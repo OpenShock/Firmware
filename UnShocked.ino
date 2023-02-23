@@ -9,6 +9,7 @@
 #include <numeric>
 #include <map>
 #include <TaskScheduler.h>
+#include <ArduinoJson.h>
 
 
 const char* ssid     = "Luc-H";         // The SSID (name) of the Wi-Fi network you want to connect to
@@ -21,9 +22,9 @@ TaskHandle_t Task1;
 #define USE_SERIAL Serial
 
 struct command_t {
-  uint shockerId;
-  uint method;
-  uint intensity;
+  uint16_t shockerId;
+  uint8_t method;
+  uint8_t intensity;
   uint duration;
   std::vector<rmt_data_t> sequence;
   ulong until;
@@ -44,6 +45,39 @@ void hexdump(const void *mem, uint32_t len, uint8_t cols = 16) {
 	USE_SERIAL.printf("\n");
 }
 
+void ParseJson(uint8_t* payload) {
+  DynamicJsonDocument doc(1024);
+  deserializeJson(doc, payload);
+  int type = doc["ResponseType"];
+
+  Serial.print("Got response type: ");
+  Serial.println(type);
+
+  switch(type) {
+    case 0:
+        ControlCommand(doc);
+        break;
+  }
+}
+
+
+void ControlCommand(DynamicJsonDocument& doc) {
+    auto data = doc["Data"];
+    for(int it = 0; it < data.size(); it++) {
+      auto cur = data[it];
+        Serial.print("Index: ");
+        Serial.println(it);
+        uint16_t id = static_cast<uint16_t>(cur["Id"]);
+        uint8_t type = static_cast<uint8_t>(cur["Type"]);
+        uint8_t intensity = static_cast<uint8_t>(cur["Intensity"]);
+        int duration = static_cast<unsigned int>(cur["Duration"]);
+
+        IntakeCommand(id, type, intensity, duration);
+    }
+  
+}
+
+
 void webSocketEvent(WStype_t type, uint8_t * payload, size_t length) {
 
 
@@ -61,9 +95,11 @@ void webSocketEvent(WStype_t type, uint8_t * payload, size_t length) {
             break;
         case WStype_TEXT:
             USE_SERIAL.printf("[WSc] get text: %s\n", payload);
-            //IntakeCommand(3068, 2, 50, 5000);
-            //IntakeCommand(3045, 2, 50, 2500);
-            IntakeCommand(999999, 2, 50, 2500);
+            ParseJson(payload);
+
+            //IntakeCommand(3068, 2, 25, 2500);
+            //IntakeCommand(3045, 2, 25, 2500);
+            //IntakeCommand(999999, 2, 50, 2500);
 
 			// send message to server
 			// webSocket.sendTXT("message here");
@@ -111,7 +147,7 @@ void setup() {
 
         Serial.println(millis());
 
-      for(uint8_t t = 4; t > 0; t--) {
+      for(uint8_t t = 2; t > 0; t--) {
           USE_SERIAL.printf("[SETUP] BOOT WAIT %d...\n", t);
           USE_SERIAL.flush();
           delay(1000);
@@ -143,7 +179,7 @@ void setup() {
 
   	
 
-    webSocket.beginSSL("10.0.0.4", 443, "/test");
+    webSocket.beginSSL("10.0.0.4", 443, "/1/ws/device");
     webSocket.onEvent(webSocketEvent);
     
 
@@ -198,9 +234,9 @@ std::vector<rmt_data_t> to_rmt_data(const std::vector<uint8_t>& data) {
     return pulses;
 }
 
-std::vector<rmt_data_t> GetSequence(unsigned int shockerId, unsigned int method, unsigned int intensity) {
+std::vector<rmt_data_t> GetSequence(uint16_t shockerId, uint8_t method, uint8_t intensity) {
     std::vector<uint8_t> data = {
-        (shockerId & 0xFF00) >> 8,
+        (shockerId >> 8) & 0xFF,
         shockerId & 0xFF,
         method,
         intensity
@@ -212,8 +248,9 @@ std::vector<rmt_data_t> GetSequence(unsigned int shockerId, unsigned int method,
     return to_rmt_data(data);
 }
 
-void IntakeCommand(uint shockerId, uint method, uint intensity, uint duration) {
-    if(Commands.count(shockerId) > 0) {
+void IntakeCommand(uint16_t shockerId, uint8_t method, uint8_t intensity, uint duration) {
+    if(Commands.count(shockerId) > 0 && Commands[shockerId].until >= millis()) {
+
       // FIXME: Callback in websocket to informat about busy shocker.
       return;
     }
@@ -229,22 +266,22 @@ void IntakeCommand(uint shockerId, uint method, uint intensity, uint duration) {
       millis() + duration
     };
     Commands[shockerId] = cmd;
-
+    Serial.print("Commands in loop: ");
+    Serial.println(Commands.size());
 }
 
 void RmtLoop() {
+
     if(Commands.size() <= 0) {
       return;
     }
 
     std::vector<rmt_data_t> sequence;
 
-    Serial.println(Commands.size());
-
     for (auto& it : Commands) {
 
         if(it.second.until <= millis()) {
-          Commands.erase(it.first);
+          //Commands.erase(it.first);
           continue;
         }
         sequence.insert(sequence.end(), it.second.sequence.begin(), it.second.sequence.end());
@@ -253,12 +290,10 @@ void RmtLoop() {
     std::size_t finalSize = sequence.size();
 
     if(finalSize <= 0) {
-      Serial.print("Return with ");
-      Serial.println(finalSize);
       return;
     }
 
-    Serial.print(finalSize);
+    Serial.print("=>");
 
     rmt_data_t* arr = new rmt_data_t[finalSize];
     std::copy(sequence.begin(), sequence.end(), arr);
