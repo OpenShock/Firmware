@@ -31,6 +31,7 @@ struct command_t {
 };
 
 std::map<uint, command_t> Commands;
+rmt_obj_t* rmt_send = NULL;
 
 void hexdump(const void *mem, uint32_t len, uint8_t cols = 16) {
 	const uint8_t* src = (const uint8_t*) mem;
@@ -45,20 +46,90 @@ void hexdump(const void *mem, uint32_t len, uint8_t cols = 16) {
 	USE_SERIAL.printf("\n");
 }
 
-void ParseJson(uint8_t* payload) {
-  DynamicJsonDocument doc(1024);
-  deserializeJson(doc, payload);
-  int type = doc["ResponseType"];
+rmt_data_t startBit = {
+  1400,
+  1,
+  800,
+  0
+};
 
-  Serial.print("Got response type: ");
-  Serial.println(type);
+rmt_data_t oneBit = {
+    800,
+    1,
+    300,
+    0
+};
 
-  switch(type) {
-    case 0:
-        ControlCommand(doc);
-        break;
-  }
+rmt_data_t zeroBit = {
+    300,
+    1,
+    800,
+    0
+};
+
+std::vector<rmt_data_t> to_rmt_data(const std::vector<uint8_t>& data) {
+    std::vector<rmt_data_t> pulses;
+
+    pulses.push_back(startBit);
+
+    for (auto byte : data) {
+      std::bitset<8> bits(byte);
+        for (int bit_pos = 7; bit_pos >= 0; --bit_pos) {
+
+          if(bits[bit_pos]) {
+            pulses.push_back(oneBit);
+          } else {
+            pulses.push_back(zeroBit);
+          }
+        }
+    }
+
+    for (int i = 0; i < 3; ++i) {
+        pulses.push_back(zeroBit);
+    }
+
+    return pulses;
 }
+
+
+
+std::vector<rmt_data_t> GetSequence(uint16_t shockerId, uint8_t method, uint8_t intensity) {
+    std::vector<uint8_t> data = {
+        (shockerId >> 8) & 0xFF,
+        shockerId & 0xFF,
+        method,
+        intensity
+    };
+
+    int checksum = std::accumulate(data.begin(), data.end(), 0) & 0xff;
+    data.push_back(checksum);
+
+    return to_rmt_data(data);
+}
+
+void IntakeCommand(uint16_t shockerId, uint8_t method, uint8_t intensity, uint duration) {
+    if(Commands.count(shockerId) > 0 && Commands[shockerId].until >= millis()) {
+
+      // FIXME: Callback in websocket to informat about busy shocker.
+      return;
+    }
+
+    std::vector<rmt_data_t> rmtData = GetSequence(shockerId, method, intensity);
+
+    command_t cmd = {
+      shockerId,
+      method,
+      intensity,
+      duration,
+      rmtData,
+      millis() + duration
+    };
+    Commands[shockerId] = cmd;
+    Serial.print("Commands in loop: ");
+    Serial.println(Commands.size());
+}
+
+
 
 
 void ControlCommand(DynamicJsonDocument& doc) {
@@ -76,6 +147,22 @@ void ControlCommand(DynamicJsonDocument& doc) {
     }
   
 }
+
+void ParseJson(uint8_t* payload) {
+  DynamicJsonDocument doc(1024);
+  deserializeJson(doc, payload);
+  int type = doc["ResponseType"];
+
+  Serial.print("Got response type: ");
+  Serial.println(type);
+
+  switch(type) {
+    case 0:
+        ControlCommand(doc);
+        break;
+  }
+}
+
 
 
 void webSocketEvent(WStype_t type, uint8_t * payload, size_t length) {
@@ -123,8 +210,39 @@ void webSocketEvent(WStype_t type, uint8_t * payload, size_t length) {
 
 
 
+void RmtLoop() {
 
-rmt_obj_t* rmt_send = NULL;
+    if(Commands.size() <= 0) {
+      return;
+    }
+
+    std::vector<rmt_data_t> sequence;
+
+    for (auto& it : Commands) {
+
+        if(it.second.until <= millis()) {
+          //Commands.erase(it.first);
+          continue;
+        }
+        sequence.insert(sequence.end(), it.second.sequence.begin(), it.second.sequence.end());
+    }
+
+    std::size_t finalSize = sequence.size();
+
+    if(finalSize <= 0) {
+      return;
+    }
+
+    Serial.print("=>");
+
+    rmt_data_t* arr = new rmt_data_t[finalSize];
+    std::copy(sequence.begin(), sequence.end(), arr);
+    rmtWriteBlocking(rmt_send, arr, finalSize);
+    delete[] arr;
+}
+
+
+
 
 void Task1code( void * parameter) {
     Serial.print("Task2 running on core ");
@@ -187,116 +305,4 @@ void setup() {
 
 void loop() {
     webSocket.loop();
-}
-
-rmt_data_t startBit = {
-  1400,
-  1,
-  800,
-  0
-};
-
-rmt_data_t oneBit = {
-    800,
-    1,
-    300,
-    0
-};
-
-rmt_data_t zeroBit = {
-    300,
-    1,
-    800,
-    0
-};
-
-std::vector<rmt_data_t> to_rmt_data(const std::vector<uint8_t>& data) {
-    std::vector<rmt_data_t> pulses;
-
-    pulses.push_back(startBit);
-
-    for (auto byte : data) {
-      std::bitset<8> bits(byte);
-        for (int bit_pos = 7; bit_pos >= 0; --bit_pos) {
-
-          if(bits[bit_pos]) {
-            pulses.push_back(oneBit);
-          } else {
-            pulses.push_back(zeroBit);
-          }
-        }
-    }
-
-    for (int i = 0; i < 3; ++i) {
-        pulses.push_back(zeroBit);
-    }
-
-    return pulses;
-}
-
-std::vector<rmt_data_t> GetSequence(uint16_t shockerId, uint8_t method, uint8_t intensity) {
-    std::vector<uint8_t> data = {
-        (shockerId >> 8) & 0xFF,
-        shockerId & 0xFF,
-        method,
-        intensity
-    };
-
-    int checksum = std::accumulate(data.begin(), data.end(), 0) & 0xff;
-    data.push_back(checksum);
-
-    return to_rmt_data(data);
-}
-
-void IntakeCommand(uint16_t shockerId, uint8_t method, uint8_t intensity, uint duration) {
-    if(Commands.count(shockerId) > 0 && Commands[shockerId].until >= millis()) {
-
-      // FIXME: Callback in websocket to informat about busy shocker.
-      return;
-    }
-
-    std::vector<rmt_data_t> rmtData = GetSequence(shockerId, method, intensity);
-
-    command_t cmd = {
-      shockerId,
-      method,
-      intensity,
-      duration,
-      rmtData,
-      millis() + duration
-    };
-    Commands[shockerId] = cmd;
-    Serial.print("Commands in loop: ");
-    Serial.println(Commands.size());
-}
-
-void RmtLoop() {
-
-    if(Commands.size() <= 0) {
-      return;
-    }
-
-    std::vector<rmt_data_t> sequence;
-
-    for (auto& it : Commands) {
-
-        if(it.second.until <= millis()) {
-          //Commands.erase(it.first);
-          continue;
-        }
-        sequence.insert(sequence.end(), it.second.sequence.begin(), it.second.sequence.end());
-    }
-
-    std::size_t finalSize = sequence.size();
-
-    if(finalSize <= 0) {
-      return;
-    }
-
-    Serial.print("=>");
-
-    rmt_data_t* arr = new rmt_data_t[finalSize];
-    std::copy(sequence.begin(), sequence.end(), arr);
-    rmtWriteBlocking(rmt_send, arr, finalSize);
-    delete[] arr;
 }
