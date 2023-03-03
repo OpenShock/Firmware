@@ -29,20 +29,6 @@ struct command_t {
 std::map<uint, command_t> Commands;
 rmt_obj_t* rmt_send = NULL;
 
-void hexdump(const void *mem, uint32_t len, uint8_t cols = 16) {
-	const uint8_t* src = (const uint8_t*) mem;
-	Serial.printf("\n[HEXDUMP] Address: 0x%08X len: 0x%X (%d)", (ptrdiff_t)src, len, len);
-	for(uint32_t i = 0; i < len; i++) {
-		if(i % cols == 0) {
-			Serial.printf("\n[0x%08X] 0x%08X: ", (ptrdiff_t)src, i);
-		}
-		Serial.printf("%02X ", *src);
-		src++;
-	}
-	Serial.printf("\n");
-}
-
-
 void IntakeCommand(uint16_t shockerId, uint8_t method, uint8_t intensity, uint duration) {
     if(Commands.count(shockerId) > 0 && Commands[shockerId].until >= millis()) {
 
@@ -96,6 +82,18 @@ void ParseJson(uint8_t* payload) {
   }
 }
 
+void SendKeepAlive() {
+    if(!webSocket.isConnected()) {
+        Serial.println("WebSocket is not connected, not sending keep alive onloine state");
+        return;
+    } 
+    Serial.println("Sending keep alive online state");
+    webSocket.sendTXT("{\"requestType\": 0}");
+}
+
+Task keepalive(30000, TASK_FOREVER, &SendKeepAlive);
+Scheduler runner;
+
 void webSocketEvent(WStype_t type, uint8_t * payload, size_t length) {
 
 
@@ -106,6 +104,7 @@ void webSocketEvent(WStype_t type, uint8_t * payload, size_t length) {
         case WStype_CONNECTED:
             {
                 Serial.printf("[WSc] Connected to url: %s\n",  payload);
+                SendKeepAlive();
 
 			    // send message to server when Connected
 				webSocket.sendTXT("Connected");
@@ -115,19 +114,10 @@ void webSocketEvent(WStype_t type, uint8_t * payload, size_t length) {
             Serial.printf("[WSc] get text: %s\n", payload);
             ParseJson(payload);
 
-            //IntakeCommand(3068, 2, 25, 2500);
-            //IntakeCommand(3045, 2, 25, 2500);
-            //IntakeCommand(999999, 2, 50, 2500);
-
-			// send message to server
-			// webSocket.sendTXT("message here");
+            SendKeepAlive();
             break;
         case WStype_BIN:
             Serial.printf("[WSc] get binary length: %u\n", length);
-            hexdump(payload, length);
-
-            // send data to server
-            // webSocket.sendBIN(payload, length);
             break;
 		case WStype_ERROR:			
 		case WStype_FRAGMENT_TEXT_START:
@@ -138,8 +128,6 @@ void webSocketEvent(WStype_t type, uint8_t * payload, size_t length) {
     }
 
 }
-
-
 
 void RmtLoop() {
 
@@ -172,9 +160,6 @@ void RmtLoop() {
     delete[] arr;
 }
 
-
-
-
 void Task1code( void * parameter) {
     Serial.print("Task2 running on core ");
     Serial.println(xPortGetCoreID());
@@ -192,13 +177,13 @@ void setup() {
     Serial.println();
     Serial.println();
 
-        Serial.println(millis());
+    Serial.println(millis());
 
-      for(uint8_t t = 2; t > 0; t--) {
+    for(uint8_t t = 2; t > 0; t--) {
           Serial.printf("[SETUP] BOOT WAIT %d...\n", t);
           Serial.flush();
-          delay(1000);
-      }
+         delay(1000);
+    }
 
     xTaskCreate(
           Task1code, /* Function to implement the task */
@@ -226,12 +211,14 @@ void setup() {
 
   	
 
+    webSocket.setExtraHeaders("DeviceToken: 3Bi7vPOr5YWIngZqJm81lg8eY2REVEyBTa63J89Xvut0EUKL0p7BtkFIhEMEQJya7xddu2iSyFhIIGy0fiMtgKYpHSvQkUmSTL6AiRArYz0ZJC2ykWhmFHMh28kDKJnBhtaNYaA5xvlRWCfR942ROocjJdaA7StHmrVMCWoO51HDNwGreN48ntnxFbRzrCF5m3Svc6Hr0iGeRcAnWve1ZjgIJMYVqz95qpEG0VXPeS6ppPt0H6fjuW8LuFmzuX10");
     webSocket.beginSSL("10.0.0.4", 443, "/1/ws/device");
     webSocket.onEvent(webSocketEvent);
-    
-
+    runner.addTask(keepalive);
+    keepalive.enable();
 }
 
 void loop() {
     webSocket.loop();
+    runner.execute();
 }
