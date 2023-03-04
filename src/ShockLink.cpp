@@ -9,6 +9,7 @@
 #include <TaskScheduler.h>
 #include <ArduinoJson.h>
 #include "RmtControl.h"
+#include <algorithm>
 
 const char* ssid     = "Luc-H";         // The SSID (name) of the Wi-Fi network you want to connect to
 const char* password = "LucNetworkPw12";     // The password of the Wi-Fi network
@@ -57,9 +58,10 @@ void ControlCommand(DynamicJsonDocument& doc) {
       auto cur = data[it];
         Serial.print("Index: ");
         Serial.println(it);
+        uint8_t minval = 99;
         uint16_t id = static_cast<uint16_t>(cur["Id"]);
         uint8_t type = static_cast<uint8_t>(cur["Type"]);
-        uint8_t intensity = static_cast<uint8_t>(cur["Intensity"]);
+        uint8_t intensity = std::min(static_cast<uint8_t>(cur["Intensity"]), minval);
         int duration = static_cast<unsigned int>(cur["Duration"]);
 
         IntakeCommand(id, type, intensity, duration);
@@ -105,9 +107,6 @@ void webSocketEvent(WStype_t type, uint8_t * payload, size_t length) {
             {
                 Serial.printf("[WSc] Connected to url: %s\n",  payload);
                 SendKeepAlive();
-
-			    // send message to server when Connected
-				webSocket.sendTXT("Connected");
             }
             break;
         case WStype_TEXT:
