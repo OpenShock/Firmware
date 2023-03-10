@@ -50,5 +50,6 @@
         "streambuf": "cpp",
         "cinttypes": "cpp",
         "typeinfo": "cpp"
-    }
+    },
+    "cmake.sourceDirectory": "${workspaceFolder}/.pio/libdeps/az-delivery-devkit-v4/ArduinoJson"
 }

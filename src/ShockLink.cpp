@@ -13,6 +13,8 @@
 
 const char* ssid     = "Luc-H";         // The SSID (name) of the Wi-Fi network you want to connect to
 const char* password = "LucNetworkPw12";     // The password of the Wi-Fi network
+const char* deviceToken = "DeviceToken: lIGkfkv7LzpVyakWowOG6NNn72dNRMAsE1Hi3Mux25QpP41nnzYBBD9GwNIQNLMcaRV7NVyxLZAfHrBqmDt1yshpQS8ntlilswCLi0g2A7tjjuseQegDwXi48BRfsboPP0ZiI1XgWUuGN1dMSvjp1aUQWCBu0FoCNheBng6IJ02snmX2QIMuGKXSquqytbh07YbwCUt7lg0HfWMzam7yjLsdN2rtuM27dlJdCfMCSRi90FAak04U1tfzNZKzvFWB";
+const char* apiUrl = "api.shocklink.net";
 
 WiFiMulti WiFiMulti;
 WebSocketsClient webSocket;
@@ -48,16 +50,12 @@ void IntakeCommand(uint16_t shockerId, uint8_t method, uint8_t intensity, uint d
       millis() + duration
     };
     Commands[shockerId] = cmd;
-    Serial.print("Commands in loop: ");
-    Serial.println(Commands.size());
 }
 
 void ControlCommand(DynamicJsonDocument& doc) {
     auto data = doc["Data"];
     for(int it = 0; it < data.size(); it++) {
       auto cur = data[it];
-        Serial.print("Index: ");
-        Serial.println(it);
         uint8_t minval = 99;
         uint16_t id = static_cast<uint16_t>(cur["Id"]);
         uint8_t type = static_cast<uint8_t>(cur["Type"]);
@@ -73,9 +71,6 @@ void ParseJson(uint8_t* payload) {
   DynamicJsonDocument doc(1024);
   deserializeJson(doc, payload);
   int type = doc["ResponseType"];
-
-  Serial.print("Got response type: ");
-  Serial.println(type);
 
   switch(type) {
     case 0:
@@ -112,8 +107,6 @@ void webSocketEvent(WStype_t type, uint8_t * payload, size_t length) {
         case WStype_TEXT:
             Serial.printf("[WSc] get text: %s\n", payload);
             ParseJson(payload);
-
-            SendKeepAlive();
             break;
         case WStype_BIN:
             Serial.printf("[WSc] get binary length: %u\n", length);
@@ -176,14 +169,6 @@ void setup() {
     Serial.println();
     Serial.println();
 
-    Serial.println(millis());
-
-    for(uint8_t t = 2; t > 0; t--) {
-          Serial.printf("[SETUP] BOOT WAIT %d...\n", t);
-          Serial.flush();
-         delay(1000);
-    }
-
     xTaskCreate(
           Task1code, /* Function to implement the task */
           "Task1", /* Name of the task */
@@ -199,8 +184,8 @@ void setup() {
         delay(100);
     }
 
-
     if ((rmt_send = rmtInit(13, RMT_TX_MODE, RMT_MEM_64)) == NULL)
+    //if ((rmt_send = rmtInit(15, RMT_TX_MODE, RMT_MEM_64)) == NULL)
     {
         Serial.println("init sender failed\n");
     }
@@ -208,10 +193,8 @@ void setup() {
     float realTick = rmtSetTick(rmt_send, 1000);
     Serial.printf("real tick set to: %fns\n", realTick);
 
-  	
-
-    webSocket.setExtraHeaders("DeviceToken: 3Bi7vPOr5YWIngZqJm81lg8eY2REVEyBTa63J89Xvut0EUKL0p7BtkFIhEMEQJya7xddu2iSyFhIIGy0fiMtgKYpHSvQkUmSTL6AiRArYz0ZJC2ykWhmFHMh28kDKJnBhtaNYaA5xvlRWCfR942ROocjJdaA7StHmrVMCWoO51HDNwGreN48ntnxFbRzrCF5m3Svc6Hr0iGeRcAnWve1ZjgIJMYVqz95qpEG0VXPeS6ppPt0H6fjuW8LuFmzuX10");
-    webSocket.beginSSL("10.0.0.4", 443, "/1/ws/device");
+    webSocket.setExtraHeaders(deviceToken);
+    webSocket.beginSSL(apiUrl, 443, "/1/ws/device");
     webSocket.onEvent(webSocketEvent);
     runner.addTask(keepalive);
     keepalive.enable();
