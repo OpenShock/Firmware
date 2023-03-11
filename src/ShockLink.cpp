@@ -132,26 +132,18 @@ void webSocketEvent(WStype_t type, uint8_t * payload, size_t length) {
 
 void RmtLoop() {
 
-    if(Commands.size() <= 0) {
-      return;
-    }
+    if(Commands.size() <= 0) return;
 
     std::vector<rmt_data_t> sequence;
-
+    long mil = millis();
     for (auto& it : Commands) {
-
-        if(it.second.until <= millis()) {
-          continue;
-        }
+        if(it.second.until <= mil) continue;
         sequence.insert(sequence.end(), it.second.sequence.begin(), it.second.sequence.end());
     }
 
     std::size_t finalSize = sequence.size();
-
-    if(finalSize <= 0) {
-      return;
-    }
-
+    if(finalSize <= 0) return;
+    
     Serial.print("=>");
     rmtWriteBlocking(rmt_send, sequence.data(), finalSize);
 }
