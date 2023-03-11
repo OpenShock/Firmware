@@ -15,6 +15,8 @@ const char* ssid     = "Luc-H";         // The SSID (name) of the Wi-Fi network 
 const char* password = "LucNetworkPw12";     // The password of the Wi-Fi network
 const char* deviceToken = "DeviceToken: lIGkfkv7LzpVyakWowOG6NNn72dNRMAsE1Hi3Mux25QpP41nnzYBBD9GwNIQNLMcaRV7NVyxLZAfHrBqmDt1yshpQS8ntlilswCLi0g2A7tjjuseQegDwXi48BRfsboPP0ZiI1XgWUuGN1dMSvjp1aUQWCBu0FoCNheBng6IJ02snmX2QIMuGKXSquqytbh07YbwCUt7lg0HfWMzam7yjLsdN2rtuM27dlJdCfMCSRi90FAak04U1tfzNZKzvFWB";
 const char* apiUrl = "api.shocklink.net";
+/*const char* deviceToken = "DeviceToken: circ1CeMkiQ47YChWvIWpbwMJ0GNmYcoWNmmnRRPIQGJ9QvjERoMxo2gJVR0CdEY2WDpuwyGi12c5kBJzQmvqfhhfceIWTNAvBDGV1hcTOskCRCcPQKbRmHHDvduMmIQIQfq9C0lDRxGtqJBwDMAYtsvlRHtmw4x2UieZgJSw8l0Ix1CYGc9yrzrnhIHq6k1iNBWw1KLGK9FD6oZJbiZQbgZoCnH3SFEmr06Ox2EEfdmGWY0pxV5EtsSg8cWyyiR";
+const char* apiUrl = "10.0.0.4";*/
 
 WiFiMulti WiFiMulti;
 WebSocketsClient webSocket;
@@ -81,9 +83,15 @@ void ParseJson(uint8_t* payload) {
 
 void SendKeepAlive() {
     if(!webSocket.isConnected()) {
-        Serial.println("WebSocket is not connected, not sending keep alive onloine state");
+        Serial.print("[");
+        Serial.print(millis());
+        Serial.print("] ");
+        Serial.println("WebSocket is not connected, not sending keep alive online state");
         return;
     } 
+    Serial.print("[");
+    Serial.print(millis());
+    Serial.print("] ");
     Serial.println("Sending keep alive online state");
     webSocket.sendTXT("{\"requestType\": 0}");
 }
@@ -116,6 +124,7 @@ void webSocketEvent(WStype_t type, uint8_t * payload, size_t length) {
 		case WStype_FRAGMENT_BIN_START:
 		case WStype_FRAGMENT:
 		case WStype_FRAGMENT_FIN:
+            Serial.println("[WSc] Error");
 			break;
     }
 
@@ -132,7 +141,6 @@ void RmtLoop() {
     for (auto& it : Commands) {
 
         if(it.second.until <= millis()) {
-          //Commands.erase(it.first);
           continue;
         }
         sequence.insert(sequence.end(), it.second.sequence.begin(), it.second.sequence.end());
@@ -145,11 +153,7 @@ void RmtLoop() {
     }
 
     Serial.print("=>");
-
-    rmt_data_t* arr = new rmt_data_t[finalSize];
-    std::copy(sequence.begin(), sequence.end(), arr);
-    rmtWriteBlocking(rmt_send, arr, finalSize);
-    delete[] arr;
+    rmtWriteBlocking(rmt_send, sequence.data(), finalSize);
 }
 
 void Task1code( void * parameter) {
