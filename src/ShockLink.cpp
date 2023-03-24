@@ -1,6 +1,5 @@
 #include <WiFi.h>
 #include <WiFiMulti.h>
-#include <WiFiClientSecure.h>
 #include <WebSocketsClient.h>
 #include "Arduino.h"
 #include <vector>
@@ -10,6 +9,8 @@
 #include <ArduinoJson.h>
 #include "RmtControl.h"
 #include <algorithm>
+#include "Captive.h"
+#include "SPIFFS.h"
 
 const char* ssid     = "Luc-H";         // The SSID (name) of the Wi-Fi network you want to connect to
 const char* password = "LucNetworkPw12";     // The password of the Wi-Fi network
@@ -36,7 +37,6 @@ rmt_obj_t* rmt_send = NULL;
 
 void IntakeCommand(uint16_t shockerId, uint8_t method, uint8_t intensity, uint duration) {
     if(Commands.count(shockerId) > 0 && Commands[shockerId].until >= millis()) {
-
       // FIXME: Callback in websocket to informat about busy shocker.
       return;
     }
@@ -136,7 +136,7 @@ void RmtLoop() {
 
     std::vector<rmt_data_t> sequence;
     long mil = millis();
-    for (auto& it : Commands) {
+    for (std::pair<const uint, command_t>& it : Commands) {
         if(it.second.until <= mil) continue;
         sequence.insert(sequence.end(), it.second.sequence.begin(), it.second.sequence.end());
     }
@@ -149,7 +149,7 @@ void RmtLoop() {
 }
 
 void Task1code( void * parameter) {
-    Serial.print("Task2 running on core ");
+    Serial.print("RMT loop running on core ");
     Serial.println(xPortGetCoreID());
     while(true) {
         RmtLoop();
@@ -165,20 +165,32 @@ void setup() {
     Serial.println();
     Serial.println();
 
+    if(!SPIFFS.begin(true)){
+        Serial.println("An Error has occurred while mounting SPIFFS");
+        return;
+    }
+
+    WiFiMulti.addAP(ssid, password);
+
+
+    File file = SPIFFS.open("/networks.txt", FILE_READ);
+    while(file.available()) {
+        String ssid = file.readStringUntil(',');
+        String pw = file.readStringUntil(';');
+        WiFiMulti.addAP(ssid.c_str(), pw.c_str());
+    }
+
+    Captive::StartCaptive();
+
     xTaskCreate(
-          Task1code, /* Function to implement the task */
-          "Task1", /* Name of the task */
+          Task1code, "RmtLoop",
           10000,  /* Stack size in words */
           NULL,  /* Task input parameter */
           0,  /* Priority of the task */
           &Task1  /* Task handle. */);
 
-    WiFiMulti.addAP(ssid, password);
-
-    //WiFi.disconnect();
-    while(WiFiMulti.run() != WL_CONNECTED) {
-        delay(100);
-    }
+    Serial.println("Init WiFi...");
+    WiFiMulti.run();
 
     if ((rmt_send = rmtInit(13, RMT_TX_MODE, RMT_MEM_64)) == NULL)
     //if ((rmt_send = rmtInit(15, RMT_TX_MODE, RMT_MEM_64)) == NULL)
@@ -196,7 +208,34 @@ void setup() {
     keepalive.enable();
 }
 
+unsigned long previousMillis = 0;
+unsigned long interval = 30000;
+bool firstConnect = true;
+bool reconnectedLoop = false;
+
 void loop() {
+    Serial.print(".");
+    unsigned long currentMillis = millis();
+    // if WiFi is down, try reconnecting every CHECK_WIFI_TIME seconds
+    if ((WiFi.status() != WL_CONNECTED) && (currentMillis - previousMillis >=interval)) {
+        reconnectedLoop = false;
+
+        Serial.print(millis());
+        Serial.println("Reconnecting to WiFi...");
+        WiFi.reconnect();
+        previousMillis = currentMillis;
+    } else if(!reconnectedLoop && WiFi.status() == WL_CONNECTED) {
+        reconnectedLoop = true;
+        Serial.print("Connected to wifi, ip: ");
+        Serial.println(WiFi.localIP());
+        //Captive::StopCaptive();
+    }
+
+    if(Captive::IsActive()) {
+        Captive::Loop();
+        return;
+    }
+
     webSocket.loop();
     runner.execute();
 }

@@ -1,0 +1,80 @@
+<html>
+    <body>
+        <textarea id="networks"></textarea>
+        <button id="sub">Save & restart!</button>
+
+        <div id="app">{{ message }}</div>
+    </body>
+    <script src="/js/vue.global.js"></script>
+    <script>
+        const { createApp } = Vue
+      
+        createApp({
+          data() {
+            return {
+              message: 'Hello Vue!'
+            }
+          },
+          methods: {
+            
+          }
+        }).mount('#app')
+      </script>
+    <script>
+        function microAjax(options) {
+            "use strict";
+
+            // Default to GET
+            if (!options.method) {
+                options.method = "GET";
+            }
+
+            // Default empty functions for the callbacks
+            function noop() {}
+            if (!options.success) {
+                options.success = noop;
+            }
+            if (!options.warning) {
+                options.warning = noop;
+            }
+            if (!options.error) {
+                options.error = noop;
+            }
+
+            var request = new XMLHttpRequest();
+            request.open(options.method, options.url, true);
+            request.send(options.data);
+
+            request.onload = function() {
+                // Success!
+                if (request.readyState === 4 && request.status === 200) {
+                options.success(request.responseText);
+
+                // We reached our target destination, but it returned an error
+                } else {
+                    options.warning();
+                }
+            };
+
+            // There was a connection error of some sort
+            request.onerror = options.error;
+        }
+
+        const button = document.getElementById('sub');
+
+        button.addEventListener('click', function() {
+            send();
+        });
+
+        function send() {
+            microAjax({
+                url: "/networks",
+                method: "POST",
+                data: document.getElementById('networks').value,
+                success: () => {
+                    alert('hi');
+                }
+            });
+        }
+    </script>
+</html>
