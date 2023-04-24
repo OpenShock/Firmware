@@ -2,31 +2,37 @@
 
 <body>
     <div id="app">
-        <table>
-            <thead>
-                <th>SSID</th>
-                <th>Password</th>
-                <th></th>
-            </thead>
-            <tbody>
-                <tr v-for="item in networks">
-                    <td><input v-model="item.ssid"></td>
-                    <td><input v-model="item.password"></td>
-                    <td><button @click="removeNetworks(item)">Remove</button></td>
-                </tr>
-            </tbody>
-        </table>
+        <h2>Configure WiFi & Pair code</h2>
+        <div class="table-wrapper">
+            <table class="fl-table">
+                <thead>
+                    <th>SSID</th>
+                    <th>Password</th>
+                    <th style="width: 0"></th>
+                </thead>
+                <tbody>
+                    <tr v-for="item in networks">
+                        <td><input v-model="item.ssid"></td>
+                        <td><input v-model="item.password"></td>
+                        <td><button @click="removeNetworks(item)">&#128465;</button></td>
+                    </tr>
+                    <tr>
+                        <td><input placeholder="Enter ssid/name of your network..." v-model="ssid"></td>
+                        <td><input placeholder="Type your password..." v-model="password"></td>
+                        <td><button @click="addNetwork">&#10133;</button></td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
 
-        <label for="ssid">SSID: </label>
-        <input v-model="ssid" id="ssid">
+        <div class="pair-code">
+            <input v-model="pairCode" placeholder="Pair code">
+        </div>
 
-        <label for="password">Password: </label>
-        <input v-model="password" id="password">
-        <button @click="addNetwork">Add Network</button>
-
-
-        <button @click="send">Save & restart!</button>
+        <button style="float:right;" @click="send" class="button"><span>Save</span></button>
+        <button style="float:right;" @click="reset" class="button"><span>Restart!</span></button>
     </div>
+
 </body>
 <script src="/js/vue.global.js"></script>
 
@@ -79,7 +85,8 @@
             return {
                 networks: [],
                 ssid: "",
-                password: ""
+                password: "",
+                pairCode: ""
             }
         },
         beforeMount() {
@@ -87,10 +94,11 @@
         },
         methods: {
             send() {
+                this.sendPairCode();
                 this.sendNetworks();
             },
             addNetwork() {
-                if(this.ssid === undefined || this.password == undefined || this.ssid === "") return;
+                if (this.ssid === undefined || this.password == undefined || this.ssid === "") return;
                 this.networks.push({
                     ssid: this.ssid,
                     password: this.password
@@ -116,6 +124,19 @@
                     }
                 });
             },
+            reset() {
+                microAjax({
+                    url: "/reset",
+                    method: "POST"
+                });
+            },
+            sendPairCode() {
+                microAjax({
+                    url: "/pairCode",
+                    method: "POST",
+                    data: this.pairCode
+                });
+            },
             sendNetworks() {
                 var data = "";
                 this.networks.forEach(it => {
@@ -125,10 +146,7 @@
                 microAjax({
                     url: "/networks",
                     method: "POST",
-                    data: data,
-                    success: () => {
-                        alert('hi');
-                    }
+                    data: data
                 });
             },
             removeNetworks(item) {
@@ -140,6 +158,6 @@
         }
     }).mount('#app')
 </script>
-
+<link rel="stylesheet" type="text/css" href="/css/main.css" />
 
 </html>
