@@ -170,8 +170,9 @@ void setup() {
         return;
     }
 
-    WiFiMulti.addAP(ssid, password);
+    WiFi.mode(WIFI_AP_STA);
 
+    WiFiMulti.addAP(ssid, password);
 
     File file = SPIFFS.open("/networks.txt", FILE_READ);
     while(file.available()) {
@@ -180,6 +181,7 @@ void setup() {
         WiFiMulti.addAP(ssid.c_str(), pw.c_str());
     }
 
+    Captive::Setup();
     Captive::StartCaptive();
 
     xTaskCreate(
@@ -214,7 +216,7 @@ bool firstConnect = true;
 bool reconnectedLoop = false;
 
 void loop() {
-    Serial.print(".");
+    //Serial.print(".");
     unsigned long currentMillis = millis();
     // if WiFi is down, try reconnecting every CHECK_WIFI_TIME seconds
     if ((WiFi.status() != WL_CONNECTED) && (currentMillis - previousMillis >=interval)) {

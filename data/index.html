@@ -1,80 +1,145 @@
 <html>
-    <body>
-        <textarea id="networks"></textarea>
-        <button id="sub">Save & restart!</button>
 
-        <div id="app">{{ message }}</div>
-    </body>
-    <script src="/js/vue.global.js"></script>
-    <script>
-        const { createApp } = Vue
-      
-        createApp({
-          data() {
-            return {
-              message: 'Hello Vue!'
-            }
-          },
-          methods: {
-            
-          }
-        }).mount('#app')
-      </script>
-    <script>
-        function microAjax(options) {
-            "use strict";
+<body>
+    <div id="app">
+        <table>
+            <thead>
+                <th>SSID</th>
+                <th>Password</th>
+                <th></th>
+            </thead>
+            <tbody>
+                <tr v-for="item in networks">
+                    <td><input v-model="item.ssid"></td>
+                    <td><input v-model="item.password"></td>
+                    <td><button @click="removeNetworks(item)">Remove</button></td>
+                </tr>
+            </tbody>
+        </table>
 
-            // Default to GET
-            if (!options.method) {
-                options.method = "GET";
-            }
+        <label for="ssid">SSID: </label>
+        <input v-model="ssid" id="ssid">
 
-            // Default empty functions for the callbacks
-            function noop() {}
-            if (!options.success) {
-                options.success = noop;
-            }
-            if (!options.warning) {
-                options.warning = noop;
-            }
-            if (!options.error) {
-                options.error = noop;
-            }
+        <label for="password">Password: </label>
+        <input v-model="password" id="password">
+        <button @click="addNetwork">Add Network</button>
 
-            var request = new XMLHttpRequest();
-            request.open(options.method, options.url, true);
-            request.send(options.data);
 
-            request.onload = function() {
-                // Success!
-                if (request.readyState === 4 && request.status === 200) {
+        <button @click="send">Save & restart!</button>
+    </div>
+</body>
+<script src="/js/vue.global.js"></script>
+
+<script>
+    function microAjax(options) {
+        "use strict";
+
+        // Default to GET
+        if (!options.method) {
+            options.method = "GET";
+        }
+
+        // Default empty functions for the callbacks
+        function noop() { }
+        if (!options.success) {
+            options.success = noop;
+        }
+        if (!options.warning) {
+            options.warning = noop;
+        }
+        if (!options.error) {
+            options.error = noop;
+        }
+
+        var request = new XMLHttpRequest();
+        request.open(options.method, options.url, true);
+        request.send(options.data);
+
+        request.onload = function () {
+            // Success!
+            if (request.readyState === 4 && request.status === 200) {
                 options.success(request.responseText);
 
                 // We reached our target destination, but it returned an error
-                } else {
-                    options.warning();
+            } else {
+                options.warning();
+            }
+        };
+
+        // There was a connection error of some sort
+        request.onerror = options.error;
+    }
+</script>
+
+<script>
+    const { createApp } = Vue
+
+    createApp({
+        data() {
+            return {
+                networks: [],
+                ssid: "",
+                password: ""
+            }
+        },
+        beforeMount() {
+            this.getNetworks();
+        },
+        methods: {
+            send() {
+                this.sendNetworks();
+            },
+            addNetwork() {
+                if(this.ssid === undefined || this.password == undefined || this.ssid === "") return;
+                this.networks.push({
+                    ssid: this.ssid,
+                    password: this.password
+                });
+            },
+            getNetworks() {
+                microAjax({
+                    url: "/networks",
+                    method: "GET",
+                    success: (data) => {
+                        nets = [];
+                        data.split(';').forEach(it => {
+                            if (it !== undefined && it !== "") {
+                                const splitted = it.split(',');
+                                nets.push({
+                                    ssid: splitted[0],
+                                    password: splitted[1]
+                                });
+                            }
+                        });
+
+                        this.networks = nets;
+                    }
+                });
+            },
+            sendNetworks() {
+                var data = "";
+                this.networks.forEach(it => {
+                    data += it.ssid + "," + it.password + ";"
+                });
+
+                microAjax({
+                    url: "/networks",
+                    method: "POST",
+                    data: data,
+                    success: () => {
+                        alert('hi');
+                    }
+                });
+            },
+            removeNetworks(item) {
+                var index = this.networks.indexOf(item);
+                if (index !== -1) {
+                    this.networks.splice(index, 1);
                 }
-            };
-
-            // There was a connection error of some sort
-            request.onerror = options.error;
+            }
         }
+    }).mount('#app')
+</script>
 
-        const button = document.getElementById('sub');
 
-        button.addEventListener('click', function() {
-            send();
-        });
-
-        function send() {
-            microAjax({
-                url: "/networks",
-                method: "POST",
-                data: document.getElementById('networks').value,
-                success: () => {
-                    alert('hi');
-                }
-            });
-        }
-    </script>
 </html>

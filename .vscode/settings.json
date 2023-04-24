@@ -50,7 +50,8 @@
         "streambuf": "cpp",
         "cinttypes": "cpp",
         "typeinfo": "cpp",
-        "networks.c": "cpp"
+        "networks.c": "cpp",
+        "regex": "cpp"
     },
     "cmake.sourceDirectory": "${workspaceFolder}/.pio/libdeps/az-delivery-devkit-v4/ArduinoJson"
 }
