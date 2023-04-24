@@ -43,6 +43,11 @@ namespace Captive
     server.serveStatic("/", SPIFFS, "/").setDefaultFile("index.html");
     server.onRequestBody(handleBody);
 
+    server.on("/reset", HTTP_POST, [] (AsyncWebServerRequest *request) {
+        request->send(200, "text/plain", "Resetting...");
+        ESP.restart();
+    });
+
     server.on("/networks", HTTP_GET, [] (AsyncWebServerRequest *request) {
         File file = SPIFFS.open("/networks.txt", FILE_READ);
         request->send(200, "text/plain", file.readString().c_str());
