@@ -26,7 +26,13 @@
         </div>
 
         <div class="pair-code">
-            <input v-model="pairCode" placeholder="Pair code">
+            <label for="pair-code">Pair code</label>
+            <input id="pair-code" v-model="pairCode" placeholder="Pair code">
+        </div>
+
+        <div class="rmt-pin">
+            <label for="rmt-pin">RMT Pin</label>
+            <input id="rmt-pin" type="number" v-model="rmtPin" placeholder="RMT Pin">
         </div>
 
         <button style="float:right;" @click="send" class="button"><span>Save</span></button>
@@ -86,7 +92,8 @@
                 networks: [],
                 ssid: "",
                 password: "",
-                pairCode: ""
+                pairCode: "",
+                rmtPin: 0
             }
         },
         beforeMount() {
@@ -96,6 +103,7 @@
             send() {
                 this.sendPairCode();
                 this.sendNetworks();
+                this.sendRmtPin();
             },
             addNetwork() {
                 if (this.ssid === undefined || this.password == undefined || this.ssid === "") return;
@@ -130,7 +138,16 @@
                     method: "POST"
                 });
             },
+            sendRmtPin() {
+                if(this.rmtPin === undefined || this.rmtPin === "") return;
+                microAjax({
+                    url: "/rmtPin",
+                    method: "POST",
+                    data: this.rmtPin
+                });
+            },
             sendPairCode() {
+                if(this.pairCode === undefined || this.pairCode === "") return;
                 microAjax({
                     url: "/pairCode",
                     method: "POST",

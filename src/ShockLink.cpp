@@ -13,14 +13,11 @@
 #include "SPIFFS.h"
 #include "HTTPClient.h"
 
-const char *ssid = "Luc-H";
-const char *password = "LucNetworkPw12";
 const String apiUrl = "api.shocklink.net";
 
 WiFiMulti WiFiMulti;
 WebSocketsClient webSocket;
 TaskHandle_t Task1;
-bool operational = false;
 
 struct command_t
 {
@@ -79,9 +76,9 @@ void ParseJson(uint8_t *payload)
 
     switch (type)
     {
-    case 0:
-        ControlCommand(doc);
-        break;
+        case 0:
+            ControlCommand(doc);
+            break;
     }
 }
 
@@ -105,20 +102,23 @@ void SendKeepAlive()
 Task keepalive(30000, TASK_FOREVER, &SendKeepAlive);
 Scheduler runner;
 
+bool firstWebSocketConnect = true;
+
 void webSocketEvent(WStype_t type, uint8_t *payload, size_t length)
 {
-
     switch (type)
     {
     case WStype_DISCONNECTED:
         Serial.printf("[WSc] Disconnected!\n");
         break;
     case WStype_CONNECTED:
-    {
+        if (firstWebSocketConnect)
+            Captive::StopCaptive();
         Serial.printf("[WSc] Connected to url: %s\n", payload);
         SendKeepAlive();
-    }
-    break;
+
+        firstWebSocketConnect = false;
+        break;
     case WStype_TEXT:
         Serial.printf("[WSc] get text: %s\n", payload);
         ParseJson(payload);
@@ -138,7 +138,6 @@ void webSocketEvent(WStype_t type, uint8_t *payload, size_t length)
 
 void RmtLoop()
 {
-
     if (Commands.size() <= 0)
         return;
 
@@ -178,6 +177,7 @@ void setup()
     Serial.println();
     Serial.println();
     Serial.println();
+    Serial.println("==== ShockLink v 0.5.0.1 ====");
 
     if (!SPIFFS.begin(true))
     {
@@ -187,9 +187,7 @@ void setup()
 
     WiFi.mode(WIFI_AP_STA);
 
-    WiFiMulti.addAP(ssid, password);
-
-    File file = SPIFFS.open("/networks.txt", FILE_READ);
+    File file = SPIFFS.open("/networks", FILE_READ);
     while (file.available())
     {
         String ssid = file.readStringUntil(',');
@@ -204,11 +202,21 @@ void setup()
     Serial.println("Init WiFi...");
     WiFiMulti.run();
 
-    if (!SPIFFS.exists("/authToken.txt"))
+    if (!SPIFFS.exists("/authToken"))
         return;
 
-    if ((rmt_send = rmtInit(13, RMT_TX_MODE, RMT_MEM_64)) == NULL)
-    // if ((rmt_send = rmtInit(15, RMT_TX_MODE, RMT_MEM_64)) == NULL)
+    int rmtPin = 15;
+
+    if (SPIFFS.exists("/rmtPin"))
+    {
+        File rmtPinFile = SPIFFS.open("/rmtPin", FILE_READ);
+        rmtPin = rmtPinFile.readString().toInt();
+        rmtPinFile.close();
+    }
+    Serial.print("Serial pin is:");
+    Serial.println(rmtPin);
+
+    if ((rmt_send = rmtInit(rmtPin, RMT_TX_MODE, RMT_MEM_64)) == NULL)
     {
         Serial.println("init sender failed\n");
         return;
@@ -221,7 +229,7 @@ void setup()
                 10000, /* Stack size in words */
                 NULL, 0, &Task1);
 
-    File authTokenFile = SPIFFS.open("/authToken.txt", FILE_READ);
+    File authTokenFile = SPIFFS.open("/authToken", FILE_READ);
     String authToken = authTokenFile.readString();
     authTokenFile.close();
 
@@ -230,8 +238,6 @@ void setup()
     webSocket.onEvent(webSocketEvent);
     runner.addTask(keepalive);
     keepalive.enable();
-
-    operational = true;
 }
 
 unsigned long previousMillis = 0;
@@ -241,6 +247,11 @@ bool reconnectedLoop = false;
 
 void loop()
 {
+    if (Serial.available()) { // Check if there is data available on the serial port
+        char data = Serial.read(); // Read the incoming data
+        Serial.print("Received: "); // Print a message to the serial monitor
+        Serial.println(data); // Print the received data
+    }
     // Serial.print(".");
     unsigned long currentMillis = millis();
     // if WiFi is down, try reconnecting every CHECK_WIFI_TIME seconds
@@ -261,12 +272,12 @@ void loop()
 
         if (firstConnect)
         {
-            if (SPIFFS.exists("/pairCode.txt"))
+            if (SPIFFS.exists("/pairCode"))
             {
-                File file = SPIFFS.open("/pairCode.txt", FILE_READ);
+                File file = SPIFFS.open("/pairCode", FILE_READ);
                 String pairCode = file.readString();
                 file.close();
-                SPIFFS.remove("/pairCode.txt");
+                SPIFFS.remove("/pairCode");
 
                 HTTPClient http;
                 String uri = "https://" + apiUrl + "/1/pair/" + pairCode;
@@ -286,7 +297,7 @@ void loop()
                     return;
                 }
 
-                File authTokenFile = SPIFFS.open("/authToken.txt", FILE_WRITE);
+                File authTokenFile = SPIFFS.open("/authToken", FILE_WRITE);
                 String response = http.getString();
                 DynamicJsonDocument doc(512);
                 deserializeJson(doc, response);
@@ -302,17 +313,13 @@ void loop()
             }
         }
 
-        Captive::StopCaptive();
         firstConnect = false;
     }
 
     if (Captive::IsActive())
     {
         Captive::Loop();
-        return;
     }
-
-    if(!operational) return;
 
     webSocket.loop();
     runner.execute();

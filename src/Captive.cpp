@@ -24,7 +24,7 @@ namespace Captive
   void handleBody(AsyncWebServerRequest *request, uint8_t *data, size_t len, size_t index, size_t total) {
 
     if (request->method() == HTTP_POST && request->url() == "/networks") {
-      File file = SPIFFS.open("/networks.txt", FILE_WRITE);
+      File file = SPIFFS.open("/networks", FILE_WRITE);
       file.write(data, len);
       file.close();
       request->send(200, "text/plain", "Saved");
@@ -32,10 +32,20 @@ namespace Captive
     }
 
     if (request->method() == HTTP_POST && request->url() == "/pairCode") {
-      File file = SPIFFS.open("/pairCode.txt", FILE_WRITE);
+      File file = SPIFFS.open("/pairCode", FILE_WRITE);
       file.write(data, len);
       file.close();
       request->send(200, "text/plain", "Saved");
+      return;
+    }
+
+    
+    if (request->method() == HTTP_POST && request->url() == "/rmtPin") {
+      File file = SPIFFS.open("/rmtPin", FILE_WRITE);
+      file.write(data, len);
+      file.close();
+      request->send(200, "text/plain", "Saved");
+      return;
     }
   }
 
@@ -45,6 +55,7 @@ namespace Captive
 
     Serial.println("Stopping captive portal...");
     server.end();
+    WiFi.mode(WIFI_STA);
     _isActive = false;
   }
 
@@ -58,7 +69,7 @@ namespace Captive
     });
 
     server.on("/networks", HTTP_GET, [] (AsyncWebServerRequest *request) {
-        File file = SPIFFS.open("/networks.txt", FILE_READ);
+        File file = SPIFFS.open("/networks", FILE_READ);
         request->send(200, "text/plain", file.readString().c_str());
         file.close();
     });

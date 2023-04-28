@@ -22,7 +22,13 @@ h2 {
 }
 
 .pair-code {
-    text-align: center;
+    margin: auto;
+    width: 20%;
+}
+
+.rmt-pin {
+    margin: auto;
+    width: 20%;
 }
 
 /* Table Styles */
