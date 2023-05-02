@@ -189,7 +189,7 @@ void setup()
     Serial.println();
     Serial.println();
     Serial.println();
-    Serial.println("==== ShockLink v 0.5.0.1 ====");
+    Serial.println("==== ShockLink v 0.5.1.0 ====");
 
     if (!SPIFFS.begin(true))
     {
