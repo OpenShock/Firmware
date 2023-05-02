@@ -68,6 +68,15 @@ void ControlCommand(DynamicJsonDocument &doc)
     }
 }
 
+void CaptiveControl(DynamicJsonDocument &doc)
+{
+    bool data = (bool)doc["Data"];
+
+    Serial.print("Captive portal debug: ");
+    Serial.println(data);
+    if(data) Captive::StartCaptive(); else Captive::StopCaptive();
+}
+
 void ParseJson(uint8_t *payload)
 {
     DynamicJsonDocument doc(1024);
@@ -78,6 +87,9 @@ void ParseJson(uint8_t *payload)
     {
         case 0:
             ControlCommand(doc);
+            break;
+        case 1:
+            CaptiveControl(doc);
             break;
     }
 }
@@ -213,7 +225,7 @@ void setup()
         rmtPin = rmtPinFile.readString().toInt();
         rmtPinFile.close();
     }
-    Serial.print("Serial pin is:");
+    Serial.print("Serial pin is: ");
     Serial.println(rmtPin);
 
     if ((rmt_send = rmtInit(rmtPin, RMT_TX_MODE, RMT_MEM_64)) == NULL)
