@@ -43,8 +43,10 @@ void IntakeCommand(uint16_t shockerId, uint8_t method, uint8_t intensity, uint d
 
     std::vector<rmt_data_t> rmtData;
     if(shockerModel == 1) {
+        Serial.println("Using pet trainer sequence"):
         rmtData = PetTrainerRmtControl::GetSequence(shockerId, method, intensity);
     } else {
+        Serial.println("Using small sequence"):
         rmtData = LRmtControl::GetSequence(shockerId, method, intensity);
     }
 
