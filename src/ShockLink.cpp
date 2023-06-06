@@ -7,7 +7,8 @@
 #include <map>
 #include <TaskScheduler.h>
 #include <ArduinoJson.h>
-#include "RmtControl.h"
+#include "LRmtControl.h"
+#include "PetTrainerRmtControl.h"
 #include <algorithm>
 #include "Captive.h"
 #include "SPIFFS.h"
@@ -32,15 +33,20 @@ struct command_t
 std::map<uint, command_t> Commands;
 rmt_obj_t *rmt_send = NULL;
 
-void IntakeCommand(uint16_t shockerId, uint8_t method, uint8_t intensity, uint duration)
+void IntakeCommand(uint16_t shockerId, uint8_t method, uint8_t intensity, uint duration, uint8_t shockerModel)
 {
     if (Commands.count(shockerId) > 0 && Commands[shockerId].until >= millis())
     {
-        // FIXME: Callback in websocket to informat about busy shocker.
+        // FIXME: Callback in websocket to inform about busy shocker.
         return;
     }
 
-    std::vector<rmt_data_t> rmtData = GetSequence(shockerId, method, intensity);
+    std::vector<rmt_data_t> rmtData;
+    if(shockerModel == 1) {
+        rmtData = PetTrainerRmtControl::GetSequence(shockerId, method, intensity);
+    } else {
+        rmtData = LRmtControl::GetSequence(shockerId, method, intensity);
+    }
 
     command_t cmd = {
         shockerId,
@@ -63,8 +69,9 @@ void ControlCommand(DynamicJsonDocument &doc)
         uint8_t type = static_cast<uint8_t>(cur["Type"]);
         uint8_t intensity = std::min(static_cast<uint8_t>(cur["Intensity"]), minval);
         int duration = static_cast<unsigned int>(cur["Duration"]);
+        uint8_t model = static_cast<uint8_t>(cur["Model"]);
 
-        IntakeCommand(id, type, intensity, duration);
+        IntakeCommand(id, type, intensity, duration, model);
     }
 }
 
@@ -257,14 +264,60 @@ unsigned long interval = 30000;
 bool firstConnect = true;
 bool reconnectedLoop = false;
 
+String inputBuffer = "";
+
+void writeFile(String name, String& data) {
+    File file = SPIFFS.open(name, FILE_READ);
+    file.print(data);
+    file.close();
+}
+
+void writeCommands(String& command, String& data) {
+    if(command == "authToken") {
+        writeFile("/authToken", data);
+        return;
+    }
+
+    if(command == "rmtPin") {
+        writeFile("/rmtPin", data);
+        return;
+    }
+
+    if(command == "networks") {
+        writeFile("/networks", data);
+        return;
+    }
+}
+
+void executeCommand() {
+    int delimiter = inputBuffer.indexOf(' ');
+    String command = inputBuffer.substring(0, delimiter);
+    command.toLowerCase();
+    String data = inputBuffer.substring(delimiter + 1);
+
+    if(data.length() > 0) writeCommands(command, data);
+
+}
+
+void handleSerial() {
+    char data = Serial.read(); // Read the incoming data
+    if(data == 0xd) return;
+
+    if(data == 0xa) {
+        Serial.print("> ");
+        Serial.println(inputBuffer);
+        executeCommand();
+        inputBuffer = "";
+        return;
+    }
+
+    inputBuffer += data;
+}
+
 void loop()
 {
-    if (Serial.available()) { // Check if there is data available on the serial port
-        char data = Serial.read(); // Read the incoming data
-        Serial.print("Received: "); // Print a message to the serial monitor
-        Serial.println(data); // Print the received data
-    }
-    // Serial.print(".");
+    if (Serial.available()) handleSerial();
+    
     unsigned long currentMillis = millis();
     // if WiFi is down, try reconnecting every CHECK_WIFI_TIME seconds
     if ((WiFi.status() != WL_CONNECTED) && (currentMillis - previousMillis >= interval))
