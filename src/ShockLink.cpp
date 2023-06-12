@@ -58,9 +58,9 @@ void IntakeCommand(uint16_t shockerId, uint8_t method, uint8_t intensity, uint d
         Serial.print("Generating new zero sequence for ");
         Serial.println(shockerId);
         if(shockerModel == 1) {
-            zeroSequence = new std::vector<rmt_data_t>(PetTrainerRmtControl::GetSequence(shockerId, 2, 25));
+            zeroSequence = new std::vector<rmt_data_t>(PetTrainerRmtControl::GetSequence(shockerId, 2, 0));
         } else {
-            zeroSequence = new std::vector<rmt_data_t>(LRmtControl::GetSequence(shockerId, 2, 25));
+            zeroSequence = new std::vector<rmt_data_t>(LRmtControl::GetSequence(shockerId, 2, 0));
         }
     }
 
