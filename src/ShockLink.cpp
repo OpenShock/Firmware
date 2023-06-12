@@ -22,11 +22,8 @@ TaskHandle_t Task1;
 
 struct command_t
 {
-    uint16_t shockerId;
-    uint8_t method;
-    uint8_t intensity;
-    uint duration;
     std::vector<rmt_data_t> sequence;
+    std::vector<rmt_data_t>* zeroSequence;
     ulong until;
 };
 
@@ -35,28 +32,44 @@ rmt_obj_t *rmt_send = NULL;
 
 void IntakeCommand(uint16_t shockerId, uint8_t method, uint8_t intensity, uint duration, uint8_t shockerModel)
 {
-    if (Commands.count(shockerId) > 0 && Commands[shockerId].until >= millis())
-    {
-        // FIXME: Callback in websocket to inform about busy shocker.
-        return;
+    // Stop logic
+    bool isStop = method == 0;
+    if(isStop) {
+        method = 2; // Vibrate
+        intensity = 0;
+        duration = 0;
     }
 
     std::vector<rmt_data_t> rmtData;
     if(shockerModel == 1) {
-        Serial.println("Using pet trainer sequence"):
+        Serial.println("Using pet trainer sequence");
         rmtData = PetTrainerRmtControl::GetSequence(shockerId, method, intensity);
     } else {
-        Serial.println("Using small sequence"):
+        Serial.println("Using small sequence");
         rmtData = LRmtControl::GetSequence(shockerId, method, intensity);
     }
 
+    // Zero sequence
+    std::vector<rmt_data_t>* zeroSequence;
+    if(Commands.find(shockerId) != Commands.end()) {
+        Serial.println("Cmd existed");
+        zeroSequence = Commands[shockerId].zeroSequence;
+    } else {
+        Serial.print("Generating new zero sequence for ");
+        Serial.println(shockerId);
+        if(shockerModel == 1) {
+            zeroSequence = new std::vector<rmt_data_t>(PetTrainerRmtControl::GetSequence(shockerId, 2, 25));
+        } else {
+            zeroSequence = new std::vector<rmt_data_t>(LRmtControl::GetSequence(shockerId, 2, 25));
+        }
+    }
+
     command_t cmd = {
-        shockerId,
-        method,
-        intensity,
-        duration,
         rmtData,
-        millis() + duration};
+        zeroSequence,
+        millis() + duration
+    };
+        
     Commands[shockerId] = cmd;
 }
 
@@ -163,12 +176,19 @@ void RmtLoop()
         return;
 
     std::vector<rmt_data_t> sequence;
+    
     long mil = millis();
     for (std::pair<const uint, command_t> &it : Commands)
     {
-        if (it.second.until <= mil)
-            continue;
-        sequence.insert(sequence.end(), it.second.sequence.begin(), it.second.sequence.end());
+        if(it.second.until <= mil) {
+            // Send stop for 300ms more to ensure the thing is stopping
+            if(it.second.until + 300 >= mil) {
+                sequence.insert(sequence.end(), it.second.zeroSequence->begin(), it.second.zeroSequence->end());
+            }
+        } else {
+            // Regular shocking sequence
+            sequence.insert(sequence.end(), it.second.sequence.begin(), it.second.sequence.end());
+        }
     }
 
     std::size_t finalSize = sequence.size();
