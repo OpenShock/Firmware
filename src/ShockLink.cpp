@@ -13,7 +13,9 @@
 #include "Captive.h"
 #include "SPIFFS.h"
 #include "HTTPClient.h"
+#include <LedManager.h>
 
+const String versionString = "7.1.0.0";
 const String apiUrl = "api.shocklink.net";
 
 WiFiMulti WiFiMulti;
@@ -212,13 +214,14 @@ void Task1code(void *parameter)
 void setup()
 {
     Serial.begin(115200);
-
     Serial.setDebugOutput(true);
 
     Serial.println();
     Serial.println();
     Serial.println();
-    Serial.println("==== ShockLink v 0.7.0.1 ====");
+    Serial.print("==== ShockLink v");
+    Serial.print(versionString);
+    Serial.println(" ====");
 
     if (!SPIFFS.begin(true))
     {
@@ -274,7 +277,7 @@ void setup()
     String authToken = authTokenFile.readString();
     authTokenFile.close();
 
-    webSocket.setExtraHeaders(("DeviceToken: " + authToken).c_str());
+    webSocket.setExtraHeaders(("FirmwareVersion:" + versionString + "\r\nDeviceToken: " + authToken).c_str());
     webSocket.beginSSL(apiUrl, 443, "/1/ws/device");
     webSocket.onEvent(webSocketEvent);
     runner.addTask(keepalive);
@@ -326,6 +329,7 @@ void handleSerial() {
     if(data == 0xd) return;
 
     if(data == 0xa) {
+    
         Serial.print("> ");
         Serial.println(inputBuffer);
         executeCommand();
@@ -341,8 +345,10 @@ void loop()
     if (Serial.available()) handleSerial();
     
     unsigned long currentMillis = millis();
+    wl_status_t wifiStatus = WiFi.status();
+    LedManager::Loop(wifiStatus, webSocket.isConnected(), currentMillis);
     // if WiFi is down, try reconnecting every CHECK_WIFI_TIME seconds
-    if ((WiFi.status() != WL_CONNECTED) && (currentMillis - previousMillis >= interval))
+    if ((wifiStatus != WL_CONNECTED) && (currentMillis - previousMillis >= interval))
     {
         reconnectedLoop = false;
 
@@ -351,7 +357,7 @@ void loop()
         WiFi.reconnect();
         previousMillis = currentMillis;
     }
-    else if (!reconnectedLoop && WiFi.status() == WL_CONNECTED)
+    else if (!reconnectedLoop && wifiStatus == WL_CONNECTED)
     {
         reconnectedLoop = true;
         Serial.print("Connected to wifi, ip: ");
@@ -403,10 +409,8 @@ void loop()
         firstConnect = false;
     }
 
-    if (Captive::IsActive())
-    {
-        Captive::Loop();
-    }
+    if (Captive::IsActive()) Captive::Loop();
+
 
     webSocket.loop();
     runner.execute();
