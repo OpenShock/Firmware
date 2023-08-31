@@ -14,9 +14,10 @@
 #include "SPIFFS.h"
 #include "HTTPClient.h"
 #include <LedManager.h>
+#include <Version.h>
 
-const String versionString = "7.1.0.0";
 const String apiUrl = "api.shocklink.net";
+const String devApiUrl = "dev-api.shocklink.net";
 
 WiFiMulti WiFiMulti;
 WebSocketsClient webSocket;
@@ -211,6 +212,14 @@ void Task1code(void *parameter)
     }
 }
 
+bool useDevApi() {
+    if(!SPIFFS.exists("/debug/api")) return false;
+    File file = SPIFFS.open("/debug/api");
+    auto data = file.read();
+    Serial.println(data);
+    return data == 1;
+}
+
 void setup()
 {
     Serial.begin(115200);
@@ -222,6 +231,8 @@ void setup()
     Serial.print("==== ShockLink v");
     Serial.print(versionString);
     Serial.println(" ====");
+
+    LedManager::Loop(WL_IDLE_STATUS, false, 0);
 
     if (!SPIFFS.begin(true))
     {
@@ -237,6 +248,10 @@ void setup()
         String ssid = file.readStringUntil(',');
         String pw = file.readStringUntil(';');
         WiFiMulti.addAP(ssid.c_str(), pw.c_str());
+        Serial.print("Adding network: ");
+        Serial.print(ssid);
+        Serial.print(" - ");
+        Serial.println(pw);
     }
     file.close();
 
@@ -282,6 +297,8 @@ void setup()
     webSocket.onEvent(webSocketEvent);
     runner.addTask(keepalive);
     keepalive.enable();
+
+    useDevApi();
 }
 
 unsigned long previousMillis = 0;
@@ -292,26 +309,49 @@ bool reconnectedLoop = false;
 String inputBuffer = "";
 
 void writeFile(String name, String& data) {
-    File file = SPIFFS.open(name, FILE_READ);
+    File file = SPIFFS.open(name, FILE_WRITE);
     file.print(data);
     file.close();
+
+    Serial.println("SYS|Success|Wrote to file");
 }
 
-void writeCommands(String& command, String& data) {
-    if(command == "authToken") {
+bool writeCommands(String& command, String& data) {
+    if(command == "authtoken") {
         writeFile("/authToken", data);
-        return;
+        return true;
     }
 
-    if(command == "rmtPin") {
+    if(command == "rmtpin") {
         writeFile("/rmtPin", data);
-        return;
+        return true;
     }
 
     if(command == "networks") {
         writeFile("/networks", data);
-        return;
+        return true;
     }
+
+    if(command == "debug") {
+        int delimiter = data.indexOf(' ');
+        String subCommand = data.substring(0, delimiter);
+        subCommand.toLowerCase();
+        if(subCommand != "api") {
+            return false;
+        }
+
+        data = inputBuffer.substring(delimiter + 1);
+
+        File file = SPIFFS.open("/debug/api", FILE_WRITE);
+        uint8_t state = data == "1" ? 1 : 0;
+        file.write(state);
+        file.close();
+        Serial.print("SYS|Success|Dev api state: ");
+        Serial.println(state);
+        return true;
+    }
+
+    return false;
 }
 
 void executeCommand() {
@@ -320,8 +360,16 @@ void executeCommand() {
     command.toLowerCase();
     String data = inputBuffer.substring(delimiter + 1);
 
-    if(data.length() > 0) writeCommands(command, data);
+    if(data.length() <= 0) {
+        if(command == "restart") {
+            Serial.println("Restarting ESP...");
+            ESP.restart();
+        }
+    }
 
+    if(data.length() > 0) if(writeCommands(command, data)) return;
+
+    Serial.println("SYS|Error|Command not found");
 }
 
 void handleSerial() {
