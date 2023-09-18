@@ -2,11 +2,10 @@ on:
   push:
     branches:
       - master
-      - feature/*
   pull_request:
     branches:
       - master
-    types: [opened, reopened]
+    types: [opened, reopened, synchronize]
 
 name: build
 
