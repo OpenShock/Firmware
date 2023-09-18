@@ -3,6 +3,10 @@ on:
     branches:
       - master
       - feature/*
+  pull_request:
+    branches:
+      - master
+    types: [opened, reopened]
 
 name: build
 
