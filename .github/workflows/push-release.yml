@@ -33,5 +33,5 @@ jobs:
         with:
           repo_token: ${{ secrets.GITHUB_TOKEN }}
           file: .pio/build/ShockLink/firmware.bin
-          asset_name: ShockLink.bin
+          asset_name: ShockLink-${{ github.ref_name }}.bin
           tag: ${{ github.ref }}
