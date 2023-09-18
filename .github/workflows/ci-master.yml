@@ -2,6 +2,7 @@ on:
   push:
     branches:
       - master
+      - feature/github-ci
 
 name: ci-master
 
