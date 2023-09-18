@@ -1,0 +1,29 @@
+on:
+  push:
+    branches:
+      - master
+
+name: ci-master
+
+jobs:
+
+  build:
+    runs-on: ubuntu-latest
+
+    # Copied verbatim from https://docs.platformio.org/en/stable/integration/ci/github-actions.html
+    steps:
+      - uses: actions/checkout@v3
+      - uses: actions/cache@v3
+        with:
+          path: |
+            ~/.cache/pip
+            ~/.platformio/cache
+          key: ${{ runner.os }}-arch
+      - uses: actions/setup-python@v4
+        with:
+          python-version: '3.9'
+      - name: Install PlatformIO Core
+        run: pip install --upgrade platformio
+
+      - name: Build PlatformIO Project
+        run: pio run
