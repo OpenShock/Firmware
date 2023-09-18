@@ -1,3 +1,6 @@
+#include "CaptivePortal.h"
+#include "AuthenticationManager.h"
+
 #include <WiFi.h>
 #include <WiFiMulti.h>
 #include <WebSocketsClient.h>
@@ -10,8 +13,7 @@
 #include "LRmtControl.h"
 #include "PetTrainerRmtControl.h"
 #include <algorithm>
-#include "Captive.h"
-#include "SPIFFS.h"
+#include <LittleFS.h>
 #include "HTTPClient.h"
 #include <LedManager.h>
 #include <Version.h>
@@ -26,7 +28,7 @@ TaskHandle_t Task1;
 struct command_t
 {
     std::vector<rmt_data_t> sequence;
-    std::vector<rmt_data_t>* zeroSequence;
+    std::vector<rmt_data_t> *zeroSequence;
     ulong until;
 };
 
@@ -37,32 +39,42 @@ void IntakeCommand(uint16_t shockerId, uint8_t method, uint8_t intensity, uint d
 {
     // Stop logic
     bool isStop = method == 0;
-    if(isStop) {
+    if (isStop)
+    {
         method = 2; // Vibrate
         intensity = 0;
         duration = 0;
     }
 
     std::vector<rmt_data_t> rmtData;
-    if(shockerModel == 1) {
+    if (shockerModel == 1)
+    {
         Serial.println("Using pet trainer sequence");
         rmtData = PetTrainerRmtControl::GetSequence(shockerId, method, intensity);
-    } else {
+    }
+    else
+    {
         Serial.println("Using small sequence");
         rmtData = LRmtControl::GetSequence(shockerId, method, intensity);
     }
 
     // Zero sequence
-    std::vector<rmt_data_t>* zeroSequence;
-    if(Commands.find(shockerId) != Commands.end()) {
+    std::vector<rmt_data_t> *zeroSequence;
+    if (Commands.find(shockerId) != Commands.end())
+    {
         Serial.println("Cmd existed");
         zeroSequence = Commands[shockerId].zeroSequence;
-    } else {
+    }
+    else
+    {
         Serial.print("Generating new zero sequence for ");
         Serial.println(shockerId);
-        if(shockerModel == 1) {
+        if (shockerModel == 1)
+        {
             zeroSequence = new std::vector<rmt_data_t>(PetTrainerRmtControl::GetSequence(shockerId, 2, 0));
-        } else {
+        }
+        else
+        {
             zeroSequence = new std::vector<rmt_data_t>(LRmtControl::GetSequence(shockerId, 2, 0));
         }
     }
@@ -70,9 +82,8 @@ void IntakeCommand(uint16_t shockerId, uint8_t method, uint8_t intensity, uint d
     command_t cmd = {
         rmtData,
         zeroSequence,
-        millis() + duration
-    };
-        
+        millis() + duration};
+
     Commands[shockerId] = cmd;
 }
 
@@ -99,7 +110,10 @@ void CaptiveControl(DynamicJsonDocument &doc)
 
     Serial.print("Captive portal debug: ");
     Serial.println(data);
-    if(data) Captive::StartCaptive(); else Captive::StopCaptive();
+    if (data)
+        ShockLink::CaptivePortal::Start();
+    else
+        ShockLink::CaptivePortal::Stop();
 }
 
 void ParseJson(uint8_t *payload)
@@ -110,12 +124,12 @@ void ParseJson(uint8_t *payload)
 
     switch (type)
     {
-        case 0:
-            ControlCommand(doc);
-            break;
-        case 1:
-            CaptiveControl(doc);
-            break;
+    case 0:
+        ControlCommand(doc);
+        break;
+    case 1:
+        CaptiveControl(doc);
+        break;
     }
 }
 
@@ -150,7 +164,7 @@ void webSocketEvent(WStype_t type, uint8_t *payload, size_t length)
         break;
     case WStype_CONNECTED:
         if (firstWebSocketConnect)
-            Captive::StopCaptive();
+            ShockLink::CaptivePortal::Start();
         Serial.printf("[WSc] Connected to url: %s\n", payload);
         SendKeepAlive();
 
@@ -179,16 +193,20 @@ void RmtLoop()
         return;
 
     std::vector<rmt_data_t> sequence;
-    
+
     long mil = millis();
     for (std::pair<const uint, command_t> &it : Commands)
     {
-        if(it.second.until <= mil) {
+        if (it.second.until <= mil)
+        {
             // Send stop for 300ms more to ensure the thing is stopping
-            if(it.second.until + 300 >= mil) {
+            if (it.second.until + 300 >= mil)
+            {
                 sequence.insert(sequence.end(), it.second.zeroSequence->begin(), it.second.zeroSequence->end());
             }
-        } else {
+        }
+        else
+        {
             // Regular shocking sequence
             sequence.insert(sequence.end(), it.second.sequence.begin(), it.second.sequence.end());
         }
@@ -212,9 +230,11 @@ void Task1code(void *parameter)
     }
 }
 
-bool useDevApi() {
-    if(!SPIFFS.exists("/debug/api")) return false;
-    File file = SPIFFS.open("/debug/api");
+bool useDevApi()
+{
+    if (!LittleFS.exists("/debug/api"))
+        return false;
+    File file = LittleFS.open("/debug/api");
     auto data = file.read();
     Serial.println(data);
     return data == 1;
@@ -225,16 +245,11 @@ void setup()
     Serial.begin(115200);
     Serial.setDebugOutput(true);
 
-    Serial.println();
-    Serial.println();
-    Serial.println();
-    Serial.print("==== ShockLink v");
-    Serial.print(versionString);
-    Serial.println(" ====");
+    Serial.printf("\n\n\n==== ShockLink v%s ====", versionString);
 
     LedManager::Loop(WL_IDLE_STATUS, false, 0);
 
-    if (!SPIFFS.begin(true))
+    if (!LittleFS.begin(true))
     {
         Serial.println("An Error has occurred while mounting SPIFFS");
         return;
@@ -242,7 +257,7 @@ void setup()
 
     WiFi.mode(WIFI_AP_STA);
 
-    File file = SPIFFS.open("/networks", FILE_READ);
+    File file = LittleFS.open("/networks", FILE_READ);
     while (file.available())
     {
         String ssid = file.readStringUntil(',');
@@ -255,20 +270,20 @@ void setup()
     }
     file.close();
 
-    Captive::Setup();
-    Captive::StartCaptive();
+    ShockLink::CaptivePortal::Start();
 
     Serial.println("Init WiFi...");
     WiFiMulti.run();
 
-    if (!SPIFFS.exists("/authToken"))
+    File authTokenFile = LittleFS.open("/authToken", FILE_READ);
+    if (!authTokenFile)
         return;
 
     int rmtPin = 15;
 
-    if (SPIFFS.exists("/rmtPin"))
+    if (LittleFS.exists("/rmtPin"))
     {
-        File rmtPinFile = SPIFFS.open("/rmtPin", FILE_READ);
+        File rmtPinFile = LittleFS.open("/rmtPin", FILE_READ);
         rmtPin = rmtPinFile.readString().toInt();
         rmtPinFile.close();
     }
@@ -288,7 +303,6 @@ void setup()
                 10000, /* Stack size in words */
                 NULL, 0, &Task1);
 
-    File authTokenFile = SPIFFS.open("/authToken", FILE_READ);
     String authToken = authTokenFile.readString();
     authTokenFile.close();
 
@@ -308,41 +322,48 @@ bool reconnectedLoop = false;
 
 String inputBuffer = "";
 
-void writeFile(String name, String& data) {
-    File file = SPIFFS.open(name, FILE_WRITE);
+void writeFile(String name, String &data)
+{
+    File file = LittleFS.open(name, FILE_WRITE);
     file.print(data);
     file.close();
 
     Serial.println("SYS|Success|Wrote to file");
 }
 
-bool writeCommands(String& command, String& data) {
-    if(command == "authtoken") {
+bool writeCommands(String &command, String &data)
+{
+    if (command == "authtoken")
+    {
         writeFile("/authToken", data);
         return true;
     }
 
-    if(command == "rmtpin") {
+    if (command == "rmtpin")
+    {
         writeFile("/rmtPin", data);
         return true;
     }
 
-    if(command == "networks") {
+    if (command == "networks")
+    {
         writeFile("/networks", data);
         return true;
     }
 
-    if(command == "debug") {
+    if (command == "debug")
+    {
         int delimiter = data.indexOf(' ');
         String subCommand = data.substring(0, delimiter);
         subCommand.toLowerCase();
-        if(subCommand != "api") {
+        if (subCommand != "api")
+        {
             return false;
         }
 
         data = inputBuffer.substring(delimiter + 1);
 
-        File file = SPIFFS.open("/debug/api", FILE_WRITE);
+        File file = LittleFS.open("/debug/api", FILE_WRITE);
         uint8_t state = data == "1" ? 1 : 0;
         file.write(state);
         file.close();
@@ -354,30 +375,38 @@ bool writeCommands(String& command, String& data) {
     return false;
 }
 
-void executeCommand() {
+void executeCommand()
+{
     int delimiter = inputBuffer.indexOf(' ');
     String command = inputBuffer.substring(0, delimiter);
     command.toLowerCase();
     String data = inputBuffer.substring(delimiter + 1);
 
-    if(data.length() <= 0) {
-        if(command == "restart") {
+    if (data.length() <= 0)
+    {
+        if (command == "restart")
+        {
             Serial.println("Restarting ESP...");
             ESP.restart();
         }
     }
 
-    if(data.length() > 0) if(writeCommands(command, data)) return;
+    if (data.length() > 0)
+        if (writeCommands(command, data))
+            return;
 
     Serial.println("SYS|Error|Command not found");
 }
 
-void handleSerial() {
+void handleSerial()
+{
     char data = Serial.read(); // Read the incoming data
-    if(data == 0xd) return;
+    if (data == 0xd)
+        return;
 
-    if(data == 0xa) {
-    
+    if (data == 0xa)
+    {
+
         Serial.print("> ");
         Serial.println(inputBuffer);
         executeCommand();
@@ -390,8 +419,9 @@ void handleSerial() {
 
 void loop()
 {
-    if (Serial.available()) handleSerial();
-    
+    if (Serial.available())
+        handleSerial();
+
     unsigned long currentMillis = millis();
     wl_status_t wifiStatus = WiFi.status();
     LedManager::Loop(wifiStatus, webSocket.isConnected(), currentMillis);
@@ -411,54 +441,10 @@ void loop()
         Serial.print("Connected to wifi, ip: ");
         Serial.println(WiFi.localIP());
 
-        if (firstConnect)
-        {
-            if (SPIFFS.exists("/pairCode"))
-            {
-                File file = SPIFFS.open("/pairCode", FILE_READ);
-                String pairCode = file.readString();
-                file.close();
-                SPIFFS.remove("/pairCode");
-
-                HTTPClient http;
-                String uri = "https://" + apiUrl + "/1/pair/" + pairCode;
-
-                Serial.print("Contacting pair code url: ");
-                Serial.println(uri);
-                http.begin(uri);
-
-                int responseCode = http.GET();
-
-                if (responseCode != 200)
-                {
-                    Serial.println("Error while getting auth token");
-                    Serial.println(responseCode);
-                    Serial.println(http.getString());
-                    firstConnect = false;
-                    return;
-                }
-
-                File authTokenFile = SPIFFS.open("/authToken", FILE_WRITE);
-                String response = http.getString();
-                DynamicJsonDocument doc(512);
-                deserializeJson(doc, response);
-
-                authTokenFile.print(doc["data"].as<String>());
-                Serial.print("Got auth token: ");
-                Serial.println(doc["data"].as<String>());
-                authTokenFile.close();
-
-                http.end();
-
-                ESP.restart();
-            }
-        }
-
         firstConnect = false;
     }
 
-    if (Captive::IsActive()) Captive::Loop();
-
+    ShockLink::CaptivePortal::Update();
 
     webSocket.loop();
     runner.execute();

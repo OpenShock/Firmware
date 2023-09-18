@@ -1,0 +1,177 @@
+<html>
+  <body>
+    <div id="app">
+      <h2>Configure WiFi & Pair code</h2>
+      <div class="table-wrapper">
+        <table class="fl-table">
+          <thead>
+            <th>SSID</th>
+            <th>Password</th>
+            <th style="width: 0"></th>
+          </thead>
+          <tbody>
+            <tr v-for="item in networks">
+              <td><input v-model="item.ssid" /></td>
+              <td><input v-model="item.password" /></td>
+              <td><button @click="removeNetworks(item)">&#128465;</button></td>
+            </tr>
+            <tr>
+              <td><input placeholder="Enter ssid/name of your network..." v-model="ssid" /></td>
+              <td><input placeholder="Type your password..." v-model="password" /></td>
+              <td><button @click="addNetwork">&#10133;</button></td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div class="pair-code">
+        <label for="pair-code">Pair code</label>
+        <input id="pair-code" v-model="pairCode" placeholder="Pair code" />
+      </div>
+
+      <div class="rmt-pin">
+        <label for="rmt-pin">RMT Pin</label>
+        <input id="rmt-pin" type="number" v-model="rmtPin" placeholder="RMT Pin" />
+      </div>
+
+      <button style="float: right" @click="send" class="button"><span>Save</span></button>
+      <button style="float: right" @click="reset" class="button"><span>Restart!</span></button>
+    </div>
+  </body>
+  <script src="/js/vue.global.js"></script>
+
+  <script>
+    function microAjax(options) {
+      'use strict';
+
+      // Default to GET
+      if (!options.method) {
+        options.method = 'GET';
+      }
+
+      // Default empty functions for the callbacks
+      function noop() {}
+      if (!options.success) {
+        options.success = noop;
+      }
+      if (!options.warning) {
+        options.warning = noop;
+      }
+      if (!options.error) {
+        options.error = noop;
+      }
+
+      var request = new XMLHttpRequest();
+      request.open(options.method, options.url, true);
+      request.send(options.data);
+
+      request.onload = function () {
+        // Success!
+        if (request.readyState === 4 && request.status === 200) {
+          options.success(request.responseText);
+
+          // We reached our target destination, but it returned an error
+        } else {
+          options.warning();
+        }
+      };
+
+      // There was a connection error of some sort
+      request.onerror = options.error;
+    }
+  </script>
+
+  <script>
+    const { createApp } = Vue;
+
+    createApp({
+      data() {
+        return {
+          networks: [],
+          ssid: '',
+          password: '',
+          pairCode: '',
+          rmtPin: 0,
+        };
+      },
+      beforeMount() {
+        this.getNetworks();
+      },
+      methods: {
+        send() {
+          this.sendPairCode();
+          this.sendNetworks();
+          this.sendRmtPin();
+        },
+        addNetwork() {
+          if (this.ssid === undefined || this.password == undefined || this.ssid === '') return;
+          this.networks.push({
+            ssid: this.ssid,
+            password: this.password,
+          });
+        },
+        getNetworks() {
+          microAjax({
+            url: '/networks',
+            method: 'GET',
+            success: (data) => {
+              nets = [];
+              data.split(';').forEach((it) => {
+                if (it !== undefined && it !== '') {
+                  const splitted = it.split(',');
+                  nets.push({
+                    ssid: splitted[0],
+                    password: splitted[1],
+                  });
+                }
+              });
+
+              this.networks = nets;
+            },
+          });
+        },
+        reset() {
+          microAjax({
+            url: '/reset',
+            method: 'POST',
+          });
+        },
+        sendRmtPin() {
+          if (this.rmtPin === undefined || this.rmtPin === '') return;
+          microAjax({
+            url: '/rmtPin',
+            method: 'POST',
+            data: this.rmtPin,
+          });
+        },
+        sendPairCode() {
+          if (this.pairCode === undefined || this.pairCode === '') return;
+          microAjax({
+            url: '/pairCode',
+            method: 'POST',
+            data: this.pairCode,
+          });
+        },
+        sendNetworks() {
+          var data = '';
+          this.networks.forEach((it) => {
+            data += it.ssid + ',' + it.password + ';';
+          });
+
+          microAjax({
+            url: '/networks',
+            method: 'POST',
+            data: data,
+          });
+        },
+        removeNetworks(item) {
+          var index = this.networks.indexOf(item);
+          if (index !== -1) {
+            this.networks.splice(index, 1);
+          }
+        },
+      },
+    }).mount('#app');
+  </script>
+  <link rel="stylesheet" type="text/css" href="/css/main.css" />
+</html>
