@@ -2,6 +2,8 @@ on:
   release:
     types: [published]
 
+name: push-release
+
 jobs:
 
   # Copied verbatim from https://docs.platformio.org/en/stable/integration/ci/github-actions.html

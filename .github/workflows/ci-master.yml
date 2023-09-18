@@ -7,7 +7,7 @@ on:
       - master
     types: [opened, reopened, synchronize]
 
-name: build
+name: ci-master
 
 jobs:
 
