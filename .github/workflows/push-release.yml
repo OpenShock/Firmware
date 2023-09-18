@@ -1,10 +1,6 @@
 on:
-  push:
-    branches:
-      - master
-      - feature/*
-
-name: build
+  release:
+    types: [published, created]
 
 jobs:
 
@@ -31,3 +27,11 @@ jobs:
 
       - name: Build PlatformIO Project
         run: pio run
+
+      - name: Upload binaries to release
+        uses: svenstaro/upload-release-action@v2
+        with:
+          repo_token: ${{ secrets.GITHUB_TOKEN }}
+          file: .pio/build/**/firmware.bin
+          asset_name: ShockLink.bin
+          tag: ${{ github.ref }}
