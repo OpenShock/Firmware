@@ -1,5 +1,6 @@
 #include "CaptivePortal.h"
 #include "AuthenticationManager.h"
+#include "Constants.h"
 
 #include <WiFi.h>
 #include <WiFiMulti.h>
@@ -16,10 +17,6 @@
 #include <LittleFS.h>
 #include "HTTPClient.h"
 #include <LedManager.h>
-#include <Version.h>
-
-const String apiUrl = "api.shocklink.net";
-const String devApiUrl = "dev-api.shocklink.net";
 
 WiFiMulti WiFiMulti;
 WebSocketsClient webSocket;
@@ -245,7 +242,7 @@ void setup()
     Serial.begin(115200);
     Serial.setDebugOutput(true);
 
-    Serial.printf("\n\n\n==== ShockLink v%s ====", versionString);
+    Serial.printf("\n\n\n==== ShockLink v%s ====", ShockLink::Constants::Version);
 
     LedManager::Loop(WL_IDLE_STATUS, false, 0);
 
@@ -306,8 +303,8 @@ void setup()
     String authToken = authTokenFile.readString();
     authTokenFile.close();
 
-    webSocket.setExtraHeaders(("FirmwareVersion:" + versionString + "\r\nDeviceToken: " + authToken).c_str());
-    webSocket.beginSSL(apiUrl, 443, "/1/ws/device");
+    webSocket.setExtraHeaders(("FirmwareVersion:" + String(ShockLink::Constants::Version) + "\r\nDeviceToken: " + authToken).c_str());
+    webSocket.beginSSL(ShockLink::Constants::ApiDomain, 443, "/1/ws/device");
     webSocket.onEvent(webSocketEvent);
     runner.addTask(keepalive);
     keepalive.enable();

@@ -2,15 +2,21 @@
 
 #include <cstdint>
 
-#define __SHOCKLINK_API_DOMAIN "api.shocklink.net"
-#define __SHOCKLINK_API_URL "https://" __SHOCKLINK_API_DOMAIN
-#define __SHOCKLINK_API_PAIR_URL __SHOCKLINK_API_URL "/1/device/pair/"
-#define __SHOCKLINK_API_PAIR_CODE_URL __SHOCKLINK_API_URL "/1/device/self/"
 
+/*
+    Constants
+
+    This namespace contains commonly used constants.
+    These are externed so that they can be used in multiple files without bloating the binary.
+
+    Ref: https://esp32.com/viewtopic.php?t=8742
+*/
 namespace ShockLink::Constants
 {
-    static const char *const ApiDomain = __SHOCKLINK_API_DOMAIN;
-    static const char *const ApiUrl = __SHOCKLINK_API_URL;
-    static const char *const ApiPairUrl = __SHOCKLINK_API_PAIR_URL;
-    static const char *const ApiPairCodeUrl = __SHOCKLINK_API_PAIR_CODE_URL;
+    extern const char *const Version;
+    extern const char *const ApiDomain;
+    extern const char *const DevApiDomain;
+    extern const char *const ApiUrl;
+    extern const char *const ApiPairUrl;
+    extern const char *const ApiPairCodeUrl;
 }
