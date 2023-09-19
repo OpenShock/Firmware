@@ -56,7 +56,7 @@ bool ShockLink::AuthenticationManager::Authenticate(std::uint32_t pairCode)
     HTTPClient http;
     String uri = SHOCKLINK_API_URL("/1/device/pair/") + String(pairCode);
 
-    ESP_LOGI(TAG, "Contacting pair code url: %s", uri.c_str());
+    ESP_LOGD(TAG, "Contacting pair code url: %s", uri.c_str());
     http.begin(uri);
 
     int responseCode = http.GET();
