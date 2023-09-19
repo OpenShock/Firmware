@@ -11,7 +11,7 @@
 #include <map>
 #include <TaskScheduler.h>
 #include <ArduinoJson.h>
-#include "LRmtControl.h"
+#include "XlcRmtControl.h"
 #include "PetTrainerRmtControl.h"
 #include <algorithm>
 #include <LittleFS.h>
@@ -72,7 +72,7 @@ void IntakeCommand(uint16_t shockerId, uint8_t method, uint8_t intensity, uint d
         }
         else
         {
-            zeroSequence = new std::vector<rmt_data_t>(LRmtControl::GetSequence(shockerId, 2, 0));
+            zeroSequence = new std::vector<rmt_data_t>(XlcRmtControl::GetSequence(shockerId, 2, 0));
         }
     }
 

@@ -1,10 +1,10 @@
-#include "LRmtControl.h"
+#include "XlcRmtControl.h"
 #include <vector>
 #include "esp32-hal.h"
 #include <bitset>
 #include <numeric>
 
-namespace LRmtControl
+namespace ShockLink::XlcRmtControl
 {
   const rmt_data_t startBit = {
       1400,
