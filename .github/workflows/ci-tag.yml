@@ -31,6 +31,18 @@ jobs:
       - name: Build PlatformIO Project
         run: pio run
 
+      # This step reads a file from repo and use it for body of the release
+      # This works on any self-hosted runner OS
+      - name: Read RELEASE.md
+        id: read_release
+        shell: bash
+        run: |
+          r=$(cat RELEASE.md)                               # <--- Read release.md (Provide correct path as per your repo)
+          r="${r//'%'/'%25'}"                               # Multiline escape sequences for %
+          r="${r//$'\n'/'%0A'}"                             # Multiline escape sequences for '\n'
+          r="${r//$'\r'/'%0D'}"                             # Multiline escape sequences for '\r'
+          echo "RELEASE_BODY=$r" >> $GITHUB_OUTPUT          # <--- Set environment variable
+
       - name: Upload binaries to release
         uses: svenstaro/upload-release-action@v2
         with:
@@ -38,3 +50,5 @@ jobs:
           file: .pio/build/ShockLink/firmware.bin
           asset_name: ShockLink.bin
           tag: ${{ github.ref }}
+          body: |
+            ${{ steps.read_release.outputs.RELEASE_BODY }}  # <--- Use environment variables that was created earlier
