@@ -1,8 +1,9 @@
 on:
-  release:
-    types: [published]
+  push:
+    tags:
+      - 'v*'
 
-name: push-release
+name: ci-tag
 
 jobs:
 
@@ -35,5 +36,5 @@ jobs:
         with:
           repo_token: ${{ secrets.GITHUB_TOKEN }}
           file: .pio/build/ShockLink/firmware.bin
-          asset_name: ShockLink-${{ github.ref_name }}.bin
+          asset_name: shocklink-${{ github.ref_name }}.bin
           tag: ${{ github.ref }}
