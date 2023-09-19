@@ -1,7 +1,8 @@
+#include <esp32-hal.h>
 #include <vector>
-#include "esp32-hal.h"
+#include <cstdint>
 
 namespace ShockLink::XlcRmtControl
 {
-    std::vector<rmt_data_t> GetSequence(uint16_t shockerId, uint8_t method, uint8_t intensity);
+    std::vector<rmt_data_t> GetSequence(std::uint16_t shockerId, std::uint8_t method, std::uint8_t intensity);
 }

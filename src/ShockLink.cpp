@@ -18,6 +18,8 @@
 #include "HTTPClient.h"
 #include <LedManager.h>
 
+const char *const TAG = "ShockLink";
+
 WiFiMulti WiFiMulti;
 WebSocketsClient webSocket;
 TaskHandle_t Task1;
@@ -67,11 +69,11 @@ void IntakeCommand(uint16_t shockerId, uint8_t method, uint8_t intensity, uint d
         ESP_LOGD(TAG, "Generating new zero sequence for %d", shockerId);
         if (shockerModel == 1)
         {
-            zeroSequence = new std::vector<rmt_data_t>(PetTrainerRmtControl::GetSequence(shockerId, 2, 0));
+            zeroSequence = new std::vector<rmt_data_t>(ShockLink::PetTrainerRmtControl::GetSequence(shockerId, 2, 0));
         }
         else
         {
-            zeroSequence = new std::vector<rmt_data_t>(XlcRmtControl::GetSequence(shockerId, 2, 0));
+            zeroSequence = new std::vector<rmt_data_t>(ShockLink::XlcRmtControl::GetSequence(shockerId, 2, 0));
         }
     }
 
