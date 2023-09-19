@@ -12,7 +12,11 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
+<<<<<<< HEAD
       - uses: actions/checkout@v4
+=======
+      - uses: actions/checkout@v3
+>>>>>>> e0dc1d9 (Modify push-tag.yml to become ci-tag.yml similar to CI in WebUI project)
 
       - uses: actions/cache@v3
         with:
