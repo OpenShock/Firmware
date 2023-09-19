@@ -46,26 +46,25 @@ void IntakeCommand(uint16_t shockerId, uint8_t method, uint8_t intensity, uint d
     std::vector<rmt_data_t> rmtData;
     if (shockerModel == 1)
     {
-        Serial.println("Using pet trainer sequence");
-        rmtData = PetTrainerRmtControl::GetSequence(shockerId, method, intensity);
+        ESP_LOGD(TAG, "Using pet trainer sequence");
+        rmtData = ShockLink::PetTrainerRmtControl::GetSequence(shockerId, method, intensity);
     }
     else
     {
-        Serial.println("Using small sequence");
-        rmtData = LRmtControl::GetSequence(shockerId, method, intensity);
+        ESP_LOGD(TAG, "Using XLC sequence");
+        rmtData = ShockLink::XlcRmtControl::GetSequence(shockerId, method, intensity);
     }
 
     // Zero sequence
     std::vector<rmt_data_t> *zeroSequence;
     if (Commands.find(shockerId) != Commands.end())
     {
-        Serial.println("Cmd existed");
+        ESP_LOGD(TAG, "Command existed");
         zeroSequence = Commands[shockerId].zeroSequence;
     }
     else
     {
-        Serial.print("Generating new zero sequence for ");
-        Serial.println(shockerId);
+        ESP_LOGD(TAG, "Generating new zero sequence for %d", shockerId);
         if (shockerModel == 1)
         {
             zeroSequence = new std::vector<rmt_data_t>(PetTrainerRmtControl::GetSequence(shockerId, 2, 0));
@@ -105,8 +104,7 @@ void CaptiveControl(DynamicJsonDocument &doc)
 {
     bool data = (bool)doc["Data"];
 
-    Serial.print("Captive portal debug: ");
-    Serial.println(data);
+    ESP_LOGD(TAG, "Captive portal debug: %s", data ? "true" : "false");
     if (data)
         ShockLink::CaptivePortal::Start();
     else
@@ -134,16 +132,10 @@ void SendKeepAlive()
 {
     if (!webSocket.isConnected())
     {
-        Serial.print("[");
-        Serial.print(millis());
-        Serial.print("] ");
-        Serial.println("WebSocket is not connected, not sending keep alive online state");
+        ESP_LOGD(TAG, "WebSocket is not connected, not sending keep alive online state");
         return;
     }
-    Serial.print("[");
-    Serial.print(millis());
-    Serial.print("] ");
-    Serial.println("Sending keep alive online state");
+    ESP_LOGD(TAG, "Sending keep alive online state");
     webSocket.sendTXT("{\"requestType\": 0}");
 }
 
@@ -157,29 +149,29 @@ void webSocketEvent(WStype_t type, uint8_t *payload, size_t length)
     switch (type)
     {
     case WStype_DISCONNECTED:
-        Serial.printf("[WSc] Disconnected!\n");
+        ESP_LOGD(TAG, "[WebSocket] Disconnected");
         break;
     case WStype_CONNECTED:
         if (firstWebSocketConnect)
             ShockLink::CaptivePortal::Start();
-        Serial.printf("[WSc] Connected to url: %s\n", payload);
+        ESP_LOGD(TAG, "[WebSocket] Connected to %s", payload);
         SendKeepAlive();
 
         firstWebSocketConnect = false;
         break;
     case WStype_TEXT:
-        Serial.printf("[WSc] get text: %s\n", payload);
+        ESP_LOGD(TAG, "[WebSocket] Received text: %s", payload);
         ParseJson(payload);
         break;
     case WStype_BIN:
-        Serial.printf("[WSc] get binary length: %u\n", length);
+        ESP_LOGD(TAG, "[WebSocket] Received binary data of length %u", length);
         break;
     case WStype_ERROR:
     case WStype_FRAGMENT_TEXT_START:
     case WStype_FRAGMENT_BIN_START:
     case WStype_FRAGMENT:
     case WStype_FRAGMENT_FIN:
-        Serial.println("[WSc] Error");
+        ESP_LOGD(TAG, "[WebSocket] Error");
         break;
     }
 }
@@ -213,14 +205,13 @@ void RmtLoop()
     if (finalSize <= 0)
         return;
 
-    Serial.print("=>");
+    ESP_LOGD(TAG, "Sending sequence of size %d", finalSize);
     rmtWriteBlocking(rmt_send, sequence.data(), finalSize);
 }
 
 void Task1code(void *parameter)
 {
-    Serial.print("RMT loop running on core ");
-    Serial.println(xPortGetCoreID());
+    ESP_LOGD(TAG, "RMT loop running on core %d", xPortGetCoreID());
     while (true)
     {
         RmtLoop();
@@ -233,7 +224,7 @@ bool useDevApi()
         return false;
     File file = LittleFS.open("/debug/api");
     auto data = file.read();
-    Serial.println(data);
+    ESP_LOGD(TAG, "Dev api state: %d", data);
     return data == 1;
 }
 
@@ -242,13 +233,13 @@ void setup()
     Serial.begin(115200);
     Serial.setDebugOutput(true);
 
-    Serial.printf("\n\n\n==== ShockLink v%s ====", ShockLink::Constants::Version);
+    ESP_LOGD(TAG, "==== ShockLink v%s ====", ShockLink::Constants::Version);
 
     LedManager::Loop(WL_IDLE_STATUS, false, 0);
 
     if (!LittleFS.begin(true))
     {
-        Serial.println("An Error has occurred while mounting SPIFFS");
+        ESP_LOGE(TAG, "An Error has occurred while mounting LittleFS");
         return;
     }
 
@@ -260,16 +251,13 @@ void setup()
         String ssid = file.readStringUntil(',');
         String pw = file.readStringUntil(';');
         WiFiMulti.addAP(ssid.c_str(), pw.c_str());
-        Serial.print("Adding network: ");
-        Serial.print(ssid);
-        Serial.print(" - ");
-        Serial.println(pw);
+        ESP_LOGD(TAG, "Adding network: %s - %s", ssid.c_str(), pw.c_str());
     }
     file.close();
 
     ShockLink::CaptivePortal::Start();
 
-    Serial.println("Init WiFi...");
+    ESP_LOGD(TAG, "Init WiFi...");
     WiFiMulti.run();
 
     File authTokenFile = LittleFS.open("/authToken", FILE_READ);
@@ -284,17 +272,16 @@ void setup()
         rmtPin = rmtPinFile.readString().toInt();
         rmtPinFile.close();
     }
-    Serial.print("Serial pin is: ");
-    Serial.println(rmtPin);
+    ESP_LOGD(TAG, "Serial pin is: %d", rmtPin);
 
     if ((rmt_send = rmtInit(rmtPin, RMT_TX_MODE, RMT_MEM_64)) == NULL)
     {
-        Serial.println("init sender failed\n");
+        ESP_LOGE(TAG, "init sender failed");
         return;
     }
 
     float realTick = rmtSetTick(rmt_send, 1000);
-    Serial.printf("real tick set to: %fns\n", realTick);
+    ESP_LOGD(TAG, "real tick set to: %fns", realTick);
 
     xTaskCreate(Task1code, "RmtLoop",
                 10000, /* Stack size in words */
@@ -325,7 +312,7 @@ void writeFile(String name, String &data)
     file.print(data);
     file.close();
 
-    Serial.println("SYS|Success|Wrote to file");
+    ESP_LOGI(TAG, "SYS|Success|Wrote to file");
 }
 
 bool writeCommands(String &command, String &data)
@@ -364,8 +351,9 @@ bool writeCommands(String &command, String &data)
         uint8_t state = data == "1" ? 1 : 0;
         file.write(state);
         file.close();
-        Serial.print("SYS|Success|Dev api state: ");
-        Serial.println(state);
+
+        Serial.printf("SYS|Success|Dev api state: %d\n", state);
+
         return true;
     }
 
@@ -403,9 +391,7 @@ void handleSerial()
 
     if (data == 0xa)
     {
-
-        Serial.print("> ");
-        Serial.println(inputBuffer);
+        Serial.printf("> %s\n", inputBuffer.c_str());
         executeCommand();
         inputBuffer = "";
         return;
@@ -427,16 +413,14 @@ void loop()
     {
         reconnectedLoop = false;
 
-        Serial.print(millis());
-        Serial.println("Reconnecting to WiFi...");
+        ESP_LOGI(TAG, "WiFi lost, reconnecting...");
         WiFi.reconnect();
         previousMillis = currentMillis;
     }
     else if (!reconnectedLoop && wifiStatus == WL_CONNECTED)
     {
         reconnectedLoop = true;
-        Serial.print("Connected to wifi, ip: ");
-        Serial.println(WiFi.localIP());
+        ESP_LOGI(TAG, "Connected to wifi, ip: %s", WiFi.localIP().toString().c_str());
 
         firstConnect = false;
     }
