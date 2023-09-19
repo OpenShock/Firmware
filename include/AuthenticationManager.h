@@ -4,11 +4,10 @@
 
 #include <cstdint>
 
-namespace ShockLink::AuthenticationManager
-{
-    bool Authenticate(std::uint32_t pairCode);
+namespace ShockLink::AuthenticationManager {
+  bool Authenticate(std::uint32_t pairCode);
 
-    bool IsAuthenticated();
-    String GetAuthToken();
-    void ClearAuthToken();
-}
+  bool IsAuthenticated();
+  String GetAuthToken();
+  void ClearAuthToken();
+}  // namespace ShockLink::AuthenticationManager

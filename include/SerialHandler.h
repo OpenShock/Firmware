@@ -1,4 +1,1 @@
-namespace SerialHandler
-{
-
-}
+namespace SerialHandler { }

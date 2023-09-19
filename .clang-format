@@ -135,7 +135,7 @@ KeepEmptyLinesAtEOF: false
 KeepEmptyLinesAtTheStartOfBlocks: false
 LambdaBodyIndentation: Signature
 MaxEmptyLinesToKeep: 1
-NamespaceIndentation: None
+NamespaceIndentation: All
 PPIndentWidth: -1
 PackConstructorInitializers: NextLine
 
