@@ -312,7 +312,7 @@ void writeFile(String name, String &data)
     file.print(data);
     file.close();
 
-    ESP_LOGI(TAG, "SYS|Success|Wrote to file");
+    ESP_LOGD(TAG, "SYS|Success|Wrote to file");
 }
 
 bool writeCommands(String &command, String &data)
@@ -413,14 +413,14 @@ void loop()
     {
         reconnectedLoop = false;
 
-        ESP_LOGI(TAG, "WiFi lost, reconnecting...");
+        ESP_LOGD(TAG, "WiFi lost, reconnecting...");
         WiFi.reconnect();
         previousMillis = currentMillis;
     }
     else if (!reconnectedLoop && wifiStatus == WL_CONNECTED)
     {
         reconnectedLoop = true;
-        ESP_LOGI(TAG, "Connected to wifi, ip: %s", WiFi.localIP().toString().c_str());
+        ESP_LOGD(TAG, "Connected to wifi, ip: %s", WiFi.localIP().toString().c_str());
 
         firstConnect = false;
     }

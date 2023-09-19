@@ -30,11 +30,11 @@ bool ShockLink::CaptivePortal::Start()
 {
     if (s_webServices != nullptr)
     {
-        ESP_LOGI(TAG, "Already started");
+        ESP_LOGD(TAG, "Already started");
         return true;
     }
 
-    ESP_LOGI(TAG, "Starting");
+    ESP_LOGD(TAG, "Starting");
 
     if (!WiFi.enableAP(true))
     {
@@ -83,7 +83,7 @@ bool ShockLink::CaptivePortal::Start()
     s_webServices->webServer.onNotFound(handleHttpNotFound);
     s_webServices->webServer.begin();
 
-    ESP_LOGI(TAG, "Started");
+    ESP_LOGD(TAG, "Started");
 
     return true;
 }
@@ -91,11 +91,11 @@ void ShockLink::CaptivePortal::Stop()
 {
     if (s_webServices == nullptr)
     {
-        ESP_LOGI(TAG, "Already stopped");
+        ESP_LOGD(TAG, "Already stopped");
         return;
     }
 
-    ESP_LOGI(TAG, "Stopping");
+    ESP_LOGD(TAG, "Stopping");
 
     s_webServices->webServer.end();
     s_webServices->socketServer.close();
@@ -142,11 +142,11 @@ bool ShockLink::CaptivePortal::BroadcastMessageBIN(const std::uint8_t *data, std
 
 void handleWebSocketClientConnected(std::uint8_t socketId)
 {
-    ESP_LOGI(TAG, "WebSocket client #%u connected from %s", socketId, s_webServices->socketServer.remoteIP(socketId).toString().c_str());
+    ESP_LOGD(TAG, "WebSocket client #%u connected from %s", socketId, s_webServices->socketServer.remoteIP(socketId).toString().c_str());
 }
 void handleWebSocketClientDisconnected(std::uint8_t socketId)
 {
-    ESP_LOGI(TAG, "WebSocket client #%u disconnected", socketId);
+    ESP_LOGD(TAG, "WebSocket client #%u disconnected", socketId);
 }
 void handleWebSocketClientMessage(std::uint8_t socketId, WStype_t type, std::uint8_t *data, std::size_t len)
 {
