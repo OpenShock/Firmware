@@ -5,6 +5,10 @@ on:
 
 name: ci-tag
 
+env:
+  SHOCKLINK_API_URL: api.shocklink.net
+  SHOCKLINK_FW_VERSION: ${{ github.ref_name }}
+
 jobs:
 
   # Copied verbatim from https://docs.platformio.org/en/stable/integration/ci/github-actions.html

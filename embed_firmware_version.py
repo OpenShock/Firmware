@@ -1,10 +1,13 @@
+import os
 
 Import("env")
 
+shocklinkApiUrl = os.getenv('SHOCKLINK_API_URL') or "api.shocklink.net"
+shocklinkFwVersion = os.getenv('SHOCKLINK_FW_VERSION') or "0.8.1"
+
 env.Append(CPPDEFINES=[
-    ("SHOCKLINK_API_URL", env.StringifyMacro("api.shocklink.net")),
-    ("SHOCKLINK_DEV_API_URL", env.StringifyMacro("dev-api.shocklink.net")),
-    ("SHOCKLINK_FW_VERSION", env.StringifyMacro("0.8.1"))
+    ("SHOCKLINK_API_URL", env.StringifyMacro(shocklinkApiUrl)),
+    ("SHOCKLINK_FW_VERSION", env.StringifyMacro(shocklinkFwVersion))
 ])
 
 print(env.Dump())

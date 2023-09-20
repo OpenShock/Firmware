@@ -16,9 +16,6 @@
 #include <LedManager.h>
 #include <Version.h>
 
-const String apiUrl = "api.shocklink.net";
-const String devApiUrl = "dev-api.shocklink.net";
-
 WiFiMulti WiFiMulti;
 WebSocketsClient webSocket;
 TaskHandle_t Task1;
@@ -292,8 +289,8 @@ void setup()
     String authToken = authTokenFile.readString();
     authTokenFile.close();
 
-    webSocket.setExtraHeaders(("FirmwareVersion:" + versionString + "\r\nDeviceToken: " + authToken).c_str());
-    webSocket.beginSSL(apiUrl, 443, "/1/ws/device");
+    webSocket.setExtraHeaders(("FirmwareVersion:" + SHOCKLINK_FW_VERSION + "\r\nDeviceToken: " + authToken).c_str());
+    webSocket.beginSSL(SHOCKLINK_API_URL, 443, "/1/ws/device");
     webSocket.onEvent(webSocketEvent);
     runner.addTask(keepalive);
     keepalive.enable();
@@ -421,7 +418,7 @@ void loop()
                 SPIFFS.remove("/pairCode");
 
                 HTTPClient http;
-                String uri = "https://" + apiUrl + "/1/pair/" + pairCode;
+                String uri = "https://" + SHOCKLINK_API_URL + "/1/pair/" + pairCode;
 
                 Serial.print("Contacting pair code url: ");
                 Serial.println(uri);

@@ -1,1 +1,0 @@
-const String versionString = "0.8.0";
