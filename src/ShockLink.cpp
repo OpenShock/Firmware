@@ -417,7 +417,7 @@ void loop()
                 SPIFFS.remove("/pairCode");
 
                 HTTPClient http;
-                String uri = "https://" + SHOCKLINK_API_URL + "/1/pair/" + pairCode;
+                String uri = String("https://") + SHOCKLINK_API_URL + "/1/pair/" + pairCode;
 
                 Serial.print("Contacting pair code url: ");
                 Serial.println(uri);
