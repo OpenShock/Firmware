@@ -10,13 +10,13 @@ struct Pattern {
   std::size_t patternLength;
 }
 
-ShockLink::PinPatternManager::PinPatternManager(unsigned int pin) {
-  m_pin = pin;
-  m_pattern = nullptr;
-  m_patternLength = 0;
-  m_taskHandle = nullptr;
-  m_taskSemaphore = xSemaphoreCreateBinary();
-
+ShockLink::PinPatternManager::PinPatternManager(unsigned int pin)
+  : m_pin(pin)
+  , m_pattern(nullptr)
+  , m_patternLength(0)
+  , m_taskHandle(nullptr)
+  , m_taskSemaphore(xSemaphoreCreateBinary())
+{
   pinMode(pin, OUTPUT);
 }
 
