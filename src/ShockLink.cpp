@@ -228,7 +228,7 @@ void setup()
     Serial.println();
     Serial.println();
     Serial.print("==== ShockLink v");
-    Serial.print(SHOCKLINK_FW_VERSION);
+    Serial.print(shocklinkFwVersion);
     Serial.println(" ====");
 
     LedManager::Loop(WL_IDLE_STATUS, false, 0);
