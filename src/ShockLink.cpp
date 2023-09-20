@@ -1,5 +1,6 @@
 #include "AuthenticationManager.h"
 #include "CaptivePortal.h"
+#include "VisualStateManager.h"
 #include "Constants.h"
 
 #include "Arduino.h"
@@ -9,7 +10,6 @@
 #include <algorithm>
 #include <ArduinoJson.h>
 #include <bitset>
-#include <LedManager.h>
 #include <LittleFS.h>
 #include <map>
 #include <TaskScheduler.h>
@@ -199,7 +199,7 @@ void setup() {
 
   ESP_LOGD(TAG, "==== ShockLink v%s ====", ShockLink::Constants::Version);
 
-  LedManager::Loop(WL_IDLE_STATUS, false, 0);
+  ShockLink::VisualStateManager::SetConnectionState(ShockLink::ConnectionState::WiFi_Disconnected);
 
   if (!LittleFS.begin(true)) {
     ESP_LOGE(TAG, "An Error has occurred while mounting LittleFS");
@@ -354,7 +354,26 @@ void loop() {
 
   unsigned long currentMillis = millis();
   wl_status_t wifiStatus      = WiFi.status();
-  LedManager::Loop(wifiStatus, webSocket.isConnected(), currentMillis);
+
+  // TODO: This is bad logic, fix it
+  ShockLink::ConnectionState connectionState;
+  switch (wifiStatus)
+  {
+  case WL_DISCONNECTED:
+    connectionState = ShockLink::ConnectionState::WiFi_Disconnected;
+    break;
+  case WL_CONNECTED:
+    if (webSocket.isConnected())
+      connectionState = ShockLink::ConnectionState::WebSocket_Connected;
+    else
+      connectionState = ShockLink::ConnectionState::WiFi_Connected;
+    break;
+  default:
+    connectionState = ShockLink::ConnectionState::WiFi_Connecting;
+    break;
+  }
+  ShockLink::VisualStateManager::SetConnectionState(connectionState);
+
   // if WiFi is down, try reconnecting every CHECK_WIFI_TIME seconds
   if ((wifiStatus != WL_CONNECTED) && (currentMillis - previousMillis >= interval)) {
     reconnectedLoop = false;
