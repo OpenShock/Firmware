@@ -1,10 +1,11 @@
 #pragma once
 
+#include <nonstd/span.hpp>
+
 #include <freertos/FreeRTOS.h>
 #include <freertos/semphr.h>
 #include <freertos/task.h>
 
-#include <span>
 #include <cstdint>
 
 namespace ShockLink {
@@ -18,8 +19,9 @@ namespace ShockLink {
       std::uint32_t duration;
     };
 
-    static void SetPattern(std::span<const State> pattern);
-    static void ClearPattern();
+    void SetPattern(nonstd::span<const State> pattern);
+    void ClearPattern();
+
   private:
     void ClearPatternInternal();
     static void RunPattern(void* arg);
@@ -30,4 +32,4 @@ namespace ShockLink {
     TaskHandle_t m_taskHandle;
     SemaphoreHandle_t m_taskSemaphore;
   };
-}
+}  // namespace ShockLink

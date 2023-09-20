@@ -2,12 +2,14 @@
 
 #include <cstdint>
 
+#ifndef SHOCKLINK_DOMAIN
 #define SHOCKLINK_DOMAIN "shocklink.net"
+#endif
 
-#define SHOCKLINK_API_DOMAIN     "api." SHOCKLINK_DOMAIN
-#define SHOCKLINK_DEV_API_DOMAIN "dev-api." SHOCKLINK_DOMAIN
+#ifndef SHOCKLINK_API_BASE_URL
+#define SHOCKLINK_API_BASE_URL "https://" SHOCKLINK_API_DOMAIN
+#endif
 
-#define SHOCKLINK_API_BASE_URL  "https://" SHOCKLINK_API_DOMAIN
 #define SHOCKLINK_API_URL(path) SHOCKLINK_API_BASE_URL path
 
 /*
@@ -21,5 +23,4 @@
 namespace ShockLink::Constants {
   extern const char* const Version;
   extern const char* const ApiDomain;
-  extern const char* const DevApiDomain;
 }  // namespace ShockLink::Constants

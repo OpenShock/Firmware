@@ -1,7 +1,7 @@
 #include "AuthenticationManager.h"
 #include "CaptivePortal.h"
-#include "VisualStateManager.h"
 #include "Constants.h"
+#include "VisualStateManager.h"
 
 #include "Arduino.h"
 #include "HTTPClient.h"
@@ -357,20 +357,19 @@ void loop() {
 
   // TODO: This is bad logic, fix it
   ShockLink::ConnectionState connectionState;
-  switch (wifiStatus)
-  {
-  case WL_DISCONNECTED:
-    connectionState = ShockLink::ConnectionState::WiFi_Disconnected;
-    break;
-  case WL_CONNECTED:
-    if (webSocket.isConnected())
-      connectionState = ShockLink::ConnectionState::WebSocket_Connected;
-    else
-      connectionState = ShockLink::ConnectionState::WiFi_Connected;
-    break;
-  default:
-    connectionState = ShockLink::ConnectionState::WiFi_Connecting;
-    break;
+  switch (wifiStatus) {
+    case WL_DISCONNECTED:
+      connectionState = ShockLink::ConnectionState::WiFi_Disconnected;
+      break;
+    case WL_CONNECTED:
+      if (webSocket.isConnected())
+        connectionState = ShockLink::ConnectionState::WebSocket_Connected;
+      else
+        connectionState = ShockLink::ConnectionState::WiFi_Connected;
+      break;
+    default:
+      connectionState = ShockLink::ConnectionState::WiFi_Connecting;
+      break;
   }
   ShockLink::VisualStateManager::SetConnectionState(connectionState);
 
