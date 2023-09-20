@@ -26,6 +26,8 @@ jobs:
         with:
           path: |
             ~/.cache/pip
+            ~/.platformio/platforms
+            ~/.platformio/packages
             ~/.platformio/cache
           key: ${{ runner.os }}-arch
 
