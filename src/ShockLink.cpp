@@ -14,7 +14,6 @@
 #include "SPIFFS.h"
 #include "HTTPClient.h"
 #include <LedManager.h>
-#include <Version.h>
 
 WiFiMulti WiFiMulti;
 WebSocketsClient webSocket;

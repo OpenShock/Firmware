@@ -9,5 +9,3 @@ env.Append(CPPDEFINES=[
     ("SHOCKLINK_API_URL", env.StringifyMacro(shocklinkApiUrl)),
     ("SHOCKLINK_FW_VERSION", env.StringifyMacro(shocklinkFwVersion))
 ])
-
-print(env.Dump())
