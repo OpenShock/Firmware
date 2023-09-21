@@ -12,7 +12,6 @@
 #include <HTTPClient.h>
 #include <LittleFS.h>
 #include <map>
-#include <TaskScheduler.h>
 #include <vector>
 #include <WebSocketsClient.h>
 #include <WiFi.h>
@@ -95,8 +94,15 @@ void SendKeepAlive() {
   webSocket.sendTXT("{\"requestType\": 0}");
 }
 
-Task keepalive(30'000, TASK_FOREVER, &SendKeepAlive);
-Scheduler runner;
+void SendKeepAliveTask() {
+  static std::uint64_t msLast = 0;
+
+  std::uint64_t msNow = ShockLink::Millis();
+  if ((msNow - msLast) >= 30'000) {
+    SendKeepAlive();
+    msLast = msNow;
+  }
+}
 
 bool firstWebSocketConnect = true;
 
@@ -186,8 +192,6 @@ void setup() {
     ("FirmwareVersion:" + String(ShockLink::Constants::Version) + "\r\nDeviceToken: " + authToken).c_str());
   webSocket.beginSSL(ShockLink::Constants::ApiDomain, 443, "/1/ws/device");
   webSocket.onEvent(webSocketEvent);
-  runner.addTask(keepalive);
-  keepalive.enable();
 
   useDevApi();
 }
@@ -320,5 +324,5 @@ void loop() {
   ShockLink::CaptivePortal::Update();
 
   webSocket.loop();
-  runner.execute();
+  SendKeepAliveTask();
 }
