@@ -22,7 +22,17 @@ const char* const TAG = "ShockLink";
 
 WiFiMulti WiFiMulti;
 WebSocketsClient webSocket;
-TaskHandle_t Task1;
+TaskHandle_t rmtLoopTask;
+
+int rmtPin = 15;
+
+struct command_t {
+  std::vector<rmt_data_t> sequence;
+  std::shared_ptr<std::vector<rmt_data_t>> zeroSequence;
+  std::uint64_t until;
+};
+
+std::unordered_map<std::uint16_t, command_t> Commands;
 
 std::vector<rmt_data_t>
   GetSequence(std::uint16_t shockerId, std::uint8_t method, std::uint8_t intensity, std::uint8_t shockerModel) {
@@ -61,27 +71,16 @@ std::shared_ptr<std::vector<rmt_data_t>> GetZeroSequence(std::uint16_t shockerId
   return sequence;
 }
 
-struct command_t {
-  std::vector<rmt_data_t> sequence;
-  std::shared_ptr<std::vector<rmt_data_t>> zeroSequence;
-  std::uint64_t until;
-};
-
-std::map<std::uint32_t, command_t> Commands;
-rmt_obj_t* rmt_send = NULL;
-
 void IntakeCommand(uint16_t shockerId, uint8_t method, uint8_t intensity, uint duration, uint8_t shockerModel) {
   // Stop logic
   if (method == 0) {
     method    = 2;  // Vibrate
     intensity = 0;
-    duration  = 0;
+    duration  = 300;
   }
 
-  command_t cmd
+  Commands[shockerId]
     = {GetSequence(shockerId, method, intensity, shockerModel), GetZeroSequence(shockerId, shockerModel), millis() + duration};
-
-  Commands[shockerId] = cmd;
 }
 
 void ControlCommand(DynamicJsonDocument& doc) {
@@ -167,36 +166,55 @@ void webSocketEvent(WStype_t type, uint8_t* payload, size_t length) {
   }
 }
 
-void RmtLoop() {
-  if (Commands.size() <= 0) return;
+void RmtLoop(void* parameter) {
+  ESP_LOGD(TAG, "RMT loop running on core %d", xPortGetCoreID());
 
-  std::vector<rmt_data_t> sequence;
+  rmt_obj_t* rmt_send = NULL;
+  if ((rmt_send = rmtInit(rmtPin, RMT_TX_MODE, RMT_MEM_64)) == NULL) {
+    ESP_LOGE(TAG, "init sender failed");
+    return;
+  }
 
-  long mil = millis();
-  for (std::pair<const uint, command_t>& it : Commands) {
-    if (it.second.until <= mil) {
-      // Send stop for 300ms more to ensure the thing is stopping
-      if (it.second.until + 300 >= mil) {
-        sequence.insert(sequence.end(), it.second.zeroSequence->begin(), it.second.zeroSequence->end());
+  float realTick = rmtSetTick(rmt_send, 1000);
+  ESP_LOGD(TAG, "real tick set to: %fns", realTick);
+
+  while (true) {
+    if (Commands.size() <= 0) {
+      vTaskDelay(0);  // Give the scheduler a chance to run
+      continue;
+    }
+
+    long mil = millis();
+
+    // Send queued commands
+    for (auto it = Commands.begin(); it != Commands.end();) {
+      auto& cmd = it->second;
+
+      bool expired = cmd.until < mil;
+      bool empty   = cmd.sequence.size() <= 0;
+
+      // Remove expired or empty commands, else send the command.
+      // After sending/receiving a command, move to the next one.
+      if (expired || empty) {
+        // If the command is not empty, send the zero sequence to stop the shocker
+        if (!empty) {
+          rmtWriteBlocking(rmt_send, cmd.zeroSequence->data(), cmd.zeroSequence->size());
+        }
+
+        // Remove the command and move to the next one
+        it = Commands.erase(it);
+      } else {
+        // Send the command
+        rmtWriteBlocking(rmt_send, cmd.sequence.data(), cmd.sequence.size());
+
+        // Move to the next command
+        ++it;
       }
-    } else {
-      // Regular shocking sequence
-      sequence.insert(sequence.end(), it.second.sequence.begin(), it.second.sequence.end());
     }
   }
 
-  std::size_t finalSize = sequence.size();
-  if (finalSize <= 0) return;
-
-  ESP_LOGD(TAG, "Sending sequence of size %d", finalSize);
-  rmtWriteBlocking(rmt_send, sequence.data(), finalSize);
-}
-
-void Task1code(void* parameter) {
-  ESP_LOGD(TAG, "RMT loop running on core %d", xPortGetCoreID());
-  while (true) {
-    RmtLoop();
-  }
+  // Yeah, this is never reached, but it's good practice
+  rmtDeinit(rmt_send);
 }
 
 bool useDevApi() {
@@ -239,29 +257,14 @@ void setup() {
   File authTokenFile = LittleFS.open("/authToken", FILE_READ);
   if (!authTokenFile) return;
 
-  int rmtPin = 15;
-
   if (LittleFS.exists("/rmtPin")) {
     File rmtPinFile = LittleFS.open("/rmtPin", FILE_READ);
     rmtPin          = rmtPinFile.readString().toInt();
     rmtPinFile.close();
   }
-  ESP_LOGD(TAG, "Serial pin is: %d", rmtPin);
+  ESP_LOGD(TAG, "RMT pin is: %d", rmtPin);
 
-  if ((rmt_send = rmtInit(rmtPin, RMT_TX_MODE, RMT_MEM_64)) == NULL) {
-    ESP_LOGE(TAG, "init sender failed");
-    return;
-  }
-
-  float realTick = rmtSetTick(rmt_send, 1000);
-  ESP_LOGD(TAG, "real tick set to: %fns", realTick);
-
-  xTaskCreate(Task1code,
-              "RmtLoop",
-              10'000, /* Stack size in words */
-              NULL,
-              0,
-              &Task1);
+  xTaskCreate(RmtLoop, "RmtLoop", 10'000, nullptr, 0, &rmtLoopTask);
 
   String authToken = authTokenFile.readString();
   authTokenFile.close();
