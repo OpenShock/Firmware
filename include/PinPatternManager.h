@@ -11,7 +11,7 @@
 namespace ShockLink {
   class PinPatternManager {
   public:
-    PinPatternManager(unsigned int pin);
+    PinPatternManager(unsigned int gpioPin);
     ~PinPatternManager();
 
     struct State {
@@ -26,7 +26,8 @@ namespace ShockLink {
     void ClearPatternInternal();
     static void RunPattern(void* arg);
 
-    unsigned int m_pin;
+    unsigned int m_gpioPin;
+    char m_name[32];
     State* m_pattern;
     std::size_t m_patternLength;
     TaskHandle_t m_taskHandle;
