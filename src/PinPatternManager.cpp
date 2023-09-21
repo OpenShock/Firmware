@@ -34,7 +34,7 @@ void ShockLink::PinPatternManager::SetPattern(nonstd::span<const State> pattern)
   snprintf(taskName, sizeof(taskName), "PinPatternManager-%d", m_pin);
 
   // Start the task
-  BaseType_t result = xTaskCreate(RunPattern, taskName, 512, this, 1, &m_taskHandle);
+  BaseType_t result = xTaskCreate(RunPattern, taskName, 1024, this, 1, &m_taskHandle);
   if (result != pdPASS) {
     ESP_LOGE(TAG, "Failed to create task: %d", result);
 
