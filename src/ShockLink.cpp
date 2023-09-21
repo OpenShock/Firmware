@@ -143,6 +143,8 @@ bool useDevApi() {
   return data == 1;
 }
 
+bool setupOk = false;
+
 void setup() {
   Serial.begin(115'200);
   Serial.setDebugOutput(true);
@@ -194,6 +196,8 @@ void setup() {
   webSocket.onEvent(webSocketEvent);
 
   useDevApi();
+
+  setupOk = true;
 }
 
 std::uint64_t previousMillis = 0;
@@ -284,6 +288,8 @@ void handleSerial() {
 }
 
 void loop() {
+  if (!setupOk) return;
+
   if (Serial.available()) handleSerial();
 
   std::uint64_t currentMillis = ShockLink::Millis();
