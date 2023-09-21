@@ -22,7 +22,7 @@ namespace ShockLink {
                      std::uint16_t shockerId,
                      std::uint8_t method,
                      std::uint8_t intensity,
-                     std::uint32_t duration);
+                     unsigned int duration);
     void ClearPendingCommands();
 
   private:

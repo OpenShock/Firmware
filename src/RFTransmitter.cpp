@@ -1,6 +1,7 @@
 #include "RFTransmitter.h"
 
 #include "Rmt/MainEncoder.h"
+#include "Time.h"
 
 #include <esp_log.h>
 
@@ -57,12 +58,16 @@ bool RFTransmitter::SendCommand(std::uint8_t shockerModel,
                                 std::uint16_t shockerId,
                                 std::uint8_t method,
                                 std::uint8_t intensity,
-                                std::uint32_t duration) {
+                                unsigned int duration) {
   if (!ok()) {
     return false;
   }
+  if (duration >= std::numeric_limits<std::uint16_t>::max()) {
+      ESP_LOGW(m_name, "Duration for provided command exceeds hard limit of 66 seconds (2^16 ms): %d", duration);
+      return false;
+    }
 
-  command_t* cmd = new command_t {millis() + duration,
+  command_t* cmd = new command_t {ShockLink::Millis() + duration,
                                   Rmt::GetSequence(shockerId, method, intensity, shockerModel),
                                   Rmt::GetZeroSequence(shockerId, shockerModel),
                                   shockerId};
@@ -120,7 +125,7 @@ void RFTransmitter::TransmitTask(void* arg) {
       }
     }
 
-    long mil = millis();
+    std::uint64_t mil = ShockLink::Millis();
 
     // Send queued commands
     for (auto it = commands.begin(); it != commands.end();) {

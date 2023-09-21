@@ -2,6 +2,7 @@
 #include "CaptivePortal.h"
 #include "Constants.h"
 #include "RFTransmitter.h"
+#include "Time.h"
 #include "VisualStateManager.h"
 
 #include <algorithm>
@@ -25,7 +26,11 @@ TaskHandle_t rmtLoopTask;
 
 std::unique_ptr<ShockLink::RFTransmitter> s_rfTransmitter;
 
-void IntakeCommand(uint16_t shockerId, uint8_t method, uint8_t intensity, uint duration, uint8_t shockerModel) {
+bool IntakeCommand(std::uint16_t shockerId,
+                   std::uint8_t method,
+                   std::uint8_t intensity,
+                   unsigned int duration,
+                   std::uint8_t shockerModel) {
   // Stop logic
   bool isStop = method == 0;
   if (isStop) {
@@ -36,21 +41,23 @@ void IntakeCommand(uint16_t shockerId, uint8_t method, uint8_t intensity, uint d
     s_rfTransmitter->ClearPendingCommands();
   }
 
-  s_rfTransmitter->SendCommand(shockerModel, shockerId, method, intensity, duration);
+  return s_rfTransmitter->SendCommand(shockerModel, shockerId, method, intensity, duration);
 }
 
 void ControlCommand(DynamicJsonDocument& doc) {
   auto data = doc["Data"];
   for (int it = 0; it < data.size(); it++) {
-    auto cur          = data[it];
-    uint8_t minval    = 99;
-    uint16_t id       = static_cast<uint16_t>(cur["Id"]);
-    uint8_t type      = static_cast<uint8_t>(cur["Type"]);
-    uint8_t intensity = std::min(static_cast<uint8_t>(cur["Intensity"]), minval);
-    int duration      = static_cast<unsigned int>(cur["Duration"]);
-    uint8_t model     = static_cast<uint8_t>(cur["Model"]);
+    auto cur              = data[it];
+    uint8_t minval        = 99;
+    uint16_t id           = static_cast<uint16_t>(cur["Id"]);
+    uint8_t type          = static_cast<uint8_t>(cur["Type"]);
+    uint8_t intensity     = std::min(static_cast<uint8_t>(cur["Intensity"]), minval);
+    unsigned int duration = static_cast<unsigned int>(cur["Duration"]);
+    uint8_t model         = static_cast<uint8_t>(cur["Model"]);
 
-    IntakeCommand(id, type, intensity, duration, model);
+    if (!IntakeCommand(id, type, intensity, duration, model)) {
+      ESP_LOGE(TAG, "Remote command failed/rejected!");
+    }
   }
 }
 
@@ -185,7 +192,7 @@ void setup() {
   useDevApi();
 }
 
-unsigned long previousMillis = 0;
+std::uint64_t previousMillis = 0;
 unsigned long interval       = 30'000;
 bool firstConnect            = true;
 bool reconnectedLoop         = false;
@@ -275,7 +282,7 @@ void handleSerial() {
 void loop() {
   if (Serial.available()) handleSerial();
 
-  unsigned long currentMillis = millis();
+  std::uint64_t currentMillis = ShockLink::Millis();
   wl_status_t wifiStatus      = WiFi.status();
 
   // TODO: This is bad logic, fix it
