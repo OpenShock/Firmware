@@ -135,14 +135,6 @@ void webSocketEvent(WStype_t type, uint8_t* payload, size_t length) {
   }
 }
 
-bool useDevApi() {
-  if (!LittleFS.exists("/debug/api")) return false;
-  File file = LittleFS.open("/debug/api");
-  auto data = file.read();
-  ESP_LOGD(TAG, "Dev api state: %d", data);
-  return data == 1;
-}
-
 bool setupOk = false;
 
 void setup() {
@@ -194,8 +186,6 @@ void setup() {
     ("FirmwareVersion:" + String(ShockLink::Constants::Version) + "\r\nDeviceToken: " + authToken).c_str());
   webSocket.beginSSL(ShockLink::Constants::ApiDomain, 443, "/1/ws/device");
   webSocket.onEvent(webSocketEvent);
-
-  useDevApi();
 
   setupOk = true;
 }
