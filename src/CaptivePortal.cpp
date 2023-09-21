@@ -1,5 +1,7 @@
 #include "CaptivePortal.h"
 
+#include "AuthenticationManager.h"
+
 #include <ArduinoJson.h>
 #include <ESPAsyncWebServer.h>
 #include <LittleFS.h>
@@ -209,10 +211,22 @@ void handleHttpPostRequest(AsyncWebServerRequest* request, std::uint8_t* data, s
   }
 
   if (request->url() == "/pairCode") {
-    File file = LittleFS.open("/pairCode", FILE_WRITE);
-    file.write(data, len);
-    file.close();
-    request->send(200, "text/plain", "Saved");
+    if (len < 7 || data[6] != 0) {
+      request->send(400, "text/plain", "Invalid pair code");
+      return;
+    }
+
+    char* cdata = reinterpret_cast<char*>(data);
+
+    // Verify that the pair code is a number
+    for (std::size_t i = 0; i < 6; ++i) {
+      if (cdata[i] < '0' || cdata[i] > '9') {
+        request->send(400, "text/plain", "Invalid pair code");
+        return;
+      }
+    }
+
+    ShockLink::AuthenticationManager::Authenticate((unsigned int)atoi(cdata));
     return;
   }
 
