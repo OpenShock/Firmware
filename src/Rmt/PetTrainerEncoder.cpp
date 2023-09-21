@@ -7,7 +7,7 @@ const rmt_data_t kRmtPostamble = {200, 1, 7000, 0};
 
 std::vector<rmt_data_t> ShockLink::Rmt::PetTrainerEncoder::GetSequence(std::uint16_t shockerId, std::uint8_t method, std::uint8_t intensity) {
   std::uint8_t methodBit = (0x80 | (1 << (method - 1))) & 0xFF;
-  std::uint8_t methodChecksum = ~((1 << (8 - method)) | 1) & 0xFF;
+  std::uint8_t methodChecksum = 0xFF ^ ((1 << (8 - method)) | 1);
   
   std::uint64_t data
     = (std::uint64_t(methodBit) << 32)
