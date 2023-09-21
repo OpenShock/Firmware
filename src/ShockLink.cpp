@@ -24,48 +24,62 @@ WiFiMulti WiFiMulti;
 WebSocketsClient webSocket;
 TaskHandle_t Task1;
 
+std::vector<rmt_data_t>
+  GetSequence(std::uint16_t shockerId, std::uint8_t method, std::uint8_t intensity, std::uint8_t shockerModel) {
+  switch (shockerModel) {
+    case 1:
+      return ShockLink::Rmt::PetTrainerEncoder::GetSequence(shockerId, method, intensity);
+    case 2:
+      return ShockLink::Rmt::XlcEncoder::GetSequence(shockerId, 0, method, intensity);
+    default:
+      ESP_LOGE(TAG, "Unknown shocker model: %d", shockerModel);
+      return {};
+  }
+}
+std::shared_ptr<std::vector<rmt_data_t>> GetZeroSequence(std::uint16_t shockerId, std::uint8_t shockerModel) {
+  static std::unordered_map<std::uint16_t, std::shared_ptr<std::vector<rmt_data_t>>> _sequences;
+
+  auto it = _sequences.find(shockerId);
+  if (it != _sequences.end()) return it->second;
+
+  std::shared_ptr<std::vector<rmt_data_t>> sequence;
+  switch (shockerModel) {
+    case 1:
+      sequence = std::make_shared<std::vector<rmt_data_t>>(ShockLink::Rmt::PetTrainerEncoder::GetSequence(shockerId, 2, 0));
+      break;
+    case 2:
+      sequence = std::make_shared<std::vector<rmt_data_t>>(ShockLink::Rmt::XlcEncoder::GetSequence(shockerId, 0, 2, 0));
+      break;
+    default:
+      ESP_LOGE(TAG, "Unknown shocker model: %d", shockerModel);
+      sequence = nullptr;
+      break;
+  }
+
+  _sequences[shockerId] = sequence;
+
+  return sequence;
+}
+
 struct command_t {
   std::vector<rmt_data_t> sequence;
-  std::vector<rmt_data_t> zeroSequence;
-  ulong until;
+  std::shared_ptr<std::vector<rmt_data_t>> zeroSequence;
+  std::uint64_t until;
 };
 
-std::map<uint, command_t> Commands;
+std::map<std::uint32_t, command_t> Commands;
 rmt_obj_t* rmt_send = NULL;
 
 void IntakeCommand(uint16_t shockerId, uint8_t method, uint8_t intensity, uint duration, uint8_t shockerModel) {
   // Stop logic
-  bool isStop = method == 0;
-  if (isStop) {
+  if (method == 0) {
     method    = 2;  // Vibrate
     intensity = 0;
     duration  = 0;
   }
 
-  std::vector<rmt_data_t> rmtData;
-  if (shockerModel == 1) {
-    ESP_LOGD(TAG, "Using pet trainer sequence");
-    rmtData = ShockLink::Rmt::PetTrainerEncoder::GetSequence(shockerId, method, intensity);
-  } else {
-    ESP_LOGD(TAG, "Using XLC sequence");
-    rmtData = ShockLink::Rmt::XlcEncoder::GetSequence(shockerId, 0, method, intensity);
-  }
-
-  // Zero sequence
-  std::vector<rmt_data_t> zeroSequence;
-  if (Commands.find(shockerId) != Commands.end()) {
-    ESP_LOGD(TAG, "Command existed");
-    zeroSequence = Commands[shockerId].zeroSequence;
-  } else {
-    ESP_LOGD(TAG, "Generating new zero sequence for %d", shockerId);
-    if (shockerModel == 1) {
-      zeroSequence = ShockLink::Rmt::PetTrainerEncoder::GetSequence(shockerId, 2, 0);
-    } else {
-      zeroSequence = ShockLink::Rmt::XlcEncoder::GetSequence(shockerId, 0, 2, 0);
-    }
-  }
-
-  command_t cmd = {rmtData, zeroSequence, millis() + duration};
+  command_t cmd
+    = {GetSequence(shockerId, method, intensity, shockerModel), GetZeroSequence(shockerId, shockerModel), millis() + duration};
 
   Commands[shockerId] = cmd;
 }
@@ -163,7 +177,7 @@ void RmtLoop() {
     if (it.second.until <= mil) {
       // Send stop for 300ms more to ensure the thing is stopping
       if (it.second.until + 300 >= mil) {
-        sequence.insert(sequence.end(), it.second.zeroSequence.begin(), it.second.zeroSequence.end());
+        sequence.insert(sequence.end(), it.second.zeroSequence->begin(), it.second.zeroSequence->end());
       }
     } else {
       // Regular shocking sequence
