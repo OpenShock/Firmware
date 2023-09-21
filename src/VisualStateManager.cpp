@@ -4,6 +4,8 @@
 
 #include <Arduino.h>
 
+const char* const TAG = "VisualStateManager";
+
 constexpr ShockLink::PinPatternManager::State kCriticalErrorPattern[] = {
   { true, 100}, // LED ON for 0.1 seconds
   {false, 100}  // LED OFF for 0.1 seconds
@@ -55,11 +57,24 @@ constexpr ShockLink::PinPatternManager::State kWebSocketConnectedPattern[] = {
 
 ShockLink::PinPatternManager s_builtInLedManager(2);
 
+static bool s_criticalError = false;
 void ShockLink::VisualStateManager::SetCriticalError() {
+  if (s_criticalError) {
+    return;
+  }
+
   s_builtInLedManager.SetPattern(kCriticalErrorPattern);
+
+  s_criticalError = true;
 }
 
+static ShockLink::ConnectionState s_connectionState = (ShockLink::ConnectionState)-1;
 void ShockLink::VisualStateManager::SetConnectionState(ConnectionState state) {
+  if (s_connectionState == state) {
+    return;
+  }
+
+  ESP_LOGD(TAG, "SetConnectionState: %d", state);
   switch (state) {
     case ConnectionState::WiFi_Disconnected:
       s_builtInLedManager.SetPattern(kWiFiDisconnected);
@@ -77,6 +92,8 @@ void ShockLink::VisualStateManager::SetConnectionState(ConnectionState state) {
       s_builtInLedManager.SetPattern(kWebSocketConnectedPattern);
       break;
     default:
-      break;
+      return;
   }
+
+  s_connectionState = state;
 }
