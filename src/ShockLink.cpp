@@ -1,15 +1,15 @@
 #include "AuthenticationManager.h"
 #include "CaptivePortal.h"
 #include "Constants.h"
-#include "VisualStateManager.h"
 #include "Rmt/PetTrainerEncoder.h"
 #include "Rmt/XlcEncoder.h"
+#include "VisualStateManager.h"
 
-#include <Arduino.h>
-#include <HTTPClient.h>
 #include <algorithm>
+#include <Arduino.h>
 #include <ArduinoJson.h>
 #include <bitset>
+#include <HTTPClient.h>
 #include <LittleFS.h>
 #include <map>
 #include <TaskScheduler.h>
@@ -45,10 +45,10 @@ void IntakeCommand(uint16_t shockerId, uint8_t method, uint8_t intensity, uint d
   std::vector<rmt_data_t> rmtData;
   if (shockerModel == 1) {
     ESP_LOGD(TAG, "Using pet trainer sequence");
-    rmtData = ShockLink::PetTrainerEncoder::GetSequence(shockerId, method, intensity);
+    rmtData = ShockLink::Rmt::PetTrainerEncoder::GetSequence(shockerId, method, intensity);
   } else {
     ESP_LOGD(TAG, "Using XLC sequence");
-    rmtData = ShockLink::XlcEncoder::GetSequence(shockerId, 0, method, intensity);
+    rmtData = ShockLink::Rmt::XlcEncoder::GetSequence(shockerId, 0, method, intensity);
   }
 
   // Zero sequence
@@ -59,9 +59,9 @@ void IntakeCommand(uint16_t shockerId, uint8_t method, uint8_t intensity, uint d
   } else {
     ESP_LOGD(TAG, "Generating new zero sequence for %d", shockerId);
     if (shockerModel == 1) {
-      zeroSequence = ShockLink::PetTrainerEncoder::GetSequence(shockerId, 2, 0);
+      zeroSequence = ShockLink::Rmt::PetTrainerEncoder::GetSequence(shockerId, 2, 0);
     } else {
-      zeroSequence = ShockLink::XlcEncoder::GetSequence(shockerId, 0, 2, 0);
+      zeroSequence = ShockLink::Rmt::XlcEncoder::GetSequence(shockerId, 0, 2, 0);
     }
   }
 
