@@ -5,7 +5,7 @@
 #include <cstdint>
 
 namespace ShockLink::AuthenticationManager {
-  bool Authenticate(std::uint32_t pairCode);
+  bool Authenticate(unsigned int pairCode);
 
   bool IsAuthenticated();
   String GetAuthToken();

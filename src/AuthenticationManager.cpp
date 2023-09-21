@@ -48,7 +48,7 @@ bool TryReadFile(const char* path, String& str) {
 static bool _isAuthenticated = false;
 static String authToken;
 
-bool ShockLink::AuthenticationManager::Authenticate(std::uint32_t pairCode) {
+bool ShockLink::AuthenticationManager::Authenticate(unsigned int pairCode) {
   HTTPClient http;
   String uri = SHOCKLINK_API_URL("/1/device/pair/") + String(pairCode);
 
