@@ -89,7 +89,25 @@ bool ShockLink::AuthenticationManager::IsAuthenticated() {
     return false;
   }
 
+  HTTPClient http;
+  const char* const uri = SHOCKLINK_API_URL("/1/device/self");
+
+  ESP_LOGD(TAG, "Contacting self url: %s", uri);
+  http.begin(uri);
+
+  int responseCode = http.GET();
+
+  if (responseCode != 200) {
+    ESP_LOGE(TAG, "Error while verifying auth token: [%d] %s", responseCode, http.getString().c_str());
+    LittleFS.remove(AUTH_TOKEN_FILE);
+    return false;
+  }
+
+  http.end();
+
   _isAuthenticated = true;
+
+  ESP_LOGD(TAG, "Successfully verified auth token");
 
   return true;
 }
