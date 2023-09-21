@@ -26,7 +26,7 @@ TaskHandle_t Task1;
 
 struct command_t {
   std::vector<rmt_data_t> sequence;
-  std::vector<rmt_data_t>* zeroSequence;
+  std::vector<rmt_data_t> zeroSequence;
   ulong until;
 };
 
@@ -52,7 +52,7 @@ void IntakeCommand(uint16_t shockerId, uint8_t method, uint8_t intensity, uint d
   }
 
   // Zero sequence
-  std::vector<rmt_data_t>* zeroSequence;
+  std::vector<rmt_data_t> zeroSequence;
   if (Commands.find(shockerId) != Commands.end()) {
     ESP_LOGD(TAG, "Command existed");
     zeroSequence = Commands[shockerId].zeroSequence;
@@ -163,7 +163,7 @@ void RmtLoop() {
     if (it.second.until <= mil) {
       // Send stop for 300ms more to ensure the thing is stopping
       if (it.second.until + 300 >= mil) {
-        sequence.insert(sequence.end(), it.second.zeroSequence->begin(), it.second.zeroSequence->end());
+        sequence.insert(sequence.end(), it.second.zeroSequence.begin(), it.second.zeroSequence.end());
       }
     } else {
       // Regular shocking sequence
