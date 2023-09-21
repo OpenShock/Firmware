@@ -1,5 +1,8 @@
-#include <cstdint>
+#pragma once
+
 #include <esp32-hal.h>
+
+#include <cstdint>
 #include <vector>
 
 namespace ShockLink::Rmt::PetTrainerEncoder {

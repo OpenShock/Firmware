@@ -1,8 +1,7 @@
 #include "AuthenticationManager.h"
 #include "CaptivePortal.h"
 #include "Constants.h"
-#include "Rmt/PetTrainerEncoder.h"
-#include "Rmt/XlcEncoder.h"
+#include "RFTransmitter.h"
 #include "VisualStateManager.h"
 
 #include <algorithm>
@@ -24,63 +23,20 @@ WiFiMulti WiFiMulti;
 WebSocketsClient webSocket;
 TaskHandle_t rmtLoopTask;
 
-int rmtPin = 15;
-
-struct command_t {
-  std::vector<rmt_data_t> sequence;
-  std::shared_ptr<std::vector<rmt_data_t>> zeroSequence;
-  std::uint64_t until;
-};
-
-std::unordered_map<std::uint16_t, command_t> Commands;
-
-std::vector<rmt_data_t>
-  GetSequence(std::uint16_t shockerId, std::uint8_t method, std::uint8_t intensity, std::uint8_t shockerModel) {
-  switch (shockerModel) {
-    case 1:
-      return ShockLink::Rmt::PetTrainerEncoder::GetSequence(shockerId, method, intensity);
-    case 2:
-      return ShockLink::Rmt::XlcEncoder::GetSequence(shockerId, 0, method, intensity);
-    default:
-      ESP_LOGE(TAG, "Unknown shocker model: %d", shockerModel);
-      return {};
-  }
-}
-std::shared_ptr<std::vector<rmt_data_t>> GetZeroSequence(std::uint16_t shockerId, std::uint8_t shockerModel) {
-  static std::unordered_map<std::uint16_t, std::shared_ptr<std::vector<rmt_data_t>>> _sequences;
-
-  auto it = _sequences.find(shockerId);
-  if (it != _sequences.end()) return it->second;
-
-  std::shared_ptr<std::vector<rmt_data_t>> sequence;
-  switch (shockerModel) {
-    case 1:
-      sequence = std::make_shared<std::vector<rmt_data_t>>(ShockLink::Rmt::PetTrainerEncoder::GetSequence(shockerId, 2, 0));
-      break;
-    case 2:
-      sequence = std::make_shared<std::vector<rmt_data_t>>(ShockLink::Rmt::XlcEncoder::GetSequence(shockerId, 0, 2, 0));
-      break;
-    default:
-      ESP_LOGE(TAG, "Unknown shocker model: %d", shockerModel);
-      sequence = nullptr;
-      break;
-  }
-
-  _sequences[shockerId] = sequence;
-
-  return sequence;
-}
+std::unique_ptr<ShockLink::RFTransmitter> s_rfTransmitter;
 
 void IntakeCommand(uint16_t shockerId, uint8_t method, uint8_t intensity, uint duration, uint8_t shockerModel) {
   // Stop logic
-  if (method == 0) {
+  bool isStop = method == 0;
+  if (isStop) {
     method    = 2;  // Vibrate
     intensity = 0;
     duration  = 300;
+
+    s_rfTransmitter->ClearPendingCommands();
   }
 
-  Commands[shockerId]
-    = {GetSequence(shockerId, method, intensity, shockerModel), GetZeroSequence(shockerId, shockerModel), millis() + duration};
+  s_rfTransmitter->SendCommand(shockerModel, shockerId, method, intensity, duration);
 }
 
 void ControlCommand(DynamicJsonDocument& doc) {
@@ -166,57 +122,6 @@ void webSocketEvent(WStype_t type, uint8_t* payload, size_t length) {
   }
 }
 
-void RmtLoop(void* parameter) {
-  ESP_LOGD(TAG, "RMT loop running on core %d", xPortGetCoreID());
-
-  rmt_obj_t* rmt_send = NULL;
-  if ((rmt_send = rmtInit(rmtPin, RMT_TX_MODE, RMT_MEM_64)) == NULL) {
-    ESP_LOGE(TAG, "init sender failed");
-    return;
-  }
-
-  float realTick = rmtSetTick(rmt_send, 1000);
-  ESP_LOGD(TAG, "real tick set to: %fns", realTick);
-
-  while (true) {
-    if (Commands.size() <= 0) {
-      vTaskDelay(0);  // Give the scheduler a chance to run
-      continue;
-    }
-
-    long mil = millis();
-
-    // Send queued commands
-    for (auto it = Commands.begin(); it != Commands.end();) {
-      auto& cmd = it->second;
-
-      bool expired = cmd.until < mil;
-      bool empty   = cmd.sequence.size() <= 0;
-
-      // Remove expired or empty commands, else send the command.
-      // After sending/receiving a command, move to the next one.
-      if (expired || empty) {
-        // If the command is not empty, send the zero sequence to stop the shocker
-        if (!empty) {
-          rmtWriteBlocking(rmt_send, cmd.zeroSequence->data(), cmd.zeroSequence->size());
-        }
-
-        // Remove the command and move to the next one
-        it = Commands.erase(it);
-      } else {
-        // Send the command
-        rmtWriteBlocking(rmt_send, cmd.sequence.data(), cmd.sequence.size());
-
-        // Move to the next command
-        ++it;
-      }
-    }
-  }
-
-  // Yeah, this is never reached, but it's good practice
-  rmtDeinit(rmt_send);
-}
-
 bool useDevApi() {
   if (!LittleFS.exists("/debug/api")) return false;
   File file = LittleFS.open("/debug/api");
@@ -257,6 +162,7 @@ void setup() {
   File authTokenFile = LittleFS.open("/authToken", FILE_READ);
   if (!authTokenFile) return;
 
+  int rmtPin = 15;
   if (LittleFS.exists("/rmtPin")) {
     File rmtPinFile = LittleFS.open("/rmtPin", FILE_READ);
     rmtPin          = rmtPinFile.readString().toInt();
@@ -264,7 +170,7 @@ void setup() {
   }
   ESP_LOGD(TAG, "RMT pin is: %d", rmtPin);
 
-  xTaskCreate(RmtLoop, "RmtLoop", 10'000, nullptr, 0, &rmtLoopTask);
+  s_rfTransmitter = std::make_unique<ShockLink::RFTransmitter>(rmtPin, 32);
 
   String authToken = authTokenFile.readString();
   authTokenFile.close();
