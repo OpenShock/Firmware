@@ -12,7 +12,7 @@ typedef void* TaskHandle_t;
 namespace ShockLink {
   class RFTransmitter {
   public:
-    RFTransmitter(int gpioPin, int queueSize = 32);
+    RFTransmitter(unsigned int gpioPin, int queueSize = 32);
     ~RFTransmitter();
 
     inline bool ok() const { return m_taskHandle != nullptr && m_queueHandle != nullptr; }
@@ -27,7 +27,7 @@ namespace ShockLink {
   private:
     static void TransmitTask(void* arg);
 
-    int m_gpioPin;
+    unsigned int m_gpioPin;
     char m_name[32];
     rmt_obj_t* m_rmtHandle;
     QueueHandle_t m_queueHandle;

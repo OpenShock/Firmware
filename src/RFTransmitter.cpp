@@ -17,7 +17,7 @@ struct command_t {
   std::uint16_t shockerId;
 };
 
-RFTransmitter::RFTransmitter(int gpioPin, int queueSize)
+RFTransmitter::RFTransmitter(unsigned int gpioPin, int queueSize)
   : m_gpioPin(gpioPin), m_rmtHandle(nullptr), m_queueHandle(nullptr), m_taskHandle(nullptr) {
   snprintf(m_name, sizeof(m_name), "RFTransmitter-%d", gpioPin);
 
@@ -63,9 +63,9 @@ bool RFTransmitter::SendCommand(std::uint8_t shockerModel,
     return false;
   }
   if (duration >= std::numeric_limits<std::uint16_t>::max()) {
-      ESP_LOGW(m_name, "Duration for provided command exceeds hard limit of 66 seconds (2^16 ms): %d", duration);
-      return false;
-    }
+    ESP_LOGW(m_name, "Duration for provided command exceeds hard limit of 66 seconds (2^16 ms): %d", duration);
+    return false;
+  }
 
   command_t* cmd = new command_t {ShockLink::Millis() + duration,
                                   Rmt::GetSequence(shockerId, method, intensity, shockerModel),
