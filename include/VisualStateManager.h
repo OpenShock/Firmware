@@ -1,10 +1,10 @@
 #pragma once
 
-#include "ConnectionState.h"
+#include "WiFiState.h"
 
 #include <cstdint>
 
 namespace ShockLink::VisualStateManager {
   void SetCriticalError();
-  void SetConnectionState(ConnectionState state);
+  void SetWiFiState(WiFiState state);
 }  // namespace ShockLink::VisualStateManager

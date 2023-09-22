@@ -57,43 +57,34 @@ constexpr ShockLink::PinPatternManager::State kWebSocketConnectedPattern[] = {
 
 ShockLink::PinPatternManager s_builtInLedManager(2);
 
-static bool s_criticalError = false;
 void ShockLink::VisualStateManager::SetCriticalError() {
-  if (s_criticalError) {
+  static bool _state = false;
+  if (_state) {
     return;
   }
 
   s_builtInLedManager.SetPattern(kCriticalErrorPattern);
 
-  s_criticalError = true;
+  _state = true;
 }
 
-static ShockLink::ConnectionState s_connectionState = (ShockLink::ConnectionState)-1;
-void ShockLink::VisualStateManager::SetConnectionState(ConnectionState state) {
-  if (s_connectionState == state) {
+void ShockLink::VisualStateManager::SetWiFiState(WiFiState state) {
+  static ShockLink::WiFiState _state = (ShockLink::WiFiState)-1;
+  if (_state == state) {
     return;
   }
 
-  ESP_LOGD(TAG, "SetConnectionState: %d", state);
+  ESP_LOGD(TAG, "SetWiFiStateState: %d", state);
   switch (state) {
-    case ConnectionState::WiFi_Disconnected:
+    case WiFiState::Disconnected:
       s_builtInLedManager.SetPattern(kWiFiDisconnected);
       break;
-    case ConnectionState::WiFi_Connected:
+    case WiFiState::Connected:
       s_builtInLedManager.SetPattern(kWiFiConnectedPattern);
-      break;
-    case ConnectionState::Ping_NoResponse:
-      s_builtInLedManager.SetPattern(kPingNoResponsePattern);
-      break;
-    case ConnectionState::WebSocket_CantConnect:
-      s_builtInLedManager.SetPattern(kWebSocketCantConnectPattern);
-      break;
-    case ConnectionState::WebSocket_Connected:
-      s_builtInLedManager.SetPattern(kWebSocketConnectedPattern);
       break;
     default:
       return;
   }
 
-  s_connectionState = state;
+  _state = state;
 }

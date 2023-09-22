@@ -4,6 +4,7 @@
 #include "RFTransmitter.h"
 #include "Time.h"
 #include "VisualStateManager.h"
+#include "WiFiManager.h"
 
 #include <algorithm>
 #include <Arduino.h>
@@ -11,15 +12,12 @@
 #include <bitset>
 #include <HTTPClient.h>
 #include <LittleFS.h>
-#include <map>
+#include <unordered_map>
 #include <vector>
 #include <WebSocketsClient.h>
-#include <WiFi.h>
-#include <WiFiMulti.h>
 
 const char* const TAG = "ShockLink";
 
-WiFiMulti WiFiMulti;
 WebSocketsClient webSocket;
 TaskHandle_t rmtLoopTask;
 
@@ -141,33 +139,14 @@ void setup() {
   Serial.begin(115'200);
   Serial.setDebugOutput(true);
 
-  ESP_LOGD(TAG, "==== ShockLink v%s ====", ShockLink::Constants::Version);
-
-  ShockLink::VisualStateManager::SetConnectionState(ShockLink::ConnectionState::WiFi_Disconnected);
+  ESP_LOGI(TAG, "==== ShockLink v%s ====", ShockLink::Constants::Version);
 
   if (!LittleFS.begin(true)) {
     ESP_LOGE(TAG, "An Error has occurred while mounting LittleFS");
     return;
   }
 
-  WiFi.mode(WIFI_AP_STA);
-
-  File file = LittleFS.open("/networks", FILE_READ);
-  while (file.available()) {
-    String ssid = file.readStringUntil(',');
-    String pw   = file.readStringUntil(';');
-    WiFiMulti.addAP(ssid.c_str(), pw.c_str());
-    ESP_LOGD(TAG, "Adding network: %s - %s", ssid.c_str(), pw.c_str());
-  }
-  file.close();
-
-  ShockLink::CaptivePortal::Start();
-
-  ESP_LOGD(TAG, "Init WiFi...");
-  WiFiMulti.run();
-
-  File authTokenFile = LittleFS.open("/authToken", FILE_READ);
-  if (!authTokenFile) return;
+  ShockLink::WiFiManager::Init();
 
   int rmtPin = 15;
   if (LittleFS.exists("/rmtPin")) {
@@ -179,9 +158,7 @@ void setup() {
 
   s_rfTransmitter = std::make_unique<ShockLink::RFTransmitter>(rmtPin, 32);
 
-  String authToken = authTokenFile.readString();
-  authTokenFile.close();
-
+  String authToken = "Missing";
   webSocket.setExtraHeaders(
     ("FirmwareVersion:" + String(ShockLink::Constants::Version) + "\r\nDeviceToken: " + authToken).c_str());
   webSocket.beginSSL(ShockLink::Constants::ApiDomain, 443, "/1/ws/device");
@@ -284,24 +261,6 @@ void loop() {
 
   std::uint64_t currentMillis = ShockLink::Millis();
   wl_status_t wifiStatus      = WiFi.status();
-
-  // TODO: This is bad logic, fix it
-  ShockLink::ConnectionState connectionState;
-  switch (wifiStatus) {
-    case WL_DISCONNECTED:
-      connectionState = ShockLink::ConnectionState::WiFi_Disconnected;
-      break;
-    case WL_CONNECTED:
-      if (webSocket.isConnected())
-        connectionState = ShockLink::ConnectionState::WebSocket_Connected;
-      else
-        connectionState = ShockLink::ConnectionState::WiFi_Connected;
-      break;
-    default:
-      connectionState = ShockLink::ConnectionState::WiFi_Connecting;
-      break;
-  }
-  ShockLink::VisualStateManager::SetConnectionState(connectionState);
 
   // if WiFi is down, try reconnecting every CHECK_WIFI_TIME seconds
   if ((wifiStatus != WL_CONNECTED) && (currentMillis - previousMillis >= interval)) {
