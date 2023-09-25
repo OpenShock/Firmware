@@ -5,7 +5,7 @@
 // TODO: This is bad architecture. Fix it.
 
 namespace ShockLink::CommandHandler {
-  void Init(unsigned int rmtPin);
+  void Init();
   bool HandleCommand(std::uint16_t shockerId,
                      std::uint8_t method,
                      std::uint8_t intensity,

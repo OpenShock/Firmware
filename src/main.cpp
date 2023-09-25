@@ -1,5 +1,6 @@
 #include "APIConnection.h"
 #include "CaptivePortal.h"
+#include "CommandHandler.h"
 #include "Constants.h"
 #include "FileUtils.h"
 #include "SerialInputHandler.h"
@@ -18,8 +19,9 @@ std::unique_ptr<ShockLink::APIConnection> s_apiConnection = nullptr;
 
 void setup() {
   ShockLink::SerialInputHandler::Init();
-
   ESP_LOGI(TAG, "==== ShockLink v%s ====", ShockLink::Constants::Version);
+
+  ShockLink::CommandHandler::Init();
 
   if (!LittleFS.begin(true)) {
     ESP_LOGE(TAG, "An Error has occurred while mounting LittleFS");
@@ -27,14 +29,6 @@ void setup() {
   }
 
   ShockLink::WiFiManager::Init();
-
-  int rmtPin = 15;
-  if (LittleFS.exists("/rmtPin")) {
-    File rmtPinFile = LittleFS.open("/rmtPin", FILE_READ);
-    rmtPin          = rmtPinFile.readString().toInt();
-    rmtPinFile.close();
-  }
-  ESP_LOGD(TAG, "RMT pin is: %d", rmtPin);
 }
 
 void loop() {

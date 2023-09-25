@@ -2,13 +2,25 @@
 
 #include "RFTransmitter.h"
 
+#include <LittleFS.h>
+
 #include <memory>
+
+const char* const TAG = "CommandHandler";
 
 using namespace ShockLink;
 
 static std::unique_ptr<RFTransmitter> s_rfTransmitter = nullptr;
 
-void CommandHandler::Init(unsigned int rmtPin) {
+void CommandHandler::Init() {
+  int rmtPin = 15;
+  if (LittleFS.exists("/rmtPin")) {
+    File rmtPinFile = LittleFS.open("/rmtPin", FILE_READ);
+    rmtPin          = rmtPinFile.readString().toInt();
+    rmtPinFile.close();
+  }
+  ESP_LOGD(TAG, "RMT pin is: %d", rmtPin);
+
   s_rfTransmitter = std::make_unique<RFTransmitter>(rmtPin, 32);
 }
 
