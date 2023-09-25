@@ -205,6 +205,7 @@ bool WiFiManager::StartScan() {
   if (s_wifiState != WiFiState::Disconnected) return false;
 
   WiFi.scanNetworks(true);
-  WiFi.scanDelete();
+  SetWiFiState(WiFiState::Scanning);
+
   return true;
 }

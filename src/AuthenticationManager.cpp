@@ -1,52 +1,15 @@
 #include "AuthenticationManager.h"
 
 #include "Constants.h"
+#include "FileUtils.h"
 
 #include <HTTPClient.h>
-#include <LittleFS.h>
 
 static const char* const TAG             = "AuthenticationManager";
 static const char* const AUTH_TOKEN_FILE = "/authToken";
 
-bool TryWriteFile(const char* path, const std::uint8_t* data, std::size_t length) {
-  if (LittleFS.exists(path)) {
-    LittleFS.remove(path);
-  }
-
-  File file = LittleFS.open(path, FILE_WRITE);
-  if (!file) {
-    ESP_LOGE(TAG, "Failed to open file %s", path);
-
-    return false;
-  }
-
-  file.write(data, length);
-  file.close();
-
-  return true;
-}
-bool TryWriteFile(const char* path, const String& str) {
-  return TryWriteFile(
-    path,
-    reinterpret_cast<const std::uint8_t*>(str.c_str()),
-    str.length() + 1);  // WARNING: Assumes null-terminated string, could be dangerous (But in practice I think it's fine)
-}
-bool TryReadFile(const char* path, String& str) {
-  File file = LittleFS.open(path, FILE_READ);
-  if (!file) {
-    ESP_LOGE(TAG, "Failed to open file %s", path);
-
-    return false;
-  }
-
-  str = file.readString();
-  file.close();
-
-  return true;
-}
-
 static bool _isAuthenticated = false;
-static String authToken;
+static String _authToken;
 
 bool ShockLink::AuthenticationManager::Authenticate(unsigned int pairCode) {
   HTTPClient http;
@@ -64,9 +27,9 @@ bool ShockLink::AuthenticationManager::Authenticate(unsigned int pairCode) {
     return false;
   }
 
-  authToken = http.getString();
+  _authToken = http.getString();
 
-  if (!TryWriteFile(AUTH_TOKEN_FILE, authToken)) {
+  if (!FileUtils::TryWriteFile(AUTH_TOKEN_FILE, _authToken)) {
     ESP_LOGE(TAG, "Error while writing auth token to file");
 
     _isAuthenticated = false;
@@ -85,7 +48,7 @@ bool ShockLink::AuthenticationManager::IsAuthenticated() {
     return true;
   }
 
-  if (!TryReadFile(AUTH_TOKEN_FILE, authToken)) {
+  if (!FileUtils::TryReadFile(AUTH_TOKEN_FILE, _authToken)) {
     return false;
   }
 
@@ -99,7 +62,7 @@ bool ShockLink::AuthenticationManager::IsAuthenticated() {
 
   if (responseCode != 200) {
     ESP_LOGE(TAG, "Error while verifying auth token: [%d] %s", responseCode, http.getString().c_str());
-    LittleFS.remove(AUTH_TOKEN_FILE);
+    FileUtils::DeleteFile(AUTH_TOKEN_FILE);
     return false;
   }
 
@@ -114,21 +77,21 @@ bool ShockLink::AuthenticationManager::IsAuthenticated() {
 
 String ShockLink::AuthenticationManager::GetAuthToken() {
   if (_isAuthenticated) {
-    return authToken;
+    return _authToken;
   }
 
-  if (!TryReadFile(AUTH_TOKEN_FILE, authToken)) {
+  if (!FileUtils::TryReadFile(AUTH_TOKEN_FILE, _authToken)) {
     return "";
   }
 
   _isAuthenticated = true;
 
-  return authToken;
+  return _authToken;
 }
 
 void ShockLink::AuthenticationManager::ClearAuthToken() {
-  authToken        = "";
   _isAuthenticated = false;
+  _authToken       = "";
 
-  LittleFS.remove(AUTH_TOKEN_FILE);
+  FileUtils::DeleteFile(AUTH_TOKEN_FILE);
 }

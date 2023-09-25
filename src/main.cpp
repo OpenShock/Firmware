@@ -1,137 +1,19 @@
-#include "AuthenticationManager.h"
+#include "APIConnection.h"
 #include "CaptivePortal.h"
 #include "Constants.h"
-#include "RFTransmitter.h"
-#include "Time.h"
-#include "VisualStateManager.h"
+#include "FileUtils.h"
 #include "WiFiManager.h"
 
-#include <algorithm>
-#include <Arduino.h>
-#include <ArduinoJson.h>
-#include <bitset>
-#include <HTTPClient.h>
+#include <esp_log.h>
+#include <HardwareSerial.h>
 #include <LittleFS.h>
-#include <unordered_map>
-#include <vector>
-#include <WebSocketsClient.h>
+#include <String.h>
+
+#include <memory>
 
 const char* const TAG = "ShockLink";
 
-WebSocketsClient webSocket;
-TaskHandle_t rmtLoopTask;
-
-std::unique_ptr<ShockLink::RFTransmitter> s_rfTransmitter;
-
-bool IntakeCommand(std::uint16_t shockerId,
-                   std::uint8_t method,
-                   std::uint8_t intensity,
-                   unsigned int duration,
-                   std::uint8_t shockerModel) {
-  // Stop logic
-  bool isStop = method == 0;
-  if (isStop) {
-    method    = 2;  // Vibrate
-    intensity = 0;
-    duration  = 300;
-
-    s_rfTransmitter->ClearPendingCommands();
-  }
-
-  return s_rfTransmitter->SendCommand(shockerModel, shockerId, method, intensity, duration);
-}
-
-void ControlCommand(DynamicJsonDocument& doc) {
-  auto data = doc["Data"];
-  for (int it = 0; it < data.size(); it++) {
-    auto cur              = data[it];
-    uint8_t minval        = 99;
-    uint16_t id           = static_cast<uint16_t>(cur["Id"]);
-    uint8_t type          = static_cast<uint8_t>(cur["Type"]);
-    uint8_t intensity     = std::min(static_cast<uint8_t>(cur["Intensity"]), minval);
-    unsigned int duration = static_cast<unsigned int>(cur["Duration"]);
-    uint8_t model         = static_cast<uint8_t>(cur["Model"]);
-
-    if (!IntakeCommand(id, type, intensity, duration, model)) {
-      ESP_LOGE(TAG, "Remote command failed/rejected!");
-    }
-  }
-}
-
-void CaptiveControl(DynamicJsonDocument& doc) {
-  bool data = (bool)doc["Data"];
-
-  ESP_LOGD(TAG, "Captive portal debug: %s", data ? "true" : "false");
-  if (data)
-    ShockLink::CaptivePortal::Start();
-  else
-    ShockLink::CaptivePortal::Stop();
-}
-
-void ParseJson(uint8_t* payload) {
-  DynamicJsonDocument doc(1024);
-  deserializeJson(doc, payload);
-  int type = doc["ResponseType"];
-
-  switch (type) {
-    case 0:
-      ControlCommand(doc);
-      break;
-    case 1:
-      CaptiveControl(doc);
-      break;
-  }
-}
-
-void SendKeepAlive() {
-  if (!webSocket.isConnected()) {
-    ESP_LOGD(TAG, "WebSocket is not connected, not sending keep alive online state");
-    return;
-  }
-  ESP_LOGD(TAG, "Sending keep alive online state");
-  webSocket.sendTXT("{\"requestType\": 0}");
-}
-
-void SendKeepAliveTask() {
-  static std::uint64_t msLast = 0;
-
-  std::uint64_t msNow = ShockLink::Millis();
-  if ((msNow - msLast) >= 30'000) {
-    SendKeepAlive();
-    msLast = msNow;
-  }
-}
-
-bool firstWebSocketConnect = true;
-
-void webSocketEvent(WStype_t type, uint8_t* payload, size_t length) {
-  switch (type) {
-    case WStype_DISCONNECTED:
-      ESP_LOGD(TAG, "[WebSocket] Disconnected");
-      break;
-    case WStype_CONNECTED:
-      if (firstWebSocketConnect) ShockLink::CaptivePortal::Start();
-      ESP_LOGD(TAG, "[WebSocket] Connected to %s", payload);
-      SendKeepAlive();
-
-      firstWebSocketConnect = false;
-      break;
-    case WStype_TEXT:
-      ESP_LOGD(TAG, "[WebSocket] Received text: %s", payload);
-      ParseJson(payload);
-      break;
-    case WStype_BIN:
-      ESP_LOGD(TAG, "[WebSocket] Received binary data of length %u", length);
-      break;
-    case WStype_ERROR:
-    case WStype_FRAGMENT_TEXT_START:
-    case WStype_FRAGMENT_BIN_START:
-    case WStype_FRAGMENT:
-    case WStype_FRAGMENT_FIN:
-      ESP_LOGD(TAG, "[WebSocket] Error");
-      break;
-  }
-}
+std::unique_ptr<ShockLink::APIConnection> s_apiConnection = nullptr;
 
 bool setupOk = false;
 
@@ -156,46 +38,22 @@ void setup() {
   }
   ESP_LOGD(TAG, "RMT pin is: %d", rmtPin);
 
-  s_rfTransmitter = std::make_unique<ShockLink::RFTransmitter>(rmtPin, 32);
-
-  String authToken = "Missing";
-  webSocket.setExtraHeaders(
-    ("FirmwareVersion:" + String(ShockLink::Constants::Version) + "\r\nDeviceToken: " + authToken).c_str());
-  webSocket.beginSSL(ShockLink::Constants::ApiDomain, 443, "/1/ws/device");
-  webSocket.onEvent(webSocketEvent);
-
   setupOk = true;
 }
 
-std::uint64_t previousMillis = 0;
-unsigned long interval       = 30'000;
-bool firstConnect            = true;
-bool reconnectedLoop         = false;
-
 String inputBuffer = "";
-
-void writeFile(String name, String& data) {
-  File file = LittleFS.open(name, FILE_WRITE);
-  file.print(data);
-  file.close();
-
-  ESP_LOGD(TAG, "SYS|Success|Wrote to file");
-}
 
 bool writeCommands(String& command, String& data) {
   if (command == "authtoken") {
-    writeFile("/authToken", data);
-    return true;
+    return ShockLink::FileUtils::TryWriteFile("/authToken", data);
   }
 
   if (command == "rmtpin") {
-    writeFile("/rmtPin", data);
-    return true;
+    return ShockLink::FileUtils::TryWriteFile("/rmtPin", data);
   }
 
   if (command == "networks") {
-    writeFile("/networks", data);
-    return true;
+    return ShockLink::FileUtils::TryWriteFile("/networks", data);
   }
 
   if (command == "debug") {
@@ -234,10 +92,14 @@ void executeCommand() {
     }
   }
 
-  if (data.length() > 0)
-    if (writeCommands(command, data)) return;
+  if (data.length() > 0) {
+    if (writeCommands(command, data)) {
+      Serial.println("SYS|Success|Command executed");
+      return;
+    }
+  }
 
-  Serial.println("SYS|Error|Command not found");
+  Serial.println("SYS|Error|Command not found or encountered an error");
 }
 
 void handleSerial() {
@@ -259,25 +121,9 @@ void loop() {
 
   if (Serial.available()) handleSerial();
 
-  std::uint64_t currentMillis = ShockLink::Millis();
-  wl_status_t wifiStatus      = WiFi.status();
-
-  // if WiFi is down, try reconnecting every CHECK_WIFI_TIME seconds
-  if ((wifiStatus != WL_CONNECTED) && (currentMillis - previousMillis >= interval)) {
-    reconnectedLoop = false;
-
-    ESP_LOGD(TAG, "WiFi lost, reconnecting...");
-    WiFi.reconnect();
-    previousMillis = currentMillis;
-  } else if (!reconnectedLoop && wifiStatus == WL_CONNECTED) {
-    reconnectedLoop = true;
-    ESP_LOGD(TAG, "Connected to wifi, ip: %s", WiFi.localIP().toString().c_str());
-
-    firstConnect = false;
-  }
-
   ShockLink::CaptivePortal::Update();
 
-  webSocket.loop();
-  SendKeepAliveTask();
+  if (s_apiConnection != nullptr) {
+    s_apiConnection->Update();
+  }
 }

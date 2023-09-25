@@ -62,10 +62,11 @@ bool RFTransmitter::SendCommand(std::uint8_t shockerModel,
   if (!ok()) {
     return false;
   }
-  if (duration >= std::numeric_limits<std::uint16_t>::max()) {
-    ESP_LOGW(m_name, "Duration for provided command exceeds hard limit of 66 seconds (2^16 ms): %d", duration);
-    return false;
-  }
+
+  // Intensity must be between 0 and 99
+  // Duration for provided command must not exceed hard limit of 66 seconds (2^16 ms)
+  intensity = std::min(intensity, (std::uint8_t)99);
+  duration  = std::min(duration, (unsigned int)std::numeric_limits<std::uint16_t>::max());
 
   command_t* cmd = new command_t {ShockLink::Millis() + duration,
                                   Rmt::GetSequence(shockerId, method, intensity, shockerModel),
