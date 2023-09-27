@@ -4,65 +4,38 @@ import shutil
 
 Import('env')
 
-def exec_replace(file, old, new):
+def file_copy(oldFile, newFile):
+  # Create the directory if it doesn't exist.
+  output_dir = os.path.dirname(newFile)
+  if not os.path.exists(output_dir):
+    os.makedirs(output_dir)
+
+  # Copy the file.
+  shutil.copyfile(oldFile, newFile)
+
+def exec_replace(filein, fileout, replace_array):
+  # Create the directory if it doesn't exist.
+  output_dir = os.path.dirname(fileout)
+  if not os.path.exists(output_dir):
+    os.makedirs(output_dir)
+
   try:
-    with open(file, 'r') as f:
-        s = f.read()
-        s = s.replace(old, new)
-    with open(file, 'w') as f:
-        f.write(s)
+    with open(filein, 'r') as f:
+      s = f.read()
+    for action in replace_array:
+      s = s.replace(action[0], action[1])
+    with open(fileout, 'w') as f:
+      f.write(s)
   except:
     try:
-      with open(file, 'rb') as f:
-          s = f.read()
-          s = s.replace(old.encode('utf-8'), new.encode('utf-8'))
-      with open(file, 'wb') as f:
-          f.write(s)
+      with open(filein, 'rb') as f:
+        s = f.read()
+      for action in replace_array:
+        s = s.replace(action[0].encode('utf-8'), action[1].encode('utf-8'))
+      with open(fileout, 'wb') as f:
+        f.write(s)
     except:
-      print('Error replacing ' + old + ' with ' + new + ' in ' + file)
-
-"""
-Replaces all references to a path in a directory with another path.
-"""
-def replace_all_references(directory, oldFile, newFile):
-  # Replace all references to the old path with the new path.
-  for root, dirs, files in os.walk(directory):
-    for filename in files:
-      # Skip binary files.
-      ext = filename.split('.')[-1]
-      if ext == 'png' or ext == 'jpg' or ext == 'jpeg' or ext == 'gif' or ext == 'ico' or ext == 'svg' or ext == 'ttf' or ext == 'woff' or ext == 'woff2' or ext == 'eot':
-        continue
-
-      # Get the full path of the file.
-      filePath = os.path.join(root, filename)
-
-      # Replace all references to the old path with the new path.
-      exec_replace(filePath, oldFile, newFile)
-
-"""
-Shorten all the filenames in the data/www/_app/immutable directory.
-This is done to make LittleFS happy.
-"""
-def shorten_immutable_filenames(realroot, directory):
-  directory = directory.replace('\\', '/')
-  fileIndex = 0
-  for root, dirs, files in os.walk(directory):
-      for filename in files:
-          newFileName = str(fileIndex) + '.' + filename.split('.')[-1]
-
-          filePath = os.path.join(root, filename)
-          newFilePath = os.path.join(root, newFileName)
-
-          print('Renaming ' + filePath + ' to ' + newFilePath)
-
-          # Rename the file to a shorter name.
-          os.rename(filePath, newFilePath)
-
-          # Replace all references to the old path with the new path.
-          replace_all_references(realroot, filename, newFileName)
-
-          # Increment the file index.
-          fileIndex += 1
+      print('Error replacing ' + old + ' with ' + new + ' in ' + filein)
 
 def build_frontend(source, target, env):
     # Change working directory to frontend.
@@ -76,14 +49,42 @@ def build_frontend(source, target, env):
     # Change working directory back to root.
     os.chdir('..')
 
+    # Shorten all the filenames in the data/www/_app/immutable directory.
+    fileIndex = 0
+    copy_actions = []
+    rename_actions = []
+    renamed_filenames = []
+    for root, dirs, files in os.walk('WebUI/build'):
+      root = root.replace('\\', '/')
+      newroot = root.replace('WebUI/build', 'data/www')
+      isImmutable = '_app/immutable' in root
+
+      for filename in files:
+        filepath = os.path.join(root, filename)
+
+        if isImmutable:
+          newfilename = str(fileIndex) + '.' + filename.split('.')[-1]
+          renamed_filenames.append((filename, newfilename))
+          newfilepath = os.path.join(newroot, newfilename)
+          fileIndex += 1
+        else:
+          newfilepath = os.path.join(newroot, filename)
+
+        # Skip formatting binary files.
+        ext = filename.split('.')[-1]
+        if ext == 'png' or ext == 'jpg' or ext == 'jpeg' or ext == 'gif' or ext == 'ico' or ext == 'svg' or ext == 'ttf' or ext == 'woff' or ext == 'woff2' or ext == 'eot':
+          copy_actions.append((filepath, newfilepath))
+        else:
+          rename_actions.append((filepath, newfilepath))
+
     # Delete the data/www directory if it exists.
     if os.path.exists('data/www'):
         shutil.rmtree('data/www')
 
-    # Copy the frontend build to the data/www directory.
-    shutil.copytree('WebUI/build', 'data/www')
+    for action in copy_actions:
+      file_copy(action[0], action[1])
 
-    # Shorten all the filenames in the data/www/_app/immutable directory.
-    shorten_immutable_filenames('data/www', 'data/www/_app/immutable')
+    for action in rename_actions:
+      exec_replace(action[0], action[1], renamed_filenames)
 
 env.AddPreAction('$BUILD_DIR/littlefs.bin', build_frontend)
