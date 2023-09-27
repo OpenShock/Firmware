@@ -1,7 +1,7 @@
 <script lang="ts">
 	import '../app.postcss';
 	import { computePosition, autoUpdate, flip, shift, offset, arrow } from '@floating-ui/dom';
-  import { AppShell, Toast, initializeStores, storePopup } from '@skeletonlabs/skeleton';
+  import { AppShell, Modal, Toast, initializeStores, storePopup } from '@skeletonlabs/skeleton';
   import Footer from '$lib/components/Layout/Footer.svelte';
   import Header from '$lib/components/Layout/Header.svelte';
 
@@ -9,6 +9,7 @@
   initializeStores();
 </script>
 
+<Modal />
 <Toast position="bl" max={5} />
 
 <AppShell>
