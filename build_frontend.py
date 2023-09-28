@@ -114,7 +114,7 @@ def exec_replace(filein, fileout, replace_array):
       with open(fileout, 'w', encoding='utf-8') as f:
         f.write(s)
     except:
-      print('Error replacing ' + old + ' with ' + new + ' in ' + filein)
+      print('Error reading from ' + filein + ' or writing to ' + fileout)
 
 def build_frontend(source, target, env):
   unproc_fa_css = 'WebUI/unproc/fa-all.css'
