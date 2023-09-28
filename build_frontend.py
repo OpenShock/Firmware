@@ -9,6 +9,8 @@ def file_copy(oldFile, newFile):
   output_dir = os.path.dirname(newFile)
   if not os.path.exists(output_dir):
     os.makedirs(output_dir)
+  elif os.path.exists(newFile):
+    os.remove(newFile)
 
   # Copy the file.
   shutil.copyfile(oldFile, newFile)
@@ -16,55 +18,79 @@ def file_delete(file):
   # Delete the file if it exists.
   if os.path.exists(file):
     os.remove(file)
-
-def get_fa_icon_list(file):
-  ext = file.split('.')[-1]
-  if ext != 'svelte' and ext != 'html' and ext != 'js' and ext != 'ts':
-    return []
-
-  # Read the file.
+def file_read_text(file):
   try:
     with open(file, 'r') as f:
-      s = f.read()
+      return f.read()
   except:
     try:
       with open(file, 'rb') as f:
-        s = f.read().decode('utf-8')
+        return f.read().decode('utf-8')
     except:
       print('Error reading ' + file)
-      return []
+      return ''
 
-  # Find all the fa icons.
-  return re.findall(r'"fa (fa-[a-z0-9-]+)', s)
-
-def get_fa_unicode_map(file):
-  ext = file.split('.')[-1]
-  if ext != 'css':
+def get_fa_icon_map(srcdir, csspath):
+  cssext = csspath.split('.')[-1]
+  if cssext != 'css':
     return []
 
-  # Read the file.
-  try:
-    with open(file, 'r') as f:
-      s = f.read()
-  except:
-    try:
-      with open(file, 'rb') as f:
-        s = f.read().decode('utf-8')
-    except:
-      print('Error reading ' + file)
-      return []
+  fa_icon_set = set()
+  for root, dirs, files in os.walk(srcdir):
+    root = root.replace('\\', '/')
+    for filename in files:
+      filepath = os.path.join(root, filename)
+      ext = filename.split('.')[-1]
+      if ext != 'svelte' and ext != 'html' and ext != 'js' and ext != 'ts':
+        continue
+
+      s = file_read_text(filepath)
+      if s == '':
+        continue
+
+      icons = re.findall(r'(fa-[a-z0-9-]+)', s)
+
+      fa_icon_set.update(icons)
 
   # Find all the fa icon classes.
+  s = file_read_text(csspath)
   css_classes = re.findall(r'((?:.fa-[a-z0-9-]+:before,?)+){content:"(\\[a-f0-9]+)";?}', s)
 
   # For each class, extract the fa-names.
-  fa_unicode_map = {}
+  icon_map = {}
+  unused_css_selectors = []
   for css_class in css_classes:
     fa_names = re.findall(r'.(fa-[a-z0-9-]+):before', css_class[0])
-    for fa_name in fa_names:
-      fa_unicode_map[fa_name] = css_class[1]
 
-  return fa_unicode_map
+    any_in_set = False
+    for fa_name in fa_names:
+      if fa_name in fa_icon_set:
+        icon_map[fa_name] = { 'unicode': css_class[1], 'selector': css_class[0] }
+        any_in_set = True
+
+    if not any_in_set:
+      unused_css_selectors.append(css_class[0])
+
+  return (icon_map, unused_css_selectors)
+def minify_fa_css(srcpath, dstpath, unused_css_selectors):
+  s = file_read_text(srcpath)
+
+  # Use regex to remove all the unused icons.
+  for selector in unused_css_selectors:
+    regex = re.escape(selector) + r'{content:"\\[a-f0-9]+";?}'
+    s = re.sub(regex, '', s)
+
+  file_delete(dstpath)
+  with open(dstpath, 'w') as f:
+    f.write(s)
+def minify_fa_font(srcpath, dstpath, icon_map):
+  values = []
+  for icon in icon_map:
+    values.append(icon_map[icon]['unicode'])
+  fa_unicode_csv = ','.join(values)
+
+  file_delete(dstpath)
+  os.system('pyftsubset {} --unicodes={} --output-file={}'.format(srcpath, fa_unicode_csv, dstpath))
 
 def exec_replace(filein, fileout, replace_array):
   # Create the directory if it doesn't exist.
@@ -91,30 +117,18 @@ def exec_replace(filein, fileout, replace_array):
       print('Error replacing ' + old + ' with ' + new + ' in ' + filein)
 
 def build_frontend(source, target, env):
-  fa_icon_set = set()
-  for root, dirs, files in os.walk('WebUI/src'):
-    root = root.replace('\\', '/')
-    for filename in files:
-      filepath = os.path.join(root, filename)
-      fa_icon_set.update(get_fa_icon_list(filepath))
+  unproc_fa_css = 'WebUI/unproc/fa-all.css'
+  unproc_fa_woff2 = 'WebUI/unproc/fa-solid-900.woff2'
+  static_fa_css = 'WebUI/static/fa/fa-all.css'
+  static_fa_woff2 = 'WebUI/static/fa/fa-solid-900.woff2'
 
-  fa_unicode_map = get_fa_unicode_map('WebUI/unproc/fa-all.css')
+  # Analyze the frontend to find all the font awesome icons in use and which css selectors from fa-all.css are unused.
+  (icon_map, unused_css_selectors) = get_fa_icon_map('WebUI/src', unproc_fa_css)
+  print('Found ' + str(len(icon_map)) + ' font awesome icons.')
 
-  fa_unicode_list = []
-  for fa_icon in fa_icon_set:
-    if fa_icon in fa_unicode_map:
-      fa_unicode_list.append(fa_unicode_map[fa_icon])
-    else:
-      print('Error: ' + fa_icon + ' not found in fa-all.css')
-
-  # Convert the unicode list to a csv.
-  fa_unicode_csv = ','.join(fa_unicode_list)
-
-  file_delete('WebUI/static/fa/fa-all.css')
-  file_copy('WebUI/unproc/fa-all.css', 'WebUI/static/fa/fa-all.css')
-
-  file_delete('WebUI/static/fa/fa-solid-900.woff2')
-  os.system('pyftsubset WebUI/unproc/fa-solid-900.woff2 --unicodes={} --output-file=WebUI/static/fa/fa-solid-900.woff2'.format(fa_unicode_csv))
+  # Write a minified css and font file to the static directory.
+  minify_fa_css(unproc_fa_css, static_fa_css, unused_css_selectors)
+  minify_fa_font(unproc_fa_woff2, static_fa_woff2, icon_map)
 
   # Change working directory to frontend.
   os.chdir('WebUI')
@@ -127,12 +141,9 @@ def build_frontend(source, target, env):
   # Change working directory back to root.
   os.chdir('..')
 
-  # Replace with unprocessed files.
-  file_delete('WebUI/static/fa/fa-all.css')
-  file_copy('WebUI/unproc/fa-all.css', 'WebUI/static/fa/fa-all.css')
-
-  file_delete('WebUI/static/fa/fa-solid-900.woff2')
-  file_copy('WebUI/unproc/fa-solid-900.woff2', 'WebUI/static/fa/fa-solid-900.woff2')
+  # Replace the minified css and font files with the unprocessed ones.
+  file_copy(unproc_fa_css, static_fa_css)
+  file_copy(unproc_fa_woff2, static_fa_woff2)
 
   # Shorten all the filenames in the data/www/_app/immutable directory.
   fileIndex = 0
