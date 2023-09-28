@@ -16,7 +16,7 @@
 <div class="card p-4 w-[24rem] flex-col space-y-4">
   <div class="flex justify-between space-x-2">
     <h2 class="h2">WiFi Info</h2>
-    <button class="btn-icon variant-outline" on:click={() => modalStore.close()}><i class="fas fa-times"></i></button>
+    <button class="btn-icon variant-outline" on:click={() => modalStore.close()}><i class="fa fa-xmark"></i></button>
   </div>
   <div>
     {#each rows as row (row.key)}
@@ -26,10 +26,10 @@
   <div class="flex justify-end space-x-2">
     <div class="btn-group variant-outline">
       {#if item.saved}
-        <button  on:click={() => modalStore.close()}><i class="fas fa-wifi mr-2 text-green-500"></i>Connect</button>
-        <button on:click={() => modalStore.close()}><i class="fas fa-trash mr-2 text-red-500"></i>Forget</button>
+        <button  on:click={() => modalStore.close()}><i class="fa fa-wifi mr-2 text-green-500"></i>Connect</button>
+        <button on:click={() => modalStore.close()}><i class="fa fa-trash mr-2 text-red-500"></i>Forget</button>
       {:else}
-        <button on:click={() => modalStore.close()}><i class="fas fa-link mr-2 text-green-500"></i>Connect</button>
+        <button on:click={() => modalStore.close()}><i class="fa fa-link mr-2 text-green-500"></i>Connect</button>
       {/if}
     </div>
   </div>
