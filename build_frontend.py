@@ -24,8 +24,8 @@ def file_read_text(file):
       return f.read()
   except:
     try:
-      with open(file, 'rb') as f:
-        return f.read().decode('utf-8')
+      with open(file, 'r', encoding='utf-8') as f:
+        return f.read()
     except:
       print('Error reading ' + file)
       return ''
@@ -107,11 +107,11 @@ def exec_replace(filein, fileout, replace_array):
       f.write(s)
   except:
     try:
-      with open(filein, 'rb') as f:
+      with open(filein, 'r', encoding='utf-8') as f:
         s = f.read()
       for action in replace_array:
-        s = s.replace(action[0].encode('utf-8'), action[1].encode('utf-8'))
-      with open(fileout, 'wb') as f:
+        s = s.replace(action[0], action[1])
+      with open(fileout, 'w', encoding='utf-8') as f:
         f.write(s)
     except:
       print('Error replacing ' + old + ' with ' + new + ' in ' + filein)
