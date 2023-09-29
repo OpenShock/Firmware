@@ -22,13 +22,17 @@ jobs:
 
     steps:
       - uses: actions/checkout@v4
+        with:
+          sparse-checkout: |
+            WebUI
+          path: .
 
       - uses: actions/setup-node@v3
         with:
           node-version: ${{ env.NODE_VERSION }}
           cache: 'npm'
-
-      - run: cd WebUI && npm ci
+          
+      - run: npm ci
 
   # Copied verbatim from https://docs.platformio.org/en/stable/integration/ci/github-actions.html
   build:
