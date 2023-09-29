@@ -173,7 +173,7 @@ jobs:
       - name: Upload merged flashable image
         uses: actions/upload-artifact@v3
         with:
-          name: firmware
+          name: merged-firmware
           path: merged.bin
           retention-days: 1
           if-no-files-found: error
