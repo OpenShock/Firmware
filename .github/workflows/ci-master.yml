@@ -20,7 +20,7 @@ env:
 jobs:
 
   build-captive-portal:
-    uses: .github/workflows/build-captive-portal.yml
+    uses: ./.github/workflows/build-captive-portal.yml@
     with:
       node-version: ${{ env.NODE_VERSION }}
 
