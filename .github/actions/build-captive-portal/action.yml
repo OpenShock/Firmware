@@ -1,6 +1,11 @@
 name: Build captive portal
 description: Builds the captive portal.
 
+inputs:
+  node-version:
+    description: 'Version of NodeJS to install'
+    required: true
+
 steps:
   - uses: actions/checkout@v4
     with:
