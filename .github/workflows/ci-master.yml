@@ -21,9 +21,10 @@ jobs:
     runs-on: ubuntu-latest
 
     strategy:
+      fail-fast: false
       matrix:
         chip: [esp32, esp32-s3, esp32-c3]
-
+      
     steps:
       - uses: actions/checkout@v4
 
@@ -45,3 +46,10 @@ jobs:
 
       - name: Build PlatformIO Project
         run: pio run -e ${{ matrix.chip }}
+
+      - name: Upload internal artifacts
+        uses: actions/upload-artifact@v3
+        with:
+          name: firmware_${{ matrix.chip }}.bin
+          path: .pio/build/*/firmware.bin
+          retention-days: 1
