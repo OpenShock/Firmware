@@ -30,7 +30,7 @@ jobs:
       - name: Move WebUI contents to root dir
         run: |
           shopt -s dotglob
-          mv WebUI/*
+          mv WebUI/* .
           rmdir WebUI
           shopt +s dotglob
 
