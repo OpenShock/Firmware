@@ -9,7 +9,6 @@
 #include <esp_log.h>
 #include <HardwareSerial.h>
 #include <LittleFS.h>
-#include <String.h>
 
 #include <memory>
 
