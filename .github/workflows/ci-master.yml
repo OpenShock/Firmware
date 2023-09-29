@@ -157,10 +157,10 @@ jobs:
       - name: Merge flash image
         working-directory: .
         run: |
-          python -m \
-            esptool merge_bin \
-            -o merged.bin \
+          python -m esptool \
             --chip esp32 \
+            -o merged.bin \
+            merge_bin \
             --flash_mode dio \
             --flash_freq 40m \
             --flash_size 4MB \
