@@ -32,7 +32,6 @@ jobs:
           shopt -s dotglob
           mv WebUI/* .
           rmdir WebUI
-          shopt +s dotglob
 
       - uses: actions/setup-node@v3
         with:
