@@ -35,6 +35,11 @@
             <input id="rmt-pin" type="number" v-model="rmtPin" placeholder="RMT Pin">
         </div>
 
+        <div class="estop-pin">
+            <label for="estop-pin">E-Stop Pin</label>
+            <input id="estop-pin" type="number" v-model="estopPin" placeholder="E-Stop Pin">
+        </div>
+
         <button style="float:right;" @click="send" class="button"><span>Save</span></button>
         <button style="float:right;" @click="reset" class="button"><span>Restart!</span></button>
     </div>
@@ -93,7 +98,8 @@
                 ssid: "",
                 password: "",
                 pairCode: "",
-                rmtPin: 0
+                rmtPin: 0,
+                estopPin: 0
             }
         },
         beforeMount() {
@@ -104,6 +110,7 @@
                 this.sendPairCode();
                 this.sendNetworks();
                 this.sendRmtPin();
+                this.sendEstopPin();
             },
             addNetwork() {
                 if (this.ssid === undefined || this.password == undefined || this.ssid === "") return;
@@ -144,6 +151,14 @@
                     url: "/rmtPin",
                     method: "POST",
                     data: this.rmtPin
+                });
+            },
+            sendEstopPin() {
+                if(this.estopPin === undefined || this.estopPin === "") return;
+                microAjax({
+                    url: "/estopPin",
+                    method: "POST",
+                    data: this.estopPin
                 });
             },
             sendPairCode() {
