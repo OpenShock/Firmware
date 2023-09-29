@@ -46,7 +46,7 @@ jobs:
         uses: actions/upload-artifact@v3
         with:
           name: captive-portal
-          path: build/*
+          path: WebUI/build/*
           retention-days: 1
           if-no-files-found: error
 
