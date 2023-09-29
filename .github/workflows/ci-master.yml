@@ -27,8 +27,8 @@ jobs:
             WebUI
           path: .
       
-      - name: Move WebUI contents to root dir
-        run: mv WebUI/* . && ls -la WebUI && rmdir WebUI
+      - name: Move into WebUI folder
+        run: cd WebUI
 
       - uses: actions/setup-node@v3
         with:
