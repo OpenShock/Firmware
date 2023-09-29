@@ -159,8 +159,8 @@ jobs:
         run: |
           python -m esptool \
             --chip esp32 \
-            -o merged.bin \
             merge_bin \
+            -o merged.bin \
             --flash_mode dio \
             --flash_freq 40m \
             --flash_size 4MB \
