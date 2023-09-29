@@ -45,6 +45,7 @@ jobs:
         with:
           node-version: ${{ env.NODE_VERSION }}
           cache: "npm"
+          cache-dependency-path: ./WebUI/package-lock.json
 
       - name: Install captive portal dependencies
         working-directory: ./WebUI
