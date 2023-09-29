@@ -13,6 +13,7 @@ name: ci-master
 env:
   NODE_VERSION: 16
   PYTHON_VERSION: 3.11
+  PLATFORMIO_ENV: ShockLink
   SHOCKLINK_API_DOMAIN: api.shocklink.net
   SHOCKLINK_FW_VERSION: master-${{ github.sha }}
 
@@ -86,7 +87,7 @@ jobs:
         uses: actions/upload-artifact@v3
         with:
           name: filesystem
-          path: .pio/build/*/littlefs.bin
+          path: .pio/build/${{ env.PLATFORMIO_ENV }}/littlefs.bin
           retention-days: 1
           if-no-files-found: error
 
@@ -119,7 +120,7 @@ jobs:
         uses: actions/upload-artifact@v3
         with:
           name: firmware
-          path: .pio/build/*/*.bin
+          path: .pio/build/${{ env.PLATFORMIO_ENV }}/*.bin
           retention-days: 1
           if-no-files-found: error
 
