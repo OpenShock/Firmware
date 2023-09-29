@@ -1,23 +1,38 @@
 on:
   push:
     branches:
-      - master
-  pull_request:
-    branches:
-      - master
+      - feature/captive-portal-ci
+#  pull_request:
+#    branches:
+#      - master
     types: [opened, reopened, synchronize]
 
 name: ci-master
 
 env:
+  NODE_VERSION: 16
   SHOCKLINK_API_DOMAIN: api.shocklink.net
   SHOCKLINK_FW_VERSION: master-${{ github.sha }}
 
 jobs:
 
+  build-captive-portal:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v3
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+
+      - run: cd WebUI && npm ci
+
   # Copied verbatim from https://docs.platformio.org/en/stable/integration/ci/github-actions.html
   build:
     runs-on: ubuntu-latest
+    needs: build-portal
 
     steps:
       - uses: actions/checkout@v4
