@@ -1,6 +1,7 @@
 #include "CaptivePortal.h"
 
 #include "AuthenticationManager.h"
+#include "WiFiManager.h"
 
 #include <ArduinoJson.h>
 #include <ESPAsyncWebServer.h>
@@ -12,11 +13,14 @@
 
 static const char* TAG = "CaptivePortal";
 
-constexpr std::uint16_t HTTP_PORT      = 80;
-constexpr std::uint16_t WEBSOCKET_PORT = 81;
+constexpr std::uint16_t HTTP_PORT               = 80;
+constexpr std::uint16_t WEBSOCKET_PORT          = 81;
+constexpr std::uint32_t WEBSOCKET_PING_INTERVAL = 10'000;
+constexpr std::uint32_t WEBSOCKET_PING_TIMEOUT  = 1000;
+constexpr std::uint8_t WEBSOCKET_PING_RETRIES   = 3;
 
 struct CaptivePortalInstance {
-  CaptivePortalInstance() : webServer(HTTP_PORT), socketServer(WEBSOCKET_PORT) { }
+  CaptivePortalInstance() : webServer(HTTP_PORT), socketServer(WEBSOCKET_PORT, "/ws", "json") { }
 
   AsyncWebServer webServer;
   WebSocketsServer socketServer;
@@ -24,7 +28,6 @@ struct CaptivePortalInstance {
 std::unique_ptr<CaptivePortalInstance> s_webServices = nullptr;
 
 void handleWebSocketEvent(std::uint8_t socketId, WStype_t type, std::uint8_t* data, std::size_t len);
-void handleHttpRequestBody(AsyncWebServerRequest* request, std::uint8_t* data, std::size_t len, size_t index, size_t total);
 void handleHttpNotFound(AsyncWebServerRequest* request);
 
 bool ShockLink::CaptivePortal::Start() {
@@ -57,26 +60,10 @@ bool ShockLink::CaptivePortal::Start() {
 
   s_webServices->socketServer.onEvent(handleWebSocketEvent);
   s_webServices->socketServer.begin();
-  // s_webServices->socketServer.enableHeartbeat(WEBSOCKET_PING_INTERVAL, WEBSOCKET_PING_TIMEOUT, WEBSOCKET_PING_RETRIES);
+  s_webServices->socketServer.enableHeartbeat(WEBSOCKET_PING_INTERVAL, WEBSOCKET_PING_TIMEOUT, WEBSOCKET_PING_RETRIES);
 
   s_webServices->webServer.serveStatic("/", LittleFS, "/www/").setDefaultFile("index.html");
-  s_webServices->webServer.on("/networks", HTTP_GET, [](AsyncWebServerRequest* request) {
-    File file = LittleFS.open("/networks", FILE_READ);
-    request->send(file, "text/plain");
-    file.close();
-  });
-  s_webServices->webServer.on("/pairCode", HTTP_GET, [](AsyncWebServerRequest* request) {
-    File file = LittleFS.open("/pairCode", FILE_READ);
-    request->send(file, "text/plain");
-    file.close();
-  });
-  s_webServices->webServer.on("/rmtPin", HTTP_GET, [](AsyncWebServerRequest* request) {
-    File file = LittleFS.open("/rmtPin", FILE_READ);
-    request->send(file, "text/plain");
-    file.close();
-  });
-  s_webServices->webServer.onRequestBody(handleHttpRequestBody);
-  s_webServices->webServer.onNotFound(handleHttpNotFound);
+  s_webServices->webServer.onNotFound([](AsyncWebServerRequest* request) { request->send(404, "text/plain", "Not found"); });
   s_webServices->webServer.begin();
 
   ESP_LOGD(TAG, "Started");
@@ -135,17 +122,8 @@ void handleWebSocketClientDisconnected(std::uint8_t socketId) {
   ESP_LOGD(TAG, "WebSocket client #%u disconnected", socketId);
 }
 void handleWebSocketClientMessage(std::uint8_t socketId, WStype_t type, std::uint8_t* data, std::size_t len) {
-  (void)socketId;
-
-  if (type == WStype_t::WStype_TEXT) {
-    ESP_LOGD(TAG, "WebSocket client #%u sent text message", socketId);
-  } else if (type == WStype_t::WStype_BIN) {
-    ESP_LOGD(TAG, "WebSocket client #%u sent binary message", socketId);
-  } else {
-    ESP_LOGE(TAG, "WebSocket client #%u sent unknown message type %u", socketId, type);
-  }
-
   if (type != WStype_t::WStype_TEXT) {
+    ESP_LOGE(TAG, "Message type is not supported");
     return;
   }
 
@@ -156,21 +134,32 @@ void handleWebSocketClientMessage(std::uint8_t socketId, WStype_t type, std::uin
     return;
   }
 
-  String str;
-  serializeJsonPretty(doc, str);
-  ESP_LOGD(TAG, "Message: %s", str.c_str());
+  String typeStr = doc["type"];
+  if (typeStr.length() == 0) {
+    ESP_LOGE(TAG, "Message type is missing");
+    return;
+  }
+
+  if (typeStr == "startScan") {
+    ShockLink::WiFiManager::StartScan();
+  } /* else if (typeStr == "connect") {
+     ShockLink::WiFiManager::Connect(doc["ssid"], doc["password"]);
+   } else if (typeStr == "disconnect") {
+     ShockLink::WiFiManager::Disconnect();
+   } else if (typeStr == "authenticate") {
+     ShockLink::AuthenticationManager::Authenticate(doc["code"]);
+   } else if (typeStr == "pair") {
+     ShockLink::AuthenticationManager::Pair(doc["code"]);
+   } else if (typeStr == "unpair") {
+     ShockLink::AuthenticationManager::Unpair();
+   } else if (typeStr == "setRmtPin") {
+     ShockLink::AuthenticationManager::SetRmtPin(doc["pin"]);
+   }*/
 }
-void handleWebSocketClientPing(std::uint8_t socketId) {
-  ESP_LOGD(TAG, "WebSocket client #%u ping received", socketId);
-}
-void handleWebSocketClientPong(std::uint8_t socketId) {
-  ESP_LOGD(TAG, "WebSocket client #%u pong received", socketId);
-}
-void handleWebSocketClientError(std::uint8_t socketId, uint16_t code, const char* message) {
+void handleWebSocketClientError(std::uint8_t socketId, std::uint16_t code, const char* message) {
   ESP_LOGE(TAG, "WebSocket client #%u error %u: %s", socketId, code, message);
 }
 void handleWebSocketEvent(std::uint8_t socketId, WStype_t type, std::uint8_t* data, std::size_t len) {
-  ESP_LOGD(TAG, "WebSocket event: %u", type);
   switch (type) {
     case WStype_CONNECTED:
       handleWebSocketClientConnected(socketId);
@@ -187,10 +176,8 @@ void handleWebSocketEvent(std::uint8_t socketId, WStype_t type, std::uint8_t* da
       handleWebSocketClientMessage(socketId, type, data, len);
       break;
     case WStype_PING:
-      handleWebSocketClientPing(socketId);
-      break;
     case WStype_PONG:
-      handleWebSocketClientPong(socketId);
+      // Do nothing
       break;
     case WStype_ERROR:
       handleWebSocketClientError(socketId, len, reinterpret_cast<char*>(data));
@@ -199,62 +186,4 @@ void handleWebSocketEvent(std::uint8_t socketId, WStype_t type, std::uint8_t* da
       ESP_LOGE(TAG, "Unknown WebSocket event type: %d", type);
       break;
   }
-}
-
-void handleHttpPostRequest(AsyncWebServerRequest* request, std::uint8_t* data, std::size_t len, size_t index, size_t total) {
-  if (request->url() == "/networks") {
-    File file = LittleFS.open("/networks", FILE_WRITE);
-    file.write(data, len);
-    file.close();
-    request->send(200, "text/plain", "Saved");
-    return;
-  }
-
-  if (request->url() == "/pairCode") {
-    if (len < 7 || data[6] != 0) {
-      request->send(400, "text/plain", "Invalid pair code");
-      return;
-    }
-
-    char* cdata = reinterpret_cast<char*>(data);
-
-    // Verify that the pair code is a number
-    for (std::size_t i = 0; i < 6; ++i) {
-      if (cdata[i] < '0' || cdata[i] > '9') {
-        request->send(400, "text/plain", "Invalid pair code");
-        return;
-      }
-    }
-
-    ShockLink::AuthenticationManager::Authenticate((unsigned int)atoi(cdata));
-    return;
-  }
-
-  if (request->url() == "/rmtPin") {
-    File file = LittleFS.open("/rmtPin", FILE_WRITE);
-    file.write(data, len);
-    file.close();
-    request->send(200, "text/plain", "Saved");
-    return;
-  }
-
-  // Default
-  request->send(404, "text/plain", "Not found");
-}
-void handleHttpRequestBody(AsyncWebServerRequest* request, std::uint8_t* data, std::size_t len, size_t index, size_t total) {
-  ESP_LOGD(TAG, "HTTP request body: %s", request->url().c_str());
-  switch (request->method()) {
-    case HTTP_POST:
-      ESP_LOGD(TAG, "HTTP POST request: %s", request->url().c_str());
-      handleHttpPostRequest(request, data, len, index, total);
-      break;
-    default:
-      ESP_LOGE(TAG, "Unsupported HTTP method: %d", request->method());
-      request->send(405, "text/plain", "Method not allowed");
-      break;
-  }
-}
-void handleHttpNotFound(AsyncWebServerRequest* request) {
-  ESP_LOGD(TAG, "HTTP not found: %s", request->url().c_str());
-  request->send(404, "text/plain", "Not found");
 }

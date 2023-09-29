@@ -1,6 +1,9 @@
 export type WiFiNetwork = {
-  id: number;
-  name: string;
+  index: number;
+  ssid: string;
+  bssid: string;
+  rssi: number;
+  channel: number;
+  secure: boolean;
   saved: boolean;
-  security: string | null;
 };

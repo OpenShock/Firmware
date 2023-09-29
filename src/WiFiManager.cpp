@@ -101,10 +101,14 @@ void _evScanCompleted(arduino_event_id_t event, arduino_event_info_t info) {
     return;
   }
 
+  DynamicJsonDocument doc(64 + numNetworks * 128);
+  JsonArray networks = doc.createNestedArray("networks");
+
   if (numNetworks == 0) {
     ESP_LOGD(TAG, "No networks found");
     SetWiFiState(WiFiState::Disconnected);
     CaptivePortal::Start();
+    CaptivePortal::BroadcastMessageJSON(doc);
     return;
   }
 
@@ -115,14 +119,25 @@ void _evScanCompleted(arduino_event_id_t event, arduino_event_info_t info) {
   std::uint16_t recognizedNetworks = 0;
   for (std::uint16_t i = 0; i < numNetworks; i++) {
     String ssid = WiFi.SSID(i);
+    bool saved  = false;
     for (auto& cred : s_wifiCredentials) {
       if (cred.ssid == ssid) {
         cred.wifiIndex = i;
         recognizedNetworks++;
+        saved = true;
         break;
       }
     }
+    JsonObject network = networks.createNestedObject();
+    network["index"]   = i;
+    network["ssid"]    = ssid;
+    network["bssid"]   = WiFi.BSSIDstr(i);
+    network["rssi"]    = WiFi.RSSI(i);
+    network["channel"] = WiFi.channel(i);
+    network["saved"]   = saved;
   }
+
+  CaptivePortal::BroadcastMessageJSON(doc);
 
   if (recognizedNetworks == 0) {
     ESP_LOGD(TAG, "No recognized networks found");
@@ -203,6 +218,8 @@ void WiFiManager::RemoveNetwork(const char* ssid) {
 
 bool WiFiManager::StartScan() {
   if (s_wifiState != WiFiState::Disconnected) return false;
+
+  CaptivePortal::BroadcastMessageTXT("{\"scanning\":true}");
 
   WiFi.scanNetworks(true);
   SetWiFiState(WiFiState::Scanning);

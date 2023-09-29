@@ -4,9 +4,12 @@
   import { AppShell, Modal, Toast, initializeStores, storePopup } from '@skeletonlabs/skeleton';
   import Footer from '$lib/components/Layout/Footer.svelte';
   import Header from '$lib/components/Layout/Header.svelte';
+	import { WebSocketClient } from '$lib/WebSocketClient';
 
 	storePopup.set({ computePosition, autoUpdate, flip, shift, offset, arrow });
   initializeStores();
+
+  WebSocketClient.Instance.Connect();
 </script>
 
 <Modal />

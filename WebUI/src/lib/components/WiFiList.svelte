@@ -1,46 +1,21 @@
 <script lang="ts">
-	import { getModalStore } from '@skeletonlabs/skeleton';
+	import { getModalStore, getToastStore } from '@skeletonlabs/skeleton';
 	import WiFiInfo from '$lib/components/modals/WiFiInfo.svelte';
 	import type { WiFiNetwork } from '$lib/types/WiFiNetwork';
+	import { WiFiStateStore } from '$lib/stores';
+	import { WebSocketClient } from '$lib/WebSocketClient';
 
   const modalStore = getModalStore();
+  const toastStore = getToastStore();
 
-  let isScanning = false
-  let connectedId = -1;
-  let items: WiFiNetwork = [
-    {
-      id: 1,
-      name: "Example network",
-      saved: true,
-      security: "WPA2",
-    },
-    {
-      id: 2,
-      name: "Example network 2",
-      saved: false,
-      security: "WPA2",
-    },
-    {
-      id: 3,
-      name: "Other network",
-      saved: false,
-      security: null,
-    },
-    {
-      id: 4,
-      name: "Another network",
-      saved: true,
-      security: "WPA2",
-    },
-    {
-      id: 5,
-      name: "Yet another network",
-      saved: false,
-      security: "WPA2",
-    }
-  ]
+  let connectedIndex = -1;
 
+  function wifiScan() {
+    toastStore.trigger({ message: 'Scanning for WiFi networks...', background: 'bg-blue-500' });
+    WebSocketClient.Instance.Send('{ "type": "startScan" }');
+  }
   function wifiPair(item: WiFiNetwork) {
+    /*
     modalStore.trigger({
       type: 'prompt',
       title: 'Enter password',
@@ -52,22 +27,23 @@
         items[index].saved = true;
       }
     });
+    */
   }
   function wifiConnect(item: WiFiNetwork) {
     console.log("wifiConnect", item);
-    connectedId = item.id;
+    connectedIndex = item.index;
   }
   function wifiDisconnect(item: WiFiNetwork) {
-    if (connectedId !== item.id) return;
+    if (connectedIndex !== item.index) return;
     console.log("wifiDisconnect", item);
-    connectedId = -1;
+    connectedIndex = -1;
   }
   function wifiSettings(item: WiFiNetwork) {
     modalStore.trigger({
       type: 'component',
       component: {
         ref: WiFiInfo,
-        props: { item },
+        props: { bssid: item.bssid },
         slot: '<p>Skeleton</p>'
       },
     });
@@ -77,8 +53,8 @@
 <div>
   <div class="flex justify-between items-center mb-2">
 	  <h3 class="h3">Configure WiFi</h3>
-    <button class="btn variant-outline" on:click={() => isScanning = true} disabled={isScanning}>
-      {#if isScanning}
+    <button class="btn variant-outline" on:click={wifiScan} disabled={$WiFiStateStore.scanning}>
+      {#if $WiFiStateStore.scanning}
         <i class="fa fa-spinner fa-spin"></i>
       {:else}
         <i class="fa fa-rotate-right"></i>
@@ -86,15 +62,15 @@
     </button>
   </div>
   <div class="max-h-64 overflow-auto">
-    {#each items as item (item.id)}
+    {#each $WiFiStateStore.networks as item (item.index)}
       <div class="card mb-2 p-2 flex justify-between items-center">
         <span>
-          {#if item.id === connectedId}
+          {#if item.index === connectedIndex}
             <i class="fa fa-wifi text-green-500"/>
           {:else}
             <i class="fa fa-wifi"/>
           {/if}
-          {item.name}
+          {item.ssid}
         </span>
         <div class="btn-group variant-outline">
           {#if item.saved}
