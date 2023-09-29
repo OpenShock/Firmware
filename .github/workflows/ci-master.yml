@@ -12,56 +12,19 @@ name: ci-master
 
 env:
   NODE_VERSION: 16
+  PYTHON_VERSION: 3.10
   SHOCKLINK_API_DOMAIN: api.shocklink.net
   SHOCKLINK_FW_VERSION: master-${{ github.sha }}
 
 jobs:
-
-  build-captive-portal:
-    runs-on: ubuntu-latest
-
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          sparse-checkout: |
-            WebUI
-          path: .
-      
-      - name: Move WebUI contents to root dir
-        run: |
-          shopt -s dotglob
-          mv WebUI/* .
-          rmdir WebUI
-          shopt -u dotglob
-
-      - uses: actions/setup-node@v3
-        with:
-          node-version: ${{ env.NODE_VERSION }}
-          cache: 'npm'
-
-      - run: npm ci
-      - run: npm run build
-
-      - name: Upload captive portal artifacts
-        uses: actions/upload-artifact@v3
-        with:
-          name: captive-portal
-          path: build/*
-          retention-days: 1
-          if-no-files-found: error
-
-  # Copied verbatim from https://docs.platformio.org/en/stable/integration/ci/github-actions.html
   build-firmware:
     runs-on: ubuntu-latest
-    needs: build-captive-portal
-
     steps:
       - uses: actions/checkout@v4
 
       - uses: actions/cache@v3
         with:
           path: |
-            ~/.cache/pip
             ~/.platformio/platforms
             ~/.platformio/packages
             ~/.platformio/cache
@@ -69,10 +32,44 @@ jobs:
 
       - uses: actions/setup-python@v4
         with:
-          python-version: '3.9'
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: "pip"
 
       - name: Install PlatformIO Core
         run: pip install --upgrade platformio
 
-      - name: Build PlatformIO Project
+      - name: Build Firmware
         run: pio run
+
+      - uses: actions/setup-node@v3
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: "npm"
+
+      - name: Install captive portal dependencies
+        working-directory: ./WebUI
+        run: npm ci
+
+      - name: Build captive portal
+        working-directory: ./WebUI
+        run: npm run build
+
+      - name: Build Filesystem
+        run: pio run buildfs
+
+      - name: Upload captive portal Artifact
+        uses: actions/upload-artifact@v3
+        with:
+          name: captive-portal
+          path: ./WebUI/build
+          retention-days: 1
+          if-no-files-found: error
+
+      - name: Upload Firmware Artifacts
+        uses: actions/upload-artifact@v3
+        with:
+          name: firmware
+          path: |
+            .pio/build/ShockLink/*.bin
+          retention-days: 1
+          if-no-files-found: error
