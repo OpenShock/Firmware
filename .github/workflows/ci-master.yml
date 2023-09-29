@@ -23,7 +23,7 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - uses: ./.github/actions/build-captive-portal/action.yml
+      - uses: ./.github/actions/build-captive-portal
         with:
           node-version: ${{ env.NODE_VERSION }}
 
