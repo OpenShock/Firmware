@@ -140,10 +140,7 @@ jobs:
           cache: "pip"
       
       - name: Install dependencies
-        run: pip install -r requirements.txt
-      
-      - name: Debug
-        run: echo $PATH && ls -la && pip show --files esptool
+        run: pip install esptool
 
       - name: Download filesystem image
         uses: actions/download-artifact@v3
@@ -160,7 +157,8 @@ jobs:
       - name: Merge flash image
         working-directory: .
         run: |
-          esptool merge_bin \
+          python -m \
+            esptool merge_bin \
             -o merged.bin \
             --chip esp32 \
             --flash_mode dio \
