@@ -2,6 +2,7 @@ on:
   push:
     branches:
       - master
+      - feature/multi-board-ci
   pull_request:
     branches:
       - master
@@ -18,6 +19,10 @@ jobs:
   # Copied verbatim from https://docs.platformio.org/en/stable/integration/ci/github-actions.html
   build:
     runs-on: ubuntu-latest
+
+    strategy:
+      matrix:
+        chip: [esp32, esp32-s3, esp32-c3]
 
     steps:
       - uses: actions/checkout@v4
@@ -39,4 +44,4 @@ jobs:
         run: pip install --upgrade platformio
 
       - name: Build PlatformIO Project
-        run: pio run
+        run: pio run -e ${{ matrix.chip }}
