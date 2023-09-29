@@ -98,7 +98,7 @@ namespace LedManager
 
     Led blue(ONBOARD_LED_STATE);
 
-    void Loop(wl_status_t wifiStatus, bool webSocketConnected, unsigned long millis)
+    void Loop(wl_status_t wifiStatus, bool webSocketConnected, EStopManager::EStopStatus_t EStopStatus, unsigned long millis)
     {
         if (wifiStatus != WL_CONNECTED)
         {
@@ -106,7 +106,7 @@ namespace LedManager
             blue.BlinkingSlow();
             return;
         }
-        if (!webSocketConnected)
+        if (!webSocketConnected || (EStopStatus == EStopManager::EStopStatus_t::ESTOPPED || EStopStatus == EStopManager::EStopStatus_t::ESTOPPED_AND_HELD))
         {
             blue.Loop(millis);
             blue.BlinkingFast();

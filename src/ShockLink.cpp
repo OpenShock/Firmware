@@ -14,6 +14,7 @@
 #include "SPIFFS.h"
 #include "HTTPClient.h"
 #include <LedManager.h>
+#include <EStopManager.h>
 
 const String shocklinkApiUrl = SHOCKLINK_API_URL;
 const String shocklinkFwVersion = SHOCKLINK_FW_VERSION;
@@ -182,6 +183,11 @@ void RmtLoop()
     long mil = millis();
     for (std::pair<const uint, command_t> &it : Commands)
     {
+        if (EStopManager::IsEStopped()) {
+            // Making sure the Stop command is sent.
+            it.second.until = EStopManager::estoppedAt;
+        }
+
         if(it.second.until <= mil) {
             // Send stop for 300ms more to ensure the thing is stopping
             if(it.second.until + 300 >= mil) {
@@ -197,7 +203,11 @@ void RmtLoop()
     if (finalSize <= 0)
         return;
 
-    Serial.print("=>");
+    if (EStopManager::IsEStopped())
+        Serial.print("##");
+    else
+        Serial.print("=>");
+
     rmtWriteBlocking(rmt_send, sequence.data(), finalSize);
 }
 
@@ -231,7 +241,7 @@ void setup()
     Serial.print(shocklinkFwVersion);
     Serial.println(" ====");
 
-    LedManager::Loop(WL_IDLE_STATUS, false, 0);
+    LedManager::Loop(WL_IDLE_STATUS, false, EStopManager::EStopStatus_t::ALL_CLEAR, 0);
 
     if (!SPIFFS.begin(true))
     {
@@ -287,6 +297,19 @@ void setup()
                 10000, /* Stack size in words */
                 NULL, 0, &Task1);
 
+    int estopPin = 13;
+
+    if (SPIFFS.exists("/estopPin"))
+    {
+        File estopPinFile = SPIFFS.open("/estopPin", FILE_READ);
+        estopPin = estopPinFile.readString().toInt();
+        estopPinFile.close();
+    }
+    Serial.print("Emergency Stop pin is: ");
+    Serial.println(estopPin);
+
+    EStopManager::Init(estopPin);
+
     File authTokenFile = SPIFFS.open("/authToken", FILE_READ);
     String authToken = authTokenFile.readString();
     authTokenFile.close();
@@ -300,8 +323,8 @@ void setup()
     useDevApi();
 }
 
-unsigned long previousMillis = 0;
 unsigned long interval = 30000;
+unsigned long previousMillis = interval;
 bool firstConnect = true;
 bool reconnectedLoop = false;
 
@@ -323,6 +346,11 @@ bool writeCommands(String& command, String& data) {
 
     if(command == "rmtpin") {
         writeFile("/rmtPin", data);
+        return true;
+    }
+
+    if(command == "estoppin") {
+        writeFile("/estopPin", data);
         return true;
     }
 
@@ -358,12 +386,14 @@ void executeCommand() {
     String command = inputBuffer.substring(0, delimiter);
     command.toLowerCase();
     String data = inputBuffer.substring(delimiter + 1);
-
-    if(data.length() <= 0) {
+    if(data.length() <= 0 || delimiter <= 0) {
         if(command == "restart") {
             Serial.println("Restarting ESP...");
             ESP.restart();
         }
+        
+        Serial.println("SYS|Error|Command not found");
+        return;
     }
 
     if(data.length() > 0) if(writeCommands(command, data)) return;
@@ -393,7 +423,8 @@ void loop()
     
     unsigned long currentMillis = millis();
     wl_status_t wifiStatus = WiFi.status();
-    LedManager::Loop(wifiStatus, webSocket.isConnected(), currentMillis);
+    EStopManager::EStopStatus_t estopStatus = EStopManager::EStopLoop();
+    LedManager::Loop(wifiStatus, webSocket.isConnected(), estopStatus, currentMillis);
     // if WiFi is down, try reconnecting every CHECK_WIFI_TIME seconds
     if ((wifiStatus != WL_CONNECTED) && (currentMillis - previousMillis >= interval))
     {

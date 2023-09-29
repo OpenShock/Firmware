@@ -47,6 +47,14 @@ namespace Captive
       request->send(200, "text/plain", "Saved");
       return;
     }
+
+    if (request->method() == HTTP_POST && request->url() == "/estopPin") {
+      File file = SPIFFS.open("/estopPin", FILE_WRITE);
+      file.write(data, len);
+      file.close();
+      request->send(200, "text/plain", "Saved");
+      return;
+    }
   }
 
   void StopCaptive()
