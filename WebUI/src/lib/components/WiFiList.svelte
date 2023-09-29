@@ -1,17 +1,15 @@
 <script lang="ts">
-	import { getModalStore, getToastStore } from '@skeletonlabs/skeleton';
+	import { getModalStore } from '@skeletonlabs/skeleton';
 	import WiFiInfo from '$lib/components/modals/WiFiInfo.svelte';
 	import type { WiFiNetwork } from '$lib/types/WiFiNetwork';
 	import { WiFiStateStore } from '$lib/stores';
 	import { WebSocketClient } from '$lib/WebSocketClient';
 
   const modalStore = getModalStore();
-  const toastStore = getToastStore();
 
   let connectedIndex = -1;
 
   function wifiScan() {
-    toastStore.trigger({ message: 'Scanning for WiFi networks...', background: 'bg-blue-500' });
     WebSocketClient.Instance.Send('{ "type": "startScan" }');
   }
   function wifiPair(item: WiFiNetwork) {

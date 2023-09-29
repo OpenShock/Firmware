@@ -8,7 +8,5 @@
     <span style="color: #e25555;">&#9829;</span>
     by the ShockLink Team
   </div>
-  <div class="hidden lg:block">Copyright ©{year} | All Rights Reserved</div>
-  <div class="hidden items-center space-x-2 sm:flex">
-  </div>
+  <div class="hidden sm:block">Copyright ©{year} | All Rights Reserved</div>
 </div>

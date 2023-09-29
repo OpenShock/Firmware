@@ -1,4 +1,5 @@
 import { browser } from "$app/environment";
+import { getToastStore } from "@skeletonlabs/skeleton";
 import { WiFiStateStore } from "./stores";
 import type { WiFiNetwork } from "./types/WiFiNetwork";
 
@@ -139,6 +140,13 @@ export class WebSocketClient {
     }
 
     if (message.scanning !== undefined) {
+      const toastStore = getToastStore();
+      if (message.scanning) {
+        toastStore.trigger({ message: 'Scanning for WiFi networks...', background: 'bg-blue-500' });
+      } else {
+        toastStore.trigger({ message: 'Scanning for WiFi networks finished', background: 'bg-green-500' });
+      }
+
       WiFiStateStore.setScanning(message.scanning as boolean);
       return;
     }
