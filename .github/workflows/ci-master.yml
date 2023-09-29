@@ -20,9 +20,12 @@ env:
 jobs:
 
   build-captive-portal:
-    uses: ./.github/workflows/build-captive-portal.yml
-    with:
-      node-version: env.NODE_VERSION
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: ./.github/actions/build-captive-portal/action.yml
+        with:
+          node-version: ${{ env.NODE_VERSION }}
 
   build-filesystem:
     runs-on: ubuntu-latest
