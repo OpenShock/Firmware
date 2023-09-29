@@ -56,7 +56,7 @@ jobs:
         run: npm run build
 
       - name: Build Filesystem
-        run: pio run buildfs
+        run: pio run --target buildfs
 
       - name: Upload captive portal Artifact
         uses: actions/upload-artifact@v3
