@@ -23,6 +23,11 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
+      - uses: actions/checkout@v4
+        with:
+          sparse-checkout: |
+            .github/actions
+
       - uses: ./.github/actions/build-captive-portal
         with:
           node-version: ${{ env.NODE_VERSION }}
