@@ -135,8 +135,8 @@ jobs:
           python-version: ${{ env.PYTHON_VERSION }}
           cache: "pip"
       
-      - name: Install esptool
-        run: pip install esptool
+      - name: Install dependencies
+        run: pip install -r requirements.txt
 
       - name: Download filesystem image
         uses: actions/download-artifact@v3
@@ -151,6 +151,7 @@ jobs:
           path: .
 
       - name: Merge flash image
+        working-directory: .
         run: |
           esptool merge_bin \
             -o merged.bin \
