@@ -2,6 +2,8 @@ import os
 import re
 import shutil
 
+is_github_ci = "GITHUB_ENV" in os.environ and os.environ["CI"] == "true"
+
 Import('env')
 
 def file_copy(oldFile, newFile):
@@ -124,7 +126,7 @@ def build_frontend(source, target, env):
   # Build the captive portal only if it wasn't already built.
   # This is to avoid rebuilding the captive portal every time the firmware is built.
   # This could also lead to some annoying behaviour where the captive portal is not updated when the firmware is built.
-  if not os.path.exists('build'):
+  if not is_github_ci:
     print('Building frontend...')
     os.system('npm i')
     os.system('npm run build')
@@ -186,10 +188,4 @@ def build_frontend(source, target, env):
       return s
     file_transform(action[0], action[1], replace_func)
 
-def cleanup_frontend(source, target, env):
-  print('Cleaning up frontend..')
-  shutil.rmtree('WebUI/build')
-  print('Front-end cleaned up.')
-
 env.AddPreAction('$BUILD_DIR/littlefs.bin', build_frontend)
-env.AddPostAction('$BUILD_DIR/littlefs.bin', cleanup_frontend)
