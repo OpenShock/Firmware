@@ -117,33 +117,29 @@ def exec_replace(filein, fileout, replace_array):
       print('Error reading from ' + filein + ' or writing to ' + fileout)
 
 def build_frontend(source, target, env):
-  unproc_fa_css = 'WebUI/unproc/fa-all.css'
-  unproc_fa_woff2 = 'WebUI/unproc/fa-solid-900.woff2'
-  static_fa_css = 'WebUI/static/fa/fa-all.css'
-  static_fa_woff2 = 'WebUI/static/fa/fa-solid-900.woff2'
-
-  # Analyze the frontend to find all the font awesome icons in use and which css selectors from fa-all.css are unused.
-  (icon_map, unused_css_selectors) = get_fa_icon_map('WebUI/src', unproc_fa_css)
-  print('Found ' + str(len(icon_map)) + ' font awesome icons.')
-
-  # Write a minified css and font file to the static directory.
-  minify_fa_css(unproc_fa_css, static_fa_css, unused_css_selectors)
-  minify_fa_font(unproc_fa_woff2, static_fa_woff2, icon_map)
-
   # Change working directory to frontend.
   os.chdir('WebUI')
 
-  print('Building frontend...')
-  os.system('npm i')
-  os.system('npm run build')
-  print('Frontend build complete.')
+  # Build the captive portal only if it wasn't already built.
+  if not os.path.exists('build'):
+    print('Building frontend...')
+    os.system('npm i')
+    os.system('npm run build')
+    print('Frontend build complete.')
 
   # Change working directory back to root.
   os.chdir('..')
 
-  # Replace the minified css and font files with the unprocessed ones.
-  file_copy(unproc_fa_css, static_fa_css)
-  file_copy(unproc_fa_woff2, static_fa_woff2)
+  fa_css = 'WebUI/build/fa/fa-all.css'
+  fa_woff2 = 'WebUI/build/fa/fa-solid-900.woff2'
+
+  # Analyze the frontend to find all the font awesome icons in use and which css selectors from fa-all.css are unused.
+  (icon_map, unused_css_selectors) = get_fa_icon_map('WebUI/src', fa_css)
+  print('Found ' + str(len(icon_map)) + ' font awesome icons.')
+
+  # Write a minified css and font file to the static directory.
+  minify_fa_css(fa_css, fa_css, unused_css_selectors)
+  minify_fa_font(fa_woff2, fa_woff2, icon_map)
 
   # Shorten all the filenames in the data/www/_app/immutable directory.
   fileIndex = 0
@@ -183,4 +179,10 @@ def build_frontend(source, target, env):
   for action in rename_actions:
     exec_replace(action[0], action[1], renamed_filenames)
 
+def cleanup_frontend(source, target, env):
+  print('Cleaning up frontend..')
+  shutil.rmtree('build')
+  print('Front-end cleaned up.')
+
 env.AddPreAction('$BUILD_DIR/littlefs.bin', build_frontend)
+env.AddPostAction('$BUILD_DIR/littlefs.bin', cleanup_frontend)
