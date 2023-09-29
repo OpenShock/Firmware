@@ -138,6 +138,18 @@ jobs:
       - name: Install esptool
         run: pip install esptool
 
+      - name: Download filesystem image
+        uses: actions/download-artifact@v3
+        with:
+          name: filesystem
+          path: .
+      
+      - name: Download firmware images
+        uses: actions/download-artifact@v3
+        with:
+          name: firmware
+          path: .
+
       - name: Merge flash image
         run: |
           esptool merge_bin \
