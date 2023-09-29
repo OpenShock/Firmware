@@ -12,7 +12,7 @@ name: ci-master
 
 env:
   NODE_VERSION: 16
-  PYTHON_VERSION: 3.10
+  PYTHON_VERSION: 3.9
   SHOCKLINK_API_DOMAIN: api.shocklink.net
   SHOCKLINK_FW_VERSION: master-${{ github.sha }}
 
@@ -32,7 +32,7 @@ jobs:
 
       - uses: actions/setup-python@v4
         with:
-          python-version: "${{ env.PYTHON_VERSION }}"
+          python-version: ${{ env.PYTHON_VERSION }}
           cache: "pip"
 
       - name: Install PlatformIO Core
