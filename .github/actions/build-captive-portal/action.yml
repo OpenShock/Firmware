@@ -6,31 +6,34 @@ inputs:
     description: 'Version of NodeJS to install'
     required: true
 
-steps:
-  - uses: actions/checkout@v4
-    with:
-      sparse-checkout: |
-        WebUI
-      path: .
+runs:
+  using: 'composite'
+  
+  steps:
+    - uses: actions/checkout@v4
+      with:
+        sparse-checkout: |
+          WebUI
+        path: .
 
-  - uses: actions/setup-node@v3
-    with:
-      node-version: ${{ inputs.node-version }}
-      cache: 'npm'
-      cache-dependency-path: ./WebUI/package-lock.json
+    - uses: actions/setup-node@v3
+      with:
+        node-version: ${{ inputs.node-version }}
+        cache: 'npm'
+        cache-dependency-path: ./WebUI/package-lock.json
 
-  - name: Install dependencies
-    working-directory: ./WebUI
-    run: npm ci
+    - name: Install dependencies
+      working-directory: ./WebUI
+      run: npm ci
 
-  - name: Build
-    working-directory: ./WebUI
-    run: npm run build
+    - name: Build
+      working-directory: ./WebUI
+      run: npm run build
 
-  - name: Upload artifacts
-    uses: actions/upload-artifact@v3
-    with:
-      name: captive-portal
-      path: WebUI/build/*
-      retention-days: 1
-      if-no-files-found: error
+    - name: Upload artifacts
+      uses: actions/upload-artifact@v3
+      with:
+        name: captive-portal
+        path: WebUI/build/*
+        retention-days: 1
+        if-no-files-found: error
