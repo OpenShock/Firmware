@@ -139,7 +139,7 @@ jobs:
         run: pip install -r requirements.txt
       
       - name: Debug
-        run: env
+        run: echo $PATH && ls -la && tree .local && echo $PATH
 
       - name: Download filesystem image
         uses: actions/download-artifact@v3
