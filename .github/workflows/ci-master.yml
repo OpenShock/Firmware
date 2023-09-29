@@ -28,7 +28,11 @@ jobs:
           path: .
       
       - name: Move WebUI contents to root dir
-        run: mv WebUI/{.*,*} . && rmdir WebUI
+        run: |
+          shopt -s dotglob
+          mv WebUI/*
+          rmdir WebUI
+          shopt +s dotglob
 
       - uses: actions/setup-node@v3
         with:
