@@ -36,6 +36,7 @@ jobs:
           name: merged-firmware.bin
           name_is_regexp: false
           run_id: ${{ github.event.workflow_run.id }}
+          workflow_conclusion: '' # ignore
           search_artifacts: true
 
       # This step reads a file from repo and use it for body of the release
