@@ -1,3 +1,3 @@
-# ShockLink Firmware
+# OpenShock Firmware
 
-Download `ShockLink.bin` and flash it to your microcontroller.
+Download `OpenShock.ESP32.bin` and flash it to your microcontroller.

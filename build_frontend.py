@@ -2,6 +2,8 @@ import os
 import re
 import shutil
 
+is_github_ci = "GITHUB_ENV" in os.environ and os.environ["CI"] == "true"
+
 Import('env')
 
 def file_copy(oldFile, newFile):
@@ -29,6 +31,27 @@ def file_read_text(file):
     except:
       print('Error reading ' + file)
       return ''
+def file_transform(filein, fileout, transform_func):
+  # Create the directory if it doesn't exist.
+  output_dir = os.path.dirname(fileout)
+  if not os.path.exists(output_dir):
+    os.makedirs(output_dir)
+
+  try:
+    with open(filein, 'r') as f:
+      s = f.read()
+    s = transform_func(s)
+    with open(fileout, 'w') as f:
+      f.write(s)
+  except:
+    try:
+      with open(filein, 'r', encoding='utf-8') as f:
+        s = f.read()
+      s = transform_func(s)
+      with open(fileout, 'w', encoding='utf-8') as f:
+        f.write(s)
+    except Exception as e:
+      print('Error reading from ' + filein + ' or writing to ' + fileout + ': ' + str(e))
 
 def get_fa_icon_map(srcdir, csspath):
   cssext = csspath.split('.')[-1]
@@ -72,78 +95,56 @@ def get_fa_icon_map(srcdir, csspath):
       unused_css_selectors.append(css_class[0])
 
   return (icon_map, unused_css_selectors)
-def minify_fa_css(srcpath, dstpath, unused_css_selectors):
-  s = file_read_text(srcpath)
+def minify_fa_css(css_path, unused_css_selectors):
+  def replace_func(s):
+    # Use regex to remove all the unused icons.
+    for selector in unused_css_selectors:
+      regex = re.escape(selector) + r'{content:"\\[a-f0-9]+";?}'
+      s = re.sub(regex, '', s)
+    return s
 
-  # Use regex to remove all the unused icons.
-  for selector in unused_css_selectors:
-    regex = re.escape(selector) + r'{content:"\\[a-f0-9]+";?}'
-    s = re.sub(regex, '', s)
-
-  file_delete(dstpath)
-  with open(dstpath, 'w') as f:
-    f.write(s)
-def minify_fa_font(srcpath, dstpath, icon_map):
+  file_transform(css_path, css_path, replace_func)
+def minify_fa_font(font_path, icon_map):
   values = []
   for icon in icon_map:
     values.append(icon_map[icon]['unicode'])
   fa_unicode_csv = ','.join(values)
 
-  file_delete(dstpath)
-  os.system('pyftsubset {} --unicodes={} --output-file={}'.format(srcpath, fa_unicode_csv, dstpath))
+  tmp_path = font_path + '.tmp'
 
-def exec_replace(filein, fileout, replace_array):
-  # Create the directory if it doesn't exist.
-  output_dir = os.path.dirname(fileout)
-  if not os.path.exists(output_dir):
-    os.makedirs(output_dir)
-
-  try:
-    with open(filein, 'r') as f:
-      s = f.read()
-    for action in replace_array:
-      s = s.replace(action[0], action[1])
-    with open(fileout, 'w') as f:
-      f.write(s)
-  except:
-    try:
-      with open(filein, 'r', encoding='utf-8') as f:
-        s = f.read()
-      for action in replace_array:
-        s = s.replace(action[0], action[1])
-      with open(fileout, 'w', encoding='utf-8') as f:
-        f.write(s)
-    except:
-      print('Error reading from ' + filein + ' or writing to ' + fileout)
+  # Use pyftsubset to remove all the unused icons.
+  # pyftsubset does not support reading from and writing to the same file, so we need to write to a temporary file.
+  # Then delete the original file and rename the temporary file to the original file.
+  os.system('pyftsubset {} --unicodes={} --output-file={}'.format(font_path, fa_unicode_csv, tmp_path))
+  file_delete(font_path)
+  os.rename(tmp_path, font_path)
 
 def build_frontend(source, target, env):
-  unproc_fa_css = 'WebUI/unproc/fa-all.css'
-  unproc_fa_woff2 = 'WebUI/unproc/fa-solid-900.woff2'
-  static_fa_css = 'WebUI/static/fa/fa-all.css'
-  static_fa_woff2 = 'WebUI/static/fa/fa-solid-900.woff2'
-
-  # Analyze the frontend to find all the font awesome icons in use and which css selectors from fa-all.css are unused.
-  (icon_map, unused_css_selectors) = get_fa_icon_map('WebUI/src', unproc_fa_css)
-  print('Found ' + str(len(icon_map)) + ' font awesome icons.')
-
-  # Write a minified css and font file to the static directory.
-  minify_fa_css(unproc_fa_css, static_fa_css, unused_css_selectors)
-  minify_fa_font(unproc_fa_woff2, static_fa_woff2, icon_map)
-
   # Change working directory to frontend.
   os.chdir('WebUI')
 
-  print('Building frontend...')
-  os.system('npm i')
-  os.system('npm run build')
-  print('Frontend build complete.')
+  # Build the captive portal only if it wasn't already built.
+  # This is to avoid rebuilding the captive portal every time the firmware is built.
+  # This could also lead to some annoying behaviour where the captive portal is not updated when the firmware is built.
+  if not is_github_ci:
+    print('Building frontend...')
+    os.system('npm i')
+    os.system('npm run build')
+    print('Frontend build complete.')
 
   # Change working directory back to root.
   os.chdir('..')
 
-  # Replace the minified css and font files with the unprocessed ones.
-  file_copy(unproc_fa_css, static_fa_css)
-  file_copy(unproc_fa_woff2, static_fa_woff2)
+  fa_css = 'WebUI/build/fa/fa-all.css'
+  fa_woff2 = 'WebUI/build/fa/fa-solid-900.woff2'
+
+  # Analyze the frontend to find all the font awesome icons in use and which css selectors from fa-all.css are unused.
+  (icon_map, unused_css_selectors) = get_fa_icon_map('WebUI/src', fa_css)
+  print('Found ' + str(len(icon_map)) + ' font awesome icons.')
+
+  # Write a minified css and font file to the static directory.
+  minify_fa_css(fa_css, unused_css_selectors)
+  minify_fa_font(fa_woff2, icon_map)
 
   # Shorten all the filenames in the data/www/_app/immutable directory.
   fileIndex = 0
@@ -181,6 +182,10 @@ def build_frontend(source, target, env):
     file_copy(action[0], action[1])
 
   for action in rename_actions:
-    exec_replace(action[0], action[1], renamed_filenames)
+    def replace_func(s):
+      for rename in renamed_filenames:
+        s = s.replace(rename[0], rename[1])
+      return s
+    file_transform(action[0], action[1], replace_func)
 
 env.AddPreAction('$BUILD_DIR/littlefs.bin', build_frontend)
