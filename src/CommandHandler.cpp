@@ -25,21 +25,20 @@ void CommandHandler::Init() {
 }
 
 bool CommandHandler::HandleCommand(std::uint16_t shockerId,
-                                   std::uint8_t method,
+                                   ShockerCommandType type,
                                    std::uint8_t intensity,
                                    unsigned int duration,
                                    std::uint8_t shockerModel) {
   if (s_rfTransmitter == nullptr) return false;
 
   // Stop logic
-  bool isStop = method == 0;
-  if (isStop) {
-    method    = 2;  // Vibrate
+  if (type == ShockerCommandType::Stop) {
+    type      = ShockerCommandType::Vibrate;
     intensity = 0;
     duration  = 300;
 
     s_rfTransmitter->ClearPendingCommands();
   }
 
-  return s_rfTransmitter->SendCommand(shockerModel, shockerId, method, intensity, duration);
+  return s_rfTransmitter->SendCommand(shockerModel, shockerId, type, intensity, duration);
 }

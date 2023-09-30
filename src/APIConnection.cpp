@@ -3,7 +3,10 @@
 #include "CaptivePortal.h"
 #include "CommandHandler.h"
 #include "Constants.h"
+#include "ShockerCommandType.h"
 #include "Time.h"
+
+#include "fbs/ServerMessages_generated.h"
 
 #include <ArduinoJson.h>
 #include <WebSocketsClient.h>
@@ -11,31 +14,42 @@
 
 const char* const TAG = "APIConnection";
 
-void handleControlCommandMessage(const DynamicJsonDocument& doc) {
-  JsonArrayConst data = doc["Data"];
-  for (int i = 0; i < data.size(); i++) {
-    JsonObjectConst cur    = data[i];
-    std::uint16_t id       = static_cast<std::uint16_t>(cur["Id"]);
-    std::uint8_t type      = static_cast<std::uint8_t>(cur["Type"]);
-    std::uint8_t intensity = static_cast<std::uint8_t>(cur["Intensity"]);
-    unsigned int duration  = static_cast<unsigned int>(cur["Duration"]);
-    std::uint8_t model     = static_cast<std::uint8_t>(cur["Model"]);
-    using namespace OpenShock;
+using namespace OpenShock;
 
-    if (!CommandHandler::HandleCommand(id, type, intensity, duration, model)) {
+constexpr ShockerCommandType commandTypeFromFlatbuffers(Serialization::ShockerCommandType commandType) {
+  switch (commandType) {
+    case Serialization::ShockerCommandType_Stop:
+      return ShockerCommandType::Stop;
+    case Serialization::ShockerCommandType_Shock:
+      return ShockerCommandType::Shock;
+    case Serialization::ShockerCommandType_Vibrate:
+      return ShockerCommandType::Vibrate;
+    case Serialization::ShockerCommandType_Sound:
+      return ShockerCommandType::Sound;
+    default:
+      // This should never happen, but if it does, we'll just stop the device
+      return ShockerCommandType::Stop;
+  }
+}
+
+void handleControlCommandMessage(const Serialization::ShockerCommandList* shockerCommandList) {
+  for (const auto& command : *shockerCommandList->commands()) {
+    if (!CommandHandler::HandleCommand(command->id(),
+                                       commandTypeFromFlatbuffers(command->type()),
+                                       command->intensity(),
+                                       command->duration(),
+                                       command->model()))
+    {
       ESP_LOGE(TAG, "Remote command failed/rejected!");
     }
   }
 }
 
-void HandleCaptivePortalMessage(const DynamicJsonDocument& doc) {
-  bool data = (bool)doc["Data"];
-
-  ESP_LOGD(TAG, "Captive portal debug: %s", data ? "true" : "false");
-  if (data) {
-    OpenShock::CaptivePortal::Start();
+void HandleCaptivePortalMessage(const Serialization::CaptivePortalConfig* captivePortalConfig) {
+  if (captivePortalConfig->enabled()) {
+    CaptivePortal::Start();
   } else {
-    OpenShock::CaptivePortal::Stop();
+    CaptivePortal::Stop();
   }
 }
 
@@ -67,18 +81,31 @@ void APIConnection::Update() {
   m_webSocket->loop();
 }
 
-void APIConnection::parseMessage(char* data, std::size_t length) {
-  ESP_LOGD(TAG, "Parsing message of length %d", length);
-  DynamicJsonDocument doc(1024);  // TODO: profile the normal message size and adjust this accordingly
-  deserializeJson(doc, data, length);
-  int type = doc["ResponseType"];
+void APIConnection::parseMessage(const std::uint8_t* data, std::size_t length) {
+  flatbuffers::Verifier::Options verifierOptions {
+    .max_depth                = 16,
+    .max_tables               = 16,
+    .check_alignment          = true,
+    .check_nested_flatbuffers = true,
+    .max_size                 = length,
+  };
+  flatbuffers::Verifier verifier(data, length, verifierOptions);
 
-  switch (type) {
-    case 0:
-      handleControlCommandMessage(doc);
+  if (!Serialization::VerifyServerMessageBuffer(verifier)) {
+    ESP_LOGE(TAG, "Received corrupt/malformed/malicious message from API");
+    return;
+  }
+
+  auto serverMessage = Serialization::GetServerMessage(data);
+  switch (serverMessage->payload_type()) {
+    case Serialization::ServerMessagePayload_ShockerCommandList:
+      handleControlCommandMessage(serverMessage->payload_as_ShockerCommandList());
       break;
-    case 1:
-      HandleCaptivePortalMessage(doc);
+    case Serialization::ServerMessagePayload_CaptivePortalConfig:
+      HandleCaptivePortalMessage(serverMessage->payload_as_CaptivePortalConfig());
+      break;
+    default:
+      ESP_LOGE(TAG, "Received unknown message type from API");
       break;
   }
 }
@@ -93,7 +120,7 @@ void APIConnection::handleEvent(WStype_t type, std::uint8_t* payload, std::size_
       sendKeepAlive();
       break;
     case WStype_TEXT:
-      parseMessage(reinterpret_cast<char*>(payload), length);
+      ESP_LOGE(TAG, "Received text from API, this is not supported!");
       break;
     case WStype_ERROR:
       ESP_LOGI(TAG, "Received error from API");
@@ -114,7 +141,7 @@ void APIConnection::handleEvent(WStype_t type, std::uint8_t* payload, std::size_
       ESP_LOGI(TAG, "Received pong from API");
       break;
     case WStype_BIN:
-      ESP_LOGE(TAG, "Received binary from API, this is not supported!");
+      parseMessage(payload, length);
       break;
     case WStype_FRAGMENT_BIN_START:
       ESP_LOGE(TAG, "Received binary fragment start from API, this is not supported!");

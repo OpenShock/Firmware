@@ -16,7 +16,7 @@ namespace OpenShock {
     void Update();
 
   private:
-    void parseMessage(char* data, std::size_t length);
+    void parseMessage(const std::uint8_t* data, std::size_t length);
     void handleEvent(WStype_t type, std::uint8_t* payload, std::size_t length);
     void sendKeepAlive();
 

@@ -1,5 +1,7 @@
 #pragma once
 
+#include "ShockerCommandType.h"
+
 #include <cstdint>
 
 // Forward definitions to remove clutter
@@ -19,7 +21,7 @@ namespace OpenShock {
 
     bool SendCommand(std::uint8_t shockerModel,
                      std::uint16_t shockerId,
-                     std::uint8_t method,
+                     OpenShock::ShockerCommandType type,
                      std::uint8_t intensity,
                      unsigned int duration);
     void ClearPendingCommands();
