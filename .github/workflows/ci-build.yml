@@ -2,13 +2,16 @@ on:
   push:
     branches:
       - master
-      - feature/captive-portal-ci
+      - develop
   pull_request:
     branches:
       - master
+      - develop
     types: [opened, reopened, synchronize]
+  workflow_call: # When another workflow invokes this one.
+  workflow_dispatch: # Manually invoked by user.
 
-name: ci-master
+name: ci-build
 
 env:
   NODE_VERSION: 16
