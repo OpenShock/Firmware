@@ -33,7 +33,7 @@ jobs:
       - name: Download build artifacts
         uses: dawidd6/action-download-artifact@v2.28.0
         with:
-          name: merged-firmware.bin
+          name: merged-firmware
           name_is_regexp: false
           run_id: ${{ github.event.workflow_run.id }}
           workflow_conclusion: '' # ignore
