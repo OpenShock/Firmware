@@ -22,7 +22,7 @@ jobs:
       matrix: ${{ steps.convert.outputs.matrix }}
 
     steps:
-      - uses: action/checkout@v4
+      - uses: actions/checkout@v4
         with:
           sparse-checkout: platformio.ini
 
