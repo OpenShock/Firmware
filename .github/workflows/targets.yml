@@ -1,0 +1,51 @@
+
+# This is a bit of a silly workflow, but Github Workflow definitions
+# do not let us easily reuse the strategy matrix used to trigger jobs
+# per-board. This is a workaround to define everything in one file, and
+# use the output in the multiple places we need it.
+#
+# Source: https://github.com/orgs/community/discussions/26284#discussioncomment-6701976
+
+on:
+  workflow_call:
+    outputs:
+      matrix:
+        description: "Strategy matrix"
+        value: ${{ jobs.generate-matrix.outputs.matrix }}
+
+name: targets
+
+jobs:
+  generate-matrix:
+    runs-on: ubuntu-latest
+    outputs:
+      matrix: ${{ steps.convert.outputs.matrix }}
+
+    steps:
+      - uses: action/checkout@v4
+        with:
+          sparse-checkout: platformio.ini
+
+      # There's a lot going on here, so bear with me.
+      #
+      # sed:
+      #   -n                              Suppresses normal output,
+      #   "s/^\[env:\(.*\)]$/\1           Substitutes "[env:...]" with whatever value is at "..."
+      #   /p"                             Prints out the substituted value (i.e. the value of "...")
+      #   platformio.ini                  Reading from this file.
+      #
+      # jq:
+      #   "--raw-input --slurp"           Takes the previous output,
+      #   split("\n")                     Splits it by line, turning it into an array,
+      #   [ .[] | select(length > 0) ]    Filters out empty lines (there is an empty trailing line usually),
+      #   { board: ... }                  Wraps the whole thing into a JSON object with only a "board" key
+      #                                   and the array in question as value.
+      # 
+      # echo "matrix=$(...)" >> $GITHUB_OUTPUT    Sets the value as job output with name "matrix".
+      # 
+      # Referenced: https://unix.stackexchange.com/a/278377
+      # Referenced: https://github.com/jqlang/jq/issues/563
+      - name: Extract targets
+        id: targets
+        run: |
+          echo "matrix=$(sed -n "s/^\[env:\(.*\)]$/\1/p" platformio.ini | jq --raw-input --slurp '{ board: split("\n") | [ .[] | select(length > 0) ] }')" >> $GITHUB_OUTPUT'

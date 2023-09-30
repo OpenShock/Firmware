@@ -3,6 +3,7 @@ on:
     branches:
       - master
       - develop
+      - feature/multi-board-ci
   pull_request:
     branches:
       - master
@@ -21,6 +22,10 @@ env:
   SHOCKLINK_FW_VERSION: master-${{ github.sha }}
 
 jobs:
+
+  # Read platformio.ini and extract all specific targets. See the referenced file for more info.
+  get-targets:
+    uses: ./.github/workflows/targets.yml
 
   build-captive-portal:
     runs-on: ubuntu-latest
@@ -96,10 +101,10 @@ jobs:
 
   build-firmware:
     runs-on: ubuntu-latest
+    needs: get-targets
     strategy:
       fail-fast: false
-      matrix:
-        board: [esp32, esp32-s3, esp32-c3]
+      matrix: ${{ fromJSON(needs.get-targets.outputs.matrix )}}
 
     steps:
       - uses: actions/checkout@v4
@@ -133,7 +138,10 @@ jobs:
 
   merge-images:
     runs-on: ubuntu-latest
-    needs: [build-filesystem, build-firmware]
+    needs: [get-targets, build-filesystem, build-firmware]
+    strategy:
+      fail-fast: false
+      matrix: ${{ fromJSON(needs.get-targets.outputs.matrix )}}
 
     steps:
       - uses: actions/checkout@v4
@@ -159,7 +167,7 @@ jobs:
       - name: Download firmware images
         uses: actions/download-artifact@v3
         with:
-          name: firmware
+          name: firmware_${{ matrix.board }}
           path: .
 
       - name: Merge flash image
@@ -180,7 +188,7 @@ jobs:
       - name: Upload merged flashable image
         uses: actions/upload-artifact@v3
         with:
-          name: merged-firmware
+          name: merged-firmware_${{ matrix.board }}
           path: merged.bin
           retention-days: 1
           if-no-files-found: error
