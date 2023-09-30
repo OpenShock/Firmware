@@ -33,7 +33,7 @@ jobs:
       - name: Download build artifacts
         uses: dawidd6/action-download-artifact@v2.28.0
         with:
-          run-id: ${{ github.event.workflow_run.id }} # current run
+          run_id: ${{ github.event.workflow_run.id }} # current run
           name: merged-firmware.bin
 
       # This step reads a file from repo and use it for body of the release
