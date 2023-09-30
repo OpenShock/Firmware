@@ -48,4 +48,4 @@ jobs:
       - name: Extract targets
         id: targets
         run: |
-          echo "matrix=$(sed -n "s/^\[env:\(.*\)]$/\1/p" platformio.ini | jq --raw-input --slurp '{ board: split("\n") | [ .[] | select(length > 0) ] }')" >> $GITHUB_OUTPUT'
+          echo "matrix=$(sed -n "s/^\[env:\(.*\)]$/\1/p" platformio.ini | jq --raw-input --slurp '{ board: split("\n") | [ .[] | select(length > 0) ] }')" >> $GITHUB_OUTPUT
