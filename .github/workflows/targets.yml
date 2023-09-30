@@ -19,7 +19,7 @@ jobs:
   generate-matrix:
     runs-on: ubuntu-latest
     outputs:
-      matrix: ${{ steps.convert.outputs.matrix }}
+      matrix: ${{ steps.extract.outputs.matrix }}
 
     steps:
       - uses: actions/checkout@v4
@@ -47,6 +47,6 @@ jobs:
       # Referenced: https://unix.stackexchange.com/a/278377
       # Referenced: https://github.com/jqlang/jq/issues/563
       - name: Extract targets
-        id: targets
+        id: extract
         run: |
           echo "matrix=$(sed -n "s/^\[env:\(.*\)]$/\1/p" platformio.ini | jq --raw-input --slurp -c '{ board: split("\n") | [ .[] | select(length > 0) ] }')" >> $GITHUB_OUTPUT
