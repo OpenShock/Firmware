@@ -175,7 +175,7 @@ jobs:
           python -m esptool \
             --chip esp32 \
             merge_bin \
-            -o merged.bin \
+            -o OpenShock.${{ matrix.board }}.bin \
             --flash_mode dio \
             --flash_freq 40m \
             --flash_size 4MB \
@@ -187,7 +187,7 @@ jobs:
       - name: Upload merged flashable image
         uses: actions/upload-artifact@v3
         with:
-          name: merged-firmware_${{ matrix.board }}
-          path: merged.bin
+          name: final_${{ matrix.board }}
+          path: OpenShock.${{ matrix.board }}.bin
           retention-days: 1
           if-no-files-found: error
