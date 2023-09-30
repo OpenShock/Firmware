@@ -38,7 +38,8 @@ jobs:
       #   "--raw-input --slurp"           Takes the previous output,
       #   -c                              Output in compact mode (no newlines or unnecessary spaces),
       #   split("\n")                     Splits it by line, turning it into an array,
-      #   [ .[] | select(length > 0) ]    Filters out empty lines (there is an empty trailing line usually),
+      #   [ .[] | select(length > 0)      Filters out empty lines (there is an empty trailing line usually),
+      #         | select(. != "fs") ]     Filters out the "fs" entry since that's only for building the filesystem,
       #   { board: ... }                  Wraps the whole thing into a JSON object with only a "board" key
       #                                   and the array in question as value.
       # 
@@ -49,4 +50,4 @@ jobs:
       - name: Extract targets
         id: extract
         run: |
-          echo "matrix=$(sed -n "s/^\[env:\(.*\)]$/\1/p" platformio.ini | jq --raw-input --slurp -c '{ board: split("\n") | [ .[] | select(length > 0) ] }')" >> $GITHUB_OUTPUT
+          echo "matrix=$(sed -n "s/^\[env:\(.*\)]$/\1/p" platformio.ini | jq --raw-input --slurp -c '{ board: split("\n") | [ .[] | select(length > 0) | select(. != "fs") ] }')" >> $GITHUB_OUTPUT

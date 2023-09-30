@@ -17,7 +17,6 @@ name: ci-build
 env:
   NODE_VERSION: 16
   PYTHON_VERSION: 3.11
-  PLATFORMIO_ENV: ShockLink
   SHOCKLINK_API_DOMAIN: api.shocklink.net
   SHOCKLINK_FW_VERSION: master-${{ github.sha }}
 
@@ -89,13 +88,13 @@ jobs:
           path: WebUI/build/
 
       - name: Build filesystem
-        run: pio run --target buildfs
+        run: pio run --target buildfs -e fs
       
       - name: Upload internal filesystem artifact
         uses: actions/upload-artifact@v3
         with:
           name: filesystem
-          path: .pio/build/${{ env.PLATFORMIO_ENV }}/littlefs.bin
+          path: .pio/build/fs/littlefs.bin
           retention-days: 1
           if-no-files-found: error
 
