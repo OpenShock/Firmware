@@ -56,7 +56,7 @@ jobs:
         uses: svenstaro/upload-release-action@v2
         with:
           repo_token: ${{ secrets.GITHUB_TOKEN }}
-          file: merged-firmware
+          file: merged.bin
           asset_name: full-firmware-esp32.bin
           tag: ${{ github.ref }}
           body: |
