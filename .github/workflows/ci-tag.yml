@@ -35,8 +35,8 @@ jobs:
         with:
           name: merged-firmware.bin
           name_is_regexp: false
-          workflow: ci-build.yml
-          #search_artifacts: true
+          run_id: ${{ github.event.workflow_run.id }}
+          search_artifacts: true
 
       # This step reads a file from repo and use it for body of the release
       # This works on any self-hosted runner OS
