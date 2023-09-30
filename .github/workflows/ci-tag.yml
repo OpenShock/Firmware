@@ -34,6 +34,7 @@ jobs:
         uses: dawidd6/action-download-artifact@v2.28.0
         with:
           name: merged-firmware
+          path: ./
           name_is_regexp: false
           run_id: ${{ github.event.workflow_run.id }}
           workflow_conclusion: '' # ignore
@@ -55,8 +56,8 @@ jobs:
         uses: svenstaro/upload-release-action@v2
         with:
           repo_token: ${{ secrets.GITHUB_TOKEN }}
-          file: merged-firmware.bin
-          asset_name: ShockLink.bin
+          file: merged-firmware
+          asset_name: full-firmware-esp32.bin
           tag: ${{ github.ref }}
           body: |
             ${{ steps.read_release.outputs.RELEASE_BODY }}
