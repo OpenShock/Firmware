@@ -9,7 +9,7 @@ on:
       - develop
     types: [opened, reopened, synchronize]
   workflow_call: # When another workflow invokes this one.
-    workflows: ['ci-build']
+    workflows: ['ci-build', 'ci-tag']
     types: [requested]
   workflow_dispatch: # Manually invoked by user.
 
