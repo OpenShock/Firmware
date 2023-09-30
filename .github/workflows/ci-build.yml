@@ -1,0 +1,182 @@
+on:
+  push:
+    branches:
+      - master
+      - develop
+  pull_request:
+    branches:
+      - master
+      - develop
+    types: [opened, reopened, synchronize]
+  workflow_call: # When another workflow invokes this one.
+  workflow_dispatch: # Manually invoked by user.
+
+name: ci-build
+
+env:
+  NODE_VERSION: 16
+  PYTHON_VERSION: 3.11
+  PLATFORMIO_ENV: ShockLink
+  SHOCKLINK_API_DOMAIN: api.shocklink.net
+  SHOCKLINK_FW_VERSION: master-${{ github.sha }}
+
+jobs:
+
+  build-captive-portal:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          sparse-checkout: |
+            WebUI
+          path: .
+
+      - uses: actions/setup-node@v3
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+          cache-dependency-path: ./WebUI/package-lock.json
+
+      - name: Install dependencies
+        working-directory: ./WebUI
+        run: npm ci
+
+      - name: Build
+        working-directory: ./WebUI
+        run: npm run build
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v3
+        with:
+          name: captive-portal
+          path: WebUI/build/*
+          retention-days: 1
+          if-no-files-found: error
+
+  build-filesystem:
+    runs-on: ubuntu-latest
+    needs: build-captive-portal
+    
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/cache@v3
+        with:
+          path: |
+            ~/.platformio/platforms
+            ~/.platformio/packages
+            ~/.platformio/cache
+          key: ${{ runner.os }}-arch
+
+      - uses: actions/setup-python@v4
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: "pip"
+      
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+      
+      - name: Download built captive portal
+        uses: actions/download-artifact@v3
+        with:
+          name: captive-portal
+          path: WebUI/build/
+
+      - name: Build filesystem
+        run: pio run --target buildfs
+      
+      - name: Upload internal filesystem artifact
+        uses: actions/upload-artifact@v3
+        with:
+          name: filesystem
+          path: .pio/build/${{ env.PLATFORMIO_ENV }}/littlefs.bin
+          retention-days: 1
+          if-no-files-found: error
+
+  build-firmware:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/cache@v3
+        with:
+          path: |
+            ~/.platformio/platforms
+            ~/.platformio/packages
+            ~/.platformio/cache
+          key: ${{ runner.os }}-arch
+
+      - uses: actions/setup-python@v4
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: "pip"
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Build firmware
+        run: pio run
+
+      - name: Upload internal firmware binaries
+        uses: actions/upload-artifact@v3
+        with:
+          name: firmware
+          path: .pio/build/${{ env.PLATFORMIO_ENV }}/*.bin
+          retention-days: 1
+          if-no-files-found: error
+
+  merge-images:
+    runs-on: ubuntu-latest
+    needs: [build-filesystem, build-firmware]
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          sparse-checkout: |
+            requirements.txt
+          path: .
+
+      - uses: actions/setup-python@v4
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: "pip"
+      
+      - name: Install dependencies
+        run: pip install esptool
+
+      - name: Download filesystem image
+        uses: actions/download-artifact@v3
+        with:
+          name: filesystem
+          path: .
+      
+      - name: Download firmware images
+        uses: actions/download-artifact@v3
+        with:
+          name: firmware
+          path: .
+
+      - name: Merge flash image
+        working-directory: .
+        run: |
+          python -m esptool \
+            --chip esp32 \
+            merge_bin \
+            -o merged.bin \
+            --flash_mode dio \
+            --flash_freq 40m \
+            --flash_size 4MB \
+            0x1000 ./bootloader.bin \
+            0x8000 ./partitions.bin \
+            0x10000 ./firmware.bin \
+            0x310000 ./littlefs.bin
+
+      - name: Upload merged flashable image
+        uses: actions/upload-artifact@v3
+        with:
+          name: merged-firmware
+          path: merged.bin
+          retention-days: 1
+          if-no-files-found: error
