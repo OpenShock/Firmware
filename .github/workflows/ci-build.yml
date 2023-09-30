@@ -106,7 +106,7 @@ jobs:
     needs: get-targets
     strategy:
       fail-fast: false
-      matrix: ${{ fromJSON(needs.get-targets.outputs.matrix )}}
+      matrix: ${{ fromJSON(needs.get-targets.outputs.matrix) }}
 
     steps:
       - uses: actions/checkout@v4
