@@ -8,14 +8,14 @@
 #include <freertos/FreeRTOS.h>
 #include <freertos/task.h>
 
-using namespace ShockLink;
-
 struct command_t {
   std::uint64_t until;
   std::vector<rmt_data_t> sequence;
   std::shared_ptr<std::vector<rmt_data_t>> zeroSequence;
   std::uint16_t shockerId;
 };
+
+using namespace OpenShock;
 
 RFTransmitter::RFTransmitter(unsigned int gpioPin, int queueSize)
   : m_gpioPin(gpioPin), m_rmtHandle(nullptr), m_queueHandle(nullptr), m_taskHandle(nullptr) {
@@ -68,7 +68,7 @@ bool RFTransmitter::SendCommand(std::uint8_t shockerModel,
   intensity = std::min(intensity, (std::uint8_t)99);
   duration  = std::min(duration, (unsigned int)std::numeric_limits<std::uint16_t>::max());
 
-  command_t* cmd = new command_t {ShockLink::Millis() + duration,
+  command_t* cmd = new command_t {OpenShock::Millis() + duration,
                                   Rmt::GetSequence(shockerId, method, intensity, shockerModel),
                                   Rmt::GetZeroSequence(shockerId, shockerModel),
                                   shockerId};
@@ -126,7 +126,7 @@ void RFTransmitter::TransmitTask(void* arg) {
       }
     }
 
-    std::uint64_t mil = ShockLink::Millis();
+    std::uint64_t mil = OpenShock::Millis();
 
     // Send queued commands
     for (auto it = commands.begin(); it != commands.end();) {

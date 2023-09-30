@@ -8,7 +8,7 @@
 
 #include <cstdint>
 
-namespace ShockLink {
+namespace OpenShock {
   class PinPatternManager {
   public:
     PinPatternManager(unsigned int gpioPin);
@@ -33,4 +33,4 @@ namespace ShockLink {
     TaskHandle_t m_taskHandle;
     SemaphoreHandle_t m_taskSemaphore;
   };
-}  // namespace ShockLink
+}  // namespace OpenShock

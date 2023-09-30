@@ -9,7 +9,7 @@ struct QueueDefinition;
 typedef QueueDefinition* QueueHandle_t;
 typedef void* TaskHandle_t;
 
-namespace ShockLink {
+namespace OpenShock {
   class RFTransmitter {
   public:
     RFTransmitter(unsigned int gpioPin, int queueSize = 32);
@@ -33,4 +33,4 @@ namespace ShockLink {
     QueueHandle_t m_queueHandle;
     TaskHandle_t m_taskHandle;
   };
-}  // namespace ShockLink
+}  // namespace OpenShock

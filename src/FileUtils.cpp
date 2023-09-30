@@ -5,7 +5,7 @@
 
 const char* const TAG = "FileUtils";
 
-using namespace ShockLink;
+using namespace OpenShock;
 
 bool FileUtils::TryWriteFile(const char* path, const std::uint8_t* data, std::size_t size, bool overwrite) {
   if (LittleFS.exists(path)) {

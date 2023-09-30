@@ -6,30 +6,21 @@
 
 const char* const TAG = "VisualStateManager";
 
-constexpr ShockLink::PinPatternManager::State kCriticalErrorPattern[] = {
+using namespace OpenShock;
+
+constexpr PinPatternManager::State kCriticalErrorPattern[] = {
   { true, 100}, // LED ON for 0.1 seconds
   {false, 100}  // LED OFF for 0.1 seconds
 };
 
-constexpr ShockLink::PinPatternManager::State kWiFiDisconnected[] = {
+constexpr PinPatternManager::State kWiFiDisconnected[] = {
   { true, 100},
   {false, 100},
   { true, 100},
   {false, 700}
 };
 
-constexpr ShockLink::PinPatternManager::State kWiFiConnectedPattern[] = {
-  { true, 100},
-  {false, 100},
-  { true, 100},
-  {false, 100},
-  { true, 100},
-  {false, 700}
-};
-
-constexpr ShockLink::PinPatternManager::State kPingNoResponsePattern[] = {
-  { true, 100},
-  {false, 100},
+constexpr PinPatternManager::State kWiFiConnectedPattern[] = {
   { true, 100},
   {false, 100},
   { true, 100},
@@ -38,9 +29,7 @@ constexpr ShockLink::PinPatternManager::State kPingNoResponsePattern[] = {
   {false, 700}
 };
 
-constexpr ShockLink::PinPatternManager::State kWebSocketCantConnectPattern[] = {
-  { true, 100},
-  {false, 100},
+constexpr PinPatternManager::State kPingNoResponsePattern[] = {
   { true, 100},
   {false, 100},
   { true, 100},
@@ -51,13 +40,26 @@ constexpr ShockLink::PinPatternManager::State kWebSocketCantConnectPattern[] = {
   {false, 700}
 };
 
-constexpr ShockLink::PinPatternManager::State kWebSocketConnectedPattern[] = {
+constexpr PinPatternManager::State kWebSocketCantConnectPattern[] = {
+  { true, 100},
+  {false, 100},
+  { true, 100},
+  {false, 100},
+  { true, 100},
+  {false, 100},
+  { true, 100},
+  {false, 100},
+  { true, 100},
+  {false, 700}
+};
+
+constexpr PinPatternManager::State kWebSocketConnectedPattern[] = {
   {true, 10'000}
 };
 
-ShockLink::PinPatternManager s_builtInLedManager(2);
+PinPatternManager s_builtInLedManager(2);
 
-void ShockLink::VisualStateManager::SetCriticalError() {
+void VisualStateManager::SetCriticalError() {
   static bool _state = false;
   if (_state) {
     return;
@@ -68,8 +70,8 @@ void ShockLink::VisualStateManager::SetCriticalError() {
   _state = true;
 }
 
-void ShockLink::VisualStateManager::SetWiFiState(WiFiState state) {
-  static ShockLink::WiFiState _state = (ShockLink::WiFiState)-1;
+void VisualStateManager::SetWiFiState(WiFiState state) {
+  static WiFiState _state = (WiFiState)-1;
   if (_state == state) {
     return;
   }

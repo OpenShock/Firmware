@@ -2,7 +2,7 @@
 
 #include <cstdint>
 
-namespace ShockLink::SerialInputHandler {
+namespace OpenShock::SerialInputHandler {
   void Init();
   void Update();
-}  // namespace ShockLink::SerialInputHandler
+}  // namespace OpenShock::SerialInputHandler

@@ -5,7 +5,7 @@
 #include <Esp.h>
 #include <HardwareSerial.h>
 
-using namespace ShockLink;
+using namespace OpenShock;
 
 int findChar(const char* buffer, std::size_t bufferSize, char c) {
   for (int i = 0; i < bufferSize; i++) {
@@ -48,17 +48,17 @@ void handleSerialCommand(char* command, std::size_t commandLength) {
 }
 void handleSerialCommand(char* command, std::size_t commandLength, char* arg, std::size_t argLength) {
   if (strcmp(command, "authtoken") == 0) {
-    ShockLink::FileUtils::TryWriteFile("/authToken", arg, argLength);
+    OpenShock::FileUtils::TryWriteFile("/authToken", arg, argLength);
     return;
   }
 
   if (strcmp(command, "rmtpin") == 0) {
-    ShockLink::FileUtils::TryWriteFile("/rmtPin", arg, argLength);
+    OpenShock::FileUtils::TryWriteFile("/rmtPin", arg, argLength);
     return;
   }
 
   if (strcmp(command, "networks") == 0) {
-    ShockLink::FileUtils::TryWriteFile("/networks", arg, argLength);
+    OpenShock::FileUtils::TryWriteFile("/networks", arg, argLength);
     return;
   }
 

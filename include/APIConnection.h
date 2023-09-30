@@ -7,7 +7,7 @@
 class String;
 class WebSocketsClient;
 
-namespace ShockLink {
+namespace OpenShock {
   class APIConnection {
   public:
     APIConnection(const String& authToken);
@@ -22,4 +22,4 @@ namespace ShockLink {
 
     WebSocketsClient* m_webSocket;
   };
-}  // namespace ShockLink
+}  // namespace OpenShock

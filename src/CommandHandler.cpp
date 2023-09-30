@@ -8,7 +8,7 @@
 
 const char* const TAG = "CommandHandler";
 
-using namespace ShockLink;
+using namespace OpenShock;
 
 static std::unique_ptr<RFTransmitter> s_rfTransmitter = nullptr;
 

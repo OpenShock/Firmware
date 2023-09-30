@@ -30,7 +30,9 @@ std::unique_ptr<CaptivePortalInstance> s_webServices = nullptr;
 void handleWebSocketEvent(std::uint8_t socketId, WStype_t type, std::uint8_t* data, std::size_t len);
 void handleHttpNotFound(AsyncWebServerRequest* request);
 
-bool ShockLink::CaptivePortal::Start() {
+using namespace OpenShock;
+
+bool CaptivePortal::Start() {
   if (s_webServices != nullptr) {
     ESP_LOGD(TAG, "Already started");
     return true;
@@ -43,7 +45,7 @@ bool ShockLink::CaptivePortal::Start() {
     return false;
   }
 
-  if (!WiFi.softAP(("ShockLink-" + WiFi.macAddress()).c_str())) {
+  if (!WiFi.softAP(("OpenShock-" + WiFi.macAddress()).c_str())) {
     ESP_LOGE(TAG, "Failed to start AP");
     WiFi.enableAP(false);
     return false;
@@ -70,7 +72,7 @@ bool ShockLink::CaptivePortal::Start() {
 
   return true;
 }
-void ShockLink::CaptivePortal::Stop() {
+void CaptivePortal::Stop() {
   if (s_webServices == nullptr) {
     ESP_LOGD(TAG, "Already stopped");
     return;
@@ -85,17 +87,17 @@ void ShockLink::CaptivePortal::Stop() {
 
   WiFi.softAPdisconnect(true);
 }
-bool ShockLink::CaptivePortal::IsRunning() {
+bool CaptivePortal::IsRunning() {
   return s_webServices != nullptr;
 }
-void ShockLink::CaptivePortal::Update() {
+void CaptivePortal::Update() {
   if (s_webServices == nullptr) {
     return;
   }
 
   s_webServices->socketServer.loop();
 }
-bool ShockLink::CaptivePortal::BroadcastMessageTXT(const char* data, std::size_t len) {
+bool CaptivePortal::BroadcastMessageTXT(const char* data, std::size_t len) {
   if (s_webServices == nullptr) {
     return false;
   }
@@ -104,7 +106,7 @@ bool ShockLink::CaptivePortal::BroadcastMessageTXT(const char* data, std::size_t
 
   return true;
 }
-bool ShockLink::CaptivePortal::BroadcastMessageBIN(const std::uint8_t* data, std::size_t len) {
+bool CaptivePortal::BroadcastMessageBIN(const std::uint8_t* data, std::size_t len) {
   if (s_webServices == nullptr) {
     return false;
   }
@@ -141,19 +143,19 @@ void handleWebSocketClientMessage(std::uint8_t socketId, WStype_t type, std::uin
   }
 
   if (typeStr == "startScan") {
-    ShockLink::WiFiManager::StartScan();
+    WiFiManager::StartScan();
   } /* else if (typeStr == "connect") {
-     ShockLink::WiFiManager::Connect(doc["ssid"], doc["password"]);
+     WiFiManager::Connect(doc["ssid"], doc["password"]);
    } else if (typeStr == "disconnect") {
-     ShockLink::WiFiManager::Disconnect();
+     WiFiManager::Disconnect();
    } else if (typeStr == "authenticate") {
-     ShockLink::AuthenticationManager::Authenticate(doc["code"]);
+     AuthenticationManager::Authenticate(doc["code"]);
    } else if (typeStr == "pair") {
-     ShockLink::AuthenticationManager::Pair(doc["code"]);
+     AuthenticationManager::Pair(doc["code"]);
    } else if (typeStr == "unpair") {
-     ShockLink::AuthenticationManager::Unpair();
+     AuthenticationManager::Unpair();
    } else if (typeStr == "setRmtPin") {
-     ShockLink::AuthenticationManager::SetRmtPin(doc["pin"]);
+     AuthenticationManager::SetRmtPin(doc["pin"]);
    }*/
 }
 void handleWebSocketClientError(std::uint8_t socketId, std::uint16_t code, const char* message) {

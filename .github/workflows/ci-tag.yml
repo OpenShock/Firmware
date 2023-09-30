@@ -6,8 +6,8 @@ on:
 name: ci-tag
 
 env:
-  SHOCKLINK_API_DOMAIN: api.shocklink.net
-  SHOCKLINK_FW_VERSION: ${{ github.ref_name }}
+  OPENSHOCK_API_DOMAIN: api.shocklink.net
+  OPENSHOCK_FW_VERSION: ${{ github.ref_name }}
 
 jobs:
 

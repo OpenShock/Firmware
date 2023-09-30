@@ -6,11 +6,13 @@ const char* const TAG = "PinPatternManager";
 
 struct Pattern {
   unsigned int pin;
-  ShockLink::PinPatternManager::State* pattern;
+  OpenShock::PinPatternManager::State* pattern;
   std::size_t patternLength;
 };
 
-ShockLink::PinPatternManager::PinPatternManager(unsigned int gpioPin)
+using namespace OpenShock;
+
+PinPatternManager::PinPatternManager(unsigned int gpioPin)
   : m_gpioPin(gpioPin)
   , m_name {0}
   , m_pattern(nullptr)
@@ -22,13 +24,13 @@ ShockLink::PinPatternManager::PinPatternManager(unsigned int gpioPin)
   xSemaphoreGive(m_taskSemaphore);
 }
 
-ShockLink::PinPatternManager::~PinPatternManager() {
+PinPatternManager::~PinPatternManager() {
   ClearPattern();
 
   vSemaphoreDelete(m_taskSemaphore);
 }
 
-void ShockLink::PinPatternManager::SetPattern(nonstd::span<const State> pattern) {
+void PinPatternManager::SetPattern(nonstd::span<const State> pattern) {
   ClearPatternInternal();
 
   // Set new values
@@ -54,12 +56,12 @@ void ShockLink::PinPatternManager::SetPattern(nonstd::span<const State> pattern)
   xSemaphoreGive(m_taskSemaphore);
 }
 
-void ShockLink::PinPatternManager::ClearPattern() {
+void PinPatternManager::ClearPattern() {
   ClearPatternInternal();
   xSemaphoreGive(m_taskSemaphore);
 }
 
-void ShockLink::PinPatternManager::ClearPatternInternal() {
+void PinPatternManager::ClearPatternInternal() {
   xSemaphoreTake(m_taskSemaphore, portMAX_DELAY);
 
   if (m_taskHandle != nullptr) {
@@ -74,12 +76,12 @@ void ShockLink::PinPatternManager::ClearPatternInternal() {
   m_patternLength = 0;
 }
 
-void ShockLink::PinPatternManager::RunPattern(void* arg) {
-  ShockLink::PinPatternManager* thisPtr = reinterpret_cast<ShockLink::PinPatternManager*>(arg);
+void PinPatternManager::RunPattern(void* arg) {
+  PinPatternManager* thisPtr = reinterpret_cast<PinPatternManager*>(arg);
 
-  unsigned int pin                             = thisPtr->m_gpioPin;
-  ShockLink::PinPatternManager::State* pattern = thisPtr->m_pattern;
-  std::size_t patternLength                    = thisPtr->m_patternLength;
+  unsigned int pin                  = thisPtr->m_gpioPin;
+  PinPatternManager::State* pattern = thisPtr->m_pattern;
+  std::size_t patternLength         = thisPtr->m_patternLength;
 
   while (true) {
     for (std::size_t i = 0; i < patternLength; ++i) {

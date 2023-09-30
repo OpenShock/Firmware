@@ -1,6 +1,6 @@
 #include "Constants.h"
 
-namespace ShockLink::Constants {
-  const char* const Version   = SHOCKLINK_FW_VERSION;
-  const char* const ApiDomain = SHOCKLINK_API_DOMAIN;
-}  // namespace ShockLink::Constants
+namespace OpenShock::Constants {
+  const char* const Version   = OPENSHOCK_FW_VERSION;
+  const char* const ApiDomain = OPENSHOCK_API_DOMAIN;
+}  // namespace OpenShock::Constants

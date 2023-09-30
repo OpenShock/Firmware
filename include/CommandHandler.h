@@ -4,11 +4,11 @@
 
 // TODO: This is bad architecture. Fix it.
 
-namespace ShockLink::CommandHandler {
+namespace OpenShock::CommandHandler {
   void Init();
   bool HandleCommand(std::uint16_t shockerId,
                      std::uint8_t method,
                      std::uint8_t intensity,
                      unsigned int duration,
                      std::uint8_t shockerModel);
-}  // namespace ShockLink::CommandHandler
+}  // namespace OpenShock::CommandHandler

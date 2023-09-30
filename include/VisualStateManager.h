@@ -4,7 +4,7 @@
 
 #include <cstdint>
 
-namespace ShockLink::VisualStateManager {
+namespace OpenShock::VisualStateManager {
   void SetCriticalError();
   void SetWiFiState(WiFiState state);
-}  // namespace ShockLink::VisualStateManager
+}  // namespace OpenShock::VisualStateManager

@@ -4,10 +4,10 @@
 
 #include <cstdint>
 
-namespace ShockLink::AuthenticationManager {
+namespace OpenShock::AuthenticationManager {
   bool Authenticate(unsigned int pairCode);
 
   bool IsAuthenticated();
   String GetAuthToken();
   void ClearAuthToken();
-}  // namespace ShockLink::AuthenticationManager
+}  // namespace OpenShock::AuthenticationManager

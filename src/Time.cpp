@@ -6,7 +6,7 @@ std::int64_t _lastMillis = 0;
 std::int64_t _lastMicros = 0;
 
 // Expires every 71.6 minutes
-std::uint64_t ShockLink::Micros() {
+std::uint64_t OpenShock::Micros() {
   std::int64_t now = (std::int64_t)micros();
 
   // TEMPORARY
@@ -16,7 +16,7 @@ std::uint64_t ShockLink::Micros() {
 }
 
 // Expires every 49 days
-std::uint64_t ShockLink::Millis() {
+std::uint64_t OpenShock::Millis() {
   std::int64_t now = (std::int64_t)millis();
 
   // TEMPORARY

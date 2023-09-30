@@ -12,27 +12,27 @@
 
 #include <memory>
 
-const char* const TAG = "ShockLink";
+const char* const TAG = "OpenShock";
 
-std::unique_ptr<ShockLink::APIConnection> s_apiConnection = nullptr;
+std::unique_ptr<OpenShock::APIConnection> s_apiConnection = nullptr;
 
 void setup() {
-  ShockLink::SerialInputHandler::Init();
-  ESP_LOGI(TAG, "==== ShockLink v%s ====", ShockLink::Constants::Version);
+  OpenShock::SerialInputHandler::Init();
+  ESP_LOGI(TAG, "==== OpenShock v%s ====", OpenShock::Constants::Version);
 
-  ShockLink::CommandHandler::Init();
+  OpenShock::CommandHandler::Init();
 
   if (!LittleFS.begin(true)) {
     ESP_LOGE(TAG, "An Error has occurred while mounting LittleFS");
     return;
   }
 
-  ShockLink::WiFiManager::Init();
+  OpenShock::WiFiManager::Init();
 }
 
 void loop() {
-  ShockLink::SerialInputHandler::Update();
-  ShockLink::CaptivePortal::Update();
+  OpenShock::SerialInputHandler::Update();
+  OpenShock::CaptivePortal::Update();
 
   if (s_apiConnection != nullptr) {
     s_apiConnection->Update();

@@ -1,10 +1,10 @@
 #pragma once
 
-namespace ShockLink {
+namespace OpenShock {
   enum class WiFiState {
     Disconnected,
     Scanning,
     Connecting,
     Connected
   };
-}  // namespace ShockLink
+}  // namespace OpenShock

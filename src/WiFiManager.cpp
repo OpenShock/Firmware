@@ -11,7 +11,7 @@
 
 const char* const TAG = "WiFiManager";
 
-using namespace ShockLink;
+using namespace OpenShock;
 
 struct WifiCredentials {
   String ssid;
@@ -175,7 +175,7 @@ bool WiFiManager::Init() {
   WiFi.onEvent(_evWiFiDisconnected, ARDUINO_EVENT_WIFI_STA_DISCONNECTED);
 
   WiFi.mode(WIFI_STA);
-  WiFi.setHostname("ShockLink");  // TODO: Add the device name to the hostname (retrieve from API and store in LittleFS)
+  WiFi.setHostname("OpenShock");  // TODO: Add the device name to the hostname (retrieve from API and store in LittleFS)
 
   if (s_wifiCredentials.size() > 0) {
     WiFi.scanNetworks(true);

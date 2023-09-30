@@ -4,7 +4,7 @@
 
 #include <cstdint>
 
-namespace ShockLink::WiFiManager {
+namespace OpenShock::WiFiManager {
   bool Init();
 
   WiFiState GetWiFiState();
@@ -14,4 +14,4 @@ namespace ShockLink::WiFiManager {
 
   bool StartScan();
 
-}  // namespace ShockLink::WiFiManager
+}  // namespace OpenShock::WiFiManager

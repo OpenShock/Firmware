@@ -5,7 +5,7 @@
 
 #include <cstdint>
 
-namespace ShockLink::CaptivePortal {
+namespace OpenShock::CaptivePortal {
   bool Start();
   void Stop();
   bool IsRunning();
@@ -21,4 +21,4 @@ namespace ShockLink::CaptivePortal {
     serializeJson(doc, message);
     return BroadcastMessageTXT(message);
   }
-};  // namespace ShockLink::CaptivePortal
+};  // namespace OpenShock::CaptivePortal

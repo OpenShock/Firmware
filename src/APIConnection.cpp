@@ -11,8 +11,6 @@
 
 const char* const TAG = "APIConnection";
 
-using namespace ShockLink;
-
 void handleControlCommandMessage(const DynamicJsonDocument& doc) {
   JsonArrayConst data = doc["Data"];
   for (int i = 0; i < data.size(); i++) {
@@ -22,6 +20,7 @@ void handleControlCommandMessage(const DynamicJsonDocument& doc) {
     std::uint8_t intensity = static_cast<std::uint8_t>(cur["Intensity"]);
     unsigned int duration  = static_cast<unsigned int>(cur["Duration"]);
     std::uint8_t model     = static_cast<std::uint8_t>(cur["Model"]);
+    using namespace OpenShock;
 
     if (!CommandHandler::HandleCommand(id, type, intensity, duration, model)) {
       ESP_LOGE(TAG, "Remote command failed/rejected!");
@@ -34,19 +33,21 @@ void HandleCaptivePortalMessage(const DynamicJsonDocument& doc) {
 
   ESP_LOGD(TAG, "Captive portal debug: %s", data ? "true" : "false");
   if (data) {
-    ShockLink::CaptivePortal::Start();
+    OpenShock::CaptivePortal::Start();
   } else {
-    ShockLink::CaptivePortal::Stop();
+    OpenShock::CaptivePortal::Stop();
   }
 }
 
+using namespace OpenShock;
+
 APIConnection::APIConnection(const String& authToken) : m_webSocket(new WebSocketsClient()) {
-  String firmwareVersionHeader = "FirmwareVersion: " + String(ShockLink::Constants::Version);
+  String firmwareVersionHeader = "FirmwareVersion: " + String(Constants::Version);
   String deviceTokenHeader     = "DeviceToken: " + authToken;
   m_webSocket->setExtraHeaders((firmwareVersionHeader + "\"" + deviceTokenHeader).c_str());
   m_webSocket->onEvent(
     std::bind(&APIConnection::handleEvent, this, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3));
-  m_webSocket->beginSSL(ShockLink::Constants::ApiDomain, 443, "/1/ws/device");
+  m_webSocket->beginSSL(Constants::ApiDomain, 443, "/1/ws/device");
 }
 
 APIConnection::~APIConnection() {
@@ -55,7 +56,7 @@ APIConnection::~APIConnection() {
 }
 
 void APIConnection::Update() {
-  std::uint64_t msNow = ShockLink::Millis();
+  std::uint64_t msNow = OpenShock::Millis();
 
   static std::uint64_t lastKA = 0;
   if ((msNow - lastKA) >= 30'000) {

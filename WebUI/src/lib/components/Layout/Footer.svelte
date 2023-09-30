@@ -6,7 +6,7 @@
   <div>
     Made with
     <span style="color: #e25555;">&#9829;</span>
-    by the ShockLink Team
+    by the OpenShock Team
   </div>
   <div class="hidden sm:block">Copyright ©{year} | All Rights Reserved</div>
 </div>

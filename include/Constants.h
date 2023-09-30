@@ -2,15 +2,15 @@
 
 #include <cstdint>
 
-#ifndef SHOCKLINK_DOMAIN
-#define SHOCKLINK_DOMAIN "shocklink.net"
+#ifndef OPENSHOCK_DOMAIN
+#define OPENSHOCK_DOMAIN "shocklink.net"
 #endif
 
-#ifndef SHOCKLINK_API_BASE_URL
-#define SHOCKLINK_API_BASE_URL "https://" SHOCKLINK_API_DOMAIN
+#ifndef OPENSHOCK_API_BASE_URL
+#define OPENSHOCK_API_BASE_URL "https://" OPENSHOCK_API_DOMAIN
 #endif
 
-#define SHOCKLINK_API_URL(path) SHOCKLINK_API_BASE_URL path
+#define OPENSHOCK_API_URL(path) OPENSHOCK_API_BASE_URL path
 
 /*
     Constants
@@ -20,7 +20,7 @@
 
     Ref: https://esp32.com/viewtopic.php?t=8742
 */
-namespace ShockLink::Constants {
+namespace OpenShock::Constants {
   extern const char* const Version;
   extern const char* const ApiDomain;
-}  // namespace ShockLink::Constants
+}  // namespace OpenShock::Constants
