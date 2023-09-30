@@ -21,7 +21,7 @@ jobs:
     runs-on: ubuntu-latest
     needs: build
     strategy:
-      matrix: ${{ needs.build.outputs.matrix }}
+      matrix: ${{ fromJSON(needs.build.outputs.matrix) }}
 
     steps:
       # Note: This step is NOT in fact `actions/download-artifact`. The reason is that since we
