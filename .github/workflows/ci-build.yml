@@ -10,6 +10,10 @@ on:
       - develop
     types: [opened, reopened, synchronize]
   workflow_call: # When another workflow invokes this one.
+    outputs:
+      matrix:
+        description: "Strategy matrix"
+        value: ${{ jobs.get-targets.outputs.matrix }}
   workflow_dispatch: # Manually invoked by user.
 
 name: ci-build
@@ -187,7 +191,7 @@ jobs:
       - name: Upload merged flashable image
         uses: actions/upload-artifact@v3
         with:
-          name: final_${{ matrix.board }}
+          name: OpenShock_${{ matrix.board }}
           path: OpenShock.${{ matrix.board }}.bin
           retention-days: 1
           if-no-files-found: error
