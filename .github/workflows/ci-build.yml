@@ -9,6 +9,8 @@ on:
       - develop
     types: [opened, reopened, synchronize]
   workflow_call: # When another workflow invokes this one.
+    workflows: ['ci-build']
+    types: [requested]
   workflow_dispatch: # Manually invoked by user.
 
 name: ci-build
