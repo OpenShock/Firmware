@@ -13,13 +13,13 @@ using namespace OpenShock;
 static std::unique_ptr<RFTransmitter> s_rfTransmitter = nullptr;
 
 void CommandHandler::Init() {
-  int rmtPin = 15;
+  int rmtPin = OPENSHOCK_TX_PIN;
   if (LittleFS.exists("/rmtPin")) {
     File rmtPinFile = LittleFS.open("/rmtPin", FILE_READ);
     rmtPin          = rmtPinFile.readString().toInt();
     rmtPinFile.close();
   }
-  ESP_LOGD(TAG, "RMT pin is: %d", rmtPin);
+  ESP_LOGD(TAG, "RMT/TX pin is: %d", rmtPin);
 
   s_rfTransmitter = std::make_unique<RFTransmitter>(rmtPin, 32);
 }

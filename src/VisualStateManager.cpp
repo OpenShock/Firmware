@@ -57,9 +57,10 @@ constexpr PinPatternManager::State kWebSocketConnectedPattern[] = {
   {true, 10'000}
 };
 
-PinPatternManager s_builtInLedManager(2);
+PinPatternManager s_builtInLedManager(OPENSHOCK_LED_PIN);
 
 void VisualStateManager::SetCriticalError() {
+#if defined(OPENSHOCK_LED_TYPE) && OPENSHOCK_LED_TYPE == PIN
   static bool _state = false;
   if (_state) {
     return;
@@ -68,9 +69,11 @@ void VisualStateManager::SetCriticalError() {
   s_builtInLedManager.SetPattern(kCriticalErrorPattern);
 
   _state = true;
+#endif
 }
 
 void VisualStateManager::SetWiFiState(WiFiState state) {
+#if defined(OPENSHOCK_LED_TYPE) && OPENSHOCK_LED_TYPE == PIN
   static WiFiState _state = (WiFiState)-1;
   if (_state == state) {
     return;
@@ -89,4 +92,5 @@ void VisualStateManager::SetWiFiState(WiFiState state) {
   }
 
   _state = state;
+#endif
 }
