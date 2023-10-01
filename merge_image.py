@@ -24,7 +24,7 @@ env = config['env:' + env_name]
 # Check if the board is custom.
 board_name = env['board']
 boards_dir = Path().absolute() / "boards"
-board_exists_direct = os.path.exists(boards_dir / board_name)
+board_exists_direct = os.path.exists(boards_dir / board_name / 'merge-image.py')
 
 print('Board name: %s' % board_name)
 print('Board found directly: %s' % board_exists_direct)
@@ -43,7 +43,7 @@ if not board_name.startswith('OpenShock-'):
 
 # Grab the indirect name and check if it exists.
 board_name_indirect = board_name[len('OpenShock-'):]
-board_exists_indirect = os.path.exists(boards_dir / board_name_indirect)
+board_exists_indirect = os.path.exists(boards_dir / board_name_indirect / 'merge-image.py')
 
 if not board_exists_indirect:
     print('Board not found directly: %s' % board_name)
