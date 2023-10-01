@@ -17,17 +17,22 @@ const char* const TAG = "OpenShock";
 std::unique_ptr<OpenShock::APIConnection> s_apiConnection = nullptr;
 
 void setup() {
+  if (!LittleFS.begin(true)) {
+    ESP_LOGE(TAG, "PANIC: An Error has occurred while mounting LittleFS, restarting in 5 seconds...");
+    delay(5000);
+    ESP.restart();
+  }
+
   OpenShock::SerialInputHandler::Init();
   ESP_LOGI(TAG, "==== OpenShock v%s ====", OpenShock::Constants::Version);
 
   OpenShock::CommandHandler::Init();
 
-  if (!LittleFS.begin(true)) {
-    ESP_LOGE(TAG, "An Error has occurred while mounting LittleFS");
-    return;
+  if (!OpenShock::WiFiManager::Init()) {
+    ESP_LOGE(TAG, "PANIC: An Error has occurred while initializing WiFiManager, restarting in 5 seconds...");
+    delay(5000);
+    ESP.restart();
   }
-
-  OpenShock::WiFiManager::Init();
 }
 
 void loop() {
