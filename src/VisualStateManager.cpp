@@ -57,9 +57,12 @@ constexpr PinPatternManager::State kWebSocketConnectedPattern[] = {
   {true, 10'000}
 };
 
-PinPatternManager s_builtInLedManager(2);
+#if defined(OPENSHOCK_LED_TYPE) && defined(OPENSHOCK_LED_PIN) && OPENSHOCK_LED_TYPE == PIN
+PinPatternManager s_builtInLedManager(OPENSHOCK_LED_PIN);
+#endif
 
 void VisualStateManager::SetCriticalError() {
+#if defined(OPENSHOCK_LED_TYPE) && defined(OPENSHOCK_LED_PIN) && OPENSHOCK_LED_TYPE == PIN
   static bool _state = false;
   if (_state) {
     return;
@@ -68,9 +71,13 @@ void VisualStateManager::SetCriticalError() {
   s_builtInLedManager.SetPattern(kCriticalErrorPattern);
 
   _state = true;
+#else
+  ESP_LOGW(TAG, "SetCriticalError (but LED was not configured at build time)");
+#endif
 }
 
 void VisualStateManager::SetWiFiState(WiFiState state) {
+#if defined(OPENSHOCK_LED_TYPE) && defined(OPENSHOCK_LED_PIN) && OPENSHOCK_LED_TYPE == PIN
   static WiFiState _state = (WiFiState)-1;
   if (_state == state) {
     return;
@@ -89,4 +96,7 @@ void VisualStateManager::SetWiFiState(WiFiState state) {
   }
 
   _state = state;
+#else
+  ESP_LOGW(TAG, "SetWiFiStateState: %d (but LED was not configured at build time)", state);
+#endif
 }
