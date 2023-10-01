@@ -6,6 +6,7 @@ import esptool
 esptool.main([
     '--chip', 'esp32-s3',
     'merge_bin', '-o', 'merged.bin',
+    '--flash_size', '16MB', # This board has 16MiB of flash.
     '0x0', './bootloader.bin',
     '0x8000', './partitions.bin',
     '0x10000', './firmware.bin',
