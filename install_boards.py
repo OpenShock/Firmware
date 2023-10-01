@@ -31,7 +31,8 @@ def install_board(file):
 def install_boards():
     print("Installing defined boards")
     for filename in os.listdir(source_dir):
-        install_board(filename)
+        if os.path.exists(source_dir / filename / "board.json"):
+            install_board(filename)
 
 create_boards_dir()
 wipe_installed_boards()
