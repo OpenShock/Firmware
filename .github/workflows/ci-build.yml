@@ -133,9 +133,6 @@ jobs:
           mkdir -p ~/.platformio/boards
           find boards/ | grep board.json | sed -r -n 's|([-a-zA-Z0-9\\-]*)/board.json|./\0\n~/.platformio/boards/\1.json|p' | xargs -n 2 mv
 
-      # - name: Install requested board override
-      #   run: mkdir -p ~/.platformio/boards && cp ./boards/${{ matrix.board }}/board.json ~/.platformio/boards/${{ matrix.board }}.json
-
       - name: Build firmware
         run: pio run -e ${{ matrix.board }}
 
@@ -159,7 +156,6 @@ jobs:
         with:
           sparse-checkout: |
             requirements.txt
-          path: .
 
       - uses: actions/setup-python@v4
         with:
@@ -173,28 +169,16 @@ jobs:
         uses: actions/download-artifact@v3
         with:
           name: filesystem
-          path: .
       
       - name: Download firmware images
         uses: actions/download-artifact@v3
         with:
           name: firmware_${{ matrix.board }}
-          path: .
 
       - name: Merge flash image
-        working-directory: .
         run: |
-          python -m esptool \
-            --chip esp32 \
-            merge_bin \
-            -o OpenShock.${{ matrix.board }}.bin \
-            --flash_mode dio \
-            --flash_freq 40m \
-            --flash_size 4MB \
-            0x1000 ./bootloader.bin \
-            0x8000 ./partitions.bin \
-            0x10000 ./firmware.bin \
-            0x310000 ./littlefs.bin
+          python ./boards/${{ matrix.board }}/merge-image.py
+          mv merged.bin OpenShock.${{ matrix.board }}.bin
 
       - name: Upload merged flashable image
         uses: actions/upload-artifact@v3
