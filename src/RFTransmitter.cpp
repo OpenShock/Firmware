@@ -8,6 +8,8 @@
 #include <freertos/FreeRTOS.h>
 #include <freertos/task.h>
 
+#include <limits>
+
 struct command_t {
   std::uint64_t until;
   std::vector<rmt_data_t> sequence;
