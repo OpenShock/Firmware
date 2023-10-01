@@ -127,18 +127,9 @@ jobs:
 
       - name: Install dependencies
         run: pip install -r requirements.txt
-      
-      # This seems super intimidiating but all it does is the following:
-      #   1. Match the ./boards/{board-name}/board.json files for each {board-name}
-      #   2. Copy said file in the same folder from "board.json" to "{board-name}.json"
-      #   3. Copy the properly named JSON files to ~/.platformio/boards so that PlatformIO can detect them
-      # That's all!
-      - name: Install board definition overrides
-        working-directory: .
-        run: |
-          mkdir -p ~/.platformio/boards
-          find boards/ | sed -n -r 's|boards/([-a-zA-Z0-9\\-]*)/board.json|\0\nboards/\1/\1.json|gp' | xargs -n 2 cp
-          find boards/ | sed -n -r 's|boards/([-a-zA-Z0-9\\-]*)/\1.json|\0|gp' | xargs -n 1 cp -t ~/.platformio/boards/
+
+      - name: Install custom board definitions
+        run: python3 install_boards.py
 
       - name: Build firmware
         working-directory: .
