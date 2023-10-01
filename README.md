@@ -19,3 +19,13 @@ You will need:
 - VSCode
 - Knowledge about Arduino library and C++
 - Optimally compatible hardware to test your code
+
+### Setting up
+```bash
+# Install dependencies
+pip install -r requirements.txt
+
+# Install boards/ into ~/.platformio/boards
+# (Needed to use PlatformIO in a meaningful capacity)
+python install_boards.py
+```
