@@ -44,6 +44,8 @@ if not board_name.startswith('OpenShock-'):
 # Grab the indirect name and check if it exists.
 board_name_indirect = board_name[len('OpenShock-'):]
 board_exists_indirect = os.path.exists(boards_dir / board_name_indirect / 'merge-image.py')
+print('Board name indirectly: %s' % board_name_indirect)
+print('Board found indirectly: %s' % board_exists_indirect)
 
 if not board_exists_indirect:
     print('Board not found directly: %s' % board_name)
@@ -52,5 +54,4 @@ if not board_exists_indirect:
     sys.exit(1)
 
 # The only option left is the board exists indirectly.
-print('Board found indirectly: %s' % board_name_indirect)
 call_script(boards_dir / board_name_indirect / 'merge-image.py')
