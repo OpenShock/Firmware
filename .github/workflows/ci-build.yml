@@ -163,7 +163,7 @@ jobs:
       - uses: actions/checkout@v4
         with:
           sparse-checkout: |
-            requirements.txt
+            boards
 
       - uses: actions/setup-python@v4
         with:
