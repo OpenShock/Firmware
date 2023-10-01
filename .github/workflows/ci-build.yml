@@ -128,6 +128,11 @@ jobs:
       - name: Install dependencies
         run: pip install -r requirements.txt
       
+      # This seems super intimidiating but all it does is the following:
+      #   1. Match the ./boards/{board-name}/board.json files for each {board-name}
+      #   2. Copy said file in the same folder from "board.json" to "{board-name}.json"
+      #   3. Copy the properly named JSON files to ~/.platformio/boards so that PlatformIO can detect them
+      # That's all!
       - name: Install board definition overrides
         working-directory: .
         run: |
