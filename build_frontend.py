@@ -33,6 +33,7 @@ def file_read_text(file):
   except:
     print('Error reading ' + file)
     return (None, None)
+
 def file_write_text(file, text, enc):
   try:
     with open(file, 'w', encoding=enc) as f:
@@ -43,8 +44,8 @@ def file_write_text(file, text, enc):
     return False
 
 def get_fa_icon_map(srcdir, csspath):
-  cssext = csspath.split('.')[-1]
-  if cssext != 'css':
+  ext = csspath.split('.')[-1]
+  if ext != 'css':
     return []
 
   fa_icon_set = set()
@@ -53,7 +54,7 @@ def get_fa_icon_map(srcdir, csspath):
     for filename in files:
       filepath = os.path.join(root, filename)
       ext = filename.split('.')[-1]
-      if ext != 'svelte' and ext != 'html' and ext != 'js' and ext != 'ts':
+      if ext == 'ico' or ext == 'woff2': # Skip binary files.
         continue
 
       (s, _) = file_read_text(filepath)
@@ -87,6 +88,7 @@ def get_fa_icon_map(srcdir, csspath):
       unused_css_selectors.append(css_class[0])
 
   return (icon_map, unused_css_selectors)
+
 def minify_fa_css(css_path, unused_css_selectors):
   (s, enc) = file_read_text(css_path)
   if s == None or s == '':
@@ -100,6 +102,7 @@ def minify_fa_css(css_path, unused_css_selectors):
       f_out.write(s)
   except Exception as e:
     print('Error writing to ' + css_path + ': ' + str(e))
+
 def minify_fa_font(font_path, icon_map):
   values = []
   for icon in icon_map:
@@ -165,17 +168,17 @@ def build_frontend(source, target, env):
 
       # Skip formatting binary files.
       ext = filename.split('.')[-1]
-      if ext == 'png' or ext == 'jpg' or ext == 'jpeg' or ext == 'gif' or ext == 'ico' or ext == 'svg' or ext == 'ttf' or ext == 'woff' or ext == 'woff2' or ext == 'eot':
+      if ext == 'png' or ext == 'jpg' or ext == 'jpeg' or ext == 'gif' or ext == 'ico' or ext == 'svg' or ext == 'ttf' or ext == 'woff' or ext == 'woff2' or ext == 'gz':
         copy_actions.append((filepath, newfilepath))
       else:
         rename_actions.append((filepath, newfilepath))
 
   # Delete the data/www directory if it exists.
   if os.path.exists('data/www'):
-      shutil.rmtree('data/www')
+    shutil.rmtree('data/www')
 
-  for action in copy_actions:
-    file_gzip(action[0], action[1] + '.gz')
+  for (src_path, dst_path) in copy_actions:
+    file_gzip(src_path, dst_path + '.gz')
 
   for (src_path, dst_path) in rename_actions:
     dir_ensure(os.path.dirname(dst_path))
@@ -185,8 +188,8 @@ def build_frontend(source, target, env):
       print('Error reading ' + src_path)
       continue
 
-    for rename in renamed_filenames:
-      s = s.replace(rename[0], rename[1])
+    for (old, new) in renamed_filenames:
+      s = s.replace(old, new)
 
     try:
       if enc == 'utf-8':
