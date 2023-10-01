@@ -132,7 +132,8 @@ jobs:
         working-directory: .
         run: |
           mkdir -p ~/.platformio/boards
-          find boards/ | grep board.json | sed -r -n 's|.*/([-a-zA-Z0-9\\-]*)/board.json|./\0\n~/.platformio/boards/\1.json|p' | xargs -n 2 mv
+          find boards/
+          find boards/ | grep board.json | sed -r -n 's|([-a-zA-Z0-9\\-]*)/board.json|\0\n~/.platformio/boards/\1.json|p' | xargs -n 2 cp
 
       - name: Build firmware
         working-directory: .
