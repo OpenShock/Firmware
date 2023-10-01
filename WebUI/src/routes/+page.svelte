@@ -10,7 +10,7 @@
     <div>
       <h3 class="h3 mb-2">Other settings</h3>
       <div class="flex space-x-2">
-        <input class="input variant-form-material" type="text" placeholder="RTM Pin" />
+        <input class="input variant-form-material" type="text" placeholder="TX Pin" />
         <button class="btn variant-filled">Configure</button>
       </div>
     </div>

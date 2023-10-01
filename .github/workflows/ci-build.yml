@@ -3,11 +3,12 @@ on:
     branches:
       - master
       - develop
-  pull_request:
-    branches:
-      - master
-      - develop
-    types: [opened, reopened, synchronize]
+      - feature/multi-board-ci
+  # pull_request:
+  #   branches:
+  #     - master
+  #     - develop
+  #   types: [opened, reopened, synchronize]
   workflow_call: # When another workflow invokes this one.
     outputs:
       matrix:
@@ -127,7 +128,11 @@ jobs:
       - name: Install dependencies
         run: pip install -r requirements.txt
 
+      - name: Install custom board definitions
+        run: python3 install_boards.py
+
       - name: Build firmware
+        working-directory: .
         run: pio run -e ${{ matrix.board }}
 
       - name: Upload internal firmware binaries
@@ -149,8 +154,7 @@ jobs:
       - uses: actions/checkout@v4
         with:
           sparse-checkout: |
-            requirements.txt
-          path: .
+            boards
 
       - uses: actions/setup-python@v4
         with:
@@ -164,28 +168,16 @@ jobs:
         uses: actions/download-artifact@v3
         with:
           name: filesystem
-          path: .
       
       - name: Download firmware images
         uses: actions/download-artifact@v3
         with:
           name: firmware_${{ matrix.board }}
-          path: .
 
       - name: Merge flash image
-        working-directory: .
         run: |
-          python -m esptool \
-            --chip esp32 \
-            merge_bin \
-            -o OpenShock.${{ matrix.board }}.bin \
-            --flash_mode dio \
-            --flash_freq 40m \
-            --flash_size 4MB \
-            0x1000 ./bootloader.bin \
-            0x8000 ./partitions.bin \
-            0x10000 ./firmware.bin \
-            0x310000 ./littlefs.bin
+          python merge_image.py ${{ matrix.board }} &&
+            mv merged.bin OpenShock.${{ matrix.board }}.bin
 
       - name: Upload merged flashable image
         uses: actions/upload-artifact@v3
