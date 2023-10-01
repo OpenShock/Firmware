@@ -57,12 +57,12 @@ constexpr PinPatternManager::State kWebSocketConnectedPattern[] = {
   {true, 10'000}
 };
 
-#if defined(OPENSHOCK_LED_TYPE) && defined(OPENSHOCK_LED_PIN) OPENSHOCK_LED_TYPE == PIN
+#if defined(OPENSHOCK_LED_TYPE) && defined(OPENSHOCK_LED_PIN) && OPENSHOCK_LED_TYPE == PIN
 PinPatternManager s_builtInLedManager(OPENSHOCK_LED_PIN);
 #endif
 
 void VisualStateManager::SetCriticalError() {
-#if defined(OPENSHOCK_LED_TYPE) && defined(OPENSHOCK_LED_PIN) OPENSHOCK_LED_TYPE == PIN
+#if defined(OPENSHOCK_LED_TYPE) && defined(OPENSHOCK_LED_PIN) && OPENSHOCK_LED_TYPE == PIN
   static bool _state = false;
   if (_state) {
     return;
