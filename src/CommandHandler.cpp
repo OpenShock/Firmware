@@ -23,6 +23,8 @@ void CommandHandler::Init() {
   ESP_LOGD(TAG, "RMT/TX pin is: %d", rmtPin);
 
   s_rfTransmitter = std::make_unique<RFTransmitter>(rmtPin, 32);
+#else
+  ESP_LOGD(TAG, "No TX pin configured at build time! RADIO IS DISABLED");
 #endif
 }
 
