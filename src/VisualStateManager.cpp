@@ -72,7 +72,7 @@ void VisualStateManager::SetCriticalError() {
 
   _state = true;
 #else
-  ESP_LOGD(TAG, "SetCriticalError (but LED was not configured at build time)");
+  ESP_LOGW(TAG, "SetCriticalError (but LED was not configured at build time)");
 #endif
 }
 
@@ -97,6 +97,6 @@ void VisualStateManager::SetWiFiState(WiFiState state) {
 
   _state = state;
 #else
-  ESP_LOGD(TAG, "SetWiFiStateState: %d (but LED was not configured at build time)", state);
+  ESP_LOGW(TAG, "SetWiFiStateState: %d (but LED was not configured at build time)", state);
 #endif
 }
