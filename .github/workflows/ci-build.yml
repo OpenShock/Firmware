@@ -4,10 +4,10 @@ on:
       - master
       - develop
       - feature/multi-board-ci
-  pull_request:
-    branches:
-      - master
-      - develop
+  # pull_request:
+  #   branches:
+  #     - master
+  #     - develop
     types: [opened, reopened, synchronize]
   workflow_call: # When another workflow invokes this one.
     outputs:
