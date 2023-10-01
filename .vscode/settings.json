@@ -53,6 +53,5 @@
         "networks.c": "cpp",
         "regex": "cpp",
         "iostream": "cpp"
-    },
-    "cmake.sourceDirectory": "${workspaceFolder}/.pio/libdeps/az-delivery-devkit-v4/ArduinoJson"
+    }
 }
