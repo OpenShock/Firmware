@@ -1,57 +1,46 @@
 import os
 import re
+import gzip
 import shutil
 
 is_github_ci = "GITHUB_ENV" in os.environ and os.environ["CI"] == "true"
 
 Import('env')
 
-def file_copy(oldFile, newFile):
-  # Create the directory if it doesn't exist.
-  output_dir = os.path.dirname(newFile)
-  if not os.path.exists(output_dir):
-    os.makedirs(output_dir)
-  elif os.path.exists(newFile):
-    os.remove(newFile)
+def dir_ensure(dir):
+  if not os.path.exists(dir):
+    os.makedirs(dir)
 
-  # Copy the file.
-  shutil.copyfile(oldFile, newFile)
 def file_delete(file):
-  # Delete the file if it exists.
   if os.path.exists(file):
     os.remove(file)
+
+def file_gzip(file_path, gzip_path):
+  dir_ensure(os.path.dirname(gzip_path))
+  file_delete(gzip_path)
+  with open(file_path, 'rb') as f_in, gzip.open(gzip_path, 'wb') as f_out:
+    f_out.write(f_in.read())
+
 def file_read_text(file):
   try:
-    with open(file, 'r') as f:
-      return f.read()
+    with open(file, 'r', encoding='utf-8') as f:
+      return (f.read(), 'utf-8')
   except:
-    try:
-      with open(file, 'r', encoding='utf-8') as f:
-        return f.read()
-    except:
-      print('Error reading ' + file)
-      return ''
-def file_transform(filein, fileout, transform_func):
-  # Create the directory if it doesn't exist.
-  output_dir = os.path.dirname(fileout)
-  if not os.path.exists(output_dir):
-    os.makedirs(output_dir)
-
+    pass
   try:
-    with open(filein, 'r') as f:
-      s = f.read()
-    s = transform_func(s)
-    with open(fileout, 'w') as f:
-      f.write(s)
+    with open(file, 'r') as f:
+      return (f.read(), None)
   except:
-    try:
-      with open(filein, 'r', encoding='utf-8') as f:
-        s = f.read()
-      s = transform_func(s)
-      with open(fileout, 'w', encoding='utf-8') as f:
-        f.write(s)
-    except Exception as e:
-      print('Error reading from ' + filein + ' or writing to ' + fileout + ': ' + str(e))
+    print('Error reading ' + file)
+    return (None, None)
+def file_write_text(file, text, enc):
+  try:
+    with open(file, 'w', encoding=enc) as f:
+      f.write(text)
+    return True
+  except:
+    print('Error writing to ' + file)
+    return False
 
 def get_fa_icon_map(srcdir, csspath):
   cssext = csspath.split('.')[-1]
@@ -67,8 +56,8 @@ def get_fa_icon_map(srcdir, csspath):
       if ext != 'svelte' and ext != 'html' and ext != 'js' and ext != 'ts':
         continue
 
-      s = file_read_text(filepath)
-      if s == '':
+      (s, _) = file_read_text(filepath)
+      if s == None or s == '':
         continue
 
       icons = re.findall(r'(fa-[a-z0-9-]+)', s)
@@ -76,7 +65,10 @@ def get_fa_icon_map(srcdir, csspath):
       fa_icon_set.update(icons)
 
   # Find all the fa icon classes.
-  s = file_read_text(csspath)
+  (s, _) = file_read_text(csspath)
+  if s == None or s == '':
+    return []
+
   css_classes = re.findall(r'((?:.fa-[a-z0-9-]+:before,?)+){content:"(\\[a-f0-9]+)";?}', s)
 
   # For each class, extract the fa-names.
@@ -96,14 +88,18 @@ def get_fa_icon_map(srcdir, csspath):
 
   return (icon_map, unused_css_selectors)
 def minify_fa_css(css_path, unused_css_selectors):
-  def replace_func(s):
-    # Use regex to remove all the unused icons.
-    for selector in unused_css_selectors:
-      regex = re.escape(selector) + r'{content:"\\[a-f0-9]+";?}'
-      s = re.sub(regex, '', s)
-    return s
-
-  file_transform(css_path, css_path, replace_func)
+  (s, enc) = file_read_text(css_path)
+  if s == None or s == '':
+    return
+  # Use regex to remove all the unused icons.
+  for selector in unused_css_selectors:
+    regex = re.escape(selector) + r'{content:"\\[a-f0-9]+";?}'
+    s = re.sub(regex, '', s)
+  try:
+    with open(css_path, 'w', encoding=enc) as f_out:
+      f_out.write(s)
+  except Exception as e:
+    print('Error writing to ' + css_path + ': ' + str(e))
 def minify_fa_font(font_path, icon_map):
   values = []
   for icon in icon_map:
@@ -179,13 +175,29 @@ def build_frontend(source, target, env):
       shutil.rmtree('data/www')
 
   for action in copy_actions:
-    file_copy(action[0], action[1])
+    file_gzip(action[0], action[1] + '.gz')
 
-  for action in rename_actions:
-    def replace_func(s):
-      for rename in renamed_filenames:
-        s = s.replace(rename[0], rename[1])
-      return s
-    file_transform(action[0], action[1], replace_func)
+  for (src_path, dst_path) in rename_actions:
+    dir_ensure(os.path.dirname(dst_path))
+    file_delete(dst_path)
+    (s, enc) = file_read_text(src_path)
+    if s == None:
+      print('Error reading ' + src_path)
+      continue
+
+    for rename in renamed_filenames:
+      s = s.replace(rename[0], rename[1])
+
+    try:
+      if enc == 'utf-8':
+        s = s.encode('utf-8')
+      else:
+        s = s.encode('ascii')
+    except Exception as e:
+      print('Error encoding ' + src_path + ': ' + str(e))
+      continue
+
+    with gzip.open(dst_path + '.gz', 'wb') as f_out:
+      f_out.write(s)
 
 env.AddPreAction('$BUILD_DIR/littlefs.bin', build_frontend)
