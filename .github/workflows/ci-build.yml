@@ -176,8 +176,8 @@ jobs:
 
       - name: Merge flash image
         run: |
-          python ./boards/${{ matrix.board }}/merge-image.py
-          mv merged.bin OpenShock.${{ matrix.board }}.bin
+          python merge_image.py ${{ matrix.board }} &&
+            mv merged.bin OpenShock.${{ matrix.board }}.bin
 
       - name: Upload merged flashable image
         uses: actions/upload-artifact@v3

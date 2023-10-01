@@ -3,6 +3,10 @@
 import os
 import shutil
 from pathlib import Path
+import configparser
+
+config = configparser.ConfigParser()
+config.read('platformio.io')
 
 source_dir = Path().absolute() / "boards"
 target_dir = Path.home() / ".platformio" / "boards"
