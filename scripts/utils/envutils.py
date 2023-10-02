@@ -78,6 +78,7 @@ class dotenv:
         # Read .env file(s) into environment variables, start from the root of the drive and work our way down.
         paths = list(path.parents[::-1]) + [path]
 
+        # Get the environment specific name. (e.g. .env.develop / .env.production / .env.release)
         env_specific_name = '.env.' + environment
 
         # Read the .env files.
@@ -126,7 +127,7 @@ class dotenv:
     def get_loglevel(self, key: str, dotenv: bool = True) -> int | None:
         value = self.get_str(key, dotenv)
         if value == None:
-            raise ValueError('Environment variable ' + key + ' is not set.')
+            return None
 
         value = value.lower()
 
