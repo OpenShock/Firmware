@@ -1,5 +1,5 @@
 import os
-import sysenv
+from . import sysenv
 
 
 # The short ref name of the branch or tag that triggered the workflow run.

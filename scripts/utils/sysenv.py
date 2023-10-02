@@ -1,5 +1,5 @@
 import os
-import conv
+from . import conv
 
 
 def get_bool(key: str, default: bool | None = None) -> bool:
