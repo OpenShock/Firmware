@@ -1,14 +1,14 @@
-env = Import('env')  # type: ignore
-print('env: ', env)
+from utils import pioenv, sysenv, dotenv
 
-from utils import fileenv, pioenv, sysenv
+Import('env')  # type: ignore
+pio = pioenv.PioEnv(env)  # type: ignore
 
 # This file is invoked by PlatformIO during build.
 # See 'extra_scripts' in 'platformio.ini'.
 
 # Get PIO variables.
-build_flags = pioenv.get_string_array('BUILD_FLAGS', [])
-project_dir = pioenv.get_string('PROJECT_DIR')
+build_flags = pio.get_string_array('BUILD_FLAGS', [])
+project_dir = pio.get_string('PROJECT_DIR')
 
 # By default, the build is run in DEVELOP mode.
 # If we are running in CI and either building the master branch,
@@ -25,7 +25,7 @@ is_release_build = is_ci and (is_branch_master or is_pr_into_master)
 pio_build_type = 'release' if is_release_build else 'debug'
 dotenv_type = 'production' if is_release_build else 'development'
 
-dotenv = fileenv.read(project_dir, dotenv_type)
+dot = dotenv.DotEnv(project_dir, dotenv_type)
 
 # Defines that will be passed to the compiler.
 cpp_defines: dict[str, str | int | bool] = {}
@@ -46,11 +46,11 @@ for flag in build_flags:
         leftover_flags.append(flag)
 
 # Gets all the environment variables prefixed with 'OPENSHOCK_'.
-openshock_vars = dotenv.get_all_prefixed('OPENSHOCK_')
+openshock_vars = dot.get_all_prefixed('OPENSHOCK_')
 cpp_defines.update(openshock_vars)
 
 # Gets the log level from environment variables.
-log_level_int = dotenv.get_loglevel('LOG_LEVEL')
+log_level_int = dot.get_loglevel('LOG_LEVEL')
 if log_level_int is None:
     raise ValueError('LOG_LEVEL must be set in environment variables.')
 cpp_defines['CORE_DEBUG_LEVEL'] = log_level_int

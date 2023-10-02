@@ -19,7 +19,7 @@ LOGLEVEL_MAP = {
 }
 
 
-class fileenv:
+class DotEnv:
     def __read_dotenv(self, path: str | Path):
         with open(path, 'r') as f:
             for line in f:
@@ -87,5 +87,5 @@ class fileenv:
         return tup[0]
 
 
-def read(workdir: str, environment_name: str) -> fileenv:
-    return fileenv(workdir, environment=environment_name)
+def read(workdir: str, environment_name: str) -> DotEnv:
+    return DotEnv(workdir, environment=environment_name)
