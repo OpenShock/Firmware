@@ -55,7 +55,7 @@ bool SaveCredentials() {
 bool ReadCredentials() {
   File file = LittleFS.open("/networks", FILE_READ);
   if (!file) {
-    ESP_LOGE(TAG, "Failed to open networks file for reading");
+    ESP_LOGW(TAG, "Failed to open networks file for reading");
     return false;
   }
 
@@ -63,7 +63,7 @@ bool ReadCredentials() {
   if (deserializeJson(doc, file) != DeserializationError::Ok) {
     file.close();
 
-    ESP_LOGE(TAG, "Failed to deserialize networks file, overwriting");
+    ESP_LOGW(TAG, "Failed to deserialize networks file, overwriting");
     SaveCredentials();
 
     return false;
@@ -102,6 +102,8 @@ void _evScanCompleted(arduino_event_id_t event, arduino_event_info_t info) {
   }
 
   DynamicJsonDocument doc(64 + numNetworks * 128);
+  doc["type"]        = "scan";
+  doc["status"]      = "finished";
   JsonArray networks = doc.createNestedArray("networks");
 
   if (numNetworks == 0) {
@@ -219,7 +221,7 @@ void WiFiManager::RemoveNetwork(const char* ssid) {
 bool WiFiManager::StartScan() {
   if (s_wifiState != WiFiState::Disconnected) return false;
 
-  CaptivePortal::BroadcastMessageTXT("{\"scanning\":true}");
+  CaptivePortal::BroadcastMessageTXT("{\"type\":\"scan\",\"status\":\"started\"}");
 
   WiFi.scanNetworks(true);
   SetWiFiState(WiFiState::Scanning);
