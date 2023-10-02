@@ -20,10 +20,10 @@ class PioEnv:
         self.env = env
 
     def get(self, key: str):
-        return env[key]  # type: ignore
+        return self.env[key]  # type: ignore
 
     def set(self, key: str, value):
-        env[key] = value  # type: ignore
+        self.env[key] = value  # type: ignore
 
     def get_bool(self, key: str, default: bool | None = None) -> bool:
         try:
