@@ -3,13 +3,13 @@
 IndentWidth: 2
 ---
 Language: Cpp
-Standard: c++17
+Standard: c++20
 DisableFormat: false
 
 TabWidth: 2
 UseTab: Never
 IndentWidth: 2
-ColumnLimit: 128
+ColumnLimit: 256
 ShortNamespaceLines: 2
 AccessModifierOffset: -2
 ContinuationIndentWidth: 2
@@ -35,7 +35,7 @@ SortIncludes: CaseInsensitive
 # IncludeIsMainRegex: "([-_](test|unittest))?$"
 # IncludeIsMainSourceRegex: ""
 
-AlignAfterOpenBracket: Align
+AlignAfterOpenBracket: BlockIndent
 AlignArrayOfStructures: Right
 AlignConsecutiveAssignments:
   Enabled: true
@@ -73,7 +73,7 @@ AllowShortCaseLabelsOnASingleLine: false
 AllowShortEnumsOnASingleLine: false
 AllowShortFunctionsOnASingleLine: Inline
 AllowShortIfStatementsOnASingleLine: WithoutElse
-AllowShortLambdasOnASingleLine: All
+AllowShortLambdasOnASingleLine: Inline
 AllowShortLoopsOnASingleLine: true
 AlwaysBreakAfterReturnType: None
 AlwaysBreakBeforeMultilineStrings: false
@@ -115,12 +115,12 @@ EmptyLineAfterAccessModifier: Never
 EmptyLineBeforeAccessModifier: LogicalBlock
 FixNamespaceComments: true
 IndentAccessModifiers: false
-IndentCaseBlocks: true
+IndentCaseBlocks: false
 IndentCaseLabels: true
 IndentExternBlock: NoIndent
 IndentGotoLabels: false
 IndentPPDirectives: None
-IndentRequiresClause: false
+IndentRequiresClause: true
 IndentWrappedFunctionNames: true
 InsertNewlineAtEOF: true
 InsertTrailingCommas: Wrapped
@@ -133,7 +133,7 @@ IntegerLiteralSeparator:
   HexMinDigits: 9
 KeepEmptyLinesAtEOF: false
 KeepEmptyLinesAtTheStartOfBlocks: false
-LambdaBodyIndentation: Signature
+LambdaBodyIndentation: OuterScope
 MaxEmptyLinesToKeep: 1
 NamespaceIndentation: All
 PPIndentWidth: -1
