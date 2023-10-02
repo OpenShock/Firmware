@@ -19,9 +19,9 @@ is_pr_into_master = envutils.get_github_base_ref() == 'master'
 is_release = is_ci and (is_branch_master or is_pr_into_master)
 
 # Get the build type string.
-builtype = 'release' if is_release else 'develop'
+build_type = 'release' if is_release else 'debug'
 
-dotenv = envutils.dotenv(project_dir, builtype)
+dotenv = envutils.dotenv(project_dir, build_type)
 
 # Defines that will be passed to the compiler.
 cpp_defines: dict[str, str | int | bool] = {}
@@ -60,10 +60,10 @@ for k, v in cpp_defines.items():
     else:
         cpp_defines[k] = v
 
-print('Build type: ' + builtype)
+print('Build type: ' + build_type)
 print('Build defines: ' + str(cpp_defines))
 
 # Set PIO variables.
-env['BUILD_TYPE'] = builtype
+env['BUILD_TYPE'] = build_type
 env['BUILD_FLAGS'] = leftover_flags
 env.Append(CPPDEFINES=[(k, v) for k, v in cpp_defines.items()])
