@@ -1,6 +1,7 @@
 from utils import fileenv, pioenv, sysenv
 
 env = Import('env')  # type: ignore
+print('env: ', env)
 
 # This file is invoked by PlatformIO during build.
 # See 'extra_scripts' in 'platformio.ini'.
