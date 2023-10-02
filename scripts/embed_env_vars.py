@@ -20,8 +20,9 @@ is_release = is_ci and (is_branch_master or is_pr_into_master)
 
 # Get the build type string.
 build_type = 'release' if is_release else 'debug'
+environment_type = 'production' if is_release else 'development'
 
-dotenv = envutils.dotenv(project_dir, build_type)
+dotenv = envutils.dotenv(project_dir, environment_type)
 
 # Defines that will be passed to the compiler.
 cpp_defines: dict[str, str | int | bool] = {}
@@ -45,8 +46,10 @@ openshock_vars = dotenv.get_all_prefixed('OPENSHOCK_')
 cpp_defines.update(openshock_vars)
 
 # Gets the log level from environment variables.
-(loglevel_int, _) = dotenv.get_loglevel('DEBUG_LEVEL')
-cpp_defines['CORE_DEBUG_LEVEL'] = loglevel_int
+log_level_int = dotenv.get_loglevel('LOG_LEVEL')
+if log_level_int is None:
+    raise ValueError('LOG_LEVEL must be set in environment variables.')
+cpp_defines['CORE_DEBUG_LEVEL'] = log_level_int
 
 # Convert all the string values to macros.
 for k, v in cpp_defines.items():

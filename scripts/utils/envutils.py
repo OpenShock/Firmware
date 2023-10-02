@@ -18,6 +18,13 @@ LOGLEVEL_MAP = {
     'log_verbose': (5, 'LOG_VERBOSE'),
 }
 
+BOOLEAN_MAP = {
+    'true': True,
+    'false': False,
+    '1': True,
+    '0': False,
+}
+
 
 def __bool(key: str, value: str | None) -> bool:
     if value == None:
@@ -25,12 +32,11 @@ def __bool(key: str, value: str | None) -> bool:
 
     value = value.lower()
 
-    if value == 'true' or value == '1':
-        return True
-    elif value == 'false' or value == '0':
-        return False
-    else:
+    b = BOOLEAN_MAP.get(value, None)
+    if b == None:
         raise ValueError('Environment variable ' + key + ' is not a boolean value.')
+
+    return b
 
 
 def get_bool(key: str) -> bool:
@@ -110,19 +116,6 @@ class dotenv:
                     result[key] = value
 
         return result
-
-    def is_equals(self, key: str, value: str, dotenv: bool = True):
-        return self.get_str(key, dotenv) == value
-
-    def get_bool(self, key: str, dotenv: bool = True):
-        return __bool(key, self.get_str(key, dotenv))
-
-    def get_int(self, key: str, dotenv: bool = True):
-        value = self.get_str(key, dotenv)
-        if value == None:
-            return None
-
-        return int(value)
 
     def get_loglevel(self, key: str, dotenv: bool = True) -> int | None:
         value = self.get_str(key, dotenv)
