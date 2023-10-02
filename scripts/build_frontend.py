@@ -2,9 +2,9 @@ import os
 import re
 import gzip
 import shutil
-from utils import envutils
+from utils import sysenv
 
-Import('env')
+Import('env')  # type: ignore
 
 
 def dir_ensure(dir):
@@ -133,7 +133,7 @@ def build_frontend(source, target, env):
     # Build the captive portal only if it wasn't already built.
     # This is to avoid rebuilding the captive portal every time the firmware is built.
     # This could also lead to some annoying behaviour where the captive portal is not updated when the firmware is built.
-    if not envutils.is_github_ci():
+    if not sysenv.get_bool('CI', False):
         print('Building frontend...')
         os.system('npm i')
         os.system('npm run build')

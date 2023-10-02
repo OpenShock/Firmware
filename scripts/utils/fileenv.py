@@ -18,54 +18,10 @@ LOGLEVEL_MAP = {
     'log_verbose': (5, 'LOG_VERBOSE'),
 }
 
-BOOLEAN_MAP = {
-    'true': True,
-    'false': False,
-    '1': True,
-    '0': False,
-}
 
-
-def __bool(key: str, value: str | None) -> bool:
-    if value == None:
-        return False
-
-    value = value.lower()
-
-    b = BOOLEAN_MAP.get(value, None)
-    if b == None:
-        raise ValueError('Environment variable ' + key + ' is not a boolean value.')
-
-    return b
-
-
-def get_bool(key: str) -> bool:
-    return __bool(key, os.environ.get(key, None))
-
-
-def get_github_ref_name():
-    return os.environ.get('GITHUB_REF_NAME', None)
-
-
-def get_github_base_ref():
-    return os.environ.get('GITHUB_BASE_REF', None)
-
-
-def get_github_event_name():
-    return os.environ.get('GITHUB_EVENT_NAME', None)
-
-
-def is_github_ci():
-    return bool('CI') and bool('GITHUB_ACTIONS')
-
-
-def is_github_pr():
-    return get_github_event_name() == 'pull_request'
-
-
-class dotenv:
+class fileenv:
     def __read_dotenv(self, path: str | Path):
-        with open(path) as f:
+        with open(path, 'r') as f:
             for line in f:
                 line = line.strip()
                 if line == '' or line.startswith('#'):
@@ -102,7 +58,7 @@ class dotenv:
                 self.__read_dotenv(env_file)
 
     def get_str(self, key: str, dotenv: bool = True):
-        return self.dotenv_vars.get(key, os.environ.get(key, None))
+        return self.dotenv_vars.get(key, os.environ.get(key))
 
     def get_all_prefixed(self, prefix: str, dotenv: bool = True):
         result: dict[str, str] = {}
@@ -124,8 +80,12 @@ class dotenv:
 
         value = value.lower()
 
-        tup = LOGLEVEL_MAP.get(value, None)
+        tup = LOGLEVEL_MAP.get(value)
         if tup == None:
             raise ValueError('Environment variable ' + key + ' (' + value + ') is not a valid log level.')
 
         return tup[0]
+
+
+def read(workdir: str, environment_name: str) -> fileenv:
+    return fileenv(workdir, environment=environment_name)

@@ -1,33 +1,36 @@
-from utils import envutils
+from utils import fileenv, pioenv, sysenv
 
-Import('env')
+env = Import('env')  # type: ignore
 
 # This file is invoked by PlatformIO during build.
 # See 'extra_scripts' in 'platformio.ini'.
 
 # Get PIO variables.
-build_flags = env['BUILD_FLAGS'] or []
-project_dir = env['PROJECT_DIR']
+build_flags = pioenv.get_string_array('BUILD_FLAGS', [])
+project_dir = pioenv.get_string('PROJECT_DIR')
 
 # By default, the build is run in DEVELOP mode.
 # If we are running in CI and either building the master branch,
 # or building a PR that will merge into the master branch, THEN
 # we will build in RELEASE mode.
-is_ci = envutils.get_bool('CI')
-is_branch_master = envutils.get_github_ref_name() == 'master'
-is_pr_into_master = envutils.get_github_base_ref() == 'master'
-is_release = is_ci and (is_branch_master or is_pr_into_master)
+is_ci = sysenv.get_bool('CI')
+is_branch_master = sysenv.get_string('GTHUB_REF_NAME') == 'master'
+is_pr_into_master = (
+    sysenv.get_string('GITHUB_BASE_REF') == 'master' and sysenv.get_string('GITHUB_EVENT_NAME', '') == 'pull_request'
+)
+is_release_build = is_ci and (is_branch_master or is_pr_into_master)
 
 # Get the build type string.
-build_type = 'release' if is_release else 'debug'
-environment_type = 'production' if is_release else 'development'
+pio_build_type = 'release' if is_release_build else 'debug'
+dotenv_type = 'production' if is_release_build else 'development'
 
-dotenv = envutils.dotenv(project_dir, environment_type)
+dotenv = fileenv.read(project_dir, dotenv_type)
 
 # Defines that will be passed to the compiler.
 cpp_defines: dict[str, str | int | bool] = {}
 
 # Gets the build flags from the PIO ini file, removes the -D prefix, splits on the first '=', and then converts to a dictionary.
+# (Intent: Remove everything from buildflags, then add everything as cppdefines, and readd the non-key-value build flags.)
 leftover_flags = []
 for flag in build_flags:
     if flag.startswith('-D'):
@@ -63,10 +66,10 @@ for k, v in cpp_defines.items():
     else:
         cpp_defines[k] = v
 
-print('Build type: ' + build_type)
+print('Build type: ' + pio_build_type)
 print('Build defines: ' + str(cpp_defines))
 
 # Set PIO variables.
-env['BUILD_TYPE'] = build_type
+env['BUILD_TYPE'] = pio_build_type
 env['BUILD_FLAGS'] = leftover_flags
 env.Append(CPPDEFINES=[(k, v) for k, v in cpp_defines.items()])
