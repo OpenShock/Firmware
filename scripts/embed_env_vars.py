@@ -1,4 +1,4 @@
-from scripts import envutils
+from utils import envutils
 
 Import('env')
 

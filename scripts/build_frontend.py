@@ -2,7 +2,7 @@ import os
 import re
 import gzip
 import shutil
-from scripts import envutils
+from utils import envutils
 
 Import('env')
 
