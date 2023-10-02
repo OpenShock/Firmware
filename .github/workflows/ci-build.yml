@@ -153,6 +153,7 @@ jobs:
       - uses: actions/checkout@v4
         with:
           sparse-checkout: |
+            scripts
             boards
 
       - uses: actions/setup-python@v4
@@ -175,7 +176,7 @@ jobs:
 
       - name: Merge flash image
         run: |
-          python merge_image.py ${{ matrix.board }} &&
+          python scripts/merge_image.py ${{ matrix.board }} &&
             mv merged.bin OpenShock.${{ matrix.board }}.bin
 
       - name: Upload merged flashable image
