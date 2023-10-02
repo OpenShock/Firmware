@@ -15,7 +15,7 @@ project_dir = pio.get_string('PROJECT_DIR')
 # or building a PR that will merge into the master branch, THEN
 # we will build in RELEASE mode.
 is_ci = sysenv.get_bool('CI')
-is_branch_master = sysenv.get_string('GTHUB_REF_NAME') == 'master'
+is_branch_master = sysenv.get_string('GITHUB_REF_NAME') == 'master'
 is_pr_into_master = (
     sysenv.get_string('GITHUB_BASE_REF') == 'master' and sysenv.get_string('GITHUB_EVENT_NAME', '') == 'pull_request'
 )
