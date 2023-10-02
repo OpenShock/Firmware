@@ -1,4 +1,4 @@
-import scripts.utils.conv as conv
+import conv
 
 Import('env')  # type: ignore
 
