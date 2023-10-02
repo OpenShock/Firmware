@@ -88,6 +88,7 @@ log_level_int = dot.get_loglevel('LOG_LEVEL')
 if log_level_int is None:
     raise ValueError('LOG_LEVEL must be set in environment variables.')
 cpp_defines['CORE_DEBUG_LEVEL'] = log_level_int
+cpp_defines = serialize_cpp_defines(cpp_defines)
 
 print('Build type: ' + pio_build_type)
 print('Build defines: ' + str(cpp_defines))
