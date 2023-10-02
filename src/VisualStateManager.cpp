@@ -126,11 +126,11 @@ void VisualStateManager::SetWiFiState(WiFiState state) {
 #ifndef OPENSHOCK_LED_IMPLEMENTATION
 
 void VisualStateManager::SetCriticalError() {
-  ESP_LOGW(TAG, "SetCriticalError: (But no LED implementation is selected)");
+  ESP_LOGW(TAG, "SetCriticalError: (But no LED implementation is selected / Selected implementation doesn't exist)");
 }
 
 void VisualStateManager::SetWiFiState(WiFiState state) {
-  ESP_LOGW(TAG, "SetWiFiState: %d (But no LED implementation is selected)", state);
+  ESP_LOGW(TAG, "SetWiFiState: %d (But no LED implementation is selected / Selected implementation doesn't exist)", state);
 }
 
 #endif // OPENSHOCK_LED_NONE
