@@ -2,8 +2,7 @@ import os
 import re
 import gzip
 import shutil
-
-is_ci = "CI" in os.environ and os.environ["CI"] == "true"
+from scripts import envutils
 
 Import('env')
 
@@ -125,7 +124,7 @@ def build_frontend(source, target, env):
   # Build the captive portal only if it wasn't already built.
   # This is to avoid rebuilding the captive portal every time the firmware is built.
   # This could also lead to some annoying behaviour where the captive portal is not updated when the firmware is built.
-  if not is_ci:
+  if not envutils.is_github_ci():
     print('Building frontend...')
     os.system('npm i')
     os.system('npm run build')

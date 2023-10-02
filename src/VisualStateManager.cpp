@@ -4,6 +4,12 @@
 
 #include <Arduino.h>
 
+#if defined(OPENSHOCK_LED_TYPE) && defined(OPENSHOCK_LED_PIN)
+#define OPENSHOCK_LED_DEFINED 1
+#else
+#define OPENSHOCK_LED_DEFINED 0
+#endif
+
 const char* const TAG = "VisualStateManager";
 
 using namespace OpenShock;
@@ -57,12 +63,12 @@ constexpr PinPatternManager::State kWebSocketConnectedPattern[] = {
   {true, 10'000}
 };
 
-#if defined(OPENSHOCK_LED_TYPE) && defined(OPENSHOCK_LED_PIN) && OPENSHOCK_LED_TYPE == PIN
+#if OPENSHOCK_LED_DEFINED && OPENSHOCK_LED_TYPE == "PIN"
 PinPatternManager s_builtInLedManager(OPENSHOCK_LED_PIN);
 #endif
 
 void VisualStateManager::SetCriticalError() {
-#if defined(OPENSHOCK_LED_TYPE) && defined(OPENSHOCK_LED_PIN) && OPENSHOCK_LED_TYPE == PIN
+#if OPENSHOCK_LED_DEFINED && OPENSHOCK_LED_TYPE == "PIN"
   static bool _state = false;
   if (_state) {
     return;
@@ -77,7 +83,7 @@ void VisualStateManager::SetCriticalError() {
 }
 
 void VisualStateManager::SetWiFiState(WiFiState state) {
-#if defined(OPENSHOCK_LED_TYPE) && defined(OPENSHOCK_LED_PIN) && OPENSHOCK_LED_TYPE == PIN
+#if OPENSHOCK_LED_DEFINED && OPENSHOCK_LED_TYPE == "PIN"
   static WiFiState _state = (WiFiState)-1;
   if (_state == state) {
     return;
