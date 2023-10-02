@@ -1,10 +1,10 @@
 #!/bin/python3
 
-import re
 import os
 import sys
 from pathlib import Path
 from configparser import ConfigParser
+
 
 def call_script(file):
     print('Calling script: %s' % file)
@@ -12,6 +12,7 @@ def call_script(file):
     with open(file) as f:
         exec(f.read())
     sys.exit(0)
+
 
 # Read envs from PlatformIO config
 config = ConfigParser()
@@ -23,7 +24,7 @@ env = config['env:' + env_name]
 
 # Check if the board is custom.
 board_name = env['board']
-boards_dir = Path().absolute() / "boards"
+boards_dir = Path().absolute() / 'boards'
 board_exists_direct = os.path.exists(boards_dir / board_name / 'merge-image.py')
 
 print('Board name: %s' % board_name)
@@ -42,7 +43,7 @@ if not board_name.startswith('OpenShock-'):
     sys.exit(1)
 
 # Grab the indirect name and check if it exists.
-board_name_indirect = board_name[len('OpenShock-'):]
+board_name_indirect = board_name[len('OpenShock-') :]
 board_exists_indirect = os.path.exists(boards_dir / board_name_indirect / 'merge-image.py')
 print('Board name indirectly: %s' % board_name_indirect)
 print('Board found indirectly: %s' % board_exists_indirect)

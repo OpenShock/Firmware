@@ -20,6 +20,12 @@
 
 #include <esp_log.h>
 
+#if defined(OPENSHOCK_LED_TYPE) && defined(OPENSHOCK_LED_PIN)
+#define OPENSHOCK_LED_DEFINED 1
+#else
+#define OPENSHOCK_LED_DEFINED 0
+#endif
+
 const char* const TAG = "VisualStateManager";
 
 using namespace OpenShock;
