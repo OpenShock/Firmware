@@ -1,6 +1,6 @@
 <script lang="ts">
   import { getModalStore } from '@skeletonlabs/skeleton';
-  import WiFiInfo from '$lib/components/modals/WiFiInfo.svelte';
+  import WiFiInfo from '$lib/components/modals/WiFiDetails.svelte';
   import type { WiFiNetwork } from '$lib/types/WiFiNetwork';
   import { WiFiStateStore } from '$lib/stores';
   import { WebSocketClient } from '$lib/WebSocketClient';

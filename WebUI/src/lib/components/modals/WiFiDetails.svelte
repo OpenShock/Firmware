@@ -6,7 +6,7 @@
 
   const modalStore = getModalStore();
 
-  $: item = $WiFiStateStore.networks.find((i) => i.bssid === bssid);
+  $: item = $WiFiStateStore.networks[bssid];
 
   $: rows = item
     ? [
