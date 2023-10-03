@@ -123,6 +123,69 @@ void handleWebSocketClientConnected(std::uint8_t socketId) {
 void handleWebSocketClientDisconnected(std::uint8_t socketId) {
   ESP_LOGD(TAG, "WebSocket client #%u disconnected", socketId);
 }
+void handleWebSocketClientWiFiScanMessage(const StaticJsonDocument<256>& doc) {
+  bool run = doc["run"];
+  if (run) {
+    WiFiManager::StartScan();
+  } else {
+    ESP_LOGW(TAG, "WiFi scan is not implemented yet");
+  }
+}
+void handleWebSocketClientWiFiAuthenticateMessage(const StaticJsonDocument<256>& doc) {
+  String bssidStr = doc["bssid"];
+  if (bssidStr.isEmpty()) {
+    ESP_LOGE(TAG, "WiFi BSSID is missing");
+    return;
+  }
+  if (bssidStr.length() != 17) {
+    ESP_LOGE(TAG, "WiFi BSSID is invalid");
+    return;
+  }
+
+  String password = doc["password"];
+
+  // Convert BSSID to byte array
+  std::uint8_t bssid[6];
+  if (sscanf(bssidStr.c_str(), "%02X:%02X:%02X:%02X:%02X:%02X", bssid + 0, bssid + 1, bssid + 2, bssid + 3, bssid + 4, bssid + 5) != 6) {
+    ESP_LOGE(TAG, "WiFi BSSID is invalid");
+    return;
+  }
+
+  WiFiManager::Authenticate(bssid, password);
+}
+void handleWebSocketClientWiFiConnectMessage(const StaticJsonDocument<256>& doc) {
+  std::uint16_t wifiId = doc["id"];
+
+  WiFiManager::Connect(wifiId);
+}
+void handleWebSocketClientWiFiDisconnectMessage(const StaticJsonDocument<256>& doc) {
+  WiFiManager::Disconnect();
+}
+void handleWebSocketClientWiFiForgetMessage(const StaticJsonDocument<256>& doc) {
+  WiFiManager::Forget(doc["bssid"]);
+}
+void handleWebSocketClientWiFiMessage(StaticJsonDocument<256> doc) {
+  // Parse "action" field
+  String actionStr = doc["action"];
+  if (actionStr.isEmpty()) {
+    ESP_LOGE(TAG, "WiFi action is missing");
+    return;
+  }
+
+  if (actionStr == "scan") {
+    handleWebSocketClientWiFiScanMessage(doc);
+  } else if (actionStr == "authenticate") {
+    handleWebSocketClientWiFiAuthenticateMessage(doc);
+  } else if (actionStr == "connect") {
+    handleWebSocketClientWiFiConnectMessage(doc);
+  } else if (actionStr == "disconnect") {
+    handleWebSocketClientWiFiDisconnectMessage(doc);
+  } else if (actionStr == "forget") {
+    handleWebSocketClientWiFiForgetMessage(doc);
+  } else {
+    ESP_LOGE(TAG, "Unknown WiFi action: %s", actionStr.c_str());
+  }
+}
 void handleWebSocketClientMessage(std::uint8_t socketId, WStype_t type, std::uint8_t* data, std::size_t len) {
   if (type != WStype_t::WStype_TEXT) {
     ESP_LOGE(TAG, "Message type is not supported");
@@ -137,13 +200,13 @@ void handleWebSocketClientMessage(std::uint8_t socketId, WStype_t type, std::uin
   }
 
   String typeStr = doc["type"];
-  if (typeStr.length() == 0) {
+  if (typeStr.isEmpty()) {
     ESP_LOGE(TAG, "Message type is missing");
     return;
   }
 
-  if (typeStr == "startScan") {
-    WiFiManager::StartScan();
+  if (typeStr == "wifi") {
+    handleWebSocketClientWiFiMessage(doc);
   } /* else if (typeStr == "connect") {
      WiFiManager::Connect(doc["ssid"], doc["password"]);
    } else if (typeStr == "disconnect") {

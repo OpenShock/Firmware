@@ -1,9 +1,8 @@
 export type WiFiNetwork = {
-  index: number;
   ssid: string;
   bssid: string;
   rssi: number;
   channel: number;
-  secure: boolean;
+  security: 'Open' | 'WEP' | 'WPA PSK' | 'WPA2 PSK' | 'WPA/WPA2 PSK' | 'WPA2 Enterprise' | 'WPA3 PSK' | 'WPA2/WPA3 PSK' | 'WAPI PSK' | null;
   saved: boolean;
 };

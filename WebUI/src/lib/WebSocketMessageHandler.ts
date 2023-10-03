@@ -1,10 +1,14 @@
-import { getToastStore } from "@skeletonlabs/skeleton";
-import { WiFiStateStore } from "./stores";
-import type { WiFiNetwork } from "./types/WiFiNetwork";
+import { WiFiStateStore } from './stores';
+import type { WiFiNetwork } from './types/WiFiNetwork';
 
-interface ScanMessage {
-  type: 'scan';
-  status: 'started' | 'finished';
+interface WiFiMessage {
+  type: 'wifi';
+  subject: 'scan';
+}
+
+interface WiFiScanMessage extends WiFiMessage {
+  subject: 'scan';
+  status: 'started' | 'completed' | 'error';
   networks?: WiFiNetwork[];
 }
 
@@ -12,7 +16,7 @@ interface InvalidMessage {
   type: undefined | null;
 }
 
-export type WebSocketMessage = InvalidMessage | ScanMessage;
+export type WebSocketMessage = InvalidMessage | WiFiScanMessage;
 
 export function WebSocketMessageHandler(message: WebSocketMessage) {
   const type = message.type;
@@ -22,8 +26,8 @@ export function WebSocketMessageHandler(message: WebSocketMessage) {
   }
 
   switch (type) {
-    case 'scan':
-      handleScanMessage(message);
+    case 'wifi':
+      handleWiFiMessage(message);
       break;
     default:
       console.warn('[WS] Received invalid message: ', message);
@@ -31,21 +35,35 @@ export function WebSocketMessageHandler(message: WebSocketMessage) {
   }
 }
 
-function handleScanMessage(message: ScanMessage) {
-  const toastStore = getToastStore();
+function handleWiFiMessage(message: WiFiScanMessage) {
+  switch (message.subject) {
+    case 'scan':
+      handleWiFiScanMessage(message);
+      break;
+    default:
+      console.warn('[WS] Received invalid wifi message: ', message);
+      return;
+  }
+}
+
+function handleWiFiScanMessage(message: WiFiScanMessage) {
+  let running: boolean;
   switch (message.status) {
     case 'started':
-      toastStore.trigger({ message: 'Scanning for WiFi networks...', background: 'bg-blue-500' });
+      running = true;
       break;
-    case 'finished':
-      toastStore.trigger({ message: 'Scanning for WiFi networks finished', background: 'bg-green-500' });
+    case 'completed':
+      running = false;
+      break;
+    case 'error':
+      running = false;
       break;
     default:
       console.warn('[WS] Received invalid scan message: ', message);
       return;
   }
 
-  WiFiStateStore.setScanning(message.status === 'started');
+  WiFiStateStore.setScanning(running);
   if (message.networks) {
     WiFiStateStore.setNetworks(message.networks);
   }

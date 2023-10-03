@@ -2,6 +2,10 @@
 
 #include "WiFiState.h"
 
+#include <WString.h>
+
+#include <nonstd/span.hpp>
+
 #include <cstdint>
 
 namespace OpenShock::WiFiManager {
@@ -9,9 +13,13 @@ namespace OpenShock::WiFiManager {
 
   WiFiState GetWiFiState();
 
-  void AddOrUpdateNetwork(const char* ssid, const char* password);
-  void RemoveNetwork(const char* ssid);
+  bool Authenticate(nonstd::span<std::uint8_t, 6> bssid, const String& password);
+  void Forget(std::uint8_t wifiId);
+
+  void Connect(std::uint8_t wifiId);
+  void Disconnect();
 
   bool StartScan();
+  void StopScan();
 
 }  // namespace OpenShock::WiFiManager
