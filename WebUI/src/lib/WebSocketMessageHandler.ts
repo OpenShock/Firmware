@@ -1,22 +1,38 @@
 import { WiFiStateStore } from './stores';
 import type { WiFiNetwork } from './types/WiFiNetwork';
 
-interface WiFiMessage {
-  type: 'wifi';
-  subject: 'scan';
-}
-
-interface WiFiScanMessage extends WiFiMessage {
-  subject: 'scan';
-  status: 'started' | 'discovery' | 'completed' | 'error';
-  data?: WiFiNetwork;
-}
-
 interface InvalidMessage {
   type: undefined | null;
 }
 
-export type WebSocketMessage = InvalidMessage | WiFiScanMessage;
+interface WiFiScanStartedMessage {
+  type: 'wifi';
+  subject: 'scan';
+  status: 'started';
+}
+
+interface WiFiScanDiscoveryMessage {
+  type: 'wifi';
+  subject: 'scan';
+  status: 'discovery';
+  data: WiFiNetwork;
+}
+
+interface WiFiScanCompletedMessage {
+  type: 'wifi';
+  subject: 'scan';
+  status: 'completed';
+}
+
+interface WiFiScanErrorMessage {
+  type: 'wifi';
+  subject: 'scan';
+  status: 'error';
+}
+
+export type WiFiScanMessage = WiFiScanStartedMessage | WiFiScanDiscoveryMessage | WiFiScanCompletedMessage | WiFiScanErrorMessage;
+export type WiFiMessage = WiFiScanMessage;
+export type WebSocketMessage = InvalidMessage | WiFiMessage;
 
 export function WebSocketMessageHandler(message: WebSocketMessage) {
   const type = message.type;
@@ -35,7 +51,7 @@ export function WebSocketMessageHandler(message: WebSocketMessage) {
   }
 }
 
-function handleWiFiMessage(message: WiFiScanMessage) {
+function handleWiFiMessage(message: WiFiMessage) {
   switch (message.subject) {
     case 'scan':
       handleWiFiScanMessage(message);
@@ -49,13 +65,13 @@ function handleWiFiMessage(message: WiFiScanMessage) {
 function handleWiFiScanMessage(message: WiFiScanMessage) {
   switch (message.status) {
     case 'started':
-      handleWiFiScanStartedMessage(message);
+      handleWiFiScanStartedMessage();
       break;
     case 'discovery':
       handleWiFiScanDiscoveryMessage(message);
       break;
     case 'completed':
-      handleWiFiScanCompletedMessage(message);
+      handleWiFiScanCompletedMessage();
       break;
     case 'error':
       handleWiFiScanErrorMessage(message);
@@ -66,18 +82,19 @@ function handleWiFiScanMessage(message: WiFiScanMessage) {
   }
 }
 
-function handleWiFiScanStartedMessage(message: WiFiScanMessage) {
+function handleWiFiScanStartedMessage() {
   WiFiStateStore.setScanning(true);
 }
 
-function handleWiFiScanDiscoveryMessage(message: WiFiScanMessage) {
-  WiFiStateStore.addNetwork(message.data!);
+function handleWiFiScanDiscoveryMessage(message: WiFiScanDiscoveryMessage) {
+  WiFiStateStore.addNetwork(message.data);
 }
 
-function handleWiFiScanCompletedMessage(message: WiFiScanMessage) {
+function handleWiFiScanCompletedMessage() {
   WiFiStateStore.setScanning(false);
 }
 
-function handleWiFiScanErrorMessage(message: WiFiScanMessage) {
+function handleWiFiScanErrorMessage(message: WiFiScanErrorMessage) {
+  console.error('[WS] Received WiFi scan error message: ', message);
   WiFiStateStore.setScanning(false);
 }

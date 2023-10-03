@@ -10,7 +10,11 @@
   let connectedBSSID: string | null = null;
 
   function wifiScan() {
-    WebSocketClient.Instance.Send('{ "type": "wifi", "action": "scan", "run": true }');
+    if ($WiFiStateStore.scanning) {
+      WebSocketClient.Instance.Send('{ "type": "wifi", "action": "scan", "run": false }');
+    } else {
+      WebSocketClient.Instance.Send('{ "type": "wifi", "action": "scan", "run": true }');
+    }
   }
   function wifiAuthenticate(item: WiFiNetwork) {
     if (item.security !== 'Open') {
@@ -40,7 +44,6 @@
       component: {
         ref: WiFiInfo,
         props: { bssid: item.bssid },
-        slot: '<p>Skeleton</p>',
       },
     });
   }
@@ -49,7 +52,7 @@
 <div>
   <div class="flex justify-between items-center mb-2">
     <h3 class="h3">Configure WiFi</h3>
-    <button class="btn variant-outline" on:click={wifiScan} disabled={$WiFiStateStore.scanning}>
+    <button class="btn variant-outline" on:click={wifiScan}>
       {#if $WiFiStateStore.scanning}
         <i class="fa fa-spinner fa-spin"></i>
       {:else}
@@ -58,7 +61,7 @@
     </button>
   </div>
   <div class="max-h-64 overflow-auto">
-    {#each $WiFiStateStore.networks as item (item.bssid)}
+    {#each Object.values($WiFiStateStore.networks) as item (item.bssid)}
       <div class="card mb-2 p-2 flex justify-between items-center">
         <span>
           {#if item.bssid === connectedBSSID}
