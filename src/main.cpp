@@ -5,7 +5,7 @@
 #include "FileUtils.h"
 #include "SerialInputHandler.h"
 #include "WiFiManager.h"
-#include "WifiScanManager.h"
+#include "WiFiScanManager.h"
 
 #include <esp_log.h>
 #include <HardwareSerial.h>
