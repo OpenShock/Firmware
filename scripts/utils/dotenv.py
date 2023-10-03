@@ -58,7 +58,7 @@ class DotEnv:
                 self.__read_dotenv(env_file)
 
     def get_str(self, key: str, dotenv: bool = True):
-        return self.dotenv_vars.get(key, os.environ.get(key))
+        return os.environ.get(key) or self.dotenv_vars.get(key)
 
     def get_all_prefixed(self, prefix: str, dotenv: bool = True):
         result: dict[str, str] = {}

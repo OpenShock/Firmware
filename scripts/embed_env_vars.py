@@ -37,7 +37,6 @@ dot = dotenv.DotEnv(project_dir, dotenv_type)
 # Find env variables based on only the pioenv and sysenv.
 def get_pio_firmware_vars() -> dict[str, str | int | bool]:
     vars = {}
-    vars['OPENSHOCK_FW_MODE'] = pio.get_string('BUILD_TYPE')
     vars['OPENSHOCK_FW_BOARD'] = pio.get_string('PIOENV')
     vars['OPENSHOCK_FW_CHIP'] = pio.get_string('BOARD_MCU')
     vars['OPENSHOCK_FW_MODE'] = pio_build_type
