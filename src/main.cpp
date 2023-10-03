@@ -24,7 +24,8 @@ void setup() {
   }
 
   OpenShock::SerialInputHandler::Init();
-  ESP_LOGI(TAG, "==== OpenShock v%s ====", OpenShock::Constants::Version);
+  OpenShock::SerialInputHandler::PrintWelcomeHeader();
+  OpenShock::SerialInputHandler::PrintVersionInfo();
 
   OpenShock::CommandHandler::Init();
 

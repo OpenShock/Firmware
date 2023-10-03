@@ -16,6 +16,7 @@ int findChar(const char* buffer, std::size_t bufferSize, char c) {
 
   return -1;
 }
+
 int findLineEnd(const char* buffer, int bufferSize) {
   for (int i = 0; i < bufferSize; i++) {
     if (buffer[i] == '\r' || buffer[i] == '\n' || buffer[i] == '\0') {
@@ -25,6 +26,7 @@ int findLineEnd(const char* buffer, int bufferSize) {
 
   return -1;
 }
+
 int findLineStart(const char* buffer, int bufferSize, int lineEnd) {
   if (lineEnd < 0) return -1;
 
@@ -37,16 +39,32 @@ int findLineStart(const char* buffer, int bufferSize, int lineEnd) {
   return -1;
 }
 
-void handleSerialCommand(char* command, std::size_t commandLength) {
+void handleZeroArgCommand(char* command, std::size_t commandLength) {
   if (strcmp(command, "restart") == 0) {
     Serial.println("Restarting ESP...");
     ESP.restart();
     return;
   }
 
+  if (strcmp(command, "help") == 0) {
+    SerialInputHandler::PrintWelcomeHeader();
+    Serial.println("help          print this menu");
+    Serial.println("version       print version information");
+    Serial.println("restart       restart the board");
+    Serial.println("rmtpin <pin>  set radio pin to <pin>\n");
+    return;
+  }
+
+  if (strcmp(command, "version") == 0) {
+    Serial.print("\n");
+    SerialInputHandler::PrintVersionInfo();
+    return;
+  }
+
   Serial.println("SYS|Error|Command not found");
 }
-void handleSerialCommand(char* command, std::size_t commandLength, char* arg, std::size_t argLength) {
+
+void handleSingleArgCommand(char* command, std::size_t commandLength, char* arg, std::size_t argLength) {
   if (strcmp(command, "authtoken") == 0) {
     OpenShock::FileUtils::TryWriteFile("/authToken", arg, argLength);
     return;
@@ -64,6 +82,7 @@ void handleSerialCommand(char* command, std::size_t commandLength, char* arg, st
 
   Serial.println("SYS|Error|Command not found");
 }
+
 void processSerialLine(char* data, std::size_t length) {
   int delimiter = findChar(data, length, ' ');
   if (delimiter == 0) {
@@ -73,12 +92,12 @@ void processSerialLine(char* data, std::size_t length) {
 
   // Handle arg-less commands
   if (delimiter <= 0) {
-    handleSerialCommand(data, length);
+    handleZeroArgCommand(data, length);
     return;
   } else {
     length          = delimiter;
     data[delimiter] = '\0';
-    handleSerialCommand(data, length, data + delimiter + 1, length - delimiter - 1);
+    handleSingleArgCommand(data, length, data + delimiter + 1, length - delimiter - 1);
   }
 }
 
@@ -129,4 +148,26 @@ void SerialInputHandler::Update() {
       bufferIndex = 0;
     }
   }
+}
+
+void SerialInputHandler::PrintWelcomeHeader() {
+  Serial.println("\n============== OPENSHOCK ==============");
+  Serial.println("  Contribute @ github.com/OpenShock");
+  Serial.println("  Discuss @ discord.gg/AHcCbXbEcF");
+  Serial.println("  Type 'help' for available commands");
+  Serial.println("=======================================\n");
+}
+
+void SerialInputHandler::PrintVersionInfo() {
+  Serial.print("  Version:  ");
+  Serial.println(OPENSHOCK_FW_VERSION);
+  Serial.print("    Build:  ");
+  Serial.println(OPENSHOCK_FW_MODE);
+  Serial.print("   Commit:  ");
+  Serial.println(OPENSHOCK_FW_COMMIT);
+  Serial.print("    Board:  ");
+  Serial.println(OPENSHOCK_FW_BOARD);
+  Serial.print("     Chip:  ");
+  Serial.println(OPENSHOCK_FW_CHIP);
+  Serial.print("\n");
 }

@@ -33,6 +33,17 @@ dotenv_type = 'production' if is_release_build else 'development'
 # Read the correct .env file.
 dot = dotenv.DotEnv(project_dir, dotenv_type)
 
+
+# Find env variables based on only the pioenv and sysenv.
+def get_pio_firmware_vars() -> dict[str, str | int | bool]:
+    vars = {}
+    vars['OPENSHOCK_FW_MODE'] = pio.get_string('BUILD_TYPE')
+    vars['OPENSHOCK_FW_BOARD'] = pio.get_string('PIOENV')
+    vars['OPENSHOCK_FW_CHIP'] = pio.get_string('BOARD_MCU')
+    vars['OPENSHOCK_FW_MODE'] = pio_build_type
+    return vars
+
+
 #######################################################
 #             UPDATING BUILD PARAMETERS               #
 #######################################################
@@ -75,13 +86,23 @@ def serialize_cpp_defines(raw_defines: dict[str, str | int | bool]) -> dict[str,
     return result_defines
 
 
+# Copy key/value pairs from "src" into "dest" only if those keys don't exist in "dest" yet.
+def merge_missing_keys(dest: dict[str, str | int | bool], src: dict[str, str | int | bool] | dict[str, str]):
+    for k, v in src.items():
+        if k not in dest:
+            dest[k] = v
+
+
 # Fetch the current build flags and group them into (CPP Defines, Other Flags).
 raw_build_flags = pio.get_string_array('BUILD_FLAGS', [])
 (cpp_defines, remaining_build_flags) = parse_pio_build_flags(raw_build_flags)
 
 # Gets all the environment variables prefixed with 'OPENSHOCK_' and add them as CPP Defines.
-openshock_vars = dot.get_all_prefixed('OPENSHOCK_')
-cpp_defines.update(openshock_vars)
+pio_openshock_vars = get_pio_firmware_vars()
+dot_openshock_vars = dot.get_all_prefixed('OPENSHOCK_')
+
+merge_missing_keys(cpp_defines, pio_openshock_vars)
+merge_missing_keys(cpp_defines, dot_openshock_vars)
 
 # Gets the log level from environment variables.
 # TODO: Delete get_loglevel and use... something more generic.

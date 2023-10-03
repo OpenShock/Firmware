@@ -22,6 +22,7 @@ env:
   PYTHON_VERSION: 3.11
   OPENSHOCK_API_DOMAIN: api.shocklink.net
   OPENSHOCK_FW_VERSION: master-${{ github.sha }}
+  OPENSHOCK_FW_COMMIT: ${{ github.sha }}
 
 jobs:
 
@@ -64,7 +65,7 @@ jobs:
   build-filesystem:
     runs-on: ubuntu-latest
     needs: build-captive-portal
-    
+
     steps:
       - uses: actions/checkout@v4
 
@@ -80,10 +81,10 @@ jobs:
         with:
           python-version: ${{ env.PYTHON_VERSION }}
           cache: "pip"
-      
+
       - name: Install dependencies
         run: pip install -r requirements.txt
-      
+
       - name: Download built captive portal
         uses: actions/download-artifact@v3
         with:
@@ -92,7 +93,7 @@ jobs:
 
       - name: Build filesystem
         run: pio run --target buildfs -e fs
-      
+
       - name: Upload internal filesystem artifact
         uses: actions/upload-artifact@v3
         with:
@@ -160,7 +161,7 @@ jobs:
         with:
           python-version: ${{ env.PYTHON_VERSION }}
           cache: "pip"
-      
+
       - name: Install dependencies
         run: pip install esptool
 
@@ -168,7 +169,7 @@ jobs:
         uses: actions/download-artifact@v3
         with:
           name: filesystem
-      
+
       - name: Download firmware images
         uses: actions/download-artifact@v3
         with:

@@ -8,6 +8,7 @@ name: ci-tag
 env:
   OPENSHOCK_API_DOMAIN: api.shocklink.net
   OPENSHOCK_FW_VERSION: ${{ github.ref_name }}
+  OPENSHOCK_FW_COMMIT: ${{ github.sha }}
 
 jobs:
 
@@ -15,7 +16,7 @@ jobs:
   # of each board that is being built for.
   build:
     uses: ./.github/workflows/ci-build.yml
-  
+
   # Publish one artifact PER BOARD.
   publish-artifacts:
     runs-on: ubuntu-latest
