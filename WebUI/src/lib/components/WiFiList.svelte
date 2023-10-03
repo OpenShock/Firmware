@@ -69,7 +69,11 @@
           {:else}
             <i class="fa fa-wifi" />
           {/if}
-          {item.ssid}
+          {#if item.ssid}
+            <span class="ml-2">{item.ssid}</span>
+          {:else}
+            <span class="ml-2">{item.bssid}</span><span class="text-gray-500 ml-1">(Hidden)</span>
+          {/if}
         </span>
         <div class="btn-group variant-outline">
           {#if item.saved}
