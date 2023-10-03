@@ -1,7 +1,9 @@
 #include "CaptivePortal.h"
 
 #include "AuthenticationManager.h"
+#include "Utils/HexUtils.h"
 #include "WiFiManager.h"
+#include "Mappers/EspWiFiTypesMapper.h"
 #include "WiFiScanManager.h"
 
 #include <ArduinoJson.h>
@@ -72,35 +74,35 @@ bool CaptivePortal::Start() {
   s_webServices->webServer.onNotFound([](AsyncWebServerRequest* request) { request->send(404, "text/plain", "Not found"); });
   s_webServices->webServer.begin();
 
-  s_webServices->wifiScanStartedHandlerId = WiFiScanManager::RegisterScanStartedHandler([]() {
+  s_webServices->wifiScanStartedHandlerId   = WiFiScanManager::RegisterScanStartedHandler([]() {
     ESP_LOGD(TAG, "WiFi scan started");
     StaticJsonDocument<256> doc;
-    doc["type"] = "wifi";
+    doc["type"]    = "wifi";
     doc["subject"] = "scan_started";
-    doc["status"] = "ok";
+    doc["status"]  = "ok";
     CaptivePortal::BroadcastMessageJSON(doc);
   });
   s_webServices->wifiScanCompletedHandlerId = WiFiScanManager::RegisterScanCompletedHandler([](WiFiScanManager::ScanCompletedStatus status) {
     ESP_LOGD(TAG, "WiFi scan completed");
     StaticJsonDocument<256> doc;
-    doc["type"] = "wifi";
+    doc["type"]    = "wifi";
     doc["subject"] = "scan_completed";
-    doc["status"] = "ok";
-    //doc["status"] = EspWiFiTypesMapper::MapScanCompletedStatus(status);
+    doc["status"]  = "ok";
+    // doc["status"] = EspWiFiTypesMapper::MapScanCompletedStatus(status);
     CaptivePortal::BroadcastMessageJSON(doc);
   });
   s_webServices->wifiScanDiscoveryHandlerId = WiFiScanManager::RegisterScanDiscoveryHandler([](const wifi_ap_record_t* record) {
     ESP_LOGD(TAG, "WiFi scan discovery");
     StaticJsonDocument<256> doc;
-    doc["type"] = "wifi";
+    doc["type"]    = "wifi";
     doc["subject"] = "scan_discovery";
-    doc["status"] = "ok";
-    doc["ssid"] = reinterpret_cast<const char*>(record->ssid);
-    //doc["bssid"] = EspWiFiTypesMapper::MapBssid(record->bssid);
+    auto data      = doc.createNestedObject("data");
+    data["ssid"]   = reinterpret_cast<const char*>(record->ssid);
+    data["bssid"]  = HexUtils::ToHexMac<6>(record->bssid).data();
+    doc["rssi"]    = record->rssi;
     doc["channel"] = record->primary;
-    doc["rssi"] = record->rssi;
-    //doc["auth"] = EspWiFiTypesMapper::MapAuthMode(record->authmode);
-    //doc["hidden"] = record->is_hidden;
+    doc["security"] = Mappers::GetWiFiAuthModeName(record->authmode);
+
     CaptivePortal::BroadcastMessageJSON(doc);
   });
 
@@ -157,8 +159,7 @@ bool CaptivePortal::BroadcastMessageBIN(const std::uint8_t* data, std::size_t le
 }
 
 void handleWebSocketClientConnected(std::uint8_t socketId) {
-  ESP_LOGD(
-    TAG, "WebSocket client #%u connected from %s", socketId, s_webServices->socketServer.remoteIP(socketId).toString().c_str());
+  ESP_LOGD(TAG, "WebSocket client #%u connected from %s", socketId, s_webServices->socketServer.remoteIP(socketId).toString().c_str());
 }
 void handleWebSocketClientDisconnected(std::uint8_t socketId) {
   ESP_LOGD(TAG, "WebSocket client #%u disconnected", socketId);

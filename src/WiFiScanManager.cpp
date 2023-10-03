@@ -43,8 +43,8 @@ bool WiFiScanManager::Init() {
     return false;
   }
 
-  s_currentChannel = 0;
-  s_scanInProgress = false;
+  s_currentChannel    = 0;
+  s_scanInProgress    = false;
   s_currentScanStatus = CurrentScanStatus::Idle;
   s_scanStartedHandlers.clear();
   s_scanCompletedHandlers.clear();
@@ -54,8 +54,7 @@ bool WiFiScanManager::Init() {
   WiFi.onEvent(_evSTAStopped, ARDUINO_EVENT_WIFI_STA_STOP);
   WiFi.enableSTA(true);
 
-  // Since currentChannel is 0, this will do a full scan
-  _scanCurrentChannel();
+  _scanAllChannels();
 
   s_initialized = true;
 
@@ -92,9 +91,9 @@ void WiFiScanManager::CancelScan() {
 }
 
 WiFiScanManager::CallbackHandle WiFiScanManager::RegisterScanStartedHandler(const WiFiScanManager::ScanStartedHandler& handler) {
-  static WiFiScanManager::CallbackHandle nextId = 0;
+  static WiFiScanManager::CallbackHandle nextId  = 0;
   WiFiScanManager::CallbackHandle CallbackHandle = nextId++;
-  s_scanStartedHandlers[CallbackHandle] = handler;
+  s_scanStartedHandlers[CallbackHandle]          = handler;
   return CallbackHandle;
 }
 void WiFiScanManager::UnregisterScanStartedHandler(WiFiScanManager::CallbackHandle id) {
@@ -108,9 +107,9 @@ void WiFiScanManager::UnregisterScanStartedHandler(WiFiScanManager::CallbackHand
 }
 
 WiFiScanManager::CallbackHandle WiFiScanManager::RegisterScanCompletedHandler(const WiFiScanManager::ScanCompletedHandler& handler) {
-  static WiFiScanManager::CallbackHandle nextId = 0;
+  static WiFiScanManager::CallbackHandle nextId  = 0;
   WiFiScanManager::CallbackHandle CallbackHandle = nextId++;
-  s_scanCompletedHandlers[CallbackHandle] = handler;
+  s_scanCompletedHandlers[CallbackHandle]        = handler;
   return CallbackHandle;
 }
 void WiFiScanManager::UnregisterScanCompletedHandler(WiFiScanManager::CallbackHandle id) {
@@ -124,9 +123,9 @@ void WiFiScanManager::UnregisterScanCompletedHandler(WiFiScanManager::CallbackHa
 }
 
 WiFiScanManager::CallbackHandle WiFiScanManager::RegisterScanDiscoveryHandler(const WiFiScanManager::ScanDiscoveryHandler& handler) {
-  static WiFiScanManager::CallbackHandle nextId = 0;
+  static WiFiScanManager::CallbackHandle nextId  = 0;
   WiFiScanManager::CallbackHandle CallbackHandle = nextId++;
-  s_scanDiscoveryHandlers[CallbackHandle] = handler;
+  s_scanDiscoveryHandlers[CallbackHandle]        = handler;
   return CallbackHandle;
 }
 void WiFiScanManager::UnregisterScanDiscoveryHandler(WiFiScanManager::CallbackHandle id) {
@@ -145,15 +144,14 @@ void WiFiScanManager::Update() {
   if (s_currentScanStatus == CurrentScanStatus::Starting) {
     s_currentChannel = 0;
     _iterateChannel();
-  }
-  else if (s_currentScanStatus == CurrentScanStatus::Complete) {
+  } else if (s_currentScanStatus == CurrentScanStatus::Complete) {
     _iterateChannel();
   }
 }
 
 void _handleScanFinished() {
-  s_currentChannel = 0;
-  s_scanInProgress = false;
+  s_currentChannel    = 0;
+  s_scanInProgress    = false;
   s_currentScanStatus = CurrentScanStatus::Idle;
   ESP_LOGD(TAG, "Scan finished");
   for (auto& it : s_scanCompletedHandlers) {
@@ -161,7 +159,7 @@ void _handleScanFinished() {
   }
 }
 void _handleScanError(std::int16_t retval) {
-  if (retval >= 0) return; // This isn't an error
+  if (retval >= 0) return;  // This isn't an error
 
   if (retval == WIFI_SCAN_RUNNING) {
     ESP_LOGE(TAG, "Scan is still running");
@@ -187,7 +185,7 @@ void _scanAllChannels() {
 }
 void _scanCurrentChannel() {
   std::int16_t retval = WiFi.scanNetworks(true, true, false, OPENSHOCK_WIFI_SCAN_MAX_MS_PER_CHANNEL, s_currentChannel);
-  s_scanInProgress = retval == WIFI_SCAN_RUNNING;
+  s_scanInProgress    = retval == WIFI_SCAN_RUNNING;
   if (s_scanInProgress) {
     s_currentScanStatus = CurrentScanStatus::Running;
     ESP_LOGD(TAG, "Scanning channel %u", s_currentChannel);
