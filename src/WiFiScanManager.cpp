@@ -10,7 +10,8 @@
 
 const char* const TAG = "WiFiScanManager";
 
-constexpr const std::size_t OPENSHOCK_WIFI_SCAN_MAX_MS_PER_CHANNEL = 150;
+constexpr const std::uint8_t OPENSHOCK_WIFI_SCAN_MAX_CHANNELS        = 14;
+constexpr const std::uint32_t OPENSHOCK_WIFI_SCAN_MAX_MS_PER_CHANNEL = 300;  // Adjusting this value will affect the scan rate, but may also affect the scan results
 
 using namespace OpenShock;
 
@@ -23,17 +24,41 @@ enum class CurrentScanStatus {
   Error,
 };
 
-static bool s_initialized = false;
-static bool s_scanInProgress;
-static std::uint8_t s_currentChannel;
-static CurrentScanStatus s_currentScanStatus;
+static bool s_initialized                    = false;
+static bool s_scanInProgress                 = false;
+static std::uint8_t s_currentChannel         = 0;
+static CurrentScanStatus s_currentScanStatus = CurrentScanStatus::Idle;
 static std::unordered_map<WiFiScanManager::CallbackHandle, WiFiScanManager::ScanStartedHandler> s_scanStartedHandlers;
 static std::unordered_map<WiFiScanManager::CallbackHandle, WiFiScanManager::ScanCompletedHandler> s_scanCompletedHandlers;
 static std::unordered_map<WiFiScanManager::CallbackHandle, WiFiScanManager::ScanDiscoveryHandler> s_scanDiscoveryHandlers;
 
-void _scanAllChannels();
-void _scanCurrentChannel();
+bool _isScanInProgress() {
+  return s_scanInProgress;
+}
+void _setScanInProgress(bool inProgress) {
+  if (s_scanInProgress != inProgress) {
+    s_scanInProgress = inProgress;
+    if (inProgress) {
+      ESP_LOGD(TAG, "Scan started");
+      for (auto& it : s_scanStartedHandlers) {
+        it.second();
+      }
+    } else {
+      ESP_LOGD(TAG, "Scan completed");
+      for (auto& it : s_scanCompletedHandlers) {
+        it.second(WiFiScanManager::ScanCompletedStatus::Success);
+      }
+    }
+  }
+
+  if (!inProgress) {
+    s_currentChannel    = 0;
+    s_currentScanStatus = CurrentScanStatus::Idle;
+  }
+}
+
 void _iterateChannel();
+void _setScanInProgress(bool inProgress);
 void _evScanCompleted(arduino_event_id_t event, arduino_event_info_t info);
 void _evSTAStopped(arduino_event_id_t event, arduino_event_info_t info);
 
@@ -43,18 +68,8 @@ bool WiFiScanManager::Init() {
     return false;
   }
 
-  s_currentChannel    = 0;
-  s_scanInProgress    = false;
-  s_currentScanStatus = CurrentScanStatus::Idle;
-  s_scanStartedHandlers.clear();
-  s_scanCompletedHandlers.clear();
-  s_scanDiscoveryHandlers.clear();
-
   WiFi.onEvent(_evScanCompleted, ARDUINO_EVENT_WIFI_SCAN_DONE);
   WiFi.onEvent(_evSTAStopped, ARDUINO_EVENT_WIFI_STA_STOP);
-  WiFi.enableSTA(true);
-
-  _scanAllChannels();
 
   s_initialized = true;
 
@@ -82,12 +97,7 @@ void WiFiScanManager::CancelScan() {
     return;
   }
 
-  WiFi.scanDelete();
-  s_currentChannel = 0;
-
-  for (auto& it : s_scanCompletedHandlers) {
-    it.second(WiFiScanManager::ScanCompletedStatus::Cancelled);
-  }
+  // TODO: implement this
 }
 
 WiFiScanManager::CallbackHandle WiFiScanManager::RegisterScanStartedHandler(const WiFiScanManager::ScanStartedHandler& handler) {
@@ -141,24 +151,23 @@ void WiFiScanManager::UnregisterScanDiscoveryHandler(WiFiScanManager::CallbackHa
 void WiFiScanManager::Update() {
   if (!s_initialized) return;
 
-  if (s_currentScanStatus == CurrentScanStatus::Starting) {
-    s_currentChannel = 0;
-    _iterateChannel();
-  } else if (s_currentScanStatus == CurrentScanStatus::Complete) {
-    _iterateChannel();
+  switch (s_currentScanStatus) {
+    case CurrentScanStatus::Starting:
+      s_currentChannel = 0;
+    case CurrentScanStatus::Error:
+    case CurrentScanStatus::Cancelled:
+    case CurrentScanStatus::Complete:
+      _iterateChannel();
+      break;
+    [[likely]] case CurrentScanStatus::Idle:
+    [[likely]] case CurrentScanStatus::Running:
+    default:
+      break;
   }
 }
 
-void _handleScanFinished() {
-  s_currentChannel    = 0;
-  s_scanInProgress    = false;
-  s_currentScanStatus = CurrentScanStatus::Idle;
-  ESP_LOGD(TAG, "Scan finished");
-  for (auto& it : s_scanCompletedHandlers) {
-    it.second(WiFiScanManager::ScanCompletedStatus::Success);
-  }
-}
 void _handleScanError(std::int16_t retval) {
+  ESP_LOGE(TAG, "Scan failed with error %d", retval);
   if (retval >= 0) return;  // This isn't an error
 
   if (retval == WIFI_SCAN_RUNNING) {
@@ -178,15 +187,12 @@ void _handleScanError(std::int16_t retval) {
 
   ESP_LOGE(TAG, "Scan returned an unknown error");
 }
-void _scanAllChannels() {
-  s_currentChannel = 0;
-  ESP_LOGD(TAG, "Scanning entire WiFi spectrum...");
-  WiFi.scanNetworks(true, true, false, OPENSHOCK_WIFI_SCAN_MAX_MS_PER_CHANNEL);
-}
 void _scanCurrentChannel() {
+  ESP_LOGD(TAG, "Starting scan on channel %u", s_currentChannel);
   std::int16_t retval = WiFi.scanNetworks(true, true, false, OPENSHOCK_WIFI_SCAN_MAX_MS_PER_CHANNEL, s_currentChannel);
-  s_scanInProgress    = retval == WIFI_SCAN_RUNNING;
-  if (s_scanInProgress) {
+
+  _setScanInProgress(retval == WIFI_SCAN_RUNNING);
+  if (_isScanInProgress()) {
     s_currentScanStatus = CurrentScanStatus::Running;
     ESP_LOGD(TAG, "Scanning channel %u", s_currentChannel);
     return;
@@ -199,8 +205,8 @@ void _scanCurrentChannel() {
   _handleScanError(retval);
 }
 void _iterateChannel() {
-  if (s_currentChannel >= 14) {
-    _handleScanFinished();
+  if (s_currentChannel >= OPENSHOCK_WIFI_SCAN_MAX_CHANNELS) {
+    _setScanInProgress(false);
     return;
   }
 
@@ -223,10 +229,14 @@ void _evScanCompleted(arduino_event_id_t event, arduino_event_info_t info) {
     }
 
     for (auto& it : s_scanDiscoveryHandlers) {
+      ESP_LOGD(TAG, "Calling scan discovery handler");
       it.second(record);
     }
   }
+
+  s_currentScanStatus = CurrentScanStatus::Complete;
 }
 void _evSTAStopped(arduino_event_id_t event, arduino_event_info_t info) {
+  ESP_LOGD(TAG, "STA stopped");
   // TODO: CLEAR RESULTS
 }

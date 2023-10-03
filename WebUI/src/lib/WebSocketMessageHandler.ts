@@ -8,8 +8,8 @@ interface WiFiMessage {
 
 interface WiFiScanMessage extends WiFiMessage {
   subject: 'scan';
-  status: 'started' | 'completed' | 'error';
-  networks?: WiFiNetwork[];
+  status: 'started' | 'discovery' | 'completed' | 'error';
+  data?: WiFiNetwork;
 }
 
 interface InvalidMessage {
@@ -47,24 +47,37 @@ function handleWiFiMessage(message: WiFiScanMessage) {
 }
 
 function handleWiFiScanMessage(message: WiFiScanMessage) {
-  let running: boolean;
   switch (message.status) {
     case 'started':
-      running = true;
+      handleWiFiScanStartedMessage(message);
+      break;
+    case 'discovery':
+      handleWiFiScanDiscoveryMessage(message);
       break;
     case 'completed':
-      running = false;
+      handleWiFiScanCompletedMessage(message);
       break;
     case 'error':
-      running = false;
+      handleWiFiScanErrorMessage(message);
       break;
     default:
       console.warn('[WS] Received invalid scan message: ', message);
       return;
   }
+}
 
-  WiFiStateStore.setScanning(running);
-  if (message.networks) {
-    WiFiStateStore.setNetworks(message.networks);
-  }
+function handleWiFiScanStartedMessage(message: WiFiScanMessage) {
+  WiFiStateStore.setScanning(true);
+}
+
+function handleWiFiScanDiscoveryMessage(message: WiFiScanMessage) {
+  WiFiStateStore.addNetwork(message.data!);
+}
+
+function handleWiFiScanCompletedMessage(message: WiFiScanMessage) {
+  WiFiStateStore.setScanning(false);
+}
+
+function handleWiFiScanErrorMessage(message: WiFiScanMessage) {
+  WiFiStateStore.setScanning(false);
 }

@@ -1,9 +1,9 @@
 #include "CaptivePortal.h"
 
 #include "AuthenticationManager.h"
+#include "Mappers/EspWiFiTypesMapper.h"
 #include "Utils/HexUtils.h"
 #include "WiFiManager.h"
-#include "Mappers/EspWiFiTypesMapper.h"
 #include "WiFiScanManager.h"
 
 #include <ArduinoJson.h>
@@ -78,16 +78,16 @@ bool CaptivePortal::Start() {
     ESP_LOGD(TAG, "WiFi scan started");
     StaticJsonDocument<256> doc;
     doc["type"]    = "wifi";
-    doc["subject"] = "scan_started";
-    doc["status"]  = "ok";
+    doc["subject"] = "scan";
+    doc["status"]  = "started";
     CaptivePortal::BroadcastMessageJSON(doc);
   });
   s_webServices->wifiScanCompletedHandlerId = WiFiScanManager::RegisterScanCompletedHandler([](WiFiScanManager::ScanCompletedStatus status) {
     ESP_LOGD(TAG, "WiFi scan completed");
     StaticJsonDocument<256> doc;
     doc["type"]    = "wifi";
-    doc["subject"] = "scan_completed";
-    doc["status"]  = "ok";
+    doc["subject"] = "scan";
+    doc["status"]  = "completed";
     // doc["status"] = EspWiFiTypesMapper::MapScanCompletedStatus(status);
     CaptivePortal::BroadcastMessageJSON(doc);
   });
@@ -95,13 +95,15 @@ bool CaptivePortal::Start() {
     ESP_LOGD(TAG, "WiFi scan discovery");
     StaticJsonDocument<256> doc;
     doc["type"]    = "wifi";
-    doc["subject"] = "scan_discovery";
-    auto data      = doc.createNestedObject("data");
-    data["ssid"]   = reinterpret_cast<const char*>(record->ssid);
-    data["bssid"]  = HexUtils::ToHexMac<6>(record->bssid).data();
-    doc["rssi"]    = record->rssi;
-    doc["channel"] = record->primary;
-    doc["security"] = Mappers::GetWiFiAuthModeName(record->authmode);
+    doc["subject"] = "scan";
+    doc["status"]  = "discovery";
+
+    auto data        = doc.createNestedObject("data");
+    data["ssid"]     = reinterpret_cast<const char*>(record->ssid);
+    data["bssid"]    = HexUtils::ToHexMac<6>(record->bssid).data();
+    data["rssi"]     = record->rssi;
+    data["channel"]  = record->primary;
+    data["security"] = Mappers::GetWiFiAuthModeName(record->authmode);
 
     CaptivePortal::BroadcastMessageJSON(doc);
   });

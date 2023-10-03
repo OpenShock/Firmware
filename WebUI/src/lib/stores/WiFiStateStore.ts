@@ -29,6 +29,12 @@ export const WiFiStateStore = {
       return store;
     });
   },
+  addNetwork(network: WiFiNetwork) {
+    update((store) => {
+      store.networks = [...store.networks, network];
+      return store;
+    });
+  },
   clearNetworks() {
     update((store) => {
       store.networks = [];
