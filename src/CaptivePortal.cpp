@@ -2,6 +2,7 @@
 
 #include "AuthenticationManager.h"
 #include "WiFiManager.h"
+#include "WiFiScanManager.h"
 
 #include <ArduinoJson.h>
 #include <ESPAsyncWebServer.h>
@@ -24,8 +25,11 @@ struct CaptivePortalInstance {
 
   AsyncWebServer webServer;
   WebSocketsServer socketServer;
+  OpenShock::WiFiScanManager::CallbackHandle wifiScanStartedHandlerId;
+  OpenShock::WiFiScanManager::CallbackHandle wifiScanCompletedHandlerId;
+  OpenShock::WiFiScanManager::CallbackHandle wifiScanDiscoveryHandlerId;
 };
-std::unique_ptr<CaptivePortalInstance> s_webServices = nullptr;
+static std::unique_ptr<CaptivePortalInstance> s_webServices = nullptr;
 
 void handleWebSocketEvent(std::uint8_t socketId, WStype_t type, std::uint8_t* data, std::size_t len);
 void handleHttpNotFound(AsyncWebServerRequest* request);
@@ -68,6 +72,38 @@ bool CaptivePortal::Start() {
   s_webServices->webServer.onNotFound([](AsyncWebServerRequest* request) { request->send(404, "text/plain", "Not found"); });
   s_webServices->webServer.begin();
 
+  s_webServices->wifiScanStartedHandlerId = WiFiScanManager::RegisterScanStartedHandler([]() {
+    ESP_LOGD(TAG, "WiFi scan started");
+    StaticJsonDocument<256> doc;
+    doc["type"] = "wifi";
+    doc["subject"] = "scan_started";
+    doc["status"] = "ok";
+    CaptivePortal::BroadcastMessageJSON(doc);
+  });
+  s_webServices->wifiScanCompletedHandlerId = WiFiScanManager::RegisterScanCompletedHandler([](WiFiScanManager::ScanCompletedStatus status) {
+    ESP_LOGD(TAG, "WiFi scan completed");
+    StaticJsonDocument<256> doc;
+    doc["type"] = "wifi";
+    doc["subject"] = "scan_completed";
+    doc["status"] = "ok";
+    //doc["status"] = EspWiFiTypesMapper::MapScanCompletedStatus(status);
+    CaptivePortal::BroadcastMessageJSON(doc);
+  });
+  s_webServices->wifiScanDiscoveryHandlerId = WiFiScanManager::RegisterScanDiscoveryHandler([](const wifi_ap_record_t* record) {
+    ESP_LOGD(TAG, "WiFi scan discovery");
+    StaticJsonDocument<256> doc;
+    doc["type"] = "wifi";
+    doc["subject"] = "scan_discovery";
+    doc["status"] = "ok";
+    doc["ssid"] = reinterpret_cast<const char*>(record->ssid);
+    //doc["bssid"] = EspWiFiTypesMapper::MapBssid(record->bssid);
+    doc["channel"] = record->primary;
+    doc["rssi"] = record->rssi;
+    //doc["auth"] = EspWiFiTypesMapper::MapAuthMode(record->authmode);
+    //doc["hidden"] = record->is_hidden;
+    CaptivePortal::BroadcastMessageJSON(doc);
+  });
+
   ESP_LOGD(TAG, "Started");
 
   return true;
@@ -82,6 +118,10 @@ void CaptivePortal::Stop() {
 
   s_webServices->webServer.end();
   s_webServices->socketServer.close();
+
+  WiFiScanManager::UnregisterScanStartedHandler(s_webServices->wifiScanStartedHandlerId);
+  WiFiScanManager::UnregisterScanCompletedHandler(s_webServices->wifiScanCompletedHandlerId);
+  WiFiScanManager::UnregisterScanDiscoveryHandler(s_webServices->wifiScanDiscoveryHandlerId);
 
   s_webServices = nullptr;
 
@@ -126,9 +166,9 @@ void handleWebSocketClientDisconnected(std::uint8_t socketId) {
 void handleWebSocketClientWiFiScanMessage(const StaticJsonDocument<256>& doc) {
   bool run = doc["run"];
   if (run) {
-    WiFiManager::StartScan();
+    WiFiScanManager::StartScan();
   } else {
-    ESP_LOGW(TAG, "WiFi scan is not implemented yet");
+    WiFiScanManager::CancelScan();
   }
 }
 void handleWebSocketClientWiFiAuthenticateMessage(const StaticJsonDocument<256>& doc) {

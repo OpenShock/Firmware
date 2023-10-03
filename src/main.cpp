@@ -5,6 +5,7 @@
 #include "FileUtils.h"
 #include "SerialInputHandler.h"
 #include "WiFiManager.h"
+#include "WifiScanManager.h"
 
 #include <esp_log.h>
 #include <HardwareSerial.h>
@@ -33,6 +34,11 @@ void setup() {
     delay(5000);
     ESP.restart();
   }
+  if (!OpenShock::WiFiScanManager::Init()) {
+    ESP_LOGE(TAG, "PANIC: An Error has occurred while initializing WifiScanManager, restarting in 5 seconds...");
+    delay(5000);
+    ESP.restart();
+  }
 }
 
 void loop() {
@@ -42,4 +48,6 @@ void loop() {
   if (s_apiConnection != nullptr) {
     s_apiConnection->Update();
   }
+
+  OpenShock::WiFiScanManager::Update();
 }
