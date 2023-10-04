@@ -1,9 +1,9 @@
 #include "WiFiManager.h"
 
 #include "CaptivePortal.h"
-#include "WiFiCredentials.h"
-#include "VisualStateManager.h"
 #include "Mappers/EspWiFiTypesMapper.h"
+#include "VisualStateManager.h"
+#include "WiFiCredentials.h"
 #include "WiFiScanManager.h"
 
 #include <ArduinoJson.h>
@@ -26,6 +26,7 @@ void _broadcastWifiAddNetworkSuccess(const char* ssid) {
   doc["subject"] = "add_network";
   doc["status"]  = "success";
   doc["ssid"]    = ssid;
+  CaptivePortal::BroadcastMessageJSON(doc);
 }
 void _broadcastWifiAddNetworkError(const char* error) {
   DynamicJsonDocument doc(64);
@@ -33,25 +34,34 @@ void _broadcastWifiAddNetworkError(const char* error) {
   doc["subject"] = "add_network";
   doc["status"]  = "error";
   doc["error"]   = error;
+  CaptivePortal::BroadcastMessageJSON(doc);
 }
 
-struct WiFiStats {
-  std::uint8_t credsId;
-  std::uint16_t wifiIndex;
-  std::uint16_t reconnectCount;
+struct WiFiNetwork {
+  char ssid[33];
+  std::uint8_t bssid[6];
+  std::uint8_t channel;
+  std::int8_t rssi;
+  wifi_auth_mode_t authmode;
+  std::uint16_t reconnectionCount;
+  std::uint8_t credentialsId;
 };
 
-static std::vector<WiFiStats> s_wifiStats;
+static std::vector<WiFiNetwork> s_wifiNetworks;
 static std::vector<WiFiCredentials> s_wifiCredentials;
 
 bool _addNetwork(const char* ssid, const String& password) {
+  // Bitmask representing available credential IDs (0-31)
   std::uint32_t bits = 0;
   for (auto& cred : s_wifiCredentials) {
     if (strcmp(cred.ssid().data(), ssid) == 0) {
+      ESP_LOGE(TAG, "Failed to add WiFi credentials: credentials for %s already exist", ssid);
       cred.setPassword(password);
       cred.save();
       return true;
     }
+
+    // Mark the credential ID as used
     bits |= 1u << cred.id();
   }
 
@@ -66,7 +76,10 @@ bool _addNetwork(const char* ssid, const String& password) {
     id++;
   }
 
-  s_wifiCredentials.push_back(WiFiCredentials(id, ssid, password));
+  WiFiCredentials credentials(id, ssid, password);
+  credentials.save();
+
+  s_wifiCredentials.push_back(std::move(credentials));
 
   return true;
 }
@@ -81,12 +94,32 @@ void _evWiFiDisconnected(arduino_event_id_t event, arduino_event_info_t info) {
   OpenShock::SetWiFiState(WiFiState::Disconnected);
   CaptivePortal::Start();
 }
+void _evWiFiNetworkDiscovered(const wifi_ap_record_t* record) {
+  WiFiNetwork network {
+    .ssid              = {0},
+    .bssid             = {0},
+    .channel           = record->primary,
+    .rssi              = record->rssi,
+    .authmode          = record->authmode,
+    .reconnectionCount = 0,
+    .credentialsId     = UINT8_MAX,
+  };
+
+  static_assert(sizeof(network.ssid) == sizeof(record->ssid), "SSID size mismatch");
+  memcpy(network.ssid, record->ssid, sizeof(network.ssid));
+
+  static_assert(sizeof(network.bssid) == sizeof(record->bssid), "BSSID size mismatch");
+  memcpy(network.bssid, record->bssid, sizeof(network.bssid));
+
+  s_wifiNetworks.push_back(network);
+}
 
 bool WiFiManager::Init() {
   WiFiCredentials::Load(s_wifiCredentials);
 
   WiFi.onEvent(_evWiFiConnected, ARDUINO_EVENT_WIFI_STA_CONNECTED);
   WiFi.onEvent(_evWiFiDisconnected, ARDUINO_EVENT_WIFI_STA_DISCONNECTED);
+  WiFiScanManager::RegisterScanDiscoveryHandler(_evWiFiNetworkDiscovered);
 
   if (!WiFiScanManager::Init()) {
     ESP_LOGE(TAG, "Failed to initialize WiFiScanManager");
@@ -108,24 +141,17 @@ bool WiFiManager::Init() {
 }
 
 bool WiFiManager::Authenticate(nonstd::span<std::uint8_t, 6> bssid, const String& password) {
-  char ssid[33]           = {0};
-  std::uint16_t wifiIndex = UINT16_MAX;
-  for (std::uint16_t i = 0; i < UINT16_MAX; i++) { // Yes, this is intentional (WiFi.getScanInfoByIndex returns nullptr when there are no more networks)
-    wifi_ap_record_t* record = reinterpret_cast<wifi_ap_record_t*>(WiFi.getScanInfoByIndex(i));
-    if (record == nullptr) {
-      ESP_LOGE(TAG, "Failed to get scan info for network #%u", i);
-      break;
-    }
-
-    if (memcmp(record->bssid, bssid.data(), bssid.size()) == 0) {
-      wifiIndex = i;
-      static_assert(sizeof(record->ssid) == sizeof(ssid), "SSID size mismatch");
-      memcpy(ssid, record->ssid, sizeof(ssid));
+  bool found = false;
+  char ssid[33];
+  for (std::uint16_t i = 0; i < s_wifiNetworks.size(); i++) {
+    if (memcmp(s_wifiNetworks[i].bssid, bssid.data(), bssid.size()) == 0) {
+      memcpy(ssid, s_wifiNetworks[i].ssid, sizeof(ssid));
+      found = true;
       break;
     }
   }
 
-  if (wifiIndex == UINT16_MAX) {
+  if (!found) {
     ESP_LOGE(TAG, "Failed to find network with BSSID %02X:%02X:%02X:%02X:%02X:%02X", bssid[0], bssid[1], bssid[2], bssid[3], bssid[4], bssid[5]);
     _broadcastWifiAddNetworkError("network_not_found");
     return false;
@@ -137,6 +163,12 @@ bool WiFiManager::Authenticate(nonstd::span<std::uint8_t, 6> bssid, const String
   }
 
   _broadcastWifiAddNetworkSuccess(ssid);
+
+  wl_status_t stat = WiFi.begin(ssid, password, 0, bssid.data(), true);
+  if (stat != WL_CONNECTED) {
+    ESP_LOGE(TAG, "Failed to connect to network %s, error code %d", ssid, stat);
+    return false;
+  }
 
   return true;
 }

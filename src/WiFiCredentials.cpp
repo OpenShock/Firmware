@@ -11,8 +11,6 @@ const char* const TAG = "WiFiCredentials";
 
 using namespace OpenShock;
 
-
-
 bool WiFiCredentials::Load(std::vector<WiFiCredentials>& credentials) {
   credentials.clear();
 
@@ -125,7 +123,7 @@ void WiFiCredentials::setPassword(const String& password) {
 }
 
 bool WiFiCredentials::save() const {
-  char filename[16] = { 0 };
+  char filename[16] = {0};
   sprintf(filename, "/wifi/creds/%u", _id);
   File file = LittleFS.open(filename, "wb");
   if (!file) {
@@ -145,7 +143,7 @@ bool WiFiCredentials::save() const {
 }
 
 bool WiFiCredentials::erase() const {
-  char filename[16] = { 0 };
+  char filename[16] = {0};
   sprintf(filename, "/wifi/creds/%u", _id);
   if (!LittleFS.remove(filename)) {
     ESP_LOGE(TAG, "Failed to remove file %s", filename);
@@ -162,6 +160,13 @@ bool WiFiCredentials::_load(fs::File& file) {
   }
 
   file.read(reinterpret_cast<std::uint8_t*>(&_id), sizeof(_id));
+  if (_id > 31) {
+    const char* filename = file.name();
+    ESP_LOGE(TAG, "Loading credentials for %s failed: ID is too large (needs to fit into a uint32 by bitshifting)", filename);  // Look in WiFiManager.cpp for the bitshifting
+    ESP_LOGW(TAG, "Deleting credentials for %s", filename);
+    LittleFS.remove(filename);
+    return false;
+  }
 
   file.read(reinterpret_cast<std::uint8_t*>(&_ssidLength), sizeof(_ssidLength));
   if (_ssidLength > sizeof(_ssid) - 1) {
