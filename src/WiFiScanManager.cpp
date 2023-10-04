@@ -189,7 +189,6 @@ void _evScanCompleted(arduino_event_id_t event, arduino_event_info_t info) {
     }
 
     for (auto& it : s_scanDiscoveryHandlers) {
-      ESP_LOGD(TAG, "Calling scan discovery handler");
       it.second(record);
     }
   }

@@ -34,11 +34,6 @@ void setup() {
     delay(5000);
     ESP.restart();
   }
-  if (!OpenShock::WiFiScanManager::Init()) {
-    ESP_LOGE(TAG, "PANIC: An Error has occurred while initializing WifiScanManager, restarting in 5 seconds...");
-    delay(5000);
-    ESP.restart();
-  }
 }
 
 void loop() {

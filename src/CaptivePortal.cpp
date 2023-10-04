@@ -75,7 +75,6 @@ bool CaptivePortal::Start() {
   s_webServices->webServer.begin();
 
   s_webServices->wifiScanStartedHandlerId   = WiFiScanManager::RegisterScanStartedHandler([]() {
-    ESP_LOGD(TAG, "WiFi scan started");
     StaticJsonDocument<256> doc;
     doc["type"]    = "wifi";
     doc["subject"] = "scan";
@@ -83,7 +82,6 @@ bool CaptivePortal::Start() {
     CaptivePortal::BroadcastMessageJSON(doc);
   });
   s_webServices->wifiScanCompletedHandlerId = WiFiScanManager::RegisterScanCompletedHandler([](WiFiScanManager::ScanCompletedStatus status) {
-    ESP_LOGD(TAG, "WiFi scan completed");
     StaticJsonDocument<256> doc;
     doc["type"]    = "wifi";
     doc["subject"] = "scan";
@@ -92,7 +90,6 @@ bool CaptivePortal::Start() {
     CaptivePortal::BroadcastMessageJSON(doc);
   });
   s_webServices->wifiScanDiscoveryHandlerId = WiFiScanManager::RegisterScanDiscoveryHandler([](const wifi_ap_record_t* record) {
-    ESP_LOGD(TAG, "WiFi scan discovery");
     StaticJsonDocument<256> doc;
     doc["type"]    = "wifi";
     doc["subject"] = "scan";

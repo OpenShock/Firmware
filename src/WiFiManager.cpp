@@ -4,6 +4,7 @@
 #include "WiFiCredentials.h"
 #include "VisualStateManager.h"
 #include "Mappers/EspWiFiTypesMapper.h"
+#include "WiFiScanManager.h"
 
 #include <ArduinoJson.h>
 #include <LittleFS.h>
@@ -87,6 +88,11 @@ bool WiFiManager::Init() {
   WiFi.onEvent(_evWiFiConnected, ARDUINO_EVENT_WIFI_STA_CONNECTED);
   WiFi.onEvent(_evWiFiDisconnected, ARDUINO_EVENT_WIFI_STA_DISCONNECTED);
 
+  if (!WiFiScanManager::Init()) {
+    ESP_LOGE(TAG, "Failed to initialize WiFiScanManager");
+    return false;
+  }
+
   WiFi.mode(WIFI_STA);
   WiFi.setHostname("OpenShock");  // TODO: Add the device name to the hostname (retrieve from API and store in LittleFS)
 
@@ -102,7 +108,7 @@ bool WiFiManager::Init() {
 }
 
 bool WiFiManager::Authenticate(nonstd::span<std::uint8_t, 6> bssid, const String& password) {
-  char ssid[33] = { 0 };
+  char ssid[33]           = {0};
   std::uint16_t wifiIndex = UINT16_MAX;
   for (std::uint16_t i = 0; i < UINT16_MAX; i++) { // Yes, this is intentional (WiFi.getScanInfoByIndex returns nullptr when there are no more networks)
     wifi_ap_record_t* record = reinterpret_cast<wifi_ap_record_t*>(WiFi.getScanInfoByIndex(i));
