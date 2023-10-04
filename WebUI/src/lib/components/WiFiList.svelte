@@ -23,7 +23,7 @@
         title: 'Enter password',
         body: 'Enter the password for the network',
         value: '',
-        valueAttr: { type: 'password', minlength: 1, maxlength: 32, required: true },
+        valueAttr: { type: 'password', minlength: 1, maxlength: 63, required: true },
         response: (password: string) => {
           WebSocketClient.Instance.Send(`{ "type": "wifi", "action": "authenticate", "bssid": "${item.bssid}", "password": "${password}" }`);
         },
