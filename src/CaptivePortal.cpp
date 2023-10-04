@@ -85,8 +85,20 @@ bool CaptivePortal::Start() {
     StaticJsonDocument<256> doc;
     doc["type"]    = "wifi";
     doc["subject"] = "scan";
-    doc["status"]  = "completed";
-    // doc["status"] = EspWiFiTypesMapper::MapScanCompletedStatus(status);
+    switch (status) {
+      case WiFiScanManager::ScanCompletedStatus::Success:
+        doc["status"] = "success";
+        break;
+      case WiFiScanManager::ScanCompletedStatus::Cancelled:
+        doc["status"] = "cancelled";
+        break;
+      case WiFiScanManager::ScanCompletedStatus::Error:
+        doc["status"] = "error";
+        break;
+      default:
+        doc["status"] = "unknown";
+        break;
+    }
     CaptivePortal::BroadcastMessageJSON(doc);
   });
   s_webServices->wifiScanDiscoveryHandlerId = WiFiScanManager::RegisterScanDiscoveryHandler([](const wifi_ap_record_t* record) {
@@ -229,10 +241,9 @@ void handleWebSocketClientWiFiForgetMessage(const StaticJsonDocument<256>& doc) 
   WiFiManager::Forget(doc["bssid"]);
 }
 void handleWebSocketClientWiFiMessage(StaticJsonDocument<256> doc) {
-  // Parse "action" field
   String actionStr = doc["action"];
   if (actionStr.isEmpty()) {
-    ESP_LOGE(TAG, "WiFi action is missing");
+    ESP_LOGE(TAG, "Received WiFi message with \"action\" property missing");
     return;
   }
 
@@ -247,7 +258,7 @@ void handleWebSocketClientWiFiMessage(StaticJsonDocument<256> doc) {
   } else if (actionStr == "forget") {
     handleWebSocketClientWiFiForgetMessage(doc);
   } else {
-    ESP_LOGE(TAG, "Unknown WiFi action: %s", actionStr.c_str());
+    ESP_LOGE(TAG, "Received WiFi message with unknown action \"%s\"", actionStr.c_str());
   }
 }
 void handleWebSocketClientMessage(std::uint8_t socketId, WStype_t type, std::uint8_t* data, std::size_t len) {
