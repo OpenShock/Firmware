@@ -66,7 +66,7 @@ WiFiCredentials::WiFiCredentials(std::uint8_t id, const String& ssid, const Stri
   _id = id;
 
   auto ssidLength = ssid.length();
-  if (ssid.length() > sizeof(_ssid)) {
+  if (ssid.length() > sizeof(_ssid) - 1) {
     ESP_LOGW(TAG, "SSID is too long, truncating");
     ssidLength = sizeof(_ssid) - 1;
   }
@@ -74,7 +74,7 @@ WiFiCredentials::WiFiCredentials(std::uint8_t id, const String& ssid, const Stri
   ssid.toCharArray(reinterpret_cast<char*>(_ssid), _ssidLength + 1);
 
   auto passwordLength = password.length();
-  if (password.length() > sizeof(_password)) {
+  if (password.length() > sizeof(_password - 1)) {
     ESP_LOGW(TAG, "Password is too long, truncating");
     passwordLength = sizeof(_password) - 1;
   }
