@@ -207,6 +207,8 @@ void handleWebSocketClientWiFiAuthenticateMessage(const StaticJsonDocument<256>&
   String password = doc["password"];
 
   // Convert BSSID to byte array
+  // Uses sscanf to parse the max-style hex format, e.g. "AA:BB:CC:DD:EE:FF" where each pair is a byte, and %02X means to parse 2 characters as a hex byte
+  // We check the return value to ensure that we parsed all 6 arguments (6 pairs of hex bytes, or 6 bytes)
   std::uint8_t bssid[6];
   if (sscanf(bssidStr.c_str(), "%02X:%02X:%02X:%02X:%02X:%02X", bssid + 0, bssid + 1, bssid + 2, bssid + 3, bssid + 4, bssid + 5) != 6) {
     ESP_LOGE(TAG, "WiFi BSSID is invalid");
