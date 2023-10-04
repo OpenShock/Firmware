@@ -65,8 +65,8 @@ bool _addNetwork(const char* ssid, const String& password) {
     bits |= 1u << cred.id();
   }
 
-  // If we have 255 credentials, we can't add any more
-  if (s_wifiCredentials.size() == 255) {
+  // If we have 31 credentials, we can't add any more
+  if (s_wifiCredentials.size() == 31) {
     ESP_LOGE(TAG, "Cannot add WiFi credentials: too many credentials");
     return false;
   }
