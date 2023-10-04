@@ -42,7 +42,7 @@ struct WiFiNetwork {
   std::uint8_t bssid[6];
   std::uint8_t channel;
   std::int8_t rssi;
-  wifi_auth_mode_t authmode;
+  wifi_auth_mode_t authMode;
   std::uint16_t reconnectionCount;
   std::uint8_t credentialsId;
 };
@@ -100,7 +100,7 @@ void _evWiFiNetworkDiscovered(const wifi_ap_record_t* record) {
     .bssid             = {0},
     .channel           = record->primary,
     .rssi              = record->rssi,
-    .authmode          = record->authmode,
+    .authMode          = record->authmode,
     .reconnectionCount = 0,
     .credentialsId     = UINT8_MAX,
   };
