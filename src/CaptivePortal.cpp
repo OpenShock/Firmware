@@ -138,6 +138,24 @@ void CaptivePortal::Update() {
 
   s_webServices->socketServer.loop();
 }
+bool CaptivePortal::SendMessageTXT(std::uint8_t socketId, const char* data, std::size_t len) {
+  if (s_webServices == nullptr) {
+    return false;
+  }
+
+  s_webServices->socketServer.sendTXT(socketId, data, len);
+
+  return true;
+}
+bool CaptivePortal::SendMessageBIN(std::uint8_t socketId, const std::uint8_t* data, std::size_t len) {
+  if (s_webServices == nullptr) {
+    return false;
+  }
+
+  s_webServices->socketServer.sendBIN(socketId, data, len);
+
+  return true;
+}
 bool CaptivePortal::BroadcastMessageTXT(const char* data, std::size_t len) {
   if (s_webServices == nullptr) {
     return false;
@@ -159,6 +177,10 @@ bool CaptivePortal::BroadcastMessageBIN(const std::uint8_t* data, std::size_t le
 
 void handleWebSocketClientConnected(std::uint8_t socketId) {
   ESP_LOGD(TAG, "WebSocket client #%u connected from %s", socketId, s_webServices->socketServer.remoteIP(socketId).toString().c_str());
+
+  StaticJsonDocument<24> doc;
+  doc["type"] = "poggies";
+  CaptivePortal::SendMessageJSON(socketId, doc);
 }
 void handleWebSocketClientDisconnected(std::uint8_t socketId) {
   ESP_LOGD(TAG, "WebSocket client #%u disconnected", socketId);

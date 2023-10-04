@@ -1,8 +1,13 @@
+import { WebSocketClient } from './WebSocketClient';
 import { WiFiStateStore } from './stores';
 import type { WiFiNetwork } from './types/WiFiNetwork';
 
 interface InvalidMessage {
   type: undefined | null;
+}
+
+interface PoggiesMessage {
+  type: 'poggies';
 }
 
 interface WiFiScanStartedMessage {
@@ -32,7 +37,7 @@ interface WiFiScanErrorMessage {
 
 export type WiFiScanMessage = WiFiScanStartedMessage | WiFiScanDiscoveryMessage | WiFiScanCompletedMessage | WiFiScanErrorMessage;
 export type WiFiMessage = WiFiScanMessage;
-export type WebSocketMessage = InvalidMessage | WiFiMessage;
+export type WebSocketMessage = InvalidMessage | PoggiesMessage | WiFiMessage;
 
 export function WebSocketMessageHandler(message: WebSocketMessage) {
   const type = message.type;
@@ -42,6 +47,9 @@ export function WebSocketMessageHandler(message: WebSocketMessage) {
   }
 
   switch (type) {
+    case 'poggies':
+      handlePoggiesMessage();
+      break;
     case 'wifi':
       handleWiFiMessage(message);
       break;
@@ -49,6 +57,10 @@ export function WebSocketMessageHandler(message: WebSocketMessage) {
       console.warn('[WS] Received invalid message: ', message);
       return;
   }
+}
+
+function handlePoggiesMessage() {
+  WebSocketClient.Instance.Send('{ "type": "wifi", "action": "scan", "run": true }');
 }
 
 function handleWiFiMessage(message: WiFiMessage) {
