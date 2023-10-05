@@ -1,7 +1,5 @@
 #include "WiFiScanManager.h"
 
-#include "CaptivePortal.h"
-
 #include <WiFi.h>
 
 #include <esp_log.h>
@@ -51,7 +49,6 @@ void _handleScanError(std::int16_t retval) {
 
   if (retval == WIFI_SCAN_FAILED) {
     ESP_LOGE(TAG, "Failed to start scan on channel %u", s_currentChannel);
-    CaptivePortal::Start();
     for (auto& it : s_scanCompletedHandlers) {
       it.second(WiFiScanManager::ScanCompletedStatus::Error);
     }
@@ -197,5 +194,5 @@ void _evScanCompleted(arduino_event_id_t event, arduino_event_info_t info) {
 }
 void _evSTAStopped(arduino_event_id_t event, arduino_event_info_t info) {
   ESP_LOGD(TAG, "STA stopped");
-  // TODO: CLEAR RESULTS
+  _setScanInProgress(false);
 }
