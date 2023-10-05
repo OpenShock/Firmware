@@ -167,7 +167,6 @@ SpaceBeforeParens: Custom
 SpaceBeforeParensOptions:
   AfterControlStatements: true
   AfterForeachMacros: false
-  AfterFunctionDeclationName: false
   AfterIfMacros: false
   AfterOverloadedOperator: false
   AfterRequiresInClause: false

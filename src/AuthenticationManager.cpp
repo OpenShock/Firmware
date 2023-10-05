@@ -8,45 +8,13 @@
 static const char* const TAG             = "AuthenticationManager";
 static const char* const AUTH_TOKEN_FILE = "/authToken";
 
-static bool _isAuthenticated = false;
+static bool _isPaired = false;
 static String _authToken;
 
 using namespace OpenShock;
 
-bool AuthenticationManager::Authenticate(unsigned int pairCode) {
-  HTTPClient http;
-  String uri = OPENSHOCK_API_URL("/1/device/pair/") + String(pairCode);
-
-  ESP_LOGD(TAG, "Contacting pair code url: %s", uri.c_str());
-  http.begin(uri);
-
-  int responseCode = http.GET();
-
-  if (responseCode != 200) {
-    ESP_LOGE(TAG, "Error while getting auth token: [%d] %s", responseCode, http.getString().c_str());
-
-    _isAuthenticated = false;
-    return false;
-  }
-
-  _authToken = http.getString();
-
-  if (!FileUtils::TryWriteFile(AUTH_TOKEN_FILE, _authToken)) {
-    ESP_LOGE(TAG, "Error while writing auth token to file");
-
-    _isAuthenticated = false;
-    return false;
-  }
-
-  http.end();
-
-  _isAuthenticated = true;
-
-  return true;
-}
-
-bool AuthenticationManager::IsAuthenticated() {
-  if (_isAuthenticated) {
+bool AuthenticationManager::IsPaired() {
+  if (_isPaired) {
     return true;
   }
 
@@ -70,15 +38,54 @@ bool AuthenticationManager::IsAuthenticated() {
 
   http.end();
 
-  _isAuthenticated = true;
+  _isPaired = true;
 
   ESP_LOGD(TAG, "Successfully verified auth token");
 
   return true;
 }
 
+bool AuthenticationManager::Pair(unsigned int pairCode) {
+  HTTPClient http;
+  String uri = OPENSHOCK_API_URL("/1/device/pair/") + String(pairCode);
+
+  ESP_LOGD(TAG, "Contacting pair code url: %s", uri.c_str());
+  http.begin(uri);
+
+  int responseCode = http.GET();
+
+  if (responseCode != 200) {
+    ESP_LOGE(TAG, "Error while getting auth token: [%d] %s", responseCode, http.getString().c_str());
+
+    _isPaired = false;
+    return false;
+  }
+
+  _authToken = http.getString();
+
+  if (!FileUtils::TryWriteFile(AUTH_TOKEN_FILE, _authToken)) {
+    ESP_LOGE(TAG, "Error while writing auth token to file");
+
+    _isPaired = false;
+    return false;
+  }
+
+  http.end();
+
+  _isPaired = true;
+
+  return true;
+}
+
+void AuthenticationManager::UnPair() {
+  _isPaired  = false;
+  _authToken = "";
+
+  FileUtils::DeleteFile(AUTH_TOKEN_FILE);
+}
+
 String AuthenticationManager::GetAuthToken() {
-  if (_isAuthenticated) {
+  if (_isPaired) {
     return _authToken;
   }
 
@@ -86,14 +93,7 @@ String AuthenticationManager::GetAuthToken() {
     return "";
   }
 
-  _isAuthenticated = true;
+  _isPaired = true;
 
   return _authToken;
-}
-
-void AuthenticationManager::ClearAuthToken() {
-  _isAuthenticated = false;
-  _authToken       = "";
-
-  FileUtils::DeleteFile(AUTH_TOKEN_FILE);
 }

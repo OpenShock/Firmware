@@ -5,6 +5,7 @@
 #include "FileUtils.h"
 #include "SerialInputHandler.h"
 #include "WiFiManager.h"
+#include "WiFiScanManager.h"
 
 #include <esp_log.h>
 #include <HardwareSerial.h>
@@ -42,4 +43,6 @@ void loop() {
   if (s_apiConnection != nullptr) {
     s_apiConnection->Update();
   }
+
+  OpenShock::WiFiScanManager::Update();
 }

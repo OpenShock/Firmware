@@ -7,11 +7,9 @@
 namespace OpenShock::WiFiManager {
   bool Init();
 
-  WiFiState GetWiFiState();
+  bool Authenticate(std::uint8_t (&bssid)[6], const char* password, std::uint8_t passwordLength);
+  void Forget(std::uint8_t wifiId);
 
-  void AddOrUpdateNetwork(const char* ssid, const char* password);
-  void RemoveNetwork(const char* ssid);
-
-  bool StartScan();
-
+  void Connect(std::uint8_t wifiId);
+  void Disconnect();
 }  // namespace OpenShock::WiFiManager

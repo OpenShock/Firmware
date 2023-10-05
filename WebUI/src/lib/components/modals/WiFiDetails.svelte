@@ -1,21 +1,23 @@
 <script lang="ts">
-	import { WiFiStateStore } from "$lib/stores";
-	import { getModalStore } from "@skeletonlabs/skeleton";
+  import { WiFiStateStore } from '$lib/stores';
+  import { getModalStore } from '@skeletonlabs/skeleton';
 
   export let bssid: string;
 
   const modalStore = getModalStore();
 
-  $: item = $WiFiStateStore.networks.find(i => i.bssid === bssid);
+  $: item = $WiFiStateStore.networks[bssid];
 
-  $: rows = item ? [
-    { key: 'SSID', value: item.ssid },
-    { key: 'BSSID', value: item.bssid },
-    { key: 'Channel', value: item.channel },
-    { key: 'RSSI', value: item.rssi },
-    { key: 'Secure', value: item.secure },
-    { key: 'Saved', value: item.saved },
-  ] : [];
+  $: rows = item
+    ? [
+        { key: 'SSID', value: item.ssid },
+        { key: 'BSSID', value: item.bssid },
+        { key: 'Channel', value: item.channel },
+        { key: 'RSSI', value: item.rssi },
+        { key: 'Security', value: item.security },
+        { key: 'Saved', value: item.saved },
+      ]
+    : [];
 </script>
 
 <div class="card p-4 w-[24rem] flex-col space-y-4">
@@ -32,7 +34,7 @@
     <div class="flex justify-end space-x-2">
       <div class="btn-group variant-outline">
         {#if item.saved}
-          <button  on:click={() => modalStore.close()}><i class="fa fa-wifi mr-2 text-green-500"></i>Connect</button>
+          <button on:click={() => modalStore.close()}><i class="fa fa-wifi mr-2 text-green-500"></i>Connect</button>
           <button on:click={() => modalStore.close()}><i class="fa fa-trash mr-2 text-red-500"></i>Forget</button>
         {:else}
           <button on:click={() => modalStore.close()}><i class="fa fa-link mr-2 text-green-500"></i>Connect</button>
