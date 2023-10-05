@@ -5,9 +5,10 @@
 #include <cstdint>
 
 namespace OpenShock::AuthenticationManager {
-  bool Authenticate(unsigned int pairCode);
+  bool IsPaired();
+  bool Pair(unsigned int pairCode);
+  void UnPair();
 
-  bool IsAuthenticated();
   String GetAuthToken();
   void ClearAuthToken();
 }  // namespace OpenShock::AuthenticationManager

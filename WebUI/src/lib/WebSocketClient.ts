@@ -1,7 +1,5 @@
 import { browser } from "$app/environment";
-import { getToastStore } from "@skeletonlabs/skeleton";
-import { WiFiStateStore } from "./stores";
-import type { WiFiNetwork } from "./types/WiFiNetwork";
+import { WebSocketMessageHandler } from "./WebSocketMessageHandler";
 
 export enum ConnectionState {
   DISCONNECTED = 0,
@@ -134,22 +132,8 @@ export class WebSocketClient {
       return;
     }
 
-    if (message.networks !== undefined) {
-      WiFiStateStore.setNetworks(message.networks as WiFiNetwork[]);
-      return;
-    }
-
-    if (message.scanning !== undefined) {
-      const toastStore = getToastStore();
-      if (message.scanning) {
-        toastStore.trigger({ message: 'Scanning for WiFi networks...', background: 'bg-blue-500' });
-      } else {
-        toastStore.trigger({ message: 'Scanning for WiFi networks finished', background: 'bg-green-500' });
-      }
-
-      WiFiStateStore.setScanning(message.scanning as boolean);
-      return;
-    }
+    // Handle message
+    WebSocketMessageHandler(message);
   }
   private AbortWebSocket() {
     if (this._socket) {

@@ -5,7 +5,7 @@ import { writable } from 'svelte/store';
 const { subscribe, update } = writable<WiFiState>({
   initialized: false,
   scanning: false,
-  networks: [],
+  networks: {},
 });
 
 export const WiFiStateStore = {
@@ -22,16 +22,15 @@ export const WiFiStateStore = {
       return store;
     });
   },
-  setNetworks(networks: WiFiNetwork[]) {
+  addNetwork(network: WiFiNetwork) {
     update((store) => {
-      store.scanning = false;
-      store.networks = networks;
+      store.networks[network.bssid] = network;
       return store;
     });
   },
   clearNetworks() {
     update((store) => {
-      store.networks = [];
+      store.networks = {};
       return store;
     });
   },

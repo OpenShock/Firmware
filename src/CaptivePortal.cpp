@@ -1,7 +1,10 @@
 #include "CaptivePortal.h"
 
 #include "AuthenticationManager.h"
+#include "Mappers/EspWiFiTypesMapper.h"
+#include "Utils/HexUtils.h"
 #include "WiFiManager.h"
+#include "WiFiScanManager.h"
 
 #include <ArduinoJson.h>
 #include <ESPAsyncWebServer.h>
@@ -24,8 +27,11 @@ struct CaptivePortalInstance {
 
   AsyncWebServer webServer;
   WebSocketsServer socketServer;
+  OpenShock::WiFiScanManager::CallbackHandle wifiScanStartedHandlerId;
+  OpenShock::WiFiScanManager::CallbackHandle wifiScanCompletedHandlerId;
+  OpenShock::WiFiScanManager::CallbackHandle wifiScanDiscoveryHandlerId;
 };
-std::unique_ptr<CaptivePortalInstance> s_webServices = nullptr;
+static std::unique_ptr<CaptivePortalInstance> s_webServices = nullptr;
 
 void handleWebSocketEvent(std::uint8_t socketId, WStype_t type, std::uint8_t* data, std::size_t len);
 void handleHttpNotFound(AsyncWebServerRequest* request);
@@ -68,6 +74,49 @@ bool CaptivePortal::Start() {
   s_webServices->webServer.onNotFound([](AsyncWebServerRequest* request) { request->send(404, "text/plain", "Not found"); });
   s_webServices->webServer.begin();
 
+  s_webServices->wifiScanStartedHandlerId   = WiFiScanManager::RegisterScanStartedHandler([]() {
+    StaticJsonDocument<256> doc;
+    doc["type"]    = "wifi";
+    doc["subject"] = "scan";
+    doc["status"]  = "started";
+    CaptivePortal::BroadcastMessageJSON(doc);
+  });
+  s_webServices->wifiScanCompletedHandlerId = WiFiScanManager::RegisterScanCompletedHandler([](WiFiScanManager::ScanCompletedStatus status) {
+    StaticJsonDocument<256> doc;
+    doc["type"]    = "wifi";
+    doc["subject"] = "scan";
+    switch (status) {
+      case WiFiScanManager::ScanCompletedStatus::Success:
+        doc["status"] = "success";
+        break;
+      case WiFiScanManager::ScanCompletedStatus::Cancelled:
+        doc["status"] = "cancelled";
+        break;
+      case WiFiScanManager::ScanCompletedStatus::Error:
+        doc["status"] = "error";
+        break;
+      default:
+        doc["status"] = "unknown";
+        break;
+    }
+    CaptivePortal::BroadcastMessageJSON(doc);
+  });
+  s_webServices->wifiScanDiscoveryHandlerId = WiFiScanManager::RegisterScanDiscoveryHandler([](const wifi_ap_record_t* record) {
+    StaticJsonDocument<256> doc;
+    doc["type"]    = "wifi";
+    doc["subject"] = "scan";
+    doc["status"]  = "discovery";
+
+    auto data        = doc.createNestedObject("data");
+    data["ssid"]     = reinterpret_cast<const char*>(record->ssid);
+    data["bssid"]    = HexUtils::ToHexMac<6>(record->bssid).data();
+    data["rssi"]     = record->rssi;
+    data["channel"]  = record->primary;
+    data["security"] = Mappers::GetWiFiAuthModeName(record->authmode);
+
+    CaptivePortal::BroadcastMessageJSON(doc);
+  });
+
   ESP_LOGD(TAG, "Started");
 
   return true;
@@ -83,6 +132,10 @@ void CaptivePortal::Stop() {
   s_webServices->webServer.end();
   s_webServices->socketServer.close();
 
+  WiFiScanManager::UnregisterScanStartedHandler(s_webServices->wifiScanStartedHandlerId);
+  WiFiScanManager::UnregisterScanCompletedHandler(s_webServices->wifiScanCompletedHandlerId);
+  WiFiScanManager::UnregisterScanDiscoveryHandler(s_webServices->wifiScanDiscoveryHandlerId);
+
   s_webServices = nullptr;
 
   WiFi.softAPdisconnect(true);
@@ -96,6 +149,24 @@ void CaptivePortal::Update() {
   }
 
   s_webServices->socketServer.loop();
+}
+bool CaptivePortal::SendMessageTXT(std::uint8_t socketId, const char* data, std::size_t len) {
+  if (s_webServices == nullptr) {
+    return false;
+  }
+
+  s_webServices->socketServer.sendTXT(socketId, data, len);
+
+  return true;
+}
+bool CaptivePortal::SendMessageBIN(std::uint8_t socketId, const std::uint8_t* data, std::size_t len) {
+  if (s_webServices == nullptr) {
+    return false;
+  }
+
+  s_webServices->socketServer.sendBIN(socketId, data, len);
+
+  return true;
 }
 bool CaptivePortal::BroadcastMessageTXT(const char* data, std::size_t len) {
   if (s_webServices == nullptr) {
@@ -117,11 +188,84 @@ bool CaptivePortal::BroadcastMessageBIN(const std::uint8_t* data, std::size_t le
 }
 
 void handleWebSocketClientConnected(std::uint8_t socketId) {
-  ESP_LOGD(
-    TAG, "WebSocket client #%u connected from %s", socketId, s_webServices->socketServer.remoteIP(socketId).toString().c_str());
+  ESP_LOGD(TAG, "WebSocket client #%u connected from %s", socketId, s_webServices->socketServer.remoteIP(socketId).toString().c_str());
+
+  StaticJsonDocument<24> doc;
+  doc["type"] = "poggies";
+  CaptivePortal::SendMessageJSON(socketId, doc);
 }
 void handleWebSocketClientDisconnected(std::uint8_t socketId) {
   ESP_LOGD(TAG, "WebSocket client #%u disconnected", socketId);
+}
+void handleWebSocketClientWiFiScanMessage(const StaticJsonDocument<256>& doc) {
+  bool run = doc["run"];
+  if (run) {
+    WiFiScanManager::StartScan();
+  } else {
+    WiFiScanManager::CancelScan();
+  }
+}
+void handleWebSocketClientWiFiAuthenticateMessage(const StaticJsonDocument<256>& doc) {
+  String bssidStr = doc["bssid"];
+  if (bssidStr.isEmpty()) {
+    ESP_LOGE(TAG, "WiFi BSSID is missing");
+    return;
+  }
+  if (bssidStr.length() != 17) {
+    ESP_LOGE(TAG, "WiFi BSSID is invalid");
+    return;
+  }
+
+  String password = doc["password"];
+
+  // Convert BSSID to byte array
+  // Uses sscanf to parse the max-style hex format, e.g. "AA:BB:CC:DD:EE:FF" where each pair is a byte, and %02X means to parse 2 characters as a hex byte
+  // We check the return value to ensure that we parsed all 6 arguments (6 pairs of hex bytes, or 6 bytes)
+  std::uint8_t bssid[6];
+  if (sscanf(bssidStr.c_str(), "%02X:%02X:%02X:%02X:%02X:%02X", bssid + 0, bssid + 1, bssid + 2, bssid + 3, bssid + 4, bssid + 5) != 6) {
+    ESP_LOGE(TAG, "WiFi BSSID is invalid");
+    return;
+  }
+
+  std::size_t passwordLength = password.length();
+  if (passwordLength > UINT8_MAX) {
+    ESP_LOGE(TAG, "WiFi password is too long");
+    return;
+  }
+
+  WiFiManager::Authenticate(bssid, password.c_str(), static_cast<std::uint8_t>(passwordLength));
+}
+void handleWebSocketClientWiFiConnectMessage(const StaticJsonDocument<256>& doc) {
+  std::uint16_t wifiId = doc["id"];
+
+  WiFiManager::Connect(wifiId);
+}
+void handleWebSocketClientWiFiDisconnectMessage(const StaticJsonDocument<256>& doc) {
+  WiFiManager::Disconnect();
+}
+void handleWebSocketClientWiFiForgetMessage(const StaticJsonDocument<256>& doc) {
+  WiFiManager::Forget(doc["bssid"]);
+}
+void handleWebSocketClientWiFiMessage(StaticJsonDocument<256> doc) {
+  String actionStr = doc["action"];
+  if (actionStr.isEmpty()) {
+    ESP_LOGE(TAG, "Received WiFi message with \"action\" property missing");
+    return;
+  }
+
+  if (actionStr == "scan") {
+    handleWebSocketClientWiFiScanMessage(doc);
+  } else if (actionStr == "authenticate") {
+    handleWebSocketClientWiFiAuthenticateMessage(doc);
+  } else if (actionStr == "connect") {
+    handleWebSocketClientWiFiConnectMessage(doc);
+  } else if (actionStr == "disconnect") {
+    handleWebSocketClientWiFiDisconnectMessage(doc);
+  } else if (actionStr == "forget") {
+    handleWebSocketClientWiFiForgetMessage(doc);
+  } else {
+    ESP_LOGE(TAG, "Received WiFi message with unknown action \"%s\"", actionStr.c_str());
+  }
 }
 void handleWebSocketClientMessage(std::uint8_t socketId, WStype_t type, std::uint8_t* data, std::size_t len) {
   if (type != WStype_t::WStype_TEXT) {
@@ -137,26 +281,24 @@ void handleWebSocketClientMessage(std::uint8_t socketId, WStype_t type, std::uin
   }
 
   String typeStr = doc["type"];
-  if (typeStr.length() == 0) {
+  if (typeStr.isEmpty()) {
     ESP_LOGE(TAG, "Message type is missing");
     return;
   }
 
-  if (typeStr == "startScan") {
-    WiFiManager::StartScan();
-  } /* else if (typeStr == "connect") {
-     WiFiManager::Connect(doc["ssid"], doc["password"]);
-   } else if (typeStr == "disconnect") {
-     WiFiManager::Disconnect();
-   } else if (typeStr == "authenticate") {
-     AuthenticationManager::Authenticate(doc["code"]);
-   } else if (typeStr == "pair") {
-     AuthenticationManager::Pair(doc["code"]);
-   } else if (typeStr == "unpair") {
-     AuthenticationManager::Unpair();
-   } else if (typeStr == "setRmtPin") {
-     AuthenticationManager::SetRmtPin(doc["pin"]);
-   }*/
+  if (typeStr == "wifi") {
+    handleWebSocketClientWiFiMessage(doc);
+  } else if (typeStr == "pair") {
+    if (!doc.containsKey("code")) {
+      ESP_LOGE(TAG, "Pair message is missing \"code\" property");
+      return;
+    }
+    AuthenticationManager::Pair(doc["code"]);
+  } else if (typeStr == "unpair") {
+    AuthenticationManager::UnPair();
+  } else if (typeStr == "tx_pin") {
+    //AuthenticationManager::SetRmtPin(doc["pin"]);
+  }
 }
 void handleWebSocketClientError(std::uint8_t socketId, std::uint16_t code, const char* message) {
   ESP_LOGE(TAG, "WebSocket client #%u error %u: %s", socketId, code, message);
