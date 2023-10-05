@@ -7,4 +7,7 @@ namespace OpenShock {
     Connecting,
     Connected
   };
+
+  WiFiState GetWiFiState() noexcept;
+  void SetWiFiState(WiFiState state) noexcept;
 }  // namespace OpenShock

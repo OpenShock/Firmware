@@ -95,11 +95,6 @@ void VisualStateManager::SetCriticalError() {
 }
 
 void VisualStateManager::SetWiFiState(WiFiState state) {
-  static WiFiState _state = (WiFiState)-1;
-  if (_state == state) {
-    return;
-  }
-
   ESP_LOGD(TAG, "SetWiFiStateState: %d", state);
   switch (state) {
     case WiFiState::Disconnected:
@@ -111,8 +106,6 @@ void VisualStateManager::SetWiFiState(WiFiState state) {
     default:
       return;
   }
-
-  _state = state;
 }
 
 #endif // OPENSHOCK_LED_GPIO
