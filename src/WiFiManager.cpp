@@ -50,13 +50,13 @@ struct WiFiNetwork {
 static std::vector<WiFiNetwork> s_wifiNetworks;
 static std::vector<WiFiCredentials> s_wifiCredentials;
 
-bool _addNetwork(const char* ssid, const String& password) {
+bool _addNetwork(const char* ssid, std::uint8_t ssidLength, const char* password, std::uint8_t passwordLength) {
   // Bitmask representing available credential IDs (0-31)
   std::uint32_t bits = 0;
   for (auto& cred : s_wifiCredentials) {
     if (strcmp(cred.ssid().data(), ssid) == 0) {
       ESP_LOGE(TAG, "Failed to add WiFi credentials: credentials for %s already exist", ssid);
-      cred.setPassword(password);
+      cred.setPassword(password, passwordLength);
       cred.save();
       return true;
     }
@@ -76,7 +76,7 @@ bool _addNetwork(const char* ssid, const String& password) {
     id++;
   }
 
-  WiFiCredentials credentials(id, ssid, password);
+  WiFiCredentials credentials(id, ssid, ssidLength, password, passwordLength);
   credentials.save();
 
   s_wifiCredentials.push_back(std::move(credentials));
@@ -140,11 +140,12 @@ bool WiFiManager::Init() {
   return true;
 }
 
-bool WiFiManager::Authenticate(nonstd::span<std::uint8_t, 6> bssid, const String& password) {
+bool WiFiManager::Authenticate(std::uint8_t (&bssid)[6], const char* password, std::uint8_t passwordLength) {
   bool found = false;
   char ssid[33];
   for (std::uint16_t i = 0; i < s_wifiNetworks.size(); i++) {
-    if (memcmp(s_wifiNetworks[i].bssid, bssid.data(), bssid.size()) == 0) {
+    static_assert(sizeof(s_wifiNetworks[i].bssid) == sizeof(bssid), "BSSID size mismatch");
+    if (memcmp(s_wifiNetworks[i].bssid, bssid, sizeof(bssid)) == 0) {
       memcpy(ssid, s_wifiNetworks[i].ssid, sizeof(ssid));
       found = true;
       break;
@@ -157,14 +158,14 @@ bool WiFiManager::Authenticate(nonstd::span<std::uint8_t, 6> bssid, const String
     return false;
   }
 
-  if (!_addNetwork(ssid, password)) {
+  if (!_addNetwork(ssid, strlen(ssid), password, passwordLength)) {
     _broadcastWifiAddNetworkError("too_many_credentials");
     return false;
   }
 
   _broadcastWifiAddNetworkSuccess(ssid);
 
-  wl_status_t stat = WiFi.begin(ssid, password, 0, bssid.data(), true);
+  wl_status_t stat = WiFi.begin(ssid, password, 0, bssid, true);
   if (stat != WL_CONNECTED) {
     ESP_LOGE(TAG, "Failed to connect to network %s, error code %d", ssid, stat);
     return false;

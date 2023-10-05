@@ -227,7 +227,13 @@ void handleWebSocketClientWiFiAuthenticateMessage(const StaticJsonDocument<256>&
     return;
   }
 
-  WiFiManager::Authenticate(bssid, password);
+  std::size_t passwordLength = password.length();
+  if (passwordLength > UINT8_MAX) {
+    ESP_LOGE(TAG, "WiFi password is too long");
+    return;
+  }
+
+  WiFiManager::Authenticate(bssid, password.c_str(), static_cast<std::uint8_t>(passwordLength));
 }
 void handleWebSocketClientWiFiConnectMessage(const StaticJsonDocument<256>& doc) {
   std::uint16_t wifiId = doc["id"];
@@ -282,19 +288,17 @@ void handleWebSocketClientMessage(std::uint8_t socketId, WStype_t type, std::uin
 
   if (typeStr == "wifi") {
     handleWebSocketClientWiFiMessage(doc);
-  } /* else if (typeStr == "connect") {
-     WiFiManager::Connect(doc["ssid"], doc["password"]);
-   } else if (typeStr == "disconnect") {
-     WiFiManager::Disconnect();
-   } else if (typeStr == "authenticate") {
-     AuthenticationManager::Authenticate(doc["code"]);
-   } else if (typeStr == "pair") {
-     AuthenticationManager::Pair(doc["code"]);
-   } else if (typeStr == "unpair") {
-     AuthenticationManager::Unpair();
-   } else if (typeStr == "setRmtPin") {
-     AuthenticationManager::SetRmtPin(doc["pin"]);
-   }*/
+  } else if (typeStr == "pair") {
+    if (!doc.containsKey("code")) {
+      ESP_LOGE(TAG, "Pair message is missing \"code\" property");
+      return;
+    }
+    AuthenticationManager::Pair(doc["code"]);
+  } else if (typeStr == "unpair") {
+    AuthenticationManager::UnPair();
+  } else if (typeStr == "tx_pin") {
+    //AuthenticationManager::SetRmtPin(doc["pin"]);
+  }
 }
 void handleWebSocketClientError(std::uint8_t socketId, std::uint16_t code, const char* message) {
   ESP_LOGE(TAG, "WebSocket client #%u error %u: %s", socketId, code, message);

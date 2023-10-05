@@ -1,6 +1,7 @@
 #include "WiFiCredentials.h"
 
-#include <Arduino.h>
+#include "Utils/HexUtils.h"
+
 #include <LittleFS.h>
 
 #include <esp_log.h>
@@ -11,28 +12,77 @@ const char* const TAG = "WiFiCredentials";
 
 using namespace OpenShock;
 
+const char* const WiFiDir      = "/wifi/";
+const char* const WiFiCredsDir = "/wifi/creds/";
+
+inline void GetWiFiCredsFilename(char (&filename)[15], std::uint8_t id) {
+  memcpy(filename, WiFiCredsDir, 12);
+  HexUtils::ToHex(id, filename + 12);
+}
+
+template<std::uint8_t N>
+std::uint8_t CopyString(const char* src, std::uint8_t srcLength, char (&dest)[N]) {
+  if (src == nullptr || srcLength == 0) {
+    ESP_LOGW(TAG, "String is null/empty, clearing");
+    memset(dest, 0, N);
+    return 0;
+  }
+
+  if (srcLength > N - 1) {
+    ESP_LOGW(TAG, "String is too long, truncating");
+    srcLength = N - 1;
+  }
+
+  memcpy(dest, src, srcLength);
+  dest[srcLength] = 0;
+
+  return srcLength;
+}
+
+template<std::uint8_t N>
+bool WriteString(fs::File& file, const char (&str)[N], std::uint8_t length) {
+  if (length > N - 1) return false;
+
+  file.write(&length, sizeof(length));
+  file.write(reinterpret_cast<const std::uint8_t*>(str), length);
+
+  return true;
+}
+template<std::uint8_t N>
+bool ReadString(fs::File& file, char (&str)[N], std::uint8_t& length) {
+  file.read(&length, sizeof(length));
+
+  if (length > N - 1) return false;
+
+  file.read(reinterpret_cast<std::uint8_t*>(str), length);
+
+  str[length] = 0;  // Ensure null-terminated
+
+  return true;
+}
+
 bool WiFiCredentials::Load(std::vector<WiFiCredentials>& credentials) {
   credentials.clear();
 
-  // Ensure the /wifi/creds directory exists
-  if (!LittleFS.exists("/wifi/creds")) {
-    if (!LittleFS.exists("/wifi")) {
-      if (!LittleFS.mkdir("/wifi")) {
-        ESP_LOGE(TAG, "Failed to create /wifi directory");
+  // Ensure the credentials directory exists
+  if (!LittleFS.exists(WiFiCredsDir)) {
+    if (!LittleFS.exists(WiFiDir)) {
+      if (!LittleFS.mkdir(WiFiDir)) {
+        ESP_LOGE(TAG, "Failed to create WiFi directory");
         return false;
       }
     }
-    if (!LittleFS.mkdir("/wifi/creds")) {
-      ESP_LOGE(TAG, "Failed to create /wifi/creds directory");
+    if (!LittleFS.mkdir(WiFiCredsDir)) {
+      ESP_LOGE(TAG, "Failed to create WiFi credentials directory");
       return false;
     }
     ESP_LOGI(TAG, "No credentials directory found, created one");
     return true;
   }
 
-  File credsDir = LittleFS.open("/wifi/creds");
+  File credsDir = LittleFS.open(WiFiCredsDir);
   if (!credsDir) {
-    ESP_LOGE(TAG, "Failed to open /wifi/creds");
+    ESP_LOGE(TAG, "Failed to open WiFi credentials directory");
     return false;
   }
 
@@ -54,77 +104,24 @@ bool WiFiCredentials::Load(std::vector<WiFiCredentials>& credentials) {
   return true;
 }
 
-WiFiCredentials::WiFiCredentials(std::uint8_t id, const wifi_ap_record_t* record) {
+WiFiCredentials::WiFiCredentials(std::uint8_t id, const char* ssid, std::uint8_t ssidLength, const char* password, std::uint8_t passwordLength) {
   _id = id;
 
-  static_assert(sizeof(_ssid) == sizeof(record->ssid), "WiFiCredentials::_ssid and wifi_ap_record_t::ssid must be the same size");
-  memset(_password, 0, sizeof(_password));
-  memcpy(_ssid, record->ssid, sizeof(_ssid));
+  setSSID(ssid, ssidLength);
+  setPassword(password, passwordLength);
 }
 
-WiFiCredentials::WiFiCredentials(std::uint8_t id, const String& ssid, const String& password) {
-  _id = id;
-
-  auto ssidLength = ssid.length();
-  if (ssid.length() > sizeof(_ssid) - 1) {
-    ESP_LOGW(TAG, "SSID is too long, truncating");
-    ssidLength = sizeof(_ssid) - 1;
-  }
-  _ssidLength = ssidLength;
-  ssid.toCharArray(reinterpret_cast<char*>(_ssid), _ssidLength + 1);
-
-  auto passwordLength = password.length();
-  if (password.length() > sizeof(_password - 1)) {
-    ESP_LOGW(TAG, "Password is too long, truncating");
-    passwordLength = sizeof(_password) - 1;
-  }
-  _passwordLength = passwordLength;
-  password.toCharArray(reinterpret_cast<char*>(_password), _passwordLength + 1);
+void WiFiCredentials::setSSID(const char* ssid, std::uint8_t ssidLength) {
+  _ssidLength = CopyString(ssid, ssidLength, _ssid);
 }
 
-void WiFiCredentials::setSSID(const String& ssid) {
-  auto ssidLength = ssid.length();
-  if (ssid.length() > sizeof(_ssid)) {
-    ESP_LOGW(TAG, "SSID is too long, truncating");
-    ssidLength = sizeof(_ssid) - 1;
-  }
-  _ssidLength = ssidLength;
-  ssid.toCharArray(reinterpret_cast<char*>(_ssid), _ssidLength + 1);
-}
-
-void WiFiCredentials::setSSID(const std::uint8_t* ssid, std::size_t ssidLength) {
-  if (ssidLength > sizeof(_ssid)) {
-    ESP_LOGW(TAG, "SSID is too long, truncating");
-    ssidLength = sizeof(_ssid) - 1;
-  }
-  _ssidLength = ssidLength;
-  memcpy(_ssid, ssid, _ssidLength);
-  _ssid[_ssidLength] = 0;
-}
-
-void WiFiCredentials::setPassword(const std::uint8_t* password, std::size_t passwordLength) {
-  if (passwordLength > sizeof(_password)) {
-    ESP_LOGW(TAG, "Password is too long, truncating");
-    passwordLength = sizeof(_password) - 1;
-  }
-  _passwordLength = passwordLength;
-  memcpy(_password, password, _passwordLength);
-  _password[_passwordLength] = 0;
-}
-
-void WiFiCredentials::setPassword(const String& password) {
-  auto passwordLength = password.length();
-  if (password.length() > sizeof(_password)) {
-    ESP_LOGW(TAG, "Password is too long, truncating");
-    passwordLength = sizeof(_password) - 1;
-  }
-  _passwordLength = passwordLength;
-  password.toCharArray(reinterpret_cast<char*>(_password), _passwordLength + 1);
+void WiFiCredentials::setPassword(const char* password, std::uint8_t passwordLength) {
+  _passwordLength = CopyString(password, passwordLength, _password);
 }
 
 bool WiFiCredentials::save() const {
-  char filename[16] = {0};
-  sprintf(filename, "/wifi/creds/%u", _id);
+  char filename[15];
+  GetWiFiCredsFilename(filename, _id);
   File file = LittleFS.open(filename, "wb");
   if (!file) {
     ESP_LOGE(TAG, "Failed to open file %s for writing", filename);
@@ -132,10 +129,8 @@ bool WiFiCredentials::save() const {
   }
 
   file.write(_id);
-  file.write(reinterpret_cast<const std::uint8_t*>(&_ssidLength), sizeof(_ssidLength));
-  file.write(_ssid, _ssidLength);
-  file.write(reinterpret_cast<const std::uint8_t*>(&_passwordLength), sizeof(_passwordLength));
-  file.write(_password, _passwordLength);
+  if (!WriteString(file, _ssid, _ssidLength)) return false;
+  if (!WriteString(file, _password, _passwordLength)) return false;
 
   file.close();
 
@@ -143,8 +138,8 @@ bool WiFiCredentials::save() const {
 }
 
 bool WiFiCredentials::erase() const {
-  char filename[16] = {0};
-  sprintf(filename, "/wifi/creds/%u", _id);
+  char filename[15];
+  GetWiFiCredsFilename(filename, _id);
   if (!LittleFS.remove(filename)) {
     ESP_LOGE(TAG, "Failed to remove file %s", filename);
     return false;
@@ -159,7 +154,7 @@ bool WiFiCredentials::_load(fs::File& file) {
     return false;
   }
 
-  file.read(reinterpret_cast<std::uint8_t*>(&_id), sizeof(_id));
+  file.read(&_id, sizeof(_id));
   if (_id > 31) {
     const char* filename = file.name();
     ESP_LOGE(TAG, "Loading credentials for %s failed: ID is too large (needs to fit into a uint32 by bitshifting)", filename);  // Look in WiFiManager.cpp for the bitshifting
@@ -168,27 +163,21 @@ bool WiFiCredentials::_load(fs::File& file) {
     return false;
   }
 
-  file.read(reinterpret_cast<std::uint8_t*>(&_ssidLength), sizeof(_ssidLength));
-  if (_ssidLength > sizeof(_ssid) - 1) {
+  if (!ReadString(file, _ssid, _ssidLength)) {
     const char* filename = file.name();
     ESP_LOGE(TAG, "Loading credentials for %s failed: SSID length is too long", filename);
     ESP_LOGW(TAG, "Deleting credentials for %s", filename);
     LittleFS.remove(filename);
     return false;
   }
-  file.read(_ssid, _ssidLength);
-  _ssid[_ssidLength] = 0;
 
-  file.read(reinterpret_cast<std::uint8_t*>(&_passwordLength), sizeof(_passwordLength));
-  if (_passwordLength > sizeof(_password) - 1) {
+  if (!ReadString(file, _password, _passwordLength)) {
     const char* filename = file.name();
     ESP_LOGE(TAG, "Loading credentials for %s failed: password length is too long", filename);
     ESP_LOGW(TAG, "Deleting credentials for %s", filename);
     LittleFS.remove(filename);
     return false;
   }
-  file.read(_password, _passwordLength);
-  _password[_passwordLength] = 0;
 
   return true;
 }
