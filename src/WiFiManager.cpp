@@ -2,7 +2,7 @@
 
 #include "CaptivePortal.h"
 #include "Mappers/EspWiFiTypesMapper.h"
-#include "utils/HexUtils.h"
+#include "Utils/HexUtils.h"
 #include "VisualStateManager.h"
 #include "WiFiCredentials.h"
 #include "WiFiScanManager.h"
