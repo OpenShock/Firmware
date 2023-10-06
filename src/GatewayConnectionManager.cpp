@@ -3,6 +3,7 @@
 #include "CaptivePortal.h"
 #include "CommandHandler.h"
 #include "Constants.h"
+#include "Time.h"
 #include "Utils/FileUtils.h"
 
 #include <esp_log.h>
