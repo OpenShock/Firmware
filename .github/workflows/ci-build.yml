@@ -185,3 +185,10 @@ jobs:
           path: OpenShock.${{ matrix.board }}.bin
           retention-days: 7
           if-no-files-found: error
+
+  done:
+    runs-on: ubuntu-latest
+    needs: [build-filesystem, merge-images]
+
+    steps:
+      - run: echo "Done"
