@@ -2,12 +2,12 @@
 
 #include "CaptivePortal.h"
 #include "Mappers/EspWiFiTypesMapper.h"
+#include "utils/HexUtils.h"
 #include "VisualStateManager.h"
 #include "WiFiCredentials.h"
 #include "WiFiScanManager.h"
 
 #include <ArduinoJson.h>
-#include <LittleFS.h>
 #include <WiFi.h>
 
 #include <esp_wifi_types.h>
@@ -33,6 +33,24 @@ void _broadcastWifiAddNetworkError(const char* error) {
   doc["type"]    = "wifi";
   doc["subject"] = "add_network";
   doc["status"]  = "error";
+  doc["error"]   = error;
+  CaptivePortal::BroadcastMessageJSON(doc);
+}
+void _broadcastWifiConnectSuccess(const std::uint8_t (&bssid)[6]) {
+  DynamicJsonDocument doc(64);
+  doc["type"]    = "wifi";
+  doc["subject"] = "connect";
+  doc["status"]  = "success";
+  doc["bssid"]   = HexUtils::ToHexMac<6>(bssid);
+  CaptivePortal::BroadcastMessageJSON(doc);
+}
+void _broadcastWifiConnectError(const char* ssid, const std::uint8_t (&bssid)[6], const char* error) {
+  DynamicJsonDocument doc(64);
+  doc["type"]    = "wifi";
+  doc["subject"] = "connect";
+  doc["status"]  = "error";
+  doc["ssid"]    = ssid;
+  doc["bssid"]   = HexUtils::ToHexMac<6>(bssid);
   doc["error"]   = error;
   CaptivePortal::BroadcastMessageJSON(doc);
 }
@@ -84,15 +102,15 @@ bool _addNetwork(const char* ssid, std::uint8_t ssidLength, const char* password
   return true;
 }
 
-void _evWiFiConnected(arduino_event_id_t event, arduino_event_info_t info) {
-  ESP_LOGD(TAG, "WiFi connected");
-  OpenShock::SetWiFiState(WiFiState::Connected);
-  CaptivePortal::Stop();
-}
-void _evWiFiDisconnected(arduino_event_id_t event, arduino_event_info_t info) {
-  ESP_LOGD(TAG, "WiFi disconnected");
-  OpenShock::SetWiFiState(WiFiState::Disconnected);
-  CaptivePortal::Start();
+void _evWiFiDisconnected(arduino_event_t* event) {
+  auto& info = event->event_info.wifi_sta_disconnected;
+
+  if (info.reason == WIFI_REASON_4WAY_HANDSHAKE_TIMEOUT) {
+    WiFi.disconnect(false);
+
+    _broadcastWifiConnectError(reinterpret_cast<char*>(info.ssid), info.bssid, "authentication_failed");
+    return;
+  }
 }
 void _evWiFiNetworkDiscovered(const wifi_ap_record_t* record) {
   WiFiNetwork network {
@@ -117,7 +135,6 @@ void _evWiFiNetworkDiscovered(const wifi_ap_record_t* record) {
 bool WiFiManager::Init() {
   WiFiCredentials::Load(s_wifiCredentials);
 
-  WiFi.onEvent(_evWiFiConnected, ARDUINO_EVENT_WIFI_STA_CONNECTED);
   WiFi.onEvent(_evWiFiDisconnected, ARDUINO_EVENT_WIFI_STA_DISCONNECTED);
   WiFiScanManager::RegisterScanDiscoveryHandler(_evWiFiNetworkDiscovered);
 
@@ -131,10 +148,7 @@ bool WiFiManager::Init() {
 
   if (s_wifiCredentials.size() > 0) {
     WiFi.scanNetworks(true);
-    OpenShock::SetWiFiState(WiFiState::Scanning);
-  } else {
-    CaptivePortal::Start();
-    OpenShock::SetWiFiState(WiFiState::Disconnected);
+    OpenShock::VisualStateManager::SetScanningStarted();
   }
 
   return true;
@@ -165,6 +179,7 @@ bool WiFiManager::Authenticate(std::uint8_t (&bssid)[6], const char* password, s
 
   _broadcastWifiAddNetworkSuccess(ssid);
 
+  ESP_LOGI(TAG, "Added WiFi credentials for %s", ssid);
   wl_status_t stat = WiFi.begin(ssid, password, 0, bssid, true);
   if (stat != WL_CONNECTED) {
     ESP_LOGE(TAG, "Failed to connect to network %s, error code %d", ssid, stat);
@@ -175,6 +190,15 @@ bool WiFiManager::Authenticate(std::uint8_t (&bssid)[6], const char* password, s
 }
 
 void WiFiManager::Forget(std::uint8_t wifiId) {
+  // Check if the network is currently connected
+  if (WiFi.isConnected()) {
+    // Check if the network is the one we're connected to
+    if (WiFi.SSID() == s_wifiCredentials[wifiId].ssid().data()) {
+      // Disconnect from the network
+      WiFi.disconnect(true);
+    }
+  }
+
   for (auto it = s_wifiCredentials.begin(); it != s_wifiCredentials.end(); it++) {
     if (it->id() == wifiId) {
       s_wifiCredentials.erase(it);
@@ -185,12 +209,10 @@ void WiFiManager::Forget(std::uint8_t wifiId) {
 }
 
 void WiFiManager::Connect(std::uint8_t wifiId) {
-  if (OpenShock::GetWiFiState() != WiFiState::Disconnected) return;
-
   for (auto& creds : s_wifiCredentials) {
     if (creds.id() == wifiId) {
+      ESP_LOGI(TAG, "Connecting to network #%u (%s)", wifiId, creds.ssid().data());
       WiFi.begin(creds.ssid().data(), creds.password().data());
-      OpenShock::SetWiFiState(WiFiState::Connecting);
       return;
     }
   }
@@ -199,9 +221,5 @@ void WiFiManager::Connect(std::uint8_t wifiId) {
 }
 
 void WiFiManager::Disconnect() {
-  if (OpenShock::GetWiFiState() != WiFiState::Connected) return;
-
   WiFi.disconnect(true);
-  OpenShock::SetWiFiState(WiFiState::Disconnected);
-  CaptivePortal::Start();
 }

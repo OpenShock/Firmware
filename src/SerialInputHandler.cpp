@@ -1,6 +1,6 @@
 #include "SerialInputHandler.h"
 
-#include "FileUtils.h"
+#include "Utils/FileUtils.h"
 
 #include <Esp.h>
 #include <HardwareSerial.h>
@@ -80,11 +80,6 @@ void processSerialLine(char* data, std::size_t length) {
     data[delimiter] = '\0';
     handleSerialCommand(data, length, data + delimiter + 1, length - delimiter - 1);
   }
-}
-
-void SerialInputHandler::Init() {
-  Serial.begin(115'200);
-  Serial.setDebugOutput(true);
 }
 
 void SerialInputHandler::Update() {

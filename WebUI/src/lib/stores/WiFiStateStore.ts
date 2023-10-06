@@ -4,6 +4,7 @@ import { writable } from 'svelte/store';
 
 const { subscribe, update } = writable<WiFiState>({
   initialized: false,
+  connected: null,
   scanning: false,
   networks: {},
 });
@@ -13,6 +14,12 @@ export const WiFiStateStore = {
   setInitialized(initialized: boolean) {
     update((store) => {
       store.initialized = initialized;
+      return store;
+    });
+  },
+  setConnected(connected: string | null) {
+    update((store) => {
+      store.connected = connected;
       return store;
     });
   },
