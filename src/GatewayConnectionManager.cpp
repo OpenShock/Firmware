@@ -3,6 +3,7 @@
 #include "CaptivePortal.h"
 #include "CommandHandler.h"
 #include "Constants.h"
+#include "ShockerCommandType.h"
 #include "Time.h"
 #include "Utils/FileUtils.h"
 
@@ -45,9 +46,10 @@ void _handleControlCommandMessage(const DynamicJsonDocument& doc) {
     std::uint8_t intensity = static_cast<std::uint8_t>(cur["Intensity"]);
     unsigned int duration  = static_cast<unsigned int>(cur["Duration"]);
     std::uint8_t model     = static_cast<std::uint8_t>(cur["Model"]);
-    using namespace OpenShock;
 
-    if (!CommandHandler::HandleCommand(id, type, intensity, duration, model)) {
+    OpenShock::ShockerCommandType cmdType = static_cast<OpenShock::ShockerCommandType>(type);
+
+    if (!OpenShock::CommandHandler::HandleCommand(id, cmdType, intensity, duration, model)) {
       ESP_LOGE(TAG, "Remote command failed/rejected!");
     }
   }

@@ -12,12 +12,12 @@ const char* const TAG = "RmtMainEncoder";
 using namespace OpenShock;
 
 std::vector<rmt_data_t>
-  Rmt::GetSequence(std::uint16_t shockerId, std::uint8_t method, std::uint8_t intensity, std::uint8_t shockerModel) {
+  Rmt::GetSequence(std::uint16_t shockerId, ShockerCommandType type, std::uint8_t intensity, std::uint8_t shockerModel) {
   switch (shockerModel) {
     case 1:
-      return Rmt::PetTrainerEncoder::GetSequence(shockerId, method, intensity);
+      return Rmt::PetTrainerEncoder::GetSequence(shockerId, type, intensity);
     case 2:
-      return Rmt::XlcEncoder::GetSequence(shockerId, 0, method, intensity);
+      return Rmt::XlcEncoder::GetSequence(shockerId, 0, type, intensity);
     default:
       ESP_LOGE(TAG, "Unknown shocker model: %d", shockerModel);
       return {};
@@ -32,10 +32,12 @@ std::shared_ptr<std::vector<rmt_data_t>> Rmt::GetZeroSequence(std::uint16_t shoc
   std::shared_ptr<std::vector<rmt_data_t>> sequence;
   switch (shockerModel) {
     case 1:
-      sequence = std::make_shared<std::vector<rmt_data_t>>(Rmt::PetTrainerEncoder::GetSequence(shockerId, 2, 0));
+      sequence = std::make_shared<std::vector<rmt_data_t>>(
+        Rmt::PetTrainerEncoder::GetSequence(shockerId, ShockerCommandType::Vibrate, 0));
       break;
     case 2:
-      sequence = std::make_shared<std::vector<rmt_data_t>>(Rmt::XlcEncoder::GetSequence(shockerId, 0, 2, 0));
+      sequence
+        = std::make_shared<std::vector<rmt_data_t>>(Rmt::XlcEncoder::GetSequence(shockerId, 0, ShockerCommandType::Vibrate, 0));
       break;
     default:
       ESP_LOGE(TAG, "Unknown shocker model: %d", shockerModel);

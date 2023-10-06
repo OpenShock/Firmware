@@ -10,13 +10,12 @@ using namespace OpenShock;
 
 std::vector<rmt_data_t> Rmt::XlcEncoder::GetSequence(std::uint16_t transmitterId,
                                                      std::uint8_t channelId,
-                                                     std::uint8_t method,
+                                                     ShockerCommandType type,
                                                      std::uint8_t intensity) {
   std::uint64_t data = (std::uint64_t(transmitterId) << 24) | (std::uint64_t(channelId & 0xF) << 20)
-                     | (std::uint64_t(method & 0xF) << 16) | (std::uint64_t(intensity & 0xFF) << 8);
+                     | (std::uint64_t((std::uint8_t)type & 0xF) << 16) | (std::uint64_t(intensity & 0xFF) << 8);
 
   data |= Checksum::CRC8(data) & 0xFF;
-  using namespace OpenShock;
 
   data <<= 2;  // The 2 last bits are always 0. this is the postamble of the packet.
 
