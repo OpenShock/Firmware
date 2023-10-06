@@ -1,9 +1,11 @@
 #pragma once
 
+#include "ScanCompletedStatus.h"
+
 #include <esp_wifi_types.h>
 
-#include <functional>
 #include <cstdint>
+#include <functional>
 
 namespace OpenShock::WiFiScanManager {
   bool Init();
@@ -13,24 +15,18 @@ namespace OpenShock::WiFiScanManager {
   bool StartScan();
   void CancelScan();
 
-  typedef std::uint64_t CallbackHandle;
-
   typedef std::function<void()> ScanStartedHandler;
-  CallbackHandle RegisterScanStartedHandler(const ScanStartedHandler& handler);
-  void UnregisterScanStartedHandler(CallbackHandle id);
-
-  enum class ScanCompletedStatus {
-    Success,
-    Cancelled,
-    Error,
-  };
-  typedef std::function<void(ScanCompletedStatus)> ScanCompletedHandler;
-  CallbackHandle RegisterScanCompletedHandler(const ScanCompletedHandler& handler);
-  void UnregisterScanCompletedHandler(CallbackHandle id);
-
+  typedef std::function<void(OpenShock::ScanCompletedStatus)> ScanCompletedHandler;
   typedef std::function<void(const wifi_ap_record_t* record)> ScanDiscoveryHandler;
-  CallbackHandle RegisterScanDiscoveryHandler(const ScanDiscoveryHandler& handler);
-  void UnregisterScanDiscoveryHandler(CallbackHandle id);
+
+  std::uint64_t RegisterScanStartedHandler(const ScanStartedHandler& handler);
+  void UnregisterScanStartedHandler(std::uint64_t id);
+
+  std::uint64_t RegisterScanCompletedHandler(const ScanCompletedHandler& handler);
+  void UnregisterScanCompletedHandler(std::uint64_t id);
+
+  std::uint64_t RegisterScanDiscoveryHandler(const ScanDiscoveryHandler& handler);
+  void UnregisterScanDiscoveryHandler(std::uint64_t id);
 
   void Update();
-} // namespace OpenShock::WiFiScanManager
+}  // namespace OpenShock::WiFiScanManager

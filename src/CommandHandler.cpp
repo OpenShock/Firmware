@@ -1,8 +1,9 @@
 #include "CommandHandler.h"
 
 #include "RFTransmitter.h"
+#include "Utils/FileUtils.h"
 
-#include <LittleFS.h>
+#include <esp_log.h>
 
 #include <memory>
 
@@ -14,11 +15,9 @@ static std::unique_ptr<RFTransmitter> s_rfTransmitter = nullptr;
 
 void CommandHandler::Init() {
 #ifdef OPENSHOCK_TX_PIN
-  int rmtPin = OPENSHOCK_TX_PIN;
-  if (LittleFS.exists("/rmtPin")) {
-    File rmtPinFile = LittleFS.open("/rmtPin", FILE_READ);
-    rmtPin          = rmtPinFile.readString().toInt();
-    rmtPinFile.close();
+  int rmtPin;
+  if (!FileUtils::TryReadFile("/rfPin", reinterpret_cast<std::uint8_t*>(&rmtPin), sizeof(rmtPin))) {
+    rmtPin = OPENSHOCK_TX_PIN;
   }
   ESP_LOGD(TAG, "RMT/TX pin is: %d", rmtPin);
 
@@ -28,22 +27,17 @@ void CommandHandler::Init() {
 #endif
 }
 
-bool CommandHandler::HandleCommand(std::uint16_t shockerId,
-                                   std::uint8_t method,
-                                   std::uint8_t intensity,
-                                   unsigned int duration,
-                                   std::uint8_t shockerModel) {
+bool CommandHandler::HandleCommand(std::uint16_t shockerId, ShockerCommandType type, std::uint8_t intensity, unsigned int duration, std::uint8_t shockerModel) {
   if (s_rfTransmitter == nullptr) return false;
 
   // Stop logic
-  bool isStop = method == 0;
-  if (isStop) {
-    method    = 2;  // Vibrate
+  if (type == ShockerCommandType::Stop) {
+    type      = ShockerCommandType::Vibrate;
     intensity = 0;
     duration  = 300;
 
     s_rfTransmitter->ClearPendingCommands();
   }
 
-  return s_rfTransmitter->SendCommand(shockerModel, shockerId, method, intensity, duration);
+  return s_rfTransmitter->SendCommand(shockerModel, shockerId, type, intensity, duration);
 }

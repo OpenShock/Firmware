@@ -7,16 +7,18 @@
 #define OPENSHOCK_LED_IMPLEMENTATION
 #include "PinPatternManager.h"
 #include <Arduino.h>
-#endif // OPENSHOCK_LED_IMPLEMENTATION
-#endif // OPENSHOCK_LED_GPIO
+#endif  // OPENSHOCK_LED_IMPLEMENTATION
+#endif  // OPENSHOCK_LED_GPIO
 
 #ifdef OPENSHOCK_LED_WS2812B
 #ifdef OPENSHOCK_LED_IMPLEMENTATION
 #error "Only one LED type can be defined at a time"
 #else
 #define OPENSHOCK_LED_IMPLEMENTATION
-#endif // OPENSHOCK_LED_IMPLEMENTATION
-#endif // OPENSHOCK_LED_WS2812B
+#endif  // OPENSHOCK_LED_IMPLEMENTATION
+#endif  // OPENSHOCK_LED_WS2812B
+
+#include <WiFi.h>
 
 #include <esp_log.h>
 
@@ -27,6 +29,12 @@
 #endif
 
 const char* const TAG = "VisualStateManager";
+
+constexpr std::uint64_t kCriticalErrorFlag = 1 << 0;
+constexpr std::uint64_t kWiFiConnectedFlag = 1 << 1;
+constexpr std::uint64_t kWiFiScanningFlag  = 1 << 2;
+
+static std::uint64_t s_stateFlags = 0;
 
 using namespace OpenShock;
 
@@ -83,53 +91,94 @@ constexpr PinPatternManager::State kWebSocketConnectedPattern[] = {
 
 PinPatternManager s_builtInLedManager(OPENSHOCK_LED_GPIO);
 
-void VisualStateManager::SetCriticalError() {
-  static bool _state = false;
-  if (_state) {
+void _updateVisualState() {
+  if (s_stateFlags & kCriticalErrorFlag) {
+    s_builtInLedManager.SetPattern(kCriticalErrorPattern);
     return;
   }
 
-  s_builtInLedManager.SetPattern(kCriticalErrorPattern);
-
-  _state = true;
-}
-
-void VisualStateManager::SetWiFiState(WiFiState state) {
-  ESP_LOGD(TAG, "SetWiFiStateState: %d", state);
-  switch (state) {
-    case WiFiState::Disconnected:
-      s_builtInLedManager.SetPattern(kWiFiDisconnected);
-      break;
-    case WiFiState::Connected:
-      s_builtInLedManager.SetPattern(kWiFiConnectedPattern);
-      break;
-    default:
-      return;
+  if (s_stateFlags & kWiFiConnectedFlag) {
+    s_builtInLedManager.SetPattern(kWiFiConnectedPattern);
+    return;
   }
+
+  if (s_stateFlags & kWiFiScanningFlag) {
+    s_builtInLedManager.SetPattern(kPingNoResponsePattern);
+    return;
+  }
+
+  s_builtInLedManager.SetPattern(kWiFiDisconnected);
 }
 
-#endif // OPENSHOCK_LED_GPIO
+#endif  // OPENSHOCK_LED_GPIO
 
 #ifdef OPENSHOCK_LED_WS2812B
 
-void VisualStateManager::SetCriticalError() {
-  ESP_LOGE(TAG, "SetCriticalError: (but WS2812B is not implemented yet)");
+void _updateVisualState() {
+  ESP_LOGE(TAG, "_updateVisualState: (but WS2812B is not implemented yet)");
 }
 
-void VisualStateManager::SetWiFiState(WiFiState state) {
-  ESP_LOGE(TAG, "SetWiFiState: %d (but WS2812B is not implemented yet)", state);
-}
-
-#endif // OPENSHOCK_LED_WS2812B
+#endif  // OPENSHOCK_LED_WS2812B
 
 #ifndef OPENSHOCK_LED_IMPLEMENTATION
 
+void _updateVisualState() {
+  ESP_LOGE(TAG, "_updateVisualState: (but no LED implementation is selected)");
+}
+
+#endif  // OPENSHOCK_LED_NONE
+
+void _handleWiFiConnected(arduino_event_t* event) {
+  std::uint64_t oldState = s_stateFlags;
+
+  s_stateFlags |= kWiFiConnectedFlag;
+
+  if (oldState != s_stateFlags) {
+    _updateVisualState();
+  }
+}
+void _handleWiFiDisconnected(arduino_event_t* event) {
+  std::uint64_t oldState = s_stateFlags;
+
+  s_stateFlags &= ~kWiFiConnectedFlag;
+
+  if (oldState != s_stateFlags) {
+    _updateVisualState();
+  }
+}
+void _handleWiFiScanDone(arduino_event_t* event) {
+  std::uint64_t oldState = s_stateFlags;
+
+  s_stateFlags &= ~kWiFiScanningFlag;
+
+  if (oldState != s_stateFlags) {
+    _updateVisualState();
+  }
+}
+
+void VisualStateManager::Init() {
+  WiFi.onEvent(_handleWiFiConnected, ARDUINO_EVENT_WIFI_STA_GOT_IP);
+  WiFi.onEvent(_handleWiFiConnected, ARDUINO_EVENT_WIFI_STA_GOT_IP6);
+  WiFi.onEvent(_handleWiFiDisconnected, ARDUINO_EVENT_WIFI_STA_DISCONNECTED);
+  WiFi.onEvent(_handleWiFiScanDone, ARDUINO_EVENT_WIFI_SCAN_DONE);
+}
+
 void VisualStateManager::SetCriticalError() {
-  ESP_LOGW(TAG, "SetCriticalError: (But no LED implementation is selected / Selected implementation doesn't exist)");
+  std::uint64_t oldState = s_stateFlags;
+
+  s_stateFlags |= kCriticalErrorFlag;
+
+  if (oldState != s_stateFlags) {
+    _updateVisualState();
+  }
 }
 
-void VisualStateManager::SetWiFiState(WiFiState state) {
-  ESP_LOGW(TAG, "SetWiFiState: %d (But no LED implementation is selected / Selected implementation doesn't exist)", state);
-}
+void VisualStateManager::SetScanningStarted() {
+  std::uint64_t oldState = s_stateFlags;
 
-#endif // OPENSHOCK_LED_NONE
+  s_stateFlags |= kWiFiScanningFlag;
+
+  if (oldState != s_stateFlags) {
+    _updateVisualState();
+  }
+}
