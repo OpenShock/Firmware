@@ -12,12 +12,14 @@ const char* const TAG = "WiFiCredentials";
 
 using namespace OpenShock;
 
-const char* const WiFiDir      = "/wifi/";
-const char* const WiFiCredsDir = "/wifi/creds/";
+const char* const WiFiDir      = "/wifi";
+const char* const WiFiCredsDir = "/wifi/creds";
 
 inline void GetWiFiCredsFilename(char (&filename)[15], std::uint8_t id) {
-  memcpy(filename, WiFiCredsDir, 12);
+  memcpy(filename, WiFiCredsDir, 11);
+  filename[11] = '/';
   HexUtils::ToHex(id, filename + 12);
+  filename[14] = 0;
 }
 
 template<std::uint8_t N>
@@ -64,43 +66,6 @@ bool ReadString(fs::File& file, char (&str)[N], std::uint8_t& length) {
 bool WiFiCredentials::Load(std::vector<WiFiCredentials>& credentials) {
   credentials.clear();
 
-  // Ensure the credentials directory exists
-  if (!LittleFS.exists(WiFiCredsDir)) {
-    if (!LittleFS.exists(WiFiDir)) {
-      if (!LittleFS.mkdir(WiFiDir)) {
-        ESP_LOGE(TAG, "Failed to create WiFi directory");
-        return false;
-      }
-    }
-    if (!LittleFS.mkdir(WiFiCredsDir)) {
-      ESP_LOGE(TAG, "Failed to create WiFi credentials directory");
-      return false;
-    }
-    ESP_LOGI(TAG, "No credentials directory found, created one");
-    return true;
-  }
-
-  File credsDir = LittleFS.open(WiFiCredsDir);
-  if (!credsDir) {
-    ESP_LOGE(TAG, "Failed to open WiFi credentials directory");
-    return false;
-  }
-
-  while (true) {
-    File file = credsDir.openNextFile();
-    if (!file) {
-      break;
-    }
-
-    WiFiCredentials creds;
-    if (!creds._load(file)) {
-      ESP_LOGE(TAG, "Failed to load credentials from %s", file.name());
-      continue;
-    }
-
-    credentials.push_back(creds);
-  }
-
   return true;
 }
 
@@ -120,6 +85,11 @@ void WiFiCredentials::setPassword(const char* password, std::uint8_t passwordLen
 }
 
 bool WiFiCredentials::save() const {
+  if (!LittleFS.exists(WiFiCredsDir)) {
+    LittleFS.mkdir(WiFiDir);
+    LittleFS.mkdir(WiFiCredsDir);
+  }
+
   char filename[15];
   GetWiFiCredsFilename(filename, _id);
   File file = LittleFS.open(filename, "wb");

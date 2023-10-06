@@ -1,7 +1,5 @@
 #pragma once
 
-#include "WiFiState.h"
-
 #include <cstdint>
 
 namespace OpenShock::WiFiManager {

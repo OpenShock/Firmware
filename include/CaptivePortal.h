@@ -6,8 +6,11 @@
 #include <cstdint>
 
 namespace OpenShock::CaptivePortal {
-  bool Start();
-  void Stop();
+  bool Init();
+
+  void SetAlwaysEnabled(bool alwaysOn);
+  bool IsAlwaysEnabled();
+
   bool IsRunning();
   void Update();
 
