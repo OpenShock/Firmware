@@ -101,15 +101,17 @@ raw_build_flags = pio.get_string_array('BUILD_FLAGS', [])
 (cpp_defines, remaining_build_flags) = parse_pio_build_flags(raw_build_flags)
 
 # Gets all the environment variables prefixed with 'OPENSHOCK_' and add them as CPP Defines.
+sys_openshock_vars = sysenv.get_all_prefixed('OPENSHOCK_')
 pio_openshock_vars = get_pio_firmware_vars()
 dot_openshock_vars = dot.get_all_prefixed('OPENSHOCK_')
 
+print_dump('Sys OpenShock vars', sys_openshock_vars)
 print_dump('PIO OpenShock vars', pio_openshock_vars)
 print_dump('Dotenv OpenShock vars', dot_openshock_vars)
 
+merge_missing_keys(cpp_defines, sys_openshock_vars)
 merge_missing_keys(cpp_defines, pio_openshock_vars)
 merge_missing_keys(cpp_defines, dot_openshock_vars)
-
 
 # Gets the log level from environment variables.
 # TODO: Delete get_loglevel and use... something more generic.
