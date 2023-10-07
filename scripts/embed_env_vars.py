@@ -62,7 +62,7 @@ def parse_pio_build_flags(raw_flags: list[str]) -> tuple[dict[str, str | int | b
                 flag_dict[flag] = True
         else:
             leftover_flags.append(flag)
-    return (flag_dict, [])
+    return (flag_dict, leftover_flags)
 
 
 # Serialize CPP Defines.
@@ -124,7 +124,7 @@ cpp_defines['CORE_DEBUG_LEVEL'] = log_level_int
 print_dump('CPP Defines', cpp_defines)
 
 cpp_defines = serialize_cpp_defines(cpp_defines)
-env.Append(CPPDEFINES=list(cpp_defines.items()))
+
 
 print('Build type: ' + pio_build_type)
 print('Build defines: ' + str(cpp_defines))
@@ -132,3 +132,6 @@ print('Build defines: ' + str(cpp_defines))
 # Set PIO variables.
 env['BUILD_TYPE'] = pio_build_type
 env['BUILD_FLAGS'] = remaining_build_flags
+env.Append(CPPDEFINES=list(cpp_defines.items()))
+
+print(env.Dump())
