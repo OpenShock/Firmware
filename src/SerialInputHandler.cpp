@@ -154,15 +154,9 @@ void SerialInputHandler::PrintWelcomeHeader() {
 }
 
 void SerialInputHandler::PrintVersionInfo() {
-  Serial.print("  Version:  ");
-  Serial.println(OPENSHOCK_FW_VERSION);
-  Serial.print("    Build:  ");
-  Serial.println(OPENSHOCK_FW_MODE);
-  Serial.print("   Commit:  ");
-  Serial.println(OPENSHOCK_FW_COMMIT);
-  Serial.print("    Board:  ");
-  Serial.println(OPENSHOCK_FW_BOARD);
-  Serial.print("     Chip:  ");
-  Serial.println(OPENSHOCK_FW_CHIP);
-  Serial.print("\n");
+  Serial.println("  Version:  " OPENSHOCK_FW_VERSION);
+  Serial.println("    Build:  " OPENSHOCK_FW_MODE);
+  Serial.println("   Commit:  " OPENSHOCK_FW_COMMIT);
+  Serial.println("    Board:  " OPENSHOCK_FW_BOARD);
+  Serial.println("     Chip:  " OPENSHOCK_FW_CHIP);
 }
