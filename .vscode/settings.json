@@ -82,10 +82,6 @@
     "editor.defaultFormatter": "esbenp.prettier-vscode",
     "editor.formatOnSave": true
   },
-  "[ini]": {
-    "editor.defaultFormatter": "lkrms.inifmt",
-    "editor.formatOnSave": true
-  },
   "[python]": {
     "editor.defaultFormatter": "ms-python.black-formatter",
     "editor.formatOnSave": true

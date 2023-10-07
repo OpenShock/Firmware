@@ -1,10 +1,10 @@
 #pragma once
 
-#include "WiFiState.h"
-
 #include <cstdint>
 
 namespace OpenShock::VisualStateManager {
+  void Init();
+
   void SetCriticalError();
-  void SetWiFiState(WiFiState state);
+  void SetScanningStarted();
 }  // namespace OpenShock::VisualStateManager

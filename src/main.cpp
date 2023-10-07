@@ -1,8 +1,7 @@
-#include "APIConnection.h"
 #include "CaptivePortal.h"
 #include "CommandHandler.h"
 #include "Constants.h"
-#include "FileUtils.h"
+#include "GatewayConnectionManager.h"
 #include "SerialInputHandler.h"
 #include "WiFiManager.h"
 #include "WiFiScanManager.h"
@@ -15,9 +14,10 @@
 
 const char* const TAG = "OpenShock";
 
-std::unique_ptr<OpenShock::APIConnection> s_apiConnection = nullptr;
-
 void setup() {
+  Serial.begin(115'200);
+  Serial.setDebugOutput(true);
+
   if (!LittleFS.begin(true)) {
     ESP_LOGE(TAG, "PANIC: An Error has occurred while mounting LittleFS, restarting in 5 seconds...");
     delay(5000);
@@ -35,15 +35,14 @@ void setup() {
     delay(5000);
     ESP.restart();
   }
+
+  OpenShock::CaptivePortal::Init();
+  OpenShock::GatewayConnectionManager::Init();
 }
 
 void loop() {
   OpenShock::SerialInputHandler::Update();
   OpenShock::CaptivePortal::Update();
-
-  if (s_apiConnection != nullptr) {
-    s_apiConnection->Update();
-  }
-
+  OpenShock::GatewayConnectionManager::Update();
   OpenShock::WiFiScanManager::Update();
 }

@@ -1,20 +1,16 @@
 {
-  // See http://go.microsoft.com/fwlink/?LinkId=827846
-  // for the documentation about the extensions.json format
   "recommendations": [
     "ardenivanov.svelte-intellisense",
     "bradlc.vscode-tailwindcss",
     "dbaeumer.vscode-eslint",
     "editorconfig.editorconfig",
     "esbenp.prettier-vscode",
-    "esbenp.prettier-vscode",
     "fivethree.vscode-svelte-snippets",
-    "lkrms.inifmt",
+    "gaborv.flatbuffers",
     "ms-python.black-formatter",
     "ms-vscode.cpptools",
     "ms-vscode.cpptools-extension-pack",
     "platformio.platformio-ide",
-    "svelte.svelte-vscode",
     "svelte.svelte-vscode",
     "xaver.clang-format"
   ],

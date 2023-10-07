@@ -3,7 +3,6 @@
 #include <cstdint>
 
 namespace OpenShock::SerialInputHandler {
-  void Init();
   void Update();
 
   void PrintWelcomeHeader();

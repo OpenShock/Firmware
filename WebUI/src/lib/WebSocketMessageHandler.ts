@@ -29,14 +29,37 @@ interface WiFiScanCompletedMessage {
   status: 'completed';
 }
 
+interface WiFiScanCancelledMessage {
+  type: 'wifi';
+  subject: 'scan';
+  status: 'cancelled';
+}
+
 interface WiFiScanErrorMessage {
   type: 'wifi';
   subject: 'scan';
   status: 'error';
 }
 
-export type WiFiScanMessage = WiFiScanStartedMessage | WiFiScanDiscoveryMessage | WiFiScanCompletedMessage | WiFiScanErrorMessage;
-export type WiFiMessage = WiFiScanMessage;
+interface WiFiConnectSuccessMessage {
+  type: 'wifi';
+  subject: 'connect';
+  status: 'success';
+  ssid: string;
+}
+
+interface WiFiConnectErrorMessage {
+  type: 'wifi';
+  subject: 'connect';
+  status: 'error';
+  ssid: string;
+  bssid: string;
+  error: string;
+}
+
+export type WiFiScanMessage = WiFiScanStartedMessage | WiFiScanDiscoveryMessage | WiFiScanCompletedMessage | WiFiScanCancelledMessage | WiFiScanErrorMessage;
+export type WiFiConnectMessage = WiFiConnectSuccessMessage | WiFiConnectErrorMessage;
+export type WiFiMessage = WiFiScanMessage | WiFiConnectMessage;
 export type WebSocketMessage = InvalidMessage | PoggiesMessage | WiFiMessage;
 
 export function WebSocketMessageHandler(message: WebSocketMessage) {
@@ -68,6 +91,9 @@ function handleWiFiMessage(message: WiFiMessage) {
     case 'scan':
       handleWiFiScanMessage(message);
       break;
+    case 'connect':
+      handleWiFiConnectMessage(message);
+      break;
     default:
       console.warn('[WS] Received invalid wifi message: ', message);
       return;
@@ -84,6 +110,9 @@ function handleWiFiScanMessage(message: WiFiScanMessage) {
       break;
     case 'completed':
       handleWiFiScanCompletedMessage();
+      break;
+    case 'cancelled':
+      handleWiFiScanCancelledMessage();
       break;
     case 'error':
       handleWiFiScanErrorMessage(message);
@@ -106,7 +135,34 @@ function handleWiFiScanCompletedMessage() {
   WiFiStateStore.setScanning(false);
 }
 
+function handleWiFiScanCancelledMessage() {
+  WiFiStateStore.setScanning(false);
+}
+
 function handleWiFiScanErrorMessage(message: WiFiScanErrorMessage) {
   console.error('[WS] Received WiFi scan error message: ', message);
   WiFiStateStore.setScanning(false);
+}
+
+function handleWiFiConnectMessage(message: WiFiConnectMessage) {
+  switch (message.status) {
+    case 'success':
+      handleWiFiConnectSuccessMessage(message);
+      break;
+    case 'error':
+      handleWiFiConnectErrorMessage(message);
+      break;
+    default:
+      console.warn('[WS] Received invalid connect message: ', message);
+      return;
+  }
+}
+
+function handleWiFiConnectSuccessMessage(message: WiFiConnectSuccessMessage) {
+  WiFiStateStore.setConnected(message.ssid);
+}
+
+function handleWiFiConnectErrorMessage(message: WiFiConnectErrorMessage) {
+  console.error('[WS] Failed to connect to %s (%s): %s', message.ssid, message.bssid, message.error);
+  WiFiStateStore.setConnected(null);
 }

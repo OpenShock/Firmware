@@ -58,7 +58,7 @@ RFTransmitter::~RFTransmitter() {
 
 bool RFTransmitter::SendCommand(std::uint8_t shockerModel,
                                 std::uint16_t shockerId,
-                                std::uint8_t method,
+                                ShockerCommandType type,
                                 std::uint8_t intensity,
                                 unsigned int duration) {
   if (!ok()) {
@@ -71,7 +71,7 @@ bool RFTransmitter::SendCommand(std::uint8_t shockerModel,
   duration  = std::min(duration, (unsigned int)std::numeric_limits<std::uint16_t>::max());
 
   command_t* cmd = new command_t {OpenShock::Millis() + duration,
-                                  Rmt::GetSequence(shockerId, method, intensity, shockerModel),
+                                  Rmt::GetSequence(shockerId, type, intensity, shockerModel),
                                   Rmt::GetZeroSequence(shockerId, shockerModel),
                                   shockerId};
 
