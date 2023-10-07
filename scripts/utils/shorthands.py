@@ -22,9 +22,14 @@ def get_github_event_name():
 
 # Whether the current environment is a Github CI environment.
 def is_github_ci():
-    return sysenv.get_bool('CI') and sysenv.get_bool('GITHUB_ACTIONS')
+    return sysenv.get_bool('CI', False) and sysenv.get_bool('GITHUB_ACTIONS', False)
 
 
 # Whether the current environment, assuming is_github_ci() == True, is caused by a pull request event.
 def is_github_pr():
     return get_github_event_name() == 'pull_request'
+
+
+# Checks whether the event is a pull_request with the specified branch as base_ref.
+def is_github_pr_into(branch: str) -> bool:
+    return is_github_pr() and get_github_base_ref() == branch

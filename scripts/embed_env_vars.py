@@ -1,4 +1,5 @@
-from utils import pioenv, sysenv, dotenv
+from typing import Mapping
+from utils import pioenv, sysenv, dotenv, shorthands
 
 # This file is invoked by PlatformIO during build.
 # See 'extra_scripts' in 'platformio.ini'.
@@ -18,12 +19,9 @@ project_dir = pio.get_string('PROJECT_DIR')
 # If we are running in CI and either building the master branch,
 # or building a PR that will merge into the master branch, THEN
 # we will build in RELEASE mode.
-is_ci = sysenv.get_bool('CI', False)
-is_branch_master = sysenv.get_string('GITHUB_REF_NAME', '') == 'master'
-is_pr_into_master = (
-    sysenv.get_string('GITHUB_BASE_REF', '') == 'master'
-    and sysenv.get_string('GITHUB_EVENT_NAME', '') == 'pull_request'
-)
+is_ci = shorthands.is_github_ci()
+is_branch_master = shorthands.get_github_ref_name() == 'master'
+is_pr_into_master = shorthands.is_github_pr_into('master')
 is_release_build = is_ci and (is_branch_master or is_pr_into_master)
 
 # Get the build type string.
@@ -86,10 +84,16 @@ def serialize_cpp_defines(raw_defines: dict[str, str | int | bool]) -> dict[str,
 
 
 # Copy key/value pairs from "src" into "dest" only if those keys don't exist in "dest" yet.
-def merge_missing_keys(dest: dict[str, str | int | bool], src: dict[str, str | int | bool] | dict[str, str]):
+def merge_missing_keys(dest: dict[str, str | int | bool], src: Mapping[str, str | int | bool]):
     for k, v in src.items():
         if k not in dest:
             dest[k] = v
+
+
+def print_dump(name: str, map: Mapping[str, str | int | bool]) -> None:
+    print('%s:' % name)
+    for k, v in map.items():
+        print('  %s = %s' % (k, v))
 
 
 # Fetch the current build flags and group them into (CPP Defines, Other Flags).
@@ -100,8 +104,12 @@ raw_build_flags = pio.get_string_array('BUILD_FLAGS', [])
 pio_openshock_vars = get_pio_firmware_vars()
 dot_openshock_vars = dot.get_all_prefixed('OPENSHOCK_')
 
+print_dump('PIO OpenShock vars', pio_openshock_vars)
+print_dump('Dotenv OpenShock vars', dot_openshock_vars)
+
 merge_missing_keys(cpp_defines, pio_openshock_vars)
 merge_missing_keys(cpp_defines, dot_openshock_vars)
+
 
 # Gets the log level from environment variables.
 # TODO: Delete get_loglevel and use... something more generic.
@@ -109,7 +117,12 @@ log_level_int = dot.get_loglevel('LOG_LEVEL')
 if log_level_int is None:
     raise ValueError('LOG_LEVEL must be set in environment variables.')
 cpp_defines['CORE_DEBUG_LEVEL'] = log_level_int
+
+# Serialize and inject CPP Defines.
+print_dump('CPP Defines', cpp_defines)
+
 cpp_defines = serialize_cpp_defines(cpp_defines)
+env.Append(CPPDEFINES=list(cpp_defines.items()))
 
 print('Build type: ' + pio_build_type)
 print('Build defines: ' + str(cpp_defines))
@@ -117,4 +130,3 @@ print('Build defines: ' + str(cpp_defines))
 # Set PIO variables.
 env['BUILD_TYPE'] = pio_build_type
 env['BUILD_FLAGS'] = remaining_build_flags
-env.Append(CPPDEFINES=list(cpp_defines.items()))
