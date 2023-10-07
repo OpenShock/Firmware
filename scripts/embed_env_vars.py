@@ -90,6 +90,7 @@ def merge_missing_keys(dest: dict[str, str | int | bool], src: Mapping[str, str 
             dest[k] = v
 
 
+# Print a dictionary for debugging purposes.
 def print_dump(name: str, map: Mapping[str, str | int | bool]) -> None:
     print('%s:' % name)
     for k, v in map.items():
