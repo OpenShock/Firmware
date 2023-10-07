@@ -21,6 +21,7 @@ env:
   PYTHON_VERSION: 3.11
   OPENSHOCK_API_DOMAIN: api.shocklink.net
   OPENSHOCK_FW_VERSION: master-${{ github.sha }}
+  OPENSHOCK_FW_COMMIT: ${{ github.sha }}
 
 jobs:
 
