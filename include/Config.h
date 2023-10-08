@@ -48,7 +48,7 @@ namespace OpenShock::Config {
   void RemoveWiFiCredentials(std::uint8_t id);
   void ClearWiFiCredentials();
 
-  std::string GetBackendAuthToken();
+  const std::string& GetBackendAuthToken();
   void SetBackendAuthToken(const std::string& token);
   void ClearBackendAuthToken();
 }  // namespace OpenShock::Config

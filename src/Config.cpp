@@ -372,7 +372,7 @@ void Config::ClearWiFiCredentials() {
   _trySaveConfig(_mainConfig);
 }
 
-std::string Config::GetBackendAuthToken() {
+const std::string& Config::GetBackendAuthToken() {
   return _mainConfig.backend.authToken;
 }
 
