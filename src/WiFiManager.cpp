@@ -1,10 +1,10 @@
 #include "WiFiManager.h"
 
 #include "CaptivePortal.h"
+#include "Config.h"
 #include "Mappers/EspWiFiTypesMapper.h"
 #include "Utils/HexUtils.h"
 #include "VisualStateManager.h"
-#include "WiFiCredentials.h"
 #include "WiFiScanManager.h"
 
 #include <ArduinoJson.h>
@@ -66,41 +66,6 @@ struct WiFiNetwork {
 };
 
 static std::vector<WiFiNetwork> s_wifiNetworks;
-static std::vector<WiFiCredentials> s_wifiCredentials;
-
-bool _addNetwork(const char* ssid, std::uint8_t ssidLength, const char* password, std::uint8_t passwordLength) {
-  // Bitmask representing available credential IDs (0-31)
-  std::uint32_t bits = 0;
-  for (auto& cred : s_wifiCredentials) {
-    if (strcmp(cred.ssid().data(), ssid) == 0) {
-      ESP_LOGE(TAG, "Failed to add WiFi credentials: credentials for %s already exist", ssid);
-      cred.setPassword(password, passwordLength);
-      cred.save();
-      return true;
-    }
-
-    // Mark the credential ID as used
-    bits |= 1u << cred.id();
-  }
-
-  // If we have 31 credentials, we can't add any more
-  if (s_wifiCredentials.size() == 31) {
-    ESP_LOGE(TAG, "Cannot add WiFi credentials: too many credentials");
-    return false;
-  }
-
-  std::uint8_t id = 0;
-  while (bits & (1u << id)) {
-    id++;
-  }
-
-  WiFiCredentials credentials(id, ssid, ssidLength, password, passwordLength);
-  credentials.save();
-
-  s_wifiCredentials.push_back(std::move(credentials));
-
-  return true;
-}
 
 void _evWiFiDisconnected(arduino_event_t* event) {
   auto& info = event->event_info.wifi_sta_disconnected;
@@ -133,8 +98,6 @@ void _evWiFiNetworkDiscovered(const wifi_ap_record_t* record) {
 }
 
 bool WiFiManager::Init() {
-  WiFiCredentials::Load(s_wifiCredentials);
-
   WiFi.onEvent(_evWiFiDisconnected, ARDUINO_EVENT_WIFI_STA_DISCONNECTED);
   WiFiScanManager::RegisterScanDiscoveryHandler(_evWiFiNetworkDiscovered);
 
@@ -143,10 +106,10 @@ bool WiFiManager::Init() {
     return false;
   }
 
-  WiFi.mode(WIFI_STA);
+  WiFi.enableSTA(true);
   WiFi.setHostname("OpenShock");  // TODO: Add the device name to the hostname (retrieve from API and store in LittleFS)
 
-  if (s_wifiCredentials.size() > 0) {
+  if (Config::GetWiFiCredentials().size() > 0) {
     WiFi.scanNetworks(true);
     OpenShock::VisualStateManager::SetScanningStarted();
   }
@@ -172,7 +135,8 @@ bool WiFiManager::Authenticate(std::uint8_t (&bssid)[6], const char* password, s
     return false;
   }
 
-  if (!_addNetwork(ssid, strlen(ssid), password, passwordLength)) {
+  std::uint8_t id = Config::AddWiFiCredentials(ssid, bssid, std::string(password, passwordLength));
+  if (id == UINT8_MAX) {
     _broadcastWifiAddNetworkError("too_many_credentials");
     return false;
   }
@@ -192,27 +156,26 @@ bool WiFiManager::Authenticate(std::uint8_t (&bssid)[6], const char* password, s
 void WiFiManager::Forget(std::uint8_t wifiId) {
   // Check if the network is currently connected
   if (WiFi.isConnected()) {
-    // Check if the network is the one we're connected to
-    if (WiFi.SSID() == s_wifiCredentials[wifiId].ssid().data()) {
-      // Disconnect from the network
-      WiFi.disconnect(true);
+    // Get the credentials for the network
+    Config::WiFiCredentials creds;
+    if (Config::TryGetWiFiCredentialsById(wifiId, creds)) {
+      // Check if the network is the one we're connected to
+      if (WiFi.SSID().c_str() == creds.ssid) {
+        // Disconnect from the network
+        WiFi.disconnect(true);
+      }
     }
   }
 
-  for (auto it = s_wifiCredentials.begin(); it != s_wifiCredentials.end(); it++) {
-    if (it->id() == wifiId) {
-      s_wifiCredentials.erase(it);
-      it->erase();
-      return;
-    }
-  }
+  // Remove the credentials from the config
+  Config::RemoveWiFiCredentials(wifiId);
 }
 
 void WiFiManager::Connect(std::uint8_t wifiId) {
-  for (auto& creds : s_wifiCredentials) {
-    if (creds.id() == wifiId) {
-      ESP_LOGI(TAG, "Connecting to network #%u (%s)", wifiId, creds.ssid().data());
-      WiFi.begin(creds.ssid().data(), creds.password().data());
+  for (auto& creds : Config::GetWiFiCredentials()) {
+    if (creds.id == wifiId) {
+      ESP_LOGI(TAG, "Connecting to network #%u (%s)", wifiId, creds.ssid);
+      WiFi.begin(creds.ssid.c_str(), creds.password.c_str());
       return;
     }
   }

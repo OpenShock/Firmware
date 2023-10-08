@@ -1,11 +1,106 @@
 #include "SerialInputHandler.h"
 
-#include "Utils/FileUtils.h"
+#include "Config.h"
 
 #include <Esp.h>
 #include <HardwareSerial.h>
+#include <ArduinoJson.h>
+
+#include <unordered_map>
 
 using namespace OpenShock;
+
+void _handleRestartCommand(char* arg, std::size_t argLength) {
+  Serial.println("Restarting ESP...");
+  ESP.restart();
+}
+
+void _handleHelpCommand(char* arg, std::size_t argLength) {
+  SerialInputHandler::PrintWelcomeHeader();
+  Serial.println("help          print this menu");
+  Serial.println("version       print version information");
+  Serial.println("restart       restart the board");
+  Serial.println("rmtpin <pin>  set radio pin to <pin>\n");
+}
+
+void _handleVersionCommand(char* arg, std::size_t argLength) {
+  Serial.print("\n");
+  SerialInputHandler::PrintVersionInfo();
+}
+
+void _handleAuthtokenCommand(char* arg, std::size_t argLength) {
+  if (arg == nullptr || argLength <= 0) {
+    Serial.println("SYS|Error|Invalid argument");
+    return;
+  }
+
+  OpenShock::Config::SetBackendAuthToken(std::string(arg, argLength));
+
+  Serial.println("SYS|Success|Saved config");
+}
+
+void _handleRmtpinCommand(char* arg, std::size_t argLength) {
+  if (arg == nullptr || argLength <= 0) {
+    Serial.println("SYS|Error|Invalid argument");
+    return;
+  }
+
+  // Check if the argument is a number
+  for (std::size_t i = 0; i < argLength; i++) {
+    if (arg[i] < '0' || arg[i] > '9') {
+      Serial.println("SYS|Error|Invalid argument (not a number)");
+      return;
+    }
+  }
+
+  OpenShock::Config::SetRFConfig({.txPin = atoi(arg)});
+
+  Serial.println("SYS|Success|Saved config");
+}
+
+void _handleNetworksCommand(char* arg, std::size_t argLength) {
+  if (arg == nullptr || argLength <= 0) {
+    Serial.println("SYS|Error|Invalid argument");
+    return;
+  }
+
+  DynamicJsonDocument doc(1024);
+  deserializeJson(doc, arg, argLength);
+
+  JsonArray networks = doc["networks"];
+
+  std::vector<Config::WiFiCredentials> creds;
+  for (auto it = networks.begin(); it != networks.end(); ++it) {
+    JsonObject network = *it;
+
+    std::string ssid     = network["ssid"].as<std::string>();
+    std::string password = network["password"].as<std::string>();
+
+    if (ssid.empty() || password.empty()) {
+      Serial.println("SYS|Error|Invalid argument (missing ssid or password)");
+      return;
+    }
+
+    Config::WiFiCredentials cred {
+      .id       = 0,
+      .ssid     = ssid,
+      .bssid    = {0, 0, 0, 0, 0, 0},
+      .password = password,
+    };
+
+    creds.push_back(std::move(cred));
+  }
+
+  OpenShock::Config::SetWiFiCredentials(creds);
+
+  Serial.println("SYS|Success|Saved config");
+}
+
+static std::unordered_map<std::string, void (*)(char*, std::size_t)> s_commandHandlers = {
+  {"authtoken", _handleAuthtokenCommand},
+  {   "rmtpin",    _handleRmtpinCommand},
+  { "networks",  _handleNetworksCommand},
+};
 
 int findChar(const char* buffer, std::size_t bufferSize, char c) {
   for (int i = 0; i < bufferSize; i++) {
@@ -39,50 +134,6 @@ int findLineStart(const char* buffer, int bufferSize, int lineEnd) {
   return -1;
 }
 
-void handleZeroArgCommand(char* command, std::size_t commandLength) {
-  if (strcmp(command, "restart") == 0) {
-    Serial.println("Restarting ESP...");
-    ESP.restart();
-    return;
-  }
-
-  if (strcmp(command, "help") == 0) {
-    SerialInputHandler::PrintWelcomeHeader();
-    Serial.println("help          print this menu");
-    Serial.println("version       print version information");
-    Serial.println("restart       restart the board");
-    Serial.println("rmtpin <pin>  set radio pin to <pin>\n");
-    return;
-  }
-
-  if (strcmp(command, "version") == 0) {
-    Serial.print("\n");
-    SerialInputHandler::PrintVersionInfo();
-    return;
-  }
-
-  Serial.println("SYS|Error|Command not found");
-}
-
-void handleSingleArgCommand(char* command, std::size_t commandLength, char* arg, std::size_t argLength) {
-  if (strcmp(command, "authtoken") == 0) {
-    OpenShock::FileUtils::TryWriteFile("/authToken", arg, argLength);
-    return;
-  }
-
-  if (strcmp(command, "rmtpin") == 0) {
-    OpenShock::FileUtils::TryWriteFile("/rmtPin", arg, argLength);
-    return;
-  }
-
-  if (strcmp(command, "networks") == 0) {
-    OpenShock::FileUtils::TryWriteFile("/networks", arg, argLength);
-    return;
-  }
-
-  Serial.println("SYS|Error|Command not found");
-}
-
 void processSerialLine(char* data, std::size_t length) {
   int delimiter = findChar(data, length, ' ');
   if (delimiter == 0) {
@@ -90,15 +141,27 @@ void processSerialLine(char* data, std::size_t length) {
     return;
   }
 
+  char* command             = data;
+  std::size_t commandLength = length;
+  char* arg                 = nullptr;
+  std::size_t argLength     = 0;
+
   // Handle arg-less commands
-  if (delimiter <= 0) {
-    handleZeroArgCommand(data, length);
-    return;
-  } else {
-    length          = delimiter;
+  if (delimiter > 0) {
     data[delimiter] = '\0';
-    handleSingleArgCommand(data, length, data + delimiter + 1, length - delimiter - 1);
+    commandLength   = delimiter;
+    arg             = data + delimiter + 1;
+    argLength       = length - delimiter - 1;
   }
+
+  // TODO: Clean this up, test this
+  auto it = s_commandHandlers.find(std::string(command, commandLength));
+  if (it != s_commandHandlers.end()) {
+    it->second(arg, argLength);
+    return;
+  }
+
+  Serial.println("SYS|Error|Command not found");
 }
 
 void SerialInputHandler::Update() {

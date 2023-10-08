@@ -1,7 +1,7 @@
 #include "CommandHandler.h"
 
+#include "Config.h"
 #include "RFTransmitter.h"
-#include "Utils/FileUtils.h"
 
 #include <esp_log.h>
 
@@ -14,17 +14,15 @@ using namespace OpenShock;
 static std::unique_ptr<RFTransmitter> s_rfTransmitter = nullptr;
 
 void CommandHandler::Init() {
-#ifdef OPENSHOCK_TX_PIN
-  int rmtPin;
-  if (!FileUtils::TryReadFile("/rfPin", reinterpret_cast<std::uint8_t*>(&rmtPin), sizeof(rmtPin))) {
-    rmtPin = OPENSHOCK_TX_PIN;
+  std::uint32_t txPin = Config::GetRFConfig().txPin;
+  if (txPin > 60) {  // WARNING: This is a magic number, set a sensible constant for this
+    ESP_LOGW(TAG, "TxPin is invalid, radio is disabled");
+    return;
   }
-  ESP_LOGD(TAG, "RMT/TX pin is: %d", rmtPin);
 
-  s_rfTransmitter = std::make_unique<RFTransmitter>(rmtPin, 32);
-#else
-  ESP_LOGW(TAG, "No TX pin configured at build time! RADIO IS DISABLED");
-#endif
+  ESP_LOGD(TAG, "RMT/TX pin is: %d", txPin);
+
+  s_rfTransmitter = std::make_unique<RFTransmitter>(txPin, 32);
 }
 
 bool CommandHandler::HandleCommand(std::uint16_t shockerId, ShockerCommandType type, std::uint8_t intensity, unsigned int duration, std::uint8_t shockerModel) {

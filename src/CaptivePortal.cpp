@@ -1,8 +1,8 @@
 #include "CaptivePortal.h"
 
+#include "Config.h"
 #include "GatewayConnectionManager.h"
 #include "Mappers/EspWiFiTypesMapper.h"
-#include "Utils/FileUtils.h"
 #include "Utils/HexUtils.h"
 #include "WiFiManager.h"
 #include "WiFiScanManager.h"
@@ -91,8 +91,8 @@ struct CaptivePortalInstance {
     }
   }
   void handleWebSocketClientWiFiAuthenticateMessage(const StaticJsonDocument<256>& doc) {
-    String bssidStr = doc["bssid"];
-    if (bssidStr.isEmpty()) {
+    std::string bssidStr = doc["bssid"];
+    if (bssidStr.empty()) {
       ESP_LOGE(TAG, "WiFi BSSID is missing");
       return;
     }
@@ -101,7 +101,7 @@ struct CaptivePortalInstance {
       return;
     }
 
-    String password = doc["password"];
+    std::string password = doc["password"];
 
     // Convert BSSID to byte array
     // Uses sscanf to parse the max-style hex format, e.g. "AA:BB:CC:DD:EE:FF" where each pair is a byte, and %02X means to parse 2 characters as a hex byte
@@ -128,8 +128,8 @@ struct CaptivePortalInstance {
   void handleWebSocketClientWiFiDisconnectMessage(const StaticJsonDocument<256>& doc) { WiFiManager::Disconnect(); }
   void handleWebSocketClientWiFiForgetMessage(const StaticJsonDocument<256>& doc) { WiFiManager::Forget(doc["bssid"]); }
   void handleWebSocketClientWiFiMessage(StaticJsonDocument<256> doc) {
-    String actionStr = doc["action"];
-    if (actionStr.isEmpty()) {
+    std::string actionStr = doc["action"];
+    if (actionStr.empty()) {
       ESP_LOGE(TAG, "Received WiFi message with \"action\" property missing");
       return;
     }
@@ -161,8 +161,8 @@ struct CaptivePortalInstance {
       return;
     }
 
-    String typeStr = doc["type"];
-    if (typeStr.isEmpty()) {
+    std::string typeStr = doc["type"];
+    if (typeStr.empty()) {
       ESP_LOGE(TAG, "Message type is missing");
       return;
     }
@@ -270,26 +270,18 @@ void _stopCaptive() {
 using namespace OpenShock;
 
 bool CaptivePortal::Init() {
-  if (!FileUtils::TryReadFile("/captive_always_on", reinterpret_cast<std::uint8_t*>(&s_alwaysEnabled), 1)) {
-    return false;
-  }
-
   // Only start captive portal if we're not connected to a gateway, or if captive is set to always be enabled
   GatewayConnectionManager::RegisterConnectedChangedHandler([](bool connected) { s_shouldBeRunning = !connected || s_alwaysEnabled; });
 
   return true;
 }
-void CaptivePortal::SetAlwaysEnabled(bool alwaysOn) {
-  if (s_alwaysEnabled == alwaysOn) return;
-
-  s_alwaysEnabled = alwaysOn;
-
-  if (!FileUtils::TryWriteFile("/captive_always_on", reinterpret_cast<const std::uint8_t*>(&s_alwaysEnabled), 1)) {
-    return;
-  }
+void CaptivePortal::SetAlwaysEnabled(bool alwaysEnabled) {
+  Config::SetCaptivePortalConfig({
+    .alwaysEnabled = alwaysEnabled,
+  });
 }
 bool CaptivePortal::IsAlwaysEnabled() {
-  return s_alwaysEnabled;
+  return Config::GetCaptivePortalConfig().alwaysEnabled;
 }
 
 bool CaptivePortal::IsRunning() {

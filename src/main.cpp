@@ -1,5 +1,6 @@
 #include "CaptivePortal.h"
 #include "CommandHandler.h"
+#include "Config.h"
 #include "Constants.h"
 #include "GatewayConnectionManager.h"
 #include "SerialInputHandler.h"
@@ -35,8 +36,17 @@ void setup() {
     ESP.restart();
   }
 
-  OpenShock::CaptivePortal::Init();
-  OpenShock::GatewayConnectionManager::Init();
+  if (!OpenShock::CaptivePortal::Init()) {
+    ESP_LOGE(TAG, "PANIC: An Error has occurred while initializing CaptivePortal, restarting in 5 seconds...");
+    delay(5000);
+    ESP.restart();
+  }
+
+  if (!OpenShock::GatewayConnectionManager::Init()) {
+    ESP_LOGE(TAG, "PANIC: An Error has occurred while initializing WiFiScanManager, restarting in 5 seconds...");
+    delay(5000);
+    ESP.restart();
+  }
 }
 
 void loop() {
