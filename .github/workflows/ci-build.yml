@@ -127,9 +127,6 @@ jobs:
       - name: Install dependencies
         run: pip install -r requirements.txt
 
-      - name: Install custom board definitions
-        run: python3 install_boards.py
-
       - name: Build firmware
         working-directory: .
         run: pio run -e ${{ matrix.board }}
