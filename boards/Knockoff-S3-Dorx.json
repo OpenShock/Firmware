@@ -22,7 +22,7 @@
       ]
     ],
     "mcu": "esp32s3",
-    "variant": "dorx"
+    "variant": "lolin_s3"
   },
   "connectivity": [
     "wifi",
