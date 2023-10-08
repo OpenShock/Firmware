@@ -14,7 +14,7 @@ struct ShockerCommand {
 }
 
 table ShockerCommandList {
-  commands:[ShockerCommand];
+  commands:[ShockerCommand] (required);
 }
 
 struct CaptivePortalConfig {
