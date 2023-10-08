@@ -25,6 +25,8 @@ void setup() {
     ESP.restart();
   }
 
+  OpenShock::Config::Init();
+
   OpenShock::SerialInputHandler::PrintWelcomeHeader();
   OpenShock::SerialInputHandler::PrintVersionInfo();
 

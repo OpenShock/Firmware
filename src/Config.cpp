@@ -142,6 +142,7 @@ MainConfig FromFbsConfig(const Serialization::Configuration::Config* fbsConfig) 
 bool _tryLoadConfig(MainConfig& config) {
   File file = LittleFS.open("/config", "rb");
   if (!file) {
+    ESP_LOGE(TAG, "Failed to open config file for reading");
     return false;
   }
 
@@ -154,6 +155,7 @@ bool _tryLoadConfig(MainConfig& config) {
   // Read file
   if (file.read(buffer, size) != size) {
     delete[] buffer;
+    ESP_LOGE(TAG, "Failed to read config file, size mismatch");
     return false;
   }
 
@@ -163,8 +165,9 @@ bool _tryLoadConfig(MainConfig& config) {
 
   // Deserialize
   auto fbsConfig = flatbuffers::GetRoot<Serialization::Configuration::Config>(buffer);
-  if (fbsConfig != nullptr) {
+  if (fbsConfig == nullptr) {
     delete[] buffer;
+    ESP_LOGE(TAG, "Failed to get deserialization root for config file");
     return false;
   }
 
@@ -173,6 +176,7 @@ bool _tryLoadConfig(MainConfig& config) {
   flatbuffers::Verifier verifier(buffer, size, verifierOptions);
   if (!fbsConfig->Verify(verifier)) {
     delete[] buffer;
+    ESP_LOGE(TAG, "Failed to verify config file integrity");
     return false;
   }
 
@@ -187,6 +191,7 @@ bool _tryLoadConfig(MainConfig& config) {
 bool _trySaveConfig(const MainConfig& config) {
   File file = LittleFS.open("/config", "wb");
   if (!file) {
+    ESP_LOGE(TAG, "Failed to open config file for writing");
     return false;
   }
 
@@ -216,6 +221,7 @@ bool _trySaveConfig(const MainConfig& config) {
 
   // Write file
   if (file.write(builder.GetBufferPointer(), builder.GetSize()) != builder.GetSize()) {
+    ESP_LOGE(TAG, "Failed to write config file");
     return false;
   }
 
