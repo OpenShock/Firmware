@@ -24,35 +24,22 @@ env = config['env:' + env_name]
 
 # Check if the board is custom.
 board_name = env['board']
-boards_dir = Path().absolute() / 'boards'
-board_exists_direct = os.path.exists(boards_dir / board_name / 'merge-image.py')
+chip_name = env['chip']
+
+# Find the directory with partitions.csv and merge-image.py
+chips_dir = Path().absolute() / 'chips'
+chip_dir = chips_dir / chip_name
+chip_dir_exists = os.path.exists(chip_dir)
 
 print('Board name: %s' % board_name)
-print('Board found directly: %s' % board_exists_direct)
+print('Chip name: %s' % chip_name)
+print('Chip dir exists: %s' % chip_dir_exists)
 
 # If the board exists directly, call `merge-image.py` in that directory.
-if board_exists_direct:
-    print('Board exists directly!')
-    call_script(boards_dir / board_name / 'merge-image.py')
-
-# If the board name is NOT an indirect reference, fail.
-if not board_name.startswith('OpenShock-'):
-    print('Board not found directly: %s' % board_name)
-    print('Board name does not start with "OpenShock-", so it\'s not an indirect name either.')
-    print('FAILED TO FIND BOARD.')
+if not chip_dir_exists:
+    print('Chip dir does not exist: %s' % chip_dir)
+    print('FAILED TO FIND merge-image.py')
     sys.exit(1)
 
-# Grab the indirect name and check if it exists.
-board_name_indirect = board_name[len('OpenShock-') :]
-board_exists_indirect = os.path.exists(boards_dir / board_name_indirect / 'merge-image.py')
-print('Board name indirectly: %s' % board_name_indirect)
-print('Board found indirectly: %s' % board_exists_indirect)
-
-if not board_exists_indirect:
-    print('Board not found directly: %s' % board_name)
-    print('Board not found indirectly: %s' % board_name_indirect)
-    print('FAILED TO FIND BOARD.')
-    sys.exit(1)
-
-# The only option left is the board exists indirectly.
-call_script(boards_dir / board_name_indirect / 'merge-image.py')
+# Call the chips/{chip}/merge-image.py script
+call_script(chip_dir / 'merge-image.py')
