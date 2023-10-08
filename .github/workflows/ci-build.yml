@@ -21,6 +21,7 @@ env:
   PYTHON_VERSION: 3.11
   OPENSHOCK_API_DOMAIN: api.shocklink.net
   OPENSHOCK_FW_VERSION: master-${{ github.sha }}
+  OPENSHOCK_FW_COMMIT: ${{ github.sha }}
 
 jobs:
 
@@ -126,9 +127,6 @@ jobs:
       - name: Install dependencies
         run: pip install -r requirements.txt
 
-      - name: Install custom board definitions
-        run: python3 install_boards.py
-
       - name: Build firmware
         working-directory: .
         run: pio run -e ${{ matrix.board }}
@@ -154,6 +152,7 @@ jobs:
           sparse-checkout: |
             scripts
             boards
+            chips
 
       - uses: actions/setup-python@v4
         with:

@@ -1,5 +1,6 @@
 import os
 from pathlib import Path
+from typing import Mapping
 
 LOGLEVEL_MAP = {
     'none': (0, 'LOG_NONE'),
@@ -57,24 +58,18 @@ class DotEnv:
             if env_file.exists():
                 self.__read_dotenv(env_file)
 
-    def get_str(self, key: str, dotenv: bool = True):
-        return self.dotenv_vars.get(key, os.environ.get(key))
+    def get_string(self, key: str):
+        return self.dotenv_vars.get(key)
 
-    def get_all_prefixed(self, prefix: str, dotenv: bool = True):
+    def get_all_prefixed(self, prefix: str) -> Mapping[str, str]:
         result: dict[str, str] = {}
-        for key, value in os.environ.items():
+        for key, value in self.dotenv_vars.items():
             if key.startswith(prefix):
                 result[key] = value
-
-        if dotenv:
-            for key, value in self.dotenv_vars.items():
-                if key.startswith(prefix):
-                    result[key] = value
-
         return result
 
-    def get_loglevel(self, key: str, dotenv: bool = True) -> int | None:
-        value = self.get_str(key, dotenv)
+    def get_loglevel(self, key: str) -> int | None:
+        value = self.get_string(key)
         if value == None:
             return None
 

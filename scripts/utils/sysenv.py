@@ -18,3 +18,11 @@ def get_string(key: str, default: str | None = None) -> str:
         if default != None:
             return default
         raise ValueError('Failed to get environment string: %s' % key) from ex
+
+
+def get_all_prefixed(prefix: str) -> dict[str, str]:
+    result = {}
+    for key, value in os.environ.items():
+        if key.startswith(prefix):
+            result[key] = value
+    return result

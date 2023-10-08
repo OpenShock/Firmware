@@ -2,8 +2,9 @@
 
 import esptool
 
+# fmt: off
 esptool.main([
-    '--chip', 'esp32s2',
+    '--chip', 'esp32',
     'merge_bin', '-o', 'merged.bin',
     '--flash_size', '4MB',
     '0x1000', './bootloader.bin',
@@ -11,3 +12,4 @@ esptool.main([
     '0x10000', './firmware.bin',
     '0x310000', './littlefs.bin'
 ])
+# fmt: on
