@@ -109,9 +109,17 @@ bool WiFiManager::Init() {
   WiFi.enableSTA(true);
   WiFi.setHostname("OpenShock");  // TODO: Add the device name to the hostname (retrieve from API and store in LittleFS)
 
-  if (Config::GetWiFiCredentials().size() > 0) {
-    WiFi.scanNetworks(true);
-    OpenShock::VisualStateManager::SetScanningStarted();
+  auto credentials = Config::GetWiFiCredentials();
+
+  if (!credentials.empty()) {
+    ESP_LOGI(TAG, "Found %d WiFi credentials in config", credentials.size());
+
+    auto creds = credentials[0];
+
+    ESP_LOGI(TAG, "Connecting to network #%u (%s)", creds.id, creds.ssid.c_str());
+    WiFi.begin(creds.ssid.c_str(), creds.password.c_str());
+
+    // TODO: improve this by doing a scan, checking which networks are available, and connecting to the one with the highest RSSI, then iterating through the rest with a maximum of 3 attempts per network
   }
 
   return true;
