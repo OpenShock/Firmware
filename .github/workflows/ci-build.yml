@@ -155,6 +155,7 @@ jobs:
           sparse-checkout: |
             scripts
             boards
+            chips
 
       - uses: actions/setup-python@v4
         with:
