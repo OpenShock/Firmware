@@ -228,7 +228,11 @@ void Config::Init() {
   if (!_tryLoadConfig(_mainConfig)) {
     _mainConfig = {
       .rf = {
+#ifdef OPENSHOCK_TX_PIN
         .txPin = OPENSHOCK_TX_PIN,
+#else
+        .txPin = UINT32_MAX,
+#endif
       },
       .wifi = {
         .apSsid      = "Config",
