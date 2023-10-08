@@ -32,11 +32,10 @@ def merge_image():
         print('FAILED TO FIND merge-image.py')
         sys.exit(1)
 
+    # Call the chips/{chip}/merge-image.py script
+    call_script(boardconf.get_merge_script())
+
 
 print_header()
 merge_image()
 print_footer()
-
-
-# Call the chips/{chip}/merge-image.py script
-call_script(boardconf.get_merge_script())
