@@ -2,6 +2,7 @@
 
 import esptool
 
+# fmt: off
 esptool.main([
     '--chip', 'esp32s2',
     'merge_bin', '-o', 'merged.bin',
@@ -11,3 +12,4 @@ esptool.main([
     '0x10000', './firmware.bin',
     '0x310000', './littlefs.bin'
 ])
+# fmt: on
