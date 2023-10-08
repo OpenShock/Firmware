@@ -73,8 +73,8 @@ jobs:
           path: |
             ~/.platformio/platforms
             ~/.platformio/packages
-            ~/.platformio/cache
-          key: ${{ runner.os }}-arch
+            ~/.platformio/.cache
+          key: ${{ runner.os }}-${{ hashFiles('platformio.ini', 'requirements.txt') }}-arch
 
       - uses: actions/setup-python@v4
         with:
@@ -116,8 +116,8 @@ jobs:
           path: |
             ~/.platformio/platforms
             ~/.platformio/packages
-            ~/.platformio/cache
-          key: ${{ runner.os }}-arch
+            ~/.platformio/.cache
+          key: ${{ runner.os }}-${{ hashFiles('platformio.ini', 'requirements.txt') }}-arch
 
       - uses: actions/setup-python@v4
         with:
