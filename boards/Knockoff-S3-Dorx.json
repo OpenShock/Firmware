@@ -8,6 +8,7 @@
     "core": "esp32",
     "extra_flags": [
       "-DBOARD_HAS_PSRAM",
+      "-DARDUINO_LOLIN_S3",
       "-DARDUINO_USB_MODE=1",
       "-DARDUINO_USB_CDC_ON_BOOT=1"
     ],
@@ -44,6 +45,6 @@
     "require_upload_port": true,
     "speed": 460800
   },
-  "url": "wiki.openshock.net",
-  "vendor": "BRANDLESS"
+  "url": "wiki.openshock.org",
+  "vendor": "Knockoff"
 }
