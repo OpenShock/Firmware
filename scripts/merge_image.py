@@ -24,25 +24,35 @@ env = config['env:' + env_name]
 
 # Check if the board is custom.
 board_name = env['board']
-chip_name = env.get('custom_openshock.chip')
+chip = env.get('custom_openshock.chip')
 chip_variant = env.get('custom_openshock.chip_variant')
 
-print('Board name: %s' % board_name)
-print('Chip name: %s' % chip_name)
+print('Board: %s' % board_name)
+print('Chip: %s' % chip)
 print('Chip variant: %s' % chip_variant)
 
 # Find the directory with partitions.csv and merge-image.py
 chips_dir = Path().absolute() / 'chips'
-chip_dir = chips_dir / chip_name
-chip_dir_exists = os.path.exists(chip_dir)
+chip_base_dir = chips_dir / chip
+chip_variant_dir = chip_base_dir
+if chip_variant != None:
+    chip_variant_dir = chip_base_dir / chip_variant
 
-print('Chip dir exists: %s' % chip_dir_exists)
+# Chip variant file paths
+partitions_file = chip_variant_dir / 'partitions.csv'
+merge_file = chip_variant_dir / 'merge-image.py'
+
+chip_dir_exists = os.path.exists(chip_variant_dir)
+
+print('Chip base dir: %s' % chip_base_dir)
+print('Chip variant dir: %s' % chip_variant_dir)
+print('Directory exists: %s' % chip_dir_exists)
 
 # If the board exists directly, call `merge-image.py` in that directory.
 if not chip_dir_exists:
-    print('Chip dir does not exist: %s' % chip_dir)
+    print('Directory does not exist: %s' % chip_variant_dir)
     print('FAILED TO FIND merge-image.py')
     sys.exit(1)
 
 # Call the chips/{chip}/merge-image.py script
-call_script(chip_dir / 'merge-image.py')
+call_script(merge_file)
