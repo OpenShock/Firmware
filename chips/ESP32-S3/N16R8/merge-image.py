@@ -2,6 +2,7 @@
 
 import esptool
 
+# fmt: off
 # Note: Bootloader for esp32-s3 starts at 0x0000, unlike several other ESP32 variants that start at 0x1000.
 esptool.main([
     '--chip', 'esp32s3',
@@ -12,3 +13,4 @@ esptool.main([
     '0x10000', './firmware.bin',
     '0x310000', './littlefs.bin'
 ])
+# fmt: on
