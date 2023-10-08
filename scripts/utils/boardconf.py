@@ -90,8 +90,8 @@ def print_header():
 
 
 def print_footer():
-    print('')
     print('========================')
+    print('')
 
 
 def validate(boardconf) -> bool:
