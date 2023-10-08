@@ -24,6 +24,16 @@ def file_gzip(file_path, gzip_path):
         f_out.write(f_in.read())
 
 
+def file_write_bin(file, data):
+    try:
+        with open(file, 'wb') as f:
+            f.write(data)
+        return True
+    except:
+        print('Error writing to ' + file)
+        return False
+
+
 def file_read_text(file):
     try:
         with open(file, 'r', encoding='utf-8') as f:
@@ -197,7 +207,11 @@ def build_frontend(source, target, env):
         shutil.rmtree('data/www')
 
     for src_path, dst_path in copy_actions:
-        file_gzip(src_path, dst_path + '.gz')
+        if src_path.endswith('.gz'):
+            # Don't gzip files that are already gzipped.
+            shutil.copyfile(src_path, dst_path)
+        else:
+            file_gzip(src_path, dst_path + '.gz')
 
     for src_path, dst_path in rename_actions:
         dir_ensure(os.path.dirname(dst_path))
@@ -221,6 +235,9 @@ def build_frontend(source, target, env):
 
         with gzip.open(dst_path + '.gz', 'wb') as f_out:
             f_out.write(s)
+        # If the file is index.html, also write a non-gzipped version.
+        if src_path.endswith('index.html'):
+            file_write_bin(dst_path, s)
 
 
 env.AddPreAction('$BUILD_DIR/littlefs.bin', build_frontend)

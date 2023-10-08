@@ -8,9 +8,5 @@
 
 namespace OpenShock::CommandHandler {
   void Init();
-  bool HandleCommand(std::uint16_t shockerId,
-                     OpenShock::ShockerCommandType type,
-                     std::uint8_t intensity,
-                     unsigned int duration,
-                     std::uint8_t shockerModel);
+  bool HandleCommand(std::uint16_t shockerId, OpenShock::ShockerCommandType type, std::uint8_t intensity, unsigned int duration, std::uint8_t shockerModel);
 }  // namespace OpenShock::CommandHandler

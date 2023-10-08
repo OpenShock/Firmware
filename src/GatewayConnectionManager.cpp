@@ -2,10 +2,10 @@
 
 #include "CaptivePortal.h"
 #include "CommandHandler.h"
+#include "Config.h"
 #include "Constants.h"
 #include "ShockerCommandType.h"
 #include "Time.h"
-#include "Utils/FileUtils.h"
 
 #include <esp_log.h>
 
@@ -23,7 +23,6 @@ extern const std::uint8_t* const rootca_crt_bundle_start asm("_binary_data_cert_
 
 static bool s_isPaired                = false;
 static bool s_wifiConnected           = false;
-static String s_authToken             = "";
 static WebSocketsClient* s_webSocket  = nullptr;
 static WiFiClientSecure* s_wifiClient = nullptr;
 static std::unordered_map<std::uint64_t, OpenShock::GatewayConnectionManager::ConnectedChangedHandler> s_connectedChangedHandlers;
@@ -129,9 +128,9 @@ void _handleEvent(WStype_t type, std::uint8_t* payload, std::size_t length) {
 void _connect() {
   if (s_webSocket != nullptr) return;
 
-  s_webSocket                  = new WebSocketsClient();
-  String firmwareVersionHeader = "FirmwareVersion: " + String(OpenShock::Constants::Version);
-  String deviceTokenHeader     = "DeviceToken: " + s_authToken;
+  s_webSocket                       = new WebSocketsClient();
+  std::string firmwareVersionHeader = "FirmwareVersion: " + std::string(OpenShock::Constants::Version);
+  std::string deviceTokenHeader     = "DeviceToken: " + OpenShock::Config::GetBackendAuthToken();
   s_webSocket->setExtraHeaders((firmwareVersionHeader + "\"" + deviceTokenHeader).c_str());
   s_webSocket->onEvent(_handleEvent);
   s_webSocket->beginSSL(OpenShock::Constants::ApiDomain, 443, "/1/ws/device");
@@ -164,12 +163,6 @@ bool GatewayConnectionManager::Init() {
   WiFi.onEvent(_evWiFiConnectedHandler, ARDUINO_EVENT_WIFI_STA_GOT_IP);
   WiFi.onEvent(_evWiFiConnectedHandler, ARDUINO_EVENT_WIFI_STA_GOT_IP6);
   WiFi.onEvent(_evWiFiDisconnectedHandler, ARDUINO_EVENT_WIFI_STA_DISCONNECTED);
-  ESP_LOGD(TAG, "Free heap: %f", static_cast<float>(ESP.getFreeHeap()) / static_cast<float>(ESP.getHeapSize()));
-
-  if (!FileUtils::TryReadFile(AUTH_TOKEN_FILE, s_authToken)) {
-    s_authToken = "";
-  }
-  ESP_LOGD(TAG, "Free heap: %f", static_cast<float>(ESP.getFreeHeap()) / static_cast<float>(ESP.getHeapSize()));
 
   return true;
 }
@@ -190,21 +183,19 @@ bool GatewayConnectionManager::IsPaired() {
     return true;
   }
 
-  if (!FileUtils::TryReadFile(AUTH_TOKEN_FILE, s_authToken)) {
-    return false;
-  }
-
   HTTPClient http;
   const char* const uri = OPENSHOCK_API_URL("/1/device/self");
 
   ESP_LOGD(TAG, "Contacting self url: %s", uri);
   http.begin(*s_wifiClient, uri);
 
+  // TODO: Attach auth token
+
   int responseCode = http.GET();
 
   if (responseCode == 401) {
-    ESP_LOGD(TAG, "Auth token is invalid, deleting file");
-    FileUtils::DeleteFile(AUTH_TOKEN_FILE);
+    ESP_LOGD(TAG, "Auth token is invalid, clearing it");
+    Config::ClearBackendAuthToken();
     return false;
   }
   if (responseCode != 200) {
@@ -228,9 +219,11 @@ bool GatewayConnectionManager::Pair(unsigned int pairCode) {
   _disconnect();
 
   HTTPClient http;
-  String uri = OPENSHOCK_API_URL("/1/device/pair/") + String(pairCode);
 
-  ESP_LOGD(TAG, "Contacting pair code url: %s", uri.c_str());
+  char uri[256];
+  sprintf(uri, OPENSHOCK_API_URL("/1/device/pair/%u"), pairCode);
+
+  ESP_LOGD(TAG, "Contacting pair code url: %s", uri);
   http.begin(*s_wifiClient, uri);
 
   int responseCode = http.GET();
@@ -240,16 +233,21 @@ bool GatewayConnectionManager::Pair(unsigned int pairCode) {
     return false;
   }
 
-  s_authToken = http.getString();
-
-  if (!FileUtils::TryWriteFile(AUTH_TOKEN_FILE, s_authToken)) {
-    ESP_LOGE(TAG, "Error while writing auth token to file");
-
-    s_isPaired = false;
+  int authTokenLen = http.getSize();
+  if (authTokenLen <= 0 || authTokenLen > 512) {
+    ESP_LOGE(TAG, "Auth token is empty");
     return false;
   }
 
+  char* authToken = new char[authTokenLen];
+
+  http.getStream().readBytes(authToken, authTokenLen);
+
   http.end();
+
+  Config::SetBackendAuthToken(authToken);
+
+  delete[] authToken;
 
   s_isPaired = true;
 
@@ -257,10 +255,9 @@ bool GatewayConnectionManager::Pair(unsigned int pairCode) {
 }
 
 void GatewayConnectionManager::UnPair() {
-  s_isPaired  = false;
-  s_authToken = "";
+  s_isPaired = false;
 
-  FileUtils::DeleteFile(AUTH_TOKEN_FILE);
+  Config::ClearBackendAuthToken();
 }
 
 std::uint64_t GatewayConnectionManager::RegisterConnectedChangedHandler(ConnectedChangedHandler handler) {
