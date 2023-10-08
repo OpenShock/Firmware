@@ -1,0 +1,8 @@
+namespace OpenShock.Serialization.Types;
+
+enum ShockerCommandType : uint8 {
+  Stop = 0,
+  Shock = 1,
+  Vibrate = 2,
+  Sound = 3
+}

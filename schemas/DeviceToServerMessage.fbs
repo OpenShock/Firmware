@@ -1,0 +1,17 @@
+attribute "fs_serializer";
+
+namespace OpenShock.Serialization;
+
+struct KeepAlive {
+    uptime:ulong;
+}
+
+union DeviceToServerMessagePayload {
+  KeepAlive
+}
+
+table DeviceToServerMessage (fs_serializer) {
+  payload:DeviceToServerMessagePayload;
+}
+
+root_type DeviceToServerMessage;
