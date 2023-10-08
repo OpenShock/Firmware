@@ -1,61 +1,38 @@
 import os
 from pathlib import Path
+from utils.boardconf import BoardConf, from_pio_env, validate, print_header, print_footer
 
 #
 # This file is responsible for processing the "custom_openshock.*"
 # parameters declared in `platformio.ini`.
 #
+# This file is invoked by PlatformIO during build.
+# See 'extra_scripts' in 'platformio.ini'.
+#
 
 Import('env')  # type: ignore
 env = env  # type: ignore
 
+# Parse the board/chip specific configuration from the current pio `env` variable.
+boardconf: BoardConf = from_pio_env(env)
 
-def apply():
-    # Read OpenShock variables.
-    # Docs:
-    #     https://docs.platformio.org/en/latest/scripting/examples/platformio_ini_custom_options.html
-    # "custom_" prefix reason:
-    #     https://community.platformio.org/t/custom-build-target-configuration-option-warnings/26251
-    chip = env.GetProjectOption('custom_openshock.chip', '')
-    chip_variant = env.GetProjectOption('custom_openshock.chip_variant', '')
 
-    if chip == '':
-        print('OpenShock: No chip specified, skipping')
+def use_openshock_params():
+    if not validate(boardconf):
         return
 
-    # Determine chip directory
-    chips_dir = Path().absolute() / 'chips'
-    chip_base_dir = chips_dir / chip
-    chip_variant_dir = chip_base_dir
-    if chip_variant != None:
-        chip_variant_dir = chip_base_dir / chip_variant
-
-    # Chip variant file paths
-    partitions_file = chip_variant_dir / 'partitions.csv'
-    merge_file = chip_variant_dir / 'merge-image.py'
-
-    # Start pretty printing to inform the user (and us) what's going on :^)
-    print('========================')
-    print('       OpenShock        ')
-    print('========================')
-    print('')
-
-    print('Chip: %s' % chip)
-    print('Variant: %s' % chip_variant)
-    print('')
-
-    print('Chip directory: %s' % chip_variant_dir)
-    print('Partitions file: %s' % partitions_file)
-    print('Merge script: %s' % merge_file)
-
-    print('')
-    print('========================')
-    print('')
+    # Handle partitions file not existing
+    if not boardconf.does_partitions_file_exists():
+        print('WARNING: PARTITIONS FILE DOES NOT EXIST.')
+        print('Not overriding default value.')
+        return
 
     # Set partition file to chip dir.
     # https://docs.platformio.org/en/latest/scripting/examples/override_board_configuration.html
     board_config = env.BoardConfig()
-    board_config.update('build.partitions', str(partitions_file))
+    board_config.update('build.partitions', str(boardconf.get_partitions_file()))
 
 
-apply()
+print_header()
+use_openshock_params()
+print_footer()
