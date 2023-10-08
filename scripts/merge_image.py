@@ -24,8 +24,8 @@ env = config['env:' + env_name]
 
 # Check if the board is custom.
 board_name = env['board']
-chip_name = env['openshock.chip']
-chip_variant = env['openshock.chip_variant']
+chip_name = env.get('custom_openshock.chip')
+chip_variant = env.get('custom_openshock.chip_variant')
 
 print('Board name: %s' % board_name)
 print('Chip name: %s' % chip_name)
