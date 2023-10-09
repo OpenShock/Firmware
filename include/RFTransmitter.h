@@ -1,6 +1,7 @@
 #pragma once
 
 #include "ShockerCommandType.h"
+#include "ShockerModelType.h"
 
 #include <cstdint>
 
@@ -19,11 +20,7 @@ namespace OpenShock {
 
     inline bool ok() const { return m_taskHandle != nullptr && m_queueHandle != nullptr; }
 
-    bool SendCommand(std::uint8_t shockerModel,
-                     std::uint16_t shockerId,
-                     OpenShock::ShockerCommandType type,
-                     std::uint8_t intensity,
-                     unsigned int duration);
+    bool SendCommand(ShockerModelType model, std::uint16_t shockerId, ShockerCommandType type, std::uint8_t intensity, unsigned int duration);
     void ClearPendingCommands();
 
   private:

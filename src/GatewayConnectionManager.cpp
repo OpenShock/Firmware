@@ -5,7 +5,9 @@
 #include "Config.h"
 #include "Constants.h"
 #include "fbs/DeviceToServerMessage_generated.h"
+#include "fbs/ServerToDeviceMessage_generated.h"
 #include "ShockerCommandType.h"
+#include "ShockerModelType.h"
 #include "Time.h"
 
 #include <esp_log.h>
@@ -116,43 +118,103 @@ private:
     m_webSocket.sendBIN(builder.GetBufferPointer(), builder.GetSize());
   }
 
-  void _handleControlCommandMessage(const DynamicJsonDocument& doc) {
-    JsonArrayConst data = doc["Data"];
-    for (int i = 0; i < data.size(); i++) {
-      JsonObjectConst cur    = data[i];
-      std::uint16_t id       = static_cast<std::uint16_t>(cur["Id"]);
-      std::uint8_t type      = static_cast<std::uint8_t>(cur["Type"]);
-      std::uint8_t intensity = static_cast<std::uint8_t>(cur["Intensity"]);
-      unsigned int duration  = static_cast<unsigned int>(cur["Duration"]);
-      std::uint8_t model     = static_cast<std::uint8_t>(cur["Model"]);
+  void _handleShockerCommandListMessage(const OpenShock::Serialization::ShockerCommandList* shockerCommandList) {
+    auto commands = shockerCommandList->commands();
+    if (commands == nullptr) {
+      ESP_LOGE(TAG, "Received invalid command list from API");
+      return;
+    }
 
-      OpenShock::ShockerCommandType cmdType = static_cast<OpenShock::ShockerCommandType>(type);
+    ESP_LOGV(TAG, "Received command list from API (%d commands)", commands->size());
 
-      if (!OpenShock::CommandHandler::HandleCommand(id, cmdType, intensity, duration, model)) {
+    for (auto command : *commands) {
+      OpenShock::ShockerModelType model;
+      switch (command->model()) {
+        case OpenShock::Serialization::Types::ShockerModelType::CaiXianlin:
+          model = OpenShock::ShockerModelType::CaiXianlin;
+          break;
+        case OpenShock::Serialization::Types::ShockerModelType::PetTrainer:
+          model = OpenShock::ShockerModelType::PetTrainer;
+          break;
+        default:
+          ESP_LOGE(TAG, "Received unknown model type from API (%d)", command->model());
+          continue;
+      }
+      ESP_LOGV(TAG, "   Model %s", OpenShock::Serialization::Types::EnumNameShockerModelType(command->model()));
+
+      OpenShock::ShockerCommandType type;
+      switch (command->type()) {
+        case OpenShock::Serialization::Types::ShockerCommandType::Stop:
+
+          type = OpenShock::ShockerCommandType::Stop;
+          break;
+        case OpenShock::Serialization::Types::ShockerCommandType::Shock:
+          type = OpenShock::ShockerCommandType::Shock;
+          break;
+        case OpenShock::Serialization::Types::ShockerCommandType::Vibrate:
+          type = OpenShock::ShockerCommandType::Vibrate;
+          break;
+        case OpenShock::Serialization::Types::ShockerCommandType::Sound:
+          type = OpenShock::ShockerCommandType::Sound;
+          break;
+        default:
+          ESP_LOGE(TAG, "Received unknown command type from API (%d)", command->type());
+          continue;
+      }
+      ESP_LOGV(TAG, "   CommandTpe %s", OpenShock::Serialization::Types::EnumNameShockerCommandType(command->type()));
+
+      std::uint16_t id       = command->id();
+      std::uint8_t intensity = command->intensity();
+      std::uint32_t duration = command->duration();
+
+      ESP_LOGV(TAG, "   ID %u, Intensity %u, Duration %u", id, intensity, duration);
+
+      if (!OpenShock::CommandHandler::HandleCommand(model, id, type, intensity, duration)) {
         ESP_LOGE(TAG, "Remote command failed/rejected!");
       }
     }
   }
 
-  void _handleCaptivePortalMessage(const DynamicJsonDocument& doc) {
-    bool data = (bool)doc["Data"];
+  void _handleCaptivePortalConfigMessage(const OpenShock::Serialization::CaptivePortalConfig* captivePortalConfig) {
+    bool enabled = captivePortalConfig->enabled();
 
-    ESP_LOGD(TAG, "Captive portal debug: %s", data ? "true" : "false");
-    OpenShock::CaptivePortal::SetAlwaysEnabled(data);
+    ESP_LOGD(TAG, "Captive portal is %s", enabled ? "force enabled" : "normal");
+
+    OpenShock::CaptivePortal::SetAlwaysEnabled(enabled);
   }
 
-  void _parseMessage(char* data, std::size_t length) {
-    ESP_LOGD(TAG, "Parsing message of length %d", length);
-    DynamicJsonDocument doc(1024);  // TODO: profile the normal message size and adjust this accordingly
-    deserializeJson(doc, data, length);
-    int type = doc["ResponseType"];
+  void _parseMessage(std::uint8_t* payload, std::size_t length) {
+    ESP_LOGV(TAG, "Received binary message from API (%d bytes)", length);
 
-    switch (type) {
-      case 0:
-        _handleControlCommandMessage(doc);
+    if (payload == nullptr || length == 0) {
+      ESP_LOGE(TAG, "Received invalid message from API");
+      return;
+    }
+
+    auto msg = flatbuffers::GetRoot<OpenShock::Serialization::ServerToDeviceMessage>(payload);
+    if (msg == nullptr) {
+      ESP_LOGE(TAG, "Received invalid message from API");
+      return;
+    }
+
+    flatbuffers::Verifier::Options verifierOptions {};  // TODO: profile the normal message size and adjust this accordingly
+    flatbuffers::Verifier verifier(payload, length, verifierOptions);
+    if (!msg->Verify(verifier)) {
+      ESP_LOGE(TAG, "Received invalid message from API");
+      return;
+    }
+
+    ESP_LOGV(TAG, "Message validated");
+
+    switch (msg->payload_type()) {
+      [[likely]] case OpenShock::Serialization::ServerToDeviceMessagePayload::ShockerCommandList:
+        _handleShockerCommandListMessage(msg->payload_as_ShockerCommandList());
         break;
-      case 1:
-        _handleCaptivePortalMessage(doc);
+      case OpenShock::Serialization::ServerToDeviceMessagePayload::CaptivePortalConfig:
+        _handleCaptivePortalConfigMessage(msg->payload_as_CaptivePortalConfig());
+        break;
+      [[unlikely]] default:
+        ESP_LOGE(TAG, "Received unknown message type from API (%d)", msg->payload_type());
         break;
     }
   }
@@ -175,7 +237,7 @@ private:
         _sendKeepAlive();
         break;
       case WStype_TEXT:
-        _parseMessage(reinterpret_cast<char*>(payload), length);
+        ESP_LOGW(TAG, "Received text from API, JSON parsing is not supported anymore :D");
         break;
       case WStype_ERROR:
         ESP_LOGE(TAG, "Received error from API");
@@ -196,7 +258,7 @@ private:
         ESP_LOGD(TAG, "Received pong from API");
         break;
       case WStype_BIN:
-        ESP_LOGE(TAG, "Received binary from API, this is not supported!");
+        _parseMessage(payload, length);
         break;
       case WStype_FRAGMENT_BIN_START:
         ESP_LOGE(TAG, "Received binary fragment start from API, this is not supported!");

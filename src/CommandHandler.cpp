@@ -25,17 +25,21 @@ void CommandHandler::Init() {
   s_rfTransmitter = std::make_unique<RFTransmitter>(txPin, 32);
 }
 
-bool CommandHandler::HandleCommand(std::uint16_t shockerId, ShockerCommandType type, std::uint8_t intensity, unsigned int duration, std::uint8_t shockerModel) {
+bool CommandHandler::HandleCommand(ShockerModelType model, std::uint16_t shockerId, ShockerCommandType type, std::uint8_t intensity, unsigned int duration) {
   if (s_rfTransmitter == nullptr) return false;
 
   // Stop logic
   if (type == ShockerCommandType::Stop) {
+    ESP_LOGV(TAG, "Stop command received, clearing pending commands");
+
     type      = ShockerCommandType::Vibrate;
     intensity = 0;
     duration  = 300;
 
     s_rfTransmitter->ClearPendingCommands();
+  } else {
+    ESP_LOGV(TAG, "Command received: %u %u %u %u", model, shockerId, type, intensity);
   }
 
-  return s_rfTransmitter->SendCommand(shockerModel, shockerId, type, intensity, duration);
+  return s_rfTransmitter->SendCommand(model, shockerId, type, intensity, duration);
 }

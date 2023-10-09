@@ -1,6 +1,7 @@
 #pragma once
 
 #include "ShockerCommandType.h"
+#include "ShockerModelType.h"
 
 #include <cstdint>
 
@@ -8,5 +9,5 @@
 
 namespace OpenShock::CommandHandler {
   void Init();
-  bool HandleCommand(std::uint16_t shockerId, OpenShock::ShockerCommandType type, std::uint8_t intensity, unsigned int duration, std::uint8_t shockerModel);
+  bool HandleCommand(ShockerModelType shockerModel, std::uint16_t shockerId, ShockerCommandType type, std::uint8_t intensity, unsigned int duration);
 }  // namespace OpenShock::CommandHandler
