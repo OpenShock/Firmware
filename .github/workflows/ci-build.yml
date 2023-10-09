@@ -26,7 +26,7 @@ env:
   NODE_VERSION: 16
   PYTHON_VERSION: 3.12
   OPENSHOCK_API_DOMAIN: api.shocklink.net
-  OPENSHOCK_FW_VERSION: ${{ inputs.fw_version || (github.event_name == 'pull_request' && '0.0.0-pr' || format('0.0.0-{0}', github.ref_name)) }}
+  OPENSHOCK_FW_VERSION: ${{ inputs.fw_version || (github.base_ref != '' && '0.0.0-pr' || format('0.0.0-{0}', github.ref_name)) }}
   OPENSHOCK_FW_COMMIT: ${{ github.sha }}
 
 jobs:
