@@ -204,6 +204,48 @@ void WiFiManager::Forget(std::uint8_t wifiId) {
   Config::RemoveWiFiCredentials(wifiId);
 }
 
+bool WiFiManager::IsSaved(const char* ssid) {
+  ESP_LOGV(TAG, "Checking if network with SSID %s is saved", ssid);
+
+  for (auto& creds : Config::GetWiFiCredentials()) {
+    if (creds.ssid == ssid) {
+      ESP_LOGV(TAG, "Network with SSID %s is saved", ssid);
+      return true;
+    }
+  }
+
+  ESP_LOGV(TAG, "Network with SSID %s is not saved", ssid);
+  return false;
+}
+
+bool WiFiManager::IsSaved(const std::uint8_t (&bssid)[6]) {
+  ESP_LOGV(TAG, "Checking if network with BSSID %02X:%02X:%02X:%02X:%02X:%02X is saved", bssid[0], bssid[1], bssid[2], bssid[3], bssid[4], bssid[5]);
+
+  for (auto& creds : Config::GetWiFiCredentials()) {
+    if (memcmp(creds.bssid, bssid, sizeof(bssid)) == 0) {
+      ESP_LOGV(TAG, "Network with BSSID %02X:%02X:%02X:%02X:%02X:%02X is saved", bssid[0], bssid[1], bssid[2], bssid[3], bssid[4], bssid[5]);
+      return true;
+    }
+  }
+
+  ESP_LOGV(TAG, "Network with BSSID %02X:%02X:%02X:%02X:%02X:%02X is not saved", bssid[0], bssid[1], bssid[2], bssid[3], bssid[4], bssid[5]);
+  return false;
+}
+
+bool WiFiManager::IsSaved(const char* ssid, const std::uint8_t (&bssid)[6]) {
+  ESP_LOGV(TAG, "Checking if network with SSID %s and BSSID %02X:%02X:%02X:%02X:%02X:%02X is saved", ssid, bssid[0], bssid[1], bssid[2], bssid[3], bssid[4], bssid[5]);
+
+  for (auto& creds : Config::GetWiFiCredentials()) {
+    if (creds.ssid == ssid && memcmp(creds.bssid, bssid, sizeof(bssid)) == 0) {
+      ESP_LOGV(TAG, "Network with SSID %s and BSSID %02X:%02X:%02X:%02X:%02X:%02X is saved", ssid, bssid[0], bssid[1], bssid[2], bssid[3], bssid[4], bssid[5]);
+      return true;
+    }
+  }
+
+  ESP_LOGV(TAG, "Network with SSID %s and BSSID %02X:%02X:%02X:%02X:%02X:%02X is not saved", ssid, bssid[0], bssid[1], bssid[2], bssid[3], bssid[4], bssid[5]);
+  return false;
+}
+
 void WiFiManager::Connect(std::uint8_t wifiId) {
   ESP_LOGV(TAG, "Connecting to network with ID %u", wifiId);
 

@@ -61,6 +61,7 @@ struct CaptivePortalInstance {
       data["rssi"]     = record->rssi;
       data["channel"]  = record->primary;
       data["security"] = Mappers::GetWiFiAuthModeName(record->authmode);
+      data["saved"]    = WiFiManager::IsSaved(reinterpret_cast<const char*>(record->ssid), record->bssid);
 
       CaptivePortal::BroadcastMessageJSON(doc);
     });
