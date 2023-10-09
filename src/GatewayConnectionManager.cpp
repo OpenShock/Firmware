@@ -28,10 +28,16 @@ static std::unordered_map<std::uint64_t, OpenShock::GatewayConnectionManager::Co
 struct GatewayClient {
   GatewayClient(const std::string& authToken, const std::string& fwVersionStr) : m_webSocket(), m_lastKeepAlive(0), m_state(State::Disconnected) {
     ESP_LOGD(TAG, "Creating GatewayClient");
-    std::string firmwareVersionHeader = "FirmwareVersion: " + fwVersionStr;
-    std::string deviceTokenHeader     = "DeviceToken: " + authToken;
+    std::string headers;
+    headers.reserve(512);
 
-    m_webSocket.setExtraHeaders((firmwareVersionHeader + "\r\n" + deviceTokenHeader).c_str());
+    headers += "Firmware-Version: ";
+    headers += fwVersionStr;
+    headers += "\r\n";
+    headers += "Device-Token: ";
+    headers += authToken;
+
+    m_webSocket.setExtraHeaders(headers.c_str());
     m_webSocket.onEvent(std::bind(&GatewayClient::_handleEvent, this, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3));
   }
   ~GatewayClient() {
