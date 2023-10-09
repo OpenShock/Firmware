@@ -276,12 +276,14 @@ bool CaptivePortal::Init() {
   return true;
 }
 void CaptivePortal::SetAlwaysEnabled(bool alwaysEnabled) {
+  s_alwaysEnabled   = alwaysEnabled;
+  s_shouldBeRunning = !GatewayConnectionManager::IsConnected() || alwaysEnabled;
   Config::SetCaptivePortalConfig({
     .alwaysEnabled = alwaysEnabled,
   });
 }
 bool CaptivePortal::IsAlwaysEnabled() {
-  return Config::GetCaptivePortalConfig().alwaysEnabled;
+  return s_alwaysEnabled;
 }
 
 bool CaptivePortal::IsRunning() {
@@ -289,9 +291,14 @@ bool CaptivePortal::IsRunning() {
 }
 void CaptivePortal::Update() {
   if (s_webServices == nullptr) {
-    if (s_shouldBeRunning || s_alwaysEnabled) {
+    if (s_shouldBeRunning) {
       _startCaptive();
     }
+    return;
+  }
+
+  if (!s_shouldBeRunning) {
+    _stopCaptive();
     return;
   }
 
