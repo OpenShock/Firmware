@@ -408,7 +408,7 @@ bool ConnectToLCG() {
   }
 
   std::uint64_t msNow = Millis();
-  if ((msNow - _lastConnectionAttempt) < 20'000) {  // Only try to connect every 20 seconds
+  if (_lastConnectionAttempt != 0 && (msNow - _lastConnectionAttempt) < 20'000) {  // Only try to connect every 20 seconds
     return false;
   }
 
