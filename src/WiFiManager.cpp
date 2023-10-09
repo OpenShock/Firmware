@@ -140,7 +140,12 @@ bool WiFiManager::Init() {
   return true;
 }
 
-bool WiFiManager::Authenticate(std::uint8_t (&bssid)[6], const char* password, std::uint8_t passwordLength) {
+bool WiFiManager::Authenticate(std::uint8_t (&bssid)[6], const std::string& password) {
+  if (password.length() > 63) {
+    ESP_LOGE(TAG, "Password is too long");
+    return false;
+  }
+
   ESP_LOGV(TAG, "Authenticating to network " BSSID_FMT, BSSID_ARG(bssid));
 
   bool found = false;
@@ -162,7 +167,7 @@ bool WiFiManager::Authenticate(std::uint8_t (&bssid)[6], const char* password, s
 
   ESP_LOGV(TAG, "Network with BSSID " BSSID_FMT " was resolved to SSID %s", BSSID_ARG(bssid), ssid);
 
-  std::uint8_t id = Config::AddWiFiCredentials(ssid, bssid, std::string(password, passwordLength));
+  std::uint8_t id = Config::AddWiFiCredentials(ssid, bssid, password);
   if (id == UINT8_MAX) {
     _broadcastWifiAddNetworkError("too_many_credentials");
     return false;
@@ -171,7 +176,7 @@ bool WiFiManager::Authenticate(std::uint8_t (&bssid)[6], const char* password, s
   _broadcastWifiAddNetworkSuccess(ssid);
 
   ESP_LOGI(TAG, "Added WiFi credentials for %s", ssid);
-  wl_status_t stat = WiFi.begin(ssid, password, 0, bssid, true);
+  wl_status_t stat = WiFi.begin(ssid, password.c_str(), 0, bssid, true);
   if (stat != WL_CONNECTED) {
     ESP_LOGE(TAG, "Failed to connect to network %s, error code %d", ssid, stat);
     return false;
