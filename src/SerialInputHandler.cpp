@@ -10,17 +10,83 @@
 
 using namespace OpenShock;
 
-void _handleRestartCommand(char* arg, std::size_t argLength) {
-  Serial.println("Restarting ESP...");
-  ESP.restart();
-}
+const char* const kCommandHelp      = "help";
+const char* const kCommandVersion   = "version";
+const char* const kCommandRestart   = "restart";
+const char* const kCommandRmtpin    = "rmtpin";
+const char* const kCommandAuthToken = "authtoken";
+const char* const kCommandNetworks  = "networks";
 
 void _handleHelpCommand(char* arg, std::size_t argLength) {
   SerialInputHandler::PrintWelcomeHeader();
-  Serial.println("help          print this menu");
-  Serial.println("version       print version information");
-  Serial.println("restart       restart the board");
-  Serial.println("rmtpin <pin>  set radio pin to <pin>\n");
+  if (arg == nullptr || argLength <= 0) {
+    Serial.println("help                print this menu");
+    Serial.println("help      <command> print help for a command");
+    Serial.println("version             print version information");
+    Serial.println("restart             restart the board");
+    Serial.println("rmtpin    <pin>     set radio pin");
+    Serial.println("authtoken <token>   set auth token");
+    Serial.println("networks  <json>    set all saved networks");
+    return;
+  }
+
+  if (strcmp(arg, kCommandRmtpin) == 0) {
+    Serial.println("rmtpin <pin>");
+    Serial.println("  Set the GPIO pin used for the radio transmitter.");
+    Serial.println("  Arguments:");
+    Serial.println("    <pin> must be a number.");
+    Serial.println("  Example:");
+    Serial.println("    rmtpin 15");
+    return;
+  }
+
+  if (strcmp(arg, kCommandAuthToken) == 0) {
+    Serial.println("authtoken <token>");
+    Serial.println("  Set the auth token.");
+    Serial.println("  Arguments:");
+    Serial.println("    <token> must be a string.");
+    Serial.println("  Example:");
+    Serial.println("    authtoken mytoken");
+    return;
+  }
+
+  if (strcmp(arg, kCommandNetworks) == 0) {
+    Serial.println("networks <json>");
+    Serial.println("  Set all saved networks.");
+    Serial.println("  Arguments:");
+    Serial.println("    <json> must be a array of objects with the following fields:");
+    Serial.println("      ssid     (string)  SSID of the network");
+    Serial.println("      password (string)  Password of the network");
+    Serial.println("  Example:");
+    Serial.println("    networks [{\"ssid\":\"myssid\",\"password\":\"mypassword\"}]");
+    return;
+  }
+
+  if (strcmp(arg, kCommandRestart) == 0) {
+    Serial.println(kCommandRestart);
+    Serial.println("  Restart the board");
+    Serial.println("  Example:");
+    Serial.println("    restart");
+    return;
+  }
+
+  if (strcmp(arg, kCommandVersion) == 0) {
+    Serial.println(kCommandVersion);
+    Serial.println("  Print version information");
+    Serial.println("  Example:");
+    Serial.println("    version");
+    return;
+  }
+
+  if (strcmp(arg, kCommandHelp) == 0) {
+    Serial.println(kCommandHelp);
+    Serial.println("  Print help information");
+    Serial.println("  Arguments:");
+    Serial.println("    <command> (optional) command to print help for");
+    Serial.println("  Example:");
+    Serial.println("    help");
+    return;
+  }
 }
 
 void _handleVersionCommand(char* arg, std::size_t argLength) {
@@ -28,15 +94,9 @@ void _handleVersionCommand(char* arg, std::size_t argLength) {
   SerialInputHandler::PrintVersionInfo();
 }
 
-void _handleAuthtokenCommand(char* arg, std::size_t argLength) {
-  if (arg == nullptr || argLength <= 0) {
-    Serial.println("SYS|Error|Invalid argument");
-    return;
-  }
-
-  OpenShock::Config::SetBackendAuthToken(std::string(arg, argLength));
-
-  Serial.println("SYS|Success|Saved config");
+void _handleRestartCommand(char* arg, std::size_t argLength) {
+  Serial.println("Restarting ESP...");
+  ESP.restart();
 }
 
 void _handleRmtpinCommand(char* arg, std::size_t argLength) {
@@ -52,6 +112,17 @@ void _handleRmtpinCommand(char* arg, std::size_t argLength) {
   }
 
   OpenShock::Config::SetRFConfig({.txPin = pin});
+
+  Serial.println("SYS|Success|Saved config");
+}
+
+void _handleAuthtokenCommand(char* arg, std::size_t argLength) {
+  if (arg == nullptr || argLength <= 0) {
+    Serial.println("SYS|Error|Invalid argument");
+    return;
+  }
+
+  OpenShock::Config::SetBackendAuthToken(std::string(arg, argLength));
 
   Serial.println("SYS|Success|Saved config");
 }
@@ -95,9 +166,12 @@ void _handleNetworksCommand(char* arg, std::size_t argLength) {
 }
 
 static std::unordered_map<std::string, void (*)(char*, std::size_t)> s_commandHandlers = {
-  {"authtoken", _handleAuthtokenCommand},
-  {   "rmtpin",    _handleRmtpinCommand},
-  { "networks",  _handleNetworksCommand},
+  {     kCommandHelp,      _handleHelpCommand},
+  {  kCommandVersion,   _handleVersionCommand},
+  {  kCommandRestart,   _handleRestartCommand},
+  {   kCommandRmtpin,    _handleRmtpinCommand},
+  {kCommandAuthToken, _handleAuthtokenCommand},
+  { kCommandNetworks,  _handleNetworksCommand},
 };
 
 int findChar(const char* buffer, std::size_t bufferSize, char c) {
