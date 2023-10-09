@@ -106,7 +106,11 @@ Config::BackendConfig FromFbsBackendConfig(const Serialization::Configuration::B
       return {
         .authToken = fbsConfig->auth_token()->str(),
       };
+    } else {
+      ESP_LOGW(TAG, "authToken == nullptr");
     }
+  } else {
+    ESP_LOGW(TAG, "fbsConfig == nullptr");
   }
 
   return {
@@ -212,7 +216,7 @@ bool _trySaveConfig(const MainConfig& config) {
 
   auto captivePortalConfig = Serialization::Configuration::CaptivePortalConfig(config.captivePortal.alwaysEnabled);
 
-  auto backendConfig = Serialization::Configuration::CreateBackendConfig(builder, builder.CreateString(config.backend.authToken));
+  auto backendConfig = Serialization::Configuration::CreateBackendConfig(builder, builder.CreateString(""), builder.CreateString(config.backend.authToken));
 
   // WARNING: Passing the bssid by reference is probably not the way this is supposed to be done, will most likely segfault
   auto fbsConfig = Serialization::Configuration::CreateConfig(builder, &rfConfig, wifiConfig, &captivePortalConfig, backendConfig);
@@ -232,6 +236,7 @@ bool _trySaveConfig(const MainConfig& config) {
 
 void Config::Init() {
   if (!_tryLoadConfig(_mainConfig)) {
+    ESP_LOGW(TAG, "Failed to load config, overwriting with default config");
     _mainConfig = {
       .rf = {
 #ifdef OPENSHOCK_TX_PIN
@@ -370,6 +375,10 @@ void Config::RemoveWiFiCredentials(std::uint8_t id) {
 void Config::ClearWiFiCredentials() {
   _mainConfig.wifi.credentials.clear();
   _trySaveConfig(_mainConfig);
+}
+
+bool Config::HasBackendAuthToken() {
+  return !_mainConfig.backend.authToken.empty();
 }
 
 const std::string& Config::GetBackendAuthToken() {
