@@ -67,6 +67,7 @@ struct WiFiNetwork {
 
 static std::vector<WiFiNetwork> s_wifiNetworks;
 
+static int _retryCount = 0;  // TODO: This is a hack, fix this
 void _evWiFiDisconnected(arduino_event_t* event) {
   auto& info = event->event_info.wifi_sta_disconnected;
 
@@ -86,7 +87,9 @@ void _evWiFiDisconnected(arduino_event_t* event) {
     _broadcastWifiConnectError(reinterpret_cast<char*>(info.ssid), info.bssid, reason);
   }
 
-  WiFiManager::Connect(creds.id);
+  if (++_retryCount < 3) {           // TODO: This is a hack, fix this
+    WiFiManager::Connect(creds.id);  // TODO: This is a hack, fix this
+  }                                  // TODO: This is a hack, fix this
 }
 void _evWiFiNetworkDiscovered(const wifi_ap_record_t* record) {
   WiFiNetwork network {
