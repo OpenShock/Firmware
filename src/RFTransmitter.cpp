@@ -69,7 +69,7 @@ bool RFTransmitter::SendCommand(ShockerModelType model, std::uint16_t shockerId,
   command_t* cmd = new command_t {OpenShock::Millis() + duration, Rmt::GetSequence(model, shockerId, type, intensity), Rmt::GetZeroSequence(model, shockerId), shockerId};
 
   // Add the command to the queue, wait max 10 ms (Adjust this)
-  if (xQueueSend(m_queueHandle, cmd, 10 / portTICK_PERIOD_MS) != pdTRUE) {
+  if (xQueueSend(m_queueHandle, &cmd, 10 / portTICK_PERIOD_MS) != pdTRUE) {
     ESP_LOGE(m_name, "Failed to send command to queue");
     delete cmd;
     return false;
