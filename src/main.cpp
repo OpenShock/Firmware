@@ -17,7 +17,6 @@ const char* const TAG = "OpenShock";
 
 void setup() {
   Serial.begin(115'200);
-  Serial.setDebugOutput(true);
 
   if (!LittleFS.begin(true)) {
     ESP_LOGE(TAG, "PANIC: An Error has occurred while mounting LittleFS, restarting in 5 seconds...");
