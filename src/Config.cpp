@@ -176,7 +176,7 @@ bool _tryLoadConfig(MainConfig& config) {
   }
 
   // Validate buffer
-  flatbuffers::Verifier::Options verifierOptions {};
+  flatbuffers::Verifier::Options verifierOptions {};  // TODO: profile the normal message size and adjust this accordingly
   flatbuffers::Verifier verifier(buffer, size, verifierOptions);
   if (!fbsConfig->Verify(verifier)) {
     delete[] buffer;
