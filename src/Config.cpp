@@ -362,6 +362,28 @@ bool Config::TryGetWiFiCredentialsById(std::uint8_t id, Config::WiFiCredentials&
   return false;
 }
 
+bool Config::TryGetWiFiCredentialsBySSID(const char* ssid, Config::WiFiCredentials& credentials) {
+  for (auto& creds : _mainConfig.wifi.credentials) {
+    if (creds.ssid == ssid) {
+      credentials = creds;
+      return true;
+    }
+  }
+
+  return false;
+}
+
+bool Config::TryGetWiFiCredentialsByBSSID(const std::uint8_t (&bssid)[6], Config::WiFiCredentials& credentials) {
+  for (auto& creds : _mainConfig.wifi.credentials) {
+    if (memcmp(creds.bssid, bssid, 6) == 0) {
+      credentials = creds;
+      return true;
+    }
+  }
+
+  return false;
+}
+
 void Config::RemoveWiFiCredentials(std::uint8_t id) {
   for (auto it = _mainConfig.wifi.credentials.begin(); it != _mainConfig.wifi.credentials.end(); ++it) {
     if (it->id == id) {

@@ -70,12 +70,23 @@ static std::vector<WiFiNetwork> s_wifiNetworks;
 void _evWiFiDisconnected(arduino_event_t* event) {
   auto& info = event->event_info.wifi_sta_disconnected;
 
-  if (info.reason == WIFI_REASON_4WAY_HANDSHAKE_TIMEOUT) {
-    WiFi.disconnect(false);
-
-    _broadcastWifiConnectError(reinterpret_cast<char*>(info.ssid), info.bssid, "authentication_failed");
+  Config::WiFiCredentials creds;
+  if (!Config::TryGetWiFiCredentialsBySSID(reinterpret_cast<char*>(info.ssid), creds) && !Config::TryGetWiFiCredentialsByBSSID(info.bssid, creds)) {
+    ESP_LOGW(TAG, "Disconnected from unknown network... WTF?");
     return;
   }
+
+  ESP_LOGI(TAG, "Disconnected from network %s (%02X:%02X:%02X:%02X:%02X:%02X)", info.ssid, info.bssid[0], info.bssid[1], info.bssid[2], info.bssid[3], info.bssid[4], info.bssid[5]);
+
+  if (info.reason == WIFI_REASON_4WAY_HANDSHAKE_TIMEOUT) {
+    _broadcastWifiConnectError(reinterpret_cast<char*>(info.ssid), info.bssid, "authentication_failed");
+  } else {
+    char reason[32];
+    snprintf(reason, sizeof(reason), "reason_%d", info.reason);
+    _broadcastWifiConnectError(reinterpret_cast<char*>(info.ssid), info.bssid, reason);
+  }
+
+  WiFiManager::Connect(creds.id);
 }
 void _evWiFiNetworkDiscovered(const wifi_ap_record_t* record) {
   WiFiNetwork network {
