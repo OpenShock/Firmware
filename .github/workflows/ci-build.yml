@@ -12,6 +12,7 @@ on:
     inputs:
       fw_version:
         description: "Firmware version"
+        type: string
         required: true
     outputs:
       matrix:
