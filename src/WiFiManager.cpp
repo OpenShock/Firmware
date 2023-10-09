@@ -2,6 +2,7 @@
 
 #include "CaptivePortal.h"
 #include "Config.h"
+#include "FormatHelpers.h"
 #include "Mappers/EspWiFiTypesMapper.h"
 #include "Utils/HexUtils.h"
 #include "VisualStateManager.h"
@@ -77,7 +78,7 @@ void _evWiFiDisconnected(arduino_event_t* event) {
     return;
   }
 
-  ESP_LOGI(TAG, "Disconnected from network %s (%02X:%02X:%02X:%02X:%02X:%02X)", info.ssid, info.bssid[0], info.bssid[1], info.bssid[2], info.bssid[3], info.bssid[4], info.bssid[5]);
+  ESP_LOGI(TAG, "Disconnected from network %s (" BSSID_FMT ")", info.ssid, BSSID_ARG(info.bssid));
 
   if (info.reason == WIFI_REASON_4WAY_HANDSHAKE_TIMEOUT) {
     _broadcastWifiConnectError(reinterpret_cast<char*>(info.ssid), info.bssid, "authentication_failed");
@@ -140,7 +141,7 @@ bool WiFiManager::Init() {
 }
 
 bool WiFiManager::Authenticate(std::uint8_t (&bssid)[6], const char* password, std::uint8_t passwordLength) {
-  ESP_LOGV(TAG, "Authenticating to network %02X:%02X:%02X:%02X:%02X:%02X", bssid[0], bssid[1], bssid[2], bssid[3], bssid[4], bssid[5]);
+  ESP_LOGV(TAG, "Authenticating to network " BSSID_FMT, BSSID_ARG(bssid));
 
   bool found = false;
   char ssid[33];
@@ -154,12 +155,12 @@ bool WiFiManager::Authenticate(std::uint8_t (&bssid)[6], const char* password, s
   }
 
   if (!found) {
-    ESP_LOGE(TAG, "Failed to find network with BSSID %02X:%02X:%02X:%02X:%02X:%02X", bssid[0], bssid[1], bssid[2], bssid[3], bssid[4], bssid[5]);
+    ESP_LOGE(TAG, "Failed to find network with BSSID " BSSID_FMT, BSSID_ARG(bssid));
     _broadcastWifiAddNetworkError("network_not_found");
     return false;
   }
 
-  ESP_LOGV(TAG, "Network with BSSID %02X:%02X:%02X:%02X:%02X:%02X was resolved to SSID %s", bssid[0], bssid[1], bssid[2], bssid[3], bssid[4], bssid[5], ssid);
+  ESP_LOGV(TAG, "Network with BSSID " BSSID_FMT " was resolved to SSID %s", BSSID_ARG(bssid), ssid);
 
   std::uint8_t id = Config::AddWiFiCredentials(ssid, bssid, std::string(password, passwordLength));
   if (id == UINT8_MAX) {
@@ -219,30 +220,30 @@ bool WiFiManager::IsSaved(const char* ssid) {
 }
 
 bool WiFiManager::IsSaved(const std::uint8_t (&bssid)[6]) {
-  ESP_LOGV(TAG, "Checking if network with BSSID %02X:%02X:%02X:%02X:%02X:%02X is saved", bssid[0], bssid[1], bssid[2], bssid[3], bssid[4], bssid[5]);
+  ESP_LOGV(TAG, "Checking if network with BSSID " BSSID_FMT " is saved", BSSID_ARG(bssid));
 
   for (auto& creds : Config::GetWiFiCredentials()) {
     if (memcmp(creds.bssid, bssid, sizeof(bssid)) == 0) {
-      ESP_LOGV(TAG, "Network with BSSID %02X:%02X:%02X:%02X:%02X:%02X is saved", bssid[0], bssid[1], bssid[2], bssid[3], bssid[4], bssid[5]);
+      ESP_LOGV(TAG, "Network with BSSID " BSSID_FMT " is saved", BSSID_ARG(bssid));
       return true;
     }
   }
 
-  ESP_LOGV(TAG, "Network with BSSID %02X:%02X:%02X:%02X:%02X:%02X is not saved", bssid[0], bssid[1], bssid[2], bssid[3], bssid[4], bssid[5]);
+  ESP_LOGV(TAG, "Network with BSSID " BSSID_FMT " is not saved", BSSID_ARG(bssid));
   return false;
 }
 
 bool WiFiManager::IsSaved(const char* ssid, const std::uint8_t (&bssid)[6]) {
-  ESP_LOGV(TAG, "Checking if network with SSID %s and BSSID %02X:%02X:%02X:%02X:%02X:%02X is saved", ssid, bssid[0], bssid[1], bssid[2], bssid[3], bssid[4], bssid[5]);
+  ESP_LOGV(TAG, "Checking if network with SSID %s and BSSID " BSSID_FMT " is saved", ssid, BSSID_ARG(bssid));
 
   for (auto& creds : Config::GetWiFiCredentials()) {
     if (creds.ssid == ssid && memcmp(creds.bssid, bssid, sizeof(bssid)) == 0) {
-      ESP_LOGV(TAG, "Network with SSID %s and BSSID %02X:%02X:%02X:%02X:%02X:%02X is saved", ssid, bssid[0], bssid[1], bssid[2], bssid[3], bssid[4], bssid[5]);
+      ESP_LOGV(TAG, "Network with SSID %s and BSSID " BSSID_FMT " is saved", ssid, BSSID_ARG(bssid));
       return true;
     }
   }
 
-  ESP_LOGV(TAG, "Network with SSID %s and BSSID %02X:%02X:%02X:%02X:%02X:%02X is not saved", ssid, bssid[0], bssid[1], bssid[2], bssid[3], bssid[4], bssid[5]);
+  ESP_LOGV(TAG, "Network with SSID %s and BSSID " BSSID_FMT " is not saved", ssid, BSSID_ARG(bssid));
   return false;
 }
 
