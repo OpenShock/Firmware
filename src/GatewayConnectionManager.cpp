@@ -30,7 +30,7 @@ struct GatewayClient {
     std::string firmwareVersionHeader = "FirmwareVersion: " + fwVersionStr;
     std::string deviceTokenHeader     = "DeviceToken: " + authToken;
 
-    m_webSocket.setExtraHeaders((firmwareVersionHeader + "\"" + deviceTokenHeader).c_str());
+    m_webSocket.setExtraHeaders((firmwareVersionHeader + "\r\n" + deviceTokenHeader).c_str());
     m_webSocket.onEvent(std::bind(&GatewayClient::_handleEvent, this, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3));
   }
   ~GatewayClient() {
