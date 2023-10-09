@@ -30,7 +30,7 @@ jobs:
           name: OpenShock_${{ matrix.board }}
           name_is_regexp: false
           run_id: ${{ github.event.workflow_run.id }}
-          workflow_conclusion: 'in_progress' # ignore
+          workflow_conclusion: '' # ignore
           search_artifacts: false
 
       # Push artifact for this board.
