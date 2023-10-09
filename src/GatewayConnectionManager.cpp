@@ -4,6 +4,7 @@
 #include "CommandHandler.h"
 #include "Config.h"
 #include "Constants.h"
+#include "fbs/DeviceToServerMessage_generated.h"
 #include "ShockerCommandType.h"
 #include "Time.h"
 
@@ -80,7 +81,7 @@ struct GatewayClient {
 
     std::uint64_t timeSinceLastKA = msNow - m_lastKeepAlive;
 
-    if (timeSinceLastKA >= 30'000) {
+    if (timeSinceLastKA >= 15'000) {
       _sendKeepAlive();
       m_lastKeepAlive = msNow;
     }
@@ -94,10 +95,19 @@ struct GatewayClient {
 
 private:
   void _sendKeepAlive() {
-    if (m_webSocket.isConnected()) {
-      ESP_LOGD(TAG, "Sending keep alive online state");
-      m_webSocket.sendTXT("{\"requestType\": 0}");
-    }
+    ESP_LOGV(TAG, "Sending keep alive message");
+
+    OpenShock::Serialization::KeepAlive keepAlive(OpenShock::Millis());
+
+    flatbuffers::FlatBufferBuilder builder(64);
+
+    auto keepAliveOffset = builder.CreateStruct(keepAlive);
+
+    auto msg = OpenShock::Serialization::CreateDeviceToServerMessage(builder, OpenShock::Serialization::DeviceToServerMessagePayload::KeepAlive, keepAliveOffset.Union());
+
+    builder.Finish(msg);
+
+    m_webSocket.sendBIN(builder.GetBufferPointer(), builder.GetSize());
   }
 
   void _handleControlCommandMessage(const DynamicJsonDocument& doc) {
