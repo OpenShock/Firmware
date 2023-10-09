@@ -30,8 +30,8 @@ jobs:
           name: OpenShock_${{ matrix.board }}
           name_is_regexp: false
           run_id: ${{ github.event.workflow_run.id }}
-          workflow_conclusion: '' # ignore
-          search_artifacts: true
+          workflow_conclusion: 'in_progress' # ignore
+          search_artifacts: false
 
       # Push artifact for this board.
       - name: Upload artifact to release
