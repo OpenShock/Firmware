@@ -3,11 +3,16 @@ on:
     branches:
       - master
       - develop
+      - bugfix/firmware-version
   pull_request:
     branches:
       - develop
     types: [opened, reopened, synchronize]
   workflow_call: # When another workflow invokes this one.
+    inputs:
+      fw_version:
+        description: "Firmware version"
+        required: true
     outputs:
       matrix:
         description: "Strategy matrix"
@@ -20,6 +25,7 @@ env:
   NODE_VERSION: 16
   PYTHON_VERSION: 3.11
   OPENSHOCK_API_DOMAIN: api.shocklink.net
+  OPENSHOCK_FW_VERSION: ${{ inputs.fw_version || github.ref_name }}
   OPENSHOCK_FW_COMMIT: ${{ github.sha }}
 
 jobs:
