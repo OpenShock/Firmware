@@ -197,7 +197,11 @@ private:
       return;
     }
 
-    flatbuffers::Verifier::Options verifierOptions {};  // TODO: profile the normal message size and adjust this accordingly
+    flatbuffers::Verifier::Options verifierOptions {
+      .max_depth  = 32,   // Half of the default value
+      .max_tables = 64,   // Way less than the default value
+      .max_size   = 512,  // Don't see why we would need more than this at the moment
+    };
     flatbuffers::Verifier verifier(payload, length, verifierOptions);
     if (!msg->Verify(verifier)) {
       ESP_LOGE(TAG, "Received invalid message from API");

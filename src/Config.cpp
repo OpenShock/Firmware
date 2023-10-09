@@ -165,8 +165,6 @@ bool _tryLoadConfig(MainConfig& config) {
 
   file.close();
 
-  // TODO: Implement checksum at end of file to verify integrity
-
   // Deserialize
   auto fbsConfig = flatbuffers::GetRoot<Serialization::Configuration::Config>(buffer);
   if (fbsConfig == nullptr) {
@@ -176,7 +174,9 @@ bool _tryLoadConfig(MainConfig& config) {
   }
 
   // Validate buffer
-  flatbuffers::Verifier::Options verifierOptions {};  // TODO: profile the normal message size and adjust this accordingly
+  flatbuffers::Verifier::Options verifierOptions {
+    .max_size = 4096,  // Should be enough
+  };
   flatbuffers::Verifier verifier(buffer, size, verifierOptions);
   if (!fbsConfig->Verify(verifier)) {
     delete[] buffer;
