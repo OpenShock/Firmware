@@ -2,9 +2,9 @@
 
 #include "Config.h"
 
+#include <ArduinoJson.h>
 #include <Esp.h>
 #include <HardwareSerial.h>
-#include <ArduinoJson.h>
 
 #include <unordered_map>
 
@@ -45,15 +45,13 @@ void _handleRmtpinCommand(char* arg, std::size_t argLength) {
     return;
   }
 
-  // Check if the argument is a number
-  for (std::size_t i = 0; i < argLength; i++) {
-    if (arg[i] < '0' || arg[i] > '9') {
-      Serial.println("SYS|Error|Invalid argument (not a number)");
-      return;
-    }
+  std::uint32_t pin;
+  if (sscanf(arg, "%u", &pin) != 1) {
+    Serial.println("SYS|Error|Invalid argument (not a number)");
+    return;
   }
 
-  OpenShock::Config::SetRFConfig({.txPin = atoi(arg)});
+  OpenShock::Config::SetRFConfig({.txPin = pin});
 
   Serial.println("SYS|Success|Saved config");
 }

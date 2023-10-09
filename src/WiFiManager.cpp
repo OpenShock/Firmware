@@ -126,6 +126,8 @@ bool WiFiManager::Init() {
 }
 
 bool WiFiManager::Authenticate(std::uint8_t (&bssid)[6], const char* password, std::uint8_t passwordLength) {
+  ESP_LOGV(TAG, "Authenticating to network %02X:%02X:%02X:%02X:%02X:%02X", bssid[0], bssid[1], bssid[2], bssid[3], bssid[4], bssid[5]);
+
   bool found = false;
   char ssid[33];
   for (std::uint16_t i = 0; i < s_wifiNetworks.size(); i++) {
@@ -142,6 +144,8 @@ bool WiFiManager::Authenticate(std::uint8_t (&bssid)[6], const char* password, s
     _broadcastWifiAddNetworkError("network_not_found");
     return false;
   }
+
+  ESP_LOGV(TAG, "Network with BSSID %02X:%02X:%02X:%02X:%02X:%02X was resolved to SSID %s", bssid[0], bssid[1], bssid[2], bssid[3], bssid[4], bssid[5], ssid);
 
   std::uint8_t id = Config::AddWiFiCredentials(ssid, bssid, std::string(password, passwordLength));
   if (id == UINT8_MAX) {
@@ -162,16 +166,23 @@ bool WiFiManager::Authenticate(std::uint8_t (&bssid)[6], const char* password, s
 }
 
 void WiFiManager::Forget(std::uint8_t wifiId) {
+  ESP_LOGV(TAG, "Removing WiFi credentials with ID %u", wifiId);
+
   // Check if the network is currently connected
   if (WiFi.isConnected()) {
     // Get the credentials for the network
     Config::WiFiCredentials creds;
-    if (Config::TryGetWiFiCredentialsById(wifiId, creds)) {
-      // Check if the network is the one we're connected to
-      if (WiFi.SSID().c_str() == creds.ssid) {
-        // Disconnect from the network
-        WiFi.disconnect(true);
-      }
+    if (!Config::TryGetWiFiCredentialsById(wifiId, creds)) {
+      ESP_LOGD(TAG, "Failed to find credentials with ID %u", wifiId);
+      return;
+    }
+
+    // Check if the network is the one we're connected to
+    if (WiFi.SSID().c_str() == creds.ssid) {
+      ESP_LOGV(TAG, "Network pending removal is the one we're connected to, disconnecting...");
+
+      // Disconnect from the network
+      WiFi.disconnect(true);
     }
   }
 
@@ -180,9 +191,11 @@ void WiFiManager::Forget(std::uint8_t wifiId) {
 }
 
 void WiFiManager::Connect(std::uint8_t wifiId) {
+  ESP_LOGV(TAG, "Connecting to network with ID %u", wifiId);
+
   for (auto& creds : Config::GetWiFiCredentials()) {
     if (creds.id == wifiId) {
-      ESP_LOGI(TAG, "Connecting to network #%u (%s)", wifiId, creds.ssid);
+      ESP_LOGV(TAG, "Network with ID %u was resolved to SSID %s", wifiId, creds.ssid.c_str());
       WiFi.begin(creds.ssid.c_str(), creds.password.c_str());
       return;
     }
