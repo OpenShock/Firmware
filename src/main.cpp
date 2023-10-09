@@ -4,6 +4,7 @@
 #include "Constants.h"
 #include "GatewayConnectionManager.h"
 #include "SerialInputHandler.h"
+#include "VisualStateManager.h"
 #include "WiFiManager.h"
 #include "WiFiScanManager.h"
 
@@ -23,6 +24,8 @@ void setup() {
     delay(5000);
     ESP.restart();
   }
+
+  OpenShock::VisualStateManager::Init();
 
   OpenShock::Config::Init();
 
