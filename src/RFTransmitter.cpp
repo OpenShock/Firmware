@@ -61,8 +61,6 @@ bool RFTransmitter::SendCommand(ShockerModelType model, std::uint16_t shockerId,
     return false;
   }
 
-  ESP_LOGV(m_name, "Sending command: %u %u %u %u %u", model, shockerId, type, intensity, duration);
-
   // Intensity must be between 0 and 99
   // Duration for provided command must not exceed hard limit of 66 seconds (2^16 ms)
   intensity = std::min(intensity, (std::uint8_t)99);
@@ -110,14 +108,11 @@ void RFTransmitter::TransmitTask(void* arg) {
         ESP_LOGW(name, "Received null command");
         continue;
       }
-      ESP_LOGV(name, "Received command: %u %u %u %u", cmd->shockerId, cmd->sequence.size(), cmd->zeroSequence->size(), cmd->until);
 
       // Replace the command if it already exists
       bool replaced = false;
       for (auto it = commands.begin(); it != commands.end(); ++it) {
-        ESP_LOGV(name, "Checking command: %u", (*it)->shockerId);
         if ((*it)->shockerId == cmd->shockerId) {
-          ESP_LOGV(name, "Replacing command: %u", (*it)->shockerId);
           delete *it;
           *it = cmd;
 
@@ -129,7 +124,6 @@ void RFTransmitter::TransmitTask(void* arg) {
 
       // If the command was not replaced, add it to the queue
       if (!replaced) {
-        ESP_LOGV(name, "Adding command: %u", cmd->shockerId);
         commands.push_back(cmd);
       }
     }
@@ -140,16 +134,12 @@ void RFTransmitter::TransmitTask(void* arg) {
     for (auto it = commands.begin(); it != commands.end();) {
       cmd = *it;
 
-      ESP_LOGV(name, "Checking command: %u", cmd->shockerId);
-
       bool expired = cmd->until < mil;
       bool empty   = cmd->sequence.size() <= 0;
 
       // Remove expired or empty commands, else send the command.
       // After sending/receiving a command, move to the next one.
       if (expired || empty) {
-        ESP_LOGV(name, "Removing command: %u", cmd->shockerId);
-
         // If the command is not empty, send the zero sequence to stop the shocker
         if (!empty) {
           rmtWriteBlocking(rmtHandle, cmd->zeroSequence->data(), cmd->zeroSequence->size());
@@ -159,8 +149,6 @@ void RFTransmitter::TransmitTask(void* arg) {
         it = commands.erase(it);
         delete cmd;
       } else {
-        ESP_LOGV(name, "Sending command: %u", cmd->shockerId);
-
         // Send the command
         rmtWriteBlocking(rmtHandle, cmd->sequence.data(), cmd->sequence.size());
 
