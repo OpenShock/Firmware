@@ -208,7 +208,6 @@ bool _trySaveConfig(const MainConfig& config) {
   for (const auto& cred : config.wifi.credentials) {
     auto bssid = Serialization::Configuration::BSSID(cred.bssid);
 
-    // WARNING: Passing the bssid by reference is probably not the way this is supposed to be done, will most likely segfault
     wifiCredentials.push_back(Serialization::Configuration::CreateWiFiCredentials(builder, cred.id, builder.CreateString(cred.ssid), &bssid, builder.CreateString(cred.password)));
   }
 
@@ -218,7 +217,6 @@ bool _trySaveConfig(const MainConfig& config) {
 
   auto backendConfig = Serialization::Configuration::CreateBackendConfig(builder, builder.CreateString(""), builder.CreateString(config.backend.authToken));
 
-  // WARNING: Passing the bssid by reference is probably not the way this is supposed to be done, will most likely segfault
   auto fbsConfig = Serialization::Configuration::CreateConfig(builder, &rfConfig, wifiConfig, &captivePortalConfig, backendConfig);
 
   builder.Finish(fbsConfig);

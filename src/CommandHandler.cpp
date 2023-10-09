@@ -1,6 +1,7 @@
 #include "CommandHandler.h"
 
 #include "Config.h"
+#include "Constants.h"
 #include "RFTransmitter.h"
 
 #include <esp_log.h>
@@ -15,7 +16,7 @@ static std::unique_ptr<RFTransmitter> s_rfTransmitter = nullptr;
 
 void CommandHandler::Init() {
   std::uint32_t txPin = Config::GetRFConfig().txPin;
-  if (txPin > 60) {  // WARNING: This is a magic number, set a sensible constant for this
+  if (txPin > OpenShock::Constants::MaxGpioPin) {
     ESP_LOGW(TAG, "TxPin is invalid, radio is disabled");
     return;
   }

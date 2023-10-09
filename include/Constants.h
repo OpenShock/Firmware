@@ -23,4 +23,5 @@
 namespace OpenShock::Constants {
   extern const char* const Version;
   extern const char* const ApiDomain;
+  const std::size_t MaxGpioPin = 60;
 }  // namespace OpenShock::Constants
