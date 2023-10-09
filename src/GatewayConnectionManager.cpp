@@ -25,12 +25,17 @@ extern const std::uint8_t* const rootca_crt_bundle_start asm("_binary_data_cert_
 static std::unordered_map<std::uint64_t, OpenShock::GatewayConnectionManager::ConnectedChangedHandler> s_connectedChangedHandlers;
 
 struct GatewayClient {
-  GatewayClient(const std::string& authToken, const std::string& fwVersionStr) : m_webSocket() {
+  GatewayClient(const std::string& authToken, const std::string& fwVersionStr) : m_webSocket(), m_lastKeepAlive(0), m_state(State::Disconnected) {
+    ESP_LOGD(TAG, "Creating GatewayClient");
     std::string firmwareVersionHeader = "FirmwareVersion: " + fwVersionStr;
     std::string deviceTokenHeader     = "DeviceToken: " + authToken;
 
     m_webSocket.setExtraHeaders((firmwareVersionHeader + "\"" + deviceTokenHeader).c_str());
     m_webSocket.onEvent(std::bind(&GatewayClient::_handleEvent, this, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3));
+  }
+  ~GatewayClient() {
+    ESP_LOGD(TAG, "Destroying GatewayClient");
+    m_webSocket.disconnect();
   }
 
   enum class State {
@@ -65,7 +70,9 @@ struct GatewayClient {
 
     m_webSocket.loop();
 
+    // We are still in the process of connecting or disconnecting
     if (m_state != State::Connected) {
+      // return true to indicate that we are still busy
       return true;
     }
 
@@ -82,8 +89,8 @@ struct GatewayClient {
   }
 
   WebSocketsClient m_webSocket;
-  std::uint64_t m_lastKeepAlive = 0;
-  State m_state                 = State::Disconnected;
+  std::uint64_t m_lastKeepAlive;
+  State m_state;
 
 private:
   void _sendKeepAlive() {
@@ -185,21 +192,23 @@ private:
   }
 };
 
-constexpr std::uint8_t FLAG_NONE           = 0;
-constexpr std::uint8_t FLAG_WIFI_CONNECTED = 1 << 0;
-constexpr std::uint8_t FLAG_DEVICE_PAIRED  = 1 << 1;
+constexpr std::uint8_t FLAG_NONE          = 0;
+constexpr std::uint8_t FLAG_HAS_IP        = 1 << 0;
+constexpr std::uint8_t FLAG_AUTHENTICATED = 1 << 1;
 
 static std::uint8_t s_flags = 0;
 // static WiFiClientSecure* s_wifiClient            = nullptr;
 static std::unique_ptr<GatewayClient> s_wsClient = nullptr;
 
-void _evWiFiConnectedHandler(arduino_event_t* event) {
-  s_flags |= FLAG_WIFI_CONNECTED;
+void _evGotIPHandler(arduino_event_t* event) {
+  s_flags |= FLAG_HAS_IP;
+  ESP_LOGD(TAG, "Got IP address");
 }
 
 void _evWiFiDisconnectedHandler(arduino_event_t* event) {
   s_flags    = FLAG_NONE;
   s_wsClient = nullptr;
+  ESP_LOGD(TAG, "Lost IP address");
 }
 
 using namespace OpenShock;
@@ -232,8 +241,8 @@ bool GatewayConnectionManager::Init() {
   // ##    ## ##       ##    ## ##     ## ##    ##   ##     ##       ##       ##    ##   ##  ##    ## ##   ##
   //  ######  ########  ######   #######  ##     ## ####    ##       ##       ##     ## ####  ######  ##    ##
   //
-  WiFi.onEvent(_evWiFiConnectedHandler, ARDUINO_EVENT_WIFI_STA_GOT_IP);
-  WiFi.onEvent(_evWiFiConnectedHandler, ARDUINO_EVENT_WIFI_STA_GOT_IP6);
+  WiFi.onEvent(_evGotIPHandler, ARDUINO_EVENT_WIFI_STA_GOT_IP);
+  WiFi.onEvent(_evGotIPHandler, ARDUINO_EVENT_WIFI_STA_GOT_IP6);
   WiFi.onEvent(_evWiFiDisconnectedHandler, ARDUINO_EVENT_WIFI_STA_DISCONNECTED);
 
   return true;
@@ -247,45 +256,30 @@ bool GatewayConnectionManager::IsConnected() {
   return s_wsClient->state() == GatewayClient::State::Connected;
 }
 
+void GetDeviceInfoFromJsonResponse(HTTPClient& http) {
+  ArduinoJson::DynamicJsonDocument doc(1024);  // TODO: profile the normal message size and adjust this accordingly
+  deserializeJson(doc, http.getString());
+
+  auto data   = doc["data"];
+  String id   = data["id"];
+  String name = data["name"];
+
+  ESP_LOGD(TAG, "Device ID:   %s", id.c_str());
+  ESP_LOGD(TAG, "Device name: %s", name.c_str());
+
+  auto shockers = data["shockers"];
+  for (int i = 0; i < shockers.size(); i++) {
+    auto shocker              = shockers[i];
+    String shockerId          = shocker["id"];
+    std::uint16_t shockerRfId = shocker["rfId"];
+    std::uint8_t shockerModel = shocker["model"];
+
+    ESP_LOGD(TAG, "Found shocker %s with RF ID %u and model %u", shockerId.c_str(), shockerRfId, shockerModel);
+  }
+}
+
 bool GatewayConnectionManager::IsPaired() {
-  // TODO: this function is very slow, should be optimized!
-  if (s_flags & FLAG_DEVICE_PAIRED) {
-    return true;
-  }
-  if ((s_flags & FLAG_WIFI_CONNECTED) == 0) {
-    return false;
-  }
-  if (Config::GetBackendAuthToken().empty()) {
-    return false;
-  }
-
-  HTTPClient http;
-  const char* const uri = OPENSHOCK_API_URL("/1/device/self");
-
-  ESP_LOGD(TAG, "Contacting self url: %s", uri);
-  http.begin(uri);  // TODO: http.begin(*s_wifiClient, uri);
-
-  // TODO: Attach auth token
-
-  int responseCode = http.GET();
-
-  if (responseCode == 401) {
-    ESP_LOGD(TAG, "Auth token is invalid, clearing it");
-    Config::ClearBackendAuthToken();
-    return false;
-  }
-  if (responseCode != 200) {
-    ESP_LOGE(TAG, "Error while verifying auth token: [%d] %s", responseCode, http.getString().c_str());
-    return false;
-  }
-
-  http.end();
-
-  s_flags |= FLAG_DEVICE_PAIRED;
-
-  ESP_LOGD(TAG, "Successfully verified auth token");
-
-  return true;
+  return (s_flags & FLAG_AUTHENTICATED) != 0;
 }
 
 // This method is here to heap usage
@@ -299,7 +293,7 @@ std::string GetAuthTokenFromJsonResponse(HTTPClient& http) {
 }
 
 bool GatewayConnectionManager::Pair(unsigned int pairCode) {
-  if ((s_flags & FLAG_WIFI_CONNECTED) == 0) {
+  if ((s_flags & FLAG_HAS_IP) == 0) {
     return false;
   }
   s_wsClient = nullptr;
@@ -331,13 +325,13 @@ bool GatewayConnectionManager::Pair(unsigned int pairCode) {
 
   Config::SetBackendAuthToken(authToken);
 
-  s_wsClient = std::make_unique<GatewayClient>(authToken, OpenShock::Constants::Version);
+  s_flags |= FLAG_AUTHENTICATED;
+  ESP_LOGD(TAG, "Successfully paired with pair code %u", pairCode);
 
   return true;
 }
-
 void GatewayConnectionManager::UnPair() {
-  s_flags &= FLAG_WIFI_CONNECTED;
+  s_flags &= FLAG_HAS_IP;
   s_wsClient = nullptr;
   Config::ClearBackendAuthToken();
 }
@@ -356,14 +350,49 @@ void GatewayConnectionManager::UnRegisterConnectedChangedHandler(std::uint64_t h
   }
 }
 
+bool FetchDeviceInfo(const std::string& authToken) {
+  // TODO: this function is very slow, should be optimized!
+  if ((s_flags & FLAG_HAS_IP) == 0) {
+    return false;
+  }
+
+  HTTPClient http;
+
+  http.begin(OPENSHOCK_API_URL("/1/device/self"));  // TODO: http.begin(*s_wifiClient, uri);
+  http.addHeader("DeviceToken", authToken.c_str());
+
+  int responseCode = http.GET();
+
+  if (responseCode == 401) {
+    ESP_LOGD(TAG, "Auth token is invalid, clearing it");
+    Config::ClearBackendAuthToken();
+    return false;
+  }
+
+  if (responseCode != 200) {
+    ESP_LOGE(TAG, "Error while verifying auth token: [%d] %s", responseCode, http.getString().c_str());
+    return false;
+  }
+
+  GetDeviceInfoFromJsonResponse(http);
+
+  http.end();
+
+  s_flags |= FLAG_AUTHENTICATED;
+
+  return true;
+}
+
 static std::uint64_t _lastConnectionAttempt = 0;
 bool ConnectToLCG() {
   // TODO: this function is very slow, should be optimized!
   if (s_wsClient == nullptr) {  // If wsClient is already initialized, we are already paired or connected
+    ESP_LOGD(TAG, "wsClient is null");
     return false;
   }
 
   if (s_wsClient->state() != GatewayClient::State::Disconnected) {
+    ESP_LOGD(TAG, "WebSocketClient is not disconnected, waiting...");
     s_wsClient->disconnect();
     return false;
   }
@@ -375,13 +404,12 @@ bool ConnectToLCG() {
 
   _lastConnectionAttempt = msNow;
 
-  std::string authToken = Config::GetBackendAuthToken();
-
-  if (authToken.empty()) {
+  if (!Config::HasBackendAuthToken()) {
+    ESP_LOGD(TAG, "No auth token, can't connect to LCG");
     return false;
   }
 
-  ESP_LOGD(TAG, "Attempting to connect to LCG endpoint with auth token %s", authToken.c_str());
+  std::string authToken = Config::GetBackendAuthToken();
 
   HTTPClient http;
 
@@ -417,7 +445,24 @@ bool ConnectToLCG() {
 
 void GatewayConnectionManager::Update() {
   if (s_wsClient == nullptr) {
-    return;
+    // Can't connect to the API without WiFi or an auth token
+    if ((s_flags & FLAG_HAS_IP) == 0 || !Config::HasBackendAuthToken()) {
+      return;
+    }
+
+    std::string authToken = Config::GetBackendAuthToken();
+
+    // Test if the auth token is valid
+    if (!FetchDeviceInfo(authToken)) {
+      ESP_LOGD(TAG, "Auth token is invalid, clearing it");
+      Config::ClearBackendAuthToken();
+      return;
+    }
+
+    s_flags |= FLAG_AUTHENTICATED;
+    ESP_LOGD(TAG, "Successfully verified auth token");
+
+    s_wsClient = std::make_unique<GatewayClient>(authToken, OpenShock::Constants::Version);
   }
 
   if (s_wsClient->loop()) {
@@ -425,6 +470,7 @@ void GatewayConnectionManager::Update() {
   }
 
   if (ConnectToLCG()) {
+    ESP_LOGD(TAG, "Successfully connected to LCG");
     return;
   }
 }
