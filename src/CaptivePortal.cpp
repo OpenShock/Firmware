@@ -228,7 +228,7 @@ bool _startCaptive() {
     return true;
   }
 
-  ESP_LOGD(TAG, "Starting");
+  ESP_LOGI(TAG, "Starting captive portal");
 
   if (!WiFi.enableAP(true)) {
     ESP_LOGE(TAG, "Failed to enable AP mode");
@@ -250,8 +250,6 @@ bool _startCaptive() {
 
   s_webServices = std::make_unique<CaptivePortalInstance>();
 
-  ESP_LOGD(TAG, "Started");
-
   return true;
 }
 void _stopCaptive() {
@@ -260,7 +258,7 @@ void _stopCaptive() {
     return;
   }
 
-  ESP_LOGD(TAG, "Stopping");
+  ESP_LOGI(TAG, "Stopping captive portal");
 
   s_webServices = nullptr;
 

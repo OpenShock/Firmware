@@ -162,22 +162,22 @@ private:
         _parseMessage(reinterpret_cast<char*>(payload), length);
         break;
       case WStype_ERROR:
-        ESP_LOGI(TAG, "Received error from API");
+        ESP_LOGE(TAG, "Received error from API");
         break;
       case WStype_FRAGMENT_TEXT_START:
-        ESP_LOGI(TAG, "Received fragment text start from API");
+        ESP_LOGD(TAG, "Received fragment text start from API");
         break;
       case WStype_FRAGMENT:
-        ESP_LOGI(TAG, "Received fragment from API");
+        ESP_LOGD(TAG, "Received fragment from API");
         break;
       case WStype_FRAGMENT_FIN:
-        ESP_LOGI(TAG, "Received fragment fin from API");
+        ESP_LOGD(TAG, "Received fragment fin from API");
         break;
       case WStype_PING:
-        ESP_LOGI(TAG, "Received ping from API");
+        ESP_LOGD(TAG, "Received ping from API");
         break;
       case WStype_PONG:
-        ESP_LOGI(TAG, "Received pong from API");
+        ESP_LOGD(TAG, "Received pong from API");
         break;
       case WStype_BIN:
         ESP_LOGE(TAG, "Received binary from API, this is not supported!");

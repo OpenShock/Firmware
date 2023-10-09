@@ -26,7 +26,6 @@ void _setScanInProgress(bool inProgress) {
   if (s_scanInProgress != inProgress) {
     s_scanInProgress = inProgress;
     if (inProgress) {
-      ESP_LOGD(TAG, "Scan started");
       for (auto& it : s_scanStartedHandlers) {
         it.second();
       }
@@ -34,11 +33,9 @@ void _setScanInProgress(bool inProgress) {
     } else {
       ScanCompletedStatus status;
       if (s_scanCancelled) {
-        ESP_LOGD(TAG, "Scan was cancelled");
         status          = ScanCompletedStatus::Cancelled;
         s_scanCancelled = false;
       } else {
-        ESP_LOGD(TAG, "Scan completed");
         status = ScanCompletedStatus::Completed;
       }
       for (auto& it : s_scanCompletedHandlers) {
@@ -108,13 +105,12 @@ void _evScanCompleted(arduino_event_id_t event, arduino_event_info_t info) {
   s_channelScanDone = true;
 }
 void _evSTAStopped(arduino_event_id_t event, arduino_event_info_t info) {
-  ESP_LOGD(TAG, "STA stopped");
   _setScanInProgress(false);
 }
 
 bool WiFiScanManager::Init() {
   if (s_initialized) {
-    ESP_LOGE(TAG, "WiFiScanManager::Init() called twice");
+    ESP_LOGW(TAG, "WiFiScanManager::Init() called twice");
     return false;
   }
 
@@ -128,7 +124,7 @@ bool WiFiScanManager::Init() {
 
 bool WiFiScanManager::StartScan() {
   if (s_scanInProgress) {
-    ESP_LOGE(TAG, "Cannot start scan: scan is already in progress");
+    ESP_LOGW(TAG, "Cannot start scan: scan is already in progress");
     return false;
   }
 
@@ -140,7 +136,7 @@ bool WiFiScanManager::StartScan() {
 }
 void WiFiScanManager::CancelScan() {
   if (!s_scanInProgress) {
-    ESP_LOGE(TAG, "Cannot cancel scan: no scan is in progress");
+    ESP_LOGW(TAG, "Cannot cancel scan: no scan is in progress");
     return;
   }
 
