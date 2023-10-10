@@ -37,21 +37,21 @@ struct CaptivePortalInstance {
     webServer.begin();
 
     wifiScanStartedHandlerHandle   = WiFiScanManager::RegisterScanStartedHandler([]() {
-      StaticJsonDocument<256> doc;
+      DynamicJsonDocument doc(256);
       doc["type"]    = "wifi";
       doc["subject"] = "scan";
       doc["status"]  = "started";
       CaptivePortal::BroadcastMessageJSON(doc);
     });
     wifiScanCompletedHandlerHandle = WiFiScanManager::RegisterScanCompletedHandler([](ScanCompletedStatus status) {
-      StaticJsonDocument<256> doc;
+      DynamicJsonDocument doc(256);
       doc["type"]    = "wifi";
       doc["subject"] = "scan";
       doc["status"]  = GetScanCompletedStatusName(status);
       CaptivePortal::BroadcastMessageJSON(doc);
     });
     wifiScanDiscoveryHandlerHandle = WiFiScanManager::RegisterScanDiscoveryHandler([](const wifi_ap_record_t* record) {
-      StaticJsonDocument<256> doc;
+      DynamicJsonDocument doc(256);
       doc["type"]    = "wifi";
       doc["subject"] = "scan";
       doc["status"]  = "discovery";
@@ -62,7 +62,7 @@ struct CaptivePortalInstance {
       data["rssi"]     = record->rssi;
       data["channel"]  = record->primary;
       data["security"] = Mappers::GetWiFiAuthModeName(record->authmode);
-      data["saved"]    = WiFiManager::IsSaved(reinterpret_cast<const char*>(record->ssid), record->bssid);
+      data["saved"]    = WiFiManager::IsSaved(reinterpret_cast<const char*>(record->ssid));
 
       CaptivePortal::BroadcastMessageJSON(doc);
     });
@@ -79,12 +79,12 @@ struct CaptivePortalInstance {
   void handleWebSocketClientConnected(std::uint8_t socketId) {
     ESP_LOGD(TAG, "WebSocket client #%u connected from %s", socketId, socketServer.remoteIP(socketId).toString().c_str());
 
-    StaticJsonDocument<24> doc;
+    DynamicJsonDocument doc(24);
     doc["type"] = "poggies";
     CaptivePortal::SendMessageJSON(socketId, doc);
   }
   void handleWebSocketClientDisconnected(std::uint8_t socketId) { ESP_LOGD(TAG, "WebSocket client #%u disconnected", socketId); }
-  void handleWebSocketClientWiFiScanMessage(const StaticJsonDocument<256>& doc) {
+  void handleWebSocketClientWiFiScanMessage(const DynamicJsonDocument& doc) {
     bool run = doc["run"];
     if (run) {
       WiFiScanManager::StartScan();
@@ -92,44 +92,37 @@ struct CaptivePortalInstance {
       WiFiScanManager::CancelScan();
     }
   }
-  void handleWebSocketClientWiFiAuthenticateMessage(const StaticJsonDocument<256>& doc) {
-    std::string bssidStr = doc["bssid"];
-    if (bssidStr.empty()) {
-      ESP_LOGE(TAG, "WiFi BSSID is missing");
+  void handleWebSocketClientWiFiAuthenticateMessage(const DynamicJsonDocument& doc) {
+    if (!doc.containsKey("bssid")) {
+      ESP_LOGE(TAG, "WiFi message is missing \"bssid\" property");
       return;
     }
+
+    std::string bssidStr = doc["bssid"];
     if (bssidStr.length() != 17) {
+      ESP_LOGE(TAG, "WiFi BSSID is invalid");
+      return;
+    }
+
+    // Convert BSSID to byte array
+    std::uint8_t bssid[6];
+    if (!HexUtils::TryParseHexMac<17>(nonstd::span<const char, 17>(bssidStr.data(), bssidStr.length()), bssid)) {
       ESP_LOGE(TAG, "WiFi BSSID is invalid");
       return;
     }
 
     std::string password = doc["password"];
 
-    // Convert BSSID to byte array
-    // Uses sscanf to parse the max-style hex format, e.g. "AA:BB:CC:DD:EE:FF" where each pair is a byte, and %02X means to parse 2 characters as a hex byte
-    // We check the return value to ensure that we parsed all 6 arguments (6 pairs of hex bytes, or 6 bytes)
-    std::uint8_t bssid[6];
-    if (sscanf(bssidStr.c_str(), BSSID_FMT, BSSID_ARG(bssid)) != 6) {
-      ESP_LOGE(TAG, "WiFi BSSID is invalid");
-      return;
-    }
-
-    std::size_t passwordLength = password.length();
-    if (passwordLength > UINT8_MAX) {
-      ESP_LOGE(TAG, "WiFi password is too long");
-      return;
-    }
-
-    WiFiManager::Authenticate(bssid, password.c_str(), static_cast<std::uint8_t>(passwordLength));
+    WiFiManager::Authenticate(bssid, password);
   }
-  void handleWebSocketClientWiFiConnectMessage(const StaticJsonDocument<256>& doc) {
+  void handleWebSocketClientWiFiConnectMessage(const DynamicJsonDocument& doc) {
     std::uint16_t wifiId = doc["id"];
 
     WiFiManager::Connect(wifiId);
   }
-  void handleWebSocketClientWiFiDisconnectMessage(const StaticJsonDocument<256>& doc) { WiFiManager::Disconnect(); }
-  void handleWebSocketClientWiFiForgetMessage(const StaticJsonDocument<256>& doc) { WiFiManager::Forget(doc["bssid"]); }
-  void handleWebSocketClientWiFiMessage(StaticJsonDocument<256> doc) {
+  void handleWebSocketClientWiFiDisconnectMessage(const DynamicJsonDocument& doc) { WiFiManager::Disconnect(); }
+  void handleWebSocketClientWiFiForgetMessage(const DynamicJsonDocument& doc) { WiFiManager::Forget(doc["bssid"]); }
+  void handleWebSocketClientWiFiMessage(const DynamicJsonDocument& doc) {
     std::string actionStr = doc["action"];
     if (actionStr.empty()) {
       ESP_LOGE(TAG, "Received WiFi message with \"action\" property missing");
@@ -156,7 +149,7 @@ struct CaptivePortalInstance {
       return;
     }
 
-    StaticJsonDocument<256> doc;
+    DynamicJsonDocument doc(256);
     auto err = deserializeJson(doc, data, len);
     if (err) {
       ESP_LOGE(TAG, "Failed to deserialize message: %s", err.c_str());
