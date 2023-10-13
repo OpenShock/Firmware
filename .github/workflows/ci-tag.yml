@@ -6,10 +6,6 @@ on:
 
 name: ci-tag
 
-env:
-  OPENSHOCK_API_DOMAIN: api.shocklink.net
-  OPENSHOCK_FW_COMMIT: ${{ github.sha }}
-
 jobs:
 
   # Build all targets. This step also outputs the strategy matrix containing the names
@@ -35,7 +31,7 @@ jobs:
           name_is_regexp: false
           run_id: ${{ github.event.workflow_run.id }}
           workflow_conclusion: '' # ignore
-          search_artifacts: true
+          search_artifacts: false
 
       # Push artifact for this board.
       - name: Upload artifact to release
@@ -45,7 +41,7 @@ jobs:
           file: OpenShock.${{ matrix.board }}.bin
           asset_name: OpenShock.${{ matrix.board }}.bin
           tag: ${{ github.ref }}
-          prerelease: ${{ contains(github.ref_name, '-rc') }}
+          prerelease: ${{ contains(github.ref_name, '-') }}
 
   publish-release:
     runs-on: ubuntu-latest
@@ -77,6 +73,6 @@ jobs:
           file: RELEASE.md
           asset_name: RELEASE.md
           tag: ${{ github.ref }}
-          prerelease: ${{ contains(github.ref_name, '-rc') }}
+          prerelease: ${{ contains(github.ref_name, '-') }}
           body: |
             ${{ steps.read_release.outputs.RELEASE_BODY }}
