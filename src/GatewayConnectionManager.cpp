@@ -374,18 +374,18 @@ std::string GetAuthTokenFromJsonResponse(HTTPClient& http) {
   return std::string(str.c_str(), str.length());
 }
 
-bool GatewayConnectionManager::Pair(unsigned int pairCode) {
+bool GatewayConnectionManager::Pair(const char* pairCode) {
   if ((s_flags & FLAG_HAS_IP) == 0) {
     return false;
   }
   s_wsClient = nullptr;
 
-  ESP_LOGD(TAG, "Attempting to pair with pair code %u", pairCode);
+  ESP_LOGD(TAG, "Attempting to pair with pair code %s", pairCode);
 
   HTTPClient http;
 
   char uri[256];
-  sprintf(uri, OPENSHOCK_API_URL("/1/device/pair/%u"), pairCode);
+  sprintf(uri, OPENSHOCK_API_URL("/1/device/pair/%s"), pairCode);
 
   http.begin(uri);  // TODO: http.begin(*s_wifiClient, uri);
 

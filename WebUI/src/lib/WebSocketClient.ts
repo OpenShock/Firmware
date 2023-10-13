@@ -1,5 +1,6 @@
-import { browser } from "$app/environment";
-import { WebSocketMessageHandler } from "./WebSocketMessageHandler";
+import { browser } from '$app/environment';
+import { isArrayBuffer, isString } from './TypeGuards/BasicGuards';
+import { WebSocketMessageBinaryHandler } from './MessageHandlers/Local';
 
 export enum ConnectionState {
   DISCONNECTED = 0,
@@ -113,27 +114,17 @@ export class WebSocketClient {
       return;
     }
 
-    // Check if message is binary
-    if (msg.data instanceof ArrayBuffer) {
-      console.warn('[WS] Received binary message, not supported yet');
+    if (isArrayBuffer(msg.data)) {
+      WebSocketMessageBinaryHandler(this, msg.data);
       return;
     }
 
-    // Check if message is text
-    if (typeof msg.data !== 'string') {
-      console.log('[WS] Received message of unknown type');
+    if (isString(msg.data)) {
+      console.warn('[WS] Text messages are not supported, received: ', msg.data);
       return;
     }
 
-    // Parse message
-    const message = JSON.parse(msg.data);
-    if (!message) {
-      console.warn('[WS] Received empty message');
-      return;
-    }
-
-    // Handle message
-    WebSocketMessageHandler(message);
+    console.warn('[WS] Received unknown message type: ', msg.data);
   }
   private AbortWebSocket() {
     if (this._socket) {

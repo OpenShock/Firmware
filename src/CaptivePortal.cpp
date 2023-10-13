@@ -1,6 +1,8 @@
 #include "CaptivePortal.h"
 
 #include "Config.h"
+#include "fbs/DeviceToLocalMessage_generated.h"
+#include "fbs/LocalToDeviceMessage_generated.h"
 #include "FormatHelpers.h"
 #include "GatewayConnectionManager.h"
 #include "Mappers/EspWiFiTypesMapper.h"
@@ -8,7 +10,6 @@
 #include "WiFiManager.h"
 #include "WiFiScanManager.h"
 
-#include <ArduinoJson.h>
 #include <ESPAsyncWebServer.h>
 #include <LittleFS.h>
 #include <WebSocketsServer.h>
@@ -35,145 +36,205 @@ struct CaptivePortalInstance {
     webServer.serveStatic("/", LittleFS, "/www/").setDefaultFile("index.html");
     webServer.onNotFound([](AsyncWebServerRequest* request) { request->send(404, "text/plain", "Not found"); });
     webServer.begin();
-
-    wifiScanStartedHandlerHandle   = WiFiScanManager::RegisterScanStartedHandler([]() {
-      DynamicJsonDocument doc(256);
-      doc["type"]    = "wifi";
-      doc["subject"] = "scan";
-      doc["status"]  = "started";
-      CaptivePortal::BroadcastMessageJSON(doc);
-    });
-    wifiScanCompletedHandlerHandle = WiFiScanManager::RegisterScanCompletedHandler([](ScanCompletedStatus status) {
-      DynamicJsonDocument doc(256);
-      doc["type"]    = "wifi";
-      doc["subject"] = "scan";
-      doc["status"]  = GetScanCompletedStatusName(status);
-      CaptivePortal::BroadcastMessageJSON(doc);
-    });
-    wifiScanDiscoveryHandlerHandle = WiFiScanManager::RegisterScanDiscoveryHandler([](const wifi_ap_record_t* record) {
-      DynamicJsonDocument doc(256);
-      doc["type"]    = "wifi";
-      doc["subject"] = "scan";
-      doc["status"]  = "discovery";
-
-      auto data        = doc.createNestedObject("data");
-      data["ssid"]     = reinterpret_cast<const char*>(record->ssid);
-      data["bssid"]    = HexUtils::ToHexMac<6>(record->bssid).data();
-      data["rssi"]     = record->rssi;
-      data["channel"]  = record->primary;
-      data["security"] = Mappers::GetWiFiAuthModeName(record->authmode);
-      data["saved"]    = WiFiManager::IsSaved(reinterpret_cast<const char*>(record->ssid));
-
-      CaptivePortal::BroadcastMessageJSON(doc);
-    });
   }
   ~CaptivePortalInstance() {
     webServer.end();
     socketServer.close();
-
-    WiFiScanManager::UnregisterScanStartedHandler(wifiScanStartedHandlerHandle);
-    WiFiScanManager::UnregisterScanCompletedHandler(wifiScanCompletedHandlerHandle);
-    WiFiScanManager::UnregisterScanDiscoveryHandler(wifiScanDiscoveryHandlerHandle);
   }
 
   void handleWebSocketClientConnected(std::uint8_t socketId) {
     ESP_LOGD(TAG, "WebSocket client #%u connected from %s", socketId, socketServer.remoteIP(socketId).toString().c_str());
 
-    DynamicJsonDocument doc(24);
-    doc["type"] = "poggies";
-    CaptivePortal::SendMessageJSON(socketId, doc);
+    flatbuffers::FlatBufferBuilder builder(32);
+    Serialization::Local::ReadyMessage readyMessage(true);
+
+    auto readyMessageOffset = builder.CreateStruct(readyMessage);
+
+    auto msg = Serialization::Local::CreateDeviceToLocalMessage(builder, Serialization::Local::DeviceToLocalMessagePayload::ReadyMessage, readyMessageOffset.Union());
+
+    builder.Finish(msg);
+
+    auto span = builder.GetBufferSpan();
+
+    CaptivePortal::SendMessageBIN(socketId, span.data(), span.size());
   }
   void handleWebSocketClientDisconnected(std::uint8_t socketId) { ESP_LOGD(TAG, "WebSocket client #%u disconnected", socketId); }
-  void handleWebSocketClientWiFiScanMessage(const DynamicJsonDocument& doc) {
-    bool run = doc["run"];
-    if (run) {
+  void handleWebSocketClientWiFiScanCommand(const Serialization::Local::WifiScanCommand* msg) {
+    if (msg->run()) {
       WiFiScanManager::StartScan();
     } else {
-      WiFiScanManager::CancelScan();
+      WiFiScanManager::AbortScan();
     }
   }
-  void handleWebSocketClientWiFiAuthenticateMessage(const DynamicJsonDocument& doc) {
-    if (!doc.containsKey("bssid")) {
-      ESP_LOGE(TAG, "WiFi message is missing \"bssid\" property");
+  void handleWebSocketClientWiFiNetworkSaveCommand(const Serialization::Local::WifiNetworkSaveCommand* msg) {
+    auto ssid     = msg->ssid();
+    auto bssid    = msg->bssid();
+    auto password = msg->password();
+
+    if (ssid == nullptr || bssid == nullptr || password == nullptr) {
+      ESP_LOGE(TAG, "WiFi message is missing required properties");
       return;
     }
 
-    std::string bssidStr = doc["bssid"];
-    if (bssidStr.length() != 17) {
-      ESP_LOGE(TAG, "WiFi BSSID is invalid");
+    if (ssid->size() > 31) {
+      ESP_LOGE(TAG, "WiFi SSID is too long");
+      return;
+    }
+
+    if (bssid->size() != 17) {
+      ESP_LOGE(TAG, "WiFi BSSID is invalid (wrong length)");
       return;
     }
 
     // Convert BSSID to byte array
-    std::uint8_t bssid[6];
-    if (!HexUtils::TryParseHexMac<17>(nonstd::span<const char, 17>(bssidStr.data(), bssidStr.length()), bssid)) {
-      ESP_LOGE(TAG, "WiFi BSSID is invalid");
+    std::uint8_t bssidBytes[6];
+    if (!HexUtils::TryParseHexMac<17>(nonstd::span<const char, 17>(bssid->data(), bssid->size()), bssidBytes)) {
+      ESP_LOGE(TAG, "WiFi BSSID is invalid (failed to parse)");
       return;
     }
 
-    std::string password = doc["password"];
-
-    WiFiManager::Authenticate(bssid, password);
-  }
-  void handleWebSocketClientWiFiConnectMessage(const DynamicJsonDocument& doc) {
-    std::uint16_t wifiId = doc["id"];
-
-    WiFiManager::Connect(wifiId);
-  }
-  void handleWebSocketClientWiFiDisconnectMessage(const DynamicJsonDocument& doc) { WiFiManager::Disconnect(); }
-  void handleWebSocketClientWiFiForgetMessage(const DynamicJsonDocument& doc) { WiFiManager::Forget(doc["bssid"]); }
-  void handleWebSocketClientWiFiMessage(const DynamicJsonDocument& doc) {
-    std::string actionStr = doc["action"];
-    if (actionStr.empty()) {
-      ESP_LOGE(TAG, "Received WiFi message with \"action\" property missing");
+    if (password->size() > 63) {
+      ESP_LOGE(TAG, "WiFi password is too long");
       return;
     }
 
-    if (actionStr == "scan") {
-      handleWebSocketClientWiFiScanMessage(doc);
-    } else if (actionStr == "authenticate") {
-      handleWebSocketClientWiFiAuthenticateMessage(doc);
-    } else if (actionStr == "connect") {
-      handleWebSocketClientWiFiConnectMessage(doc);
-    } else if (actionStr == "disconnect") {
-      handleWebSocketClientWiFiDisconnectMessage(doc);
-    } else if (actionStr == "forget") {
-      handleWebSocketClientWiFiForgetMessage(doc);
-    } else {
-      ESP_LOGE(TAG, "Received WiFi message with unknown action \"%s\"", actionStr.c_str());
+    if (!WiFiManager::Save(bssidBytes, password->str())) {  // TODO: support SSID as well
+      ESP_LOGE(TAG, "Failed to save WiFi network");
     }
+  }
+  void handleWebSocketClientWiFiNetworkForgetCommand(const Serialization::Local::WifiNetworkForgetCommand* msg) {
+    auto ssid  = msg->ssid();
+    auto bssid = msg->bssid();
+
+    if (ssid == nullptr && bssid == nullptr) {
+      ESP_LOGE(TAG, "WiFi message is missing required properties");
+      return;
+    }
+
+    if (ssid != nullptr && ssid->size() > 31) {
+      ESP_LOGE(TAG, "WiFi SSID is too long");
+      return;
+    }
+
+    if (bssid != nullptr && bssid->size() != 17) {
+      ESP_LOGE(TAG, "WiFi BSSID is invalid (wrong length)");
+      return;
+    }
+
+    // Convert BSSID to byte array
+    std::uint8_t bssidBytes[6];
+    if (bssid != nullptr && !HexUtils::TryParseHexMac<17>(nonstd::span<const char, 17>(bssid->data(), bssid->size()), bssidBytes)) {
+      ESP_LOGE(TAG, "WiFi BSSID is invalid (failed to parse)");
+      return;
+    }
+
+    if (!WiFiManager::Forget(bssidBytes)) {  // TODO: support SSID as well
+      ESP_LOGE(TAG, "Failed to forget WiFi network");
+    }
+  }
+  void handleWebSocketClientWiFiNetworkConnectCommand(const Serialization::Local::WifiNetworkConnectCommand* msg) {
+    auto ssid  = msg->ssid();
+    auto bssid = msg->bssid();
+
+    if (ssid == nullptr && bssid == nullptr) {
+      ESP_LOGE(TAG, "WiFi message is missing required properties");
+      return;
+    }
+
+    if (ssid != nullptr && ssid->size() > 31) {
+      ESP_LOGE(TAG, "WiFi SSID is too long");
+      return;
+    }
+
+    if (bssid != nullptr && bssid->size() != 17) {
+      ESP_LOGE(TAG, "WiFi BSSID is invalid (wrong length)");
+      return;
+    }
+
+    // Convert BSSID to byte array
+    std::uint8_t bssidBytes[6];
+    if (bssid != nullptr && !HexUtils::TryParseHexMac<17>(nonstd::span<const char, 17>(bssid->data(), bssid->size()), bssidBytes)) {
+      ESP_LOGE(TAG, "WiFi BSSID is invalid (failed to parse)");
+      return;
+    }
+
+    if (!WiFiManager::Connect(bssidBytes)) {  // TODO: support SSID as well
+      ESP_LOGE(TAG, "Failed to connect to WiFi network");
+    }
+  }
+  void handleWebSocketClientWiFiNetworkDisconnectCommand(const Serialization::Local::WifiNetworkDisconnectCommand* msg) { WiFiManager::Disconnect(); }
+  void handleWebSocketClientGatewayPairCommand(const Serialization::Local::GatewayPairCommand* msg) {
+    auto code = msg->code();
+
+    if (code == nullptr) {
+      ESP_LOGE(TAG, "Gateway message is missing required properties");
+      return;
+    }
+
+    if (code->size() != 6) {
+      ESP_LOGE(TAG, "Gateway code is invalid (wrong length)");
+      return;
+    }
+
+    GatewayConnectionManager::Pair(code->data());
+  }
+  void handleWebSocketClientGatewayUnPairCommand(const Serialization::Local::GatewayUnpairCommand* msg) { GatewayConnectionManager::UnPair(); }
+  void handleWebSocketClientSetRfTxPinCommand(const Serialization::Local::SetRfTxPinCommand* msg) {
+    auto pin = msg->pin();
+
+    // AuthenticationManager::SetRmtPin(pin->data());
   }
   void handleWebSocketClientMessage(std::uint8_t socketId, WStype_t type, std::uint8_t* data, std::size_t len) {
-    if (type != WStype_t::WStype_TEXT) {
+    if (type != WStype_t::WStype_BIN) {
       ESP_LOGE(TAG, "Message type is not supported");
       return;
     }
 
-    DynamicJsonDocument doc(256);
-    auto err = deserializeJson(doc, data, len);
-    if (err) {
-      ESP_LOGE(TAG, "Failed to deserialize message: %s", err.c_str());
+    // Deserialize
+    auto msg = flatbuffers::GetRoot<Serialization::Local::LocalToDeviceMessage>(data);
+    if (msg == nullptr) {
+      ESP_LOGE(TAG, "Failed to deserialize message");
       return;
     }
 
-    std::string typeStr = doc["type"];
-    if (typeStr.empty()) {
-      ESP_LOGE(TAG, "Message type is missing");
+    // Validate buffer
+    flatbuffers::Verifier::Options verifierOptions {
+      .max_size = 4096,  // TODO: Profile this
+    };
+    flatbuffers::Verifier verifier(data, len, verifierOptions);
+    if (!msg->Verify(verifier)) {
+      ESP_LOGE(TAG, "Failed to verify message");
       return;
     }
 
-    if (typeStr == "wifi") {
-      handleWebSocketClientWiFiMessage(doc);
-    } else if (typeStr == "pair") {
-      if (!doc.containsKey("code")) {
-        ESP_LOGE(TAG, "Pair message is missing \"code\" property");
+    switch (msg->payload_type()) {
+      case Serialization::Local::LocalToDeviceMessagePayload::WifiScanCommand:
+        handleWebSocketClientWiFiScanCommand(msg->payload_as_WifiScanCommand());
+        break;
+      case Serialization::Local::LocalToDeviceMessagePayload::WifiNetworkSaveCommand:
+        handleWebSocketClientWiFiNetworkSaveCommand(msg->payload_as_WifiNetworkSaveCommand());
+        break;
+      case Serialization::Local::LocalToDeviceMessagePayload::WifiNetworkForgetCommand:
+        handleWebSocketClientWiFiNetworkForgetCommand(msg->payload_as_WifiNetworkForgetCommand());
+        break;
+      case Serialization::Local::LocalToDeviceMessagePayload::WifiNetworkConnectCommand:
+        handleWebSocketClientWiFiNetworkConnectCommand(msg->payload_as_WifiNetworkConnectCommand());
+        break;
+      case Serialization::Local::LocalToDeviceMessagePayload::WifiNetworkDisconnectCommand:
+        handleWebSocketClientWiFiNetworkDisconnectCommand(msg->payload_as_WifiNetworkDisconnectCommand());
+        break;
+      case Serialization::Local::LocalToDeviceMessagePayload::GatewayPairCommand:
+        handleWebSocketClientGatewayPairCommand(msg->payload_as_GatewayPairCommand());
+        break;
+      case Serialization::Local::LocalToDeviceMessagePayload::GatewayUnpairCommand:
+        handleWebSocketClientGatewayUnPairCommand(msg->payload_as_GatewayUnpairCommand());
+        break;
+      case Serialization::Local::LocalToDeviceMessagePayload::SetRfTxPinCommand:
+        handleWebSocketClientSetRfTxPinCommand(msg->payload_as_SetRfTxPinCommand());
+        break;
+      default:
+        ESP_LOGE(TAG, "Received message with unknown payload type");
         return;
-      }
-      GatewayConnectionManager::Pair(doc["code"]);
-    } else if (typeStr == "unpair") {
-      GatewayConnectionManager::UnPair();
-    } else if (typeStr == "tx_pin") {
-      // AuthenticationManager::SetRmtPin(doc["pin"]);
     }
   }
   void handleWebSocketClientError(std::uint8_t socketId, std::uint16_t code, const char* message) { ESP_LOGE(TAG, "WebSocket client #%u error %u: %s", socketId, code, message); }
@@ -186,12 +247,14 @@ struct CaptivePortalInstance {
         handleWebSocketClientDisconnected(socketId);
         break;
       case WStype_BIN:
-      case WStype_TEXT:
       case WStype_FRAGMENT_BIN_START:
-      case WStype_FRAGMENT_TEXT_START:
       case WStype_FRAGMENT:
       case WStype_FRAGMENT_FIN:
         handleWebSocketClientMessage(socketId, type, payload, length);
+        break;
+      case WStype_TEXT:
+      case WStype_FRAGMENT_TEXT_START:
+        ESP_LOGE(TAG, "Message type is not supported");
         break;
       case WStype_PING:
       case WStype_PONG:

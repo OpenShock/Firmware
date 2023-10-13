@@ -2,6 +2,7 @@
 #include "CommandHandler.h"
 #include "Config.h"
 #include "Constants.h"
+#include "EventHandlers/EventHandlers.h"
 #include "GatewayConnectionManager.h"
 #include "SerialInputHandler.h"
 #include "VisualStateManager.h"
@@ -25,12 +26,14 @@ void setup() {
     ESP.restart();
   }
 
-  OpenShock::VisualStateManager::Init();
+  OpenShock::EventHandlers::Init();
 
-  OpenShock::Config::Init();
+  OpenShock::VisualStateManager::Init();
 
   OpenShock::SerialInputHandler::PrintWelcomeHeader();
   OpenShock::SerialInputHandler::PrintVersionInfo();
+
+  OpenShock::Config::Init();
 
   OpenShock::CommandHandler::Init();
 
@@ -58,4 +61,5 @@ void loop() {
   OpenShock::CaptivePortal::Update();
   OpenShock::GatewayConnectionManager::Update();
   OpenShock::WiFiScanManager::Update();
+  OpenShock::WiFiManager::Update();
 }

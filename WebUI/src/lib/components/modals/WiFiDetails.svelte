@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { WebSocketClient } from '$lib/WebSocketClient';
   import { WiFiStateStore } from '$lib/stores';
   import { getModalStore } from '@skeletonlabs/skeleton';
 
@@ -18,6 +19,19 @@
         { key: 'Saved', value: item.saved },
       ]
     : [];
+
+  function AuthenticateWiFi() {
+    WebSocketClient.Instance.Send('{ "type": "wifi", "action": "scan", "run": true }');
+    modalStore.close();
+  }
+  function ConnectWiFi() {
+    WebSocketClient.Instance.Send('{ "type": "wifi", "action": "scan", "run": true }');
+    modalStore.close();
+  }
+  function ForgetWiFi() {
+    WebSocketClient.Instance.Send('{ "type": "wifi", "action": "forget", "bssid": "' + bssid + '" }');
+    modalStore.close();
+  }
 </script>
 
 <div class="card p-4 w-[24rem] flex-col space-y-4">
@@ -34,10 +48,10 @@
     <div class="flex justify-end space-x-2">
       <div class="btn-group variant-outline">
         {#if item.saved}
-          <button on:click={() => modalStore.close()}><i class="fa fa-wifi mr-2 text-green-500"></i>Connect</button>
-          <button on:click={() => modalStore.close()}><i class="fa fa-trash mr-2 text-red-500"></i>Forget</button>
+          <button on:click={ConnectWiFi}><i class="fa fa-wifi mr-2 text-green-500"></i>Connect</button>
+          <button on:click={ForgetWiFi}><i class="fa fa-trash mr-2 text-red-500"></i>Forget</button>
         {:else}
-          <button on:click={() => modalStore.close()}><i class="fa fa-link mr-2 text-green-500"></i>Connect</button>
+          <button on:click={AuthenticateWiFi}><i class="fa fa-link mr-2 text-green-500"></i>Connect</button>
         {/if}
       </div>
     </div>

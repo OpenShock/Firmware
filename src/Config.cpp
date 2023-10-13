@@ -1,5 +1,7 @@
 #include "Config.h"
 
+#include "Utils/HexUtils.h"
+
 #include <esp_log.h>
 #include <LittleFS.h>
 
@@ -37,7 +39,7 @@ Config::WiFiCredentials FromFbsWiFiCredentials(const Serialization::Configuratio
     auto bssid    = fbsConfig->bssid();
     auto password = fbsConfig->password();
 
-    if (ssid != nullptr && bssid != nullptr && password != nullptr) {
+    if (id != 0 && ssid != nullptr && bssid != nullptr && password != nullptr) {
       Config::WiFiCredentials creds {
         .id       = fbsConfig->id(),
         .ssid     = fbsConfig->ssid()->str(),
@@ -304,8 +306,8 @@ void Config::SetBackendConfig(const BackendConfig& config) {
   _trySaveConfig(_mainConfig);
 }
 
-std::uint8_t Config::AddWiFiCredentials(const std::string& ssid, std::uint8_t (&bssid)[6], const std::string& password) {
-  std::uint8_t id = UINT8_MAX;
+std::uint8_t Config::AddWiFiCredentials(const std::string& ssid, const std::uint8_t (&bssid)[6], const std::string& password) {
+  std::uint8_t id = 0;
 
   // Bitmask representing available credential IDs (0-31)
   std::uint32_t bits = 0;
@@ -322,15 +324,15 @@ std::uint8_t Config::AddWiFiCredentials(const std::string& ssid, std::uint8_t (&
     bits |= 1u << creds.id;
   }
 
-  if (id == UINT8_MAX) {
-    id = 0;
+  if (id == 0) {
+    id = 1;
     while (bits & (1u << id) && id < 32) {
       id++;
     }
 
-    if (id >= 32) {
+    if (id > 32) {
       ESP_LOGE(TAG, "Cannot add WiFi credentials: too many credentials");
-      return UINT8_MAX;
+      return 0;
     }
 
     WiFiCredentials creds {
@@ -349,7 +351,11 @@ std::uint8_t Config::AddWiFiCredentials(const std::string& ssid, std::uint8_t (&
   return id;
 }
 
-bool Config::TryGetWiFiCredentialsById(std::uint8_t id, Config::WiFiCredentials& credentials) {
+bool Config::TryGetWiFiCredentialsByID(std::uint8_t id, Config::WiFiCredentials& credentials) {
+  if (id == 0) {
+    return false;
+  }
+
   for (auto& creds : _mainConfig.wifi.credentials) {
     if (creds.id == id) {
       credentials = creds;
@@ -383,6 +389,10 @@ bool Config::TryGetWiFiCredentialsByBSSID(const std::uint8_t (&bssid)[6], Config
 }
 
 void Config::RemoveWiFiCredentials(std::uint8_t id) {
+  if (id == 0) {
+    return;
+  }
+
   for (auto it = _mainConfig.wifi.credentials.begin(); it != _mainConfig.wifi.credentials.end(); ++it) {
     if (it->id == id) {
       _mainConfig.wifi.credentials.erase(it);

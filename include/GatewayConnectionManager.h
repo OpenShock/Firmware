@@ -9,7 +9,7 @@ namespace OpenShock::GatewayConnectionManager {
   bool IsConnected();
 
   bool IsPaired();
-  bool Pair(unsigned int pairCode);
+  bool Pair(const char* pairCode);
   void UnPair();
 
   typedef std::function<void(bool)> ConnectedChangedHandler;

@@ -1,6 +1,6 @@
 #pragma once
 
-#include "ScanCompletedStatus.h"
+#include "fbs/WifiScanStatus_generated.h"
 
 #include <esp_wifi_types.h>
 
@@ -13,20 +13,16 @@ namespace OpenShock::WiFiScanManager {
   bool IsScanning();
 
   bool StartScan();
-  void CancelScan();
+  void AbortScan();
 
-  typedef std::function<void()> ScanStartedHandler;
-  typedef std::function<void(OpenShock::ScanCompletedStatus)> ScanCompletedHandler;
-  typedef std::function<void(const wifi_ap_record_t* record)> ScanDiscoveryHandler;
+  typedef std::function<void(OpenShock::WifiScanStatus)> StatusChangedHandler;
+  typedef std::function<void(const wifi_ap_record_t* record)> NetworkDiscoveryHandler;
 
-  std::uint64_t RegisterScanStartedHandler(const ScanStartedHandler& handler);
-  void UnregisterScanStartedHandler(std::uint64_t id);
+  std::uint64_t RegisterStatusChangedHandler(const StatusChangedHandler& handler);
+  void UnregisterStatusChangedHandler(std::uint64_t id);
 
-  std::uint64_t RegisterScanCompletedHandler(const ScanCompletedHandler& handler);
-  void UnregisterScanCompletedHandler(std::uint64_t id);
-
-  std::uint64_t RegisterScanDiscoveryHandler(const ScanDiscoveryHandler& handler);
-  void UnregisterScanDiscoveryHandler(std::uint64_t id);
+  std::uint64_t RegisterNetworkDiscoveryHandler(const NetworkDiscoveryHandler& handler);
+  void UnregisterNetworkDiscoveryHandler(std::uint64_t id);
 
   void Update();
 }  // namespace OpenShock::WiFiScanManager

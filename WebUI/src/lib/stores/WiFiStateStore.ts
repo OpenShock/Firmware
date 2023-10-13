@@ -6,7 +6,7 @@ const { subscribe, update } = writable<WiFiState>({
   initialized: false,
   connected: null,
   scanning: false,
-  networks: {},
+  networks: new Map<string, WiFiNetwork>(),
 });
 
 export const WiFiStateStore = {
@@ -31,13 +31,19 @@ export const WiFiStateStore = {
   },
   addNetwork(network: WiFiNetwork) {
     update((store) => {
-      store.networks[network.bssid] = network;
+      store.networks.set(network.bssid, network);
+      return store;
+    });
+  },
+  removeNetwork(bssid: string) {
+    update((store) => {
+      store.networks.delete(bssid);
       return store;
     });
   },
   clearNetworks() {
     update((store) => {
-      store.networks = {};
+      store.networks.clear();
       return store;
     });
   },

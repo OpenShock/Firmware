@@ -1,8 +1,10 @@
+import type { WifiAuthMode } from '$lib/fbs/open-shock/wifi-auth-mode';
+
 export type WiFiNetwork = {
   ssid: string;
   bssid: string;
   rssi: number;
   channel: number;
-  security: 'Open' | 'WEP' | 'WPA PSK' | 'WPA2 PSK' | 'WPA/WPA2 PSK' | 'WPA2 Enterprise' | 'WPA3 PSK' | 'WPA2/WPA3 PSK' | 'WAPI PSK' | null;
+  security: WifiAuthMode;
   saved: boolean;
 };
