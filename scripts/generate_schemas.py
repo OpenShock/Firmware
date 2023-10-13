@@ -30,16 +30,12 @@ for root, dirs, files in os.walk(schemas_path):
 
 # Compile the schemas for C++ and TypeScript.
 flatc_args_ts = [
-    # Generate not just code for the current schema files, but for all files it includes as well
-    '--gen-all',
     # Compile for TypeScript.
     '--ts',
     # Output directory.
     '-o ' + ts_output_path,
 ] + schema_files
 flatc_args_cpp = [
-    # Generate not just code for the current schema files, but for all files it includes as well.
-    '--gen-all',
     # Compile for C++.
     '--cpp',
     # Don't prefix enum values in generated C++ by their enum type.
