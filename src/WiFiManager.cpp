@@ -4,6 +4,7 @@
 #include "Config.h"
 #include "FormatHelpers.h"
 #include "Mappers/EspWiFiTypesMapper.h"
+#include "Time.h"
 #include "Utils/HexUtils.h"
 #include "VisualStateManager.h"
 #include "WiFiScanManager.h"
