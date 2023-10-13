@@ -47,6 +47,7 @@ static startCommandsVector(builder:flatbuffers.Builder, numElems:number) {
 
 static endShockerCommandList(builder:flatbuffers.Builder):flatbuffers.Offset {
   const offset = builder.endObject();
+  builder.requiredField(offset, 4) // commands
   return offset;
 }
 

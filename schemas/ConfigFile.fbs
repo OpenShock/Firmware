@@ -1,11 +1,11 @@
 namespace OpenShock.Serialization.Configuration;
 
-struct RFConfig {
-  tx_pin:uint32;
+struct BSSID {
+  array:[ubyte:6];
 }
 
-struct BSSID {
-  array:[uint8:6];
+struct RFConfig {
+  tx_pin:uint32;
 }
 
 table WiFiCredentials {

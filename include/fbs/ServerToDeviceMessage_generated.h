@@ -13,6 +13,9 @@ static_assert(FLATBUFFERS_VERSION_MAJOR == 23 &&
               FLATBUFFERS_VERSION_REVISION == 26,
              "Non-compatible flatbuffers version included");
 
+#include "ShockerCommandType_generated.h"
+#include "ShockerModelType_generated.h"
+
 namespace OpenShock {
 namespace Serialization {
 
@@ -25,76 +28,6 @@ struct CaptivePortalConfig;
 
 struct ServerToDeviceMessage;
 struct ServerToDeviceMessageBuilder;
-
-namespace Types {
-
-enum class ShockerCommandType : uint8_t {
-  Stop = 0,
-  Shock = 1,
-  Vibrate = 2,
-  Sound = 3,
-  MIN = Stop,
-  MAX = Sound
-};
-
-inline const ShockerCommandType (&EnumValuesShockerCommandType())[4] {
-  static const ShockerCommandType values[] = {
-    ShockerCommandType::Stop,
-    ShockerCommandType::Shock,
-    ShockerCommandType::Vibrate,
-    ShockerCommandType::Sound
-  };
-  return values;
-}
-
-inline const char * const *EnumNamesShockerCommandType() {
-  static const char * const names[5] = {
-    "Stop",
-    "Shock",
-    "Vibrate",
-    "Sound",
-    nullptr
-  };
-  return names;
-}
-
-inline const char *EnumNameShockerCommandType(ShockerCommandType e) {
-  if (::flatbuffers::IsOutRange(e, ShockerCommandType::Stop, ShockerCommandType::Sound)) return "";
-  const size_t index = static_cast<size_t>(e);
-  return EnumNamesShockerCommandType()[index];
-}
-
-enum class ShockerModelType : uint8_t {
-  CaiXianlin = 0,
-  PetTrainer = 1,
-  MIN = CaiXianlin,
-  MAX = PetTrainer
-};
-
-inline const ShockerModelType (&EnumValuesShockerModelType())[2] {
-  static const ShockerModelType values[] = {
-    ShockerModelType::CaiXianlin,
-    ShockerModelType::PetTrainer
-  };
-  return values;
-}
-
-inline const char * const *EnumNamesShockerModelType() {
-  static const char * const names[3] = {
-    "CaiXianlin",
-    "PetTrainer",
-    nullptr
-  };
-  return names;
-}
-
-inline const char *EnumNameShockerModelType(ShockerModelType e) {
-  if (::flatbuffers::IsOutRange(e, ShockerModelType::CaiXianlin, ShockerModelType::PetTrainer)) return "";
-  const size_t index = static_cast<size_t>(e);
-  return EnumNamesShockerModelType()[index];
-}
-
-}  // namespace Types
 
 enum class ServerToDeviceMessagePayload : uint8_t {
   NONE = 0,
@@ -242,7 +175,7 @@ struct ShockerCommandList FLATBUFFERS_FINAL_CLASS : private ::flatbuffers::Table
   }
   bool Verify(::flatbuffers::Verifier &verifier) const {
     return VerifyTableStart(verifier) &&
-           VerifyOffset(verifier, VT_COMMANDS) &&
+           VerifyOffsetRequired(verifier, VT_COMMANDS) &&
            verifier.VerifyVector(commands()) &&
            verifier.EndTable();
   }
@@ -262,6 +195,7 @@ struct ShockerCommandListBuilder {
   ::flatbuffers::Offset<ShockerCommandList> Finish() {
     const auto end = fbb_.EndTable(start_);
     auto o = ::flatbuffers::Offset<ShockerCommandList>(end);
+    fbb_.Required(o, ShockerCommandList::VT_COMMANDS);
     return o;
   }
 };

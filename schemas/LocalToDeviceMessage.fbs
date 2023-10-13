@@ -1,0 +1,50 @@
+attribute "fs_serializer";
+
+namespace OpenShock.Serialization.Local;
+
+struct WifiScanCommand {
+  run:bool;
+}
+table WifiNetworkSaveCommand {
+  ssid:string;
+  bssid:string;
+  password:string;
+}
+table WifiNetworkForgetCommand {
+  ssid:string;
+  bssid:string;
+}
+table WifiNetworkConnectCommand {
+  ssid:string;
+  bssid:string;
+}
+struct WifiNetworkDisconnectCommand {
+  placeholder:bool;
+}
+
+table GatewayPairCommand {
+  code:string;
+}
+struct GatewayUnpairCommand {
+  placeholder:bool;
+}
+struct SetRfTxPinCommand {
+  pin:uint8;
+}
+
+union LocalToDeviceMessagePayload {
+  WifiScanCommand,
+  WifiNetworkSaveCommand,
+  WifiNetworkForgetCommand,
+  WifiNetworkConnectCommand,
+  WifiNetworkDisconnectCommand,
+  GatewayPairCommand,
+  GatewayUnpairCommand,
+  SetRfTxPinCommand
+}
+
+table LocalToDeviceMessage (fs_serializer) {
+  payload:LocalToDeviceMessagePayload;
+}
+
+root_type LocalToDeviceMessage;

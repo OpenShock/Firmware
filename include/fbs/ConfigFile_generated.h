@@ -17,9 +17,9 @@ namespace OpenShock {
 namespace Serialization {
 namespace Configuration {
 
-struct RFConfig;
-
 struct BSSID;
+
+struct RFConfig;
 
 struct WiFiCredentials;
 struct WiFiCredentialsBuilder;
@@ -34,31 +34,6 @@ struct BackendConfigBuilder;
 
 struct Config;
 struct ConfigBuilder;
-
-FLATBUFFERS_MANUALLY_ALIGNED_STRUCT(4) RFConfig FLATBUFFERS_FINAL_CLASS {
- private:
-  uint32_t tx_pin_;
-
- public:
-  struct Traits;
-  static FLATBUFFERS_CONSTEXPR_CPP11 const char *GetFullyQualifiedName() {
-    return "OpenShock.Serialization.Configuration.RFConfig";
-  }
-  RFConfig()
-      : tx_pin_(0) {
-  }
-  RFConfig(uint32_t _tx_pin)
-      : tx_pin_(::flatbuffers::EndianScalar(_tx_pin)) {
-  }
-  uint32_t tx_pin() const {
-    return ::flatbuffers::EndianScalar(tx_pin_);
-  }
-};
-FLATBUFFERS_STRUCT_END(RFConfig, 4);
-
-struct RFConfig::Traits {
-  using type = RFConfig;
-};
 
 FLATBUFFERS_MANUALLY_ALIGNED_STRUCT(1) BSSID FLATBUFFERS_FINAL_CLASS {
  private:
@@ -83,6 +58,31 @@ FLATBUFFERS_STRUCT_END(BSSID, 6);
 
 struct BSSID::Traits {
   using type = BSSID;
+};
+
+FLATBUFFERS_MANUALLY_ALIGNED_STRUCT(4) RFConfig FLATBUFFERS_FINAL_CLASS {
+ private:
+  uint32_t tx_pin_;
+
+ public:
+  struct Traits;
+  static FLATBUFFERS_CONSTEXPR_CPP11 const char *GetFullyQualifiedName() {
+    return "OpenShock.Serialization.Configuration.RFConfig";
+  }
+  RFConfig()
+      : tx_pin_(0) {
+  }
+  RFConfig(uint32_t _tx_pin)
+      : tx_pin_(::flatbuffers::EndianScalar(_tx_pin)) {
+  }
+  uint32_t tx_pin() const {
+    return ::flatbuffers::EndianScalar(tx_pin_);
+  }
+};
+FLATBUFFERS_STRUCT_END(RFConfig, 4);
+
+struct RFConfig::Traits {
+  using type = RFConfig;
 };
 
 FLATBUFFERS_MANUALLY_ALIGNED_STRUCT(1) CaptivePortalConfig FLATBUFFERS_FINAL_CLASS {
