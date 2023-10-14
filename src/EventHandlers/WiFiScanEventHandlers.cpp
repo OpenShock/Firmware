@@ -45,7 +45,9 @@ void _scanNetworkDiscoveryHandler(const wifi_ap_record_t* record) {
 
   auto wifiNetworkOffset = Serialization::Local::CreateWifiNetwork(builder, ssidOffset, bssidOffset, record->rssi, record->primary, authMode, WiFiManager::IsSaved(ssid, record->bssid));
 
-  auto msg = Serialization::Local::CreateDeviceToLocalMessage(builder, Serialization::Local::DeviceToLocalMessagePayload::WifiNetworkDiscoveredEvent, wifiNetworkOffset.Union());
+  auto disoveryEventOffset = Serialization::Local::CreateWifiNetworkDiscoveredEvent(builder, wifiNetworkOffset);
+
+  auto msg = Serialization::Local::CreateDeviceToLocalMessage(builder, Serialization::Local::DeviceToLocalMessagePayload::WifiNetworkDiscoveredEvent, disoveryEventOffset.Union());
 
   builder.Finish(msg);
 

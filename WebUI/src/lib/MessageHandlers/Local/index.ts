@@ -88,7 +88,7 @@ PayloadHandlers[DeviceToLocalMessagePayload.WifiNetworkDiscoveredEvent] = (cli, 
   const bssid = fbsNetwork.bssid();
 
   if (!ssid || !bssid) {
-    console.warn('[WS] Received invalid network lost event: ', fbsNetwork.ssid(), fbsNetwork.bssid(), fbsNetwork.rssi(), fbsNetwork.channel(), fbsNetwork.authMode(), fbsNetwork.saved());
+    console.warn('[WS] Received invalid network lost event');
     return;
   }
 
@@ -100,6 +100,8 @@ PayloadHandlers[DeviceToLocalMessagePayload.WifiNetworkDiscoveredEvent] = (cli, 
     security: fbsNetwork.authMode(),
     saved: fbsNetwork.saved(),
   };
+
+  console.log('[WS] Received network discovered event: ', network);
 
   WiFiStateStore.addNetwork(network);
 };
