@@ -1,7 +1,10 @@
 <script lang="ts">
+  import { SerializeWifiNetworkSaveCommand } from '$lib/Serializers/WifiNetworkSaveCommand';
+  import { SerializeWifiNetworkConnectCommand } from '$lib/Serializers/WifiNetworkConnectCommand';
   import { WebSocketClient } from '$lib/WebSocketClient';
   import { WiFiStateStore } from '$lib/stores';
   import { getModalStore } from '@skeletonlabs/skeleton';
+  import { SerializeWifiNetworkForgetCommand } from '$lib/Serializers/WifiNetworkForgetCommand';
 
   export let bssid: string;
 
@@ -21,15 +24,22 @@
     : [];
 
   function AuthenticateWiFi() {
-    WebSocketClient.Instance.Send('{ "type": "wifi", "action": "scan", "run": true }');
+    if (!item) return;
+    // TODO: Prompt for password
+    const data = SerializeWifiNetworkSaveCommand(item.ssid, item.bssid, '');
+    WebSocketClient.Instance.Send(data);
     modalStore.close();
   }
   function ConnectWiFi() {
-    WebSocketClient.Instance.Send('{ "type": "wifi", "action": "scan", "run": true }');
+    if (!item) return;
+    const data = SerializeWifiNetworkConnectCommand(item.ssid, item.bssid);
+    WebSocketClient.Instance.Send(data);
     modalStore.close();
   }
   function ForgetWiFi() {
-    WebSocketClient.Instance.Send('{ "type": "wifi", "action": "forget", "bssid": "' + bssid + '" }');
+    if (!item) return;
+    const data = SerializeWifiNetworkForgetCommand(item.ssid, item.bssid);
+    WebSocketClient.Instance.Send(data);
     modalStore.close();
   }
 </script>

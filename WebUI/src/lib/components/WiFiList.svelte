@@ -9,23 +9,18 @@
   import { LocalToDeviceMessage } from '$lib/fbs/open-shock/serialization/local/local-to-device-message';
   import { LocalToDeviceMessagePayload } from '$lib/fbs/open-shock/serialization/local/local-to-device-message-payload';
   import { WifiAuthMode } from '$lib/fbs/open-shock/wifi-auth-mode';
+  import { SerializeWifiScanCommand } from '$lib/Serializers/WifiScanCommand';
+  import { SerializeWifiNetworkDisconnectCommand } from '$lib/Serializers/WifiNetworkDisconnectCommand';
+  import { SerializeWifiNetworkConnectCommand } from '$lib/Serializers/WifiNetworkConnectCommand';
+  import { SerializeWifiNetworkSaveCommand } from '$lib/Serializers/WifiNetworkSaveCommand';
 
   const modalStore = getModalStore();
 
   let connectedBSSID: string | null = null;
 
   function wifiScan() {
-    const fbb = new FlatbufferBuilder(64);
-
-    const cmdOffset = WifiScanCommand.createWifiScanCommand(fbb, !$WiFiStateStore.scanning);
-
-    const payloadOffset = LocalToDeviceMessage.createLocalToDeviceMessage(fbb, LocalToDeviceMessagePayload.WifiScanCommand, cmdOffset);
-
-    fbb.finish(payloadOffset);
-
-    const buf = fbb.asUint8Array();
-
-    WebSocketClient.Instance.Send(buf);
+    const data = SerializeWifiScanCommand(!$WiFiStateStore.scanning);
+    WebSocketClient.Instance.Send(data);
   }
   function wifiAuthenticate(item: WiFiNetwork) {
     if (item.security !== WifiAuthMode.Open) {
@@ -36,18 +31,22 @@
         value: '',
         valueAttr: { type: 'password', minlength: 1, maxlength: 63, required: true },
         response: (password: string) => {
-          WebSocketClient.Instance.Send(`{ "type": "wifi", "action": "authenticate", "bssid": "${item.bssid}", "password": "${password}" }`);
+          const data = SerializeWifiNetworkSaveCommand(item.ssid, item.bssid, password);
+          WebSocketClient.Instance.Send(data);
         },
       });
     } else {
-      WebSocketClient.Instance.Send(`{ "type": "wifi", "action": "authenticate", "bssid": "${item.bssid}" }`);
+      const data = SerializeWifiNetworkSaveCommand(item.ssid, item.bssid, '');
+      WebSocketClient.Instance.Send(data);
     }
   }
   function wifiConnect(item: WiFiNetwork) {
-    WebSocketClient.Instance.Send(`{ "type": "wifi", "action": "connect", "bssid": "${item.bssid}" }`);
+    const data = SerializeWifiNetworkConnectCommand(item.ssid, item.bssid);
+    WebSocketClient.Instance.Send(data);
   }
   function wifiDisconnect(item: WiFiNetwork) {
-    WebSocketClient.Instance.Send(`{ "type": "wifi", "action": "disconnect", "bssid": "${item.bssid}" }`);
+    const data = SerializeWifiNetworkDisconnectCommand();
+    WebSocketClient.Instance.Send(data);
   }
   function wifiSettings(item: WiFiNetwork) {
     modalStore.trigger({

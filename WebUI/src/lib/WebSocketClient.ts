@@ -1,6 +1,6 @@
 import { browser } from '$app/environment';
 import { isArrayBuffer, isString } from './TypeGuards/BasicGuards';
-import { WebSocketMessageBinaryHandler } from './MessageHandlers/Local';
+import { WebSocketMessageBinaryHandler } from './MessageHandlers';
 
 export enum ConnectionState {
   DISCONNECTED = 0,

@@ -4,7 +4,7 @@ import { DeviceToLocalMessage } from '$lib/fbs/open-shock/serialization/local/de
 import { DeviceToLocalMessagePayload } from '$lib/fbs/open-shock/serialization/local/device-to-local-message-payload';
 import { ReadyMessage } from '$lib/fbs/open-shock/serialization/local/ready-message';
 import { WifiScanStatusMessage } from '$lib/fbs/open-shock/serialization/local/wifi-scan-status-message';
-import { ByteBuffer, Builder as FlatbufferBuilder } from 'flatbuffers';
+import { ByteBuffer } from 'flatbuffers';
 import { WifiNetworkUpdatedEvent } from '$lib/fbs/open-shock/serialization/local/wifi-network-updated-event';
 import { WifiNetworkLostEvent } from '$lib/fbs/open-shock/serialization/local/wifi-network-lost-event';
 import { WifiNetworkSavedEvent } from '$lib/fbs/open-shock/serialization/local/wifi-network-saved-event';
@@ -15,9 +15,7 @@ import { WifiScanStatus } from '$lib/fbs/open-shock';
 import { WiFiStateStore } from '$lib/stores';
 import type { WiFiNetwork } from '$lib/types/WiFiNetwork';
 import { WifiNetwork as FbsWifiNetwork } from '$lib/fbs/open-shock/serialization/local/wifi-network';
-import { WifiScanCommand } from '$lib/fbs/open-shock/serialization/local/wifi-scan-command';
-import { LocalToDeviceMessage } from '$lib/fbs/open-shock/serialization/local/local-to-device-message';
-import { LocalToDeviceMessagePayload } from '$lib/fbs/open-shock/serialization/local/local-to-device-message-payload';
+import { SerializeWifiScanCommand } from '$lib/Serializers/WifiScanCommand';
 
 type MessageHandler = (wsClient: WebSocketClient, message: DeviceToLocalMessage) => void;
 
@@ -25,7 +23,8 @@ function handleInvalidMessage() {
   console.warn('[WS] Received invalid message');
 }
 
-const PayloadHandlers: MessageHandler[] = new Array<MessageHandler>(Object.keys(DeviceToLocalMessagePayload).length / 2).fill(handleInvalidMessage);
+const PayloadTypes = Object.keys(DeviceToLocalMessagePayload).length / 2;
+const PayloadHandlers: MessageHandler[] = new Array<MessageHandler>(PayloadTypes).fill(handleInvalidMessage);
 
 PayloadHandlers[DeviceToLocalMessagePayload.ReadyMessage] = (cli, msg) => {
   const payload = new ReadyMessage();
@@ -33,17 +32,8 @@ PayloadHandlers[DeviceToLocalMessagePayload.ReadyMessage] = (cli, msg) => {
 
   console.log('[WS] Received ready message, poggies: ', payload.poggies());
 
-  const fbb = new FlatbufferBuilder(64);
-
-  const cmdOffset = WifiScanCommand.createWifiScanCommand(fbb, true);
-
-  const payloadOffset = LocalToDeviceMessage.createLocalToDeviceMessage(fbb, LocalToDeviceMessagePayload.WifiScanCommand, cmdOffset);
-
-  fbb.finish(payloadOffset);
-
-  const buf = fbb.asUint8Array();
-
-  cli.Send(buf);
+  const data = SerializeWifiScanCommand(true);
+  cli.Send(data);
 };
 
 PayloadHandlers[DeviceToLocalMessagePayload.WifiScanStatusMessage] = (cli, msg) => {
