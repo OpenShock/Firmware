@@ -26,6 +26,16 @@ void CommandHandler::Init() {
   s_rfTransmitter = std::make_unique<RFTransmitter>(txPin, 32);
 }
 
+bool CommandHandler::SetRfTxPin(std::uint32_t txPin) {
+  if (s_rfTransmitter != nullptr) return false;
+
+  Config::SetRFConfigTxPin(txPin);
+
+  s_rfTransmitter = std::make_unique<RFTransmitter>(txPin, 32);
+
+  return true;
+}
+
 bool CommandHandler::HandleCommand(ShockerModelType model, std::uint16_t shockerId, ShockerCommandType type, std::uint8_t intensity, unsigned int duration) {
   if (s_rfTransmitter == nullptr) return false;
 

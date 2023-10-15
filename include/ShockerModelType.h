@@ -1,12 +1,9 @@
 #pragma once
 
+#include "fbs/ShockerModelType_generated.h"
+
 #include <cstdint>
 
 namespace OpenShock {
-
-  enum ShockerModelType : std::uint8_t {
-    CaiXianlin = 0,
-    PetTrainer = 1
-  };
-
+  typedef OpenShock::Serialization::Types::ShockerModelType ShockerModelType;
 }  // namespace OpenShock

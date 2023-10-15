@@ -30,7 +30,7 @@ PayloadHandlers[DeviceToLocalMessagePayload.ReadyMessage] = (cli, msg) => {
   const payload = new ReadyMessage();
   msg.payload(payload);
 
-  console.log('[WS] Received ready message, poggies: ', payload.poggies());
+  console.log('[WS] Connected to device, poggies: ', payload.poggies());
 
   const data = SerializeWifiScanCommand(true);
   cli.Send(data);
@@ -42,23 +42,18 @@ PayloadHandlers[DeviceToLocalMessagePayload.WifiScanStatusMessage] = (cli, msg) 
 
   switch (payload.status()) {
     case WifiScanStatus.Started:
-      console.log('[WS] Received scan started message');
       WiFiStateStore.setScanning(true);
       break;
     case WifiScanStatus.InProgress:
-      console.log('[WS] Received scan in progress message');
       WiFiStateStore.setScanning(true);
       break;
     case WifiScanStatus.Completed:
-      console.log('[WS] Received scan completed message');
       WiFiStateStore.setScanning(false);
       break;
     case WifiScanStatus.Aborted:
-      console.log('[WS] Received scan aborted message');
       WiFiStateStore.setScanning(false);
       break;
     case WifiScanStatus.Error:
-      console.log('[WS] Received scan error message');
       WiFiStateStore.setScanning(false);
       break;
     default:
@@ -90,8 +85,6 @@ PayloadHandlers[DeviceToLocalMessagePayload.WifiNetworkDiscoveredEvent] = (cli, 
     security: fbsNetwork.authMode(),
     saved: fbsNetwork.saved(),
   };
-
-  console.log('[WS] Received network discovered event: ', network);
 
   WiFiStateStore.addNetwork(network);
 };

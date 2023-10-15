@@ -5,7 +5,6 @@
 #include "Config.h"
 #include "Constants.h"
 #include "fbs/DeviceToServerMessage_generated.h"
-#include "fbs/ServerToDeviceMessage_generated.h"
 #include "ShockerCommandType.h"
 #include "ShockerModelType.h"
 #include "Time.h"
@@ -118,111 +117,6 @@ private:
     m_webSocket.sendBIN(builder.GetBufferPointer(), builder.GetSize());
   }
 
-  void _handleShockerCommandListMessage(const OpenShock::Serialization::ShockerCommandList* shockerCommandList) {
-    auto commands = shockerCommandList->commands();
-    if (commands == nullptr) {
-      ESP_LOGE(TAG, "Received invalid command list from API");
-      return;
-    }
-
-    ESP_LOGV(TAG, "Received command list from API (%d commands)", commands->size());
-
-    for (auto command : *commands) {
-      OpenShock::ShockerModelType model;
-      switch (command->model()) {
-        case OpenShock::Serialization::Types::ShockerModelType::CaiXianlin:
-          model = OpenShock::ShockerModelType::CaiXianlin;
-          break;
-        case OpenShock::Serialization::Types::ShockerModelType::PetTrainer:
-          model = OpenShock::ShockerModelType::PetTrainer;
-          break;
-        default:
-          ESP_LOGE(TAG, "Received unknown model type from API (%d)", command->model());
-          continue;
-      }
-      ESP_LOGV(TAG, "   Model %s", OpenShock::Serialization::Types::EnumNameShockerModelType(command->model()));
-
-      OpenShock::ShockerCommandType type;
-      switch (command->type()) {
-        case OpenShock::Serialization::Types::ShockerCommandType::Stop:
-
-          type = OpenShock::ShockerCommandType::Stop;
-          break;
-        case OpenShock::Serialization::Types::ShockerCommandType::Shock:
-          type = OpenShock::ShockerCommandType::Shock;
-          break;
-        case OpenShock::Serialization::Types::ShockerCommandType::Vibrate:
-          type = OpenShock::ShockerCommandType::Vibrate;
-          break;
-        case OpenShock::Serialization::Types::ShockerCommandType::Sound:
-          type = OpenShock::ShockerCommandType::Sound;
-          break;
-        default:
-          ESP_LOGE(TAG, "Received unknown command type from API (%d)", command->type());
-          continue;
-      }
-      ESP_LOGV(TAG, "   CommandTpe %s", OpenShock::Serialization::Types::EnumNameShockerCommandType(command->type()));
-
-      std::uint16_t id       = command->id();
-      std::uint8_t intensity = command->intensity();
-      std::uint32_t duration = command->duration();
-
-      ESP_LOGV(TAG, "   ID %u, Intensity %u, Duration %u", id, intensity, duration);
-
-      if (!OpenShock::CommandHandler::HandleCommand(model, id, type, intensity, duration)) {
-        ESP_LOGE(TAG, "Remote command failed/rejected!");
-      }
-    }
-  }
-
-  void _handleCaptivePortalConfigMessage(const OpenShock::Serialization::CaptivePortalConfig* captivePortalConfig) {
-    bool enabled = captivePortalConfig->enabled();
-
-    ESP_LOGD(TAG, "Captive portal is %s", enabled ? "force enabled" : "normal");
-
-    OpenShock::CaptivePortal::SetAlwaysEnabled(enabled);
-  }
-
-  void _parseMessage(std::uint8_t* payload, std::size_t length) {
-    ESP_LOGV(TAG, "Received binary message from API (%d bytes)", length);
-
-    if (payload == nullptr || length == 0) {
-      ESP_LOGE(TAG, "Received invalid message from API");
-      return;
-    }
-
-    auto msg = flatbuffers::GetRoot<OpenShock::Serialization::ServerToDeviceMessage>(payload);
-    if (msg == nullptr) {
-      ESP_LOGE(TAG, "Received invalid message from API");
-      return;
-    }
-
-    flatbuffers::Verifier::Options verifierOptions {
-      .max_depth  = 32,   // Half of the default value
-      .max_tables = 64,   // Way less than the default value
-      .max_size   = 512,  // Don't see why we would need more than this at the moment
-    };
-    flatbuffers::Verifier verifier(payload, length, verifierOptions);
-    if (!msg->Verify(verifier)) {
-      ESP_LOGE(TAG, "Received invalid message from API");
-      return;
-    }
-
-    ESP_LOGV(TAG, "Message validated");
-
-    switch (msg->payload_type()) {
-      [[likely]] case OpenShock::Serialization::ServerToDeviceMessagePayload::ShockerCommandList:
-        _handleShockerCommandListMessage(msg->payload_as_ShockerCommandList());
-        break;
-      case OpenShock::Serialization::ServerToDeviceMessagePayload::CaptivePortalConfig:
-        _handleCaptivePortalConfigMessage(msg->payload_as_CaptivePortalConfig());
-        break;
-      [[unlikely]] default:
-        ESP_LOGE(TAG, "Received unknown message type from API (%d)", msg->payload_type());
-        break;
-    }
-  }
-
   void _handleEvent(WStype_t type, std::uint8_t* payload, std::size_t length) {
     switch (type) {
       case WStype_DISCONNECTED:
@@ -262,7 +156,7 @@ private:
         ESP_LOGD(TAG, "Received pong from API");
         break;
       case WStype_BIN:
-        _parseMessage(payload, length);
+
         break;
       case WStype_FRAGMENT_BIN_START:
         ESP_LOGE(TAG, "Received binary fragment start from API, this is not supported!");

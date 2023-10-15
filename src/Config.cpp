@@ -306,6 +306,11 @@ void Config::SetBackendConfig(const BackendConfig& config) {
   _trySaveConfig(_mainConfig);
 }
 
+bool Config::SetRFConfigTxPin(std::uint32_t txPin) {
+  _mainConfig.rf.txPin = txPin;
+  return _trySaveConfig(_mainConfig);
+}
+
 std::uint8_t Config::AddWiFiCredentials(const std::string& ssid, const std::uint8_t (&bssid)[6], const std::string& password) {
   std::uint8_t id = 0;
 

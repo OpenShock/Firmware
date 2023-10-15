@@ -43,6 +43,8 @@ namespace OpenShock::Config {
   void SetCaptivePortalConfig(const CaptivePortalConfig& config);
   void SetBackendConfig(const BackendConfig& config);
 
+  bool SetRFConfigTxPin(std::uint32_t txPin);
+
   std::uint8_t AddWiFiCredentials(const std::string& ssid, const std::uint8_t (&bssid)[6], const std::string& password);
   bool TryGetWiFiCredentialsByID(std::uint8_t id, WiFiCredentials& out);
   bool TryGetWiFiCredentialsBySSID(const char* ssid, WiFiCredentials& out);

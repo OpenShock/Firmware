@@ -1,11 +1,13 @@
 #include "CaptivePortal.h"
 
+#include "CommandHandler.h"
 #include "Config.h"
+#include "Constants.h"
 #include "fbs/DeviceToLocalMessage_generated.h"
-#include "fbs/LocalToDeviceMessage_generated.h"
 #include "FormatHelpers.h"
 #include "GatewayConnectionManager.h"
 #include "Mappers/EspWiFiTypesMapper.h"
+#include "MessageHandlers/Local.h"
 #include "Utils/HexUtils.h"
 #include "WiFiManager.h"
 #include "WiFiScanManager.h"
@@ -14,6 +16,8 @@
 #include <LittleFS.h>
 #include <WebSocketsServer.h>
 #include <WiFi.h>
+
+#include <esp_log.h>
 
 #include <memory>
 
@@ -59,184 +63,6 @@ struct CaptivePortalInstance {
     CaptivePortal::SendMessageBIN(socketId, span.data(), span.size());
   }
   void handleWebSocketClientDisconnected(std::uint8_t socketId) { ESP_LOGD(TAG, "WebSocket client #%u disconnected", socketId); }
-  void handleWebSocketClientWiFiScanCommand(const Serialization::Local::WifiScanCommand* msg) {
-    if (msg->run()) {
-      WiFiScanManager::StartScan();
-    } else {
-      WiFiScanManager::AbortScan();
-    }
-  }
-  void handleWebSocketClientWiFiNetworkSaveCommand(const Serialization::Local::WifiNetworkSaveCommand* msg) {
-    auto ssid     = msg->ssid();
-    auto bssid    = msg->bssid();
-    auto password = msg->password();
-
-    if (ssid == nullptr || bssid == nullptr || password == nullptr) {
-      ESP_LOGE(TAG, "WiFi message is missing required properties");
-      return;
-    }
-
-    if (ssid->size() > 31) {
-      ESP_LOGE(TAG, "WiFi SSID is too long");
-      return;
-    }
-
-    if (bssid->size() != 17) {
-      ESP_LOGE(TAG, "WiFi BSSID is invalid (wrong length)");
-      return;
-    }
-
-    // Convert BSSID to byte array
-    std::uint8_t bssidBytes[6];
-    if (!HexUtils::TryParseHexMac<17>(nonstd::span<const char, 17>(bssid->data(), bssid->size()), bssidBytes)) {
-      ESP_LOGE(TAG, "WiFi BSSID is invalid (failed to parse)");
-      return;
-    }
-
-    if (password->size() > 63) {
-      ESP_LOGE(TAG, "WiFi password is too long");
-      return;
-    }
-
-    if (!WiFiManager::Save(bssidBytes, password->str())) {  // TODO: support SSID as well
-      ESP_LOGE(TAG, "Failed to save WiFi network");
-    }
-  }
-  void handleWebSocketClientWiFiNetworkForgetCommand(const Serialization::Local::WifiNetworkForgetCommand* msg) {
-    auto ssid  = msg->ssid();
-    auto bssid = msg->bssid();
-
-    if (ssid == nullptr && bssid == nullptr) {
-      ESP_LOGE(TAG, "WiFi message is missing required properties");
-      return;
-    }
-
-    if (ssid != nullptr && ssid->size() > 31) {
-      ESP_LOGE(TAG, "WiFi SSID is too long");
-      return;
-    }
-
-    if (bssid != nullptr && bssid->size() != 17) {
-      ESP_LOGE(TAG, "WiFi BSSID is invalid (wrong length)");
-      return;
-    }
-
-    // Convert BSSID to byte array
-    std::uint8_t bssidBytes[6];
-    if (bssid != nullptr && !HexUtils::TryParseHexMac<17>(nonstd::span<const char, 17>(bssid->data(), bssid->size()), bssidBytes)) {
-      ESP_LOGE(TAG, "WiFi BSSID is invalid (failed to parse)");
-      return;
-    }
-
-    if (!WiFiManager::Forget(bssidBytes)) {  // TODO: support SSID as well
-      ESP_LOGE(TAG, "Failed to forget WiFi network");
-    }
-  }
-  void handleWebSocketClientWiFiNetworkConnectCommand(const Serialization::Local::WifiNetworkConnectCommand* msg) {
-    auto ssid  = msg->ssid();
-    auto bssid = msg->bssid();
-
-    if (ssid == nullptr && bssid == nullptr) {
-      ESP_LOGE(TAG, "WiFi message is missing required properties");
-      return;
-    }
-
-    if (ssid != nullptr && ssid->size() > 31) {
-      ESP_LOGE(TAG, "WiFi SSID is too long");
-      return;
-    }
-
-    if (bssid != nullptr && bssid->size() != 17) {
-      ESP_LOGE(TAG, "WiFi BSSID is invalid (wrong length)");
-      return;
-    }
-
-    // Convert BSSID to byte array
-    std::uint8_t bssidBytes[6];
-    if (bssid != nullptr && !HexUtils::TryParseHexMac<17>(nonstd::span<const char, 17>(bssid->data(), bssid->size()), bssidBytes)) {
-      ESP_LOGE(TAG, "WiFi BSSID is invalid (failed to parse)");
-      return;
-    }
-
-    if (!WiFiManager::Connect(bssidBytes)) {  // TODO: support SSID as well
-      ESP_LOGE(TAG, "Failed to connect to WiFi network");
-    }
-  }
-  void handleWebSocketClientWiFiNetworkDisconnectCommand(const Serialization::Local::WifiNetworkDisconnectCommand* msg) { WiFiManager::Disconnect(); }
-  void handleWebSocketClientGatewayPairCommand(const Serialization::Local::GatewayPairCommand* msg) {
-    auto code = msg->code();
-
-    if (code == nullptr) {
-      ESP_LOGE(TAG, "Gateway message is missing required properties");
-      return;
-    }
-
-    if (code->size() != 6) {
-      ESP_LOGE(TAG, "Gateway code is invalid (wrong length)");
-      return;
-    }
-
-    GatewayConnectionManager::Pair(code->data());
-  }
-  void handleWebSocketClientGatewayUnPairCommand(const Serialization::Local::GatewayUnpairCommand* msg) { GatewayConnectionManager::UnPair(); }
-  void handleWebSocketClientSetRfTxPinCommand(const Serialization::Local::SetRfTxPinCommand* msg) {
-    auto pin = msg->pin();
-
-    // AuthenticationManager::SetRmtPin(pin->data());
-  }
-  void handleWebSocketClientMessage(std::uint8_t socketId, WStype_t type, std::uint8_t* data, std::size_t len) {
-    if (type != WStype_t::WStype_BIN) {
-      ESP_LOGE(TAG, "Message type is not supported");
-      return;
-    }
-
-    // Deserialize
-    auto msg = flatbuffers::GetRoot<Serialization::Local::LocalToDeviceMessage>(data);
-    if (msg == nullptr) {
-      ESP_LOGE(TAG, "Failed to deserialize message");
-      return;
-    }
-
-    // Validate buffer
-    flatbuffers::Verifier::Options verifierOptions {
-      .max_size = 4096,  // TODO: Profile this
-    };
-    flatbuffers::Verifier verifier(data, len, verifierOptions);
-    if (!msg->Verify(verifier)) {
-      ESP_LOGE(TAG, "Failed to verify message");
-      return;
-    }
-
-    switch (msg->payload_type()) {
-      case Serialization::Local::LocalToDeviceMessagePayload::WifiScanCommand:
-        handleWebSocketClientWiFiScanCommand(msg->payload_as_WifiScanCommand());
-        break;
-      case Serialization::Local::LocalToDeviceMessagePayload::WifiNetworkSaveCommand:
-        handleWebSocketClientWiFiNetworkSaveCommand(msg->payload_as_WifiNetworkSaveCommand());
-        break;
-      case Serialization::Local::LocalToDeviceMessagePayload::WifiNetworkForgetCommand:
-        handleWebSocketClientWiFiNetworkForgetCommand(msg->payload_as_WifiNetworkForgetCommand());
-        break;
-      case Serialization::Local::LocalToDeviceMessagePayload::WifiNetworkConnectCommand:
-        handleWebSocketClientWiFiNetworkConnectCommand(msg->payload_as_WifiNetworkConnectCommand());
-        break;
-      case Serialization::Local::LocalToDeviceMessagePayload::WifiNetworkDisconnectCommand:
-        handleWebSocketClientWiFiNetworkDisconnectCommand(msg->payload_as_WifiNetworkDisconnectCommand());
-        break;
-      case Serialization::Local::LocalToDeviceMessagePayload::GatewayPairCommand:
-        handleWebSocketClientGatewayPairCommand(msg->payload_as_GatewayPairCommand());
-        break;
-      case Serialization::Local::LocalToDeviceMessagePayload::GatewayUnpairCommand:
-        handleWebSocketClientGatewayUnPairCommand(msg->payload_as_GatewayUnpairCommand());
-        break;
-      case Serialization::Local::LocalToDeviceMessagePayload::SetRfTxPinCommand:
-        handleWebSocketClientSetRfTxPinCommand(msg->payload_as_SetRfTxPinCommand());
-        break;
-      default:
-        ESP_LOGE(TAG, "Received message with unknown payload type");
-        return;
-    }
-  }
   void handleWebSocketClientError(std::uint8_t socketId, std::uint16_t code, const char* message) { ESP_LOGE(TAG, "WebSocket client #%u error %u: %s", socketId, code, message); }
   void handleWebSocketEvent(std::uint8_t socketId, WStype_t type, std::uint8_t* payload, std::size_t length) {
     switch (type) {
@@ -250,7 +76,7 @@ struct CaptivePortalInstance {
       case WStype_FRAGMENT_BIN_START:
       case WStype_FRAGMENT:
       case WStype_FRAGMENT_FIN:
-        handleWebSocketClientMessage(socketId, type, payload, length);
+        MessageHandlers::Local::Handle(socketId, type, payload, length);
         break;
       case WStype_TEXT:
       case WStype_FRAGMENT_TEXT_START:
