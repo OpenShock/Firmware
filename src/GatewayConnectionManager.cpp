@@ -3,6 +3,7 @@
 #include "Config.h"
 #include "Constants.h"
 #include "GatewayClient.h"
+#include "Time.h"
 
 #include <esp_log.h>
 
