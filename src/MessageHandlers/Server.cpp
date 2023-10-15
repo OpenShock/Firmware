@@ -2,7 +2,7 @@
 
 #include "MessageHandlers/Server_Private.h"
 
-#include "fbs/ServerToDeviceMessage_generated.h"
+#include "_fbs/ServerToDeviceMessage_generated.h"
 
 #include <WebSockets.h>
 
@@ -33,7 +33,7 @@ static std::array<Handlers::HandlerType, HANDLER_COUNT> s_serverHandlers = []() 
   return std::move(handlers);
 }();
 
-void MessageHandlers::Server::Handle(std::uint8_t socketId, WStype_t type, const std::uint8_t* data, std::size_t len) {
+void MessageHandlers::Server::Handle(WStype_t type, const std::uint8_t* data, std::size_t len) {
   if (type != WStype_t::WStype_BIN) {
     ESP_LOGE(TAG, "Message type is not supported");
     return;
@@ -57,9 +57,9 @@ void MessageHandlers::Server::Handle(std::uint8_t socketId, WStype_t type, const
   }
 
   if (msg->payload_type() < PayloadType::MIN || msg->payload_type() > PayloadType::MAX) {
-    Handlers::HandleInvalidMessage(socketId, msg);
+    Handlers::HandleInvalidMessage(msg);
     return;
   }
 
-  s_serverHandlers[static_cast<std::size_t>(msg->payload_type())](socketId, msg);
+  s_serverHandlers[static_cast<std::size_t>(msg->payload_type())](msg);
 }

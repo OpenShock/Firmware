@@ -1,10 +1,10 @@
 #pragma once
 
-#include "fbs/ServerToDeviceMessage_generated.h"
+#include "_fbs/ServerToDeviceMessage_generated.h"
 
 #include <cstdint>
 
-#define _HANDLER_SIGNATURE(NAME) void NAME(std::uint8_t socketId, const OpenShock::Serialization::ServerToDeviceMessage* msg)
+#define _HANDLER_SIGNATURE(NAME) void NAME(const OpenShock::Serialization::ServerToDeviceMessage* msg)
 
 namespace OpenShock::MessageHandlers::Server::_Private {
   typedef _HANDLER_SIGNATURE((*HandlerType));

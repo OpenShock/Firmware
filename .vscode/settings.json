@@ -52,7 +52,14 @@
     "typeinfo": "cpp",
     "networks.c": "cpp",
     "regex": "cpp",
-    "iostream": "cpp"
+    "iostream": "cpp",
+    "chrono": "cpp",
+    "codecvt": "cpp",
+    "condition_variable": "cpp",
+    "list": "cpp",
+    "ratio": "cpp",
+    "set": "cpp",
+    "thread": "cpp"
   },
   "[cpp]": {
     "editor.defaultFormatter": "xaver.clang-format",

@@ -6,7 +6,7 @@ const char* const TAG = "ServerMessageHandlers";
 
 using namespace OpenShock::MessageHandlers::Server;
 
-void _Private::HandleInvalidMessage(std::uint8_t socketId, const OpenShock::Serialization::ServerToDeviceMessage* root) {
+void _Private::HandleInvalidMessage(const OpenShock::Serialization::ServerToDeviceMessage* root) {
   if (root == nullptr) {
     ESP_LOGE(TAG, "Message cannot be parsed");
     return;

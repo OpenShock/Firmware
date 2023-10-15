@@ -4,8 +4,6 @@
 #include <string>
 
 namespace OpenShock::CaptivePortal {
-  bool Init();
-
   void SetAlwaysEnabled(bool alwaysEnabled);
   bool IsAlwaysEnabled();
 

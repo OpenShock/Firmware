@@ -1,13 +1,8 @@
 #include "GatewayConnectionManager.h"
 
-#include "CaptivePortal.h"
-#include "CommandHandler.h"
 #include "Config.h"
 #include "Constants.h"
-#include "fbs/DeviceToServerMessage_generated.h"
-#include "ShockerCommandType.h"
-#include "ShockerModelType.h"
-#include "Time.h"
+#include "GatewayClient.h"
 
 #include <esp_log.h>
 
@@ -24,157 +19,13 @@ static const char* const AUTH_TOKEN_FILE = "/authToken";
 
 extern const std::uint8_t* const rootca_crt_bundle_start asm("_binary_data_cert_x509_crt_bundle_start");
 
-static std::unordered_map<std::uint64_t, OpenShock::GatewayConnectionManager::ConnectedChangedHandler> s_connectedChangedHandlers;
-
-struct GatewayClient {
-  GatewayClient(const std::string& authToken, const std::string& fwVersionStr) : m_webSocket(), m_lastKeepAlive(0), m_state(State::Disconnected) {
-    ESP_LOGD(TAG, "Creating GatewayClient");
-    std::string headers;
-    headers.reserve(512);
-
-    headers += "Firmware-Version: ";
-    headers += fwVersionStr;
-    headers += "\r\n";
-    headers += "Device-Token: ";
-    headers += authToken;
-
-    m_webSocket.setExtraHeaders(headers.c_str());
-    m_webSocket.onEvent(std::bind(&GatewayClient::_handleEvent, this, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3));
-  }
-  ~GatewayClient() {
-    ESP_LOGD(TAG, "Destroying GatewayClient");
-    m_webSocket.disconnect();
-  }
-
-  enum class State {
-    Disconnected,
-    Disconnecting,
-    Connecting,
-    Connected,
-  };
-
-  State state() { return m_state; }
-
-  void connect(const char* lcgFqdn) {
-    if (m_state != State::Disconnected) {
-      return;
-    }
-    m_state = State::Connecting;
-    m_webSocket.beginSSL(lcgFqdn, 443, "/1/ws/device");
-  }
-
-  void disconnect() {
-    if (m_state != State::Connected) {
-      return;
-    }
-    m_state = State::Disconnecting;
-    m_webSocket.disconnect();
-  }
-
-  bool loop() {
-    if (m_state == State::Disconnected) {
-      return false;
-    }
-
-    m_webSocket.loop();
-
-    // We are still in the process of connecting or disconnecting
-    if (m_state != State::Connected) {
-      // return true to indicate that we are still busy
-      return true;
-    }
-
-    std::uint64_t msNow = OpenShock::Millis();
-
-    std::uint64_t timeSinceLastKA = msNow - m_lastKeepAlive;
-
-    if (timeSinceLastKA >= 15'000) {
-      _sendKeepAlive();
-      m_lastKeepAlive = msNow;
-    }
-
-    return true;
-  }
-
-  WebSocketsClient m_webSocket;
-  std::uint64_t m_lastKeepAlive;
-  State m_state;
-
-private:
-  void _sendKeepAlive() {
-    ESP_LOGV(TAG, "Sending keep alive message");
-
-    OpenShock::Serialization::KeepAlive keepAlive(OpenShock::Millis());
-
-    flatbuffers::FlatBufferBuilder builder(64);
-
-    auto keepAliveOffset = builder.CreateStruct(keepAlive);
-
-    auto msg = OpenShock::Serialization::CreateDeviceToServerMessage(builder, OpenShock::Serialization::DeviceToServerMessagePayload::KeepAlive, keepAliveOffset.Union());
-
-    builder.Finish(msg);
-
-    m_webSocket.sendBIN(builder.GetBufferPointer(), builder.GetSize());
-  }
-
-  void _handleEvent(WStype_t type, std::uint8_t* payload, std::size_t length) {
-    switch (type) {
-      case WStype_DISCONNECTED:
-        ESP_LOGI(TAG, "Disconnected from API");
-        m_state = State::Disconnected;
-        for (auto& handler : s_connectedChangedHandlers) {
-          handler.second(false);
-        }
-        break;
-      case WStype_CONNECTED:
-        ESP_LOGI(TAG, "Connected to API");
-        m_state = State::Connected;
-        for (auto& handler : s_connectedChangedHandlers) {
-          handler.second(true);
-        }
-        _sendKeepAlive();
-        break;
-      case WStype_TEXT:
-        ESP_LOGW(TAG, "Received text from API, JSON parsing is not supported anymore :D");
-        break;
-      case WStype_ERROR:
-        ESP_LOGE(TAG, "Received error from API");
-        break;
-      case WStype_FRAGMENT_TEXT_START:
-        ESP_LOGD(TAG, "Received fragment text start from API");
-        break;
-      case WStype_FRAGMENT:
-        ESP_LOGD(TAG, "Received fragment from API");
-        break;
-      case WStype_FRAGMENT_FIN:
-        ESP_LOGD(TAG, "Received fragment fin from API");
-        break;
-      case WStype_PING:
-        ESP_LOGD(TAG, "Received ping from API");
-        break;
-      case WStype_PONG:
-        ESP_LOGD(TAG, "Received pong from API");
-        break;
-      case WStype_BIN:
-
-        break;
-      case WStype_FRAGMENT_BIN_START:
-        ESP_LOGE(TAG, "Received binary fragment start from API, this is not supported!");
-        break;
-      default:
-        ESP_LOGE(TAG, "Received unknown event from API");
-        break;
-    }
-  }
-};
-
 constexpr std::uint8_t FLAG_NONE          = 0;
 constexpr std::uint8_t FLAG_HAS_IP        = 1 << 0;
 constexpr std::uint8_t FLAG_AUTHENTICATED = 1 << 1;
 
 static std::uint8_t s_flags = 0;
 // static WiFiClientSecure* s_wifiClient            = nullptr;
-static std::unique_ptr<GatewayClient> s_wsClient = nullptr;
+static std::unique_ptr<OpenShock::GatewayClient> s_wsClient = nullptr;
 
 void _evGotIPHandler(arduino_event_t* event) {
   s_flags |= FLAG_HAS_IP;
@@ -310,20 +161,6 @@ void GatewayConnectionManager::UnPair() {
   s_flags &= FLAG_HAS_IP;
   s_wsClient = nullptr;
   Config::ClearBackendAuthToken();
-}
-
-std::uint64_t GatewayConnectionManager::RegisterConnectedChangedHandler(ConnectedChangedHandler handler) {
-  static std::uint64_t nextHandleId    = 0;
-  std::uint64_t handleId               = nextHandleId++;
-  s_connectedChangedHandlers[handleId] = handler;
-  return handleId;
-}
-void GatewayConnectionManager::UnRegisterConnectedChangedHandler(std::uint64_t handlerId) {
-  auto it = s_connectedChangedHandlers.find(handlerId);
-
-  if (it != s_connectedChangedHandlers.end()) {
-    s_connectedChangedHandlers.erase(it);
-  }
 }
 
 bool FetchDeviceInfo(const std::string& authToken) {

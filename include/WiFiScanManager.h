@@ -1,6 +1,6 @@
 #pragma once
 
-#include "fbs/WifiScanStatus_generated.h"
+#include "_fbs/WifiScanStatus_generated.h"
 
 #include <esp_wifi_types.h>
 

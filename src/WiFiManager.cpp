@@ -9,7 +9,7 @@
 #include "VisualStateManager.h"
 #include "WiFiScanManager.h"
 
-#include "fbs/DeviceToLocalMessage_generated.h"
+#include "_fbs/DeviceToLocalMessage_generated.h"
 
 #include <WiFi.h>
 

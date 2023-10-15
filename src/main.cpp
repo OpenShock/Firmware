@@ -43,12 +43,6 @@ void setup() {
     ESP.restart();
   }
 
-  if (!OpenShock::CaptivePortal::Init()) {
-    ESP_LOGE(TAG, "PANIC: An Error has occurred while initializing CaptivePortal, restarting in 5 seconds...");
-    delay(5000);
-    ESP.restart();
-  }
-
   if (!OpenShock::GatewayConnectionManager::Init()) {
     ESP_LOGE(TAG, "PANIC: An Error has occurred while initializing WiFiScanManager, restarting in 5 seconds...");
     delay(5000);

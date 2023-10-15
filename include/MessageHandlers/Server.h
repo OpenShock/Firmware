@@ -5,5 +5,5 @@
 #include <cstdint>
 
 namespace OpenShock::MessageHandlers::Server {
-  void Handle(std::uint8_t socketId, WStype_t type, const std::uint8_t* data, std::size_t len);
+  void Handle(WStype_t type, const std::uint8_t* data, std::size_t len);
 }

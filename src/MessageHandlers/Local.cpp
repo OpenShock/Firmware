@@ -2,7 +2,7 @@
 
 #include "MessageHandlers/Local_Private.h"
 
-#include "fbs/LocalToDeviceMessage_generated.h"
+#include "_fbs/LocalToDeviceMessage_generated.h"
 
 #include <WebSockets.h>
 

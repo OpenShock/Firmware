@@ -16,7 +16,7 @@ def resolve_path(path):
 
 # resolve paths
 schemas_path = resolve_path('../schemas')
-ts_output_path = resolve_path('../WebUI/src/lib/fbs')
+ts_output_path = resolve_path('../WebUI/src/lib/_fbs')
 cpp_output_path = resolve_path('../include/fbs')
 
 # Get all the schema files.
