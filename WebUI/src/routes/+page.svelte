@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { SerializeGatewayPairCommand } from '$lib/Serializers/GatewayPairCommand';
   import { WebSocketClient } from '$lib/WebSocketClient';
   import WiFiList from '$lib/components/WiFiList.svelte';
 
@@ -16,12 +17,8 @@
   $: pairCodeValid = isValidPairCode(pairCode);
 
   function pair() {
-    WebSocketClient.Instance.Send(
-      JSON.stringify({
-        type: 'pair',
-        code: pairCode,
-      })
-    );
+    const data = SerializeGatewayPairCommand(pairCode);
+    WebSocketClient.Instance.Send(data);
   }
 </script>
 
