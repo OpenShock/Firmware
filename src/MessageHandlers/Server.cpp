@@ -21,7 +21,7 @@ using namespace OpenShock;
 
 constexpr std::size_t HANDLER_COUNT = static_cast<std::size_t>(PayloadType::MAX) + 1;
 
-#define SET_HANDLER(payload, handler) s_serverHandlers[static_cast<std::size_t>(payload)] = handler
+#define SET_HANDLER(payload, handler) handlers[static_cast<std::size_t>(payload)] = handler
 
 static std::array<Handlers::HandlerType, HANDLER_COUNT> s_serverHandlers = []() {
   std::array<Handlers::HandlerType, HANDLER_COUNT> handlers {};
