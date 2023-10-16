@@ -5,6 +5,7 @@ on:
       - completed
 
 name: tag-publish
+run-name: "tag-publish: ${{ github.event.workflow_run.head_branch }}"
 
 jobs:
 
@@ -69,7 +70,6 @@ jobs:
           file: RELEASE.md
           asset_name: RELEASE.md
           tag: ${{ github.event.workflow_run.head_branch }}
-          prerelease: ${{ contains(github.event.workflow_run.head_branch, '-') }}
           promote: ${{ !contains(github.event.workflow_run.head_branch, '-') }}
           make_latest: ${{ !contains(github.event.workflow_run.head_branch, '-') }}
           body: |

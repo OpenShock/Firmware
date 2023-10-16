@@ -5,6 +5,7 @@ on:
       - '[0-9]+.[0-9]+.[0-9]+-*'
 
 name: ci-tag
+run-name: "tag-build: ${{ github.ref_name }}"
 
 jobs:
 
