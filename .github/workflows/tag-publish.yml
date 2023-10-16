@@ -26,7 +26,8 @@ jobs:
 
       - name: Test
         run: |
-          ls
+          ls -la
+          find .
           echo "${{ github.event.workflow_run.head_branch }}"
 
       # Upload artifacts to release.
