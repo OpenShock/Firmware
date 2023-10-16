@@ -19,7 +19,7 @@ struct command_t {
 
 using namespace OpenShock;
 
-RFTransmitter::RFTransmitter(unsigned int gpioPin, int queueSize) : m_gpioPin(gpioPin), m_rmtHandle(nullptr), m_queueHandle(nullptr), m_taskHandle(nullptr) {
+RFTransmitter::RFTransmitter(std::uint8_t gpioPin, int queueSize) : m_rmtHandle(nullptr), m_queueHandle(nullptr), m_taskHandle(nullptr) {
   snprintf(m_name, sizeof(m_name), "RFTransmitter-%d", gpioPin);
 
   m_rmtHandle = rmtInit(gpioPin, RMT_TX_MODE, RMT_MEM_64);

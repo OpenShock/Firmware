@@ -15,10 +15,10 @@ typedef void* TaskHandle_t;
 namespace OpenShock {
   class RFTransmitter {
   public:
-    RFTransmitter(unsigned int gpioPin, int queueSize = 32);
+    RFTransmitter(std::uint8_t gpioPin, int queueSize = 32);
     ~RFTransmitter();
 
-    inline bool ok() const { return m_taskHandle != nullptr && m_queueHandle != nullptr; }
+    inline bool ok() const { return m_rmtHandle != nullptr && m_queueHandle != nullptr && m_taskHandle != nullptr; }
 
     bool SendCommand(ShockerModelType model, std::uint16_t shockerId, ShockerCommandType type, std::uint8_t intensity, unsigned int duration);
     void ClearPendingCommands();
@@ -26,8 +26,7 @@ namespace OpenShock {
   private:
     static void TransmitTask(void* arg);
 
-    unsigned int m_gpioPin;
-    char m_name[32];
+    char m_name[20];
     rmt_obj_t* m_rmtHandle;
     QueueHandle_t m_queueHandle;
     TaskHandle_t m_taskHandle;

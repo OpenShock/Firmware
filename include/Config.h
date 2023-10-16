@@ -9,7 +9,7 @@
 namespace OpenShock::Config {
   // This is a copy of the flatbuffers schema defined in schemas/ConfigFile.fbs
   struct RFConfig {
-    std::uint32_t txPin;
+    std::uint8_t txPin;
   };
   struct WiFiCredentials {
     std::uint8_t id;
@@ -43,7 +43,7 @@ namespace OpenShock::Config {
   void SetCaptivePortalConfig(const CaptivePortalConfig& config);
   void SetBackendConfig(const BackendConfig& config);
 
-  bool SetRFConfigTxPin(std::uint32_t txPin);
+  bool SetRFConfigTxPin(std::uint8_t txPin);
 
   std::uint8_t AddWiFiCredentials(const std::string& ssid, const std::uint8_t (&bssid)[6], const std::string& password);
   bool TryGetWiFiCredentialsByID(std::uint8_t id, WiFiCredentials& out);

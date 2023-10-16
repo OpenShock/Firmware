@@ -20,8 +20,8 @@ void _Private::HandleSetRfTxPinCommand(std::uint8_t socketId, const OpenShock::S
 
   auto pin = msg->pin();
 
-  if (pin > OpenShock::Constants::MaxGpioPin) {
-    ESP_LOGE(TAG, "RF TX pin is invalid");
+  if (pin == OpenShock::Constants::GPIO_INVALID) {
+    ESP_LOGE(TAG, "Invalid pin specified");
     return;
   }
 

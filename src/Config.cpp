@@ -1,5 +1,6 @@
 #include "Config.h"
 
+#include "Constants.h"
 #include "Utils/HexUtils.h"
 
 #include <esp_log.h>
@@ -23,8 +24,8 @@ Config::RFConfig FromFbsRFConfig(const Serialization::Configuration::RFConfig* f
 #ifdef OPENSHOCK_TX_PIN
     return {.txPin = OPENSHOCK_TX_PIN};
 #else
-    ESP_LOGW(TAG, "OPENSHOCK_TX_PIN is not defined, defaulting to UINT32_MAX");
-    return {.txPin = UINT32_MAX};
+    ESP_LOGW(TAG, "OPENSHOCK_TX_PIN is not defined, defaulting to UINT8_MAX");
+    return {.txPin = Constants::GPIO_INVALID};
 #endif
   }
 
@@ -242,7 +243,7 @@ void Config::Init() {
 #ifdef OPENSHOCK_TX_PIN
         .txPin = OPENSHOCK_TX_PIN,
 #else
-        .txPin = UINT32_MAX,
+        .txPin = Constants::GPIO_INVALID,
 #endif
       },
       .wifi = {
@@ -306,7 +307,7 @@ void Config::SetBackendConfig(const BackendConfig& config) {
   _trySaveConfig(_mainConfig);
 }
 
-bool Config::SetRFConfigTxPin(std::uint32_t txPin) {
+bool Config::SetRFConfigTxPin(std::uint8_t txPin) {
   _mainConfig.rf.txPin = txPin;
   return _trySaveConfig(_mainConfig);
 }

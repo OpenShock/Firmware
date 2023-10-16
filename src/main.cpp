@@ -35,7 +35,9 @@ void setup() {
 
   OpenShock::Config::Init();
 
-  OpenShock::CommandHandler::Init();
+  if (!OpenShock::CommandHandler::Init()) {
+    ESP_LOGW(TAG, "An Error has occurred while initializing CommandHandler");
+  }
 
   if (!OpenShock::WiFiManager::Init()) {
     ESP_LOGE(TAG, "PANIC: An Error has occurred while initializing WiFiManager, restarting in 5 seconds...");

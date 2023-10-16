@@ -12,16 +12,16 @@ export class RFConfig {
 }
 
 txPin():number {
-  return this.bb!.readUint32(this.bb_pos);
+  return this.bb!.readUint8(this.bb_pos);
 }
 
 static sizeOf():number {
-  return 4;
+  return 1;
 }
 
 static createRFConfig(builder:flatbuffers.Builder, tx_pin: number):flatbuffers.Offset {
-  builder.prep(4, 4);
-  builder.writeInt32(tx_pin);
+  builder.prep(1, 1);
+  builder.writeInt8(tx_pin);
   return builder.offset();
 }
 

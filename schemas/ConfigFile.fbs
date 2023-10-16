@@ -5,7 +5,7 @@ struct BSSID {
 }
 
 struct RFConfig {
-  tx_pin:uint32;
+  tx_pin:uint8;
 }
 
 table WiFiCredentials {

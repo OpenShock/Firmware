@@ -14,20 +14,29 @@ using namespace OpenShock;
 
 static std::unique_ptr<RFTransmitter> s_rfTransmitter = nullptr;
 
-void CommandHandler::Init() {
+bool CommandHandler::Init() {
   std::uint32_t txPin = Config::GetRFConfig().txPin;
-  if (txPin > OpenShock::Constants::MaxGpioPin) {
-    ESP_LOGW(TAG, "TxPin is invalid, radio is disabled");
-    return;
+  if (txPin == Constants::GPIO_INVALID) {
+    ESP_LOGW(TAG, "Invalid RF TX pin loaded from config, ignoring");
+    return false;
   }
 
-  ESP_LOGD(TAG, "RMT/TX pin is: %d", txPin);
+  ESP_LOGD(TAG, "RF TX pin loaded from config: %u", txPin);
 
   s_rfTransmitter = std::make_unique<RFTransmitter>(txPin, 32);
+
+  return true;
 }
 
-bool CommandHandler::SetRfTxPin(std::uint32_t txPin) {
-  Config::SetRFConfigTxPin(txPin);
+bool CommandHandler::Ok() {
+  return s_rfTransmitter != nullptr && s_rfTransmitter->ok();
+}
+
+bool CommandHandler::SetRfTxPin(std::uint8_t txPin) {
+  if (!Config::SetRFConfigTxPin(txPin)) {
+    ESP_LOGW(TAG, "Failed to set RF TX pin");
+    return false;
+  }
 
   s_rfTransmitter = std::make_unique<RFTransmitter>(txPin, 32);
 

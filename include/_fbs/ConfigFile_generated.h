@@ -60,9 +60,9 @@ struct BSSID::Traits {
   using type = BSSID;
 };
 
-FLATBUFFERS_MANUALLY_ALIGNED_STRUCT(4) RFConfig FLATBUFFERS_FINAL_CLASS {
+FLATBUFFERS_MANUALLY_ALIGNED_STRUCT(1) RFConfig FLATBUFFERS_FINAL_CLASS {
  private:
-  uint32_t tx_pin_;
+  uint8_t tx_pin_;
 
  public:
   struct Traits;
@@ -72,14 +72,14 @@ FLATBUFFERS_MANUALLY_ALIGNED_STRUCT(4) RFConfig FLATBUFFERS_FINAL_CLASS {
   RFConfig()
       : tx_pin_(0) {
   }
-  RFConfig(uint32_t _tx_pin)
+  RFConfig(uint8_t _tx_pin)
       : tx_pin_(::flatbuffers::EndianScalar(_tx_pin)) {
   }
-  uint32_t tx_pin() const {
+  uint8_t tx_pin() const {
     return ::flatbuffers::EndianScalar(tx_pin_);
   }
 };
-FLATBUFFERS_STRUCT_END(RFConfig, 4);
+FLATBUFFERS_STRUCT_END(RFConfig, 1);
 
 struct RFConfig::Traits {
   using type = RFConfig;
@@ -397,7 +397,7 @@ struct Config FLATBUFFERS_FINAL_CLASS : private ::flatbuffers::Table {
   }
   bool Verify(::flatbuffers::Verifier &verifier) const {
     return VerifyTableStart(verifier) &&
-           VerifyField<OpenShock::Serialization::Configuration::RFConfig>(verifier, VT_RF, 4) &&
+           VerifyField<OpenShock::Serialization::Configuration::RFConfig>(verifier, VT_RF, 1) &&
            VerifyOffset(verifier, VT_WIFI) &&
            verifier.VerifyTable(wifi()) &&
            VerifyField<OpenShock::Serialization::Configuration::CaptivePortalConfig>(verifier, VT_CAPTIVE_PORTAL, 1) &&
