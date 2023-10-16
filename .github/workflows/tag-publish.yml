@@ -36,7 +36,7 @@ jobs:
           repo_token: ${{ secrets.GITHUB_TOKEN }}
           file: OpenShock.*.bin
           file_glob: true
-          tag: ${{ github.ref }}
+          tag: ${{ github.event.workflow_run.head_branch }}
           prerelease: ${{ contains(github.event.workflow_run.head_branch, '-') }}
 
   publish-release:
