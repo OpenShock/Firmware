@@ -83,11 +83,17 @@ jobs:
     steps:
       - name: Make artifact
         run: |
-          echo "artifact 1" >> OpenShock_Example1.bin
-          echo "artifact 2" >> OpenShock_Example2.bin
+          echo "artifact 1" >> OpenShock.Example1.bin
+          echo "artifact 2" >> OpenShock.Example2.bin
 
       - name: Upload artifacts
         uses: actions/upload-artifact@v3
         with:
-          path: OpenShock*
+          path: OpenShock.Example1.bin
+          name: OpenShock_Example1
 
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v3
+        with:
+          path: OpenShock.Example2.bin
+          name: OpenShock_Example2
