@@ -1,6 +1,0 @@
-namespace OpenShock.Serialization.Types;
-
-enum ShockerModelType : uint8 {
-  CaiXianlin = 0,
-  PetTrainer = 1
-}
