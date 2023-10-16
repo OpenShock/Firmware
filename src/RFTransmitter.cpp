@@ -55,18 +55,16 @@ RFTransmitter::~RFTransmitter() {
   }
 }
 
-bool RFTransmitter::SendCommand(ShockerModelType model, std::uint16_t shockerId, ShockerCommandType type, std::uint8_t intensity, unsigned int duration) {
+bool RFTransmitter::SendCommand(ShockerModelType model, std::uint16_t shockerId, ShockerCommandType type, std::uint8_t intensity, std::uint16_t durationMs) {
   if (!ok()) {
     ESP_LOGW(m_name, "RFTransmitter is not ok");
     return false;
   }
 
   // Intensity must be between 0 and 99
-  // Duration for provided command must not exceed hard limit of 66 seconds (2^16 ms)
   intensity = std::min(intensity, (std::uint8_t)99);
-  duration  = std::min(duration, (unsigned int)std::numeric_limits<std::uint16_t>::max());
 
-  command_t* cmd = new command_t {OpenShock::Millis() + duration, Rmt::GetSequence(model, shockerId, type, intensity), Rmt::GetZeroSequence(model, shockerId), shockerId};
+  command_t* cmd = new command_t {OpenShock::Millis() + durationMs, Rmt::GetSequence(model, shockerId, type, intensity), Rmt::GetZeroSequence(model, shockerId), shockerId};
 
   // Add the command to the queue, wait max 10 ms (Adjust this)
   if (xQueueSend(m_queueHandle, &cmd, 10 / portTICK_PERIOD_MS) != pdTRUE) {

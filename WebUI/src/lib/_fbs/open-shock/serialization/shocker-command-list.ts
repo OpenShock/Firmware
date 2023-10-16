@@ -25,7 +25,7 @@ static getSizePrefixedRootAsShockerCommandList(bb:flatbuffers.ByteBuffer, obj?:S
 
 commands(index: number, obj?:ShockerCommand):ShockerCommand|null {
   const offset = this.bb!.__offset(this.bb_pos, 4);
-  return offset ? (obj || new ShockerCommand()).__init(this.bb!.__vector(this.bb_pos + offset) + index * 12, this.bb!) : null;
+  return offset ? (obj || new ShockerCommand()).__init(this.bb!.__vector(this.bb_pos + offset) + index * 8, this.bb!) : null;
 }
 
 commandsLength():number {
@@ -42,7 +42,7 @@ static addCommands(builder:flatbuffers.Builder, commandsOffset:flatbuffers.Offse
 }
 
 static startCommandsVector(builder:flatbuffers.Builder, numElems:number) {
-  builder.startVector(12, numElems, 4);
+  builder.startVector(8, numElems, 2);
 }
 
 static endShockerCommandList(builder:flatbuffers.Builder):flatbuffers.Offset {

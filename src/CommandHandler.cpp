@@ -43,7 +43,7 @@ bool CommandHandler::SetRfTxPin(std::uint8_t txPin) {
   return true;
 }
 
-bool CommandHandler::HandleCommand(ShockerModelType model, std::uint16_t shockerId, ShockerCommandType type, std::uint8_t intensity, unsigned int duration) {
+bool CommandHandler::HandleCommand(ShockerModelType model, std::uint16_t shockerId, ShockerCommandType type, std::uint8_t intensity, std::uint16_t durationMs) {
   if (s_rfTransmitter == nullptr) {
     ESP_LOGW(TAG, "RF Transmitter is not initialized, ignoring command");
     return false;
@@ -53,14 +53,14 @@ bool CommandHandler::HandleCommand(ShockerModelType model, std::uint16_t shocker
   if (type == ShockerCommandType::Stop) {
     ESP_LOGV(TAG, "Stop command received, clearing pending commands");
 
-    type      = ShockerCommandType::Vibrate;
-    intensity = 0;
-    duration  = 300;
+    type       = ShockerCommandType::Vibrate;
+    intensity  = 0;
+    durationMs = 300;
 
     s_rfTransmitter->ClearPendingCommands();
   } else {
     ESP_LOGV(TAG, "Command received: %u %u %u %u", model, shockerId, type, intensity);
   }
 
-  return s_rfTransmitter->SendCommand(model, shockerId, type, intensity, duration);
+  return s_rfTransmitter->SendCommand(model, shockerId, type, intensity, durationMs);
 }

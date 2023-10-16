@@ -29,13 +29,13 @@ void _Private::HandleShockerCommandList(const OpenShock::Serialization::ServerTo
   for (auto command : *commands) {
     std::uint16_t id                   = command->id();
     std::uint8_t intensity             = command->intensity();
-    std::uint32_t duration             = command->duration();
+    std::uint16_t durationMs           = command->duration_ms();
     OpenShock::ShockerModelType model  = command->model();
     OpenShock::ShockerCommandType type = command->type();
 
-    ESP_LOGV(TAG, "   ID %u, Intensity %u, Duration %u, Model %s, Type %s", id, intensity, duration, OpenShock::Serialization::Types::EnumNameShockerModelType(model), OpenShock::Serialization::Types::EnumNameShockerCommandType(type));
+    ESP_LOGV(TAG, "   ID %u, Intensity %u, Duration %u, Model %s, Type %s", id, intensity, durationMs, OpenShock::Serialization::Types::EnumNameShockerModelType(model), OpenShock::Serialization::Types::EnumNameShockerCommandType(type));
 
-    if (!OpenShock::CommandHandler::HandleCommand(model, id, type, intensity, duration)) {
+    if (!OpenShock::CommandHandler::HandleCommand(model, id, type, intensity, durationMs)) {
       ESP_LOGE(TAG, "Remote command failed/rejected!");
     }
   }

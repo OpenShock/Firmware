@@ -77,15 +77,14 @@ template<> struct ServerToDeviceMessagePayloadTraits<OpenShock::Serialization::C
 bool VerifyServerToDeviceMessagePayload(::flatbuffers::Verifier &verifier, const void *obj, ServerToDeviceMessagePayload type);
 bool VerifyServerToDeviceMessagePayloadVector(::flatbuffers::Verifier &verifier, const ::flatbuffers::Vector<::flatbuffers::Offset<void>> *values, const ::flatbuffers::Vector<ServerToDeviceMessagePayload> *types);
 
-FLATBUFFERS_MANUALLY_ALIGNED_STRUCT(4) ShockerCommand FLATBUFFERS_FINAL_CLASS {
+FLATBUFFERS_MANUALLY_ALIGNED_STRUCT(2) ShockerCommand FLATBUFFERS_FINAL_CLASS {
  private:
   uint8_t model_;
   int8_t padding0__;
   uint16_t id_;
   uint8_t type_;
   uint8_t intensity_;
-  int16_t padding1__;
-  uint32_t duration_;
+  uint16_t duration_ms_;
 
  public:
   struct Traits;
@@ -98,21 +97,17 @@ FLATBUFFERS_MANUALLY_ALIGNED_STRUCT(4) ShockerCommand FLATBUFFERS_FINAL_CLASS {
         id_(0),
         type_(0),
         intensity_(0),
-        padding1__(0),
-        duration_(0) {
+        duration_ms_(0) {
     (void)padding0__;
-    (void)padding1__;
   }
-  ShockerCommand(OpenShock::Serialization::Types::ShockerModelType _model, uint16_t _id, OpenShock::Serialization::Types::ShockerCommandType _type, uint8_t _intensity, uint32_t _duration)
+  ShockerCommand(OpenShock::Serialization::Types::ShockerModelType _model, uint16_t _id, OpenShock::Serialization::Types::ShockerCommandType _type, uint8_t _intensity, uint16_t _duration_ms)
       : model_(::flatbuffers::EndianScalar(static_cast<uint8_t>(_model))),
         padding0__(0),
         id_(::flatbuffers::EndianScalar(_id)),
         type_(::flatbuffers::EndianScalar(static_cast<uint8_t>(_type))),
         intensity_(::flatbuffers::EndianScalar(_intensity)),
-        padding1__(0),
-        duration_(::flatbuffers::EndianScalar(_duration)) {
+        duration_ms_(::flatbuffers::EndianScalar(_duration_ms)) {
     (void)padding0__;
-    (void)padding1__;
   }
   OpenShock::Serialization::Types::ShockerModelType model() const {
     return static_cast<OpenShock::Serialization::Types::ShockerModelType>(::flatbuffers::EndianScalar(model_));
@@ -126,11 +121,11 @@ FLATBUFFERS_MANUALLY_ALIGNED_STRUCT(4) ShockerCommand FLATBUFFERS_FINAL_CLASS {
   uint8_t intensity() const {
     return ::flatbuffers::EndianScalar(intensity_);
   }
-  uint32_t duration() const {
-    return ::flatbuffers::EndianScalar(duration_);
+  uint16_t duration_ms() const {
+    return ::flatbuffers::EndianScalar(duration_ms_);
   }
 };
-FLATBUFFERS_STRUCT_END(ShockerCommand, 12);
+FLATBUFFERS_STRUCT_END(ShockerCommand, 8);
 
 struct ShockerCommand::Traits {
   using type = ShockerCommand;

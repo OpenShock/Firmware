@@ -31,18 +31,17 @@ intensity():number {
   return this.bb!.readUint8(this.bb_pos + 5);
 }
 
-duration():number {
-  return this.bb!.readUint32(this.bb_pos + 8);
+durationMs():number {
+  return this.bb!.readUint16(this.bb_pos + 6);
 }
 
 static sizeOf():number {
-  return 12;
+  return 8;
 }
 
-static createShockerCommand(builder:flatbuffers.Builder, model: ShockerModelType, id: number, type: ShockerCommandType, intensity: number, duration: number):flatbuffers.Offset {
-  builder.prep(4, 12);
-  builder.writeInt32(duration);
-  builder.pad(2);
+static createShockerCommand(builder:flatbuffers.Builder, model: ShockerModelType, id: number, type: ShockerCommandType, intensity: number, duration_ms: number):flatbuffers.Offset {
+  builder.prep(2, 8);
+  builder.writeInt16(duration_ms);
   builder.writeInt8(intensity);
   builder.writeInt8(type);
   builder.writeInt16(id);
