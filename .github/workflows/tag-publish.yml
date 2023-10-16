@@ -24,11 +24,10 @@ jobs:
           workflow_conclusion: success
           search_artifacts: false
 
-      - name: Test
-        run: |
-          ls -la
-          find .
-          echo "${{ github.event.workflow_run.head_branch }}"
+      # Since all artifacts are extracted to their own directories, we need to move them all
+      # to the root directory prior to uploading.
+      - name: Move artifacts to root dir
+        run: find . -type f | xargs -n 1 cp -t .
 
       # Upload artifacts to release.
       - name: Upload artifact to release
