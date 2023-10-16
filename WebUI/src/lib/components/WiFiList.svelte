@@ -4,7 +4,7 @@
   import type { WiFiNetwork } from '$lib/types/WiFiNetwork';
   import { WiFiStateStore } from '$lib/stores';
   import { WebSocketClient } from '$lib/WebSocketClient';
-  import { WifiAuthMode } from '$lib/fbs/open-shock/wifi-auth-mode';
+  import { WifiAuthMode } from '$lib/_fbs/open-shock/wifi-auth-mode';
   import { SerializeWifiScanCommand } from '$lib/Serializers/WifiScanCommand';
   import { SerializeWifiNetworkDisconnectCommand } from '$lib/Serializers/WifiNetworkDisconnectCommand';
   import { SerializeWifiNetworkConnectCommand } from '$lib/Serializers/WifiNetworkConnectCommand';
@@ -27,17 +27,17 @@
         value: '',
         valueAttr: { type: 'password', minlength: 1, maxlength: 63, required: true },
         response: (password: string) => {
-          const data = SerializeWifiNetworkSaveCommand(item.ssid, item.bssid, password);
+          const data = SerializeWifiNetworkSaveCommand(item.ssid, password, true);
           WebSocketClient.Instance.Send(data);
         },
       });
     } else {
-      const data = SerializeWifiNetworkSaveCommand(item.ssid, item.bssid, '');
+      const data = SerializeWifiNetworkSaveCommand(item.ssid, null, true);
       WebSocketClient.Instance.Send(data);
     }
   }
   function wifiConnect(item: WiFiNetwork) {
-    const data = SerializeWifiNetworkConnectCommand(item.ssid, item.bssid);
+    const data = SerializeWifiNetworkConnectCommand(item.ssid);
     WebSocketClient.Instance.Send(data);
   }
   function wifiDisconnect(item: WiFiNetwork) {

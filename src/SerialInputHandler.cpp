@@ -1,5 +1,6 @@
 #include "SerialInputHandler.h"
 
+#include "CommandHandler.h"
 #include "Config.h"
 
 #include <ArduinoJson.h>
@@ -111,7 +112,7 @@ void _handleRmtpinCommand(char* arg, std::size_t argLength) {
     return;
   }
 
-  OpenShock::Config::SetRFConfig({.txPin = pin});
+  OpenShock::CommandHandler::SetRfTxPin(pin);
 
   Serial.println("SYS|Success|Saved config");
 }

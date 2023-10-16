@@ -26,19 +26,19 @@
   function AuthenticateWiFi() {
     if (!item) return;
     // TODO: Prompt for password
-    const data = SerializeWifiNetworkSaveCommand(item.ssid, item.bssid, '');
+    const data = SerializeWifiNetworkSaveCommand(item.ssid, '', true);
     WebSocketClient.Instance.Send(data);
     modalStore.close();
   }
   function ConnectWiFi() {
     if (!item) return;
-    const data = SerializeWifiNetworkConnectCommand(item.ssid, item.bssid);
+    const data = SerializeWifiNetworkConnectCommand(item.ssid);
     WebSocketClient.Instance.Send(data);
     modalStore.close();
   }
   function ForgetWiFi() {
     if (!item) return;
-    const data = SerializeWifiNetworkForgetCommand(item.ssid, item.bssid);
+    const data = SerializeWifiNetworkForgetCommand(item.ssid);
     WebSocketClient.Instance.Send(data);
     modalStore.close();
   }

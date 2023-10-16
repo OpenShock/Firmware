@@ -238,26 +238,25 @@ struct WifiNetworkSaveCommand FLATBUFFERS_FINAL_CLASS : private ::flatbuffers::T
   }
   enum FlatBuffersVTableOffset FLATBUFFERS_VTABLE_UNDERLYING_TYPE {
     VT_SSID = 4,
-    VT_BSSID = 6,
-    VT_PASSWORD = 8
+    VT_PASSWORD = 6,
+    VT_CONNECT = 8
   };
   const ::flatbuffers::String *ssid() const {
     return GetPointer<const ::flatbuffers::String *>(VT_SSID);
   }
-  const ::flatbuffers::String *bssid() const {
-    return GetPointer<const ::flatbuffers::String *>(VT_BSSID);
-  }
   const ::flatbuffers::String *password() const {
     return GetPointer<const ::flatbuffers::String *>(VT_PASSWORD);
+  }
+  bool connect() const {
+    return GetField<uint8_t>(VT_CONNECT, 0) != 0;
   }
   bool Verify(::flatbuffers::Verifier &verifier) const {
     return VerifyTableStart(verifier) &&
            VerifyOffset(verifier, VT_SSID) &&
            verifier.VerifyString(ssid()) &&
-           VerifyOffset(verifier, VT_BSSID) &&
-           verifier.VerifyString(bssid()) &&
            VerifyOffset(verifier, VT_PASSWORD) &&
            verifier.VerifyString(password()) &&
+           VerifyField<uint8_t>(verifier, VT_CONNECT, 1) &&
            verifier.EndTable();
   }
 };
@@ -269,11 +268,11 @@ struct WifiNetworkSaveCommandBuilder {
   void add_ssid(::flatbuffers::Offset<::flatbuffers::String> ssid) {
     fbb_.AddOffset(WifiNetworkSaveCommand::VT_SSID, ssid);
   }
-  void add_bssid(::flatbuffers::Offset<::flatbuffers::String> bssid) {
-    fbb_.AddOffset(WifiNetworkSaveCommand::VT_BSSID, bssid);
-  }
   void add_password(::flatbuffers::Offset<::flatbuffers::String> password) {
     fbb_.AddOffset(WifiNetworkSaveCommand::VT_PASSWORD, password);
+  }
+  void add_connect(bool connect) {
+    fbb_.AddElement<uint8_t>(WifiNetworkSaveCommand::VT_CONNECT, static_cast<uint8_t>(connect), 0);
   }
   explicit WifiNetworkSaveCommandBuilder(::flatbuffers::FlatBufferBuilder &_fbb)
         : fbb_(_fbb) {
@@ -289,12 +288,12 @@ struct WifiNetworkSaveCommandBuilder {
 inline ::flatbuffers::Offset<WifiNetworkSaveCommand> CreateWifiNetworkSaveCommand(
     ::flatbuffers::FlatBufferBuilder &_fbb,
     ::flatbuffers::Offset<::flatbuffers::String> ssid = 0,
-    ::flatbuffers::Offset<::flatbuffers::String> bssid = 0,
-    ::flatbuffers::Offset<::flatbuffers::String> password = 0) {
+    ::flatbuffers::Offset<::flatbuffers::String> password = 0,
+    bool connect = false) {
   WifiNetworkSaveCommandBuilder builder_(_fbb);
   builder_.add_password(password);
-  builder_.add_bssid(bssid);
   builder_.add_ssid(ssid);
+  builder_.add_connect(connect);
   return builder_.Finish();
 }
 
@@ -306,16 +305,15 @@ struct WifiNetworkSaveCommand::Traits {
 inline ::flatbuffers::Offset<WifiNetworkSaveCommand> CreateWifiNetworkSaveCommandDirect(
     ::flatbuffers::FlatBufferBuilder &_fbb,
     const char *ssid = nullptr,
-    const char *bssid = nullptr,
-    const char *password = nullptr) {
+    const char *password = nullptr,
+    bool connect = false) {
   auto ssid__ = ssid ? _fbb.CreateString(ssid) : 0;
-  auto bssid__ = bssid ? _fbb.CreateString(bssid) : 0;
   auto password__ = password ? _fbb.CreateString(password) : 0;
   return OpenShock::Serialization::Local::CreateWifiNetworkSaveCommand(
       _fbb,
       ssid__,
-      bssid__,
-      password__);
+      password__,
+      connect);
 }
 
 struct WifiNetworkForgetCommand FLATBUFFERS_FINAL_CLASS : private ::flatbuffers::Table {
@@ -325,21 +323,15 @@ struct WifiNetworkForgetCommand FLATBUFFERS_FINAL_CLASS : private ::flatbuffers:
     return "OpenShock.Serialization.Local.WifiNetworkForgetCommand";
   }
   enum FlatBuffersVTableOffset FLATBUFFERS_VTABLE_UNDERLYING_TYPE {
-    VT_SSID = 4,
-    VT_BSSID = 6
+    VT_SSID = 4
   };
   const ::flatbuffers::String *ssid() const {
     return GetPointer<const ::flatbuffers::String *>(VT_SSID);
-  }
-  const ::flatbuffers::String *bssid() const {
-    return GetPointer<const ::flatbuffers::String *>(VT_BSSID);
   }
   bool Verify(::flatbuffers::Verifier &verifier) const {
     return VerifyTableStart(verifier) &&
            VerifyOffset(verifier, VT_SSID) &&
            verifier.VerifyString(ssid()) &&
-           VerifyOffset(verifier, VT_BSSID) &&
-           verifier.VerifyString(bssid()) &&
            verifier.EndTable();
   }
 };
@@ -350,9 +342,6 @@ struct WifiNetworkForgetCommandBuilder {
   ::flatbuffers::uoffset_t start_;
   void add_ssid(::flatbuffers::Offset<::flatbuffers::String> ssid) {
     fbb_.AddOffset(WifiNetworkForgetCommand::VT_SSID, ssid);
-  }
-  void add_bssid(::flatbuffers::Offset<::flatbuffers::String> bssid) {
-    fbb_.AddOffset(WifiNetworkForgetCommand::VT_BSSID, bssid);
   }
   explicit WifiNetworkForgetCommandBuilder(::flatbuffers::FlatBufferBuilder &_fbb)
         : fbb_(_fbb) {
@@ -367,10 +356,8 @@ struct WifiNetworkForgetCommandBuilder {
 
 inline ::flatbuffers::Offset<WifiNetworkForgetCommand> CreateWifiNetworkForgetCommand(
     ::flatbuffers::FlatBufferBuilder &_fbb,
-    ::flatbuffers::Offset<::flatbuffers::String> ssid = 0,
-    ::flatbuffers::Offset<::flatbuffers::String> bssid = 0) {
+    ::flatbuffers::Offset<::flatbuffers::String> ssid = 0) {
   WifiNetworkForgetCommandBuilder builder_(_fbb);
-  builder_.add_bssid(bssid);
   builder_.add_ssid(ssid);
   return builder_.Finish();
 }
@@ -382,14 +369,11 @@ struct WifiNetworkForgetCommand::Traits {
 
 inline ::flatbuffers::Offset<WifiNetworkForgetCommand> CreateWifiNetworkForgetCommandDirect(
     ::flatbuffers::FlatBufferBuilder &_fbb,
-    const char *ssid = nullptr,
-    const char *bssid = nullptr) {
+    const char *ssid = nullptr) {
   auto ssid__ = ssid ? _fbb.CreateString(ssid) : 0;
-  auto bssid__ = bssid ? _fbb.CreateString(bssid) : 0;
   return OpenShock::Serialization::Local::CreateWifiNetworkForgetCommand(
       _fbb,
-      ssid__,
-      bssid__);
+      ssid__);
 }
 
 struct WifiNetworkConnectCommand FLATBUFFERS_FINAL_CLASS : private ::flatbuffers::Table {
@@ -399,21 +383,15 @@ struct WifiNetworkConnectCommand FLATBUFFERS_FINAL_CLASS : private ::flatbuffers
     return "OpenShock.Serialization.Local.WifiNetworkConnectCommand";
   }
   enum FlatBuffersVTableOffset FLATBUFFERS_VTABLE_UNDERLYING_TYPE {
-    VT_SSID = 4,
-    VT_BSSID = 6
+    VT_SSID = 4
   };
   const ::flatbuffers::String *ssid() const {
     return GetPointer<const ::flatbuffers::String *>(VT_SSID);
-  }
-  const ::flatbuffers::String *bssid() const {
-    return GetPointer<const ::flatbuffers::String *>(VT_BSSID);
   }
   bool Verify(::flatbuffers::Verifier &verifier) const {
     return VerifyTableStart(verifier) &&
            VerifyOffset(verifier, VT_SSID) &&
            verifier.VerifyString(ssid()) &&
-           VerifyOffset(verifier, VT_BSSID) &&
-           verifier.VerifyString(bssid()) &&
            verifier.EndTable();
   }
 };
@@ -424,9 +402,6 @@ struct WifiNetworkConnectCommandBuilder {
   ::flatbuffers::uoffset_t start_;
   void add_ssid(::flatbuffers::Offset<::flatbuffers::String> ssid) {
     fbb_.AddOffset(WifiNetworkConnectCommand::VT_SSID, ssid);
-  }
-  void add_bssid(::flatbuffers::Offset<::flatbuffers::String> bssid) {
-    fbb_.AddOffset(WifiNetworkConnectCommand::VT_BSSID, bssid);
   }
   explicit WifiNetworkConnectCommandBuilder(::flatbuffers::FlatBufferBuilder &_fbb)
         : fbb_(_fbb) {
@@ -441,10 +416,8 @@ struct WifiNetworkConnectCommandBuilder {
 
 inline ::flatbuffers::Offset<WifiNetworkConnectCommand> CreateWifiNetworkConnectCommand(
     ::flatbuffers::FlatBufferBuilder &_fbb,
-    ::flatbuffers::Offset<::flatbuffers::String> ssid = 0,
-    ::flatbuffers::Offset<::flatbuffers::String> bssid = 0) {
+    ::flatbuffers::Offset<::flatbuffers::String> ssid = 0) {
   WifiNetworkConnectCommandBuilder builder_(_fbb);
-  builder_.add_bssid(bssid);
   builder_.add_ssid(ssid);
   return builder_.Finish();
 }
@@ -456,14 +429,11 @@ struct WifiNetworkConnectCommand::Traits {
 
 inline ::flatbuffers::Offset<WifiNetworkConnectCommand> CreateWifiNetworkConnectCommandDirect(
     ::flatbuffers::FlatBufferBuilder &_fbb,
-    const char *ssid = nullptr,
-    const char *bssid = nullptr) {
+    const char *ssid = nullptr) {
   auto ssid__ = ssid ? _fbb.CreateString(ssid) : 0;
-  auto bssid__ = bssid ? _fbb.CreateString(bssid) : 0;
   return OpenShock::Serialization::Local::CreateWifiNetworkConnectCommand(
       _fbb,
-      ssid__,
-      bssid__);
+      ssid__);
 }
 
 struct GatewayPairCommand FLATBUFFERS_FINAL_CLASS : private ::flatbuffers::Table {

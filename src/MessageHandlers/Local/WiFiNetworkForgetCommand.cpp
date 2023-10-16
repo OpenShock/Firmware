@@ -20,32 +20,19 @@ void _Private::HandleWiFiNetworkForgetCommand(std::uint8_t socketId, const OpenS
     return;
   }
 
-  auto ssid  = msg->ssid();
-  auto bssid = msg->bssid();
+  auto ssid = msg->ssid();
 
-  if (ssid == nullptr && bssid == nullptr) {
+  if (ssid == nullptr) {
     ESP_LOGE(TAG, "WiFi message is missing required properties");
     return;
   }
 
-  if (ssid != nullptr && ssid->size() > 31) {
+  if (ssid->size() > 31) {
     ESP_LOGE(TAG, "WiFi SSID is too long");
     return;
   }
 
-  if (bssid != nullptr && bssid->size() != 17) {
-    ESP_LOGE(TAG, "WiFi BSSID is invalid (wrong length)");
-    return;
-  }
-
-  // Convert BSSID to byte array
-  std::uint8_t bssidBytes[6];
-  if (bssid != nullptr && !HexUtils::TryParseHexMac<17>(nonstd::span<const char, 17>(bssid->data(), bssid->size()), bssidBytes)) {
-    ESP_LOGE(TAG, "WiFi BSSID is invalid (failed to parse)");
-    return;
-  }
-
-  if (!WiFiManager::Forget(bssidBytes)) {  // TODO: support SSID as well
+  if (!WiFiManager::Forget(ssid->c_str())) {  // TODO: support hidden networks
     ESP_LOGE(TAG, "Failed to forget WiFi network");
   }
 }

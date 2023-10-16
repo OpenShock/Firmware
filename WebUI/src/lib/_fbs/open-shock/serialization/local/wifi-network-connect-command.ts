@@ -27,23 +27,12 @@ ssid(optionalEncoding?:any):string|Uint8Array|null {
   return offset ? this.bb!.__string(this.bb_pos + offset, optionalEncoding) : null;
 }
 
-bssid():string|null
-bssid(optionalEncoding:flatbuffers.Encoding):string|Uint8Array|null
-bssid(optionalEncoding?:any):string|Uint8Array|null {
-  const offset = this.bb!.__offset(this.bb_pos, 6);
-  return offset ? this.bb!.__string(this.bb_pos + offset, optionalEncoding) : null;
-}
-
 static startWifiNetworkConnectCommand(builder:flatbuffers.Builder) {
-  builder.startObject(2);
+  builder.startObject(1);
 }
 
 static addSsid(builder:flatbuffers.Builder, ssidOffset:flatbuffers.Offset) {
   builder.addFieldOffset(0, ssidOffset, 0);
-}
-
-static addBssid(builder:flatbuffers.Builder, bssidOffset:flatbuffers.Offset) {
-  builder.addFieldOffset(1, bssidOffset, 0);
 }
 
 static endWifiNetworkConnectCommand(builder:flatbuffers.Builder):flatbuffers.Offset {
@@ -51,10 +40,9 @@ static endWifiNetworkConnectCommand(builder:flatbuffers.Builder):flatbuffers.Off
   return offset;
 }
 
-static createWifiNetworkConnectCommand(builder:flatbuffers.Builder, ssidOffset:flatbuffers.Offset, bssidOffset:flatbuffers.Offset):flatbuffers.Offset {
+static createWifiNetworkConnectCommand(builder:flatbuffers.Builder, ssidOffset:flatbuffers.Offset):flatbuffers.Offset {
   WifiNetworkConnectCommand.startWifiNetworkConnectCommand(builder);
   WifiNetworkConnectCommand.addSsid(builder, ssidOffset);
-  WifiNetworkConnectCommand.addBssid(builder, bssidOffset);
   return WifiNetworkConnectCommand.endWifiNetworkConnectCommand(builder);
 }
 }

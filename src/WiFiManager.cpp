@@ -326,7 +326,25 @@ bool _authenticate(const WiFiNetwork& net, const std::string& password) {
   return true;
 }
 
-bool WiFiManager::Save(std::uint8_t (&bssid)[6], const std::string& password) {
+bool WiFiManager::Save(const char* ssid, const std::string& password) {
+  ESP_LOGV(TAG, "Authenticating to network %s", ssid);
+
+  for (auto& net : s_wifiNetworks) {
+    if (strcmp(net.ssid, ssid) == 0) {
+      ESP_LOGV(TAG, "Network with SSID %s was resolved", ssid);
+
+      return _authenticate(net, password);
+    }
+  }
+
+  ESP_LOGE(TAG, "Failed to find network with SSID %s", ssid);
+
+  _broadcastErrorMessage("network_not_found");
+
+  return false;
+}
+
+bool WiFiManager::Save(const std::uint8_t (&bssid)[6], const std::string& password) {
   ESP_LOGV(TAG, "Authenticating to network " BSSID_FMT, BSSID_ARG(bssid));
 
   for (auto& net : s_wifiNetworks) {
@@ -343,6 +361,36 @@ bool WiFiManager::Save(std::uint8_t (&bssid)[6], const std::string& password) {
   _broadcastErrorMessage("network_not_found");
 
   return false;
+}
+
+bool WiFiManager::Forget(const char* ssid) {
+  ESP_LOGV(TAG, "Forgetting network %s", ssid);
+
+  std::uint8_t credsId = 0;
+  for (auto& net : s_wifiNetworks) {
+    if (strcmp(net.ssid, ssid) == 0) {
+      credsId = net.credentialsID;
+
+      net.credentialsID = 0;
+      break;
+    }
+  }
+
+  if (credsId == 0) {
+    ESP_LOGE(TAG, "Failed to find network with SSID %s", ssid);
+    return false;
+  }
+
+  // Check if the network is currently connected
+  if (s_connectedCredentialsID == credsId) {
+    // Disconnect from the network
+    WiFiManager::Disconnect();
+  }
+
+  // Remove the credentials from the config
+  Config::RemoveWiFiCredentials(credsId);
+
+  return true;
 }
 
 bool WiFiManager::Forget(const std::uint8_t (&bssid)[6]) {
@@ -427,6 +475,27 @@ bool _connect(const Config::WiFiCredentials& creds) {
   }
 
   return true;
+}
+
+bool WiFiManager::Connect(const char* ssid) {
+  Config::WiFiCredentials creds;
+  if (!Config::TryGetWiFiCredentialsBySSID(ssid, creds)) {
+    ESP_LOGE(TAG, "Failed to find credentials for network %s", ssid);
+    return false;
+  }
+
+  if (s_connectedCredentialsID != creds.id) {
+    Disconnect();
+    s_preferredCredentialsID = creds.id;
+    return true;
+  }
+
+  if (!s_wifiConnected) {
+    s_preferredCredentialsID = creds.id;
+    return true;
+  }
+
+  return false;
 }
 
 bool WiFiManager::Connect(const std::uint8_t (&bssid)[6]) {

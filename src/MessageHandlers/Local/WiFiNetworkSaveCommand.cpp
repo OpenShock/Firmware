@@ -21,10 +21,9 @@ void _Private::HandleWiFiNetworkSaveCommand(std::uint8_t socketId, const OpenSho
   }
 
   auto ssid     = msg->ssid();
-  auto bssid    = msg->bssid();
   auto password = msg->password();
 
-  if (ssid == nullptr || bssid == nullptr || password == nullptr) {
+  if (ssid == nullptr || password == nullptr) {
     ESP_LOGE(TAG, "WiFi message is missing required properties");
     return;
   }
@@ -34,24 +33,12 @@ void _Private::HandleWiFiNetworkSaveCommand(std::uint8_t socketId, const OpenSho
     return;
   }
 
-  if (bssid->size() != 17) {
-    ESP_LOGE(TAG, "WiFi BSSID is invalid (wrong length)");
-    return;
-  }
-
-  // Convert BSSID to byte array
-  std::uint8_t bssidBytes[6];
-  if (!HexUtils::TryParseHexMac<17>(nonstd::span<const char, 17>(bssid->data(), bssid->size()), bssidBytes)) {
-    ESP_LOGE(TAG, "WiFi BSSID is invalid (failed to parse)");
-    return;
-  }
-
   if (password->size() > 63) {
     ESP_LOGE(TAG, "WiFi password is too long");
     return;
   }
 
-  if (!WiFiManager::Save(bssidBytes, password->str())) {  // TODO: support SSID as well
+  if (!WiFiManager::Save(ssid->c_str(), password->str())) {  // TODO: support hidden networks
     ESP_LOGE(TAG, "Failed to save WiFi network");
   }
 }

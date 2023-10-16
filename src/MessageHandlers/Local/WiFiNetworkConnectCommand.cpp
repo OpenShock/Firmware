@@ -20,10 +20,9 @@ void _Private::HandleWiFiNetworkConnectCommand(std::uint8_t socketId, const Open
     return;
   }
 
-  auto ssid  = msg->ssid();
-  auto bssid = msg->bssid();
+  auto ssid = msg->ssid();
 
-  if (ssid == nullptr && bssid == nullptr) {
+  if (ssid == nullptr) {
     ESP_LOGE(TAG, "WiFi message is missing required properties");
     return;
   }
@@ -33,19 +32,7 @@ void _Private::HandleWiFiNetworkConnectCommand(std::uint8_t socketId, const Open
     return;
   }
 
-  if (bssid != nullptr && bssid->size() != 17) {
-    ESP_LOGE(TAG, "WiFi BSSID is invalid (wrong length)");
-    return;
-  }
-
-  // Convert BSSID to byte array
-  std::uint8_t bssidBytes[6];
-  if (bssid != nullptr && !HexUtils::TryParseHexMac<17>(nonstd::span<const char, 17>(bssid->data(), bssid->size()), bssidBytes)) {
-    ESP_LOGE(TAG, "WiFi BSSID is invalid (failed to parse)");
-    return;
-  }
-
-  if (!WiFiManager::Connect(bssidBytes)) {  // TODO: support SSID as well
+  if (!WiFiManager::Connect(ssid->c_str())) {  // TODO: support hidden networks
     ESP_LOGE(TAG, "Failed to connect to WiFi network");
   }
 }

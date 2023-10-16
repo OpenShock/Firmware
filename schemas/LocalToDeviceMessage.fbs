@@ -7,16 +7,14 @@ struct WifiScanCommand {
 }
 table WifiNetworkSaveCommand {
   ssid:string;
-  bssid:string;
   password:string;
+  connect:bool;
 }
 table WifiNetworkForgetCommand {
   ssid:string;
-  bssid:string;
 }
 table WifiNetworkConnectCommand {
   ssid:string;
-  bssid:string;
 }
 struct WifiNetworkDisconnectCommand {
   placeholder:bool;

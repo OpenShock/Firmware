@@ -1,7 +1,7 @@
 import { Builder as FlatbufferBuilder } from 'flatbuffers';
-import { LocalToDeviceMessage } from '$lib/fbs/open-shock/serialization/local/local-to-device-message';
-import { LocalToDeviceMessagePayload } from '$lib/fbs/open-shock/serialization/local/local-to-device-message-payload';
-import { GatewayPairCommand } from '$lib/fbs/open-shock/serialization/local/gateway-pair-command';
+import { LocalToDeviceMessage } from '$lib/_fbs/open-shock/serialization/local/local-to-device-message';
+import { LocalToDeviceMessagePayload } from '$lib/_fbs/open-shock/serialization/local/local-to-device-message-payload';
+import { GatewayPairCommand } from '$lib/_fbs/open-shock/serialization/local/gateway-pair-command';
 
 export function SerializeGatewayPairCommand(pairCode: string): Uint8Array {
   const fbb = new FlatbufferBuilder(64);

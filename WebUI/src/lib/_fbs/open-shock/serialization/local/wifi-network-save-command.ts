@@ -27,18 +27,16 @@ ssid(optionalEncoding?:any):string|Uint8Array|null {
   return offset ? this.bb!.__string(this.bb_pos + offset, optionalEncoding) : null;
 }
 
-bssid():string|null
-bssid(optionalEncoding:flatbuffers.Encoding):string|Uint8Array|null
-bssid(optionalEncoding?:any):string|Uint8Array|null {
+password():string|null
+password(optionalEncoding:flatbuffers.Encoding):string|Uint8Array|null
+password(optionalEncoding?:any):string|Uint8Array|null {
   const offset = this.bb!.__offset(this.bb_pos, 6);
   return offset ? this.bb!.__string(this.bb_pos + offset, optionalEncoding) : null;
 }
 
-password():string|null
-password(optionalEncoding:flatbuffers.Encoding):string|Uint8Array|null
-password(optionalEncoding?:any):string|Uint8Array|null {
+connect():boolean {
   const offset = this.bb!.__offset(this.bb_pos, 8);
-  return offset ? this.bb!.__string(this.bb_pos + offset, optionalEncoding) : null;
+  return offset ? !!this.bb!.readInt8(this.bb_pos + offset) : false;
 }
 
 static startWifiNetworkSaveCommand(builder:flatbuffers.Builder) {
@@ -49,12 +47,12 @@ static addSsid(builder:flatbuffers.Builder, ssidOffset:flatbuffers.Offset) {
   builder.addFieldOffset(0, ssidOffset, 0);
 }
 
-static addBssid(builder:flatbuffers.Builder, bssidOffset:flatbuffers.Offset) {
-  builder.addFieldOffset(1, bssidOffset, 0);
+static addPassword(builder:flatbuffers.Builder, passwordOffset:flatbuffers.Offset) {
+  builder.addFieldOffset(1, passwordOffset, 0);
 }
 
-static addPassword(builder:flatbuffers.Builder, passwordOffset:flatbuffers.Offset) {
-  builder.addFieldOffset(2, passwordOffset, 0);
+static addConnect(builder:flatbuffers.Builder, connect:boolean) {
+  builder.addFieldInt8(2, +connect, +false);
 }
 
 static endWifiNetworkSaveCommand(builder:flatbuffers.Builder):flatbuffers.Offset {
@@ -62,11 +60,11 @@ static endWifiNetworkSaveCommand(builder:flatbuffers.Builder):flatbuffers.Offset
   return offset;
 }
 
-static createWifiNetworkSaveCommand(builder:flatbuffers.Builder, ssidOffset:flatbuffers.Offset, bssidOffset:flatbuffers.Offset, passwordOffset:flatbuffers.Offset):flatbuffers.Offset {
+static createWifiNetworkSaveCommand(builder:flatbuffers.Builder, ssidOffset:flatbuffers.Offset, passwordOffset:flatbuffers.Offset, connect:boolean):flatbuffers.Offset {
   WifiNetworkSaveCommand.startWifiNetworkSaveCommand(builder);
   WifiNetworkSaveCommand.addSsid(builder, ssidOffset);
-  WifiNetworkSaveCommand.addBssid(builder, bssidOffset);
   WifiNetworkSaveCommand.addPassword(builder, passwordOffset);
+  WifiNetworkSaveCommand.addConnect(builder, connect);
   return WifiNetworkSaveCommand.endWifiNetworkSaveCommand(builder);
 }
 }
