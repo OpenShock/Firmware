@@ -1,0 +1,67 @@
+include "./Types/WifiScanStatus.fbs";
+include "./Types/WifiAuthMode.fbs";
+
+attribute "fs_serializer";
+
+namespace OpenShock.Serialization.Local;
+
+table WifiNetwork {
+  ssid:string;
+  bssid:string;
+  channel:uint8;
+  rssi:int8;
+  auth_mode:WifiAuthMode;
+  saved:bool;
+}
+
+struct ReadyMessage {
+  poggies:bool;
+}
+
+table ErrorMessage {
+  message:string;
+}
+
+struct WifiScanStatusMessage {
+  status:WifiScanStatus;
+}
+table WifiNetworkDiscoveredEvent {
+  network:WifiNetwork;
+}
+table WifiNetworkUpdatedEvent {
+  network:WifiNetwork;
+}
+table WifiNetworkLostEvent {
+  network:WifiNetwork;
+}
+table WifiNetworkSavedEvent {
+  network:WifiNetwork;
+}
+table WifiNetworkRemovedEvent {
+  network:WifiNetwork;
+}
+table WifiNetworkConnectedEvent {
+  network:WifiNetwork;
+}
+table WifiNetworkDisconnectedEvent {
+  network:WifiNetwork;
+}
+
+union DeviceToLocalMessagePayload {
+  ReadyMessage,
+  ErrorMessage,
+  WifiScanStatusMessage,
+  WifiNetworkDiscoveredEvent,
+  WifiNetworkUpdatedEvent,
+  WifiNetworkLostEvent,
+  WifiNetworkSavedEvent,
+  WifiNetworkRemovedEvent,
+  WifiNetworkConnectedEvent,
+  WifiNetworkDisconnectedEvent,
+}
+
+table DeviceToLocalMessage (fs_serializer) {
+  payload:DeviceToLocalMessagePayload;
+}
+
+root_type DeviceToLocalMessage;

@@ -1,0 +1,197 @@
+on:
+  push:
+    branches:
+      - master
+      - develop
+  pull_request:
+    branches:
+      - develop
+    types: [opened, reopened, synchronize]
+  workflow_call: # When another workflow invokes this one.
+    outputs:
+      matrix:
+        description: "Strategy matrix"
+        value: ${{ jobs.get-targets.outputs.matrix }}
+  workflow_dispatch: # Manually invoked by user.
+
+name: ci-build
+
+env:
+  NODE_VERSION: 16
+  PYTHON_VERSION: 3.12
+  OPENSHOCK_API_DOMAIN: api.shocklink.net
+  # OPENSHOCK_FW_VERSION:
+  #   - If this is a tag push, we can use ref_name to get the tag name.
+  #   - If this is branch "master" or "develop", we use "0.0.0-master" or "0.0.0-develop" respectively.
+  #   - All other scenarios we use "0.0.0-unknown", as we cannot guarantee SemVer compliance by accepting any branch name. So this is the safe option.
+  OPENSHOCK_FW_VERSION: ${{ (startsWith(github.ref, 'refs/tags/') && github.ref_name) || (contains(fromJSON('["master","develop"]'), github.ref_name) && format('0.0.0-{0}', github.ref_name)) || '0.0.0-unknown' }}
+  OPENSHOCK_FW_COMMIT: ${{ github.sha }}
+
+jobs:
+
+  # Read platformio.ini and extract all specific targets. See the referenced file for more info.
+  get-targets:
+    uses: ./.github/workflows/get-targets.yml
+
+  build-captive-portal:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          sparse-checkout: |
+            WebUI
+          path: .
+
+      - uses: actions/setup-node@v3
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+          cache-dependency-path: ./WebUI/package-lock.json
+
+      - name: Install dependencies
+        working-directory: ./WebUI
+        run: npm ci
+
+      - name: Build
+        working-directory: ./WebUI
+        run: npm run build
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v3
+        with:
+          name: captive-portal
+          path: WebUI/build/*
+          retention-days: 1
+          if-no-files-found: error
+
+  build-filesystem:
+    runs-on: ubuntu-latest
+    needs: build-captive-portal
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/cache@v3
+        with:
+          path: |
+            ~/.platformio/platforms
+            ~/.platformio/packages
+            ~/.platformio/.cache
+          key: pio-${{ runner.os }}-${{ hashFiles('platformio.ini', 'requirements.txt') }}
+
+      - uses: actions/setup-python@v4
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: "pip"
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Download built captive portal
+        uses: actions/download-artifact@v3
+        with:
+          name: captive-portal
+          path: WebUI/build/
+
+      - name: Build filesystem
+        run: pio run --target buildfs -e fs
+
+      - name: Upload internal filesystem artifact
+        uses: actions/upload-artifact@v3
+        with:
+          name: filesystem
+          path: .pio/build/fs/littlefs.bin
+          retention-days: 1
+          if-no-files-found: error
+
+  build-firmware:
+    runs-on: ubuntu-latest
+    needs: get-targets
+    strategy:
+      fail-fast: false
+      matrix: ${{ fromJSON(needs.get-targets.outputs.matrix) }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/cache@v3
+        with:
+          path: |
+            ~/.platformio/platforms
+            ~/.platformio/packages
+            ~/.platformio/.cache
+          key: pio-${{ runner.os }}-${{ hashFiles('platformio.ini', 'requirements.txt') }}
+
+      - uses: actions/setup-python@v4
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: "pip"
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Build firmware
+        working-directory: .
+        run: pio run -e ${{ matrix.board }}
+
+      - name: Upload internal firmware binaries
+        uses: actions/upload-artifact@v3
+        with:
+          name: firmware_${{ matrix.board }}
+          path: .pio/build/${{ matrix.board }}/*.bin
+          retention-days: 1
+          if-no-files-found: error
+
+  merge-images:
+    runs-on: ubuntu-latest
+    needs: [get-targets, build-filesystem, build-firmware]
+    strategy:
+      fail-fast: false
+      matrix: ${{ fromJSON(needs.get-targets.outputs.matrix )}}
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          sparse-checkout: |
+            scripts
+            boards
+            chips
+
+      - uses: actions/setup-python@v4
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: "pip"
+
+      - name: Install dependencies
+        run: pip install esptool
+
+      - name: Download filesystem image
+        uses: actions/download-artifact@v3
+        with:
+          name: filesystem
+
+      - name: Download firmware images
+        uses: actions/download-artifact@v3
+        with:
+          name: firmware_${{ matrix.board }}
+
+      - name: Merge flash image
+        run: |
+          python scripts/merge_image.py ${{ matrix.board }} &&
+            mv merged.bin OpenShock.${{ matrix.board }}.bin
+
+      - name: Upload merged flashable image
+        uses: actions/upload-artifact@v3
+        with:
+          name: OpenShock_${{ matrix.board }}
+          path: OpenShock.${{ matrix.board }}.bin
+          retention-days: 7
+          if-no-files-found: error
+
+  done:
+    runs-on: ubuntu-latest
+    needs: [build-filesystem, merge-images]
+
+    steps:
+      - run: echo "Done"

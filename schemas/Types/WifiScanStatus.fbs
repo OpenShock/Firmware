@@ -1,0 +1,9 @@
+namespace OpenShock;
+
+enum WifiScanStatus : uint8 {
+  Started,
+  InProgress,
+  Completed,
+  Aborted,
+  Error
+}

@@ -1,0 +1,21 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+@tailwind variants;
+
+/* place global styles here */
+html,
+body {
+	@apply h-full w-full overflow-hidden;
+}
+
+@layer components {
+	.responsive-card {
+		@apply m-auto h-full w-full max-w-full overflow-hidden rounded-none;
+	}
+	@media (min-width: 700px) {
+		.responsive-card {
+			@apply my-8 h-auto w-1/2 max-w-[40rem] rounded-2xl;
+		}
+	}
+}
