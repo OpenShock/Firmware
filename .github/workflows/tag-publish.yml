@@ -67,7 +67,7 @@ jobs:
           repo_token: ${{ secrets.GITHUB_TOKEN }}
           file: RELEASE.md
           asset_name: RELEASE.md
-          tag: ${{ github.ref }}
-          prerelease: ${{ contains(github.ref_name, '-') }}
+          tag: ${{ github.event.workflow_run.head_branch }}
+          prerelease: ${{ contains(github.event.workflow_run.head_branch, '-') }}
           body: |
             ${{ steps.read_release.outputs.RELEASE_BODY }}
