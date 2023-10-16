@@ -8,71 +8,86 @@ name: ci-tag
 
 jobs:
 
-  # Build all targets. This step also outputs the strategy matrix containing the names
-  # of each board that is being built for.
-  build:
-    uses: ./.github/workflows/ci-build.yml
+  # # Build all targets. This step also outputs the strategy matrix containing the names
+  # # of each board that is being built for.
+  # build:
+  #   uses: ./.github/workflows/ci-build.yml
 
-  # Publish one artifact PER BOARD.
-  publish-artifacts:
+  # # Publish one artifact PER BOARD.
+  # publish-artifacts:
+  #   runs-on: ubuntu-latest
+  #   needs: build
+  #   strategy:
+  #     matrix: ${{ fromJSON(needs.build.outputs.matrix) }}
+
+  #   steps:
+  #     # Note: This step is NOT in fact `actions/download-artifact`. The reason is that since we
+  #     # invoked the build workflow as a sub-workflow, we cannot directly access its artifacts.
+  #     # This alternative implementation enables us to do it regardless.
+  #     - name: Download build artifacts
+  #       uses: dawidd6/action-download-artifact@v2.28.0
+  #       with:
+  #         name: OpenShock_${{ matrix.board }}
+  #         name_is_regexp: false
+  #         run_id: ${{ github.event.workflow_run.id }}
+  #         workflow_conclusion: '' # ignore
+  #         search_artifacts: false
+
+  #     # Push artifact for this board.
+  #     - name: Upload artifact to release
+  #       uses: svenstaro/upload-release-action@v2
+  #       with:
+  #         repo_token: ${{ secrets.GITHUB_TOKEN }}
+  #         file: OpenShock.${{ matrix.board }}.bin
+  #         asset_name: OpenShock.${{ matrix.board }}.bin
+  #         tag: ${{ github.ref }}
+  #         prerelease: ${{ contains(github.ref_name, '-') }}
+
+  # publish-release:
+  #   runs-on: ubuntu-latest
+  #   needs: [build]
+
+  #   steps:
+  #     - name: Download release notes
+  #       uses: actions/checkout@v4
+  #       with:
+  #         sparse-checkout: |
+  #           RELEASE.md
+
+  #     # This step reads a file from repo and use it for body of the release
+  #     # This works on any self-hosted runner OS
+  #     - name: Read RELEASE.md
+  #       id: read_release
+  #       shell: bash
+  #       run: |
+  #         r=$(cat RELEASE.md)                               # <--- Read release.md (Provide correct path as per your repo)
+  #         r="${r//'%'/'%25'}"                               # Multiline escape sequences for %
+  #         r="${r//$'\n'/'%0A'}"                             # Multiline escape sequences for '\n'
+  #         r="${r//$'\r'/'%0D'}"                             # Multiline escape sequences for '\r'
+  #         echo "RELEASE_BODY=$r" >> $GITHUB_OUTPUT          # <--- Set environment variable
+
+  #     - name: Upload release notes
+  #       uses: svenstaro/upload-release-action@v2
+  #       with:
+  #         repo_token: ${{ secrets.GITHUB_TOKEN }}
+  #         file: RELEASE.md
+  #         asset_name: RELEASE.md
+  #         tag: ${{ github.ref }}
+  #         prerelease: ${{ contains(github.ref_name, '-') }}
+  #         body: |
+  #           ${{ steps.read_release.outputs.RELEASE_BODY }}
+
+  create-dummy-artifact:
     runs-on: ubuntu-latest
-    needs: build
-    strategy:
-      matrix: ${{ fromJSON(needs.build.outputs.matrix) }}
 
     steps:
-      # Note: This step is NOT in fact `actions/download-artifact`. The reason is that since we
-      # invoked the build workflow as a sub-workflow, we cannot directly access its artifacts.
-      # This alternative implementation enables us to do it regardless.
-      - name: Download build artifacts
-        uses: dawidd6/action-download-artifact@v2.28.0
-        with:
-          name: OpenShock_${{ matrix.board }}
-          name_is_regexp: false
-          run_id: ${{ github.event.workflow_run.id }}
-          workflow_conclusion: '' # ignore
-          search_artifacts: false
-
-      # Push artifact for this board.
-      - name: Upload artifact to release
-        uses: svenstaro/upload-release-action@v2
-        with:
-          repo_token: ${{ secrets.GITHUB_TOKEN }}
-          file: OpenShock.${{ matrix.board }}.bin
-          asset_name: OpenShock.${{ matrix.board }}.bin
-          tag: ${{ github.ref }}
-          prerelease: ${{ contains(github.ref_name, '-') }}
-
-  publish-release:
-    runs-on: ubuntu-latest
-    needs: [build]
-
-    steps:
-      - name: Download release notes
-        uses: actions/checkout@v4
-        with:
-          sparse-checkout: |
-            RELEASE.md
-
-      # This step reads a file from repo and use it for body of the release
-      # This works on any self-hosted runner OS
-      - name: Read RELEASE.md
-        id: read_release
-        shell: bash
+      - name: Make artifact
         run: |
-          r=$(cat RELEASE.md)                               # <--- Read release.md (Provide correct path as per your repo)
-          r="${r//'%'/'%25'}"                               # Multiline escape sequences for %
-          r="${r//$'\n'/'%0A'}"                             # Multiline escape sequences for '\n'
-          r="${r//$'\r'/'%0D'}"                             # Multiline escape sequences for '\r'
-          echo "RELEASE_BODY=$r" >> $GITHUB_OUTPUT          # <--- Set environment variable
+          echo "artifact 1" >> OpenShock_Example1.bin
+          echo "artifact 2" >> OpenShock_Example2.bin
 
-      - name: Upload release notes
-        uses: svenstaro/upload-release-action@v2
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v3
         with:
-          repo_token: ${{ secrets.GITHUB_TOKEN }}
-          file: RELEASE.md
-          asset_name: RELEASE.md
-          tag: ${{ github.ref }}
-          prerelease: ${{ contains(github.ref_name, '-') }}
-          body: |
-            ${{ steps.read_release.outputs.RELEASE_BODY }}
+          path: OpenShock.*
+
