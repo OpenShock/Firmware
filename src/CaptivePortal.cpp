@@ -3,6 +3,7 @@
 #include "CaptivePortalInstance.h"
 #include "Config.h"
 #include "GatewayConnectionManager.h"
+#include "CommandHandler.h"
 
 #include <ESPAsyncWebServer.h>
 #include <WebSocketsServer.h>
@@ -78,7 +79,7 @@ bool CaptivePortal::IsRunning() {
   return s_instance != nullptr;
 }
 void CaptivePortal::Update() {
-  bool shouldBeRunning = s_alwaysEnabled || !GatewayConnectionManager::IsConnected();
+  bool shouldBeRunning = s_alwaysEnabled || !GatewayConnectionManager::IsConnected() || !CommandHandler::Ok();
 
   if (s_instance == nullptr) {
     if (shouldBeRunning) {
