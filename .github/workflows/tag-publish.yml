@@ -1,6 +1,6 @@
 on:
   workflow_run:
-    workflows: ["ci-tag"]
+    workflows: [ci-tag]
     types:
       - completed
 
