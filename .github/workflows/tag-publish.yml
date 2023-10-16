@@ -4,6 +4,8 @@ on:
     types:
       - completed
 
+name: tag-publish
+
 jobs:
 
   # Download all artifacts from the previous workflow.
@@ -24,6 +26,7 @@ jobs:
 
       - name: Test
         run: |
+          ls
           echo "${{ github.event.workflow_run.head_branch }}"
 
       # Upload artifacts to release.

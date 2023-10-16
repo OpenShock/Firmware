@@ -13,17 +13,20 @@ jobs:
   # build:
   #   uses: ./.github/workflows/ci-build.yml
 
-  debug-print-workflow:
-    runs-on: ubuntu-latest
+  # trigger-publish:
+  #   runs-on: ubuntu-latest
+  #   needs: build
 
-    steps:
-      - name: Print run id
-        run: echo "${{ github.run_id }}"
+  #   steps:
+  #     - name: Repository Dispatch
+  #       uses: peter-evans/repository-dispatch@v2
+  #       with:
+  #         event-type: my-event
 
   # # Publish one artifact PER BOARD.
   # publish-artifacts:
   #   runs-on: ubuntu-latest
-  #   needs: debug-print-workflow
+  #   needs: build
   #   strategy:
   #     matrix: ${{ fromJSON(needs.build.outputs.matrix) }}
 
@@ -36,7 +39,7 @@ jobs:
   #       with:
   #         name: OpenShock_${{ matrix.board }}
   #         name_is_regexp: false
-  #         run_id: ${{ github.run_id }}
+  #         run_id: ${{ github.event.workflow_run.id }}
   #         workflow_conclusion: '' # ignore
   #         search_artifacts: false
 
@@ -104,21 +107,3 @@ jobs:
         with:
           path: OpenShock.Example2.bin
           name: OpenShock_Example2
-
-  test-stuff:
-    runs-on: ubuntu-latest
-    needs: [create-dummy-artifact]
-
-    steps:
-        # Download all final artifacts from the competed ci-tag workflow
-        - name: Download artifacts
-          uses: dawidd6/action-download-artifact@v2.28.0
-          with:
-            name: OpenShock_*
-            name_is_regexp: true
-            run_id: ${{ github.run_id }}
-            workflow_conclusion: ''
-            search_artifacts: false
-
-        - name: Print ls
-          run: ls
