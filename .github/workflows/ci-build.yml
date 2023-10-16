@@ -189,6 +189,10 @@ jobs:
           retention-days: 7
           if-no-files-found: error
 
+  publish-images:
+    runs-on: ubuntu-latest
+    needs: [merge-images]
+
   done:
     runs-on: ubuntu-latest
     needs: [build-filesystem, merge-images]

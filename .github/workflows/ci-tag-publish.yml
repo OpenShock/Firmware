@@ -1,10 +1,10 @@
 on:
   workflow_run:
-    workflows: [ci-tag]
+    workflows: [ci-tag-build]
     types:
       - completed
 
-name: tag-publish
+name: ci-tag-publish
 run-name: "tag-publish: ${{ github.event.workflow_run.head_branch }}"
 
 jobs:
