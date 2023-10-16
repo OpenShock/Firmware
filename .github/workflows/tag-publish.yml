@@ -37,10 +37,11 @@ jobs:
           file: OpenShock.*.bin
           file_glob: true
           tag: ${{ github.event.workflow_run.head_branch }}
-          prerelease: ${{ contains(github.event.workflow_run.head_branch, '-') }}
+          prerelease: true # will be promoted once release notes are added
 
   publish-release:
     runs-on: ubuntu-latest
+    needs: [publish-artifacts]
 
     steps:
       - name: Download release notes
@@ -69,5 +70,6 @@ jobs:
           asset_name: RELEASE.md
           tag: ${{ github.event.workflow_run.head_branch }}
           prerelease: ${{ contains(github.event.workflow_run.head_branch, '-') }}
+          promote: ${{ !contains(github.event.workflow_run.head_branch, '-') }}
           body: |
             ${{ steps.read_release.outputs.RELEASE_BODY }}
