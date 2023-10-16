@@ -30,44 +30,44 @@ jobs:
           echo "${{ github.event.workflow_run.head_branch }}"
 
       # Upload artifacts to release.
-      # - name: Upload artifact to release
-      #   uses: svenstaro/upload-release-action@v2
-      #   with:
-      #     repo_token: ${{ secrets.GITHUB_TOKEN }}
-      #     file: OpenShock.*.bin
-      #     file_glob: true
-      #     tag: ${{ github.ref }}
-      #     prerelease: ${{ contains(github.ref_name, '-') }}
+      - name: Upload artifact to release
+        uses: svenstaro/upload-release-action@v2
+        with:
+          repo_token: ${{ secrets.GITHUB_TOKEN }}
+          file: OpenShock.*.bin
+          file_glob: true
+          tag: ${{ github.ref }}
+          prerelease: ${{ contains(github.event.workflow_run.head_branch, '-') }}
 
-  # publish-release:
-  #   runs-on: ubuntu-latest
+  publish-release:
+    runs-on: ubuntu-latest
 
-  #   steps:
-  #     - name: Download release notes
-  #       uses: actions/checkout@v4
-  #       with:
-  #         sparse-checkout: |
-  #           RELEASE.md
+    steps:
+      - name: Download release notes
+        uses: actions/checkout@v4
+        with:
+          sparse-checkout: |
+            RELEASE.md
 
-  #     # This step reads a file from repo and use it for body of the release
-  #     # This works on any self-hosted runner OS
-  #     - name: Read RELEASE.md
-  #       id: read_release
-  #       shell: bash
-  #       run: |
-  #         r=$(cat RELEASE.md)                               # <--- Read release.md (Provide correct path as per your repo)
-  #         r="${r//'%'/'%25'}"                               # Multiline escape sequences for %
-  #         r="${r//$'\n'/'%0A'}"                             # Multiline escape sequences for '\n'
-  #         r="${r//$'\r'/'%0D'}"                             # Multiline escape sequences for '\r'
-  #         echo "RELEASE_BODY=$r" >> $GITHUB_OUTPUT          # <--- Set environment variable
+      # This step reads a file from repo and use it for body of the release
+      # This works on any self-hosted runner OS
+      - name: Read RELEASE.md
+        id: read_release
+        shell: bash
+        run: |
+          r=$(cat RELEASE.md)                               # <--- Read release.md (Provide correct path as per your repo)
+          r="${r//'%'/'%25'}"                               # Multiline escape sequences for %
+          r="${r//$'\n'/'%0A'}"                             # Multiline escape sequences for '\n'
+          r="${r//$'\r'/'%0D'}"                             # Multiline escape sequences for '\r'
+          echo "RELEASE_BODY=$r" >> $GITHUB_OUTPUT          # <--- Set environment variable
 
-  #     - name: Upload release notes
-  #       uses: svenstaro/upload-release-action@v2
-  #       with:
-  #         repo_token: ${{ secrets.GITHUB_TOKEN }}
-  #         file: RELEASE.md
-  #         asset_name: RELEASE.md
-  #         tag: ${{ github.ref }}
-  #         prerelease: ${{ contains(github.ref_name, '-') }}
-  #         body: |
-  #           ${{ steps.read_release.outputs.RELEASE_BODY }}
+      - name: Upload release notes
+        uses: svenstaro/upload-release-action@v2
+        with:
+          repo_token: ${{ secrets.GITHUB_TOKEN }}
+          file: RELEASE.md
+          asset_name: RELEASE.md
+          tag: ${{ github.ref }}
+          prerelease: ${{ contains(github.ref_name, '-') }}
+          body: |
+            ${{ steps.read_release.outputs.RELEASE_BODY }}
