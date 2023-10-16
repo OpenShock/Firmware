@@ -39,12 +39,7 @@ static std::array<Handlers::HandlerType, HANDLER_COUNT> s_localHandlers = []() {
   return std::move(handlers);
 }();
 
-void MessageHandlers::Local::Handle(std::uint8_t socketId, WStype_t type, const std::uint8_t* data, std::size_t len) {
-  if (type != WStype_t::WStype_BIN) {
-    ESP_LOGE(TAG, "Message type is not supported");
-    return;
-  }
-
+void MessageHandlers::Local::HandleBinary(std::uint8_t socketId, const std::uint8_t* data, std::size_t len) {
   // Deserialize
   auto msg = flatbuffers::GetRoot<Schemas::LocalToDeviceMessage>(data);
   if (msg == nullptr) {

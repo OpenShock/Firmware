@@ -33,12 +33,7 @@ static std::array<Handlers::HandlerType, HANDLER_COUNT> s_serverHandlers = []() 
   return std::move(handlers);
 }();
 
-void MessageHandlers::Server::Handle(WStype_t type, const std::uint8_t* data, std::size_t len) {
-  if (type != WStype_t::WStype_BIN) {
-    ESP_LOGE(TAG, "Message type is not supported");
-    return;
-  }
-
+void MessageHandlers::Server::HandleBinary(const std::uint8_t* data, std::size_t len) {
   // Deserialize
   auto msg = flatbuffers::GetRoot<Schemas::ServerToDeviceMessage>(data);
   if (msg == nullptr) {

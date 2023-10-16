@@ -119,7 +119,7 @@ void GatewayClient::_handleEvent(WStype_t type, std::uint8_t* payload, std::size
       ESP_LOGD(TAG, "Received pong from API");
       break;
     case WStype_BIN:
-      MessageHandlers::Server::Handle(type, payload, length);
+      MessageHandlers::Server::HandleBinary(payload, length);
       break;
     case WStype_FRAGMENT_BIN_START:
       ESP_LOGE(TAG, "Received binary fragment start from API, this is not supported!");

@@ -17,23 +17,22 @@ constexpr std::uint8_t WEBSOCKET_PING_RETRIES   = 3;
 
 using namespace OpenShock;
 
-CaptivePortalInstance::CaptivePortalInstance() : webServer(HTTP_PORT), socketServer(WEBSOCKET_PORT, "/ws", "json") {
-  socketServer.onEvent(std::bind(&CaptivePortalInstance::handleWebSocketEvent, this, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3, std::placeholders::_4));
-  socketServer.begin();
-  socketServer.enableHeartbeat(WEBSOCKET_PING_INTERVAL, WEBSOCKET_PING_TIMEOUT, WEBSOCKET_PING_RETRIES);
+CaptivePortalInstance::CaptivePortalInstance() : m_webServer(HTTP_PORT), m_socketServer(WEBSOCKET_PORT, "/ws", "json"), m_socketDeFragger(std::bind(&CaptivePortalInstance::handleWebSocketEvent, this, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3, std::placeholders::_4)) {
+  m_socketServer.onEvent(std::bind(&WebSocketDeFragger::handler, &m_socketDeFragger, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3, std::placeholders::_4));
+  m_socketServer.begin();
+  m_socketServer.enableHeartbeat(WEBSOCKET_PING_INTERVAL, WEBSOCKET_PING_TIMEOUT, WEBSOCKET_PING_RETRIES);
 
-  webServer.serveStatic("/", LittleFS, "/www/").setDefaultFile("index.html");
-  webServer.onNotFound([](AsyncWebServerRequest* request) { request->send(404, "text/plain", "Not found"); });
-  webServer.begin();
+  m_webServer.onNotFound([](AsyncWebServerRequest* request) { request->send(404, "text/plain", "Not found"); });
+  m_webServer.begin();
 }
 
 CaptivePortalInstance::~CaptivePortalInstance() {
-  webServer.end();
-  socketServer.close();
+  m_webServer.end();
+  m_socketServer.close();
 }
 
 void CaptivePortalInstance::handleWebSocketClientConnected(std::uint8_t socketId) {
-  ESP_LOGD(TAG, "WebSocket client #%u connected from %s", socketId, socketServer.remoteIP(socketId).toString().c_str());
+  ESP_LOGD(TAG, "WebSocket client #%u connected from %s", socketId, m_socketServer.remoteIP(socketId).toString().c_str());
 
   flatbuffers::FlatBufferBuilder builder(32);
   Serialization::Local::ReadyMessage readyMessage(true);
@@ -57,32 +56,29 @@ void CaptivePortalInstance::handleWebSocketClientError(std::uint8_t socketId, st
   ESP_LOGE(TAG, "WebSocket client #%u error %u: %s", socketId, code, message);
 }
 
-void CaptivePortalInstance::handleWebSocketEvent(std::uint8_t socketId, WStype_t type, std::uint8_t* payload, std::size_t length) {
+void CaptivePortalInstance::handleWebSocketEvent(std::uint8_t socketId, WebSocketMessageType type, const std::uint8_t* payload, std::size_t length) {
   switch (type) {
-    case WStype_CONNECTED:
+    case WebSocketMessageType::Connected:
       handleWebSocketClientConnected(socketId);
       break;
-    case WStype_DISCONNECTED:
+    case WebSocketMessageType::Disconnected:
       handleWebSocketClientDisconnected(socketId);
       break;
-    case WStype_BIN:
-    case WStype_FRAGMENT_BIN_START:
-    case WStype_FRAGMENT:
-    case WStype_FRAGMENT_FIN:
-      MessageHandlers::Local::Handle(socketId, type, payload, length);
-      break;
-    case WStype_TEXT:
-    case WStype_FRAGMENT_TEXT_START:
+    case WebSocketMessageType::Text:
       ESP_LOGE(TAG, "Message type is not supported");
       break;
-    case WStype_PING:
-    case WStype_PONG:
+    case WebSocketMessageType::Binary:
+      MessageHandlers::Local::HandleBinary(socketId, payload, length);
+      break;
+    case WebSocketMessageType::Error:
+      handleWebSocketClientError(socketId, length, reinterpret_cast<const char*>(payload));
+      break;
+    case WebSocketMessageType::Ping:
+    case WebSocketMessageType::Pong:
       // Do nothing
       break;
-    case WStype_ERROR:
-      handleWebSocketClientError(socketId, length, reinterpret_cast<char*>(payload));
-      break;
     default:
+      m_socketDeFragger.clear();
       ESP_LOGE(TAG, "Unknown WebSocket event type: %d", type);
       break;
   }
