@@ -179,13 +179,13 @@ jobs:
       - name: Merge flash image
         run: |
           python scripts/merge_image.py ${{ matrix.board }} &&
-            mv merged.bin OpenShock.${{ matrix.board }}.${{ !contains(github.ref_name, '/') && github.ref_name || 'unknown' }}.bin
+            mv merged.bin OpenShock_${{ matrix.board }}_${{ !contains(github.ref_name, '/') && github.ref_name || 'unknown' }}.bin
 
       - name: Upload merged flashable image
         uses: actions/upload-artifact@v3
         with:
           name: OpenShock_${{ matrix.board }}
-          path: OpenShock.${{ matrix.board }}.*.bin
+          path: OpenShock_${{ matrix.board }}_*.bin
           retention-days: 7
           if-no-files-found: error
 
