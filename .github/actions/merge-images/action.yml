@@ -29,6 +29,7 @@ runs:
         cache: "pip"
 
     - name: Install dependencies
+      shell: bash
       run: pip install esptool
 
     - name: Download filesystem image
@@ -42,6 +43,7 @@ runs:
         name: firmware_${{ inputs.board }}
 
     - name: Merge flash image
+      shell: bash
       run: |
         python scripts/merge_image.py ${{ inputs.board }} &&
           mv merged.bin OpenShock_${{ inputs.board }}_${{ !contains(github.ref_name, '/') && github.ref_name || 'unknown' }}.bin
