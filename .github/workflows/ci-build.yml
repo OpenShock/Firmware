@@ -91,11 +91,10 @@ jobs:
             boards
             chips
 
-
-            - name: Debug
-            run: |
-              ls -la
-              find .
+      - name: Debug
+        run: |
+          ls -la
+          find .
 
       - uses: ./.github/actions/merge-images
         with:
