@@ -84,17 +84,11 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
-          path: .
           sparse-checkout: |
             .github
             scripts
             boards
             chips
-
-      - name: Debug
-        run: |
-          ls -la
-          find .
 
       - uses: ./.github/actions/merge-images
         with:
