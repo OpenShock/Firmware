@@ -67,33 +67,11 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - uses: actions/cache@v3
-        with:
-          path: |
-            ~/.platformio/platforms
-            ~/.platformio/packages
-            ~/.platformio/.cache
-          key: pio-${{ runner.os }}-${{ hashFiles('platformio.ini', 'requirements.txt') }}
-
-      - uses: actions/setup-python@v4
+      - uses: ./.github/actions/build-firmware
         with:
           python-version: ${{ env.PYTHON_VERSION }}
-          cache: "pip"
-
-      - name: Install dependencies
-        run: pip install -r requirements.txt
-
-      - name: Build firmware
-        working-directory: .
-        run: pio run -e ${{ matrix.board }}
-
-      - name: Upload internal firmware binaries
-        uses: actions/upload-artifact@v3
-        with:
-          name: firmware_${{ matrix.board }}
-          path: .pio/build/${{ matrix.board }}/*.bin
-          retention-days: 1
-          if-no-files-found: error
+          board: ${{ matrix.board }}
+          skip-checkout: true
 
   merge-images:
     runs-on: ubuntu-latest

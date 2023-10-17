@@ -5,8 +5,12 @@ inputs:
   python-version:
     description: 'Python version to use'
     required: true
+  board:
+    description: 'Board name to build'
+    required: true
   skip-checkout:
     description: 'If true, skips checkout'
+    required: false
     default: false
 
 runs:
@@ -26,7 +30,7 @@ runs:
 
     - uses: actions/setup-python@v4
       with:
-        python-version: ${{ env.PYTHON_VERSION }}
+        python-version: ${{ inputs.board }}
         cache: "pip"
 
     - name: Install dependencies
@@ -34,12 +38,12 @@ runs:
 
     - name: Build firmware
       working-directory: .
-      run: pio run -e ${{ matrix.board }}
+      run: pio run -e ${{ inputs.board }}
 
     - name: Upload internal firmware binaries
       uses: actions/upload-artifact@v3
       with:
-        name: firmware_${{ matrix.board }}
-        path: .pio/build/${{ matrix.board }}/*.bin
+        name: firmware_${{ inputs.board }}
+        path: .pio/build/${{ inputs.board }}/*.bin
         retention-days: 1
         if-no-files-found: error
