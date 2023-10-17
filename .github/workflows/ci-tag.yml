@@ -12,10 +12,8 @@ env:
   PYTHON_VERSION: 3.12
   OPENSHOCK_API_DOMAIN: api.shocklink.net
   # OPENSHOCK_FW_VERSION:
-  #   - If this is a tag push, we can use ref_name to get the tag name.
-  #   - If this is branch "master" or "develop", we use "0.0.0-master" or "0.0.0-develop" respectively.
-  #   - All other scenarios we use "0.0.0-unknown", as we cannot guarantee SemVer compliance by accepting any branch name. So this is the safe option.
-  OPENSHOCK_FW_VERSION: ${{ (startsWith(github.ref, 'refs/tags/') && github.ref_name) || (contains(fromJSON('["master","develop"]'), github.ref_name) && format('0.0.0-{0}', github.ref_name)) || '0.0.0-unknown' }}
+  #   - Since this is a tag push, we can use ref_name to get the tag name.
+  OPENSHOCK_FW_VERSION: ${{ github.ref_name }}
   OPENSHOCK_FW_COMMIT: ${{ github.sha }}
 
 jobs:
