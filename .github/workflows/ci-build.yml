@@ -40,30 +40,12 @@ jobs:
       - uses: actions/checkout@v4
         with:
           sparse-checkout: |
-            WebUI
+            .github
           path: .
 
-      - uses: actions/setup-node@v3
+      - uses: ./.github/actions/build-captive-portal
         with:
           node-version: ${{ env.NODE_VERSION }}
-          cache: 'npm'
-          cache-dependency-path: ./WebUI/package-lock.json
-
-      - name: Install dependencies
-        working-directory: ./WebUI
-        run: npm ci
-
-      - name: Build
-        working-directory: ./WebUI
-        run: npm run build
-
-      - name: Upload artifacts
-        uses: actions/upload-artifact@v3
-        with:
-          name: captive-portal
-          path: WebUI/build/*
-          retention-days: 1
-          if-no-files-found: error
 
   build-filesystem:
     runs-on: ubuntu-latest
@@ -71,40 +53,9 @@ jobs:
 
     steps:
       - uses: actions/checkout@v4
-      - uses: ./.github/actions/build-fs
-
-      # - uses: actions/cache@v3
-      #   with:
-      #     path: |
-      #       ~/.platformio/platforms
-      #       ~/.platformio/packages
-      #       ~/.platformio/.cache
-      #     key: pio-${{ runner.os }}-${{ hashFiles('platformio.ini', 'requirements.txt') }}
-
-      # - uses: actions/setup-python@v4
-      #   with:
-      #     python-version: ${{ env.PYTHON_VERSION }}
-      #     cache: "pip"
-
-      # - name: Install dependencies
-      #   run: pip install -r requirements.txt
-
-      # - name: Download built captive portal
-      #   uses: actions/download-artifact@v3
-      #   with:
-      #     name: captive-portal
-      #     path: WebUI/build/
-
-      # - name: Build filesystem
-      #   run: pio run --target buildfs -e fs
-
-      # - name: Upload internal filesystem artifact
-      #   uses: actions/upload-artifact@v3
-      #   with:
-      #     name: filesystem
-      #     path: .pio/build/fs/littlefs.bin
-      #     retention-days: 1
-      #     if-no-files-found: error
+      - uses: ./.github/actions/build-filesystem
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
 
   build-firmware:
     runs-on: ubuntu-latest

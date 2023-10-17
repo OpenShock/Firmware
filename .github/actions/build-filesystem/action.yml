@@ -1,6 +1,10 @@
 
 name: build-filesystem
-description: Builds the filesystem
+description: Builds the filesystem.
+inputs:
+  python-version:
+    description: 'Python version to use'
+    required: true
 
 runs:
   using: composite
@@ -17,7 +21,7 @@ runs:
 
     - uses: actions/setup-python@v4
       with:
-        python-version: ${{ env.PYTHON_VERSION }}
+        python-version: ${{ inputs.python-version }}
         cache: "pip"
 
     - name: Install dependencies
