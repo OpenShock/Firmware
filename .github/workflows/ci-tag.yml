@@ -107,7 +107,7 @@ jobs:
       - name: Release
         uses: ncipollo/release-action@v1
         with:
-          artifacts: ./**/OpenShock_*.bin\
+          artifacts: '**/OpenShock_*.bin'
           tag: ${{ github.ref_name }}
           prerelease: ${{ contains(github.ref_name, '-') }}
           artifactErrorsFailBuild: true
