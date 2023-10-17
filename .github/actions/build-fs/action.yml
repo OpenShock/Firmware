@@ -21,6 +21,7 @@ runs:
         cache: "pip"
 
     - name: Install dependencies
+      shell: bash
       run: pip install -r requirements.txt
 
     - name: Download built captive portal
@@ -30,6 +31,7 @@ runs:
         path: WebUI/build/
 
     - name: Build filesystem
+      shell: bash
       run: pio run --target buildfs -e fs
 
     - name: Upload internal filesystem artifact
