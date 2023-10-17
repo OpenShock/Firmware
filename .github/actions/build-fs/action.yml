@@ -1,0 +1,41 @@
+
+name: build-filesystem
+description: Builds the filesystem
+
+runs:
+  using: composite
+  steps:
+    - uses: actions/checkout@v4
+
+    - uses: actions/cache@v3
+      with:
+        path: |
+          ~/.platformio/platforms
+          ~/.platformio/packages
+          ~/.platformio/.cache
+        key: pio-${{ runner.os }}-${{ hashFiles('platformio.ini', 'requirements.txt') }}
+
+    - uses: actions/setup-python@v4
+      with:
+        python-version: ${{ env.PYTHON_VERSION }}
+        cache: "pip"
+
+    - name: Install dependencies
+      run: pip install -r requirements.txt
+
+    - name: Download built captive portal
+      uses: actions/download-artifact@v3
+      with:
+        name: captive-portal
+        path: WebUI/build/
+
+    - name: Build filesystem
+      run: pio run --target buildfs -e fs
+
+    - name: Upload internal filesystem artifact
+      uses: actions/upload-artifact@v3
+      with:
+        name: filesystem
+        path: .pio/build/fs/littlefs.bin
+        retention-days: 1
+        if-no-files-found: error
