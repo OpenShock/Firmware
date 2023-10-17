@@ -1,9 +1,12 @@
+
 name: build-captive-portal
 description: Builds the captive portal
 inputs:
   node-version:
     description: 'NodeJS runtime version to use'
     required: true
+  skip-checkout:
+    description: 'If true, skips checkout'
 
 runs:
   using: composite

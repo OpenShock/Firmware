@@ -41,6 +41,7 @@ jobs:
         with:
           sparse-checkout: |
             .github
+            WebUI
 
       - uses: ./.github/actions/build-captive-portal
         with:
