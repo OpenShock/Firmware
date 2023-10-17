@@ -111,4 +111,4 @@ jobs:
           tag: ${{ github.ref_name }}
           prerelease: ${{ contains(github.ref_name, '-') }}
           artifactErrorsFailBuild: true
-          bodyFile: README.md
+          bodyFile: RELEASE.md
