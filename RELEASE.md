@@ -1,7 +1,7 @@
 # OpenShock Firmware
 
-Download `OpenShock.[your-board-here].bin` and flash it to your microcontroller:
+Download `OpenShock_[board]_[version].bin` and flash it to your microcontroller:
 
 ```bash
-esptool write_flash 0x0 OpenShock.YOUR-BOARD-GOES-HERE.bin
+esptool write_flash 0x0 OpenShock_[board]_[version].bin
 ```

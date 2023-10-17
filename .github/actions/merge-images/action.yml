@@ -1,0 +1,57 @@
+name: merge-images
+description: Merges multiple images into a single flashable image
+inputs:
+  python-version:
+    description: 'Python version to use'
+    required: true
+  board:
+    description: 'Board name to merge images for'
+    required: true
+  skip-checkout:
+    description: 'If true, skips checkout'
+    required: false
+    default: false
+
+runs:
+  using: composite
+  steps:
+    - uses: actions/checkout@v4
+      if: ${{ !inputs.skip-checkout }}
+      with:
+        sparse-checkout: |
+          scripts
+          boards
+          chips
+
+    - uses: actions/setup-python@v4
+      with:
+        python-version: ${{ inputs.python-version }}
+        cache: "pip"
+
+    - name: Install dependencies
+      shell: bash
+      run: pip install esptool
+
+    - name: Download filesystem image
+      uses: actions/download-artifact@v3
+      with:
+        name: filesystem
+
+    - name: Download firmware images
+      uses: actions/download-artifact@v3
+      with:
+        name: firmware_${{ inputs.board }}
+
+    - name: Merge flash image
+      shell: bash
+      run: |
+        python scripts/merge_image.py ${{ inputs.board }} &&
+          mv merged.bin OpenShock_${{ inputs.board }}_${{ !contains(github.ref_name, '/') && github.ref_name || 'unknown' }}.bin
+
+    - name: Upload merged flashable image
+      uses: actions/upload-artifact@v3
+      with:
+        name: OpenShock_${{ inputs.board }}
+        path: OpenShock_${{ inputs.board }}_*.bin
+        retention-days: 7
+        if-no-files-found: error
