@@ -2,6 +2,7 @@
 
 #include "_fbs/DeviceToServerMessage_generated.h"
 #include "MessageHandlers/Server.h"
+#include "CertificateUtils.h"
 #include "Time.h"
 
 #include <esp_log.h>
@@ -33,8 +34,24 @@ void GatewayClient::connect(const char* lcgFqdn) {
   if (m_state != State::Disconnected) {
     return;
   }
+
   m_state = State::Connecting;
+
+  //
+  //  ######  ########  ######  ##     ## ########  #### ######## ##    ##    ########  ####  ######  ##    ##
+  // ##    ## ##       ##    ## ##     ## ##     ##  ##     ##     ##  ##     ##     ##  ##  ##    ## ##   ##
+  // ##       ##       ##       ##     ## ##     ##  ##     ##      ####      ##     ##  ##  ##       ##  ##
+  //  ######  ######   ##       ##     ## ########   ##     ##       ##       ########   ##   ######  #####
+  //       ## ##       ##       ##     ## ##   ##    ##     ##       ##       ##   ##    ##        ## ##  ##
+  // ##    ## ##       ##    ## ##     ## ##    ##   ##     ##       ##       ##    ##   ##  ##    ## ##   ##
+  //  ######  ########  ######   #######  ##     ## ####    ##       ##       ##     ## ####  ######  ##    ##
+  //
+  // TODO: Implement certificate verification
+  //
+  #warning SSL certificate verification is currently not implemented, by RFC definition this is a security risk, and allows for MITM attacks, but the realistic risk is low
+
   m_webSocket.beginSSL(lcgFqdn, 443, "/1/ws/device");
+  ESP_LOGW(TAG, "WEBSOCKET CONNECTION BY RFC DEFINITION IS INSECURE, remote endpoint can not be verified due to lack of CA verification support, theoretically this is a security risk and allows for MITM attacks, but the realistic risk is low");
 }
 
 void GatewayClient::disconnect() {

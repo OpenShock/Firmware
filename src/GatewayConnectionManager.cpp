@@ -9,23 +9,32 @@
 
 #include <ArduinoJson.h>
 #include <HTTPClient.h>
-#include <WebSocketsClient.h>
-#include <WiFiClientSecure.h>
 
 #include <memory>
 #include <unordered_map>
 
+//
+//  ######  ########  ######  ##     ## ########  #### ######## ##    ##    ########  ####  ######  ##    ##
+// ##    ## ##       ##    ## ##     ## ##     ##  ##     ##     ##  ##     ##     ##  ##  ##    ## ##   ##
+// ##       ##       ##       ##     ## ##     ##  ##     ##      ####      ##     ##  ##  ##       ##  ##
+//  ######  ######   ##       ##     ## ########   ##     ##       ##       ########   ##   ######  #####
+//       ## ##       ##       ##     ## ##   ##    ##     ##       ##       ##   ##    ##        ## ##  ##
+// ##    ## ##       ##    ## ##     ## ##    ##   ##     ##       ##       ##    ##   ##  ##    ## ##   ##
+//  ######  ########  ######   #######  ##     ## ####    ##       ##       ##     ## ####  ######  ##    ##
+//
+// TODO: Fix loading CA Certificate bundles, currently fails with "[esp_crt_bundle.c:161] esp_crt_bundle_init(): Unable to allocate memory for bundle"
+// This is probably due to the fact that the bundle is too large for the ESP32's heap or the bundle is incorrectly packedy them
+//
+#warning SSL certificate verification is currently not implemented, by RFC definition this is a security risk, and allows for MITM attacks, but the realistic risk is low
+
 static const char* const TAG             = "GatewayConnectionManager";
 static const char* const AUTH_TOKEN_FILE = "/authToken";
-
-extern const std::uint8_t* const rootca_crt_bundle_start asm("_binary_data_cert_x509_crt_bundle_start");
 
 constexpr std::uint8_t FLAG_NONE          = 0;
 constexpr std::uint8_t FLAG_HAS_IP        = 1 << 0;
 constexpr std::uint8_t FLAG_AUTHENTICATED = 1 << 1;
 
 static std::uint8_t s_flags = 0;
-// static WiFiClientSecure* s_wifiClient            = nullptr;
 static std::unique_ptr<OpenShock::GatewayClient> s_wsClient = nullptr;
 
 void _evGotIPHandler(arduino_event_t* event) {
@@ -42,33 +51,6 @@ void _evWiFiDisconnectedHandler(arduino_event_t* event) {
 using namespace OpenShock;
 
 bool GatewayConnectionManager::Init() {
-  //
-  //  ######  ########  ######  ##     ## ########  #### ######## ##    ##    ########  ####  ######  ##    ##
-  // ##    ## ##       ##    ## ##     ## ##     ##  ##     ##     ##  ##     ##     ##  ##  ##    ## ##   ##
-  // ##       ##       ##       ##     ## ##     ##  ##     ##      ####      ##     ##  ##  ##       ##  ##
-  //  ######  ######   ##       ##     ## ########   ##     ##       ##       ########   ##   ######  #####
-  //       ## ##       ##       ##     ## ##   ##    ##     ##       ##       ##   ##    ##        ## ##  ##
-  // ##    ## ##       ##    ## ##     ## ##    ##   ##     ##       ##       ##    ##   ##  ##    ## ##   ##
-  //  ######  ########  ######   #######  ##     ## ####    ##       ##       ##     ## ####  ######  ##    ##
-  //
-  // WARNING: Skipping SSL Verification!
-  //
-  // Fix loading CA Certificate bundles, currently fails with "[esp_crt_bundle.c:161] esp_crt_bundle_init(): Unable to allocate memory for bundle"
-  // This is probably due to the fact that the bundle is too large for the ESP32's heap or the bundle is incorrectly packed
-  //
-  //
-  // s_wifiClient = new WiFiClientSecure();
-  // s_wifiClient->setCACertBundle(rootca_crt_bundle_start);
-  //
-  //
-  //  ######  ########  ######  ##     ## ########  #### ######## ##    ##    ########  ####  ######  ##    ##
-  // ##    ## ##       ##    ## ##     ## ##     ##  ##     ##     ##  ##     ##     ##  ##  ##    ## ##   ##
-  // ##       ##       ##       ##     ## ##     ##  ##     ##      ####      ##     ##  ##  ##       ##  ##
-  //  ######  ######   ##       ##     ## ########   ##     ##       ##       ########   ##   ######  #####
-  //       ## ##       ##       ##     ## ##   ##    ##     ##       ##       ##   ##    ##        ## ##  ##
-  // ##    ## ##       ##    ## ##     ## ##    ##   ##     ##       ##       ##    ##   ##  ##    ## ##   ##
-  //  ######  ########  ######   #######  ##     ## ####    ##       ##       ##     ## ####  ######  ##    ##
-  //
   WiFi.onEvent(_evGotIPHandler, ARDUINO_EVENT_WIFI_STA_GOT_IP);
   WiFi.onEvent(_evGotIPHandler, ARDUINO_EVENT_WIFI_STA_GOT_IP6);
   WiFi.onEvent(_evWiFiDisconnectedHandler, ARDUINO_EVENT_WIFI_STA_DISCONNECTED);
@@ -84,9 +66,9 @@ bool GatewayConnectionManager::IsConnected() {
   return s_wsClient->state() == GatewayClient::State::Connected;
 }
 
-void GetDeviceInfoFromJsonResponse(HTTPClient& http) {
+void GetDeviceInfoFromJsonResponse(HTTPClient& client) {
   ArduinoJson::DynamicJsonDocument doc(1024);  // TODO: profile the normal message size and adjust this accordingly
-  deserializeJson(doc, http.getString());
+  deserializeJson(doc, client.getString());
 
   auto data   = doc["data"];
   String id   = data["id"];
@@ -111,9 +93,9 @@ bool GatewayConnectionManager::IsPaired() {
 }
 
 // This method is here to heap usage
-std::string GetAuthTokenFromJsonResponse(HTTPClient& http) {
+std::string GetAuthTokenFromJsonResponse(HTTPClient& client) {
   ArduinoJson::DynamicJsonDocument doc(1024);  // TODO: profile the normal message size and adjust this accordingly
-  deserializeJson(doc, http.getString());
+  deserializeJson(doc, client.getString());
 
   String str = doc["data"];
 
@@ -128,23 +110,23 @@ bool GatewayConnectionManager::Pair(const char* pairCode) {
 
   ESP_LOGD(TAG, "Attempting to pair with pair code %s", pairCode);
 
-  HTTPClient http;
+  HTTPClient client;
 
   char uri[256];
   sprintf(uri, OPENSHOCK_API_URL("/1/device/pair/%s"), pairCode);
 
-  http.begin(uri);  // TODO: http.begin(*s_wifiClient, uri);
+  client.begin(uri);
 
-  int responseCode = http.GET();
+  int responseCode = client.GET();
 
   if (responseCode != 200) {
-    ESP_LOGE(TAG, "Error while getting auth token: [%d] %s", responseCode, http.getString().c_str());
+    ESP_LOGE(TAG, "Error while getting auth token: [%d] %s", responseCode, client.getString().c_str());
     return false;
   }
 
-  std::string authToken = GetAuthTokenFromJsonResponse(http);
+  std::string authToken = GetAuthTokenFromJsonResponse(client);
 
-  http.end();
+  client.end();
 
   if (authToken.empty()) {
     ESP_LOGE(TAG, "Received empty auth token");
@@ -170,12 +152,13 @@ bool FetchDeviceInfo(const std::string& authToken) {
     return false;
   }
 
-  HTTPClient http;
+  HTTPClient client;
 
-  http.begin(OPENSHOCK_API_URL("/1/device/self"));  // TODO: http.begin(*s_wifiClient, uri);
-  http.addHeader("DeviceToken", authToken.c_str());
+  client.begin(OPENSHOCK_API_URL("/1/device/self"));
 
-  int responseCode = http.GET();
+  client.addHeader("DeviceToken", authToken.c_str());
+
+  int responseCode = client.GET();
 
   if (responseCode == 401) {
     ESP_LOGD(TAG, "Auth token is invalid, clearing it");
@@ -184,13 +167,13 @@ bool FetchDeviceInfo(const std::string& authToken) {
   }
 
   if (responseCode != 200) {
-    ESP_LOGE(TAG, "Error while verifying auth token: [%d] %s", responseCode, http.getString().c_str());
+    ESP_LOGE(TAG, "Error while verifying auth token: [%d] %s", responseCode, client.getString().c_str());
     return false;
   }
 
-  GetDeviceInfoFromJsonResponse(http);
+  GetDeviceInfoFromJsonResponse(client);
 
-  http.end();
+  client.end();
 
   s_flags |= FLAG_AUTHENTICATED;
 
@@ -225,26 +208,27 @@ bool ConnectToLCG() {
 
   std::string authToken = Config::GetBackendAuthToken();
 
-  HTTPClient http;
+  HTTPClient client;
 
-  http.begin(OPENSHOCK_API_URL("/1/device/assignLCG"));  // TODO: http.begin(*s_wifiClient, uri);
-  http.addHeader("DeviceToken", authToken.c_str());
+  client.begin(OPENSHOCK_API_URL("/1/device/assignLCG"));
 
-  int responseCode = http.GET();
+  client.addHeader("DeviceToken", authToken.c_str());
+
+  int responseCode = client.GET();
 
   if (responseCode != 200) {
-    ESP_LOGE(TAG, "Error while fetching LCG endpoint: [%d] %s", responseCode, http.getString().c_str());
+    ESP_LOGE(TAG, "Error while fetching LCG endpoint: [%d] %s", responseCode, client.getString().c_str());
     return false;
   }
 
   ArduinoJson::DynamicJsonDocument doc(1024);  // TODO: profile the normal message size and adjust this accordingly
-  deserializeJson(doc, http.getString());
+  deserializeJson(doc, client.getString());
 
   auto data           = doc["data"];
   const char* fqdn    = data["fqdn"];
   const char* country = data["country"];
 
-  http.end();
+  client.end();
 
   if (fqdn == nullptr || country == nullptr) {
     ESP_LOGE(TAG, "Received invalid response from LCG endpoint");
