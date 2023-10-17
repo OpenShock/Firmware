@@ -85,40 +85,16 @@ jobs:
       - uses: actions/checkout@v4
         with:
           sparse-checkout: |
+            .github
             scripts
             boards
             chips
 
-      - uses: actions/setup-python@v4
+      - uses: ./.github/actions/merge-images
         with:
           python-version: ${{ env.PYTHON_VERSION }}
-          cache: "pip"
-
-      - name: Install dependencies
-        run: pip install esptool
-
-      - name: Download filesystem image
-        uses: actions/download-artifact@v3
-        with:
-          name: filesystem
-
-      - name: Download firmware images
-        uses: actions/download-artifact@v3
-        with:
-          name: firmware_${{ matrix.board }}
-
-      - name: Merge flash image
-        run: |
-          python scripts/merge_image.py ${{ matrix.board }} &&
-            mv merged.bin OpenShock_${{ matrix.board }}_${{ !contains(github.ref_name, '/') && github.ref_name || 'unknown' }}.bin
-
-      - name: Upload merged flashable image
-        uses: actions/upload-artifact@v3
-        with:
-          name: OpenShock_${{ matrix.board }}
-          path: OpenShock_${{ matrix.board }}_*.bin
-          retention-days: 7
-          if-no-files-found: error
+          board: ${{ matrix.board }}
+          skip-checkout: true
 
   done:
     runs-on: ubuntu-latest

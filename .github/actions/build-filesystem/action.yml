@@ -5,11 +5,16 @@ inputs:
   python-version:
     description: 'Python version to use'
     required: true
+  skip-checkout:
+    description: 'If true, skips checkout'
+    required: false
+    default: false
 
 runs:
   using: composite
   steps:
     - uses: actions/checkout@v4
+      if: ${{ !inputs.skip-checkout }}
 
     - uses: actions/cache@v3
       with:
