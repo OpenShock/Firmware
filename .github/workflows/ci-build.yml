@@ -41,7 +41,6 @@ jobs:
         with:
           sparse-checkout: |
             .github
-          path: .
 
       - uses: ./.github/actions/build-captive-portal
         with:
