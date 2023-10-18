@@ -61,11 +61,11 @@ body:
     attributes:
       label: Status LED checks
       options:
-        - 'Board uses GPIO LED'
-        - 'Board uses WS2812B LED'
-        - 'Board uses neither'
-        - '[GPIO Only] Status LED lights up at all'
-        - '[WS2815B Only] Nothing happens'
+        - label: 'Board uses GPIO LED'
+        - label: 'Board uses WS2812B LED'
+        - label: 'Board uses neither'
+        - label: '[GPIO Only] Status LED lights up at all'
+        - label: '[WS2815B Only] Nothing happens'
 
   - type: checkboxes
     id: wifi-checks
