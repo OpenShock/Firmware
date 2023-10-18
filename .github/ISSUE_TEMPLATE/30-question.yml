@@ -1,5 +1,5 @@
 name: 'Question'
-description: "Is there a feature you'd really like to see? Request it here."
+description: "Can't figure something out? Feel free to ask."
 title: '[Question] '
 labels: ['type: question']
 projects: ['OpenShock/3']
@@ -15,7 +15,6 @@ body:
     id: question
     attributes:
       label: 'Ask your question!'
-      description: "Don't hold back."
       placeholder: |
         How do I..?
         Is it possible to..?
