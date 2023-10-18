@@ -64,7 +64,12 @@ bool RFTransmitter::SendCommand(ShockerModelType model, std::uint16_t shockerId,
   // Intensity must be between 0 and 99
   intensity = std::min(intensity, (std::uint8_t)99);
 
-  command_t* cmd = new command_t {OpenShock::millis() + durationMs, Rmt::GetSequence(model, shockerId, type, intensity), Rmt::GetZeroSequence(model, shockerId), shockerId};
+  command_t* cmd = new command_t {
+    .until = OpenShock::millis() + durationMs,
+    .sequence = Rmt::GetSequence(model, shockerId, type, intensity),
+    .zeroSequence = Rmt::GetZeroSequence(model, shockerId),
+    .shockerId = shockerId
+  };
 
   // Add the command to the queue, wait max 10 ms (Adjust this)
   if (xQueueSend(m_queueHandle, &cmd, 10 / portTICK_PERIOD_MS) != pdTRUE) {
@@ -126,13 +131,11 @@ void RFTransmitter::TransmitTask(void* arg) {
       }
     }
 
-    std::int64_t mil = OpenShock::millis();
-
     // Send queued commands
     for (auto it = commands.begin(); it != commands.end();) {
       cmd = *it;
 
-      bool expired = cmd->until < mil;
+      bool expired = cmd->until < OpenShock::millis();
       bool empty   = cmd->sequence.size() <= 0;
 
       // Remove expired or empty commands, else send the command.
