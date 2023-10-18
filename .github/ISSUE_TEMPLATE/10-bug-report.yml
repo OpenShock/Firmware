@@ -51,7 +51,7 @@ body:
   - type: markdown
     attributes:
       value: |
-        # What did you expect to happen instead?
+        # What did you expect to happen?
 
   - type: textarea
     id: what-did-you-expect
@@ -63,21 +63,40 @@ body:
   - type: markdown
     attributes:
       value: |
-        # How to reproduce the problem?
-    validations:
-      required: true
+        # Steps to reproduce
 
   - type: textarea
     id: how-to-reproduce
     attributes:
       label: 'In as much detail as possible, describe the exact steps you took to make the problem appear.'
       description: |
-        If we can't reproduce the problem, we have no way of figuring out what's going on behind the scenes.
-        Make sure to be as precise as you can!
+        If we can't reproduce the problem, we won't be able to figure out how to fix it either!
+        Make sure to be as precise as you can.
       placeholder: |
         1. Turn on the board
         2. Go to captive portal
         3. Click a WiFi network
         4. The world catches fire!
+    validations:
+      required: true
+
+  - type: markdown
+    attributes:
+      value: |
+        # Anything else?
+
+  - type: textarea
+    id: anything-else
+    attributes:
+      label: 'Feel free to share.'
+      description: |
+        If we can't reproduce the problem, we have no way of figuring out what's going on behind the scenes.
+        Make sure to be as precise as you can!
+      placeholder: |
+        For example:
+        1. Connect to the boards' wifi network
+        2. Visit `http://10.10.10.10/`
+        3. Click a WiFi network
+        4. Nothing happens!
     validations:
       required: true
