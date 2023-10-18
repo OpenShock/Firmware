@@ -22,7 +22,7 @@ body:
   - type: input
     id: firmware-version
     attributes:
-      label: '# Firmware version'
+      label: 'Firmware version'
       description: Which firmware version did you flash?
       placeholder: 'E.g.: 1.0.0-rc.4, 1.2.4, 0.0.0-develop, ..'
     validations:
@@ -41,6 +41,10 @@ body:
       value: |
         # Checks
 
+        ## Core functions
+
+        ### Prerequisites
+
   - type: checkboxes
     id: basic-checks
     attributes:
@@ -49,6 +53,11 @@ body:
       options:
         - label: Image can be flashed to board
         - label: Board outputs logging statements over serial
+
+  - type: markdown
+    attributes:
+      value: |
+        ### Serial functions
 
   - type: checkboxes
     id: serial-checks
@@ -61,6 +70,24 @@ body:
         - label: '`version` prints correct version'
         - label: '`restart` restarts the board correctly'
 
+  - type: markdown
+    attributes:
+      value: |
+        ### LED checks
+
+  - type: dropdown
+    id: led-type
+    attributes:
+      label: LED Type
+      description: What LED type is available on this board?
+      options:
+        - 'None'
+        - 'GPIO-based'
+        - 'WS2812B-based'
+      default: 0
+    validations:
+      required: true
+
   - type: checkboxes
     id: led-checks
     attributes:
@@ -71,6 +98,11 @@ body:
         - label: 'Board uses neither'
         - label: '[GPIO Only] Status LED lights up at all'
         - label: '[WS2815B Only] Nothing happens'
+
+  - type: markdown
+    attributes:
+      value: |
+        ## WiFi checks
 
   - type: checkboxes
     id: wifi-checks
@@ -85,6 +117,11 @@ body:
         - label: 'Connection attempt is made when connect modal is submitted'
         - label: 'Connection succeeds when correct credentials are used (verify using serial monitor)'
 
+  - type: markdown
+    attributes:
+      value: |
+        ## Gateway checks
+
   - type: checkboxes
     id: gateway-checks
     attributes:
@@ -92,6 +129,11 @@ body:
       options:
         - label: 'Can use pairing code to connect board to gateway server'
         - label: 'Shows up as online on server board list (depends on API, LiveControlGateway and WebUI)'
+
+  - type: markdown
+    attributes:
+      value: |
+        ## Radio checks
 
   - type: dropdown
     id: radio-type
@@ -112,10 +154,15 @@ body:
       options:
         - label: 'Can '
 
+  - type: markdown
+    attributes:
+      value: |
+        # Anything else?
+
   - type: textarea
     id: findings
     attributes:
-      label: 'Findings'
+      label: 'Put all your findings here.'
       description: 'You can put any findings you have here.'
     validations:
       required: false
