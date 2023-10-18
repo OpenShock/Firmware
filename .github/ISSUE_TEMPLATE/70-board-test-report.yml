@@ -24,7 +24,7 @@ body:
     attributes:
       label: 'Firmware version'
       description: Which firmware version did you flash?
-      placeholder: 'E.g.: 1.0.0-rc.4, 1.2.4, 0.0.0-develop, ..'
+      placeholder: 'E.g.: 1.2.4, 1.0.0-rc.4, 0.0.0-develop, ..'
     validations:
       required: true
 
@@ -39,15 +39,12 @@ body:
   - type: markdown
     attributes:
       value: |
-        # Checks
-
-        ## Prerequisites
+        # Basic checks
 
   - type: checkboxes
     id: basic-checks
     attributes:
       label: Basic functions
-      # description: Basic functions
       options:
         - label: Image can be flashed to board
         - label: Board starts after firmware is flashed and board is power-cycled/reset
@@ -55,13 +52,12 @@ body:
   - type: markdown
     attributes:
       value: |
-        ## Serial functions
+        # Serial checks
 
   - type: checkboxes
     id: serial-checks
     attributes:
       label: Serial checks
-      # description: Basic checks
       options:
         - label: 'Board outputs _any_ serial output'
         - label: 'Board accepts _any_ serial input (`help` or `version` suffices)'
@@ -71,7 +67,7 @@ body:
   - type: markdown
     attributes:
       value: |
-        ## LED checks
+        # LED checks
 
   - type: dropdown
     id: led-type
@@ -91,13 +87,13 @@ body:
     attributes:
       label: LED checks
       options:
-        - label: 'GPIO Only -- Status LED lights up at all'
-        - label: 'WS2815B Only -- Nothing happens'
+        - label: '[GPIO Only] Status LED lights up at all'
+        - label: '[WS2815B Only] Nothing happens'
 
   - type: markdown
     attributes:
       value: |
-        ## WiFi checks
+        # WiFi checks
 
   - type: checkboxes
     id: wifi-ap-checks
@@ -122,7 +118,7 @@ body:
   - type: markdown
     attributes:
       value: |
-        ## Gateway
+        # Gateway checks
 
   - type: checkboxes
     id: gateway-checks
@@ -135,7 +131,7 @@ body:
   - type: markdown
     attributes:
       value: |
-        ## Radio checks
+        # Radio checks
 
   - type: dropdown
     id: radio-type
@@ -154,17 +150,21 @@ body:
     attributes:
       label: 'Radio checks'
       options:
-        - label: 'Can '
+        - label: 'Can send beep command'
+        - label: 'Can send vibrate command'
+        - label: 'Can send shock command'
+        - label: 'Sent commands have the correct intensity'
+        - label: 'Sent commands have the correct duration'
 
   - type: markdown
     attributes:
       value: |
-        # Anything else?
+        # Findings
 
   - type: textarea
     id: findings
     attributes:
-      label: 'Put any remaining findings here.'
+      label: 'Put your findings here.'
       description: "Even if you weren't looking for them!"
     validations:
       required: false
