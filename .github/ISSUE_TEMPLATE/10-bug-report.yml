@@ -1,6 +1,6 @@
 name: 'Report a bug'
 description: "Something isn't working as expected."
-title: ' '
+title: '[Bug] '
 labels: ['type: bug', 'status: triage']
 projects: ['OpenShock/3']
 

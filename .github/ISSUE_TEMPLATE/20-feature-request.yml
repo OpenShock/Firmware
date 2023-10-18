@@ -1,6 +1,6 @@
 name: 'Request a feature'
 description: "Is there a feature you'd really like to see? Request it here."
-title: ' '
+title: '[Feature] '
 labels: ['type: enhancement']
 projects: ['OpenShock/3']
 
