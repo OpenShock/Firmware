@@ -16,16 +16,16 @@ body:
     attributes:
       label: Pre-submission checklist
       description: |
-        To prevent wasting time, please fill out the below checklist before continuing.
+        To prevent wasting your or our time, please fill out the below checklist before continuing.
         Thanks for understanding!
       options:
-        - label: 'I checked that no other bug report describing my problem exists.'
+        - label: 'I checked that no other issue describing my problem exists.'
           required: true
-        - label: 'I am running the latest stable (or prerelease) firmware.'
+        - label: 'I am running the latest stable or prerelease firmware.'
           required: true
         - label: 'My board is on the [list of maintained boards](https://wiki.openshock.org/hardware/boards/#fully-maintained).'
           required: true
-        - label: 'I understand and accept that my issue may be closed without notice if any of the above are found to be untrue.'
+        - label: 'I accept that this issue may be closed if any of the above are found to be untrue.'
           required: true
 
   - type: markdown
@@ -48,6 +48,19 @@ body:
       label: 'Firmware version'
       description: Which firmware version did you flash?
       placeholder: 'E.g.: 1.2.4, 1.0.0-rc.4, 0.0.0-develop, ..'
+    validations:
+      required: true
+
+  - type: textarea
+    id: flashing-method
+    attributes:
+      label: 'Flashing method'
+      description: Briefly describe how you flashed your firmware.
+      placeholder: |
+        Examples:
+        - I used the web flash tool.
+        - I used a different tool, namely: ...
+        - I ran this command: ...
     validations:
       required: true
 
@@ -89,10 +102,10 @@ body:
         Make sure to be as precise as you can.
       placeholder: |
         For example:
-        1. Connect to the boards' wifi network
+        1. Connect to the OpenShock wifi network
         2. Visit `http://10.10.10.10/`
         3. Click a WiFi network
-        4. Nothing happens!
+        4. Everything explodes!
     validations:
       required: true
 

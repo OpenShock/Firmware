@@ -16,14 +16,14 @@ body:
     attributes:
       label: Pre-submission checklist
       description: |
-        To prevent wasting time, please fill out the below checklist before continuing.
+        To prevent wasting your or our time, please fill out the below checklist before continuing.
         Thanks for understanding!
       options:
-        - label: 'I checked that no other feature request describing my problem exists.'
+        - label: 'I checked that no other feature request describing my wish exists.'
           required: true
-        - label: 'I checked that this feature is in fact indeed not supported.'
+        - label: 'I checked that this feature is, in fact, not supported.'
           required: true
-        - label: 'I understand and accept that my issue may be closed if any of the above are found to be untrue.'
+        - label: 'I accept that this issue may be closed if any of the above are found to be untrue.'
           required: true
 
   - type: markdown
