@@ -122,7 +122,7 @@ body:
   - type: markdown
     attributes:
       value: |
-        ## Gateway checks
+        ## Gateway
 
   - type: checkboxes
     id: gateway-checks
@@ -165,6 +165,6 @@ body:
     id: findings
     attributes:
       label: 'Put any remaining findings here.'
-      description: 'Even if you weren't looking for them!'
+      description: "Even if you weren't looking for them!"
     validations:
       required: false
