@@ -1,4 +1,4 @@
-name: 'Request a feature'
+name: 'Feature Request'
 description: "Is there a feature you'd really like to see? Request it here."
 title: '[Feature] '
 labels: ['type: enhancement']

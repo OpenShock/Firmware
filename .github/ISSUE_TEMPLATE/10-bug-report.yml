@@ -1,4 +1,4 @@
-name: 'Report a bug'
+name: 'Bug Report'
 description: "Something isn't working as expected."
 title: '[Bug] '
 labels: ['type: bug', 'status: triage']
