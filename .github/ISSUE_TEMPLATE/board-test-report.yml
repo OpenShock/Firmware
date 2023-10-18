@@ -1,6 +1,6 @@
 name: '[Testing] Board test report'
 description: Submit a test report for the latest release candidate on a specific board.
-title: '[Test Report] '
+title: '[Testing] Board test report: '
 labels: ['type: board-test-report']
 projects: ['OpenShock/3']
 
@@ -15,7 +15,7 @@ body:
     attributes:
       label: Board
       description: What board are you using?
-      placeholder: 'E.g. "Wemos Lolin S3", "Pishock 2023", ..'
+      placeholder: 'E.g.: "Wemos Lolin S3", "Pishock 2023", ..'
     validations:
       required: True
 
@@ -102,7 +102,8 @@ body:
   - type: checkboxes
     id: wifi-ap-checks
     attributes:
-      label: Access Point checks
+      label: Access point
+      description: Whether the board acts as an access point correctly.
       options:
         - label: 'WiFi network appears (named `OpenShock-XX:XX:XX:XX:XX:XX`)'
         - label: 'WiFi network can be connected to'
@@ -111,8 +112,8 @@ body:
   - type: checkboxes
     id: wifi-client-checks
     attributes:
-      label: Client checks
-      description: Requires that the captive portal works.
+      label: Client
+      description: If the captive portal does not work, leave all unchecked.
       options:
         - label: 'Captive portal works (prerequisite)'
         - label: 'Connection attempt is made when connect modal is submitted'
@@ -163,7 +164,7 @@ body:
   - type: textarea
     id: findings
     attributes:
-      label: 'Put all your findings here.'
-      description: 'You can put any findings you have here.'
+      label: 'Put any remaining findings here.'
+      description: 'Even if you weren't looking for them!'
     validations:
       required: false
