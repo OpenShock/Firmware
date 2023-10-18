@@ -81,7 +81,7 @@ body:
       label: LED Type
       description: What LED type is available on this board?
       options:
-        - 'None'
+        - 'No LED'
         - 'GPIO-based'
         - 'WS2812B-based'
       default: 0
