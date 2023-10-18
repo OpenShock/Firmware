@@ -51,8 +51,8 @@ body:
       label: Serial checks
       # description: Basic checks
       options:
-        - label: Board outputs _any_ serial output
-        - label: Board accepts _any_ serial input (`help` or `version` suffices)
+        - label: 'Board outputs _any_ serial output'
+        - label: 'Board accepts _any_ serial input (`help` or `version` suffices)'
         - label: '`version` prints correct version'
         - label: '`restart` restarts the board correctly'
 
