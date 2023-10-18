@@ -1,4 +1,4 @@
-name: '[Testers] Submit board test results'
+name: '[Testing] Submit board test results'
 description: 'Submit test results for the latest release candidate on a specific board or configuration.'
 title: '[Testing] Board test report: '
 labels: ['type: board-test-report']
