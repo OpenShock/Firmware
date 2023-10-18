@@ -50,7 +50,7 @@ body:
       # description: Basic functions
       options:
         - label: Image can be flashed to board
-        - label: Board outputs logging statements over serial
+        - label: Board starts after firmware is flashed and board is power-cycled/reset
 
   - type: markdown
     attributes:
