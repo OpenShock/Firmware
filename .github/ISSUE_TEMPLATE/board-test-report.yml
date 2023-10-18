@@ -8,7 +8,7 @@ body:
   - type: markdown
     attributes:
       value: |
-        Thank you for helping us test! Let's get started :^)
+        # Board & Firmware
 
   - type: input
     id: board
@@ -22,7 +22,7 @@ body:
   - type: input
     id: firmware-version
     attributes:
-      label: Firmware version
+      label: '# Firmware version'
       description: Which firmware version did you flash?
       placeholder: 'E.g.: 1.0.0-rc.4, 1.2.4, 0.0.0-develop, ..'
     validations:
@@ -35,6 +35,11 @@ body:
       description: 'Enter the "Commit" field output from the "version" serial command'
     validations:
       required: false
+
+  - type: markdown
+    attributes:
+      value: |
+        # Checks
 
   - type: checkboxes
     id: basic-checks
