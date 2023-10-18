@@ -1,5 +1,5 @@
-name: '[Testing] Submit board test results'
-description: 'Submit test results for the latest release candidate on a specific board or configuration.'
+name: '[Testing] Submit board test report'
+description: 'Submit test results for the latest release candidate running on a specific board.'
 title: '[Testing] Board test report: '
 labels: ['type: board-test-report']
 projects: ['OpenShock/3']
