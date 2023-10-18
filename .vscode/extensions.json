@@ -13,6 +13,5 @@
     "platformio.platformio-ide",
     "svelte.svelte-vscode",
     "xaver.clang-format"
-  ],
-  "unwantedRecommendations": ["ms-vscode.cpptools-extension-pack"]
+  ]
 }
