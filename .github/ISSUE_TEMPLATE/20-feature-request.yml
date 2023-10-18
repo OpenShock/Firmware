@@ -1,6 +1,6 @@
-name: 'Feature request'
-description: "You want a feature that doesn't exist yet."
-title: '[Feature] '
+name: 'Request a feature'
+description: "Is there a feature you'd really like to see? Request it here."
+title: ' '
 labels: ['type: enhancement']
 projects: ['OpenShock/3']
 

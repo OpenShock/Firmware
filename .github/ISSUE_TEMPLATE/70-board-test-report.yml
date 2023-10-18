@@ -1,5 +1,5 @@
-name: 'Board test report'
-description: Submit a test report for the latest release candidate on a specific board.
+name: 'Submit a board test report'
+description: 'Submit test results for the latest release candidate on a specific board or configuration.'
 title: '[Testing] Board test report: '
 labels: ['type: board-test-report']
 projects: ['OpenShock/3']
@@ -159,12 +159,12 @@ body:
   - type: markdown
     attributes:
       value: |
-        # Findings
+        # Anything else?
 
   - type: textarea
-    id: findings
+    id: comments
     attributes:
-      label: 'Put your findings here.'
-      description: "Even if you weren't looking for them!"
+      label: 'Let us know!'
+      description: "If you found something that wasn't on the checklist, let us know here."
     validations:
       required: false
