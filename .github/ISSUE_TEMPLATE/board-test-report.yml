@@ -41,9 +41,7 @@ body:
       value: |
         # Checks
 
-        ## Core functions
-
-        ### Prerequisites
+        ## Prerequisites
 
   - type: checkboxes
     id: basic-checks
@@ -57,7 +55,7 @@ body:
   - type: markdown
     attributes:
       value: |
-        ### Serial functions
+        ## Serial functions
 
   - type: checkboxes
     id: serial-checks
@@ -73,7 +71,7 @@ body:
   - type: markdown
     attributes:
       value: |
-        ### LED checks
+        ## LED checks
 
   - type: dropdown
     id: led-type
