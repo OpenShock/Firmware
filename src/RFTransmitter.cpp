@@ -11,7 +11,7 @@
 #include <limits>
 
 struct command_t {
-  std::uint64_t until;
+  std::int64_t until;
   std::vector<rmt_data_t> sequence;
   std::shared_ptr<std::vector<rmt_data_t>> zeroSequence;
   std::uint16_t shockerId;
@@ -64,7 +64,7 @@ bool RFTransmitter::SendCommand(ShockerModelType model, std::uint16_t shockerId,
   // Intensity must be between 0 and 99
   intensity = std::min(intensity, (std::uint8_t)99);
 
-  command_t* cmd = new command_t {OpenShock::Millis() + durationMs, Rmt::GetSequence(model, shockerId, type, intensity), Rmt::GetZeroSequence(model, shockerId), shockerId};
+  command_t* cmd = new command_t {OpenShock::millis() + durationMs, Rmt::GetSequence(model, shockerId, type, intensity), Rmt::GetZeroSequence(model, shockerId), shockerId};
 
   // Add the command to the queue, wait max 10 ms (Adjust this)
   if (xQueueSend(m_queueHandle, &cmd, 10 / portTICK_PERIOD_MS) != pdTRUE) {
@@ -126,7 +126,7 @@ void RFTransmitter::TransmitTask(void* arg) {
       }
     }
 
-    std::uint64_t mil = OpenShock::Millis();
+    std::int64_t mil = OpenShock::millis();
 
     // Send queued commands
     for (auto it = commands.begin(); it != commands.end();) {
