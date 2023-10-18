@@ -22,6 +22,8 @@ CaptivePortalInstance::CaptivePortalInstance() : m_webServer(HTTP_PORT), m_socke
   m_socketServer.begin();
   m_socketServer.enableHeartbeat(WEBSOCKET_PING_INTERVAL, WEBSOCKET_PING_TIMEOUT, WEBSOCKET_PING_RETRIES);
 
+  m_socketServer.serveStatic("/", LittleFS, "/www/").setDefaultFile("index.html");
+
   m_webServer.onNotFound([](AsyncWebServerRequest* request) { request->send(404, "text/plain", "Not found"); });
   m_webServer.begin();
 }
