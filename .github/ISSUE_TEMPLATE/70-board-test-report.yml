@@ -1,0 +1,170 @@
+name: '[Testing] Submit board test report'
+description: 'Submit test results for the latest release candidate running on a specific board.'
+title: '[Testing] Board test report: '
+labels: ['type: board-test-report']
+projects: ['OpenShock/3']
+
+body:
+  - type: markdown
+    attributes:
+      value: |
+        # Board & Firmware
+
+  - type: input
+    id: board
+    attributes:
+      label: Board
+      description: What board are you using?
+      placeholder: 'E.g.: Wemos Lolin S3, Pishock 2023, ..'
+    validations:
+      required: True
+
+  - type: input
+    id: firmware-version
+    attributes:
+      label: 'Firmware version'
+      description: Which firmware version did you flash?
+      placeholder: 'E.g.: 1.2.4, 1.0.0-rc.4, 0.0.0-develop, ..'
+    validations:
+      required: true
+
+  - type: input
+    id: firmware-commit
+    attributes:
+      label: Firmware commit
+      description: 'Enter the `Commit` field output from the `version` serial command.'
+    validations:
+      required: false
+
+  - type: markdown
+    attributes:
+      value: |
+        # Basic checks
+
+  - type: checkboxes
+    id: basic-checks
+    attributes:
+      label: Basic functions
+      options:
+        - label: Image can be flashed to board
+        - label: Board starts after firmware is flashed and board is power-cycled/reset
+
+  - type: markdown
+    attributes:
+      value: |
+        # Serial checks
+
+  - type: checkboxes
+    id: serial-checks
+    attributes:
+      label: Serial checks
+      options:
+        - label: 'Board outputs _any_ serial output'
+        - label: 'Board accepts _any_ serial input (`help` or `version` suffices)'
+        - label: '`version` prints correct version'
+        - label: '`restart` restarts the board correctly'
+
+  - type: markdown
+    attributes:
+      value: |
+        # LED checks
+
+  - type: dropdown
+    id: led-type
+    attributes:
+      label: LED Type
+      description: What LED type is available on this board?
+      options:
+        - 'No LED'
+        - 'GPIO-based'
+        - 'WS2812B-based'
+      default: 0
+    validations:
+      required: true
+
+  - type: checkboxes
+    id: led-checks
+    attributes:
+      label: LED checks
+      options:
+        - label: '[GPIO Only] Status LED lights up at all'
+        - label: '[WS2815B Only] Nothing happens'
+
+  - type: markdown
+    attributes:
+      value: |
+        # WiFi checks
+
+  - type: checkboxes
+    id: wifi-ap-checks
+    attributes:
+      label: Access point
+      description: Whether the board acts as an access point correctly.
+      options:
+        - label: 'WiFi network appears (named `OpenShock-XX:XX:XX:XX:XX:XX`)'
+        - label: 'WiFi network can be connected to'
+        - label: 'Visiting `http://10.10.10.10/` while connected returns _any_ web page (blank or partial = OK!)'
+
+  - type: checkboxes
+    id: wifi-client-checks
+    attributes:
+      label: Client
+      description: If the captive portal does not work, leave all unchecked.
+      options:
+        - label: 'Captive portal works (prerequisite)'
+        - label: 'Connection attempt is made when connect modal is submitted'
+        - label: 'Connection succeeds when correct credentials are used (verify using serial monitor)'
+
+  - type: markdown
+    attributes:
+      value: |
+        # Gateway checks
+
+  - type: checkboxes
+    id: gateway-checks
+    attributes:
+      label: 'Gateway checks'
+      options:
+        - label: 'Can use pairing code to connect board to gateway server'
+        - label: 'Shows up as online on server board list (depends on API, LiveControlGateway and WebUI)'
+
+  - type: markdown
+    attributes:
+      value: |
+        # Radio checks
+
+  - type: dropdown
+    id: radio-type
+    attributes:
+      label: Radio installed?
+      description: Do you have a 433MHz radio connected to the board?
+      options:
+        - 'Yes'
+        - 'No'
+      default: 1
+    validations:
+      required: true
+
+  - type: checkboxes
+    id: radio-checks
+    attributes:
+      label: 'Radio checks'
+      options:
+        - label: 'Can send beep command'
+        - label: 'Can send vibrate command'
+        - label: 'Can send shock command'
+        - label: 'Sent commands have the correct intensity'
+        - label: 'Sent commands have the correct duration'
+
+  - type: markdown
+    attributes:
+      value: |
+        # Anything else?
+
+  - type: textarea
+    id: comments
+    attributes:
+      label: 'Let us know!'
+      description: "If you found something that wasn't on the checklist, let us know here."
+    validations:
+      required: false

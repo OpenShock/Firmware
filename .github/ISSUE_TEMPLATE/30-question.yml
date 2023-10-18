@@ -1,0 +1,23 @@
+name: 'Question'
+description: "Can't figure something out? Feel free to ask."
+title: '[Question] '
+labels: ['type: question']
+projects: ['OpenShock/3']
+
+body:
+
+  - type: markdown
+    attributes:
+      value: |
+        # Question
+
+  - type: textarea
+    id: question
+    attributes:
+      label: 'Ask your question!'
+      placeholder: |
+        How do I..?
+        Is it possible to..?
+        Are you planning to..?
+    validations:
+      required: true
