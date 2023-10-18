@@ -1,4 +1,4 @@
-name: '[Testing] Board test report'
+name: 'Board test report'
 description: Submit a test report for the latest release candidate on a specific board.
 title: '[Testing] Board test report: '
 labels: ['type: board-test-report']
@@ -32,7 +32,7 @@ body:
     id: firmware-commit
     attributes:
       label: Firmware commit
-      description: 'Enter the "Commit" field output from the "version" serial command'
+      description: 'Enter the `Commit` field output from the `version` serial command.'
     validations:
       required: false
 

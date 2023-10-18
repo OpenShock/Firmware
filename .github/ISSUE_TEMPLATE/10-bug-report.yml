@@ -1,10 +1,33 @@
 name: 'Bug report'
-description: "Something isn't working as intended."
+description: "Something isn't working as expected."
 title: '[Bug] '
 labels: ['type: bug', 'status: triage']
 projects: ['OpenShock/3']
 
 body:
+
+  - type: markdown
+    attributes:
+      value: |
+        # Checklist
+
+  - type: checkboxes
+    id: checklist
+    attributes:
+      label: Pre-submission checklist
+      description: |
+        To prevent wasting time, please fill out the below checklist before continuing.
+        Thanks for understanding!
+      options:
+        - label: 'I checked that no other bug report describing my problem exists.'
+          required: true
+        - label: 'I am running the latest stable (or prerelease) firmware.'
+          required: true
+        - label: 'My board is on the [list of maintained boards](https://wiki.openshock.org/hardware/boards/#fully-maintained).'
+          required: true
+        - label: 'I understand and accept that my issue may be closed without notice if any of the above are found to be untrue.'
+          required: true
+
   - type: markdown
     attributes:
       value: |
@@ -27,14 +50,6 @@ body:
       placeholder: 'E.g.: 1.2.4, 1.0.0-rc.4, 0.0.0-develop, ..'
     validations:
       required: true
-
-  - type: input
-    id: firmware-commit
-    attributes:
-      label: Firmware commit
-      description: 'Enter the "Commit" field output from the "version" serial command'
-    validations:
-      required: false
 
   - type: markdown
     attributes:
@@ -89,6 +104,6 @@ body:
   - type: textarea
     id: anything-else
     attributes:
-      label: 'Feel free to share.'
+      label: 'Other remarks'
     validations:
       required: false

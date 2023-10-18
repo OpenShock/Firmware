@@ -1,0 +1,51 @@
+name: 'Feature request'
+description: "You want a feature that doesn't exist yet."
+title: '[Feature] '
+labels: ['type: enhancement']
+projects: ['OpenShock/3']
+
+body:
+
+  - type: markdown
+    attributes:
+      value: |
+        # Checklist
+
+  - type: checkboxes
+    id: checklist
+    attributes:
+      label: Pre-submission checklist
+      description: |
+        To prevent wasting time, please fill out the below checklist before continuing.
+        Thanks for understanding!
+      options:
+        - label: 'I checked that no other feature request describing my problem exists.'
+          required: true
+        - label: 'I checked that this feature is in fact indeed not supported.'
+          required: true
+        - label: 'I understand and accept that my issue may be closed if any of the above are found to be untrue.'
+          required: true
+
+  - type: markdown
+    attributes:
+      value: |
+        # Describe the feature
+
+  - type: textarea
+    id: feature-request
+    attributes:
+      label: 'What should be possible that currently is not?'
+    validations:
+      required: true
+
+  - type: markdown
+    attributes:
+      value: |
+        # Anything else?
+
+  - type: textarea
+    id: anything-else
+    attributes:
+      label: 'Other remarks'
+    validations:
+      required: false
