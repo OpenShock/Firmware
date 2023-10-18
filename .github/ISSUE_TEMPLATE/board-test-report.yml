@@ -1,0 +1,116 @@
+name: '[Testing] Board test report'
+description: Submit a test report for the latest release candidate on a specific board.
+title: '[Test Report] '
+labels: ['type: board-test-report']
+projects: ['OpenShock/3']
+
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thank you for helping us test! Let's get started :^)
+
+  - type: input
+    id: board
+    attributes:
+      label: Board
+      description: What board are you using?
+      placeholder: 'E.g. "Wemos Lolin S3", "Pishock 2023", ..'
+    validations:
+      required: True
+
+  - type: input
+    id: firmware-version
+    attributes:
+      label: Firmware version
+      description: Which firmware version did you flash?
+      placeholder: 'E.g.: 1.0.0-rc.4, 1.2.4, 0.0.0-develop, ..'
+    validations:
+      required: true
+
+  - type: input
+    id: firmware-commit
+    attributes:
+      label: Firmware commit
+      description: 'Enter the "Commit" field output from the "version" serial command'
+    validations:
+      required: false
+
+  - type: checkboxes
+    id: basic-checks
+    attributes:
+      label: Basic functions
+      # description: Basic functions
+      options:
+        - label: Image can be flashed to board
+        - label: Board outputs logging statements over serial
+
+  - type: checkboxes
+    id: serial-checks
+    attributes:
+      label: Serial checks
+      # description: Basic checks
+      options:
+        - label: Board outputs _any_ serial output
+        - label: Board accepts _any_ serial input (`help` or `version` suffices)
+        - label: `version` prints correct version
+        - label: `restart` restarts the board correctly
+
+  - type: checkboxes
+    id: led-checks
+    attributes:
+      label: Status LED checks
+      options:
+        - 'Board uses GPIO LED'
+        - 'Board uses WS2812B LED'
+        - 'Board uses neither'
+        - '[GPIO Only] Status LED lights up at all'
+        - '[WS2815B Only] Nothing happens'
+
+  - type: checkboxes
+    id: wifi-checks
+    attributes:
+      label: WiFi checks
+      options:
+        - label: 'WiFi network appears (named `OpenShock-XX:XX:XX:XX:XX:XX`)'
+        - label: 'WiFi network can be connected to'
+        - label: 'Visiting `http://10.10.10.10/` while connected returns _any_ web page (blank or partial = OK!)'
+        - label: 'Captive portal loads'
+        - label: 'Network list is populated after page load'
+        - label: 'Connection attempt is made when connect modal is submitted'
+        - label: 'Connection succeeds when correct credentials are used (verify using serial monitor)'
+
+  - type: checkboxes
+    id: gateway-checks
+    attributes:
+      label: 'Gateway checks'
+      options:
+        - label: 'Can use pairing code to connect board to gateway server'
+        - label: 'Shows up as online on server board list (depends on API, LiveControlGateway and WebUI)'
+
+  - type: dropdown
+    id: radio-type
+    attributes:
+      label: Radio installed?
+      description: Do you have a 433MHz radio connected to the board?
+      options:
+        - 'Yes'
+        - 'No'
+      default: 1
+    validations:
+      required: true
+
+  - type: checkboxes
+    id: radio-checks
+    attributes:
+      label: 'Radio checks'
+      options:
+        - label: 'Can '
+
+  - type: textarea
+    id: findings
+    attributes:
+      label: 'Findings'
+      description: 'You can put any findings you have here.'
+    validations:
+      required: false
