@@ -103,15 +103,21 @@ body:
         ## WiFi checks
 
   - type: checkboxes
-    id: wifi-checks
+    id: wifi-ap-checks
     attributes:
-      label: WiFi checks
+      label: Access Point checks
       options:
         - label: 'WiFi network appears (named `OpenShock-XX:XX:XX:XX:XX:XX`)'
         - label: 'WiFi network can be connected to'
         - label: 'Visiting `http://10.10.10.10/` while connected returns _any_ web page (blank or partial = OK!)'
-        - label: 'Captive portal loads'
-        - label: 'Network list is populated after page load'
+
+  - type: checkboxes
+    id: wifi-client-checks
+    attributes:
+      label: Client checks
+      description: Requires that the captive portal works.
+      options:
+        - label: 'Captive portal works (prerequisite)'
         - label: 'Connection attempt is made when connect modal is submitted'
         - label: 'Connection succeeds when correct credentials are used (verify using serial monitor)'
 
