@@ -1,6 +1,6 @@
 name: 'Request support for a new board'
 description: "You'd like a prebuilt image for your board."
-title: '[Board] '
+title: '[Board Request] '
 labels: ['type: board-compatability']
 projects: ['OpenShock/3']
 
