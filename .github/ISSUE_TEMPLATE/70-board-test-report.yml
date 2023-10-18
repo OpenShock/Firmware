@@ -15,7 +15,7 @@ body:
     attributes:
       label: Board
       description: What board are you using?
-      placeholder: 'E.g.: "Wemos Lolin S3", "Pishock 2023", ..'
+      placeholder: 'E.g.: Wemos Lolin S3, Pishock 2023, ..'
     validations:
       required: True
 
