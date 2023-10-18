@@ -89,13 +89,10 @@ body:
   - type: checkboxes
     id: led-checks
     attributes:
-      label: Status LED checks
+      label: LED checks
       options:
-        - label: 'Board uses GPIO LED'
-        - label: 'Board uses WS2812B LED'
-        - label: 'Board uses neither'
-        - label: '[GPIO Only] Status LED lights up at all'
-        - label: '[WS2815B Only] Nothing happens'
+        - label: 'GPIO Only -- Status LED lights up at all'
+        - label: 'WS2815B Only -- Nothing happens'
 
   - type: markdown
     attributes:
