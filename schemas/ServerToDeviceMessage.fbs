@@ -10,7 +10,7 @@ struct ShockerCommand {
   id:uint16;
   type:Types.ShockerCommandType;
   intensity:uint8;
-  duration_ms:uint16;
+  duration:uint16;
 }
 
 table ShockerCommandList {
