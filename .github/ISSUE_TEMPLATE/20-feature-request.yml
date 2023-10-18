@@ -19,7 +19,7 @@ body:
         To prevent wasting your or our time, please fill out the below checklist before continuing.
         Thanks for understanding!
       options:
-        - label: 'I checked that no other feature request describing my wish exists.'
+        - label: 'I checked that there is no other Feature Request describing my wish.'
           required: true
         - label: 'I checked that this feature is, in fact, not supported.'
           required: true

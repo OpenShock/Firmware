@@ -19,7 +19,7 @@ body:
         To prevent wasting your or our time, please fill out the below checklist before continuing.
         Thanks for understanding!
       options:
-        - label: 'I checked that no current board request exists for this board.'
+        - label: 'I checked that there is no other open Board Request for this board.'
           required: true
         - label: 'I checked the [maintained boards list](https://wiki.openshock.org/hardware/boards/#fully-maintained) and this board is indeed not supported.'
           required: true
@@ -46,15 +46,6 @@ body:
       label: Board MCU
       description: The MCU the board uses. Leave empty only if you don't know.
       placeholder: 'ESP32, ESP32-S3, ...'
-    validations:
-      required: false
-
-  - type: input
-    id: board-platformio
-    attributes:
-      label: Platformio Board link
-      description: Check the [https://docs.platformio.org/en/latest/boards/index.html](PlatformIO board list). If you can find the board you are requesting on that link, post the link to it here.
-      placeholder: 'https://docs.platformio.org/en/latest/boards/...'
     validations:
       required: false
 

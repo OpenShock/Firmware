@@ -19,7 +19,7 @@ body:
         To prevent wasting your or our time, please fill out the below checklist before continuing.
         Thanks for understanding!
       options:
-        - label: 'I checked that no other issue describing my problem exists.'
+        - label: 'I checked that no other Bug Report describing my problem exists.'
           required: true
         - label: 'I am running the latest stable or prerelease firmware.'
           required: true
