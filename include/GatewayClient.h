@@ -30,7 +30,7 @@ namespace OpenShock {
     void _handleEvent(WStype_t type, std::uint8_t* payload, std::size_t length);
 
     WebSocketsClient m_webSocket;
-    std::uint64_t m_lastKeepAlive;
+    std::int64_t m_lastKeepAlive;
     State m_state;
   };
 }  // namespace OpenShock

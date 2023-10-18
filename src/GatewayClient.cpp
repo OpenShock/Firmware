@@ -75,9 +75,9 @@ bool GatewayClient::loop() {
     return true;
   }
 
-  std::uint64_t msNow = OpenShock::Millis();
+  std::int64_t msNow = OpenShock::millis();
 
-  std::uint64_t timeSinceLastKA = msNow - m_lastKeepAlive;
+  std::int64_t timeSinceLastKA = msNow - m_lastKeepAlive;
 
   if (timeSinceLastKA >= 15'000) {
     _sendKeepAlive();
@@ -90,7 +90,8 @@ bool GatewayClient::loop() {
 void GatewayClient::_sendKeepAlive() {
   ESP_LOGV(TAG, "Sending keep alive message");
 
-  OpenShock::Serialization::KeepAlive keepAlive(OpenShock::Millis());
+  // Casting to uint64 here is safe since millis is guaranteed to return a positive value
+  OpenShock::Serialization::KeepAlive keepAlive((std::uint64_t)OpenShock::millis());
 
   flatbuffers::FlatBufferBuilder builder(64);
 
