@@ -180,7 +180,7 @@ bool FetchDeviceInfo(const std::string& authToken) {
   return true;
 }
 
-static std::uint64_t _lastConnectionAttempt = 0;
+static std::int64_t _lastConnectionAttempt = 0;
 bool ConnectToLCG() {
   // TODO: this function is very slow, should be optimized!
   if (s_wsClient == nullptr) {  // If wsClient is already initialized, we are already paired or connected
@@ -194,7 +194,7 @@ bool ConnectToLCG() {
     return false;
   }
 
-  std::uint64_t msNow = Millis();
+  std::int64_t msNow = OpenShock::millis();
   if (_lastConnectionAttempt != 0 && (msNow - _lastConnectionAttempt) < 20'000) {  // Only try to connect every 20 seconds
     return false;
   }

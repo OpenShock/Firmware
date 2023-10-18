@@ -42,7 +42,7 @@ struct WiFiNetwork {
   WifiAuthMode authMode;
   std::uint8_t credentialsID;
   std::uint16_t connectAttempts;
-  std::uint64_t lastConnectAttempt;
+  std::int64_t lastConnectAttempt;
   std::uint8_t scansMissed;
 };
 
@@ -153,7 +153,7 @@ static std::vector<WiFiNetwork> s_wifiNetworks;
 /// @param network The network to populate with the next WiFi network to connect to
 /// @return True if a network was found, false otherwise
 bool GetNextWiFiNetwork(OpenShock::Config::WiFiCredentials& creds) {
-  std::uint64_t now = OpenShock::Millis();
+  std::int64_t now = OpenShock::millis();
 
   bool found                         = false;
   std::int8_t highestRssi            = INT8_MIN;
@@ -173,7 +173,7 @@ bool GetNextWiFiNetwork(OpenShock::Config::WiFiCredentials& creds) {
     }
 
     if (net.lastConnectAttempt != 0) {
-      std::uint64_t diff = now - net.lastConnectAttempt;
+      std::int64_t diff = now - net.lastConnectAttempt;
       if ((net.connectAttempts > 5 && diff < 5000) || (net.connectAttempts > 10 && diff < 10'000) || (net.connectAttempts > 15 && diff < 30'000) || (net.connectAttempts > 20 && diff < 60'000)) {
         continue;
       }
@@ -523,7 +523,7 @@ void WiFiManager::Disconnect() {
   WiFi.disconnect(false);
 }
 
-static std::uint64_t s_lastScanRequest = 0;
+static std::int64_t s_lastScanRequest = 0;
 void WiFiManager::Update() {
   if (s_wifiConnected || s_wifiConnecting || WiFiScanManager::IsScanning()) return;
 
@@ -547,7 +547,7 @@ void WiFiManager::Update() {
 
   Config::WiFiCredentials creds;
   if (!GetNextWiFiNetwork(creds)) {
-    std::uint64_t now = OpenShock::Millis();
+    std::int64_t now = OpenShock::millis();
     if (s_lastScanRequest == 0 || now - s_lastScanRequest > 30'000) {
       s_lastScanRequest = now;
 
