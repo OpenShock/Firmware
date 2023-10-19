@@ -24,14 +24,14 @@ const char* const kCommandFactoryReset = "factoryreset";
 void _handleHelpCommand(char* arg, std::size_t argLength) {
   SerialInputHandler::PrintWelcomeHeader();
   if (arg == nullptr || argLength <= 0) {
-    Serial.println("help                print this menu");
-    Serial.println("help      <command> print help for a command");
-    Serial.println("version             print version information");
-    Serial.println("restart             restart the board");
-    Serial.println("rmtpin    <pin>     set radio pin");
-    Serial.println("authtoken <token>   set auth token");
-    Serial.println("networks  <json>    set all saved networks");
-    Serial.println("factoryreset        reset device to factory defaults and reboots");
+    Serial.println("help                   print this menu");
+    Serial.println("help         <command> print help for a command");
+    Serial.println("version                print version information");
+    Serial.println("restart                restart the board");
+    Serial.println("rmtpin       <pin>     set radio pin");
+    Serial.println("authtoken    <token>   set auth token");
+    Serial.println("networks     <json>    set all saved networks");
+    Serial.println("factoryreset           reset device to factory defaults and reboot");
     return;
   }
 
@@ -77,7 +77,7 @@ void _handleHelpCommand(char* arg, std::size_t argLength) {
 
   if (strcmp(arg, kCommandFactoryReset) == 0) {
     Serial.println(kCommandFactoryReset);
-    Serial.println("  Reset the device to factory defaults and reboots");
+    Serial.println("  Reset the device to factory defaults and reboot");
     Serial.println("  Example:");
     Serial.println("    factoryreset");
     return;
@@ -189,12 +189,13 @@ void _handleNetworksCommand(char* arg, std::size_t argLength) {
 }
 
 static std::unordered_map<std::string, void (*)(char*, std::size_t)> s_commandHandlers = {
-  {     kCommandHelp,      _handleHelpCommand},
-  {  kCommandVersion,   _handleVersionCommand},
-  {  kCommandRestart,   _handleRestartCommand},
-  {   kCommandRmtpin,    _handleRmtpinCommand},
-  {kCommandAuthToken, _handleAuthtokenCommand},
-  { kCommandNetworks,  _handleNetworksCommand},
+  {        kCommandHelp,         _handleHelpCommand},
+  {     kCommandVersion,      _handleVersionCommand},
+  {     kCommandRestart,      _handleRestartCommand},
+  {      kCommandRmtpin,       _handleRmtpinCommand},
+  {   kCommandAuthToken,    _handleAuthtokenCommand},
+  {    kCommandNetworks,     _handleNetworksCommand},
+  {kCommandFactoryReset, _handleFactoryResetCommand},
 };
 
 int findChar(const char* buffer, std::size_t bufferSize, char c) {
