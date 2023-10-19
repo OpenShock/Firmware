@@ -19,134 +19,134 @@ struct MainConfig {
 
 static MainConfig _mainConfig;
 
-Config::RFConfig FromFbsRFConfig(const Serialization::Configuration::RFConfig* fbsConfig) {
+bool ReadFbsConfig(const Serialization::Configuration::RFConfig* fbsConfig) {
   if (fbsConfig == nullptr) {
-#ifdef OPENSHOCK_TX_PIN
-    return {.txPin = OPENSHOCK_TX_PIN};
-#else
-    ESP_LOGW(TAG, "OPENSHOCK_TX_PIN is not defined, defaulting to UINT8_MAX");
-    return {.txPin = Constants::GPIO_INVALID};
-#endif
+    ESP_LOGE(TAG, "Config::RF is null");
+    return false;
   }
 
-  return {
+  _mainConfig.rf = {
     .txPin = fbsConfig->tx_pin(),
   };
+
+  return true;
 }
-Config::WiFiCredentials FromFbsWiFiCredentials(const Serialization::Configuration::WiFiCredentials* fbsConfig) {
-  if (fbsConfig != nullptr) {
-    auto id       = fbsConfig->id();
-    auto ssid     = fbsConfig->ssid();
-    auto bssid    = fbsConfig->bssid();
-    auto password = fbsConfig->password();
-
-    if (id != 0 && ssid != nullptr && bssid != nullptr && password != nullptr) {
-      Config::WiFiCredentials creds {
-        .id       = fbsConfig->id(),
-        .ssid     = fbsConfig->ssid()->str(),
-        .password = fbsConfig->password()->str(),
-      };
-
-      std::memcpy(creds.bssid, fbsConfig->bssid()->array()->data(), 6);
-
-      return creds;
-    }
+bool ReadFbsConfig(const Serialization::Configuration::WiFiConfig* cfg) {
+  if (cfg == nullptr) {
+    ESP_LOGE(TAG, "Config::WiFi is null");
+    return false;
   }
 
-  return {
-    .id       = 0,
-    .ssid     = "",
-    .bssid    = {0, 0, 0, 0, 0, 0},
-    .password = "",
-  };
-}
-Config::WiFiConfig FromFbsWiFiConfig(const Serialization::Configuration::WiFiConfig* fbsConfig) {
-  if (fbsConfig != nullptr) {
-    auto apSsid   = fbsConfig->ap_ssid();
-    auto hostname = fbsConfig->hostname();
-    auto creds    = fbsConfig->credentials();
+  auto fbsApSsid   = cfg->ap_ssid();
+  auto fbsHostname = cfg->hostname();
+  auto fbsCredsVec = cfg->credentials();
 
-    if (apSsid != nullptr && hostname != nullptr && creds != nullptr) {
-      Config::WiFiConfig config {
-        .apSsid   = fbsConfig->ap_ssid()->str(),
-        .hostname = fbsConfig->hostname()->str(),
-      };
-
-      std::vector<Config::WiFiCredentials> credentials;
-
-      for (auto it = creds->begin(); it != creds->end(); ++it) {
-        credentials.push_back(FromFbsWiFiCredentials(*it));
-      }
-
-      config.credentials = std::move(credentials);
-
-      return config;
-    }
+  if (fbsApSsid == nullptr || fbsHostname == nullptr || fbsCredsVec == nullptr) {
+    ESP_LOGE(TAG, "Config::WiFi::apSsid, Config::WiFi::hostname or Config::WiFi::credentials is null");
+    return false;
   }
 
-  return {
-    .apSsid      = "",
-    .hostname    = "",
-    .credentials = {},
-  };
-}
-Config::CaptivePortalConfig FromFbsCaptivePortalConfig(const Serialization::Configuration::CaptivePortalConfig* fbsConfig) {
-  if (fbsConfig != nullptr) {
-    return {
-      .alwaysEnabled = fbsConfig->always_enabled(),
+  std::vector<Config::WiFiCredentials> credentials;
+  credentials.reserve(fbsCredsVec->size());
+
+  for (auto it = fbsCredsVec->begin(); it != fbsCredsVec->end(); ++it) {
+    auto fbsCreds = *it;
+
+    if (fbsCreds == nullptr) {
+      ESP_LOGE(TAG, "Config::WiFi::credentials contains null entry");
+      return false;
+    }
+
+    auto id       = fbsCreds->id();
+    if (id == 0) {
+      ESP_LOGE(TAG, "Config::WiFi::credentials entry has invalid ID");
+      return false;
+    }
+
+    auto ssid     = fbsCreds->ssid();
+    if (ssid == nullptr) {
+      ESP_LOGE(TAG, "Config::WiFi::credentials entry has null SSID");
+      return false;
+    }
+
+    auto bssid    = fbsCreds->bssid();
+    if (bssid == nullptr) {
+      ESP_LOGE(TAG, "Config::WiFi::credentials entry has null BSSID");
+      return false;
+    }
+
+    auto password = fbsCreds->password();
+    if (password == nullptr) {
+      ESP_LOGE(TAG, "Config::WiFi::credentials entry has null password");
+      return false;
+    }
+
+    auto bssidArray = bssid->array();
+    if (bssidArray == nullptr) {
+      ESP_LOGE(TAG, "Config::WiFi::credentials entry has null BSSID array");
+      return false;
+    }
+
+    Config::WiFiCredentials creds {
+      .id       = id,
+      .ssid     = ssid->str(),
+      .password = password->str(),
     };
+
+    std::memcpy(creds.bssid, bssidArray->data(), 6);
+
+    credentials.push_back(std::move(creds));
   }
 
-  return {
-    .alwaysEnabled = false,
+  _mainConfig.wifi = {
+    .apSsid   = cfg->ap_ssid()->str(),
+    .hostname = cfg->hostname()->str(),
+    .credentials = std::move(credentials),
   };
-}
-Config::BackendConfig FromFbsBackendConfig(const Serialization::Configuration::BackendConfig* fbsConfig) {
-  if (fbsConfig != nullptr) {
-    auto authToken = fbsConfig->auth_token();
 
-    if (authToken != nullptr) {
-      return {
-        .authToken = fbsConfig->auth_token()->str(),
-      };
-    } else {
-      ESP_LOGW(TAG, "authToken == nullptr");
-    }
-  } else {
-    ESP_LOGW(TAG, "fbsConfig == nullptr");
+  return true;
+}
+bool ReadFbsConfig(const Serialization::Configuration::CaptivePortalConfig* cfg) {
+  if (cfg == nullptr) {
+    ESP_LOGE(TAG, "Config::CaptivePortal is null");
+    return false;
   }
 
-  return {
-    .authToken = "",
+  _mainConfig.captivePortal = {
+    .alwaysEnabled = cfg->always_enabled(),
   };
-}
-MainConfig FromFbsConfig(const Serialization::Configuration::Config* fbsConfig) {
-  const Serialization::Configuration::RFConfig* rfConfig;
-  const Serialization::Configuration::WiFiConfig* wifiConfig;
-  const Serialization::Configuration::CaptivePortalConfig* captivePortalConfig;
-  const Serialization::Configuration::BackendConfig* backendConfig;
 
-  if (fbsConfig != nullptr) {
-    rfConfig            = fbsConfig->rf();
-    wifiConfig          = fbsConfig->wifi();
-    captivePortalConfig = fbsConfig->captive_portal();
-    backendConfig       = fbsConfig->backend();
-  } else {
-    rfConfig            = nullptr;
-    wifiConfig          = nullptr;
-    captivePortalConfig = nullptr;
-    backendConfig       = nullptr;
+  return true;
+}
+bool ReadFbsConfig(const Serialization::Configuration::BackendConfig* cfg) {
+  if (cfg == nullptr) {
+    ESP_LOGE(TAG, "Config::Backend is null");
+    return false;
   }
 
-  return {
-    .rf            = FromFbsRFConfig(rfConfig),
-    .wifi          = FromFbsWiFiConfig(wifiConfig),
-    .captivePortal = FromFbsCaptivePortalConfig(captivePortalConfig),
-    .backend       = FromFbsBackendConfig(backendConfig),
+  auto authToken = cfg->auth_token();
+
+  if (authToken == nullptr) {
+    ESP_LOGE(TAG, "Config::Backend::authToken is null");
+    return false;
+  }
+
+  _mainConfig.backend = {
+    .authToken = authToken->str(),
   };
+
+  return true;
+}
+bool ReadFbsConfig(const Serialization::Configuration::Config* cfg) {
+  if (cfg == nullptr) {
+    ESP_LOGE(TAG, "Config is null");
+    return false;
+  }
+
+  return ReadFbsConfig(cfg->rf()) && ReadFbsConfig(cfg->wifi()) && ReadFbsConfig(cfg->captive_portal()) && ReadFbsConfig(cfg->backend());
 }
 
-bool _tryLoadConfig(MainConfig& config) {
+bool _tryLoadConfig() {
   File file = LittleFS.open("/config", "rb");
   if (!file) {
     ESP_LOGE(TAG, "Failed to open config file for reading");
@@ -157,11 +157,10 @@ bool _tryLoadConfig(MainConfig& config) {
   std::size_t size = file.size();
 
   // Allocate buffer
-  std::uint8_t* buffer = new std::uint8_t[size];
+  std::vector<std::uint8_t> buffer(size);
 
   // Read file
-  if (file.read(buffer, size) != size) {
-    delete[] buffer;
+  if (file.read(buffer.data(), buffer.size()) != buffer.size()) {
     ESP_LOGE(TAG, "Failed to read config file, size mismatch");
     return false;
   }
@@ -169,9 +168,8 @@ bool _tryLoadConfig(MainConfig& config) {
   file.close();
 
   // Deserialize
-  auto fbsConfig = flatbuffers::GetRoot<Serialization::Configuration::Config>(buffer);
+  auto fbsConfig = flatbuffers::GetRoot<Serialization::Configuration::Config>(buffer.data());
   if (fbsConfig == nullptr) {
-    delete[] buffer;
     ESP_LOGE(TAG, "Failed to get deserialization root for config file");
     return false;
   }
@@ -180,45 +178,49 @@ bool _tryLoadConfig(MainConfig& config) {
   flatbuffers::Verifier::Options verifierOptions {
     .max_size = 4096,  // Should be enough
   };
-  flatbuffers::Verifier verifier(buffer, size, verifierOptions);
+  flatbuffers::Verifier verifier(buffer.data(), buffer.size(), verifierOptions);
   if (!fbsConfig->Verify(verifier)) {
-    delete[] buffer;
     ESP_LOGE(TAG, "Failed to verify config file integrity");
     return false;
   }
 
-  // Copy
-  config = FromFbsConfig(fbsConfig);
-
-  // Cleanup
-  delete[] buffer;
+  // Read config
+  if (!ReadFbsConfig(fbsConfig)) {
+    ESP_LOGE(TAG, "Failed to read config file");
+    return false;
+  }
 
   return true;
 }
-bool _trySaveConfig(const MainConfig& config) {
+bool _trySaveConfig() {
   File file = LittleFS.open("/config", "wb");
   if (!file) {
     ESP_LOGE(TAG, "Failed to open config file for writing");
     return false;
   }
 
+  auto& _rf = _mainConfig.rf;
+  auto& _wifi = _mainConfig.wifi;
+  auto& _backend = _mainConfig.backend;
+  auto& _captivePortal = _mainConfig.captivePortal;
+
   // Serialize
   flatbuffers::FlatBufferBuilder builder(1024);
 
-  auto rfConfig = Serialization::Configuration::RFConfig(config.rf.txPin);
+  auto rfConfig = Serialization::Configuration::RFConfig(_rf.txPin);
 
   std::vector<flatbuffers::Offset<Serialization::Configuration::WiFiCredentials>> wifiCredentials;
-  for (const auto& cred : config.wifi.credentials) {
+  for (const auto& cred : _wifi.credentials) {
     auto bssid = Serialization::Configuration::BSSID(cred.bssid);
 
     wifiCredentials.push_back(Serialization::Configuration::CreateWiFiCredentials(builder, cred.id, builder.CreateString(cred.ssid), &bssid, builder.CreateString(cred.password)));
   }
 
-  auto wifiConfig = Serialization::Configuration::CreateWiFiConfig(builder, builder.CreateString(config.wifi.apSsid), builder.CreateString(config.wifi.hostname), builder.CreateVector(wifiCredentials));
+  auto wifiConfig = Serialization::Configuration::CreateWiFiConfig(builder, builder.CreateString(_wifi.apSsid), builder.CreateString(_wifi.hostname), builder.CreateVector(wifiCredentials));
 
-  auto captivePortalConfig = Serialization::Configuration::CaptivePortalConfig(config.captivePortal.alwaysEnabled);
+  auto backendConfig = Serialization::Configuration::CreateBackendConfig(builder, builder.CreateString(""), builder.CreateString(_backend.authToken));
 
-  auto backendConfig = Serialization::Configuration::CreateBackendConfig(builder, builder.CreateString(""), builder.CreateString(config.backend.authToken));
+  auto captivePortalConfig = Serialization::Configuration::CaptivePortalConfig(_captivePortal.alwaysEnabled);
 
   auto fbsConfig = Serialization::Configuration::CreateConfig(builder, &rfConfig, wifiConfig, &captivePortalConfig, backendConfig);
 
@@ -236,29 +238,41 @@ bool _trySaveConfig(const MainConfig& config) {
 }
 
 void Config::Init() {
-  if (!_tryLoadConfig(_mainConfig)) {
-    ESP_LOGW(TAG, "Failed to load config, overwriting with default config");
-    _mainConfig = {
-      .rf = {
+  if (_tryLoadConfig()) {
+    return;
+  }
+
+  ESP_LOGW(TAG, "Failed to load config, writing default config");
+
+  _mainConfig = {
+    .rf = {
 #ifdef OPENSHOCK_TX_PIN
-        .txPin = OPENSHOCK_TX_PIN,
+      .txPin = OPENSHOCK_TX_PIN,
 #else
-        .txPin = Constants::GPIO_INVALID,
+      .txPin = Constants::GPIO_INVALID,
 #endif
-      },
-      .wifi = {
-        .apSsid      = "Config",
-        .hostname    = "Config",
-        .credentials = {},
-      },
-      .captivePortal = {
-        .alwaysEnabled = false,
-      },
-      .backend = {
-        .authToken = "",
-      },
-    };
-    _trySaveConfig(_mainConfig);
+    },
+    .wifi = {
+      .apSsid      = "",
+      .hostname    = "",
+      .credentials = {},
+    },
+    .captivePortal = {
+      .alwaysEnabled = false,
+    },
+    .backend = {
+      .authToken = "",
+    },
+  };
+
+  if (!_trySaveConfig()) {
+    ESP_LOGE(TAG, "!!!CRITICAL ERROR!!! Failed to save default config. Reccomend formatting microcontroller and re-flashing firmware !!!CRITICAL ERROR!!!");
+  }
+}
+
+void Config::FactoryReset() {
+  if (!LittleFS.remove("/config") && LittleFS.exists("/config")) {
+    ESP_LOGE(TAG, "!!!CRITICAL ERROR!!! Failed to remove existing config file for factory reset. Reccomend formatting microcontroller and re-flashing firmware !!!CRITICAL ERROR!!!");
   }
 }
 
@@ -284,32 +298,32 @@ const Config::BackendConfig& Config::GetBackendConfig() {
 
 void Config::SetRFConfig(const RFConfig& config) {
   _mainConfig.rf = config;
-  _trySaveConfig(_mainConfig);
+  _trySaveConfig();
 }
 
 void Config::SetWiFiConfig(const WiFiConfig& config) {
   _mainConfig.wifi = config;
-  _trySaveConfig(_mainConfig);
+  _trySaveConfig();
 }
 
 void Config::SetWiFiCredentials(const std::vector<WiFiCredentials>& credentials) {
   _mainConfig.wifi.credentials = credentials;
-  _trySaveConfig(_mainConfig);
+  _trySaveConfig();
 }
 
 void Config::SetCaptivePortalConfig(const CaptivePortalConfig& config) {
   _mainConfig.captivePortal = config;
-  _trySaveConfig(_mainConfig);
+  _trySaveConfig();
 }
 
 void Config::SetBackendConfig(const BackendConfig& config) {
   _mainConfig.backend = config;
-  _trySaveConfig(_mainConfig);
+  _trySaveConfig();
 }
 
 bool Config::SetRFConfigTxPin(std::uint8_t txPin) {
   _mainConfig.rf.txPin = txPin;
-  return _trySaveConfig(_mainConfig);
+  return _trySaveConfig();
 }
 
 std::uint8_t Config::AddWiFiCredentials(const std::string& ssid, const std::uint8_t (&bssid)[6], const std::string& password) {
@@ -352,7 +366,7 @@ std::uint8_t Config::AddWiFiCredentials(const std::string& ssid, const std::uint
     _mainConfig.wifi.credentials.push_back(creds);
   }
 
-  _trySaveConfig(_mainConfig);
+  _trySaveConfig();
 
   return id;
 }
@@ -402,7 +416,7 @@ void Config::RemoveWiFiCredentials(std::uint8_t id) {
   for (auto it = _mainConfig.wifi.credentials.begin(); it != _mainConfig.wifi.credentials.end(); ++it) {
     if (it->id == id) {
       _mainConfig.wifi.credentials.erase(it);
-      _trySaveConfig(_mainConfig);
+      _trySaveConfig();
       return;
     }
   }
@@ -410,7 +424,7 @@ void Config::RemoveWiFiCredentials(std::uint8_t id) {
 
 void Config::ClearWiFiCredentials() {
   _mainConfig.wifi.credentials.clear();
-  _trySaveConfig(_mainConfig);
+  _trySaveConfig();
 }
 
 bool Config::HasBackendAuthToken() {
@@ -423,10 +437,10 @@ const std::string& Config::GetBackendAuthToken() {
 
 void Config::SetBackendAuthToken(const std::string& token) {
   _mainConfig.backend.authToken = token;
-  _trySaveConfig(_mainConfig);
+  _trySaveConfig();
 }
 
 void Config::ClearBackendAuthToken() {
   _mainConfig.backend.authToken = "";
-  _trySaveConfig(_mainConfig);
+  _trySaveConfig();
 }
