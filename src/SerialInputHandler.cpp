@@ -8,25 +8,29 @@
 
 #include <unordered_map>
 
+const char* const TAG = "SerialInputHandler";
+
 using namespace OpenShock;
 
-const char* const kCommandHelp      = "help";
-const char* const kCommandVersion   = "version";
-const char* const kCommandRestart   = "restart";
-const char* const kCommandRmtpin    = "rmtpin";
-const char* const kCommandAuthToken = "authtoken";
-const char* const kCommandNetworks  = "networks";
+const char* const kCommandHelp         = "help";
+const char* const kCommandVersion      = "version";
+const char* const kCommandRestart      = "restart";
+const char* const kCommandRmtpin       = "rmtpin";
+const char* const kCommandAuthToken    = "authtoken";
+const char* const kCommandNetworks     = "networks";
+const char* const kCommandFactoryReset = "factoryreset";
 
 void _handleHelpCommand(char* arg, std::size_t argLength) {
   SerialInputHandler::PrintWelcomeHeader();
   if (arg == nullptr || argLength <= 0) {
-    Serial.println("help                print this menu");
-    Serial.println("help      <command> print help for a command");
-    Serial.println("version             print version information");
-    Serial.println("restart             restart the board");
-    Serial.println("rmtpin    <pin>     set radio pin");
-    Serial.println("authtoken <token>   set auth token");
-    Serial.println("networks  <json>    set all saved networks");
+    Serial.println("help                   print this menu");
+    Serial.println("help         <command> print help for a command");
+    Serial.println("version                print version information");
+    Serial.println("restart                restart the board");
+    Serial.println("rmtpin       <pin>     set radio pin");
+    Serial.println("authtoken    <token>   set auth token");
+    Serial.println("networks     <json>    set all saved networks");
+    Serial.println("factoryreset           reset device to factory defaults and reboot");
     return;
   }
 
@@ -70,6 +74,14 @@ void _handleHelpCommand(char* arg, std::size_t argLength) {
     return;
   }
 
+  if (strcmp(arg, kCommandFactoryReset) == 0) {
+    Serial.println(kCommandFactoryReset);
+    Serial.println("  Reset the device to factory defaults and reboot");
+    Serial.println("  Example:");
+    Serial.println("    factoryreset");
+    return;
+  }
+
   if (strcmp(arg, kCommandVersion) == 0) {
     Serial.println(kCommandVersion);
     Serial.println("  Print version information");
@@ -87,6 +99,8 @@ void _handleHelpCommand(char* arg, std::size_t argLength) {
     Serial.println("    help");
     return;
   }
+
+  Serial.println("Command not found");
 }
 
 void _handleVersionCommand(char* arg, std::size_t argLength) {
@@ -97,6 +111,14 @@ void _handleVersionCommand(char* arg, std::size_t argLength) {
 void _handleRestartCommand(char* arg, std::size_t argLength) {
   Serial.println("Restarting ESP...");
   ESP.restart();
+}
+
+void _handleFactoryResetCommand(char* arg, std::size_t argLength) {
+  Serial.println("Resetting to factory defaults...");
+  Config::FactoryReset();
+  Serial.println("Rebooting...");
+  ESP.restart();
+  ESP_LOGE(TAG, "IMPOSSIBLE REACHED");
 }
 
 void _handleRmtpinCommand(char* arg, std::size_t argLength) {
@@ -166,12 +188,13 @@ void _handleNetworksCommand(char* arg, std::size_t argLength) {
 }
 
 static std::unordered_map<std::string, void (*)(char*, std::size_t)> s_commandHandlers = {
-  {     kCommandHelp,      _handleHelpCommand},
-  {  kCommandVersion,   _handleVersionCommand},
-  {  kCommandRestart,   _handleRestartCommand},
-  {   kCommandRmtpin,    _handleRmtpinCommand},
-  {kCommandAuthToken, _handleAuthtokenCommand},
-  { kCommandNetworks,  _handleNetworksCommand},
+  {        kCommandHelp,         _handleHelpCommand},
+  {     kCommandVersion,      _handleVersionCommand},
+  {     kCommandRestart,      _handleRestartCommand},
+  {      kCommandRmtpin,       _handleRmtpinCommand},
+  {   kCommandAuthToken,    _handleAuthtokenCommand},
+  {    kCommandNetworks,     _handleNetworksCommand},
+  {kCommandFactoryReset, _handleFactoryResetCommand},
 };
 
 int findChar(const char* buffer, std::size_t bufferSize, char c) {

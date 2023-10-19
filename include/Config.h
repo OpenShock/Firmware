@@ -31,6 +31,13 @@ namespace OpenShock::Config {
 
   void Init();
 
+  /**
+   * @brief Resets the config file to the factory default values.
+   *
+   * @note A reboot after calling this function is HIGHLY recommended.
+   */
+  void FactoryReset();
+
   const RFConfig& GetRFConfig();
   const WiFiConfig& GetWiFiConfig();
   const std::vector<WiFiCredentials>& GetWiFiCredentials();
