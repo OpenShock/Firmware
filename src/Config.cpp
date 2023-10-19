@@ -2,8 +2,8 @@
 
 #include "Constants.h"
 #include "Utils/HexUtils.h"
+#include "Logging.h"
 
-#include <esp_log.h>
 #include <LittleFS.h>
 
 const char* const TAG = "Config";

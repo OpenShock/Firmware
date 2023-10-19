@@ -1,6 +1,6 @@
 #include "MessageHandlers/Server_Private.h"
 
-#include <esp_log.h>
+#include "Logging.h"
 
 const char* const TAG = "ServerMessageHandlers";
 

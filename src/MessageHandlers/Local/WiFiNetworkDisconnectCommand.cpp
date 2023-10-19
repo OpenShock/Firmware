@@ -2,8 +2,7 @@
 
 #include "Utils/HexUtils.h"
 #include "WiFiManager.h"
-
-#include <esp_log.h>
+#include "Logging.h"
 
 #include <nonstd/span.hpp>
 
