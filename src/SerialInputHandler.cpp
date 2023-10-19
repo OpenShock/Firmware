@@ -5,7 +5,6 @@
 
 #include <ArduinoJson.h>
 #include <Esp.h>
-#include <HardwareSerial.h>
 
 #include <unordered_map>
 

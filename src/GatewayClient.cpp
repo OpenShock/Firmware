@@ -1,11 +1,11 @@
 #include "GatewayClient.h"
 
-#include "_fbs/DeviceToServerMessage_generated.h"
 #include "MessageHandlers/Server.h"
 #include "CertificateUtils.h"
+#include "Logging.h"
 #include "Time.h"
 
-#include <esp_log.h>
+#include "_fbs/DeviceToServerMessage_generated.h"
 
 const char* const TAG = "GatewayClient";
 

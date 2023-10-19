@@ -18,9 +18,9 @@
 #endif  // OPENSHOCK_LED_IMPLEMENTATION
 #endif  // OPENSHOCK_LED_WS2812B
 
-#include <WiFi.h>
+#include "Logging.h"
 
-#include <esp_log.h>
+#include <WiFi.h>
 
 #if defined(OPENSHOCK_LED_TYPE) && defined(OPENSHOCK_LED_PIN)
 #define OPENSHOCK_LED_DEFINED 1

@@ -1,5 +1,7 @@
 #include "PinPatternManager.h"
 
+#include "Logging.h"
+
 #include <Arduino.h>
 
 const char* const TAG = "PinPatternManager";

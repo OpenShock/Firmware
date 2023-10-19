@@ -4,12 +4,11 @@
 #include "Config.h"
 #include "GatewayConnectionManager.h"
 #include "CommandHandler.h"
+#include "Logging.h"
 
 #include <ESPAsyncWebServer.h>
 #include <WebSocketsServer.h>
 #include <WiFi.h>
-
-#include <esp_log.h>
 
 #include <memory>
 

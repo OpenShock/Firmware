@@ -1,8 +1,7 @@
 #include "MessageHandlers/Local_Private.h"
 
 #include "GatewayConnectionManager.h"
-
-#include <esp_log.h>
+#include "Logging.h"
 
 #include <cstdint>
 
