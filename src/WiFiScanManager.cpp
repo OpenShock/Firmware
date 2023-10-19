@@ -1,8 +1,8 @@
 #include "WiFiScanManager.h"
 
-#include <WiFi.h>
+#include "Logging.h"
 
-#include <esp_log.h>
+#include <WiFi.h>
 
 #include <map>
 

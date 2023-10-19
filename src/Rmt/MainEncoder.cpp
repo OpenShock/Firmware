@@ -2,8 +2,7 @@
 
 #include "Rmt/PetTrainerEncoder.h"
 #include "Rmt/XlcEncoder.h"
-
-#include <esp_log.h>
+#include "Logging.h"
 
 #include <unordered_map>
 

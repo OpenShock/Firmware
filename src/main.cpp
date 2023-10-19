@@ -8,9 +8,8 @@
 #include "VisualStateManager.h"
 #include "WiFiManager.h"
 #include "WiFiScanManager.h"
+#include "Logging.h"
 
-#include <esp_log.h>
-#include <HardwareSerial.h>
 #include <LittleFS.h>
 
 #include <memory>

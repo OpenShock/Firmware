@@ -1,12 +1,11 @@
 #include "MessageHandlers/Server.h"
 
 #include "MessageHandlers/Server_Private.h"
+#include "Logging.h"
 
 #include "_fbs/ServerToDeviceMessage_generated.h"
 
 #include <WebSockets.h>
-
-#include <esp_log.h>
 
 #include <array>
 #include <cstdint>

@@ -3,7 +3,7 @@
 #include "ShockerCommandType.h"
 #include "ShockerModelType.h"
 
-#include <esp32-hal.h>
+#include <esp32-hal-rmt.h>
 
 #include <cstdint>
 #include <memory>
