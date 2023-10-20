@@ -9,7 +9,7 @@ const char* const TAG = "CertificateUtils";
 const char* const PEM_HEADER = "-----BEGIN CERTIFICATE-----\n";
 const char* const PEM_FOOTER = "-----END CERTIFICATE-----\n";
 
-extern const std::uint8_t* const rootca_crt_bundle_start asm("_binary_data_cert_x509_crt_bundle_start");
+extern const std::uint8_t* const rootca_crt_bundle_start asm("_binary_certificates_x509_crt_bundle_start");
 
 WiFiClientSecure OpenShock::CertificateUtils::GetSecureClient() {
   WiFiClientSecure client;
