@@ -8,6 +8,7 @@
 #include "Utils/HexUtils.h"
 #include "VisualStateManager.h"
 #include "WiFiScanManager.h"
+#include "Logging.h"
 
 #include "_fbs/DeviceToLocalMessage_generated.h"
 

@@ -2,7 +2,7 @@
 
 #include "ShockerCommandType.h"
 
-#include <esp32-hal.h>
+#include <esp32-hal-rmt.h>
 
 #include <cstdint>
 #include <vector>

@@ -2,9 +2,7 @@
 
 #include "CommandHandler.h"
 #include "ShockerModelType.h"
-
-#include <esp32-hal.h>
-#include <esp_log.h>
+#include "Logging.h"
 
 #include <cstdint>
 

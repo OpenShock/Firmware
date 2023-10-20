@@ -1,5 +1,7 @@
 #include "CertificateUtils.h"
 
+#include "Logging.h"
+
 #include <mbedtls/pem.h>
 
 const char* const TAG = "CertificateUtils";

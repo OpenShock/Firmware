@@ -1,8 +1,7 @@
 #include "MessageHandlers/Server_Private.h"
 
 #include "CaptivePortal.h"
-
-#include <esp_log.h>
+#include "Logging.h"
 
 #include <cstdint>
 

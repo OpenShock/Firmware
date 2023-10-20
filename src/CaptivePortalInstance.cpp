@@ -1,11 +1,11 @@
 #include "CaptivePortalInstance.h"
 
-#include "_fbs/DeviceToLocalMessage_generated.h"
 #include "MessageHandlers/Local.h"
+#include "Logging.h"
+
+#include "_fbs/DeviceToLocalMessage_generated.h"
 
 #include <LittleFS.h>
-
-#include <esp_log.h>
 
 static const char* TAG = "CaptivePortalInstance";
 
