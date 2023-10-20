@@ -5,6 +5,7 @@
 
 #include <ArduinoJson.h>
 #include <Esp.h>
+#include "Logging.h"
 
 #include <unordered_map>
 
@@ -27,15 +28,17 @@ void _handleHelpCommand(char* arg, std::size_t argLength) {
     Serial.println("help         <command> print help for a command");
     Serial.println("version                print version information");
     Serial.println("restart                restart the board");
+    Serial.println("rmtpin                 get radio pin");
     Serial.println("rmtpin       <pin>     set radio pin");
     Serial.println("authtoken    <token>   set auth token");
+    Serial.println("networks               get all saved networks");
     Serial.println("networks     <json>    set all saved networks");
     Serial.println("factoryreset           reset device to factory defaults and reboot");
     return;
   }
 
   if (strcmp(arg, kCommandRmtpin) == 0) {
-    Serial.println("rmtpin <pin>");
+    Serial.println("rmtpin [<pin>]");
     Serial.println("  Set the GPIO pin used for the radio transmitter.");
     Serial.println("  Arguments:");
     Serial.println("    <pin> must be a number.");
@@ -55,7 +58,7 @@ void _handleHelpCommand(char* arg, std::size_t argLength) {
   }
 
   if (strcmp(arg, kCommandNetworks) == 0) {
-    Serial.println("networks <json>");
+    Serial.println("networks [<json>]");
     Serial.println("  Set all saved networks.");
     Serial.println("  Arguments:");
     Serial.println("    <json> must be a array of objects with the following fields:");
@@ -123,52 +126,67 @@ void _handleFactoryResetCommand(char* arg, std::size_t argLength) {
 
 void _handleRmtpinCommand(char* arg, std::size_t argLength) {
   if (arg == nullptr || argLength <= 0) {
-    Serial.println("SYS|Error|Invalid argument");
+    // Get rmt pin
+    Serial.print("$SYS$|Response|RmtPin|");
+    Serial.println(Config::GetRFConfig().txPin);
     return;
   }
 
   std::uint32_t pin;
   if (sscanf(arg, "%u", &pin) != 1) {
-    Serial.println("SYS|Error|Invalid argument (not a number)");
+    Serial.println("$SYS$|Error|Invalid argument (not a number)");
     return;
   }
 
   OpenShock::CommandHandler::SetRfTxPin(pin);
 
-  Serial.println("SYS|Success|Saved config");
+  Serial.println("$SYS$|Success|Saved config");
 }
 
 void _handleAuthtokenCommand(char* arg, std::size_t argLength) {
   if (arg == nullptr || argLength <= 0) {
-    Serial.println("SYS|Error|Invalid argument");
+    Serial.println("$SYS$|Error|Invalid argument");
     return;
   }
 
   OpenShock::Config::SetBackendAuthToken(std::string(arg, argLength));
 
-  Serial.println("SYS|Success|Saved config");
+  Serial.println("$SYS$|Success|Saved config");
 }
 
 void _handleNetworksCommand(char* arg, std::size_t argLength) {
+
+
   if (arg == nullptr || argLength <= 0) {
-    Serial.println("SYS|Error|Invalid argument");
+    // Get networks
+    StaticJsonDocument<1024> outDoc;
+    JsonArray outNetworks = outDoc.to<JsonArray>();
+
+  for (auto& creds : Config::GetWiFiCredentials()) {
+    JsonObject network = outNetworks.createNestedObject();
+    network["ssid"] = creds.ssid;
+    network["password"] = creds.password;
+  }
+
+    Serial.print("$SYS$|Response|Networks|");
+    serializeJson(outDoc, Serial);
+    Serial.println();
     return;
   }
 
   DynamicJsonDocument doc(1024);
   deserializeJson(doc, arg, argLength);
 
-  JsonArray networks = doc["networks"];
+  JsonArray networks = doc.as<JsonArray>();
 
   std::vector<Config::WiFiCredentials> creds;
-  for (auto it = networks.begin(); it != networks.end(); ++it) {
-    JsonObject network = *it;
+  for (JsonObject network : networks) {
 
     std::string ssid     = network["ssid"].as<std::string>();
     std::string password = network["password"].as<std::string>();
 
     if (ssid.empty() || password.empty()) {
-      Serial.println("SYS|Error|Invalid argument (missing ssid or password)");
+      Serial.println("$SYS$|Error|Invalid argument (missing ssid or password)");
       return;
     }
 
@@ -178,13 +196,14 @@ void _handleNetworksCommand(char* arg, std::size_t argLength) {
       .bssid    = {0, 0, 0, 0, 0, 0},
       .password = password,
     };
+    ESP_LOGI(TAG, "Adding network to config %s", ssid.c_str());  
 
     creds.push_back(std::move(cred));
   }
 
   OpenShock::Config::SetWiFiCredentials(creds);
 
-  Serial.println("SYS|Success|Saved config");
+  Serial.println("$SYS$|Success|Saved config");
 }
 
 static std::unordered_map<std::string, void (*)(char*, std::size_t)> s_commandHandlers = {
@@ -232,7 +251,7 @@ int findLineStart(const char* buffer, int bufferSize, int lineEnd) {
 void processSerialLine(char* data, std::size_t length) {
   int delimiter = findChar(data, length, ' ');
   if (delimiter == 0) {
-    Serial.println("SYS|Error|Command cannot start with a space");
+    Serial.println("$SYS$|Error|Command cannot start with a space");
     return;
   }
 
@@ -256,7 +275,7 @@ void processSerialLine(char* data, std::size_t length) {
     return;
   }
 
-  Serial.println("SYS|Error|Command not found");
+  Serial.println("$SYS$|Error|Command not found");
 }
 
 void SerialInputHandler::Update() {
