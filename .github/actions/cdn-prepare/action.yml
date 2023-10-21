@@ -34,4 +34,4 @@ runs:
     - name: Test rclone
       shell: bash
       run: |
-        rclone ls fw:/
+        rclone tree fw:openshock-cdn-firmware
