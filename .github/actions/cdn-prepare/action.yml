@@ -23,13 +23,13 @@ runs:
       run: |
         mkdir -p ~/.config/rclone/
         conf=~/.config/rclone/rclone.conf
-        echo "[fw]" >> conf
-        echo "type = s3" >> conf
-        echo "provider = Cloudflare" >> conf
-        echo "access_key_id = ${{ inputs.cf_access_key_id }}" >> conf
-        echo "secret_access_key = ${{ inputs.cf_secret_access_key }}" >> conf
-        echo "endpoint = https://${{ inputs.cf_account_id }}.r2.cloudflarestorage.com" >> conf
-        echo "acl = private" >> conf
+        echo "[fw]" >> $conf
+        echo "type = s3" >> $conf
+        echo "provider = Cloudflare" >> $conf
+        echo "access_key_id = ${{ inputs.cf_access_key_id }}" >> $conf
+        echo "secret_access_key = ${{ inputs.cf_secret_access_key }}" >> $conf
+        echo "endpoint = https://${{ inputs.cf_account_id }}.r2.cloudflarestorage.com" >> $conf
+        echo "acl = private" >> $conf
 
     - name: Test rclone
       shell: bash
