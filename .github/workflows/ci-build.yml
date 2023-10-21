@@ -17,7 +17,8 @@ on:
 name: ci-build
 
 env:
-  NODE_VERSION: 16
+  NODE_VERSION: 16elp
+
   PYTHON_VERSION: 3.12
   OPENSHOCK_API_DOMAIN: api.shocklink.net
   # OPENSHOCK_FW_VERSION:
@@ -95,9 +96,29 @@ jobs:
           board: ${{ matrix.board }}
           skip-checkout: true
 
+  upload:
+    runs-on: ubuntu-latest
+    needs: [get-targets, merge-images]
+    environment: cdn-firmware-r2
+    strategy:
+      fail-fast: true
+      matrix: ${{ fromJson(needs.get-targets.outputs.matrix )}}
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          sparse-checkout: |
+            .github
+
+      - uses: ./.github/actions/cdn-prepare
+        with:
+          cf_account_id: ${{ vars.CF_ACCOUNT_ID }}
+          cf_access_key_id: ${{ vars.CF_ACCESS_KEY_ID }}
+          cf_secret_access_key: ${{ secrets.CF_SECRET_ACCESS_KEY }}
+
   done:
     runs-on: ubuntu-latest
-    needs: [build-filesystem, merge-images]
+    needs: [upload]
 
     steps:
       - run: echo "Done"

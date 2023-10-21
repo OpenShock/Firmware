@@ -1,0 +1,37 @@
+name: cnd-upload
+description: Uploads firmware artifacts to CDN
+inputs:
+  cf_account_id:
+    description: Cloudflare Account ID
+    required: true
+  cf_access_key_id:
+    description: Cloudflare Access Key ID
+    required: true
+  cf_secret_access_key:
+    description: Cloudflare Secret Access Key
+    required: true
+
+runs:
+  using: composite
+  steps:
+    - name: Install rclone
+      shell: bash
+      run: apt install -y rclone
+
+    - name: Configure rclone
+      shell: bash
+      run: |
+        mkdir -p ~/.config/rclone/
+        conf=~/.config/rclone/rclone.conf
+        echo "[fw]" >> conf
+        echo "type = s3" >> conf
+        echo "provider = Cloudflare" >> conf
+        echo "access_key_id = ${{ inputs.cf_access_key_id }}" >> conf
+        echo "secret_access_key = ${{ inputs.cf_secret_access_key }}" >> conf
+        echo "endpoint = https://${{ inputs.cf_account_id }}.r2.cloudflarestorage.com" >> conf
+        echo "acl = private" >> conf
+
+    - name: Test rclone
+      shell: bash
+      run: |
+        rclone ls fw:/

@@ -1,0 +1,55 @@
+name: cnd-upload
+description: Uploads firmware artifacts to CDN
+inputs:
+  node-version:
+    description: 'Python version to use'
+    required: true
+  release-channel:
+    description: 'Release channel that describes this upload'
+    required: false
+    default: 'none'
+  board:
+    description: 'Board to upload'
+    required: true
+  skip-checkout:
+    description: 'If true, skips checkout'
+    required: false
+    default: false
+
+runs:
+  using: composite
+  steps:
+    - name: Download artifacts
+      shell: bash
+
+    - name: Install rclone
+      shell: bash
+      run: apt install -y rclone
+
+    - name: Install dependencies
+      shell: bash
+      run: pip install esptool
+
+    - name: Download filesystem image
+      uses: actions/download-artifact@v3
+      with:
+        name: filesystem
+
+    - name: Download firmware images
+      uses: actions/download-artifact@v3
+      with:
+        name: firmware_${{ inputs.board }}
+
+    - name: Merge flash image
+      shell: bash
+      run: |
+        python scripts/merge_image.py ${{ inputs.board }} &&
+          mv merged.bin OpenShock_${{ inputs.board }}_${{ !contains(github.ref_name, '/') && github.ref_name || 'unknown' }}.bin
+
+    - name: Upload merged flashable image
+      uses: actions/upload-artifact@v3
+      with:
+        name: OpenShock_${{ inputs.board }}
+        path: OpenShock_${{ inputs.board }}_*.bin
+        retention-days: 7
+        if-no-files-found: error
