@@ -4,7 +4,7 @@ import { WebSocketMessageBinaryHandler } from './MessageHandlers';
 import { page } from '$app/stores';
 import { get } from 'svelte/store';
 
-function getWebSocketURL() {
+function getWebSocketHostname() {
   if (!browser) {
     return null;
   }
@@ -15,9 +15,9 @@ function getWebSocketURL() {
   switch (hostname) {
     case 'localhost':
     case '127.0.0.1':
-      return 'ws://10.10.10.10/ws';
+      return '10.10.10.10';
     default:
-      return `ws://${hostname}:81/ws`;
+      return hostname;
   }
 }
 
@@ -68,14 +68,14 @@ export class WebSocketClient {
     this._autoReconnect = true;
     this.ConnectionState = ConnectionState.CONNECTING;
 
-    const wsURL = getWebSocketURL();
+    const wsURL = getWebSocketHostname();
     if (!wsURL) {
       console.error('[WS] ERROR: Failed to get WebSocket URL');
       this.ReconnectIfWanted();
       return;
     }
 
-    this._socket = new WebSocket(wsURL);
+    this._socket = new WebSocket(`ws://${wsURL}:81/ws`);
     this._socket.binaryType = 'arraybuffer';
     this._socket.onopen = this.handleOpen.bind(this);
     this._socket.onclose = this.handleClose.bind(this);
