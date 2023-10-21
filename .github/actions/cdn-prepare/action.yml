@@ -16,7 +16,7 @@ runs:
   steps:
     - name: Install rclone
       shell: bash
-      run: apt install -y rclone
+      run: sudo apt install -y rclone
 
     - name: Configure rclone
       shell: bash
