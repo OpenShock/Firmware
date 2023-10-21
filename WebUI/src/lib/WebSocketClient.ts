@@ -68,14 +68,14 @@ export class WebSocketClient {
     this._autoReconnect = true;
     this.ConnectionState = ConnectionState.CONNECTING;
 
-    const wsURL = getWebSocketHostname();
-    if (!wsURL) {
-      console.error('[WS] ERROR: Failed to get WebSocket URL');
+    const hostname = getWebSocketHostname();
+    if (!hostname) {
+      console.error('[WS] ERROR: Failed to get WebSocket hostname');
       this.ReconnectIfWanted();
       return;
     }
 
-    this._socket = new WebSocket(`ws://${wsURL}:81/ws`);
+    this._socket = new WebSocket(`ws://${hostname}:81/ws`);
     this._socket.binaryType = 'arraybuffer';
     this._socket.onopen = this.handleOpen.bind(this);
     this._socket.onclose = this.handleClose.bind(this);
