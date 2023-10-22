@@ -95,29 +95,9 @@ jobs:
           board: ${{ matrix.board }}
           skip-checkout: true
 
-  upload:
-    runs-on: ubuntu-latest
-    needs: [get-targets]
-    environment: cdn-firmware-r2
-    strategy:
-      fail-fast: true
-      matrix: ${{ fromJson(needs.get-targets.outputs.matrix )}}
-
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          sparse-checkout: |
-            .github
-
-      - uses: ./.github/actions/cdn-prepare
-        with:
-          cf_account_id: ${{ vars.CF_ACCOUNT_ID }}
-          cf_access_key_id: ${{ vars.CF_ACCESS_KEY_ID }}
-          cf_secret_access_key: ${{ secrets.CF_SECRET_ACCESS_KEY }}
-
   done:
     runs-on: ubuntu-latest
-    needs: [upload]
+    needs: [build-filesystem, merge-images]
 
     steps:
       - run: echo "Done"

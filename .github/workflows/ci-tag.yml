@@ -88,6 +88,35 @@ jobs:
           board: ${{ matrix.board }}
           skip-checkout: true
 
+  upload:
+    runs-on: ubuntu-latest
+    needs: [get-targets]
+    environment: cdn-firmware-r2
+    strategy:
+      fail-fast: true
+      matrix: ${{ fromJson(needs.get-targets.outputs.matrix )}}
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          sparse-checkout: |
+            .github
+
+      # Set up rclone for CDN uploads.
+      - uses: ./.github/actions/cdn-prepare
+        with:
+          cf-account-id: ${{ vars.CF_ACCOUNT_ID }}
+          cf-access-key-id: ${{ vars.CF_ACCESS_KEY_ID }}
+          cf-secret-access-key: ${{ secrets.CF_SECRET_ACCESS_KEY }}
+
+      # Upload firmware to CDN.
+      - uses: ./.github/actions/cdn-upload-firmware
+        with:
+          cf-bucket: ${{ vars.CF_BUCKET }}
+          board: ${{ matrix.board }}
+          version: ${{ github.ref_name }}
+          release-channel: ${{ contains(github.ref_name, '-') && 'stable' || 'beta' }}
+
   release:
     runs-on: ubuntu-latest
     needs: [merge-images]

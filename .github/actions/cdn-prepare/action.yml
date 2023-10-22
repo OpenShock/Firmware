@@ -1,13 +1,13 @@
 name: cnd-upload
 description: Uploads firmware artifacts to CDN
 inputs:
-  cf_account_id:
+  cf-account-id:
     description: Cloudflare Account ID
     required: true
-  cf_access_key_id:
+  cf-access-key-id:
     description: Cloudflare Access Key ID
     required: true
-  cf_secret_access_key:
+  cf-secret-access-key:
     description: Cloudflare Secret Access Key
     required: true
 
@@ -16,22 +16,18 @@ runs:
   steps:
     - name: Install rclone
       shell: bash
-      run: sudo apt install -y rclone
+      run: sudo apt-get install -y rclone
 
     - name: Configure rclone
       shell: bash
       run: |
         mkdir -p ~/.config/rclone/
         conf=~/.config/rclone/rclone.conf
-        echo "[fw]" >> $conf
+        echo "[cdn]" >> $conf
         echo "type = s3" >> $conf
         echo "provider = Cloudflare" >> $conf
-        echo "access_key_id = ${{ inputs.cf_access_key_id }}" >> $conf
-        echo "secret_access_key = ${{ inputs.cf_secret_access_key }}" >> $conf
-        echo "endpoint = https://${{ inputs.cf_account_id }}.r2.cloudflarestorage.com" >> $conf
-        echo "acl = private" >> $conf
+        echo "access_key_id = ${{ inputs.cf-access-key-id }}" >> $conf
+        echo "secret_access_key = ${{ inputs.cf-secret-access-key }}" >> $conf
+        echo "endpoint = https://${{ inputs.cf-account-id }}.r2.cloudflarestorage.com" >> $conf
+        echo "acl = public-read" >> $conf
 
-    - name: Test rclone
-      shell: bash
-      run: |
-        rclone tree fw:openshock-cdn-firmware

@@ -43,10 +43,14 @@ runs:
       shell: bash
       run: pio run --target buildfs -e fs
 
+    - name: Rename filesystem binary
+      shell: bash
+      run: mv .pio/build/fs/littlefs.bin filesystem.bin
+
     - name: Upload internal filesystem artifact
       uses: actions/upload-artifact@v3
       with:
         name: filesystem
-        path: .pio/build/fs/littlefs.bin
+        path: filesystem.bin
         retention-days: 1
         if-no-files-found: error
