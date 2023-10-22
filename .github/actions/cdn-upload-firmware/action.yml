@@ -36,8 +36,10 @@ runs:
         name: OpenShock_${{ inputs.board }}
         path: .
 
-    - name: Upload firmware binaries
+    - name: Upload artifacts to CDN
       shell: bash
       run: |
         mv OpenShock_*.bin OpenShock.bin
-        rclone copy . cdn:${{ inputs.cf-bucket-id }}/${{ inputs.version }}/${{ inputs.board }}/
+        mkdir upload
+        mv *.bin upload/
+        rclone copy upload cdn:${{ inputs.cf-bucket }}/${{ inputs.version }}/${{ inputs.board }}/
