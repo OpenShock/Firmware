@@ -19,6 +19,8 @@ runs:
     - name: Upload version file
       shell: bash
       run: |
+        mkdir upload
+        cd upload
         echo "${{ inputs.version }}" >> version-${{ inputs.release-channel }}.txt
-        rclone copy version-${{ inputs.release-channel }}.txt cdn:${{ inputs.cf-bucket }}/
+        rclone copy . cdn:${{ inputs.cf-bucket }}/
 
