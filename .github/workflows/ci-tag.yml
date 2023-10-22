@@ -140,7 +140,7 @@ jobs:
         with:
           cf-bucket: ${{ vars.CF_BUCKET }}
           version: ${{ github.ref_name }}
-          release-channel: ${{ contains(github.ref_name, '-') && 'stable' || 'beta' }}
+          release-channel: ${{ !contains(github.ref_name, '-') && 'stable' || 'beta' }}
 
   release:
     runs-on: ubuntu-latest
