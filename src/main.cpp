@@ -4,11 +4,12 @@
 #include "Constants.h"
 #include "EventHandlers/EventHandlers.h"
 #include "GatewayConnectionManager.h"
+#include "Logging.h"
+#include "OtaUpdateManager.h"
 #include "SerialInputHandler.h"
 #include "VisualStateManager.h"
 #include "WiFiManager.h"
 #include "WiFiScanManager.h"
-#include "Logging.h"
 
 #include <LittleFS.h>
 
@@ -18,6 +19,8 @@ const char* const TAG = "OpenShock";
 
 void setup() {
   Serial.begin(115'200);
+
+  OpenShock::OtaUpdateManager::Init();
 
   if (!LittleFS.begin(true)) {
     ESP_LOGE(TAG, "PANIC: An Error has occurred while mounting LittleFS, restarting in 5 seconds...");

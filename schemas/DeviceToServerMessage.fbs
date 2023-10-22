@@ -1,3 +1,6 @@
+include "./Types/OtaDownloadResultType.fbs";
+include "./Types/OtaInstallResultType.fbs";
+
 attribute "fs_serializer";
 
 namespace OpenShock.Serialization;
@@ -6,8 +9,18 @@ struct KeepAlive {
     uptime:ulong;
 }
 
+struct OtaDownloadResult {
+  result: OtaDownloadResultType;
+}
+
+struct OtaInstallResult {
+  result: OtaInstallResultType;
+}
+
 union DeviceToServerMessagePayload {
-  KeepAlive
+  KeepAlive,
+  OtaDownloadResult,
+  OtaInstallResult,
 }
 
 table DeviceToServerMessage (fs_serializer) {

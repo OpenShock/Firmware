@@ -1,5 +1,6 @@
 include "./Types/ShockerCommandType.fbs";
 include "./Types/ShockerModelType.fbs";
+include "./Types/SemVer.fbs";
 
 attribute "fs_serializer";
 
@@ -21,9 +22,21 @@ struct CaptivePortalConfig {
   enabled:bool;
 }
 
+// Download a new firmware version.
+table OtaDownload {
+  version: SemVer;
+}
+
+// Begin installing downloaded firmware.
+table OtaInstall {
+  version: SemVer;
+}
+
 union ServerToDeviceMessagePayload {
   ShockerCommandList,
-  CaptivePortalConfig
+  CaptivePortalConfig,
+  OtaDownload,
+  OtaInstall
 }
 
 table ServerToDeviceMessage (fs_serializer) {

@@ -1,0 +1,7 @@
+namespace OpenShock;
+
+enum OtaInstallResultType : uint8 {
+  OK,
+  FAIL_AND_ROLLBACK,
+  FAIL_CRITICALLY,
+}

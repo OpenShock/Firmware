@@ -13,10 +13,17 @@ static_assert(FLATBUFFERS_VERSION_MAJOR == 23 &&
               FLATBUFFERS_VERSION_REVISION == 26,
              "Non-compatible flatbuffers version included");
 
+#include "OtaDownloadResultType_generated.h"
+#include "OtaInstallResultType_generated.h"
+
 namespace OpenShock {
 namespace Serialization {
 
 struct KeepAlive;
+
+struct OtaDownloadResult;
+
+struct OtaInstallResult;
 
 struct DeviceToServerMessage;
 struct DeviceToServerMessageBuilder;
@@ -24,29 +31,35 @@ struct DeviceToServerMessageBuilder;
 enum class DeviceToServerMessagePayload : uint8_t {
   NONE = 0,
   KeepAlive = 1,
+  OtaDownloadResult = 2,
+  OtaInstallResult = 3,
   MIN = NONE,
-  MAX = KeepAlive
+  MAX = OtaInstallResult
 };
 
-inline const DeviceToServerMessagePayload (&EnumValuesDeviceToServerMessagePayload())[2] {
+inline const DeviceToServerMessagePayload (&EnumValuesDeviceToServerMessagePayload())[4] {
   static const DeviceToServerMessagePayload values[] = {
     DeviceToServerMessagePayload::NONE,
-    DeviceToServerMessagePayload::KeepAlive
+    DeviceToServerMessagePayload::KeepAlive,
+    DeviceToServerMessagePayload::OtaDownloadResult,
+    DeviceToServerMessagePayload::OtaInstallResult
   };
   return values;
 }
 
 inline const char * const *EnumNamesDeviceToServerMessagePayload() {
-  static const char * const names[3] = {
+  static const char * const names[5] = {
     "NONE",
     "KeepAlive",
+    "OtaDownloadResult",
+    "OtaInstallResult",
     nullptr
   };
   return names;
 }
 
 inline const char *EnumNameDeviceToServerMessagePayload(DeviceToServerMessagePayload e) {
-  if (::flatbuffers::IsOutRange(e, DeviceToServerMessagePayload::NONE, DeviceToServerMessagePayload::KeepAlive)) return "";
+  if (::flatbuffers::IsOutRange(e, DeviceToServerMessagePayload::NONE, DeviceToServerMessagePayload::OtaInstallResult)) return "";
   const size_t index = static_cast<size_t>(e);
   return EnumNamesDeviceToServerMessagePayload()[index];
 }
@@ -57,6 +70,14 @@ template<typename T> struct DeviceToServerMessagePayloadTraits {
 
 template<> struct DeviceToServerMessagePayloadTraits<OpenShock::Serialization::KeepAlive> {
   static const DeviceToServerMessagePayload enum_value = DeviceToServerMessagePayload::KeepAlive;
+};
+
+template<> struct DeviceToServerMessagePayloadTraits<OpenShock::Serialization::OtaDownloadResult> {
+  static const DeviceToServerMessagePayload enum_value = DeviceToServerMessagePayload::OtaDownloadResult;
+};
+
+template<> struct DeviceToServerMessagePayloadTraits<OpenShock::Serialization::OtaInstallResult> {
+  static const DeviceToServerMessagePayload enum_value = DeviceToServerMessagePayload::OtaInstallResult;
 };
 
 bool VerifyDeviceToServerMessagePayload(::flatbuffers::Verifier &verifier, const void *obj, DeviceToServerMessagePayload type);
@@ -87,6 +108,56 @@ struct KeepAlive::Traits {
   using type = KeepAlive;
 };
 
+FLATBUFFERS_MANUALLY_ALIGNED_STRUCT(1) OtaDownloadResult FLATBUFFERS_FINAL_CLASS {
+ private:
+  uint8_t result_;
+
+ public:
+  struct Traits;
+  static FLATBUFFERS_CONSTEXPR_CPP11 const char *GetFullyQualifiedName() {
+    return "OpenShock.Serialization.OtaDownloadResult";
+  }
+  OtaDownloadResult()
+      : result_(0) {
+  }
+  OtaDownloadResult(OpenShock::OtaDownloadResultType _result)
+      : result_(::flatbuffers::EndianScalar(static_cast<uint8_t>(_result))) {
+  }
+  OpenShock::OtaDownloadResultType result() const {
+    return static_cast<OpenShock::OtaDownloadResultType>(::flatbuffers::EndianScalar(result_));
+  }
+};
+FLATBUFFERS_STRUCT_END(OtaDownloadResult, 1);
+
+struct OtaDownloadResult::Traits {
+  using type = OtaDownloadResult;
+};
+
+FLATBUFFERS_MANUALLY_ALIGNED_STRUCT(1) OtaInstallResult FLATBUFFERS_FINAL_CLASS {
+ private:
+  uint8_t result_;
+
+ public:
+  struct Traits;
+  static FLATBUFFERS_CONSTEXPR_CPP11 const char *GetFullyQualifiedName() {
+    return "OpenShock.Serialization.OtaInstallResult";
+  }
+  OtaInstallResult()
+      : result_(0) {
+  }
+  OtaInstallResult(OpenShock::OtaInstallResultType _result)
+      : result_(::flatbuffers::EndianScalar(static_cast<uint8_t>(_result))) {
+  }
+  OpenShock::OtaInstallResultType result() const {
+    return static_cast<OpenShock::OtaInstallResultType>(::flatbuffers::EndianScalar(result_));
+  }
+};
+FLATBUFFERS_STRUCT_END(OtaInstallResult, 1);
+
+struct OtaInstallResult::Traits {
+  using type = OtaInstallResult;
+};
+
 struct DeviceToServerMessage FLATBUFFERS_FINAL_CLASS : private ::flatbuffers::Table {
   typedef DeviceToServerMessageBuilder Builder;
   struct Traits;
@@ -107,6 +178,12 @@ struct DeviceToServerMessage FLATBUFFERS_FINAL_CLASS : private ::flatbuffers::Ta
   const OpenShock::Serialization::KeepAlive *payload_as_KeepAlive() const {
     return payload_type() == OpenShock::Serialization::DeviceToServerMessagePayload::KeepAlive ? static_cast<const OpenShock::Serialization::KeepAlive *>(payload()) : nullptr;
   }
+  const OpenShock::Serialization::OtaDownloadResult *payload_as_OtaDownloadResult() const {
+    return payload_type() == OpenShock::Serialization::DeviceToServerMessagePayload::OtaDownloadResult ? static_cast<const OpenShock::Serialization::OtaDownloadResult *>(payload()) : nullptr;
+  }
+  const OpenShock::Serialization::OtaInstallResult *payload_as_OtaInstallResult() const {
+    return payload_type() == OpenShock::Serialization::DeviceToServerMessagePayload::OtaInstallResult ? static_cast<const OpenShock::Serialization::OtaInstallResult *>(payload()) : nullptr;
+  }
   bool Verify(::flatbuffers::Verifier &verifier) const {
     return VerifyTableStart(verifier) &&
            VerifyField<uint8_t>(verifier, VT_PAYLOAD_TYPE, 1) &&
@@ -118,6 +195,14 @@ struct DeviceToServerMessage FLATBUFFERS_FINAL_CLASS : private ::flatbuffers::Ta
 
 template<> inline const OpenShock::Serialization::KeepAlive *DeviceToServerMessage::payload_as<OpenShock::Serialization::KeepAlive>() const {
   return payload_as_KeepAlive();
+}
+
+template<> inline const OpenShock::Serialization::OtaDownloadResult *DeviceToServerMessage::payload_as<OpenShock::Serialization::OtaDownloadResult>() const {
+  return payload_as_OtaDownloadResult();
+}
+
+template<> inline const OpenShock::Serialization::OtaInstallResult *DeviceToServerMessage::payload_as<OpenShock::Serialization::OtaInstallResult>() const {
+  return payload_as_OtaInstallResult();
 }
 
 struct DeviceToServerMessageBuilder {
@@ -163,6 +248,12 @@ inline bool VerifyDeviceToServerMessagePayload(::flatbuffers::Verifier &verifier
     }
     case DeviceToServerMessagePayload::KeepAlive: {
       return verifier.VerifyField<OpenShock::Serialization::KeepAlive>(static_cast<const uint8_t *>(obj), 0, 8);
+    }
+    case DeviceToServerMessagePayload::OtaDownloadResult: {
+      return verifier.VerifyField<OpenShock::Serialization::OtaDownloadResult>(static_cast<const uint8_t *>(obj), 0, 1);
+    }
+    case DeviceToServerMessagePayload::OtaInstallResult: {
+      return verifier.VerifyField<OpenShock::Serialization::OtaInstallResult>(static_cast<const uint8_t *>(obj), 0, 1);
     }
     default: return true;
   }
