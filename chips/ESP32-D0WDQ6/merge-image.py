@@ -10,6 +10,6 @@ esptool.main([
     '0x1000', './bootloader.bin',
     '0x8000', './partitions.bin',
     '0x10000', './firmware.bin',
-    '0x390000', './littlefs.bin'
+    '0x390000', './filesystem.bin'
 ])
 # fmt: on
