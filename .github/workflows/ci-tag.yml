@@ -90,7 +90,7 @@ jobs:
 
   upload:
     runs-on: ubuntu-latest
-    needs: [get-targets]
+    needs: [get-targets, merge-images]
     environment: cdn-firmware-r2
     strategy:
       fail-fast: true
