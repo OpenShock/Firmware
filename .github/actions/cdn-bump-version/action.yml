@@ -20,5 +20,5 @@ runs:
       shell: bash
       run: |
         echo "${{ inputs.version }}" >> version-${{ inputs.release-channel }}.txt
-        rclone copy version-${{ inputs.release-channel }}.txt cnd:${{ inputs.cf-bucket }}/
+        rclone copy version-${{ inputs.release-channel }}.txt cdn:${{ inputs.cf-bucket }}/
 
