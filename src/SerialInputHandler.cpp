@@ -38,6 +38,9 @@ void _handleHelpCommand(char* arg, std::size_t argLength) {
   }
 
   if (strcmp(arg, kCommandRmtpin) == 0) {
+    Serial.println("rmtpin");
+    Serial.println("  Get the GPIO pin used for the radio transmitter.");
+    Serial.println();
     Serial.println("rmtpin [<pin>]");
     Serial.println("  Set the GPIO pin used for the radio transmitter.");
     Serial.println("  Arguments:");
@@ -58,6 +61,9 @@ void _handleHelpCommand(char* arg, std::size_t argLength) {
   }
 
   if (strcmp(arg, kCommandNetworks) == 0) {
+    Serial.println("networks");
+    Serial.println("  Get all saved networks.");
+    Serial.println();
     Serial.println("networks [<json>]");
     Serial.println("  Set all saved networks.");
     Serial.println("  Arguments:");
