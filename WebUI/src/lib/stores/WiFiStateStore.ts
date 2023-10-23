@@ -1,3 +1,4 @@
+import type { WifiScanStatus } from '$lib/_fbs/open-shock';
 import type { WiFiNetwork } from '$lib/types/WiFiNetwork';
 import type { WiFiState } from '$lib/types/WiFiState';
 import { writable } from 'svelte/store';
@@ -5,7 +6,7 @@ import { writable } from 'svelte/store';
 const { subscribe, update } = writable<WiFiState>({
   initialized: false,
   connected: null,
-  scanning: false,
+  scan_status: null,
   networks: new Map<string, WiFiNetwork>(),
 });
 
@@ -23,9 +24,9 @@ export const WiFiStateStore = {
       return store;
     });
   },
-  setScanning(scanning: boolean) {
+  setScanStatus(scanStatus: WifiScanStatus | null) {
     update((store) => {
-      store.scanning = scanning;
+      store.scan_status = scanStatus;
       return store;
     });
   },

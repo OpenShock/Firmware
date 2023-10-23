@@ -11,11 +11,12 @@ import { WifiNetworkSavedEvent } from '$lib/_fbs/open-shock/serialization/local/
 import { WifiNetworkRemovedEvent } from '$lib/_fbs/open-shock/serialization/local/wifi-network-removed-event';
 import { WifiNetworkConnectedEvent } from '$lib/_fbs/open-shock/serialization/local/wifi-network-connected-event';
 import { WifiNetworkDisconnectedEvent } from '$lib/_fbs/open-shock/serialization/local/wifi-network-disconnected-event';
-import { WifiScanStatus } from '$lib/_fbs/open-shock';
 import { WiFiStateStore } from '$lib/stores';
 import type { WiFiNetwork } from '$lib/types/WiFiNetwork';
 import { WifiNetwork as FbsWifiNetwork } from '$lib/_fbs/open-shock/serialization/local/wifi-network';
 import { SerializeWifiScanCommand } from '$lib/Serializers/WifiScanCommand';
+import { toastDelegator } from '$lib/stores/ToastDelegator';
+import { WifiScanStatus } from '$lib/_fbs/open-shock';
 
 type MessageHandler = (wsClient: WebSocketClient, message: DeviceToLocalMessage) => void;
 
@@ -34,31 +35,29 @@ PayloadHandlers[DeviceToLocalMessagePayload.ReadyMessage] = (cli, msg) => {
 
   const data = SerializeWifiScanCommand(true);
   cli.Send(data);
+
+  toastDelegator.trigger({
+    message: 'Websocket connection established',
+    background: 'bg-green-500',
+  });
 };
 
 PayloadHandlers[DeviceToLocalMessagePayload.WifiScanStatusMessage] = (cli, msg) => {
   const payload = new WifiScanStatusMessage();
   msg.payload(payload);
 
-  switch (payload.status()) {
-    case WifiScanStatus.Started:
-      WiFiStateStore.setScanning(true);
-      break;
-    case WifiScanStatus.InProgress:
-      WiFiStateStore.setScanning(true);
-      break;
-    case WifiScanStatus.Completed:
-      WiFiStateStore.setScanning(false);
-      break;
-    case WifiScanStatus.Aborted:
-      WiFiStateStore.setScanning(false);
-      break;
-    case WifiScanStatus.Error:
-      WiFiStateStore.setScanning(false);
-      break;
-    default:
-      console.warn('[WS] Received invalid scan status message:', payload.status());
-      return;
+  WiFiStateStore.setScanStatus(payload.status());
+
+  if (payload.status() === WifiScanStatus.Started) {
+    toastDelegator.trigger({
+      message: 'WiFi scan started',
+      background: 'bg-green-500',
+    });
+  } else if (payload.status() === WifiScanStatus.Completed) {
+    toastDelegator.trigger({
+      message: 'WiFi scan completed',
+      background: 'bg-green-500',
+    });
   }
 };
 
@@ -137,20 +136,40 @@ PayloadHandlers[DeviceToLocalMessagePayload.WifiNetworkLostEvent] = (cli, msg) =
 PayloadHandlers[DeviceToLocalMessagePayload.WifiNetworkSavedEvent] = (cli, msg) => {
   const payload = new WifiNetworkSavedEvent();
   msg.payload(payload);
+
+  toastDelegator.trigger({
+    message: 'WiFi network saved: ' + payload.network()?.ssid(),
+    background: 'bg-green-500',
+  });
 };
 
 PayloadHandlers[DeviceToLocalMessagePayload.WifiNetworkRemovedEvent] = (cli, msg) => {
   const payload = new WifiNetworkRemovedEvent();
   msg.payload(payload);
+
+  toastDelegator.trigger({
+    message: 'WiFi network removed: ' + payload.network()?.ssid(),
+    background: 'bg-green-500',
+  });
 };
 PayloadHandlers[DeviceToLocalMessagePayload.WifiNetworkConnectedEvent] = (cli, msg) => {
   const payload = new WifiNetworkConnectedEvent();
   msg.payload(payload);
+
+  toastDelegator.trigger({
+    message: 'WiFi network connected: ' + payload.network()?.ssid(),
+    background: 'bg-green-500',
+  });
 };
 
 PayloadHandlers[DeviceToLocalMessagePayload.WifiNetworkDisconnectedEvent] = (cli, msg) => {
   const payload = new WifiNetworkDisconnectedEvent();
   msg.payload(payload);
+
+  toastDelegator.trigger({
+    message: 'WiFi network disconnected: ' + payload.network()?.ssid(),
+    background: 'bg-green-500',
+  });
 };
 
 export function WebSocketMessageBinaryHandler(cli: WebSocketClient, data: ArrayBuffer) {

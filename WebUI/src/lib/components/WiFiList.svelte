@@ -9,13 +9,17 @@
   import { SerializeWifiNetworkDisconnectCommand } from '$lib/Serializers/WifiNetworkDisconnectCommand';
   import { SerializeWifiNetworkConnectCommand } from '$lib/Serializers/WifiNetworkConnectCommand';
   import { SerializeWifiNetworkSaveCommand } from '$lib/Serializers/WifiNetworkSaveCommand';
+  import { WifiScanStatus } from '$lib/_fbs/open-shock';
 
   const modalStore = getModalStore();
+
+  $: scanStatus = $WiFiStateStore.scan_status;
+  $: isScanning = scanStatus === WifiScanStatus.Started || scanStatus === WifiScanStatus.InProgress;
 
   let connectedBSSID: string | null = null;
 
   function wifiScan() {
-    const data = SerializeWifiScanCommand(!$WiFiStateStore.scanning);
+    const data = SerializeWifiScanCommand(!isScanning);
     WebSocketClient.Instance.Send(data);
   }
   function wifiAuthenticate(item: WiFiNetwork) {
@@ -59,7 +63,7 @@
   <div class="flex justify-between items-center mb-2">
     <h3 class="h3">Configure WiFi</h3>
     <button class="btn variant-outline" on:click={wifiScan}>
-      {#if $WiFiStateStore.scanning}
+      {#if isScanning}
         <i class="fa fa-spinner fa-spin"></i>
       {:else}
         <i class="fa fa-rotate-right"></i>

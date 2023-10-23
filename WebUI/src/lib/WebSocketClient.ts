@@ -3,6 +3,7 @@ import { isArrayBuffer, isString } from './TypeGuards/BasicGuards';
 import { WebSocketMessageBinaryHandler } from './MessageHandlers';
 import { page } from '$app/stores';
 import { get } from 'svelte/store';
+import { toastDelegator } from './stores/ToastDelegator';
 
 function getWebSocketHostname() {
   if (!browser) {
@@ -125,6 +126,10 @@ export class WebSocketClient {
   private handleClose(ev: CloseEvent) {
     if (!ev.wasClean) {
       console.error('[WS] ERROR: Connection closed unexpectedly');
+      toastDelegator.trigger({
+        message: 'Websocket connection closed unexpectedly',
+        background: 'bg-red-500',
+      });
     } else {
       console.log('[WS] Received disconnect: ', ev.reason);
     }
