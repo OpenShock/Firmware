@@ -234,6 +234,8 @@ bool _trySaveConfig() {
 
   file.close();
 
+  ESP_LOGV(TAG, "Successfully saved config file");
+
   return true;
 }
 
