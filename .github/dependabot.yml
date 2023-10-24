@@ -19,7 +19,7 @@ updates:
       interval: 'weekly'
       day: 'monday'
       time: '06:00'
-    group:
+    groups:
       npm-dependencies:
         patterns:
           - '*' # Group all updates together
