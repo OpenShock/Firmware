@@ -2,10 +2,10 @@
 
 #include "CommandHandler.h"
 #include "Config.h"
+#include "Logging.h"
 
 #include <ArduinoJson.h>
 #include <Esp.h>
-#include "Logging.h"
 
 #include <unordered_map>
 
