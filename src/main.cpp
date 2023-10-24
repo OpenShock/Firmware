@@ -1,3 +1,4 @@
+#include "main.h"
 #include "CaptivePortal.h"
 #include "CommandHandler.h"
 #include "Config.h"
@@ -17,11 +18,26 @@
 
 const char* const TAG = "OpenShock";
 
+static void (*s_setup)() = normalSetup;
+static void (*s_loop)()  = normalLoop;
+
 void setup() {
   Serial.begin(115'200);
 
   OpenShock::OtaUpdateManager::Init();
+  if (OpenShock::OtaUpdateManager::IsPerformingUpdate()) {
+    s_setup = OpenShock::OtaUpdateManager::Setup;
+    s_loop  = OpenShock::OtaUpdateManager::Update;
+  }
 
+  s_setup();
+}
+
+void loop() {
+  s_loop();
+}
+
+void normalSetup() {
   if (!LittleFS.begin(true)) {
     ESP_LOGE(TAG, "PANIC: An Error has occurred while mounting LittleFS, restarting in 5 seconds...");
     delay(5000);
@@ -54,7 +70,7 @@ void setup() {
   }
 }
 
-void loop() {
+void normalLoop() {
   OpenShock::SerialInputHandler::Update();
   OpenShock::CaptivePortal::Update();
   OpenShock::GatewayConnectionManager::Update();

@@ -13,8 +13,9 @@ using namespace OpenShock;
   static std::vector<WiFiNetwork> s_wifiNetworks;
 */
 
-static const char* TAG                          = "OtaUpdateManager";
-static OtaUpdateManager::OtaUpdateState s_state = OtaUpdateManager::NONE;
+static const char* TAG                       = "OtaUpdateManager";
+static OtaUpdateManager::BootMode s_bootMode = OtaUpdateManager::BootMode::NORMAL;
+static OtaUpdateManager::UpdateState s_state = OtaUpdateManager::UpdateState::NONE;
 
 void OtaUpdateManager::Init() {
   ESP_LOGD(TAG, "Fetching current partition");
@@ -31,18 +32,23 @@ void OtaUpdateManager::Init() {
   ESP_LOGD(TAG, "Partition state: %u", states);
 
   // If the currently booting partition is being verified, set correct state.
+  s_bootMode = OtaUpdateManager::BootMode::NORMAL;
   if (states == ESP_OTA_IMG_PENDING_VERIFY) {
-    s_state = OtaUpdateManager::FILESYSTEM_PENDING_WIFI;
+    s_bootMode = OtaUpdateManager::BootMode::OTA_UPDATE;
   }
 }
 
+void OtaUpdateManager::Setup() { }
 void OtaUpdateManager::Update() { }
 
-OtaUpdateManager::OtaUpdateState OtaUpdateManager::GetState() {
-  return s_state;
+bool OtaUpdateManager::IsPerformingUpdate() {
+  return s_bootMode == OtaUpdateManager::BootMode::OTA_UPDATE;
 }
 
-bool OtaUpdateManager::IsUpdateAvailable() {
-  return false;
+OtaUpdateManager::BootMode OtaUpdateManager::GetBootMode() {
+  return s_bootMode;
 }
-bool OtaUpdateManager::IsPerformingUpdate() { }
+
+OtaUpdateManager::UpdateState OtaUpdateManager::GetState() {
+  return s_state;
+}
