@@ -39,9 +39,10 @@ void OtaUpdateManager::Init() {
 }
 
 void OtaUpdateManager::Setup() { }
-void OtaUpdateManager::Update() { }
 
-bool OtaUpdateManager::IsPerformingUpdate() {
+void OtaUpdateManager::Loop() { }
+
+inline bool OtaUpdateManager::IsPerformingUpdate() {
   return s_bootMode == OtaUpdateManager::BootMode::OTA_UPDATE;
 }
 

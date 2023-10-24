@@ -36,7 +36,8 @@ namespace OpenShock::OtaUpdateManager {
 
   /* Alternative setup() method. */
   void Setup();
-  void Update();
+  /* Alternative loop() method. */
+  void Loop();
 
   bool IsPerformingUpdate();
 

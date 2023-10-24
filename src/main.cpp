@@ -18,26 +18,16 @@
 
 const char* const TAG = "OpenShock";
 
-static void (*s_setup)() = normalSetup;
-static void (*s_loop)()  = normalLoop;
-
 void setup() {
   Serial.begin(115'200);
 
+  // Delegate startup to OtaManager if an ota update is ongoing
   OpenShock::OtaUpdateManager::Init();
   if (OpenShock::OtaUpdateManager::IsPerformingUpdate()) {
-    s_setup = OpenShock::OtaUpdateManager::Setup;
-    s_loop  = OpenShock::OtaUpdateManager::Update;
+    OpenShock::OtaUpdateManager::Setup();
+    return;
   }
 
-  s_setup();
-}
-
-void loop() {
-  s_loop();
-}
-
-void normalSetup() {
   if (!LittleFS.begin(true)) {
     ESP_LOGE(TAG, "PANIC: An Error has occurred while mounting LittleFS, restarting in 5 seconds...");
     delay(5000);
@@ -45,12 +35,9 @@ void normalSetup() {
   }
 
   OpenShock::EventHandlers::Init();
-
   OpenShock::VisualStateManager::Init();
-
   OpenShock::SerialInputHandler::PrintWelcomeHeader();
   OpenShock::SerialInputHandler::PrintVersionInfo();
-
   OpenShock::Config::Init();
 
   if (!OpenShock::CommandHandler::Init()) {
@@ -70,7 +57,11 @@ void normalSetup() {
   }
 }
 
-void normalLoop() {
+void loop() {
+  if (OpenShock::OtaUpdateManager::IsPerformingUpdate()) {
+    OpenShock::OtaUpdateManager::Loop();
+    return
+  }
   OpenShock::SerialInputHandler::Update();
   OpenShock::CaptivePortal::Update();
   OpenShock::GatewayConnectionManager::Update();
