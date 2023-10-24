@@ -42,7 +42,7 @@ void OtaUpdateManager::Setup() { }
 
 void OtaUpdateManager::Loop() { }
 
-inline bool OtaUpdateManager::IsPerformingUpdate() {
+bool OtaUpdateManager::IsPerformingUpdate() {
   return s_bootMode == OtaUpdateManager::BootMode::OTA_UPDATE;
 }
 

@@ -59,7 +59,7 @@ void setup() {
 void loop() {
   if (OpenShock::OtaUpdateManager::IsPerformingUpdate()) {
     OpenShock::OtaUpdateManager::Loop();
-    return
+    return;
   }
   OpenShock::SerialInputHandler::Update();
   OpenShock::CaptivePortal::Update();
