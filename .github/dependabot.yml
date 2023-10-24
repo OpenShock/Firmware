@@ -11,3 +11,11 @@ updates:
     directory: "/"
     schedule:
       interval: "daily"
+
+  # Check for npm updates
+  - package-ecosystem: 'npm'
+    directory: '/WebUI'
+    schedule:
+      interval: 'weekly'
+      day: 'monday'
+      time: '06:00'
