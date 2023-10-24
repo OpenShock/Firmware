@@ -7,8 +7,7 @@ These certificates are fetched from [CURL's website](https://curl.se/docs/caextr
 1. Download the latest version of the certificate bundle along with its sha256 from [CURL's website](https://curl.se/docs/caextract.html).
 2. Replace the `cacrt_all.pem` file in this directory with the new one.
 3. Run `gen_crt_bundle.py` to generate the new `x509_crt_bundle` file.
-4. Move the new `x509_crt_bundle` file to the `data/cert` directory.
-5. Commit the changes.
+4. Commit the changes.
 
 ## References
 

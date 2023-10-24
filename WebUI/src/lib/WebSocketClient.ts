@@ -1,6 +1,25 @@
 import { browser } from '$app/environment';
 import { isArrayBuffer, isString } from './TypeGuards/BasicGuards';
 import { WebSocketMessageBinaryHandler } from './MessageHandlers';
+import { page } from '$app/stores';
+import { get } from 'svelte/store';
+
+function getWebSocketHostname() {
+  if (!browser) {
+    return null;
+  }
+
+  const { url } = get(page);
+  const hostname = url.hostname;
+
+  switch (hostname) {
+    case 'localhost':
+    case '127.0.0.1':
+      return '10.10.10.10';
+    default:
+      return hostname;
+  }
+}
 
 export enum ConnectionState {
   DISCONNECTED = 0,
@@ -49,7 +68,14 @@ export class WebSocketClient {
     this._autoReconnect = true;
     this.ConnectionState = ConnectionState.CONNECTING;
 
-    this._socket = new WebSocket('ws://10.10.10.10:81/ws');
+    const hostname = getWebSocketHostname();
+    if (!hostname) {
+      console.error('[WS] ERROR: Failed to get WebSocket hostname');
+      this.ReconnectIfWanted();
+      return;
+    }
+
+    this._socket = new WebSocket(`ws://${hostname}:81/ws`);
     this._socket.binaryType = 'arraybuffer';
     this._socket.onopen = this.handleOpen.bind(this);
     this._socket.onclose = this.handleClose.bind(this);
