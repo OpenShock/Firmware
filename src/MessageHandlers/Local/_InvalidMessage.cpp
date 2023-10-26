@@ -12,5 +12,5 @@ void _Private::HandleInvalidMessage(std::uint8_t socketId, const OpenShock::Seri
     return;
   }
 
-  ESP_LOGE(TAG, "Invalid message type: %d", root->payload_type());
+  ESP_LOGE(TAG, "Invalid message type: %u", (std::uint8_t)root->payload_type());
 }

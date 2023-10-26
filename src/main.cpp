@@ -58,3 +58,12 @@ void loop() {
   OpenShock::WiFiScanManager::Update();
   OpenShock::WiFiManager::Update();
 }
+
+extern "C" void app_main() {
+  initArduino();
+  setup();
+  while (true) {
+    loop();
+    vTaskDelay(1);
+  }
+}

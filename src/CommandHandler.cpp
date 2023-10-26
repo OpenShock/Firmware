@@ -58,7 +58,7 @@ bool CommandHandler::HandleCommand(ShockerModelType model, std::uint16_t shocker
 
     s_rfTransmitter->ClearPendingCommands();
   } else {
-    ESP_LOGV(TAG, "Command received: %u %u %u %u", model, shockerId, type, intensity);
+    ESP_LOGV(TAG, "Command received: %u %u %u %u", (std::uint8_t)model, shockerId, (std::uint8_t)type, intensity);
   }
 
   return s_rfTransmitter->SendCommand(model, shockerId, type, intensity, durationMs);

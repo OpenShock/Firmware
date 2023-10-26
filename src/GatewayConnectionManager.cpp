@@ -6,7 +6,8 @@
 #include "Logging.h"
 #include "Time.h"
 
-#include <ArduinoJson.h>
+#include <cJSON.h>
+
 #include <HTTPClient.h>
 
 #include <memory>
@@ -66,24 +67,59 @@ bool GatewayConnectionManager::IsConnected() {
 }
 
 void GetDeviceInfoFromJsonResponse(HTTPClient& client) {
-  ArduinoJson::DynamicJsonDocument doc(1024);  // TODO: profile the normal message size and adjust this accordingly
-  deserializeJson(doc, client.getString());
+  String json = client.getString();
+  std::shared_ptr<cJSON> root = std::shared_ptr<cJSON>(cJSON_ParseWithLength(json.c_str(), json.length()), cJSON_Delete);
+  if (root == nullptr) {
+    const char *error_ptr = cJSON_GetErrorPtr();
+    if (error_ptr != nullptr)
+    {
+      ESP_LOGE(TAG, "Error parsing JSON: %s", error_ptr);
+    }
+    return;
+  }
 
-  auto data   = doc["data"];
-  String id   = data["id"];
-  String name = data["name"];
+  const cJSON* data = cJSON_GetObjectItemCaseSensitive(root.get(), "data");
+  if (!cJSON_IsObject(data)) {
+    ESP_LOGE(TAG, "Invalid JSON response");
+    return;
+  }
 
-  ESP_LOGD(TAG, "Device ID:   %s", id.c_str());
-  ESP_LOGD(TAG, "Device name: %s", name.c_str());
+  const cJSON* deviceId = cJSON_GetObjectItemCaseSensitive(data, "id");
+  const cJSON* deviceName = cJSON_GetObjectItemCaseSensitive(data, "name");
+  const cJSON* deviceShockers = cJSON_GetObjectItemCaseSensitive(data, "shockers");
 
-  auto shockers = data["shockers"];
-  for (int i = 0; i < shockers.size(); i++) {
-    auto shocker              = shockers[i];
-    String shockerId          = shocker["id"];
-    std::uint16_t shockerRfId = shocker["rfId"];
-    std::uint8_t shockerModel = shocker["model"];
+  if (!cJSON_IsString(deviceId) || !cJSON_IsString(deviceName) || !cJSON_IsArray(deviceShockers)) {
+    ESP_LOGE(TAG, "Invalid JSON response");
+    return;
+  }
 
-    ESP_LOGD(TAG, "Found shocker %s with RF ID %u and model %u", shockerId.c_str(), shockerRfId, shockerModel);
+  ESP_LOGD(TAG, "Device ID:   %s", deviceId->valuestring);
+  ESP_LOGD(TAG, "Device name: %s", deviceName->valuestring);
+
+  cJSON* shocker = nullptr;
+  cJSON_ArrayForEach(shocker, deviceShockers) {
+    const cJSON* shockerId = cJSON_GetObjectItemCaseSensitive(shocker, "id");
+    const cJSON* shockerRfId = cJSON_GetObjectItemCaseSensitive(shocker, "rfId");
+    const cJSON* shockerModel = cJSON_GetObjectItemCaseSensitive(shocker, "model");
+
+    if (!cJSON_IsString(shockerId) || !cJSON_IsNumber(shockerRfId) || !cJSON_IsNumber(shockerModel)) {
+      ESP_LOGE(TAG, "Invalid JSON response");
+      return;
+    }
+
+    const char* shockerIdStr = shockerId->valuestring;
+    int shockerRfIdInt = shockerRfId->valueint;
+    int shockerModelInt = shockerModel->valueint;
+
+    if (shockerRfIdInt < 0 || shockerRfIdInt > UINT16_MAX || shockerModelInt < 0 || shockerModelInt > UINT8_MAX) {
+      ESP_LOGE(TAG, "Invalid JSON response");
+      return;
+    }
+
+    std::uint16_t shockerRfIdU16 = shockerRfIdInt;
+    std::uint8_t shockerModelU8 = shockerModelInt;
+
+    ESP_LOGD(TAG, "Found shocker %s with RF ID %u and model %u", shockerIdStr, shockerRfIdU16, shockerModelU8);
   }
 }
 
@@ -91,14 +127,26 @@ bool GatewayConnectionManager::IsPaired() {
   return (s_flags & FLAG_AUTHENTICATED) != 0;
 }
 
-// This method is here to heap usage
 std::string GetAuthTokenFromJsonResponse(HTTPClient& client) {
-  ArduinoJson::DynamicJsonDocument doc(1024);  // TODO: profile the normal message size and adjust this accordingly
-  deserializeJson(doc, client.getString());
+  String json = client.getString();
+  std::shared_ptr<cJSON> root = std::shared_ptr<cJSON>(cJSON_ParseWithLength(json.c_str(), json.length()), cJSON_Delete);
+  if (root == nullptr) {
+    const char *error_ptr = cJSON_GetErrorPtr();
+    if (error_ptr != nullptr)
+    {
+      ESP_LOGE(TAG, "Error parsing JSON: %s", error_ptr);
+    }
+    return "";
+  }
 
-  String str = doc["data"];
+  const cJSON* data = cJSON_GetObjectItemCaseSensitive(root.get(), "data");
+  if (!cJSON_IsString(data)) {
+    ESP_LOGE(TAG, "Invalid JSON response");
+    return "";
+  }
 
-  return std::string(str.c_str(), str.length());
+
+  return std::string(data->valuestring);
 }
 
 bool GatewayConnectionManager::Pair(const char* pairCode) {
@@ -135,7 +183,7 @@ bool GatewayConnectionManager::Pair(const char* pairCode) {
   Config::SetBackendAuthToken(authToken);
 
   s_flags |= FLAG_AUTHENTICATED;
-  ESP_LOGD(TAG, "Successfully paired with pair code %u", pairCode);
+  ESP_LOGD(TAG, "Successfully paired with pair code %s", pairCode);
 
   return true;
 }
@@ -220,22 +268,39 @@ bool ConnectToLCG() {
     return false;
   }
 
-  ArduinoJson::DynamicJsonDocument doc(1024);  // TODO: profile the normal message size and adjust this accordingly
-  deserializeJson(doc, client.getString());
-
-  auto data           = doc["data"];
-  const char* fqdn    = data["fqdn"];
-  const char* country = data["country"];
+  String json = client.getString();
 
   client.end();
 
-  if (fqdn == nullptr || country == nullptr) {
-    ESP_LOGE(TAG, "Received invalid response from LCG endpoint");
+  std::shared_ptr<cJSON> root = std::shared_ptr<cJSON>(cJSON_ParseWithLength(json.c_str(), json.length()), cJSON_Delete);
+  if (root == nullptr) {
+    const char *error_ptr = cJSON_GetErrorPtr();
+    if (error_ptr != nullptr)
+    {
+      ESP_LOGE(TAG, "Error parsing JSON: %s", error_ptr);
+    }
     return false;
   }
 
-  ESP_LOGD(TAG, "Connecting to LCG endpoint %s in country %s", fqdn, country);
-  s_wsClient->connect(fqdn);
+  const cJSON* data = cJSON_GetObjectItemCaseSensitive(root.get(), "data");
+  if (!cJSON_IsObject(data)) {
+    ESP_LOGE(TAG, "Invalid JSON response");
+    return false;
+  }
+
+  const cJSON* fqdn    = cJSON_GetObjectItemCaseSensitive(data, "fqdn");
+  const cJSON* country = cJSON_GetObjectItemCaseSensitive(data, "country");
+
+  if (!cJSON_IsString(fqdn) || !cJSON_IsString(country)) {
+    ESP_LOGE(TAG, "Invalid JSON response");
+    return false;
+  }
+
+  const char* fqdnStr    = fqdn->valuestring;
+  const char* countryStr = country->valuestring;
+
+  ESP_LOGD(TAG, "Connecting to LCG endpoint %s in country %s", fqdnStr, countryStr);
+  s_wsClient->connect(fqdnStr);
 
   return true;
 }

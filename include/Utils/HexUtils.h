@@ -20,7 +20,7 @@ namespace OpenShock::HexUtils {
   /// @param data The byte array to convert.
   /// @param output The output buffer to write to.
   /// @param upper Whether to use uppercase hex characters.
-  /// @remark To use this you must specify the size of the array in the template parameter. (e.g. ToHexMac<6>(...))
+  /// @remark To use this you must specify the size of the array in the template parameter. (e.g. ToHex<6>(...))
   template<std::size_t N>
   constexpr void ToHex(nonstd::span<const std::uint8_t, N> data, nonstd::span<char, N * 2> output, bool upper = true) noexcept {
     for (std::size_t i = 0; i < data.size(); ++i) {
@@ -32,7 +32,7 @@ namespace OpenShock::HexUtils {
   /// @param data The byte array to convert.
   /// @param upper Whether to use uppercase hex characters.
   /// @return The hex string.
-  /// @remark To use this you must specify the size of the array in the template parameter. (e.g. ToHexMac<6>(...))
+  /// @remark To use this you must specify the size of the array in the template parameter. (e.g. ToHex<6>(...))
   template<std::size_t N>
   constexpr std::array<char, (N * 2) + 1> ToHex(nonstd::span<const std::uint8_t, N> data, bool upper = true) noexcept {
     std::array<char, (N * 2) + 1> output {};

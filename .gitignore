@@ -11,3 +11,6 @@ data/www
 
 # ignore local config files
 *.local
+
+# Ignore esp-idf stuff
+managed_components

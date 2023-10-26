@@ -81,7 +81,7 @@ void CaptivePortalInstance::handleWebSocketEvent(std::uint8_t socketId, WebSocke
       break;
     default:
       m_socketDeFragger.clear();
-      ESP_LOGE(TAG, "Unknown WebSocket event type: %d", type);
+      ESP_LOGE(TAG, "Unknown WebSocket event type: %u", (std::uint8_t)type);
       break;
   }
 }
