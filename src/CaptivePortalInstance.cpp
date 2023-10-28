@@ -1,10 +1,13 @@
 #include "CaptivePortalInstance.h"
 
+#include "CommandHandler.h"
+#include "DevicePairStatus.h"
 #include "MessageHandlers/Local.h"
 #include "Logging.h"
 
 #include "_fbs/DeviceToLocalMessage_generated.h"
 
+#include <WiFi.h>
 #include <LittleFS.h>
 
 static const char* TAG = "CaptivePortalInstance";
@@ -37,7 +40,7 @@ void CaptivePortalInstance::handleWebSocketClientConnected(std::uint8_t socketId
   ESP_LOGD(TAG, "WebSocket client #%u connected from %s", socketId, m_socketServer.remoteIP(socketId).toString().c_str());
 
   flatbuffers::FlatBufferBuilder builder(32);
-  Serialization::Local::ReadyMessage readyMessage(true);
+  Serialization::Local::ReadyMessage readyMessage(true, WiFi.isConnected(), DevicePairStatus::Unpaired, CommandHandler::GetRfTxPin());
 
   auto readyMessageOffset = builder.CreateStruct(readyMessage);
 

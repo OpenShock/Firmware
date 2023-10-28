@@ -26,17 +26,17 @@ void _setScanInProgress(bool inProgress) {
     s_scanInProgress = inProgress;
     if (inProgress) {
       for (auto& it : s_statusChangedHandlers) {
-        it.second(WifiScanStatus::Started);
-        it.second(WifiScanStatus::InProgress);
+        it.second(WiFiScanStatus::Started);
+        it.second(WiFiScanStatus::InProgress);
       }
       WiFi.scanDelete();
     } else {
-      WifiScanStatus status;
+      WiFiScanStatus status;
       if (s_scanAborted) {
-        status        = WifiScanStatus::Aborted;
+        status        = WiFiScanStatus::Aborted;
         s_scanAborted = false;
       } else {
-        status = WifiScanStatus::Completed;
+        status = WiFiScanStatus::Completed;
       }
       for (auto& it : s_statusChangedHandlers) {
         it.second(status);
@@ -56,7 +56,7 @@ void _handleScanError(std::int16_t retval) {
   if (retval == WIFI_SCAN_FAILED) {
     ESP_LOGE(TAG, "Failed to start scan on channel %u", s_currentChannel);
     for (auto& it : s_statusChangedHandlers) {
-      it.second(WifiScanStatus::Error);
+      it.second(WiFiScanStatus::Error);
     }
     return;
   }

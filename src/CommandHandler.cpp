@@ -42,6 +42,10 @@ bool CommandHandler::SetRfTxPin(std::uint8_t txPin) {
   return true;
 }
 
+std::uint8_t CommandHandler::GetRfTxPin() {
+  return Config::GetRFConfig().txPin;
+}
+
 bool CommandHandler::HandleCommand(ShockerModelType model, std::uint16_t shockerId, ShockerCommandType type, std::uint8_t intensity, std::uint16_t durationMs) {
   if (s_rfTransmitter == nullptr) {
     ESP_LOGW(TAG, "RF Transmitter is not initialized, ignoring command");

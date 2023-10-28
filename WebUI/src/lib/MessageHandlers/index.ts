@@ -16,7 +16,9 @@ import type { WiFiNetwork } from '$lib/types/WiFiNetwork';
 import { WifiNetwork as FbsWifiNetwork } from '$lib/_fbs/open-shock/serialization/local/wifi-network';
 import { SerializeWifiScanCommand } from '$lib/Serializers/WifiScanCommand';
 import { toastDelegator } from '$lib/stores/ToastDelegator';
-import { WifiScanStatus } from '$lib/_fbs/open-shock';
+import { WifiScanStatus } from '$lib/_fbs/open-shock/serialization/types/wifi-scan-status';
+import { PairStateChangedEvent } from '$lib/_fbs/open-shock/serialization/local/pair-state-changed-event';
+import { RfTxPinChangedEvent } from '$lib/_fbs/open-shock/serialization/local/rf-tx-pin-changed-event';
 
 type MessageHandler = (wsClient: WebSocketClient, message: DeviceToLocalMessage) => void;
 
@@ -168,6 +170,26 @@ PayloadHandlers[DeviceToLocalMessagePayload.WifiNetworkDisconnectedEvent] = (cli
 
   toastDelegator.trigger({
     message: 'WiFi network disconnected: ' + payload.network()?.ssid(),
+    background: 'bg-green-500',
+  });
+};
+
+PayloadHandlers[DeviceToLocalMessagePayload.PairStateChangedEvent] = (cli, msg) => {
+  const payload = new PairStateChangedEvent();
+  msg.payload(payload);
+
+  toastDelegator.trigger({
+    message: 'Pairing state changed: ' + payload.status(),
+    background: 'bg-green-500',
+  });
+};
+
+PayloadHandlers[DeviceToLocalMessagePayload.RfTxPinChangedEvent] = (cli, msg) => {
+  const payload = new RfTxPinChangedEvent();
+  msg.payload(payload);
+
+  toastDelegator.trigger({
+    message: 'RF TX pin changed: ' + payload.pin(),
     background: 'bg-green-500',
   });
 };

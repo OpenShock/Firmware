@@ -1,5 +1,6 @@
 include "./Types/WifiScanStatus.fbs";
 include "./Types/WifiAuthMode.fbs";
+include "./Types/DevicePairStatus.fbs";
 
 attribute "fs_serializer";
 
@@ -10,12 +11,15 @@ table WifiNetwork {
   bssid:string;
   channel:uint8;
   rssi:int8;
-  auth_mode:WifiAuthMode;
+  auth_mode:Types.WifiAuthMode;
   saved:bool;
 }
 
 struct ReadyMessage {
   poggies:bool;
+  wifi_connected:bool;
+  pair_status:Types.DevicePairStatus;
+  rftx_pin:uint8;
 }
 
 table ErrorMessage {
@@ -23,7 +27,7 @@ table ErrorMessage {
 }
 
 struct WifiScanStatusMessage {
-  status:WifiScanStatus;
+  status:Types.WifiScanStatus;
 }
 table WifiNetworkDiscoveredEvent {
   network:WifiNetwork;
@@ -47,6 +51,14 @@ table WifiNetworkDisconnectedEvent {
   network:WifiNetwork;
 }
 
+struct PairStateChangedEvent {
+  status:Types.DevicePairStatus;
+}
+
+struct RfTxPinChangedEvent {
+  pin:uint8;
+}
+
 union DeviceToLocalMessagePayload {
   ReadyMessage,
   ErrorMessage,
@@ -58,6 +70,8 @@ union DeviceToLocalMessagePayload {
   WifiNetworkRemovedEvent,
   WifiNetworkConnectedEvent,
   WifiNetworkDisconnectedEvent,
+  PairStateChangedEvent,
+  RfTxPinChangedEvent
 }
 
 table DeviceToLocalMessage (fs_serializer) {

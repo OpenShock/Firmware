@@ -1,15 +1,14 @@
 <script lang="ts">
   import { getModalStore } from '@skeletonlabs/skeleton';
-  import WiFiInfo from '$lib/components/modals/WiFiDetails.svelte';
   import type { WiFiNetwork } from '$lib/types/WiFiNetwork';
   import { WiFiStateStore } from '$lib/stores';
   import { WebSocketClient } from '$lib/WebSocketClient';
-  import { WifiAuthMode } from '$lib/_fbs/open-shock/wifi-auth-mode';
+  import { WifiAuthMode } from '$lib/_fbs/open-shock/serialization/types/wifi-auth-mode';
+  import { WifiScanStatus } from '$lib/_fbs/open-shock/serialization/types/wifi-scan-status';
   import { SerializeWifiScanCommand } from '$lib/Serializers/WifiScanCommand';
   import { SerializeWifiNetworkDisconnectCommand } from '$lib/Serializers/WifiNetworkDisconnectCommand';
   import { SerializeWifiNetworkConnectCommand } from '$lib/Serializers/WifiNetworkConnectCommand';
   import { SerializeWifiNetworkSaveCommand } from '$lib/Serializers/WifiNetworkSaveCommand';
-  import { WifiScanStatus } from '$lib/_fbs/open-shock';
 
   const modalStore = getModalStore();
 
