@@ -21,7 +21,7 @@ PinPatternManager::PinPatternManager(unsigned int gpioPin)
   , m_patternLength(0)
   , m_taskHandle(nullptr)
   , m_taskSemaphore(xSemaphoreCreateBinary()) {
-  snprintf(m_name, sizeof(m_name), "PinPatternManager-%d", m_gpioPin);
+  snprintf(m_name, sizeof(m_name), "PinPatternManager-%u", m_gpioPin);
   pinMode(gpioPin, OUTPUT);
   xSemaphoreGive(m_taskSemaphore);
 }
