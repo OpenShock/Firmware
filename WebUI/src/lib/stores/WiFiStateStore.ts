@@ -1,4 +1,4 @@
-import type { WifiScanStatus } from '$lib/_fbs/open-shock';
+import type { WifiScanStatus } from '$lib/_fbs/open-shock/serialization/types/wifi-scan-status';
 import type { WiFiNetwork } from '$lib/types/WiFiNetwork';
 import type { WiFiState } from '$lib/types/WiFiState';
 import { writable } from 'svelte/store';

@@ -2,8 +2,10 @@
 
 #include "Config.h"
 #include "Constants.h"
-#include "RFTransmitter.h"
 #include "Logging.h"
+#include "RFTransmitter.h"
+
+#include <driver/gpio.h>
 
 #include <memory>
 
@@ -22,22 +24,43 @@ bool CommandHandler::Init() {
 
   ESP_LOGD(TAG, "RF TX pin loaded from config: %u", txPin);
 
+  if (!GPIO_IS_VALID_OUTPUT_GPIO(txPin)) {
+    ESP_LOGW(TAG, "Specified pin is not a valid GPIO pin, clearing config");
+    Config::SetRFConfigTxPin(Constants::GPIO_INVALID);
+    return false;
+  }
+
   s_rfTransmitter = std::make_unique<RFTransmitter>(txPin, 32);
+  if (!s_rfTransmitter->ok()) {
+    ESP_LOGE(TAG, "Failed to initialize RF transmitter");
+    s_rfTransmitter = nullptr;
+    return false;
+  }
 
   return true;
 }
 
 bool CommandHandler::Ok() {
-  return s_rfTransmitter != nullptr && s_rfTransmitter->ok();
+  return s_rfTransmitter != nullptr;
 }
 
 bool CommandHandler::SetRfTxPin(std::uint8_t txPin) {
+  if (!GPIO_IS_VALID_OUTPUT_GPIO(txPin)) {
+    ESP_LOGW(TAG, "Specified pin is not a valid GPIO pin");
+    return false;
+  }
+
   if (!Config::SetRFConfigTxPin(txPin)) {
     ESP_LOGW(TAG, "Failed to set RF TX pin");
     return false;
   }
 
   s_rfTransmitter = std::make_unique<RFTransmitter>(txPin, 32);
+  if (!s_rfTransmitter->ok()) {
+    ESP_LOGE(TAG, "Failed to initialize RF transmitter");
+    s_rfTransmitter = nullptr;
+    return false;
+  }
 
   return true;
 }

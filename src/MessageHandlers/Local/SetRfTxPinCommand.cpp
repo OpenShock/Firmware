@@ -1,12 +1,30 @@
 #include "MessageHandlers/Local_Private.h"
 
+#include "CaptivePortal.h"
 #include "CommandHandler.h"
 #include "Constants.h"
 #include "Logging.h"
 
+#include <driver/gpio.h>
+
 #include <cstdint>
 
 const char* const TAG = "LocalMessageHandlers";
+
+void serializeSetRfTxPinResult(std::uint8_t socketId, std::uint8_t pin, OpenShock::Serialization::Local::SetRfPinResultCode result) {
+  flatbuffers::FlatBufferBuilder builder(1024);
+
+  auto responseOffset = OpenShock::Serialization::Local::CreateSetRfTxPinCommandResult(builder, pin, result);
+
+  auto msgOffset = OpenShock::Serialization::Local::CreateDeviceToLocalMessage(builder, OpenShock::Serialization::Local::DeviceToLocalMessagePayload::SetRfTxPinCommandResult, responseOffset.Union());
+
+  builder.Finish(msgOffset);
+
+  auto buffer = builder.GetBufferPointer();
+  auto size   = builder.GetSize();
+
+  OpenShock::CaptivePortal::SendMessageBIN(socketId, buffer, size);
+}
 
 using namespace OpenShock::MessageHandlers::Local;
 
@@ -19,10 +37,21 @@ void _Private::HandleSetRfTxPinCommand(std::uint8_t socketId, const OpenShock::S
 
   auto pin = msg->pin();
 
-  if (pin == OpenShock::Constants::GPIO_INVALID) {
-    ESP_LOGE(TAG, "Invalid pin specified");
+  if (!GPIO_IS_VALID_OUTPUT_GPIO(pin) || pin == Constants::GPIO_INVALID) {
+    ESP_LOGE(TAG, "Specified pin is not a valid GPIO pin");
+
+    serializeSetRfTxPinResult(socketId, pin, OpenShock::Serialization::Local::SetRfPinResultCode::InvalidPin);
+
     return;
   }
 
-  CommandHandler::SetRfTxPin(pin);
+  if (!CommandHandler::SetRfTxPin(pin)) {
+    ESP_LOGE(TAG, "Failed to set RF TX pin");
+
+    serializeSetRfTxPinResult(socketId, pin, OpenShock::Serialization::Local::SetRfPinResultCode::InternalError);
+
+    return;
+  }
+
+  serializeSetRfTxPinResult(socketId, pin, OpenShock::Serialization::Local::SetRfPinResultCode::Success);
 }

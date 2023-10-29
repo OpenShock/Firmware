@@ -55,8 +55,15 @@ struct PairStateChangedEvent {
   status:Types.DevicePairStatus;
 }
 
-struct RfTxPinChangedEvent {
+enum SetRfPinResultCode : uint8 {
+  Success = 0,
+  Unchanged = 1,
+  InvalidPin = 2,
+  InternalError = 3
+}
+table SetRfTxPinCommandResult {
   pin:uint8;
+  result:SetRfPinResultCode;
 }
 
 union DeviceToLocalMessagePayload {
@@ -71,7 +78,7 @@ union DeviceToLocalMessagePayload {
   WifiNetworkConnectedEvent,
   WifiNetworkDisconnectedEvent,
   PairStateChangedEvent,
-  RfTxPinChangedEvent
+  SetRfTxPinCommandResult
 }
 
 table DeviceToLocalMessage (fs_serializer) {

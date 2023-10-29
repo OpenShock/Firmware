@@ -16,9 +16,9 @@ import type { WiFiNetwork } from '$lib/types/WiFiNetwork';
 import { WifiNetwork as FbsWifiNetwork } from '$lib/_fbs/open-shock/serialization/local/wifi-network';
 import { SerializeWifiScanCommand } from '$lib/Serializers/WifiScanCommand';
 import { toastDelegator } from '$lib/stores/ToastDelegator';
-import { WifiScanStatus } from '$lib/_fbs/open-shock/serialization/types/wifi-scan-status';
 import { PairStateChangedEvent } from '$lib/_fbs/open-shock/serialization/local/pair-state-changed-event';
-import { RfTxPinChangedEvent } from '$lib/_fbs/open-shock/serialization/local/rf-tx-pin-changed-event';
+import { SetRfTxPinCommandResult } from '$lib/_fbs/open-shock/serialization/local/set-rf-tx-pin-command-result';
+import { SetRfPinResultCode } from '$lib/_fbs/open-shock/serialization/local/set-rf-pin-result-code';
 
 type MessageHandler = (wsClient: WebSocketClient, message: DeviceToLocalMessage) => void;
 
@@ -49,18 +49,6 @@ PayloadHandlers[DeviceToLocalMessagePayload.WifiScanStatusMessage] = (cli, msg) 
   msg.payload(payload);
 
   WiFiStateStore.setScanStatus(payload.status());
-
-  if (payload.status() === WifiScanStatus.Started) {
-    toastDelegator.trigger({
-      message: 'WiFi scan started',
-      background: 'bg-green-500',
-    });
-  } else if (payload.status() === WifiScanStatus.Completed) {
-    toastDelegator.trigger({
-      message: 'WiFi scan completed',
-      background: 'bg-green-500',
-    });
-  }
 };
 
 PayloadHandlers[DeviceToLocalMessagePayload.WifiNetworkDiscoveredEvent] = (cli, msg) => {
@@ -184,14 +172,35 @@ PayloadHandlers[DeviceToLocalMessagePayload.PairStateChangedEvent] = (cli, msg) 
   });
 };
 
-PayloadHandlers[DeviceToLocalMessagePayload.RfTxPinChangedEvent] = (cli, msg) => {
-  const payload = new RfTxPinChangedEvent();
+PayloadHandlers[DeviceToLocalMessagePayload.SetRfTxPinCommandResult] = (cli, msg) => {
+  const payload = new SetRfTxPinCommandResult();
   msg.payload(payload);
 
-  toastDelegator.trigger({
-    message: 'RF TX pin changed: ' + payload.pin(),
-    background: 'bg-green-500',
-  });
+  const result = payload.result();
+
+  if (result == SetRfPinResultCode.Success) {
+    toastDelegator.trigger({
+      message: 'Changed RF TX pin to: ' + payload.pin(),
+      background: 'bg-green-500',
+    });
+  } else {
+    let reason = 'Unknown';
+    switch (result) {
+      case SetRfPinResultCode.Unchanged:
+        reason = 'Pin unchanged';
+        break;
+      case SetRfPinResultCode.InvalidPin:
+        reason = 'Invalid pin';
+        break;
+      case SetRfPinResultCode.InternalError:
+        reason = 'Internal error';
+        break;
+    }
+    toastDelegator.trigger({
+      message: 'Failed to change RF TX pin: ' + reason,
+      background: 'bg-red-500',
+    });
+  }
 };
 
 export function WebSocketMessageBinaryHandler(cli: WebSocketClient, data: ArrayBuffer) {

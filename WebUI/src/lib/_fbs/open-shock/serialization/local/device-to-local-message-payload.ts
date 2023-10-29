@@ -3,7 +3,7 @@
 import { ErrorMessage } from '../../../open-shock/serialization/local/error-message.js';
 import { PairStateChangedEvent } from '../../../open-shock/serialization/local/pair-state-changed-event.js';
 import { ReadyMessage } from '../../../open-shock/serialization/local/ready-message.js';
-import { RfTxPinChangedEvent } from '../../../open-shock/serialization/local/rf-tx-pin-changed-event.js';
+import { SetRfTxPinCommandResult } from '../../../open-shock/serialization/local/set-rf-tx-pin-command-result.js';
 import { WifiNetworkConnectedEvent } from '../../../open-shock/serialization/local/wifi-network-connected-event.js';
 import { WifiNetworkDisconnectedEvent } from '../../../open-shock/serialization/local/wifi-network-disconnected-event.js';
 import { WifiNetworkDiscoveredEvent } from '../../../open-shock/serialization/local/wifi-network-discovered-event.js';
@@ -27,13 +27,13 @@ export enum DeviceToLocalMessagePayload {
   WifiNetworkConnectedEvent = 9,
   WifiNetworkDisconnectedEvent = 10,
   PairStateChangedEvent = 11,
-  RfTxPinChangedEvent = 12
+  SetRfTxPinCommandResult = 12
 }
 
 export function unionToDeviceToLocalMessagePayload(
   type: DeviceToLocalMessagePayload,
-  accessor: (obj:ErrorMessage|PairStateChangedEvent|ReadyMessage|RfTxPinChangedEvent|WifiNetworkConnectedEvent|WifiNetworkDisconnectedEvent|WifiNetworkDiscoveredEvent|WifiNetworkLostEvent|WifiNetworkRemovedEvent|WifiNetworkSavedEvent|WifiNetworkUpdatedEvent|WifiScanStatusMessage) => ErrorMessage|PairStateChangedEvent|ReadyMessage|RfTxPinChangedEvent|WifiNetworkConnectedEvent|WifiNetworkDisconnectedEvent|WifiNetworkDiscoveredEvent|WifiNetworkLostEvent|WifiNetworkRemovedEvent|WifiNetworkSavedEvent|WifiNetworkUpdatedEvent|WifiScanStatusMessage|null
-): ErrorMessage|PairStateChangedEvent|ReadyMessage|RfTxPinChangedEvent|WifiNetworkConnectedEvent|WifiNetworkDisconnectedEvent|WifiNetworkDiscoveredEvent|WifiNetworkLostEvent|WifiNetworkRemovedEvent|WifiNetworkSavedEvent|WifiNetworkUpdatedEvent|WifiScanStatusMessage|null {
+  accessor: (obj:ErrorMessage|PairStateChangedEvent|ReadyMessage|SetRfTxPinCommandResult|WifiNetworkConnectedEvent|WifiNetworkDisconnectedEvent|WifiNetworkDiscoveredEvent|WifiNetworkLostEvent|WifiNetworkRemovedEvent|WifiNetworkSavedEvent|WifiNetworkUpdatedEvent|WifiScanStatusMessage) => ErrorMessage|PairStateChangedEvent|ReadyMessage|SetRfTxPinCommandResult|WifiNetworkConnectedEvent|WifiNetworkDisconnectedEvent|WifiNetworkDiscoveredEvent|WifiNetworkLostEvent|WifiNetworkRemovedEvent|WifiNetworkSavedEvent|WifiNetworkUpdatedEvent|WifiScanStatusMessage|null
+): ErrorMessage|PairStateChangedEvent|ReadyMessage|SetRfTxPinCommandResult|WifiNetworkConnectedEvent|WifiNetworkDisconnectedEvent|WifiNetworkDiscoveredEvent|WifiNetworkLostEvent|WifiNetworkRemovedEvent|WifiNetworkSavedEvent|WifiNetworkUpdatedEvent|WifiScanStatusMessage|null {
   switch(DeviceToLocalMessagePayload[type]) {
     case 'NONE': return null; 
     case 'ReadyMessage': return accessor(new ReadyMessage())! as ReadyMessage;
@@ -47,16 +47,16 @@ export function unionToDeviceToLocalMessagePayload(
     case 'WifiNetworkConnectedEvent': return accessor(new WifiNetworkConnectedEvent())! as WifiNetworkConnectedEvent;
     case 'WifiNetworkDisconnectedEvent': return accessor(new WifiNetworkDisconnectedEvent())! as WifiNetworkDisconnectedEvent;
     case 'PairStateChangedEvent': return accessor(new PairStateChangedEvent())! as PairStateChangedEvent;
-    case 'RfTxPinChangedEvent': return accessor(new RfTxPinChangedEvent())! as RfTxPinChangedEvent;
+    case 'SetRfTxPinCommandResult': return accessor(new SetRfTxPinCommandResult())! as SetRfTxPinCommandResult;
     default: return null;
   }
 }
 
 export function unionListToDeviceToLocalMessagePayload(
   type: DeviceToLocalMessagePayload, 
-  accessor: (index: number, obj:ErrorMessage|PairStateChangedEvent|ReadyMessage|RfTxPinChangedEvent|WifiNetworkConnectedEvent|WifiNetworkDisconnectedEvent|WifiNetworkDiscoveredEvent|WifiNetworkLostEvent|WifiNetworkRemovedEvent|WifiNetworkSavedEvent|WifiNetworkUpdatedEvent|WifiScanStatusMessage) => ErrorMessage|PairStateChangedEvent|ReadyMessage|RfTxPinChangedEvent|WifiNetworkConnectedEvent|WifiNetworkDisconnectedEvent|WifiNetworkDiscoveredEvent|WifiNetworkLostEvent|WifiNetworkRemovedEvent|WifiNetworkSavedEvent|WifiNetworkUpdatedEvent|WifiScanStatusMessage|null, 
+  accessor: (index: number, obj:ErrorMessage|PairStateChangedEvent|ReadyMessage|SetRfTxPinCommandResult|WifiNetworkConnectedEvent|WifiNetworkDisconnectedEvent|WifiNetworkDiscoveredEvent|WifiNetworkLostEvent|WifiNetworkRemovedEvent|WifiNetworkSavedEvent|WifiNetworkUpdatedEvent|WifiScanStatusMessage) => ErrorMessage|PairStateChangedEvent|ReadyMessage|SetRfTxPinCommandResult|WifiNetworkConnectedEvent|WifiNetworkDisconnectedEvent|WifiNetworkDiscoveredEvent|WifiNetworkLostEvent|WifiNetworkRemovedEvent|WifiNetworkSavedEvent|WifiNetworkUpdatedEvent|WifiScanStatusMessage|null, 
   index: number
-): ErrorMessage|PairStateChangedEvent|ReadyMessage|RfTxPinChangedEvent|WifiNetworkConnectedEvent|WifiNetworkDisconnectedEvent|WifiNetworkDiscoveredEvent|WifiNetworkLostEvent|WifiNetworkRemovedEvent|WifiNetworkSavedEvent|WifiNetworkUpdatedEvent|WifiScanStatusMessage|null {
+): ErrorMessage|PairStateChangedEvent|ReadyMessage|SetRfTxPinCommandResult|WifiNetworkConnectedEvent|WifiNetworkDisconnectedEvent|WifiNetworkDiscoveredEvent|WifiNetworkLostEvent|WifiNetworkRemovedEvent|WifiNetworkSavedEvent|WifiNetworkUpdatedEvent|WifiScanStatusMessage|null {
   switch(DeviceToLocalMessagePayload[type]) {
     case 'NONE': return null; 
     case 'ReadyMessage': return accessor(index, new ReadyMessage())! as ReadyMessage;
@@ -70,7 +70,7 @@ export function unionListToDeviceToLocalMessagePayload(
     case 'WifiNetworkConnectedEvent': return accessor(index, new WifiNetworkConnectedEvent())! as WifiNetworkConnectedEvent;
     case 'WifiNetworkDisconnectedEvent': return accessor(index, new WifiNetworkDisconnectedEvent())! as WifiNetworkDisconnectedEvent;
     case 'PairStateChangedEvent': return accessor(index, new PairStateChangedEvent())! as PairStateChangedEvent;
-    case 'RfTxPinChangedEvent': return accessor(index, new RfTxPinChangedEvent())! as RfTxPinChangedEvent;
+    case 'SetRfTxPinCommandResult': return accessor(index, new SetRfTxPinCommandResult())! as SetRfTxPinCommandResult;
     default: return null;
   }
 }

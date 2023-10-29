@@ -9,6 +9,7 @@
   import { SerializeWifiNetworkDisconnectCommand } from '$lib/Serializers/WifiNetworkDisconnectCommand';
   import { SerializeWifiNetworkConnectCommand } from '$lib/Serializers/WifiNetworkConnectCommand';
   import { SerializeWifiNetworkSaveCommand } from '$lib/Serializers/WifiNetworkSaveCommand';
+  import WiFiDetails from './modals/WiFiDetails.svelte';
 
   const modalStore = getModalStore();
 
@@ -51,7 +52,7 @@
     modalStore.trigger({
       type: 'component',
       component: {
-        ref: WiFiInfo,
+        ref: WiFiDetails,
         props: { bssid: item.bssid },
       },
     });

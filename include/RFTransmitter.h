@@ -24,6 +24,7 @@ namespace OpenShock {
     void ClearPendingCommands();
 
   private:
+    void destroy();
     static void TransmitTask(void* arg);
 
     char m_name[20];

@@ -1,4 +1,4 @@
-import type { WifiScanStatus } from '$lib/_fbs/open-shock';
+import type { WifiScanStatus } from '$lib/_fbs/open-shock/serialization/types/wifi-scan-status';
 import type { WiFiNetwork } from './WiFiNetwork';
 
 export type WiFiState = {
