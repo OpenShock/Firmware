@@ -1,11 +1,10 @@
 #include "CommandHandler.h"
 
+#include "Board.h"
 #include "Config.h"
 #include "Constants.h"
 #include "Logging.h"
 #include "RFTransmitter.h"
-
-#include <driver/gpio.h>
 
 #include <memory>
 
@@ -17,15 +16,8 @@ static std::unique_ptr<RFTransmitter> s_rfTransmitter = nullptr;
 
 bool CommandHandler::Init() {
   std::uint32_t txPin = Config::GetRFConfig().txPin;
-  if (txPin == Constants::GPIO_INVALID) {
-    ESP_LOGW(TAG, "Invalid RF TX pin loaded from config, ignoring");
-    return false;
-  }
-
-  ESP_LOGD(TAG, "RF TX pin loaded from config: %u", txPin);
-
-  if (!GPIO_IS_VALID_OUTPUT_GPIO(txPin)) {
-    ESP_LOGW(TAG, "Specified pin is not a valid GPIO pin, clearing config");
+  if (!OpenShock::IsValidOutputPin(txPin)) {
+    ESP_LOGW(TAG, "Clearing invalid RF TX pin");
     Config::SetRFConfigTxPin(Constants::GPIO_INVALID);
     return false;
   }
@@ -45,8 +37,8 @@ bool CommandHandler::Ok() {
 }
 
 bool CommandHandler::SetRfTxPin(std::uint8_t txPin) {
-  if (!GPIO_IS_VALID_OUTPUT_GPIO(txPin)) {
-    ESP_LOGW(TAG, "Specified pin is not a valid GPIO pin");
+  if (!OpenShock::IsValidOutputPin(txPin)) {
+    ESP_LOGW(TAG, "Invalid RF TX pin");
     return false;
   }
 
