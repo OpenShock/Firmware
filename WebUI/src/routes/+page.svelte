@@ -46,7 +46,7 @@
     <WiFiList />
 
     <div class="flex flex-col space-y-2">
-      <h3 class="h3">Gateway Pairing</h3>
+      <h3 class="h3">Pairing</h3>
       <div class="flex space-x-2">
         <input class={'input variant-form-material ' + (pairCodeValid ? '' : 'input-error')} type="text" placeholder="Pair Code" bind:value={pairCode} />
         <button class="btn variant-filled" on:click={pair} disabled={!pairCodeValid || pairCode.length < 4}>Pair</button>
