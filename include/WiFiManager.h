@@ -1,5 +1,7 @@
 #pragma once
 
+#include "WiFiNetwork.h"
+
 #include <cstdint>
 #include <string>
 
@@ -18,6 +20,9 @@ namespace OpenShock::WiFiManager {
   bool Connect(const char* ssid);
   bool Connect(const std::uint8_t (&bssid)[6]);
   void Disconnect();
+
+  bool IsConnected();
+  bool GetConnectedNetwork(OpenShock::WiFiNetwork& network);
 
   void Update();
 }  // namespace OpenShock::WiFiManager
