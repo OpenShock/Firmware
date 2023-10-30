@@ -1,6 +1,6 @@
 #pragma once
 
-#include "_fbs/WiFiScanStatus_generated.h"
+#include "_fbs/WifiScanStatus_generated.h"
 
 #include <cstdint>
 
