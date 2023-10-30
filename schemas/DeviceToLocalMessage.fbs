@@ -10,12 +10,15 @@ table WifiNetwork {
   bssid:string;
   channel:uint8;
   rssi:int8;
-  auth_mode:WifiAuthMode;
+  auth_mode:Types.WifiAuthMode;
   saved:bool;
 }
 
 struct ReadyMessage {
   poggies:bool;
+  wifi_connected:bool;
+  paired:bool;
+  rftx_pin:uint8;
 }
 
 table ErrorMessage {
@@ -23,7 +26,7 @@ table ErrorMessage {
 }
 
 struct WifiScanStatusMessage {
-  status:WifiScanStatus;
+  status:Types.WifiScanStatus;
 }
 table WifiNetworkDiscoveredEvent {
   network:WifiNetwork;
@@ -47,6 +50,29 @@ table WifiNetworkDisconnectedEvent {
   network:WifiNetwork;
 }
 
+enum GatewayPairResultCode : uint8 {
+  Success = 0,
+  CodeRequired = 1,
+  InvalidCodeLength = 2,
+  NoInternetConnection = 3,
+  InvalidCode = 4,
+  InternalError = 5
+}
+
+struct GatewayPairCommandResult {
+  result:GatewayPairResultCode;
+}
+
+enum SetRfPinResultCode : uint8 {
+  Success = 0,
+  InvalidPin = 1,
+  InternalError = 2
+}
+struct SetRfTxPinCommandResult {
+  pin:uint8;
+  result:SetRfPinResultCode;
+}
+
 union DeviceToLocalMessagePayload {
   ReadyMessage,
   ErrorMessage,
@@ -58,6 +84,8 @@ union DeviceToLocalMessagePayload {
   WifiNetworkRemovedEvent,
   WifiNetworkConnectedEvent,
   WifiNetworkDisconnectedEvent,
+  GatewayPairCommandResult,
+  SetRfTxPinCommandResult
 }
 
 table DeviceToLocalMessage (fs_serializer) {

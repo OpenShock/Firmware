@@ -1,5 +1,6 @@
 #include "MessageHandlers/Local_Private.h"
 
+#include "CaptivePortal.h"
 #include "CommandHandler.h"
 #include "Constants.h"
 #include "Logging.h"
@@ -7,6 +8,21 @@
 #include <cstdint>
 
 const char* const TAG = "LocalMessageHandlers";
+
+void serializeSetRfTxPinResult(std::uint8_t socketId, std::uint8_t pin, OpenShock::Serialization::Local::SetRfPinResultCode result) {
+  flatbuffers::FlatBufferBuilder builder(1024);
+
+  auto responseOffset = builder.CreateStruct(OpenShock::Serialization::Local::SetRfTxPinCommandResult(pin, result));
+
+  auto msgOffset = OpenShock::Serialization::Local::CreateDeviceToLocalMessage(builder, OpenShock::Serialization::Local::DeviceToLocalMessagePayload::SetRfTxPinCommandResult, responseOffset.Union());
+
+  builder.Finish(msgOffset);
+
+  auto buffer = builder.GetBufferPointer();
+  auto size   = builder.GetSize();
+
+  OpenShock::CaptivePortal::SendMessageBIN(socketId, buffer, size);
+}
 
 using namespace OpenShock::MessageHandlers::Local;
 
@@ -19,10 +35,7 @@ void _Private::HandleSetRfTxPinCommand(std::uint8_t socketId, const OpenShock::S
 
   auto pin = msg->pin();
 
-  if (pin == OpenShock::Constants::GPIO_INVALID) {
-    ESP_LOGE(TAG, "Invalid pin specified");
-    return;
-  }
+  auto result = OpenShock::CommandHandler::SetRfTxPin(pin);
 
-  CommandHandler::SetRfTxPin(pin);
+  serializeSetRfTxPinResult(socketId, pin, result);
 }

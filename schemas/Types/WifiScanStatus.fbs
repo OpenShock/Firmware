@@ -1,4 +1,4 @@
-namespace OpenShock;
+namespace OpenShock.Serialization.Types;
 
 enum WifiScanStatus : uint8 {
   Started,

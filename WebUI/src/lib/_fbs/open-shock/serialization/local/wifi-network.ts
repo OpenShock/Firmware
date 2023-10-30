@@ -2,7 +2,7 @@
 
 import * as flatbuffers from 'flatbuffers';
 
-import { WifiAuthMode } from '../../../open-shock/wifi-auth-mode.js';
+import { WifiAuthMode } from '../../../open-shock/serialization/types/wifi-auth-mode.js';
 
 
 export class WifiNetwork {

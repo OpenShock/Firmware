@@ -1,32 +1,32 @@
 #pragma once
 
-#include "_fbs/WifiAuthMode_generated.h"
+#include "WiFiAuthMode.h"
 
 #include <esp_wifi_types.h>
 
 namespace OpenShock::Mappers {
-  constexpr WifiAuthMode GetWiFiAuthModeEnum(wifi_auth_mode_t authMode) {
+  constexpr OpenShock::WiFiAuthMode GetWiFiAuthModeEnum(wifi_auth_mode_t authMode) {
     switch (authMode) {
       case WIFI_AUTH_OPEN:
-        return OpenShock::WifiAuthMode::Open;
+        return OpenShock::WiFiAuthMode::Open;
       case WIFI_AUTH_WEP:
-        return OpenShock::WifiAuthMode::WEP;
+        return OpenShock::WiFiAuthMode::WEP;
       case WIFI_AUTH_WPA_PSK:
-        return OpenShock::WifiAuthMode::WPA_PSK;
+        return OpenShock::WiFiAuthMode::WPA_PSK;
       case WIFI_AUTH_WPA2_PSK:
-        return OpenShock::WifiAuthMode::WPA2_PSK;
+        return OpenShock::WiFiAuthMode::WPA2_PSK;
       case WIFI_AUTH_WPA_WPA2_PSK:
-        return OpenShock::WifiAuthMode::WPA_WPA2_PSK;
+        return OpenShock::WiFiAuthMode::WPA_WPA2_PSK;
       case WIFI_AUTH_WPA2_ENTERPRISE:
-        return OpenShock::WifiAuthMode::WPA2_ENTERPRISE;
+        return OpenShock::WiFiAuthMode::WPA2_ENTERPRISE;
       case WIFI_AUTH_WPA3_PSK:
-        return OpenShock::WifiAuthMode::WPA3_PSK;
+        return OpenShock::WiFiAuthMode::WPA3_PSK;
       case WIFI_AUTH_WPA2_WPA3_PSK:
-        return OpenShock::WifiAuthMode::WPA2_WPA3_PSK;
+        return OpenShock::WiFiAuthMode::WPA2_WPA3_PSK;
       case WIFI_AUTH_WAPI_PSK:
-        return OpenShock::WifiAuthMode::WAPI_PSK;
+        return OpenShock::WiFiAuthMode::WAPI_PSK;
       default:
-        return OpenShock::WifiAuthMode::UNKNOWN;
+        return OpenShock::WiFiAuthMode::UNKNOWN;
     }
   }
 
@@ -36,6 +36,6 @@ namespace OpenShock::Mappers {
    * @return A human-readable string representing the auth mode, or nullptr if the auth mode is invalid.
    */
   inline const char* const GetWiFiAuthModeString(wifi_auth_mode_t authMode) {
-    return OpenShock::EnumNameWifiAuthMode(GetWiFiAuthModeEnum(authMode));
+    return OpenShock::Serialization::Types::EnumNameWifiAuthMode(GetWiFiAuthModeEnum(authMode));
   }
 }  // namespace OpenShock::Mappers
