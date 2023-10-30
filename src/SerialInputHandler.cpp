@@ -161,18 +161,16 @@ void _handleAuthtokenCommand(char* arg, std::size_t argLength) {
 }
 
 void _handleNetworksCommand(char* arg, std::size_t argLength) {
-
-
   if (arg == nullptr || argLength <= 0) {
     // Get networks
     StaticJsonDocument<1024> outDoc;
     JsonArray outNetworks = outDoc.to<JsonArray>();
 
-  for (auto& creds : Config::GetWiFiCredentials()) {
-    JsonObject network = outNetworks.createNestedObject();
-    network["ssid"] = creds.ssid;
-    network["password"] = creds.password;
-  }
+    for (auto& creds : Config::GetWiFiCredentials()) {
+      JsonObject network  = outNetworks.createNestedObject();
+      network["ssid"]     = creds.ssid;
+      network["password"] = creds.password;
+    }
 
     Serial.print("$SYS$|Response|Networks|");
     serializeJson(outDoc, Serial);
@@ -185,9 +183,9 @@ void _handleNetworksCommand(char* arg, std::size_t argLength) {
 
   JsonArray networks = doc.as<JsonArray>();
 
+  std::uint8_t id = 1;
   std::vector<Config::WiFiCredentials> creds;
   for (JsonObject network : networks) {
-
     std::string ssid     = network["ssid"].as<std::string>();
     std::string password = network["password"].as<std::string>();
 
@@ -197,17 +195,20 @@ void _handleNetworksCommand(char* arg, std::size_t argLength) {
     }
 
     Config::WiFiCredentials cred {
-      .id       = 0,
+      .id       = id++,
       .ssid     = ssid,
       .bssid    = {0, 0, 0, 0, 0, 0},
       .password = password,
     };
-    ESP_LOGI(TAG, "Adding network to config %s", ssid.c_str());  
+    ESP_LOGI(TAG, "Adding network to config %s", ssid.c_str());
 
     creds.push_back(std::move(cred));
   }
 
-  OpenShock::Config::SetWiFiCredentials(creds);
+  if (!OpenShock::Config::SetWiFiCredentials(creds)) {
+    Serial.println("$SYS$|Error|Failed to save config");
+    return;
+  }
 
   Serial.println("$SYS$|Success|Saved config");
 }
