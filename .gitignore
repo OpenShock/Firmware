@@ -11,3 +11,8 @@ data/www
 
 # ignore local config files
 *.local
+
+# ignore generated files
+.vs
+packages
+*.sln
