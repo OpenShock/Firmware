@@ -32,7 +32,7 @@ bool _startCaptive() {
     return false;
   }
 
-  if (!WiFi.softAP(("OpenShock-" + WiFi.macAddress()).c_str())) {
+  if (!WiFi.softAP((OPENSHOCK_FW_AP_PREFIX + WiFi.macAddress()).c_str())) {
     ESP_LOGE(TAG, "Failed to start AP");
     WiFi.enableAP(false);
     return false;
