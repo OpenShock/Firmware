@@ -14,10 +14,10 @@ table WifiNetwork {
   saved:bool;
 }
 
-struct ReadyMessage {
+table ReadyMessage {
   poggies:bool;
-  wifi_connected:bool;
-  paired:bool;
+  connected_wifi:WifiNetwork;
+  gateway_paired:bool;
   rftx_pin:uint8;
 }
 
