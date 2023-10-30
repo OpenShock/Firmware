@@ -16,9 +16,10 @@ import type { WiFiNetwork } from '$lib/types/WiFiNetwork';
 import { WifiNetwork as FbsWifiNetwork } from '$lib/_fbs/open-shock/serialization/local/wifi-network';
 import { SerializeWifiScanCommand } from '$lib/Serializers/WifiScanCommand';
 import { toastDelegator } from '$lib/stores/ToastDelegator';
-import { PairStateChangedEvent } from '$lib/_fbs/open-shock/serialization/local/pair-state-changed-event';
 import { SetRfTxPinCommandResult } from '$lib/_fbs/open-shock/serialization/local/set-rf-tx-pin-command-result';
 import { SetRfPinResultCode } from '$lib/_fbs/open-shock/serialization/local/set-rf-pin-result-code';
+import { GatewayPairCommandResult } from '$lib/_fbs/open-shock/serialization/local/gateway-pair-command-result';
+import { GatewayPairResultCode } from '$lib/_fbs/open-shock/serialization/local/gateway-pair-result-code';
 
 type MessageHandler = (wsClient: WebSocketClient, message: DeviceToLocalMessage) => void;
 
@@ -162,14 +163,44 @@ PayloadHandlers[DeviceToLocalMessagePayload.WifiNetworkDisconnectedEvent] = (cli
   });
 };
 
-PayloadHandlers[DeviceToLocalMessagePayload.PairStateChangedEvent] = (cli, msg) => {
-  const payload = new PairStateChangedEvent();
+PayloadHandlers[DeviceToLocalMessagePayload.GatewayPairCommandResult] = (cli, msg) => {
+  const payload = new GatewayPairCommandResult();
   msg.payload(payload);
 
-  toastDelegator.trigger({
-    message: 'Pairing state changed: ' + payload.status(),
-    background: 'bg-green-500',
-  });
+  const result = payload.result();
+
+  if (result == GatewayPairResultCode.Success) {
+    toastDelegator.trigger({
+      message: 'Gateway paired successfully',
+      background: 'bg-green-500',
+    });
+  } else {
+    let reason: string;
+    switch (result) {
+      case GatewayPairResultCode.CodeRequired:
+        reason = 'Code required';
+        break;
+      case GatewayPairResultCode.InvalidCodeLength:
+        reason = 'Invalid code length';
+        break;
+      case GatewayPairResultCode.NoInternetConnection:
+        reason = 'No internet connection';
+        break;
+      case GatewayPairResultCode.InvalidCode:
+        reason = 'Invalid code';
+        break;
+      case GatewayPairResultCode.InternalError:
+        reason = 'Internal error';
+        break;
+      default:
+        reason = 'Unknown';
+        break;
+    }
+    toastDelegator.trigger({
+      message: 'Failed to pair gateway: ' + reason,
+      background: 'bg-red-500',
+    });
+  }
 };
 
 PayloadHandlers[DeviceToLocalMessagePayload.SetRfTxPinCommandResult] = (cli, msg) => {
@@ -184,16 +215,16 @@ PayloadHandlers[DeviceToLocalMessagePayload.SetRfTxPinCommandResult] = (cli, msg
       background: 'bg-green-500',
     });
   } else {
-    let reason = 'Unknown';
+    let reason: string;
     switch (result) {
-      case SetRfPinResultCode.Unchanged:
-        reason = 'Pin unchanged';
-        break;
       case SetRfPinResultCode.InvalidPin:
         reason = 'Invalid pin';
         break;
       case SetRfPinResultCode.InternalError:
         reason = 'Internal error';
+        break;
+      default:
+        reason = 'Unknown';
         break;
     }
     toastDelegator.trigger({

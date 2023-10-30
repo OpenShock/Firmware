@@ -14,7 +14,7 @@ const char* const TAG = "LocalMessageHandlers";
 void serializeSetRfTxPinResult(std::uint8_t socketId, std::uint8_t pin, OpenShock::Serialization::Local::SetRfPinResultCode result) {
   flatbuffers::FlatBufferBuilder builder(1024);
 
-  auto responseOffset = OpenShock::Serialization::Local::CreateSetRfTxPinCommandResult(builder, pin, result);
+  auto responseOffset = builder.CreateStruct(OpenShock::Serialization::Local::SetRfTxPinCommandResult(pin, result));
 
   auto msgOffset = OpenShock::Serialization::Local::CreateDeviceToLocalMessage(builder, OpenShock::Serialization::Local::DeviceToLocalMessagePayload::SetRfTxPinCommandResult, responseOffset.Union());
 
@@ -36,7 +36,7 @@ void _Private::HandleSetRfTxPinCommand(std::uint8_t socketId, const OpenShock::S
   }
 
   auto pin = msg->pin();
-  
+
   auto result = OpenShock::CommandHandler::SetRfTxPin(pin);
 
   serializeSetRfTxPinResult(socketId, pin, result);

@@ -1,8 +1,0 @@
-namespace OpenShock.Serialization.Types;
-
-enum DevicePairStatus : uint8 {
-  Unpaired,
-  Pairing,
-  Paired,
-  PairingFailed
-}

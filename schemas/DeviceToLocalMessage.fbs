@@ -1,6 +1,5 @@
 include "./Types/WifiScanStatus.fbs";
 include "./Types/WifiAuthMode.fbs";
-include "./Types/DevicePairStatus.fbs";
 
 attribute "fs_serializer";
 
@@ -18,7 +17,7 @@ table WifiNetwork {
 struct ReadyMessage {
   poggies:bool;
   wifi_connected:bool;
-  pair_status:Types.DevicePairStatus;
+  paired:bool;
   rftx_pin:uint8;
 }
 
@@ -51,8 +50,17 @@ table WifiNetworkDisconnectedEvent {
   network:WifiNetwork;
 }
 
-struct PairStateChangedEvent {
-  status:Types.DevicePairStatus;
+enum GatewayPairResultCode : uint8 {
+  Success = 0,
+  CodeRequired = 1,
+  InvalidCodeLength = 2,
+  NoInternetConnection = 3,
+  InvalidCode = 4,
+  InternalError = 5
+}
+
+struct GatewayPairCommandResult {
+  result:GatewayPairResultCode;
 }
 
 enum SetRfPinResultCode : uint8 {
@@ -60,7 +68,7 @@ enum SetRfPinResultCode : uint8 {
   InvalidPin = 1,
   InternalError = 2
 }
-table SetRfTxPinCommandResult {
+struct SetRfTxPinCommandResult {
   pin:uint8;
   result:SetRfPinResultCode;
 }
@@ -76,7 +84,7 @@ union DeviceToLocalMessagePayload {
   WifiNetworkRemovedEvent,
   WifiNetworkConnectedEvent,
   WifiNetworkDisconnectedEvent,
-  PairStateChangedEvent,
+  GatewayPairCommandResult,
   SetRfTxPinCommandResult
 }
 

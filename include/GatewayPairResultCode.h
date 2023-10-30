@@ -5,5 +5,5 @@
 #include <cstdint>
 
 namespace OpenShock {
-  typedef OpenShock::Serialization::Types::DevicePairStatus DevicePairStatus;
+  typedef OpenShock::Serialization::Local::GatewayPairResultCode GatewayPairResultCode;
 }  // namespace OpenShock
