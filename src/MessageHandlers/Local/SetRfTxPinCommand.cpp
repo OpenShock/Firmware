@@ -5,8 +5,6 @@
 #include "Constants.h"
 #include "Logging.h"
 
-#include <driver/gpio.h>
-
 #include <cstdint>
 
 const char* const TAG = "LocalMessageHandlers";
