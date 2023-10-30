@@ -25,7 +25,7 @@ const char* const TAG = "WiFiManager";
 using namespace OpenShock;
 
 struct WiFiNetwork {
-  WiFiNetwork(const char (&ssid)[33], const std::uint8_t (&bssid)[6], std::uint8_t channel, std::int8_t rssi, WifiAuthMode authMode, std::uint8_t credentialsId)
+  WiFiNetwork(const char (&ssid)[33], const std::uint8_t (&bssid)[6], std::uint8_t channel, std::int8_t rssi, WiFiAuthMode authMode, std::uint8_t credentialsId)
     : channel(channel), rssi(rssi), authMode(authMode), credentialsID(credentialsId), connectAttempts(0), lastConnectAttempt(0), scansMissed(0) {
     static_assert(sizeof(ssid) == sizeof(this->ssid) && sizeof(ssid) == 33, "SSID buffers must be 33 bytes long! (32 bytes for the SSID + 1 byte for the null terminator)");
     static_assert(sizeof(bssid) == sizeof(this->bssid) && sizeof(bssid) == 6, "BSSIDs must be 6 bytes long!");
@@ -33,14 +33,14 @@ struct WiFiNetwork {
     memcpy(this->ssid, ssid, sizeof(ssid));
     memcpy(this->bssid, bssid, sizeof(bssid));
   }
-  WiFiNetwork(const std::uint8_t (&ssid)[33], const std::uint8_t (&bssid)[6], std::uint8_t channel, std::int8_t rssi, WifiAuthMode authMode, std::uint8_t credentialsId)
+  WiFiNetwork(const std::uint8_t (&ssid)[33], const std::uint8_t (&bssid)[6], std::uint8_t channel, std::int8_t rssi, WiFiAuthMode authMode, std::uint8_t credentialsId)
     : WiFiNetwork(reinterpret_cast<const char (&)[33]>(ssid), bssid, channel, rssi, authMode, credentialsId) { }
 
   char ssid[33];
   std::uint8_t bssid[6];
   std::uint8_t channel;
   std::int8_t rssi;
-  WifiAuthMode authMode;
+  WiFiAuthMode authMode;
   std::uint8_t credentialsID;
   std::uint16_t connectAttempts;
   std::int64_t lastConnectAttempt;
@@ -251,9 +251,9 @@ void _evWiFiDisconnected(arduino_event_t* event) {
   }
 }
 void _evWiFiScanStarted() { }
-void _evWiFiScanStatusChanged(OpenShock::WifiScanStatus status) {
+void _evWiFiScanStatusChanged(OpenShock::WiFiScanStatus status) {
   // If the scan started, remove any networks that have not been seen in 3 scans
-  if (status == OpenShock::WifiScanStatus::Started) {
+  if (status == OpenShock::WiFiScanStatus::Started) {
     for (auto it = s_wifiNetworks.begin(); it != s_wifiNetworks.end(); ++it) {
       if (it->scansMissed++ > 3) {
         ESP_LOGV(TAG, "Network %s (" BSSID_FMT ") has not been seen in 3 scans, removing from list", it->ssid, BSSID_ARG(it->bssid));
@@ -265,13 +265,13 @@ void _evWiFiScanStatusChanged(OpenShock::WifiScanStatus status) {
   }
 
   // If the scan completed, sort the networks by RSSI
-  if (status == OpenShock::WifiScanStatus::Completed || status == OpenShock::WifiScanStatus::Aborted || status == OpenShock::WifiScanStatus::Error) {
+  if (status == OpenShock::WiFiScanStatus::Completed || status == OpenShock::WiFiScanStatus::Aborted || status == OpenShock::WiFiScanStatus::Error) {
     // Sort the networks by RSSI
     std::sort(s_wifiNetworks.begin(), s_wifiNetworks.end(), [](const WiFiNetwork& a, const WiFiNetwork& b) { return a.rssi > b.rssi; });
   }
 }
 void _evWiFiNetworkDiscovery(const wifi_ap_record_t* record) {
-  OpenShock::WifiAuthMode authMode = Mappers::GetWiFiAuthModeEnum(record->authmode);
+  OpenShock::WiFiAuthMode authMode = Mappers::GetWiFiAuthModeEnum(record->authmode);
 
   auto it = _findNetwork(record->bssid);
   if (it != s_wifiNetworks.end()) {

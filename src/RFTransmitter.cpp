@@ -1,7 +1,7 @@
 #include "RFTransmitter.h"
 
-#include "Rmt/MainEncoder.h"
 #include "Logging.h"
+#include "Rmt/MainEncoder.h"
 #include "Time.h"
 
 #include <freertos/FreeRTOS.h>
@@ -19,12 +19,15 @@ struct command_t {
 
 using namespace OpenShock;
 
-RFTransmitter::RFTransmitter(std::uint8_t gpioPin, int queueSize) : m_rmtHandle(nullptr), m_queueHandle(nullptr), m_taskHandle(nullptr) {
-  snprintf(m_name, sizeof(m_name), "RFTransmitter-%d", gpioPin);
+RFTransmitter::RFTransmitter(std::uint8_t gpioPin, int queueSize) : m_txPin(gpioPin), m_rmtHandle(nullptr), m_queueHandle(nullptr), m_taskHandle(nullptr) {
+  snprintf(m_name, sizeof(m_name), "RFTransmitter-%u", gpioPin);
+
+  ESP_LOGD(m_name, "Creating RFTransmitter");
 
   m_rmtHandle = rmtInit(gpioPin, RMT_TX_MODE, RMT_MEM_64);
   if (m_rmtHandle == nullptr) {
     ESP_LOGE(m_name, "Failed to create rmt object");
+    destroy();
     return;
   }
 
@@ -34,25 +37,19 @@ RFTransmitter::RFTransmitter(std::uint8_t gpioPin, int queueSize) : m_rmtHandle(
   m_queueHandle = xQueueCreate(queueSize, sizeof(command_t*));
   if (m_queueHandle == nullptr) {
     ESP_LOGE(m_name, "Failed to create queue");
+    destroy();
     return;
   }
 
   if (xTaskCreate(TransmitTask, m_name, 4096, this, 1, &m_taskHandle) != pdPASS) {
     ESP_LOGE(m_name, "Failed to create task");
+    destroy();
     return;
   }
 }
 
 RFTransmitter::~RFTransmitter() {
-  if (m_taskHandle != nullptr) {
-    vTaskDelete(m_taskHandle);
-  }
-  if (m_queueHandle != nullptr) {
-    vQueueDelete(m_queueHandle);
-  }
-  if (m_rmtHandle != nullptr) {
-    rmtDeinit(m_rmtHandle);
-  }
+  destroy();
 }
 
 bool RFTransmitter::SendCommand(ShockerModelType model, std::uint16_t shockerId, ShockerCommandType type, std::uint8_t intensity, std::uint16_t durationMs) {
@@ -64,12 +61,13 @@ bool RFTransmitter::SendCommand(ShockerModelType model, std::uint16_t shockerId,
   // Intensity must be between 0 and 99
   intensity = std::min(intensity, (std::uint8_t)99);
 
-  command_t* cmd = new command_t {
-    .until = OpenShock::millis() + durationMs,
-    .sequence = Rmt::GetSequence(model, shockerId, type, intensity),
-    .zeroSequence = Rmt::GetZeroSequence(model, shockerId),
-    .shockerId = shockerId
-  };
+  command_t* cmd = new command_t {.until = OpenShock::millis() + durationMs, .sequence = Rmt::GetSequence(model, shockerId, type, intensity), .zeroSequence = Rmt::GetZeroSequence(model, shockerId), .shockerId = shockerId};
+
+  // We will use nullptr commands to end the task, if we got a nullptr here, we are out of memory... :(
+  if (cmd == nullptr) {
+    ESP_LOGE(m_name, "Failed to allocate command");
+    return false;
+  }
 
   // Add the command to the queue, wait max 10 ms (Adjust this)
   if (xQueueSend(m_queueHandle, &cmd, 10 / portTICK_PERIOD_MS) != pdTRUE) {
@@ -82,7 +80,7 @@ bool RFTransmitter::SendCommand(ShockerModelType model, std::uint16_t shockerId,
 }
 
 void RFTransmitter::ClearPendingCommands() {
-  if (!ok()) {
+  if (m_queueHandle == nullptr) {
     return;
   }
 
@@ -91,6 +89,36 @@ void RFTransmitter::ClearPendingCommands() {
   command_t* command;
   while (xQueueReceive(m_queueHandle, &command, 0) == pdPASS) {
     delete command;
+  }
+}
+
+void RFTransmitter::destroy() {
+  if (m_taskHandle != nullptr) {
+    ESP_LOGD(m_name, "Stopping task");
+
+    // Wait for the task to stop
+    command_t* cmd = nullptr;
+    while (eTaskGetState(m_taskHandle) != eDeleted) {
+      vTaskDelay(10 / portTICK_PERIOD_MS);
+
+      // Send nullptr to stop the task gracefully
+      xQueueSend(m_queueHandle, &cmd, 10 / portTICK_PERIOD_MS);
+    }
+
+    ESP_LOGD(m_name, "Task stopped");
+
+    // Clear the queue
+    ClearPendingCommands();
+
+    m_taskHandle = nullptr;
+  }
+  if (m_queueHandle != nullptr) {
+    vQueueDelete(m_queueHandle);
+    m_queueHandle = nullptr;
+  }
+  if (m_rmtHandle != nullptr) {
+    rmtDeinit(m_rmtHandle);
+    m_rmtHandle = nullptr;
   }
 }
 
@@ -108,8 +136,16 @@ void RFTransmitter::TransmitTask(void* arg) {
     command_t* cmd = nullptr;
     while (xQueueReceive(queueHandle, &cmd, 0) == pdTRUE) {
       if (cmd == nullptr) {
-        ESP_LOGW(name, "Received null command");
-        continue;
+        ESP_LOGD(name, "Received nullptr (stop command), cleaning up...");
+
+        for (auto it = commands.begin(); it != commands.end(); ++it) {
+          delete *it;
+        }
+
+        ESP_LOGD(name, "Cleanup done, stopping task");
+
+        vTaskDelete(nullptr);
+        return;
       }
 
       // Replace the command if it already exists
