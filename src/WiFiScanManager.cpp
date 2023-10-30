@@ -84,16 +84,16 @@ void _iterateChannel() {
 }
 
 void _evScanCompleted(arduino_event_id_t event, arduino_event_info_t info) {
-  std::uint16_t numNetworks = WiFi.scanComplete();
+  std::int16_t numNetworks = WiFi.scanComplete();
   if (numNetworks < 0) {
     _handleScanError(numNetworks);
     return;
   }
 
-  for (std::uint16_t i = 0; i < numNetworks; i++) {
+  for (std::int16_t i = 0; i < numNetworks; i++) {
     wifi_ap_record_t* record = reinterpret_cast<wifi_ap_record_t*>(WiFi.getScanInfoByIndex(i));
     if (record == nullptr) {
-      ESP_LOGE(TAG, "Failed to get scan info for network #%u", i);
+      ESP_LOGE(TAG, "Failed to get scan info for network #%d", i);
       return;
     }
 

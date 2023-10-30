@@ -53,8 +53,8 @@ RFTransmitter::~RFTransmitter() {
 }
 
 bool RFTransmitter::SendCommand(ShockerModelType model, std::uint16_t shockerId, ShockerCommandType type, std::uint8_t intensity, std::uint16_t durationMs) {
-  if (!ok()) {
-    ESP_LOGW(m_name, "RFTransmitter is not ok");
+  if (m_queueHandle == nullptr) {
+    ESP_LOGE(m_name, "Queue is null");
     return false;
   }
 
