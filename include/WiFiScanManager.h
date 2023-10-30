@@ -1,6 +1,6 @@
 #pragma once
 
-#include "_fbs/WifiScanStatus_generated.h"
+#include "WiFiScanStatus.h"
 
 #include <esp_wifi_types.h>
 
@@ -15,7 +15,7 @@ namespace OpenShock::WiFiScanManager {
   bool StartScan();
   void AbortScan();
 
-  typedef std::function<void(OpenShock::WifiScanStatus)> StatusChangedHandler;
+  typedef std::function<void(OpenShock::WiFiScanStatus)> StatusChangedHandler;
   typedef std::function<void(const wifi_ap_record_t* record)> NetworkDiscoveryHandler;
 
   std::uint64_t RegisterStatusChangedHandler(const StatusChangedHandler& handler);

@@ -51,8 +51,87 @@ struct WifiNetworkConnectedEventBuilder;
 struct WifiNetworkDisconnectedEvent;
 struct WifiNetworkDisconnectedEventBuilder;
 
+struct GatewayPairCommandResult;
+
+struct SetRfTxPinCommandResult;
+
 struct DeviceToLocalMessage;
 struct DeviceToLocalMessageBuilder;
+
+enum class GatewayPairResultCode : uint8_t {
+  Success = 0,
+  CodeRequired = 1,
+  InvalidCodeLength = 2,
+  NoInternetConnection = 3,
+  InvalidCode = 4,
+  InternalError = 5,
+  MIN = Success,
+  MAX = InternalError
+};
+
+inline const GatewayPairResultCode (&EnumValuesGatewayPairResultCode())[6] {
+  static const GatewayPairResultCode values[] = {
+    GatewayPairResultCode::Success,
+    GatewayPairResultCode::CodeRequired,
+    GatewayPairResultCode::InvalidCodeLength,
+    GatewayPairResultCode::NoInternetConnection,
+    GatewayPairResultCode::InvalidCode,
+    GatewayPairResultCode::InternalError
+  };
+  return values;
+}
+
+inline const char * const *EnumNamesGatewayPairResultCode() {
+  static const char * const names[7] = {
+    "Success",
+    "CodeRequired",
+    "InvalidCodeLength",
+    "NoInternetConnection",
+    "InvalidCode",
+    "InternalError",
+    nullptr
+  };
+  return names;
+}
+
+inline const char *EnumNameGatewayPairResultCode(GatewayPairResultCode e) {
+  if (::flatbuffers::IsOutRange(e, GatewayPairResultCode::Success, GatewayPairResultCode::InternalError)) return "";
+  const size_t index = static_cast<size_t>(e);
+  return EnumNamesGatewayPairResultCode()[index];
+}
+
+enum class SetRfPinResultCode : uint8_t {
+  Success = 0,
+  InvalidPin = 1,
+  InternalError = 2,
+  MIN = Success,
+  MAX = InternalError
+};
+
+inline const SetRfPinResultCode (&EnumValuesSetRfPinResultCode())[3] {
+  static const SetRfPinResultCode values[] = {
+    SetRfPinResultCode::Success,
+    SetRfPinResultCode::InvalidPin,
+    SetRfPinResultCode::InternalError
+  };
+  return values;
+}
+
+inline const char * const *EnumNamesSetRfPinResultCode() {
+  static const char * const names[4] = {
+    "Success",
+    "InvalidPin",
+    "InternalError",
+    nullptr
+  };
+  return names;
+}
+
+inline const char *EnumNameSetRfPinResultCode(SetRfPinResultCode e) {
+  if (::flatbuffers::IsOutRange(e, SetRfPinResultCode::Success, SetRfPinResultCode::InternalError)) return "";
+  const size_t index = static_cast<size_t>(e);
+  return EnumNamesSetRfPinResultCode()[index];
+}
 
 enum class DeviceToLocalMessagePayload : uint8_t {
   NONE = 0,
@@ -66,11 +145,13 @@ enum class DeviceToLocalMessagePayload : uint8_t {
   WifiNetworkRemovedEvent = 8,
   WifiNetworkConnectedEvent = 9,
   WifiNetworkDisconnectedEvent = 10,
+  GatewayPairCommandResult = 11,
+  SetRfTxPinCommandResult = 12,
   MIN = NONE,
-  MAX = WifiNetworkDisconnectedEvent
+  MAX = SetRfTxPinCommandResult
 };
 
-inline const DeviceToLocalMessagePayload (&EnumValuesDeviceToLocalMessagePayload())[11] {
+inline const DeviceToLocalMessagePayload (&EnumValuesDeviceToLocalMessagePayload())[13] {
   static const DeviceToLocalMessagePayload values[] = {
     DeviceToLocalMessagePayload::NONE,
     DeviceToLocalMessagePayload::ReadyMessage,
@@ -82,13 +163,15 @@ inline const DeviceToLocalMessagePayload (&EnumValuesDeviceToLocalMessagePayload
     DeviceToLocalMessagePayload::WifiNetworkSavedEvent,
     DeviceToLocalMessagePayload::WifiNetworkRemovedEvent,
     DeviceToLocalMessagePayload::WifiNetworkConnectedEvent,
-    DeviceToLocalMessagePayload::WifiNetworkDisconnectedEvent
+    DeviceToLocalMessagePayload::WifiNetworkDisconnectedEvent,
+    DeviceToLocalMessagePayload::GatewayPairCommandResult,
+    DeviceToLocalMessagePayload::SetRfTxPinCommandResult
   };
   return values;
 }
 
 inline const char * const *EnumNamesDeviceToLocalMessagePayload() {
-  static const char * const names[12] = {
+  static const char * const names[14] = {
     "NONE",
     "ReadyMessage",
     "ErrorMessage",
@@ -100,13 +183,15 @@ inline const char * const *EnumNamesDeviceToLocalMessagePayload() {
     "WifiNetworkRemovedEvent",
     "WifiNetworkConnectedEvent",
     "WifiNetworkDisconnectedEvent",
+    "GatewayPairCommandResult",
+    "SetRfTxPinCommandResult",
     nullptr
   };
   return names;
 }
 
 inline const char *EnumNameDeviceToLocalMessagePayload(DeviceToLocalMessagePayload e) {
-  if (::flatbuffers::IsOutRange(e, DeviceToLocalMessagePayload::NONE, DeviceToLocalMessagePayload::WifiNetworkDisconnectedEvent)) return "";
+  if (::flatbuffers::IsOutRange(e, DeviceToLocalMessagePayload::NONE, DeviceToLocalMessagePayload::SetRfTxPinCommandResult)) return "";
   const size_t index = static_cast<size_t>(e);
   return EnumNamesDeviceToLocalMessagePayload()[index];
 }
@@ -155,12 +240,23 @@ template<> struct DeviceToLocalMessagePayloadTraits<OpenShock::Serialization::Lo
   static const DeviceToLocalMessagePayload enum_value = DeviceToLocalMessagePayload::WifiNetworkDisconnectedEvent;
 };
 
+template<> struct DeviceToLocalMessagePayloadTraits<OpenShock::Serialization::Local::GatewayPairCommandResult> {
+  static const DeviceToLocalMessagePayload enum_value = DeviceToLocalMessagePayload::GatewayPairCommandResult;
+};
+
+template<> struct DeviceToLocalMessagePayloadTraits<OpenShock::Serialization::Local::SetRfTxPinCommandResult> {
+  static const DeviceToLocalMessagePayload enum_value = DeviceToLocalMessagePayload::SetRfTxPinCommandResult;
+};
+
 bool VerifyDeviceToLocalMessagePayload(::flatbuffers::Verifier &verifier, const void *obj, DeviceToLocalMessagePayload type);
 bool VerifyDeviceToLocalMessagePayloadVector(::flatbuffers::Verifier &verifier, const ::flatbuffers::Vector<::flatbuffers::Offset<void>> *values, const ::flatbuffers::Vector<DeviceToLocalMessagePayload> *types);
 
 FLATBUFFERS_MANUALLY_ALIGNED_STRUCT(1) ReadyMessage FLATBUFFERS_FINAL_CLASS {
  private:
   uint8_t poggies_;
+  uint8_t wifi_connected_;
+  uint8_t paired_;
+  uint8_t rftx_pin_;
 
  public:
   struct Traits;
@@ -168,16 +264,31 @@ FLATBUFFERS_MANUALLY_ALIGNED_STRUCT(1) ReadyMessage FLATBUFFERS_FINAL_CLASS {
     return "OpenShock.Serialization.Local.ReadyMessage";
   }
   ReadyMessage()
-      : poggies_(0) {
+      : poggies_(0),
+        wifi_connected_(0),
+        paired_(0),
+        rftx_pin_(0) {
   }
-  ReadyMessage(bool _poggies)
-      : poggies_(::flatbuffers::EndianScalar(static_cast<uint8_t>(_poggies))) {
+  ReadyMessage(bool _poggies, bool _wifi_connected, bool _paired, uint8_t _rftx_pin)
+      : poggies_(::flatbuffers::EndianScalar(static_cast<uint8_t>(_poggies))),
+        wifi_connected_(::flatbuffers::EndianScalar(static_cast<uint8_t>(_wifi_connected))),
+        paired_(::flatbuffers::EndianScalar(static_cast<uint8_t>(_paired))),
+        rftx_pin_(::flatbuffers::EndianScalar(_rftx_pin)) {
   }
   bool poggies() const {
     return ::flatbuffers::EndianScalar(poggies_) != 0;
   }
+  bool wifi_connected() const {
+    return ::flatbuffers::EndianScalar(wifi_connected_) != 0;
+  }
+  bool paired() const {
+    return ::flatbuffers::EndianScalar(paired_) != 0;
+  }
+  uint8_t rftx_pin() const {
+    return ::flatbuffers::EndianScalar(rftx_pin_);
+  }
 };
-FLATBUFFERS_STRUCT_END(ReadyMessage, 1);
+FLATBUFFERS_STRUCT_END(ReadyMessage, 4);
 
 struct ReadyMessage::Traits {
   using type = ReadyMessage;
@@ -195,17 +306,73 @@ FLATBUFFERS_MANUALLY_ALIGNED_STRUCT(1) WifiScanStatusMessage FLATBUFFERS_FINAL_C
   WifiScanStatusMessage()
       : status_(0) {
   }
-  WifiScanStatusMessage(OpenShock::WifiScanStatus _status)
+  WifiScanStatusMessage(OpenShock::Serialization::Types::WifiScanStatus _status)
       : status_(::flatbuffers::EndianScalar(static_cast<uint8_t>(_status))) {
   }
-  OpenShock::WifiScanStatus status() const {
-    return static_cast<OpenShock::WifiScanStatus>(::flatbuffers::EndianScalar(status_));
+  OpenShock::Serialization::Types::WifiScanStatus status() const {
+    return static_cast<OpenShock::Serialization::Types::WifiScanStatus>(::flatbuffers::EndianScalar(status_));
   }
 };
 FLATBUFFERS_STRUCT_END(WifiScanStatusMessage, 1);
 
 struct WifiScanStatusMessage::Traits {
   using type = WifiScanStatusMessage;
+};
+
+FLATBUFFERS_MANUALLY_ALIGNED_STRUCT(1) GatewayPairCommandResult FLATBUFFERS_FINAL_CLASS {
+ private:
+  uint8_t result_;
+
+ public:
+  struct Traits;
+  static FLATBUFFERS_CONSTEXPR_CPP11 const char *GetFullyQualifiedName() {
+    return "OpenShock.Serialization.Local.GatewayPairCommandResult";
+  }
+  GatewayPairCommandResult()
+      : result_(0) {
+  }
+  GatewayPairCommandResult(OpenShock::Serialization::Local::GatewayPairResultCode _result)
+      : result_(::flatbuffers::EndianScalar(static_cast<uint8_t>(_result))) {
+  }
+  OpenShock::Serialization::Local::GatewayPairResultCode result() const {
+    return static_cast<OpenShock::Serialization::Local::GatewayPairResultCode>(::flatbuffers::EndianScalar(result_));
+  }
+};
+FLATBUFFERS_STRUCT_END(GatewayPairCommandResult, 1);
+
+struct GatewayPairCommandResult::Traits {
+  using type = GatewayPairCommandResult;
+};
+
+FLATBUFFERS_MANUALLY_ALIGNED_STRUCT(1) SetRfTxPinCommandResult FLATBUFFERS_FINAL_CLASS {
+ private:
+  uint8_t pin_;
+  uint8_t result_;
+
+ public:
+  struct Traits;
+  static FLATBUFFERS_CONSTEXPR_CPP11 const char *GetFullyQualifiedName() {
+    return "OpenShock.Serialization.Local.SetRfTxPinCommandResult";
+  }
+  SetRfTxPinCommandResult()
+      : pin_(0),
+        result_(0) {
+  }
+  SetRfTxPinCommandResult(uint8_t _pin, OpenShock::Serialization::Local::SetRfPinResultCode _result)
+      : pin_(::flatbuffers::EndianScalar(_pin)),
+        result_(::flatbuffers::EndianScalar(static_cast<uint8_t>(_result))) {
+  }
+  uint8_t pin() const {
+    return ::flatbuffers::EndianScalar(pin_);
+  }
+  OpenShock::Serialization::Local::SetRfPinResultCode result() const {
+    return static_cast<OpenShock::Serialization::Local::SetRfPinResultCode>(::flatbuffers::EndianScalar(result_));
+  }
+};
+FLATBUFFERS_STRUCT_END(SetRfTxPinCommandResult, 2);
+
+struct SetRfTxPinCommandResult::Traits {
+  using type = SetRfTxPinCommandResult;
 };
 
 struct WifiNetwork FLATBUFFERS_FINAL_CLASS : private ::flatbuffers::Table {
@@ -234,8 +401,8 @@ struct WifiNetwork FLATBUFFERS_FINAL_CLASS : private ::flatbuffers::Table {
   int8_t rssi() const {
     return GetField<int8_t>(VT_RSSI, 0);
   }
-  OpenShock::WifiAuthMode auth_mode() const {
-    return static_cast<OpenShock::WifiAuthMode>(GetField<uint8_t>(VT_AUTH_MODE, 0));
+  OpenShock::Serialization::Types::WifiAuthMode auth_mode() const {
+    return static_cast<OpenShock::Serialization::Types::WifiAuthMode>(GetField<uint8_t>(VT_AUTH_MODE, 0));
   }
   bool saved() const {
     return GetField<uint8_t>(VT_SAVED, 0) != 0;
@@ -270,7 +437,7 @@ struct WifiNetworkBuilder {
   void add_rssi(int8_t rssi) {
     fbb_.AddElement<int8_t>(WifiNetwork::VT_RSSI, rssi, 0);
   }
-  void add_auth_mode(OpenShock::WifiAuthMode auth_mode) {
+  void add_auth_mode(OpenShock::Serialization::Types::WifiAuthMode auth_mode) {
     fbb_.AddElement<uint8_t>(WifiNetwork::VT_AUTH_MODE, static_cast<uint8_t>(auth_mode), 0);
   }
   void add_saved(bool saved) {
@@ -293,7 +460,7 @@ inline ::flatbuffers::Offset<WifiNetwork> CreateWifiNetwork(
     ::flatbuffers::Offset<::flatbuffers::String> bssid = 0,
     uint8_t channel = 0,
     int8_t rssi = 0,
-    OpenShock::WifiAuthMode auth_mode = OpenShock::WifiAuthMode::Open,
+    OpenShock::Serialization::Types::WifiAuthMode auth_mode = OpenShock::Serialization::Types::WifiAuthMode::Open,
     bool saved = false) {
   WifiNetworkBuilder builder_(_fbb);
   builder_.add_bssid(bssid);
@@ -316,7 +483,7 @@ inline ::flatbuffers::Offset<WifiNetwork> CreateWifiNetworkDirect(
     const char *bssid = nullptr,
     uint8_t channel = 0,
     int8_t rssi = 0,
-    OpenShock::WifiAuthMode auth_mode = OpenShock::WifiAuthMode::Open,
+    OpenShock::Serialization::Types::WifiAuthMode auth_mode = OpenShock::Serialization::Types::WifiAuthMode::Open,
     bool saved = false) {
   auto ssid__ = ssid ? _fbb.CreateString(ssid) : 0;
   auto bssid__ = bssid ? _fbb.CreateString(bssid) : 0;
@@ -794,6 +961,12 @@ struct DeviceToLocalMessage FLATBUFFERS_FINAL_CLASS : private ::flatbuffers::Tab
   const OpenShock::Serialization::Local::WifiNetworkDisconnectedEvent *payload_as_WifiNetworkDisconnectedEvent() const {
     return payload_type() == OpenShock::Serialization::Local::DeviceToLocalMessagePayload::WifiNetworkDisconnectedEvent ? static_cast<const OpenShock::Serialization::Local::WifiNetworkDisconnectedEvent *>(payload()) : nullptr;
   }
+  const OpenShock::Serialization::Local::GatewayPairCommandResult *payload_as_GatewayPairCommandResult() const {
+    return payload_type() == OpenShock::Serialization::Local::DeviceToLocalMessagePayload::GatewayPairCommandResult ? static_cast<const OpenShock::Serialization::Local::GatewayPairCommandResult *>(payload()) : nullptr;
+  }
+  const OpenShock::Serialization::Local::SetRfTxPinCommandResult *payload_as_SetRfTxPinCommandResult() const {
+    return payload_type() == OpenShock::Serialization::Local::DeviceToLocalMessagePayload::SetRfTxPinCommandResult ? static_cast<const OpenShock::Serialization::Local::SetRfTxPinCommandResult *>(payload()) : nullptr;
+  }
   bool Verify(::flatbuffers::Verifier &verifier) const {
     return VerifyTableStart(verifier) &&
            VerifyField<uint8_t>(verifier, VT_PAYLOAD_TYPE, 1) &&
@@ -841,6 +1014,14 @@ template<> inline const OpenShock::Serialization::Local::WifiNetworkConnectedEve
 
 template<> inline const OpenShock::Serialization::Local::WifiNetworkDisconnectedEvent *DeviceToLocalMessage::payload_as<OpenShock::Serialization::Local::WifiNetworkDisconnectedEvent>() const {
   return payload_as_WifiNetworkDisconnectedEvent();
+}
+
+template<> inline const OpenShock::Serialization::Local::GatewayPairCommandResult *DeviceToLocalMessage::payload_as<OpenShock::Serialization::Local::GatewayPairCommandResult>() const {
+  return payload_as_GatewayPairCommandResult();
+}
+
+template<> inline const OpenShock::Serialization::Local::SetRfTxPinCommandResult *DeviceToLocalMessage::payload_as<OpenShock::Serialization::Local::SetRfTxPinCommandResult>() const {
+  return payload_as_SetRfTxPinCommandResult();
 }
 
 struct DeviceToLocalMessageBuilder {
@@ -921,6 +1102,12 @@ inline bool VerifyDeviceToLocalMessagePayload(::flatbuffers::Verifier &verifier,
     case DeviceToLocalMessagePayload::WifiNetworkDisconnectedEvent: {
       auto ptr = reinterpret_cast<const OpenShock::Serialization::Local::WifiNetworkDisconnectedEvent *>(obj);
       return verifier.VerifyTable(ptr);
+    }
+    case DeviceToLocalMessagePayload::GatewayPairCommandResult: {
+      return verifier.VerifyField<OpenShock::Serialization::Local::GatewayPairCommandResult>(static_cast<const uint8_t *>(obj), 0, 1);
+    }
+    case DeviceToLocalMessagePayload::SetRfTxPinCommandResult: {
+      return verifier.VerifyField<OpenShock::Serialization::Local::SetRfTxPinCommandResult>(static_cast<const uint8_t *>(obj), 0, 1);
     }
     default: return true;
   }

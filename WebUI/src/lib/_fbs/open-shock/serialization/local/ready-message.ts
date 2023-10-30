@@ -15,12 +15,27 @@ poggies():boolean {
   return !!this.bb!.readInt8(this.bb_pos);
 }
 
-static sizeOf():number {
-  return 1;
+wifiConnected():boolean {
+  return !!this.bb!.readInt8(this.bb_pos + 1);
 }
 
-static createReadyMessage(builder:flatbuffers.Builder, poggies: boolean):flatbuffers.Offset {
-  builder.prep(1, 1);
+paired():boolean {
+  return !!this.bb!.readInt8(this.bb_pos + 2);
+}
+
+rftxPin():number {
+  return this.bb!.readUint8(this.bb_pos + 3);
+}
+
+static sizeOf():number {
+  return 4;
+}
+
+static createReadyMessage(builder:flatbuffers.Builder, poggies: boolean, wifi_connected: boolean, paired: boolean, rftx_pin: number):flatbuffers.Offset {
+  builder.prep(1, 4);
+  builder.writeInt8(rftx_pin);
+  builder.writeInt8(Number(Boolean(paired)));
+  builder.writeInt8(Number(Boolean(wifi_connected)));
   builder.writeInt8(Number(Boolean(poggies)));
   return builder.offset();
 }

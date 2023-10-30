@@ -1,11 +1,27 @@
 #include "MessageHandlers/Local_Private.h"
 
+#include "CaptivePortal.h"
 #include "GatewayConnectionManager.h"
 #include "Logging.h"
 
 #include <cstdint>
 
 const char* const TAG = "LocalMessageHandlers";
+
+void serializeSetRfTxPinResult(std::uint8_t socketId, OpenShock::Serialization::Local::GatewayPairResultCode result) {
+  flatbuffers::FlatBufferBuilder builder(1024);
+
+  auto responseOffset = builder.CreateStruct(OpenShock::Serialization::Local::GatewayPairCommandResult(result));
+
+  auto msgOffset = OpenShock::Serialization::Local::CreateDeviceToLocalMessage(builder, OpenShock::Serialization::Local::DeviceToLocalMessagePayload::GatewayPairCommandResult, responseOffset.Union());
+
+  builder.Finish(msgOffset);
+
+  auto buffer = builder.GetBufferPointer();
+  auto size   = builder.GetSize();
+
+  OpenShock::CaptivePortal::SendMessageBIN(socketId, buffer, size);
+}
 
 using namespace OpenShock::MessageHandlers::Local;
 
@@ -19,14 +35,16 @@ void _Private::HandleGatewayPairCommand(std::uint8_t socketId, const OpenShock::
   auto code = msg->code();
 
   if (code == nullptr) {
-    ESP_LOGE(TAG, "Gateway message is missing required properties");
+    serializeSetRfTxPinResult(socketId, OpenShock::Serialization::Local::GatewayPairResultCode::CodeRequired);
     return;
   }
 
   if (code->size() != 6) {
-    ESP_LOGE(TAG, "Gateway code is invalid (wrong length)");
+    serializeSetRfTxPinResult(socketId, OpenShock::Serialization::Local::GatewayPairResultCode::InvalidCodeLength);
     return;
   }
 
-  GatewayConnectionManager::Pair(code->data());
+  auto result = GatewayConnectionManager::Pair(code->data());
+
+  serializeSetRfTxPinResult(socketId, result);
 }

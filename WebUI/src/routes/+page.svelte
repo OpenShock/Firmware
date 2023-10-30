@@ -1,5 +1,6 @@
 <script lang="ts">
   import { SerializeGatewayPairCommand } from '$lib/Serializers/GatewayPairCommand';
+  import { SerializeSetRfTxPinCommand } from '$lib/Serializers/SetRfTxPinCommand';
   import { WebSocketClient } from '$lib/WebSocketClient';
   import WiFiList from '$lib/components/WiFiList.svelte';
 
@@ -16,8 +17,18 @@
   let pairCode: string = '';
   $: pairCodeValid = isValidPairCode(pairCode);
 
+  let rfTxPin: number | null = null;
+  $: rfTxPinValid = rfTxPin !== null && rfTxPin >= 0 && rfTxPin < 255;
+
   function pair() {
-    const data = SerializeGatewayPairCommand(pairCode);
+    if (!pairCodeValid) return;
+    const data = SerializeGatewayPairCommand(pairCode!);
+    WebSocketClient.Instance.Send(data);
+  }
+
+  function setRfTxPin() {
+    if (!rfTxPinValid) return;
+    const data = SerializeSetRfTxPinCommand(rfTxPin!);
     WebSocketClient.Instance.Send(data);
   }
 </script>
@@ -32,8 +43,8 @@
         <button class="btn variant-filled" on:click={pair} disabled={!pairCodeValid || pairCode.length < 4}>Pair</button>
       </div>
       <div class="flex space-x-2">
-        <input class="input variant-form-material" type="text" placeholder="TX Pin" />
-        <button class="btn variant-filled">Configure</button>
+        <input class="input variant-form-material" type="number" placeholder="TX Pin" bind:value={rfTxPin} />
+        <button class="btn variant-filled" on:click={setRfTxPin} disabled={!rfTxPinValid}>Set</button>
       </div>
     </div>
   </div>
