@@ -26,17 +26,17 @@ void _setScanInProgress(bool inProgress) {
     s_scanInProgress = inProgress;
     if (inProgress) {
       for (auto& it : s_statusChangedHandlers) {
-        it.second(WifiScanStatus::Started);
-        it.second(WifiScanStatus::InProgress);
+        it.second(WiFiScanStatus::Started);
+        it.second(WiFiScanStatus::InProgress);
       }
       WiFi.scanDelete();
     } else {
-      WifiScanStatus status;
+      WiFiScanStatus status;
       if (s_scanAborted) {
-        status        = WifiScanStatus::Aborted;
+        status        = WiFiScanStatus::Aborted;
         s_scanAborted = false;
       } else {
-        status = WifiScanStatus::Completed;
+        status = WiFiScanStatus::Completed;
       }
       for (auto& it : s_statusChangedHandlers) {
         it.second(status);
@@ -56,7 +56,7 @@ void _handleScanError(std::int16_t retval) {
   if (retval == WIFI_SCAN_FAILED) {
     ESP_LOGE(TAG, "Failed to start scan on channel %u", s_currentChannel);
     for (auto& it : s_statusChangedHandlers) {
-      it.second(WifiScanStatus::Error);
+      it.second(WiFiScanStatus::Error);
     }
     return;
   }
@@ -84,16 +84,16 @@ void _iterateChannel() {
 }
 
 void _evScanCompleted(arduino_event_id_t event, arduino_event_info_t info) {
-  std::uint16_t numNetworks = WiFi.scanComplete();
+  std::int16_t numNetworks = WiFi.scanComplete();
   if (numNetworks < 0) {
     _handleScanError(numNetworks);
     return;
   }
 
-  for (std::uint16_t i = 0; i < numNetworks; i++) {
+  for (std::int16_t i = 0; i < numNetworks; i++) {
     wifi_ap_record_t* record = reinterpret_cast<wifi_ap_record_t*>(WiFi.getScanInfoByIndex(i));
     if (record == nullptr) {
-      ESP_LOGE(TAG, "Failed to get scan info for network #%u", i);
+      ESP_LOGE(TAG, "Failed to get scan info for network #%d", i);
       return;
     }
 

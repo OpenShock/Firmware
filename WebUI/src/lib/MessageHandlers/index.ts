@@ -11,11 +11,15 @@ import { WifiNetworkSavedEvent } from '$lib/_fbs/open-shock/serialization/local/
 import { WifiNetworkRemovedEvent } from '$lib/_fbs/open-shock/serialization/local/wifi-network-removed-event';
 import { WifiNetworkConnectedEvent } from '$lib/_fbs/open-shock/serialization/local/wifi-network-connected-event';
 import { WifiNetworkDisconnectedEvent } from '$lib/_fbs/open-shock/serialization/local/wifi-network-disconnected-event';
-import { WifiScanStatus } from '$lib/_fbs/open-shock';
 import { WiFiStateStore } from '$lib/stores';
 import type { WiFiNetwork } from '$lib/types/WiFiNetwork';
 import { WifiNetwork as FbsWifiNetwork } from '$lib/_fbs/open-shock/serialization/local/wifi-network';
 import { SerializeWifiScanCommand } from '$lib/Serializers/WifiScanCommand';
+import { toastDelegator } from '$lib/stores/ToastDelegator';
+import { SetRfTxPinCommandResult } from '$lib/_fbs/open-shock/serialization/local/set-rf-tx-pin-command-result';
+import { SetRfPinResultCode } from '$lib/_fbs/open-shock/serialization/local/set-rf-pin-result-code';
+import { GatewayPairCommandResult } from '$lib/_fbs/open-shock/serialization/local/gateway-pair-command-result';
+import { GatewayPairResultCode } from '$lib/_fbs/open-shock/serialization/local/gateway-pair-result-code';
 
 type MessageHandler = (wsClient: WebSocketClient, message: DeviceToLocalMessage) => void;
 
@@ -34,32 +38,18 @@ PayloadHandlers[DeviceToLocalMessagePayload.ReadyMessage] = (cli, msg) => {
 
   const data = SerializeWifiScanCommand(true);
   cli.Send(data);
+
+  toastDelegator.trigger({
+    message: 'Websocket connection established',
+    background: 'bg-green-500',
+  });
 };
 
 PayloadHandlers[DeviceToLocalMessagePayload.WifiScanStatusMessage] = (cli, msg) => {
   const payload = new WifiScanStatusMessage();
   msg.payload(payload);
 
-  switch (payload.status()) {
-    case WifiScanStatus.Started:
-      WiFiStateStore.setScanning(true);
-      break;
-    case WifiScanStatus.InProgress:
-      WiFiStateStore.setScanning(true);
-      break;
-    case WifiScanStatus.Completed:
-      WiFiStateStore.setScanning(false);
-      break;
-    case WifiScanStatus.Aborted:
-      WiFiStateStore.setScanning(false);
-      break;
-    case WifiScanStatus.Error:
-      WiFiStateStore.setScanning(false);
-      break;
-    default:
-      console.warn('[WS] Received invalid scan status message:', payload.status());
-      return;
-  }
+  WiFiStateStore.setScanStatus(payload.status());
 };
 
 PayloadHandlers[DeviceToLocalMessagePayload.WifiNetworkDiscoveredEvent] = (cli, msg) => {
@@ -137,20 +127,111 @@ PayloadHandlers[DeviceToLocalMessagePayload.WifiNetworkLostEvent] = (cli, msg) =
 PayloadHandlers[DeviceToLocalMessagePayload.WifiNetworkSavedEvent] = (cli, msg) => {
   const payload = new WifiNetworkSavedEvent();
   msg.payload(payload);
+
+  toastDelegator.trigger({
+    message: 'WiFi network saved: ' + payload.network()?.ssid(),
+    background: 'bg-green-500',
+  });
 };
 
 PayloadHandlers[DeviceToLocalMessagePayload.WifiNetworkRemovedEvent] = (cli, msg) => {
   const payload = new WifiNetworkRemovedEvent();
   msg.payload(payload);
+
+  toastDelegator.trigger({
+    message: 'WiFi network removed: ' + payload.network()?.ssid(),
+    background: 'bg-green-500',
+  });
 };
 PayloadHandlers[DeviceToLocalMessagePayload.WifiNetworkConnectedEvent] = (cli, msg) => {
   const payload = new WifiNetworkConnectedEvent();
   msg.payload(payload);
+
+  toastDelegator.trigger({
+    message: 'WiFi network connected: ' + payload.network()?.ssid(),
+    background: 'bg-green-500',
+  });
 };
 
 PayloadHandlers[DeviceToLocalMessagePayload.WifiNetworkDisconnectedEvent] = (cli, msg) => {
   const payload = new WifiNetworkDisconnectedEvent();
   msg.payload(payload);
+
+  toastDelegator.trigger({
+    message: 'WiFi network disconnected: ' + payload.network()?.ssid(),
+    background: 'bg-green-500',
+  });
+};
+
+PayloadHandlers[DeviceToLocalMessagePayload.GatewayPairCommandResult] = (cli, msg) => {
+  const payload = new GatewayPairCommandResult();
+  msg.payload(payload);
+
+  const result = payload.result();
+
+  if (result == GatewayPairResultCode.Success) {
+    toastDelegator.trigger({
+      message: 'Gateway paired successfully',
+      background: 'bg-green-500',
+    });
+  } else {
+    let reason: string;
+    switch (result) {
+      case GatewayPairResultCode.CodeRequired:
+        reason = 'Code required';
+        break;
+      case GatewayPairResultCode.InvalidCodeLength:
+        reason = 'Invalid code length';
+        break;
+      case GatewayPairResultCode.NoInternetConnection:
+        reason = 'No internet connection';
+        break;
+      case GatewayPairResultCode.InvalidCode:
+        reason = 'Invalid code';
+        break;
+      case GatewayPairResultCode.InternalError:
+        reason = 'Internal error';
+        break;
+      default:
+        reason = 'Unknown';
+        break;
+    }
+    toastDelegator.trigger({
+      message: 'Failed to pair gateway: ' + reason,
+      background: 'bg-red-500',
+    });
+  }
+};
+
+PayloadHandlers[DeviceToLocalMessagePayload.SetRfTxPinCommandResult] = (cli, msg) => {
+  const payload = new SetRfTxPinCommandResult();
+  msg.payload(payload);
+
+  const result = payload.result();
+
+  if (result == SetRfPinResultCode.Success) {
+    toastDelegator.trigger({
+      message: 'Changed RF TX pin to: ' + payload.pin(),
+      background: 'bg-green-500',
+    });
+  } else {
+    let reason: string;
+    switch (result) {
+      case SetRfPinResultCode.InvalidPin:
+        reason = 'Invalid pin';
+        break;
+      case SetRfPinResultCode.InternalError:
+        reason = 'Internal error';
+        break;
+      default:
+        reason = 'Unknown';
+        break;
+    }
+    toastDelegator.trigger({
+      message: 'Failed to change RF TX pin: ' + reason,
+      background: 'bg-red-500',
+    });
+  }
 };
 
 export function WebSocketMessageBinaryHandler(cli: WebSocketClient, data: ArrayBuffer) {

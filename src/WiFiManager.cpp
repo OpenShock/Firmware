@@ -3,12 +3,12 @@
 #include "CaptivePortal.h"
 #include "Config.h"
 #include "FormatHelpers.h"
+#include "Logging.h"
 #include "Mappers/EspWiFiTypesMapper.h"
 #include "Time.h"
 #include "Utils/HexUtils.h"
 #include "VisualStateManager.h"
 #include "WiFiScanManager.h"
-#include "Logging.h"
 
 #include "_fbs/DeviceToLocalMessage_generated.h"
 
@@ -25,7 +25,7 @@ const char* const TAG = "WiFiManager";
 using namespace OpenShock;
 
 struct WiFiNetwork {
-  WiFiNetwork(const char (&ssid)[33], const std::uint8_t (&bssid)[6], std::uint8_t channel, std::int8_t rssi, WifiAuthMode authMode, std::uint8_t credentialsId)
+  WiFiNetwork(const char (&ssid)[33], const std::uint8_t (&bssid)[6], std::uint8_t channel, std::int8_t rssi, WiFiAuthMode authMode, std::uint8_t credentialsId)
     : channel(channel), rssi(rssi), authMode(authMode), credentialsID(credentialsId), connectAttempts(0), lastConnectAttempt(0), scansMissed(0) {
     static_assert(sizeof(ssid) == sizeof(this->ssid) && sizeof(ssid) == 33, "SSID buffers must be 33 bytes long! (32 bytes for the SSID + 1 byte for the null terminator)");
     static_assert(sizeof(bssid) == sizeof(this->bssid) && sizeof(bssid) == 6, "BSSIDs must be 6 bytes long!");
@@ -33,14 +33,14 @@ struct WiFiNetwork {
     memcpy(this->ssid, ssid, sizeof(ssid));
     memcpy(this->bssid, bssid, sizeof(bssid));
   }
-  WiFiNetwork(const std::uint8_t (&ssid)[33], const std::uint8_t (&bssid)[6], std::uint8_t channel, std::int8_t rssi, WifiAuthMode authMode, std::uint8_t credentialsId)
+  WiFiNetwork(const std::uint8_t (&ssid)[33], const std::uint8_t (&bssid)[6], std::uint8_t channel, std::int8_t rssi, WiFiAuthMode authMode, std::uint8_t credentialsId)
     : WiFiNetwork(reinterpret_cast<const char (&)[33]>(ssid), bssid, channel, rssi, authMode, credentialsId) { }
 
   char ssid[33];
   std::uint8_t bssid[6];
   std::uint8_t channel;
   std::int8_t rssi;
-  WifiAuthMode authMode;
+  WiFiAuthMode authMode;
   std::uint8_t credentialsID;
   std::uint16_t connectAttempts;
   std::int64_t lastConnectAttempt;
@@ -200,19 +200,32 @@ bool GetNextWiFiNetwork(OpenShock::Config::WiFiCredentials& creds) {
   return found;
 }
 
+std::vector<WiFiNetwork>::iterator _findNetwork(std::function<bool(const WiFiNetwork&)> predicate) {
+  return std::find_if(s_wifiNetworks.begin(), s_wifiNetworks.end(), predicate);
+}
+std::vector<WiFiNetwork>::iterator _findNetwork(const char* ssid) {
+  return _findNetwork([ssid](const WiFiNetwork& net) { return strcmp(net.ssid, ssid) == 0; });
+}
+std::vector<WiFiNetwork>::iterator _findNetwork(const std::uint8_t (&bssid)[6]) {
+  return _findNetwork([bssid](const WiFiNetwork& net) { return memcmp(net.bssid, bssid, sizeof(bssid)) == 0; });
+}
+
 void _evWiFiConnected(arduino_event_t* event) {
   s_wifiConnected  = true;
   s_wifiConnecting = false;
 
   auto& info = event->event_info.wifi_sta_connected;
 
-  for (auto& net : s_wifiNetworks) {
-    if (memcmp(net.bssid, info.bssid, sizeof(net.bssid)) == 0) {
-      s_connectedCredentialsID = net.credentialsID;
-      _broadcastWifiConnected(net);
-      break;
-    }
+  auto it = _findNetwork(info.bssid);
+  if (it == s_wifiNetworks.end()) {
+    ESP_LOGW(TAG, "Connected to unknown network " BSSID_FMT, BSSID_ARG(info.bssid));
+    return;
   }
+
+  ESP_LOGI(TAG, "Connected to network %s (" BSSID_FMT ")", it->ssid, BSSID_ARG(it->bssid));
+
+  s_connectedCredentialsID = it->credentialsID;
+  _broadcastWifiConnected(*it);
 }
 void _evWiFiDisconnected(arduino_event_t* event) {
   s_wifiConnected          = false;
@@ -238,9 +251,9 @@ void _evWiFiDisconnected(arduino_event_t* event) {
   }
 }
 void _evWiFiScanStarted() { }
-void _evWiFiScanStatusChanged(OpenShock::WifiScanStatus status) {
+void _evWiFiScanStatusChanged(OpenShock::WiFiScanStatus status) {
   // If the scan started, remove any networks that have not been seen in 3 scans
-  if (status == OpenShock::WifiScanStatus::Started) {
+  if (status == OpenShock::WiFiScanStatus::Started) {
     for (auto it = s_wifiNetworks.begin(); it != s_wifiNetworks.end(); ++it) {
       if (it->scansMissed++ > 3) {
         ESP_LOGV(TAG, "Network %s (" BSSID_FMT ") has not been seen in 3 scans, removing from list", it->ssid, BSSID_ARG(it->bssid));
@@ -252,27 +265,27 @@ void _evWiFiScanStatusChanged(OpenShock::WifiScanStatus status) {
   }
 
   // If the scan completed, sort the networks by RSSI
-  if (status == OpenShock::WifiScanStatus::Completed || status == OpenShock::WifiScanStatus::Aborted || status == OpenShock::WifiScanStatus::Error) {
+  if (status == OpenShock::WiFiScanStatus::Completed || status == OpenShock::WiFiScanStatus::Aborted || status == OpenShock::WiFiScanStatus::Error) {
     // Sort the networks by RSSI
     std::sort(s_wifiNetworks.begin(), s_wifiNetworks.end(), [](const WiFiNetwork& a, const WiFiNetwork& b) { return a.rssi > b.rssi; });
   }
 }
 void _evWiFiNetworkDiscovery(const wifi_ap_record_t* record) {
-  OpenShock::WifiAuthMode authMode = Mappers::GetWiFiAuthModeEnum(record->authmode);
+  OpenShock::WiFiAuthMode authMode = Mappers::GetWiFiAuthModeEnum(record->authmode);
 
-  for (auto& net : s_wifiNetworks) {
-    if (memcmp(net.bssid, record->bssid, sizeof(net.bssid)) == 0) {
-      memcpy(net.ssid, record->ssid, sizeof(net.ssid));
-      net.channel     = record->primary;
-      net.rssi        = record->rssi;
-      net.authMode    = authMode;
-      net.scansMissed = 0;
+  auto it = _findNetwork(record->bssid);
+  if (it != s_wifiNetworks.end()) {
+    // Update the network
+    memcpy(it->ssid, record->ssid, sizeof(it->ssid));
+    it->channel     = record->primary;
+    it->rssi        = record->rssi;
+    it->authMode    = authMode;
+    it->scansMissed = 0;
 
-      _broadcastWifiNetworkUpdated(net);
-      ESP_LOGV(TAG, "Updated network %s (" BSSID_FMT ") with new scan info", net.ssid, BSSID_ARG(net.bssid));
+    _broadcastWifiNetworkUpdated(*it);
+    ESP_LOGV(TAG, "Updated network %s (" BSSID_FMT ") with new scan info", it->ssid, BSSID_ARG(it->bssid));
 
-      return;
-    }
+    return;
   }
 
   WiFiNetwork network(record->ssid, record->bssid, record->primary, record->rssi, authMode, 0);
@@ -330,57 +343,43 @@ bool _authenticate(const WiFiNetwork& net, const std::string& password) {
 bool WiFiManager::Save(const char* ssid, const std::string& password) {
   ESP_LOGV(TAG, "Authenticating to network %s", ssid);
 
-  for (auto& net : s_wifiNetworks) {
-    if (strcmp(net.ssid, ssid) == 0) {
-      ESP_LOGV(TAG, "Network with SSID %s was resolved", ssid);
+  auto it = _findNetwork(ssid);
+  if (it == s_wifiNetworks.end()) {
+    ESP_LOGE(TAG, "Failed to find network with SSID %s", ssid);
 
-      return _authenticate(net, password);
-    }
+    _broadcastErrorMessage("network_not_found");
+
+    return false;
   }
 
-  ESP_LOGE(TAG, "Failed to find network with SSID %s", ssid);
-
-  _broadcastErrorMessage("network_not_found");
-
-  return false;
+  return _authenticate(*it, password);
 }
 
 bool WiFiManager::Save(const std::uint8_t (&bssid)[6], const std::string& password) {
   ESP_LOGV(TAG, "Authenticating to network " BSSID_FMT, BSSID_ARG(bssid));
 
-  for (auto& net : s_wifiNetworks) {
-    static_assert(sizeof(net.bssid) == sizeof(bssid), "BSSID size mismatch");
-    if (memcmp(net.bssid, bssid, sizeof(bssid)) == 0) {
-      ESP_LOGV(TAG, "Network with BSSID " BSSID_FMT " was resolved to SSID %s", BSSID_ARG(bssid), net.ssid);
+  auto it = _findNetwork(bssid);
+  if (it == s_wifiNetworks.end()) {
+    ESP_LOGE(TAG, "Failed to find network with BSSID " BSSID_FMT, BSSID_ARG(bssid));
 
-      return _authenticate(net, password);
-    }
+    _broadcastErrorMessage("network_not_found");
+
+    return false;
   }
 
-  ESP_LOGE(TAG, "Failed to find network with BSSID " BSSID_FMT, BSSID_ARG(bssid));
-
-  _broadcastErrorMessage("network_not_found");
-
-  return false;
+  return _authenticate(*it, password);
 }
 
 bool WiFiManager::Forget(const char* ssid) {
   ESP_LOGV(TAG, "Forgetting network %s", ssid);
 
-  std::uint8_t credsId = 0;
-  for (auto& net : s_wifiNetworks) {
-    if (strcmp(net.ssid, ssid) == 0) {
-      credsId = net.credentialsID;
-
-      net.credentialsID = 0;
-      break;
-    }
-  }
-
-  if (credsId == 0) {
+  auto it = _findNetwork(ssid);
+  if (it == s_wifiNetworks.end()) {
     ESP_LOGE(TAG, "Failed to find network with SSID %s", ssid);
     return false;
   }
+
+  std::uint8_t credsId = it->credentialsID;
 
   // Check if the network is currently connected
   if (s_connectedCredentialsID == credsId) {
@@ -397,20 +396,13 @@ bool WiFiManager::Forget(const char* ssid) {
 bool WiFiManager::Forget(const std::uint8_t (&bssid)[6]) {
   ESP_LOGV(TAG, "Forgetting network " BSSID_FMT, BSSID_ARG(bssid));
 
-  std::uint8_t credsId = 0;
-  for (auto& net : s_wifiNetworks) {
-    if (memcmp(net.bssid, bssid, sizeof(bssid)) == 0) {
-      credsId = net.credentialsID;
-
-      net.credentialsID = 0;
-      break;
-    }
-  }
-
-  if (credsId == 0) {
+  auto it = std::find_if(s_wifiNetworks.begin(), s_wifiNetworks.end(), [bssid](const WiFiNetwork& net) { return memcmp(net.bssid, bssid, sizeof(bssid)) == 0; });
+  if (it == s_wifiNetworks.end()) {
     ESP_LOGE(TAG, "Failed to find network with BSSID " BSSID_FMT, BSSID_ARG(bssid));
     return false;
   }
+
+  std::uint8_t credsId = it->credentialsID;
 
   // Check if the network is currently connected
   if (s_connectedCredentialsID == credsId) {
@@ -424,46 +416,22 @@ bool WiFiManager::Forget(const std::uint8_t (&bssid)[6]) {
   return true;
 }
 
+bool _isSaved(std::function<bool(const Config::WiFiCredentials&)> predicate) {
+  const auto& credentials = Config::GetWiFiCredentials();
+
+  return std::any_of(credentials.begin(), credentials.end(), predicate);
+}
+
 bool WiFiManager::IsSaved(const char* ssid) {
-  ESP_LOGV(TAG, "Checking if network with SSID %s is saved", ssid);
-
-  for (auto& creds : Config::GetWiFiCredentials()) {
-    if (creds.ssid == ssid) {
-      ESP_LOGV(TAG, "Network with SSID %s is saved", ssid);
-      return true;
-    }
-  }
-
-  ESP_LOGV(TAG, "Network with SSID %s is not saved", ssid);
-  return false;
+  return _isSaved([ssid](const Config::WiFiCredentials& creds) { return creds.ssid == ssid; });
 }
 
 bool WiFiManager::IsSaved(const std::uint8_t (&bssid)[6]) {
-  ESP_LOGV(TAG, "Checking if network with BSSID " BSSID_FMT " is saved", BSSID_ARG(bssid));
-
-  for (auto& creds : Config::GetWiFiCredentials()) {
-    if (memcmp(creds.bssid, bssid, sizeof(bssid)) == 0) {
-      ESP_LOGV(TAG, "Network with BSSID " BSSID_FMT " is saved", BSSID_ARG(bssid));
-      return true;
-    }
-  }
-
-  ESP_LOGV(TAG, "Network with BSSID " BSSID_FMT " is not saved", BSSID_ARG(bssid));
-  return false;
+  return _isSaved([bssid](const Config::WiFiCredentials& creds) { return memcmp(creds.bssid, bssid, sizeof(bssid)) == 0; });
 }
 
 bool WiFiManager::IsSaved(const char* ssid, const std::uint8_t (&bssid)[6]) {
-  ESP_LOGV(TAG, "Checking if network with SSID %s or BSSID " BSSID_FMT " is saved", ssid, BSSID_ARG(bssid));
-
-  for (auto& creds : Config::GetWiFiCredentials()) {
-    if (creds.ssid == ssid || memcmp(creds.bssid, bssid, sizeof(bssid)) == 0) {
-      ESP_LOGV(TAG, "Network with SSID %s or BSSID " BSSID_FMT " is saved", ssid, BSSID_ARG(bssid));
-      return true;
-    }
-  }
-
-  ESP_LOGV(TAG, "Network with SSID %s or BSSID " BSSID_FMT " is not saved", ssid, BSSID_ARG(bssid));
-  return false;
+  return _isSaved([ssid, bssid](const Config::WiFiCredentials& creds) { return creds.ssid == ssid || memcmp(creds.bssid, bssid, sizeof(bssid)) == 0; });
 }
 
 bool _connect(const Config::WiFiCredentials& creds) {

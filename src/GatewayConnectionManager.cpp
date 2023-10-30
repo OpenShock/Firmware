@@ -34,7 +34,7 @@ constexpr std::uint8_t FLAG_NONE          = 0;
 constexpr std::uint8_t FLAG_HAS_IP        = 1 << 0;
 constexpr std::uint8_t FLAG_AUTHENTICATED = 1 << 1;
 
-static std::uint8_t s_flags = 0;
+static std::uint8_t s_flags                                 = 0;
 static std::unique_ptr<OpenShock::GatewayClient> s_wsClient = nullptr;
 
 void _evGotIPHandler(arduino_event_t* event) {
@@ -149,9 +149,9 @@ std::string GetAuthTokenFromJsonResponse(HTTPClient& client) {
   return std::string(data->valuestring);
 }
 
-bool GatewayConnectionManager::Pair(const char* pairCode) {
+GatewayPairResultCode GatewayConnectionManager::Pair(const char* pairCode) {
   if ((s_flags & FLAG_HAS_IP) == 0) {
-    return false;
+    return GatewayPairResultCode::NoInternetConnection;
   }
   s_wsClient = nullptr;
 
@@ -166,9 +166,12 @@ bool GatewayConnectionManager::Pair(const char* pairCode) {
 
   int responseCode = client.GET();
 
+  if (responseCode == 404) {
+    return GatewayPairResultCode::InvalidCode;
+  }
   if (responseCode != 200) {
     ESP_LOGE(TAG, "Error while getting auth token: [%d] %s", responseCode, client.getString().c_str());
-    return false;
+    return GatewayPairResultCode::InternalError;
   }
 
   std::string authToken = GetAuthTokenFromJsonResponse(client);
@@ -177,7 +180,7 @@ bool GatewayConnectionManager::Pair(const char* pairCode) {
 
   if (authToken.empty()) {
     ESP_LOGE(TAG, "Received empty auth token");
-    return false;
+    return GatewayPairResultCode::InternalError;
   }
 
   Config::SetBackendAuthToken(authToken);
@@ -185,7 +188,7 @@ bool GatewayConnectionManager::Pair(const char* pairCode) {
   s_flags |= FLAG_AUTHENTICATED;
   ESP_LOGD(TAG, "Successfully paired with pair code %s", pairCode);
 
-  return true;
+  return GatewayPairResultCode::Success;
 }
 void GatewayConnectionManager::UnPair() {
   s_flags &= FLAG_HAS_IP;

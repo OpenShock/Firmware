@@ -1,11 +1,13 @@
 #include "CaptivePortalInstance.h"
 
-#include "MessageHandlers/Local.h"
+#include "CommandHandler.h"
 #include "Logging.h"
+#include "MessageHandlers/Local.h"
 
 #include "_fbs/DeviceToLocalMessage_generated.h"
 
 #include <LittleFS.h>
+#include <WiFi.h>
 
 static const char* TAG = "CaptivePortalInstance";
 
@@ -17,7 +19,8 @@ constexpr std::uint8_t WEBSOCKET_PING_RETRIES   = 3;
 
 using namespace OpenShock;
 
-CaptivePortalInstance::CaptivePortalInstance() : m_webServer(HTTP_PORT), m_socketServer(WEBSOCKET_PORT, "/ws", "json"), m_socketDeFragger(std::bind(&CaptivePortalInstance::handleWebSocketEvent, this, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3, std::placeholders::_4)) {
+CaptivePortalInstance::CaptivePortalInstance()
+  : m_webServer(HTTP_PORT), m_socketServer(WEBSOCKET_PORT, "/ws", "json"), m_socketDeFragger(std::bind(&CaptivePortalInstance::handleWebSocketEvent, this, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3, std::placeholders::_4)) {
   m_socketServer.onEvent(std::bind(&WebSocketDeFragger::handler, &m_socketDeFragger, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3, std::placeholders::_4));
   m_socketServer.begin();
   m_socketServer.enableHeartbeat(WEBSOCKET_PING_INTERVAL, WEBSOCKET_PING_TIMEOUT, WEBSOCKET_PING_RETRIES);
@@ -37,7 +40,7 @@ void CaptivePortalInstance::handleWebSocketClientConnected(std::uint8_t socketId
   ESP_LOGD(TAG, "WebSocket client #%u connected from %s", socketId, m_socketServer.remoteIP(socketId).toString().c_str());
 
   flatbuffers::FlatBufferBuilder builder(32);
-  Serialization::Local::ReadyMessage readyMessage(true);
+  Serialization::Local::ReadyMessage readyMessage(true, WiFi.isConnected(), false, CommandHandler::GetRfTxPin());  // TODO: improve this
 
   auto readyMessageOffset = builder.CreateStruct(readyMessage);
 

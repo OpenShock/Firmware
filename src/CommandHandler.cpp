@@ -1,9 +1,10 @@
 #include "CommandHandler.h"
 
+#include "Board.h"
 #include "Config.h"
 #include "Constants.h"
-#include "RFTransmitter.h"
 #include "Logging.h"
+#include "RFTransmitter.h"
 
 #include <memory>
 
@@ -15,31 +16,55 @@ static std::unique_ptr<RFTransmitter> s_rfTransmitter = nullptr;
 
 bool CommandHandler::Init() {
   std::uint32_t txPin = Config::GetRFConfig().txPin;
-  if (txPin == Constants::GPIO_INVALID) {
-    ESP_LOGW(TAG, "Invalid RF TX pin loaded from config, ignoring");
+  if (!OpenShock::IsValidOutputPin(txPin)) {
+    ESP_LOGW(TAG, "Clearing invalid RF TX pin");
+    Config::SetRFConfigTxPin(Constants::GPIO_INVALID);
     return false;
   }
 
-  ESP_LOGD(TAG, "RF TX pin loaded from config: %u", txPin);
-
   s_rfTransmitter = std::make_unique<RFTransmitter>(txPin, 32);
+  if (!s_rfTransmitter->ok()) {
+    ESP_LOGE(TAG, "Failed to initialize RF transmitter");
+    s_rfTransmitter = nullptr;
+    return false;
+  }
 
   return true;
 }
 
 bool CommandHandler::Ok() {
-  return s_rfTransmitter != nullptr && s_rfTransmitter->ok();
+  return s_rfTransmitter != nullptr;
 }
 
-bool CommandHandler::SetRfTxPin(std::uint8_t txPin) {
-  if (!Config::SetRFConfigTxPin(txPin)) {
-    ESP_LOGW(TAG, "Failed to set RF TX pin");
-    return false;
+SetRfPinResultCode CommandHandler::SetRfTxPin(std::uint8_t txPin) {
+  if (!OpenShock::IsValidOutputPin(txPin)) {
+    return SetRfPinResultCode::InvalidPin;
   }
 
-  s_rfTransmitter = std::make_unique<RFTransmitter>(txPin, 32);
+  if (s_rfTransmitter != nullptr) {
+    ESP_LOGV(TAG, "Destroying existing RF transmitter");
+    s_rfTransmitter = nullptr;
+  }
 
-  return true;
+  ESP_LOGV(TAG, "Creating new RF transmitter");
+  auto rfxmit = std::make_unique<RFTransmitter>(txPin, 32);
+  if (!rfxmit->ok()) {
+    ESP_LOGE(TAG, "Failed to initialize RF transmitter");
+    return SetRfPinResultCode::InternalError;
+  }
+
+  if (!Config::SetRFConfigTxPin(txPin)) {
+    ESP_LOGE(TAG, "Failed to set RF TX pin in config");
+    return SetRfPinResultCode::InternalError;
+  }
+
+  s_rfTransmitter = std::move(rfxmit);
+
+  return SetRfPinResultCode::Success;
+}
+
+std::uint8_t CommandHandler::GetRfTxPin() {
+  return Config::GetRFConfig().txPin;
 }
 
 bool CommandHandler::HandleCommand(ShockerModelType model, std::uint16_t shockerId, ShockerCommandType type, std::uint8_t intensity, std::uint16_t durationMs) {
