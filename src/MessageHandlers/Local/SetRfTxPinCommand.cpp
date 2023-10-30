@@ -36,22 +36,8 @@ void _Private::HandleSetRfTxPinCommand(std::uint8_t socketId, const OpenShock::S
   }
 
   auto pin = msg->pin();
+  
+  auto result = OpenShock::CommandHandler::SetRfTxPin(pin);
 
-  if (!GPIO_IS_VALID_OUTPUT_GPIO(pin) || pin == Constants::GPIO_INVALID) {
-    ESP_LOGE(TAG, "Specified pin is not a valid GPIO pin");
-
-    serializeSetRfTxPinResult(socketId, pin, OpenShock::Serialization::Local::SetRfPinResultCode::InvalidPin);
-
-    return;
-  }
-
-  if (!CommandHandler::SetRfTxPin(pin)) {
-    ESP_LOGE(TAG, "Failed to set RF TX pin");
-
-    serializeSetRfTxPinResult(socketId, pin, OpenShock::Serialization::Local::SetRfPinResultCode::InternalError);
-
-    return;
-  }
-
-  serializeSetRfTxPinResult(socketId, pin, OpenShock::Serialization::Local::SetRfPinResultCode::Success);
+  serializeSetRfTxPinResult(socketId, pin, result);
 }

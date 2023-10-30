@@ -62,17 +62,15 @@ struct DeviceToLocalMessageBuilder;
 
 enum class SetRfPinResultCode : uint8_t {
   Success = 0,
-  Unchanged = 1,
-  InvalidPin = 2,
-  InternalError = 3,
+  InvalidPin = 1,
+  InternalError = 2,
   MIN = Success,
   MAX = InternalError
 };
 
-inline const SetRfPinResultCode (&EnumValuesSetRfPinResultCode())[4] {
+inline const SetRfPinResultCode (&EnumValuesSetRfPinResultCode())[3] {
   static const SetRfPinResultCode values[] = {
     SetRfPinResultCode::Success,
-    SetRfPinResultCode::Unchanged,
     SetRfPinResultCode::InvalidPin,
     SetRfPinResultCode::InternalError
   };
@@ -80,9 +78,8 @@ inline const SetRfPinResultCode (&EnumValuesSetRfPinResultCode())[4] {
 }
 
 inline const char * const *EnumNamesSetRfPinResultCode() {
-  static const char * const names[5] = {
+  static const char * const names[4] = {
     "Success",
-    "Unchanged",
     "InvalidPin",
     "InternalError",
     nullptr

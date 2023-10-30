@@ -18,6 +18,8 @@ namespace OpenShock {
     RFTransmitter(std::uint8_t gpioPin, int queueSize = 32);
     ~RFTransmitter();
 
+    inline std::uint8_t GetTxPin() const { return m_txPin; }
+
     inline bool ok() const { return m_rmtHandle != nullptr && m_queueHandle != nullptr && m_taskHandle != nullptr; }
 
     bool SendCommand(ShockerModelType model, std::uint16_t shockerId, ShockerCommandType type, std::uint8_t intensity, std::uint16_t durationMs);
@@ -27,6 +29,7 @@ namespace OpenShock {
     void destroy();
     static void TransmitTask(void* arg);
 
+    std::uint8_t m_txPin;
     char m_name[20];
     rmt_obj_t* m_rmtHandle;
     QueueHandle_t m_queueHandle;

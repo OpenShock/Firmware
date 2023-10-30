@@ -2,7 +2,6 @@
 
 export enum SetRfPinResultCode {
   Success = 0,
-  Unchanged = 1,
-  InvalidPin = 2,
-  InternalError = 3
+  InvalidPin = 1,
+  InternalError = 2
 }

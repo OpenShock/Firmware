@@ -36,25 +36,31 @@ bool CommandHandler::Ok() {
   return s_rfTransmitter != nullptr;
 }
 
-bool CommandHandler::SetRfTxPin(std::uint8_t txPin) {
+SetRfPinResultCode CommandHandler::SetRfTxPin(std::uint8_t txPin) {
   if (!OpenShock::IsValidOutputPin(txPin)) {
-    ESP_LOGW(TAG, "Invalid RF TX pin");
-    return false;
+    return SetRfPinResultCode::InvalidPin;
+  }
+
+  if (s_rfTransmitter != nullptr) {
+    ESP_LOGV(TAG, "Destroying existing RF transmitter");
+    s_rfTransmitter = nullptr;
+  }
+
+  ESP_LOGV(TAG, "Creating new RF transmitter");
+  auto rfxmit = std::make_unique<RFTransmitter>(txPin, 32);
+  if (!rfxmit->ok()) {
+    ESP_LOGE(TAG, "Failed to initialize RF transmitter");
+    return SetRfPinResultCode::InternalError;
   }
 
   if (!Config::SetRFConfigTxPin(txPin)) {
-    ESP_LOGW(TAG, "Failed to set RF TX pin");
-    return false;
+    ESP_LOGE(TAG, "Failed to set RF TX pin in config");
+    return SetRfPinResultCode::InternalError;
   }
 
-  s_rfTransmitter = std::make_unique<RFTransmitter>(txPin, 32);
-  if (!s_rfTransmitter->ok()) {
-    ESP_LOGE(TAG, "Failed to initialize RF transmitter");
-    s_rfTransmitter = nullptr;
-    return false;
-  }
+  s_rfTransmitter = std::move(rfxmit);
 
-  return true;
+  return SetRfPinResultCode::Success;
 }
 
 std::uint8_t CommandHandler::GetRfTxPin() {

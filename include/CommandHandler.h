@@ -1,5 +1,6 @@
 #pragma once
 
+#include "SetRfPinResultCode.h"
 #include "ShockerCommandType.h"
 #include "ShockerModelType.h"
 
@@ -10,7 +11,9 @@
 namespace OpenShock::CommandHandler {
   bool Init();
   bool Ok();
-  bool SetRfTxPin(std::uint8_t txPin);
+
+  SetRfPinResultCode SetRfTxPin(std::uint8_t txPin);
   std::uint8_t GetRfTxPin();
+
   bool HandleCommand(ShockerModelType shockerModel, std::uint16_t shockerId, ShockerCommandType type, std::uint8_t intensity, std::uint16_t durationMs);
 }  // namespace OpenShock::CommandHandler

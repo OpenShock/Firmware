@@ -19,7 +19,7 @@ struct command_t {
 
 using namespace OpenShock;
 
-RFTransmitter::RFTransmitter(std::uint8_t gpioPin, int queueSize) : m_rmtHandle(nullptr), m_queueHandle(nullptr), m_taskHandle(nullptr) {
+RFTransmitter::RFTransmitter(std::uint8_t gpioPin, int queueSize) : m_txPin(gpioPin), m_rmtHandle(nullptr), m_queueHandle(nullptr), m_taskHandle(nullptr) {
   snprintf(m_name, sizeof(m_name), "RFTransmitter-%u", gpioPin);
 
   ESP_LOGD(m_name, "Creating RFTransmitter");
@@ -107,11 +107,6 @@ void RFTransmitter::destroy() {
 
     ESP_LOGD(m_name, "Task stopped");
 
-    // Delete the task, kill it if it is still running
-    vTaskDelete(m_taskHandle);
-
-    ESP_LOGD(m_name, "Task deleted");
-
     // Clear the queue
     ClearPendingCommands();
 
@@ -149,6 +144,7 @@ void RFTransmitter::TransmitTask(void* arg) {
 
         ESP_LOGD(name, "Cleanup done, stopping task");
 
+        vTaskDelete(nullptr);
         return;
       }
 
