@@ -2,7 +2,7 @@
   import { SerializeWifiNetworkSaveCommand } from '$lib/Serializers/WifiNetworkSaveCommand';
   import { SerializeWifiNetworkConnectCommand } from '$lib/Serializers/WifiNetworkConnectCommand';
   import { WebSocketClient } from '$lib/WebSocketClient';
-  import { WiFiStateStore } from '$lib/stores';
+  import { DeviceStateStore } from '$lib/stores';
   import { getModalStore } from '@skeletonlabs/skeleton';
   import { SerializeWifiNetworkForgetCommand } from '$lib/Serializers/WifiNetworkForgetCommand';
 
@@ -10,7 +10,7 @@
 
   const modalStore = getModalStore();
 
-  $: item = $WiFiStateStore.networks.get(bssid);
+  $: item = $DeviceStateStore.wifiNetworks.get(bssid);
 
   $: rows = item
     ? [

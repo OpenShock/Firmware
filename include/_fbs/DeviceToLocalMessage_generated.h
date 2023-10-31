@@ -24,6 +24,7 @@ struct WifiNetwork;
 struct WifiNetworkBuilder;
 
 struct ReadyMessage;
+struct ReadyMessageBuilder;
 
 struct ErrorMessage;
 struct ErrorMessageBuilder;
@@ -251,49 +252,6 @@ template<> struct DeviceToLocalMessagePayloadTraits<OpenShock::Serialization::Lo
 bool VerifyDeviceToLocalMessagePayload(::flatbuffers::Verifier &verifier, const void *obj, DeviceToLocalMessagePayload type);
 bool VerifyDeviceToLocalMessagePayloadVector(::flatbuffers::Verifier &verifier, const ::flatbuffers::Vector<::flatbuffers::Offset<void>> *values, const ::flatbuffers::Vector<DeviceToLocalMessagePayload> *types);
 
-FLATBUFFERS_MANUALLY_ALIGNED_STRUCT(1) ReadyMessage FLATBUFFERS_FINAL_CLASS {
- private:
-  uint8_t poggies_;
-  uint8_t wifi_connected_;
-  uint8_t paired_;
-  uint8_t rftx_pin_;
-
- public:
-  struct Traits;
-  static FLATBUFFERS_CONSTEXPR_CPP11 const char *GetFullyQualifiedName() {
-    return "OpenShock.Serialization.Local.ReadyMessage";
-  }
-  ReadyMessage()
-      : poggies_(0),
-        wifi_connected_(0),
-        paired_(0),
-        rftx_pin_(0) {
-  }
-  ReadyMessage(bool _poggies, bool _wifi_connected, bool _paired, uint8_t _rftx_pin)
-      : poggies_(::flatbuffers::EndianScalar(static_cast<uint8_t>(_poggies))),
-        wifi_connected_(::flatbuffers::EndianScalar(static_cast<uint8_t>(_wifi_connected))),
-        paired_(::flatbuffers::EndianScalar(static_cast<uint8_t>(_paired))),
-        rftx_pin_(::flatbuffers::EndianScalar(_rftx_pin)) {
-  }
-  bool poggies() const {
-    return ::flatbuffers::EndianScalar(poggies_) != 0;
-  }
-  bool wifi_connected() const {
-    return ::flatbuffers::EndianScalar(wifi_connected_) != 0;
-  }
-  bool paired() const {
-    return ::flatbuffers::EndianScalar(paired_) != 0;
-  }
-  uint8_t rftx_pin() const {
-    return ::flatbuffers::EndianScalar(rftx_pin_);
-  }
-};
-FLATBUFFERS_STRUCT_END(ReadyMessage, 4);
-
-struct ReadyMessage::Traits {
-  using type = ReadyMessage;
-};
-
 FLATBUFFERS_MANUALLY_ALIGNED_STRUCT(1) WifiScanStatusMessage FLATBUFFERS_FINAL_CLASS {
  private:
   uint8_t status_;
@@ -496,6 +454,87 @@ inline ::flatbuffers::Offset<WifiNetwork> CreateWifiNetworkDirect(
       auth_mode,
       saved);
 }
+
+struct ReadyMessage FLATBUFFERS_FINAL_CLASS : private ::flatbuffers::Table {
+  typedef ReadyMessageBuilder Builder;
+  struct Traits;
+  static FLATBUFFERS_CONSTEXPR_CPP11 const char *GetFullyQualifiedName() {
+    return "OpenShock.Serialization.Local.ReadyMessage";
+  }
+  enum FlatBuffersVTableOffset FLATBUFFERS_VTABLE_UNDERLYING_TYPE {
+    VT_POGGIES = 4,
+    VT_CONNECTED_WIFI = 6,
+    VT_GATEWAY_PAIRED = 8,
+    VT_RFTX_PIN = 10
+  };
+  bool poggies() const {
+    return GetField<uint8_t>(VT_POGGIES, 0) != 0;
+  }
+  const OpenShock::Serialization::Local::WifiNetwork *connected_wifi() const {
+    return GetPointer<const OpenShock::Serialization::Local::WifiNetwork *>(VT_CONNECTED_WIFI);
+  }
+  bool gateway_paired() const {
+    return GetField<uint8_t>(VT_GATEWAY_PAIRED, 0) != 0;
+  }
+  uint8_t rftx_pin() const {
+    return GetField<uint8_t>(VT_RFTX_PIN, 0);
+  }
+  bool Verify(::flatbuffers::Verifier &verifier) const {
+    return VerifyTableStart(verifier) &&
+           VerifyField<uint8_t>(verifier, VT_POGGIES, 1) &&
+           VerifyOffset(verifier, VT_CONNECTED_WIFI) &&
+           verifier.VerifyTable(connected_wifi()) &&
+           VerifyField<uint8_t>(verifier, VT_GATEWAY_PAIRED, 1) &&
+           VerifyField<uint8_t>(verifier, VT_RFTX_PIN, 1) &&
+           verifier.EndTable();
+  }
+};
+
+struct ReadyMessageBuilder {
+  typedef ReadyMessage Table;
+  ::flatbuffers::FlatBufferBuilder &fbb_;
+  ::flatbuffers::uoffset_t start_;
+  void add_poggies(bool poggies) {
+    fbb_.AddElement<uint8_t>(ReadyMessage::VT_POGGIES, static_cast<uint8_t>(poggies), 0);
+  }
+  void add_connected_wifi(::flatbuffers::Offset<OpenShock::Serialization::Local::WifiNetwork> connected_wifi) {
+    fbb_.AddOffset(ReadyMessage::VT_CONNECTED_WIFI, connected_wifi);
+  }
+  void add_gateway_paired(bool gateway_paired) {
+    fbb_.AddElement<uint8_t>(ReadyMessage::VT_GATEWAY_PAIRED, static_cast<uint8_t>(gateway_paired), 0);
+  }
+  void add_rftx_pin(uint8_t rftx_pin) {
+    fbb_.AddElement<uint8_t>(ReadyMessage::VT_RFTX_PIN, rftx_pin, 0);
+  }
+  explicit ReadyMessageBuilder(::flatbuffers::FlatBufferBuilder &_fbb)
+        : fbb_(_fbb) {
+    start_ = fbb_.StartTable();
+  }
+  ::flatbuffers::Offset<ReadyMessage> Finish() {
+    const auto end = fbb_.EndTable(start_);
+    auto o = ::flatbuffers::Offset<ReadyMessage>(end);
+    return o;
+  }
+};
+
+inline ::flatbuffers::Offset<ReadyMessage> CreateReadyMessage(
+    ::flatbuffers::FlatBufferBuilder &_fbb,
+    bool poggies = false,
+    ::flatbuffers::Offset<OpenShock::Serialization::Local::WifiNetwork> connected_wifi = 0,
+    bool gateway_paired = false,
+    uint8_t rftx_pin = 0) {
+  ReadyMessageBuilder builder_(_fbb);
+  builder_.add_connected_wifi(connected_wifi);
+  builder_.add_rftx_pin(rftx_pin);
+  builder_.add_gateway_paired(gateway_paired);
+  builder_.add_poggies(poggies);
+  return builder_.Finish();
+}
+
+struct ReadyMessage::Traits {
+  using type = ReadyMessage;
+  static auto constexpr Create = CreateReadyMessage;
+};
 
 struct ErrorMessage FLATBUFFERS_FINAL_CLASS : private ::flatbuffers::Table {
   typedef ErrorMessageBuilder Builder;
@@ -1066,7 +1105,8 @@ inline bool VerifyDeviceToLocalMessagePayload(::flatbuffers::Verifier &verifier,
       return true;
     }
     case DeviceToLocalMessagePayload::ReadyMessage: {
-      return verifier.VerifyField<OpenShock::Serialization::Local::ReadyMessage>(static_cast<const uint8_t *>(obj), 0, 1);
+      auto ptr = reinterpret_cast<const OpenShock::Serialization::Local::ReadyMessage *>(obj);
+      return verifier.VerifyTable(ptr);
     }
     case DeviceToLocalMessagePayload::ErrorMessage: {
       auto ptr = reinterpret_cast<const OpenShock::Serialization::Local::ErrorMessage *>(obj);
