@@ -4,8 +4,8 @@
 #include "Config.h"
 #include "Logging.h"
 
-#include <Esp.h>
 #include <cJSON.h>
+#include <Esp.h>
 
 #include <unordered_map>
 
@@ -161,21 +161,19 @@ void _handleAuthtokenCommand(char* arg, std::size_t argLength) {
 }
 
 void _handleNetworksCommand(char* arg, std::size_t argLength) {
-  cJSON* network = nullptr;
+  cJSON* network  = nullptr;
   cJSON* networks = nullptr;
   std::shared_ptr<cJSON> json;
 
-
   if (arg == nullptr || argLength <= 0) {
     // Get networks
-    json = std::shared_ptr<cJSON>(cJSON_CreateArray(), cJSON_Delete);
+    json     = std::shared_ptr<cJSON>(cJSON_CreateArray(), cJSON_Delete);
     networks = json.get();
 
-    if (networks) {
+    if (!networks) {
       Serial.println("$SYS$|Error|Failed to create json");
       return;
     }
-
 
     for (auto& creds : Config::GetWiFiCredentials()) {
       network = cJSON_CreateObject();
@@ -196,7 +194,7 @@ void _handleNetworksCommand(char* arg, std::size_t argLength) {
     return;
   }
 
-  json = std::shared_ptr<cJSON>(cJSON_ParseWithLength(arg, argLength), cJSON_Delete);
+  json     = std::shared_ptr<cJSON>(cJSON_ParseWithLength(arg, argLength), cJSON_Delete);
   networks = json.get();
 
   if (!cJSON_IsArray(networks)) {
@@ -204,6 +202,7 @@ void _handleNetworksCommand(char* arg, std::size_t argLength) {
     return;
   }
 
+  std::uint8_t id = 1;
   std::vector<Config::WiFiCredentials> creds;
   cJSON_ArrayForEach(network, networks) {
     if (!cJSON_IsObject(network)) {
@@ -228,7 +227,7 @@ void _handleNetworksCommand(char* arg, std::size_t argLength) {
     }
 
     Config::WiFiCredentials cred {
-      .id       = 0,
+      .id       = id++,
       .ssid     = ssidStr,
       .bssid    = {0, 0, 0, 0, 0, 0},
       .password = passwordStr,
@@ -238,7 +237,10 @@ void _handleNetworksCommand(char* arg, std::size_t argLength) {
     creds.push_back(std::move(cred));
   }
 
-  OpenShock::Config::SetWiFiCredentials(creds);
+  if (!OpenShock::Config::SetWiFiCredentials(creds)) {
+    Serial.println("$SYS$|Error|Failed to save config");
+    return;
+  }
 
   Serial.println("$SYS$|Success|Saved config");
 }

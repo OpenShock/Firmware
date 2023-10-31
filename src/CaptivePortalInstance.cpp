@@ -1,8 +1,10 @@
 #include "CaptivePortalInstance.h"
 
 #include "CommandHandler.h"
+#include "GatewayConnectionManager.h"
 #include "Logging.h"
 #include "MessageHandlers/Local.h"
+#include "WiFiManager.h"
 
 #include "_fbs/DeviceToLocalMessage_generated.h"
 
@@ -39,10 +41,20 @@ CaptivePortalInstance::~CaptivePortalInstance() {
 void CaptivePortalInstance::handleWebSocketClientConnected(std::uint8_t socketId) {
   ESP_LOGD(TAG, "WebSocket client #%u connected from %s", socketId, m_socketServer.remoteIP(socketId).toString().c_str());
 
-  flatbuffers::FlatBufferBuilder builder(32);
-  Serialization::Local::ReadyMessage readyMessage(true, WiFi.isConnected(), false, CommandHandler::GetRfTxPin());  // TODO: improve this
+  flatbuffers::FlatBufferBuilder builder(256);
 
-  auto readyMessageOffset = builder.CreateStruct(readyMessage);
+  flatbuffers::Offset<Serialization::Local::WifiNetwork> fbsNetwork = 0;
+
+  WiFiNetwork network;
+  if (WiFiManager::GetConnectedNetwork(network)) {
+    auto hexBSSID = network.GetHexBSSID();
+
+    fbsNetwork = Serialization::Local::CreateWifiNetworkDirect(builder, network.ssid, hexBSSID.data(), network.channel, network.rssi, network.authMode, network.IsSaved());
+  } else {
+    fbsNetwork = 0;
+  }
+
+  auto readyMessageOffset = Serialization::Local::CreateReadyMessage(builder, true, fbsNetwork, GatewayConnectionManager::IsPaired(), CommandHandler::GetRfTxPin());
 
   auto msg = Serialization::Local::CreateDeviceToLocalMessage(builder, Serialization::Local::DeviceToLocalMessagePayload::ReadyMessage, readyMessageOffset.Union());
 

@@ -1,4 +1,4 @@
-import type { WifiAuthMode } from '$lib/_fbs/open-shock/wifi-auth-mode';
+import type { WifiAuthMode } from '$lib/_fbs/open-shock/serialization/types/wifi-auth-mode';
 
 export type WiFiNetwork = {
   ssid: string;

@@ -11,7 +11,7 @@ import { WifiNetworkSavedEvent } from '$lib/_fbs/open-shock/serialization/local/
 import { WifiNetworkRemovedEvent } from '$lib/_fbs/open-shock/serialization/local/wifi-network-removed-event';
 import { WifiNetworkConnectedEvent } from '$lib/_fbs/open-shock/serialization/local/wifi-network-connected-event';
 import { WifiNetworkDisconnectedEvent } from '$lib/_fbs/open-shock/serialization/local/wifi-network-disconnected-event';
-import { WiFiStateStore } from '$lib/stores';
+import { DeviceStateStore } from '$lib/stores';
 import type { WiFiNetwork } from '$lib/types/WiFiNetwork';
 import { WifiNetwork as FbsWifiNetwork } from '$lib/_fbs/open-shock/serialization/local/wifi-network';
 import { SerializeWifiScanCommand } from '$lib/Serializers/WifiScanCommand';
@@ -36,6 +36,13 @@ PayloadHandlers[DeviceToLocalMessagePayload.ReadyMessage] = (cli, msg) => {
 
   console.log('[WS] Connected to device, poggies: ', payload.poggies());
 
+  DeviceStateStore.update((store) => {
+    store.wifiConnectedBSSID = payload.connectedWifi()?.bssid() || null;
+    store.gatewayPaired = payload.gatewayPaired();
+    store.rfTxPin = payload.rftxPin();
+    return store;
+  });
+
   const data = SerializeWifiScanCommand(true);
   cli.Send(data);
 
@@ -49,7 +56,7 @@ PayloadHandlers[DeviceToLocalMessagePayload.WifiScanStatusMessage] = (cli, msg) 
   const payload = new WifiScanStatusMessage();
   msg.payload(payload);
 
-  WiFiStateStore.setScanStatus(payload.status());
+  DeviceStateStore.setWifiScanStatus(payload.status());
 };
 
 PayloadHandlers[DeviceToLocalMessagePayload.WifiNetworkDiscoveredEvent] = (cli, msg) => {
@@ -76,7 +83,7 @@ PayloadHandlers[DeviceToLocalMessagePayload.WifiNetworkDiscoveredEvent] = (cli, 
     saved: fbsNetwork.saved(),
   };
 
-  WiFiStateStore.addNetwork(network);
+  DeviceStateStore.addWifiNetwork(network);
 };
 
 PayloadHandlers[DeviceToLocalMessagePayload.WifiNetworkUpdatedEvent] = (cli, msg) => {
@@ -103,7 +110,7 @@ PayloadHandlers[DeviceToLocalMessagePayload.WifiNetworkUpdatedEvent] = (cli, msg
     saved: fbsNetwork.saved(),
   };
 
-  WiFiStateStore.addNetwork(network);
+  DeviceStateStore.addWifiNetwork(network);
 };
 
 PayloadHandlers[DeviceToLocalMessagePayload.WifiNetworkLostEvent] = (cli, msg) => {
@@ -121,7 +128,7 @@ PayloadHandlers[DeviceToLocalMessagePayload.WifiNetworkLostEvent] = (cli, msg) =
     return;
   }
 
-  WiFiStateStore.removeNetwork(bssid);
+  DeviceStateStore.removeWifiNetwork(bssid);
 };
 
 PayloadHandlers[DeviceToLocalMessagePayload.WifiNetworkSavedEvent] = (cli, msg) => {

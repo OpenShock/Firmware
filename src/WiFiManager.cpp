@@ -8,6 +8,7 @@
 #include "Time.h"
 #include "Utils/HexUtils.h"
 #include "VisualStateManager.h"
+#include "WiFiNetwork.h"
 #include "WiFiScanManager.h"
 
 #include "_fbs/DeviceToLocalMessage_generated.h"
@@ -23,29 +24,6 @@
 const char* const TAG = "WiFiManager";
 
 using namespace OpenShock;
-
-struct WiFiNetwork {
-  WiFiNetwork(const char (&ssid)[33], const std::uint8_t (&bssid)[6], std::uint8_t channel, std::int8_t rssi, WiFiAuthMode authMode, std::uint8_t credentialsId)
-    : channel(channel), rssi(rssi), authMode(authMode), credentialsID(credentialsId), connectAttempts(0), lastConnectAttempt(0), scansMissed(0) {
-    static_assert(sizeof(ssid) == sizeof(this->ssid) && sizeof(ssid) == 33, "SSID buffers must be 33 bytes long! (32 bytes for the SSID + 1 byte for the null terminator)");
-    static_assert(sizeof(bssid) == sizeof(this->bssid) && sizeof(bssid) == 6, "BSSIDs must be 6 bytes long!");
-
-    memcpy(this->ssid, ssid, sizeof(ssid));
-    memcpy(this->bssid, bssid, sizeof(bssid));
-  }
-  WiFiNetwork(const std::uint8_t (&ssid)[33], const std::uint8_t (&bssid)[6], std::uint8_t channel, std::int8_t rssi, WiFiAuthMode authMode, std::uint8_t credentialsId)
-    : WiFiNetwork(reinterpret_cast<const char (&)[33]>(ssid), bssid, channel, rssi, authMode, credentialsId) { }
-
-  char ssid[33];
-  std::uint8_t bssid[6];
-  std::uint8_t channel;
-  std::int8_t rssi;
-  WiFiAuthMode authMode;
-  std::uint8_t credentialsID;
-  std::uint16_t connectAttempts;
-  std::int64_t lastConnectAttempt;
-  std::uint8_t scansMissed;
-};
 
 flatbuffers::Offset<OpenShock::Serialization::Local::WifiNetwork> _createWiFiNetwork(flatbuffers::FlatBufferBuilder& builder, const WiFiNetwork& network) {
   char bssid[18];
@@ -490,6 +468,24 @@ bool WiFiManager::Connect(const std::uint8_t (&bssid)[6]) {
 
 void WiFiManager::Disconnect() {
   WiFi.disconnect(false);
+}
+
+bool WiFiManager::IsConnected() {
+  return s_wifiConnected;
+}
+bool WiFiManager::GetConnectedNetwork(OpenShock::WiFiNetwork& network) {
+  if (s_connectedCredentialsID == 0) {
+    return false;
+  }
+
+  auto it = _findNetwork([](const WiFiNetwork& net) { return net.credentialsID == s_connectedCredentialsID; });
+  if (it == s_wifiNetworks.end()) {
+    return false;
+  }
+
+  network = *it;
+
+  return true;
 }
 
 static std::int64_t s_lastScanRequest = 0;

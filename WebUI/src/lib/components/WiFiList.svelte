@@ -1,7 +1,7 @@
 <script lang="ts">
   import { getModalStore } from '@skeletonlabs/skeleton';
   import type { WiFiNetwork } from '$lib/types/WiFiNetwork';
-  import { WiFiStateStore } from '$lib/stores';
+  import { DeviceStateStore } from '$lib/stores';
   import { WebSocketClient } from '$lib/WebSocketClient';
   import { WifiAuthMode } from '$lib/_fbs/open-shock/serialization/types/wifi-auth-mode';
   import { WifiScanStatus } from '$lib/_fbs/open-shock/serialization/types/wifi-scan-status';
@@ -13,7 +13,7 @@
 
   const modalStore = getModalStore();
 
-  $: scanStatus = $WiFiStateStore.scan_status;
+  $: scanStatus = $DeviceStateStore.wifiScanStatus;
   $: isScanning = scanStatus === WifiScanStatus.Started || scanStatus === WifiScanStatus.InProgress;
 
   let connectedBSSID: string | null = null;
@@ -71,7 +71,7 @@
     </button>
   </div>
   <div class="max-h-64 overflow-auto">
-    {#each $WiFiStateStore.networks as [key, network] (key)}
+    {#each $DeviceStateStore.wifiNetworks as [key, network] (key)}
       <div class="card mb-2 p-2 flex justify-between items-center">
         <span>
           {#if network.bssid === connectedBSSID}

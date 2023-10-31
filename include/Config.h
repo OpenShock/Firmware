@@ -44,11 +44,11 @@ namespace OpenShock::Config {
   const CaptivePortalConfig& GetCaptivePortalConfig();
   const BackendConfig& GetBackendConfig();
 
-  void SetRFConfig(const RFConfig& config);
-  void SetWiFiConfig(const WiFiConfig& config);
-  void SetWiFiCredentials(const std::vector<WiFiCredentials>& credentials);
-  void SetCaptivePortalConfig(const CaptivePortalConfig& config);
-  void SetBackendConfig(const BackendConfig& config);
+  bool SetRFConfig(const RFConfig& config);
+  bool SetWiFiConfig(const WiFiConfig& config);
+  bool SetWiFiCredentials(const std::vector<WiFiCredentials>& credentials);
+  bool SetCaptivePortalConfig(const CaptivePortalConfig& config);
+  bool SetBackendConfig(const BackendConfig& config);
 
   bool SetRFConfigTxPin(std::uint8_t txPin);
 

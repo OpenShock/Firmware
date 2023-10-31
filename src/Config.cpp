@@ -1,8 +1,8 @@
 #include "Config.h"
 
 #include "Constants.h"
-#include "Utils/HexUtils.h"
 #include "Logging.h"
+#include "Utils/HexUtils.h"
 
 #include <LittleFS.h>
 
@@ -57,19 +57,19 @@ bool ReadFbsConfig(const Serialization::Configuration::WiFiConfig* cfg) {
       return false;
     }
 
-    auto id       = fbsCreds->id();
+    auto id = fbsCreds->id();
     if (id == 0) {
       ESP_LOGE(TAG, "Config::WiFi::credentials entry has invalid ID");
       return false;
     }
 
-    auto ssid     = fbsCreds->ssid();
+    auto ssid = fbsCreds->ssid();
     if (ssid == nullptr) {
       ESP_LOGE(TAG, "Config::WiFi::credentials entry has null SSID");
       return false;
     }
 
-    auto bssid    = fbsCreds->bssid();
+    auto bssid = fbsCreds->bssid();
     if (bssid == nullptr) {
       ESP_LOGE(TAG, "Config::WiFi::credentials entry has null BSSID");
       return false;
@@ -99,8 +99,8 @@ bool ReadFbsConfig(const Serialization::Configuration::WiFiConfig* cfg) {
   }
 
   _mainConfig.wifi = {
-    .apSsid   = cfg->ap_ssid()->str(),
-    .hostname = cfg->hostname()->str(),
+    .apSsid      = cfg->ap_ssid()->str(),
+    .hostname    = cfg->hostname()->str(),
     .credentials = std::move(credentials),
   };
 
@@ -199,9 +199,9 @@ bool _trySaveConfig() {
     return false;
   }
 
-  auto& _rf = _mainConfig.rf;
-  auto& _wifi = _mainConfig.wifi;
-  auto& _backend = _mainConfig.backend;
+  auto& _rf            = _mainConfig.rf;
+  auto& _wifi          = _mainConfig.wifi;
+  auto& _backend       = _mainConfig.backend;
   auto& _captivePortal = _mainConfig.captivePortal;
 
   // Serialize
@@ -233,8 +233,6 @@ bool _trySaveConfig() {
   }
 
   file.close();
-
-  ESP_LOGV(TAG, "Successfully saved config file");
 
   return true;
 }
@@ -298,29 +296,36 @@ const Config::BackendConfig& Config::GetBackendConfig() {
   return _mainConfig.backend;
 }
 
-void Config::SetRFConfig(const RFConfig& config) {
+bool Config::SetRFConfig(const RFConfig& config) {
   _mainConfig.rf = config;
-  _trySaveConfig();
+  return _trySaveConfig();
 }
 
-void Config::SetWiFiConfig(const WiFiConfig& config) {
+bool Config::SetWiFiConfig(const WiFiConfig& config) {
   _mainConfig.wifi = config;
-  _trySaveConfig();
+  return _trySaveConfig();
 }
 
-void Config::SetWiFiCredentials(const std::vector<WiFiCredentials>& credentials) {
+bool Config::SetWiFiCredentials(const std::vector<WiFiCredentials>& credentials) {
+  for (auto& cred : credentials) {
+    if (cred.id == 0) {
+      ESP_LOGE(TAG, "Cannot set WiFi credentials: credential ID cannot be 0");
+      return false;
+    }
+  }
+
   _mainConfig.wifi.credentials = credentials;
-  _trySaveConfig();
+  return _trySaveConfig();
 }
 
-void Config::SetCaptivePortalConfig(const CaptivePortalConfig& config) {
+bool Config::SetCaptivePortalConfig(const CaptivePortalConfig& config) {
   _mainConfig.captivePortal = config;
-  _trySaveConfig();
+  return _trySaveConfig();
 }
 
-void Config::SetBackendConfig(const BackendConfig& config) {
+bool Config::SetBackendConfig(const BackendConfig& config) {
   _mainConfig.backend = config;
-  _trySaveConfig();
+  return _trySaveConfig();
 }
 
 bool Config::SetRFConfigTxPin(std::uint8_t txPin) {
