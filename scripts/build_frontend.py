@@ -2,6 +2,7 @@ import os
 import re
 import gzip
 import shutil
+import subprocess
 from utils import sysenv
 
 Import('env')  # type: ignore
@@ -56,6 +57,42 @@ def file_write_text(file, text, enc):
     except:
         print('Error writing to ' + file)
         return False
+
+
+def get_global_python_interpreter_path():
+    # Run where or which to find the path to python.
+    python_paths = subprocess.getoutput('where python') if os.name == 'nt' else subprocess.getoutput('which python')
+
+    # Get first python path from the list that doesnt contain 'platformio' in it
+    python_path = next((path for path in python_paths.split('\n') if 'platformio' not in path), None)
+
+    if python_path is None:
+        return None
+
+    if not os.path.exists(python_path):
+        return None
+
+    return python_path
+
+
+def pyftsubset(font_path, fa_unicode_csv, output_path):
+    # Get the path to the global python interpreter.
+    python_path = get_global_python_interpreter_path()
+    if python_path is None:
+        print('Error: Could not find a global python interpreter.')
+        exit(1)
+
+    # Use pyftsubset to remove all the unused icons.
+    # pyftsubset does not support reading from and writing to the same file, so we need to write to a temporary file.
+    # Then delete the original file and rename the temporary file to the original file.
+    pyftsubset_cmd = (
+        f'{python_path} -m fontTools.subset {font_path} --unicodes={fa_unicode_csv} --output-file={output_path}'
+    )
+
+    print('Running: ' + pyftsubset_cmd)
+
+    # Run pyftsubset.
+    os.system(pyftsubset_cmd)
 
 
 def get_fa_icon_map(srcdir, csspath):
@@ -129,9 +166,9 @@ def minify_fa_font(font_path, icon_map):
     tmp_path = font_path + '.tmp'
 
     # Use pyftsubset to remove all the unused icons.
-    # pyftsubset does not support reading from and writing to the same file, so we need to write to a temporary file.
-    # Then delete the original file and rename the temporary file to the original file.
-    os.system('pyftsubset {} --unicodes={} --output-file={}'.format(font_path, fa_unicode_csv, tmp_path))
+    pyftsubset(font_path, fa_unicode_csv, tmp_path)
+
+    # Delete the original font file and rename the temporary file to the original file.
     file_delete(font_path)
     os.rename(tmp_path, font_path)
 
