@@ -217,6 +217,7 @@ PayloadHandlers[DeviceToLocalMessagePayload.SetRfTxPinCommandResult] = (cli, msg
   const result = payload.result();
 
   if (result == SetRfPinResultCode.Success) {
+    DeviceStateStore.setRfTxPin(payload.pin());
     toastDelegator.trigger({
       message: 'Changed RF TX pin to: ' + payload.pin(),
       background: 'bg-green-500',
