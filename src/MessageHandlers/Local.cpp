@@ -1,7 +1,7 @@
 #include "MessageHandlers/Local.h"
 
-#include "MessageHandlers/Local_Private.h"
 #include "Logging.h"
+#include "MessageHandlers/Local_Private.h"
 
 #include "_fbs/LocalToDeviceMessage_generated.h"
 
@@ -31,8 +31,8 @@ static std::array<Handlers::HandlerType, HANDLER_COUNT> s_localHandlers = []() {
   SET_HANDLER(PayloadType::WifiNetworkForgetCommand, Handlers::HandleWiFiNetworkForgetCommand);
   SET_HANDLER(PayloadType::WifiNetworkConnectCommand, Handlers::HandleWiFiNetworkConnectCommand);
   SET_HANDLER(PayloadType::WifiNetworkDisconnectCommand, Handlers::HandleWiFiNetworkDisconnectCommand);
-  SET_HANDLER(PayloadType::GatewayPairCommand, Handlers::HandleGatewayPairCommand);
-  SET_HANDLER(PayloadType::GatewayUnpairCommand, Handlers::HandleGatewayUnpairCommand);
+  SET_HANDLER(PayloadType::AccountLinkCommand, Handlers::HandleAccountLinkCommand);
+  SET_HANDLER(PayloadType::AccountUnlinkCommand, Handlers::HandleAccountUnlinkCommand);
   SET_HANDLER(PayloadType::SetRfTxPinCommand, Handlers::HandleSetRfTxPinCommand);
 
   return std::move(handlers);
