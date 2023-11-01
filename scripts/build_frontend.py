@@ -59,28 +59,30 @@ def file_write_text(file, text, enc):
         return False
 
 
-def get_global_python_interpreter_path():
+def get_interpreter_path():
     # Run where or which to find the path to python.
-    python_paths = subprocess.getoutput('where python') if os.name == 'nt' else subprocess.getoutput('which python')
+    if os.name == 'nt':
+        python_paths = subprocess.getoutput('where python').split('\n')
+    else:
+        python_paths = subprocess.getoutput('which python').split('\n')
 
-    # Get first python path from the list that doesnt contain 'platformio' in it
-    python_path = next((path for path in python_paths.split('\n') if 'platformio' not in path), None)
+    for path in python_paths:
+        if 'platformio' not in path:
+            return path.strip()
 
-    if python_path is None:
-        return None
+    first = python_paths[0].strip()
+    if first == '':
+        print('Error: Could not find a python interpreter.')
+        exit(1)
 
-    if not os.path.exists(python_path):
-        return None
+    print('Warning: Could not find a global python interpreter. Using ' + first + ' instead.')
 
-    return python_path
+    return first
 
 
 def pyftsubset(font_path, fa_unicode_csv, output_path):
-    # Get the path to the global python interpreter.
-    python_path = get_global_python_interpreter_path()
-    if python_path is None:
-        print('Error: Could not find a global python interpreter.')
-        exit(1)
+    # Get the path to python, optimally the global python interpreter.
+    python_path = get_interpreter_path()
 
     # Use pyftsubset to remove all the unused icons.
     # pyftsubset does not support reading from and writing to the same file, so we need to write to a temporary file.
