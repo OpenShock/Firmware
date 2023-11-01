@@ -25,7 +25,7 @@ def file_gzip(file_path, gzip_path):
     with open(file_path, 'rb') as f_in, gzip.open(gzip_path, 'wb') as f_out:
         f_out.write(f_in.read())
     size_after = os.path.getsize(gzip_path)
-    print('Gzipped ' + file_path + ': ' + size_before + ' => ' + size_after + ' bytes')
+    print('Gzipped ' + file_path + ': ' + str(size_before) + ' => ' + str(size_after) + ' bytes')
 
 
 def file_write_bin(file, data):
@@ -162,7 +162,7 @@ def minify_fa_css(css_path, unused_css_selectors):
     except Exception as e:
         print('Error writing to ' + css_path + ': ' + str(e))
     size_after = os.path.getsize(css_path)
-    print('Minified ' + css_path + ': ' + size_before + ' => ' + size_after + ' bytes')
+    print('Minified ' + css_path + ': ' + str(size_before) + ' => ' + str(size_after) + ' bytes')
 
 
 def minify_fa_font(font_path, icon_map):
@@ -183,7 +183,7 @@ def minify_fa_font(font_path, icon_map):
     file_delete(font_path)
     os.rename(tmp_path, font_path)
     size_after = os.path.getsize(font_path)
-    print('Minified ' + font_path + ': ' + size_before + ' => ' + size_after + ' bytes')
+    print('Minified ' + font_path + ': ' + str(size_before) + ' => ' + str(size_after) + ' bytes')
 
 
 def build_frontend(source, target, env):
