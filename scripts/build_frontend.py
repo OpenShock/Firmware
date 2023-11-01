@@ -160,6 +160,7 @@ def minify_fa_css(css_path, unused_css_selectors):
 
 
 def minify_fa_font(font_path, icon_map):
+    print('Minifying font: ' + font_path)
     values = []
     for icon in icon_map:
         values.append(icon_map[icon]['unicode'])
@@ -167,12 +168,15 @@ def minify_fa_font(font_path, icon_map):
 
     tmp_path = font_path + '.tmp'
 
+    print('Before: ' + str(os.path.getsize(font_path)) + ' bytes')
+
     # Use pyftsubset to remove all the unused icons.
     pyftsubset(font_path, fa_unicode_csv, tmp_path)
 
     # Delete the original font file and rename the temporary file to the original file.
     file_delete(font_path)
     os.rename(tmp_path, font_path)
+    print('After: ' + str(os.path.getsize(font_path)) + ' bytes')
 
 
 def build_frontend(source, target, env):
