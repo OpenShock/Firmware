@@ -20,10 +20,10 @@ struct WifiNetworkDisconnectCommand {
   placeholder:bool;
 }
 
-table GatewayPairCommand {
+table AccountLinkCommand {
   code:string;
 }
-struct GatewayUnpairCommand {
+struct AccountUnlinkCommand {
   placeholder:bool;
 }
 struct SetRfTxPinCommand {
@@ -36,8 +36,8 @@ union LocalToDeviceMessagePayload {
   WifiNetworkForgetCommand,
   WifiNetworkConnectCommand,
   WifiNetworkDisconnectCommand,
-  GatewayPairCommand,
-  GatewayUnpairCommand,
+  AccountLinkCommand,
+  AccountUnlinkCommand,
   SetRfTxPinCommand
 }
 
