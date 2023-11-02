@@ -1,5 +1,7 @@
 #pragma once
 
+bool verifyRollbackLater();
+
 namespace OpenShock::OtaUpdateManager {
 
   enum class BootMode {
@@ -38,6 +40,9 @@ namespace OpenShock::OtaUpdateManager {
   void Setup();
   /* Alternative loop() method. */
   void Loop();
+
+  bool LoadConfig();
+  bool SaveConfig();
 
   bool IsPerformingUpdate();
 

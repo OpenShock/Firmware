@@ -17,6 +17,10 @@
 
 const char* const TAG = "OpenShock";
 
+void verifyRollbackLater() {
+  return true;
+}
+
 void setup() {
   Serial.begin(115'200);
 
@@ -61,6 +65,7 @@ void loop() {
     OpenShock::OtaUpdateManager::Loop();
     return;
   }
+
   OpenShock::SerialInputHandler::Update();
   OpenShock::CaptivePortal::Update();
   OpenShock::GatewayConnectionManager::Update();

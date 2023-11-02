@@ -1,7 +1,13 @@
 #include "OtaUpdateManager.h"
+#include "Config.h"
 #include <esp_log.h>
 #include <esp_ota_ops.h>
+#include <LittleFS.h>
 #include <WiFi.h>
+
+bool verifyRollbackLater() {
+  return true;
+}
 
 using namespace OpenShock;
 
@@ -38,9 +44,46 @@ void OtaUpdateManager::Init() {
   }
 }
 
-void OtaUpdateManager::Setup() { }
+void OtaUpdateManager::Setup() {
+  OtaUpdateManager::LoadConfig();
 
-void OtaUpdateManager::Loop() { }
+  if (!OpenShock::WiFiManager::Init()) {
+    ESP_LOGE(TAG, "PANIC: An Error has occurred while initializing WiFiManager, restarting in 5 seconds...");
+    delay(5000);
+    ESP.restart();
+  }
+
+  if (!OpenShock::GatewayConnectionManager::Init()) {
+    ESP_LOGE(TAG, "PANIC: An Error has occurred while initializing WiFiScanManager, restarting in 5 seconds...");
+    delay(5000);
+    ESP.restart();
+  }
+}
+
+void OtaUpdateManager::Loop() {
+  OpenShock::WiFiScanManager::Update();
+  OpenShock::WiFiManager::Update();
+}
+
+bool OtaUpdateManager::LoadConfig() {
+  // Mount LittleFS.
+  if (!LittleFS.begin(true, "littlefs", 10U, "config")) {
+    ESP_LOGE(TAG, "PANIC: Could not mount LittleFS, restarting in 5 seconds..");
+    delay(5000);
+
+    // Invalidate update partition and restart.
+    esp_ota_mark_app_invalid_rollback_and_reboot();
+    ESP.restart();
+  }
+
+  // Load config while LittleFS is mounted.
+  OpenShock::Config::Init();
+
+  // Unmount LittleFS, as we will be reflashing that partition shortly.
+  LittleFS.end();
+}
+
+void OtaUpdateManager::SaveConfig() { }
 
 bool OtaUpdateManager::IsPerformingUpdate() {
   return s_bootMode == OtaUpdateManager::BootMode::OTA_UPDATE;
