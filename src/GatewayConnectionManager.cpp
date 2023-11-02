@@ -149,9 +149,9 @@ std::string GetAuthTokenFromJsonResponse(HTTPClient& client) {
   return std::string(data->valuestring);
 }
 
-GatewayPairResultCode GatewayConnectionManager::Pair(const char* pairCode) {
+AccountLinkResultCode GatewayConnectionManager::Pair(const char* pairCode) {
   if ((s_flags & FLAG_HAS_IP) == 0) {
-    return GatewayPairResultCode::NoInternetConnection;
+    return AccountLinkResultCode::NoInternetConnection;
   }
   s_wsClient = nullptr;
 
@@ -167,11 +167,11 @@ GatewayPairResultCode GatewayConnectionManager::Pair(const char* pairCode) {
   int responseCode = client.GET();
 
   if (responseCode == 404) {
-    return GatewayPairResultCode::InvalidCode;
+    return AccountLinkResultCode::InvalidCode;
   }
   if (responseCode != 200) {
     ESP_LOGE(TAG, "Error while getting auth token: [%d] %s", responseCode, client.getString().c_str());
-    return GatewayPairResultCode::InternalError;
+    return AccountLinkResultCode::InternalError;
   }
 
   std::string authToken = GetAuthTokenFromJsonResponse(client);
@@ -180,7 +180,7 @@ GatewayPairResultCode GatewayConnectionManager::Pair(const char* pairCode) {
 
   if (authToken.empty()) {
     ESP_LOGE(TAG, "Received empty auth token");
-    return GatewayPairResultCode::InternalError;
+    return AccountLinkResultCode::InternalError;
   }
 
   Config::SetBackendAuthToken(authToken);
@@ -188,7 +188,7 @@ GatewayPairResultCode GatewayConnectionManager::Pair(const char* pairCode) {
   s_flags |= FLAG_AUTHENTICATED;
   ESP_LOGD(TAG, "Successfully paired with pair code %s", pairCode);
 
-  return GatewayPairResultCode::Success;
+  return AccountLinkResultCode::Success;
 }
 void GatewayConnectionManager::UnPair() {
   s_flags &= FLAG_HAS_IP;

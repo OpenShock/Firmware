@@ -15,7 +15,7 @@ namespace OpenShock::MessageHandlers::Local::_Private {
   _HANDLER_SIGNATURE(HandleWiFiNetworkForgetCommand);
   _HANDLER_SIGNATURE(HandleWiFiNetworkConnectCommand);
   _HANDLER_SIGNATURE(HandleWiFiNetworkDisconnectCommand);
-  _HANDLER_SIGNATURE(HandleGatewayPairCommand);
-  _HANDLER_SIGNATURE(HandleGatewayUnpairCommand);
+  _HANDLER_SIGNATURE(HandleAccountLinkCommand);
+  _HANDLER_SIGNATURE(HandleAccountUnlinkCommand);
   _HANDLER_SIGNATURE(HandleSetRfTxPinCommand);
 }  // namespace OpenShock::MessageHandlers::Local::_Private

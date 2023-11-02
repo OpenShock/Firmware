@@ -50,7 +50,7 @@ table WifiNetworkDisconnectedEvent {
   network:WifiNetwork;
 }
 
-enum GatewayPairResultCode : uint8 {
+enum AccountLinkResultCode : uint8 {
   Success = 0,
   CodeRequired = 1,
   InvalidCodeLength = 2,
@@ -59,8 +59,8 @@ enum GatewayPairResultCode : uint8 {
   InternalError = 5
 }
 
-struct GatewayPairCommandResult {
-  result:GatewayPairResultCode;
+struct AccountLinkCommandResult {
+  result:AccountLinkResultCode;
 }
 
 enum SetRfPinResultCode : uint8 {
@@ -84,7 +84,7 @@ union DeviceToLocalMessagePayload {
   WifiNetworkRemovedEvent,
   WifiNetworkConnectedEvent,
   WifiNetworkDisconnectedEvent,
-  GatewayPairCommandResult,
+  AccountLinkCommandResult,
   SetRfTxPinCommandResult
 }
 
