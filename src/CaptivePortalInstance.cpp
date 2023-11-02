@@ -27,9 +27,15 @@ CaptivePortalInstance::CaptivePortalInstance()
   m_socketServer.begin();
   m_socketServer.enableHeartbeat(WEBSOCKET_PING_INTERVAL, WEBSOCKET_PING_TIMEOUT, WEBSOCKET_PING_RETRIES);
 
-  m_webServer.serveStatic("/", LittleFS, "/www/").setDefaultFile("index.html");
+  // Check if the www folder exists and is populated
+  if (LittleFS.exists("/www") && LittleFS.exists("/www/index.html")) {
+    m_webServer.serveStatic("/", LittleFS, "/www/").setDefaultFile("index.html");
 
-  m_webServer.onNotFound([](AsyncWebServerRequest* request) { request->send(404, "text/plain", "Not found"); });
+    m_webServer.onNotFound([](AsyncWebServerRequest* request) { request->send(404, "text/plain", "Not found"); });
+  } else {
+    m_webServer.onNotFound([](AsyncWebServerRequest* request) { request->send(200, "text/plain", F("You probably forgot to upload the Filesystem with PlatformIO!\nGo to PlatformIO -> Platform -> Upload Filesystem Image!\nIf this happened with a file we provided or you just need help, come to the Discord!\n\ndiscord.gg/openshock")); });
+  }
+  
   m_webServer.begin();
 }
 
