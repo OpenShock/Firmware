@@ -1,5 +1,7 @@
 #include "GatewayConnectionManager.h"
 
+#include "VisualStateManager.h"
+
 #include "Config.h"
 #include "Constants.h"
 #include "GatewayClient.h"
@@ -45,6 +47,7 @@ void _evWiFiDisconnectedHandler(arduino_event_t* event) {
   s_flags    = FLAG_NONE;
   s_wsClient = nullptr;
   ESP_LOGD(TAG, "Lost IP address");
+  OpenShock::VisualStateManager::SetWebSocketConnected(false);
 }
 
 using namespace OpenShock;
@@ -271,6 +274,7 @@ void GatewayConnectionManager::Update() {
 
   if (ConnectToLCG()) {
     ESP_LOGD(TAG, "Successfully connected to LCG");
+    OpenShock::VisualStateManager::SetWebSocketConnected(true);
     return;
   }
 }

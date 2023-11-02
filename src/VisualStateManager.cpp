@@ -30,9 +30,11 @@
 
 const char* const TAG = "VisualStateManager";
 
-constexpr std::uint64_t kCriticalErrorFlag = 1 << 0;
-constexpr std::uint64_t kWiFiConnectedFlag = 1 << 1;
-constexpr std::uint64_t kWiFiScanningFlag  = 1 << 2;
+constexpr std::uint64_t kCriticalErrorFlag          = 1 << 0;
+constexpr std::uint64_t kEmergencyStoppedFlag       = 1 << 1;
+constexpr std::uint64_t kWebSocketConnectedFlag     = 1 << 2;
+constexpr std::uint64_t kWiFiConnectedWithoutWSFlag = 1 << 3;
+constexpr std::uint64_t kWiFiScanningFlag           = 1 << 4;
 
 static std::uint64_t s_stateFlags = 0;
 
@@ -45,6 +47,11 @@ constexpr PinPatternManager::State kCriticalErrorPattern[] = {
   {false, 100}  // LED OFF for 0.1 seconds
 };
 
+constexpr PinPatternManager::State kEmergencyStoppedPattern[] = {
+  { true, 500},
+  {false, 500}
+};
+
 constexpr PinPatternManager::State kWiFiDisconnectedPattern[] = {
   { true, 100},
   {false, 100},
@@ -52,7 +59,7 @@ constexpr PinPatternManager::State kWiFiDisconnectedPattern[] = {
   {false, 700}
 };
 
-constexpr PinPatternManager::State kWiFiConnectedPattern[] = {
+constexpr PinPatternManager::State kWiFiConnectedWithoutWSPattern[] = {
   { true, 100},
   {false, 100},
   { true, 100},
@@ -86,7 +93,8 @@ constexpr PinPatternManager::State kWebSocketCantConnectPattern[] = {
 };
 
 constexpr PinPatternManager::State kWebSocketConnectedPattern[] = {
-  {true, 10'000}
+  { true, 100},
+  {false, 10'000}
 };
 
 PinPatternManager s_builtInLedManager(OPENSHOCK_LED_GPIO);
@@ -97,8 +105,18 @@ void _updateVisualState() {
     return;
   }
 
-  if (s_stateFlags & kWiFiConnectedFlag) {
-    s_builtInLedManager.SetPattern(kWiFiConnectedPattern);
+  if (s_stateFlags & kEmergencyStoppedFlag) {
+    s_builtInLedManager.SetPattern(kEmergencyStoppedPattern);
+    return;
+  }
+
+  if (s_stateFlags & kWebSocketConnectedFlag) {
+    s_builtInLedManager.SetPattern(kWebSocketConnectedPattern);
+    return;
+  }
+
+  if (s_stateFlags & kWiFiConnectedWithoutWSFlag) {
+    s_builtInLedManager.SetPattern(kWiFiConnectedWithoutWSPattern);
     return;
   }
 
@@ -131,7 +149,7 @@ void _updateVisualState() {
 void _handleWiFiConnected(arduino_event_t* event) {
   std::uint64_t oldState = s_stateFlags;
 
-  s_stateFlags |= kWiFiConnectedFlag;
+  s_stateFlags |= kWiFiConnectedWithoutWSFlag;
 
   if (oldState != s_stateFlags) {
     _updateVisualState();
@@ -140,7 +158,7 @@ void _handleWiFiConnected(arduino_event_t* event) {
 void _handleWiFiDisconnected(arduino_event_t* event) {
   std::uint64_t oldState = s_stateFlags;
 
-  s_stateFlags &= ~kWiFiConnectedFlag;
+  s_stateFlags &= ~kWiFiConnectedWithoutWSFlag;
 
   if (oldState != s_stateFlags) {
     _updateVisualState();
@@ -177,6 +195,34 @@ void VisualStateManager::SetScanningStarted() {
   std::uint64_t oldState = s_stateFlags;
 
   s_stateFlags |= kWiFiScanningFlag;
+
+  if (oldState != s_stateFlags) {
+    _updateVisualState();
+  }
+}
+
+void VisualStateManager::SetEmergencyStop(bool isStopped) {
+  std::uint64_t oldState = s_stateFlags;
+
+  if (isStopped) {
+    s_stateFlags |= kEmergencyStoppedFlag;
+  } else {
+    s_stateFlags &= ~kEmergencyStoppedFlag;
+  }
+
+  if (oldState != s_stateFlags) {
+    _updateVisualState();
+  }
+}
+
+void VisualStateManager::SetWebSocketConnected(bool isConnected) {
+  std::uint64_t oldState = s_stateFlags;
+
+  if (isConnected) {
+    s_stateFlags |= kWebSocketConnectedFlag;
+  } else {
+    s_stateFlags &= ~kWebSocketConnectedFlag;
+  }
 
   if (oldState != s_stateFlags) {
     _updateVisualState();

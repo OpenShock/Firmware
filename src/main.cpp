@@ -3,6 +3,7 @@
 #include "Config.h"
 #include "Constants.h"
 #include "EventHandlers/EventHandlers.h"
+#include "EStopManager.h"
 #include "GatewayConnectionManager.h"
 #include "SerialInputHandler.h"
 #include "VisualStateManager.h"
@@ -32,6 +33,8 @@ void setup() {
   OpenShock::SerialInputHandler::PrintWelcomeHeader();
   OpenShock::SerialInputHandler::PrintVersionInfo();
 
+  OpenShock::EStopManager::Init();
+
   OpenShock::Config::Init();
 
   if (!OpenShock::CommandHandler::Init()) {
@@ -57,4 +60,5 @@ void loop() {
   OpenShock::GatewayConnectionManager::Update();
   OpenShock::WiFiScanManager::Update();
   OpenShock::WiFiManager::Update();
+  OpenShock::EStopManager::Update();
 }

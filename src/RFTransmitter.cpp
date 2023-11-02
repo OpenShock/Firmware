@@ -1,4 +1,5 @@
 #include "RFTransmitter.h"
+#include "EStopManager.h"
 
 #include "Logging.h"
 #include "Rmt/MainEncoder.h"
@@ -176,7 +177,7 @@ void RFTransmitter::TransmitTask(void* arg) {
 
       // Remove expired or empty commands, else send the command.
       // After sending/receiving a command, move to the next one.
-      if (expired || empty) {
+      if (expired || empty || OpenShock::EStopManager::IsEStopped()) {
         // If the command is not empty, send the zero sequence to stop the shocker
         if (!empty) {
           rmtWriteBlocking(rmtHandle, cmd->zeroSequence->data(), cmd->zeroSequence->size());
