@@ -1,3 +1,4 @@
 platformio
 esptool
 cryptography
+setuptools
