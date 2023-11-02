@@ -18,6 +18,8 @@ runs:
   steps:
     - uses: actions/checkout@v4
       if: ${{ !inputs.skip-checkout }}
+      with:
+        submodules: recursive
 
     - uses: actions/cache@v3
       with:
