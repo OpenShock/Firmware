@@ -45,7 +45,7 @@ constexpr PinPatternManager::State kCriticalErrorPattern[] = {
   {false, 100}  // LED OFF for 0.1 seconds
 };
 
-constexpr PinPatternManager::State kWiFiDisconnected[] = {
+constexpr PinPatternManager::State kWiFiDisconnectedPattern[] = {
   { true, 100},
   {false, 100},
   { true, 100},
@@ -107,7 +107,7 @@ void _updateVisualState() {
     return;
   }
 
-  s_builtInLedManager.SetPattern(kWiFiDisconnected);
+  s_builtInLedManager.SetPattern(kWiFiDisconnectedPattern);
 }
 
 #endif  // OPENSHOCK_LED_GPIO

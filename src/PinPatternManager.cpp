@@ -6,15 +6,9 @@
 
 const char* const TAG = "PinPatternManager";
 
-struct Pattern {
-  unsigned int pin;
-  OpenShock::PinPatternManager::State* pattern;
-  std::size_t patternLength;
-};
-
 using namespace OpenShock;
 
-PinPatternManager::PinPatternManager(unsigned int gpioPin)
+PinPatternManager::PinPatternManager(std::uint8_t gpioPin)
   : m_gpioPin(gpioPin)
   , m_name {0}
   , m_pattern(nullptr)
@@ -81,7 +75,7 @@ void PinPatternManager::ClearPatternInternal() {
 void PinPatternManager::RunPattern(void* arg) {
   PinPatternManager* thisPtr = reinterpret_cast<PinPatternManager*>(arg);
 
-  unsigned int pin                  = thisPtr->m_gpioPin;
+  std::uint8_t pin                  = thisPtr->m_gpioPin;
   PinPatternManager::State* pattern = thisPtr->m_pattern;
   std::size_t patternLength         = thisPtr->m_patternLength;
 
