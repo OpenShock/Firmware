@@ -1,24 +1,38 @@
+import importlib.util
 import sys
 import subprocess
-import pkg_resources
-import site
 
-# Get the path to the python executable
-python = sys.executable
+# This function checks if a package is installed using multiple methods
+def is_installed(package):
+    if package in sys.modules:
+        return True
 
-# Get the site-packages path(s)
-package_path = site.getsitepackages()
+    if importlib.util.find_spec(package) is not None:
+        return True
 
-# Get the list of installed packages
-installed = {pkg.key for pkg in pkg_resources.working_set}
+    try:
+        __import__(package)
+        return True
+    except ImportError:
+        pass
 
-# Check if pip is installed
-if 'pip' not in installed:
-    raise RuntimeError('pip is not installed on this system')
+    return False
 
-required = ['fonttools[woff,unicode]', 'brotli']
+# Dictionary of required packages and their pip install names
+required = {
+    'fontTools': 'fonttools[woff,unicode]',
+    'brotli': 'brotli',
+}
 
-for package in required:
-    if package not in installed:
-        subprocess.check_call([python, '-m', 'pip', 'install', package])
-        print('Installed', package)
+# Get all packages that are not installed
+to_install = [ required[pip] for pip in required if not is_installed(pip) ]
+
+# Install all packages that are not installed
+if len(to_install) > 0:
+    print('Installing: ' + ', '.join(to_install))
+
+    # Get the python executable path
+    python_path = sys.executable
+
+    # Install the packages
+    subprocess.check_call([python_path, '-m', 'pip', 'install', *to_install])
