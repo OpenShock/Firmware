@@ -53,75 +53,91 @@ const char* GetContentType(const String& path) {
 
 class FileStream : public Stream {
 public:
-  FileStream(FILE* fileHandle, std::size_t fileLength) : m_handle(fileHandle), m_length(fileLength) {}
+  FileStream(FILE* fileHandle, std::size_t fileLength) : m_fHandle(fileHandle), m_fLeft(fileLength) {}
+
+  std::size_t availableFile() const {
+    return m_fLeft;
+  }
+  std::size_t availableBuffer() const {
+    return sizeof(m_buffer) - m_bOffs;
+  }
+  std::size_t availableTotal() const {
+    return availableBuffer() + availableFile();
+  }
 
   int available() override {
-    return m_length;
+    return (int)std::min(availableTotal(), (std::size_t)INT_MAX);
   }
 
   int read() override {
-    if (m_length == 0) {
+    if (availableTotal() == 0) {
       return -1;
     }
 
     _ensureBuffer();
 
-    m_length--;
-    return m_buffer[m_offset++];
+    return m_buffer[m_bOffs++];
   }
 
   int peek() override {
-    if (m_length == 0) {
+    if (availableTotal() == 0) {
       return -1;
     }
 
     _ensureBuffer();
 
-    return m_buffer[m_offset];
+    return m_buffer[m_bOffs];
+  }
+
+  std::size_t write(uint8_t) override {
+    return 0;
   }
 
   std::size_t readBytes(char* buffer, std::size_t length) override {
-    if (m_length == 0) {
+    std::size_t nToRead = std::min(availableTotal(), length);
+
+    if (buffer == nullptr || nToRead == 0) {
       return 0;
     }
 
-    char* start = buffer;
-    char* end = buffer + length;
+
+    char* cur = buffer;
+    const char* end = buffer + nToRead;
 
     // First drain the buffer
-    std::size_t bufferAvail = sizeof(m_buffer) - m_offset;
-    if (bufferAvail > 0) {
-      std::size_t nToRead = std::min(length, bufferAvail);
+    std::size_t bufferToRead = std::min(availableBuffer(), nToRead);
+    if (bufferToRead > 0) {
+      const char* bPtr = m_buffer + m_bOffs;
+      const char* bEnd = bPtr + bufferToRead;
 
-      memcpy(buffer, m_buffer + m_offset, nToRead);
+      std::copy(bPtr, bEnd, cur);
 
-      buffer += nToRead;
+      cur += bufferToRead;
     }
 
     // Then read the rest directly from the file
-    if (buffer < end) {
-      buffer += fread(buffer, 1, end - buffer, m_handle);
+    if (cur < end) {
+      std::size_t nRead = fread(cur, 1, end - cur, m_fHandle);
+
+      m_fLeft -= nRead;
+      cur += nRead;
     }
 
-    std::size_t nRead = buffer - start;
-
-    m_length -= nRead;
-
-    return nRead;
+    return cur - buffer;
   }
 private:
 void _ensureBuffer() {
-    if (m_length == 0 || sizeof(m_buffer) - m_offset > 0) {
+    if (availableFile() == 0 || availableBuffer() > 0) {
       return;
     }
 
-    m_length -= fread(m_buffer, 1, sizeof(m_buffer), m_handle);
-    m_offset = 0;
+    m_fLeft -= fread(m_buffer, 1, sizeof(m_buffer), m_fHandle);
+    m_bOffs = 0;
   }
 
-  FILE* m_handle;
-  std::size_t m_length;
-  std::size_t m_offset;
+  FILE* m_fHandle;
+  std::size_t m_fLeft;
+  std::size_t m_bOffs;
   char m_buffer[1024];
 };
 
@@ -154,9 +170,14 @@ void StaticFileHandler::handleRequest(AsyncWebServerRequest* request) {
   long size = ftell(handle);
   fseek(handle, 0, SEEK_SET);
 
+  if (size < 0) {
+    request->send(500, "text/plain", "Internal Server Error");
+    return;
+  }
+
   String contentType = GetContentType(url);
 
-  FileStream* stream = new FileStream(handle);
+  FileStream* stream = new FileStream(handle, size);
 
   auto response = request->beginResponse(*stream, contentType, size);
 
