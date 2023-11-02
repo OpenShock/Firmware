@@ -1,9 +1,9 @@
 import type { WifiScanStatus } from '$lib/_fbs/open-shock/serialization/types/wifi-scan-status';
 import type { WiFiNetwork } from '$lib/types/WiFiNetwork';
-import type { WiFiState } from '$lib/types/WiFiState';
+import type { DeviceState } from '$lib/types/DeviceState';
 import { writable } from 'svelte/store';
 
-const { subscribe, update } = writable<WiFiState>({
+const { subscribe, update } = writable<DeviceState>({
   wifiConnectedBSSID: null,
   wifiScanStatus: null,
   wifiNetworks: new Map<string, WiFiNetwork>(),
@@ -41,6 +41,18 @@ export const DeviceStateStore = {
   clearWifiNetworks() {
     update((store) => {
       store.wifiNetworks.clear();
+      return store;
+    });
+  },
+  setGatewayPaired(paired: boolean) {
+    update((store) => {
+      store.gatewayPaired = paired;
+      return store;
+    });
+  },
+  setRfTxPin(pin: number) {
+    update((store) => {
+      store.rfTxPin = pin;
       return store;
     });
   },

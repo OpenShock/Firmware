@@ -30,10 +30,10 @@ struct WifiNetworkConnectCommandBuilder;
 
 struct WifiNetworkDisconnectCommand;
 
-struct GatewayPairCommand;
-struct GatewayPairCommandBuilder;
+struct AccountLinkCommand;
+struct AccountLinkCommandBuilder;
 
-struct GatewayUnpairCommand;
+struct AccountUnlinkCommand;
 
 struct SetRfTxPinCommand;
 
@@ -47,8 +47,8 @@ enum class LocalToDeviceMessagePayload : uint8_t {
   WifiNetworkForgetCommand = 3,
   WifiNetworkConnectCommand = 4,
   WifiNetworkDisconnectCommand = 5,
-  GatewayPairCommand = 6,
-  GatewayUnpairCommand = 7,
+  AccountLinkCommand = 6,
+  AccountUnlinkCommand = 7,
   SetRfTxPinCommand = 8,
   MIN = NONE,
   MAX = SetRfTxPinCommand
@@ -62,8 +62,8 @@ inline const LocalToDeviceMessagePayload (&EnumValuesLocalToDeviceMessagePayload
     LocalToDeviceMessagePayload::WifiNetworkForgetCommand,
     LocalToDeviceMessagePayload::WifiNetworkConnectCommand,
     LocalToDeviceMessagePayload::WifiNetworkDisconnectCommand,
-    LocalToDeviceMessagePayload::GatewayPairCommand,
-    LocalToDeviceMessagePayload::GatewayUnpairCommand,
+    LocalToDeviceMessagePayload::AccountLinkCommand,
+    LocalToDeviceMessagePayload::AccountUnlinkCommand,
     LocalToDeviceMessagePayload::SetRfTxPinCommand
   };
   return values;
@@ -77,8 +77,8 @@ inline const char * const *EnumNamesLocalToDeviceMessagePayload() {
     "WifiNetworkForgetCommand",
     "WifiNetworkConnectCommand",
     "WifiNetworkDisconnectCommand",
-    "GatewayPairCommand",
-    "GatewayUnpairCommand",
+    "AccountLinkCommand",
+    "AccountUnlinkCommand",
     "SetRfTxPinCommand",
     nullptr
   };
@@ -115,12 +115,12 @@ template<> struct LocalToDeviceMessagePayloadTraits<OpenShock::Serialization::Lo
   static const LocalToDeviceMessagePayload enum_value = LocalToDeviceMessagePayload::WifiNetworkDisconnectCommand;
 };
 
-template<> struct LocalToDeviceMessagePayloadTraits<OpenShock::Serialization::Local::GatewayPairCommand> {
-  static const LocalToDeviceMessagePayload enum_value = LocalToDeviceMessagePayload::GatewayPairCommand;
+template<> struct LocalToDeviceMessagePayloadTraits<OpenShock::Serialization::Local::AccountLinkCommand> {
+  static const LocalToDeviceMessagePayload enum_value = LocalToDeviceMessagePayload::AccountLinkCommand;
 };
 
-template<> struct LocalToDeviceMessagePayloadTraits<OpenShock::Serialization::Local::GatewayUnpairCommand> {
-  static const LocalToDeviceMessagePayload enum_value = LocalToDeviceMessagePayload::GatewayUnpairCommand;
+template<> struct LocalToDeviceMessagePayloadTraits<OpenShock::Serialization::Local::AccountUnlinkCommand> {
+  static const LocalToDeviceMessagePayload enum_value = LocalToDeviceMessagePayload::AccountUnlinkCommand;
 };
 
 template<> struct LocalToDeviceMessagePayloadTraits<OpenShock::Serialization::Local::SetRfTxPinCommand> {
@@ -180,29 +180,29 @@ struct WifiNetworkDisconnectCommand::Traits {
   using type = WifiNetworkDisconnectCommand;
 };
 
-FLATBUFFERS_MANUALLY_ALIGNED_STRUCT(1) GatewayUnpairCommand FLATBUFFERS_FINAL_CLASS {
+FLATBUFFERS_MANUALLY_ALIGNED_STRUCT(1) AccountUnlinkCommand FLATBUFFERS_FINAL_CLASS {
  private:
   uint8_t placeholder_;
 
  public:
   struct Traits;
   static FLATBUFFERS_CONSTEXPR_CPP11 const char *GetFullyQualifiedName() {
-    return "OpenShock.Serialization.Local.GatewayUnpairCommand";
+    return "OpenShock.Serialization.Local.AccountUnlinkCommand";
   }
-  GatewayUnpairCommand()
+  AccountUnlinkCommand()
       : placeholder_(0) {
   }
-  GatewayUnpairCommand(bool _placeholder)
+  AccountUnlinkCommand(bool _placeholder)
       : placeholder_(::flatbuffers::EndianScalar(static_cast<uint8_t>(_placeholder))) {
   }
   bool placeholder() const {
     return ::flatbuffers::EndianScalar(placeholder_) != 0;
   }
 };
-FLATBUFFERS_STRUCT_END(GatewayUnpairCommand, 1);
+FLATBUFFERS_STRUCT_END(AccountUnlinkCommand, 1);
 
-struct GatewayUnpairCommand::Traits {
-  using type = GatewayUnpairCommand;
+struct AccountUnlinkCommand::Traits {
+  using type = AccountUnlinkCommand;
 };
 
 FLATBUFFERS_MANUALLY_ALIGNED_STRUCT(1) SetRfTxPinCommand FLATBUFFERS_FINAL_CLASS {
@@ -436,11 +436,11 @@ inline ::flatbuffers::Offset<WifiNetworkConnectCommand> CreateWifiNetworkConnect
       ssid__);
 }
 
-struct GatewayPairCommand FLATBUFFERS_FINAL_CLASS : private ::flatbuffers::Table {
-  typedef GatewayPairCommandBuilder Builder;
+struct AccountLinkCommand FLATBUFFERS_FINAL_CLASS : private ::flatbuffers::Table {
+  typedef AccountLinkCommandBuilder Builder;
   struct Traits;
   static FLATBUFFERS_CONSTEXPR_CPP11 const char *GetFullyQualifiedName() {
-    return "OpenShock.Serialization.Local.GatewayPairCommand";
+    return "OpenShock.Serialization.Local.AccountLinkCommand";
   }
   enum FlatBuffersVTableOffset FLATBUFFERS_VTABLE_UNDERLYING_TYPE {
     VT_CODE = 4
@@ -456,42 +456,42 @@ struct GatewayPairCommand FLATBUFFERS_FINAL_CLASS : private ::flatbuffers::Table
   }
 };
 
-struct GatewayPairCommandBuilder {
-  typedef GatewayPairCommand Table;
+struct AccountLinkCommandBuilder {
+  typedef AccountLinkCommand Table;
   ::flatbuffers::FlatBufferBuilder &fbb_;
   ::flatbuffers::uoffset_t start_;
   void add_code(::flatbuffers::Offset<::flatbuffers::String> code) {
-    fbb_.AddOffset(GatewayPairCommand::VT_CODE, code);
+    fbb_.AddOffset(AccountLinkCommand::VT_CODE, code);
   }
-  explicit GatewayPairCommandBuilder(::flatbuffers::FlatBufferBuilder &_fbb)
+  explicit AccountLinkCommandBuilder(::flatbuffers::FlatBufferBuilder &_fbb)
         : fbb_(_fbb) {
     start_ = fbb_.StartTable();
   }
-  ::flatbuffers::Offset<GatewayPairCommand> Finish() {
+  ::flatbuffers::Offset<AccountLinkCommand> Finish() {
     const auto end = fbb_.EndTable(start_);
-    auto o = ::flatbuffers::Offset<GatewayPairCommand>(end);
+    auto o = ::flatbuffers::Offset<AccountLinkCommand>(end);
     return o;
   }
 };
 
-inline ::flatbuffers::Offset<GatewayPairCommand> CreateGatewayPairCommand(
+inline ::flatbuffers::Offset<AccountLinkCommand> CreateAccountLinkCommand(
     ::flatbuffers::FlatBufferBuilder &_fbb,
     ::flatbuffers::Offset<::flatbuffers::String> code = 0) {
-  GatewayPairCommandBuilder builder_(_fbb);
+  AccountLinkCommandBuilder builder_(_fbb);
   builder_.add_code(code);
   return builder_.Finish();
 }
 
-struct GatewayPairCommand::Traits {
-  using type = GatewayPairCommand;
-  static auto constexpr Create = CreateGatewayPairCommand;
+struct AccountLinkCommand::Traits {
+  using type = AccountLinkCommand;
+  static auto constexpr Create = CreateAccountLinkCommand;
 };
 
-inline ::flatbuffers::Offset<GatewayPairCommand> CreateGatewayPairCommandDirect(
+inline ::flatbuffers::Offset<AccountLinkCommand> CreateAccountLinkCommandDirect(
     ::flatbuffers::FlatBufferBuilder &_fbb,
     const char *code = nullptr) {
   auto code__ = code ? _fbb.CreateString(code) : 0;
-  return OpenShock::Serialization::Local::CreateGatewayPairCommand(
+  return OpenShock::Serialization::Local::CreateAccountLinkCommand(
       _fbb,
       code__);
 }
@@ -528,11 +528,11 @@ struct LocalToDeviceMessage FLATBUFFERS_FINAL_CLASS : private ::flatbuffers::Tab
   const OpenShock::Serialization::Local::WifiNetworkDisconnectCommand *payload_as_WifiNetworkDisconnectCommand() const {
     return payload_type() == OpenShock::Serialization::Local::LocalToDeviceMessagePayload::WifiNetworkDisconnectCommand ? static_cast<const OpenShock::Serialization::Local::WifiNetworkDisconnectCommand *>(payload()) : nullptr;
   }
-  const OpenShock::Serialization::Local::GatewayPairCommand *payload_as_GatewayPairCommand() const {
-    return payload_type() == OpenShock::Serialization::Local::LocalToDeviceMessagePayload::GatewayPairCommand ? static_cast<const OpenShock::Serialization::Local::GatewayPairCommand *>(payload()) : nullptr;
+  const OpenShock::Serialization::Local::AccountLinkCommand *payload_as_AccountLinkCommand() const {
+    return payload_type() == OpenShock::Serialization::Local::LocalToDeviceMessagePayload::AccountLinkCommand ? static_cast<const OpenShock::Serialization::Local::AccountLinkCommand *>(payload()) : nullptr;
   }
-  const OpenShock::Serialization::Local::GatewayUnpairCommand *payload_as_GatewayUnpairCommand() const {
-    return payload_type() == OpenShock::Serialization::Local::LocalToDeviceMessagePayload::GatewayUnpairCommand ? static_cast<const OpenShock::Serialization::Local::GatewayUnpairCommand *>(payload()) : nullptr;
+  const OpenShock::Serialization::Local::AccountUnlinkCommand *payload_as_AccountUnlinkCommand() const {
+    return payload_type() == OpenShock::Serialization::Local::LocalToDeviceMessagePayload::AccountUnlinkCommand ? static_cast<const OpenShock::Serialization::Local::AccountUnlinkCommand *>(payload()) : nullptr;
   }
   const OpenShock::Serialization::Local::SetRfTxPinCommand *payload_as_SetRfTxPinCommand() const {
     return payload_type() == OpenShock::Serialization::Local::LocalToDeviceMessagePayload::SetRfTxPinCommand ? static_cast<const OpenShock::Serialization::Local::SetRfTxPinCommand *>(payload()) : nullptr;
@@ -566,12 +566,12 @@ template<> inline const OpenShock::Serialization::Local::WifiNetworkDisconnectCo
   return payload_as_WifiNetworkDisconnectCommand();
 }
 
-template<> inline const OpenShock::Serialization::Local::GatewayPairCommand *LocalToDeviceMessage::payload_as<OpenShock::Serialization::Local::GatewayPairCommand>() const {
-  return payload_as_GatewayPairCommand();
+template<> inline const OpenShock::Serialization::Local::AccountLinkCommand *LocalToDeviceMessage::payload_as<OpenShock::Serialization::Local::AccountLinkCommand>() const {
+  return payload_as_AccountLinkCommand();
 }
 
-template<> inline const OpenShock::Serialization::Local::GatewayUnpairCommand *LocalToDeviceMessage::payload_as<OpenShock::Serialization::Local::GatewayUnpairCommand>() const {
-  return payload_as_GatewayUnpairCommand();
+template<> inline const OpenShock::Serialization::Local::AccountUnlinkCommand *LocalToDeviceMessage::payload_as<OpenShock::Serialization::Local::AccountUnlinkCommand>() const {
+  return payload_as_AccountUnlinkCommand();
 }
 
 template<> inline const OpenShock::Serialization::Local::SetRfTxPinCommand *LocalToDeviceMessage::payload_as<OpenShock::Serialization::Local::SetRfTxPinCommand>() const {
@@ -637,12 +637,12 @@ inline bool VerifyLocalToDeviceMessagePayload(::flatbuffers::Verifier &verifier,
     case LocalToDeviceMessagePayload::WifiNetworkDisconnectCommand: {
       return verifier.VerifyField<OpenShock::Serialization::Local::WifiNetworkDisconnectCommand>(static_cast<const uint8_t *>(obj), 0, 1);
     }
-    case LocalToDeviceMessagePayload::GatewayPairCommand: {
-      auto ptr = reinterpret_cast<const OpenShock::Serialization::Local::GatewayPairCommand *>(obj);
+    case LocalToDeviceMessagePayload::AccountLinkCommand: {
+      auto ptr = reinterpret_cast<const OpenShock::Serialization::Local::AccountLinkCommand *>(obj);
       return verifier.VerifyTable(ptr);
     }
-    case LocalToDeviceMessagePayload::GatewayUnpairCommand: {
-      return verifier.VerifyField<OpenShock::Serialization::Local::GatewayUnpairCommand>(static_cast<const uint8_t *>(obj), 0, 1);
+    case LocalToDeviceMessagePayload::AccountUnlinkCommand: {
+      return verifier.VerifyField<OpenShock::Serialization::Local::AccountUnlinkCommand>(static_cast<const uint8_t *>(obj), 0, 1);
     }
     case LocalToDeviceMessagePayload::SetRfTxPinCommand: {
       return verifier.VerifyField<OpenShock::Serialization::Local::SetRfTxPinCommand>(static_cast<const uint8_t *>(obj), 0, 1);

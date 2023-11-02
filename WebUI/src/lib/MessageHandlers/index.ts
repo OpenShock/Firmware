@@ -18,8 +18,8 @@ import { SerializeWifiScanCommand } from '$lib/Serializers/WifiScanCommand';
 import { toastDelegator } from '$lib/stores/ToastDelegator';
 import { SetRfTxPinCommandResult } from '$lib/_fbs/open-shock/serialization/local/set-rf-tx-pin-command-result';
 import { SetRfPinResultCode } from '$lib/_fbs/open-shock/serialization/local/set-rf-pin-result-code';
-import { GatewayPairCommandResult } from '$lib/_fbs/open-shock/serialization/local/gateway-pair-command-result';
-import { GatewayPairResultCode } from '$lib/_fbs/open-shock/serialization/local/gateway-pair-result-code';
+import { AccountLinkCommandResult } from '$lib/_fbs/open-shock/serialization/local/account-link-command-result';
+import { AccountLinkResultCode } from '$lib/_fbs/open-shock/serialization/local/account-link-result-code';
 
 type MessageHandler = (wsClient: WebSocketClient, message: DeviceToLocalMessage) => void;
 
@@ -170,13 +170,13 @@ PayloadHandlers[DeviceToLocalMessagePayload.WifiNetworkDisconnectedEvent] = (cli
   });
 };
 
-PayloadHandlers[DeviceToLocalMessagePayload.GatewayPairCommandResult] = (cli, msg) => {
-  const payload = new GatewayPairCommandResult();
+PayloadHandlers[DeviceToLocalMessagePayload.AccountLinkCommandResult] = (cli, msg) => {
+  const payload = new AccountLinkCommandResult();
   msg.payload(payload);
 
   const result = payload.result();
 
-  if (result == GatewayPairResultCode.Success) {
+  if (result == AccountLinkResultCode.Success) {
     toastDelegator.trigger({
       message: 'Gateway paired successfully',
       background: 'bg-green-500',
@@ -184,19 +184,19 @@ PayloadHandlers[DeviceToLocalMessagePayload.GatewayPairCommandResult] = (cli, ms
   } else {
     let reason: string;
     switch (result) {
-      case GatewayPairResultCode.CodeRequired:
+      case AccountLinkResultCode.CodeRequired:
         reason = 'Code required';
         break;
-      case GatewayPairResultCode.InvalidCodeLength:
+      case AccountLinkResultCode.InvalidCodeLength:
         reason = 'Invalid code length';
         break;
-      case GatewayPairResultCode.NoInternetConnection:
+      case AccountLinkResultCode.NoInternetConnection:
         reason = 'No internet connection';
         break;
-      case GatewayPairResultCode.InvalidCode:
+      case AccountLinkResultCode.InvalidCode:
         reason = 'Invalid code';
         break;
-      case GatewayPairResultCode.InternalError:
+      case AccountLinkResultCode.InternalError:
         reason = 'Internal error';
         break;
       default:
@@ -217,6 +217,7 @@ PayloadHandlers[DeviceToLocalMessagePayload.SetRfTxPinCommandResult] = (cli, msg
   const result = payload.result();
 
   if (result == SetRfPinResultCode.Success) {
+    DeviceStateStore.setRfTxPin(payload.pin());
     toastDelegator.trigger({
       message: 'Changed RF TX pin to: ' + payload.pin(),
       background: 'bg-green-500',

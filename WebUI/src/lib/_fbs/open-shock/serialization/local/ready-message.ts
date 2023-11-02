@@ -4,68 +4,66 @@ import * as flatbuffers from 'flatbuffers';
 
 import { WifiNetwork } from '../../../open-shock/serialization/local/wifi-network.js';
 
-
 export class ReadyMessage {
-  bb: flatbuffers.ByteBuffer|null = null;
+  bb: flatbuffers.ByteBuffer | null = null;
   bb_pos = 0;
-  __init(i:number, bb:flatbuffers.ByteBuffer):ReadyMessage {
-  this.bb_pos = i;
-  this.bb = bb;
-  return this;
-}
+  __init(i: number, bb: flatbuffers.ByteBuffer): ReadyMessage {
+    this.bb_pos = i;
+    this.bb = bb;
+    return this;
+  }
 
-static getRootAsReadyMessage(bb:flatbuffers.ByteBuffer, obj?:ReadyMessage):ReadyMessage {
-  return (obj || new ReadyMessage()).__init(bb.readInt32(bb.position()) + bb.position(), bb);
-}
+  static getRootAsReadyMessage(bb: flatbuffers.ByteBuffer, obj?: ReadyMessage): ReadyMessage {
+    return (obj || new ReadyMessage()).__init(bb.readInt32(bb.position()) + bb.position(), bb);
+  }
 
-static getSizePrefixedRootAsReadyMessage(bb:flatbuffers.ByteBuffer, obj?:ReadyMessage):ReadyMessage {
-  bb.setPosition(bb.position() + flatbuffers.SIZE_PREFIX_LENGTH);
-  return (obj || new ReadyMessage()).__init(bb.readInt32(bb.position()) + bb.position(), bb);
-}
+  static getSizePrefixedRootAsReadyMessage(bb: flatbuffers.ByteBuffer, obj?: ReadyMessage): ReadyMessage {
+    bb.setPosition(bb.position() + flatbuffers.SIZE_PREFIX_LENGTH);
+    return (obj || new ReadyMessage()).__init(bb.readInt32(bb.position()) + bb.position(), bb);
+  }
 
-poggies():boolean {
-  const offset = this.bb!.__offset(this.bb_pos, 4);
-  return offset ? !!this.bb!.readInt8(this.bb_pos + offset) : false;
-}
+  poggies(): boolean {
+    const offset = this.bb!.__offset(this.bb_pos, 4);
+    return offset ? !!this.bb!.readInt8(this.bb_pos + offset) : false;
+  }
 
-connectedWifi(obj?:WifiNetwork):WifiNetwork|null {
-  const offset = this.bb!.__offset(this.bb_pos, 6);
-  return offset ? (obj || new WifiNetwork()).__init(this.bb!.__indirect(this.bb_pos + offset), this.bb!) : null;
-}
+  connectedWifi(obj?: WifiNetwork): WifiNetwork | null {
+    const offset = this.bb!.__offset(this.bb_pos, 6);
+    return offset ? (obj || new WifiNetwork()).__init(this.bb!.__indirect(this.bb_pos + offset), this.bb!) : null;
+  }
 
-gatewayPaired():boolean {
-  const offset = this.bb!.__offset(this.bb_pos, 8);
-  return offset ? !!this.bb!.readInt8(this.bb_pos + offset) : false;
-}
+  gatewayPaired(): boolean {
+    const offset = this.bb!.__offset(this.bb_pos, 8);
+    return offset ? !!this.bb!.readInt8(this.bb_pos + offset) : false;
+  }
 
-rftxPin():number {
-  const offset = this.bb!.__offset(this.bb_pos, 10);
-  return offset ? this.bb!.readUint8(this.bb_pos + offset) : 0;
-}
+  rftxPin(): number {
+    const offset = this.bb!.__offset(this.bb_pos, 10);
+    return offset ? this.bb!.readUint8(this.bb_pos + offset) : 0;
+  }
 
-static startReadyMessage(builder:flatbuffers.Builder) {
-  builder.startObject(4);
-}
+  static startReadyMessage(builder: flatbuffers.Builder) {
+    builder.startObject(4);
+  }
 
-static addPoggies(builder:flatbuffers.Builder, poggies:boolean) {
-  builder.addFieldInt8(0, +poggies, +false);
-}
+  static addPoggies(builder: flatbuffers.Builder, poggies: boolean) {
+    builder.addFieldInt8(0, +poggies, +false);
+  }
 
-static addConnectedWifi(builder:flatbuffers.Builder, connectedWifiOffset:flatbuffers.Offset) {
-  builder.addFieldOffset(1, connectedWifiOffset, 0);
-}
+  static addConnectedWifi(builder: flatbuffers.Builder, connectedWifiOffset: flatbuffers.Offset) {
+    builder.addFieldOffset(1, connectedWifiOffset, 0);
+  }
 
-static addGatewayPaired(builder:flatbuffers.Builder, gatewayPaired:boolean) {
-  builder.addFieldInt8(2, +gatewayPaired, +false);
-}
+  static addAccountLinked(builder: flatbuffers.Builder, gatewayPaired: boolean) {
+    builder.addFieldInt8(2, +gatewayPaired, +false);
+  }
 
-static addRftxPin(builder:flatbuffers.Builder, rftxPin:number) {
-  builder.addFieldInt8(3, rftxPin, 0);
-}
+  static addRftxPin(builder: flatbuffers.Builder, rftxPin: number) {
+    builder.addFieldInt8(3, rftxPin, 0);
+  }
 
-static endReadyMessage(builder:flatbuffers.Builder):flatbuffers.Offset {
-  const offset = builder.endObject();
-  return offset;
-}
-
+  static endReadyMessage(builder: flatbuffers.Builder): flatbuffers.Offset {
+    const offset = builder.endObject();
+    return offset;
+  }
 }

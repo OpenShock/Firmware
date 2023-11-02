@@ -9,10 +9,10 @@ const char* const TAG = "LocalMessageHandlers";
 
 using namespace OpenShock::MessageHandlers::Local;
 
-void _Private::HandleGatewayUnpairCommand(std::uint8_t socketId, const OpenShock::Serialization::Local::LocalToDeviceMessage* root) {
-  auto msg = root->payload_as_GatewayUnpairCommand();
+void _Private::HandleAccountUnlinkCommand(std::uint8_t socketId, const OpenShock::Serialization::Local::LocalToDeviceMessage* root) {
+  auto msg = root->payload_as_AccountUnlinkCommand();
   if (msg == nullptr) {
-    ESP_LOGE(TAG, "Payload cannot be parsed as GatewayUnpairCommand");
+    ESP_LOGE(TAG, "Payload cannot be parsed as AccountUnlinkCommand");
     return;
   }
 

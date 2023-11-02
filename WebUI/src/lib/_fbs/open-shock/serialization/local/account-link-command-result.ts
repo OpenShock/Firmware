@@ -2,19 +2,19 @@
 
 import * as flatbuffers from 'flatbuffers';
 
-import { GatewayPairResultCode } from '../../../open-shock/serialization/local/gateway-pair-result-code.js';
+import { AccountLinkResultCode } from '../../../open-shock/serialization/local/account-link-result-code.js';
 
 
-export class GatewayPairCommandResult {
+export class AccountLinkCommandResult {
   bb: flatbuffers.ByteBuffer|null = null;
   bb_pos = 0;
-  __init(i:number, bb:flatbuffers.ByteBuffer):GatewayPairCommandResult {
+  __init(i:number, bb:flatbuffers.ByteBuffer):AccountLinkCommandResult {
   this.bb_pos = i;
   this.bb = bb;
   return this;
 }
 
-result():GatewayPairResultCode {
+result():AccountLinkResultCode {
   return this.bb!.readUint8(this.bb_pos);
 }
 
@@ -22,7 +22,7 @@ static sizeOf():number {
   return 1;
 }
 
-static createGatewayPairCommandResult(builder:flatbuffers.Builder, result: GatewayPairResultCode):flatbuffers.Offset {
+static createAccountLinkCommandResult(builder:flatbuffers.Builder, result: AccountLinkResultCode):flatbuffers.Offset {
   builder.prep(1, 1);
   builder.writeInt8(result);
   return builder.offset();

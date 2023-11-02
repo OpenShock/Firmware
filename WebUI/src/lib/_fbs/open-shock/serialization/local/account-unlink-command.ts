@@ -2,10 +2,10 @@
 
 import * as flatbuffers from 'flatbuffers';
 
-export class GatewayUnpairCommand {
+export class AccountUnlinkCommand {
   bb: flatbuffers.ByteBuffer|null = null;
   bb_pos = 0;
-  __init(i:number, bb:flatbuffers.ByteBuffer):GatewayUnpairCommand {
+  __init(i:number, bb:flatbuffers.ByteBuffer):AccountUnlinkCommand {
   this.bb_pos = i;
   this.bb = bb;
   return this;
@@ -19,7 +19,7 @@ static sizeOf():number {
   return 1;
 }
 
-static createGatewayUnpairCommand(builder:flatbuffers.Builder, placeholder: boolean):flatbuffers.Offset {
+static createAccountUnlinkCommand(builder:flatbuffers.Builder, placeholder: boolean):flatbuffers.Offset {
   builder.prep(1, 1);
   builder.writeInt8(Number(Boolean(placeholder)));
   return builder.offset();
