@@ -5,10 +5,10 @@
 #include "Logging.h"
 #include "MessageHandlers/Local.h"
 #include "WiFiManager.h"
+#include "Utils/FS.h"
 
 #include "_fbs/DeviceToLocalMessage_generated.h"
 
-#include <LittleFS.h>
 #include <WiFi.h>
 
 static const char* TAG = "CaptivePortalInstance";
@@ -22,20 +22,20 @@ constexpr std::uint8_t WEBSOCKET_PING_RETRIES   = 3;
 using namespace OpenShock;
 
 CaptivePortalInstance::CaptivePortalInstance()
-  : m_webServer(HTTP_PORT), m_socketServer(WEBSOCKET_PORT, "/ws", "json"), m_socketDeFragger(std::bind(&CaptivePortalInstance::handleWebSocketEvent, this, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3, std::placeholders::_4)) {
+  : m_webServer(HTTP_PORT), m_socketServer(WEBSOCKET_PORT, "/ws", "json"), m_socketDeFragger(std::bind(&CaptivePortalInstance::handleWebSocketEvent, this, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3, std::placeholders::_4)), m_staticFileHandler() {
   m_socketServer.onEvent(std::bind(&WebSocketDeFragger::handler, &m_socketDeFragger, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3, std::placeholders::_4));
   m_socketServer.begin();
   m_socketServer.enableHeartbeat(WEBSOCKET_PING_INTERVAL, WEBSOCKET_PING_TIMEOUT, WEBSOCKET_PING_RETRIES);
 
   // Check if the www folder exists and is populated
-  if (LittleFS.exists("/www") && LittleFS.exists("/www/index.html")) {
-    m_webServer.serveStatic("/", LittleFS, "/www/").setDefaultFile("index.html");
+  if (access("/www/index.html", R_OK) == 0) {
+    m_webServer.addHandler(&m_staticFileHandler);
 
     m_webServer.onNotFound([](AsyncWebServerRequest* request) { request->send(404, "text/plain", "Not found"); });
   } else {
     m_webServer.onNotFound([](AsyncWebServerRequest* request) { request->send(200, "text/plain", F("You probably forgot to upload the Filesystem with PlatformIO!\nGo to PlatformIO -> Platform -> Upload Filesystem Image!\nIf this happened with a file we provided or you just need help, come to the Discord!\n\ndiscord.gg/openshock")); });
   }
-  
+
   m_webServer.begin();
 }
 

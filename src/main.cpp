@@ -9,8 +9,7 @@
 #include "WiFiManager.h"
 #include "WiFiScanManager.h"
 #include "Logging.h"
-
-#include <LittleFS.h>
+#include "Utils/FS.h"
 
 #include <memory>
 
@@ -19,8 +18,8 @@ const char* const TAG = "OpenShock";
 void setup() {
   Serial.begin(115'200);
 
-  if (!LittleFS.begin(true)) {
-    ESP_LOGE(TAG, "PANIC: An Error has occurred while mounting LittleFS, restarting in 5 seconds...");
+  if (OpenShock::FS::registerPartition("data", "/data", false, false, false) != ESP_OK) {
+    ESP_LOGE(TAG, "PANIC: An Error has occurred while mounting LittleFS (var), restarting in 5 seconds...");
     delay(5000);
     ESP.restart();
   }

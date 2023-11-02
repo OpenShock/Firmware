@@ -2,11 +2,13 @@
 
 #include "Constants.h"
 #include "Logging.h"
+#include "Utils/FS.h"
 #include "Utils/HexUtils.h"
 
-#include <LittleFS.h>
+#include <esp_littlefs.h>
 
 const char* const TAG = "Config";
+const char* const ConfigPath = "/data/config";
 
 using namespace OpenShock;
 
@@ -147,25 +149,35 @@ bool ReadFbsConfig(const Serialization::Configuration::Config* cfg) {
 }
 
 bool _tryLoadConfig() {
-  File file = LittleFS.open("/config", "rb");
-  if (!file) {
+  FILE* file = fopen(ConfigPath, "rb");
+  if (file == nullptr) {
     ESP_LOGE(TAG, "Failed to open config file for reading");
     return false;
   }
 
   // Get file size
-  std::size_t size = file.size();
+  fseek(file, 0, SEEK_END);
+  long size = ftell(file);
+  fseek(file, 0, SEEK_SET);
+
+  if (size <= 0) {
+    ESP_LOGE(TAG, "Failed to read config file, size is 0");
+    fclose(file);
+    return false;
+  }
 
   // Allocate buffer
   std::vector<std::uint8_t> buffer(size);
 
+  std::size_t result = fread(buffer.data(), 1, size, file);
+
+  fclose(file);
+
   // Read file
-  if (file.read(buffer.data(), buffer.size()) != buffer.size()) {
+  if (result != size) {
     ESP_LOGE(TAG, "Failed to read config file, size mismatch");
     return false;
   }
-
-  file.close();
 
   // Deserialize
   auto fbsConfig = flatbuffers::GetRoot<Serialization::Configuration::Config>(buffer.data());
@@ -193,8 +205,8 @@ bool _tryLoadConfig() {
   return true;
 }
 bool _trySaveConfig() {
-  File file = LittleFS.open("/config", "wb");
-  if (!file) {
+  FILE* file = fopen(ConfigPath, "wb");
+  if (file == nullptr) {
     ESP_LOGE(TAG, "Failed to open config file for writing");
     return false;
   }
@@ -227,12 +239,15 @@ bool _trySaveConfig() {
   builder.Finish(fbsConfig);
 
   // Write file
-  if (file.write(builder.GetBufferPointer(), builder.GetSize()) != builder.GetSize()) {
+  std::size_t size = builder.GetSize();
+  std::size_t result = fwrite(builder.GetBufferPointer(), 1, size, file);
+
+  fclose(file);
+
+  if (result != size) {
     ESP_LOGE(TAG, "Failed to write config file");
     return false;
   }
-
-  file.close();
 
   return true;
 }
@@ -271,7 +286,7 @@ void Config::Init() {
 }
 
 void Config::FactoryReset() {
-  if (!LittleFS.remove("/config") && LittleFS.exists("/config")) {
+  if (remove(ConfigPath) != 0) {
     ESP_LOGE(TAG, "!!!CRITICAL ERROR!!! Failed to remove existing config file for factory reset. Reccomend formatting microcontroller and re-flashing firmware !!!CRITICAL ERROR!!!");
   }
 }
