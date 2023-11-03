@@ -28,7 +28,7 @@ CaptivePortalInstance::CaptivePortalInstance()
   m_socketServer.enableHeartbeat(WEBSOCKET_PING_INTERVAL, WEBSOCKET_PING_TIMEOUT, WEBSOCKET_PING_RETRIES);
 
   // Check if the www folder exists and is populated
-  if (access("/www/index.html", R_OK) == 0) {
+  if (m_staticFileHandler.canServeFiles()) {
     m_webServer.addHandler(&m_staticFileHandler);
 
     m_webServer.onNotFound([](AsyncWebServerRequest* request) { request->send(404, "text/plain", "Not found"); });

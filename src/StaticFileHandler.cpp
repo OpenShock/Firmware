@@ -8,66 +8,15 @@ const char* const TAG = "StaticFileHandler";
 
 using namespace OpenShock;
 
-StaticFileHandler::StaticFileHandler() {
-  if (OpenShock::FS::registerPartition("static", "/static", false, true, false) != ESP_OK) {
-    ESP_LOGE(TAG, "PANIC: An Error has occurred while mounting LittleFS (static), restarting in 5 seconds...");
-    delay(5000);
-    ESP.restart();
-  }
-}
-
-StaticFileHandler::~StaticFileHandler() {
-  OpenShock::FS::unregisterPartition("static");
-}
-
-bool StaticFileHandler::canHandle(AsyncWebServerRequest* request) {
-  if (request->method() != HTTP_GET) {
-    return false;
-  }
-
-  return true;
-}
-
-const char* GetContentType(const String& path) {
-  if (path.endsWith(".html")) return "text/html";
-  else if (path.endsWith(".htm")) return "text/html";
-  else if (path.endsWith(".css")) return "text/css";
-  else if (path.endsWith(".json")) return "application/json";
-  else if (path.endsWith(".js")) return "application/javascript";
-  else if (path.endsWith(".png")) return "image/png";
-  else if (path.endsWith(".gif")) return "image/gif";
-  else if (path.endsWith(".jpg")) return "image/jpeg";
-  else if (path.endsWith(".ico")) return "image/x-icon";
-  else if (path.endsWith(".svg")) return "image/svg+xml";
-  else if (path.endsWith(".eot")) return "font/eot";
-  else if (path.endsWith(".woff")) return "font/woff";
-  else if (path.endsWith(".woff2")) return "font/woff2";
-  else if (path.endsWith(".ttf")) return "font/ttf";
-  else if (path.endsWith(".xml")) return "text/xml";
-  else if (path.endsWith(".pdf")) return "application/pdf";
-  else if (path.endsWith(".zip")) return "application/zip";
-  else if(path.endsWith(".gz")) return "application/x-gzip";
-  else if (path.endsWith(".txt")) return "text/plain";
-  else return "application/octet-stream";
-}
-
 class FileStream : public Stream {
 public:
-  FileStream(FILE* fileHandle, std::size_t fileLength) : m_fHandle(fileHandle), m_fLeft(fileLength) {}
+  FileStream(FILE* fileHandle, std::size_t fileLength) : m_fHandle(fileHandle), m_fLeft(fileLength) { }
 
-  std::size_t availableFile() const {
-    return m_fLeft;
-  }
-  std::size_t availableBuffer() const {
-    return sizeof(m_buffer) - m_bOffs;
-  }
-  std::size_t availableTotal() const {
-    return availableBuffer() + availableFile();
-  }
+  std::size_t availableFile() const { return m_fLeft; }
+  std::size_t availableBuffer() const { return sizeof(m_buffer) - m_bOffs; }
+  std::size_t availableTotal() const { return availableBuffer() + availableFile(); }
 
-  int available() override {
-    return (int)std::min(availableTotal(), (std::size_t)INT_MAX);
-  }
+  int available() override { return (int)std::min(availableTotal(), (std::size_t)INT_MAX); }
 
   int read() override {
     if (availableTotal() == 0) {
@@ -89,9 +38,7 @@ public:
     return m_buffer[m_bOffs];
   }
 
-  std::size_t write(uint8_t) override {
-    return 0;
-  }
+  std::size_t write(uint8_t) override { return 0; }
 
   std::size_t readBytes(char* buffer, std::size_t length) override {
     std::size_t nToRead = std::min(availableTotal(), length);
@@ -100,8 +47,7 @@ public:
       return 0;
     }
 
-
-    char* cur = buffer;
+    char* cur       = buffer;
     const char* end = buffer + nToRead;
 
     // First drain the buffer
@@ -125,8 +71,9 @@ public:
 
     return cur - buffer;
   }
+
 private:
-void _ensureBuffer() {
+  void _ensureBuffer() {
     if (availableFile() == 0 || availableBuffer() > 0) {
       return;
     }
@@ -141,6 +88,79 @@ void _ensureBuffer() {
   char m_buffer[1024];
 };
 
+StaticFileHandler::StaticFileHandler() : m_fileSystem(FileSystem::GetWWW()) {
+  if (!m_fileSystem->ok()) {
+    ESP_LOGE(TAG, "An Error has occurred while initializing StaticFileHandler");
+    m_fileSystem = nullptr;
+  }
+}
+
+bool StaticFileHandler::ok() const {
+  return m_fileSystem != nullptr;
+}
+bool StaticFileHandler::canServeFiles() const {
+  if (!ok()) {
+    return false;
+  }
+
+  return m_fileSystem->canRead("/index.html.gz");
+}
+
+bool StaticFileHandler::canHandle(AsyncWebServerRequest* request) {
+  if (!ok()) {
+    return false;
+  }
+
+  if (request->method() != HTTP_GET) {
+    return false;
+  }
+
+  return true;
+}
+
+const char* GetContentType(const String& path) {
+  if (path.endsWith(".html"))
+    return "text/html";
+  else if (path.endsWith(".htm"))
+    return "text/html";
+  else if (path.endsWith(".css"))
+    return "text/css";
+  else if (path.endsWith(".json"))
+    return "application/json";
+  else if (path.endsWith(".js"))
+    return "application/javascript";
+  else if (path.endsWith(".png"))
+    return "image/png";
+  else if (path.endsWith(".gif"))
+    return "image/gif";
+  else if (path.endsWith(".jpg"))
+    return "image/jpeg";
+  else if (path.endsWith(".ico"))
+    return "image/x-icon";
+  else if (path.endsWith(".svg"))
+    return "image/svg+xml";
+  else if (path.endsWith(".eot"))
+    return "font/eot";
+  else if (path.endsWith(".woff"))
+    return "font/woff";
+  else if (path.endsWith(".woff2"))
+    return "font/woff2";
+  else if (path.endsWith(".ttf"))
+    return "font/ttf";
+  else if (path.endsWith(".xml"))
+    return "text/xml";
+  else if (path.endsWith(".pdf"))
+    return "application/pdf";
+  else if (path.endsWith(".zip"))
+    return "application/zip";
+  else if (path.endsWith(".gz"))
+    return "application/x-gzip";
+  else if (path.endsWith(".txt"))
+    return "text/plain";
+  else
+    return "application/octet-stream";
+}
+
 void StaticFileHandler::handleRequest(AsyncWebServerRequest* request) {
   if (!ok()) {
     request->send(500);
@@ -149,19 +169,22 @@ void StaticFileHandler::handleRequest(AsyncWebServerRequest* request) {
 
   auto url = request->url();
 
+  FILE* handle;
+
   // Handle path (every static file should be gzipped)
   if (url == "/") {
-    url = "/static/index.html.gz";
+    handle = fopen("/index.html.gz", "rb");
   } else {
-    url = "/static" + url + ".gz";
+    handle = fopen((url + ".gz").c_str(), "rb");
 
-    if (access(url.c_str(), R_OK) != 0) {
-      url = "/static" + url;
+    // Fallback to non-gzipped file
+    if (handle == nullptr) {
+      handle = fopen(url.c_str(), "rb");
     }
   }
 
-  FILE* handle = fopen(url.c_str(), "rb");
-  if (!handle) {
+  // File not found
+  if (handle == nullptr) {
     request->send(404, "text/plain", "Not found");
     return;
   }
@@ -170,6 +193,7 @@ void StaticFileHandler::handleRequest(AsyncWebServerRequest* request) {
   long size = ftell(handle);
   fseek(handle, 0, SEEK_SET);
 
+  // File size is negative
   if (size < 0) {
     request->send(500, "text/plain", "Internal Server Error");
     return;

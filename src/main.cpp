@@ -4,12 +4,12 @@
 #include "Constants.h"
 #include "EventHandlers/EventHandlers.h"
 #include "GatewayConnectionManager.h"
+#include "Logging.h"
 #include "SerialInputHandler.h"
+#include "Utils/FS.h"
 #include "VisualStateManager.h"
 #include "WiFiManager.h"
 #include "WiFiScanManager.h"
-#include "Logging.h"
-#include "Utils/FS.h"
 
 #include <memory>
 
@@ -17,12 +17,6 @@ const char* const TAG = "OpenShock";
 
 void setup() {
   Serial.begin(115'200);
-
-  if (OpenShock::FS::registerPartition("data", "/data", false, false, false) != ESP_OK) {
-    ESP_LOGE(TAG, "PANIC: An Error has occurred while mounting LittleFS (var), restarting in 5 seconds...");
-    delay(5000);
-    ESP.restart();
-  }
 
   OpenShock::EventHandlers::Init();
 
