@@ -14,6 +14,7 @@ data/www
 
 # Ignore esp-idf stuff
 managed_components
+dependencies.lock
 
 # ignore generated files
 .vs
