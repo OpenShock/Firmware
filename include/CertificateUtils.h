@@ -7,5 +7,4 @@
 
 namespace OpenShock::CertificateUtils {
   WiFiClientSecure GetSecureClient();
-  bool GetHostCertificate(const char* host, std::vector<char>& pem);
 } // namespace OpenShock::CertificateUtils
