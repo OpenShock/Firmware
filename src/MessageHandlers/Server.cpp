@@ -29,7 +29,7 @@ static std::array<Handlers::HandlerType, HANDLER_COUNT> s_serverHandlers = []() 
   SET_HANDLER(PayloadType::ShockerCommandList, Handlers::HandleShockerCommandList);
   SET_HANDLER(PayloadType::CaptivePortalConfig, Handlers::HandleCaptivePortalConfig);
 
-  return std::move(handlers);
+  return handlers;
 }();
 
 void MessageHandlers::Server::HandleBinary(const std::uint8_t* data, std::size_t len) {
