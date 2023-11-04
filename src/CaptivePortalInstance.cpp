@@ -25,14 +25,15 @@ CaptivePortalInstance::CaptivePortalInstance()
   : m_webServer(HTTP_PORT)
   , m_socketServer(WEBSOCKET_PORT, "/ws", "json")
   , m_socketDeFragger(std::bind(&CaptivePortalInstance::handleWebSocketEvent, this, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3, std::placeholders::_4))
-  , m_staticFileHandler() {
+  , m_staticWebHandler("/", LittleFS, "/www/", nullptr) {
   m_socketServer.onEvent(std::bind(&WebSocketDeFragger::handler, &m_socketDeFragger, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3, std::placeholders::_4));
   m_socketServer.begin();
   m_socketServer.enableHeartbeat(WEBSOCKET_PING_INTERVAL, WEBSOCKET_PING_TIMEOUT, WEBSOCKET_PING_RETRIES);
 
   // Check if the www folder exists and is populated
-  if (m_staticFileHandler.canServeFiles()) {
-    m_webServer.addHandler(&m_staticFileHandler);
+  if (LittleFS.exists("/www/index.html")) {
+    m_staticWebHandler.setDefaultFile("index.html");
+    m_webServer.addHandler(&m_staticWebHandler);
 
     m_webServer.onNotFound([](AsyncWebServerRequest* request) { request->send(404, "text/plain", "Not found"); });
   } else {
