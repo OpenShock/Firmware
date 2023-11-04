@@ -30,7 +30,6 @@ namespace OpenShock {
     static void TransmitTask(void* arg);
 
     std::uint8_t m_txPin;
-    char m_name[20];
     rmt_obj_t* m_rmtHandle;
     QueueHandle_t m_queueHandle;
     TaskHandle_t m_taskHandle;

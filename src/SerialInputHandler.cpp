@@ -127,7 +127,6 @@ void _handleFactoryResetCommand(char* arg, std::size_t argLength) {
   Config::FactoryReset();
   Serial.println("Rebooting...");
   ESP.restart();
-  ESP_LOGE(TAG, "IMPOSSIBLE REACHED");
 }
 
 void _handleRmtpinCommand(char* arg, std::size_t argLength) {
