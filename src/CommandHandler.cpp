@@ -15,7 +15,7 @@ using namespace OpenShock;
 static std::unique_ptr<RFTransmitter> s_rfTransmitter = nullptr;
 
 bool CommandHandler::Init() {
-  std::uint32_t txPin = Config::GetRFConfig().txPin;
+  std::uint8_t txPin = Config::GetRFConfig().txPin;
   if (!OpenShock::IsValidOutputPin(txPin)) {
     ESP_LOGW(TAG, "Clearing invalid RF TX pin");
     Config::SetRFConfigTxPin(Constants::GPIO_INVALID);
