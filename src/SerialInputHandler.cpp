@@ -1,26 +1,115 @@
 #include "SerialInputHandler.h"
 
+#include "CommandHandler.h"
 #include "Config.h"
+#include "Logging.h"
 
-#include <Esp.h>
-#include <HardwareSerial.h>
 #include <ArduinoJson.h>
+#include <Esp.h>
 
 #include <unordered_map>
 
+const char* const TAG = "SerialInputHandler";
+
 using namespace OpenShock;
 
-void _handleRestartCommand(char* arg, std::size_t argLength) {
-  Serial.println("Restarting ESP...");
-  ESP.restart();
-}
+const char* const kCommandHelp         = "help";
+const char* const kCommandVersion      = "version";
+const char* const kCommandRestart      = "restart";
+const char* const kCommandRmtpin       = "rmtpin";
+const char* const kCommandAuthToken    = "authtoken";
+const char* const kCommandNetworks     = "networks";
+const char* const kCommandFactoryReset = "factoryreset";
 
 void _handleHelpCommand(char* arg, std::size_t argLength) {
   SerialInputHandler::PrintWelcomeHeader();
-  Serial.println("help          print this menu");
-  Serial.println("version       print version information");
-  Serial.println("restart       restart the board");
-  Serial.println("rmtpin <pin>  set radio pin to <pin>\n");
+  if (arg == nullptr || argLength <= 0) {
+    Serial.println("help                   print this menu");
+    Serial.println("help         <command> print help for a command");
+    Serial.println("version                print version information");
+    Serial.println("restart                restart the board");
+    Serial.println("rmtpin                 get radio pin");
+    Serial.println("rmtpin       <pin>     set radio pin");
+    Serial.println("authtoken    <token>   set auth token");
+    Serial.println("networks               get all saved networks");
+    Serial.println("networks     <json>    set all saved networks");
+    Serial.println("factoryreset           reset device to factory defaults and reboot");
+    return;
+  }
+
+  if (strcmp(arg, kCommandRmtpin) == 0) {
+    Serial.println("rmtpin");
+    Serial.println("  Get the GPIO pin used for the radio transmitter.");
+    Serial.println();
+    Serial.println("rmtpin [<pin>]");
+    Serial.println("  Set the GPIO pin used for the radio transmitter.");
+    Serial.println("  Arguments:");
+    Serial.println("    <pin> must be a number.");
+    Serial.println("  Example:");
+    Serial.println("    rmtpin 15");
+    return;
+  }
+
+  if (strcmp(arg, kCommandAuthToken) == 0) {
+    Serial.println("authtoken <token>");
+    Serial.println("  Set the auth token.");
+    Serial.println("  Arguments:");
+    Serial.println("    <token> must be a string.");
+    Serial.println("  Example:");
+    Serial.println("    authtoken mytoken");
+    return;
+  }
+
+  if (strcmp(arg, kCommandNetworks) == 0) {
+    Serial.println("networks");
+    Serial.println("  Get all saved networks.");
+    Serial.println();
+    Serial.println("networks [<json>]");
+    Serial.println("  Set all saved networks.");
+    Serial.println("  Arguments:");
+    Serial.println("    <json> must be a array of objects with the following fields:");
+    Serial.println("      ssid     (string)  SSID of the network");
+    Serial.println("      password (string)  Password of the network");
+    Serial.println("  Example:");
+    Serial.println("    networks [{\"ssid\":\"myssid\",\"password\":\"mypassword\"}]");
+    return;
+  }
+
+  if (strcmp(arg, kCommandRestart) == 0) {
+    Serial.println(kCommandRestart);
+    Serial.println("  Restart the board");
+    Serial.println("  Example:");
+    Serial.println("    restart");
+    return;
+  }
+
+  if (strcmp(arg, kCommandFactoryReset) == 0) {
+    Serial.println(kCommandFactoryReset);
+    Serial.println("  Reset the device to factory defaults and reboot");
+    Serial.println("  Example:");
+    Serial.println("    factoryreset");
+    return;
+  }
+
+  if (strcmp(arg, kCommandVersion) == 0) {
+    Serial.println(kCommandVersion);
+    Serial.println("  Print version information");
+    Serial.println("  Example:");
+    Serial.println("    version");
+    return;
+  }
+
+  if (strcmp(arg, kCommandHelp) == 0) {
+    Serial.println(kCommandHelp);
+    Serial.println("  Print help information");
+    Serial.println("  Arguments:");
+    Serial.println("    <command> (optional) command to print help for");
+    Serial.println("  Example:");
+    Serial.println("    help");
+    return;
+  }
+
+  Serial.println("Command not found");
 }
 
 void _handleVersionCommand(char* arg, std::size_t argLength) {
@@ -28,78 +117,109 @@ void _handleVersionCommand(char* arg, std::size_t argLength) {
   SerialInputHandler::PrintVersionInfo();
 }
 
+void _handleRestartCommand(char* arg, std::size_t argLength) {
+  Serial.println("Restarting ESP...");
+  ESP.restart();
+}
+
+void _handleFactoryResetCommand(char* arg, std::size_t argLength) {
+  Serial.println("Resetting to factory defaults...");
+  Config::FactoryReset();
+  Serial.println("Rebooting...");
+  ESP.restart();
+}
+
+void _handleRmtpinCommand(char* arg, std::size_t argLength) {
+  if (arg == nullptr || argLength <= 0) {
+    // Get rmt pin
+    Serial.print("$SYS$|Response|RmtPin|");
+    Serial.println(Config::GetRFConfig().txPin);
+    return;
+  }
+
+  std::uint32_t pin;
+  if (sscanf(arg, "%u", &pin) != 1) {
+    Serial.println("$SYS$|Error|Invalid argument (not a number)");
+    return;
+  }
+
+  OpenShock::CommandHandler::SetRfTxPin(pin);
+
+  Serial.println("$SYS$|Success|Saved config");
+}
+
 void _handleAuthtokenCommand(char* arg, std::size_t argLength) {
   if (arg == nullptr || argLength <= 0) {
-    Serial.println("SYS|Error|Invalid argument");
+    Serial.println("$SYS$|Error|Invalid argument");
     return;
   }
 
   OpenShock::Config::SetBackendAuthToken(std::string(arg, argLength));
 
-  Serial.println("SYS|Success|Saved config");
-}
-
-void _handleRmtpinCommand(char* arg, std::size_t argLength) {
-  if (arg == nullptr || argLength <= 0) {
-    Serial.println("SYS|Error|Invalid argument");
-    return;
-  }
-
-  // Check if the argument is a number
-  for (std::size_t i = 0; i < argLength; i++) {
-    if (arg[i] < '0' || arg[i] > '9') {
-      Serial.println("SYS|Error|Invalid argument (not a number)");
-      return;
-    }
-  }
-
-  OpenShock::Config::SetRFConfig({.txPin = atoi(arg)});
-
-  Serial.println("SYS|Success|Saved config");
+  Serial.println("$SYS$|Success|Saved config");
 }
 
 void _handleNetworksCommand(char* arg, std::size_t argLength) {
   if (arg == nullptr || argLength <= 0) {
-    Serial.println("SYS|Error|Invalid argument");
+    // Get networks
+    StaticJsonDocument<1024> outDoc;
+    JsonArray outNetworks = outDoc.to<JsonArray>();
+
+    for (auto& creds : Config::GetWiFiCredentials()) {
+      JsonObject network  = outNetworks.createNestedObject();
+      network["ssid"]     = creds.ssid;
+      network["password"] = creds.password;
+    }
+
+    Serial.print("$SYS$|Response|Networks|");
+    serializeJson(outDoc, Serial);
+    Serial.println();
     return;
   }
 
   DynamicJsonDocument doc(1024);
   deserializeJson(doc, arg, argLength);
 
-  JsonArray networks = doc["networks"];
+  JsonArray networks = doc.as<JsonArray>();
 
+  std::uint8_t id = 1;
   std::vector<Config::WiFiCredentials> creds;
-  for (auto it = networks.begin(); it != networks.end(); ++it) {
-    JsonObject network = *it;
-
+  for (JsonObject network : networks) {
     std::string ssid     = network["ssid"].as<std::string>();
     std::string password = network["password"].as<std::string>();
 
     if (ssid.empty() || password.empty()) {
-      Serial.println("SYS|Error|Invalid argument (missing ssid or password)");
+      Serial.println("$SYS$|Error|Invalid argument (missing ssid or password)");
       return;
     }
 
     Config::WiFiCredentials cred {
-      .id       = 0,
+      .id       = id++,
       .ssid     = ssid,
       .bssid    = {0, 0, 0, 0, 0, 0},
       .password = password,
     };
+    ESP_LOGI(TAG, "Adding network to config %s", ssid.c_str());
 
     creds.push_back(std::move(cred));
   }
 
-  OpenShock::Config::SetWiFiCredentials(creds);
+  if (!OpenShock::Config::SetWiFiCredentials(creds)) {
+    Serial.println("$SYS$|Error|Failed to save config");
+    return;
+  }
 
-  Serial.println("SYS|Success|Saved config");
+  Serial.println("$SYS$|Success|Saved config");
 }
 
 static std::unordered_map<std::string, void (*)(char*, std::size_t)> s_commandHandlers = {
-  {"authtoken", _handleAuthtokenCommand},
-  {   "rmtpin",    _handleRmtpinCommand},
-  { "networks",  _handleNetworksCommand},
+  {        kCommandHelp,         _handleHelpCommand},
+  {     kCommandVersion,      _handleVersionCommand},
+  {     kCommandRestart,      _handleRestartCommand},
+  {      kCommandRmtpin,       _handleRmtpinCommand},
+  {   kCommandAuthToken,    _handleAuthtokenCommand},
+  {    kCommandNetworks,     _handleNetworksCommand},
+  {kCommandFactoryReset, _handleFactoryResetCommand},
 };
 
 int findChar(const char* buffer, std::size_t bufferSize, char c) {
@@ -137,7 +257,7 @@ int findLineStart(const char* buffer, int bufferSize, int lineEnd) {
 void processSerialLine(char* data, std::size_t length) {
   int delimiter = findChar(data, length, ' ');
   if (delimiter == 0) {
-    Serial.println("SYS|Error|Command cannot start with a space");
+    Serial.println("$SYS$|Error|Command cannot start with a space");
     return;
   }
 
@@ -161,7 +281,7 @@ void processSerialLine(char* data, std::size_t length) {
     return;
   }
 
-  Serial.println("SYS|Error|Command not found");
+  Serial.println("$SYS$|Error|Command not found");
 }
 
 void SerialInputHandler::Update() {

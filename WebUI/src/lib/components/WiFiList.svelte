@@ -1,23 +1,29 @@
 <script lang="ts">
   import { getModalStore } from '@skeletonlabs/skeleton';
-  import WiFiInfo from '$lib/components/modals/WiFiDetails.svelte';
   import type { WiFiNetwork } from '$lib/types/WiFiNetwork';
-  import { WiFiStateStore } from '$lib/stores';
+  import { DeviceStateStore } from '$lib/stores';
   import { WebSocketClient } from '$lib/WebSocketClient';
+  import { WifiAuthMode } from '$lib/_fbs/open-shock/serialization/types/wifi-auth-mode';
+  import { WifiScanStatus } from '$lib/_fbs/open-shock/serialization/types/wifi-scan-status';
+  import { SerializeWifiScanCommand } from '$lib/Serializers/WifiScanCommand';
+  import { SerializeWifiNetworkDisconnectCommand } from '$lib/Serializers/WifiNetworkDisconnectCommand';
+  import { SerializeWifiNetworkConnectCommand } from '$lib/Serializers/WifiNetworkConnectCommand';
+  import { SerializeWifiNetworkSaveCommand } from '$lib/Serializers/WifiNetworkSaveCommand';
+  import WiFiDetails from './modals/WiFiDetails.svelte';
 
   const modalStore = getModalStore();
+
+  $: scanStatus = $DeviceStateStore.wifiScanStatus;
+  $: isScanning = scanStatus === WifiScanStatus.Started || scanStatus === WifiScanStatus.InProgress;
 
   let connectedBSSID: string | null = null;
 
   function wifiScan() {
-    if ($WiFiStateStore.scanning) {
-      WebSocketClient.Instance.Send('{ "type": "wifi", "action": "scan", "run": false }');
-    } else {
-      WebSocketClient.Instance.Send('{ "type": "wifi", "action": "scan", "run": true }');
-    }
+    const data = SerializeWifiScanCommand(!isScanning);
+    WebSocketClient.Instance.Send(data);
   }
   function wifiAuthenticate(item: WiFiNetwork) {
-    if (item.security !== 'Open') {
+    if (item.security !== WifiAuthMode.Open) {
       modalStore.trigger({
         type: 'prompt',
         title: 'Enter password',
@@ -25,24 +31,28 @@
         value: '',
         valueAttr: { type: 'password', minlength: 1, maxlength: 63, required: true },
         response: (password: string) => {
-          WebSocketClient.Instance.Send(`{ "type": "wifi", "action": "authenticate", "bssid": "${item.bssid}", "password": "${password}" }`);
+          const data = SerializeWifiNetworkSaveCommand(item.ssid, password, true);
+          WebSocketClient.Instance.Send(data);
         },
       });
     } else {
-      WebSocketClient.Instance.Send(`{ "type": "wifi", "action": "authenticate", "bssid": "${item.bssid}" }`);
+      const data = SerializeWifiNetworkSaveCommand(item.ssid, null, true);
+      WebSocketClient.Instance.Send(data);
     }
   }
   function wifiConnect(item: WiFiNetwork) {
-    WebSocketClient.Instance.Send(`{ "type": "wifi", "action": "connect", "bssid": "${item.bssid}" }`);
+    const data = SerializeWifiNetworkConnectCommand(item.ssid);
+    WebSocketClient.Instance.Send(data);
   }
   function wifiDisconnect(item: WiFiNetwork) {
-    WebSocketClient.Instance.Send(`{ "type": "wifi", "action": "disconnect", "bssid": "${item.bssid}" }`);
+    const data = SerializeWifiNetworkDisconnectCommand();
+    WebSocketClient.Instance.Send(data);
   }
   function wifiSettings(item: WiFiNetwork) {
     modalStore.trigger({
       type: 'component',
       component: {
-        ref: WiFiInfo,
+        ref: WiFiDetails,
         props: { bssid: item.bssid },
       },
     });
@@ -53,7 +63,7 @@
   <div class="flex justify-between items-center mb-2">
     <h3 class="h3">Configure WiFi</h3>
     <button class="btn variant-outline" on:click={wifiScan}>
-      {#if $WiFiStateStore.scanning}
+      {#if isScanning}
         <i class="fa fa-spinner fa-spin"></i>
       {:else}
         <i class="fa fa-rotate-right"></i>
@@ -61,27 +71,27 @@
     </button>
   </div>
   <div class="max-h-64 overflow-auto">
-    {#each Object.values($WiFiStateStore.networks) as item (item.bssid)}
+    {#each $DeviceStateStore.wifiNetworks as [key, network] (key)}
       <div class="card mb-2 p-2 flex justify-between items-center">
         <span>
-          {#if item.bssid === connectedBSSID}
+          {#if network.bssid === connectedBSSID}
             <i class="fa fa-wifi text-green-500" />
           {:else}
             <i class="fa fa-wifi" />
           {/if}
-          {#if item.ssid}
-            <span class="ml-2">{item.ssid}</span>
+          {#if network.ssid}
+            <span class="ml-2">{network.ssid}</span>
           {:else}
-            <span class="ml-2">{item.bssid}</span><span class="text-gray-500 ml-1">(Hidden)</span>
+            <span class="ml-2">{network.bssid}</span><span class="text-gray-500 ml-1">(Hidden)</span>
           {/if}
         </span>
         <div class="btn-group variant-outline">
-          {#if item.saved}
-            <button on:click={() => wifiConnect(item)}><i class="fa fa-arrow-right text-green-500" /></button>
+          {#if network.saved}
+            <button on:click={() => wifiConnect(network)}><i class="fa fa-arrow-right text-green-500" /></button>
           {:else}
-            <button on:click={() => wifiAuthenticate(item)}><i class="fa fa-link text-green-500" /></button>
+            <button on:click={() => wifiAuthenticate(network)}><i class="fa fa-link text-green-500" /></button>
           {/if}
-          <button on:click={() => wifiSettings(item)}><i class="fa fa-cog" /></button>
+          <button on:click={() => wifiSettings(network)}><i class="fa fa-cog" /></button>
         </div>
       </div>
     {/each}

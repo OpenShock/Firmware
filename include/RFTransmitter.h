@@ -1,6 +1,7 @@
 #pragma once
 
 #include "ShockerCommandType.h"
+#include "ShockerModelType.h"
 
 #include <cstdint>
 
@@ -14,23 +15,21 @@ typedef void* TaskHandle_t;
 namespace OpenShock {
   class RFTransmitter {
   public:
-    RFTransmitter(unsigned int gpioPin, int queueSize = 32);
+    RFTransmitter(std::uint8_t gpioPin, int queueSize = 32);
     ~RFTransmitter();
 
-    inline bool ok() const { return m_taskHandle != nullptr && m_queueHandle != nullptr; }
+    inline std::uint8_t GetTxPin() const { return m_txPin; }
 
-    bool SendCommand(std::uint8_t shockerModel,
-                     std::uint16_t shockerId,
-                     OpenShock::ShockerCommandType type,
-                     std::uint8_t intensity,
-                     unsigned int duration);
+    inline bool ok() const { return m_rmtHandle != nullptr && m_queueHandle != nullptr && m_taskHandle != nullptr; }
+
+    bool SendCommand(ShockerModelType model, std::uint16_t shockerId, ShockerCommandType type, std::uint8_t intensity, std::uint16_t durationMs);
     void ClearPendingCommands();
 
   private:
+    void destroy();
     static void TransmitTask(void* arg);
 
-    unsigned int m_gpioPin;
-    char m_name[32];
+    std::uint8_t m_txPin;
     rmt_obj_t* m_rmtHandle;
     QueueHandle_t m_queueHandle;
     TaskHandle_t m_taskHandle;

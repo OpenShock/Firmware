@@ -23,7 +23,7 @@ std::vector<rmt_data_t> Rmt::XlcEncoder::GetSequence(std::uint16_t transmitterId
   pulses.reserve(43);
 
   pulses.push_back(kRmtPreamble);
-  for (int bit_pos = 39; bit_pos >= 0; --bit_pos) {
+  for (int bit_pos = 41; bit_pos >= 0; --bit_pos) {
     pulses.push_back((data >> bit_pos) & 1 ? kRmtOne : kRmtZero);
   }
 

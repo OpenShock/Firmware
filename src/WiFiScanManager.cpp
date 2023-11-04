@@ -1,10 +1,10 @@
 #include "WiFiScanManager.h"
 
+#include "Logging.h"
+
 #include <WiFi.h>
 
-#include <esp_log.h>
-
-#include <unordered_map>
+#include <map>
 
 const char* const TAG = "WiFiScanManager";
 
@@ -16,32 +16,29 @@ using namespace OpenShock;
 static bool s_initialized            = false;
 static bool s_scanInProgress         = false;
 static bool s_channelScanDone        = false;
-static bool s_scanCancelled          = false;
+static bool s_scanAborted            = false;
 static std::uint8_t s_currentChannel = 0;
-static std::unordered_map<std::uint64_t, WiFiScanManager::ScanStartedHandler> s_scanStartedHandlers;
-static std::unordered_map<std::uint64_t, WiFiScanManager::ScanCompletedHandler> s_scanCompletedHandlers;
-static std::unordered_map<std::uint64_t, WiFiScanManager::ScanDiscoveryHandler> s_scanDiscoveryHandlers;
+static std::map<std::uint64_t, WiFiScanManager::StatusChangedHandler> s_statusChangedHandlers;
+static std::map<std::uint64_t, WiFiScanManager::NetworkDiscoveryHandler> s_networkDiscoveryHandlers;
 
 void _setScanInProgress(bool inProgress) {
   if (s_scanInProgress != inProgress) {
     s_scanInProgress = inProgress;
     if (inProgress) {
-      ESP_LOGD(TAG, "Scan started");
-      for (auto& it : s_scanStartedHandlers) {
-        it.second();
+      for (auto& it : s_statusChangedHandlers) {
+        it.second(WiFiScanStatus::Started);
+        it.second(WiFiScanStatus::InProgress);
       }
       WiFi.scanDelete();
     } else {
-      ScanCompletedStatus status;
-      if (s_scanCancelled) {
-        ESP_LOGD(TAG, "Scan was cancelled");
-        status          = ScanCompletedStatus::Cancelled;
-        s_scanCancelled = false;
+      WiFiScanStatus status;
+      if (s_scanAborted) {
+        status        = WiFiScanStatus::Aborted;
+        s_scanAborted = false;
       } else {
-        ESP_LOGD(TAG, "Scan completed");
-        status = ScanCompletedStatus::Completed;
+        status = WiFiScanStatus::Completed;
       }
-      for (auto& it : s_scanCompletedHandlers) {
+      for (auto& it : s_statusChangedHandlers) {
         it.second(status);
       }
     }
@@ -58,8 +55,8 @@ void _handleScanError(std::int16_t retval) {
 
   if (retval == WIFI_SCAN_FAILED) {
     ESP_LOGE(TAG, "Failed to start scan on channel %u", s_currentChannel);
-    for (auto& it : s_scanCompletedHandlers) {
-      it.second(ScanCompletedStatus::Error);
+    for (auto& it : s_statusChangedHandlers) {
+      it.second(WiFiScanStatus::Error);
     }
     return;
   }
@@ -87,20 +84,20 @@ void _iterateChannel() {
 }
 
 void _evScanCompleted(arduino_event_id_t event, arduino_event_info_t info) {
-  std::uint16_t numNetworks = WiFi.scanComplete();
+  std::int16_t numNetworks = WiFi.scanComplete();
   if (numNetworks < 0) {
     _handleScanError(numNetworks);
     return;
   }
 
-  for (std::uint16_t i = 0; i < numNetworks; i++) {
+  for (std::int16_t i = 0; i < numNetworks; i++) {
     wifi_ap_record_t* record = reinterpret_cast<wifi_ap_record_t*>(WiFi.getScanInfoByIndex(i));
     if (record == nullptr) {
-      ESP_LOGE(TAG, "Failed to get scan info for network #%u", i);
+      ESP_LOGE(TAG, "Failed to get scan info for network #%d", i);
       return;
     }
 
-    for (auto& it : s_scanDiscoveryHandlers) {
+    for (auto& it : s_networkDiscoveryHandlers) {
       it.second(record);
     }
   }
@@ -108,13 +105,12 @@ void _evScanCompleted(arduino_event_id_t event, arduino_event_info_t info) {
   s_channelScanDone = true;
 }
 void _evSTAStopped(arduino_event_id_t event, arduino_event_info_t info) {
-  ESP_LOGD(TAG, "STA stopped");
   _setScanInProgress(false);
 }
 
 bool WiFiScanManager::Init() {
   if (s_initialized) {
-    ESP_LOGE(TAG, "WiFiScanManager::Init() called twice");
+    ESP_LOGW(TAG, "WiFiScanManager::Init() called twice");
     return false;
   }
 
@@ -126,9 +122,13 @@ bool WiFiScanManager::Init() {
   return true;
 }
 
+bool WiFiScanManager::IsScanning() {
+  return s_scanInProgress;
+}
+
 bool WiFiScanManager::StartScan() {
   if (s_scanInProgress) {
-    ESP_LOGE(TAG, "Cannot start scan: scan is already in progress");
+    ESP_LOGW(TAG, "Cannot start scan: scan is already in progress");
     return false;
   }
 
@@ -138,55 +138,41 @@ bool WiFiScanManager::StartScan() {
 
   return true;
 }
-void WiFiScanManager::CancelScan() {
+void WiFiScanManager::AbortScan() {
   if (!s_scanInProgress) {
-    ESP_LOGE(TAG, "Cannot cancel scan: no scan is in progress");
+    ESP_LOGW(TAG, "Cannot cancel scan: no scan is in progress");
     return;
   }
 
-  s_scanCancelled  = true;
+  s_scanAborted    = true;
   s_currentChannel = 0;
 }
 
-std::uint64_t WiFiScanManager::RegisterScanStartedHandler(const WiFiScanManager::ScanStartedHandler& handler) {
+std::uint64_t WiFiScanManager::RegisterStatusChangedHandler(const WiFiScanManager::StatusChangedHandler& handler) {
   static std::uint64_t nextHandle = 0;
   std::uint64_t handle            = nextHandle++;
-  s_scanStartedHandlers[handle]   = handler;
+  s_statusChangedHandlers[handle] = handler;
   return handle;
 }
-void WiFiScanManager::UnregisterScanStartedHandler(std::uint64_t handle) {
-  auto it = s_scanStartedHandlers.find(handle);
+void WiFiScanManager::UnregisterStatusChangedHandler(std::uint64_t handle) {
+  auto it = s_statusChangedHandlers.find(handle);
 
-  if (it != s_scanStartedHandlers.end()) {
-    s_scanStartedHandlers.erase(it);
+  if (it != s_statusChangedHandlers.end()) {
+    s_statusChangedHandlers.erase(it);
   }
 }
 
-std::uint64_t WiFiScanManager::RegisterScanCompletedHandler(const WiFiScanManager::ScanCompletedHandler& handler) {
-  static std::uint64_t nextHandle = 0;
-  std::uint64_t handle            = nextHandle++;
-  s_scanCompletedHandlers[handle] = handler;
+std::uint64_t WiFiScanManager::RegisterNetworkDiscoveryHandler(const WiFiScanManager::NetworkDiscoveryHandler& handler) {
+  static std::uint64_t nextHandle    = 0;
+  std::uint64_t handle               = nextHandle++;
+  s_networkDiscoveryHandlers[handle] = handler;
   return handle;
 }
-void WiFiScanManager::UnregisterScanCompletedHandler(std::uint64_t handle) {
-  auto it = s_scanCompletedHandlers.find(handle);
+void WiFiScanManager::UnregisterNetworkDiscoveryHandler(std::uint64_t handle) {
+  auto it = s_networkDiscoveryHandlers.find(handle);
 
-  if (it != s_scanCompletedHandlers.end()) {
-    s_scanCompletedHandlers.erase(it);
-  }
-}
-
-std::uint64_t WiFiScanManager::RegisterScanDiscoveryHandler(const WiFiScanManager::ScanDiscoveryHandler& handler) {
-  static std::uint64_t nextHandle = 0;
-  std::uint64_t handle            = nextHandle++;
-  s_scanDiscoveryHandlers[handle] = handler;
-  return handle;
-}
-void WiFiScanManager::UnregisterScanDiscoveryHandler(std::uint64_t handle) {
-  auto it = s_scanDiscoveryHandlers.find(handle);
-
-  if (it != s_scanDiscoveryHandlers.end()) {
-    s_scanDiscoveryHandlers.erase(it);
+  if (it != s_networkDiscoveryHandlers.end()) {
+    s_networkDiscoveryHandlers.erase(it);
   }
 }
 

@@ -1,5 +1,8 @@
 #pragma once
 
+#include "AccountLinkResultCode.h"
+#include "GatewayClient.h"
+
 #include <cstdint>
 #include <functional>
 
@@ -9,12 +12,8 @@ namespace OpenShock::GatewayConnectionManager {
   bool IsConnected();
 
   bool IsPaired();
-  bool Pair(unsigned int pairCode);
+  AccountLinkResultCode Pair(const char* pairCode);
   void UnPair();
-
-  typedef std::function<void(bool)> ConnectedChangedHandler;
-  std::uint64_t RegisterConnectedChangedHandler(ConnectedChangedHandler handler);
-  void UnRegisterConnectedChangedHandler(std::uint64_t handlerId);
 
   void Update();
 }  // namespace OpenShock::GatewayConnectionManager

@@ -1,301 +1,276 @@
 #include "GatewayConnectionManager.h"
 
-#include "CaptivePortal.h"
-#include "CommandHandler.h"
 #include "Config.h"
 #include "Constants.h"
-#include "ShockerCommandType.h"
+#include "GatewayClient.h"
+#include "Logging.h"
 #include "Time.h"
-
-#include <esp_log.h>
 
 #include <ArduinoJson.h>
 #include <HTTPClient.h>
-#include <WebSocketsClient.h>
-#include <WiFiClientSecure.h>
 
+#include <memory>
 #include <unordered_map>
+
+//
+//  ######  ########  ######  ##     ## ########  #### ######## ##    ##    ########  ####  ######  ##    ##
+// ##    ## ##       ##    ## ##     ## ##     ##  ##     ##     ##  ##     ##     ##  ##  ##    ## ##   ##
+// ##       ##       ##       ##     ## ##     ##  ##     ##      ####      ##     ##  ##  ##       ##  ##
+//  ######  ######   ##       ##     ## ########   ##     ##       ##       ########   ##   ######  #####
+//       ## ##       ##       ##     ## ##   ##    ##     ##       ##       ##   ##    ##        ## ##  ##
+// ##    ## ##       ##    ## ##     ## ##    ##   ##     ##       ##       ##    ##   ##  ##    ## ##   ##
+//  ######  ########  ######   #######  ##     ## ####    ##       ##       ##     ## ####  ######  ##    ##
+//
+// TODO: Fix loading CA Certificate bundles, currently fails with "[esp_crt_bundle.c:161] esp_crt_bundle_init(): Unable to allocate memory for bundle"
+// This is probably due to the fact that the bundle is too large for the ESP32's heap or the bundle is incorrectly packedy them
+//
+#warning SSL certificate verification is currently not implemented, by RFC definition this is a security risk, and allows for MITM attacks, but the realistic risk is low
 
 static const char* const TAG             = "GatewayConnectionManager";
 static const char* const AUTH_TOKEN_FILE = "/authToken";
 
-extern const std::uint8_t* const rootca_crt_bundle_start asm("_binary_data_cert_x509_crt_bundle_start");
+constexpr std::uint8_t FLAG_NONE          = 0;
+constexpr std::uint8_t FLAG_HAS_IP        = 1 << 0;
+constexpr std::uint8_t FLAG_AUTHENTICATED = 1 << 1;
 
-static bool s_isPaired                = false;
-static bool s_wifiConnected           = false;
-static WebSocketsClient* s_webSocket  = nullptr;
-static WiFiClientSecure* s_wifiClient = nullptr;
-static std::unordered_map<std::uint64_t, OpenShock::GatewayConnectionManager::ConnectedChangedHandler> s_connectedChangedHandlers;
+static std::uint8_t s_flags                                 = 0;
+static std::unique_ptr<OpenShock::GatewayClient> s_wsClient = nullptr;
 
-void _sendKeepAlive() {
-  if (s_webSocket == nullptr) return;
-
-  if (s_webSocket->isConnected()) {
-    ESP_LOGD(TAG, "Sending keep alive online state");
-    s_webSocket->sendTXT("{\"requestType\": 0}");
-  }
-}
-
-void _handleControlCommandMessage(const DynamicJsonDocument& doc) {
-  JsonArrayConst data = doc["Data"];
-  for (int i = 0; i < data.size(); i++) {
-    JsonObjectConst cur    = data[i];
-    std::uint16_t id       = static_cast<std::uint16_t>(cur["Id"]);
-    std::uint8_t type      = static_cast<std::uint8_t>(cur["Type"]);
-    std::uint8_t intensity = static_cast<std::uint8_t>(cur["Intensity"]);
-    unsigned int duration  = static_cast<unsigned int>(cur["Duration"]);
-    std::uint8_t model     = static_cast<std::uint8_t>(cur["Model"]);
-
-    OpenShock::ShockerCommandType cmdType = static_cast<OpenShock::ShockerCommandType>(type);
-
-    if (!OpenShock::CommandHandler::HandleCommand(id, cmdType, intensity, duration, model)) {
-      ESP_LOGE(TAG, "Remote command failed/rejected!");
-    }
-  }
-}
-
-void _handleCaptivePortalMessage(const DynamicJsonDocument& doc) {
-  bool data = (bool)doc["Data"];
-
-  ESP_LOGD(TAG, "Captive portal debug: %s", data ? "true" : "false");
-  OpenShock::CaptivePortal::SetAlwaysEnabled(data);
-}
-
-void _parseMessage(char* data, std::size_t length) {
-  ESP_LOGD(TAG, "Parsing message of length %d", length);
-  DynamicJsonDocument doc(1024);  // TODO: profile the normal message size and adjust this accordingly
-  deserializeJson(doc, data, length);
-  int type = doc["ResponseType"];
-
-  switch (type) {
-    case 0:
-      _handleControlCommandMessage(doc);
-      break;
-    case 1:
-      _handleCaptivePortalMessage(doc);
-      break;
-  }
-}
-
-void _handleEvent(WStype_t type, std::uint8_t* payload, std::size_t length) {
-  switch (type) {
-    case WStype_DISCONNECTED:
-      ESP_LOGI(TAG, "Disconnected from API");
-      for (auto& handler : s_connectedChangedHandlers) {
-        handler.second(false);
-      }
-      break;
-    case WStype_CONNECTED:
-      ESP_LOGI(TAG, "Connected to API");
-      for (auto& handler : s_connectedChangedHandlers) {
-        handler.second(true);
-      }
-      _sendKeepAlive();
-      break;
-    case WStype_TEXT:
-      _parseMessage(reinterpret_cast<char*>(payload), length);
-      break;
-    case WStype_ERROR:
-      ESP_LOGI(TAG, "Received error from API");
-      break;
-    case WStype_FRAGMENT_TEXT_START:
-      ESP_LOGI(TAG, "Received fragment text start from API");
-      break;
-    case WStype_FRAGMENT:
-      ESP_LOGI(TAG, "Received fragment from API");
-      break;
-    case WStype_FRAGMENT_FIN:
-      ESP_LOGI(TAG, "Received fragment fin from API");
-      break;
-    case WStype_PING:
-      ESP_LOGI(TAG, "Received ping from API");
-      break;
-    case WStype_PONG:
-      ESP_LOGI(TAG, "Received pong from API");
-      break;
-    case WStype_BIN:
-      ESP_LOGE(TAG, "Received binary from API, this is not supported!");
-      break;
-    case WStype_FRAGMENT_BIN_START:
-      ESP_LOGE(TAG, "Received binary fragment start from API, this is not supported!");
-      break;
-    default:
-      ESP_LOGE(TAG, "Received unknown event from API");
-      break;
-  }
-}
-
-void _connect() {
-  if (s_webSocket != nullptr) return;
-
-  s_webSocket                       = new WebSocketsClient();
-  std::string firmwareVersionHeader = "FirmwareVersion: " + std::string(OpenShock::Constants::Version);
-  std::string deviceTokenHeader     = "DeviceToken: " + OpenShock::Config::GetBackendAuthToken();
-  s_webSocket->setExtraHeaders((firmwareVersionHeader + "\"" + deviceTokenHeader).c_str());
-  s_webSocket->onEvent(_handleEvent);
-  s_webSocket->beginSSL(OpenShock::Constants::ApiDomain, 443, "/1/ws/device");
-}
-
-void _disconnect() {
-  if (s_webSocket == nullptr) return;
-
-  s_webSocket->disconnect();
-  delete s_webSocket;
-  s_webSocket = nullptr;
-}
-
-void _evWiFiConnectedHandler(arduino_event_t* event) {
-  s_wifiConnected = true;
+void _evGotIPHandler(arduino_event_t* event) {
+  s_flags |= FLAG_HAS_IP;
+  ESP_LOGD(TAG, "Got IP address");
 }
 
 void _evWiFiDisconnectedHandler(arduino_event_t* event) {
-  s_wifiConnected = false;
-  _disconnect();
+  s_flags    = FLAG_NONE;
+  s_wsClient = nullptr;
+  ESP_LOGD(TAG, "Lost IP address");
 }
 
 using namespace OpenShock;
 
 bool GatewayConnectionManager::Init() {
-  ESP_LOGD(TAG, "Free heap: %f (%f KB)", (1.f - static_cast<float>(ESP.getFreeHeap()) / static_cast<float>(ESP.getHeapSize())) * 100.f, static_cast<float>(ESP.getFreeHeap()) / 1024.f);
-  s_wifiClient = new WiFiClientSecure();
-  s_wifiClient->setCACertBundle(rootca_crt_bundle_start);
-  ESP_LOGD(TAG, "Free heap: %f (%f KB)", (1.f - static_cast<float>(ESP.getFreeHeap()) / static_cast<float>(ESP.getHeapSize())) * 100.f, static_cast<float>(ESP.getFreeHeap()) / 1024.f);
-  WiFi.onEvent(_evWiFiConnectedHandler, ARDUINO_EVENT_WIFI_STA_GOT_IP);
-  WiFi.onEvent(_evWiFiConnectedHandler, ARDUINO_EVENT_WIFI_STA_GOT_IP6);
+  WiFi.onEvent(_evGotIPHandler, ARDUINO_EVENT_WIFI_STA_GOT_IP);
+  WiFi.onEvent(_evGotIPHandler, ARDUINO_EVENT_WIFI_STA_GOT_IP6);
   WiFi.onEvent(_evWiFiDisconnectedHandler, ARDUINO_EVENT_WIFI_STA_DISCONNECTED);
 
   return true;
 }
 
 bool GatewayConnectionManager::IsConnected() {
-  if (s_webSocket == nullptr) {
+  if (s_wsClient == nullptr) {
     return false;
   }
 
-  return s_webSocket->isConnected();
+  return s_wsClient->state() == GatewayClient::State::Connected;
+}
+
+void GetDeviceInfoFromJsonResponse(HTTPClient& client) {
+  ArduinoJson::DynamicJsonDocument doc(1024);  // TODO: profile the normal message size and adjust this accordingly
+  deserializeJson(doc, client.getString());
+
+  auto data   = doc["data"];
+  String id   = data["id"];
+  String name = data["name"];
+
+  ESP_LOGD(TAG, "Device ID:   %s", id.c_str());
+  ESP_LOGD(TAG, "Device name: %s", name.c_str());
+
+  auto shockers = data["shockers"];
+  for (int i = 0; i < shockers.size(); i++) {
+    auto shocker              = shockers[i];
+    String shockerId          = shocker["id"];
+    std::uint16_t shockerRfId = shocker["rfId"];
+    std::uint8_t shockerModel = shocker["model"];
+
+    ESP_LOGD(TAG, "Found shocker %s with RF ID %u and model %u", shockerId.c_str(), shockerRfId, shockerModel);
+  }
 }
 
 bool GatewayConnectionManager::IsPaired() {
-  if (!s_wifiConnected) {
+  return (s_flags & FLAG_AUTHENTICATED) != 0;
+}
+
+// This method is here to heap usage
+std::string GetAuthTokenFromJsonResponse(HTTPClient& client) {
+  ArduinoJson::DynamicJsonDocument doc(1024);  // TODO: profile the normal message size and adjust this accordingly
+  deserializeJson(doc, client.getString());
+
+  String str = doc["data"];
+
+  return std::string(str.c_str(), str.length());
+}
+
+AccountLinkResultCode GatewayConnectionManager::Pair(const char* pairCode) {
+  if ((s_flags & FLAG_HAS_IP) == 0) {
+    return AccountLinkResultCode::NoInternetConnection;
+  }
+  s_wsClient = nullptr;
+
+  ESP_LOGD(TAG, "Attempting to pair with pair code %s", pairCode);
+
+  HTTPClient client;
+
+  char uri[256];
+  sprintf(uri, OPENSHOCK_API_URL("/1/device/pair/%s"), pairCode);
+
+  client.begin(uri);
+
+  int responseCode = client.GET();
+
+  if (responseCode == 404) {
+    return AccountLinkResultCode::InvalidCode;
+  }
+  if (responseCode != 200) {
+    ESP_LOGE(TAG, "Error while getting auth token: [%d] %s", responseCode, client.getString().c_str());
+    return AccountLinkResultCode::InternalError;
+  }
+
+  std::string authToken = GetAuthTokenFromJsonResponse(client);
+
+  client.end();
+
+  if (authToken.empty()) {
+    ESP_LOGE(TAG, "Received empty auth token");
+    return AccountLinkResultCode::InternalError;
+  }
+
+  Config::SetBackendAuthToken(authToken);
+
+  s_flags |= FLAG_AUTHENTICATED;
+  ESP_LOGD(TAG, "Successfully paired with pair code %u", pairCode);
+
+  return AccountLinkResultCode::Success;
+}
+void GatewayConnectionManager::UnPair() {
+  s_flags &= FLAG_HAS_IP;
+  s_wsClient = nullptr;
+  Config::ClearBackendAuthToken();
+}
+
+bool FetchDeviceInfo(const std::string& authToken) {
+  // TODO: this function is very slow, should be optimized!
+  if ((s_flags & FLAG_HAS_IP) == 0) {
     return false;
   }
-  if (s_isPaired) {
-    return true;
-  }
 
-  HTTPClient http;
-  const char* const uri = OPENSHOCK_API_URL("/1/device/self");
+  HTTPClient client;
 
-  ESP_LOGD(TAG, "Contacting self url: %s", uri);
-  http.begin(*s_wifiClient, uri);
+  client.begin(OPENSHOCK_API_URL("/1/device/self"));
 
-  // TODO: Attach auth token
+  client.addHeader("DeviceToken", authToken.c_str());
 
-  int responseCode = http.GET();
+  int responseCode = client.GET();
 
   if (responseCode == 401) {
     ESP_LOGD(TAG, "Auth token is invalid, clearing it");
     Config::ClearBackendAuthToken();
     return false;
   }
+
   if (responseCode != 200) {
-    ESP_LOGE(TAG, "Error while verifying auth token: [%d] %s", responseCode, http.getString().c_str());
+    ESP_LOGE(TAG, "Error while verifying auth token: [%d] %s", responseCode, client.getString().c_str());
     return false;
   }
 
-  http.end();
+  GetDeviceInfoFromJsonResponse(client);
 
-  s_isPaired = true;
+  client.end();
 
-  ESP_LOGD(TAG, "Successfully verified auth token");
+  s_flags |= FLAG_AUTHENTICATED;
 
   return true;
 }
 
-bool GatewayConnectionManager::Pair(unsigned int pairCode) {
-  if (!s_wifiConnected || s_wifiClient == nullptr) {
+static std::int64_t _lastConnectionAttempt = 0;
+bool ConnectToLCG() {
+  // TODO: this function is very slow, should be optimized!
+  if (s_wsClient == nullptr) {  // If wsClient is already initialized, we are already paired or connected
+    ESP_LOGD(TAG, "wsClient is null");
     return false;
   }
-  _disconnect();
 
-  HTTPClient http;
+  if (s_wsClient->state() != GatewayClient::State::Disconnected) {
+    ESP_LOGD(TAG, "WebSocketClient is not disconnected, waiting...");
+    s_wsClient->disconnect();
+    return false;
+  }
 
-  char uri[256];
-  sprintf(uri, OPENSHOCK_API_URL("/1/device/pair/%u"), pairCode);
+  std::int64_t msNow = OpenShock::millis();
+  if (_lastConnectionAttempt != 0 && (msNow - _lastConnectionAttempt) < 20'000) {  // Only try to connect every 20 seconds
+    return false;
+  }
 
-  ESP_LOGD(TAG, "Contacting pair code url: %s", uri);
-  http.begin(*s_wifiClient, uri);
+  _lastConnectionAttempt = msNow;
 
-  int responseCode = http.GET();
+  if (!Config::HasBackendAuthToken()) {
+    ESP_LOGD(TAG, "No auth token, can't connect to LCG");
+    return false;
+  }
+
+  std::string authToken = Config::GetBackendAuthToken();
+
+  HTTPClient client;
+
+  client.begin(OPENSHOCK_API_URL("/1/device/assignLCG"));
+
+  client.addHeader("DeviceToken", authToken.c_str());
+
+  int responseCode = client.GET();
 
   if (responseCode != 200) {
-    ESP_LOGE(TAG, "Error while getting auth token: [%d] %s", responseCode, http.getString().c_str());
+    ESP_LOGE(TAG, "Error while fetching LCG endpoint: [%d] %s", responseCode, client.getString().c_str());
     return false;
   }
 
-  int authTokenLen = http.getSize();
-  if (authTokenLen <= 0 || authTokenLen > 512) {
-    ESP_LOGE(TAG, "Auth token is empty");
+  ArduinoJson::DynamicJsonDocument doc(1024);  // TODO: profile the normal message size and adjust this accordingly
+  deserializeJson(doc, client.getString());
+
+  auto data           = doc["data"];
+  const char* fqdn    = data["fqdn"];
+  const char* country = data["country"];
+
+  client.end();
+
+  if (fqdn == nullptr || country == nullptr) {
+    ESP_LOGE(TAG, "Received invalid response from LCG endpoint");
     return false;
   }
 
-  char* authToken = new char[authTokenLen];
-
-  http.getStream().readBytes(authToken, authTokenLen);
-
-  http.end();
-
-  Config::SetBackendAuthToken(authToken);
-
-  delete[] authToken;
-
-  s_isPaired = true;
+  ESP_LOGD(TAG, "Connecting to LCG endpoint %s in country %s", fqdn, country);
+  s_wsClient->connect(fqdn);
 
   return true;
-}
-
-void GatewayConnectionManager::UnPair() {
-  s_isPaired = false;
-
-  Config::ClearBackendAuthToken();
-}
-
-std::uint64_t GatewayConnectionManager::RegisterConnectedChangedHandler(ConnectedChangedHandler handler) {
-  static std::uint64_t nextHandleId    = 0;
-  std::uint64_t handleId               = nextHandleId++;
-  s_connectedChangedHandlers[handleId] = handler;
-  return handleId;
-}
-void GatewayConnectionManager::UnRegisterConnectedChangedHandler(std::uint64_t handlerId) {
-  auto it = s_connectedChangedHandlers.find(handlerId);
-
-  if (it != s_connectedChangedHandlers.end()) {
-    s_connectedChangedHandlers.erase(it);
-  }
 }
 
 void GatewayConnectionManager::Update() {
-  if (s_webSocket == nullptr) {
-    if (s_wifiConnected && s_isPaired) {
-      ESP_LOGD(TAG, "Connecting to API");
-      _connect();
+  if (s_wsClient == nullptr) {
+    // Can't connect to the API without WiFi or an auth token
+    if ((s_flags & FLAG_HAS_IP) == 0 || !Config::HasBackendAuthToken()) {
+      return;
     }
 
+    std::string authToken = Config::GetBackendAuthToken();
+
+    // Test if the auth token is valid
+    if (!FetchDeviceInfo(authToken)) {
+      ESP_LOGD(TAG, "Auth token is invalid, clearing it");
+      Config::ClearBackendAuthToken();
+      return;
+    }
+
+    s_flags |= FLAG_AUTHENTICATED;
+    ESP_LOGD(TAG, "Successfully verified auth token");
+
+    s_wsClient = std::make_unique<GatewayClient>(authToken);
+  }
+
+  if (s_wsClient->loop()) {
     return;
   }
 
-  if (!IsConnected()) {
-    ESP_LOGD(TAG, "Connecting to API");
-    s_webSocket->beginSSL(Constants::ApiDomain, 443, "/1/ws/device");
+  if (ConnectToLCG()) {
+    ESP_LOGD(TAG, "Successfully connected to LCG");
+    return;
   }
-
-  std::uint64_t msNow = OpenShock::Millis();
-
-  static std::uint64_t lastKA = 0;
-  if ((msNow - lastKA) >= 30'000) {
-    _sendKeepAlive();
-    lastKA = msNow;
-  }
-
-  s_webSocket->loop();
 }

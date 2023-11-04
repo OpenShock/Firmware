@@ -1,0 +1,95 @@
+include "./Types/WifiScanStatus.fbs";
+include "./Types/WifiAuthMode.fbs";
+
+attribute "fs_serializer";
+
+namespace OpenShock.Serialization.Local;
+
+table WifiNetwork {
+  ssid:string;
+  bssid:string;
+  channel:uint8;
+  rssi:int8;
+  auth_mode:Types.WifiAuthMode;
+  saved:bool;
+}
+
+table ReadyMessage {
+  poggies:bool;
+  connected_wifi:WifiNetwork;
+  gateway_paired:bool;
+  rftx_pin:uint8;
+}
+
+table ErrorMessage {
+  message:string;
+}
+
+struct WifiScanStatusMessage {
+  status:Types.WifiScanStatus;
+}
+table WifiNetworkDiscoveredEvent {
+  network:WifiNetwork;
+}
+table WifiNetworkUpdatedEvent {
+  network:WifiNetwork;
+}
+table WifiNetworkLostEvent {
+  network:WifiNetwork;
+}
+table WifiNetworkSavedEvent {
+  network:WifiNetwork;
+}
+table WifiNetworkRemovedEvent {
+  network:WifiNetwork;
+}
+table WifiNetworkConnectedEvent {
+  network:WifiNetwork;
+}
+table WifiNetworkDisconnectedEvent {
+  network:WifiNetwork;
+}
+
+enum AccountLinkResultCode : uint8 {
+  Success = 0,
+  CodeRequired = 1,
+  InvalidCodeLength = 2,
+  NoInternetConnection = 3,
+  InvalidCode = 4,
+  InternalError = 5
+}
+
+struct AccountLinkCommandResult {
+  result:AccountLinkResultCode;
+}
+
+enum SetRfPinResultCode : uint8 {
+  Success = 0,
+  InvalidPin = 1,
+  InternalError = 2
+}
+struct SetRfTxPinCommandResult {
+  pin:uint8;
+  result:SetRfPinResultCode;
+}
+
+union DeviceToLocalMessagePayload {
+  ReadyMessage,
+  ErrorMessage,
+  WifiScanStatusMessage,
+  WifiNetworkDiscoveredEvent,
+  WifiNetworkUpdatedEvent,
+  WifiNetworkLostEvent,
+  WifiNetworkSavedEvent,
+  WifiNetworkRemovedEvent,
+  WifiNetworkConnectedEvent,
+  WifiNetworkDisconnectedEvent,
+  AccountLinkCommandResult,
+  SetRfTxPinCommandResult
+}
+
+table DeviceToLocalMessage (fs_serializer) {
+  payload:DeviceToLocalMessagePayload;
+}
+
+root_type DeviceToLocalMessage;

@@ -1,7 +1,9 @@
 import os
 import re
+import sys
 import gzip
 import shutil
+import subprocess
 from utils import sysenv
 
 Import('env')  # type: ignore
@@ -56,6 +58,20 @@ def file_write_text(file, text, enc):
     except:
         print('Error writing to ' + file)
         return False
+
+
+def pyftsubset(font_path, fa_unicode_csv, output_path):
+    # Use pyftsubset to remove all the unused icons.
+    # pyftsubset does not support reading from and writing to the same file, so we need to write to a temporary file.
+    # Then delete the original file and rename the temporary file to the original file.
+    pyftsubset_cmd = (
+        f'{sys.executable} -m fontTools.subset {font_path} --unicodes={fa_unicode_csv} --output-file={output_path}'
+    )
+
+    print('Running: ' + pyftsubset_cmd)
+
+    # Run pyftsubset.
+    os.system(pyftsubset_cmd)
 
 
 def get_fa_icon_map(srcdir, csspath):
@@ -129,9 +145,9 @@ def minify_fa_font(font_path, icon_map):
     tmp_path = font_path + '.tmp'
 
     # Use pyftsubset to remove all the unused icons.
-    # pyftsubset does not support reading from and writing to the same file, so we need to write to a temporary file.
-    # Then delete the original file and rename the temporary file to the original file.
-    os.system('pyftsubset {} --unicodes={} --output-file={}'.format(font_path, fa_unicode_csv, tmp_path))
+    pyftsubset(font_path, fa_unicode_csv, tmp_path)
+
+    # Delete the original font file and rename the temporary file to the original file.
     file_delete(font_path)
     os.rename(tmp_path, font_path)
 

@@ -1,5 +1,26 @@
-import { browser } from "$app/environment";
-import { WebSocketMessageHandler } from "./WebSocketMessageHandler";
+import { browser } from '$app/environment';
+import { isArrayBuffer, isString } from './TypeGuards/BasicGuards';
+import { WebSocketMessageBinaryHandler } from './MessageHandlers';
+import { page } from '$app/stores';
+import { get } from 'svelte/store';
+import { toastDelegator } from './stores/ToastDelegator';
+
+function getWebSocketHostname() {
+  if (!browser) {
+    return null;
+  }
+
+  const { url } = get(page);
+  const hostname = url.hostname;
+
+  switch (hostname) {
+    case 'localhost':
+    case '127.0.0.1':
+      return '10.10.10.10';
+    default:
+      return hostname;
+  }
+}
 
 export enum ConnectionState {
   DISCONNECTED = 0,
@@ -48,7 +69,14 @@ export class WebSocketClient {
     this._autoReconnect = true;
     this.ConnectionState = ConnectionState.CONNECTING;
 
-    this._socket = new WebSocket('ws://10.10.10.10:81/ws');
+    const hostname = getWebSocketHostname();
+    if (!hostname) {
+      console.error('[WS] ERROR: Failed to get WebSocket hostname');
+      this.ReconnectIfWanted();
+      return;
+    }
+
+    this._socket = new WebSocket(`ws://${hostname}:81/ws`);
     this._socket.binaryType = 'arraybuffer';
     this._socket.onopen = this.handleOpen.bind(this);
     this._socket.onclose = this.handleClose.bind(this);
@@ -98,6 +126,10 @@ export class WebSocketClient {
   private handleClose(ev: CloseEvent) {
     if (!ev.wasClean) {
       console.error('[WS] ERROR: Connection closed unexpectedly');
+      toastDelegator.trigger({
+        message: 'Websocket connection closed unexpectedly',
+        background: 'bg-red-500',
+      });
     } else {
       console.log('[WS] Received disconnect: ', ev.reason);
     }
@@ -113,27 +145,17 @@ export class WebSocketClient {
       return;
     }
 
-    // Check if message is binary
-    if (msg.data instanceof ArrayBuffer) {
-      console.warn('[WS] Received binary message, not supported yet');
+    if (isArrayBuffer(msg.data)) {
+      WebSocketMessageBinaryHandler(this, msg.data);
       return;
     }
 
-    // Check if message is text
-    if (typeof msg.data !== 'string') {
-      console.log('[WS] Received message of unknown type');
+    if (isString(msg.data)) {
+      console.warn('[WS] Text messages are not supported, received: ', msg.data);
       return;
     }
 
-    // Parse message
-    const message = JSON.parse(msg.data);
-    if (!message) {
-      console.warn('[WS] Received empty message');
-      return;
-    }
-
-    // Handle message
-    WebSocketMessageHandler(message);
+    console.warn('[WS] Received unknown message type: ', msg.data);
   }
   private AbortWebSocket() {
     if (this._socket) {
