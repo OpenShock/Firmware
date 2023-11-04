@@ -265,7 +265,7 @@ void GatewayConnectionManager::Update() {
     s_flags |= FLAG_AUTHENTICATED;
     ESP_LOGD(TAG, "Successfully verified auth token");
 
-    s_wsClient = std::make_unique<GatewayClient>(authToken, OPENSHOCK_FW_VERSION);
+    s_wsClient = std::make_unique<GatewayClient>(authToken);
   }
 
   if (s_wsClient->loop()) {

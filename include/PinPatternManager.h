@@ -27,7 +27,6 @@ namespace OpenShock {
     static void RunPattern(void* arg);
 
     std::uint8_t m_gpioPin;
-    char m_name[32];
     State* m_pattern;
     std::size_t m_patternLength;
     TaskHandle_t m_taskHandle;

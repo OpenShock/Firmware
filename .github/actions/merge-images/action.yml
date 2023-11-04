@@ -45,8 +45,8 @@ runs:
     - name: Merge flash image
       shell: bash
       run: |
-        python scripts/merge_image.py ${{ inputs.board }} &&
-          mv merged.bin OpenShock_${{ inputs.board }}_${{ !contains(github.ref_name, '/') && github.ref_name || 'unknown' }}.bin
+        python scripts/merge_image.py ${{ inputs.board }}
+        mv merged.bin OpenShock_${{ inputs.board }}_${{ !contains(github.ref_name, '/') && github.ref_name || 'unknown' }}.bin
 
     - name: Upload merged flashable image
       uses: actions/upload-artifact@v3

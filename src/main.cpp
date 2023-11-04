@@ -5,11 +5,11 @@
 #include "EventHandlers/EventHandlers.h"
 #include "EStopManager.h"
 #include "GatewayConnectionManager.h"
+#include "Logging.h"
 #include "SerialInputHandler.h"
 #include "VisualStateManager.h"
 #include "WiFiManager.h"
 #include "WiFiScanManager.h"
-#include "Logging.h"
 
 #include <LittleFS.h>
 
@@ -21,9 +21,7 @@ void setup() {
   Serial.begin(115'200);
 
   if (!LittleFS.begin(true)) {
-    ESP_LOGE(TAG, "PANIC: An Error has occurred while mounting LittleFS, restarting in 5 seconds...");
-    delay(5000);
-    ESP.restart();
+    ESP_PANIC(TAG, "Unable to mount LittleFS");
   }
 
   OpenShock::EventHandlers::Init();
@@ -38,19 +36,15 @@ void setup() {
   OpenShock::Config::Init();
 
   if (!OpenShock::CommandHandler::Init()) {
-    ESP_LOGW(TAG, "An Error has occurred while initializing CommandHandler");
+    ESP_LOGW(TAG, "Unable to initialize CommandHandler");
   }
 
   if (!OpenShock::WiFiManager::Init()) {
-    ESP_LOGE(TAG, "PANIC: An Error has occurred while initializing WiFiManager, restarting in 5 seconds...");
-    delay(5000);
-    ESP.restart();
+    ESP_PANIC(TAG, "Unable to initialize WiFiManager");
   }
 
   if (!OpenShock::GatewayConnectionManager::Init()) {
-    ESP_LOGE(TAG, "PANIC: An Error has occurred while initializing WiFiScanManager, restarting in 5 seconds...");
-    delay(5000);
-    ESP.restart();
+    ESP_PANIC(TAG, "Unable to initialize GatewayConnectionManager");
   }
 }
 

@@ -1,0 +1,26 @@
+name: cnd-upload-firmware
+description: Uploads firmware artifacts to CDN
+inputs:
+  cf-bucket:
+    description: Name of the S3 bucket
+    required: true
+  version:
+    description: Version to upload
+    required: true
+  release-channel:
+    description: 'Release channel that describes this upload'
+    required: false
+    default: 'none'
+
+runs:
+  using: composite
+  steps:
+
+    - name: Upload version file
+      shell: bash
+      run: |
+        mkdir upload
+        cd upload
+        echo "${{ inputs.version }}" >> version-${{ inputs.release-channel }}.txt
+        rclone copy . cdn:${{ inputs.cf-bucket }}/
+

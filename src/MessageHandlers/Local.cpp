@@ -35,7 +35,7 @@ static std::array<Handlers::HandlerType, HANDLER_COUNT> s_localHandlers = []() {
   SET_HANDLER(PayloadType::AccountUnlinkCommand, Handlers::HandleAccountUnlinkCommand);
   SET_HANDLER(PayloadType::SetRfTxPinCommand, Handlers::HandleSetRfTxPinCommand);
 
-  return std::move(handlers);
+  return handlers;
 }();
 
 void MessageHandlers::Local::HandleBinary(std::uint8_t socketId, const std::uint8_t* data, std::size_t len) {

@@ -8,14 +8,7 @@ const char* const TAG = "PinPatternManager";
 
 using namespace OpenShock;
 
-PinPatternManager::PinPatternManager(std::uint8_t gpioPin)
-  : m_gpioPin(gpioPin)
-  , m_name {0}
-  , m_pattern(nullptr)
-  , m_patternLength(0)
-  , m_taskHandle(nullptr)
-  , m_taskSemaphore(xSemaphoreCreateBinary()) {
-  snprintf(m_name, sizeof(m_name), "PinPatternManager-%u", m_gpioPin);
+PinPatternManager::PinPatternManager(std::uint8_t gpioPin) : m_gpioPin(gpioPin), m_pattern(nullptr), m_patternLength(0), m_taskHandle(nullptr), m_taskSemaphore(xSemaphoreCreateBinary()) {
   pinMode(gpioPin, OUTPUT);
   xSemaphoreGive(m_taskSemaphore);
 }
@@ -34,10 +27,13 @@ void PinPatternManager::SetPattern(nonstd::span<const State> pattern) {
   m_pattern       = new State[m_patternLength];
   std::copy(pattern.begin(), pattern.end(), m_pattern);
 
+  char name[32];
+  snprintf(name, sizeof(name), "PinPatternManager-%u", m_gpioPin);
+
   // Start the task
-  BaseType_t result = xTaskCreate(RunPattern, m_name, 1024, this, 1, &m_taskHandle);
+  BaseType_t result = xTaskCreate(RunPattern, name, 1024, this, 1, &m_taskHandle);
   if (result != pdPASS) {
-    ESP_LOGE(m_name, "Failed to create task: %d", result);
+    ESP_LOGE(TAG, "[pin-%u] Failed to create task: %d", m_gpioPin, result);
 
     m_taskHandle = nullptr;
 
@@ -82,7 +78,7 @@ void PinPatternManager::RunPattern(void* arg) {
   while (true) {
     for (std::size_t i = 0; i < patternLength; ++i) {
       digitalWrite(pin, pattern[i].level);
-      vTaskDelay(pattern[i].duration / portTICK_PERIOD_MS);
+      vTaskDelay(pdMS_TO_TICKS(pattern[i].duration));
     }
   }
 }

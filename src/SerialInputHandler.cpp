@@ -127,7 +127,6 @@ void _handleFactoryResetCommand(char* arg, std::size_t argLength) {
   Config::FactoryReset();
   Serial.println("Rebooting...");
   ESP.restart();
-  ESP_LOGE(TAG, "IMPOSSIBLE REACHED");
 }
 
 void _handleRmtpinCommand(char* arg, std::size_t argLength) {
@@ -138,13 +137,18 @@ void _handleRmtpinCommand(char* arg, std::size_t argLength) {
     return;
   }
 
-  std::uint32_t pin;
+  unsigned int pin;
   if (sscanf(arg, "%u", &pin) != 1) {
     Serial.println("$SYS$|Error|Invalid argument (not a number)");
     return;
   }
 
-  OpenShock::CommandHandler::SetRfTxPin(pin);
+  if (pin > UINT8_MAX) {
+    Serial.println("$SYS$|Error|Invalid argument (out of range)");
+    return;
+  }
+
+  OpenShock::CommandHandler::SetRfTxPin(static_cast<std::uint8_t>(pin));
 
   Serial.println("$SYS$|Success|Saved config");
 }

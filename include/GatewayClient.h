@@ -8,7 +8,7 @@
 namespace OpenShock {
   class GatewayClient {
   public:
-    GatewayClient(const std::string& authToken, const std::string& fwVersionStr);
+    GatewayClient(const std::string& authToken);
     ~GatewayClient();
 
     enum class State {

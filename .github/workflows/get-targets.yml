@@ -9,17 +9,25 @@
 on:
   workflow_call:
     outputs:
+      board-list:
+        description: "Newline-separated list of boards"
+        value: ${{ jobs.get-targets.outputs.board-list }}
+      board-array:
+        description: "JSON array of boards"
+        value: ${{ jobs.get-targets.outputs.board-array }}
       matrix:
-        description: "Strategy matrix"
-        value: ${{ jobs.generate-matrix.outputs.matrix }}
+        description: "Strategy matrix with a single key 'board', containing a list of all boards."
+        value: ${{ jobs.get-targets.outputs.matrix }}
 
 name: targets
 
 jobs:
-  generate-matrix:
+  get-targets:
     runs-on: ubuntu-latest
     outputs:
-      matrix: ${{ steps.extract.outputs.matrix }}
+      board-array: ${{ steps.board-array.outputs.array }}
+      board-list: ${{ steps.board-list.outputs.list }}
+      matrix: ${{ steps.matrix.outputs.matrix }}
 
     steps:
       - uses: actions/checkout@v4
@@ -42,12 +50,24 @@ jobs:
       #         | select(. != "fs") ]     Filters out the "fs" entry since that's only for building the filesystem,
       #   { board: ... }                  Wraps the whole thing into a JSON object with only a "board" key
       #                                   and the array in question as value.
-      # 
+      #
       # echo "matrix=$(...)" >> $GITHUB_OUTPUT    Sets the value as job output with name "matrix".
-      # 
+      #
       # Referenced: https://unix.stackexchange.com/a/278377
       # Referenced: https://github.com/jqlang/jq/issues/563
-      - name: Extract targets
-        id: extract
+      - name: Extract board array
+        id: board-array
         run: |
-          echo "matrix=$(sed -n "s/^\[env:\(.*\)]$/\1/p" platformio.ini | jq --raw-input --slurp -c '{ board: split("\n") | [ .[] | select(length > 0) | select(. != "fs") ] }')" >> $GITHUB_OUTPUT
+          echo "array=$(sed -n "s/^\[env:\(.*\)]$/\1/p" platformio.ini | jq --raw-input --slurp -c 'split("\n") | [ .[] | select(length > 0) | select(. != "fs") ]')" >> $GITHUB_OUTPUT
+
+      - name: Build strategy matrix
+        id: matrix
+        run: |
+          echo "matrix=$(echo '${{ steps.board-array.outputs.array }}' | jq -c '{ board: . }')" >> $GITHUB_OUTPUT
+
+      - name: Build board list
+        id: board-list
+        run: |
+          echo "list<<EOF" >> $GITHUB_OUTPUT
+          echo "$(echo '${{ steps.board-array.outputs.array }}' | jq -r '. | join("\n")' | sed 's|\\n|\n|g')" >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
