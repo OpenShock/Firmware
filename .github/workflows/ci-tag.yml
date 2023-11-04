@@ -150,7 +150,7 @@ jobs:
 
   cdn-bump-version:
     runs-on: ubuntu-latest
-    needs: [cdn-upload-boards, cdn-upload-board-list] # only after version is complete
+    needs: [cdn-upload-boards] # only after version is complete
     environment: cdn-firmware-r2
 
     steps:
