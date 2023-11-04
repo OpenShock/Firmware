@@ -1,5 +1,6 @@
 #pragma once
 
+#include "StaticFileHandler.h"
 #include "WebSocketDeFragger.h"
 
 #include <ESPAsyncWebServer.h>
@@ -29,5 +30,6 @@ namespace OpenShock {
     AsyncWebServer m_webServer;
     WebSocketsServer m_socketServer;
     WebSocketDeFragger m_socketDeFragger;
+    StaticFileHandler m_staticFileHandler;
   };
 }  // namespace OpenShock
