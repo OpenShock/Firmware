@@ -9,26 +9,66 @@
 on:
   workflow_call:
     outputs:
-      boards:
+      board-list:
         description: "Newline-separated list of boards"
-        value: ${{ jobs.generate-matrix.outputs.boards }}
+        value: ${{ jobs.get-targets.outputs.board-list }}
+      board-array:
+        description: "JSON array of boards"
+        value: ${{ jobs.get-targets.outputs.board-array }}
       matrix:
         description: "Strategy matrix with a single key 'boards', containing a list of all boards."
-        value: ${{ jobs.generate-matrix.outputs.matrix }}
+        value: ${{ jobs.get-targets.outputs.matrix }}
 
 name: targets
 
 jobs:
-  generate-matrix:
+  get-targets:
     runs-on: ubuntu-latest
     outputs:
-      boards: ${{ steps.boards.outputs.boards }}
-      matrix: ${{ steps.extract.outputs.matrix }}
+      board-array: ${{ steps.board-array.outputs.boards }}
+      board-list: ${{ steps.board-list.outputs.boards }}
+      matrix: ${{ steps.matrix.outputs.matrix }}
 
     steps:
       - uses: actions/checkout@v4
         with:
           sparse-checkout: platformio.ini
+
+      # There's a lot going on here, so bear with me.
+      #
+      # sed:
+      #   -n                              Suppresses normal output,
+      #   "s/^\[env:\(.*\)]$/\1           Substitutes "[env:...]" with whatever value is at "..."
+      #   /p"                             Prints out the substituted value (i.e. the value of "...")
+      #   platformio.ini                  Reading from this file.
+      #
+      # jq:
+      #   "--raw-input --slurp"           Takes the previous output,
+      #   -c                              Output in compact mode (no newlines or unnecessary spaces),
+      #   split("\n")                     Splits it by line, turning it into an array,
+      #   [ .[] | select(length > 0)      Filters out empty lines (there is an empty trailing line usually),
+      #         | select(. != "fs") ]     Filters out the "fs" entry since that's only for building the filesystem,
+      #   { board: ... }                  Wraps the whole thing into a JSON object with only a "board" key
+      #                                   and the array in question as value.
+      #
+      # echo "matrix=$(...)" >> $GITHUB_OUTPUT    Sets the value as job output with name "matrix".
+      #
+      # Referenced: https://unix.stackexchange.com/a/278377
+      # Referenced: https://github.com/jqlang/jq/issues/563
+      - name: Extract board array
+        id: board-array
+        run: |
+          echo "boards=$(sed -n "s/^\[env:\(.*\)]$/\1/p" platformio.ini | jq --raw-input --slurp -c 'split("\n") | [ .[] | select(length > 0) | select(. != "fs") ]')" >> $GITHUB_OUTPUT
+
+      - name: Build strategy matrix
+        id: matrix
+        run: |
+          echo "matrix=$(${{ steps.board-array.outputs.boards }}" | jq '{ boards: . }') >> $GITHUB_OUTPUT
+
+      - name: Build board list
+        id: board-list
+        run: |
+          echo "list=$('${{ steps.board-array.outputs.boards }}' | jq -r '. | join("\n")' | sed 's|\\n|\n|g')" >> $GITHUB_OUTPUT
 
       # There's a lot going on here, so bear with me.
       #
@@ -45,21 +85,4 @@ jobs:
         id: boards
         shell: bash
         run: |
-          echo "boards=$(sed -n "s/^\[env:\(.*\)]$/\1/p" platformio.ini) >> $GITHUB_OUTPUT
-
-      # jq:
-      #   "--raw-input --slurp"           Takes the previous output,
-      #   -c                              Output in compact mode (no newlines or unnecessary spaces),
-      #   split("\n")                     Splits it by line, turning it into an array,
-      #   [ .[] | select(length > 0)      Filters out empty lines (there is an empty trailing line usually),
-      #         | select(. != "fs") ]     Filters out the "fs" entry since that's only for building the filesystem,
-      #   { board: ... }                  Wraps the whole thing into a JSON object with only a "board" key
-      #                                   and the array in question as value.
-      #
-      # echo "matrix=$(...)" >> $GITHUB_OUTPUT    Outputs the value as job output with name "matrix".
-      #
-      # Referenced: https://github.com/jqlang/jq/issues/563
-      - name: Extract targets
-        id: extract
-        run: |
-          echo "matrix=$(echo '${{ steps.boards.outputs.boards }}' | jq --raw-input --slurp -c '{ board: split("\n") | [ .[] | select(length > 0) | select(. != "fs") ] }')" >> $GITHUB_OUTPUT
+          echo "boards=$(sed -n 's/^\[env:\(.*\)]$/\1/p' platformio.ini | ) >> $GITHUB_OUTPUT
