@@ -84,7 +84,7 @@ void PinPatternManager::RunPattern(void* arg) {
   while (true) {
     for (std::size_t i = 0; i < patternLength; ++i) {
       digitalWrite(pin, pattern[i].level);
-      vTaskDelay(pattern[i].duration / portTICK_PERIOD_MS);
+      vTaskDelay(pdMS_TO_TICKS(pattern[i].duration));
     }
   }
 }

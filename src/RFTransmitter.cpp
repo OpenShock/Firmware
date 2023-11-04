@@ -73,7 +73,7 @@ bool RFTransmitter::SendCommand(ShockerModelType model, std::uint16_t shockerId,
   }
 
   // Add the command to the queue, wait max 10 ms (Adjust this)
-  if (xQueueSend(m_queueHandle, &cmd, 10 / portTICK_PERIOD_MS) != pdTRUE) {
+  if (xQueueSend(m_queueHandle, &cmd, pdMS_TO_TICKS(10)) != pdTRUE) {
     ESP_LOGE(TAG, "[pin-%u] Failed to send command to queue", m_txPin);
     delete cmd;
     return false;
@@ -102,10 +102,10 @@ void RFTransmitter::destroy() {
     // Wait for the task to stop
     command_t* cmd = nullptr;
     while (eTaskGetState(m_taskHandle) != eDeleted) {
-      vTaskDelay(10 / portTICK_PERIOD_MS);
+      vTaskDelay(pdMS_TO_TICKS(10));
 
       // Send nullptr to stop the task gracefully
-      xQueueSend(m_queueHandle, &cmd, 10 / portTICK_PERIOD_MS);
+      xQueueSend(m_queueHandle, &cmd, pdMS_TO_TICKS(10));
     }
 
     ESP_LOGD(TAG, "[pin-%u] Task stopped", m_txPin);
