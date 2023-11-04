@@ -25,8 +25,8 @@ jobs:
   get-targets:
     runs-on: ubuntu-latest
     outputs:
-      board-array: ${{ steps.board-array.outputs.boards }}
-      board-list: ${{ steps.board-list.outputs.boards }}
+      board-array: ${{ steps.board-array.outputs.array }}
+      board-list: ${{ steps.board-list.outputs.list }}
       matrix: ${{ steps.matrix.outputs.matrix }}
 
     steps:
@@ -58,16 +58,16 @@ jobs:
       - name: Extract board array
         id: board-array
         run: |
-          echo "boards=$(sed -n "s/^\[env:\(.*\)]$/\1/p" platformio.ini | jq --raw-input --slurp -c 'split("\n") | [ .[] | select(length > 0) | select(. != "fs") ]')" >> $GITHUB_OUTPUT
+          echo "array=$(sed -n "s/^\[env:\(.*\)]$/\1/p" platformio.ini | jq --raw-input --slurp -c 'split("\n") | [ .[] | select(length > 0) | select(. != "fs") ]')" >> $GITHUB_OUTPUT
 
       - name: Build strategy matrix
         id: matrix
         run: |
-          echo "matrix=$(echo '${{ steps.board-array.outputs.boards }}' | jq -c '{ board: . }')" >> $GITHUB_OUTPUT
+          echo "matrix=$(echo '${{ steps.board-array.outputs.array }}' | jq -c '{ board: . }')" >> $GITHUB_OUTPUT
 
       - name: Build board list
         id: board-list
         run: |
           echo -e "list<<EOF" >> $GITHUB_OUTPUT
-          echo "$(echo '${{ steps.board-array.outputs.boards }}' | jq -r '. | join("\n")' | sed 's|\\n|\n|g')\nEOF" >> $GITHUB_OUTPUT
+          echo "$(echo '${{ steps.board-array.outputs.array }}' | jq -r '. | join("\n")' | sed 's|\\n|\n|g')\nEOF" >> $GITHUB_OUTPUT
           echo "EOF" >> $GITHUB_OUTPUT

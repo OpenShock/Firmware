@@ -17,7 +17,7 @@ runs:
     - name: Create boards.txt
       shell: bash
       run: |
-        echo '${{ inputs.boards }}' >> boards.txt
+        echo -e '${{ inputs.boards }}' >> boards.txt
 
     - name: Upload artifacts to CDN
       shell: bash
