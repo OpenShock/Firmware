@@ -5,51 +5,64 @@
 #include <esp_task_wdt.h>
 #include <LittleFS.h>
 
+#include <string>
+#include <unordered_map>
+
 const char* const TAG = "StaticFileHandler";
+
+namespace std {
+  // hash functor for Arduino String
+  template<>
+  struct hash<String> {
+    // hash _Keyval to size_t value by pseudorandomizing transform
+    size_t operator()(const String& _Keyval) const noexcept { return (std::_Hash_bytes(_Keyval.c_str(), _Keyval.length(), 0)); }
+  };
+}  // namespace std
+
+std::unordered_map<String, const __FlashStringHelper*> mimeTypes = {
+  { ".html",              F("text/html")},
+  {  ".htm",              F("text/html")},
+  {  ".css",               F("text/css")},
+  { ".json",       F("application/json")},
+  {   ".js", F("application/javascript")},
+  {  ".png",              F("image/png")},
+  {  ".gif",              F("image/gif")},
+  {  ".jpg",             F("image/jpeg")},
+  {  ".ico",           F("image/x-icon")},
+  {  ".svg",          F("image/svg+xml")},
+  {  ".eot",               F("font/eot")},
+  { ".woff",              F("font/woff")},
+  {".woff2",             F("font/woff2")},
+  {  ".ttf",               F("font/ttf")},
+  {  ".xml",               F("text/xml")},
+  {  ".pdf",        F("application/pdf")},
+  {  ".zip",        F("application/zip")},
+  {   ".gz",     F("application/x-gzip")},
+  {  ".txt",             F("text/plain")},
+};
 
 using namespace OpenShock;
 
-const char* GetContentType(const String& path) {
-  if (path.endsWith(".html"))
-    return "text/html";
-  else if (path.endsWith(".htm"))
-    return "text/html";
-  else if (path.endsWith(".css"))
-    return "text/css";
-  else if (path.endsWith(".json"))
-    return "application/json";
-  else if (path.endsWith(".js"))
-    return "application/javascript";
-  else if (path.endsWith(".png"))
-    return "image/png";
-  else if (path.endsWith(".gif"))
-    return "image/gif";
-  else if (path.endsWith(".jpg"))
-    return "image/jpeg";
-  else if (path.endsWith(".ico"))
-    return "image/x-icon";
-  else if (path.endsWith(".svg"))
-    return "image/svg+xml";
-  else if (path.endsWith(".eot"))
-    return "font/eot";
-  else if (path.endsWith(".woff"))
-    return "font/woff";
-  else if (path.endsWith(".woff2"))
-    return "font/woff2";
-  else if (path.endsWith(".ttf"))
-    return "font/ttf";
-  else if (path.endsWith(".xml"))
-    return "text/xml";
-  else if (path.endsWith(".pdf"))
-    return "application/pdf";
-  else if (path.endsWith(".zip"))
-    return "application/zip";
-  else if (path.endsWith(".gz"))
-    return "application/x-gzip";
-  else if (path.endsWith(".txt"))
-    return "text/plain";
-  else
-    return "application/octet-stream";
+String GetContentType(const String& path) {
+  const char* const MIME_DEFAULT = "application/octet-stream";
+
+  if (path.isEmpty()) {
+    return MIME_DEFAULT;
+  }
+
+  int lastDot = path.lastIndexOf('.');
+  if (lastDot < 0) {
+    return MIME_DEFAULT;
+  }
+
+  String extension = path.substring(lastDot);
+
+  auto it = mimeTypes.find(extension);
+  if (it == mimeTypes.end()) {
+    return MIME_DEFAULT;
+  }
+
+  return String(it->second);
 }
 
 String GetFsPath(const String& path) {
