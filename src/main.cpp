@@ -21,7 +21,7 @@ void setup() {
 
   if (!LittleFS.begin(true)) {
     ESP_LOGE(TAG, "PANIC: An Error has occurred while mounting LittleFS, restarting in 5 seconds...");
-    delay(5000);
+    vTaskDelay(pdMS_TO_TICKS(5000));
     ESP.restart();
   }
 
@@ -40,13 +40,13 @@ void setup() {
 
   if (!OpenShock::WiFiManager::Init()) {
     ESP_LOGE(TAG, "PANIC: An Error has occurred while initializing WiFiManager, restarting in 5 seconds...");
-    delay(5000);
+    vTaskDelay(pdMS_TO_TICKS(5000));
     ESP.restart();
   }
 
   if (!OpenShock::GatewayConnectionManager::Init()) {
     ESP_LOGE(TAG, "PANIC: An Error has occurred while initializing WiFiScanManager, restarting in 5 seconds...");
-    delay(5000);
+    vTaskDelay(pdMS_TO_TICKS(5000));
     ESP.restart();
   }
 }
