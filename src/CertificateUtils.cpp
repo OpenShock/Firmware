@@ -16,7 +16,7 @@ WiFiClientSecure OpenShock::CertificateUtils::GetSecureClient() {
 
   client.setCACertBundle(rootca_crt_bundle_start);
 
-  return std::move(client);
+  return client;
 }
 
 bool OpenShock::CertificateUtils::GetHostCertificate(const char* host, std::vector<char>& pem) {

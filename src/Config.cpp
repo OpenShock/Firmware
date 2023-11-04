@@ -266,13 +266,13 @@ void Config::Init() {
   };
 
   if (!_trySaveConfig()) {
-    ESP_LOGE(TAG, "!!!CRITICAL ERROR!!! Failed to save default config. Reccomend formatting microcontroller and re-flashing firmware !!!CRITICAL ERROR!!!");
+    ESP_PANIC(TAG, "Failed to save default config. Recommend formatting microcontroller and re-flashing firmware");
   }
 }
 
 void Config::FactoryReset() {
   if (!LittleFS.remove("/config") && LittleFS.exists("/config")) {
-    ESP_LOGE(TAG, "!!!CRITICAL ERROR!!! Failed to remove existing config file for factory reset. Reccomend formatting microcontroller and re-flashing firmware !!!CRITICAL ERROR!!!");
+    ESP_PANIC(TAG, "Failed to remove existing config file for factory reset. Reccomend formatting microcontroller and re-flashing firmware");
   }
 }
 

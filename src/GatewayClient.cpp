@@ -11,16 +11,12 @@ const char* const TAG = "GatewayClient";
 
 using namespace OpenShock;
 
-GatewayClient::GatewayClient(const std::string& authToken, const std::string& fwVersionStr) : m_webSocket(), m_lastKeepAlive(0), m_state(State::Disconnected) {
+GatewayClient::GatewayClient(const std::string& authToken) : m_webSocket(), m_lastKeepAlive(0), m_state(State::Disconnected) {
   ESP_LOGD(TAG, "Creating GatewayClient");
-  std::string headers;
-  headers.reserve(512);
 
-  headers += "Firmware-Version: ";
-  headers += fwVersionStr;
-  headers += "\r\n";
-  headers += "Device-Token: ";
-  headers += authToken;
+  std::string headers = "Firmware-Version: " OPENSHOCK_FW_VERSION "\r\n"
+                        "Device-Token: "
+                      + authToken;
 
   m_webSocket.setExtraHeaders(headers.c_str());
   m_webSocket.onEvent(std::bind(&GatewayClient::_handleEvent, this, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3));
