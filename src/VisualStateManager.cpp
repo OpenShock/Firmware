@@ -93,7 +93,7 @@ constexpr PinPatternManager::State kWebSocketCantConnectPattern[] = {
 };
 
 constexpr PinPatternManager::State kWebSocketConnectedPattern[] = {
-  { true, 100},
+  { true,    100},
   {false, 10'000}
 };
 
@@ -179,6 +179,9 @@ void VisualStateManager::Init() {
   WiFi.onEvent(_handleWiFiConnected, ARDUINO_EVENT_WIFI_STA_GOT_IP6);
   WiFi.onEvent(_handleWiFiDisconnected, ARDUINO_EVENT_WIFI_STA_DISCONNECTED);
   WiFi.onEvent(_handleWiFiScanDone, ARDUINO_EVENT_WIFI_SCAN_DONE);
+
+  // Run the update on init, otherwise no inital pattern is set.
+  _updateVisualState();
 }
 
 void VisualStateManager::SetCriticalError() {
