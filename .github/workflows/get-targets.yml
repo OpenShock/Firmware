@@ -16,7 +16,7 @@ on:
         description: "JSON array of boards"
         value: ${{ jobs.get-targets.outputs.board-array }}
       matrix:
-        description: "Strategy matrix with a single key 'boards', containing a list of all boards."
+        description: "Strategy matrix with a single key 'board', containing a list of all boards."
         value: ${{ jobs.get-targets.outputs.matrix }}
 
 name: targets
@@ -63,7 +63,7 @@ jobs:
       - name: Build strategy matrix
         id: matrix
         run: |
-          echo "matrix=$(echo '${{ steps.board-array.outputs.boards }}' | jq -c '{ boards: . }')" >> $GITHUB_OUTPUT
+          echo "matrix=$(echo '${{ steps.board-array.outputs.boards }}' | jq -c '{ board: . }')" >> $GITHUB_OUTPUT
 
       - name: Build board list
         id: board-list
