@@ -91,6 +91,6 @@ EStopManager::EStopStatus EStopManager::Update() {
 
   return s_estopStatus;
 #else
-  return ALL_CLEAR;
+  return EStopManager::EStopStatus::ALL_CLEAR;
 #endif
 }
