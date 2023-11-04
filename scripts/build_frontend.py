@@ -1,5 +1,6 @@
 import os
 import re
+import sys
 import gzip
 import shutil
 import subprocess
@@ -62,36 +63,12 @@ def file_write_text(file, text, enc):
         return False
 
 
-def get_interpreter_path():
-    # Run where or which to find the path to python.
-    if os.name == 'nt':
-        python_paths = subprocess.getoutput('where python').split('\n')
-    else:
-        python_paths = subprocess.getoutput('which python').split('\n')
-
-    for path in python_paths:
-        if 'platformio' not in path:
-            return path.strip()
-
-    first = python_paths[0].strip()
-    if first == '':
-        print('Error: Could not find a python interpreter.')
-        exit(1)
-
-    print('Warning: Could not find a global python interpreter. Using ' + first + ' instead.')
-
-    return first
-
-
 def pyftsubset(font_path, fa_unicode_csv, output_path):
-    # Get the path to python, optimally the global python interpreter.
-    python_path = get_interpreter_path()
-
     # Use pyftsubset to remove all the unused icons.
     # pyftsubset does not support reading from and writing to the same file, so we need to write to a temporary file.
     # Then delete the original file and rename the temporary file to the original file.
     pyftsubset_cmd = (
-        f'{python_path} -m fontTools.subset {font_path} --unicodes={fa_unicode_csv} --output-file={output_path}'
+        f'{sys.executable} -m fontTools.subset {font_path} --unicodes={fa_unicode_csv} --output-file={output_path}'
     )
 
     print('Running: ' + pyftsubset_cmd)
