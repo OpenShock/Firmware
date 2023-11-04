@@ -46,10 +46,6 @@ using namespace OpenShock;
 String GetContentType(const String& path) {
   const char* const MIME_DEFAULT = "application/octet-stream";
 
-  if (path.isEmpty()) {
-    return MIME_DEFAULT;
-  }
-
   int lastDot = path.lastIndexOf('.');
   if (lastDot < 0) {
     return MIME_DEFAULT;
@@ -100,7 +96,7 @@ String GetFileName(const String& path) {
 
 class CustomAsyncFileResponse : public AsyncAbstractResponse {
 public:
-  CustomAsyncFileResponse(fs::File file, const String& fileName, bool gzipped) : AsyncAbstractResponse(nullptr), m_file(file), m_started(OpenShock::millis()), m_lastRead(0) {
+  CustomAsyncFileResponse(fs::File file, const String& fileName, bool gzipped) : AsyncAbstractResponse(), m_file(file), m_started(OpenShock::millis()), m_lastRead(0) {
     _contentType   = GetContentType(fileName);
     _contentLength = file.size();
 
