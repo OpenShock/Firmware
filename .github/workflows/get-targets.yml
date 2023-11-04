@@ -71,20 +71,3 @@ jobs:
           echo -e "list<<EOF" >> $GITHUB_OUTPUT
           echo "$(echo '${{ steps.board-array.outputs.boards }}' | jq -r '. | join("\n")' | sed 's|\\n|\n|g')\nEOF" >> $GITHUB_OUTPUT
           echo "EOF" >> $GITHUB_OUTPUT
-
-      # There's a lot going on here, so bear with me.
-      #
-      # sed:
-      #   -n                              Suppresses normal output,
-      #   "s/^\[env:\(.*\)]$/\1           Substitutes "[env:...]" with whatever value is at "..."
-      #   /p"                             Prints out the substituted value (i.e. the value of "...")
-      #   platformio.ini                  Reading from this file.
-      #
-      # echo "boards=$(...)" >> $GITHUB_OUTPUT    Outputs the value as job output with name "boards".
-      #
-      # Referenced: https://unix.stackexchange.com/a/278377
-      - name: Collect boards
-        id: boards
-        shell: bash
-        run: |
-          echo "boards=$(sed -n 's/^\[env:\(.*\)]$/\1/p' platformio.ini | ) >> $GITHUB_OUTPUT

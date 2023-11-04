@@ -88,9 +88,15 @@ jobs:
           board: ${{ matrix.board }}
           skip-checkout: true
 
+  checkpoint-build:
+    runs-on: ubuntu-latest
+    needs: [build-filesystem, merge-images]
+    steps:
+      - run: echo "Builds checkpoint reached"
+
   cdn-upload-boards:
     runs-on: ubuntu-latest
-    needs: [get-targets, merge-images]
+    needs: [get-targets, checkpoint-build]
     environment: cdn-firmware-r2
     strategy:
       fail-fast: true
@@ -117,13 +123,10 @@ jobs:
           version: ${{ github.ref_name }}
           release-channel: ${{ contains(github.ref_name, '-') && 'stable' || 'beta' }}
 
-  cdn-upload-version-info:
+  cdn-upload-board-list:
     runs-on: ubuntu-latest
-    needs: [get-targets, merge-images]
+    needs: [get-targets, checkpoint-build]
     environment: cdn-firmware-r2
-    strategy:
-      fail-fast: true
-      matrix: ${{ fromJson(needs.get-targets.outputs.matrix )}}
 
     steps:
       - uses: actions/checkout@v4
@@ -143,11 +146,11 @@ jobs:
         with:
           cf-bucket: ${{ vars.S3_BUCKET }}
           version: ${{ github.ref_name }}
-          boards: ${{ needs.get-targets.outputs.boards }}
+          boards: ${{ needs.get-targets.outputs.board-list }}
 
   cdn-bump-version:
     runs-on: ubuntu-latest
-    needs: [cdn-upload-boards]
+    needs: [cdn-upload-boards, cdn-upload-board-list] # only after version is complete
     environment: cdn-firmware-r2
 
     steps:
@@ -170,9 +173,15 @@ jobs:
           version: ${{ github.ref_name }}
           release-channel: ${{ !contains(github.ref_name, '-') && 'stable' || 'beta' }}
 
+  checkpoint-cdn:
+    runs-on: ubuntu-latest
+    needs: [checkpoint-build, cdn-upload-boards, cdn-upload-board-list, cdn-bump-version]
+    steps:
+      - run: echo "CDN checkpoint reached"
+
   release:
     runs-on: ubuntu-latest
-    needs: [cdn-upload-firmware]
+    needs: [checkpoint-cdn]
 
     steps:
       - name: Download release notes
