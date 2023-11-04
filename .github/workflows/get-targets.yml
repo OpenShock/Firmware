@@ -68,6 +68,6 @@ jobs:
       - name: Build board list
         id: board-list
         run: |
-          echo -e "list<<EOF" >> $GITHUB_OUTPUT
-          echo "$(echo '${{ steps.board-array.outputs.array }}' | jq -r '. | join("\n")' | sed 's|\\n|\n|g')\nEOF" >> $GITHUB_OUTPUT
+          echo "list<<EOF" >> $GITHUB_OUTPUT
+          echo "$(echo '${{ steps.board-array.outputs.array }}' | jq -r '. | join("\n")' | sed 's|\\n|\n|g')" >> $GITHUB_OUTPUT
           echo "EOF" >> $GITHUB_OUTPUT
