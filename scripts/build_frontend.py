@@ -20,10 +20,13 @@ def file_delete(file):
 
 
 def file_gzip(file_path, gzip_path):
+    size_before = os.path.getsize(file_path)
     dir_ensure(os.path.dirname(gzip_path))
     file_delete(gzip_path)
     with open(file_path, 'rb') as f_in, gzip.open(gzip_path, 'wb') as f_out:
         f_out.write(f_in.read())
+    size_after = os.path.getsize(gzip_path)
+    print('Gzipped ' + file_path + ': ' + str(size_before) + ' => ' + str(size_after) + ' bytes')
 
 
 def file_write_bin(file, data):
@@ -122,6 +125,7 @@ def get_fa_icon_map(srcdir, csspath):
 
 
 def minify_fa_css(css_path, unused_css_selectors):
+    size_before = os.path.getsize(css_path)
     (s, enc) = file_read_text(css_path)
     if s == None or s == '':
         return
@@ -134,9 +138,12 @@ def minify_fa_css(css_path, unused_css_selectors):
             f_out.write(s)
     except Exception as e:
         print('Error writing to ' + css_path + ': ' + str(e))
+    size_after = os.path.getsize(css_path)
+    print('Minified ' + css_path + ': ' + str(size_before) + ' => ' + str(size_after) + ' bytes')
 
 
 def minify_fa_font(font_path, icon_map):
+    print('Minifying font: ' + font_path)
     values = []
     for icon in icon_map:
         values.append(icon_map[icon]['unicode'])
@@ -144,12 +151,16 @@ def minify_fa_font(font_path, icon_map):
 
     tmp_path = font_path + '.tmp'
 
+    size_before = os.path.getsize(font_path)
+
     # Use pyftsubset to remove all the unused icons.
     pyftsubset(font_path, fa_unicode_csv, tmp_path)
 
     # Delete the original font file and rename the temporary file to the original file.
     file_delete(font_path)
     os.rename(tmp_path, font_path)
+    size_after = os.path.getsize(font_path)
+    print('Minified ' + font_path + ': ' + str(size_before) + ' => ' + str(size_after) + ' bytes')
 
 
 def build_frontend(source, target, env):

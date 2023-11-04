@@ -29,5 +29,6 @@ namespace OpenShock {
     AsyncWebServer m_webServer;
     WebSocketsServer m_socketServer;
     WebSocketDeFragger m_socketDeFragger;
+    AsyncStaticWebHandler m_staticWebHandler;
   };
 }  // namespace OpenShock
