@@ -1,0 +1,27 @@
+name: cnd-upload-version-info
+description: Uploads firmware artifacts to CDN
+inputs:
+  cf-bucket:
+    description: Name of the S3 bucket
+    required: true
+  version:
+    description: Version to upload
+    required: true
+  boards:
+    description: 'List of boards, separated by newlines'
+    required: true
+
+runs:
+  using: composite
+  steps:
+    - name: Create boards.txt
+      shell: bash
+      run: |
+        echo -e '${{ inputs.boards }}' >> boards.txt
+
+    - name: Upload artifacts to CDN
+      shell: bash
+      run: |
+        mkdir upload
+        mv boards.txt upload/
+        rclone copy upload cdn:${{ inputs.cf-bucket }}/${{ inputs.version }}/${{ inputs.board }}/
