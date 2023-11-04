@@ -100,6 +100,8 @@ jobs:
     runs-on: ubuntu-latest
     needs: [get-targets, checkpoint-build]
     environment: cdn-firmware-r2
+    if: contains(fromJSON('["master","develop"]'), github.ref_name)
+
     strategy:
       fail-fast: true
       matrix: ${{ fromJson(needs.get-targets.outputs.matrix )}}
@@ -123,13 +125,13 @@ jobs:
           cf-bucket: ${{ vars.S3_BUCKET }}
           board: ${{ matrix.board }}
           version: ${{ github.ref_name }}
-          release-channel: 'develop'
+          release-channel: ${{ github.ref_name }}
 
   cdn-upload-board-list:
     runs-on: ubuntu-latest
     needs: [get-targets, checkpoint-build]
     environment: cdn-firmware-r2
-    if: github.ref_name == 'develop'
+    if: contains(fromJSON('["master","develop"]'), github.ref_name)
 
     steps:
       - uses: actions/checkout@v4
@@ -155,7 +157,7 @@ jobs:
     runs-on: ubuntu-latest
     needs: [cdn-upload-boards]
     environment: cdn-firmware-r2
-    if: github.ref_name == 'develop'
+    if: contains(fromJSON('["master","develop"]'), github.ref_name)
 
     steps:
       - uses: actions/checkout@v4
@@ -175,7 +177,7 @@ jobs:
         with:
           cf-bucket: ${{ vars.S3_BUCKET }}
           version: ${{ github.ref_name }}
-          release-channel: 'develop'
+          release-channel: ${{ github.ref_name }}
 
   checkpoint-cdn:
     runs-on: ubuntu-latest
