@@ -200,7 +200,7 @@ def build_frontend(source, target, env):
 
     # Write a minified css and font file to the static directory.
     minify_fa_css(fa_css, unused_css_selectors)
-    minify_fa_font(fa_woff2, icon_map)
+    #minify_fa_font(fa_woff2, icon_map)
 
     # Shorten all the filenames in the data/www/_app/immutable directory.
     fileIndex = 0
