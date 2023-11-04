@@ -1,4 +1,4 @@
-name: cnd-upload-firmware
+name: cnd-upload-board
 description: Uploads firmware artifacts to CDN
 inputs:
   cf-bucket:
