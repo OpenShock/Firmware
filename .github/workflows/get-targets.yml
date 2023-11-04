@@ -63,7 +63,7 @@ jobs:
       - name: Build strategy matrix
         id: matrix
         run: |
-          echo "matrix=$(echo '${{ steps.board-array.outputs.boards }}' | jq '{ boards: . }') >> $GITHUB_OUTPUT
+          echo "matrix=$(echo '${{ steps.board-array.outputs.boards }}' | jq '{ boards: . }')" >> $GITHUB_OUTPUT
 
       - name: Build board list
         id: board-list
