@@ -310,7 +310,7 @@ bool _authenticate(const WiFiNetwork& net, const std::string& password) {
 
   ESP_LOGI(TAG, "Added WiFi credentials for %s", net.ssid);
   wl_status_t stat = WiFi.begin(net.ssid, password.c_str(), 0, net.bssid, true);
-  if (stat != WL_CONNECTED) {
+  if (stat == WL_CONNECT_FAILED) {
     ESP_LOGE(TAG, "Failed to connect to network %s, error code %d", net.ssid, stat);
     return false;
   }
