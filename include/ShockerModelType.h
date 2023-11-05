@@ -1,6 +1,6 @@
 #pragma once
 
-#include "_fbs/ShockerModelType_generated.h"
+#include "serialization/_fbs/ShockerModelType_generated.h"
 
 #include <cstdint>
 

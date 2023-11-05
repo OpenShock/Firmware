@@ -2,14 +2,14 @@
 #include "CommandHandler.h"
 #include "Config.h"
 #include "Constants.h"
-#include "EventHandlers/EventHandlers.h"
 #include "EStopManager.h"
+#include "event_handlers/Init.h"
 #include "GatewayConnectionManager.h"
 #include "Logging.h"
 #include "SerialInputHandler.h"
 #include "VisualStateManager.h"
-#include "WiFiManager.h"
-#include "WiFiScanManager.h"
+#include "wifi/WiFiManager.h"
+#include "wifi/WiFiScanManager.h"
 
 #include <LittleFS.h>
 

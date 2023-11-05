@@ -1,11 +1,11 @@
 #include "GatewayClient.h"
 
-#include "MessageHandlers/Server.h"
 #include "CertificateUtils.h"
+#include "event_handlers/WebSocket.h"
 #include "Logging.h"
 #include "Time.h"
 
-#include "_fbs/DeviceToServerMessage_generated.h"
+#include "serialization/_fbs/DeviceToServerMessage_generated.h"
 
 const char* const TAG = "GatewayClient";
 
@@ -33,18 +33,18 @@ void GatewayClient::connect(const char* lcgFqdn) {
 
   m_state = State::Connecting;
 
-  //
-  //  ######  ########  ######  ##     ## ########  #### ######## ##    ##    ########  ####  ######  ##    ##
-  // ##    ## ##       ##    ## ##     ## ##     ##  ##     ##     ##  ##     ##     ##  ##  ##    ## ##   ##
-  // ##       ##       ##       ##     ## ##     ##  ##     ##      ####      ##     ##  ##  ##       ##  ##
-  //  ######  ######   ##       ##     ## ########   ##     ##       ##       ########   ##   ######  #####
-  //       ## ##       ##       ##     ## ##   ##    ##     ##       ##       ##   ##    ##        ## ##  ##
-  // ##    ## ##       ##    ## ##     ## ##    ##   ##     ##       ##       ##    ##   ##  ##    ## ##   ##
-  //  ######  ########  ######   #######  ##     ## ####    ##       ##       ##     ## ####  ######  ##    ##
-  //
-  // TODO: Implement certificate verification
-  //
-  #warning SSL certificate verification is currently not implemented, by RFC definition this is a security risk, and allows for MITM attacks, but the realistic risk is low
+//
+//  ######  ########  ######  ##     ## ########  #### ######## ##    ##    ########  ####  ######  ##    ##
+// ##    ## ##       ##    ## ##     ## ##     ##  ##     ##     ##  ##     ##     ##  ##  ##    ## ##   ##
+// ##       ##       ##       ##     ## ##     ##  ##     ##      ####      ##     ##  ##  ##       ##  ##
+//  ######  ######   ##       ##     ## ########   ##     ##       ##       ########   ##   ######  #####
+//       ## ##       ##       ##     ## ##   ##    ##     ##       ##       ##   ##    ##        ## ##  ##
+// ##    ## ##       ##    ## ##     ## ##    ##   ##     ##       ##       ##    ##   ##  ##    ## ##   ##
+//  ######  ########  ######   #######  ##     ## ####    ##       ##       ##     ## ####  ######  ##    ##
+//
+// TODO: Implement certificate verification
+//
+#warning SSL certificate verification is currently not implemented, by RFC definition this is a security risk, and allows for MITM attacks, but the realistic risk is low
 
   m_webSocket.beginSSL(lcgFqdn, 443, "/1/ws/device");
   ESP_LOGW(TAG, "WEBSOCKET CONNECTION BY RFC DEFINITION IS INSECURE, remote endpoint can not be verified due to lack of CA verification support, theoretically this is a security risk and allows for MITM attacks, but the realistic risk is low");
@@ -133,7 +133,7 @@ void GatewayClient::_handleEvent(WStype_t type, std::uint8_t* payload, std::size
       ESP_LOGD(TAG, "Received pong from API");
       break;
     case WStype_BIN:
-      MessageHandlers::Server::HandleBinary(payload, length);
+      EventHandlers::WebSocket::HandleGatewayBinary(payload, length);
       break;
     case WStype_FRAGMENT_BIN_START:
       ESP_LOGE(TAG, "Received binary fragment start from API, this is not supported!");

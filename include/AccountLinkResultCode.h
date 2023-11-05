@@ -1,6 +1,6 @@
 #pragma once
 
-#include "_fbs/DeviceToLocalMessage_generated.h"
+#include "serialization/_fbs/DeviceToLocalMessage_generated.h"
 
 #include <cstdint>
 

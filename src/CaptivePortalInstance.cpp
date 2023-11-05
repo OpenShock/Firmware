@@ -1,12 +1,13 @@
 #include "CaptivePortalInstance.h"
 
 #include "CommandHandler.h"
+#include "event_handlers/WebSocket.h"
 #include "GatewayConnectionManager.h"
 #include "Logging.h"
-#include "MessageHandlers/Local.h"
-#include "WiFiManager.h"
+#include "serialization/WSLocal.h"
+#include "wifi/WiFiManager.h"
 
-#include "_fbs/DeviceToLocalMessage_generated.h"
+#include "serialization/_fbs/DeviceToLocalMessage_generated.h"
 
 #include <LittleFS.h>
 #include <WiFi.h>
@@ -53,28 +54,13 @@ CaptivePortalInstance::~CaptivePortalInstance() {
 void CaptivePortalInstance::handleWebSocketClientConnected(std::uint8_t socketId) {
   ESP_LOGD(TAG, "WebSocket client #%u connected from %s", socketId, m_socketServer.remoteIP(socketId).toString().c_str());
 
-  flatbuffers::FlatBufferBuilder builder(256);
-
-  flatbuffers::Offset<Serialization::Local::WifiNetwork> fbsNetwork = 0;
-
-  WiFiNetwork network;
-  if (WiFiManager::GetConnectedNetwork(network)) {
-    auto hexBSSID = network.GetHexBSSID();
-
-    fbsNetwork = Serialization::Local::CreateWifiNetworkDirect(builder, network.ssid, hexBSSID.data(), network.channel, network.rssi, network.authMode, network.IsSaved());
-  } else {
-    fbsNetwork = 0;
+  WiFiNetwork connectedNetwork;
+  WiFiNetwork* connectedNetworkPtr = nullptr;
+  if (WiFiManager::GetConnectedNetwork(connectedNetwork)) {
+    connectedNetworkPtr = &connectedNetwork;
   }
 
-  auto readyMessageOffset = Serialization::Local::CreateReadyMessage(builder, true, fbsNetwork, GatewayConnectionManager::IsPaired(), CommandHandler::GetRfTxPin());
-
-  auto msg = Serialization::Local::CreateDeviceToLocalMessage(builder, Serialization::Local::DeviceToLocalMessagePayload::ReadyMessage, readyMessageOffset.Union());
-
-  builder.Finish(msg);
-
-  auto span = builder.GetBufferSpan();
-
-  sendMessageBIN(socketId, span.data(), span.size());
+  Serialization::Local::SerializeReadyMessage(connectedNetworkPtr, GatewayConnectionManager::IsPaired(), CommandHandler::GetRfTxPin(), std::bind(&CaptivePortalInstance::sendMessageBIN, this, socketId, std::placeholders::_1, std::placeholders::_2));
 }
 
 void CaptivePortalInstance::handleWebSocketClientDisconnected(std::uint8_t socketId) {
@@ -97,7 +83,7 @@ void CaptivePortalInstance::handleWebSocketEvent(std::uint8_t socketId, WebSocke
       ESP_LOGE(TAG, "Message type is not supported");
       break;
     case WebSocketMessageType::Binary:
-      MessageHandlers::Local::HandleBinary(socketId, payload, length);
+      EventHandlers::WebSocket::HandleLocalBinary(socketId, payload, length);
       break;
     case WebSocketMessageType::Error:
       handleWebSocketClientError(socketId, length, reinterpret_cast<const char*>(payload));
