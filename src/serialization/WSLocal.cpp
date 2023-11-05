@@ -53,6 +53,8 @@ bool Local::SerializeErrorMessage(const char* message, Common::SerializationCall
   auto span = builder.GetBufferSpan();
 
   callback(span.data(), span.size());
+
+  return true;
 }
 
 bool Local::SerializeReadyMessage(const WiFiNetwork* connectedNetwork, bool gatewayPaired, std::uint8_t radioTxPin, Common::SerializationCallbackFn callback) {
