@@ -1,14 +1,16 @@
 #include "CaptivePortal.h"
 
 #include "CaptivePortalInstance.h"
+#include "CommandHandler.h"
 #include "Config.h"
 #include "GatewayConnectionManager.h"
-#include "CommandHandler.h"
 #include "Logging.h"
 
 #include <ESPAsyncWebServer.h>
 #include <WebSocketsServer.h>
 #include <WiFi.h>
+
+#include <mdns.h>
 
 #include <memory>
 
@@ -45,6 +47,20 @@ bool _startCaptive() {
     return false;
   }
 
+  esp_err_t err = mdns_init();
+  if (err != ESP_OK) {
+    ESP_LOGE(TAG, "Failed to initialize mDNS");
+    WiFi.softAPdisconnect(true);
+    return false;
+  }
+
+  err = mdns_hostname_set(OPENSHOCK_MDNS_HOSTNAME);
+  if (err != ESP_OK) {
+    ESP_LOGE(TAG, "Failed to set mDNS hostname");
+    WiFi.softAPdisconnect(true);
+    return false;
+  }
+
   s_instance = std::make_unique<CaptivePortalInstance>();
 
   return true;
@@ -58,6 +74,8 @@ void _stopCaptive() {
   ESP_LOGI(TAG, "Stopping captive portal");
 
   s_instance = nullptr;
+
+  mdns_free();
 
   WiFi.softAPdisconnect(true);
 }
