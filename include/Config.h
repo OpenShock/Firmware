@@ -1,6 +1,6 @@
 #pragma once
 
-#include "_fbs/ConfigFile_generated.h"
+#include "serialization/_fbs/ConfigFile_generated.h"
 
 #include <functional>
 #include <string>
