@@ -294,7 +294,7 @@ bool WiFiManager::Init() {
   WiFi.setAutoConnect(false);
   WiFi.setAutoReconnect(false);
   WiFi.enableSTA(true);
-  WiFi.setHostname("OpenShock");  // TODO: Add the device name to the hostname (retrieve from API and store in LittleFS)
+  WiFi.setHostname(OPENSHOCK_FW_HOSTNAME);  // TODO: Add the device name to the hostname (retrieve from API and store in LittleFS)
 
   return true;
 }

@@ -54,7 +54,7 @@ bool _startCaptive() {
     return false;
   }
 
-  err = mdns_hostname_set(OPENSHOCK_FW_MDNS_HOSTNAME);
+  err = mdns_hostname_set(OPENSHOCK_FW_HOSTNAME);
   if (err != ESP_OK) {
     ESP_LOGE(TAG, "Failed to set mDNS hostname");
     WiFi.softAPdisconnect(true);
