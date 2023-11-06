@@ -22,6 +22,46 @@ constexpr std::uint8_t WEBSOCKET_PING_RETRIES   = 3;
 
 using namespace OpenShock;
 
+bool TryReadFile(const char* path, char* buffer, std::size_t& bufferSize) {
+  File file = LittleFS.open(path, "r");
+  if (!file) {
+    ESP_LOGE(TAG, "Failed to open file %s for reading", path);
+    return false;
+  }
+
+  std::size_t fileSize = file.size();
+  if (fileSize > bufferSize) {
+    ESP_LOGE(TAG, "File %s is too large to fit in buffer", path);
+    file.close();
+    return false;
+  }
+
+  file.readBytes(buffer, fileSize);
+
+  bufferSize = fileSize;
+
+  file.close();
+
+  return true;
+}
+
+bool TryGetFsHash(char (&buffer)[65]) {
+  std::size_t bufferSize = sizeof(buffer);
+  if (TryReadFile("/www/hash.sha1", buffer, bufferSize)) {
+    buffer[bufferSize] = '\0';
+    return true;
+  }
+  if (TryReadFile("/www/hash.sha256", buffer, bufferSize)) {
+    buffer[bufferSize] = '\0';
+    return true;
+  }
+  if (TryReadFile("/www/hash.md5", buffer, bufferSize)) {
+    buffer[bufferSize] = '\0';
+    return true;
+  }
+  return false;
+}
+
 CaptivePortalInstance::CaptivePortalInstance()
   : m_webServer(HTTP_PORT), m_socketServer(WEBSOCKET_PORT, "/ws", "json"), m_socketDeFragger(std::bind(&CaptivePortalInstance::handleWebSocketEvent, this, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3, std::placeholders::_4)) {
   m_socketServer.onEvent(std::bind(&WebSocketDeFragger::handler, &m_socketDeFragger, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3, std::placeholders::_4));
@@ -29,11 +69,17 @@ CaptivePortalInstance::CaptivePortalInstance()
   m_socketServer.enableHeartbeat(WEBSOCKET_PING_INTERVAL, WEBSOCKET_PING_TIMEOUT, WEBSOCKET_PING_RETRIES);
 
   // Check if the www folder exists and is populated
-  if (LittleFS.exists("/www/index.html")) {
-    m_webServer.serveStatic("/", LittleFS, "/www/").setDefaultFile("index.html");
+  char fsHash[65];
+  if (LittleFS.exists("/www/index.html.gz") && TryGetFsHash(fsHash)) {
+    ESP_LOGI(TAG, "Serving files from LittleFS");
+    ESP_LOGI(TAG, "Filesystem hash: %s", fsHash);
+
+    m_webServer.serveStatic("/", LittleFS, "/www/", "max-age=31536000").setDefaultFile("index.html").setSharedEtag(fsHash);
 
     m_webServer.onNotFound([](AsyncWebServerRequest* request) { request->send(404, "text/plain", "Not found"); });
   } else {
+    ESP_LOGE(TAG, "/www/index.html or hash files not found, serving error page");
+
     m_webServer.onNotFound([](AsyncWebServerRequest* request) {
       request->send(
         200,
