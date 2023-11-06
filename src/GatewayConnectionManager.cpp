@@ -154,7 +154,7 @@ void GatewayConnectionManager::UnPair() {
   Config::ClearBackendAuthToken();
 }
 
-bool FetchDeviceInfo(const std::string& authToken) {
+bool FetchDeviceInfo() {
   // TODO: this function is very slow, should be optimized!
   if ((s_flags & FLAG_HAS_IP) == 0) {
     return false;
@@ -164,7 +164,7 @@ bool FetchDeviceInfo(const std::string& authToken) {
 
   client.begin(OPENSHOCK_API_URL("/1/device/self"));
 
-  client.addHeader("DeviceToken", authToken.c_str());
+  client.addHeader("DeviceToken", Config::GetBackendAuthToken());
 
   int responseCode = client.GET();
 
@@ -256,10 +256,10 @@ void GatewayConnectionManager::Update() {
       return;
     }
 
-    std::string authToken = Config::GetBackendAuthToken();
+    std::string authToken = ;
 
-    // Test if the auth token is valid
-    if (!FetchDeviceInfo(authToken)) {
+    // Fetch device info
+    if (!FetchDeviceInfo()) {
       return;
     }
 
