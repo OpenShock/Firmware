@@ -442,12 +442,12 @@ const std::string& Config::GetBackendAuthToken() {
   return _mainConfig.backend.authToken;
 }
 
-void Config::SetBackendAuthToken(const std::string& token) {
+bool Config::SetBackendAuthToken(const std::string& token) {
   _mainConfig.backend.authToken = token;
-  _trySaveConfig();
+  return _trySaveConfig();
 }
 
-void Config::ClearBackendAuthToken() {
+bool Config::ClearBackendAuthToken() {
   _mainConfig.backend.authToken = "";
-  _trySaveConfig();
+  return _trySaveConfig();
 }
