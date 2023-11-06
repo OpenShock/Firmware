@@ -78,6 +78,10 @@ bool GetNextWiFiNetwork(OpenShock::Config::WiFiCredentials& creds) {
     found = true;
   }
 
+  if (!found) {
+    return false;
+  }
+
   for (auto& net : s_wifiNetworks) {
     if (net.credentialsID == creds.id) {
       net.connectAttempts++;
