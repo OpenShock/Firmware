@@ -96,16 +96,26 @@ bool CaptivePortal::IsRunning() {
   return s_instance != nullptr;
 }
 void CaptivePortal::Update() {
-  bool shouldBeRunning = s_alwaysEnabled || !GatewayConnectionManager::IsConnected() || !CommandHandler::Ok();
+  bool gatewayConnected = GatewayConnectionManager::IsConnected();
+  bool commandHandlerOk = CommandHandler::Ok();
+  bool shouldBeRunning  = s_alwaysEnabled || !gatewayConnected || !commandHandlerOk;
 
   if (s_instance == nullptr) {
     if (shouldBeRunning) {
+      ESP_LOGD(TAG, "Starting captive portal");
+      ESP_LOGD(TAG, "  alwaysEnabled: %s", s_alwaysEnabled ? "true" : "false");
+      ESP_LOGD(TAG, "  isConnected: %s", gatewayConnected ? "true" : "false");
+      ESP_LOGD(TAG, "  commandHandlerOk: %s", commandHandlerOk ? "true" : "false");
       _startCaptive();
     }
     return;
   }
 
   if (!shouldBeRunning) {
+    ESP_LOGD(TAG, "Stopping captive portal");
+    ESP_LOGD(TAG, "  alwaysEnabled: %s", s_alwaysEnabled ? "true" : "false");
+    ESP_LOGD(TAG, "  isConnected: %s", gatewayConnected ? "true" : "false");
+    ESP_LOGD(TAG, "  commandHandlerOk: %s", commandHandlerOk ? "true" : "false");
     _stopCaptive();
     return;
   }
