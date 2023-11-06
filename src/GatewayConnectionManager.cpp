@@ -258,10 +258,8 @@ void GatewayConnectionManager::Update() {
 
     std::string authToken = Config::GetBackendAuthToken();
 
-    // Test if the auth token is valid
+    // Fetch device info
     if (!FetchDeviceInfo(authToken)) {
-      ESP_LOGD(TAG, "Auth token is invalid, clearing it");
-      Config::ClearBackendAuthToken();
       return;
     }
 
