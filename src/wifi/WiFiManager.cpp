@@ -18,7 +18,7 @@
 
 #include <nonstd/span.hpp>
 
-const char* const TAG = "wifi/WiFiManager";
+const char* const TAG = "WiFiManager";
 
 using namespace OpenShock;
 
@@ -44,9 +44,13 @@ bool GetNextWiFiNetwork(OpenShock::Config::WiFiCredentials& creds) {
   std::uint16_t leastConnectAttempts = UINT16_MAX;
   for (auto& net : s_wifiNetworks) {
     if (net.credentialsID == 0) continue;
-    if (net.connectAttempts > leastConnectAttempts) continue;
+    if (net.connectAttempts > leastConnectAttempts) {
+      ESP_LOGV(TAG, "Network %s (" BSSID_FMT ") has more connection attempts than the current least (%u)", net.ssid, BSSID_ARG(net.bssid), net.connectAttempts);
+      continue;
+    }
 
     if (net.connectAttempts < leastConnectAttempts) {
+      ESP_LOGV(TAG, "Network %s (" BSSID_FMT ") has the least number of connection attempts (%u)", net.ssid, BSSID_ARG(net.bssid), net.connectAttempts);
       leastConnectAttempts = net.connectAttempts;
     } else if (net.rssi > highestRssi) {
       ESP_LOGV(TAG, "Network %s (" BSSID_FMT ") has the highest RSSI (%d)", net.ssid, BSSID_ARG(net.bssid), net.rssi);
@@ -57,8 +61,10 @@ bool GetNextWiFiNetwork(OpenShock::Config::WiFiCredentials& creds) {
     }
 
     if (net.lastConnectAttempt != 0) {
+      ESP_LOGV(TAG, "Network %s (" BSSID_FMT ") has a last connection attempt time of %lld", net.ssid, BSSID_ARG(net.bssid), net.lastConnectAttempt);
       std::int64_t diff = now - net.lastConnectAttempt;
       if ((net.connectAttempts > 5 && diff < 5000) || (net.connectAttempts > 10 && diff < 10'000) || (net.connectAttempts > 15 && diff < 30'000) || (net.connectAttempts > 20 && diff < 60'000)) {
+        ESP_LOGV(TAG, "Network %s (" BSSID_FMT ") has had too many connection attempts in the last %lldms", net.ssid, BSSID_ARG(net.bssid), diff);
         continue;
       }
     }
