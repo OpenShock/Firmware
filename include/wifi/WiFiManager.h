@@ -32,6 +32,10 @@ namespace OpenShock::WiFiManager {
   /// @return True if the network was removed successfully
   bool Forget(const std::uint8_t (&bssid)[6]);
 
+  /// @brief Refreshes all the networks with updated credential IDs from the config
+  /// @return True if the networks were refreshed successfully
+  bool RefreshNetworkCredentials();
+
   /// @brief Checks if a network is saved in the config by it's SSID
   /// @param ssid SSID of the network
   /// @return True if a saved network matches the given SSID

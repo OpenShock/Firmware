@@ -138,7 +138,10 @@ AccountLinkResultCode GatewayConnectionManager::Pair(const char* pairCode) {
     return AccountLinkResultCode::InternalError;
   }
 
-  Config::SetBackendAuthToken(authToken);
+  if (!Config::SetBackendAuthToken(authToken)) {
+    ESP_LOGE(TAG, "Failed to save auth token");
+    return AccountLinkResultCode::InternalError;
+  }
 
   s_flags |= FLAG_AUTHENTICATED;
   ESP_LOGD(TAG, "Successfully paired with pair code %u", pairCode);

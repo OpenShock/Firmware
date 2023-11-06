@@ -3,6 +3,7 @@
 #include "CommandHandler.h"
 #include "Config.h"
 #include "Logging.h"
+#include "wifi/WiFiManager.h"
 
 #include <ArduinoJson.h>
 #include <Esp.h>
@@ -215,6 +216,8 @@ void _handleNetworksCommand(char* arg, std::size_t argLength) {
   }
 
   Serial.println("$SYS$|Success|Saved config");
+
+  OpenShock::WiFiManager::RefreshNetworkCredentials();
 }
 
 static std::unordered_map<std::string, void (*)(char*, std::size_t)> s_commandHandlers = {
