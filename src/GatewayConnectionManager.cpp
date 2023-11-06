@@ -164,7 +164,7 @@ bool FetchDeviceInfo() {
 
   client.begin(OPENSHOCK_API_URL("/1/device/self"));
 
-  client.addHeader("DeviceToken", Config::GetBackendAuthToken());
+  client.addHeader("DeviceToken", Config::GetBackendAuthToken().c_str());
 
   int responseCode = client.GET();
 
@@ -255,8 +255,6 @@ void GatewayConnectionManager::Update() {
     if ((s_flags & FLAG_HAS_IP) == 0 || !Config::HasBackendAuthToken()) {
       return;
     }
-
-    std::string authToken = ;
 
     // Fetch device info
     if (!FetchDeviceInfo()) {
