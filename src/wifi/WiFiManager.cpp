@@ -172,7 +172,7 @@ void _evWiFiNetworkDiscovery(const wifi_ap_record_t* record) {
   WiFiNetwork network(record->ssid, record->bssid, record->primary, record->rssi, record->authmode, 0);
 
   Config::WiFiCredentials creds;
-  if (Config::TryGetWiFiCredentialsByBSSID(record->bssid, creds)) {
+  if (Config::TryGetWiFiCredentialsBySSID(reinterpret_cast<const char*>(record->ssid), creds) || Config::TryGetWiFiCredentialsByBSSID(record->bssid, creds)) {
     network.credentialsID = creds.id;
   }
 
