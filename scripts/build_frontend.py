@@ -3,7 +3,7 @@ import re
 import sys
 import gzip
 import shutil
-import subprocess
+import hashlib
 from utils import sysenv
 
 Import('env')  # type: ignore
@@ -262,9 +262,36 @@ def build_frontend(source, target, env):
 
         with gzip.open(dst_path + '.gz', 'wb') as f_out:
             f_out.write(s)
-        # If the file is index.html, also write a non-gzipped version.
-        if src_path.endswith('index.html'):
-            file_write_bin(dst_path, s)
+
+    # Hash the data/www directory.
+    hashMd5 = hashlib.md5()
+    hashSha1 = hashlib.sha1()
+    hashSha256 = hashlib.sha256()
+    for root, _, files in os.walk('data/www'):
+        root = root.replace('\\', '/')
+        for filename in files:
+            filepath = os.path.join(root, filename)
+            with open(filepath, 'rb') as f:
+                while True:
+                    chunk = f.read(65536)
+                    if not chunk:
+                        break
+                    hashMd5.update(chunk)
+                    hashSha1.update(chunk)
+                    hashSha256.update(chunk)
+    hashMd5 = hashMd5.hexdigest()
+    hashSha1 = hashSha1.hexdigest()
+    hashSha256 = hashSha256.hexdigest()
+
+    print('Build hash:')
+    print('  MD5:    ' + hashMd5)
+    print('  SHA1:   ' + hashSha1)
+    print('  SHA256: ' + hashSha256)
+
+    # Write the hashes to data/www files
+    file_write_text('data/www/hash.md5', hashMd5, None)
+    file_write_text('data/www/hash.sha1', hashSha1, None)
+    file_write_text('data/www/hash.sha256', hashSha256, None)
 
 
 env.AddPreAction('$BUILD_DIR/littlefs.bin', build_frontend)
