@@ -122,26 +122,7 @@ bool _getNextWiFiNetwork(OpenShock::Config::WiFiCredentials& creds) {
   }) != s_wifiNetworks.end();
 }
 
-bool _authenticate(const WiFiNetwork& net, const std::string& password) {
-  std::uint8_t id = Config::AddWiFiCredentials(net.ssid, net.bssid, password);
-  if (id == 0) {
-    Serialization::Local::SerializeErrorMessage("too_many_credentials", CaptivePortal::BroadcastMessageBIN);
-    return false;
-  }
-
-  Serialization::Local::SerializeWiFiNetworkSavedEvent(net, CaptivePortal::BroadcastMessageBIN);
-
-  ESP_LOGI(TAG, "Added WiFi credentials for %s", net.ssid);
-  wl_status_t stat = WiFi.begin(net.ssid, password.c_str(), 0, net.bssid, true);
-  if (stat == WL_CONNECT_FAILED) {
-    ESP_LOGE(TAG, "Failed to connect to network %s, error code %d", net.ssid, stat);
-    return false;
-  }
-
-  return true;
-}
-
-bool _connect(const char* ssid, const char* password, const std::uint8_t (&bssid)[6]) {
+bool _connectImpl(const char* ssid, const char* password, const std::uint8_t (&bssid)[6]) {
   ESP_LOGV(TAG, "Connecting to network %s (" BSSID_FMT ")", ssid, BSSID_ARG(bssid));
 
   _markNetworkAsAttempted(bssid);
@@ -155,30 +136,42 @@ bool _connect(const char* ssid, const char* password, const std::uint8_t (&bssid
 
   return true;
 }
-bool _connectHidden(const Config::WiFiCredentials& creds) {
-  ESP_LOGV(TAG, "Connecting to hidden network " BSSID_FMT, BSSID_ARG(creds.bssid));
+bool _connectHidden(const std::uint8_t (&bssid)[6], const std::string& password) {
+  ESP_LOGV(TAG, "Connecting to hidden network " BSSID_FMT, BSSID_ARG(bssid));
 
   // TODO: Implement hidden network support
   ESP_LOGE(TAG, "Connecting to hidden networks is not yet supported");
 
   return false;
 }
-bool _connect(const Config::WiFiCredentials& creds) {
-  if (creds.ssid.empty()) {
-    return _connectHidden(creds);
+bool _connect(const std::string& ssid, const std::string& password, const std::uint8_t (&bssid)[6]) {
+  if (ssid.empty()) {
+    return _connectHidden(bssid, password);
   }
 
-  if (!_isZeroBSSID(creds.bssid)) {
-    return _connect(creds.ssid.c_str(), creds.password.c_str(), creds.bssid);
+  if (!_isZeroBSSID(bssid)) {
+    return _connectImpl(ssid.c_str(), password.c_str(), bssid);
   }
 
-  auto it = _findNetworkBySSID(creds.ssid.c_str());
+  auto it = _findNetworkBySSID(ssid.c_str());
   if (it == s_wifiNetworks.end()) {
-    ESP_LOGE(TAG, "Failed to find network with SSID %s", creds.ssid.c_str());
+    ESP_LOGE(TAG, "Failed to find network with SSID %s", ssid.c_str());
     return false;
   }
 
-  return _connect(creds.ssid.c_str(), creds.password.c_str(), it->bssid);
+  return _connectImpl(ssid.c_str(), password.c_str(), it->bssid);
+}
+
+bool _authenticate(const WiFiNetwork& net, const std::string& password) {
+  std::uint8_t id = Config::AddWiFiCredentials(net.ssid, net.bssid, password);
+  if (id == 0) {
+    Serialization::Local::SerializeErrorMessage("too_many_credentials", CaptivePortal::BroadcastMessageBIN);
+    return false;
+  }
+
+  Serialization::Local::SerializeWiFiNetworkSavedEvent(net, CaptivePortal::BroadcastMessageBIN);
+
+  return _connect(net.ssid, password, net.bssid);
 }
 
 void _evWiFiConnected(arduino_event_t* event) {
@@ -476,7 +469,7 @@ void WiFiManager::Update() {
       return;
     }
 
-    if (_connect(creds)) {
+    if (_connect(creds.ssid, creds.password, creds.bssid)) {
       return;
     }
 
@@ -495,5 +488,5 @@ void WiFiManager::Update() {
     return;
   }
 
-  _connect(creds);
+  _connect(creds.ssid, creds.password, creds.bssid);
 }
