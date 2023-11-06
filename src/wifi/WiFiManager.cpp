@@ -22,108 +22,188 @@ const char* const TAG = "WiFiManager";
 
 using namespace OpenShock;
 
-static bool s_wifiConnected                  = false;
-static bool s_wifiConnecting                 = false;
+enum class WiFiState : std::uint8_t {
+  Disconnected = 0,
+  Connecting   = 1 << 0,
+  Connected    = 1 << 1,
+};
+
+static WiFiState s_wifiState                 = WiFiState::Disconnected;
+static std::uint8_t s_connectedBSSID[6]      = {0};
 static std::uint8_t s_connectedCredentialsID = 0;
 static std::uint8_t s_preferredCredentialsID = 0;
 static std::vector<WiFiNetwork> s_wifiNetworks;
 
-/// @brief Gets the next WiFi network to connect to
-///
-/// This function will return the next WiFi network to connect to, based on the following criteria:
-/// - The network must be saved in the config
-/// - The network must not have reached the maximum number of connection attempts
-/// - The network must have the least number of connection attempts
-/// @param network The network to populate with the next WiFi network to connect to
-/// @return True if a network was found, false otherwise
-bool GetNextWiFiNetwork(OpenShock::Config::WiFiCredentials& creds) {
-  std::int64_t now = OpenShock::millis();
-
-  bool found                         = false;
-  std::int8_t highestRssi            = INT8_MIN;
-  std::uint16_t leastConnectAttempts = UINT16_MAX;
-  for (auto& net : s_wifiNetworks) {
-    if (net.credentialsID == 0) continue;
-    if (net.connectAttempts > leastConnectAttempts) {
-      ESP_LOGV(TAG, "Network %s (" BSSID_FMT ") has more connection attempts than the current least (%u)", net.ssid, BSSID_ARG(net.bssid), net.connectAttempts);
-      continue;
+bool _isZeroBSSID(const std::uint8_t (&bssid)[6]) {
+  for (std::size_t i = 0; i < sizeof(bssid); i++) {
+    if (bssid[i] != 0) {
+      return false;
     }
-
-    if (net.connectAttempts < leastConnectAttempts) {
-      ESP_LOGV(TAG, "Network %s (" BSSID_FMT ") has the least number of connection attempts (%u)", net.ssid, BSSID_ARG(net.bssid), net.connectAttempts);
-      leastConnectAttempts = net.connectAttempts;
-    } else if (net.rssi > highestRssi) {
-      ESP_LOGV(TAG, "Network %s (" BSSID_FMT ") has the highest RSSI (%d)", net.ssid, BSSID_ARG(net.bssid), net.rssi);
-      highestRssi = net.rssi;
-    } else {
-      ESP_LOGV(TAG, "Network %s (" BSSID_FMT ") is not a candidate", net.ssid, BSSID_ARG(net.bssid));
-      continue;
-    }
-
-    if (net.lastConnectAttempt != 0) {
-      ESP_LOGV(TAG, "Network %s (" BSSID_FMT ") has a last connection attempt time of %lld", net.ssid, BSSID_ARG(net.bssid), net.lastConnectAttempt);
-      std::int64_t diff = now - net.lastConnectAttempt;
-      if ((net.connectAttempts > 5 && diff < 5000) || (net.connectAttempts > 10 && diff < 10'000) || (net.connectAttempts > 15 && diff < 30'000) || (net.connectAttempts > 20 && diff < 60'000)) {
-        ESP_LOGV(TAG, "Network %s (" BSSID_FMT ") has had too many connection attempts in the last %lldms", net.ssid, BSSID_ARG(net.bssid), diff);
-        continue;
-      }
-    }
-
-    if (!Config::TryGetWiFiCredentialsByID(net.credentialsID, creds)) {
-      ESP_LOGE(TAG, "Failed to find credentials with ID %u", net.credentialsID);
-      net.credentialsID = 0;
-      continue;
-    }
-
-    found = true;
   }
 
-  if (!found) {
+  return true;
+}
+
+bool _attractivityComparer(const WiFiNetwork& a, const WiFiNetwork& b) {
+  if (a.credentialsID == 0) {
     return false;
   }
 
-  for (auto& net : s_wifiNetworks) {
-    if (net.credentialsID == creds.id) {
-      net.connectAttempts++;
-      net.lastConnectAttempt = now;
-      break;
-    }
+  if (a.connectAttempts > b.connectAttempts) {
+    return false;
   }
 
-  return found;
+  return a.rssi > b.rssi;
+}
+bool _isConnectRateLimited(const WiFiNetwork& net) {
+  if (net.lastConnectAttempt == 0) {
+    return false;
+  }
+
+  std::int64_t now  = OpenShock::millis();
+  std::int64_t diff = now - net.lastConnectAttempt;
+  if ((net.connectAttempts > 5 && diff < 5000) || (net.connectAttempts > 10 && diff < 10'000) || (net.connectAttempts > 15 && diff < 30'000) || (net.connectAttempts > 20 && diff < 60'000)) {
+    return true;
+  }
+
+  return false;
 }
 
-std::vector<WiFiNetwork>::iterator _findNetwork(std::function<bool(const WiFiNetwork&)> predicate) {
+bool _isSaved(std::function<bool(const Config::WiFiCredentials&)> predicate) {
+  const auto& credentials = Config::GetWiFiCredentials();
+
+  return std::any_of(credentials.begin(), credentials.end(), predicate);
+}
+std::vector<WiFiNetwork>::iterator _findNetwork(std::function<bool(WiFiNetwork&)> predicate, bool sortByAttractivity = true) {
+  if (sortByAttractivity) {
+    std::sort(s_wifiNetworks.begin(), s_wifiNetworks.end(), _attractivityComparer);
+  }
   return std::find_if(s_wifiNetworks.begin(), s_wifiNetworks.end(), predicate);
 }
-std::vector<WiFiNetwork>::iterator _findNetwork(const char* ssid) {
-  return _findNetwork([ssid](const WiFiNetwork& net) { return strcmp(net.ssid, ssid) == 0; });
+std::vector<WiFiNetwork>::iterator _findNetworkBySSID(const char* ssid, bool sortByAttractivity = true) {
+  return _findNetwork([ssid](const WiFiNetwork& net) { return strcmp(net.ssid, ssid) == 0; }, sortByAttractivity);
 }
-std::vector<WiFiNetwork>::iterator _findNetwork(const std::uint8_t (&bssid)[6]) {
-  return _findNetwork([bssid](const WiFiNetwork& net) { return memcmp(net.bssid, bssid, sizeof(bssid)) == 0; });
+std::vector<WiFiNetwork>::iterator _findNetworkByBSSID(const std::uint8_t (&bssid)[6]) {
+  return _findNetwork([bssid](const WiFiNetwork& net) { return memcmp(net.bssid, bssid, sizeof(bssid)) == 0; }, false);
+}
+std::vector<WiFiNetwork>::iterator _findNetworkByCredentialsID(std::uint8_t credentialsID, bool sortByAttractivity = true) {
+  return _findNetwork([credentialsID](const WiFiNetwork& net) { return net.credentialsID == credentialsID; }, sortByAttractivity);
+}
+
+bool _markNetworkAsAttempted(const std::uint8_t (&bssid)[6]) {
+  auto it = _findNetworkByBSSID(bssid);
+  if (it == s_wifiNetworks.end()) {
+    return false;
+  }
+
+  it->connectAttempts++;
+  it->lastConnectAttempt = OpenShock::millis();
+
+  return true;
+}
+
+bool _getNextWiFiNetwork(OpenShock::Config::WiFiCredentials& creds) {
+  return _findNetwork([&creds](const WiFiNetwork& net) {
+    if (net.credentialsID == 0) {
+      return false;
+    }
+
+    if (_isConnectRateLimited(net)) {
+      return false;
+    }
+
+    if (!Config::TryGetWiFiCredentialsByID(net.credentialsID, creds)) {
+      return false;
+    }
+
+    memcpy(creds.bssid, net.bssid, sizeof(creds.bssid));
+
+    return true;
+  }) != s_wifiNetworks.end();
+}
+
+bool _authenticate(const WiFiNetwork& net, const std::string& password) {
+  std::uint8_t id = Config::AddWiFiCredentials(net.ssid, net.bssid, password);
+  if (id == 0) {
+    Serialization::Local::SerializeErrorMessage("too_many_credentials", CaptivePortal::BroadcastMessageBIN);
+    return false;
+  }
+
+  Serialization::Local::SerializeWiFiNetworkSavedEvent(net, CaptivePortal::BroadcastMessageBIN);
+
+  ESP_LOGI(TAG, "Added WiFi credentials for %s", net.ssid);
+  wl_status_t stat = WiFi.begin(net.ssid, password.c_str(), 0, net.bssid, true);
+  if (stat == WL_CONNECT_FAILED) {
+    ESP_LOGE(TAG, "Failed to connect to network %s, error code %d", net.ssid, stat);
+    return false;
+  }
+
+  return true;
+}
+
+bool _connect(const char* ssid, const char* password, const std::uint8_t (&bssid)[6]) {
+  ESP_LOGV(TAG, "Connecting to network %s (" BSSID_FMT ")", ssid, BSSID_ARG(bssid));
+
+  _markNetworkAsAttempted(bssid);
+
+  // Connect to the network
+  s_wifiState = WiFiState::Connecting;
+  if (WiFi.begin(ssid, password, 0, bssid, true) == WL_CONNECT_FAILED) {
+    s_wifiState = WiFiState::Disconnected;
+    return false;
+  }
+
+  return true;
+}
+bool _connectHidden(const Config::WiFiCredentials& creds) {
+  ESP_LOGV(TAG, "Connecting to hidden network " BSSID_FMT, BSSID_ARG(creds.bssid));
+
+  // TODO: Implement hidden network support
+  ESP_LOGE(TAG, "Connecting to hidden networks is not yet supported");
+
+  return false;
+}
+bool _connect(const Config::WiFiCredentials& creds) {
+  if (creds.ssid.empty()) {
+    return _connectHidden(creds);
+  }
+
+  if (!_isZeroBSSID(creds.bssid)) {
+    return _connect(creds.ssid.c_str(), creds.password.c_str(), creds.bssid);
+  }
+
+  auto it = _findNetworkBySSID(creds.ssid.c_str());
+  if (it == s_wifiNetworks.end()) {
+    ESP_LOGE(TAG, "Failed to find network with SSID %s", creds.ssid.c_str());
+    return false;
+  }
+
+  return _connect(creds.ssid.c_str(), creds.password.c_str(), it->bssid);
 }
 
 void _evWiFiConnected(arduino_event_t* event) {
-  s_wifiConnected  = true;
-  s_wifiConnecting = false;
-
   auto& info = event->event_info.wifi_sta_connected;
 
-  auto it = _findNetwork(info.bssid);
+  s_wifiState = WiFiState::Connected;
+  memcpy(s_connectedBSSID, info.bssid, sizeof(s_connectedBSSID));
+
+  auto it = _findNetworkByBSSID(info.bssid);
   if (it == s_wifiNetworks.end()) {
+    s_connectedCredentialsID = 0;
+
     ESP_LOGW(TAG, "Connected to unknown network " BSSID_FMT, BSSID_ARG(info.bssid));
+
     return;
   }
 
-  ESP_LOGI(TAG, "Connected to network %s (" BSSID_FMT ")", it->ssid, BSSID_ARG(it->bssid));
-
   s_connectedCredentialsID = it->credentialsID;
+
+  ESP_LOGI(TAG, "Connected to network %s (" BSSID_FMT ")", reinterpret_cast<const char*>(info.ssid), BSSID_ARG(info.bssid));
+
   Serialization::Local::SerializeWiFiNetworkConnectedEvent(*it, CaptivePortal::BroadcastMessageBIN);
 }
 void _evWiFiDisconnected(arduino_event_t* event) {
-  s_wifiConnected          = false;
-  s_wifiConnecting         = false;
-  s_connectedCredentialsID = 0;
+  s_wifiState = WiFiState::Disconnected;
 
   auto& info = event->event_info.wifi_sta_disconnected;
 
@@ -164,7 +244,7 @@ void _evWiFiScanStatusChanged(OpenShock::WiFiScanStatus status) {
   }
 }
 void _evWiFiNetworkDiscovery(const wifi_ap_record_t* record) {
-  auto it = _findNetwork(record->bssid);
+  auto it = _findNetworkByBSSID(record->bssid);
   if (it != s_wifiNetworks.end()) {
     // Update the network
     memcpy(it->ssid, record->ssid, sizeof(it->ssid));
@@ -212,29 +292,10 @@ bool WiFiManager::Init() {
   return true;
 }
 
-bool _authenticate(const WiFiNetwork& net, const std::string& password) {
-  std::uint8_t id = Config::AddWiFiCredentials(net.ssid, net.bssid, password);
-  if (id == 0) {
-    Serialization::Local::SerializeErrorMessage("too_many_credentials", CaptivePortal::BroadcastMessageBIN);
-    return false;
-  }
-
-  Serialization::Local::SerializeWiFiNetworkSavedEvent(net, CaptivePortal::BroadcastMessageBIN);
-
-  ESP_LOGI(TAG, "Added WiFi credentials for %s", net.ssid);
-  wl_status_t stat = WiFi.begin(net.ssid, password.c_str(), 0, net.bssid, true);
-  if (stat == WL_CONNECT_FAILED) {
-    ESP_LOGE(TAG, "Failed to connect to network %s, error code %d", net.ssid, stat);
-    return false;
-  }
-
-  return true;
-}
-
 bool WiFiManager::Save(const char* ssid, const std::string& password) {
   ESP_LOGV(TAG, "Authenticating to network %s", ssid);
 
-  auto it = _findNetwork(ssid);
+  auto it = _findNetworkBySSID(ssid);
   if (it == s_wifiNetworks.end()) {
     ESP_LOGE(TAG, "Failed to find network with SSID %s", ssid);
 
@@ -249,7 +310,7 @@ bool WiFiManager::Save(const char* ssid, const std::string& password) {
 bool WiFiManager::Save(const std::uint8_t (&bssid)[6], const std::string& password) {
   ESP_LOGV(TAG, "Authenticating to network " BSSID_FMT, BSSID_ARG(bssid));
 
-  auto it = _findNetwork(bssid);
+  auto it = _findNetworkByBSSID(bssid);
   if (it == s_wifiNetworks.end()) {
     ESP_LOGE(TAG, "Failed to find network with BSSID " BSSID_FMT, BSSID_ARG(bssid));
 
@@ -264,7 +325,7 @@ bool WiFiManager::Save(const std::uint8_t (&bssid)[6], const std::string& passwo
 bool WiFiManager::Forget(const char* ssid) {
   ESP_LOGV(TAG, "Forgetting network %s", ssid);
 
-  auto it = _findNetwork(ssid);
+  auto it = _findNetworkBySSID(ssid);
   if (it == s_wifiNetworks.end()) {
     ESP_LOGE(TAG, "Failed to find network with SSID %s", ssid);
     return false;
@@ -324,12 +385,6 @@ bool WiFiManager::RefreshNetworkCredentials() {
   return true;
 }
 
-bool _isSaved(std::function<bool(const Config::WiFiCredentials&)> predicate) {
-  const auto& credentials = Config::GetWiFiCredentials();
-
-  return std::any_of(credentials.begin(), credentials.end(), predicate);
-}
-
 bool WiFiManager::IsSaved(const char* ssid) {
   return _isSaved([ssid](const Config::WiFiCredentials& creds) { return creds.ssid == ssid; });
 }
@@ -340,18 +395,6 @@ bool WiFiManager::IsSaved(const std::uint8_t (&bssid)[6]) {
 
 bool WiFiManager::IsSaved(const char* ssid, const std::uint8_t (&bssid)[6]) {
   return _isSaved([ssid, bssid](const Config::WiFiCredentials& creds) { return creds.ssid == ssid || memcmp(creds.bssid, bssid, sizeof(bssid)) == 0; });
-}
-
-bool _connect(const Config::WiFiCredentials& creds) {
-  ESP_LOGV(TAG, "Connecting to network %s (" BSSID_FMT ")", creds.ssid.c_str(), BSSID_ARG(creds.bssid));
-
-  s_wifiConnecting = true;
-  if (WiFi.begin(creds.ssid.c_str(), creds.password.c_str(), 0, nullptr, true) == WL_CONNECT_FAILED) {
-    s_wifiConnecting = false;
-    return false;
-  }
-
-  return true;
 }
 
 bool WiFiManager::Connect(const char* ssid) {
@@ -367,7 +410,7 @@ bool WiFiManager::Connect(const char* ssid) {
     return true;
   }
 
-  if (!s_wifiConnected) {
+  if (s_wifiState == WiFiState::Disconnected) {
     s_preferredCredentialsID = creds.id;
     return true;
   }
@@ -388,7 +431,7 @@ bool WiFiManager::Connect(const std::uint8_t (&bssid)[6]) {
     return true;
   }
 
-  if (!s_wifiConnected) {
+  if (s_wifiState == WiFiState::Disconnected) {
     s_preferredCredentialsID = creds.id;
     return true;
   }
@@ -401,7 +444,7 @@ void WiFiManager::Disconnect() {
 }
 
 bool WiFiManager::IsConnected() {
-  return s_wifiConnected;
+  return s_wifiState == WiFiState::Connected;
 }
 bool WiFiManager::GetConnectedNetwork(OpenShock::WiFiNetwork& network) {
   if (s_connectedCredentialsID == 0) {
@@ -420,7 +463,7 @@ bool WiFiManager::GetConnectedNetwork(OpenShock::WiFiNetwork& network) {
 
 static std::int64_t s_lastScanRequest = 0;
 void WiFiManager::Update() {
-  if (s_wifiConnected || s_wifiConnecting || WiFiScanManager::IsScanning()) return;
+  if (s_wifiState != WiFiState::Disconnected || WiFiScanManager::IsScanning()) return;
 
   if (s_preferredCredentialsID != 0) {
     Config::WiFiCredentials creds;
@@ -441,7 +484,7 @@ void WiFiManager::Update() {
   }
 
   Config::WiFiCredentials creds;
-  if (!GetNextWiFiNetwork(creds)) {
+  if (!_getNextWiFiNetwork(creds)) {
     std::int64_t now = OpenShock::millis();
     if (s_lastScanRequest == 0 || now - s_lastScanRequest > 30'000) {
       s_lastScanRequest = now;

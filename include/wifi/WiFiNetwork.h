@@ -20,7 +20,7 @@ namespace OpenShock {
     std::int8_t rssi;
     wifi_auth_mode_t authMode;
     std::uint8_t credentialsID;
-    std::uint16_t connectAttempts;
+    std::uint16_t connectAttempts;  // TODO: Add connectSuccesses as well, so we can track the success rate of a network
     std::int64_t lastConnectAttempt;
     std::uint8_t scansMissed;
   };
