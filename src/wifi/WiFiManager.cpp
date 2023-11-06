@@ -297,6 +297,23 @@ bool WiFiManager::Forget(const std::uint8_t (&bssid)[6]) {
   return true;
 }
 
+bool WiFiManager::RefreshNetworkCredentials() {
+  ESP_LOGV(TAG, "Refreshing network credentials");
+
+  for (auto& net : s_wifiNetworks) {
+    Config::WiFiCredentials creds;
+    if (Config::TryGetWiFiCredentialsBySSID(net.ssid, creds) || Config::TryGetWiFiCredentialsByBSSID(net.bssid, creds)) {
+      ESP_LOGV(TAG, "Found credentials for network %s (" BSSID_FMT ")", net.ssid, BSSID_ARG(net.bssid));
+      net.credentialsID = creds.id;
+    } else {
+      ESP_LOGV(TAG, "Failed to find credentials for network %s (" BSSID_FMT ")", net.ssid, BSSID_ARG(net.bssid));
+      net.credentialsID = 0;
+    }
+  }
+
+  return true;
+}
+
 bool _isSaved(std::function<bool(const Config::WiFiCredentials&)> predicate) {
   const auto& credentials = Config::GetWiFiCredentials();
 
