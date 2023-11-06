@@ -260,8 +260,6 @@ void GatewayConnectionManager::Update() {
 
     // Test if the auth token is valid
     if (!FetchDeviceInfo(authToken)) {
-      ESP_LOGD(TAG, "Auth token is invalid, clearing it");
-      Config::ClearBackendAuthToken();
       return;
     }
 
