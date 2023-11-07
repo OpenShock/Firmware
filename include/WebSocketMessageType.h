@@ -1,7 +1,9 @@
 #pragma once
 
+#include <cstdint>
+
 namespace OpenShock {
-  enum class WebSocketMessageType {
+  enum class WebSocketMessageType : std::uint8_t {
     Error,
     Disconnected,
     Connected,

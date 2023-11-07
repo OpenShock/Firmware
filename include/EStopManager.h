@@ -1,10 +1,9 @@
 #pragma once
 
-#include <Arduino.h>
 #include <cstdint>
 
 namespace OpenShock::EStopManager {
-  enum class EStopStatus : uint8_t {
+  enum class EStopStatus : std::uint8_t {
     ALL_CLEAR,          // The initial, idle state
     ESTOPPED_AND_HELD,  // The EStop has been pressed and has not yet been released
     ESTOPPED,           // Idle EStopped state
@@ -14,5 +13,5 @@ namespace OpenShock::EStopManager {
   void Init();
   EStopStatus Update();
   bool IsEStopped();
-  unsigned long WhenEStopped();
+  std::int64_t WhenEStopped();
 }  // namespace OpenShock::EStopManager

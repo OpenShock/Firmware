@@ -1,16 +1,19 @@
-#include "Arduino.h"
-#include <EStopManager.h>
+#include "EStopManager.h"
 
+#include "Time.h"
+#include "Logging.h"
 #include "VisualStateManager.h"
+
+#include <Arduino.h>
 
 const char* const TAG = "EStopManager";
 
 using namespace OpenShock;
 
 static EStopManager::EStopStatus s_estopStatus    = EStopManager::EStopStatus::ALL_CLEAR;
-static unsigned long s_estopHoldToClearTime       = 5000;
-static unsigned long s_lastEStopButtonStateChange = 0;
-static unsigned long s_estoppedAt                 = 0;
+static std::uint32_t s_estopHoldToClearTime       = 5000;
+static std::int64_t s_lastEStopButtonStateChange  = 0;
+static std::int64_t s_estoppedAt                  = 0;
 static bool s_lastEStopButtonState                = HIGH;
 
 static std::uint8_t s_estopPin;
@@ -34,7 +37,7 @@ bool EStopManager::IsEStopped() {
 #endif
 }
 
-unsigned long EStopManager::WhenEStopped() {
+std::int64_t EStopManager::WhenEStopped() {
 #ifdef OPENSHOCK_ESTOP_PIN
   if (IsEStopped()) {
     return s_estoppedAt;
@@ -50,7 +53,7 @@ EStopManager::EStopStatus EStopManager::Update() {
 #ifdef OPENSHOCK_ESTOP_PIN
   bool buttonState = digitalRead(s_estopPin);
   if (buttonState != s_lastEStopButtonState) {
-    s_lastEStopButtonStateChange = millis();
+    s_lastEStopButtonStateChange = OpenShock::millis();
   }
   switch (s_estopStatus) {
     case EStopManager::EStopStatus::ALL_CLEAR:
@@ -69,7 +72,7 @@ EStopManager::EStopStatus EStopManager::Update() {
       break;
     case EStopManager::EStopStatus::ESTOPPED:
       // If the button is held again for the specified time after being released, clear the EStop
-      if (buttonState == LOW && s_lastEStopButtonState == LOW && s_lastEStopButtonStateChange + s_estopHoldToClearTime <= millis()) {
+      if (buttonState == LOW && s_lastEStopButtonState == LOW && s_lastEStopButtonStateChange + s_estopHoldToClearTime <= OpenShock::millis()) {
         s_estopStatus = EStopManager::EStopStatus::ESTOPPED_CLEARED;
         ESP_LOGI(TAG, "Clearing EStop on button release!");
         OpenShock::VisualStateManager::SetEmergencyStop(false);
