@@ -5,7 +5,7 @@
 #include "Logging.h"
 #include "wifi/WiFiManager.h"
 
-#include <ArduinoJson.h>
+#include <cJSON.h>
 #include <Esp.h>
 
 #include <unordered_map>
@@ -166,46 +166,87 @@ void _handleAuthtokenCommand(char* arg, std::size_t argLength) {
 }
 
 void _handleNetworksCommand(char* arg, std::size_t argLength) {
+  cJSON* network = nullptr;
+  cJSON* networks = nullptr;
+  std::shared_ptr<cJSON> json;
+
   if (arg == nullptr || argLength <= 0) {
     // Get networks
-    StaticJsonDocument<1024> outDoc;
-    JsonArray outNetworks = outDoc.to<JsonArray>();
+    json = std::shared_ptr<cJSON>(cJSON_CreateArray(), cJSON_Delete);
+    networks = json.get();
+    if (networks == nullptr) {
+      Serial.println("$SYS$|Error|Failed to create JSON array");
+      return;
+    }
 
     for (auto& creds : Config::GetWiFiCredentials()) {
-      JsonObject network  = outNetworks.createNestedObject();
-      network["ssid"]     = creds.ssid;
-      network["password"] = creds.password;
+      network = cJSON_CreateObject();
+      if (network == nullptr) {
+        Serial.println("$SYS$|Error|Failed to create JSON object");
+        return;
+      }
+
+      cJSON_AddStringToObject(network, "ssid", creds.ssid.c_str());
+      cJSON_AddStringToObject(network, "password", creds.password.c_str());
+
+      cJSON_AddItemToArray(networks, network);
+    }
+
+    char* out = cJSON_PrintUnformatted(networks);
+    if (out == nullptr) {
+      Serial.println("$SYS$|Error|Failed to print JSON");
+      return;
     }
 
     Serial.print("$SYS$|Response|Networks|");
-    serializeJson(outDoc, Serial);
-    Serial.println();
+    Serial.println(out);
+
+    cJSON_free(out);
     return;
   }
 
-  DynamicJsonDocument doc(1024);
-  deserializeJson(doc, arg, argLength);
-
-  JsonArray networks = doc.as<JsonArray>();
+  json = std::shared_ptr<cJSON>(cJSON_ParseWithLength(arg, argLength), cJSON_Delete);
+  networks = json.get();
+  if (!cJSON_IsArray(networks)) {
+    Serial.println("$SYS$|Error|Invalid argument (not an array)");
+    return;
+  }
 
   std::uint8_t id = 1;
   std::vector<Config::WiFiCredentials> creds;
-  for (JsonObject network : networks) {
-    std::string ssid     = network["ssid"].as<std::string>();
-    std::string password = network["password"].as<std::string>();
+  cJSON_ArrayForEach(network, networks) {
+    if (!cJSON_IsObject(network)) {
+      Serial.println("$SYS$|Error|Invalid argument (array entry is not an object)");
+      return;
+    }
 
-    if (ssid.empty() || password.empty()) {
-      Serial.println("$SYS$|Error|Invalid argument (missing ssid or password)");
+    const cJSON* ssid     = cJSON_GetObjectItemCaseSensitive(network, "ssid");
+    const cJSON* password = cJSON_GetObjectItemCaseSensitive(network, "password");
+
+    if (!cJSON_IsString(ssid) || !cJSON_IsString(password)) {
+      Serial.println("$SYS$|Error|Invalid argument (ssid or password is not a string)");
+      return;
+    }
+
+    const char* ssidStr     = ssid->valuestring;
+    const char* passwordStr = password->valuestring;
+
+    if (ssidStr == nullptr || passwordStr == nullptr) {
+      Serial.println("$SYS$|Error|Invalid argument (ssid or password is null)");
+      return;
+    }
+    if (ssidStr[0] == '\0' || passwordStr[0] == '\0') {
+      Serial.println("$SYS$|Error|Invalid argument (ssid or password is empty)");
       return;
     }
 
     Config::WiFiCredentials cred {
       .id       = id++,
-      .ssid     = ssid,
+      .ssid     = ssidStr,
       .bssid    = {0, 0, 0, 0, 0, 0},
-      .password = password,
+      .password = passwordStr,
     };
-    ESP_LOGI(TAG, "Adding network to config %s", ssid.c_str());
+    ESP_LOGI(TAG, "Adding network to config %s", ssidStr);
 
     creds.push_back(std::move(cred));
   }

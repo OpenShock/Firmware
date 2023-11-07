@@ -6,9 +6,10 @@
 #include "Constants.h"
 #include "GatewayClient.h"
 #include "Logging.h"
+#include "ShockerModelType.h"
 #include "Time.h"
 
-#include <ArduinoJson.h>
+#include <cJSON.h>
 #include <HTTPClient.h>
 
 #include <memory>
@@ -50,6 +51,173 @@ void _evWiFiDisconnectedHandler(arduino_event_t* event) {
   OpenShock::VisualStateManager::SetWebSocketConnected(false);
 }
 
+struct AccountLinkResponse {
+  std::string authToken;
+};
+struct DeviceInfoResponse {
+  std::string deviceId;
+  std::string deviceName;
+  struct ShockerInfo {
+    std::string id;
+    std::uint16_t rfId;
+    OpenShock::ShockerModelType model;
+  };
+  std::vector<ShockerInfo> shockers;
+};
+struct LcgResponse {
+  std::string fqdn;
+  std::string country;
+};
+
+bool ParseAccountLinkJsonResponse(const String& json, AccountLinkResponse& out) {
+  if (json.isEmpty()) {
+    ESP_LOGE(TAG, "Received empty JSON response");
+    return false;
+  }
+
+  std::shared_ptr<cJSON> root(cJSON_ParseWithLength(json.c_str(), json.length()), cJSON_Delete);
+  if (root == nullptr) {
+    const char* errorPtr = cJSON_GetErrorPtr();
+    ESP_LOGE(TAG, "Failed to parse JSON response: %s", errorPtr == nullptr ? "Unknown error" : errorPtr);
+    return false;
+  }
+
+  const cJSON* data = cJSON_GetObjectItemCaseSensitive(root.get(), "data");
+  if (!cJSON_IsString(data)) {
+    ESP_LOGE(TAG, "Invalid JSON response");
+    return false;
+  }
+
+  out = {};
+
+  out.authToken = data->valuestring;
+
+  return true;
+}
+bool ParseDeviceInfoJsonResponse(const String& json, DeviceInfoResponse& out) {
+  if (json.isEmpty()) {
+    ESP_LOGE(TAG, "Received empty JSON response");
+    return false;
+  }
+
+  std::shared_ptr<cJSON> root(cJSON_ParseWithLength(json.c_str(), json.length()), cJSON_Delete);
+  if (root == nullptr) {
+    const char* errorPtr = cJSON_GetErrorPtr();
+    ESP_LOGE(TAG, "Failed to parse JSON response: %s", errorPtr == nullptr ? "Unknown error" : errorPtr);
+    return false;
+  }
+
+  const cJSON* data = cJSON_GetObjectItemCaseSensitive(root.get(), "data");
+  if (!cJSON_IsObject(data)) {
+    ESP_LOGE(TAG, "Invalid JSON response");
+    return false;
+  }
+
+  const cJSON* deviceId       = cJSON_GetObjectItemCaseSensitive(data, "id");
+  if (!cJSON_IsString(deviceId)) {
+    ESP_LOGE(TAG, "Invalid JSON response");
+    return false;
+  }
+
+  const cJSON* deviceName     = cJSON_GetObjectItemCaseSensitive(data, "name");
+  if (!cJSON_IsString(deviceName)) {
+    ESP_LOGE(TAG, "Invalid JSON response");
+    return false;
+  }
+
+  const cJSON* deviceShockers = cJSON_GetObjectItemCaseSensitive(data, "shockers");
+  if (!cJSON_IsArray(deviceShockers)) {
+    ESP_LOGE(TAG, "Invalid JSON response");
+    return false;
+  }
+
+  out = {};
+
+  out.deviceId   = deviceId->valuestring;
+  out.deviceName = deviceName->valuestring;
+
+  cJSON* shocker = nullptr;
+  cJSON_ArrayForEach(shocker, deviceShockers) {
+    const cJSON* shockerId    = cJSON_GetObjectItemCaseSensitive(shocker, "id");
+    if (!cJSON_IsString(shockerId)) {
+      ESP_LOGE(TAG, "Invalid JSON response");
+      return false;
+    }
+    const char* shockerIdStr = shockerId->valuestring;
+
+    const cJSON* shockerRfId  = cJSON_GetObjectItemCaseSensitive(shocker, "rfId");
+    if (!cJSON_IsNumber(shockerRfId)) {
+      ESP_LOGE(TAG, "Invalid JSON response");
+      return false;
+    }
+    int shockerRfIdInt = shockerRfId->valueint;
+    if (shockerRfIdInt < 0 || shockerRfIdInt > UINT16_MAX) {
+      ESP_LOGE(TAG, "Invalid JSON response");
+      return false;
+    }
+    std::uint16_t shockerRfIdU16 = (std::uint16_t)shockerRfIdInt;
+
+    const cJSON* shockerModel = cJSON_GetObjectItemCaseSensitive(shocker, "model");
+    if (!cJSON_IsString(shockerModel)) {
+      ESP_LOGE(TAG, "Invalid JSON response");
+      return false;
+    }
+    const char* shockerModelStr = shockerModel->valuestring;
+
+    OpenShock::ShockerModelType shockerModelType;
+    if (strcmp(shockerModelStr, "CaiXianlin") == 0 || strcmp(shockerModelStr, "CaiXianLin") == 0 || strcmp(shockerModelStr, "XLC") == 0 || strcmp(shockerModelStr, "CXL") == 0) {
+      shockerModelType = OpenShock::ShockerModelType::CaiXianlin;
+    } else if (strcmp(shockerModelStr, "PetTrainer") == 0 || strcmp(shockerModelStr, "PT") == 0) {
+      shockerModelType = OpenShock::ShockerModelType::PetTrainer;
+    } else {
+      ESP_LOGE(TAG, "Invalid JSON response");
+      return false;
+    }
+
+    out.shockers.push_back({
+      .id = shockerIdStr,
+      .rfId = shockerRfIdU16,
+      .model = shockerModelType
+    });
+  }
+
+  return true;
+}
+bool ParseLcgJsonResponse(const String& json, LcgResponse& out) {
+  if (json.isEmpty()) {
+    ESP_LOGE(TAG, "Received empty JSON response");
+    return false;
+  }
+
+  std::shared_ptr<cJSON> root(cJSON_ParseWithLength(json.c_str(), json.length()), cJSON_Delete);
+  if (root == nullptr) {
+    const char* errorPtr = cJSON_GetErrorPtr();
+    ESP_LOGE(TAG, "Failed to parse JSON response: %s", errorPtr == nullptr ? "Unknown error" : errorPtr);
+    return false;
+  }
+
+  const cJSON* data = cJSON_GetObjectItemCaseSensitive(root.get(), "data");
+  if (!cJSON_IsObject(data)) {
+    ESP_LOGE(TAG, "Invalid JSON response");
+    return false;
+  }
+
+  const cJSON* fqdn    = cJSON_GetObjectItemCaseSensitive(data, "fqdn");
+  const cJSON* country = cJSON_GetObjectItemCaseSensitive(data, "country");
+
+  if (!cJSON_IsString(fqdn) || !cJSON_IsString(country)) {
+    ESP_LOGE(TAG, "Invalid JSON response");
+    return false;
+  }
+
+  out = {};
+
+  out.fqdn    = fqdn->valuestring;
+  out.country = country->valuestring;
+
+  return true;
+}
+
 using namespace OpenShock;
 
 bool GatewayConnectionManager::Init() {
@@ -68,40 +236,8 @@ bool GatewayConnectionManager::IsConnected() {
   return s_wsClient->state() == GatewayClient::State::Connected;
 }
 
-void GetDeviceInfoFromJsonResponse(HTTPClient& client) {
-  ArduinoJson::DynamicJsonDocument doc(1024);  // TODO: profile the normal message size and adjust this accordingly
-  deserializeJson(doc, client.getString());
-
-  auto data   = doc["data"];
-  String id   = data["id"];
-  String name = data["name"];
-
-  ESP_LOGD(TAG, "Device ID:   %s", id.c_str());
-  ESP_LOGD(TAG, "Device name: %s", name.c_str());
-
-  auto shockers = data["shockers"];
-  for (int i = 0; i < shockers.size(); i++) {
-    auto shocker              = shockers[i];
-    String shockerId          = shocker["id"];
-    std::uint16_t shockerRfId = shocker["rfId"];
-    std::uint8_t shockerModel = shocker["model"];
-
-    ESP_LOGD(TAG, "Found shocker %s with RF ID %u and model %u", shockerId.c_str(), shockerRfId, shockerModel);
-  }
-}
-
 bool GatewayConnectionManager::IsPaired() {
   return (s_flags & FLAG_AUTHENTICATED) != 0;
-}
-
-// This method is here to heap usage
-std::string GetAuthTokenFromJsonResponse(HTTPClient& client) {
-  ArduinoJson::DynamicJsonDocument doc(1024);  // TODO: profile the normal message size and adjust this accordingly
-  deserializeJson(doc, client.getString());
-
-  String str = doc["data"];
-
-  return std::string(str.c_str(), str.length());
 }
 
 AccountLinkResultCode GatewayConnectionManager::Pair(const char* pairCode) {
@@ -129,16 +265,22 @@ AccountLinkResultCode GatewayConnectionManager::Pair(const char* pairCode) {
     return AccountLinkResultCode::InternalError;
   }
 
-  std::string authToken = GetAuthTokenFromJsonResponse(client);
+  String json = client.getString();
 
   client.end();
 
-  if (authToken.empty()) {
+  AccountLinkResponse response;
+  if (!ParseAccountLinkJsonResponse(json, response)) {
+    ESP_LOGE(TAG, "Failed to parse auth token");
+    return AccountLinkResultCode::InternalError;
+  }
+
+  if (response.authToken.empty()) {
     ESP_LOGE(TAG, "Received empty auth token");
     return AccountLinkResultCode::InternalError;
   }
 
-  if (!Config::SetBackendAuthToken(authToken)) {
+  if (!Config::SetBackendAuthToken(response.authToken)) {
     ESP_LOGE(TAG, "Failed to save auth token");
     return AccountLinkResultCode::InternalError;
   }
@@ -179,9 +321,27 @@ bool FetchDeviceInfo(const std::string& authToken) {
     return false;
   }
 
-  GetDeviceInfoFromJsonResponse(client);
+  String json = client.getString();
 
   client.end();
+
+  DeviceInfoResponse response;
+  if (!ParseDeviceInfoJsonResponse(json, response)) {
+    ESP_LOGE(TAG, "Failed to parse device info");
+    return false;
+  }
+
+  if (response.deviceId.empty() || response.deviceName.empty()) {
+    ESP_LOGE(TAG, "Received invalid device info");
+    return false;
+  }
+
+  ESP_LOGI(TAG, "Device ID:   %s", response.deviceId.c_str());
+  ESP_LOGI(TAG, "Device Name: %s", response.deviceName.c_str());
+  ESP_LOGI(TAG, "Shockers:");
+  for (auto& shocker : response.shockers) {
+    ESP_LOGI(TAG, "  [%s] rf=%u model=%u", shocker.id.c_str(), shocker.rfId, shocker.model);
+  }
 
   s_flags |= FLAG_AUTHENTICATED;
 
@@ -229,22 +389,18 @@ bool ConnectToLCG() {
     return false;
   }
 
-  ArduinoJson::DynamicJsonDocument doc(1024);  // TODO: profile the normal message size and adjust this accordingly
-  deserializeJson(doc, client.getString());
-
-  auto data           = doc["data"];
-  const char* fqdn    = data["fqdn"];
-  const char* country = data["country"];
+  String json = client.getString();
 
   client.end();
 
-  if (fqdn == nullptr || country == nullptr) {
-    ESP_LOGE(TAG, "Received invalid response from LCG endpoint");
+  LcgResponse response;
+  if (!ParseLcgJsonResponse(json, response)) {
+    ESP_LOGE(TAG, "Failed to parse LCG endpoint");
     return false;
   }
 
-  ESP_LOGD(TAG, "Connecting to LCG endpoint %s in country %s", fqdn, country);
-  s_wsClient->connect(fqdn);
+  ESP_LOGD(TAG, "Connecting to LCG endpoint %s in country %s", response.fqdn.c_str(), response.country.c_str());
+  s_wsClient->connect(response.fqdn.c_str());
 
   return true;
 }
