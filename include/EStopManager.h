@@ -1,6 +1,5 @@
 #pragma once
 
-#include <Arduino.h>
 #include <cstdint>
 
 namespace OpenShock::EStopManager {
@@ -14,5 +13,5 @@ namespace OpenShock::EStopManager {
   void Init();
   EStopStatus Update();
   bool IsEStopped();
-  unsigned long WhenEStopped();
+  std::int64_t WhenEStopped();
 }  // namespace OpenShock::EStopManager
