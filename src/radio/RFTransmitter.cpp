@@ -43,7 +43,7 @@ RFTransmitter::RFTransmitter(std::uint8_t gpioPin, int queueSize) : m_txPin(gpio
   }
 
   char name[32];
-  snprintf(name, sizeof(name), "RFTransmitter-%d", m_txPin);
+  snprintf(name, sizeof(name), "RFTransmitter-%u", m_txPin);
 
   if (xTaskCreate(TransmitTask, name, 4096, this, 1, &m_taskHandle) != pdPASS) {
     ESP_LOGE(TAG, "[pin-%u] Failed to create task", m_txPin);

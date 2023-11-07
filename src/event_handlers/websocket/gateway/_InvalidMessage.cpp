@@ -2,6 +2,7 @@
 
 #include "Logging.h"
 
+
 const char* const TAG = "ServerMessageHandlers";
 
 using namespace OpenShock::MessageHandlers::Server;
@@ -12,5 +13,5 @@ void _Private::HandleInvalidMessage(const OpenShock::Serialization::ServerToDevi
     return;
   }
 
-  ESP_LOGE(TAG, "Invalid message type: %d", root->payload_type());
+  ESP_LOGE(TAG, "Invalid message type: %u", root->payload_type());
 }
