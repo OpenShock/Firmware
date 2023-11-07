@@ -8,11 +8,11 @@
 #include "Logging.h"
 #include "ShockerModelType.h"
 #include "Time.h"
+#include "Utils/JsonRoot.h"
 
 #include <cJSON.h>
 #include <HTTPClient.h>
 
-#include <memory>
 #include <unordered_map>
 
 //
@@ -75,14 +75,17 @@ bool ParseAccountLinkJsonResponse(const String& json, AccountLinkResponse& out) 
     return false;
   }
 
-  std::shared_ptr<cJSON> root(cJSON_ParseWithLength(json.c_str(), json.length()), cJSON_Delete);
-  if (root == nullptr) {
-    const char* errorPtr = cJSON_GetErrorPtr();
-    ESP_LOGE(TAG, "Failed to parse JSON response: %s", errorPtr == nullptr ? "Unknown error" : errorPtr);
+  OpenShock::JsonRoot root(json);
+  if (!root.isValid()) {
+    ESP_LOGE(TAG, "Failed to parse JSON response: %s", root.GetErrorMessage());
+    return false;
+  }
+  if (!root.isObject()) {
+    ESP_LOGE(TAG, "Invalid JSON response");
     return false;
   }
 
-  const cJSON* data = cJSON_GetObjectItemCaseSensitive(root.get(), "data");
+  const cJSON* data = cJSON_GetObjectItemCaseSensitive(root, "data");
   if (!cJSON_IsString(data)) {
     ESP_LOGE(TAG, "Invalid JSON response");
     return false;
@@ -100,14 +103,17 @@ bool ParseDeviceInfoJsonResponse(const String& json, DeviceInfoResponse& out) {
     return false;
   }
 
-  std::shared_ptr<cJSON> root(cJSON_ParseWithLength(json.c_str(), json.length()), cJSON_Delete);
-  if (root == nullptr) {
-    const char* errorPtr = cJSON_GetErrorPtr();
-    ESP_LOGE(TAG, "Failed to parse JSON response: %s", errorPtr == nullptr ? "Unknown error" : errorPtr);
+  OpenShock::JsonRoot root(json);
+  if (!root.isValid()) {
+    ESP_LOGE(TAG, "Failed to parse JSON response: %s", root.GetErrorMessage());
+    return false;
+  }
+  if (!root.isObject()) {
+    ESP_LOGE(TAG, "Invalid JSON response");
     return false;
   }
 
-  const cJSON* data = cJSON_GetObjectItemCaseSensitive(root.get(), "data");
+  const cJSON* data = cJSON_GetObjectItemCaseSensitive(root, "data");
   if (!cJSON_IsObject(data)) {
     ESP_LOGE(TAG, "Invalid JSON response");
     return false;
@@ -189,14 +195,17 @@ bool ParseLcgJsonResponse(const String& json, LcgResponse& out) {
     return false;
   }
 
-  std::shared_ptr<cJSON> root(cJSON_ParseWithLength(json.c_str(), json.length()), cJSON_Delete);
-  if (root == nullptr) {
-    const char* errorPtr = cJSON_GetErrorPtr();
-    ESP_LOGE(TAG, "Failed to parse JSON response: %s", errorPtr == nullptr ? "Unknown error" : errorPtr);
+  OpenShock::JsonRoot root(json);
+  if (!root.isValid()) {
+    ESP_LOGE(TAG, "Failed to parse JSON response: %s", root.GetErrorMessage());
+    return false;
+  }
+  if (!root.isObject()) {
+    ESP_LOGE(TAG, "Invalid JSON response");
     return false;
   }
 
-  const cJSON* data = cJSON_GetObjectItemCaseSensitive(root.get(), "data");
+  const cJSON* data = cJSON_GetObjectItemCaseSensitive(root, "data");
   if (!cJSON_IsObject(data)) {
     ESP_LOGE(TAG, "Invalid JSON response");
     return false;

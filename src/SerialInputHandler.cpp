@@ -4,6 +4,7 @@
 #include "Config.h"
 #include "Logging.h"
 #include "wifi/WiFiManager.h"
+#include "Utils/JsonRoot.h"
 
 #include <cJSON.h>
 #include <Esp.h>
@@ -167,14 +168,11 @@ void _handleAuthtokenCommand(char* arg, std::size_t argLength) {
 
 void _handleNetworksCommand(char* arg, std::size_t argLength) {
   cJSON* network = nullptr;
-  cJSON* networks = nullptr;
-  std::shared_ptr<cJSON> json;
+  OpenShock::JsonRoot root;
 
   if (arg == nullptr || argLength <= 0) {
-    // Get networks
-    json = std::shared_ptr<cJSON>(cJSON_CreateArray(), cJSON_Delete);
-    networks = json.get();
-    if (networks == nullptr) {
+    root = OpenShock::JsonRoot::CreateArray();
+    if (!root.isValid()) {
       Serial.println("$SYS$|Error|Failed to create JSON array");
       return;
     }
@@ -189,10 +187,10 @@ void _handleNetworksCommand(char* arg, std::size_t argLength) {
       cJSON_AddStringToObject(network, "ssid", creds.ssid.c_str());
       cJSON_AddStringToObject(network, "password", creds.password.c_str());
 
-      cJSON_AddItemToArray(networks, network);
+      cJSON_AddItemToArray(root, network);
     }
 
-    char* out = cJSON_PrintUnformatted(networks);
+    char* out = cJSON_PrintUnformatted(root);
     if (out == nullptr) {
       Serial.println("$SYS$|Error|Failed to print JSON");
       return;
@@ -205,16 +203,20 @@ void _handleNetworksCommand(char* arg, std::size_t argLength) {
     return;
   }
 
-  json = std::shared_ptr<cJSON>(cJSON_ParseWithLength(arg, argLength), cJSON_Delete);
-  networks = json.get();
-  if (!cJSON_IsArray(networks)) {
+  root = OpenShock::JsonRoot(arg, argLength);
+  if (!root.isValid()) {
+    Serial.print("$SYS$|Error|Failed to parse JSON: ");
+    Serial.println(root.GetErrorMessage());
+    return;
+  }
+  if (!root.isArray()) {
     Serial.println("$SYS$|Error|Invalid argument (not an array)");
     return;
   }
 
   std::uint8_t id = 1;
   std::vector<Config::WiFiCredentials> creds;
-  cJSON_ArrayForEach(network, networks) {
+  cJSON_ArrayForEach(network, root) {
     if (!cJSON_IsObject(network)) {
       Serial.println("$SYS$|Error|Invalid argument (array entry is not an object)");
       return;
