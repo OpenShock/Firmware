@@ -4,7 +4,7 @@
 #include "Config.h"
 #include "Logging.h"
 #include "wifi/WiFiManager.h"
-#include "Utils/JsonRoot.h"
+#include "util/JsonRoot.h"
 
 #include <cJSON.h>
 #include <Esp.h>
@@ -203,7 +203,7 @@ void _handleNetworksCommand(char* arg, std::size_t argLength) {
     return;
   }
 
-  root = OpenShock::JsonRoot(arg, argLength);
+  root = OpenShock::JsonRoot::Parse(arg, argLength);
   if (!root.isValid()) {
     Serial.print("$SYS$|Error|Failed to parse JSON: ");
     Serial.println(root.GetErrorMessage());

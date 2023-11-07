@@ -1,6 +1,6 @@
 #include "wifi/WiFiNetwork.h"
 
-#include "Utils/HexUtils.h"
+#include "util/HexUtils.h"
 
 #include <cstring>
 

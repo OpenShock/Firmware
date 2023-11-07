@@ -8,10 +8,8 @@
 #include "Logging.h"
 #include "ShockerModelType.h"
 #include "Time.h"
-#include "Utils/JsonRoot.h"
-
-#include <cJSON.h>
-#include <HTTPClient.h>
+#include "util/JsonRoot.h"
+#include "http/HTTPRequestManager.h"
 
 #include <unordered_map>
 
@@ -64,23 +62,13 @@ struct DeviceInfoResponse {
   };
   std::vector<ShockerInfo> shockers;
 };
-struct LcgResponse {
+struct AssignLcgResponse {
   std::string fqdn;
   std::string country;
 };
 
-bool ParseAccountLinkJsonResponse(const String& json, AccountLinkResponse& out) {
-  if (json.isEmpty()) {
-    ESP_LOGE(TAG, "Received empty JSON response");
-    return false;
-  }
-
-  OpenShock::JsonRoot root(json);
-  if (!root.isValid()) {
-    ESP_LOGE(TAG, "Failed to parse JSON response: %s", root.GetErrorMessage());
-    return false;
-  }
-  if (!root.isObject()) {
+bool ParseAccountLinkJsonResponse(int code, const cJSON* root, AccountLinkResponse& out) {
+  if (!cJSON_IsObject(root)) {
     ESP_LOGE(TAG, "Invalid JSON response");
     return false;
   }
@@ -97,18 +85,8 @@ bool ParseAccountLinkJsonResponse(const String& json, AccountLinkResponse& out) 
 
   return true;
 }
-bool ParseDeviceInfoJsonResponse(const String& json, DeviceInfoResponse& out) {
-  if (json.isEmpty()) {
-    ESP_LOGE(TAG, "Received empty JSON response");
-    return false;
-  }
-
-  OpenShock::JsonRoot root(json);
-  if (!root.isValid()) {
-    ESP_LOGE(TAG, "Failed to parse JSON response: %s", root.GetErrorMessage());
-    return false;
-  }
-  if (!root.isObject()) {
+bool ParseDeviceInfoJsonResponse(int code, const cJSON* root, DeviceInfoResponse& out) {
+  if (!cJSON_IsObject(root)) {
     ESP_LOGE(TAG, "Invalid JSON response");
     return false;
   }
@@ -142,6 +120,11 @@ bool ParseDeviceInfoJsonResponse(const String& json, DeviceInfoResponse& out) {
   out.deviceId   = deviceId->valuestring;
   out.deviceName = deviceName->valuestring;
 
+  if (out.deviceId.empty() || out.deviceName.empty()) {
+    ESP_LOGE(TAG, "Invalid JSON response");
+    return false;
+  }
+
   cJSON* shocker = nullptr;
   cJSON_ArrayForEach(shocker, deviceShockers) {
     const cJSON* shockerId    = cJSON_GetObjectItemCaseSensitive(shocker, "id");
@@ -150,6 +133,11 @@ bool ParseDeviceInfoJsonResponse(const String& json, DeviceInfoResponse& out) {
       return false;
     }
     const char* shockerIdStr = shockerId->valuestring;
+
+    if (shockerIdStr == nullptr || shockerIdStr[0] == '\0') {
+      ESP_LOGE(TAG, "Invalid JSON response");
+      return false;
+    }
 
     const cJSON* shockerRfId  = cJSON_GetObjectItemCaseSensitive(shocker, "rfId");
     if (!cJSON_IsNumber(shockerRfId)) {
@@ -170,6 +158,11 @@ bool ParseDeviceInfoJsonResponse(const String& json, DeviceInfoResponse& out) {
     }
     const char* shockerModelStr = shockerModel->valuestring;
 
+    if (shockerModelStr == nullptr || shockerModelStr[0] == '\0') {
+      ESP_LOGE(TAG, "Invalid JSON response");
+      return false;
+    }
+
     OpenShock::ShockerModelType shockerModelType;
     if (strcmp(shockerModelStr, "CaiXianlin") == 0 || strcmp(shockerModelStr, "CaiXianLin") == 0 || strcmp(shockerModelStr, "XLC") == 0 || strcmp(shockerModelStr, "CXL") == 0) {
       shockerModelType = OpenShock::ShockerModelType::CaiXianlin;
@@ -189,18 +182,8 @@ bool ParseDeviceInfoJsonResponse(const String& json, DeviceInfoResponse& out) {
 
   return true;
 }
-bool ParseLcgJsonResponse(const String& json, LcgResponse& out) {
-  if (json.isEmpty()) {
-    ESP_LOGE(TAG, "Received empty JSON response");
-    return false;
-  }
-
-  OpenShock::JsonRoot root(json);
-  if (!root.isValid()) {
-    ESP_LOGE(TAG, "Failed to parse JSON response: %s", root.GetErrorMessage());
-    return false;
-  }
-  if (!root.isObject()) {
+bool ParseLcgJsonResponse(int code, const cJSON* root, AssignLcgResponse& out) {
+  if (!cJSON_IsObject(root)) {
     ESP_LOGE(TAG, "Invalid JSON response");
     return false;
   }
@@ -257,39 +240,35 @@ AccountLinkResultCode GatewayConnectionManager::Pair(const char* pairCode) {
 
   ESP_LOGD(TAG, "Attempting to pair with pair code %s", pairCode);
 
-  HTTPClient client;
-
   char uri[256];
   sprintf(uri, OPENSHOCK_API_URL("/1/device/pair/%s"), pairCode);
 
-  client.begin(uri);
+  auto response = HTTPRequestManager::GetJSON<AccountLinkResponse>({
+    .url = uri,
+    .headers = {
+      { "User-Agent", "OpenShock/1.0" }
+    },
+    .okCodes = { 200, 404 },
+    .blockOnRateLimit = true
+  }, ParseAccountLinkJsonResponse);
 
-  int responseCode = client.GET();
+  if (response.result != HTTPRequestManager::RequestResult::Success) {
+    ESP_LOGE(TAG, "Error while getting auth token: %d %d", response.result, response.code);
+    return AccountLinkResultCode::InternalError;
+  }
 
-  if (responseCode == 404) {
+  if (response.code == 404) {
     return AccountLinkResultCode::InvalidCode;
   }
-  if (responseCode != 200) {
-    ESP_LOGE(TAG, "Error while getting auth token: [%d] %s", responseCode, client.getString().c_str());
-    return AccountLinkResultCode::InternalError;
-  }
 
-  String json = client.getString();
+  std::string& authToken = response.data.authToken;
 
-  client.end();
-
-  AccountLinkResponse response;
-  if (!ParseAccountLinkJsonResponse(json, response)) {
-    ESP_LOGE(TAG, "Failed to parse auth token");
-    return AccountLinkResultCode::InternalError;
-  }
-
-  if (response.authToken.empty()) {
+  if (authToken.empty()) {
     ESP_LOGE(TAG, "Received empty auth token");
     return AccountLinkResultCode::InternalError;
   }
 
-  if (!Config::SetBackendAuthToken(response.authToken)) {
+  if (!Config::SetBackendAuthToken(authToken)) {
     ESP_LOGE(TAG, "Failed to save auth token");
     return AccountLinkResultCode::InternalError;
   }
@@ -305,50 +284,36 @@ void GatewayConnectionManager::UnPair() {
   Config::ClearBackendAuthToken();
 }
 
-bool FetchDeviceInfo(const std::string& authToken) {
+bool FetchDeviceInfo(const String& authToken) {
   // TODO: this function is very slow, should be optimized!
   if ((s_flags & FLAG_HAS_IP) == 0) {
     return false;
   }
 
-  HTTPClient client;
+  auto response = HTTPRequestManager::GetJSON<DeviceInfoResponse>({
+    .url = OPENSHOCK_API_URL("/1/device/self"),
+    .headers = {
+      { "User-Agent", "OpenShock/1.0" },
+      { "DeviceToken", authToken }
+    },
+    .okCodes = { 200, 401 },
+    .blockOnRateLimit = true
+  }, ParseDeviceInfoJsonResponse);
+  if (response.result != HTTPRequestManager::RequestResult::Success) {
+    ESP_LOGE(TAG, "Error while fetching device info: %d %d", response.result, response.code);
+    return false;
+  }
 
-  client.begin(OPENSHOCK_API_URL("/1/device/self"));
-
-  client.addHeader("DeviceToken", authToken.c_str());
-
-  int responseCode = client.GET();
-
-  if (responseCode == 401) {
+  if (response.code == 401) {
     ESP_LOGD(TAG, "Auth token is invalid, clearing it");
     Config::ClearBackendAuthToken();
     return false;
   }
 
-  if (responseCode != 200) {
-    ESP_LOGE(TAG, "Error while verifying auth token: [%d] %s", responseCode, client.getString().c_str());
-    return false;
-  }
-
-  String json = client.getString();
-
-  client.end();
-
-  DeviceInfoResponse response;
-  if (!ParseDeviceInfoJsonResponse(json, response)) {
-    ESP_LOGE(TAG, "Failed to parse device info");
-    return false;
-  }
-
-  if (response.deviceId.empty() || response.deviceName.empty()) {
-    ESP_LOGE(TAG, "Received invalid device info");
-    return false;
-  }
-
-  ESP_LOGI(TAG, "Device ID:   %s", response.deviceId.c_str());
-  ESP_LOGI(TAG, "Device Name: %s", response.deviceName.c_str());
+  ESP_LOGI(TAG, "Device ID:   %s", response.data.deviceId.c_str());
+  ESP_LOGI(TAG, "Device Name: %s", response.data.deviceName.c_str());
   ESP_LOGI(TAG, "Shockers:");
-  for (auto& shocker : response.shockers) {
+  for (auto& shocker : response.data.shockers) {
     ESP_LOGI(TAG, "  [%s] rf=%u model=%u", shocker.id.c_str(), shocker.rfId, shocker.model);
   }
 
@@ -383,33 +348,24 @@ bool ConnectToLCG() {
     return false;
   }
 
-  std::string authToken = Config::GetBackendAuthToken();
+  String authToken = Config::GetBackendAuthToken().c_str();
 
-  HTTPClient client;
-
-  client.begin(OPENSHOCK_API_URL("/1/device/assignLCG"));
-
-  client.addHeader("DeviceToken", authToken.c_str());
-
-  int responseCode = client.GET();
-
-  if (responseCode != 200) {
-    ESP_LOGE(TAG, "Error while fetching LCG endpoint: [%d] %s", responseCode, client.getString().c_str());
+  auto response = HTTPRequestManager::GetJSON<AssignLcgResponse>({
+    .url = OPENSHOCK_API_URL("/1/device/assignLCG"),
+    .headers = {
+      { "User-Agent", "OpenShock/1.0" },
+      { "DeviceToken", authToken }
+    },
+    .okCodes = { 200 },
+    .blockOnRateLimit = true
+  }, ParseLcgJsonResponse);
+  if (response.result != HTTPRequestManager::RequestResult::Success) {
+    ESP_LOGE(TAG, "Error while fetching LCG endpoint: %d %d", response.result, response.code);
     return false;
   }
 
-  String json = client.getString();
-
-  client.end();
-
-  LcgResponse response;
-  if (!ParseLcgJsonResponse(json, response)) {
-    ESP_LOGE(TAG, "Failed to parse LCG endpoint");
-    return false;
-  }
-
-  ESP_LOGD(TAG, "Connecting to LCG endpoint %s in country %s", response.fqdn.c_str(), response.country.c_str());
-  s_wsClient->connect(response.fqdn.c_str());
+  ESP_LOGD(TAG, "Connecting to LCG endpoint %s in country %s", response.data.fqdn.c_str(), response.data.country.c_str());
+  s_wsClient->connect(response.data.fqdn.c_str());
 
   return true;
 }
@@ -421,7 +377,7 @@ void GatewayConnectionManager::Update() {
       return;
     }
 
-    std::string authToken = Config::GetBackendAuthToken();
+    String authToken = Config::GetBackendAuthToken().c_str();
 
     // Fetch device info
     if (!FetchDeviceInfo(authToken)) {
@@ -431,7 +387,7 @@ void GatewayConnectionManager::Update() {
     s_flags |= FLAG_AUTHENTICATED;
     ESP_LOGD(TAG, "Successfully verified auth token");
 
-    s_wsClient = std::make_unique<GatewayClient>(authToken);
+    s_wsClient = std::make_unique<GatewayClient>(authToken.c_str());
   }
 
   if (s_wsClient->loop()) {
