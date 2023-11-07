@@ -4,7 +4,7 @@
 #include <cstdint>
 
 namespace OpenShock::EStopManager {
-  enum class EStopStatus : uint8_t {
+  enum class EStopStatus : std::uint8_t {
     ALL_CLEAR,          // The initial, idle state
     ESTOPPED_AND_HELD,  // The EStop has been pressed and has not yet been released
     ESTOPPED,           // Idle EStopped state

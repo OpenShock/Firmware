@@ -5,6 +5,7 @@
 #include "GatewayConnectionManager.h"
 #include "Logging.h"
 #include "serialization/WSLocal.h"
+
 #include "wifi/WiFiManager.h"
 
 #include "serialization/_fbs/DeviceToLocalMessage_generated.h"
@@ -140,7 +141,7 @@ void CaptivePortalInstance::handleWebSocketEvent(std::uint8_t socketId, WebSocke
       break;
     default:
       m_socketDeFragger.clear();
-      ESP_LOGE(TAG, "Unknown WebSocket event type: %d", type);
+      ESP_LOGE(TAG, "Unknown WebSocket event type: %u", type);
       break;
   }
 }
