@@ -5,11 +5,10 @@
 #include "Config.h"
 #include "Constants.h"
 #include "GatewayClient.h"
-#include "Logging.h"
-#include "ShockerModelType.h"
-#include "Time.h"
-#include "util/JsonRoot.h"
 #include "http/HTTPRequestManager.h"
+#include "Logging.h"
+#include "serialization/JsonAPI.h"
+#include "Time.h"
 
 #include <unordered_map>
 
@@ -49,168 +48,8 @@ void _evWiFiDisconnectedHandler(arduino_event_t* event) {
   OpenShock::VisualStateManager::SetWebSocketConnected(false);
 }
 
-struct AccountLinkResponse {
-  std::string authToken;
-};
-struct DeviceInfoResponse {
-  std::string deviceId;
-  std::string deviceName;
-  struct ShockerInfo {
-    std::string id;
-    std::uint16_t rfId;
-    OpenShock::ShockerModelType model;
-  };
-  std::vector<ShockerInfo> shockers;
-};
-struct AssignLcgResponse {
-  std::string fqdn;
-  std::string country;
-};
-
-bool ParseAccountLinkJsonResponse(int code, const cJSON* root, AccountLinkResponse& out) {
-  if (!cJSON_IsObject(root)) {
-    ESP_LOGE(TAG, "Invalid JSON response");
-    return false;
-  }
-
-  const cJSON* data = cJSON_GetObjectItemCaseSensitive(root, "data");
-  if (!cJSON_IsString(data)) {
-    ESP_LOGE(TAG, "Invalid JSON response");
-    return false;
-  }
-
-  out = {};
-
-  out.authToken = data->valuestring;
-
-  return true;
-}
-bool ParseDeviceInfoJsonResponse(int code, const cJSON* root, DeviceInfoResponse& out) {
-  if (!cJSON_IsObject(root)) {
-    ESP_LOGE(TAG, "Invalid JSON response");
-    return false;
-  }
-
-  const cJSON* data = cJSON_GetObjectItemCaseSensitive(root, "data");
-  if (!cJSON_IsObject(data)) {
-    ESP_LOGE(TAG, "Invalid JSON response");
-    return false;
-  }
-
-  const cJSON* deviceId       = cJSON_GetObjectItemCaseSensitive(data, "id");
-  if (!cJSON_IsString(deviceId)) {
-    ESP_LOGE(TAG, "Invalid JSON response");
-    return false;
-  }
-
-  const cJSON* deviceName     = cJSON_GetObjectItemCaseSensitive(data, "name");
-  if (!cJSON_IsString(deviceName)) {
-    ESP_LOGE(TAG, "Invalid JSON response");
-    return false;
-  }
-
-  const cJSON* deviceShockers = cJSON_GetObjectItemCaseSensitive(data, "shockers");
-  if (!cJSON_IsArray(deviceShockers)) {
-    ESP_LOGE(TAG, "Invalid JSON response");
-    return false;
-  }
-
-  out = {};
-
-  out.deviceId   = deviceId->valuestring;
-  out.deviceName = deviceName->valuestring;
-
-  if (out.deviceId.empty() || out.deviceName.empty()) {
-    ESP_LOGE(TAG, "Invalid JSON response");
-    return false;
-  }
-
-  cJSON* shocker = nullptr;
-  cJSON_ArrayForEach(shocker, deviceShockers) {
-    const cJSON* shockerId    = cJSON_GetObjectItemCaseSensitive(shocker, "id");
-    if (!cJSON_IsString(shockerId)) {
-      ESP_LOGE(TAG, "Invalid JSON response");
-      return false;
-    }
-    const char* shockerIdStr = shockerId->valuestring;
-
-    if (shockerIdStr == nullptr || shockerIdStr[0] == '\0') {
-      ESP_LOGE(TAG, "Invalid JSON response");
-      return false;
-    }
-
-    const cJSON* shockerRfId  = cJSON_GetObjectItemCaseSensitive(shocker, "rfId");
-    if (!cJSON_IsNumber(shockerRfId)) {
-      ESP_LOGE(TAG, "Invalid JSON response");
-      return false;
-    }
-    int shockerRfIdInt = shockerRfId->valueint;
-    if (shockerRfIdInt < 0 || shockerRfIdInt > UINT16_MAX) {
-      ESP_LOGE(TAG, "Invalid JSON response");
-      return false;
-    }
-    std::uint16_t shockerRfIdU16 = (std::uint16_t)shockerRfIdInt;
-
-    const cJSON* shockerModel = cJSON_GetObjectItemCaseSensitive(shocker, "model");
-    if (!cJSON_IsString(shockerModel)) {
-      ESP_LOGE(TAG, "Invalid JSON response");
-      return false;
-    }
-    const char* shockerModelStr = shockerModel->valuestring;
-
-    if (shockerModelStr == nullptr || shockerModelStr[0] == '\0') {
-      ESP_LOGE(TAG, "Invalid JSON response");
-      return false;
-    }
-
-    OpenShock::ShockerModelType shockerModelType;
-    if (strcmp(shockerModelStr, "CaiXianlin") == 0 || strcmp(shockerModelStr, "CaiXianLin") == 0 || strcmp(shockerModelStr, "XLC") == 0 || strcmp(shockerModelStr, "CXL") == 0) {
-      shockerModelType = OpenShock::ShockerModelType::CaiXianlin;
-    } else if (strcmp(shockerModelStr, "PetTrainer") == 0 || strcmp(shockerModelStr, "PT") == 0) {
-      shockerModelType = OpenShock::ShockerModelType::PetTrainer;
-    } else {
-      ESP_LOGE(TAG, "Invalid JSON response");
-      return false;
-    }
-
-    out.shockers.push_back({
-      .id = shockerIdStr,
-      .rfId = shockerRfIdU16,
-      .model = shockerModelType
-    });
-  }
-
-  return true;
-}
-bool ParseLcgJsonResponse(int code, const cJSON* root, AssignLcgResponse& out) {
-  if (!cJSON_IsObject(root)) {
-    ESP_LOGE(TAG, "Invalid JSON response");
-    return false;
-  }
-
-  const cJSON* data = cJSON_GetObjectItemCaseSensitive(root, "data");
-  if (!cJSON_IsObject(data)) {
-    ESP_LOGE(TAG, "Invalid JSON response");
-    return false;
-  }
-
-  const cJSON* fqdn    = cJSON_GetObjectItemCaseSensitive(data, "fqdn");
-  const cJSON* country = cJSON_GetObjectItemCaseSensitive(data, "country");
-
-  if (!cJSON_IsString(fqdn) || !cJSON_IsString(country)) {
-    ESP_LOGE(TAG, "Invalid JSON response");
-    return false;
-  }
-
-  out = {};
-
-  out.fqdn    = fqdn->valuestring;
-  out.country = country->valuestring;
-
-  return true;
-}
-
 using namespace OpenShock;
+namespace JsonAPI = OpenShock::Serialization::JsonAPI;
 
 bool GatewayConnectionManager::Init() {
   WiFi.onEvent(_evGotIPHandler, ARDUINO_EVENT_WIFI_STA_GOT_IP);
@@ -243,13 +82,15 @@ AccountLinkResultCode GatewayConnectionManager::Pair(const char* pairCode) {
   char uri[256];
   sprintf(uri, OPENSHOCK_API_URL("/1/device/pair/%s"), pairCode);
 
-  auto response = HTTPRequestManager::GetJSON<AccountLinkResponse>({
+  auto response = HTTPRequestManager::GetJSON<JsonAPI::AccountLinkResponse>(
+  {
     .url = uri,
     .headers = {
+      {"Accept", "application/json"}
     },
     .okCodes = { 200, 404 },
     .blockOnRateLimit = true
-  }, ParseAccountLinkJsonResponse);
+  }, JsonAPI::ParseAccountLinkJsonResponse);
 
   if (response.result != HTTPRequestManager::RequestResult::Success) {
     ESP_LOGE(TAG, "Error while getting auth token: %d %d", response.result, response.code);
@@ -289,14 +130,16 @@ bool FetchDeviceInfo(const String& authToken) {
     return false;
   }
 
-  auto response = HTTPRequestManager::GetJSON<DeviceInfoResponse>({
+  auto response = HTTPRequestManager::GetJSON<JsonAPI::DeviceInfoResponse>(
+  {
     .url = OPENSHOCK_API_URL("/1/device/self"),
     .headers = {
-      { "DeviceToken", authToken }
+      {"Accept", "application/json"},
+      {"DeviceToken", authToken}
     },
     .okCodes = { 200, 401 },
     .blockOnRateLimit = true
-  }, ParseDeviceInfoJsonResponse);
+  }, JsonAPI::ParseDeviceInfoJsonResponse);
   if (response.result != HTTPRequestManager::RequestResult::Success) {
     ESP_LOGE(TAG, "Error while fetching device info: %d %d", response.result, response.code);
     return false;
@@ -348,14 +191,16 @@ bool ConnectToLCG() {
 
   String authToken = Config::GetBackendAuthToken().c_str();
 
-  auto response = HTTPRequestManager::GetJSON<AssignLcgResponse>({
+  auto response = HTTPRequestManager::GetJSON<JsonAPI::AssignLcgResponse>(
+  {
     .url = OPENSHOCK_API_URL("/1/device/assignLCG"),
     .headers = {
-      { "DeviceToken", authToken }
+      {"Accept", "application/json"},
+      {"DeviceToken", authToken}
     },
     .okCodes = { 200 },
     .blockOnRateLimit = true
-  }, ParseLcgJsonResponse);
+  }, JsonAPI::ParseAssignLcgJsonResponse);
   if (response.result != HTTPRequestManager::RequestResult::Success) {
     ESP_LOGE(TAG, "Error while fetching LCG endpoint: %d %d", response.result, response.code);
     return false;

@@ -59,4 +59,4 @@ namespace OpenShock::HTTPRequestManager {
 
     return { response.result, response.code, data };
   }
-}  // namespace OpenShock::HTTPClientManager
+}  // namespace OpenShock::HTTPRequestManager
