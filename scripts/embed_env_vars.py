@@ -38,8 +38,7 @@ def get_git_commit() -> str | None:
     try:
         # Get the current git repository.
         repo = git.Repo(search_parent_directories=True)
-        sha = repo.head.object.hexsha
-        return f'"{sha}"'  # Surround with quotes to make it unparsable as a number.
+        return repo.head.object.hexsha
     except git.exc.InvalidGitRepositoryError:
         return None
 
@@ -93,6 +92,10 @@ def transform_cpp_define_string(k: str, v: str) -> str:
 
 
 def serialize_cpp_define(k: str, v: str | int | bool) -> str | int:
+    # Special case for OPENSHOCK_FW_COMMIT.
+    if k == 'OPENSHOCK_FW_COMMIT':
+        return transform_cpp_define_string(k, str(v))
+
     try:
         return int(v)
     except ValueError:
