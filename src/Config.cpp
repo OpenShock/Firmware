@@ -431,7 +431,7 @@ std::uint8_t Config::GetWiFiCredentialsIDbyBSSID(const std::uint8_t (&bssid)[6])
   return 0;
 }
 
-std::uint8_t Config::GetWiFiCredentialsIDbySSIDorBSSID(const char* ssid, const std::uint8_t (&bssid)[6]) {
+std::uint8_t Config::GetWiFiCredentialsIDbyBSSIDorSSID(const std::uint8_t (&bssid)[6], const char* ssid) {
   std::uint8_t id = GetWiFiCredentialsIDbyBSSID(bssid);
   if (id != 0) {
     return id;

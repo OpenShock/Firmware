@@ -254,22 +254,23 @@ void _evWiFiScanStatusChanged(OpenShock::WiFiScanStatus status) {
   }
 }
 void _evWiFiNetworkDiscovery(const wifi_ap_record_t* record) {
+  std::uint8_t credsId = Config::GetWiFiCredentialsIDbyBSSIDorSSID(record->bssid, reinterpret_cast<const char*>(record->ssid));
+
   auto it = _findNetworkByBSSID(record->bssid);
   if (it != s_wifiNetworks.end()) {
     // Update the network
     memcpy(it->ssid, record->ssid, sizeof(it->ssid));
-    it->channel     = record->primary;
-    it->rssi        = record->rssi;
-    it->authMode    = record->authmode;
-    it->scansMissed = 0;
+    it->channel       = record->primary;
+    it->rssi          = record->rssi;
+    it->authMode      = record->authmode;
+    it->credentialsID = credsId;  // TODO: I don't understand why I need to set this here, but it seems to fix a bug where the credentials ID is not set correctly
+    it->scansMissed   = 0;
 
     Serialization::Local::SerializeWiFiNetworkEvent(Serialization::Types::WifiNetworkEventType::Updated, *it, CaptivePortal::BroadcastMessageBIN);
     ESP_LOGV(TAG, "Updated network %s (" BSSID_FMT ") with new scan info", it->ssid, BSSID_ARG(it->bssid));
 
     return;
   }
-
-  std::uint8_t credsId = Config::GetWiFiCredentialsIDbySSIDorBSSID(reinterpret_cast<const char*>(record->ssid), record->bssid);
 
   WiFiNetwork network(record->ssid, record->bssid, record->primary, record->rssi, record->authmode, credsId);
 

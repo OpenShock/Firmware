@@ -58,7 +58,7 @@ namespace OpenShock::Config {
   bool TryGetWiFiCredentialsByBSSID(const std::uint8_t (&bssid)[6], WiFiCredentials& out);
   std::uint8_t GetWiFiCredentialsIDbySSID(const char* ssid);
   std::uint8_t GetWiFiCredentialsIDbyBSSID(const std::uint8_t (&bssid)[6]);
-  std::uint8_t GetWiFiCredentialsIDbySSIDorBSSID(const char* ssid, const std::uint8_t (&bssid)[6]);
+  std::uint8_t GetWiFiCredentialsIDbyBSSIDorSSID(const std::uint8_t (&bssid)[6], const char* ssid);
   bool RemoveWiFiCredentials(std::uint8_t id);
   void ClearWiFiCredentials();
 
