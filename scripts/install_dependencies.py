@@ -39,6 +39,7 @@ class Package:
 required = [
     Package('fonttools', ['woff', 'unicode'], 'fontTools'),
     Package('brotli', [], 'brotli'),
+    Package('gitpython', [], 'git'),
 ]
 
 # Get all packages that are not installed
