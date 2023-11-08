@@ -6,7 +6,7 @@ const char* const TAG = "HTTPRequestManager";
 
 using namespace OpenShock;
 
-constexpr const char* USER_AGENT = "OpenShock/1.0";
+const char* const USER_AGENT = OPENSHOCK_FW_HOSTNAME "/" OPENSHOCK_FW_VERSION " (Espressif; " OPENSHOCK_FW_CHIP "; " OPENSHOCK_FW_BOARD ") " OPENSHOCK_FW_COMMIT;
 
 bool HTTPRequestManager::Init() {
   return true;
@@ -16,6 +16,8 @@ HTTPRequestManager::Response<String> HTTPRequestManager::GetString(const HTTPReq
   // TODO: Implement rate limiting
 
   HTTPClient client;
+
+  client.setUserAgent(USER_AGENT);
 
   if (!client.begin(request.url)) {
     ESP_LOGE(TAG, "Failed to begin HTTP request");

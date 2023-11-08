@@ -246,7 +246,6 @@ AccountLinkResultCode GatewayConnectionManager::Pair(const char* pairCode) {
   auto response = HTTPRequestManager::GetJSON<AccountLinkResponse>({
     .url = uri,
     .headers = {
-      { "User-Agent", "OpenShock/1.0" }
     },
     .okCodes = { 200, 404 },
     .blockOnRateLimit = true
@@ -293,7 +292,6 @@ bool FetchDeviceInfo(const String& authToken) {
   auto response = HTTPRequestManager::GetJSON<DeviceInfoResponse>({
     .url = OPENSHOCK_API_URL("/1/device/self"),
     .headers = {
-      { "User-Agent", "OpenShock/1.0" },
       { "DeviceToken", authToken }
     },
     .okCodes = { 200, 401 },
@@ -353,7 +351,6 @@ bool ConnectToLCG() {
   auto response = HTTPRequestManager::GetJSON<AssignLcgResponse>({
     .url = OPENSHOCK_API_URL("/1/device/assignLCG"),
     .headers = {
-      { "User-Agent", "OpenShock/1.0" },
       { "DeviceToken", authToken }
     },
     .okCodes = { 200 },
