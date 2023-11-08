@@ -4,59 +4,54 @@
 
 #include <Arduino.h>
 
+#include <functional>
 #include <map>
 #include <vector>
-#include <functional>
 
-namespace OpenShock::HTTPRequestManager {
+namespace OpenShock::HTTP {
   enum class RequestResult : std::uint8_t {
-    RequestFailed,
-    ServerError,
-    RateLimited,
-    ResponseCodeNotOK,
-    ParseFailed,
-    Success
+    RequestFailed,  // Failed to start request
+    RateLimited,    // Rate limited (can be both local and global)
+    CodeRejected,   // Request completed, but response code was not OK
+    ParseFailed,    // Request completed, but JSON parsing failed
+    Success,        // Request completed successfully
   };
 
   struct Request {
     const char* const url;
     std::map<String, String> headers;
-    std::vector<int> okCodes;
     bool blockOnRateLimit;
   };
 
-  template <typename T>
+  template<typename T>
   struct Response {
     RequestResult result;
     int code;
     T data;
   };
 
-  bool Init();
+  template<typename T>
+  using JsonParser = std::function<bool(int code, const cJSON* json, T& data)>;
 
-  Response<String> GetString(const Request& request);
+  Response<String> GetString(const Request& request, std::vector<int> acceptedCodes = {200});
 
-  template <typename T>
-  Response<T> GetJSON(const Request& request, std::function<bool(int code, const cJSON* json, T& data)> jsonParser) {
-    Response<String> response = GetString(request);
-    if (
-      response.result == RequestResult::RequestFailed     ||
-      response.result == RequestResult::RateLimited       ||
-      response.result == RequestResult::ResponseCodeNotOK
-      ) {
-      return { response.result, response.code, {} };
+  template<typename T>
+  Response<T> GetJSON(const Request& request, JsonParser<T> jsonParser, std::vector<int> acceptedCodes = {200}) {
+    auto response = GetString(request, acceptedCodes);
+    if (response.result != RequestResult::Success) {
+      return {response.result, response.code, {}};
     }
 
     OpenShock::JsonRoot json = OpenShock::JsonRoot::Parse(response.data);
     if (!json.isValid()) {
-      return { RequestResult::ParseFailed, response.code, {} };
+      return {RequestResult::ParseFailed, response.code, {}};
     }
 
     T data;
     if (!jsonParser(response.code, json, data)) {
-      return { RequestResult::ParseFailed, response.code, {} };
+      return {RequestResult::ParseFailed, response.code, {}};
     }
 
-    return { response.result, response.code, data };
+    return {response.result, response.code, data};
   }
-}  // namespace OpenShock::HTTPRequestManager
+}  // namespace OpenShock::HTTP

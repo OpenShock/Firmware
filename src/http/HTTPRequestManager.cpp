@@ -1,27 +1,97 @@
 #include "http/HTTPRequestManager.h"
 
+#include "Time.h"
+
 #include <HTTPClient.h>
 
-const char* const TAG = "HTTPRequestManager";
+#include <algorithm>
+#include <numeric>
+#include <unordered_map>
+
+const char* const TAG                    = "HTTPRequestManager";
+const char* const OPENSHOCK_FW_USERAGENT = OPENSHOCK_FW_HOSTNAME "/" OPENSHOCK_FW_VERSION " (Espressif; " OPENSHOCK_FW_CHIP "; " OPENSHOCK_FW_BOARD ") " OPENSHOCK_FW_COMMIT;
+
+struct RateLimit {
+  RateLimit(std::uint16_t limitSeconds10, std::uint16_t limitSeconds30, std::uint16_t limitMinutes1, std::uint16_t limitMinutes5)
+    : windowBegin(0), tooManyRequestsTime(0), requests {0}, index(0), m_limitSeconds10(limitSeconds10), m_limitSeconds30(limitSeconds30), m_limitMinutes1(limitMinutes1), m_limitMinutes5(limitMinutes5) { }
+
+  std::int64_t windowBegin;
+  std::int64_t tooManyRequestsTime;
+  std::array<std::uint8_t, 50> requests;  // 10 second bucket, 5 minute window
+  std::uint8_t index;
+
+  std::uint8_t current() const { return requests[index]; }
+  std::uint8_t total() const { return std::accumulate(requests.begin(), requests.end(), 0); }
+
+private:
+  std::uint16_t m_limitSeconds10;
+  std::uint16_t m_limitSeconds30;
+  std::uint16_t m_limitMinutes1;
+  std::uint16_t m_limitMinutes5;
+};
+
+std::unordered_map<std::string, RateLimit> s_rateLimits;
 
 using namespace OpenShock;
 
-const char* const USER_AGENT = OPENSHOCK_FW_HOSTNAME "/" OPENSHOCK_FW_VERSION " (Espressif; " OPENSHOCK_FW_CHIP "; " OPENSHOCK_FW_BOARD ") " OPENSHOCK_FW_COMMIT;
+RateLimit _rateLimitFactory(const char* url) {
+  if (strcmp(url, OPENSHOCK_API_DOMAIN) == 0) {
+    return RateLimit(10, 30, 6, 30);
+  }
 
-bool HTTPRequestManager::Init() {
-  return true;
+  return RateLimit(10, 30, 60, 300);  // Default to 1 per second
 }
 
-HTTPRequestManager::Response<String> HTTPRequestManager::GetString(const HTTPRequestManager::Request& request) {
-  // TODO: Implement rate limiting
+bool _rateLimit(const HTTP::Request& request) {
+  auto it = s_rateLimits.find(request.url);
+  if (it == s_rateLimits.end()) {
+    s_rateLimits.emplace(request.url, _rateLimitFactory(request.url));
+    it = s_rateLimits.find(request.url);
+  }
 
-  HTTPClient client;
+  RateLimit& rateLimit = it->second;
 
-  client.setUserAgent(USER_AGENT);
+  if (rateLimit.tooManyRequestsTime > 0) {
+    // If it's been more than 30 seconds since we were rate limited by the server, reset the rate limit
+    if (OpenShock::millis() - rateLimit.tooManyRequestsTime > 30 * 1000) {
+      rateLimit.tooManyRequestsTime = 0;
+    } else {
+      return true;
+    }
+  }
 
+  std::int64_t now = OpenShock::millis();
+  if (now - rateLimit.windowBegin > 30 * 60 * 1000) {
+    rateLimit.windowBegin = now;
+    rateLimit.index       = 0;
+    rateLimit.requests.fill(0);
+  }
+
+  rateLimit.requests[rateLimit.index]++;
+  rateLimit.index++;
+
+  return false;
+}
+
+void _registerTooManyRequests(const HTTP::Request& request) {
+  auto it = s_rateLimits.find(request.url);
+  if (it == s_rateLimits.end()) {
+    s_rateLimits.emplace(request.url, _rateLimitFactory(request.url));
+    it = s_rateLimits.find(request.url);
+  }
+
+  RateLimit& rateLimit = it->second;
+
+  rateLimit.tooManyRequestsTime = OpenShock::millis();
+}
+
+void _setupClient(HTTPClient& client) {
+  client.setUserAgent(OPENSHOCK_FW_USERAGENT);
+}
+HTTP::Response<String> _doGet(HTTPClient& client, const HTTP::Request& request) {
   if (!client.begin(request.url)) {
     ESP_LOGE(TAG, "Failed to begin HTTP request");
-    return { RequestResult::RequestFailed, 0, "" };
+    return {HTTP::RequestResult::RequestFailed, 0, ""};
   }
 
   for (auto& header : request.headers) {
@@ -31,20 +101,34 @@ HTTPRequestManager::Response<String> HTTPRequestManager::GetString(const HTTPReq
   int responseCode = client.GET();
 
   if (responseCode == HTTP_CODE_TOO_MANY_REQUESTS) {
-    // TODO: Implement rate limiting
+    _registerTooManyRequests(request);
+    return {HTTP::RequestResult::RateLimited, responseCode, ""};
   }
 
   if (responseCode == 418) {
     ESP_LOGW(TAG, "The server refused to brew coffee because it is, permanently, a teapot.");
   }
 
-  if (responseCode >= 500) {
-    return { RequestResult::ServerError, responseCode, "" };
+  return {HTTP::RequestResult::Success, responseCode, client.getString()};
+}
+
+HTTP::Response<String> HTTP::GetString(const HTTP::Request& request, std::vector<int> acceptedCodes) {
+  if (_rateLimit(request)) {
+    return {RequestResult::RateLimited, 0, ""};
   }
 
-  if (!std::any_of(request.okCodes.begin(), request.okCodes.end(), [responseCode](int code) { return code == responseCode; })) {
-    return { RequestResult::ResponseCodeNotOK, responseCode, "" };
+  HTTPClient client;
+  _setupClient(client);
+
+  auto response = _doGet(client, request);
+  if (response.result != RequestResult::Success) {
+    return response;
   }
 
-  return { RequestResult::Success, responseCode, client.getString() };
+  if (std::find(acceptedCodes.begin(), acceptedCodes.end(), response.code) == acceptedCodes.end()) {
+    ESP_LOGE(TAG, "Received unexpected response code %d", response.code);
+    return {RequestResult::CodeRejected, response.code, ""};
+  }
+
+  return response;
 }

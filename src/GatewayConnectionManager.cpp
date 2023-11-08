@@ -82,17 +82,9 @@ AccountLinkResultCode GatewayConnectionManager::Pair(const char* pairCode) {
   char uri[256];
   sprintf(uri, OPENSHOCK_API_URL("/1/device/pair/%s"), pairCode);
 
-  auto response = HTTPRequestManager::GetJSON<JsonAPI::AccountLinkResponse>(
-  {
-    .url = uri,
-    .headers = {
-      {"Accept", "application/json"}
-    },
-    .okCodes = { 200, 404 },
-    .blockOnRateLimit = true
-  }, JsonAPI::ParseAccountLinkJsonResponse);
+  auto response = HTTP::GetJSON<JsonAPI::AccountLinkResponse>({.url = uri, .headers = {{"Accept", "application/json"}}, .blockOnRateLimit = true}, JsonAPI::ParseAccountLinkJsonResponse, {200, 404});
 
-  if (response.result != HTTPRequestManager::RequestResult::Success) {
+  if (response.result != HTTP::RequestResult::Success) {
     ESP_LOGE(TAG, "Error while getting auth token: %d %d", response.result, response.code);
     return AccountLinkResultCode::InternalError;
   }
@@ -130,17 +122,15 @@ bool FetchDeviceInfo(const String& authToken) {
     return false;
   }
 
-  auto response = HTTPRequestManager::GetJSON<JsonAPI::DeviceInfoResponse>(
-  {
-    .url = OPENSHOCK_API_URL("/1/device/self"),
-    .headers = {
-      {"Accept", "application/json"},
-      {"DeviceToken", authToken}
-    },
-    .okCodes = { 200, 401 },
-    .blockOnRateLimit = true
-  }, JsonAPI::ParseDeviceInfoJsonResponse);
-  if (response.result != HTTPRequestManager::RequestResult::Success) {
+  auto response = HTTP::GetJSON<JsonAPI::DeviceInfoResponse>(
+    {
+      .url = OPENSHOCK_API_URL("/1/device/self"), .headers = {{"Accept", "application/json"}, {"DeviceToken", authToken}},
+           .blockOnRateLimit = true
+  },
+    JsonAPI::ParseDeviceInfoJsonResponse,
+    {200, 401}
+  );
+  if (response.result != HTTP::RequestResult::Success) {
     ESP_LOGE(TAG, "Error while fetching device info: %d %d", response.result, response.code);
     return false;
   }
@@ -191,17 +181,15 @@ bool ConnectToLCG() {
 
   String authToken = Config::GetBackendAuthToken().c_str();
 
-  auto response = HTTPRequestManager::GetJSON<JsonAPI::AssignLcgResponse>(
-  {
-    .url = OPENSHOCK_API_URL("/1/device/assignLCG"),
-    .headers = {
-      {"Accept", "application/json"},
-      {"DeviceToken", authToken}
-    },
-    .okCodes = { 200 },
-    .blockOnRateLimit = true
-  }, JsonAPI::ParseAssignLcgJsonResponse);
-  if (response.result != HTTPRequestManager::RequestResult::Success) {
+  auto response = HTTP::GetJSON<JsonAPI::AssignLcgResponse>(
+    {
+      .url = OPENSHOCK_API_URL("/1/device/assignLCG"), .headers = {{"Accept", "application/json"}, {"DeviceToken", authToken}},
+           .blockOnRateLimit = true
+  },
+    JsonAPI::ParseAssignLcgJsonResponse,
+    {200, 401}
+  );
+  if (response.result != HTTP::RequestResult::Success) {
     ESP_LOGE(TAG, "Error while fetching LCG endpoint: %d %d", response.result, response.code);
     return false;
   }
