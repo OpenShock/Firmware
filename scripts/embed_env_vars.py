@@ -1,5 +1,6 @@
 from typing import Mapping
 from utils import pioenv, sysenv, dotenv, shorthands
+import git
 
 # This file is invoked by PlatformIO during build.
 # See 'extra_scripts' in 'platformio.ini'.
@@ -32,12 +33,25 @@ dotenv_type = 'production' if is_release_build else 'development'
 dot = dotenv.DotEnv(project_dir, dotenv_type)
 
 
+# Get the current git commit hash.
+def get_git_commit() -> str | None:
+    try:
+        # Get the current git repository.
+        repo = git.Repo(search_parent_directories=True)
+        return repo.head.object.hexsha
+    except git.exc.InvalidGitRepositoryError:
+        return None
+
+
 # Find env variables based on only the pioenv and sysenv.
 def get_pio_firmware_vars() -> dict[str, str | int | bool]:
     vars = {}
     vars['OPENSHOCK_FW_BOARD'] = pio.get_string('PIOENV')
     vars['OPENSHOCK_FW_CHIP'] = pio.get_string('BOARD_MCU')
     vars['OPENSHOCK_FW_MODE'] = pio_build_type
+    git_commit = get_git_commit()
+    if git_commit is not None:
+        vars['OPENSHOCK_FW_COMMIT'] = git_commit
     return vars
 
 
@@ -65,6 +79,35 @@ def parse_pio_build_flags(raw_flags: list[str]) -> tuple[dict[str, str | int | b
     return (flag_dict, leftover_flags)
 
 
+def transform_cpp_define_string(k: str, v: str) -> str:
+    # Remove surrounding quotes if present.
+    if v.startswith('"') and v.endswith('"'):
+        v = v[1:-1]
+
+    # Special case for OPENSHOCK_FW_COMMIT.
+    if k == 'OPENSHOCK_FW_COMMIT' and len(v) > 7:
+        v = v[0:7]
+
+    return env.StringifyMacro(v)
+
+
+def serialize_cpp_define(k: str, v: str | int | bool) -> str | int:
+    # Special case for OPENSHOCK_FW_COMMIT.
+    if k == 'OPENSHOCK_FW_COMMIT':
+        return transform_cpp_define_string(k, str(v))
+
+    try:
+        return int(v)
+    except ValueError:
+        pass
+    if isinstance(v, str):
+        return transform_cpp_define_string(k, v)
+
+    # TODO: Handle booleans.
+
+    return v
+
+
 # Serialize CPP Defines.
 #   Strings are escaped to be a correct CPP macro.
 #   Booleans are turned into integers, True => 1 and False => 0.
@@ -72,14 +115,7 @@ def parse_pio_build_flags(raw_flags: list[str]) -> tuple[dict[str, str | int | b
 def serialize_cpp_defines(raw_defines: dict[str, str | int | bool]) -> dict[str, str | int]:
     result_defines = {}
     for k, v in raw_defines.items():
-        try:
-            v = int(v)
-        except ValueError:
-            pass
-        if isinstance(v, str):
-            result_defines[k] = env.StringifyMacro(v)
-        else:
-            result_defines[k] = v
+        result_defines[k] = serialize_cpp_define(k, v)
     return result_defines
 
 
