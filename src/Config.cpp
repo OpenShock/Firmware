@@ -411,14 +411,45 @@ bool Config::TryGetWiFiCredentialsByBSSID(const std::uint8_t (&bssid)[6], Config
   return false;
 }
 
-void Config::RemoveWiFiCredentials(std::uint8_t id) {
+std::uint8_t Config::GetWiFiCredentialsIDbySSID(const char* ssid) {
+  for (auto& creds : _mainConfig.wifi.credentials) {
+    if (creds.ssid == ssid) {
+      return creds.id;
+    }
+  }
+
+  return 0;
+}
+
+std::uint8_t Config::GetWiFiCredentialsIDbyBSSID(const std::uint8_t (&bssid)[6]) {
+  for (auto& creds : _mainConfig.wifi.credentials) {
+    if (memcmp(creds.bssid, bssid, 6) == 0) {
+      return creds.id;
+    }
+  }
+
+  return 0;
+}
+
+std::uint8_t Config::GetWiFiCredentialsIDbySSIDorBSSID(const char* ssid, const std::uint8_t (&bssid)[6]) {
+  std::uint8_t id = GetWiFiCredentialsIDbyBSSID(bssid);
+  if (id != 0) {
+    return id;
+  }
+
+  return GetWiFiCredentialsIDbySSID(ssid);
+}
+
+bool Config::RemoveWiFiCredentials(std::uint8_t id) {
   for (auto it = _mainConfig.wifi.credentials.begin(); it != _mainConfig.wifi.credentials.end(); ++it) {
     if (it->id == id) {
       _mainConfig.wifi.credentials.erase(it);
       _trySaveConfig();
-      return;
+      return true;
     }
   }
+
+  return false;
 }
 
 void Config::ClearWiFiCredentials() {
