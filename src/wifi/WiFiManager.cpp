@@ -16,8 +16,8 @@
 
 #include <esp_wifi_types.h>
 
-#include <vector>
 #include <cstdint>
+#include <vector>
 
 const char* const TAG = "WiFiManager";
 
@@ -170,7 +170,7 @@ bool _authenticate(const WiFiNetwork& net, const std::string& password) {
     return false;
   }
 
-  Serialization::Local::SerializeWiFiNetworkSavedEvent(net, CaptivePortal::BroadcastMessageBIN);
+  Serialization::Local::SerializeWiFiNetworkEvent(Serialization::Types::WifiNetworkEventType::Saved, net, CaptivePortal::BroadcastMessageBIN);
 
   return _connect(net.ssid, password, net.bssid);
 }
@@ -194,7 +194,23 @@ void _evWiFiConnected(arduino_event_t* event) {
 
   ESP_LOGI(TAG, "Connected to network %s (" BSSID_FMT ")", reinterpret_cast<const char*>(info.ssid), BSSID_ARG(info.bssid));
 
-  Serialization::Local::SerializeWiFiNetworkConnectedEvent(*it, CaptivePortal::BroadcastMessageBIN);
+  Serialization::Local::SerializeWiFiNetworkEvent(Serialization::Types::WifiNetworkEventType::Connected, *it, CaptivePortal::BroadcastMessageBIN);
+}
+void _evWiFiGotIP(arduino_event_t* event) {
+  auto& info = event->event_info.got_ip;
+
+  std::uint8_t ip[4];
+  memcpy(ip, &info.ip_info.ip.addr, sizeof(ip));
+
+  ESP_LOGI(TAG, "Got IP address %u.%u.%u.%u from network " BSSID_FMT, ip[0], ip[1], ip[2], ip[3], BSSID_ARG(s_connectedBSSID));
+}
+void _evWiFiGotIP6(arduino_event_t* event) {
+  auto& info = event->event_info.got_ip6;
+
+  std::uint8_t ip6[16];
+  memcpy(ip6, &info.ip6_info.ip.addr, sizeof(ip6));
+
+  ESP_LOGI(TAG, "Got IPv6 address %02x%02x:%02x%02x:%02x%02x:%02x%02x from network " BSSID_FMT, ip6[0], ip6[1], ip6[2], ip6[3], ip6[4], ip6[5], ip6[6], ip6[7], BSSID_ARG(s_connectedBSSID));
 }
 void _evWiFiDisconnected(arduino_event_t* event) {
   s_wifiState = WiFiState::Disconnected;
@@ -224,7 +240,7 @@ void _evWiFiScanStatusChanged(OpenShock::WiFiScanStatus status) {
     for (auto it = s_wifiNetworks.begin(); it != s_wifiNetworks.end(); ++it) {
       if (it->scansMissed++ > 3) {
         ESP_LOGV(TAG, "Network %s (" BSSID_FMT ") has not been seen in 3 scans, removing from list", it->ssid, BSSID_ARG(it->bssid));
-        Serialization::Local::SerializeWiFiNetworkLostEvent(*it, CaptivePortal::BroadcastMessageBIN);
+        Serialization::Local::SerializeWiFiNetworkEvent(Serialization::Types::WifiNetworkEventType::Lost, *it, CaptivePortal::BroadcastMessageBIN);
         s_wifiNetworks.erase(it);
         it--;
       }
@@ -238,29 +254,27 @@ void _evWiFiScanStatusChanged(OpenShock::WiFiScanStatus status) {
   }
 }
 void _evWiFiNetworkDiscovery(const wifi_ap_record_t* record) {
+  std::uint8_t credsId = Config::GetWiFiCredentialsIDbyBSSIDorSSID(record->bssid, reinterpret_cast<const char*>(record->ssid));
+
   auto it = _findNetworkByBSSID(record->bssid);
   if (it != s_wifiNetworks.end()) {
     // Update the network
     memcpy(it->ssid, record->ssid, sizeof(it->ssid));
-    it->channel     = record->primary;
-    it->rssi        = record->rssi;
-    it->authMode    = record->authmode;
-    it->scansMissed = 0;
+    it->channel       = record->primary;
+    it->rssi          = record->rssi;
+    it->authMode      = record->authmode;
+    it->credentialsID = credsId;  // TODO: I don't understand why I need to set this here, but it seems to fix a bug where the credentials ID is not set correctly
+    it->scansMissed   = 0;
 
-    Serialization::Local::SerializeWiFiNetworkUpdatedEvent(*it, CaptivePortal::BroadcastMessageBIN);
+    Serialization::Local::SerializeWiFiNetworkEvent(Serialization::Types::WifiNetworkEventType::Updated, *it, CaptivePortal::BroadcastMessageBIN);
     ESP_LOGV(TAG, "Updated network %s (" BSSID_FMT ") with new scan info", it->ssid, BSSID_ARG(it->bssid));
 
     return;
   }
 
-  WiFiNetwork network(record->ssid, record->bssid, record->primary, record->rssi, record->authmode, 0);
+  WiFiNetwork network(record->ssid, record->bssid, record->primary, record->rssi, record->authmode, credsId);
 
-  Config::WiFiCredentials creds;
-  if (Config::TryGetWiFiCredentialsBySSID(reinterpret_cast<const char*>(record->ssid), creds) || Config::TryGetWiFiCredentialsByBSSID(record->bssid, creds)) {
-    network.credentialsID = creds.id;
-  }
-
-  Serialization::Local::SerializeWiFiNetworkDiscoveredEvent(network, CaptivePortal::BroadcastMessageBIN);
+  Serialization::Local::SerializeWiFiNetworkEvent(Serialization::Types::WifiNetworkEventType::Discovered, network, CaptivePortal::BroadcastMessageBIN);
   ESP_LOGV(TAG, "Discovered new network %s (" BSSID_FMT ")", network.ssid, BSSID_ARG(network.bssid));
 
   // Insert the network into the list of networks sorted by RSSI
@@ -269,6 +283,8 @@ void _evWiFiNetworkDiscovery(const wifi_ap_record_t* record) {
 
 bool WiFiManager::Init() {
   WiFi.onEvent(_evWiFiConnected, ARDUINO_EVENT_WIFI_STA_CONNECTED);
+  WiFi.onEvent(_evWiFiGotIP, ARDUINO_EVENT_WIFI_STA_GOT_IP);
+  WiFi.onEvent(_evWiFiGotIP6, ARDUINO_EVENT_WIFI_STA_GOT_IP6);
   WiFi.onEvent(_evWiFiDisconnected, ARDUINO_EVENT_WIFI_STA_DISCONNECTED);
   WiFiScanManager::RegisterStatusChangedHandler(_evWiFiScanStatusChanged);
   WiFiScanManager::RegisterNetworkDiscoveryHandler(_evWiFiNetworkDiscovery);
@@ -334,7 +350,10 @@ bool WiFiManager::Forget(const char* ssid) {
   }
 
   // Remove the credentials from the config
-  Config::RemoveWiFiCredentials(credsId);
+  if (Config::RemoveWiFiCredentials(credsId)) {
+    it->credentialsID = 0;
+    Serialization::Local::SerializeWiFiNetworkEvent(Serialization::Types::WifiNetworkEventType::Removed, *it, CaptivePortal::BroadcastMessageBIN);
+  }
 
   return true;
 }
@@ -357,7 +376,10 @@ bool WiFiManager::Forget(const std::uint8_t (&bssid)[6]) {
   }
 
   // Remove the credentials from the config
-  Config::RemoveWiFiCredentials(credsId);
+  if (Config::RemoveWiFiCredentials(credsId)) {
+    it->credentialsID = 0;
+    Serialization::Local::SerializeWiFiNetworkEvent(Serialization::Types::WifiNetworkEventType::Removed, *it, CaptivePortal::BroadcastMessageBIN);
+  }
 
   return true;
 }
