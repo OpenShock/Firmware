@@ -1,0 +1,51 @@
+name: 'Feature Request'
+description: "Is there a feature you'd really like to see? Request it here."
+title: '[Feature] '
+labels: ['type: enhancement']
+projects: ['OpenShock/3']
+
+body:
+
+  - type: markdown
+    attributes:
+      value: |
+        # Checklist
+
+  - type: checkboxes
+    id: checklist
+    attributes:
+      label: Pre-submission checklist
+      description: |
+        To prevent wasting your or our time, please fill out the below checklist before continuing.
+        Thanks for understanding!
+      options:
+        - label: 'I checked that there is no other Feature Request describing my wish.'
+          required: true
+        - label: 'I checked that this feature is, in fact, not supported.'
+          required: true
+        - label: 'I accept that this issue may be closed if any of the above are found to be untrue.'
+          required: true
+
+  - type: markdown
+    attributes:
+      value: |
+        # Describe the feature
+
+  - type: textarea
+    id: feature-request
+    attributes:
+      label: 'What should be possible that currently is not?'
+    validations:
+      required: true
+
+  - type: markdown
+    attributes:
+      value: |
+        # Anything else?
+
+  - type: textarea
+    id: anything-else
+    attributes:
+      label: 'Other remarks'
+    validations:
+      required: false

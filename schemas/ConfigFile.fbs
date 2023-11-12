@@ -1,0 +1,38 @@
+namespace OpenShock.Serialization.Configuration;
+
+struct BSSID {
+  array:[ubyte:6];
+}
+
+struct RFConfig {
+  tx_pin:uint8;
+}
+
+table WiFiCredentials {
+  id:uint8;
+  ssid:string;
+  bssid:BSSID;
+  password:string;
+}
+
+table WiFiConfig {
+  ap_ssid:string;
+  hostname:string;
+  credentials:[WiFiCredentials];
+}
+
+struct CaptivePortalConfig {
+  always_enabled:bool;
+}
+
+table BackendConfig {
+  host:string;
+  auth_token:string;
+}
+
+table Config {
+  rf:RFConfig;
+  wifi:WiFiConfig;
+  captive_portal:CaptivePortalConfig;
+  backend:BackendConfig;
+}

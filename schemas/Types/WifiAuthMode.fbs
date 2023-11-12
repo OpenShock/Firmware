@@ -1,0 +1,14 @@
+namespace OpenShock.Serialization.Types;
+
+enum WifiAuthMode : uint8 {
+  Open,
+  WEP,
+  WPA_PSK,
+  WPA2_PSK,
+  WPA_WPA2_PSK,
+  WPA2_ENTERPRISE,
+  WPA3_PSK,
+  WPA2_WPA3_PSK,
+  WAPI_PSK,
+  UNKNOWN
+}
