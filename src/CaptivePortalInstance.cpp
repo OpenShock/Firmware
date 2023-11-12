@@ -75,7 +75,7 @@ CaptivePortalInstance::CaptivePortalInstance()
     ESP_LOGI(TAG, "Serving files from LittleFS");
     ESP_LOGI(TAG, "Filesystem hash: %s", fsHash);
 
-    m_webServer.serveStatic("/", LittleFS, "/www/", "max-age=31536000").setDefaultFile("index.html").setSharedEtag(fsHash);
+    m_webServer.serveStatic("/", LittleFS, "/www/", "max-age=3600").setDefaultFile("index.html").setSharedEtag(fsHash);
 
     m_webServer.onNotFound([](AsyncWebServerRequest* request) { request->send(404, "text/plain", "Not found"); });
   } else {
