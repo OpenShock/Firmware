@@ -8,6 +8,7 @@
 namespace OpenShock {
   struct WiFiNetwork {
     WiFiNetwork();
+    WiFiNetwork(const wifi_ap_record_t* apRecord, std::uint8_t credentialsId);
     WiFiNetwork(const char (&ssid)[33], const std::uint8_t (&bssid)[6], std::uint8_t channel, std::int8_t rssi, wifi_auth_mode_t authMode, std::uint8_t credentialsId);
     WiFiNetwork(const std::uint8_t (&ssid)[33], const std::uint8_t (&bssid)[6], std::uint8_t channel, std::int8_t rssi, wifi_auth_mode_t authMode, std::uint8_t credentialsId);
 

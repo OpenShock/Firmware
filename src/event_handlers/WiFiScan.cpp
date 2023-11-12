@@ -1,8 +1,10 @@
 #include "event_handlers/WiFiScan.h"
 
 #include "CaptivePortal.h"
+#include "Config.h"
 #include "serialization/WSLocal.h"
 #include "wifi/WiFiManager.h"
+#include "wifi/WiFiNetwork.h"
 #include "wifi/WiFiScanManager.h"
 #include "wifi/WiFiScanStatus.h"
 
@@ -18,8 +20,10 @@ void _scanStatusChangedHandler(OpenShock::WiFiScanStatus status) {
 }
 
 void _scanNetworkDiscoveredHandler(const wifi_ap_record_t* record) {
-  bool isSaved = WiFiManager::IsSaved(reinterpret_cast<const char*>(record->ssid));
-  Serialization::Local::SerializeWiFiScanNetworkDiscoveredEvent(record, isSaved, CaptivePortal::BroadcastMessageBIN);
+  std::uint8_t id = Config::GetWiFiCredentialsIDbyBSSIDorSSID(record->bssid, reinterpret_cast<const char*>(record->ssid));
+  WiFiNetwork network(record, id);
+
+  Serialization::Local::SerializeWiFiNetworkEvent(Serialization::Types::WifiNetworkEventType::Discovered, network, CaptivePortal::BroadcastMessageBIN);
 }
 
 void OpenShock::EventHandlers::WiFiScan::Init() {

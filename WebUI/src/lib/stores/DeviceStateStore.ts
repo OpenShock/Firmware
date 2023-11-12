@@ -26,9 +26,18 @@ export const DeviceStateStore = {
       return store;
     });
   },
-  addWifiNetwork(network: WiFiNetwork) {
+  setWifiNetwork(network: WiFiNetwork) {
     update((store) => {
       store.wifiNetworks.set(network.bssid, network);
+      return store;
+    });
+  },
+  updateWifiNetwork(bssid: string, updater: (network: WiFiNetwork) => WiFiNetwork) {
+    update((store) => {
+      const network = store.wifiNetworks.get(bssid);
+      if (network) {
+        store.wifiNetworks.set(bssid, updater(network));
+      }
       return store;
     });
   },
