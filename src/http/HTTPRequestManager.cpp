@@ -42,11 +42,11 @@ RateLimit _rateLimitFactory(const char* url) {
   return RateLimit(10, 30, 60, 300);  // Default to 1 per second
 }
 
-bool _rateLimit(const HTTP::Request& request) {
-  auto it = s_rateLimits.find(request.url);
+bool _rateLimit(const char* url) {
+  auto it = s_rateLimits.find(url);
   if (it == s_rateLimits.end()) {
-    s_rateLimits.emplace(request.url, _rateLimitFactory(request.url));
-    it = s_rateLimits.find(request.url);
+    s_rateLimits.emplace(url, _rateLimitFactory(url));
+    it = s_rateLimits.find(url);
   }
 
   RateLimit& rateLimit = it->second;
@@ -73,11 +73,11 @@ bool _rateLimit(const HTTP::Request& request) {
   return false;
 }
 
-void _registerTooManyRequests(const HTTP::Request& request) {
-  auto it = s_rateLimits.find(request.url);
+void _registerTooManyRequests(const char* url) {
+  auto it = s_rateLimits.find(url);
   if (it == s_rateLimits.end()) {
-    s_rateLimits.emplace(request.url, _rateLimitFactory(request.url));
-    it = s_rateLimits.find(request.url);
+    s_rateLimits.emplace(url, _rateLimitFactory(url));
+    it = s_rateLimits.find(url);
   }
 
   RateLimit& rateLimit = it->second;
@@ -88,20 +88,20 @@ void _registerTooManyRequests(const HTTP::Request& request) {
 void _setupClient(HTTPClient& client) {
   client.setUserAgent(OPENSHOCK_FW_USERAGENT);
 }
-HTTP::Response<String> _doGet(HTTPClient& client, const HTTP::Request& request) {
-  if (!client.begin(request.url)) {
+HTTP::Response<String> _doGet(HTTPClient& client, const char* url, const std::map<String, String>& headers) {
+  if (!client.begin(url)) {
     ESP_LOGE(TAG, "Failed to begin HTTP request");
     return {HTTP::RequestResult::RequestFailed, 0, ""};
   }
 
-  for (auto& header : request.headers) {
+  for (auto& header : headers) {
     client.addHeader(header.first, header.second);
   }
 
   int responseCode = client.GET();
 
   if (responseCode == HTTP_CODE_TOO_MANY_REQUESTS) {
-    _registerTooManyRequests(request);
+    _registerTooManyRequests(url);
     return {HTTP::RequestResult::RateLimited, responseCode, ""};
   }
 
@@ -112,15 +112,15 @@ HTTP::Response<String> _doGet(HTTPClient& client, const HTTP::Request& request) 
   return {HTTP::RequestResult::Success, responseCode, client.getString()};
 }
 
-HTTP::Response<String> HTTP::GetString(const HTTP::Request& request, std::vector<int> acceptedCodes) {
-  if (_rateLimit(request)) {
+HTTP::Response<String> HTTP::GetString(const char* url, const std::map<String, String>& headers, std::vector<int> acceptedCodes) {
+  if (_rateLimit(url)) {
     return {RequestResult::RateLimited, 0, ""};
   }
 
   HTTPClient client;
   _setupClient(client);
 
-  auto response = _doGet(client, request);
+  auto response = _doGet(client, url, headers);
   if (response.result != RequestResult::Success) {
     return response;
   }

@@ -17,12 +17,6 @@ namespace OpenShock::HTTP {
     Success,        // Request completed successfully
   };
 
-  struct Request {
-    const char* const url;
-    std::map<String, String> headers;
-    bool blockOnRateLimit;
-  };
-
   template<typename T>
   struct Response {
     RequestResult result;
@@ -33,11 +27,11 @@ namespace OpenShock::HTTP {
   template<typename T>
   using JsonParser = std::function<bool(int code, const cJSON* json, T& data)>;
 
-  Response<String> GetString(const Request& request, std::vector<int> acceptedCodes = {200});
+  Response<String> GetString(const char* const url, const std::map<String, String>& headers, std::vector<int> acceptedCodes = {200});
 
   template<typename T>
-  Response<T> GetJSON(const Request& request, JsonParser<T> jsonParser, std::vector<int> acceptedCodes = {200}) {
-    auto response = GetString(request, acceptedCodes);
+  Response<T> GetJSON(const char* const url, const std::map<String, String>& headers, JsonParser<T> jsonParser, std::vector<int> acceptedCodes = {200}) {
+    auto response = GetString(url, headers, acceptedCodes);
     if (response.result != RequestResult::Success) {
       return {response.result, response.code, {}};
     }

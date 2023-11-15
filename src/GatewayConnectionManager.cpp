@@ -3,11 +3,9 @@
 #include "VisualStateManager.h"
 
 #include "Config.h"
-#include "Constants.h"
 #include "GatewayClient.h"
-#include "http/HTTPRequestManager.h"
+#include "http/JsonAPI.h"
 #include "Logging.h"
-#include "serialization/JsonAPI.h"
 #include "Time.h"
 
 #include <unordered_map>
@@ -79,10 +77,7 @@ AccountLinkResultCode GatewayConnectionManager::Pair(const char* pairCode) {
 
   ESP_LOGD(TAG, "Attempting to pair with pair code %s", pairCode);
 
-  char uri[256];
-  sprintf(uri, OPENSHOCK_API_URL("/1/device/pair/%s"), pairCode);
-
-  auto response = HTTP::GetJSON<JsonAPI::AccountLinkResponse>({.url = uri, .headers = {{"Accept", "application/json"}}, .blockOnRateLimit = true}, JsonAPI::ParseAccountLinkJsonResponse, {200, 404});
+  auto response = HTTP::JsonAPI::LinkAccount(pairCode);
 
   if (response.result != HTTP::RequestResult::Success) {
     ESP_LOGE(TAG, "Error while getting auth token: %d %d", response.result, response.code);
@@ -122,14 +117,8 @@ bool FetchDeviceInfo(const String& authToken) {
     return false;
   }
 
-  auto response = HTTP::GetJSON<JsonAPI::DeviceInfoResponse>(
-    {
-      .url = OPENSHOCK_API_URL("/1/device/self"), .headers = {{"Accept", "application/json"}, {"DeviceToken", authToken}},
-           .blockOnRateLimit = true
-  },
-    JsonAPI::ParseDeviceInfoJsonResponse,
-    {200, 401}
-  );
+  auto response = HTTP::JsonAPI::GetDeviceInfo(authToken);
+
   if (response.result != HTTP::RequestResult::Success) {
     ESP_LOGE(TAG, "Error while fetching device info: %d %d", response.result, response.code);
     return false;
@@ -181,14 +170,8 @@ bool ConnectToLCG() {
 
   String authToken = Config::GetBackendAuthToken().c_str();
 
-  auto response = HTTP::GetJSON<JsonAPI::AssignLcgResponse>(
-    {
-      .url = OPENSHOCK_API_URL("/1/device/assignLCG"), .headers = {{"Accept", "application/json"}, {"DeviceToken", authToken}},
-           .blockOnRateLimit = true
-  },
-    JsonAPI::ParseAssignLcgJsonResponse,
-    {200, 401}
-  );
+  auto response = HTTP::JsonAPI::AssignLcg(authToken);
+
   if (response.result != HTTP::RequestResult::Success) {
     ESP_LOGE(TAG, "Error while fetching LCG endpoint: %d %d", response.result, response.code);
     return false;
