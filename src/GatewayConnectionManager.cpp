@@ -88,6 +88,11 @@ AccountLinkResultCode GatewayConnectionManager::Pair(const char* pairCode) {
     return AccountLinkResultCode::InvalidCode;
   }
 
+  if (response.code != 200) {
+    ESP_LOGE(TAG, "Unexpected response code: %d", response.code);
+    return AccountLinkResultCode::InternalError;
+  }
+
   std::string& authToken = response.data.authToken;
 
   if (authToken.empty()) {
@@ -127,6 +132,11 @@ bool FetchDeviceInfo(const String& authToken) {
   if (response.code == 401) {
     ESP_LOGD(TAG, "Auth token is invalid, clearing it");
     Config::ClearBackendAuthToken();
+    return false;
+  }
+
+  if (response.code != 200) {
+    ESP_LOGE(TAG, "Unexpected response code: %d", response.code);
     return false;
   }
 
@@ -174,6 +184,17 @@ bool ConnectToLCG() {
 
   if (response.result != HTTP::RequestResult::Success) {
     ESP_LOGE(TAG, "Error while fetching LCG endpoint: %d %d", response.result, response.code);
+    return false;
+  }
+
+  if (response.code == 401) {
+    ESP_LOGD(TAG, "Auth token is invalid, clearing it");
+    Config::ClearBackendAuthToken();
+    return false;
+  }
+
+  if (response.code != 200) {
+    ESP_LOGE(TAG, "Unexpected response code: %d", response.code);
     return false;
   }
 
