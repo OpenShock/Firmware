@@ -10,6 +10,7 @@
 
 namespace OpenShock::HTTP {
   enum class RequestResult : std::uint8_t {
+    InvalidURL,     // Invalid URL
     RequestFailed,  // Failed to start request
     RateLimited,    // Rate limited (can be both local and global)
     CodeRejected,   // Request completed, but response code was not OK
