@@ -1,6 +1,6 @@
 #include "GatewayClient.h"
 
-#include "CertificateUtils.h"
+#include "util/CertificateUtils.h"
 #include "event_handlers/WebSocket.h"
 #include "Logging.h"
 #include "Time.h"

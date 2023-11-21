@@ -1,6 +1,6 @@
 #include "serialization/WSLocal.h"
 
-#include "Utils/HexUtils.h"
+#include "util/HexUtils.h"
 #include "wifi/WiFiNetwork.h"
 
 #include "serialization/_fbs/DeviceToLocalMessage_generated.h"

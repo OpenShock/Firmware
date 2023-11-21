@@ -1,7 +1,7 @@
 #include "event_handlers/impl/WSLocal.h"
 
 #include "Logging.h"
-#include "Utils/HexUtils.h"
+#include "util/HexUtils.h"
 #include "wifi/WiFiManager.h"
 
 #include <nonstd/span.hpp>
