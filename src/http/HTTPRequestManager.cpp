@@ -20,12 +20,6 @@ struct RateLimit {
     m_limits.insert(std::upper_bound(m_limits.begin(), m_limits.end(), durationMs, [](std::int64_t durationMs, const Limit& limit) {
       return durationMs > limit.durationMs;
     }), {durationMs, count});
-
-    // TODO: DEBUG THIS
-    // List all limits
-    for (auto& limit : m_limits) {
-      ESP_LOGI(TAG, "Limit: %lld, %d", limit.durationMs, limit.count);
-    }
   }
   void clearLimits() {
     m_limits.clear();
