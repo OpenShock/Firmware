@@ -32,7 +32,7 @@ HTTP::Response<Serialization::JsonAPI::DeviceInfoResponse> HTTP::JsonAPI::GetDev
 
 HTTP::Response<Serialization::JsonAPI::AssignLcgResponse> HTTP::JsonAPI::AssignLcg(const String& deviceToken) {
   return HTTP::GetJSON<Serialization::JsonAPI::AssignLcgResponse>(
-    OPENSHOCK_API_URL("/1/device/assign_lcg"),
+    OPENSHOCK_API_URL("/1/device/assignLCG"),
     {
       {     "Accept", "application/json"},
       {"DeviceToken",        deviceToken}
