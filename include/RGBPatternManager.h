@@ -2,13 +2,13 @@
 
 #include <nonstd/span.hpp>
 
+#include <esp32-hal-rmt.h>
+
 #include <freertos/FreeRTOS.h>
 #include <freertos/semphr.h>
 #include <freertos/task.h>
 
 #include <cstdint>
-
-#include <esp32-hal-rmt.h>
 
 namespace OpenShock {
   class RGBPatternManager {
@@ -33,9 +33,8 @@ namespace OpenShock {
     static void RunPattern(void* arg);
 
     std::uint8_t m_rgbPin;
-    std::uint8_t m_rgbBrightness; // 0-255
+    std::uint8_t m_rgbBrightness;  // 0-255
     rmt_obj_t* m_rmtHandle;
-    char m_name[32];
     RGBState* m_pattern;
     std::size_t m_patternLength;
     TaskHandle_t m_taskHandle;

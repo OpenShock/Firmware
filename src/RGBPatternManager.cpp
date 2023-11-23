@@ -12,15 +12,13 @@ using namespace OpenShock;
 // TODO: Support multiple LEDs ?
 // TODO: Support other LED types ?
 
-RGBPatternManager::RGBPatternManager(std::uint8_t rgbPin) : m_rgbPin(rgbPin), m_rgbBrightness(255), m_name {0}, m_pattern(nullptr), m_patternLength(0), m_taskHandle(nullptr), m_taskSemaphore(xSemaphoreCreateBinary()) {
-  snprintf(m_name, sizeof(m_name), "RGBPatternManager-%u", m_rgbPin);
-
+RGBPatternManager::RGBPatternManager(std::uint8_t rgbPin) : m_rgbPin(rgbPin), m_rgbBrightness(255), m_pattern(nullptr), m_patternLength(0), m_taskHandle(nullptr), m_taskSemaphore(xSemaphoreCreateBinary()) {
   if ((m_rmtHandle = rmtInit(m_rgbPin, RMT_TX_MODE, RMT_MEM_64)) == NULL) {
-    ESP_LOGE(m_name, "Failed to create rgb rmt object");
+    ESP_LOGE(TAG, "[pin-%u] Failed to create rgb rmt object", m_rgbPin);
   }
 
   float realTick = rmtSetTick(m_rmtHandle, 100);
-  ESP_LOGD(m_name, "real tick set to: %fns", realTick);
+  ESP_LOGD(TAG, "[pin-%u] real tick set to: %fns", m_rgbPin, realTick);
 
   SetBrightness(20);
 
@@ -41,10 +39,13 @@ void RGBPatternManager::SetPattern(nonstd::span<const RGBState> pattern) {
   m_pattern       = new RGBState[m_patternLength];
   std::copy(pattern.begin(), pattern.end(), m_pattern);
 
+  char name[32];
+  snprintf(name, sizeof(name), "RGBPatternManager-%u", m_rgbPin);
+
   // Start the task
-  BaseType_t result = xTaskCreate(RunPattern, m_name, 1024, this, 1, &m_taskHandle);
+  BaseType_t result = xTaskCreate(RunPattern, name, 1024, this, 1, &m_taskHandle);
   if (result != pdPASS) {
-    ESP_LOGE(m_name, "Failed to create task: %d", result);
+    ESP_LOGE(TAG, "[pin-%u] Failed to create task: %d", m_rgbPin, result);
 
     m_taskHandle = nullptr;
 
@@ -123,14 +124,13 @@ void RGBPatternManager::SendRGB(const RGBState state) {
 void RGBPatternManager::RunPattern(void* arg) {
   RGBPatternManager* thisPtr = reinterpret_cast<RGBPatternManager*>(arg);
 
-  std::uint8_t pin                     = thisPtr->m_rgbPin;
   RGBPatternManager::RGBState* pattern = thisPtr->m_pattern;
   std::size_t patternLength            = thisPtr->m_patternLength;
 
   while (true) {
     for (std::size_t i = 0; i < patternLength; ++i) {
       thisPtr->SendRGB(pattern[i]);
-      vTaskDelay(pattern[i].duration / portTICK_PERIOD_MS);
+      vTaskDelay(pdMS_TO_TICKS([i].duration));
     }
   }
 }
