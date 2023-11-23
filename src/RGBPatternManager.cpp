@@ -130,7 +130,7 @@ void RGBPatternManager::RunPattern(void* arg) {
   while (true) {
     for (std::size_t i = 0; i < patternLength; ++i) {
       thisPtr->SendRGB(pattern[i]);
-      vTaskDelay(pdMS_TO_TICKS([i].duration));
+      vTaskDelay(pattern[i].duration / portTICK_PERIOD_MS);
     }
   }
 }
