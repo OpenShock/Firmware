@@ -8,6 +8,10 @@
 
 const char* const TAG = "EStopManager";
 
+namespace OpenShock::EStopManager {
+  void Update(TimerHandle_t xTimer);
+}
+
 using namespace OpenShock;
 
 static EStopManager::EStopStatus s_estopStatus    = EStopManager::EStopStatus::ALL_CLEAR;
@@ -24,33 +28,31 @@ void EStopManager::Init() {
   s_estopPin = OPENSHOCK_ESTOP_PIN;
   pinMode(s_estopPin, INPUT_PULLUP);
   ESP_LOGI(TAG, "Initializing on pin %u", s_estopPin);
+
+  // Start the repeating task, 10Hz may seem slow, but it's plenty fast for an EStop
+  if (xTimerCreate(TAG, pdMS_TO_TICKS(100), pdTRUE, nullptr, EStopManager::Update) == nullptr) {
+    ESP_LOGE(TAG, "Failed to create timer");
+  }
 #else
   ESP_LOGI(TAG, "EStopManager disabled, no pin defined");
 #endif
 }
 
 bool EStopManager::IsEStopped() {
-#ifdef OPENSHOCK_ESTOP_PIN
   return (s_estopStatus != EStopManager::EStopStatus::ALL_CLEAR);
-#else
-  return false;
-#endif
 }
 
 std::int64_t EStopManager::WhenEStopped() {
-#ifdef OPENSHOCK_ESTOP_PIN
   if (IsEStopped()) {
     return s_estoppedAt;
-  } else {
-    return 0;
   }
-#else
+
   return 0;
-#endif
 }
 
-EStopManager::EStopStatus EStopManager::Update() {
-#ifdef OPENSHOCK_ESTOP_PIN
+void EStopManager::Update(TimerHandle_t xTimer) {
+  configASSERT(xTimer);
+
   bool buttonState = digitalRead(s_estopPin);
   if (buttonState != s_lastEStopButtonState) {
     s_lastEStopButtonStateChange = OpenShock::millis();
@@ -91,9 +93,4 @@ EStopManager::EStopStatus EStopManager::Update() {
   }
 
   s_lastEStopButtonState = buttonState;
-
-  return s_estopStatus;
-#else
-  return EStopManager::EStopStatus::ALL_CLEAR;
-#endif
 }

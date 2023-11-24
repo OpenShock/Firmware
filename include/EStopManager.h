@@ -11,7 +11,6 @@ namespace OpenShock::EStopManager {
   };
 
   void Init();
-  EStopStatus Update();
   bool IsEStopped();
   std::int64_t WhenEStopped();
 }  // namespace OpenShock::EStopManager

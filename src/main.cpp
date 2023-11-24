@@ -54,5 +54,4 @@ void loop() {
   OpenShock::GatewayConnectionManager::Update();
   OpenShock::WiFiScanManager::Update();
   OpenShock::WiFiManager::Update();
-  OpenShock::EStopManager::Update();
 }
