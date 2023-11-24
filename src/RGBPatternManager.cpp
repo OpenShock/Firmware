@@ -1,6 +1,7 @@
 #include "RGBPatternManager.h"
 
 #include "Logging.h"
+#include "util/TaskUtils.h"
 
 #include <Arduino.h>
 
@@ -39,11 +40,8 @@ void RGBPatternManager::SetPattern(nonstd::span<const RGBState> pattern) {
   m_pattern       = new RGBState[m_patternLength];
   std::copy(pattern.begin(), pattern.end(), m_pattern);
 
-  char name[32];
-  snprintf(name, sizeof(name), "RGBPatternManager-%u", m_rgbPin);
-
   // Start the task
-  BaseType_t result = xTaskCreate(RunPattern, name, 1024, this, 1, &m_taskHandle);
+  BaseType_t result = TaskUtils::TaskCreateExpensive(RunPattern, TAG, 4096, this, 1, &m_taskHandle);
   if (result != pdPASS) {
     ESP_LOGE(TAG, "[pin-%u] Failed to create task: %d", m_rgbPin, result);
 
@@ -88,7 +86,7 @@ void RGBPatternManager::SetBrightness(std::uint8_t brightness) {
 void RGBPatternManager::SendRGB(const RGBState state) {
   const std::uint16_t bitCount = (8 * 3) * (1);  // 8 bits per color * 3 colors * 1 LED
 
-  rmt_data_t led_data[1];
+  rmt_data_t led_data[24];
 
   std::uint8_t r = (std::uint8_t)((std::uint16_t)state.red * m_rgbBrightness / 255);
   std::uint8_t g = (std::uint8_t)((std::uint16_t)state.green * m_rgbBrightness / 255);
@@ -118,7 +116,7 @@ void RGBPatternManager::SendRGB(const RGBState state) {
     }
   }
   // Send the data
-  rmtWrite(m_rmtHandle, led_data, bitCount);
+  rmtWriteBlocking(m_rmtHandle, led_data, bitCount);
 }
 
 void RGBPatternManager::RunPattern(void* arg) {
@@ -130,7 +128,7 @@ void RGBPatternManager::RunPattern(void* arg) {
   while (true) {
     for (std::size_t i = 0; i < patternLength; ++i) {
       thisPtr->SendRGB(pattern[i]);
-      vTaskDelay(pattern[i].duration / portTICK_PERIOD_MS);
+      vTaskDelay(pdMS_TO_TICKS(pattern[i].duration));
     }
   }
 }
