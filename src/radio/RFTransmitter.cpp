@@ -4,10 +4,10 @@
 #include "Logging.h"
 #include "radio/rmt/MainEncoder.h"
 #include "Time.h"
+#include "util/TaskUtils.h"
 
 #include <freertos/FreeRTOS.h>
 #include <freertos/queue.h>
-#include <freertos/task.h>
 
 #include <limits>
 
@@ -45,7 +45,7 @@ RFTransmitter::RFTransmitter(std::uint8_t gpioPin, int queueSize) : m_txPin(gpio
   char name[32];
   snprintf(name, sizeof(name), "RFTransmitter-%u", m_txPin);
 
-  if (xTaskCreate(TransmitTask, name, 4096, this, 1, &m_taskHandle) != pdPASS) {
+  if (TaskUtils::TaskCreateExpensive(TransmitTask, name, 4096, this, 1, &m_taskHandle) != pdPASS) {
     ESP_LOGE(TAG, "[pin-%u] Failed to create task", m_txPin);
     destroy();
     return;
