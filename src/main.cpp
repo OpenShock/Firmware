@@ -52,6 +52,5 @@ void loop() {
   OpenShock::SerialInputHandler::Update();
   OpenShock::CaptivePortal::Update();
   OpenShock::GatewayConnectionManager::Update();
-  OpenShock::WiFiScanManager::Update();
   OpenShock::WiFiManager::Update();
 }
