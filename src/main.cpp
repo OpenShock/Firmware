@@ -31,7 +31,7 @@ void setup() {
   OpenShock::SerialInputHandler::PrintWelcomeHeader();
   OpenShock::SerialInputHandler::PrintVersionInfo();
 
-  OpenShock::EStopManager::Init();
+  OpenShock::EStopManager::Init(100);  // 100ms update interval
 
   OpenShock::Config::Init();
 
