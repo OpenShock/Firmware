@@ -86,7 +86,7 @@ void RGBPatternManager::SetBrightness(std::uint8_t brightness) {
 void RGBPatternManager::SendRGB(const RGBState state) {
   const std::uint16_t bitCount = (8 * 3) * (1);  // 8 bits per color * 3 colors * 1 LED
 
-  rmt_data_t led_data[24];
+  rmt_data_t led_data[bitCount];
 
   std::uint8_t r = (std::uint8_t)((std::uint16_t)state.red * m_rgbBrightness / 255);
   std::uint8_t g = (std::uint8_t)((std::uint16_t)state.green * m_rgbBrightness / 255);
@@ -124,9 +124,6 @@ void RGBPatternManager::RunPattern(void* arg) {
 
   RGBPatternManager::RGBState* pattern = thisPtr->m_pattern;
   std::size_t patternLength            = thisPtr->m_patternLength;
-
-  // Send black to start
-  thisPtr->SendRGB({0, 0, 0, 0});
 
   while (true) {
     for (std::size_t i = 0; i < patternLength; ++i) {
