@@ -1,7 +1,7 @@
 #include "EStopManager.h"
 
-#include "Time.h"
 #include "Logging.h"
+#include "Time.h"
 #include "VisualStateManager.h"
 
 #include <Arduino.h>
@@ -10,11 +10,11 @@ const char* const TAG = "EStopManager";
 
 using namespace OpenShock;
 
-static EStopManager::EStopStatus s_estopStatus    = EStopManager::EStopStatus::ALL_CLEAR;
-static std::uint32_t s_estopHoldToClearTime       = 5000;
-static std::int64_t s_lastEStopButtonStateChange  = 0;
-static std::int64_t s_estoppedAt                  = 0;
-static bool s_lastEStopButtonState                = HIGH;
+static EStopManager::EStopStatus s_estopStatus   = EStopManager::EStopStatus::ALL_CLEAR;
+static std::uint32_t s_estopHoldToClearTime      = 5000;
+static std::int64_t s_lastEStopButtonStateChange = 0;
+static std::int64_t s_estoppedAt                 = 0;
+static bool s_lastEStopButtonState               = HIGH;
 
 static std::uint8_t s_estopPin;
 
@@ -61,13 +61,14 @@ EStopManager::EStopStatus EStopManager::Update() {
         s_estopStatus = EStopManager::EStopStatus::ESTOPPED_AND_HELD;
         s_estoppedAt  = s_lastEStopButtonStateChange;
         ESP_LOGI(TAG, "Emergency Stopped!!!");
-        OpenShock::VisualStateManager::SetEmergencyStop(true);
+        OpenShock::VisualStateManager::SetEmergencyStop(s_estopStatus);
       }
       break;
     case EStopManager::EStopStatus::ESTOPPED_AND_HELD:
       if (buttonState == HIGH) {
         // User has released the button, now we can trust them holding to clear it.
         s_estopStatus = EStopManager::EStopStatus::ESTOPPED;
+        OpenShock::VisualStateManager::SetEmergencyStop(s_estopStatus);
       }
       break;
     case EStopManager::EStopStatus::ESTOPPED:
@@ -75,7 +76,7 @@ EStopManager::EStopStatus EStopManager::Update() {
       if (buttonState == LOW && s_lastEStopButtonState == LOW && s_lastEStopButtonStateChange + s_estopHoldToClearTime <= OpenShock::millis()) {
         s_estopStatus = EStopManager::EStopStatus::ESTOPPED_CLEARED;
         ESP_LOGI(TAG, "Clearing EStop on button release!");
-        OpenShock::VisualStateManager::SetEmergencyStop(false);
+        OpenShock::VisualStateManager::SetEmergencyStop(s_estopStatus);
       }
       break;
     case EStopManager::EStopStatus::ESTOPPED_CLEARED:
@@ -83,6 +84,7 @@ EStopManager::EStopStatus EStopManager::Update() {
       if (buttonState == HIGH) {
         s_estopStatus = EStopManager::EStopStatus::ALL_CLEAR;
         ESP_LOGI(TAG, "All clear!");
+        OpenShock::VisualStateManager::SetEmergencyStop(s_estopStatus);
       }
       break;
 
