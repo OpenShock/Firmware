@@ -31,13 +31,14 @@ void _estopManagerTask(TimerHandle_t xTimer) {
         s_estopStatus = EStopManager::EStopStatus::ESTOPPED_AND_HELD;
         s_estoppedAt  = s_lastEStopButtonStateChange;
         ESP_LOGI(TAG, "Emergency Stopped!!!");
-        OpenShock::VisualStateManager::SetEmergencyStop(true);
+        OpenShock::VisualStateManager::SetEmergencyStop(s_estopStatus);
       }
       break;
     case EStopManager::EStopStatus::ESTOPPED_AND_HELD:
       if (buttonState == HIGH) {
         // User has released the button, now we can trust them holding to clear it.
         s_estopStatus = EStopManager::EStopStatus::ESTOPPED;
+        OpenShock::VisualStateManager::SetEmergencyStop(s_estopStatus);
       }
       break;
     case EStopManager::EStopStatus::ESTOPPED:
@@ -45,7 +46,7 @@ void _estopManagerTask(TimerHandle_t xTimer) {
       if (buttonState == LOW && s_lastEStopButtonState == LOW && s_lastEStopButtonStateChange + s_estopHoldToClearTime <= OpenShock::millis()) {
         s_estopStatus = EStopManager::EStopStatus::ESTOPPED_CLEARED;
         ESP_LOGI(TAG, "Clearing EStop on button release!");
-        OpenShock::VisualStateManager::SetEmergencyStop(false);
+        OpenShock::VisualStateManager::SetEmergencyStop(s_estopStatus);
       }
       break;
     case EStopManager::EStopStatus::ESTOPPED_CLEARED:
@@ -53,6 +54,7 @@ void _estopManagerTask(TimerHandle_t xTimer) {
       if (buttonState == HIGH) {
         s_estopStatus = EStopManager::EStopStatus::ALL_CLEAR;
         ESP_LOGI(TAG, "All clear!");
+        OpenShock::VisualStateManager::SetEmergencyStop(s_estopStatus);
       }
       break;
 
