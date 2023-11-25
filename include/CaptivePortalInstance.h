@@ -5,6 +5,9 @@
 #include <ESPAsyncWebServer.h>
 #include <WebSocketsServer.h>
 
+#include <freertos/FreeRTOS.h>
+#include <freertos/task.h>
+
 #include <cstdint>
 
 namespace OpenShock {
@@ -18,9 +21,8 @@ namespace OpenShock {
     bool broadcastMessageTXT(const char* data, std::size_t len) { return m_socketServer.broadcastTXT(data, len); }
     bool broadcastMessageBIN(const std::uint8_t* data, std::size_t len) { return m_socketServer.broadcastBIN(data, len); }
 
-    void loop() { m_socketServer.loop(); }
-
   private:
+    static void task(void* arg);
     void handleWebSocketClientConnected(std::uint8_t socketId);
     void handleWebSocketClientDisconnected(std::uint8_t socketId);
     void handleWebSocketClientError(std::uint8_t socketId, std::uint16_t code, const char* message);
@@ -29,5 +31,6 @@ namespace OpenShock {
     AsyncWebServer m_webServer;
     WebSocketsServer m_socketServer;
     WebSocketDeFragger m_socketDeFragger;
+    TaskHandle_t m_taskHandle;
   };
 }  // namespace OpenShock
