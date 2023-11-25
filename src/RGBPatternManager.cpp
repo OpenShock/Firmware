@@ -125,6 +125,9 @@ void RGBPatternManager::RunPattern(void* arg) {
   RGBPatternManager::RGBState* pattern = thisPtr->m_pattern;
   std::size_t patternLength            = thisPtr->m_patternLength;
 
+  // Send black to start
+  thisPtr->SendRGB({0, 0, 0, 0});
+
   while (true) {
     for (std::size_t i = 0; i < patternLength; ++i) {
       thisPtr->SendRGB(pattern[i]);
