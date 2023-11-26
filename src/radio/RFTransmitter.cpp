@@ -2,7 +2,6 @@
 #include "EStopManager.h"
 
 #include "Logging.h"
-#include "radio/rmt/MainEncoder.h"
 #include "Time.h"
 #include "util/TaskUtils.h"
 
@@ -10,13 +9,6 @@
 #include <freertos/queue.h>
 
 #include <limits>
-
-struct command_t {
-  std::int64_t until;
-  std::vector<rmt_data_t> sequence;
-  std::shared_ptr<std::vector<rmt_data_t>> zeroSequence;
-  std::uint16_t shockerId;
-};
 
 const char* const TAG = "RFTransmitter";
 
@@ -65,7 +57,7 @@ bool RFTransmitter::SendCommand(ShockerModelType model, std::uint16_t shockerId,
   // Intensity must be between 0 and 99
   intensity = std::min(intensity, (std::uint8_t)99);
 
-  command_t* cmd = new command_t {.until = OpenShock::millis() + durationMs, .sequence = Rmt::GetSequence(model, shockerId, type, intensity), .zeroSequence = Rmt::GetZeroSequence(model, shockerId), .shockerId = shockerId};
+  command_t* cmd = new command_t {.timestamp = OpenShock::millis() + durationMs, .sequence = Rmt::GetSequence(model, shockerId, type, intensity), .zeroSequence = Rmt::GetZeroSequence(model, shockerId), .shockerId = shockerId};
 
   // We will use nullptr commands to end the task, if we got a nullptr here, we are out of memory... :(
   if (cmd == nullptr) {
@@ -126,6 +118,35 @@ void RFTransmitter::destroy() {
   }
 }
 
+void RFTransmitter::replaceOrAddCommand(std::vector<command_t*>& commands, command_t* newCmd, bool createCopy = false) {
+  bool replaced = false;
+  for (auto it = commands.begin(); it != commands.end(); ++it) {
+    if ((*it)->shockerId == newCmd->shockerId) {
+      delete *it;
+      if (createCopy) {
+        *it = new command_t {.timestamp = newCmd->timestamp, .sequence = newCmd->sequence, .zeroSequence = newCmd->zeroSequence, .shockerId = newCmd->shockerId};
+      } else {
+        *it = newCmd;
+      }
+      replaced = true;
+      break;
+    }
+  }
+
+  if (!replaced) {
+    if (createCopy) {
+      commands.push_back(new command_t {.timestamp = newCmd->timestamp, .sequence = newCmd->sequence, .zeroSequence = newCmd->zeroSequence, .shockerId = newCmd->shockerId});
+    } else {
+      commands.push_back(newCmd);
+    }
+  }
+}
+
+// Task for transmitting RF to Shockers, as well as handling Shocker Keepalive
+// This task will run on APP_CORE when available
+// Keep-Alive is handled by adding a copy of the command to the keep-alive queue whenever a "stop" is supposed to be sent.
+// And after OPENSHOCK_SHOCKER_KEEPALIVE_INTERVAL_MS passes, we send the zero sequence to keep the shocker awake.
+// The keep-alive queue is cleared by Emergency Stops
 void RFTransmitter::TransmitTask(void* arg) {
   RFTransmitter* transmitter = reinterpret_cast<RFTransmitter*>(arg);
   std::uint8_t m_txPin       = transmitter->m_txPin;  // This must be defined here, because the THIS_LOG macro uses it
@@ -135,8 +156,11 @@ void RFTransmitter::TransmitTask(void* arg) {
   ESP_LOGD(TAG, "[pin-%u] RMT loop running on core %d", m_txPin, xPortGetCoreID());
 
   std::vector<command_t*> commands;
+#if OPENSHOCK_SHOCKER_KEEPALIVE_INTERVAL_MS > 0
+  std::vector<command_t*> keepAliveCommands;
+#endif
   while (true) {
-    // Receive commands
+    // Receive commands from CommandHandler via queue
     command_t* cmd = nullptr;
     while (xQueueReceive(queueHandle, &cmd, 0) == pdTRUE) {
       if (cmd == nullptr) {
@@ -152,38 +176,61 @@ void RFTransmitter::TransmitTask(void* arg) {
         return;
       }
 
-      // Replace the command if it already exists
-      bool replaced = false;
-      for (auto it = commands.begin(); it != commands.end(); ++it) {
-        if ((*it)->shockerId == cmd->shockerId) {
-          delete *it;
-          *it = cmd;
+      RFTransmitter::replaceOrAddCommand(commands, cmd);
+    }
 
-          replaced = true;
+#if OPENSHOCK_SHOCKER_KEEPALIVE_INTERVAL_MS > 0
+    // Add keep-alive commands to commands queue if the timestamp has passed
+    for (auto it = keepAliveCommands.begin(); it != keepAliveCommands.end();) {
+      cmd = *it;
 
-          break;
+      bool sendKeepAlive = cmd->timestamp < OpenShock::millis();
+
+      if (sendKeepAlive) {
+        for (auto it = commands.begin(); it != commands.end(); ++it) {
+          if ((*it)->shockerId == cmd->shockerId) {
+            sendKeepAlive = false;
+            break;
+          }
         }
       }
 
-      // If the command was not replaced, add it to the queue
-      if (!replaced) {
-        commands.push_back(cmd);
+      if (sendKeepAlive) {
+        // ESP_LOGD(TAG, "[pin-%u] Adding keep-alive command, free heap: %u", m_txPin, xPortGetFreeHeapSize());
+        cmd->timestamp = OpenShock::millis() + 1000;
+        RFTransmitter::replaceOrAddCommand(commands, cmd, true);
+        it = keepAliveCommands.erase(it);
+        delete cmd;
+      } else {
+        ++it;
       }
     }
+#endif
 
     // Send queued commands
     for (auto it = commands.begin(); it != commands.end();) {
       cmd = *it;
 
-      bool expired = cmd->until < OpenShock::millis();
+      bool expired = cmd->timestamp < OpenShock::millis();
       bool empty   = cmd->sequence.size() <= 0;
 
       // Remove expired or empty commands, else send the command.
       // After sending/receiving a command, move to the next one.
       if (expired || empty || OpenShock::EStopManager::IsEStopped()) {
         // If the command is not empty, send the zero sequence to stop the shocker
-        if (!empty) {
+        if (!empty && cmd->zeroSequence->size() > 0) {
           rmtWriteBlocking(rmtHandle, cmd->zeroSequence->data(), cmd->zeroSequence->size());
+
+#if OPENSHOCK_SHOCKER_KEEPALIVE_INTERVAL_MS > 0
+          // Add the command to the keep-alive queue
+          if (!OpenShock::EStopManager::IsEStopped()) {
+            // When to send the keep-alive message
+            cmd->timestamp = OpenShock::millis() + OPENSHOCK_SHOCKER_KEEPALIVE_INTERVAL_MS;
+            // What to send
+            cmd->sequence = *cmd->zeroSequence;
+            RFTransmitter::replaceOrAddCommand(keepAliveCommands, cmd, true);
+          }
+#endif
         }
 
         // Remove the command and move to the next one
