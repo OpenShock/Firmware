@@ -1,6 +1,7 @@
 #include "wifi/WiFiScanManager.h"
 
 #include "Logging.h"
+#include "Time.h"
 
 #include <WiFi.h>
 
