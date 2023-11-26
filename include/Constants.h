@@ -16,10 +16,6 @@
 #error "OPENSHOCK_FW_VERSION must be defined"
 #endif
 
-#ifndef OPENSHOCK_SHOCKER_KEEPALIVE_INTERVAL_MS
-#define OPENSHOCK_SHOCKER_KEEPALIVE_INTERVAL_MS 45'000
-#endif
-
 namespace OpenShock::Constants {
   constexpr std::uint8_t GPIO_INVALID = UINT8_MAX;
 }  // namespace OpenShock::Constants
