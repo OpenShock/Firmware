@@ -16,6 +16,24 @@
   $: scanStatus = $DeviceStateStore.wifiScanStatus;
   $: isScanning = scanStatus === WifiScanStatus.Started || scanStatus === WifiScanStatus.InProgress;
 
+  let filteredNetworks: WiFiNetwork[] = [];
+
+  // Reactive statement to group networks by SSID and select a representative for each group
+  $: {
+    const groups = new Map<string, WiFiNetwork[]>();
+    $DeviceStateStore.wifiNetworks.forEach((network: WiFiNetwork) => {
+      if (!groups.has(network.ssid)) {
+        groups.set(network.ssid, []);
+      }
+      groups.get(network.ssid)?.push(network);
+    });
+
+    filteredNetworks = Array.from(groups.values()).map((networks) => {
+      // Prioritize network with connected BSSID
+      const connectedNetwork = networks.find((n: WiFiNetwork) => n.bssid === connectedBSSID);
+      return connectedNetwork || networks[0];
+    });
+  }
   let connectedBSSID: string | null = null;
 
   function wifiScan() {
@@ -71,7 +89,7 @@
     </button>
   </div>
   <div class="max-h-64 overflow-auto">
-    {#each $DeviceStateStore.wifiNetworks as [key, network] (key)}
+    {#each filteredNetworks as network}
       <div class="card mb-2 p-2 flex justify-between items-center">
         <span>
           {#if network.bssid === connectedBSSID}

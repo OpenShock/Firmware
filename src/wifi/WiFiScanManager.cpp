@@ -10,14 +10,17 @@ const char* const TAG = "WiFiScanManager";
 
 constexpr const std::uint8_t OPENSHOCK_WIFI_SCAN_MAX_CHANNEL         = 13;
 constexpr const std::uint32_t OPENSHOCK_WIFI_SCAN_MAX_MS_PER_CHANNEL = 300;  // Adjusting this value will affect the scan rate, but may also affect the scan results
+constexpr const std::uint32_t OPENSHOCK_WIFI_SCAN_MAX_MS_PER_SCAN    = 20'000;
 
 using namespace OpenShock;
 
-static bool s_initialized            = false;
-static bool s_scanInProgress         = false;
-static bool s_channelScanDone        = false;
-static bool s_scanAborted            = false;
-static std::uint8_t s_currentChannel = 0;
+static bool s_initialized                      = false;
+static bool s_scanInProgress                   = false;
+static bool s_channelScanDone                  = false;
+static bool s_scanAborted                      = false;
+static int64_t s_lastChannelScanStartTimestamp = 0;
+static int64_t s_lastScanStartTimestamp        = 0;
+static std::uint8_t s_currentChannel           = 0;
 static std::map<std::uint64_t, WiFiScanManager::StatusChangedHandler> s_statusChangedHandlers;
 static std::map<std::uint64_t, WiFiScanManager::NetworkDiscoveryHandler> s_networkDiscoveredHandlers;
 
@@ -65,22 +68,26 @@ void _handleScanError(std::int16_t retval) {
 }
 
 void _iterateChannel() {
-  if (s_currentChannel-- <= 1) {
+  s_currentChannel++;
+  if (s_currentChannel > OPENSHOCK_WIFI_SCAN_MAX_CHANNEL) {
     s_currentChannel = 0;
     _setScanInProgress(false);
     return;
   }
 
-  s_channelScanDone = false;
+  s_lastChannelScanStartTimestamp = OpenShock::millis();
+  s_channelScanDone               = false;
 
-  std::int16_t retval = WiFi.scanNetworks(true, true, false, OPENSHOCK_WIFI_SCAN_MAX_MS_PER_CHANNEL, s_currentChannel);
+  if (s_currentChannel > 0) {
+    std::int16_t retval = WiFi.scanNetworks(true, true, false, OPENSHOCK_WIFI_SCAN_MAX_MS_PER_CHANNEL, s_currentChannel);
 
-  if (retval == WIFI_SCAN_RUNNING) {
-    _setScanInProgress(true);
-    return;
+    if (retval == WIFI_SCAN_RUNNING) {
+      _setScanInProgress(true);
+      return;
+    }
+
+    _handleScanError(retval);
   }
-
-  _handleScanError(retval);
 }
 
 void _evScanCompleted(arduino_event_id_t event, arduino_event_info_t info) {
@@ -132,8 +139,14 @@ bool WiFiScanManager::StartScan() {
     return false;
   }
 
-  WiFi.enableSTA(true);
-  s_currentChannel = OPENSHOCK_WIFI_SCAN_MAX_CHANNEL;
+  // If not already connected to a network, disable STA to fix stuck scans
+  if (WiFi.status() != WL_CONNECTED) {
+    WiFi.enableSTA(false);
+  }
+
+  s_lastScanStartTimestamp = OpenShock::millis();
+  s_currentChannel         = 0;
+  s_channelScanDone        = false;
   _iterateChannel();
 
   return true;
@@ -144,6 +157,7 @@ void WiFiScanManager::AbortScan() {
     return;
   }
 
+  _setScanInProgress(false);
   s_scanAborted    = true;
   s_currentChannel = 0;
 }
@@ -179,7 +193,19 @@ void WiFiScanManager::UnregisterNetworkDiscoveredHandler(std::uint64_t handle) {
 void WiFiScanManager::Update() {
   if (!s_initialized) return;
 
+  if (s_scanInProgress && !s_channelScanDone && (OpenShock::millis() - s_lastChannelScanStartTimestamp > OPENSHOCK_WIFI_SCAN_MAX_MS_PER_CHANNEL * 2)) {
+    ESP_LOGD(TAG, "Scan on channel %u timed out", s_currentChannel);
+    _handleScanError(WIFI_SCAN_FAILED);
+  }
+
+  if (s_scanInProgress && (OpenShock::millis() - s_lastScanStartTimestamp > OPENSHOCK_WIFI_SCAN_MAX_MS_PER_SCAN)) {
+    ESP_LOGD(TAG, "Scan timed out");
+    _handleScanError(WIFI_SCAN_FAILED);
+    AbortScan();
+  }
+
   if (s_scanInProgress && s_channelScanDone) {
+    ESP_LOGD(TAG, "Scan on channel %u completed", s_currentChannel);
     _iterateChannel();
   }
 }
