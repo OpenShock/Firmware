@@ -60,6 +60,7 @@ namespace OpenShock::Config {
   std::uint8_t GetWiFiCredentialsIDbyBSSID(const std::uint8_t (&bssid)[6]);
   std::uint8_t GetWiFiCredentialsIDbyBSSIDorSSID(const std::uint8_t (&bssid)[6], const char* ssid);
   bool RemoveWiFiCredentials(std::uint8_t id);
+  std::uint8_t GetWiFiCredentialsCount();
   void ClearWiFiCredentials();
 
   bool HasBackendAuthToken();

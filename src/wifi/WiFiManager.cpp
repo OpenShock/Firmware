@@ -298,6 +298,7 @@ bool WiFiManager::Init() {
   WiFi.setAutoReconnect(false);
   WiFi.enableSTA(true);
   WiFi.setHostname(OPENSHOCK_FW_HOSTNAME);  // TODO: Add the device name to the hostname (retrieve from API and store in LittleFS)
+  WiFi.begin();
 
   return true;
 }

@@ -1,5 +1,6 @@
 #include "wifi/WiFiScanManager.h"
 
+#include "Config.h"
 #include "Logging.h"
 #include "Time.h"
 
@@ -141,7 +142,7 @@ bool WiFiScanManager::StartScan() {
   }
 
   // If not already connected to a network, disable STA to fix stuck scans
-  if (WiFi.status() != WL_CONNECTED) {
+  if (WiFi.status() != WL_CONNECTED && Config::GetWiFiCredentialsCount() == 0) {
     WiFi.enableSTA(false);
   }
 

@@ -452,6 +452,10 @@ bool Config::RemoveWiFiCredentials(std::uint8_t id) {
   return false;
 }
 
+std::uint8_t Config::GetWiFiCredentialsCount() {
+  return _mainConfig.wifi.credentials.size();
+}
+
 void Config::ClearWiFiCredentials() {
   _mainConfig.wifi.credentials.clear();
   _trySaveConfig();
