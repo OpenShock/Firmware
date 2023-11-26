@@ -5,7 +5,7 @@
 #include "GatewayConnectionManager.h"
 #include "Logging.h"
 #include "serialization/WSLocal.h"
-
+#include "util/TaskUtils.h"
 #include "wifi/WiFiManager.h"
 
 #include "serialization/_fbs/DeviceToLocalMessage_generated.h"
@@ -15,11 +15,12 @@
 
 static const char* TAG = "CaptivePortalInstance";
 
-constexpr std::uint16_t HTTP_PORT               = 80;
-constexpr std::uint16_t WEBSOCKET_PORT          = 81;
-constexpr std::uint32_t WEBSOCKET_PING_INTERVAL = 10'000;
-constexpr std::uint32_t WEBSOCKET_PING_TIMEOUT  = 1000;
-constexpr std::uint8_t WEBSOCKET_PING_RETRIES   = 3;
+constexpr std::uint16_t HTTP_PORT                 = 80;
+constexpr std::uint16_t WEBSOCKET_PORT            = 81;
+constexpr std::uint32_t WEBSOCKET_PING_INTERVAL   = 10'000;
+constexpr std::uint32_t WEBSOCKET_PING_TIMEOUT    = 1000;
+constexpr std::uint8_t WEBSOCKET_PING_RETRIES     = 3;
+constexpr std::uint32_t WEBSOCKET_UPDATE_INTERVAL = 10;  // 10ms / 100Hz
 
 using namespace OpenShock;
 
@@ -64,14 +65,23 @@ bool TryGetFsHash(char (&buffer)[65]) {
 }
 
 CaptivePortalInstance::CaptivePortalInstance()
-  : m_webServer(HTTP_PORT), m_socketServer(WEBSOCKET_PORT, "/ws", "json"), m_socketDeFragger(std::bind(&CaptivePortalInstance::handleWebSocketEvent, this, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3, std::placeholders::_4)) {
+  : m_webServer(HTTP_PORT)
+  , m_socketServer(WEBSOCKET_PORT, "/ws", "json")
+  , m_socketDeFragger(std::bind(&CaptivePortalInstance::handleWebSocketEvent, this, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3, std::placeholders::_4))
+  , m_taskHandle(nullptr) {
   m_socketServer.onEvent(std::bind(&WebSocketDeFragger::handler, &m_socketDeFragger, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3, std::placeholders::_4));
   m_socketServer.begin();
   m_socketServer.enableHeartbeat(WEBSOCKET_PING_INTERVAL, WEBSOCKET_PING_TIMEOUT, WEBSOCKET_PING_RETRIES);
 
   // Check if the www folder exists and is populated
+  bool indexExists = LittleFS.exists("/www/index.html.gz");
+
+  // Get the hash of the filesystem
   char fsHash[65];
-  if (LittleFS.exists("/www/index.html.gz") && TryGetFsHash(fsHash)) {
+  bool gotFsHash = TryGetFsHash(fsHash);
+
+  bool fsOk = indexExists && gotFsHash;
+  if (fsOk) {
     ESP_LOGI(TAG, "Serving files from LittleFS");
     ESP_LOGI(TAG, "Filesystem hash: %s", fsHash);
 
@@ -91,11 +101,28 @@ CaptivePortalInstance::CaptivePortalInstance()
   }
 
   m_webServer.begin();
+
+  if (fsOk) {
+    if (TaskUtils::TaskCreateExpensive(CaptivePortalInstance::task, TAG, 8192, this, 1, &m_taskHandle) != pdPASS) {
+      ESP_LOGE(TAG, "Failed to create task");
+    }
+  }
 }
 
 CaptivePortalInstance::~CaptivePortalInstance() {
+  vTaskDelete(m_taskHandle);
+
   m_webServer.end();
   m_socketServer.close();
+}
+
+void CaptivePortalInstance::task(void* arg) {
+  CaptivePortalInstance* instance = reinterpret_cast<CaptivePortalInstance*>(arg);
+
+  while (true) {
+    instance->m_socketServer.loop();
+    vTaskDelay(pdMS_TO_TICKS(WEBSOCKET_UPDATE_INTERVAL));
+  }
 }
 
 void CaptivePortalInstance::handleWebSocketClientConnected(std::uint8_t socketId) {
