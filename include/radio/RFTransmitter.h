@@ -20,6 +20,7 @@ namespace OpenShock {
     std::vector<rmt_data_t> sequence;
     std::shared_ptr<std::vector<rmt_data_t>> zeroSequence;
     std::uint16_t shockerId;
+    bool isKeepAlive;
   };
   class RFTransmitter {
   public:
@@ -28,7 +29,7 @@ namespace OpenShock {
 
     inline std::uint8_t GetTxPin() const { return m_txPin; }
 
-    inline bool ok() const { return m_rmtHandle != nullptr && m_queueHandle != nullptr && m_taskHandle != nullptr; }
+    inline bool ok() const { return m_rmtHandle != nullptr && m_transmitQueueHandle != nullptr && m_transmitTaskHandle != nullptr; }
 
     bool SendCommand(ShockerModelType model, std::uint16_t shockerId, ShockerCommandType type, std::uint8_t intensity, std::uint16_t durationMs);
     void ClearPendingCommands();
@@ -36,11 +37,14 @@ namespace OpenShock {
   private:
     void destroy();
     static void TransmitTask(void* arg);
-    static void replaceOrAddCommand(std::vector<command_t*>& commands, command_t* newCmd, bool createCopy);
+    static void KeepAliveTask(void* arg);
+    static void replaceOrAddCommand(std::vector<command_t*>& commands, command_t* newCmd, bool checkKeepAlive, bool createCopy);
 
     std::uint8_t m_txPin;
     rmt_obj_t* m_rmtHandle;
-    QueueHandle_t m_queueHandle;
-    TaskHandle_t m_taskHandle;
+    QueueHandle_t m_transmitQueueHandle;
+    TaskHandle_t m_transmitTaskHandle;
+    QueueHandle_t m_keepAliveQueueHandle;
+    TaskHandle_t m_keepAliveTaskHandle;
   };
 }  // namespace OpenShock
