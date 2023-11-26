@@ -232,15 +232,16 @@ void RFTransmitter::KeepAliveTask(void* arg) {
         if (xQueueSend(transmitQueueHandle, &copy, 0) != pdTRUE) {
           // ESP_LOGE(TAG, "Failed to send keep-alive command to queue");
           delete copy;
+          ++it;
         } else {
           it = keepAliveCommands.erase(it);
           delete cmd;
-          ++it;
         }
       } else {
         ++it;
       }
     }
+    vTaskDelay(1);
   }
 }
 #endif
