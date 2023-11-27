@@ -1,26 +1,22 @@
 #include "GatewayClient.h"
 
-#include "MessageHandlers/Server.h"
-#include "CertificateUtils.h"
+#include "util/CertificateUtils.h"
+#include "event_handlers/WebSocket.h"
 #include "Logging.h"
 #include "Time.h"
 
-#include "_fbs/DeviceToServerMessage_generated.h"
+#include "serialization/_fbs/DeviceToServerMessage_generated.h"
 
 const char* const TAG = "GatewayClient";
 
 using namespace OpenShock;
 
-GatewayClient::GatewayClient(const std::string& authToken, const std::string& fwVersionStr) : m_webSocket(), m_lastKeepAlive(0), m_state(State::Disconnected) {
+GatewayClient::GatewayClient(const std::string& authToken) : m_webSocket(), m_lastKeepAlive(0), m_state(State::Disconnected) {
   ESP_LOGD(TAG, "Creating GatewayClient");
-  std::string headers;
-  headers.reserve(512);
 
-  headers += "Firmware-Version: ";
-  headers += fwVersionStr;
-  headers += "\r\n";
-  headers += "Device-Token: ";
-  headers += authToken;
+  std::string headers = "Firmware-Version: " OPENSHOCK_FW_VERSION "\r\n"
+                        "Device-Token: "
+                      + authToken;
 
   m_webSocket.setExtraHeaders(headers.c_str());
   m_webSocket.onEvent(std::bind(&GatewayClient::_handleEvent, this, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3));
@@ -37,18 +33,18 @@ void GatewayClient::connect(const char* lcgFqdn) {
 
   m_state = State::Connecting;
 
-  //
-  //  ######  ########  ######  ##     ## ########  #### ######## ##    ##    ########  ####  ######  ##    ##
-  // ##    ## ##       ##    ## ##     ## ##     ##  ##     ##     ##  ##     ##     ##  ##  ##    ## ##   ##
-  // ##       ##       ##       ##     ## ##     ##  ##     ##      ####      ##     ##  ##  ##       ##  ##
-  //  ######  ######   ##       ##     ## ########   ##     ##       ##       ########   ##   ######  #####
-  //       ## ##       ##       ##     ## ##   ##    ##     ##       ##       ##   ##    ##        ## ##  ##
-  // ##    ## ##       ##    ## ##     ## ##    ##   ##     ##       ##       ##    ##   ##  ##    ## ##   ##
-  //  ######  ########  ######   #######  ##     ## ####    ##       ##       ##     ## ####  ######  ##    ##
-  //
-  // TODO: Implement certificate verification
-  //
-  #warning SSL certificate verification is currently not implemented, by RFC definition this is a security risk, and allows for MITM attacks, but the realistic risk is low
+//
+//  ######  ########  ######  ##     ## ########  #### ######## ##    ##    ########  ####  ######  ##    ##
+// ##    ## ##       ##    ## ##     ## ##     ##  ##     ##     ##  ##     ##     ##  ##  ##    ## ##   ##
+// ##       ##       ##       ##     ## ##     ##  ##     ##      ####      ##     ##  ##  ##       ##  ##
+//  ######  ######   ##       ##     ## ########   ##     ##       ##       ########   ##   ######  #####
+//       ## ##       ##       ##     ## ##   ##    ##     ##       ##       ##   ##    ##        ## ##  ##
+// ##    ## ##       ##    ## ##     ## ##    ##   ##     ##       ##       ##    ##   ##  ##    ## ##   ##
+//  ######  ########  ######   #######  ##     ## ####    ##       ##       ##     ## ####  ######  ##    ##
+//
+// TODO: Implement certificate verification
+//
+#warning SSL certificate verification is currently not implemented, by RFC definition this is a security risk, and allows for MITM attacks, but the realistic risk is low
 
   m_webSocket.beginSSL(lcgFqdn, 443, "/1/ws/device");
   ESP_LOGW(TAG, "WEBSOCKET CONNECTION BY RFC DEFINITION IS INSECURE, remote endpoint can not be verified due to lack of CA verification support, theoretically this is a security risk and allows for MITM attacks, but the realistic risk is low");
@@ -137,7 +133,7 @@ void GatewayClient::_handleEvent(WStype_t type, std::uint8_t* payload, std::size
       ESP_LOGD(TAG, "Received pong from API");
       break;
     case WStype_BIN:
-      MessageHandlers::Server::HandleBinary(payload, length);
+      EventHandlers::WebSocket::HandleGatewayBinary(payload, length);
       break;
     case WStype_FRAGMENT_BIN_START:
       ESP_LOGE(TAG, "Received binary fragment start from API, this is not supported!");

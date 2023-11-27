@@ -1,6 +1,6 @@
 #pragma once
 
-#include "_fbs/ConfigFile_generated.h"
+#include "serialization/_fbs/ConfigFile_generated.h"
 
 #include <functional>
 #include <string>
@@ -44,11 +44,11 @@ namespace OpenShock::Config {
   const CaptivePortalConfig& GetCaptivePortalConfig();
   const BackendConfig& GetBackendConfig();
 
-  void SetRFConfig(const RFConfig& config);
-  void SetWiFiConfig(const WiFiConfig& config);
-  void SetWiFiCredentials(const std::vector<WiFiCredentials>& credentials);
-  void SetCaptivePortalConfig(const CaptivePortalConfig& config);
-  void SetBackendConfig(const BackendConfig& config);
+  bool SetRFConfig(const RFConfig& config);
+  bool SetWiFiConfig(const WiFiConfig& config);
+  bool SetWiFiCredentials(const std::vector<WiFiCredentials>& credentials);
+  bool SetCaptivePortalConfig(const CaptivePortalConfig& config);
+  bool SetBackendConfig(const BackendConfig& config);
 
   bool SetRFConfigTxPin(std::uint8_t txPin);
 
@@ -56,11 +56,14 @@ namespace OpenShock::Config {
   bool TryGetWiFiCredentialsByID(std::uint8_t id, WiFiCredentials& out);
   bool TryGetWiFiCredentialsBySSID(const char* ssid, WiFiCredentials& out);
   bool TryGetWiFiCredentialsByBSSID(const std::uint8_t (&bssid)[6], WiFiCredentials& out);
-  void RemoveWiFiCredentials(std::uint8_t id);
+  std::uint8_t GetWiFiCredentialsIDbySSID(const char* ssid);
+  std::uint8_t GetWiFiCredentialsIDbyBSSID(const std::uint8_t (&bssid)[6]);
+  std::uint8_t GetWiFiCredentialsIDbyBSSIDorSSID(const std::uint8_t (&bssid)[6], const char* ssid);
+  bool RemoveWiFiCredentials(std::uint8_t id);
   void ClearWiFiCredentials();
 
   bool HasBackendAuthToken();
   const std::string& GetBackendAuthToken();
-  void SetBackendAuthToken(const std::string& token);
-  void ClearBackendAuthToken();
+  bool SetBackendAuthToken(const std::string& token);
+  bool ClearBackendAuthToken();
 }  // namespace OpenShock::Config

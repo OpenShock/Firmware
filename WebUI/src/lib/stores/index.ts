@@ -1,1 +1,1 @@
-export * from './WiFiStateStore';
+export * from './DeviceStateStore';

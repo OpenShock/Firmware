@@ -11,7 +11,7 @@
 namespace OpenShock {
   class PinPatternManager {
   public:
-    PinPatternManager(unsigned int gpioPin);
+    PinPatternManager(std::uint8_t gpioPin);
     ~PinPatternManager();
 
     struct State {
@@ -26,8 +26,7 @@ namespace OpenShock {
     void ClearPatternInternal();
     static void RunPattern(void* arg);
 
-    unsigned int m_gpioPin;
-    char m_name[32];
+    std::uint8_t m_gpioPin;
     State* m_pattern;
     std::size_t m_patternLength;
     TaskHandle_t m_taskHandle;

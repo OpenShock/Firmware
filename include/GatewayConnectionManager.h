@@ -1,6 +1,6 @@
 #pragma once
 
-#include "GatewayClient.h"
+#include "AccountLinkResultCode.h"
 
 #include <cstdint>
 #include <functional>
@@ -11,7 +11,7 @@ namespace OpenShock::GatewayConnectionManager {
   bool IsConnected();
 
   bool IsPaired();
-  bool Pair(const char* pairCode);
+  AccountLinkResultCode Pair(const char* pairCode);
   void UnPair();
 
   void Update();

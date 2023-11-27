@@ -1,0 +1,12 @@
+include "./WifiAuthMode.fbs";
+
+namespace OpenShock.Serialization.Types;
+
+table WifiNetwork {
+  ssid:string;
+  bssid:string;
+  channel:uint8;
+  rssi:int8;
+  auth_mode:WifiAuthMode;
+  saved:bool;
+}

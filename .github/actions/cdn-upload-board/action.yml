@@ -1,0 +1,45 @@
+name: cnd-upload-board
+description: Uploads firmware artifacts to CDN
+inputs:
+  cf-bucket:
+    description: Name of the S3 bucket
+    required: true
+  version:
+    description: Version to upload
+    required: true
+  release-channel:
+    description: 'Release channel that describes this upload'
+    required: false
+    default: 'none'
+  board:
+    description: 'Board to upload'
+    required: true
+
+runs:
+  using: composite
+  steps:
+    - name: Download filesystem image
+      uses: actions/download-artifact@v3
+      with:
+        name: filesystem
+        path: .
+
+    - name: Download firmware images
+      uses: actions/download-artifact@v3
+      with:
+        name: firmware_${{ inputs.board }}
+        path: .
+
+    - name: Download final artifact
+      uses: actions/download-artifact@v3
+      with:
+        name: OpenShock_${{ inputs.board }}
+        path: .
+
+    - name: Upload artifacts to CDN
+      shell: bash
+      run: |
+        mv OpenShock_*.bin OpenShock.bin
+        mkdir upload
+        mv *.bin upload/
+        rclone copy upload cdn:${{ inputs.cf-bucket }}/${{ inputs.version }}/${{ inputs.board }}/

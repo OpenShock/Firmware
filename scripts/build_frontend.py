@@ -1,7 +1,9 @@
 import os
 import re
+import sys
 import gzip
 import shutil
+import hashlib
 from utils import sysenv
 
 Import('env')  # type: ignore
@@ -18,10 +20,13 @@ def file_delete(file):
 
 
 def file_gzip(file_path, gzip_path):
+    size_before = os.path.getsize(file_path)
     dir_ensure(os.path.dirname(gzip_path))
     file_delete(gzip_path)
     with open(file_path, 'rb') as f_in, gzip.open(gzip_path, 'wb') as f_out:
         f_out.write(f_in.read())
+    size_after = os.path.getsize(gzip_path)
+    print('Gzipped ' + file_path + ': ' + str(size_before) + ' => ' + str(size_after) + ' bytes')
 
 
 def file_write_bin(file, data):
@@ -56,6 +61,20 @@ def file_write_text(file, text, enc):
     except:
         print('Error writing to ' + file)
         return False
+
+
+def pyftsubset(font_path, fa_unicode_csv, output_path):
+    # Use pyftsubset to remove all the unused icons.
+    # pyftsubset does not support reading from and writing to the same file, so we need to write to a temporary file.
+    # Then delete the original file and rename the temporary file to the original file.
+    pyftsubset_cmd = (
+        f'{sys.executable} -m fontTools.subset {font_path} --unicodes={fa_unicode_csv} --output-file={output_path}'
+    )
+
+    print('Running: ' + pyftsubset_cmd)
+
+    # Run pyftsubset.
+    os.system(pyftsubset_cmd)
 
 
 def get_fa_icon_map(srcdir, csspath):
@@ -106,6 +125,7 @@ def get_fa_icon_map(srcdir, csspath):
 
 
 def minify_fa_css(css_path, unused_css_selectors):
+    size_before = os.path.getsize(css_path)
     (s, enc) = file_read_text(css_path)
     if s == None or s == '':
         return
@@ -118,9 +138,12 @@ def minify_fa_css(css_path, unused_css_selectors):
             f_out.write(s)
     except Exception as e:
         print('Error writing to ' + css_path + ': ' + str(e))
+    size_after = os.path.getsize(css_path)
+    print('Minified ' + css_path + ': ' + str(size_before) + ' => ' + str(size_after) + ' bytes')
 
 
 def minify_fa_font(font_path, icon_map):
+    print('Minifying font: ' + font_path)
     values = []
     for icon in icon_map:
         values.append(icon_map[icon]['unicode'])
@@ -128,12 +151,16 @@ def minify_fa_font(font_path, icon_map):
 
     tmp_path = font_path + '.tmp'
 
+    size_before = os.path.getsize(font_path)
+
     # Use pyftsubset to remove all the unused icons.
-    # pyftsubset does not support reading from and writing to the same file, so we need to write to a temporary file.
-    # Then delete the original file and rename the temporary file to the original file.
-    os.system('pyftsubset {} --unicodes={} --output-file={}'.format(font_path, fa_unicode_csv, tmp_path))
+    pyftsubset(font_path, fa_unicode_csv, tmp_path)
+
+    # Delete the original font file and rename the temporary file to the original file.
     file_delete(font_path)
     os.rename(tmp_path, font_path)
+    size_after = os.path.getsize(font_path)
+    print('Minified ' + font_path + ': ' + str(size_before) + ' => ' + str(size_after) + ' bytes')
 
 
 def build_frontend(source, target, env):
@@ -235,9 +262,36 @@ def build_frontend(source, target, env):
 
         with gzip.open(dst_path + '.gz', 'wb') as f_out:
             f_out.write(s)
-        # If the file is index.html, also write a non-gzipped version.
-        if src_path.endswith('index.html'):
-            file_write_bin(dst_path, s)
+
+    # Hash the data/www directory.
+    hashMd5 = hashlib.md5()
+    hashSha1 = hashlib.sha1()
+    hashSha256 = hashlib.sha256()
+    for root, _, files in os.walk('data/www'):
+        root = root.replace('\\', '/')
+        for filename in files:
+            filepath = os.path.join(root, filename)
+            with open(filepath, 'rb') as f:
+                while True:
+                    chunk = f.read(65536)
+                    if not chunk:
+                        break
+                    hashMd5.update(chunk)
+                    hashSha1.update(chunk)
+                    hashSha256.update(chunk)
+    hashMd5 = hashMd5.hexdigest()
+    hashSha1 = hashSha1.hexdigest()
+    hashSha256 = hashSha256.hexdigest()
+
+    print('Build hash:')
+    print('  MD5:    ' + hashMd5)
+    print('  SHA1:   ' + hashSha1)
+    print('  SHA256: ' + hashSha256)
+
+    # Write the hashes to data/www files
+    file_write_text('data/www/hash.md5', hashMd5, None)
+    file_write_text('data/www/hash.sha1', hashSha1, None)
+    file_write_text('data/www/hash.sha256', hashSha256, None)
 
 
 env.AddPreAction('$BUILD_DIR/littlefs.bin', build_frontend)

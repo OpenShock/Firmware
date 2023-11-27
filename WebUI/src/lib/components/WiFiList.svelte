@@ -1,21 +1,25 @@
 <script lang="ts">
   import { getModalStore } from '@skeletonlabs/skeleton';
-  import WiFiInfo from '$lib/components/modals/WiFiDetails.svelte';
   import type { WiFiNetwork } from '$lib/types/WiFiNetwork';
-  import { WiFiStateStore } from '$lib/stores';
+  import { DeviceStateStore } from '$lib/stores';
   import { WebSocketClient } from '$lib/WebSocketClient';
-  import { WifiAuthMode } from '$lib/_fbs/open-shock/wifi-auth-mode';
+  import { WifiAuthMode } from '$lib/_fbs/open-shock/serialization/types/wifi-auth-mode';
+  import { WifiScanStatus } from '$lib/_fbs/open-shock/serialization/types/wifi-scan-status';
   import { SerializeWifiScanCommand } from '$lib/Serializers/WifiScanCommand';
   import { SerializeWifiNetworkDisconnectCommand } from '$lib/Serializers/WifiNetworkDisconnectCommand';
   import { SerializeWifiNetworkConnectCommand } from '$lib/Serializers/WifiNetworkConnectCommand';
   import { SerializeWifiNetworkSaveCommand } from '$lib/Serializers/WifiNetworkSaveCommand';
+  import WiFiDetails from './modals/WiFiDetails.svelte';
 
   const modalStore = getModalStore();
+
+  $: scanStatus = $DeviceStateStore.wifiScanStatus;
+  $: isScanning = scanStatus === WifiScanStatus.Started || scanStatus === WifiScanStatus.InProgress;
 
   let connectedBSSID: string | null = null;
 
   function wifiScan() {
-    const data = SerializeWifiScanCommand(!$WiFiStateStore.scanning);
+    const data = SerializeWifiScanCommand(!isScanning);
     WebSocketClient.Instance.Send(data);
   }
   function wifiAuthenticate(item: WiFiNetwork) {
@@ -48,7 +52,7 @@
     modalStore.trigger({
       type: 'component',
       component: {
-        ref: WiFiInfo,
+        ref: WiFiDetails,
         props: { bssid: item.bssid },
       },
     });
@@ -59,7 +63,7 @@
   <div class="flex justify-between items-center mb-2">
     <h3 class="h3">Configure WiFi</h3>
     <button class="btn variant-outline" on:click={wifiScan}>
-      {#if $WiFiStateStore.scanning}
+      {#if isScanning}
         <i class="fa fa-spinner fa-spin"></i>
       {:else}
         <i class="fa fa-rotate-right"></i>
@@ -67,7 +71,7 @@
     </button>
   </div>
   <div class="max-h-64 overflow-auto">
-    {#each $WiFiStateStore.networks as [key, network] (key)}
+    {#each $DeviceStateStore.wifiNetworks as [key, network] (key)}
       <div class="card mb-2 p-2 flex justify-between items-center">
         <span>
           {#if network.bssid === connectedBSSID}

@@ -4,14 +4,15 @@
 
 #include <string>
 #include <unordered_map>
+#include <cstdint>
 
 namespace OpenShock {
   class GatewayClient {
   public:
-    GatewayClient(const std::string& authToken, const std::string& fwVersionStr);
+    GatewayClient(const std::string& authToken);
     ~GatewayClient();
 
-    enum class State {
+    enum class State : std::uint8_t {
       Disconnected,
       Disconnecting,
       Connecting,

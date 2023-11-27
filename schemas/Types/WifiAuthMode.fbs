@@ -1,4 +1,4 @@
-namespace OpenShock;
+namespace OpenShock.Serialization.Types;
 
 enum WifiAuthMode : uint8 {
   Open,

@@ -2,15 +2,42 @@
   import { SerializeWifiNetworkSaveCommand } from '$lib/Serializers/WifiNetworkSaveCommand';
   import { SerializeWifiNetworkConnectCommand } from '$lib/Serializers/WifiNetworkConnectCommand';
   import { WebSocketClient } from '$lib/WebSocketClient';
-  import { WiFiStateStore } from '$lib/stores';
+  import { DeviceStateStore } from '$lib/stores';
   import { getModalStore } from '@skeletonlabs/skeleton';
   import { SerializeWifiNetworkForgetCommand } from '$lib/Serializers/WifiNetworkForgetCommand';
+  import { WifiAuthMode } from '$lib/_fbs/open-shock/serialization/types/wifi-auth-mode';
 
   export let bssid: string;
 
   const modalStore = getModalStore();
 
-  $: item = $WiFiStateStore.networks.get(bssid);
+  function GetWifiAuthModeString(type: WifiAuthMode) {
+    switch (type) {
+      case WifiAuthMode.Open:
+        return 'Open';
+      case WifiAuthMode.WEP:
+        return 'WEP';
+      case WifiAuthMode.WPA_PSK:
+        return 'WPA PSK';
+      case WifiAuthMode.WPA2_PSK:
+        return 'WPA2 PSK';
+      case WifiAuthMode.WPA_WPA2_PSK:
+        return 'WPA/WPA2 PSK';
+      case WifiAuthMode.WPA2_ENTERPRISE:
+        return 'WPA2 Enterprise';
+      case WifiAuthMode.WPA3_PSK:
+        return 'WPA3 PSK';
+      case WifiAuthMode.WPA2_WPA3_PSK:
+        return 'WPA2/WPA3 PSK';
+      case WifiAuthMode.WAPI_PSK:
+        return 'WAPI PSK';
+      case WifiAuthMode.UNKNOWN:
+      default:
+        return 'Unknown';
+    }
+  }
+
+  $: item = $DeviceStateStore.wifiNetworks.get(bssid);
 
   $: rows = item
     ? [
@@ -18,7 +45,7 @@
         { key: 'BSSID', value: item.bssid },
         { key: 'Channel', value: item.channel },
         { key: 'RSSI', value: item.rssi },
-        { key: 'Security', value: item.security },
+        { key: 'Security', value: GetWifiAuthModeString(item.security) },
         { key: 'Saved', value: item.saved },
       ]
     : [];

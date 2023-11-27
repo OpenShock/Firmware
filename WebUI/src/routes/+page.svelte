@@ -1,9 +1,12 @@
 <script lang="ts">
-  import { SerializeGatewayPairCommand } from '$lib/Serializers/GatewayPairCommand';
+  import { browser } from '$app/environment';
+  import { SerializeAccountLinkCommand } from '$lib/Serializers/AccountLinkCommand';
+  import { SerializeSetRfTxPinCommand } from '$lib/Serializers/SetRfTxPinCommand';
   import { WebSocketClient } from '$lib/WebSocketClient';
   import WiFiList from '$lib/components/WiFiList.svelte';
+  import { DeviceStateStore } from '$lib/stores';
 
-  function isValidPairCode(str: string) {
+  function isValidLinkCode(str: string) {
     if (typeof str != 'string') return false;
 
     for (var i = 0; i < str.length; i++) {
@@ -13,11 +16,21 @@
     return true;
   }
 
-  let pairCode: string = '';
-  $: pairCodeValid = isValidPairCode(pairCode);
+  let linkCode: string = '';
+  $: linkCodeValid = isValidLinkCode(linkCode);
 
-  function pair() {
-    const data = SerializeGatewayPairCommand(pairCode);
+  let rfTxPin: number | null = $DeviceStateStore.rfTxPin;
+  $: rfTxPinValid = rfTxPin !== null && rfTxPin >= 0 && rfTxPin < 255;
+
+  function linkAccount() {
+    if (!linkCodeValid) return;
+    const data = SerializeAccountLinkCommand(linkCode!);
+    WebSocketClient.Instance.Send(data);
+  }
+
+  function setRfTxPin() {
+    if (!rfTxPinValid) return;
+    const data = SerializeSetRfTxPinCommand(rfTxPin!);
     WebSocketClient.Instance.Send(data);
   }
 </script>
@@ -25,15 +38,23 @@
 <div class="flex flex-col items-center justify-center h-full">
   <div class="flex-col space-y-5 w-full max-w-md">
     <WiFiList />
+
     <div class="flex flex-col space-y-2">
-      <h3 class="h3">Other settings</h3>
+      <h3 class="h3">Account Linking</h3>
       <div class="flex space-x-2">
-        <input class={'input variant-form-material ' + (pairCodeValid ? '' : 'input-error')} type="text" placeholder="Pair Code" bind:value={pairCode} />
-        <button class="btn variant-filled" on:click={pair} disabled={!pairCodeValid || pairCode.length < 4}>Pair</button>
+        <input class={'input variant-form-material ' + (linkCodeValid ? '' : 'input-error')} type="text" inputmode="numeric" pattern="[0-9]*" placeholder="Link Code" bind:value={linkCode} />
+        <button class="btn variant-filled" on:click={linkAccount} disabled={!linkCodeValid || linkCode.length < 6}>Pair</button>
+      </div>
+    </div>
+
+    <div class="flex flex-col space-y-2">
+      <div class="flex flex-row space-x-2 items-center">
+        <h3 class="h3">RF TX Pin</h3>
+        <span class="text-sm text-gray-500">(Currently {$DeviceStateStore.rfTxPin == null ? ' not set' : $DeviceStateStore.rfTxPin}) </span>
       </div>
       <div class="flex space-x-2">
-        <input class="input variant-form-material" type="text" placeholder="TX Pin" />
-        <button class="btn variant-filled">Configure</button>
+        <input class="input variant-form-material" type="number" placeholder="TX Pin" bind:value={rfTxPin} />
+        <button class="btn variant-filled" on:click={setRfTxPin} disabled={!rfTxPinValid}>Set</button>
       </div>
     </div>
   </div>
