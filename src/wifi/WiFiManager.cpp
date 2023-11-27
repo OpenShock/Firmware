@@ -300,15 +300,11 @@ bool WiFiManager::Init() {
   WiFi.enableSTA(true);
   WiFi.setHostname(OPENSHOCK_FW_HOSTNAME);  // TODO: Add the device name to the hostname (retrieve from API and store in LittleFS)
 
+  // If we recognize the network in the ESP's WiFi cache, try to connect to it
   wifi_config_t current_conf;
   if (esp_wifi_get_config((wifi_interface_t)ESP_IF_WIFI_STA, &current_conf) == ESP_OK) {
-    char ssid[33];
-    char password[65];
-
     if (current_conf.sta.ssid[0] != '\0') {
-      memcpy(ssid, current_conf.sta.ssid, sizeof(ssid));
-      ssid[sizeof(ssid) - 1] = '\0';
-      if (Config::GetWiFiCredentialsIDbySSID(ssid) != 0) {
+      if (Config::GetWiFiCredentialsIDbySSID(reinterpret_cast<const char*>(current_conf.sta.ssid)) != 0) {
         WiFi.begin();
       }
     }
