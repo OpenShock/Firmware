@@ -1,27 +1,20 @@
 import type { WebSocketClient } from '$lib/WebSocketClient';
-import { WifiNetworkDiscoveredEvent } from '$lib/_fbs/open-shock/serialization/local/wifi-network-discovered-event';
 import { DeviceToLocalMessage } from '$lib/_fbs/open-shock/serialization/local/device-to-local-message';
 import { DeviceToLocalMessagePayload } from '$lib/_fbs/open-shock/serialization/local/device-to-local-message-payload';
 import { ReadyMessage } from '$lib/_fbs/open-shock/serialization/local/ready-message';
 import { WifiScanStatusMessage } from '$lib/_fbs/open-shock/serialization/local/wifi-scan-status-message';
 import { ByteBuffer } from 'flatbuffers';
-import { WifiNetworkUpdatedEvent } from '$lib/_fbs/open-shock/serialization/local/wifi-network-updated-event';
-import { WifiNetworkLostEvent } from '$lib/_fbs/open-shock/serialization/local/wifi-network-lost-event';
-import { WifiNetworkSavedEvent } from '$lib/_fbs/open-shock/serialization/local/wifi-network-saved-event';
-import { WifiNetworkRemovedEvent } from '$lib/_fbs/open-shock/serialization/local/wifi-network-removed-event';
-import { WifiNetworkConnectedEvent } from '$lib/_fbs/open-shock/serialization/local/wifi-network-connected-event';
-import { WifiNetworkDisconnectedEvent } from '$lib/_fbs/open-shock/serialization/local/wifi-network-disconnected-event';
 import { DeviceStateStore } from '$lib/stores';
-import type { WiFiNetwork } from '$lib/types/WiFiNetwork';
-import { WifiNetwork as FbsWifiNetwork } from '$lib/_fbs/open-shock/serialization/local/wifi-network';
 import { SerializeWifiScanCommand } from '$lib/Serializers/WifiScanCommand';
 import { toastDelegator } from '$lib/stores/ToastDelegator';
 import { SetRfTxPinCommandResult } from '$lib/_fbs/open-shock/serialization/local/set-rf-tx-pin-command-result';
 import { SetRfPinResultCode } from '$lib/_fbs/open-shock/serialization/local/set-rf-pin-result-code';
 import { AccountLinkCommandResult } from '$lib/_fbs/open-shock/serialization/local/account-link-command-result';
 import { AccountLinkResultCode } from '$lib/_fbs/open-shock/serialization/local/account-link-result-code';
+import { ErrorMessage } from '$lib/_fbs/open-shock/serialization/local/error-message';
+import { WifiNetworkEventHandler } from './WifiNetworkEventHandler';
 
-type MessageHandler = (wsClient: WebSocketClient, message: DeviceToLocalMessage) => void;
+export type MessageHandler = (wsClient: WebSocketClient, message: DeviceToLocalMessage) => void;
 
 function handleInvalidMessage() {
   console.warn('[WS] Received invalid message');
@@ -52,6 +45,18 @@ PayloadHandlers[DeviceToLocalMessagePayload.ReadyMessage] = (cli, msg) => {
   });
 };
 
+PayloadHandlers[DeviceToLocalMessagePayload.ErrorMessage] = (cli, msg) => {
+  const payload = new ErrorMessage();
+  msg.payload(payload);
+
+  console.error('[WS] Received error message: ', payload.message());
+
+  toastDelegator.trigger({
+    message: 'Error: ' + payload.message(),
+    background: 'bg-red-500',
+  });
+};
+
 PayloadHandlers[DeviceToLocalMessagePayload.WifiScanStatusMessage] = (cli, msg) => {
   const payload = new WifiScanStatusMessage();
   msg.payload(payload);
@@ -59,116 +64,7 @@ PayloadHandlers[DeviceToLocalMessagePayload.WifiScanStatusMessage] = (cli, msg) 
   DeviceStateStore.setWifiScanStatus(payload.status());
 };
 
-PayloadHandlers[DeviceToLocalMessagePayload.WifiNetworkDiscoveredEvent] = (cli, msg) => {
-  const payload = new WifiNetworkDiscoveredEvent();
-  msg.payload(payload);
-
-  const fbsNetwork = new FbsWifiNetwork();
-  payload.network(fbsNetwork);
-
-  const ssid = fbsNetwork.ssid();
-  const bssid = fbsNetwork.bssid();
-
-  if (!ssid || !bssid) {
-    console.warn('[WS] Received invalid network lost event');
-    return;
-  }
-
-  const network: WiFiNetwork = {
-    ssid: ssid,
-    bssid: bssid,
-    rssi: fbsNetwork.rssi(),
-    channel: fbsNetwork.channel(),
-    security: fbsNetwork.authMode(),
-    saved: fbsNetwork.saved(),
-  };
-
-  DeviceStateStore.addWifiNetwork(network);
-};
-
-PayloadHandlers[DeviceToLocalMessagePayload.WifiNetworkUpdatedEvent] = (cli, msg) => {
-  const payload = new WifiNetworkUpdatedEvent();
-  msg.payload(payload);
-
-  const fbsNetwork = new FbsWifiNetwork();
-  payload.network(fbsNetwork);
-
-  const ssid = fbsNetwork.ssid();
-  const bssid = fbsNetwork.bssid();
-
-  if (!ssid || !bssid) {
-    console.warn('[WS] Received invalid network lost event: ', fbsNetwork.ssid(), fbsNetwork.bssid(), fbsNetwork.rssi(), fbsNetwork.channel(), fbsNetwork.authMode(), fbsNetwork.saved());
-    return;
-  }
-
-  const network: WiFiNetwork = {
-    ssid: ssid,
-    bssid: bssid,
-    rssi: fbsNetwork.rssi(),
-    channel: fbsNetwork.channel(),
-    security: fbsNetwork.authMode(),
-    saved: fbsNetwork.saved(),
-  };
-
-  DeviceStateStore.addWifiNetwork(network);
-};
-
-PayloadHandlers[DeviceToLocalMessagePayload.WifiNetworkLostEvent] = (cli, msg) => {
-  const payload = new WifiNetworkLostEvent();
-  msg.payload(payload);
-
-  const fbsNetwork = new FbsWifiNetwork();
-  payload.network(fbsNetwork);
-
-  const ssid = fbsNetwork.ssid();
-  const bssid = fbsNetwork.bssid();
-
-  if (!ssid || !bssid) {
-    console.warn('[WS] Received invalid network lost event: ', fbsNetwork.ssid(), fbsNetwork.bssid(), fbsNetwork.rssi(), fbsNetwork.channel(), fbsNetwork.authMode(), fbsNetwork.saved());
-    return;
-  }
-
-  DeviceStateStore.removeWifiNetwork(bssid);
-};
-
-PayloadHandlers[DeviceToLocalMessagePayload.WifiNetworkSavedEvent] = (cli, msg) => {
-  const payload = new WifiNetworkSavedEvent();
-  msg.payload(payload);
-
-  toastDelegator.trigger({
-    message: 'WiFi network saved: ' + payload.network()?.ssid(),
-    background: 'bg-green-500',
-  });
-};
-
-PayloadHandlers[DeviceToLocalMessagePayload.WifiNetworkRemovedEvent] = (cli, msg) => {
-  const payload = new WifiNetworkRemovedEvent();
-  msg.payload(payload);
-
-  toastDelegator.trigger({
-    message: 'WiFi network removed: ' + payload.network()?.ssid(),
-    background: 'bg-green-500',
-  });
-};
-PayloadHandlers[DeviceToLocalMessagePayload.WifiNetworkConnectedEvent] = (cli, msg) => {
-  const payload = new WifiNetworkConnectedEvent();
-  msg.payload(payload);
-
-  toastDelegator.trigger({
-    message: 'WiFi network connected: ' + payload.network()?.ssid(),
-    background: 'bg-green-500',
-  });
-};
-
-PayloadHandlers[DeviceToLocalMessagePayload.WifiNetworkDisconnectedEvent] = (cli, msg) => {
-  const payload = new WifiNetworkDisconnectedEvent();
-  msg.payload(payload);
-
-  toastDelegator.trigger({
-    message: 'WiFi network disconnected: ' + payload.network()?.ssid(),
-    background: 'bg-green-500',
-  });
-};
+PayloadHandlers[DeviceToLocalMessagePayload.WifiNetworkEvent] = WifiNetworkEventHandler;
 
 PayloadHandlers[DeviceToLocalMessagePayload.AccountLinkCommandResult] = (cli, msg) => {
   const payload = new AccountLinkCommandResult();
@@ -246,7 +142,7 @@ export function WebSocketMessageBinaryHandler(cli: WebSocketClient, data: ArrayB
   const msg = DeviceToLocalMessage.getRootAsDeviceToLocalMessage(new ByteBuffer(new Uint8Array(data)));
 
   const payloadType = msg.payloadType();
-  if (payloadType >= PayloadHandlers.length) {
+  if (payloadType < 0 || payloadType >= PayloadHandlers.length) {
     console.error('[WS] ERROR: Received unknown payload type (out of bounds)');
     return;
   }

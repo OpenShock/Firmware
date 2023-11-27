@@ -1,5 +1,6 @@
 #pragma once
 
+#include "EStopManager.h"
 #include <cstdint>
 
 namespace OpenShock::VisualStateManager {
@@ -7,4 +8,6 @@ namespace OpenShock::VisualStateManager {
 
   void SetCriticalError();
   void SetScanningStarted();
+  void SetEmergencyStop(OpenShock::EStopManager::EStopStatus status);
+  void SetWebSocketConnected(bool isConnected);
 }  // namespace OpenShock::VisualStateManager

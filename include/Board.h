@@ -3,12 +3,8 @@
 #include <driver/gpio.h>
 
 namespace OpenShock {
-  constexpr bool IsValidOutputPin(std::uint8_t pin) {
+  constexpr bool IsValidGPIOPin(std::uint8_t pin) {
     if (pin >= GPIO_NUM_MAX) {
-      return false;
-    }
-
-    if (!GPIO_IS_VALID_OUTPUT_GPIO(pin)) {
       return false;
     }
 
@@ -33,5 +29,19 @@ namespace OpenShock {
     }
 
     return true;
+  }
+  constexpr bool IsValidInputPin(std::uint8_t pin) {
+    if (!IsValidGPIOPin(pin)) {
+      return false;
+    }
+
+    return GPIO_IS_VALID_GPIO(pin) && !GPIO_IS_VALID_OUTPUT_GPIO(pin);
+  }
+  constexpr bool IsValidOutputPin(std::uint8_t pin) {
+    if (!IsValidGPIOPin(pin)) {
+      return false;
+    }
+
+    return GPIO_IS_VALID_OUTPUT_GPIO(pin);
   }
 }  // namespace OpenShock

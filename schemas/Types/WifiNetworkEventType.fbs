@@ -1,0 +1,11 @@
+namespace OpenShock.Serialization.Types;
+
+enum WifiNetworkEventType : uint8 {
+  Discovered,
+  Updated,
+  Lost,
+  Saved,
+  Removed,
+  Connected,
+  Disconnected
+}

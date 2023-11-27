@@ -3,8 +3,10 @@
 #include "CommandHandler.h"
 #include "Config.h"
 #include "Logging.h"
+#include "wifi/WiFiManager.h"
+#include "util/JsonRoot.h"
 
-#include <ArduinoJson.h>
+#include <cJSON.h>
 #include <Esp.h>
 
 #include <unordered_map>
@@ -137,13 +139,18 @@ void _handleRmtpinCommand(char* arg, std::size_t argLength) {
     return;
   }
 
-  std::uint32_t pin;
+  unsigned int pin;
   if (sscanf(arg, "%u", &pin) != 1) {
     Serial.println("$SYS$|Error|Invalid argument (not a number)");
     return;
   }
 
-  OpenShock::CommandHandler::SetRfTxPin(pin);
+  if (pin > UINT8_MAX) {
+    Serial.println("$SYS$|Error|Invalid argument (out of range)");
+    return;
+  }
+
+  OpenShock::CommandHandler::SetRfTxPin(static_cast<std::uint8_t>(pin));
 
   Serial.println("$SYS$|Success|Saved config");
 }
@@ -160,46 +167,88 @@ void _handleAuthtokenCommand(char* arg, std::size_t argLength) {
 }
 
 void _handleNetworksCommand(char* arg, std::size_t argLength) {
+  cJSON* network = nullptr;
+  OpenShock::JsonRoot root;
+
   if (arg == nullptr || argLength <= 0) {
-    // Get networks
-    StaticJsonDocument<1024> outDoc;
-    JsonArray outNetworks = outDoc.to<JsonArray>();
+    root = OpenShock::JsonRoot::CreateArray();
+    if (!root.isValid()) {
+      Serial.println("$SYS$|Error|Failed to create JSON array");
+      return;
+    }
 
     for (auto& creds : Config::GetWiFiCredentials()) {
-      JsonObject network  = outNetworks.createNestedObject();
-      network["ssid"]     = creds.ssid;
-      network["password"] = creds.password;
+      network = cJSON_CreateObject();
+      if (network == nullptr) {
+        Serial.println("$SYS$|Error|Failed to create JSON object");
+        return;
+      }
+
+      cJSON_AddStringToObject(network, "ssid", creds.ssid.c_str());
+      cJSON_AddStringToObject(network, "password", creds.password.c_str());
+
+      cJSON_AddItemToArray(root, network);
+    }
+
+    char* out = cJSON_PrintUnformatted(root);
+    if (out == nullptr) {
+      Serial.println("$SYS$|Error|Failed to print JSON");
+      return;
     }
 
     Serial.print("$SYS$|Response|Networks|");
-    serializeJson(outDoc, Serial);
-    Serial.println();
+    Serial.println(out);
+
+    cJSON_free(out);
     return;
   }
 
-  DynamicJsonDocument doc(1024);
-  deserializeJson(doc, arg, argLength);
-
-  JsonArray networks = doc.as<JsonArray>();
+  root = OpenShock::JsonRoot::Parse(arg, argLength);
+  if (!root.isValid()) {
+    Serial.print("$SYS$|Error|Failed to parse JSON: ");
+    Serial.println(root.GetErrorMessage());
+    return;
+  }
+  if (!root.isArray()) {
+    Serial.println("$SYS$|Error|Invalid argument (not an array)");
+    return;
+  }
 
   std::uint8_t id = 1;
   std::vector<Config::WiFiCredentials> creds;
-  for (JsonObject network : networks) {
-    std::string ssid     = network["ssid"].as<std::string>();
-    std::string password = network["password"].as<std::string>();
+  cJSON_ArrayForEach(network, root) {
+    if (!cJSON_IsObject(network)) {
+      Serial.println("$SYS$|Error|Invalid argument (array entry is not an object)");
+      return;
+    }
 
-    if (ssid.empty() || password.empty()) {
-      Serial.println("$SYS$|Error|Invalid argument (missing ssid or password)");
+    const cJSON* ssid     = cJSON_GetObjectItemCaseSensitive(network, "ssid");
+    const cJSON* password = cJSON_GetObjectItemCaseSensitive(network, "password");
+
+    if (!cJSON_IsString(ssid) || !cJSON_IsString(password)) {
+      Serial.println("$SYS$|Error|Invalid argument (ssid or password is not a string)");
+      return;
+    }
+
+    const char* ssidStr     = ssid->valuestring;
+    const char* passwordStr = password->valuestring;
+
+    if (ssidStr == nullptr || passwordStr == nullptr) {
+      Serial.println("$SYS$|Error|Invalid argument (ssid or password is null)");
+      return;
+    }
+    if (ssidStr[0] == '\0' || passwordStr[0] == '\0') {
+      Serial.println("$SYS$|Error|Invalid argument (ssid or password is empty)");
       return;
     }
 
     Config::WiFiCredentials cred {
       .id       = id++,
-      .ssid     = ssid,
+      .ssid     = ssidStr,
       .bssid    = {0, 0, 0, 0, 0, 0},
-      .password = password,
+      .password = passwordStr,
     };
-    ESP_LOGI(TAG, "Adding network to config %s", ssid.c_str());
+    ESP_LOGI(TAG, "Adding network to config %s", ssidStr);
 
     creds.push_back(std::move(cred));
   }
@@ -210,6 +259,8 @@ void _handleNetworksCommand(char* arg, std::size_t argLength) {
   }
 
   Serial.println("$SYS$|Success|Saved config");
+
+  OpenShock::WiFiManager::RefreshNetworkCredentials();
 }
 
 static std::unordered_map<std::string, void (*)(char*, std::size_t)> s_commandHandlers = {

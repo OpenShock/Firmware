@@ -2,7 +2,7 @@
 
 #include "Constants.h"
 #include "Logging.h"
-#include "Utils/HexUtils.h"
+#include "util/HexUtils.h"
 
 #include <LittleFS.h>
 
@@ -54,37 +54,37 @@ bool ReadFbsConfig(const Serialization::Configuration::WiFiConfig* cfg) {
 
     if (fbsCreds == nullptr) {
       ESP_LOGE(TAG, "Config::WiFi::credentials contains null entry");
-      return false;
+      continue;
     }
 
     auto id = fbsCreds->id();
-    if (id == 0) {
-      ESP_LOGE(TAG, "Config::WiFi::credentials entry has invalid ID");
-      return false;
+    if (id == 0 || id > 32) {
+      ESP_LOGE(TAG, "Config::WiFi::credentials entry %u has invalid ID (must be 1-32)", id);
+      continue;
     }
 
     auto ssid = fbsCreds->ssid();
     if (ssid == nullptr) {
       ESP_LOGE(TAG, "Config::WiFi::credentials entry has null SSID");
-      return false;
+      continue;
     }
 
     auto bssid = fbsCreds->bssid();
     if (bssid == nullptr) {
       ESP_LOGE(TAG, "Config::WiFi::credentials entry has null BSSID");
-      return false;
+      continue;
     }
 
     auto password = fbsCreds->password();
     if (password == nullptr) {
       ESP_LOGE(TAG, "Config::WiFi::credentials entry has null password");
-      return false;
+      continue;
     }
 
     auto bssidArray = bssid->array();
     if (bssidArray == nullptr) {
       ESP_LOGE(TAG, "Config::WiFi::credentials entry has null BSSID array");
-      return false;
+      continue;
     }
 
     Config::WiFiCredentials creds {
@@ -308,8 +308,8 @@ bool Config::SetWiFiConfig(const WiFiConfig& config) {
 
 bool Config::SetWiFiCredentials(const std::vector<WiFiCredentials>& credentials) {
   for (auto& cred : credentials) {
-    if (cred.id == 0) {
-      ESP_LOGE(TAG, "Cannot set WiFi credentials: credential ID cannot be 0");
+    if (cred.id == 0 || cred.id > 32) {
+      ESP_LOGE(TAG, "Cannot set WiFi credentials: credential ID %u is invalid (must be 1-32)", cred.id);
       return false;
     }
   }
@@ -353,7 +353,7 @@ std::uint8_t Config::AddWiFiCredentials(const std::string& ssid, const std::uint
 
   if (id == 0) {
     id = 1;
-    while (bits & (1u << id) && id < 32) {
+    while (bits & (1u << (id - 1)) && id <= 32) {
       id++;
     }
 
@@ -379,10 +379,6 @@ std::uint8_t Config::AddWiFiCredentials(const std::string& ssid, const std::uint
 }
 
 bool Config::TryGetWiFiCredentialsByID(std::uint8_t id, Config::WiFiCredentials& credentials) {
-  if (id == 0) {
-    return false;
-  }
-
   for (auto& creds : _mainConfig.wifi.credentials) {
     if (creds.id == id) {
       credentials = creds;
@@ -415,18 +411,45 @@ bool Config::TryGetWiFiCredentialsByBSSID(const std::uint8_t (&bssid)[6], Config
   return false;
 }
 
-void Config::RemoveWiFiCredentials(std::uint8_t id) {
-  if (id == 0) {
-    return;
+std::uint8_t Config::GetWiFiCredentialsIDbySSID(const char* ssid) {
+  for (auto& creds : _mainConfig.wifi.credentials) {
+    if (creds.ssid == ssid) {
+      return creds.id;
+    }
   }
 
+  return 0;
+}
+
+std::uint8_t Config::GetWiFiCredentialsIDbyBSSID(const std::uint8_t (&bssid)[6]) {
+  for (auto& creds : _mainConfig.wifi.credentials) {
+    if (memcmp(creds.bssid, bssid, 6) == 0) {
+      return creds.id;
+    }
+  }
+
+  return 0;
+}
+
+std::uint8_t Config::GetWiFiCredentialsIDbyBSSIDorSSID(const std::uint8_t (&bssid)[6], const char* ssid) {
+  std::uint8_t id = GetWiFiCredentialsIDbyBSSID(bssid);
+  if (id != 0) {
+    return id;
+  }
+
+  return GetWiFiCredentialsIDbySSID(ssid);
+}
+
+bool Config::RemoveWiFiCredentials(std::uint8_t id) {
   for (auto it = _mainConfig.wifi.credentials.begin(); it != _mainConfig.wifi.credentials.end(); ++it) {
     if (it->id == id) {
       _mainConfig.wifi.credentials.erase(it);
       _trySaveConfig();
-      return;
+      return true;
     }
   }
+
+  return false;
 }
 
 void Config::ClearWiFiCredentials() {
@@ -442,12 +465,12 @@ const std::string& Config::GetBackendAuthToken() {
   return _mainConfig.backend.authToken;
 }
 
-void Config::SetBackendAuthToken(const std::string& token) {
+bool Config::SetBackendAuthToken(const std::string& token) {
   _mainConfig.backend.authToken = token;
-  _trySaveConfig();
+  return _trySaveConfig();
 }
 
-void Config::ClearBackendAuthToken() {
+bool Config::ClearBackendAuthToken() {
   _mainConfig.backend.authToken = "";
-  _trySaveConfig();
+  return _trySaveConfig();
 }

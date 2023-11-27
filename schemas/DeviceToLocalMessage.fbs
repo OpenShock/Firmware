@@ -1,22 +1,14 @@
 include "./Types/WifiScanStatus.fbs";
-include "./Types/WifiAuthMode.fbs";
+include "./Types/WifiNetwork.fbs";
+include "./Types/WifiNetworkEventType.fbs";
 
 attribute "fs_serializer";
 
 namespace OpenShock.Serialization.Local;
 
-table WifiNetwork {
-  ssid:string;
-  bssid:string;
-  channel:uint8;
-  rssi:int8;
-  auth_mode:Types.WifiAuthMode;
-  saved:bool;
-}
-
 table ReadyMessage {
   poggies:bool;
-  connected_wifi:WifiNetwork;
+  connected_wifi:Types.WifiNetwork;
   gateway_paired:bool;
   rftx_pin:uint8;
 }
@@ -28,26 +20,15 @@ table ErrorMessage {
 struct WifiScanStatusMessage {
   status:Types.WifiScanStatus;
 }
-table WifiNetworkDiscoveredEvent {
-  network:WifiNetwork;
+table WifiNetworkEvent {
+  event_type:Types.WifiNetworkEventType;
+  network:Types.WifiNetwork;
 }
-table WifiNetworkUpdatedEvent {
-  network:WifiNetwork;
+table WifiGotIpEvent {
+  ip:string;
 }
-table WifiNetworkLostEvent {
-  network:WifiNetwork;
-}
-table WifiNetworkSavedEvent {
-  network:WifiNetwork;
-}
-table WifiNetworkRemovedEvent {
-  network:WifiNetwork;
-}
-table WifiNetworkConnectedEvent {
-  network:WifiNetwork;
-}
-table WifiNetworkDisconnectedEvent {
-  network:WifiNetwork;
+table WifiLostIpEvent {
+  ip:string;
 }
 
 enum AccountLinkResultCode : uint8 {
@@ -77,13 +58,9 @@ union DeviceToLocalMessagePayload {
   ReadyMessage,
   ErrorMessage,
   WifiScanStatusMessage,
-  WifiNetworkDiscoveredEvent,
-  WifiNetworkUpdatedEvent,
-  WifiNetworkLostEvent,
-  WifiNetworkSavedEvent,
-  WifiNetworkRemovedEvent,
-  WifiNetworkConnectedEvent,
-  WifiNetworkDisconnectedEvent,
+  WifiNetworkEvent,
+  WifiGotIpEvent,
+  WifiLostIpEvent,
   AccountLinkCommandResult,
   SetRfTxPinCommandResult
 }

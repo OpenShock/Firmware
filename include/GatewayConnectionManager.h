@@ -1,7 +1,6 @@
 #pragma once
 
 #include "AccountLinkResultCode.h"
-#include "GatewayClient.h"
 
 #include <cstdint>
 #include <functional>
