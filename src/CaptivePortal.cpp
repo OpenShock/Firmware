@@ -119,8 +119,6 @@ void CaptivePortal::Update() {
     _stopCaptive();
     return;
   }
-
-  s_instance->loop();
 }
 
 bool CaptivePortal::SendMessageTXT(std::uint8_t socketId, const char* data, std::size_t len) {

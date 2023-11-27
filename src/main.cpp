@@ -31,7 +31,7 @@ void setup() {
   OpenShock::SerialInputHandler::PrintWelcomeHeader();
   OpenShock::SerialInputHandler::PrintVersionInfo();
 
-  OpenShock::EStopManager::Init();
+  OpenShock::EStopManager::Init(100);  // 100ms update interval
 
   OpenShock::Config::Init();
 
@@ -52,7 +52,5 @@ void loop() {
   OpenShock::SerialInputHandler::Update();
   OpenShock::CaptivePortal::Update();
   OpenShock::GatewayConnectionManager::Update();
-  OpenShock::WiFiScanManager::Update();
   OpenShock::WiFiManager::Update();
-  OpenShock::EStopManager::Update();
 }

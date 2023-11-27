@@ -14,44 +14,14 @@ static EStopManager::EStopStatus s_estopStatus   = EStopManager::EStopStatus::AL
 static std::uint32_t s_estopHoldToClearTime      = 5000;
 static std::int64_t s_lastEStopButtonStateChange = 0;
 static std::int64_t s_estoppedAt                 = 0;
-static bool s_lastEStopButtonState               = HIGH;
+static int s_lastEStopButtonState                = HIGH;
 
 static std::uint8_t s_estopPin;
 
-// TODO?: Allow active HIGH EStops?
-void EStopManager::Init() {
-#ifdef OPENSHOCK_ESTOP_PIN
-  s_estopPin = OPENSHOCK_ESTOP_PIN;
-  pinMode(s_estopPin, INPUT_PULLUP);
-  ESP_LOGI(TAG, "Initializing on pin %u", s_estopPin);
-#else
-  ESP_LOGI(TAG, "EStopManager disabled, no pin defined");
-#endif
-}
+void _estopManagerTask(TimerHandle_t xTimer) {
+  configASSERT(xTimer);
 
-bool EStopManager::IsEStopped() {
-#ifdef OPENSHOCK_ESTOP_PIN
-  return (s_estopStatus != EStopManager::EStopStatus::ALL_CLEAR);
-#else
-  return false;
-#endif
-}
-
-std::int64_t EStopManager::WhenEStopped() {
-#ifdef OPENSHOCK_ESTOP_PIN
-  if (IsEStopped()) {
-    return s_estoppedAt;
-  } else {
-    return 0;
-  }
-#else
-  return 0;
-#endif
-}
-
-EStopManager::EStopStatus EStopManager::Update() {
-#ifdef OPENSHOCK_ESTOP_PIN
-  bool buttonState = digitalRead(s_estopPin);
+  int buttonState = digitalRead(s_estopPin);
   if (buttonState != s_lastEStopButtonState) {
     s_lastEStopButtonStateChange = OpenShock::millis();
   }
@@ -93,9 +63,32 @@ EStopManager::EStopStatus EStopManager::Update() {
   }
 
   s_lastEStopButtonState = buttonState;
+}
 
-  return s_estopStatus;
+// TODO?: Allow active HIGH EStops?
+void EStopManager::Init(std::uint16_t updateIntervalMs) {
+#ifdef OPENSHOCK_ESTOP_PIN
+  s_estopPin = OPENSHOCK_ESTOP_PIN;
+  pinMode(s_estopPin, INPUT_PULLUP);
+  ESP_LOGI(TAG, "Initializing on pin %u", s_estopPin);
+
+  // Start the repeating task, 10Hz may seem slow, but it's plenty fast for an EStop
+  if (xTimerCreate(TAG, pdMS_TO_TICKS(updateIntervalMs), pdTRUE, nullptr, _estopManagerTask) == nullptr) {
+    ESP_LOGE(TAG, "Failed to create timer");
+  }
 #else
-  return EStopManager::EStopStatus::ALL_CLEAR;
+  ESP_LOGI(TAG, "EStopManager disabled, no pin defined");
 #endif
+}
+
+bool EStopManager::IsEStopped() {
+  return (s_estopStatus != EStopManager::EStopStatus::ALL_CLEAR);
+}
+
+std::int64_t EStopManager::WhenEStopped() {
+  if (IsEStopped()) {
+    return s_estoppedAt;
+  }
+
+  return 0;
 }

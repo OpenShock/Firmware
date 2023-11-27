@@ -12,84 +12,139 @@ const char* const TAG = "WiFiScanManager";
 
 constexpr const std::uint8_t OPENSHOCK_WIFI_SCAN_MAX_CHANNEL         = 13;
 constexpr const std::uint32_t OPENSHOCK_WIFI_SCAN_MAX_MS_PER_CHANNEL = 300;  // Adjusting this value will affect the scan rate, but may also affect the scan results
-constexpr const std::uint32_t OPENSHOCK_WIFI_SCAN_MAX_MS_PER_SCAN    = 20'000;
+constexpr const std::uint32_t OPENSHOCK_WIFI_SCAN_TIMEOUT_MS = 10 * 1000;
+
+enum WiFiScanTaskNotificationFlags {
+  CHANNEL_DONE  = 1 << 0,
+  ERROR         = 1 << 1,
+  WIFI_DISABLED = 1 << 2,
+  CLEAR_FLAGS   = CHANNEL_DONE | ERROR
+};
 
 using namespace OpenShock;
 
-static bool s_initialized                      = false;
-static bool s_scanInProgress                   = false;
-static bool s_channelScanDone                  = false;
-static bool s_scanAborted                      = false;
-static int64_t s_lastChannelScanStartTimestamp = 0;
-static int64_t s_lastScanStartTimestamp        = 0;
-static std::uint8_t s_currentChannel           = 0;
+static TaskHandle_t s_scanTaskHandle     = nullptr;
+static SemaphoreHandle_t s_scanTaskMutex = xSemaphoreCreateBinary();
+static std::uint8_t s_currentChannel = 0;
 static std::map<std::uint64_t, WiFiScanManager::StatusChangedHandler> s_statusChangedHandlers;
 static std::map<std::uint64_t, WiFiScanManager::NetworkDiscoveryHandler> s_networkDiscoveredHandlers;
 
-void _setScanInProgress(bool inProgress) {
-  if (s_scanInProgress != inProgress) {
-    s_scanInProgress = inProgress;
-    if (inProgress) {
-      for (auto& it : s_statusChangedHandlers) {
-        it.second(WiFiScanStatus::Started);
-        it.second(WiFiScanStatus::InProgress);
-      }
-      WiFi.scanDelete();
-    } else {
-      WiFiScanStatus status;
-      if (s_scanAborted) {
-        status        = WiFiScanStatus::Aborted;
-        s_scanAborted = false;
-      } else {
-        status = WiFiScanStatus::Completed;
-      }
-      for (auto& it : s_statusChangedHandlers) {
-        it.second(status);
-      }
-    }
+bool _notifyTask(WiFiScanTaskNotificationFlags flags) {
+  if (xSemaphoreTake(s_scanTaskMutex, portMAX_DELAY) != pdTRUE) {
+    ESP_LOGE(TAG, "Failed to take scan task mutex");
+    return false;
   }
 
-  if (!inProgress) {
-    s_currentChannel  = 0;
-    s_channelScanDone = false;
+  bool success = false;
+
+  if (s_scanTaskHandle != nullptr) {
+    success = xTaskNotify(s_scanTaskHandle, flags, eSetBits) == pdPASS;
+  }
+
+  xSemaphoreGive(s_scanTaskMutex);
+
+  return success;
+}
+
+void _notifyStatusChangedHandlers(OpenShock::WiFiScanStatus status) {
+  for (auto& it : s_statusChangedHandlers) {
+    it.second(status);
   }
 }
 
 void _handleScanError(std::int16_t retval) {
-  s_channelScanDone = true;
+  _notifyTask(WiFiScanTaskNotificationFlags::ERROR);
 
   if (retval == WIFI_SCAN_FAILED) {
     ESP_LOGE(TAG, "Failed to start scan on channel %u", s_currentChannel);
-    for (auto& it : s_statusChangedHandlers) {
-      it.second(WiFiScanStatus::Error);
-    }
+    return;
+  }
+
+  if (retval == WIFI_SCAN_RUNNING) {
+    ESP_LOGE(TAG, "Scan is running on channel %u", s_currentChannel);
     return;
   }
 
   ESP_LOGE(TAG, "Scan returned an unknown error");
 }
 
-void _iterateChannel() {
-  s_currentChannel++;
-  if (s_currentChannel > OPENSHOCK_WIFI_SCAN_MAX_CHANNEL) {
-    s_currentChannel = 0;
-    _setScanInProgress(false);
-    return;
+std::int16_t _scanChannel(std::uint8_t channel) {
+  std::int16_t retval = WiFi.scanNetworks(true, true, false, OPENSHOCK_WIFI_SCAN_MAX_MS_PER_CHANNEL, channel);
+  if (retval == WIFI_SCAN_RUNNING || retval >= 0) {
+    return retval;
   }
 
-  s_lastChannelScanStartTimestamp = OpenShock::millis();
-  s_channelScanDone               = false;
+  _handleScanError(retval);
 
-  if (s_currentChannel > 0) {
-    std::int16_t retval = WiFi.scanNetworks(true, true, false, OPENSHOCK_WIFI_SCAN_MAX_MS_PER_CHANNEL, s_currentChannel);
+  return retval;
+}
 
-    if (retval == WIFI_SCAN_RUNNING) {
-      _setScanInProgress(true);
-      return;
+WiFiScanStatus _scanningTaskImpl() {
+  WiFi.enableSTA(true);
+  WiFi.scanDelete();
+
+  std::uint8_t channel = OPENSHOCK_WIFI_SCAN_MAX_CHANNEL;
+
+  std::int16_t retval = _scanChannel(channel);
+  if (retval != WIFI_SCAN_RUNNING) {
+    // TODO: Handle this
+    return WiFiScanStatus::Error;
+  }
+
+  _notifyStatusChangedHandlers(WiFiScanStatus::Started);
+  _notifyStatusChangedHandlers(WiFiScanStatus::InProgress);
+
+  while (true) {
+    std::uint32_t notificationFlags = 0;
+
+    // Wait for the scan to complete
+    if (xTaskNotifyWait(0, WiFiScanTaskNotificationFlags::CLEAR_FLAGS, &notificationFlags, pdMS_TO_TICKS(OPENSHOCK_WIFI_SCAN_TIMEOUT_MS)) != pdTRUE) {
+      ESP_LOGE(TAG, "Scan timed out");
+      return WiFiScanStatus::Error; // TODO: Add a "timed out" status
     }
 
-    _handleScanError(retval);
+    if (notificationFlags != WiFiScanTaskNotificationFlags::CHANNEL_DONE) {
+      if (notificationFlags & WiFiScanTaskNotificationFlags::WIFI_DISABLED) {
+        ESP_LOGE(TAG, "Scan task exiting due to being notified that WiFi was disabled");
+        return WiFiScanStatus::Aborted;
+      }
+
+      if (notificationFlags & WiFiScanTaskNotificationFlags::ERROR) {
+        ESP_LOGE(TAG, "Scan task exiting due to being notified of an error");
+        return WiFiScanStatus::Error;
+      }
+
+      return WiFiScanStatus::Error;
+    }
+
+
+    // Select the next channel, or break if we're done
+    if (--channel <= 0) {
+      break;
+    }
+
+    // Start the scan on the next channel
+    retval = _scanChannel(channel);
+    if (retval != WIFI_SCAN_RUNNING) {
+      // TODO: Handle this
+      return WiFiScanStatus::Error;
+    }
   }
+
+  return WiFiScanStatus::Completed;
+}
+
+void _scanningTask(void* arg) {
+  WiFiScanStatus status = _scanningTaskImpl();
+  _notifyStatusChangedHandlers(status);
+
+  // Clear the task handle
+  xSemaphoreTake(s_scanTaskMutex, portMAX_DELAY);
+  s_scanTaskHandle = nullptr;
+  xSemaphoreGive(s_scanTaskMutex);
+
+  // Commit suicide
+  vTaskDelete(nullptr);
 }
 
 void _evScanCompleted(arduino_event_id_t event, arduino_event_info_t info) {
@@ -111,57 +166,74 @@ void _evScanCompleted(arduino_event_id_t event, arduino_event_info_t info) {
     }
   }
 
-  s_channelScanDone = true;
+  // Notify the scan task that we're done
+  _notifyTask(WiFiScanTaskNotificationFlags::CHANNEL_DONE);
 }
 void _evSTAStopped(arduino_event_id_t event, arduino_event_info_t info) {
-  _setScanInProgress(false);
+  _notifyTask(WiFiScanTaskNotificationFlags::WIFI_DISABLED);
 }
 
 bool WiFiScanManager::Init() {
-  if (s_initialized) {
-    ESP_LOGW(TAG, "WiFiScanManager::Init() called twice");
+  // Initialize the scan semaphore
+  if (xSemaphoreGive(s_scanTaskMutex) != pdTRUE) {
+    ESP_LOGE(TAG, "Initialize function called more than once");
     return false;
   }
 
   WiFi.onEvent(_evScanCompleted, ARDUINO_EVENT_WIFI_SCAN_DONE);
   WiFi.onEvent(_evSTAStopped, ARDUINO_EVENT_WIFI_STA_STOP);
 
-  s_initialized = true;
-
   return true;
 }
 
 bool WiFiScanManager::IsScanning() {
-  return s_scanInProgress;
+  return s_scanTaskHandle != nullptr;
 }
 
 bool WiFiScanManager::StartScan() {
-  if (s_scanInProgress) {
-    ESP_LOGW(TAG, "Cannot start scan: scan is already in progress");
+  xSemaphoreTake(s_scanTaskMutex, portMAX_DELAY);
+
+  // Check if a scan is already in progress
+  if (s_scanTaskHandle != nullptr && eTaskGetState(s_scanTaskHandle) != eDeleted) {
+    ESP_LOGW(TAG, "Cannot start scan: scan task is already running");
+
+    xSemaphoreGive(s_scanTaskMutex);
     return false;
   }
 
-  // If not already connected to a network, disable STA to fix stuck scans
-  if (WiFi.status() != WL_CONNECTED && Config::GetWiFiCredentialsCount() == 0) {
-    WiFi.enableSTA(false);
+  // Start the scan task
+  if (xTaskCreate(_scanningTask, "WiFiScanManager", 4096, nullptr, 1, &s_scanTaskHandle) != pdPASS) {
+    ESP_LOGE(TAG, "Failed to create scan task");
+
+    xSemaphoreGive(s_scanTaskMutex);
+    return false;
   }
 
-  s_lastScanStartTimestamp = OpenShock::millis();
-  s_currentChannel         = 0;
-  s_channelScanDone        = false;
-  _iterateChannel();
-
+  xSemaphoreGive(s_scanTaskMutex);
   return true;
 }
-void WiFiScanManager::AbortScan() {
-  if (!s_scanInProgress) {
-    ESP_LOGW(TAG, "Cannot cancel scan: no scan is in progress");
-    return;
+bool WiFiScanManager::AbortScan() {
+  xSemaphoreTake(s_scanTaskMutex, portMAX_DELAY);
+
+  // Check if a scan is in progress
+  if (s_scanTaskHandle == nullptr || eTaskGetState(s_scanTaskHandle) == eDeleted) {
+    ESP_LOGW(TAG, "Cannot abort scan: no scan is in progress");
+
+    xSemaphoreGive(s_scanTaskMutex);
+    return false;
   }
 
-  _setScanInProgress(false);
-  s_scanAborted    = true;
-  s_currentChannel = 0;
+  // Kill the task
+  vTaskDelete(s_scanTaskHandle);
+  s_scanTaskHandle = nullptr;
+
+  // Inform the change handlers that the scan was aborted
+  for (auto& it : s_statusChangedHandlers) {
+    it.second(WiFiScanStatus::Aborted);
+  }
+
+  xSemaphoreGive(s_scanTaskMutex);
+  return true;
 }
 
 std::uint64_t WiFiScanManager::RegisterStatusChangedHandler(const WiFiScanManager::StatusChangedHandler& handler) {
@@ -189,25 +261,5 @@ void WiFiScanManager::UnregisterNetworkDiscoveredHandler(std::uint64_t handle) {
 
   if (it != s_networkDiscoveredHandlers.end()) {
     s_networkDiscoveredHandlers.erase(it);
-  }
-}
-
-void WiFiScanManager::Update() {
-  if (!s_initialized) return;
-
-  if (s_scanInProgress && !s_channelScanDone && (OpenShock::millis() - s_lastChannelScanStartTimestamp > OPENSHOCK_WIFI_SCAN_MAX_MS_PER_CHANNEL * 2)) {
-    ESP_LOGD(TAG, "Scan on channel %u timed out", s_currentChannel);
-    _handleScanError(WIFI_SCAN_FAILED);
-  }
-
-  if (s_scanInProgress && (OpenShock::millis() - s_lastScanStartTimestamp > OPENSHOCK_WIFI_SCAN_MAX_MS_PER_SCAN)) {
-    ESP_LOGD(TAG, "Scan timed out");
-    _handleScanError(WIFI_SCAN_FAILED);
-    AbortScan();
-  }
-
-  if (s_scanInProgress && s_channelScanDone) {
-    ESP_LOGD(TAG, "Scan on channel %u completed", s_currentChannel);
-    _iterateChannel();
   }
 }
