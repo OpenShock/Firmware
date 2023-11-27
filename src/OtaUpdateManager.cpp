@@ -1,7 +1,13 @@
 #include "OtaUpdateManager.h"
+
+
 #include "Config.h"
-#include <esp_log.h>
+#include "GatewayConnectionManager.h"
+#include "Logging.h"
+#include "wifi/WiFiManager.h"
+
 #include <esp_ota_ops.h>
+
 #include <LittleFS.h>
 #include <WiFi.h>
 
@@ -61,7 +67,6 @@ void OtaUpdateManager::Setup() {
 }
 
 void OtaUpdateManager::Loop() {
-  OpenShock::WiFiScanManager::Update();
   OpenShock::WiFiManager::Update();
 }
 
@@ -83,7 +88,7 @@ bool OtaUpdateManager::LoadConfig() {
   LittleFS.end();
 }
 
-void OtaUpdateManager::SaveConfig() { }
+bool OtaUpdateManager::SaveConfig() { }
 
 bool OtaUpdateManager::IsPerformingUpdate() {
   return s_bootMode == OtaUpdateManager::BootMode::OTA_UPDATE;

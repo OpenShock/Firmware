@@ -18,10 +18,6 @@
 
 const char* const TAG = "OpenShock";
 
-void verifyRollbackLater() {
-  return true;
-}
-
 void setup() {
   Serial.begin(115'200);
 
