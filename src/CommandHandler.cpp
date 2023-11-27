@@ -17,7 +17,7 @@
 
 const char* const TAG = "CommandHandler";
 
-const std::uint16_t KEEP_ALIVE_INTERVAL = 60'000;
+const std::int64_t KEEP_ALIVE_INTERVAL  = 60'000;
 const std::uint16_t KEEP_ALIVE_DURATION = 500;
 
 using namespace OpenShock;
@@ -26,8 +26,9 @@ template<typename T>
 constexpr T saturate(T value, T min, T max) {
   return std::min(std::max(value, min), max);
 }
-constexpr std::uint32_t calculateEepyTime(std::int64_t now, std::int64_t timeToKeepAlive) {
-  return static_cast<std::uint32_t>(saturate(timeToKeepAlive - now, 0LL, std::int64_t(KEEP_ALIVE_INTERVAL)));
+std::uint32_t calculateEepyTime(std::int64_t timeToKeepAlive) {
+  std::int64_t now = OpenShock::millis();
+  return static_cast<std::uint32_t>(saturate<std::int64_t>(timeToKeepAlive - now, 0LL, KEEP_ALIVE_INTERVAL));
 }
 
 struct KnownShocker {
@@ -45,16 +46,14 @@ static QueueHandle_t s_keepAliveQueue         = nullptr;
 static TaskHandle_t s_keepAliveTaskHandle     = nullptr;
 
 void _keepAliveTask(void* arg) {
-  std::int64_t timeToKeepAlive = OpenShock::millis() + KEEP_ALIVE_INTERVAL;
+  std::int64_t timeToKeepAlive =  + KEEP_ALIVE_INTERVAL;
 
   // Map of shocker IDs to time of next keep alive
   std::unordered_map<std::uint16_t, KnownShocker> activityMap;
 
   while (true) {
-    std::int64_t now = OpenShock::millis();
-
     // Calculate eepyTime based on the timeToKeepAlive
-    std::uint32_t eepyTime = calculateEepyTime(now, timeToKeepAlive);
+    std::uint32_t eepyTime = calculateEepyTime(timeToKeepAlive);
 
     KnownShocker cmd;
     while (xQueueReceive(s_keepAliveQueue, &cmd, pdMS_TO_TICKS(eepyTime)) == pdTRUE) {
@@ -66,15 +65,11 @@ void _keepAliveTask(void* arg) {
 
       activityMap[cmd.shockerId] = cmd;
 
-      now      = OpenShock::millis();
-      eepyTime = calculateEepyTime(now, std::min(timeToKeepAlive, cmd.lastActivityTimestamp + KEEP_ALIVE_INTERVAL));
-      ESP_LOGV(TAG, "Command for shocker %u was sent, adding/updating keep alive map, next eep time is %ums", cmd.shockerId, eepyTime);
-      // ESP_LOGV(TAG, "Free heap: %u", esp_get_free_heap_size());
-      // ESP_LOGV(TAG, "Tasks: %u", uxTaskGetNumberOfTasks());
+      eepyTime = calculateEepyTime(std::min(timeToKeepAlive, cmd.lastActivityTimestamp + KEEP_ALIVE_INTERVAL));
     }
 
     // Update the time to now
-    now = OpenShock::millis();
+    std::int64_t now = OpenShock::millis();
 
     // Keep track of the minimum activity time, so we know when to wake up
     timeToKeepAlive = now + KEEP_ALIVE_INTERVAL;
@@ -278,14 +273,9 @@ bool CommandHandler::HandleCommand(ShockerModelType model, std::uint16_t shocker
   bool ok = s_rfTransmitter->SendCommand(model, shockerId, type, intensity, durationMs);
 
   xSemaphoreGive(s_rfTransmitterSemaphore);
-
-  ESP_LOGV(TAG, "Command sent: %u", ok);
-
   xSemaphoreTake(s_keepAliveSemaphore, portMAX_DELAY);
 
   if (ok && s_keepAliveQueue != nullptr) {
-    ESP_LOGV(TAG, "Command sent, adding keep-alive for %u", shockerId);
-
     KnownShocker cmd {.model = model, .shockerId = shockerId, .lastActivityTimestamp = OpenShock::millis() + durationMs};
     if (xQueueSend(s_keepAliveQueue, &cmd, pdMS_TO_TICKS(10)) != pdTRUE) {
       ESP_LOGE(TAG, "Failed to send keep-alive command to queue");

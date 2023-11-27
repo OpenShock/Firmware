@@ -298,10 +298,6 @@ const Config::BackendConfig& Config::GetBackendConfig() {
   return _mainConfig.backend;
 }
 
-const bool Config::GetRFConfigKeepAliveEnabled() {
-  return _mainConfig.rf.keepAliveEnabled;
-}
-
 bool Config::SetRFConfig(const RFConfig& config) {
   _mainConfig.rf = config;
   return _trySaveConfig();

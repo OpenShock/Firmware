@@ -44,7 +44,6 @@ namespace OpenShock::Config {
   const std::vector<WiFiCredentials>& GetWiFiCredentials();
   const CaptivePortalConfig& GetCaptivePortalConfig();
   const BackendConfig& GetBackendConfig();
-  const bool GetRFConfigKeepAliveEnabled();
 
   bool SetRFConfig(const RFConfig& config);
   bool SetWiFiConfig(const WiFiConfig& config);
