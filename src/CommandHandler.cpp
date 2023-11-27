@@ -5,6 +5,7 @@
 #include "Constants.h"
 #include "Logging.h"
 #include "radio/RFTransmitter.h"
+#include "Time.h"
 #include "util/TaskUtils.h"
 
 #include <freertos/FreeRTOS.h>
@@ -33,6 +34,7 @@ struct KnownShocker {
   ShockerModelType model;
   std::uint16_t shockerId;
   std::int64_t lastActivityTimestamp;
+  bool killTask;
 };
 
 static SemaphoreHandle_t s_rfTransmitterSemaphore     = nullptr;
@@ -56,17 +58,19 @@ void _keepAliveTask(void* arg) {
 
     KnownShocker cmd;
     while (xQueueReceive(s_keepAliveQueue, &cmd, pdMS_TO_TICKS(eepyTime)) == pdTRUE) {
+      if (cmd.killTask) {
+        ESP_LOGW(TAG, "Received kill command, exiting keep alive task");
+        vTaskDelete(nullptr);
+        break;  // This should never be reached
+      }
+
       activityMap[cmd.shockerId] = cmd;
 
       now      = OpenShock::millis();
       eepyTime = calculateEepyTime(now, std::min(timeToKeepAlive, cmd.lastActivityTimestamp + KEEP_ALIVE_INTERVAL));
       ESP_LOGV(TAG, "Command for shocker %u was sent, adding/updating keep alive map, next eep time is %ums", cmd.shockerId, eepyTime);
-    }
-
-    if (xTaskNotifyWait(0, 0, nullptr, 0) == pdTRUE) {
-      ESP_LOGV(TAG, "Received notification, exiting keep alive task");
-      vTaskDelete(nullptr);
-      break;  // This should never be reached
+      // ESP_LOGV(TAG, "Free heap: %u", esp_get_free_heap_size());
+      // ESP_LOGV(TAG, "Tasks: %u", uxTaskGetNumberOfTasks());
     }
 
     // Update the time to now
@@ -131,13 +135,19 @@ bool _internalSetKeepAliveEnabled(bool enabled) {
     }
   } else {
     ESP_LOGV(TAG, "Disabling keep alive task");
-    if (s_keepAliveTaskHandle != nullptr) {
-      xTaskNotify(s_keepAliveTaskHandle, 0, eNoAction);
-      s_keepAliveTaskHandle = nullptr;
-    }
-    if (s_keepAliveQueue != nullptr) {
+    if (s_keepAliveTaskHandle != nullptr && s_keepAliveQueue != nullptr) {
+      // Wait for the task to stop
+      KnownShocker cmd {.killTask = true};
+      while (eTaskGetState(s_keepAliveTaskHandle) != eDeleted) {
+        vTaskDelay(pdMS_TO_TICKS(10));
+
+        // Send nullptr to stop the task gracefully
+        xQueueSend(s_keepAliveQueue, &cmd, pdMS_TO_TICKS(10));
+      }
       vQueueDelete(s_keepAliveQueue);
       s_keepAliveQueue = nullptr;
+    } else {
+      ESP_LOGW(TAG, "Keep alive task is already disabled? Something might be wrong.");
     }
   }
 
