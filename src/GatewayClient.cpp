@@ -1,9 +1,9 @@
 #include "GatewayClient.h"
 
-#include "util/CertificateUtils.h"
 #include "event_handlers/WebSocket.h"
 #include "Logging.h"
 #include "Time.h"
+#include "util/CertificateUtils.h"
 
 #include "serialization/_fbs/DeviceToServerMessage_generated.h"
 
@@ -84,7 +84,7 @@ bool GatewayClient::loop() {
 }
 
 void GatewayClient::_sendKeepAlive() {
-  ESP_LOGV(TAG, "Sending keep alive message");
+  ESP_LOGV(TAG, "Sending Gateway keep-alive message");
 
   // Casting to uint64 here is safe since millis is guaranteed to return a positive value
   OpenShock::Serialization::KeepAlive keepAlive((std::uint64_t)OpenShock::millis());
