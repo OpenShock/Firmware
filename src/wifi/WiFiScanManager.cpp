@@ -52,7 +52,13 @@ void _notifyStatusChangedHandlers(OpenShock::WiFiScanStatus status) {
   }
 }
 
+bool _isScanError(std::int16_t retval) {
+  return retval < 0 && retval != WIFI_SCAN_RUNNING;
+}
+
 void _handleScanError(std::int16_t retval) {
+  if (retval >= 0) return;
+
   _notifyTask(WiFiScanTaskNotificationFlags::ERROR);
 
   if (retval == WIFI_SCAN_FAILED) {
@@ -70,7 +76,7 @@ void _handleScanError(std::int16_t retval) {
 
 std::int16_t _scanChannel(std::uint8_t channel) {
   std::int16_t retval = WiFi.scanNetworks(true, true, false, OPENSHOCK_WIFI_SCAN_MAX_MS_PER_CHANNEL, channel);
-  if (retval == WIFI_SCAN_RUNNING || retval >= 0) {
+  if (!_isScanError(retval)) {
     return retval;
   }
 
@@ -80,29 +86,30 @@ std::int16_t _scanChannel(std::uint8_t channel) {
 }
 
 WiFiScanStatus _scanningTaskImpl() {
-  WiFi.enableSTA(true);
-  WiFi.scanDelete();
-
+  // Start the scan on the highest channel and work our way down
   std::uint8_t channel = OPENSHOCK_WIFI_SCAN_MAX_CHANNEL;
 
+  // Start the scan on the first channel
   std::int16_t retval = _scanChannel(channel);
-  if (retval != WIFI_SCAN_RUNNING) {
-    // TODO: Handle this
+  if (_isScanError(retval)) {
     return WiFiScanStatus::Error;
   }
 
+  // Notify the status changed handlers that the scan has started and is in progress
   _notifyStatusChangedHandlers(WiFiScanStatus::Started);
   _notifyStatusChangedHandlers(WiFiScanStatus::InProgress);
 
+  // Scan each channel until we're done
   while (true) {
     std::uint32_t notificationFlags = 0;
 
-    // Wait for the scan to complete
+    // Wait for the scan to complete, _evScanCompleted will notify us when it's done
     if (xTaskNotifyWait(0, WiFiScanTaskNotificationFlags::CLEAR_FLAGS, &notificationFlags, pdMS_TO_TICKS(OPENSHOCK_WIFI_SCAN_TIMEOUT_MS)) != pdTRUE) {
       ESP_LOGE(TAG, "Scan timed out");
-      return WiFiScanStatus::Error; // TODO: Add a "timed out" status
+      return WiFiScanStatus::TimedOut;
     }
 
+    // Check if we were notified of an error or if WiFi was disabled
     if (notificationFlags != WiFiScanTaskNotificationFlags::CHANNEL_DONE) {
       if (notificationFlags & WiFiScanTaskNotificationFlags::WIFI_DISABLED) {
         ESP_LOGE(TAG, "Scan task exiting due to being notified that WiFi was disabled");
@@ -125,8 +132,7 @@ WiFiScanStatus _scanningTaskImpl() {
 
     // Start the scan on the next channel
     retval = _scanChannel(channel);
-    if (retval != WIFI_SCAN_RUNNING) {
-      // TODO: Handle this
+    if (_isScanError(retval)) {
       return WiFiScanStatus::Error;
     }
   }
@@ -135,7 +141,10 @@ WiFiScanStatus _scanningTaskImpl() {
 }
 
 void _scanningTask(void* arg) {
+  // Start the scan
   WiFiScanStatus status = _scanningTaskImpl();
+
+  // Notify the status changed handlers of the scan result
   _notifyStatusChangedHandlers(status);
 
   // Clear the task handle
@@ -143,14 +152,19 @@ void _scanningTask(void* arg) {
   s_scanTaskHandle = nullptr;
   xSemaphoreGive(s_scanTaskMutex);
 
-  // Commit suicide
+  // Kill this task
   vTaskDelete(nullptr);
 }
 
 void _evScanCompleted(arduino_event_id_t event, arduino_event_info_t info) {
   std::int16_t numNetworks = WiFi.scanComplete();
-  if (numNetworks < 0) {
+  if (_isScanError(numNetworks)) {
     _handleScanError(numNetworks);
+    return;
+  }
+
+  if (numNetworks == WIFI_SCAN_RUNNING) {
+    ESP_LOGE(TAG, "Scan completed but scan is still running... WTF?");
     return;
   }
 
