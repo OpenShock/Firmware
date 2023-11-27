@@ -35,6 +35,8 @@ void setup() {
 
   OpenShock::Config::Init();
 
+  OpenShock::Config::SetRFConfigKeepAliveEnabled(true);
+
   if (!OpenShock::CommandHandler::Init()) {
     ESP_LOGW(TAG, "Unable to initialize CommandHandler");
   }
