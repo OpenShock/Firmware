@@ -19,14 +19,26 @@
 
 const char* const TAG = "OpenShock";
 
+const UBaseType_t MAIN_PRIORITY = 1;
+const std::uint32_t MAIN_STACK_SIZE = 8192;
+const TickType_t MAIN_UPDATE_INTERVAL = 5;
+
 void setup_ota() {
-  OpenShock::OtaUpdateManager::Setup();
+  OpenShock::OtaUpdateManager::LoadConfig();
+
+  if (!OpenShock::WiFiManager::Init()) {
+    ESP_PANIC(TAG, "An Error has occurred while initializing WiFiManager");
+  }
+
+  if (!OpenShock::GatewayConnectionManager::Init()) {
+    ESP_PANIC(TAG, "An Error has occurred while initializing GatewayConnectionManager");
+  }
 }
 void main_ota(void* arg) {
   while (true) {
-    OpenShock::OtaUpdateManager::Loop();
+    OpenShock::WiFiManager::Update();
 
-    vTaskDelay(5);
+    vTaskDelay(MAIN_UPDATE_INTERVAL);
   }
 }
 
@@ -63,7 +75,7 @@ void main_app(void* arg) {
     OpenShock::GatewayConnectionManager::Update();
     OpenShock::WiFiManager::Update();
 
-    vTaskDelay(5);
+    vTaskDelay(MAIN_UPDATE_INTERVAL);
   }
 }
 
@@ -81,9 +93,9 @@ void setup() {
 void loop() {
   // Start the main task
   if (OpenShock::OtaUpdateManager::IsPerformingUpdate()) {
-    OpenShock::TaskUtils::TaskCreateExpensive(main_ota, "main_ota", 8192, nullptr, 1, nullptr);
+    OpenShock::TaskUtils::TaskCreateExpensive(main_ota, "main_ota", MAIN_STACK_SIZE, nullptr, MAIN_PRIORITY, nullptr);
   } else {
-    OpenShock::TaskUtils::TaskCreateExpensive(main_app, "main_app", 8192, nullptr, 1, nullptr);
+    OpenShock::TaskUtils::TaskCreateExpensive(main_app, "main_app", MAIN_STACK_SIZE, nullptr, MAIN_PRIORITY, nullptr);
   }
 
   // Kill the loop task

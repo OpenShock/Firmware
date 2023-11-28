@@ -50,26 +50,6 @@ void OtaUpdateManager::Init() {
   }
 }
 
-void OtaUpdateManager::Setup() {
-  OtaUpdateManager::LoadConfig();
-
-  if (!OpenShock::WiFiManager::Init()) {
-    ESP_LOGE(TAG, "PANIC: An Error has occurred while initializing WiFiManager, restarting in 5 seconds...");
-    delay(5000);
-    ESP.restart();
-  }
-
-  if (!OpenShock::GatewayConnectionManager::Init()) {
-    ESP_LOGE(TAG, "PANIC: An Error has occurred while initializing WiFiScanManager, restarting in 5 seconds...");
-    delay(5000);
-    ESP.restart();
-  }
-}
-
-void OtaUpdateManager::Loop() {
-  OpenShock::WiFiManager::Update();
-}
-
 bool OtaUpdateManager::LoadConfig() {
   // Mount LittleFS.
   if (!LittleFS.begin(true, "littlefs", 10U, "config")) {
