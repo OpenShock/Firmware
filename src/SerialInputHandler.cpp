@@ -302,7 +302,7 @@ void _handleNetworksCommand(char* arg, std::size_t argLength) {
 
 void _handleKeepAliveCommand(char* arg, std::size_t argLength) {
   if (arg == nullptr || argLength <= 0) {
-    // Get keep alive status
+    // Get keep-alive status
     Serial.print("$SYS$|Response|KeepAlive|");
     Serial.println(Config::GetRFConfig().keepAliveEnabled ? "true" : "false");
     return;
