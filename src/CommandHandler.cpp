@@ -46,7 +46,7 @@ static QueueHandle_t s_keepAliveQueue         = nullptr;
 static TaskHandle_t s_keepAliveTaskHandle     = nullptr;
 
 void _keepAliveTask(void* arg) {
-  std::int64_t timeToKeepAlive =  + KEEP_ALIVE_INTERVAL;
+  std::int64_t timeToKeepAlive = KEEP_ALIVE_INTERVAL;
 
   // Map of shocker IDs to time of next keep alive
   std::unordered_map<std::uint16_t, KnownShocker> activityMap;
@@ -178,7 +178,7 @@ bool CommandHandler::Init() {
   s_keepAliveSemaphore = xSemaphoreCreateBinary();
   xSemaphoreGive(s_keepAliveSemaphore);
   if (rfConfig.keepAliveEnabled) {
-    CommandHandler::SetKeepAliveEnabled(true);
+    _internalSetKeepAliveEnabled(true);
   }
 
   return true;
