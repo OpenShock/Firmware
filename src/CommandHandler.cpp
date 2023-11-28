@@ -18,7 +18,7 @@
 const char* const TAG = "CommandHandler";
 
 const std::int64_t KEEP_ALIVE_INTERVAL  = 60'000;
-const std::uint16_t KEEP_ALIVE_DURATION = 500;
+const std::uint16_t KEEP_ALIVE_DURATION = 300;
 
 using namespace OpenShock;
 
