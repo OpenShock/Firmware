@@ -7,7 +7,8 @@ const char* const TAG = "Config::RFConfig";
 using namespace OpenShock::Config;
 
 void RFConfig::ToDefault() {
-  txPin = 0U;
+  txPin            = 0U;
+  keepAliveEnabled = true;
 }
 
 bool RFConfig::FromFlatbuffers(const Serialization::Configuration::RFConfig* config) {
@@ -16,13 +17,14 @@ bool RFConfig::FromFlatbuffers(const Serialization::Configuration::RFConfig* con
     return false;
   }
 
-  txPin = config->tx_pin();
+  txPin            = config->tx_pin();
+  keepAliveEnabled = config->keepalive_enabled();
 
   return true;
 }
 
 flatbuffers::Offset<OpenShock::Serialization::Configuration::RFConfig> RFConfig::ToFlatbuffers(flatbuffers::FlatBufferBuilder& builder) const {
-  return Serialization::Configuration::CreateRFConfig(builder, txPin);
+  return Serialization::Configuration::CreateRFConfig(builder, txPin, keepAliveEnabled);
 }
 
 bool RFConfig::FromJSON(const cJSON* json) {
@@ -44,6 +46,14 @@ bool RFConfig::FromJSON(const cJSON* json) {
 
   txPin = txPinJson->valueint;
 
+  const cJSON* keepAliveEnabledJson = cJSON_GetObjectItemCaseSensitive(json, "keepAliveEnabled");
+  if (!cJSON_IsBool(keepAliveEnabledJson)) {
+    ESP_LOGE(TAG, "value at 'keepAliveEnabled' is not a bool");
+    return false;
+  }
+
+  keepAliveEnabled = cJSON_IsTrue(keepAliveEnabledJson);
+
   return true;
 }
 
@@ -51,6 +61,7 @@ cJSON* RFConfig::ToJSON() const {
   cJSON* root = cJSON_CreateObject();
 
   cJSON_AddNumberToObject(root, "txPin", txPin);
+  cJSON_AddBoolToObject(root, "keepAliveEnabled", keepAliveEnabled);
 
   return root;
 }
