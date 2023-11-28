@@ -15,5 +15,8 @@ namespace OpenShock::CommandHandler {
   SetRfPinResultCode SetRfTxPin(std::uint8_t txPin);
   std::uint8_t GetRfTxPin();
 
+  bool SetKeepAliveEnabled(bool enabled);
+  bool SetKeepAlivePaused(bool paused);
+
   bool HandleCommand(ShockerModelType shockerModel, std::uint16_t shockerId, ShockerCommandType type, std::uint8_t intensity, std::uint16_t durationMs);
 }  // namespace OpenShock::CommandHandler

@@ -6,6 +6,7 @@ struct BSSID {
 
 struct RFConfig {
   tx_pin:uint8;
+  keepalive_enabled:bool;
 }
 
 table WiFiCredentials {

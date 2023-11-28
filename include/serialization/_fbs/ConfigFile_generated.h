@@ -63,6 +63,7 @@ struct BSSID::Traits {
 FLATBUFFERS_MANUALLY_ALIGNED_STRUCT(1) RFConfig FLATBUFFERS_FINAL_CLASS {
  private:
   uint8_t tx_pin_;
+  uint8_t keepalive_enabled_;
 
  public:
   struct Traits;
@@ -70,16 +71,21 @@ FLATBUFFERS_MANUALLY_ALIGNED_STRUCT(1) RFConfig FLATBUFFERS_FINAL_CLASS {
     return "OpenShock.Serialization.Configuration.RFConfig";
   }
   RFConfig()
-      : tx_pin_(0) {
+      : tx_pin_(0),
+        keepalive_enabled_(0) {
   }
-  RFConfig(uint8_t _tx_pin)
-      : tx_pin_(::flatbuffers::EndianScalar(_tx_pin)) {
+  RFConfig(uint8_t _tx_pin, bool _keepalive_enabled)
+      : tx_pin_(::flatbuffers::EndianScalar(_tx_pin)),
+        keepalive_enabled_(::flatbuffers::EndianScalar(static_cast<uint8_t>(_keepalive_enabled))) {
   }
   uint8_t tx_pin() const {
     return ::flatbuffers::EndianScalar(tx_pin_);
   }
+  bool keepalive_enabled() const {
+    return ::flatbuffers::EndianScalar(keepalive_enabled_) != 0;
+  }
 };
-FLATBUFFERS_STRUCT_END(RFConfig, 1);
+FLATBUFFERS_STRUCT_END(RFConfig, 2);
 
 struct RFConfig::Traits {
   using type = RFConfig;

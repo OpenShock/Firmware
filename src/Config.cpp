@@ -26,7 +26,8 @@ bool ReadFbsConfig(const Serialization::Configuration::RFConfig* fbsConfig) {
   }
 
   _mainConfig.rf = {
-    .txPin = fbsConfig->tx_pin(),
+    .txPin            = fbsConfig->tx_pin(),
+    .keepAliveEnabled = fbsConfig->keepalive_enabled(),
   };
 
   return true;
@@ -207,7 +208,7 @@ bool _trySaveConfig() {
   // Serialize
   flatbuffers::FlatBufferBuilder builder(1024);
 
-  auto rfConfig = Serialization::Configuration::RFConfig(_rf.txPin);
+  auto rfConfig = Serialization::Configuration::RFConfig(_rf.txPin, _rf.keepAliveEnabled);
 
   std::vector<flatbuffers::Offset<Serialization::Configuration::WiFiCredentials>> wifiCredentials;
   for (const auto& cred : _wifi.credentials) {
@@ -251,6 +252,7 @@ void Config::Init() {
 #else
       .txPin = Constants::GPIO_INVALID,
 #endif
+      .keepAliveEnabled = true,
     },
     .wifi = {
       .apSsid      = "",
@@ -330,6 +332,11 @@ bool Config::SetBackendConfig(const BackendConfig& config) {
 
 bool Config::SetRFConfigTxPin(std::uint8_t txPin) {
   _mainConfig.rf.txPin = txPin;
+  return _trySaveConfig();
+}
+
+bool Config::SetRFConfigKeepAliveEnabled(bool enabled) {
+  _mainConfig.rf.keepAliveEnabled = enabled;
   return _trySaveConfig();
 }
 

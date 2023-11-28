@@ -15,12 +15,17 @@ txPin():number {
   return this.bb!.readUint8(this.bb_pos);
 }
 
-static sizeOf():number {
-  return 1;
+keepaliveEnabled():boolean {
+  return !!this.bb!.readInt8(this.bb_pos + 1);
 }
 
-static createRFConfig(builder:flatbuffers.Builder, tx_pin: number):flatbuffers.Offset {
-  builder.prep(1, 1);
+static sizeOf():number {
+  return 2;
+}
+
+static createRFConfig(builder:flatbuffers.Builder, tx_pin: number, keepalive_enabled: boolean):flatbuffers.Offset {
+  builder.prep(1, 2);
+  builder.writeInt8(Number(Boolean(keepalive_enabled)));
   builder.writeInt8(tx_pin);
   return builder.offset();
 }
