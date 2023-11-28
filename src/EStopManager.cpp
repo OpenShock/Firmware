@@ -1,5 +1,7 @@
 #include "EStopManager.h"
 
+#include "CommandHandler.h"
+#include "Config.h"
 #include "Logging.h"
 #include "Time.h"
 #include "VisualStateManager.h"
@@ -32,6 +34,7 @@ void _estopManagerTask(TimerHandle_t xTimer) {
         s_estoppedAt  = s_lastEStopButtonStateChange;
         ESP_LOGI(TAG, "Emergency Stopped!!!");
         OpenShock::VisualStateManager::SetEmergencyStop(s_estopStatus);
+        OpenShock::CommandHandler::SetKeepAlivePaused(true);
       }
       break;
     case EStopManager::EStopStatus::ESTOPPED_AND_HELD:
@@ -55,6 +58,7 @@ void _estopManagerTask(TimerHandle_t xTimer) {
         s_estopStatus = EStopManager::EStopStatus::ALL_CLEAR;
         ESP_LOGI(TAG, "All clear!");
         OpenShock::VisualStateManager::SetEmergencyStop(s_estopStatus);
+        OpenShock::CommandHandler::SetKeepAlivePaused(false);
       }
       break;
 
@@ -73,9 +77,14 @@ void EStopManager::Init(std::uint16_t updateIntervalMs) {
   ESP_LOGI(TAG, "Initializing on pin %u", s_estopPin);
 
   // Start the repeating task, 10Hz may seem slow, but it's plenty fast for an EStop
-  if (xTimerCreate(TAG, pdMS_TO_TICKS(updateIntervalMs), pdTRUE, nullptr, _estopManagerTask) == nullptr) {
-    ESP_LOGE(TAG, "Failed to create timer");
+  TimerHandle_t timer = xTimerCreate(TAG, pdMS_TO_TICKS(updateIntervalMs), pdTRUE, nullptr, _estopManagerTask);
+  if (timer == nullptr) {
+    ESP_LOGE(TAG, "Failed to create timer!!! Triggering EStop.");
+    s_estopStatus = EStopManager::EStopStatus::ESTOPPED;
+  } else {
+    xTimerStart(timer, 0);
   }
+
 #else
   ESP_LOGI(TAG, "EStopManager disabled, no pin defined");
 #endif

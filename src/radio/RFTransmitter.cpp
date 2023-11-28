@@ -16,6 +16,7 @@ struct command_t {
   std::vector<rmt_data_t> sequence;
   std::shared_ptr<std::vector<rmt_data_t>> zeroSequence;
   std::uint16_t shockerId;
+  bool overwrite;
 };
 
 const char* const TAG = "RFTransmitter";
@@ -56,7 +57,7 @@ RFTransmitter::~RFTransmitter() {
   destroy();
 }
 
-bool RFTransmitter::SendCommand(ShockerModelType model, std::uint16_t shockerId, ShockerCommandType type, std::uint8_t intensity, std::uint16_t durationMs) {
+bool RFTransmitter::SendCommand(ShockerModelType model, std::uint16_t shockerId, ShockerCommandType type, std::uint8_t intensity, std::uint16_t durationMs, bool overwriteExisting) {
   if (m_queueHandle == nullptr) {
     ESP_LOGE(TAG, "[pin-%u] Queue is null", m_txPin);
     return false;
@@ -65,7 +66,7 @@ bool RFTransmitter::SendCommand(ShockerModelType model, std::uint16_t shockerId,
   // Intensity must be between 0 and 99
   intensity = std::min(intensity, (std::uint8_t)99);
 
-  command_t* cmd = new command_t {.until = OpenShock::millis() + durationMs, .sequence = Rmt::GetSequence(model, shockerId, type, intensity), .zeroSequence = Rmt::GetZeroSequence(model, shockerId), .shockerId = shockerId};
+  command_t* cmd = new command_t {.until = OpenShock::millis() + durationMs, .sequence = Rmt::GetSequence(model, shockerId, type, intensity), .zeroSequence = Rmt::GetZeroSequence(model, shockerId), .shockerId = shockerId, .overwrite = overwriteExisting};
 
   // We will use nullptr commands to end the task, if we got a nullptr here, we are out of memory... :(
   if (cmd == nullptr) {
@@ -153,20 +154,27 @@ void RFTransmitter::TransmitTask(void* arg) {
       }
 
       // Replace the command if it already exists
-      bool replaced = false;
+      bool existed = false;
       for (auto it = commands.begin(); it != commands.end(); ++it) {
-        if ((*it)->shockerId == cmd->shockerId) {
-          delete *it;
-          *it = cmd;
+        auto& existingCmd = *it;
 
-          replaced = true;
+        if (existingCmd->shockerId == cmd->shockerId) {
+          existed = true;
+
+          // Only replace the command if it should be overwritten
+          if (existingCmd->overwrite) {
+            delete *it;
+            *it = cmd;
+          } else {
+            delete cmd;
+          }
 
           break;
         }
       }
 
       // If the command was not replaced, add it to the queue
-      if (!replaced) {
+      if (!existed) {
         commands.push_back(cmd);
       }
     }

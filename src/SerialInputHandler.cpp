@@ -3,8 +3,8 @@
 #include "CommandHandler.h"
 #include "Config.h"
 #include "Logging.h"
-#include "wifi/WiFiManager.h"
 #include "util/JsonRoot.h"
+#include "wifi/WiFiManager.h"
 
 #include <cJSON.h>
 #include <Esp.h>
@@ -21,6 +21,7 @@ const char* const kCommandRestart      = "restart";
 const char* const kCommandRmtpin       = "rmtpin";
 const char* const kCommandAuthToken    = "authtoken";
 const char* const kCommandNetworks     = "networks";
+const char* const kCommandKeepAlive    = "keepalive";
 const char* const kCommandFactoryReset = "factoryreset";
 
 void _handleHelpCommand(char* arg, std::size_t argLength) {
@@ -35,6 +36,8 @@ void _handleHelpCommand(char* arg, std::size_t argLength) {
     Serial.println("authtoken    <token>   set auth token");
     Serial.println("networks               get all saved networks");
     Serial.println("networks     <json>    set all saved networks");
+    Serial.println("keepalive              get shocker keep-alive status");
+    Serial.println("keepalive    <bool>    enable/disable shocker keep-alive");
     Serial.println("factoryreset           reset device to factory defaults and reboot");
     return;
   }
@@ -77,6 +80,19 @@ void _handleHelpCommand(char* arg, std::size_t argLength) {
     return;
   }
 
+  if (strcmp(arg, kCommandKeepAlive) == 0) {
+    Serial.println("keepalive");
+    Serial.println("  Get the shocker keep-alive status.");
+    Serial.println();
+    Serial.println("keepalive [<bool>]");
+    Serial.println("  Enable/disable shocker keep-alive.");
+    Serial.println("  Arguments:");
+    Serial.println("    <bool> must be a boolean.");
+    Serial.println("  Example:");
+    Serial.println("    keepalive true");
+    return;
+  }
+
   if (strcmp(arg, kCommandRestart) == 0) {
     Serial.println(kCommandRestart);
     Serial.println("  Restart the board");
@@ -112,6 +128,27 @@ void _handleHelpCommand(char* arg, std::size_t argLength) {
   }
 
   Serial.println("Command not found");
+}
+
+// Checks if the given argument is a boolean
+// Returns 0 if false, 1 if true, 255 if invalid
+// Valid inputs: true, false, 1, 0, yes, no, y, n
+// Case-insensitive
+std::uint8_t _argToBool(char* arg, std::size_t argLength) {
+  if (arg == nullptr || argLength <= 0) {
+    return 255;
+  }
+
+  // Convert to lowercase
+  std::transform(arg, arg + argLength, arg, ::tolower);
+
+  if (strcmp(arg, "true") == 0 || strcmp(arg, "1") == 0 || strcmp(arg, "yes") == 0 || strcmp(arg, "y") == 0) {
+    return 1;
+  } else if (strcmp(arg, "false") == 0 || strcmp(arg, "0") == 0 || strcmp(arg, "no") == 0 || strcmp(arg, "n") == 0) {
+    return 0;
+  } else {
+    return 255;
+  }
 }
 
 void _handleVersionCommand(char* arg, std::size_t argLength) {
@@ -263,6 +300,26 @@ void _handleNetworksCommand(char* arg, std::size_t argLength) {
   OpenShock::WiFiManager::RefreshNetworkCredentials();
 }
 
+void _handleKeepAliveCommand(char* arg, std::size_t argLength) {
+  if (arg == nullptr || argLength <= 0) {
+    // Get keep alive status
+    Serial.print("$SYS$|Response|KeepAlive|");
+    Serial.println(Config::GetRFConfig().keepAliveEnabled ? "true" : "false");
+    return;
+  }
+
+  std::uint8_t enabled = _argToBool(arg, argLength);
+
+  if (enabled == 255) {
+    Serial.println("$SYS$|Error|Invalid argument (not a boolean)");
+    return;
+  } else {
+    OpenShock::CommandHandler::SetKeepAliveEnabled(enabled);
+  }
+
+  Serial.println("$SYS$|Success|Saved config");
+}
+
 static std::unordered_map<std::string, void (*)(char*, std::size_t)> s_commandHandlers = {
   {        kCommandHelp,         _handleHelpCommand},
   {     kCommandVersion,      _handleVersionCommand},
@@ -270,6 +327,7 @@ static std::unordered_map<std::string, void (*)(char*, std::size_t)> s_commandHa
   {      kCommandRmtpin,       _handleRmtpinCommand},
   {   kCommandAuthToken,    _handleAuthtokenCommand},
   {    kCommandNetworks,     _handleNetworksCommand},
+  {   kCommandKeepAlive,    _handleKeepAliveCommand},
   {kCommandFactoryReset, _handleFactoryResetCommand},
 };
 
