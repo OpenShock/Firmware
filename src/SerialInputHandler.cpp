@@ -1,7 +1,7 @@
 #include "SerialInputHandler.h"
 
 #include "CommandHandler.h"
-#include "Config.h"
+#include "config/Config.h"
 #include "Logging.h"
 #include "wifi/WiFiManager.h"
 #include "util/JsonRoot.h"

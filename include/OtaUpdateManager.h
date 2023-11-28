@@ -36,7 +36,7 @@ namespace OpenShock::OtaUpdateManager {
   /* Initialize the OtaUpdateManager. */
   void Init();
 
-  bool LoadConfig();
+  void LoadConfig();
   bool SaveConfig();
 
   bool IsPerformingUpdate();

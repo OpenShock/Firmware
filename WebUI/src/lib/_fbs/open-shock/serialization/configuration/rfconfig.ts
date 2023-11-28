@@ -11,18 +11,36 @@ export class RFConfig {
   return this;
 }
 
+static getRootAsRFConfig(bb:flatbuffers.ByteBuffer, obj?:RFConfig):RFConfig {
+  return (obj || new RFConfig()).__init(bb.readInt32(bb.position()) + bb.position(), bb);
+}
+
+static getSizePrefixedRootAsRFConfig(bb:flatbuffers.ByteBuffer, obj?:RFConfig):RFConfig {
+  bb.setPosition(bb.position() + flatbuffers.SIZE_PREFIX_LENGTH);
+  return (obj || new RFConfig()).__init(bb.readInt32(bb.position()) + bb.position(), bb);
+}
+
 txPin():number {
-  return this.bb!.readUint8(this.bb_pos);
+  const offset = this.bb!.__offset(this.bb_pos, 4);
+  return offset ? this.bb!.readUint8(this.bb_pos + offset) : 0;
 }
 
-static sizeOf():number {
-  return 1;
+static startRFConfig(builder:flatbuffers.Builder) {
+  builder.startObject(1);
 }
 
-static createRFConfig(builder:flatbuffers.Builder, tx_pin: number):flatbuffers.Offset {
-  builder.prep(1, 1);
-  builder.writeInt8(tx_pin);
-  return builder.offset();
+static addTxPin(builder:flatbuffers.Builder, txPin:number) {
+  builder.addFieldInt8(0, txPin, 0);
 }
 
+static endRFConfig(builder:flatbuffers.Builder):flatbuffers.Offset {
+  const offset = builder.endObject();
+  return offset;
+}
+
+static createRFConfig(builder:flatbuffers.Builder, txPin:number):flatbuffers.Offset {
+  RFConfig.startRFConfig(builder);
+  RFConfig.addTxPin(builder, txPin);
+  return RFConfig.endRFConfig(builder);
+}
 }

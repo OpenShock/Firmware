@@ -28,7 +28,7 @@ static getSizePrefixedRootAsConfig(bb:flatbuffers.ByteBuffer, obj?:Config):Confi
 
 rf(obj?:RFConfig):RFConfig|null {
   const offset = this.bb!.__offset(this.bb_pos, 4);
-  return offset ? (obj || new RFConfig()).__init(this.bb_pos + offset, this.bb!) : null;
+  return offset ? (obj || new RFConfig()).__init(this.bb!.__indirect(this.bb_pos + offset), this.bb!) : null;
 }
 
 wifi(obj?:WiFiConfig):WiFiConfig|null {
@@ -38,7 +38,7 @@ wifi(obj?:WiFiConfig):WiFiConfig|null {
 
 captivePortal(obj?:CaptivePortalConfig):CaptivePortalConfig|null {
   const offset = this.bb!.__offset(this.bb_pos, 8);
-  return offset ? (obj || new CaptivePortalConfig()).__init(this.bb_pos + offset, this.bb!) : null;
+  return offset ? (obj || new CaptivePortalConfig()).__init(this.bb!.__indirect(this.bb_pos + offset), this.bb!) : null;
 }
 
 backend(obj?:BackendConfig):BackendConfig|null {
@@ -51,7 +51,7 @@ static startConfig(builder:flatbuffers.Builder) {
 }
 
 static addRf(builder:flatbuffers.Builder, rfOffset:flatbuffers.Offset) {
-  builder.addFieldStruct(0, rfOffset, 0);
+  builder.addFieldOffset(0, rfOffset, 0);
 }
 
 static addWifi(builder:flatbuffers.Builder, wifiOffset:flatbuffers.Offset) {
@@ -59,7 +59,7 @@ static addWifi(builder:flatbuffers.Builder, wifiOffset:flatbuffers.Offset) {
 }
 
 static addCaptivePortal(builder:flatbuffers.Builder, captivePortalOffset:flatbuffers.Offset) {
-  builder.addFieldStruct(2, captivePortalOffset, 0);
+  builder.addFieldOffset(2, captivePortalOffset, 0);
 }
 
 static addBackend(builder:flatbuffers.Builder, backendOffset:flatbuffers.Offset) {

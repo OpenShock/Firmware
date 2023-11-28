@@ -1,6 +1,6 @@
 #include "CaptivePortal.h"
 #include "CommandHandler.h"
-#include "Config.h"
+#include "config/Config.h"
 #include "Constants.h"
 #include "EStopManager.h"
 #include "event_handlers/Init.h"
@@ -55,6 +55,8 @@ void setup_app() {
   OpenShock::EStopManager::Init(100);  // 100ms update interval
 
   OpenShock::Config::Init();
+
+  ESP_LOGI(TAG, "Config loaded: %s", OpenShock::Config::GetAsJSON().c_str());
 
   if (!OpenShock::CommandHandler::Init()) {
     ESP_LOGW(TAG, "Unable to initialize CommandHandler");

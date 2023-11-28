@@ -1,7 +1,6 @@
 #include "OtaUpdateManager.h"
 
-
-#include "Config.h"
+#include "config/Config.h"
 #include "GatewayConnectionManager.h"
 #include "Logging.h"
 #include "wifi/WiFiManager.h"
@@ -50,15 +49,11 @@ void OtaUpdateManager::Init() {
   }
 }
 
-bool OtaUpdateManager::LoadConfig() {
+void OtaUpdateManager::LoadConfig() {
   // Mount LittleFS.
   if (!LittleFS.begin(true, "littlefs", 10U, "config")) {
-    ESP_LOGE(TAG, "PANIC: Could not mount LittleFS, restarting in 5 seconds..");
-    delay(5000);
-
     // Invalidate update partition and restart.
-    esp_ota_mark_app_invalid_rollback_and_reboot();
-    ESP.restart();
+    ESP_PANIC_OTA(TAG, "Could not mount LittleFS");
   }
 
   // Load config while LittleFS is mounted.
@@ -68,7 +63,9 @@ bool OtaUpdateManager::LoadConfig() {
   LittleFS.end();
 }
 
-bool OtaUpdateManager::SaveConfig() { }
+bool OtaUpdateManager::SaveConfig() {
+  return true;
+}
 
 bool OtaUpdateManager::IsPerformingUpdate() {
   return s_bootMode == OtaUpdateManager::BootMode::OTA_UPDATE;
