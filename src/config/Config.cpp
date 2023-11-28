@@ -198,6 +198,11 @@ bool Config::SetRFConfigTxPin(std::uint8_t txPin) {
   return _trySaveConfig();
 }
 
+bool Config::SetRFConfigKeepAliveEnabled(bool enabled) {
+  _mainConfig.rf.keepAliveEnabled = enabled;
+  return _trySaveConfig();
+}
+
 std::uint8_t Config::AddWiFiCredentials(const std::string& ssid, const std::uint8_t (&bssid)[6], const std::string& password) {
   std::uint8_t id = 0;
 

@@ -69,14 +69,19 @@ struct RFConfig FLATBUFFERS_FINAL_CLASS : private ::flatbuffers::Table {
     return "OpenShock.Serialization.Configuration.RFConfig";
   }
   enum FlatBuffersVTableOffset FLATBUFFERS_VTABLE_UNDERLYING_TYPE {
-    VT_TX_PIN = 4
+    VT_TX_PIN = 4,
+    VT_KEEPALIVE_ENABLED = 6
   };
   uint8_t tx_pin() const {
     return GetField<uint8_t>(VT_TX_PIN, 0);
   }
+  bool keepalive_enabled() const {
+    return GetField<uint8_t>(VT_KEEPALIVE_ENABLED, 0) != 0;
+  }
   bool Verify(::flatbuffers::Verifier &verifier) const {
     return VerifyTableStart(verifier) &&
            VerifyField<uint8_t>(verifier, VT_TX_PIN, 1) &&
+           VerifyField<uint8_t>(verifier, VT_KEEPALIVE_ENABLED, 1) &&
            verifier.EndTable();
   }
 };
@@ -87,6 +92,9 @@ struct RFConfigBuilder {
   ::flatbuffers::uoffset_t start_;
   void add_tx_pin(uint8_t tx_pin) {
     fbb_.AddElement<uint8_t>(RFConfig::VT_TX_PIN, tx_pin, 0);
+  }
+  void add_keepalive_enabled(bool keepalive_enabled) {
+    fbb_.AddElement<uint8_t>(RFConfig::VT_KEEPALIVE_ENABLED, static_cast<uint8_t>(keepalive_enabled), 0);
   }
   explicit RFConfigBuilder(::flatbuffers::FlatBufferBuilder &_fbb)
         : fbb_(_fbb) {
@@ -101,8 +109,10 @@ struct RFConfigBuilder {
 
 inline ::flatbuffers::Offset<RFConfig> CreateRFConfig(
     ::flatbuffers::FlatBufferBuilder &_fbb,
-    uint8_t tx_pin = 0) {
+    uint8_t tx_pin = 0,
+    bool keepalive_enabled = false) {
   RFConfigBuilder builder_(_fbb);
+  builder_.add_keepalive_enabled(keepalive_enabled);
   builder_.add_tx_pin(tx_pin);
   return builder_.Finish();
 }

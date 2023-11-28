@@ -25,12 +25,21 @@ txPin():number {
   return offset ? this.bb!.readUint8(this.bb_pos + offset) : 0;
 }
 
+keepaliveEnabled():boolean {
+  const offset = this.bb!.__offset(this.bb_pos, 6);
+  return offset ? !!this.bb!.readInt8(this.bb_pos + offset) : false;
+}
+
 static startRFConfig(builder:flatbuffers.Builder) {
-  builder.startObject(1);
+  builder.startObject(2);
 }
 
 static addTxPin(builder:flatbuffers.Builder, txPin:number) {
   builder.addFieldInt8(0, txPin, 0);
+}
+
+static addKeepaliveEnabled(builder:flatbuffers.Builder, keepaliveEnabled:boolean) {
+  builder.addFieldInt8(1, +keepaliveEnabled, +false);
 }
 
 static endRFConfig(builder:flatbuffers.Builder):flatbuffers.Offset {
@@ -38,9 +47,10 @@ static endRFConfig(builder:flatbuffers.Builder):flatbuffers.Offset {
   return offset;
 }
 
-static createRFConfig(builder:flatbuffers.Builder, txPin:number):flatbuffers.Offset {
+static createRFConfig(builder:flatbuffers.Builder, txPin:number, keepaliveEnabled:boolean):flatbuffers.Offset {
   RFConfig.startRFConfig(builder);
   RFConfig.addTxPin(builder, txPin);
+  RFConfig.addKeepaliveEnabled(builder, keepaliveEnabled);
   return RFConfig.endRFConfig(builder);
 }
 }
