@@ -13,117 +13,133 @@
 
 const char* const TAG = "SerialInputHandler";
 
+#define SERPR_SYS(format, ...) Serial.printf("$SYS$|" format "\n", ##__VA_ARGS__)
+#define SERPR_RESPONSE(format, ...) SERPR_SYS("Response|" format, ##__VA_ARGS__)
+#define SERPR_SUCCESS(format, ...) SERPR_SYS("Success|" format, ##__VA_ARGS__)
+#define SERPR_ERROR(format, ...) SERPR_SYS("Error|" format, ##__VA_ARGS__)
+
 using namespace OpenShock;
 
-const char* const kCommandHelp         = "help";
-const char* const kCommandVersion      = "version";
-const char* const kCommandRestart      = "restart";
-const char* const kCommandRmtpin       = "rmtpin";
-const char* const kCommandAuthToken    = "authtoken";
-const char* const kCommandNetworks     = "networks";
-const char* const kCommandKeepAlive    = "keepalive";
-const char* const kCommandFactoryReset = "factoryreset";
+#define kCommandHelp         "help"
+#define kCommandVersion      "version"
+#define kCommandRestart      "restart"
+#define kCommandRmtpin       "rmtpin"
+#define kCommandAuthToken    "authtoken"
+#define kCommandNetworks     "networks"
+#define kCommandKeepAlive    "keepalive"
+#define kCommandFactoryReset "factoryreset"
 
 void _handleHelpCommand(char* arg, std::size_t argLength) {
   SerialInputHandler::PrintWelcomeHeader();
   if (arg == nullptr || argLength <= 0) {
-    Serial.println("help                   print this menu");
-    Serial.println("help         <command> print help for a command");
-    Serial.println("version                print version information");
-    Serial.println("restart                restart the board");
-    Serial.println("rmtpin                 get radio pin");
-    Serial.println("rmtpin       <pin>     set radio pin");
-    Serial.println("authtoken    <token>   set auth token");
-    Serial.println("networks               get all saved networks");
-    Serial.println("networks     <json>    set all saved networks");
-    Serial.println("keepalive              get shocker keep-alive status");
-    Serial.println("keepalive    <bool>    enable/disable shocker keep-alive");
-    Serial.println("factoryreset           reset device to factory defaults and reboot");
+    // Raw string literal (1+ to remove the first newline)
+    Serial.print(1+R"(
+help                   print this menu
+help         <command> print help for a command
+version                print version information
+restart                restart the board
+rmtpin                 get radio pin
+rmtpin       <pin>     set radio pin
+authtoken    <token>   set auth token
+networks               get all saved networks
+networks     <json>    set all saved networks
+keepalive              get shocker keep-alive status
+keepalive    <bool>    enable/disable shocker keep-alive
+factoryreset           reset device to factory defaults and reboot
+)");
     return;
   }
 
   if (strcmp(arg, kCommandRmtpin) == 0) {
-    Serial.println("rmtpin");
-    Serial.println("  Get the GPIO pin used for the radio transmitter.");
+    Serial.print(kCommandRmtpin R"(
+  Get the GPIO pin used for the radio transmitter.
     Serial.println();
-    Serial.println("rmtpin [<pin>]");
-    Serial.println("  Set the GPIO pin used for the radio transmitter.");
-    Serial.println("  Arguments:");
-    Serial.println("    <pin> must be a number.");
-    Serial.println("  Example:");
-    Serial.println("    rmtpin 15");
+rmtpin [<pin>]
+  Set the GPIO pin used for the radio transmitter.
+  Arguments:
+    <pin> must be a number.
+  Example:
+    rmtpin 15
+)");
     return;
   }
 
   if (strcmp(arg, kCommandAuthToken) == 0) {
-    Serial.println("authtoken <token>");
-    Serial.println("  Set the auth token.");
-    Serial.println("  Arguments:");
-    Serial.println("    <token> must be a string.");
-    Serial.println("  Example:");
-    Serial.println("    authtoken mytoken");
+    Serial.print(kCommandAuthToken R"( <token>
+  Set the auth token.
+  Arguments:
+    <token> must be a string.
+  Example:
+    authtoken mytoken
+)");
     return;
   }
 
   if (strcmp(arg, kCommandNetworks) == 0) {
-    Serial.println("networks");
-    Serial.println("  Get all saved networks.");
+    Serial.print(kCommandNetworks R"(
+  Get all saved networks.
     Serial.println();
-    Serial.println("networks [<json>]");
-    Serial.println("  Set all saved networks.");
-    Serial.println("  Arguments:");
-    Serial.println("    <json> must be a array of objects with the following fields:");
-    Serial.println("      ssid     (string)  SSID of the network");
-    Serial.println("      password (string)  Password of the network");
-    Serial.println("  Example:");
-    Serial.println("    networks [{\"ssid\":\"myssid\",\"password\":\"mypassword\"}]");
+networks [<json>]
+  Set all saved networks.
+  Arguments:
+    <json> must be a array of objects with the following fields:
+      ssid     (string)  SSID of the network
+      password (string)  Password of the network
+  Example:
+    networks [{\"ssid\":\"myssid\",\"password\":\"mypassword\"}]
+)");
     return;
   }
 
   if (strcmp(arg, kCommandKeepAlive) == 0) {
-    Serial.println("keepalive");
-    Serial.println("  Get the shocker keep-alive status.");
+    Serial.print(kCommandKeepAlive R"( <bool>
+  Get the shocker keep-alive status.
     Serial.println();
-    Serial.println("keepalive [<bool>]");
-    Serial.println("  Enable/disable shocker keep-alive.");
-    Serial.println("  Arguments:");
-    Serial.println("    <bool> must be a boolean.");
-    Serial.println("  Example:");
-    Serial.println("    keepalive true");
+keepalive [<bool>]
+  Enable/disable shocker keep-alive.
+  Arguments:
+    <bool> must be a boolean.
+  Example:
+    keepalive true
+)");
     return;
   }
 
   if (strcmp(arg, kCommandRestart) == 0) {
-    Serial.println(kCommandRestart);
-    Serial.println("  Restart the board");
-    Serial.println("  Example:");
-    Serial.println("    restart");
+    Serial.print(kCommandRestart R"(
+  Restart the board
+  Example:
+    restart
+)");
     return;
   }
 
   if (strcmp(arg, kCommandFactoryReset) == 0) {
-    Serial.println(kCommandFactoryReset);
-    Serial.println("  Reset the device to factory defaults and reboot");
-    Serial.println("  Example:");
-    Serial.println("    factoryreset");
+    Serial.print(kCommandFactoryReset R"(
+  Reset the device to factory defaults and reboot
+  Example:
+    factoryreset
+)");
     return;
   }
 
   if (strcmp(arg, kCommandVersion) == 0) {
-    Serial.println(kCommandVersion);
-    Serial.println("  Print version information");
-    Serial.println("  Example:");
-    Serial.println("    version");
+    Serial.print(kCommandVersion R"(
+  Print version information
+  Example:
+    version
+)");
     return;
   }
 
   if (strcmp(arg, kCommandHelp) == 0) {
-    Serial.println(kCommandHelp);
-    Serial.println("  Print help information");
-    Serial.println("  Arguments:");
-    Serial.println("    <command> (optional) command to print help for");
-    Serial.println("  Example:");
-    Serial.println("    help");
+    Serial.print(kCommandHelp R"( [<command>]
+  Print help information
+  Arguments:
+    <command> (optional) command to print help for
+  Example:
+    help
+)");
     return;
   }
 
@@ -171,36 +187,35 @@ void _handleFactoryResetCommand(char* arg, std::size_t argLength) {
 void _handleRmtpinCommand(char* arg, std::size_t argLength) {
   if (arg == nullptr || argLength <= 0) {
     // Get rmt pin
-    Serial.print("$SYS$|Response|RmtPin|");
-    Serial.println(Config::GetRFConfig().txPin);
+    SERPR_RESPONSE("RmtPin|%u", Config::GetRFConfig().txPin);
     return;
   }
 
   unsigned int pin;
   if (sscanf(arg, "%u", &pin) != 1) {
-    Serial.println("$SYS$|Error|Invalid argument (not a number)");
+    SERPR_ERROR("Invalid argument (not a number)");
     return;
   }
 
   if (pin > UINT8_MAX) {
-    Serial.println("$SYS$|Error|Invalid argument (out of range)");
+    SERPR_ERROR("Invalid argument (out of range)");
     return;
   }
 
   OpenShock::CommandHandler::SetRfTxPin(static_cast<std::uint8_t>(pin));
 
-  Serial.println("$SYS$|Success|Saved config");
+  SERPR_SUCCESS("Saved config");
 }
 
 void _handleAuthtokenCommand(char* arg, std::size_t argLength) {
   if (arg == nullptr || argLength <= 0) {
-    Serial.println("$SYS$|Error|Invalid argument");
+    SERPR_ERROR("Invalid argument");
     return;
   }
 
   OpenShock::Config::SetBackendAuthToken(std::string(arg, argLength));
 
-  Serial.println("$SYS$|Success|Saved config");
+  SERPR_SUCCESS("Saved config");
 }
 
 void _handleNetworksCommand(char* arg, std::size_t argLength) {
@@ -210,14 +225,14 @@ void _handleNetworksCommand(char* arg, std::size_t argLength) {
   if (arg == nullptr || argLength <= 0) {
     root = OpenShock::JsonRoot::CreateArray();
     if (!root.isValid()) {
-      Serial.println("$SYS$|Error|Failed to create JSON array");
+      SERPR_ERROR("Failed to create JSON array");
       return;
     }
 
     for (auto& creds : Config::GetWiFiCredentials()) {
       network = cJSON_CreateObject();
       if (network == nullptr) {
-        Serial.println("$SYS$|Error|Failed to create JSON object");
+        SERPR_ERROR("Failed to create JSON object");
         return;
       }
 
@@ -229,12 +244,11 @@ void _handleNetworksCommand(char* arg, std::size_t argLength) {
 
     char* out = cJSON_PrintUnformatted(root);
     if (out == nullptr) {
-      Serial.println("$SYS$|Error|Failed to print JSON");
+      SERPR_ERROR("Failed to print JSON");
       return;
     }
 
-    Serial.print("$SYS$|Response|Networks|");
-    Serial.println(out);
+    SERPR_RESPONSE("Networks|%s", out);
 
     cJSON_free(out);
     return;
@@ -242,12 +256,11 @@ void _handleNetworksCommand(char* arg, std::size_t argLength) {
 
   root = OpenShock::JsonRoot::Parse(arg, argLength);
   if (!root.isValid()) {
-    Serial.print("$SYS$|Error|Failed to parse JSON: ");
-    Serial.println(root.GetErrorMessage());
+    SERPR_ERROR("Failed to parse JSON: %s", root.GetErrorMessage());
     return;
   }
   if (!root.isArray()) {
-    Serial.println("$SYS$|Error|Invalid argument (not an array)");
+    SERPR_ERROR("Invalid argument (not an array)");
     return;
   }
 
@@ -255,7 +268,7 @@ void _handleNetworksCommand(char* arg, std::size_t argLength) {
   std::vector<Config::WiFiCredentials> creds;
   cJSON_ArrayForEach(network, root) {
     if (!cJSON_IsObject(network)) {
-      Serial.println("$SYS$|Error|Invalid argument (array entry is not an object)");
+      SERPR_ERROR("Invalid argument (array entry is not an object)");
       return;
     }
 
@@ -263,7 +276,7 @@ void _handleNetworksCommand(char* arg, std::size_t argLength) {
     const cJSON* password = cJSON_GetObjectItemCaseSensitive(network, "password");
 
     if (!cJSON_IsString(ssid) || !cJSON_IsString(password)) {
-      Serial.println("$SYS$|Error|Invalid argument (ssid or password is not a string)");
+      SERPR_ERROR("Invalid argument (ssid or password is not a string)");
       return;
     }
 
@@ -271,11 +284,11 @@ void _handleNetworksCommand(char* arg, std::size_t argLength) {
     const char* passwordStr = password->valuestring;
 
     if (ssidStr == nullptr || passwordStr == nullptr) {
-      Serial.println("$SYS$|Error|Invalid argument (ssid or password is null)");
+      SERPR_ERROR("Invalid argument (ssid or password is null)");
       return;
     }
     if (ssidStr[0] == '\0' || passwordStr[0] == '\0') {
-      Serial.println("$SYS$|Error|Invalid argument (ssid or password is empty)");
+      SERPR_ERROR("Invalid argument (ssid or password is empty)");
       return;
     }
 
@@ -291,11 +304,11 @@ void _handleNetworksCommand(char* arg, std::size_t argLength) {
   }
 
   if (!OpenShock::Config::SetWiFiCredentials(creds)) {
-    Serial.println("$SYS$|Error|Failed to save config");
+    SERPR_ERROR("Failed to save config");
     return;
   }
 
-  Serial.println("$SYS$|Success|Saved config");
+  SERPR_SUCCESS("Saved config");
 
   OpenShock::WiFiManager::RefreshNetworkCredentials();
 }
@@ -303,21 +316,20 @@ void _handleNetworksCommand(char* arg, std::size_t argLength) {
 void _handleKeepAliveCommand(char* arg, std::size_t argLength) {
   if (arg == nullptr || argLength <= 0) {
     // Get keep alive status
-    Serial.print("$SYS$|Response|KeepAlive|");
-    Serial.println(Config::GetRFConfig().keepAliveEnabled ? "true" : "false");
+    SERPR_RESPONSE("KeepAlive|%s", Config::GetRFConfig().keepAliveEnabled ? "true" : "false");
     return;
   }
 
   std::uint8_t enabled = _argToBool(arg, argLength);
 
   if (enabled == 255) {
-    Serial.println("$SYS$|Error|Invalid argument (not a boolean)");
+    SERPR_ERROR("Invalid argument (not a boolean)");
     return;
   } else {
     OpenShock::CommandHandler::SetKeepAliveEnabled(enabled);
   }
 
-  Serial.println("$SYS$|Success|Saved config");
+  SERPR_SUCCESS("Saved config");
 }
 
 static std::unordered_map<std::string, void (*)(char*, std::size_t)> s_commandHandlers = {
@@ -366,7 +378,7 @@ int findLineStart(const char* buffer, int bufferSize, int lineEnd) {
 void processSerialLine(char* data, std::size_t length) {
   int delimiter = findChar(data, length, ' ');
   if (delimiter == 0) {
-    Serial.println("$SYS$|Error|Command cannot start with a space");
+    SERPR_ERROR("Command cannot start with a space");
     return;
   }
 
@@ -438,17 +450,21 @@ void SerialInputHandler::Update() {
 }
 
 void SerialInputHandler::PrintWelcomeHeader() {
-  Serial.println("\n============== OPENSHOCK ==============");
-  Serial.println("  Contribute @ github.com/OpenShock");
-  Serial.println("  Discuss @ discord.gg/AHcCbXbEcF");
-  Serial.println("  Type 'help' for available commands");
-  Serial.println("=======================================\n");
+  Serial.print(R"(
+============== OPENSHOCK ==============
+  Contribute @ github.com/OpenShock
+  Discuss    @ discord.gg/OpenShock
+  Type 'help' for available commands
+=======================================
+)");
 }
 
 void SerialInputHandler::PrintVersionInfo() {
-  Serial.println("  Version:  " OPENSHOCK_FW_VERSION);
-  Serial.println("    Build:  " OPENSHOCK_FW_MODE);
-  Serial.println("   Commit:  " OPENSHOCK_FW_COMMIT);
-  Serial.println("    Board:  " OPENSHOCK_FW_BOARD);
-  Serial.println("     Chip:  " OPENSHOCK_FW_CHIP);
+  Serial.print("\
+  Version:  " OPENSHOCK_FW_VERSION "\n\
+    Build:  " OPENSHOCK_FW_MODE "\n\
+   Commit:  " OPENSHOCK_FW_COMMIT "\n\
+    Board:  " OPENSHOCK_FW_BOARD "\n\
+     Chip:  " OPENSHOCK_FW_CHIP "\n\
+");
 }
