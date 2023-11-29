@@ -9,16 +9,6 @@
 #include <freertos/FreeRTOS.h>
 #include <freertos/queue.h>
 
-#include <limits>
-
-struct command_t {
-  std::int64_t until;
-  std::vector<rmt_data_t> sequence;
-  std::shared_ptr<std::vector<rmt_data_t>> zeroSequence;
-  std::uint16_t shockerId;
-  bool overwrite;
-};
-
 const char* const TAG = "RFTransmitter";
 
 const UBaseType_t RFTRANSMITTER_QUEUE_SIZE = 32;
@@ -27,6 +17,14 @@ const std::uint32_t RFTRANSMITTER_TASK_STACK_SIZE = 4096;
 const float RFTRANSMITTER_TICKRATE_NS = 1000;
 
 using namespace OpenShock;
+
+struct command_t {
+  std::int64_t until;
+  std::vector<rmt_data_t> sequence;
+  std::shared_ptr<std::vector<rmt_data_t>> zeroSequence;
+  std::uint16_t shockerId;
+  bool overwrite;
+};
 
 RFTransmitter::RFTransmitter(std::uint8_t gpioPin) : m_txPin(gpioPin), m_rmtHandle(nullptr), m_queueHandle(nullptr), m_taskHandle(nullptr) {
   ESP_LOGD(TAG, "[pin-%u] Creating RFTransmitter", m_txPin);
@@ -67,9 +65,6 @@ bool RFTransmitter::SendCommand(ShockerModelType model, std::uint16_t shockerId,
     ESP_LOGE(TAG, "[pin-%u] Queue is null", m_txPin);
     return false;
   }
-
-  // Intensity must be between 0 and 99
-  intensity = std::min(intensity, (std::uint8_t)99);
 
   command_t* cmd = new command_t {.until = OpenShock::millis() + durationMs, .sequence = Rmt::GetSequence(model, shockerId, type, intensity), .zeroSequence = Rmt::GetZeroSequence(model, shockerId), .shockerId = shockerId, .overwrite = overwriteExisting};
 
