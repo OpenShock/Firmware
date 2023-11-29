@@ -5,7 +5,10 @@ struct BSSID {
 }
 
 table RFConfig {
+  /// The GPIO pin connected to the RF modulator's data pin for transmitting (TX)
   tx_pin:uint8;
+
+  /// Whether to transmit keepalive messages to keep the devices from entering sleep mode
   keepalive_enabled:bool;
 }
 
@@ -23,11 +26,16 @@ table WiFiConfig {
 }
 
 table CaptivePortalConfig {
+  /// Whether the captive portal is forced to be enabled
+  /// The captive portal will otherwise shut down when a gateway connection is established
   always_enabled:bool;
 }
 
 table BackendConfig {
-  host:string;
+  /// Domain name of the backend server, e.g. "api.shocklink.net"
+  domain:string;
+
+  /// Authentication token for the backend server
   auth_token:string;
 }
 

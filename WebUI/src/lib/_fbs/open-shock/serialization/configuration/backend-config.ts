@@ -20,13 +20,19 @@ static getSizePrefixedRootAsBackendConfig(bb:flatbuffers.ByteBuffer, obj?:Backen
   return (obj || new BackendConfig()).__init(bb.readInt32(bb.position()) + bb.position(), bb);
 }
 
-host():string|null
-host(optionalEncoding:flatbuffers.Encoding):string|Uint8Array|null
-host(optionalEncoding?:any):string|Uint8Array|null {
+/**
+ * Domain name of the backend server, e.g. "api.shocklink.net"
+ */
+domain():string|null
+domain(optionalEncoding:flatbuffers.Encoding):string|Uint8Array|null
+domain(optionalEncoding?:any):string|Uint8Array|null {
   const offset = this.bb!.__offset(this.bb_pos, 4);
   return offset ? this.bb!.__string(this.bb_pos + offset, optionalEncoding) : null;
 }
 
+/**
+ * Authentication token for the backend server
+ */
 authToken():string|null
 authToken(optionalEncoding:flatbuffers.Encoding):string|Uint8Array|null
 authToken(optionalEncoding?:any):string|Uint8Array|null {
@@ -38,8 +44,8 @@ static startBackendConfig(builder:flatbuffers.Builder) {
   builder.startObject(2);
 }
 
-static addHost(builder:flatbuffers.Builder, hostOffset:flatbuffers.Offset) {
-  builder.addFieldOffset(0, hostOffset, 0);
+static addDomain(builder:flatbuffers.Builder, domainOffset:flatbuffers.Offset) {
+  builder.addFieldOffset(0, domainOffset, 0);
 }
 
 static addAuthToken(builder:flatbuffers.Builder, authTokenOffset:flatbuffers.Offset) {
@@ -51,9 +57,9 @@ static endBackendConfig(builder:flatbuffers.Builder):flatbuffers.Offset {
   return offset;
 }
 
-static createBackendConfig(builder:flatbuffers.Builder, hostOffset:flatbuffers.Offset, authTokenOffset:flatbuffers.Offset):flatbuffers.Offset {
+static createBackendConfig(builder:flatbuffers.Builder, domainOffset:flatbuffers.Offset, authTokenOffset:flatbuffers.Offset):flatbuffers.Offset {
   BackendConfig.startBackendConfig(builder);
-  BackendConfig.addHost(builder, hostOffset);
+  BackendConfig.addDomain(builder, domainOffset);
   BackendConfig.addAuthToken(builder, authTokenOffset);
   return BackendConfig.endBackendConfig(builder);
 }
