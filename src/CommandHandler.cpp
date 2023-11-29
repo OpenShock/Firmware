@@ -157,6 +157,12 @@ bool CommandHandler::Init() {
     return true;
   }
 
+  // Initialize semaphores
+  s_rfTransmitterSemaphore = xSemaphoreCreateBinary();
+  xSemaphoreGive(s_rfTransmitterSemaphore);
+  s_keepAliveSemaphore = xSemaphoreCreateBinary();
+  xSemaphoreGive(s_keepAliveSemaphore);
+
   auto& rfConfig = Config::GetRFConfig();
 
   std::uint8_t txPin = rfConfig.txPin;
@@ -166,8 +172,6 @@ bool CommandHandler::Init() {
     return false;
   }
 
-  s_rfTransmitterSemaphore = xSemaphoreCreateBinary();
-  xSemaphoreGive(s_rfTransmitterSemaphore);
   s_rfTransmitter = std::make_unique<RFTransmitter>(txPin, 32);
   if (!s_rfTransmitter->ok()) {
     ESP_LOGE(TAG, "Failed to initialize RF Transmitter");
@@ -175,8 +179,6 @@ bool CommandHandler::Init() {
     return false;
   }
 
-  s_keepAliveSemaphore = xSemaphoreCreateBinary();
-  xSemaphoreGive(s_keepAliveSemaphore);
   if (rfConfig.keepAliveEnabled) {
     _internalSetKeepAliveEnabled(true);
   }
