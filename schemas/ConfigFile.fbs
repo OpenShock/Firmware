@@ -1,9 +1,5 @@
 namespace OpenShock.Serialization.Configuration;
 
-struct BSSID {
-  array:[ubyte:6];
-}
-
 table RFConfig {
   tx_pin:uint8;
   keepalive_enabled:bool;
@@ -12,7 +8,6 @@ table RFConfig {
 table WiFiCredentials {
   id:uint8;
   ssid:string;
-  bssid:BSSID;
   password:string;
 }
 
