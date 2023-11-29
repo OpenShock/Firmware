@@ -172,7 +172,7 @@ bool CommandHandler::Init() {
     return false;
   }
 
-  s_rfTransmitter = std::make_unique<RFTransmitter>(txPin, 32);
+  s_rfTransmitter = std::make_unique<RFTransmitter>(txPin);
   if (!s_rfTransmitter->ok()) {
     ESP_LOGE(TAG, "Failed to initialize RF Transmitter");
     s_rfTransmitter = nullptr;
@@ -203,7 +203,7 @@ SetRfPinResultCode CommandHandler::SetRfTxPin(std::uint8_t txPin) {
   }
 
   ESP_LOGV(TAG, "Creating new RF transmitter");
-  auto rfxmit = std::make_unique<RFTransmitter>(txPin, 32);
+  auto rfxmit = std::make_unique<RFTransmitter>(txPin);
   if (!rfxmit->ok()) {
     ESP_LOGE(TAG, "Failed to initialize RF transmitter");
 

@@ -15,7 +15,7 @@ typedef void* TaskHandle_t;
 namespace OpenShock {
   class RFTransmitter {
   public:
-    RFTransmitter(std::uint8_t gpioPin, int queueSize = 32);
+    RFTransmitter(std::uint8_t gpioPin);
     ~RFTransmitter();
 
     inline std::uint8_t GetTxPin() const { return m_txPin; }
