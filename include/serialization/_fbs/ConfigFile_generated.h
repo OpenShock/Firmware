@@ -17,8 +17,6 @@ namespace OpenShock {
 namespace Serialization {
 namespace Configuration {
 
-struct BSSID;
-
 struct RFConfig;
 struct RFConfigBuilder;
 
@@ -36,31 +34,6 @@ struct BackendConfigBuilder;
 
 struct Config;
 struct ConfigBuilder;
-
-FLATBUFFERS_MANUALLY_ALIGNED_STRUCT(1) BSSID FLATBUFFERS_FINAL_CLASS {
- private:
-  uint8_t array_[6];
-
- public:
-  struct Traits;
-  static FLATBUFFERS_CONSTEXPR_CPP11 const char *GetFullyQualifiedName() {
-    return "OpenShock.Serialization.Configuration.BSSID";
-  }
-  BSSID()
-      : array_() {
-  }
-  BSSID(::flatbuffers::span<const uint8_t, 6> _array) {
-    ::flatbuffers::CastToArray(array_).CopyFromSpan(_array);
-  }
-  const ::flatbuffers::Array<uint8_t, 6> *array() const {
-    return &::flatbuffers::CastToArray(array_);
-  }
-};
-FLATBUFFERS_STRUCT_END(BSSID, 6);
-
-struct BSSID::Traits {
-  using type = BSSID;
-};
 
 struct RFConfig FLATBUFFERS_FINAL_CLASS : private ::flatbuffers::Table {
   typedef RFConfigBuilder Builder;
@@ -133,17 +106,13 @@ struct WiFiCredentials FLATBUFFERS_FINAL_CLASS : private ::flatbuffers::Table {
   enum FlatBuffersVTableOffset FLATBUFFERS_VTABLE_UNDERLYING_TYPE {
     VT_ID = 4,
     VT_SSID = 6,
-    VT_BSSID = 8,
-    VT_PASSWORD = 10
+    VT_PASSWORD = 8
   };
   uint8_t id() const {
     return GetField<uint8_t>(VT_ID, 0);
   }
   const ::flatbuffers::String *ssid() const {
     return GetPointer<const ::flatbuffers::String *>(VT_SSID);
-  }
-  const OpenShock::Serialization::Configuration::BSSID *bssid() const {
-    return GetStruct<const OpenShock::Serialization::Configuration::BSSID *>(VT_BSSID);
   }
   const ::flatbuffers::String *password() const {
     return GetPointer<const ::flatbuffers::String *>(VT_PASSWORD);
@@ -153,7 +122,6 @@ struct WiFiCredentials FLATBUFFERS_FINAL_CLASS : private ::flatbuffers::Table {
            VerifyField<uint8_t>(verifier, VT_ID, 1) &&
            VerifyOffset(verifier, VT_SSID) &&
            verifier.VerifyString(ssid()) &&
-           VerifyField<OpenShock::Serialization::Configuration::BSSID>(verifier, VT_BSSID, 1) &&
            VerifyOffset(verifier, VT_PASSWORD) &&
            verifier.VerifyString(password()) &&
            verifier.EndTable();
@@ -169,9 +137,6 @@ struct WiFiCredentialsBuilder {
   }
   void add_ssid(::flatbuffers::Offset<::flatbuffers::String> ssid) {
     fbb_.AddOffset(WiFiCredentials::VT_SSID, ssid);
-  }
-  void add_bssid(const OpenShock::Serialization::Configuration::BSSID *bssid) {
-    fbb_.AddStruct(WiFiCredentials::VT_BSSID, bssid);
   }
   void add_password(::flatbuffers::Offset<::flatbuffers::String> password) {
     fbb_.AddOffset(WiFiCredentials::VT_PASSWORD, password);
@@ -191,11 +156,9 @@ inline ::flatbuffers::Offset<WiFiCredentials> CreateWiFiCredentials(
     ::flatbuffers::FlatBufferBuilder &_fbb,
     uint8_t id = 0,
     ::flatbuffers::Offset<::flatbuffers::String> ssid = 0,
-    const OpenShock::Serialization::Configuration::BSSID *bssid = nullptr,
     ::flatbuffers::Offset<::flatbuffers::String> password = 0) {
   WiFiCredentialsBuilder builder_(_fbb);
   builder_.add_password(password);
-  builder_.add_bssid(bssid);
   builder_.add_ssid(ssid);
   builder_.add_id(id);
   return builder_.Finish();
@@ -210,7 +173,6 @@ inline ::flatbuffers::Offset<WiFiCredentials> CreateWiFiCredentialsDirect(
     ::flatbuffers::FlatBufferBuilder &_fbb,
     uint8_t id = 0,
     const char *ssid = nullptr,
-    const OpenShock::Serialization::Configuration::BSSID *bssid = nullptr,
     const char *password = nullptr) {
   auto ssid__ = ssid ? _fbb.CreateString(ssid) : 0;
   auto password__ = password ? _fbb.CreateString(password) : 0;
@@ -218,7 +180,6 @@ inline ::flatbuffers::Offset<WiFiCredentials> CreateWiFiCredentialsDirect(
       _fbb,
       id,
       ssid__,
-      bssid,
       password__);
 }
 

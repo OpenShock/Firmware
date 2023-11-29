@@ -1,9 +1,5 @@
 namespace OpenShock.Serialization.Configuration;
 
-struct BSSID {
-  array:[ubyte:6];
-}
-
 table RFConfig {
   /// The GPIO pin connected to the RF modulator's data pin for transmitting (TX)
   tx_pin:uint8;
@@ -15,7 +11,6 @@ table RFConfig {
 table WiFiCredentials {
   id:uint8;
   ssid:string;
-  bssid:BSSID;
   password:string;
 }
 

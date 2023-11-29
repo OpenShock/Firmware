@@ -20,7 +20,7 @@ void _scanStatusChangedHandler(OpenShock::WiFiScanStatus status) {
 }
 
 void _scanNetworkDiscoveredHandler(const wifi_ap_record_t* record) {
-  std::uint8_t id = Config::GetWiFiCredentialsIDbyBSSIDorSSID(record->bssid, reinterpret_cast<const char*>(record->ssid));
+  std::uint8_t id = Config::GetWiFiCredentialsIDbySSID(reinterpret_cast<const char*>(record->ssid));
   WiFiNetwork network(record, id);
 
   Serialization::Local::SerializeWiFiNetworkEvent(Serialization::Types::WifiNetworkEventType::Discovered, network, CaptivePortal::BroadcastMessageBIN);
