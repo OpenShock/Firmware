@@ -108,12 +108,15 @@ struct WiFiCredentials FLATBUFFERS_FINAL_CLASS : private ::flatbuffers::Table {
     VT_SSID = 6,
     VT_PASSWORD = 8
   };
+  /// ID of the WiFi network credentials, used for referencing the credentials with a low memory footprint
   uint8_t id() const {
     return GetField<uint8_t>(VT_ID, 0);
   }
+  /// SSID of the WiFi network
   const ::flatbuffers::String *ssid() const {
     return GetPointer<const ::flatbuffers::String *>(VT_SSID);
   }
+  /// Password of the WiFi network
   const ::flatbuffers::String *password() const {
     return GetPointer<const ::flatbuffers::String *>(VT_PASSWORD);
   }
@@ -194,12 +197,15 @@ struct WiFiConfig FLATBUFFERS_FINAL_CLASS : private ::flatbuffers::Table {
     VT_HOSTNAME = 6,
     VT_CREDENTIALS = 8
   };
+  /// Access point SSID
   const ::flatbuffers::String *ap_ssid() const {
     return GetPointer<const ::flatbuffers::String *>(VT_AP_SSID);
   }
+  /// Device hostname
   const ::flatbuffers::String *hostname() const {
     return GetPointer<const ::flatbuffers::String *>(VT_HOSTNAME);
   }
+  /// WiFi network credentials
   const ::flatbuffers::Vector<::flatbuffers::Offset<OpenShock::Serialization::Configuration::WiFiCredentials>> *credentials() const {
     return GetPointer<const ::flatbuffers::Vector<::flatbuffers::Offset<OpenShock::Serialization::Configuration::WiFiCredentials>> *>(VT_CREDENTIALS);
   }
@@ -412,15 +418,19 @@ struct Config FLATBUFFERS_FINAL_CLASS : private ::flatbuffers::Table {
     VT_CAPTIVE_PORTAL = 8,
     VT_BACKEND = 10
   };
+  /// RF Transmitter configuration
   const OpenShock::Serialization::Configuration::RFConfig *rf() const {
     return GetPointer<const OpenShock::Serialization::Configuration::RFConfig *>(VT_RF);
   }
+  /// WiFi configuration
   const OpenShock::Serialization::Configuration::WiFiConfig *wifi() const {
     return GetPointer<const OpenShock::Serialization::Configuration::WiFiConfig *>(VT_WIFI);
   }
+  /// Captive portal configuration
   const OpenShock::Serialization::Configuration::CaptivePortalConfig *captive_portal() const {
     return GetPointer<const OpenShock::Serialization::Configuration::CaptivePortalConfig *>(VT_CAPTIVE_PORTAL);
   }
+  /// Backend configuration
   const OpenShock::Serialization::Configuration::BackendConfig *backend() const {
     return GetPointer<const OpenShock::Serialization::Configuration::BackendConfig *>(VT_BACKEND);
   }

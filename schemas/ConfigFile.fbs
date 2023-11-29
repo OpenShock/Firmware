@@ -9,14 +9,24 @@ table RFConfig {
 }
 
 table WiFiCredentials {
+  /// ID of the WiFi network credentials, used for referencing the credentials with a low memory footprint
   id:uint8;
+
+  /// SSID of the WiFi network
   ssid:string;
+
+  /// Password of the WiFi network
   password:string;
 }
 
 table WiFiConfig {
+  /// Access point SSID
   ap_ssid:string;
+
+  /// Device hostname
   hostname:string;
+
+  /// WiFi network credentials
   credentials:[WiFiCredentials];
 }
 
@@ -35,8 +45,15 @@ table BackendConfig {
 }
 
 table Config {
+  /// RF Transmitter configuration
   rf:RFConfig;
+
+  /// WiFi configuration
   wifi:WiFiConfig;
+
+  /// Captive portal configuration
   captive_portal:CaptivePortalConfig;
+
+  /// Backend configuration
   backend:BackendConfig;
 }
