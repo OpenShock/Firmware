@@ -13,16 +13,21 @@
 
 const char* const TAG = "SerialInputHandler";
 
+#define SERPR_SYS(format, ...) Serial.printf("$SYS$|" format "\n", ##__VA_ARGS__)
+#define SERPR_RESPONSE(format, ...) SERPR_SYS("Response|" format, ##__VA_ARGS__)
+#define SERPR_SUCCESS(format, ...) SERPR_SYS("Success|" format, ##__VA_ARGS__)
+#define SERPR_ERROR(format, ...) SERPR_SYS("Error|" format, ##__VA_ARGS__)
+
 using namespace OpenShock;
 
-const char* const kCommandHelp         = "help";
-const char* const kCommandVersion      = "version";
-const char* const kCommandRestart      = "restart";
-const char* const kCommandRmtpin       = "rmtpin";
-const char* const kCommandAuthToken    = "authtoken";
-const char* const kCommandNetworks     = "networks";
-const char* const kCommandKeepAlive    = "keepalive";
-const char* const kCommandFactoryReset = "factoryreset";
+#define kCommandHelp         "help"
+#define kCommandVersion      "version"
+#define kCommandRestart      "restart"
+#define kCommandRmtpin       "rmtpin"
+#define kCommandAuthToken    "authtoken"
+#define kCommandNetworks     "networks"
+#define kCommandKeepAlive    "keepalive"
+#define kCommandFactoryReset "factoryreset"
 
 void _handleHelpCommand(char* arg, std::size_t argLength) {
   SerialInputHandler::PrintWelcomeHeader();
@@ -171,36 +176,35 @@ void _handleFactoryResetCommand(char* arg, std::size_t argLength) {
 void _handleRmtpinCommand(char* arg, std::size_t argLength) {
   if (arg == nullptr || argLength <= 0) {
     // Get rmt pin
-    Serial.print("$SYS$|Response|RmtPin|");
-    Serial.println(Config::GetRFConfig().txPin);
+    SERPR_RESPONSE("RmtPin|%u", Config::GetRFConfig().txPin);
     return;
   }
 
   unsigned int pin;
   if (sscanf(arg, "%u", &pin) != 1) {
-    Serial.println("$SYS$|Error|Invalid argument (not a number)");
+    SERPR_ERROR("Invalid argument (not a number)");
     return;
   }
 
   if (pin > UINT8_MAX) {
-    Serial.println("$SYS$|Error|Invalid argument (out of range)");
+    SERPR_ERROR("Invalid argument (out of range)");
     return;
   }
 
   OpenShock::CommandHandler::SetRfTxPin(static_cast<std::uint8_t>(pin));
 
-  Serial.println("$SYS$|Success|Saved config");
+  SERPR_SUCCESS("Saved config");
 }
 
 void _handleAuthtokenCommand(char* arg, std::size_t argLength) {
   if (arg == nullptr || argLength <= 0) {
-    Serial.println("$SYS$|Error|Invalid argument");
+    SERPR_ERROR("Invalid argument");
     return;
   }
 
   OpenShock::Config::SetBackendAuthToken(std::string(arg, argLength));
 
-  Serial.println("$SYS$|Success|Saved config");
+  SERPR_SUCCESS("Saved config");
 }
 
 void _handleNetworksCommand(char* arg, std::size_t argLength) {
@@ -210,14 +214,14 @@ void _handleNetworksCommand(char* arg, std::size_t argLength) {
   if (arg == nullptr || argLength <= 0) {
     root = OpenShock::JsonRoot::CreateArray();
     if (!root.isValid()) {
-      Serial.println("$SYS$|Error|Failed to create JSON array");
+      SERPR_ERROR("Failed to create JSON array");
       return;
     }
 
     for (auto& creds : Config::GetWiFiCredentials()) {
       network = cJSON_CreateObject();
       if (network == nullptr) {
-        Serial.println("$SYS$|Error|Failed to create JSON object");
+        SERPR_ERROR("Failed to create JSON object");
         return;
       }
 
@@ -229,12 +233,11 @@ void _handleNetworksCommand(char* arg, std::size_t argLength) {
 
     char* out = cJSON_PrintUnformatted(root);
     if (out == nullptr) {
-      Serial.println("$SYS$|Error|Failed to print JSON");
+      SERPR_ERROR("Failed to print JSON");
       return;
     }
 
-    Serial.print("$SYS$|Response|Networks|");
-    Serial.println(out);
+    SERPR_RESPONSE("Networks|%s", out);
 
     cJSON_free(out);
     return;
@@ -242,12 +245,11 @@ void _handleNetworksCommand(char* arg, std::size_t argLength) {
 
   root = OpenShock::JsonRoot::Parse(arg, argLength);
   if (!root.isValid()) {
-    Serial.print("$SYS$|Error|Failed to parse JSON: ");
-    Serial.println(root.GetErrorMessage());
+    SERPR_ERROR("Failed to parse JSON: %s", root.GetErrorMessage());
     return;
   }
   if (!root.isArray()) {
-    Serial.println("$SYS$|Error|Invalid argument (not an array)");
+    SERPR_ERROR("Invalid argument (not an array)");
     return;
   }
 
@@ -255,7 +257,7 @@ void _handleNetworksCommand(char* arg, std::size_t argLength) {
   std::vector<Config::WiFiCredentials> creds;
   cJSON_ArrayForEach(network, root) {
     if (!cJSON_IsObject(network)) {
-      Serial.println("$SYS$|Error|Invalid argument (array entry is not an object)");
+      SERPR_ERROR("Invalid argument (array entry is not an object)");
       return;
     }
 
@@ -263,7 +265,7 @@ void _handleNetworksCommand(char* arg, std::size_t argLength) {
     const cJSON* password = cJSON_GetObjectItemCaseSensitive(network, "password");
 
     if (!cJSON_IsString(ssid) || !cJSON_IsString(password)) {
-      Serial.println("$SYS$|Error|Invalid argument (ssid or password is not a string)");
+      SERPR_ERROR("Invalid argument (ssid or password is not a string)");
       return;
     }
 
@@ -271,11 +273,11 @@ void _handleNetworksCommand(char* arg, std::size_t argLength) {
     const char* passwordStr = password->valuestring;
 
     if (ssidStr == nullptr || passwordStr == nullptr) {
-      Serial.println("$SYS$|Error|Invalid argument (ssid or password is null)");
+      SERPR_ERROR("Invalid argument (ssid or password is null)");
       return;
     }
     if (ssidStr[0] == '\0' || passwordStr[0] == '\0') {
-      Serial.println("$SYS$|Error|Invalid argument (ssid or password is empty)");
+      SERPR_ERROR("Invalid argument (ssid or password is empty)");
       return;
     }
 
@@ -291,11 +293,11 @@ void _handleNetworksCommand(char* arg, std::size_t argLength) {
   }
 
   if (!OpenShock::Config::SetWiFiCredentials(creds)) {
-    Serial.println("$SYS$|Error|Failed to save config");
+    SERPR_ERROR("Failed to save config");
     return;
   }
 
-  Serial.println("$SYS$|Success|Saved config");
+  SERPR_SUCCESS("Saved config");
 
   OpenShock::WiFiManager::RefreshNetworkCredentials();
 }
@@ -303,21 +305,20 @@ void _handleNetworksCommand(char* arg, std::size_t argLength) {
 void _handleKeepAliveCommand(char* arg, std::size_t argLength) {
   if (arg == nullptr || argLength <= 0) {
     // Get keep alive status
-    Serial.print("$SYS$|Response|KeepAlive|");
-    Serial.println(Config::GetRFConfig().keepAliveEnabled ? "true" : "false");
+    SERPR_RESPONSE("KeepAlive|%s", Config::GetRFConfig().keepAliveEnabled ? "true" : "false");
     return;
   }
 
   std::uint8_t enabled = _argToBool(arg, argLength);
 
   if (enabled == 255) {
-    Serial.println("$SYS$|Error|Invalid argument (not a boolean)");
+    SERPR_ERROR("Invalid argument (not a boolean)");
     return;
   } else {
     OpenShock::CommandHandler::SetKeepAliveEnabled(enabled);
   }
 
-  Serial.println("$SYS$|Success|Saved config");
+  SERPR_SUCCESS("Saved config");
 }
 
 static std::unordered_map<std::string, void (*)(char*, std::size_t)> s_commandHandlers = {
@@ -366,7 +367,7 @@ int findLineStart(const char* buffer, int bufferSize, int lineEnd) {
 void processSerialLine(char* data, std::size_t length) {
   int delimiter = findChar(data, length, ' ');
   if (delimiter == 0) {
-    Serial.println("$SYS$|Error|Command cannot start with a space");
+    SERPR_ERROR("Command cannot start with a space");
     return;
   }
 
