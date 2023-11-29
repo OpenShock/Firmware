@@ -1,9 +1,8 @@
 #include "SerialInputHandler.h"
 
 #include "CommandHandler.h"
-#include "Config.h"
+#include "config/Config.h"
 #include "Logging.h"
-#include "util/JsonRoot.h"
 #include "wifi/WiFiManager.h"
 
 #include <cJSON.h>
@@ -220,24 +219,17 @@ void _handleAuthtokenCommand(char* arg, std::size_t argLength) {
 
 void _handleNetworksCommand(char* arg, std::size_t argLength) {
   cJSON* network = nullptr;
-  OpenShock::JsonRoot root;
+  cJSON* root;
 
   if (arg == nullptr || argLength <= 0) {
-    root = OpenShock::JsonRoot::CreateArray();
-    if (!root.isValid()) {
+    root = cJSON_CreateArray();
+    if (root == nullptr) {
       SERPR_ERROR("Failed to create JSON array");
       return;
     }
 
     for (auto& creds : Config::GetWiFiCredentials()) {
-      network = cJSON_CreateObject();
-      if (network == nullptr) {
-        SERPR_ERROR("Failed to create JSON object");
-        return;
-      }
-
-      cJSON_AddStringToObject(network, "ssid", creds.ssid.c_str());
-      cJSON_AddStringToObject(network, "password", creds.password.c_str());
+      network = creds.ToJSON();
 
       cJSON_AddItemToArray(root, network);
     }
@@ -254,12 +246,13 @@ void _handleNetworksCommand(char* arg, std::size_t argLength) {
     return;
   }
 
-  root = OpenShock::JsonRoot::Parse(arg, argLength);
-  if (!root.isValid()) {
-    SERPR_ERROR("Failed to parse JSON: %s", root.GetErrorMessage());
+  root = cJSON_ParseWithLength(arg, argLength);
+  if (root == nullptr) {
+    SERPR_ERROR("Failed to parse JSON: %s", cJSON_GetErrorPtr());
     return;
   }
-  if (!root.isArray()) {
+
+  if (!cJSON_IsArray(root)) {
     SERPR_ERROR("Invalid argument (not an array)");
     return;
   }
@@ -267,38 +260,14 @@ void _handleNetworksCommand(char* arg, std::size_t argLength) {
   std::uint8_t id = 1;
   std::vector<Config::WiFiCredentials> creds;
   cJSON_ArrayForEach(network, root) {
-    if (!cJSON_IsObject(network)) {
-      SERPR_ERROR("Invalid argument (array entry is not an object)");
+    Config::WiFiCredentials cred;
+
+    if (!cred.FromJSON(network)) {
+      SERPR_ERROR("Failed to parse network");
       return;
     }
 
-    const cJSON* ssid     = cJSON_GetObjectItemCaseSensitive(network, "ssid");
-    const cJSON* password = cJSON_GetObjectItemCaseSensitive(network, "password");
-
-    if (!cJSON_IsString(ssid) || !cJSON_IsString(password)) {
-      SERPR_ERROR("Invalid argument (ssid or password is not a string)");
-      return;
-    }
-
-    const char* ssidStr     = ssid->valuestring;
-    const char* passwordStr = password->valuestring;
-
-    if (ssidStr == nullptr || passwordStr == nullptr) {
-      SERPR_ERROR("Invalid argument (ssid or password is null)");
-      return;
-    }
-    if (ssidStr[0] == '\0' || passwordStr[0] == '\0') {
-      SERPR_ERROR("Invalid argument (ssid or password is empty)");
-      return;
-    }
-
-    Config::WiFiCredentials cred {
-      .id       = id++,
-      .ssid     = ssidStr,
-      .bssid    = {0, 0, 0, 0, 0, 0},
-      .password = passwordStr,
-    };
-    ESP_LOGI(TAG, "Adding network to config %s", ssidStr);
+    ESP_LOGI(TAG, "Adding network to config %s", cred.ssid.c_str());
 
     creds.push_back(std::move(cred));
   }

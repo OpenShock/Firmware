@@ -1,7 +1,7 @@
 #include "event_handlers/WiFiScan.h"
 
 #include "CaptivePortal.h"
-#include "Config.h"
+#include "config/Config.h"
 #include "serialization/WSLocal.h"
 #include "wifi/WiFiManager.h"
 #include "wifi/WiFiNetwork.h"

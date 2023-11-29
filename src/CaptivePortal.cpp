@@ -2,7 +2,7 @@
 
 #include "CaptivePortalInstance.h"
 #include "CommandHandler.h"
-#include "Config.h"
+#include "config/Config.h"
 #include "GatewayConnectionManager.h"
 #include "Logging.h"
 

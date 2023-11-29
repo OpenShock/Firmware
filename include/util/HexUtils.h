@@ -4,6 +4,7 @@
 
 #include <array>
 #include <cstdint>
+#include <cstring>
 
 namespace OpenShock::HexUtils {
   /// @brief Converts a single byte to a hex pair, and writes it to the output buffer.
@@ -98,19 +99,34 @@ namespace OpenShock::HexUtils {
     return true;
   }
 
-  /// @brief Converts a hex string to a byte array.
-  /// @param data The hex string to convert.
-  /// @param output The output buffer to write to.
-  /// @return Whether the conversion was successful.
-  /// @remark To use this you must specify the size of the array in the template parameter.
-  template<std::size_t N>
-  constexpr bool TryParseHexMac(nonstd::span<const char, N> data, nonstd::span<std::uint8_t, 6> output) noexcept {
-    static_assert((N + 1) % 3 == 0, "Invalid MAC-Style hex string length.");
-    for (std::size_t i = 0; i < output.size(); ++i) {
-      if (!TryParseHexPair(data[i * 3], data[i * 3 + 1], output[i])) {
-        return false;
+  constexpr std::size_t TryParseHexMac(const char* str, std::size_t strLen, std::uint8_t* out, std::size_t outLen) noexcept {
+    std::size_t parsedLength = (strLen + 1) / 3;
+
+    if ((parsedLength * 3) - 1 != strLen) {
+      return 0;  // Invalid MAC-Style hex string length.
+    }
+
+    if (parsedLength > outLen) {
+      return 0;  // Output buffer is too small.
+    }
+
+    for (std::size_t i = 0; i < parsedLength - 1; ++i) {
+      if (!TryParseHexPair(str[i * 3], str[i * 3 + 1], out[i])) {
+        return 0;  // Invalid hex pair.
+      }
+      if (str[i * 3 + 2] != ':') {
+        return 0;  // Invalid separator.
       }
     }
-    return true;
+
+    if (!TryParseHexPair(str[(parsedLength - 1) * 3], str[(parsedLength - 1) * 3 + 1], out[parsedLength - 1])) {
+      return 0;  // Invalid hex pair.
+    }
+
+    return parsedLength;
+  }
+
+  inline std::size_t TryParseHexMac(const char* str, std::uint8_t* out, std::size_t outLen) noexcept {
+    return TryParseHexMac(str, strlen(str), out, outLen);
   }
 }  // namespace OpenShock::HexUtils
