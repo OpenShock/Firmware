@@ -45,9 +45,11 @@ struct RFConfig FLATBUFFERS_FINAL_CLASS : private ::flatbuffers::Table {
     VT_TX_PIN = 4,
     VT_KEEPALIVE_ENABLED = 6
   };
+  /// The GPIO pin connected to the RF modulator's data pin for transmitting (TX)
   uint8_t tx_pin() const {
     return GetField<uint8_t>(VT_TX_PIN, 0);
   }
+  /// Whether to transmit keepalive messages to keep the devices from entering sleep mode
   bool keepalive_enabled() const {
     return GetField<uint8_t>(VT_KEEPALIVE_ENABLED, 0) != 0;
   }
@@ -106,12 +108,15 @@ struct WiFiCredentials FLATBUFFERS_FINAL_CLASS : private ::flatbuffers::Table {
     VT_SSID = 6,
     VT_PASSWORD = 8
   };
+  /// ID of the WiFi network credentials, used for referencing the credentials with a low memory footprint
   uint8_t id() const {
     return GetField<uint8_t>(VT_ID, 0);
   }
+  /// SSID of the WiFi network
   const ::flatbuffers::String *ssid() const {
     return GetPointer<const ::flatbuffers::String *>(VT_SSID);
   }
+  /// Password of the WiFi network
   const ::flatbuffers::String *password() const {
     return GetPointer<const ::flatbuffers::String *>(VT_PASSWORD);
   }
@@ -192,12 +197,15 @@ struct WiFiConfig FLATBUFFERS_FINAL_CLASS : private ::flatbuffers::Table {
     VT_HOSTNAME = 6,
     VT_CREDENTIALS = 8
   };
+  /// Access point SSID
   const ::flatbuffers::String *ap_ssid() const {
     return GetPointer<const ::flatbuffers::String *>(VT_AP_SSID);
   }
+  /// Device hostname
   const ::flatbuffers::String *hostname() const {
     return GetPointer<const ::flatbuffers::String *>(VT_HOSTNAME);
   }
+  /// WiFi network credentials
   const ::flatbuffers::Vector<::flatbuffers::Offset<OpenShock::Serialization::Configuration::WiFiCredentials>> *credentials() const {
     return GetPointer<const ::flatbuffers::Vector<::flatbuffers::Offset<OpenShock::Serialization::Configuration::WiFiCredentials>> *>(VT_CREDENTIALS);
   }
@@ -279,6 +287,8 @@ struct CaptivePortalConfig FLATBUFFERS_FINAL_CLASS : private ::flatbuffers::Tabl
   enum FlatBuffersVTableOffset FLATBUFFERS_VTABLE_UNDERLYING_TYPE {
     VT_ALWAYS_ENABLED = 4
   };
+  /// Whether the captive portal is forced to be enabled
+  /// The captive portal will otherwise shut down when a gateway connection is established
   bool always_enabled() const {
     return GetField<uint8_t>(VT_ALWAYS_ENABLED, 0) != 0;
   }
@@ -327,19 +337,21 @@ struct BackendConfig FLATBUFFERS_FINAL_CLASS : private ::flatbuffers::Table {
     return "OpenShock.Serialization.Configuration.BackendConfig";
   }
   enum FlatBuffersVTableOffset FLATBUFFERS_VTABLE_UNDERLYING_TYPE {
-    VT_HOST = 4,
+    VT_DOMAIN = 4,
     VT_AUTH_TOKEN = 6
   };
-  const ::flatbuffers::String *host() const {
-    return GetPointer<const ::flatbuffers::String *>(VT_HOST);
+  /// Domain name of the backend server, e.g. "api.shocklink.net"
+  const ::flatbuffers::String *domain() const {
+    return GetPointer<const ::flatbuffers::String *>(VT_DOMAIN);
   }
+  /// Authentication token for the backend server
   const ::flatbuffers::String *auth_token() const {
     return GetPointer<const ::flatbuffers::String *>(VT_AUTH_TOKEN);
   }
   bool Verify(::flatbuffers::Verifier &verifier) const {
     return VerifyTableStart(verifier) &&
-           VerifyOffset(verifier, VT_HOST) &&
-           verifier.VerifyString(host()) &&
+           VerifyOffset(verifier, VT_DOMAIN) &&
+           verifier.VerifyString(domain()) &&
            VerifyOffset(verifier, VT_AUTH_TOKEN) &&
            verifier.VerifyString(auth_token()) &&
            verifier.EndTable();
@@ -350,8 +362,8 @@ struct BackendConfigBuilder {
   typedef BackendConfig Table;
   ::flatbuffers::FlatBufferBuilder &fbb_;
   ::flatbuffers::uoffset_t start_;
-  void add_host(::flatbuffers::Offset<::flatbuffers::String> host) {
-    fbb_.AddOffset(BackendConfig::VT_HOST, host);
+  void add_domain(::flatbuffers::Offset<::flatbuffers::String> domain) {
+    fbb_.AddOffset(BackendConfig::VT_DOMAIN, domain);
   }
   void add_auth_token(::flatbuffers::Offset<::flatbuffers::String> auth_token) {
     fbb_.AddOffset(BackendConfig::VT_AUTH_TOKEN, auth_token);
@@ -369,11 +381,11 @@ struct BackendConfigBuilder {
 
 inline ::flatbuffers::Offset<BackendConfig> CreateBackendConfig(
     ::flatbuffers::FlatBufferBuilder &_fbb,
-    ::flatbuffers::Offset<::flatbuffers::String> host = 0,
+    ::flatbuffers::Offset<::flatbuffers::String> domain = 0,
     ::flatbuffers::Offset<::flatbuffers::String> auth_token = 0) {
   BackendConfigBuilder builder_(_fbb);
   builder_.add_auth_token(auth_token);
-  builder_.add_host(host);
+  builder_.add_domain(domain);
   return builder_.Finish();
 }
 
@@ -384,13 +396,13 @@ struct BackendConfig::Traits {
 
 inline ::flatbuffers::Offset<BackendConfig> CreateBackendConfigDirect(
     ::flatbuffers::FlatBufferBuilder &_fbb,
-    const char *host = nullptr,
+    const char *domain = nullptr,
     const char *auth_token = nullptr) {
-  auto host__ = host ? _fbb.CreateString(host) : 0;
+  auto domain__ = domain ? _fbb.CreateString(domain) : 0;
   auto auth_token__ = auth_token ? _fbb.CreateString(auth_token) : 0;
   return OpenShock::Serialization::Configuration::CreateBackendConfig(
       _fbb,
-      host__,
+      domain__,
       auth_token__);
 }
 
@@ -406,15 +418,19 @@ struct Config FLATBUFFERS_FINAL_CLASS : private ::flatbuffers::Table {
     VT_CAPTIVE_PORTAL = 8,
     VT_BACKEND = 10
   };
+  /// RF Transmitter configuration
   const OpenShock::Serialization::Configuration::RFConfig *rf() const {
     return GetPointer<const OpenShock::Serialization::Configuration::RFConfig *>(VT_RF);
   }
+  /// WiFi configuration
   const OpenShock::Serialization::Configuration::WiFiConfig *wifi() const {
     return GetPointer<const OpenShock::Serialization::Configuration::WiFiConfig *>(VT_WIFI);
   }
+  /// Captive portal configuration
   const OpenShock::Serialization::Configuration::CaptivePortalConfig *captive_portal() const {
     return GetPointer<const OpenShock::Serialization::Configuration::CaptivePortalConfig *>(VT_CAPTIVE_PORTAL);
   }
+  /// Backend configuration
   const OpenShock::Serialization::Configuration::BackendConfig *backend() const {
     return GetPointer<const OpenShock::Serialization::Configuration::BackendConfig *>(VT_BACKEND);
   }

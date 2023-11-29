@@ -20,11 +20,17 @@ static getSizePrefixedRootAsWiFiCredentials(bb:flatbuffers.ByteBuffer, obj?:WiFi
   return (obj || new WiFiCredentials()).__init(bb.readInt32(bb.position()) + bb.position(), bb);
 }
 
+/**
+ * ID of the WiFi network credentials, used for referencing the credentials with a low memory footprint
+ */
 id():number {
   const offset = this.bb!.__offset(this.bb_pos, 4);
   return offset ? this.bb!.readUint8(this.bb_pos + offset) : 0;
 }
 
+/**
+ * SSID of the WiFi network
+ */
 ssid():string|null
 ssid(optionalEncoding:flatbuffers.Encoding):string|Uint8Array|null
 ssid(optionalEncoding?:any):string|Uint8Array|null {
@@ -32,6 +38,9 @@ ssid(optionalEncoding?:any):string|Uint8Array|null {
   return offset ? this.bb!.__string(this.bb_pos + offset, optionalEncoding) : null;
 }
 
+/**
+ * Password of the WiFi network
+ */
 password():string|null
 password(optionalEncoding:flatbuffers.Encoding):string|Uint8Array|null
 password(optionalEncoding?:any):string|Uint8Array|null {

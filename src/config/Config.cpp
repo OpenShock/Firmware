@@ -14,7 +14,7 @@ const char* const TAG = "Config";
 
 using namespace OpenShock;
 
-Config::RootConfig _mainConfig;
+static Config::RootConfig _mainConfig;
 
 bool _tryLoadConfig() {
   File file = LittleFS.open("/config", "rb");
@@ -68,11 +68,6 @@ bool _trySaveConfig() {
     ESP_LOGE(TAG, "Failed to open config file for writing");
     return false;
   }
-
-  auto& _rf            = _mainConfig.rf;
-  auto& _wifi          = _mainConfig.wifi;
-  auto& _backend       = _mainConfig.backend;
-  auto& _captivePortal = _mainConfig.captivePortal;
 
   // Serialize
   flatbuffers::FlatBufferBuilder builder(1024);

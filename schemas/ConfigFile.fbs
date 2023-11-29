@@ -1,34 +1,59 @@
 namespace OpenShock.Serialization.Configuration;
 
 table RFConfig {
+  /// The GPIO pin connected to the RF modulator's data pin for transmitting (TX)
   tx_pin:uint8;
+
+  /// Whether to transmit keepalive messages to keep the devices from entering sleep mode
   keepalive_enabled:bool;
 }
 
 table WiFiCredentials {
+  /// ID of the WiFi network credentials, used for referencing the credentials with a low memory footprint
   id:uint8;
+
+  /// SSID of the WiFi network
   ssid:string;
+
+  /// Password of the WiFi network
   password:string;
 }
 
 table WiFiConfig {
+  /// Access point SSID
   ap_ssid:string;
+
+  /// Device hostname
   hostname:string;
+
+  /// WiFi network credentials
   credentials:[WiFiCredentials];
 }
 
 table CaptivePortalConfig {
+  /// Whether the captive portal is forced to be enabled
+  /// The captive portal will otherwise shut down when a gateway connection is established
   always_enabled:bool;
 }
 
 table BackendConfig {
-  host:string;
+  /// Domain name of the backend server, e.g. "api.shocklink.net"
+  domain:string;
+
+  /// Authentication token for the backend server
   auth_token:string;
 }
 
 table Config {
+  /// RF Transmitter configuration
   rf:RFConfig;
+
+  /// WiFi configuration
   wifi:WiFiConfig;
+
+  /// Captive portal configuration
   captive_portal:CaptivePortalConfig;
+
+  /// Backend configuration
   backend:BackendConfig;
 }
