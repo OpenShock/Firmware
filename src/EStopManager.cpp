@@ -1,7 +1,7 @@
 #include "EStopManager.h"
 
 #include "CommandHandler.h"
-#include "Config.h"
+#include "config/Config.h"
 #include "Logging.h"
 #include "Time.h"
 #include "VisualStateManager.h"

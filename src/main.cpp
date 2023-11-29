@@ -1,6 +1,6 @@
 #include "CaptivePortal.h"
 #include "CommandHandler.h"
-#include "Config.h"
+#include "config/Config.h"
 #include "Constants.h"
 #include "EStopManager.h"
 #include "event_handlers/Init.h"

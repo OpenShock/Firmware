@@ -95,8 +95,14 @@ CaptivePortalInstance::CaptivePortalInstance()
       request->send(
         200,
         "text/plain",
-        "You probably forgot to upload the Filesystem with PlatformIO!\nGo to PlatformIO -> Platform -> Upload Filesystem Image!\nIf this happened with a file we provided or you just need help, come to the Discord!\n\ndiscord.gg/openshock"
-      );
+// Raw string literal (1+ to remove the first newline)
+1+R"(
+You probably forgot to upload the Filesystem with PlatformIO!
+Go to PlatformIO -> Platform -> Upload Filesystem Image!
+If this happened with a file we provided or you just need help, come to the Discord!
+
+discord.gg/openshock
+)");
     });
   }
 
