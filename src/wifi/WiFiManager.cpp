@@ -1,7 +1,7 @@
 #include "wifi/WiFiManager.h"
 
 #include "CaptivePortal.h"
-#include "Config.h"
+#include "config/Config.h"
 #include "FormatHelpers.h"
 #include "Logging.h"
 #include "serialization/WSLocal.h"

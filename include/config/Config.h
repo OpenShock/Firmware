@@ -1,36 +1,23 @@
 #pragma once
 
-#include "serialization/_fbs/ConfigFile_generated.h"
+#include "config/BackendConfig.h"
+#include "config/CaptivePortalConfig.h"
+#include "config/RFConfig.h"
+#include "config/WiFiConfig.h"
+#include "config/WiFiCredentials.h"
 
 #include <functional>
 #include <string>
 #include <vector>
 
 namespace OpenShock::Config {
-  // This is a copy of the flatbuffers schema defined in schemas/ConfigFile.fbs
-  struct RFConfig {
-    std::uint8_t txPin;
-    bool keepAliveEnabled;
-  };
-  struct WiFiCredentials {
-    std::uint8_t id;
-    std::string ssid;
-    std::uint8_t bssid[6];
-    std::string password;
-  };
-  struct WiFiConfig {
-    std::string apSsid;
-    std::string hostname;
-    std::vector<WiFiCredentials> credentials;
-  };
-  struct CaptivePortalConfig {
-    bool alwaysEnabled;
-  };
-  struct BackendConfig {
-    std::string authToken;
-  };
-
   void Init();
+
+  /* Get the config file translated to JSON. */
+  std::string GetAsJSON();
+
+  /* Save the config file from JSON. */
+  bool SaveFromJSON(const std::string& json);
 
   /**
    * @brief Resets the config file to the factory default values.
@@ -68,4 +55,6 @@ namespace OpenShock::Config {
   const std::string& GetBackendAuthToken();
   bool SetBackendAuthToken(const std::string& token);
   bool ClearBackendAuthToken();
+
+  bool SaveChanges();
 }  // namespace OpenShock::Config

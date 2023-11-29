@@ -4,7 +4,7 @@ struct BSSID {
   array:[ubyte:6];
 }
 
-struct RFConfig {
+table RFConfig {
   tx_pin:uint8;
   keepalive_enabled:bool;
 }
@@ -22,7 +22,7 @@ table WiFiConfig {
   credentials:[WiFiCredentials];
 }
 
-struct CaptivePortalConfig {
+table CaptivePortalConfig {
   always_enabled:bool;
 }
 

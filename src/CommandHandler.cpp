@@ -1,7 +1,7 @@
 #include "CommandHandler.h"
 
 #include "Board.h"
-#include "Config.h"
+#include "config/Config.h"
 #include "Constants.h"
 #include "Logging.h"
 #include "radio/RFTransmitter.h"
