@@ -56,8 +56,6 @@ void setup_app() {
 
   OpenShock::Config::Init();
 
-  ESP_LOGI(TAG, "Config loaded: %s", OpenShock::Config::GetAsJSON().c_str());
-
   if (!OpenShock::CommandHandler::Init()) {
     ESP_LOGW(TAG, "Unable to initialize CommandHandler");
   }
