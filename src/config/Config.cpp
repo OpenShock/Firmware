@@ -3,7 +3,6 @@
 #include "config/RootConfig.h"
 #include "Constants.h"
 #include "Logging.h"
-#include "util/HexUtils.h"
 
 #include <LittleFS.h>
 
@@ -203,7 +202,7 @@ bool Config::SetRFConfigKeepAliveEnabled(bool enabled) {
   return _trySaveConfig();
 }
 
-std::uint8_t Config::AddWiFiCredentials(const std::string& ssid, const std::uint8_t (&bssid)[6], const std::string& password) {
+std::uint8_t Config::AddWiFiCredentials(const std::string& ssid, const std::string& password) {
   std::uint8_t id = 0;
 
   // Bitmask representing available credential IDs (0-31)
@@ -232,7 +231,7 @@ std::uint8_t Config::AddWiFiCredentials(const std::string& ssid, const std::uint
       return 0;
     }
 
-    WiFiCredentials creds(id, ssid, bssid, password);
+    WiFiCredentials creds(id, ssid, password);
 
     _mainConfig.wifi.credentialsList.push_back(creds);
   }
@@ -264,17 +263,6 @@ bool Config::TryGetWiFiCredentialsBySSID(const char* ssid, Config::WiFiCredentia
   return false;
 }
 
-bool Config::TryGetWiFiCredentialsByBSSID(const std::uint8_t (&bssid)[6], Config::WiFiCredentials& credentials) {
-  for (auto& creds : _mainConfig.wifi.credentialsList) {
-    if (memcmp(creds.bssid, bssid, 6) == 0) {
-      credentials = creds;
-      return true;
-    }
-  }
-
-  return false;
-}
-
 std::uint8_t Config::GetWiFiCredentialsIDbySSID(const char* ssid) {
   for (auto& creds : _mainConfig.wifi.credentialsList) {
     if (creds.ssid == ssid) {
@@ -283,25 +271,6 @@ std::uint8_t Config::GetWiFiCredentialsIDbySSID(const char* ssid) {
   }
 
   return 0;
-}
-
-std::uint8_t Config::GetWiFiCredentialsIDbyBSSID(const std::uint8_t (&bssid)[6]) {
-  for (auto& creds : _mainConfig.wifi.credentialsList) {
-    if (memcmp(creds.bssid, bssid, 6) == 0) {
-      return creds.id;
-    }
-  }
-
-  return 0;
-}
-
-std::uint8_t Config::GetWiFiCredentialsIDbyBSSIDorSSID(const std::uint8_t (&bssid)[6], const char* ssid) {
-  std::uint8_t id = GetWiFiCredentialsIDbyBSSID(bssid);
-  if (id != 0) {
-    return id;
-  }
-
-  return GetWiFiCredentialsIDbySSID(ssid);
 }
 
 bool Config::RemoveWiFiCredentials(std::uint8_t id) {

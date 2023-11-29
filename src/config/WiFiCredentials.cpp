@@ -12,17 +12,15 @@ WiFiCredentials::WiFiCredentials() {
   ToDefault();
 }
 
-WiFiCredentials::WiFiCredentials(std::uint8_t id, const std::string& ssid, const std::uint8_t (&bssid)[6], const std::string& password) {
+WiFiCredentials::WiFiCredentials(std::uint8_t id, const std::string& ssid, const std::string& password) {
   this->id       = id;
   this->ssid     = ssid;
   this->password = password;
-  std::copy(std::begin(bssid), std::end(bssid), this->bssid);
 }
 
 void WiFiCredentials::ToDefault() {
   id   = 0;
   ssid = "";
-  std::fill(std::begin(bssid), std::end(bssid), 0);
   password = "";
 }
 
@@ -36,25 +34,11 @@ bool WiFiCredentials::FromFlatbuffers(const Serialization::Configuration::WiFiCr
   Internal::Utils::FromFbsStr(ssid, config->ssid(), "");
   Internal::Utils::FromFbsStr(password, config->password(), "");
 
-  auto fbsBssid = config->bssid();
-  if (fbsBssid != nullptr) {
-    auto fbsBssidArr = fbsBssid->array();
-    if (fbsBssidArr != nullptr) {
-      std::copy(fbsBssidArr->begin(), fbsBssidArr->end(), bssid);
-    } else {
-      std::fill(std::begin(bssid), std::end(bssid), 0);
-    }
-  } else {
-    std::fill(std::begin(bssid), std::end(bssid), 0);
-  }
-
   return true;
 }
 
 flatbuffers::Offset<OpenShock::Serialization::Configuration::WiFiCredentials> WiFiCredentials::ToFlatbuffers(flatbuffers::FlatBufferBuilder& builder) const {
-  Serialization::Configuration::BSSID fbsBssid(bssid);
-
-  return Serialization::Configuration::CreateWiFiCredentials(builder, id, builder.CreateString(ssid), &fbsBssid, builder.CreateString(password));
+  return Serialization::Configuration::CreateWiFiCredentials(builder, id, builder.CreateString(ssid), builder.CreateString(password));
 }
 
 bool WiFiCredentials::FromJSON(const cJSON* json) {
@@ -99,28 +83,18 @@ bool WiFiCredentials::FromJSON(const cJSON* json) {
 
   ssid = ssidJson->valuestring;
 
-  const cJSON* bssidJson = cJSON_GetObjectItemCaseSensitive(json, "bssid");
-  if (bssidJson == nullptr) {
-    ESP_LOGE(TAG, "bssid is null");
+  const cJSON* passwordJson = cJSON_GetObjectItemCaseSensitive(json, "password");
+  if (passwordJson == nullptr) {
+    ESP_LOGE(TAG, "password is null");
     return false;
   }
 
-  if (!cJSON_IsString(bssidJson)) {
-    ESP_LOGE(TAG, "bssid is not a string");
+  if (!cJSON_IsString(passwordJson)) {
+    ESP_LOGE(TAG, "password is not a string");
     return false;
   }
 
-  std::size_t bssidLen = strlen(bssidJson->valuestring);
-
-  if (bssidLen != 17) {
-    ESP_LOGE(TAG, "bssid is not a valid MAC address");
-    return false;
-  }
-
-  if (!HexUtils::TryParseHexMac(bssidJson->valuestring, bssidLen, bssid, 6)) {
-    ESP_LOGE(TAG, "bssid has a invalid format");
-    return false;
-  }
+  password = passwordJson->valuestring;
 
   return true;
 }
@@ -130,10 +104,7 @@ cJSON* WiFiCredentials::ToJSON() const {
 
   cJSON_AddNumberToObject(root, "id", id);
   cJSON_AddStringToObject(root, "ssid", ssid.c_str());
-
-  char bssidStr[17];
-  HexUtils::ToHexMac<6>(bssid, bssidStr);
-  cJSON_AddStringToObject(root, "bssid", bssidStr);
+  cJSON_AddStringToObject(root, "password", password.c_str());
 
   return root;
 }
