@@ -52,7 +52,7 @@ factoryreset           reset device to factory defaults and reboot
   if (strcmp(arg, kCommandRmtpin) == 0) {
     Serial.print(kCommandRmtpin R"(
   Get the GPIO pin used for the radio transmitter.
-    Serial.println();
+
 rmtpin [<pin>]
   Set the GPIO pin used for the radio transmitter.
   Arguments:
@@ -77,7 +77,7 @@ rmtpin [<pin>]
   if (strcmp(arg, kCommandNetworks) == 0) {
     Serial.print(kCommandNetworks R"(
   Get all saved networks.
-    Serial.println();
+
 networks [<json>]
   Set all saved networks.
   Arguments:
@@ -91,9 +91,9 @@ networks [<json>]
   }
 
   if (strcmp(arg, kCommandKeepAlive) == 0) {
-    Serial.print(kCommandKeepAlive R"( <bool>
+    Serial.print(kCommandKeepAlive R"(
   Get the shocker keep-alive status.
-    Serial.println();
+
 keepalive [<bool>]
   Enable/disable shocker keep-alive.
   Arguments:
