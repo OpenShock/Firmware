@@ -2,9 +2,6 @@
 
 import * as flatbuffers from 'flatbuffers';
 
-import { BSSID } from '../../../open-shock/serialization/configuration/bssid.js';
-
-
 export class WiFiCredentials {
   bb: flatbuffers.ByteBuffer|null = null;
   bb_pos = 0;
@@ -23,11 +20,17 @@ static getSizePrefixedRootAsWiFiCredentials(bb:flatbuffers.ByteBuffer, obj?:WiFi
   return (obj || new WiFiCredentials()).__init(bb.readInt32(bb.position()) + bb.position(), bb);
 }
 
+/**
+ * ID of the WiFi network credentials, used for referencing the credentials with a low memory footprint
+ */
 id():number {
   const offset = this.bb!.__offset(this.bb_pos, 4);
   return offset ? this.bb!.readUint8(this.bb_pos + offset) : 0;
 }
 
+/**
+ * SSID of the WiFi network
+ */
 ssid():string|null
 ssid(optionalEncoding:flatbuffers.Encoding):string|Uint8Array|null
 ssid(optionalEncoding?:any):string|Uint8Array|null {
@@ -35,20 +38,18 @@ ssid(optionalEncoding?:any):string|Uint8Array|null {
   return offset ? this.bb!.__string(this.bb_pos + offset, optionalEncoding) : null;
 }
 
-bssid(obj?:BSSID):BSSID|null {
-  const offset = this.bb!.__offset(this.bb_pos, 8);
-  return offset ? (obj || new BSSID()).__init(this.bb_pos + offset, this.bb!) : null;
-}
-
+/**
+ * Password of the WiFi network
+ */
 password():string|null
 password(optionalEncoding:flatbuffers.Encoding):string|Uint8Array|null
 password(optionalEncoding?:any):string|Uint8Array|null {
-  const offset = this.bb!.__offset(this.bb_pos, 10);
+  const offset = this.bb!.__offset(this.bb_pos, 8);
   return offset ? this.bb!.__string(this.bb_pos + offset, optionalEncoding) : null;
 }
 
 static startWiFiCredentials(builder:flatbuffers.Builder) {
-  builder.startObject(4);
+  builder.startObject(3);
 }
 
 static addId(builder:flatbuffers.Builder, id:number) {
@@ -59,12 +60,8 @@ static addSsid(builder:flatbuffers.Builder, ssidOffset:flatbuffers.Offset) {
   builder.addFieldOffset(1, ssidOffset, 0);
 }
 
-static addBssid(builder:flatbuffers.Builder, bssidOffset:flatbuffers.Offset) {
-  builder.addFieldStruct(2, bssidOffset, 0);
-}
-
 static addPassword(builder:flatbuffers.Builder, passwordOffset:flatbuffers.Offset) {
-  builder.addFieldOffset(3, passwordOffset, 0);
+  builder.addFieldOffset(2, passwordOffset, 0);
 }
 
 static endWiFiCredentials(builder:flatbuffers.Builder):flatbuffers.Offset {
@@ -72,4 +69,11 @@ static endWiFiCredentials(builder:flatbuffers.Builder):flatbuffers.Offset {
   return offset;
 }
 
+static createWiFiCredentials(builder:flatbuffers.Builder, id:number, ssidOffset:flatbuffers.Offset, passwordOffset:flatbuffers.Offset):flatbuffers.Offset {
+  WiFiCredentials.startWiFiCredentials(builder);
+  WiFiCredentials.addId(builder, id);
+  WiFiCredentials.addSsid(builder, ssidOffset);
+  WiFiCredentials.addPassword(builder, passwordOffset);
+  return WiFiCredentials.endWiFiCredentials(builder);
+}
 }

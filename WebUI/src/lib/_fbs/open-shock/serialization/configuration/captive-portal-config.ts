@@ -20,6 +20,10 @@ static getSizePrefixedRootAsCaptivePortalConfig(bb:flatbuffers.ByteBuffer, obj?:
   return (obj || new CaptivePortalConfig()).__init(bb.readInt32(bb.position()) + bb.position(), bb);
 }
 
+/**
+ * Whether the captive portal is forced to be enabled
+ * The captive portal will otherwise shut down when a gateway connection is established
+ */
 alwaysEnabled():boolean {
   const offset = this.bb!.__offset(this.bb_pos, 4);
   return offset ? !!this.bb!.readInt8(this.bb_pos + offset) : false;

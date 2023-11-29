@@ -7,11 +7,10 @@
 namespace OpenShock::Config {
   struct WiFiCredentials : public ConfigBase<Serialization::Configuration::WiFiCredentials> {
     WiFiCredentials();
-    WiFiCredentials(std::uint8_t id, const std::string& ssid, const std::uint8_t (&bssid)[6], const std::string& password);
+    WiFiCredentials(std::uint8_t id, const std::string& ssid, const std::string& password);
 
     std::uint8_t id;
     std::string ssid;
-    std::uint8_t bssid[6];
     std::string password;
 
     void ToDefault() override;

@@ -23,6 +23,9 @@ static getSizePrefixedRootAsWiFiConfig(bb:flatbuffers.ByteBuffer, obj?:WiFiConfi
   return (obj || new WiFiConfig()).__init(bb.readInt32(bb.position()) + bb.position(), bb);
 }
 
+/**
+ * Access point SSID
+ */
 apSsid():string|null
 apSsid(optionalEncoding:flatbuffers.Encoding):string|Uint8Array|null
 apSsid(optionalEncoding?:any):string|Uint8Array|null {
@@ -30,6 +33,9 @@ apSsid(optionalEncoding?:any):string|Uint8Array|null {
   return offset ? this.bb!.__string(this.bb_pos + offset, optionalEncoding) : null;
 }
 
+/**
+ * Device hostname
+ */
 hostname():string|null
 hostname(optionalEncoding:flatbuffers.Encoding):string|Uint8Array|null
 hostname(optionalEncoding?:any):string|Uint8Array|null {
@@ -37,6 +43,9 @@ hostname(optionalEncoding?:any):string|Uint8Array|null {
   return offset ? this.bb!.__string(this.bb_pos + offset, optionalEncoding) : null;
 }
 
+/**
+ * WiFi network credentials
+ */
 credentials(index: number, obj?:WiFiCredentials):WiFiCredentials|null {
   const offset = this.bb!.__offset(this.bb_pos, 8);
   return offset ? (obj || new WiFiCredentials()).__init(this.bb!.__indirect(this.bb!.__vector(this.bb_pos + offset) + index * 4), this.bb!) : null;
