@@ -338,6 +338,7 @@ void _handleRawConfigCommand(char* arg, std::size_t argLength) {
     }
 
     SERPR_RESPONSE("RawConfig|%s", base64.c_str());
+    return;
   }
 
   std::vector<std::uint8_t> buffer;
