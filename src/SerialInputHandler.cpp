@@ -3,6 +3,7 @@
 #include "CommandHandler.h"
 #include "config/Config.h"
 #include "Logging.h"
+#include "serialization/JsonSerial.h"
 #include "util/Base64Utils.h"
 #include "wifi/WiFiManager.h"
 
@@ -28,6 +29,7 @@ using namespace OpenShock;
 #define kCommandNetworks     "networks"
 #define kCommandKeepAlive    "keepalive"
 #define kCommandRawConfig    "rawconfig"
+#define kCommandRFTransmit   "rftransmit"
 #define kCommandFactoryReset "factoryreset"
 
 void _handleHelpCommand(char* arg, std::size_t argLength) {
@@ -48,6 +50,7 @@ keepalive              get shocker keep-alive status
 keepalive    <bool>    enable/disable shocker keep-alive
 rawconfig              get raw binary config
 rawconfig    <base64>  set raw binary config
+rftransmit   <json>    transmit a RF command
 factoryreset           reset device to factory defaults and reboot
 )");
     return;
@@ -158,6 +161,22 @@ rawconfig <base64>
     <command> (optional) command to print help for
   Example:
     help
+)");
+    return;
+  }
+
+  if (strcmp(arg, kCommandRFTransmit) == 0) {
+    Serial.print(kCommandRFTransmit R"( <json>
+  Transmit a RF command
+  Arguments:
+    <json> must be a JSON object with the following fields:
+      model      (string) Model of the shocker                    ("CaiXianlin", "PetTrainer")
+      id         (number) ID of the shocker                       (0-65535)
+      type       (string) Type of the command                     ("shock", "vibrate", "sound", "stop")
+      intensity  (number) Intensity of the command                (0-255)
+      durationMs (number) Duration of the command in milliseconds (0-65535)
+  Example:
+    rftransmit {\"model\":\"cai-xianlin\",\"id\":12345,\"type\":\"shock\",\"intensity\":99,\"duration\":500}
 )");
     return;
   }
@@ -357,6 +376,31 @@ void _handleRawConfigCommand(char* arg, std::size_t argLength) {
   ESP.restart();
 }
 
+void _handleRFTransmitCommand(char* arg, std::size_t argLength) {
+  cJSON* root = cJSON_ParseWithLength(arg, argLength);
+  if (root == nullptr) {
+    SERPR_ERROR("Failed to parse JSON: %s", cJSON_GetErrorPtr());
+    return;
+  }
+
+  OpenShock::Serialization::JsonSerial::ShockerCommand cmd;
+  bool parsed = Serialization::JsonSerial::ParseShockerCommand(root, cmd);
+
+  cJSON_Delete(root);
+
+  if (!parsed) {
+    SERPR_ERROR("Failed to parse shocker command");
+    return;
+  }
+
+  if (!OpenShock::CommandHandler::HandleCommand(cmd.model, cmd.id, cmd.command, cmd.intensity, cmd.durationMs)) {
+    SERPR_ERROR("Failed to send command");
+    return;
+  }
+
+  SERPR_SUCCESS("Command sent");
+}
+
 static std::unordered_map<std::string, void (*)(char*, std::size_t)> s_commandHandlers = {
   {        kCommandHelp,         _handleHelpCommand},
   {     kCommandVersion,      _handleVersionCommand},
@@ -366,6 +410,7 @@ static std::unordered_map<std::string, void (*)(char*, std::size_t)> s_commandHa
   {    kCommandNetworks,     _handleNetworksCommand},
   {   kCommandKeepAlive,    _handleKeepAliveCommand},
   {   kCommandRawConfig,    _handleRawConfigCommand},
+  {  kCommandRFTransmit,   _handleRFTransmitCommand},
   {kCommandFactoryReset, _handleFactoryResetCommand},
 };
 
