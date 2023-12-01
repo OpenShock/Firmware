@@ -16,29 +16,14 @@ using namespace OpenShock;
 
 static Config::RootConfig _mainConfig;
 
-bool _tryLoadConfig() {
-  File file = LittleFS.open("/config", "rb");
-  if (!file) {
-    ESP_LOGE(TAG, "Failed to open config file for reading");
+bool _tryDeserializeConfig(const std::uint8_t* buffer, std::size_t bufferLen, OpenShock::Config::RootConfig& config) {
+  if (buffer == nullptr || bufferLen == 0) {
+    ESP_LOGE(TAG, "Buffer is null or empty");
     return false;
   }
-
-  // Get file size
-  std::size_t size = file.size();
-
-  // Allocate buffer
-  std::vector<std::uint8_t> buffer(size);
-
-  // Read file
-  if (file.read(buffer.data(), buffer.size()) != buffer.size()) {
-    ESP_LOGE(TAG, "Failed to read config file, size mismatch");
-    return false;
-  }
-
-  file.close();
 
   // Deserialize
-  auto fbsConfig = flatbuffers::GetRoot<Serialization::Configuration::Config>(buffer.data());
+  auto fbsConfig = flatbuffers::GetRoot<Serialization::Configuration::Config>(buffer);
   if (fbsConfig == nullptr) {
     ESP_LOGE(TAG, "Failed to get deserialization root for config file");
     return false;
@@ -48,34 +33,60 @@ bool _tryLoadConfig() {
   flatbuffers::Verifier::Options verifierOptions {
     .max_size = 4096,  // Should be enough
   };
-  flatbuffers::Verifier verifier(buffer.data(), buffer.size(), verifierOptions);
+  flatbuffers::Verifier verifier(buffer, bufferLen, verifierOptions);
   if (!fbsConfig->Verify(verifier)) {
     ESP_LOGE(TAG, "Failed to verify config file integrity");
     return false;
   }
 
   // Read config
-  if (!_mainConfig.FromFlatbuffers(fbsConfig)) {
+  if (!config.FromFlatbuffers(fbsConfig)) {
     ESP_LOGE(TAG, "Failed to read config file");
     return false;
   }
 
   return true;
 }
-bool _trySaveConfig() {
+bool _tryLoadConfig(std::vector<std::uint8_t>& buffer) {
+  File file = LittleFS.open("/config", "rb");
+  if (!file) {
+    ESP_LOGE(TAG, "Failed to open config file for reading");
+    return false;
+  }
+
+  // Get file size
+  std::size_t size = file.size();
+
+  // Resize buffer
+  buffer.resize(size);
+
+  // Read file
+  if (file.read(buffer.data(), buffer.size()) != buffer.size()) {
+    ESP_LOGE(TAG, "Failed to read config file, size mismatch");
+    return false;
+  }
+
+  file.close();
+
+  return true;
+}
+bool _tryLoadConfig() {
+  std::vector<std::uint8_t> buffer;
+  if (!_tryLoadConfig(buffer)) {
+    return false;
+  }
+
+  return _tryDeserializeConfig(buffer.data(), buffer.size(), _mainConfig);
+}
+bool _trySaveConfig(const std::uint8_t* data, std::size_t dataLen) {
   File file = LittleFS.open("/config", "wb");
   if (!file) {
     ESP_LOGE(TAG, "Failed to open config file for writing");
     return false;
   }
 
-  // Serialize
-  flatbuffers::FlatBufferBuilder builder(1024);
-
-  builder.Finish(_mainConfig.ToFlatbuffers(builder));
-
   // Write file
-  if (file.write(builder.GetBufferPointer(), builder.GetSize()) != builder.GetSize()) {
+  if (file.write(data, dataLen) != dataLen) {
     ESP_LOGE(TAG, "Failed to write config file");
     return false;
   }
@@ -83,6 +94,15 @@ bool _trySaveConfig() {
   file.close();
 
   return true;
+}
+bool _trySaveConfig() {
+  flatbuffers::FlatBufferBuilder builder;
+
+  auto fbsConfig = _mainConfig.ToFlatbuffers(builder);
+
+  builder.Finish(fbsConfig);
+
+  return _trySaveConfig(builder.GetBufferPointer(), builder.GetSize());
 }
 
 void Config::Init() {
@@ -129,6 +149,20 @@ bool Config::SaveFromJSON(const std::string& json) {
   }
 
   return _trySaveConfig();
+}
+
+bool Config::GetRaw(std::vector<std::uint8_t>& buffer) {
+  return _tryLoadConfig(buffer);
+}
+
+bool Config::SetRaw(const std::uint8_t* buffer, std::size_t size) {
+  OpenShock::Config::RootConfig config;
+  if (!_tryDeserializeConfig(buffer, size, config)) {
+    ESP_LOGE(TAG, "Failed to deserialize config");
+    return false;
+  }
+
+  return _trySaveConfig(buffer, size);
 }
 
 void Config::FactoryReset() {
