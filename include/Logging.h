@@ -2,6 +2,8 @@
 
 #include <esp32-hal-log.h>
 #include <esp_log.h>
+#include <esp_ota_ops.h>
+#include <esp_system.h>
 
 #define ESP_PANIC_PRINT(TAG, format, ...) ESP_LOGE(TAG, "PANIC: " format, ##__VA_ARGS__)
 
