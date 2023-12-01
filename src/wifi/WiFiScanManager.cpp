@@ -1,8 +1,6 @@
 #include "wifi/WiFiScanManager.h"
 
-#include "Config.h"
 #include "Logging.h"
-#include "Time.h"
 
 #include <WiFi.h>
 
@@ -12,7 +10,7 @@ const char* const TAG = "WiFiScanManager";
 
 constexpr const std::uint8_t OPENSHOCK_WIFI_SCAN_MAX_CHANNEL         = 13;
 constexpr const std::uint32_t OPENSHOCK_WIFI_SCAN_MAX_MS_PER_CHANNEL = 300;  // Adjusting this value will affect the scan rate, but may also affect the scan results
-constexpr const std::uint32_t OPENSHOCK_WIFI_SCAN_TIMEOUT_MS = 10 * 1000;
+constexpr const std::uint32_t OPENSHOCK_WIFI_SCAN_TIMEOUT_MS         = 10 * 1000;
 
 enum WiFiScanTaskNotificationFlags {
   CHANNEL_DONE  = 1 << 0,
@@ -25,7 +23,7 @@ using namespace OpenShock;
 
 static TaskHandle_t s_scanTaskHandle     = nullptr;
 static SemaphoreHandle_t s_scanTaskMutex = xSemaphoreCreateBinary();
-static std::uint8_t s_currentChannel = 0;
+static std::uint8_t s_currentChannel     = 0;
 static std::map<std::uint64_t, WiFiScanManager::StatusChangedHandler> s_statusChangedHandlers;
 static std::map<std::uint64_t, WiFiScanManager::NetworkDiscoveryHandler> s_networkDiscoveredHandlers;
 
@@ -123,7 +121,6 @@ WiFiScanStatus _scanningTaskImpl() {
 
       return WiFiScanStatus::Error;
     }
-
 
     // Select the next channel, or break if we're done
     if (--channel <= 0) {

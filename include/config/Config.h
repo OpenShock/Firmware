@@ -48,7 +48,6 @@ namespace OpenShock::Config {
   bool TryGetWiFiCredentialsBySSID(const char* ssid, WiFiCredentials& out);
   std::uint8_t GetWiFiCredentialsIDbySSID(const char* ssid);
   bool RemoveWiFiCredentials(std::uint8_t id);
-  std::uint8_t GetWiFiCredentialsCount();
   void ClearWiFiCredentials();
 
   bool HasBackendAuthToken();
