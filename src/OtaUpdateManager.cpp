@@ -10,21 +10,19 @@
 #include <LittleFS.h>
 #include <WiFi.h>
 
+/// @brief Stops initArduino() from handling OTA rollbacks
+/// @todo Get rid of Arduino entirely. >:(
+///
+/// @see .platformio/packages/framework-arduinoespressif32/cores/esp32/esp32-hal-misc.c
+/// @return true
 bool verifyRollbackLater() {
   return true;
 }
 
 using namespace OpenShock;
 
-/*
-  static bool s_wifiConnected                  = false;
-  static bool s_wifiConnecting                 = false;
-  static std::uint8_t s_connectedCredentialsID = 0;
-  static std::uint8_t s_preferredCredentialsID = 0;
-  static std::vector<WiFiNetwork> s_wifiNetworks;
-*/
+const char* TAG = "OtaUpdateManager";
 
-static const char* TAG                       = "OtaUpdateManager";
 static OtaUpdateManager::BootMode s_bootMode = OtaUpdateManager::BootMode::NORMAL;
 static OtaUpdateManager::UpdateState s_state = OtaUpdateManager::UpdateState::NONE;
 

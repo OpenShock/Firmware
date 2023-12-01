@@ -27,11 +27,11 @@ void setup_ota() {
   OpenShock::OtaUpdateManager::LoadConfig();
 
   if (!OpenShock::WiFiManager::Init()) {
-    ESP_PANIC(TAG, "An Error has occurred while initializing WiFiManager");
+    ESP_PANIC_OTA(TAG, "An Error has occurred while initializing WiFiManager");
   }
 
   if (!OpenShock::GatewayConnectionManager::Init()) {
-    ESP_PANIC(TAG, "An Error has occurred while initializing GatewayConnectionManager");
+    ESP_PANIC_OTA(TAG, "An Error has occurred while initializing GatewayConnectionManager");
   }
 }
 void main_ota(void* arg) {

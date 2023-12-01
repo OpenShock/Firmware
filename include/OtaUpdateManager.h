@@ -1,6 +1,5 @@
 #pragma once
 
-bool verifyRollbackLater();
 
 namespace OpenShock::OtaUpdateManager {
 
