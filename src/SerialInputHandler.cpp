@@ -3,6 +3,7 @@
 #include "CommandHandler.h"
 #include "config/Config.h"
 #include "Logging.h"
+#include "util/Base64Utils.h"
 #include "wifi/WiFiManager.h"
 
 #include <cJSON.h>
@@ -12,10 +13,10 @@
 
 const char* const TAG = "SerialInputHandler";
 
-#define SERPR_SYS(format, ...) Serial.printf("$SYS$|" format "\n", ##__VA_ARGS__)
+#define SERPR_SYS(format, ...)      Serial.printf("$SYS$|" format "\n", ##__VA_ARGS__)
 #define SERPR_RESPONSE(format, ...) SERPR_SYS("Response|" format, ##__VA_ARGS__)
-#define SERPR_SUCCESS(format, ...) SERPR_SYS("Success|" format, ##__VA_ARGS__)
-#define SERPR_ERROR(format, ...) SERPR_SYS("Error|" format, ##__VA_ARGS__)
+#define SERPR_SUCCESS(format, ...)  SERPR_SYS("Success|" format, ##__VA_ARGS__)
+#define SERPR_ERROR(format, ...)    SERPR_SYS("Error|" format, ##__VA_ARGS__)
 
 using namespace OpenShock;
 
@@ -26,13 +27,14 @@ using namespace OpenShock;
 #define kCommandAuthToken    "authtoken"
 #define kCommandNetworks     "networks"
 #define kCommandKeepAlive    "keepalive"
+#define kCommandRawConfig    "rawconfig"
 #define kCommandFactoryReset "factoryreset"
 
 void _handleHelpCommand(char* arg, std::size_t argLength) {
   SerialInputHandler::PrintWelcomeHeader();
   if (arg == nullptr || argLength <= 0) {
     // Raw string literal (1+ to remove the first newline)
-    Serial.print(1+R"(
+    Serial.print(1 + R"(
 help                   print this menu
 help         <command> print help for a command
 version                print version information
@@ -44,6 +46,8 @@ networks               get all saved networks
 networks     <json>    set all saved networks
 keepalive              get shocker keep-alive status
 keepalive    <bool>    enable/disable shocker keep-alive
+rawconfig              get raw binary config
+rawconfig    <base64>  set raw binary config
 factoryreset           reset device to factory defaults and reboot
 )");
     return;
@@ -109,6 +113,22 @@ keepalive [<bool>]
   Restart the board
   Example:
     restart
+)");
+    return;
+  }
+
+  if (strcmp(arg, kCommandRawConfig) == 0) {
+    Serial.print(kCommandRawConfig R"(
+  Get the raw binary config
+  Example:
+    rawconfig
+
+rawconfig <base64>
+  Set the raw binary config, and reboot
+  Arguments:
+    <base64> must be a base64 encoded string
+  Example:
+    rawconfig (base64 encoded binary data)
 )");
     return;
   }
@@ -301,6 +321,41 @@ void _handleKeepAliveCommand(char* arg, std::size_t argLength) {
   SERPR_SUCCESS("Saved config");
 }
 
+void _handleRawConfigCommand(char* arg, std::size_t argLength) {
+  if (arg == nullptr || argLength <= 0) {
+    std::vector<std::uint8_t> buffer;
+
+    // Get raw config
+    if (!Config::GetRaw(buffer)) {
+      SERPR_ERROR("Failed to get raw config");
+      return;
+    }
+
+    std::string base64;
+    if (!OpenShock::Base64Utils::Encode(buffer.data(), buffer.size(), base64)) {
+      SERPR_ERROR("Failed to encode raw config to base64");
+      return;
+    }
+
+    SERPR_RESPONSE("RawConfig|%s", base64.c_str());
+  }
+
+  std::vector<std::uint8_t> buffer;
+  if (!OpenShock::Base64Utils::Decode(arg, argLength, buffer)) {
+    SERPR_ERROR("Failed to decode base64");
+    return;
+  }
+
+  if (!Config::SetRaw(buffer.data(), buffer.size())) {
+    SERPR_ERROR("Failed to save config");
+    return;
+  }
+
+  SERPR_SUCCESS("Saved config");
+
+  ESP.restart();
+}
+
 static std::unordered_map<std::string, void (*)(char*, std::size_t)> s_commandHandlers = {
   {        kCommandHelp,         _handleHelpCommand},
   {     kCommandVersion,      _handleVersionCommand},
@@ -309,6 +364,7 @@ static std::unordered_map<std::string, void (*)(char*, std::size_t)> s_commandHa
   {   kCommandAuthToken,    _handleAuthtokenCommand},
   {    kCommandNetworks,     _handleNetworksCommand},
   {   kCommandKeepAlive,    _handleKeepAliveCommand},
+  {   kCommandRawConfig,    _handleRawConfigCommand},
   {kCommandFactoryReset, _handleFactoryResetCommand},
 };
 

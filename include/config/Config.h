@@ -13,11 +13,13 @@
 namespace OpenShock::Config {
   void Init();
 
-  /* Get the config file translated to JSON. */
+  /* GetAsJSON and SaveFromJSON are used for Reading/Writing the config file in its human-readable form. */
   std::string GetAsJSON();
-
-  /* Save the config file from JSON. */
   bool SaveFromJSON(const std::string& json);
+
+  /* GetRaw and SetRaw are used for Reading/Writing the config file in its binary form. */
+  bool GetRaw(std::vector<std::uint8_t>& buffer);
+  bool SetRaw(const std::uint8_t* buffer, std::size_t size);
 
   /**
    * @brief Resets the config file to the factory default values.
