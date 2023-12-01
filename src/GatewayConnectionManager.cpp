@@ -2,7 +2,7 @@
 
 #include "VisualStateManager.h"
 
-#include "Config.h"
+#include "config/Config.h"
 #include "GatewayClient.h"
 #include "http/JsonAPI.h"
 #include "Logging.h"

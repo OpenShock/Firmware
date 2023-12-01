@@ -26,21 +26,33 @@ static getSizePrefixedRootAsConfig(bb:flatbuffers.ByteBuffer, obj?:Config):Confi
   return (obj || new Config()).__init(bb.readInt32(bb.position()) + bb.position(), bb);
 }
 
+/**
+ * RF Transmitter configuration
+ */
 rf(obj?:RFConfig):RFConfig|null {
   const offset = this.bb!.__offset(this.bb_pos, 4);
-  return offset ? (obj || new RFConfig()).__init(this.bb_pos + offset, this.bb!) : null;
+  return offset ? (obj || new RFConfig()).__init(this.bb!.__indirect(this.bb_pos + offset), this.bb!) : null;
 }
 
+/**
+ * WiFi configuration
+ */
 wifi(obj?:WiFiConfig):WiFiConfig|null {
   const offset = this.bb!.__offset(this.bb_pos, 6);
   return offset ? (obj || new WiFiConfig()).__init(this.bb!.__indirect(this.bb_pos + offset), this.bb!) : null;
 }
 
+/**
+ * Captive portal configuration
+ */
 captivePortal(obj?:CaptivePortalConfig):CaptivePortalConfig|null {
   const offset = this.bb!.__offset(this.bb_pos, 8);
-  return offset ? (obj || new CaptivePortalConfig()).__init(this.bb_pos + offset, this.bb!) : null;
+  return offset ? (obj || new CaptivePortalConfig()).__init(this.bb!.__indirect(this.bb_pos + offset), this.bb!) : null;
 }
 
+/**
+ * Backend configuration
+ */
 backend(obj?:BackendConfig):BackendConfig|null {
   const offset = this.bb!.__offset(this.bb_pos, 10);
   return offset ? (obj || new BackendConfig()).__init(this.bb!.__indirect(this.bb_pos + offset), this.bb!) : null;
@@ -51,7 +63,7 @@ static startConfig(builder:flatbuffers.Builder) {
 }
 
 static addRf(builder:flatbuffers.Builder, rfOffset:flatbuffers.Offset) {
-  builder.addFieldStruct(0, rfOffset, 0);
+  builder.addFieldOffset(0, rfOffset, 0);
 }
 
 static addWifi(builder:flatbuffers.Builder, wifiOffset:flatbuffers.Offset) {
@@ -59,7 +71,7 @@ static addWifi(builder:flatbuffers.Builder, wifiOffset:flatbuffers.Offset) {
 }
 
 static addCaptivePortal(builder:flatbuffers.Builder, captivePortalOffset:flatbuffers.Offset) {
-  builder.addFieldStruct(2, captivePortalOffset, 0);
+  builder.addFieldOffset(2, captivePortalOffset, 0);
 }
 
 static addBackend(builder:flatbuffers.Builder, backendOffset:flatbuffers.Offset) {

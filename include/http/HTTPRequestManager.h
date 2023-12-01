@@ -1,8 +1,8 @@
 #pragma once
 
-#include "util/JsonRoot.h"
-
 #include <Arduino.h>
+
+#include <cJSON.h>
 
 #include <functional>
 #include <map>
@@ -37,8 +37,8 @@ namespace OpenShock::HTTP {
       return {response.result, response.code, {}};
     }
 
-    OpenShock::JsonRoot json = OpenShock::JsonRoot::Parse(response.data);
-    if (!json.isValid()) {
+    cJSON* json = cJSON_ParseWithLength(response.data.c_str(), response.data.length());
+    if (json == nullptr) {
       return {RequestResult::ParseFailed, response.code, {}};
     }
 
@@ -46,6 +46,8 @@ namespace OpenShock::HTTP {
     if (!jsonParser(response.code, json, data)) {
       return {RequestResult::ParseFailed, response.code, {}};
     }
+
+    cJSON_Delete(json);
 
     return {response.result, response.code, data};
   }

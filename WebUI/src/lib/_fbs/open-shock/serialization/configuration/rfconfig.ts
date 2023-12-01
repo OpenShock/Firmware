@@ -11,18 +11,52 @@ export class RFConfig {
   return this;
 }
 
+static getRootAsRFConfig(bb:flatbuffers.ByteBuffer, obj?:RFConfig):RFConfig {
+  return (obj || new RFConfig()).__init(bb.readInt32(bb.position()) + bb.position(), bb);
+}
+
+static getSizePrefixedRootAsRFConfig(bb:flatbuffers.ByteBuffer, obj?:RFConfig):RFConfig {
+  bb.setPosition(bb.position() + flatbuffers.SIZE_PREFIX_LENGTH);
+  return (obj || new RFConfig()).__init(bb.readInt32(bb.position()) + bb.position(), bb);
+}
+
+/**
+ * The GPIO pin connected to the RF modulator's data pin for transmitting (TX)
+ */
 txPin():number {
-  return this.bb!.readUint8(this.bb_pos);
+  const offset = this.bb!.__offset(this.bb_pos, 4);
+  return offset ? this.bb!.readUint8(this.bb_pos + offset) : 0;
 }
 
-static sizeOf():number {
-  return 1;
+/**
+ * Whether to transmit keepalive messages to keep the devices from entering sleep mode
+ */
+keepaliveEnabled():boolean {
+  const offset = this.bb!.__offset(this.bb_pos, 6);
+  return offset ? !!this.bb!.readInt8(this.bb_pos + offset) : false;
 }
 
-static createRFConfig(builder:flatbuffers.Builder, tx_pin: number):flatbuffers.Offset {
-  builder.prep(1, 1);
-  builder.writeInt8(tx_pin);
-  return builder.offset();
+static startRFConfig(builder:flatbuffers.Builder) {
+  builder.startObject(2);
 }
 
+static addTxPin(builder:flatbuffers.Builder, txPin:number) {
+  builder.addFieldInt8(0, txPin, 0);
+}
+
+static addKeepaliveEnabled(builder:flatbuffers.Builder, keepaliveEnabled:boolean) {
+  builder.addFieldInt8(1, +keepaliveEnabled, +false);
+}
+
+static endRFConfig(builder:flatbuffers.Builder):flatbuffers.Offset {
+  const offset = builder.endObject();
+  return offset;
+}
+
+static createRFConfig(builder:flatbuffers.Builder, txPin:number, keepaliveEnabled:boolean):flatbuffers.Offset {
+  RFConfig.startRFConfig(builder);
+  RFConfig.addTxPin(builder, txPin);
+  RFConfig.addKeepaliveEnabled(builder, keepaliveEnabled);
+  return RFConfig.endRFConfig(builder);
+}
 }

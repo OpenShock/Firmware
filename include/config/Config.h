@@ -1,35 +1,25 @@
 #pragma once
 
-#include "serialization/_fbs/ConfigFile_generated.h"
+#include "config/BackendConfig.h"
+#include "config/CaptivePortalConfig.h"
+#include "config/RFConfig.h"
+#include "config/WiFiConfig.h"
+#include "config/WiFiCredentials.h"
 
 #include <functional>
 #include <string>
 #include <vector>
 
 namespace OpenShock::Config {
-  // This is a copy of the flatbuffers schema defined in schemas/ConfigFile.fbs
-  struct RFConfig {
-    std::uint8_t txPin;
-  };
-  struct WiFiCredentials {
-    std::uint8_t id;
-    std::string ssid;
-    std::uint8_t bssid[6];
-    std::string password;
-  };
-  struct WiFiConfig {
-    std::string apSsid;
-    std::string hostname;
-    std::vector<WiFiCredentials> credentials;
-  };
-  struct CaptivePortalConfig {
-    bool alwaysEnabled;
-  };
-  struct BackendConfig {
-    std::string authToken;
-  };
-
   void Init();
+
+  /* GetAsJSON and SaveFromJSON are used for Reading/Writing the config file in its human-readable form. */
+  std::string GetAsJSON();
+  bool SaveFromJSON(const std::string& json);
+
+  /* GetRaw and SetRaw are used for Reading/Writing the config file in its binary form. */
+  bool GetRaw(std::vector<std::uint8_t>& buffer);
+  bool SetRaw(const std::uint8_t* buffer, std::size_t size);
 
   /**
    * @brief Resets the config file to the factory default values.
@@ -51,14 +41,12 @@ namespace OpenShock::Config {
   bool SetBackendConfig(const BackendConfig& config);
 
   bool SetRFConfigTxPin(std::uint8_t txPin);
+  bool SetRFConfigKeepAliveEnabled(bool enabled);
 
-  std::uint8_t AddWiFiCredentials(const std::string& ssid, const std::uint8_t (&bssid)[6], const std::string& password);
+  std::uint8_t AddWiFiCredentials(const std::string& ssid, const std::string& password);
   bool TryGetWiFiCredentialsByID(std::uint8_t id, WiFiCredentials& out);
   bool TryGetWiFiCredentialsBySSID(const char* ssid, WiFiCredentials& out);
-  bool TryGetWiFiCredentialsByBSSID(const std::uint8_t (&bssid)[6], WiFiCredentials& out);
   std::uint8_t GetWiFiCredentialsIDbySSID(const char* ssid);
-  std::uint8_t GetWiFiCredentialsIDbyBSSID(const std::uint8_t (&bssid)[6]);
-  std::uint8_t GetWiFiCredentialsIDbyBSSIDorSSID(const std::uint8_t (&bssid)[6], const char* ssid);
   bool RemoveWiFiCredentials(std::uint8_t id);
   std::uint8_t GetWiFiCredentialsCount();
   void ClearWiFiCredentials();
@@ -67,4 +55,6 @@ namespace OpenShock::Config {
   const std::string& GetBackendAuthToken();
   bool SetBackendAuthToken(const std::string& token);
   bool ClearBackendAuthToken();
+
+  bool SaveChanges();
 }  // namespace OpenShock::Config

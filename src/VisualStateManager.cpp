@@ -15,6 +15,10 @@
 #endif  // OPENSHOCK_LED_IMPLEMENTATION
 #endif  // OPENSHOCK_LED_WS2812B
 
+#ifndef OPENSHOCK_LED_IMPLEMENTATION
+#warning "No LED implementation selected, board will not be able to indicate its status visually"
+#endif  // OPENSHOCK_LED_IMPLEMENTATION
+
 #include "Logging.h"
 
 #include <WiFi.h>
