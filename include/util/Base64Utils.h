@@ -42,10 +42,10 @@ namespace OpenShock::Base64Utils {
   /// @param dataLen The size of the data to encode.
   /// @param output The output string to write to.
   /// @return The amount of bytes written to the output buffer.
-  inline std::size_t Encode(const std::uint8_t* data, std::size_t dataLen, std::string& output) noexcept {
+  inline bool Encode(const std::uint8_t* data, std::size_t dataLen, std::string& output) noexcept {
     std::size_t outputLen = CalculateEncodedSize(dataLen);
     output.resize(outputLen);
-    return Encode(data, dataLen, const_cast<char*>(output.data()), output.size());
+    return Encode(data, dataLen, const_cast<char*>(output.data()), output.size()) != 0;
   }
 
   /// @brief Decodes a base64 string.
@@ -67,9 +67,9 @@ namespace OpenShock::Base64Utils {
   /// @param dataLen The size of the data to decode.
   /// @param output The output buffer to write to.
   /// @return The amount of bytes written to the output buffer.
-  inline std::size_t Decode(const char* data, std::size_t dataLen, std::vector<std::uint8_t>& output) noexcept {
+  inline bool Decode(const char* data, std::size_t dataLen, std::vector<std::uint8_t>& output) noexcept {
     std::size_t outputLen = CalculateDecodedSize(dataLen);
     output.resize(outputLen);
-    return Decode(data, dataLen, output.data(), outputLen);
+    return Decode(data, dataLen, output.data(), outputLen) != 0;
   }
 }  // namespace OpenShock::Base64Utils
