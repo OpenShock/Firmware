@@ -16,25 +16,25 @@
   $: scanStatus = $DeviceStateStore.wifiScanStatus;
   $: isScanning = scanStatus === WifiScanStatus.Started || scanStatus === WifiScanStatus.InProgress;
 
-  let filteredNetworks: WiFiNetwork[] = [];
+  let filteredNetworks: [string, WiFiNetwork][] = []; // Array of tuples
+  let connectedBSSID: string | null = null;
 
-  // Reactive statement to group networks by SSID and select a representative for each group
   $: {
+    // Grouping networks by SSID
     const groups = new Map<string, WiFiNetwork[]>();
     $DeviceStateStore.wifiNetworks.forEach((network: WiFiNetwork) => {
-      if (!groups.has(network.ssid)) {
-        groups.set(network.ssid, []);
-      }
-      groups.get(network.ssid)?.push(network);
+      groups.set(network.ssid, [...(groups.get(network.ssid) || []), network]);
     });
 
-    filteredNetworks = Array.from(groups.values()).map((networks) => {
-      // Prioritize network with connected BSSID
-      const connectedNetwork = networks.find((n: WiFiNetwork) => n.bssid === connectedBSSID);
-      return connectedNetwork || networks[0];
-    });
+    // Choosing a representative network for each SSID, preferring the one that we're connected to
+    // And sorting by signal strength (RSSI, higher is stronger)
+    filteredNetworks = Array.from(groups)
+      .map(([ssid, networks]) => {
+        const representativeNetwork = networks.find((n) => n.bssid === connectedBSSID) || networks[0];
+        return [representativeNetwork.bssid, representativeNetwork] as [string, WiFiNetwork];
+      })
+      .sort((a, b) => Math.abs(a[1].rssi) - Math.abs(b[1].rssi));
   }
-  let connectedBSSID: string | null = null;
 
   function wifiScan() {
     const data = SerializeWifiScanCommand(!isScanning);
@@ -89,7 +89,7 @@
     </button>
   </div>
   <div class="max-h-64 overflow-auto">
-    {#each filteredNetworks as network}
+    {#each filteredNetworks as [key, network] (key)}
       <div class="card mb-2 p-2 flex justify-between items-center">
         <span>
           {#if network.bssid === connectedBSSID}
