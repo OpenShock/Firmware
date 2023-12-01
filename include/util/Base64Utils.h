@@ -5,8 +5,6 @@
 #include <string>
 #include <vector>
 
-// IMPORTANT: WE DONT USE ARRAYS OR TEMPLATES HERE
-
 namespace OpenShock::Base64Utils {
   /// @brief Calculates the size of the buffer required to hold the base64 encoded data.
   /// @param size The size of the data to encode.
