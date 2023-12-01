@@ -304,35 +304,10 @@ bool WiFiManager::Init() {
     return false;
   }
 
-  WiFi.enableSTA(true);
-  // We're not supposed to know any APs! Clear the list of networks.
-  ESP_LOGD(TAG, "Count of known networks: %d", Config::GetWiFiCredentialsCount());
-  if (Config::GetWiFiCredentialsCount() == 0) {
-    wifi_config_t conf;
-    if (esp_wifi_get_config((wifi_interface_t)ESP_IF_WIFI_STA, &conf)) {
-      ESP_LOGE(TAG, "get config failed!");
-    }
-    conf.sta.ssid[0]     = '\0';
-    conf.sta.password[0] = '\0';
-    if (esp_wifi_set_config((wifi_interface_t)ESP_IF_WIFI_STA, &conf)) {
-      ESP_LOGE(TAG, "clear config failed!");
-    }
-  }
-
   WiFi.setAutoConnect(false);
   WiFi.setAutoReconnect(false);
+  WiFi.enableSTA(true);
   WiFi.setHostname(OPENSHOCK_FW_HOSTNAME);  // TODO: Add the device name to the hostname (retrieve from API and store in LittleFS)
-  WiFi.begin();
-
-  // If we recognize the network in the ESP's WiFi cache, try to connect to it
-  wifi_config_t current_conf;
-  if (esp_wifi_get_config((wifi_interface_t)ESP_IF_WIFI_STA, &current_conf) == ESP_OK) {
-    if (current_conf.sta.ssid[0] != '\0') {
-      if (Config::GetWiFiCredentialsIDbySSID(reinterpret_cast<const char*>(current_conf.sta.ssid)) != 0) {
-        WiFi.begin();
-      }
-    }
-  }
 
   // If we recognize the network in the ESP's WiFi cache, try to connect to it
   wifi_config_t current_conf;
