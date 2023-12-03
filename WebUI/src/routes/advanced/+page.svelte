@@ -6,7 +6,6 @@
   import WiFiList from '$lib/components/WiFiList.svelte';
   import WiFiRefreshButton from '$lib/components/WiFiRefreshButton.svelte';
   import { DeviceStateStore } from '$lib/stores';
-  import { Step, Stepper } from '@skeletonlabs/skeleton';
 
   function isValidLinkCode(str: string) {
     if (typeof str != 'string') return false;
@@ -37,19 +36,16 @@
   }
 </script>
 
-<Stepper class="p-2 sm:p-20 max-w-6xl mx-auto">
-  <Step>
-    <svelte:fragment slot="header">
+<div class="flex flex-col items-center justify-center h-full">
+  <div class="flex-col space-y-5 w-full max-w-md">
+    <div class="flex flex-col space-y-2">
       <div class="flex flex-row items-center">
         Connect to WiFi
         <div class="flex-grow" />
         <WiFiRefreshButton />
       </div>
-    </svelte:fragment>
-    <WiFiList />
-  </Step>
-  <Step class="h-full">
-    <svelte:fragment slot="header">Link Account</svelte:fragment>
+      <WiFiList />
+    </div>
 
     <div class="flex flex-col space-y-2">
       <h3 class="h3">Account Linking</h3>
@@ -58,6 +54,16 @@
         <button class="btn variant-filled" on:click={linkAccount} disabled={!linkCodeValid || linkCode.length < 6}>Pair</button>
       </div>
     </div>
-  </Step>
-  <!-- ... -->
-</Stepper>
+
+    <div class="flex flex-col space-y-2">
+      <div class="flex flex-row space-x-2 items-center">
+        <h3 class="h3">RF TX Pin</h3>
+        <span class="text-sm text-gray-500">(Currently {$DeviceStateStore.rfTxPin == null ? ' not set' : $DeviceStateStore.rfTxPin}) </span>
+      </div>
+      <div class="flex space-x-2">
+        <input class="input variant-form-material" type="number" placeholder="TX Pin" bind:value={rfTxPin} />
+        <button class="btn variant-filled" on:click={setRfTxPin} disabled={!rfTxPinValid}>Set</button>
+      </div>
+    </div>
+  </div>
+</div>

@@ -1,6 +1,7 @@
 #include "CaptivePortalInstance.h"
 
 #include "CommandHandler.h"
+#include "config/Config.h"
 #include "event_handlers/WebSocket.h"
 #include "GatewayConnectionManager.h"
 #include "Logging.h"
@@ -95,14 +96,15 @@ CaptivePortalInstance::CaptivePortalInstance()
       request->send(
         200,
         "text/plain",
-// Raw string literal (1+ to remove the first newline)
-1+R"(
+        // Raw string literal (1+ to remove the first newline)
+        1 + R"(
 You probably forgot to upload the Filesystem with PlatformIO!
 Go to PlatformIO -> Platform -> Upload Filesystem Image!
 If this happened with a file we provided or you just need help, come to the Discord!
 
 discord.gg/openshock
-)");
+)"
+      );
     });
   }
 
@@ -140,7 +142,14 @@ void CaptivePortalInstance::handleWebSocketClientConnected(std::uint8_t socketId
     connectedNetworkPtr = &connectedNetwork;
   }
 
-  Serialization::Local::SerializeReadyMessage(connectedNetworkPtr, GatewayConnectionManager::IsPaired(), CommandHandler::GetRfTxPin(), std::bind(&CaptivePortalInstance::sendMessageBIN, this, socketId, std::placeholders::_1, std::placeholders::_2));
+  std::vector<std::string> savedNetworkSSIDs;
+  for (const auto& credentials : Config::GetWiFiCredentials()) {
+    savedNetworkSSIDs.push_back(credentials.ssid);
+  }
+
+  Serialization::Local::SerializeReadyMessage(
+    CommandHandler::GetRfTxPin(), GatewayConnectionManager::IsPaired(), savedNetworkSSIDs, connectedNetworkPtr, std::bind(&CaptivePortalInstance::sendMessageBIN, this, socketId, std::placeholders::_1, std::placeholders::_2)
+  );
 }
 
 void CaptivePortalInstance::handleWebSocketClientDisconnected(std::uint8_t socketId) {

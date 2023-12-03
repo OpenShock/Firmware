@@ -8,5 +8,4 @@ table WifiNetwork {
   channel:uint8;
   rssi:int8;
   auth_mode:WifiAuthMode;
-  saved:bool;
 }

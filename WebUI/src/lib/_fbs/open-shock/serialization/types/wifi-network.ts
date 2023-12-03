@@ -52,13 +52,8 @@ authMode():WifiAuthMode {
   return offset ? this.bb!.readUint8(this.bb_pos + offset) : WifiAuthMode.Open;
 }
 
-saved():boolean {
-  const offset = this.bb!.__offset(this.bb_pos, 14);
-  return offset ? !!this.bb!.readInt8(this.bb_pos + offset) : false;
-}
-
 static startWifiNetwork(builder:flatbuffers.Builder) {
-  builder.startObject(6);
+  builder.startObject(5);
 }
 
 static addSsid(builder:flatbuffers.Builder, ssidOffset:flatbuffers.Offset) {
@@ -81,23 +76,18 @@ static addAuthMode(builder:flatbuffers.Builder, authMode:WifiAuthMode) {
   builder.addFieldInt8(4, authMode, WifiAuthMode.Open);
 }
 
-static addSaved(builder:flatbuffers.Builder, saved:boolean) {
-  builder.addFieldInt8(5, +saved, +false);
-}
-
 static endWifiNetwork(builder:flatbuffers.Builder):flatbuffers.Offset {
   const offset = builder.endObject();
   return offset;
 }
 
-static createWifiNetwork(builder:flatbuffers.Builder, ssidOffset:flatbuffers.Offset, bssidOffset:flatbuffers.Offset, channel:number, rssi:number, authMode:WifiAuthMode, saved:boolean):flatbuffers.Offset {
+static createWifiNetwork(builder:flatbuffers.Builder, ssidOffset:flatbuffers.Offset, bssidOffset:flatbuffers.Offset, channel:number, rssi:number, authMode:WifiAuthMode):flatbuffers.Offset {
   WifiNetwork.startWifiNetwork(builder);
   WifiNetwork.addSsid(builder, ssidOffset);
   WifiNetwork.addBssid(builder, bssidOffset);
   WifiNetwork.addChannel(builder, channel);
   WifiNetwork.addRssi(builder, rssi);
   WifiNetwork.addAuthMode(builder, authMode);
-  WifiNetwork.addSaved(builder, saved);
   return WifiNetwork.endWifiNetwork(builder);
 }
 }

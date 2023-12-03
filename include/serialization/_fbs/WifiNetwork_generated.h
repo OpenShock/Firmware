@@ -33,8 +33,7 @@ struct WifiNetwork FLATBUFFERS_FINAL_CLASS : private ::flatbuffers::Table {
     VT_BSSID = 6,
     VT_CHANNEL = 8,
     VT_RSSI = 10,
-    VT_AUTH_MODE = 12,
-    VT_SAVED = 14
+    VT_AUTH_MODE = 12
   };
   const ::flatbuffers::String *ssid() const {
     return GetPointer<const ::flatbuffers::String *>(VT_SSID);
@@ -51,9 +50,6 @@ struct WifiNetwork FLATBUFFERS_FINAL_CLASS : private ::flatbuffers::Table {
   OpenShock::Serialization::Types::WifiAuthMode auth_mode() const {
     return static_cast<OpenShock::Serialization::Types::WifiAuthMode>(GetField<uint8_t>(VT_AUTH_MODE, 0));
   }
-  bool saved() const {
-    return GetField<uint8_t>(VT_SAVED, 0) != 0;
-  }
   bool Verify(::flatbuffers::Verifier &verifier) const {
     return VerifyTableStart(verifier) &&
            VerifyOffset(verifier, VT_SSID) &&
@@ -63,7 +59,6 @@ struct WifiNetwork FLATBUFFERS_FINAL_CLASS : private ::flatbuffers::Table {
            VerifyField<uint8_t>(verifier, VT_CHANNEL, 1) &&
            VerifyField<int8_t>(verifier, VT_RSSI, 1) &&
            VerifyField<uint8_t>(verifier, VT_AUTH_MODE, 1) &&
-           VerifyField<uint8_t>(verifier, VT_SAVED, 1) &&
            verifier.EndTable();
   }
 };
@@ -87,9 +82,6 @@ struct WifiNetworkBuilder {
   void add_auth_mode(OpenShock::Serialization::Types::WifiAuthMode auth_mode) {
     fbb_.AddElement<uint8_t>(WifiNetwork::VT_AUTH_MODE, static_cast<uint8_t>(auth_mode), 0);
   }
-  void add_saved(bool saved) {
-    fbb_.AddElement<uint8_t>(WifiNetwork::VT_SAVED, static_cast<uint8_t>(saved), 0);
-  }
   explicit WifiNetworkBuilder(::flatbuffers::FlatBufferBuilder &_fbb)
         : fbb_(_fbb) {
     start_ = fbb_.StartTable();
@@ -107,12 +99,10 @@ inline ::flatbuffers::Offset<WifiNetwork> CreateWifiNetwork(
     ::flatbuffers::Offset<::flatbuffers::String> bssid = 0,
     uint8_t channel = 0,
     int8_t rssi = 0,
-    OpenShock::Serialization::Types::WifiAuthMode auth_mode = OpenShock::Serialization::Types::WifiAuthMode::Open,
-    bool saved = false) {
+    OpenShock::Serialization::Types::WifiAuthMode auth_mode = OpenShock::Serialization::Types::WifiAuthMode::Open) {
   WifiNetworkBuilder builder_(_fbb);
   builder_.add_bssid(bssid);
   builder_.add_ssid(ssid);
-  builder_.add_saved(saved);
   builder_.add_auth_mode(auth_mode);
   builder_.add_rssi(rssi);
   builder_.add_channel(channel);
@@ -130,8 +120,7 @@ inline ::flatbuffers::Offset<WifiNetwork> CreateWifiNetworkDirect(
     const char *bssid = nullptr,
     uint8_t channel = 0,
     int8_t rssi = 0,
-    OpenShock::Serialization::Types::WifiAuthMode auth_mode = OpenShock::Serialization::Types::WifiAuthMode::Open,
-    bool saved = false) {
+    OpenShock::Serialization::Types::WifiAuthMode auth_mode = OpenShock::Serialization::Types::WifiAuthMode::Open) {
   auto ssid__ = ssid ? _fbb.CreateString(ssid) : 0;
   auto bssid__ = bssid ? _fbb.CreateString(bssid) : 0;
   return OpenShock::Serialization::Types::CreateWifiNetwork(
@@ -140,8 +129,7 @@ inline ::flatbuffers::Offset<WifiNetwork> CreateWifiNetworkDirect(
       bssid__,
       channel,
       rssi,
-      auth_mode,
-      saved);
+      auth_mode);
 }
 
 }  // namespace Types

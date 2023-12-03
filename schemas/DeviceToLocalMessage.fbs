@@ -7,10 +7,20 @@ attribute "fs_serializer";
 namespace OpenShock.Serialization.Local;
 
 table ReadyMessage {
+  /// Poggies is always true.
   poggies:bool;
-  connected_wifi:Types.WifiNetwork;
-  gateway_paired:bool;
+
+  /// The radio transmit pin that the device is currently using.
   rftx_pin:uint8;
+
+  /// Whether the device is linked to an account. (Has a valid access token)
+  account_linked:bool;
+
+  /// The networks that the device has saved.
+  networks_saved:[string];
+
+  /// The network that the device is currently connected to.
+  network_connected:Types.WifiNetwork;
 }
 
 table ErrorMessage {
@@ -24,11 +34,8 @@ table WifiNetworkEvent {
   event_type:Types.WifiNetworkEventType;
   network:Types.WifiNetwork;
 }
-table WifiGotIpEvent {
-  ip:string;
-}
-table WifiLostIpEvent {
-  ip:string;
+table WifiIpAddressChangedEvent {
+  ip_address:string;
 }
 
 enum AccountLinkResultCode : uint8 {
@@ -59,8 +66,7 @@ union DeviceToLocalMessagePayload {
   ErrorMessage,
   WifiScanStatusMessage,
   WifiNetworkEvent,
-  WifiGotIpEvent,
-  WifiLostIpEvent,
+  WifiIpAddressChangedEvent,
   AccountLinkCommandResult,
   SetRfTxPinCommandResult
 }

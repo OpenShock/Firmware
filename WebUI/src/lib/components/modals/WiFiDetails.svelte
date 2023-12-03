@@ -37,7 +37,7 @@
     }
   }
 
-  $: item = $DeviceStateStore.wifiNetworks.get(bssid);
+  $: item = $DeviceStateStore.wifiNetworksPresent.get(bssid);
 
   $: rows = item
     ? [

@@ -13,6 +13,9 @@ import { AccountLinkCommandResult } from '$lib/_fbs/open-shock/serialization/loc
 import { AccountLinkResultCode } from '$lib/_fbs/open-shock/serialization/local/account-link-result-code';
 import { ErrorMessage } from '$lib/_fbs/open-shock/serialization/local/error-message';
 import { WifiNetworkEventHandler } from './WifiNetworkEventHandler';
+import { WifiIpAddressChangedEvent } from '$lib/_fbs/open-shock/serialization/local/wifi-ip-address-changed-event';
+import { SavedNetworkAddedEvent } from '$lib/_fbs/open-shock/serialization/local/saved-network-added-event';
+import { SavedNetworkRemovedEvent } from '$lib/_fbs/open-shock/serialization/local/saved-network-removed-event';
 
 export type MessageHandler = (wsClient: WebSocketClient, message: DeviceToLocalMessage) => void;
 
@@ -30,9 +33,17 @@ PayloadHandlers[DeviceToLocalMessagePayload.ReadyMessage] = (cli, msg) => {
   console.log('[WS] Connected to device, poggies: ', payload.poggies());
 
   DeviceStateStore.update((store) => {
-    store.wifiConnectedBSSID = payload.connectedWifi()?.bssid() || null;
-    store.gatewayPaired = payload.gatewayPaired();
+    store.wsConnected = true;
     store.rfTxPin = payload.rftxPin();
+    store.accountLinked = payload.accountLinked();
+
+    store.wifiNetworksSaved = new Array<string>(payload.networksSavedLength());
+    for (let i = 0; i < store.wifiNetworksSaved.length; i++) {
+      store.wifiNetworksSaved[i] = payload.networksSaved(i);
+    }
+
+    store.wifiConnectedBSSID = payload.networkConnected()?.bssid() ?? null;
+
     return store;
   });
 
@@ -65,6 +76,53 @@ PayloadHandlers[DeviceToLocalMessagePayload.WifiScanStatusMessage] = (cli, msg) 
 };
 
 PayloadHandlers[DeviceToLocalMessagePayload.WifiNetworkEvent] = WifiNetworkEventHandler;
+
+PayloadHandlers[DeviceToLocalMessagePayload.WifiIpAddressChangedEvent] = (cli, msg) => {
+  const payload = new WifiIpAddressChangedEvent();
+  msg.payload(payload);
+
+  const ipAddress = payload.ipAddress();
+
+  if (ipAddress == null) {
+    toastDelegator.trigger({
+      message: 'Lost IP address',
+      background: 'bg-red-500',
+    });
+  } else {
+    toastDelegator.trigger({
+      message: 'IP address changed to: ' + ipAddress,
+      background: 'bg-green-500',
+    });
+  }
+
+  DeviceStateStore.setDeviceIPAddress(ipAddress);
+};
+
+PayloadHandlers[DeviceToLocalMessagePayload.SavedNetworkAddedEvent] = (cli, msg) => {
+  const payload = new SavedNetworkAddedEvent();
+  msg.payload(payload);
+
+  const ssid = payload.ssid();
+  if (ssid == null) {
+    console.error('[WS] ERROR: Received SavedNetworkAddedEvent with null SSID');
+    return;
+  }
+
+  DeviceStateStore.addSavedWifiNetwork(ssid);
+};
+
+PayloadHandlers[DeviceToLocalMessagePayload.SavedNetworkRemovedEvent] = (cli, msg) => {
+  const payload = new SavedNetworkRemovedEvent();
+  msg.payload(payload);
+
+  const ssid = payload.ssid();
+  if (ssid == null) {
+    console.error('[WS] ERROR: Received SavedNetworkRemovedEvent with null SSID');
+    return;
+  }
+
+  DeviceStateStore.removeSavedWifiNetwork(ssid);
+};
 
 PayloadHandlers[DeviceToLocalMessagePayload.AccountLinkCommandResult] = (cli, msg) => {
   const payload = new AccountLinkCommandResult();

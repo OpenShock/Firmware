@@ -6,5 +6,4 @@ export type WiFiNetwork = {
   rssi: number;
   channel: number;
   security: WifiAuthMode;
-  saved: boolean;
 };

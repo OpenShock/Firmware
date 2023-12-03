@@ -2,9 +2,12 @@ import type { WifiScanStatus } from '$lib/_fbs/open-shock/serialization/types/wi
 import type { WiFiNetwork } from './WiFiNetwork';
 
 export type DeviceState = {
-  wifiConnectedBSSID: string | null;
+  wsConnected: boolean;
+  deviceIPAddress: string | null;
   wifiScanStatus: WifiScanStatus | null;
-  wifiNetworks: Map<string, WiFiNetwork>;
-  gatewayPaired: boolean;
+  wifiNetworksSaved: string[];
+  wifiNetworksPresent: Map<string, WiFiNetwork>;
+  wifiConnectedBSSID: string | null;
+  accountLinked: boolean;
   rfTxPin: number | null;
 };

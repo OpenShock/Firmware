@@ -24,7 +24,6 @@ function handleDiscoveredEvent(fbsNetwork: FbsWifiNetwork) {
     rssi: fbsNetwork.rssi(),
     channel: fbsNetwork.channel(),
     security: fbsNetwork.authMode(),
-    saved: fbsNetwork.saved(),
   };
 
   DeviceStateStore.setWifiNetwork(network);
@@ -44,7 +43,6 @@ function handleUpdatedEvent(fbsNetwork: FbsWifiNetwork) {
     rssi: fbsNetwork.rssi(),
     channel: fbsNetwork.channel(),
     security: fbsNetwork.authMode(),
-    saved: fbsNetwork.saved(),
   };
 
   DeviceStateStore.setWifiNetwork(network);

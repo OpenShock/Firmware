@@ -38,7 +38,7 @@ flatbuffers::Offset<OpenShock::Serialization::Types::WifiNetwork> _createWiFiNet
   auto bssid    = network.GetHexBSSID();
   auto authMode = GetWiFiAuthModeEnum(network.authMode);
 
-  return Types::CreateWifiNetworkDirect(builder, network.ssid, bssid.data(), network.channel, network.rssi, authMode, network.IsSaved());
+  return Types::CreateWifiNetworkDirect(builder, network.ssid, bssid.data(), network.channel, network.rssi, authMode);
 }
 
 bool Local::SerializeErrorMessage(const char* message, Common::SerializationCallbackFn callback) {
@@ -57,8 +57,19 @@ bool Local::SerializeErrorMessage(const char* message, Common::SerializationCall
   return true;
 }
 
-bool Local::SerializeReadyMessage(const WiFiNetwork* connectedNetwork, bool gatewayPaired, std::uint8_t radioTxPin, Common::SerializationCallbackFn callback) {
+bool Local::SerializeReadyMessage(std::uint8_t radioTxPin, bool accountLinked, std::vector<std::string>& savedNetworkSSIDs, const WiFiNetwork* connectedNetwork, Common::SerializationCallbackFn callback) {
   flatbuffers::FlatBufferBuilder builder(256);
+
+  flatbuffers::Offset<flatbuffers::Vector<flatbuffers::Offset<flatbuffers::String>>> fbsSavedNetworkSSIDs = 0;
+
+  std::vector<flatbuffers::Offset<flatbuffers::String>> fbsSavedNetworkSSIDsVec;
+  fbsSavedNetworkSSIDsVec.reserve(savedNetworkSSIDs.size());
+
+  for (auto& ssid : savedNetworkSSIDs) {
+    fbsSavedNetworkSSIDsVec.push_back(builder.CreateString(ssid));
+  }
+
+  fbsSavedNetworkSSIDs = builder.CreateVector(fbsSavedNetworkSSIDsVec);
 
   flatbuffers::Offset<Serialization::Types::WifiNetwork> fbsNetwork = 0;
 
@@ -68,7 +79,7 @@ bool Local::SerializeReadyMessage(const WiFiNetwork* connectedNetwork, bool gate
     fbsNetwork = 0;
   }
 
-  auto readyMessageOffset = Serialization::Local::CreateReadyMessage(builder, true, fbsNetwork, gatewayPaired, radioTxPin);
+  auto readyMessageOffset = Serialization::Local::CreateReadyMessage(builder, true, radioTxPin, accountLinked, fbsSavedNetworkSSIDs, fbsNetwork);
 
   auto msg = Serialization::Local::CreateDeviceToLocalMessage(builder, Serialization::Local::DeviceToLocalMessagePayload::ReadyMessage, readyMessageOffset.Union());
 
@@ -100,6 +111,80 @@ bool Local::SerializeWiFiNetworkEvent(Types::WifiNetworkEventType eventType, con
   auto wrapperOffset = Local::CreateWifiNetworkEvent(builder, eventType, _createWiFiNetwork(builder, network));
 
   auto msg = Local::CreateDeviceToLocalMessage(builder, Local::DeviceToLocalMessagePayload::WifiNetworkEvent, wrapperOffset.Union());
+
+  builder.Finish(msg);
+
+  auto span = builder.GetBufferSpan();
+
+  return callback(span.data(), span.size());
+}
+
+bool Local::SerializeWiFiIpAddressChangedEvent(const char* ipAddress, Common::SerializationCallbackFn callback) {
+  flatbuffers::FlatBufferBuilder builder(32);  // TODO: Profile this and adjust the size accordingly
+
+  auto wrapperOffset = Local::CreateWifiIpAddressChangedEvent(builder, builder.CreateString(ipAddress));
+
+  auto msg = Local::CreateDeviceToLocalMessage(builder, Local::DeviceToLocalMessagePayload::WifiIpAddressChangedEvent, wrapperOffset.Union());
+
+  builder.Finish(msg);
+
+  auto span = builder.GetBufferSpan();
+
+  return callback(span.data(), span.size());
+}
+
+bool Local::SerializeSavedNetworkAddedEvent(const char* ssid, Common::SerializationCallbackFn callback) {
+  flatbuffers::FlatBufferBuilder builder(32);  // TODO: Profile this and adjust the size accordingly
+
+  auto wrapperOffset = Local::CreateSavedNetworkAddedEvent(builder, builder.CreateString(ssid));
+
+  auto msg = Local::CreateDeviceToLocalMessage(builder, Local::DeviceToLocalMessagePayload::SavedNetworkAddedEvent, wrapperOffset.Union());
+
+  builder.Finish(msg);
+
+  auto span = builder.GetBufferSpan();
+
+  return callback(span.data(), span.size());
+}
+
+bool Local::SerializeSavedNetworkRemovedEvent(const char* ssid, Common::SerializationCallbackFn callback) {
+  flatbuffers::FlatBufferBuilder builder(32);  // TODO: Profile this and adjust the size accordingly
+
+  auto wrapperOffset = Local::CreateSavedNetworkRemovedEvent(builder, builder.CreateString(ssid));
+
+  auto msg = Local::CreateDeviceToLocalMessage(builder, Local::DeviceToLocalMessagePayload::SavedNetworkRemovedEvent, wrapperOffset.Union());
+
+  builder.Finish(msg);
+
+  auto span = builder.GetBufferSpan();
+
+  return callback(span.data(), span.size());
+}
+
+bool Local::SerializeAccountLinkCommandResult(AccountLinkResultCode resultCode, Common::SerializationCallbackFn callback) {
+  flatbuffers::FlatBufferBuilder builder(32);  // TODO: Profile this and adjust the size accordingly
+
+  Local::AccountLinkCommandResult accountLinkCommandResult(resultCode);
+
+  auto wrapperOffset = builder.CreateStruct(accountLinkCommandResult);
+
+  auto msg = Local::CreateDeviceToLocalMessage(builder, Local::DeviceToLocalMessagePayload::AccountLinkCommandResult, wrapperOffset.Union());
+
+  builder.Finish(msg);
+
+  auto span = builder.GetBufferSpan();
+
+  return callback(span.data(), span.size());
+}
+
+bool Local::SerializeSetRfTxPinCommandResult(std::uint8_t pin, SetRfPinResultCode resultCode, Common::SerializationCallbackFn callback) {
+  flatbuffers::FlatBufferBuilder builder(32);  // TODO: Profile this and adjust the size accordingly
+
+  Local::SetRfTxPinCommandResult setRfTxPinCommandResult(pin, resultCode);
+
+  auto wrapperOffset = builder.CreateStruct(setRfTxPinCommandResult);
+
+  auto msg = Local::CreateDeviceToLocalMessage(builder, Local::DeviceToLocalMessagePayload::SetRfTxPinCommandResult, wrapperOffset.Union());
 
   builder.Finish(msg);
 

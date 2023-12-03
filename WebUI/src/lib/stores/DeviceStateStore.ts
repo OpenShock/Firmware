@@ -4,19 +4,28 @@ import type { DeviceState } from '$lib/types/DeviceState';
 import { writable } from 'svelte/store';
 
 const { subscribe, update } = writable<DeviceState>({
-  wifiConnectedBSSID: null,
+  wsConnected: false,
+  deviceIPAddress: null,
   wifiScanStatus: null,
-  wifiNetworks: new Map<string, WiFiNetwork>(),
-  gatewayPaired: false,
+  wifiNetworksSaved: [],
+  wifiNetworksPresent: new Map<string, WiFiNetwork>(),
+  wifiConnectedBSSID: null,
+  accountLinked: false,
   rfTxPin: null,
 });
 
 export const DeviceStateStore = {
   subscribe,
   update,
-  setWifiConnectedBSSID(connectedBSSID: string | null) {
+  setWsConnected(connected: boolean) {
     update((store) => {
-      store.wifiConnectedBSSID = connectedBSSID;
+      store.wsConnected = connected;
+      return store;
+    });
+  },
+  setDeviceIPAddress(ipAddress: string | null) {
+    update((store) => {
+      store.deviceIPAddress = ipAddress;
       return store;
     });
   },
@@ -26,36 +35,69 @@ export const DeviceStateStore = {
       return store;
     });
   },
+  setSavedWifiNetworks(networkSSIDs: string[]) {
+    update((store) => {
+      store.wifiNetworksSaved = networkSSIDs;
+      return store;
+    });
+  },
+  addSavedWifiNetwork(networkSSID: string) {
+    update((store) => {
+      store.wifiNetworksSaved.push(networkSSID);
+      return store;
+    });
+  },
+  removeSavedWifiNetwork(networkSSID: string) {
+    update((store) => {
+      const index = store.wifiNetworksSaved.indexOf(networkSSID);
+      if (index !== -1) {
+        store.wifiNetworksSaved.splice(index, 1);
+      }
+      return store;
+    });
+  },
+  clearSavedWifiNetworks() {
+    update((store) => {
+      store.wifiNetworksSaved = [];
+      return store;
+    });
+  },
   setWifiNetwork(network: WiFiNetwork) {
     update((store) => {
-      store.wifiNetworks.set(network.bssid, network);
+      store.wifiNetworksPresent.set(network.bssid, network);
       return store;
     });
   },
   updateWifiNetwork(bssid: string, updater: (network: WiFiNetwork) => WiFiNetwork) {
     update((store) => {
-      const network = store.wifiNetworks.get(bssid);
+      const network = store.wifiNetworksPresent.get(bssid);
       if (network) {
-        store.wifiNetworks.set(bssid, updater(network));
+        store.wifiNetworksPresent.set(bssid, updater(network));
       }
       return store;
     });
   },
   removeWifiNetwork(bssid: string) {
     update((store) => {
-      store.wifiNetworks.delete(bssid);
+      store.wifiNetworksPresent.delete(bssid);
       return store;
     });
   },
   clearWifiNetworks() {
     update((store) => {
-      store.wifiNetworks.clear();
+      store.wifiNetworksPresent.clear();
       return store;
     });
   },
-  setGatewayPaired(paired: boolean) {
+  setWifiConnectedBSSID(connectedBSSID: string | null) {
     update((store) => {
-      store.gatewayPaired = paired;
+      store.wifiConnectedBSSID = connectedBSSID;
+      return store;
+    });
+  },
+  setAccountLinked(linked: boolean) {
+    update((store) => {
+      store.accountLinked = linked;
       return store;
     });
   },

@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { page } from '$app/stores';
   import { AppBar, LightSwitch } from '@skeletonlabs/skeleton';
 </script>
 
@@ -10,6 +11,14 @@
     </a>
   </div>
   <svelte:fragment slot="trail">
+    <!-- Advanced menu -->
+    <div class="flex items-center space-x-4">
+      {#if $page.url.pathname === '/advanced'}
+        <a href="/" class="btn variant-filled">Simple</a>
+      {:else}
+        <a href="/advanced" class="btn variant-filled">Advanced</a>
+      {/if}
+    </div>
     <LightSwitch />
   </svelte:fragment>
 </AppBar>
