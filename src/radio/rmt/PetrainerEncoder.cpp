@@ -1,5 +1,7 @@
 #include "radio/rmt/PetrainerEncoder.h"
 
+#include "radio/rmt/internal/Shared.h"
+
 const rmt_data_t kRmtPreamble  = {750, 1, 750, 0};
 const rmt_data_t kRmtOne       = {200, 1, 1500, 0};
 const rmt_data_t kRmtZero      = {200, 1, 750, 0};
@@ -11,18 +13,36 @@ std::vector<rmt_data_t> Rmt::PetrainerEncoder::GetSequence(std::uint16_t shocker
   // Intensity must be between 0 and 100
   intensity = std::min(intensity, (std::uint8_t)100);
 
-  std::uint8_t methodBit      = (0x80 | (1 << ((std::uint8_t)type - 1))) & 0xFF;
-  std::uint8_t methodChecksum = 0xFF ^ ((1 << (8 - (std::uint8_t)type)) | 1);
+  std::uint8_t nShift = 0;
+  switch (type) {
+  case ShockerCommandType::Shock:
+    nShift = 0;
+    break;
+  case ShockerCommandType::Vibrate:
+    nShift = 1;
+    break;
+  case ShockerCommandType::Sound:
+    nShift = 2;
+    break;
+  default:
+    return {}; // Invalid type
+  }
 
-  std::uint64_t data = (std::uint64_t(methodBit) << 32) | (std::uint64_t(shockerId) << 16) | (std::uint64_t(intensity) << 8) | (std::uint64_t(methodChecksum) << 0);
+  // Type is 0x80 | (0x01 << nShift)
+  std::uint8_t typeVal = (0x80 | (0x01 << nShift)) & 0xFF;
+
+  // TypeSum is NOT(0x01 | (0x80 >> nShift))
+  std::uint8_t typeSum = (~(0x01 | (0x80 >> nShift))) & 0xFF;
+
+  // Payload layout: [methodBit:8][shockerId:16][intensity:8][methodChecksum:8]
+  std::uint64_t data = (std::uint64_t(typeVal) << 32) | (std::uint64_t(shockerId) << 16) | (std::uint64_t(intensity) << 8) | std::uint64_t(typeSum);
 
   std::vector<rmt_data_t> pulses;
   pulses.reserve(42);
 
+  // Generate the sequence
   pulses.push_back(kRmtPreamble);
-  for (int bit_pos = 39; bit_pos >= 0; --bit_pos) {
-    pulses.push_back((data >> bit_pos) & 1 ? kRmtOne : kRmtZero);
-  }
+  Internal::EncodeBits<40>(pulses, data, kRmtOne, kRmtZero);
   pulses.push_back(kRmtPostamble);
 
   return pulses;
