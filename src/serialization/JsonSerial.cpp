@@ -22,12 +22,12 @@ bool JsonSerial::ParseShockerCommand(const cJSON* root, JsonSerial::ShockerComma
     return false;
   }
   ShockerModelType modelType;
-  if (strcmp(model->valuestring, "CaiXianlin") == 0 || strcmp(model->valuestring, "CaiXianLin") == 0 || strcmp(model->valuestring, "CXL") == 0) {
+  if (strcmp(model->valuestring, "caixianlin") == 0) {
     modelType = ShockerModelType::CaiXianlin;
-  } else if (strcmp(model->valuestring, "PetTrainer") == 0 || strcmp(model->valuestring, "PT") == 0) {
-    modelType = ShockerModelType::PetTrainer;
+  } else if (strcmp(model->valuestring, "petrainer") == 0) {
+    modelType = ShockerModelType::Petrainer;
   } else {
-    ESP_LOGE(TAG, "value at 'model' is not a valid shocker model (CaiXianlin, PetTrainer)");
+    ESP_LOGE(TAG, "value at 'model' is not a valid shocker model (caixianlin, petrainer)");
     return false;
   }
 
@@ -57,16 +57,16 @@ bool JsonSerial::ParseShockerCommand(const cJSON* root, JsonSerial::ShockerComma
     return false;
   }
   ShockerCommandType commandType;
-  if (strcmp(command->valuestring, "Stop") == 0) {
+  if (strcmp(command->valuestring, "stop") == 0) {
     commandType = ShockerCommandType::Stop;
-  } else if (strcmp(command->valuestring, "Shock") == 0) {
+  } else if (strcmp(command->valuestring, "shock") == 0) {
     commandType = ShockerCommandType::Shock;
-  } else if (strcmp(command->valuestring, "Vibrate") == 0) {
+  } else if (strcmp(command->valuestring, "vibrate") == 0) {
     commandType = ShockerCommandType::Vibrate;
-  } else if (strcmp(command->valuestring, "Sound") == 0) {
+  } else if (strcmp(command->valuestring, "sound") == 0) {
     commandType = ShockerCommandType::Sound;
   } else {
-    ESP_LOGE(TAG, "value at 'type' is not a valid shocker command (Stop, Shock, Vibrate, Sound)");
+    ESP_LOGE(TAG, "value at 'type' is not a valid shocker command (stop, shock, vibrate, sound)");
     return false;
   }
 
