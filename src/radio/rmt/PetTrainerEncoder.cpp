@@ -1,5 +1,7 @@
 #include "radio/rmt/PetTrainerEncoder.h"
 
+#include "radio/rmt/internal/Shared.h"
+
 const rmt_data_t kRmtPreamble  = {750, 1, 750, 0};
 const rmt_data_t kRmtOne       = {200, 1, 1500, 0};
 const rmt_data_t kRmtZero      = {200, 1, 750, 0};
@@ -19,10 +21,9 @@ std::vector<rmt_data_t> Rmt::PetTrainerEncoder::GetSequence(std::uint16_t shocke
   std::vector<rmt_data_t> pulses;
   pulses.reserve(42);
 
+  // Generate the sequence
   pulses.push_back(kRmtPreamble);
-  for (int bit_pos = 39; bit_pos >= 0; --bit_pos) {
-    pulses.push_back((data >> bit_pos) & 1 ? kRmtOne : kRmtZero);
-  }
+  Internal::EncodeBits<40>(pulses, data, kRmtOne, kRmtZero);
   pulses.push_back(kRmtPostamble);
 
   return pulses;
