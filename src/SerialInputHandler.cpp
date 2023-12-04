@@ -170,13 +170,13 @@ rawconfig <base64>
   Transmit a RF command
   Arguments:
     <json> must be a JSON object with the following fields:
-      model      (string) Model of the shocker                    ("CaiXianlin", "PetTrainer")
+      model      (string) Model of the shocker                    ("caixianlin", "petrainer")
       id         (number) ID of the shocker                       (0-65535)
       type       (string) Type of the command                     ("shock", "vibrate", "sound", "stop")
       intensity  (number) Intensity of the command                (0-255)
       durationMs (number) Duration of the command in milliseconds (0-65535)
   Example:
-    rftransmit {\"model\":\"cai-xianlin\",\"id\":12345,\"type\":\"shock\",\"intensity\":99,\"duration\":500}
+    rftransmit {"model":"caixianlin","id":12345,"type":"shock","intensity":99,"duration_ms":500}
 )");
     return;
   }

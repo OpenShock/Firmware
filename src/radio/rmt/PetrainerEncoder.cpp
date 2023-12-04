@@ -1,4 +1,4 @@
-#include "radio/rmt/PetTrainerEncoder.h"
+#include "radio/rmt/PetrainerEncoder.h"
 
 #include "radio/rmt/internal/Shared.h"
 
@@ -9,7 +9,7 @@ const rmt_data_t kRmtPostamble = {200, 1, 7000, 0};
 
 using namespace OpenShock;
 
-std::vector<rmt_data_t> Rmt::PetTrainerEncoder::GetSequence(std::uint16_t shockerId, ShockerCommandType type, std::uint8_t intensity) {
+std::vector<rmt_data_t> Rmt::PetrainerEncoder::GetSequence(std::uint16_t shockerId, ShockerCommandType type, std::uint8_t intensity) {
   // Intensity must be between 0 and 100
   intensity = std::min(intensity, (std::uint8_t)100);
 

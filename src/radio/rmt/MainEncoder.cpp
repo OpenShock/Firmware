@@ -1,9 +1,8 @@
 #include "radio/rmt/MainEncoder.h"
 
 #include "Logging.h"
-#include "radio/rmt/PetTrainerEncoder.h"
-#include "radio/rmt/XlcEncoder.h"
-
+#include "radio/rmt/CaiXianlinEncoder.h"
+#include "radio/rmt/PetrainerEncoder.h"
 
 #include <unordered_map>
 
@@ -13,10 +12,10 @@ using namespace OpenShock;
 
 std::vector<rmt_data_t> Rmt::GetSequence(ShockerModelType model, std::uint16_t shockerId, ShockerCommandType type, std::uint8_t intensity) {
   switch (model) {
-    case ShockerModelType::PetTrainer:
-      return Rmt::PetTrainerEncoder::GetSequence(shockerId, type, intensity);
+    case ShockerModelType::Petrainer:
+      return Rmt::PetrainerEncoder::GetSequence(shockerId, type, intensity);
     case ShockerModelType::CaiXianlin:
-      return Rmt::XlcEncoder::GetSequence(shockerId, 0, type, intensity);
+      return Rmt::CaiXianlinEncoder::GetSequence(shockerId, 0, type, intensity);
     default:
       ESP_LOGE(TAG, "Unknown shocker model: %u", model);
       return {};
@@ -30,11 +29,11 @@ std::shared_ptr<std::vector<rmt_data_t>> Rmt::GetZeroSequence(ShockerModelType m
 
   std::shared_ptr<std::vector<rmt_data_t>> sequence;
   switch (model) {
-    case ShockerModelType::PetTrainer:
-      sequence = std::make_shared<std::vector<rmt_data_t>>(Rmt::PetTrainerEncoder::GetSequence(shockerId, ShockerCommandType::Vibrate, 0));
+    case ShockerModelType::Petrainer:
+      sequence = std::make_shared<std::vector<rmt_data_t>>(Rmt::PetrainerEncoder::GetSequence(shockerId, ShockerCommandType::Vibrate, 0));
       break;
     case ShockerModelType::CaiXianlin:
-      sequence = std::make_shared<std::vector<rmt_data_t>>(Rmt::XlcEncoder::GetSequence(shockerId, 0, ShockerCommandType::Vibrate, 0));
+      sequence = std::make_shared<std::vector<rmt_data_t>>(Rmt::CaiXianlinEncoder::GetSequence(shockerId, 0, ShockerCommandType::Vibrate, 0));
       break;
     default:
       ESP_LOGE(TAG, "Unknown shocker model: %u", model);

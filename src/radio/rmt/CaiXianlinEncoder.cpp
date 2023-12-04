@@ -1,4 +1,4 @@
-#include "radio/rmt/XlcEncoder.h"
+#include "radio/rmt/CaiXianlinEncoder.h"
 
 #include "radio/rmt/internal/Shared.h"
 
@@ -15,7 +15,7 @@ const rmt_data_t kRmtZero     = {300, 1, 800, 0};
 
 using namespace OpenShock;
 
-std::vector<rmt_data_t> Rmt::XlcEncoder::GetSequence(std::uint16_t transmitterId, std::uint8_t channelId, ShockerCommandType type, std::uint8_t intensity) {
+std::vector<rmt_data_t> Rmt::CaiXianlinEncoder::GetSequence(std::uint16_t transmitterId, std::uint8_t channelId, ShockerCommandType type, std::uint8_t intensity) {
   // Intensity must be between 0 and 99
   intensity = std::min(intensity, (std::uint8_t)99);
 

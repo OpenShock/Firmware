@@ -105,10 +105,10 @@ bool JsonAPI::ParseDeviceInfoJsonResponse(int code, const cJSON* root, JsonAPI::
     }
 
     OpenShock::ShockerModelType shockerModelType;
-    if (strcmp(shockerModelStr, "CaiXianlin") == 0 || strcmp(shockerModelStr, "CaiXianLin") == 0 || strcmp(shockerModelStr, "XLC") == 0 || strcmp(shockerModelStr, "CXL") == 0) {
+    if (strcmp(shockerModelStr, "caixianlin") == 0 || strcmp(shockerModelStr, "cai-xianlin") == 0 || strcmp(shockerModelStr, "CaiXianlin") == 0) {
       shockerModelType = OpenShock::ShockerModelType::CaiXianlin;
-    } else if (strcmp(shockerModelStr, "PetTrainer") == 0 || strcmp(shockerModelStr, "PT") == 0) {
-      shockerModelType = OpenShock::ShockerModelType::PetTrainer;
+    } else if (strcmp(shockerModelStr, "petrainer") == 0 || strcmp(shockerModelStr, "Petrainer") == 0) {
+      shockerModelType = OpenShock::ShockerModelType::Petrainer;
     } else {
       ESP_LOGJSONE("value at 'shocker.model' is not a valid shocker model", shocker);
       return false;
