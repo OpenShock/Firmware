@@ -48,7 +48,7 @@ static TaskHandle_t s_keepAliveTaskHandle     = nullptr;
 void _keepAliveTask(void* arg) {
   std::int64_t timeToKeepAlive = KEEP_ALIVE_INTERVAL;
 
-  // Map of shocker IDs to time of next keep alive
+  // Map of shocker IDs to time of next keep-alive
   std::unordered_map<std::uint16_t, KnownShocker> activityMap;
 
   while (true) {
@@ -58,7 +58,7 @@ void _keepAliveTask(void* arg) {
     KnownShocker cmd;
     while (xQueueReceive(s_keepAliveQueue, &cmd, pdMS_TO_TICKS(eepyTime)) == pdTRUE) {
       if (cmd.killTask) {
-        ESP_LOGW(TAG, "Received kill command, exiting keep alive task");
+        ESP_LOGW(TAG, "Received kill command, exiting keep-alive task");
         vTaskDelete(nullptr);
         break;  // This should never be reached
       }
@@ -74,20 +74,20 @@ void _keepAliveTask(void* arg) {
     // Keep track of the minimum activity time, so we know when to wake up
     timeToKeepAlive = now + KEEP_ALIVE_INTERVAL;
 
-    // For every entry that has a keep alive time less than now, send a keep alive
+    // For every entry that has a keep-alive time less than now, send a keep-alive
     for (auto it = activityMap.begin(); it != activityMap.end(); ++it) {
       auto& cmd = it->second;
 
       if (cmd.lastActivityTimestamp + KEEP_ALIVE_INTERVAL < now) {
-        ESP_LOGV(TAG, "Sending keep alive for shocker %u", cmd.shockerId);
+        ESP_LOGV(TAG, "Sending keep-alive for shocker %u", cmd.shockerId);
 
         if (s_rfTransmitter == nullptr) {
-          ESP_LOGW(TAG, "RF Transmitter is not initialized, ignoring keep alive");
+          ESP_LOGW(TAG, "RF Transmitter is not initialized, ignoring keep-alive");
           break;
         }
 
         if (!s_rfTransmitter->SendCommand(cmd.model, cmd.shockerId, ShockerCommandType::Vibrate, 0, KEEP_ALIVE_DURATION, false)) {
-          ESP_LOGW(TAG, "Failed to send keep alive for shocker %u", cmd.shockerId);
+          ESP_LOGW(TAG, "Failed to send keep-alive for shocker %u", cmd.shockerId);
         }
 
         cmd.lastActivityTimestamp = now;
@@ -102,14 +102,14 @@ bool _internalSetKeepAliveEnabled(bool enabled) {
   bool wasEnabled = s_keepAliveQueue != nullptr && s_keepAliveTaskHandle != nullptr;
 
   if (enabled == wasEnabled) {
-    ESP_LOGV(TAG, "Keep alive task is already %s", enabled ? "enabled" : "disabled");
+    ESP_LOGV(TAG, "keep-alive task is already %s", enabled ? "enabled" : "disabled");
     return true;
   }
 
   xSemaphoreTake(s_keepAliveSemaphore, portMAX_DELAY);
 
   if (enabled) {
-    ESP_LOGV(TAG, "Enabling keep alive task");
+    ESP_LOGV(TAG, "Enabling keep-alive task");
 
     s_keepAliveQueue = xQueueCreate(32, sizeof(KnownShocker));
     if (s_keepAliveQueue == nullptr) {
@@ -129,7 +129,7 @@ bool _internalSetKeepAliveEnabled(bool enabled) {
       return false;
     }
   } else {
-    ESP_LOGV(TAG, "Disabling keep alive task");
+    ESP_LOGV(TAG, "Disabling keep-alive task");
     if (s_keepAliveTaskHandle != nullptr && s_keepAliveQueue != nullptr) {
       // Wait for the task to stop
       KnownShocker cmd {.killTask = true};
@@ -142,7 +142,7 @@ bool _internalSetKeepAliveEnabled(bool enabled) {
       vQueueDelete(s_keepAliveQueue);
       s_keepAliveQueue = nullptr;
     } else {
-      ESP_LOGW(TAG, "Keep alive task is already disabled? Something might be wrong.");
+      ESP_LOGW(TAG, "keep-alive task is already disabled? Something might be wrong.");
     }
   }
 
@@ -172,7 +172,7 @@ bool CommandHandler::Init() {
     return false;
   }
 
-  s_rfTransmitter = std::make_unique<RFTransmitter>(txPin, 32);
+  s_rfTransmitter = std::make_unique<RFTransmitter>(txPin);
   if (!s_rfTransmitter->ok()) {
     ESP_LOGE(TAG, "Failed to initialize RF Transmitter");
     s_rfTransmitter = nullptr;
@@ -203,7 +203,7 @@ SetRfPinResultCode CommandHandler::SetRfTxPin(std::uint8_t txPin) {
   }
 
   ESP_LOGV(TAG, "Creating new RF transmitter");
-  auto rfxmit = std::make_unique<RFTransmitter>(txPin, 32);
+  auto rfxmit = std::make_unique<RFTransmitter>(txPin);
   if (!rfxmit->ok()) {
     ESP_LOGE(TAG, "Failed to initialize RF transmitter");
 
@@ -230,7 +230,7 @@ bool CommandHandler::SetKeepAliveEnabled(bool enabled) {
   }
 
   if (!Config::SetRFConfigKeepAliveEnabled(enabled)) {
-    ESP_LOGE(TAG, "Failed to set keep alive enabled in config");
+    ESP_LOGE(TAG, "Failed to set keep-alive enabled in config");
     return false;
   }
 
@@ -238,6 +238,10 @@ bool CommandHandler::SetKeepAliveEnabled(bool enabled) {
 }
 
 bool CommandHandler::SetKeepAlivePaused(bool paused) {
+  if (Config::GetRFConfig().keepAliveEnabled == false && paused == false) {
+    ESP_LOGW(TAG, "Keep-alive is disabled in config, ignoring unpause command");
+    return false;
+  }
   if (!_internalSetKeepAliveEnabled(!paused)) {
     return false;
   }

@@ -6,6 +6,7 @@
 
 namespace OpenShock::Config {
   struct BackendConfig : public ConfigBase<Serialization::Configuration::BackendConfig> {
+    std::string domain;
     std::string authToken;
 
     void ToDefault() override;

@@ -20,11 +20,17 @@ static getSizePrefixedRootAsRFConfig(bb:flatbuffers.ByteBuffer, obj?:RFConfig):R
   return (obj || new RFConfig()).__init(bb.readInt32(bb.position()) + bb.position(), bb);
 }
 
+/**
+ * The GPIO pin connected to the RF modulator's data pin for transmitting (TX)
+ */
 txPin():number {
   const offset = this.bb!.__offset(this.bb_pos, 4);
   return offset ? this.bb!.readUint8(this.bb_pos + offset) : 0;
 }
 
+/**
+ * Whether to transmit keepalive messages to keep the devices from entering sleep mode
+ */
 keepaliveEnabled():boolean {
   const offset = this.bb!.__offset(this.bb_pos, 6);
   return offset ? !!this.bb!.readInt8(this.bb_pos + offset) : false;

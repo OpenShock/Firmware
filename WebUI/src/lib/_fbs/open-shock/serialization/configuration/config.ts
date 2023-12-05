@@ -26,21 +26,33 @@ static getSizePrefixedRootAsConfig(bb:flatbuffers.ByteBuffer, obj?:Config):Confi
   return (obj || new Config()).__init(bb.readInt32(bb.position()) + bb.position(), bb);
 }
 
+/**
+ * RF Transmitter configuration
+ */
 rf(obj?:RFConfig):RFConfig|null {
   const offset = this.bb!.__offset(this.bb_pos, 4);
   return offset ? (obj || new RFConfig()).__init(this.bb!.__indirect(this.bb_pos + offset), this.bb!) : null;
 }
 
+/**
+ * WiFi configuration
+ */
 wifi(obj?:WiFiConfig):WiFiConfig|null {
   const offset = this.bb!.__offset(this.bb_pos, 6);
   return offset ? (obj || new WiFiConfig()).__init(this.bb!.__indirect(this.bb_pos + offset), this.bb!) : null;
 }
 
+/**
+ * Captive portal configuration
+ */
 captivePortal(obj?:CaptivePortalConfig):CaptivePortalConfig|null {
   const offset = this.bb!.__offset(this.bb_pos, 8);
   return offset ? (obj || new CaptivePortalConfig()).__init(this.bb!.__indirect(this.bb_pos + offset), this.bb!) : null;
 }
 
+/**
+ * Backend configuration
+ */
 backend(obj?:BackendConfig):BackendConfig|null {
   const offset = this.bb!.__offset(this.bb_pos, 10);
   return offset ? (obj || new BackendConfig()).__init(this.bb!.__indirect(this.bb_pos + offset), this.bb!) : null;

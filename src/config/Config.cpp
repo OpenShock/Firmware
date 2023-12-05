@@ -3,41 +3,27 @@
 #include "config/RootConfig.h"
 #include "Constants.h"
 #include "Logging.h"
-#include "util/HexUtils.h"
 
 #include <LittleFS.h>
 
 #include <cJSON.h>
 
+#include <bitset>
+
 const char* const TAG = "Config";
 
 using namespace OpenShock;
 
-Config::RootConfig _mainConfig;
+static Config::RootConfig _mainConfig;
 
-bool _tryLoadConfig() {
-  File file = LittleFS.open("/config", "rb");
-  if (!file) {
-    ESP_LOGE(TAG, "Failed to open config file for reading");
+bool _tryDeserializeConfig(const std::uint8_t* buffer, std::size_t bufferLen, OpenShock::Config::RootConfig& config) {
+  if (buffer == nullptr || bufferLen == 0) {
+    ESP_LOGE(TAG, "Buffer is null or empty");
     return false;
   }
-
-  // Get file size
-  std::size_t size = file.size();
-
-  // Allocate buffer
-  std::vector<std::uint8_t> buffer(size);
-
-  // Read file
-  if (file.read(buffer.data(), buffer.size()) != buffer.size()) {
-    ESP_LOGE(TAG, "Failed to read config file, size mismatch");
-    return false;
-  }
-
-  file.close();
 
   // Deserialize
-  auto fbsConfig = flatbuffers::GetRoot<Serialization::Configuration::Config>(buffer.data());
+  auto fbsConfig = flatbuffers::GetRoot<Serialization::Configuration::Config>(buffer);
   if (fbsConfig == nullptr) {
     ESP_LOGE(TAG, "Failed to get deserialization root for config file");
     return false;
@@ -47,39 +33,60 @@ bool _tryLoadConfig() {
   flatbuffers::Verifier::Options verifierOptions {
     .max_size = 4096,  // Should be enough
   };
-  flatbuffers::Verifier verifier(buffer.data(), buffer.size(), verifierOptions);
+  flatbuffers::Verifier verifier(buffer, bufferLen, verifierOptions);
   if (!fbsConfig->Verify(verifier)) {
     ESP_LOGE(TAG, "Failed to verify config file integrity");
     return false;
   }
 
   // Read config
-  if (!_mainConfig.FromFlatbuffers(fbsConfig)) {
+  if (!config.FromFlatbuffers(fbsConfig)) {
     ESP_LOGE(TAG, "Failed to read config file");
     return false;
   }
 
   return true;
 }
-bool _trySaveConfig() {
+bool _tryLoadConfig(std::vector<std::uint8_t>& buffer) {
+  File file = LittleFS.open("/config", "rb");
+  if (!file) {
+    ESP_LOGE(TAG, "Failed to open config file for reading");
+    return false;
+  }
+
+  // Get file size
+  std::size_t size = file.size();
+
+  // Resize buffer
+  buffer.resize(size);
+
+  // Read file
+  if (file.read(buffer.data(), buffer.size()) != buffer.size()) {
+    ESP_LOGE(TAG, "Failed to read config file, size mismatch");
+    return false;
+  }
+
+  file.close();
+
+  return true;
+}
+bool _tryLoadConfig() {
+  std::vector<std::uint8_t> buffer;
+  if (!_tryLoadConfig(buffer)) {
+    return false;
+  }
+
+  return _tryDeserializeConfig(buffer.data(), buffer.size(), _mainConfig);
+}
+bool _trySaveConfig(const std::uint8_t* data, std::size_t dataLen) {
   File file = LittleFS.open("/config", "wb");
   if (!file) {
     ESP_LOGE(TAG, "Failed to open config file for writing");
     return false;
   }
 
-  auto& _rf            = _mainConfig.rf;
-  auto& _wifi          = _mainConfig.wifi;
-  auto& _backend       = _mainConfig.backend;
-  auto& _captivePortal = _mainConfig.captivePortal;
-
-  // Serialize
-  flatbuffers::FlatBufferBuilder builder(1024);
-
-  builder.Finish(_mainConfig.ToFlatbuffers(builder));
-
   // Write file
-  if (file.write(builder.GetBufferPointer(), builder.GetSize()) != builder.GetSize()) {
+  if (file.write(data, dataLen) != dataLen) {
     ESP_LOGE(TAG, "Failed to write config file");
     return false;
   }
@@ -87,6 +94,15 @@ bool _trySaveConfig() {
   file.close();
 
   return true;
+}
+bool _trySaveConfig() {
+  flatbuffers::FlatBufferBuilder builder;
+
+  auto fbsConfig = _mainConfig.ToFlatbuffers(builder);
+
+  builder.Finish(fbsConfig);
+
+  return _trySaveConfig(builder.GetBufferPointer(), builder.GetSize());
 }
 
 void Config::Init() {
@@ -135,6 +151,20 @@ bool Config::SaveFromJSON(const std::string& json) {
   return _trySaveConfig();
 }
 
+bool Config::GetRaw(std::vector<std::uint8_t>& buffer) {
+  return _tryLoadConfig(buffer);
+}
+
+bool Config::SetRaw(const std::uint8_t* buffer, std::size_t size) {
+  OpenShock::Config::RootConfig config;
+  if (!_tryDeserializeConfig(buffer, size, config)) {
+    ESP_LOGE(TAG, "Failed to deserialize config");
+    return false;
+  }
+
+  return _trySaveConfig(buffer, size);
+}
+
 void Config::FactoryReset() {
   if (!LittleFS.remove("/config") && LittleFS.exists("/config")) {
     ESP_PANIC(TAG, "Failed to remove existing config file for factory reset. Reccomend formatting microcontroller and re-flashing firmware");
@@ -173,8 +203,8 @@ bool Config::SetWiFiConfig(const Config::WiFiConfig& config) {
 
 bool Config::SetWiFiCredentials(const std::vector<Config::WiFiCredentials>& credentials) {
   for (auto& cred : credentials) {
-    if (cred.id == 0 || cred.id > 32) {
-      ESP_LOGE(TAG, "Cannot set WiFi credentials: credential ID %u is invalid (must be 1-32)", cred.id);
+    if (cred.id == 0) {
+      ESP_LOGE(TAG, "Cannot set WiFi credentials: credential ID cannot be 0");
       return false;
     }
   }
@@ -203,12 +233,13 @@ bool Config::SetRFConfigKeepAliveEnabled(bool enabled) {
   return _trySaveConfig();
 }
 
-std::uint8_t Config::AddWiFiCredentials(const std::string& ssid, const std::uint8_t (&bssid)[6], const std::string& password) {
+std::uint8_t Config::AddWiFiCredentials(const std::string& ssid, const std::string& password) {
   std::uint8_t id = 0;
 
-  // Bitmask representing available credential IDs (0-31)
-  std::uint32_t bits = 0;
-  for (auto& creds : _mainConfig.wifi.credentialsList) {
+  std::bitset<255> bits;
+  for (auto it = _mainConfig.wifi.credentialsList.begin(); it != _mainConfig.wifi.credentialsList.end(); ++it) {
+    auto& creds = *it;
+
     if (creds.ssid == ssid) {
       creds.password = password;
 
@@ -217,26 +248,34 @@ std::uint8_t Config::AddWiFiCredentials(const std::string& ssid, const std::uint
       break;
     }
 
-    // Mark the credential ID as used
-    bits |= 1u << creds.id;
+    if (creds.id == 0) {
+      ESP_LOGW(TAG, "Found WiFi credentials with ID 0, removing");
+      it = _mainConfig.wifi.credentialsList.erase(it);
+      continue;
+    }
+
+    // Mark ID as used
+    bits[creds.id - 1] = true;
+  }
+
+  // Get first available ID
+  for (std::size_t i = 0; i < bits.size(); ++i) {
+    if (!bits[i]) {
+      id = i + 1;
+      break;
+    }
   }
 
   if (id == 0) {
-    id = 1;
-    while (bits & (1u << (id - 1)) && id <= 32) {
-      id++;
-    }
-
-    if (id > 32) {
-      ESP_LOGE(TAG, "Cannot add WiFi credentials: too many credentials");
-      return 0;
-    }
-
-    WiFiCredentials creds(id, ssid, bssid, password);
-
-    _mainConfig.wifi.credentialsList.push_back(creds);
+    ESP_LOGE(TAG, "Failed to add WiFi credentials: no available IDs");
+    return 0;
   }
 
+  _mainConfig.wifi.credentialsList.push_back({
+    .id       = id,
+    .ssid     = ssid,
+    .password = password,
+  });
   _trySaveConfig();
 
   return id;
@@ -264,17 +303,6 @@ bool Config::TryGetWiFiCredentialsBySSID(const char* ssid, Config::WiFiCredentia
   return false;
 }
 
-bool Config::TryGetWiFiCredentialsByBSSID(const std::uint8_t (&bssid)[6], Config::WiFiCredentials& credentials) {
-  for (auto& creds : _mainConfig.wifi.credentialsList) {
-    if (memcmp(creds.bssid, bssid, 6) == 0) {
-      credentials = creds;
-      return true;
-    }
-  }
-
-  return false;
-}
-
 std::uint8_t Config::GetWiFiCredentialsIDbySSID(const char* ssid) {
   for (auto& creds : _mainConfig.wifi.credentialsList) {
     if (creds.ssid == ssid) {
@@ -283,25 +311,6 @@ std::uint8_t Config::GetWiFiCredentialsIDbySSID(const char* ssid) {
   }
 
   return 0;
-}
-
-std::uint8_t Config::GetWiFiCredentialsIDbyBSSID(const std::uint8_t (&bssid)[6]) {
-  for (auto& creds : _mainConfig.wifi.credentialsList) {
-    if (memcmp(creds.bssid, bssid, 6) == 0) {
-      return creds.id;
-    }
-  }
-
-  return 0;
-}
-
-std::uint8_t Config::GetWiFiCredentialsIDbyBSSIDorSSID(const std::uint8_t (&bssid)[6], const char* ssid) {
-  std::uint8_t id = GetWiFiCredentialsIDbyBSSID(bssid);
-  if (id != 0) {
-    return id;
-  }
-
-  return GetWiFiCredentialsIDbySSID(ssid);
 }
 
 bool Config::RemoveWiFiCredentials(std::uint8_t id) {

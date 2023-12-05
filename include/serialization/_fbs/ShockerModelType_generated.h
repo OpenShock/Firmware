@@ -19,15 +19,15 @@ namespace Types {
 
 enum class ShockerModelType : uint8_t {
   CaiXianlin = 0,
-  PetTrainer = 1,
+  Petrainer = 1,
   MIN = CaiXianlin,
-  MAX = PetTrainer
+  MAX = Petrainer
 };
 
 inline const ShockerModelType (&EnumValuesShockerModelType())[2] {
   static const ShockerModelType values[] = {
     ShockerModelType::CaiXianlin,
-    ShockerModelType::PetTrainer
+    ShockerModelType::Petrainer
   };
   return values;
 }
@@ -35,14 +35,14 @@ inline const ShockerModelType (&EnumValuesShockerModelType())[2] {
 inline const char * const *EnumNamesShockerModelType() {
   static const char * const names[3] = {
     "CaiXianlin",
-    "PetTrainer",
+    "Petrainer",
     nullptr
   };
   return names;
 }
 
 inline const char *EnumNameShockerModelType(ShockerModelType e) {
-  if (::flatbuffers::IsOutRange(e, ShockerModelType::CaiXianlin, ShockerModelType::PetTrainer)) return "";
+  if (::flatbuffers::IsOutRange(e, ShockerModelType::CaiXianlin, ShockerModelType::Petrainer)) return "";
   const size_t index = static_cast<size_t>(e);
   return EnumNamesShockerModelType()[index];
 }

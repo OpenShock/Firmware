@@ -13,11 +13,13 @@
 namespace OpenShock::Config {
   void Init();
 
-  /* Get the config file translated to JSON. */
+  /* GetAsJSON and SaveFromJSON are used for Reading/Writing the config file in its human-readable form. */
   std::string GetAsJSON();
-
-  /* Save the config file from JSON. */
   bool SaveFromJSON(const std::string& json);
+
+  /* GetRaw and SetRaw are used for Reading/Writing the config file in its binary form. */
+  bool GetRaw(std::vector<std::uint8_t>& buffer);
+  bool SetRaw(const std::uint8_t* buffer, std::size_t size);
 
   /**
    * @brief Resets the config file to the factory default values.
@@ -41,13 +43,10 @@ namespace OpenShock::Config {
   bool SetRFConfigTxPin(std::uint8_t txPin);
   bool SetRFConfigKeepAliveEnabled(bool enabled);
 
-  std::uint8_t AddWiFiCredentials(const std::string& ssid, const std::uint8_t (&bssid)[6], const std::string& password);
+  std::uint8_t AddWiFiCredentials(const std::string& ssid, const std::string& password);
   bool TryGetWiFiCredentialsByID(std::uint8_t id, WiFiCredentials& out);
   bool TryGetWiFiCredentialsBySSID(const char* ssid, WiFiCredentials& out);
-  bool TryGetWiFiCredentialsByBSSID(const std::uint8_t (&bssid)[6], WiFiCredentials& out);
   std::uint8_t GetWiFiCredentialsIDbySSID(const char* ssid);
-  std::uint8_t GetWiFiCredentialsIDbyBSSID(const std::uint8_t (&bssid)[6]);
-  std::uint8_t GetWiFiCredentialsIDbyBSSIDorSSID(const std::uint8_t (&bssid)[6], const char* ssid);
   bool RemoveWiFiCredentials(std::uint8_t id);
   void ClearWiFiCredentials();
 
