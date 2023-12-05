@@ -22,11 +22,7 @@ bool JsonSerial::ParseShockerCommand(const cJSON* root, JsonSerial::ShockerComma
     return false;
   }
   ShockerModelType modelType;
-  if (strcmp(model->valuestring, "caixianlin") == 0) {
-    modelType = ShockerModelType::CaiXianlin;
-  } else if (strcmp(model->valuestring, "petrainer") == 0) {
-    modelType = ShockerModelType::Petrainer;
-  } else {
+  if (!ShockerModelTypeFromString(model->valuestring, modelType)) {
     ESP_LOGE(TAG, "value at 'model' is not a valid shocker model (caixianlin, petrainer)");
     return false;
   }
