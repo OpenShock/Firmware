@@ -7,7 +7,7 @@
   import { SerializeWifiNetworkForgetCommand } from '$lib/Serializers/WifiNetworkForgetCommand';
   import { WifiAuthMode } from '$lib/_fbs/open-shock/serialization/types/wifi-auth-mode';
 
-  export let bssid: string;
+  export let groupKey: string;
 
   const modalStore = getModalStore();
 
@@ -37,14 +37,11 @@
     }
   }
 
-  $: item = $DeviceStateStore.wifiNetworks.get(bssid);
+  $: item = $DeviceStateStore.wifiNetworkGroups.get(groupKey);
 
   $: rows = item
     ? [
         { key: 'SSID', value: item.ssid },
-        { key: 'BSSID', value: item.bssid },
-        { key: 'Channel', value: item.channel },
-        { key: 'RSSI', value: item.rssi },
         { key: 'Security', value: GetWifiAuthModeString(item.security) },
         { key: 'Saved', value: item.saved },
       ]
@@ -74,13 +71,27 @@
 <div class="card p-4 w-[24rem] flex-col space-y-4">
   {#if item}
     <div class="flex justify-between space-x-2">
-      <h2 class="h2">WiFi Info</h2>
+      <h2 class="h2">Network Info</h2>
       <button class="btn-icon variant-outline" on:click={() => modalStore.close()}><i class="fa fa-xmark"></i></button>
     </div>
     <div>
       {#each rows as row (row.key)}
         <span class="flex justify-between"><span class="font-bold">{row.key}:</span><span class="text-gray-300">{row.value}</span></span>
       {/each}
+    </div>
+    <!-- Per-AP info -->
+    <div>
+      <h3 class="h3">Access Points</h3>
+      <!-- Scrollable list of APs -->
+      <div class="flex flex-col space-y-2 p-2 max-h-64 overflow-y-auto">
+        {#each item.networks as network}
+          <div class="card p-2 flex justify-between items-center">
+            <span class="font-bold">{network.bssid}</span>
+            <span class="text-gray-300">{network.rssi} dBm</span>
+            <span class="text-gray-300">Channel {network.channel}</span>
+          </div>
+        {/each}
+      </div>
     </div>
     <div class="flex justify-end space-x-2">
       <div class="btn-group variant-outline">

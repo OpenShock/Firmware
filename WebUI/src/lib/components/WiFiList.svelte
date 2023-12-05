@@ -1,6 +1,5 @@
 <script lang="ts">
   import { getModalStore } from '@skeletonlabs/skeleton';
-  import type { WiFiNetwork } from '$lib/types/WiFiNetwork';
   import { DeviceStateStore } from '$lib/stores';
   import { WebSocketClient } from '$lib/WebSocketClient';
   import { WifiAuthMode } from '$lib/_fbs/open-shock/serialization/types/wifi-auth-mode';
@@ -10,37 +9,20 @@
   import { SerializeWifiNetworkConnectCommand } from '$lib/Serializers/WifiNetworkConnectCommand';
   import { SerializeWifiNetworkSaveCommand } from '$lib/Serializers/WifiNetworkSaveCommand';
   import WiFiDetails from './modals/WiFiDetails.svelte';
+  import type { WiFiNetworkGroup } from '$lib/types';
 
   const modalStore = getModalStore();
 
   $: scanStatus = $DeviceStateStore.wifiScanStatus;
   $: isScanning = scanStatus === WifiScanStatus.Started || scanStatus === WifiScanStatus.InProgress;
 
-  let filteredNetworks: [string, WiFiNetwork][] = []; // Array of tuples
-  let connectedBSSID: string | null = null;
-
-  $: {
-    // Grouping networks by SSID
-    const groups = new Map<string, WiFiNetwork[]>();
-    $DeviceStateStore.wifiNetworks.forEach((network: WiFiNetwork) => {
-      groups.set(network.ssid, [...(groups.get(network.ssid) || []), network]);
-    });
-
-    // Choosing a representative network for each SSID, preferring the one that we're connected to
-    // And sorting by signal strength (RSSI, higher is stronger)
-    filteredNetworks = Array.from(groups)
-      .map(([ssid, networks]) => {
-        const representativeNetwork = networks.find((n) => n.bssid === connectedBSSID) || networks[0];
-        return [representativeNetwork.bssid, representativeNetwork] as [string, WiFiNetwork];
-      })
-      .sort((a, b) => Math.abs(a[1].rssi) - Math.abs(b[1].rssi));
-  }
+  $: connectedBSSID = $DeviceStateStore.wifiConnectedBSSID;
 
   function wifiScan() {
     const data = SerializeWifiScanCommand(!isScanning);
     WebSocketClient.Instance.Send(data);
   }
-  function wifiAuthenticate(item: WiFiNetwork) {
+  function wifiAuthenticate(item: WiFiNetworkGroup) {
     if (item.security !== WifiAuthMode.Open) {
       modalStore.trigger({
         type: 'prompt',
@@ -58,20 +40,20 @@
       WebSocketClient.Instance.Send(data);
     }
   }
-  function wifiConnect(item: WiFiNetwork) {
+  function wifiConnect(item: WiFiNetworkGroup) {
     const data = SerializeWifiNetworkConnectCommand(item.ssid);
     WebSocketClient.Instance.Send(data);
   }
-  function wifiDisconnect(item: WiFiNetwork) {
+  function wifiDisconnect(item: WiFiNetworkGroup) {
     const data = SerializeWifiNetworkDisconnectCommand();
     WebSocketClient.Instance.Send(data);
   }
-  function wifiSettings(item: WiFiNetwork) {
+  function wifiSettings(groupKey: string) {
     modalStore.trigger({
       type: 'component',
       component: {
         ref: WiFiDetails,
-        props: { bssid: item.bssid },
+        props: { groupKey },
       },
     });
   }
@@ -89,27 +71,27 @@
     </button>
   </div>
   <div class="max-h-64 overflow-auto">
-    {#each filteredNetworks as [key, network] (key)}
+    {#each $DeviceStateStore.wifiNetworkGroups as [netgroupKey, netgroup] (netgroupKey)}
       <div class="card mb-2 p-2 flex justify-between items-center">
         <span>
-          {#if network.bssid === connectedBSSID}
+          {#if netgroup.networks.some((n) => n.bssid === connectedBSSID)}
             <i class="fa fa-wifi text-green-500" />
           {:else}
             <i class="fa fa-wifi" />
           {/if}
-          {#if network.ssid}
-            <span class="ml-2">{network.ssid}</span>
+          {#if netgroup.ssid}
+            <span class="ml-2">{netgroup.ssid}</span>
           {:else}
-            <span class="ml-2">{network.bssid}</span><span class="text-gray-500 ml-1">(Hidden)</span>
+            <span class="ml-2">{netgroup.networks[0].bssid}</span><span class="text-gray-500 ml-1">(Hidden)</span>
           {/if}
         </span>
         <div class="btn-group variant-outline">
-          {#if network.saved}
-            <button on:click={() => wifiConnect(network)}><i class="fa fa-arrow-right text-green-500" /></button>
+          {#if netgroup.saved}
+            <button on:click={() => wifiConnect(netgroup)}><i class="fa fa-arrow-right text-green-500" /></button>
           {:else}
-            <button on:click={() => wifiAuthenticate(network)}><i class="fa fa-link text-green-500" /></button>
+            <button on:click={() => wifiAuthenticate(netgroup)}><i class="fa fa-link text-green-500" /></button>
           {/if}
-          <button on:click={() => wifiSettings(network)}><i class="fa fa-cog" /></button>
+          <button on:click={() => wifiSettings(netgroupKey)}><i class="fa fa-cog" /></button>
         </div>
       </div>
     {/each}
