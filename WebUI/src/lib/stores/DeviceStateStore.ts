@@ -1,31 +1,60 @@
 import type { WifiScanStatus } from '$lib/_fbs/open-shock/serialization/types/wifi-scan-status';
-import type { WiFiNetwork } from '$lib/types/WiFiNetwork';
-import type { DeviceState } from '$lib/types/DeviceState';
+import type { WiFiNetwork, WiFiNetworkGroup, DeviceState } from '$lib/types';
 import { writable } from 'svelte/store';
+import { WifiAuthMode } from '$lib/_fbs/open-shock/serialization/types/wifi-auth-mode';
 
 const { subscribe, update } = writable<DeviceState>({
-  wsConnected: false,
-  deviceIPAddress: null,
-  wifiScanStatus: null,
-  wifiNetworksSaved: [],
-  wifiNetworksPresent: new Map<string, WiFiNetwork>(),
   wifiConnectedBSSID: null,
-  accountLinked: false,
+  wifiScanStatus: null,
+  wifiNetworks: new Map<string, WiFiNetwork>(),
+  wifiNetworkGroups: new Map<string, WiFiNetworkGroup>(),
+  gatewayPaired: false,
   rfTxPin: null,
 });
+
+function insertSorted<T>(array: T[], value: T, compare: (a: T, b: T) => number) {
+  let low = 0,
+    high = array.length;
+  while (low < high) {
+    const mid = (low + high) >>> 1;
+    if (compare(array[mid], value) < 0) {
+      low = mid + 1;
+    } else {
+      high = mid;
+    }
+  }
+  array.splice(low, 0, value);
+}
+
+function SsidMapReducer(groups: Map<string, WiFiNetworkGroup>, [_, value]: [string, WiFiNetwork]): Map<string, WiFiNetworkGroup> {
+  const key = `${value.ssid || value.bssid}_${WifiAuthMode[value.security]}`;
+
+  // Get the group for this SSID, or create a new one
+  const group = groups.get(key) ?? ({ ssid: value.ssid, saved: false, security: value.security, networks: [] } as WiFiNetworkGroup);
+
+  // Update the group's saved status
+  group.saved = group.saved || value.saved;
+
+  // Add the network to the group, sorted by signal strength (RSSI, higher is stronger)
+  insertSorted(group.networks, value, (a, b) => b.rssi - a.rssi);
+
+  // Update the group in the map
+  groups.set(key, group);
+
+  // Return the updated groups object
+  return groups;
+}
+
+function updateWifiNetworkGroups(store: DeviceState) {
+  store.wifiNetworkGroups = Array.from(store.wifiNetworks.entries()).reduce(SsidMapReducer, new Map<string, WiFiNetworkGroup>());
+}
 
 export const DeviceStateStore = {
   subscribe,
   update,
-  setWsConnected(connected: boolean) {
+  setWifiConnectedBSSID(connectedBSSID: string | null) {
     update((store) => {
-      store.wsConnected = connected;
-      return store;
-    });
-  },
-  setDeviceIPAddress(ipAddress: string | null) {
-    update((store) => {
-      store.deviceIPAddress = ipAddress;
+      store.wifiConnectedBSSID = connectedBSSID;
       return store;
     });
   },
@@ -35,69 +64,40 @@ export const DeviceStateStore = {
       return store;
     });
   },
-  setSavedWifiNetworks(networkSSIDs: string[]) {
-    update((store) => {
-      store.wifiNetworksSaved = networkSSIDs;
-      return store;
-    });
-  },
-  addSavedWifiNetwork(networkSSID: string) {
-    update((store) => {
-      store.wifiNetworksSaved.push(networkSSID);
-      return store;
-    });
-  },
-  removeSavedWifiNetwork(networkSSID: string) {
-    update((store) => {
-      const index = store.wifiNetworksSaved.indexOf(networkSSID);
-      if (index !== -1) {
-        store.wifiNetworksSaved.splice(index, 1);
-      }
-      return store;
-    });
-  },
-  clearSavedWifiNetworks() {
-    update((store) => {
-      store.wifiNetworksSaved = [];
-      return store;
-    });
-  },
   setWifiNetwork(network: WiFiNetwork) {
     update((store) => {
-      store.wifiNetworksPresent.set(network.bssid, network);
+      store.wifiNetworks.set(network.bssid, network);
+      updateWifiNetworkGroups(store);
       return store;
     });
   },
   updateWifiNetwork(bssid: string, updater: (network: WiFiNetwork) => WiFiNetwork) {
     update((store) => {
-      const network = store.wifiNetworksPresent.get(bssid);
+      const network = store.wifiNetworks.get(bssid);
       if (network) {
-        store.wifiNetworksPresent.set(bssid, updater(network));
+        store.wifiNetworks.set(bssid, updater(network));
+        updateWifiNetworkGroups(store);
       }
       return store;
     });
   },
   removeWifiNetwork(bssid: string) {
     update((store) => {
-      store.wifiNetworksPresent.delete(bssid);
+      store.wifiNetworks.delete(bssid);
+      updateWifiNetworkGroups(store);
       return store;
     });
   },
   clearWifiNetworks() {
     update((store) => {
-      store.wifiNetworksPresent.clear();
+      store.wifiNetworks.clear();
+      store.wifiNetworkGroups.clear();
       return store;
     });
   },
-  setWifiConnectedBSSID(connectedBSSID: string | null) {
+  setGatewayPaired(paired: boolean) {
     update((store) => {
-      store.wifiConnectedBSSID = connectedBSSID;
-      return store;
-    });
-  },
-  setAccountLinked(linked: boolean) {
-    update((store) => {
-      store.accountLinked = linked;
+      store.gatewayPaired = paired;
       return store;
     });
   },

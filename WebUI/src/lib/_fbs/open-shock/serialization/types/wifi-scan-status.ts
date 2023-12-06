@@ -4,6 +4,7 @@ export enum WifiScanStatus {
   Started = 0,
   InProgress = 1,
   Completed = 2,
-  Aborted = 3,
-  Error = 4
+  TimedOut = 3,
+  Aborted = 4,
+  Error = 5
 }
