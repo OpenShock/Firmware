@@ -133,34 +133,6 @@ bool Local::SerializeWiFiIpAddressChangedEvent(const char* ipAddress, Common::Se
   return callback(span.data(), span.size());
 }
 
-bool Local::SerializeSavedNetworkAddedEvent(const char* ssid, Common::SerializationCallbackFn callback) {
-  flatbuffers::FlatBufferBuilder builder(32);  // TODO: Profile this and adjust the size accordingly
-
-  auto wrapperOffset = Local::CreateSavedNetworkAddedEvent(builder, builder.CreateString(ssid));
-
-  auto msg = Local::CreateDeviceToLocalMessage(builder, Local::DeviceToLocalMessagePayload::SavedNetworkAddedEvent, wrapperOffset.Union());
-
-  builder.Finish(msg);
-
-  auto span = builder.GetBufferSpan();
-
-  return callback(span.data(), span.size());
-}
-
-bool Local::SerializeSavedNetworkRemovedEvent(const char* ssid, Common::SerializationCallbackFn callback) {
-  flatbuffers::FlatBufferBuilder builder(32);  // TODO: Profile this and adjust the size accordingly
-
-  auto wrapperOffset = Local::CreateSavedNetworkRemovedEvent(builder, builder.CreateString(ssid));
-
-  auto msg = Local::CreateDeviceToLocalMessage(builder, Local::DeviceToLocalMessagePayload::SavedNetworkRemovedEvent, wrapperOffset.Union());
-
-  builder.Finish(msg);
-
-  auto span = builder.GetBufferSpan();
-
-  return callback(span.data(), span.size());
-}
-
 bool Local::SerializeAccountLinkCommandResult(AccountLinkResultCode resultCode, Common::SerializationCallbackFn callback) {
   flatbuffers::FlatBufferBuilder builder(32);  // TODO: Profile this and adjust the size accordingly
 

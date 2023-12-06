@@ -8,7 +8,9 @@ const { subscribe, update } = writable<DeviceState>({
   wifiScanStatus: null,
   wifiNetworks: new Map<string, WiFiNetwork>(),
   wifiNetworkGroups: new Map<string, WiFiNetworkGroup>(),
-  gatewayPaired: false,
+  wifiSavedNetworks: [],
+  wifiIpAddress: null,
+  accountLinked: false,
   rfTxPin: null,
 });
 
@@ -26,14 +28,11 @@ function insertSorted<T>(array: T[], value: T, compare: (a: T, b: T) => number) 
   array.splice(low, 0, value);
 }
 
-function SsidMapReducer(groups: Map<string, WiFiNetworkGroup>, [_, value]: [string, WiFiNetwork]): Map<string, WiFiNetworkGroup> {
+function SsidMapReducer(groups: Map<string, WiFiNetworkGroup>, [, value]: [string, WiFiNetwork]): Map<string, WiFiNetworkGroup> {
   const key = `${value.ssid || value.bssid}_${WifiAuthMode[value.security]}`;
 
   // Get the group for this SSID, or create a new one
   const group = groups.get(key) ?? ({ ssid: value.ssid, saved: false, security: value.security, networks: [] } as WiFiNetworkGroup);
-
-  // Update the group's saved status
-  group.saved = group.saved || value.saved;
 
   // Add the network to the group, sorted by signal strength (RSSI, higher is stronger)
   insertSorted(group.networks, value, (a, b) => b.rssi - a.rssi);
@@ -47,6 +46,11 @@ function SsidMapReducer(groups: Map<string, WiFiNetworkGroup>, [_, value]: [stri
 
 function updateWifiNetworkGroups(store: DeviceState) {
   store.wifiNetworkGroups = Array.from(store.wifiNetworks.entries()).reduce(SsidMapReducer, new Map<string, WiFiNetworkGroup>());
+
+  // Update the saved flag for each group
+  store.wifiNetworkGroups.forEach((group) => {
+    group.saved = store.wifiSavedNetworks.includes(group.ssid);
+  });
 }
 
 export const DeviceStateStore = {
@@ -95,9 +99,46 @@ export const DeviceStateStore = {
       return store;
     });
   },
-  setGatewayPaired(paired: boolean) {
+  setWifiSavedNetworks(networks: string[]) {
     update((store) => {
-      store.gatewayPaired = paired;
+      store.wifiSavedNetworks = networks;
+      updateWifiNetworkGroups(store);
+      return store;
+    });
+  },
+  addWifiSavedNetwork(network: string) {
+    update((store) => {
+      store.wifiSavedNetworks.push(network);
+      updateWifiNetworkGroups(store);
+      return store;
+    });
+  },
+  removeWifiSavedNetwork(network: string) {
+    update((store) => {
+      const index = store.wifiSavedNetworks.indexOf(network);
+      if (index >= 0) {
+        store.wifiSavedNetworks.splice(index, 1);
+        updateWifiNetworkGroups(store);
+      }
+      return store;
+    });
+  },
+  clearWifiSavedNetworks() {
+    update((store) => {
+      store.wifiSavedNetworks = [];
+      updateWifiNetworkGroups(store);
+      return store;
+    });
+  },
+  setWifiIpAddress(ipAddress: string | null) {
+    update((store) => {
+      store.wifiIpAddress = ipAddress;
+      return store;
+    });
+  },
+  setAccountLinked(paired: boolean) {
+    update((store) => {
+      store.accountLinked = paired;
       return store;
     });
   },

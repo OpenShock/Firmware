@@ -4,7 +4,7 @@ import { DeviceToLocalMessagePayload } from '$lib/_fbs/open-shock/serialization/
 import { ReadyMessage } from '$lib/_fbs/open-shock/serialization/local/ready-message';
 import { WifiScanStatusMessage } from '$lib/_fbs/open-shock/serialization/local/wifi-scan-status-message';
 import { ByteBuffer } from 'flatbuffers';
-import { DeviceStateStore } from '$lib/stores';
+import { DeviceStateStore, WebsocketStateStore } from '$lib/stores';
 import { SerializeWifiScanCommand } from '$lib/Serializers/WifiScanCommand';
 import { toastDelegator } from '$lib/stores/ToastDelegator';
 import { SetRfTxPinCommandResult } from '$lib/_fbs/open-shock/serialization/local/set-rf-tx-pin-command-result';
@@ -14,8 +14,6 @@ import { AccountLinkResultCode } from '$lib/_fbs/open-shock/serialization/local/
 import { ErrorMessage } from '$lib/_fbs/open-shock/serialization/local/error-message';
 import { WifiNetworkEventHandler } from './WifiNetworkEventHandler';
 import { WifiIpAddressChangedEvent } from '$lib/_fbs/open-shock/serialization/local/wifi-ip-address-changed-event';
-import { SavedNetworkAddedEvent } from '$lib/_fbs/open-shock/serialization/local/saved-network-added-event';
-import { SavedNetworkRemovedEvent } from '$lib/_fbs/open-shock/serialization/local/saved-network-removed-event';
 
 export type MessageHandler = (wsClient: WebSocketClient, message: DeviceToLocalMessage) => void;
 
@@ -30,16 +28,17 @@ PayloadHandlers[DeviceToLocalMessagePayload.ReadyMessage] = (cli, msg) => {
   const payload = new ReadyMessage();
   msg.payload(payload);
 
+  WebsocketStateStore.setConnected(true);
+
   console.log('[WS] Connected to device, poggies: ', payload.poggies());
 
   DeviceStateStore.update((store) => {
-    store.wsConnected = true;
     store.rfTxPin = payload.rftxPin();
     store.accountLinked = payload.accountLinked();
 
-    store.wifiNetworksSaved = new Array<string>(payload.networksSavedLength());
-    for (let i = 0; i < store.wifiNetworksSaved.length; i++) {
-      store.wifiNetworksSaved[i] = payload.networksSaved(i);
+    store.wifiSavedNetworks = new Array<string>(payload.networksSavedLength());
+    for (let i = 0; i < store.wifiSavedNetworks.length; i++) {
+      store.wifiSavedNetworks[i] = payload.networksSaved(i);
     }
 
     store.wifiConnectedBSSID = payload.networkConnected()?.bssid() ?? null;
@@ -95,33 +94,7 @@ PayloadHandlers[DeviceToLocalMessagePayload.WifiIpAddressChangedEvent] = (cli, m
     });
   }
 
-  DeviceStateStore.setDeviceIPAddress(ipAddress);
-};
-
-PayloadHandlers[DeviceToLocalMessagePayload.SavedNetworkAddedEvent] = (cli, msg) => {
-  const payload = new SavedNetworkAddedEvent();
-  msg.payload(payload);
-
-  const ssid = payload.ssid();
-  if (ssid == null) {
-    console.error('[WS] ERROR: Received SavedNetworkAddedEvent with null SSID');
-    return;
-  }
-
-  DeviceStateStore.addSavedWifiNetwork(ssid);
-};
-
-PayloadHandlers[DeviceToLocalMessagePayload.SavedNetworkRemovedEvent] = (cli, msg) => {
-  const payload = new SavedNetworkRemovedEvent();
-  msg.payload(payload);
-
-  const ssid = payload.ssid();
-  if (ssid == null) {
-    console.error('[WS] ERROR: Received SavedNetworkRemovedEvent with null SSID');
-    return;
-  }
-
-  DeviceStateStore.removeSavedWifiNetwork(ssid);
+  DeviceStateStore.setWifiIpAddress(ipAddress);
 };
 
 PayloadHandlers[DeviceToLocalMessagePayload.AccountLinkCommandResult] = (cli, msg) => {

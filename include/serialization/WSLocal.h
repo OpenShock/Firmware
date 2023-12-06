@@ -18,8 +18,6 @@ namespace OpenShock::Serialization::Local {
   bool SerializeWiFiScanStatusChangedEvent(OpenShock::WiFiScanStatus status, Common::SerializationCallbackFn callback);
   bool SerializeWiFiNetworkEvent(Types::WifiNetworkEventType eventType, const WiFiNetwork& network, Common::SerializationCallbackFn callback);
   bool SerializeWiFiIpAddressChangedEvent(const char* ipAddress, Common::SerializationCallbackFn callback);
-  bool SerializeSavedNetworkAddedEvent(const char* ssid, Common::SerializationCallbackFn callback);
-  bool SerializeSavedNetworkRemovedEvent(const char* ssid, Common::SerializationCallbackFn callback);
   bool SerializeAccountLinkCommandResult(AccountLinkResultCode resultCode, Common::SerializationCallbackFn callback);
   bool SerializeSetRfTxPinCommandResult(std::uint8_t pin, SetRfPinResultCode resultCode, Common::SerializationCallbackFn callback);
 }  // namespace OpenShock::Serialization::Local

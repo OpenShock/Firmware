@@ -66,10 +66,7 @@ function handleSavedEvent(fbsNetwork: FbsWifiNetwork) {
     return;
   }
 
-  DeviceStateStore.updateWifiNetwork(bssid, (network) => {
-    network.saved = true;
-    return network;
-  });
+  DeviceStateStore.addWifiSavedNetwork(ssid);
 
   toastDelegator.trigger({
     message: 'WiFi network saved: ' + ssid,
@@ -85,10 +82,7 @@ function handleRemovedEvent(fbsNetwork: FbsWifiNetwork) {
     return;
   }
 
-  DeviceStateStore.updateWifiNetwork(bssid, (network) => {
-    network.saved = false;
-    return network;
-  });
+  DeviceStateStore.removeWifiSavedNetwork(ssid);
 
   toastDelegator.trigger({
     message: 'WiFi network forgotten: ' + ssid,

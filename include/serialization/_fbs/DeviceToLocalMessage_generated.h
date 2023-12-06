@@ -35,12 +35,6 @@ struct WifiNetworkEventBuilder;
 struct WifiIpAddressChangedEvent;
 struct WifiIpAddressChangedEventBuilder;
 
-struct SavedNetworkAddedEvent;
-struct SavedNetworkAddedEventBuilder;
-
-struct SavedNetworkRemovedEvent;
-struct SavedNetworkRemovedEventBuilder;
-
 struct AccountLinkCommandResult;
 
 struct SetRfTxPinCommandResult;
@@ -130,15 +124,13 @@ enum class DeviceToLocalMessagePayload : uint8_t {
   WifiScanStatusMessage = 3,
   WifiNetworkEvent = 4,
   WifiIpAddressChangedEvent = 5,
-  SavedNetworkAddedEvent = 6,
-  SavedNetworkRemovedEvent = 7,
-  AccountLinkCommandResult = 8,
-  SetRfTxPinCommandResult = 9,
+  AccountLinkCommandResult = 6,
+  SetRfTxPinCommandResult = 7,
   MIN = NONE,
   MAX = SetRfTxPinCommandResult
 };
 
-inline const DeviceToLocalMessagePayload (&EnumValuesDeviceToLocalMessagePayload())[10] {
+inline const DeviceToLocalMessagePayload (&EnumValuesDeviceToLocalMessagePayload())[8] {
   static const DeviceToLocalMessagePayload values[] = {
     DeviceToLocalMessagePayload::NONE,
     DeviceToLocalMessagePayload::ReadyMessage,
@@ -146,8 +138,6 @@ inline const DeviceToLocalMessagePayload (&EnumValuesDeviceToLocalMessagePayload
     DeviceToLocalMessagePayload::WifiScanStatusMessage,
     DeviceToLocalMessagePayload::WifiNetworkEvent,
     DeviceToLocalMessagePayload::WifiIpAddressChangedEvent,
-    DeviceToLocalMessagePayload::SavedNetworkAddedEvent,
-    DeviceToLocalMessagePayload::SavedNetworkRemovedEvent,
     DeviceToLocalMessagePayload::AccountLinkCommandResult,
     DeviceToLocalMessagePayload::SetRfTxPinCommandResult
   };
@@ -155,15 +145,13 @@ inline const DeviceToLocalMessagePayload (&EnumValuesDeviceToLocalMessagePayload
 }
 
 inline const char * const *EnumNamesDeviceToLocalMessagePayload() {
-  static const char * const names[11] = {
+  static const char * const names[9] = {
     "NONE",
     "ReadyMessage",
     "ErrorMessage",
     "WifiScanStatusMessage",
     "WifiNetworkEvent",
     "WifiIpAddressChangedEvent",
-    "SavedNetworkAddedEvent",
-    "SavedNetworkRemovedEvent",
     "AccountLinkCommandResult",
     "SetRfTxPinCommandResult",
     nullptr
@@ -199,14 +187,6 @@ template<> struct DeviceToLocalMessagePayloadTraits<OpenShock::Serialization::Lo
 
 template<> struct DeviceToLocalMessagePayloadTraits<OpenShock::Serialization::Local::WifiIpAddressChangedEvent> {
   static const DeviceToLocalMessagePayload enum_value = DeviceToLocalMessagePayload::WifiIpAddressChangedEvent;
-};
-
-template<> struct DeviceToLocalMessagePayloadTraits<OpenShock::Serialization::Local::SavedNetworkAddedEvent> {
-  static const DeviceToLocalMessagePayload enum_value = DeviceToLocalMessagePayload::SavedNetworkAddedEvent;
-};
-
-template<> struct DeviceToLocalMessagePayloadTraits<OpenShock::Serialization::Local::SavedNetworkRemovedEvent> {
-  static const DeviceToLocalMessagePayload enum_value = DeviceToLocalMessagePayload::SavedNetworkRemovedEvent;
 };
 
 template<> struct DeviceToLocalMessagePayloadTraits<OpenShock::Serialization::Local::AccountLinkCommandResult> {
@@ -597,126 +577,6 @@ inline ::flatbuffers::Offset<WifiIpAddressChangedEvent> CreateWifiIpAddressChang
       ip_address__);
 }
 
-struct SavedNetworkAddedEvent FLATBUFFERS_FINAL_CLASS : private ::flatbuffers::Table {
-  typedef SavedNetworkAddedEventBuilder Builder;
-  struct Traits;
-  static FLATBUFFERS_CONSTEXPR_CPP11 const char *GetFullyQualifiedName() {
-    return "OpenShock.Serialization.Local.SavedNetworkAddedEvent";
-  }
-  enum FlatBuffersVTableOffset FLATBUFFERS_VTABLE_UNDERLYING_TYPE {
-    VT_SSID = 4
-  };
-  const ::flatbuffers::String *ssid() const {
-    return GetPointer<const ::flatbuffers::String *>(VT_SSID);
-  }
-  bool Verify(::flatbuffers::Verifier &verifier) const {
-    return VerifyTableStart(verifier) &&
-           VerifyOffset(verifier, VT_SSID) &&
-           verifier.VerifyString(ssid()) &&
-           verifier.EndTable();
-  }
-};
-
-struct SavedNetworkAddedEventBuilder {
-  typedef SavedNetworkAddedEvent Table;
-  ::flatbuffers::FlatBufferBuilder &fbb_;
-  ::flatbuffers::uoffset_t start_;
-  void add_ssid(::flatbuffers::Offset<::flatbuffers::String> ssid) {
-    fbb_.AddOffset(SavedNetworkAddedEvent::VT_SSID, ssid);
-  }
-  explicit SavedNetworkAddedEventBuilder(::flatbuffers::FlatBufferBuilder &_fbb)
-        : fbb_(_fbb) {
-    start_ = fbb_.StartTable();
-  }
-  ::flatbuffers::Offset<SavedNetworkAddedEvent> Finish() {
-    const auto end = fbb_.EndTable(start_);
-    auto o = ::flatbuffers::Offset<SavedNetworkAddedEvent>(end);
-    return o;
-  }
-};
-
-inline ::flatbuffers::Offset<SavedNetworkAddedEvent> CreateSavedNetworkAddedEvent(
-    ::flatbuffers::FlatBufferBuilder &_fbb,
-    ::flatbuffers::Offset<::flatbuffers::String> ssid = 0) {
-  SavedNetworkAddedEventBuilder builder_(_fbb);
-  builder_.add_ssid(ssid);
-  return builder_.Finish();
-}
-
-struct SavedNetworkAddedEvent::Traits {
-  using type = SavedNetworkAddedEvent;
-  static auto constexpr Create = CreateSavedNetworkAddedEvent;
-};
-
-inline ::flatbuffers::Offset<SavedNetworkAddedEvent> CreateSavedNetworkAddedEventDirect(
-    ::flatbuffers::FlatBufferBuilder &_fbb,
-    const char *ssid = nullptr) {
-  auto ssid__ = ssid ? _fbb.CreateString(ssid) : 0;
-  return OpenShock::Serialization::Local::CreateSavedNetworkAddedEvent(
-      _fbb,
-      ssid__);
-}
-
-struct SavedNetworkRemovedEvent FLATBUFFERS_FINAL_CLASS : private ::flatbuffers::Table {
-  typedef SavedNetworkRemovedEventBuilder Builder;
-  struct Traits;
-  static FLATBUFFERS_CONSTEXPR_CPP11 const char *GetFullyQualifiedName() {
-    return "OpenShock.Serialization.Local.SavedNetworkRemovedEvent";
-  }
-  enum FlatBuffersVTableOffset FLATBUFFERS_VTABLE_UNDERLYING_TYPE {
-    VT_SSID = 4
-  };
-  const ::flatbuffers::String *ssid() const {
-    return GetPointer<const ::flatbuffers::String *>(VT_SSID);
-  }
-  bool Verify(::flatbuffers::Verifier &verifier) const {
-    return VerifyTableStart(verifier) &&
-           VerifyOffset(verifier, VT_SSID) &&
-           verifier.VerifyString(ssid()) &&
-           verifier.EndTable();
-  }
-};
-
-struct SavedNetworkRemovedEventBuilder {
-  typedef SavedNetworkRemovedEvent Table;
-  ::flatbuffers::FlatBufferBuilder &fbb_;
-  ::flatbuffers::uoffset_t start_;
-  void add_ssid(::flatbuffers::Offset<::flatbuffers::String> ssid) {
-    fbb_.AddOffset(SavedNetworkRemovedEvent::VT_SSID, ssid);
-  }
-  explicit SavedNetworkRemovedEventBuilder(::flatbuffers::FlatBufferBuilder &_fbb)
-        : fbb_(_fbb) {
-    start_ = fbb_.StartTable();
-  }
-  ::flatbuffers::Offset<SavedNetworkRemovedEvent> Finish() {
-    const auto end = fbb_.EndTable(start_);
-    auto o = ::flatbuffers::Offset<SavedNetworkRemovedEvent>(end);
-    return o;
-  }
-};
-
-inline ::flatbuffers::Offset<SavedNetworkRemovedEvent> CreateSavedNetworkRemovedEvent(
-    ::flatbuffers::FlatBufferBuilder &_fbb,
-    ::flatbuffers::Offset<::flatbuffers::String> ssid = 0) {
-  SavedNetworkRemovedEventBuilder builder_(_fbb);
-  builder_.add_ssid(ssid);
-  return builder_.Finish();
-}
-
-struct SavedNetworkRemovedEvent::Traits {
-  using type = SavedNetworkRemovedEvent;
-  static auto constexpr Create = CreateSavedNetworkRemovedEvent;
-};
-
-inline ::flatbuffers::Offset<SavedNetworkRemovedEvent> CreateSavedNetworkRemovedEventDirect(
-    ::flatbuffers::FlatBufferBuilder &_fbb,
-    const char *ssid = nullptr) {
-  auto ssid__ = ssid ? _fbb.CreateString(ssid) : 0;
-  return OpenShock::Serialization::Local::CreateSavedNetworkRemovedEvent(
-      _fbb,
-      ssid__);
-}
-
 struct DeviceToLocalMessage FLATBUFFERS_FINAL_CLASS : private ::flatbuffers::Table {
   typedef DeviceToLocalMessageBuilder Builder;
   struct Traits;
@@ -748,12 +608,6 @@ struct DeviceToLocalMessage FLATBUFFERS_FINAL_CLASS : private ::flatbuffers::Tab
   }
   const OpenShock::Serialization::Local::WifiIpAddressChangedEvent *payload_as_WifiIpAddressChangedEvent() const {
     return payload_type() == OpenShock::Serialization::Local::DeviceToLocalMessagePayload::WifiIpAddressChangedEvent ? static_cast<const OpenShock::Serialization::Local::WifiIpAddressChangedEvent *>(payload()) : nullptr;
-  }
-  const OpenShock::Serialization::Local::SavedNetworkAddedEvent *payload_as_SavedNetworkAddedEvent() const {
-    return payload_type() == OpenShock::Serialization::Local::DeviceToLocalMessagePayload::SavedNetworkAddedEvent ? static_cast<const OpenShock::Serialization::Local::SavedNetworkAddedEvent *>(payload()) : nullptr;
-  }
-  const OpenShock::Serialization::Local::SavedNetworkRemovedEvent *payload_as_SavedNetworkRemovedEvent() const {
-    return payload_type() == OpenShock::Serialization::Local::DeviceToLocalMessagePayload::SavedNetworkRemovedEvent ? static_cast<const OpenShock::Serialization::Local::SavedNetworkRemovedEvent *>(payload()) : nullptr;
   }
   const OpenShock::Serialization::Local::AccountLinkCommandResult *payload_as_AccountLinkCommandResult() const {
     return payload_type() == OpenShock::Serialization::Local::DeviceToLocalMessagePayload::AccountLinkCommandResult ? static_cast<const OpenShock::Serialization::Local::AccountLinkCommandResult *>(payload()) : nullptr;
@@ -788,14 +642,6 @@ template<> inline const OpenShock::Serialization::Local::WifiNetworkEvent *Devic
 
 template<> inline const OpenShock::Serialization::Local::WifiIpAddressChangedEvent *DeviceToLocalMessage::payload_as<OpenShock::Serialization::Local::WifiIpAddressChangedEvent>() const {
   return payload_as_WifiIpAddressChangedEvent();
-}
-
-template<> inline const OpenShock::Serialization::Local::SavedNetworkAddedEvent *DeviceToLocalMessage::payload_as<OpenShock::Serialization::Local::SavedNetworkAddedEvent>() const {
-  return payload_as_SavedNetworkAddedEvent();
-}
-
-template<> inline const OpenShock::Serialization::Local::SavedNetworkRemovedEvent *DeviceToLocalMessage::payload_as<OpenShock::Serialization::Local::SavedNetworkRemovedEvent>() const {
-  return payload_as_SavedNetworkRemovedEvent();
 }
 
 template<> inline const OpenShock::Serialization::Local::AccountLinkCommandResult *DeviceToLocalMessage::payload_as<OpenShock::Serialization::Local::AccountLinkCommandResult>() const {
@@ -864,14 +710,6 @@ inline bool VerifyDeviceToLocalMessagePayload(::flatbuffers::Verifier &verifier,
     }
     case DeviceToLocalMessagePayload::WifiIpAddressChangedEvent: {
       auto ptr = reinterpret_cast<const OpenShock::Serialization::Local::WifiIpAddressChangedEvent *>(obj);
-      return verifier.VerifyTable(ptr);
-    }
-    case DeviceToLocalMessagePayload::SavedNetworkAddedEvent: {
-      auto ptr = reinterpret_cast<const OpenShock::Serialization::Local::SavedNetworkAddedEvent *>(obj);
-      return verifier.VerifyTable(ptr);
-    }
-    case DeviceToLocalMessagePayload::SavedNetworkRemovedEvent: {
-      auto ptr = reinterpret_cast<const OpenShock::Serialization::Local::SavedNetworkRemovedEvent *>(obj);
       return verifier.VerifyTable(ptr);
     }
     case DeviceToLocalMessagePayload::AccountLinkCommandResult: {

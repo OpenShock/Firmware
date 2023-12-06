@@ -4,7 +4,7 @@ import { WebSocketMessageBinaryHandler } from './MessageHandlers';
 import { page } from '$app/stores';
 import { get } from 'svelte/store';
 import { toastDelegator } from './stores/ToastDelegator';
-import { DeviceStateStore } from './stores';
+import { WebsocketStateStore } from './stores';
 
 function getWebSocketHostname() {
   if (!browser) {
@@ -125,7 +125,7 @@ export class WebSocketClient {
     }
   }
   private handleClose(ev: CloseEvent) {
-    DeviceStateStore.setWsConnected(false);
+    WebsocketStateStore.setConnected(false);
     if (!ev.wasClean) {
       console.error('[WS] ERROR: Connection closed unexpectedly');
       toastDelegator.trigger({

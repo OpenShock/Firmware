@@ -3,8 +3,6 @@
 import { AccountLinkCommandResult } from '../../../open-shock/serialization/local/account-link-command-result.js';
 import { ErrorMessage } from '../../../open-shock/serialization/local/error-message.js';
 import { ReadyMessage } from '../../../open-shock/serialization/local/ready-message.js';
-import { SavedNetworkAddedEvent } from '../../../open-shock/serialization/local/saved-network-added-event.js';
-import { SavedNetworkRemovedEvent } from '../../../open-shock/serialization/local/saved-network-removed-event.js';
 import { SetRfTxPinCommandResult } from '../../../open-shock/serialization/local/set-rf-tx-pin-command-result.js';
 import { WifiIpAddressChangedEvent } from '../../../open-shock/serialization/local/wifi-ip-address-changed-event.js';
 import { WifiNetworkEvent } from '../../../open-shock/serialization/local/wifi-network-event.js';
@@ -18,16 +16,14 @@ export enum DeviceToLocalMessagePayload {
   WifiScanStatusMessage = 3,
   WifiNetworkEvent = 4,
   WifiIpAddressChangedEvent = 5,
-  SavedNetworkAddedEvent = 6,
-  SavedNetworkRemovedEvent = 7,
-  AccountLinkCommandResult = 8,
-  SetRfTxPinCommandResult = 9
+  AccountLinkCommandResult = 6,
+  SetRfTxPinCommandResult = 7
 }
 
 export function unionToDeviceToLocalMessagePayload(
   type: DeviceToLocalMessagePayload,
-  accessor: (obj:AccountLinkCommandResult|ErrorMessage|ReadyMessage|SavedNetworkAddedEvent|SavedNetworkRemovedEvent|SetRfTxPinCommandResult|WifiIpAddressChangedEvent|WifiNetworkEvent|WifiScanStatusMessage) => AccountLinkCommandResult|ErrorMessage|ReadyMessage|SavedNetworkAddedEvent|SavedNetworkRemovedEvent|SetRfTxPinCommandResult|WifiIpAddressChangedEvent|WifiNetworkEvent|WifiScanStatusMessage|null
-): AccountLinkCommandResult|ErrorMessage|ReadyMessage|SavedNetworkAddedEvent|SavedNetworkRemovedEvent|SetRfTxPinCommandResult|WifiIpAddressChangedEvent|WifiNetworkEvent|WifiScanStatusMessage|null {
+  accessor: (obj:AccountLinkCommandResult|ErrorMessage|ReadyMessage|SetRfTxPinCommandResult|WifiIpAddressChangedEvent|WifiNetworkEvent|WifiScanStatusMessage) => AccountLinkCommandResult|ErrorMessage|ReadyMessage|SetRfTxPinCommandResult|WifiIpAddressChangedEvent|WifiNetworkEvent|WifiScanStatusMessage|null
+): AccountLinkCommandResult|ErrorMessage|ReadyMessage|SetRfTxPinCommandResult|WifiIpAddressChangedEvent|WifiNetworkEvent|WifiScanStatusMessage|null {
   switch(DeviceToLocalMessagePayload[type]) {
     case 'NONE': return null; 
     case 'ReadyMessage': return accessor(new ReadyMessage())! as ReadyMessage;
@@ -35,8 +31,6 @@ export function unionToDeviceToLocalMessagePayload(
     case 'WifiScanStatusMessage': return accessor(new WifiScanStatusMessage())! as WifiScanStatusMessage;
     case 'WifiNetworkEvent': return accessor(new WifiNetworkEvent())! as WifiNetworkEvent;
     case 'WifiIpAddressChangedEvent': return accessor(new WifiIpAddressChangedEvent())! as WifiIpAddressChangedEvent;
-    case 'SavedNetworkAddedEvent': return accessor(new SavedNetworkAddedEvent())! as SavedNetworkAddedEvent;
-    case 'SavedNetworkRemovedEvent': return accessor(new SavedNetworkRemovedEvent())! as SavedNetworkRemovedEvent;
     case 'AccountLinkCommandResult': return accessor(new AccountLinkCommandResult())! as AccountLinkCommandResult;
     case 'SetRfTxPinCommandResult': return accessor(new SetRfTxPinCommandResult())! as SetRfTxPinCommandResult;
     default: return null;
@@ -45,9 +39,9 @@ export function unionToDeviceToLocalMessagePayload(
 
 export function unionListToDeviceToLocalMessagePayload(
   type: DeviceToLocalMessagePayload, 
-  accessor: (index: number, obj:AccountLinkCommandResult|ErrorMessage|ReadyMessage|SavedNetworkAddedEvent|SavedNetworkRemovedEvent|SetRfTxPinCommandResult|WifiIpAddressChangedEvent|WifiNetworkEvent|WifiScanStatusMessage) => AccountLinkCommandResult|ErrorMessage|ReadyMessage|SavedNetworkAddedEvent|SavedNetworkRemovedEvent|SetRfTxPinCommandResult|WifiIpAddressChangedEvent|WifiNetworkEvent|WifiScanStatusMessage|null, 
+  accessor: (index: number, obj:AccountLinkCommandResult|ErrorMessage|ReadyMessage|SetRfTxPinCommandResult|WifiIpAddressChangedEvent|WifiNetworkEvent|WifiScanStatusMessage) => AccountLinkCommandResult|ErrorMessage|ReadyMessage|SetRfTxPinCommandResult|WifiIpAddressChangedEvent|WifiNetworkEvent|WifiScanStatusMessage|null, 
   index: number
-): AccountLinkCommandResult|ErrorMessage|ReadyMessage|SavedNetworkAddedEvent|SavedNetworkRemovedEvent|SetRfTxPinCommandResult|WifiIpAddressChangedEvent|WifiNetworkEvent|WifiScanStatusMessage|null {
+): AccountLinkCommandResult|ErrorMessage|ReadyMessage|SetRfTxPinCommandResult|WifiIpAddressChangedEvent|WifiNetworkEvent|WifiScanStatusMessage|null {
   switch(DeviceToLocalMessagePayload[type]) {
     case 'NONE': return null; 
     case 'ReadyMessage': return accessor(index, new ReadyMessage())! as ReadyMessage;
@@ -55,8 +49,6 @@ export function unionListToDeviceToLocalMessagePayload(
     case 'WifiScanStatusMessage': return accessor(index, new WifiScanStatusMessage())! as WifiScanStatusMessage;
     case 'WifiNetworkEvent': return accessor(index, new WifiNetworkEvent())! as WifiNetworkEvent;
     case 'WifiIpAddressChangedEvent': return accessor(index, new WifiIpAddressChangedEvent())! as WifiIpAddressChangedEvent;
-    case 'SavedNetworkAddedEvent': return accessor(index, new SavedNetworkAddedEvent())! as SavedNetworkAddedEvent;
-    case 'SavedNetworkRemovedEvent': return accessor(index, new SavedNetworkRemovedEvent())! as SavedNetworkRemovedEvent;
     case 'AccountLinkCommandResult': return accessor(index, new AccountLinkCommandResult())! as AccountLinkCommandResult;
     case 'SetRfTxPinCommandResult': return accessor(index, new SetRfTxPinCommandResult())! as SetRfTxPinCommandResult;
     default: return null;
