@@ -18,6 +18,10 @@
 
   $: connectedBSSID = $DeviceStateStore.wifiConnectedBSSID;
 
+  // Sorting the groups themselves by each one's strongest network (by RSSI, higher is stronger)
+  // Only need to check the first network in each group, since they're already sorted by signal strength
+  $: strengthSortedGroups = Array.from($DeviceStateStore.wifiNetworkGroups.entries()).sort((a, b) => b[1].networks[0].rssi - a[1].networks[0].rssi);
+
   function wifiScan() {
     const data = SerializeWifiScanCommand(!isScanning);
     WebSocketClient.Instance.Send(data);
@@ -71,7 +75,7 @@
     </button>
   </div>
   <div class="max-h-64 overflow-auto">
-    {#each $DeviceStateStore.wifiNetworkGroups as [netgroupKey, netgroup] (netgroupKey)}
+    {#each strengthSortedGroups as [netgroupKey, netgroup] (netgroupKey)}
       <div class="card mb-2 p-2 flex justify-between items-center">
         <span>
           {#if netgroup.networks.some((n) => n.bssid === connectedBSSID)}
