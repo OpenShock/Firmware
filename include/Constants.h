@@ -16,12 +16,12 @@
 #error "OPENSHOCK_FW_VERSION must be defined"
 #endif
 
-#ifndef OPENSHOCK_RADIO_TX_GPIO
-#warning "OPENSHOCK_RADIO_TX_GPIO is not defined, using default value of UINT8_MAX"
-#define OPENSHOCK_RADIO_TX_GPIO UINT8_MAX
+#ifndef OPENSHOCK_RF_TX_GPIO
+#warning "OPENSHOCK_RF_TX_GPIO is not defined, using default value of UINT8_MAX"
+#define OPENSHOCK_RF_TX_GPIO UINT8_MAX
 #endif
 
 namespace OpenShock::Constants {
   constexpr std::uint8_t GPIO_INVALID  = UINT8_MAX;
-  constexpr std::uint8_t GPIO_RADIO_TX = OPENSHOCK_RADIO_TX_GPIO;
+  constexpr std::uint8_t GPIO_RF_TX = OPENSHOCK_RF_TX_GPIO;
 }  // namespace OpenShock::Constants

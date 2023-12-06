@@ -167,14 +167,14 @@ bool CommandHandler::Init() {
 
   std::uint8_t txPin = rfConfig.txPin;
   if (!OpenShock::IsValidOutputPin(txPin)) {
-    if (!OpenShock::IsValidOutputPin(Constants::GPIO_RADIO_TX)) {
+    if (!OpenShock::IsValidOutputPin(Constants::GPIO_RF_TX)) {
       ESP_LOGE(TAG, "Configured RF TX pin is invalid, default pin is also invalid. Pausing RF transmitter");
       Config::SetRFConfigTxPin(Constants::GPIO_INVALID);
       return false;
     }
 
-    ESP_LOGW(TAG, "Configured RF TX pin is invalid, using default pin (%u)", Constants::GPIO_RADIO_TX);
-    txPin = Constants::GPIO_RADIO_TX;
+    ESP_LOGW(TAG, "Configured RF TX pin is invalid, using default pin (%u)", Constants::GPIO_RF_TX);
+    txPin = Constants::GPIO_RF_TX;
     Config::SetRFConfigTxPin(txPin);
   }
 

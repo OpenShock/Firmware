@@ -8,7 +8,7 @@ const char* const TAG = "Config::RFConfig";
 using namespace OpenShock::Config;
 
 void RFConfig::ToDefault() {
-  txPin            = OpenShock::Constants::GPIO_RADIO_TX;
+  txPin            = OpenShock::Constants::GPIO_RF_TX;
   keepAliveEnabled = true;
 }
 
