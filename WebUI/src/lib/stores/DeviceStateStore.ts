@@ -50,7 +50,7 @@ function updateWifiNetworkGroups(store: DeviceState) {
   // Sort the groups themselves by each one's strongest network (by RSSI, higher is stronger)
   // Only need to check the first network in each group, since they're already sorted by signal strength
   store.wifiNetworkGroups = new Map(
-    Array.from(store.wifiNetworkGroups.entries()).sort(([_, a], [__, b]) => b.networks[0].rssi - a.networks[0].rssi)
+    Array.from(store.wifiNetworkGroups.entries()).sort((a, b) => b[1].networks[0].rssi - a[1].networks[0].rssi)
   );
 }
 
