@@ -1,5 +1,6 @@
 #include "config/RFConfig.h"
 
+#include "Constants.h"
 #include "Logging.h"
 
 const char* const TAG = "Config::RFConfig";
@@ -7,7 +8,7 @@ const char* const TAG = "Config::RFConfig";
 using namespace OpenShock::Config;
 
 void RFConfig::ToDefault() {
-  txPin            = 0U;
+  txPin            = OpenShock::Constants::GPIO_RF_TX;
   keepAliveEnabled = true;
 }
 
