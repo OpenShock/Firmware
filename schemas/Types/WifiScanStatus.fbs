@@ -4,6 +4,7 @@ enum WifiScanStatus : uint8 {
   Started,
   InProgress,
   Completed,
+  TimedOut,
   Aborted,
   Error
 }
