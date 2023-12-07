@@ -2,6 +2,7 @@
 
 #include "CommandHandler.h"
 #include "config/Config.h"
+#include "config/SerialInputConfig.h"
 #include "Logging.h"
 #include "serialization/JsonSerial.h"
 #include "util/Base64Utils.h"
@@ -23,6 +24,8 @@ using namespace OpenShock;
 
 constexpr std::int64_t PASTE_INTERVAL_THRESHOLD_MS  = 20;
 constexpr std::size_t SERIAL_BUFFER_CLEAR_THRESHOLD = 512;
+
+static bool s_echoEnabled = true;
 
 #define kCommandHelp         "help"
 #define kCommandVersion      "version"
@@ -303,9 +306,13 @@ void _handleAuthtokenCommand(char* arg, std::size_t argLength) {
     return;
   }
 
-  OpenShock::Config::SetBackendAuthToken(std::string(arg, argLength));
+  bool result = OpenShock::Config::SetBackendAuthToken(std::string(arg, argLength));
 
-  SERPR_SUCCESS("Saved config");
+  if (result) {
+    SERPR_SUCCESS("Saved config");
+  } else {
+    SERPR_ERROR("Failed to save config");
+  }
 }
 
 void _handleNetworksCommand(char* arg, std::size_t argLength) {
@@ -379,7 +386,7 @@ void _handleNetworksCommand(char* arg, std::size_t argLength) {
 
 void _handleKeepAliveCommand(char* arg, std::size_t argLength) {
   if (arg == nullptr || argLength <= 0) {
-    // Get keep alive status
+    // Get current keep-alive status
     SERPR_RESPONSE("KeepAlive|%s", Config::GetRFConfig().keepAliveEnabled ? "true" : "false");
     return;
   }
@@ -390,10 +397,38 @@ void _handleKeepAliveCommand(char* arg, std::size_t argLength) {
     SERPR_ERROR("Invalid argument (not a boolean)");
     return;
   } else {
-    OpenShock::CommandHandler::SetKeepAliveEnabled(enabled);
+    bool result = OpenShock::CommandHandler::SetKeepAliveEnabled(enabled);
+
+    if (result) {
+      SERPR_SUCCESS("Saved config");
+    } else {
+      SERPR_ERROR("Failed to save config");
+    }
+  }
+}
+
+void _handleSerialEchoCommand(char* arg, std::size_t argLength) {
+  if (arg == nullptr || argLength <= 0) {
+    // Get current serial echo status
+    SERPR_RESPONSE("SerialEcho|%s", s_echoEnabled ? "true" : "false");
+    return;
   }
 
-  SERPR_SUCCESS("Saved config");
+  std::uint8_t enabled = _argToBool(arg, argLength);
+
+  if (enabled == 255) {
+    SERPR_ERROR("Invalid argument (not a boolean)");
+    return;
+  } else {
+    bool result   = Config::SetSerialInputConfigEchoEnabled(enabled);
+    s_echoEnabled = enabled;
+
+    if (result) {
+      SERPR_SUCCESS("Saved config");
+    } else {
+      SERPR_ERROR("Failed to save config");
+    }
+  }
 }
 
 void _handleRawConfigCommand(char* arg, std::size_t argLength) {
@@ -427,7 +462,7 @@ void _handleRawConfigCommand(char* arg, std::size_t argLength) {
     return;
   }
 
-  SERPR_SUCCESS("Saved config");
+  SERPR_SUCCESS("Saved config, rebooting...");
 
   ESP.restart();
 }
@@ -475,7 +510,7 @@ static std::unordered_map<std::string, void (*)(char*, std::size_t)> s_commandHa
   {kCommandRestartAlias,      _handleRestartCommand},
   {    kCommandRTOSInfo,     _handleRTOSInfoCommand},
   {   kCommandRTOSAlias,     _handleRTOSInfoCommand},
- //{  kCommandSerialEcho,    _handleSerialEchoCommand},
+  {  kCommandSerialEcho,   _handleSerialEchoCommand},
   {     kCommandRfTxPin,      _handleRfTxPinCommand},
   {   kCommandAuthToken,    _handleAuthtokenCommand},
   {    kCommandNetworks,     _handleNetworksCommand},
@@ -557,18 +592,27 @@ void processSerialLine(char* data, std::size_t length) {
   }
 }
 
+bool SerialInputHandler::Init() {
+  SerialInputHandler::PrintWelcomeHeader();
+  SerialInputHandler::PrintVersionInfo();
+  Serial.println();
+
+  s_echoEnabled = Config::GetSerialInputConfig().echoEnabled;
+
+  return true;
+}
+
 void SerialInputHandler::Update() {
   static char* buffer            = nullptr;  // TODO: Clean up this buffer every once in a while
   static std::size_t bufferSize  = 0;
   static std::size_t bufferIndex = 0;
   static std::int64_t lastEcho   = 0;
-  static bool echoEnabled        = true;
   static bool suppressingPaste   = false;
 
   while (true) {
     int available = Serial.available();
     if (available <= 0 && findLineEnd(buffer, bufferIndex) == -1) {
-      if (echoEnabled && suppressingPaste && OpenShock::millis() - lastEcho > PASTE_INTERVAL_THRESHOLD_MS) {
+      if (s_echoEnabled && suppressingPaste && OpenShock::millis() - lastEcho > PASTE_INTERVAL_THRESHOLD_MS) {
         // \r - carriage return, moves to start of line
         // \x1B[K - clears rest of line
         Serial.printf("\r\x1B[K> %.*s", bufferIndex, buffer);
@@ -599,7 +643,7 @@ void SerialInputHandler::Update() {
 
     int lineEnd = findLineEnd(buffer, bufferIndex);
     if (lineEnd == -1) {
-      if (echoEnabled) {
+      if (s_echoEnabled) {
         if (OpenShock::millis() - lastEcho > PASTE_INTERVAL_THRESHOLD_MS) {
           // \r - carriage return, moves to start of line
           // \x1B[K - clears rest of line
@@ -616,7 +660,7 @@ void SerialInputHandler::Update() {
 
     buffer[lineEnd] = '\0';
     // Don't print finished command unless we were pasting or echo was off
-    if (echoEnabled && !suppressingPaste) {
+    if (s_echoEnabled && !suppressingPaste) {
       Serial.println();
     } else {
       Serial.printf("> %s\n", buffer);

@@ -3,6 +3,7 @@
 #include "config/BackendConfig.h"
 #include "config/CaptivePortalConfig.h"
 #include "config/RFConfig.h"
+#include "config/SerialInputConfig.h"
 #include "config/WiFiConfig.h"
 #include "config/WiFiCredentials.h"
 
@@ -32,16 +33,20 @@ namespace OpenShock::Config {
   const WiFiConfig& GetWiFiConfig();
   const std::vector<WiFiCredentials>& GetWiFiCredentials();
   const CaptivePortalConfig& GetCaptivePortalConfig();
+  const SerialInputConfig& GetSerialInputConfig();
   const BackendConfig& GetBackendConfig();
 
   bool SetRFConfig(const RFConfig& config);
   bool SetWiFiConfig(const WiFiConfig& config);
   bool SetWiFiCredentials(const std::vector<WiFiCredentials>& credentials);
   bool SetCaptivePortalConfig(const CaptivePortalConfig& config);
+  bool SetSerialInputConfig(const SerialInputConfig& config);
   bool SetBackendConfig(const BackendConfig& config);
 
   bool SetRFConfigTxPin(std::uint8_t txPin);
   bool SetRFConfigKeepAliveEnabled(bool enabled);
+
+  bool SetSerialInputConfigEchoEnabled(bool enabled);
 
   std::uint8_t AddWiFiCredentials(const std::string& ssid, const std::string& password);
   bool TryGetWiFiCredentialsByID(std::uint8_t id, WiFiCredentials& out);

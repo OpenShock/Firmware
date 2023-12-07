@@ -187,6 +187,10 @@ const Config::CaptivePortalConfig& Config::GetCaptivePortalConfig() {
   return _mainConfig.captivePortal;
 }
 
+const Config::SerialInputConfig& Config::GetSerialInputConfig() {
+  return _mainConfig.serialInput;
+}
+
 const Config::BackendConfig& Config::GetBackendConfig() {
   return _mainConfig.backend;
 }
@@ -215,6 +219,16 @@ bool Config::SetWiFiCredentials(const std::vector<Config::WiFiCredentials>& cred
 
 bool Config::SetCaptivePortalConfig(const Config::CaptivePortalConfig& config) {
   _mainConfig.captivePortal = config;
+  return _trySaveConfig();
+}
+
+bool Config::SetSerialInputConfig(const Config::SerialInputConfig& config) {
+  _mainConfig.serialInput = config;
+  return _trySaveConfig();
+}
+
+bool Config::SetSerialInputConfigEchoEnabled(bool enabled) {
+  _mainConfig.serialInput.echoEnabled = enabled;
   return _trySaveConfig();
 }
 

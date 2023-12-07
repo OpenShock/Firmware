@@ -28,12 +28,13 @@ void setup() {
 
   OpenShock::VisualStateManager::Init();
 
-  OpenShock::SerialInputHandler::PrintWelcomeHeader();
-  OpenShock::SerialInputHandler::PrintVersionInfo();
-
   OpenShock::EStopManager::Init(100);  // 100ms update interval
 
   OpenShock::Config::Init();
+
+  if (!OpenShock::SerialInputHandler::Init()) {
+    ESP_PANIC(TAG, "Unable to initialize SerialInputHandler");
+  }
 
   if (!OpenShock::CommandHandler::Init()) {
     ESP_LOGW(TAG, "Unable to initialize CommandHandler");
