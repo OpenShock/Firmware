@@ -19,8 +19,8 @@ WiFiCredentials::WiFiCredentials(std::uint8_t id, const std::string& ssid, const
 }
 
 void WiFiCredentials::ToDefault() {
-  id   = 0;
-  ssid = "";
+  id       = 0;
+  ssid     = "";
   password = "";
 }
 
@@ -54,21 +54,21 @@ bool WiFiCredentials::FromJSON(const cJSON* json) {
 
   const cJSON* idJson = cJSON_GetObjectItemCaseSensitive(json, "id");
   if (idJson == nullptr) {
-    ESP_LOGE(TAG, "id is null");
-    return false;
-  }
+    ESP_LOGV(TAG, "id was null");
+    id = 0;
+  } else {
+    if (!cJSON_IsNumber(idJson)) {
+      ESP_LOGE(TAG, "id is not a number");
+      return false;
+    }
 
-  if (!cJSON_IsNumber(idJson)) {
-    ESP_LOGE(TAG, "id is not a number");
-    return false;
-  }
+    if (idJson->valueint < 0 || idJson->valueint > UINT8_MAX) {
+      ESP_LOGE(TAG, "id is out of range");
+      return false;
+    }
 
-  if (idJson->valueint < 0 || idJson->valueint > UINT8_MAX) {
-    ESP_LOGE(TAG, "id is out of range");
-    return false;
+    id = idJson->valueint;
   }
-
-  id = idJson->valueint;
 
   const cJSON* ssidJson = cJSON_GetObjectItemCaseSensitive(json, "ssid");
   if (ssidJson == nullptr) {

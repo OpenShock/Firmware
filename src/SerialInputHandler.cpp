@@ -21,10 +21,17 @@ const char* const TAG = "SerialInputHandler";
 
 using namespace OpenShock;
 
+constexpr std::int64_t PASTE_INTERVAL_THRESHOLD_MS  = 20;
+constexpr std::size_t SERIAL_BUFFER_CLEAR_THRESHOLD = 512;
+
 #define kCommandHelp         "help"
 #define kCommandVersion      "version"
 #define kCommandRestart      "restart"
-#define kCommandRmtpin       "rmtpin"
+#define kCommandRestartAlias "reboot"
+#define kCommandRTOSInfo     "rtosinfo"
+#define kCommandRTOSAlias    "rtos"
+#define kCommandSerialEcho   "echo"
+#define kCommandRfTxPin      "txpin"
 #define kCommandAuthToken    "authtoken"
 #define kCommandNetworks     "networks"
 #define kCommandKeepAlive    "keepalive"
@@ -33,21 +40,25 @@ using namespace OpenShock;
 #define kCommandFactoryReset "factoryreset"
 
 void _handleHelpCommand(char* arg, std::size_t argLength) {
-  SerialInputHandler::PrintWelcomeHeader();
   if (arg == nullptr || argLength <= 0) {
+    SerialInputHandler::PrintWelcomeHeader();
     // Raw string literal (1+ to remove the first newline)
     Serial.print(1 + R"(
 help                   print this menu
 help         <command> print help for a command
 version                print version information
-restart                restart the board
-rmtpin                 get radio pin
-rmtpin       <pin>     set radio pin
+restart | reboot       restart the board
+rtosinfo | rtos        print FreeRTOS debug information
+echo                   get serial echo enabled
+echo         <bool>    set serial echo enabled
+txpin                  get radio transmit pin
+txpin        <pin>     set radio transmit pin
+authtoken              get auth token
 authtoken    <token>   set auth token
 networks               get all saved networks
 networks     <json>    set all saved networks
-keepalive              get shocker keep-alive status
-keepalive    <bool>    enable/disable shocker keep-alive
+keepalive              get shocker keep-alive enabled
+keepalive    <bool>    set shocker keep-alive enabled
 rawconfig              get raw binary config
 rawconfig    <base64>  set raw binary config
 rftransmit   <json>    transmit a RF command
@@ -56,8 +67,8 @@ factoryreset           reset device to factory defaults and reboot
     return;
   }
 
-  if (strcmp(arg, kCommandRmtpin) == 0) {
-    Serial.print(kCommandRmtpin R"(
+  if (strcasecmp(arg, kCommandRfTxPin) == 0) {
+    Serial.print(kCommandRfTxPin R"(
   Get the GPIO pin used for the radio transmitter.
 
 rmtpin [<pin>]
@@ -70,8 +81,11 @@ rmtpin [<pin>]
     return;
   }
 
-  if (strcmp(arg, kCommandAuthToken) == 0) {
-    Serial.print(kCommandAuthToken R"( <token>
+  if (strcasecmp(arg, kCommandAuthToken) == 0) {
+    Serial.print(kCommandAuthToken R"( 
+  Get the backend auth token.
+
+authtoken [<token>]
   Set the auth token.
   Arguments:
     <token> must be a string.
@@ -81,7 +95,30 @@ rmtpin [<pin>]
     return;
   }
 
-  if (strcmp(arg, kCommandNetworks) == 0) {
+  if (strcasecmp(arg, kCommandRTOSInfo) == 0 || strcasecmp(arg, kCommandRTOSAlias) == 0) {
+    Serial.print(kCommandRTOSInfo R"(
+  Get FreeRTOS debug information.
+  Example:
+    rtosinfo
+)");
+    return;
+  }
+
+  if (strcasecmp(arg, kCommandSerialEcho) == 0) {
+    Serial.print(kCommandSerialEcho R"(
+  Get the serial echo status.
+
+echo [<bool>]
+  Enable/disable serial echo.
+  Arguments:
+    <bool> must be a boolean.
+  Example:
+    echo true
+)");
+    return;
+  }
+
+  if (strcasecmp(arg, kCommandNetworks) == 0) {
     Serial.print(kCommandNetworks R"(
   Get all saved networks.
 
@@ -91,13 +128,14 @@ networks [<json>]
     <json> must be a array of objects with the following fields:
       ssid     (string)  SSID of the network
       password (string)  Password of the network
+      id       (number)  ID of the network (optional)
   Example:
     networks [{\"ssid\":\"myssid\",\"password\":\"mypassword\"}]
 )");
     return;
   }
 
-  if (strcmp(arg, kCommandKeepAlive) == 0) {
+  if (strcasecmp(arg, kCommandKeepAlive) == 0) {
     Serial.print(kCommandKeepAlive R"(
   Get the shocker keep-alive status.
 
@@ -111,7 +149,7 @@ keepalive [<bool>]
     return;
   }
 
-  if (strcmp(arg, kCommandRestart) == 0) {
+  if (strcasecmp(arg, kCommandRestart) == 0 || strcasecmp(arg, kCommandRestartAlias) == 0) {
     Serial.print(kCommandRestart R"(
   Restart the board
   Example:
@@ -120,7 +158,7 @@ keepalive [<bool>]
     return;
   }
 
-  if (strcmp(arg, kCommandRawConfig) == 0) {
+  if (strcasecmp(arg, kCommandRawConfig) == 0) {
     Serial.print(kCommandRawConfig R"(
   Get the raw binary config
   Example:
@@ -136,7 +174,7 @@ rawconfig <base64>
     return;
   }
 
-  if (strcmp(arg, kCommandFactoryReset) == 0) {
+  if (strcasecmp(arg, kCommandFactoryReset) == 0) {
     Serial.print(kCommandFactoryReset R"(
   Reset the device to factory defaults and reboot
   Example:
@@ -145,7 +183,7 @@ rawconfig <base64>
     return;
   }
 
-  if (strcmp(arg, kCommandVersion) == 0) {
+  if (strcasecmp(arg, kCommandVersion) == 0) {
     Serial.print(kCommandVersion R"(
   Print version information
   Example:
@@ -154,7 +192,7 @@ rawconfig <base64>
     return;
   }
 
-  if (strcmp(arg, kCommandHelp) == 0) {
+  if (strcasecmp(arg, kCommandHelp) == 0) {
     Serial.print(kCommandHelp R"( [<command>]
   Print help information
   Arguments:
@@ -165,7 +203,7 @@ rawconfig <base64>
     return;
   }
 
-  if (strcmp(arg, kCommandRFTransmit) == 0) {
+  if (strcasecmp(arg, kCommandRFTransmit) == 0) {
     Serial.print(kCommandRFTransmit R"( <json>
   Transmit a RF command
   Arguments:
@@ -176,7 +214,7 @@ rawconfig <base64>
       intensity  (number) Intensity of the command                (0-255)
       durationMs (number) Duration of the command in milliseconds (0-65535)
   Example:
-    rftransmit {"model":"caixianlin","id":12345,"type":"shock","intensity":99,"duration_ms":500}
+    rftransmit {"model":"caixianlin","id":12345,"type":"vibrate","intensity":99,"durationMs":500}
 )");
     return;
   }
@@ -193,12 +231,9 @@ std::uint8_t _argToBool(char* arg, std::size_t argLength) {
     return 255;
   }
 
-  // Convert to lowercase
-  std::transform(arg, arg + argLength, arg, ::tolower);
-
-  if (strcmp(arg, "true") == 0 || strcmp(arg, "1") == 0 || strcmp(arg, "yes") == 0 || strcmp(arg, "y") == 0) {
+  if (strcasecmp(arg, "true") == 0 || strcasecmp(arg, "1") == 0 || strcasecmp(arg, "yes") == 0 || strcasecmp(arg, "y") == 0) {
     return 1;
-  } else if (strcmp(arg, "false") == 0 || strcmp(arg, "0") == 0 || strcmp(arg, "no") == 0 || strcmp(arg, "n") == 0) {
+  } else if (strcasecmp(arg, "false") == 0 || strcasecmp(arg, "0") == 0 || strcasecmp(arg, "no") == 0 || strcasecmp(arg, "n") == 0) {
     return 0;
   } else {
     return 255;
@@ -222,10 +257,10 @@ void _handleFactoryResetCommand(char* arg, std::size_t argLength) {
   ESP.restart();
 }
 
-void _handleRmtpinCommand(char* arg, std::size_t argLength) {
+void _handleRfTxPinCommand(char* arg, std::size_t argLength) {
   if (arg == nullptr || argLength <= 0) {
     // Get rmt pin
-    SERPR_RESPONSE("RmtPin|%u", Config::GetRFConfig().txPin);
+    SERPR_RESPONSE("RfTxPin|%u", Config::GetRFConfig().txPin);
     return;
   }
 
@@ -240,14 +275,31 @@ void _handleRmtpinCommand(char* arg, std::size_t argLength) {
     return;
   }
 
-  OpenShock::CommandHandler::SetRfTxPin(static_cast<std::uint8_t>(pin));
+  OpenShock::SetRfPinResultCode result = OpenShock::CommandHandler::SetRfTxPin(static_cast<std::uint8_t>(pin));
 
-  SERPR_SUCCESS("Saved config");
+  switch (result) {
+    case OpenShock::SetRfPinResultCode::InvalidPin:
+      SERPR_ERROR("Invalid argument (invalid pin)");
+      break;
+
+    case OpenShock::SetRfPinResultCode::InternalError:
+      SERPR_ERROR("Internal error while setting RF TX pin");
+      break;
+
+    case OpenShock::SetRfPinResultCode::Success:
+      SERPR_SUCCESS("Saved config");
+      break;
+
+    default:
+      SERPR_ERROR("Unknown error while setting RF TX pin");
+      break;
+  }
 }
 
 void _handleAuthtokenCommand(char* arg, std::size_t argLength) {
   if (arg == nullptr || argLength <= 0) {
-    SERPR_ERROR("Invalid argument");
+    // Get auth token
+    SERPR_RESPONSE("AuthToken|%s", Config::GetBackendAuthToken().c_str());
     return;
   }
 
@@ -306,7 +358,11 @@ void _handleNetworksCommand(char* arg, std::size_t argLength) {
       return;
     }
 
-    ESP_LOGI(TAG, "Adding network to config %s", cred.ssid.c_str());
+    if (cred.id == 0) {
+      cred.id = id++;
+    }
+
+    ESP_LOGI(TAG, "Adding network \"%s\" to config, id=%u", cred.ssid.c_str(), cred.id);
 
     creds.push_back(std::move(cred));
   }
@@ -376,7 +432,18 @@ void _handleRawConfigCommand(char* arg, std::size_t argLength) {
   ESP.restart();
 }
 
+void _handleRTOSInfoCommand(char* arg, std::size_t argLength) {
+  SERPR_RESPONSE("RTOSInfo");
+  Serial.printf("Free heap: %u\n", xPortGetFreeHeapSize());
+  Serial.printf("Min free heap: %u\n", xPortGetMinimumEverFreeHeapSize());
+  Serial.printf("Free stack (serial/loop): %u\n", uxTaskGetStackHighWaterMark(nullptr));
+}
+
 void _handleRFTransmitCommand(char* arg, std::size_t argLength) {
+  if (arg == nullptr || argLength <= 0) {
+    SERPR_ERROR("No command");
+    return;
+  }
   cJSON* root = cJSON_ParseWithLength(arg, argLength);
   if (root == nullptr) {
     SERPR_ERROR("Failed to parse JSON: %s", cJSON_GetErrorPtr());
@@ -405,7 +472,11 @@ static std::unordered_map<std::string, void (*)(char*, std::size_t)> s_commandHa
   {        kCommandHelp,         _handleHelpCommand},
   {     kCommandVersion,      _handleVersionCommand},
   {     kCommandRestart,      _handleRestartCommand},
-  {      kCommandRmtpin,       _handleRmtpinCommand},
+  {kCommandRestartAlias,      _handleRestartCommand},
+  {    kCommandRTOSInfo,     _handleRTOSInfoCommand},
+  {   kCommandRTOSAlias,     _handleRTOSInfoCommand},
+ //{  kCommandSerialEcho,    _handleSerialEchoCommand},
+  {     kCommandRfTxPin,      _handleRfTxPinCommand},
   {   kCommandAuthToken,    _handleAuthtokenCommand},
   {    kCommandNetworks,     _handleNetworksCommand},
   {   kCommandKeepAlive,    _handleKeepAliveCommand},
@@ -425,6 +496,8 @@ int findChar(const char* buffer, std::size_t bufferSize, char c) {
 }
 
 int findLineEnd(const char* buffer, int bufferSize) {
+  if (bufferSize <= 0) return -1;
+
   for (int i = 0; i < bufferSize; i++) {
     if (buffer[i] == '\r' || buffer[i] == '\n' || buffer[i] == '\0') {
       return i;
@@ -436,8 +509,9 @@ int findLineEnd(const char* buffer, int bufferSize) {
 
 int findLineStart(const char* buffer, int bufferSize, int lineEnd) {
   if (lineEnd < 0) return -1;
+  if (lineEnd >= bufferSize) return -1;
 
-  for (int i = lineEnd; i < bufferSize - lineEnd; i++) {
+  for (int i = lineEnd + 1; i < bufferSize; i++) {
     if (buffer[i] != '\r' && buffer[i] != '\n' && buffer[i] != '\0') {
       return i;
     }
@@ -458,13 +532,16 @@ void processSerialLine(char* data, std::size_t length) {
   char* arg                 = nullptr;
   std::size_t argLength     = 0;
 
-  // Handle arg-less commands
+  // If there is a delimiter, split the command and argument
   if (delimiter > 0) {
     data[delimiter] = '\0';
     commandLength   = delimiter;
     arg             = data + delimiter + 1;
     argLength       = length - delimiter - 1;
   }
+
+  // Convert command to lowercase
+  std::transform(command, command + commandLength, command, ::tolower);
 
   // TODO: Clean this up, test this
   auto it = s_commandHandlers.find(std::string(command, commandLength));
@@ -473,17 +550,31 @@ void processSerialLine(char* data, std::size_t length) {
     return;
   }
 
-  Serial.println("$SYS$|Error|Command not found");
+  if (commandLength > 0) {
+    SERPR_ERROR("Command \"%.*s\" not found", commandLength, command);
+  } else {
+    SERPR_ERROR("No command");
+  }
 }
 
 void SerialInputHandler::Update() {
   static char* buffer            = nullptr;  // TODO: Clean up this buffer every once in a while
   static std::size_t bufferSize  = 0;
   static std::size_t bufferIndex = 0;
+  static std::int64_t lastEcho   = 0;
+  static bool echoEnabled        = true;
+  static bool suppressingPaste   = false;
 
   while (true) {
     int available = Serial.available();
-    if (available <= 0) {
+    if (available <= 0 && findLineEnd(buffer, bufferIndex) == -1) {
+      if (echoEnabled && suppressingPaste && OpenShock::millis() - lastEcho > PASTE_INTERVAL_THRESHOLD_MS) {
+        // \r - carriage return, moves to start of line
+        // \x1B[K - clears rest of line
+        Serial.printf("\r\x1B[K> %.*s", bufferIndex, buffer);
+        lastEcho         = OpenShock::millis();
+        suppressingPaste = false;
+      }
       break;
     }
 
@@ -492,21 +583,57 @@ void SerialInputHandler::Update() {
       buffer     = static_cast<char*>(realloc(buffer, bufferSize));
     }
 
-    bufferIndex += Serial.readBytes(buffer + bufferIndex, available);
+    // bufferIndex += Serial.readBytes(buffer + bufferIndex, available);
+
+    while (available-- > 0) {
+      char c = Serial.read();
+      // Handle backspace
+      if (c == '\b') {
+        if (bufferIndex > 0) {
+          bufferIndex--;
+        }
+        continue;
+      }
+      buffer[bufferIndex++] = c;
+    }
 
     int lineEnd = findLineEnd(buffer, bufferIndex);
     if (lineEnd == -1) {
+      if (echoEnabled) {
+        if (OpenShock::millis() - lastEcho > PASTE_INTERVAL_THRESHOLD_MS) {
+          // \r - carriage return, moves to start of line
+          // \x1B[K - clears rest of line
+          Serial.printf("\r\x1B[K> %.*s", bufferIndex, buffer);
+          lastEcho         = OpenShock::millis();
+          suppressingPaste = false;
+        } else {
+          lastEcho         = OpenShock::millis();
+          suppressingPaste = true;
+        }
+      }
       break;
     }
 
     buffer[lineEnd] = '\0';
-    Serial.printf("> %s\n", buffer);
+    // Don't print finished command unless we were pasting or echo was off
+    if (echoEnabled && !suppressingPaste) {
+      Serial.println();
+    } else {
+      Serial.printf("> %s\n", buffer);
+    }
 
     processSerialLine(buffer, lineEnd);
 
-    int nextLine = findLineStart(buffer, bufferIndex, lineEnd + 1);
+    int nextLine = findLineStart(buffer, bufferSize, lineEnd + 1);
     if (nextLine < 0) {
       bufferIndex = 0;
+      // Free buffer if it's too big
+      if (bufferSize > SERIAL_BUFFER_CLEAR_THRESHOLD) {
+        ESP_LOGV(TAG, "Clearing serial input buffer");
+        bufferSize = 0;
+        free(buffer);
+        buffer = nullptr;
+      }
       break;
     }
 
@@ -516,6 +643,13 @@ void SerialInputHandler::Update() {
       bufferIndex = remaining;
     } else {
       bufferIndex = 0;
+      // Free buffer if it's too big
+      if (bufferSize > SERIAL_BUFFER_CLEAR_THRESHOLD) {
+        ESP_LOGV(TAG, "Clearing serial input buffer");
+        bufferSize = 0;
+        free(buffer);
+        buffer = nullptr;
+      }
     }
   }
 }
