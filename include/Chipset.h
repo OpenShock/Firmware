@@ -1,0 +1,154 @@
+#pragma once
+
+#include <driver/gpio.h>
+
+// ESP8266EX
+//
+// Chips: ESP8266EX
+//
+// Docs: https://www.espressif.com/sites/default/files/documentation/0a-esp8266ex_datasheet_en.pdf
+#ifdef OPENSHOCK_FW_CHIP_ESP8266EX
+#define OPENSHOCK_FW_CHIP_NAME "ESP8266EX"
+// GPIO3, GPIO1 is used for UART0 RXD/TXD.
+// GPIO0, GPIO2, and GPIO15 are used for boot mode and SDIO slave timing selection.
+#define CHIP_UNSAFE_GPIO(pin) (pin == GPIO_NUM_0 || pin == GPIO_NUM_1 || pin == GPIO_NUM_2 || pin == GPIO_NUM_3 || pin == GPIO_NUM_15)
+#endif
+
+// ESP8285
+//
+// Chips: ESP8285N08, ESP8285H16
+//
+// Docs: https://www.espressif.com/sites/default/files/documentation/0a-esp8285_datasheet_en.pdf
+#ifdef OPENSHOCK_FW_CHIP_ESP8285
+#define OPENSHOCK_FW_CHIP_NAME "ESP8285"
+#error "ESP8285 is not supported yet."
+#endif
+
+// ESP8684
+//
+// Chips: ESP8684H1, ESP8684H2, ESP8684H4
+//
+// Docs: https://www.espressif.com/sites/default/files/documentation/esp8684_datasheet_en.pdf
+#ifdef OPENSHOCK_FW_CHIP_ESP8684
+#define OPENSHOCK_FW_CHIP_NAME "ESP8684"
+#error "ESP8684 is not supported yet."
+#endif
+
+// ESP8685
+//
+// Chips: ESP8685H2, ESP8685H4
+//
+// Docs: https://www.espressif.com/sites/default/files/documentation/esp8685_datasheet_en.pdf
+#ifdef OPENSHOCK_FW_CHIP_ESP8685
+#define OPENSHOCK_FW_CHIP_NAME "ESP8685"
+#error "ESP8685 is not supported yet."
+#endif
+
+// ESP32
+//
+// Chips: ESP32-D0WD-V3, ESP32-D0WDR2-V3, ESP32-U4WDH, ESP32-S0WD, ESP32-D0WD, ESP32-D0WDQ6, ESP32-D0WDQ6-V3
+//
+// Docs: https://www.espressif.com/sites/default/files/documentation/esp32_datasheet_en.pdf
+#ifdef OPENSHOCK_FW_CHIP_ESP32
+#define OPENSHOCK_FW_CHIP_NAME "ESP32"
+
+// GPIO1, GPIO3 is used for UART0 RXD/TXD.
+// GPIO0, GPIO2 is used to control the boot mode of the chip.
+// GPIO5, GPIO15 is used for SDIO slave timing selection.
+// GPIO6, GPIO7, GPIO8, GPIO9, GPIO11, GPIO16, GPIO17 is used for SPI flash connection.
+//
+// See: ESP32 Series Datasheet Version 4.3 Section 2.2 Pin Overview
+// See: ESP32 Series Datasheet Version 4.3 Section 2.4 Strapping Pins
+#define CHIP_UNSAFE_GPIO(pin)                                                                                                                                                                                                                                  \
+  (pin == GPIO_NUM_1 || pin == GPIO_NUM_3 || pin == GPIO_NUM_0 || pin == GPIO_NUM_2 || pin == GPIO_NUM_5 || pin == GPIO_NUM_15 || pin == GPIO_NUM_6 || pin == GPIO_NUM_7 || pin == GPIO_NUM_8 || pin == GPIO_NUM_9 || pin == GPIO_NUM_11 || pin == GPIO_NUM_16 \
+   || pin == GPIO_NUM_17)
+#endif
+
+// ESP32-PICO
+//
+// Chips: ESP32-PICO-D4, ESP32-PICO-V3, ESP32-PICO-V3-02
+//
+// Docs: https://www.espressif.com/sites/default/files/documentation/esp32-pico_series_datasheet_en.pdf
+#ifdef OPENSHOCK_FW_CHIP_ESP32PICO
+#define OPENSHOCK_FW_CHIP_NAME "ESP32-PICO"
+#error "ESP32-PICO is not supported yet."
+#endif
+
+// ESP32-S2
+//
+// Chips: ESP32-S2, ESP32-S2FH2, ESP32-S2FH4, ESP32-S2FN4R2, ESP32-S2R2
+//
+// Docs: https://www.espressif.com/sites/default/files/documentation/esp32-s2_datasheet_en.pdf
+#ifdef OPENSHOCK_FW_CHIP_ESP32S2
+#define OPENSHOCK_FW_CHIP_NAME "ESP32-S2"
+#error "ESP32-S2 is not supported yet."
+#endif
+
+// ESP32-S3
+//
+// Chips: ESP32-S3, ESP32-S3FN8, ESP32-S3R2, ESP32-S3R8, ESP32-S3R8V, ESP32-S3R16V, ESP32-S3FH4R2
+//
+// Docs: https://www.espressif.com/sites/default/files/documentation/esp32-s3_datasheet_en.pdf
+#ifdef OPENSHOCK_FW_CHIP_ESP32S3
+#define OPENSHOCK_FW_CHIP_NAME "ESP32-S3"
+#error "ESP32-S3 is not supported yet."
+#endif
+
+// ESP32-S3-PICO-1
+//
+// Chips: ESP32-S3-PICO-1-N8R2, ESP32-S3-PICO-1-N8R8
+//
+// Docs: https://www.espressif.com/sites/default/files/documentation/esp32-s3-pico-1_datasheet_en.pdf
+#ifdef OPENSHOCK_FW_CHIP_ESP32S3PICO1
+#define OPENSHOCK_FW_CHIP_NAME "ESP32-S3-PICO-1"
+#error "ESP32-S3-PICO-1 is not supported yet."
+#endif
+
+// ESP32-C3
+//
+// Chips: ESP32-C3, ESP32-C3FN4, ESP32-C3FH4, ESP32-C3FH4AZ
+//
+// Docs: https://www.espressif.com/sites/default/files/documentation/esp32-c3_datasheet_en.pdf
+#ifdef OPENSHOCK_FW_CHIP_ESP32C3
+#define OPENSHOCK_FW_CHIP_NAME "ESP32-C3"
+#error "ESP32-C3 is not supported yet."
+#endif
+
+// ESP32-C6
+//
+// Chips: ESP32-C6, ESP32-C6FH4
+//
+// Docs: https://www.espressif.com/sites/default/files/documentation/esp32-c6_datasheet_en.pdf
+#ifdef OPENSHOCK_FW_CHIP_ESP32C6
+#define OPENSHOCK_FW_CHIP_NAME "ESP32-C6"
+#error "ESP32-C6 is not supported yet."
+#endif
+
+namespace OpenShock {
+  constexpr bool IsValidGPIOPin(std::uint8_t pin) {
+    if (pin >= GPIO_NUM_MAX) {
+      return false;
+    }
+
+    // Check if the pin is reserved for the chip.
+    if (CHIP_UNSAFE_GPIO(pin)) {
+      return false;
+    }
+
+    return true;
+  }
+  constexpr bool IsValidInputPin(std::uint8_t pin) {
+    if (!IsValidGPIOPin(pin)) {
+      return false;
+    }
+
+    return GPIO_IS_VALID_GPIO(pin) && !GPIO_IS_VALID_OUTPUT_GPIO(pin);
+  }
+  constexpr bool IsValidOutputPin(std::uint8_t pin) {
+    if (!IsValidGPIOPin(pin)) {
+      return false;
+    }
+
+    return GPIO_IS_VALID_OUTPUT_GPIO(pin);
+  }
+}  // namespace OpenShock
