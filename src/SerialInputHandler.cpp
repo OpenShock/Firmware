@@ -612,6 +612,7 @@ void SerialInputHandler::Update() {
   while (true) {
     int available = Serial.available();
     if (available <= 0 && findLineEnd(buffer, bufferIndex) == -1) {
+      // If we're suppressing paste, and we haven't printed anything in a while, print the buffer and stop suppressing
       if (s_echoEnabled && suppressingPaste && OpenShock::millis() - lastEcho > PASTE_INTERVAL_THRESHOLD_MS) {
         // \r - carriage return, moves to start of line
         // \x1B[K - clears rest of line
@@ -627,8 +628,6 @@ void SerialInputHandler::Update() {
       buffer     = static_cast<char*>(realloc(buffer, bufferSize));
     }
 
-    // bufferIndex += Serial.readBytes(buffer + bufferIndex, available);
-
     while (available-- > 0) {
       char c = Serial.read();
       // Handle backspace
@@ -642,8 +641,10 @@ void SerialInputHandler::Update() {
     }
 
     int lineEnd = findLineEnd(buffer, bufferIndex);
+    // No newline found, wait for more input
     if (lineEnd == -1) {
       if (s_echoEnabled) {
+        // If we're typing without pasting, echo the buffer
         if (OpenShock::millis() - lastEcho > PASTE_INTERVAL_THRESHOLD_MS) {
           // \r - carriage return, moves to start of line
           // \x1B[K - clears rest of line
@@ -659,12 +660,7 @@ void SerialInputHandler::Update() {
     }
 
     buffer[lineEnd] = '\0';
-    // Don't print finished command unless we were pasting or echo was off
-    if (s_echoEnabled && !suppressingPaste) {
-      Serial.println();
-    } else {
-      Serial.printf("> %s\n", buffer);
-    }
+    Serial.printf("\r> %s\n", buffer);
 
     processSerialLine(buffer, lineEnd);
 
