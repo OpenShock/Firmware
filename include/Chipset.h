@@ -2,6 +2,8 @@
 
 #include <driver/gpio.h>
 
+#include <bitset>
+
 // The following chipsets are supported by the OpenShock firmware.
 // To find documentation for a specific chipset, see the docs link.
 // You need to navigate to the datasheets pin's section, the unsafe pins are usually listed under the "Strapping Pins" section.
@@ -184,5 +186,32 @@ namespace OpenShock {
     }
 
     return GPIO_IS_VALID_OUTPUT_GPIO(pin);
+  }
+  constexpr std::bitset<UINT8_MAX+1> GetValidGPIOPins() {
+    std::bitset<UINT8_MAX+1> pins;
+    for (std::uint8_t i = 0; i < GPIO_NUM_MAX; i++) {
+      if (IsValidGPIOPin(i)) {
+        pins.set(i);
+      }
+    }
+    return pins;
+  }
+  constexpr std::bitset<UINT8_MAX+1> GetValidInputPins() {
+    std::bitset<UINT8_MAX+1> pins;
+    for (std::uint8_t i = 0; i < GPIO_NUM_MAX; i++) {
+      if (IsValidInputPin(i)) {
+        pins.set(i);
+      }
+    }
+    return pins;
+  }
+  constexpr std::bitset<UINT8_MAX+1> GetValidOutputPins() {
+    std::bitset<UINT8_MAX+1> pins;
+    for (std::uint8_t i = 0; i < GPIO_NUM_MAX; i++) {
+      if (IsValidOutputPin(i)) {
+        pins.set(i);
+      }
+    }
+    return pins;
   }
 }  // namespace OpenShock
