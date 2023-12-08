@@ -83,8 +83,8 @@
 // Chips: ESP32-PICO-D4
 //
 // Docs: https://www.espressif.com/sites/default/files/documentation/esp32-pico_series_datasheet_en.pdf (Section 2.1.2 - 2.1.3 Pin Description and Pin Mapping between ESP and Flash/PSRAM)
-#ifdef OPENSHOCK_FW_CHIP_ESP32PICO
-#define OPENSHOCK_FW_CHIP_NAME "ESP32-PICO"
+#ifdef OPENSHOCK_FW_CHIP_ESP32PICOD4
+#define OPENSHOCK_FW_CHIP_NAME "ESP32-PICO-D4"
 // GPIO3, GPIO1 is used for UART0 RXD/TXD.
 // GPIO25, GPIO27, GPIO29, GPIO30, GPIO31, GPIO32, GPIO33 is used for SPI flash connection. (DO NOT TOUCH)
 // GPIO12, GPIO0, GPIO2, GPIO15, and GPIO5 are used for boot mode and SDIO slave timing selection.
@@ -96,8 +96,8 @@
 // Chips:, ESP32-PICO-V3, ESP32-PICO-V3-02
 //
 // Docs: https://www.espressif.com/sites/default/files/documentation/esp32-pico_series_datasheet_en.pdf
-#ifdef OPENSHOCK_FW_CHIP_ESP32PICO
-#define OPENSHOCK_FW_CHIP_NAME "ESP32-PICO"
+#ifdef OPENSHOCK_FW_CHIP_ESP32PICOV3
+#define OPENSHOCK_FW_CHIP_NAME "ESP32-PICO-V3"
 // GPIO3, GPIO1 is used for UART0 RXD/TXD.
 // GPIO6, GPIO11, GPIO9, GPIO10 is used for SPI flash connection. (DO NOT TOUCH)
 // GPIO12, GPIO0, GPIO2, GPIO15, and GPIO5 are used for boot mode and SDIO slave timing selection.
