@@ -4,6 +4,7 @@
 #include "Constants.h"
 #include "Logging.h"
 
+#include <FS.h>
 #include <LittleFS.h>
 
 #include <cJSON.h>
@@ -15,6 +16,8 @@ const char* const TAG = "Config";
 using namespace OpenShock;
 
 static Config::RootConfig _mainConfig;
+
+static fs::LittleFSFS configLittleFS;
 
 bool _tryDeserializeConfig(const std::uint8_t* buffer, std::size_t bufferLen, OpenShock::Config::RootConfig& config) {
   if (buffer == nullptr || bufferLen == 0) {
@@ -48,7 +51,7 @@ bool _tryDeserializeConfig(const std::uint8_t* buffer, std::size_t bufferLen, Op
   return true;
 }
 bool _tryLoadConfig(std::vector<std::uint8_t>& buffer) {
-  File file = LittleFS.open("/config", "rb");
+  File file = configLittleFS.open("/config", "rb");
   if (!file) {
     ESP_LOGE(TAG, "Failed to open config file for reading");
     return false;
@@ -79,7 +82,7 @@ bool _tryLoadConfig() {
   return _tryDeserializeConfig(buffer.data(), buffer.size(), _mainConfig);
 }
 bool _trySaveConfig(const std::uint8_t* data, std::size_t dataLen) {
-  File file = LittleFS.open("/config", "wb");
+  File file = configLittleFS.open("/config", "wb");
   if (!file) {
     ESP_LOGE(TAG, "Failed to open config file for writing");
     return false;
@@ -106,6 +109,10 @@ bool _trySaveConfig() {
 }
 
 void Config::Init() {
+  if (!configLittleFS.begin(true, "/config", 3, "config")) {
+    ESP_PANIC(TAG, "Unable to mount config LittleFS partition!");
+  }
+
   if (_tryLoadConfig()) {
     return;
   }
@@ -166,7 +173,7 @@ bool Config::SetRaw(const std::uint8_t* buffer, std::size_t size) {
 }
 
 void Config::FactoryReset() {
-  if (!LittleFS.remove("/config") && LittleFS.exists("/config")) {
+  if (!configLittleFS.remove("/config") && configLittleFS.exists("/config")) {
     ESP_PANIC(TAG, "Failed to remove existing config file for factory reset. Reccomend formatting microcontroller and re-flashing firmware");
   }
 }
