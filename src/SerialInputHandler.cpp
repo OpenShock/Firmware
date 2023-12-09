@@ -31,8 +31,8 @@ static bool s_echoEnabled = true;
 #define kCommandVersion      "version"
 #define kCommandRestart      "restart"
 #define kCommandRestartAlias "reboot"
-#define kCommandRTOSInfo     "rtosinfo"
-#define kCommandRTOSAlias    "rtos"
+#define kCommandDebugInfo    "debug"
+#define kCommandDebugAlias   "info"
 #define kCommandSerialEcho   "echo"
 #define kCommandRfTxPin      "txpin"
 #define kCommandAuthToken    "authtoken"
@@ -51,7 +51,7 @@ help                   print this menu
 help         <command> print help for a command
 version                print version information
 restart | reboot       restart the board
-rtosinfo | rtos        print FreeRTOS debug information
+debug | info           print debug information for various subsystems
 echo                   get serial echo enabled
 echo         <bool>    set serial echo enabled
 txpin                  get radio transmit pin
@@ -98,11 +98,11 @@ authtoken [<token>]
     return;
   }
 
-  if (strcasecmp(arg, kCommandRTOSInfo) == 0 || strcasecmp(arg, kCommandRTOSAlias) == 0) {
-    Serial.print(kCommandRTOSInfo R"(
-  Get FreeRTOS debug information.
+  if (strcasecmp(arg, kCommandDebugInfo) == 0 || strcasecmp(arg, kCommandDebugAlias) == 0) {
+    Serial.print(kCommandDebugInfo R"(
+  Get debug information from RTOS, WiFi, etc.
   Example:
-    rtosinfo
+    debug
 )");
     return;
   }
@@ -110,6 +110,7 @@ authtoken [<token>]
   if (strcasecmp(arg, kCommandSerialEcho) == 0) {
     Serial.print(kCommandSerialEcho R"(
   Get the serial echo status.
+  If enabled, typed characters are echoed back to the serial port.
 
 echo [<bool>]
   Enable/disable serial echo.
@@ -467,11 +468,23 @@ void _handleRawConfigCommand(char* arg, std::size_t argLength) {
   ESP.restart();
 }
 
-void _handleRTOSInfoCommand(char* arg, std::size_t argLength) {
-  SERPR_RESPONSE("RTOSInfo");
-  Serial.printf("Free heap: %u\n", xPortGetFreeHeapSize());
-  Serial.printf("Min free heap: %u\n", xPortGetMinimumEverFreeHeapSize());
-  Serial.printf("Free stack (serial/loop): %u\n", uxTaskGetStackHighWaterMark(nullptr));
+void _handleDebugInfoCommand(char* arg, std::size_t argLength) {
+  SERPR_RESPONSE("RTOSInfo|Free Heap|%u", xPortGetFreeHeapSize());
+  SERPR_RESPONSE("RTOSInfo|Min Free Heap|%u", xPortGetMinimumEverFreeHeapSize());
+
+  OpenShock::WiFiNetwork network;
+  bool connected = OpenShock::WiFiManager::GetConnectedNetwork(network);
+  SERPR_RESPONSE("WiFiInfo|Connected|%s", connected ? "true" : "false");
+  if (connected) {
+    SERPR_RESPONSE("WiFiInfo|SSID|%s", network.ssid);
+    SERPR_RESPONSE("WiFiInfo|BSSID|%02X:%02X:%02X:%02X:%02X:%02X", network.bssid[0], network.bssid[1], network.bssid[2], network.bssid[3], network.bssid[4], network.bssid[5]);
+
+    char ipAddressBuffer[64];
+    OpenShock::WiFiManager::GetIPAddress(ipAddressBuffer);
+    SERPR_RESPONSE("WiFiInfo|IPv4|%s", ipAddressBuffer);
+    OpenShock::WiFiManager::GetIPv6Address(ipAddressBuffer);
+    SERPR_RESPONSE("WiFiInfo|IPv6|%s", ipAddressBuffer);
+  }
 }
 
 void _handleRFTransmitCommand(char* arg, std::size_t argLength) {
@@ -508,8 +521,8 @@ static std::unordered_map<std::string, void (*)(char*, std::size_t)> s_commandHa
   {     kCommandVersion,      _handleVersionCommand},
   {     kCommandRestart,      _handleRestartCommand},
   {kCommandRestartAlias,      _handleRestartCommand},
-  {    kCommandRTOSInfo,     _handleRTOSInfoCommand},
-  {   kCommandRTOSAlias,     _handleRTOSInfoCommand},
+  {   kCommandDebugInfo,    _handleDebugInfoCommand},
+  {  kCommandDebugAlias,    _handleDebugInfoCommand},
   {  kCommandSerialEcho,   _handleSerialEchoCommand},
   {     kCommandRfTxPin,      _handleRfTxPinCommand},
   {   kCommandAuthToken,    _handleAuthtokenCommand},

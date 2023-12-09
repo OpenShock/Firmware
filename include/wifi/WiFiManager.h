@@ -52,6 +52,16 @@ namespace OpenShock::WiFiManager {
   /// @return True if the device is connected to a network
   bool GetConnectedNetwork(OpenShock::WiFiNetwork& network);
 
+  /// @brief Gets the devices IP address if it's connected to a network (IPv4)
+  /// @param ipAddress Variable to store the IP address in
+  /// @return True if the device is connected to a network
+  bool GetIPAddress(char* ipAddress);
+
+  /// @brief Gets the devices IP address if it's connected to a network (IPv6)
+  /// @param ipAddress Variable to store the IP address in
+  /// @return True if the device is connected to a network
+  bool GetIPv6Address(char* ipAddress);
+
   /// @brief Runs the WiFiManager loop
   void Update();
 }  // namespace OpenShock::WiFiManager

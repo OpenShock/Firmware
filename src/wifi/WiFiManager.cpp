@@ -195,7 +195,7 @@ void _evWiFiConnected(arduino_event_t* event) {
   if (it == s_wifiNetworks.end()) {
     s_connectedCredentialsID = 0;
 
-    ESP_LOGW(TAG, "Connected to unknown network " BSSID_FMT, BSSID_ARG(info.bssid));
+    ESP_LOGW(TAG, "Connected to unscanned network \"%s\", BSSID: " BSSID_FMT, reinterpret_cast<char*>(info.ssid), BSSID_ARG(info.bssid));
 
     return;
   }
@@ -441,6 +441,15 @@ bool WiFiManager::IsConnected() {
 }
 bool WiFiManager::GetConnectedNetwork(OpenShock::WiFiNetwork& network) {
   if (s_connectedCredentialsID == 0) {
+    if (IsConnected()) {
+      // We connected without a scan, so populate the network with the current connection info manually
+      network.credentialsID = 255;
+      memcpy(network.ssid, WiFi.SSID().c_str(), WiFi.SSID().length() + 1);
+      memcpy(network.bssid, WiFi.BSSID(), sizeof(network.bssid));
+      network.channel = WiFi.channel();
+      network.rssi    = WiFi.RSSI();
+      return true;
+    }
     return false;
   }
 
@@ -450,6 +459,28 @@ bool WiFiManager::GetConnectedNetwork(OpenShock::WiFiNetwork& network) {
   }
 
   network = *it;
+
+  return true;
+}
+
+bool WiFiManager::GetIPAddress(char* ipAddress) {
+  if (!IsConnected()) {
+    return false;
+  }
+
+  IPAddress ip = WiFi.localIP();
+  snprintf(ipAddress, 16, "%u.%u.%u.%u", ip[0], ip[1], ip[2], ip[3]);
+
+  return true;
+}
+
+bool WiFiManager::GetIPv6Address(char* ipAddress) {
+  if (!IsConnected()) {
+    return false;
+  }
+
+  IPv6Address ip = WiFi.localIPv6();
+  snprintf(ipAddress, 40, "%02x%02x:%02x%02x:%02x%02x:%02x%02x", ip[0], ip[1], ip[2], ip[3], ip[4], ip[5], ip[6], ip[7]);
 
   return true;
 }
