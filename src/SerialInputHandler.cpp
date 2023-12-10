@@ -5,6 +5,7 @@
 #include "config/SerialInputConfig.h"
 #include "Logging.h"
 #include "serialization/JsonSerial.h"
+#include "Time.h"
 #include "util/Base64Utils.h"
 #include "wifi/WiFiManager.h"
 
