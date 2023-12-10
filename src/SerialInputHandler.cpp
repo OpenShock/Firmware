@@ -473,6 +473,15 @@ void _handleDebugInfoCommand(char* arg, std::size_t argLength) {
   SERPR_RESPONSE("RTOSInfo|Free Heap|%u", xPortGetFreeHeapSize());
   SERPR_RESPONSE("RTOSInfo|Min Free Heap|%u", xPortGetMinimumEverFreeHeapSize());
 
+  const std::int64_t now = OpenShock::millis();
+  SERPR_RESPONSE("RTOSInfo|UptimeMS|%llu", now);
+
+  const std::int64_t seconds = now / 1000;
+  const std::int64_t minutes = seconds / 60;
+  const std::int64_t hours   = minutes / 60;
+  const std::int64_t days    = hours / 24;
+  SERPR_RESPONSE("RTOSInfo|Uptime|%llud %lluh %llum %llus", days, hours % 24, minutes % 60, seconds % 60);
+
   OpenShock::WiFiNetwork network;
   bool connected = OpenShock::WiFiManager::GetConnectedNetwork(network);
   SERPR_RESPONSE("WiFiInfo|Connected|%s", connected ? "true" : "false");
