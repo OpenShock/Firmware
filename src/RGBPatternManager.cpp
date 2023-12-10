@@ -13,7 +13,7 @@ using namespace OpenShock;
 // TODO: Support multiple LEDs ?
 // TODO: Support other LED types ?
 
-RGBPatternManager::RGBPatternManager(std::uint8_t rgbPin) : m_rgbPin(rgbPin), m_rgbBrightness(255), m_pattern(nullptr), m_patternLength(0), m_taskHandle(nullptr), m_taskSemaphore(xSemaphoreCreateBinary()) {
+RGBPatternManager::RGBPatternManager(std::uint8_t rgbPin) : m_rgbPin(rgbPin), m_rgbBrightness(255), m_pattern(nullptr), m_patternLength(0), m_taskHandle(nullptr), m_taskMutex(xSemaphoreCreateMutex()) {
   if ((m_rmtHandle = rmtInit(m_rgbPin, RMT_TX_MODE, RMT_MEM_64)) == NULL) {
     ESP_LOGE(TAG, "[pin-%u] Failed to create rgb rmt object", m_rgbPin);
   }
@@ -22,14 +22,12 @@ RGBPatternManager::RGBPatternManager(std::uint8_t rgbPin) : m_rgbPin(rgbPin), m_
   ESP_LOGD(TAG, "[pin-%u] real tick set to: %fns", m_rgbPin, realTick);
 
   SetBrightness(20);
-
-  xSemaphoreGive(m_taskSemaphore);
 }
 
 RGBPatternManager::~RGBPatternManager() {
   ClearPattern();
 
-  vSemaphoreDelete(m_taskSemaphore);
+  vSemaphoreDelete(m_taskMutex);
 }
 
 void RGBPatternManager::SetPattern(nonstd::span<const RGBState> pattern) {
@@ -55,16 +53,16 @@ void RGBPatternManager::SetPattern(nonstd::span<const RGBState> pattern) {
   }
 
   // Give the semaphore back
-  xSemaphoreGive(m_taskSemaphore);
+  xSemaphoreGive(m_taskMutex);
 }
 
 void RGBPatternManager::ClearPattern() {
   ClearPatternInternal();
-  xSemaphoreGive(m_taskSemaphore);
+  xSemaphoreGive(m_taskMutex);
 }
 
 void RGBPatternManager::ClearPatternInternal() {
-  xSemaphoreTake(m_taskSemaphore, portMAX_DELAY);
+  xSemaphoreTake(m_taskMutex, portMAX_DELAY);
 
   if (m_taskHandle != nullptr) {
     vTaskDelete(m_taskHandle);
