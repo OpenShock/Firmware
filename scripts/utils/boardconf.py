@@ -8,6 +8,8 @@ class BoardConf:
     def __init__(self, chip: str, flash_size: str):
         self.chip = chip
         self.flash_size = flash_size
+        if flash_size == '':
+            self.flash_size = fallback_flash_size
 
         # Set dirs
         self.root_dir = Path().absolute()
