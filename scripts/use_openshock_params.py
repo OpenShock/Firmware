@@ -27,6 +27,7 @@ blacklisted_OTA_sizes = [
 
 def use_openshock_params():
     if not validate(boardconf):
+        print('Failed to validate OpenShock board configuration.')
         return
 
     # Handle partitions file not existing
