@@ -217,10 +217,9 @@ void _evWiFiGotIP(arduino_event_t* event) {
 void _evWiFiGotIP6(arduino_event_t* event) {
   auto& info = event->event_info.got_ip6;
 
-  std::uint8_t ip6[16];
-  memcpy(ip6, &info.ip6_info.ip.addr, sizeof(ip6));
+  std::uint8_t* ip6 = reinterpret_cast<std::uint8_t*>(&info.ip6_info.ip.addr);
 
-  ESP_LOGI(TAG, "Got IPv6 address %02x%02x:%02x%02x:%02x%02x:%02x%02x from network " BSSID_FMT, ip6[0], ip6[1], ip6[2], ip6[3], ip6[4], ip6[5], ip6[6], ip6[7], BSSID_ARG(s_connectedBSSID));
+  ESP_LOGI(TAG, "Got IPv6 address " IPV6ADDR_FMT " from network " BSSID_FMT, IPV6ADDR_ARG(ip6), BSSID_ARG(s_connectedBSSID));
 }
 void _evWiFiDisconnected(arduino_event_t* event) {
   s_wifiState = WiFiState::Disconnected;
@@ -469,7 +468,8 @@ bool WiFiManager::GetIPAddress(char* ipAddress) {
   }
 
   IPAddress ip = WiFi.localIP();
-  snprintf(ipAddress, 16, "%u.%u.%u.%u", ip[0], ip[1], ip[2], ip[3]);
+  std::uint8_t* ipPtr = ip; // Using the implicit conversion operator of IPAddress
+  snprintf(ipAddress, IPV4ADDR_FMT_LEN + 1, IPV4ADDR_FMT, IPV4ADDR_ARG(ipPtr));
 
   return true;
 }
@@ -480,7 +480,8 @@ bool WiFiManager::GetIPv6Address(char* ipAddress) {
   }
 
   IPv6Address ip = WiFi.localIPv6();
-  snprintf(ipAddress, 40, "%02x%02x:%02x%02x:%02x%02x:%02x%02x", ip[0], ip[1], ip[2], ip[3], ip[4], ip[5], ip[6], ip[7]);
+  std::uint8_t* ipPtr = ip; // Using the implicit conversion operator of IPv6Address
+  snprintf(ipAddress, IPV6ADDR_FMT_LEN + 1, IPV6ADDR_FMT, IPV6ADDR_ARG(ipPtr));
 
   return true;
 }
