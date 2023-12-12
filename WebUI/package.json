@@ -19,7 +19,7 @@
 		"@skeletonlabs/skeleton": "2.6.0",
 		"@skeletonlabs/tw-plugin": "0.3.0",
 		"@sveltejs/adapter-static": "2.0.3",
-		"@sveltejs/kit": "1.27.7",
+		"@sveltejs/kit": "1.28.0",
 		"@tailwindcss/forms": "0.5.7",
 		"@tailwindcss/typography": "0.5.10",
 		"@types/node": "20.10.4",
@@ -32,7 +32,7 @@
 		"flatbuffers": "23.5.26",
 		"npm-check-updates": "16.14.11",
 		"postcss": "8.4.32",
-		"prettier": "3.1.0",
+		"prettier": "3.1.1",
 		"prettier-plugin-svelte": "3.1.2",
 		"svelte": "4.2.8",
 		"svelte-check": "3.6.2",
@@ -41,7 +41,7 @@
 		"typescript": "5.3.3",
 		"vite": "^4.5.1",
 		"vite-plugin-tailwind-purgecss": "0.1.4",
-		"vitest": "1.0.2"
+		"vitest": "1.0.4"
 	},
 	"type": "module",
 	"dependencies": {
