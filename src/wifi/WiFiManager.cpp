@@ -468,8 +468,7 @@ bool WiFiManager::GetIPAddress(char* ipAddress) {
   }
 
   IPAddress ip = WiFi.localIP();
-  const std::uint8_t* ipPtr = ip; // Using the implicit conversion operator of IPAddress
-  snprintf(ipAddress, IPV4ADDR_FMT_LEN + 1, IPV4ADDR_FMT, IPV4ADDR_ARG(ipPtr));
+  snprintf(ipAddress, IPV4ADDR_FMT_LEN + 1, IPV4ADDR_FMT, IPV4ADDR_ARG(ip));
 
   return true;
 }
