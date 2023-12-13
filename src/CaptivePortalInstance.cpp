@@ -49,15 +49,15 @@ bool TryReadFile(const char* path, char* buffer, std::size_t& bufferSize) {
 
 bool TryGetFsHash(char (&buffer)[65]) {
   std::size_t bufferSize = sizeof(buffer);
-  if (TryReadFile("/www/hash.sha1", buffer, bufferSize)) {
+  if (TryReadFile("/static/www/hash.sha1", buffer, bufferSize)) {
     buffer[bufferSize] = '\0';
     return true;
   }
-  if (TryReadFile("/www/hash.sha256", buffer, bufferSize)) {
+  if (TryReadFile("/static/www/hash.sha256", buffer, bufferSize)) {
     buffer[bufferSize] = '\0';
     return true;
   }
-  if (TryReadFile("/www/hash.md5", buffer, bufferSize)) {
+  if (TryReadFile("/static/www/hash.md5", buffer, bufferSize)) {
     buffer[bufferSize] = '\0';
     return true;
   }
@@ -74,7 +74,7 @@ CaptivePortalInstance::CaptivePortalInstance()
   m_socketServer.enableHeartbeat(WEBSOCKET_PING_INTERVAL, WEBSOCKET_PING_TIMEOUT, WEBSOCKET_PING_RETRIES);
 
   // Check if the www folder exists and is populated
-  bool indexExists = LittleFS.exists("/www/index.html.gz");
+  bool indexExists = LittleFS.exists("/static/www/index.html.gz");
 
   // Get the hash of the filesystem
   char fsHash[65];
@@ -85,11 +85,11 @@ CaptivePortalInstance::CaptivePortalInstance()
     ESP_LOGI(TAG, "Serving files from LittleFS");
     ESP_LOGI(TAG, "Filesystem hash: %s", fsHash);
 
-    m_webServer.serveStatic("/", LittleFS, "/www/", "max-age=3600").setDefaultFile("index.html").setSharedEtag(fsHash);
+    m_webServer.serveStatic("/", LittleFS, "/static/www/", "max-age=3600").setDefaultFile("index.html").setSharedEtag(fsHash);
 
     m_webServer.onNotFound([](AsyncWebServerRequest* request) { request->send(404, "text/plain", "Not found"); });
   } else {
-    ESP_LOGE(TAG, "/www/index.html or hash files not found, serving error page");
+    ESP_LOGE(TAG, "/static/www/index.html or hash files not found, serving error page");
 
     m_webServer.onNotFound([](AsyncWebServerRequest* request) {
       request->send(
