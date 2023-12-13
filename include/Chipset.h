@@ -171,22 +171,22 @@
 #pragma region Board Specific Bypasses
 
 #ifdef OPENSHOCK_FW_BOARD_WEMOSD1MINIESP32
-#define OPENSHOCK_BYPASSED_GPIO(pin) (pin == 15)
+#define OPENSHOCK_BYPASSED_GPIO(pin) (pin == 15 || pin == 2)
 #endif
 #ifdef OPENSHOCK_FW_BOARD_WEMOSLOLINS2MINI
 #define OPENSHOCK_BYPASSED_GPIO(pin) (pin == 15)
 #endif
 #ifdef OPENSHOCK_FW_BOARD_PISHOCK2023
-#define OPENSHOCK_BYPASSED_GPIO(pin) (pin == 12)
+#define OPENSHOCK_BYPASSED_GPIO(pin) (pin == 12 || pin == 2)
 #endif
 #ifdef OPENSHOCK_FW_BOARD_PISHOCKLITE2021
-#define OPENSHOCK_BYPASSED_GPIO(pin) (pin == 15)
+#define OPENSHOCK_BYPASSED_GPIO(pin) (pin == 15 || pin == 2)
 #endif
 #ifdef OPENSHOCK_FW_BOARD_SEEEDXIAOESP32S3
 #define OPENSHOCK_BYPASSED_GPIO(pin) (pin == 21)
 #endif
 #ifdef OPENSHOCK_FW_BOARD_OPENSHOCKCOREV1
-#define OPENSHOCK_BYPASSED_GPIO(pin) (pin == 15)
+#define OPENSHOCK_BYPASSED_GPIO(pin) (pin == 15 || pin == 35)
 #endif
 #ifndef OPENSHOCK_BYPASSED_GPIO
 #define OPENSHOCK_BYPASSED_GPIO(pin) (false)
