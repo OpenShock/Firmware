@@ -3,9 +3,9 @@
 #include "CommandHandler.h"
 #include "event_handlers/WebSocket.h"
 #include "GatewayConnectionManager.h"
-#include "util/HexUtils.h"
 #include "Logging.h"
 #include "serialization/WSLocal.h"
+#include "util/HexUtils.h"
 #include "util/TaskUtils.h"
 #include "wifi/WiFiManager.h"
 
@@ -40,8 +40,8 @@ const esp_partition_t* _getStaticPartition() {
 }
 
 bool _tryGetPartitionHash(char (&buffer)[65]) {
-  static bool initialized = false;
-  static std::uint8_t staticSha256[32] = { 0 };
+  static bool initialized              = false;
+  static std::uint8_t staticSha256[32] = {0};
 
   if (!initialized) {
     initialized = true;
@@ -86,7 +86,7 @@ CaptivePortalInstance::CaptivePortalInstance()
   m_socketServer.enableHeartbeat(WEBSOCKET_PING_INTERVAL, WEBSOCKET_PING_TIMEOUT, WEBSOCKET_PING_RETRIES);
 
   // Check if the www folder exists and is populated
-  bool indexExists = LittleFS.exists("/static/www/index.html.gz");
+  bool indexExists = LittleFS.exists("/www/index.html.gz");
 
   // Get the hash of the filesystem
   char fsHash[65];
@@ -97,11 +97,11 @@ CaptivePortalInstance::CaptivePortalInstance()
     ESP_LOGI(TAG, "Serving files from LittleFS");
     ESP_LOGI(TAG, "Filesystem hash: %s", fsHash);
 
-    m_webServer.serveStatic("/", LittleFS, "/static/www/", "max-age=3600").setDefaultFile("index.html").setSharedEtag(fsHash);
+    m_webServer.serveStatic("/", LittleFS, "/www/", "max-age=3600").setDefaultFile("index.html").setSharedEtag(fsHash);
 
     m_webServer.onNotFound([](AsyncWebServerRequest* request) { request->send(404, "text/plain", "Not found"); });
   } else {
-    ESP_LOGE(TAG, "/static/www/index.html or hash files not found, serving error page");
+    ESP_LOGE(TAG, "/www/index.html or hash files not found, serving error page");
 
     m_webServer.onNotFound([](AsyncWebServerRequest* request) {
       request->send(
