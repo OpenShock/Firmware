@@ -8,7 +8,7 @@
 // To find documentation for a specific chipset, see the docs link.
 // You need to navigate to the datasheets pin's section, the unsafe pins are usually listed under the "Strapping Pins" section.
 // We want to avoid using these pins as they are used for boot mode and SDIO slave timing selection, and its easy to encounter issues if we use them.
-
+#pragma region Chipset Definitions
 // ESP8266EX
 //
 // Chips: ESP8266EX
@@ -160,32 +160,49 @@
 #error "ESP32-C6 is not supported yet."
 #endif
 
+#pragma endregion
+
+/// Board specific bad-pin bypasses for compatibility reasons.
+/// To be clear, these pins are still unsafe, but we need to use them for compatibility reasons.
+#pragma region Board Specific Bypasses
+
+#ifdef OPENSHOCK_FW_BOARD_WEMOSD1MINIESP32
+#define OPENSHOCK_BYPASSED_GPIO(pin) (pin == 15)
+#endif
+#ifdef OPENSHOCK_FW_BOARD_WEMOSLOLINS2MINI
+#define OPENSHOCK_BYPASSED_GPIO(pin) (pin == 15)
+#endif
+#ifdef OPENSHOCK_FW_BOARD_PISHOCK2023
+#define OPENSHOCK_BYPASSED_GPIO(pin) (pin == 12)
+#endif
+#ifdef OPENSHOCK_FW_BOARD_PISHOCKLITE2021
+#define OPENSHOCK_BYPASSED_GPIO(pin) (pin == 15)
+#endif
+#ifdef OPENSHOCK_FW_BOARD_SEEEDXIAOESP32S3
+#define OPENSHOCK_BYPASSED_GPIO(pin) (pin == 21)
+#endif
+#ifdef OPENSHOCK_FW_BOARD_OPENSHOCKCOREV1
+#define OPENSHOCK_BYPASSED_GPIO(pin) (pin == 15)
+#endif
+#ifndef OPENSHOCK_BYPASSED_GPIO
+#define OPENSHOCK_BYPASSED_GPIO(pin) (false)
+#endif
+
+#pragma endregion
+
+#define OPENSHOCK_IS_VALID_GPIO(pin) ((pin < GPIO_NUM_MAX && !CHIP_UNSAFE_GPIO(pin)) || OPENSHOCK_BYPASSED_GPIO(pin))
+#define OPENSHOCK_IS_VALID_INPUT_GPIO(pin) ((OPENSHOCK_IS_VALID_GPIO(pin) && (GPIO_IS_VALID_GPIO(pin) && !GPIO_IS_VALID_OUTPUT_GPIO(pin))) || OPENSHOCK_BYPASSED_GPIO(pin))
+#define OPENSHOCK_IS_VALID_OUTPUT_GPIO(pin) ((OPENSHOCK_IS_VALID_GPIO(pin) && GPIO_IS_VALID_OUTPUT_GPIO(pin)) || OPENSHOCK_BYPASSED_GPIO(pin))
+
 namespace OpenShock {
   constexpr bool IsValidGPIOPin(std::uint8_t pin) {
-    if (pin >= GPIO_NUM_MAX) {
-      return false;
-    }
-
-    // Check if the pin is reserved for the chip.
-    if (CHIP_UNSAFE_GPIO(pin)) {
-      return false;
-    }
-
-    return true;
+    return OPENSHOCK_IS_VALID_GPIO(pin);
   }
   constexpr bool IsValidInputPin(std::uint8_t pin) {
-    if (!IsValidGPIOPin(pin)) {
-      return false;
-    }
-
-    return GPIO_IS_VALID_GPIO(pin) && !GPIO_IS_VALID_OUTPUT_GPIO(pin);
+    return OPENSHOCK_IS_VALID_INPUT_GPIO(pin);
   }
   constexpr bool IsValidOutputPin(std::uint8_t pin) {
-    if (!IsValidGPIOPin(pin)) {
-      return false;
-    }
-
-    return GPIO_IS_VALID_OUTPUT_GPIO(pin);
+    return OPENSHOCK_IS_VALID_OUTPUT_GPIO(pin);
   }
   constexpr std::bitset<UINT8_MAX+1> GetValidGPIOPins() {
     std::bitset<UINT8_MAX+1> pins;
