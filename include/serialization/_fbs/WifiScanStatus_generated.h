@@ -21,17 +21,19 @@ enum class WifiScanStatus : uint8_t {
   Started = 0,
   InProgress = 1,
   Completed = 2,
-  Aborted = 3,
-  Error = 4,
+  TimedOut = 3,
+  Aborted = 4,
+  Error = 5,
   MIN = Started,
   MAX = Error
 };
 
-inline const WifiScanStatus (&EnumValuesWifiScanStatus())[5] {
+inline const WifiScanStatus (&EnumValuesWifiScanStatus())[6] {
   static const WifiScanStatus values[] = {
     WifiScanStatus::Started,
     WifiScanStatus::InProgress,
     WifiScanStatus::Completed,
+    WifiScanStatus::TimedOut,
     WifiScanStatus::Aborted,
     WifiScanStatus::Error
   };
@@ -39,10 +41,11 @@ inline const WifiScanStatus (&EnumValuesWifiScanStatus())[5] {
 }
 
 inline const char * const *EnumNamesWifiScanStatus() {
-  static const char * const names[6] = {
+  static const char * const names[7] = {
     "Started",
     "InProgress",
     "Completed",
+    "TimedOut",
     "Aborted",
     "Error",
     nullptr

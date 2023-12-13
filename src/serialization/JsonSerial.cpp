@@ -53,15 +53,7 @@ bool JsonSerial::ParseShockerCommand(const cJSON* root, JsonSerial::ShockerComma
     return false;
   }
   ShockerCommandType commandType;
-  if (strcmp(command->valuestring, "stop") == 0) {
-    commandType = ShockerCommandType::Stop;
-  } else if (strcmp(command->valuestring, "shock") == 0) {
-    commandType = ShockerCommandType::Shock;
-  } else if (strcmp(command->valuestring, "vibrate") == 0) {
-    commandType = ShockerCommandType::Vibrate;
-  } else if (strcmp(command->valuestring, "sound") == 0) {
-    commandType = ShockerCommandType::Sound;
-  } else {
+  if (!ShockerCommandTypeFromString(command->valuestring, commandType)) {
     ESP_LOGE(TAG, "value at 'type' is not a valid shocker command (stop, shock, vibrate, sound)");
     return false;
   }

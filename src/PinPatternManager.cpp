@@ -8,15 +8,14 @@ const char* const TAG = "PinPatternManager";
 
 using namespace OpenShock;
 
-PinPatternManager::PinPatternManager(std::uint8_t gpioPin) : m_gpioPin(gpioPin), m_pattern(nullptr), m_patternLength(0), m_taskHandle(nullptr), m_taskSemaphore(xSemaphoreCreateBinary()) {
+PinPatternManager::PinPatternManager(std::uint8_t gpioPin) : m_gpioPin(gpioPin), m_pattern(nullptr), m_patternLength(0), m_taskHandle(nullptr), m_taskMutex(xSemaphoreCreateMutex()) {
   pinMode(gpioPin, OUTPUT);
-  xSemaphoreGive(m_taskSemaphore);
 }
 
 PinPatternManager::~PinPatternManager() {
   ClearPattern();
 
-  vSemaphoreDelete(m_taskSemaphore);
+  vSemaphoreDelete(m_taskMutex);
 }
 
 void PinPatternManager::SetPattern(nonstd::span<const State> pattern) {
@@ -45,16 +44,16 @@ void PinPatternManager::SetPattern(nonstd::span<const State> pattern) {
   }
 
   // Give the semaphore back
-  xSemaphoreGive(m_taskSemaphore);
+  xSemaphoreGive(m_taskMutex);
 }
 
 void PinPatternManager::ClearPattern() {
   ClearPatternInternal();
-  xSemaphoreGive(m_taskSemaphore);
+  xSemaphoreGive(m_taskMutex);
 }
 
 void PinPatternManager::ClearPatternInternal() {
-  xSemaphoreTake(m_taskSemaphore, portMAX_DELAY);
+  xSemaphoreTake(m_taskMutex, portMAX_DELAY);
 
   if (m_taskHandle != nullptr) {
     vTaskDelete(m_taskHandle);
