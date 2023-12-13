@@ -34,7 +34,7 @@ static bool s_echoEnabled = true;
 #define kCommandRestart      "restart"
 #define kCommandSystemInfo   "sysinfo"
 #define kCommandSerialEcho   "echo"
-#define kCommandRfTxPin      "txpin"
+#define kCommandRfTxPin      "rftxpin"
 #define kCommandAuthToken    "authtoken"
 #define kCommandNetworks     "networks"
 #define kCommandKeepAlive    "keepalive"
@@ -54,8 +54,8 @@ restart                restart the board
 sysinfo                print debug information for various subsystems
 echo                   get serial echo enabled
 echo         <bool>    set serial echo enabled
-txpin                  get radio transmit pin
-txpin        <pin>     set radio transmit pin
+rftxpin                get radio transmit pin
+rftxpin      <pin>     set radio transmit pin
 authtoken              get auth token
 authtoken    <token>   set auth token
 networks               get all saved networks
@@ -74,12 +74,12 @@ factoryreset           reset device to factory defaults and restart
     Serial.print(kCommandRfTxPin R"(
   Get the GPIO pin used for the radio transmitter.
 
-rmtpin [<pin>]
+rftxpin [<pin>]
   Set the GPIO pin used for the radio transmitter.
   Arguments:
     <pin> must be a number.
   Example:
-    rmtpin 15
+    rftxpin 15
 )");
     return;
   }
