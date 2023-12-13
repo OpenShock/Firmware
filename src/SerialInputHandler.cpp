@@ -32,9 +32,7 @@ static bool s_echoEnabled = true;
 #define kCommandHelp         "help"
 #define kCommandVersion      "version"
 #define kCommandRestart      "restart"
-#define kCommandRestartAlias "reboot"
-#define kCommandDebugInfo    "debug"
-#define kCommandDebugAlias   "info"
+#define kCommandSystemInfo   "sysinfo"
 #define kCommandSerialEcho   "echo"
 #define kCommandRfTxPin      "txpin"
 #define kCommandAuthToken    "authtoken"
@@ -52,8 +50,8 @@ void _handleHelpCommand(char* arg, std::size_t argLength) {
 help                   print this menu
 help         <command> print help for a command
 version                print version information
-restart | reboot       restart the board
-debug | info           print debug information for various subsystems
+restart                restart the board
+sysinfo                print debug information for various subsystems
 echo                   get serial echo enabled
 echo         <bool>    set serial echo enabled
 txpin                  get radio transmit pin
@@ -100,11 +98,11 @@ authtoken [<token>]
     return;
   }
 
-  if (strcasecmp(arg, kCommandDebugInfo) == 0 || strcasecmp(arg, kCommandDebugAlias) == 0) {
-    Serial.print(kCommandDebugInfo R"(
-  Get debug information from RTOS, WiFi, etc.
+  if (strcasecmp(arg, kCommandSystemInfo) == 0) {
+    Serial.print(kCommandSystemInfo R"(
+  Get system information from RTOS, WiFi, etc.
   Example:
-    debug
+    sysinfo
 )");
     return;
   }
@@ -155,7 +153,7 @@ keepalive [<bool>]
     return;
   }
 
-  if (strcasecmp(arg, kCommandRestart) == 0 || strcasecmp(arg, kCommandRestartAlias) == 0) {
+  if (strcasecmp(arg, kCommandRestart) == 0) {
     Serial.print(kCommandRestart R"(
   Restart the board
   Example:
@@ -228,22 +226,25 @@ rawconfig <base64>
   Serial.println("Command not found");
 }
 
-// Checks if the given argument is a boolean
-// Returns 0 if false, 1 if true, 255 if invalid
-// Valid inputs: true, false, 1, 0, yes, no, y, n, on, off
-// Case-insensitive
-std::uint8_t _argToBool(char* arg, std::size_t argLength) {
-  if (arg == nullptr || argLength <= 0) {
-    return 255;
+/// @brief Tries to parse a boolean from a string (case-insensitive)
+/// @param str Input string
+/// @param strLen Length of input string
+/// @param out Output boolean
+/// @return True if the argument is a boolean, false otherwise
+bool _tryParseBool(char* str, std::size_t strLen, bool& out) {
+  if (str == nullptr || strLen <= 0) {
+    return false;
   }
 
-  if (strcasecmp(arg, "true") == 0 || strcasecmp(arg, "1") == 0 || strcasecmp(arg, "yes") == 0 || strcasecmp(arg, "y") == 0 || strcasecmp(arg, "on") == 0) {
-    return 1;
-  } else if (strcasecmp(arg, "false") == 0 || strcasecmp(arg, "0") == 0 || strcasecmp(arg, "no") == 0 || strcasecmp(arg, "n") == 0 || strcasecmp(arg, "off") == 0) {
-    return 0;
-  } else {
-    return 255;
+  if (strcasecmp(str, "true") == 0) {
+    return true;
   }
+
+  if (strcasecmp(str, "false") == 0) {
+    return true;
+  }
+
+  return false;
 }
 
 void _handleVersionCommand(char* arg, std::size_t argLength) {
@@ -400,9 +401,10 @@ void _handleNetworksCommand(char* arg, std::size_t argLength) {
 }
 
 void _handleKeepAliveCommand(char* arg, std::size_t argLength) {
+  bool keepAliveEnabled;
+
   if (arg == nullptr || argLength <= 0) {
     // Get keep alive status
-    bool keepAliveEnabled;
     if (!Config::GetRFConfigKeepAliveEnabled(keepAliveEnabled)) {
       SERPR_ERROR("Failed to get keep-alive status from config");
       return;
@@ -412,19 +414,17 @@ void _handleKeepAliveCommand(char* arg, std::size_t argLength) {
     return;
   }
 
-  std::uint8_t enabled = _argToBool(arg, argLength);
-
-  if (enabled == 255) {
+  if (!_tryParseBool(arg, argLength, keepAliveEnabled)) {
     SERPR_ERROR("Invalid argument (not a boolean)");
     return;
-  } else {
-    bool result = OpenShock::CommandHandler::SetKeepAliveEnabled(enabled);
+  }
 
-    if (result) {
-      SERPR_SUCCESS("Saved config");
-    } else {
-      SERPR_ERROR("Failed to save config");
-    }
+  bool result = OpenShock::CommandHandler::SetKeepAliveEnabled(keepAliveEnabled);
+
+  if (result) {
+    SERPR_SUCCESS("Saved config");
+  } else {
+    SERPR_ERROR("Failed to save config");
   }
 }
 
@@ -435,20 +435,19 @@ void _handleSerialEchoCommand(char* arg, std::size_t argLength) {
     return;
   }
 
-  std::uint8_t enabled = _argToBool(arg, argLength);
-
-  if (enabled == 255) {
+  bool enabled;
+  if (!_tryParseBool(arg, argLength, enabled)) {
     SERPR_ERROR("Invalid argument (not a boolean)");
     return;
-  } else {
-    bool result   = Config::SetSerialInputConfigEchoEnabled(enabled);
-    s_echoEnabled = enabled;
+  }
 
-    if (result) {
-      SERPR_SUCCESS("Saved config");
-    } else {
-      SERPR_ERROR("Failed to save config");
-    }
+  bool result   = Config::SetSerialInputConfigEchoEnabled(enabled);
+  s_echoEnabled = enabled;
+
+  if (result) {
+    SERPR_SUCCESS("Saved config");
+  } else {
+    SERPR_ERROR("Failed to save config");
   }
 }
 
@@ -549,9 +548,7 @@ static std::unordered_map<std::string, void (*)(char*, std::size_t)> s_commandHa
   {        kCommandHelp,         _handleHelpCommand},
   {     kCommandVersion,      _handleVersionCommand},
   {     kCommandRestart,      _handleRestartCommand},
-  {kCommandRestartAlias,      _handleRestartCommand},
-  {   kCommandDebugInfo,    _handleDebugInfoCommand},
-  {  kCommandDebugAlias,    _handleDebugInfoCommand},
+  {  kCommandSystemInfo,    _handleDebugInfoCommand},
   {  kCommandSerialEcho,   _handleSerialEchoCommand},
   {     kCommandRfTxPin,      _handleRfTxPinCommand},
   {   kCommandAuthToken,    _handleAuthtokenCommand},
