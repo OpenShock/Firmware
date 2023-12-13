@@ -20,7 +20,7 @@ const char* const TAG = "OpenShock";
 void setup() {
   Serial.begin(115'200);
 
-  if (!LittleFS.begin(true, "/static", 10, "static")) {
+  if (!LittleFS.begin(true, "/static", 10, "static0")) {
     ESP_PANIC(TAG, "Unable to mount LittleFS");
   }
 
