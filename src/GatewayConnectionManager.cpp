@@ -178,9 +178,13 @@ bool ConnectToLCG() {
     return false;
   }
 
-  String authToken = Config::GetBackendAuthToken().c_str();
+  std::string authToken;
+  if (!Config::GetBackendAuthToken(authToken)) {
+    ESP_LOGE(TAG, "Failed to get auth token");
+    return false;
+  }
 
-  auto response = HTTP::JsonAPI::AssignLcg(authToken);
+  auto response = HTTP::JsonAPI::AssignLcg(authToken.c_str());
 
   if (response.result != HTTP::RequestResult::Success) {
     ESP_LOGE(TAG, "Error while fetching LCG endpoint: %d %d", response.result, response.code);
@@ -211,17 +215,21 @@ void GatewayConnectionManager::Update() {
       return;
     }
 
-    String authToken = Config::GetBackendAuthToken().c_str();
+    std::string authToken;
+    if (!Config::GetBackendAuthToken(authToken)) {
+      ESP_LOGE(TAG, "Failed to get auth token");
+      return;
+    }
 
     // Fetch device info
-    if (!FetchDeviceInfo(authToken)) {
+    if (!FetchDeviceInfo(authToken.c_str())) {
       return;
     }
 
     s_flags |= FLAG_AUTHENTICATED;
     ESP_LOGD(TAG, "Successfully verified auth token");
 
-    s_wsClient = std::make_unique<GatewayClient>(authToken.c_str());
+    s_wsClient = std::make_unique<GatewayClient>(authToken);
   }
 
   if (s_wsClient->loop()) {

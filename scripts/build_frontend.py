@@ -263,35 +263,48 @@ def build_frontend(source, target, env):
         with gzip.open(dst_path + '.gz', 'wb') as f_out:
             f_out.write(s)
 
-    # Hash the data/www directory.
+
+def hash_file_update(md5, sha1, sha256, filepath):
+    with open(filepath, 'rb') as f:
+        while True:
+            chunk = f.read(65536)
+            if not chunk:
+                break
+            md5.update(chunk)
+            sha1.update(chunk)
+            sha256.update(chunk)
+
+
+def hash_file(filepath):
     hashMd5 = hashlib.md5()
     hashSha1 = hashlib.sha1()
     hashSha256 = hashlib.sha256()
-    for root, _, files in os.walk('data/www'):
-        root = root.replace('\\', '/')
-        for filename in files:
-            filepath = os.path.join(root, filename)
-            with open(filepath, 'rb') as f:
-                while True:
-                    chunk = f.read(65536)
-                    if not chunk:
-                        break
-                    hashMd5.update(chunk)
-                    hashSha1.update(chunk)
-                    hashSha256.update(chunk)
-    hashMd5 = hashMd5.hexdigest()
-    hashSha1 = hashSha1.hexdigest()
-    hashSha256 = hashSha256.hexdigest()
 
-    print('Build hash:')
-    print('  MD5:    ' + hashMd5)
-    print('  SHA1:   ' + hashSha1)
-    print('  SHA256: ' + hashSha256)
+    hash_file_update(hashMd5, hashSha1, hashSha256, filepath)
 
-    # Write the hashes to data/www files
-    file_write_text('data/www/hash.md5', hashMd5, None)
-    file_write_text('data/www/hash.sha1', hashSha1, None)
-    file_write_text('data/www/hash.sha256', hashSha256, None)
+    return {
+        'MD5': hashMd5.hexdigest(),
+        'SHA1': hashSha1.hexdigest(),
+        'SHA256': hashSha256.hexdigest(),
+    }
+
+
+def get_littlefs_bin_statistics(source, target, env):
+    nTargets = len(target)
+    if nTargets != 1:
+        raise Exception('Expected 1 target, got ' + str(nTargets))
+
+    bin_path = target[0].get_abspath()
+
+    bin_size = os.path.getsize(bin_path)
+    bin_hashes = hash_file(bin_path)
+
+    print('FileSystem Size: ' + str(bin_size) + ' bytes')
+    print('FileSystem Hashes:')
+    print('MD5:    ' + bin_hashes['MD5'])
+    print('SHA1:   ' + bin_hashes['SHA1'])
+    print('SHA256: ' + bin_hashes['SHA256'])
 
 
 env.AddPreAction('$BUILD_DIR/littlefs.bin', build_frontend)
+env.AddPostAction('$BUILD_DIR/littlefs.bin', get_littlefs_bin_statistics)

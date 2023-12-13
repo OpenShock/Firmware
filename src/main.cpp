@@ -19,8 +19,8 @@
 
 const char* const TAG = "OpenShock";
 
-const UBaseType_t MAIN_PRIORITY = 1;
-const std::uint32_t MAIN_STACK_SIZE = 8192;
+const UBaseType_t MAIN_PRIORITY       = 1;
+const std::uint32_t MAIN_STACK_SIZE   = 8192;
 const TickType_t MAIN_UPDATE_INTERVAL = 5;
 
 void setup_ota() {
@@ -43,18 +43,20 @@ void main_ota(void* arg) {
 }
 
 void setup_app() {
-  if (!LittleFS.begin(true)) {
+  if (!LittleFS.begin(true, "/static", 10, "static0")) {
     ESP_PANIC(TAG, "Unable to mount LittleFS");
   }
 
   OpenShock::EventHandlers::Init();
   OpenShock::VisualStateManager::Init();
-  OpenShock::SerialInputHandler::PrintWelcomeHeader();
-  OpenShock::SerialInputHandler::PrintVersionInfo();
 
   OpenShock::EStopManager::Init(100);  // 100ms update interval
 
   OpenShock::Config::Init();
+
+  if (!OpenShock::SerialInputHandler::Init()) {
+    ESP_PANIC(TAG, "Unable to initialize SerialInputHandler");
+  }
 
   if (!OpenShock::CommandHandler::Init()) {
     ESP_LOGW(TAG, "Unable to initialize CommandHandler");

@@ -1,7 +1,0 @@
-# Name,   Type, SubType,Offset,   Size, Flags
-nvs,      data, nvs,    0x9000,   0x5000
-otadata,  data, ota,    0xE000,   0x2000
-ota_0,    app,  ota_0,  0x10000,  0x1C0000
-ota_1,    app,  ota_1,  0x1D0000, 0x1C0000
-web,      data, spiffs, 0x390000, 0x6C000
-config,   data, spiffs, 0x3FC000, 0x4000

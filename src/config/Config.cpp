@@ -3,7 +3,9 @@
 #include "config/RootConfig.h"
 #include "Constants.h"
 #include "Logging.h"
+#include "ReadWriteMutex.h"
 
+#include <FS.h>
 #include <LittleFS.h>
 
 #include <cJSON.h>
@@ -14,7 +16,9 @@ const char* const TAG = "Config";
 
 using namespace OpenShock;
 
-static Config::RootConfig _mainConfig;
+static fs::LittleFSFS _configFS;
+static Config::RootConfig _configData;
+static ReadWriteMutex _configMutex;
 
 bool _tryDeserializeConfig(const std::uint8_t* buffer, std::size_t bufferLen, OpenShock::Config::RootConfig& config) {
   if (buffer == nullptr || bufferLen == 0) {
@@ -48,7 +52,7 @@ bool _tryDeserializeConfig(const std::uint8_t* buffer, std::size_t bufferLen, Op
   return true;
 }
 bool _tryLoadConfig(std::vector<std::uint8_t>& buffer) {
-  File file = LittleFS.open("/config", "rb");
+  File file = _configFS.open("/config", "rb");
   if (!file) {
     ESP_LOGE(TAG, "Failed to open config file for reading");
     return false;
@@ -76,10 +80,10 @@ bool _tryLoadConfig() {
     return false;
   }
 
-  return _tryDeserializeConfig(buffer.data(), buffer.size(), _mainConfig);
+  return _tryDeserializeConfig(buffer.data(), buffer.size(), _configData);
 }
 bool _trySaveConfig(const std::uint8_t* data, std::size_t dataLen) {
-  File file = LittleFS.open("/config", "wb");
+  File file = _configFS.open("/config", "wb");
   if (!file) {
     ESP_LOGE(TAG, "Failed to open config file for writing");
     return false;
@@ -98,7 +102,7 @@ bool _trySaveConfig(const std::uint8_t* data, std::size_t dataLen) {
 bool _trySaveConfig() {
   flatbuffers::FlatBufferBuilder builder;
 
-  auto fbsConfig = _mainConfig.ToFlatbuffers(builder);
+  auto fbsConfig = _configData.ToFlatbuffers(builder);
 
   builder.Finish(fbsConfig);
 
@@ -106,13 +110,22 @@ bool _trySaveConfig() {
 }
 
 void Config::Init() {
+  ScopedWriteLock lock(&_configMutex);
+  if (!lock.isLocked()) {
+    return;
+  }
+
+  if (!_configFS.begin(true, "/config", 3, "config")) {
+    ESP_PANIC(TAG, "Unable to mount config LittleFS partition!");
+  }
+
   if (_tryLoadConfig()) {
     return;
   }
 
   ESP_LOGW(TAG, "Failed to load config, writing default config");
 
-  _mainConfig.ToDefault();
+  _configData.ToDefault();
 
   if (!_trySaveConfig()) {
     ESP_PANIC(TAG, "Failed to save default config. Recommend formatting microcontroller and re-flashing firmware");
@@ -120,7 +133,14 @@ void Config::Init() {
 }
 
 std::string Config::GetAsJSON() {
-  cJSON* root = _mainConfig.ToJSON();
+  ScopedReadLock lock(&_configMutex);
+  if (!lock.isLocked()) {
+    return "";
+  }
+
+  cJSON* root = _configData.ToJSON();
+
+  lock.unlock();
 
   char* json = cJSON_PrintUnformatted(root);
 
@@ -139,7 +159,14 @@ bool Config::SaveFromJSON(const std::string& json) {
     return false;
   }
 
-  bool result = _mainConfig.FromJSON(root);
+  ScopedWriteLock lock(&_configMutex);
+  if (!lock.isLocked()) {
+    ESP_LOGE(TAG, "Failed to acquire write lock");
+    cJSON_Delete(root);
+    return false;
+  }
+
+  bool result = _configData.FromJSON(root);
 
   cJSON_Delete(root);
 
@@ -152,10 +179,22 @@ bool Config::SaveFromJSON(const std::string& json) {
 }
 
 bool Config::GetRaw(std::vector<std::uint8_t>& buffer) {
+  ScopedReadLock lock(&_configMutex);
+  if (!lock.isLocked()) {
+    ESP_LOGE(TAG, "Failed to acquire read lock");
+    return false;
+  }
+
   return _tryLoadConfig(buffer);
 }
 
 bool Config::SetRaw(const std::uint8_t* buffer, std::size_t size) {
+  ScopedWriteLock lock(&_configMutex);
+  if (!lock.isLocked()) {
+    ESP_LOGE(TAG, "Failed to acquire write lock");
+    return false;
+  }
+
   OpenShock::Config::RootConfig config;
   if (!_tryDeserializeConfig(buffer, size, config)) {
     ESP_LOGE(TAG, "Failed to deserialize config");
@@ -166,38 +205,90 @@ bool Config::SetRaw(const std::uint8_t* buffer, std::size_t size) {
 }
 
 void Config::FactoryReset() {
-  if (!LittleFS.remove("/config") && LittleFS.exists("/config")) {
+  ScopedWriteLock lock(&_configMutex);
+  if (!lock.isLocked()) {
+    ESP_LOGE(TAG, "Failed to acquire write lock");
+    return;
+  }
+
+  _configData.ToDefault();
+
+  if (!_configFS.remove("/config") && _configFS.exists("/config")) {
     ESP_PANIC(TAG, "Failed to remove existing config file for factory reset. Reccomend formatting microcontroller and re-flashing firmware");
   }
+
+  if (!_trySaveConfig()) {
+    ESP_PANIC(TAG, "Failed to save default config. Recommend formatting microcontroller and re-flashing firmware");
+  }
+
+  ESP_LOGI(TAG, "Factory reset complete");
 }
 
-const Config::RFConfig& Config::GetRFConfig() {
-  return _mainConfig.rf;
+bool Config::GetRFConfig(Config::RFConfig& out) {
+  ScopedReadLock lock(&_configMutex);
+  if (!lock.isLocked()) {
+    ESP_LOGE(TAG, "Failed to acquire read lock");
+    return false;
+  }
+
+  out = _configData.rf;
+
+  return true;
 }
 
-const Config::WiFiConfig& Config::GetWiFiConfig() {
-  return _mainConfig.wifi;
+bool Config::GetWiFiConfig(Config::WiFiConfig& out) {
+  ScopedReadLock lock(&_configMutex);
+  if (!lock.isLocked()) {
+    ESP_LOGE(TAG, "Failed to acquire read lock");
+    return false;
+  }
+
+  out = _configData.wifi;
+
+  return true;
 }
 
-const std::vector<Config::WiFiCredentials>& Config::GetWiFiCredentials() {
-  return _mainConfig.wifi.credentialsList;
+bool Config::GetWiFiCredentials(cJSON* array) {
+  ScopedReadLock lock(&_configMutex);
+  if (!lock.isLocked()) {
+    ESP_LOGE(TAG, "Failed to acquire read lock");
+    return false;
+  }
+
+  for (auto& creds : _configData.wifi.credentialsList) {
+    cJSON* jsonCreds = creds.ToJSON();
+
+    cJSON_AddItemToArray(array, jsonCreds);
+  }
+
+  return true;
 }
 
-const Config::CaptivePortalConfig& Config::GetCaptivePortalConfig() {
-  return _mainConfig.captivePortal;
-}
+bool Config::GetWiFiCredentials(std::vector<Config::WiFiCredentials>& out) {
+  out = _configData.wifi.credentialsList;
 
-const Config::BackendConfig& Config::GetBackendConfig() {
-  return _mainConfig.backend;
+  return true;
 }
 
 bool Config::SetRFConfig(const Config::RFConfig& config) {
-  _mainConfig.rf = config;
+  ScopedWriteLock lock(&_configMutex);
+  if (!lock.isLocked()) {
+    ESP_LOGE(TAG, "Failed to acquire write lock");
+    return false;
+  }
+
+  _configData.rf = config;
   return _trySaveConfig();
 }
 
 bool Config::SetWiFiConfig(const Config::WiFiConfig& config) {
-  _mainConfig.wifi = config;
+  ScopedWriteLock lock(&_configMutex);
+  if (!lock.isLocked()) {
+    ESP_LOGE(TAG, "Failed to acquire write lock");
+    return false;
+  }
+
+  _configData.wifi = config;
   return _trySaveConfig();
 }
 
@@ -209,35 +300,121 @@ bool Config::SetWiFiCredentials(const std::vector<Config::WiFiCredentials>& cred
     }
   }
 
-  _mainConfig.wifi.credentialsList = credentials;
+  ScopedWriteLock lock(&_configMutex);
+  if (!lock.isLocked()) {
+    ESP_LOGE(TAG, "Failed to acquire write lock");
+    return false;
+  }
+
+  _configData.wifi.credentialsList = credentials;
   return _trySaveConfig();
 }
 
 bool Config::SetCaptivePortalConfig(const Config::CaptivePortalConfig& config) {
-  _mainConfig.captivePortal = config;
+  ScopedWriteLock lock(&_configMutex);
+  if (!lock.isLocked()) {
+    ESP_LOGE(TAG, "Failed to acquire write lock");
+    return false;
+  }
+
+  _configData.captivePortal = config;
+  return _trySaveConfig();
+}
+
+bool Config::SetSerialInputConfig(const Config::SerialInputConfig& config) {
+  _configData.serialInput = config;
+  return _trySaveConfig();
+}
+
+bool Config::GetSerialInputConfigEchoEnabled(bool& out) {
+  out = _configData.serialInput.echoEnabled;
+  return true;
+}
+
+bool Config::SetSerialInputConfigEchoEnabled(bool enabled) {
+  _configData.serialInput.echoEnabled = enabled;
   return _trySaveConfig();
 }
 
 bool Config::SetBackendConfig(const Config::BackendConfig& config) {
-  _mainConfig.backend = config;
+  ScopedWriteLock lock(&_configMutex);
+  if (!lock.isLocked()) {
+    ESP_LOGE(TAG, "Failed to acquire write lock");
+    return false;
+  }
+
+  _configData.backend = config;
   return _trySaveConfig();
+}
+
+bool Config::GetRFConfigTxPin(std::uint8_t& out) {
+  ScopedReadLock lock(&_configMutex);
+  if (!lock.isLocked()) {
+    ESP_LOGE(TAG, "Failed to acquire read lock");
+    return false;
+  }
+
+  out = _configData.rf.txPin;
+
+  return true;
 }
 
 bool Config::SetRFConfigTxPin(std::uint8_t txPin) {
-  _mainConfig.rf.txPin = txPin;
+  ScopedWriteLock lock(&_configMutex);
+  if (!lock.isLocked()) {
+    ESP_LOGE(TAG, "Failed to acquire write lock");
+    return false;
+  }
+
+  _configData.rf.txPin = txPin;
   return _trySaveConfig();
+}
+
+bool Config::GetRFConfigKeepAliveEnabled(bool& out) {
+  ScopedReadLock lock(&_configMutex);
+  if (!lock.isLocked()) {
+    ESP_LOGE(TAG, "Failed to acquire read lock");
+    return false;
+  }
+
+  out = _configData.rf.keepAliveEnabled;
+
+  return true;
 }
 
 bool Config::SetRFConfigKeepAliveEnabled(bool enabled) {
-  _mainConfig.rf.keepAliveEnabled = enabled;
+  ScopedWriteLock lock(&_configMutex);
+  if (!lock.isLocked()) {
+    ESP_LOGE(TAG, "Failed to acquire write lock");
+    return false;
+  }
+
+  _configData.rf.keepAliveEnabled = enabled;
   return _trySaveConfig();
 }
 
+bool Config::AnyWiFiCredentials(std::function<bool(const Config::WiFiCredentials&)> predicate) {
+  ScopedReadLock lock(&_configMutex);
+  if (!lock.isLocked()) {
+    ESP_LOGE(TAG, "Failed to acquire read lock");
+  }
+
+  auto& creds = _configData.wifi.credentialsList;
+
+  return std::any_of(creds.begin(), creds.end(), predicate);
+}
+
 std::uint8_t Config::AddWiFiCredentials(const std::string& ssid, const std::string& password) {
+  ScopedWriteLock lock(&_configMutex);
+  if (!lock.isLocked()) {
+    ESP_LOGE(TAG, "Failed to acquire write lock");
+    return false;
+  }
+
   std::uint8_t id = 0;
 
   std::bitset<255> bits;
-  for (auto it = _mainConfig.wifi.credentialsList.begin(); it != _mainConfig.wifi.credentialsList.end(); ++it) {
+  for (auto it = _configData.wifi.credentialsList.begin(); it != _configData.wifi.credentialsList.end(); ++it) {
     auto& creds = *it;
 
     if (creds.ssid == ssid) {
@@ -250,7 +427,7 @@ std::uint8_t Config::AddWiFiCredentials(const std::string& ssid, const std::stri
 
     if (creds.id == 0) {
       ESP_LOGW(TAG, "Found WiFi credentials with ID 0, removing");
-      it = _mainConfig.wifi.credentialsList.erase(it);
+      it = _configData.wifi.credentialsList.erase(it);
       continue;
     }
 
@@ -271,7 +448,7 @@ std::uint8_t Config::AddWiFiCredentials(const std::string& ssid, const std::stri
     return 0;
   }
 
-  _mainConfig.wifi.credentialsList.push_back({
+  _configData.wifi.credentialsList.push_back({
     .id       = id,
     .ssid     = ssid,
     .password = password,
@@ -282,7 +459,13 @@ std::uint8_t Config::AddWiFiCredentials(const std::string& ssid, const std::stri
 }
 
 bool Config::TryGetWiFiCredentialsByID(std::uint8_t id, Config::WiFiCredentials& credentials) {
-  for (auto& creds : _mainConfig.wifi.credentialsList) {
+  ScopedReadLock lock(&_configMutex);
+  if (!lock.isLocked()) {
+    ESP_LOGE(TAG, "Failed to acquire read lock");
+    return false;
+  }
+
+  for (auto& creds : _configData.wifi.credentialsList) {
     if (creds.id == id) {
       credentials = creds;
       return true;
@@ -293,7 +476,13 @@ bool Config::TryGetWiFiCredentialsByID(std::uint8_t id, Config::WiFiCredentials&
 }
 
 bool Config::TryGetWiFiCredentialsBySSID(const char* ssid, Config::WiFiCredentials& credentials) {
-  for (auto& creds : _mainConfig.wifi.credentialsList) {
+  ScopedReadLock lock(&_configMutex);
+  if (!lock.isLocked()) {
+    ESP_LOGE(TAG, "Failed to acquire read lock");
+    return false;
+  }
+
+  for (auto& creds : _configData.wifi.credentialsList) {
     if (creds.ssid == ssid) {
       credentials = creds;
       return true;
@@ -304,7 +493,13 @@ bool Config::TryGetWiFiCredentialsBySSID(const char* ssid, Config::WiFiCredentia
 }
 
 std::uint8_t Config::GetWiFiCredentialsIDbySSID(const char* ssid) {
-  for (auto& creds : _mainConfig.wifi.credentialsList) {
+  ScopedReadLock lock(&_configMutex);
+  if (!lock.isLocked()) {
+    ESP_LOGE(TAG, "Failed to acquire read lock");
+    return false;
+  }
+
+  for (auto& creds : _configData.wifi.credentialsList) {
     if (creds.ssid == ssid) {
       return creds.id;
     }
@@ -314,9 +509,15 @@ std::uint8_t Config::GetWiFiCredentialsIDbySSID(const char* ssid) {
 }
 
 bool Config::RemoveWiFiCredentials(std::uint8_t id) {
-  for (auto it = _mainConfig.wifi.credentialsList.begin(); it != _mainConfig.wifi.credentialsList.end(); ++it) {
+  ScopedWriteLock lock(&_configMutex);
+  if (!lock.isLocked()) {
+    ESP_LOGE(TAG, "Failed to acquire write lock");
+    return false;
+  }
+
+  for (auto it = _configData.wifi.credentialsList.begin(); it != _configData.wifi.credentialsList.end(); ++it) {
     if (it->id == id) {
-      _mainConfig.wifi.credentialsList.erase(it);
+      _configData.wifi.credentialsList.erase(it);
       _trySaveConfig();
       return true;
     }
@@ -325,25 +526,58 @@ bool Config::RemoveWiFiCredentials(std::uint8_t id) {
   return false;
 }
 
-void Config::ClearWiFiCredentials() {
-  _mainConfig.wifi.credentialsList.clear();
-  _trySaveConfig();
+bool Config::ClearWiFiCredentials() {
+  ScopedWriteLock lock(&_configMutex);
+  if (!lock.isLocked()) {
+    ESP_LOGE(TAG, "Failed to acquire write lock");
+    return false;
+  }
+
+  _configData.wifi.credentialsList.clear();
+
+  return _trySaveConfig();
 }
 
 bool Config::HasBackendAuthToken() {
-  return !_mainConfig.backend.authToken.empty();
+  ScopedReadLock lock(&_configMutex);
+  if (!lock.isLocked()) {
+    ESP_LOGE(TAG, "Failed to acquire read lock");
+    return false;
+  }
+
+  return !_configData.backend.authToken.empty();
 }
 
-const std::string& Config::GetBackendAuthToken() {
-  return _mainConfig.backend.authToken;
+bool Config::GetBackendAuthToken(std::string& out) {
+  ScopedReadLock lock(&_configMutex);
+  if (!lock.isLocked()) {
+    ESP_LOGE(TAG, "Failed to acquire read lock");
+    return false;
+  }
+
+  out = _configData.backend.authToken;
+
+  return true;
 }
 
 bool Config::SetBackendAuthToken(const std::string& token) {
-  _mainConfig.backend.authToken = token;
+  ScopedWriteLock lock(&_configMutex);
+  if (!lock.isLocked()) {
+    ESP_LOGE(TAG, "Failed to acquire write lock");
+    return false;
+  }
+
+  _configData.backend.authToken = token;
   return _trySaveConfig();
 }
 
 bool Config::ClearBackendAuthToken() {
-  _mainConfig.backend.authToken = "";
+  ScopedWriteLock lock(&_configMutex);
+  if (!lock.isLocked()) {
+    ESP_LOGE(TAG, "Failed to acquire write lock");
+    return false;
+  }
+
+  _configData.backend.authToken = "";
   return _trySaveConfig();
 }
