@@ -1,7 +1,7 @@
 #pragma once
 
-#include <FreeRTOS.h>
-#include <semphr.h>
+#include <freertos/FreeRTOS.h>
+#include <freertos/semphr.h>
 
 namespace OpenShock {
   class ReadWriteMutex {
