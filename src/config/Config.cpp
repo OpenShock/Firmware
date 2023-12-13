@@ -1,9 +1,9 @@
 #include "config/Config.h"
 
 #include "config/RootConfig.h"
-#include "ReadWriteMutex.h"
 #include "Constants.h"
 #include "Logging.h"
+#include "ReadWriteMutex.h"
 
 #include <FS.h>
 #include <LittleFS.h>
@@ -318,6 +318,21 @@ bool Config::SetCaptivePortalConfig(const Config::CaptivePortalConfig& config) {
   }
 
   _configData.captivePortal = config;
+  return _trySaveConfig();
+}
+
+bool Config::SetSerialInputConfig(const Config::SerialInputConfig& config) {
+  _configData.serialInput = config;
+  return _trySaveConfig();
+}
+
+bool Config::GetSerialInputConfigEchoEnabled(bool& out) {
+  out = _configData.serialInput.echoEnabled;
+  return true;
+}
+
+bool Config::SetSerialInputConfigEchoEnabled(bool enabled) {
+  _configData.serialInput.echoEnabled = enabled;
   return _trySaveConfig();
 }
 
