@@ -3,6 +3,7 @@
 #include "CommandHandler.h"
 #include "config/Config.h"
 #include "config/SerialInputConfig.h"
+#include "FormatHelpers.h"
 #include "Logging.h"
 #include "serialization/JsonSerial.h"
 #include "Time.h"
@@ -229,16 +230,16 @@ rawconfig <base64>
 
 // Checks if the given argument is a boolean
 // Returns 0 if false, 1 if true, 255 if invalid
-// Valid inputs: true, false, 1, 0, yes, no, y, n
+// Valid inputs: true, false, 1, 0, yes, no, y, n, on, off
 // Case-insensitive
 std::uint8_t _argToBool(char* arg, std::size_t argLength) {
   if (arg == nullptr || argLength <= 0) {
     return 255;
   }
 
-  if (strcasecmp(arg, "true") == 0 || strcasecmp(arg, "1") == 0 || strcasecmp(arg, "yes") == 0 || strcasecmp(arg, "y") == 0) {
+  if (strcasecmp(arg, "true") == 0 || strcasecmp(arg, "1") == 0 || strcasecmp(arg, "yes") == 0 || strcasecmp(arg, "y") == 0 || strcasecmp(arg, "on") == 0) {
     return 1;
-  } else if (strcasecmp(arg, "false") == 0 || strcasecmp(arg, "0") == 0 || strcasecmp(arg, "no") == 0 || strcasecmp(arg, "n") == 0) {
+  } else if (strcasecmp(arg, "false") == 0 || strcasecmp(arg, "0") == 0 || strcasecmp(arg, "no") == 0 || strcasecmp(arg, "n") == 0 || strcasecmp(arg, "off") == 0) {
     return 0;
   } else {
     return 255;
@@ -487,7 +488,7 @@ void _handleDebugInfoCommand(char* arg, std::size_t argLength) {
   SERPR_RESPONSE("WiFiInfo|Connected|%s", connected ? "true" : "false");
   if (connected) {
     SERPR_RESPONSE("WiFiInfo|SSID|%s", network.ssid);
-    SERPR_RESPONSE("WiFiInfo|BSSID|%02X:%02X:%02X:%02X:%02X:%02X", network.bssid[0], network.bssid[1], network.bssid[2], network.bssid[3], network.bssid[4], network.bssid[5]);
+    SERPR_RESPONSE("WiFiInfo|BSSID|" BSSID_FMT, BSSID_ARG(network.bssid));
 
     char ipAddressBuffer[64];
     OpenShock::WiFiManager::GetIPAddress(ipAddressBuffer);
