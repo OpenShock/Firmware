@@ -1,6 +1,6 @@
 #include "CommandHandler.h"
 
-#include "Board.h"
+#include "Chipset.h"
 #include "config/Config.h"
 #include "Constants.h"
 #include "Logging.h"
