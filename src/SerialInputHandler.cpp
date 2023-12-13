@@ -65,7 +65,7 @@ keepalive    <bool>    set shocker keep-alive enabled
 rawconfig              get raw binary config
 rawconfig    <base64>  set raw binary config
 rftransmit   <json>    transmit a RF command
-factoryreset           reset device to factory defaults and reboot
+factoryreset           reset device to factory defaults and restart
 )");
     return;
   }
@@ -169,7 +169,7 @@ keepalive [<bool>]
     rawconfig
 
 rawconfig <base64>
-  Set the raw binary config, and reboot
+  Set the raw binary config, and restart
   Arguments:
     <base64> must be a base64 encoded string
   Example:
@@ -180,7 +180,7 @@ rawconfig <base64>
 
   if (strcasecmp(arg, kCommandFactoryReset) == 0) {
     Serial.print(kCommandFactoryReset R"(
-  Reset the device to factory defaults and reboot
+  Reset the device to factory defaults and restart
   Example:
     factoryreset
 )");
@@ -260,7 +260,7 @@ void _handleRestartCommand(char* arg, std::size_t argLength) {
 void _handleFactoryResetCommand(char* arg, std::size_t argLength) {
   Serial.println("Resetting to factory defaults...");
   Config::FactoryReset();
-  Serial.println("Rebooting...");
+  Serial.println("Restarting...");
   ESP.restart();
 }
 
@@ -482,7 +482,7 @@ void _handleRawConfigCommand(char* arg, std::size_t argLength) {
     return;
   }
 
-  SERPR_SUCCESS("Saved config, rebooting...");
+  SERPR_SUCCESS("Saved config, restarting...");
 
   ESP.restart();
 }

@@ -25,7 +25,7 @@ namespace OpenShock::Config {
   /**
    * @brief Resets the config file to the factory default values.
    *
-   * @note A reboot after calling this function is HIGHLY recommended.
+   * @note A restart after calling this function is HIGHLY recommended.
    */
   void FactoryReset();
 
