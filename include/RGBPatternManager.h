@@ -38,6 +38,6 @@ namespace OpenShock {
     RGBState* m_pattern;
     std::size_t m_patternLength;
     TaskHandle_t m_taskHandle;
-    SemaphoreHandle_t m_taskSemaphore;
+    SemaphoreHandle_t m_taskMutex;
   };
 }  // namespace OpenShock

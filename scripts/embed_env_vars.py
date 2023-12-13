@@ -45,9 +45,17 @@ def get_git_commit() -> str | None:
 
 # Find env variables based on only the pioenv and sysenv.
 def get_pio_firmware_vars() -> dict[str, str | int | bool]:
+    fw_board = pio.get_string('PIOENV')
+    fw_chip = pio.get_string('BOARD_MCU')
+
+    def macroify(s: str) -> str:
+        return s.upper().replace('-', '').replace('_', '')
+
     vars = {}
-    vars['OPENSHOCK_FW_BOARD'] = pio.get_string('PIOENV')
-    vars['OPENSHOCK_FW_CHIP'] = pio.get_string('BOARD_MCU')
+    vars['OPENSHOCK_FW_BOARD'] = fw_board
+    vars['OPENSHOCK_FW_BOARD_' + macroify(fw_board)] = True  # Used for conditional compilation.
+    vars['OPENSHOCK_FW_CHIP'] = fw_chip
+    vars['OPENSHOCK_FW_CHIP_' + macroify(fw_chip)] = True  # Used for conditional compilation.
     vars['OPENSHOCK_FW_MODE'] = pio_build_type
     git_commit = get_git_commit()
     if git_commit is not None:
