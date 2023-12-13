@@ -160,6 +160,10 @@
 #error "ESP32-C6 is not supported yet."
 #endif
 
+#ifndef OPENSHOCK_FW_CHIP_NAME
+#error "Selected chipset is misspelled or not supported by OpenShock."
+#endif
+
 #pragma endregion
 
 /// Board specific bad-pin bypasses for compatibility reasons.
@@ -190,19 +194,39 @@
 
 #pragma endregion
 
-#define OPENSHOCK_IS_VALID_GPIO(pin) ((pin < GPIO_NUM_MAX && !CHIP_UNSAFE_GPIO(pin)) || OPENSHOCK_BYPASSED_GPIO(pin))
-#define OPENSHOCK_IS_VALID_INPUT_GPIO(pin) ((OPENSHOCK_IS_VALID_GPIO(pin) && (GPIO_IS_VALID_GPIO(pin) && !GPIO_IS_VALID_OUTPUT_GPIO(pin))) || OPENSHOCK_BYPASSED_GPIO(pin))
-#define OPENSHOCK_IS_VALID_OUTPUT_GPIO(pin) ((OPENSHOCK_IS_VALID_GPIO(pin) && GPIO_IS_VALID_OUTPUT_GPIO(pin)) || OPENSHOCK_BYPASSED_GPIO(pin))
-
 namespace OpenShock {
   constexpr bool IsValidGPIOPin(std::uint8_t pin) {
-    return OPENSHOCK_IS_VALID_GPIO(pin);
+    if (pin >= GPIO_NUM_MAX) {
+      return false;
+    }
+
+    if (!GPIO_IS_VALID_GPIO(pin)) {
+      return false;
+    }
+
+    if (OPENSHOCK_BYPASSED_GPIO(pin)) {
+      return true;
+    }
+
+    if (CHIP_UNSAFE_GPIO(pin)) {
+      return false;
+    }
+
+    return true;
   }
   constexpr bool IsValidInputPin(std::uint8_t pin) {
-    return OPENSHOCK_IS_VALID_INPUT_GPIO(pin);
+    return IsValidGPIOPin(pin);
   }
   constexpr bool IsValidOutputPin(std::uint8_t pin) {
-    return OPENSHOCK_IS_VALID_OUTPUT_GPIO(pin);
+    if (!IsValidGPIOPin(pin)) {
+      return false;
+    }
+
+    if (!GPIO_IS_VALID_OUTPUT_GPIO(pin)) {
+      return false;
+    }
+
+    return true;
   }
   constexpr std::bitset<UINT8_MAX+1> GetValidGPIOPins() {
     std::bitset<UINT8_MAX+1> pins;
