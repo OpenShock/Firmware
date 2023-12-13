@@ -21,8 +21,9 @@ enum WiFiScanTaskNotificationFlags {
 
 using namespace OpenShock;
 
+static bool s_initialized = false;
 static TaskHandle_t s_scanTaskHandle     = nullptr;
-static SemaphoreHandle_t s_scanTaskMutex = xSemaphoreCreateBinary();
+static SemaphoreHandle_t s_scanTaskMutex = xSemaphoreCreateMutex();
 static std::uint8_t s_currentChannel     = 0;
 static std::map<std::uint64_t, WiFiScanManager::StatusChangedHandler> s_statusChangedHandlers;
 static std::map<std::uint64_t, WiFiScanManager::NetworkDiscoveryHandler> s_networkDiscoveredHandlers;
@@ -185,14 +186,15 @@ void _evSTAStopped(arduino_event_id_t event, arduino_event_info_t info) {
 }
 
 bool WiFiScanManager::Init() {
-  // Initialize the scan semaphore
-  if (xSemaphoreGive(s_scanTaskMutex) != pdTRUE) {
-    ESP_LOGE(TAG, "Initialize function called more than once");
-    return false;
+  if (s_initialized) {
+    ESP_LOGW(TAG, "WiFiScanManager is already initialized");
+    return true;
   }
 
   WiFi.onEvent(_evScanCompleted, ARDUINO_EVENT_WIFI_SCAN_DONE);
   WiFi.onEvent(_evSTAStopped, ARDUINO_EVENT_WIFI_STA_STOP);
+
+  s_initialized = true;
 
   return true;
 }

@@ -107,14 +107,15 @@ CaptivePortalInstance::CaptivePortalInstance()
       request->send(
         200,
         "text/plain",
-// Raw string literal (1+ to remove the first newline)
-1+R"(
+        // Raw string literal (1+ to remove the first newline)
+        1 + R"(
 You probably forgot to upload the Filesystem with PlatformIO!
 Go to PlatformIO -> Platform -> Upload Filesystem Image!
 If this happened with a file we provided or you just need help, come to the Discord!
 
-discord.gg/openshock
-)");
+discord.gg/OpenShock
+)"
+      );
     });
   }
 
@@ -128,8 +129,10 @@ discord.gg/openshock
 }
 
 CaptivePortalInstance::~CaptivePortalInstance() {
-  vTaskDelete(m_taskHandle);
-
+  if (m_taskHandle != nullptr) {
+    vTaskDelete(m_taskHandle);
+    m_taskHandle = nullptr;
+  }
   m_webServer.end();
   m_socketServer.close();
 }
