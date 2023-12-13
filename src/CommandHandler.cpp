@@ -163,7 +163,11 @@ bool CommandHandler::Init() {
   s_keepAliveSemaphore = xSemaphoreCreateBinary();
   xSemaphoreGive(s_keepAliveSemaphore);
 
-  auto& rfConfig = Config::GetRFConfig();
+  Config::RFConfig rfConfig;
+  if (!Config::GetRFConfig(rfConfig)) {
+    ESP_LOGE(TAG, "Failed to get RF config");
+    return false;
+  }
 
   std::uint8_t txPin = rfConfig.txPin;
   if (!OpenShock::IsValidOutputPin(txPin)) {
@@ -244,7 +248,13 @@ bool CommandHandler::SetKeepAliveEnabled(bool enabled) {
 }
 
 bool CommandHandler::SetKeepAlivePaused(bool paused) {
-  if (Config::GetRFConfig().keepAliveEnabled == false && paused == false) {
+  bool keepAliveEnabled = false;
+  if (!Config::GetRFConfigKeepAliveEnabled(keepAliveEnabled)) {
+    ESP_LOGE(TAG, "Failed to get keep-alive enabled from config");
+    return false;
+  }
+
+  if (keepAliveEnabled == false && paused == false) {
     ESP_LOGW(TAG, "Keep-alive is disabled in config, ignoring unpause command");
     return false;
   }
@@ -256,7 +266,13 @@ bool CommandHandler::SetKeepAlivePaused(bool paused) {
 }
 
 std::uint8_t CommandHandler::GetRfTxPin() {
-  return Config::GetRFConfig().txPin;
+  std::uint8_t txPin;
+  if (!Config::GetRFConfigTxPin(txPin)) {
+    ESP_LOGE(TAG, "Failed to get RF TX pin from config");
+    txPin = Constants::GPIO_INVALID;
+  }
+
+  return txPin;
 }
 
 bool CommandHandler::HandleCommand(ShockerModelType model, std::uint16_t shockerId, ShockerCommandType type, std::uint8_t intensity, std::uint16_t durationMs) {
