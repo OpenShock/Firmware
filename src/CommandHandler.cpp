@@ -1,6 +1,6 @@
 #include "CommandHandler.h"
 
-#include "Board.h"
+#include "Chipset.h"
 #include "config/Config.h"
 #include "Constants.h"
 #include "Logging.h"
@@ -38,12 +38,12 @@ struct KnownShocker {
   bool killTask;
 };
 
-static SemaphoreHandle_t s_rfTransmitterSemaphore     = nullptr;
+static SemaphoreHandle_t s_rfTransmitterMutex         = nullptr;
 static std::unique_ptr<RFTransmitter> s_rfTransmitter = nullptr;
 
-static SemaphoreHandle_t s_keepAliveSemaphore = nullptr;
-static QueueHandle_t s_keepAliveQueue         = nullptr;
-static TaskHandle_t s_keepAliveTaskHandle     = nullptr;
+static SemaphoreHandle_t s_keepAliveMutex = nullptr;
+static QueueHandle_t s_keepAliveQueue     = nullptr;
+static TaskHandle_t s_keepAliveTaskHandle = nullptr;
 
 void _keepAliveTask(void* arg) {
   std::int64_t timeToKeepAlive = KEEP_ALIVE_INTERVAL;
@@ -106,7 +106,7 @@ bool _internalSetKeepAliveEnabled(bool enabled) {
     return true;
   }
 
-  xSemaphoreTake(s_keepAliveSemaphore, portMAX_DELAY);
+  xSemaphoreTake(s_keepAliveMutex, portMAX_DELAY);
 
   if (enabled) {
     ESP_LOGV(TAG, "Enabling keep-alive task");
@@ -115,7 +115,7 @@ bool _internalSetKeepAliveEnabled(bool enabled) {
     if (s_keepAliveQueue == nullptr) {
       ESP_LOGE(TAG, "Failed to create keep-alive task");
 
-      xSemaphoreGive(s_keepAliveSemaphore);
+      xSemaphoreGive(s_keepAliveMutex);
       return false;
     }
 
@@ -125,7 +125,7 @@ bool _internalSetKeepAliveEnabled(bool enabled) {
       vQueueDelete(s_keepAliveQueue);
       s_keepAliveQueue = nullptr;
 
-      xSemaphoreGive(s_keepAliveSemaphore);
+      xSemaphoreGive(s_keepAliveMutex);
       return false;
     }
   } else {
@@ -146,24 +146,26 @@ bool _internalSetKeepAliveEnabled(bool enabled) {
     }
   }
 
-  xSemaphoreGive(s_keepAliveSemaphore);
+  xSemaphoreGive(s_keepAliveMutex);
 
   return true;
 }
 
 bool CommandHandler::Init() {
-  if (s_rfTransmitterSemaphore != nullptr) {
+  if (s_rfTransmitterMutex != nullptr) {
     ESP_LOGW(TAG, "RF Transmitter is already initialized");
     return true;
   }
 
-  // Initialize semaphores
-  s_rfTransmitterSemaphore = xSemaphoreCreateBinary();
-  xSemaphoreGive(s_rfTransmitterSemaphore);
-  s_keepAliveSemaphore = xSemaphoreCreateBinary();
-  xSemaphoreGive(s_keepAliveSemaphore);
+  // Initialize mutexes
+  s_rfTransmitterMutex = xSemaphoreCreateMutex();
+  s_keepAliveMutex     = xSemaphoreCreateMutex();
 
-  auto& rfConfig = Config::GetRFConfig();
+  Config::RFConfig rfConfig;
+  if (!Config::GetRFConfig(rfConfig)) {
+    ESP_LOGE(TAG, "Failed to get RF config");
+    return false;
+  }
 
   std::uint8_t txPin = rfConfig.txPin;
   if (!OpenShock::IsValidOutputPin(txPin)) {
@@ -201,7 +203,7 @@ SetRfPinResultCode CommandHandler::SetRfTxPin(std::uint8_t txPin) {
     return SetRfPinResultCode::InvalidPin;
   }
 
-  xSemaphoreTake(s_rfTransmitterSemaphore, portMAX_DELAY);
+  xSemaphoreTake(s_rfTransmitterMutex, portMAX_DELAY);
 
   if (s_rfTransmitter != nullptr) {
     ESP_LOGV(TAG, "Destroying existing RF transmitter");
@@ -213,20 +215,20 @@ SetRfPinResultCode CommandHandler::SetRfTxPin(std::uint8_t txPin) {
   if (!rfxmit->ok()) {
     ESP_LOGE(TAG, "Failed to initialize RF transmitter");
 
-    xSemaphoreGive(s_rfTransmitterSemaphore);
+    xSemaphoreGive(s_rfTransmitterMutex);
     return SetRfPinResultCode::InternalError;
   }
 
   if (!Config::SetRFConfigTxPin(txPin)) {
     ESP_LOGE(TAG, "Failed to set RF TX pin in config");
 
-    xSemaphoreGive(s_rfTransmitterSemaphore);
+    xSemaphoreGive(s_rfTransmitterMutex);
     return SetRfPinResultCode::InternalError;
   }
 
   s_rfTransmitter = std::move(rfxmit);
 
-  xSemaphoreGive(s_rfTransmitterSemaphore);
+  xSemaphoreGive(s_rfTransmitterMutex);
   return SetRfPinResultCode::Success;
 }
 
@@ -244,7 +246,13 @@ bool CommandHandler::SetKeepAliveEnabled(bool enabled) {
 }
 
 bool CommandHandler::SetKeepAlivePaused(bool paused) {
-  if (Config::GetRFConfig().keepAliveEnabled == false && paused == false) {
+  bool keepAliveEnabled = false;
+  if (!Config::GetRFConfigKeepAliveEnabled(keepAliveEnabled)) {
+    ESP_LOGE(TAG, "Failed to get keep-alive enabled from config");
+    return false;
+  }
+
+  if (keepAliveEnabled == false && paused == false) {
     ESP_LOGW(TAG, "Keep-alive is disabled in config, ignoring unpause command");
     return false;
   }
@@ -256,16 +264,22 @@ bool CommandHandler::SetKeepAlivePaused(bool paused) {
 }
 
 std::uint8_t CommandHandler::GetRfTxPin() {
-  return Config::GetRFConfig().txPin;
+  std::uint8_t txPin;
+  if (!Config::GetRFConfigTxPin(txPin)) {
+    ESP_LOGE(TAG, "Failed to get RF TX pin from config");
+    txPin = Constants::GPIO_INVALID;
+  }
+
+  return txPin;
 }
 
 bool CommandHandler::HandleCommand(ShockerModelType model, std::uint16_t shockerId, ShockerCommandType type, std::uint8_t intensity, std::uint16_t durationMs) {
-  xSemaphoreTake(s_rfTransmitterSemaphore, portMAX_DELAY);
+  xSemaphoreTake(s_rfTransmitterMutex, portMAX_DELAY);
 
   if (s_rfTransmitter == nullptr) {
     ESP_LOGW(TAG, "RF Transmitter is not initialized, ignoring command");
 
-    xSemaphoreGive(s_rfTransmitterSemaphore);
+    xSemaphoreGive(s_rfTransmitterMutex);
     return false;
   }
 
@@ -284,8 +298,8 @@ bool CommandHandler::HandleCommand(ShockerModelType model, std::uint16_t shocker
 
   bool ok = s_rfTransmitter->SendCommand(model, shockerId, type, intensity, durationMs);
 
-  xSemaphoreGive(s_rfTransmitterSemaphore);
-  xSemaphoreTake(s_keepAliveSemaphore, portMAX_DELAY);
+  xSemaphoreGive(s_rfTransmitterMutex);
+  xSemaphoreTake(s_keepAliveMutex, portMAX_DELAY);
 
   if (ok && s_keepAliveQueue != nullptr) {
     KnownShocker cmd {.model = model, .shockerId = shockerId, .lastActivityTimestamp = OpenShock::millis() + durationMs};
@@ -294,7 +308,7 @@ bool CommandHandler::HandleCommand(ShockerModelType model, std::uint16_t shocker
     }
   }
 
-  xSemaphoreGive(s_keepAliveSemaphore);
+  xSemaphoreGive(s_keepAliveMutex);
 
   return ok;
 }

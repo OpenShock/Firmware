@@ -87,7 +87,7 @@ rmtpin [<pin>]
   }
 
   if (strcasecmp(arg, kCommandAuthToken) == 0) {
-    Serial.print(kCommandAuthToken R"( 
+    Serial.print(kCommandAuthToken R"(
   Get the backend auth token.
 
 authtoken [<token>]
@@ -265,8 +265,14 @@ void _handleFactoryResetCommand(char* arg, std::size_t argLength) {
 
 void _handleRfTxPinCommand(char* arg, std::size_t argLength) {
   if (arg == nullptr || argLength <= 0) {
+    std::uint8_t txPin;
+    if (!Config::GetRFConfigTxPin(txPin)) {
+      SERPR_ERROR("Failed to get RF TX pin from config");
+      return;
+    }
+
     // Get rmt pin
-    SERPR_RESPONSE("RfTxPin|%u", Config::GetRFConfig().txPin);
+    SERPR_RESPONSE("RmtPin|%u", txPin);
     return;
   }
 
@@ -304,8 +310,14 @@ void _handleRfTxPinCommand(char* arg, std::size_t argLength) {
 
 void _handleAuthtokenCommand(char* arg, std::size_t argLength) {
   if (arg == nullptr || argLength <= 0) {
+    std::string authToken;
+    if (!Config::GetBackendAuthToken(authToken)) {
+      SERPR_ERROR("Failed to get auth token from config");
+      return;
+    }
+
     // Get auth token
-    SERPR_RESPONSE("AuthToken|%s", Config::GetBackendAuthToken().c_str());
+    SERPR_RESPONSE("AuthToken|%s", authToken.c_str());
     return;
   }
 
@@ -319,7 +331,6 @@ void _handleAuthtokenCommand(char* arg, std::size_t argLength) {
 }
 
 void _handleNetworksCommand(char* arg, std::size_t argLength) {
-  cJSON* network = nullptr;
   cJSON* root;
 
   if (arg == nullptr || argLength <= 0) {
@@ -329,10 +340,9 @@ void _handleNetworksCommand(char* arg, std::size_t argLength) {
       return;
     }
 
-    for (auto& creds : Config::GetWiFiCredentials()) {
-      network = creds.ToJSON();
-
-      cJSON_AddItemToArray(root, network);
+    if (!Config::GetWiFiCredentials(root)) {
+      SERPR_ERROR("Failed to get WiFi credentials from config");
+      return;
     }
 
     char* out = cJSON_PrintUnformatted(root);
@@ -358,8 +368,10 @@ void _handleNetworksCommand(char* arg, std::size_t argLength) {
     return;
   }
 
-  std::uint8_t id = 1;
   std::vector<Config::WiFiCredentials> creds;
+
+  std::uint8_t id = 1;
+  cJSON* network  = nullptr;
   cJSON_ArrayForEach(network, root) {
     Config::WiFiCredentials cred;
 
@@ -389,8 +401,14 @@ void _handleNetworksCommand(char* arg, std::size_t argLength) {
 
 void _handleKeepAliveCommand(char* arg, std::size_t argLength) {
   if (arg == nullptr || argLength <= 0) {
-    // Get current keep-alive status
-    SERPR_RESPONSE("KeepAlive|%s", Config::GetRFConfig().keepAliveEnabled ? "true" : "false");
+    // Get keep alive status
+    bool keepAliveEnabled;
+    if (!Config::GetRFConfigKeepAliveEnabled(keepAliveEnabled)) {
+      SERPR_ERROR("Failed to get keep-alive status from config");
+      return;
+    }
+
+    SERPR_RESPONSE("KeepAlive|%s", keepAliveEnabled ? "true" : "false");
     return;
   }
 
@@ -621,7 +639,10 @@ bool SerialInputHandler::Init() {
   SerialInputHandler::PrintVersionInfo();
   Serial.println();
 
-  s_echoEnabled = Config::GetSerialInputConfig().echoEnabled;
+  if (!Config::GetSerialInputConfigEchoEnabled(s_echoEnabled)) {
+    ESP_LOGE(TAG, "Failed to get serial echo status from config");
+    return false;
+  }
 
   return true;
 }
