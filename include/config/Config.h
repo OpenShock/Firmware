@@ -28,11 +28,10 @@ namespace OpenShock::Config {
    */
   void FactoryReset();
 
-  const RFConfig& GetRFConfig();
-  const WiFiConfig& GetWiFiConfig();
-  const std::vector<WiFiCredentials>& GetWiFiCredentials();
-  const CaptivePortalConfig& GetCaptivePortalConfig();
-  const BackendConfig& GetBackendConfig();
+  bool GetRFConfig(RFConfig& out);
+  bool GetWiFiConfig(WiFiConfig& out);
+  bool GetWiFiCredentials(cJSON* array);
+  bool GetWiFiCredentials(std::vector<WiFiCredentials>& out);
 
   bool SetRFConfig(const RFConfig& config);
   bool SetWiFiConfig(const WiFiConfig& config);
@@ -40,18 +39,22 @@ namespace OpenShock::Config {
   bool SetCaptivePortalConfig(const CaptivePortalConfig& config);
   bool SetBackendConfig(const BackendConfig& config);
 
+  bool GetRFConfigTxPin(std::uint8_t& out);
   bool SetRFConfigTxPin(std::uint8_t txPin);
+  bool GetRFConfigKeepAliveEnabled(bool& out);
   bool SetRFConfigKeepAliveEnabled(bool enabled);
+
+  bool AnyWiFiCredentials(std::function<bool(const Config::WiFiCredentials&)> predicate);
 
   std::uint8_t AddWiFiCredentials(const std::string& ssid, const std::string& password);
   bool TryGetWiFiCredentialsByID(std::uint8_t id, WiFiCredentials& out);
   bool TryGetWiFiCredentialsBySSID(const char* ssid, WiFiCredentials& out);
   std::uint8_t GetWiFiCredentialsIDbySSID(const char* ssid);
   bool RemoveWiFiCredentials(std::uint8_t id);
-  void ClearWiFiCredentials();
+  bool ClearWiFiCredentials();
 
   bool HasBackendAuthToken();
-  const std::string& GetBackendAuthToken();
+  bool GetBackendAuthToken(std::string& out);
   bool SetBackendAuthToken(const std::string& token);
   bool ClearBackendAuthToken();
 

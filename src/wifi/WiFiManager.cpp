@@ -72,9 +72,7 @@ bool _isConnectRateLimited(const WiFiNetwork& net) {
 }
 
 bool _isSaved(std::function<bool(const Config::WiFiCredentials&)> predicate) {
-  const auto& credentials = Config::GetWiFiCredentials();
-
-  return std::any_of(credentials.begin(), credentials.end(), predicate);
+  return Config::AnyWiFiCredentials(predicate);
 }
 std::vector<WiFiNetwork>::iterator _findNetwork(std::function<bool(WiFiNetwork&)> predicate, bool sortByAttractivity = true) {
   if (sortByAttractivity) {

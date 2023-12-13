@@ -224,8 +224,14 @@ void _handleFactoryResetCommand(char* arg, std::size_t argLength) {
 
 void _handleRmtpinCommand(char* arg, std::size_t argLength) {
   if (arg == nullptr || argLength <= 0) {
+    std::uint8_t txPin;
+    if (!Config::GetRFConfigTxPin(txPin)) {
+      SERPR_ERROR("Failed to get RF TX pin from config");
+      return;
+    }
+
     // Get rmt pin
-    SERPR_RESPONSE("RmtPin|%u", Config::GetRFConfig().txPin);
+    SERPR_RESPONSE("RmtPin|%u", txPin);
     return;
   }
 
@@ -257,7 +263,6 @@ void _handleAuthtokenCommand(char* arg, std::size_t argLength) {
 }
 
 void _handleNetworksCommand(char* arg, std::size_t argLength) {
-  cJSON* network = nullptr;
   cJSON* root;
 
   if (arg == nullptr || argLength <= 0) {
@@ -267,10 +272,9 @@ void _handleNetworksCommand(char* arg, std::size_t argLength) {
       return;
     }
 
-    for (auto& creds : Config::GetWiFiCredentials()) {
-      network = creds.ToJSON();
-
-      cJSON_AddItemToArray(root, network);
+    if (!Config::GetWiFiCredentials(root)) {
+      SERPR_ERROR("Failed to get WiFi credentials from config");
+      return;
     }
 
     char* out = cJSON_PrintUnformatted(root);
@@ -296,8 +300,10 @@ void _handleNetworksCommand(char* arg, std::size_t argLength) {
     return;
   }
 
-  std::uint8_t id = 1;
   std::vector<Config::WiFiCredentials> creds;
+
+  std::uint8_t id = 1;
+  cJSON* network  = nullptr;
   cJSON_ArrayForEach(network, root) {
     Config::WiFiCredentials cred;
 
@@ -324,7 +330,13 @@ void _handleNetworksCommand(char* arg, std::size_t argLength) {
 void _handleKeepAliveCommand(char* arg, std::size_t argLength) {
   if (arg == nullptr || argLength <= 0) {
     // Get keep alive status
-    SERPR_RESPONSE("KeepAlive|%s", Config::GetRFConfig().keepAliveEnabled ? "true" : "false");
+    bool keepAliveEnabled;
+    if (!Config::GetRFConfigKeepAliveEnabled(keepAliveEnabled)) {
+      SERPR_ERROR("Failed to get keep-alive status from config");
+      return;
+    }
+
+    SERPR_RESPONSE("KeepAlive|%s", keepAliveEnabled ? "true" : "false");
     return;
   }
 
