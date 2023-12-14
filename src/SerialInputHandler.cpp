@@ -7,6 +7,7 @@
 #include "Logging.h"
 #include "serialization/JsonSerial.h"
 #include "Time.h"
+#include "Chipset.h"
 #include "util/Base64Utils.h"
 #include "wifi/WiFiManager.h"
 
@@ -34,6 +35,7 @@ static bool s_echoEnabled = true;
 #define kCommandRestart      "restart"
 #define kCommandSystemInfo   "sysinfo"
 #define kCommandSerialEcho   "echo"
+#define kCommandAvailGPIO    "availgpio"
 #define kCommandRfTxPin      "rftxpin"
 #define kCommandAuthToken    "authtoken"
 #define kCommandNetworks     "networks"
@@ -54,6 +56,7 @@ restart                restart the board
 sysinfo                print debug information for various subsystems
 echo                   get serial echo enabled
 echo         <bool>    set serial echo enabled
+availgpio              get available GPIO pins
 rftxpin                get radio transmit pin
 rftxpin      <pin>     set radio transmit pin
 authtoken              get auth token
@@ -158,6 +161,15 @@ keepalive [<bool>]
   Restart the board
   Example:
     restart
+)");
+    return;
+  }
+
+  if (strcasecmp(arg, kCommandAvailGPIO) == 0) {
+    Serial.print(kCommandAvailGPIO R"(
+  Get all available GPIO pins
+  Example:
+    availgpio
 )");
     return;
   }
@@ -451,6 +463,29 @@ void _handleSerialEchoCommand(char* arg, std::size_t argLength) {
   }
 }
 
+void _handleAvailGpioCommand(char* arg, std::size_t argLength) {
+  if (arg != nullptr && argLength > 0) {
+    SERPR_ERROR("Invalid argument (too many arguments)");
+    return;
+  }
+
+  auto pins = OpenShock::GetValidGPIOPins();
+
+  std::string buffer;
+  buffer.reserve(pins.count() * 4);
+
+  for (std::size_t i = 0; i < pins.size(); i++) {
+    if (pins[i]) {
+      buffer.append(std::to_string(i));
+      if (i != pins.size() - 1) {
+        buffer.append(",");
+      }
+    }
+  }
+
+  SERPR_RESPONSE("AvailGPIO|%s", buffer.c_str());
+}
+
 void _handleRawConfigCommand(char* arg, std::size_t argLength) {
   if (arg == nullptr || argLength <= 0) {
     std::vector<std::uint8_t> buffer;
@@ -550,6 +585,7 @@ static std::unordered_map<std::string, void (*)(char*, std::size_t)> s_commandHa
   {     kCommandRestart,      _handleRestartCommand},
   {  kCommandSystemInfo,    _handleDebugInfoCommand},
   {  kCommandSerialEcho,   _handleSerialEchoCommand},
+  {   kCommandAvailGPIO,    _handleAvailGpioCommand},
   {     kCommandRfTxPin,      _handleRfTxPinCommand},
   {   kCommandAuthToken,    _handleAuthtokenCommand},
   {    kCommandNetworks,     _handleNetworksCommand},
