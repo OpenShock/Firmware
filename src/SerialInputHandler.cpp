@@ -35,7 +35,7 @@ static bool s_echoEnabled = true;
 #define kCommandRestart      "restart"
 #define kCommandSystemInfo   "sysinfo"
 #define kCommandSerialEcho   "echo"
-#define kCommandAvailGPIO    "availgpio"
+#define kCommandValidGPIOs   "validgpios"
 #define kCommandRfTxPin      "rftxpin"
 #define kCommandAuthToken    "authtoken"
 #define kCommandNetworks     "networks"
@@ -56,7 +56,7 @@ restart                restart the board
 sysinfo                print debug information for various subsystems
 echo                   get serial echo enabled
 echo         <bool>    set serial echo enabled
-availgpio              get available GPIO pins
+validgpios             list all valid GPIO pins
 rftxpin                get radio transmit pin
 rftxpin      <pin>     set radio transmit pin
 authtoken              get auth token
@@ -165,11 +165,11 @@ keepalive [<bool>]
     return;
   }
 
-  if (strcasecmp(arg, kCommandAvailGPIO) == 0) {
-    Serial.print(kCommandAvailGPIO R"(
-  Get all available GPIO pins
+  if (strcasecmp(arg, kCommandValidGPIOs) == 0) {
+    Serial.print(kCommandValidGPIOs R"(
+  List all valid GPIO pins
   Example:
-    availgpio
+    validgpios
 )");
     return;
   }
@@ -463,7 +463,7 @@ void _handleSerialEchoCommand(char* arg, std::size_t argLength) {
   }
 }
 
-void _handleAvailGpioCommand(char* arg, std::size_t argLength) {
+void _handleValidGpiosCommand(char* arg, std::size_t argLength) {
   if (arg != nullptr && argLength > 0) {
     SERPR_ERROR("Invalid argument (too many arguments)");
     return;
@@ -483,7 +483,7 @@ void _handleAvailGpioCommand(char* arg, std::size_t argLength) {
 
   buffer.pop_back();
 
-  SERPR_RESPONSE("AvailGPIO|%s", buffer.c_str());
+  SERPR_RESPONSE("ValidGPIOs|%s", buffer.c_str());
 }
 
 void _handleRawConfigCommand(char* arg, std::size_t argLength) {
@@ -585,7 +585,7 @@ static std::unordered_map<std::string, void (*)(char*, std::size_t)> s_commandHa
   {     kCommandRestart,      _handleRestartCommand},
   {  kCommandSystemInfo,    _handleDebugInfoCommand},
   {  kCommandSerialEcho,   _handleSerialEchoCommand},
-  {   kCommandAvailGPIO,    _handleAvailGpioCommand},
+  {  kCommandValidGPIOs,   _handleValidGpiosCommand},
   {     kCommandRfTxPin,      _handleRfTxPinCommand},
   {   kCommandAuthToken,    _handleAuthtokenCommand},
   {    kCommandNetworks,     _handleNetworksCommand},
