@@ -477,11 +477,11 @@ void _handleAvailGpioCommand(char* arg, std::size_t argLength) {
   for (std::size_t i = 0; i < pins.size(); i++) {
     if (pins[i]) {
       buffer.append(std::to_string(i));
-      if (i != pins.size() - 1) {
-        buffer.append(",");
-      }
+      buffer.append(",");
     }
   }
+
+  buffer.pop_back();
 
   SERPR_RESPONSE("AvailGPIO|%s", buffer.c_str());
 }
