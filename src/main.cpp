@@ -19,32 +19,11 @@
 
 const char* const TAG = "OpenShock";
 
-const UBaseType_t MAIN_PRIORITY       = 1;
-const std::uint32_t MAIN_STACK_SIZE   = 8192;
-const TickType_t MAIN_UPDATE_INTERVAL = 5;
-
-void setup_ota() {
-  OpenShock::OtaUpdateManager::LoadConfig();
-
-  if (!OpenShock::WiFiManager::Init()) {
-    ESP_PANIC_OTA(TAG, "An Error has occurred while initializing WiFiManager");
-  }
-
-  if (!OpenShock::GatewayConnectionManager::Init()) {
-    ESP_PANIC_OTA(TAG, "An Error has occurred while initializing GatewayConnectionManager");
-  }
-}
-void main_ota(void* arg) {
-  while (true) {
-    OpenShock::WiFiManager::Update();
-
-    vTaskDelay(MAIN_UPDATE_INTERVAL);
-  }
-}
-
-void setup_app() {
+// Internal setup function, returns true if setup succeeded, false otherwise.
+bool trySetup() {
   if (!LittleFS.begin(true, "/static", 10, "static0")) {
-    ESP_PANIC(TAG, "Unable to mount LittleFS");
+    ESP_LOGE(TAG, "Unable to mount LittleFS");
+    return false;
   }
 
   OpenShock::EventHandlers::Init();
@@ -55,21 +34,65 @@ void setup_app() {
   OpenShock::Config::Init();
 
   if (!OpenShock::SerialInputHandler::Init()) {
-    ESP_PANIC(TAG, "Unable to initialize SerialInputHandler");
+    ESP_LOGE(TAG, "Unable to initialize SerialInputHandler");
+    return false;
   }
 
   if (!OpenShock::CommandHandler::Init()) {
     ESP_LOGW(TAG, "Unable to initialize CommandHandler");
+    return false;
   }
 
   if (!OpenShock::WiFiManager::Init()) {
-    ESP_PANIC(TAG, "Unable to initialize WiFiManager");
+    ESP_LOGE(TAG, "Unable to initialize WiFiManager");
+    return false;
   }
 
   if (!OpenShock::GatewayConnectionManager::Init()) {
-    ESP_PANIC(TAG, "Unable to initialize GatewayConnectionManager");
+    ESP_LOGE(TAG, "Unable to initialize GatewayConnectionManager");
+    return false;
+  }
+
+  return true;
+}
+
+// OTA setup is the same as normal setup, but we invalidate the firmware, and roll back if it fails.
+void otaSetup() {
+  ESP_LOGI(TAG, "Validating OTA image");
+
+  if (!trySetup()) {
+    ESP_LOGE(TAG, "Unable to validate OTA image, rolling back");
+    OpenShock::OtaUpdateManager::InvalidateAndRollback();
+  }
+
+  ESP_LOGI(TAG, "Validating OTA image...");
+
+  OpenShock::OtaUpdateManager::ValidateImage();
+
+  ESP_LOGI(TAG, "Validated OTA image");
+}
+
+// App setup is the same as normal setup, but we restart if it fails.
+void appSetup() {
+  if (!trySetup()) {
+    ESP_LOGI(TAG, "Restarting in 5 seconds...");
+    vTaskDelay(pdMS_TO_TICKS(5000));
+    ESP.restart();
   }
 }
+
+// Arduino setup function
+void setup() {
+  Serial.begin(115'200);
+
+  OpenShock::OtaUpdateManager::Init();
+  if (OpenShock::OtaUpdateManager::IsValidatingImage()) {
+    otaSetup();
+  } else {
+    appSetup();
+  }
+}
+
 void main_app(void* arg) {
   while (true) {
     OpenShock::SerialInputHandler::Update();
@@ -77,29 +100,14 @@ void main_app(void* arg) {
     OpenShock::GatewayConnectionManager::Update();
     OpenShock::WiFiManager::Update();
 
-    vTaskDelay(MAIN_UPDATE_INTERVAL);
-  }
-}
-
-void setup() {
-  Serial.begin(115'200);
-
-  OpenShock::OtaUpdateManager::Init();
-  if (OpenShock::OtaUpdateManager::IsPerformingUpdate()) {
-    setup_ota();
-  } else {
-    setup_app();
+    vTaskDelay(5);  // 5 ticks update interval
   }
 }
 
 void loop() {
   // Start the main task
-  if (OpenShock::OtaUpdateManager::IsPerformingUpdate()) {
-    OpenShock::TaskUtils::TaskCreateExpensive(main_ota, "main_ota", MAIN_STACK_SIZE, nullptr, MAIN_PRIORITY, nullptr);
-  } else {
-    OpenShock::TaskUtils::TaskCreateExpensive(main_app, "main_app", MAIN_STACK_SIZE, nullptr, MAIN_PRIORITY, nullptr);
-  }
+  OpenShock::TaskUtils::TaskCreateExpensive(main_app, "main_app", 8192, nullptr, 1, nullptr);
 
-  // Kill the loop task
+  // Kill the loop task (Arduino is stinky)
   vTaskDelete(nullptr);
 }

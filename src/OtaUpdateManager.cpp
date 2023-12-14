@@ -23,8 +23,7 @@ using namespace OpenShock;
 
 const char* TAG = "OtaUpdateManager";
 
-static OtaUpdateManager::BootMode s_bootMode = OtaUpdateManager::BootMode::NORMAL;
-static OtaUpdateManager::UpdateState s_state = OtaUpdateManager::UpdateState::NONE;
+static bool _otaValidatingImage = false;
 
 void OtaUpdateManager::Init() {
   ESP_LOGD(TAG, "Fetching current partition");
@@ -41,38 +40,28 @@ void OtaUpdateManager::Init() {
   ESP_LOGD(TAG, "Partition state: %u", states);
 
   // If the currently booting partition is being verified, set correct state.
-  s_bootMode = OtaUpdateManager::BootMode::NORMAL;
-  if (states == ESP_OTA_IMG_PENDING_VERIFY) {
-    s_bootMode = OtaUpdateManager::BootMode::OTA_UPDATE;
+  _otaValidatingImage = states == ESP_OTA_IMG_PENDING_VERIFY;
+}
+
+bool OtaUpdateManager::IsValidatingImage() {
+  return _otaValidatingImage;
+}
+
+void OtaUpdateManager::InvalidateAndRollback() {
+  esp_err_t err = esp_ota_mark_app_invalid_rollback_and_reboot();
+
+  // If we get here, something went VERY wrong.
+  // TODO: Wtf do we do here?
+
+  // I have no idea, placeholder:
+
+  vTaskDelay(pdMS_TO_TICKS(5000));
+
+  esp_restart();
+}
+
+void OtaUpdateManager::ValidateImage() {
+  if (esp_ota_mark_app_valid_cancel_rollback() != ESP_OK) {
+    ESP_PANIC(TAG, "Unable to mark app as valid, WTF?");  // TODO: Wtf do we do here?
   }
-}
-
-void OtaUpdateManager::LoadConfig() {
-  // Mount LittleFS.
-  if (!LittleFS.begin(true, "littlefs", 10U, "config")) {
-    // Invalidate update partition and restart.
-    ESP_PANIC_OTA(TAG, "Could not mount LittleFS");
-  }
-
-  // Load config while LittleFS is mounted.
-  OpenShock::Config::Init();
-
-  // Unmount LittleFS, as we will be reflashing that partition shortly.
-  LittleFS.end();
-}
-
-bool OtaUpdateManager::SaveConfig() {
-  return true;
-}
-
-bool OtaUpdateManager::IsPerformingUpdate() {
-  return s_bootMode == OtaUpdateManager::BootMode::OTA_UPDATE;
-}
-
-OtaUpdateManager::BootMode OtaUpdateManager::GetBootMode() {
-  return s_bootMode;
-}
-
-OtaUpdateManager::UpdateState OtaUpdateManager::GetState() {
-  return s_state;
 }

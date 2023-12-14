@@ -1,46 +1,32 @@
 #pragma once
 
+/*
+ok so uhhh:
+
+flash firmware
+check firmware hash
+
+flash filesystem
+check filesystem hash
+check filesystem mountability
+
+restart
+
+check setup success
+  rollback if failed
+mark ota succeeded
+*/
 
 namespace OpenShock::OtaUpdateManager {
-
-  enum class BootMode {
-    NORMAL,
-    OTA_UPDATE,
-  };
-
-  enum class Preparation {
-    /* To our knowledge, no other firmware version is present on the device. */
-    NONE,
-
-    /* We are in the process of downloading and flashing new firmware to an unused OTA slot. */
-    IMAGE_FLASHING,
-
-    /* New firmware is pending in another OTA slot. */
-    IMAGE_FLASHED,
-  };
-
-  enum class UpdateState {
-    NONE,
-
-    /* Waiting for WiFi to begin downloading new filesystem. */
-    PENDING_WIFI,
-
-    /* Filesystem is being downloaded. */
-    FLASHING,
-
-    /* Something failed. */
-    ERROR,
-  };
-
-  /* Initialize the OtaUpdateManager. */
   void Init();
 
-  void LoadConfig();
-  bool SaveConfig();
+  void FlashFirmware();
+  void ValidateFirmware();
 
-  bool IsPerformingUpdate();
+  void FlashFilesystem();
+  void ValidateFilesystem();
 
-  BootMode GetBootMode();
-  UpdateState GetState();
-
+  bool IsValidatingImage();
+  void InvalidateAndRollback();
+  void ValidateImage();
 }  // namespace OpenShock::OtaUpdateManager
