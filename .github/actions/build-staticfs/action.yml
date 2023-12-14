@@ -1,0 +1,55 @@
+name: build-staticfs
+description: Builds the static filesystem partition and uploads it as an artifact
+inputs:
+  python-version:
+    description: 'Python version to use'
+    required: true
+  skip-checkout:
+    description: 'If true, skips checkout'
+    required: false
+    default: false
+
+runs:
+  using: composite
+  steps:
+    - uses: actions/checkout@v4
+      if: ${{ !inputs.skip-checkout }}
+
+    - uses: actions/cache@v3
+      with:
+        path: |
+          ~/.platformio/platforms
+          ~/.platformio/packages
+          ~/.platformio/.cache
+        key: pio-${{ runner.os }}-${{ hashFiles('platformio.ini', 'requirements.txt') }}
+
+    - uses: actions/setup-python@v4
+      with:
+        python-version: ${{ inputs.python-version }}
+        cache: 'pip'
+
+    - name: Install dependencies
+      shell: bash
+      run: pip install -r requirements.txt
+
+    - name: Download built frontend
+      uses: actions/download-artifact@v3
+      with:
+        name: frontend
+        path: frontend/build/
+
+    - name: Build filesystem partition
+      shell: bash
+      run: pio run --target buildfs -e fs
+
+    - name: Rename partition binary
+      shell: bash
+      run: mv .pio/build/fs/staticfs.bin staticfs.bin
+
+    - name: Upload internal filesystem artifact
+      uses: actions/upload-artifact@v3
+      with:
+        name: firmware_staticfs
+        path: staticfs.bin
+        retention-days: 1
+        if-no-files-found: error

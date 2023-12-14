@@ -178,4 +178,7 @@ env['BUILD_TYPE'] = pio_build_type
 env['BUILD_FLAGS'] = remaining_build_flags
 env.Append(CPPDEFINES=list(cpp_defines.items()))
 
+# Rename the firmware.bin to app.bin.
+env.Replace(PROGNAME='app')
+
 print(env.Dump())

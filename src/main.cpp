@@ -56,20 +56,20 @@ bool trySetup() {
   return true;
 }
 
-// OTA setup is the same as normal setup, but we invalidate the firmware, and roll back if it fails.
+// OTA setup is the same as normal setup, but we invalidate the currently running app, and roll back if it fails.
 void otaSetup() {
-  ESP_LOGI(TAG, "Validating OTA image");
+  ESP_LOGI(TAG, "Validating OTA app");
 
   if (!trySetup()) {
-    ESP_LOGE(TAG, "Unable to validate OTA image, rolling back");
+    ESP_LOGE(TAG, "Unable to validate OTA app, rolling back");
     OpenShock::OtaUpdateManager::InvalidateAndRollback();
   }
 
-  ESP_LOGI(TAG, "Validating OTA image...");
+  ESP_LOGI(TAG, "Marking OTA app as valid");
 
-  OpenShock::OtaUpdateManager::ValidateImage();
+  OpenShock::OtaUpdateManager::ValidateApp();
 
-  ESP_LOGI(TAG, "Validated OTA image");
+  ESP_LOGI(TAG, "Done validating OTA app");
 }
 
 // App setup is the same as normal setup, but we restart if it fails.
@@ -86,7 +86,7 @@ void setup() {
   Serial.begin(115'200);
 
   OpenShock::OtaUpdateManager::Init();
-  if (OpenShock::OtaUpdateManager::IsValidatingImage()) {
+  if (OpenShock::OtaUpdateManager::IsValidatingApp()) {
     otaSetup();
   } else {
     appSetup();

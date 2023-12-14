@@ -1,6 +1,6 @@
 
 name: build-firmware
-description: Builds the firmware
+description: Builds the firmware partitions and uploads them as an artifact
 inputs:
   python-version:
     description: 'Python version to use'
@@ -32,7 +32,7 @@ runs:
         python-version: ${{ inputs.python-version }}
         cache: "pip"
 
-    - name: Install dependencies
+    - name: Install python dependencies
       shell: bash
       run: pip install -r requirements.txt
 
@@ -41,10 +41,10 @@ runs:
       shell: bash
       run: pio run -e ${{ inputs.board }}
 
-    - name: Upload internal firmware binaries
+    - name: Upload build artifacts
       uses: actions/upload-artifact@v3
       with:
-        name: firmware_${{ inputs.board }}
+        name: firmware_build_${{ inputs.board }}
         path: .pio/build/${{ inputs.board }}/*.bin
         retention-days: 1
         if-no-files-found: error
