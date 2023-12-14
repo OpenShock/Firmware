@@ -21,7 +21,7 @@
 #define OPENSHOCK_FW_CDN_BOARDS_BASE_URL_FORMAT OPENSHOCK_FW_CDN_URL("/%s")
 #define OPENSHOCK_FW_CDN_BOARDS_INDEX_URL_FORMAT OPENSHOCK_FW_CDN_BOARDS_BASE_URL_FORMAT "/boards.txt"
 
-#define OPENSHOCK_FW_CDN_VERSION_BASE_URL_FORMAT OPENSHOCK_FW_CDN_BOARDS_BASE_URL_FORMAT "/%s"
+#define OPENSHOCK_FW_CDN_VERSION_BASE_URL_FORMAT OPENSHOCK_FW_CDN_BOARDS_BASE_URL_FORMAT "/" OPENSHOCK_FW_BOARD
 
 #define OPENSHOCK_FW_CDN_APP_URL_FORMAT OPENSHOCK_FW_CDN_VERSION_BASE_URL_FORMAT "/app.bin"
 #define OPENSHOCK_FW_CDN_APP_HASH_URL_FORMAT OPENSHOCK_FW_CDN_APP_URL_FORMAT ".sha256"
@@ -184,28 +184,27 @@ bool OtaUpdateManager::TryGetFirmwareBoards(const std::string& version, std::vec
   return true;
 }
 
-bool OtaUpdateManager::TryGetFirmwareRelease(const std::string& version, const std::string& board, FirmwareRelease& release) {
-  release.board = board;
+bool OtaUpdateManager::TryGetFirmwareRelease(const std::string& version, FirmwareRelease& release) {
   release.version = version;
 
-  if (!_printfToString(release.appBinaryUrl, OPENSHOCK_FW_CDN_APP_URL_FORMAT, version.c_str(), board.c_str())) {
+  if (!_printfToString(release.appBinaryUrl, OPENSHOCK_FW_CDN_APP_URL_FORMAT, version.c_str())) {
     ESP_LOGE(TAG, "Failed to format URL");
     return false;
   }
 
-  if (!_printfToString(release.filesystemBinaryUrl, OPENSHOCK_FW_CDN_FILESYSTEM_URL_FORMAT, version.c_str(), board.c_str())) {
+  if (!_printfToString(release.filesystemBinaryUrl, OPENSHOCK_FW_CDN_FILESYSTEM_URL_FORMAT, version.c_str())) {
     ESP_LOGE(TAG, "Failed to format URL");
     return false;
   }
 
   // Construct hash URLs.
   std::string appBinaryHashUrl;
-  if (!_printfToString(appBinaryHashUrl, OPENSHOCK_FW_CDN_APP_HASH_URL_FORMAT, version.c_str(), board.c_str())) {
+  if (!_printfToString(appBinaryHashUrl, OPENSHOCK_FW_CDN_APP_HASH_URL_FORMAT, version.c_str())) {
     ESP_LOGE(TAG, "Failed to format URL");
     return false;
   }
   std::string filesystemBinaryHashUrl;
-  if (!_printfToString(filesystemBinaryHashUrl, OPENSHOCK_FW_CDN_FILESYSTEM_HASH_URL_FORMAT, version.c_str(), board.c_str())) {
+  if (!_printfToString(filesystemBinaryHashUrl, OPENSHOCK_FW_CDN_FILESYSTEM_HASH_URL_FORMAT, version.c_str())) {
     ESP_LOGE(TAG, "Failed to format URL");
     return false;
   }

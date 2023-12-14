@@ -30,7 +30,6 @@ namespace OpenShock::OtaUpdateManager {
   };
 
   struct FirmwareRelease {
-    std::string board;
     std::string version;
     std::string appBinaryUrl;
     std::string appBinaryHash;
@@ -40,7 +39,7 @@ namespace OpenShock::OtaUpdateManager {
 
   bool TryGetFirmwareVersions(FirmwareReleaseChannel channel, std::vector<std::string>& versions);
   bool TryGetFirmwareBoards(const std::string& version, std::vector<std::string>& boards);
-  bool TryGetFirmwareRelease(const std::string& version, const std::string& board, FirmwareRelease& release);
+  bool TryGetFirmwareRelease(const std::string& version, FirmwareRelease& release);
 
   void FlashAppPartition();
   void ValidateAppPartition();
