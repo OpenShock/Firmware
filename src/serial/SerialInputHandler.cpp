@@ -7,6 +7,7 @@
 #include "Logging.h"
 #include "serialization/JsonSerial.h"
 #include "Time.h"
+#include "Chipset.h"
 #include "util/Base64Utils.h"
 #include "wifi/WiFiManager.h"
 
@@ -261,6 +262,29 @@ void _handleSerialEchoCommand(char* arg, std::size_t argLength) {
   }
 }
 
+void _handleValidGpiosCommand(char* arg, std::size_t argLength) {
+  if (arg != nullptr && argLength > 0) {
+    SERPR_ERROR("Invalid argument (too many arguments)");
+    return;
+  }
+
+  auto pins = OpenShock::GetValidGPIOPins();
+
+  std::string buffer;
+  buffer.reserve(pins.count() * 4);
+
+  for (std::size_t i = 0; i < pins.size(); i++) {
+    if (pins[i]) {
+      buffer.append(std::to_string(i));
+      buffer.append(",");
+    }
+  }
+
+  buffer.pop_back();
+
+  SERPR_RESPONSE("ValidGPIOs|%s", buffer.c_str());
+}
+
 void _handleRawConfigCommand(char* arg, std::size_t argLength) {
   if (arg == nullptr || argLength <= 0) {
     std::vector<std::uint8_t> buffer;
@@ -385,6 +409,7 @@ restart                restart the board
 sysinfo                print debug information for various subsystems
 echo                   get serial echo enabled
 echo         <bool>    set serial echo enabled
+validgpios             list all valid GPIO pins
 rftxpin                get radio transmit pin
 rftxpin      <pin>     set radio transmit pin
 authtoken              get auth token
@@ -441,6 +466,15 @@ echo [<bool>]
     echo true
 )",
   _handleSerialEchoCommand,
+};
+static const SerialCmdHandler kValidGpiosCmdHandler = {
+  "validgpios",
+R"(validgpios
+  List all valid GPIO pins
+  Example:
+    validgpios
+)",
+  _handleValidGpiosCommand,
 };
 static const SerialCmdHandler kRfTxPinCmdHandler = {
   "rftxpin",
@@ -642,6 +676,7 @@ bool SerialInputHandler::Init() {
   RegisterCommandHandler(kRestartCmdHandler);
   RegisterCommandHandler(kSystemInfoCmdHandler);
   RegisterCommandHandler(kSerialEchoCmdHandler);
+  RegisterCommandHandler(kValidGpiosCmdHandler);
   RegisterCommandHandler(kRfTxPinCmdHandler);
   RegisterCommandHandler(kAuthTokenCmdHandler);
   RegisterCommandHandler(kNetworksCmdHandler);

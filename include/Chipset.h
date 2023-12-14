@@ -125,9 +125,10 @@
 #ifdef OPENSHOCK_FW_CHIP_ESP32S3
 #define OPENSHOCK_FW_CHIP_NAME "ESP32-S3"
 // GPIO44, GPIO43 is used for UART0 RXD/TXD.
+// GPIO19, GPIO20 is used for USB serial, flashing, and debugging.
 // GPIO30, GPIO29, GPIO26, GPIO32, GPIO31, GPIO28, GPIO27, GPIO33, GPIO34, GPIO35, GPIO36, GPIO37 is used for SPI flash connection. (DO NOT TOUCH)
 // GPIO0, GPIO3, GPIO45, GPIO46 is strapping pins used to control the boot mode and misc. functions.
-#define CHIP_UNSAFE_GPIO(pin) (pin == GPIO_NUM_44 || pin == GPIO_NUM_43 || pin == GPIO_NUM_30 || pin == GPIO_NUM_29 || pin == GPIO_NUM_26 || pin == GPIO_NUM_32 || pin == GPIO_NUM_31 || pin == GPIO_NUM_28 || pin == GPIO_NUM_27 || pin == GPIO_NUM_33 || pin == GPIO_NUM_34 || pin == GPIO_NUM_35 || pin == GPIO_NUM_36 || pin == GPIO_NUM_37 || pin == GPIO_NUM_0 || pin == GPIO_NUM_3 || pin == GPIO_NUM_45 || pin == GPIO_NUM_46)
+#define CHIP_UNSAFE_GPIO(pin) (pin == GPIO_NUM_44 || pin == GPIO_NUM_43 || pin == GPIO_NUM_19 || pin == GPIO_NUM_20 || pin == GPIO_NUM_30 || pin == GPIO_NUM_29 || pin == GPIO_NUM_26 || pin == GPIO_NUM_32 || pin == GPIO_NUM_31 || pin == GPIO_NUM_28 || pin == GPIO_NUM_27 || pin == GPIO_NUM_33 || pin == GPIO_NUM_34 || pin == GPIO_NUM_35 || pin == GPIO_NUM_36 || pin == GPIO_NUM_37 || pin == GPIO_NUM_0 || pin == GPIO_NUM_3 || pin == GPIO_NUM_45 || pin == GPIO_NUM_46)
 #endif
 
 // ESP32-S3-PICO-1
