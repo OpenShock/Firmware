@@ -184,7 +184,7 @@
 #define OPENSHOCK_BYPASSED_GPIO(pin) (pin == 15 || pin == 2)
 #endif
 #ifdef OPENSHOCK_FW_BOARD_SEEEDXIAOESP32S3
-#define OPENSHOCK_BYPASSED_GPIO(pin) (pin == 21)
+#define OPENSHOCK_BYPASSED_GPIO(pin) (pin == 44 || pin == 43)
 #endif
 #ifdef OPENSHOCK_FW_BOARD_OPENSHOCKCOREV1
 #define OPENSHOCK_BYPASSED_GPIO(pin) (pin == 15 || pin == 35)
