@@ -1,4 +1,4 @@
-#include "SerialInputHandler.h"
+#include "serial/SerialInputHandler.h"
 
 #include "CommandHandler.h"
 #include "config/Config.h"

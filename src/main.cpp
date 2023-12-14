@@ -6,7 +6,7 @@
 #include "event_handlers/Init.h"
 #include "GatewayConnectionManager.h"
 #include "Logging.h"
-#include "SerialInputHandler.h"
+#include "serial/SerialInputHandler.h"
 #include "VisualStateManager.h"
 #include "wifi/WiFiManager.h"
 #include "wifi/WiFiScanManager.h"
