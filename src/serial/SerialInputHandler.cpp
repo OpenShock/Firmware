@@ -1,4 +1,4 @@
-#include "SerialInputHandler.h"
+#include "serial/SerialInputHandler.h"
 
 #include "CommandHandler.h"
 #include "config/Config.h"
@@ -7,6 +7,7 @@
 #include "Logging.h"
 #include "serialization/JsonSerial.h"
 #include "Time.h"
+#include "Chipset.h"
 #include "util/Base64Utils.h"
 #include "wifi/WiFiManager.h"
 
@@ -27,204 +28,14 @@ using namespace OpenShock;
 constexpr std::int64_t PASTE_INTERVAL_THRESHOLD_MS  = 20;
 constexpr std::size_t SERIAL_BUFFER_CLEAR_THRESHOLD = 512;
 
+struct SerialCmdHandler {
+  const char* cmd;
+  const char* helpResponse;
+  void (*commandHandler)(char*, std::size_t);
+};
+
 static bool s_echoEnabled = true;
-
-#define kCommandHelp         "help"
-#define kCommandVersion      "version"
-#define kCommandRestart      "restart"
-#define kCommandSystemInfo   "sysinfo"
-#define kCommandSerialEcho   "echo"
-#define kCommandRfTxPin      "rftxpin"
-#define kCommandAuthToken    "authtoken"
-#define kCommandNetworks     "networks"
-#define kCommandKeepAlive    "keepalive"
-#define kCommandRawConfig    "rawconfig"
-#define kCommandRFTransmit   "rftransmit"
-#define kCommandFactoryReset "factoryreset"
-
-void _handleHelpCommand(char* arg, std::size_t argLength) {
-  if (arg == nullptr || argLength <= 0) {
-    SerialInputHandler::PrintWelcomeHeader();
-    // Raw string literal (1+ to remove the first newline)
-    Serial.print(1 + R"(
-help                   print this menu
-help         <command> print help for a command
-version                print version information
-restart                restart the board
-sysinfo                print debug information for various subsystems
-echo                   get serial echo enabled
-echo         <bool>    set serial echo enabled
-rftxpin                get radio transmit pin
-rftxpin      <pin>     set radio transmit pin
-authtoken              get auth token
-authtoken    <token>   set auth token
-networks               get all saved networks
-networks     <json>    set all saved networks
-keepalive              get shocker keep-alive enabled
-keepalive    <bool>    set shocker keep-alive enabled
-rawconfig              get raw binary config
-rawconfig    <base64>  set raw binary config
-rftransmit   <json>    transmit a RF command
-factoryreset           reset device to factory defaults and restart
-)");
-    return;
-  }
-
-  if (strcasecmp(arg, kCommandRfTxPin) == 0) {
-    Serial.print(kCommandRfTxPin R"(
-  Get the GPIO pin used for the radio transmitter.
-
-rftxpin [<pin>]
-  Set the GPIO pin used for the radio transmitter.
-  Arguments:
-    <pin> must be a number.
-  Example:
-    rftxpin 15
-)");
-    return;
-  }
-
-  if (strcasecmp(arg, kCommandAuthToken) == 0) {
-    Serial.print(kCommandAuthToken R"(
-  Get the backend auth token.
-
-authtoken [<token>]
-  Set the auth token.
-  Arguments:
-    <token> must be a string.
-  Example:
-    authtoken mytoken
-)");
-    return;
-  }
-
-  if (strcasecmp(arg, kCommandSystemInfo) == 0) {
-    Serial.print(kCommandSystemInfo R"(
-  Get system information from RTOS, WiFi, etc.
-  Example:
-    sysinfo
-)");
-    return;
-  }
-
-  if (strcasecmp(arg, kCommandSerialEcho) == 0) {
-    Serial.print(kCommandSerialEcho R"(
-  Get the serial echo status.
-  If enabled, typed characters are echoed back to the serial port.
-
-echo [<bool>]
-  Enable/disable serial echo.
-  Arguments:
-    <bool> must be a boolean.
-  Example:
-    echo true
-)");
-    return;
-  }
-
-  if (strcasecmp(arg, kCommandNetworks) == 0) {
-    Serial.print(kCommandNetworks R"(
-  Get all saved networks.
-
-networks [<json>]
-  Set all saved networks.
-  Arguments:
-    <json> must be a array of objects with the following fields:
-      ssid     (string)  SSID of the network
-      password (string)  Password of the network
-      id       (number)  ID of the network (optional)
-  Example:
-    networks [{\"ssid\":\"myssid\",\"password\":\"mypassword\"}]
-)");
-    return;
-  }
-
-  if (strcasecmp(arg, kCommandKeepAlive) == 0) {
-    Serial.print(kCommandKeepAlive R"(
-  Get the shocker keep-alive status.
-
-keepalive [<bool>]
-  Enable/disable shocker keep-alive.
-  Arguments:
-    <bool> must be a boolean.
-  Example:
-    keepalive true
-)");
-    return;
-  }
-
-  if (strcasecmp(arg, kCommandRestart) == 0) {
-    Serial.print(kCommandRestart R"(
-  Restart the board
-  Example:
-    restart
-)");
-    return;
-  }
-
-  if (strcasecmp(arg, kCommandRawConfig) == 0) {
-    Serial.print(kCommandRawConfig R"(
-  Get the raw binary config
-  Example:
-    rawconfig
-
-rawconfig <base64>
-  Set the raw binary config, and restart
-  Arguments:
-    <base64> must be a base64 encoded string
-  Example:
-    rawconfig (base64 encoded binary data)
-)");
-    return;
-  }
-
-  if (strcasecmp(arg, kCommandFactoryReset) == 0) {
-    Serial.print(kCommandFactoryReset R"(
-  Reset the device to factory defaults and restart
-  Example:
-    factoryreset
-)");
-    return;
-  }
-
-  if (strcasecmp(arg, kCommandVersion) == 0) {
-    Serial.print(kCommandVersion R"(
-  Print version information
-  Example:
-    version
-)");
-    return;
-  }
-
-  if (strcasecmp(arg, kCommandHelp) == 0) {
-    Serial.print(kCommandHelp R"( [<command>]
-  Print help information
-  Arguments:
-    <command> (optional) command to print help for
-  Example:
-    help
-)");
-    return;
-  }
-
-  if (strcasecmp(arg, kCommandRFTransmit) == 0) {
-    Serial.print(kCommandRFTransmit R"( <json>
-  Transmit a RF command
-  Arguments:
-    <json> must be a JSON object with the following fields:
-      model      (string) Model of the shocker                    ("caixianlin", "petrainer")
-      id         (number) ID of the shocker                       (0-65535)
-      type       (string) Type of the command                     ("shock", "vibrate", "sound", "stop")
-      intensity  (number) Intensity of the command                (0-255)
-      durationMs (number) Duration of the command in milliseconds (0-65535)
-  Example:
-    rftransmit {"model":"caixianlin","id":12345,"type":"vibrate","intensity":99,"durationMs":500}
-)");
-    return;
-  }
-
-  Serial.println("Command not found");
-}
+static std::unordered_map<std::string, SerialCmdHandler> s_commandHandlers;
 
 /// @brief Tries to parse a boolean from a string (case-insensitive)
 /// @param str Input string
@@ -451,6 +262,29 @@ void _handleSerialEchoCommand(char* arg, std::size_t argLength) {
   }
 }
 
+void _handleValidGpiosCommand(char* arg, std::size_t argLength) {
+  if (arg != nullptr && argLength > 0) {
+    SERPR_ERROR("Invalid argument (too many arguments)");
+    return;
+  }
+
+  auto pins = OpenShock::GetValidGPIOPins();
+
+  std::string buffer;
+  buffer.reserve(pins.count() * 4);
+
+  for (std::size_t i = 0; i < pins.size(); i++) {
+    if (pins[i]) {
+      buffer.append(std::to_string(i));
+      buffer.append(",");
+    }
+  }
+
+  buffer.pop_back();
+
+  SERPR_RESPONSE("ValidGPIOs|%s", buffer.c_str());
+}
+
 void _handleRawConfigCommand(char* arg, std::size_t argLength) {
   if (arg == nullptr || argLength <= 0) {
     std::vector<std::uint8_t> buffer;
@@ -544,21 +378,219 @@ void _handleRFTransmitCommand(char* arg, std::size_t argLength) {
   SERPR_SUCCESS("Command sent");
 }
 
-static std::unordered_map<std::string, void (*)(char*, std::size_t)> s_commandHandlers = {
-  {        kCommandHelp,         _handleHelpCommand},
-  {     kCommandVersion,      _handleVersionCommand},
-  {     kCommandRestart,      _handleRestartCommand},
-  {  kCommandSystemInfo,    _handleDebugInfoCommand},
-  {  kCommandSerialEcho,   _handleSerialEchoCommand},
-  {     kCommandRfTxPin,      _handleRfTxPinCommand},
-  {   kCommandAuthToken,    _handleAuthtokenCommand},
-  {    kCommandNetworks,     _handleNetworksCommand},
-  {   kCommandKeepAlive,    _handleKeepAliveCommand},
-  {   kCommandRawConfig,    _handleRawConfigCommand},
-  {  kCommandRFTransmit,   _handleRFTransmitCommand},
-  {kCommandFactoryReset, _handleFactoryResetCommand},
+void _handleHelpCommand(char* arg, std::size_t argLength) {
+  if (arg != nullptr && argLength > 0) {
+    // Convert argument to lowercase
+    std::transform(arg, arg + argLength, arg, ::tolower);
+
+    // Get help for a specific command
+    auto it = s_commandHandlers.find(std::string(arg, argLength));
+    if (it != s_commandHandlers.end()) {
+      Serial.print(it->second.helpResponse);
+      return;
+    }
+
+    if (argLength > 0) {
+      SERPR_ERROR("Command \"%.*s\" not found", argLength, arg);
+    } else {
+      SERPR_ERROR("No command");
+    }
+    return;
+  }
+
+  SerialInputHandler::PrintWelcomeHeader();
+
+  // Raw string literal (1+ to remove the first newline)
+  Serial.print(1 + R"(
+help                   print this menu
+help         <command> print help for a command
+version                print version information
+restart                restart the board
+sysinfo                print debug information for various subsystems
+echo                   get serial echo enabled
+echo         <bool>    set serial echo enabled
+validgpios             list all valid GPIO pins
+rftxpin                get radio transmit pin
+rftxpin      <pin>     set radio transmit pin
+authtoken              get auth token
+authtoken    <token>   set auth token
+networks               get all saved networks
+networks     <json>    set all saved networks
+keepalive              get shocker keep-alive enabled
+keepalive    <bool>    set shocker keep-alive enabled
+rawconfig              get raw binary config
+rawconfig    <base64>  set raw binary config
+rftransmit   <json>    transmit a RF command
+factoryreset           reset device to factory defaults and restart
+)");
+}
+
+static const SerialCmdHandler kVersionCmdHandler = {
+  "version",
+R"(version
+  Print version information
+  Example:
+    version
+)",
+  _handleVersionCommand,
+};
+static const SerialCmdHandler kRestartCmdHandler = {
+  "restart",
+R"(restart
+  Restart the board
+  Example:
+    restart
+)",
+  _handleRestartCommand,
+};
+static const SerialCmdHandler kSystemInfoCmdHandler = {
+  "sysinfo",
+R"(sysinfo
+  Get system information from RTOS, WiFi, etc.
+  Example:
+    sysinfo
+)",
+  _handleDebugInfoCommand,
+};
+static const SerialCmdHandler kSerialEchoCmdHandler = {
+  "echo",
+R"(echo
+  Get the serial echo status.
+  If enabled, typed characters are echoed back to the serial port.
+
+echo [<bool>]
+  Enable/disable serial echo.
+  Arguments:
+    <bool> must be a boolean.
+  Example:
+    echo true
+)",
+  _handleSerialEchoCommand,
+};
+static const SerialCmdHandler kValidGpiosCmdHandler = {
+  "validgpios",
+R"(validgpios
+  List all valid GPIO pins
+  Example:
+    validgpios
+)",
+  _handleValidGpiosCommand,
+};
+static const SerialCmdHandler kRfTxPinCmdHandler = {
+  "rftxpin",
+R"(rftxpin
+  Get the GPIO pin used for the radio transmitter.
+
+rftxpin [<pin>]
+  Set the GPIO pin used for the radio transmitter.
+  Arguments:
+    <pin> must be a number.
+  Example:
+    rftxpin 15
+)",
+  _handleRfTxPinCommand,
+};
+static const SerialCmdHandler kAuthTokenCmdHandler = {
+  "authtoken",
+R"(authtoken
+  Get the backend auth token.
+
+authtoken [<token>]
+  Set the auth token.
+  Arguments:
+    <token> must be a string.
+  Example:
+    authtoken mytoken
+)",
+  _handleAuthtokenCommand,
+};
+static const SerialCmdHandler kNetworksCmdHandler = {
+  "networks",
+R"(networks
+  Get all saved networks.
+
+networks [<json>]
+  Set all saved networks.
+  Arguments:
+    <json> must be a array of objects with the following fields:
+      ssid     (string)  SSID of the network
+      password (string)  Password of the network
+      id       (number)  ID of the network (optional)
+  Example:
+    networks [{\"ssid\":\"myssid\",\"password\":\"mypassword\"}]
+)",
+  _handleNetworksCommand,
+};
+static const SerialCmdHandler kKeepAliveCmdHandler = {
+  "keepalive",
+R"(keepalive
+  Get the shocker keep-alive status.
+
+keepalive [<bool>]
+  Enable/disable shocker keep-alive.
+  Arguments:
+    <bool> must be a boolean.
+  Example:
+    keepalive true
+)",
+  _handleKeepAliveCommand,
+};
+static const SerialCmdHandler kRawConfigCmdHandler = {
+  "rawconfig",
+R"(rawconfig
+  Get the raw binary config
+  Example:
+    rawconfig
+
+rawconfig <base64>
+  Set the raw binary config, and restart
+  Arguments:
+    <base64> must be a base64 encoded string
+  Example:
+    rawconfig (base64 encoded binary data)
+)",
+  _handleRawConfigCommand,
+};
+static const SerialCmdHandler kRfTransmitCmdHandler = {
+  "rftransmit",
+R"(rftransmit <json>
+  Transmit a RF command
+  Arguments:
+    <json> must be a JSON object with the following fields:
+      model      (string) Model of the shocker                    ("caixianlin", "petrainer")
+      id         (number) ID of the shocker                       (0-65535)
+      type       (string) Type of the command                     ("shock", "vibrate", "sound", "stop")
+      intensity  (number) Intensity of the command                (0-255)
+      durationMs (number) Duration of the command in milliseconds (0-65535)
+  Example:
+    rftransmit {"model":"caixianlin","id":12345,"type":"vibrate","intensity":99,"durationMs":500}
+)",
+  _handleRFTransmitCommand,
+};
+static const SerialCmdHandler kFactoryResetCmdHandler = {
+  "factoryreset",
+R"(factoryreset
+  Reset the device to factory defaults and restart
+  Example:
+    factoryreset
+)",
+  _handleFactoryResetCommand,
+};
+static const SerialCmdHandler khelpCmdHandler = {
+  "help",
+R"(help [<command>]
+  Print help information
+  Arguments:
+    <command> (optional) command to print help for
+  Example:
+    help
+)",
+  _handleHelpCommand,
 };
 
+void RegisterCommandHandler(const SerialCmdHandler& handler) {
+  s_commandHandlers[handler.cmd] = handler;
+}
 int findChar(const char* buffer, std::size_t bufferSize, char c) {
   for (int i = 0; i < bufferSize; i++) {
     if (buffer[i] == c) {
@@ -620,7 +652,7 @@ void processSerialLine(char* data, std::size_t length) {
   // TODO: Clean this up, test this
   auto it = s_commandHandlers.find(std::string(command, commandLength));
   if (it != s_commandHandlers.end()) {
-    it->second(arg, argLength);
+    it->second.commandHandler(arg, argLength);
     return;
   }
 
@@ -632,6 +664,28 @@ void processSerialLine(char* data, std::size_t length) {
 }
 
 bool SerialInputHandler::Init() {
+  static bool s_initialized = false;
+  if (s_initialized) {
+    ESP_LOGW(TAG, "Serial input handler already initialized");
+    return false;
+  }
+  s_initialized = true;
+
+  // Register command handlers
+  RegisterCommandHandler(kVersionCmdHandler);
+  RegisterCommandHandler(kRestartCmdHandler);
+  RegisterCommandHandler(kSystemInfoCmdHandler);
+  RegisterCommandHandler(kSerialEchoCmdHandler);
+  RegisterCommandHandler(kValidGpiosCmdHandler);
+  RegisterCommandHandler(kRfTxPinCmdHandler);
+  RegisterCommandHandler(kAuthTokenCmdHandler);
+  RegisterCommandHandler(kNetworksCmdHandler);
+  RegisterCommandHandler(kKeepAliveCmdHandler);
+  RegisterCommandHandler(kRawConfigCmdHandler);
+  RegisterCommandHandler(kRfTransmitCmdHandler);
+  RegisterCommandHandler(kFactoryResetCmdHandler);
+  RegisterCommandHandler(khelpCmdHandler);
+
   SerialInputHandler::PrintWelcomeHeader();
   SerialInputHandler::PrintVersionInfo();
   Serial.println();

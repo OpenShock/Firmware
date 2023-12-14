@@ -7,7 +7,7 @@
 #include "GatewayConnectionManager.h"
 #include "Logging.h"
 #include "OtaUpdateManager.h"
-#include "SerialInputHandler.h"
+#include "serial/SerialInputHandler.h"
 #include "util/TaskUtils.h"
 #include "VisualStateManager.h"
 #include "wifi/WiFiManager.h"
