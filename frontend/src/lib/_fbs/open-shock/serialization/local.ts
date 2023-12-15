@@ -4,6 +4,15 @@ export { AccountLinkCommand } from './serialization/local/account-link-command.j
 export { AccountUnlinkCommand } from './serialization/local/account-unlink-command.js';
 export { LocalToDeviceMessage } from './serialization/local/local-to-device-message.js';
 export { LocalToDeviceMessagePayload } from './serialization/local/local-to-device-message-payload.js';
+export { OtaUpdateCheckForUpdatesCommand } from './serialization/local/ota-update-check-for-updates-command.js';
+export { OtaUpdateHandleUpdateRequestCommand } from './serialization/local/ota-update-handle-update-request-command.js';
+export { OtaUpdateSetAllowBackendManagementCommand } from './serialization/local/ota-update-set-allow-backend-management-command.js';
+export { OtaUpdateSetCheckIntervalCommand } from './serialization/local/ota-update-set-check-interval-command.js';
+export { OtaUpdateSetDomainCommand } from './serialization/local/ota-update-set-domain-command.js';
+export { OtaUpdateSetIsEnabledCommand } from './serialization/local/ota-update-set-is-enabled-command.js';
+export { OtaUpdateSetRequireManualApprovalCommand } from './serialization/local/ota-update-set-require-manual-approval-command.js';
+export { OtaUpdateSetUpdateChannelCommand } from './serialization/local/ota-update-set-update-channel-command.js';
+export { OtaUpdateStartUpdateCommand } from './serialization/local/ota-update-start-update-command.js';
 export { SetRfTxPinCommand } from './serialization/local/set-rf-tx-pin-command.js';
 export { WifiNetworkConnectCommand } from './serialization/local/wifi-network-connect-command.js';
 export { WifiNetworkDisconnectCommand } from './serialization/local/wifi-network-disconnect-command.js';

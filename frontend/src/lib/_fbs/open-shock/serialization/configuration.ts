@@ -3,6 +3,7 @@
 export { BackendConfig } from './serialization/configuration/backend-config.js';
 export { CaptivePortalConfig } from './serialization/configuration/captive-portal-config.js';
 export { Config } from './serialization/configuration/config.js';
+export { OtaUpdateConfig } from './serialization/configuration/ota-update-config.js';
 export { RFConfig } from './serialization/configuration/rfconfig.js';
 export { SerialInputConfig } from './serialization/configuration/serial-input-config.js';
 export { WiFiConfig } from './serialization/configuration/wi-fi-config.js';

@@ -44,6 +44,27 @@ table BackendConfig {
   auth_token:string;
 }
 
+// Represents configuration for Over-The-Air (OTA) updates.
+table OtaUpdateConfig {
+  /// Indicates whether OTA updates are enabled.
+  is_enabled:bool;
+
+  /// The domain name of the OTA Content Delivery Network (CDN).
+  cdn_domain:string;
+
+  /// The update channel to use, e.g. "stable", "beta", "dev".
+  update_channel:string;
+
+  /// The interval between update checks in minutes, 0 to disable automatic update checks. ( 5 minutes minimum )
+  check_interval:uint16;
+
+  /// Indicates if the backend is authorized to manage the device's update version on behalf of the user.
+  allow_backend_management:bool;
+
+  /// Indicates if manual approval via serial input or captive portal is required before installing updates.
+  require_manual_approval:bool;
+}
+
 table SerialInputConfig {
   /// Whether to echo typed characters back to the serial console
   echo_enabled:bool = true;
@@ -61,6 +82,9 @@ table Config {
 
   /// Backend configuration
   backend:BackendConfig;
+
+  /// OTA update configuration
+  ota_update:OtaUpdateConfig;
 
   /// Serial input configuration
   serial_input:SerialInputConfig;

@@ -2,6 +2,7 @@
 
 import * as flatbuffers from 'flatbuffers';
 
+import { Config } from '../../../open-shock/serialization/configuration/config.js';
 import { WifiNetwork } from '../../../open-shock/serialization/types/wifi-network.js';
 
 
@@ -38,9 +39,9 @@ gatewayPaired():boolean {
   return offset ? !!this.bb!.readInt8(this.bb_pos + offset) : false;
 }
 
-rftxPin():number {
+config(obj?:Config):Config|null {
   const offset = this.bb!.__offset(this.bb_pos, 10);
-  return offset ? this.bb!.readUint8(this.bb_pos + offset) : 0;
+  return offset ? (obj || new Config()).__init(this.bb!.__indirect(this.bb_pos + offset), this.bb!) : null;
 }
 
 static startReadyMessage(builder:flatbuffers.Builder) {
@@ -59,8 +60,8 @@ static addGatewayPaired(builder:flatbuffers.Builder, gatewayPaired:boolean) {
   builder.addFieldInt8(2, +gatewayPaired, +false);
 }
 
-static addRftxPin(builder:flatbuffers.Builder, rftxPin:number) {
-  builder.addFieldInt8(3, rftxPin, 0);
+static addConfig(builder:flatbuffers.Builder, configOffset:flatbuffers.Offset) {
+  builder.addFieldOffset(3, configOffset, 0);
 }
 
 static endReadyMessage(builder:flatbuffers.Builder):flatbuffers.Offset {
