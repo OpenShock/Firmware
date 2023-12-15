@@ -33,7 +33,7 @@ void _Private::HandleWiFiNetworkSaveCommand(std::uint8_t socketId, const OpenSho
   }
 
   if (password.size() < 1) {
-    ESP_LOGE(TAG, "WiFi message is missing password, assuming open network");
+    ESP_LOGV(TAG, "WiFi message is missing password, assuming open network");
   } else if (password.size() < 8) {
     ESP_LOGE(TAG, "WiFi password is too short");
     return;
