@@ -191,7 +191,7 @@ jobs:
             RELEASE.md
 
       - name: Download release artifacts
-        uses: actions/download-artifact@v3
+        uses: actions/download-artifact@v4
 
       - name: Release
         uses: ncipollo/release-action@v1
