@@ -44,6 +44,11 @@ table BackendConfig {
   auth_token:string;
 }
 
+table SerialInputConfig {
+  /// Whether to echo typed characters back to the serial console
+  echo_enabled:bool = true;
+}
+
 // Represents configuration for Over-The-Air (OTA) updates.
 table OtaUpdateConfig {
   /// Indicates whether OTA updates are enabled.
@@ -55,6 +60,9 @@ table OtaUpdateConfig {
   /// The update channel to use, e.g. "stable", "beta", "dev".
   update_channel:string;
 
+  /// Indicates whether to check for updates on startup.
+  check_on_startup:bool;
+
   /// The interval between update checks in minutes, 0 to disable automatic update checks. ( 5 minutes minimum )
   check_interval:uint16;
 
@@ -63,11 +71,6 @@ table OtaUpdateConfig {
 
   /// Indicates if manual approval via serial input or captive portal is required before installing updates.
   require_manual_approval:bool;
-}
-
-table SerialInputConfig {
-  /// Whether to echo typed characters back to the serial console
-  echo_enabled:bool = true;
 }
 
 table Config {
@@ -83,9 +86,9 @@ table Config {
   /// Backend configuration
   backend:BackendConfig;
 
-  /// OTA update configuration
-  ota_update:OtaUpdateConfig;
-
   /// Serial input configuration
   serial_input:SerialInputConfig;
+
+  /// OTA update configuration
+  ota_update:OtaUpdateConfig;
 }

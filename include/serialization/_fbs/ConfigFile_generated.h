@@ -32,11 +32,11 @@ struct CaptivePortalConfigBuilder;
 struct BackendConfig;
 struct BackendConfigBuilder;
 
-struct OtaUpdateConfig;
-struct OtaUpdateConfigBuilder;
-
 struct SerialInputConfig;
 struct SerialInputConfigBuilder;
+
+struct OtaUpdateConfig;
+struct OtaUpdateConfigBuilder;
 
 struct Config;
 struct ConfigBuilder;
@@ -412,134 +412,6 @@ inline ::flatbuffers::Offset<BackendConfig> CreateBackendConfigDirect(
       auth_token__);
 }
 
-struct OtaUpdateConfig FLATBUFFERS_FINAL_CLASS : private ::flatbuffers::Table {
-  typedef OtaUpdateConfigBuilder Builder;
-  struct Traits;
-  static FLATBUFFERS_CONSTEXPR_CPP11 const char *GetFullyQualifiedName() {
-    return "OpenShock.Serialization.Configuration.OtaUpdateConfig";
-  }
-  enum FlatBuffersVTableOffset FLATBUFFERS_VTABLE_UNDERLYING_TYPE {
-    VT_IS_ENABLED = 4,
-    VT_CDN_DOMAIN = 6,
-    VT_UPDATE_CHANNEL = 8,
-    VT_CHECK_INTERVAL = 10,
-    VT_ALLOW_BACKEND_MANAGEMENT = 12,
-    VT_REQUIRE_MANUAL_APPROVAL = 14
-  };
-  /// Indicates whether OTA updates are enabled.
-  bool is_enabled() const {
-    return GetField<uint8_t>(VT_IS_ENABLED, 0) != 0;
-  }
-  /// The domain name of the OTA Content Delivery Network (CDN).
-  const ::flatbuffers::String *cdn_domain() const {
-    return GetPointer<const ::flatbuffers::String *>(VT_CDN_DOMAIN);
-  }
-  /// The update channel to use, e.g. "stable", "beta", "dev".
-  const ::flatbuffers::String *update_channel() const {
-    return GetPointer<const ::flatbuffers::String *>(VT_UPDATE_CHANNEL);
-  }
-  /// The interval between update checks in minutes, 0 to disable automatic update checks. ( 5 minutes minimum )
-  uint16_t check_interval() const {
-    return GetField<uint16_t>(VT_CHECK_INTERVAL, 0);
-  }
-  /// Indicates if the backend is authorized to manage the device's update version on behalf of the user.
-  bool allow_backend_management() const {
-    return GetField<uint8_t>(VT_ALLOW_BACKEND_MANAGEMENT, 0) != 0;
-  }
-  /// Indicates if manual approval via serial input or captive portal is required before installing updates.
-  bool require_manual_approval() const {
-    return GetField<uint8_t>(VT_REQUIRE_MANUAL_APPROVAL, 0) != 0;
-  }
-  bool Verify(::flatbuffers::Verifier &verifier) const {
-    return VerifyTableStart(verifier) &&
-           VerifyField<uint8_t>(verifier, VT_IS_ENABLED, 1) &&
-           VerifyOffset(verifier, VT_CDN_DOMAIN) &&
-           verifier.VerifyString(cdn_domain()) &&
-           VerifyOffset(verifier, VT_UPDATE_CHANNEL) &&
-           verifier.VerifyString(update_channel()) &&
-           VerifyField<uint16_t>(verifier, VT_CHECK_INTERVAL, 2) &&
-           VerifyField<uint8_t>(verifier, VT_ALLOW_BACKEND_MANAGEMENT, 1) &&
-           VerifyField<uint8_t>(verifier, VT_REQUIRE_MANUAL_APPROVAL, 1) &&
-           verifier.EndTable();
-  }
-};
-
-struct OtaUpdateConfigBuilder {
-  typedef OtaUpdateConfig Table;
-  ::flatbuffers::FlatBufferBuilder &fbb_;
-  ::flatbuffers::uoffset_t start_;
-  void add_is_enabled(bool is_enabled) {
-    fbb_.AddElement<uint8_t>(OtaUpdateConfig::VT_IS_ENABLED, static_cast<uint8_t>(is_enabled), 0);
-  }
-  void add_cdn_domain(::flatbuffers::Offset<::flatbuffers::String> cdn_domain) {
-    fbb_.AddOffset(OtaUpdateConfig::VT_CDN_DOMAIN, cdn_domain);
-  }
-  void add_update_channel(::flatbuffers::Offset<::flatbuffers::String> update_channel) {
-    fbb_.AddOffset(OtaUpdateConfig::VT_UPDATE_CHANNEL, update_channel);
-  }
-  void add_check_interval(uint16_t check_interval) {
-    fbb_.AddElement<uint16_t>(OtaUpdateConfig::VT_CHECK_INTERVAL, check_interval, 0);
-  }
-  void add_allow_backend_management(bool allow_backend_management) {
-    fbb_.AddElement<uint8_t>(OtaUpdateConfig::VT_ALLOW_BACKEND_MANAGEMENT, static_cast<uint8_t>(allow_backend_management), 0);
-  }
-  void add_require_manual_approval(bool require_manual_approval) {
-    fbb_.AddElement<uint8_t>(OtaUpdateConfig::VT_REQUIRE_MANUAL_APPROVAL, static_cast<uint8_t>(require_manual_approval), 0);
-  }
-  explicit OtaUpdateConfigBuilder(::flatbuffers::FlatBufferBuilder &_fbb)
-        : fbb_(_fbb) {
-    start_ = fbb_.StartTable();
-  }
-  ::flatbuffers::Offset<OtaUpdateConfig> Finish() {
-    const auto end = fbb_.EndTable(start_);
-    auto o = ::flatbuffers::Offset<OtaUpdateConfig>(end);
-    return o;
-  }
-};
-
-inline ::flatbuffers::Offset<OtaUpdateConfig> CreateOtaUpdateConfig(
-    ::flatbuffers::FlatBufferBuilder &_fbb,
-    bool is_enabled = false,
-    ::flatbuffers::Offset<::flatbuffers::String> cdn_domain = 0,
-    ::flatbuffers::Offset<::flatbuffers::String> update_channel = 0,
-    uint16_t check_interval = 0,
-    bool allow_backend_management = false,
-    bool require_manual_approval = false) {
-  OtaUpdateConfigBuilder builder_(_fbb);
-  builder_.add_update_channel(update_channel);
-  builder_.add_cdn_domain(cdn_domain);
-  builder_.add_check_interval(check_interval);
-  builder_.add_require_manual_approval(require_manual_approval);
-  builder_.add_allow_backend_management(allow_backend_management);
-  builder_.add_is_enabled(is_enabled);
-  return builder_.Finish();
-}
-
-struct OtaUpdateConfig::Traits {
-  using type = OtaUpdateConfig;
-  static auto constexpr Create = CreateOtaUpdateConfig;
-};
-
-inline ::flatbuffers::Offset<OtaUpdateConfig> CreateOtaUpdateConfigDirect(
-    ::flatbuffers::FlatBufferBuilder &_fbb,
-    bool is_enabled = false,
-    const char *cdn_domain = nullptr,
-    const char *update_channel = nullptr,
-    uint16_t check_interval = 0,
-    bool allow_backend_management = false,
-    bool require_manual_approval = false) {
-  auto cdn_domain__ = cdn_domain ? _fbb.CreateString(cdn_domain) : 0;
-  auto update_channel__ = update_channel ? _fbb.CreateString(update_channel) : 0;
-  return OpenShock::Serialization::Configuration::CreateOtaUpdateConfig(
-      _fbb,
-      is_enabled,
-      cdn_domain__,
-      update_channel__,
-      check_interval,
-      allow_backend_management,
-      require_manual_approval);
-}
-
 struct SerialInputConfig FLATBUFFERS_FINAL_CLASS : private ::flatbuffers::Table {
   typedef SerialInputConfigBuilder Builder;
   struct Traits;
@@ -591,6 +463,147 @@ struct SerialInputConfig::Traits {
   static auto constexpr Create = CreateSerialInputConfig;
 };
 
+struct OtaUpdateConfig FLATBUFFERS_FINAL_CLASS : private ::flatbuffers::Table {
+  typedef OtaUpdateConfigBuilder Builder;
+  struct Traits;
+  static FLATBUFFERS_CONSTEXPR_CPP11 const char *GetFullyQualifiedName() {
+    return "OpenShock.Serialization.Configuration.OtaUpdateConfig";
+  }
+  enum FlatBuffersVTableOffset FLATBUFFERS_VTABLE_UNDERLYING_TYPE {
+    VT_IS_ENABLED = 4,
+    VT_CDN_DOMAIN = 6,
+    VT_UPDATE_CHANNEL = 8,
+    VT_CHECK_ON_STARTUP = 10,
+    VT_CHECK_INTERVAL = 12,
+    VT_ALLOW_BACKEND_MANAGEMENT = 14,
+    VT_REQUIRE_MANUAL_APPROVAL = 16
+  };
+  /// Indicates whether OTA updates are enabled.
+  bool is_enabled() const {
+    return GetField<uint8_t>(VT_IS_ENABLED, 0) != 0;
+  }
+  /// The domain name of the OTA Content Delivery Network (CDN).
+  const ::flatbuffers::String *cdn_domain() const {
+    return GetPointer<const ::flatbuffers::String *>(VT_CDN_DOMAIN);
+  }
+  /// The update channel to use, e.g. "stable", "beta", "dev".
+  const ::flatbuffers::String *update_channel() const {
+    return GetPointer<const ::flatbuffers::String *>(VT_UPDATE_CHANNEL);
+  }
+  /// Indicates whether to check for updates on startup.
+  bool check_on_startup() const {
+    return GetField<uint8_t>(VT_CHECK_ON_STARTUP, 0) != 0;
+  }
+  /// The interval between update checks in minutes, 0 to disable automatic update checks. ( 5 minutes minimum )
+  uint16_t check_interval() const {
+    return GetField<uint16_t>(VT_CHECK_INTERVAL, 0);
+  }
+  /// Indicates if the backend is authorized to manage the device's update version on behalf of the user.
+  bool allow_backend_management() const {
+    return GetField<uint8_t>(VT_ALLOW_BACKEND_MANAGEMENT, 0) != 0;
+  }
+  /// Indicates if manual approval via serial input or captive portal is required before installing updates.
+  bool require_manual_approval() const {
+    return GetField<uint8_t>(VT_REQUIRE_MANUAL_APPROVAL, 0) != 0;
+  }
+  bool Verify(::flatbuffers::Verifier &verifier) const {
+    return VerifyTableStart(verifier) &&
+           VerifyField<uint8_t>(verifier, VT_IS_ENABLED, 1) &&
+           VerifyOffset(verifier, VT_CDN_DOMAIN) &&
+           verifier.VerifyString(cdn_domain()) &&
+           VerifyOffset(verifier, VT_UPDATE_CHANNEL) &&
+           verifier.VerifyString(update_channel()) &&
+           VerifyField<uint8_t>(verifier, VT_CHECK_ON_STARTUP, 1) &&
+           VerifyField<uint16_t>(verifier, VT_CHECK_INTERVAL, 2) &&
+           VerifyField<uint8_t>(verifier, VT_ALLOW_BACKEND_MANAGEMENT, 1) &&
+           VerifyField<uint8_t>(verifier, VT_REQUIRE_MANUAL_APPROVAL, 1) &&
+           verifier.EndTable();
+  }
+};
+
+struct OtaUpdateConfigBuilder {
+  typedef OtaUpdateConfig Table;
+  ::flatbuffers::FlatBufferBuilder &fbb_;
+  ::flatbuffers::uoffset_t start_;
+  void add_is_enabled(bool is_enabled) {
+    fbb_.AddElement<uint8_t>(OtaUpdateConfig::VT_IS_ENABLED, static_cast<uint8_t>(is_enabled), 0);
+  }
+  void add_cdn_domain(::flatbuffers::Offset<::flatbuffers::String> cdn_domain) {
+    fbb_.AddOffset(OtaUpdateConfig::VT_CDN_DOMAIN, cdn_domain);
+  }
+  void add_update_channel(::flatbuffers::Offset<::flatbuffers::String> update_channel) {
+    fbb_.AddOffset(OtaUpdateConfig::VT_UPDATE_CHANNEL, update_channel);
+  }
+  void add_check_on_startup(bool check_on_startup) {
+    fbb_.AddElement<uint8_t>(OtaUpdateConfig::VT_CHECK_ON_STARTUP, static_cast<uint8_t>(check_on_startup), 0);
+  }
+  void add_check_interval(uint16_t check_interval) {
+    fbb_.AddElement<uint16_t>(OtaUpdateConfig::VT_CHECK_INTERVAL, check_interval, 0);
+  }
+  void add_allow_backend_management(bool allow_backend_management) {
+    fbb_.AddElement<uint8_t>(OtaUpdateConfig::VT_ALLOW_BACKEND_MANAGEMENT, static_cast<uint8_t>(allow_backend_management), 0);
+  }
+  void add_require_manual_approval(bool require_manual_approval) {
+    fbb_.AddElement<uint8_t>(OtaUpdateConfig::VT_REQUIRE_MANUAL_APPROVAL, static_cast<uint8_t>(require_manual_approval), 0);
+  }
+  explicit OtaUpdateConfigBuilder(::flatbuffers::FlatBufferBuilder &_fbb)
+        : fbb_(_fbb) {
+    start_ = fbb_.StartTable();
+  }
+  ::flatbuffers::Offset<OtaUpdateConfig> Finish() {
+    const auto end = fbb_.EndTable(start_);
+    auto o = ::flatbuffers::Offset<OtaUpdateConfig>(end);
+    return o;
+  }
+};
+
+inline ::flatbuffers::Offset<OtaUpdateConfig> CreateOtaUpdateConfig(
+    ::flatbuffers::FlatBufferBuilder &_fbb,
+    bool is_enabled = false,
+    ::flatbuffers::Offset<::flatbuffers::String> cdn_domain = 0,
+    ::flatbuffers::Offset<::flatbuffers::String> update_channel = 0,
+    bool check_on_startup = false,
+    uint16_t check_interval = 0,
+    bool allow_backend_management = false,
+    bool require_manual_approval = false) {
+  OtaUpdateConfigBuilder builder_(_fbb);
+  builder_.add_update_channel(update_channel);
+  builder_.add_cdn_domain(cdn_domain);
+  builder_.add_check_interval(check_interval);
+  builder_.add_require_manual_approval(require_manual_approval);
+  builder_.add_allow_backend_management(allow_backend_management);
+  builder_.add_check_on_startup(check_on_startup);
+  builder_.add_is_enabled(is_enabled);
+  return builder_.Finish();
+}
+
+struct OtaUpdateConfig::Traits {
+  using type = OtaUpdateConfig;
+  static auto constexpr Create = CreateOtaUpdateConfig;
+};
+
+inline ::flatbuffers::Offset<OtaUpdateConfig> CreateOtaUpdateConfigDirect(
+    ::flatbuffers::FlatBufferBuilder &_fbb,
+    bool is_enabled = false,
+    const char *cdn_domain = nullptr,
+    const char *update_channel = nullptr,
+    bool check_on_startup = false,
+    uint16_t check_interval = 0,
+    bool allow_backend_management = false,
+    bool require_manual_approval = false) {
+  auto cdn_domain__ = cdn_domain ? _fbb.CreateString(cdn_domain) : 0;
+  auto update_channel__ = update_channel ? _fbb.CreateString(update_channel) : 0;
+  return OpenShock::Serialization::Configuration::CreateOtaUpdateConfig(
+      _fbb,
+      is_enabled,
+      cdn_domain__,
+      update_channel__,
+      check_on_startup,
+      check_interval,
+      allow_backend_management,
+      require_manual_approval);
+}
+
 struct Config FLATBUFFERS_FINAL_CLASS : private ::flatbuffers::Table {
   typedef ConfigBuilder Builder;
   struct Traits;
@@ -602,8 +615,8 @@ struct Config FLATBUFFERS_FINAL_CLASS : private ::flatbuffers::Table {
     VT_WIFI = 6,
     VT_CAPTIVE_PORTAL = 8,
     VT_BACKEND = 10,
-    VT_OTA_UPDATE = 12,
-    VT_SERIAL_INPUT = 14
+    VT_SERIAL_INPUT = 12,
+    VT_OTA_UPDATE = 14
   };
   /// RF Transmitter configuration
   const OpenShock::Serialization::Configuration::RFConfig *rf() const {
@@ -621,13 +634,13 @@ struct Config FLATBUFFERS_FINAL_CLASS : private ::flatbuffers::Table {
   const OpenShock::Serialization::Configuration::BackendConfig *backend() const {
     return GetPointer<const OpenShock::Serialization::Configuration::BackendConfig *>(VT_BACKEND);
   }
-  /// OTA update configuration
-  const OpenShock::Serialization::Configuration::OtaUpdateConfig *ota_update() const {
-    return GetPointer<const OpenShock::Serialization::Configuration::OtaUpdateConfig *>(VT_OTA_UPDATE);
-  }
   /// Serial input configuration
   const OpenShock::Serialization::Configuration::SerialInputConfig *serial_input() const {
     return GetPointer<const OpenShock::Serialization::Configuration::SerialInputConfig *>(VT_SERIAL_INPUT);
+  }
+  /// OTA update configuration
+  const OpenShock::Serialization::Configuration::OtaUpdateConfig *ota_update() const {
+    return GetPointer<const OpenShock::Serialization::Configuration::OtaUpdateConfig *>(VT_OTA_UPDATE);
   }
   bool Verify(::flatbuffers::Verifier &verifier) const {
     return VerifyTableStart(verifier) &&
@@ -639,10 +652,10 @@ struct Config FLATBUFFERS_FINAL_CLASS : private ::flatbuffers::Table {
            verifier.VerifyTable(captive_portal()) &&
            VerifyOffset(verifier, VT_BACKEND) &&
            verifier.VerifyTable(backend()) &&
-           VerifyOffset(verifier, VT_OTA_UPDATE) &&
-           verifier.VerifyTable(ota_update()) &&
            VerifyOffset(verifier, VT_SERIAL_INPUT) &&
            verifier.VerifyTable(serial_input()) &&
+           VerifyOffset(verifier, VT_OTA_UPDATE) &&
+           verifier.VerifyTable(ota_update()) &&
            verifier.EndTable();
   }
 };
@@ -663,11 +676,11 @@ struct ConfigBuilder {
   void add_backend(::flatbuffers::Offset<OpenShock::Serialization::Configuration::BackendConfig> backend) {
     fbb_.AddOffset(Config::VT_BACKEND, backend);
   }
-  void add_ota_update(::flatbuffers::Offset<OpenShock::Serialization::Configuration::OtaUpdateConfig> ota_update) {
-    fbb_.AddOffset(Config::VT_OTA_UPDATE, ota_update);
-  }
   void add_serial_input(::flatbuffers::Offset<OpenShock::Serialization::Configuration::SerialInputConfig> serial_input) {
     fbb_.AddOffset(Config::VT_SERIAL_INPUT, serial_input);
+  }
+  void add_ota_update(::flatbuffers::Offset<OpenShock::Serialization::Configuration::OtaUpdateConfig> ota_update) {
+    fbb_.AddOffset(Config::VT_OTA_UPDATE, ota_update);
   }
   explicit ConfigBuilder(::flatbuffers::FlatBufferBuilder &_fbb)
         : fbb_(_fbb) {
@@ -686,11 +699,11 @@ inline ::flatbuffers::Offset<Config> CreateConfig(
     ::flatbuffers::Offset<OpenShock::Serialization::Configuration::WiFiConfig> wifi = 0,
     ::flatbuffers::Offset<OpenShock::Serialization::Configuration::CaptivePortalConfig> captive_portal = 0,
     ::flatbuffers::Offset<OpenShock::Serialization::Configuration::BackendConfig> backend = 0,
-    ::flatbuffers::Offset<OpenShock::Serialization::Configuration::OtaUpdateConfig> ota_update = 0,
-    ::flatbuffers::Offset<OpenShock::Serialization::Configuration::SerialInputConfig> serial_input = 0) {
+    ::flatbuffers::Offset<OpenShock::Serialization::Configuration::SerialInputConfig> serial_input = 0,
+    ::flatbuffers::Offset<OpenShock::Serialization::Configuration::OtaUpdateConfig> ota_update = 0) {
   ConfigBuilder builder_(_fbb);
-  builder_.add_serial_input(serial_input);
   builder_.add_ota_update(ota_update);
+  builder_.add_serial_input(serial_input);
   builder_.add_backend(backend);
   builder_.add_captive_portal(captive_portal);
   builder_.add_wifi(wifi);
