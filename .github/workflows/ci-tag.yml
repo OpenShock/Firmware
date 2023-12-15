@@ -3,12 +3,13 @@ on:
     tags:
       - '[0-9]+.[0-9]+.[0-9]+'
       - '[0-9]+.[0-9]+.[0-9]+-*'
+  workflow_dispatch:
 
 name: ci-tag
-run-name: "ci-tag: ${{ github.ref_name }}"
+run-name: 'ci-tag: ${{ github.ref_name }}'
 
 env:
-  NODE_VERSION: 16
+  NODE_VERSION: 18
   PYTHON_VERSION: 3.12
   OPENSHOCK_API_DOMAIN: api.shocklink.net
   # OPENSHOCK_FW_VERSION:
@@ -17,7 +18,6 @@ env:
   OPENSHOCK_FW_COMMIT: ${{ github.sha }}
 
 jobs:
-
   # Read platformio.ini and extract all specific targets. See the referenced file for more info.
   get-targets:
     uses: ./.github/workflows/get-targets.yml
@@ -191,7 +191,7 @@ jobs:
             RELEASE.md
 
       - name: Download release artifacts
-        uses: actions/download-artifact@v3
+        uses: actions/download-artifact@v4
 
       - name: Release
         uses: ncipollo/release-action@v1

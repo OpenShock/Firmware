@@ -1,19 +1,34 @@
-# OpenShock (ESP-32) Firmware
+# OpenShock Espressif Firmware
 
-ESP-32 Firmware for OpenShock. Controlling shockers via 433 MHz RF.
+Espressif Firmware for OpenShock.
+
+Controlling shockers via Reverse engineered proprietary Sub-1 GHz Protocols.
 
 ## Compatible Hardware
 
-You will need a ESP-32 and a 433 MHz antenna attached to it. For more info about buying such hardware see here [OpenShock Wiki - Hardware: Buy](https://docs.shocklink.net/en/Hardware/Buy).
-Guide for assembly can be found here [OpenShock Wiki - Hardware: Assembly](https://docs.shocklink.net/en/Hardware/Assembly)
+You will need a ESP-32 and a 433 MHz antenna attached to it.
 
-Confirmed working ESP's:
+For more info about buying such hardware see here [OpenShock Wiki - Vendors: Hardware](https://wiki.openshock.org/vendors/hardware/).
 
-- Wemos Mini D1 ESP32-WROOM-32
+Guide for assembly can be found here [OpenShock Wiki - DIY: Assembling](https://wiki.openshock.org/diy/assembling/)
+
+Confirmed working boards:
+
+- PiShock
+  - 2021 Q3
+  - 2023
+- Seeed
+  - Xiao ESP32S3
+- Wemos
+  - D1 Mini
+  - Lolin S2 Mini
+  - Lolin S3
+- OpenShock (Legacy)
+  - Core V1
 
 ## Flashing
 
-Refer to [OpenShock Wiki - Device: Flashing](https://docs.shocklink.net/en/Device/Setup/Flashing) on how to flash your micro controller.
+Refer to [OpenShock Wiki - Guides: First time setup](https://wiki.openshock.org/guides/openshock-first-setup/) on how to set up your microcontroller.
 
 Other than that, you can just flash via platform io in vscode. More in the contribute section.
 

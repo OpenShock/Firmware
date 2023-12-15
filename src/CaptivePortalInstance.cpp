@@ -5,6 +5,7 @@
 #include "GatewayConnectionManager.h"
 #include "Logging.h"
 #include "serialization/WSLocal.h"
+#include "util/HexUtils.h"
 #include "util/TaskUtils.h"
 #include "wifi/WiFiManager.h"
 
@@ -24,44 +25,55 @@ constexpr std::uint32_t WEBSOCKET_UPDATE_INTERVAL = 10;  // 10ms / 100Hz
 
 using namespace OpenShock;
 
-bool TryReadFile(const char* path, char* buffer, std::size_t& bufferSize) {
-  File file = LittleFS.open(path, "r");
-  if (!file) {
-    ESP_LOGE(TAG, "Failed to open file %s for reading", path);
-    return false;
+const esp_partition_t* _getStaticPartition() {
+  const esp_partition_t* partition = esp_partition_find_first(ESP_PARTITION_TYPE_DATA, ESP_PARTITION_SUBTYPE_DATA_SPIFFS, "static0");
+  if (partition != nullptr) {
+    return partition;
   }
 
-  std::size_t fileSize = file.size();
-  if (fileSize > bufferSize) {
-    ESP_LOGE(TAG, "File %s is too large to fit in buffer", path);
-    file.close();
-    return false;
+  partition = esp_partition_find_first(ESP_PARTITION_TYPE_DATA, ESP_PARTITION_SUBTYPE_DATA_SPIFFS, "static1");
+  if (partition != nullptr) {
+    return partition;
   }
 
-  file.readBytes(buffer, fileSize);
-
-  bufferSize = fileSize;
-
-  file.close();
-
-  return true;
+  return nullptr;
 }
 
-bool TryGetFsHash(char (&buffer)[65]) {
-  std::size_t bufferSize = sizeof(buffer);
-  if (TryReadFile("/www/hash.sha1", buffer, bufferSize)) {
-    buffer[bufferSize] = '\0';
-    return true;
+bool _tryGetPartitionHash(char (&buffer)[65]) {
+  static bool initialized              = false;
+  static std::uint8_t staticSha256[32] = {0};
+
+  if (!initialized) {
+    initialized = true;
+
+    ESP_LOGI(TAG, "Looking for static partition");
+
+    // Get the static partition
+    const esp_partition_t* partition = _getStaticPartition();
+    if (partition == nullptr) {
+      ESP_LOGE(TAG, "Failed to find static partition");
+      return false;
+    }
+
+    ESP_LOGI(TAG, "Found static partition, getting hash... (this may take a while)");
+
+    // Get the hash of the partition
+    esp_err_t err = esp_partition_get_sha256(partition, staticSha256);
+    if (err != ESP_OK) {
+      ESP_LOGE(TAG, "Failed to get partition hash: %s", esp_err_to_name(err));
+      return false;
+    }
+
+    ESP_LOGI(TAG, "Got partition hash");
   }
-  if (TryReadFile("/www/hash.sha256", buffer, bufferSize)) {
-    buffer[bufferSize] = '\0';
-    return true;
-  }
-  if (TryReadFile("/www/hash.md5", buffer, bufferSize)) {
-    buffer[bufferSize] = '\0';
-    return true;
-  }
-  return false;
+
+  // Copy the hash to the output buffer
+  HexUtils::ToHex<32>(staticSha256, nonstd::span<char, 64>(buffer, 64), false);
+
+  // Null-terminate the string
+  buffer[64] = '\0';
+
+  return true;
 }
 
 CaptivePortalInstance::CaptivePortalInstance()
@@ -78,7 +90,7 @@ CaptivePortalInstance::CaptivePortalInstance()
 
   // Get the hash of the filesystem
   char fsHash[65];
-  bool gotFsHash = TryGetFsHash(fsHash);
+  bool gotFsHash = _tryGetPartitionHash(fsHash);
 
   bool fsOk = indexExists && gotFsHash;
   if (fsOk) {
@@ -95,7 +107,14 @@ CaptivePortalInstance::CaptivePortalInstance()
       request->send(
         200,
         "text/plain",
-        "You probably forgot to upload the Filesystem with PlatformIO!\nGo to PlatformIO -> Platform -> Upload Filesystem Image!\nIf this happened with a file we provided or you just need help, come to the Discord!\n\ndiscord.gg/openshock"
+        // Raw string literal (1+ to remove the first newline)
+        1 + R"(
+You probably forgot to upload the Filesystem with PlatformIO!
+Go to PlatformIO -> Platform -> Upload Filesystem Image!
+If this happened with a file we provided or you just need help, come to the Discord!
+
+discord.gg/OpenShock
+)"
       );
     });
   }
@@ -110,8 +129,10 @@ CaptivePortalInstance::CaptivePortalInstance()
 }
 
 CaptivePortalInstance::~CaptivePortalInstance() {
-  vTaskDelete(m_taskHandle);
-
+  if (m_taskHandle != nullptr) {
+    vTaskDelete(m_taskHandle);
+    m_taskHandle = nullptr;
+  }
   m_webServer.end();
   m_socketServer.close();
 }
