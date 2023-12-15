@@ -20,10 +20,10 @@ void _Private::HandleWiFiNetworkSaveCommand(std::uint8_t socketId, const OpenSho
   }
 
   auto ssid     = msg->ssid();
-  auto password = msg->password();
+  auto password = msg->password() ? msg->password()->str() : "";
 
-  if (ssid == nullptr || password == nullptr) {
-    ESP_LOGE(TAG, "WiFi message is missing required properties");
+  if (ssid == nullptr) {
+    ESP_LOGE(TAG, "WiFi message is missing SSID");
     return;
   }
 
@@ -32,12 +32,17 @@ void _Private::HandleWiFiNetworkSaveCommand(std::uint8_t socketId, const OpenSho
     return;
   }
 
-  if (password->size() > 63) {
+  if (password.size() < 1) {
+    ESP_LOGE(TAG, "WiFi message is missing password, assuming open network");
+  } else if (password.size() < 8) {
+    ESP_LOGE(TAG, "WiFi password is too short");
+    return;
+  } else if (password.size() > 63) {
     ESP_LOGE(TAG, "WiFi password is too long");
     return;
   }
 
-  if (!WiFiManager::Save(ssid->c_str(), password->str())) {  // TODO: support hidden networks
+  if (!WiFiManager::Save(ssid->c_str(), password)) {
     ESP_LOGE(TAG, "Failed to save WiFi network");
   }
 }
