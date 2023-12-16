@@ -293,7 +293,7 @@ bool Config::SetWiFiConfig(const Config::WiFiConfig& config) {
 }
 
 bool Config::SetWiFiCredentials(const std::vector<Config::WiFiCredentials>& credentials) {
-  for (auto& cred : credentials) {
+  for (const auto& cred : credentials) {
     if (cred.id == 0) {
       ESP_LOGE(TAG, "Cannot set WiFi credentials: credential ID cannot be 0");
       return false;
@@ -408,7 +408,7 @@ std::uint8_t Config::AddWiFiCredentials(const std::string& ssid, const std::stri
   ScopedWriteLock lock(&_configMutex);
   if (!lock.isLocked()) {
     ESP_LOGE(TAG, "Failed to acquire write lock");
-    return false;
+    return 0;
   }
 
   std::uint8_t id = 0;
@@ -465,7 +465,7 @@ bool Config::TryGetWiFiCredentialsByID(std::uint8_t id, Config::WiFiCredentials&
     return false;
   }
 
-  for (auto& creds : _configData.wifi.credentialsList) {
+  for (const auto& creds : _configData.wifi.credentialsList) {
     if (creds.id == id) {
       credentials = creds;
       return true;
@@ -482,7 +482,7 @@ bool Config::TryGetWiFiCredentialsBySSID(const char* ssid, Config::WiFiCredentia
     return false;
   }
 
-  for (auto& creds : _configData.wifi.credentialsList) {
+  for (const auto& creds : _configData.wifi.credentialsList) {
     if (creds.ssid == ssid) {
       credentials = creds;
       return true;
@@ -496,10 +496,10 @@ std::uint8_t Config::GetWiFiCredentialsIDbySSID(const char* ssid) {
   ScopedReadLock lock(&_configMutex);
   if (!lock.isLocked()) {
     ESP_LOGE(TAG, "Failed to acquire read lock");
-    return false;
+    return 0;
   }
 
-  for (auto& creds : _configData.wifi.credentialsList) {
+  for (const auto& creds : _configData.wifi.credentialsList) {
     if (creds.ssid == ssid) {
       return creds.id;
     }
@@ -578,6 +578,6 @@ bool Config::ClearBackendAuthToken() {
     return false;
   }
 
-  _configData.backend.authToken = "";
+  _configData.backend.authToken.clear();
   return _trySaveConfig();
 }

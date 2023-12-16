@@ -18,7 +18,7 @@
 #define OPENSHOCK_FW_CHIP_NAME "ESP8266EX"
 // GPIO3, GPIO1 is used for UART0 RXD/TXD.
 // GPIO0, GPIO2, and GPIO15 are used for boot mode and SDIO slave timing selection.
-#define CHIP_UNSAFE_GPIO(pin) (pin == GPIO_NUM_0 || pin == GPIO_NUM_1 || pin == GPIO_NUM_2 || pin == GPIO_NUM_3 || pin == GPIO_NUM_15)
+#define CHIP_UNSAFE_GPIO(pin) ((pin) == GPIO_NUM_0 || (pin) == GPIO_NUM_1 || (pin) == GPIO_NUM_2 || (pin) == GPIO_NUM_3 || (pin) == GPIO_NUM_15)
 #endif
 
 // ESP8285
@@ -30,7 +30,7 @@
 #define OPENSHOCK_FW_CHIP_NAME "ESP8285"
 // GPIO3, GPIO1 is used for UART0 RXD/TXD.
 // GPIO0, GPIO2, and GPIO15 are used for boot mode and SDIO slave timing selection.
-#define CHIP_UNSAFE_GPIO(pin) (pin == GPIO_NUM_0 || pin == GPIO_NUM_1 || pin == GPIO_NUM_2 || pin == GPIO_NUM_3 || pin == GPIO_NUM_15)
+#define CHIP_UNSAFE_GPIO(pin) ((pin) == GPIO_NUM_0 || (pin) == GPIO_NUM_1 || (pin) == GPIO_NUM_2 || (pin) == GPIO_NUM_3 || (pin) == GPIO_NUM_15)
 #endif
 
 // ESP8684
@@ -43,7 +43,7 @@
 #define OPENSHOCK_FW_CHIP_NAME "ESP8684"
 // GPIO3, GPIO1 is used for UART0 RXD/TXD.
 // GPIO8, GPIO9 are strapping pins used to control the boot mode adn ROM code printing
-#define CHIP_UNSAFE_GPIO(pin) (pin == GPIO_NUM_1 || pin == GPIO_NUM_3 || pin == GPIO_NUM_8 || pin == GPIO_NUM_9)
+#define CHIP_UNSAFE_GPIO(pin) ((pin) == GPIO_NUM_1 || (pin) == GPIO_NUM_3 || (pin) == GPIO_NUM_8 || (pin) == GPIO_NUM_9)
 #endif
 
 // ESP8685
@@ -55,7 +55,7 @@
 #define OPENSHOCK_FW_CHIP_NAME "ESP8685"
 // GPIO20, GPIO21 is used for UART0 RXD/TXD.
 // GPIO2, GPIO8, GPIO9 are strapping pins.
-#define CHIP_UNSAFE_GPIO(pin) (pin == GPIO_NUM_2 || pin == GPIO_NUM_8 || pin == GPIO_NUM_9 || pin == GPIO_NUM_20 || pin == GPIO_NUM_21)
+#define CHIP_UNSAFE_GPIO(pin) ((pin) == GPIO_NUM_2 || (pin) == GPIO_NUM_8 || (pin) == GPIO_NUM_9 || (pin) == GPIO_NUM_20 || (pin) == GPIO_NUM_21)
 #endif
 
 // ESP32
@@ -74,8 +74,8 @@
 // See: ESP32 Series Datasheet Version 4.3 Section 2.2 Pin Overview
 // See: ESP32 Series Datasheet Version 4.3 Section 2.4 Strapping Pins
 #define CHIP_UNSAFE_GPIO(pin)                                                                                                                                                                                                                                  \
-  (pin == GPIO_NUM_1 || pin == GPIO_NUM_3 || pin == GPIO_NUM_0 || pin == GPIO_NUM_2 || pin == GPIO_NUM_5 || pin == GPIO_NUM_15 || pin == GPIO_NUM_6 || pin == GPIO_NUM_7 || pin == GPIO_NUM_8 || pin == GPIO_NUM_9 || pin == GPIO_NUM_11 || pin == GPIO_NUM_16 \
-   || pin == GPIO_NUM_17)
+  ((pin) == GPIO_NUM_1 || (pin) == GPIO_NUM_3 || (pin) == GPIO_NUM_0 || (pin) == GPIO_NUM_2 || (pin) == GPIO_NUM_5 || (pin) == GPIO_NUM_15 || (pin) == GPIO_NUM_6 || (pin) == GPIO_NUM_7 || (pin) == GPIO_NUM_8 || (pin) == GPIO_NUM_9 || (pin) == GPIO_NUM_11 || (pin) == GPIO_NUM_16 \
+   || (pin) == GPIO_NUM_17)
 #endif
 
 // ESP32-PICO-D4
@@ -88,7 +88,7 @@
 // GPIO3, GPIO1 is used for UART0 RXD/TXD.
 // GPIO25, GPIO27, GPIO29, GPIO30, GPIO31, GPIO32, GPIO33 is used for SPI flash connection. (DO NOT TOUCH)
 // GPIO12, GPIO0, GPIO2, GPIO15, and GPIO5 are used for boot mode and SDIO slave timing selection.
-#define CHIP_UNSAFE_GPIO(pin) (pin == GPIO_NUM_3 || pin == GPIO_NUM_1 || pin == GPIO_NUM_25 || pin == GPIO_NUM_27 || pin == GPIO_NUM_29 || pin == GPIO_NUM_30 || pin == GPIO_NUM_31 || pin == GPIO_NUM_32 || pin == GPIO_NUM_33 || pin == GPIO_NUM_12 || pin == GPIO_NUM_0 || pin == GPIO_NUM_2 || pin == GPIO_NUM_15 || pin == GPIO_NUM_5)
+#define CHIP_UNSAFE_GPIO(pin) ((pin) == GPIO_NUM_3 || (pin) == GPIO_NUM_1 || (pin) == GPIO_NUM_25 || (pin) == GPIO_NUM_27 || (pin) == GPIO_NUM_29 || (pin) == GPIO_NUM_30 || (pin) == GPIO_NUM_31 || (pin) == GPIO_NUM_32 || (pin) == GPIO_NUM_33 || (pin) == GPIO_NUM_12 || (pin) == GPIO_NUM_0 || (pin) == GPIO_NUM_2 || (pin) == GPIO_NUM_15 || (pin) == GPIO_NUM_5)
 #endif
 
 // ESP32-PICO-V3
@@ -101,7 +101,7 @@
 // GPIO3, GPIO1 is used for UART0 RXD/TXD.
 // GPIO6, GPIO11, GPIO9, GPIO10 is used for SPI flash connection. (DO NOT TOUCH)
 // GPIO12, GPIO0, GPIO2, GPIO15, and GPIO5 are used for boot mode and SDIO slave timing selection.
-#define CHIP_UNSAFE_GPIO(pin) (pin == GPIO_NUM_3 || pin == GPIO_NUM_1 || pin == GPIO_NUM_6 || pin == GPIO_NUM_11 || pin == GPIO_NUM_9 || pin == GPIO_NUM_10 || pin == GPIO_NUM_12 || pin == GPIO_NUM_0 || pin == GPIO_NUM_2 || pin == GPIO_NUM_15 || pin == GPIO_NUM_5)
+#define CHIP_UNSAFE_GPIO(pin) ((pin) == GPIO_NUM_3 || (pin) == GPIO_NUM_1 || (pin) == GPIO_NUM_6 || (pin) == GPIO_NUM_11 || (pin) == GPIO_NUM_9 || (pin) == GPIO_NUM_10 || (pin) == GPIO_NUM_12 || (pin) == GPIO_NUM_0 || (pin) == GPIO_NUM_2 || (pin) == GPIO_NUM_15 || (pin) == GPIO_NUM_5)
 #endif
 
 // ESP32-S2
@@ -114,7 +114,7 @@
 // GPIO44, GPIO43 is used for UART0 RXD/TXD.
 // GPIO29, GPIO26, GPIO32, GPIO31, GPIO30, GPIO28, GPIO27 is used for SPI flash connection. (DO NOT TOUCH)
 // GPIO0, GPIO45, GPIO46 is strapping pins used to control the boot mode and misc. functions.
-#define CHIP_UNSAFE_GPIO(pin) (pin == GPIO_NUM_44 || pin == GPIO_NUM_43 || pin == GPIO_NUM_29 || pin == GPIO_NUM_26 || pin == GPIO_NUM_32 || pin == GPIO_NUM_31 || pin == GPIO_NUM_30 || pin == GPIO_NUM_28 || pin == GPIO_NUM_27 || pin == GPIO_NUM_0 || pin == GPIO_NUM_45 || pin == GPIO_NUM_46)
+#define CHIP_UNSAFE_GPIO(pin) ((pin) == GPIO_NUM_44 || (pin) == GPIO_NUM_43 || (pin) == GPIO_NUM_29 || (pin) == GPIO_NUM_26 || (pin) == GPIO_NUM_32 || (pin) == GPIO_NUM_31 || (pin) == GPIO_NUM_30 || (pin) == GPIO_NUM_28 || (pin) == GPIO_NUM_27 || (pin) == GPIO_NUM_0 || (pin) == GPIO_NUM_45 || (pin) == GPIO_NUM_46)
 #endif
 
 // ESP32-S3
@@ -128,7 +128,7 @@
 // GPIO19, GPIO20 is used for USB serial, flashing, and debugging.
 // GPIO30, GPIO29, GPIO26, GPIO32, GPIO31, GPIO28, GPIO27, GPIO33, GPIO34, GPIO35, GPIO36, GPIO37 is used for SPI flash connection. (DO NOT TOUCH)
 // GPIO0, GPIO3, GPIO45, GPIO46 is strapping pins used to control the boot mode and misc. functions.
-#define CHIP_UNSAFE_GPIO(pin) (pin == GPIO_NUM_44 || pin == GPIO_NUM_43 || pin == GPIO_NUM_19 || pin == GPIO_NUM_20 || pin == GPIO_NUM_30 || pin == GPIO_NUM_29 || pin == GPIO_NUM_26 || pin == GPIO_NUM_32 || pin == GPIO_NUM_31 || pin == GPIO_NUM_28 || pin == GPIO_NUM_27 || pin == GPIO_NUM_33 || pin == GPIO_NUM_34 || pin == GPIO_NUM_35 || pin == GPIO_NUM_36 || pin == GPIO_NUM_37 || pin == GPIO_NUM_0 || pin == GPIO_NUM_3 || pin == GPIO_NUM_45 || pin == GPIO_NUM_46)
+#define CHIP_UNSAFE_GPIO(pin) ((pin) == GPIO_NUM_44 || (pin) == GPIO_NUM_43 || (pin) == GPIO_NUM_19 || (pin) == GPIO_NUM_20 || (pin) == GPIO_NUM_30 || (pin) == GPIO_NUM_29 || (pin) == GPIO_NUM_26 || (pin) == GPIO_NUM_32 || (pin) == GPIO_NUM_31 || (pin) == GPIO_NUM_28 || (pin) == GPIO_NUM_27 || (pin) == GPIO_NUM_33 || (pin) == GPIO_NUM_34 || (pin) == GPIO_NUM_35 || (pin) == GPIO_NUM_36 || (pin) == GPIO_NUM_37 || (pin) == GPIO_NUM_0 || (pin) == GPIO_NUM_3 || (pin) == GPIO_NUM_45 || (pin) == GPIO_NUM_46)
 #endif
 
 // ESP32-S3-PICO-1
@@ -172,22 +172,22 @@
 #pragma region Board Specific Bypasses
 
 #ifdef OPENSHOCK_FW_BOARD_WEMOSD1MINIESP32
-#define OPENSHOCK_BYPASSED_GPIO(pin) (pin == 15 || pin == 2)
+#define OPENSHOCK_BYPASSED_GPIO(pin) ((pin) == 15 || (pin) == 2)
 #endif
 #ifdef OPENSHOCK_FW_BOARD_WEMOSLOLINS2MINI
-#define OPENSHOCK_BYPASSED_GPIO(pin) (pin == 15)
+#define OPENSHOCK_BYPASSED_GPIO(pin) ((pin) == 15)
 #endif
 #ifdef OPENSHOCK_FW_BOARD_PISHOCK2023
-#define OPENSHOCK_BYPASSED_GPIO(pin) (pin == 12 || pin == 2)
+#define OPENSHOCK_BYPASSED_GPIO(pin) ((pin) == 12 || (pin) == 2)
 #endif
 #ifdef OPENSHOCK_FW_BOARD_PISHOCKLITE2021
-#define OPENSHOCK_BYPASSED_GPIO(pin) (pin == 15 || pin == 2)
+#define OPENSHOCK_BYPASSED_GPIO(pin) ((pin) == 15 || (pin) == 2)
 #endif
 #ifdef OPENSHOCK_FW_BOARD_SEEEDXIAOESP32S3
-#define OPENSHOCK_BYPASSED_GPIO(pin) (pin == 21)
+#define OPENSHOCK_BYPASSED_GPIO(pin) ((pin) == 21)
 #endif
 #ifdef OPENSHOCK_FW_BOARD_OPENSHOCKCOREV1
-#define OPENSHOCK_BYPASSED_GPIO(pin) (pin == 15 || pin == 35)
+#define OPENSHOCK_BYPASSED_GPIO(pin) ((pin) == 15 || (pin) == 35)
 #endif
 #ifndef OPENSHOCK_BYPASSED_GPIO
 #define OPENSHOCK_BYPASSED_GPIO(pin) (false)

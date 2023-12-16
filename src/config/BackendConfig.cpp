@@ -7,9 +7,11 @@ const char* const TAG = "Config::BackendConfig";
 
 using namespace OpenShock::Config;
 
+BackendConfig::BackendConfig() : domain(OPENSHOCK_API_DOMAIN), authToken() {}
+
 void BackendConfig::ToDefault() {
   domain = OPENSHOCK_API_DOMAIN;
-  authToken = "";
+  authToken.clear();
 }
 
 bool BackendConfig::FromFlatbuffers(const Serialization::Configuration::BackendConfig* config) {
@@ -34,7 +36,7 @@ bool BackendConfig::FromJSON(const cJSON* json) {
     return false;
   }
 
-  if (!cJSON_IsObject(json)) {
+  if (cJSON_IsObject(json) == 0) {
     ESP_LOGE(TAG, "json is not an object");
     return false;
   }
@@ -45,7 +47,7 @@ bool BackendConfig::FromJSON(const cJSON* json) {
     return false;
   }
 
-  if (!cJSON_IsString(domainJson)) {
+  if (cJSON_IsString(domainJson) == 0) {
     ESP_LOGE(TAG, "domain is not a string");
     return false;
   }
@@ -58,7 +60,7 @@ bool BackendConfig::FromJSON(const cJSON* json) {
     return false;
   }
 
-  if (!cJSON_IsString(authTokenJson)) {
+  if (cJSON_IsString(authTokenJson) == 0) {
     ESP_LOGE(TAG, "authToken is not a string");
     return false;
   }
