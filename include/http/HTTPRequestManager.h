@@ -28,10 +28,10 @@ namespace OpenShock::HTTP {
   template<typename T>
   using JsonParser = std::function<bool(int code, const cJSON* json, T& data)>;
 
-  Response<String> GetString(const char* const url, const std::map<String, String>& headers, std::vector<int> acceptedCodes = {200});
+  Response<String> GetString(const char* const url, const std::map<String, String>& headers, const std::vector<int>& acceptedCodes = {200});
 
   template<typename T>
-  Response<T> GetJSON(const char* const url, const std::map<String, String>& headers, JsonParser<T> jsonParser, std::vector<int> acceptedCodes = {200}) {
+  Response<T> GetJSON(const char* const url, const std::map<String, String>& headers, JsonParser<T> jsonParser, const std::vector<int>& acceptedCodes = {200}) {
     auto response = GetString(url, headers, acceptedCodes);
     if (response.result != RequestResult::Success) {
       return {response.result, response.code, {}};

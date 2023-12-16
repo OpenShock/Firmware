@@ -7,6 +7,10 @@ const char* const TAG = "Config::WiFiConfig";
 
 using namespace OpenShock::Config;
 
+WiFiConfig::WiFiConfig() : accessPointSSID(OPENSHOCK_FW_AP_PREFIX), hostname(OPENSHOCK_FW_HOSTNAME), credentialsList() {}
+
+WiFiConfig::WiFiConfig(const std::string& accessPointSSID, const std::string& hostname, const std::vector<WiFiCredentials>& credentialsList) : accessPointSSID(accessPointSSID), hostname(hostname), credentialsList(credentialsList) {}
+
 void WiFiConfig::ToDefault() {
   accessPointSSID = OPENSHOCK_FW_AP_PREFIX;
   hostname        = OPENSHOCK_FW_HOSTNAME;
@@ -29,7 +33,7 @@ bool WiFiConfig::FromFlatbuffers(const Serialization::Configuration::WiFiConfig*
 flatbuffers::Offset<OpenShock::Serialization::Configuration::WiFiConfig> WiFiConfig::ToFlatbuffers(flatbuffers::FlatBufferBuilder& builder) const {
   std::vector<flatbuffers::Offset<OpenShock::Serialization::Configuration::WiFiCredentials>> fbsCredentialsList;
   for (auto& credentials : credentialsList) {
-    fbsCredentialsList.push_back(credentials.ToFlatbuffers(builder));
+    fbsCredentialsList.emplace_back(credentials.ToFlatbuffers(builder));
   }
 
   return Serialization::Configuration::CreateWiFiConfig(builder, builder.CreateString(accessPointSSID), builder.CreateString(hostname), builder.CreateVector(fbsCredentialsList));
@@ -41,7 +45,7 @@ bool WiFiConfig::FromJSON(const cJSON* json) {
     return false;
   }
 
-  if (!cJSON_IsObject(json)) {
+  if (cJSON_IsObject(json) == 0) {
     ESP_LOGE(TAG, "json is not an object");
     return false;
   }
@@ -52,7 +56,7 @@ bool WiFiConfig::FromJSON(const cJSON* json) {
     return false;
   }
 
-  if (!cJSON_IsString(accessPointSSIDJson)) {
+  if (cJSON_IsString(accessPointSSIDJson) == 0) {
     ESP_LOGE(TAG, "accessPointSSID is not a string");
     return false;
   }
@@ -65,7 +69,7 @@ bool WiFiConfig::FromJSON(const cJSON* json) {
     return false;
   }
 
-  if (!cJSON_IsString(hostnameJson)) {
+  if (cJSON_IsString(hostnameJson) == 0) {
     ESP_LOGE(TAG, "hostname is not a string");
     return false;
   }
@@ -78,7 +82,7 @@ bool WiFiConfig::FromJSON(const cJSON* json) {
     return false;
   }
 
-  if (!cJSON_IsArray(credentialsListJson)) {
+  if (cJSON_IsArray(credentialsListJson) == 0) {
     ESP_LOGE(TAG, "credentials is not an array");
     return false;
   }
