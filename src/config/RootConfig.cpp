@@ -11,6 +11,7 @@ void RootConfig::ToDefault() {
   wifi.ToDefault();
   captivePortal.ToDefault();
   backend.ToDefault();
+  serialInput.ToDefault();
 }
 
 bool RootConfig::FromFlatbuffers(const Serialization::Configuration::Config* config) {
@@ -39,11 +40,16 @@ bool RootConfig::FromFlatbuffers(const Serialization::Configuration::Config* con
     return false;
   }
 
+  if (!serialInput.FromFlatbuffers(config->serial_input())) {
+    ESP_LOGE(TAG, "Unable to load serial input config");
+    return false;
+  }
+
   return true;
 }
 
 flatbuffers::Offset<OpenShock::Serialization::Configuration::Config> RootConfig::ToFlatbuffers(flatbuffers::FlatBufferBuilder& builder) const {
-  return Serialization::Configuration::CreateConfig(builder, rf.ToFlatbuffers(builder), wifi.ToFlatbuffers(builder), captivePortal.ToFlatbuffers(builder), backend.ToFlatbuffers(builder));
+  return Serialization::Configuration::CreateConfig(builder, rf.ToFlatbuffers(builder), wifi.ToFlatbuffers(builder), captivePortal.ToFlatbuffers(builder), backend.ToFlatbuffers(builder), serialInput.ToFlatbuffers(builder));
 }
 
 bool RootConfig::FromJSON(const cJSON* json) {
@@ -52,7 +58,7 @@ bool RootConfig::FromJSON(const cJSON* json) {
     return false;
   }
 
-  if (!cJSON_IsObject(json)) {
+  if (cJSON_IsObject(json) == 0) {
     ESP_LOGE(TAG, "json is not an object");
     return false;
   }
@@ -77,6 +83,11 @@ bool RootConfig::FromJSON(const cJSON* json) {
     return false;
   }
 
+  if (!serialInput.FromJSON(cJSON_GetObjectItemCaseSensitive(json, "serialInput"))) {
+    ESP_LOGE(TAG, "Unable to load serial input config");
+    return false;
+  }
+
   return true;
 }
 
@@ -87,6 +98,7 @@ cJSON* RootConfig::ToJSON() const {
   cJSON_AddItemToObject(root, "wifi", wifi.ToJSON());
   cJSON_AddItemToObject(root, "captivePortal", captivePortal.ToJSON());
   cJSON_AddItemToObject(root, "backend", backend.ToJSON());
+  cJSON_AddItemToObject(root, "serialInput", serialInput.ToJSON());
 
   return root;
 }

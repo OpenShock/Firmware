@@ -32,10 +32,10 @@ std::uint32_t calculateEepyTime(std::int64_t timeToKeepAlive) {
 }
 
 struct KnownShocker {
+  bool killTask;
   ShockerModelType model;
   std::uint16_t shockerId;
   std::int64_t lastActivityTimestamp;
-  bool killTask;
 };
 
 static SemaphoreHandle_t s_rfTransmitterMutex         = nullptr;
@@ -46,6 +46,8 @@ static QueueHandle_t s_keepAliveQueue     = nullptr;
 static TaskHandle_t s_keepAliveTaskHandle = nullptr;
 
 void _keepAliveTask(void* arg) {
+  (void)arg;
+
   std::int64_t timeToKeepAlive = KEEP_ALIVE_INTERVAL;
 
   // Map of shocker IDs to time of next keep-alive
@@ -76,24 +78,24 @@ void _keepAliveTask(void* arg) {
 
     // For every entry that has a keep-alive time less than now, send a keep-alive
     for (auto it = activityMap.begin(); it != activityMap.end(); ++it) {
-      auto& cmd = it->second;
+      auto& cmdRef = it->second;
 
-      if (cmd.lastActivityTimestamp + KEEP_ALIVE_INTERVAL < now) {
-        ESP_LOGV(TAG, "Sending keep-alive for shocker %u", cmd.shockerId);
+      if (cmdRef.lastActivityTimestamp + KEEP_ALIVE_INTERVAL < now) {
+        ESP_LOGV(TAG, "Sending keep-alive for shocker %u", cmdRef.shockerId);
 
         if (s_rfTransmitter == nullptr) {
           ESP_LOGW(TAG, "RF Transmitter is not initialized, ignoring keep-alive");
           break;
         }
 
-        if (!s_rfTransmitter->SendCommand(cmd.model, cmd.shockerId, ShockerCommandType::Vibrate, 0, KEEP_ALIVE_DURATION, false)) {
-          ESP_LOGW(TAG, "Failed to send keep-alive for shocker %u", cmd.shockerId);
+        if (!s_rfTransmitter->SendCommand(cmdRef.model, cmdRef.shockerId, ShockerCommandType::Vibrate, 0, KEEP_ALIVE_DURATION, false)) {
+          ESP_LOGW(TAG, "Failed to send keep-alive for shocker %u", cmdRef.shockerId);
         }
 
-        cmd.lastActivityTimestamp = now;
+        cmdRef.lastActivityTimestamp = now;
       }
 
-      timeToKeepAlive = std::min(timeToKeepAlive, cmd.lastActivityTimestamp + KEEP_ALIVE_INTERVAL);
+      timeToKeepAlive = std::min(timeToKeepAlive, cmdRef.lastActivityTimestamp + KEEP_ALIVE_INTERVAL);
     }
   }
 }
@@ -161,7 +163,11 @@ bool CommandHandler::Init() {
   s_rfTransmitterMutex = xSemaphoreCreateMutex();
   s_keepAliveMutex     = xSemaphoreCreateMutex();
 
-  auto& rfConfig = Config::GetRFConfig();
+  Config::RFConfig rfConfig;
+  if (!Config::GetRFConfig(rfConfig)) {
+    ESP_LOGE(TAG, "Failed to get RF config");
+    return false;
+  }
 
   std::uint8_t txPin = rfConfig.txPin;
   if (!OpenShock::IsValidOutputPin(txPin)) {
@@ -242,7 +248,13 @@ bool CommandHandler::SetKeepAliveEnabled(bool enabled) {
 }
 
 bool CommandHandler::SetKeepAlivePaused(bool paused) {
-  if (Config::GetRFConfig().keepAliveEnabled == false && paused == false) {
+  bool keepAliveEnabled = false;
+  if (!Config::GetRFConfigKeepAliveEnabled(keepAliveEnabled)) {
+    ESP_LOGE(TAG, "Failed to get keep-alive enabled from config");
+    return false;
+  }
+
+  if (keepAliveEnabled == false && paused == false) {
     ESP_LOGW(TAG, "Keep-alive is disabled in config, ignoring unpause command");
     return false;
   }
@@ -254,7 +266,13 @@ bool CommandHandler::SetKeepAlivePaused(bool paused) {
 }
 
 std::uint8_t CommandHandler::GetRfTxPin() {
-  return Config::GetRFConfig().txPin;
+  std::uint8_t txPin;
+  if (!Config::GetRFConfigTxPin(txPin)) {
+    ESP_LOGE(TAG, "Failed to get RF TX pin from config");
+    txPin = Constants::GPIO_INVALID;
+  }
+
+  return txPin;
 }
 
 bool CommandHandler::HandleCommand(ShockerModelType model, std::uint16_t shockerId, ShockerCommandType type, std::uint8_t intensity, std::uint16_t durationMs) {

@@ -11,10 +11,10 @@
 
 const char* const TAG = "RFTransmitter";
 
-const UBaseType_t RFTRANSMITTER_QUEUE_SIZE = 32;
-const BaseType_t RFTRANSMITTER_TASK_PRIORITY = 1;
+const UBaseType_t RFTRANSMITTER_QUEUE_SIZE        = 32;
+const BaseType_t RFTRANSMITTER_TASK_PRIORITY      = 1;
 const std::uint32_t RFTRANSMITTER_TASK_STACK_SIZE = 4096;
-const float RFTRANSMITTER_TICKRATE_NS = 1000;
+const float RFTRANSMITTER_TICKRATE_NS             = 1000;
 
 using namespace OpenShock;
 
@@ -154,13 +154,10 @@ void RFTransmitter::TransmitTask(void* arg) {
       }
 
       // Replace the command if it already exists
-      bool existed = false;
       for (auto it = commands.begin(); it != commands.end(); ++it) {
-        auto& existingCmd = *it;
+        const command_t* existingCmd = *it;
 
         if (existingCmd->shockerId == cmd->shockerId) {
-          existed = true;
-
           // Only replace the command if it should be overwritten
           if (existingCmd->overwrite) {
             delete *it;
@@ -169,12 +166,14 @@ void RFTransmitter::TransmitTask(void* arg) {
             delete cmd;
           }
 
+          cmd = nullptr;
+
           break;
         }
       }
 
       // If the command was not replaced, add it to the queue
-      if (!existed) {
+      if (cmd != nullptr) {
         commands.push_back(cmd);
       }
     }
@@ -184,7 +183,7 @@ void RFTransmitter::TransmitTask(void* arg) {
       cmd = *it;
 
       bool expired = cmd->until < OpenShock::millis();
-      bool empty   = cmd->sequence.size() <= 0;
+      bool empty   = cmd->sequence.empty();
 
       // Remove expired or empty commands, else send the command.
       // After sending/receiving a command, move to the next one.

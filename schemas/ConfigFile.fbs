@@ -44,6 +44,11 @@ table BackendConfig {
   auth_token:string;
 }
 
+table SerialInputConfig {
+  /// Whether to echo typed characters back to the serial console
+  echo_enabled:bool = true;
+}
+
 table Config {
   /// RF Transmitter configuration
   rf:RFConfig;
@@ -56,4 +61,7 @@ table Config {
 
   /// Backend configuration
   backend:BackendConfig;
+
+  /// Serial input configuration
+  serial_input:SerialInputConfig;
 }

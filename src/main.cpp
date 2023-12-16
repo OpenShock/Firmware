@@ -6,7 +6,7 @@
 #include "event_handlers/Init.h"
 #include "GatewayConnectionManager.h"
 #include "Logging.h"
-#include "SerialInputHandler.h"
+#include "serial/SerialInputHandler.h"
 #include "VisualStateManager.h"
 #include "wifi/WiFiManager.h"
 #include "wifi/WiFiScanManager.h"
@@ -20,7 +20,7 @@ const char* const TAG = "OpenShock";
 void setup() {
   Serial.begin(115'200);
 
-  if (!LittleFS.begin(true)) {
+  if (!LittleFS.begin(true, "/static", 10, "static0")) {
     ESP_PANIC(TAG, "Unable to mount LittleFS");
   }
 
@@ -28,12 +28,13 @@ void setup() {
 
   OpenShock::VisualStateManager::Init();
 
-  OpenShock::SerialInputHandler::PrintWelcomeHeader();
-  OpenShock::SerialInputHandler::PrintVersionInfo();
-
   OpenShock::EStopManager::Init(100);  // 100ms update interval
 
   OpenShock::Config::Init();
+
+  if (!OpenShock::SerialInputHandler::Init()) {
+    ESP_PANIC(TAG, "Unable to initialize SerialInputHandler");
+  }
 
   if (!OpenShock::CommandHandler::Init()) {
     ESP_LOGW(TAG, "Unable to initialize CommandHandler");

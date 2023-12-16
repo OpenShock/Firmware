@@ -8,6 +8,9 @@
 
 namespace OpenShock::Config {
   struct WiFiConfig : public ConfigBase<Serialization::Configuration::WiFiConfig> {
+    WiFiConfig();
+    WiFiConfig(const std::string& accessPointSSID, const std::string& hostname, const std::vector<WiFiCredentials>& credentialsList);
+
     std::string accessPointSSID;
     std::string hostname;
     std::vector<OpenShock::Config::WiFiCredentials> credentialsList;

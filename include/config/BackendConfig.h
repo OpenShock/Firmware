@@ -6,6 +6,9 @@
 
 namespace OpenShock::Config {
   struct BackendConfig : public ConfigBase<Serialization::Configuration::BackendConfig> {
+    BackendConfig();
+    BackendConfig(const std::string& domain, const std::string& authToken);
+    
     std::string domain;
     std::string authToken;
 

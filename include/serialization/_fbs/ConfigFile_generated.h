@@ -32,6 +32,9 @@ struct CaptivePortalConfigBuilder;
 struct BackendConfig;
 struct BackendConfigBuilder;
 
+struct SerialInputConfig;
+struct SerialInputConfigBuilder;
+
 struct Config;
 struct ConfigBuilder;
 
@@ -406,6 +409,57 @@ inline ::flatbuffers::Offset<BackendConfig> CreateBackendConfigDirect(
       auth_token__);
 }
 
+struct SerialInputConfig FLATBUFFERS_FINAL_CLASS : private ::flatbuffers::Table {
+  typedef SerialInputConfigBuilder Builder;
+  struct Traits;
+  static FLATBUFFERS_CONSTEXPR_CPP11 const char *GetFullyQualifiedName() {
+    return "OpenShock.Serialization.Configuration.SerialInputConfig";
+  }
+  enum FlatBuffersVTableOffset FLATBUFFERS_VTABLE_UNDERLYING_TYPE {
+    VT_ECHO_ENABLED = 4
+  };
+  /// Whether to echo typed characters back to the serial console
+  bool echo_enabled() const {
+    return GetField<uint8_t>(VT_ECHO_ENABLED, 1) != 0;
+  }
+  bool Verify(::flatbuffers::Verifier &verifier) const {
+    return VerifyTableStart(verifier) &&
+           VerifyField<uint8_t>(verifier, VT_ECHO_ENABLED, 1) &&
+           verifier.EndTable();
+  }
+};
+
+struct SerialInputConfigBuilder {
+  typedef SerialInputConfig Table;
+  ::flatbuffers::FlatBufferBuilder &fbb_;
+  ::flatbuffers::uoffset_t start_;
+  void add_echo_enabled(bool echo_enabled) {
+    fbb_.AddElement<uint8_t>(SerialInputConfig::VT_ECHO_ENABLED, static_cast<uint8_t>(echo_enabled), 1);
+  }
+  explicit SerialInputConfigBuilder(::flatbuffers::FlatBufferBuilder &_fbb)
+        : fbb_(_fbb) {
+    start_ = fbb_.StartTable();
+  }
+  ::flatbuffers::Offset<SerialInputConfig> Finish() {
+    const auto end = fbb_.EndTable(start_);
+    auto o = ::flatbuffers::Offset<SerialInputConfig>(end);
+    return o;
+  }
+};
+
+inline ::flatbuffers::Offset<SerialInputConfig> CreateSerialInputConfig(
+    ::flatbuffers::FlatBufferBuilder &_fbb,
+    bool echo_enabled = true) {
+  SerialInputConfigBuilder builder_(_fbb);
+  builder_.add_echo_enabled(echo_enabled);
+  return builder_.Finish();
+}
+
+struct SerialInputConfig::Traits {
+  using type = SerialInputConfig;
+  static auto constexpr Create = CreateSerialInputConfig;
+};
+
 struct Config FLATBUFFERS_FINAL_CLASS : private ::flatbuffers::Table {
   typedef ConfigBuilder Builder;
   struct Traits;
@@ -416,7 +470,8 @@ struct Config FLATBUFFERS_FINAL_CLASS : private ::flatbuffers::Table {
     VT_RF = 4,
     VT_WIFI = 6,
     VT_CAPTIVE_PORTAL = 8,
-    VT_BACKEND = 10
+    VT_BACKEND = 10,
+    VT_SERIAL_INPUT = 12
   };
   /// RF Transmitter configuration
   const OpenShock::Serialization::Configuration::RFConfig *rf() const {
@@ -434,6 +489,10 @@ struct Config FLATBUFFERS_FINAL_CLASS : private ::flatbuffers::Table {
   const OpenShock::Serialization::Configuration::BackendConfig *backend() const {
     return GetPointer<const OpenShock::Serialization::Configuration::BackendConfig *>(VT_BACKEND);
   }
+  /// Serial input configuration
+  const OpenShock::Serialization::Configuration::SerialInputConfig *serial_input() const {
+    return GetPointer<const OpenShock::Serialization::Configuration::SerialInputConfig *>(VT_SERIAL_INPUT);
+  }
   bool Verify(::flatbuffers::Verifier &verifier) const {
     return VerifyTableStart(verifier) &&
            VerifyOffset(verifier, VT_RF) &&
@@ -444,6 +503,8 @@ struct Config FLATBUFFERS_FINAL_CLASS : private ::flatbuffers::Table {
            verifier.VerifyTable(captive_portal()) &&
            VerifyOffset(verifier, VT_BACKEND) &&
            verifier.VerifyTable(backend()) &&
+           VerifyOffset(verifier, VT_SERIAL_INPUT) &&
+           verifier.VerifyTable(serial_input()) &&
            verifier.EndTable();
   }
 };
@@ -464,6 +525,9 @@ struct ConfigBuilder {
   void add_backend(::flatbuffers::Offset<OpenShock::Serialization::Configuration::BackendConfig> backend) {
     fbb_.AddOffset(Config::VT_BACKEND, backend);
   }
+  void add_serial_input(::flatbuffers::Offset<OpenShock::Serialization::Configuration::SerialInputConfig> serial_input) {
+    fbb_.AddOffset(Config::VT_SERIAL_INPUT, serial_input);
+  }
   explicit ConfigBuilder(::flatbuffers::FlatBufferBuilder &_fbb)
         : fbb_(_fbb) {
     start_ = fbb_.StartTable();
@@ -480,8 +544,10 @@ inline ::flatbuffers::Offset<Config> CreateConfig(
     ::flatbuffers::Offset<OpenShock::Serialization::Configuration::RFConfig> rf = 0,
     ::flatbuffers::Offset<OpenShock::Serialization::Configuration::WiFiConfig> wifi = 0,
     ::flatbuffers::Offset<OpenShock::Serialization::Configuration::CaptivePortalConfig> captive_portal = 0,
-    ::flatbuffers::Offset<OpenShock::Serialization::Configuration::BackendConfig> backend = 0) {
+    ::flatbuffers::Offset<OpenShock::Serialization::Configuration::BackendConfig> backend = 0,
+    ::flatbuffers::Offset<OpenShock::Serialization::Configuration::SerialInputConfig> serial_input = 0) {
   ConfigBuilder builder_(_fbb);
+  builder_.add_serial_input(serial_input);
   builder_.add_backend(backend);
   builder_.add_captive_portal(captive_portal);
   builder_.add_wifi(wifi);

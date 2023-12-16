@@ -96,6 +96,12 @@ bool _getDomain(const char* url, char (&domain)[256]) {
     return false;
   }
 
+  std::size_t urlLen = strlen(url);
+  if (urlLen == 0) {
+    memset(domain, 0, 256);
+    return false;
+  }
+
   const char* urlEnd = url + strlen(url);
 
   const char* ptr;
@@ -215,7 +221,7 @@ HTTP::Response<String> _doGet(HTTPClient& client, const char* url, const std::ma
   return {HTTP::RequestResult::Success, responseCode, client.getString()};
 }
 
-HTTP::Response<String> HTTP::GetString(const char* url, const std::map<String, String>& headers, std::vector<int> acceptedCodes) {
+HTTP::Response<String> HTTP::GetString(const char* url, const std::map<String, String>& headers, const std::vector<int>& acceptedCodes) {
   std::shared_ptr<RateLimit> rateLimiter = _getRateLimiter(url);
   if (rateLimiter == nullptr) {
     return {RequestResult::InvalidURL, 0, ""};

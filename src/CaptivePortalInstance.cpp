@@ -6,6 +6,7 @@
 #include "GatewayConnectionManager.h"
 #include "Logging.h"
 #include "serialization/WSLocal.h"
+#include "util/HexUtils.h"
 #include "util/TaskUtils.h"
 #include "wifi/WiFiManager.h"
 
@@ -18,6 +19,7 @@ static const char* TAG = "CaptivePortalInstance";
 
 constexpr std::uint16_t HTTP_PORT                 = 80;
 constexpr std::uint16_t WEBSOCKET_PORT            = 81;
+constexpr std::uint16_t DNS_PORT                  = 53;
 constexpr std::uint32_t WEBSOCKET_PING_INTERVAL   = 10'000;
 constexpr std::uint32_t WEBSOCKET_PING_TIMEOUT    = 1000;
 constexpr std::uint8_t WEBSOCKET_PING_RETRIES     = 3;
@@ -25,70 +27,90 @@ constexpr std::uint32_t WEBSOCKET_UPDATE_INTERVAL = 10;  // 10ms / 100Hz
 
 using namespace OpenShock;
 
-bool TryReadFile(const char* path, char* buffer, std::size_t& bufferSize) {
-  File file = LittleFS.open(path, "r");
-  if (!file) {
-    ESP_LOGE(TAG, "Failed to open file %s for reading", path);
-    return false;
+const esp_partition_t* _getStaticPartition() {
+  const esp_partition_t* partition = esp_partition_find_first(ESP_PARTITION_TYPE_DATA, ESP_PARTITION_SUBTYPE_DATA_SPIFFS, "static0");
+  if (partition != nullptr) {
+    return partition;
   }
 
-  std::size_t fileSize = file.size();
-  if (fileSize > bufferSize) {
-    ESP_LOGE(TAG, "File %s is too large to fit in buffer", path);
-    file.close();
-    return false;
+  partition = esp_partition_find_first(ESP_PARTITION_TYPE_DATA, ESP_PARTITION_SUBTYPE_DATA_SPIFFS, "static1");
+  if (partition != nullptr) {
+    return partition;
   }
 
-  file.readBytes(buffer, fileSize);
-
-  bufferSize = fileSize;
-
-  file.close();
-
-  return true;
+  return nullptr;
 }
 
-bool TryGetFsHash(char (&buffer)[65]) {
-  std::size_t bufferSize = sizeof(buffer);
-  if (TryReadFile("/www/hash.sha1", buffer, bufferSize)) {
-    buffer[bufferSize] = '\0';
-    return true;
+bool _tryGetPartitionHash(char (&buffer)[65]) {
+  static bool initialized              = false;
+  static std::uint8_t staticSha256[32] = {0};
+
+  if (!initialized) {
+    initialized = true;
+
+    ESP_LOGI(TAG, "Looking for static partition");
+
+    // Get the static partition
+    const esp_partition_t* partition = _getStaticPartition();
+    if (partition == nullptr) {
+      ESP_LOGE(TAG, "Failed to find static partition");
+      return false;
+    }
+
+    ESP_LOGI(TAG, "Found static partition, getting hash... (this may take a while)");
+
+    // Get the hash of the partition
+    esp_err_t err = esp_partition_get_sha256(partition, staticSha256);
+    if (err != ESP_OK) {
+      ESP_LOGE(TAG, "Failed to get partition hash: %s", esp_err_to_name(err));
+      return false;
+    }
+
+    ESP_LOGI(TAG, "Got partition hash");
   }
-  if (TryReadFile("/www/hash.sha256", buffer, bufferSize)) {
-    buffer[bufferSize] = '\0';
-    return true;
-  }
-  if (TryReadFile("/www/hash.md5", buffer, bufferSize)) {
-    buffer[bufferSize] = '\0';
-    return true;
-  }
-  return false;
+
+  // Copy the hash to the output buffer
+  HexUtils::ToHex<32>(staticSha256, nonstd::span<char, 64>(buffer, 64), false);
+
+  // Null-terminate the string
+  buffer[64] = '\0';
+
+  return true;
 }
 
 CaptivePortalInstance::CaptivePortalInstance()
   : m_webServer(HTTP_PORT)
   , m_socketServer(WEBSOCKET_PORT, "/ws", "json")
   , m_socketDeFragger(std::bind(&CaptivePortalInstance::handleWebSocketEvent, this, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3, std::placeholders::_4))
+  , m_dnsServer()
   , m_taskHandle(nullptr) {
   m_socketServer.onEvent(std::bind(&WebSocketDeFragger::handler, &m_socketDeFragger, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3, std::placeholders::_4));
   m_socketServer.begin();
   m_socketServer.enableHeartbeat(WEBSOCKET_PING_INTERVAL, WEBSOCKET_PING_TIMEOUT, WEBSOCKET_PING_RETRIES);
+
+  ESP_LOGI(TAG, "Setting up DNS server");
+  m_dnsServer.start(DNS_PORT, "*", WiFi.softAPIP());
 
   // Check if the www folder exists and is populated
   bool indexExists = LittleFS.exists("/www/index.html.gz");
 
   // Get the hash of the filesystem
   char fsHash[65];
-  bool gotFsHash = TryGetFsHash(fsHash);
+  bool gotFsHash = _tryGetPartitionHash(fsHash);
 
   bool fsOk = indexExists && gotFsHash;
   if (fsOk) {
     ESP_LOGI(TAG, "Serving files from LittleFS");
     ESP_LOGI(TAG, "Filesystem hash: %s", fsHash);
 
+    char softAPURL[64];
+    snprintf(softAPURL, sizeof(softAPURL), "http://%s", WiFi.softAPIP().toString().c_str());
+
+    // Serving the captive portal files from LittleFS
     m_webServer.serveStatic("/", LittleFS, "/www/", "max-age=3600").setDefaultFile("index.html").setSharedEtag(fsHash);
 
-    m_webServer.onNotFound([](AsyncWebServerRequest* request) { request->send(404, "text/plain", "Not found"); });
+    // Redirecting connection tests to the captive portal, triggering the "login to network" prompt
+    m_webServer.onNotFound([softAPURL](AsyncWebServerRequest* request) { request->redirect(softAPURL); });
   } else {
     ESP_LOGE(TAG, "/www/index.html or hash files not found, serving error page");
 
@@ -124,6 +146,7 @@ CaptivePortalInstance::~CaptivePortalInstance() {
   }
   m_webServer.end();
   m_socketServer.close();
+  m_dnsServer.stop();
 }
 
 void CaptivePortalInstance::task(void* arg) {
@@ -131,6 +154,7 @@ void CaptivePortalInstance::task(void* arg) {
 
   while (true) {
     instance->m_socketServer.loop();
+    instance->m_dnsServer.processNextRequest();
     vTaskDelay(pdMS_TO_TICKS(WEBSOCKET_UPDATE_INTERVAL));
   }
 }

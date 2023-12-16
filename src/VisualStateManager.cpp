@@ -281,6 +281,8 @@ void _updateVisualState() {
 }
 
 void _handleWiFiConnected(arduino_event_t* event) {
+  (void)event;
+
   std::uint64_t oldState = s_stateFlags;
 
   s_stateFlags |= kWiFiConnectedFlag;
@@ -290,6 +292,8 @@ void _handleWiFiConnected(arduino_event_t* event) {
   }
 }
 void _handleWiFiDisconnected(arduino_event_t* event) {
+  (void)event;
+
   std::uint64_t oldState = s_stateFlags;
 
   s_stateFlags &= ~kWiFiConnectedFlag;
@@ -299,6 +303,8 @@ void _handleWiFiDisconnected(arduino_event_t* event) {
   }
 }
 void _handleWiFiScanDone(arduino_event_t* event) {
+  (void)event;
+  
   std::uint64_t oldState = s_stateFlags;
 
   s_stateFlags &= ~kWiFiScanningFlag;

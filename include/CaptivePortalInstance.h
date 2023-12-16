@@ -2,6 +2,7 @@
 
 #include "WebSocketDeFragger.h"
 
+#include <DNSServer.h>
 #include <ESPAsyncWebServer.h>
 #include <WebSocketsServer.h>
 
@@ -31,6 +32,7 @@ namespace OpenShock {
     AsyncWebServer m_webServer;
     WebSocketsServer m_socketServer;
     WebSocketDeFragger m_socketDeFragger;
+    DNSServer m_dnsServer;
     TaskHandle_t m_taskHandle;
   };
 }  // namespace OpenShock

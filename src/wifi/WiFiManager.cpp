@@ -72,9 +72,7 @@ bool _isConnectRateLimited(const WiFiNetwork& net) {
 }
 
 bool _isSaved(std::function<bool(const Config::WiFiCredentials&)> predicate) {
-  const auto& credentials = Config::GetWiFiCredentials();
-
-  return std::any_of(credentials.begin(), credentials.end(), predicate);
+  return Config::AnyWiFiCredentials(predicate);
 }
 std::vector<WiFiNetwork>::iterator _findNetwork(std::function<bool(WiFiNetwork&)> predicate, bool sortByAttractivity = true) {
   if (sortByAttractivity) {
@@ -137,6 +135,8 @@ bool _connectImpl(const char* ssid, const char* password, const std::uint8_t (&b
   return true;
 }
 bool _connectHidden(const std::uint8_t (&bssid)[6], const std::string& password) {
+  (void)password;
+  
   ESP_LOGV(TAG, "Connecting to hidden network " BSSID_FMT, BSSID_ARG(bssid));
 
   // TODO: Implement hidden network support
@@ -195,7 +195,7 @@ void _evWiFiConnected(arduino_event_t* event) {
   if (it == s_wifiNetworks.end()) {
     s_connectedCredentialsID = 0;
 
-    ESP_LOGW(TAG, "Connected to unknown network " BSSID_FMT, BSSID_ARG(info.bssid));
+    ESP_LOGW(TAG, "Connected to unscanned network \"%s\", BSSID: " BSSID_FMT, reinterpret_cast<char*>(info.ssid), BSSID_ARG(info.bssid));
 
     return;
   }
@@ -207,7 +207,7 @@ void _evWiFiConnected(arduino_event_t* event) {
   Serialization::Local::SerializeWiFiNetworkEvent(Serialization::Types::WifiNetworkEventType::Connected, *it, CaptivePortal::BroadcastMessageBIN);
 }
 void _evWiFiGotIP(arduino_event_t* event) {
-  auto& info = event->event_info.got_ip;
+  const auto& info = event->event_info.got_ip;
 
   std::uint8_t ip[4];
   memcpy(ip, &info.ip_info.ip.addr, sizeof(ip));
@@ -217,10 +217,9 @@ void _evWiFiGotIP(arduino_event_t* event) {
 void _evWiFiGotIP6(arduino_event_t* event) {
   auto& info = event->event_info.got_ip6;
 
-  std::uint8_t ip6[16];
-  memcpy(ip6, &info.ip6_info.ip.addr, sizeof(ip6));
+  std::uint8_t* ip6 = reinterpret_cast<std::uint8_t*>(&info.ip6_info.ip.addr);
 
-  ESP_LOGI(TAG, "Got IPv6 address %02x%02x:%02x%02x:%02x%02x:%02x%02x from network " BSSID_FMT, ip6[0], ip6[1], ip6[2], ip6[3], ip6[4], ip6[5], ip6[6], ip6[7], BSSID_ARG(s_connectedBSSID));
+  ESP_LOGI(TAG, "Got IPv6 address " IPV6ADDR_FMT " from network " BSSID_FMT, IPV6ADDR_ARG(ip6), BSSID_ARG(s_connectedBSSID));
 }
 void _evWiFiDisconnected(arduino_event_t* event) {
   s_wifiState = WiFiState::Disconnected;
@@ -247,12 +246,13 @@ void _evWiFiScanStarted() { }
 void _evWiFiScanStatusChanged(OpenShock::WiFiScanStatus status) {
   // If the scan started, remove any networks that have not been seen in 3 scans
   if (status == OpenShock::WiFiScanStatus::Started) {
-    for (auto it = s_wifiNetworks.begin(); it != s_wifiNetworks.end(); ++it) {
+    for (auto it = s_wifiNetworks.begin(); it != s_wifiNetworks.end();) {
       if (it->scansMissed++ > 3) {
         ESP_LOGV(TAG, "Network %s (" BSSID_FMT ") has not been seen in 3 scans, removing from list", it->ssid, BSSID_ARG(it->bssid));
         Serialization::Local::SerializeWiFiNetworkEvent(Serialization::Types::WifiNetworkEventType::Lost, *it, CaptivePortal::BroadcastMessageBIN);
-        s_wifiNetworks.erase(it);
-        it--;
+        it = s_wifiNetworks.erase(it);
+      } else {
+        ++it;
       }
     }
   }
@@ -311,7 +311,7 @@ bool WiFiManager::Init() {
 
   // If we recognize the network in the ESP's WiFi cache, try to connect to it
   wifi_config_t current_conf;
-  if (esp_wifi_get_config((wifi_interface_t)ESP_IF_WIFI_STA, &current_conf) == ESP_OK) {
+  if (esp_wifi_get_config(static_cast<wifi_interface_t>(ESP_IF_WIFI_STA), &current_conf) == ESP_OK) {
     if (current_conf.sta.ssid[0] != '\0') {
       if (Config::GetWiFiCredentialsIDbySSID(reinterpret_cast<const char*>(current_conf.sta.ssid)) != 0) {
         WiFi.begin();
@@ -441,6 +441,15 @@ bool WiFiManager::IsConnected() {
 }
 bool WiFiManager::GetConnectedNetwork(OpenShock::WiFiNetwork& network) {
   if (s_connectedCredentialsID == 0) {
+    if (IsConnected()) {
+      // We connected without a scan, so populate the network with the current connection info manually
+      network.credentialsID = 255;
+      memcpy(network.ssid, WiFi.SSID().c_str(), WiFi.SSID().length() + 1);
+      memcpy(network.bssid, WiFi.BSSID(), sizeof(network.bssid));
+      network.channel = WiFi.channel();
+      network.rssi    = WiFi.RSSI();
+      return true;
+    }
     return false;
   }
 
@@ -450,6 +459,29 @@ bool WiFiManager::GetConnectedNetwork(OpenShock::WiFiNetwork& network) {
   }
 
   network = *it;
+
+  return true;
+}
+
+bool WiFiManager::GetIPAddress(char* ipAddress) {
+  if (!IsConnected()) {
+    return false;
+  }
+
+  IPAddress ip = WiFi.localIP();
+  snprintf(ipAddress, IPV4ADDR_FMT_LEN + 1, IPV4ADDR_FMT, IPV4ADDR_ARG(ip));
+
+  return true;
+}
+
+bool WiFiManager::GetIPv6Address(char* ipAddress) {
+  if (!IsConnected()) {
+    return false;
+  }
+
+  IPv6Address ip = WiFi.localIPv6();
+  const std::uint8_t* ipPtr = ip; // Using the implicit conversion operator of IPv6Address
+  snprintf(ipAddress, IPV6ADDR_FMT_LEN + 1, IPV6ADDR_FMT, IPV6ADDR_ARG(ipPtr));
 
   return true;
 }

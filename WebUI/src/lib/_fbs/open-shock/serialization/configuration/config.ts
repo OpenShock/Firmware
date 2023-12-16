@@ -5,6 +5,7 @@ import * as flatbuffers from 'flatbuffers';
 import { BackendConfig } from '../../../open-shock/serialization/configuration/backend-config.js';
 import { CaptivePortalConfig } from '../../../open-shock/serialization/configuration/captive-portal-config.js';
 import { RFConfig } from '../../../open-shock/serialization/configuration/rfconfig.js';
+import { SerialInputConfig } from '../../../open-shock/serialization/configuration/serial-input-config.js';
 import { WiFiConfig } from '../../../open-shock/serialization/configuration/wi-fi-config.js';
 
 
@@ -58,8 +59,16 @@ backend(obj?:BackendConfig):BackendConfig|null {
   return offset ? (obj || new BackendConfig()).__init(this.bb!.__indirect(this.bb_pos + offset), this.bb!) : null;
 }
 
+/**
+ * Serial input configuration
+ */
+serialInput(obj?:SerialInputConfig):SerialInputConfig|null {
+  const offset = this.bb!.__offset(this.bb_pos, 12);
+  return offset ? (obj || new SerialInputConfig()).__init(this.bb!.__indirect(this.bb_pos + offset), this.bb!) : null;
+}
+
 static startConfig(builder:flatbuffers.Builder) {
-  builder.startObject(4);
+  builder.startObject(5);
 }
 
 static addRf(builder:flatbuffers.Builder, rfOffset:flatbuffers.Offset) {
@@ -76,6 +85,10 @@ static addCaptivePortal(builder:flatbuffers.Builder, captivePortalOffset:flatbuf
 
 static addBackend(builder:flatbuffers.Builder, backendOffset:flatbuffers.Offset) {
   builder.addFieldOffset(3, backendOffset, 0);
+}
+
+static addSerialInput(builder:flatbuffers.Builder, serialInputOffset:flatbuffers.Offset) {
+  builder.addFieldOffset(4, serialInputOffset, 0);
 }
 
 static endConfig(builder:flatbuffers.Builder):flatbuffers.Offset {

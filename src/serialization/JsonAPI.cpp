@@ -9,13 +9,15 @@ const char* const TAG = "JsonAPI";
 using namespace OpenShock::Serialization;
 
 bool JsonAPI::ParseAccountLinkJsonResponse(int code, const cJSON* root, JsonAPI::AccountLinkResponse& out) {
-  if (!cJSON_IsObject(root)) {
+  (void)code;
+
+  if (cJSON_IsObject(root) == 0) {
     ESP_LOGJSONE("not an object", root);
     return false;
   }
 
   const cJSON* data = cJSON_GetObjectItemCaseSensitive(root, "data");
-  if (!cJSON_IsString(data)) {
+  if (cJSON_IsString(data) == 0) {
     ESP_LOGJSONE("value at 'data' is not a string", root);
     return false;
   }
@@ -27,31 +29,33 @@ bool JsonAPI::ParseAccountLinkJsonResponse(int code, const cJSON* root, JsonAPI:
   return true;
 }
 bool JsonAPI::ParseDeviceInfoJsonResponse(int code, const cJSON* root, JsonAPI::DeviceInfoResponse& out) {
-  if (!cJSON_IsObject(root)) {
+  (void)code;
+  
+  if (cJSON_IsObject(root) == 0) {
     ESP_LOGJSONE("not an object", root);
     return false;
   }
 
   const cJSON* data = cJSON_GetObjectItemCaseSensitive(root, "data");
-  if (!cJSON_IsObject(data)) {
+  if (cJSON_IsObject(data) == 0) {
     ESP_LOGJSONE("value at 'data' is not an object", root);
     return false;
   }
 
   const cJSON* deviceId = cJSON_GetObjectItemCaseSensitive(data, "id");
-  if (!cJSON_IsString(deviceId)) {
+  if (cJSON_IsString(deviceId) == 0) {
     ESP_LOGJSONE("value at 'data.id' is not a string", root);
     return false;
   }
 
   const cJSON* deviceName = cJSON_GetObjectItemCaseSensitive(data, "name");
-  if (!cJSON_IsString(deviceName)) {
+  if (cJSON_IsString(deviceName) == 0) {
     ESP_LOGJSONE("value at 'data.name' is not a string", root);
     return false;
   }
 
   const cJSON* deviceShockers = cJSON_GetObjectItemCaseSensitive(data, "shockers");
-  if (!cJSON_IsArray(deviceShockers)) {
+  if (cJSON_IsArray(deviceShockers) == 0) {
     ESP_LOGJSONE("value at 'data.shockers' is not an array", root);
     return false;
   }
@@ -69,7 +73,7 @@ bool JsonAPI::ParseDeviceInfoJsonResponse(int code, const cJSON* root, JsonAPI::
   cJSON* shocker = nullptr;
   cJSON_ArrayForEach(shocker, deviceShockers) {
     const cJSON* shockerId = cJSON_GetObjectItemCaseSensitive(shocker, "id");
-    if (!cJSON_IsString(shockerId)) {
+    if (cJSON_IsString(shockerId) == 0) {
       ESP_LOGJSONE("value at 'shocker.id' is not a string", shocker);
       return false;
     }
@@ -81,7 +85,7 @@ bool JsonAPI::ParseDeviceInfoJsonResponse(int code, const cJSON* root, JsonAPI::
     }
 
     const cJSON* shockerRfId = cJSON_GetObjectItemCaseSensitive(shocker, "rfId");
-    if (!cJSON_IsNumber(shockerRfId)) {
+    if (cJSON_IsNumber(shockerRfId) == 0) {
       ESP_LOGJSONE("value at 'shocker.rfId' is not a number", shocker);
       return false;
     }
@@ -90,10 +94,10 @@ bool JsonAPI::ParseDeviceInfoJsonResponse(int code, const cJSON* root, JsonAPI::
       ESP_LOGJSONE("value at 'shocker.rfId' is not a valid uint16_t", shocker);
       return false;
     }
-    std::uint16_t shockerRfIdU16 = (std::uint16_t)shockerRfIdInt;
+    std::uint16_t shockerRfIdU16 = static_cast<std::uint16_t>(shockerRfIdInt);
 
     const cJSON* shockerModel = cJSON_GetObjectItemCaseSensitive(shocker, "model");
-    if (!cJSON_IsString(shockerModel)) {
+    if (cJSON_IsString(shockerModel) == 0) {
       ESP_LOGJSONE("value at 'shocker.model' is not a string", shocker);
       return false;
     }
@@ -116,13 +120,15 @@ bool JsonAPI::ParseDeviceInfoJsonResponse(int code, const cJSON* root, JsonAPI::
   return true;
 }
 bool JsonAPI::ParseAssignLcgJsonResponse(int code, const cJSON* root, JsonAPI::AssignLcgResponse& out) {
-  if (!cJSON_IsObject(root)) {
+  (void)code;
+
+  if (cJSON_IsObject(root) == 0) {
     ESP_LOGJSONE("not an object", root);
     return false;
   }
 
   const cJSON* data = cJSON_GetObjectItemCaseSensitive(root, "data");
-  if (!cJSON_IsObject(data)) {
+  if (cJSON_IsObject(data) == 0) {
     ESP_LOGJSONE("value at 'data' is not an object", root);
     return false;
   }
@@ -130,7 +136,7 @@ bool JsonAPI::ParseAssignLcgJsonResponse(int code, const cJSON* root, JsonAPI::A
   const cJSON* fqdn    = cJSON_GetObjectItemCaseSensitive(data, "fqdn");
   const cJSON* country = cJSON_GetObjectItemCaseSensitive(data, "country");
 
-  if (!cJSON_IsString(fqdn) || !cJSON_IsString(country)) {
+  if (cJSON_IsString(fqdn) == 0 || cJSON_IsString(country) == 0) {
     ESP_LOGJSONE("value at 'data.fqdn' or 'data.country' is not a string", root);
     return false;
   }
