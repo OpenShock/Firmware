@@ -168,8 +168,14 @@ void CaptivePortalInstance::handleWebSocketClientConnected(std::uint8_t socketId
     connectedNetworkPtr = &connectedNetwork;
   }
 
+  std::vector<Config::WiFiCredentials> credentialsList;
+  if (!Config::GetWiFiCredentials(credentialsList)) {
+    ESP_LOGE(TAG, "Failed to get WiFi credentials");
+    return;
+  }
+
   std::vector<std::string> savedNetworkSSIDs;
-  for (const auto& credentials : Config::GetWiFiCredentials()) {
+  for (const auto& credentials : credentialsList) {
     savedNetworkSSIDs.push_back(credentials.ssid);
   }
 
