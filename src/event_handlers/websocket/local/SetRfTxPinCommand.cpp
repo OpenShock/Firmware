@@ -18,8 +18,8 @@ void serializeSetRfTxPinResult(std::uint8_t socketId, std::uint8_t pin, OpenShoc
 
   builder.Finish(msgOffset);
 
-  auto buffer = builder.GetBufferPointer();
-  auto size   = builder.GetSize();
+  const std::uint8_t* buffer = builder.GetBufferPointer();
+  std::uint8_t size   = builder.GetSize();
 
   OpenShock::CaptivePortal::SendMessageBIN(socketId, buffer, size);
 }

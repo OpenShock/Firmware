@@ -8,20 +8,14 @@ const char* const TAG = "Config::WiFiCredentials";
 
 using namespace OpenShock::Config;
 
-WiFiCredentials::WiFiCredentials() {
-  ToDefault();
-}
+WiFiCredentials::WiFiCredentials() : id(0), ssid(), password() { }
 
-WiFiCredentials::WiFiCredentials(std::uint8_t id, const std::string& ssid, const std::string& password) {
-  this->id       = id;
-  this->ssid     = ssid;
-  this->password = password;
-}
+WiFiCredentials::WiFiCredentials(std::uint8_t id, const std::string& ssid, const std::string& password) : id(id), ssid(ssid), password(password) { }
 
 void WiFiCredentials::ToDefault() {
   id       = 0;
-  ssid     = "";
-  password = "";
+  ssid.clear();
+  password.clear();
 }
 
 bool WiFiCredentials::FromFlatbuffers(const Serialization::Configuration::WiFiCredentials* config) {
@@ -47,7 +41,7 @@ bool WiFiCredentials::FromJSON(const cJSON* json) {
     return false;
   }
 
-  if (!cJSON_IsObject(json)) {
+  if (cJSON_IsObject(json) == 0) {
     ESP_LOGE(TAG, "json is not an object");
     return false;
   }
@@ -57,7 +51,7 @@ bool WiFiCredentials::FromJSON(const cJSON* json) {
     ESP_LOGV(TAG, "id was null");
     id = 0;
   } else {
-    if (!cJSON_IsNumber(idJson)) {
+    if (cJSON_IsNumber(idJson) == 0) {
       ESP_LOGE(TAG, "id is not a number");
       return false;
     }
@@ -76,7 +70,7 @@ bool WiFiCredentials::FromJSON(const cJSON* json) {
     return false;
   }
 
-  if (!cJSON_IsString(ssidJson)) {
+  if (cJSON_IsString(ssidJson) == 0) {
     ESP_LOGE(TAG, "ssid is not a string");
     return false;
   }
@@ -89,7 +83,7 @@ bool WiFiCredentials::FromJSON(const cJSON* json) {
     return false;
   }
 
-  if (!cJSON_IsString(passwordJson)) {
+  if (cJSON_IsString(passwordJson) == 0) {
     ESP_LOGE(TAG, "password is not a string");
     return false;
   }
@@ -102,7 +96,7 @@ bool WiFiCredentials::FromJSON(const cJSON* json) {
 cJSON* WiFiCredentials::ToJSON() const {
   cJSON* root = cJSON_CreateObject();
 
-  cJSON_AddNumberToObject(root, "id", id);
+  cJSON_AddNumberToObject(root, "id", id);  //-V2564
   cJSON_AddStringToObject(root, "ssid", ssid.c_str());
   cJSON_AddStringToObject(root, "password", password.c_str());
 

@@ -87,7 +87,7 @@ void GatewayClient::_sendKeepAlive() {
   ESP_LOGV(TAG, "Sending Gateway keep-alive message");
 
   // Casting to uint64 here is safe since millis is guaranteed to return a positive value
-  OpenShock::Serialization::KeepAlive keepAlive((std::uint64_t)OpenShock::millis());
+  OpenShock::Serialization::KeepAlive keepAlive(static_cast<std::uint64_t>(OpenShock::millis()));
 
   flatbuffers::FlatBufferBuilder builder(64);
 
@@ -101,6 +101,8 @@ void GatewayClient::_sendKeepAlive() {
 }
 
 void GatewayClient::_handleEvent(WStype_t type, std::uint8_t* payload, std::size_t length) {
+  (void)payload;
+  
   switch (type) {
     case WStype_DISCONNECTED:
       ESP_LOGI(TAG, "Disconnected from API");

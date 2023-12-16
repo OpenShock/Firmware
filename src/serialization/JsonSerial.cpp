@@ -7,7 +7,7 @@ const char* const TAG = "JsonSerial";
 using namespace OpenShock::Serialization;
 
 bool JsonSerial::ParseShockerCommand(const cJSON* root, JsonSerial::ShockerCommand& out) {
-  if (!cJSON_IsObject(root)) {
+  if (cJSON_IsObject(root) == 0) {
     ESP_LOGE(TAG, "not an object");
     return false;
   }
@@ -17,7 +17,7 @@ bool JsonSerial::ParseShockerCommand(const cJSON* root, JsonSerial::ShockerComma
     ESP_LOGE(TAG, "missing 'model' field");
     return false;
   }
-  if (!cJSON_IsString(model)) {
+  if (cJSON_IsString(model) == 0) {
     ESP_LOGE(TAG, "value at 'model' is not a string");
     return false;
   }
@@ -32,7 +32,7 @@ bool JsonSerial::ParseShockerCommand(const cJSON* root, JsonSerial::ShockerComma
     ESP_LOGE(TAG, "missing 'id' field");
     return false;
   }
-  if (!cJSON_IsNumber(id)) {
+  if (cJSON_IsNumber(id) == 0) {
     ESP_LOGE(TAG, "value at 'id' is not a number");
     return false;
   }
@@ -48,7 +48,7 @@ bool JsonSerial::ParseShockerCommand(const cJSON* root, JsonSerial::ShockerComma
     ESP_LOGE(TAG, "missing 'type' field");
     return false;
   }
-  if (!cJSON_IsString(command)) {
+  if (cJSON_IsString(command) == 0) {
     ESP_LOGE(TAG, "value at 'type' is not a string");
     return false;
   }
@@ -63,7 +63,7 @@ bool JsonSerial::ParseShockerCommand(const cJSON* root, JsonSerial::ShockerComma
     ESP_LOGE(TAG, "missing 'intensity' field");
     return false;
   }
-  if (!cJSON_IsNumber(intensity)) {
+  if (cJSON_IsNumber(intensity) == 0) {
     ESP_LOGE(TAG, "value at 'intensity' is not a number");
     return false;
   }
@@ -79,7 +79,7 @@ bool JsonSerial::ParseShockerCommand(const cJSON* root, JsonSerial::ShockerComma
     ESP_LOGE(TAG, "missing 'durationMs' field");
     return false;
   }
-  if (!cJSON_IsNumber(durationMs)) {
+  if (cJSON_IsNumber(durationMs) == 0) {
     ESP_LOGE(TAG, "value at 'durationMs' is not a number");
     return false;
   }
