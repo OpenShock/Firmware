@@ -87,8 +87,8 @@ CaptivePortalInstance::CaptivePortalInstance()
   m_socketServer.begin();
   m_socketServer.enableHeartbeat(WEBSOCKET_PING_INTERVAL, WEBSOCKET_PING_TIMEOUT, WEBSOCKET_PING_RETRIES);
 
-  ESP_LOGI(TAG, "Setting up DNS server");
-  m_dnsServer.start(DNS_PORT, "*", WiFi.softAPIP());
+  // ESP_LOGI(TAG, "Setting up DNS server");
+  // m_dnsServer.start(DNS_PORT, "*", WiFi.softAPIP());
 
   // Check if the www folder exists and is populated
   bool indexExists = LittleFS.exists("/www/index.html.gz");
@@ -153,7 +153,7 @@ void CaptivePortalInstance::task(void* arg) {
 
   while (true) {
     instance->m_socketServer.loop();
-    instance->m_dnsServer.processNextRequest();
+    // instance->m_dnsServer.processNextRequest();
     vTaskDelay(pdMS_TO_TICKS(WEBSOCKET_UPDATE_INTERVAL));
   }
 }
@@ -167,7 +167,7 @@ void CaptivePortalInstance::handleWebSocketClientConnected(std::uint8_t socketId
     connectedNetworkPtr = &connectedNetwork;
   }
 
-  Serialization::Local::SerializeReadyMessage(connectedNetworkPtr, GatewayConnectionManager::IsPaired(), CommandHandler::GetRfTxPin(), std::bind(&CaptivePortalInstance::sendMessageBIN, this, socketId, std::placeholders::_1, std::placeholders::_2));
+  Serialization::Local::SerializeReadyMessage(connectedNetworkPtr, GatewayConnectionManager::IsPaired(), std::bind(&CaptivePortalInstance::sendMessageBIN, this, socketId, std::placeholders::_1, std::placeholders::_2));
 }
 
 void CaptivePortalInstance::handleWebSocketClientDisconnected(std::uint8_t socketId) {

@@ -6,7 +6,7 @@ const char* const TAG = "Config::CaptivePortalConfig";
 
 using namespace OpenShock::Config;
 
-CaptivePortalConfig::CaptivePortalConfig() : alwaysEnabled(false) {}
+CaptivePortalConfig::CaptivePortalConfig() : alwaysEnabled(false) { }
 
 CaptivePortalConfig::CaptivePortalConfig(bool alwaysEnabled) {
   this->alwaysEnabled = alwaysEnabled;
@@ -27,7 +27,7 @@ bool CaptivePortalConfig::FromFlatbuffers(const Serialization::Configuration::Ca
   return true;
 }
 
-flatbuffers::Offset<OpenShock::Serialization::Configuration::CaptivePortalConfig> CaptivePortalConfig::ToFlatbuffers(flatbuffers::FlatBufferBuilder& builder) const {
+flatbuffers::Offset<OpenShock::Serialization::Configuration::CaptivePortalConfig> CaptivePortalConfig::ToFlatbuffers(flatbuffers::FlatBufferBuilder& builder, bool withSensitiveData) const {
   return Serialization::Configuration::CreateCaptivePortalConfig(builder, alwaysEnabled);
 }
 
@@ -58,7 +58,7 @@ bool CaptivePortalConfig::FromJSON(const cJSON* json) {
   return true;
 }
 
-cJSON* CaptivePortalConfig::ToJSON() const {
+cJSON* CaptivePortalConfig::ToJSON(bool withSensitiveData) const {
   cJSON* root = cJSON_CreateObject();
 
   cJSON_AddBoolToObject(root, "alwaysEnabled", alwaysEnabled);

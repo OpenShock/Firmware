@@ -2,7 +2,7 @@
 
 import * as flatbuffers from 'flatbuffers';
 
-import { SetRfPinResultCode } from '../../../open-shock/serialization/local/set-rf-pin-result-code.js';
+import { SetRfPinResultCode } from '../../../open-shock/serialization/local/set-rf-pin-result-code';
 
 
 export class SetRfTxPinCommandResult {

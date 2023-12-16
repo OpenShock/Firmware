@@ -13,6 +13,7 @@ import { AccountLinkCommandResult } from '$lib/_fbs/open-shock/serialization/loc
 import { AccountLinkResultCode } from '$lib/_fbs/open-shock/serialization/local/account-link-result-code';
 import { ErrorMessage } from '$lib/_fbs/open-shock/serialization/local/error-message';
 import { WifiNetworkEventHandler } from './WifiNetworkEventHandler';
+import { mapConfig } from '$lib/mappers/ConfigMapper';
 
 export type MessageHandler = (wsClient: WebSocketClient, message: DeviceToLocalMessage) => void;
 
@@ -32,7 +33,10 @@ PayloadHandlers[DeviceToLocalMessagePayload.ReadyMessage] = (cli, msg) => {
   DeviceStateStore.update((store) => {
     store.wifiConnectedBSSID = payload.connectedWifi()?.bssid() || null;
     store.gatewayPaired = payload.gatewayPaired();
-    store.rfTxPin = payload.rftxPin();
+    store.config = mapConfig(payload.config());
+
+    console.log('[WS] Updated device state store: ', store);
+
     return store;
   });
 

@@ -11,23 +11,23 @@ OtaUpdateConfig::OtaUpdateConfig() {
 }
 
 OtaUpdateConfig::OtaUpdateConfig(bool isEnabled, std::string cdnDomain, std::string updateChannel, bool checkOnStartup, std::uint16_t checkInterval, bool allowBackendManagement, bool requireManualApproval) {
-  this->isEnabled = isEnabled;
-  this->cdnDomain = cdnDomain;
-  this->updateChannel = updateChannel;
-  this->checkOnStartup = checkOnStartup;
-  this->checkInterval = checkInterval;
+  this->isEnabled              = isEnabled;
+  this->cdnDomain              = cdnDomain;
+  this->updateChannel          = updateChannel;
+  this->checkOnStartup         = checkOnStartup;
+  this->checkInterval          = checkInterval;
   this->allowBackendManagement = allowBackendManagement;
-  this->requireManualApproval = requireManualApproval;
+  this->requireManualApproval  = requireManualApproval;
 }
 
 void OtaUpdateConfig::ToDefault() {
-  isEnabled = true;
-  cdnDomain = OPENSHOCK_FW_CDN_DOMAIN;
-  updateChannel = "stable";
-  checkOnStartup = true;
-  checkInterval = 0;
+  isEnabled              = true;
+  cdnDomain              = OPENSHOCK_FW_CDN_DOMAIN;
+  updateChannel          = "stable";
+  checkOnStartup         = true;
+  checkInterval          = 0;
   allowBackendManagement = true;
-  requireManualApproval = false;
+  requireManualApproval  = false;
 }
 
 bool OtaUpdateConfig::FromFlatbuffers(const Serialization::Configuration::OtaUpdateConfig* config) {
@@ -36,18 +36,18 @@ bool OtaUpdateConfig::FromFlatbuffers(const Serialization::Configuration::OtaUpd
     return false;
   }
 
-  isEnabled = config->is_enabled();
-  cdnDomain = config->cdn_domain()->str();
-  updateChannel = config->update_channel()->str();
-  checkOnStartup = config->check_on_startup();
-  checkInterval = config->check_interval();
+  isEnabled              = config->is_enabled();
+  cdnDomain              = config->cdn_domain()->str();
+  updateChannel          = config->update_channel()->str();
+  checkOnStartup         = config->check_on_startup();
+  checkInterval          = config->check_interval();
   allowBackendManagement = config->allow_backend_management();
-  requireManualApproval = config->require_manual_approval();
+  requireManualApproval  = config->require_manual_approval();
 
   return true;
 }
 
-flatbuffers::Offset<OpenShock::Serialization::Configuration::OtaUpdateConfig> OtaUpdateConfig::ToFlatbuffers(flatbuffers::FlatBufferBuilder& builder) const {
+flatbuffers::Offset<OpenShock::Serialization::Configuration::OtaUpdateConfig> OtaUpdateConfig::ToFlatbuffers(flatbuffers::FlatBufferBuilder& builder, bool withSensitiveData) const {
   return Serialization::Configuration::CreateOtaUpdateConfig(builder, isEnabled, builder.CreateString(cdnDomain), builder.CreateString(updateChannel), checkInterval, allowBackendManagement, requireManualApproval);
 }
 
@@ -165,7 +165,7 @@ bool OtaUpdateConfig::FromJSON(const cJSON* json) {
   return true;
 }
 
-cJSON* OtaUpdateConfig::ToJSON() const {
+cJSON* OtaUpdateConfig::ToJSON(bool withSensitiveData) const {
   cJSON* root = cJSON_CreateObject();
 
   cJSON_AddBoolToObject(root, "isEnabled", isEnabled);

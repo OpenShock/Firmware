@@ -19,7 +19,7 @@
   let linkCode: string = '';
   $: linkCodeValid = isValidLinkCode(linkCode);
 
-  let rfTxPin: number | null = $DeviceStateStore.rfTxPin;
+  let rfTxPin: number | null = $DeviceStateStore.config?.rf.txPin ?? null;
   $: rfTxPinValid = rfTxPin !== null && rfTxPin >= 0 && rfTxPin < 255;
 
   function linkAccount() {
@@ -50,7 +50,7 @@
     <div class="flex flex-col space-y-2">
       <div class="flex flex-row space-x-2 items-center">
         <h3 class="h3">RF TX Pin</h3>
-        <span class="text-sm text-gray-500">(Currently {$DeviceStateStore.rfTxPin == null ? ' not set' : $DeviceStateStore.rfTxPin}) </span>
+        <span class="text-sm text-gray-500">(Currently {$DeviceStateStore.config == null ? ' not set' : $DeviceStateStore.config.rf.txPin}) </span>
       </div>
       <div class="flex space-x-2">
         <input class="input variant-form-material" type="number" placeholder="TX Pin" bind:value={rfTxPin} />

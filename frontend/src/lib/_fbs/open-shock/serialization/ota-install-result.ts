@@ -2,7 +2,7 @@
 
 import * as flatbuffers from 'flatbuffers';
 
-import { OtaInstallResultType } from '../../open-shock/ota-install-result-type.js';
+import { OtaInstallResultType } from '../../open-shock/ota-install-result-type';
 
 
 export class OtaInstallResult {

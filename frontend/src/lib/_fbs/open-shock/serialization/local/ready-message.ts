@@ -2,8 +2,8 @@
 
 import * as flatbuffers from 'flatbuffers';
 
-import { Config } from '../../../open-shock/serialization/configuration/config.js';
-import { WifiNetwork } from '../../../open-shock/serialization/types/wifi-network.js';
+import { Config } from '../../../open-shock/serialization/configuration/config';
+import { WifiNetwork } from '../../../open-shock/serialization/types/wifi-network';
 
 
 export class ReadyMessage {

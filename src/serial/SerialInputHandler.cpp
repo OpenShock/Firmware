@@ -163,7 +163,7 @@ void _handleNetworksCommand(char* arg, std::size_t argLength) {
       return;
     }
 
-    if (!Config::GetWiFiCredentials(root)) {
+    if (!Config::GetWiFiCredentials(root, true)) {
       SERPR_ERROR("Failed to get WiFi credentials from config");
       return;
     }

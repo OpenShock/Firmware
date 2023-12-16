@@ -2,8 +2,8 @@
 
 import * as flatbuffers from 'flatbuffers';
 
-import { ShockerCommandType } from '../../open-shock/serialization/types/shocker-command-type.js';
-import { ShockerModelType } from '../../open-shock/serialization/types/shocker-model-type.js';
+import { ShockerCommandType } from '../../open-shock/serialization/types/shocker-command-type';
+import { ShockerModelType } from '../../open-shock/serialization/types/shocker-model-type';
 
 
 export class ShockerCommand {

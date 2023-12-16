@@ -2,7 +2,7 @@
 
 import * as flatbuffers from 'flatbuffers';
 
-import { SemVer } from '../../open-shock/sem-ver.js';
+import { SemVer } from '../../open-shock/sem-ver';
 
 
 export class OtaDownload {

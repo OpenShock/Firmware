@@ -2,7 +2,7 @@
 
 import * as flatbuffers from 'flatbuffers';
 
-import { ShockerCommand } from '../../open-shock/serialization/shocker-command.js';
+import { ShockerCommand } from '../../open-shock/serialization/shocker-command';
 
 
 export class ShockerCommandList {

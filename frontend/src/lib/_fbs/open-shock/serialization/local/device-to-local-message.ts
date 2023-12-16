@@ -2,7 +2,7 @@
 
 import * as flatbuffers from 'flatbuffers';
 
-import { DeviceToLocalMessagePayload, unionToDeviceToLocalMessagePayload, unionListToDeviceToLocalMessagePayload } from '../../../open-shock/serialization/local/device-to-local-message-payload.js';
+import { DeviceToLocalMessagePayload, unionToDeviceToLocalMessagePayload, unionListToDeviceToLocalMessagePayload } from '../../../open-shock/serialization/local/device-to-local-message-payload';
 
 
 export class DeviceToLocalMessage {

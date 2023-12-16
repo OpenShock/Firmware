@@ -2,7 +2,7 @@
 
 import * as flatbuffers from 'flatbuffers';
 
-import { DeviceToServerMessagePayload, unionToDeviceToServerMessagePayload, unionListToDeviceToServerMessagePayload } from '../../open-shock/serialization/device-to-server-message-payload.js';
+import { DeviceToServerMessagePayload, unionToDeviceToServerMessagePayload, unionListToDeviceToServerMessagePayload } from '../../open-shock/serialization/device-to-server-message-payload';
 
 
 export class DeviceToServerMessage {

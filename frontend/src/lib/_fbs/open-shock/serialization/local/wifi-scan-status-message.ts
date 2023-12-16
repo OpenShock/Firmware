@@ -2,7 +2,7 @@
 
 import * as flatbuffers from 'flatbuffers';
 
-import { WifiScanStatus } from '../../../open-shock/serialization/types/wifi-scan-status.js';
+import { WifiScanStatus } from '../../../open-shock/serialization/types/wifi-scan-status';
 
 
 export class WifiScanStatusMessage {

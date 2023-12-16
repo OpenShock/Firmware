@@ -32,6 +32,8 @@ for root, dirs, files in os.walk(schemas_path):
 flatc_args_ts = [
     # Compile for TypeScript.
     '--ts',
+    # Don't add .ts extension to imports.
+    '--ts-no-import-ext',
     # Output directory.
     '-o ' + ts_output_path,
 ] + schema_files

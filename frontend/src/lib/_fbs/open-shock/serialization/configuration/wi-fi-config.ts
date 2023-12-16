@@ -2,7 +2,7 @@
 
 import * as flatbuffers from 'flatbuffers';
 
-import { WiFiCredentials } from '../../../open-shock/serialization/configuration/wi-fi-credentials.js';
+import { WiFiCredentials } from '../../../open-shock/serialization/configuration/wi-fi-credentials';
 
 
 export class WiFiConfig {

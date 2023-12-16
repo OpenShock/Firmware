@@ -2,7 +2,7 @@
 
 import * as flatbuffers from 'flatbuffers';
 
-import { OtaDownloadResultType } from '../../open-shock/ota-download-result-type.js';
+import { OtaDownloadResultType } from '../../open-shock/ota-download-result-type';
 
 
 export class OtaDownloadResult {

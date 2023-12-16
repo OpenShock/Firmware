@@ -2,8 +2,8 @@
 
 import * as flatbuffers from 'flatbuffers';
 
-import { WifiNetwork } from '../../../open-shock/serialization/types/wifi-network.js';
-import { WifiNetworkEventType } from '../../../open-shock/serialization/types/wifi-network-event-type.js';
+import { WifiNetwork } from '../../../open-shock/serialization/types/wifi-network';
+import { WifiNetworkEventType } from '../../../open-shock/serialization/types/wifi-network-event-type';
 
 
 export class WifiNetworkEvent {

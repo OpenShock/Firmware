@@ -2,7 +2,7 @@
 
 import * as flatbuffers from 'flatbuffers';
 
-import { AccountLinkResultCode } from '../../../open-shock/serialization/local/account-link-result-code.js';
+import { AccountLinkResultCode } from '../../../open-shock/serialization/local/account-link-result-code';
 
 
 export class AccountLinkCommandResult {
