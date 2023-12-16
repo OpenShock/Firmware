@@ -139,6 +139,8 @@ WiFiScanStatus _scanningTaskImpl() {
 }
 
 void _scanningTask(void* arg) {
+  (void)arg;
+  
   // Start the scan
   WiFiScanStatus status = _scanningTaskImpl();
 
@@ -155,6 +157,9 @@ void _scanningTask(void* arg) {
 }
 
 void _evScanCompleted(arduino_event_id_t event, arduino_event_info_t info) {
+  (void)event;
+  (void)info;
+
   std::int16_t numNetworks = WiFi.scanComplete();
   if (_isScanError(numNetworks)) {
     _handleScanError(numNetworks);
@@ -182,6 +187,9 @@ void _evScanCompleted(arduino_event_id_t event, arduino_event_info_t info) {
   _notifyTask(WiFiScanTaskNotificationFlags::CHANNEL_DONE);
 }
 void _evSTAStopped(arduino_event_id_t event, arduino_event_info_t info) {
+  (void)event;
+  (void)info;
+
   _notifyTask(WiFiScanTaskNotificationFlags::WIFI_DISABLED);
 }
 

@@ -7,6 +7,10 @@ const char* const TAG = "Config::RFConfig";
 
 using namespace OpenShock::Config;
 
+RFConfig::RFConfig() : txPin(OpenShock::Constants::GPIO_RF_TX), keepAliveEnabled(true) { }
+
+RFConfig::RFConfig(std::uint8_t txPin, bool keepAliveEnabled) : txPin(txPin), keepAliveEnabled(keepAliveEnabled) { }
+
 void RFConfig::ToDefault() {
   txPin            = OpenShock::Constants::GPIO_RF_TX;
   keepAliveEnabled = true;
@@ -34,13 +38,13 @@ bool RFConfig::FromJSON(const cJSON* json) {
     return false;
   }
 
-  if (!cJSON_IsObject(json)) {
+  if (cJSON_IsObject(json) == 0) {
     ESP_LOGE(TAG, "json is not an object");
     return false;
   }
 
   const cJSON* txPinJson = cJSON_GetObjectItemCaseSensitive(json, "txPin");
-  if (!cJSON_IsNumber(txPinJson)) {
+  if (cJSON_IsNumber(txPinJson) == 0) {
     ESP_LOGE(TAG, "value at 'txPin' is not a number");
     return false;
   }
@@ -48,7 +52,7 @@ bool RFConfig::FromJSON(const cJSON* json) {
   txPin = txPinJson->valueint;
 
   const cJSON* keepAliveEnabledJson = cJSON_GetObjectItemCaseSensitive(json, "keepAliveEnabled");
-  if (!cJSON_IsBool(keepAliveEnabledJson)) {
+  if (cJSON_IsBool(keepAliveEnabledJson) == 0) {
     ESP_LOGE(TAG, "value at 'keepAliveEnabled' is not a bool");
     return false;
   }
@@ -61,7 +65,7 @@ bool RFConfig::FromJSON(const cJSON* json) {
 cJSON* RFConfig::ToJSON() const {
   cJSON* root = cJSON_CreateObject();
 
-  cJSON_AddNumberToObject(root, "txPin", txPin);
+  cJSON_AddNumberToObject(root, "txPin", txPin);  //-V2564
   cJSON_AddBoolToObject(root, "keepAliveEnabled", keepAliveEnabled);
 
   return root;

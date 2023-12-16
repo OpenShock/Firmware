@@ -6,9 +6,7 @@ const char* const TAG = "Config::SerialInputConfig";
 
 using namespace OpenShock::Config;
 
-SerialInputConfig::SerialInputConfig() {
-  ToDefault();
-}
+SerialInputConfig::SerialInputConfig() : echoEnabled(true) {}
 
 SerialInputConfig::SerialInputConfig(bool echoEnabled) {
   this->echoEnabled = echoEnabled;
@@ -39,7 +37,7 @@ bool SerialInputConfig::FromJSON(const cJSON* json) {
     return false;
   }
 
-  if (!cJSON_IsObject(json)) {
+  if (cJSON_IsObject(json) == 0) {
     ESP_LOGE(TAG, "json is not an object");
     return false;
   }
@@ -50,7 +48,7 @@ bool SerialInputConfig::FromJSON(const cJSON* json) {
     return false;
   }
 
-  if (!cJSON_IsBool(echoEnabledJson)) {
+  if (cJSON_IsBool(echoEnabledJson) == 0) {
     ESP_LOGE(TAG, "echoEnabled is not a bool");
     return false;
   }

@@ -35,11 +35,15 @@ static std::uint8_t s_flags                                 = 0;
 static std::unique_ptr<OpenShock::GatewayClient> s_wsClient = nullptr;
 
 void _evGotIPHandler(arduino_event_t* event) {
+  (void)event;
+
   s_flags |= FLAG_HAS_IP;
   ESP_LOGD(TAG, "Got IP address");
 }
 
 void _evWiFiDisconnectedHandler(arduino_event_t* event) {
+  (void)event;
+
   s_flags    = FLAG_NONE;
   s_wsClient = nullptr;
   ESP_LOGD(TAG, "Lost IP address");
@@ -93,7 +97,7 @@ AccountLinkResultCode GatewayConnectionManager::Pair(const char* pairCode) {
     return AccountLinkResultCode::InternalError;
   }
 
-  std::string& authToken = response.data.authToken;
+  const std::string& authToken = response.data.authToken;
 
   if (authToken.empty()) {
     ESP_LOGE(TAG, "Received empty auth token");

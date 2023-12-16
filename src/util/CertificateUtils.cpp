@@ -24,7 +24,7 @@ bool OpenShock::CertificateUtils::GetHostCertificate(const char* host, std::vect
 
   client.connect(host, 443);
 
-  if (!client.connected()) {
+  if (client.connected() == 0) {
     ESP_LOGE(TAG, "Failed to connect to host %s", host);
     return false;
   }
