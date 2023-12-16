@@ -29,7 +29,7 @@ namespace OpenShock {
 
   private:
     void ClearPatternInternal();
-    void SendRGB(const RGBState state);
+    void SendRGB(const RGBState& state);
     static void RunPattern(void* arg);
 
     std::uint8_t m_rgbPin;

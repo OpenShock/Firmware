@@ -24,15 +24,22 @@ std::size_t Base64Utils::Encode(const std::uint8_t* data, std::size_t dataLen, c
   return requiredLen;
 }
 
-bool Base64Utils::Encode(const std::uint8_t* data, std::size_t dataLen, std::string& output) noexcept {
+bool Base64Utils::Encode(const std::uint8_t* data, std::size_t dataLen, std::string& output) {
   std::size_t requiredLen = Base64Utils::CalculateEncodedSize(dataLen) + 1; // +1 for null terminator
-  output.resize(requiredLen);
+  char* buffer = new char[requiredLen];
 
-  std::size_t written = Encode(data, dataLen, const_cast<char*>(output.data()), output.size());
+  std::size_t written = Encode(data, dataLen, buffer, requiredLen);
   if (written == 0) {
     output.clear();
+    delete[] buffer;
     return false;
   }
+
+  buffer[written] = '\0';
+
+  output.assign(buffer, written);
+  
+  delete[] buffer;
 
   if (written < requiredLen) {
     output.resize(written);

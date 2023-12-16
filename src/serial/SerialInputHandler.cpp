@@ -1,5 +1,6 @@
 #include "serial/SerialInputHandler.h"
 
+#include "Chipset.h"
 #include "CommandHandler.h"
 #include "config/Config.h"
 #include "config/SerialInputConfig.h"
@@ -7,7 +8,6 @@
 #include "Logging.h"
 #include "serialization/JsonSerial.h"
 #include "Time.h"
-#include "Chipset.h"
 #include "util/Base64Utils.h"
 #include "wifi/WiFiManager.h"
 
@@ -42,16 +42,18 @@ static std::unordered_map<std::string, SerialCmdHandler> s_commandHandlers;
 /// @param strLen Length of input string
 /// @param out Output boolean
 /// @return True if the argument is a boolean, false otherwise
-bool _tryParseBool(char* str, std::size_t strLen, bool& out) {
-  if (str == nullptr || strLen <= 0) {
+bool _tryParseBool(const char* str, std::size_t strLen, bool& out) {
+  if (str == nullptr || strLen == 0) {
     return false;
   }
 
   if (strcasecmp(str, "true") == 0) {
+    out = true;
     return true;
   }
 
   if (strcasecmp(str, "false") == 0) {
+    out = false;
     return true;
   }
 
@@ -59,16 +61,25 @@ bool _tryParseBool(char* str, std::size_t strLen, bool& out) {
 }
 
 void _handleVersionCommand(char* arg, std::size_t argLength) {
+  (void)arg;
+  (void)argLength;
+
   Serial.print("\n");
   SerialInputHandler::PrintVersionInfo();
 }
 
 void _handleRestartCommand(char* arg, std::size_t argLength) {
+  (void)arg;
+  (void)argLength;
+
   Serial.println("Restarting ESP...");
   ESP.restart();
 }
 
 void _handleFactoryResetCommand(char* arg, std::size_t argLength) {
+  (void)arg;
+  (void)argLength;
+
   Serial.println("Resetting to factory defaults...");
   Config::FactoryReset();
   Serial.println("Restarting...");
@@ -76,7 +87,7 @@ void _handleFactoryResetCommand(char* arg, std::size_t argLength) {
 }
 
 void _handleRfTxPinCommand(char* arg, std::size_t argLength) {
-  if (arg == nullptr || argLength <= 0) {
+  if (arg == nullptr || argLength == 0) {
     std::uint8_t txPin;
     if (!Config::GetRFConfigTxPin(txPin)) {
       SERPR_ERROR("Failed to get RF TX pin from config");
@@ -121,7 +132,7 @@ void _handleRfTxPinCommand(char* arg, std::size_t argLength) {
 }
 
 void _handleAuthtokenCommand(char* arg, std::size_t argLength) {
-  if (arg == nullptr || argLength <= 0) {
+  if (arg == nullptr || argLength == 0) {
     std::string authToken;
     if (!Config::GetBackendAuthToken(authToken)) {
       SERPR_ERROR("Failed to get auth token from config");
@@ -145,7 +156,7 @@ void _handleAuthtokenCommand(char* arg, std::size_t argLength) {
 void _handleNetworksCommand(char* arg, std::size_t argLength) {
   cJSON* root;
 
-  if (arg == nullptr || argLength <= 0) {
+  if (arg == nullptr || argLength == 0) {
     root = cJSON_CreateArray();
     if (root == nullptr) {
       SERPR_ERROR("Failed to create JSON array");
@@ -175,7 +186,7 @@ void _handleNetworksCommand(char* arg, std::size_t argLength) {
     return;
   }
 
-  if (!cJSON_IsArray(root)) {
+  if (cJSON_IsArray(root) == 0) {
     SERPR_ERROR("Invalid argument (not an array)");
     return;
   }
@@ -214,7 +225,7 @@ void _handleNetworksCommand(char* arg, std::size_t argLength) {
 void _handleKeepAliveCommand(char* arg, std::size_t argLength) {
   bool keepAliveEnabled;
 
-  if (arg == nullptr || argLength <= 0) {
+  if (arg == nullptr || argLength == 0) {
     // Get keep alive status
     if (!Config::GetRFConfigKeepAliveEnabled(keepAliveEnabled)) {
       SERPR_ERROR("Failed to get keep-alive status from config");
@@ -240,7 +251,7 @@ void _handleKeepAliveCommand(char* arg, std::size_t argLength) {
 }
 
 void _handleSerialEchoCommand(char* arg, std::size_t argLength) {
-  if (arg == nullptr || argLength <= 0) {
+  if (arg == nullptr || argLength == 0) {
     // Get current serial echo status
     SERPR_RESPONSE("SerialEcho|%s", s_echoEnabled ? "true" : "false");
     return;
@@ -280,13 +291,15 @@ void _handleValidGpiosCommand(char* arg, std::size_t argLength) {
     }
   }
 
-  buffer.pop_back();
+  if (!buffer.empty()) {
+    buffer.pop_back();
+  }
 
   SERPR_RESPONSE("ValidGPIOs|%s", buffer.c_str());
 }
 
 void _handleRawConfigCommand(char* arg, std::size_t argLength) {
-  if (arg == nullptr || argLength <= 0) {
+  if (arg == nullptr || argLength == 0) {
     std::vector<std::uint8_t> buffer;
 
     // Get raw config
@@ -322,17 +335,20 @@ void _handleRawConfigCommand(char* arg, std::size_t argLength) {
 }
 
 void _handleDebugInfoCommand(char* arg, std::size_t argLength) {
+  (void)arg;
+  (void)argLength;
+
   SERPR_RESPONSE("RTOSInfo|Free Heap|%u", xPortGetFreeHeapSize());
   SERPR_RESPONSE("RTOSInfo|Min Free Heap|%u", xPortGetMinimumEverFreeHeapSize());
 
   const std::int64_t now = OpenShock::millis();
-  SERPR_RESPONSE("RTOSInfo|UptimeMS|%llu", now);
+  SERPR_RESPONSE("RTOSInfo|UptimeMS|%lli", now);
 
   const std::int64_t seconds = now / 1000;
   const std::int64_t minutes = seconds / 60;
   const std::int64_t hours   = minutes / 60;
   const std::int64_t days    = hours / 24;
-  SERPR_RESPONSE("RTOSInfo|Uptime|%llud %lluh %llum %llus", days, hours % 24, minutes % 60, seconds % 60);
+  SERPR_RESPONSE("RTOSInfo|Uptime|%llid %llih %llim %llis", days, hours % 24, minutes % 60, seconds % 60);
 
   OpenShock::WiFiNetwork network;
   bool connected = OpenShock::WiFiManager::GetConnectedNetwork(network);
@@ -350,7 +366,7 @@ void _handleDebugInfoCommand(char* arg, std::size_t argLength) {
 }
 
 void _handleRFTransmitCommand(char* arg, std::size_t argLength) {
-  if (arg == nullptr || argLength <= 0) {
+  if (arg == nullptr || argLength == 0) {
     SERPR_ERROR("No command");
     return;
   }
@@ -390,11 +406,8 @@ void _handleHelpCommand(char* arg, std::size_t argLength) {
       return;
     }
 
-    if (argLength > 0) {
-      SERPR_ERROR("Command \"%.*s\" not found", argLength, arg);
-    } else {
-      SERPR_ERROR("No command");
-    }
+    SERPR_ERROR("Command \"%.*s\" not found", argLength, arg);
+
     return;
   }
 
@@ -427,7 +440,7 @@ factoryreset           reset device to factory defaults and restart
 
 static const SerialCmdHandler kVersionCmdHandler = {
   "version",
-R"(version
+  R"(version
   Print version information
   Example:
     version
@@ -436,7 +449,7 @@ R"(version
 };
 static const SerialCmdHandler kRestartCmdHandler = {
   "restart",
-R"(restart
+  R"(restart
   Restart the board
   Example:
     restart
@@ -445,7 +458,7 @@ R"(restart
 };
 static const SerialCmdHandler kSystemInfoCmdHandler = {
   "sysinfo",
-R"(sysinfo
+  R"(sysinfo
   Get system information from RTOS, WiFi, etc.
   Example:
     sysinfo
@@ -454,7 +467,7 @@ R"(sysinfo
 };
 static const SerialCmdHandler kSerialEchoCmdHandler = {
   "echo",
-R"(echo
+  R"(echo
   Get the serial echo status.
   If enabled, typed characters are echoed back to the serial port.
 
@@ -469,7 +482,7 @@ echo [<bool>]
 };
 static const SerialCmdHandler kValidGpiosCmdHandler = {
   "validgpios",
-R"(validgpios
+  R"(validgpios
   List all valid GPIO pins
   Example:
     validgpios
@@ -478,7 +491,7 @@ R"(validgpios
 };
 static const SerialCmdHandler kRfTxPinCmdHandler = {
   "rftxpin",
-R"(rftxpin
+  R"(rftxpin
   Get the GPIO pin used for the radio transmitter.
 
 rftxpin [<pin>]
@@ -492,7 +505,7 @@ rftxpin [<pin>]
 };
 static const SerialCmdHandler kAuthTokenCmdHandler = {
   "authtoken",
-R"(authtoken
+  R"(authtoken
   Get the backend auth token.
 
 authtoken [<token>]
@@ -506,7 +519,7 @@ authtoken [<token>]
 };
 static const SerialCmdHandler kNetworksCmdHandler = {
   "networks",
-R"(networks
+  R"(networks
   Get all saved networks.
 
 networks [<json>]
@@ -523,7 +536,7 @@ networks [<json>]
 };
 static const SerialCmdHandler kKeepAliveCmdHandler = {
   "keepalive",
-R"(keepalive
+  R"(keepalive
   Get the shocker keep-alive status.
 
 keepalive [<bool>]
@@ -537,7 +550,7 @@ keepalive [<bool>]
 };
 static const SerialCmdHandler kRawConfigCmdHandler = {
   "rawconfig",
-R"(rawconfig
+  R"(rawconfig
   Get the raw binary config
   Example:
     rawconfig
@@ -553,7 +566,7 @@ rawconfig <base64>
 };
 static const SerialCmdHandler kRfTransmitCmdHandler = {
   "rftransmit",
-R"(rftransmit <json>
+  R"(rftransmit <json>
   Transmit a RF command
   Arguments:
     <json> must be a JSON object with the following fields:
@@ -569,7 +582,7 @@ R"(rftransmit <json>
 };
 static const SerialCmdHandler kFactoryResetCmdHandler = {
   "factoryreset",
-R"(factoryreset
+  R"(factoryreset
   Reset the device to factory defaults and restart
   Example:
     factoryreset
@@ -578,7 +591,7 @@ R"(factoryreset
 };
 static const SerialCmdHandler khelpCmdHandler = {
   "help",
-R"(help [<command>]
+  R"(help [<command>]
   Print help information
   Arguments:
     <command> (optional) command to print help for
@@ -602,7 +615,7 @@ int findChar(const char* buffer, std::size_t bufferSize, char c) {
 }
 
 int findLineEnd(const char* buffer, int bufferSize) {
-  if (bufferSize <= 0) return -1;
+  if (buffer == nullptr || bufferSize <= 0) return -1;
 
   for (int i = 0; i < bufferSize; i++) {
     if (buffer[i] == '\r' || buffer[i] == '\n' || buffer[i] == '\0') {
@@ -707,9 +720,9 @@ void SerialInputHandler::Update() {
 
   while (true) {
     int available = Serial.available();
-    if (available <= 0 && findLineEnd(buffer, bufferIndex) == -1) {
+    if (available <= 0 && findLineEnd(buffer, bufferIndex) < 0) {
       // If we're suppressing paste, and we haven't printed anything in a while, print the buffer and stop suppressing
-      if (s_echoEnabled && suppressingPaste && OpenShock::millis() - lastEcho > PASTE_INTERVAL_THRESHOLD_MS) {
+      if (buffer != nullptr && s_echoEnabled && suppressingPaste && OpenShock::millis() - lastEcho > PASTE_INTERVAL_THRESHOLD_MS) {
         // \r - carriage return, moves to start of line
         // \x1B[K - clears rest of line
         Serial.printf("\r\x1B[K> %.*s", bufferIndex, buffer);
@@ -721,7 +734,20 @@ void SerialInputHandler::Update() {
 
     if (bufferIndex + available > bufferSize) {
       bufferSize = bufferIndex + available;
-      buffer     = static_cast<char*>(realloc(buffer, bufferSize));
+
+      void* newBuffer = realloc(buffer, bufferSize);
+      if (newBuffer == nullptr) {
+        free(buffer);
+        buffer     = nullptr;
+        bufferSize = 0;
+        continue;
+      }
+
+      buffer = static_cast<char*>(newBuffer);
+    }
+
+    if (buffer == nullptr) {
+      continue;
     }
 
     while (available-- > 0) {

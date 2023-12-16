@@ -6,9 +6,7 @@ const char* const TAG = "Config::CaptivePortalConfig";
 
 using namespace OpenShock::Config;
 
-CaptivePortalConfig::CaptivePortalConfig() {
-  ToDefault();
-}
+CaptivePortalConfig::CaptivePortalConfig() : alwaysEnabled(false) {}
 
 CaptivePortalConfig::CaptivePortalConfig(bool alwaysEnabled) {
   this->alwaysEnabled = alwaysEnabled;
@@ -39,7 +37,7 @@ bool CaptivePortalConfig::FromJSON(const cJSON* json) {
     return false;
   }
 
-  if (!cJSON_IsObject(json)) {
+  if (cJSON_IsObject(json) == 0) {
     ESP_LOGE(TAG, "json is not an object");
     return false;
   }
@@ -50,7 +48,7 @@ bool CaptivePortalConfig::FromJSON(const cJSON* json) {
     return false;
   }
 
-  if (!cJSON_IsBool(alwaysEnabledJson)) {
+  if (cJSON_IsBool(alwaysEnabledJson) == 0) {
     ESP_LOGE(TAG, "alwaysEnabled is not a bool");
     return false;
   }

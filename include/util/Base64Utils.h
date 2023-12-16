@@ -33,7 +33,7 @@ namespace OpenShock::Base64Utils {
   /// @param dataLen The size of the data to encode.
   /// @param output The output string to write to.
   /// @return The amount of bytes written to the output buffer.
-  bool Encode(const std::uint8_t* data, std::size_t dataLen, std::string& output) noexcept;
+  bool Encode(const std::uint8_t* data, std::size_t dataLen, std::string& output);
 
   /// @brief Decodes a base64 string.
   /// @param data The data to decode.

@@ -11,7 +11,7 @@ using namespace OpenShock;
 
 std::vector<rmt_data_t> Rmt::PetrainerEncoder::GetSequence(std::uint16_t shockerId, ShockerCommandType type, std::uint8_t intensity) {
   // Intensity must be between 0 and 100
-  intensity = std::min(intensity, (std::uint8_t)100);
+  intensity = std::min(intensity, static_cast<std::uint8_t>(100));
 
   std::uint8_t nShift = 0;
   switch (type) {
@@ -35,7 +35,7 @@ std::vector<rmt_data_t> Rmt::PetrainerEncoder::GetSequence(std::uint16_t shocker
   std::uint8_t typeSum = (~(0x01 | (0x80 >> nShift))) & 0xFF;
 
   // Payload layout: [methodBit:8][shockerId:16][intensity:8][methodChecksum:8]
-  std::uint64_t data = (std::uint64_t(typeVal) << 32) | (std::uint64_t(shockerId) << 16) | (std::uint64_t(intensity) << 8) | std::uint64_t(typeSum);
+  std::uint64_t data = (static_cast<std::uint64_t>(typeVal) << 32) | (static_cast<std::uint64_t>(shockerId) << 16) | (static_cast<std::uint64_t>(intensity) << 8) | static_cast<std::uint64_t>(typeSum);
 
   std::vector<rmt_data_t> pulses;
   pulses.reserve(42);
