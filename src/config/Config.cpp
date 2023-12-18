@@ -272,6 +272,18 @@ bool Config::GetWiFiConfig(Config::WiFiConfig& out) {
   return true;
 }
 
+bool Config::GetOtaUpdateConfig(Config::OtaUpdateConfig& out) {
+  ScopedReadLock lock(&_configMutex);
+  if (!lock.isLocked()) {
+    ESP_LOGE(TAG, "Failed to acquire read lock");
+    return false;
+  }
+
+  out = _configData.otaUpdate;
+
+  return true;
+}
+
 bool Config::GetWiFiCredentials(cJSON* array, bool withSensitiveData) {
   ScopedReadLock lock(&_configMutex);
   if (!lock.isLocked()) {
@@ -289,6 +301,12 @@ bool Config::GetWiFiCredentials(cJSON* array, bool withSensitiveData) {
 }
 
 bool Config::GetWiFiCredentials(std::vector<Config::WiFiCredentials>& out) {
+  ScopedReadLock lock(&_configMutex);
+  if (!lock.isLocked()) {
+    ESP_LOGE(TAG, "Failed to acquire read lock");
+    return false;
+  }
+
   out = _configData.wifi.credentialsList;
 
   return true;

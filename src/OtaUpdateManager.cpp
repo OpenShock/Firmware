@@ -44,22 +44,51 @@ const char* TAG = "OtaUpdateManager";
 
 static bool _otaValidatingApp = false;
 
-void OtaUpdateManager::Init() {
+void _evGotIPHandler(arduino_event_t* event) {
+  (void)event;
+
+  ESP_LOGD(TAG, "Got IP address");
+}
+void _evWiFiDisconnectedHandler(arduino_event_t* event) {
+  (void)event;
+
+  ESP_LOGD(TAG, "Lost IP address");
+}
+
+bool OtaUpdateManager::Init() {
   ESP_LOGD(TAG, "Fetching current partition");
 
   // Fetch current partition info.
   const esp_partition_t* partition = esp_ota_get_running_partition();
+  if (partition == nullptr) {
+    ESP_PANIC(TAG, "Failed to get currently running partition");
+    return false;  // This will never be reached, but the compiler doesn't know that.
+  }
 
   ESP_LOGD(TAG, "Fetching partition state");
 
   // Get OTA state for said partition.
   esp_ota_img_states_t states;
-  esp_ota_get_state_partition(partition, &states);
+  esp_err_t err = esp_ota_get_state_partition(partition, &states);
+  if (err != ESP_OK) {
+    ESP_PANIC(TAG, "Failed to get partition state: %s", esp_err_to_name(err));
+    return false;  // This will never be reached, but the compiler doesn't know that.
+  }
 
   ESP_LOGD(TAG, "Partition state: %u", states);
 
   // If the currently booting partition is being verified, set correct state.
   _otaValidatingApp = states == ESP_OTA_IMG_PENDING_VERIFY;
+
+  // Configure event triggers.
+  Config::OtaUpdateConfig otaUpdateConfig;
+  if (!Config::GetOtaUpdateConfig(otaUpdateConfig)) {
+    ESP_LOGE(TAG, "Failed to get OTA update config");
+    return;
+  }
+  WiFi.onEvent(_evGotIPHandler, ARDUINO_EVENT_WIFI_STA_GOT_IP);
+  WiFi.onEvent(_evGotIPHandler, ARDUINO_EVENT_WIFI_STA_GOT_IP6);
+  WiFi.onEvent(_evWiFiDisconnectedHandler, ARDUINO_EVENT_WIFI_STA_DISCONNECTED);
 }
 
 bool _tryGetStringList(const char* url, std::vector<std::string>& list) {

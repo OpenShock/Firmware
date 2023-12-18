@@ -21,7 +21,7 @@ mark ota succeeded
 */
 
 namespace OpenShock::OtaUpdateManager {
-  void Init();
+  bool Init();
 
   enum class FirmwareReleaseChannel {
     Stable,
