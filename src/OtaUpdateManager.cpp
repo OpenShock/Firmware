@@ -5,6 +5,8 @@
 #include "Logging.h"
 #include "Constants.h"
 #include "wifi/WiFiManager.h"
+#include "Time.h"
+#include "util/TaskUtils.h"
 #include "http/HTTPRequestManager.h"
 
 #include <esp_ota_ops.h>
@@ -14,9 +16,11 @@
 
 #include <sstream>
 
-#define OPENSHOCK_FW_CDN_STABLE_URL OPENSHOCK_FW_CDN_URL("/versions-stable.txt")
-#define OPENSHOCK_FW_CDN_BETA_URL OPENSHOCK_FW_CDN_URL("/versions-beta.txt")
-#define OPENSHOCK_FW_CDN_DEV_URL OPENSHOCK_FW_CDN_URL("/versions-develop.txt")
+#define OPENSHOCK_FW_CDN_CHANNEL_URL(ch) OPENSHOCK_FW_CDN_URL("/version-" ch ".txt")
+
+#define OPENSHOCK_FW_CDN_STABLE_URL OPENSHOCK_FW_CDN_CHANNEL_URL("stable")
+#define OPENSHOCK_FW_CDN_BETA_URL OPENSHOCK_FW_CDN_CHANNEL_URL("beta")
+#define OPENSHOCK_FW_CDN_DEV_URL OPENSHOCK_FW_CDN_CHANNEL_URL("develop")
 
 #define OPENSHOCK_FW_CDN_BOARDS_BASE_URL_FORMAT OPENSHOCK_FW_CDN_URL("/%s")
 #define OPENSHOCK_FW_CDN_BOARDS_INDEX_URL_FORMAT OPENSHOCK_FW_CDN_BOARDS_BASE_URL_FORMAT "/boards.txt"
@@ -29,6 +33,8 @@
 #define OPENSHOCK_FW_CDN_FILESYSTEM_URL_FORMAT OPENSHOCK_FW_CDN_VERSION_BASE_URL_FORMAT "/staticfs.bin"
 #define OPENSHOCK_FW_CDN_FILESYSTEM_HASH_URL_FORMAT OPENSHOCK_FW_CDN_FILESYSTEM_URL_FORMAT ".sha256"
 
+const char* const TAG = "OtaUpdateManager";
+
 /// @brief Stops initArduino() from handling OTA rollbacks
 /// @todo Get rid of Arduino entirely. >:(
 ///
@@ -40,19 +46,112 @@ bool verifyRollbackLater() {
 
 using namespace OpenShock;
 
-const char* TAG = "OtaUpdateManager";
+enum OtaTaskEventFlag : std::uint32_t {
+  OTA_TASK_EVENT_UPDATE_REQUESTED  = 1 << 0,
+  OTA_TASK_EVENT_WIFI_DISCONNECTED = 1 << 1, // If both connected and disconnected are set, disconnected takes priority.
+  OTA_TASK_EVENT_WIFI_CONNECTED    = 1 << 2,
+};
 
 static bool _otaValidatingApp = false;
+static TaskHandle_t _taskHandle;
 
-void _evGotIPHandler(arduino_event_t* event) {
+void _otaEvGotIPHandler(arduino_event_t* event) {
   (void)event;
 
-  ESP_LOGD(TAG, "Got IP address");
+  xTaskNotify(_taskHandle, OTA_TASK_EVENT_WIFI_CONNECTED, eSetBits);
 }
-void _evWiFiDisconnectedHandler(arduino_event_t* event) {
+void _otaEvWiFiDisconnectedHandler(arduino_event_t* event) {
   (void)event;
 
-  ESP_LOGD(TAG, "Lost IP address");
+  xTaskNotify(_taskHandle, OTA_TASK_EVENT_WIFI_DISCONNECTED, eSetBits);
+}
+
+void _otaUpdateTask(void* arg) {
+  (void)arg;
+
+  ESP_LOGD(TAG, "OTA update task started");
+
+  bool connected = false;
+  bool updateRequested = false;
+  std::int64_t lastUpdateCheck = 0;
+
+  // Update task loop.
+  while (true) {
+    // Wait for event.
+    uint32_t eventBits = 0;
+    xTaskNotifyWait(0, UINT32_MAX, &eventBits, pdMS_TO_TICKS(1000));
+
+    updateRequested |= (eventBits & OTA_TASK_EVENT_UPDATE_REQUESTED) != 0;
+
+    if ((eventBits & OTA_TASK_EVENT_WIFI_DISCONNECTED) != 0) {
+      ESP_LOGD(TAG, "WiFi disconnected");
+      connected = false;
+      continue; // No further processing needed.
+    }
+
+    if ((eventBits & OTA_TASK_EVENT_WIFI_CONNECTED) != 0 && !connected) {
+      ESP_LOGD(TAG, "WiFi connected");
+      connected = true;
+    }
+
+    // If we're not connected, continue.
+    if (!connected) {
+      continue;
+    }
+
+    std::int64_t now = OpenShock::millis();
+
+    bool check = false;
+    if (lastUpdateCheck != 0) {
+      std::int64_t diff = now - lastUpdateCheck;
+
+      check = diff >= 1'800'000LL; // 30 minutes
+
+      if (updateRequested && diff >= 60'000LL) { // 1 minute
+        check = true;
+      }
+    } else {
+      check = true;
+    }
+
+    lastUpdateCheck = now;
+
+    if (!check) {
+      continue;
+    }
+
+    updateRequested = false;
+
+    ESP_LOGD(TAG, "Checking for updates");
+
+    // Fetch current version.
+    std::vector<std::string> versions;
+    if (!OtaUpdateManager::TryGetFirmwareVersions(OtaUpdateManager::FirmwareReleaseChannel::Beta, versions)) {
+      ESP_LOGE(TAG, "Failed to fetch firmware versions");
+      continue;
+    }
+
+    // Print versions.
+    ESP_LOGD(TAG, "Firmware versions:");
+    for (const auto& version : versions) {
+      ESP_LOGD(TAG, "  %s", version.c_str());
+    }
+
+    // Fetch current release.
+    OtaUpdateManager::FirmwareRelease release;
+    if (!OtaUpdateManager::TryGetFirmwareRelease(versions[0], release)) {
+      ESP_LOGE(TAG, "Failed to fetch firmware release");
+      continue;
+    }
+
+    // Print release.
+    ESP_LOGD(TAG, "Firmware release:");
+    ESP_LOGD(TAG, "  Version:                %s", release.version.c_str());
+    ESP_LOGD(TAG, "  App binary URL:         %s", release.appBinaryUrl.c_str());
+    ESP_LOGD(TAG, "  App binary hash:        %s", release.appBinaryHash.c_str());
+    ESP_LOGD(TAG, "  Filesystem binary URL:  %s", release.filesystemBinaryUrl.c_str());
+    ESP_LOGD(TAG, "  Filesystem binary hash: %s", release.filesystemBinaryHash.c_str());
+  }
 }
 
 bool OtaUpdateManager::Init() {
@@ -84,11 +183,17 @@ bool OtaUpdateManager::Init() {
   Config::OtaUpdateConfig otaUpdateConfig;
   if (!Config::GetOtaUpdateConfig(otaUpdateConfig)) {
     ESP_LOGE(TAG, "Failed to get OTA update config");
-    return;
+    return false;
   }
-  WiFi.onEvent(_evGotIPHandler, ARDUINO_EVENT_WIFI_STA_GOT_IP);
-  WiFi.onEvent(_evGotIPHandler, ARDUINO_EVENT_WIFI_STA_GOT_IP6);
-  WiFi.onEvent(_evWiFiDisconnectedHandler, ARDUINO_EVENT_WIFI_STA_DISCONNECTED);
+
+  WiFi.onEvent(_otaEvGotIPHandler, ARDUINO_EVENT_WIFI_STA_GOT_IP);
+  WiFi.onEvent(_otaEvGotIPHandler, ARDUINO_EVENT_WIFI_STA_GOT_IP6);
+  WiFi.onEvent(_otaEvWiFiDisconnectedHandler, ARDUINO_EVENT_WIFI_STA_DISCONNECTED);
+
+  // Start OTA update task.
+  TaskUtils::TaskCreateExpensive(_otaUpdateTask, "OTA Update", 8192, nullptr, 1, &_taskHandle);
+
+  return true;
 }
 
 bool _tryGetStringList(const char* url, std::vector<std::string>& list) {
@@ -128,16 +233,16 @@ bool _printfToString(std::string& out, const char* format, ...) {
 
   // Try format with stack buffer.
   va_start(args, format);
-  int result = vsnprintf(buffer, sizeof(buffer), format, args);
+  int result = vsnprintf(buffer, STACK_BUFFER_SIZE, format, args);
   va_end(args);
 
-  // If we fail with less than STACK_BUFFER_SIZE, something is wrong.
-  if (result < STACK_BUFFER_SIZE) {
+  // If result is negative, something went wrong.
+  if (result < 0) {
     ESP_LOGE(TAG, "Failed to format string");
     return false;
   }
 
-  if (result >= sizeof(buffer)) {
+  if (result >= STACK_BUFFER_SIZE) {
     // Account for null terminator.
     result += 1;
 

@@ -6,6 +6,7 @@
 #include "config/SerialInputConfig.h"
 #include "config/WiFiConfig.h"
 #include "config/WiFiCredentials.h"
+#include "config/OtaUpdateConfig.h"
 
 #include <functional>
 #include <string>
