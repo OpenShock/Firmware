@@ -1,3 +1,4 @@
+import type { OtaUpdateChannel } from '$lib/_fbs/open-shock/serialization/configuration';
 import { Config as FbsConfig } from '$lib/_fbs/open-shock/serialization/configuration/config';
 
 export interface RFConfig {
@@ -33,7 +34,7 @@ export interface SerialInputConfig {
 export interface OtaUpdateConfig {
   isEnabled: boolean;
   cdnDomain: string;
-  updateChannel: string;
+  updateChannel: OtaUpdateChannel;
   checkOnStartup: boolean;
   checkInterval: number;
   allowBackendManagement: boolean;
