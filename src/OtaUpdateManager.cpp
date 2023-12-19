@@ -1,13 +1,13 @@
 #include "OtaUpdateManager.h"
 
 #include "config/Config.h"
-#include "GatewayConnectionManager.h"
-#include "Logging.h"
 #include "Constants.h"
-#include "wifi/WiFiManager.h"
+#include "GatewayConnectionManager.h"
+#include "http/HTTPRequestManager.h"
+#include "Logging.h"
 #include "Time.h"
 #include "util/TaskUtils.h"
-#include "http/HTTPRequestManager.h"
+#include "wifi/WiFiManager.h"
 
 #include <esp_ota_ops.h>
 
@@ -18,19 +18,19 @@
 
 #define OPENSHOCK_FW_CDN_CHANNEL_URL(ch) OPENSHOCK_FW_CDN_URL("/version-" ch ".txt")
 
-#define OPENSHOCK_FW_CDN_STABLE_URL OPENSHOCK_FW_CDN_CHANNEL_URL("stable")
-#define OPENSHOCK_FW_CDN_BETA_URL OPENSHOCK_FW_CDN_CHANNEL_URL("beta")
+#define OPENSHOCK_FW_CDN_STABLE_URL  OPENSHOCK_FW_CDN_CHANNEL_URL("stable")
+#define OPENSHOCK_FW_CDN_BETA_URL    OPENSHOCK_FW_CDN_CHANNEL_URL("beta")
 #define OPENSHOCK_FW_CDN_DEVELOP_URL OPENSHOCK_FW_CDN_CHANNEL_URL("develop")
 
-#define OPENSHOCK_FW_CDN_BOARDS_BASE_URL_FORMAT OPENSHOCK_FW_CDN_URL("/%s")
+#define OPENSHOCK_FW_CDN_BOARDS_BASE_URL_FORMAT  OPENSHOCK_FW_CDN_URL("/%s")
 #define OPENSHOCK_FW_CDN_BOARDS_INDEX_URL_FORMAT OPENSHOCK_FW_CDN_BOARDS_BASE_URL_FORMAT "/boards.txt"
 
 #define OPENSHOCK_FW_CDN_VERSION_BASE_URL_FORMAT OPENSHOCK_FW_CDN_BOARDS_BASE_URL_FORMAT "/" OPENSHOCK_FW_BOARD
 
-#define OPENSHOCK_FW_CDN_APP_URL_FORMAT OPENSHOCK_FW_CDN_VERSION_BASE_URL_FORMAT "/app.bin"
+#define OPENSHOCK_FW_CDN_APP_URL_FORMAT      OPENSHOCK_FW_CDN_VERSION_BASE_URL_FORMAT "/app.bin"
 #define OPENSHOCK_FW_CDN_APP_HASH_URL_FORMAT OPENSHOCK_FW_CDN_APP_URL_FORMAT ".sha256"
 
-#define OPENSHOCK_FW_CDN_FILESYSTEM_URL_FORMAT OPENSHOCK_FW_CDN_VERSION_BASE_URL_FORMAT "/staticfs.bin"
+#define OPENSHOCK_FW_CDN_FILESYSTEM_URL_FORMAT      OPENSHOCK_FW_CDN_VERSION_BASE_URL_FORMAT "/staticfs.bin"
 #define OPENSHOCK_FW_CDN_FILESYSTEM_HASH_URL_FORMAT OPENSHOCK_FW_CDN_FILESYSTEM_URL_FORMAT ".sha256"
 
 const char* const TAG = "OtaUpdateManager";
@@ -48,7 +48,7 @@ using namespace OpenShock;
 
 enum OtaTaskEventFlag : std::uint32_t {
   OTA_TASK_EVENT_UPDATE_REQUESTED  = 1 << 0,
-  OTA_TASK_EVENT_WIFI_DISCONNECTED = 1 << 1, // If both connected and disconnected are set, disconnected takes priority.
+  OTA_TASK_EVENT_WIFI_DISCONNECTED = 1 << 1,  // If both connected and disconnected are set, disconnected takes priority.
   OTA_TASK_EVENT_WIFI_CONNECTED    = 1 << 2,
 };
 
@@ -69,8 +69,8 @@ void _otaUpdateTask(void* arg) {
 
   ESP_LOGD(TAG, "OTA update task started");
 
-  bool connected = false;
-  bool updateRequested = false;
+  bool connected               = false;
+  bool updateRequested         = false;
   std::int64_t lastUpdateCheck = 0;
 
   // Update task loop.
@@ -84,7 +84,7 @@ void _otaUpdateTask(void* arg) {
     if ((eventBits & OTA_TASK_EVENT_WIFI_DISCONNECTED) != 0) {
       ESP_LOGD(TAG, "WiFi disconnected");
       connected = false;
-      continue; // No further processing needed.
+      continue;  // No further processing needed.
     }
 
     if ((eventBits & OTA_TASK_EVENT_WIFI_CONNECTED) != 0 && !connected) {
@@ -103,9 +103,9 @@ void _otaUpdateTask(void* arg) {
     if (lastUpdateCheck != 0) {
       std::int64_t diff = now - lastUpdateCheck;
 
-      check = diff >= 1'800'000LL; // 30 minutes
+      check = diff >= 1'800'000LL;                // 30 minutes
 
-      if (updateRequested && diff >= 60'000LL) { // 1 minute
+      if (updateRequested && diff >= 60'000LL) {  // 1 minute
         check = true;
       }
     } else {
@@ -203,8 +203,7 @@ bool _tryGetStringList(const char* url, std::vector<std::string>& list) {
 
   list.clear();
 
-  std::stringstream data;
-  data << response.data.c_str();
+  std::stringstream data(response.data);
 
   // Split response into lines.
   std::string line;
@@ -354,7 +353,7 @@ bool OtaUpdateManager::TryGetFirmwareRelease(const std::string& version, Firmwar
     return false;
   }
 
-  release.appBinaryHash = appBinaryHashResponse.data.c_str();
+  release.appBinaryHash        = appBinaryHashResponse.data.c_str();
   release.filesystemBinaryHash = filesystemBinaryHashResponse.data.c_str();
 
   return true;
