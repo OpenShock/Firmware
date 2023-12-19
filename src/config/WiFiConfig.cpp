@@ -50,31 +50,8 @@ bool WiFiConfig::FromJSON(const cJSON* json) {
     return false;
   }
 
-  const cJSON* accessPointSSIDJson = cJSON_GetObjectItemCaseSensitive(json, "accessPointSSID");
-  if (accessPointSSIDJson == nullptr) {
-    ESP_LOGE(TAG, "accessPointSSID is null");
-    return false;
-  }
-
-  if (cJSON_IsString(accessPointSSIDJson) == 0) {
-    ESP_LOGE(TAG, "accessPointSSID is not a string");
-    return false;
-  }
-
-  accessPointSSID = accessPointSSIDJson->valuestring;
-
-  const cJSON* hostnameJson = cJSON_GetObjectItemCaseSensitive(json, "hostname");
-  if (hostnameJson == nullptr) {
-    ESP_LOGE(TAG, "hostname is null");
-    return false;
-  }
-
-  if (cJSON_IsString(hostnameJson) == 0) {
-    ESP_LOGE(TAG, "hostname is not a string");
-    return false;
-  }
-
-  hostname = hostnameJson->valuestring;
+  Internal::Utils::FromJsonStr(accessPointSSID, json, "accessPointSSID", OPENSHOCK_FW_AP_PREFIX);
+  Internal::Utils::FromJsonStr(hostname, json, "hostname", OPENSHOCK_FW_HOSTNAME);
 
   const cJSON* credentialsListJson = cJSON_GetObjectItemCaseSensitive(json, "credentials");
   if (credentialsListJson == nullptr) {
@@ -87,18 +64,7 @@ bool WiFiConfig::FromJSON(const cJSON* json) {
     return false;
   }
 
-  credentialsList.clear();
-
-  const cJSON* credentialsJson = nullptr;
-  cJSON_ArrayForEach(credentialsJson, credentialsListJson) {
-    WiFiCredentials wifiCredential;
-    if (!wifiCredential.FromJSON(credentialsJson)) {
-      ESP_LOGE(TAG, "Failed to parse WiFiCredential");
-      return false;
-    }
-
-    credentialsList.push_back(std::move(wifiCredential));
-  }
+  Internal::Utils::FromJsonArray(credentialsList, credentialsListJson);
 
   return true;
 }

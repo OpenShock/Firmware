@@ -1,5 +1,6 @@
 #include "config/RFConfig.h"
 
+#include "config/internal/utils.h"
 #include "Constants.h"
 #include "Logging.h"
 
@@ -43,21 +44,8 @@ bool RFConfig::FromJSON(const cJSON* json) {
     return false;
   }
 
-  const cJSON* txPinJson = cJSON_GetObjectItemCaseSensitive(json, "txPin");
-  if (cJSON_IsNumber(txPinJson) == 0) {
-    ESP_LOGE(TAG, "value at 'txPin' is not a number");
-    return false;
-  }
-
-  txPin = txPinJson->valueint;
-
-  const cJSON* keepAliveEnabledJson = cJSON_GetObjectItemCaseSensitive(json, "keepAliveEnabled");
-  if (cJSON_IsBool(keepAliveEnabledJson) == 0) {
-    ESP_LOGE(TAG, "value at 'keepAliveEnabled' is not a bool");
-    return false;
-  }
-
-  keepAliveEnabled = cJSON_IsTrue(keepAliveEnabledJson);
+  Internal::Utils::FromJsonU8(txPin, json, "txPin", OpenShock::Constants::GPIO_RF_TX);
+  Internal::Utils::FromJsonBool(keepAliveEnabled, json, "keepAliveEnabled", true);
 
   return true;
 }

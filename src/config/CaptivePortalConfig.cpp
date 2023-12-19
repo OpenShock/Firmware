@@ -1,5 +1,6 @@
 #include "config/CaptivePortalConfig.h"
 
+#include "config/internal/utils.h"
 #include "Logging.h"
 
 const char* const TAG = "Config::CaptivePortalConfig";
@@ -42,18 +43,7 @@ bool CaptivePortalConfig::FromJSON(const cJSON* json) {
     return false;
   }
 
-  const cJSON* alwaysEnabledJson = cJSON_GetObjectItemCaseSensitive(json, "alwaysEnabled");
-  if (alwaysEnabledJson == nullptr) {
-    ESP_LOGE(TAG, "alwaysEnabled is null");
-    return false;
-  }
-
-  if (cJSON_IsBool(alwaysEnabledJson) == 0) {
-    ESP_LOGE(TAG, "alwaysEnabled is not a bool");
-    return false;
-  }
-
-  alwaysEnabled = cJSON_IsTrue(alwaysEnabledJson);
+  Internal::Utils::FromJsonBool(alwaysEnabled, json, "alwaysEnabled", false);
 
   return true;
 }

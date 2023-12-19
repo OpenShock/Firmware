@@ -50,31 +50,8 @@ bool BackendConfig::FromJSON(const cJSON* json) {
     return false;
   }
 
-  const cJSON* domainJson = cJSON_GetObjectItemCaseSensitive(json, "domain");
-  if (domainJson == nullptr) {
-    ESP_LOGE(TAG, "domain is null");
-    return false;
-  }
-
-  if (cJSON_IsString(domainJson) == 0) {
-    ESP_LOGE(TAG, "domain is not a string");
-    return false;
-  }
-
-  domain = domainJson->valuestring;
-
-  const cJSON* authTokenJson = cJSON_GetObjectItemCaseSensitive(json, "authToken");
-  if (authTokenJson == nullptr) {
-    ESP_LOGE(TAG, "authToken is null");
-    return false;
-  }
-
-  if (cJSON_IsString(authTokenJson) == 0) {
-    ESP_LOGE(TAG, "authToken is not a string");
-    return false;
-  }
-
-  authToken = authTokenJson->valuestring;
+  Internal::Utils::FromJsonStr(domain, json, "domain", OPENSHOCK_API_DOMAIN);
+  Internal::Utils::FromJsonStr(authToken, json, "authToken", "");
 
   return true;
 }
