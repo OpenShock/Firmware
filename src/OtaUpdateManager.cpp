@@ -20,7 +20,7 @@
 
 #define OPENSHOCK_FW_CDN_STABLE_URL OPENSHOCK_FW_CDN_CHANNEL_URL("stable")
 #define OPENSHOCK_FW_CDN_BETA_URL OPENSHOCK_FW_CDN_CHANNEL_URL("beta")
-#define OPENSHOCK_FW_CDN_DEV_URL OPENSHOCK_FW_CDN_CHANNEL_URL("develop")
+#define OPENSHOCK_FW_CDN_DEVELOP_URL OPENSHOCK_FW_CDN_CHANNEL_URL("develop")
 
 #define OPENSHOCK_FW_CDN_BOARDS_BASE_URL_FORMAT OPENSHOCK_FW_CDN_URL("/%s")
 #define OPENSHOCK_FW_CDN_BOARDS_INDEX_URL_FORMAT OPENSHOCK_FW_CDN_BOARDS_BASE_URL_FORMAT "/boards.txt"
@@ -57,12 +57,10 @@ static TaskHandle_t _taskHandle;
 
 void _otaEvGotIPHandler(arduino_event_t* event) {
   (void)event;
-
   xTaskNotify(_taskHandle, OTA_TASK_EVENT_WIFI_CONNECTED, eSetBits);
 }
 void _otaEvWiFiDisconnectedHandler(arduino_event_t* event) {
   (void)event;
-
   xTaskNotify(_taskHandle, OTA_TASK_EVENT_WIFI_DISCONNECTED, eSetBits);
 }
 
@@ -79,7 +77,7 @@ void _otaUpdateTask(void* arg) {
   while (true) {
     // Wait for event.
     uint32_t eventBits = 0;
-    xTaskNotifyWait(0, UINT32_MAX, &eventBits, pdMS_TO_TICKS(1000));
+    xTaskNotifyWait(0, UINT32_MAX, &eventBits, pdMS_TO_TICKS(5000));
 
     updateRequested |= (eventBits & OTA_TASK_EVENT_UPDATE_REQUESTED) != 0;
 
@@ -126,7 +124,7 @@ void _otaUpdateTask(void* arg) {
 
     // Fetch current version.
     std::vector<std::string> versions;
-    if (!OtaUpdateManager::TryGetFirmwareVersions(OtaUpdateManager::FirmwareReleaseChannel::Beta, versions)) {
+    if (!OtaUpdateManager::TryGetFirmwareVersions(OtaUpdateChannel::Beta, versions)) {
       ESP_LOGE(TAG, "Failed to fetch firmware versions");
       continue;
     }
@@ -274,17 +272,17 @@ bool _printfToString(std::string& out, const char* format, ...) {
   return true;
 }
 
-bool OtaUpdateManager::TryGetFirmwareVersions(FirmwareReleaseChannel channel, std::vector<std::string>& versions) {
+bool OtaUpdateManager::TryGetFirmwareVersions(OtaUpdateChannel channel, std::vector<std::string>& versions) {
   const char* channelIndexUrl = nullptr;
   switch (channel) {
-    case FirmwareReleaseChannel::Stable:
+    case OtaUpdateChannel::Stable:
       channelIndexUrl = OPENSHOCK_FW_CDN_STABLE_URL;
       break;
-    case FirmwareReleaseChannel::Beta:
+    case OtaUpdateChannel::Beta:
       channelIndexUrl = OPENSHOCK_FW_CDN_BETA_URL;
       break;
-    case FirmwareReleaseChannel::Dev:
-      channelIndexUrl = OPENSHOCK_FW_CDN_DEV_URL;
+    case OtaUpdateChannel::Develop:
+      channelIndexUrl = OPENSHOCK_FW_CDN_DEVELOP_URL;
       break;
     default:
       ESP_LOGE(TAG, "Unknown channel: %u", channel);

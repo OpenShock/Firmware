@@ -41,6 +41,39 @@ struct OtaUpdateConfigBuilder;
 struct Config;
 struct ConfigBuilder;
 
+enum class OtaUpdateChannel : uint8_t {
+  Stable = 0,
+  Beta = 1,
+  Develop = 2,
+  MIN = Stable,
+  MAX = Develop
+};
+
+inline const OtaUpdateChannel (&EnumValuesOtaUpdateChannel())[3] {
+  static const OtaUpdateChannel values[] = {
+    OtaUpdateChannel::Stable,
+    OtaUpdateChannel::Beta,
+    OtaUpdateChannel::Develop
+  };
+  return values;
+}
+
+inline const char * const *EnumNamesOtaUpdateChannel() {
+  static const char * const names[4] = {
+    "Stable",
+    "Beta",
+    "Develop",
+    nullptr
+  };
+  return names;
+}
+
+inline const char *EnumNameOtaUpdateChannel(OtaUpdateChannel e) {
+  if (::flatbuffers::IsOutRange(e, OtaUpdateChannel::Stable, OtaUpdateChannel::Develop)) return "";
+  const size_t index = static_cast<size_t>(e);
+  return EnumNamesOtaUpdateChannel()[index];
+}
+
 struct RFConfig FLATBUFFERS_FINAL_CLASS : private ::flatbuffers::Table {
   typedef RFConfigBuilder Builder;
   struct Traits;
@@ -486,9 +519,9 @@ struct OtaUpdateConfig FLATBUFFERS_FINAL_CLASS : private ::flatbuffers::Table {
   const ::flatbuffers::String *cdn_domain() const {
     return GetPointer<const ::flatbuffers::String *>(VT_CDN_DOMAIN);
   }
-  /// The update channel to use, e.g. "stable", "beta", "dev".
-  const ::flatbuffers::String *update_channel() const {
-    return GetPointer<const ::flatbuffers::String *>(VT_UPDATE_CHANNEL);
+  /// The update channel to use.
+  OpenShock::Serialization::Configuration::OtaUpdateChannel update_channel() const {
+    return static_cast<OpenShock::Serialization::Configuration::OtaUpdateChannel>(GetField<uint8_t>(VT_UPDATE_CHANNEL, 0));
   }
   /// Indicates whether to check for updates on startup.
   bool check_on_startup() const {
@@ -511,8 +544,7 @@ struct OtaUpdateConfig FLATBUFFERS_FINAL_CLASS : private ::flatbuffers::Table {
            VerifyField<uint8_t>(verifier, VT_IS_ENABLED, 1) &&
            VerifyOffset(verifier, VT_CDN_DOMAIN) &&
            verifier.VerifyString(cdn_domain()) &&
-           VerifyOffset(verifier, VT_UPDATE_CHANNEL) &&
-           verifier.VerifyString(update_channel()) &&
+           VerifyField<uint8_t>(verifier, VT_UPDATE_CHANNEL, 1) &&
            VerifyField<uint8_t>(verifier, VT_CHECK_ON_STARTUP, 1) &&
            VerifyField<uint16_t>(verifier, VT_CHECK_INTERVAL, 2) &&
            VerifyField<uint8_t>(verifier, VT_ALLOW_BACKEND_MANAGEMENT, 1) &&
@@ -531,8 +563,8 @@ struct OtaUpdateConfigBuilder {
   void add_cdn_domain(::flatbuffers::Offset<::flatbuffers::String> cdn_domain) {
     fbb_.AddOffset(OtaUpdateConfig::VT_CDN_DOMAIN, cdn_domain);
   }
-  void add_update_channel(::flatbuffers::Offset<::flatbuffers::String> update_channel) {
-    fbb_.AddOffset(OtaUpdateConfig::VT_UPDATE_CHANNEL, update_channel);
+  void add_update_channel(OpenShock::Serialization::Configuration::OtaUpdateChannel update_channel) {
+    fbb_.AddElement<uint8_t>(OtaUpdateConfig::VT_UPDATE_CHANNEL, static_cast<uint8_t>(update_channel), 0);
   }
   void add_check_on_startup(bool check_on_startup) {
     fbb_.AddElement<uint8_t>(OtaUpdateConfig::VT_CHECK_ON_STARTUP, static_cast<uint8_t>(check_on_startup), 0);
@@ -561,18 +593,18 @@ inline ::flatbuffers::Offset<OtaUpdateConfig> CreateOtaUpdateConfig(
     ::flatbuffers::FlatBufferBuilder &_fbb,
     bool is_enabled = false,
     ::flatbuffers::Offset<::flatbuffers::String> cdn_domain = 0,
-    ::flatbuffers::Offset<::flatbuffers::String> update_channel = 0,
+    OpenShock::Serialization::Configuration::OtaUpdateChannel update_channel = OpenShock::Serialization::Configuration::OtaUpdateChannel::Stable,
     bool check_on_startup = false,
     uint16_t check_interval = 0,
     bool allow_backend_management = false,
     bool require_manual_approval = false) {
   OtaUpdateConfigBuilder builder_(_fbb);
-  builder_.add_update_channel(update_channel);
   builder_.add_cdn_domain(cdn_domain);
   builder_.add_check_interval(check_interval);
   builder_.add_require_manual_approval(require_manual_approval);
   builder_.add_allow_backend_management(allow_backend_management);
   builder_.add_check_on_startup(check_on_startup);
+  builder_.add_update_channel(update_channel);
   builder_.add_is_enabled(is_enabled);
   return builder_.Finish();
 }
@@ -586,18 +618,17 @@ inline ::flatbuffers::Offset<OtaUpdateConfig> CreateOtaUpdateConfigDirect(
     ::flatbuffers::FlatBufferBuilder &_fbb,
     bool is_enabled = false,
     const char *cdn_domain = nullptr,
-    const char *update_channel = nullptr,
+    OpenShock::Serialization::Configuration::OtaUpdateChannel update_channel = OpenShock::Serialization::Configuration::OtaUpdateChannel::Stable,
     bool check_on_startup = false,
     uint16_t check_interval = 0,
     bool allow_backend_management = false,
     bool require_manual_approval = false) {
   auto cdn_domain__ = cdn_domain ? _fbb.CreateString(cdn_domain) : 0;
-  auto update_channel__ = update_channel ? _fbb.CreateString(update_channel) : 0;
   return OpenShock::Serialization::Configuration::CreateOtaUpdateConfig(
       _fbb,
       is_enabled,
       cdn_domain__,
-      update_channel__,
+      update_channel,
       check_on_startup,
       check_interval,
       allow_backend_management,

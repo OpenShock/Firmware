@@ -1,5 +1,7 @@
 #pragma once
 
+#include "OtaUpdateChannel.h"
+
 #include <string>
 #include <vector>
 
@@ -23,12 +25,6 @@ mark ota succeeded
 namespace OpenShock::OtaUpdateManager {
   bool Init();
 
-  enum class FirmwareReleaseChannel {
-    Stable,
-    Beta,
-    Dev,
-  };
-
   struct FirmwareRelease {
     std::string version;
     std::string appBinaryUrl;
@@ -37,7 +33,7 @@ namespace OpenShock::OtaUpdateManager {
     std::string filesystemBinaryHash;
   };
 
-  bool TryGetFirmwareVersions(FirmwareReleaseChannel channel, std::vector<std::string>& versions);
+  bool TryGetFirmwareVersions(OtaUpdateChannel channel, std::vector<std::string>& versions);
   bool TryGetFirmwareBoards(const std::string& version, std::vector<std::string>& boards);
   bool TryGetFirmwareRelease(const std::string& version, FirmwareRelease& release);
 

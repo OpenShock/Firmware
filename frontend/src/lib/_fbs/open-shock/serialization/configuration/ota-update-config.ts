@@ -2,6 +2,9 @@
 
 import * as flatbuffers from 'flatbuffers';
 
+import { OtaUpdateChannel } from '../../../open-shock/serialization/configuration/ota-update-channel';
+
+
 export class OtaUpdateConfig {
   bb: flatbuffers.ByteBuffer|null = null;
   bb_pos = 0;
@@ -39,13 +42,11 @@ cdnDomain(optionalEncoding?:any):string|Uint8Array|null {
 }
 
 /**
- * The update channel to use, e.g. "stable", "beta", "dev".
+ * The update channel to use.
  */
-updateChannel():string|null
-updateChannel(optionalEncoding:flatbuffers.Encoding):string|Uint8Array|null
-updateChannel(optionalEncoding?:any):string|Uint8Array|null {
+updateChannel():OtaUpdateChannel {
   const offset = this.bb!.__offset(this.bb_pos, 8);
-  return offset ? this.bb!.__string(this.bb_pos + offset, optionalEncoding) : null;
+  return offset ? this.bb!.readUint8(this.bb_pos + offset) : OtaUpdateChannel.Stable;
 }
 
 /**
@@ -92,8 +93,8 @@ static addCdnDomain(builder:flatbuffers.Builder, cdnDomainOffset:flatbuffers.Off
   builder.addFieldOffset(1, cdnDomainOffset, 0);
 }
 
-static addUpdateChannel(builder:flatbuffers.Builder, updateChannelOffset:flatbuffers.Offset) {
-  builder.addFieldOffset(2, updateChannelOffset, 0);
+static addUpdateChannel(builder:flatbuffers.Builder, updateChannel:OtaUpdateChannel) {
+  builder.addFieldInt8(2, updateChannel, OtaUpdateChannel.Stable);
 }
 
 static addCheckOnStartup(builder:flatbuffers.Builder, checkOnStartup:boolean) {
@@ -117,11 +118,11 @@ static endOtaUpdateConfig(builder:flatbuffers.Builder):flatbuffers.Offset {
   return offset;
 }
 
-static createOtaUpdateConfig(builder:flatbuffers.Builder, isEnabled:boolean, cdnDomainOffset:flatbuffers.Offset, updateChannelOffset:flatbuffers.Offset, checkOnStartup:boolean, checkInterval:number, allowBackendManagement:boolean, requireManualApproval:boolean):flatbuffers.Offset {
+static createOtaUpdateConfig(builder:flatbuffers.Builder, isEnabled:boolean, cdnDomainOffset:flatbuffers.Offset, updateChannel:OtaUpdateChannel, checkOnStartup:boolean, checkInterval:number, allowBackendManagement:boolean, requireManualApproval:boolean):flatbuffers.Offset {
   OtaUpdateConfig.startOtaUpdateConfig(builder);
   OtaUpdateConfig.addIsEnabled(builder, isEnabled);
   OtaUpdateConfig.addCdnDomain(builder, cdnDomainOffset);
-  OtaUpdateConfig.addUpdateChannel(builder, updateChannelOffset);
+  OtaUpdateConfig.addUpdateChannel(builder, updateChannel);
   OtaUpdateConfig.addCheckOnStartup(builder, checkOnStartup);
   OtaUpdateConfig.addCheckInterval(builder, checkInterval);
   OtaUpdateConfig.addAllowBackendManagement(builder, allowBackendManagement);

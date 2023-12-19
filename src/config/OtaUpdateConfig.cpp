@@ -1,5 +1,6 @@
 #include "config/OtaUpdateConfig.h"
 
+#include "config/internal/utils.h"
 #include "Logging.h"
 
 const char* const TAG = "Config::OtaUpdateConfig";
@@ -10,7 +11,7 @@ OtaUpdateConfig::OtaUpdateConfig() {
   ToDefault();
 }
 
-OtaUpdateConfig::OtaUpdateConfig(bool isEnabled, std::string cdnDomain, std::string updateChannel, bool checkOnStartup, std::uint16_t checkInterval, bool allowBackendManagement, bool requireManualApproval) {
+OtaUpdateConfig::OtaUpdateConfig(bool isEnabled, std::string cdnDomain, OtaUpdateChannel updateChannel, bool checkOnStartup, std::uint16_t checkInterval, bool allowBackendManagement, bool requireManualApproval) {
   this->isEnabled              = isEnabled;
   this->cdnDomain              = cdnDomain;
   this->updateChannel          = updateChannel;
@@ -23,7 +24,7 @@ OtaUpdateConfig::OtaUpdateConfig(bool isEnabled, std::string cdnDomain, std::str
 void OtaUpdateConfig::ToDefault() {
   isEnabled              = true;
   cdnDomain              = OPENSHOCK_FW_CDN_DOMAIN;
-  updateChannel          = "stable";
+  updateChannel          = OtaUpdateChannel::Stable;
   checkOnStartup         = true;
   checkInterval          = 0;
   allowBackendManagement = true;
@@ -37,8 +38,8 @@ bool OtaUpdateConfig::FromFlatbuffers(const Serialization::Configuration::OtaUpd
   }
 
   isEnabled              = config->is_enabled();
-  cdnDomain              = config->cdn_domain()->str();
-  updateChannel          = config->update_channel()->str();
+  Internal::Utils::FromFbsStr(cdnDomain, config->cdn_domain(), OPENSHOCK_FW_CDN_DOMAIN);
+  updateChannel          = config->update_channel();
   checkOnStartup         = config->check_on_startup();
   checkInterval          = config->check_interval();
   allowBackendManagement = config->allow_backend_management();
@@ -48,7 +49,7 @@ bool OtaUpdateConfig::FromFlatbuffers(const Serialization::Configuration::OtaUpd
 }
 
 flatbuffers::Offset<OpenShock::Serialization::Configuration::OtaUpdateConfig> OtaUpdateConfig::ToFlatbuffers(flatbuffers::FlatBufferBuilder& builder, bool withSensitiveData) const {
-  return Serialization::Configuration::CreateOtaUpdateConfig(builder, isEnabled, builder.CreateString(cdnDomain), builder.CreateString(updateChannel), checkInterval, allowBackendManagement, requireManualApproval);
+  return Serialization::Configuration::CreateOtaUpdateConfig(builder, isEnabled, builder.CreateString(cdnDomain), updateChannel, checkInterval, allowBackendManagement, requireManualApproval);
 }
 
 bool OtaUpdateConfig::FromJSON(const cJSON* json) {
@@ -62,105 +63,13 @@ bool OtaUpdateConfig::FromJSON(const cJSON* json) {
     return false;
   }
 
-  const cJSON* isEnabledJson = cJSON_GetObjectItemCaseSensitive(json, "isEnabled");
-  if (isEnabledJson == nullptr) {
-    ESP_LOGE(TAG, "isEnabled is null");
-    return false;
-  }
-
-  if (!cJSON_IsBool(isEnabledJson)) {
-    ESP_LOGE(TAG, "isEnabled is not a bool");
-    return false;
-  }
-
-  isEnabled = cJSON_IsTrue(isEnabledJson);
-
-  const cJSON* cdnDomainJson = cJSON_GetObjectItemCaseSensitive(json, "cdnDomain");
-  if (cdnDomainJson == nullptr) {
-    ESP_LOGE(TAG, "cdnDomain is null");
-    return false;
-  }
-
-  if (!cJSON_IsString(cdnDomainJson)) {
-    ESP_LOGE(TAG, "cdnDomain is not a string");
-    return false;
-  }
-
-  cdnDomain = cdnDomainJson->valuestring;
-
-  const cJSON* updateChannelJson = cJSON_GetObjectItemCaseSensitive(json, "updateChannel");
-  if (updateChannelJson == nullptr) {
-    ESP_LOGE(TAG, "updateChannel is null");
-    return false;
-  }
-
-  if (!cJSON_IsString(updateChannelJson)) {
-    ESP_LOGE(TAG, "updateChannel is not a string");
-    return false;
-  }
-
-  updateChannel = updateChannelJson->valuestring;
-
-  const cJSON* checkOnStartupJson = cJSON_GetObjectItemCaseSensitive(json, "checkOnStartup");
-  if (checkOnStartupJson == nullptr) {
-    ESP_LOGE(TAG, "checkOnStartup is null");
-    return false;
-  }
-
-  if (!cJSON_IsBool(checkOnStartupJson)) {
-    ESP_LOGE(TAG, "checkOnStartup is not a bool");
-    return false;
-  }
-
-  checkOnStartup = cJSON_IsTrue(checkOnStartupJson);
-
-  const cJSON* checkIntervalJson = cJSON_GetObjectItemCaseSensitive(json, "checkInterval");
-  if (checkIntervalJson == nullptr) {
-    ESP_LOGE(TAG, "checkInterval is null");
-    return false;
-  }
-
-  if (!cJSON_IsNumber(checkIntervalJson)) {
-    ESP_LOGE(TAG, "checkInterval is not a number");
-    return false;
-  }
-
-  if (checkIntervalJson->valueint < 0) {
-    ESP_LOGE(TAG, "checkInterval is less than 0");
-    return false;
-  }
-  if (checkIntervalJson->valueint > UINT16_MAX) {
-    ESP_LOGE(TAG, "checkInterval is greater than UINT16_MAX");
-    return false;
-  }
-
-  checkInterval = checkIntervalJson->valueint;
-
-  const cJSON* allowBackendManagementJson = cJSON_GetObjectItemCaseSensitive(json, "allowBackendManagement");
-  if (allowBackendManagementJson == nullptr) {
-    ESP_LOGE(TAG, "allowBackendManagement is null");
-    return false;
-  }
-
-  if (!cJSON_IsBool(allowBackendManagementJson)) {
-    ESP_LOGE(TAG, "allowBackendManagement is not a bool");
-    return false;
-  }
-
-  allowBackendManagement = cJSON_IsTrue(allowBackendManagementJson);
-
-  const cJSON* requireManualApprovalJson = cJSON_GetObjectItemCaseSensitive(json, "requireManualApproval");
-  if (requireManualApprovalJson == nullptr) {
-    ESP_LOGE(TAG, "requireManualApproval is null");
-    return false;
-  }
-
-  if (!cJSON_IsBool(requireManualApprovalJson)) {
-    ESP_LOGE(TAG, "requireManualApproval is not a bool");
-    return false;
-  }
-
-  requireManualApproval = cJSON_IsTrue(requireManualApprovalJson);
+  Internal::Utils::FromJsonBool(isEnabled, json, "isEnabled", true);
+  Internal::Utils::FromJsonStr(cdnDomain, json, "cdnDomain", OPENSHOCK_FW_CDN_DOMAIN);
+  Internal::Utils::FromJsonStrParsed(updateChannel, json, "updateChannel", OpenShock::TryParseOtaUpdateChannel, OpenShock::OtaUpdateChannel::Stable);
+  Internal::Utils::FromJsonBool(checkOnStartup, json, "checkOnStartup", true);
+  Internal::Utils::FromJsonU16(checkInterval, json, "checkInterval", 0);
+  Internal::Utils::FromJsonBool(allowBackendManagement, json, "allowBackendManagement", true);
+  Internal::Utils::FromJsonBool(requireManualApproval, json, "requireManualApproval", false);
 
   return true;
 }
@@ -170,7 +79,7 @@ cJSON* OtaUpdateConfig::ToJSON(bool withSensitiveData) const {
 
   cJSON_AddBoolToObject(root, "isEnabled", isEnabled);
   cJSON_AddStringToObject(root, "cdnDomain", cdnDomain.c_str());
-  cJSON_AddStringToObject(root, "updateChannel", updateChannel.c_str());
+  cJSON_AddStringToObject(root, "updateChannel", OpenShock::Serialization::Configuration::EnumNameOtaUpdateChannel(updateChannel));
   cJSON_AddBoolToObject(root, "checkOnStartup", checkOnStartup);
   cJSON_AddNumberToObject(root, "checkInterval", checkInterval);
   cJSON_AddBoolToObject(root, "allowBackendManagement", allowBackendManagement);
