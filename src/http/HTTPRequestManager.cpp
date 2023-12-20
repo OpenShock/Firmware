@@ -305,7 +305,7 @@ StreamReaderResult _readStreamDataChunked(HTTPClient& client, WiFiClient* stream
     return {HTTP::RequestResult::RequestFailed, 0};
   }
 
-  std::size_t bufferOffset = 0;
+  std::size_t BufferCursor = 0;
 
   while (client.connected()) {
     if (begin + timeoutMs < OpenShock::millis()) {
@@ -320,15 +320,17 @@ StreamReaderResult _readStreamDataChunked(HTTPClient& client, WiFiClient* stream
       continue;
     }
 
-    std::size_t bytesRead = stream->readBytes(buffer, HTTP_BUFFER_SIZE);
+    std::size_t bytesRead = stream->readBytes(buffer + BufferCursor, HTTP_BUFFER_SIZE - BufferCursor);
     if (bytesRead == 0) {
       ESP_LOGD(TAG, "No bytes read");
       result = HTTP::RequestResult::RequestFailed;
       break;
     }
 
+    BufferCursor += bytesRead;
+
     std::size_t payloadPos, payloadSize;
-    ParserState state = _parseChunk(buffer, bytesRead, payloadPos, payloadSize);
+    ParserState state = _parseChunk(buffer, BufferCursor, payloadPos, payloadSize);
     if (state == ParserState::Invalid) {
       ESP_LOGE(TAG, "Failed to parse chunk");
       result = HTTP::RequestResult::RequestFailed;
@@ -336,7 +338,11 @@ StreamReaderResult _readStreamDataChunked(HTTPClient& client, WiFiClient* stream
     }
 
     if (state == ParserState::NeedMoreData) {
-      ESP_LOGD(TAG, "Need more data");
+      if (BufferCursor == HTTP_BUFFER_SIZE) {
+        ESP_LOGE(TAG, "Chunk too large");
+        result = HTTP::RequestResult::RequestFailed;
+        break;
+      }
       continue;
     }
 
@@ -350,6 +356,7 @@ StreamReaderResult _readStreamDataChunked(HTTPClient& client, WiFiClient* stream
       break;
     }
 
+    BufferCursor = 0;
     nWritten += payloadSize;
 
     vTaskDelay(pdMS_TO_TICKS(10));
@@ -474,7 +481,7 @@ HTTP::Response<std::size_t> _doGetStream(
   if (contentLength < 0) {
     // Check for chunked transfer encoding
     if (!client.header("Transfer-Encoding").equalsIgnoreCase("chunked")) {
-      ESP_LOGE(TAG, "Invalid content length");
+      ESP_LOGE(TAG, "Unknown Transfer-Encoding: %s", client.header("Transfer-Encoding").c_str());
       return {HTTP::RequestResult::RequestFailed, responseCode, 0};
     }
   } else {
