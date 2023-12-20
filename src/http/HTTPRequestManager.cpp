@@ -225,7 +225,7 @@ enum ParserState : std::uint8_t {
   Invalid,
 };
 
-ParserState _parseChunkHeader(const uint8_t* buffer, std::size_t bufferLen, std::size_t& headerLen, std::size_t& payloadLen) {
+ParserState _parseChunkHeader(const std::uint8_t* buffer, std::size_t bufferLen, std::size_t& headerLen, std::size_t& payloadLen) {
   if (bufferLen < 5) { // Bare minimum: "0\r\n\r\n"
     return ParserState::NeedMoreData;
   }
@@ -273,7 +273,7 @@ ParserState _parseChunkHeader(const uint8_t* buffer, std::size_t bufferLen, std:
   return ParserState::Ok;
 }
 
-ParserState _parseChunk(const uint8_t* buffer, std::size_t bufferLen, std::size_t& payloadPos, std::size_t& payloadLen) {
+ParserState _parseChunk(const std::uint8_t* buffer, std::size_t bufferLen, std::size_t& payloadPos, std::size_t& payloadLen) {
   if (payloadPos == 0) {
     ParserState state = _parseChunkHeader(buffer, bufferLen, payloadPos, payloadLen);
     if (state != ParserState::Ok) {
@@ -295,8 +295,19 @@ ParserState _parseChunk(const uint8_t* buffer, std::size_t bufferLen, std::size_
   return ParserState::Ok;
 }
 
+void _alignChunk(std::uint8_t* buffer, std::size_t& bufferCursor, std::size_t payloadPos, std::size_t payloadLen) {
+  std::size_t totalLen = payloadPos + payloadLen + 2; // +2 for CRLF
+  std::size_t remaining = bufferCursor - totalLen;
+  if (remaining > 0) {
+    memmove(buffer, buffer + totalLen, remaining);
+    bufferCursor = remaining;
+  } else {
+    bufferCursor = 0;
+  }
+}
+
 StreamReaderResult _readStreamDataChunked(HTTPClient& client, WiFiClient* stream, HTTP::DownloadCallback downloadCallback, std::int64_t begin, std::uint16_t timeoutMs) {
-  std::size_t nWritten = 0;
+  std::size_t totalWritten = 0;
   HTTP::RequestResult result = HTTP::RequestResult::Success;
 
   std::uint8_t* buffer = static_cast<std::uint8_t*>(malloc(HTTP_BUFFER_SIZE));
@@ -305,9 +316,10 @@ StreamReaderResult _readStreamDataChunked(HTTPClient& client, WiFiClient* stream
     return {HTTP::RequestResult::RequestFailed, 0};
   }
 
-  std::size_t BufferCursor = 0;
+  ParserState state = ParserState::NeedMoreData;
+  std::size_t bufferCursor = 0, payloadPos = 0, payloadSize = 0;
 
-  while (client.connected()) {
+  while (client.connected() && state != ParserState::Invalid) {
     if (begin + timeoutMs < OpenShock::millis()) {
       ESP_LOGW(TAG, "Request timed out");
       result = HTTP::RequestResult::TimedOut;
@@ -319,52 +331,65 @@ StreamReaderResult _readStreamDataChunked(HTTPClient& client, WiFiClient* stream
       vTaskDelay(pdMS_TO_TICKS(5));
       continue;
     }
+    ESP_LOGD(TAG, "%zu bytes available", bytesAvailable);
 
-    std::size_t bytesRead = stream->readBytes(buffer + BufferCursor, HTTP_BUFFER_SIZE - BufferCursor);
+    std::size_t bytesRead = stream->readBytes(buffer + bufferCursor, HTTP_BUFFER_SIZE - bufferCursor);
     if (bytesRead == 0) {
       ESP_LOGD(TAG, "No bytes read");
       result = HTTP::RequestResult::RequestFailed;
       break;
     }
+    ESP_LOGD(TAG, "%zu bytes read", bytesRead);
 
-    BufferCursor += bytesRead;
+    bufferCursor += bytesRead;
 
-    std::size_t payloadPos, payloadSize;
-    ParserState state = _parseChunk(buffer, BufferCursor, payloadPos, payloadSize);
+parseMore:
+    state = _parseChunk(buffer, bufferCursor, payloadPos, payloadSize);
     if (state == ParserState::Invalid) {
       ESP_LOGE(TAG, "Failed to parse chunk");
       result = HTTP::RequestResult::RequestFailed;
       break;
     }
+    ESP_LOGD(TAG, "Chunk parsed: %zu %zu", payloadPos, payloadSize);
 
     if (state == ParserState::NeedMoreData) {
-      if (BufferCursor == HTTP_BUFFER_SIZE) {
+      if (bufferCursor == HTTP_BUFFER_SIZE) {
         ESP_LOGE(TAG, "Chunk too large");
         result = HTTP::RequestResult::RequestFailed;
         break;
       }
+      ESP_LOGD(TAG, "Need more data");
       continue;
     }
+    ESP_LOGD(TAG, "Chunk complete");
 
     // Check for zero chunk size (end of transfer)
     if (payloadSize == 0) {
       break;
     }
+    ESP_LOGD(TAG, "Chunk size: %zu", payloadSize);
 
-    if (!downloadCallback(nWritten, buffer + payloadPos, payloadSize)) {
+    if (!downloadCallback(totalWritten, buffer + payloadPos, payloadSize)) {
       result = HTTP::RequestResult::Cancelled;
       break;
     }
+    ESP_LOGD(TAG, "%zu bytes written", payloadSize);
 
-    BufferCursor = 0;
-    nWritten += payloadSize;
+    totalWritten += payloadSize;
+    _alignChunk(buffer, bufferCursor, payloadPos, payloadSize);
+    payloadSize = 0;
+    payloadPos = 0;
 
-    vTaskDelay(pdMS_TO_TICKS(10));
+    if (bufferCursor > 0) {
+      goto parseMore;
+    }
+
+    vTaskDelay(pdMS_TO_TICKS(5));
   }
 
   free(buffer);
 
-  return {result, nWritten};
+  return {result, totalWritten};
 }
 
 StreamReaderResult _readStreamData(HTTPClient& client, WiFiClient* stream, std::size_t contentLength, HTTP::DownloadCallback downloadCallback, std::int64_t begin, std::uint16_t timeoutMs) {
@@ -386,6 +411,7 @@ StreamReaderResult _readStreamData(HTTPClient& client, WiFiClient* stream, std::
       vTaskDelay(pdMS_TO_TICKS(2));
       continue;
     }
+    ESP_LOGD(TAG, "%zu bytes available", bytesAvailable);
 
     std::size_t bytesToRead = std::min(bytesAvailable, HTTP_BUFFER_SIZE);
 
@@ -395,13 +421,18 @@ StreamReaderResult _readStreamData(HTTPClient& client, WiFiClient* stream, std::
       vTaskDelay(pdMS_TO_TICKS(2));
       continue;
     }
+    ESP_LOGD(TAG, "%zu bytes read", bytesRead);
 
     if (!downloadCallback(nWritten, buffer, bytesRead)) {
+      ESP_LOGW(TAG, "Request cancelled by callback");
       result = HTTP::RequestResult::Cancelled;
       break;
     }
+    ESP_LOGD(TAG, "%zu bytes written", bytesRead);
 
     nWritten += bytesRead;
+
+    ESP_LOGD(TAG, "%zu bytes remaining", contentLength - nWritten);
 
     vTaskDelay(pdMS_TO_TICKS(10));
   }
@@ -478,13 +509,7 @@ HTTP::Response<std::size_t> _doGetStream(
     return {HTTP::RequestResult::Success, responseCode, 0};
   }
 
-  if (contentLength < 0) {
-    // Check for chunked transfer encoding
-    if (!client.header("Transfer-Encoding").equalsIgnoreCase("chunked")) {
-      ESP_LOGE(TAG, "Unknown Transfer-Encoding: %s", client.header("Transfer-Encoding").c_str());
-      return {HTTP::RequestResult::RequestFailed, responseCode, 0};
-    }
-  } else {
+  if (contentLength > 0) {
     if (contentLength > HTTP_DOWNLOAD_SIZE_LIMIT) {
       ESP_LOGE(TAG, "Content-Length too large");
       return {HTTP::RequestResult::RequestFailed, responseCode, 0};
