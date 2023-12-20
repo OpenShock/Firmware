@@ -306,7 +306,7 @@ void _alignChunk(std::uint8_t* buffer, std::size_t& bufferCursor, std::size_t pa
   }
 }
 
-StreamReaderResult _readStreamDataChunked(HTTPClient& client, WiFiClient* stream, HTTP::DownloadCallback downloadCallback, std::int64_t begin, std::uint16_t timeoutMs) {
+StreamReaderResult _readStreamDataChunked(HTTPClient& client, WiFiClient* stream, HTTP::DownloadCallback downloadCallback, std::int64_t begin, std::uint32_t timeoutMs) {
   std::size_t totalWritten = 0;
   HTTP::RequestResult result = HTTP::RequestResult::Success;
 
@@ -331,15 +331,13 @@ StreamReaderResult _readStreamDataChunked(HTTPClient& client, WiFiClient* stream
       vTaskDelay(pdMS_TO_TICKS(5));
       continue;
     }
-    ESP_LOGD(TAG, "%zu bytes available", bytesAvailable);
 
     std::size_t bytesRead = stream->readBytes(buffer + bufferCursor, HTTP_BUFFER_SIZE - bufferCursor);
     if (bytesRead == 0) {
-      ESP_LOGD(TAG, "No bytes read");
+      ESP_LOGW(TAG, "No bytes read");
       result = HTTP::RequestResult::RequestFailed;
       break;
     }
-    ESP_LOGD(TAG, "%zu bytes read", bytesRead);
 
     bufferCursor += bytesRead;
 
@@ -358,22 +356,18 @@ parseMore:
         result = HTTP::RequestResult::RequestFailed;
         break;
       }
-      ESP_LOGD(TAG, "Need more data");
       continue;
     }
-    ESP_LOGD(TAG, "Chunk complete");
 
     // Check for zero chunk size (end of transfer)
     if (payloadSize == 0) {
       break;
     }
-    ESP_LOGD(TAG, "Chunk size: %zu", payloadSize);
 
     if (!downloadCallback(totalWritten, buffer + payloadPos, payloadSize)) {
       result = HTTP::RequestResult::Cancelled;
       break;
     }
-    ESP_LOGD(TAG, "%zu bytes written", payloadSize);
 
     totalWritten += payloadSize;
     _alignChunk(buffer, bufferCursor, payloadPos, payloadSize);
@@ -392,7 +386,7 @@ parseMore:
   return {result, totalWritten};
 }
 
-StreamReaderResult _readStreamData(HTTPClient& client, WiFiClient* stream, std::size_t contentLength, HTTP::DownloadCallback downloadCallback, std::int64_t begin, std::uint16_t timeoutMs) {
+StreamReaderResult _readStreamData(HTTPClient& client, WiFiClient* stream, std::size_t contentLength, HTTP::DownloadCallback downloadCallback, std::int64_t begin, std::uint32_t timeoutMs) {
   std::size_t nWritten = 0;
   HTTP::RequestResult result = HTTP::RequestResult::Success;
 
@@ -407,32 +401,26 @@ StreamReaderResult _readStreamData(HTTPClient& client, WiFiClient* stream, std::
 
     std::size_t bytesAvailable = stream->available();
     if (bytesAvailable == 0) {
-      ESP_LOGD(TAG, "No bytes available");
-      vTaskDelay(pdMS_TO_TICKS(2));
+      vTaskDelay(pdMS_TO_TICKS(5));
       continue;
     }
-    ESP_LOGD(TAG, "%zu bytes available", bytesAvailable);
 
     std::size_t bytesToRead = std::min(bytesAvailable, HTTP_BUFFER_SIZE);
 
     std::size_t bytesRead = stream->readBytes(buffer, bytesToRead);
     if (bytesRead == 0) {
-      ESP_LOGD(TAG, "No bytes read");
-      vTaskDelay(pdMS_TO_TICKS(2));
-      continue;
+      ESP_LOGW(TAG, "No bytes read");
+      result = HTTP::RequestResult::RequestFailed;
+      break;
     }
-    ESP_LOGD(TAG, "%zu bytes read", bytesRead);
 
     if (!downloadCallback(nWritten, buffer, bytesRead)) {
       ESP_LOGW(TAG, "Request cancelled by callback");
       result = HTTP::RequestResult::Cancelled;
       break;
     }
-    ESP_LOGD(TAG, "%zu bytes written", bytesRead);
 
     nWritten += bytesRead;
-
-    ESP_LOGD(TAG, "%zu bytes remaining", contentLength - nWritten);
 
     vTaskDelay(pdMS_TO_TICKS(10));
   }
@@ -450,7 +438,7 @@ HTTP::Response<std::size_t> _doGetStream(
   std::shared_ptr<RateLimit> rateLimiter,
   HTTP::GotContentLengthCallback contentLengthCallback,
   HTTP::DownloadCallback downloadCallback,
-  std::uint16_t timeoutMs
+  std::uint32_t timeoutMs
 ) {
   std::int64_t begin = OpenShock::millis();
   if (!client.begin(url)) {
@@ -537,7 +525,7 @@ HTTP::Response<std::size_t> _doGetStream(
   return {result.result, responseCode, result.nWritten};
 }
 
-HTTP::Response<std::size_t> HTTP::Download(const char* const url, const std::map<String, String>& headers, HTTP::GotContentLengthCallback contentLengthCallback, HTTP::DownloadCallback downloadCallback, const std::vector<int>& acceptedCodes, std::uint16_t timeoutMs) {
+HTTP::Response<std::size_t> HTTP::Download(const char* const url, const std::map<String, String>& headers, HTTP::GotContentLengthCallback contentLengthCallback, HTTP::DownloadCallback downloadCallback, const std::vector<int>& acceptedCodes, std::uint32_t timeoutMs) {
   std::shared_ptr<RateLimit> rateLimiter = _getRateLimiter(url);
   if (rateLimiter == nullptr) {
     return {RequestResult::InvalidURL, 0, 0};
@@ -563,7 +551,7 @@ HTTP::Response<std::size_t> HTTP::Download(const char* const url, const std::map
   return response;
 }
 
-HTTP::Response<std::string> HTTP::GetString(const char* const url, const std::map<String, String>& headers, const std::vector<int>& acceptedCodes, std::uint16_t timeoutMs) {
+HTTP::Response<std::string> HTTP::GetString(const char* const url, const std::map<String, String>& headers, const std::vector<int>& acceptedCodes, std::uint32_t timeoutMs) {
   std::string result;
 
   auto allocator = [&result](std::size_t contentLength) {
@@ -579,9 +567,6 @@ HTTP::Response<std::string> HTTP::GetString(const char* const url, const std::ma
   if (response.result != RequestResult::Success) {
     return {response.result, response.code, {}};
   }
-
-  ESP_LOGD(TAG, "Downloaded %zu bytes\n", result.size());
-  ESP_LOGD(TAG, "Result: %s\n", result.c_str());
 
   return {response.result, response.code, result};
 }
