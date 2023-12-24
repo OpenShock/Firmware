@@ -44,12 +44,13 @@ runs:
     - name: Generate SHA256 checksums
       shell: bash
       run: |
-        for file in *.bin; do sha256sum "$file" > "$file.sha256"; done
+        find . -type f -name '*.bin' -exec sha256sum {} \; > hashes.md5.txt
+        find . -type f -name '*.bin' -exec sha256sum {} \; > hashes.sha256.txt
 
     - name: Upload artifacts to CDN
       shell: bash
       run: |
         mkdir upload
         mv *.bin upload/
-        mv *.bin.sha256 upload/
+        mv hashes.*.txt upload/
         rclone copy upload cdn:${{ inputs.cf-bucket }}/${{ inputs.version }}/${{ inputs.board }}/

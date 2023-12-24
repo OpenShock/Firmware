@@ -4,6 +4,7 @@
 
 #include <string>
 #include <vector>
+#include <unordered_map>
 
 /*
 ok so uhhh:
@@ -28,9 +29,8 @@ namespace OpenShock::OtaUpdateManager {
   struct FirmwareRelease {
     std::string version;
     std::string appBinaryUrl;
-    std::string appBinaryHash;
     std::string filesystemBinaryUrl;
-    std::string filesystemBinaryHash;
+    std::unordered_map<std::string, std::string> fileHashes;
   };
 
   bool TryGetFirmwareVersions(OtaUpdateChannel channel, std::vector<std::string>& versions);

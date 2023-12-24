@@ -3,10 +3,13 @@
 #include <Arduino.h>
 
 #include <algorithm>
+#include <functional>
 #include <string>
+#include <vector>
 #include <limits>
 #include <cstddef>
 
+namespace OpenShock {
 struct StringView {
   using value_type = char;
   using const_iterator = const value_type*;
@@ -175,6 +178,120 @@ struct StringView {
     return *this;
   }
 
+  std::vector<StringView> split(char delimiter) const {
+    std::vector<StringView> result;
+
+    std::size_t pos = 0;
+    while (pos < size()) {
+      std::size_t nextPos = find(delimiter, pos);
+      if (nextPos == StringView::npos) {
+        nextPos = size();
+      }
+
+      result.push_back(substr(pos, nextPos - pos));
+      pos = nextPos + 1;
+    }
+
+    return result;
+  }
+  std::vector<StringView> split(StringView delimiter) const {
+    std::vector<StringView> result;
+
+    std::size_t pos = 0;
+    while (pos < size()) {
+      std::size_t nextPos = find(delimiter, pos);
+      if (nextPos == StringView::npos) {
+        nextPos = size();
+      }
+
+      result.push_back(substr(pos, nextPos - pos));
+      pos = nextPos + delimiter.size();
+    }
+
+    return result;
+  }
+  std::vector<StringView> split(std::function<bool(char)> predicate) const {
+    std::vector<StringView> result;
+
+    std::size_t pos = 0;
+    while (pos < size()) {
+      std::size_t nextPos = pos;
+      while (nextPos < size() && !predicate(_ptrBeg[nextPos])) {
+        ++nextPos;
+      }
+
+      result.push_back(substr(pos, nextPos - pos));
+      pos = nextPos + 1;
+    }
+
+    return result;
+  }
+
+  constexpr bool startsWith(char needle) const {
+    if (isNull()) {
+      return false;
+    }
+
+    return _ptrBeg[0] == needle;
+  }
+  constexpr bool startsWith(StringView needle) const {
+    if (isNull()) {
+      return false;
+    }
+
+    return _strEquals(_ptrBeg, _ptrBeg + needle.size(), needle._ptrBeg, needle._ptrEnd);
+  }
+
+  constexpr bool endsWith(char needle) const {
+    if (isNull()) {
+      return false;
+    }
+
+    return _ptrEnd[-1] == needle;
+  }
+  constexpr bool endsWith(StringView needle) const {
+    if (isNull()) {
+      return false;
+    }
+
+    return _strEquals(_ptrEnd - needle.size(), _ptrEnd, needle._ptrBeg, needle._ptrEnd);
+  }
+
+  constexpr StringView& trimLeft() {
+    if (isNull()) {
+      return *this;
+    }
+
+    while (_ptrBeg < _ptrEnd && isspace(*_ptrBeg)) {
+      ++_ptrBeg;
+    }
+
+    return *this;
+  }
+
+  constexpr StringView& trimRight() {
+    if (isNull()) {
+      return *this;
+    }
+
+    while (_ptrBeg < _ptrEnd && isspace(_ptrEnd[-1])) {
+      --_ptrEnd;
+    }
+
+    return *this;
+  }
+
+  constexpr StringView& trim() {
+    trimLeft();
+    trimRight();
+    return *this;
+  }
+
+  constexpr void clear() {
+    _ptrBeg = nullptr;
+    _ptrEnd = nullptr;
+  }
+
   String toArduinoString() const {
     if (isNull()) {
       return String();
@@ -281,4 +398,4 @@ private:
   const char* _ptrBeg;
   const char* _ptrEnd;
 };
-
+}

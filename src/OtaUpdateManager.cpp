@@ -6,6 +6,7 @@
 #include "http/HTTPRequestManager.h"
 #include "Logging.h"
 #include "Time.h"
+#include "StringView.h"
 #include "util/TaskUtils.h"
 #include "wifi/WiFiManager.h"
 
@@ -13,6 +14,8 @@
 
 #include <LittleFS.h>
 #include <WiFi.h>
+
+#include <mbedtls/sha256.h>
 
 #include <sstream>
 
@@ -27,11 +30,9 @@
 
 #define OPENSHOCK_FW_CDN_VERSION_BASE_URL_FORMAT OPENSHOCK_FW_CDN_BOARDS_BASE_URL_FORMAT "/" OPENSHOCK_FW_BOARD
 
-#define OPENSHOCK_FW_CDN_APP_URL_FORMAT      OPENSHOCK_FW_CDN_VERSION_BASE_URL_FORMAT "/app.bin"
-#define OPENSHOCK_FW_CDN_APP_HASH_URL_FORMAT OPENSHOCK_FW_CDN_APP_URL_FORMAT ".sha256"
-
-#define OPENSHOCK_FW_CDN_FILESYSTEM_URL_FORMAT      OPENSHOCK_FW_CDN_VERSION_BASE_URL_FORMAT "/staticfs.bin"
-#define OPENSHOCK_FW_CDN_FILESYSTEM_HASH_URL_FORMAT OPENSHOCK_FW_CDN_FILESYSTEM_URL_FORMAT ".sha256"
+#define OPENSHOCK_FW_CDN_APP_URL_FORMAT           OPENSHOCK_FW_CDN_VERSION_BASE_URL_FORMAT "/app.bin"
+#define OPENSHOCK_FW_CDN_FILESYSTEM_URL_FORMAT    OPENSHOCK_FW_CDN_VERSION_BASE_URL_FORMAT "/staticfs.bin"
+#define OPENSHOCK_FW_CDN_SHA256_HASHES_URL_FORMAT OPENSHOCK_FW_CDN_VERSION_BASE_URL_FORMAT "/hashes.sha256.txt"
 
 const char* const TAG = "OtaUpdateManager";
 
@@ -146,9 +147,11 @@ void _otaUpdateTask(void* arg) {
     ESP_LOGD(TAG, "Firmware release:");
     ESP_LOGD(TAG, "  Version:                %s", release.version.c_str());
     ESP_LOGD(TAG, "  App binary URL:         %s", release.appBinaryUrl.c_str());
-    ESP_LOGD(TAG, "  App binary hash:        %s", release.appBinaryHash.c_str());
     ESP_LOGD(TAG, "  Filesystem binary URL:  %s", release.filesystemBinaryUrl.c_str());
-    ESP_LOGD(TAG, "  Filesystem binary hash: %s", release.filesystemBinaryHash.c_str());
+    ESP_LOGD(TAG, "  File hashes:");
+    for (const auto& [file, hash] : release.fileHashes) {
+      ESP_LOGD(TAG, "    %s: %s", file.c_str(), hash.c_str());
+    }
 
     // Flash app partition.
     if (!OtaUpdateManager::FlashAppPartition(release)) {
@@ -206,7 +209,7 @@ bool OtaUpdateManager::Init() {
   return true;
 }
 
-bool _tryGetStringList(const char* url, std::vector<std::string>& list) {
+bool _tryGetStringList(StringView url, std::vector<std::string>& list) {
   auto response = OpenShock::HTTP::GetString(url, {{ "Accept", "text/plain" }}, { 200, 304 });
   if (response.result != OpenShock::HTTP::RequestResult::Success) {
     ESP_LOGE(TAG, "Failed to fetch list: [%u] %s", response.code, response.data.c_str());
@@ -215,17 +218,16 @@ bool _tryGetStringList(const char* url, std::vector<std::string>& list) {
 
   list.clear();
 
-  std::stringstream data(response.data);
+  OpenShock::StringView data = response.data;
 
-  // Split response into lines.
-  std::string line;
-  while (std::getline(data, line)) {
-    // Skip empty lines.
-    if (line.empty() || std::all_of(line.begin(), line.end(), isspace)) {
+  for (auto line : data.split('\n')) {
+    line = line.trim();
+
+    if (line.isNullOrEmpty()) {
       continue;
     }
 
-    list.push_back(line);
+    list.push_back(line.toString());
   }
 
   return true;
@@ -341,43 +343,67 @@ bool OtaUpdateManager::TryGetFirmwareRelease(const std::string& version, Firmwar
   }
 
   // Construct hash URLs.
-  std::string appBinaryHashUrl;
-  if (!_printfToString(appBinaryHashUrl, OPENSHOCK_FW_CDN_APP_HASH_URL_FORMAT, version.c_str())) {
-    ESP_LOGE(TAG, "Failed to format URL");
-    return false;
-  }
-  std::string filesystemBinaryHashUrl;
-  if (!_printfToString(filesystemBinaryHashUrl, OPENSHOCK_FW_CDN_FILESYSTEM_HASH_URL_FORMAT, version.c_str())) {
+  std::string sha256HashesUrl;
+  if (!_printfToString(sha256HashesUrl, OPENSHOCK_FW_CDN_SHA256_HASHES_URL_FORMAT, version.c_str())) {
     ESP_LOGE(TAG, "Failed to format URL");
     return false;
   }
 
   // Fetch hashes.
-  auto appBinaryHashResponse = OpenShock::HTTP::GetString(appBinaryHashUrl.c_str(), {{ "Accept", "text/plain" }}, { 200, 304 });
-  if (appBinaryHashResponse.result != OpenShock::HTTP::RequestResult::Success) {
-    ESP_LOGE(TAG, "Failed to fetch app binary hash: [%u] %s", appBinaryHashResponse.code, appBinaryHashResponse.data.c_str());
+  auto sha256HashesResponse = OpenShock::HTTP::GetString(sha256HashesUrl.c_str(), {{ "Accept", "text/plain" }}, { 200, 304 });
+  if (sha256HashesResponse.result != OpenShock::HTTP::RequestResult::Success) {
+    ESP_LOGE(TAG, "Failed to fetch hashes: [%u] %s", sha256HashesResponse.code, sha256HashesResponse.data.c_str());
     return false;
   }
 
-  auto filesystemBinaryHashResponse = OpenShock::HTTP::GetString(filesystemBinaryHashUrl.c_str(), {{ "Accept", "text/plain" }}, { 200, 304 });
-  if (filesystemBinaryHashResponse.result != OpenShock::HTTP::RequestResult::Success) {
-    ESP_LOGE(TAG, "Failed to fetch filesystem binary hash: [%u] %s", filesystemBinaryHashResponse.code, filesystemBinaryHashResponse.data.c_str());
-    return false;
-  }
+  auto hashesLines = OpenShock::StringView(sha256HashesResponse.data).split('\n');
 
-  release.appBinaryHash        = appBinaryHashResponse.data.c_str();
-  release.filesystemBinaryHash = filesystemBinaryHashResponse.data.c_str();
+  // Parse hashes.
+  for (auto line : hashesLines) {
+    auto parts = line.split(' ');
+    if (parts.size() != 2) {
+      ESP_LOGE(TAG, "Invalid hashes entry: %.*s", line.size(), line.data());
+      return false;
+    }
+
+    auto hash = parts[0].trim();
+    auto file = parts[1].trim();
+
+    if (hash.size() != 64) {
+      ESP_LOGE(TAG, "Invalid hash: %.*s", hash.size(), hash.data());
+      return false;
+    }
+
+    ESP_LOGD(TAG, "Hash for %..*s: %.*s", file.size(), file.data(), hash.size(), hash.data());
+
+    release.fileHashes[file.toString()] = hash.toString();
+  }
 
   return true;
 }
 
 bool OtaUpdateManager::FlashAppPartition(const FirmwareRelease& release) {
+  // Get hash for current app partition.
+  auto fileHashIt = release.fileHashes.find("app.bin");
+  if (fileHashIt == release.fileHashes.end()) {
+    ESP_LOGE(TAG, "No hash for app.bin");
+    return false;
+  }
+
   ESP_LOGD(TAG, "Flashing app partition");
 
   // Get available app update partition.
   const esp_partition_t* appPartition = esp_ota_get_next_update_partition(nullptr);
   if (appPartition == nullptr) {
     ESP_LOGE(TAG, "Failed to get app update partition");
+    return false;
+  }
+
+  mbedtls_sha256_context sha256Context;
+  mbedtls_sha256_init(&sha256Context);
+  if (mbedtls_sha256_starts_ret(&sha256Context, 0) != 0) {
+    mbedtls_sha256_free(&sha256Context);
+    ESP_LOGE(TAG, "Failed to initialize SHA256 context");
     return false;
   }
 
@@ -395,9 +421,14 @@ bool OtaUpdateManager::FlashAppPartition(const FirmwareRelease& release) {
 
     return true;
   };
-  auto dataWriter    = [appPartition](std::size_t offset, const std::uint8_t* data, std::size_t length) -> bool {
+  auto dataWriter    = [appPartition, &sha256Context](std::size_t offset, const std::uint8_t* data, std::size_t length) -> bool {
     if (esp_partition_write(appPartition, offset, data, length) != ESP_OK) {
       ESP_LOGE(TAG, "Failed to write app partition");
+      return false;
+    }
+
+    if (mbedtls_sha256_update_ret(&sha256Context, data, length) != 0) {
+      ESP_LOGE(TAG, "Failed to update SHA256 context");
       return false;
     }
 
@@ -414,10 +445,13 @@ bool OtaUpdateManager::FlashAppPartition(const FirmwareRelease& release) {
   ESP_LOGD(TAG, "Wrote %u bytes to app partition", appBinaryResponse.data);
 
   std::uint8_t appBinaryHash[32];
-  if (esp_partition_get_sha256(appPartition, appBinaryHash) != ESP_OK) {
-    ESP_LOGE(TAG, "Failed to get app binary hash");
+  if (mbedtls_sha256_finish_ret(&sha256Context, appBinaryHash) != 0) {
+    mbedtls_sha256_free(&sha256Context);
+    ESP_LOGE(TAG, "Failed to finish SHA256 context");
     return false;
   }
+
+  mbedtls_sha256_free(&sha256Context);
 
   // Convert hash to string.
   char appBinaryHashStr[65];
@@ -427,8 +461,8 @@ bool OtaUpdateManager::FlashAppPartition(const FirmwareRelease& release) {
   appBinaryHashStr[64] = '\0';
 
   // Compare hashes.
-  if (strcmp(appBinaryHashStr, release.appBinaryHash.c_str()) != 0) {
-    ESP_LOGE(TAG, "App binary hash mismatch (expected: %s, actual: %s)", release.appBinaryHash.c_str(), appBinaryHashStr);
+  if (strcmp(appBinaryHashStr, fileHashIt->second.c_str()) != 0) {
+    ESP_LOGE(TAG, "App binary hash mismatch (expected: %s, actual: %s)", fileHashIt->second.c_str(), appBinaryHashStr);
     return false;
   }
 
@@ -442,12 +476,27 @@ bool OtaUpdateManager::FlashAppPartition(const FirmwareRelease& release) {
 }
 
 bool OtaUpdateManager::FlashFilesystemPartition(const FirmwareRelease& release) {
+  // Get hash for current filesystem partition.
+  auto fileHashIt = release.fileHashes.find("staticfs.bin");
+  if (fileHashIt == release.fileHashes.end()) {
+    ESP_LOGE(TAG, "No hash for staticfs.bin");
+    return false;
+  }
+
   ESP_LOGD(TAG, "Flashing filesystem partition");
 
   // Open filesystem partition.
   const esp_partition_t* filesystemPartition = esp_partition_find_first(ESP_PARTITION_TYPE_DATA, ESP_PARTITION_SUBTYPE_DATA_SPIFFS, "static0");
   if (filesystemPartition == nullptr) {
     ESP_LOGE(TAG, "Failed to find filesystem partition");
+    return false;
+  }
+
+  mbedtls_sha256_context sha256Context;
+  mbedtls_sha256_init(&sha256Context);
+  if (mbedtls_sha256_starts_ret(&sha256Context, 0) != 0) {
+    mbedtls_sha256_free(&sha256Context);
+    ESP_LOGE(TAG, "Failed to initialize SHA256 context");
     return false;
   }
 
@@ -465,9 +514,14 @@ bool OtaUpdateManager::FlashFilesystemPartition(const FirmwareRelease& release) 
 
     return true;
   };
-  auto dataWriter    = [filesystemPartition](std::size_t offset, const std::uint8_t* data, std::size_t length) -> bool {
+  auto dataWriter    = [filesystemPartition, &sha256Context](std::size_t offset, const std::uint8_t* data, std::size_t length) -> bool {
     if (esp_partition_write(filesystemPartition, offset, data, length) != ESP_OK) {
       ESP_LOGE(TAG, "Failed to write filesystem partition");
+      return false;
+    }
+
+    if (mbedtls_sha256_update_ret(&sha256Context, data, length) != 0) {
+      ESP_LOGE(TAG, "Failed to update SHA256 context");
       return false;
     }
 
@@ -484,10 +538,13 @@ bool OtaUpdateManager::FlashFilesystemPartition(const FirmwareRelease& release) 
   ESP_LOGD(TAG, "Wrote %u bytes to filesystem partition", filesystemBinaryResponse.data);
 
   std::uint8_t filesystemBinaryHash[32];
-  if (esp_partition_get_sha256(filesystemPartition, filesystemBinaryHash) != ESP_OK) {
-    ESP_LOGE(TAG, "Failed to get filesystem binary hash");
+  if (mbedtls_sha256_finish_ret(&sha256Context, filesystemBinaryHash) != 0) {
+    mbedtls_sha256_free(&sha256Context);
+    ESP_LOGE(TAG, "Failed to finish SHA256 context");
     return false;
   }
+
+  mbedtls_sha256_free(&sha256Context);
 
   // Convert hash to string.
   char filesystemBinaryHashStr[65];
@@ -497,8 +554,8 @@ bool OtaUpdateManager::FlashFilesystemPartition(const FirmwareRelease& release) 
   filesystemBinaryHashStr[64] = '\0';
 
   // Compare hashes.
-  if (strcmp(filesystemBinaryHashStr, release.filesystemBinaryHash.c_str()) != 0) {
-    ESP_LOGE(TAG, "Filesystem binary hash mismatch (expected: %s, actual: %s)", release.filesystemBinaryHash.c_str(), filesystemBinaryHashStr);
+  if (strcmp(filesystemBinaryHashStr, fileHashIt->second.c_str()) != 0) {
+    ESP_LOGE(TAG, "Filesystem binary hash mismatch (expected: %s, actual: %s)", fileHashIt->second.c_str(), filesystemBinaryHashStr);
     return false;
   }
 
