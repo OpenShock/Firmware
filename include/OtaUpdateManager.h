@@ -2,6 +2,7 @@
 
 #include "OtaUpdateChannel.h"
 
+#include <array>
 #include <string>
 #include <vector>
 #include <unordered_map>
@@ -30,7 +31,7 @@ namespace OpenShock::OtaUpdateManager {
     std::string version;
     std::string appBinaryUrl;
     std::string filesystemBinaryUrl;
-    std::unordered_map<std::string, std::string> fileHashes;
+    std::unordered_map<std::string, std::array<std::uint8_t, 32>> hashMap;
   };
 
   bool TryGetFirmwareVersions(OtaUpdateChannel channel, std::vector<std::string>& versions);
