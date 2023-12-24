@@ -374,7 +374,7 @@ bool OtaUpdateManager::TryGetFirmwareRelease(const std::string& version, Firmwar
       return false;
     }
 
-    ESP_LOGD(TAG, "Hash for %..*s: %.*s", file.size(), file.data(), hash.size(), hash.data());
+    ESP_LOGD(TAG, "Hash for %.*s: %.*s", file.size(), file.data(), hash.size(), hash.data());
 
     release.fileHashes[file.toString()] = hash.toString();
   }
