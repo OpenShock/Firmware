@@ -220,7 +220,7 @@ bool _tryGetStringList(StringView url, std::vector<std::string>& list) {
 
   OpenShock::StringView data = response.data;
 
-  for (auto line : data.split('\n')) {
+  for (auto line : data.splitLines()) {
     line = line.trim();
 
     if (line.isNullOrEmpty()) {
@@ -356,11 +356,11 @@ bool OtaUpdateManager::TryGetFirmwareRelease(const std::string& version, Firmwar
     return false;
   }
 
-  auto hashesLines = OpenShock::StringView(sha256HashesResponse.data).split('\n');
+  auto hashesLines = OpenShock::StringView(sha256HashesResponse.data).splitLines();
 
   // Parse hashes.
   for (auto line : hashesLines) {
-    auto parts = line.split(' ');
+    auto parts = line.splitWhitespace();
     if (parts.size() != 2) {
       ESP_LOGE(TAG, "Invalid hashes entry: %.*s", line.size(), line.data());
       return false;
@@ -384,7 +384,7 @@ bool OtaUpdateManager::TryGetFirmwareRelease(const std::string& version, Firmwar
 
 bool OtaUpdateManager::FlashAppPartition(const FirmwareRelease& release) {
   // Get hash for current app partition.
-  auto fileHashIt = release.fileHashes.find("app.bin");
+  auto fileHashIt = release.fileHashes.find("./app.bin");
   if (fileHashIt == release.fileHashes.end()) {
     ESP_LOGE(TAG, "No hash for app.bin");
     return false;
@@ -477,7 +477,7 @@ bool OtaUpdateManager::FlashAppPartition(const FirmwareRelease& release) {
 
 bool OtaUpdateManager::FlashFilesystemPartition(const FirmwareRelease& release) {
   // Get hash for current filesystem partition.
-  auto fileHashIt = release.fileHashes.find("staticfs.bin");
+  auto fileHashIt = release.fileHashes.find("./staticfs.bin");
   if (fileHashIt == release.fileHashes.end()) {
     ESP_LOGE(TAG, "No hash for staticfs.bin");
     return false;

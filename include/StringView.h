@@ -213,18 +213,30 @@ struct StringView {
   std::vector<StringView> split(std::function<bool(char)> predicate) const {
     std::vector<StringView> result;
 
-    std::size_t pos = 0;
-    while (pos < size()) {
-      std::size_t nextPos = pos;
-      while (nextPos < size() && !predicate(_ptrBeg[nextPos])) {
-        ++nextPos;
+    const char* start = nullptr;
+    for (const char* ptr = _ptrBeg; ptr < _ptrEnd; ++ptr) {
+      if (predicate(*ptr)) {
+        if (start != nullptr) {
+          result.push_back(StringView(start, ptr));
+          start = nullptr;
+        }
+      } else if (start == nullptr) {
+        start = ptr;
       }
+    }
 
-      result.push_back(substr(pos, nextPos - pos));
-      pos = nextPos + 1;
+    if (start != nullptr) {
+      result.push_back(StringView(start, _ptrEnd));
     }
 
     return result;
+  }
+
+  std::vector<StringView> splitLines() const {
+    return split([](char c) { return c == '\r' || c == '\n'; });
+  }
+  std::vector<StringView> splitWhitespace() const {
+    return split(isspace);
   }
 
   constexpr bool startsWith(char needle) const {
