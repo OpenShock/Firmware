@@ -37,11 +37,8 @@ namespace OpenShock::OtaUpdateManager {
   bool TryGetFirmwareBoards(const std::string& version, std::vector<std::string>& boards);
   bool TryGetFirmwareRelease(const std::string& version, FirmwareRelease& release);
 
-  void FlashAppPartition();
-  void ValidateAppPartition();
-
-  void FlashFilesystemPartition();
-  void ValidateFilesystemPartition();
+  bool FlashAppPartition(const FirmwareRelease& release);
+  bool FlashFilesystemPartition(const FirmwareRelease& release);
 
   bool IsValidatingApp();
   void InvalidateAndRollback();

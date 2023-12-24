@@ -149,6 +149,18 @@ void _otaUpdateTask(void* arg) {
     ESP_LOGD(TAG, "  App binary hash:        %s", release.appBinaryHash.c_str());
     ESP_LOGD(TAG, "  Filesystem binary URL:  %s", release.filesystemBinaryUrl.c_str());
     ESP_LOGD(TAG, "  Filesystem binary hash: %s", release.filesystemBinaryHash.c_str());
+
+    // Flash app partition.
+    if (!OtaUpdateManager::FlashAppPartition(release)) {
+      ESP_LOGE(TAG, "Failed to flash app partition");
+      continue;
+    }
+
+    // Flash filesystem partition.
+    if (!OtaUpdateManager::FlashFilesystemPartition(release)) {
+      ESP_LOGE(TAG, "Failed to flash filesystem partition");
+      continue;
+    }
   }
 }
 
@@ -359,21 +371,159 @@ bool OtaUpdateManager::TryGetFirmwareRelease(const std::string& version, Firmwar
   return true;
 }
 
+bool OtaUpdateManager::FlashAppPartition(const FirmwareRelease& release) {
+  ESP_LOGD(TAG, "Flashing app partition");
+
+  // Get available app update partition.
+  const esp_partition_t* appPartition = esp_ota_get_next_update_partition(nullptr);
+  if (appPartition == nullptr) {
+    ESP_LOGE(TAG, "Failed to get app update partition");
+    return false;
+  }
+
+  auto sizeValidator = [appPartition](std::size_t size) -> bool {
+    if (size > appPartition->size) {
+      ESP_LOGE(TAG, "App binary is too large");
+      return false;
+    }
+
+    // Erase app partition.
+    if (esp_partition_erase_range(appPartition, 0, appPartition->size) != ESP_OK) {
+      ESP_LOGE(TAG, "Failed to erase app partition");
+      return false;
+    }
+
+    return true;
+  };
+  auto dataWriter    = [appPartition](std::size_t offset, const std::uint8_t* data, std::size_t length) -> bool {
+    if (esp_partition_write(appPartition, offset, data, length) != ESP_OK) {
+      ESP_LOGE(TAG, "Failed to write app partition");
+      return false;
+    }
+
+    return true;
+  };
+
+  // Start streaming binary to app partition.
+  auto appBinaryResponse = OpenShock::HTTP::Download(release.appBinaryUrl.c_str(), {{ "Accept", "application/octet-stream" }}, sizeValidator, dataWriter, { 200, 304 }, 180'000); // 3 minutes
+  if (appBinaryResponse.result != OpenShock::HTTP::RequestResult::Success) {
+    ESP_LOGE(TAG, "Failed to download app binary: [%u]", appBinaryResponse.code);
+    return false;
+  }
+
+  ESP_LOGD(TAG, "Wrote %u bytes to app partition", appBinaryResponse.data);
+
+  std::uint8_t appBinaryHash[32];
+  if (esp_partition_get_sha256(appPartition, appBinaryHash) != ESP_OK) {
+    ESP_LOGE(TAG, "Failed to get app binary hash");
+    return false;
+  }
+
+  // Convert hash to string.
+  char appBinaryHashStr[65];
+  for (std::size_t i = 0; i < 32; i++) {
+    sprintf(&appBinaryHashStr[i * 2], "%02x", appBinaryHash[i]);
+  }
+  appBinaryHashStr[64] = '\0';
+
+  // Compare hashes.
+  if (strcmp(appBinaryHashStr, release.appBinaryHash.c_str()) != 0) {
+    ESP_LOGE(TAG, "App binary hash mismatch (expected: %s, actual: %s)", release.appBinaryHash.c_str(), appBinaryHashStr);
+    return false;
+  }
+
+  // Set app partition bootable.
+  if (esp_ota_set_boot_partition(appPartition) != ESP_OK) {
+    ESP_LOGE(TAG, "Failed to set app partition bootable");
+    return false;
+  }
+
+  return true;
+}
+
+bool OtaUpdateManager::FlashFilesystemPartition(const FirmwareRelease& release) {
+  ESP_LOGD(TAG, "Flashing filesystem partition");
+
+  // Open filesystem partition.
+  const esp_partition_t* filesystemPartition = esp_partition_find_first(ESP_PARTITION_TYPE_DATA, ESP_PARTITION_SUBTYPE_DATA_SPIFFS, "static0");
+  if (filesystemPartition == nullptr) {
+    ESP_LOGE(TAG, "Failed to find filesystem partition");
+    return false;
+  }
+
+  auto sizeValidator = [filesystemPartition](std::size_t size) -> bool {
+    if (size > filesystemPartition->size) {
+      ESP_LOGE(TAG, "Filesystem binary is too large");
+      return false;
+    }
+
+    // Erase filesystem partition.
+    if (esp_partition_erase_range(filesystemPartition, 0, filesystemPartition->size) != ESP_OK) {
+      ESP_LOGE(TAG, "Failed to erase filesystem partition");
+      return false;
+    }
+
+    return true;
+  };
+  auto dataWriter    = [filesystemPartition](std::size_t offset, const std::uint8_t* data, std::size_t length) -> bool {
+    if (esp_partition_write(filesystemPartition, offset, data, length) != ESP_OK) {
+      ESP_LOGE(TAG, "Failed to write filesystem partition");
+      return false;
+    }
+
+    return true;
+  };
+
+  // Start streaming binary to filesystem partition.
+  auto filesystemBinaryResponse = OpenShock::HTTP::Download(release.filesystemBinaryUrl.c_str(), {{ "Accept", "application/octet-stream" }}, sizeValidator, dataWriter, { 200, 304 }, 180'000); // 3 minutes
+  if (filesystemBinaryResponse.result != OpenShock::HTTP::RequestResult::Success) {
+    ESP_LOGE(TAG, "Failed to download filesystem binary: [%u]", filesystemBinaryResponse.code);
+    return false;
+  }
+
+  ESP_LOGD(TAG, "Wrote %u bytes to filesystem partition", filesystemBinaryResponse.data);
+
+  std::uint8_t filesystemBinaryHash[32];
+  if (esp_partition_get_sha256(filesystemPartition, filesystemBinaryHash) != ESP_OK) {
+    ESP_LOGE(TAG, "Failed to get filesystem binary hash");
+    return false;
+  }
+
+  // Convert hash to string.
+  char filesystemBinaryHashStr[65];
+  for (std::size_t i = 0; i < 32; i++) {
+    sprintf(&filesystemBinaryHashStr[i * 2], "%02x", filesystemBinaryHash[i]);
+  }
+  filesystemBinaryHashStr[64] = '\0';
+
+  // Compare hashes.
+  if (strcmp(filesystemBinaryHashStr, release.filesystemBinaryHash.c_str()) != 0) {
+    ESP_LOGE(TAG, "Filesystem binary hash mismatch (expected: %s, actual: %s)", release.filesystemBinaryHash.c_str(), filesystemBinaryHashStr);
+    return false;
+  }
+
+  // Attempt to mount filesystem.
+  if (!LittleFS.begin(false, "/static", 10, "static0")) {
+    ESP_LOGE(TAG, "Failed to mount filesystem");
+    return false;
+  }
+
+  return true;
+}
+
 bool OtaUpdateManager::IsValidatingApp() {
   return _otaValidatingApp;
 }
 
 void OtaUpdateManager::InvalidateAndRollback() {
-  esp_err_t err = esp_ota_mark_app_invalid_rollback_and_reboot();
-
-  // If we get here, something went VERY wrong.
-  // TODO: Wtf do we do here?
-
-  // I have no idea, placeholder:
-
-  vTaskDelay(pdMS_TO_TICKS(5000));
-
-  esp_restart();
+  switch (esp_ota_mark_app_invalid_rollback_and_reboot()) {
+  case ESP_FAIL:
+    ESP_PANIC(TAG, "Rollback failed");
+  case ESP_ERR_OTA_ROLLBACK_FAILED:
+    ESP_PANIC(TAG, "Rollback failed");
+  default:
+    ESP_PANIC(TAG, "Rollback failed");
+  }
 }
 
 void OtaUpdateManager::ValidateApp() {

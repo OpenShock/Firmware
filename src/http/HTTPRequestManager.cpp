@@ -75,67 +75,28 @@ std::unordered_map<std::string, std::shared_ptr<RateLimit>> s_rateLimits;
 
 using namespace OpenShock;
 
-const char* _strfind(const char* haystack, const char* haystackEnd, const char* needle, std::size_t needleLen) {
-  const char* needleEnd = needle + needleLen;
-  const char* result    = std::search(haystack, haystackEnd, needle, needleEnd);
-  if (result == haystackEnd) {
-    return nullptr;
+StringView _getDomain(StringView url) {
+  if (url.isNullOrEmpty()) {
+    return StringView::Null();
   }
 
-  return result;
+  // Remove the protocol, port, and path eg. "https://api.example.com:443/path" -> "api.example.com"
+  url = url.afterDelimiter("://").beforeDelimiter('/').beforeDelimiter(':');
+
+  // Remove all subdomains eg. "api.example.com" -> "example.com"
+  auto domainSep = url.rfind('.');
+  if (domainSep == StringView::npos) {
+    return url; // E.g. "localhost"
+  }
+  domainSep = url.rfind('.', domainSep - 1);
+  if (domainSep != StringView::npos) {
+    url = url.substr(domainSep + 1);
+  }
+
+  return url;
 }
 
-bool _getDomain(const char* url, char (&domain)[256]) {
-  if (url == nullptr) {
-    memset(domain, 0, 256);
-    return false;
-  }
-
-  std::size_t urlLen = strlen(url);
-  if (urlLen == 0) {
-    memset(domain, 0, 256);
-    return false;
-  }
-
-  const char* urlEnd = url + strlen(url);
-
-  const char* ptr;
-
-  // Get the beginning of the domain (after the protocol) eg. "https://api.example.com/path" -> "api.example.com/path"
-  ptr = _strfind(url, urlEnd, "://", 3);
-  if (ptr != nullptr) {
-    url = ptr + 3;
-  }
-
-  // Get the end of the domain (before the first colon or slash) eg. "api.example.com/path" -> "api.example.com" or "api.example.com:8080/path" -> "api.example.com"
-  ptr = std::find_if(url, urlEnd, [](char c) { return c == ':' || c == '/'; });
-  if (ptr != urlEnd) {
-    urlEnd = ptr;
-  }
-
-  // Reverse trough url, get domain seperator, then store subdomain seperator in ptr
-  bool foundDomSep = false;
-  for (ptr = urlEnd - 1; ptr != url; ptr--) {
-    if (*ptr == '.') {
-      if (foundDomSep) {
-        url = ptr + 1;
-        break;
-      }
-      foundDomSep = true;
-    }
-  }
-  if (!foundDomSep) {
-    return false;
-  }
-
-  // Copy the domain into the buffer, and set the null terminator
-  memcpy(domain, url, urlEnd - url);
-  domain[urlEnd - url] = '\0';
-
-  return true;
-}
-
-std::shared_ptr<RateLimit> _rateLimitFactory(const char (&domain)[256]) {
+std::shared_ptr<RateLimit> _rateLimitFactory(StringView domain) {
   auto rateLimit = std::make_shared<RateLimit>();
 
   // Add default limits
@@ -143,7 +104,7 @@ std::shared_ptr<RateLimit> _rateLimitFactory(const char (&domain)[256]) {
   rateLimit->addLimit(10 * 1000, 10);  // 10 per 10 seconds
 
   // per-domain limits
-  if (strcmp(domain, OPENSHOCK_API_DOMAIN) == 0) {
+  if (domain == OPENSHOCK_API_DOMAIN) {
     rateLimit->addLimit(60 * 1000, 12);        // 12 per minute
     rateLimit->addLimit(60 * 60 * 1000, 120);  // 120 per hour
   }
@@ -151,13 +112,13 @@ std::shared_ptr<RateLimit> _rateLimitFactory(const char (&domain)[256]) {
   return rateLimit;
 }
 
-std::shared_ptr<RateLimit> _getRateLimiter(const char* url) {
-  char domain[256];
-  if (!_getDomain(url, domain)) {
+std::shared_ptr<RateLimit> _getRateLimiter(StringView url) {
+  auto domain = _getDomain(url).toString();
+  if (domain.empty()) {
     return nullptr;
   }
 
-  ESP_LOGI(TAG, "Getting rate limiter for domain: %s", domain);
+  ESP_LOGI(TAG, "Getting rate limiter for domain: %s", domain.c_str());
 
   auto it = s_rateLimits.find(domain);
   if (it == s_rateLimits.end()) {
@@ -195,16 +156,14 @@ constexpr bool _tryFindCRLF(std::size_t& pos, const uint8_t* buffer, std::size_t
 
   return false;
 }
-constexpr bool _tryParseHexSizeT(std::size_t& result, const char* buffer, std::size_t len) {
-  if (len == 0 || len > sizeof(std::size_t) * 2) {
+constexpr bool _tryParseHexSizeT(std::size_t& result, StringView str) {
+  if (str.isNullOrEmpty() || str.size() > sizeof(std::size_t) * 2) {
     return false;
   }
 
   result = 0;
 
-  for (std::size_t i = 0; i < len; ++i) {
-    char c = buffer[i];
-
+  for (char c : str) {
     if (c >= '0' && c <= '9') {
       result = (result << 4) | (c - '0');
     } else if (c >= 'a' && c <= 'f') {
@@ -256,8 +215,10 @@ ParserState _parseChunkHeader(const std::uint8_t* buffer, std::size_t bufferLen,
     return ParserState::Invalid;
   }
 
+  StringView sizeField(reinterpret_cast<const char*>(buffer), sizeFieldEnd);
+
   // Parse the chunk size
-  if (!_tryParseHexSizeT(payloadLen, reinterpret_cast<const char*>(buffer), sizeFieldEnd)) {
+  if (!_tryParseHexSizeT(payloadLen, sizeField)) {
     ESP_LOGW(TAG, "Failed to parse chunk size");
     return ParserState::Invalid;
   }
@@ -432,7 +393,7 @@ StreamReaderResult _readStreamData(HTTPClient& client, WiFiClient* stream, std::
 
 HTTP::Response<std::size_t> _doGetStream(
   HTTPClient& client,
-  const char* url,
+  StringView url,
   const std::map<String, String>& headers,
   const std::vector<int>& acceptedCodes,
   std::shared_ptr<RateLimit> rateLimiter,
@@ -441,7 +402,7 @@ HTTP::Response<std::size_t> _doGetStream(
   std::uint32_t timeoutMs
 ) {
   std::int64_t begin = OpenShock::millis();
-  if (!client.begin(url)) {
+  if (!client.begin(url.toArduinoString())) {
     ESP_LOGE(TAG, "Failed to begin HTTP request");
     return {HTTP::RequestResult::RequestFailed, 0};
   }
@@ -525,7 +486,7 @@ HTTP::Response<std::size_t> _doGetStream(
   return {result.result, responseCode, result.nWritten};
 }
 
-HTTP::Response<std::size_t> HTTP::Download(const char* const url, const std::map<String, String>& headers, HTTP::GotContentLengthCallback contentLengthCallback, HTTP::DownloadCallback downloadCallback, const std::vector<int>& acceptedCodes, std::uint32_t timeoutMs) {
+HTTP::Response<std::size_t> HTTP::Download(StringView url, const std::map<String, String>& headers, HTTP::GotContentLengthCallback contentLengthCallback, HTTP::DownloadCallback downloadCallback, const std::vector<int>& acceptedCodes, std::uint32_t timeoutMs) {
   std::shared_ptr<RateLimit> rateLimiter = _getRateLimiter(url);
   if (rateLimiter == nullptr) {
     return {RequestResult::InvalidURL, 0, 0};
@@ -551,7 +512,7 @@ HTTP::Response<std::size_t> HTTP::Download(const char* const url, const std::map
   return response;
 }
 
-HTTP::Response<std::string> HTTP::GetString(const char* const url, const std::map<String, String>& headers, const std::vector<int>& acceptedCodes, std::uint32_t timeoutMs) {
+HTTP::Response<std::string> HTTP::GetString(StringView url, const std::map<String, String>& headers, const std::vector<int>& acceptedCodes, std::uint32_t timeoutMs) {
   std::string result;
 
   auto allocator = [&result](std::size_t contentLength) {
