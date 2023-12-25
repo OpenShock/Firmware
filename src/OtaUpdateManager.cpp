@@ -1,5 +1,6 @@
 #include "OtaUpdateManager.h"
 
+#include "CaptivePortal.h"
 #include "config/Config.h"
 #include "Constants.h"
 #include "GatewayConnectionManager.h"
@@ -487,6 +488,14 @@ bool OtaUpdateManager::FlashFilesystemPartition(const FirmwareRelease& release) 
     return false;
   }
 
+  // Make sure captive portal is stopped.
+  OpenShock::CaptivePortal::SetForceClosed(true);
+  while (OpenShock::CaptivePortal::IsRunning())
+  {
+    vTaskDelay(pdMS_TO_TICKS(100));
+    OpenShock::CaptivePortal::SetForceClosed(true);
+  }
+
   ESP_LOGD(TAG, "Flashing filesystem partition");
 
   // Open filesystem partition.
@@ -502,10 +511,14 @@ bool OtaUpdateManager::FlashFilesystemPartition(const FirmwareRelease& release) 
   }
 
   // Attempt to mount filesystem.
-  if (!LittleFS.begin(false, "/static", 10, "static0")) {
+  fs::LittleFSFS test;
+  if (!test.begin(false, "/static", 10, "static0")) {
     ESP_LOGE(TAG, "Failed to mount filesystem");
     return false;
   }
+  test.end();
+
+  OpenShock::CaptivePortal::SetForceClosed(false);
 
   return true;
 }

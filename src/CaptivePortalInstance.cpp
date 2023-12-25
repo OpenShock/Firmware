@@ -11,7 +11,6 @@
 
 #include "serialization/_fbs/DeviceToLocalMessage_generated.h"
 
-#include <LittleFS.h>
 #include <WiFi.h>
 
 static const char* TAG = "CaptivePortalInstance";
@@ -78,6 +77,7 @@ CaptivePortalInstance::CaptivePortalInstance()
   : m_webServer(HTTP_PORT)
   , m_socketServer(WEBSOCKET_PORT, "/ws", "json")
   , m_socketDeFragger(std::bind(&CaptivePortalInstance::handleWebSocketEvent, this, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3, std::placeholders::_4))
+  , m_fileSystem()
   , m_dnsServer()
   , m_taskHandle(nullptr) {
   m_socketServer.onEvent(std::bind(&WebSocketDeFragger::handler, &m_socketDeFragger, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3, std::placeholders::_4));
@@ -95,6 +95,15 @@ CaptivePortalInstance::CaptivePortalInstance()
   bool gotFsHash = _tryGetPartitionHash(fsHash);
 
   bool fsOk = indexExists && gotFsHash;
+
+  if (fsOk) {
+    // Mounting LittleFS
+    if (!m_fileSystem.begin(false, "/static", 10U, "static0")) {
+      ESP_LOGE(TAG, "Failed to mount LittleFS");
+      fsOk = false;
+    }
+  }
+
   if (fsOk) {
     ESP_LOGI(TAG, "Serving files from LittleFS");
     ESP_LOGI(TAG, "Filesystem hash: %s", fsHash);
@@ -103,7 +112,7 @@ CaptivePortalInstance::CaptivePortalInstance()
     snprintf(softAPURL, sizeof(softAPURL), "http://%s", WiFi.softAPIP().toString().c_str());
 
     // Serving the captive portal files from LittleFS
-    m_webServer.serveStatic("/", LittleFS, "/www/", "max-age=3600").setDefaultFile("index.html").setSharedEtag(fsHash);
+    m_webServer.serveStatic("/", m_fileSystem, "/www/", "max-age=3600").setDefaultFile("index.html").setSharedEtag(fsHash);
 
     // Redirecting connection tests to the captive portal, triggering the "login to network" prompt
     m_webServer.onNotFound([softAPURL](AsyncWebServerRequest* request) { request->redirect(softAPURL); });
@@ -142,6 +151,7 @@ CaptivePortalInstance::~CaptivePortalInstance() {
   }
   m_webServer.end();
   m_socketServer.close();
+  m_fileSystem.end();
   m_dnsServer.stop();
 }
 

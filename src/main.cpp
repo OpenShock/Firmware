@@ -13,7 +13,7 @@
 #include "wifi/WiFiManager.h"
 #include "wifi/WiFiScanManager.h"
 
-#include <LittleFS.h>
+#include <Arduino.h>
 
 #include <memory>
 
@@ -21,11 +21,6 @@ const char* const TAG = "OpenShock";
 
 // Internal setup function, returns true if setup succeeded, false otherwise.
 bool trySetup() {
-  if (!LittleFS.begin(true, "/static", 10, "static0")) {
-    ESP_LOGE(TAG, "Unable to mount LittleFS");
-    return false;
-  }
-
   OpenShock::EventHandlers::Init();
   OpenShock::VisualStateManager::Init();
 
