@@ -19,9 +19,7 @@ table OtaInstallProgress {
 
 table OtaInstallFailed {
   bricked:bool;
-  revertable:bool;
-  critical:bool;
-  reason:string;
+  message:string;
 }
 
 table OtaInstallSucceeded {
