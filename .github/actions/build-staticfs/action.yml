@@ -44,7 +44,7 @@ runs:
 
     - name: Rename partition binary
       shell: bash
-      run: mv .pio/build/fs/staticfs.bin staticfs.bin
+      run: mv .pio/build/fs/littlefs.bin staticfs.bin
 
     - name: Upload internal filesystem artifact
       uses: actions/upload-artifact@v3

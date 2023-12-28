@@ -296,17 +296,9 @@ def process_littlefs_binary(source, target, env):
 
     # Get the path to the binary and its directory.
     littlefs_path = target[0].get_abspath()
-    littlefs_dir = os.path.dirname(littlefs_path)
 
-    # Rename the binary to staticfs.bin.
-    staticfs_path = os.path.join(littlefs_dir, 'staticfs.bin')
-    file_delete(staticfs_path)  # Delete the old staticfs.bin if it exists.
-    os.rename(littlefs_path, staticfs_path)
-
-    print('Renamed ' + os.path.basename(littlefs_path) + ' to ' + os.path.basename(staticfs_path))
-
-    bin_size = os.path.getsize(staticfs_path)
-    bin_hashes = hash_file(staticfs_path)
+    bin_size = os.path.getsize(littlefs_path)
+    bin_hashes = hash_file(littlefs_path)
 
     print('FileSystem Size: ' + str(bin_size) + ' bytes')
     print('FileSystem Hashes:')
