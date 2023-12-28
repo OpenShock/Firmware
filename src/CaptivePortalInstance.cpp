@@ -46,7 +46,7 @@ bool _tryGetPartitionHash(char (&buffer)[65]) {
   if (!initialized) {
     initialized = true;
 
-    ESP_LOGI(TAG, "Looking for static partition");
+    ESP_LOGD(TAG, "Looking for static partition");
 
     // Get the static partition
     const esp_partition_t* partition = _getStaticPartition();
@@ -55,7 +55,7 @@ bool _tryGetPartitionHash(char (&buffer)[65]) {
       return false;
     }
 
-    ESP_LOGI(TAG, "Found static partition, getting hash... (this may take a while)");
+    ESP_LOGD(TAG, "Found static partition, getting hash...");
 
     // Get the hash of the partition
     esp_err_t err = esp_partition_get_sha256(partition, staticSha256);
@@ -64,7 +64,7 @@ bool _tryGetPartitionHash(char (&buffer)[65]) {
       return false;
     }
 
-    ESP_LOGI(TAG, "Got partition hash");
+    ESP_LOGD(TAG, "Got partition hash");
   }
 
   // Copy the hash to the output buffer

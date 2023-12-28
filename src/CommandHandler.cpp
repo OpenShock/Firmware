@@ -60,7 +60,7 @@ void _keepAliveTask(void* arg) {
     KnownShocker cmd;
     while (xQueueReceive(s_keepAliveQueue, &cmd, pdMS_TO_TICKS(eepyTime)) == pdTRUE) {
       if (cmd.killTask) {
-        ESP_LOGW(TAG, "Received kill command, exiting keep-alive task");
+        ESP_LOGI(TAG, "Received kill command, exiting keep-alive task");
         vTaskDelete(nullptr);
         break;  // This should never be reached
       }
@@ -174,8 +174,8 @@ bool CommandHandler::Init() {
     if (!OpenShock::IsValidOutputPin(Constants::GPIO_RF_TX)) {
       ESP_LOGE(TAG, "Configured RF TX pin (%u) is invalid, and default pin (%u) is invalid. Unable to initialize RF transmitter", txPin, Constants::GPIO_RF_TX);
 
-      ESP_LOGI(TAG, "Setting RF TX pin to invalid");
-      return Config::SetRFConfigTxPin(Constants::GPIO_INVALID); // This is not a error yet, unless we are unable to save the RF TX Pin as invalid
+      ESP_LOGD(TAG, "Setting RF TX pin to GPIO_INVALID");
+      return Config::SetRFConfigTxPin(Constants::GPIO_INVALID);  // This is not a error yet, unless we are unable to save the RF TX Pin as invalid
     }
 
     ESP_LOGW(TAG, "Configured RF TX pin (%u) is invalid, using default pin (%u)", txPin, Constants::GPIO_RF_TX);
@@ -296,7 +296,7 @@ bool CommandHandler::HandleCommand(ShockerModelType model, std::uint16_t shocker
 
     s_rfTransmitter->ClearPendingCommands();
   } else {
-    ESP_LOGV(TAG, "Command received: %u %u %u %u", model, shockerId, type, intensity);
+    ESP_LOGD(TAG, "Command received: %u %u %u %u", model, shockerId, type, intensity);
   }
 
   bool ok = s_rfTransmitter->SendCommand(model, shockerId, type, intensity, durationMs);
