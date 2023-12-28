@@ -1,19 +1,20 @@
 #pragma once
 
-#include "OtaUpdateChannel.h"
 #include "config/ConfigBase.h"
+#include "OtaUpdateChannel.h"
 
 #include <string>
 
 namespace OpenShock::Config {
   struct OtaUpdateConfig : public ConfigBase<Serialization::Configuration::OtaUpdateConfig> {
     OtaUpdateConfig();
-    OtaUpdateConfig(bool isEnabled, std::string cdnDomain, OtaUpdateChannel updateChannel, bool checkOnStartup, std::uint16_t checkInterval, bool allowBackendManagement, bool requireManualApproval);
+    OtaUpdateConfig(bool isEnabled, std::string cdnDomain, OtaUpdateChannel updateChannel, bool checkOnStartup, bool checkPeriodically, std::uint16_t checkInterval, bool allowBackendManagement, bool requireManualApproval);
 
     bool isEnabled;
     std::string cdnDomain;
     OtaUpdateChannel updateChannel;
     bool checkOnStartup;
+    bool checkPeriodically;
     std::uint16_t checkInterval;
     bool allowBackendManagement;
     bool requireManualApproval;

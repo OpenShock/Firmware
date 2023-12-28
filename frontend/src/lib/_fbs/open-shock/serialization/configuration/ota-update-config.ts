@@ -60,10 +60,18 @@ checkOnStartup():boolean {
 }
 
 /**
- * The interval between update checks in minutes, 0 to disable automatic update checks. ( 5 minutes minimum )
+ * Indicates whether to check for updates periodically.
+ */
+checkPeriodically():boolean {
+  const offset = this.bb!.__offset(this.bb_pos, 12);
+  return offset ? !!this.bb!.readInt8(this.bb_pos + offset) : false;
+}
+
+/**
+ * The interval in minutes between periodic update checks.
  */
 checkInterval():number {
-  const offset = this.bb!.__offset(this.bb_pos, 12);
+  const offset = this.bb!.__offset(this.bb_pos, 14);
   return offset ? this.bb!.readUint16(this.bb_pos + offset) : 0;
 }
 
@@ -71,7 +79,7 @@ checkInterval():number {
  * Indicates if the backend is authorized to manage the device's update version on behalf of the user.
  */
 allowBackendManagement():boolean {
-  const offset = this.bb!.__offset(this.bb_pos, 14);
+  const offset = this.bb!.__offset(this.bb_pos, 16);
   return offset ? !!this.bb!.readInt8(this.bb_pos + offset) : false;
 }
 
@@ -79,12 +87,12 @@ allowBackendManagement():boolean {
  * Indicates if manual approval via serial input or captive portal is required before installing updates.
  */
 requireManualApproval():boolean {
-  const offset = this.bb!.__offset(this.bb_pos, 16);
+  const offset = this.bb!.__offset(this.bb_pos, 18);
   return offset ? !!this.bb!.readInt8(this.bb_pos + offset) : false;
 }
 
 static startOtaUpdateConfig(builder:flatbuffers.Builder) {
-  builder.startObject(7);
+  builder.startObject(8);
 }
 
 static addIsEnabled(builder:flatbuffers.Builder, isEnabled:boolean) {
@@ -103,16 +111,20 @@ static addCheckOnStartup(builder:flatbuffers.Builder, checkOnStartup:boolean) {
   builder.addFieldInt8(3, +checkOnStartup, +false);
 }
 
+static addCheckPeriodically(builder:flatbuffers.Builder, checkPeriodically:boolean) {
+  builder.addFieldInt8(4, +checkPeriodically, +false);
+}
+
 static addCheckInterval(builder:flatbuffers.Builder, checkInterval:number) {
-  builder.addFieldInt16(4, checkInterval, 0);
+  builder.addFieldInt16(5, checkInterval, 0);
 }
 
 static addAllowBackendManagement(builder:flatbuffers.Builder, allowBackendManagement:boolean) {
-  builder.addFieldInt8(5, +allowBackendManagement, +false);
+  builder.addFieldInt8(6, +allowBackendManagement, +false);
 }
 
 static addRequireManualApproval(builder:flatbuffers.Builder, requireManualApproval:boolean) {
-  builder.addFieldInt8(6, +requireManualApproval, +false);
+  builder.addFieldInt8(7, +requireManualApproval, +false);
 }
 
 static endOtaUpdateConfig(builder:flatbuffers.Builder):flatbuffers.Offset {
@@ -120,12 +132,13 @@ static endOtaUpdateConfig(builder:flatbuffers.Builder):flatbuffers.Offset {
   return offset;
 }
 
-static createOtaUpdateConfig(builder:flatbuffers.Builder, isEnabled:boolean, cdnDomainOffset:flatbuffers.Offset, updateChannel:OtaUpdateChannel, checkOnStartup:boolean, checkInterval:number, allowBackendManagement:boolean, requireManualApproval:boolean):flatbuffers.Offset {
+static createOtaUpdateConfig(builder:flatbuffers.Builder, isEnabled:boolean, cdnDomainOffset:flatbuffers.Offset, updateChannel:OtaUpdateChannel, checkOnStartup:boolean, checkPeriodically:boolean, checkInterval:number, allowBackendManagement:boolean, requireManualApproval:boolean):flatbuffers.Offset {
   OtaUpdateConfig.startOtaUpdateConfig(builder);
   OtaUpdateConfig.addIsEnabled(builder, isEnabled);
   OtaUpdateConfig.addCdnDomain(builder, cdnDomainOffset);
   OtaUpdateConfig.addUpdateChannel(builder, updateChannel);
   OtaUpdateConfig.addCheckOnStartup(builder, checkOnStartup);
+  OtaUpdateConfig.addCheckPeriodically(builder, checkPeriodically);
   OtaUpdateConfig.addCheckInterval(builder, checkInterval);
   OtaUpdateConfig.addAllowBackendManagement(builder, allowBackendManagement);
   OtaUpdateConfig.addRequireManualApproval(builder, requireManualApproval);

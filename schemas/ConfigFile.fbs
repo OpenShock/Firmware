@@ -69,7 +69,10 @@ table OtaUpdateConfig {
   /// Indicates whether to check for updates on startup.
   check_on_startup:bool;
 
-  /// The interval between update checks in minutes, 0 to disable automatic update checks. ( 5 minutes minimum )
+  /// Indicates whether to check for updates periodically.
+  check_periodically:bool;
+
+  /// The interval in minutes between periodic update checks.
   check_interval:uint16;
 
   /// Indicates if the backend is authorized to manage the device's update version on behalf of the user.

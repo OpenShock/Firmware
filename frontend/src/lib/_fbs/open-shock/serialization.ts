@@ -9,4 +9,4 @@ export { ServerToDeviceMessage } from './serialization/server-to-device-message'
 export { ServerToDeviceMessagePayload } from './serialization/server-to-device-message-payload';
 export { ShockerCommand } from './serialization/shocker-command';
 export { ShockerCommandList } from './serialization/shocker-command-list';
-export * as Types from './serialization/types';
+export * as Types from './open-shock/serialization/types';

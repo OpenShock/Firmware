@@ -507,9 +507,10 @@ struct OtaUpdateConfig FLATBUFFERS_FINAL_CLASS : private ::flatbuffers::Table {
     VT_CDN_DOMAIN = 6,
     VT_UPDATE_CHANNEL = 8,
     VT_CHECK_ON_STARTUP = 10,
-    VT_CHECK_INTERVAL = 12,
-    VT_ALLOW_BACKEND_MANAGEMENT = 14,
-    VT_REQUIRE_MANUAL_APPROVAL = 16
+    VT_CHECK_PERIODICALLY = 12,
+    VT_CHECK_INTERVAL = 14,
+    VT_ALLOW_BACKEND_MANAGEMENT = 16,
+    VT_REQUIRE_MANUAL_APPROVAL = 18
   };
   /// Indicates whether OTA updates are enabled.
   bool is_enabled() const {
@@ -527,7 +528,11 @@ struct OtaUpdateConfig FLATBUFFERS_FINAL_CLASS : private ::flatbuffers::Table {
   bool check_on_startup() const {
     return GetField<uint8_t>(VT_CHECK_ON_STARTUP, 0) != 0;
   }
-  /// The interval between update checks in minutes, 0 to disable automatic update checks. ( 5 minutes minimum )
+  /// Indicates whether to check for updates periodically.
+  bool check_periodically() const {
+    return GetField<uint8_t>(VT_CHECK_PERIODICALLY, 0) != 0;
+  }
+  /// The interval in minutes between periodic update checks.
   uint16_t check_interval() const {
     return GetField<uint16_t>(VT_CHECK_INTERVAL, 0);
   }
@@ -546,6 +551,7 @@ struct OtaUpdateConfig FLATBUFFERS_FINAL_CLASS : private ::flatbuffers::Table {
            verifier.VerifyString(cdn_domain()) &&
            VerifyField<uint8_t>(verifier, VT_UPDATE_CHANNEL, 1) &&
            VerifyField<uint8_t>(verifier, VT_CHECK_ON_STARTUP, 1) &&
+           VerifyField<uint8_t>(verifier, VT_CHECK_PERIODICALLY, 1) &&
            VerifyField<uint16_t>(verifier, VT_CHECK_INTERVAL, 2) &&
            VerifyField<uint8_t>(verifier, VT_ALLOW_BACKEND_MANAGEMENT, 1) &&
            VerifyField<uint8_t>(verifier, VT_REQUIRE_MANUAL_APPROVAL, 1) &&
@@ -568,6 +574,9 @@ struct OtaUpdateConfigBuilder {
   }
   void add_check_on_startup(bool check_on_startup) {
     fbb_.AddElement<uint8_t>(OtaUpdateConfig::VT_CHECK_ON_STARTUP, static_cast<uint8_t>(check_on_startup), 0);
+  }
+  void add_check_periodically(bool check_periodically) {
+    fbb_.AddElement<uint8_t>(OtaUpdateConfig::VT_CHECK_PERIODICALLY, static_cast<uint8_t>(check_periodically), 0);
   }
   void add_check_interval(uint16_t check_interval) {
     fbb_.AddElement<uint16_t>(OtaUpdateConfig::VT_CHECK_INTERVAL, check_interval, 0);
@@ -595,6 +604,7 @@ inline ::flatbuffers::Offset<OtaUpdateConfig> CreateOtaUpdateConfig(
     ::flatbuffers::Offset<::flatbuffers::String> cdn_domain = 0,
     OpenShock::Serialization::Configuration::OtaUpdateChannel update_channel = OpenShock::Serialization::Configuration::OtaUpdateChannel::Stable,
     bool check_on_startup = false,
+    bool check_periodically = false,
     uint16_t check_interval = 0,
     bool allow_backend_management = false,
     bool require_manual_approval = false) {
@@ -603,6 +613,7 @@ inline ::flatbuffers::Offset<OtaUpdateConfig> CreateOtaUpdateConfig(
   builder_.add_check_interval(check_interval);
   builder_.add_require_manual_approval(require_manual_approval);
   builder_.add_allow_backend_management(allow_backend_management);
+  builder_.add_check_periodically(check_periodically);
   builder_.add_check_on_startup(check_on_startup);
   builder_.add_update_channel(update_channel);
   builder_.add_is_enabled(is_enabled);
@@ -620,6 +631,7 @@ inline ::flatbuffers::Offset<OtaUpdateConfig> CreateOtaUpdateConfigDirect(
     const char *cdn_domain = nullptr,
     OpenShock::Serialization::Configuration::OtaUpdateChannel update_channel = OpenShock::Serialization::Configuration::OtaUpdateChannel::Stable,
     bool check_on_startup = false,
+    bool check_periodically = false,
     uint16_t check_interval = 0,
     bool allow_backend_management = false,
     bool require_manual_approval = false) {
@@ -630,6 +642,7 @@ inline ::flatbuffers::Offset<OtaUpdateConfig> CreateOtaUpdateConfigDirect(
       cdn_domain__,
       update_channel,
       check_on_startup,
+      check_periodically,
       check_interval,
       allow_backend_management,
       require_manual_approval);

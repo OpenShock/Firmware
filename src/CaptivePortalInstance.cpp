@@ -87,20 +87,21 @@ CaptivePortalInstance::CaptivePortalInstance()
   // ESP_LOGI(TAG, "Setting up DNS server");
   // m_dnsServer.start(DNS_PORT, "*", WiFi.softAPIP());
 
-  // Check if the www folder exists and is populated
-  bool indexExists = LittleFS.exists("/www/index.html.gz");
-
   // Get the hash of the filesystem
   char fsHash[65];
-  bool gotFsHash = _tryGetPartitionHash(fsHash);
-
-  bool fsOk = indexExists && gotFsHash;
+  bool fsOk = true;
+  if (!_tryGetPartitionHash(fsHash)) {
+    ESP_LOGE(TAG, "Failed to get filesystem hash");
+    fsOk = false;
+  }
 
   if (fsOk) {
     // Mounting LittleFS
     if (!m_fileSystem.begin(false, "/static", 10U, "static0")) {
       ESP_LOGE(TAG, "Failed to mount LittleFS");
       fsOk = false;
+    } else {
+      fsOk = m_fileSystem.exists("/www/index.html.gz");
     }
   }
 

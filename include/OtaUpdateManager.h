@@ -4,8 +4,8 @@
 
 #include <array>
 #include <string>
-#include <vector>
 #include <unordered_map>
+#include <vector>
 
 /*
 ok so uhhh:
@@ -34,7 +34,7 @@ namespace OpenShock::OtaUpdateManager {
     std::unordered_map<std::string, std::array<std::uint8_t, 32>> hashMap;
   };
 
-  bool TryGetFirmwareVersions(OtaUpdateChannel channel, std::vector<std::string>& versions);
+  bool TryGetFirmwareVersion(OtaUpdateChannel channel, std::string& version);
   bool TryGetFirmwareBoards(const std::string& version, std::vector<std::string>& boards);
   bool TryGetFirmwareRelease(const std::string& version, FirmwareRelease& release);
 

@@ -11,11 +11,12 @@ OtaUpdateConfig::OtaUpdateConfig() {
   ToDefault();
 }
 
-OtaUpdateConfig::OtaUpdateConfig(bool isEnabled, std::string cdnDomain, OtaUpdateChannel updateChannel, bool checkOnStartup, std::uint16_t checkInterval, bool allowBackendManagement, bool requireManualApproval) {
+OtaUpdateConfig::OtaUpdateConfig(bool isEnabled, std::string cdnDomain, OtaUpdateChannel updateChannel, bool checkOnStartup, bool checkPeriodically, std::uint16_t checkInterval, bool allowBackendManagement, bool requireManualApproval) {
   this->isEnabled              = isEnabled;
   this->cdnDomain              = cdnDomain;
   this->updateChannel          = updateChannel;
   this->checkOnStartup         = checkOnStartup;
+  this->checkPeriodically      = checkPeriodically;
   this->checkInterval          = checkInterval;
   this->allowBackendManagement = allowBackendManagement;
   this->requireManualApproval  = requireManualApproval;
@@ -25,8 +26,9 @@ void OtaUpdateConfig::ToDefault() {
   isEnabled              = true;
   cdnDomain              = OPENSHOCK_FW_CDN_DOMAIN;
   updateChannel          = OtaUpdateChannel::Stable;
-  checkOnStartup         = true;
-  checkInterval          = 0;
+  checkOnStartup         = false;
+  checkPeriodically      = false;
+  checkInterval          = 30;  // 30 minutes
   allowBackendManagement = true;
   requireManualApproval  = false;
 }
@@ -37,10 +39,11 @@ bool OtaUpdateConfig::FromFlatbuffers(const Serialization::Configuration::OtaUpd
     return false;
   }
 
-  isEnabled              = config->is_enabled();
+  isEnabled = config->is_enabled();
   Internal::Utils::FromFbsStr(cdnDomain, config->cdn_domain(), OPENSHOCK_FW_CDN_DOMAIN);
   updateChannel          = config->update_channel();
   checkOnStartup         = config->check_on_startup();
+  checkPeriodically      = config->check_periodically();
   checkInterval          = config->check_interval();
   allowBackendManagement = config->allow_backend_management();
   requireManualApproval  = config->require_manual_approval();
@@ -49,7 +52,7 @@ bool OtaUpdateConfig::FromFlatbuffers(const Serialization::Configuration::OtaUpd
 }
 
 flatbuffers::Offset<OpenShock::Serialization::Configuration::OtaUpdateConfig> OtaUpdateConfig::ToFlatbuffers(flatbuffers::FlatBufferBuilder& builder, bool withSensitiveData) const {
-  return Serialization::Configuration::CreateOtaUpdateConfig(builder, isEnabled, builder.CreateString(cdnDomain), updateChannel, checkInterval, allowBackendManagement, requireManualApproval);
+  return Serialization::Configuration::CreateOtaUpdateConfig(builder, isEnabled, builder.CreateString(cdnDomain), updateChannel, checkPeriodically, checkInterval, allowBackendManagement, requireManualApproval);
 }
 
 bool OtaUpdateConfig::FromJSON(const cJSON* json) {
@@ -67,6 +70,7 @@ bool OtaUpdateConfig::FromJSON(const cJSON* json) {
   Internal::Utils::FromJsonStr(cdnDomain, json, "cdnDomain", OPENSHOCK_FW_CDN_DOMAIN);
   Internal::Utils::FromJsonStrParsed(updateChannel, json, "updateChannel", OpenShock::TryParseOtaUpdateChannel, OpenShock::OtaUpdateChannel::Stable);
   Internal::Utils::FromJsonBool(checkOnStartup, json, "checkOnStartup", true);
+  Internal::Utils::FromJsonBool(checkPeriodically, json, "checkPeriodically", false);
   Internal::Utils::FromJsonU16(checkInterval, json, "checkInterval", 0);
   Internal::Utils::FromJsonBool(allowBackendManagement, json, "allowBackendManagement", true);
   Internal::Utils::FromJsonBool(requireManualApproval, json, "requireManualApproval", false);
@@ -81,6 +85,7 @@ cJSON* OtaUpdateConfig::ToJSON(bool withSensitiveData) const {
   cJSON_AddStringToObject(root, "cdnDomain", cdnDomain.c_str());
   cJSON_AddStringToObject(root, "updateChannel", OpenShock::Serialization::Configuration::EnumNameOtaUpdateChannel(updateChannel));
   cJSON_AddBoolToObject(root, "checkOnStartup", checkOnStartup);
+  cJSON_AddBoolToObject(root, "checkPeriodically", checkPeriodically);
   cJSON_AddNumberToObject(root, "checkInterval", checkInterval);
   cJSON_AddBoolToObject(root, "allowBackendManagement", allowBackendManagement);
   cJSON_AddBoolToObject(root, "requireManualApproval", requireManualApproval);
