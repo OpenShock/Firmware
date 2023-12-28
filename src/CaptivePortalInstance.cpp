@@ -84,8 +84,8 @@ CaptivePortalInstance::CaptivePortalInstance()
   m_socketServer.begin();
   m_socketServer.enableHeartbeat(WEBSOCKET_PING_INTERVAL, WEBSOCKET_PING_TIMEOUT, WEBSOCKET_PING_RETRIES);
 
-  // ESP_LOGI(TAG, "Setting up DNS server");
-  // m_dnsServer.start(DNS_PORT, "*", WiFi.softAPIP());
+  ESP_LOGI(TAG, "Setting up DNS server");
+  m_dnsServer.start(DNS_PORT, "*", WiFi.softAPIP());
 
   // Get the hash of the filesystem
   char fsHash[65];
