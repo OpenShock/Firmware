@@ -3,7 +3,6 @@
 /* eslint-disable @typescript-eslint/no-unused-vars, @typescript-eslint/no-explicit-any, @typescript-eslint/no-non-null-assertion */
 
 export { CaptivePortalConfig } from './serialization/captive-portal-config';
-export { OtaDownload } from './serialization/ota-download';
 export { OtaInstall } from './serialization/ota-install';
 export { ServerToDeviceMessage } from './serialization/server-to-device-message';
 export { ServerToDeviceMessagePayload } from './serialization/server-to-device-message-payload';

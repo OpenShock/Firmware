@@ -3,40 +3,48 @@
 /* eslint-disable @typescript-eslint/no-unused-vars, @typescript-eslint/no-explicit-any, @typescript-eslint/no-non-null-assertion */
 
 import { KeepAlive } from '../../open-shock/serialization/keep-alive';
-import { OtaDownloadResult } from '../../open-shock/serialization/ota-download-result';
-import { OtaInstallResult } from '../../open-shock/serialization/ota-install-result';
+import { OtaInstallFailed } from '../../open-shock/serialization/ota-install-failed';
+import { OtaInstallProgress } from '../../open-shock/serialization/ota-install-progress';
+import { OtaInstallStarted } from '../../open-shock/serialization/ota-install-started';
+import { OtaInstallSucceeded } from '../../open-shock/serialization/ota-install-succeeded';
 
 
 export enum DeviceToServerMessagePayload {
   NONE = 0,
   KeepAlive = 1,
-  OtaDownloadResult = 2,
-  OtaInstallResult = 3
+  OtaInstallStarted = 2,
+  OtaInstallProgress = 3,
+  OtaInstallFailed = 4,
+  OtaInstallSucceeded = 5
 }
 
 export function unionToDeviceToServerMessagePayload(
   type: DeviceToServerMessagePayload,
-  accessor: (obj:KeepAlive|OtaDownloadResult|OtaInstallResult) => KeepAlive|OtaDownloadResult|OtaInstallResult|null
-): KeepAlive|OtaDownloadResult|OtaInstallResult|null {
+  accessor: (obj:KeepAlive|OtaInstallFailed|OtaInstallProgress|OtaInstallStarted|OtaInstallSucceeded) => KeepAlive|OtaInstallFailed|OtaInstallProgress|OtaInstallStarted|OtaInstallSucceeded|null
+): KeepAlive|OtaInstallFailed|OtaInstallProgress|OtaInstallStarted|OtaInstallSucceeded|null {
   switch(DeviceToServerMessagePayload[type]) {
     case 'NONE': return null; 
     case 'KeepAlive': return accessor(new KeepAlive())! as KeepAlive;
-    case 'OtaDownloadResult': return accessor(new OtaDownloadResult())! as OtaDownloadResult;
-    case 'OtaInstallResult': return accessor(new OtaInstallResult())! as OtaInstallResult;
+    case 'OtaInstallStarted': return accessor(new OtaInstallStarted())! as OtaInstallStarted;
+    case 'OtaInstallProgress': return accessor(new OtaInstallProgress())! as OtaInstallProgress;
+    case 'OtaInstallFailed': return accessor(new OtaInstallFailed())! as OtaInstallFailed;
+    case 'OtaInstallSucceeded': return accessor(new OtaInstallSucceeded())! as OtaInstallSucceeded;
     default: return null;
   }
 }
 
 export function unionListToDeviceToServerMessagePayload(
   type: DeviceToServerMessagePayload, 
-  accessor: (index: number, obj:KeepAlive|OtaDownloadResult|OtaInstallResult) => KeepAlive|OtaDownloadResult|OtaInstallResult|null, 
+  accessor: (index: number, obj:KeepAlive|OtaInstallFailed|OtaInstallProgress|OtaInstallStarted|OtaInstallSucceeded) => KeepAlive|OtaInstallFailed|OtaInstallProgress|OtaInstallStarted|OtaInstallSucceeded|null, 
   index: number
-): KeepAlive|OtaDownloadResult|OtaInstallResult|null {
+): KeepAlive|OtaInstallFailed|OtaInstallProgress|OtaInstallStarted|OtaInstallSucceeded|null {
   switch(DeviceToServerMessagePayload[type]) {
     case 'NONE': return null; 
     case 'KeepAlive': return accessor(index, new KeepAlive())! as KeepAlive;
-    case 'OtaDownloadResult': return accessor(index, new OtaDownloadResult())! as OtaDownloadResult;
-    case 'OtaInstallResult': return accessor(index, new OtaInstallResult())! as OtaInstallResult;
+    case 'OtaInstallStarted': return accessor(index, new OtaInstallStarted())! as OtaInstallStarted;
+    case 'OtaInstallProgress': return accessor(index, new OtaInstallProgress())! as OtaInstallProgress;
+    case 'OtaInstallFailed': return accessor(index, new OtaInstallFailed())! as OtaInstallFailed;
+    case 'OtaInstallSucceeded': return accessor(index, new OtaInstallSucceeded())! as OtaInstallSucceeded;
     default: return null;
   }
 }

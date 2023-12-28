@@ -27,9 +27,6 @@ struct ShockerCommandListBuilder;
 
 struct CaptivePortalConfig;
 
-struct OtaDownload;
-struct OtaDownloadBuilder;
-
 struct OtaInstall;
 struct OtaInstallBuilder;
 
@@ -40,29 +37,26 @@ enum class ServerToDeviceMessagePayload : uint8_t {
   NONE = 0,
   ShockerCommandList = 1,
   CaptivePortalConfig = 2,
-  OtaDownload = 3,
-  OtaInstall = 4,
+  OtaInstall = 3,
   MIN = NONE,
   MAX = OtaInstall
 };
 
-inline const ServerToDeviceMessagePayload (&EnumValuesServerToDeviceMessagePayload())[5] {
+inline const ServerToDeviceMessagePayload (&EnumValuesServerToDeviceMessagePayload())[4] {
   static const ServerToDeviceMessagePayload values[] = {
     ServerToDeviceMessagePayload::NONE,
     ServerToDeviceMessagePayload::ShockerCommandList,
     ServerToDeviceMessagePayload::CaptivePortalConfig,
-    ServerToDeviceMessagePayload::OtaDownload,
     ServerToDeviceMessagePayload::OtaInstall
   };
   return values;
 }
 
 inline const char * const *EnumNamesServerToDeviceMessagePayload() {
-  static const char * const names[6] = {
+  static const char * const names[5] = {
     "NONE",
     "ShockerCommandList",
     "CaptivePortalConfig",
-    "OtaDownload",
     "OtaInstall",
     nullptr
   };
@@ -85,10 +79,6 @@ template<> struct ServerToDeviceMessagePayloadTraits<OpenShock::Serialization::S
 
 template<> struct ServerToDeviceMessagePayloadTraits<OpenShock::Serialization::CaptivePortalConfig> {
   static const ServerToDeviceMessagePayload enum_value = ServerToDeviceMessagePayload::CaptivePortalConfig;
-};
-
-template<> struct ServerToDeviceMessagePayloadTraits<OpenShock::Serialization::OtaDownload> {
-  static const ServerToDeviceMessagePayload enum_value = ServerToDeviceMessagePayload::OtaDownload;
 };
 
 template<> struct ServerToDeviceMessagePayloadTraits<OpenShock::Serialization::OtaInstall> {
@@ -238,57 +228,6 @@ inline ::flatbuffers::Offset<ShockerCommandList> CreateShockerCommandListDirect(
       commands__);
 }
 
-struct OtaDownload FLATBUFFERS_FINAL_CLASS : private ::flatbuffers::Table {
-  typedef OtaDownloadBuilder Builder;
-  struct Traits;
-  static FLATBUFFERS_CONSTEXPR_CPP11 const char *GetFullyQualifiedName() {
-    return "OpenShock.Serialization.OtaDownload";
-  }
-  enum FlatBuffersVTableOffset FLATBUFFERS_VTABLE_UNDERLYING_TYPE {
-    VT_VERSION = 4
-  };
-  const OpenShock::SemVer *version() const {
-    return GetPointer<const OpenShock::SemVer *>(VT_VERSION);
-  }
-  bool Verify(::flatbuffers::Verifier &verifier) const {
-    return VerifyTableStart(verifier) &&
-           VerifyOffset(verifier, VT_VERSION) &&
-           verifier.VerifyTable(version()) &&
-           verifier.EndTable();
-  }
-};
-
-struct OtaDownloadBuilder {
-  typedef OtaDownload Table;
-  ::flatbuffers::FlatBufferBuilder &fbb_;
-  ::flatbuffers::uoffset_t start_;
-  void add_version(::flatbuffers::Offset<OpenShock::SemVer> version) {
-    fbb_.AddOffset(OtaDownload::VT_VERSION, version);
-  }
-  explicit OtaDownloadBuilder(::flatbuffers::FlatBufferBuilder &_fbb)
-        : fbb_(_fbb) {
-    start_ = fbb_.StartTable();
-  }
-  ::flatbuffers::Offset<OtaDownload> Finish() {
-    const auto end = fbb_.EndTable(start_);
-    auto o = ::flatbuffers::Offset<OtaDownload>(end);
-    return o;
-  }
-};
-
-inline ::flatbuffers::Offset<OtaDownload> CreateOtaDownload(
-    ::flatbuffers::FlatBufferBuilder &_fbb,
-    ::flatbuffers::Offset<OpenShock::SemVer> version = 0) {
-  OtaDownloadBuilder builder_(_fbb);
-  builder_.add_version(version);
-  return builder_.Finish();
-}
-
-struct OtaDownload::Traits {
-  using type = OtaDownload;
-  static auto constexpr Create = CreateOtaDownload;
-};
-
 struct OtaInstall FLATBUFFERS_FINAL_CLASS : private ::flatbuffers::Table {
   typedef OtaInstallBuilder Builder;
   struct Traits;
@@ -363,9 +302,6 @@ struct ServerToDeviceMessage FLATBUFFERS_FINAL_CLASS : private ::flatbuffers::Ta
   const OpenShock::Serialization::CaptivePortalConfig *payload_as_CaptivePortalConfig() const {
     return payload_type() == OpenShock::Serialization::ServerToDeviceMessagePayload::CaptivePortalConfig ? static_cast<const OpenShock::Serialization::CaptivePortalConfig *>(payload()) : nullptr;
   }
-  const OpenShock::Serialization::OtaDownload *payload_as_OtaDownload() const {
-    return payload_type() == OpenShock::Serialization::ServerToDeviceMessagePayload::OtaDownload ? static_cast<const OpenShock::Serialization::OtaDownload *>(payload()) : nullptr;
-  }
   const OpenShock::Serialization::OtaInstall *payload_as_OtaInstall() const {
     return payload_type() == OpenShock::Serialization::ServerToDeviceMessagePayload::OtaInstall ? static_cast<const OpenShock::Serialization::OtaInstall *>(payload()) : nullptr;
   }
@@ -384,10 +320,6 @@ template<> inline const OpenShock::Serialization::ShockerCommandList *ServerToDe
 
 template<> inline const OpenShock::Serialization::CaptivePortalConfig *ServerToDeviceMessage::payload_as<OpenShock::Serialization::CaptivePortalConfig>() const {
   return payload_as_CaptivePortalConfig();
-}
-
-template<> inline const OpenShock::Serialization::OtaDownload *ServerToDeviceMessage::payload_as<OpenShock::Serialization::OtaDownload>() const {
-  return payload_as_OtaDownload();
 }
 
 template<> inline const OpenShock::Serialization::OtaInstall *ServerToDeviceMessage::payload_as<OpenShock::Serialization::OtaInstall>() const {
@@ -441,10 +373,6 @@ inline bool VerifyServerToDeviceMessagePayload(::flatbuffers::Verifier &verifier
     }
     case ServerToDeviceMessagePayload::CaptivePortalConfig: {
       return verifier.VerifyField<OpenShock::Serialization::CaptivePortalConfig>(static_cast<const uint8_t *>(obj), 0, 1);
-    }
-    case ServerToDeviceMessagePayload::OtaDownload: {
-      auto ptr = reinterpret_cast<const OpenShock::Serialization::OtaDownload *>(obj);
-      return verifier.VerifyTable(ptr);
     }
     case ServerToDeviceMessagePayload::OtaInstall: {
       auto ptr = reinterpret_cast<const OpenShock::Serialization::OtaInstall *>(obj);

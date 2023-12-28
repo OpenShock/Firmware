@@ -22,20 +22,14 @@ struct CaptivePortalConfig {
   enabled:bool;
 }
 
-// Download a new firmware version.
-table OtaDownload {
-  version: SemVer;
-}
-
-// Begin installing downloaded firmware.
+// Begin installing an OTA update
 table OtaInstall {
-  version: SemVer;
+  version:SemVer;
 }
 
 union ServerToDeviceMessagePayload {
   ShockerCommandList,
   CaptivePortalConfig,
-  OtaDownload,
   OtaInstall
 }
 

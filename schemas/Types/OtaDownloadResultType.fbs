@@ -1,6 +1,0 @@
-namespace OpenShock;
-
-enum OtaDownloadResultType : uint8 {
-  OK,
-  FAIL
-}

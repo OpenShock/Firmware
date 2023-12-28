@@ -72,7 +72,7 @@ void appSetup() {
   if (!trySetup()) {
     ESP_LOGI(TAG, "Restarting in 5 seconds...");
     vTaskDelay(pdMS_TO_TICKS(5000));
-    ESP.restart();
+    esp_restart();
   }
 }
 

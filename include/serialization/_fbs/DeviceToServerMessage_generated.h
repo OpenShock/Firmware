@@ -13,17 +13,24 @@ static_assert(FLATBUFFERS_VERSION_MAJOR == 23 &&
               FLATBUFFERS_VERSION_REVISION == 26,
              "Non-compatible flatbuffers version included");
 
-#include "OtaDownloadResultType_generated.h"
-#include "OtaInstallResultType_generated.h"
+#include "SemVer_generated.h"
 
 namespace OpenShock {
 namespace Serialization {
 
 struct KeepAlive;
 
-struct OtaDownloadResult;
+struct OtaInstallStarted;
+struct OtaInstallStartedBuilder;
 
-struct OtaInstallResult;
+struct OtaInstallProgress;
+struct OtaInstallProgressBuilder;
+
+struct OtaInstallFailed;
+struct OtaInstallFailedBuilder;
+
+struct OtaInstallSucceeded;
+struct OtaInstallSucceededBuilder;
 
 struct DeviceToServerMessage;
 struct DeviceToServerMessageBuilder;
@@ -31,35 +38,41 @@ struct DeviceToServerMessageBuilder;
 enum class DeviceToServerMessagePayload : uint8_t {
   NONE = 0,
   KeepAlive = 1,
-  OtaDownloadResult = 2,
-  OtaInstallResult = 3,
+  OtaInstallStarted = 2,
+  OtaInstallProgress = 3,
+  OtaInstallFailed = 4,
+  OtaInstallSucceeded = 5,
   MIN = NONE,
-  MAX = OtaInstallResult
+  MAX = OtaInstallSucceeded
 };
 
-inline const DeviceToServerMessagePayload (&EnumValuesDeviceToServerMessagePayload())[4] {
+inline const DeviceToServerMessagePayload (&EnumValuesDeviceToServerMessagePayload())[6] {
   static const DeviceToServerMessagePayload values[] = {
     DeviceToServerMessagePayload::NONE,
     DeviceToServerMessagePayload::KeepAlive,
-    DeviceToServerMessagePayload::OtaDownloadResult,
-    DeviceToServerMessagePayload::OtaInstallResult
+    DeviceToServerMessagePayload::OtaInstallStarted,
+    DeviceToServerMessagePayload::OtaInstallProgress,
+    DeviceToServerMessagePayload::OtaInstallFailed,
+    DeviceToServerMessagePayload::OtaInstallSucceeded
   };
   return values;
 }
 
 inline const char * const *EnumNamesDeviceToServerMessagePayload() {
-  static const char * const names[5] = {
+  static const char * const names[7] = {
     "NONE",
     "KeepAlive",
-    "OtaDownloadResult",
-    "OtaInstallResult",
+    "OtaInstallStarted",
+    "OtaInstallProgress",
+    "OtaInstallFailed",
+    "OtaInstallSucceeded",
     nullptr
   };
   return names;
 }
 
 inline const char *EnumNameDeviceToServerMessagePayload(DeviceToServerMessagePayload e) {
-  if (::flatbuffers::IsOutRange(e, DeviceToServerMessagePayload::NONE, DeviceToServerMessagePayload::OtaInstallResult)) return "";
+  if (::flatbuffers::IsOutRange(e, DeviceToServerMessagePayload::NONE, DeviceToServerMessagePayload::OtaInstallSucceeded)) return "";
   const size_t index = static_cast<size_t>(e);
   return EnumNamesDeviceToServerMessagePayload()[index];
 }
@@ -72,12 +85,20 @@ template<> struct DeviceToServerMessagePayloadTraits<OpenShock::Serialization::K
   static const DeviceToServerMessagePayload enum_value = DeviceToServerMessagePayload::KeepAlive;
 };
 
-template<> struct DeviceToServerMessagePayloadTraits<OpenShock::Serialization::OtaDownloadResult> {
-  static const DeviceToServerMessagePayload enum_value = DeviceToServerMessagePayload::OtaDownloadResult;
+template<> struct DeviceToServerMessagePayloadTraits<OpenShock::Serialization::OtaInstallStarted> {
+  static const DeviceToServerMessagePayload enum_value = DeviceToServerMessagePayload::OtaInstallStarted;
 };
 
-template<> struct DeviceToServerMessagePayloadTraits<OpenShock::Serialization::OtaInstallResult> {
-  static const DeviceToServerMessagePayload enum_value = DeviceToServerMessagePayload::OtaInstallResult;
+template<> struct DeviceToServerMessagePayloadTraits<OpenShock::Serialization::OtaInstallProgress> {
+  static const DeviceToServerMessagePayload enum_value = DeviceToServerMessagePayload::OtaInstallProgress;
+};
+
+template<> struct DeviceToServerMessagePayloadTraits<OpenShock::Serialization::OtaInstallFailed> {
+  static const DeviceToServerMessagePayload enum_value = DeviceToServerMessagePayload::OtaInstallFailed;
+};
+
+template<> struct DeviceToServerMessagePayloadTraits<OpenShock::Serialization::OtaInstallSucceeded> {
+  static const DeviceToServerMessagePayload enum_value = DeviceToServerMessagePayload::OtaInstallSucceeded;
 };
 
 bool VerifyDeviceToServerMessagePayload(::flatbuffers::Verifier &verifier, const void *obj, DeviceToServerMessagePayload type);
@@ -108,54 +129,250 @@ struct KeepAlive::Traits {
   using type = KeepAlive;
 };
 
-FLATBUFFERS_MANUALLY_ALIGNED_STRUCT(1) OtaDownloadResult FLATBUFFERS_FINAL_CLASS {
- private:
-  uint8_t result_;
-
- public:
+struct OtaInstallStarted FLATBUFFERS_FINAL_CLASS : private ::flatbuffers::Table {
+  typedef OtaInstallStartedBuilder Builder;
   struct Traits;
   static FLATBUFFERS_CONSTEXPR_CPP11 const char *GetFullyQualifiedName() {
-    return "OpenShock.Serialization.OtaDownloadResult";
+    return "OpenShock.Serialization.OtaInstallStarted";
   }
-  OtaDownloadResult()
-      : result_(0) {
+  enum FlatBuffersVTableOffset FLATBUFFERS_VTABLE_UNDERLYING_TYPE {
+    VT_VERSION = 4
+  };
+  const OpenShock::SemVer *version() const {
+    return GetPointer<const OpenShock::SemVer *>(VT_VERSION);
   }
-  OtaDownloadResult(OpenShock::OtaDownloadResultType _result)
-      : result_(::flatbuffers::EndianScalar(static_cast<uint8_t>(_result))) {
-  }
-  OpenShock::OtaDownloadResultType result() const {
-    return static_cast<OpenShock::OtaDownloadResultType>(::flatbuffers::EndianScalar(result_));
+  bool Verify(::flatbuffers::Verifier &verifier) const {
+    return VerifyTableStart(verifier) &&
+           VerifyOffset(verifier, VT_VERSION) &&
+           verifier.VerifyTable(version()) &&
+           verifier.EndTable();
   }
 };
-FLATBUFFERS_STRUCT_END(OtaDownloadResult, 1);
 
-struct OtaDownloadResult::Traits {
-  using type = OtaDownloadResult;
+struct OtaInstallStartedBuilder {
+  typedef OtaInstallStarted Table;
+  ::flatbuffers::FlatBufferBuilder &fbb_;
+  ::flatbuffers::uoffset_t start_;
+  void add_version(::flatbuffers::Offset<OpenShock::SemVer> version) {
+    fbb_.AddOffset(OtaInstallStarted::VT_VERSION, version);
+  }
+  explicit OtaInstallStartedBuilder(::flatbuffers::FlatBufferBuilder &_fbb)
+        : fbb_(_fbb) {
+    start_ = fbb_.StartTable();
+  }
+  ::flatbuffers::Offset<OtaInstallStarted> Finish() {
+    const auto end = fbb_.EndTable(start_);
+    auto o = ::flatbuffers::Offset<OtaInstallStarted>(end);
+    return o;
+  }
 };
 
-FLATBUFFERS_MANUALLY_ALIGNED_STRUCT(1) OtaInstallResult FLATBUFFERS_FINAL_CLASS {
- private:
-  uint8_t result_;
+inline ::flatbuffers::Offset<OtaInstallStarted> CreateOtaInstallStarted(
+    ::flatbuffers::FlatBufferBuilder &_fbb,
+    ::flatbuffers::Offset<OpenShock::SemVer> version = 0) {
+  OtaInstallStartedBuilder builder_(_fbb);
+  builder_.add_version(version);
+  return builder_.Finish();
+}
 
- public:
+struct OtaInstallStarted::Traits {
+  using type = OtaInstallStarted;
+  static auto constexpr Create = CreateOtaInstallStarted;
+};
+
+struct OtaInstallProgress FLATBUFFERS_FINAL_CLASS : private ::flatbuffers::Table {
+  typedef OtaInstallProgressBuilder Builder;
   struct Traits;
   static FLATBUFFERS_CONSTEXPR_CPP11 const char *GetFullyQualifiedName() {
-    return "OpenShock.Serialization.OtaInstallResult";
+    return "OpenShock.Serialization.OtaInstallProgress";
   }
-  OtaInstallResult()
-      : result_(0) {
+  enum FlatBuffersVTableOffset FLATBUFFERS_VTABLE_UNDERLYING_TYPE {
+    VT_TASK = 4,
+    VT_PROGRESS = 6
+  };
+  const ::flatbuffers::String *task() const {
+    return GetPointer<const ::flatbuffers::String *>(VT_TASK);
   }
-  OtaInstallResult(OpenShock::OtaInstallResultType _result)
-      : result_(::flatbuffers::EndianScalar(static_cast<uint8_t>(_result))) {
+  float progress() const {
+    return GetField<float>(VT_PROGRESS, 0.0f);
   }
-  OpenShock::OtaInstallResultType result() const {
-    return static_cast<OpenShock::OtaInstallResultType>(::flatbuffers::EndianScalar(result_));
+  bool Verify(::flatbuffers::Verifier &verifier) const {
+    return VerifyTableStart(verifier) &&
+           VerifyOffset(verifier, VT_TASK) &&
+           verifier.VerifyString(task()) &&
+           VerifyField<float>(verifier, VT_PROGRESS, 4) &&
+           verifier.EndTable();
   }
 };
-FLATBUFFERS_STRUCT_END(OtaInstallResult, 1);
 
-struct OtaInstallResult::Traits {
-  using type = OtaInstallResult;
+struct OtaInstallProgressBuilder {
+  typedef OtaInstallProgress Table;
+  ::flatbuffers::FlatBufferBuilder &fbb_;
+  ::flatbuffers::uoffset_t start_;
+  void add_task(::flatbuffers::Offset<::flatbuffers::String> task) {
+    fbb_.AddOffset(OtaInstallProgress::VT_TASK, task);
+  }
+  void add_progress(float progress) {
+    fbb_.AddElement<float>(OtaInstallProgress::VT_PROGRESS, progress, 0.0f);
+  }
+  explicit OtaInstallProgressBuilder(::flatbuffers::FlatBufferBuilder &_fbb)
+        : fbb_(_fbb) {
+    start_ = fbb_.StartTable();
+  }
+  ::flatbuffers::Offset<OtaInstallProgress> Finish() {
+    const auto end = fbb_.EndTable(start_);
+    auto o = ::flatbuffers::Offset<OtaInstallProgress>(end);
+    return o;
+  }
+};
+
+inline ::flatbuffers::Offset<OtaInstallProgress> CreateOtaInstallProgress(
+    ::flatbuffers::FlatBufferBuilder &_fbb,
+    ::flatbuffers::Offset<::flatbuffers::String> task = 0,
+    float progress = 0.0f) {
+  OtaInstallProgressBuilder builder_(_fbb);
+  builder_.add_progress(progress);
+  builder_.add_task(task);
+  return builder_.Finish();
+}
+
+struct OtaInstallProgress::Traits {
+  using type = OtaInstallProgress;
+  static auto constexpr Create = CreateOtaInstallProgress;
+};
+
+inline ::flatbuffers::Offset<OtaInstallProgress> CreateOtaInstallProgressDirect(
+    ::flatbuffers::FlatBufferBuilder &_fbb,
+    const char *task = nullptr,
+    float progress = 0.0f) {
+  auto task__ = task ? _fbb.CreateString(task) : 0;
+  return OpenShock::Serialization::CreateOtaInstallProgress(
+      _fbb,
+      task__,
+      progress);
+}
+
+struct OtaInstallFailed FLATBUFFERS_FINAL_CLASS : private ::flatbuffers::Table {
+  typedef OtaInstallFailedBuilder Builder;
+  struct Traits;
+  static FLATBUFFERS_CONSTEXPR_CPP11 const char *GetFullyQualifiedName() {
+    return "OpenShock.Serialization.OtaInstallFailed";
+  }
+  enum FlatBuffersVTableOffset FLATBUFFERS_VTABLE_UNDERLYING_TYPE {
+    VT_CRITICAL = 4,
+    VT_REASON = 6
+  };
+  bool critical() const {
+    return GetField<uint8_t>(VT_CRITICAL, 0) != 0;
+  }
+  const ::flatbuffers::String *reason() const {
+    return GetPointer<const ::flatbuffers::String *>(VT_REASON);
+  }
+  bool Verify(::flatbuffers::Verifier &verifier) const {
+    return VerifyTableStart(verifier) &&
+           VerifyField<uint8_t>(verifier, VT_CRITICAL, 1) &&
+           VerifyOffset(verifier, VT_REASON) &&
+           verifier.VerifyString(reason()) &&
+           verifier.EndTable();
+  }
+};
+
+struct OtaInstallFailedBuilder {
+  typedef OtaInstallFailed Table;
+  ::flatbuffers::FlatBufferBuilder &fbb_;
+  ::flatbuffers::uoffset_t start_;
+  void add_critical(bool critical) {
+    fbb_.AddElement<uint8_t>(OtaInstallFailed::VT_CRITICAL, static_cast<uint8_t>(critical), 0);
+  }
+  void add_reason(::flatbuffers::Offset<::flatbuffers::String> reason) {
+    fbb_.AddOffset(OtaInstallFailed::VT_REASON, reason);
+  }
+  explicit OtaInstallFailedBuilder(::flatbuffers::FlatBufferBuilder &_fbb)
+        : fbb_(_fbb) {
+    start_ = fbb_.StartTable();
+  }
+  ::flatbuffers::Offset<OtaInstallFailed> Finish() {
+    const auto end = fbb_.EndTable(start_);
+    auto o = ::flatbuffers::Offset<OtaInstallFailed>(end);
+    return o;
+  }
+};
+
+inline ::flatbuffers::Offset<OtaInstallFailed> CreateOtaInstallFailed(
+    ::flatbuffers::FlatBufferBuilder &_fbb,
+    bool critical = false,
+    ::flatbuffers::Offset<::flatbuffers::String> reason = 0) {
+  OtaInstallFailedBuilder builder_(_fbb);
+  builder_.add_reason(reason);
+  builder_.add_critical(critical);
+  return builder_.Finish();
+}
+
+struct OtaInstallFailed::Traits {
+  using type = OtaInstallFailed;
+  static auto constexpr Create = CreateOtaInstallFailed;
+};
+
+inline ::flatbuffers::Offset<OtaInstallFailed> CreateOtaInstallFailedDirect(
+    ::flatbuffers::FlatBufferBuilder &_fbb,
+    bool critical = false,
+    const char *reason = nullptr) {
+  auto reason__ = reason ? _fbb.CreateString(reason) : 0;
+  return OpenShock::Serialization::CreateOtaInstallFailed(
+      _fbb,
+      critical,
+      reason__);
+}
+
+struct OtaInstallSucceeded FLATBUFFERS_FINAL_CLASS : private ::flatbuffers::Table {
+  typedef OtaInstallSucceededBuilder Builder;
+  struct Traits;
+  static FLATBUFFERS_CONSTEXPR_CPP11 const char *GetFullyQualifiedName() {
+    return "OpenShock.Serialization.OtaInstallSucceeded";
+  }
+  enum FlatBuffersVTableOffset FLATBUFFERS_VTABLE_UNDERLYING_TYPE {
+    VT_VERSION = 4
+  };
+  const OpenShock::SemVer *version() const {
+    return GetPointer<const OpenShock::SemVer *>(VT_VERSION);
+  }
+  bool Verify(::flatbuffers::Verifier &verifier) const {
+    return VerifyTableStart(verifier) &&
+           VerifyOffset(verifier, VT_VERSION) &&
+           verifier.VerifyTable(version()) &&
+           verifier.EndTable();
+  }
+};
+
+struct OtaInstallSucceededBuilder {
+  typedef OtaInstallSucceeded Table;
+  ::flatbuffers::FlatBufferBuilder &fbb_;
+  ::flatbuffers::uoffset_t start_;
+  void add_version(::flatbuffers::Offset<OpenShock::SemVer> version) {
+    fbb_.AddOffset(OtaInstallSucceeded::VT_VERSION, version);
+  }
+  explicit OtaInstallSucceededBuilder(::flatbuffers::FlatBufferBuilder &_fbb)
+        : fbb_(_fbb) {
+    start_ = fbb_.StartTable();
+  }
+  ::flatbuffers::Offset<OtaInstallSucceeded> Finish() {
+    const auto end = fbb_.EndTable(start_);
+    auto o = ::flatbuffers::Offset<OtaInstallSucceeded>(end);
+    return o;
+  }
+};
+
+inline ::flatbuffers::Offset<OtaInstallSucceeded> CreateOtaInstallSucceeded(
+    ::flatbuffers::FlatBufferBuilder &_fbb,
+    ::flatbuffers::Offset<OpenShock::SemVer> version = 0) {
+  OtaInstallSucceededBuilder builder_(_fbb);
+  builder_.add_version(version);
+  return builder_.Finish();
+}
+
+struct OtaInstallSucceeded::Traits {
+  using type = OtaInstallSucceeded;
+  static auto constexpr Create = CreateOtaInstallSucceeded;
 };
 
 struct DeviceToServerMessage FLATBUFFERS_FINAL_CLASS : private ::flatbuffers::Table {
@@ -178,11 +395,17 @@ struct DeviceToServerMessage FLATBUFFERS_FINAL_CLASS : private ::flatbuffers::Ta
   const OpenShock::Serialization::KeepAlive *payload_as_KeepAlive() const {
     return payload_type() == OpenShock::Serialization::DeviceToServerMessagePayload::KeepAlive ? static_cast<const OpenShock::Serialization::KeepAlive *>(payload()) : nullptr;
   }
-  const OpenShock::Serialization::OtaDownloadResult *payload_as_OtaDownloadResult() const {
-    return payload_type() == OpenShock::Serialization::DeviceToServerMessagePayload::OtaDownloadResult ? static_cast<const OpenShock::Serialization::OtaDownloadResult *>(payload()) : nullptr;
+  const OpenShock::Serialization::OtaInstallStarted *payload_as_OtaInstallStarted() const {
+    return payload_type() == OpenShock::Serialization::DeviceToServerMessagePayload::OtaInstallStarted ? static_cast<const OpenShock::Serialization::OtaInstallStarted *>(payload()) : nullptr;
   }
-  const OpenShock::Serialization::OtaInstallResult *payload_as_OtaInstallResult() const {
-    return payload_type() == OpenShock::Serialization::DeviceToServerMessagePayload::OtaInstallResult ? static_cast<const OpenShock::Serialization::OtaInstallResult *>(payload()) : nullptr;
+  const OpenShock::Serialization::OtaInstallProgress *payload_as_OtaInstallProgress() const {
+    return payload_type() == OpenShock::Serialization::DeviceToServerMessagePayload::OtaInstallProgress ? static_cast<const OpenShock::Serialization::OtaInstallProgress *>(payload()) : nullptr;
+  }
+  const OpenShock::Serialization::OtaInstallFailed *payload_as_OtaInstallFailed() const {
+    return payload_type() == OpenShock::Serialization::DeviceToServerMessagePayload::OtaInstallFailed ? static_cast<const OpenShock::Serialization::OtaInstallFailed *>(payload()) : nullptr;
+  }
+  const OpenShock::Serialization::OtaInstallSucceeded *payload_as_OtaInstallSucceeded() const {
+    return payload_type() == OpenShock::Serialization::DeviceToServerMessagePayload::OtaInstallSucceeded ? static_cast<const OpenShock::Serialization::OtaInstallSucceeded *>(payload()) : nullptr;
   }
   bool Verify(::flatbuffers::Verifier &verifier) const {
     return VerifyTableStart(verifier) &&
@@ -197,12 +420,20 @@ template<> inline const OpenShock::Serialization::KeepAlive *DeviceToServerMessa
   return payload_as_KeepAlive();
 }
 
-template<> inline const OpenShock::Serialization::OtaDownloadResult *DeviceToServerMessage::payload_as<OpenShock::Serialization::OtaDownloadResult>() const {
-  return payload_as_OtaDownloadResult();
+template<> inline const OpenShock::Serialization::OtaInstallStarted *DeviceToServerMessage::payload_as<OpenShock::Serialization::OtaInstallStarted>() const {
+  return payload_as_OtaInstallStarted();
 }
 
-template<> inline const OpenShock::Serialization::OtaInstallResult *DeviceToServerMessage::payload_as<OpenShock::Serialization::OtaInstallResult>() const {
-  return payload_as_OtaInstallResult();
+template<> inline const OpenShock::Serialization::OtaInstallProgress *DeviceToServerMessage::payload_as<OpenShock::Serialization::OtaInstallProgress>() const {
+  return payload_as_OtaInstallProgress();
+}
+
+template<> inline const OpenShock::Serialization::OtaInstallFailed *DeviceToServerMessage::payload_as<OpenShock::Serialization::OtaInstallFailed>() const {
+  return payload_as_OtaInstallFailed();
+}
+
+template<> inline const OpenShock::Serialization::OtaInstallSucceeded *DeviceToServerMessage::payload_as<OpenShock::Serialization::OtaInstallSucceeded>() const {
+  return payload_as_OtaInstallSucceeded();
 }
 
 struct DeviceToServerMessageBuilder {
@@ -249,11 +480,21 @@ inline bool VerifyDeviceToServerMessagePayload(::flatbuffers::Verifier &verifier
     case DeviceToServerMessagePayload::KeepAlive: {
       return verifier.VerifyField<OpenShock::Serialization::KeepAlive>(static_cast<const uint8_t *>(obj), 0, 8);
     }
-    case DeviceToServerMessagePayload::OtaDownloadResult: {
-      return verifier.VerifyField<OpenShock::Serialization::OtaDownloadResult>(static_cast<const uint8_t *>(obj), 0, 1);
+    case DeviceToServerMessagePayload::OtaInstallStarted: {
+      auto ptr = reinterpret_cast<const OpenShock::Serialization::OtaInstallStarted *>(obj);
+      return verifier.VerifyTable(ptr);
     }
-    case DeviceToServerMessagePayload::OtaInstallResult: {
-      return verifier.VerifyField<OpenShock::Serialization::OtaInstallResult>(static_cast<const uint8_t *>(obj), 0, 1);
+    case DeviceToServerMessagePayload::OtaInstallProgress: {
+      auto ptr = reinterpret_cast<const OpenShock::Serialization::OtaInstallProgress *>(obj);
+      return verifier.VerifyTable(ptr);
+    }
+    case DeviceToServerMessagePayload::OtaInstallFailed: {
+      auto ptr = reinterpret_cast<const OpenShock::Serialization::OtaInstallFailed *>(obj);
+      return verifier.VerifyTable(ptr);
+    }
+    case DeviceToServerMessagePayload::OtaInstallSucceeded: {
+      auto ptr = reinterpret_cast<const OpenShock::Serialization::OtaInstallSucceeded *>(obj);
+      return verifier.VerifyTable(ptr);
     }
     default: return true;
   }

@@ -1,5 +1,4 @@
-include "./Types/OtaDownloadResultType.fbs";
-include "./Types/OtaInstallResultType.fbs";
+include "./Types/SemVer.fbs";
 
 attribute "fs_serializer";
 
@@ -9,18 +8,32 @@ struct KeepAlive {
     uptime:ulong;
 }
 
-struct OtaDownloadResult {
-  result: OtaDownloadResultType;
+table OtaInstallStarted {
+  version:SemVer;
 }
 
-struct OtaInstallResult {
-  result: OtaInstallResultType;
+table OtaInstallProgress {
+  task:string;
+  progress:float;
+}
+
+table OtaInstallFailed {
+  bricked:bool;
+  revertable:bool;
+  critical:bool;
+  reason:string;
+}
+
+table OtaInstallSucceeded {
+  version:SemVer;
 }
 
 union DeviceToServerMessagePayload {
   KeepAlive,
-  OtaDownloadResult,
-  OtaInstallResult,
+  OtaInstallStarted,
+  OtaInstallProgress,
+  OtaInstallFailed,
+  OtaInstallSucceeded
 }
 
 table DeviceToServerMessage (fs_serializer) {
