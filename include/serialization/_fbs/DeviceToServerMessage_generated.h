@@ -259,20 +259,20 @@ struct OtaInstallFailed FLATBUFFERS_FINAL_CLASS : private ::flatbuffers::Table {
     return "OpenShock.Serialization.OtaInstallFailed";
   }
   enum FlatBuffersVTableOffset FLATBUFFERS_VTABLE_UNDERLYING_TYPE {
-    VT_CRITICAL = 4,
-    VT_REASON = 6
+    VT_BRICKED = 4,
+    VT_MESSAGE = 6
   };
-  bool critical() const {
-    return GetField<uint8_t>(VT_CRITICAL, 0) != 0;
+  bool bricked() const {
+    return GetField<uint8_t>(VT_BRICKED, 0) != 0;
   }
-  const ::flatbuffers::String *reason() const {
-    return GetPointer<const ::flatbuffers::String *>(VT_REASON);
+  const ::flatbuffers::String *message() const {
+    return GetPointer<const ::flatbuffers::String *>(VT_MESSAGE);
   }
   bool Verify(::flatbuffers::Verifier &verifier) const {
     return VerifyTableStart(verifier) &&
-           VerifyField<uint8_t>(verifier, VT_CRITICAL, 1) &&
-           VerifyOffset(verifier, VT_REASON) &&
-           verifier.VerifyString(reason()) &&
+           VerifyField<uint8_t>(verifier, VT_BRICKED, 1) &&
+           VerifyOffset(verifier, VT_MESSAGE) &&
+           verifier.VerifyString(message()) &&
            verifier.EndTable();
   }
 };
@@ -281,11 +281,11 @@ struct OtaInstallFailedBuilder {
   typedef OtaInstallFailed Table;
   ::flatbuffers::FlatBufferBuilder &fbb_;
   ::flatbuffers::uoffset_t start_;
-  void add_critical(bool critical) {
-    fbb_.AddElement<uint8_t>(OtaInstallFailed::VT_CRITICAL, static_cast<uint8_t>(critical), 0);
+  void add_bricked(bool bricked) {
+    fbb_.AddElement<uint8_t>(OtaInstallFailed::VT_BRICKED, static_cast<uint8_t>(bricked), 0);
   }
-  void add_reason(::flatbuffers::Offset<::flatbuffers::String> reason) {
-    fbb_.AddOffset(OtaInstallFailed::VT_REASON, reason);
+  void add_message(::flatbuffers::Offset<::flatbuffers::String> message) {
+    fbb_.AddOffset(OtaInstallFailed::VT_MESSAGE, message);
   }
   explicit OtaInstallFailedBuilder(::flatbuffers::FlatBufferBuilder &_fbb)
         : fbb_(_fbb) {
@@ -300,11 +300,11 @@ struct OtaInstallFailedBuilder {
 
 inline ::flatbuffers::Offset<OtaInstallFailed> CreateOtaInstallFailed(
     ::flatbuffers::FlatBufferBuilder &_fbb,
-    bool critical = false,
-    ::flatbuffers::Offset<::flatbuffers::String> reason = 0) {
+    bool bricked = false,
+    ::flatbuffers::Offset<::flatbuffers::String> message = 0) {
   OtaInstallFailedBuilder builder_(_fbb);
-  builder_.add_reason(reason);
-  builder_.add_critical(critical);
+  builder_.add_message(message);
+  builder_.add_bricked(bricked);
   return builder_.Finish();
 }
 
@@ -315,13 +315,13 @@ struct OtaInstallFailed::Traits {
 
 inline ::flatbuffers::Offset<OtaInstallFailed> CreateOtaInstallFailedDirect(
     ::flatbuffers::FlatBufferBuilder &_fbb,
-    bool critical = false,
-    const char *reason = nullptr) {
-  auto reason__ = reason ? _fbb.CreateString(reason) : 0;
+    bool bricked = false,
+    const char *message = nullptr) {
+  auto message__ = message ? _fbb.CreateString(message) : 0;
   return OpenShock::Serialization::CreateOtaInstallFailed(
       _fbb,
-      critical,
-      reason__);
+      bricked,
+      message__);
 }
 
 struct OtaInstallSucceeded FLATBUFFERS_FINAL_CLASS : private ::flatbuffers::Table {

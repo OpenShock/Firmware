@@ -22,14 +22,14 @@ static getSizePrefixedRootAsOtaInstallFailed(bb:flatbuffers.ByteBuffer, obj?:Ota
   return (obj || new OtaInstallFailed()).__init(bb.readInt32(bb.position()) + bb.position(), bb);
 }
 
-critical():boolean {
+bricked():boolean {
   const offset = this.bb!.__offset(this.bb_pos, 4);
   return offset ? !!this.bb!.readInt8(this.bb_pos + offset) : false;
 }
 
-reason():string|null
-reason(optionalEncoding:flatbuffers.Encoding):string|Uint8Array|null
-reason(optionalEncoding?:any):string|Uint8Array|null {
+message():string|null
+message(optionalEncoding:flatbuffers.Encoding):string|Uint8Array|null
+message(optionalEncoding?:any):string|Uint8Array|null {
   const offset = this.bb!.__offset(this.bb_pos, 6);
   return offset ? this.bb!.__string(this.bb_pos + offset, optionalEncoding) : null;
 }
@@ -38,12 +38,12 @@ static startOtaInstallFailed(builder:flatbuffers.Builder) {
   builder.startObject(2);
 }
 
-static addCritical(builder:flatbuffers.Builder, critical:boolean) {
-  builder.addFieldInt8(0, +critical, +false);
+static addBricked(builder:flatbuffers.Builder, bricked:boolean) {
+  builder.addFieldInt8(0, +bricked, +false);
 }
 
-static addReason(builder:flatbuffers.Builder, reasonOffset:flatbuffers.Offset) {
-  builder.addFieldOffset(1, reasonOffset, 0);
+static addMessage(builder:flatbuffers.Builder, messageOffset:flatbuffers.Offset) {
+  builder.addFieldOffset(1, messageOffset, 0);
 }
 
 static endOtaInstallFailed(builder:flatbuffers.Builder):flatbuffers.Offset {
@@ -51,10 +51,10 @@ static endOtaInstallFailed(builder:flatbuffers.Builder):flatbuffers.Offset {
   return offset;
 }
 
-static createOtaInstallFailed(builder:flatbuffers.Builder, critical:boolean, reasonOffset:flatbuffers.Offset):flatbuffers.Offset {
+static createOtaInstallFailed(builder:flatbuffers.Builder, bricked:boolean, messageOffset:flatbuffers.Offset):flatbuffers.Offset {
   OtaInstallFailed.startOtaInstallFailed(builder);
-  OtaInstallFailed.addCritical(builder, critical);
-  OtaInstallFailed.addReason(builder, reasonOffset);
+  OtaInstallFailed.addBricked(builder, bricked);
+  OtaInstallFailed.addMessage(builder, messageOffset);
   return OtaInstallFailed.endOtaInstallFailed(builder);
 }
 }
