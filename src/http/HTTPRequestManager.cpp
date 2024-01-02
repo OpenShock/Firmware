@@ -39,12 +39,11 @@ struct RateLimit {
     }
 
     // Check if we've exceeded any limits
-    for (auto& limit : m_limits) {
-      if (m_requests.size() >= limit.count) {
-        m_blockUntilMs = now + limit.durationMs;
-        ESP_LOGW(TAG, "Rate limited for %lld milliseconds", limit.durationMs);
-        return false;
-      }
+    auto it = std::find_if(m_limits.begin(), m_limits.end(), [&m_requests](const RateLimit::Limit& limit) { return m_requests.size() >= limit.count; });
+    if (it != m_limits.end()) {
+      m_blockUntilMs = now + it->durationMs;
+      ESP_LOGW(TAG, "Rate limited for %lld milliseconds", it->durationMs);
+      return false;
     }
 
     // Add the request
@@ -86,7 +85,7 @@ StringView _getDomain(StringView url) {
   // Remove all subdomains eg. "api.example.com" -> "example.com"
   auto domainSep = url.rfind('.');
   if (domainSep == StringView::npos) {
-    return url; // E.g. "localhost"
+    return url;  // E.g. "localhost"
   }
   domainSep = url.rfind('.', domainSep - 1);
   if (domainSep != StringView::npos) {
@@ -185,7 +184,7 @@ enum ParserState : std::uint8_t {
 };
 
 ParserState _parseChunkHeader(const std::uint8_t* buffer, std::size_t bufferLen, std::size_t& headerLen, std::size_t& payloadLen) {
-  if (bufferLen < 5) { // Bare minimum: "0\r\n\r\n"
+  if (bufferLen < 5) {  // Bare minimum: "0\r\n\r\n"
     return ParserState::NeedMoreData;
   }
 
@@ -242,7 +241,7 @@ ParserState _parseChunk(const std::uint8_t* buffer, std::size_t bufferLen, std::
     }
   }
 
-  std::size_t totalLen = payloadPos + payloadLen + 2; // +2 for CRLF
+  std::size_t totalLen = payloadPos + payloadLen + 2;  // +2 for CRLF
   if (bufferLen < totalLen) {
     return ParserState::NeedMoreData;
   }
@@ -257,7 +256,7 @@ ParserState _parseChunk(const std::uint8_t* buffer, std::size_t bufferLen, std::
 }
 
 void _alignChunk(std::uint8_t* buffer, std::size_t& bufferCursor, std::size_t payloadPos, std::size_t payloadLen) {
-  std::size_t totalLen = payloadPos + payloadLen + 2; // +2 for CRLF
+  std::size_t totalLen  = payloadPos + payloadLen + 2;  // +2 for CRLF
   std::size_t remaining = bufferCursor - totalLen;
   if (remaining > 0) {
     memmove(buffer, buffer + totalLen, remaining);
@@ -268,7 +267,7 @@ void _alignChunk(std::uint8_t* buffer, std::size_t& bufferCursor, std::size_t pa
 }
 
 StreamReaderResult _readStreamDataChunked(HTTPClient& client, WiFiClient* stream, HTTP::DownloadCallback downloadCallback, std::int64_t begin, std::uint32_t timeoutMs) {
-  std::size_t totalWritten = 0;
+  std::size_t totalWritten   = 0;
   HTTP::RequestResult result = HTTP::RequestResult::Success;
 
   std::uint8_t* buffer = static_cast<std::uint8_t*>(malloc(HTTP_BUFFER_SIZE));
@@ -277,7 +276,7 @@ StreamReaderResult _readStreamDataChunked(HTTPClient& client, WiFiClient* stream
     return {HTTP::RequestResult::RequestFailed, 0};
   }
 
-  ParserState state = ParserState::NeedMoreData;
+  ParserState state        = ParserState::NeedMoreData;
   std::size_t bufferCursor = 0, payloadPos = 0, payloadSize = 0;
 
   while (client.connected() && state != ParserState::Invalid) {
@@ -333,7 +332,7 @@ parseMore:
     totalWritten += payloadSize;
     _alignChunk(buffer, bufferCursor, payloadPos, payloadSize);
     payloadSize = 0;
-    payloadPos = 0;
+    payloadPos  = 0;
 
     if (bufferCursor > 0) {
       goto parseMore;
@@ -348,7 +347,7 @@ parseMore:
 }
 
 StreamReaderResult _readStreamData(HTTPClient& client, WiFiClient* stream, std::size_t contentLength, HTTP::DownloadCallback downloadCallback, std::int64_t begin, std::uint32_t timeoutMs) {
-  std::size_t nWritten = 0;
+  std::size_t nWritten       = 0;
   HTTP::RequestResult result = HTTP::RequestResult::Success;
 
   std::uint8_t* buffer = static_cast<std::uint8_t*>(malloc(HTTP_BUFFER_SIZE));
@@ -486,7 +485,8 @@ HTTP::Response<std::size_t> _doGetStream(
   return {result.result, responseCode, result.nWritten};
 }
 
-HTTP::Response<std::size_t> HTTP::Download(StringView url, const std::map<String, String>& headers, HTTP::GotContentLengthCallback contentLengthCallback, HTTP::DownloadCallback downloadCallback, const std::vector<int>& acceptedCodes, std::uint32_t timeoutMs) {
+HTTP::Response<std::size_t>
+  HTTP::Download(StringView url, const std::map<String, String>& headers, HTTP::GotContentLengthCallback contentLengthCallback, HTTP::DownloadCallback downloadCallback, const std::vector<int>& acceptedCodes, std::uint32_t timeoutMs) {
   std::shared_ptr<RateLimit> rateLimiter = _getRateLimiter(url);
   if (rateLimiter == nullptr) {
     return {RequestResult::InvalidURL, 0, 0};
