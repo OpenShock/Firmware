@@ -39,7 +39,7 @@ struct RateLimit {
     }
 
     // Check if we've exceeded any limits
-    auto it = std::find_if(m_limits.begin(), m_limits.end(), [&m_requests](const RateLimit::Limit& limit) { return m_requests.size() >= limit.count; });
+    auto it = std::find_if(m_limits.begin(), m_limits.end(), [this](const RateLimit::Limit& limit) { return m_requests.size() >= limit.count; });
     if (it != m_limits.end()) {
       m_blockUntilMs = now + it->durationMs;
       ESP_LOGW(TAG, "Rate limited for %lld milliseconds", it->durationMs);

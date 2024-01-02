@@ -29,6 +29,7 @@ static std::array<Handlers::HandlerType, HANDLER_COUNT> s_serverHandlers = []() 
 
   SET_HANDLER(PayloadType::ShockerCommandList, Handlers::HandleShockerCommandList);
   SET_HANDLER(PayloadType::CaptivePortalConfig, Handlers::HandleCaptivePortalConfig);
+  SET_HANDLER(PayloadType::OtaInstall, Handlers::HandleOtaInstall);
 
   return handlers;
 }();

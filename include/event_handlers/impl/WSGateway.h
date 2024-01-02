@@ -11,4 +11,5 @@ namespace OpenShock::MessageHandlers::Server::_Private {
   WS_EVENT_HANDLER_SIGNATURE(HandleInvalidMessage);
   WS_EVENT_HANDLER_SIGNATURE(HandleShockerCommandList);
   WS_EVENT_HANDLER_SIGNATURE(HandleCaptivePortalConfig);
+  WS_EVENT_HANDLER_SIGNATURE(HandleOtaInstall);
 }  // namespace OpenShock::MessageHandlers::Server::_Private

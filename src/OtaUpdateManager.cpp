@@ -56,209 +56,49 @@ enum OtaTaskEventFlag : std::uint32_t {
 
 static bool _otaValidatingApp = false;
 static TaskHandle_t _taskHandle;
+static std::string _requestedVersion;
+static SemaphoreHandle_t _requestedVersionMutex = xSemaphoreCreateMutex();
 
-void _otaEvGotIPHandler(arduino_event_t* event) {
-  (void)event;
-  xTaskNotify(_taskHandle, OTA_TASK_EVENT_WIFI_CONNECTED, eSetBits);
-}
-void _otaEvWiFiDisconnectedHandler(arduino_event_t* event) {
-  (void)event;
-  xTaskNotify(_taskHandle, OTA_TASK_EVENT_WIFI_DISCONNECTED, eSetBits);
-}
-
-void _otaUpdateTask(void* arg) {
-  (void)arg;
-
-  ESP_LOGD(TAG, "OTA update task started");
-
-  bool connected               = false;
-  bool updateRequested         = false;
-  std::int64_t lastUpdateCheck = 0;
-
-  // Update task loop.
-  while (true) {
-    // Wait for event.
-    uint32_t eventBits = 0;
-    xTaskNotifyWait(0, UINT32_MAX, &eventBits, pdMS_TO_TICKS(5000));
-
-    updateRequested |= (eventBits & OTA_TASK_EVENT_UPDATE_REQUESTED) != 0;
-
-    if ((eventBits & OTA_TASK_EVENT_WIFI_DISCONNECTED) != 0) {
-      ESP_LOGD(TAG, "WiFi disconnected");
-      connected = false;
-      continue;  // No further processing needed.
-    }
-
-    if ((eventBits & OTA_TASK_EVENT_WIFI_CONNECTED) != 0 && !connected) {
-      ESP_LOGD(TAG, "WiFi connected");
-      connected = true;
-    }
-
-    // If we're not connected, continue.
-    if (!connected) {
-      continue;
-    }
-
-    std::int64_t now = OpenShock::millis();
-
-    Config::OtaUpdateConfig config;
-    if (!Config::GetOtaUpdateConfig(config)) {
-      ESP_LOGE(TAG, "Failed to get OTA update config");
-      continue;
-    }
-
-    if (!config.isEnabled) {
-      continue;
-    }
-
-    std::int64_t diff = now - lastUpdateCheck;
-
-    bool check = false;
-    check |= config.checkOnStartup && lastUpdateCheck == 0;                        // On startup
-    check |= config.checkPeriodically && diff >= config.checkInterval * 60'000LL;  // Periodically
-    check |= updateRequested && diff >= 60'000LL;                                  // Rate limit update requests to once per minute
-
-    lastUpdateCheck = now;
-
-    if (!check) {
-      continue;
-    }
-
-    if (config.requireManualApproval) {
-      ESP_LOGD(TAG, "Manual approval required, skipping update check");
-      // TODO: IMPLEMENT
-      continue;
-    }
-
-    updateRequested = false;
-
-    ESP_LOGD(TAG, "Checking for updates");
-
-    // Fetch current version.
-    std::string version;
-    if (!OtaUpdateManager::TryGetFirmwareVersion(config.updateChannel, version)) {
-      ESP_LOGE(TAG, "Failed to fetch firmware version");
-      continue;
-    }
-
-    ESP_LOGD(TAG, "Current version: %s", version.c_str());
-
-    // Compare to current version.
-    if (version == OPENSHOCK_FW_VERSION) {
-      ESP_LOGD(TAG, "Already up to date");
-      continue;
-    }
-
-    // Fetch current release.
-    OtaUpdateManager::FirmwareRelease release;
-    if (!OtaUpdateManager::TryGetFirmwareRelease(version, release)) {
-      ESP_LOGE(TAG, "Failed to fetch firmware release");
-      continue;
-    }
-
-    // Print release.
-    ESP_LOGD(TAG, "Firmware release:");
-    ESP_LOGD(TAG, "  Version:                %s", release.version.c_str());
-    ESP_LOGD(TAG, "  App binary URL:         %s", release.appBinaryUrl.c_str());
-    ESP_LOGD(TAG, "  Filesystem binary URL:  %s", release.filesystemBinaryUrl.c_str());
-    ESP_LOGD(TAG, "  File hashes:");
-    for (const auto& entry : release.hashMap) {
-      auto hex = HexUtils::ToHex<32>(entry.second, false);
-      ESP_LOGD(TAG, "    %s: %s", entry.first.c_str(), hex.data());
-    }
-
-    // Flash app partition.
-    if (!OtaUpdateManager::FlashAppPartition(release)) {
-      ESP_LOGE(TAG, "Failed to flash app partition");
-      continue;
-    }
-
-    // Flash filesystem partition.
-    if (!OtaUpdateManager::FlashFilesystemPartition(release)) {
-      ESP_LOGE(TAG, "Failed to flash filesystem partition");
-      continue;
-    }
-
-    // Restart.
-    ESP_LOGI(TAG, "Restarting in 5 seconds...");
-    vTaskDelay(pdMS_TO_TICKS(5000));
-    esp_restart();
-  }
-}
-
-bool OtaUpdateManager::Init() {
-  ESP_LOGD(TAG, "Fetching current partition");
-
-  // Fetch current partition info.
-  const esp_partition_t* partition = esp_ota_get_running_partition();
-  if (partition == nullptr) {
-    ESP_PANIC(TAG, "Failed to get currently running partition");
-    return false;  // This will never be reached, but the compiler doesn't know that.
-  }
-
-  ESP_LOGD(TAG, "Fetching partition state");
-
-  // Get OTA state for said partition.
-  esp_ota_img_states_t states;
-  esp_err_t err = esp_ota_get_state_partition(partition, &states);
-  if (err != ESP_OK) {
-    ESP_PANIC(TAG, "Failed to get partition state: %s", esp_err_to_name(err));
-    return false;  // This will never be reached, but the compiler doesn't know that.
-  }
-
-  ESP_LOGD(TAG, "Partition state: %u", states);
-
-  // If the currently booting partition is being verified, set correct state.
-  _otaValidatingApp = states == ESP_OTA_IMG_PENDING_VERIFY;
-
-  // Configure event triggers.
-  Config::OtaUpdateConfig otaUpdateConfig;
-  if (!Config::GetOtaUpdateConfig(otaUpdateConfig)) {
-    ESP_LOGE(TAG, "Failed to get OTA update config");
+bool _tryQueueUpdateRequest(StringView version) {
+  if (xSemaphoreTake(_requestedVersionMutex, pdMS_TO_TICKS(1000)) != pdTRUE) {
+    ESP_LOGE(TAG, "Failed to take requested version mutex");
     return false;
   }
 
-  WiFi.onEvent(_otaEvGotIPHandler, ARDUINO_EVENT_WIFI_STA_GOT_IP);
-  WiFi.onEvent(_otaEvGotIPHandler, ARDUINO_EVENT_WIFI_STA_GOT_IP6);
-  WiFi.onEvent(_otaEvWiFiDisconnectedHandler, ARDUINO_EVENT_WIFI_STA_DISCONNECTED);
+  if (!_requestedVersion.empty()) {
+    ESP_LOGW(TAG, "Update request already queued");
+    xSemaphoreGive(_requestedVersionMutex);
+    return false;
+  }
 
-  // Start OTA update task.
-  TaskUtils::TaskCreateExpensive(_otaUpdateTask, "OTA Update", 8192, nullptr, 1, &_taskHandle);
+  _requestedVersion = version.toString();
+
+  xSemaphoreGive(_requestedVersionMutex);
+
+  xTaskNotify(_taskHandle, OTA_TASK_EVENT_UPDATE_REQUESTED, eSetBits);
 
   return true;
 }
 
-bool _tryGetStringList(StringView url, std::vector<std::string>& list) {
-  auto response = OpenShock::HTTP::GetString(
-    url,
-    {
-      {"Accept", "text/plain"}
-  },
-    {200, 304}
-  );
-  if (response.result != OpenShock::HTTP::RequestResult::Success) {
-    ESP_LOGE(TAG, "Failed to fetch list: [%u] %s", response.code, response.data.c_str());
+bool _tryGetRequestedVersion(std::string& version) {
+  if (xSemaphoreTake(_requestedVersionMutex, pdMS_TO_TICKS(1000)) != pdTRUE) {
+    ESP_LOGE(TAG, "Failed to take requested version mutex");
     return false;
   }
 
-  list.clear();
-
-  OpenShock::StringView data = response.data;
-
-  for (auto line : data.splitLines()) {
-    line = line.trim();
-
-    if (line.isNullOrEmpty()) {
-      continue;
-    }
-
-    list.push_back(line.toString());
+  if (_requestedVersion.empty()) {
+    xSemaphoreGive(_requestedVersionMutex);
+    return false;
   }
+
+  version = std::move(_requestedVersion);
+  _requestedVersion.clear();
+
+  xSemaphoreGive(_requestedVersionMutex);
 
   return true;
 }
 
-// Retries if buffer is too small.
 bool _printfToString(std::string& out, const char* format, ...) {
   constexpr std::size_t STACK_BUFFER_SIZE = 128;
 
@@ -310,40 +150,23 @@ bool _printfToString(std::string& out, const char* format, ...) {
   return true;
 }
 
-bool OtaUpdateManager::TryGetFirmwareVersion(OtaUpdateChannel channel, std::string& version) {
-  const char* channelIndexUrl = nullptr;
-  switch (channel) {
-    case OtaUpdateChannel::Stable:
-      channelIndexUrl = OPENSHOCK_FW_CDN_STABLE_URL;
-      break;
-    case OtaUpdateChannel::Beta:
-      channelIndexUrl = OPENSHOCK_FW_CDN_BETA_URL;
-      break;
-    case OtaUpdateChannel::Develop:
-      channelIndexUrl = OPENSHOCK_FW_CDN_DEVELOP_URL;
-      break;
-    default:
-      ESP_LOGE(TAG, "Unknown channel: %u", channel);
-      return false;
+void _otaEvGotIPHandler(arduino_event_t* event) {
+  (void)event;
+  xTaskNotify(_taskHandle, OTA_TASK_EVENT_WIFI_CONNECTED, eSetBits);
+}
+void _otaEvWiFiDisconnectedHandler(arduino_event_t* event) {
+  (void)event;
+  xTaskNotify(_taskHandle, OTA_TASK_EVENT_WIFI_DISCONNECTED, eSetBits);
+}
+
+bool _tryForceCloseCaptivePortal(TickType_t timeout) {
+  OpenShock::CaptivePortal::SetForceClosed(true);
+  while (OpenShock::CaptivePortal::IsRunning() && timeout > 0) {
+    vTaskDelay(pdMS_TO_TICKS(std::min(timeout, 100U)));
+    OpenShock::CaptivePortal::SetForceClosed(true);
   }
 
-  ESP_LOGD(TAG, "Fetching firmware version from %s", channelIndexUrl);
-
-  auto response = OpenShock::HTTP::GetString(
-    channelIndexUrl,
-    {
-      {"Accept", "text/plain"}
-  },
-    {200, 304}
-  );
-  if (response.result != OpenShock::HTTP::RequestResult::Success) {
-    ESP_LOGE(TAG, "Failed to fetch firmware version: [%u] %s", response.code, response.data.c_str());
-    return false;
-  }
-
-  version = response.data;
-
-  return true;
+  return !OpenShock::CaptivePortal::IsRunning();
 }
 
 bool _flashPartition(const esp_partition_t* partition, StringView remoteUrl, const std::array<std::uint8_t, 32>& remoteHash, std::function<bool(std::size_t, std::size_t, float)> progressCallback = nullptr) {
@@ -424,6 +247,306 @@ bool _flashPartition(const esp_partition_t* partition, StringView remoteUrl, con
   return true;
 }
 
+bool _flashAppPartition(const esp_partition_t* partition, StringView remoteUrl, const std::array<std::uint8_t, 32>& remoteHash) {
+  ESP_LOGD(TAG, "Flashing app partition");
+
+  auto onProgress = [](std::size_t current, std::size_t total, float progress) -> bool {
+    // TODO: Implement
+    ESP_LOGD(TAG, "Flashing app partition: %u / %u (%.2f%%)", current, total, progress * 100.0f);
+    return true;
+  };
+
+  if (!_flashPartition(partition, remoteUrl, remoteHash, onProgress)) {
+    ESP_LOGE(TAG, "Failed to flash app partition");
+    return false;
+  }
+
+  // Set app partition bootable.
+  if (esp_ota_set_boot_partition(partition) != ESP_OK) {
+    ESP_LOGE(TAG, "Failed to set app partition bootable");
+    return false;
+  }
+
+  return true;
+}
+
+bool _flashFilesystemPartition(const esp_partition_t* parition, StringView remoteUrl, const std::array<std::uint8_t, 32>& remoteHash) {
+  // Make sure captive portal is stopped.
+  if (!_tryForceCloseCaptivePortal(5000U)) { // 5 seconds
+    ESP_LOGE(TAG, "Failed to force close captive portal (timed out)");
+    return false;
+  }
+
+  ESP_LOGD(TAG, "Flashing filesystem partition");
+
+  auto onProgress = [](std::size_t current, std::size_t total, float progress) -> bool {
+    // TODO: Implement
+    ESP_LOGD(TAG, "Flashing filesystem partition: %u / %u (%.2f%%)", current, total, progress * 100.0f);
+    return true;
+  };
+
+  if (!_flashPartition(parition, remoteUrl, remoteHash, onProgress)) {
+    ESP_LOGE(TAG, "Failed to flash filesystem partition");
+    return false;
+  }
+
+  // Attempt to mount filesystem.
+  fs::LittleFSFS test;
+  if (!test.begin(false, "/static", 10, "static0")) {
+    ESP_LOGE(TAG, "Failed to mount filesystem");
+    return false;
+  }
+  test.end();
+
+  OpenShock::CaptivePortal::SetForceClosed(false);
+
+  return true;
+}
+
+void _otaUpdateTask(void* arg) {
+  (void)arg;
+
+  ESP_LOGD(TAG, "OTA update task started");
+
+  bool connected               = false;
+  bool updateRequested         = false;
+  std::int64_t lastUpdateCheck = 0;
+
+  // Update task loop.
+  while (true) {
+    // Wait for event.
+    uint32_t eventBits = 0;
+    xTaskNotifyWait(0, UINT32_MAX, &eventBits, pdMS_TO_TICKS(5000));
+
+    updateRequested |= (eventBits & OTA_TASK_EVENT_UPDATE_REQUESTED) != 0;
+
+    if ((eventBits & OTA_TASK_EVENT_WIFI_DISCONNECTED) != 0) {
+      ESP_LOGD(TAG, "WiFi disconnected");
+      connected = false;
+      continue;  // No further processing needed.
+    }
+
+    if ((eventBits & OTA_TASK_EVENT_WIFI_CONNECTED) != 0 && !connected) {
+      ESP_LOGD(TAG, "WiFi connected");
+      connected = true;
+    }
+
+    // If we're not connected, continue.
+    if (!connected) {
+      continue;
+    }
+
+    std::int64_t now = OpenShock::millis();
+
+    Config::OtaUpdateConfig config;
+    if (!Config::GetOtaUpdateConfig(config)) {
+      ESP_LOGE(TAG, "Failed to get OTA update config");
+      continue;
+    }
+
+    if (!config.isEnabled) {
+      continue;
+    }
+
+    std::int64_t diff = now - lastUpdateCheck;
+
+    bool check = false;
+    check |= config.checkOnStartup && lastUpdateCheck == 0;                        // On startup
+    check |= config.checkPeriodically && diff >= config.checkInterval * 60'000LL;  // Periodically
+    check |= updateRequested && diff >= 60'000LL;                                  // Rate limit update requests to once per minute
+
+    lastUpdateCheck = now;
+
+    if (!check) {
+      continue;
+    }
+
+    if (config.requireManualApproval) {
+      ESP_LOGD(TAG, "Manual approval required, skipping update check");
+      // TODO: IMPLEMENT
+      continue;
+    }
+
+    std::string version;
+    if (updateRequested) {
+      updateRequested = false;
+
+      if (!_tryGetRequestedVersion(version)) {
+        ESP_LOGE(TAG, "Failed to get requested version");
+        continue;
+      }
+
+      ESP_LOGD(TAG, "Update requested for version %s", version.c_str());
+    } else {
+      ESP_LOGD(TAG, "Checking for updates");
+
+      // Fetch current version.
+      std::string version;
+      if (!OtaUpdateManager::TryGetFirmwareVersion(config.updateChannel, version)) {
+        ESP_LOGE(TAG, "Failed to fetch firmware version");
+        continue;
+      }
+
+      ESP_LOGD(TAG, "Remote version: %s", version.c_str());
+    }
+
+    if (version == OPENSHOCK_FW_VERSION) {
+      ESP_LOGI(TAG, "Requested version is already installed"); // TODO: Send error message to server
+      continue;
+    }
+
+    // Fetch current release.
+    OtaUpdateManager::FirmwareRelease release;
+    if (!OtaUpdateManager::TryGetFirmwareRelease(version, release)) {
+      ESP_LOGE(TAG, "Failed to fetch firmware release"); // TODO: Send error message to server
+      continue;
+    }
+
+    // Print release.
+    ESP_LOGD(TAG, "Firmware release:");
+    ESP_LOGD(TAG, "  Version:                %s", version.c_str());
+    ESP_LOGD(TAG, "  App binary URL:         %s", release.appBinaryUrl.c_str());
+    ESP_LOGD(TAG, "  App binary hash:        %s", HexUtils::ToHex<32>(release.appBinaryHash).data());
+    ESP_LOGD(TAG, "  Filesystem binary URL:  %s", release.filesystemBinaryUrl.c_str());
+    ESP_LOGD(TAG, "  Filesystem binary hash: %s", HexUtils::ToHex<32>(release.filesystemBinaryHash).data());
+
+    // Get available app update partition.
+    const esp_partition_t* appPartition = esp_ota_get_next_update_partition(nullptr);
+    if (appPartition == nullptr) {
+      ESP_LOGE(TAG, "Failed to get app update partition"); // TODO: Send error message to server
+      continue;
+    }
+
+    // Get filesystem partition.
+    const esp_partition_t* filesystemPartition = esp_partition_find_first(ESP_PARTITION_TYPE_DATA, ESP_PARTITION_SUBTYPE_DATA_SPIFFS, "static0");
+    if (filesystemPartition == nullptr) {
+      ESP_LOGE(TAG, "Failed to find filesystem partition"); // TODO: Send error message to server
+      continue;
+    }
+
+    // Flash app and filesystem partitions.
+    if (!_flashFilesystemPartition(filesystemPartition, release.filesystemBinaryUrl, release.filesystemBinaryHash)) {
+      continue; // TODO: Send error message to server
+    }
+    if (!_flashAppPartition(appPartition, release.appBinaryUrl, release.appBinaryHash)) {
+      continue; // TODO: Send error message to server
+    }
+
+    // Restart.
+    ESP_LOGI(TAG, "Restarting in 5 seconds...");
+    vTaskDelay(pdMS_TO_TICKS(5000));
+    esp_restart();
+  }
+}
+
+bool _tryGetStringList(StringView url, std::vector<std::string>& list) {
+  auto response = OpenShock::HTTP::GetString(
+    url,
+    {
+      {"Accept", "text/plain"}
+  },
+    {200, 304}
+  );
+  if (response.result != OpenShock::HTTP::RequestResult::Success) {
+    ESP_LOGE(TAG, "Failed to fetch list: [%u] %s", response.code, response.data.c_str());
+    return false;
+  }
+
+  list.clear();
+
+  OpenShock::StringView data = response.data;
+
+  for (auto line : data.splitLines()) {
+    line = line.trim();
+
+    if (line.isNullOrEmpty()) {
+      continue;
+    }
+
+    list.push_back(line.toString());
+  }
+
+  return true;
+}
+
+bool OtaUpdateManager::Init() {
+  ESP_LOGD(TAG, "Fetching current partition");
+
+  // Fetch current partition info.
+  const esp_partition_t* partition = esp_ota_get_running_partition();
+  if (partition == nullptr) {
+    ESP_PANIC(TAG, "Failed to get currently running partition");
+    return false;  // This will never be reached, but the compiler doesn't know that.
+  }
+
+  ESP_LOGD(TAG, "Fetching partition state");
+
+  // Get OTA state for said partition.
+  esp_ota_img_states_t states;
+  esp_err_t err = esp_ota_get_state_partition(partition, &states);
+  if (err != ESP_OK) {
+    ESP_PANIC(TAG, "Failed to get partition state: %s", esp_err_to_name(err));
+    return false;  // This will never be reached, but the compiler doesn't know that.
+  }
+
+  ESP_LOGD(TAG, "Partition state: %u", states);
+
+  // If the currently booting partition is being verified, set correct state.
+  _otaValidatingApp = states == ESP_OTA_IMG_PENDING_VERIFY;
+
+  // Configure event triggers.
+  Config::OtaUpdateConfig otaUpdateConfig;
+  if (!Config::GetOtaUpdateConfig(otaUpdateConfig)) {
+    ESP_LOGE(TAG, "Failed to get OTA update config");
+    return false;
+  }
+
+  WiFi.onEvent(_otaEvGotIPHandler, ARDUINO_EVENT_WIFI_STA_GOT_IP);
+  WiFi.onEvent(_otaEvGotIPHandler, ARDUINO_EVENT_WIFI_STA_GOT_IP6);
+  WiFi.onEvent(_otaEvWiFiDisconnectedHandler, ARDUINO_EVENT_WIFI_STA_DISCONNECTED);
+
+  // Start OTA update task.
+  TaskUtils::TaskCreateExpensive(_otaUpdateTask, "OTA Update", 8192, nullptr, 1, &_taskHandle);
+
+  return true;
+}
+
+bool OtaUpdateManager::TryGetFirmwareVersion(OtaUpdateChannel channel, std::string& version) {
+  const char* channelIndexUrl = nullptr;
+  switch (channel) {
+    case OtaUpdateChannel::Stable:
+      channelIndexUrl = OPENSHOCK_FW_CDN_STABLE_URL;
+      break;
+    case OtaUpdateChannel::Beta:
+      channelIndexUrl = OPENSHOCK_FW_CDN_BETA_URL;
+      break;
+    case OtaUpdateChannel::Develop:
+      channelIndexUrl = OPENSHOCK_FW_CDN_DEVELOP_URL;
+      break;
+    default:
+      ESP_LOGE(TAG, "Unknown channel: %u", channel);
+      return false;
+  }
+
+  ESP_LOGD(TAG, "Fetching firmware version from %s", channelIndexUrl);
+
+  auto response = OpenShock::HTTP::GetString(
+    channelIndexUrl,
+    {
+      {"Accept", "text/plain"}
+  },
+    {200, 304}
+  );
+  if (response.result != OpenShock::HTTP::RequestResult::Success) {
+    ESP_LOGE(TAG, "Failed to fetch firmware version: [%u] %s", response.code, response.data.c_str());
+    return false;
+  }
+
+  version = response.data;
+
+  return true;
+}
+
 bool OtaUpdateManager::TryGetFirmwareBoards(const std::string& version, std::vector<std::string>& boards) {
   std::string channelIndexUrl;
   if (!_printfToString(channelIndexUrl, OPENSHOCK_FW_CDN_BOARDS_INDEX_URL_FORMAT, version.c_str())) {
@@ -441,9 +564,16 @@ bool OtaUpdateManager::TryGetFirmwareBoards(const std::string& version, std::vec
   return true;
 }
 
-bool OtaUpdateManager::TryGetFirmwareRelease(const std::string& version, FirmwareRelease& release) {
-  release.version = version;
+bool _tryParseIntoHash(const std::string& hash, std::array<std::uint8_t, 32>& hashBytes) {
+  if (!HexUtils::TryParseHex(hash.data(), hash.size(), hashBytes.data(), hashBytes.size())) {
+    ESP_LOGE(TAG, "Failed to parse hash: %.*s", hash.size(), hash.data());
+    return false;
+  }
 
+  return true;
+}
+
+bool OtaUpdateManager::TryGetFirmwareRelease(const std::string& version, FirmwareRelease& release) {
   if (!_printfToString(release.appBinaryUrl, OPENSHOCK_FW_CDN_APP_URL_FORMAT, version.c_str())) {
     ESP_LOGE(TAG, "Failed to format URL");
     return false;
@@ -477,6 +607,7 @@ bool OtaUpdateManager::TryGetFirmwareRelease(const std::string& version, Firmwar
   auto hashesLines = OpenShock::StringView(sha256HashesResponse.data).splitLines();
 
   // Parse hashes.
+  bool foundAppHash = false,foundFilesystemHash = false;
   for (auto line : hashesLines) {
     auto parts = line.splitWhitespace();
     if (parts.size() != 2) {
@@ -487,108 +618,47 @@ bool OtaUpdateManager::TryGetFirmwareRelease(const std::string& version, Firmwar
     auto hash = parts[0].trim();
     auto file = parts[1].trim();
 
+    if (file.startsWith("./")) {
+      file = file.substr(2);
+    }
+
     if (hash.size() != 64) {
       ESP_LOGE(TAG, "Invalid hash: %.*s", hash.size(), hash.data());
       return false;
     }
 
-    ESP_LOGD(TAG, "Hash for %.*s: %.*s", file.size(), file.data(), hash.size(), hash.data());
+    if (file == "app.bin") {
+      if (foundAppHash) {
+        ESP_LOGE(TAG, "Duplicate hash for app.bin");
+        return false;
+      }
 
-    std::array<std::uint8_t, 32> hashBytes;
-    if (!HexUtils::TryParseHex(hash.data(), hash.size(), hashBytes.data(), hashBytes.size())) {
-      ESP_LOGE(TAG, "Failed to parse hash: %.*s", hash.size(), hash.data());
-      return false;
+      if (!_tryParseIntoHash(hash.toString(), release.appBinaryHash)) {
+        return false;
+      }
+
+      foundAppHash = true;
+    } else if (file == "staticfs.bin") {
+      if (foundFilesystemHash) {
+        ESP_LOGE(TAG, "Duplicate hash for staticfs.bin");
+        return false;
+      }
+
+      if (!_tryParseIntoHash(hash.toString(), release.filesystemBinaryHash)) {
+        return false;
+      }
+
+      foundFilesystemHash = true;
     }
-
-    release.hashMap.emplace(file.toString(), std::move(hashBytes));
   }
 
   return true;
 }
 
-bool OtaUpdateManager::FlashAppPartition(const FirmwareRelease& release) {
-  // Get hash for current app partition.
-  auto fileHashIt = release.hashMap.find("./app.bin");
-  if (fileHashIt == release.hashMap.end()) {
-    ESP_LOGE(TAG, "No hash for app.bin");
-    return false;
-  }
+bool OtaUpdateManager::TryStartFirmwareInstallation(OpenShock::StringView version) {
+  ESP_LOGD(TAG, "Requesting firmware version %.*s", version.size(), version.data());
 
-  ESP_LOGD(TAG, "Flashing app partition");
-
-  // Get available app update partition.
-  const esp_partition_t* appPartition = esp_ota_get_next_update_partition(nullptr);
-  if (appPartition == nullptr) {
-    ESP_LOGE(TAG, "Failed to get app update partition");
-    return false;
-  }
-
-  auto onProgress = [](std::size_t current, std::size_t total, float progress) -> bool {
-    // TODO: Implement
-    ESP_LOGD(TAG, "Flashing app partition: %u / %u (%.2f%%)", current, total, progress * 100.0f);
-    return true;
-  };
-
-  if (!_flashPartition(appPartition, release.appBinaryUrl, fileHashIt->second, onProgress)) {
-    ESP_LOGE(TAG, "Failed to flash app partition");
-    return false;
-  }
-
-  // Set app partition bootable.
-  if (esp_ota_set_boot_partition(appPartition) != ESP_OK) {
-    ESP_LOGE(TAG, "Failed to set app partition bootable");
-    return false;
-  }
-
-  return true;
-}
-
-bool OtaUpdateManager::FlashFilesystemPartition(const FirmwareRelease& release) {
-  // Get hash for current filesystem partition.
-  auto fileHashIt = release.hashMap.find("./staticfs.bin");
-  if (fileHashIt == release.hashMap.end()) {
-    ESP_LOGE(TAG, "No hash for staticfs.bin");
-    return false;
-  }
-
-  // Make sure captive portal is stopped.
-  OpenShock::CaptivePortal::SetForceClosed(true);
-  while (OpenShock::CaptivePortal::IsRunning()) {
-    vTaskDelay(pdMS_TO_TICKS(100));
-    OpenShock::CaptivePortal::SetForceClosed(true);
-  }
-
-  ESP_LOGD(TAG, "Flashing filesystem partition");
-
-  // Open filesystem partition.
-  const esp_partition_t* filesystemPartition = esp_partition_find_first(ESP_PARTITION_TYPE_DATA, ESP_PARTITION_SUBTYPE_DATA_SPIFFS, "static0");
-  if (filesystemPartition == nullptr) {
-    ESP_LOGE(TAG, "Failed to find filesystem partition");
-    return false;
-  }
-
-  auto onProgress = [](std::size_t current, std::size_t total, float progress) -> bool {
-    // TODO: Implement
-    ESP_LOGD(TAG, "Flashing filesystem partition: %u / %u (%.2f%%)", current, total, progress * 100.0f);
-    return true;
-  };
-
-  if (!_flashPartition(filesystemPartition, release.filesystemBinaryUrl, fileHashIt->second, onProgress)) {
-    ESP_LOGE(TAG, "Failed to flash filesystem partition");
-    return false;
-  }
-
-  // Attempt to mount filesystem.
-  fs::LittleFSFS test;
-  if (!test.begin(false, "/static", 10, "static0")) {
-    ESP_LOGE(TAG, "Failed to mount filesystem");
-    return false;
-  }
-  test.end();
-
-  OpenShock::CaptivePortal::SetForceClosed(false);
-
-  return true;
+  return _tryQueueUpdateRequest(version);
 }
 
 bool OtaUpdateManager::IsValidatingApp() {
