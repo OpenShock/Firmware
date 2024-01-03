@@ -126,7 +126,7 @@ body:
       label: 'Gateway checks'
       options:
         - label: 'Can use pairing code to connect board to gateway server'
-        - label: 'Shows up as online on server board list (depends on API, LiveControlGateway and WebUI)'
+        - label: 'Shows up as online on server board list (depends on API, LiveControlGateway and Captive Portal)'
 
   - type: markdown
     attributes:
