@@ -26,8 +26,17 @@ bool BackendConfig::FromFlatbuffers(const Serialization::Configuration::BackendC
   return true;
 }
 
-flatbuffers::Offset<OpenShock::Serialization::Configuration::BackendConfig> BackendConfig::ToFlatbuffers(flatbuffers::FlatBufferBuilder& builder) const {
-  return Serialization::Configuration::CreateBackendConfig(builder, builder.CreateString(domain), builder.CreateString(authToken));
+flatbuffers::Offset<OpenShock::Serialization::Configuration::BackendConfig> BackendConfig::ToFlatbuffers(flatbuffers::FlatBufferBuilder& builder, bool withSensitiveData) const {
+  auto domainOffset = builder.CreateString(domain);
+
+  flatbuffers::Offset<flatbuffers::String> authTokenOffset;
+  if (withSensitiveData) {
+    authTokenOffset = builder.CreateString(authToken);
+  } else {
+    authTokenOffset = 0;
+  }
+
+  return Serialization::Configuration::CreateBackendConfig(builder, domainOffset, authTokenOffset);
 }
 
 bool BackendConfig::FromJSON(const cJSON* json) {
@@ -47,11 +56,13 @@ bool BackendConfig::FromJSON(const cJSON* json) {
   return true;
 }
 
-cJSON* BackendConfig::ToJSON() const {
+cJSON* BackendConfig::ToJSON(bool withSensitiveData) const {
   cJSON* root = cJSON_CreateObject();
 
   cJSON_AddStringToObject(root, "domain", domain.c_str());
-  cJSON_AddStringToObject(root, "authToken", authToken.c_str());
+  if (withSensitiveData) {
+    cJSON_AddStringToObject(root, "authToken", authToken.c_str());
+  }
 
   return root;
 }

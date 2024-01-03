@@ -29,7 +29,7 @@ bool RFConfig::FromFlatbuffers(const Serialization::Configuration::RFConfig* con
   return true;
 }
 
-flatbuffers::Offset<OpenShock::Serialization::Configuration::RFConfig> RFConfig::ToFlatbuffers(flatbuffers::FlatBufferBuilder& builder) const {
+flatbuffers::Offset<OpenShock::Serialization::Configuration::RFConfig> RFConfig::ToFlatbuffers(flatbuffers::FlatBufferBuilder& builder, bool withSensitiveData) const {
   return Serialization::Configuration::CreateRFConfig(builder, txPin, keepAliveEnabled);
 }
 
@@ -50,7 +50,7 @@ bool RFConfig::FromJSON(const cJSON* json) {
   return true;
 }
 
-cJSON* RFConfig::ToJSON() const {
+cJSON* RFConfig::ToJSON(bool withSensitiveData) const {
   cJSON* root = cJSON_CreateObject();
 
   cJSON_AddNumberToObject(root, "txPin", txPin);  //-V2564

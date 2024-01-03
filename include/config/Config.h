@@ -15,7 +15,7 @@ namespace OpenShock::Config {
   void Init();
 
   /* GetAsJSON and SaveFromJSON are used for Reading/Writing the config file in its human-readable form. */
-  std::string GetAsJSON();
+  std::string GetAsJSON(bool withSensitiveData);
   bool SaveFromJSON(const std::string& json);
 
   /* GetRaw and SetRaw are used for Reading/Writing the config file in its binary form. */
@@ -31,7 +31,7 @@ namespace OpenShock::Config {
 
   bool GetRFConfig(RFConfig& out);
   bool GetWiFiConfig(WiFiConfig& out);
-  bool GetWiFiCredentials(cJSON* array);
+  bool GetWiFiCredentials(cJSON* array, bool withSensitiveData);
   bool GetWiFiCredentials(std::vector<WiFiCredentials>& out);
 
   bool SetRFConfig(const RFConfig& config);

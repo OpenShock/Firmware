@@ -102,7 +102,7 @@ bool _trySaveConfig(const std::uint8_t* data, std::size_t dataLen) {
 bool _trySaveConfig() {
   flatbuffers::FlatBufferBuilder builder;
 
-  auto fbsConfig = _configData.ToFlatbuffers(builder);
+  auto fbsConfig = _configData.ToFlatbuffers(builder, true);
 
   builder.Finish(fbsConfig);
 
@@ -132,13 +132,13 @@ void Config::Init() {
   }
 }
 
-std::string Config::GetAsJSON() {
+std::string Config::GetAsJSON(bool withSensitiveData) {
   ScopedReadLock lock(&_configMutex);
   if (!lock.isLocked()) {
     return "";
   }
 
-  cJSON* root = _configData.ToJSON();
+  cJSON* root = _configData.ToJSON(withSensitiveData);
 
   lock.unlock();
 
@@ -248,7 +248,7 @@ bool Config::GetWiFiConfig(Config::WiFiConfig& out) {
   return true;
 }
 
-bool Config::GetWiFiCredentials(cJSON* array) {
+bool Config::GetWiFiCredentials(cJSON* array, bool withSensitiveData) {
   ScopedReadLock lock(&_configMutex);
   if (!lock.isLocked()) {
     ESP_LOGE(TAG, "Failed to acquire read lock");
@@ -256,7 +256,7 @@ bool Config::GetWiFiCredentials(cJSON* array) {
   }
 
   for (auto& creds : _configData.wifi.credentialsList) {
-    cJSON* jsonCreds = creds.ToJSON();
+    cJSON* jsonCreds = creds.ToJSON(withSensitiveData);
 
     cJSON_AddItemToArray(array, jsonCreds);
   }
