@@ -33,11 +33,11 @@ runs:
       shell: bash
       run: pip install -r requirements.txt
 
-    - name: Download built captive portal
+    - name: Download built frontend
       uses: actions/download-artifact@v3
       with:
-        name: captive-portal
-        path: WebUI/build/
+        name: frontend
+        path: frontend/build/
 
     - name: Build filesystem
       shell: bash

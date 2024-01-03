@@ -26,7 +26,7 @@ jobs:
   get-targets:
     uses: ./.github/workflows/get-targets.yml
 
-  build-captive-portal:
+  build-frontend:
     runs-on: ubuntu-latest
 
     steps:
@@ -34,15 +34,15 @@ jobs:
         with:
           sparse-checkout: |
             .github
-            WebUI
+            frontend
 
-      - uses: ./.github/actions/build-captive-portal
+      - uses: ./.github/actions/build-frontend
         with:
           node-version: ${{ env.NODE_VERSION }}
 
   build-filesystem:
     runs-on: ubuntu-latest
-    needs: build-captive-portal
+    needs: build-frontend
 
     steps:
       - uses: actions/checkout@v4

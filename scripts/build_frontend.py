@@ -165,11 +165,11 @@ def minify_fa_font(font_path, icon_map):
 
 def build_frontend(source, target, env):
     # Change working directory to frontend.
-    os.chdir('WebUI')
+    os.chdir('frontend')
 
-    # Build the captive portal only if it wasn't already built.
-    # This is to avoid rebuilding the captive portal every time the firmware is built.
-    # This could also lead to some annoying behaviour where the captive portal is not updated when the firmware is built.
+    # Build the frontend only if it wasn't already built.
+    # This is to avoid rebuilding the frontend every time the firmware is built.
+    # This could also lead to some annoying behaviour where the frontend is not updated when the firmware is built.
     if not sysenv.get_bool('CI', False):
         print('Building frontend...')
         os.system('npm i')
@@ -179,11 +179,11 @@ def build_frontend(source, target, env):
     # Change working directory back to root.
     os.chdir('..')
 
-    fa_css = 'WebUI/build/fa/fa-all.css'
-    fa_woff2 = 'WebUI/build/fa/fa-solid-900.woff2'
+    fa_css = 'frontend/build/fa/fa-all.css'
+    fa_woff2 = 'frontend/build/fa/fa-solid-900.woff2'
 
     # Analyze the frontend to find all the font awesome icons in use and which css selectors from fa-all.css are unused.
-    (icon_map, unused_css_selectors) = get_fa_icon_map('WebUI/src', fa_css)
+    (icon_map, unused_css_selectors) = get_fa_icon_map('frontend/src', fa_css)
     print('Found ' + str(len(icon_map)) + ' font awesome icons.')
 
     # Write a minified css and font file to the static directory.
@@ -195,9 +195,9 @@ def build_frontend(source, target, env):
     copy_actions = []
     rename_actions = []
     renamed_filenames = []
-    for root, dirs, files in os.walk('WebUI/build'):
+    for root, dirs, files in os.walk('frontend/build'):
         root = root.replace('\\', '/')
-        newroot = root.replace('WebUI/build', 'data/www')
+        newroot = root.replace('frontend/build', 'data/www')
         isImmutable = '_app/immutable' in root
 
         for filename in files:
