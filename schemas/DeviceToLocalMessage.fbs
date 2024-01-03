@@ -55,13 +55,21 @@ struct SetRfTxPinCommandResult {
 }
 
 union DeviceToLocalMessagePayload {
+
+  // General stuff
   ReadyMessage,
   ErrorMessage,
+
+  // Wifi stuff
   WifiScanStatusMessage,
   WifiNetworkEvent,
   WifiGotIpEvent,
   WifiLostIpEvent,
+
+  // Account linking stuff
   AccountLinkCommandResult,
+
+  // RF transmitter stuff
   SetRfTxPinCommandResult
 }
 
