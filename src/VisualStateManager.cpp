@@ -118,7 +118,8 @@ constexpr PinPatternManager::State kSolidOffPattern[] = {
 
 PinPatternManager s_builtInLedManager(OPENSHOCK_LED_GPIO);
 
-void _updateVisualStateGPIO(nonstd::span<const PinPatternManager::State> override) {
+template <std::size_t N>
+inline void _updateVisualStateGPIO(const PinPatternManager::State (&override)[N]) {
   s_builtInLedManager.SetPattern(override);
 }
 

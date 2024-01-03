@@ -18,13 +18,13 @@ PinPatternManager::~PinPatternManager() {
   vSemaphoreDelete(m_taskMutex);
 }
 
-void PinPatternManager::SetPattern(nonstd::span<const State> pattern) {
+void PinPatternManager::SetPattern(const State* pattern, std::size_t patternLength) {
   ClearPatternInternal();
 
   // Set new values
-  m_patternLength = pattern.size();
+  m_patternLength = patternLength;
   m_pattern       = new State[m_patternLength];
-  std::copy(pattern.begin(), pattern.end(), m_pattern);
+  std::copy(pattern, pattern + m_patternLength, m_pattern);
 
   char name[32];
   snprintf(name, sizeof(name), "PinPatternManager-%u", m_gpioPin);

@@ -10,8 +10,6 @@
 #include "wifi/WiFiNetwork.h"
 #include "wifi/WiFiScanManager.h"
 
-#include <nonstd/span.hpp>
-
 #include <WiFi.h>
 
 #include <esp_wifi.h>
