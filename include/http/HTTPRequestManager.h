@@ -1,6 +1,6 @@
 #pragma once
 
-#include <Arduino.h>
+#include "StringView.h"
 
 #include <cJSON.h>
 
@@ -12,9 +12,11 @@ namespace OpenShock::HTTP {
   enum class RequestResult : std::uint8_t {
     InvalidURL,     // Invalid URL
     RequestFailed,  // Failed to start request
+    TimedOut,       // Request timed out
     RateLimited,    // Rate limited (can be both local and global)
     CodeRejected,   // Request completed, but response code was not OK
     ParseFailed,    // Request completed, but JSON parsing failed
+    Cancelled,      // Request was cancelled
     Success,        // Request completed successfully
   };
 
@@ -26,13 +28,16 @@ namespace OpenShock::HTTP {
   };
 
   template<typename T>
-  using JsonParser = std::function<bool(int code, const cJSON* json, T& data)>;
+  using JsonParser               = std::function<bool(int code, const cJSON* json, T& data)>;
+  using GotContentLengthCallback = std::function<bool(int contentLength)>;
+  using DownloadCallback         = std::function<bool(std::size_t offset, const uint8_t* data, std::size_t len)>;
 
-  Response<String> GetString(const char* const url, const std::map<String, String>& headers, const std::vector<int>& acceptedCodes = {200});
+  Response<std::size_t> Download(StringView url, const std::map<String, String>& headers, GotContentLengthCallback contentLengthCallback, DownloadCallback downloadCallback, const std::vector<int>& acceptedCodes = {200}, std::uint32_t timeoutMs = 10'000);
+  Response<std::string> GetString(StringView url, const std::map<String, String>& headers, const std::vector<int>& acceptedCodes = {200}, std::uint32_t timeoutMs = 10'000);
 
   template<typename T>
-  Response<T> GetJSON(const char* const url, const std::map<String, String>& headers, JsonParser<T> jsonParser, const std::vector<int>& acceptedCodes = {200}) {
-    auto response = GetString(url, headers, acceptedCodes);
+  Response<T> GetJSON(StringView url, const std::map<String, String>& headers, JsonParser<T> jsonParser, const std::vector<int>& acceptedCodes = {200}, std::uint32_t timeoutMs = 10'000) {
+    auto response = GetString(url, headers, acceptedCodes, timeoutMs);
     if (response.result != RequestResult::Success) {
       return {response.result, response.code, {}};
     }
