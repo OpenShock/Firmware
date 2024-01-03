@@ -36,7 +36,7 @@ connectedWifi(obj?:WifiNetwork):WifiNetwork|null {
   return offset ? (obj || new WifiNetwork()).__init(this.bb!.__indirect(this.bb_pos + offset), this.bb!) : null;
 }
 
-gatewayPaired():boolean {
+accountLinked():boolean {
   const offset = this.bb!.__offset(this.bb_pos, 8);
   return offset ? !!this.bb!.readInt8(this.bb_pos + offset) : false;
 }
@@ -58,8 +58,8 @@ static addConnectedWifi(builder:flatbuffers.Builder, connectedWifiOffset:flatbuf
   builder.addFieldOffset(1, connectedWifiOffset, 0);
 }
 
-static addGatewayPaired(builder:flatbuffers.Builder, gatewayPaired:boolean) {
-  builder.addFieldInt8(2, +gatewayPaired, +false);
+static addAccountLinked(builder:flatbuffers.Builder, accountLinked:boolean) {
+  builder.addFieldInt8(2, +accountLinked, +false);
 }
 
 static addConfig(builder:flatbuffers.Builder, configOffset:flatbuffers.Offset) {

@@ -31,7 +31,7 @@ PayloadHandlers[DeviceToLocalMessagePayload.ReadyMessage] = (cli, msg) => {
 
   DeviceStateStore.update((store) => {
     store.wifiConnectedBSSID = payload.connectedWifi()?.bssid() || null;
-    store.gatewayPaired = payload.gatewayPaired();
+    store.accountLinked = payload.accountLinked();
     store.rfTxPin = payload.config()?.rf()?.txPin() ?? 255; // 255 = invalid
     return store;
   });
@@ -74,7 +74,7 @@ PayloadHandlers[DeviceToLocalMessagePayload.AccountLinkCommandResult] = (cli, ms
 
   if (result == AccountLinkResultCode.Success) {
     toastDelegator.trigger({
-      message: 'Gateway paired successfully',
+      message: 'Account linked successfully',
       background: 'bg-green-500',
     });
   } else {
@@ -100,7 +100,7 @@ PayloadHandlers[DeviceToLocalMessagePayload.AccountLinkCommandResult] = (cli, ms
         break;
     }
     toastDelegator.trigger({
-      message: 'Failed to pair gateway: ' + reason,
+      message: 'Failed to link account: ' + reason,
       background: 'bg-red-500',
     });
   }
