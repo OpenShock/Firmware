@@ -3,8 +3,6 @@
 #include "Logging.h"
 #include "util/TaskUtils.h"
 
-#include <Arduino.h>
-
 const char* const TAG = "RGBPatternManager";
 
 using namespace OpenShock;
@@ -31,13 +29,13 @@ RGBPatternManager::~RGBPatternManager() {
   vSemaphoreDelete(m_taskMutex);
 }
 
-void RGBPatternManager::SetPattern(nonstd::span<const RGBState> pattern) {
+void RGBPatternManager::SetPattern(const RGBState* pattern, std::size_t patternLength) {
   ClearPatternInternal();
 
   // Set new values
-  m_patternLength = pattern.size();
+  m_patternLength = patternLength;
   m_pattern       = new RGBState[m_patternLength];
-  std::copy(pattern.begin(), pattern.end(), m_pattern);
+  std::copy(pattern, pattern + m_patternLength, m_pattern);
 
   // Start the task
   BaseType_t result = TaskUtils::TaskCreateExpensive(RunPattern, TAG, 4096, this, 1, &m_taskHandle);

@@ -69,10 +69,7 @@ bool _tryGetPartitionHash(char (&buffer)[65]) {
   }
 
   // Copy the hash to the output buffer
-  HexUtils::ToHex<32>(staticSha256, nonstd::span<char, 64>(buffer, 64), false);
-
-  // Null-terminate the string
-  buffer[64] = '\0';
+  HexUtils::ToHex<32>(staticSha256, buffer, false);
 
   return true;
 }

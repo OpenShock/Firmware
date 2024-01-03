@@ -4,8 +4,6 @@
 #include "util/HexUtils.h"
 #include "wifi/WiFiManager.h"
 
-#include <nonstd/span.hpp>
-
 #include <cstdint>
 
 const char* const TAG = "LocalMessageHandlers";
