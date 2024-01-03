@@ -7,7 +7,7 @@ const char* const TAG = "Config::CaptivePortalConfig";
 
 using namespace OpenShock::Config;
 
-CaptivePortalConfig::CaptivePortalConfig() : alwaysEnabled(false) {}
+CaptivePortalConfig::CaptivePortalConfig() : alwaysEnabled(false) { }
 
 CaptivePortalConfig::CaptivePortalConfig(bool alwaysEnabled) {
   this->alwaysEnabled = alwaysEnabled;

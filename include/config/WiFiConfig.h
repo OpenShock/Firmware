@@ -1,7 +1,7 @@
 #pragma once
 
-#include "config/WiFiCredentials.h"
 #include "config/ConfigBase.h"
+#include "config/WiFiCredentials.h"
 
 #include <string>
 #include <vector>

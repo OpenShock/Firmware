@@ -7,7 +7,7 @@ const char* const TAG = "Config::SerialInputConfig";
 
 using namespace OpenShock::Config;
 
-SerialInputConfig::SerialInputConfig() : echoEnabled(true) {}
+SerialInputConfig::SerialInputConfig() : echoEnabled(true) { }
 
 SerialInputConfig::SerialInputConfig(bool echoEnabled) {
   this->echoEnabled = echoEnabled;

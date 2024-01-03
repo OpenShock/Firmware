@@ -7,7 +7,7 @@ const char* const TAG = "Config::BackendConfig";
 
 using namespace OpenShock::Config;
 
-BackendConfig::BackendConfig() : domain(OPENSHOCK_API_DOMAIN), authToken() {}
+BackendConfig::BackendConfig() : domain(OPENSHOCK_API_DOMAIN), authToken() { }
 
 void BackendConfig::ToDefault() {
   domain = OPENSHOCK_API_DOMAIN;
