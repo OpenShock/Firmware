@@ -1,11 +1,48 @@
 import os
-import sys
 import shutil
+import subprocess
 
-# Check if flatc is installed.
-if os.system('flatc --version') != 0:
+
+def flatc_test(path: str):
+    return os.system(path + ' --version') == 0
+
+
+def exec_silent(args: list[str]):
+    return subprocess.check_output(args, shell=True).decode('utf-8').strip()
+
+
+def get_flatc_path():
+    # Check if there is a flatc.exe in the working directory.
+    path = os.path.join(os.getcwd(), 'flatc.exe')
+    if os.path.exists(path):
+        # Test if the executable is working.
+        if flatc_test(path):
+            return path
+
+    # Check if there is a flatc.exe in the scripts directory.
+    script_dir = os.path.dirname(os.path.realpath(__file__))
+    path = os.path.join(script_dir, 'flatc.exe')
+    if os.path.exists(path):
+        # Test if the executable is working.
+        if flatc_test(path):
+            return path
+
+    # Check if flatc is installed globally.
+    if flatc_test('flatc'):
+        return 'flatc'
+
+    return None
+
+
+flatc_path = get_flatc_path()
+if flatc_path is None:
     print('flatc not found. Please install flatc and make sure it is in your PATH.')
     exit(1)
+
+
+def run_flatc(args):
+    # Run flatc.
+    return os.system(flatc_path + ' ' + args)
 
 
 def resolve_path(path):
@@ -32,6 +69,8 @@ for root, dirs, files in os.walk(schemas_path):
 flatc_args_ts = [
     # Compile for TypeScript.
     '--ts',
+    # Don't add .ts extension to imports.
+    '--ts-no-import-ext',
     # Output directory.
     '-o ' + ts_output_path,
 ] + schema_files
@@ -56,10 +95,10 @@ if os.path.exists(ts_output_path):
     print('Deleting old TypeScript schemas')
     shutil.rmtree(ts_output_path)
 print('Compiling schemas for TypeScript')
-os.system('flatc ' + ' '.join(flatc_args_ts))
+run_flatc(' '.join(flatc_args_ts))
 
 if os.path.exists(cpp_output_path):
     print('Deleting old C++ schemas')
     shutil.rmtree(cpp_output_path)
 print('Compiling schemas for C++')
-os.system('flatc ' + ' '.join(flatc_args_cpp))
+run_flatc(' '.join(flatc_args_cpp))
