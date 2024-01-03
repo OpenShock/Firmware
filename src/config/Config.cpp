@@ -289,6 +289,12 @@ bool Config::GetWiFiCredentials(cJSON* array, bool withSensitiveData) {
 }
 
 bool Config::GetWiFiCredentials(std::vector<Config::WiFiCredentials>& out) {
+  ScopedReadLock lock(&_configMutex);
+  if (!lock.isLocked()) {
+    ESP_LOGE(TAG, "Failed to acquire read lock");
+    return false;
+  }
+
   out = _configData.wifi.credentialsList;
 
   return true;
@@ -317,11 +323,10 @@ bool Config::SetWiFiConfig(const Config::WiFiConfig& config) {
 }
 
 bool Config::SetWiFiCredentials(const std::vector<Config::WiFiCredentials>& credentials) {
-  for (const auto& cred : credentials) {
-    if (cred.id == 0) {
-      ESP_LOGE(TAG, "Cannot set WiFi credentials: credential ID cannot be 0");
-      return false;
-    }
+  bool foundZeroId = std::any_of(credentials.begin(), credentials.end(), [](const Config::WiFiCredentials& creds) { return creds.id == 0; });
+  if (foundZeroId) {
+    ESP_LOGE(TAG, "Cannot set WiFi credentials: credential ID cannot be 0");
+    return false;
   }
 
   ScopedWriteLock lock(&_configMutex);

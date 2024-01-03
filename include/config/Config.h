@@ -66,6 +66,4 @@ namespace OpenShock::Config {
   bool GetBackendAuthToken(std::string& out);
   bool SetBackendAuthToken(const std::string& token);
   bool ClearBackendAuthToken();
-
-  bool SaveChanges();
 }  // namespace OpenShock::Config
