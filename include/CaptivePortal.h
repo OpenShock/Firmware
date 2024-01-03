@@ -1,7 +1,8 @@
 #pragma once
 
+#include "StringView.h"
+
 #include <cstdint>
-#include <string>
 
 namespace OpenShock::CaptivePortal {
   void SetAlwaysEnabled(bool alwaysEnabled);
@@ -10,15 +11,9 @@ namespace OpenShock::CaptivePortal {
   bool IsRunning();
   void Update();
 
-  bool SendMessageTXT(std::uint8_t socketId, const char* data, std::size_t len);
+  bool SendMessageTXT(std::uint8_t socketId, StringView data);
   bool SendMessageBIN(std::uint8_t socketId, const std::uint8_t* data, std::size_t len);
-  inline bool SendMessageTXT(std::uint8_t socketId, const std::string& message) {
-    return SendMessageTXT(socketId, message.c_str(), message.length());
-  }
 
-  bool BroadcastMessageTXT(const char* data, std::size_t len);
+  bool BroadcastMessageTXT(StringView data);
   bool BroadcastMessageBIN(const std::uint8_t* data, std::size_t len);
-  inline bool BroadcastMessageTXT(const std::string& message) {
-    return BroadcastMessageTXT(message.c_str(), message.length());
-  }
 }  // namespace OpenShock::CaptivePortal

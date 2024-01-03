@@ -121,10 +121,10 @@ void CaptivePortal::Update() {
   }
 }
 
-bool CaptivePortal::SendMessageTXT(std::uint8_t socketId, const char* data, std::size_t len) {
+bool CaptivePortal::SendMessageTXT(std::uint8_t socketId, StringView data) {
   if (s_instance == nullptr) return false;
 
-  s_instance->sendMessageTXT(socketId, data, len);
+  s_instance->sendMessageTXT(socketId, data);
 
   return true;
 }
@@ -136,10 +136,10 @@ bool CaptivePortal::SendMessageBIN(std::uint8_t socketId, const std::uint8_t* da
   return true;
 }
 
-bool CaptivePortal::BroadcastMessageTXT(const char* data, std::size_t len) {
+bool CaptivePortal::BroadcastMessageTXT(StringView data) {
   if (s_instance == nullptr) return false;
 
-  s_instance->broadcastMessageTXT(data, len);
+  s_instance->broadcastMessageTXT(data);
 
   return true;
 }
