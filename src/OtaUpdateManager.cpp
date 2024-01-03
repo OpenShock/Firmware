@@ -355,11 +355,12 @@ void _otaUpdateTask(void* arg) {
     check |= config.checkPeriodically && diff >= config.checkInterval * 60'000LL;  // Periodically
     check |= updateRequested && diff >= 60'000LL;                                  // Rate limit update requests to once per minute
 
-    lastUpdateCheck = now;
 
     if (!check) {
       continue;
     }
+
+    lastUpdateCheck = now;
 
     if (config.requireManualApproval) {
       ESP_LOGD(TAG, "Manual approval required, skipping update check");
