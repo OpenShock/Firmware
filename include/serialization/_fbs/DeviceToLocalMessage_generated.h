@@ -13,6 +13,7 @@ static_assert(FLATBUFFERS_VERSION_MAJOR == 23 &&
               FLATBUFFERS_VERSION_REVISION == 26,
              "Non-compatible flatbuffers version included");
 
+#include "ConfigFile_generated.h"
 #include "WifiNetwork_generated.h"
 #include "WifiNetworkEventType_generated.h"
 #include "WifiScanStatus_generated.h"
@@ -301,7 +302,7 @@ struct ReadyMessage FLATBUFFERS_FINAL_CLASS : private ::flatbuffers::Table {
     VT_POGGIES = 4,
     VT_CONNECTED_WIFI = 6,
     VT_GATEWAY_PAIRED = 8,
-    VT_RFTX_PIN = 10
+    VT_CONFIG = 10
   };
   bool poggies() const {
     return GetField<uint8_t>(VT_POGGIES, 0) != 0;
@@ -312,8 +313,8 @@ struct ReadyMessage FLATBUFFERS_FINAL_CLASS : private ::flatbuffers::Table {
   bool gateway_paired() const {
     return GetField<uint8_t>(VT_GATEWAY_PAIRED, 0) != 0;
   }
-  uint8_t rftx_pin() const {
-    return GetField<uint8_t>(VT_RFTX_PIN, 0);
+  const OpenShock::Serialization::Configuration::Config *config() const {
+    return GetPointer<const OpenShock::Serialization::Configuration::Config *>(VT_CONFIG);
   }
   bool Verify(::flatbuffers::Verifier &verifier) const {
     return VerifyTableStart(verifier) &&
@@ -321,7 +322,8 @@ struct ReadyMessage FLATBUFFERS_FINAL_CLASS : private ::flatbuffers::Table {
            VerifyOffset(verifier, VT_CONNECTED_WIFI) &&
            verifier.VerifyTable(connected_wifi()) &&
            VerifyField<uint8_t>(verifier, VT_GATEWAY_PAIRED, 1) &&
-           VerifyField<uint8_t>(verifier, VT_RFTX_PIN, 1) &&
+           VerifyOffset(verifier, VT_CONFIG) &&
+           verifier.VerifyTable(config()) &&
            verifier.EndTable();
   }
 };
@@ -339,8 +341,8 @@ struct ReadyMessageBuilder {
   void add_gateway_paired(bool gateway_paired) {
     fbb_.AddElement<uint8_t>(ReadyMessage::VT_GATEWAY_PAIRED, static_cast<uint8_t>(gateway_paired), 0);
   }
-  void add_rftx_pin(uint8_t rftx_pin) {
-    fbb_.AddElement<uint8_t>(ReadyMessage::VT_RFTX_PIN, rftx_pin, 0);
+  void add_config(::flatbuffers::Offset<OpenShock::Serialization::Configuration::Config> config) {
+    fbb_.AddOffset(ReadyMessage::VT_CONFIG, config);
   }
   explicit ReadyMessageBuilder(::flatbuffers::FlatBufferBuilder &_fbb)
         : fbb_(_fbb) {
@@ -358,10 +360,10 @@ inline ::flatbuffers::Offset<ReadyMessage> CreateReadyMessage(
     bool poggies = false,
     ::flatbuffers::Offset<OpenShock::Serialization::Types::WifiNetwork> connected_wifi = 0,
     bool gateway_paired = false,
-    uint8_t rftx_pin = 0) {
+    ::flatbuffers::Offset<OpenShock::Serialization::Configuration::Config> config = 0) {
   ReadyMessageBuilder builder_(_fbb);
+  builder_.add_config(config);
   builder_.add_connected_wifi(connected_wifi);
-  builder_.add_rftx_pin(rftx_pin);
   builder_.add_gateway_paired(gateway_paired);
   builder_.add_poggies(poggies);
   return builder_.Finish();
