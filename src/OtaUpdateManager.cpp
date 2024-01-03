@@ -272,7 +272,7 @@ bool _flashAppPartition(const esp_partition_t* partition, StringView remoteUrl, 
 
 bool _flashFilesystemPartition(const esp_partition_t* parition, StringView remoteUrl, const std::uint8_t (&remoteHash)[32]) {
   // Make sure captive portal is stopped.
-  if (!_tryForceCloseCaptivePortal(5000U)) { // 5 seconds
+  if (!_tryForceCloseCaptivePortal(5000U)) {  // 5 seconds
     ESP_LOGE(TAG, "Failed to force close captive portal (timed out)");
     return false;
   }
@@ -316,7 +316,7 @@ void _otaUpdateTask(void* arg) {
   while (true) {
     // Wait for event.
     uint32_t eventBits = 0;
-    xTaskNotifyWait(0, UINT32_MAX, &eventBits, pdMS_TO_TICKS(5000));
+    xTaskNotifyWait(0, UINT32_MAX, &eventBits, pdMS_TO_TICKS(5000));  // TODO: wait for rest time
 
     updateRequested |= (eventBits & OTA_TASK_EVENT_UPDATE_REQUESTED) != 0;
 
@@ -333,6 +333,7 @@ void _otaUpdateTask(void* arg) {
 
     // If we're not connected, continue.
     if (!connected) {
+      ESP_LOGD(TAG, "Not connected, skipping update check");
       continue;
     }
 
@@ -345,18 +346,26 @@ void _otaUpdateTask(void* arg) {
     }
 
     if (!config.isEnabled) {
+      ESP_LOGD(TAG, "OTA updates are disabled, skipping update check");
       continue;
     }
 
-    std::int64_t diff = now - lastUpdateCheck;
+    bool firstCheck       = lastUpdateCheck == 0;
+    std::int64_t diff     = now - lastUpdateCheck;
+    std::int64_t diffMins = diff / 60'000LL;
 
     bool check = false;
-    check |= config.checkOnStartup && lastUpdateCheck == 0;                        // On startup
-    check |= config.checkPeriodically && diff >= config.checkInterval * 60'000LL;  // Periodically
-    check |= updateRequested && diff >= 60'000LL;                                  // Rate limit update requests to once per minute
-
+    check |= config.checkOnStartup && firstCheck;                           // On startup
+    check |= config.checkPeriodically && diffMins >= config.checkInterval;  // Periodically
+    check |= updateRequested && (firstCheck || diffMins >= 1);              // Update requested
 
     if (!check) {
+      ESP_LOGD(TAG, "Skipping update check:");
+      ESP_LOGD(TAG, "  Diff:         %f secs", static_cast<float>(diff) / 1'000.0f);
+      ESP_LOGD(TAG, "  Check:        %s", check ? "true" : "false");
+      ESP_LOGD(TAG, "  Startup:      %s", config.checkOnStartup ? "true" : "false");
+      ESP_LOGD(TAG, "  Periodically: %s (%u minutes)", config.checkPeriodically ? "true" : "false", config.checkInterval);
+      ESP_LOGD(TAG, "  Requested:    %s", updateRequested ? "true" : "false");
       continue;
     }
 
@@ -392,14 +401,14 @@ void _otaUpdateTask(void* arg) {
     }
 
     if (version == OPENSHOCK_FW_VERSION) {
-      ESP_LOGI(TAG, "Requested version is already installed"); // TODO: Send error message to server
+      ESP_LOGI(TAG, "Requested version is already installed");  // TODO: Send error message to server
       continue;
     }
 
     // Fetch current release.
     OtaUpdateManager::FirmwareRelease release;
     if (!OtaUpdateManager::TryGetFirmwareRelease(version, release)) {
-      ESP_LOGE(TAG, "Failed to fetch firmware release"); // TODO: Send error message to server
+      ESP_LOGE(TAG, "Failed to fetch firmware release");  // TODO: Send error message to server
       continue;
     }
 
@@ -414,23 +423,23 @@ void _otaUpdateTask(void* arg) {
     // Get available app update partition.
     const esp_partition_t* appPartition = esp_ota_get_next_update_partition(nullptr);
     if (appPartition == nullptr) {
-      ESP_LOGE(TAG, "Failed to get app update partition"); // TODO: Send error message to server
+      ESP_LOGE(TAG, "Failed to get app update partition");  // TODO: Send error message to server
       continue;
     }
 
     // Get filesystem partition.
     const esp_partition_t* filesystemPartition = esp_partition_find_first(ESP_PARTITION_TYPE_DATA, ESP_PARTITION_SUBTYPE_DATA_SPIFFS, "static0");
     if (filesystemPartition == nullptr) {
-      ESP_LOGE(TAG, "Failed to find filesystem partition"); // TODO: Send error message to server
+      ESP_LOGE(TAG, "Failed to find filesystem partition");  // TODO: Send error message to server
       continue;
     }
 
     // Flash app and filesystem partitions.
     if (!_flashFilesystemPartition(filesystemPartition, release.filesystemBinaryUrl, release.filesystemBinaryHash)) {
-      continue; // TODO: Send error message to server
+      continue;  // TODO: Send error message to server
     }
     if (!_flashAppPartition(appPartition, release.appBinaryUrl, release.appBinaryHash)) {
-      continue; // TODO: Send error message to server
+      continue;  // TODO: Send error message to server
     }
 
     // Restart.
@@ -608,7 +617,7 @@ bool OtaUpdateManager::TryGetFirmwareRelease(const std::string& version, Firmwar
   auto hashesLines = OpenShock::StringView(sha256HashesResponse.data).splitLines();
 
   // Parse hashes.
-  bool foundAppHash = false,foundFilesystemHash = false;
+  bool foundAppHash = false, foundFilesystemHash = false;
   for (auto line : hashesLines) {
     auto parts = line.splitWhitespace();
     if (parts.size() != 2) {
