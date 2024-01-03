@@ -32,7 +32,7 @@ PayloadHandlers[DeviceToLocalMessagePayload.ReadyMessage] = (cli, msg) => {
 
   DeviceStateStore.update((store) => {
     store.wifiConnectedBSSID = payload.connectedWifi()?.bssid() || null;
-    store.gatewayPaired = payload.gatewayPaired();
+    store.accountLinked = payload.accountLinked();
     store.config = mapConfig(payload.config());
 
     console.log('[WS] Updated device state store: ', store);
@@ -78,7 +78,7 @@ PayloadHandlers[DeviceToLocalMessagePayload.AccountLinkCommandResult] = (cli, ms
 
   if (result == AccountLinkResultCode.Success) {
     toastDelegator.trigger({
-      message: 'Gateway paired successfully',
+      message: 'Account linked successfully',
       background: 'bg-green-500',
     });
   } else {
@@ -104,7 +104,7 @@ PayloadHandlers[DeviceToLocalMessagePayload.AccountLinkCommandResult] = (cli, ms
         break;
     }
     toastDelegator.trigger({
-      message: 'Failed to pair gateway: ' + reason,
+      message: 'Failed to link account: ' + reason,
       background: 'bg-red-500',
     });
   }

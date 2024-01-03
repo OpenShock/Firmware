@@ -10,7 +10,7 @@ namespace OpenShock.Serialization.Local;
 table ReadyMessage {
   poggies:bool;
   connected_wifi:Types.WifiNetwork;
-  gateway_paired:bool;
+  account_linked:bool;
 
   config:Configuration.Config;
 }

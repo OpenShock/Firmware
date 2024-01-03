@@ -10,9 +10,9 @@ namespace OpenShock::GatewayConnectionManager {
 
   bool IsConnected();
 
-  bool IsPaired();
-  AccountLinkResultCode Pair(const char* pairCode);
-  void UnPair();
+  bool IsLinked();
+  AccountLinkResultCode Link(const char* linkCode);
+  void UnLink();
 
   void Update();
 }  // namespace OpenShock::GatewayConnectionManager

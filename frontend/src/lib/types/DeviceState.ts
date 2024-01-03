@@ -7,6 +7,6 @@ export type DeviceState = {
   wifiScanStatus: WifiScanStatus | null;
   wifiNetworks: Map<string, WiFiNetwork>;
   wifiNetworkGroups: Map<string, WiFiNetworkGroup>;
-  gatewayPaired: boolean;
+  accountLinked: boolean;
   config: Config | null;
 };

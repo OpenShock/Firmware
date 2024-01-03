@@ -3,12 +3,12 @@ import { LocalToDeviceMessage } from '$lib/_fbs/open-shock/serialization/local/l
 import { LocalToDeviceMessagePayload } from '$lib/_fbs/open-shock/serialization/local/local-to-device-message-payload';
 import { AccountLinkCommand } from '$lib/_fbs/open-shock/serialization/local/account-link-command';
 
-export function SerializeAccountLinkCommand(pairCode: string): Uint8Array {
+export function SerializeAccountLinkCommand(linkCode: string): Uint8Array {
   const fbb = new FlatbufferBuilder(64);
 
-  const pairCodeOffset = fbb.createString(pairCode);
+  const linkCodeOffset = fbb.createString(linkCode);
 
-  const cmdOffset = AccountLinkCommand.createAccountLinkCommand(fbb, pairCodeOffset);
+  const cmdOffset = AccountLinkCommand.createAccountLinkCommand(fbb, linkCodeOffset);
 
   const payloadOffset = LocalToDeviceMessage.createLocalToDeviceMessage(fbb, LocalToDeviceMessagePayload.AccountLinkCommand, cmdOffset);
 

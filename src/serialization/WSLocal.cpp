@@ -61,7 +61,7 @@ bool Local::SerializeErrorMessage(const char* message, Common::SerializationCall
   return true;
 }
 
-bool Local::SerializeReadyMessage(const WiFiNetwork* connectedNetwork, bool gatewayPaired, Common::SerializationCallbackFn callback) {
+bool Local::SerializeReadyMessage(const WiFiNetwork* connectedNetwork, bool accountLinked, Common::SerializationCallbackFn callback) {
   flatbuffers::FlatBufferBuilder builder(256);
 
   flatbuffers::Offset<Serialization::Types::WifiNetwork> fbsNetwork = 0;
@@ -78,7 +78,7 @@ bool Local::SerializeReadyMessage(const WiFiNetwork* connectedNetwork, bool gate
     return false;
   }
 
-  auto readyMessageOffset = Serialization::Local::CreateReadyMessage(builder, true, fbsNetwork, gatewayPaired, configOffset);
+  auto readyMessageOffset = Serialization::Local::CreateReadyMessage(builder, true, fbsNetwork, accountLinked, configOffset);
 
   auto msg = Serialization::Local::CreateDeviceToLocalMessage(builder, Serialization::Local::DeviceToLocalMessagePayload::ReadyMessage, readyMessageOffset.Union());
 

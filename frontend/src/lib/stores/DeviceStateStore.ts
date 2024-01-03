@@ -8,7 +8,7 @@ const { subscribe, update } = writable<DeviceState>({
   wifiScanStatus: null,
   wifiNetworks: new Map<string, WiFiNetwork>(),
   wifiNetworkGroups: new Map<string, WiFiNetworkGroup>(),
-  gatewayPaired: false,
+  accountLinked: false,
   config: null,
 });
 
@@ -95,9 +95,9 @@ export const DeviceStateStore = {
       return store;
     });
   },
-  setGatewayPaired(paired: boolean) {
+  setAccountLinked(linked: boolean) {
     update((store) => {
-      store.gatewayPaired = paired;
+      store.accountLinked = linked;
       return store;
     });
   },
