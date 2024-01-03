@@ -167,9 +167,9 @@ def build_frontend(source, target, env):
     # Change working directory to frontend.
     os.chdir('frontend')
 
-    # Build the captive portal only if it wasn't already built.
-    # This is to avoid rebuilding the captive portal every time the firmware is built.
-    # This could also lead to some annoying behaviour where the captive portal is not updated when the firmware is built.
+    # Build the frontend only if it wasn't already built.
+    # This is to avoid rebuilding the frontend every time the firmware is built.
+    # This could also lead to some annoying behaviour where the frontend is not updated when the firmware is built.
     if not sysenv.get_bool('CI', False):
         print('Building frontend...')
         os.system('npm i')
