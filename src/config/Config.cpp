@@ -178,6 +178,30 @@ bool Config::SaveFromJSON(const std::string& json) {
   return _trySaveConfig();
 }
 
+flatbuffers::Offset<Serialization::Configuration::Config> Config::GetAsFlatBuffer(flatbuffers::FlatBufferBuilder& builder, bool withSensitiveData) {
+  ScopedReadLock lock(&_configMutex);
+  if (!lock.isLocked()) {
+    return 0;
+  }
+
+  return _configData.ToFlatbuffers(builder, withSensitiveData);
+}
+
+bool Config::SaveFromFlatBuffer(const Serialization::Configuration::Config* config) {
+  ScopedWriteLock lock(&_configMutex);
+  if (!lock.isLocked()) {
+    ESP_LOGE(TAG, "Failed to acquire write lock");
+    return false;
+  }
+
+  if (!_configData.FromFlatbuffers(config)) {
+    ESP_LOGE(TAG, "Failed to read config file");
+    return false;
+  }
+
+  return _trySaveConfig();
+}
+
 bool Config::GetRaw(std::vector<std::uint8_t>& buffer) {
   ScopedReadLock lock(&_configMutex);
   if (!lock.isLocked()) {

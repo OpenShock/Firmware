@@ -18,6 +18,10 @@ namespace OpenShock::Config {
   std::string GetAsJSON(bool withSensitiveData);
   bool SaveFromJSON(const std::string& json);
 
+  /* GetAsFlatBuffer and SaveFromFlatBuffer are used for Reading/Writing the config file in its binary form. */
+  flatbuffers::Offset<Serialization::Configuration::Config> GetAsFlatBuffer(flatbuffers::FlatBufferBuilder& builder, bool withSensitiveData);
+  bool SaveFromFlatBuffer(const Serialization::Configuration::Config* config);
+
   /* GetRaw and SetRaw are used for Reading/Writing the config file in its binary form. */
   bool GetRaw(std::vector<std::uint8_t>& buffer);
   bool SetRaw(const std::uint8_t* buffer, std::size_t size);
