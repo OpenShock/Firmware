@@ -30,9 +30,9 @@ namespace OpenShock::OtaUpdateManager {
 
   struct FirmwareRelease {
     std::string appBinaryUrl;
-    std::array<std::uint8_t, 32> appBinaryHash;
+    std::uint8_t appBinaryHash[32];
     std::string filesystemBinaryUrl;
-    std::array<std::uint8_t, 32> filesystemBinaryHash;
+    std::uint8_t filesystemBinaryHash[32];
   };
 
   bool TryGetFirmwareVersion(OtaUpdateChannel channel, std::string& version);

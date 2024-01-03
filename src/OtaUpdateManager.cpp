@@ -169,7 +169,7 @@ bool _tryForceCloseCaptivePortal(TickType_t timeout) {
   return !OpenShock::CaptivePortal::IsRunning();
 }
 
-bool _flashPartition(const esp_partition_t* partition, StringView remoteUrl, const std::array<std::uint8_t, 32>& remoteHash, std::function<bool(std::size_t, std::size_t, float)> progressCallback = nullptr) {
+bool _flashPartition(const esp_partition_t* partition, StringView remoteUrl, const std::uint8_t (&remoteHash)[32], std::function<bool(std::size_t, std::size_t, float)> progressCallback = nullptr) {
   OpenShock::SHA256 sha256;
   if (!sha256.begin()) {
     ESP_LOGE(TAG, "Failed to initialize SHA256 hash");
@@ -239,7 +239,7 @@ bool _flashPartition(const esp_partition_t* partition, StringView remoteUrl, con
   }
 
   // Compare hashes.
-  if (memcmp(localHash.data(), remoteHash.data(), 32) != 0) {
+  if (memcmp(localHash.data(), remoteHash, 32) != 0) {
     ESP_LOGE(TAG, "App binary hash mismatch");
     return false;
   }
@@ -247,7 +247,7 @@ bool _flashPartition(const esp_partition_t* partition, StringView remoteUrl, con
   return true;
 }
 
-bool _flashAppPartition(const esp_partition_t* partition, StringView remoteUrl, const std::array<std::uint8_t, 32>& remoteHash) {
+bool _flashAppPartition(const esp_partition_t* partition, StringView remoteUrl, const std::uint8_t (&remoteHash)[32]) {
   ESP_LOGD(TAG, "Flashing app partition");
 
   auto onProgress = [](std::size_t current, std::size_t total, float progress) -> bool {
@@ -270,7 +270,7 @@ bool _flashAppPartition(const esp_partition_t* partition, StringView remoteUrl, 
   return true;
 }
 
-bool _flashFilesystemPartition(const esp_partition_t* parition, StringView remoteUrl, const std::array<std::uint8_t, 32>& remoteHash) {
+bool _flashFilesystemPartition(const esp_partition_t* parition, StringView remoteUrl, const std::uint8_t (&remoteHash)[32]) {
   // Make sure captive portal is stopped.
   if (!_tryForceCloseCaptivePortal(5000U)) { // 5 seconds
     ESP_LOGE(TAG, "Failed to force close captive portal (timed out)");
@@ -564,8 +564,8 @@ bool OtaUpdateManager::TryGetFirmwareBoards(const std::string& version, std::vec
   return true;
 }
 
-bool _tryParseIntoHash(const std::string& hash, std::array<std::uint8_t, 32>& hashBytes) {
-  if (!HexUtils::TryParseHex(hash.data(), hash.size(), hashBytes.data(), hashBytes.size())) {
+bool _tryParseIntoHash(const std::string& hash, std::uint8_t (&hashBytes)[32]) {
+  if (!HexUtils::TryParseHex(hash.data(), hash.size(), hashBytes, 32)) {
     ESP_LOGE(TAG, "Failed to parse hash: %.*s", hash.size(), hash.data());
     return false;
   }
