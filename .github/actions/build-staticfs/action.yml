@@ -1,6 +1,5 @@
-
-name: build-filesystem
-description: Builds the filesystem.
+name: build-staticfs
+description: Builds the static filesystem partition and uploads it as an artifact
 inputs:
   python-version:
     description: 'Python version to use'
@@ -27,7 +26,7 @@ runs:
     - uses: actions/setup-python@v4
       with:
         python-version: ${{ inputs.python-version }}
-        cache: "pip"
+        cache: 'pip'
 
     - name: Install dependencies
       shell: bash
@@ -39,18 +38,18 @@ runs:
         name: frontend
         path: frontend/build/
 
-    - name: Build filesystem
+    - name: Build filesystem partition
       shell: bash
       run: pio run --target buildfs -e fs
 
-    - name: Rename filesystem binary
+    - name: Rename partition binary
       shell: bash
-      run: mv .pio/build/fs/littlefs.bin filesystem.bin
+      run: mv .pio/build/fs/littlefs.bin staticfs.bin
 
     - name: Upload internal filesystem artifact
       uses: actions/upload-artifact@v3
       with:
-        name: filesystem
-        path: filesystem.bin
+        name: firmware_staticfs
+        path: staticfs.bin
         retention-days: 1
         if-no-files-found: error

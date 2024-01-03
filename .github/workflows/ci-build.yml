@@ -40,13 +40,13 @@ jobs:
         with:
           node-version: ${{ env.NODE_VERSION }}
 
-  build-filesystem:
+  build-staticfs:
     runs-on: ubuntu-latest
     needs: build-frontend
 
     steps:
       - uses: actions/checkout@v4
-      - uses: ./.github/actions/build-filesystem
+      - uses: ./.github/actions/build-staticfs
         with:
           python-version: ${{ env.PYTHON_VERSION }}
           skip-checkout: true
@@ -67,9 +67,9 @@ jobs:
           board: ${{ matrix.board }}
           skip-checkout: true
 
-  merge-images:
+  merge-partitions:
     runs-on: ubuntu-latest
-    needs: [get-targets, build-filesystem, build-firmware]
+    needs: [get-targets, build-staticfs, build-firmware]
     strategy:
       fail-fast: false
       matrix: ${{ fromJSON(needs.get-targets.outputs.matrix )}}
@@ -83,7 +83,7 @@ jobs:
             boards
             chips
 
-      - uses: ./.github/actions/merge-images
+      - uses: ./.github/actions/merge-partitions
         with:
           python-version: ${{ env.PYTHON_VERSION }}
           board: ${{ matrix.board }}
@@ -91,6 +91,6 @@ jobs:
 
   checkpoint-build:
     runs-on: ubuntu-latest
-    needs: [build-filesystem, merge-images]
+    needs: [build-staticfs, merge-partitions]
     steps:
       - run: echo "Builds checkpoint reached"

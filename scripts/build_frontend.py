@@ -289,15 +289,16 @@ def hash_file(filepath):
     }
 
 
-def get_littlefs_bin_statistics(source, target, env):
+def process_littlefs_binary(source, target, env):
     nTargets = len(target)
     if nTargets != 1:
         raise Exception('Expected 1 target, got ' + str(nTargets))
 
-    bin_path = target[0].get_abspath()
+    # Get the path to the binary and its directory.
+    littlefs_path = target[0].get_abspath()
 
-    bin_size = os.path.getsize(bin_path)
-    bin_hashes = hash_file(bin_path)
+    bin_size = os.path.getsize(littlefs_path)
+    bin_hashes = hash_file(littlefs_path)
 
     print('FileSystem Size: ' + str(bin_size) + ' bytes')
     print('FileSystem Hashes:')
@@ -307,4 +308,4 @@ def get_littlefs_bin_statistics(source, target, env):
 
 
 env.AddPreAction('$BUILD_DIR/littlefs.bin', build_frontend)
-env.AddPostAction('$BUILD_DIR/littlefs.bin', get_littlefs_bin_statistics)
+env.AddPostAction('$BUILD_DIR/littlefs.bin', process_littlefs_binary)
