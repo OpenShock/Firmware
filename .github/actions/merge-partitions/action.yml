@@ -1,11 +1,11 @@
-name: merge-images
-description: Merges multiple images into a single flashable image
+name: merge-partitions
+description: Merges multiple partitions into a single flashable binary
 inputs:
   python-version:
     description: 'Python version to use'
     required: true
   board:
-    description: 'Board name to merge images for'
+    description: 'Board name to merge partitions for'
     required: true
   skip-checkout:
     description: 'If true, skips checkout'
@@ -26,32 +26,32 @@ runs:
     - uses: actions/setup-python@v4
       with:
         python-version: ${{ inputs.python-version }}
-        cache: "pip"
+        cache: 'pip'
 
     - name: Install dependencies
       shell: bash
       run: pip install esptool
 
-    - name: Download filesystem image
+    - name: Download static filesystem partition
       uses: actions/download-artifact@v3
       with:
-        name: filesystem
+        name: firmware_staticfs
 
-    - name: Download firmware images
+    - name: Download firmware partitions
       uses: actions/download-artifact@v3
       with:
-        name: firmware_${{ inputs.board }}
+        name: firmware_build_${{ inputs.board }}
 
-    - name: Merge flash image
+    - name: Merge partitions
       shell: bash
       run: |
         python scripts/merge_image.py ${{ inputs.board }}
         mv merged.bin OpenShock_${{ inputs.board }}_${{ !contains(github.ref_name, '/') && github.ref_name || 'unknown' }}.bin
 
-    - name: Upload merged flashable image
+    - name: Upload merged firmware binary
       uses: actions/upload-artifact@v3
       with:
-        name: OpenShock_${{ inputs.board }}
+        name: firmware_merged_${{ inputs.board }}
         path: OpenShock_${{ inputs.board }}_*.bin
         retention-days: 7
         if-no-files-found: error

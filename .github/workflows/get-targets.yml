@@ -47,7 +47,7 @@ jobs:
       #   -c                              Output in compact mode (no newlines or unnecessary spaces),
       #   split("\n")                     Splits it by line, turning it into an array,
       #   [ .[] | select(length > 0)      Filters out empty lines (there is an empty trailing line usually),
-      #         | select(. != "fs") ]     Filters out the "fs" entry since that's only for building the filesystem,
+      #         | select(. != "fs") ]     Filters out the "fs" entry since that's only for building the static filesystem,
       #   { board: ... }                  Wraps the whole thing into a JSON object with only a "board" key
       #                                   and the array in question as value.
       #
