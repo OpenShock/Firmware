@@ -298,6 +298,25 @@ void _handleValidGpiosCommand(char* arg, std::size_t argLength) {
   SERPR_RESPONSE("ValidGPIOs|%s", buffer.c_str());
 }
 
+void _handleJsonConfigCommand(char* arg, std::size_t argLength) {
+  if (arg == nullptr || argLength == 0) {
+    // Get raw config
+    std::string json = Config::GetAsJSON(true);
+
+    SERPR_RESPONSE("JsonConfig|%s", json.c_str());
+    return;
+  }
+
+  if (!Config::SaveFromJSON(std::string(arg, argLength))) {
+    SERPR_ERROR("Failed to save config");
+    return;
+  }
+
+  SERPR_SUCCESS("Saved config, restarting...");
+
+  ESP.restart();
+}
+
 void _handleRawConfigCommand(char* arg, std::size_t argLength) {
   if (arg == nullptr || argLength == 0) {
     std::vector<std::uint8_t> buffer;
@@ -431,8 +450,10 @@ networks               get all saved networks
 networks     <json>    set all saved networks
 keepalive              get shocker keep-alive enabled
 keepalive    <bool>    set shocker keep-alive enabled
-rawconfig              get raw binary config
-rawconfig    <base64>  set raw binary config
+jsonconfig             get configuration as JSON
+jsonconfig   <json>    set configuration from JSON
+rawconfig              get raw configuration as base64
+rawconfig    <base64>  set raw configuration from base64
 rftransmit   <json>    transmit a RF command
 factoryreset           reset device to factory defaults and restart
 )");
@@ -547,6 +568,22 @@ keepalive [<bool>]
     keepalive true
 )",
   _handleKeepAliveCommand,
+};
+static const SerialCmdHandler kJsonConfigCmdHandler = {
+  "jsonconfig",
+  R"(jsonconfig
+  Get the configuration as JSON
+  Example:
+    jsonconfig
+
+jsonconfig <json>
+  Set the configuration from JSON, and restart
+  Arguments:
+    <json> must be a valid JSON object
+  Example:
+    jsonconfig { ... }
+)",
+  _handleJsonConfigCommand,
 };
 static const SerialCmdHandler kRawConfigCmdHandler = {
   "rawconfig",
@@ -694,6 +731,7 @@ bool SerialInputHandler::Init() {
   RegisterCommandHandler(kAuthTokenCmdHandler);
   RegisterCommandHandler(kNetworksCmdHandler);
   RegisterCommandHandler(kKeepAliveCmdHandler);
+  RegisterCommandHandler(kJsonConfigCmdHandler);
   RegisterCommandHandler(kRawConfigCmdHandler);
   RegisterCommandHandler(kRfTransmitCmdHandler);
   RegisterCommandHandler(kFactoryResetCmdHandler);
