@@ -29,20 +29,19 @@ void _Private::HandleOtaInstall(const OpenShock::Serialization::ServerToDeviceMe
     return;
   }
 
-
   std::string version;
   version.reserve(32);
 
   version += buffer;
 
   auto prerelease = semver->prerelease();
-  if (prerelease != nullptr) {
+  if (prerelease != nullptr && prerelease->size() > 0) {
     version += "-";
     version += prerelease->c_str();
   }
 
   auto build = semver->build();
-  if (build != nullptr) {
+  if (build != nullptr && build->size() > 0) {
     version += "+";
     version += build->c_str();
   }
@@ -50,7 +49,7 @@ void _Private::HandleOtaInstall(const OpenShock::Serialization::ServerToDeviceMe
   ESP_LOGI(TAG, "OTA install requested for version %s", version.c_str());
 
   if (!OpenShock::OtaUpdateManager::TryStartFirmwareInstallation(version)) {
-    ESP_LOGE(TAG, "Failed to install firmware"); // TODO: Send error message to server
+    ESP_LOGE(TAG, "Failed to install firmware");  // TODO: Send error message to server
     return;
   }
 }
