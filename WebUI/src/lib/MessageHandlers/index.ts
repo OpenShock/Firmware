@@ -32,7 +32,7 @@ PayloadHandlers[DeviceToLocalMessagePayload.ReadyMessage] = (cli, msg) => {
   DeviceStateStore.update((store) => {
     store.wifiConnectedBSSID = payload.connectedWifi()?.bssid() || null;
     store.gatewayPaired = payload.gatewayPaired();
-    store.rfTxPin = payload.config()?.rf()?.txPin() || 255; // 255 = invalid
+    store.rfTxPin = payload.config()?.rf()?.txPin() ?? 255; // 255 = invalid
     return store;
   });
 
