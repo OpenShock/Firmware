@@ -27,19 +27,23 @@
 static const char* const TAG             = "GatewayConnectionManager";
 static const char* const AUTH_TOKEN_FILE = "/authToken";
 
-constexpr std::uint8_t FLAG_NONE          = 0;
-constexpr std::uint8_t FLAG_HAS_IP        = 1 << 0;
-constexpr std::uint8_t FLAG_AUTHENTICATED = 1 << 1;
+constexpr std::uint8_t FLAG_NONE   = 0;
+constexpr std::uint8_t FLAG_HAS_IP = 1 << 0;
+constexpr std::uint8_t FLAG_LINKED = 1 << 1;
 
 static std::uint8_t s_flags                                 = 0;
 static std::unique_ptr<OpenShock::GatewayClient> s_wsClient = nullptr;
 
 void _evGotIPHandler(arduino_event_t* event) {
+  (void)event;
+
   s_flags |= FLAG_HAS_IP;
   ESP_LOGD(TAG, "Got IP address");
 }
 
 void _evWiFiDisconnectedHandler(arduino_event_t* event) {
+  (void)event;
+
   s_flags    = FLAG_NONE;
   s_wsClient = nullptr;
   ESP_LOGD(TAG, "Lost IP address");
@@ -65,19 +69,19 @@ bool GatewayConnectionManager::IsConnected() {
   return s_wsClient->state() == GatewayClient::State::Connected;
 }
 
-bool GatewayConnectionManager::IsPaired() {
-  return (s_flags & FLAG_AUTHENTICATED) != 0;
+bool GatewayConnectionManager::IsLinked() {
+  return (s_flags & FLAG_LINKED) != 0;
 }
 
-AccountLinkResultCode GatewayConnectionManager::Pair(const char* pairCode) {
+AccountLinkResultCode GatewayConnectionManager::Link(const char* linkCode) {
   if ((s_flags & FLAG_HAS_IP) == 0) {
     return AccountLinkResultCode::NoInternetConnection;
   }
   s_wsClient = nullptr;
 
-  ESP_LOGD(TAG, "Attempting to pair with pair code %s", pairCode);
+  ESP_LOGD(TAG, "Attempting to link to account using code %s", linkCode);
 
-  auto response = HTTP::JsonAPI::LinkAccount(pairCode);
+  auto response = HTTP::JsonAPI::LinkAccount(linkCode);
 
   if (response.result != HTTP::RequestResult::Success) {
     ESP_LOGE(TAG, "Error while getting auth token: %d %d", response.result, response.code);
@@ -93,7 +97,7 @@ AccountLinkResultCode GatewayConnectionManager::Pair(const char* pairCode) {
     return AccountLinkResultCode::InternalError;
   }
 
-  std::string& authToken = response.data.authToken;
+  const std::string& authToken = response.data.authToken;
 
   if (authToken.empty()) {
     ESP_LOGE(TAG, "Received empty auth token");
@@ -105,12 +109,12 @@ AccountLinkResultCode GatewayConnectionManager::Pair(const char* pairCode) {
     return AccountLinkResultCode::InternalError;
   }
 
-  s_flags |= FLAG_AUTHENTICATED;
-  ESP_LOGD(TAG, "Successfully paired with pair code %u", pairCode);
+  s_flags |= FLAG_LINKED;
+  ESP_LOGD(TAG, "Successfully linked to account");
 
   return AccountLinkResultCode::Success;
 }
-void GatewayConnectionManager::UnPair() {
+void GatewayConnectionManager::UnLink() {
   s_flags &= FLAG_HAS_IP;
   s_wsClient = nullptr;
   Config::ClearBackendAuthToken();
@@ -147,7 +151,7 @@ bool FetchDeviceInfo(const String& authToken) {
     ESP_LOGI(TAG, "  [%s] rf=%u model=%u", shocker.id.c_str(), shocker.rfId, shocker.model);
   }
 
-  s_flags |= FLAG_AUTHENTICATED;
+  s_flags |= FLAG_LINKED;
 
   return true;
 }
@@ -226,7 +230,7 @@ void GatewayConnectionManager::Update() {
       return;
     }
 
-    s_flags |= FLAG_AUTHENTICATED;
+    s_flags |= FLAG_LINKED;
     ESP_LOGD(TAG, "Successfully verified auth token");
 
     s_wsClient = std::make_unique<GatewayClient>(authToken);

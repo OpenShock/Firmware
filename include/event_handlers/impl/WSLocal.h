@@ -5,17 +5,17 @@
 
 #include <cstdint>
 
-#define _HANDLER_SIGNATURE(NAME) void NAME(std::uint8_t socketId, const OpenShock::Serialization::Local::LocalToDeviceMessage* msg)
+#define WS_EVENT_HANDLER_SIGNATURE(NAME) void NAME(std::uint8_t socketId, const OpenShock::Serialization::Local::LocalToDeviceMessage* msg)
 
 namespace OpenShock::MessageHandlers::Local::_Private {
-  typedef _HANDLER_SIGNATURE((*HandlerType));
-  _HANDLER_SIGNATURE(HandleInvalidMessage);
-  _HANDLER_SIGNATURE(HandleWiFiScanCommand);
-  _HANDLER_SIGNATURE(HandleWiFiNetworkSaveCommand);
-  _HANDLER_SIGNATURE(HandleWiFiNetworkForgetCommand);
-  _HANDLER_SIGNATURE(HandleWiFiNetworkConnectCommand);
-  _HANDLER_SIGNATURE(HandleWiFiNetworkDisconnectCommand);
-  _HANDLER_SIGNATURE(HandleAccountLinkCommand);
-  _HANDLER_SIGNATURE(HandleAccountUnlinkCommand);
-  _HANDLER_SIGNATURE(HandleSetRfTxPinCommand);
+  typedef WS_EVENT_HANDLER_SIGNATURE((*HandlerType));
+  WS_EVENT_HANDLER_SIGNATURE(HandleInvalidMessage);
+  WS_EVENT_HANDLER_SIGNATURE(HandleWiFiScanCommand);
+  WS_EVENT_HANDLER_SIGNATURE(HandleWiFiNetworkSaveCommand);
+  WS_EVENT_HANDLER_SIGNATURE(HandleWiFiNetworkForgetCommand);
+  WS_EVENT_HANDLER_SIGNATURE(HandleWiFiNetworkConnectCommand);
+  WS_EVENT_HANDLER_SIGNATURE(HandleWiFiNetworkDisconnectCommand);
+  WS_EVENT_HANDLER_SIGNATURE(HandleAccountLinkCommand);
+  WS_EVENT_HANDLER_SIGNATURE(HandleAccountUnlinkCommand);
+  WS_EVENT_HANDLER_SIGNATURE(HandleSetRfTxPinCommand);
 }  // namespace OpenShock::MessageHandlers::Local::_Private

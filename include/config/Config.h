@@ -15,8 +15,12 @@ namespace OpenShock::Config {
   void Init();
 
   /* GetAsJSON and SaveFromJSON are used for Reading/Writing the config file in its human-readable form. */
-  std::string GetAsJSON();
+  std::string GetAsJSON(bool withSensitiveData);
   bool SaveFromJSON(const std::string& json);
+
+  /* GetAsFlatBuffer and SaveFromFlatBuffer are used for Reading/Writing the config file in its binary form. */
+  flatbuffers::Offset<Serialization::Configuration::Config> GetAsFlatBuffer(flatbuffers::FlatBufferBuilder& builder, bool withSensitiveData);
+  bool SaveFromFlatBuffer(const Serialization::Configuration::Config* config);
 
   /* GetRaw and SetRaw are used for Reading/Writing the config file in its binary form. */
   bool GetRaw(std::vector<std::uint8_t>& buffer);
@@ -31,7 +35,7 @@ namespace OpenShock::Config {
 
   bool GetRFConfig(RFConfig& out);
   bool GetWiFiConfig(WiFiConfig& out);
-  bool GetWiFiCredentials(cJSON* array);
+  bool GetWiFiCredentials(cJSON* array, bool withSensitiveData);
   bool GetWiFiCredentials(std::vector<WiFiCredentials>& out);
 
   bool SetRFConfig(const RFConfig& config);
@@ -62,6 +66,4 @@ namespace OpenShock::Config {
   bool GetBackendAuthToken(std::string& out);
   bool SetBackendAuthToken(const std::string& token);
   bool ClearBackendAuthToken();
-
-  bool SaveChanges();
 }  // namespace OpenShock::Config

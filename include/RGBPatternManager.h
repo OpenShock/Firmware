@@ -1,13 +1,12 @@
 #pragma once
 
-#include <nonstd/span.hpp>
-
-#include <esp32-hal-rmt.h>
-
 #include <freertos/FreeRTOS.h>
 #include <freertos/semphr.h>
 #include <freertos/task.h>
 
+#include <esp32-hal-rmt.h>
+
+#include <array>
 #include <cstdint>
 
 namespace OpenShock {
@@ -23,13 +22,17 @@ namespace OpenShock {
       std::uint32_t duration;
     };
 
-    void SetPattern(nonstd::span<const RGBState> pattern);
+    void SetPattern(const RGBState* pattern, std::size_t patternLength);
+    template <std::size_t N>
+    inline void SetPattern(const RGBState (&pattern)[N]) {
+      SetPattern(pattern, N);
+    }
     void SetBrightness(std::uint8_t brightness);
     void ClearPattern();
 
   private:
     void ClearPatternInternal();
-    void SendRGB(const RGBState state);
+    void SendRGB(const RGBState& state);
     static void RunPattern(void* arg);
 
     std::uint8_t m_rgbPin;

@@ -1,14 +1,13 @@
 #include "config/CaptivePortalConfig.h"
 
+#include "config/internal/utils.h"
 #include "Logging.h"
 
 const char* const TAG = "Config::CaptivePortalConfig";
 
 using namespace OpenShock::Config;
 
-CaptivePortalConfig::CaptivePortalConfig() {
-  ToDefault();
-}
+CaptivePortalConfig::CaptivePortalConfig() : alwaysEnabled(false) { }
 
 CaptivePortalConfig::CaptivePortalConfig(bool alwaysEnabled) {
   this->alwaysEnabled = alwaysEnabled;
@@ -29,7 +28,7 @@ bool CaptivePortalConfig::FromFlatbuffers(const Serialization::Configuration::Ca
   return true;
 }
 
-flatbuffers::Offset<OpenShock::Serialization::Configuration::CaptivePortalConfig> CaptivePortalConfig::ToFlatbuffers(flatbuffers::FlatBufferBuilder& builder) const {
+flatbuffers::Offset<OpenShock::Serialization::Configuration::CaptivePortalConfig> CaptivePortalConfig::ToFlatbuffers(flatbuffers::FlatBufferBuilder& builder, bool withSensitiveData) const {
   return Serialization::Configuration::CreateCaptivePortalConfig(builder, alwaysEnabled);
 }
 
@@ -39,28 +38,17 @@ bool CaptivePortalConfig::FromJSON(const cJSON* json) {
     return false;
   }
 
-  if (!cJSON_IsObject(json)) {
+  if (cJSON_IsObject(json) == 0) {
     ESP_LOGE(TAG, "json is not an object");
     return false;
   }
 
-  const cJSON* alwaysEnabledJson = cJSON_GetObjectItemCaseSensitive(json, "alwaysEnabled");
-  if (alwaysEnabledJson == nullptr) {
-    ESP_LOGE(TAG, "alwaysEnabled is null");
-    return false;
-  }
-
-  if (!cJSON_IsBool(alwaysEnabledJson)) {
-    ESP_LOGE(TAG, "alwaysEnabled is not a bool");
-    return false;
-  }
-
-  alwaysEnabled = cJSON_IsTrue(alwaysEnabledJson);
+  Internal::Utils::FromJsonBool(alwaysEnabled, json, "alwaysEnabled", false);
 
   return true;
 }
 
-cJSON* CaptivePortalConfig::ToJSON() const {
+cJSON* CaptivePortalConfig::ToJSON(bool withSensitiveData) const {
   cJSON* root = cJSON_CreateObject();
 
   cJSON_AddBoolToObject(root, "alwaysEnabled", alwaysEnabled);

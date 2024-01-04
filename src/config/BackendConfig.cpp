@@ -7,9 +7,11 @@ const char* const TAG = "Config::BackendConfig";
 
 using namespace OpenShock::Config;
 
+BackendConfig::BackendConfig() : domain(OPENSHOCK_API_DOMAIN), authToken() { }
+
 void BackendConfig::ToDefault() {
   domain = OPENSHOCK_API_DOMAIN;
-  authToken = "";
+  authToken.clear();
 }
 
 bool BackendConfig::FromFlatbuffers(const Serialization::Configuration::BackendConfig* config) {
@@ -24,8 +26,17 @@ bool BackendConfig::FromFlatbuffers(const Serialization::Configuration::BackendC
   return true;
 }
 
-flatbuffers::Offset<OpenShock::Serialization::Configuration::BackendConfig> BackendConfig::ToFlatbuffers(flatbuffers::FlatBufferBuilder& builder) const {
-  return Serialization::Configuration::CreateBackendConfig(builder, builder.CreateString(domain), builder.CreateString(authToken));
+flatbuffers::Offset<OpenShock::Serialization::Configuration::BackendConfig> BackendConfig::ToFlatbuffers(flatbuffers::FlatBufferBuilder& builder, bool withSensitiveData) const {
+  auto domainOffset = builder.CreateString(domain);
+
+  flatbuffers::Offset<flatbuffers::String> authTokenOffset;
+  if (withSensitiveData) {
+    authTokenOffset = builder.CreateString(authToken);
+  } else {
+    authTokenOffset = 0;
+  }
+
+  return Serialization::Configuration::CreateBackendConfig(builder, domainOffset, authTokenOffset);
 }
 
 bool BackendConfig::FromJSON(const cJSON* json) {
@@ -34,45 +45,24 @@ bool BackendConfig::FromJSON(const cJSON* json) {
     return false;
   }
 
-  if (!cJSON_IsObject(json)) {
+  if (cJSON_IsObject(json) == 0) {
     ESP_LOGE(TAG, "json is not an object");
     return false;
   }
 
-  const cJSON* domainJson = cJSON_GetObjectItemCaseSensitive(json, "domain");
-  if (domainJson == nullptr) {
-    ESP_LOGE(TAG, "domain is null");
-    return false;
-  }
-
-  if (!cJSON_IsString(domainJson)) {
-    ESP_LOGE(TAG, "domain is not a string");
-    return false;
-  }
-
-  domain = domainJson->valuestring;
-
-  const cJSON* authTokenJson = cJSON_GetObjectItemCaseSensitive(json, "authToken");
-  if (authTokenJson == nullptr) {
-    ESP_LOGE(TAG, "authToken is null");
-    return false;
-  }
-
-  if (!cJSON_IsString(authTokenJson)) {
-    ESP_LOGE(TAG, "authToken is not a string");
-    return false;
-  }
-
-  authToken = authTokenJson->valuestring;
+  Internal::Utils::FromJsonStr(domain, json, "domain", OPENSHOCK_API_DOMAIN);
+  Internal::Utils::FromJsonStr(authToken, json, "authToken", "");
 
   return true;
 }
 
-cJSON* BackendConfig::ToJSON() const {
+cJSON* BackendConfig::ToJSON(bool withSensitiveData) const {
   cJSON* root = cJSON_CreateObject();
 
   cJSON_AddStringToObject(root, "domain", domain.c_str());
-  cJSON_AddStringToObject(root, "authToken", authToken.c_str());
+  if (withSensitiveData) {
+    cJSON_AddStringToObject(root, "authToken", authToken.c_str());
+  }
 
   return root;
 }

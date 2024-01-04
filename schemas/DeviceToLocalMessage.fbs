@@ -1,6 +1,7 @@
 include "./Types/WifiScanStatus.fbs";
 include "./Types/WifiNetwork.fbs";
 include "./Types/WifiNetworkEventType.fbs";
+include "./ConfigFile.fbs";
 
 attribute "fs_serializer";
 
@@ -9,8 +10,9 @@ namespace OpenShock.Serialization.Local;
 table ReadyMessage {
   poggies:bool;
   connected_wifi:Types.WifiNetwork;
-  gateway_paired:bool;
-  rftx_pin:uint8;
+  account_linked:bool;
+
+  config:Configuration.Config;
 }
 
 table ErrorMessage {
@@ -55,13 +57,21 @@ struct SetRfTxPinCommandResult {
 }
 
 union DeviceToLocalMessagePayload {
+
+  // General stuff
   ReadyMessage,
   ErrorMessage,
+
+  // Wifi stuff
   WifiScanStatusMessage,
   WifiNetworkEvent,
   WifiGotIpEvent,
   WifiLostIpEvent,
+
+  // Account linking stuff
   AccountLinkCommandResult,
+
+  // RF transmitter stuff
   SetRfTxPinCommandResult
 }
 

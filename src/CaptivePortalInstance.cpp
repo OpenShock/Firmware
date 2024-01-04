@@ -18,6 +18,7 @@ static const char* TAG = "CaptivePortalInstance";
 
 constexpr std::uint16_t HTTP_PORT                 = 80;
 constexpr std::uint16_t WEBSOCKET_PORT            = 81;
+constexpr std::uint16_t DNS_PORT                  = 53;
 constexpr std::uint32_t WEBSOCKET_PING_INTERVAL   = 10'000;
 constexpr std::uint32_t WEBSOCKET_PING_TIMEOUT    = 1000;
 constexpr std::uint8_t WEBSOCKET_PING_RETRIES     = 3;
@@ -46,7 +47,7 @@ bool _tryGetPartitionHash(char (&buffer)[65]) {
   if (!initialized) {
     initialized = true;
 
-    ESP_LOGI(TAG, "Looking for static partition");
+    ESP_LOGD(TAG, "Looking for static partition");
 
     // Get the static partition
     const esp_partition_t* partition = _getStaticPartition();
@@ -55,7 +56,7 @@ bool _tryGetPartitionHash(char (&buffer)[65]) {
       return false;
     }
 
-    ESP_LOGI(TAG, "Found static partition, getting hash... (this may take a while)");
+    ESP_LOGD(TAG, "Found static partition, getting hash...");
 
     // Get the hash of the partition
     esp_err_t err = esp_partition_get_sha256(partition, staticSha256);
@@ -64,14 +65,11 @@ bool _tryGetPartitionHash(char (&buffer)[65]) {
       return false;
     }
 
-    ESP_LOGI(TAG, "Got partition hash");
+    ESP_LOGD(TAG, "Got partition hash");
   }
 
   // Copy the hash to the output buffer
-  HexUtils::ToHex<32>(staticSha256, nonstd::span<char, 64>(buffer, 64), false);
-
-  // Null-terminate the string
-  buffer[64] = '\0';
+  HexUtils::ToHex<32>(staticSha256, buffer, false);
 
   return true;
 }
@@ -80,10 +78,14 @@ CaptivePortalInstance::CaptivePortalInstance()
   : m_webServer(HTTP_PORT)
   , m_socketServer(WEBSOCKET_PORT, "/ws", "json")
   , m_socketDeFragger(std::bind(&CaptivePortalInstance::handleWebSocketEvent, this, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3, std::placeholders::_4))
+  , m_dnsServer()
   , m_taskHandle(nullptr) {
   m_socketServer.onEvent(std::bind(&WebSocketDeFragger::handler, &m_socketDeFragger, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3, std::placeholders::_4));
   m_socketServer.begin();
   m_socketServer.enableHeartbeat(WEBSOCKET_PING_INTERVAL, WEBSOCKET_PING_TIMEOUT, WEBSOCKET_PING_RETRIES);
+
+  ESP_LOGI(TAG, "Setting up DNS server");
+  m_dnsServer.start(DNS_PORT, "*", WiFi.softAPIP());
 
   // Check if the www folder exists and is populated
   bool indexExists = LittleFS.exists("/www/index.html.gz");
@@ -97,9 +99,14 @@ CaptivePortalInstance::CaptivePortalInstance()
     ESP_LOGI(TAG, "Serving files from LittleFS");
     ESP_LOGI(TAG, "Filesystem hash: %s", fsHash);
 
+    char softAPURL[64];
+    snprintf(softAPURL, sizeof(softAPURL), "http://%s", WiFi.softAPIP().toString().c_str());
+
+    // Serving the captive portal files from LittleFS
     m_webServer.serveStatic("/", LittleFS, "/www/", "max-age=3600").setDefaultFile("index.html").setSharedEtag(fsHash);
 
-    m_webServer.onNotFound([](AsyncWebServerRequest* request) { request->send(404, "text/plain", "Not found"); });
+    // Redirecting connection tests to the captive portal, triggering the "login to network" prompt
+    m_webServer.onNotFound([softAPURL](AsyncWebServerRequest* request) { request->redirect(softAPURL); });
   } else {
     ESP_LOGE(TAG, "/www/index.html or hash files not found, serving error page");
 
@@ -135,6 +142,7 @@ CaptivePortalInstance::~CaptivePortalInstance() {
   }
   m_webServer.end();
   m_socketServer.close();
+  m_dnsServer.stop();
 }
 
 void CaptivePortalInstance::task(void* arg) {
@@ -142,6 +150,7 @@ void CaptivePortalInstance::task(void* arg) {
 
   while (true) {
     instance->m_socketServer.loop();
+    instance->m_dnsServer.processNextRequest();
     vTaskDelay(pdMS_TO_TICKS(WEBSOCKET_UPDATE_INTERVAL));
   }
 }
@@ -155,7 +164,7 @@ void CaptivePortalInstance::handleWebSocketClientConnected(std::uint8_t socketId
     connectedNetworkPtr = &connectedNetwork;
   }
 
-  Serialization::Local::SerializeReadyMessage(connectedNetworkPtr, GatewayConnectionManager::IsPaired(), CommandHandler::GetRfTxPin(), std::bind(&CaptivePortalInstance::sendMessageBIN, this, socketId, std::placeholders::_1, std::placeholders::_2));
+  Serialization::Local::SerializeReadyMessage(connectedNetworkPtr, GatewayConnectionManager::IsLinked(), std::bind(&CaptivePortalInstance::sendMessageBIN, this, socketId, std::placeholders::_1, std::placeholders::_2));
 }
 
 void CaptivePortalInstance::handleWebSocketClientDisconnected(std::uint8_t socketId) {

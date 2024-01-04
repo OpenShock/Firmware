@@ -10,8 +10,6 @@
 #include "wifi/WiFiNetwork.h"
 #include "wifi/WiFiScanManager.h"
 
-#include <nonstd/span.hpp>
-
 #include <WiFi.h>
 
 #include <esp_wifi.h>
@@ -135,6 +133,8 @@ bool _connectImpl(const char* ssid, const char* password, const std::uint8_t (&b
   return true;
 }
 bool _connectHidden(const std::uint8_t (&bssid)[6], const std::string& password) {
+  (void)password;
+  
   ESP_LOGV(TAG, "Connecting to hidden network " BSSID_FMT, BSSID_ARG(bssid));
 
   // TODO: Implement hidden network support
@@ -205,7 +205,7 @@ void _evWiFiConnected(arduino_event_t* event) {
   Serialization::Local::SerializeWiFiNetworkEvent(Serialization::Types::WifiNetworkEventType::Connected, *it, CaptivePortal::BroadcastMessageBIN);
 }
 void _evWiFiGotIP(arduino_event_t* event) {
-  auto& info = event->event_info.got_ip;
+  const auto& info = event->event_info.got_ip;
 
   std::uint8_t ip[4];
   memcpy(ip, &info.ip_info.ip.addr, sizeof(ip));
@@ -244,12 +244,13 @@ void _evWiFiScanStarted() { }
 void _evWiFiScanStatusChanged(OpenShock::WiFiScanStatus status) {
   // If the scan started, remove any networks that have not been seen in 3 scans
   if (status == OpenShock::WiFiScanStatus::Started) {
-    for (auto it = s_wifiNetworks.begin(); it != s_wifiNetworks.end(); ++it) {
+    for (auto it = s_wifiNetworks.begin(); it != s_wifiNetworks.end();) {
       if (it->scansMissed++ > 3) {
         ESP_LOGV(TAG, "Network %s (" BSSID_FMT ") has not been seen in 3 scans, removing from list", it->ssid, BSSID_ARG(it->bssid));
         Serialization::Local::SerializeWiFiNetworkEvent(Serialization::Types::WifiNetworkEventType::Lost, *it, CaptivePortal::BroadcastMessageBIN);
-        s_wifiNetworks.erase(it);
-        it--;
+        it = s_wifiNetworks.erase(it);
+      } else {
+        ++it;
       }
     }
   }
@@ -308,7 +309,7 @@ bool WiFiManager::Init() {
 
   // If we recognize the network in the ESP's WiFi cache, try to connect to it
   wifi_config_t current_conf;
-  if (esp_wifi_get_config((wifi_interface_t)ESP_IF_WIFI_STA, &current_conf) == ESP_OK) {
+  if (esp_wifi_get_config(static_cast<wifi_interface_t>(ESP_IF_WIFI_STA), &current_conf) == ESP_OK) {
     if (current_conf.sta.ssid[0] != '\0') {
       if (Config::GetWiFiCredentialsIDbySSID(reinterpret_cast<const char*>(current_conf.sta.ssid)) != 0) {
         WiFi.begin();

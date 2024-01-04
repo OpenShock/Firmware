@@ -14,7 +14,7 @@ updates:
 
   # Check for npm updates
   - package-ecosystem: 'npm'
-    directory: '/WebUI'
+    directory: '/frontend'
     schedule:
       interval: 'weekly'
       day: 'monday'

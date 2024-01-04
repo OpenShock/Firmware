@@ -118,7 +118,8 @@ constexpr PinPatternManager::State kSolidOffPattern[] = {
 
 PinPatternManager s_builtInLedManager(OPENSHOCK_LED_GPIO);
 
-void _updateVisualStateGPIO(nonstd::span<const PinPatternManager::State> override) {
+template <std::size_t N>
+inline void _updateVisualStateGPIO(const PinPatternManager::State (&override)[N]) {
   s_builtInLedManager.SetPattern(override);
 }
 
@@ -281,6 +282,8 @@ void _updateVisualState() {
 }
 
 void _handleWiFiConnected(arduino_event_t* event) {
+  (void)event;
+
   std::uint64_t oldState = s_stateFlags;
 
   s_stateFlags |= kWiFiConnectedFlag;
@@ -290,6 +293,8 @@ void _handleWiFiConnected(arduino_event_t* event) {
   }
 }
 void _handleWiFiDisconnected(arduino_event_t* event) {
+  (void)event;
+
   std::uint64_t oldState = s_stateFlags;
 
   s_stateFlags &= ~kWiFiConnectedFlag;
@@ -299,6 +304,8 @@ void _handleWiFiDisconnected(arduino_event_t* event) {
   }
 }
 void _handleWiFiScanDone(arduino_event_t* event) {
+  (void)event;
+  
   std::uint64_t oldState = s_stateFlags;
 
   s_stateFlags &= ~kWiFiScanningFlag;

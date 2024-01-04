@@ -1,7 +1,9 @@
 #pragma once
 
+#include "StringView.h"
 #include "WebSocketDeFragger.h"
 
+#include <DNSServer.h>
 #include <ESPAsyncWebServer.h>
 #include <WebSocketsServer.h>
 
@@ -16,9 +18,9 @@ namespace OpenShock {
     CaptivePortalInstance();
     ~CaptivePortalInstance();
 
-    bool sendMessageTXT(std::uint8_t socketId, const char* data, std::size_t len) { return m_socketServer.sendTXT(socketId, data, len); }
+    bool sendMessageTXT(std::uint8_t socketId, StringView data) { return m_socketServer.sendTXT(socketId, data.data(), data.length()); }
     bool sendMessageBIN(std::uint8_t socketId, const std::uint8_t* data, std::size_t len) { return m_socketServer.sendBIN(socketId, data, len); }
-    bool broadcastMessageTXT(const char* data, std::size_t len) { return m_socketServer.broadcastTXT(data, len); }
+    bool broadcastMessageTXT(StringView data) { return m_socketServer.broadcastTXT(data.data(), data.length()); }
     bool broadcastMessageBIN(const std::uint8_t* data, std::size_t len) { return m_socketServer.broadcastBIN(data, len); }
 
   private:
@@ -31,6 +33,7 @@ namespace OpenShock {
     AsyncWebServer m_webServer;
     WebSocketsServer m_socketServer;
     WebSocketDeFragger m_socketDeFragger;
+    DNSServer m_dnsServer;
     TaskHandle_t m_taskHandle;
   };
 }  // namespace OpenShock

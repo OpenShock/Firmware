@@ -32,10 +32,10 @@ std::uint32_t calculateEepyTime(std::int64_t timeToKeepAlive) {
 }
 
 struct KnownShocker {
+  bool killTask;
   ShockerModelType model;
   std::uint16_t shockerId;
   std::int64_t lastActivityTimestamp;
-  bool killTask;
 };
 
 static SemaphoreHandle_t s_rfTransmitterMutex         = nullptr;
@@ -46,6 +46,8 @@ static QueueHandle_t s_keepAliveQueue     = nullptr;
 static TaskHandle_t s_keepAliveTaskHandle = nullptr;
 
 void _keepAliveTask(void* arg) {
+  (void)arg;
+
   std::int64_t timeToKeepAlive = KEEP_ALIVE_INTERVAL;
 
   // Map of shocker IDs to time of next keep-alive
@@ -58,7 +60,7 @@ void _keepAliveTask(void* arg) {
     KnownShocker cmd;
     while (xQueueReceive(s_keepAliveQueue, &cmd, pdMS_TO_TICKS(eepyTime)) == pdTRUE) {
       if (cmd.killTask) {
-        ESP_LOGW(TAG, "Received kill command, exiting keep-alive task");
+        ESP_LOGI(TAG, "Received kill command, exiting keep-alive task");
         vTaskDelete(nullptr);
         break;  // This should never be reached
       }
@@ -76,24 +78,24 @@ void _keepAliveTask(void* arg) {
 
     // For every entry that has a keep-alive time less than now, send a keep-alive
     for (auto it = activityMap.begin(); it != activityMap.end(); ++it) {
-      auto& cmd = it->second;
+      auto& cmdRef = it->second;
 
-      if (cmd.lastActivityTimestamp + KEEP_ALIVE_INTERVAL < now) {
-        ESP_LOGV(TAG, "Sending keep-alive for shocker %u", cmd.shockerId);
+      if (cmdRef.lastActivityTimestamp + KEEP_ALIVE_INTERVAL < now) {
+        ESP_LOGV(TAG, "Sending keep-alive for shocker %u", cmdRef.shockerId);
 
         if (s_rfTransmitter == nullptr) {
           ESP_LOGW(TAG, "RF Transmitter is not initialized, ignoring keep-alive");
           break;
         }
 
-        if (!s_rfTransmitter->SendCommand(cmd.model, cmd.shockerId, ShockerCommandType::Vibrate, 0, KEEP_ALIVE_DURATION, false)) {
-          ESP_LOGW(TAG, "Failed to send keep-alive for shocker %u", cmd.shockerId);
+        if (!s_rfTransmitter->SendCommand(cmdRef.model, cmdRef.shockerId, ShockerCommandType::Vibrate, 0, KEEP_ALIVE_DURATION, false)) {
+          ESP_LOGW(TAG, "Failed to send keep-alive for shocker %u", cmdRef.shockerId);
         }
 
-        cmd.lastActivityTimestamp = now;
+        cmdRef.lastActivityTimestamp = now;
       }
 
-      timeToKeepAlive = std::min(timeToKeepAlive, cmd.lastActivityTimestamp + KEEP_ALIVE_INTERVAL);
+      timeToKeepAlive = std::min(timeToKeepAlive, cmdRef.lastActivityTimestamp + KEEP_ALIVE_INTERVAL);
     }
   }
 }
@@ -170,12 +172,13 @@ bool CommandHandler::Init() {
   std::uint8_t txPin = rfConfig.txPin;
   if (!OpenShock::IsValidOutputPin(txPin)) {
     if (!OpenShock::IsValidOutputPin(Constants::GPIO_RF_TX)) {
-      ESP_LOGE(TAG, "Configured RF TX pin is invalid, default pin is also invalid. Pausing RF transmitter");
-      Config::SetRFConfigTxPin(Constants::GPIO_INVALID);
-      return false;
+      ESP_LOGE(TAG, "Configured RF TX pin (%u) is invalid, and default pin (%u) is invalid. Unable to initialize RF transmitter", txPin, Constants::GPIO_RF_TX);
+
+      ESP_LOGD(TAG, "Setting RF TX pin to GPIO_INVALID");
+      return Config::SetRFConfigTxPin(Constants::GPIO_INVALID);  // This is not a error yet, unless we are unable to save the RF TX Pin as invalid
     }
 
-    ESP_LOGW(TAG, "Configured RF TX pin is invalid, using default pin (%u)", Constants::GPIO_RF_TX);
+    ESP_LOGW(TAG, "Configured RF TX pin (%u) is invalid, using default pin (%u)", txPin, Constants::GPIO_RF_TX);
     txPin = Constants::GPIO_RF_TX;
     Config::SetRFConfigTxPin(txPin);
   }
@@ -293,7 +296,7 @@ bool CommandHandler::HandleCommand(ShockerModelType model, std::uint16_t shocker
 
     s_rfTransmitter->ClearPendingCommands();
   } else {
-    ESP_LOGV(TAG, "Command received: %u %u %u %u", model, shockerId, type, intensity);
+    ESP_LOGD(TAG, "Command received: %u %u %u %u", model, shockerId, type, intensity);
   }
 
   bool ok = s_rfTransmitter->SendCommand(model, shockerId, type, intensity, durationMs);

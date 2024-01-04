@@ -1,9 +1,13 @@
 #include "serialization/WSLocal.h"
 
+#include "config/Config.h"
+#include "Logging.h"
 #include "util/HexUtils.h"
 #include "wifi/WiFiNetwork.h"
 
 #include "serialization/_fbs/DeviceToLocalMessage_generated.h"
+
+const char* const TAG = "WSLocal";
 
 using namespace OpenShock::Serialization;
 
@@ -57,7 +61,7 @@ bool Local::SerializeErrorMessage(const char* message, Common::SerializationCall
   return true;
 }
 
-bool Local::SerializeReadyMessage(const WiFiNetwork* connectedNetwork, bool gatewayPaired, std::uint8_t radioTxPin, Common::SerializationCallbackFn callback) {
+bool Local::SerializeReadyMessage(const WiFiNetwork* connectedNetwork, bool accountLinked, Common::SerializationCallbackFn callback) {
   flatbuffers::FlatBufferBuilder builder(256);
 
   flatbuffers::Offset<Serialization::Types::WifiNetwork> fbsNetwork = 0;
@@ -68,7 +72,13 @@ bool Local::SerializeReadyMessage(const WiFiNetwork* connectedNetwork, bool gate
     fbsNetwork = 0;
   }
 
-  auto readyMessageOffset = Serialization::Local::CreateReadyMessage(builder, true, fbsNetwork, gatewayPaired, radioTxPin);
+  auto configOffset = OpenShock::Config::GetAsFlatBuffer(builder, false);
+  if (configOffset.IsNull()) {
+    ESP_LOGE(TAG, "Failed to serialize config");
+    return false;
+  }
+
+  auto readyMessageOffset = Serialization::Local::CreateReadyMessage(builder, true, fbsNetwork, accountLinked, configOffset);
 
   auto msg = Serialization::Local::CreateDeviceToLocalMessage(builder, Serialization::Local::DeviceToLocalMessagePayload::ReadyMessage, readyMessageOffset.Union());
 

@@ -1,5 +1,5 @@
 name: cnd-upload-version-info
-description: Uploads firmware artifacts to CDN
+description: Uploads version specific info to CDN
 inputs:
   cf-bucket:
     description: Name of the S3 bucket

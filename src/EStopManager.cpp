@@ -32,7 +32,7 @@ void _estopManagerTask(TimerHandle_t xTimer) {
       if (buttonState == LOW) {
         s_estopStatus = EStopManager::EStopStatus::ESTOPPED_AND_HELD;
         s_estoppedAt  = s_lastEStopButtonStateChange;
-        ESP_LOGI(TAG, "Emergency Stopped!!!");
+        ESP_LOGI(TAG, "EStop triggered");
         OpenShock::VisualStateManager::SetEmergencyStop(s_estopStatus);
         OpenShock::CommandHandler::SetKeepAlivePaused(true);
       }
@@ -48,7 +48,7 @@ void _estopManagerTask(TimerHandle_t xTimer) {
       // If the button is held again for the specified time after being released, clear the EStop
       if (buttonState == LOW && s_lastEStopButtonState == LOW && s_lastEStopButtonStateChange + s_estopHoldToClearTime <= OpenShock::millis()) {
         s_estopStatus = EStopManager::EStopStatus::ESTOPPED_CLEARED;
-        ESP_LOGI(TAG, "Clearing EStop on button release!");
+        ESP_LOGI(TAG, "EStop cleared");
         OpenShock::VisualStateManager::SetEmergencyStop(s_estopStatus);
       }
       break;
@@ -56,7 +56,7 @@ void _estopManagerTask(TimerHandle_t xTimer) {
       // If the button is released, report as ALL_CLEAR
       if (buttonState == HIGH) {
         s_estopStatus = EStopManager::EStopStatus::ALL_CLEAR;
-        ESP_LOGI(TAG, "All clear!");
+        ESP_LOGI(TAG, "EStop cleared, all clear");
         OpenShock::VisualStateManager::SetEmergencyStop(s_estopStatus);
         OpenShock::CommandHandler::SetKeepAlivePaused(false);
       }
@@ -86,6 +86,8 @@ void EStopManager::Init(std::uint16_t updateIntervalMs) {
   }
 
 #else
+  (void)updateIntervalMs;
+
   ESP_LOGI(TAG, "EStopManager disabled, no pin defined");
 #endif
 }

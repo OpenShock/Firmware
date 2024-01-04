@@ -4,8 +4,6 @@
 #include "util/HexUtils.h"
 #include "wifi/WiFiManager.h"
 
-#include <nonstd/span.hpp>
-
 #include <cstdint>
 
 const char* const TAG = "LocalMessageHandlers";
@@ -13,6 +11,8 @@ const char* const TAG = "LocalMessageHandlers";
 using namespace OpenShock::MessageHandlers::Local;
 
 void _Private::HandleWiFiNetworkSaveCommand(std::uint8_t socketId, const OpenShock::Serialization::Local::LocalToDeviceMessage* root) {
+  (void)socketId;
+  
   auto msg = root->payload_as_WifiNetworkSaveCommand();
   if (msg == nullptr) {
     ESP_LOGE(TAG, "Payload cannot be parsed as WiFiNetworkSaveCommand");
@@ -32,12 +32,14 @@ void _Private::HandleWiFiNetworkSaveCommand(std::uint8_t socketId, const OpenSho
     return;
   }
 
-  if (password.size() < 1) {
-    ESP_LOGV(TAG, "WiFi message is missing password, assuming open network");
-  } else if (password.size() < 8) {
+  std::size_t passwordLength = password.size();
+
+  if (passwordLength != 0 && passwordLength < 8) {
     ESP_LOGE(TAG, "WiFi password is too short");
     return;
-  } else if (password.size() > 63) {
+  }
+
+  if (passwordLength > 63) {
     ESP_LOGE(TAG, "WiFi password is too long");
     return;
   }

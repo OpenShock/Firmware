@@ -22,7 +22,7 @@ jobs:
   get-targets:
     uses: ./.github/workflows/get-targets.yml
 
-  build-captive-portal:
+  build-frontend:
     runs-on: ubuntu-latest
 
     steps:
@@ -30,20 +30,20 @@ jobs:
         with:
           sparse-checkout: |
             .github
-            WebUI
+            frontend
 
-      - uses: ./.github/actions/build-captive-portal
+      - uses: ./.github/actions/build-frontend
         with:
           node-version: ${{ env.NODE_VERSION }}
           skip-checkout: true
 
-  build-filesystem:
+  build-staticfs:
     runs-on: ubuntu-latest
-    needs: build-captive-portal
+    needs: build-frontend
 
     steps:
       - uses: actions/checkout@v4
-      - uses: ./.github/actions/build-filesystem
+      - uses: ./.github/actions/build-staticfs
         with:
           python-version: ${{ env.PYTHON_VERSION }}
           skip-checkout: true
@@ -64,9 +64,9 @@ jobs:
           board: ${{ matrix.board }}
           skip-checkout: true
 
-  merge-images:
+  merge-partitions:
     runs-on: ubuntu-latest
-    needs: [get-targets, build-filesystem, build-firmware]
+    needs: [get-targets, build-staticfs, build-firmware]
     strategy:
       fail-fast: false
       matrix: ${{ fromJSON(needs.get-targets.outputs.matrix )}}
@@ -82,7 +82,7 @@ jobs:
             chips
 
       - name: Merge images
-        uses: ./.github/actions/merge-images
+        uses: ./.github/actions/merge-partitions
         with:
           python-version: ${{ env.PYTHON_VERSION }}
           board: ${{ matrix.board }}
@@ -90,11 +90,11 @@ jobs:
 
   checkpoint-build:
     runs-on: ubuntu-latest
-    needs: [build-filesystem, merge-images]
+    needs: [build-staticfs, merge-partitions]
     steps:
       - run: echo "Builds checkpoint reached"
 
-  cdn-upload-boards:
+  cdn-upload-firmware:
     runs-on: ubuntu-latest
     needs: [get-targets, checkpoint-build]
     environment: cdn-firmware-r2
@@ -116,14 +116,14 @@ jobs:
           cf-secret-access-key: ${{ secrets.S3_SECRET_ACCESS_KEY }}
 
       # Upload firmware to CDN.
-      - uses: ./.github/actions/cdn-upload-board
+      - uses: ./.github/actions/cdn-upload-firmware
         with:
           cf-bucket: ${{ vars.S3_BUCKET }}
           board: ${{ matrix.board }}
           version: ${{ github.ref_name }}
           release-channel: ${{ contains(github.ref_name, '-') && 'stable' || 'beta' }}
 
-  cdn-upload-board-list:
+  cdn-upload-version-info:
     runs-on: ubuntu-latest
     needs: [get-targets, checkpoint-build]
     environment: cdn-firmware-r2
@@ -150,7 +150,7 @@ jobs:
 
   cdn-bump-version:
     runs-on: ubuntu-latest
-    needs: [cdn-upload-boards] # only after version is complete
+    needs: [cdn-upload-firmware] # only after version is complete
     environment: cdn-firmware-r2
 
     steps:
@@ -175,7 +175,7 @@ jobs:
 
   checkpoint-cdn:
     runs-on: ubuntu-latest
-    needs: [checkpoint-build, cdn-upload-boards, cdn-upload-board-list, cdn-bump-version]
+    needs: [checkpoint-build, cdn-upload-firmware, cdn-upload-version-info, cdn-bump-version]
     steps:
       - run: echo "CDN checkpoint reached"
 

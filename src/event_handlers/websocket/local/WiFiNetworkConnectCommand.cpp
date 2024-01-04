@@ -4,8 +4,6 @@
 #include "util/HexUtils.h"
 #include "wifi/WiFiManager.h"
 
-#include <nonstd/span.hpp>
-
 #include <cstdint>
 
 const char* const TAG = "LocalMessageHandlers";
@@ -13,6 +11,8 @@ const char* const TAG = "LocalMessageHandlers";
 using namespace OpenShock::MessageHandlers::Local;
 
 void _Private::HandleWiFiNetworkConnectCommand(std::uint8_t socketId, const OpenShock::Serialization::Local::LocalToDeviceMessage* root) {
+  (void)socketId;
+  
   auto msg = root->payload_as_WifiNetworkConnectCommand();
   if (msg == nullptr) {
     ESP_LOGE(TAG, "Payload cannot be parsed as WiFiNetworkConnectCommand");
@@ -26,7 +26,7 @@ void _Private::HandleWiFiNetworkConnectCommand(std::uint8_t socketId, const Open
     return;
   }
 
-  if (ssid != nullptr && ssid->size() > 31) {
+  if (ssid->size() > 31) {
     ESP_LOGE(TAG, "WiFi SSID is too long");
     return;
   }

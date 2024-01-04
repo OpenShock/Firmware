@@ -1,11 +1,16 @@
 #include "config/RFConfig.h"
 
+#include "config/internal/utils.h"
 #include "Constants.h"
 #include "Logging.h"
 
 const char* const TAG = "Config::RFConfig";
 
 using namespace OpenShock::Config;
+
+RFConfig::RFConfig() : txPin(OpenShock::Constants::GPIO_RF_TX), keepAliveEnabled(true) { }
+
+RFConfig::RFConfig(std::uint8_t txPin, bool keepAliveEnabled) : txPin(txPin), keepAliveEnabled(keepAliveEnabled) { }
 
 void RFConfig::ToDefault() {
   txPin            = OpenShock::Constants::GPIO_RF_TX;
@@ -24,7 +29,7 @@ bool RFConfig::FromFlatbuffers(const Serialization::Configuration::RFConfig* con
   return true;
 }
 
-flatbuffers::Offset<OpenShock::Serialization::Configuration::RFConfig> RFConfig::ToFlatbuffers(flatbuffers::FlatBufferBuilder& builder) const {
+flatbuffers::Offset<OpenShock::Serialization::Configuration::RFConfig> RFConfig::ToFlatbuffers(flatbuffers::FlatBufferBuilder& builder, bool withSensitiveData) const {
   return Serialization::Configuration::CreateRFConfig(builder, txPin, keepAliveEnabled);
 }
 
@@ -34,34 +39,21 @@ bool RFConfig::FromJSON(const cJSON* json) {
     return false;
   }
 
-  if (!cJSON_IsObject(json)) {
+  if (cJSON_IsObject(json) == 0) {
     ESP_LOGE(TAG, "json is not an object");
     return false;
   }
 
-  const cJSON* txPinJson = cJSON_GetObjectItemCaseSensitive(json, "txPin");
-  if (!cJSON_IsNumber(txPinJson)) {
-    ESP_LOGE(TAG, "value at 'txPin' is not a number");
-    return false;
-  }
-
-  txPin = txPinJson->valueint;
-
-  const cJSON* keepAliveEnabledJson = cJSON_GetObjectItemCaseSensitive(json, "keepAliveEnabled");
-  if (!cJSON_IsBool(keepAliveEnabledJson)) {
-    ESP_LOGE(TAG, "value at 'keepAliveEnabled' is not a bool");
-    return false;
-  }
-
-  keepAliveEnabled = cJSON_IsTrue(keepAliveEnabledJson);
+  Internal::Utils::FromJsonU8(txPin, json, "txPin", OpenShock::Constants::GPIO_RF_TX);
+  Internal::Utils::FromJsonBool(keepAliveEnabled, json, "keepAliveEnabled", true);
 
   return true;
 }
 
-cJSON* RFConfig::ToJSON() const {
+cJSON* RFConfig::ToJSON(bool withSensitiveData) const {
   cJSON* root = cJSON_CreateObject();
 
-  cJSON_AddNumberToObject(root, "txPin", txPin);
+  cJSON_AddNumberToObject(root, "txPin", txPin);  //-V2564
   cJSON_AddBoolToObject(root, "keepAliveEnabled", keepAliveEnabled);
 
   return root;
