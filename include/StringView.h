@@ -20,6 +20,7 @@ namespace OpenShock {
     static constexpr StringView Null() { return StringView(nullptr); }
     static constexpr StringView Empty() { return StringView(""); }
 
+    constexpr StringView() : _ptrBeg(nullptr), _ptrEnd(nullptr) { }
     constexpr StringView(const char* const ptr) : _ptrBeg(ptr), _ptrEnd(_getStringEnd(ptr)) { }
     constexpr StringView(const char* const ptr, std::size_t len) : _ptrBeg(ptr), _ptrEnd(ptr + len) { }
     constexpr StringView(const char* const ptrBeg, const char* const ptrEnd) : _ptrBeg(ptrBeg), _ptrEnd(ptrEnd) { }
@@ -37,6 +38,9 @@ namespace OpenShock {
     constexpr const_iterator end() const { return _ptrEnd; }
     const_reverse_iterator rend() const { return std::make_reverse_iterator(begin()); }
 
+    constexpr char front() const { return *_ptrBeg; }
+    constexpr char back() const { return *(_ptrEnd - 1); }
+
     constexpr std::size_t size() const {
       if (isNull()) return 0;
 
@@ -46,7 +50,7 @@ namespace OpenShock {
 
     constexpr bool isNullOrEmpty() const { return size() == 0; }
 
-    StringView substr(std::size_t pos, std::size_t count = StringView::npos) const {
+    constexpr StringView substr(std::size_t pos, std::size_t count = StringView::npos) const {
       if (isNullOrEmpty()) {
         return *this;
       }
@@ -64,7 +68,7 @@ namespace OpenShock {
       return StringView(_ptrBeg + pos, _ptrBeg + pos + count);
     }
 
-    std::size_t find(char needle, std::size_t pos = 0) const {
+    constexpr std::size_t find(char needle, std::size_t pos = 0) const {
       std::size_t _size = this->size();
 
       for (std::size_t i = pos; i < _size; ++i) {
@@ -305,10 +309,6 @@ namespace OpenShock {
     explicit operator std::string() const { return toString(); }
 
     constexpr char operator[](std::size_t index) const {
-      if (isNull()) {
-        return '\0';
-      }
-
       return _ptrBeg[index];
     }
 
@@ -320,6 +320,15 @@ namespace OpenShock {
     constexpr bool operator!=(const StringView& other) { return !(*this == other); }
     constexpr bool operator==(const char* const other) { return *this == StringView(other); }
     constexpr bool operator!=(const char* const other) { return !(*this == other); }
+
+    constexpr bool operator<(const StringView& other) const {
+      if (this == &other) return false;
+
+      return std::lexicographical_compare(_ptrBeg, _ptrEnd, other._ptrBeg, other._ptrEnd);
+    }
+    constexpr bool operator<=(const StringView& other) const { return *this < other || *this == other; }
+    constexpr bool operator>(const StringView& other) const { return !(*this <= other); }
+    constexpr bool operator>=(const StringView& other) const { return !(*this < other); }
 
     constexpr StringView& operator=(const char* const ptr) {
       _ptrBeg = ptr;
