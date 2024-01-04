@@ -308,7 +308,12 @@ namespace OpenShock {
 
     explicit operator std::string() const { return toString(); }
 
-    constexpr char operator[](std::size_t index) const {
+    /// Returns a reference to the character at the specified index, Going out of bounds is undefined behavior
+    constexpr char const& operator[](int index) const {
+      return _ptrBeg[index];
+    }
+    /// Returns a const reference to the character at the specified index, Going out of bounds is undefined behavior
+    constexpr char const& operator[](std::size_t index) const {
       return _ptrBeg[index];
     }
 
