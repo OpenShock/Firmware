@@ -321,14 +321,14 @@ namespace OpenShock {
     constexpr bool operator==(const char* const other) { return *this == StringView(other); }
     constexpr bool operator!=(const char* const other) { return !(*this == other); }
 
-    constexpr bool operator<(const StringView& other) const {
+    bool operator<(const StringView& other) const {
       if (this == &other) return false;
 
       return std::lexicographical_compare(_ptrBeg, _ptrEnd, other._ptrBeg, other._ptrEnd);
     }
-    constexpr bool operator<=(const StringView& other) const { return *this < other || *this == other; }
-    constexpr bool operator>(const StringView& other) const { return !(*this <= other); }
-    constexpr bool operator>=(const StringView& other) const { return !(*this < other); }
+    bool operator<=(const StringView& other) const { return *this < other || *this == other; }
+    bool operator>(const StringView& other) const { return !(*this <= other); }
+    bool operator>=(const StringView& other) const { return !(*this < other); }
 
     constexpr StringView& operator=(const char* const ptr) {
       _ptrBeg = ptr;
