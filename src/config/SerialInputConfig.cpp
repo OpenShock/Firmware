@@ -1,12 +1,13 @@
 #include "config/SerialInputConfig.h"
 
+#include "config/internal/utils.h"
 #include "Logging.h"
 
 const char* const TAG = "Config::SerialInputConfig";
 
 using namespace OpenShock::Config;
 
-SerialInputConfig::SerialInputConfig() : echoEnabled(true) {}
+SerialInputConfig::SerialInputConfig() : echoEnabled(true) { }
 
 SerialInputConfig::SerialInputConfig(bool echoEnabled) {
   this->echoEnabled = echoEnabled;
@@ -27,7 +28,7 @@ bool SerialInputConfig::FromFlatbuffers(const Serialization::Configuration::Seri
   return true;
 }
 
-flatbuffers::Offset<OpenShock::Serialization::Configuration::SerialInputConfig> SerialInputConfig::ToFlatbuffers(flatbuffers::FlatBufferBuilder& builder) const {
+flatbuffers::Offset<OpenShock::Serialization::Configuration::SerialInputConfig> SerialInputConfig::ToFlatbuffers(flatbuffers::FlatBufferBuilder& builder, bool withSensitiveData) const {
   return Serialization::Configuration::CreateSerialInputConfig(builder, echoEnabled);
 }
 
@@ -42,23 +43,12 @@ bool SerialInputConfig::FromJSON(const cJSON* json) {
     return false;
   }
 
-  const cJSON* echoEnabledJson = cJSON_GetObjectItemCaseSensitive(json, "echoEnabled");
-  if (echoEnabledJson == nullptr) {
-    ESP_LOGE(TAG, "echoEnabled is null");
-    return false;
-  }
-
-  if (cJSON_IsBool(echoEnabledJson) == 0) {
-    ESP_LOGE(TAG, "echoEnabled is not a bool");
-    return false;
-  }
-
-  echoEnabled = cJSON_IsTrue(echoEnabledJson);
+  Internal::Utils::FromJsonBool(echoEnabled, json, "echoEnabled", true);
 
   return true;
 }
 
-cJSON* SerialInputConfig::ToJSON() const {
+cJSON* SerialInputConfig::ToJSON(bool withSensitiveData) const {
   cJSON* root = cJSON_CreateObject();
 
   cJSON_AddBoolToObject(root, "echoEnabled", echoEnabled);

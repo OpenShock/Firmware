@@ -48,8 +48,14 @@ bool RootConfig::FromFlatbuffers(const Serialization::Configuration::Config* con
   return true;
 }
 
-flatbuffers::Offset<OpenShock::Serialization::Configuration::Config> RootConfig::ToFlatbuffers(flatbuffers::FlatBufferBuilder& builder) const {
-  return Serialization::Configuration::CreateConfig(builder, rf.ToFlatbuffers(builder), wifi.ToFlatbuffers(builder), captivePortal.ToFlatbuffers(builder), backend.ToFlatbuffers(builder), serialInput.ToFlatbuffers(builder));
+flatbuffers::Offset<OpenShock::Serialization::Configuration::Config> RootConfig::ToFlatbuffers(flatbuffers::FlatBufferBuilder& builder, bool withSensitiveData) const {
+  auto rfOffset            = rf.ToFlatbuffers(builder, withSensitiveData);
+  auto wifiOffset          = wifi.ToFlatbuffers(builder, withSensitiveData);
+  auto captivePortalOffset = captivePortal.ToFlatbuffers(builder, withSensitiveData);
+  auto backendOffset       = backend.ToFlatbuffers(builder, withSensitiveData);
+  auto serialInputOffset   = serialInput.ToFlatbuffers(builder, withSensitiveData);
+
+  return Serialization::Configuration::CreateConfig(builder, rfOffset, wifiOffset, captivePortalOffset, backendOffset, serialInputOffset);
 }
 
 bool RootConfig::FromJSON(const cJSON* json) {
@@ -91,14 +97,14 @@ bool RootConfig::FromJSON(const cJSON* json) {
   return true;
 }
 
-cJSON* RootConfig::ToJSON() const {
+cJSON* RootConfig::ToJSON(bool withSensitiveData) const {
   cJSON* root = cJSON_CreateObject();
 
-  cJSON_AddItemToObject(root, "rf", rf.ToJSON());
-  cJSON_AddItemToObject(root, "wifi", wifi.ToJSON());
-  cJSON_AddItemToObject(root, "captivePortal", captivePortal.ToJSON());
-  cJSON_AddItemToObject(root, "backend", backend.ToJSON());
-  cJSON_AddItemToObject(root, "serialInput", serialInput.ToJSON());
+  cJSON_AddItemToObject(root, "rf", rf.ToJSON(withSensitiveData));
+  cJSON_AddItemToObject(root, "wifi", wifi.ToJSON(withSensitiveData));
+  cJSON_AddItemToObject(root, "captivePortal", captivePortal.ToJSON(withSensitiveData));
+  cJSON_AddItemToObject(root, "backend", backend.ToJSON(withSensitiveData));
+  cJSON_AddItemToObject(root, "serialInput", serialInput.ToJSON(withSensitiveData));
 
   return root;
 }

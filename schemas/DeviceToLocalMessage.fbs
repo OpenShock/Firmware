@@ -1,6 +1,7 @@
 include "./Types/WifiScanStatus.fbs";
 include "./Types/WifiNetwork.fbs";
 include "./Types/WifiNetworkEventType.fbs";
+include "./ConfigFile.fbs";
 
 attribute "fs_serializer";
 
@@ -10,17 +11,14 @@ table ReadyMessage {
   /// Poggies is always true.
   poggies:bool;
 
-  /// The radio transmit pin that the device is currently using.
-  rftx_pin:uint8;
+  /// The configuration of the device.
+  config:Configuration.Config;
 
   /// Whether the device is linked to an account. (Has a valid access token)
   account_linked:bool;
 
-  /// The networks that the device has saved.
-  networks_saved:[string];
-
-  /// The network that the device is currently connected to.
-  network_connected:Types.WifiNetwork;
+  /// The wifi network that the device is currently connected to.
+  connected_wifi:Types.WifiNetwork;
 }
 
 table ErrorMessage {
@@ -62,12 +60,20 @@ struct SetRfTxPinCommandResult {
 }
 
 union DeviceToLocalMessagePayload {
+
+  // General stuff
   ReadyMessage,
   ErrorMessage,
+
+  // Wifi stuff
   WifiScanStatusMessage,
   WifiNetworkEvent,
   WifiIpAddressChangedEvent,
+
+  // Account linking stuff
   AccountLinkCommandResult,
+
+  // RF transmitter stuff
   SetRfTxPinCommandResult
 }
 

@@ -1,11 +1,10 @@
 #pragma once
 
-#include <nonstd/span.hpp>
-
 #include <freertos/FreeRTOS.h>
 #include <freertos/semphr.h>
 #include <freertos/task.h>
 
+#include <array>
 #include <cstdint>
 
 namespace OpenShock {
@@ -19,7 +18,11 @@ namespace OpenShock {
       std::uint32_t duration;
     };
 
-    void SetPattern(nonstd::span<const State> pattern);
+    void SetPattern(const State* pattern, std::size_t patternLength);
+    template <std::size_t N>
+    inline void SetPattern(const State (&pattern)[N]) {
+      SetPattern(pattern, N);
+    }
     void ClearPattern();
 
   private:

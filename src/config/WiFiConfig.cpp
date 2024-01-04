@@ -7,9 +7,9 @@ const char* const TAG = "Config::WiFiConfig";
 
 using namespace OpenShock::Config;
 
-WiFiConfig::WiFiConfig() : accessPointSSID(OPENSHOCK_FW_AP_PREFIX), hostname(OPENSHOCK_FW_HOSTNAME), credentialsList() {}
+WiFiConfig::WiFiConfig() : accessPointSSID(OPENSHOCK_FW_AP_PREFIX), hostname(OPENSHOCK_FW_HOSTNAME), credentialsList() { }
 
-WiFiConfig::WiFiConfig(const std::string& accessPointSSID, const std::string& hostname, const std::vector<WiFiCredentials>& credentialsList) : accessPointSSID(accessPointSSID), hostname(hostname), credentialsList(credentialsList) {}
+WiFiConfig::WiFiConfig(const std::string& accessPointSSID, const std::string& hostname, const std::vector<WiFiCredentials>& credentialsList) : accessPointSSID(accessPointSSID), hostname(hostname), credentialsList(credentialsList) { }
 
 void WiFiConfig::ToDefault() {
   accessPointSSID = OPENSHOCK_FW_AP_PREFIX;
@@ -30,10 +30,10 @@ bool WiFiConfig::FromFlatbuffers(const Serialization::Configuration::WiFiConfig*
   return true;
 }
 
-flatbuffers::Offset<OpenShock::Serialization::Configuration::WiFiConfig> WiFiConfig::ToFlatbuffers(flatbuffers::FlatBufferBuilder& builder) const {
+flatbuffers::Offset<OpenShock::Serialization::Configuration::WiFiConfig> WiFiConfig::ToFlatbuffers(flatbuffers::FlatBufferBuilder& builder, bool withSensitiveData) const {
   std::vector<flatbuffers::Offset<OpenShock::Serialization::Configuration::WiFiCredentials>> fbsCredentialsList;
   for (auto& credentials : credentialsList) {
-    fbsCredentialsList.emplace_back(credentials.ToFlatbuffers(builder));
+    fbsCredentialsList.emplace_back(credentials.ToFlatbuffers(builder, withSensitiveData));
   }
 
   return Serialization::Configuration::CreateWiFiConfig(builder, builder.CreateString(accessPointSSID), builder.CreateString(hostname), builder.CreateVector(fbsCredentialsList));
@@ -50,31 +50,8 @@ bool WiFiConfig::FromJSON(const cJSON* json) {
     return false;
   }
 
-  const cJSON* accessPointSSIDJson = cJSON_GetObjectItemCaseSensitive(json, "accessPointSSID");
-  if (accessPointSSIDJson == nullptr) {
-    ESP_LOGE(TAG, "accessPointSSID is null");
-    return false;
-  }
-
-  if (cJSON_IsString(accessPointSSIDJson) == 0) {
-    ESP_LOGE(TAG, "accessPointSSID is not a string");
-    return false;
-  }
-
-  accessPointSSID = accessPointSSIDJson->valuestring;
-
-  const cJSON* hostnameJson = cJSON_GetObjectItemCaseSensitive(json, "hostname");
-  if (hostnameJson == nullptr) {
-    ESP_LOGE(TAG, "hostname is null");
-    return false;
-  }
-
-  if (cJSON_IsString(hostnameJson) == 0) {
-    ESP_LOGE(TAG, "hostname is not a string");
-    return false;
-  }
-
-  hostname = hostnameJson->valuestring;
+  Internal::Utils::FromJsonStr(accessPointSSID, json, "accessPointSSID", OPENSHOCK_FW_AP_PREFIX);
+  Internal::Utils::FromJsonStr(hostname, json, "hostname", OPENSHOCK_FW_HOSTNAME);
 
   const cJSON* credentialsListJson = cJSON_GetObjectItemCaseSensitive(json, "credentials");
   if (credentialsListJson == nullptr) {
@@ -87,23 +64,12 @@ bool WiFiConfig::FromJSON(const cJSON* json) {
     return false;
   }
 
-  credentialsList.clear();
-
-  const cJSON* credentialsJson = nullptr;
-  cJSON_ArrayForEach(credentialsJson, credentialsListJson) {
-    WiFiCredentials wifiCredential;
-    if (!wifiCredential.FromJSON(credentialsJson)) {
-      ESP_LOGE(TAG, "Failed to parse WiFiCredential");
-      return false;
-    }
-
-    credentialsList.push_back(std::move(wifiCredential));
-  }
+  Internal::Utils::FromJsonArray(credentialsList, credentialsListJson);
 
   return true;
 }
 
-cJSON* WiFiConfig::ToJSON() const {
+cJSON* WiFiConfig::ToJSON(bool withSensitiveData) const {
   cJSON* root = cJSON_CreateObject();
 
   cJSON_AddStringToObject(root, "accessPointSSID", accessPointSSID.c_str());
@@ -112,7 +78,7 @@ cJSON* WiFiConfig::ToJSON() const {
   cJSON* credentialsListJson = cJSON_CreateArray();
 
   for (auto& credentials : credentialsList) {
-    cJSON_AddItemToArray(credentialsListJson, credentials.ToJSON());
+    cJSON_AddItemToArray(credentialsListJson, credentials.ToJSON(withSensitiveData));
   }
 
   cJSON_AddItemToObject(root, "credentials", credentialsListJson);

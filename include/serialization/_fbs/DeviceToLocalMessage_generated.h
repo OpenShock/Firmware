@@ -13,6 +13,7 @@ static_assert(FLATBUFFERS_VERSION_MAJOR == 23 &&
               FLATBUFFERS_VERSION_REVISION == 26,
              "Non-compatible flatbuffers version included");
 
+#include "ConfigFile_generated.h"
 #include "WifiNetwork_generated.h"
 #include "WifiNetworkEventType_generated.h"
 #include "WifiScanStatus_generated.h"
@@ -289,41 +290,34 @@ struct ReadyMessage FLATBUFFERS_FINAL_CLASS : private ::flatbuffers::Table {
   }
   enum FlatBuffersVTableOffset FLATBUFFERS_VTABLE_UNDERLYING_TYPE {
     VT_POGGIES = 4,
-    VT_RFTX_PIN = 6,
+    VT_CONFIG = 6,
     VT_ACCOUNT_LINKED = 8,
-    VT_NETWORKS_SAVED = 10,
-    VT_NETWORK_CONNECTED = 12
+    VT_CONNECTED_WIFI = 10
   };
   /// Poggies is always true.
   bool poggies() const {
     return GetField<uint8_t>(VT_POGGIES, 0) != 0;
   }
-  /// The radio transmit pin that the device is currently using.
-  uint8_t rftx_pin() const {
-    return GetField<uint8_t>(VT_RFTX_PIN, 0);
+  /// The configuration of the device.
+  const OpenShock::Serialization::Configuration::Config *config() const {
+    return GetPointer<const OpenShock::Serialization::Configuration::Config *>(VT_CONFIG);
   }
   /// Whether the device is linked to an account. (Has a valid access token)
   bool account_linked() const {
     return GetField<uint8_t>(VT_ACCOUNT_LINKED, 0) != 0;
   }
-  /// The networks that the device has saved.
-  const ::flatbuffers::Vector<::flatbuffers::Offset<::flatbuffers::String>> *networks_saved() const {
-    return GetPointer<const ::flatbuffers::Vector<::flatbuffers::Offset<::flatbuffers::String>> *>(VT_NETWORKS_SAVED);
-  }
-  /// The network that the device is currently connected to.
-  const OpenShock::Serialization::Types::WifiNetwork *network_connected() const {
-    return GetPointer<const OpenShock::Serialization::Types::WifiNetwork *>(VT_NETWORK_CONNECTED);
+  /// The wifi network that the device is currently connected to.
+  const OpenShock::Serialization::Types::WifiNetwork *connected_wifi() const {
+    return GetPointer<const OpenShock::Serialization::Types::WifiNetwork *>(VT_CONNECTED_WIFI);
   }
   bool Verify(::flatbuffers::Verifier &verifier) const {
     return VerifyTableStart(verifier) &&
            VerifyField<uint8_t>(verifier, VT_POGGIES, 1) &&
-           VerifyField<uint8_t>(verifier, VT_RFTX_PIN, 1) &&
+           VerifyOffset(verifier, VT_CONFIG) &&
+           verifier.VerifyTable(config()) &&
            VerifyField<uint8_t>(verifier, VT_ACCOUNT_LINKED, 1) &&
-           VerifyOffset(verifier, VT_NETWORKS_SAVED) &&
-           verifier.VerifyVector(networks_saved()) &&
-           verifier.VerifyVectorOfStrings(networks_saved()) &&
-           VerifyOffset(verifier, VT_NETWORK_CONNECTED) &&
-           verifier.VerifyTable(network_connected()) &&
+           VerifyOffset(verifier, VT_CONNECTED_WIFI) &&
+           verifier.VerifyTable(connected_wifi()) &&
            verifier.EndTable();
   }
 };
@@ -335,17 +329,14 @@ struct ReadyMessageBuilder {
   void add_poggies(bool poggies) {
     fbb_.AddElement<uint8_t>(ReadyMessage::VT_POGGIES, static_cast<uint8_t>(poggies), 0);
   }
-  void add_rftx_pin(uint8_t rftx_pin) {
-    fbb_.AddElement<uint8_t>(ReadyMessage::VT_RFTX_PIN, rftx_pin, 0);
+  void add_config(::flatbuffers::Offset<OpenShock::Serialization::Configuration::Config> config) {
+    fbb_.AddOffset(ReadyMessage::VT_CONFIG, config);
   }
   void add_account_linked(bool account_linked) {
     fbb_.AddElement<uint8_t>(ReadyMessage::VT_ACCOUNT_LINKED, static_cast<uint8_t>(account_linked), 0);
   }
-  void add_networks_saved(::flatbuffers::Offset<::flatbuffers::Vector<::flatbuffers::Offset<::flatbuffers::String>>> networks_saved) {
-    fbb_.AddOffset(ReadyMessage::VT_NETWORKS_SAVED, networks_saved);
-  }
-  void add_network_connected(::flatbuffers::Offset<OpenShock::Serialization::Types::WifiNetwork> network_connected) {
-    fbb_.AddOffset(ReadyMessage::VT_NETWORK_CONNECTED, network_connected);
+  void add_connected_wifi(::flatbuffers::Offset<OpenShock::Serialization::Types::WifiNetwork> connected_wifi) {
+    fbb_.AddOffset(ReadyMessage::VT_CONNECTED_WIFI, connected_wifi);
   }
   explicit ReadyMessageBuilder(::flatbuffers::FlatBufferBuilder &_fbb)
         : fbb_(_fbb) {
@@ -361,15 +352,13 @@ struct ReadyMessageBuilder {
 inline ::flatbuffers::Offset<ReadyMessage> CreateReadyMessage(
     ::flatbuffers::FlatBufferBuilder &_fbb,
     bool poggies = false,
-    uint8_t rftx_pin = 0,
+    ::flatbuffers::Offset<OpenShock::Serialization::Configuration::Config> config = 0,
     bool account_linked = false,
-    ::flatbuffers::Offset<::flatbuffers::Vector<::flatbuffers::Offset<::flatbuffers::String>>> networks_saved = 0,
-    ::flatbuffers::Offset<OpenShock::Serialization::Types::WifiNetwork> network_connected = 0) {
+    ::flatbuffers::Offset<OpenShock::Serialization::Types::WifiNetwork> connected_wifi = 0) {
   ReadyMessageBuilder builder_(_fbb);
-  builder_.add_network_connected(network_connected);
-  builder_.add_networks_saved(networks_saved);
+  builder_.add_connected_wifi(connected_wifi);
+  builder_.add_config(config);
   builder_.add_account_linked(account_linked);
-  builder_.add_rftx_pin(rftx_pin);
   builder_.add_poggies(poggies);
   return builder_.Finish();
 }
@@ -378,23 +367,6 @@ struct ReadyMessage::Traits {
   using type = ReadyMessage;
   static auto constexpr Create = CreateReadyMessage;
 };
-
-inline ::flatbuffers::Offset<ReadyMessage> CreateReadyMessageDirect(
-    ::flatbuffers::FlatBufferBuilder &_fbb,
-    bool poggies = false,
-    uint8_t rftx_pin = 0,
-    bool account_linked = false,
-    const std::vector<::flatbuffers::Offset<::flatbuffers::String>> *networks_saved = nullptr,
-    ::flatbuffers::Offset<OpenShock::Serialization::Types::WifiNetwork> network_connected = 0) {
-  auto networks_saved__ = networks_saved ? _fbb.CreateVector<::flatbuffers::Offset<::flatbuffers::String>>(*networks_saved) : 0;
-  return OpenShock::Serialization::Local::CreateReadyMessage(
-      _fbb,
-      poggies,
-      rftx_pin,
-      account_linked,
-      networks_saved__,
-      network_connected);
-}
 
 struct ErrorMessage FLATBUFFERS_FINAL_CLASS : private ::flatbuffers::Table {
   typedef ErrorMessageBuilder Builder;

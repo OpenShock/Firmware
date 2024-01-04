@@ -31,13 +31,19 @@ struct SetRfTxPinCommand {
 }
 
 union LocalToDeviceMessagePayload {
+
+  // Wifi stuff
   WifiScanCommand,
   WifiNetworkSaveCommand,
   WifiNetworkForgetCommand,
   WifiNetworkConnectCommand,
   WifiNetworkDisconnectCommand,
+
+  // Account linking stuff
   AccountLinkCommand,
   AccountUnlinkCommand,
+
+  // RF Transmitter stuff
   SetRfTxPinCommand
 }
 

@@ -1,9 +1,13 @@
 #include "serialization/WSLocal.h"
 
+#include "config/Config.h"
+#include "Logging.h"
 #include "util/HexUtils.h"
 #include "wifi/WiFiNetwork.h"
 
 #include "serialization/_fbs/DeviceToLocalMessage_generated.h"
+
+const char* const TAG = "WSLocal";
 
 using namespace OpenShock::Serialization;
 
@@ -57,19 +61,8 @@ bool Local::SerializeErrorMessage(const char* message, Common::SerializationCall
   return true;
 }
 
-bool Local::SerializeReadyMessage(std::uint8_t radioTxPin, bool accountLinked, std::vector<std::string>& savedNetworkSSIDs, const WiFiNetwork* connectedNetwork, Common::SerializationCallbackFn callback) {
+bool Local::SerializeReadyMessage(const WiFiNetwork* connectedNetwork, bool accountLinked, Common::SerializationCallbackFn callback) {
   flatbuffers::FlatBufferBuilder builder(256);
-
-  flatbuffers::Offset<flatbuffers::Vector<flatbuffers::Offset<flatbuffers::String>>> fbsSavedNetworkSSIDs = 0;
-
-  std::vector<flatbuffers::Offset<flatbuffers::String>> fbsSavedNetworkSSIDsVec;
-  fbsSavedNetworkSSIDsVec.reserve(savedNetworkSSIDs.size());
-
-  for (auto& ssid : savedNetworkSSIDs) {
-    fbsSavedNetworkSSIDsVec.push_back(builder.CreateString(ssid));
-  }
-
-  fbsSavedNetworkSSIDs = builder.CreateVector(fbsSavedNetworkSSIDsVec);
 
   flatbuffers::Offset<Serialization::Types::WifiNetwork> fbsNetwork = 0;
 
@@ -79,7 +72,13 @@ bool Local::SerializeReadyMessage(std::uint8_t radioTxPin, bool accountLinked, s
     fbsNetwork = 0;
   }
 
-  auto readyMessageOffset = Serialization::Local::CreateReadyMessage(builder, true, radioTxPin, accountLinked, fbsSavedNetworkSSIDs, fbsNetwork);
+  auto fbsConfig = OpenShock::Config::GetAsFlatBuffer(builder, false);
+  if (fbsConfig.IsNull()) {
+    ESP_LOGE(TAG, "Failed to serialize config");
+    return false;
+  }
+
+  auto readyMessageOffset = Serialization::Local::CreateReadyMessage(builder, true, fbsConfig, accountLinked, fbsNetwork);
 
   auto msg = Serialization::Local::CreateDeviceToLocalMessage(builder, Serialization::Local::DeviceToLocalMessagePayload::ReadyMessage, readyMessageOffset.Union());
 

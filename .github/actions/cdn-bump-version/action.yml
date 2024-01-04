@@ -1,5 +1,5 @@
-name: cnd-upload-firmware
-description: Uploads firmware artifacts to CDN
+name: cnd-bump-version
+description: Uploads version file to CDN
 inputs:
   cf-bucket:
     description: Name of the S3 bucket
@@ -20,7 +20,5 @@ runs:
       shell: bash
       run: |
         mkdir upload
-        cd upload
-        echo "${{ inputs.version }}" >> version-${{ inputs.release-channel }}.txt
-        rclone copy . cdn:${{ inputs.cf-bucket }}/
-
+        echo "${{ inputs.version }}" >> upload/version-${{ inputs.release-channel }}.txt
+        rclone copy upload cdn:${{ inputs.cf-bucket }}/

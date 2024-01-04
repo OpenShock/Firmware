@@ -5,7 +5,6 @@
 #ifndef OPENSHOCK_API_DOMAIN
 #error "OPENSHOCK_API_DOMAIN must be defined"
 #endif
-
 #ifndef OPENSHOCK_API_BASE_URL
 #define OPENSHOCK_API_BASE_URL "https://" OPENSHOCK_API_DOMAIN
 #endif

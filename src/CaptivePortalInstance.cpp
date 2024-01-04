@@ -48,7 +48,7 @@ bool _tryGetPartitionHash(char (&buffer)[65]) {
   if (!initialized) {
     initialized = true;
 
-    ESP_LOGI(TAG, "Looking for static partition");
+    ESP_LOGD(TAG, "Looking for static partition");
 
     // Get the static partition
     const esp_partition_t* partition = _getStaticPartition();
@@ -57,7 +57,7 @@ bool _tryGetPartitionHash(char (&buffer)[65]) {
       return false;
     }
 
-    ESP_LOGI(TAG, "Found static partition, getting hash... (this may take a while)");
+    ESP_LOGD(TAG, "Found static partition, getting hash...");
 
     // Get the hash of the partition
     esp_err_t err = esp_partition_get_sha256(partition, staticSha256);
@@ -66,14 +66,11 @@ bool _tryGetPartitionHash(char (&buffer)[65]) {
       return false;
     }
 
-    ESP_LOGI(TAG, "Got partition hash");
+    ESP_LOGD(TAG, "Got partition hash");
   }
 
   // Copy the hash to the output buffer
-  HexUtils::ToHex<32>(staticSha256, nonstd::span<char, 64>(buffer, 64), false);
-
-  // Null-terminate the string
-  buffer[64] = '\0';
+  HexUtils::ToHex<32>(staticSha256, buffer, false);
 
   return true;
 }
@@ -168,20 +165,7 @@ void CaptivePortalInstance::handleWebSocketClientConnected(std::uint8_t socketId
     connectedNetworkPtr = &connectedNetwork;
   }
 
-  std::vector<Config::WiFiCredentials> credentialsList;
-  if (!Config::GetWiFiCredentials(credentialsList)) {
-    ESP_LOGE(TAG, "Failed to get WiFi credentials");
-    return;
-  }
-
-  std::vector<std::string> savedNetworkSSIDs;
-  for (const auto& credentials : credentialsList) {
-    savedNetworkSSIDs.push_back(credentials.ssid);
-  }
-
-  Serialization::Local::SerializeReadyMessage(
-    CommandHandler::GetRfTxPin(), GatewayConnectionManager::IsPaired(), savedNetworkSSIDs, connectedNetworkPtr, std::bind(&CaptivePortalInstance::sendMessageBIN, this, socketId, std::placeholders::_1, std::placeholders::_2)
-  );
+  Serialization::Local::SerializeReadyMessage(connectedNetworkPtr, GatewayConnectionManager::IsLinked(), std::bind(&CaptivePortalInstance::sendMessageBIN, this, socketId, std::placeholders::_1, std::placeholders::_2));
 }
 
 void CaptivePortalInstance::handleWebSocketClientDisconnected(std::uint8_t socketId) {
