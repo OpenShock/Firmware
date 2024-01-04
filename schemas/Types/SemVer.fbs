@@ -1,4 +1,4 @@
-namespace OpenShock;
+namespace OpenShock.Serialization.Types;
 
 table SemVer {
   major: uint16;

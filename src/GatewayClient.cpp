@@ -2,10 +2,9 @@
 
 #include "event_handlers/WebSocket.h"
 #include "Logging.h"
+#include "serialization/WSGateway.h"
 #include "Time.h"
 #include "util/CertificateUtils.h"
-
-#include "serialization/_fbs/DeviceToServerMessage_generated.h"
 
 const char* const TAG = "GatewayClient";
 
@@ -85,24 +84,12 @@ bool GatewayClient::loop() {
 
 void GatewayClient::_sendKeepAlive() {
   ESP_LOGV(TAG, "Sending Gateway keep-alive message");
-
-  // Casting to uint64 here is safe since millis is guaranteed to return a positive value
-  OpenShock::Serialization::KeepAlive keepAlive(static_cast<std::uint64_t>(OpenShock::millis()));
-
-  flatbuffers::FlatBufferBuilder builder(64);
-
-  auto keepAliveOffset = builder.CreateStruct(keepAlive);
-
-  auto msg = OpenShock::Serialization::CreateDeviceToServerMessage(builder, OpenShock::Serialization::DeviceToServerMessagePayload::KeepAlive, keepAliveOffset.Union());
-
-  builder.Finish(msg);
-
-  m_webSocket.sendBIN(builder.GetBufferPointer(), builder.GetSize());
+  Serialization::Gateway::SerializeKeepAliveMessage([this](const std::uint8_t* data, std::size_t len) { return m_webSocket.sendBIN(data, len); });
 }
 
 void GatewayClient::_handleEvent(WStype_t type, std::uint8_t* payload, std::size_t length) {
   (void)payload;
-  
+
   switch (type) {
     case WStype_DISCONNECTED:
       ESP_LOGI(TAG, "Disconnected from API");

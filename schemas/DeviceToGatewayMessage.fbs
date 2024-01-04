@@ -2,14 +2,14 @@ include "./Types/SemVer.fbs";
 
 attribute "fs_serializer";
 
-namespace OpenShock.Serialization;
+namespace OpenShock.Serialization.Gateway;
 
 struct KeepAlive {
-    uptime:ulong;
+  uptime:ulong;
 }
 
 table OtaInstallStarted {
-  version:SemVer;
+  version:Types.SemVer;
 }
 
 table OtaInstallProgress {
@@ -23,10 +23,10 @@ table OtaInstallFailed {
 }
 
 table OtaInstallSucceeded {
-  version:SemVer;
+  version:Types.SemVer;
 }
 
-union DeviceToServerMessagePayload {
+union DeviceToGatewayMessagePayload {
   KeepAlive,
   OtaInstallStarted,
   OtaInstallProgress,
@@ -34,8 +34,8 @@ union DeviceToServerMessagePayload {
   OtaInstallSucceeded
 }
 
-table DeviceToServerMessage (fs_serializer) {
-  payload:DeviceToServerMessagePayload;
+table DeviceToGatewayMessage (fs_serializer) {
+  payload:DeviceToGatewayMessagePayload;
 }
 
-root_type DeviceToServerMessage;
+root_type DeviceToGatewayMessage;
