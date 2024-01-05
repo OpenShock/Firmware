@@ -12,8 +12,18 @@ table OtaInstallStarted {
   version:Types.SemVer;
 }
 
+enum OtaInstallProgressTask:byte {
+  FetchingMetadata,
+  PreparingForInstall,
+  FlashingFilesystem,
+  VerifyingFilesystem,
+  FlashingApplication,
+  MarkingApplicationBootable,
+  Rebooting
+}
+
 table OtaInstallProgress {
-  task:string;
+  task:OtaInstallProgressTask;
   progress:float;
 }
 

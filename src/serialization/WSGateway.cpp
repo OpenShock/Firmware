@@ -3,8 +3,6 @@
 #include "Logging.h"
 #include "Time.h"
 
-#include "serialization/_fbs/DeviceToGatewayMessage_generated.h"
-
 const char* const TAG = "WSGateway";
 
 using namespace OpenShock::Serialization;
@@ -46,12 +44,10 @@ bool Gateway::SerializeOtaInstallStartedMessage(const OpenShock::SemVer& semver,
   return callback(span.data(), span.size());
 }
 
-bool Gateway::SerializeOtaInstallProgressMessage(StringView task, float progress, Common::SerializationCallbackFn callback) {
+bool Gateway::SerializeOtaInstallProgressMessage(Gateway::OtaInstallProgressTask task, float progress, Common::SerializationCallbackFn callback) {
   flatbuffers::FlatBufferBuilder builder(256);  // TODO: Profile this and adjust the size accordingly
 
-  auto taskOffset = builder.CreateString(task.data(), task.size());
-
-  auto otaInstallProgressOffset = Gateway::CreateOtaInstallProgress(builder, taskOffset, progress);
+  auto otaInstallProgressOffset = Gateway::CreateOtaInstallProgress(builder, task, progress);
 
   auto msg = Gateway::CreateDeviceToGatewayMessage(builder, Gateway::DeviceToGatewayMessagePayload::OtaInstallProgress, otaInstallProgressOffset.Union());
 

@@ -168,8 +168,9 @@ bool _flashPartition(const esp_partition_t* partition, StringView remoteUrl, con
 
   std::size_t contentLength  = 0;
   std::size_t contentWritten = 0;
+  std::int64_t lastProgress  = 0;
 
-  auto sizeValidator = [partition, &contentLength, progressCallback](std::size_t size) -> bool {
+  auto sizeValidator = [partition, &contentLength, progressCallback, &lastProgress](std::size_t size) -> bool {
     if (size > partition->size) {
       ESP_LOGE(TAG, "Remote partition binary is too large");
       return false;
@@ -182,11 +183,13 @@ bool _flashPartition(const esp_partition_t* partition, StringView remoteUrl, con
     }
 
     contentLength = size;
+
+    lastProgress = OpenShock::millis();
     progressCallback(0, contentLength, 0.0f);
 
     return true;
   };
-  auto dataWriter = [partition, &sha256, &contentLength, &contentWritten, progressCallback](std::size_t offset, const std::uint8_t* data, std::size_t length) -> bool {
+  auto dataWriter = [partition, &sha256, &contentLength, &contentWritten, progressCallback, &lastProgress](std::size_t offset, const std::uint8_t* data, std::size_t length) -> bool {
     if (esp_partition_write(partition, offset, data, length) != ESP_OK) {
       ESP_LOGE(TAG, "Failed to write to partition");
       return false;
@@ -198,7 +201,12 @@ bool _flashPartition(const esp_partition_t* partition, StringView remoteUrl, con
     }
 
     contentWritten += length;
-    progressCallback(contentWritten, contentLength, static_cast<float>(contentWritten) / static_cast<float>(contentLength));
+
+    std::int64_t now = OpenShock::millis();
+    if (now - lastProgress >= 1000) {  // Once per second
+      lastProgress = now;
+      progressCallback(contentWritten, contentLength, static_cast<float>(contentWritten) / static_cast<float>(contentLength));
+    }
 
     return true;
   };
@@ -237,8 +245,8 @@ bool _flashPartition(const esp_partition_t* partition, StringView remoteUrl, con
   return true;
 }
 
-bool _sendProgressMessage(StringView message, float progress) {
-  if (!Serialization::Gateway::SerializeOtaInstallProgressMessage(message, progress, GatewayConnectionManager::SendMessageBIN)) {
+bool _sendProgressMessage(Serialization::Gateway::OtaInstallProgressTask  task, float progress) {
+  if (!Serialization::Gateway::SerializeOtaInstallProgressMessage(task, progress, GatewayConnectionManager::SendMessageBIN)) {
     ESP_LOGE(TAG, "Failed to send OTA install progress message");
     return false;
   }
@@ -257,17 +265,14 @@ bool _sendFailureMessage(StringView message, bool fatal = false) {
 bool _flashAppPartition(const esp_partition_t* partition, StringView remoteUrl, const std::uint8_t (&remoteHash)[32]) {
   ESP_LOGD(TAG, "Flashing app partition");
 
-  if (!_sendProgressMessage("Flashing app partition", 0.0f)) {
+  if (!_sendProgressMessage(Serialization::Gateway::OtaInstallProgressTask::FlashingApplication, 0.0f)) {
     return false;
   }
 
   auto onProgress = [](std::size_t current, std::size_t total, float progress) -> bool {
-    // TODO: Implement
     ESP_LOGD(TAG, "Flashing app partition: %u / %u (%.2f%%)", current, total, progress * 100.0f);
 
-    if (!_sendProgressMessage("Flashing app partition", progress)) {
-      return false;
-    }
+    _sendProgressMessage(Serialization::Gateway::OtaInstallProgressTask::FlashingApplication, progress);
 
     return true;
   };
@@ -278,11 +283,7 @@ bool _flashAppPartition(const esp_partition_t* partition, StringView remoteUrl, 
     return false;
   }
 
-  if (!_sendProgressMessage("Flashing app partition", 1.0f)) {
-    return false;
-  }
-
-  if (!_sendProgressMessage("Setting app partition bootable", 0.0f)) {
+  if (!_sendProgressMessage(Serialization::Gateway::OtaInstallProgressTask::MarkingApplicationBootable, 0.0f)) {
     return false;
   }
 
@@ -293,13 +294,11 @@ bool _flashAppPartition(const esp_partition_t* partition, StringView remoteUrl, 
     return false;
   }
 
-  _sendProgressMessage("Setting app partition bootable", 1.0f);
-
   return true;
 }
 
 bool _flashFilesystemPartition(const esp_partition_t* parition, StringView remoteUrl, const std::uint8_t (&remoteHash)[32]) {
-  if (!_sendProgressMessage("Closing captive portal", 0.0f)) {
+  if (!_sendProgressMessage(Serialization::Gateway::OtaInstallProgressTask::PreparingForInstall, 0.0f)) {
     return false;
   }
 
@@ -310,23 +309,16 @@ bool _flashFilesystemPartition(const esp_partition_t* parition, StringView remot
     return false;
   }
 
-  if (!_sendProgressMessage("Closing captive portal", 1.0f)) {
-    return false;
-  }
-
   ESP_LOGD(TAG, "Flashing filesystem partition");
 
-  if (!_sendProgressMessage("Flashing filesystem partition", 0.0f)) {
+  if (!_sendProgressMessage(Serialization::Gateway::OtaInstallProgressTask::FlashingFilesystem, 0.0f)) {
     return false;
   }
 
   auto onProgress = [](std::size_t current, std::size_t total, float progress) -> bool {
-    // TODO: Implement
     ESP_LOGD(TAG, "Flashing filesystem partition: %u / %u (%.2f%%)", current, total, progress * 100.0f);
 
-    if (!_sendProgressMessage("Flashing filesystem partition", progress)) {
-      return false;
-    }
+    _sendProgressMessage(Serialization::Gateway::OtaInstallProgressTask::FlashingFilesystem, progress);
 
     return true;
   };
@@ -337,11 +329,7 @@ bool _flashFilesystemPartition(const esp_partition_t* parition, StringView remot
     return false;
   }
 
-  if (!_sendProgressMessage("Flashing filesystem partition", 1.0f)) {
-    return false;
-  }
-
-  if (!_sendProgressMessage("Testing filesystem", 0.0f)) {
+  if (!_sendProgressMessage(Serialization::Gateway::OtaInstallProgressTask::VerifyingFilesystem, 0.0f)) {
     return false;
   }
 
@@ -355,10 +343,6 @@ bool _flashFilesystemPartition(const esp_partition_t* parition, StringView remot
   test.end();
 
   OpenShock::CaptivePortal::SetForceClosed(false);
-
-  if (!_sendProgressMessage("Testing filesystem", 1.0f)) {
-    return false;
-  }
 
   return true;
 }
@@ -469,7 +453,7 @@ void _otaUpdateTask(void* arg) {
       continue;
     }
 
-    if (!_sendProgressMessage("Fetching metadata", 0.0f)) {
+    if (!_sendProgressMessage(Serialization::Gateway::OtaInstallProgressTask::FetchingMetadata, 0.0f)) {
       continue;
     }
 
@@ -478,10 +462,6 @@ void _otaUpdateTask(void* arg) {
     if (!OtaUpdateManager::TryGetFirmwareRelease(version, release)) {
       ESP_LOGE(TAG, "Failed to fetch firmware release");  // TODO: Send error message to server
       _sendFailureMessage("Failed to fetch firmware release");
-      continue;
-    }
-
-    if (!_sendProgressMessage("Fetching metadata", 1.0f)) {
       continue;
     }
 
@@ -514,7 +494,7 @@ void _otaUpdateTask(void* arg) {
     if (!_flashAppPartition(appPartition, release.appBinaryUrl, release.appBinaryHash)) continue;
 
     // Send reboot message.
-    _sendProgressMessage("Rebooting", 0.0f);
+    _sendProgressMessage(Serialization::Gateway::OtaInstallProgressTask::Rebooting, 0.0f);
 
     // Restart.
     ESP_LOGI(TAG, "Restarting in 1 seconds...");

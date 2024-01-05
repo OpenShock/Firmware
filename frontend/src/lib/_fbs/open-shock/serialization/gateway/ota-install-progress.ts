@@ -4,6 +4,9 @@
 
 import * as flatbuffers from 'flatbuffers';
 
+import { OtaInstallProgressTask } from '../../../open-shock/serialization/gateway/ota-install-progress-task';
+
+
 export class OtaInstallProgress {
   bb: flatbuffers.ByteBuffer|null = null;
   bb_pos = 0;
@@ -22,11 +25,9 @@ static getSizePrefixedRootAsOtaInstallProgress(bb:flatbuffers.ByteBuffer, obj?:O
   return (obj || new OtaInstallProgress()).__init(bb.readInt32(bb.position()) + bb.position(), bb);
 }
 
-task():string|null
-task(optionalEncoding:flatbuffers.Encoding):string|Uint8Array|null
-task(optionalEncoding?:any):string|Uint8Array|null {
+task():OtaInstallProgressTask {
   const offset = this.bb!.__offset(this.bb_pos, 4);
-  return offset ? this.bb!.__string(this.bb_pos + offset, optionalEncoding) : null;
+  return offset ? this.bb!.readInt8(this.bb_pos + offset) : OtaInstallProgressTask.FetchingMetadata;
 }
 
 progress():number {
@@ -38,8 +39,8 @@ static startOtaInstallProgress(builder:flatbuffers.Builder) {
   builder.startObject(2);
 }
 
-static addTask(builder:flatbuffers.Builder, taskOffset:flatbuffers.Offset) {
-  builder.addFieldOffset(0, taskOffset, 0);
+static addTask(builder:flatbuffers.Builder, task:OtaInstallProgressTask) {
+  builder.addFieldInt8(0, task, OtaInstallProgressTask.FetchingMetadata);
 }
 
 static addProgress(builder:flatbuffers.Builder, progress:number) {
@@ -51,9 +52,9 @@ static endOtaInstallProgress(builder:flatbuffers.Builder):flatbuffers.Offset {
   return offset;
 }
 
-static createOtaInstallProgress(builder:flatbuffers.Builder, taskOffset:flatbuffers.Offset, progress:number):flatbuffers.Offset {
+static createOtaInstallProgress(builder:flatbuffers.Builder, task:OtaInstallProgressTask, progress:number):flatbuffers.Offset {
   OtaInstallProgress.startOtaInstallProgress(builder);
-  OtaInstallProgress.addTask(builder, taskOffset);
+  OtaInstallProgress.addTask(builder, task);
   OtaInstallProgress.addProgress(builder, progress);
   return OtaInstallProgress.endOtaInstallProgress(builder);
 }

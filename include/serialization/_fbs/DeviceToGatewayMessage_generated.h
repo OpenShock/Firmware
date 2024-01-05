@@ -33,6 +33,51 @@ struct OtaInstallFailedBuilder;
 struct DeviceToGatewayMessage;
 struct DeviceToGatewayMessageBuilder;
 
+enum class OtaInstallProgressTask : int8_t {
+  FetchingMetadata = 0,
+  PreparingForInstall = 1,
+  FlashingFilesystem = 2,
+  VerifyingFilesystem = 3,
+  FlashingApplication = 4,
+  MarkingApplicationBootable = 5,
+  Rebooting = 6,
+  MIN = FetchingMetadata,
+  MAX = Rebooting
+};
+
+inline const OtaInstallProgressTask (&EnumValuesOtaInstallProgressTask())[7] {
+  static const OtaInstallProgressTask values[] = {
+    OtaInstallProgressTask::FetchingMetadata,
+    OtaInstallProgressTask::PreparingForInstall,
+    OtaInstallProgressTask::FlashingFilesystem,
+    OtaInstallProgressTask::VerifyingFilesystem,
+    OtaInstallProgressTask::FlashingApplication,
+    OtaInstallProgressTask::MarkingApplicationBootable,
+    OtaInstallProgressTask::Rebooting
+  };
+  return values;
+}
+
+inline const char * const *EnumNamesOtaInstallProgressTask() {
+  static const char * const names[8] = {
+    "FetchingMetadata",
+    "PreparingForInstall",
+    "FlashingFilesystem",
+    "VerifyingFilesystem",
+    "FlashingApplication",
+    "MarkingApplicationBootable",
+    "Rebooting",
+    nullptr
+  };
+  return names;
+}
+
+inline const char *EnumNameOtaInstallProgressTask(OtaInstallProgressTask e) {
+  if (::flatbuffers::IsOutRange(e, OtaInstallProgressTask::FetchingMetadata, OtaInstallProgressTask::Rebooting)) return "";
+  const size_t index = static_cast<size_t>(e);
+  return EnumNamesOtaInstallProgressTask()[index];
+}
+
 enum class DeviceToGatewayMessagePayload : uint8_t {
   NONE = 0,
   KeepAlive = 1,
@@ -181,16 +226,15 @@ struct OtaInstallProgress FLATBUFFERS_FINAL_CLASS : private ::flatbuffers::Table
     VT_TASK = 4,
     VT_PROGRESS = 6
   };
-  const ::flatbuffers::String *task() const {
-    return GetPointer<const ::flatbuffers::String *>(VT_TASK);
+  OpenShock::Serialization::Gateway::OtaInstallProgressTask task() const {
+    return static_cast<OpenShock::Serialization::Gateway::OtaInstallProgressTask>(GetField<int8_t>(VT_TASK, 0));
   }
   float progress() const {
     return GetField<float>(VT_PROGRESS, 0.0f);
   }
   bool Verify(::flatbuffers::Verifier &verifier) const {
     return VerifyTableStart(verifier) &&
-           VerifyOffset(verifier, VT_TASK) &&
-           verifier.VerifyString(task()) &&
+           VerifyField<int8_t>(verifier, VT_TASK, 1) &&
            VerifyField<float>(verifier, VT_PROGRESS, 4) &&
            verifier.EndTable();
   }
@@ -200,8 +244,8 @@ struct OtaInstallProgressBuilder {
   typedef OtaInstallProgress Table;
   ::flatbuffers::FlatBufferBuilder &fbb_;
   ::flatbuffers::uoffset_t start_;
-  void add_task(::flatbuffers::Offset<::flatbuffers::String> task) {
-    fbb_.AddOffset(OtaInstallProgress::VT_TASK, task);
+  void add_task(OpenShock::Serialization::Gateway::OtaInstallProgressTask task) {
+    fbb_.AddElement<int8_t>(OtaInstallProgress::VT_TASK, static_cast<int8_t>(task), 0);
   }
   void add_progress(float progress) {
     fbb_.AddElement<float>(OtaInstallProgress::VT_PROGRESS, progress, 0.0f);
@@ -219,7 +263,7 @@ struct OtaInstallProgressBuilder {
 
 inline ::flatbuffers::Offset<OtaInstallProgress> CreateOtaInstallProgress(
     ::flatbuffers::FlatBufferBuilder &_fbb,
-    ::flatbuffers::Offset<::flatbuffers::String> task = 0,
+    OpenShock::Serialization::Gateway::OtaInstallProgressTask task = OpenShock::Serialization::Gateway::OtaInstallProgressTask::FetchingMetadata,
     float progress = 0.0f) {
   OtaInstallProgressBuilder builder_(_fbb);
   builder_.add_progress(progress);
@@ -231,17 +275,6 @@ struct OtaInstallProgress::Traits {
   using type = OtaInstallProgress;
   static auto constexpr Create = CreateOtaInstallProgress;
 };
-
-inline ::flatbuffers::Offset<OtaInstallProgress> CreateOtaInstallProgressDirect(
-    ::flatbuffers::FlatBufferBuilder &_fbb,
-    const char *task = nullptr,
-    float progress = 0.0f) {
-  auto task__ = task ? _fbb.CreateString(task) : 0;
-  return OpenShock::Serialization::Gateway::CreateOtaInstallProgress(
-      _fbb,
-      task__,
-      progress);
-}
 
 struct OtaInstallFailed FLATBUFFERS_FINAL_CLASS : private ::flatbuffers::Table {
   typedef OtaInstallFailedBuilder Builder;
