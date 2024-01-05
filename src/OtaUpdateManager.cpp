@@ -404,12 +404,6 @@ void _otaUpdateTask(void* arg) {
     check |= updateRequested && (firstCheck || diffMins >= 1);              // Update requested
 
     if (!check) {
-      ESP_LOGD(TAG, "Skipping update check:");
-      ESP_LOGD(TAG, "  Diff:         %f secs", static_cast<float>(diff) / 1'000.0f);
-      ESP_LOGD(TAG, "  Check:        %s", check ? "true" : "false");
-      ESP_LOGD(TAG, "  Startup:      %s", config.checkOnStartup ? "true" : "false");
-      ESP_LOGD(TAG, "  Periodically: %s (%u minutes)", config.checkPeriodically ? "true" : "false", config.checkInterval);
-      ESP_LOGD(TAG, "  Requested:    %s", updateRequested ? "true" : "false");
       continue;
     }
 
