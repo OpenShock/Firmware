@@ -1,6 +1,7 @@
 #pragma once
 
 #include "config/ConfigBase.h"
+#include "FirmwareBootType.h"
 #include "OtaUpdateChannel.h"
 
 #include <string>
@@ -8,7 +9,7 @@
 namespace OpenShock::Config {
   struct OtaUpdateConfig : public ConfigBase<Serialization::Configuration::OtaUpdateConfig> {
     OtaUpdateConfig();
-    OtaUpdateConfig(bool isEnabled, std::string cdnDomain, OtaUpdateChannel updateChannel, bool checkOnStartup, bool checkPeriodically, std::uint16_t checkInterval, bool allowBackendManagement, bool requireManualApproval);
+    OtaUpdateConfig(bool isEnabled, std::string cdnDomain, OtaUpdateChannel updateChannel, bool checkOnStartup, bool checkPeriodically, std::uint16_t checkInterval, bool allowBackendManagement, bool requireManualApproval, FirmwareBootType bootType);
 
     bool isEnabled;
     std::string cdnDomain;
@@ -18,6 +19,7 @@ namespace OpenShock::Config {
     std::uint16_t checkInterval;
     bool allowBackendManagement;
     bool requireManualApproval;
+    FirmwareBootType bootType;
 
     void ToDefault() override;
 

@@ -579,6 +579,17 @@ bool Config::ClearWiFiCredentials() {
   return _trySaveConfig();
 }
 
+bool Config::GetOtaFirmwareBootType(FirmwareBootType& out) {
+  ScopedReadLock lock(&_configMutex);
+  if (!lock.isLocked()) {
+    ESP_LOGE(TAG, "Failed to acquire read lock");
+  }
+
+  out = _configData.otaUpdate.bootType;
+
+  return true;
+}
+
 bool Config::HasBackendAuthToken() {
   ScopedReadLock lock(&_configMutex);
   if (!lock.isLocked()) {

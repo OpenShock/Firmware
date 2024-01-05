@@ -1,5 +1,6 @@
 #include "serialization/WSGateway.h"
 
+#include "config/Config.h"
 #include "Logging.h"
 #include "Time.h"
 
@@ -20,6 +21,22 @@ bool Gateway::SerializeKeepAliveMessage(Common::SerializationCallbackFn callback
   auto keepAliveOffset = builder.CreateStruct(keepAlive);
 
   auto msg = Gateway::CreateDeviceToGatewayMessage(builder, Gateway::DeviceToGatewayMessagePayload::KeepAlive, keepAliveOffset.Union());
+
+  builder.Finish(msg);
+
+  auto span = builder.GetBufferSpan();
+
+  return callback(span.data(), span.size());
+}
+
+bool Gateway::SerializeBootStatusMessage(OpenShock::FirmwareBootType bootType, const OpenShock::SemVer& version, Common::SerializationCallbackFn callback) {
+  flatbuffers::FlatBufferBuilder builder(256);  // TODO: Profile this and adjust the size accordingly
+
+  auto fbsVersion = Types::CreateSemVerDirect(builder, version.major, version.minor, version.patch, version.prerelease.data(), version.build.data());
+
+  auto fbsBootStatus = Gateway::CreateBootStatus(builder, bootType, fbsVersion);
+
+  auto msg = Gateway::CreateDeviceToGatewayMessage(builder, Gateway::DeviceToGatewayMessagePayload::BootStatus, fbsBootStatus.Union());
 
   builder.Finish(msg);
 

@@ -1,5 +1,6 @@
 #include "GatewayClient.h"
 
+#include "config/Config.h"
 #include "event_handlers/WebSocket.h"
 #include "Logging.h"
 #include "serialization/WSGateway.h"
@@ -103,6 +104,24 @@ void GatewayClient::_sendKeepAlive() {
   Serialization::Gateway::SerializeKeepAliveMessage([this](const std::uint8_t* data, std::size_t len) { return m_webSocket.sendBIN(data, len); });
 }
 
+void GatewayClient::_sendBootStatus() {
+  ESP_LOGV(TAG, "Sending Gateway boot status message");
+
+  OpenShock::FirmwareBootType bootType;
+  if (!Config::GetOtaFirmwareBootType(bootType)) {
+    ESP_LOGE(TAG, "Failed to get OTA firmware boot type");
+    return;
+  }
+
+  OpenShock::SemVer version;
+  if (!OpenShock::TryParseSemVer(OPENSHOCK_FW_VERSION, version)) {
+    ESP_LOGE(TAG, "Failed to parse firmware version");
+    return;
+  }
+
+  Serialization::Gateway::SerializeBootStatusMessage(bootType, version, [this](const std::uint8_t* data, std::size_t len) { return m_webSocket.sendBIN(data, len); });
+}
+
 void GatewayClient::_handleEvent(WStype_t type, std::uint8_t* payload, std::size_t length) {
   (void)payload;
 
@@ -115,6 +134,7 @@ void GatewayClient::_handleEvent(WStype_t type, std::uint8_t* payload, std::size
       ESP_LOGI(TAG, "Connected to API");
       m_state = State::Connected;
       _sendKeepAlive();
+      _sendBootStatus();
       break;
     case WStype_TEXT:
       ESP_LOGW(TAG, "Received text from API, JSON parsing is not supported anymore :D");
