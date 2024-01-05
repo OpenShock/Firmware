@@ -19,7 +19,7 @@ namespace Types {
 
 enum class FirmwareBootType : uint8_t {
   Normal = 0,
-  New = 1,
+  NewFirmware = 1,
   Rollback = 2,
   MIN = Normal,
   MAX = Rollback
@@ -28,7 +28,7 @@ enum class FirmwareBootType : uint8_t {
 inline const FirmwareBootType (&EnumValuesFirmwareBootType())[3] {
   static const FirmwareBootType values[] = {
     FirmwareBootType::Normal,
-    FirmwareBootType::New,
+    FirmwareBootType::NewFirmware,
     FirmwareBootType::Rollback
   };
   return values;
@@ -37,7 +37,7 @@ inline const FirmwareBootType (&EnumValuesFirmwareBootType())[3] {
 inline const char * const *EnumNamesFirmwareBootType() {
   static const char * const names[4] = {
     "Normal",
-    "New",
+    "NewFirmware",
     "Rollback",
     nullptr
   };

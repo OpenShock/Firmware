@@ -65,6 +65,7 @@ namespace OpenShock::Config {
   bool ClearWiFiCredentials();
 
   bool GetOtaFirmwareBootType(FirmwareBootType& out);
+  bool SetOtaFirmwareBootType(FirmwareBootType bootType);
 
   bool HasBackendAuthToken();
   bool GetBackendAuthToken(std::string& out);

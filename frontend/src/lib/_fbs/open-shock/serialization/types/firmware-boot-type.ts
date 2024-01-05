@@ -4,6 +4,6 @@
 
 export enum FirmwareBootType {
   Normal = 0,
-  New = 1,
+  NewFirmware = 1,
   Rollback = 2
 }

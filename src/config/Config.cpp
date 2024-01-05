@@ -590,6 +590,20 @@ bool Config::GetOtaFirmwareBootType(FirmwareBootType& out) {
   return true;
 }
 
+bool Config::SetOtaFirmwareBootType(FirmwareBootType bootType) {
+  ScopedWriteLock lock(&_configMutex);
+  if (!lock.isLocked()) {
+    ESP_LOGE(TAG, "Failed to acquire write lock");
+  }
+
+  if (_configData.otaUpdate.bootType == bootType) {
+    return true;
+  }
+
+  _configData.otaUpdate.bootType = bootType;
+  return _trySaveConfig();
+}
+
 bool Config::HasBackendAuthToken() {
   ScopedReadLock lock(&_configMutex);
   if (!lock.isLocked()) {

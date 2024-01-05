@@ -14,8 +14,8 @@ namespace OpenShock {
       return true;
     }
 
-    if (strcasecmp(str, "new") == 0) {
-      bootType = FirmwareBootType::New;
+    if (strcasecmp(str, "newfirmware") == 0 || strcasecmp(str, "new_firmware") == 0) {
+      bootType = FirmwareBootType::NewFirmware;
       return true;
     }
 

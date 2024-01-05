@@ -493,6 +493,13 @@ void _otaUpdateTask(void* arg) {
     if (!_flashFilesystemPartition(filesystemPartition, release.filesystemBinaryUrl, release.filesystemBinaryHash)) continue;
     if (!_flashAppPartition(appPartition, release.appBinaryUrl, release.appBinaryHash)) continue;
 
+    // Set OTA boot type in config.
+    if (!Config::SetOtaFirmwareBootType(OpenShock::FirmwareBootType::NewFirmware)) {
+      ESP_LOGE(TAG, "Failed to set OTA firmware boot type");
+      _sendFailureMessage("Failed to set OTA firmware boot type");
+      continue;
+    }
+
     // Send reboot message.
     _sendProgressMessage(Serialization::Gateway::OtaInstallProgressTask::Rebooting, 0.0f);
 
@@ -737,18 +744,44 @@ bool OtaUpdateManager::IsValidatingApp() {
 }
 
 void OtaUpdateManager::InvalidateAndRollback() {
+  // Set OTA boot type in config.
+  if (!Config::SetOtaFirmwareBootType(OpenShock::FirmwareBootType::Rollback)) {
+    ESP_PANIC(TAG, "Failed to set OTA firmware boot type in critical section"); // TODO: THIS IS A CRITICAL SECTION, WHAT DO WE DO?
+    return;
+  }
+
   switch (esp_ota_mark_app_invalid_rollback_and_reboot()) {
     case ESP_FAIL:
-      ESP_PANIC(TAG, "Rollback failed");
+      ESP_LOGE(TAG, "Rollback failed (ESP_FAIL)");
+      break;
     case ESP_ERR_OTA_ROLLBACK_FAILED:
-      ESP_PANIC(TAG, "Rollback failed");
+      ESP_LOGE(TAG, "Rollback failed (ESP_ERR_OTA_ROLLBACK_FAILED)");
+      break;
     default:
-      ESP_PANIC(TAG, "Rollback failed");
+      ESP_LOGE(TAG, "Rollback failed (Unknown)");
+      break;
   }
+
+  // Set OTA boot type in config.
+  if (!Config::SetOtaFirmwareBootType(OpenShock::FirmwareBootType::Normal)) {
+    ESP_LOGE(TAG, "Failed to set OTA firmware boot type");
+  }
+
+  esp_restart();
 }
 
 void OtaUpdateManager::ValidateApp() {
   if (esp_ota_mark_app_valid_cancel_rollback() != ESP_OK) {
+    // Set OTA boot type in config.
+    if (!Config::SetOtaFirmwareBootType(OpenShock::FirmwareBootType::Rollback)) { // TODO: Check if we are in new firmware, if so set to rollback, else set to normal
+      ESP_LOGE(TAG, "Failed to set OTA firmware boot type");
+    }
+
     ESP_PANIC(TAG, "Unable to mark app as valid, WTF?");  // TODO: Wtf do we do here?
+  }
+
+  // Set OTA boot type in config.
+  if (!Config::SetOtaFirmwareBootType(OpenShock::FirmwareBootType::Normal)) {
+    ESP_PANIC(TAG, "Failed to set OTA firmware boot type in critical section"); // TODO: THIS IS A CRITICAL SECTION, WHAT DO WE DO?
   }
 }
