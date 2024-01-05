@@ -11,6 +11,8 @@ const char* const TAG = "GatewayClient";
 
 using namespace OpenShock;
 
+static bool s_bootStatusSent = false;
+
 GatewayClient::GatewayClient(const std::string& authToken) : m_webSocket(), m_lastKeepAlive(0), m_state(State::Disconnected) {
   ESP_LOGD(TAG, "Creating GatewayClient");
 
@@ -105,6 +107,8 @@ void GatewayClient::_sendKeepAlive() {
 }
 
 void GatewayClient::_sendBootStatus() {
+  if (s_bootStatusSent) return;
+
   ESP_LOGV(TAG, "Sending Gateway boot status message");
 
   OpenShock::FirmwareBootType bootType;
@@ -119,7 +123,7 @@ void GatewayClient::_sendBootStatus() {
     return;
   }
 
-  Serialization::Gateway::SerializeBootStatusMessage(bootType, version, [this](const std::uint8_t* data, std::size_t len) { return m_webSocket.sendBIN(data, len); });
+  s_bootStatusSent = Serialization::Gateway::SerializeBootStatusMessage(bootType, version, [this](const std::uint8_t* data, std::size_t len) { return m_webSocket.sendBIN(data, len); });
 }
 
 void GatewayClient::_handleEvent(WStype_t type, std::uint8_t* payload, std::size_t length) {
