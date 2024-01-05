@@ -57,6 +57,22 @@ void GatewayClient::disconnect() {
   m_webSocket.disconnect();
 }
 
+bool GatewayClient::sendMessageTXT(StringView data) {
+  if (m_state != State::Connected) {
+    return false;
+  }
+
+  return m_webSocket.sendTXT(data.data(), data.length());
+}
+
+bool GatewayClient::sendMessageBIN(const std::uint8_t* data, std::size_t length) {
+  if (m_state != State::Connected) {
+    return false;
+  }
+
+  return m_webSocket.sendBIN(data, length);
+}
+
 bool GatewayClient::loop() {
   if (m_state == State::Disconnected) {
     return false;

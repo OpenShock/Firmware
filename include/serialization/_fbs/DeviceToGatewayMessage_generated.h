@@ -30,9 +30,6 @@ struct OtaInstallProgressBuilder;
 struct OtaInstallFailed;
 struct OtaInstallFailedBuilder;
 
-struct OtaInstallSucceeded;
-struct OtaInstallSucceededBuilder;
-
 struct DeviceToGatewayMessage;
 struct DeviceToGatewayMessageBuilder;
 
@@ -42,38 +39,35 @@ enum class DeviceToGatewayMessagePayload : uint8_t {
   OtaInstallStarted = 2,
   OtaInstallProgress = 3,
   OtaInstallFailed = 4,
-  OtaInstallSucceeded = 5,
   MIN = NONE,
-  MAX = OtaInstallSucceeded
+  MAX = OtaInstallFailed
 };
 
-inline const DeviceToGatewayMessagePayload (&EnumValuesDeviceToGatewayMessagePayload())[6] {
+inline const DeviceToGatewayMessagePayload (&EnumValuesDeviceToGatewayMessagePayload())[5] {
   static const DeviceToGatewayMessagePayload values[] = {
     DeviceToGatewayMessagePayload::NONE,
     DeviceToGatewayMessagePayload::KeepAlive,
     DeviceToGatewayMessagePayload::OtaInstallStarted,
     DeviceToGatewayMessagePayload::OtaInstallProgress,
-    DeviceToGatewayMessagePayload::OtaInstallFailed,
-    DeviceToGatewayMessagePayload::OtaInstallSucceeded
+    DeviceToGatewayMessagePayload::OtaInstallFailed
   };
   return values;
 }
 
 inline const char * const *EnumNamesDeviceToGatewayMessagePayload() {
-  static const char * const names[7] = {
+  static const char * const names[6] = {
     "NONE",
     "KeepAlive",
     "OtaInstallStarted",
     "OtaInstallProgress",
     "OtaInstallFailed",
-    "OtaInstallSucceeded",
     nullptr
   };
   return names;
 }
 
 inline const char *EnumNameDeviceToGatewayMessagePayload(DeviceToGatewayMessagePayload e) {
-  if (::flatbuffers::IsOutRange(e, DeviceToGatewayMessagePayload::NONE, DeviceToGatewayMessagePayload::OtaInstallSucceeded)) return "";
+  if (::flatbuffers::IsOutRange(e, DeviceToGatewayMessagePayload::NONE, DeviceToGatewayMessagePayload::OtaInstallFailed)) return "";
   const size_t index = static_cast<size_t>(e);
   return EnumNamesDeviceToGatewayMessagePayload()[index];
 }
@@ -96,10 +90,6 @@ template<> struct DeviceToGatewayMessagePayloadTraits<OpenShock::Serialization::
 
 template<> struct DeviceToGatewayMessagePayloadTraits<OpenShock::Serialization::Gateway::OtaInstallFailed> {
   static const DeviceToGatewayMessagePayload enum_value = DeviceToGatewayMessagePayload::OtaInstallFailed;
-};
-
-template<> struct DeviceToGatewayMessagePayloadTraits<OpenShock::Serialization::Gateway::OtaInstallSucceeded> {
-  static const DeviceToGatewayMessagePayload enum_value = DeviceToGatewayMessagePayload::OtaInstallSucceeded;
 };
 
 bool VerifyDeviceToGatewayMessagePayload(::flatbuffers::Verifier &verifier, const void *obj, DeviceToGatewayMessagePayload type);
@@ -260,20 +250,20 @@ struct OtaInstallFailed FLATBUFFERS_FINAL_CLASS : private ::flatbuffers::Table {
     return "OpenShock.Serialization.Gateway.OtaInstallFailed";
   }
   enum FlatBuffersVTableOffset FLATBUFFERS_VTABLE_UNDERLYING_TYPE {
-    VT_BRICKED = 4,
-    VT_MESSAGE = 6
+    VT_MESSAGE = 4,
+    VT_FATAL = 6
   };
-  bool bricked() const {
-    return GetField<uint8_t>(VT_BRICKED, 0) != 0;
-  }
   const ::flatbuffers::String *message() const {
     return GetPointer<const ::flatbuffers::String *>(VT_MESSAGE);
   }
+  bool fatal() const {
+    return GetField<uint8_t>(VT_FATAL, 0) != 0;
+  }
   bool Verify(::flatbuffers::Verifier &verifier) const {
     return VerifyTableStart(verifier) &&
-           VerifyField<uint8_t>(verifier, VT_BRICKED, 1) &&
            VerifyOffset(verifier, VT_MESSAGE) &&
            verifier.VerifyString(message()) &&
+           VerifyField<uint8_t>(verifier, VT_FATAL, 1) &&
            verifier.EndTable();
   }
 };
@@ -282,11 +272,11 @@ struct OtaInstallFailedBuilder {
   typedef OtaInstallFailed Table;
   ::flatbuffers::FlatBufferBuilder &fbb_;
   ::flatbuffers::uoffset_t start_;
-  void add_bricked(bool bricked) {
-    fbb_.AddElement<uint8_t>(OtaInstallFailed::VT_BRICKED, static_cast<uint8_t>(bricked), 0);
-  }
   void add_message(::flatbuffers::Offset<::flatbuffers::String> message) {
     fbb_.AddOffset(OtaInstallFailed::VT_MESSAGE, message);
+  }
+  void add_fatal(bool fatal) {
+    fbb_.AddElement<uint8_t>(OtaInstallFailed::VT_FATAL, static_cast<uint8_t>(fatal), 0);
   }
   explicit OtaInstallFailedBuilder(::flatbuffers::FlatBufferBuilder &_fbb)
         : fbb_(_fbb) {
@@ -301,11 +291,11 @@ struct OtaInstallFailedBuilder {
 
 inline ::flatbuffers::Offset<OtaInstallFailed> CreateOtaInstallFailed(
     ::flatbuffers::FlatBufferBuilder &_fbb,
-    bool bricked = false,
-    ::flatbuffers::Offset<::flatbuffers::String> message = 0) {
+    ::flatbuffers::Offset<::flatbuffers::String> message = 0,
+    bool fatal = false) {
   OtaInstallFailedBuilder builder_(_fbb);
   builder_.add_message(message);
-  builder_.add_bricked(bricked);
+  builder_.add_fatal(fatal);
   return builder_.Finish();
 }
 
@@ -316,65 +306,14 @@ struct OtaInstallFailed::Traits {
 
 inline ::flatbuffers::Offset<OtaInstallFailed> CreateOtaInstallFailedDirect(
     ::flatbuffers::FlatBufferBuilder &_fbb,
-    bool bricked = false,
-    const char *message = nullptr) {
+    const char *message = nullptr,
+    bool fatal = false) {
   auto message__ = message ? _fbb.CreateString(message) : 0;
   return OpenShock::Serialization::Gateway::CreateOtaInstallFailed(
       _fbb,
-      bricked,
-      message__);
+      message__,
+      fatal);
 }
-
-struct OtaInstallSucceeded FLATBUFFERS_FINAL_CLASS : private ::flatbuffers::Table {
-  typedef OtaInstallSucceededBuilder Builder;
-  struct Traits;
-  static FLATBUFFERS_CONSTEXPR_CPP11 const char *GetFullyQualifiedName() {
-    return "OpenShock.Serialization.Gateway.OtaInstallSucceeded";
-  }
-  enum FlatBuffersVTableOffset FLATBUFFERS_VTABLE_UNDERLYING_TYPE {
-    VT_VERSION = 4
-  };
-  const OpenShock::Serialization::Types::SemVer *version() const {
-    return GetPointer<const OpenShock::Serialization::Types::SemVer *>(VT_VERSION);
-  }
-  bool Verify(::flatbuffers::Verifier &verifier) const {
-    return VerifyTableStart(verifier) &&
-           VerifyOffset(verifier, VT_VERSION) &&
-           verifier.VerifyTable(version()) &&
-           verifier.EndTable();
-  }
-};
-
-struct OtaInstallSucceededBuilder {
-  typedef OtaInstallSucceeded Table;
-  ::flatbuffers::FlatBufferBuilder &fbb_;
-  ::flatbuffers::uoffset_t start_;
-  void add_version(::flatbuffers::Offset<OpenShock::Serialization::Types::SemVer> version) {
-    fbb_.AddOffset(OtaInstallSucceeded::VT_VERSION, version);
-  }
-  explicit OtaInstallSucceededBuilder(::flatbuffers::FlatBufferBuilder &_fbb)
-        : fbb_(_fbb) {
-    start_ = fbb_.StartTable();
-  }
-  ::flatbuffers::Offset<OtaInstallSucceeded> Finish() {
-    const auto end = fbb_.EndTable(start_);
-    auto o = ::flatbuffers::Offset<OtaInstallSucceeded>(end);
-    return o;
-  }
-};
-
-inline ::flatbuffers::Offset<OtaInstallSucceeded> CreateOtaInstallSucceeded(
-    ::flatbuffers::FlatBufferBuilder &_fbb,
-    ::flatbuffers::Offset<OpenShock::Serialization::Types::SemVer> version = 0) {
-  OtaInstallSucceededBuilder builder_(_fbb);
-  builder_.add_version(version);
-  return builder_.Finish();
-}
-
-struct OtaInstallSucceeded::Traits {
-  using type = OtaInstallSucceeded;
-  static auto constexpr Create = CreateOtaInstallSucceeded;
-};
 
 struct DeviceToGatewayMessage FLATBUFFERS_FINAL_CLASS : private ::flatbuffers::Table {
   typedef DeviceToGatewayMessageBuilder Builder;
@@ -405,9 +344,6 @@ struct DeviceToGatewayMessage FLATBUFFERS_FINAL_CLASS : private ::flatbuffers::T
   const OpenShock::Serialization::Gateway::OtaInstallFailed *payload_as_OtaInstallFailed() const {
     return payload_type() == OpenShock::Serialization::Gateway::DeviceToGatewayMessagePayload::OtaInstallFailed ? static_cast<const OpenShock::Serialization::Gateway::OtaInstallFailed *>(payload()) : nullptr;
   }
-  const OpenShock::Serialization::Gateway::OtaInstallSucceeded *payload_as_OtaInstallSucceeded() const {
-    return payload_type() == OpenShock::Serialization::Gateway::DeviceToGatewayMessagePayload::OtaInstallSucceeded ? static_cast<const OpenShock::Serialization::Gateway::OtaInstallSucceeded *>(payload()) : nullptr;
-  }
   bool Verify(::flatbuffers::Verifier &verifier) const {
     return VerifyTableStart(verifier) &&
            VerifyField<uint8_t>(verifier, VT_PAYLOAD_TYPE, 1) &&
@@ -431,10 +367,6 @@ template<> inline const OpenShock::Serialization::Gateway::OtaInstallProgress *D
 
 template<> inline const OpenShock::Serialization::Gateway::OtaInstallFailed *DeviceToGatewayMessage::payload_as<OpenShock::Serialization::Gateway::OtaInstallFailed>() const {
   return payload_as_OtaInstallFailed();
-}
-
-template<> inline const OpenShock::Serialization::Gateway::OtaInstallSucceeded *DeviceToGatewayMessage::payload_as<OpenShock::Serialization::Gateway::OtaInstallSucceeded>() const {
-  return payload_as_OtaInstallSucceeded();
 }
 
 struct DeviceToGatewayMessageBuilder {
@@ -491,10 +423,6 @@ inline bool VerifyDeviceToGatewayMessagePayload(::flatbuffers::Verifier &verifie
     }
     case DeviceToGatewayMessagePayload::OtaInstallFailed: {
       auto ptr = reinterpret_cast<const OpenShock::Serialization::Gateway::OtaInstallFailed *>(obj);
-      return verifier.VerifyTable(ptr);
-    }
-    case DeviceToGatewayMessagePayload::OtaInstallSucceeded: {
-      auto ptr = reinterpret_cast<const OpenShock::Serialization::Gateway::OtaInstallSucceeded *>(obj);
       return verifier.VerifyTable(ptr);
     }
     default: return true;

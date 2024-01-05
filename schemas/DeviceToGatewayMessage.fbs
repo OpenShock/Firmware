@@ -18,20 +18,15 @@ table OtaInstallProgress {
 }
 
 table OtaInstallFailed {
-  bricked:bool;
   message:string;
-}
-
-table OtaInstallSucceeded {
-  version:Types.SemVer;
+  fatal:bool;
 }
 
 union DeviceToGatewayMessagePayload {
   KeepAlive,
   OtaInstallStarted,
   OtaInstallProgress,
-  OtaInstallFailed,
-  OtaInstallSucceeded
+  OtaInstallFailed
 }
 
 table DeviceToGatewayMessage (fs_serializer) {

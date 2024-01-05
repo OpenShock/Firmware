@@ -30,7 +30,7 @@ bool Gateway::SerializeKeepAliveMessage(Common::SerializationCallbackFn callback
   return callback(span.data(), span.size());
 }
 
-bool Gateway::SerializeOtaInstallStartedMessage(SemVer semver, Common::SerializationCallbackFn callback) {
+bool Gateway::SerializeOtaInstallStartedMessage(const OpenShock::SemVer& semver, Common::SerializationCallbackFn callback) {
   flatbuffers::FlatBufferBuilder builder(256);  // TODO: Profile this and adjust the size accordingly
 
   auto semVerOffset = Types::CreateSemVerDirect(builder, semver.major, semver.minor, semver.patch, semver.prerelease.data(), semver.build.data());
@@ -38,6 +38,38 @@ bool Gateway::SerializeOtaInstallStartedMessage(SemVer semver, Common::Serializa
   auto otaInstallStartedOffset = Gateway::CreateOtaInstallStarted(builder, semVerOffset);
 
   auto msg = Gateway::CreateDeviceToGatewayMessage(builder, Gateway::DeviceToGatewayMessagePayload::OtaInstallStarted, otaInstallStartedOffset.Union());
+
+  builder.Finish(msg);
+
+  auto span = builder.GetBufferSpan();
+
+  return callback(span.data(), span.size());
+}
+
+bool Gateway::SerializeOtaInstallProgressMessage(StringView task, float progress, Common::SerializationCallbackFn callback) {
+  flatbuffers::FlatBufferBuilder builder(256);  // TODO: Profile this and adjust the size accordingly
+
+  auto taskOffset = builder.CreateString(task.data(), task.size());
+
+  auto otaInstallProgressOffset = Gateway::CreateOtaInstallProgress(builder, taskOffset, progress);
+
+  auto msg = Gateway::CreateDeviceToGatewayMessage(builder, Gateway::DeviceToGatewayMessagePayload::OtaInstallProgress, otaInstallProgressOffset.Union());
+
+  builder.Finish(msg);
+
+  auto span = builder.GetBufferSpan();
+
+  return callback(span.data(), span.size());
+}
+
+bool Gateway::SerializeOtaInstallFailedMessage(StringView message, bool fatal, Common::SerializationCallbackFn callback) {
+  flatbuffers::FlatBufferBuilder builder(256);  // TODO: Profile this and adjust the size accordingly
+
+  auto messageOffset = builder.CreateString(message.data(), message.size());
+
+  auto otaInstallFailedOffset = Gateway::CreateOtaInstallFailed(builder, messageOffset, fatal);
+
+  auto msg = Gateway::CreateDeviceToGatewayMessage(builder, Gateway::DeviceToGatewayMessagePayload::OtaInstallFailed, otaInstallFailedOffset.Union());
 
   builder.Finish(msg);
 

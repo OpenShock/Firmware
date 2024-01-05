@@ -6,7 +6,6 @@ import { KeepAlive } from '../../../open-shock/serialization/gateway/keep-alive'
 import { OtaInstallFailed } from '../../../open-shock/serialization/gateway/ota-install-failed';
 import { OtaInstallProgress } from '../../../open-shock/serialization/gateway/ota-install-progress';
 import { OtaInstallStarted } from '../../../open-shock/serialization/gateway/ota-install-started';
-import { OtaInstallSucceeded } from '../../../open-shock/serialization/gateway/ota-install-succeeded';
 
 
 export enum DeviceToGatewayMessagePayload {
@@ -14,37 +13,34 @@ export enum DeviceToGatewayMessagePayload {
   KeepAlive = 1,
   OtaInstallStarted = 2,
   OtaInstallProgress = 3,
-  OtaInstallFailed = 4,
-  OtaInstallSucceeded = 5
+  OtaInstallFailed = 4
 }
 
 export function unionToDeviceToGatewayMessagePayload(
   type: DeviceToGatewayMessagePayload,
-  accessor: (obj:KeepAlive|OtaInstallFailed|OtaInstallProgress|OtaInstallStarted|OtaInstallSucceeded) => KeepAlive|OtaInstallFailed|OtaInstallProgress|OtaInstallStarted|OtaInstallSucceeded|null
-): KeepAlive|OtaInstallFailed|OtaInstallProgress|OtaInstallStarted|OtaInstallSucceeded|null {
+  accessor: (obj:KeepAlive|OtaInstallFailed|OtaInstallProgress|OtaInstallStarted) => KeepAlive|OtaInstallFailed|OtaInstallProgress|OtaInstallStarted|null
+): KeepAlive|OtaInstallFailed|OtaInstallProgress|OtaInstallStarted|null {
   switch(DeviceToGatewayMessagePayload[type]) {
     case 'NONE': return null; 
     case 'KeepAlive': return accessor(new KeepAlive())! as KeepAlive;
     case 'OtaInstallStarted': return accessor(new OtaInstallStarted())! as OtaInstallStarted;
     case 'OtaInstallProgress': return accessor(new OtaInstallProgress())! as OtaInstallProgress;
     case 'OtaInstallFailed': return accessor(new OtaInstallFailed())! as OtaInstallFailed;
-    case 'OtaInstallSucceeded': return accessor(new OtaInstallSucceeded())! as OtaInstallSucceeded;
     default: return null;
   }
 }
 
 export function unionListToDeviceToGatewayMessagePayload(
   type: DeviceToGatewayMessagePayload, 
-  accessor: (index: number, obj:KeepAlive|OtaInstallFailed|OtaInstallProgress|OtaInstallStarted|OtaInstallSucceeded) => KeepAlive|OtaInstallFailed|OtaInstallProgress|OtaInstallStarted|OtaInstallSucceeded|null, 
+  accessor: (index: number, obj:KeepAlive|OtaInstallFailed|OtaInstallProgress|OtaInstallStarted) => KeepAlive|OtaInstallFailed|OtaInstallProgress|OtaInstallStarted|null, 
   index: number
-): KeepAlive|OtaInstallFailed|OtaInstallProgress|OtaInstallStarted|OtaInstallSucceeded|null {
+): KeepAlive|OtaInstallFailed|OtaInstallProgress|OtaInstallStarted|null {
   switch(DeviceToGatewayMessagePayload[type]) {
     case 'NONE': return null; 
     case 'KeepAlive': return accessor(index, new KeepAlive())! as KeepAlive;
     case 'OtaInstallStarted': return accessor(index, new OtaInstallStarted())! as OtaInstallStarted;
     case 'OtaInstallProgress': return accessor(index, new OtaInstallProgress())! as OtaInstallProgress;
     case 'OtaInstallFailed': return accessor(index, new OtaInstallFailed())! as OtaInstallFailed;
-    case 'OtaInstallSucceeded': return accessor(index, new OtaInstallSucceeded())! as OtaInstallSucceeded;
     default: return null;
   }
 }

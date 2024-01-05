@@ -23,30 +23,17 @@ void _Private::HandleOtaInstall(const OpenShock::Serialization::Gateway::Gateway
     return;
   }
 
-  char buffer[18];
-  if (snprintf(buffer, sizeof(buffer), "%u.%u.%u", semver->major(), semver->minor(), semver->patch()) < 0) {
-    ESP_LOGE(TAG, "Failed to format version string");
-    return;
+  StringView prerelease, build;
+  if (semver->prerelease() != nullptr) {
+    prerelease = StringView(semver->prerelease()->c_str(), semver->prerelease()->size());
+  }
+  if (semver->build() != nullptr) {
+    build = StringView(semver->build()->c_str(), semver->build()->size());
   }
 
-  std::string version;
-  version.reserve(32);
+  OpenShock::SemVer version(semver->major(), semver->minor(), semver->patch(), prerelease, build);
 
-  version += buffer;
-
-  auto prerelease = semver->prerelease();
-  if (prerelease != nullptr && prerelease->size() > 0) {
-    version += "-";
-    version += prerelease->c_str();
-  }
-
-  auto build = semver->build();
-  if (build != nullptr && build->size() > 0) {
-    version += "+";
-    version += build->c_str();
-  }
-
-  ESP_LOGI(TAG, "OTA install requested for version %s", version.c_str());
+  ESP_LOGI(TAG, "OTA install requested for version %s", version.toString().c_str());  // TODO: This is abusing the SemVer::toString() method causing alot of string copies, fix this
 
   if (!OpenShock::OtaUpdateManager::TryStartFirmwareInstallation(version)) {
     ESP_LOGE(TAG, "Failed to install firmware");  // TODO: Send error message to server

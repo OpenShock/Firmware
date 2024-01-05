@@ -7,6 +7,8 @@
 #include "Hashing.h"
 #include "http/HTTPRequestManager.h"
 #include "Logging.h"
+#include "SemVer.h"
+#include "serialization/WSGateway.h"
 #include "StringView.h"
 #include "Time.h"
 #include "util/HexUtils.h"
@@ -56,22 +58,16 @@ enum OtaTaskEventFlag : std::uint32_t {
 
 static bool _otaValidatingApp = false;
 static TaskHandle_t _taskHandle;
-static std::string _requestedVersion;
+static OpenShock::SemVer _requestedVersion;
 static SemaphoreHandle_t _requestedVersionMutex = xSemaphoreCreateMutex();
 
-bool _tryQueueUpdateRequest(StringView version) {
+bool _tryQueueUpdateRequest(const OpenShock::SemVer& version) {
   if (xSemaphoreTake(_requestedVersionMutex, pdMS_TO_TICKS(1000)) != pdTRUE) {
     ESP_LOGE(TAG, "Failed to take requested version mutex");
     return false;
   }
 
-  if (!_requestedVersion.empty()) {
-    ESP_LOGW(TAG, "Update request already queued");
-    xSemaphoreGive(_requestedVersionMutex);
-    return false;
-  }
-
-  _requestedVersion = version.toString();
+  _requestedVersion = version;
 
   xSemaphoreGive(_requestedVersionMutex);
 
@@ -80,19 +76,13 @@ bool _tryQueueUpdateRequest(StringView version) {
   return true;
 }
 
-bool _tryGetRequestedVersion(std::string& version) {
+bool _tryGetRequestedVersion(OpenShock::SemVer& version) {
   if (xSemaphoreTake(_requestedVersionMutex, pdMS_TO_TICKS(1000)) != pdTRUE) {
     ESP_LOGE(TAG, "Failed to take requested version mutex");
     return false;
   }
 
-  if (_requestedVersion.empty()) {
-    xSemaphoreGive(_requestedVersionMutex);
-    return false;
-  }
-
-  version = std::move(_requestedVersion);
-  _requestedVersion.clear();
+  version = _requestedVersion;
 
   xSemaphoreGive(_requestedVersionMutex);
 
@@ -247,46 +237,111 @@ bool _flashPartition(const esp_partition_t* partition, StringView remoteUrl, con
   return true;
 }
 
-bool _flashAppPartition(const esp_partition_t* partition, StringView remoteUrl, const std::uint8_t (&remoteHash)[32]) {
-  ESP_LOGD(TAG, "Flashing app partition");
-
-  auto onProgress = [](std::size_t current, std::size_t total, float progress) -> bool {
-    // TODO: Implement
-    ESP_LOGD(TAG, "Flashing app partition: %u / %u (%.2f%%)", current, total, progress * 100.0f);
-    return true;
-  };
-
-  if (!_flashPartition(partition, remoteUrl, remoteHash, onProgress)) {
-    ESP_LOGE(TAG, "Failed to flash app partition");
+bool _sendProgressMessage(StringView message, float progress) {
+  if (!Serialization::Gateway::SerializeOtaInstallProgressMessage(message, progress, GatewayConnectionManager::SendMessageBIN)) {
+    ESP_LOGE(TAG, "Failed to send OTA install progress message");
     return false;
   }
 
-  // Set app partition bootable.
-  if (esp_ota_set_boot_partition(partition) != ESP_OK) {
-    ESP_LOGE(TAG, "Failed to set app partition bootable");
+  return true;
+}
+bool _sendFailureMessage(StringView message, bool fatal = false) {
+  if (!Serialization::Gateway::SerializeOtaInstallFailedMessage(message, fatal, GatewayConnectionManager::SendMessageBIN)) {
+    ESP_LOGE(TAG, "Failed to send OTA install failed message");
     return false;
   }
 
   return true;
 }
 
+bool _flashAppPartition(const esp_partition_t* partition, StringView remoteUrl, const std::uint8_t (&remoteHash)[32]) {
+  ESP_LOGD(TAG, "Flashing app partition");
+
+  if (!_sendProgressMessage("Flashing app partition", 0.0f)) {
+    return false;
+  }
+
+  auto onProgress = [](std::size_t current, std::size_t total, float progress) -> bool {
+    // TODO: Implement
+    ESP_LOGD(TAG, "Flashing app partition: %u / %u (%.2f%%)", current, total, progress * 100.0f);
+
+    if (!_sendProgressMessage("Flashing app partition", progress)) {
+      return false;
+    }
+
+    return true;
+  };
+
+  if (!_flashPartition(partition, remoteUrl, remoteHash, onProgress)) {
+    ESP_LOGE(TAG, "Failed to flash app partition");
+    _sendFailureMessage("Failed to flash app partition");
+    return false;
+  }
+
+  if (!_sendProgressMessage("Flashing app partition", 1.0f)) {
+    return false;
+  }
+
+  if (!_sendProgressMessage("Setting app partition bootable", 0.0f)) {
+    return false;
+  }
+
+  // Set app partition bootable.
+  if (esp_ota_set_boot_partition(partition) != ESP_OK) {
+    ESP_LOGE(TAG, "Failed to set app partition bootable");
+    _sendFailureMessage("Failed to set app partition bootable");
+    return false;
+  }
+
+  _sendProgressMessage("Setting app partition bootable", 1.0f);
+
+  return true;
+}
+
 bool _flashFilesystemPartition(const esp_partition_t* parition, StringView remoteUrl, const std::uint8_t (&remoteHash)[32]) {
+  if (!_sendProgressMessage("Closing captive portal", 0.0f)) {
+    return false;
+  }
+
   // Make sure captive portal is stopped.
   if (!_tryForceCloseCaptivePortal(5000U)) {  // 5 seconds
     ESP_LOGE(TAG, "Failed to force close captive portal (timed out)");
+    _sendFailureMessage("Failed to force close captive portal (timed out)");
+    return false;
+  }
+
+  if (!_sendProgressMessage("Closing captive portal", 1.0f)) {
     return false;
   }
 
   ESP_LOGD(TAG, "Flashing filesystem partition");
 
+  if (!_sendProgressMessage("Flashing filesystem partition", 0.0f)) {
+    return false;
+  }
+
   auto onProgress = [](std::size_t current, std::size_t total, float progress) -> bool {
     // TODO: Implement
     ESP_LOGD(TAG, "Flashing filesystem partition: %u / %u (%.2f%%)", current, total, progress * 100.0f);
+
+    if (!_sendProgressMessage("Flashing filesystem partition", progress)) {
+      return false;
+    }
+
     return true;
   };
 
   if (!_flashPartition(parition, remoteUrl, remoteHash, onProgress)) {
     ESP_LOGE(TAG, "Failed to flash filesystem partition");
+    _sendFailureMessage("Failed to flash filesystem partition");
+    return false;
+  }
+
+  if (!_sendProgressMessage("Flashing filesystem partition", 1.0f)) {
+    return false;
+  }
+
+  if (!_sendProgressMessage("Testing filesystem", 0.0f)) {
     return false;
   }
 
@@ -294,11 +349,16 @@ bool _flashFilesystemPartition(const esp_partition_t* parition, StringView remot
   fs::LittleFSFS test;
   if (!test.begin(false, "/static", 10, "static0")) {
     ESP_LOGE(TAG, "Failed to mount filesystem");
+    _sendFailureMessage("Failed to mount filesystem");
     return false;
   }
   test.end();
 
   OpenShock::CaptivePortal::SetForceClosed(false);
+
+  if (!_sendProgressMessage("Testing filesystem", 1.0f)) {
+    return false;
+  }
 
   return true;
 }
@@ -377,7 +437,7 @@ void _otaUpdateTask(void* arg) {
       continue;
     }
 
-    std::string version;
+    OpenShock::SemVer version;
     if (updateRequested) {
       updateRequested = false;
 
@@ -386,22 +446,30 @@ void _otaUpdateTask(void* arg) {
         continue;
       }
 
-      ESP_LOGD(TAG, "Update requested for version %s", version.c_str());
+      ESP_LOGD(TAG, "Update requested for version %s", version.toString().c_str());  // TODO: This is abusing the SemVer::toString() method causing alot of string copies, fix this
     } else {
       ESP_LOGD(TAG, "Checking for updates");
 
       // Fetch current version.
-      std::string version;
       if (!OtaUpdateManager::TryGetFirmwareVersion(config.updateChannel, version)) {
         ESP_LOGE(TAG, "Failed to fetch firmware version");
         continue;
       }
 
-      ESP_LOGD(TAG, "Remote version: %s", version.c_str());
+      ESP_LOGD(TAG, "Remote version: %s", version.toString().c_str());  // TODO: This is abusing the SemVer::toString() method causing alot of string copies, fix this
     }
 
-    if (version == OPENSHOCK_FW_VERSION) {
-      ESP_LOGI(TAG, "Requested version is already installed");  // TODO: Send error message to server
+    if (version.toString() == OPENSHOCK_FW_VERSION) {  // TODO: This is abusing the SemVer::toString() method causing alot of string copies, fix this
+      ESP_LOGI(TAG, "Requested version is already installed");
+      continue;
+    }
+
+    if (!Serialization::Gateway::SerializeOtaInstallStartedMessage(version, GatewayConnectionManager::SendMessageBIN)) {
+      ESP_LOGE(TAG, "Failed to serialize OTA install started message");
+      continue;
+    }
+
+    if (!_sendProgressMessage("Fetching metadata", 0.0f)) {
       continue;
     }
 
@@ -409,12 +477,17 @@ void _otaUpdateTask(void* arg) {
     OtaUpdateManager::FirmwareRelease release;
     if (!OtaUpdateManager::TryGetFirmwareRelease(version, release)) {
       ESP_LOGE(TAG, "Failed to fetch firmware release");  // TODO: Send error message to server
+      _sendFailureMessage("Failed to fetch firmware release");
+      continue;
+    }
+
+    if (!_sendProgressMessage("Fetching metadata", 1.0f)) {
       continue;
     }
 
     // Print release.
     ESP_LOGD(TAG, "Firmware release:");
-    ESP_LOGD(TAG, "  Version:                %s", version.c_str());
+    ESP_LOGD(TAG, "  Version:                %s", version.toString().c_str());  // TODO: This is abusing the SemVer::toString() method causing alot of string copies, fix this
     ESP_LOGD(TAG, "  App binary URL:         %s", release.appBinaryUrl.c_str());
     ESP_LOGD(TAG, "  App binary hash:        %s", HexUtils::ToHex<32>(release.appBinaryHash).data());
     ESP_LOGD(TAG, "  Filesystem binary URL:  %s", release.filesystemBinaryUrl.c_str());
@@ -424,6 +497,7 @@ void _otaUpdateTask(void* arg) {
     const esp_partition_t* appPartition = esp_ota_get_next_update_partition(nullptr);
     if (appPartition == nullptr) {
       ESP_LOGE(TAG, "Failed to get app update partition");  // TODO: Send error message to server
+      _sendFailureMessage("Failed to get app update partition");
       continue;
     }
 
@@ -431,21 +505,23 @@ void _otaUpdateTask(void* arg) {
     const esp_partition_t* filesystemPartition = esp_partition_find_first(ESP_PARTITION_TYPE_DATA, ESP_PARTITION_SUBTYPE_DATA_SPIFFS, "static0");
     if (filesystemPartition == nullptr) {
       ESP_LOGE(TAG, "Failed to find filesystem partition");  // TODO: Send error message to server
+      _sendFailureMessage("Failed to find filesystem partition");
       continue;
     }
 
     // Flash app and filesystem partitions.
-    if (!_flashFilesystemPartition(filesystemPartition, release.filesystemBinaryUrl, release.filesystemBinaryHash)) {
-      continue;  // TODO: Send error message to server
-    }
-    if (!_flashAppPartition(appPartition, release.appBinaryUrl, release.appBinaryHash)) {
-      continue;  // TODO: Send error message to server
-    }
+    if (!_flashFilesystemPartition(filesystemPartition, release.filesystemBinaryUrl, release.filesystemBinaryHash)) continue;
+    if (!_flashAppPartition(appPartition, release.appBinaryUrl, release.appBinaryHash)) continue;
+
+    // Send reboot message.
+    _sendProgressMessage("Rebooting", 0.0f);
 
     // Restart.
-    ESP_LOGI(TAG, "Restarting in 5 seconds...");
-    vTaskDelay(pdMS_TO_TICKS(5000));
+    ESP_LOGI(TAG, "Restarting in 1 seconds...");
+    vTaskDelay(pdMS_TO_TICKS(1000));
     esp_restart();
+
+    _sendFailureMessage("Well, this is awkward...");
   }
 }
 
@@ -521,7 +597,7 @@ bool OtaUpdateManager::Init() {
   return true;
 }
 
-bool OtaUpdateManager::TryGetFirmwareVersion(OtaUpdateChannel channel, std::string& version) {
+bool OtaUpdateManager::TryGetFirmwareVersion(OtaUpdateChannel channel, OpenShock::SemVer& version) {
   const char* channelIndexUrl = nullptr;
   switch (channel) {
     case OtaUpdateChannel::Stable:
@@ -552,14 +628,17 @@ bool OtaUpdateManager::TryGetFirmwareVersion(OtaUpdateChannel channel, std::stri
     return false;
   }
 
-  version = response.data;
+  if (!OpenShock::TryParseSemVer(response.data, version)) {
+    ESP_LOGE(TAG, "Failed to parse firmware version: %.*s", response.data.size(), response.data.data());
+    return false;
+  }
 
   return true;
 }
 
-bool OtaUpdateManager::TryGetFirmwareBoards(const std::string& version, std::vector<std::string>& boards) {
+bool OtaUpdateManager::TryGetFirmwareBoards(const OpenShock::SemVer& version, std::vector<std::string>& boards) {
   std::string channelIndexUrl;
-  if (!_printfToString(channelIndexUrl, OPENSHOCK_FW_CDN_BOARDS_INDEX_URL_FORMAT, version.c_str())) {
+  if (!_printfToString(channelIndexUrl, OPENSHOCK_FW_CDN_BOARDS_INDEX_URL_FORMAT, version.toString().c_str())) {  // TODO: This is abusing the SemVer::toString() method causing alot of string copies, fix this
     ESP_LOGE(TAG, "Failed to format URL");
     return false;
   }
@@ -583,20 +662,22 @@ bool _tryParseIntoHash(const std::string& hash, std::uint8_t (&hashBytes)[32]) {
   return true;
 }
 
-bool OtaUpdateManager::TryGetFirmwareRelease(const std::string& version, FirmwareRelease& release) {
-  if (!_printfToString(release.appBinaryUrl, OPENSHOCK_FW_CDN_APP_URL_FORMAT, version.c_str())) {
+bool OtaUpdateManager::TryGetFirmwareRelease(const OpenShock::SemVer& version, FirmwareRelease& release) {
+  auto versionStr = version.toString();  // TODO: This is abusing the SemVer::toString() method causing alot of string copies, fix this
+
+  if (!_printfToString(release.appBinaryUrl, OPENSHOCK_FW_CDN_APP_URL_FORMAT, versionStr.c_str())) {
     ESP_LOGE(TAG, "Failed to format URL");
     return false;
   }
 
-  if (!_printfToString(release.filesystemBinaryUrl, OPENSHOCK_FW_CDN_FILESYSTEM_URL_FORMAT, version.c_str())) {
+  if (!_printfToString(release.filesystemBinaryUrl, OPENSHOCK_FW_CDN_FILESYSTEM_URL_FORMAT, versionStr.c_str())) {
     ESP_LOGE(TAG, "Failed to format URL");
     return false;
   }
 
   // Construct hash URLs.
   std::string sha256HashesUrl;
-  if (!_printfToString(sha256HashesUrl, OPENSHOCK_FW_CDN_SHA256_HASHES_URL_FORMAT, version.c_str())) {
+  if (!_printfToString(sha256HashesUrl, OPENSHOCK_FW_CDN_SHA256_HASHES_URL_FORMAT, versionStr.c_str())) {
     ESP_LOGE(TAG, "Failed to format URL");
     return false;
   }
@@ -665,8 +746,8 @@ bool OtaUpdateManager::TryGetFirmwareRelease(const std::string& version, Firmwar
   return true;
 }
 
-bool OtaUpdateManager::TryStartFirmwareInstallation(OpenShock::StringView version) {
-  ESP_LOGD(TAG, "Requesting firmware version %.*s", version.size(), version.data());
+bool OtaUpdateManager::TryStartFirmwareInstallation(const OpenShock::SemVer& version) {
+  ESP_LOGD(TAG, "Requesting firmware version %s", version.toString().c_str());  // TODO: This is abusing the SemVer::toString() method causing alot of string copies, fix this
 
   return _tryQueueUpdateRequest(version);
 }
