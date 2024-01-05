@@ -1,4 +1,5 @@
 include "./Types/SemVer.fbs";
+include "./Types/FirmwareBootType.fbs";
 
 attribute "fs_serializer";
 
@@ -6,6 +7,11 @@ namespace OpenShock.Serialization.Gateway;
 
 struct KeepAlive {
   uptime:ulong;
+}
+
+table BootStatus {
+  boot_type:Types.FirmwareBootType;
+  firmware_version:Types.SemVer;
 }
 
 table OtaInstallStarted {
@@ -34,6 +40,7 @@ table OtaInstallFailed {
 
 union DeviceToGatewayMessagePayload {
   KeepAlive,
+  BootStatus,
   OtaInstallStarted,
   OtaInstallProgress,
   OtaInstallFailed

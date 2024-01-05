@@ -5,6 +5,7 @@
 import * as flatbuffers from 'flatbuffers';
 
 import { OtaUpdateChannel } from '../../../open-shock/serialization/configuration/ota-update-channel';
+import { FirmwareBootType } from '../../../open-shock/serialization/types/firmware-boot-type';
 
 
 export class OtaUpdateConfig {
@@ -91,8 +92,16 @@ requireManualApproval():boolean {
   return offset ? !!this.bb!.readInt8(this.bb_pos + offset) : false;
 }
 
+/**
+ * Indicates what kind of firmware boot is happening (normal boot, booting into new firmware, rolling back to old firmware, etc.)
+ */
+bootType():FirmwareBootType {
+  const offset = this.bb!.__offset(this.bb_pos, 20);
+  return offset ? this.bb!.readUint8(this.bb_pos + offset) : FirmwareBootType.Normal;
+}
+
 static startOtaUpdateConfig(builder:flatbuffers.Builder) {
-  builder.startObject(8);
+  builder.startObject(9);
 }
 
 static addIsEnabled(builder:flatbuffers.Builder, isEnabled:boolean) {
@@ -127,12 +136,16 @@ static addRequireManualApproval(builder:flatbuffers.Builder, requireManualApprov
   builder.addFieldInt8(7, +requireManualApproval, +false);
 }
 
+static addBootType(builder:flatbuffers.Builder, bootType:FirmwareBootType) {
+  builder.addFieldInt8(8, bootType, FirmwareBootType.Normal);
+}
+
 static endOtaUpdateConfig(builder:flatbuffers.Builder):flatbuffers.Offset {
   const offset = builder.endObject();
   return offset;
 }
 
-static createOtaUpdateConfig(builder:flatbuffers.Builder, isEnabled:boolean, cdnDomainOffset:flatbuffers.Offset, updateChannel:OtaUpdateChannel, checkOnStartup:boolean, checkPeriodically:boolean, checkInterval:number, allowBackendManagement:boolean, requireManualApproval:boolean):flatbuffers.Offset {
+static createOtaUpdateConfig(builder:flatbuffers.Builder, isEnabled:boolean, cdnDomainOffset:flatbuffers.Offset, updateChannel:OtaUpdateChannel, checkOnStartup:boolean, checkPeriodically:boolean, checkInterval:number, allowBackendManagement:boolean, requireManualApproval:boolean, bootType:FirmwareBootType):flatbuffers.Offset {
   OtaUpdateConfig.startOtaUpdateConfig(builder);
   OtaUpdateConfig.addIsEnabled(builder, isEnabled);
   OtaUpdateConfig.addCdnDomain(builder, cdnDomainOffset);
@@ -142,6 +155,7 @@ static createOtaUpdateConfig(builder:flatbuffers.Builder, isEnabled:boolean, cdn
   OtaUpdateConfig.addCheckInterval(builder, checkInterval);
   OtaUpdateConfig.addAllowBackendManagement(builder, allowBackendManagement);
   OtaUpdateConfig.addRequireManualApproval(builder, requireManualApproval);
+  OtaUpdateConfig.addBootType(builder, bootType);
   return OtaUpdateConfig.endOtaUpdateConfig(builder);
 }
 }

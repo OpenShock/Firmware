@@ -2,6 +2,7 @@
 
 /* eslint-disable @typescript-eslint/no-unused-vars, @typescript-eslint/no-explicit-any, @typescript-eslint/no-non-null-assertion */
 
+import { BootStatus } from '../../../open-shock/serialization/gateway/boot-status';
 import { KeepAlive } from '../../../open-shock/serialization/gateway/keep-alive';
 import { OtaInstallFailed } from '../../../open-shock/serialization/gateway/ota-install-failed';
 import { OtaInstallProgress } from '../../../open-shock/serialization/gateway/ota-install-progress';
@@ -11,18 +12,20 @@ import { OtaInstallStarted } from '../../../open-shock/serialization/gateway/ota
 export enum DeviceToGatewayMessagePayload {
   NONE = 0,
   KeepAlive = 1,
-  OtaInstallStarted = 2,
-  OtaInstallProgress = 3,
-  OtaInstallFailed = 4
+  BootStatus = 2,
+  OtaInstallStarted = 3,
+  OtaInstallProgress = 4,
+  OtaInstallFailed = 5
 }
 
 export function unionToDeviceToGatewayMessagePayload(
   type: DeviceToGatewayMessagePayload,
-  accessor: (obj:KeepAlive|OtaInstallFailed|OtaInstallProgress|OtaInstallStarted) => KeepAlive|OtaInstallFailed|OtaInstallProgress|OtaInstallStarted|null
-): KeepAlive|OtaInstallFailed|OtaInstallProgress|OtaInstallStarted|null {
+  accessor: (obj:BootStatus|KeepAlive|OtaInstallFailed|OtaInstallProgress|OtaInstallStarted) => BootStatus|KeepAlive|OtaInstallFailed|OtaInstallProgress|OtaInstallStarted|null
+): BootStatus|KeepAlive|OtaInstallFailed|OtaInstallProgress|OtaInstallStarted|null {
   switch(DeviceToGatewayMessagePayload[type]) {
     case 'NONE': return null; 
     case 'KeepAlive': return accessor(new KeepAlive())! as KeepAlive;
+    case 'BootStatus': return accessor(new BootStatus())! as BootStatus;
     case 'OtaInstallStarted': return accessor(new OtaInstallStarted())! as OtaInstallStarted;
     case 'OtaInstallProgress': return accessor(new OtaInstallProgress())! as OtaInstallProgress;
     case 'OtaInstallFailed': return accessor(new OtaInstallFailed())! as OtaInstallFailed;
@@ -32,12 +35,13 @@ export function unionToDeviceToGatewayMessagePayload(
 
 export function unionListToDeviceToGatewayMessagePayload(
   type: DeviceToGatewayMessagePayload, 
-  accessor: (index: number, obj:KeepAlive|OtaInstallFailed|OtaInstallProgress|OtaInstallStarted) => KeepAlive|OtaInstallFailed|OtaInstallProgress|OtaInstallStarted|null, 
+  accessor: (index: number, obj:BootStatus|KeepAlive|OtaInstallFailed|OtaInstallProgress|OtaInstallStarted) => BootStatus|KeepAlive|OtaInstallFailed|OtaInstallProgress|OtaInstallStarted|null, 
   index: number
-): KeepAlive|OtaInstallFailed|OtaInstallProgress|OtaInstallStarted|null {
+): BootStatus|KeepAlive|OtaInstallFailed|OtaInstallProgress|OtaInstallStarted|null {
   switch(DeviceToGatewayMessagePayload[type]) {
     case 'NONE': return null; 
     case 'KeepAlive': return accessor(index, new KeepAlive())! as KeepAlive;
+    case 'BootStatus': return accessor(index, new BootStatus())! as BootStatus;
     case 'OtaInstallStarted': return accessor(index, new OtaInstallStarted())! as OtaInstallStarted;
     case 'OtaInstallProgress': return accessor(index, new OtaInstallProgress())! as OtaInstallProgress;
     case 'OtaInstallFailed': return accessor(index, new OtaInstallFailed())! as OtaInstallFailed;

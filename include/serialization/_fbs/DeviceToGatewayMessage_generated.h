@@ -13,6 +13,7 @@ static_assert(FLATBUFFERS_VERSION_MAJOR == 23 &&
               FLATBUFFERS_VERSION_REVISION == 26,
              "Non-compatible flatbuffers version included");
 
+#include "FirmwareBootType_generated.h"
 #include "SemVer_generated.h"
 
 namespace OpenShock {
@@ -20,6 +21,9 @@ namespace Serialization {
 namespace Gateway {
 
 struct KeepAlive;
+
+struct BootStatus;
+struct BootStatusBuilder;
 
 struct OtaInstallStarted;
 struct OtaInstallStartedBuilder;
@@ -81,17 +85,19 @@ inline const char *EnumNameOtaInstallProgressTask(OtaInstallProgressTask e) {
 enum class DeviceToGatewayMessagePayload : uint8_t {
   NONE = 0,
   KeepAlive = 1,
-  OtaInstallStarted = 2,
-  OtaInstallProgress = 3,
-  OtaInstallFailed = 4,
+  BootStatus = 2,
+  OtaInstallStarted = 3,
+  OtaInstallProgress = 4,
+  OtaInstallFailed = 5,
   MIN = NONE,
   MAX = OtaInstallFailed
 };
 
-inline const DeviceToGatewayMessagePayload (&EnumValuesDeviceToGatewayMessagePayload())[5] {
+inline const DeviceToGatewayMessagePayload (&EnumValuesDeviceToGatewayMessagePayload())[6] {
   static const DeviceToGatewayMessagePayload values[] = {
     DeviceToGatewayMessagePayload::NONE,
     DeviceToGatewayMessagePayload::KeepAlive,
+    DeviceToGatewayMessagePayload::BootStatus,
     DeviceToGatewayMessagePayload::OtaInstallStarted,
     DeviceToGatewayMessagePayload::OtaInstallProgress,
     DeviceToGatewayMessagePayload::OtaInstallFailed
@@ -100,9 +106,10 @@ inline const DeviceToGatewayMessagePayload (&EnumValuesDeviceToGatewayMessagePay
 }
 
 inline const char * const *EnumNamesDeviceToGatewayMessagePayload() {
-  static const char * const names[6] = {
+  static const char * const names[7] = {
     "NONE",
     "KeepAlive",
+    "BootStatus",
     "OtaInstallStarted",
     "OtaInstallProgress",
     "OtaInstallFailed",
@@ -123,6 +130,10 @@ template<typename T> struct DeviceToGatewayMessagePayloadTraits {
 
 template<> struct DeviceToGatewayMessagePayloadTraits<OpenShock::Serialization::Gateway::KeepAlive> {
   static const DeviceToGatewayMessagePayload enum_value = DeviceToGatewayMessagePayload::KeepAlive;
+};
+
+template<> struct DeviceToGatewayMessagePayloadTraits<OpenShock::Serialization::Gateway::BootStatus> {
+  static const DeviceToGatewayMessagePayload enum_value = DeviceToGatewayMessagePayload::BootStatus;
 };
 
 template<> struct DeviceToGatewayMessagePayloadTraits<OpenShock::Serialization::Gateway::OtaInstallStarted> {
@@ -163,6 +174,67 @@ FLATBUFFERS_STRUCT_END(KeepAlive, 8);
 
 struct KeepAlive::Traits {
   using type = KeepAlive;
+};
+
+struct BootStatus FLATBUFFERS_FINAL_CLASS : private ::flatbuffers::Table {
+  typedef BootStatusBuilder Builder;
+  struct Traits;
+  static FLATBUFFERS_CONSTEXPR_CPP11 const char *GetFullyQualifiedName() {
+    return "OpenShock.Serialization.Gateway.BootStatus";
+  }
+  enum FlatBuffersVTableOffset FLATBUFFERS_VTABLE_UNDERLYING_TYPE {
+    VT_BOOT_TYPE = 4,
+    VT_FIRMWARE_VERSION = 6
+  };
+  OpenShock::Serialization::Types::FirmwareBootType boot_type() const {
+    return static_cast<OpenShock::Serialization::Types::FirmwareBootType>(GetField<uint8_t>(VT_BOOT_TYPE, 0));
+  }
+  const OpenShock::Serialization::Types::SemVer *firmware_version() const {
+    return GetPointer<const OpenShock::Serialization::Types::SemVer *>(VT_FIRMWARE_VERSION);
+  }
+  bool Verify(::flatbuffers::Verifier &verifier) const {
+    return VerifyTableStart(verifier) &&
+           VerifyField<uint8_t>(verifier, VT_BOOT_TYPE, 1) &&
+           VerifyOffset(verifier, VT_FIRMWARE_VERSION) &&
+           verifier.VerifyTable(firmware_version()) &&
+           verifier.EndTable();
+  }
+};
+
+struct BootStatusBuilder {
+  typedef BootStatus Table;
+  ::flatbuffers::FlatBufferBuilder &fbb_;
+  ::flatbuffers::uoffset_t start_;
+  void add_boot_type(OpenShock::Serialization::Types::FirmwareBootType boot_type) {
+    fbb_.AddElement<uint8_t>(BootStatus::VT_BOOT_TYPE, static_cast<uint8_t>(boot_type), 0);
+  }
+  void add_firmware_version(::flatbuffers::Offset<OpenShock::Serialization::Types::SemVer> firmware_version) {
+    fbb_.AddOffset(BootStatus::VT_FIRMWARE_VERSION, firmware_version);
+  }
+  explicit BootStatusBuilder(::flatbuffers::FlatBufferBuilder &_fbb)
+        : fbb_(_fbb) {
+    start_ = fbb_.StartTable();
+  }
+  ::flatbuffers::Offset<BootStatus> Finish() {
+    const auto end = fbb_.EndTable(start_);
+    auto o = ::flatbuffers::Offset<BootStatus>(end);
+    return o;
+  }
+};
+
+inline ::flatbuffers::Offset<BootStatus> CreateBootStatus(
+    ::flatbuffers::FlatBufferBuilder &_fbb,
+    OpenShock::Serialization::Types::FirmwareBootType boot_type = OpenShock::Serialization::Types::FirmwareBootType::Normal,
+    ::flatbuffers::Offset<OpenShock::Serialization::Types::SemVer> firmware_version = 0) {
+  BootStatusBuilder builder_(_fbb);
+  builder_.add_firmware_version(firmware_version);
+  builder_.add_boot_type(boot_type);
+  return builder_.Finish();
+}
+
+struct BootStatus::Traits {
+  using type = BootStatus;
+  static auto constexpr Create = CreateBootStatus;
 };
 
 struct OtaInstallStarted FLATBUFFERS_FINAL_CLASS : private ::flatbuffers::Table {
@@ -368,6 +440,9 @@ struct DeviceToGatewayMessage FLATBUFFERS_FINAL_CLASS : private ::flatbuffers::T
   const OpenShock::Serialization::Gateway::KeepAlive *payload_as_KeepAlive() const {
     return payload_type() == OpenShock::Serialization::Gateway::DeviceToGatewayMessagePayload::KeepAlive ? static_cast<const OpenShock::Serialization::Gateway::KeepAlive *>(payload()) : nullptr;
   }
+  const OpenShock::Serialization::Gateway::BootStatus *payload_as_BootStatus() const {
+    return payload_type() == OpenShock::Serialization::Gateway::DeviceToGatewayMessagePayload::BootStatus ? static_cast<const OpenShock::Serialization::Gateway::BootStatus *>(payload()) : nullptr;
+  }
   const OpenShock::Serialization::Gateway::OtaInstallStarted *payload_as_OtaInstallStarted() const {
     return payload_type() == OpenShock::Serialization::Gateway::DeviceToGatewayMessagePayload::OtaInstallStarted ? static_cast<const OpenShock::Serialization::Gateway::OtaInstallStarted *>(payload()) : nullptr;
   }
@@ -388,6 +463,10 @@ struct DeviceToGatewayMessage FLATBUFFERS_FINAL_CLASS : private ::flatbuffers::T
 
 template<> inline const OpenShock::Serialization::Gateway::KeepAlive *DeviceToGatewayMessage::payload_as<OpenShock::Serialization::Gateway::KeepAlive>() const {
   return payload_as_KeepAlive();
+}
+
+template<> inline const OpenShock::Serialization::Gateway::BootStatus *DeviceToGatewayMessage::payload_as<OpenShock::Serialization::Gateway::BootStatus>() const {
+  return payload_as_BootStatus();
 }
 
 template<> inline const OpenShock::Serialization::Gateway::OtaInstallStarted *DeviceToGatewayMessage::payload_as<OpenShock::Serialization::Gateway::OtaInstallStarted>() const {
@@ -445,6 +524,10 @@ inline bool VerifyDeviceToGatewayMessagePayload(::flatbuffers::Verifier &verifie
     }
     case DeviceToGatewayMessagePayload::KeepAlive: {
       return verifier.VerifyField<OpenShock::Serialization::Gateway::KeepAlive>(static_cast<const uint8_t *>(obj), 0, 8);
+    }
+    case DeviceToGatewayMessagePayload::BootStatus: {
+      auto ptr = reinterpret_cast<const OpenShock::Serialization::Gateway::BootStatus *>(obj);
+      return verifier.VerifyTable(ptr);
     }
     case DeviceToGatewayMessagePayload::OtaInstallStarted: {
       auto ptr = reinterpret_cast<const OpenShock::Serialization::Gateway::OtaInstallStarted *>(obj);
