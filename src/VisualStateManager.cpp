@@ -116,7 +116,7 @@ constexpr PinPatternManager::State kSolidOffPattern[] = {
   {false, 100'000}
 };
 
-PinPatternManager s_builtInLedManager(OPENSHOCK_LED_GPIO);
+PinPatternManager s_builtInLedManager(static_cast<gpio_num_t>(OPENSHOCK_LED_GPIO));
 
 template <std::size_t N>
 inline void _updateVisualStateGPIO(const PinPatternManager::State (&override)[N]) {
@@ -315,7 +315,7 @@ void _handleWiFiScanDone(arduino_event_t* event) {
   }
 }
 
-void VisualStateManager::Init() {
+bool VisualStateManager::Init() {
   WiFi.onEvent(_handleWiFiConnected, ARDUINO_EVENT_WIFI_STA_GOT_IP);
   WiFi.onEvent(_handleWiFiConnected, ARDUINO_EVENT_WIFI_STA_GOT_IP6);
   WiFi.onEvent(_handleWiFiDisconnected, ARDUINO_EVENT_WIFI_STA_DISCONNECTED);
@@ -323,6 +323,8 @@ void VisualStateManager::Init() {
 
   // Run the update on init, otherwise no inital pattern is set.
   _updateVisualState();
+
+  return true;
 }
 
 void VisualStateManager::SetCriticalError() {

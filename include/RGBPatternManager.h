@@ -6,8 +6,8 @@
 
 #include <esp32-hal-rmt.h>
 
-#include <array>
 #include <cstdint>
+#include <vector>
 
 namespace OpenShock {
   class RGBPatternManager {
@@ -32,14 +32,12 @@ namespace OpenShock {
 
   private:
     void ClearPatternInternal();
-    void SendRGB(const RGBState& state);
     static void RunPattern(void* arg);
 
     std::uint8_t m_rgbPin;
-    std::uint8_t m_rgbBrightness;  // 0-255
+    std::uint8_t m_brightness;  // 0-255
+    std::vector<RGBState> m_pattern;
     rmt_obj_t* m_rmtHandle;
-    RGBState* m_pattern;
-    std::size_t m_patternLength;
     TaskHandle_t m_taskHandle;
     SemaphoreHandle_t m_taskMutex;
   };

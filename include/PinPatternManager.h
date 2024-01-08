@@ -1,16 +1,18 @@
 #pragma once
 
+#include <driver/gpio.h>
+
 #include <freertos/FreeRTOS.h>
 #include <freertos/semphr.h>
 #include <freertos/task.h>
 
-#include <array>
 #include <cstdint>
+#include <vector>
 
 namespace OpenShock {
   class PinPatternManager {
   public:
-    PinPatternManager(std::uint8_t gpioPin);
+    PinPatternManager(gpio_num_t gpioPin);
     ~PinPatternManager();
 
     struct State {
@@ -29,9 +31,8 @@ namespace OpenShock {
     void ClearPatternInternal();
     static void RunPattern(void* arg);
 
-    std::uint8_t m_gpioPin;
-    State* m_pattern;
-    std::size_t m_patternLength;
+    gpio_num_t m_gpioPin;
+    std::vector<State> m_pattern;
     TaskHandle_t m_taskHandle;
     SemaphoreHandle_t m_taskMutex;
   };

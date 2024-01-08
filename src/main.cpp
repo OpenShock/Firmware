@@ -26,7 +26,9 @@ void setup() {
 
   OpenShock::EventHandlers::Init();
 
-  OpenShock::VisualStateManager::Init();
+  if (!OpenShock::VisualStateManager::Init()) {
+    ESP_PANIC(TAG, "Unable to initialize VisualStateManager");
+  }
 
   OpenShock::EStopManager::Init(100);  // 100ms update interval
 
