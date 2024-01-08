@@ -1,5 +1,7 @@
 #pragma once
 
+#include "Common.h"
+
 #include <freertos/FreeRTOS.h>
 #include <freertos/semphr.h>
 #include <freertos/task.h>
@@ -11,6 +13,7 @@
 
 namespace OpenShock {
   class RGBPatternManager {
+    DISABLE_COPY(RGBPatternManager);
   public:
     RGBPatternManager(std::uint8_t gpioPin);
     ~RGBPatternManager();

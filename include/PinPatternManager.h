@@ -1,5 +1,7 @@
 #pragma once
 
+#include "Common.h"
+
 #include <freertos/FreeRTOS.h>
 #include <freertos/semphr.h>
 #include <freertos/task.h>
@@ -9,6 +11,7 @@
 
 namespace OpenShock {
   class PinPatternManager {
+    DISABLE_COPY(PinPatternManager);
   public:
     PinPatternManager(std::uint8_t gpioPin);
     ~PinPatternManager();

@@ -1,4 +1,4 @@
-#include "Constants.h"
+#include "Common.h"
 #include "Chipset.h"
 
 constexpr bool kIsValidRfTxPin = OpenShock::IsValidOutputPin(OPENSHOCK_RF_TX_GPIO) || OPENSHOCK_RF_TX_GPIO == UINT8_MAX;
