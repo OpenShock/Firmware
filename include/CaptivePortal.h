@@ -2,14 +2,15 @@
 
 #include "StringView.h"
 
+#include <freertos/portmacro.h>
+
 #include <cstdint>
 
 namespace OpenShock::CaptivePortal {
   void SetAlwaysEnabled(bool alwaysEnabled);
   bool IsAlwaysEnabled();
 
-  void SetForceClosed(bool forceClosed);
-  bool IsForceClosed();
+  bool ForceClose(std::uint32_t timeoutMs);
 
   bool IsRunning();
   void Update();

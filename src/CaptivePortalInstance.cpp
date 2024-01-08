@@ -6,6 +6,7 @@
 #include "Logging.h"
 #include "serialization/WSLocal.h"
 #include "util/HexUtils.h"
+#include "util/PartitionUtils.h"
 #include "util/TaskUtils.h"
 #include "wifi/WiFiManager.h"
 
@@ -39,38 +40,18 @@ const esp_partition_t* _getStaticPartition() {
   return nullptr;
 }
 
-bool _tryGetPartitionHash(char (&buffer)[65]) {
-  static bool initialized              = false;
-  static std::uint8_t staticSha256[32] = {0};
-
-  if (!initialized) {
-    initialized = true;
-
-    ESP_LOGD(TAG, "Looking for static partition");
-
-    // Get the static partition
-    const esp_partition_t* partition = _getStaticPartition();
-    if (partition == nullptr) {
-      ESP_LOGE(TAG, "Failed to find static partition");
-      return false;
-    }
-
-    ESP_LOGD(TAG, "Found static partition, getting hash...");
-
-    // Get the hash of the partition
-    esp_err_t err = esp_partition_get_sha256(partition, staticSha256);
-    if (err != ESP_OK) {
-      ESP_LOGE(TAG, "Failed to get partition hash: %s", esp_err_to_name(err));
-      return false;
-    }
-
-    ESP_LOGD(TAG, "Got partition hash");
+const char* _getPartitionHash() {
+  const esp_partition_t* partition = _getStaticPartition();
+  if (partition == nullptr) {
+    return nullptr;
   }
 
-  // Copy the hash to the output buffer
-  HexUtils::ToHex<32>(staticSha256, buffer, false);
+  static char hash[65];
+  if (!OpenShock::TryGetPartitionHash(partition, hash)) {
+    return nullptr;
+  }
 
-  return true;
+  return hash;
 }
 
 CaptivePortalInstance::CaptivePortalInstance()
@@ -87,10 +68,11 @@ CaptivePortalInstance::CaptivePortalInstance()
   ESP_LOGI(TAG, "Setting up DNS server");
   m_dnsServer.start(DNS_PORT, "*", WiFi.softAPIP());
 
-  // Get the hash of the filesystem
-  char fsHash[65];
   bool fsOk = true;
-  if (!_tryGetPartitionHash(fsHash)) {
+
+  // Get the hash of the filesystem
+  const char* fsHash = _getPartitionHash();
+  if (fsHash == nullptr) {
     ESP_LOGE(TAG, "Failed to get filesystem hash");
     fsOk = false;
   }

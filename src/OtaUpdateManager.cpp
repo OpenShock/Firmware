@@ -12,6 +12,8 @@
 #include "StringView.h"
 #include "Time.h"
 #include "util/HexUtils.h"
+#include "util/PartitionUtils.h"
+#include "util/StringUtils.h"
 #include "util/TaskUtils.h"
 #include "wifi/WiFiManager.h"
 
@@ -89,57 +91,6 @@ bool _tryGetRequestedVersion(OpenShock::SemVer& version) {
   return true;
 }
 
-bool _printfToString(std::string& out, const char* format, ...) {
-  constexpr std::size_t STACK_BUFFER_SIZE = 128;
-
-  char buffer[STACK_BUFFER_SIZE];
-  char* bufferPtr = buffer;
-
-  va_list args;
-
-  // Try format with stack buffer.
-  va_start(args, format);
-  int result = vsnprintf(buffer, STACK_BUFFER_SIZE, format, args);
-  va_end(args);
-
-  // If result is negative, something went wrong.
-  if (result < 0) {
-    ESP_LOGE(TAG, "Failed to format string");
-    return false;
-  }
-
-  if (result >= STACK_BUFFER_SIZE) {
-    // Account for null terminator.
-    result += 1;
-
-    // Allocate heap buffer.
-    bufferPtr = new char[result];
-
-    // Try format with heap buffer.
-    va_start(args, format);
-    result = vsnprintf(bufferPtr, result, format, args);
-    va_end(args);
-
-    // If we still fail, something is wrong.
-    // Free heap buffer and return false.
-    if (result < 0) {
-      delete[] bufferPtr;
-      ESP_LOGE(TAG, "Failed to format string");
-      return false;
-    }
-  }
-
-  // Set output string.
-  out = std::string(bufferPtr, result);
-
-  // Free heap buffer if we used it.
-  if (bufferPtr != buffer) {
-    delete[] bufferPtr;
-  }
-
-  return true;
-}
-
 void _otaEvGotIPHandler(arduino_event_t* event) {
   (void)event;
   xTaskNotify(_taskHandle, OTA_TASK_EVENT_WIFI_CONNECTED, eSetBits);
@@ -147,102 +98,6 @@ void _otaEvGotIPHandler(arduino_event_t* event) {
 void _otaEvWiFiDisconnectedHandler(arduino_event_t* event) {
   (void)event;
   xTaskNotify(_taskHandle, OTA_TASK_EVENT_WIFI_DISCONNECTED, eSetBits);
-}
-
-bool _tryForceCloseCaptivePortal(TickType_t timeout) {
-  OpenShock::CaptivePortal::SetForceClosed(true);
-  while (OpenShock::CaptivePortal::IsRunning() && timeout > 0) {
-    vTaskDelay(pdMS_TO_TICKS(std::min(timeout, 100U)));
-    OpenShock::CaptivePortal::SetForceClosed(true);
-  }
-
-  return !OpenShock::CaptivePortal::IsRunning();
-}
-
-bool _flashPartition(const esp_partition_t* partition, StringView remoteUrl, const std::uint8_t (&remoteHash)[32], std::function<bool(std::size_t, std::size_t, float)> progressCallback = nullptr) {
-  OpenShock::SHA256 sha256;
-  if (!sha256.begin()) {
-    ESP_LOGE(TAG, "Failed to initialize SHA256 hash");
-    return false;
-  }
-
-  std::size_t contentLength  = 0;
-  std::size_t contentWritten = 0;
-  std::int64_t lastProgress  = 0;
-
-  auto sizeValidator = [partition, &contentLength, progressCallback, &lastProgress](std::size_t size) -> bool {
-    if (size > partition->size) {
-      ESP_LOGE(TAG, "Remote partition binary is too large");
-      return false;
-    }
-
-    // Erase app partition.
-    if (esp_partition_erase_range(partition, 0, partition->size) != ESP_OK) {
-      ESP_LOGE(TAG, "Failed to erase partition in preparation for update");
-      return false;
-    }
-
-    contentLength = size;
-
-    lastProgress = OpenShock::millis();
-    progressCallback(0, contentLength, 0.0f);
-
-    return true;
-  };
-  auto dataWriter = [partition, &sha256, &contentLength, &contentWritten, progressCallback, &lastProgress](std::size_t offset, const std::uint8_t* data, std::size_t length) -> bool {
-    if (esp_partition_write(partition, offset, data, length) != ESP_OK) {
-      ESP_LOGE(TAG, "Failed to write to partition");
-      return false;
-    }
-
-    if (!sha256.update(data, length)) {
-      ESP_LOGE(TAG, "Failed to update SHA256 hash");
-      return false;
-    }
-
-    contentWritten += length;
-
-    std::int64_t now = OpenShock::millis();
-    if (now - lastProgress >= 1000) {  // Once per second
-      lastProgress = now;
-      progressCallback(contentWritten, contentLength, static_cast<float>(contentWritten) / static_cast<float>(contentLength));
-    }
-
-    return true;
-  };
-
-  // Start streaming binary to app partition.
-  auto appBinaryResponse = OpenShock::HTTP::Download(
-    remoteUrl,
-    {
-      {"Accept", "application/octet-stream"}
-  },
-    sizeValidator,
-    dataWriter,
-    {200, 304},
-    180'000
-  );  // 3 minutes
-  if (appBinaryResponse.result != OpenShock::HTTP::RequestResult::Success) {
-    ESP_LOGE(TAG, "Failed to download remote partition binary: [%u]", appBinaryResponse.code);
-    return false;
-  }
-
-  progressCallback(contentLength, contentLength, 1.0f);
-  ESP_LOGD(TAG, "Wrote %u bytes to partition", appBinaryResponse.data);
-
-  std::array<std::uint8_t, 32> localHash;
-  if (!sha256.finish(localHash)) {
-    ESP_LOGE(TAG, "Failed to finish SHA256 hash");
-    return false;
-  }
-
-  // Compare hashes.
-  if (memcmp(localHash.data(), remoteHash, 32) != 0) {
-    ESP_LOGE(TAG, "App binary hash mismatch");
-    return false;
-  }
-
-  return true;
 }
 
 bool _sendProgressMessage(Serialization::Gateway::OtaInstallProgressTask  task, float progress) {
@@ -277,7 +132,7 @@ bool _flashAppPartition(const esp_partition_t* partition, StringView remoteUrl, 
     return true;
   };
 
-  if (!_flashPartition(partition, remoteUrl, remoteHash, onProgress)) {
+  if (!OpenShock::FlashPartitionFromUrl(partition, remoteUrl, remoteHash, onProgress)) {
     ESP_LOGE(TAG, "Failed to flash app partition");
     _sendFailureMessage("Failed to flash app partition");
     return false;
@@ -302,8 +157,8 @@ bool _flashFilesystemPartition(const esp_partition_t* parition, StringView remot
     return false;
   }
 
-  // Make sure captive portal is stopped.
-  if (!_tryForceCloseCaptivePortal(5000U)) {  // 5 seconds
+  // Make sure captive portal is stopped, timeout after 5 seconds.
+  if (!CaptivePortal::ForceClose(5000U)) {
     ESP_LOGE(TAG, "Failed to force close captive portal (timed out)");
     _sendFailureMessage("Failed to force close captive portal (timed out)");
     return false;
@@ -323,7 +178,7 @@ bool _flashFilesystemPartition(const esp_partition_t* parition, StringView remot
     return true;
   };
 
-  if (!_flashPartition(parition, remoteUrl, remoteHash, onProgress)) {
+  if (!OpenShock::FlashPartitionFromUrl(parition, remoteUrl, remoteHash, onProgress)) {
     ESP_LOGE(TAG, "Failed to flash filesystem partition");
     _sendFailureMessage("Failed to flash filesystem partition");
     return false;
@@ -342,7 +197,7 @@ bool _flashFilesystemPartition(const esp_partition_t* parition, StringView remot
   }
   test.end();
 
-  OpenShock::CaptivePortal::SetForceClosed(false);
+  OpenShock::CaptivePortal::ForceClose(false);
 
   return true;
 }
@@ -619,7 +474,7 @@ bool OtaUpdateManager::TryGetFirmwareVersion(OtaUpdateChannel channel, OpenShock
 
 bool OtaUpdateManager::TryGetFirmwareBoards(const OpenShock::SemVer& version, std::vector<std::string>& boards) {
   std::string channelIndexUrl;
-  if (!_printfToString(channelIndexUrl, OPENSHOCK_FW_CDN_BOARDS_INDEX_URL_FORMAT, version.toString().c_str())) {  // TODO: This is abusing the SemVer::toString() method causing alot of string copies, fix this
+  if (!FormatToString(channelIndexUrl, OPENSHOCK_FW_CDN_BOARDS_INDEX_URL_FORMAT, version.toString().c_str())) {  // TODO: This is abusing the SemVer::toString() method causing alot of string copies, fix this
     ESP_LOGE(TAG, "Failed to format URL");
     return false;
   }
@@ -646,19 +501,19 @@ bool _tryParseIntoHash(const std::string& hash, std::uint8_t (&hashBytes)[32]) {
 bool OtaUpdateManager::TryGetFirmwareRelease(const OpenShock::SemVer& version, FirmwareRelease& release) {
   auto versionStr = version.toString();  // TODO: This is abusing the SemVer::toString() method causing alot of string copies, fix this
 
-  if (!_printfToString(release.appBinaryUrl, OPENSHOCK_FW_CDN_APP_URL_FORMAT, versionStr.c_str())) {
+  if (!FormatToString(release.appBinaryUrl, OPENSHOCK_FW_CDN_APP_URL_FORMAT, versionStr.c_str())) {
     ESP_LOGE(TAG, "Failed to format URL");
     return false;
   }
 
-  if (!_printfToString(release.filesystemBinaryUrl, OPENSHOCK_FW_CDN_FILESYSTEM_URL_FORMAT, versionStr.c_str())) {
+  if (!FormatToString(release.filesystemBinaryUrl, OPENSHOCK_FW_CDN_FILESYSTEM_URL_FORMAT, versionStr.c_str())) {
     ESP_LOGE(TAG, "Failed to format URL");
     return false;
   }
 
   // Construct hash URLs.
   std::string sha256HashesUrl;
-  if (!_printfToString(sha256HashesUrl, OPENSHOCK_FW_CDN_SHA256_HASHES_URL_FORMAT, versionStr.c_str())) {
+  if (!FormatToString(sha256HashesUrl, OPENSHOCK_FW_CDN_SHA256_HASHES_URL_FORMAT, versionStr.c_str())) {
     ESP_LOGE(TAG, "Failed to format URL");
     return false;
   }

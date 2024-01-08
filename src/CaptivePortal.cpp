@@ -5,6 +5,7 @@
 #include "config/Config.h"
 #include "GatewayConnectionManager.h"
 #include "Logging.h"
+#include "Time.h"
 
 #include <ESPAsyncWebServer.h>
 #include <WebSocketsServer.h>
@@ -93,17 +94,28 @@ bool CaptivePortal::IsAlwaysEnabled() {
   return s_alwaysEnabled;
 }
 
-void CaptivePortal::SetForceClosed(bool forceClosed) {
-  s_forceClosed = forceClosed;
-}
+bool CaptivePortal::ForceClose(std::uint32_t timeoutMs) {
+  s_forceClosed = true;
 
-bool CaptivePortal::IsForceClosed() {
-  return s_forceClosed;
+  if (s_instance == nullptr) return true;
+
+  while (timeoutMs > 0) {
+    std::uint32_t delay = std::min(timeoutMs, 10U);
+
+    vTaskDelay(pdMS_TO_TICKS(delay));
+
+    timeoutMs -= delay;
+
+    if (s_instance == nullptr) return true;
+  }
+
+  return false;
 }
 
 bool CaptivePortal::IsRunning() {
   return s_instance != nullptr;
 }
+
 void CaptivePortal::Update() {
   bool gatewayConnected = GatewayConnectionManager::IsConnected();
   bool commandHandlerOk = CommandHandler::Ok();
