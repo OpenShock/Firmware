@@ -8,6 +8,11 @@ const char* const TAG = "PinPatternManager";
 using namespace OpenShock;
 
 PinPatternManager::PinPatternManager(gpio_num_t gpioPin) : m_gpioPin(GPIO_NUM_NC), m_pattern(), m_taskHandle(nullptr), m_taskMutex(xSemaphoreCreateMutex()) {
+  if (gpioPin == GPIO_NUM_NC) {
+    ESP_LOGE(TAG, "Pin is not set");
+    return;
+  }
+
   if (!IsValidOutputPin(gpioPin)) {
     ESP_LOGE(TAG, "Pin %d is not a valid output pin", gpioPin);
     return;

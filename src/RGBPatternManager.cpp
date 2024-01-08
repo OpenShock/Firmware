@@ -14,24 +14,29 @@ using namespace OpenShock;
 // TODO: Support multiple LEDs ?
 // TODO: Support other LED types ?
 
-RGBPatternManager::RGBPatternManager(std::uint8_t rgbPin) : m_rgbPin(255), m_brightness(255), m_pattern(), m_rmtHandle(nullptr), m_taskHandle(nullptr), m_taskMutex(xSemaphoreCreateMutex()) {
-  if (!OpenShock::IsValidOutputPin(rgbPin)) {
-    ESP_LOGE(TAG, "Pin %d is not a valid output pin", rgbPin);
+RGBPatternManager::RGBPatternManager(gpio_num_t gpioPin) : m_gpioPin(GPIO_NUM_NC), m_brightness(255), m_pattern(), m_rmtHandle(nullptr), m_taskHandle(nullptr), m_taskMutex(xSemaphoreCreateMutex()) {
+  if (gpioPin == GPIO_NUM_NC) {
+    ESP_LOGE(TAG, "Pin is not set");
     return;
   }
 
-  m_rmtHandle = rmtInit(rgbPin, RMT_TX_MODE, RMT_MEM_64);
+  if (!OpenShock::IsValidOutputPin(gpioPin)) {
+    ESP_LOGE(TAG, "Pin %d is not a valid output pin", gpioPin);
+    return;
+  }
+
+  m_rmtHandle = rmtInit(gpioPin, RMT_TX_MODE, RMT_MEM_64);
   if (m_rmtHandle == NULL) {
-    ESP_LOGE(TAG, "Failed to initialize RMT for pin %d", rgbPin);
+    ESP_LOGE(TAG, "Failed to initialize RMT for pin %d", gpioPin);
     return;
   }
 
   float realTick = rmtSetTick(m_rmtHandle, 100.F);
-  ESP_LOGD(TAG, "RMT tick is %f ns for pin %d", realTick, rgbPin);
+  ESP_LOGD(TAG, "RMT tick is %f ns for pin %d", realTick, gpioPin);
 
   SetBrightness(20);
 
-  m_rgbPin = rgbPin;
+  m_gpioPin = gpioPin;
 }
 
 RGBPatternManager::~RGBPatternManager() {
@@ -50,7 +55,7 @@ void RGBPatternManager::SetPattern(const RGBState* pattern, std::size_t patternL
   // Start the task
   BaseType_t result = TaskUtils::TaskCreateExpensive(RunPattern, TAG, 4096, this, 1, &m_taskHandle);
   if (result != pdPASS) {
-    ESP_LOGE(TAG, "[pin-%u] Failed to create task: %d", m_rgbPin, result);
+    ESP_LOGE(TAG, "[pin-%u] Failed to create task: %d", m_gpioPin, result);
 
     m_taskHandle = nullptr;
     m_pattern.clear();

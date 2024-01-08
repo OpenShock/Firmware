@@ -1,5 +1,7 @@
 #pragma once
 
+#include <hal/gpio_types.h>
+
 #include <freertos/FreeRTOS.h>
 #include <freertos/semphr.h>
 #include <freertos/task.h>
@@ -12,8 +14,11 @@
 namespace OpenShock {
   class RGBPatternManager {
   public:
-    RGBPatternManager(std::uint8_t gpioPin);
+    RGBPatternManager() = delete;
+    RGBPatternManager(gpio_num_t gpioPin);
     ~RGBPatternManager();
+
+    bool IsValid() const { return m_gpioPin != GPIO_NUM_NC; }
 
     struct RGBState {
       std::uint8_t red;
@@ -29,12 +34,11 @@ namespace OpenShock {
     }
     void SetBrightness(std::uint8_t brightness);
     void ClearPattern();
-
   private:
     void ClearPatternInternal();
     static void RunPattern(void* arg);
 
-    std::uint8_t m_rgbPin;
+    gpio_num_t m_gpioPin;
     std::uint8_t m_brightness;  // 0-255
     std::vector<RGBState> m_pattern;
     rmt_obj_t* m_rmtHandle;

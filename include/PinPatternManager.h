@@ -12,13 +12,16 @@
 namespace OpenShock {
   class PinPatternManager {
   public:
-    PinPatternManager(gpio_num_t gpioPin);
-    ~PinPatternManager();
-
     struct State {
       bool level;
       std::uint32_t duration;
     };
+
+    PinPatternManager() = delete;
+    PinPatternManager(gpio_num_t gpioPin);
+    ~PinPatternManager();
+
+    bool IsValid() const { return m_gpioPin != GPIO_NUM_NC; }
 
     void SetPattern(const State* pattern, std::size_t patternLength);
     template <std::size_t N>
