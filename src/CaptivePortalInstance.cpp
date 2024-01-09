@@ -6,12 +6,12 @@
 #include "Logging.h"
 #include "serialization/WSLocal.h"
 #include "util/HexUtils.h"
+#include "util/PartitionUtils.h"
 #include "util/TaskUtils.h"
 #include "wifi/WiFiManager.h"
 
 #include "serialization/_fbs/DeviceToLocalMessage_generated.h"
 
-#include <LittleFS.h>
 #include <WiFi.h>
 
 static const char* TAG = "CaptivePortalInstance";
@@ -40,44 +40,25 @@ const esp_partition_t* _getStaticPartition() {
   return nullptr;
 }
 
-bool _tryGetPartitionHash(char (&buffer)[65]) {
-  static bool initialized              = false;
-  static std::uint8_t staticSha256[32] = {0};
-
-  if (!initialized) {
-    initialized = true;
-
-    ESP_LOGD(TAG, "Looking for static partition");
-
-    // Get the static partition
-    const esp_partition_t* partition = _getStaticPartition();
-    if (partition == nullptr) {
-      ESP_LOGE(TAG, "Failed to find static partition");
-      return false;
-    }
-
-    ESP_LOGD(TAG, "Found static partition, getting hash...");
-
-    // Get the hash of the partition
-    esp_err_t err = esp_partition_get_sha256(partition, staticSha256);
-    if (err != ESP_OK) {
-      ESP_LOGE(TAG, "Failed to get partition hash: %s", esp_err_to_name(err));
-      return false;
-    }
-
-    ESP_LOGD(TAG, "Got partition hash");
+const char* _getPartitionHash() {
+  const esp_partition_t* partition = _getStaticPartition();
+  if (partition == nullptr) {
+    return nullptr;
   }
 
-  // Copy the hash to the output buffer
-  HexUtils::ToHex<32>(staticSha256, buffer, false);
+  static char hash[65];
+  if (!OpenShock::TryGetPartitionHash(partition, hash)) {
+    return nullptr;
+  }
 
-  return true;
+  return hash;
 }
 
 CaptivePortalInstance::CaptivePortalInstance()
   : m_webServer(HTTP_PORT)
   , m_socketServer(WEBSOCKET_PORT, "/ws", "json")
   , m_socketDeFragger(std::bind(&CaptivePortalInstance::handleWebSocketEvent, this, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3, std::placeholders::_4))
+  , m_fileSystem()
   , m_dnsServer()
   , m_taskHandle(nullptr) {
   m_socketServer.onEvent(std::bind(&WebSocketDeFragger::handler, &m_socketDeFragger, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3, std::placeholders::_4));
@@ -87,14 +68,25 @@ CaptivePortalInstance::CaptivePortalInstance()
   ESP_LOGI(TAG, "Setting up DNS server");
   m_dnsServer.start(DNS_PORT, "*", WiFi.softAPIP());
 
-  // Check if the www folder exists and is populated
-  bool indexExists = LittleFS.exists("/www/index.html.gz");
+  bool fsOk = true;
 
   // Get the hash of the filesystem
-  char fsHash[65];
-  bool gotFsHash = _tryGetPartitionHash(fsHash);
+  const char* fsHash = _getPartitionHash();
+  if (fsHash == nullptr) {
+    ESP_LOGE(TAG, "Failed to get filesystem hash");
+    fsOk = false;
+  }
 
-  bool fsOk = indexExists && gotFsHash;
+  if (fsOk) {
+    // Mounting LittleFS
+    if (!m_fileSystem.begin(false, "/static", 10U, "static0")) {
+      ESP_LOGE(TAG, "Failed to mount LittleFS");
+      fsOk = false;
+    } else {
+      fsOk = m_fileSystem.exists("/www/index.html.gz");
+    }
+  }
+
   if (fsOk) {
     ESP_LOGI(TAG, "Serving files from LittleFS");
     ESP_LOGI(TAG, "Filesystem hash: %s", fsHash);
@@ -103,7 +95,7 @@ CaptivePortalInstance::CaptivePortalInstance()
     snprintf(softAPURL, sizeof(softAPURL), "http://%s", WiFi.softAPIP().toString().c_str());
 
     // Serving the captive portal files from LittleFS
-    m_webServer.serveStatic("/", LittleFS, "/www/", "max-age=3600").setDefaultFile("index.html").setSharedEtag(fsHash);
+    m_webServer.serveStatic("/", m_fileSystem, "/www/", "max-age=3600").setDefaultFile("index.html").setSharedEtag(fsHash);
 
     // Redirecting connection tests to the captive portal, triggering the "login to network" prompt
     m_webServer.onNotFound([softAPURL](AsyncWebServerRequest* request) { request->redirect(softAPURL); });
@@ -142,6 +134,7 @@ CaptivePortalInstance::~CaptivePortalInstance() {
   }
   m_webServer.end();
   m_socketServer.close();
+  m_fileSystem.end();
   m_dnsServer.stop();
 }
 
@@ -150,7 +143,7 @@ void CaptivePortalInstance::task(void* arg) {
 
   while (true) {
     instance->m_socketServer.loop();
-    instance->m_dnsServer.processNextRequest();
+    // instance->m_dnsServer.processNextRequest();
     vTaskDelay(pdMS_TO_TICKS(WEBSOCKET_UPDATE_INTERVAL));
   }
 }

@@ -9,7 +9,7 @@ const { subscribe, update } = writable<DeviceState>({
   wifiNetworks: new Map<string, WiFiNetwork>(),
   wifiNetworkGroups: new Map<string, WiFiNetworkGroup>(),
   accountLinked: false,
-  rfTxPin: null,
+  config: null,
 });
 
 function insertSorted<T>(array: T[], value: T, compare: (a: T, b: T) => number) {
@@ -26,7 +26,7 @@ function insertSorted<T>(array: T[], value: T, compare: (a: T, b: T) => number) 
   array.splice(low, 0, value);
 }
 
-function SsidMapReducer(groups: Map<string, WiFiNetworkGroup>, [_, value]: [string, WiFiNetwork]): Map<string, WiFiNetworkGroup> {
+function SsidMapReducer(groups: Map<string, WiFiNetworkGroup>, [, value]: [string, WiFiNetwork]): Map<string, WiFiNetworkGroup> {
   const key = `${value.ssid || value.bssid}_${WifiAuthMode[value.security]}`;
 
   // Get the group for this SSID, or create a new one
@@ -103,7 +103,9 @@ export const DeviceStateStore = {
   },
   setRfTxPin(pin: number) {
     update((store) => {
-      store.rfTxPin = pin;
+      if (store.config) {
+        store.config.rf.txPin = pin;
+      }
       return store;
     });
   },

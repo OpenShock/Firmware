@@ -71,6 +71,10 @@ bool Config::Internal::Utils::FromJsonU16(std::uint16_t& val, const cJSON* json,
   return _utilFromJsonInt(val, json, name, defaultVal, 0, UINT16_MAX);
 }
 
+bool Config::Internal::Utils::FromJsonI32(std::int32_t& val, const cJSON* json, const char* name, std::int32_t defaultVal) {
+  return _utilFromJsonInt(val, json, name, defaultVal, INT32_MIN, INT32_MAX);
+}
+
 bool Config::Internal::Utils::FromJsonStr(std::string& str, const cJSON* json, const char* name, const char* defaultStr) {
   const cJSON* jsonVal = cJSON_GetObjectItemCaseSensitive(json, name);
   if (jsonVal == nullptr) {

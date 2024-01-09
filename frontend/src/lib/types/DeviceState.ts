@@ -1,4 +1,5 @@
 import type { WifiScanStatus } from '$lib/_fbs/open-shock/serialization/types/wifi-scan-status';
+import type { Config } from '$lib/mappers/ConfigMapper';
 import type { WiFiNetwork, WiFiNetworkGroup } from './';
 
 export type DeviceState = {
@@ -7,5 +8,5 @@ export type DeviceState = {
   wifiNetworks: Map<string, WiFiNetwork>;
   wifiNetworkGroups: Map<string, WiFiNetworkGroup>;
   accountLinked: boolean;
-  rfTxPin: number | null;
+  config: Config | null;
 };

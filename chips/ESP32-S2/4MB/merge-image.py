@@ -4,7 +4,7 @@ import esptool
 
 # fmt: off
 esptool.main([
-    '--chip', 'esp32s2',
+    '--chip', 'esp32',
     'merge_bin', '-o', 'merged.bin',
     '--flash_size', '4MB',
     '0x1000', './bootloader.bin',
