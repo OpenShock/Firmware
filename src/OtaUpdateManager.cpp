@@ -1,8 +1,8 @@
 #include "OtaUpdateManager.h"
 
 #include "CaptivePortal.h"
+#include "Common.h"
 #include "config/Config.h"
-#include "Constants.h"
 #include "GatewayConnectionManager.h"
 #include "Hashing.h"
 #include "http/HTTPRequestManager.h"
