@@ -25,26 +25,35 @@ static getSizePrefixedRootAsOtaInstallProgress(bb:flatbuffers.ByteBuffer, obj?:O
   return (obj || new OtaInstallProgress()).__init(bb.readInt32(bb.position()) + bb.position(), bb);
 }
 
-task():OtaInstallProgressTask {
+updateId():number {
   const offset = this.bb!.__offset(this.bb_pos, 4);
+  return offset ? this.bb!.readInt32(this.bb_pos + offset) : 0;
+}
+
+task():OtaInstallProgressTask {
+  const offset = this.bb!.__offset(this.bb_pos, 6);
   return offset ? this.bb!.readInt8(this.bb_pos + offset) : OtaInstallProgressTask.FetchingMetadata;
 }
 
 progress():number {
-  const offset = this.bb!.__offset(this.bb_pos, 6);
+  const offset = this.bb!.__offset(this.bb_pos, 8);
   return offset ? this.bb!.readFloat32(this.bb_pos + offset) : 0.0;
 }
 
 static startOtaInstallProgress(builder:flatbuffers.Builder) {
-  builder.startObject(2);
+  builder.startObject(3);
+}
+
+static addUpdateId(builder:flatbuffers.Builder, updateId:number) {
+  builder.addFieldInt32(0, updateId, 0);
 }
 
 static addTask(builder:flatbuffers.Builder, task:OtaInstallProgressTask) {
-  builder.addFieldInt8(0, task, OtaInstallProgressTask.FetchingMetadata);
+  builder.addFieldInt8(1, task, OtaInstallProgressTask.FetchingMetadata);
 }
 
 static addProgress(builder:flatbuffers.Builder, progress:number) {
-  builder.addFieldFloat32(1, progress, 0.0);
+  builder.addFieldFloat32(2, progress, 0.0);
 }
 
 static endOtaInstallProgress(builder:flatbuffers.Builder):flatbuffers.Offset {
@@ -52,8 +61,9 @@ static endOtaInstallProgress(builder:flatbuffers.Builder):flatbuffers.Offset {
   return offset;
 }
 
-static createOtaInstallProgress(builder:flatbuffers.Builder, task:OtaInstallProgressTask, progress:number):flatbuffers.Offset {
+static createOtaInstallProgress(builder:flatbuffers.Builder, updateId:number, task:OtaInstallProgressTask, progress:number):flatbuffers.Offset {
   OtaInstallProgress.startOtaInstallProgress(builder);
+  OtaInstallProgress.addUpdateId(builder, updateId);
   OtaInstallProgress.addTask(builder, task);
   OtaInstallProgress.addProgress(builder, progress);
   return OtaInstallProgress.endOtaInstallProgress(builder);

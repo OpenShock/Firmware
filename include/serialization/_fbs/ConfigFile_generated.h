@@ -513,7 +513,8 @@ struct OtaUpdateConfig FLATBUFFERS_FINAL_CLASS : private ::flatbuffers::Table {
     VT_CHECK_INTERVAL = 14,
     VT_ALLOW_BACKEND_MANAGEMENT = 16,
     VT_REQUIRE_MANUAL_APPROVAL = 18,
-    VT_BOOT_TYPE = 20
+    VT_UPDATE_ID = 20,
+    VT_BOOT_TYPE = 22
   };
   /// Indicates whether OTA updates are enabled.
   bool is_enabled() const {
@@ -547,6 +548,10 @@ struct OtaUpdateConfig FLATBUFFERS_FINAL_CLASS : private ::flatbuffers::Table {
   bool require_manual_approval() const {
     return GetField<uint8_t>(VT_REQUIRE_MANUAL_APPROVAL, 0) != 0;
   }
+  /// Update process ID, used to track the update process server-side across reboots.
+  int32_t update_id() const {
+    return GetField<int32_t>(VT_UPDATE_ID, 0);
+  }
   /// Indicates what kind of firmware boot is happening (normal boot, booting into new firmware, rolling back to old firmware, etc.)
   OpenShock::Serialization::Types::FirmwareBootType boot_type() const {
     return static_cast<OpenShock::Serialization::Types::FirmwareBootType>(GetField<uint8_t>(VT_BOOT_TYPE, 0));
@@ -562,6 +567,7 @@ struct OtaUpdateConfig FLATBUFFERS_FINAL_CLASS : private ::flatbuffers::Table {
            VerifyField<uint16_t>(verifier, VT_CHECK_INTERVAL, 2) &&
            VerifyField<uint8_t>(verifier, VT_ALLOW_BACKEND_MANAGEMENT, 1) &&
            VerifyField<uint8_t>(verifier, VT_REQUIRE_MANUAL_APPROVAL, 1) &&
+           VerifyField<int32_t>(verifier, VT_UPDATE_ID, 4) &&
            VerifyField<uint8_t>(verifier, VT_BOOT_TYPE, 1) &&
            verifier.EndTable();
   }
@@ -595,6 +601,9 @@ struct OtaUpdateConfigBuilder {
   void add_require_manual_approval(bool require_manual_approval) {
     fbb_.AddElement<uint8_t>(OtaUpdateConfig::VT_REQUIRE_MANUAL_APPROVAL, static_cast<uint8_t>(require_manual_approval), 0);
   }
+  void add_update_id(int32_t update_id) {
+    fbb_.AddElement<int32_t>(OtaUpdateConfig::VT_UPDATE_ID, update_id, 0);
+  }
   void add_boot_type(OpenShock::Serialization::Types::FirmwareBootType boot_type) {
     fbb_.AddElement<uint8_t>(OtaUpdateConfig::VT_BOOT_TYPE, static_cast<uint8_t>(boot_type), 0);
   }
@@ -619,8 +628,10 @@ inline ::flatbuffers::Offset<OtaUpdateConfig> CreateOtaUpdateConfig(
     uint16_t check_interval = 0,
     bool allow_backend_management = false,
     bool require_manual_approval = false,
+    int32_t update_id = 0,
     OpenShock::Serialization::Types::FirmwareBootType boot_type = OpenShock::Serialization::Types::FirmwareBootType::Normal) {
   OtaUpdateConfigBuilder builder_(_fbb);
+  builder_.add_update_id(update_id);
   builder_.add_cdn_domain(cdn_domain);
   builder_.add_check_interval(check_interval);
   builder_.add_boot_type(boot_type);
@@ -648,6 +659,7 @@ inline ::flatbuffers::Offset<OtaUpdateConfig> CreateOtaUpdateConfigDirect(
     uint16_t check_interval = 0,
     bool allow_backend_management = false,
     bool require_manual_approval = false,
+    int32_t update_id = 0,
     OpenShock::Serialization::Types::FirmwareBootType boot_type = OpenShock::Serialization::Types::FirmwareBootType::Normal) {
   auto cdn_domain__ = cdn_domain ? _fbb.CreateString(cdn_domain) : 0;
   return OpenShock::Serialization::Configuration::CreateOtaUpdateConfig(
@@ -660,6 +672,7 @@ inline ::flatbuffers::Offset<OtaUpdateConfig> CreateOtaUpdateConfigDirect(
       check_interval,
       allow_backend_management,
       require_manual_approval,
+      update_id,
       boot_type);
 }
 

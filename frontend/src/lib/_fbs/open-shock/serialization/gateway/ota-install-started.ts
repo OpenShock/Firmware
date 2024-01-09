@@ -25,17 +25,26 @@ static getSizePrefixedRootAsOtaInstallStarted(bb:flatbuffers.ByteBuffer, obj?:Ot
   return (obj || new OtaInstallStarted()).__init(bb.readInt32(bb.position()) + bb.position(), bb);
 }
 
-version(obj?:SemVer):SemVer|null {
+updateId():number {
   const offset = this.bb!.__offset(this.bb_pos, 4);
+  return offset ? this.bb!.readInt32(this.bb_pos + offset) : 0;
+}
+
+version(obj?:SemVer):SemVer|null {
+  const offset = this.bb!.__offset(this.bb_pos, 6);
   return offset ? (obj || new SemVer()).__init(this.bb!.__indirect(this.bb_pos + offset), this.bb!) : null;
 }
 
 static startOtaInstallStarted(builder:flatbuffers.Builder) {
-  builder.startObject(1);
+  builder.startObject(2);
+}
+
+static addUpdateId(builder:flatbuffers.Builder, updateId:number) {
+  builder.addFieldInt32(0, updateId, 0);
 }
 
 static addVersion(builder:flatbuffers.Builder, versionOffset:flatbuffers.Offset) {
-  builder.addFieldOffset(0, versionOffset, 0);
+  builder.addFieldOffset(1, versionOffset, 0);
 }
 
 static endOtaInstallStarted(builder:flatbuffers.Builder):flatbuffers.Offset {
@@ -43,9 +52,4 @@ static endOtaInstallStarted(builder:flatbuffers.Builder):flatbuffers.Offset {
   return offset;
 }
 
-static createOtaInstallStarted(builder:flatbuffers.Builder, versionOffset:flatbuffers.Offset):flatbuffers.Offset {
-  OtaInstallStarted.startOtaInstallStarted(builder);
-  OtaInstallStarted.addVersion(builder, versionOffset);
-  return OtaInstallStarted.endOtaInstallStarted(builder);
-}
 }

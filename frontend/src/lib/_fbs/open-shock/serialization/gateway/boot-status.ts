@@ -36,8 +36,13 @@ firmwareVersion(obj?:SemVer):SemVer|null {
   return offset ? (obj || new SemVer()).__init(this.bb!.__indirect(this.bb_pos + offset), this.bb!) : null;
 }
 
+otaUpdateId():number {
+  const offset = this.bb!.__offset(this.bb_pos, 8);
+  return offset ? this.bb!.readInt32(this.bb_pos + offset) : 0;
+}
+
 static startBootStatus(builder:flatbuffers.Builder) {
-  builder.startObject(2);
+  builder.startObject(3);
 }
 
 static addBootType(builder:flatbuffers.Builder, bootType:FirmwareBootType) {
@@ -46,6 +51,10 @@ static addBootType(builder:flatbuffers.Builder, bootType:FirmwareBootType) {
 
 static addFirmwareVersion(builder:flatbuffers.Builder, firmwareVersionOffset:flatbuffers.Offset) {
   builder.addFieldOffset(1, firmwareVersionOffset, 0);
+}
+
+static addOtaUpdateId(builder:flatbuffers.Builder, otaUpdateId:number) {
+  builder.addFieldInt32(2, otaUpdateId, 0);
 }
 
 static endBootStatus(builder:flatbuffers.Builder):flatbuffers.Offset {

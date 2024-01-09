@@ -111,6 +111,12 @@ void GatewayClient::_sendBootStatus() {
 
   ESP_LOGV(TAG, "Sending Gateway boot status message");
 
+  std::int32_t updateId;
+  if (!Config::GetOtaUpdateId(updateId)) {
+    ESP_LOGE(TAG, "Failed to get OTA update ID");
+    return;
+  }
+
   OpenShock::FirmwareBootType bootType;
   if (!Config::GetOtaFirmwareBootType(bootType)) {
     ESP_LOGE(TAG, "Failed to get OTA firmware boot type");
@@ -123,7 +129,7 @@ void GatewayClient::_sendBootStatus() {
     return;
   }
 
-  s_bootStatusSent = Serialization::Gateway::SerializeBootStatusMessage(bootType, version, [this](const std::uint8_t* data, std::size_t len) { return m_webSocket.sendBIN(data, len); });
+  s_bootStatusSent = Serialization::Gateway::SerializeBootStatusMessage(updateId, bootType, version, [this](const std::uint8_t* data, std::size_t len) { return m_webSocket.sendBIN(data, len); });
 }
 
 void GatewayClient::_handleEvent(WStype_t type, std::uint8_t* payload, std::size_t length) {

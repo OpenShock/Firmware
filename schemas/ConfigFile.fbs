@@ -83,6 +83,9 @@ table OtaUpdateConfig {
   /// Indicates if manual approval via serial input or captive portal is required before installing updates.
   require_manual_approval:bool;
 
+  /// Update process ID, used to track the update process server-side across reboots.
+  update_id:int32;
+
   /// Indicates what kind of firmware boot is happening (normal boot, booting into new firmware, rolling back to old firmware, etc.)
   boot_type:Types.FirmwareBootType;
 }

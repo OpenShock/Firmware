@@ -9,7 +9,18 @@
 namespace OpenShock::Config {
   struct OtaUpdateConfig : public ConfigBase<Serialization::Configuration::OtaUpdateConfig> {
     OtaUpdateConfig();
-    OtaUpdateConfig(bool isEnabled, std::string cdnDomain, OtaUpdateChannel updateChannel, bool checkOnStartup, bool checkPeriodically, std::uint16_t checkInterval, bool allowBackendManagement, bool requireManualApproval, FirmwareBootType bootType);
+    OtaUpdateConfig(
+      bool isEnabled,
+      std::string cdnDomain,
+      OtaUpdateChannel updateChannel,
+      bool checkOnStartup,
+      bool checkPeriodically,
+      std::uint16_t checkInterval,
+      bool allowBackendManagement,
+      bool requireManualApproval,
+      std::int32_t updateId,
+      FirmwareBootType bootType
+    );
 
     bool isEnabled;
     std::string cdnDomain;
@@ -19,6 +30,7 @@ namespace OpenShock::Config {
     std::uint16_t checkInterval;
     bool allowBackendManagement;
     bool requireManualApproval;
+    std::int32_t updateId;
     FirmwareBootType bootType;
 
     void ToDefault() override;

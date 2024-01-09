@@ -100,8 +100,14 @@ void _otaEvWiFiDisconnectedHandler(arduino_event_t* event) {
   xTaskNotify(_taskHandle, OTA_TASK_EVENT_WIFI_DISCONNECTED, eSetBits);
 }
 
-bool _sendProgressMessage(Serialization::Gateway::OtaInstallProgressTask  task, float progress) {
-  if (!Serialization::Gateway::SerializeOtaInstallProgressMessage(task, progress, GatewayConnectionManager::SendMessageBIN)) {
+bool _sendProgressMessage(Serialization::Gateway::OtaInstallProgressTask task, float progress) {
+  std::int32_t updateId;
+  if (!Config::GetOtaUpdateId(updateId)) {
+    ESP_LOGE(TAG, "Failed to get OTA update ID");
+    return false;
+  }
+
+  if (!Serialization::Gateway::SerializeOtaInstallProgressMessage(updateId, task, progress, GatewayConnectionManager::SendMessageBIN)) {
     ESP_LOGE(TAG, "Failed to send OTA install progress message");
     return false;
   }
@@ -109,7 +115,13 @@ bool _sendProgressMessage(Serialization::Gateway::OtaInstallProgressTask  task, 
   return true;
 }
 bool _sendFailureMessage(StringView message, bool fatal = false) {
-  if (!Serialization::Gateway::SerializeOtaInstallFailedMessage(message, fatal, GatewayConnectionManager::SendMessageBIN)) {
+  std::int32_t updateId;
+  if (!Config::GetOtaUpdateId(updateId)) {
+    ESP_LOGE(TAG, "Failed to get OTA update ID");
+    return false;
+  }
+
+  if (!Serialization::Gateway::SerializeOtaInstallFailedMessage(updateId, message, fatal, GatewayConnectionManager::SendMessageBIN)) {
     ESP_LOGE(TAG, "Failed to send OTA install failed message");
     return false;
   }
@@ -297,7 +309,14 @@ void _otaUpdateTask(void* arg) {
       continue;
     }
 
-    if (!Serialization::Gateway::SerializeOtaInstallStartedMessage(version, GatewayConnectionManager::SendMessageBIN)) {
+    // Generate random int32_t for this update.
+    std::int32_t updateId = static_cast<std::int32_t>(esp_random());
+    if (!Config::SetOtaUpdateId(updateId)) {
+      ESP_LOGE(TAG, "Failed to set OTA update ID");
+      continue;
+    }
+
+    if (!Serialization::Gateway::SerializeOtaInstallStartedMessage(updateId, version, GatewayConnectionManager::SendMessageBIN)) {
       ESP_LOGE(TAG, "Failed to serialize OTA install started message");
       continue;
     }
@@ -595,7 +614,7 @@ bool OtaUpdateManager::IsValidatingApp() {
 void OtaUpdateManager::InvalidateAndRollback() {
   // Set OTA boot type in config.
   if (!Config::SetOtaFirmwareBootType(OpenShock::FirmwareBootType::Rollback)) {
-    ESP_PANIC(TAG, "Failed to set OTA firmware boot type in critical section"); // TODO: THIS IS A CRITICAL SECTION, WHAT DO WE DO?
+    ESP_PANIC(TAG, "Failed to set OTA firmware boot type in critical section");  // TODO: THIS IS A CRITICAL SECTION, WHAT DO WE DO?
     return;
   }
 
@@ -622,7 +641,7 @@ void OtaUpdateManager::InvalidateAndRollback() {
 void OtaUpdateManager::ValidateApp() {
   if (esp_ota_mark_app_valid_cancel_rollback() != ESP_OK) {
     // Set OTA boot type in config.
-    if (!Config::SetOtaFirmwareBootType(OpenShock::FirmwareBootType::Rollback)) { // TODO: Check if we are in new firmware, if so set to rollback, else set to normal
+    if (!Config::SetOtaFirmwareBootType(OpenShock::FirmwareBootType::Rollback)) {  // TODO: Check if we are in new firmware, if so set to rollback, else set to normal
       ESP_LOGE(TAG, "Failed to set OTA firmware boot type");
     }
 
@@ -631,6 +650,6 @@ void OtaUpdateManager::ValidateApp() {
 
   // Set OTA boot type in config.
   if (!Config::SetOtaFirmwareBootType(OpenShock::FirmwareBootType::Normal)) {
-    ESP_PANIC(TAG, "Failed to set OTA firmware boot type in critical section"); // TODO: THIS IS A CRITICAL SECTION, WHAT DO WE DO?
+    ESP_PANIC(TAG, "Failed to set OTA firmware boot type in critical section");  // TODO: THIS IS A CRITICAL SECTION, WHAT DO WE DO?
   }
 }

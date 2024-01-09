@@ -11,7 +11,18 @@ OtaUpdateConfig::OtaUpdateConfig() {
   ToDefault();
 }
 
-OtaUpdateConfig::OtaUpdateConfig(bool isEnabled, std::string cdnDomain, OtaUpdateChannel updateChannel, bool checkOnStartup, bool checkPeriodically, std::uint16_t checkInterval, bool allowBackendManagement, bool requireManualApproval, FirmwareBootType bootType) {
+OtaUpdateConfig::OtaUpdateConfig(
+  bool isEnabled,
+  std::string cdnDomain,
+  OtaUpdateChannel updateChannel,
+  bool checkOnStartup,
+  bool checkPeriodically,
+  std::uint16_t checkInterval,
+  bool allowBackendManagement,
+  bool requireManualApproval,
+  std::int32_t updateId,
+  FirmwareBootType bootType
+) {
   this->isEnabled              = isEnabled;
   this->cdnDomain              = cdnDomain;
   this->updateChannel          = updateChannel;
@@ -20,6 +31,7 @@ OtaUpdateConfig::OtaUpdateConfig(bool isEnabled, std::string cdnDomain, OtaUpdat
   this->checkInterval          = checkInterval;
   this->allowBackendManagement = allowBackendManagement;
   this->requireManualApproval  = requireManualApproval;
+  this->updateId               = updateId;
   this->bootType               = bootType;
 }
 
@@ -32,6 +44,7 @@ void OtaUpdateConfig::ToDefault() {
   checkInterval          = 30;  // 30 minutes
   allowBackendManagement = true;
   requireManualApproval  = false;
+  updateId               = 0;
   bootType               = FirmwareBootType::Normal;
 }
 
@@ -49,6 +62,7 @@ bool OtaUpdateConfig::FromFlatbuffers(const Serialization::Configuration::OtaUpd
   checkInterval          = config->check_interval();
   allowBackendManagement = config->allow_backend_management();
   requireManualApproval  = config->require_manual_approval();
+  updateId               = config->update_id();
   bootType               = config->boot_type();
 
   return true;
@@ -77,6 +91,7 @@ bool OtaUpdateConfig::FromJSON(const cJSON* json) {
   Internal::Utils::FromJsonU16(checkInterval, json, "checkInterval", 0);
   Internal::Utils::FromJsonBool(allowBackendManagement, json, "allowBackendManagement", true);
   Internal::Utils::FromJsonBool(requireManualApproval, json, "requireManualApproval", false);
+  Internal::Utils::FromJsonI32(updateId, json, "updateId", 0);
   Internal::Utils::FromJsonStrParsed(bootType, json, "bootType", OpenShock::TryParseFirmwareBootType, OpenShock::FirmwareBootType::Normal);
 
   return true;
@@ -93,6 +108,7 @@ cJSON* OtaUpdateConfig::ToJSON(bool withSensitiveData) const {
   cJSON_AddNumberToObject(root, "checkInterval", checkInterval);
   cJSON_AddBoolToObject(root, "allowBackendManagement", allowBackendManagement);
   cJSON_AddBoolToObject(root, "requireManualApproval", requireManualApproval);
+  cJSON_AddNumberToObject(root, "updateId", updateId);
   cJSON_AddStringToObject(root, "bootType", OpenShock::Serialization::Types::EnumNameFirmwareBootType(bootType));
 
   return root;

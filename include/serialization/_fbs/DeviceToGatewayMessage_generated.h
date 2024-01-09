@@ -184,7 +184,8 @@ struct BootStatus FLATBUFFERS_FINAL_CLASS : private ::flatbuffers::Table {
   }
   enum FlatBuffersVTableOffset FLATBUFFERS_VTABLE_UNDERLYING_TYPE {
     VT_BOOT_TYPE = 4,
-    VT_FIRMWARE_VERSION = 6
+    VT_FIRMWARE_VERSION = 6,
+    VT_OTA_UPDATE_ID = 8
   };
   OpenShock::Serialization::Types::FirmwareBootType boot_type() const {
     return static_cast<OpenShock::Serialization::Types::FirmwareBootType>(GetField<uint8_t>(VT_BOOT_TYPE, 0));
@@ -192,11 +193,15 @@ struct BootStatus FLATBUFFERS_FINAL_CLASS : private ::flatbuffers::Table {
   const OpenShock::Serialization::Types::SemVer *firmware_version() const {
     return GetPointer<const OpenShock::Serialization::Types::SemVer *>(VT_FIRMWARE_VERSION);
   }
+  int32_t ota_update_id() const {
+    return GetField<int32_t>(VT_OTA_UPDATE_ID, 0);
+  }
   bool Verify(::flatbuffers::Verifier &verifier) const {
     return VerifyTableStart(verifier) &&
            VerifyField<uint8_t>(verifier, VT_BOOT_TYPE, 1) &&
            VerifyOffset(verifier, VT_FIRMWARE_VERSION) &&
            verifier.VerifyTable(firmware_version()) &&
+           VerifyField<int32_t>(verifier, VT_OTA_UPDATE_ID, 4) &&
            verifier.EndTable();
   }
 };
@@ -210,6 +215,9 @@ struct BootStatusBuilder {
   }
   void add_firmware_version(::flatbuffers::Offset<OpenShock::Serialization::Types::SemVer> firmware_version) {
     fbb_.AddOffset(BootStatus::VT_FIRMWARE_VERSION, firmware_version);
+  }
+  void add_ota_update_id(int32_t ota_update_id) {
+    fbb_.AddElement<int32_t>(BootStatus::VT_OTA_UPDATE_ID, ota_update_id, 0);
   }
   explicit BootStatusBuilder(::flatbuffers::FlatBufferBuilder &_fbb)
         : fbb_(_fbb) {
@@ -225,8 +233,10 @@ struct BootStatusBuilder {
 inline ::flatbuffers::Offset<BootStatus> CreateBootStatus(
     ::flatbuffers::FlatBufferBuilder &_fbb,
     OpenShock::Serialization::Types::FirmwareBootType boot_type = OpenShock::Serialization::Types::FirmwareBootType::Normal,
-    ::flatbuffers::Offset<OpenShock::Serialization::Types::SemVer> firmware_version = 0) {
+    ::flatbuffers::Offset<OpenShock::Serialization::Types::SemVer> firmware_version = 0,
+    int32_t ota_update_id = 0) {
   BootStatusBuilder builder_(_fbb);
+  builder_.add_ota_update_id(ota_update_id);
   builder_.add_firmware_version(firmware_version);
   builder_.add_boot_type(boot_type);
   return builder_.Finish();
@@ -244,13 +254,18 @@ struct OtaInstallStarted FLATBUFFERS_FINAL_CLASS : private ::flatbuffers::Table 
     return "OpenShock.Serialization.Gateway.OtaInstallStarted";
   }
   enum FlatBuffersVTableOffset FLATBUFFERS_VTABLE_UNDERLYING_TYPE {
-    VT_VERSION = 4
+    VT_UPDATE_ID = 4,
+    VT_VERSION = 6
   };
+  int32_t update_id() const {
+    return GetField<int32_t>(VT_UPDATE_ID, 0);
+  }
   const OpenShock::Serialization::Types::SemVer *version() const {
     return GetPointer<const OpenShock::Serialization::Types::SemVer *>(VT_VERSION);
   }
   bool Verify(::flatbuffers::Verifier &verifier) const {
     return VerifyTableStart(verifier) &&
+           VerifyField<int32_t>(verifier, VT_UPDATE_ID, 4) &&
            VerifyOffset(verifier, VT_VERSION) &&
            verifier.VerifyTable(version()) &&
            verifier.EndTable();
@@ -261,6 +276,9 @@ struct OtaInstallStartedBuilder {
   typedef OtaInstallStarted Table;
   ::flatbuffers::FlatBufferBuilder &fbb_;
   ::flatbuffers::uoffset_t start_;
+  void add_update_id(int32_t update_id) {
+    fbb_.AddElement<int32_t>(OtaInstallStarted::VT_UPDATE_ID, update_id, 0);
+  }
   void add_version(::flatbuffers::Offset<OpenShock::Serialization::Types::SemVer> version) {
     fbb_.AddOffset(OtaInstallStarted::VT_VERSION, version);
   }
@@ -277,9 +295,11 @@ struct OtaInstallStartedBuilder {
 
 inline ::flatbuffers::Offset<OtaInstallStarted> CreateOtaInstallStarted(
     ::flatbuffers::FlatBufferBuilder &_fbb,
+    int32_t update_id = 0,
     ::flatbuffers::Offset<OpenShock::Serialization::Types::SemVer> version = 0) {
   OtaInstallStartedBuilder builder_(_fbb);
   builder_.add_version(version);
+  builder_.add_update_id(update_id);
   return builder_.Finish();
 }
 
@@ -295,9 +315,13 @@ struct OtaInstallProgress FLATBUFFERS_FINAL_CLASS : private ::flatbuffers::Table
     return "OpenShock.Serialization.Gateway.OtaInstallProgress";
   }
   enum FlatBuffersVTableOffset FLATBUFFERS_VTABLE_UNDERLYING_TYPE {
-    VT_TASK = 4,
-    VT_PROGRESS = 6
+    VT_UPDATE_ID = 4,
+    VT_TASK = 6,
+    VT_PROGRESS = 8
   };
+  int32_t update_id() const {
+    return GetField<int32_t>(VT_UPDATE_ID, 0);
+  }
   OpenShock::Serialization::Gateway::OtaInstallProgressTask task() const {
     return static_cast<OpenShock::Serialization::Gateway::OtaInstallProgressTask>(GetField<int8_t>(VT_TASK, 0));
   }
@@ -306,6 +330,7 @@ struct OtaInstallProgress FLATBUFFERS_FINAL_CLASS : private ::flatbuffers::Table
   }
   bool Verify(::flatbuffers::Verifier &verifier) const {
     return VerifyTableStart(verifier) &&
+           VerifyField<int32_t>(verifier, VT_UPDATE_ID, 4) &&
            VerifyField<int8_t>(verifier, VT_TASK, 1) &&
            VerifyField<float>(verifier, VT_PROGRESS, 4) &&
            verifier.EndTable();
@@ -316,6 +341,9 @@ struct OtaInstallProgressBuilder {
   typedef OtaInstallProgress Table;
   ::flatbuffers::FlatBufferBuilder &fbb_;
   ::flatbuffers::uoffset_t start_;
+  void add_update_id(int32_t update_id) {
+    fbb_.AddElement<int32_t>(OtaInstallProgress::VT_UPDATE_ID, update_id, 0);
+  }
   void add_task(OpenShock::Serialization::Gateway::OtaInstallProgressTask task) {
     fbb_.AddElement<int8_t>(OtaInstallProgress::VT_TASK, static_cast<int8_t>(task), 0);
   }
@@ -335,10 +363,12 @@ struct OtaInstallProgressBuilder {
 
 inline ::flatbuffers::Offset<OtaInstallProgress> CreateOtaInstallProgress(
     ::flatbuffers::FlatBufferBuilder &_fbb,
+    int32_t update_id = 0,
     OpenShock::Serialization::Gateway::OtaInstallProgressTask task = OpenShock::Serialization::Gateway::OtaInstallProgressTask::FetchingMetadata,
     float progress = 0.0f) {
   OtaInstallProgressBuilder builder_(_fbb);
   builder_.add_progress(progress);
+  builder_.add_update_id(update_id);
   builder_.add_task(task);
   return builder_.Finish();
 }
@@ -355,9 +385,13 @@ struct OtaInstallFailed FLATBUFFERS_FINAL_CLASS : private ::flatbuffers::Table {
     return "OpenShock.Serialization.Gateway.OtaInstallFailed";
   }
   enum FlatBuffersVTableOffset FLATBUFFERS_VTABLE_UNDERLYING_TYPE {
-    VT_MESSAGE = 4,
-    VT_FATAL = 6
+    VT_UPDATE_ID = 4,
+    VT_MESSAGE = 6,
+    VT_FATAL = 8
   };
+  int32_t update_id() const {
+    return GetField<int32_t>(VT_UPDATE_ID, 0);
+  }
   const ::flatbuffers::String *message() const {
     return GetPointer<const ::flatbuffers::String *>(VT_MESSAGE);
   }
@@ -366,6 +400,7 @@ struct OtaInstallFailed FLATBUFFERS_FINAL_CLASS : private ::flatbuffers::Table {
   }
   bool Verify(::flatbuffers::Verifier &verifier) const {
     return VerifyTableStart(verifier) &&
+           VerifyField<int32_t>(verifier, VT_UPDATE_ID, 4) &&
            VerifyOffset(verifier, VT_MESSAGE) &&
            verifier.VerifyString(message()) &&
            VerifyField<uint8_t>(verifier, VT_FATAL, 1) &&
@@ -377,6 +412,9 @@ struct OtaInstallFailedBuilder {
   typedef OtaInstallFailed Table;
   ::flatbuffers::FlatBufferBuilder &fbb_;
   ::flatbuffers::uoffset_t start_;
+  void add_update_id(int32_t update_id) {
+    fbb_.AddElement<int32_t>(OtaInstallFailed::VT_UPDATE_ID, update_id, 0);
+  }
   void add_message(::flatbuffers::Offset<::flatbuffers::String> message) {
     fbb_.AddOffset(OtaInstallFailed::VT_MESSAGE, message);
   }
@@ -396,10 +434,12 @@ struct OtaInstallFailedBuilder {
 
 inline ::flatbuffers::Offset<OtaInstallFailed> CreateOtaInstallFailed(
     ::flatbuffers::FlatBufferBuilder &_fbb,
+    int32_t update_id = 0,
     ::flatbuffers::Offset<::flatbuffers::String> message = 0,
     bool fatal = false) {
   OtaInstallFailedBuilder builder_(_fbb);
   builder_.add_message(message);
+  builder_.add_update_id(update_id);
   builder_.add_fatal(fatal);
   return builder_.Finish();
 }
@@ -411,11 +451,13 @@ struct OtaInstallFailed::Traits {
 
 inline ::flatbuffers::Offset<OtaInstallFailed> CreateOtaInstallFailedDirect(
     ::flatbuffers::FlatBufferBuilder &_fbb,
+    int32_t update_id = 0,
     const char *message = nullptr,
     bool fatal = false) {
   auto message__ = message ? _fbb.CreateString(message) : 0;
   return OpenShock::Serialization::Gateway::CreateOtaInstallFailed(
       _fbb,
+      update_id,
       message__,
       fatal);
 }

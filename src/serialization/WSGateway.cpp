@@ -29,7 +29,7 @@ bool Gateway::SerializeKeepAliveMessage(Common::SerializationCallbackFn callback
   return callback(span.data(), span.size());
 }
 
-bool Gateway::SerializeBootStatusMessage(OpenShock::FirmwareBootType bootType, const OpenShock::SemVer& version, Common::SerializationCallbackFn callback) {
+bool Gateway::SerializeBootStatusMessage(std::int32_t updateId, OpenShock::FirmwareBootType bootType, const OpenShock::SemVer& version, Common::SerializationCallbackFn callback) {
   flatbuffers::FlatBufferBuilder builder(256);  // TODO: Profile this and adjust the size accordingly
 
   auto fbsVersion = Types::CreateSemVerDirect(builder, version.major, version.minor, version.patch, version.prerelease.data(), version.build.data());
@@ -45,12 +45,12 @@ bool Gateway::SerializeBootStatusMessage(OpenShock::FirmwareBootType bootType, c
   return callback(span.data(), span.size());
 }
 
-bool Gateway::SerializeOtaInstallStartedMessage(const OpenShock::SemVer& semver, Common::SerializationCallbackFn callback) {
+bool Gateway::SerializeOtaInstallStartedMessage(std::int32_t updateId, const OpenShock::SemVer& version, Common::SerializationCallbackFn callback) {
   flatbuffers::FlatBufferBuilder builder(256);  // TODO: Profile this and adjust the size accordingly
 
-  auto semVerOffset = Types::CreateSemVerDirect(builder, semver.major, semver.minor, semver.patch, semver.prerelease.data(), semver.build.data());
+  auto versionOffset = Types::CreateSemVerDirect(builder, version.major, version.minor, version.patch, version.prerelease.data(), version.build.data());
 
-  auto otaInstallStartedOffset = Gateway::CreateOtaInstallStarted(builder, semVerOffset);
+  auto otaInstallStartedOffset = Gateway::CreateOtaInstallStarted(builder, updateId, versionOffset);
 
   auto msg = Gateway::CreateDeviceToGatewayMessage(builder, Gateway::DeviceToGatewayMessagePayload::OtaInstallStarted, otaInstallStartedOffset.Union());
 
@@ -61,10 +61,10 @@ bool Gateway::SerializeOtaInstallStartedMessage(const OpenShock::SemVer& semver,
   return callback(span.data(), span.size());
 }
 
-bool Gateway::SerializeOtaInstallProgressMessage(Gateway::OtaInstallProgressTask task, float progress, Common::SerializationCallbackFn callback) {
+bool Gateway::SerializeOtaInstallProgressMessage(std::int32_t updateId, Gateway::OtaInstallProgressTask task, float progress, Common::SerializationCallbackFn callback) {
   flatbuffers::FlatBufferBuilder builder(256);  // TODO: Profile this and adjust the size accordingly
 
-  auto otaInstallProgressOffset = Gateway::CreateOtaInstallProgress(builder, task, progress);
+  auto otaInstallProgressOffset = Gateway::CreateOtaInstallProgress(builder, updateId, task, progress);
 
   auto msg = Gateway::CreateDeviceToGatewayMessage(builder, Gateway::DeviceToGatewayMessagePayload::OtaInstallProgress, otaInstallProgressOffset.Union());
 
@@ -75,12 +75,12 @@ bool Gateway::SerializeOtaInstallProgressMessage(Gateway::OtaInstallProgressTask
   return callback(span.data(), span.size());
 }
 
-bool Gateway::SerializeOtaInstallFailedMessage(StringView message, bool fatal, Common::SerializationCallbackFn callback) {
+bool Gateway::SerializeOtaInstallFailedMessage(std::int32_t updateId, StringView message, bool fatal, Common::SerializationCallbackFn callback) {
   flatbuffers::FlatBufferBuilder builder(256);  // TODO: Profile this and adjust the size accordingly
 
   auto messageOffset = builder.CreateString(message.data(), message.size());
 
-  auto otaInstallFailedOffset = Gateway::CreateOtaInstallFailed(builder, messageOffset, fatal);
+  auto otaInstallFailedOffset = Gateway::CreateOtaInstallFailed(builder, updateId, messageOffset, fatal);
 
   auto msg = Gateway::CreateDeviceToGatewayMessage(builder, Gateway::DeviceToGatewayMessagePayload::OtaInstallFailed, otaInstallFailedOffset.Union());
 

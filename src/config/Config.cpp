@@ -579,6 +579,31 @@ bool Config::ClearWiFiCredentials() {
   return _trySaveConfig();
 }
 
+bool Config::GetOtaUpdateId(std::int32_t& out) {
+  ScopedReadLock lock(&_configMutex);
+  if (!lock.isLocked()) {
+    ESP_LOGE(TAG, "Failed to acquire read lock");
+  }
+
+  out = _configData.otaUpdate.updateId;
+
+  return true;
+}
+
+bool Config::SetOtaUpdateId(std::int32_t updateId) {
+  ScopedWriteLock lock(&_configMutex);
+  if (!lock.isLocked()) {
+    ESP_LOGE(TAG, "Failed to acquire write lock");
+  }
+
+  if (_configData.otaUpdate.updateId == updateId) {
+    return true;
+  }
+
+  _configData.otaUpdate.updateId = updateId;
+  return _trySaveConfig();
+}
+
 bool Config::GetOtaFirmwareBootType(FirmwareBootType& out) {
   ScopedReadLock lock(&_configMutex);
   if (!lock.isLocked()) {

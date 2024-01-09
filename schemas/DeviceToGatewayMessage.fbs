@@ -12,9 +12,11 @@ struct KeepAlive {
 table BootStatus {
   boot_type:Types.FirmwareBootType;
   firmware_version:Types.SemVer;
+  ota_update_id:int32;
 }
 
 table OtaInstallStarted {
+  update_id:int32;
   version:Types.SemVer;
 }
 
@@ -29,11 +31,13 @@ enum OtaInstallProgressTask:byte {
 }
 
 table OtaInstallProgress {
+  update_id:int32;
   task:OtaInstallProgressTask;
   progress:float;
 }
 
 table OtaInstallFailed {
+  update_id:int32;
   message:string;
   fatal:bool;
 }
