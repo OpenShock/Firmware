@@ -19,8 +19,8 @@ env:
   OPENSHOCK_FW_COMMIT: ${{ github.sha }}
 
 jobs:
-  get-targets:
-    uses: ./.github/workflows/get-targets.yml
+  get-vars:
+    uses: ./.github/workflows/get-vars.yml
 
   analyze-js-py:
     name: Analyze JS/PY
@@ -59,7 +59,7 @@ jobs:
   analyze-cpp:
     name: Analyze C/C++
     runs-on: 'ubuntu-latest'
-    needs: [get-targets]
+    needs: [get-vars]
     timeout-minutes: 360
     permissions:
       actions: read
@@ -72,7 +72,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        board: ${{ fromJson(needs.get-targets.outputs.board-array) }}
+        board: ${{ fromJson(needs.get-vars.outputs.board-array) }}
 
     steps:
       - name: Checkout repository
