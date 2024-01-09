@@ -120,6 +120,22 @@ void GatewayConnectionManager::UnLink() {
   Config::ClearBackendAuthToken();
 }
 
+bool GatewayConnectionManager::SendMessageTXT(StringView data) {
+  if (s_wsClient == nullptr) {
+    return false;
+  }
+
+  return s_wsClient->sendMessageTXT(data);
+}
+
+bool GatewayConnectionManager::SendMessageBIN(const std::uint8_t* data, std::size_t length) {
+  if (s_wsClient == nullptr) {
+    return false;
+  }
+
+  return s_wsClient->sendMessageBIN(data, length);
+}
+
 bool FetchDeviceInfo(const String& authToken) {
   // TODO: this function is very slow, should be optimized!
   if ((s_flags & FLAG_HAS_IP) == 0) {

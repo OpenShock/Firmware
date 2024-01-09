@@ -272,6 +272,18 @@ bool Config::GetWiFiConfig(Config::WiFiConfig& out) {
   return true;
 }
 
+bool Config::GetOtaUpdateConfig(Config::OtaUpdateConfig& out) {
+  ScopedReadLock lock(&_configMutex);
+  if (!lock.isLocked()) {
+    ESP_LOGE(TAG, "Failed to acquire read lock");
+    return false;
+  }
+
+  out = _configData.otaUpdate;
+
+  return true;
+}
+
 bool Config::GetWiFiCredentials(cJSON* array, bool withSensitiveData) {
   ScopedReadLock lock(&_configMutex);
   if (!lock.isLocked()) {
@@ -564,6 +576,56 @@ bool Config::ClearWiFiCredentials() {
 
   _configData.wifi.credentialsList.clear();
 
+  return _trySaveConfig();
+}
+
+bool Config::GetOtaUpdateId(std::int32_t& out) {
+  ScopedReadLock lock(&_configMutex);
+  if (!lock.isLocked()) {
+    ESP_LOGE(TAG, "Failed to acquire read lock");
+  }
+
+  out = _configData.otaUpdate.updateId;
+
+  return true;
+}
+
+bool Config::SetOtaUpdateId(std::int32_t updateId) {
+  ScopedWriteLock lock(&_configMutex);
+  if (!lock.isLocked()) {
+    ESP_LOGE(TAG, "Failed to acquire write lock");
+  }
+
+  if (_configData.otaUpdate.updateId == updateId) {
+    return true;
+  }
+
+  _configData.otaUpdate.updateId = updateId;
+  return _trySaveConfig();
+}
+
+bool Config::GetOtaFirmwareBootType(FirmwareBootType& out) {
+  ScopedReadLock lock(&_configMutex);
+  if (!lock.isLocked()) {
+    ESP_LOGE(TAG, "Failed to acquire read lock");
+  }
+
+  out = _configData.otaUpdate.bootType;
+
+  return true;
+}
+
+bool Config::SetOtaFirmwareBootType(FirmwareBootType bootType) {
+  ScopedWriteLock lock(&_configMutex);
+  if (!lock.isLocked()) {
+    ESP_LOGE(TAG, "Failed to acquire write lock");
+  }
+
+  if (_configData.otaUpdate.bootType == bootType) {
+    return true;
+  }
+
+  _configData.otaUpdate.bootType = bootType;
   return _trySaveConfig();
 }
 

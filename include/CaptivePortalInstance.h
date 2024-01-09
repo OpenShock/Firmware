@@ -5,6 +5,7 @@
 
 #include <DNSServer.h>
 #include <ESPAsyncWebServer.h>
+#include <LittleFS.h>
 #include <WebSocketsServer.h>
 
 #include <freertos/FreeRTOS.h>
@@ -33,6 +34,7 @@ namespace OpenShock {
     AsyncWebServer m_webServer;
     WebSocketsServer m_socketServer;
     WebSocketDeFragger m_socketDeFragger;
+    fs::LittleFSFS m_fileSystem;
     DNSServer m_dnsServer;
     TaskHandle_t m_taskHandle;
   };
