@@ -1,6 +1,8 @@
 #pragma once
 
-#include <driver/gpio.h>
+#include "Common.h"
+
+#include <hal/gpio_types.h>
 
 #include <freertos/FreeRTOS.h>
 #include <freertos/semphr.h>
@@ -11,6 +13,8 @@
 
 namespace OpenShock {
   class PinPatternManager {
+    DISABLE_COPY(PinPatternManager);
+
   public:
     struct State {
       bool level;
@@ -24,7 +28,7 @@ namespace OpenShock {
     bool IsValid() const { return m_gpioPin != GPIO_NUM_NC; }
 
     void SetPattern(const State* pattern, std::size_t patternLength);
-    template <std::size_t N>
+    template<std::size_t N>
     inline void SetPattern(const State (&pattern)[N]) {
       SetPattern(pattern, N);
     }

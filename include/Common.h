@@ -2,6 +2,14 @@
 
 #include <cstdint>
 
+#define DISABLE_COPY(TypeName)             \
+  TypeName(const TypeName&) = delete;      \
+  void operator=(const TypeName&) = delete
+#define DISABLE_MOVE(TypeName)             \
+  TypeName(TypeName&&) = delete;           \
+  void operator=(TypeName&&) = delete
+
+
 #ifndef OPENSHOCK_API_DOMAIN
 #error "OPENSHOCK_API_DOMAIN must be defined"
 #endif

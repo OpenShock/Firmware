@@ -1,5 +1,7 @@
 #pragma once
 
+#include "Common.h"
+
 #include <hal/gpio_types.h>
 
 #include <freertos/FreeRTOS.h>
@@ -13,6 +15,8 @@
 
 namespace OpenShock {
   class RGBPatternManager {
+    DISABLE_COPY(RGBPatternManager);
+
   public:
     RGBPatternManager() = delete;
     RGBPatternManager(gpio_num_t gpioPin);
@@ -28,12 +32,13 @@ namespace OpenShock {
     };
 
     void SetPattern(const RGBState* pattern, std::size_t patternLength);
-    template <std::size_t N>
+    template<std::size_t N>
     inline void SetPattern(const RGBState (&pattern)[N]) {
       SetPattern(pattern, N);
     }
     void SetBrightness(std::uint8_t brightness);
     void ClearPattern();
+
   private:
     void ClearPatternInternal();
     static void RunPattern(void* arg);

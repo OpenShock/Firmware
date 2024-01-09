@@ -1,7 +1,7 @@
 #include "config/RFConfig.h"
 
 #include "config/internal/utils.h"
-#include "Constants.h"
+#include "Common.h"
 #include "Logging.h"
 
 const char* const TAG = "Config::RFConfig";
