@@ -11,8 +11,11 @@ on:
       version:
         description: 'The current version of the project, e.g.  1.0.0-rc.1+build.1'
         value: ${{ jobs.get-vars.outputs.version }}
+      release:
+        description: 'The release notes for the current version (changelog + contents of RELEASE.md)'
+        value: ${{ jobs.get-vars.outputs.release }}
       changelog:
-        description: 'Newline-separated list of changes since the last release'
+        description: 'The changelog for the current version'
         value: ${{ jobs.get-vars.outputs.changelog }}
       board-list:
         description: 'Newline-separated list of boards to build'
@@ -31,6 +34,7 @@ jobs:
     runs-on: ubuntu-latest
     outputs:
       version: ${{ steps.get-vars.outputs.version }}
+      release: ${{ steps.get-vars.outputs.release }}
       changelog: ${{ steps.get-vars.outputs.changelog }}
       board-list: ${{ steps.get-vars.outputs.board-list }}
       board-array: ${{ steps.get-vars.outputs.board-array }}

@@ -3,18 +3,16 @@ const ini = require('ini');
 const semver = require('semver');
 const core = require('@actions/core');
 
-if (!fs.existsSync('VERSION')) {
-  core.setFailed('File "VERSION" not found');
-  process.exit();
-}
-
-if (!fs.existsSync('CHANGELOG.md')) {
-  core.setFailed('File "CHANGELOG.md" not found');
-  process.exit();
+for (const file of ['VERSION', 'RELEASE.md', 'CHANGELOG.md', 'platformio.ini']) {
+  if (!fs.existsSync(file)) {
+    core.setFailed(`File "${file}" not found`);
+    process.exit();
+  }
 }
 
 // Read files "VERSION" and "CHANGELOG.md"
 let version = fs.readFileSync('VERSION', 'utf8').trim();
+let release = fs.readFileSync('RELEASE.md', 'utf8');
 let changelog = fs.readFileSync('CHANGELOG.md', 'utf8').trim();
 let platformioIniStr = fs.readFileSync('platformio.ini', 'utf8').trim();
 
@@ -57,6 +55,7 @@ let boards = Object.keys(platformioIni)
 
 // Set outputs
 core.setOutput('version', version);
+core.setOutput('release', changelog + '\n\n' + release);
 core.setOutput('changelog', changelog);
 core.setOutput('board-list', boards.join('\n'));
 core.setOutput('board-array', JSON.stringify(boards));
