@@ -20,6 +20,35 @@ struct WifiNetworkDisconnectCommand {
   placeholder:bool;
 }
 
+struct OtaUpdateSetIsEnabledCommand {
+  enabled:bool;
+}
+table OtaUpdateSetDomainCommand {
+  domain:string;
+}
+table OtaUpdateSetUpdateChannelCommand {
+  channel:string;
+}
+struct OtaUpdateSetCheckIntervalCommand {
+  interval:uint16;
+}
+struct OtaUpdateSetAllowBackendManagementCommand {
+  allow:bool;
+}
+struct OtaUpdateSetRequireManualApprovalCommand {
+  require:bool;
+}
+struct OtaUpdateHandleUpdateRequestCommand {
+  accept:bool;
+}
+table OtaUpdateCheckForUpdatesCommand {
+  channel:string;
+}
+table OtaUpdateStartUpdateCommand {
+  channel:string;
+  version:string;
+}
+
 table AccountLinkCommand {
   code:string;
 }
@@ -38,6 +67,17 @@ union LocalToDeviceMessagePayload {
   WifiNetworkForgetCommand,
   WifiNetworkConnectCommand,
   WifiNetworkDisconnectCommand,
+
+  // OTA stuff
+  OtaUpdateSetIsEnabledCommand,
+  OtaUpdateSetDomainCommand,
+  OtaUpdateSetUpdateChannelCommand,
+  OtaUpdateSetCheckIntervalCommand,
+  OtaUpdateSetAllowBackendManagementCommand,
+  OtaUpdateSetRequireManualApprovalCommand,
+  OtaUpdateHandleUpdateRequestCommand,
+  OtaUpdateCheckForUpdatesCommand,
+  OtaUpdateStartUpdateCommand,
 
   // Account linking stuff
   AccountLinkCommand,

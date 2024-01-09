@@ -30,13 +30,26 @@ namespace OpenShock::HexUtils {
 
   /// @brief Converts a byte array to a hex string.
   /// @param data The byte array to convert.
+  /// @param output The output buffer to write to.
+  /// @param upper Whether to use uppercase hex characters.
+  /// @remark To use this you must specify the size of the array in the template parameter. (e.g. ToHexMac<6>(...))
+  template<std::size_t N>
+  constexpr void ToHex(const std::uint8_t (&data)[N], std::array<char, (N * 2) + 1>& output, bool upper = true) noexcept {
+    for (std::size_t i = 0; i < N; ++i) {
+      ToHex(data[i], &output[i * 2], upper);
+    }
+    output[N * 2] = '\0';
+  }
+
+  /// @brief Converts a byte array to a hex string.
+  /// @param data The byte array to convert.
   /// @param upper Whether to use uppercase hex characters.
   /// @return The hex string.
   /// @remark To use this you must specify the size of the array in the template parameter. (e.g. ToHexMac<6>(...))
   template<std::size_t N>
   constexpr std::array<char, (N * 2) + 1> ToHex(const std::uint8_t (&data)[N], bool upper = true) noexcept {
     std::array<char, (N * 2) + 1> output {};
-    ToHex(data, output, upper);
+    ToHex<N>(data, output, upper);
     return output;
   }
 
@@ -126,5 +139,28 @@ namespace OpenShock::HexUtils {
 
   inline std::size_t TryParseHexMac(const char* str, std::uint8_t* out, std::size_t outLen) noexcept {
     return TryParseHexMac(str, strlen(str), out, outLen);
+  }
+
+  constexpr std::size_t TryParseHex(const char* str, std::size_t strLen, std::uint8_t* out, std::size_t outLen) noexcept {
+    std::size_t parsedLength = strLen / 2;
+
+    if (parsedLength * 2 != strLen) {
+      return 0;  // Invalid hex string length.
+    }
+
+    if (parsedLength > outLen) {
+      return 0;  // Output buffer is too small.
+    }
+
+    for (std::size_t i = 0; i < parsedLength; ++i) {
+      if (!TryParseHexPair(str[i * 2], str[i * 2 + 1], out[i])) {
+        return 0;  // Invalid hex pair.
+      }
+    }
+
+    return parsedLength;
+  }
+  inline std::size_t TryParseHex(const char* str, std::uint8_t* out, std::size_t outLen) noexcept {
+    return TryParseHex(str, strlen(str), out, outLen);
   }
 }  // namespace OpenShock::HexUtils

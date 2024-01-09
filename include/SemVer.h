@@ -72,5 +72,5 @@ namespace OpenShock {
     std::string toString() const;
   };
 
-  static bool TryParseSemVer(StringView str, SemVer& out);
+  bool TryParseSemVer(StringView str, SemVer& out);
 } // namespace OpenShock

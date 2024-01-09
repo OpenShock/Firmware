@@ -5,6 +5,8 @@
 export { BackendConfig } from './configuration/backend-config';
 export { CaptivePortalConfig } from './configuration/captive-portal-config';
 export { Config } from './configuration/config';
+export { OtaUpdateChannel } from './configuration/ota-update-channel';
+export { OtaUpdateConfig } from './configuration/ota-update-config';
 export { RFConfig } from './configuration/rfconfig';
 export { SerialInputConfig } from './configuration/serial-input-config';
 export { WiFiConfig } from './configuration/wi-fi-config';

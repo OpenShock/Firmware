@@ -1,10 +1,12 @@
 #pragma once
 
+#include "StringView.h"
+
 #include <WebSocketsClient.h>
 
+#include <cstdint>
 #include <string>
 #include <unordered_map>
-#include <cstdint>
 
 namespace OpenShock {
   class GatewayClient {
@@ -24,10 +26,14 @@ namespace OpenShock {
     void connect(const char* lcgFqdn);
     void disconnect();
 
+    bool sendMessageTXT(StringView data);
+    bool sendMessageBIN(const std::uint8_t* data, std::size_t length);
+
     bool loop();
 
   private:
     void _sendKeepAlive();
+    void _sendBootStatus();
     void _handleEvent(WStype_t type, std::uint8_t* payload, std::size_t length);
 
     WebSocketsClient m_webSocket;

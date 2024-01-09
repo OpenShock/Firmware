@@ -45,6 +45,11 @@ bool RootConfig::FromFlatbuffers(const Serialization::Configuration::Config* con
     return false;
   }
 
+  if (!otaUpdate.FromFlatbuffers(config->ota_update())) {
+    ESP_LOGE(TAG, "Unable to load ota update config");
+    return false;
+  }
+
   return true;
 }
 
@@ -54,8 +59,9 @@ flatbuffers::Offset<OpenShock::Serialization::Configuration::Config> RootConfig:
   auto captivePortalOffset = captivePortal.ToFlatbuffers(builder, withSensitiveData);
   auto backendOffset       = backend.ToFlatbuffers(builder, withSensitiveData);
   auto serialInputOffset   = serialInput.ToFlatbuffers(builder, withSensitiveData);
+  auto otaUpdateOffset     = otaUpdate.ToFlatbuffers(builder, withSensitiveData);
 
-  return Serialization::Configuration::CreateConfig(builder, rfOffset, wifiOffset, captivePortalOffset, backendOffset, serialInputOffset);
+  return Serialization::Configuration::CreateConfig(builder, rfOffset, wifiOffset, captivePortalOffset, backendOffset, serialInputOffset, otaUpdateOffset);
 }
 
 bool RootConfig::FromJSON(const cJSON* json) {
@@ -94,6 +100,11 @@ bool RootConfig::FromJSON(const cJSON* json) {
     return false;
   }
 
+  if (!otaUpdate.FromJSON(cJSON_GetObjectItemCaseSensitive(json, "otaUpdate"))) {
+    ESP_LOGE(TAG, "Unable to load ota update config");
+    return false;
+  }
+
   return true;
 }
 
@@ -105,6 +116,7 @@ cJSON* RootConfig::ToJSON(bool withSensitiveData) const {
   cJSON_AddItemToObject(root, "captivePortal", captivePortal.ToJSON(withSensitiveData));
   cJSON_AddItemToObject(root, "backend", backend.ToJSON(withSensitiveData));
   cJSON_AddItemToObject(root, "serialInput", serialInput.ToJSON(withSensitiveData));
+  cJSON_AddItemToObject(root, "otaUpdate", otaUpdate.ToJSON(withSensitiveData));
 
   return root;
 }
