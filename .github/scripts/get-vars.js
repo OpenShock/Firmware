@@ -14,11 +14,15 @@ if (gitRef === undefined) {
 const isGitTag = gitRef.startsWith('refs/tags/');
 const isGitBranch = gitRef.startsWith('refs/heads/');
 const isGitPullRequest = gitRef.startsWith('refs/pull/') && gitRef.endsWith('/merge');
-const gitCommitHash = child_process.execSync('git rev-parse HEAD').toString().trim();
+const gitCommitHash = process.env.GITHUB_SHA;
 const gitShortCommitHash = child_process.execSync('git rev-parse --short HEAD').toString().trim();
 
 if (!isGitTag && !isGitBranch && !isGitPullRequest) {
   core.setFailed(`Git ref "${gitRef}" is not a valid branch, tag or pull request`);
+  process.exit();
+}
+if (gitCommitHash === undefined) {
+  core.setFailed('Environment variable "GITHUB_SHA" not found');
   process.exit();
 }
 

@@ -5,6 +5,7 @@ on:
       - develop
   pull_request:
     branches:
+      - master
       - develop
     types: [opened, reopened, synchronize]
   workflow_dispatch: # Manually invoked by user.
@@ -21,3 +22,15 @@ jobs:
     with:
       fw-version: ${{ needs.getvars.outputs.version }}
       board-matrix: ${{ needs.getvars.outputs.board-matrix }}
+
+  publish:
+    if: github.event_name == 'push' && (github.ref == 'refs/heads/master' || github.ref == 'refs/heads/develop')
+    needs: [getvars, build]
+    uses: ./.github/workflows/publish-all.yml
+    with:
+      version: ${{ needs.getvars.outputs.version }}
+      release-channel: ${{ (github.ref == 'refs/heads/master' && 'stable') || 'develop' }}
+      is-prerelease: true
+      board-list: ${{ needs.getvars.outputs.board-list }}
+      board-matrix: ${{ needs.getvars.outputs.board-matrix }}
+      release-notes: ${{ needs.getvars.outputs.release-notes }}
