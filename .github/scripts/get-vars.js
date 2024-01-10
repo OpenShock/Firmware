@@ -49,7 +49,13 @@ function getCurrentVersion() {
   // Build version string
   let base = `${parsed.major}.${parsed.minor}.${parsed.patch}`;
   if (!isGitTag) {
-    base += `-${gitHeadRefName}+${gitShortCommitHash}`;
+    // Get last part of branch name and replace all non-alphanumeric characters with dashes
+    const sanitizedGitHeadRefName = gitHeadRefName
+      .split('/')
+      .pop()
+      .replace(/[^a-zA-Z0-9-]/g, '-');
+
+    base += `-${sanitizedGitHeadRefName}.${gitShortCommitHash}`;
   }
 
   return base;
