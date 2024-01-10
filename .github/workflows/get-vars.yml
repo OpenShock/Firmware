@@ -17,6 +17,9 @@ on:
       changelog:
         description: 'The changelog for the current version'
         value: ${{ jobs.get-vars.outputs.changelog }}
+      full-changelog:
+        description: 'The complete changelog for all versions ever released'
+        value: ${{ jobs.get-vars.outputs.full-changelog }}
       board-list:
         description: 'Newline-separated list of boards to build'
         value: ${{ jobs.get-vars.outputs.board-list }}
@@ -26,6 +29,12 @@ on:
       board-matrix:
         description: 'JSON matrix of boards to build'
         value: ${{ jobs.get-vars.outputs.board-matrix }}
+      version-list:
+        description: 'Newline-separated list of all versions ever released'
+        value: ${{ jobs.get-vars.outputs.version-list }}
+      version-array:
+        description: 'JSON array of all versions ever released'
+        value: ${{ jobs.get-vars.outputs.version-array }}
 
 name: get-vars
 
@@ -36,9 +45,12 @@ jobs:
       version: ${{ steps.get-vars.outputs.version }}
       release: ${{ steps.get-vars.outputs.release }}
       changelog: ${{ steps.get-vars.outputs.changelog }}
+      full-changelog: ${{ steps.get-vars.outputs.full-changelog }}
       board-list: ${{ steps.get-vars.outputs.board-list }}
       board-array: ${{ steps.get-vars.outputs.board-array }}
       board-matrix: ${{ steps.get-vars.outputs.board-matrix }}
+      version-list: ${{ steps.get-vars.outputs.version-list }}
+      version-array: ${{ steps.get-vars.outputs.version-array }}
 
     steps:
       - uses: actions/checkout@v4
