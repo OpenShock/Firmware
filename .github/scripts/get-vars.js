@@ -55,7 +55,7 @@ function getCurrentVersion() {
       .pop()
       .replace(/[^a-zA-Z0-9-]/g, '-');
 
-    base += `-${sanitizedGitHeadRefName}.${gitShortCommitHash}`;
+    base += `-${sanitizedGitHeadRefName}+${gitShortCommitHash}`;
   }
 
   return base;
