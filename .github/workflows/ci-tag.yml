@@ -20,110 +20,13 @@ jobs:
       fw-version: ${{ needs.getvars.outputs.version }}
       board-matrix: ${{ needs.getvars.outputs.board-matrix }}
 
-  cdn-upload-firmware:
-    runs-on: ubuntu-latest
+  publish:
     needs: [getvars, build]
-    environment: cdn-firmware-r2
-    strategy:
-      fail-fast: true
-      matrix: ${{ fromJson(needs.getvars.outputs.board-matrix) }}
-
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          sparse-checkout: |
-            .github
-
-      # Set up rclone for CDN uploads.
-      - uses: ./.github/actions/cdn-prepare
-        with:
-          cf-account-id: ${{ vars.S3_ACCOUNT_ID }}
-          cf-access-key-id: ${{ vars.S3_ACCESS_KEY_ID }}
-          cf-secret-access-key: ${{ secrets.S3_SECRET_ACCESS_KEY }}
-
-      # Upload firmware to CDN.
-      - uses: ./.github/actions/cdn-upload-firmware
-        with:
-          cf-bucket: ${{ vars.S3_BUCKET }}
-          board: ${{ matrix.board }}
-          version: ${{ github.ref_name }}
-          release-channel: ${{ contains(github.ref_name, '-') && 'stable' || 'beta' }}
-
-  cdn-upload-version-info:
-    runs-on: ubuntu-latest
-    needs: [getvars, build]
-    environment: cdn-firmware-r2
-
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          sparse-checkout: |
-            .github
-
-      # Set up rclone for CDN uploads.
-      - uses: ./.github/actions/cdn-prepare
-        with:
-          cf-account-id: ${{ vars.S3_ACCOUNT_ID }}
-          cf-access-key-id: ${{ vars.S3_ACCESS_KEY_ID }}
-          cf-secret-access-key: ${{ secrets.S3_SECRET_ACCESS_KEY }}
-
-      # Upload firmware to CDN.
-      - uses: ./.github/actions/cdn-upload-version-info
-        with:
-          cf-bucket: ${{ vars.S3_BUCKET }}
-          version: ${{ github.ref_name }}
-          boards: ${{ needs.getvars.outputs.board-list }}
-
-  cdn-bump-version:
-    runs-on: ubuntu-latest
-    needs: [cdn-upload-firmware] # only after version is complete
-    environment: cdn-firmware-r2
-
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          sparse-checkout: |
-            .github
-
-      # Set up rclone for CDN uploads.
-      - uses: ./.github/actions/cdn-prepare
-        with:
-          cf-account-id: ${{ vars.S3_ACCOUNT_ID }}
-          cf-access-key-id: ${{ vars.S3_ACCESS_KEY_ID }}
-          cf-secret-access-key: ${{ secrets.S3_SECRET_ACCESS_KEY }}
-
-      # Upload firmware to CDN.
-      - uses: ./.github/actions/cdn-bump-version
-        with:
-          cf-bucket: ${{ vars.S3_BUCKET }}
-          version: ${{ github.ref_name }}
-          release-channel: ${{ !contains(github.ref_name, '-') && 'stable' || 'beta' }}
-
-  checkpoint-cdn:
-    runs-on: ubuntu-latest
-    needs: [build, cdn-upload-firmware, cdn-upload-version-info, cdn-bump-version]
-    steps:
-      - run: echo "CDN checkpoint reached"
-
-  release:
-    runs-on: ubuntu-latest
-    needs: [checkpoint-cdn]
-
-    steps:
-      - name: Download release notes
-        uses: actions/checkout@v4
-        with:
-          sparse-checkout: |
-            RELEASE.md
-
-      - name: Download release artifacts
-        uses: actions/download-artifact@v4
-
-      - name: Release
-        uses: ncipollo/release-action@v1
-        with:
-          artifacts: '**/OpenShock_*.bin'
-          tag: ${{ github.ref_name }}
-          prerelease: ${{ contains(github.ref_name, '-') }}
-          artifactErrorsFailBuild: true
-          bodyFile: RELEASE.md
+    uses: ./.github/workflows/publish-all.yml
+    with:
+      version: ${{ needs.getvars.outputs.version }}
+      release-channel: ${{ contains(github.ref_name, '-') && 'stable' || 'beta' }}
+      is-prerelease: ${{ contains(github.ref_name, '-') }}
+      board-list: ${{ needs.getvars.outputs.board-list }}
+      board-matrix: ${{ needs.getvars.outputs.board-matrix }}
+      release-notes: ${{ needs.getvars.outputs.release-notes }}

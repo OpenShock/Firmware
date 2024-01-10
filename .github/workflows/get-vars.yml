@@ -16,9 +16,9 @@ on:
       version:
         description: 'The current version of the project, e.g.  1.0.0-rc.1+build.1'
         value: ${{ jobs.get-vars.outputs.version }}
-      release:
+      release-notes:
         description: 'The release notes for the current version (changelog + contents of RELEASE.md)'
-        value: ${{ jobs.get-vars.outputs.release }}
+        value: ${{ jobs.get-vars.outputs.release-notes }}
       changelog:
         description: 'The changelog for the current version'
         value: ${{ jobs.get-vars.outputs.changelog }}
@@ -34,12 +34,12 @@ on:
       board-matrix:
         description: 'JSON matrix of boards to build'
         value: ${{ jobs.get-vars.outputs.board-matrix }}
-      version-list:
-        description: 'Newline-separated list of all versions ever released'
-        value: ${{ jobs.get-vars.outputs.version-list }}
-      version-array:
-        description: 'JSON array of all versions ever released'
-        value: ${{ jobs.get-vars.outputs.version-array }}
+      release-list:
+        description: 'Newline-separated list of all released versions'
+        value: ${{ jobs.get-vars.outputs.release-list }}
+      release-array:
+        description: 'JSON array of all released versions'
+        value: ${{ jobs.get-vars.outputs.release-array }}
 
 name: get-vars
 
@@ -48,14 +48,14 @@ jobs:
     runs-on: ubuntu-latest
     outputs:
       version: ${{ steps.get-vars.outputs.version }}
-      release: ${{ steps.get-vars.outputs.release }}
       changelog: ${{ steps.get-vars.outputs.changelog }}
+      release-notes: ${{ steps.get-vars.outputs.release-notes }}
       full-changelog: ${{ steps.get-vars.outputs.full-changelog }}
       board-list: ${{ steps.get-vars.outputs.board-list }}
       board-array: ${{ steps.get-vars.outputs.board-array }}
       board-matrix: ${{ steps.get-vars.outputs.board-matrix }}
-      version-list: ${{ steps.get-vars.outputs.version-list }}
-      version-array: ${{ steps.get-vars.outputs.version-array }}
+      release-list: ${{ steps.get-vars.outputs.release-list }}
+      release-array: ${{ steps.get-vars.outputs.release-array }}
 
     steps:
       - uses: actions/checkout@v4
