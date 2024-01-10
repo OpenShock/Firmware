@@ -7,6 +7,11 @@
 
 on:
   workflow_call:
+    inputs:
+      node-version:
+        type: string
+        default: '18'
+        description: 'The Node.js version to use'
     outputs:
       version:
         description: 'The current version of the project, e.g.  1.0.0-rc.1+build.1'
@@ -60,6 +65,7 @@ jobs:
 
       - uses: actions/setup-node@v3
         with:
+          node-version: ${{ inputs.node-version }}
           cache: 'npm'
           cache-dependency-path: ./.github/scripts/package-lock.json
 

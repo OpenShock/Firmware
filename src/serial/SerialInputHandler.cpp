@@ -868,7 +868,7 @@ void SerialInputHandler::PrintVersionInfo() {
   Serial.print("\
   Version:  " OPENSHOCK_FW_VERSION "\n\
     Build:  " OPENSHOCK_FW_MODE "\n\
-   Commit:  " OPENSHOCK_FW_COMMIT "\n\
+   Commit:  " OPENSHOCK_FW_GIT_COMMIT "\n\
     Board:  " OPENSHOCK_FW_BOARD "\n\
      Chip:  " OPENSHOCK_FW_CHIP "\n\
 ");
