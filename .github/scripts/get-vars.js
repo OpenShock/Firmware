@@ -111,7 +111,7 @@ function getVersionChangeLog(lines) {
     process.exit();
   }
 
-  return lines.slice(changeLogBegin, changeLogEnd).join('\n');
+  return lines.slice(changeLogBegin + 1, changeLogEnd).join('\n');
 }
 
 // Make sure we have all the files we need
@@ -133,7 +133,11 @@ const changelogLines = fullChangelog.split('\n');
 const versionChangeLog = getVersionChangeLog(changelogLines);
 
 // Finish building the release string
-releaseNotes = versionChangeLog ? versionChangeLog + '\n\n' + releaseNotes : releaseNotes;
+if (versionChangeLog !== '') {
+  releaseNotes = `# OpenShock Firmware ${version}\n\n${versionChangeLog}\n\n${releaseNotes}`.trim();
+} else {
+  releaseNotes = `# OpenShock Firmware ${version}\n\n${releaseNotes}`.trim();
+}
 
 // Get all versions from the changelog
 const releases = changelogLines.filter((line) => line.startsWith('# Version ')).map((line) => line.substring(10).split(' ')[0].trim());
