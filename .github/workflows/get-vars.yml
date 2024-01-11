@@ -16,12 +16,15 @@ on:
       version:
         description: 'The current version of the project, e.g.  1.0.0-rc.1+build.1'
         value: ${{ jobs.get-vars.outputs.version }}
-      release-notes:
-        description: 'The release notes for the current version (changelog + contents of RELEASE.md)'
-        value: ${{ jobs.get-vars.outputs.release-notes }}
       changelog:
         description: 'The changelog for the current version'
         value: ${{ jobs.get-vars.outputs.changelog }}
+      release-notes:
+        description: 'The release notes for the current version (changelog + contents of RELEASE.md)'
+        value: ${{ jobs.get-vars.outputs.release-notes }}
+      release-channel:
+        description: 'The release channel for the current version (stable, beta, dev)'
+        value: ${{ jobs.get-vars.outputs.release-channel }}
       full-changelog:
         description: 'The complete changelog for all versions ever released'
         value: ${{ jobs.get-vars.outputs.full-changelog }}
@@ -34,6 +37,9 @@ on:
       board-matrix:
         description: 'JSON matrix of boards to build'
         value: ${{ jobs.get-vars.outputs.board-matrix }}
+      should-deploy:
+        description: 'Whether to deploy the current version'
+        value: ${{ jobs.get-vars.outputs.should-deploy }}
       release-stable-list:
         description: 'Newline-separated list of stable releases'
         value: ${{ jobs.get-vars.outputs.release-stable-list }}
@@ -62,10 +68,12 @@ jobs:
       version: ${{ steps.get-vars.outputs.version }}
       changelog: ${{ steps.get-vars.outputs.changelog }}
       release-notes: ${{ steps.get-vars.outputs.release-notes }}
+      release-channel: ${{ steps.get-vars.outputs.release-channel }}
       full-changelog: ${{ steps.get-vars.outputs.full-changelog }}
       board-list: ${{ steps.get-vars.outputs.board-list }}
       board-array: ${{ steps.get-vars.outputs.board-array }}
       board-matrix: ${{ steps.get-vars.outputs.board-matrix }}
+      should-deploy: ${{ steps.get-vars.outputs.should-deploy }}
       release-stable-list: ${{ steps.get-vars.outputs.release-stable-list }}
       release-stable-array: ${{ steps.get-vars.outputs.release-stable-array }}
       release-beta-list: ${{ steps.get-vars.outputs.release-beta-list }}

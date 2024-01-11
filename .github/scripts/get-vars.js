@@ -83,6 +83,18 @@ if (!isGitTag) {
   currentVersion += `+${gitShortCommitHash}`;
 }
 
+// Get the channel to deploy to
+let currentChannel;
+if (gitHeadRefName === 'master') {
+  currentChannel = 'stable';
+} else if (gitHeadRefName === 'develop') {
+  currentChannel = 'dev';
+} else if (gitHeadRefName === 'beta') {
+  currentChannel = 'beta';
+} else {
+  currentChannel = gitHeadRefName.replace(/[^a-zA-Z0-9-]/g, '-').replace(/^\-+|\-+$/g, '');
+}
+
 function getVersionChangeLog(lines) {
   const emptyChangelog = lines.length === 0;
 
@@ -185,8 +197,12 @@ const boards = Object.keys(platformioIni)
     return arr;
   }, []);
 
+const shouldDeploy = isGitTag || (isGitBranch && gitHeadRefName === 'develop');
+
 console.log('Version:  ' + currentVersion);
+console.log('Channel:  ' + currentChannel);
 console.log('Boards:   ' + boards.join(', '));
+console.log('Deploy:   ' + shouldDeploy);
 console.log('Tags:     ' + gitTagsArray.join(', '));
 console.log('Stable:   ' + stableReleasesArray.join(', '));
 console.log('Beta:     ' + betaReleasesArray.join(', '));
@@ -196,10 +212,12 @@ console.log('Dev:      ' + devReleasesArray.join(', '));
 core.setOutput('version', currentVersion);
 core.setOutput('changelog', versionChangeLog);
 core.setOutput('release-notes', releaseNotes);
+core.setOutput('release-channel', currentChannel);
 core.setOutput('full-changelog', fullChangelog);
 core.setOutput('board-list', boards.join('\n'));
 core.setOutput('board-array', JSON.stringify(boards));
 core.setOutput('board-matrix', JSON.stringify({ board: boards }));
+core.setOutput('should-deploy', shouldDeploy);
 core.setOutput('release-stable-list', stableReleasesArray.join('\n'));
 core.setOutput('release-stable-array', JSON.stringify(stableReleasesArray));
 core.setOutput('release-beta-list', betaReleasesArray.join('\n'));
