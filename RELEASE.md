@@ -1,4 +1,4 @@
-# OpenShock Firmware
+## Flashing the firmware
 
 Download `OpenShock_[board]_[version].bin` and flash it to your microcontroller:
 

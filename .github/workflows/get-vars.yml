@@ -1,0 +1,105 @@
+# This is a bit of a silly workflow, but Github Workflow definitions
+# do not let us easily reuse the strategy matrix used to trigger jobs
+# per-board. This is a workaround to define everything in one file, and
+# use the output in the multiple places we need it.
+#
+# Source: https://github.com/orgs/community/discussions/26284#discussioncomment-6701976
+
+on:
+  workflow_call:
+    inputs:
+      node-version:
+        type: string
+        default: '18'
+        description: 'The Node.js version to use'
+    outputs:
+      version:
+        description: 'The current version of the project, e.g.  1.0.0-rc.1+build.1'
+        value: ${{ jobs.get-vars.outputs.version }}
+      changelog:
+        description: 'The changelog for the current version'
+        value: ${{ jobs.get-vars.outputs.changelog }}
+      release-notes:
+        description: 'The release notes for the current version (changelog + contents of RELEASE.md)'
+        value: ${{ jobs.get-vars.outputs.release-notes }}
+      release-channel:
+        description: 'The release channel for the current version (stable, beta, dev)'
+        value: ${{ jobs.get-vars.outputs.release-channel }}
+      full-changelog:
+        description: 'The complete changelog for all versions ever released'
+        value: ${{ jobs.get-vars.outputs.full-changelog }}
+      board-list:
+        description: 'Newline-separated list of boards to build'
+        value: ${{ jobs.get-vars.outputs.board-list }}
+      board-array:
+        description: 'JSON array of boards to build'
+        value: ${{ jobs.get-vars.outputs.board-array }}
+      board-matrix:
+        description: 'JSON matrix of boards to build'
+        value: ${{ jobs.get-vars.outputs.board-matrix }}
+      should-deploy:
+        description: 'Whether to deploy the current version'
+        value: ${{ jobs.get-vars.outputs.should-deploy }}
+      release-stable-list:
+        description: 'Newline-separated list of stable releases'
+        value: ${{ jobs.get-vars.outputs.release-stable-list }}
+      release-stable-array:
+        description: 'JSON array of stable releases'
+        value: ${{ jobs.get-vars.outputs.release-stable-array }}
+      release-beta-list:
+        description: 'Newline-separated list of beta releases'
+        value: ${{ jobs.get-vars.outputs.release-beta-list }}
+      release-beta-array:
+        description: 'JSON array of beta releases'
+        value: ${{ jobs.get-vars.outputs.release-beta-array }}
+      release-dev-list:
+        description: 'Newline-separated list of dev releases'
+        value: ${{ jobs.get-vars.outputs.release-dev-list }}
+      release-dev-array:
+        description: 'JSON array of dev releases'
+        value: ${{ jobs.get-vars.outputs.release-dev-array }}
+
+name: get-vars
+
+jobs:
+  get-vars:
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.get-vars.outputs.version }}
+      changelog: ${{ steps.get-vars.outputs.changelog }}
+      release-notes: ${{ steps.get-vars.outputs.release-notes }}
+      release-channel: ${{ steps.get-vars.outputs.release-channel }}
+      full-changelog: ${{ steps.get-vars.outputs.full-changelog }}
+      board-list: ${{ steps.get-vars.outputs.board-list }}
+      board-array: ${{ steps.get-vars.outputs.board-array }}
+      board-matrix: ${{ steps.get-vars.outputs.board-matrix }}
+      should-deploy: ${{ steps.get-vars.outputs.should-deploy }}
+      release-stable-list: ${{ steps.get-vars.outputs.release-stable-list }}
+      release-stable-array: ${{ steps.get-vars.outputs.release-stable-array }}
+      release-beta-list: ${{ steps.get-vars.outputs.release-beta-list }}
+      release-beta-array: ${{ steps.get-vars.outputs.release-beta-array }}
+      release-dev-list: ${{ steps.get-vars.outputs.release-dev-list }}
+      release-dev-array: ${{ steps.get-vars.outputs.release-dev-array }}
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          sparse-checkout: |
+            .github
+
+      - uses: actions/setup-node@v3
+        with:
+          node-version: ${{ inputs.node-version }}
+          cache: 'npm'
+          cache-dependency-path: ./.github/scripts/package-lock.json
+
+      - name: Install dependencies
+        working-directory: ./.github/scripts
+        shell: bash
+        run: npm ci
+
+      - name: Get variables
+        id: get-vars
+        shell: bash
+        run: node ./.github/scripts/get-vars.js

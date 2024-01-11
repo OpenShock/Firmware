@@ -14,7 +14,7 @@ constexpr std::size_t HTTP_BUFFER_SIZE = 4096LLU;
 constexpr int HTTP_DOWNLOAD_SIZE_LIMIT = 200 * 1024 * 1024;  // 200 MB
 
 const char* const TAG                    = "HTTPRequestManager";
-const char* const OPENSHOCK_FW_USERAGENT = OPENSHOCK_FW_HOSTNAME "/" OPENSHOCK_FW_VERSION " (Espressif; " OPENSHOCK_FW_CHIP "; " OPENSHOCK_FW_BOARD ") " OPENSHOCK_FW_COMMIT;
+const char* const OPENSHOCK_FW_USERAGENT = OPENSHOCK_FW_HOSTNAME "/" OPENSHOCK_FW_VERSION " (Espressif; " OPENSHOCK_FW_CHIP "; " OPENSHOCK_FW_BOARD ") " OPENSHOCK_FW_GIT_COMMIT;
 
 struct RateLimit {
   RateLimit() : m_blockUntilMs(0), m_limits(), m_requests() { }

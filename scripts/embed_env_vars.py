@@ -59,7 +59,7 @@ def get_pio_firmware_vars() -> dict[str, str | int | bool]:
     vars['OPENSHOCK_FW_MODE'] = pio_build_type
     git_commit = get_git_commit()
     if git_commit is not None:
-        vars['OPENSHOCK_FW_COMMIT'] = git_commit
+        vars['OPENSHOCK_FW_GIT_COMMIT'] = git_commit
     return vars
 
 
@@ -92,16 +92,16 @@ def transform_cpp_define_string(k: str, v: str) -> str:
     if v.startswith('"') and v.endswith('"'):
         v = v[1:-1]
 
-    # Special case for OPENSHOCK_FW_COMMIT.
-    if k == 'OPENSHOCK_FW_COMMIT' and len(v) > 7:
+    # Special case for OPENSHOCK_FW_GIT_COMMIT.
+    if k == 'OPENSHOCK_FW_GIT_COMMIT' and len(v) > 7:
         v = v[0:7]
 
     return env.StringifyMacro(v)
 
 
 def serialize_cpp_define(k: str, v: str | int | bool) -> str | int:
-    # Special case for OPENSHOCK_FW_COMMIT.
-    if k == 'OPENSHOCK_FW_COMMIT':
+    # Special case for OPENSHOCK_FW_GIT_COMMIT.
+    if k == 'OPENSHOCK_FW_GIT_COMMIT':
         return transform_cpp_define_string(k, str(v))
 
     try:
