@@ -25,7 +25,7 @@ jobs:
     needs: getvars
     uses: ./.github/workflows/build-all.yml
     with:
-      fw-version: ${{ needs.getvars.outputs.version }}
+      version: ${{ needs.getvars.outputs.version }}
       board-matrix: ${{ needs.getvars.outputs.board-matrix }}
 
   checkpoint-build:
@@ -36,7 +36,7 @@ jobs:
 
   publish:
     if: ${{ needs.getvars.outputs.should-deploy == 'true' }}
-    needs: checkpoint-build
+    needs: [getvars, checkpoint-build]
     uses: ./.github/workflows/publish-all.yml
     with:
       version: ${{ needs.getvars.outputs.version }}

@@ -7,6 +7,9 @@ inputs:
   board:
     required: true
     description: 'Board name to build'
+  version:
+    required: true
+    description: 'Current firmware version'
   skip-checkout:
     description: 'If true, skips checkout'
     required: false
@@ -39,6 +42,12 @@ runs:
       working-directory: .
       shell: bash
       run: pio run -e ${{ inputs.board }}
+      env:
+        OPENSHOCK_API_DOMAIN: api.openshock.net
+        OPENSHOCK_FW_VERSION: ${{ inputs.version }}
+        OPENSHOCK_FW_GIT_REF: ${{ github.ref }}
+        OPENSHOCK_FW_GIT_COMMIT: ${{ github.sha }}
+        OPENSHOCK_FW_BUILD_DATE: ${{ github.event.head_commit.timestamp }}
 
     - name: Upload build artifacts
       uses: actions/upload-artifact@v3

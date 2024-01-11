@@ -11,7 +11,7 @@ on:
         type: string
         default: '3.12'
         description: 'The version of Python to use'
-      fw-version:
+      version:
         type: string
         required: true
         description: 'The version of the firmware'
@@ -19,13 +19,6 @@ on:
         type: string
         required: true
         description: 'A JSON matrix of boards to build for'
-
-env:
-  OPENSHOCK_API_DOMAIN: api.openshock.net
-  OPENSHOCK_FW_VERSION: ${{ inputs.fw-version }}
-  OPENSHOCK_FW_GIT_REF: ${{ github.ref }}
-  OPENSHOCK_FW_GIT_COMMIT: ${{ github.sha }}
-  OPENSHOCK_FW_BUILD_DATE: ${{ github.event.head_commit.timestamp }}
 
 jobs:
   build-frontend:
@@ -66,6 +59,7 @@ jobs:
         with:
           python-version: ${{ inputs.python-version }}
           board: ${{ matrix.board }}
+          version: ${{ inputs.version }}
           skip-checkout: true
 
   merge-partitions:
