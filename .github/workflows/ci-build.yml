@@ -28,9 +28,15 @@ jobs:
       fw-version: ${{ needs.getvars.outputs.version }}
       board-matrix: ${{ needs.getvars.outputs.board-matrix }}
 
+  checkpoint-build:
+    runs-on: ubuntu-latest
+    needs: [getvars, build]
+    steps:
+      - run: echo "Builds checkpoint reached"
+
   publish:
     if: ${{ needs.getvars.outputs.should-deploy == 'true' }}
-    needs: [getvars, build]
+    needs: checkpoint-build
     uses: ./.github/workflows/publish-all.yml
     with:
       version: ${{ needs.getvars.outputs.version }}
