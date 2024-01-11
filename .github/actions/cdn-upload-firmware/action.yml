@@ -40,7 +40,7 @@ runs:
     - name: Generate SHA256 checksums
       shell: bash
       run: |
-        find . -type f -name '*.bin' -exec sha256sum {} \; > hashes.md5.txt
+        find . -type f -name '*.bin' -exec md5sum {} \; > hashes.md5.txt
         find . -type f -name '*.bin' -exec sha256sum {} \; > hashes.sha256.txt
 
     - name: Upload artifacts to CDN
