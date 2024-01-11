@@ -4,8 +4,8 @@ inputs:
   cf-bucket:
     description: Name of the S3 bucket
     required: true
-  version-list:
-    description: 'List of versions, separated by newlines'
+  version:
+    description: 'Version of the release'
     required: true
   release-channel:
     description: 'Release channel that describes this upload'
@@ -18,5 +18,5 @@ runs:
       shell: bash
       run: |
         mkdir -p upload
-        echo "${{ inputs.version-list }}" >> upload/version-${{ inputs.release-channel }}.txt
+        echo "${{ inputs.version }}" >> upload/version-${{ inputs.release-channel }}.txt
         rclone copy upload cdn:${{ inputs.cf-bucket }}/

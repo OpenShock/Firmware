@@ -25,18 +25,6 @@ on:
         type: string
         required: true
         description: 'Release notes for this release'
-      release-stable-list:
-        type: string
-        required: true
-        description: Newline-separated list of all stable releases
-      release-beta-list:
-        type: string
-        required: true
-        description: Newline-separated list of all beta releases
-      release-dev-list:
-        type: string
-        required: true
-        description: Newline-separated list of all dev releases
     secrets:
       S3_SECRET_ACCESS_KEY:
         required: true
@@ -117,22 +105,8 @@ jobs:
       - uses: ./.github/actions/cdn-bump-version
         with:
           cf-bucket: ${{ vars.S3_BUCKET }}
-          version-list: ${{ inputs.release-stable-list }}
-          release-channel: stable
-
-      # Upload firmware to CDN.
-      - uses: ./.github/actions/cdn-bump-version
-        with:
-          cf-bucket: ${{ vars.S3_BUCKET }}
-          version-list: ${{ inputs.release-beta-list }}
-          release-channel: beta
-
-      # Upload firmware to CDN.
-      - uses: ./.github/actions/cdn-bump-version
-        with:
-          cf-bucket: ${{ vars.S3_BUCKET }}
-          version-list: ${{ inputs.release-dev-list }}
-          release-channel: dev
+          version: ${{ inputs.version }}
+          release-channel: ${{ inputs.release-channel }}
 
   checkpoint-cdn:
     runs-on: ubuntu-latest
