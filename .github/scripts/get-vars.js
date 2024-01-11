@@ -70,11 +70,6 @@ if (!isGitTag) {
   // Remove leading and trailing dashes
   sanitizedGitHeadRefName = sanitizedGitHeadRefName.replace(/^\-+|\-+$/g, '');
 
-  // If the branch name is 'develop', use 'dev' instead
-  if (sanitizedGitHeadRefName === 'develop') {
-    sanitizedGitHeadRefName = 'dev';
-  }
-
   if (sanitizedGitHeadRefName.length > 0) {
     currentVersion += `-${sanitizedGitHeadRefName}`;
   }
@@ -88,7 +83,7 @@ let currentChannel;
 if (gitHeadRefName === 'master') {
   currentChannel = 'stable';
 } else if (gitHeadRefName === 'develop') {
-  currentChannel = 'dev';
+  currentChannel = 'develop';
 } else if (gitHeadRefName === 'beta') {
   currentChannel = 'beta';
 } else {
