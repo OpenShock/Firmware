@@ -24,4 +24,4 @@ runs:
       run: |
         mkdir upload
         mv boards.txt upload/
-        rclone copy upload cdn:${{ inputs.cf-bucket }}/${{ inputs.release-channel }}/${{ inputs.board }}/
+        rclone copy upload 'cdn:${{ inputs.cf-bucket }}/${{ inputs.release-channel }}/${{ inputs.board }}/'
