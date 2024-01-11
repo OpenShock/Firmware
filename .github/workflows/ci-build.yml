@@ -2,6 +2,7 @@ on:
   push:
     branches:
       - master
+      - beta
       - develop
     tags:
       - '[0-9]+.[0-9]+.[0-9]+'
@@ -9,6 +10,7 @@ on:
   pull_request:
     branches:
       - master
+      - beta
       - develop
     types: [opened, reopened, synchronize]
   workflow_dispatch: # Manually invoked by user.

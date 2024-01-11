@@ -28,21 +28,6 @@ env:
   OPENSHOCK_FW_BUILD_DATE: ${{ github.event.head_commit.timestamp }}
 
 jobs:
-  build-firmware:
-    runs-on: ubuntu-latest
-    strategy:
-      fail-fast: false
-      matrix: ${{ fromJSON(inputs.board-matrix) }}
-
-    steps:
-      - uses: actions/checkout@v4
-
-      - uses: ./.github/actions/build-firmware
-        with:
-          python-version: ${{ inputs.python-version }}
-          board: ${{ matrix.board }}
-          skip-checkout: true
-
   build-frontend:
     runs-on: ubuntu-latest
 
@@ -66,6 +51,21 @@ jobs:
       - uses: ./.github/actions/build-staticfs
         with:
           python-version: ${{ inputs.python-version }}
+          skip-checkout: true
+
+  build-firmware:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix: ${{ fromJSON(inputs.board-matrix) }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: ./.github/actions/build-firmware
+        with:
+          python-version: ${{ inputs.python-version }}
+          board: ${{ matrix.board }}
           skip-checkout: true
 
   merge-partitions:
