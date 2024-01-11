@@ -163,7 +163,6 @@ for (const tag of gitTagsArray) {
   }
 }
 if (missingTags.length > 0) {
-  console.log('Changelog versions: "' + changelogVersions.join('", "') + '"');
   core.setFailed(`Changelog is missing the following tags: ${missingTags.join(', ')}`);
   process.exit();
 }
