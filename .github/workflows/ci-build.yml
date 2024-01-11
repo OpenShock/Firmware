@@ -46,3 +46,4 @@ jobs:
       board-list: ${{ needs.getvars.outputs.board-list }}
       board-matrix: ${{ needs.getvars.outputs.board-matrix }}
       release-notes: ${{ needs.getvars.outputs.release-notes }}
+    secrets: inherit

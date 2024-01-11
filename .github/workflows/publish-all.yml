@@ -25,6 +25,9 @@ on:
         type: string
         required: true
         description: 'Release notes for this release'
+    secrets:
+      S3_SECRET_ACCESS_KEY:
+        required: true
 
 name: Publish release
 
@@ -112,6 +115,7 @@ jobs:
       - run: echo "CDN checkpoint reached"
 
   release:
+    if: (inputs.release-channel == 'stable' || inputs.release-channel == 'beta')
     runs-on: ubuntu-latest
     needs: [checkpoint-cdn]
 
