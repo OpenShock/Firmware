@@ -23,9 +23,3 @@
 # Version 1.1.0-rc.1
 
 # Version 0.8.1
-
-# Version 0.7.4
-
-# Version 0.7.3
-
-# Version v0.7.2
