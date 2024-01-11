@@ -53,9 +53,8 @@ jobs:
       - uses: ./.github/actions/cdn-upload-firmware
         with:
           cf-bucket: ${{ vars.S3_BUCKET }}
-          board: ${{ matrix.board }}
-          version: ${{ inputs.version }}
           release-channel: ${{ inputs.release-channel }}
+          board: ${{ matrix.board }}
 
   cdn-upload-version-info:
     runs-on: ubuntu-latest
@@ -78,7 +77,7 @@ jobs:
       - uses: ./.github/actions/cdn-upload-version-info
         with:
           cf-bucket: ${{ vars.S3_BUCKET }}
-          version: ${{ inputs.version }}
+          release-channel: ${{ inputs.release-channel }}
           boards: ${{ inputs.board-list }}
 
   cdn-bump-version:

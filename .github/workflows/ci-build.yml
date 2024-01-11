@@ -26,6 +26,7 @@ jobs:
     uses: ./.github/workflows/build-all.yml
     with:
       version: ${{ needs.getvars.outputs.version }}
+      release-channel: ${{ needs.getvars.outputs.release-channel }}
       board-matrix: ${{ needs.getvars.outputs.board-matrix }}
 
   checkpoint-build:

@@ -15,6 +15,10 @@ on:
         type: string
         required: true
         description: 'The version of the firmware'
+      release-channel:
+        type: string
+        required: true
+        description: 'The release channel to use'
       board-matrix:
         type: string
         required: true
@@ -81,5 +85,6 @@ jobs:
       - uses: ./.github/actions/merge-partitions
         with:
           python-version: ${{ inputs.python-version }}
+          release-channel: ${{ inputs.release-channel }}
           board: ${{ matrix.board }}
           skip-checkout: true
