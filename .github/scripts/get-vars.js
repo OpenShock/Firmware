@@ -83,9 +83,7 @@ if (!isGitTag) {
   currentVersion += `+${gitShortCommitHash}`;
 }
 
-function getVersionChangeLog(changelog) {
-  const lines = changelog.split('\n');
-
+function getVersionChangeLog(lines) {
   const emptyChangelog = lines.length === 0;
 
   // Enforce that the changelog is not empty if we are on the master branch
@@ -149,17 +147,23 @@ let releaseNotes = fs.readFileSync('RELEASE.md', 'utf8');
 const fullChangelog = fs.readFileSync('CHANGELOG.md', 'utf8').trim();
 const platformioIniStr = fs.readFileSync('platformio.ini', 'utf8').trim();
 
+const fullChangelogLines = fullChangelog.split('\n');
+
+// Get all versions from the changelog
+const changelogVersions = fullChangelogLines.filter((line) => line.startsWith('# Version ')).map((line) => line.substring(10).split(' ')[0].trim());
+
 // Get the changelog for the current version
-const versionChangeLog = getVersionChangeLog(fullChangelog);
+const versionChangeLog = getVersionChangeLog(fullChangelogLines);
 
 // Enforce that all tags exist in the changelog
 let missingTags = [];
 for (const tag of gitTagsArray) {
-  if (!fullChangelog.includes(`# Version ${tag}`)) {
+  if (!changelogVersions.includes(tag)) {
     missingTags.push(tag);
   }
 }
 if (missingTags.length > 0) {
+  console.log('Changelog versions: "' + changelogVersions.join('", "') + '"');
   core.setFailed(`Changelog is missing the following tags: ${missingTags.join(', ')}`);
   process.exit();
 }
