@@ -49,4 +49,5 @@ jobs:
       release-stable-list: ${{ needs.getvars.outputs.release-stable-list }}
       release-beta-list: ${{ needs.getvars.outputs.release-beta-list }}
       release-dev-list: ${{ needs.getvars.outputs.release-dev-list }}
-    secrets: inherit
+    secrets:
+      S3_SECRET_ACCESS_KEY: ${{ secrets.S3_SECRET_ACCESS_KEY }}
