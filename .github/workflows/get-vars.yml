@@ -34,12 +34,24 @@ on:
       board-matrix:
         description: 'JSON matrix of boards to build'
         value: ${{ jobs.get-vars.outputs.board-matrix }}
-      release-list:
-        description: 'Newline-separated list of all released versions'
-        value: ${{ jobs.get-vars.outputs.release-list }}
-      release-array:
-        description: 'JSON array of all released versions'
-        value: ${{ jobs.get-vars.outputs.release-array }}
+      release-stable-list:
+        description: 'Newline-separated list of stable releases'
+        value: ${{ jobs.get-vars.outputs.release-stable-list }}
+      release-stable-array:
+        description: 'JSON array of stable releases'
+        value: ${{ jobs.get-vars.outputs.release-stable-array }}
+      release-beta-list:
+        description: 'Newline-separated list of beta releases'
+        value: ${{ jobs.get-vars.outputs.release-beta-list }}
+      release-beta-array:
+        description: 'JSON array of beta releases'
+        value: ${{ jobs.get-vars.outputs.release-beta-array }}
+      release-dev-list:
+        description: 'Newline-separated list of dev releases'
+        value: ${{ jobs.get-vars.outputs.release-dev-list }}
+      release-dev-array:
+        description: 'JSON array of dev releases'
+        value: ${{ jobs.get-vars.outputs.release-dev-array }}
 
 name: get-vars
 
@@ -54,8 +66,12 @@ jobs:
       board-list: ${{ steps.get-vars.outputs.board-list }}
       board-array: ${{ steps.get-vars.outputs.board-array }}
       board-matrix: ${{ steps.get-vars.outputs.board-matrix }}
-      release-list: ${{ steps.get-vars.outputs.release-list }}
-      release-array: ${{ steps.get-vars.outputs.release-array }}
+      release-stable-list: ${{ steps.get-vars.outputs.release-stable-list }}
+      release-stable-array: ${{ steps.get-vars.outputs.release-stable-array }}
+      release-beta-list: ${{ steps.get-vars.outputs.release-beta-list }}
+      release-beta-array: ${{ steps.get-vars.outputs.release-beta-array }}
+      release-dev-list: ${{ steps.get-vars.outputs.release-dev-list }}
+      release-dev-array: ${{ steps.get-vars.outputs.release-dev-array }}
 
     steps:
       - uses: actions/checkout@v4

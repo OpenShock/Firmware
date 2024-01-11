@@ -50,7 +50,7 @@ function convertGitTagToSemver(tag) {
   return parsed;
 }
 
-const gitTagsArray = gitTagsList.split('\n');
+const gitTagsArray = gitTagsList.split('\n').map((tag) => tag.trim());
 const releasesArray = gitTagsArray.map(convertGitTagToSemver);
 const latestRelease = isGitTag ? convertGitTagToSemver(gitRef.split('/')[2]) : releasesArray[0];
 
