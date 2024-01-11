@@ -76,7 +76,7 @@ if (!isGitTag) {
   }
 
   if (sanitizedGitHeadRefName.length > 0) {
-    sanitizedGitHeadRefName = `-${sanitizedGitHeadRefName}`;
+    currentVersion += `-${sanitizedGitHeadRefName}`;
   }
 
   // Add the git commit hash to the version string
