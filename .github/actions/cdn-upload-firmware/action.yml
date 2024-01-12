@@ -15,19 +15,19 @@ runs:
   using: composite
   steps:
     - name: Download static filesystem partition
-      uses: actions/download-artifact@v3
+      uses: actions/download-artifact@v4
       with:
         name: firmware_staticfs
         path: .
 
     - name: Download firmware partitions
-      uses: actions/download-artifact@v3
+      uses: actions/download-artifact@v4
       with:
         name: firmware_build_${{ inputs.board }}
         path: .
 
     - name: Download merged firmware binary
-      uses: actions/download-artifact@v3
+      uses: actions/download-artifact@v4
       with:
         name: firmware_merged_${{ inputs.board }}
         path: .

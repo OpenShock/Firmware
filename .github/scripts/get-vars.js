@@ -54,9 +54,19 @@ const gitTagsArray = gitTagsList.split('\n').map((tag) => tag.trim());
 const releasesArray = gitTagsArray.map(convertGitTagToSemver);
 const latestRelease = isGitTag ? convertGitTagToSemver(gitRef.split('/')[2]) : releasesArray[0];
 
-const stableReleasesArray = releasesArray.filter((release) => release.prerelease.length === 0 || release.prerelease[0] === 'stable');
-const betaReleasesArray = releasesArray.filter((release) => release.prerelease.length > 0 && ['rc', 'beta'].includes(release.prerelease[0]));
-const devReleasesArray = releasesArray.filter((release) => release.prerelease.length > 0 && ['dev', 'develop'].includes(release.prerelease[0]));
+function isStableRelease(release) {
+  return release.prerelease.length === 0 || release.prerelease[0] === 'stable';
+}
+function isBetaRelease(release) {
+  return release.prerelease.length > 0 && ['rc', 'beta'].includes(release.prerelease[0]);
+}
+function isDevRelease(release) {
+  return release.prerelease.length > 0 && ['dev', 'develop'].includes(release.prerelease[0]);
+}
+
+const stableReleasesArray = releasesArray.filter(isStableRelease);
+const betaReleasesArray = releasesArray.filter(isBetaRelease);
+const devReleasesArray = releasesArray.filter(isDevRelease);
 
 // Build version string
 let currentVersion = `${latestRelease.major}.${latestRelease.minor}.${latestRelease.patch}`;
@@ -76,16 +86,23 @@ if (!isGitTag) {
 
   // Add the git commit hash to the version string
   currentVersion += `+${gitShortCommitHash}`;
+} else {
+  if (latestRelease.prerelease.length > 0) {
+    currentVersion += `-${latestRelease.prerelease.join('.')}`;
+  }
+  if (latestRelease.build.length > 0) {
+    currentVersion += `+${latestRelease.build.join('.')}`;
+  }
 }
 
 // Get the channel to deploy to
 let currentChannel;
-if (gitHeadRefName === 'master') {
+if (gitHeadRefName === 'master' || (isGitTag && isStableRelease(latestRelease))) {
   currentChannel = 'stable';
-} else if (gitHeadRefName === 'develop') {
-  currentChannel = 'develop';
-} else if (gitHeadRefName === 'beta') {
+} else if (gitHeadRefName === 'beta' || (isGitTag && isBetaRelease(latestRelease))) {
   currentChannel = 'beta';
+} else if (gitHeadRefName === 'develop' || (isGitTag && isDevRelease(latestRelease))) {
+  currentChannel = 'develop';
 } else {
   currentChannel = gitHeadRefName.replace(/[^a-zA-Z0-9-]/g, '-').replace(/^\-+|\-+$/g, '');
 }

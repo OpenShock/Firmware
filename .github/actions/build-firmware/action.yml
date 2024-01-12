@@ -50,7 +50,7 @@ runs:
         OPENSHOCK_FW_BUILD_DATE: ${{ github.event.head_commit.timestamp }}
 
     - name: Upload build artifacts
-      uses: actions/upload-artifact@v3
+      uses: actions/upload-artifact@v4
       with:
         name: firmware_build_${{ inputs.board }}
         path: .pio/build/${{ inputs.board }}/*.bin
