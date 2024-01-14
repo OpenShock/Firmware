@@ -10,7 +10,7 @@ esptool.main([
     '--flash_size', '8MB',
     '0x0', './bootloader.bin',
     '0x8000', './partitions.bin',
-    '0x10000', './firmware.bin',
-    '0x310000', './filesystem.bin'
+    '0x10000', './app.bin',
+    '0x310000', './staticfs.bin'
 ])
 # fmt: on
