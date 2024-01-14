@@ -1,9 +1,10 @@
 include "./Types/ShockerCommandType.fbs";
 include "./Types/ShockerModelType.fbs";
+include "./Types/SemVer.fbs";
 
 attribute "fs_serializer";
 
-namespace OpenShock.Serialization;
+namespace OpenShock.Serialization.Gateway;
 
 struct ShockerCommand {
   model:Types.ShockerModelType;
@@ -21,13 +22,19 @@ struct CaptivePortalConfig {
   enabled:bool;
 }
 
-union ServerToDeviceMessagePayload {
+// Begin installing an OTA update
+table OtaInstall {
+  version:Types.SemVer;
+}
+
+union GatewayToDeviceMessagePayload {
   ShockerCommandList,
-  CaptivePortalConfig
+  CaptivePortalConfig,
+  OtaInstall
 }
 
-table ServerToDeviceMessage (fs_serializer) {
-  payload:ServerToDeviceMessagePayload;
+table GatewayToDeviceMessage (fs_serializer) {
+  payload:GatewayToDeviceMessagePayload;
 }
 
-root_type ServerToDeviceMessage;
+root_type GatewayToDeviceMessage;

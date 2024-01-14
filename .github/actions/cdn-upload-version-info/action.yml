@@ -1,11 +1,11 @@
-name: cnd-upload-version-info
+name: cdn-upload-version-info
 description: Uploads version specific info to CDN
 inputs:
   cf-bucket:
     description: Name of the S3 bucket
     required: true
-  version:
-    description: Version to upload
+  release-channel:
+    description: 'Release channel that describes this upload'
     required: true
   boards:
     description: 'List of boards, separated by newlines'
@@ -22,6 +22,6 @@ runs:
     - name: Upload artifacts to CDN
       shell: bash
       run: |
-        mkdir upload
+        mkdir -p upload
         mv boards.txt upload/
-        rclone copy upload cdn:${{ inputs.cf-bucket }}/${{ inputs.version }}/${{ inputs.board }}/
+        rclone copy upload 'cdn:${{ inputs.cf-bucket }}/${{ inputs.release-channel }}/${{ inputs.board }}/'

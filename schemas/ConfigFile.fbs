@@ -1,3 +1,5 @@
+include "./Types/FirmwareBootType.fbs";
+
 namespace OpenShock.Serialization.Configuration;
 
 table RFConfig {
@@ -49,6 +51,45 @@ table SerialInputConfig {
   echo_enabled:bool = true;
 }
 
+enum OtaUpdateChannel:uint8 {
+  Stable = 0,
+  Beta = 1,
+  Develop = 2
+}
+
+// Represents configuration for Over-The-Air (OTA) updates.
+table OtaUpdateConfig {
+  /// Indicates whether OTA updates are enabled.
+  is_enabled:bool;
+
+  /// The domain name of the OTA Content Delivery Network (CDN).
+  cdn_domain:string;
+
+  /// The update channel to use.
+  update_channel:OtaUpdateChannel;
+
+  /// Indicates whether to check for updates on startup.
+  check_on_startup:bool;
+
+  /// Indicates whether to check for updates periodically.
+  check_periodically:bool;
+
+  /// The interval in minutes between periodic update checks.
+  check_interval:uint16;
+
+  /// Indicates if the backend is authorized to manage the device's update version on behalf of the user.
+  allow_backend_management:bool;
+
+  /// Indicates if manual approval via serial input or captive portal is required before installing updates.
+  require_manual_approval:bool;
+
+  /// Update process ID, used to track the update process server-side across reboots.
+  update_id:int32;
+
+  /// Indicates what kind of firmware boot is happening (normal boot, booting into new firmware, rolling back to old firmware, etc.)
+  boot_type:Types.FirmwareBootType;
+}
+
 table Config {
   /// RF Transmitter configuration
   rf:RFConfig;
@@ -64,4 +105,7 @@ table Config {
 
   /// Serial input configuration
   serial_input:SerialInputConfig;
+
+  /// OTA update configuration
+  ota_update:OtaUpdateConfig;
 }

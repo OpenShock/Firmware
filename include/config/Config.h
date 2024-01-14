@@ -2,6 +2,7 @@
 
 #include "config/BackendConfig.h"
 #include "config/CaptivePortalConfig.h"
+#include "config/OtaUpdateConfig.h"
 #include "config/RFConfig.h"
 #include "config/SerialInputConfig.h"
 #include "config/WiFiConfig.h"
@@ -35,6 +36,7 @@ namespace OpenShock::Config {
 
   bool GetRFConfig(RFConfig& out);
   bool GetWiFiConfig(WiFiConfig& out);
+  bool GetOtaUpdateConfig(OtaUpdateConfig& out);
   bool GetWiFiCredentials(cJSON* array, bool withSensitiveData);
   bool GetWiFiCredentials(std::vector<WiFiCredentials>& out);
 
@@ -61,6 +63,11 @@ namespace OpenShock::Config {
   std::uint8_t GetWiFiCredentialsIDbySSID(const char* ssid);
   bool RemoveWiFiCredentials(std::uint8_t id);
   bool ClearWiFiCredentials();
+
+  bool GetOtaUpdateId(std::int32_t& out);
+  bool SetOtaUpdateId(std::int32_t updateId);
+  bool GetOtaFirmwareBootType(FirmwareBootType& out);
+  bool SetOtaFirmwareBootType(FirmwareBootType bootType);
 
   bool HasBackendAuthToken();
   bool GetBackendAuthToken(std::string& out);

@@ -33,7 +33,7 @@ runs:
       run: pip install -r requirements.txt
 
     - name: Download built frontend
-      uses: actions/download-artifact@v3
+      uses: actions/download-artifact@v4
       with:
         name: frontend
         path: frontend/build/
@@ -47,7 +47,7 @@ runs:
       run: mv .pio/build/fs/littlefs.bin staticfs.bin
 
     - name: Upload internal filesystem artifact
-      uses: actions/upload-artifact@v3
+      uses: actions/upload-artifact@v4
       with:
         name: firmware_staticfs
         path: staticfs.bin
