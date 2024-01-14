@@ -4,6 +4,9 @@ inputs:
   cf-bucket:
     description: Name of the S3 bucket
     required: true
+  fw-version:
+    description: Firmware version
+    required: true
   release-channel:
     description: 'Release channel that describes this upload'
     required: true
@@ -24,4 +27,4 @@ runs:
       run: |
         mkdir -p upload
         mv boards.txt upload/
-        rclone copy upload 'cdn:${{ inputs.cf-bucket }}/${{ inputs.release-channel }}/${{ inputs.board }}/'
+        rclone copy upload 'cdn:${{ inputs.cf-bucket }}/${{ inputs.fw-version }}/${{ inputs.board }}/'
