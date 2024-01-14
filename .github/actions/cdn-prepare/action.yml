@@ -1,4 +1,4 @@
-name: cnd-prepare
+name: cdn-prepare
 description: Prepares the CDN for firmware uploads
 inputs:
   cf-account-id:
