@@ -69,7 +69,7 @@ bool OtaUpdateConfig::FromFlatbuffers(const Serialization::Configuration::OtaUpd
 }
 
 flatbuffers::Offset<OpenShock::Serialization::Configuration::OtaUpdateConfig> OtaUpdateConfig::ToFlatbuffers(flatbuffers::FlatBufferBuilder& builder, bool withSensitiveData) const {
-  return Serialization::Configuration::CreateOtaUpdateConfig(builder, isEnabled, builder.CreateString(cdnDomain), updateChannel, checkPeriodically, checkInterval, allowBackendManagement, requireManualApproval);
+  return Serialization::Configuration::CreateOtaUpdateConfig(builder, isEnabled, builder.CreateString(cdnDomain), updateChannel, checkOnStartup, checkPeriodically, checkInterval, allowBackendManagement, requireManualApproval, updateId, bootType);
 }
 
 bool OtaUpdateConfig::FromJSON(const cJSON* json) {

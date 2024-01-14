@@ -153,7 +153,6 @@ function mapOtaUpdateConfig(fbsConfig: FbsConfig): OtaUpdateConfig {
   const requireManualApproval = otaUpdate.requireManualApproval();
 
   if (!cdnDomain) throw new Error('otaUpdate.cdnDomain is null');
-  if (!updateChannel) throw new Error('otaUpdate.updateChannel is null');
 
   return {
     isEnabled,
