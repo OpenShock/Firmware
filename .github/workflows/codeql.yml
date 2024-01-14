@@ -9,27 +9,27 @@ on:
     - cron: '0 6 * * 1'
 
 env:
-  NODE_VERSION: 18
-  PYTHON_VERSION: 3.12
   OPENSHOCK_API_DOMAIN: api.shocklink.net
-  # OPENSHOCK_FW_VERSION:
-  #   - If this is branch "master" or "develop", we use "0.0.0-master" or "0.0.0-develop" respectively.
-  #   - All other scenarios we use "0.0.0-unknown", as we cannot guarantee SemVer compliance by accepting any branch name. So this is the safe option.
-  OPENSHOCK_FW_VERSION: ${{ (contains(fromJSON('["master","develop"]'), github.ref_name) && format('0.0.0-{0}', github.ref_name)) || '0.0.0-unknown' }}
-  OPENSHOCK_FW_COMMIT: ${{ github.sha }}
+  OPENSHOCK_FW_GIT_REF: ${{ github.ref }}
+  OPENSHOCK_FW_GIT_COMMIT: ${{ github.sha }}
+  OPENSHOCK_FW_BUILD_DATE: ${{ github.event.head_commit.timestamp }}
 
 jobs:
-  get-targets:
-    uses: ./.github/workflows/get-targets.yml
+  get-vars:
+    uses: ./.github/workflows/get-vars.yml
 
   analyze-js-py:
     name: Analyze JS/PY
     runs-on: 'ubuntu-latest'
+    needs: get-vars
     timeout-minutes: 360
     permissions:
       actions: read
       contents: read
       security-events: write
+
+    env:
+      OPENSHOCK_FW_VERSION: ${{ needs.get-vars.outputs.version }}
 
     strategy:
       fail-fast: false
@@ -59,7 +59,7 @@ jobs:
   analyze-cpp:
     name: Analyze C/C++
     runs-on: 'ubuntu-latest'
-    needs: [get-targets]
+    needs: get-vars
     timeout-minutes: 360
     permissions:
       actions: read
@@ -68,11 +68,12 @@ jobs:
 
     env:
       language: 'c-cpp'
+      OPENSHOCK_FW_VERSION: ${{ needs.get-vars.outputs.version }}
 
     strategy:
       fail-fast: false
       matrix:
-        board: ${{ fromJson(needs.get-targets.outputs.board-array) }}
+        board: ${{ fromJson(needs.get-vars.outputs.board-array) }}
 
     steps:
       - name: Checkout repository
@@ -85,7 +86,7 @@ jobs:
 
       - uses: ./.github/actions/build-firmware
         with:
-          python-version: ${{ env.PYTHON_VERSION }}
+          python-version: 3.12
           board: ${{ matrix.board }}
           skip-checkout: true
 

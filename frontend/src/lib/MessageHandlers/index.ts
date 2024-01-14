@@ -35,7 +35,7 @@ PayloadHandlers[DeviceToLocalMessagePayload.ReadyMessage] = (cli, msg) => {
   DeviceStateStore.update((store) => {
     store.wifiConnectedBSSID = payload.connectedWifi()?.bssid() ?? null;
     store.accountLinked = payload.accountLinked();
-    store.config = null; // TODO: Implement config
+    store.config = mapConfig(payload.config());
 
     return store;
   });

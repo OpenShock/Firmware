@@ -2,9 +2,15 @@ on:
   push:
     branches:
       - master
+      - beta
       - develop
+    tags:
+      - '[0-9]+.[0-9]+.[0-9]+'
+      - '[0-9]+.[0-9]+.[0-9]+-*'
   pull_request:
     branches:
+      - master
+      - beta
       - develop
     types: [opened, reopened, synchronize]
   workflow_dispatch: # Manually invoked by user.
@@ -14,17 +20,10 @@ name: ci-build
 env:
   NODE_VERSION: 18
   PYTHON_VERSION: 3.12
-  OPENSHOCK_API_DOMAIN: api.shocklink.net
-  # OPENSHOCK_FW_VERSION:
-  #   - If this is branch "master" or "develop", we use "0.0.0-master" or "0.0.0-develop" respectively.
-  #   - All other scenarios we use "0.0.0-unknown", as we cannot guarantee SemVer compliance by accepting any branch name. So this is the safe option.
-  OPENSHOCK_FW_VERSION: ${{ (contains(fromJSON('["master","develop"]'), github.ref_name) && format('0.0.0-{0}', github.ref_name)) || '0.0.0-unknown' }}
-  OPENSHOCK_FW_COMMIT: ${{ github.sha }}
 
 jobs:
-  # Read platformio.ini and extract all specific targets. See the referenced file for more info.
-  get-targets:
-    uses: ./.github/workflows/get-targets.yml
+  getvars:
+    uses: ./.github/workflows/get-vars.yml
 
   build-frontend:
     runs-on: ubuntu-latest
@@ -52,11 +51,11 @@ jobs:
           skip-checkout: true
 
   build-firmware:
+    needs: [getvars]
     runs-on: ubuntu-latest
-    needs: get-targets
     strategy:
       fail-fast: false
-      matrix: ${{ fromJSON(needs.get-targets.outputs.matrix) }}
+      matrix: ${{ fromJSON(needs.getvars.outputs.board-matrix) }}
 
     steps:
       - uses: actions/checkout@v4
@@ -65,14 +64,15 @@ jobs:
         with:
           python-version: ${{ env.PYTHON_VERSION }}
           board: ${{ matrix.board }}
+          version: ${{ needs.getvars.outputs.version }}
           skip-checkout: true
 
   merge-partitions:
+    needs: [getvars, build-staticfs, build-firmware]
     runs-on: ubuntu-latest
-    needs: [get-targets, build-staticfs, build-firmware]
     strategy:
       fail-fast: false
-      matrix: ${{ fromJSON(needs.get-targets.outputs.matrix )}}
+      matrix: ${{ fromJSON(needs.getvars.outputs.board-matrix) }}
 
     steps:
       - uses: actions/checkout@v4
@@ -86,11 +86,119 @@ jobs:
       - uses: ./.github/actions/merge-partitions
         with:
           python-version: ${{ env.PYTHON_VERSION }}
+          release-channel: ${{ needs.getvars.outputs.release-channel }}
           board: ${{ matrix.board }}
           skip-checkout: true
 
   checkpoint-build:
     runs-on: ubuntu-latest
-    needs: [build-staticfs, merge-partitions]
+    needs: [merge-partitions]
     steps:
       - run: echo "Builds checkpoint reached"
+
+  cdn-upload-firmware:
+    needs: [getvars, checkpoint-build]
+    if: ${{ needs.getvars.outputs.should-deploy == 'true' }}
+    runs-on: ubuntu-latest
+    environment: cdn-firmware-r2
+    strategy:
+      fail-fast: true
+      matrix: ${{ fromJson(needs.getvars.outputs.board-matrix) }}
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          sparse-checkout: |
+            .github
+
+      # Set up rclone for CDN uploads.
+      - uses: ./.github/actions/cdn-prepare
+        with:
+          cf-account-id: ${{ vars.S3_ACCOUNT_ID }}
+          cf-access-key-id: ${{ vars.S3_ACCESS_KEY_ID }}
+          cf-secret-access-key: ${{ secrets.S3_SECRET_ACCESS_KEY }}
+
+      # Upload firmware to CDN.
+      - uses: ./.github/actions/cdn-upload-firmware
+        with:
+          cf-bucket: ${{ vars.S3_BUCKET }}
+          release-channel: ${{ needs.getvars.outputs.release-channel }}
+          board: ${{ matrix.board }}
+
+  cdn-upload-version-info:
+    needs: [getvars, checkpoint-build]
+    if: ${{ needs.getvars.outputs.should-deploy == 'true' }}
+    runs-on: ubuntu-latest
+    environment: cdn-firmware-r2
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          sparse-checkout: |
+            .github
+
+      # Set up rclone for CDN uploads.
+      - uses: ./.github/actions/cdn-prepare
+        with:
+          cf-account-id: ${{ vars.S3_ACCOUNT_ID }}
+          cf-access-key-id: ${{ vars.S3_ACCESS_KEY_ID }}
+          cf-secret-access-key: ${{ secrets.S3_SECRET_ACCESS_KEY }}
+
+      # Upload firmware to CDN.
+      - uses: ./.github/actions/cdn-upload-version-info
+        with:
+          cf-bucket: ${{ vars.S3_BUCKET }}
+          release-channel: ${{ needs.getvars.outputs.release-channel }}
+          boards: ${{ needs.getvars.outputs.board-list }}
+
+  cdn-bump-version:
+    runs-on: ubuntu-latest
+    needs: [getvars, cdn-upload-firmware] # only after version is complete
+    environment: cdn-firmware-r2
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          sparse-checkout: |
+            .github
+
+      # Set up rclone for CDN uploads.
+      - uses: ./.github/actions/cdn-prepare
+        with:
+          cf-account-id: ${{ vars.S3_ACCOUNT_ID }}
+          cf-access-key-id: ${{ vars.S3_ACCESS_KEY_ID }}
+          cf-secret-access-key: ${{ secrets.S3_SECRET_ACCESS_KEY }}
+
+      # Upload firmware to CDN.
+      - uses: ./.github/actions/cdn-bump-version
+        with:
+          cf-bucket: ${{ vars.S3_BUCKET }}
+          version: ${{ needs.getvars.outputs.version }}
+          release-channel: ${{ needs.getvars.outputs.release-channel }}
+
+  checkpoint-cdn:
+    runs-on: ubuntu-latest
+    needs: [cdn-upload-firmware, cdn-upload-version-info, cdn-bump-version]
+    steps:
+      - run: echo "CDN checkpoint reached"
+
+  release:
+    needs: [getvars, checkpoint-cdn]
+    if: (needs.getvars.outputs.release-channel == 'stable' || needs.getvars.outputs.release-channel == 'beta')
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Download release artifacts
+        uses: actions/download-artifact@v4
+
+      - name: Display artifacts
+        run: ls -R
+
+      - name: Release
+        uses: ncipollo/release-action@v1
+        with:
+          artifacts: '**/OpenShock_*.bin'
+          tag: ${{ needs.getvars.outputs.version }}
+          prerelease: ${{ needs.getvars.outputs.release-channel != 'stable' }}
+          artifactErrorsFailBuild: true
+          body: ${{ needs.getvars.outputs.release-notes }}

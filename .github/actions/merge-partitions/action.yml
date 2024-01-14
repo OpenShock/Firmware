@@ -4,6 +4,9 @@ inputs:
   python-version:
     description: 'Python version to use'
     required: true
+  release-channel:
+    description: 'Release channel that describes this upload'
+    required: true
   board:
     description: 'Board name to merge partitions for'
     required: true
@@ -33,12 +36,12 @@ runs:
       run: pip install esptool
 
     - name: Download static filesystem partition
-      uses: actions/download-artifact@v3
+      uses: actions/download-artifact@v4
       with:
         name: firmware_staticfs
 
     - name: Download firmware partitions
-      uses: actions/download-artifact@v3
+      uses: actions/download-artifact@v4
       with:
         name: firmware_build_${{ inputs.board }}
 
@@ -46,10 +49,10 @@ runs:
       shell: bash
       run: |
         python scripts/merge_image.py ${{ inputs.board }}
-        mv merged.bin OpenShock_${{ inputs.board }}_${{ !contains(github.ref_name, '/') && github.ref_name || 'unknown' }}.bin
+        mv merged.bin OpenShock_${{ inputs.board }}_${{ inputs.release-channel }}.bin
 
     - name: Upload merged firmware binary
-      uses: actions/upload-artifact@v3
+      uses: actions/upload-artifact@v4
       with:
         name: firmware_merged_${{ inputs.board }}
         path: OpenShock_${{ inputs.board }}_*.bin

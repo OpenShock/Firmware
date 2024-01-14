@@ -1,24 +1,22 @@
-name: cnd-bump-version
+name: cdn-bump-version
 description: Uploads version file to CDN
 inputs:
   cf-bucket:
     description: Name of the S3 bucket
     required: true
   version:
-    description: Version to upload
+    description: 'Version of the release'
     required: true
   release-channel:
     description: 'Release channel that describes this upload'
-    required: false
-    default: 'none'
+    required: true
 
 runs:
   using: composite
   steps:
-
     - name: Upload version file
       shell: bash
       run: |
-        mkdir upload
+        mkdir -p upload
         echo "${{ inputs.version }}" >> upload/version-${{ inputs.release-channel }}.txt
         rclone copy upload cdn:${{ inputs.cf-bucket }}/

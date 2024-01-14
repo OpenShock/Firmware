@@ -13,6 +13,8 @@ static_assert(FLATBUFFERS_VERSION_MAJOR == 23 &&
               FLATBUFFERS_VERSION_REVISION == 26,
              "Non-compatible flatbuffers version included");
 
+#include "FirmwareBootType_generated.h"
+
 namespace OpenShock {
 namespace Serialization {
 namespace Configuration {
@@ -35,8 +37,44 @@ struct BackendConfigBuilder;
 struct SerialInputConfig;
 struct SerialInputConfigBuilder;
 
+struct OtaUpdateConfig;
+struct OtaUpdateConfigBuilder;
+
 struct Config;
 struct ConfigBuilder;
+
+enum class OtaUpdateChannel : uint8_t {
+  Stable = 0,
+  Beta = 1,
+  Develop = 2,
+  MIN = Stable,
+  MAX = Develop
+};
+
+inline const OtaUpdateChannel (&EnumValuesOtaUpdateChannel())[3] {
+  static const OtaUpdateChannel values[] = {
+    OtaUpdateChannel::Stable,
+    OtaUpdateChannel::Beta,
+    OtaUpdateChannel::Develop
+  };
+  return values;
+}
+
+inline const char * const *EnumNamesOtaUpdateChannel() {
+  static const char * const names[4] = {
+    "Stable",
+    "Beta",
+    "Develop",
+    nullptr
+  };
+  return names;
+}
+
+inline const char *EnumNameOtaUpdateChannel(OtaUpdateChannel e) {
+  if (::flatbuffers::IsOutRange(e, OtaUpdateChannel::Stable, OtaUpdateChannel::Develop)) return "";
+  const size_t index = static_cast<size_t>(e);
+  return EnumNamesOtaUpdateChannel()[index];
+}
 
 struct RFConfig FLATBUFFERS_FINAL_CLASS : private ::flatbuffers::Table {
   typedef RFConfigBuilder Builder;
@@ -460,6 +498,184 @@ struct SerialInputConfig::Traits {
   static auto constexpr Create = CreateSerialInputConfig;
 };
 
+struct OtaUpdateConfig FLATBUFFERS_FINAL_CLASS : private ::flatbuffers::Table {
+  typedef OtaUpdateConfigBuilder Builder;
+  struct Traits;
+  static FLATBUFFERS_CONSTEXPR_CPP11 const char *GetFullyQualifiedName() {
+    return "OpenShock.Serialization.Configuration.OtaUpdateConfig";
+  }
+  enum FlatBuffersVTableOffset FLATBUFFERS_VTABLE_UNDERLYING_TYPE {
+    VT_IS_ENABLED = 4,
+    VT_CDN_DOMAIN = 6,
+    VT_UPDATE_CHANNEL = 8,
+    VT_CHECK_ON_STARTUP = 10,
+    VT_CHECK_PERIODICALLY = 12,
+    VT_CHECK_INTERVAL = 14,
+    VT_ALLOW_BACKEND_MANAGEMENT = 16,
+    VT_REQUIRE_MANUAL_APPROVAL = 18,
+    VT_UPDATE_ID = 20,
+    VT_BOOT_TYPE = 22
+  };
+  /// Indicates whether OTA updates are enabled.
+  bool is_enabled() const {
+    return GetField<uint8_t>(VT_IS_ENABLED, 0) != 0;
+  }
+  /// The domain name of the OTA Content Delivery Network (CDN).
+  const ::flatbuffers::String *cdn_domain() const {
+    return GetPointer<const ::flatbuffers::String *>(VT_CDN_DOMAIN);
+  }
+  /// The update channel to use.
+  OpenShock::Serialization::Configuration::OtaUpdateChannel update_channel() const {
+    return static_cast<OpenShock::Serialization::Configuration::OtaUpdateChannel>(GetField<uint8_t>(VT_UPDATE_CHANNEL, 0));
+  }
+  /// Indicates whether to check for updates on startup.
+  bool check_on_startup() const {
+    return GetField<uint8_t>(VT_CHECK_ON_STARTUP, 0) != 0;
+  }
+  /// Indicates whether to check for updates periodically.
+  bool check_periodically() const {
+    return GetField<uint8_t>(VT_CHECK_PERIODICALLY, 0) != 0;
+  }
+  /// The interval in minutes between periodic update checks.
+  uint16_t check_interval() const {
+    return GetField<uint16_t>(VT_CHECK_INTERVAL, 0);
+  }
+  /// Indicates if the backend is authorized to manage the device's update version on behalf of the user.
+  bool allow_backend_management() const {
+    return GetField<uint8_t>(VT_ALLOW_BACKEND_MANAGEMENT, 0) != 0;
+  }
+  /// Indicates if manual approval via serial input or captive portal is required before installing updates.
+  bool require_manual_approval() const {
+    return GetField<uint8_t>(VT_REQUIRE_MANUAL_APPROVAL, 0) != 0;
+  }
+  /// Update process ID, used to track the update process server-side across reboots.
+  int32_t update_id() const {
+    return GetField<int32_t>(VT_UPDATE_ID, 0);
+  }
+  /// Indicates what kind of firmware boot is happening (normal boot, booting into new firmware, rolling back to old firmware, etc.)
+  OpenShock::Serialization::Types::FirmwareBootType boot_type() const {
+    return static_cast<OpenShock::Serialization::Types::FirmwareBootType>(GetField<uint8_t>(VT_BOOT_TYPE, 0));
+  }
+  bool Verify(::flatbuffers::Verifier &verifier) const {
+    return VerifyTableStart(verifier) &&
+           VerifyField<uint8_t>(verifier, VT_IS_ENABLED, 1) &&
+           VerifyOffset(verifier, VT_CDN_DOMAIN) &&
+           verifier.VerifyString(cdn_domain()) &&
+           VerifyField<uint8_t>(verifier, VT_UPDATE_CHANNEL, 1) &&
+           VerifyField<uint8_t>(verifier, VT_CHECK_ON_STARTUP, 1) &&
+           VerifyField<uint8_t>(verifier, VT_CHECK_PERIODICALLY, 1) &&
+           VerifyField<uint16_t>(verifier, VT_CHECK_INTERVAL, 2) &&
+           VerifyField<uint8_t>(verifier, VT_ALLOW_BACKEND_MANAGEMENT, 1) &&
+           VerifyField<uint8_t>(verifier, VT_REQUIRE_MANUAL_APPROVAL, 1) &&
+           VerifyField<int32_t>(verifier, VT_UPDATE_ID, 4) &&
+           VerifyField<uint8_t>(verifier, VT_BOOT_TYPE, 1) &&
+           verifier.EndTable();
+  }
+};
+
+struct OtaUpdateConfigBuilder {
+  typedef OtaUpdateConfig Table;
+  ::flatbuffers::FlatBufferBuilder &fbb_;
+  ::flatbuffers::uoffset_t start_;
+  void add_is_enabled(bool is_enabled) {
+    fbb_.AddElement<uint8_t>(OtaUpdateConfig::VT_IS_ENABLED, static_cast<uint8_t>(is_enabled), 0);
+  }
+  void add_cdn_domain(::flatbuffers::Offset<::flatbuffers::String> cdn_domain) {
+    fbb_.AddOffset(OtaUpdateConfig::VT_CDN_DOMAIN, cdn_domain);
+  }
+  void add_update_channel(OpenShock::Serialization::Configuration::OtaUpdateChannel update_channel) {
+    fbb_.AddElement<uint8_t>(OtaUpdateConfig::VT_UPDATE_CHANNEL, static_cast<uint8_t>(update_channel), 0);
+  }
+  void add_check_on_startup(bool check_on_startup) {
+    fbb_.AddElement<uint8_t>(OtaUpdateConfig::VT_CHECK_ON_STARTUP, static_cast<uint8_t>(check_on_startup), 0);
+  }
+  void add_check_periodically(bool check_periodically) {
+    fbb_.AddElement<uint8_t>(OtaUpdateConfig::VT_CHECK_PERIODICALLY, static_cast<uint8_t>(check_periodically), 0);
+  }
+  void add_check_interval(uint16_t check_interval) {
+    fbb_.AddElement<uint16_t>(OtaUpdateConfig::VT_CHECK_INTERVAL, check_interval, 0);
+  }
+  void add_allow_backend_management(bool allow_backend_management) {
+    fbb_.AddElement<uint8_t>(OtaUpdateConfig::VT_ALLOW_BACKEND_MANAGEMENT, static_cast<uint8_t>(allow_backend_management), 0);
+  }
+  void add_require_manual_approval(bool require_manual_approval) {
+    fbb_.AddElement<uint8_t>(OtaUpdateConfig::VT_REQUIRE_MANUAL_APPROVAL, static_cast<uint8_t>(require_manual_approval), 0);
+  }
+  void add_update_id(int32_t update_id) {
+    fbb_.AddElement<int32_t>(OtaUpdateConfig::VT_UPDATE_ID, update_id, 0);
+  }
+  void add_boot_type(OpenShock::Serialization::Types::FirmwareBootType boot_type) {
+    fbb_.AddElement<uint8_t>(OtaUpdateConfig::VT_BOOT_TYPE, static_cast<uint8_t>(boot_type), 0);
+  }
+  explicit OtaUpdateConfigBuilder(::flatbuffers::FlatBufferBuilder &_fbb)
+        : fbb_(_fbb) {
+    start_ = fbb_.StartTable();
+  }
+  ::flatbuffers::Offset<OtaUpdateConfig> Finish() {
+    const auto end = fbb_.EndTable(start_);
+    auto o = ::flatbuffers::Offset<OtaUpdateConfig>(end);
+    return o;
+  }
+};
+
+inline ::flatbuffers::Offset<OtaUpdateConfig> CreateOtaUpdateConfig(
+    ::flatbuffers::FlatBufferBuilder &_fbb,
+    bool is_enabled = false,
+    ::flatbuffers::Offset<::flatbuffers::String> cdn_domain = 0,
+    OpenShock::Serialization::Configuration::OtaUpdateChannel update_channel = OpenShock::Serialization::Configuration::OtaUpdateChannel::Stable,
+    bool check_on_startup = false,
+    bool check_periodically = false,
+    uint16_t check_interval = 0,
+    bool allow_backend_management = false,
+    bool require_manual_approval = false,
+    int32_t update_id = 0,
+    OpenShock::Serialization::Types::FirmwareBootType boot_type = OpenShock::Serialization::Types::FirmwareBootType::Normal) {
+  OtaUpdateConfigBuilder builder_(_fbb);
+  builder_.add_update_id(update_id);
+  builder_.add_cdn_domain(cdn_domain);
+  builder_.add_check_interval(check_interval);
+  builder_.add_boot_type(boot_type);
+  builder_.add_require_manual_approval(require_manual_approval);
+  builder_.add_allow_backend_management(allow_backend_management);
+  builder_.add_check_periodically(check_periodically);
+  builder_.add_check_on_startup(check_on_startup);
+  builder_.add_update_channel(update_channel);
+  builder_.add_is_enabled(is_enabled);
+  return builder_.Finish();
+}
+
+struct OtaUpdateConfig::Traits {
+  using type = OtaUpdateConfig;
+  static auto constexpr Create = CreateOtaUpdateConfig;
+};
+
+inline ::flatbuffers::Offset<OtaUpdateConfig> CreateOtaUpdateConfigDirect(
+    ::flatbuffers::FlatBufferBuilder &_fbb,
+    bool is_enabled = false,
+    const char *cdn_domain = nullptr,
+    OpenShock::Serialization::Configuration::OtaUpdateChannel update_channel = OpenShock::Serialization::Configuration::OtaUpdateChannel::Stable,
+    bool check_on_startup = false,
+    bool check_periodically = false,
+    uint16_t check_interval = 0,
+    bool allow_backend_management = false,
+    bool require_manual_approval = false,
+    int32_t update_id = 0,
+    OpenShock::Serialization::Types::FirmwareBootType boot_type = OpenShock::Serialization::Types::FirmwareBootType::Normal) {
+  auto cdn_domain__ = cdn_domain ? _fbb.CreateString(cdn_domain) : 0;
+  return OpenShock::Serialization::Configuration::CreateOtaUpdateConfig(
+      _fbb,
+      is_enabled,
+      cdn_domain__,
+      update_channel,
+      check_on_startup,
+      check_periodically,
+      check_interval,
+      allow_backend_management,
+      require_manual_approval,
+      update_id,
+      boot_type);
+}
+
 struct Config FLATBUFFERS_FINAL_CLASS : private ::flatbuffers::Table {
   typedef ConfigBuilder Builder;
   struct Traits;
@@ -471,7 +687,8 @@ struct Config FLATBUFFERS_FINAL_CLASS : private ::flatbuffers::Table {
     VT_WIFI = 6,
     VT_CAPTIVE_PORTAL = 8,
     VT_BACKEND = 10,
-    VT_SERIAL_INPUT = 12
+    VT_SERIAL_INPUT = 12,
+    VT_OTA_UPDATE = 14
   };
   /// RF Transmitter configuration
   const OpenShock::Serialization::Configuration::RFConfig *rf() const {
@@ -493,6 +710,10 @@ struct Config FLATBUFFERS_FINAL_CLASS : private ::flatbuffers::Table {
   const OpenShock::Serialization::Configuration::SerialInputConfig *serial_input() const {
     return GetPointer<const OpenShock::Serialization::Configuration::SerialInputConfig *>(VT_SERIAL_INPUT);
   }
+  /// OTA update configuration
+  const OpenShock::Serialization::Configuration::OtaUpdateConfig *ota_update() const {
+    return GetPointer<const OpenShock::Serialization::Configuration::OtaUpdateConfig *>(VT_OTA_UPDATE);
+  }
   bool Verify(::flatbuffers::Verifier &verifier) const {
     return VerifyTableStart(verifier) &&
            VerifyOffset(verifier, VT_RF) &&
@@ -505,6 +726,8 @@ struct Config FLATBUFFERS_FINAL_CLASS : private ::flatbuffers::Table {
            verifier.VerifyTable(backend()) &&
            VerifyOffset(verifier, VT_SERIAL_INPUT) &&
            verifier.VerifyTable(serial_input()) &&
+           VerifyOffset(verifier, VT_OTA_UPDATE) &&
+           verifier.VerifyTable(ota_update()) &&
            verifier.EndTable();
   }
 };
@@ -528,6 +751,9 @@ struct ConfigBuilder {
   void add_serial_input(::flatbuffers::Offset<OpenShock::Serialization::Configuration::SerialInputConfig> serial_input) {
     fbb_.AddOffset(Config::VT_SERIAL_INPUT, serial_input);
   }
+  void add_ota_update(::flatbuffers::Offset<OpenShock::Serialization::Configuration::OtaUpdateConfig> ota_update) {
+    fbb_.AddOffset(Config::VT_OTA_UPDATE, ota_update);
+  }
   explicit ConfigBuilder(::flatbuffers::FlatBufferBuilder &_fbb)
         : fbb_(_fbb) {
     start_ = fbb_.StartTable();
@@ -545,8 +771,10 @@ inline ::flatbuffers::Offset<Config> CreateConfig(
     ::flatbuffers::Offset<OpenShock::Serialization::Configuration::WiFiConfig> wifi = 0,
     ::flatbuffers::Offset<OpenShock::Serialization::Configuration::CaptivePortalConfig> captive_portal = 0,
     ::flatbuffers::Offset<OpenShock::Serialization::Configuration::BackendConfig> backend = 0,
-    ::flatbuffers::Offset<OpenShock::Serialization::Configuration::SerialInputConfig> serial_input = 0) {
+    ::flatbuffers::Offset<OpenShock::Serialization::Configuration::SerialInputConfig> serial_input = 0,
+    ::flatbuffers::Offset<OpenShock::Serialization::Configuration::OtaUpdateConfig> ota_update = 0) {
   ConfigBuilder builder_(_fbb);
+  builder_.add_ota_update(ota_update);
   builder_.add_serial_input(serial_input);
   builder_.add_backend(backend);
   builder_.add_captive_portal(captive_portal);

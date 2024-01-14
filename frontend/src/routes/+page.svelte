@@ -21,7 +21,7 @@
   let linkCode: string = '';
   $: linkCodeValid = isValidLinkCode(linkCode);
 
-  let rfTxPin: number | null = $DeviceStateStore.rfTxPin;
+  let rfTxPin: number | null = $DeviceStateStore.config?.rf.txPin ?? null;
   $: rfTxPinValid = rfTxPin !== null && rfTxPin >= 0 && rfTxPin < 255;
 
   function linkAccount() {

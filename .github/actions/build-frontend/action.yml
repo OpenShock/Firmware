@@ -18,7 +18,7 @@ runs:
           frontend
         path: ${{ github.repository }}
 
-    - uses: actions/setup-node@v3
+    - uses: actions/setup-node@v4
       with:
         node-version: ${{ inputs.node-version }}
         cache: 'npm'
@@ -35,7 +35,7 @@ runs:
       run: npm run build
 
     - name: Upload artifacts
-      uses: actions/upload-artifact@v3
+      uses: actions/upload-artifact@v4
       with:
         name: frontend
         path: frontend/build/*

@@ -143,7 +143,9 @@ export const DeviceStateStore = {
   },
   setRfTxPin(pin: number) {
     update((store) => {
-      store.rfTxPin = pin;
+      if (store.config) {
+        store.config.rf.txPin = pin;
+      }
       return store;
     });
   },

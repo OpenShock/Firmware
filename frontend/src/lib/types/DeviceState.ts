@@ -1,4 +1,5 @@
 import type { WifiScanStatus } from '$lib/_fbs/open-shock/serialization/types/wifi-scan-status';
+import type { Config } from '$lib/mappers/ConfigMapper';
 import type { WiFiNetwork, WiFiNetworkGroup } from './';
 
 export type DeviceState = {
@@ -21,5 +22,5 @@ export type DeviceState = {
   accountLinked: boolean;
 
   /// The RF TX pin, or null if not set.
-  config: null; // TODO: Implement config
+  config: Config | null;
 };
