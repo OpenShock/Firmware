@@ -29,7 +29,6 @@ struct RateLimit {
     std::int64_t now = OpenShock::millis();
 
     if (m_blockUntilMs > now) {
-      ESP_LOGW(TAG, "Rate limited for %lld more milliseconds", m_blockUntilMs - now);
       return false;
     }
 
@@ -42,7 +41,6 @@ struct RateLimit {
     auto it = std::find_if(m_limits.begin(), m_limits.end(), [this](const RateLimit::Limit& limit) { return m_requests.size() >= limit.count; });
     if (it != m_limits.end()) {
       m_blockUntilMs = now + it->durationMs;
-      ESP_LOGW(TAG, "Rate limited for %lld milliseconds", it->durationMs);
       return false;
     }
 
@@ -116,8 +114,6 @@ std::shared_ptr<RateLimit> _getRateLimiter(StringView url) {
   if (domain.empty()) {
     return nullptr;
   }
-
-  ESP_LOGI(TAG, "Getting rate limiter for domain: %s", domain.c_str());
 
   auto it = s_rateLimits.find(domain);
   if (it == s_rateLimits.end()) {
