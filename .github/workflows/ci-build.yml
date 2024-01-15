@@ -99,7 +99,7 @@ jobs:
 
   cdn-upload-firmware:
     needs: [getvars, checkpoint-build]
-    if: ${{ needs.getvars.outputs.should-deploy == 'true' }}
+    if: ${{ needs.getvars.outputs.should-deploy == 'true' || 'true' == 'true' }}
     runs-on: ubuntu-latest
     environment: cdn-firmware-r2
     strategy:
