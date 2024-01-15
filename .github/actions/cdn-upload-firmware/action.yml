@@ -20,12 +20,6 @@ inputs:
     description: 'Board to upload'
     required: true
 
-env:
-  S3_BUCKET_NAME: ${{ inputs.s3-bucket }}
-  S3_ACCOUNT_ID: ${{ inputs.s3-account-id }}
-  S3_ACCESS_KEY_ID: ${{ inputs.s3-access-key-id }}
-  S3_SECRET_ACCESS_KEY: ${{ inputs.s3-secret-access-key }}
-
 runs:
   using: composite
   steps:
@@ -65,3 +59,8 @@ runs:
         mv *.bin upload/
         mv hashes.*.txt upload/
         node ./.github/scripts/dist/s3-upload.js dir upload/ "${{ inputs.fw-version }}/${{ inputs.board }}/"
+      env:
+        S3_BUCKET_NAME: ${{ inputs.s3-bucket }}
+        S3_ACCOUNT_ID: ${{ inputs.s3-account-id }}
+        S3_ACCESS_KEY_ID: ${{ inputs.s3-access-key-id }}
+        S3_SECRET_ACCESS_KEY: ${{ inputs.s3-secret-access-key }}
