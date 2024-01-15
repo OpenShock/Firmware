@@ -101,7 +101,6 @@ jobs:
     needs: [getvars, checkpoint-build]
     if: ${{ needs.getvars.outputs.should-deploy == 'true' || 'true' == 'true' }}
     runs-on: ubuntu-latest
-    environment: cdn-firmware-r2
     strategy:
       fail-fast: true
       matrix: ${{ fromJson(needs.getvars.outputs.board-matrix) }}
@@ -130,7 +129,6 @@ jobs:
     needs: [getvars, checkpoint-build]
     if: ${{ needs.getvars.outputs.should-deploy == 'true' }}
     runs-on: ubuntu-latest
-    environment: cdn-firmware-r2
 
     steps:
       - uses: actions/checkout@v4
@@ -156,7 +154,6 @@ jobs:
   cdn-bump-version:
     runs-on: ubuntu-latest
     needs: [getvars, cdn-upload-firmware] # only after version is complete
-    environment: cdn-firmware-r2
 
     steps:
       - uses: actions/checkout@v4
