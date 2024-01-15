@@ -520,3 +520,8 @@ void WiFiManager::Update() {
 
   _connect(creds.ssid, creds.password);
 }
+
+// Function to get a reference to s_wifiNetworks
+std::vector<WiFiNetwork>& WiFiManager::GetDiscoveredWiFiNetworks() {
+  return s_wifiNetworks;
+}

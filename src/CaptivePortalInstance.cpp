@@ -158,6 +158,13 @@ void CaptivePortalInstance::handleWebSocketClientConnected(std::uint8_t socketId
   }
 
   Serialization::Local::SerializeReadyMessage(connectedNetworkPtr, GatewayConnectionManager::IsLinked(), std::bind(&CaptivePortalInstance::sendMessageBIN, this, socketId, std::placeholders::_1, std::placeholders::_2));
+
+  // Send all previously scanned wifi networks
+  auto& networks = OpenShock::WiFiManager::GetDiscoveredWiFiNetworks();
+
+  for (auto& network : networks) {
+    Serialization::Local::SerializeWiFiNetworkEvent(Serialization::Types::WifiNetworkEventType::Discovered, network, std::bind(&CaptivePortalInstance::sendMessageBIN, this, socketId, std::placeholders::_1, std::placeholders::_2));
+  }
 }
 
 void CaptivePortalInstance::handleWebSocketClientDisconnected(std::uint8_t socketId) {
