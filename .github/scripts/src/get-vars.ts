@@ -1,8 +1,8 @@
-const fs = require('fs');
-const ini = require('ini');
-const semver = require('semver');
-const core = require('@actions/core');
-const child_process = require('child_process');
+import * as fs from 'fs';
+import * as ini from 'ini';
+import { parse as ParseSemVer, type SemVer } from 'semver';
+import * as core from '@actions/core';
+import * as child_process from 'child_process';
 
 // Get branch name
 const gitRef = process.env.GITHUB_REF;
@@ -40,8 +40,8 @@ if (gitTagsList === undefined) {
   process.exit();
 }
 
-function convertGitTagToSemver(tag) {
-  const parsed = semver.parse(tag === '' ? '0.0.0' : tag);
+function convertGitTagToSemver(tag: string) {
+  const parsed = ParseSemVer(tag === '' ? '0.0.0' : tag);
   if (parsed === null || parsed.loose) {
     core.setFailed(`Git tag "${tag}" is not a valid semver version`);
     process.exit();
@@ -50,18 +50,18 @@ function convertGitTagToSemver(tag) {
   return parsed;
 }
 
-const gitTagsArray = gitTagsList.split('\n').map((tag) => tag.trim());
+const gitTagsArray = gitTagsList.split('\n').map((tag: string) => tag.trim());
 const releasesArray = gitTagsArray.map(convertGitTagToSemver);
 const latestRelease = isGitTag ? convertGitTagToSemver(gitRef.split('/')[2]) : releasesArray[0];
 
-function isStableRelease(release) {
+function isStableRelease(release: SemVer) {
   return release.prerelease.length === 0 || release.prerelease[0] === 'stable';
 }
-function isBetaRelease(release) {
-  return release.prerelease.length > 0 && ['rc', 'beta'].includes(release.prerelease[0]);
+function isBetaRelease(release: SemVer) {
+  return release.prerelease.length > 0 && (['rc', 'beta'] as (string | number)[]).includes(release.prerelease[0]);
 }
-function isDevRelease(release) {
-  return release.prerelease.length > 0 && ['dev', 'develop'].includes(release.prerelease[0]);
+function isDevRelease(release: SemVer) {
+  return release.prerelease.length > 0 && (['dev', 'develop'] as (string | number)[]).includes(release.prerelease[0]);
 }
 
 const stableReleasesArray = releasesArray.filter(isStableRelease);
@@ -75,7 +75,12 @@ if (!isGitTag) {
   let sanitizedGitHeadRefName = gitHeadRefName
     .split('/')
     .pop()
-    .replace(/[^a-zA-Z0-9-]/g, '-');
+    ?.replace(/[^a-zA-Z0-9-]/g, '-');
+
+  if (sanitizedGitHeadRefName === undefined) {
+    core.setFailed('Failed to sanitize git head ref name');
+    process.exit();
+  }
 
   // Remove leading and trailing dashes
   sanitizedGitHeadRefName = sanitizedGitHeadRefName.replace(/^\-+|\-+$/g, '');
@@ -107,7 +112,7 @@ if (gitHeadRefName === 'master' || (isGitTag && isStableRelease(latestRelease)))
   currentChannel = gitHeadRefName.replace(/[^a-zA-Z0-9-]/g, '-').replace(/^\-+|\-+$/g, '');
 }
 
-function getVersionChangeLog(lines) {
+function getVersionChangeLog(lines: string[]) {
   const emptyChangelog = lines.length === 0;
 
   // Enforce that the changelog is not empty if we are on the master branch
@@ -204,7 +209,7 @@ const platformioIni = ini.parse(platformioIniStr);
 // Get every key that starts with "env:", and that isnt "env:fs" (which is the filesystem)
 const boards = Object.keys(platformioIni)
   .filter((key) => key.startsWith('env:') && key !== 'env:fs')
-  .reduce((arr, key) => {
+  .reduce<string[]>((arr, key) => {
     arr.push(key.substring(4));
     return arr;
   }, []);

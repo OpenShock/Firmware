@@ -4,6 +4,7 @@ on:
       - master
       - beta
       - develop
+      - feature/ci-* # Feature branches for CI development.
     tags:
       - '[0-9]+.[0-9]+.[0-9]+'
       - '[0-9]+.[0-9]+.[0-9]+-*'

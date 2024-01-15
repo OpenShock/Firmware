@@ -91,15 +91,8 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: ${{ inputs.node-version }}
-          cache: 'npm'
-          cache-dependency-path: ./.github/scripts/package-lock.json
-
-      - name: Install dependencies
-        working-directory: ./.github/scripts
-        shell: bash
-        run: npm ci
 
       - name: Get variables
         id: get-vars
         shell: bash
-        run: node ./.github/scripts/get-vars.js
+        run: node ./.github/scripts/dist/get-vars.js
