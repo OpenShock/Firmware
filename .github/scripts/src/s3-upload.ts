@@ -6,10 +6,10 @@ import { S3Client, PutObjectCommand } from '@aws-sdk/client-s3';
 import { setFailed } from '@actions/core';
 import * as child_process from 'child_process';
 
+const bucketName = process.env.S3_BUCKET_NAME;
 const s3AccountId = process.env.S3_ACCOUNT_ID;
 const s3AccessKeyId = process.env.S3_ACCESS_KEY_ID;
 const s3SecretAccessKey = process.env.S3_SECRET_ACCESS_KEY;
-const bucketName = process.env.AWS_BUCKET_NAME;
 
 if (!s3AccessKeyId || !s3SecretAccessKey || !bucketName) {
   setFailed('AWS credentials are required');
