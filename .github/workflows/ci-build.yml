@@ -111,13 +111,6 @@ jobs:
           sparse-checkout: |
             .github
 
-      # Set up rclone for CDN uploads.
-      - uses: ./.github/actions/cdn-prepare
-        with:
-          cf-account-id: ${{ vars.S3_ACCOUNT_ID }}
-          cf-access-key-id: ${{ vars.S3_ACCESS_KEY_ID }}
-          cf-secret-access-key: ${{ secrets.S3_SECRET_ACCESS_KEY }}
-
       # Upload firmware to CDN.
       - uses: ./.github/actions/cdn-upload-firmware
         with:
@@ -136,13 +129,6 @@ jobs:
           sparse-checkout: |
             .github
 
-      # Set up rclone for CDN uploads.
-      - uses: ./.github/actions/cdn-prepare
-        with:
-          cf-account-id: ${{ vars.S3_ACCOUNT_ID }}
-          cf-access-key-id: ${{ vars.S3_ACCESS_KEY_ID }}
-          cf-secret-access-key: ${{ secrets.S3_SECRET_ACCESS_KEY }}
-
       # Upload firmware to CDN.
       - uses: ./.github/actions/cdn-upload-version-info
         with:
@@ -160,13 +146,6 @@ jobs:
         with:
           sparse-checkout: |
             .github
-
-      # Set up rclone for CDN uploads.
-      - uses: ./.github/actions/cdn-prepare
-        with:
-          cf-account-id: ${{ vars.S3_ACCOUNT_ID }}
-          cf-access-key-id: ${{ vars.S3_ACCESS_KEY_ID }}
-          cf-secret-access-key: ${{ secrets.S3_SECRET_ACCESS_KEY }}
 
       # Upload firmware to CDN.
       - uses: ./.github/actions/cdn-bump-version
