@@ -11,7 +11,11 @@ const s3AccountId = process.env.S3_ACCOUNT_ID;
 const s3AccessKeyId = process.env.S3_ACCESS_KEY_ID;
 const s3SecretAccessKey = process.env.S3_SECRET_ACCESS_KEY;
 
-if (!s3AccessKeyId || !s3SecretAccessKey || !bucketName) {
+if (!bucketName || !s3AccountId || !s3AccessKeyId || !s3SecretAccessKey) {
+  console.log('S3_BUCKET_NAME: ' + bucketName ? 'OK' : 'MISSING');
+  console.log('S3_ACCOUNT_ID: ' + s3AccountId ? 'OK' : 'MISSING');
+  console.log('S3_ACCESS_KEY_ID: ' + s3AccessKeyId ? 'OK' : 'MISSING');
+  console.log('S3_SECRET_ACCESS_KEY: ' + s3SecretAccessKey ? 'OK' : 'MISSING');
   setFailed('AWS credentials are required');
   process.exit();
 }
