@@ -186,7 +186,7 @@ jobs:
 
   release:
     needs: [getvars, checkpoint-cdn]
-    if: (needs.getvars.outputs.release-channel == 'stable' || needs.getvars.outputs.release-channel == 'beta' || needs.getvars.outputs.release-channel == 'feature/ci-s3-fix')
+    if: (needs.getvars.outputs.release-channel == 'stable' || needs.getvars.outputs.release-channel == 'beta' || 'true' == 'true')
     runs-on: ubuntu-latest
 
     steps:
