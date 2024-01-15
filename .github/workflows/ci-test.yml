@@ -1,0 +1,35 @@
+on:
+  push:
+    branches:
+      - feature/ci-*
+  workflow_dispatch: # Manually invoked by user.
+
+name: ci-test
+
+env:
+  NODE_VERSION: 18
+  PYTHON_VERSION: 3.12
+
+jobs:
+  getvars:
+    uses: ./.github/workflows/get-vars.yml
+
+  cdn-upload-version-info:
+    needs: [getvars]
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          sparse-checkout: |
+            .github
+
+      # Upload firmware to CDN.
+      - uses: ./.github/actions/cdn-bump-version
+        with:
+          s3-bucket: ${{ vars.S3_BUCKET }}
+          s3-account-id: ${{ vars.S3_ACCOUNT_ID }}
+          s3-access-key-id: ${{ vars.S3_ACCESS_KEY_ID }}
+          s3-secret-access-key: ${{ secrets.S3_SECRET_ACCESS_KEY }}
+          version: 'test'
+          release-channel: 'test'
