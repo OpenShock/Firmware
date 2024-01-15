@@ -17,6 +17,7 @@ jobs:
   cdn-upload-version-info:
     needs: [getvars]
     runs-on: ubuntu-latest
+    environment: cdn-fimware-r2
 
     steps:
       - uses: actions/checkout@v4
