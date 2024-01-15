@@ -6,13 +6,13 @@ import { S3Client, PutObjectCommand } from '@aws-sdk/client-s3';
 import { setFailed } from '@actions/core';
 import * as child_process from 'child_process';
 
-const bucketName = process.env.S3_BUCKET_NAME;
+const s3Bucket = process.env.S3_BUCKET;
 const s3AccountId = process.env.S3_ACCOUNT_ID;
 const s3AccessKeyId = process.env.S3_ACCESS_KEY_ID;
 const s3SecretAccessKey = process.env.S3_SECRET_ACCESS_KEY;
 
-if (!bucketName || !s3AccountId || !s3AccessKeyId || !s3SecretAccessKey) {
-  console.log('S3_BUCKET_NAME: ' + (bucketName ? 'OK' : 'MISSING'));
+if (!s3Bucket || !s3AccountId || !s3AccessKeyId || !s3SecretAccessKey) {
+  console.log('S3_BUCKET: ' + (s3Bucket ? 'OK' : 'MISSING'));
   console.log('S3_ACCOUNT_ID: ' + (s3AccountId ? 'OK' : 'MISSING'));
   console.log('S3_ACCESS_KEY_ID: ' + (s3AccessKeyId ? 'OK' : 'MISSING'));
   console.log('S3_SECRET_ACCESS_KEY: ' + (s3SecretAccessKey ? 'OK' : 'MISSING'));
@@ -50,7 +50,7 @@ function getFileHashMD5(fileName: string): string {
 
 async function uploadStream(Body: stream.Readable, Key: string, ContentLength: number | undefined = undefined, contentTypeMime: string | null = null, ContentMD5: string | undefined = undefined) {
   const command = new PutObjectCommand({
-    Bucket: bucketName,
+    Bucket: s3Bucket,
     Key,
     Body,
     ContentType: contentTypeMime ?? 'application/octet-stream',
