@@ -441,7 +441,7 @@ bool WiFiManager::GetConnectedNetwork(OpenShock::WiFiNetwork& network) {
   if (s_connectedCredentialsID == 0) {
     if (IsConnected()) {
       // We connected without a scan, so populate the network with the current connection info manually
-      network.credentialsID = 255;
+      network.credentialsID = 0;
       memcpy(network.ssid, WiFi.SSID().c_str(), WiFi.SSID().length() + 1);
       memcpy(network.bssid, WiFi.BSSID(), sizeof(network.bssid));
       network.channel = WiFi.channel();
