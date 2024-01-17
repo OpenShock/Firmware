@@ -62,7 +62,7 @@ bool Gateway::SerializeOtaInstallStartedMessage(std::int32_t updateId, const Ope
 }
 
 bool Gateway::SerializeOtaInstallProgressMessage(std::int32_t updateId, Gateway::OtaInstallProgressTask task, float progress, Common::SerializationCallbackFn callback) {
-  flatbuffers::FlatBufferBuilder builder(256);  // TODO: Profile this and adjust the size accordingly
+  flatbuffers::FlatBufferBuilder builder(64);  // TODO: Profile this and adjust the size accordingly
 
   auto otaInstallProgressOffset = Gateway::CreateOtaInstallProgress(builder, updateId, task, progress);
 
