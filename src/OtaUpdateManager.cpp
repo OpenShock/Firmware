@@ -367,16 +367,19 @@ void _otaUpdateTask(void* arg) {
       continue;
     }
 
+    // Disconnect from WiFi.
+    WiFi.disconnect(true, true);
+
     // Send reboot message.
     _sendProgressMessage(Serialization::Gateway::OtaInstallProgressTask::Rebooting, 0.0f);
 
-    // Restart.
-    ESP_LOGI(TAG, "Restarting in 1 seconds...");
-    vTaskDelay(pdMS_TO_TICKS(1000));
-    esp_restart();
-
-    _sendFailureMessage("Well, this is awkward...");
+    // Reboot into new firmware.
+    ESP_LOGI(TAG, "Restarting into new firmware");
+    break;
   }
+
+  // Restart.
+  esp_restart();
 }
 
 bool _tryGetStringList(StringView url, std::vector<std::string>& list) {
