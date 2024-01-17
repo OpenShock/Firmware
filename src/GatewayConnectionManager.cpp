@@ -83,6 +83,9 @@ AccountLinkResultCode GatewayConnectionManager::Link(const char* linkCode) {
 
   auto response = HTTP::JsonAPI::LinkAccount(linkCode);
 
+  if (response.result == HTTP::RequestResult::RateLimited) {
+    return AccountLinkResultCode::InternalError;  // Just return false, don't spam the console with errors
+  }
   if (response.result != HTTP::RequestResult::Success) {
     ESP_LOGE(TAG, "Error while getting auth token: %d %d", response.result, response.code);
     return AccountLinkResultCode::InternalError;
@@ -144,6 +147,9 @@ bool FetchDeviceInfo(const String& authToken) {
 
   auto response = HTTP::JsonAPI::GetDeviceInfo(authToken);
 
+  if (response.result == HTTP::RequestResult::RateLimited) {
+    return false;  // Just return false, don't spam the console with errors
+  }
   if (response.result != HTTP::RequestResult::Success) {
     ESP_LOGE(TAG, "Error while fetching device info: %d %d", response.result, response.code);
     return false;
@@ -206,6 +212,9 @@ bool ConnectToLCG() {
 
   auto response = HTTP::JsonAPI::AssignLcg(authToken.c_str());
 
+  if (response.result == HTTP::RequestResult::RateLimited) {
+    return false;  // Just return false, don't spam the console with errors
+  }
   if (response.result != HTTP::RequestResult::Success) {
     ESP_LOGE(TAG, "Error while fetching LCG endpoint: %d %d", response.result, response.code);
     return false;
