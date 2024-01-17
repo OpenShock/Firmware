@@ -367,9 +367,6 @@ void _otaUpdateTask(void* arg) {
       continue;
     }
 
-    // Disconnect from WiFi.
-    WiFi.disconnect(true, true);
-
     // Send reboot message.
     _sendProgressMessage(Serialization::Gateway::OtaInstallProgressTask::Rebooting, 0.0f);
 
