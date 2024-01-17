@@ -43,7 +43,6 @@ runs:
       shell: bash
       run: pio run -e ${{ inputs.board }}
       env:
-        OPENSHOCK_API_DOMAIN: api.openshock.net
         OPENSHOCK_FW_VERSION: ${{ inputs.version }}
         OPENSHOCK_FW_GIT_REF: ${{ github.ref }}
         OPENSHOCK_FW_GIT_COMMIT: ${{ github.sha }}
