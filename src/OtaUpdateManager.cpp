@@ -244,7 +244,6 @@ void _otaUpdateTask(void* arg) {
 
     // If we're not connected, continue.
     if (!connected) {
-      ESP_LOGD(TAG, "Not connected, skipping update check");
       continue;
     }
 
