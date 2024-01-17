@@ -29,10 +29,7 @@ static std::map<std::uint64_t, WiFiScanManager::StatusChangedHandler> s_statusCh
 static std::map<std::uint64_t, WiFiScanManager::NetworkDiscoveryHandler> s_networkDiscoveredHandlers;
 
 bool _notifyTask(WiFiScanTaskNotificationFlags flags) {
-  if (xSemaphoreTake(s_scanTaskMutex, portMAX_DELAY) != pdTRUE) {
-    ESP_LOGE(TAG, "Failed to take scan task mutex");
-    return false;
-  }
+  xSemaphoreTake(s_scanTaskMutex, portMAX_DELAY);
 
   bool success = false;
 

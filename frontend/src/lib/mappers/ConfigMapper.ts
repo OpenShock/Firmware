@@ -1,6 +1,8 @@
 import type { OtaUpdateChannel } from '$lib/_fbs/open-shock/serialization/configuration';
 import { Config as FbsConfig } from '$lib/_fbs/open-shock/serialization/configuration/config';
 
+// TODO: Update these configs and ensure that typescript enforces them to be up to date
+
 export interface RFConfig {
   txPin: number;
   keepaliveEnabled: boolean;
@@ -56,8 +58,6 @@ function mapRfConfig(fbsConfig: FbsConfig): RFConfig {
 
   const txPin = rf.txPin();
   const keepaliveEnabled = rf.keepaliveEnabled();
-
-  if (!txPin) throw new Error('rf.txPin is null');
 
   return {
     txPin,

@@ -122,7 +122,7 @@ jobs:
       - uses: ./.github/actions/cdn-upload-firmware
         with:
           cf-bucket: ${{ vars.S3_BUCKET }}
-          release-channel: ${{ needs.getvars.outputs.release-channel }}
+          fw-version: ${{ needs.getvars.outputs.version }}
           board: ${{ matrix.board }}
 
   cdn-upload-version-info:
@@ -148,6 +148,7 @@ jobs:
       - uses: ./.github/actions/cdn-upload-version-info
         with:
           cf-bucket: ${{ vars.S3_BUCKET }}
+          fw-version: ${{ needs.getvars.outputs.version }}
           release-channel: ${{ needs.getvars.outputs.release-channel }}
           boards: ${{ needs.getvars.outputs.board-list }}
 
