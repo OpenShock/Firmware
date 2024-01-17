@@ -289,12 +289,9 @@ void _evWiFiNetworkDiscovery(const wifi_ap_record_t* record) {
   s_wifiNetworks.insert(std::lower_bound(s_wifiNetworks.begin(), s_wifiNetworks.end(), network, [](const WiFiNetwork& a, const WiFiNetwork& b) { return a.rssi > b.rssi; }), std::move(network));
 }
 
-bool WiFiManager::Init() {
-  if (set_esp_interface_dns(ESP_IF_WIFI_STA, "1.1.1.1", "8.8.8.8", "9.9.9.9") != ESP_OK) {
-    ESP_LOGE(TAG, "Failed to set DNS servers");
-    return false;
-  }
+esp_err_t set_esp_interface_dns(esp_interface_t interface, IPAddress main_dns, IPAddress backup_dns, IPAddress fallback_dns);
 
+bool WiFiManager::Init() {
   WiFi.onEvent(_evWiFiConnected, ARDUINO_EVENT_WIFI_STA_CONNECTED);
   WiFi.onEvent(_evWiFiGotIP, ARDUINO_EVENT_WIFI_STA_GOT_IP);
   WiFi.onEvent(_evWiFiGotIP6, ARDUINO_EVENT_WIFI_STA_GOT_IP6);
@@ -320,6 +317,12 @@ bool WiFiManager::Init() {
         WiFi.begin();
       }
     }
+  }
+
+
+  if (set_esp_interface_dns(ESP_IF_WIFI_STA, IPAddress(1,1,1,1), IPAddress(8,8,8,8), IPAddress(9,9,9,9)) != ESP_OK) {
+    ESP_LOGE(TAG, "Failed to set DNS servers");
+    return false;
   }
 
   return true;
