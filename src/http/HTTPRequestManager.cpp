@@ -1,5 +1,6 @@
 #include "http/HTTPRequestManager.h"
 
+#include "Common.h"
 #include "Time.h"
 
 #include <HTTPClient.h>
@@ -13,8 +14,7 @@
 constexpr std::size_t HTTP_BUFFER_SIZE = 4096LLU;
 constexpr int HTTP_DOWNLOAD_SIZE_LIMIT = 200 * 1024 * 1024;  // 200 MB
 
-const char* const TAG                    = "HTTPRequestManager";
-const char* const OPENSHOCK_FW_USERAGENT = OPENSHOCK_FW_HOSTNAME "/" OPENSHOCK_FW_VERSION " (" OPENSHOCK_FW_BOARD "; " OPENSHOCK_FW_CHIP "; Espressif) " OPENSHOCK_FW_GIT_COMMIT;
+const char* const TAG = "HTTPRequestManager";
 
 struct RateLimit {
   RateLimit() : m_mutex(xSemaphoreCreateMutex()), m_blockUntilMs(0), m_limits(), m_requests() { }
@@ -158,7 +158,7 @@ std::shared_ptr<RateLimit> _getRateLimiter(StringView url) {
 }
 
 void _setupClient(HTTPClient& client) {
-  client.setUserAgent(OPENSHOCK_FW_USERAGENT);
+  client.setUserAgent(OpenShock::Constants::FW_USERAGENT);
 }
 
 struct StreamReaderResult {
@@ -528,17 +528,7 @@ HTTP::Response<std::size_t>
   HTTPClient client;
   _setupClient(client);
 
-  auto response = _doGetStream(client, url, headers, acceptedCodes, rateLimiter, contentLengthCallback, downloadCallback, timeoutMs);
-  if (response.result != RequestResult::Success) {
-    return response;
-  }
-
-  if (std::find(acceptedCodes.begin(), acceptedCodes.end(), response.code) == acceptedCodes.end()) {
-    ESP_LOGE(TAG, "Received unexpected response code %d", response.code);
-    return {RequestResult::CodeRejected, response.code, 0};
-  }
-
-  return response;
+  return _doGetStream(client, url, headers, acceptedCodes, rateLimiter, contentLengthCallback, downloadCallback, timeoutMs);
 }
 
 HTTP::Response<std::string> HTTP::GetString(StringView url, const std::map<String, String>& headers, const std::vector<int>& acceptedCodes, std::uint32_t timeoutMs) {

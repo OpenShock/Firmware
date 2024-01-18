@@ -1,5 +1,6 @@
 #include "GatewayClient.h"
 
+#include "Common.h"
 #include "config/Config.h"
 #include "event_handlers/WebSocket.h"
 #include "Logging.h"
@@ -20,6 +21,7 @@ GatewayClient::GatewayClient(const std::string& authToken) : m_webSocket(), m_la
                         "Device-Token: "
                       + authToken;
 
+  m_webSocket.setUserAgent(OpenShock::Constants::FW_USERAGENT);
   m_webSocket.setExtraHeaders(headers.c_str());
   m_webSocket.onEvent(std::bind(&GatewayClient::_handleEvent, this, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3));
 }

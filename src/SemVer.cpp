@@ -286,12 +286,12 @@ bool OpenShock::TryParseSemVer(StringView semverStr, SemVer& semver) {
     return false;
   }
 
-  if (!_semverIsPrerelease(semver.prerelease)) {
+  if (!semver.prerelease.empty() && !_semverIsPrerelease(semver.prerelease)) {
     ESP_LOGE(TAG, "Invalid prerelease: %s", semver.prerelease.data());
     return false;
   }
 
-  if (!_semverIsBuild(semver.build)) {
+  if (!semver.build.empty() && !_semverIsBuild(semver.build)) {
     ESP_LOGE(TAG, "Invalid build: %s", semver.build.data());
     return false;
   }
