@@ -35,6 +35,7 @@
         value: '',
         valueAttr: { type: 'password', minlength: 1, maxlength: 63, required: true },
         response: (password: string) => {
+          if (!password) return;
           const data = SerializeWifiNetworkSaveCommand(item.ssid, password, true);
           WebSocketClient.Instance.Send(data);
         },

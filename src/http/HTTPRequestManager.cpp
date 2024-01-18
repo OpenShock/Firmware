@@ -528,17 +528,7 @@ HTTP::Response<std::size_t>
   HTTPClient client;
   _setupClient(client);
 
-  auto response = _doGetStream(client, url, headers, acceptedCodes, rateLimiter, contentLengthCallback, downloadCallback, timeoutMs);
-  if (response.result != RequestResult::Success) {
-    return response;
-  }
-
-  if (std::find(acceptedCodes.begin(), acceptedCodes.end(), response.code) == acceptedCodes.end()) {
-    ESP_LOGE(TAG, "Received unexpected response code %d", response.code);
-    return {RequestResult::CodeRejected, response.code, 0};
-  }
-
-  return response;
+  return _doGetStream(client, url, headers, acceptedCodes, rateLimiter, contentLengthCallback, downloadCallback, timeoutMs);
 }
 
 HTTP::Response<std::string> HTTP::GetString(StringView url, const std::map<String, String>& headers, const std::vector<int>& acceptedCodes, std::uint32_t timeoutMs) {
