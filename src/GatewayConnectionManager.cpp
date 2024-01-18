@@ -31,6 +31,8 @@ constexpr std::uint8_t FLAG_NONE   = 0;
 constexpr std::uint8_t FLAG_HAS_IP = 1 << 0;
 constexpr std::uint8_t FLAG_LINKED = 1 << 1;
 
+constexpr std::uint8_t LINK_CODE_LENGTH = 6;
+
 static std::uint8_t s_flags                                 = 0;
 static std::unique_ptr<OpenShock::GatewayClient> s_wsClient = nullptr;
 
@@ -81,6 +83,11 @@ AccountLinkResultCode GatewayConnectionManager::Link(const char* linkCode) {
 
   ESP_LOGD(TAG, "Attempting to link to account using code %s", linkCode);
 
+  if (std::strlen(linkCode) != LINK_CODE_LENGTH) {
+    ESP_LOGE(TAG, "Invalid link code length");
+    return AccountLinkResultCode::InvalidCode;
+  }
+
   auto response = HTTP::JsonAPI::LinkAccount(linkCode);
 
   if (response.result == HTTP::RequestResult::RateLimited) {
@@ -88,11 +95,12 @@ AccountLinkResultCode GatewayConnectionManager::Link(const char* linkCode) {
   }
   if (response.result != HTTP::RequestResult::Success) {
     ESP_LOGE(TAG, "Error while getting auth token: %d %d", response.result, response.code);
-    return AccountLinkResultCode::InternalError;
-  }
 
-  if (response.code == 404) {
-    return AccountLinkResultCode::InvalidCode;
+    if (response.code == 404) {
+      return AccountLinkResultCode::InvalidCode;
+    }
+
+    return AccountLinkResultCode::InternalError;
   }
 
   if (response.code != 200) {
