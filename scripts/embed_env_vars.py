@@ -54,7 +54,7 @@ def get_pio_firmware_vars() -> dict[str, str | int | bool]:
     vars = {}
     vars['OPENSHOCK_FW_BOARD'] = fw_board
     vars['OPENSHOCK_FW_BOARD_' + macroify(fw_board)] = True  # Used for conditional compilation.
-    vars['OPENSHOCK_FW_CHIP'] = fw_chip
+    vars['OPENSHOCK_FW_CHIP'] = fw_chip.upper()
     vars['OPENSHOCK_FW_CHIP_' + macroify(fw_chip)] = True  # Used for conditional compilation.
     vars['OPENSHOCK_FW_MODE'] = pio_build_type
     git_commit = get_git_commit()

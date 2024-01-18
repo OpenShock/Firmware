@@ -96,11 +96,11 @@ AccountLinkResultCode GatewayConnectionManager::Link(const char* linkCode) {
   if (response.result != HTTP::RequestResult::Success) {
     ESP_LOGE(TAG, "Error while getting auth token: %d %d", response.result, response.code);
 
-    if (response.code == 404) {
-      return AccountLinkResultCode::InvalidCode;
-    }
-
     return AccountLinkResultCode::InternalError;
+  }
+
+  if (response.code == 404) {
+    return AccountLinkResultCode::InvalidCode;
   }
 
   if (response.code != 200) {
