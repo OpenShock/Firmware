@@ -134,7 +134,7 @@ bool _connectImpl(const char* ssid, const char* password, const std::uint8_t (&b
 }
 bool _connectHidden(const std::uint8_t (&bssid)[6], const std::string& password) {
   (void)password;
-  
+
   ESP_LOGV(TAG, "Connecting to hidden network " BSSID_FMT, BSSID_ARG(bssid));
 
   // TODO: Implement hidden network support
@@ -292,9 +292,8 @@ void _evWiFiNetworkDiscovery(const wifi_ap_record_t* record) {
 esp_err_t set_esp_interface_dns(esp_interface_t interface, IPAddress main_dns, IPAddress backup_dns, IPAddress fallback_dns);
 
 bool WiFiManager::Init() {
-  WiFi.onEvent(_evWiFiConnected, ARDUINO_EVENT_WIFI_STA_CONNECTED);
-  WiFi.onEvent(_evWiFiGotIP, ARDUINO_EVENT_WIFI_STA_GOT_IP);
-  WiFi.onEvent(_evWiFiGotIP6, ARDUINO_EVENT_WIFI_STA_GOT_IP6);
+  ESP_ERROR_CHECK(esp_event_handler_register(IP_EVENT, IP_EVENT_STA_GOT_IP, &_evWiFiScanStatusChanged, nullptr));
+  ESP_ERROR_CHECK(esp_event_handler_register(WIFI_EVENT, WIFI_EVENT_STA_DISCONNECTED, &_evWiFiScanStatusChanged, nullptr));
   WiFi.onEvent(_evWiFiDisconnected, ARDUINO_EVENT_WIFI_STA_DISCONNECTED);
   WiFiScanManager::RegisterStatusChangedHandler(_evWiFiScanStatusChanged);
   WiFiScanManager::RegisterNetworkDiscoveryHandler(_evWiFiNetworkDiscovery);

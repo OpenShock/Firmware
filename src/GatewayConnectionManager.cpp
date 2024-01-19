@@ -36,31 +36,32 @@ constexpr std::uint8_t LINK_CODE_LENGTH = 6;
 static std::uint8_t s_flags                                 = 0;
 static std::unique_ptr<OpenShock::GatewayClient> s_wsClient = nullptr;
 
-void _evGotIPHandler(arduino_event_t* event) {
-  (void)event;
+void _evGotIPHandler(void* arg, esp_event_base_t event_base, int32_t event_id, void* event_data) {
+  (void)arg;
+  (void)event_base;
+  (void)event_id;
+  (void)event_data;
 
   s_flags |= FLAG_HAS_IP;
-  ESP_LOGD(TAG, "Got IP address");
 }
 
-void _evWiFiDisconnectedHandler(arduino_event_t* event) {
-  (void)event;
+void _evWiFiDisconnectedHandler(void* arg, esp_event_base_t event_base, int32_t event_id, void* event_data) {
+  (void)arg;
+  (void)event_base;
+  (void)event_id;
+  (void)event_data;
 
   s_flags    = FLAG_NONE;
   s_wsClient = nullptr;
-  ESP_LOGD(TAG, "Lost IP address");
   OpenShock::VisualStateManager::SetWebSocketConnected(false);
 }
 
 using namespace OpenShock;
 namespace JsonAPI = OpenShock::Serialization::JsonAPI;
 
-bool GatewayConnectionManager::Init() {
-  WiFi.onEvent(_evGotIPHandler, ARDUINO_EVENT_WIFI_STA_GOT_IP);
-  WiFi.onEvent(_evGotIPHandler, ARDUINO_EVENT_WIFI_STA_GOT_IP6);
-  WiFi.onEvent(_evWiFiDisconnectedHandler, ARDUINO_EVENT_WIFI_STA_DISCONNECTED);
-
-  return true;
+void GatewayConnectionManager::Init() {
+  ESP_ERROR_CHECK(esp_event_handler_register(IP_EVENT, IP_EVENT_STA_GOT_IP, &_evGotIPHandler, nullptr));
+  ESP_ERROR_CHECK(esp_event_handler_register(WIFI_EVENT, WIFI_EVENT_STA_DISCONNECTED, &_evWiFiDisconnectedHandler, nullptr));
 }
 
 bool GatewayConnectionManager::IsConnected() {

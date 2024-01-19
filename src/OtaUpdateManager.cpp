@@ -91,12 +91,20 @@ bool _tryGetRequestedVersion(OpenShock::SemVer& version) {
   return true;
 }
 
-void _otaEvGotIPHandler(arduino_event_t* event) {
-  (void)event;
+void _otaEvGotIPHandler(void* arg, esp_event_base_t event_base, int32_t event_id, void* event_data) {
+  (void)arg;
+  (void)event_base;
+  (void)event_id;
+  (void)event_data;
+
   xTaskNotify(_taskHandle, OTA_TASK_EVENT_WIFI_CONNECTED, eSetBits);
 }
-void _otaEvWiFiDisconnectedHandler(arduino_event_t* event) {
-  (void)event;
+void _otaEvWiFiDisconnectedHandler(void* arg, esp_event_base_t event_base, int32_t event_id, void* event_data) {
+  (void)arg;
+  (void)event_base;
+  (void)event_id;
+  (void)event_data;
+
   xTaskNotify(_taskHandle, OTA_TASK_EVENT_WIFI_DISCONNECTED, eSetBits);
 }
 
@@ -441,9 +449,8 @@ bool OtaUpdateManager::Init() {
     return false;
   }
 
-  WiFi.onEvent(_otaEvGotIPHandler, ARDUINO_EVENT_WIFI_STA_GOT_IP);
-  WiFi.onEvent(_otaEvGotIPHandler, ARDUINO_EVENT_WIFI_STA_GOT_IP6);
-  WiFi.onEvent(_otaEvWiFiDisconnectedHandler, ARDUINO_EVENT_WIFI_STA_DISCONNECTED);
+  ESP_ERROR_CHECK(esp_event_handler_register(IP_EVENT, IP_EVENT_STA_GOT_IP, _otaEvGotIPHandler, nullptr));
+  ESP_ERROR_CHECK(esp_event_handler_register(WIFI_EVENT, WIFI_EVENT_STA_DISCONNECTED, _otaEvWiFiDisconnectedHandler, nullptr));
 
   // Start OTA update task.
   TaskUtils::TaskCreateExpensive(_otaUpdateTask, "OTA Update", 8192, nullptr, 1, &_taskHandle);

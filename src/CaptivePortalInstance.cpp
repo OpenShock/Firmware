@@ -12,7 +12,7 @@
 
 #include "serialization/_fbs/DeviceToLocalMessage_generated.h"
 
-#include <WiFi.h>
+#include <esp_http_server.h>
 
 static const char* TAG = "CaptivePortalInstance";
 
@@ -25,6 +25,22 @@ constexpr std::uint8_t WEBSOCKET_PING_RETRIES     = 3;
 constexpr std::uint32_t WEBSOCKET_UPDATE_INTERVAL = 10;  // 10ms / 100Hz
 
 using namespace OpenShock;
+
+/* clang-format off */
+static httpd_uri_t s_errorHandler {
+  .uri     = "/*",
+  .method  = HTTP_GET,
+  .handler = [](httpd_req_t* req) -> esp_err_t {
+  httpd_resp_set_status(req, "500 Internal Server Error");
+  httpd_resp_set_type(req, "text/html");
+  httpd_resp_send(req, R"(You probably forgot to upload the Filesystem with PlatformIO!
+Go to PlatformIO -> Platform -> Upload Filesystem Image!
+If this happened with a file we provided or you just need help, come to the Discord!
+
+discord.gg/OpenShock)", HTTPD_RESP_USE_STRLEN);
+  }
+};
+/* clang-format on */
 
 const esp_partition_t* _getStaticPartition() {
   const esp_partition_t* partition = esp_partition_find_first(ESP_PARTITION_TYPE_DATA, ESP_PARTITION_SUBTYPE_DATA_SPIFFS, "static0");
@@ -55,15 +71,15 @@ const char* _getPartitionHash() {
 }
 
 CaptivePortalInstance::CaptivePortalInstance()
-  : m_webServer(HTTP_PORT)
-  , m_socketServer(WEBSOCKET_PORT, "/ws", "json")
-  , m_socketDeFragger(std::bind(&CaptivePortalInstance::handleWebSocketEvent, this, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3, std::placeholders::_4))
-  , m_fileSystem()
-  , m_dnsServer()
-  , m_taskHandle(nullptr) {
-  m_socketServer.onEvent(std::bind(&WebSocketDeFragger::handler, &m_socketDeFragger, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3, std::placeholders::_4));
-  m_socketServer.begin();
-  m_socketServer.enableHeartbeat(WEBSOCKET_PING_INTERVAL, WEBSOCKET_PING_TIMEOUT, WEBSOCKET_PING_RETRIES);
+  : m_httpServer(nullptr), m_socketDeFragger(std::bind(&CaptivePortalInstance::handleWebSocketEvent, this, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3, std::placeholders::_4)), m_fileSystem(), m_dnsServer(), m_taskHandle(nullptr) {
+  httpd_config_t config = HTTPD_DEFAULT_CONFIG();
+
+  ESP_LOGI(TAG, "Starting HTTP server");
+  if (httpd_start(&m_httpServer, &config) != ESP_OK) {
+    ESP_LOGE(TAG, "Failed to start HTTP server");
+    m_httpServer = nullptr;
+    return;
+  }
 
   ESP_LOGI(TAG, "Setting up DNS server");
   m_dnsServer.start(DNS_PORT, "*", WiFi.softAPIP());
@@ -96,26 +112,34 @@ CaptivePortalInstance::CaptivePortalInstance()
 
     // Serving the captive portal files from LittleFS
     m_webServer.serveStatic("/", m_fileSystem, "/www/", "max-age=3600").setDefaultFile("index.html").setSharedEtag(fsHash);
+    httpd_uri_t webSockerHandler {
+      .uri                      = "/ws",
+      .method                   = HTTP_GET,
+      .handler                  =,
+      .user_ctx                 = this,
+      .is_websocket             = true,
+      .handle_ws_control_frames = true,
+      .supported_subprotocol    = nullptr,
+    };
+    httpd_register_uri_handler(m_httpServer, &webSockerHandler);
+
+    httpd_uri_t staticFileHandler {
+      .uri                      = "/*",
+      .method                   = HTTP_GET,
+      .handler                  =,
+      .user_ctx                 = this,
+      .is_websocket             = false,
+      .handle_ws_control_frames = false,
+      .supported_subprotocol    = nullptr,
+    };
+    httpd_register_uri_handler(m_httpServer, &staticFileHandler);
 
     // Redirecting connection tests to the captive portal, triggering the "login to network" prompt
     m_webServer.onNotFound([softAPURL](AsyncWebServerRequest* request) { request->redirect(softAPURL); });
   } else {
     ESP_LOGE(TAG, "/www/index.html or hash files not found, serving error page");
 
-    m_webServer.onNotFound([](AsyncWebServerRequest* request) {
-      request->send(
-        200,
-        "text/plain",
-        // Raw string literal (1+ to remove the first newline)
-        1 + R"(
-You probably forgot to upload the Filesystem with PlatformIO!
-Go to PlatformIO -> Platform -> Upload Filesystem Image!
-If this happened with a file we provided or you just need help, come to the Discord!
-
-discord.gg/OpenShock
-)"
-      );
-    });
+    httpd_register_uri_handler(m_httpServer, &s_errorHandler);
   }
 
   m_webServer.begin();

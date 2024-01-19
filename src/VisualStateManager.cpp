@@ -146,7 +146,7 @@ constexpr PinPatternManager::State kSolidOffPattern[] = {
   {false, 100'000}
 };
 
-template <std::size_t N>
+template<std::size_t N>
 inline void _updateVisualStateGPIO(const PinPatternManager::State (&override)[N]) {
   s_builtInLedManager->SetPattern(override);
 }
@@ -221,7 +221,7 @@ void _updateVisualStateRGB() {
 
 void _updateVisualState() {
   bool gpioActive = s_builtInLedManager != nullptr;
-  bool rgbActive = s_RGBLedManager != nullptr;
+  bool rgbActive  = s_RGBLedManager != nullptr;
 
   if (gpioActive && rgbActive) {
     if (s_stateFlags == kStatusOKMask) {
@@ -246,8 +246,11 @@ void _updateVisualState() {
   ESP_LOGW(TAG, "Trying to update visual state, but no LED is active!");
 }
 
-void _handleWiFiConnected(arduino_event_t* event) {
-  (void)event;
+void _handleWiFiConnected(void* arg, esp_event_base_t event_base, int32_t event_id, void* event_data) {
+  (void)arg;
+  (void)event_base;
+  (void)event_id;
+  (void)event_data;
 
   std::uint64_t oldState = s_stateFlags;
 
@@ -257,8 +260,11 @@ void _handleWiFiConnected(arduino_event_t* event) {
     _updateVisualState();
   }
 }
-void _handleWiFiDisconnected(arduino_event_t* event) {
-  (void)event;
+void _handleWiFiDisconnected(void* arg, esp_event_base_t event_base, int32_t event_id, void* event_data) {
+  (void)arg;
+  (void)event_base;
+  (void)event_id;
+  (void)event_data;
 
   std::uint64_t oldState = s_stateFlags;
 
@@ -268,8 +274,11 @@ void _handleWiFiDisconnected(arduino_event_t* event) {
     _updateVisualState();
   }
 }
-void _handleWiFiScanDone(arduino_event_t* event) {
-  (void)event;
+void _handleWiFiScanDone(void* arg, esp_event_base_t event_base, int32_t event_id, void* event_data) {
+  (void)arg;
+  (void)event_base;
+  (void)event_id;
+  (void)event_data;
 
   std::uint64_t oldState = s_stateFlags;
 
@@ -282,10 +291,10 @@ void _handleWiFiScanDone(arduino_event_t* event) {
 
 #ifndef OPENSHOCK_LED_GPIO
 #define OPENSHOCK_LED_GPIO GPIO_NUM_NC
-#endif // OPENSHOCK_LED_GPIO
+#endif  // OPENSHOCK_LED_GPIO
 #ifndef OPENSHOCK_LED_WS2812B
 #define OPENSHOCK_LED_WS2812B GPIO_NUM_NC
-#endif // OPENSHOCK_LED_WS2812B
+#endif  // OPENSHOCK_LED_WS2812B
 
 bool VisualStateManager::Init() {
   bool ledActive = false;
@@ -313,9 +322,9 @@ bool VisualStateManager::Init() {
     return true;
   }
 
-  WiFi.onEvent(_handleWiFiConnected, ARDUINO_EVENT_WIFI_STA_GOT_IP);
-  WiFi.onEvent(_handleWiFiConnected, ARDUINO_EVENT_WIFI_STA_GOT_IP6);
-  WiFi.onEvent(_handleWiFiDisconnected, ARDUINO_EVENT_WIFI_STA_DISCONNECTED);
+  ESP_ERROR_CHECK(esp_event_handler_register(IP_EVENT, IP_EVENT_STA_GOT_IP, &_handleWiFiConnected, nullptr));
+  ESP_ERROR_CHECK(esp_event_handler_register(WIFI_EVENT, WIFI_EVENT_STA_DISCONNECTED, &_handleWiFiDisconnected, nullptr));
+
   WiFi.onEvent(_handleWiFiScanDone, ARDUINO_EVENT_WIFI_SCAN_DONE);
 
   // Run the update on init, otherwise no inital pattern is set.

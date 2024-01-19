@@ -46,10 +46,7 @@ bool trySetup() {
     return false;
   }
 
-  if (!OpenShock::GatewayConnectionManager::Init()) {
-    ESP_LOGE(TAG, "Unable to initialize GatewayConnectionManager");
-    return false;
-  }
+  OpenShock::GatewayConnectionManager::Init();
 
   return true;
 }

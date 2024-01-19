@@ -1,7 +1,5 @@
 #pragma once
 
-#include <Arduino.h>
-
 #include <algorithm>
 #include <cstddef>
 #include <functional>
@@ -25,7 +23,6 @@ namespace OpenShock {
     constexpr StringView(const char* const ptr, std::size_t len) : _ptrBeg(ptr), _ptrEnd(ptr + len) { }
     constexpr StringView(const char* const ptrBeg, const char* const ptrEnd) : _ptrBeg(ptrBeg), _ptrEnd(ptrEnd) { }
     constexpr StringView(const StringView& str) : _ptrBeg(str._ptrBeg), _ptrEnd(str._ptrEnd) { }
-    StringView(const String& str) : _ptrBeg(str.c_str()), _ptrEnd(str.c_str() + str.length()) { }
     StringView(const std::string& str) : _ptrBeg(str.c_str()), _ptrEnd(str.c_str() + str.size()) { }
 
     constexpr bool isNull() const { return _ptrBeg == nullptr || _ptrEnd == nullptr; }
@@ -286,14 +283,6 @@ namespace OpenShock {
       _ptrEnd = nullptr;
     }
 
-    String toArduinoString() const {
-      if (isNull()) {
-        return String();
-      }
-
-      return String(_ptrBeg, size());
-    }
-
     std::string toString() const {
       if (isNull()) {
         return std::string();
@@ -304,18 +293,12 @@ namespace OpenShock {
 
     constexpr operator const char*() const { return _ptrBeg; }
 
-    explicit operator String() const { return toArduinoString(); }
-
     explicit operator std::string() const { return toString(); }
 
     /// Returns a reference to the character at the specified index, Going out of bounds is undefined behavior
-    constexpr char const& operator[](int index) const {
-      return _ptrBeg[index];
-    }
+    constexpr char const& operator[](int index) const { return _ptrBeg[index]; }
     /// Returns a const reference to the character at the specified index, Going out of bounds is undefined behavior
-    constexpr char const& operator[](std::size_t index) const {
-      return _ptrBeg[index];
-    }
+    constexpr char const& operator[](std::size_t index) const { return _ptrBeg[index]; }
 
     constexpr bool operator==(const StringView& other) {
       if (this == &other) return true;

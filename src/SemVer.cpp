@@ -1,5 +1,7 @@
 #include "SemVer.h"
 
+#include "Logging.h"
+
 const char* const TAG = "SemVer";
 
 using namespace OpenShock;
@@ -109,7 +111,7 @@ constexpr bool _semverIsDotSeperatedBuildIdentifiers(StringView str) {
       return false;
     }
 
-    str = str.substr(dotIdx + 1);
+    str    = str.substr(dotIdx + 1);
     dotIdx = str.find('.');
   }
 
@@ -127,17 +129,17 @@ constexpr bool _semverIsDotSeperatedPreleaseIdentifiers(StringView str) {
       return false;
     }
 
-    str = str.substr(dotIdx + 1);
+    str    = str.substr(dotIdx + 1);
     dotIdx = str.find('.');
   }
 
   return _semverIsPrereleaseIdentifier(str);
 }
-const auto _semverIsPatch = _semverIsNumericIdentifier;
-const auto _semverIsMinor = _semverIsNumericIdentifier;
-const auto _semverIsMajor = _semverIsNumericIdentifier;
+const auto _semverIsPatch      = _semverIsNumericIdentifier;
+const auto _semverIsMinor      = _semverIsNumericIdentifier;
+const auto _semverIsMajor      = _semverIsNumericIdentifier;
 const auto _semverIsPrerelease = _semverIsDotSeperatedPreleaseIdentifiers;
-const auto _semverIsBuild = _semverIsDotSeperatedBuildIdentifiers;
+const auto _semverIsBuild      = _semverIsDotSeperatedBuildIdentifiers;
 bool _semverIsVersionCore(StringView str) {
   if (str.isNullOrEmpty()) {
     return false;
@@ -167,22 +169,22 @@ bool _semverIsSemver(StringView str) {
       return false;
     }
 
-    auto core = str.substr(0, dashPos);
+    auto core       = str.substr(0, dashPos);
     auto prerelease = str.substr(dashPos + 1, plusPos - dashPos - 1);
-    auto build = str.substr(plusPos + 1);
+    auto build      = str.substr(plusPos + 1);
 
     return _semverIsVersionCore(core) && _semverIsPrerelease(prerelease) && _semverIsBuild(build);
   }
 
   if (dashPos != StringView::npos) {
-    auto core = str.substr(0, dashPos);
+    auto core       = str.substr(0, dashPos);
     auto prerelease = str.substr(dashPos + 1);
 
     return _semverIsVersionCore(core) && _semverIsPrerelease(prerelease);
   }
 
   if (plusPos != StringView::npos) {
-    auto core = str.substr(0, plusPos);
+    auto core  = str.substr(0, plusPos);
     auto build = str.substr(plusPos + 1);
 
     return _semverIsVersionCore(core) && _semverIsBuild(build);
@@ -262,12 +264,12 @@ bool OpenShock::TryParseSemVer(StringView semverStr, SemVer& semver) {
   auto dashIdx = patchStr.find('-');
   if (dashIdx != StringView::npos) {
     semver.prerelease = patchStr.substr(dashIdx + 1);
-    patchStr = patchStr.substr(0, dashIdx);
+    patchStr          = patchStr.substr(0, dashIdx);
   }
 
   auto plusIdx = semver.prerelease.find('+');
   if (plusIdx != StringView::npos) {
-    semver.build = semver.prerelease.substr(plusIdx + 1);
+    semver.build      = semver.prerelease.substr(plusIdx + 1);
     semver.prerelease = semver.prerelease.substr(0, plusIdx);
   }
 

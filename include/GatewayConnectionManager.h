@@ -7,7 +7,7 @@
 #include <functional>
 
 namespace OpenShock::GatewayConnectionManager {
-  bool Init();
+  void Init();
 
   bool IsConnected();
 
