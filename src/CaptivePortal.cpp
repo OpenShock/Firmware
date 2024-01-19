@@ -100,7 +100,7 @@ bool CaptivePortal::ForceClose(std::uint32_t timeoutMs) {
   if (s_instance == nullptr) return true;
 
   while (timeoutMs > 0) {
-    std::uint32_t delay = std::min(timeoutMs, 10U);
+    std::uint32_t delay = std::min(timeoutMs, static_cast<std::uint32_t>(10U));
 
     vTaskDelay(pdMS_TO_TICKS(delay));
 
