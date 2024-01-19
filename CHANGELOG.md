@@ -1,3 +1,14 @@
+# Version 1.1.0-rc.2 Release Notes
+
+This is the RC (Release Candidate) 2 for version 1.1.0
+
+We did a couple of bugfixes:
+
+- Fixed User-Agent header not being set on websocket connections.
+- Stopped frontend from requesting to connect to a secured network without a password.
+- Do sanity checking on pairing code length in firmware to return a proper error message early.
+- Fixed some SemVer parsing logic.
+
 # Version 1.1.0-rc.1 Release Notes
 
 It's been a while, and we think it's time for another beta release :smile:

@@ -252,8 +252,8 @@ std::string SemVer::toString() const {
 
 bool OpenShock::TryParseSemVer(StringView semverStr, SemVer& semver) {
   auto parts = semverStr.split('.');
-  if (parts.size() != 3) {
-    ESP_LOGE(TAG, "Must have 3 dot-separated parts: %s", semverStr.data());
+  if (parts.size() < 3) {
+    ESP_LOGE(TAG, "Must have at least 3 parts: %s", semverStr.data());
     return false;
   }
 
