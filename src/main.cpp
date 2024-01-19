@@ -22,7 +22,10 @@ const char* const TAG = "OpenShock";
 // Internal setup function, returns true if setup succeeded, false otherwise.
 bool trySetup() {
   OpenShock::EventHandlers::Init();
-  OpenShock::VisualStateManager::Init();
+
+  if (!OpenShock::VisualStateManager::Init()) {
+    ESP_PANIC(TAG, "Unable to initialize VisualStateManager");
+  }
 
   OpenShock::EStopManager::Init(100);  // 100ms update interval
 

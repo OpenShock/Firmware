@@ -2,21 +2,27 @@
 
 #include "Common.h"
 
+#include <hal/gpio_types.h>
+
 #include <freertos/FreeRTOS.h>
 #include <freertos/semphr.h>
 #include <freertos/task.h>
 
 #include <esp32-hal-rmt.h>
 
-#include <array>
 #include <cstdint>
+#include <vector>
 
 namespace OpenShock {
   class RGBPatternManager {
     DISABLE_COPY(RGBPatternManager);
+
   public:
-    RGBPatternManager(std::uint8_t gpioPin);
+    RGBPatternManager() = delete;
+    RGBPatternManager(gpio_num_t gpioPin);
     ~RGBPatternManager();
+
+    bool IsValid() const { return m_gpioPin != GPIO_NUM_NC; }
 
     struct RGBState {
       std::uint8_t red;
@@ -26,7 +32,7 @@ namespace OpenShock {
     };
 
     void SetPattern(const RGBState* pattern, std::size_t patternLength);
-    template <std::size_t N>
+    template<std::size_t N>
     inline void SetPattern(const RGBState (&pattern)[N]) {
       SetPattern(pattern, N);
     }
@@ -35,14 +41,12 @@ namespace OpenShock {
 
   private:
     void ClearPatternInternal();
-    void SendRGB(const RGBState& state);
     static void RunPattern(void* arg);
 
-    std::uint8_t m_rgbPin;
-    std::uint8_t m_rgbBrightness;  // 0-255
+    gpio_num_t m_gpioPin;
+    std::uint8_t m_brightness;  // 0-255
+    std::vector<RGBState> m_pattern;
     rmt_obj_t* m_rmtHandle;
-    RGBState* m_pattern;
-    std::size_t m_patternLength;
     TaskHandle_t m_taskHandle;
     SemaphoreHandle_t m_taskMutex;
   };

@@ -1,33 +1,56 @@
 #include "PinPatternManager.h"
 
+#include "Chipset.h"
 #include "Logging.h"
-
-#include <Arduino.h>
 
 const char* const TAG = "PinPatternManager";
 
 using namespace OpenShock;
 
-PinPatternManager::PinPatternManager(std::uint8_t gpioPin) : m_gpioPin(gpioPin), m_pattern(nullptr), m_patternLength(0), m_taskHandle(nullptr), m_taskMutex(xSemaphoreCreateMutex()) {
-  pinMode(gpioPin, OUTPUT);
+PinPatternManager::PinPatternManager(gpio_num_t gpioPin) : m_gpioPin(GPIO_NUM_NC), m_pattern(), m_taskHandle(nullptr), m_taskMutex(xSemaphoreCreateMutex()) {
+  if (gpioPin == GPIO_NUM_NC) {
+    ESP_LOGE(TAG, "Pin is not set");
+    return;
+  }
+
+  if (!IsValidOutputPin(gpioPin)) {
+    ESP_LOGE(TAG, "Pin %d is not a valid output pin", gpioPin);
+    return;
+  }
+
+  gpio_config_t config;
+  config.pin_bit_mask = (1ULL << gpioPin);
+  config.mode         = GPIO_MODE_OUTPUT;
+  config.pull_up_en   = GPIO_PULLUP_DISABLE;
+  config.pull_down_en = GPIO_PULLDOWN_DISABLE;
+  config.intr_type    = GPIO_INTR_DISABLE;
+  if (gpio_config(&config) != ESP_OK) {
+    ESP_LOGE(TAG, "Failed to configure pin %d", gpioPin);
+    return;
+  }
+
+  m_gpioPin = gpioPin;
 }
 
 PinPatternManager::~PinPatternManager() {
   ClearPattern();
 
   vSemaphoreDelete(m_taskMutex);
+
+  if (m_gpioPin != GPIO_NUM_NC) {
+    gpio_reset_pin(m_gpioPin);
+  }
 }
 
 void PinPatternManager::SetPattern(const State* pattern, std::size_t patternLength) {
   ClearPatternInternal();
 
   // Set new values
-  m_patternLength = patternLength;
-  m_pattern       = new State[m_patternLength];
-  std::copy(pattern, pattern + m_patternLength, m_pattern);
+  m_pattern.resize(patternLength);
+  std::copy(pattern, pattern + patternLength, m_pattern.begin());
 
   char name[32];
-  snprintf(name, sizeof(name), "PinPatternManager-%u", m_gpioPin);
+  snprintf(name, sizeof(name), "PinPatternManager-%d", m_gpioPin);
 
   // Start the task
   BaseType_t result = xTaskCreate(RunPattern, name, 1024, this, 1, &m_taskHandle);
@@ -35,12 +58,7 @@ void PinPatternManager::SetPattern(const State* pattern, std::size_t patternLeng
     ESP_LOGE(TAG, "[pin-%u] Failed to create task: %d", m_gpioPin, result);
 
     m_taskHandle = nullptr;
-
-    if (m_pattern != nullptr) {
-      delete[] m_pattern;
-      m_pattern = nullptr;
-    }
-    m_patternLength = 0;
+    m_pattern.clear();
   }
 
   // Give the semaphore back
@@ -60,24 +78,19 @@ void PinPatternManager::ClearPatternInternal() {
     m_taskHandle = nullptr;
   }
 
-  if (m_pattern != nullptr) {
-    delete[] m_pattern;
-    m_pattern = nullptr;
-  }
-  m_patternLength = 0;
+  m_pattern.clear();
 }
 
 void PinPatternManager::RunPattern(void* arg) {
   PinPatternManager* thisPtr = reinterpret_cast<PinPatternManager*>(arg);
 
-  std::uint8_t pin                  = thisPtr->m_gpioPin;
-  PinPatternManager::State* pattern = thisPtr->m_pattern;
-  std::size_t patternLength         = thisPtr->m_patternLength;
+  gpio_num_t pin              = thisPtr->m_gpioPin;
+  std::vector<State>& pattern = thisPtr->m_pattern;
 
   while (true) {
-    for (std::size_t i = 0; i < patternLength; ++i) {
-      digitalWrite(pin, pattern[i].level);
-      vTaskDelay(pdMS_TO_TICKS(pattern[i].duration));
+    for (const auto& state : pattern) {
+      gpio_set_level(pin, state.level);
+      vTaskDelay(pdMS_TO_TICKS(state.duration));
     }
   }
 }
