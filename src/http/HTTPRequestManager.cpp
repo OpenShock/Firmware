@@ -1,9 +1,10 @@
 #include "http/HTTPRequestManager.h"
 
 #include "Common.h"
+#include "Logging.h"
 #include "Time.h"
 
-#include <HTTPClient.h>
+#include <esp_http_client.h>
 
 #include <algorithm>
 #include <memory>
