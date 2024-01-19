@@ -24,7 +24,7 @@ struct WifiScanStatusMessage {
 }
 table WifiNetworkEvent {
   event_type:Types.WifiNetworkEventType;
-  network:Types.WifiNetwork;
+  networks:[Types.WifiNetwork];
 }
 table WifiGotIpEvent {
   ip:string;

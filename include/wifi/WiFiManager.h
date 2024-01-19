@@ -66,7 +66,7 @@ namespace OpenShock::WiFiManager {
   /// @brief Runs the WiFiManager loop
   void Update();
 
-  /// @brief Gets the vector of discovered WiFi networks
-  /// @return Vector of discovered WiFi networks
-  std::vector<WiFiNetwork>& GetDiscoveredWiFiNetworks();
+  /// @brief Gets a copy of the vector of discovered WiFi networks
+  /// @return Vector of discovered WiFiNetworks
+  std::vector<WiFiNetwork> GetDiscoveredWiFiNetworks();
 }  // namespace OpenShock::WiFiManager

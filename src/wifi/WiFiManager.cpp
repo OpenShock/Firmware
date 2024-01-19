@@ -178,7 +178,7 @@ bool _authenticate(const WiFiNetwork& net, const std::string& password) {
     return false;
   }
 
-  Serialization::Local::SerializeWiFiNetworkEvent(Serialization::Types::WifiNetworkEventType::Saved, net, CaptivePortal::BroadcastMessageBIN);
+  Serialization::Local::SerializeWiFiNetworkEvent(Serialization::Types::WifiNetworkEventType::Saved, {net}, CaptivePortal::BroadcastMessageBIN);
 
   return _connect(net.ssid, password);
 }
@@ -202,7 +202,7 @@ void _evWiFiConnected(arduino_event_t* event) {
 
   ESP_LOGI(TAG, "Connected to network %s (" BSSID_FMT ")", reinterpret_cast<const char*>(info.ssid), BSSID_ARG(info.bssid));
 
-  Serialization::Local::SerializeWiFiNetworkEvent(Serialization::Types::WifiNetworkEventType::Connected, *it, CaptivePortal::BroadcastMessageBIN);
+  Serialization::Local::SerializeWiFiNetworkEvent(Serialization::Types::WifiNetworkEventType::Connected, {*it}, CaptivePortal::BroadcastMessageBIN);
 }
 void _evWiFiGotIP(arduino_event_t* event) {
   const auto& info = event->event_info.got_ip;
@@ -247,7 +247,7 @@ void _evWiFiScanStatusChanged(OpenShock::WiFiScanStatus status) {
     for (auto it = s_wifiNetworks.begin(); it != s_wifiNetworks.end();) {
       if (it->scansMissed++ > 3) {
         ESP_LOGV(TAG, "Network %s (" BSSID_FMT ") has not been seen in 3 scans, removing from list", it->ssid, BSSID_ARG(it->bssid));
-        Serialization::Local::SerializeWiFiNetworkEvent(Serialization::Types::WifiNetworkEventType::Lost, *it, CaptivePortal::BroadcastMessageBIN);
+        Serialization::Local::SerializeWiFiNetworkEvent(Serialization::Types::WifiNetworkEventType::Lost, {*it}, CaptivePortal::BroadcastMessageBIN);
         it = s_wifiNetworks.erase(it);
       } else {
         ++it;
@@ -274,7 +274,7 @@ void _evWiFiNetworkDiscovery(const wifi_ap_record_t* record) {
     it->credentialsID = credsId;  // TODO: I don't understand why I need to set this here, but it seems to fix a bug where the credentials ID is not set correctly
     it->scansMissed   = 0;
 
-    Serialization::Local::SerializeWiFiNetworkEvent(Serialization::Types::WifiNetworkEventType::Updated, *it, CaptivePortal::BroadcastMessageBIN);
+    Serialization::Local::SerializeWiFiNetworkEvent(Serialization::Types::WifiNetworkEventType::Updated, {*it}, CaptivePortal::BroadcastMessageBIN);
     ESP_LOGV(TAG, "Updated network %s (" BSSID_FMT ") with new scan info", it->ssid, BSSID_ARG(it->bssid));
 
     return;
@@ -282,7 +282,7 @@ void _evWiFiNetworkDiscovery(const wifi_ap_record_t* record) {
 
   WiFiNetwork network(record->ssid, record->bssid, record->primary, record->rssi, record->authmode, credsId);
 
-  Serialization::Local::SerializeWiFiNetworkEvent(Serialization::Types::WifiNetworkEventType::Discovered, network, CaptivePortal::BroadcastMessageBIN);
+  Serialization::Local::SerializeWiFiNetworkEvent(Serialization::Types::WifiNetworkEventType::Discovered, {network}, CaptivePortal::BroadcastMessageBIN);
   ESP_LOGV(TAG, "Discovered new network %s (" BSSID_FMT ")", network.ssid, BSSID_ARG(network.bssid));
 
   // Insert the network into the list of networks sorted by RSSI
@@ -363,7 +363,7 @@ bool WiFiManager::Forget(const char* ssid) {
   // Remove the credentials from the config
   if (Config::RemoveWiFiCredentials(credsId)) {
     it->credentialsID = 0;
-    Serialization::Local::SerializeWiFiNetworkEvent(Serialization::Types::WifiNetworkEventType::Removed, *it, CaptivePortal::BroadcastMessageBIN);
+    Serialization::Local::SerializeWiFiNetworkEvent(Serialization::Types::WifiNetworkEventType::Removed, {*it}, CaptivePortal::BroadcastMessageBIN);
   }
 
   return true;
@@ -529,7 +529,6 @@ void WiFiManager::Update() {
   _connect(creds.ssid, creds.password);
 }
 
-// Function to get a reference to s_wifiNetworks
-std::vector<WiFiNetwork>& WiFiManager::GetDiscoveredWiFiNetworks() {
+std::vector<WiFiNetwork> WiFiManager::GetDiscoveredWiFiNetworks() {
   return s_wifiNetworks;
 }
