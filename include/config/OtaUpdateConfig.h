@@ -3,6 +3,7 @@
 #include "config/ConfigBase.h"
 #include "FirmwareBootType.h"
 #include "OtaUpdateChannel.h"
+#include "OtaUpdateStep.h"
 
 #include <string>
 
@@ -19,7 +20,7 @@ namespace OpenShock::Config {
       bool allowBackendManagement,
       bool requireManualApproval,
       std::int32_t updateId,
-      FirmwareBootType bootType
+      OtaUpdateStep updateStep
     );
 
     bool isEnabled;
@@ -31,7 +32,7 @@ namespace OpenShock::Config {
     bool allowBackendManagement;
     bool requireManualApproval;
     std::int32_t updateId;
-    FirmwareBootType bootType;
+    OtaUpdateStep updateStep;
 
     void ToDefault() override;
 

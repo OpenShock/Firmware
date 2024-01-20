@@ -67,7 +67,7 @@ bool OpenShock::FlashPartitionFromUrl(const esp_partition_t* partition, StringVi
     contentWritten += length;
 
     std::int64_t now = OpenShock::millis();
-    if (now - lastProgress >= 1000) {  // Once per second
+    if (now - lastProgress >= 500) {  // Send progress every 500ms
       lastProgress = now;
       progressCallback(contentWritten, contentLength, static_cast<float>(contentWritten) / static_cast<float>(contentLength));
     }

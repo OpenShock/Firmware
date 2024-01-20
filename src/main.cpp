@@ -1,7 +1,7 @@
 #include "CaptivePortal.h"
 #include "CommandHandler.h"
-#include "config/Config.h"
 #include "Common.h"
+#include "config/Config.h"
 #include "EStopManager.h"
 #include "event_handlers/Init.h"
 #include "GatewayConnectionManager.h"
@@ -28,8 +28,6 @@ bool trySetup() {
   }
 
   OpenShock::EStopManager::Init(100);  // 100ms update interval
-
-  OpenShock::Config::Init();
 
   if (!OpenShock::SerialInputHandler::Init()) {
     ESP_LOGE(TAG, "Unable to initialize SerialInputHandler");
@@ -83,6 +81,7 @@ void appSetup() {
 void setup() {
   Serial.begin(115'200);
 
+  OpenShock::Config::Init();
   OpenShock::OtaUpdateManager::Init();
   if (OpenShock::OtaUpdateManager::IsValidatingApp()) {
     otaSetup();
