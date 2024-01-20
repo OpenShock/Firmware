@@ -1,3 +1,9 @@
+# Version 1.1.0-rc.4 Release Notes
+
+Bugfixes:
+
+- Make OTA update status reporting smoother.
+
 # Version 1.1.0-rc.3 Release Notes
 
 Bugfixes:
