@@ -1,5 +1,6 @@
 #pragma once
 
+#include "FirmwareBootType.h"
 #include "OtaUpdateChannel.h"
 #include "SemVer.h"
 #include "StringView.h"
@@ -25,7 +26,9 @@ namespace OpenShock::OtaUpdateManager {
 
   bool TryStartFirmwareInstallation(const OpenShock::SemVer& version);
 
+  FirmwareBootType GetFirmwareBootType();
   bool IsValidatingApp();
+
   void InvalidateAndRollback();
   void ValidateApp();
 }  // namespace OpenShock::OtaUpdateManager

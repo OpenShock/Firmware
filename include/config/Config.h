@@ -66,8 +66,8 @@ namespace OpenShock::Config {
 
   bool GetOtaUpdateId(std::int32_t& out);
   bool SetOtaUpdateId(std::int32_t updateId);
-  bool GetOtaFirmwareBootType(FirmwareBootType& out);
-  bool SetOtaFirmwareBootType(FirmwareBootType bootType);
+  bool GetOtaUpdateStep(OtaUpdateStep& out);
+  bool SetOtaUpdateStep(OtaUpdateStep updateStep);
 
   bool HasBackendAuthToken();
   bool GetBackendAuthToken(std::string& out);

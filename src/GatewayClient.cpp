@@ -4,6 +4,7 @@
 #include "config/Config.h"
 #include "event_handlers/WebSocket.h"
 #include "Logging.h"
+#include "OtaUpdateManager.h"
 #include "serialization/WSGateway.h"
 #include "Time.h"
 #include "util/CertificateUtils.h"
@@ -119,8 +120,8 @@ void GatewayClient::_sendBootStatus() {
     return;
   }
 
-  OpenShock::FirmwareBootType bootType;
-  if (!Config::GetOtaFirmwareBootType(bootType)) {
+  OpenShock::OtaUpdateStep updateStep;
+  if (!Config::GetOtaUpdateStep(updateStep)) {
     ESP_LOGE(TAG, "Failed to get OTA firmware boot type");
     return;
   }
@@ -131,7 +132,13 @@ void GatewayClient::_sendBootStatus() {
     return;
   }
 
-  s_bootStatusSent = Serialization::Gateway::SerializeBootStatusMessage(updateId, bootType, version, [this](const std::uint8_t* data, std::size_t len) { return m_webSocket.sendBIN(data, len); });
+  s_bootStatusSent = Serialization::Gateway::SerializeBootStatusMessage(updateId, OtaUpdateManager::GetFirmwareBootType(), version, [this](const std::uint8_t* data, std::size_t len) { return m_webSocket.sendBIN(data, len); });
+
+  if (s_bootStatusSent && updateStep != OpenShock::OtaUpdateStep::None) {
+    if (!Config::SetOtaUpdateStep(OpenShock::OtaUpdateStep::None)) {
+      ESP_LOGE(TAG, "Failed to reset firmware boot type to normal");
+    }
+  }
 }
 
 void GatewayClient::_handleEvent(WStype_t type, std::uint8_t* payload, std::size_t length) {
