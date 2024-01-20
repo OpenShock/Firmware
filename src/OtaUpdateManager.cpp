@@ -371,7 +371,8 @@ void _otaUpdateTask(void* arg) {
     _sendProgressMessage(Serialization::Gateway::OtaInstallProgressTask::Rebooting, 0.0f);
 
     // Reboot into new firmware.
-    ESP_LOGI(TAG, "Restarting into new firmware");
+    ESP_LOGI(TAG, "Restarting into new firmware...");
+    vTaskDelay(pdMS_TO_TICKS(200));
     break;
   }
 
