@@ -1,3 +1,9 @@
+# Version 1.1.0-rc.5 Release Notes
+
+Bugfixes:
+
+- Fix what firmware boot type firmware reports to server.
+
 # Version 1.1.0-rc.4 Release Notes
 
 Bugfixes:
