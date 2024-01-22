@@ -17,10 +17,16 @@ pio = pioenv.PioEnv(env)  # type: ignore
 project_dir = pio.get_string('PROJECT_DIR')
 
 # By default, the build is run in DEVELOP mode.
-# If we are running in CI and either building the master branch or beta branch, then we are in RELEASE mode.
+# If we are running in CI and either building the master branch, beta branch, or a tag, then we are in RELEASE mode.
 is_ci = shorthands.is_github_ci()
 branch_name = shorthands.get_github_ref_name()
-is_release_build = is_ci and (branch_name == 'master' or branch_name == 'beta' or branch_name == 'develop')
+is_release_build = is_ci and (
+    branch_name == 'master'
+    or shorthands.is_github_pr_into('master')
+    or branch_name == 'beta'
+    or shorthands.is_github_pr_into('beta')
+    or shorthands.is_github_tag()
+)
 
 # Get the build type string.
 pio_build_type = 'release' if is_release_build else 'debug'
