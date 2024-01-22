@@ -1,3 +1,9 @@
+# Version 1.1.0-rc.6 Release Notes
+
+Bugfixes:
+
+- Reduced latency, allocations, and network traffic for reporting wifi network scan results, making the networks instantly available in the frontend and improving the reliability of the captive portal.
+
 # Version 1.1.0-rc.5 Release Notes
 
 Bugfixes:

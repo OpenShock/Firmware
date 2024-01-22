@@ -402,7 +402,10 @@ bool _tryGetStringList(StringView url, std::vector<std::string>& list) {
 
   OpenShock::StringView data = response.data;
 
-  for (auto line : data.splitLines()) {
+  auto lines = data.splitLines();
+  list.reserve(lines.size());
+
+  for (auto line : lines) {
     line = line.trim();
 
     if (line.isNullOrEmpty()) {
