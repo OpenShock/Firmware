@@ -260,6 +260,9 @@ void _evWiFiScanStatusChanged(OpenShock::WiFiScanStatus status) {
     // Sort the networks by RSSI
     std::sort(s_wifiNetworks.begin(), s_wifiNetworks.end(), [](const WiFiNetwork& a, const WiFiNetwork& b) { return a.rssi > b.rssi; });
   }
+
+  // Send the scan status changed event
+  Serialization::Local::SerializeWiFiScanStatusChangedEvent(status, CaptivePortal::BroadcastMessageBIN);
 }
 void _evWiFiNetworkDiscovery(const wifi_ap_record_t* record) {
   std::uint8_t credsId = Config::GetWiFiCredentialsIDbySSID(reinterpret_cast<const char*>(record->ssid));
