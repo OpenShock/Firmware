@@ -1,5 +1,5 @@
-name: cnd-upload
-description: Uploads firmware artifacts to CDN
+name: cdn-prepare
+description: Prepares the CDN for firmware uploads
 inputs:
   cf-account-id:
     description: Cloudflare Account ID

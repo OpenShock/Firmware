@@ -1,0 +1,96 @@
+name: 'CodeQL'
+
+on:
+  push:
+    branches: ['master']
+  pull_request:
+    branches: ['master']
+  schedule:
+    - cron: '0 6 * * 1'
+
+env:
+  OPENSHOCK_API_DOMAIN: api.shocklink.net
+  OPENSHOCK_FW_GIT_REF: ${{ github.ref }}
+  OPENSHOCK_FW_GIT_COMMIT: ${{ github.sha }}
+  OPENSHOCK_FW_BUILD_DATE: ${{ github.event.head_commit.timestamp }}
+
+jobs:
+  get-vars:
+    uses: ./.github/workflows/get-vars.yml
+
+  analyze-js-py:
+    name: Analyze JS/PY
+    runs-on: 'ubuntu-latest'
+    needs: get-vars
+    timeout-minutes: 360
+    permissions:
+      actions: read
+      contents: read
+      security-events: write
+
+    env:
+      OPENSHOCK_FW_VERSION: ${{ needs.get-vars.outputs.version }}
+
+    strategy:
+      fail-fast: false
+      matrix:
+        language: ['javascript-typescript', 'python']
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      # Initializes the CodeQL tools for scanning.
+      - name: Initialize CodeQL
+        uses: github/codeql-action/init@v3
+        with:
+          languages: ${{ matrix.language }}
+
+      - name: Autobuild
+        uses: github/codeql-action/autobuild@v3
+
+      # Build stuff here
+
+      - name: Perform CodeQL Analysis
+        uses: github/codeql-action/analyze@v3
+        with:
+          category: '/language:${{matrix.language}}'
+
+  analyze-cpp:
+    name: Analyze C/C++
+    runs-on: 'ubuntu-latest'
+    needs: get-vars
+    timeout-minutes: 360
+    permissions:
+      actions: read
+      contents: read
+      security-events: write
+
+    env:
+      language: 'c-cpp'
+      OPENSHOCK_FW_VERSION: ${{ needs.get-vars.outputs.version }}
+
+    strategy:
+      fail-fast: false
+      matrix:
+        board: ${{ fromJson(needs.get-vars.outputs.board-array) }}
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Initialize CodeQL
+        uses: github/codeql-action/init@v3
+        with:
+          languages: ${{ env.language }}
+
+      - uses: ./.github/actions/build-firmware
+        with:
+          python-version: 3.12
+          board: ${{ matrix.board }}
+          skip-checkout: true
+
+      - name: Perform CodeQL Analysis
+        uses: github/codeql-action/analyze@v3
+        with:
+          category: '/language:${{ env.language }}'

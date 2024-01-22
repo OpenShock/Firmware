@@ -2,16 +2,12 @@
 
 #include "VisualStateManager.h"
 
-#include "Config.h"
-#include "Constants.h"
+#include "config/Config.h"
 #include "GatewayClient.h"
+#include "http/JsonAPI.h"
 #include "Logging.h"
 #include "Time.h"
 
-#include <ArduinoJson.h>
-#include <HTTPClient.h>
-
-#include <memory>
 #include <unordered_map>
 
 //
@@ -31,19 +27,25 @@
 static const char* const TAG             = "GatewayConnectionManager";
 static const char* const AUTH_TOKEN_FILE = "/authToken";
 
-constexpr std::uint8_t FLAG_NONE          = 0;
-constexpr std::uint8_t FLAG_HAS_IP        = 1 << 0;
-constexpr std::uint8_t FLAG_AUTHENTICATED = 1 << 1;
+constexpr std::uint8_t FLAG_NONE   = 0;
+constexpr std::uint8_t FLAG_HAS_IP = 1 << 0;
+constexpr std::uint8_t FLAG_LINKED = 1 << 1;
+
+constexpr std::uint8_t LINK_CODE_LENGTH = 6;
 
 static std::uint8_t s_flags                                 = 0;
 static std::unique_ptr<OpenShock::GatewayClient> s_wsClient = nullptr;
 
 void _evGotIPHandler(arduino_event_t* event) {
+  (void)event;
+
   s_flags |= FLAG_HAS_IP;
   ESP_LOGD(TAG, "Got IP address");
 }
 
 void _evWiFiDisconnectedHandler(arduino_event_t* event) {
+  (void)event;
+
   s_flags    = FLAG_NONE;
   s_wsClient = nullptr;
   ESP_LOGD(TAG, "Lost IP address");
@@ -51,6 +53,7 @@ void _evWiFiDisconnectedHandler(arduino_event_t* event) {
 }
 
 using namespace OpenShock;
+namespace JsonAPI = OpenShock::Serialization::JsonAPI;
 
 bool GatewayConnectionManager::Init() {
   WiFi.onEvent(_evGotIPHandler, ARDUINO_EVENT_WIFI_STA_GOT_IP);
@@ -68,70 +71,44 @@ bool GatewayConnectionManager::IsConnected() {
   return s_wsClient->state() == GatewayClient::State::Connected;
 }
 
-void GetDeviceInfoFromJsonResponse(HTTPClient& client) {
-  ArduinoJson::DynamicJsonDocument doc(1024);  // TODO: profile the normal message size and adjust this accordingly
-  deserializeJson(doc, client.getString());
-
-  auto data   = doc["data"];
-  String id   = data["id"];
-  String name = data["name"];
-
-  ESP_LOGD(TAG, "Device ID:   %s", id.c_str());
-  ESP_LOGD(TAG, "Device name: %s", name.c_str());
-
-  auto shockers = data["shockers"];
-  for (int i = 0; i < shockers.size(); i++) {
-    auto shocker              = shockers[i];
-    String shockerId          = shocker["id"];
-    std::uint16_t shockerRfId = shocker["rfId"];
-    std::uint8_t shockerModel = shocker["model"];
-
-    ESP_LOGD(TAG, "Found shocker %s with RF ID %u and model %u", shockerId.c_str(), shockerRfId, shockerModel);
-  }
+bool GatewayConnectionManager::IsLinked() {
+  return (s_flags & FLAG_LINKED) != 0;
 }
 
-bool GatewayConnectionManager::IsPaired() {
-  return (s_flags & FLAG_AUTHENTICATED) != 0;
-}
-
-// This method is here to heap usage
-std::string GetAuthTokenFromJsonResponse(HTTPClient& client) {
-  ArduinoJson::DynamicJsonDocument doc(1024);  // TODO: profile the normal message size and adjust this accordingly
-  deserializeJson(doc, client.getString());
-
-  String str = doc["data"];
-
-  return std::string(str.c_str(), str.length());
-}
-
-AccountLinkResultCode GatewayConnectionManager::Pair(const char* pairCode) {
+AccountLinkResultCode GatewayConnectionManager::Link(const char* linkCode) {
   if ((s_flags & FLAG_HAS_IP) == 0) {
     return AccountLinkResultCode::NoInternetConnection;
   }
   s_wsClient = nullptr;
 
-  ESP_LOGD(TAG, "Attempting to pair with pair code %s", pairCode);
+  ESP_LOGD(TAG, "Attempting to link to account using code %s", linkCode);
 
-  HTTPClient client;
-
-  char uri[256];
-  sprintf(uri, OPENSHOCK_API_URL("/1/device/pair/%s"), pairCode);
-
-  client.begin(uri);
-
-  int responseCode = client.GET();
-
-  if (responseCode == 404) {
+  if (std::strlen(linkCode) != LINK_CODE_LENGTH) {
+    ESP_LOGE(TAG, "Invalid link code length");
     return AccountLinkResultCode::InvalidCode;
   }
-  if (responseCode != 200) {
-    ESP_LOGE(TAG, "Error while getting auth token: [%d] %s", responseCode, client.getString().c_str());
+
+  auto response = HTTP::JsonAPI::LinkAccount(linkCode);
+
+  if (response.result == HTTP::RequestResult::RateLimited) {
+    return AccountLinkResultCode::InternalError;  // Just return false, don't spam the console with errors
+  }
+  if (response.result != HTTP::RequestResult::Success) {
+    ESP_LOGE(TAG, "Error while getting auth token: %d %d", response.result, response.code);
+
     return AccountLinkResultCode::InternalError;
   }
 
-  std::string authToken = GetAuthTokenFromJsonResponse(client);
+  if (response.code == 404) {
+    return AccountLinkResultCode::InvalidCode;
+  }
 
-  client.end();
+  if (response.code != 200) {
+    ESP_LOGE(TAG, "Unexpected response code: %d", response.code);
+    return AccountLinkResultCode::InternalError;
+  }
+
+  const std::string& authToken = response.data.authToken;
 
   if (authToken.empty()) {
     ESP_LOGE(TAG, "Received empty auth token");
@@ -143,47 +120,68 @@ AccountLinkResultCode GatewayConnectionManager::Pair(const char* pairCode) {
     return AccountLinkResultCode::InternalError;
   }
 
-  s_flags |= FLAG_AUTHENTICATED;
-  ESP_LOGD(TAG, "Successfully paired with pair code %u", pairCode);
+  s_flags |= FLAG_LINKED;
+  ESP_LOGD(TAG, "Successfully linked to account");
 
   return AccountLinkResultCode::Success;
 }
-void GatewayConnectionManager::UnPair() {
+void GatewayConnectionManager::UnLink() {
   s_flags &= FLAG_HAS_IP;
   s_wsClient = nullptr;
   Config::ClearBackendAuthToken();
 }
 
-bool FetchDeviceInfo(const std::string& authToken) {
+bool GatewayConnectionManager::SendMessageTXT(StringView data) {
+  if (s_wsClient == nullptr) {
+    return false;
+  }
+
+  return s_wsClient->sendMessageTXT(data);
+}
+
+bool GatewayConnectionManager::SendMessageBIN(const std::uint8_t* data, std::size_t length) {
+  if (s_wsClient == nullptr) {
+    return false;
+  }
+
+  return s_wsClient->sendMessageBIN(data, length);
+}
+
+bool FetchDeviceInfo(const String& authToken) {
   // TODO: this function is very slow, should be optimized!
   if ((s_flags & FLAG_HAS_IP) == 0) {
     return false;
   }
 
-  HTTPClient client;
+  auto response = HTTP::JsonAPI::GetDeviceInfo(authToken);
 
-  client.begin(OPENSHOCK_API_URL("/1/device/self"));
+  if (response.result == HTTP::RequestResult::RateLimited) {
+    return false;  // Just return false, don't spam the console with errors
+  }
+  if (response.result != HTTP::RequestResult::Success) {
+    ESP_LOGE(TAG, "Error while fetching device info: %d %d", response.result, response.code);
+    return false;
+  }
 
-  client.addHeader("DeviceToken", authToken.c_str());
-
-  int responseCode = client.GET();
-
-  if (responseCode == 401) {
+  if (response.code == 401) {
     ESP_LOGD(TAG, "Auth token is invalid, clearing it");
     Config::ClearBackendAuthToken();
     return false;
   }
 
-  if (responseCode != 200) {
-    ESP_LOGE(TAG, "Error while verifying auth token: [%d] %s", responseCode, client.getString().c_str());
+  if (response.code != 200) {
+    ESP_LOGE(TAG, "Unexpected response code: %d", response.code);
     return false;
   }
 
-  GetDeviceInfoFromJsonResponse(client);
+  ESP_LOGI(TAG, "Device ID:   %s", response.data.deviceId.c_str());
+  ESP_LOGI(TAG, "Device Name: %s", response.data.deviceName.c_str());
+  ESP_LOGI(TAG, "Shockers:");
+  for (auto& shocker : response.data.shockers) {
+    ESP_LOGI(TAG, "  [%s] rf=%u model=%u", shocker.id.c_str(), shocker.rfId, shocker.model);
+  }
 
-  client.end();
-
-  s_flags |= FLAG_AUTHENTICATED;
+  s_flags |= FLAG_LINKED;
 
   return true;
 }
@@ -214,37 +212,35 @@ bool ConnectToLCG() {
     return false;
   }
 
-  std::string authToken = Config::GetBackendAuthToken();
-
-  HTTPClient client;
-
-  client.begin(OPENSHOCK_API_URL("/1/device/assignLCG"));
-
-  client.addHeader("DeviceToken", authToken.c_str());
-
-  int responseCode = client.GET();
-
-  if (responseCode != 200) {
-    ESP_LOGE(TAG, "Error while fetching LCG endpoint: [%d] %s", responseCode, client.getString().c_str());
+  std::string authToken;
+  if (!Config::GetBackendAuthToken(authToken)) {
+    ESP_LOGE(TAG, "Failed to get auth token");
     return false;
   }
 
-  ArduinoJson::DynamicJsonDocument doc(1024);  // TODO: profile the normal message size and adjust this accordingly
-  deserializeJson(doc, client.getString());
+  auto response = HTTP::JsonAPI::AssignLcg(authToken.c_str());
 
-  auto data           = doc["data"];
-  const char* fqdn    = data["fqdn"];
-  const char* country = data["country"];
-
-  client.end();
-
-  if (fqdn == nullptr || country == nullptr) {
-    ESP_LOGE(TAG, "Received invalid response from LCG endpoint");
+  if (response.result == HTTP::RequestResult::RateLimited) {
+    return false;  // Just return false, don't spam the console with errors
+  }
+  if (response.result != HTTP::RequestResult::Success) {
+    ESP_LOGE(TAG, "Error while fetching LCG endpoint: %d %d", response.result, response.code);
     return false;
   }
 
-  ESP_LOGD(TAG, "Connecting to LCG endpoint %s in country %s", fqdn, country);
-  s_wsClient->connect(fqdn);
+  if (response.code == 401) {
+    ESP_LOGD(TAG, "Auth token is invalid, clearing it");
+    Config::ClearBackendAuthToken();
+    return false;
+  }
+
+  if (response.code != 200) {
+    ESP_LOGE(TAG, "Unexpected response code: %d", response.code);
+    return false;
+  }
+
+  ESP_LOGD(TAG, "Connecting to LCG endpoint %s in country %s", response.data.fqdn.c_str(), response.data.country.c_str());
+  s_wsClient->connect(response.data.fqdn.c_str());
 
   return true;
 }
@@ -256,14 +252,18 @@ void GatewayConnectionManager::Update() {
       return;
     }
 
-    std::string authToken = Config::GetBackendAuthToken();
-
-    // Fetch device info
-    if (!FetchDeviceInfo(authToken)) {
+    std::string authToken;
+    if (!Config::GetBackendAuthToken(authToken)) {
+      ESP_LOGE(TAG, "Failed to get auth token");
       return;
     }
 
-    s_flags |= FLAG_AUTHENTICATED;
+    // Fetch device info
+    if (!FetchDeviceInfo(authToken.c_str())) {
+      return;
+    }
+
+    s_flags |= FLAG_LINKED;
     ESP_LOGD(TAG, "Successfully verified auth token");
 
     s_wsClient = std::make_unique<GatewayClient>(authToken);

@@ -30,6 +30,28 @@ struct WifiNetworkConnectCommandBuilder;
 
 struct WifiNetworkDisconnectCommand;
 
+struct OtaUpdateSetIsEnabledCommand;
+
+struct OtaUpdateSetDomainCommand;
+struct OtaUpdateSetDomainCommandBuilder;
+
+struct OtaUpdateSetUpdateChannelCommand;
+struct OtaUpdateSetUpdateChannelCommandBuilder;
+
+struct OtaUpdateSetCheckIntervalCommand;
+
+struct OtaUpdateSetAllowBackendManagementCommand;
+
+struct OtaUpdateSetRequireManualApprovalCommand;
+
+struct OtaUpdateHandleUpdateRequestCommand;
+
+struct OtaUpdateCheckForUpdatesCommand;
+struct OtaUpdateCheckForUpdatesCommandBuilder;
+
+struct OtaUpdateStartUpdateCommand;
+struct OtaUpdateStartUpdateCommandBuilder;
+
 struct AccountLinkCommand;
 struct AccountLinkCommandBuilder;
 
@@ -47,14 +69,23 @@ enum class LocalToDeviceMessagePayload : uint8_t {
   WifiNetworkForgetCommand = 3,
   WifiNetworkConnectCommand = 4,
   WifiNetworkDisconnectCommand = 5,
-  AccountLinkCommand = 6,
-  AccountUnlinkCommand = 7,
-  SetRfTxPinCommand = 8,
+  OtaUpdateSetIsEnabledCommand = 6,
+  OtaUpdateSetDomainCommand = 7,
+  OtaUpdateSetUpdateChannelCommand = 8,
+  OtaUpdateSetCheckIntervalCommand = 9,
+  OtaUpdateSetAllowBackendManagementCommand = 10,
+  OtaUpdateSetRequireManualApprovalCommand = 11,
+  OtaUpdateHandleUpdateRequestCommand = 12,
+  OtaUpdateCheckForUpdatesCommand = 13,
+  OtaUpdateStartUpdateCommand = 14,
+  AccountLinkCommand = 15,
+  AccountUnlinkCommand = 16,
+  SetRfTxPinCommand = 17,
   MIN = NONE,
   MAX = SetRfTxPinCommand
 };
 
-inline const LocalToDeviceMessagePayload (&EnumValuesLocalToDeviceMessagePayload())[9] {
+inline const LocalToDeviceMessagePayload (&EnumValuesLocalToDeviceMessagePayload())[18] {
   static const LocalToDeviceMessagePayload values[] = {
     LocalToDeviceMessagePayload::NONE,
     LocalToDeviceMessagePayload::WifiScanCommand,
@@ -62,6 +93,15 @@ inline const LocalToDeviceMessagePayload (&EnumValuesLocalToDeviceMessagePayload
     LocalToDeviceMessagePayload::WifiNetworkForgetCommand,
     LocalToDeviceMessagePayload::WifiNetworkConnectCommand,
     LocalToDeviceMessagePayload::WifiNetworkDisconnectCommand,
+    LocalToDeviceMessagePayload::OtaUpdateSetIsEnabledCommand,
+    LocalToDeviceMessagePayload::OtaUpdateSetDomainCommand,
+    LocalToDeviceMessagePayload::OtaUpdateSetUpdateChannelCommand,
+    LocalToDeviceMessagePayload::OtaUpdateSetCheckIntervalCommand,
+    LocalToDeviceMessagePayload::OtaUpdateSetAllowBackendManagementCommand,
+    LocalToDeviceMessagePayload::OtaUpdateSetRequireManualApprovalCommand,
+    LocalToDeviceMessagePayload::OtaUpdateHandleUpdateRequestCommand,
+    LocalToDeviceMessagePayload::OtaUpdateCheckForUpdatesCommand,
+    LocalToDeviceMessagePayload::OtaUpdateStartUpdateCommand,
     LocalToDeviceMessagePayload::AccountLinkCommand,
     LocalToDeviceMessagePayload::AccountUnlinkCommand,
     LocalToDeviceMessagePayload::SetRfTxPinCommand
@@ -70,13 +110,22 @@ inline const LocalToDeviceMessagePayload (&EnumValuesLocalToDeviceMessagePayload
 }
 
 inline const char * const *EnumNamesLocalToDeviceMessagePayload() {
-  static const char * const names[10] = {
+  static const char * const names[19] = {
     "NONE",
     "WifiScanCommand",
     "WifiNetworkSaveCommand",
     "WifiNetworkForgetCommand",
     "WifiNetworkConnectCommand",
     "WifiNetworkDisconnectCommand",
+    "OtaUpdateSetIsEnabledCommand",
+    "OtaUpdateSetDomainCommand",
+    "OtaUpdateSetUpdateChannelCommand",
+    "OtaUpdateSetCheckIntervalCommand",
+    "OtaUpdateSetAllowBackendManagementCommand",
+    "OtaUpdateSetRequireManualApprovalCommand",
+    "OtaUpdateHandleUpdateRequestCommand",
+    "OtaUpdateCheckForUpdatesCommand",
+    "OtaUpdateStartUpdateCommand",
     "AccountLinkCommand",
     "AccountUnlinkCommand",
     "SetRfTxPinCommand",
@@ -113,6 +162,42 @@ template<> struct LocalToDeviceMessagePayloadTraits<OpenShock::Serialization::Lo
 
 template<> struct LocalToDeviceMessagePayloadTraits<OpenShock::Serialization::Local::WifiNetworkDisconnectCommand> {
   static const LocalToDeviceMessagePayload enum_value = LocalToDeviceMessagePayload::WifiNetworkDisconnectCommand;
+};
+
+template<> struct LocalToDeviceMessagePayloadTraits<OpenShock::Serialization::Local::OtaUpdateSetIsEnabledCommand> {
+  static const LocalToDeviceMessagePayload enum_value = LocalToDeviceMessagePayload::OtaUpdateSetIsEnabledCommand;
+};
+
+template<> struct LocalToDeviceMessagePayloadTraits<OpenShock::Serialization::Local::OtaUpdateSetDomainCommand> {
+  static const LocalToDeviceMessagePayload enum_value = LocalToDeviceMessagePayload::OtaUpdateSetDomainCommand;
+};
+
+template<> struct LocalToDeviceMessagePayloadTraits<OpenShock::Serialization::Local::OtaUpdateSetUpdateChannelCommand> {
+  static const LocalToDeviceMessagePayload enum_value = LocalToDeviceMessagePayload::OtaUpdateSetUpdateChannelCommand;
+};
+
+template<> struct LocalToDeviceMessagePayloadTraits<OpenShock::Serialization::Local::OtaUpdateSetCheckIntervalCommand> {
+  static const LocalToDeviceMessagePayload enum_value = LocalToDeviceMessagePayload::OtaUpdateSetCheckIntervalCommand;
+};
+
+template<> struct LocalToDeviceMessagePayloadTraits<OpenShock::Serialization::Local::OtaUpdateSetAllowBackendManagementCommand> {
+  static const LocalToDeviceMessagePayload enum_value = LocalToDeviceMessagePayload::OtaUpdateSetAllowBackendManagementCommand;
+};
+
+template<> struct LocalToDeviceMessagePayloadTraits<OpenShock::Serialization::Local::OtaUpdateSetRequireManualApprovalCommand> {
+  static const LocalToDeviceMessagePayload enum_value = LocalToDeviceMessagePayload::OtaUpdateSetRequireManualApprovalCommand;
+};
+
+template<> struct LocalToDeviceMessagePayloadTraits<OpenShock::Serialization::Local::OtaUpdateHandleUpdateRequestCommand> {
+  static const LocalToDeviceMessagePayload enum_value = LocalToDeviceMessagePayload::OtaUpdateHandleUpdateRequestCommand;
+};
+
+template<> struct LocalToDeviceMessagePayloadTraits<OpenShock::Serialization::Local::OtaUpdateCheckForUpdatesCommand> {
+  static const LocalToDeviceMessagePayload enum_value = LocalToDeviceMessagePayload::OtaUpdateCheckForUpdatesCommand;
+};
+
+template<> struct LocalToDeviceMessagePayloadTraits<OpenShock::Serialization::Local::OtaUpdateStartUpdateCommand> {
+  static const LocalToDeviceMessagePayload enum_value = LocalToDeviceMessagePayload::OtaUpdateStartUpdateCommand;
 };
 
 template<> struct LocalToDeviceMessagePayloadTraits<OpenShock::Serialization::Local::AccountLinkCommand> {
@@ -178,6 +263,131 @@ FLATBUFFERS_STRUCT_END(WifiNetworkDisconnectCommand, 1);
 
 struct WifiNetworkDisconnectCommand::Traits {
   using type = WifiNetworkDisconnectCommand;
+};
+
+FLATBUFFERS_MANUALLY_ALIGNED_STRUCT(1) OtaUpdateSetIsEnabledCommand FLATBUFFERS_FINAL_CLASS {
+ private:
+  uint8_t enabled_;
+
+ public:
+  struct Traits;
+  static FLATBUFFERS_CONSTEXPR_CPP11 const char *GetFullyQualifiedName() {
+    return "OpenShock.Serialization.Local.OtaUpdateSetIsEnabledCommand";
+  }
+  OtaUpdateSetIsEnabledCommand()
+      : enabled_(0) {
+  }
+  OtaUpdateSetIsEnabledCommand(bool _enabled)
+      : enabled_(::flatbuffers::EndianScalar(static_cast<uint8_t>(_enabled))) {
+  }
+  bool enabled() const {
+    return ::flatbuffers::EndianScalar(enabled_) != 0;
+  }
+};
+FLATBUFFERS_STRUCT_END(OtaUpdateSetIsEnabledCommand, 1);
+
+struct OtaUpdateSetIsEnabledCommand::Traits {
+  using type = OtaUpdateSetIsEnabledCommand;
+};
+
+FLATBUFFERS_MANUALLY_ALIGNED_STRUCT(2) OtaUpdateSetCheckIntervalCommand FLATBUFFERS_FINAL_CLASS {
+ private:
+  uint16_t interval_;
+
+ public:
+  struct Traits;
+  static FLATBUFFERS_CONSTEXPR_CPP11 const char *GetFullyQualifiedName() {
+    return "OpenShock.Serialization.Local.OtaUpdateSetCheckIntervalCommand";
+  }
+  OtaUpdateSetCheckIntervalCommand()
+      : interval_(0) {
+  }
+  OtaUpdateSetCheckIntervalCommand(uint16_t _interval)
+      : interval_(::flatbuffers::EndianScalar(_interval)) {
+  }
+  uint16_t interval() const {
+    return ::flatbuffers::EndianScalar(interval_);
+  }
+};
+FLATBUFFERS_STRUCT_END(OtaUpdateSetCheckIntervalCommand, 2);
+
+struct OtaUpdateSetCheckIntervalCommand::Traits {
+  using type = OtaUpdateSetCheckIntervalCommand;
+};
+
+FLATBUFFERS_MANUALLY_ALIGNED_STRUCT(1) OtaUpdateSetAllowBackendManagementCommand FLATBUFFERS_FINAL_CLASS {
+ private:
+  uint8_t allow_;
+
+ public:
+  struct Traits;
+  static FLATBUFFERS_CONSTEXPR_CPP11 const char *GetFullyQualifiedName() {
+    return "OpenShock.Serialization.Local.OtaUpdateSetAllowBackendManagementCommand";
+  }
+  OtaUpdateSetAllowBackendManagementCommand()
+      : allow_(0) {
+  }
+  OtaUpdateSetAllowBackendManagementCommand(bool _allow)
+      : allow_(::flatbuffers::EndianScalar(static_cast<uint8_t>(_allow))) {
+  }
+  bool allow() const {
+    return ::flatbuffers::EndianScalar(allow_) != 0;
+  }
+};
+FLATBUFFERS_STRUCT_END(OtaUpdateSetAllowBackendManagementCommand, 1);
+
+struct OtaUpdateSetAllowBackendManagementCommand::Traits {
+  using type = OtaUpdateSetAllowBackendManagementCommand;
+};
+
+FLATBUFFERS_MANUALLY_ALIGNED_STRUCT(1) OtaUpdateSetRequireManualApprovalCommand FLATBUFFERS_FINAL_CLASS {
+ private:
+  uint8_t require_;
+
+ public:
+  struct Traits;
+  static FLATBUFFERS_CONSTEXPR_CPP11 const char *GetFullyQualifiedName() {
+    return "OpenShock.Serialization.Local.OtaUpdateSetRequireManualApprovalCommand";
+  }
+  OtaUpdateSetRequireManualApprovalCommand()
+      : require_(0) {
+  }
+  OtaUpdateSetRequireManualApprovalCommand(bool _require)
+      : require_(::flatbuffers::EndianScalar(static_cast<uint8_t>(_require))) {
+  }
+  bool require() const {
+    return ::flatbuffers::EndianScalar(require_) != 0;
+  }
+};
+FLATBUFFERS_STRUCT_END(OtaUpdateSetRequireManualApprovalCommand, 1);
+
+struct OtaUpdateSetRequireManualApprovalCommand::Traits {
+  using type = OtaUpdateSetRequireManualApprovalCommand;
+};
+
+FLATBUFFERS_MANUALLY_ALIGNED_STRUCT(1) OtaUpdateHandleUpdateRequestCommand FLATBUFFERS_FINAL_CLASS {
+ private:
+  uint8_t accept_;
+
+ public:
+  struct Traits;
+  static FLATBUFFERS_CONSTEXPR_CPP11 const char *GetFullyQualifiedName() {
+    return "OpenShock.Serialization.Local.OtaUpdateHandleUpdateRequestCommand";
+  }
+  OtaUpdateHandleUpdateRequestCommand()
+      : accept_(0) {
+  }
+  OtaUpdateHandleUpdateRequestCommand(bool _accept)
+      : accept_(::flatbuffers::EndianScalar(static_cast<uint8_t>(_accept))) {
+  }
+  bool accept() const {
+    return ::flatbuffers::EndianScalar(accept_) != 0;
+  }
+};
+FLATBUFFERS_STRUCT_END(OtaUpdateHandleUpdateRequestCommand, 1);
+
+struct OtaUpdateHandleUpdateRequestCommand::Traits {
+  using type = OtaUpdateHandleUpdateRequestCommand;
 };
 
 FLATBUFFERS_MANUALLY_ALIGNED_STRUCT(1) AccountUnlinkCommand FLATBUFFERS_FINAL_CLASS {
@@ -436,6 +646,260 @@ inline ::flatbuffers::Offset<WifiNetworkConnectCommand> CreateWifiNetworkConnect
       ssid__);
 }
 
+struct OtaUpdateSetDomainCommand FLATBUFFERS_FINAL_CLASS : private ::flatbuffers::Table {
+  typedef OtaUpdateSetDomainCommandBuilder Builder;
+  struct Traits;
+  static FLATBUFFERS_CONSTEXPR_CPP11 const char *GetFullyQualifiedName() {
+    return "OpenShock.Serialization.Local.OtaUpdateSetDomainCommand";
+  }
+  enum FlatBuffersVTableOffset FLATBUFFERS_VTABLE_UNDERLYING_TYPE {
+    VT_DOMAIN = 4
+  };
+  const ::flatbuffers::String *domain() const {
+    return GetPointer<const ::flatbuffers::String *>(VT_DOMAIN);
+  }
+  bool Verify(::flatbuffers::Verifier &verifier) const {
+    return VerifyTableStart(verifier) &&
+           VerifyOffset(verifier, VT_DOMAIN) &&
+           verifier.VerifyString(domain()) &&
+           verifier.EndTable();
+  }
+};
+
+struct OtaUpdateSetDomainCommandBuilder {
+  typedef OtaUpdateSetDomainCommand Table;
+  ::flatbuffers::FlatBufferBuilder &fbb_;
+  ::flatbuffers::uoffset_t start_;
+  void add_domain(::flatbuffers::Offset<::flatbuffers::String> domain) {
+    fbb_.AddOffset(OtaUpdateSetDomainCommand::VT_DOMAIN, domain);
+  }
+  explicit OtaUpdateSetDomainCommandBuilder(::flatbuffers::FlatBufferBuilder &_fbb)
+        : fbb_(_fbb) {
+    start_ = fbb_.StartTable();
+  }
+  ::flatbuffers::Offset<OtaUpdateSetDomainCommand> Finish() {
+    const auto end = fbb_.EndTable(start_);
+    auto o = ::flatbuffers::Offset<OtaUpdateSetDomainCommand>(end);
+    return o;
+  }
+};
+
+inline ::flatbuffers::Offset<OtaUpdateSetDomainCommand> CreateOtaUpdateSetDomainCommand(
+    ::flatbuffers::FlatBufferBuilder &_fbb,
+    ::flatbuffers::Offset<::flatbuffers::String> domain = 0) {
+  OtaUpdateSetDomainCommandBuilder builder_(_fbb);
+  builder_.add_domain(domain);
+  return builder_.Finish();
+}
+
+struct OtaUpdateSetDomainCommand::Traits {
+  using type = OtaUpdateSetDomainCommand;
+  static auto constexpr Create = CreateOtaUpdateSetDomainCommand;
+};
+
+inline ::flatbuffers::Offset<OtaUpdateSetDomainCommand> CreateOtaUpdateSetDomainCommandDirect(
+    ::flatbuffers::FlatBufferBuilder &_fbb,
+    const char *domain = nullptr) {
+  auto domain__ = domain ? _fbb.CreateString(domain) : 0;
+  return OpenShock::Serialization::Local::CreateOtaUpdateSetDomainCommand(
+      _fbb,
+      domain__);
+}
+
+struct OtaUpdateSetUpdateChannelCommand FLATBUFFERS_FINAL_CLASS : private ::flatbuffers::Table {
+  typedef OtaUpdateSetUpdateChannelCommandBuilder Builder;
+  struct Traits;
+  static FLATBUFFERS_CONSTEXPR_CPP11 const char *GetFullyQualifiedName() {
+    return "OpenShock.Serialization.Local.OtaUpdateSetUpdateChannelCommand";
+  }
+  enum FlatBuffersVTableOffset FLATBUFFERS_VTABLE_UNDERLYING_TYPE {
+    VT_CHANNEL = 4
+  };
+  const ::flatbuffers::String *channel() const {
+    return GetPointer<const ::flatbuffers::String *>(VT_CHANNEL);
+  }
+  bool Verify(::flatbuffers::Verifier &verifier) const {
+    return VerifyTableStart(verifier) &&
+           VerifyOffset(verifier, VT_CHANNEL) &&
+           verifier.VerifyString(channel()) &&
+           verifier.EndTable();
+  }
+};
+
+struct OtaUpdateSetUpdateChannelCommandBuilder {
+  typedef OtaUpdateSetUpdateChannelCommand Table;
+  ::flatbuffers::FlatBufferBuilder &fbb_;
+  ::flatbuffers::uoffset_t start_;
+  void add_channel(::flatbuffers::Offset<::flatbuffers::String> channel) {
+    fbb_.AddOffset(OtaUpdateSetUpdateChannelCommand::VT_CHANNEL, channel);
+  }
+  explicit OtaUpdateSetUpdateChannelCommandBuilder(::flatbuffers::FlatBufferBuilder &_fbb)
+        : fbb_(_fbb) {
+    start_ = fbb_.StartTable();
+  }
+  ::flatbuffers::Offset<OtaUpdateSetUpdateChannelCommand> Finish() {
+    const auto end = fbb_.EndTable(start_);
+    auto o = ::flatbuffers::Offset<OtaUpdateSetUpdateChannelCommand>(end);
+    return o;
+  }
+};
+
+inline ::flatbuffers::Offset<OtaUpdateSetUpdateChannelCommand> CreateOtaUpdateSetUpdateChannelCommand(
+    ::flatbuffers::FlatBufferBuilder &_fbb,
+    ::flatbuffers::Offset<::flatbuffers::String> channel = 0) {
+  OtaUpdateSetUpdateChannelCommandBuilder builder_(_fbb);
+  builder_.add_channel(channel);
+  return builder_.Finish();
+}
+
+struct OtaUpdateSetUpdateChannelCommand::Traits {
+  using type = OtaUpdateSetUpdateChannelCommand;
+  static auto constexpr Create = CreateOtaUpdateSetUpdateChannelCommand;
+};
+
+inline ::flatbuffers::Offset<OtaUpdateSetUpdateChannelCommand> CreateOtaUpdateSetUpdateChannelCommandDirect(
+    ::flatbuffers::FlatBufferBuilder &_fbb,
+    const char *channel = nullptr) {
+  auto channel__ = channel ? _fbb.CreateString(channel) : 0;
+  return OpenShock::Serialization::Local::CreateOtaUpdateSetUpdateChannelCommand(
+      _fbb,
+      channel__);
+}
+
+struct OtaUpdateCheckForUpdatesCommand FLATBUFFERS_FINAL_CLASS : private ::flatbuffers::Table {
+  typedef OtaUpdateCheckForUpdatesCommandBuilder Builder;
+  struct Traits;
+  static FLATBUFFERS_CONSTEXPR_CPP11 const char *GetFullyQualifiedName() {
+    return "OpenShock.Serialization.Local.OtaUpdateCheckForUpdatesCommand";
+  }
+  enum FlatBuffersVTableOffset FLATBUFFERS_VTABLE_UNDERLYING_TYPE {
+    VT_CHANNEL = 4
+  };
+  const ::flatbuffers::String *channel() const {
+    return GetPointer<const ::flatbuffers::String *>(VT_CHANNEL);
+  }
+  bool Verify(::flatbuffers::Verifier &verifier) const {
+    return VerifyTableStart(verifier) &&
+           VerifyOffset(verifier, VT_CHANNEL) &&
+           verifier.VerifyString(channel()) &&
+           verifier.EndTable();
+  }
+};
+
+struct OtaUpdateCheckForUpdatesCommandBuilder {
+  typedef OtaUpdateCheckForUpdatesCommand Table;
+  ::flatbuffers::FlatBufferBuilder &fbb_;
+  ::flatbuffers::uoffset_t start_;
+  void add_channel(::flatbuffers::Offset<::flatbuffers::String> channel) {
+    fbb_.AddOffset(OtaUpdateCheckForUpdatesCommand::VT_CHANNEL, channel);
+  }
+  explicit OtaUpdateCheckForUpdatesCommandBuilder(::flatbuffers::FlatBufferBuilder &_fbb)
+        : fbb_(_fbb) {
+    start_ = fbb_.StartTable();
+  }
+  ::flatbuffers::Offset<OtaUpdateCheckForUpdatesCommand> Finish() {
+    const auto end = fbb_.EndTable(start_);
+    auto o = ::flatbuffers::Offset<OtaUpdateCheckForUpdatesCommand>(end);
+    return o;
+  }
+};
+
+inline ::flatbuffers::Offset<OtaUpdateCheckForUpdatesCommand> CreateOtaUpdateCheckForUpdatesCommand(
+    ::flatbuffers::FlatBufferBuilder &_fbb,
+    ::flatbuffers::Offset<::flatbuffers::String> channel = 0) {
+  OtaUpdateCheckForUpdatesCommandBuilder builder_(_fbb);
+  builder_.add_channel(channel);
+  return builder_.Finish();
+}
+
+struct OtaUpdateCheckForUpdatesCommand::Traits {
+  using type = OtaUpdateCheckForUpdatesCommand;
+  static auto constexpr Create = CreateOtaUpdateCheckForUpdatesCommand;
+};
+
+inline ::flatbuffers::Offset<OtaUpdateCheckForUpdatesCommand> CreateOtaUpdateCheckForUpdatesCommandDirect(
+    ::flatbuffers::FlatBufferBuilder &_fbb,
+    const char *channel = nullptr) {
+  auto channel__ = channel ? _fbb.CreateString(channel) : 0;
+  return OpenShock::Serialization::Local::CreateOtaUpdateCheckForUpdatesCommand(
+      _fbb,
+      channel__);
+}
+
+struct OtaUpdateStartUpdateCommand FLATBUFFERS_FINAL_CLASS : private ::flatbuffers::Table {
+  typedef OtaUpdateStartUpdateCommandBuilder Builder;
+  struct Traits;
+  static FLATBUFFERS_CONSTEXPR_CPP11 const char *GetFullyQualifiedName() {
+    return "OpenShock.Serialization.Local.OtaUpdateStartUpdateCommand";
+  }
+  enum FlatBuffersVTableOffset FLATBUFFERS_VTABLE_UNDERLYING_TYPE {
+    VT_CHANNEL = 4,
+    VT_VERSION = 6
+  };
+  const ::flatbuffers::String *channel() const {
+    return GetPointer<const ::flatbuffers::String *>(VT_CHANNEL);
+  }
+  const ::flatbuffers::String *version() const {
+    return GetPointer<const ::flatbuffers::String *>(VT_VERSION);
+  }
+  bool Verify(::flatbuffers::Verifier &verifier) const {
+    return VerifyTableStart(verifier) &&
+           VerifyOffset(verifier, VT_CHANNEL) &&
+           verifier.VerifyString(channel()) &&
+           VerifyOffset(verifier, VT_VERSION) &&
+           verifier.VerifyString(version()) &&
+           verifier.EndTable();
+  }
+};
+
+struct OtaUpdateStartUpdateCommandBuilder {
+  typedef OtaUpdateStartUpdateCommand Table;
+  ::flatbuffers::FlatBufferBuilder &fbb_;
+  ::flatbuffers::uoffset_t start_;
+  void add_channel(::flatbuffers::Offset<::flatbuffers::String> channel) {
+    fbb_.AddOffset(OtaUpdateStartUpdateCommand::VT_CHANNEL, channel);
+  }
+  void add_version(::flatbuffers::Offset<::flatbuffers::String> version) {
+    fbb_.AddOffset(OtaUpdateStartUpdateCommand::VT_VERSION, version);
+  }
+  explicit OtaUpdateStartUpdateCommandBuilder(::flatbuffers::FlatBufferBuilder &_fbb)
+        : fbb_(_fbb) {
+    start_ = fbb_.StartTable();
+  }
+  ::flatbuffers::Offset<OtaUpdateStartUpdateCommand> Finish() {
+    const auto end = fbb_.EndTable(start_);
+    auto o = ::flatbuffers::Offset<OtaUpdateStartUpdateCommand>(end);
+    return o;
+  }
+};
+
+inline ::flatbuffers::Offset<OtaUpdateStartUpdateCommand> CreateOtaUpdateStartUpdateCommand(
+    ::flatbuffers::FlatBufferBuilder &_fbb,
+    ::flatbuffers::Offset<::flatbuffers::String> channel = 0,
+    ::flatbuffers::Offset<::flatbuffers::String> version = 0) {
+  OtaUpdateStartUpdateCommandBuilder builder_(_fbb);
+  builder_.add_version(version);
+  builder_.add_channel(channel);
+  return builder_.Finish();
+}
+
+struct OtaUpdateStartUpdateCommand::Traits {
+  using type = OtaUpdateStartUpdateCommand;
+  static auto constexpr Create = CreateOtaUpdateStartUpdateCommand;
+};
+
+inline ::flatbuffers::Offset<OtaUpdateStartUpdateCommand> CreateOtaUpdateStartUpdateCommandDirect(
+    ::flatbuffers::FlatBufferBuilder &_fbb,
+    const char *channel = nullptr,
+    const char *version = nullptr) {
+  auto channel__ = channel ? _fbb.CreateString(channel) : 0;
+  auto version__ = version ? _fbb.CreateString(version) : 0;
+  return OpenShock::Serialization::Local::CreateOtaUpdateStartUpdateCommand(
+      _fbb,
+      channel__,
+      version__);
+}
+
 struct AccountLinkCommand FLATBUFFERS_FINAL_CLASS : private ::flatbuffers::Table {
   typedef AccountLinkCommandBuilder Builder;
   struct Traits;
@@ -528,6 +992,33 @@ struct LocalToDeviceMessage FLATBUFFERS_FINAL_CLASS : private ::flatbuffers::Tab
   const OpenShock::Serialization::Local::WifiNetworkDisconnectCommand *payload_as_WifiNetworkDisconnectCommand() const {
     return payload_type() == OpenShock::Serialization::Local::LocalToDeviceMessagePayload::WifiNetworkDisconnectCommand ? static_cast<const OpenShock::Serialization::Local::WifiNetworkDisconnectCommand *>(payload()) : nullptr;
   }
+  const OpenShock::Serialization::Local::OtaUpdateSetIsEnabledCommand *payload_as_OtaUpdateSetIsEnabledCommand() const {
+    return payload_type() == OpenShock::Serialization::Local::LocalToDeviceMessagePayload::OtaUpdateSetIsEnabledCommand ? static_cast<const OpenShock::Serialization::Local::OtaUpdateSetIsEnabledCommand *>(payload()) : nullptr;
+  }
+  const OpenShock::Serialization::Local::OtaUpdateSetDomainCommand *payload_as_OtaUpdateSetDomainCommand() const {
+    return payload_type() == OpenShock::Serialization::Local::LocalToDeviceMessagePayload::OtaUpdateSetDomainCommand ? static_cast<const OpenShock::Serialization::Local::OtaUpdateSetDomainCommand *>(payload()) : nullptr;
+  }
+  const OpenShock::Serialization::Local::OtaUpdateSetUpdateChannelCommand *payload_as_OtaUpdateSetUpdateChannelCommand() const {
+    return payload_type() == OpenShock::Serialization::Local::LocalToDeviceMessagePayload::OtaUpdateSetUpdateChannelCommand ? static_cast<const OpenShock::Serialization::Local::OtaUpdateSetUpdateChannelCommand *>(payload()) : nullptr;
+  }
+  const OpenShock::Serialization::Local::OtaUpdateSetCheckIntervalCommand *payload_as_OtaUpdateSetCheckIntervalCommand() const {
+    return payload_type() == OpenShock::Serialization::Local::LocalToDeviceMessagePayload::OtaUpdateSetCheckIntervalCommand ? static_cast<const OpenShock::Serialization::Local::OtaUpdateSetCheckIntervalCommand *>(payload()) : nullptr;
+  }
+  const OpenShock::Serialization::Local::OtaUpdateSetAllowBackendManagementCommand *payload_as_OtaUpdateSetAllowBackendManagementCommand() const {
+    return payload_type() == OpenShock::Serialization::Local::LocalToDeviceMessagePayload::OtaUpdateSetAllowBackendManagementCommand ? static_cast<const OpenShock::Serialization::Local::OtaUpdateSetAllowBackendManagementCommand *>(payload()) : nullptr;
+  }
+  const OpenShock::Serialization::Local::OtaUpdateSetRequireManualApprovalCommand *payload_as_OtaUpdateSetRequireManualApprovalCommand() const {
+    return payload_type() == OpenShock::Serialization::Local::LocalToDeviceMessagePayload::OtaUpdateSetRequireManualApprovalCommand ? static_cast<const OpenShock::Serialization::Local::OtaUpdateSetRequireManualApprovalCommand *>(payload()) : nullptr;
+  }
+  const OpenShock::Serialization::Local::OtaUpdateHandleUpdateRequestCommand *payload_as_OtaUpdateHandleUpdateRequestCommand() const {
+    return payload_type() == OpenShock::Serialization::Local::LocalToDeviceMessagePayload::OtaUpdateHandleUpdateRequestCommand ? static_cast<const OpenShock::Serialization::Local::OtaUpdateHandleUpdateRequestCommand *>(payload()) : nullptr;
+  }
+  const OpenShock::Serialization::Local::OtaUpdateCheckForUpdatesCommand *payload_as_OtaUpdateCheckForUpdatesCommand() const {
+    return payload_type() == OpenShock::Serialization::Local::LocalToDeviceMessagePayload::OtaUpdateCheckForUpdatesCommand ? static_cast<const OpenShock::Serialization::Local::OtaUpdateCheckForUpdatesCommand *>(payload()) : nullptr;
+  }
+  const OpenShock::Serialization::Local::OtaUpdateStartUpdateCommand *payload_as_OtaUpdateStartUpdateCommand() const {
+    return payload_type() == OpenShock::Serialization::Local::LocalToDeviceMessagePayload::OtaUpdateStartUpdateCommand ? static_cast<const OpenShock::Serialization::Local::OtaUpdateStartUpdateCommand *>(payload()) : nullptr;
+  }
   const OpenShock::Serialization::Local::AccountLinkCommand *payload_as_AccountLinkCommand() const {
     return payload_type() == OpenShock::Serialization::Local::LocalToDeviceMessagePayload::AccountLinkCommand ? static_cast<const OpenShock::Serialization::Local::AccountLinkCommand *>(payload()) : nullptr;
   }
@@ -564,6 +1055,42 @@ template<> inline const OpenShock::Serialization::Local::WifiNetworkConnectComma
 
 template<> inline const OpenShock::Serialization::Local::WifiNetworkDisconnectCommand *LocalToDeviceMessage::payload_as<OpenShock::Serialization::Local::WifiNetworkDisconnectCommand>() const {
   return payload_as_WifiNetworkDisconnectCommand();
+}
+
+template<> inline const OpenShock::Serialization::Local::OtaUpdateSetIsEnabledCommand *LocalToDeviceMessage::payload_as<OpenShock::Serialization::Local::OtaUpdateSetIsEnabledCommand>() const {
+  return payload_as_OtaUpdateSetIsEnabledCommand();
+}
+
+template<> inline const OpenShock::Serialization::Local::OtaUpdateSetDomainCommand *LocalToDeviceMessage::payload_as<OpenShock::Serialization::Local::OtaUpdateSetDomainCommand>() const {
+  return payload_as_OtaUpdateSetDomainCommand();
+}
+
+template<> inline const OpenShock::Serialization::Local::OtaUpdateSetUpdateChannelCommand *LocalToDeviceMessage::payload_as<OpenShock::Serialization::Local::OtaUpdateSetUpdateChannelCommand>() const {
+  return payload_as_OtaUpdateSetUpdateChannelCommand();
+}
+
+template<> inline const OpenShock::Serialization::Local::OtaUpdateSetCheckIntervalCommand *LocalToDeviceMessage::payload_as<OpenShock::Serialization::Local::OtaUpdateSetCheckIntervalCommand>() const {
+  return payload_as_OtaUpdateSetCheckIntervalCommand();
+}
+
+template<> inline const OpenShock::Serialization::Local::OtaUpdateSetAllowBackendManagementCommand *LocalToDeviceMessage::payload_as<OpenShock::Serialization::Local::OtaUpdateSetAllowBackendManagementCommand>() const {
+  return payload_as_OtaUpdateSetAllowBackendManagementCommand();
+}
+
+template<> inline const OpenShock::Serialization::Local::OtaUpdateSetRequireManualApprovalCommand *LocalToDeviceMessage::payload_as<OpenShock::Serialization::Local::OtaUpdateSetRequireManualApprovalCommand>() const {
+  return payload_as_OtaUpdateSetRequireManualApprovalCommand();
+}
+
+template<> inline const OpenShock::Serialization::Local::OtaUpdateHandleUpdateRequestCommand *LocalToDeviceMessage::payload_as<OpenShock::Serialization::Local::OtaUpdateHandleUpdateRequestCommand>() const {
+  return payload_as_OtaUpdateHandleUpdateRequestCommand();
+}
+
+template<> inline const OpenShock::Serialization::Local::OtaUpdateCheckForUpdatesCommand *LocalToDeviceMessage::payload_as<OpenShock::Serialization::Local::OtaUpdateCheckForUpdatesCommand>() const {
+  return payload_as_OtaUpdateCheckForUpdatesCommand();
+}
+
+template<> inline const OpenShock::Serialization::Local::OtaUpdateStartUpdateCommand *LocalToDeviceMessage::payload_as<OpenShock::Serialization::Local::OtaUpdateStartUpdateCommand>() const {
+  return payload_as_OtaUpdateStartUpdateCommand();
 }
 
 template<> inline const OpenShock::Serialization::Local::AccountLinkCommand *LocalToDeviceMessage::payload_as<OpenShock::Serialization::Local::AccountLinkCommand>() const {
@@ -636,6 +1163,37 @@ inline bool VerifyLocalToDeviceMessagePayload(::flatbuffers::Verifier &verifier,
     }
     case LocalToDeviceMessagePayload::WifiNetworkDisconnectCommand: {
       return verifier.VerifyField<OpenShock::Serialization::Local::WifiNetworkDisconnectCommand>(static_cast<const uint8_t *>(obj), 0, 1);
+    }
+    case LocalToDeviceMessagePayload::OtaUpdateSetIsEnabledCommand: {
+      return verifier.VerifyField<OpenShock::Serialization::Local::OtaUpdateSetIsEnabledCommand>(static_cast<const uint8_t *>(obj), 0, 1);
+    }
+    case LocalToDeviceMessagePayload::OtaUpdateSetDomainCommand: {
+      auto ptr = reinterpret_cast<const OpenShock::Serialization::Local::OtaUpdateSetDomainCommand *>(obj);
+      return verifier.VerifyTable(ptr);
+    }
+    case LocalToDeviceMessagePayload::OtaUpdateSetUpdateChannelCommand: {
+      auto ptr = reinterpret_cast<const OpenShock::Serialization::Local::OtaUpdateSetUpdateChannelCommand *>(obj);
+      return verifier.VerifyTable(ptr);
+    }
+    case LocalToDeviceMessagePayload::OtaUpdateSetCheckIntervalCommand: {
+      return verifier.VerifyField<OpenShock::Serialization::Local::OtaUpdateSetCheckIntervalCommand>(static_cast<const uint8_t *>(obj), 0, 2);
+    }
+    case LocalToDeviceMessagePayload::OtaUpdateSetAllowBackendManagementCommand: {
+      return verifier.VerifyField<OpenShock::Serialization::Local::OtaUpdateSetAllowBackendManagementCommand>(static_cast<const uint8_t *>(obj), 0, 1);
+    }
+    case LocalToDeviceMessagePayload::OtaUpdateSetRequireManualApprovalCommand: {
+      return verifier.VerifyField<OpenShock::Serialization::Local::OtaUpdateSetRequireManualApprovalCommand>(static_cast<const uint8_t *>(obj), 0, 1);
+    }
+    case LocalToDeviceMessagePayload::OtaUpdateHandleUpdateRequestCommand: {
+      return verifier.VerifyField<OpenShock::Serialization::Local::OtaUpdateHandleUpdateRequestCommand>(static_cast<const uint8_t *>(obj), 0, 1);
+    }
+    case LocalToDeviceMessagePayload::OtaUpdateCheckForUpdatesCommand: {
+      auto ptr = reinterpret_cast<const OpenShock::Serialization::Local::OtaUpdateCheckForUpdatesCommand *>(obj);
+      return verifier.VerifyTable(ptr);
+    }
+    case LocalToDeviceMessagePayload::OtaUpdateStartUpdateCommand: {
+      auto ptr = reinterpret_cast<const OpenShock::Serialization::Local::OtaUpdateStartUpdateCommand *>(obj);
+      return verifier.VerifyTable(ptr);
     }
     case LocalToDeviceMessagePayload::AccountLinkCommand: {
       auto ptr = reinterpret_cast<const OpenShock::Serialization::Local::AccountLinkCommand *>(obj);

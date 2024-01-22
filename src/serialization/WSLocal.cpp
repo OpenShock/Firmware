@@ -1,9 +1,13 @@
 #include "serialization/WSLocal.h"
 
-#include "Utils/HexUtils.h"
+#include "config/Config.h"
+#include "Logging.h"
+#include "util/HexUtils.h"
 #include "wifi/WiFiNetwork.h"
 
 #include "serialization/_fbs/DeviceToLocalMessage_generated.h"
+
+const char* const TAG = "WSLocal";
 
 using namespace OpenShock::Serialization;
 
@@ -57,7 +61,7 @@ bool Local::SerializeErrorMessage(const char* message, Common::SerializationCall
   return true;
 }
 
-bool Local::SerializeReadyMessage(const WiFiNetwork* connectedNetwork, bool gatewayPaired, std::uint8_t radioTxPin, Common::SerializationCallbackFn callback) {
+bool Local::SerializeReadyMessage(const WiFiNetwork* connectedNetwork, bool accountLinked, Common::SerializationCallbackFn callback) {
   flatbuffers::FlatBufferBuilder builder(256);
 
   flatbuffers::Offset<Serialization::Types::WifiNetwork> fbsNetwork = 0;
@@ -68,7 +72,13 @@ bool Local::SerializeReadyMessage(const WiFiNetwork* connectedNetwork, bool gate
     fbsNetwork = 0;
   }
 
-  auto readyMessageOffset = Serialization::Local::CreateReadyMessage(builder, true, fbsNetwork, gatewayPaired, radioTxPin);
+  auto configOffset = OpenShock::Config::GetAsFlatBuffer(builder, false);
+  if (configOffset.IsNull()) {
+    ESP_LOGE(TAG, "Failed to serialize config");
+    return false;
+  }
+
+  auto readyMessageOffset = Serialization::Local::CreateReadyMessage(builder, true, fbsNetwork, accountLinked, configOffset);
 
   auto msg = Serialization::Local::CreateDeviceToLocalMessage(builder, Serialization::Local::DeviceToLocalMessagePayload::ReadyMessage, readyMessageOffset.Union());
 
@@ -97,7 +107,30 @@ bool Local::SerializeWiFiScanStatusChangedEvent(OpenShock::WiFiScanStatus status
 bool Local::SerializeWiFiNetworkEvent(Types::WifiNetworkEventType eventType, const WiFiNetwork& network, Common::SerializationCallbackFn callback) {
   flatbuffers::FlatBufferBuilder builder(256);  // TODO: Profile this and adjust the size accordingly
 
-  auto wrapperOffset = Local::CreateWifiNetworkEvent(builder, eventType, _createWiFiNetwork(builder, network));
+  auto networkOffset = _createWiFiNetwork(builder, network);
+
+  auto wrapperOffset = Local::CreateWifiNetworkEvent(builder, eventType, builder.CreateVector(&networkOffset, 1));  // Resulting vector will have 1 element
+
+  auto msg = Local::CreateDeviceToLocalMessage(builder, Local::DeviceToLocalMessagePayload::WifiNetworkEvent, wrapperOffset.Union());
+
+  builder.Finish(msg);
+
+  auto span = builder.GetBufferSpan();
+
+  return callback(span.data(), span.size());
+}
+
+bool Local::SerializeWiFiNetworksEvent(Types::WifiNetworkEventType eventType, const std::vector<WiFiNetwork>& networks, Common::SerializationCallbackFn callback) {
+  flatbuffers::FlatBufferBuilder builder(256);  // TODO: Profile this and adjust the size accordingly
+
+  std::vector<flatbuffers::Offset<Serialization::Types::WifiNetwork>> fbsNetworks;
+  fbsNetworks.reserve(networks.size());
+
+  for (const auto& network : networks) {
+    fbsNetworks.push_back(_createWiFiNetwork(builder, network));
+  }
+
+  auto wrapperOffset = Local::CreateWifiNetworkEvent(builder, eventType, builder.CreateVector(fbsNetworks));
 
   auto msg = Local::CreateDeviceToLocalMessage(builder, Local::DeviceToLocalMessagePayload::WifiNetworkEvent, wrapperOffset.Union());
 

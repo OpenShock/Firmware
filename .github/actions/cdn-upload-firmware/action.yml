@@ -1,0 +1,52 @@
+name: cdn-upload-firmware
+description: Uploads firmware partitions and merged binaries to CDN along with SHA256 checksums
+inputs:
+  cf-bucket:
+    description: Name of the S3 bucket
+    required: true
+  fw-version:
+    description: Firmware version
+    required: true
+  board:
+    description: 'Board to upload'
+    required: true
+
+runs:
+  using: composite
+  steps:
+    - name: Download static filesystem partition
+      uses: actions/download-artifact@v4
+      with:
+        name: firmware_staticfs
+        path: .
+
+    - name: Download firmware partitions
+      uses: actions/download-artifact@v4
+      with:
+        name: firmware_build_${{ inputs.board }}
+        path: .
+
+    - name: Download merged firmware binary
+      uses: actions/download-artifact@v4
+      with:
+        name: firmware_merged_${{ inputs.board }}
+        path: .
+
+    - name: Rename firmware binaries
+      shell: bash
+      run: |
+        mv OpenShock_*.bin firmware.bin
+
+    - name: Generate SHA256 checksums
+      shell: bash
+      run: |
+        find . -type f -name '*.bin' -exec md5sum {} \; > hashes.md5.txt
+        find . -type f -name '*.bin' -exec sha256sum {} \; > hashes.sha256.txt
+
+    - name: Upload artifacts to CDN
+      shell: bash
+      run: |
+        mkdir -p upload
+        mv *.bin upload/
+        mv hashes.*.txt upload/
+        rclone copy upload 'cdn:${{ inputs.cf-bucket }}/${{ inputs.fw-version }}/${{ inputs.board }}/'

@@ -10,7 +10,7 @@ const char* const TAG = "ServerMessageHandlers";
 
 using namespace OpenShock::MessageHandlers::Server;
 
-void _Private::HandleShockerCommandList(const OpenShock::Serialization::ServerToDeviceMessage* root) {
+void _Private::HandleShockerCommandList(const OpenShock::Serialization::Gateway::GatewayToDeviceMessage* root) {
   auto msg = root->payload_as_ShockerCommandList();
   if (msg == nullptr) {
     ESP_LOGE(TAG, "Payload cannot be parsed as ShockerCommandList");
@@ -23,7 +23,7 @@ void _Private::HandleShockerCommandList(const OpenShock::Serialization::ServerTo
     return;
   }
 
-  ESP_LOGV(TAG, "Received command list from API (%llu commands)", commands->size());
+  ESP_LOGV(TAG, "Received command list from API (%u commands)", commands->size());
 
   for (auto command : *commands) {
     std::uint16_t id                   = command->id();

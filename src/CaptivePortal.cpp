@@ -2,9 +2,10 @@
 
 #include "CaptivePortalInstance.h"
 #include "CommandHandler.h"
-#include "Config.h"
+#include "config/Config.h"
 #include "GatewayConnectionManager.h"
 #include "Logging.h"
+#include "Time.h"
 
 #include <ESPAsyncWebServer.h>
 #include <WebSocketsServer.h>
@@ -19,6 +20,7 @@ static const char* TAG = "CaptivePortal";
 using namespace OpenShock;
 
 static bool s_alwaysEnabled                              = false;
+static bool s_forceClosed                                = false;
 static std::unique_ptr<CaptivePortalInstance> s_instance = nullptr;
 
 bool _startCaptive() {
@@ -92,18 +94,38 @@ bool CaptivePortal::IsAlwaysEnabled() {
   return s_alwaysEnabled;
 }
 
+bool CaptivePortal::ForceClose(std::uint32_t timeoutMs) {
+  s_forceClosed = true;
+
+  if (s_instance == nullptr) return true;
+
+  while (timeoutMs > 0) {
+    std::uint32_t delay = std::min(timeoutMs, 10U);
+
+    vTaskDelay(pdMS_TO_TICKS(delay));
+
+    timeoutMs -= delay;
+
+    if (s_instance == nullptr) return true;
+  }
+
+  return false;
+}
+
 bool CaptivePortal::IsRunning() {
   return s_instance != nullptr;
 }
+
 void CaptivePortal::Update() {
   bool gatewayConnected = GatewayConnectionManager::IsConnected();
   bool commandHandlerOk = CommandHandler::Ok();
-  bool shouldBeRunning  = s_alwaysEnabled || !gatewayConnected || !commandHandlerOk;
+  bool shouldBeRunning  = (s_alwaysEnabled || !gatewayConnected || !commandHandlerOk) && !s_forceClosed;
 
   if (s_instance == nullptr) {
     if (shouldBeRunning) {
       ESP_LOGD(TAG, "Starting captive portal");
       ESP_LOGD(TAG, "  alwaysEnabled: %s", s_alwaysEnabled ? "true" : "false");
+      ESP_LOGD(TAG, "  forceClosed: %s", s_forceClosed ? "true" : "false");
       ESP_LOGD(TAG, "  isConnected: %s", gatewayConnected ? "true" : "false");
       ESP_LOGD(TAG, "  commandHandlerOk: %s", commandHandlerOk ? "true" : "false");
       _startCaptive();
@@ -114,19 +136,18 @@ void CaptivePortal::Update() {
   if (!shouldBeRunning) {
     ESP_LOGD(TAG, "Stopping captive portal");
     ESP_LOGD(TAG, "  alwaysEnabled: %s", s_alwaysEnabled ? "true" : "false");
+    ESP_LOGD(TAG, "  forceClosed: %s", s_forceClosed ? "true" : "false");
     ESP_LOGD(TAG, "  isConnected: %s", gatewayConnected ? "true" : "false");
     ESP_LOGD(TAG, "  commandHandlerOk: %s", commandHandlerOk ? "true" : "false");
     _stopCaptive();
     return;
   }
-
-  s_instance->loop();
 }
 
-bool CaptivePortal::SendMessageTXT(std::uint8_t socketId, const char* data, std::size_t len) {
+bool CaptivePortal::SendMessageTXT(std::uint8_t socketId, StringView data) {
   if (s_instance == nullptr) return false;
 
-  s_instance->sendMessageTXT(socketId, data, len);
+  s_instance->sendMessageTXT(socketId, data);
 
   return true;
 }
@@ -138,10 +159,10 @@ bool CaptivePortal::SendMessageBIN(std::uint8_t socketId, const std::uint8_t* da
   return true;
 }
 
-bool CaptivePortal::BroadcastMessageTXT(const char* data, std::size_t len) {
+bool CaptivePortal::BroadcastMessageTXT(StringView data) {
   if (s_instance == nullptr) return false;
 
-  s_instance->broadcastMessageTXT(data, len);
+  s_instance->broadcastMessageTXT(data);
 
   return true;
 }

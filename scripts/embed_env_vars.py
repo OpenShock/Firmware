@@ -45,13 +45,21 @@ def get_git_commit() -> str | None:
 
 # Find env variables based on only the pioenv and sysenv.
 def get_pio_firmware_vars() -> dict[str, str | int | bool]:
+    fw_board = pio.get_string('PIOENV')
+    fw_chip = pio.get_string('BOARD_MCU')
+
+    def macroify(s: str) -> str:
+        return s.upper().replace('-', '').replace('_', '')
+
     vars = {}
-    vars['OPENSHOCK_FW_BOARD'] = pio.get_string('PIOENV')
-    vars['OPENSHOCK_FW_CHIP'] = pio.get_string('BOARD_MCU')
+    vars['OPENSHOCK_FW_BOARD'] = fw_board
+    vars['OPENSHOCK_FW_BOARD_' + macroify(fw_board)] = True  # Used for conditional compilation.
+    vars['OPENSHOCK_FW_CHIP'] = fw_chip.upper()
+    vars['OPENSHOCK_FW_CHIP_' + macroify(fw_chip)] = True  # Used for conditional compilation.
     vars['OPENSHOCK_FW_MODE'] = pio_build_type
     git_commit = get_git_commit()
     if git_commit is not None:
-        vars['OPENSHOCK_FW_COMMIT'] = git_commit
+        vars['OPENSHOCK_FW_GIT_COMMIT'] = git_commit
     return vars
 
 
@@ -84,16 +92,16 @@ def transform_cpp_define_string(k: str, v: str) -> str:
     if v.startswith('"') and v.endswith('"'):
         v = v[1:-1]
 
-    # Special case for OPENSHOCK_FW_COMMIT.
-    if k == 'OPENSHOCK_FW_COMMIT' and len(v) > 7:
+    # Special case for OPENSHOCK_FW_GIT_COMMIT.
+    if k == 'OPENSHOCK_FW_GIT_COMMIT' and len(v) > 7:
         v = v[0:7]
 
     return env.StringifyMacro(v)
 
 
 def serialize_cpp_define(k: str, v: str | int | bool) -> str | int:
-    # Special case for OPENSHOCK_FW_COMMIT.
-    if k == 'OPENSHOCK_FW_COMMIT':
+    # Special case for OPENSHOCK_FW_GIT_COMMIT.
+    if k == 'OPENSHOCK_FW_GIT_COMMIT':
         return transform_cpp_define_string(k, str(v))
 
     try:
@@ -169,5 +177,8 @@ print('Build defines: ' + str(cpp_defines))
 env['BUILD_TYPE'] = pio_build_type
 env['BUILD_FLAGS'] = remaining_build_flags
 env.Append(CPPDEFINES=list(cpp_defines.items()))
+
+# Rename the firmware.bin to app.bin.
+env.Replace(PROGNAME='app')
 
 print(env.Dump())

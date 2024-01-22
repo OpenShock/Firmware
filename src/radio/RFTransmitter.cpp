@@ -4,25 +4,29 @@
 #include "Logging.h"
 #include "radio/rmt/MainEncoder.h"
 #include "Time.h"
+#include "util/TaskUtils.h"
 
 #include <freertos/FreeRTOS.h>
 #include <freertos/queue.h>
-#include <freertos/task.h>
 
-#include <limits>
+const char* const TAG = "RFTransmitter";
+
+const UBaseType_t RFTRANSMITTER_QUEUE_SIZE        = 32;
+const BaseType_t RFTRANSMITTER_TASK_PRIORITY      = 1;
+const std::uint32_t RFTRANSMITTER_TASK_STACK_SIZE = 4096;
+const float RFTRANSMITTER_TICKRATE_NS             = 1000;
+
+using namespace OpenShock;
 
 struct command_t {
   std::int64_t until;
   std::vector<rmt_data_t> sequence;
   std::shared_ptr<std::vector<rmt_data_t>> zeroSequence;
   std::uint16_t shockerId;
+  bool overwrite;
 };
 
-const char* const TAG = "RFTransmitter";
-
-using namespace OpenShock;
-
-RFTransmitter::RFTransmitter(std::uint8_t gpioPin, int queueSize) : m_txPin(gpioPin), m_rmtHandle(nullptr), m_queueHandle(nullptr), m_taskHandle(nullptr) {
+RFTransmitter::RFTransmitter(std::uint8_t gpioPin) : m_txPin(gpioPin), m_rmtHandle(nullptr), m_queueHandle(nullptr), m_taskHandle(nullptr) {
   ESP_LOGD(TAG, "[pin-%u] Creating RFTransmitter", m_txPin);
 
   m_rmtHandle = rmtInit(gpioPin, RMT_TX_MODE, RMT_MEM_64);
@@ -32,10 +36,10 @@ RFTransmitter::RFTransmitter(std::uint8_t gpioPin, int queueSize) : m_txPin(gpio
     return;
   }
 
-  float realTick = rmtSetTick(m_rmtHandle, 1000);
+  float realTick = rmtSetTick(m_rmtHandle, RFTRANSMITTER_TICKRATE_NS);
   ESP_LOGD(TAG, "[pin-%u] real tick set to: %fns", m_txPin, realTick);
 
-  m_queueHandle = xQueueCreate(queueSize, sizeof(command_t*));
+  m_queueHandle = xQueueCreate(RFTRANSMITTER_QUEUE_SIZE, sizeof(command_t*));
   if (m_queueHandle == nullptr) {
     ESP_LOGE(TAG, "[pin-%u] Failed to create queue", m_txPin);
     destroy();
@@ -45,7 +49,7 @@ RFTransmitter::RFTransmitter(std::uint8_t gpioPin, int queueSize) : m_txPin(gpio
   char name[32];
   snprintf(name, sizeof(name), "RFTransmitter-%u", m_txPin);
 
-  if (xTaskCreate(TransmitTask, name, 4096, this, 1, &m_taskHandle) != pdPASS) {
+  if (TaskUtils::TaskCreateExpensive(TransmitTask, name, RFTRANSMITTER_TASK_STACK_SIZE, this, RFTRANSMITTER_TASK_PRIORITY, &m_taskHandle) != pdPASS) {
     ESP_LOGE(TAG, "[pin-%u] Failed to create task", m_txPin);
     destroy();
     return;
@@ -56,16 +60,13 @@ RFTransmitter::~RFTransmitter() {
   destroy();
 }
 
-bool RFTransmitter::SendCommand(ShockerModelType model, std::uint16_t shockerId, ShockerCommandType type, std::uint8_t intensity, std::uint16_t durationMs) {
+bool RFTransmitter::SendCommand(ShockerModelType model, std::uint16_t shockerId, ShockerCommandType type, std::uint8_t intensity, std::uint16_t durationMs, bool overwriteExisting) {
   if (m_queueHandle == nullptr) {
     ESP_LOGE(TAG, "[pin-%u] Queue is null", m_txPin);
     return false;
   }
 
-  // Intensity must be between 0 and 99
-  intensity = std::min(intensity, (std::uint8_t)99);
-
-  command_t* cmd = new command_t {.until = OpenShock::millis() + durationMs, .sequence = Rmt::GetSequence(model, shockerId, type, intensity), .zeroSequence = Rmt::GetZeroSequence(model, shockerId), .shockerId = shockerId};
+  command_t* cmd = new command_t {.until = OpenShock::millis() + durationMs, .sequence = Rmt::GetSequence(model, shockerId, type, intensity), .zeroSequence = Rmt::GetZeroSequence(model, shockerId), .shockerId = shockerId, .overwrite = overwriteExisting};
 
   // We will use nullptr commands to end the task, if we got a nullptr here, we are out of memory... :(
   if (cmd == nullptr) {
@@ -153,20 +154,26 @@ void RFTransmitter::TransmitTask(void* arg) {
       }
 
       // Replace the command if it already exists
-      bool replaced = false;
       for (auto it = commands.begin(); it != commands.end(); ++it) {
-        if ((*it)->shockerId == cmd->shockerId) {
-          delete *it;
-          *it = cmd;
+        const command_t* existingCmd = *it;
 
-          replaced = true;
+        if (existingCmd->shockerId == cmd->shockerId) {
+          // Only replace the command if it should be overwritten
+          if (existingCmd->overwrite) {
+            delete *it;
+            *it = cmd;
+          } else {
+            delete cmd;
+          }
+
+          cmd = nullptr;
 
           break;
         }
       }
 
       // If the command was not replaced, add it to the queue
-      if (!replaced) {
+      if (cmd != nullptr) {
         commands.push_back(cmd);
       }
     }
@@ -176,7 +183,7 @@ void RFTransmitter::TransmitTask(void* arg) {
       cmd = *it;
 
       bool expired = cmd->until < OpenShock::millis();
-      bool empty   = cmd->sequence.size() <= 0;
+      bool empty   = cmd->sequence.empty();
 
       // Remove expired or empty commands, else send the command.
       // After sending/receiving a command, move to the next one.

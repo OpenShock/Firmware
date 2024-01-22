@@ -1,15 +1,19 @@
 #include "GatewayClient.h"
 
-#include "CertificateUtils.h"
+#include "Common.h"
+#include "config/Config.h"
 #include "event_handlers/WebSocket.h"
 #include "Logging.h"
+#include "OtaUpdateManager.h"
+#include "serialization/WSGateway.h"
 #include "Time.h"
-
-#include "serialization/_fbs/DeviceToServerMessage_generated.h"
+#include "util/CertificateUtils.h"
 
 const char* const TAG = "GatewayClient";
 
 using namespace OpenShock;
+
+static bool s_bootStatusSent = false;
 
 GatewayClient::GatewayClient(const std::string& authToken) : m_webSocket(), m_lastKeepAlive(0), m_state(State::Disconnected) {
   ESP_LOGD(TAG, "Creating GatewayClient");
@@ -18,6 +22,7 @@ GatewayClient::GatewayClient(const std::string& authToken) : m_webSocket(), m_la
                         "Device-Token: "
                       + authToken;
 
+  m_webSocket.setUserAgent(OpenShock::Constants::FW_USERAGENT);
   m_webSocket.setExtraHeaders(headers.c_str());
   m_webSocket.onEvent(std::bind(&GatewayClient::_handleEvent, this, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3));
 }
@@ -58,6 +63,22 @@ void GatewayClient::disconnect() {
   m_webSocket.disconnect();
 }
 
+bool GatewayClient::sendMessageTXT(StringView data) {
+  if (m_state != State::Connected) {
+    return false;
+  }
+
+  return m_webSocket.sendTXT(data.data(), data.length());
+}
+
+bool GatewayClient::sendMessageBIN(const std::uint8_t* data, std::size_t length) {
+  if (m_state != State::Connected) {
+    return false;
+  }
+
+  return m_webSocket.sendBIN(data, length);
+}
+
 bool GatewayClient::loop() {
   if (m_state == State::Disconnected) {
     return false;
@@ -84,23 +105,45 @@ bool GatewayClient::loop() {
 }
 
 void GatewayClient::_sendKeepAlive() {
-  ESP_LOGV(TAG, "Sending keep alive message");
+  ESP_LOGV(TAG, "Sending Gateway keep-alive message");
+  Serialization::Gateway::SerializeKeepAliveMessage([this](const std::uint8_t* data, std::size_t len) { return m_webSocket.sendBIN(data, len); });
+}
 
-  // Casting to uint64 here is safe since millis is guaranteed to return a positive value
-  OpenShock::Serialization::KeepAlive keepAlive((std::uint64_t)OpenShock::millis());
+void GatewayClient::_sendBootStatus() {
+  if (s_bootStatusSent) return;
 
-  flatbuffers::FlatBufferBuilder builder(64);
+  ESP_LOGV(TAG, "Sending Gateway boot status message");
 
-  auto keepAliveOffset = builder.CreateStruct(keepAlive);
+  std::int32_t updateId;
+  if (!Config::GetOtaUpdateId(updateId)) {
+    ESP_LOGE(TAG, "Failed to get OTA update ID");
+    return;
+  }
 
-  auto msg = OpenShock::Serialization::CreateDeviceToServerMessage(builder, OpenShock::Serialization::DeviceToServerMessagePayload::KeepAlive, keepAliveOffset.Union());
+  OpenShock::OtaUpdateStep updateStep;
+  if (!Config::GetOtaUpdateStep(updateStep)) {
+    ESP_LOGE(TAG, "Failed to get OTA firmware boot type");
+    return;
+  }
 
-  builder.Finish(msg);
+  OpenShock::SemVer version;
+  if (!OpenShock::TryParseSemVer(OPENSHOCK_FW_VERSION, version)) {
+    ESP_LOGE(TAG, "Failed to parse firmware version");
+    return;
+  }
 
-  m_webSocket.sendBIN(builder.GetBufferPointer(), builder.GetSize());
+  s_bootStatusSent = Serialization::Gateway::SerializeBootStatusMessage(updateId, OtaUpdateManager::GetFirmwareBootType(), version, [this](const std::uint8_t* data, std::size_t len) { return m_webSocket.sendBIN(data, len); });
+
+  if (s_bootStatusSent && updateStep != OpenShock::OtaUpdateStep::None) {
+    if (!Config::SetOtaUpdateStep(OpenShock::OtaUpdateStep::None)) {
+      ESP_LOGE(TAG, "Failed to reset firmware boot type to normal");
+    }
+  }
 }
 
 void GatewayClient::_handleEvent(WStype_t type, std::uint8_t* payload, std::size_t length) {
+  (void)payload;
+
   switch (type) {
     case WStype_DISCONNECTED:
       ESP_LOGI(TAG, "Disconnected from API");
@@ -110,6 +153,7 @@ void GatewayClient::_handleEvent(WStype_t type, std::uint8_t* payload, std::size
       ESP_LOGI(TAG, "Connected to API");
       m_state = State::Connected;
       _sendKeepAlive();
+      _sendBootStatus();
       break;
     case WStype_TEXT:
       ESP_LOGW(TAG, "Received text from API, JSON parsing is not supported anymore :D");

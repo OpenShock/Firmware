@@ -165,11 +165,11 @@ def minify_fa_font(font_path, icon_map):
 
 def build_frontend(source, target, env):
     # Change working directory to frontend.
-    os.chdir('WebUI')
+    os.chdir('frontend')
 
-    # Build the captive portal only if it wasn't already built.
-    # This is to avoid rebuilding the captive portal every time the firmware is built.
-    # This could also lead to some annoying behaviour where the captive portal is not updated when the firmware is built.
+    # Build the frontend only if it wasn't already built.
+    # This is to avoid rebuilding the frontend every time the firmware is built.
+    # This could also lead to some annoying behaviour where the frontend is not updated when the firmware is built.
     if not sysenv.get_bool('CI', False):
         print('Building frontend...')
         os.system('npm i')
@@ -179,11 +179,11 @@ def build_frontend(source, target, env):
     # Change working directory back to root.
     os.chdir('..')
 
-    fa_css = 'WebUI/build/fa/fa-all.css'
-    fa_woff2 = 'WebUI/build/fa/fa-solid-900.woff2'
+    fa_css = 'frontend/build/fa/fa-all.css'
+    fa_woff2 = 'frontend/build/fa/fa-solid-900.woff2'
 
     # Analyze the frontend to find all the font awesome icons in use and which css selectors from fa-all.css are unused.
-    (icon_map, unused_css_selectors) = get_fa_icon_map('WebUI/src', fa_css)
+    (icon_map, unused_css_selectors) = get_fa_icon_map('frontend/src', fa_css)
     print('Found ' + str(len(icon_map)) + ' font awesome icons.')
 
     # Write a minified css and font file to the static directory.
@@ -195,9 +195,9 @@ def build_frontend(source, target, env):
     copy_actions = []
     rename_actions = []
     renamed_filenames = []
-    for root, dirs, files in os.walk('WebUI/build'):
+    for root, dirs, files in os.walk('frontend/build'):
         root = root.replace('\\', '/')
-        newroot = root.replace('WebUI/build', 'data/www')
+        newroot = root.replace('frontend/build', 'data/www')
         isImmutable = '_app/immutable' in root
 
         for filename in files:
@@ -263,35 +263,49 @@ def build_frontend(source, target, env):
         with gzip.open(dst_path + '.gz', 'wb') as f_out:
             f_out.write(s)
 
-    # Hash the data/www directory.
+
+def hash_file_update(md5, sha1, sha256, filepath):
+    with open(filepath, 'rb') as f:
+        while True:
+            chunk = f.read(65536)
+            if not chunk:
+                break
+            md5.update(chunk)
+            sha1.update(chunk)
+            sha256.update(chunk)
+
+
+def hash_file(filepath):
     hashMd5 = hashlib.md5()
     hashSha1 = hashlib.sha1()
     hashSha256 = hashlib.sha256()
-    for root, _, files in os.walk('data/www'):
-        root = root.replace('\\', '/')
-        for filename in files:
-            filepath = os.path.join(root, filename)
-            with open(filepath, 'rb') as f:
-                while True:
-                    chunk = f.read(65536)
-                    if not chunk:
-                        break
-                    hashMd5.update(chunk)
-                    hashSha1.update(chunk)
-                    hashSha256.update(chunk)
-    hashMd5 = hashMd5.hexdigest()
-    hashSha1 = hashSha1.hexdigest()
-    hashSha256 = hashSha256.hexdigest()
 
-    print('Build hash:')
-    print('  MD5:    ' + hashMd5)
-    print('  SHA1:   ' + hashSha1)
-    print('  SHA256: ' + hashSha256)
+    hash_file_update(hashMd5, hashSha1, hashSha256, filepath)
 
-    # Write the hashes to data/www files
-    file_write_text('data/www/hash.md5', hashMd5, None)
-    file_write_text('data/www/hash.sha1', hashSha1, None)
-    file_write_text('data/www/hash.sha256', hashSha256, None)
+    return {
+        'MD5': hashMd5.hexdigest(),
+        'SHA1': hashSha1.hexdigest(),
+        'SHA256': hashSha256.hexdigest(),
+    }
+
+
+def process_littlefs_binary(source, target, env):
+    nTargets = len(target)
+    if nTargets != 1:
+        raise Exception('Expected 1 target, got ' + str(nTargets))
+
+    # Get the path to the binary and its directory.
+    littlefs_path = target[0].get_abspath()
+
+    bin_size = os.path.getsize(littlefs_path)
+    bin_hashes = hash_file(littlefs_path)
+
+    print('FileSystem Size: ' + str(bin_size) + ' bytes')
+    print('FileSystem Hashes:')
+    print('MD5:    ' + bin_hashes['MD5'])
+    print('SHA1:   ' + bin_hashes['SHA1'])
+    print('SHA256: ' + bin_hashes['SHA256'])
 
 
 env.AddPreAction('$BUILD_DIR/littlefs.bin', build_frontend)
+env.AddPostAction('$BUILD_DIR/littlefs.bin', process_littlefs_binary)
