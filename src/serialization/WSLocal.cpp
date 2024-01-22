@@ -104,10 +104,16 @@ bool Local::SerializeWiFiScanStatusChangedEvent(OpenShock::WiFiScanStatus status
   return callback(span.data(), span.size());
 }
 
-bool Local::SerializeWiFiNetworkEvent(Types::WifiNetworkEventType eventType, const WiFiNetwork& network, Common::SerializationCallbackFn callback) {
+bool Local::SerializeWiFiNetworkEvent(Types::WifiNetworkEventType eventType, std::vector<WiFiNetwork> networks, Common::SerializationCallbackFn callback) {
   flatbuffers::FlatBufferBuilder builder(256);  // TODO: Profile this and adjust the size accordingly
 
-  auto wrapperOffset = Local::CreateWifiNetworkEvent(builder, eventType, _createWiFiNetwork(builder, network));
+  std::vector<flatbuffers::Offset<Serialization::Types::WifiNetwork>> fbsNetworks;
+
+  for (const auto& network : networks) {
+    fbsNetworks.push_back(_createWiFiNetwork(builder, network));
+  }
+
+  auto wrapperOffset = Local::CreateWifiNetworkEvent(builder, eventType, builder.CreateVector(fbsNetworks));
 
   auto msg = Local::CreateDeviceToLocalMessage(builder, Local::DeviceToLocalMessagePayload::WifiNetworkEvent, wrapperOffset.Union());
 
