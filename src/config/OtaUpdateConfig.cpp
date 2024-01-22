@@ -21,7 +21,7 @@ OtaUpdateConfig::OtaUpdateConfig(
   bool allowBackendManagement,
   bool requireManualApproval,
   std::int32_t updateId,
-  FirmwareBootType bootType
+  OtaUpdateStep updateStep
 ) {
   this->isEnabled              = isEnabled;
   this->cdnDomain              = cdnDomain;
@@ -32,7 +32,7 @@ OtaUpdateConfig::OtaUpdateConfig(
   this->allowBackendManagement = allowBackendManagement;
   this->requireManualApproval  = requireManualApproval;
   this->updateId               = updateId;
-  this->bootType               = bootType;
+  this->updateStep             = updateStep;
 }
 
 void OtaUpdateConfig::ToDefault() {
@@ -45,7 +45,7 @@ void OtaUpdateConfig::ToDefault() {
   allowBackendManagement = true;
   requireManualApproval  = false;
   updateId               = 0;
-  bootType               = FirmwareBootType::Normal;
+  updateStep             = OtaUpdateStep::None;
 }
 
 bool OtaUpdateConfig::FromFlatbuffers(const Serialization::Configuration::OtaUpdateConfig* config) {
@@ -63,13 +63,13 @@ bool OtaUpdateConfig::FromFlatbuffers(const Serialization::Configuration::OtaUpd
   allowBackendManagement = config->allow_backend_management();
   requireManualApproval  = config->require_manual_approval();
   updateId               = config->update_id();
-  bootType               = config->boot_type();
+  updateStep             = config->update_step();
 
   return true;
 }
 
 flatbuffers::Offset<OpenShock::Serialization::Configuration::OtaUpdateConfig> OtaUpdateConfig::ToFlatbuffers(flatbuffers::FlatBufferBuilder& builder, bool withSensitiveData) const {
-  return Serialization::Configuration::CreateOtaUpdateConfig(builder, isEnabled, builder.CreateString(cdnDomain), updateChannel, checkOnStartup, checkPeriodically, checkInterval, allowBackendManagement, requireManualApproval, updateId, bootType);
+  return Serialization::Configuration::CreateOtaUpdateConfig(builder, isEnabled, builder.CreateString(cdnDomain), updateChannel, checkOnStartup, checkPeriodically, checkInterval, allowBackendManagement, requireManualApproval, updateId, updateStep);
 }
 
 bool OtaUpdateConfig::FromJSON(const cJSON* json) {
@@ -92,7 +92,7 @@ bool OtaUpdateConfig::FromJSON(const cJSON* json) {
   Internal::Utils::FromJsonBool(allowBackendManagement, json, "allowBackendManagement", true);
   Internal::Utils::FromJsonBool(requireManualApproval, json, "requireManualApproval", false);
   Internal::Utils::FromJsonI32(updateId, json, "updateId", 0);
-  Internal::Utils::FromJsonStrParsed(bootType, json, "bootType", OpenShock::TryParseFirmwareBootType, OpenShock::FirmwareBootType::Normal);
+  Internal::Utils::FromJsonStrParsed(updateStep, json, "updateStep", OpenShock::TryParseOtaUpdateStep, OpenShock::OtaUpdateStep::None);
 
   return true;
 }
@@ -109,7 +109,7 @@ cJSON* OtaUpdateConfig::ToJSON(bool withSensitiveData) const {
   cJSON_AddBoolToObject(root, "allowBackendManagement", allowBackendManagement);
   cJSON_AddBoolToObject(root, "requireManualApproval", requireManualApproval);
   cJSON_AddNumberToObject(root, "updateId", updateId);
-  cJSON_AddStringToObject(root, "bootType", OpenShock::Serialization::Types::EnumNameFirmwareBootType(bootType));
+  cJSON_AddStringToObject(root, "updateStep", OpenShock::Serialization::Configuration::EnumNameOtaUpdateStep(updateStep));
 
   return root;
 }

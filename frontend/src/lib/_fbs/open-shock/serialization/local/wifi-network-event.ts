@@ -31,9 +31,14 @@ eventType():WifiNetworkEventType {
   return offset ? this.bb!.readUint8(this.bb_pos + offset) : WifiNetworkEventType.Discovered;
 }
 
-network(obj?:WifiNetwork):WifiNetwork|null {
+networks(index: number, obj?:WifiNetwork):WifiNetwork|null {
   const offset = this.bb!.__offset(this.bb_pos, 6);
-  return offset ? (obj || new WifiNetwork()).__init(this.bb!.__indirect(this.bb_pos + offset), this.bb!) : null;
+  return offset ? (obj || new WifiNetwork()).__init(this.bb!.__indirect(this.bb!.__vector(this.bb_pos + offset) + index * 4), this.bb!) : null;
+}
+
+networksLength():number {
+  const offset = this.bb!.__offset(this.bb_pos, 6);
+  return offset ? this.bb!.__vector_len(this.bb_pos + offset) : 0;
 }
 
 static startWifiNetworkEvent(builder:flatbuffers.Builder) {
@@ -44,8 +49,20 @@ static addEventType(builder:flatbuffers.Builder, eventType:WifiNetworkEventType)
   builder.addFieldInt8(0, eventType, WifiNetworkEventType.Discovered);
 }
 
-static addNetwork(builder:flatbuffers.Builder, networkOffset:flatbuffers.Offset) {
-  builder.addFieldOffset(1, networkOffset, 0);
+static addNetworks(builder:flatbuffers.Builder, networksOffset:flatbuffers.Offset) {
+  builder.addFieldOffset(1, networksOffset, 0);
+}
+
+static createNetworksVector(builder:flatbuffers.Builder, data:flatbuffers.Offset[]):flatbuffers.Offset {
+  builder.startVector(4, data.length, 4);
+  for (let i = data.length - 1; i >= 0; i--) {
+    builder.addOffset(data[i]!);
+  }
+  return builder.endVector();
+}
+
+static startNetworksVector(builder:flatbuffers.Builder, numElems:number) {
+  builder.startVector(4, numElems, 4);
 }
 
 static endWifiNetworkEvent(builder:flatbuffers.Builder):flatbuffers.Offset {
@@ -53,4 +70,10 @@ static endWifiNetworkEvent(builder:flatbuffers.Builder):flatbuffers.Offset {
   return offset;
 }
 
+static createWifiNetworkEvent(builder:flatbuffers.Builder, eventType:WifiNetworkEventType, networksOffset:flatbuffers.Offset):flatbuffers.Offset {
+  WifiNetworkEvent.startWifiNetworkEvent(builder);
+  WifiNetworkEvent.addEventType(builder, eventType);
+  WifiNetworkEvent.addNetworks(builder, networksOffset);
+  return WifiNetworkEvent.endWifiNetworkEvent(builder);
+}
 }

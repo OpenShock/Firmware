@@ -5,7 +5,7 @@
 import * as flatbuffers from 'flatbuffers';
 
 import { OtaUpdateChannel } from '../../../open-shock/serialization/configuration/ota-update-channel';
-import { FirmwareBootType } from '../../../open-shock/serialization/types/firmware-boot-type';
+import { OtaUpdateStep } from '../../../open-shock/serialization/configuration/ota-update-step';
 
 
 export class OtaUpdateConfig {
@@ -101,11 +101,11 @@ updateId():number {
 }
 
 /**
- * Indicates what kind of firmware boot is happening (normal boot, booting into new firmware, rolling back to old firmware, etc.)
+ * Indicates what step of the update process the device is currently in, used to detect failed updates for status reporting.
  */
-bootType():FirmwareBootType {
+updateStep():OtaUpdateStep {
   const offset = this.bb!.__offset(this.bb_pos, 22);
-  return offset ? this.bb!.readUint8(this.bb_pos + offset) : FirmwareBootType.Normal;
+  return offset ? this.bb!.readUint8(this.bb_pos + offset) : OtaUpdateStep.None;
 }
 
 static startOtaUpdateConfig(builder:flatbuffers.Builder) {
@@ -148,8 +148,8 @@ static addUpdateId(builder:flatbuffers.Builder, updateId:number) {
   builder.addFieldInt32(8, updateId, 0);
 }
 
-static addBootType(builder:flatbuffers.Builder, bootType:FirmwareBootType) {
-  builder.addFieldInt8(9, bootType, FirmwareBootType.Normal);
+static addUpdateStep(builder:flatbuffers.Builder, updateStep:OtaUpdateStep) {
+  builder.addFieldInt8(9, updateStep, OtaUpdateStep.None);
 }
 
 static endOtaUpdateConfig(builder:flatbuffers.Builder):flatbuffers.Offset {
@@ -157,7 +157,7 @@ static endOtaUpdateConfig(builder:flatbuffers.Builder):flatbuffers.Offset {
   return offset;
 }
 
-static createOtaUpdateConfig(builder:flatbuffers.Builder, isEnabled:boolean, cdnDomainOffset:flatbuffers.Offset, updateChannel:OtaUpdateChannel, checkOnStartup:boolean, checkPeriodically:boolean, checkInterval:number, allowBackendManagement:boolean, requireManualApproval:boolean, updateId:number, bootType:FirmwareBootType):flatbuffers.Offset {
+static createOtaUpdateConfig(builder:flatbuffers.Builder, isEnabled:boolean, cdnDomainOffset:flatbuffers.Offset, updateChannel:OtaUpdateChannel, checkOnStartup:boolean, checkPeriodically:boolean, checkInterval:number, allowBackendManagement:boolean, requireManualApproval:boolean, updateId:number, updateStep:OtaUpdateStep):flatbuffers.Offset {
   OtaUpdateConfig.startOtaUpdateConfig(builder);
   OtaUpdateConfig.addIsEnabled(builder, isEnabled);
   OtaUpdateConfig.addCdnDomain(builder, cdnDomainOffset);
@@ -168,7 +168,7 @@ static createOtaUpdateConfig(builder:flatbuffers.Builder, isEnabled:boolean, cdn
   OtaUpdateConfig.addAllowBackendManagement(builder, allowBackendManagement);
   OtaUpdateConfig.addRequireManualApproval(builder, requireManualApproval);
   OtaUpdateConfig.addUpdateId(builder, updateId);
-  OtaUpdateConfig.addBootType(builder, bootType);
+  OtaUpdateConfig.addUpdateStep(builder, updateStep);
   return OtaUpdateConfig.endOtaUpdateConfig(builder);
 }
 }

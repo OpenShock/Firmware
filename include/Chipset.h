@@ -15,7 +15,7 @@
 //
 // Docs: https://www.espressif.com/sites/default/files/documentation/0a-esp8266ex_datasheet_en.pdf
 #ifdef OPENSHOCK_FW_CHIP_ESP8266EX
-#define OPENSHOCK_FW_CHIP_NAME "ESP8266EX"
+#define OPENSHOCK_FW_CHIP_DEFINED
 // GPIO3, GPIO1 is used for UART0 RXD/TXD.
 // GPIO0, GPIO2, and GPIO15 are used for boot mode and SDIO slave timing selection.
 #define CHIP_UNSAFE_GPIO(pin) ((pin) == GPIO_NUM_0 || (pin) == GPIO_NUM_1 || (pin) == GPIO_NUM_2 || (pin) == GPIO_NUM_3 || (pin) == GPIO_NUM_15)
@@ -27,7 +27,7 @@
 //
 // Docs: https://www.espressif.com/sites/default/files/documentation/0a-esp8285_datasheet_en.pdf
 #ifdef OPENSHOCK_FW_CHIP_ESP8285
-#define OPENSHOCK_FW_CHIP_NAME "ESP8285"
+#define OPENSHOCK_FW_CHIP_DEFINED
 // GPIO3, GPIO1 is used for UART0 RXD/TXD.
 // GPIO0, GPIO2, and GPIO15 are used for boot mode and SDIO slave timing selection.
 #define CHIP_UNSAFE_GPIO(pin) ((pin) == GPIO_NUM_0 || (pin) == GPIO_NUM_1 || (pin) == GPIO_NUM_2 || (pin) == GPIO_NUM_3 || (pin) == GPIO_NUM_15)
@@ -40,7 +40,7 @@
 // Docs: https://www.espressif.com/sites/default/files/documentation/esp8684_datasheet_en.pdf
 // Docs: https://www.espressif.com/sites/default/files/documentation/esp8684_technical_reference_manual_en.pdf#bootctrl
 #ifdef OPENSHOCK_FW_CHIP_ESP8684
-#define OPENSHOCK_FW_CHIP_NAME "ESP8684"
+#define OPENSHOCK_FW_CHIP_DEFINED
 // GPIO3, GPIO1 is used for UART0 RXD/TXD.
 // GPIO8, GPIO9 are strapping pins used to control the boot mode adn ROM code printing
 #define CHIP_UNSAFE_GPIO(pin) ((pin) == GPIO_NUM_1 || (pin) == GPIO_NUM_3 || (pin) == GPIO_NUM_8 || (pin) == GPIO_NUM_9)
@@ -52,7 +52,7 @@
 //
 // Docs: https://www.espressif.com/sites/default/files/documentation/esp8685_datasheet_en.pdf
 #ifdef OPENSHOCK_FW_CHIP_ESP8685
-#define OPENSHOCK_FW_CHIP_NAME "ESP8685"
+#define OPENSHOCK_FW_CHIP_DEFINED
 // GPIO20, GPIO21 is used for UART0 RXD/TXD.
 // GPIO2, GPIO8, GPIO9 are strapping pins.
 #define CHIP_UNSAFE_GPIO(pin) ((pin) == GPIO_NUM_2 || (pin) == GPIO_NUM_8 || (pin) == GPIO_NUM_9 || (pin) == GPIO_NUM_20 || (pin) == GPIO_NUM_21)
@@ -64,7 +64,7 @@
 //
 // Docs: https://www.espressif.com/sites/default/files/documentation/esp32_datasheet_en.pdf
 #ifdef OPENSHOCK_FW_CHIP_ESP32
-#define OPENSHOCK_FW_CHIP_NAME "ESP32"
+#define OPENSHOCK_FW_CHIP_DEFINED
 
 // GPIO1, GPIO3 is used for UART0 RXD/TXD.
 // GPIO0, GPIO2 is used to control the boot mode of the chip.
@@ -84,7 +84,7 @@
 //
 // Docs: https://www.espressif.com/sites/default/files/documentation/esp32-pico_series_datasheet_en.pdf (Section 2.1.2 - 2.1.3 Pin Description and Pin Mapping between ESP and Flash/PSRAM)
 #ifdef OPENSHOCK_FW_CHIP_ESP32PICOD4
-#define OPENSHOCK_FW_CHIP_NAME "ESP32-PICO-D4"
+#define OPENSHOCK_FW_CHIP_DEFINED
 // GPIO3, GPIO1 is used for UART0 RXD/TXD.
 // GPIO25, GPIO27, GPIO29, GPIO30, GPIO31, GPIO32, GPIO33 is used for SPI flash connection. (DO NOT TOUCH)
 // GPIO12, GPIO0, GPIO2, GPIO15, and GPIO5 are used for boot mode and SDIO slave timing selection.
@@ -97,7 +97,7 @@
 //
 // Docs: https://www.espressif.com/sites/default/files/documentation/esp32-pico_series_datasheet_en.pdf
 #ifdef OPENSHOCK_FW_CHIP_ESP32PICOV3
-#define OPENSHOCK_FW_CHIP_NAME "ESP32-PICO-V3"
+#define OPENSHOCK_FW_CHIP_DEFINED
 // GPIO3, GPIO1 is used for UART0 RXD/TXD.
 // GPIO6, GPIO11, GPIO9, GPIO10 is used for SPI flash connection. (DO NOT TOUCH)
 // GPIO12, GPIO0, GPIO2, GPIO15, and GPIO5 are used for boot mode and SDIO slave timing selection.
@@ -110,7 +110,7 @@
 //
 // Docs: https://www.espressif.com/sites/default/files/documentation/esp32-s2_datasheet_en.pdf
 #ifdef OPENSHOCK_FW_CHIP_ESP32S2
-#define OPENSHOCK_FW_CHIP_NAME "ESP32-S2"
+#define OPENSHOCK_FW_CHIP_DEFINED
 // GPIO44, GPIO43 is used for UART0 RXD/TXD.
 // GPIO29, GPIO26, GPIO32, GPIO31, GPIO30, GPIO28, GPIO27 is used for SPI flash connection. (DO NOT TOUCH)
 // GPIO0, GPIO45, GPIO46 is strapping pins used to control the boot mode and misc. functions.
@@ -123,7 +123,7 @@
 //
 // Docs: https://www.espressif.com/sites/default/files/documentation/esp32-s3_datasheet_en.pdf
 #ifdef OPENSHOCK_FW_CHIP_ESP32S3
-#define OPENSHOCK_FW_CHIP_NAME "ESP32-S3"
+#define OPENSHOCK_FW_CHIP_DEFINED
 // GPIO44, GPIO43 is used for UART0 RXD/TXD.
 // GPIO19, GPIO20 is used for USB serial, flashing, and debugging.
 // GPIO30, GPIO29, GPIO26, GPIO32, GPIO31, GPIO28, GPIO27, GPIO33, GPIO34, GPIO35, GPIO36, GPIO37 is used for SPI flash connection. (DO NOT TOUCH)
@@ -137,7 +137,7 @@
 //
 // Docs: https://www.espressif.com/sites/default/files/documentation/esp32-s3-pico-1_datasheet_en.pdf
 #ifdef OPENSHOCK_FW_CHIP_ESP32S3PICO1
-#define OPENSHOCK_FW_CHIP_NAME "ESP32-S3-PICO-1"
+#define OPENSHOCK_FW_CHIP_DEFINED
 #error "ESP32-S3-PICO-1 is not supported yet."
 #endif
 
@@ -147,8 +147,12 @@
 //
 // Docs: https://www.espressif.com/sites/default/files/documentation/esp32-c3_datasheet_en.pdf
 #ifdef OPENSHOCK_FW_CHIP_ESP32C3
-#define OPENSHOCK_FW_CHIP_NAME "ESP32-C3"
-#error "ESP32-C3 is not supported yet."
+#define OPENSHOCK_FW_CHIP_DEFINED
+// GPIO20, GPIO21 is used for UART0 RXD/TXD.
+// GPIO18, GPIO19, GPIO4, GPIO5, GPIO6, GPIO7 is used for USB serial, flashing, and debugging.
+// GPIO12, GPIO13, GPIO14, GPIO15, GPIO16, GPIO17 is used for SPI flash connection. (DO NOT TOUCH)
+// GPIO2, GPIO8, GPIO9 is strapping pins used to control the boot mode and misc. functions.
+#define CHIP_UNSAFE_GPIO(pin) ((pin) == GPIO_NUM_20 || (pin) == GPIO_NUM_21 || (pin) == GPIO_NUM_18 || (pin) == GPIO_NUM_19 || (pin) == GPIO_NUM_4 || (pin) == GPIO_NUM_5 || (pin) == GPIO_NUM_6 || (pin) == GPIO_NUM_7 || (pin) == GPIO_NUM_12 || (pin) == GPIO_NUM_13 || (pin) == GPIO_NUM_14 || (pin) == GPIO_NUM_15 || (pin) == GPIO_NUM_16 || (pin) == GPIO_NUM_17 || (pin) == GPIO_NUM_2 || (pin) == GPIO_NUM_8 || (pin) == GPIO_NUM_9)
 #endif
 
 // ESP32-C6
@@ -157,11 +161,11 @@
 //
 // Docs: https://www.espressif.com/sites/default/files/documentation/esp32-c6_datasheet_en.pdf
 #ifdef OPENSHOCK_FW_CHIP_ESP32C6
-#define OPENSHOCK_FW_CHIP_NAME "ESP32-C6"
+#define OPENSHOCK_FW_CHIP_DEFINED
 #error "ESP32-C6 is not supported yet."
 #endif
 
-#ifndef OPENSHOCK_FW_CHIP_NAME
+#ifndef OPENSHOCK_FW_CHIP_DEFINED
 #error "Selected chipset is misspelled or not supported by OpenShock."
 #endif
 

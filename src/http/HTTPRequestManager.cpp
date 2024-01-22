@@ -1,5 +1,6 @@
 #include "http/HTTPRequestManager.h"
 
+#include "Common.h"
 #include "Time.h"
 
 #include <HTTPClient.h>
@@ -13,22 +14,34 @@
 constexpr std::size_t HTTP_BUFFER_SIZE = 4096LLU;
 constexpr int HTTP_DOWNLOAD_SIZE_LIMIT = 200 * 1024 * 1024;  // 200 MB
 
-const char* const TAG                    = "HTTPRequestManager";
-const char* const OPENSHOCK_FW_USERAGENT = OPENSHOCK_FW_HOSTNAME "/" OPENSHOCK_FW_VERSION " (" OPENSHOCK_FW_BOARD "; " OPENSHOCK_FW_CHIP "; Espressif) " OPENSHOCK_FW_GIT_COMMIT;
+const char* const TAG = "HTTPRequestManager";
 
 struct RateLimit {
-  RateLimit() : m_blockUntilMs(0), m_limits(), m_requests() { }
+  RateLimit() : m_mutex(xSemaphoreCreateMutex()), m_blockUntilMs(0), m_limits(), m_requests() { }
 
   void addLimit(std::uint32_t durationMs, std::uint16_t count) {
+    xSemaphoreTake(m_mutex, portMAX_DELAY);
+
     // Insert sorted
     m_limits.insert(std::upper_bound(m_limits.begin(), m_limits.end(), durationMs, [](std::int64_t durationMs, const Limit& limit) { return durationMs > limit.durationMs; }), {durationMs, count});
+
+    xSemaphoreGive(m_mutex);
   }
-  void clearLimits() { m_limits.clear(); }
+  void clearLimits() {
+    xSemaphoreTake(m_mutex, portMAX_DELAY);
+
+    m_limits.clear();
+
+    xSemaphoreGive(m_mutex);
+  }
 
   bool tryRequest() {
     std::int64_t now = OpenShock::millis();
 
+    xSemaphoreTake(m_mutex, portMAX_DELAY);
+
     if (m_blockUntilMs > now) {
+      xSemaphoreGive(m_mutex);
       return false;
     }
 
@@ -41,20 +54,34 @@ struct RateLimit {
     auto it = std::find_if(m_limits.begin(), m_limits.end(), [this](const RateLimit::Limit& limit) { return m_requests.size() >= limit.count; });
     if (it != m_limits.end()) {
       m_blockUntilMs = now + it->durationMs;
+      xSemaphoreGive(m_mutex);
       return false;
     }
 
     // Add the request
     m_requests.push_back(now);
 
+    xSemaphoreGive(m_mutex);
+
     return true;
   }
-  void clearRequests() { m_requests.clear(); }
+  void clearRequests() {
+    xSemaphoreTake(m_mutex, portMAX_DELAY);
+    m_requests.clear();
+    xSemaphoreGive(m_mutex);
+  }
 
-  void blockUntil(std::int64_t blockUntilMs) { m_blockUntilMs = blockUntilMs; }
+  void blockUntil(std::int64_t blockUntilMs) {
+    xSemaphoreTake(m_mutex, portMAX_DELAY);
+    m_blockUntilMs = blockUntilMs;
+    xSemaphoreGive(m_mutex);
+  }
 
   std::uint32_t requestsSince(std::int64_t sinceMs) {
-    return std::count_if(m_requests.begin(), m_requests.end(), [sinceMs](std::int64_t requestMs) { return requestMs >= sinceMs; });
+    xSemaphoreTake(m_mutex, portMAX_DELAY);
+    std::uint32_t result = std::count_if(m_requests.begin(), m_requests.end(), [sinceMs](std::int64_t requestMs) { return requestMs >= sinceMs; });
+    xSemaphoreGive(m_mutex);
+    return result;
   }
 
 private:
@@ -63,11 +90,13 @@ private:
     std::uint16_t count;
   };
 
+  SemaphoreHandle_t m_mutex;
   std::int64_t m_blockUntilMs;
   std::vector<Limit> m_limits;
   std::vector<std::int64_t> m_requests;
 };
 
+SemaphoreHandle_t s_rateLimitsMutex = xSemaphoreCreateMutex();
 std::unordered_map<std::string, std::shared_ptr<RateLimit>> s_rateLimits;
 
 using namespace OpenShock;
@@ -115,17 +144,21 @@ std::shared_ptr<RateLimit> _getRateLimiter(StringView url) {
     return nullptr;
   }
 
+  xSemaphoreTake(s_rateLimitsMutex, portMAX_DELAY);
+
   auto it = s_rateLimits.find(domain);
   if (it == s_rateLimits.end()) {
     s_rateLimits.emplace(domain, _rateLimitFactory(domain));
     it = s_rateLimits.find(domain);
   }
 
+  xSemaphoreGive(s_rateLimitsMutex);
+
   return it->second;
 }
 
 void _setupClient(HTTPClient& client) {
-  client.setUserAgent(OPENSHOCK_FW_USERAGENT);
+  client.setUserAgent(OpenShock::Constants::FW_USERAGENT);
 }
 
 struct StreamReaderResult {
@@ -495,17 +528,7 @@ HTTP::Response<std::size_t>
   HTTPClient client;
   _setupClient(client);
 
-  auto response = _doGetStream(client, url, headers, acceptedCodes, rateLimiter, contentLengthCallback, downloadCallback, timeoutMs);
-  if (response.result != RequestResult::Success) {
-    return response;
-  }
-
-  if (std::find(acceptedCodes.begin(), acceptedCodes.end(), response.code) == acceptedCodes.end()) {
-    ESP_LOGE(TAG, "Received unexpected response code %d", response.code);
-    return {RequestResult::CodeRejected, response.code, 0};
-  }
-
-  return response;
+  return _doGetStream(client, url, headers, acceptedCodes, rateLimiter, contentLengthCallback, downloadCallback, timeoutMs);
 }
 
 HTTP::Response<std::string> HTTP::GetString(StringView url, const std::map<String, String>& headers, const std::vector<int>& acceptedCodes, std::uint32_t timeoutMs) {

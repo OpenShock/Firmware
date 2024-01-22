@@ -147,9 +147,6 @@ export const WifiNetworkEventHandler: MessageHandler = (cli, msg) => {
   const payload = new WifiNetworkEvent();
   msg.payload(payload);
 
-  const fbsNetwork = new FbsWifiNetwork();
-  payload.network(fbsNetwork);
-
   const eventType = payload.eventType();
 
   if (eventType < 0 || eventType >= EventHandlers.length) {
@@ -157,5 +154,13 @@ export const WifiNetworkEventHandler: MessageHandler = (cli, msg) => {
     return;
   }
 
-  EventHandlers[eventType](fbsNetwork);
+  const networksLength = payload.networksLength();
+  for (let i = 0; i < networksLength; i++) {
+    const fbsNetwork = payload.networks(i);
+    if (!fbsNetwork) {
+      console.warn('[WS] Received invalid wifi network event (null network)');
+      continue;
+    }
+    EventHandlers[eventType](fbsNetwork);
+  }
 };

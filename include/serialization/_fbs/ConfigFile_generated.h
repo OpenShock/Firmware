@@ -13,8 +13,6 @@ static_assert(FLATBUFFERS_VERSION_MAJOR == 23 &&
               FLATBUFFERS_VERSION_REVISION == 26,
              "Non-compatible flatbuffers version included");
 
-#include "FirmwareBootType_generated.h"
-
 namespace OpenShock {
 namespace Serialization {
 namespace Configuration {
@@ -74,6 +72,48 @@ inline const char *EnumNameOtaUpdateChannel(OtaUpdateChannel e) {
   if (::flatbuffers::IsOutRange(e, OtaUpdateChannel::Stable, OtaUpdateChannel::Develop)) return "";
   const size_t index = static_cast<size_t>(e);
   return EnumNamesOtaUpdateChannel()[index];
+}
+
+enum class OtaUpdateStep : uint8_t {
+  None = 0,
+  Updating = 1,
+  Updated = 2,
+  Validating = 3,
+  Validated = 4,
+  RollingBack = 5,
+  MIN = None,
+  MAX = RollingBack
+};
+
+inline const OtaUpdateStep (&EnumValuesOtaUpdateStep())[6] {
+  static const OtaUpdateStep values[] = {
+    OtaUpdateStep::None,
+    OtaUpdateStep::Updating,
+    OtaUpdateStep::Updated,
+    OtaUpdateStep::Validating,
+    OtaUpdateStep::Validated,
+    OtaUpdateStep::RollingBack
+  };
+  return values;
+}
+
+inline const char * const *EnumNamesOtaUpdateStep() {
+  static const char * const names[7] = {
+    "None",
+    "Updating",
+    "Updated",
+    "Validating",
+    "Validated",
+    "RollingBack",
+    nullptr
+  };
+  return names;
+}
+
+inline const char *EnumNameOtaUpdateStep(OtaUpdateStep e) {
+  if (::flatbuffers::IsOutRange(e, OtaUpdateStep::None, OtaUpdateStep::RollingBack)) return "";
+  const size_t index = static_cast<size_t>(e);
+  return EnumNamesOtaUpdateStep()[index];
 }
 
 struct RFConfig FLATBUFFERS_FINAL_CLASS : private ::flatbuffers::Table {
@@ -514,7 +554,7 @@ struct OtaUpdateConfig FLATBUFFERS_FINAL_CLASS : private ::flatbuffers::Table {
     VT_ALLOW_BACKEND_MANAGEMENT = 16,
     VT_REQUIRE_MANUAL_APPROVAL = 18,
     VT_UPDATE_ID = 20,
-    VT_BOOT_TYPE = 22
+    VT_UPDATE_STEP = 22
   };
   /// Indicates whether OTA updates are enabled.
   bool is_enabled() const {
@@ -552,9 +592,9 @@ struct OtaUpdateConfig FLATBUFFERS_FINAL_CLASS : private ::flatbuffers::Table {
   int32_t update_id() const {
     return GetField<int32_t>(VT_UPDATE_ID, 0);
   }
-  /// Indicates what kind of firmware boot is happening (normal boot, booting into new firmware, rolling back to old firmware, etc.)
-  OpenShock::Serialization::Types::FirmwareBootType boot_type() const {
-    return static_cast<OpenShock::Serialization::Types::FirmwareBootType>(GetField<uint8_t>(VT_BOOT_TYPE, 0));
+  /// Indicates what step of the update process the device is currently in, used to detect failed updates for status reporting.
+  OpenShock::Serialization::Configuration::OtaUpdateStep update_step() const {
+    return static_cast<OpenShock::Serialization::Configuration::OtaUpdateStep>(GetField<uint8_t>(VT_UPDATE_STEP, 0));
   }
   bool Verify(::flatbuffers::Verifier &verifier) const {
     return VerifyTableStart(verifier) &&
@@ -568,7 +608,7 @@ struct OtaUpdateConfig FLATBUFFERS_FINAL_CLASS : private ::flatbuffers::Table {
            VerifyField<uint8_t>(verifier, VT_ALLOW_BACKEND_MANAGEMENT, 1) &&
            VerifyField<uint8_t>(verifier, VT_REQUIRE_MANUAL_APPROVAL, 1) &&
            VerifyField<int32_t>(verifier, VT_UPDATE_ID, 4) &&
-           VerifyField<uint8_t>(verifier, VT_BOOT_TYPE, 1) &&
+           VerifyField<uint8_t>(verifier, VT_UPDATE_STEP, 1) &&
            verifier.EndTable();
   }
 };
@@ -604,8 +644,8 @@ struct OtaUpdateConfigBuilder {
   void add_update_id(int32_t update_id) {
     fbb_.AddElement<int32_t>(OtaUpdateConfig::VT_UPDATE_ID, update_id, 0);
   }
-  void add_boot_type(OpenShock::Serialization::Types::FirmwareBootType boot_type) {
-    fbb_.AddElement<uint8_t>(OtaUpdateConfig::VT_BOOT_TYPE, static_cast<uint8_t>(boot_type), 0);
+  void add_update_step(OpenShock::Serialization::Configuration::OtaUpdateStep update_step) {
+    fbb_.AddElement<uint8_t>(OtaUpdateConfig::VT_UPDATE_STEP, static_cast<uint8_t>(update_step), 0);
   }
   explicit OtaUpdateConfigBuilder(::flatbuffers::FlatBufferBuilder &_fbb)
         : fbb_(_fbb) {
@@ -629,12 +669,12 @@ inline ::flatbuffers::Offset<OtaUpdateConfig> CreateOtaUpdateConfig(
     bool allow_backend_management = false,
     bool require_manual_approval = false,
     int32_t update_id = 0,
-    OpenShock::Serialization::Types::FirmwareBootType boot_type = OpenShock::Serialization::Types::FirmwareBootType::Normal) {
+    OpenShock::Serialization::Configuration::OtaUpdateStep update_step = OpenShock::Serialization::Configuration::OtaUpdateStep::None) {
   OtaUpdateConfigBuilder builder_(_fbb);
   builder_.add_update_id(update_id);
   builder_.add_cdn_domain(cdn_domain);
   builder_.add_check_interval(check_interval);
-  builder_.add_boot_type(boot_type);
+  builder_.add_update_step(update_step);
   builder_.add_require_manual_approval(require_manual_approval);
   builder_.add_allow_backend_management(allow_backend_management);
   builder_.add_check_periodically(check_periodically);
@@ -660,7 +700,7 @@ inline ::flatbuffers::Offset<OtaUpdateConfig> CreateOtaUpdateConfigDirect(
     bool allow_backend_management = false,
     bool require_manual_approval = false,
     int32_t update_id = 0,
-    OpenShock::Serialization::Types::FirmwareBootType boot_type = OpenShock::Serialization::Types::FirmwareBootType::Normal) {
+    OpenShock::Serialization::Configuration::OtaUpdateStep update_step = OpenShock::Serialization::Configuration::OtaUpdateStep::None) {
   auto cdn_domain__ = cdn_domain ? _fbb.CreateString(cdn_domain) : 0;
   return OpenShock::Serialization::Configuration::CreateOtaUpdateConfig(
       _fbb,
@@ -673,7 +713,7 @@ inline ::flatbuffers::Offset<OtaUpdateConfig> CreateOtaUpdateConfigDirect(
       allow_backend_management,
       require_manual_approval,
       update_id,
-      boot_type);
+      update_step);
 }
 
 struct Config FLATBUFFERS_FINAL_CLASS : private ::flatbuffers::Table {

@@ -1,7 +1,7 @@
 #include "CaptivePortal.h"
 #include "CommandHandler.h"
-#include "config/Config.h"
 #include "Common.h"
+#include "config/Config.h"
 #include "EStopManager.h"
 #include "event_handlers/Init.h"
 #include "GatewayConnectionManager.h"
@@ -22,11 +22,12 @@ const char* const TAG = "OpenShock";
 // Internal setup function, returns true if setup succeeded, false otherwise.
 bool trySetup() {
   OpenShock::EventHandlers::Init();
-  OpenShock::VisualStateManager::Init();
+
+  if (!OpenShock::VisualStateManager::Init()) {
+    ESP_PANIC(TAG, "Unable to initialize VisualStateManager");
+  }
 
   OpenShock::EStopManager::Init(100);  // 100ms update interval
-
-  OpenShock::Config::Init();
 
   if (!OpenShock::SerialInputHandler::Init()) {
     ESP_LOGE(TAG, "Unable to initialize SerialInputHandler");
@@ -80,6 +81,7 @@ void appSetup() {
 void setup() {
   Serial.begin(115'200);
 
+  OpenShock::Config::Init();
   OpenShock::OtaUpdateManager::Init();
   if (OpenShock::OtaUpdateManager::IsValidatingApp()) {
     otaSetup();
