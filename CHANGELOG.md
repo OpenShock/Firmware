@@ -1,3 +1,7 @@
+# Version 1.1.1-rc.1 Release Notes
+
+In this release we enabled release builds, resulting in smaller, faster, and more stable firmware.
+
 # Version 1.1.0 Release Notes
 
 It's finally here! The 1.1.0 release of OpenShock is now available for download.
