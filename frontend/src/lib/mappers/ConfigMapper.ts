@@ -87,7 +87,6 @@ function mapWifiConfig(fbsConfig: FbsConfig): WifiConfig {
 
     if (!id) throw new Error('cred.id is null');
     if (!ssid) throw new Error('cred.ssid is null');
-    if (!password) throw new Error('cred.password is null');
 
     credentials.push({
       id,
