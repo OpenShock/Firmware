@@ -1,6 +1,9 @@
 name: merge-partitions
 description: Merges multiple partitions into a single flashable binary
 inputs:
+  node-version:
+    description: 'Node version to use'
+    required: true
   python-version:
     description: 'Python version to use'
     required: true
@@ -28,6 +31,7 @@ runs:
 
     - uses: actions/setup-python@v4
       with:
+        node-version: ${{ inputs.node-version }}
         python-version: ${{ inputs.python-version }}
         cache: 'pip'
 
