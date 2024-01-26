@@ -226,7 +226,7 @@ bool WiFiScanManager::StartScan() {
   }
 
   // Start the scan task
-  if (xTaskCreate(_scanningTask, "WiFiScanManager", 4096, nullptr, 1, &s_scanTaskHandle) != pdPASS) {
+  if (xTaskCreate(_scanningTask, "WiFiScanManager", 4096, nullptr, 1, &s_scanTaskHandle) != pdPASS) {  // PROFILED: 1.8KB stack usage
     ESP_LOGE(TAG, "Failed to create scan task");
 
     xSemaphoreGive(s_scanTaskMutex);

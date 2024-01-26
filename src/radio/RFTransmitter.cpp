@@ -13,7 +13,7 @@ const char* const TAG = "RFTransmitter";
 
 const UBaseType_t RFTRANSMITTER_QUEUE_SIZE        = 32;
 const BaseType_t RFTRANSMITTER_TASK_PRIORITY      = 1;
-const std::uint32_t RFTRANSMITTER_TASK_STACK_SIZE = 4096;
+const std::uint32_t RFTRANSMITTER_TASK_STACK_SIZE = 4096;  // PROFILED: 1.4KB stack usage
 const float RFTRANSMITTER_TICKRATE_NS             = 1000;
 
 using namespace OpenShock;
