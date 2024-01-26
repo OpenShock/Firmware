@@ -47,7 +47,6 @@ jobs:
       - uses: actions/checkout@v4
       - uses: ./.github/actions/build-staticfs
         with:
-          node-version: ${{ env.NODE_VERSION }}
           python-version: ${{ env.PYTHON_VERSION }}
           skip-checkout: true
 
@@ -63,7 +62,6 @@ jobs:
 
       - uses: ./.github/actions/build-firmware
         with:
-          node-version: ${{ env.NODE_VERSION }}
           python-version: ${{ env.PYTHON_VERSION }}
           board: ${{ matrix.board }}
           version: ${{ needs.getvars.outputs.version }}
@@ -87,7 +85,6 @@ jobs:
 
       - uses: ./.github/actions/merge-partitions
         with:
-          node-version: ${{ env.NODE_VERSION }}
           python-version: ${{ env.PYTHON_VERSION }}
           release-channel: ${{ needs.getvars.outputs.release-channel }}
           board: ${{ matrix.board }}

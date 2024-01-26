@@ -1,9 +1,6 @@
 name: build-firmware
 description: Builds the firmware partitions and uploads them as an artifact
 inputs:
-  node-version:
-    required: true
-    description: 'Node version to use'
   python-version:
     required: true
     description: 'Python version to use'
@@ -24,16 +21,15 @@ runs:
     - uses: actions/checkout@v4
       if: ${{ !inputs.skip-checkout }}
 
-    - uses: actions/cache@v3
+    - uses: actions/cache@v4
       with:
-        node-version: ${{ inputs.node-version }}
         path: |
           ~/.platformio/platforms
           ~/.platformio/packages
           ~/.platformio/.cache
         key: pio-${{ runner.os }}-${{ hashFiles('platformio.ini', 'requirements.txt') }}
 
-    - uses: actions/setup-python@v4
+    - uses: actions/setup-python@v5
       with:
         python-version: ${{ inputs.python-version }}
         cache: 'pip'
