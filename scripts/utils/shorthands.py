@@ -37,4 +37,4 @@ def is_github_pr_into(branch: str) -> bool:
 
 # Checks if a tag is a release tag.
 def is_github_tag() -> bool:
-    return get_github_base_ref().startswith('refs/tags/')
+    return get_github_ref_name().startswith('refs/tags/')
