@@ -1,3 +1,7 @@
+# Version 1.1.1-rc.2 Release Notes
+
+Removed null check on credentials password received in frontend, as null is expected due to sensitive data removal.
+
 # Version 1.1.1-rc.1 Release Notes
 
 In this release we enabled release builds, resulting in smaller, faster, and more stable firmware.
