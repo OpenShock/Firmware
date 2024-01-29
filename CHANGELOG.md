@@ -1,3 +1,7 @@
+# Version 1.1.1-rc.4 Release Notes
+
+Fix tag check again, this time for real.
+
 # Version 1.1.1-rc.3 Release Notes
 
 Increased performance margins for RFTransmitter to prevent commands from stacking up and getting delayed.
