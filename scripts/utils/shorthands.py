@@ -35,6 +35,6 @@ def is_github_pr_into(branch: str) -> bool:
     return is_github_pr() and get_github_base_ref() == branch
 
 
-# Checks if a tag is a release tag.
+# Checks if the run was triggered by a tag.
 def is_github_tag() -> bool:
-    return get_github_ref_name().startswith('refs/tags/')
+    return sysenv.get_string('GITHUB_REF_TYPE', 'branch') == 'tag'
