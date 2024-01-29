@@ -1,3 +1,9 @@
+# Version 1.1.1-rc.3 Release Notes
+
+Increased performance margins for RFTransmitter to prevent commands from stacking up and getting delayed.
+
+Fixed python build script git-tag check to check `GIT_REF_NAME` instead of incorrect `GIT_BASE_REF` which caused it to build in debug mode.
+
 # Version 1.1.1-rc.2 Release Notes
 
 Removed null check on credentials password received in frontend, as null is expected due to sensitive data removal.
