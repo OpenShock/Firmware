@@ -235,5 +235,8 @@ void RFTransmitter::TransmitTask(void* arg) {
         ++it;
       }
     }
+
+    // Let other tasks run
+    vTaskDelay(0);
   }
 }
