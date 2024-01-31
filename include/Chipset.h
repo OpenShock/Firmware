@@ -148,7 +148,11 @@
 // Docs: https://www.espressif.com/sites/default/files/documentation/esp32-c3_datasheet_en.pdf
 #ifdef OPENSHOCK_FW_CHIP_ESP32C3
 #define OPENSHOCK_FW_CHIP_DEFINED
-#error "ESP32-C3 is not supported yet."
+// GPIO20, GPIO21 is used for UART0 RXD/TXD.
+// GPIO18, GPIO19, GPIO4, GPIO5, GPIO6, GPIO7 is used for USB serial, flashing, and debugging.
+// GPIO12, GPIO13, GPIO14, GPIO15, GPIO16, GPIO17 is used for SPI flash connection. (DO NOT TOUCH)
+// GPIO2, GPIO8, GPIO9 is strapping pins used to control the boot mode and misc. functions.
+#define CHIP_UNSAFE_GPIO(pin) ((pin) == GPIO_NUM_20 || (pin) == GPIO_NUM_21 || (pin) == GPIO_NUM_18 || (pin) == GPIO_NUM_19 || (pin) == GPIO_NUM_4 || (pin) == GPIO_NUM_5 || (pin) == GPIO_NUM_6 || (pin) == GPIO_NUM_7 || (pin) == GPIO_NUM_12 || (pin) == GPIO_NUM_13 || (pin) == GPIO_NUM_14 || (pin) == GPIO_NUM_15 || (pin) == GPIO_NUM_16 || (pin) == GPIO_NUM_17 || (pin) == GPIO_NUM_2 || (pin) == GPIO_NUM_8 || (pin) == GPIO_NUM_9)
 #endif
 
 // ESP32-C6
