@@ -28,32 +28,42 @@ struct command_t {
 
 RFTransmitter::RFTransmitter(std::uint8_t gpioPin) : m_txPin(gpioPin), m_rmtHandle(nullptr), m_queueHandle(nullptr), m_taskHandle(nullptr) {
   ESP_LOGD(TAG, "[pin-%u] Creating RFTransmitter", m_txPin);
+  ESP_LOGI(TAG, "POGGIES");
 
   m_rmtHandle = rmtInit(gpioPin, RMT_TX_MODE, RMT_MEM_64);
+  ESP_LOGI(TAG, "POGGIES");
   if (m_rmtHandle == nullptr) {
     ESP_LOGE(TAG, "[pin-%u] Failed to create rmt object", m_txPin);
     destroy();
     return;
   }
 
+  ESP_LOGI(TAG, "POGGIES");
   float realTick = rmtSetTick(m_rmtHandle, RFTRANSMITTER_TICKRATE_NS);
+  ESP_LOGI(TAG, "POGGIES");
   ESP_LOGD(TAG, "[pin-%u] real tick set to: %fns", m_txPin, realTick);
 
+  ESP_LOGI(TAG, "POGGIES");
   m_queueHandle = xQueueCreate(RFTRANSMITTER_QUEUE_SIZE, sizeof(command_t*));
+  ESP_LOGI(TAG, "POGGIES");
   if (m_queueHandle == nullptr) {
     ESP_LOGE(TAG, "[pin-%u] Failed to create queue", m_txPin);
     destroy();
     return;
   }
 
+  ESP_LOGI(TAG, "POGGIES");
   char name[32];
+  ESP_LOGI(TAG, "POGGIES");
   snprintf(name, sizeof(name), "RFTransmitter-%u", m_txPin);
+  ESP_LOGI(TAG, "POGGIES");
 
   if (TaskUtils::TaskCreateExpensive(TransmitTask, name, RFTRANSMITTER_TASK_STACK_SIZE, this, RFTRANSMITTER_TASK_PRIORITY, &m_taskHandle) != pdPASS) {
     ESP_LOGE(TAG, "[pin-%u] Failed to create task", m_txPin);
     destroy();
     return;
   }
+  ESP_LOGI(TAG, "POGGIES");
 }
 
 RFTransmitter::~RFTransmitter() {
