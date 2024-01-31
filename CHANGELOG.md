@@ -1,3 +1,40 @@
+# Version 1.1.1 Release Notes
+
+This release is increases the stability and performance of the firmware, as well as fixes some minor bugs.
+
+## Highlight
+
+- Enabled release builds for improved firmware size, performance, and stability.
+
+## Minor Updates
+
+- Improved RFTransmitter delay logic to wait patiently for commands if it has no transmissions to send.
+- Increased RFTransmitter performance margins to avoid command stacking and delays.
+- Updated build script to properly identify git-tag triggered github action runs.
+
+## Bug Fixes
+
+- Fixed a bug where the RFTransmitter loop would never delay, causing other tasks running on the same core to completely halt.
+- Removed null check on credentials password received in frontend, as null is expected due to sensitive data removal.
+
+# Version 1.1.1-rc.6 Release Notes
+
+Inlined the wait time check in RFTransmitter to re-check if we added any commands on receiving a event.
+
+# Version 1.1.1-rc.5 Release Notes
+
+Fixed a bug where the RFTransmitter loop would never delay, causing other tasks running on the same core to completely halt.
+
+# Version 1.1.1-rc.4 Release Notes
+
+Fix tag check again, this time for real.
+
+# Version 1.1.1-rc.3 Release Notes
+
+Increased performance margins for RFTransmitter to prevent commands from stacking up and getting delayed.
+
+Fixed python build script git-tag check to check `GIT_REF_NAME` instead of incorrect `GIT_BASE_REF` which caused it to build in debug mode.
+
 # Version 1.1.1-rc.2 Release Notes
 
 Removed null check on credentials password received in frontend, as null is expected due to sensitive data removal.

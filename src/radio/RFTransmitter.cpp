@@ -11,7 +11,7 @@
 
 const char* const TAG = "RFTransmitter";
 
-const UBaseType_t RFTRANSMITTER_QUEUE_SIZE        = 32;
+const UBaseType_t RFTRANSMITTER_QUEUE_SIZE        = 64;
 const BaseType_t RFTRANSMITTER_TASK_PRIORITY      = 1;
 const std::uint32_t RFTRANSMITTER_TASK_STACK_SIZE = 4096;  // PROFILED: 1.4KB stack usage
 const float RFTRANSMITTER_TICKRATE_NS             = 1000;
@@ -139,7 +139,7 @@ void RFTransmitter::TransmitTask(void* arg) {
   while (true) {
     // Receive commands
     command_t* cmd = nullptr;
-    while (xQueueReceive(queueHandle, &cmd, 0) == pdTRUE) {
+    while (xQueueReceive(queueHandle, &cmd, commands.empty() ? portMAX_DELAY : 0) == pdTRUE) {
       if (cmd == nullptr) {
         ESP_LOGD(TAG, "[pin-%u] Received nullptr (stop command), cleaning up...", m_txPin);
 
