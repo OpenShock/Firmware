@@ -121,7 +121,7 @@ discord.gg/OpenShock
   m_webServer.begin();
 
   if (fsOk) {
-    if (TaskUtils::TaskCreateExpensive(CaptivePortalInstance::task, TAG, 8192, this, 1, &m_taskHandle) != pdPASS) {
+    if (TaskUtils::TaskCreateExpensive(CaptivePortalInstance::task, TAG, 8192, this, 1, &m_taskHandle) != pdPASS) {  // PROFILED: 4-6KB stack usage
       ESP_LOGE(TAG, "Failed to create task");
     }
   }
@@ -162,7 +162,7 @@ void CaptivePortalInstance::handleWebSocketClientConnected(std::uint8_t socketId
   // Send all previously scanned wifi networks
   auto networks = OpenShock::WiFiManager::GetDiscoveredWiFiNetworks();
 
-  Serialization::Local::SerializeWiFiNetworkEvent(Serialization::Types::WifiNetworkEventType::Discovered, {networks}, std::bind(&CaptivePortalInstance::sendMessageBIN, this, socketId, std::placeholders::_1, std::placeholders::_2));
+  Serialization::Local::SerializeWiFiNetworksEvent(Serialization::Types::WifiNetworkEventType::Discovered, networks, std::bind(&CaptivePortalInstance::sendMessageBIN, this, socketId, std::placeholders::_1, std::placeholders::_2));
 }
 
 void CaptivePortalInstance::handleWebSocketClientDisconnected(std::uint8_t socketId) {

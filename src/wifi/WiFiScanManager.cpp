@@ -26,7 +26,7 @@ static TaskHandle_t s_scanTaskHandle     = nullptr;
 static SemaphoreHandle_t s_scanTaskMutex = xSemaphoreCreateMutex();
 static std::uint8_t s_currentChannel     = 0;
 static std::map<std::uint64_t, WiFiScanManager::StatusChangedHandler> s_statusChangedHandlers;
-static std::map<std::uint64_t, WiFiScanManager::NetworkDiscoveryHandler> s_networkDiscoveredHandlers;
+static std::map<std::uint64_t, WiFiScanManager::NetworksDiscoveredHandler> s_networksDiscoveredHandlers;
 
 bool _notifyTask(WiFiScanTaskNotificationFlags flags) {
   xSemaphoreTake(s_scanTaskMutex, portMAX_DELAY);
@@ -168,6 +168,9 @@ void _evScanCompleted(arduino_event_id_t event, arduino_event_info_t info) {
     return;
   }
 
+  std::vector<const wifi_ap_record_t*> networkRecords;
+  networkRecords.reserve(numNetworks);
+
   for (std::int16_t i = 0; i < numNetworks; i++) {
     wifi_ap_record_t* record = reinterpret_cast<wifi_ap_record_t*>(WiFi.getScanInfoByIndex(i));
     if (record == nullptr) {
@@ -175,9 +178,12 @@ void _evScanCompleted(arduino_event_id_t event, arduino_event_info_t info) {
       return;
     }
 
-    for (auto& it : s_networkDiscoveredHandlers) {
-      it.second(record);
-    }
+    networkRecords.push_back(record);
+  }
+
+  // Notify the networks discovered handlers
+  for (auto& it : s_networksDiscoveredHandlers) {
+    it.second(networkRecords);
   }
 
   // Notify the scan task that we're done
@@ -220,7 +226,7 @@ bool WiFiScanManager::StartScan() {
   }
 
   // Start the scan task
-  if (xTaskCreate(_scanningTask, "WiFiScanManager", 4096, nullptr, 1, &s_scanTaskHandle) != pdPASS) {
+  if (xTaskCreate(_scanningTask, "WiFiScanManager", 4096, nullptr, 1, &s_scanTaskHandle) != pdPASS) {  // PROFILED: 1.8KB stack usage
     ESP_LOGE(TAG, "Failed to create scan task");
 
     xSemaphoreGive(s_scanTaskMutex);
@@ -268,16 +274,16 @@ void WiFiScanManager::UnregisterStatusChangedHandler(std::uint64_t handle) {
   }
 }
 
-std::uint64_t WiFiScanManager::RegisterNetworkDiscoveryHandler(const WiFiScanManager::NetworkDiscoveryHandler& handler) {
-  static std::uint64_t nextHandle     = 0;
-  std::uint64_t handle                = nextHandle++;
-  s_networkDiscoveredHandlers[handle] = handler;
+std::uint64_t WiFiScanManager::RegisterNetworksDiscoveredHandler(const WiFiScanManager::NetworksDiscoveredHandler& handler) {
+  static std::uint64_t nextHandle      = 0;
+  std::uint64_t handle                 = nextHandle++;
+  s_networksDiscoveredHandlers[handle] = handler;
   return handle;
 }
-void WiFiScanManager::UnregisterNetworkDiscoveredHandler(std::uint64_t handle) {
-  auto it = s_networkDiscoveredHandlers.find(handle);
+void WiFiScanManager::UnregisterNetworksDiscoveredHandler(std::uint64_t handle) {
+  auto it = s_networksDiscoveredHandlers.find(handle);
 
-  if (it != s_networkDiscoveredHandlers.end()) {
-    s_networkDiscoveredHandlers.erase(it);
+  if (it != s_networksDiscoveredHandlers.end()) {
+    s_networksDiscoveredHandlers.erase(it);
   }
 }

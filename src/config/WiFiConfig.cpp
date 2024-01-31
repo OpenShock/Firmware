@@ -32,6 +32,8 @@ bool WiFiConfig::FromFlatbuffers(const Serialization::Configuration::WiFiConfig*
 
 flatbuffers::Offset<OpenShock::Serialization::Configuration::WiFiConfig> WiFiConfig::ToFlatbuffers(flatbuffers::FlatBufferBuilder& builder, bool withSensitiveData) const {
   std::vector<flatbuffers::Offset<OpenShock::Serialization::Configuration::WiFiCredentials>> fbsCredentialsList;
+  fbsCredentialsList.reserve(credentialsList.size());
+
   for (auto& credentials : credentialsList) {
     fbsCredentialsList.emplace_back(credentials.ToFlatbuffers(builder, withSensitiveData));
   }
