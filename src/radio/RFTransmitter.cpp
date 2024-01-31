@@ -143,17 +143,19 @@ void RFTransmitter::TransmitTask(void* arg) {
     command_t* cmd = nullptr;
     while (xQueueReceive(queueHandle, &cmd, waitTime) == pdTRUE) {
       if (cmd == nullptr) {
-        ESP_LOGD(TAG, "[pin-%u] Received nullptr (stop command), cleaning up...", m_txPin);
+        ESP_LOGI(TAG, "[pin-%u] Received nullptr (stop command), cleaning up...", m_txPin);
 
         for (auto it = commands.begin(); it != commands.end(); ++it) {
           delete *it;
         }
 
-        ESP_LOGD(TAG, "[pin-%u] Cleanup done, stopping task", m_txPin);
+        ESP_LOGI(TAG, "[pin-%u] Cleanup done, stopping task", m_txPin);
 
         vTaskDelete(nullptr);
         return;
       }
+
+      ESP_LOGI(TAG, "[pin-%u] Received command for shocker %u", m_txPin, cmd->shockerId);
 
       // Replace the command if it already exists
       for (auto it = commands.begin(); it != commands.end(); ++it) {
@@ -180,6 +182,8 @@ void RFTransmitter::TransmitTask(void* arg) {
       }
     }
 
+    ESP_LOGI(TAG, "[pin-%u] Sending %u commands", m_txPin, commands.size());
+
     // Send queued commands
     for (auto it = commands.begin(); it != commands.end();) {
       cmd = *it;
@@ -194,6 +198,8 @@ void RFTransmitter::TransmitTask(void* arg) {
         if (!empty) {
           rmtWriteBlocking(rmtHandle, cmd->zeroSequence->data(), cmd->zeroSequence->size());
         }
+
+        ESP_LOGI(TAG, "[pin-%u] Removing command for shocker %u", m_txPin, cmd->shockerId);
 
         // Remove the command and move to the next one
         it = commands.erase(it);
