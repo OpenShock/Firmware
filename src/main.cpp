@@ -33,21 +33,25 @@ bool trySetup() {
     ESP_LOGE(TAG, "Unable to initialize SerialInputHandler");
     return false;
   }
+  ESP_LOGI(TAG, "POGGIES");
 
   if (!OpenShock::CommandHandler::Init()) {
     ESP_LOGW(TAG, "Unable to initialize CommandHandler");
     return false;
   }
+  ESP_LOGI(TAG, "POGGIES");
 
   if (!OpenShock::WiFiManager::Init()) {
     ESP_LOGE(TAG, "Unable to initialize WiFiManager");
     return false;
   }
+  ESP_LOGI(TAG, "POGGIES");
 
   if (!OpenShock::GatewayConnectionManager::Init()) {
     ESP_LOGE(TAG, "Unable to initialize GatewayConnectionManager");
     return false;
   }
+  ESP_LOGI(TAG, "POGGIES");
 
   return true;
 }
@@ -75,6 +79,7 @@ void appSetup() {
     vTaskDelay(pdMS_TO_TICKS(5000));
     esp_restart();
   }
+  ESP_LOGI(TAG, "POGGIES");
 }
 
 // Arduino setup function
@@ -82,15 +87,20 @@ void setup() {
   Serial.begin(115'200);
 
   OpenShock::Config::Init();
+  ESP_LOGI(TAG, "POGGIES");
   OpenShock::OtaUpdateManager::Init();
+  ESP_LOGI(TAG, "POGGIES");
   if (OpenShock::OtaUpdateManager::IsValidatingApp()) {
     otaSetup();
+    ESP_LOGI(TAG, "POGGIES");
   } else {
     appSetup();
+    ESP_LOGI(TAG, "POGGIES");
   }
 }
 
 void main_app(void* arg) {
+  ESP_LOGI(TAG, "POGGIES");
   while (true) {
     OpenShock::SerialInputHandler::Update();
     OpenShock::CaptivePortal::Update();
