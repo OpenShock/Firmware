@@ -28,42 +28,32 @@ struct command_t {
 
 RFTransmitter::RFTransmitter(std::uint8_t gpioPin) : m_txPin(gpioPin), m_rmtHandle(nullptr), m_queueHandle(nullptr), m_taskHandle(nullptr) {
   ESP_LOGD(TAG, "[pin-%u] Creating RFTransmitter", m_txPin);
-  ESP_LOGI(TAG, "POGGIES");
 
   m_rmtHandle = rmtInit(gpioPin, RMT_TX_MODE, RMT_MEM_64);
-  ESP_LOGI(TAG, "POGGIES");
   if (m_rmtHandle == nullptr) {
     ESP_LOGE(TAG, "[pin-%u] Failed to create rmt object", m_txPin);
     destroy();
     return;
   }
 
-  ESP_LOGI(TAG, "POGGIES");
   float realTick = rmtSetTick(m_rmtHandle, RFTRANSMITTER_TICKRATE_NS);
-  ESP_LOGI(TAG, "POGGIES");
   ESP_LOGD(TAG, "[pin-%u] real tick set to: %fns", m_txPin, realTick);
 
-  ESP_LOGI(TAG, "POGGIES");
   m_queueHandle = xQueueCreate(RFTRANSMITTER_QUEUE_SIZE, sizeof(command_t*));
-  ESP_LOGI(TAG, "POGGIES");
   if (m_queueHandle == nullptr) {
     ESP_LOGE(TAG, "[pin-%u] Failed to create queue", m_txPin);
     destroy();
     return;
   }
 
-  ESP_LOGI(TAG, "POGGIES");
   char name[32];
-  ESP_LOGI(TAG, "POGGIES");
   snprintf(name, sizeof(name), "RFTransmitter-%u", m_txPin);
-  ESP_LOGI(TAG, "POGGIES");
 
   if (TaskUtils::TaskCreateExpensive(TransmitTask, name, RFTRANSMITTER_TASK_STACK_SIZE, this, RFTRANSMITTER_TASK_PRIORITY, &m_taskHandle) != pdPASS) {
     ESP_LOGE(TAG, "[pin-%u] Failed to create task", m_txPin);
     destroy();
     return;
   }
-  ESP_LOGI(TAG, "POGGIES");
 }
 
 RFTransmitter::~RFTransmitter() {
@@ -138,21 +128,14 @@ void RFTransmitter::destroy() {
 }
 
 void RFTransmitter::TransmitTask(void* arg) {
-  ESP_LOGI(TAG, "POGGIES");
   RFTransmitter* transmitter = reinterpret_cast<RFTransmitter*>(arg);
-  ESP_LOGI(TAG, "POGGIES");
-  std::uint8_t m_txPin = transmitter->m_txPin;  // This must be defined here, because the THIS_LOG macro uses it
-  ESP_LOGI(TAG, "POGGIES");
-  rmt_obj_t* rmtHandle = transmitter->m_rmtHandle;
-  ESP_LOGI(TAG, "POGGIES");
-  QueueHandle_t queueHandle = transmitter->m_queueHandle;
-  ESP_LOGI(TAG, "POGGIES");
+  std::uint8_t m_txPin       = transmitter->m_txPin;  // This must be defined here, because the THIS_LOG macro uses it
+  rmt_obj_t* rmtHandle       = transmitter->m_rmtHandle;
+  QueueHandle_t queueHandle  = transmitter->m_queueHandle;
 
   ESP_LOGD(TAG, "[pin-%u] RMT loop running on core %d", m_txPin, xPortGetCoreID());
-  ESP_LOGI(TAG, "POGGIES");
 
   std::vector<command_t*> commands;
-  ESP_LOGI(TAG, "POGGIES");
   while (true) {
     // Receive commands
     command_t* cmd = nullptr;

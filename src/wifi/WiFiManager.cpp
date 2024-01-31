@@ -308,53 +308,36 @@ esp_err_t set_esp_interface_dns(esp_interface_t interface, IPAddress main_dns, I
 
 bool WiFiManager::Init() {
   WiFi.onEvent(_evWiFiConnected, ARDUINO_EVENT_WIFI_STA_CONNECTED);
-  ESP_LOGI(TAG, "POGGIES");
   WiFi.onEvent(_evWiFiGotIP, ARDUINO_EVENT_WIFI_STA_GOT_IP);
-  ESP_LOGI(TAG, "POGGIES");
   WiFi.onEvent(_evWiFiGotIP6, ARDUINO_EVENT_WIFI_STA_GOT_IP6);
-  ESP_LOGI(TAG, "POGGIES");
   WiFi.onEvent(_evWiFiDisconnected, ARDUINO_EVENT_WIFI_STA_DISCONNECTED);
-  ESP_LOGI(TAG, "POGGIES");
   WiFiScanManager::RegisterStatusChangedHandler(_evWiFiScanStatusChanged);
-  ESP_LOGI(TAG, "POGGIES");
   WiFiScanManager::RegisterNetworksDiscoveredHandler(_evWiFiNetworksDiscovery);
-  ESP_LOGI(TAG, "POGGIES");
 
   if (!WiFiScanManager::Init()) {
     ESP_LOGE(TAG, "Failed to initialize WiFiScanManager");
     return false;
   }
-  ESP_LOGI(TAG, "POGGIES");
 
   WiFi.setAutoConnect(false);
-  ESP_LOGI(TAG, "POGGIES");
   WiFi.setAutoReconnect(false);
-  ESP_LOGI(TAG, "POGGIES");
   WiFi.enableSTA(true);
-  ESP_LOGI(TAG, "POGGIES");
   WiFi.setHostname(OPENSHOCK_FW_HOSTNAME);  // TODO: Add the device name to the hostname (retrieve from API and store in LittleFS)
-  ESP_LOGI(TAG, "POGGIES");
 
   // If we recognize the network in the ESP's WiFi cache, try to connect to it
   wifi_config_t current_conf;
-  ESP_LOGI(TAG, "POGGIES");
   if (esp_wifi_get_config(static_cast<wifi_interface_t>(ESP_IF_WIFI_STA), &current_conf) == ESP_OK) {
-    ESP_LOGI(TAG, "POGGIES");
     if (current_conf.sta.ssid[0] != '\0') {
-      ESP_LOGI(TAG, "POGGIES");
       if (Config::GetWiFiCredentialsIDbySSID(reinterpret_cast<const char*>(current_conf.sta.ssid)) != 0) {
-        ESP_LOGI(TAG, "POGGIES");
         WiFi.begin();
       }
     }
   }
-  ESP_LOGI(TAG, "POGGIES");
 
   if (set_esp_interface_dns(ESP_IF_WIFI_STA, IPAddress(1, 1, 1, 1), IPAddress(8, 8, 8, 8), IPAddress(9, 9, 9, 9)) != ESP_OK) {
     ESP_LOGE(TAG, "Failed to set DNS servers");
     return false;
   }
-  ESP_LOGI(TAG, "POGGIES");
 
   return true;
 }

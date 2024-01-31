@@ -739,15 +739,12 @@ bool SerialInputHandler::Init() {
 
   SerialInputHandler::PrintWelcomeHeader();
   SerialInputHandler::PrintVersionInfo();
-  ESP_LOGI(TAG, "POGGIES");
   Serial.println();
-  ESP_LOGI(TAG, "POGGIES");
 
   if (!Config::GetSerialInputConfigEchoEnabled(s_echoEnabled)) {
     ESP_LOGE(TAG, "Failed to get serial echo status from config");
     return false;
   }
-  ESP_LOGI(TAG, "POGGIES");
 
   return true;
 }

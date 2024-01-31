@@ -56,13 +56,9 @@ using namespace OpenShock;
 namespace JsonAPI = OpenShock::Serialization::JsonAPI;
 
 bool GatewayConnectionManager::Init() {
-  ESP_LOGI(TAG, "POGGIES");
   WiFi.onEvent(_evGotIPHandler, ARDUINO_EVENT_WIFI_STA_GOT_IP);
-  ESP_LOGI(TAG, "POGGIES");
   WiFi.onEvent(_evGotIPHandler, ARDUINO_EVENT_WIFI_STA_GOT_IP6);
-  ESP_LOGI(TAG, "POGGIES");
   WiFi.onEvent(_evWiFiDisconnectedHandler, ARDUINO_EVENT_WIFI_STA_DISCONNECTED);
-  ESP_LOGI(TAG, "POGGIES");
 
   return true;
 }
