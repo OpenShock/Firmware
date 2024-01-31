@@ -138,36 +138,51 @@ void RFTransmitter::destroy() {
 }
 
 void RFTransmitter::TransmitTask(void* arg) {
+  ESP_LOGI(TAG, "POGGIES");
   RFTransmitter* transmitter = reinterpret_cast<RFTransmitter*>(arg);
-  std::uint8_t m_txPin       = transmitter->m_txPin;  // This must be defined here, because the THIS_LOG macro uses it
-  rmt_obj_t* rmtHandle       = transmitter->m_rmtHandle;
-  QueueHandle_t queueHandle  = transmitter->m_queueHandle;
+  ESP_LOGI(TAG, "POGGIES");
+  std::uint8_t m_txPin = transmitter->m_txPin;  // This must be defined here, because the THIS_LOG macro uses it
+  ESP_LOGI(TAG, "POGGIES");
+  rmt_obj_t* rmtHandle = transmitter->m_rmtHandle;
+  ESP_LOGI(TAG, "POGGIES");
+  QueueHandle_t queueHandle = transmitter->m_queueHandle;
+  ESP_LOGI(TAG, "POGGIES");
 
   ESP_LOGD(TAG, "[pin-%u] RMT loop running on core %d", m_txPin, xPortGetCoreID());
+  ESP_LOGI(TAG, "POGGIES");
 
   std::vector<command_t*> commands;
+  ESP_LOGI(TAG, "POGGIES");
   while (true) {
+    ESP_LOGI(TAG, "POGGIES");
     // Receive commands
     command_t* cmd = nullptr;
+    ESP_LOGI(TAG, "POGGIES");
     while (xQueueReceive(queueHandle, &cmd, 0) == pdTRUE) {
+      ESP_LOGI(TAG, "POGGIES");
       if (cmd == nullptr) {
+        ESP_LOGI(TAG, "POGGIES");
         ESP_LOGD(TAG, "[pin-%u] Received nullptr (stop command), cleaning up...", m_txPin);
 
         for (auto it = commands.begin(); it != commands.end(); ++it) {
           delete *it;
         }
+        ESP_LOGI(TAG, "POGGIES");
 
         ESP_LOGD(TAG, "[pin-%u] Cleanup done, stopping task", m_txPin);
 
         vTaskDelete(nullptr);
         return;
       }
+      ESP_LOGI(TAG, "POGGIES");
 
       // Replace the command if it already exists
       for (auto it = commands.begin(); it != commands.end(); ++it) {
+        ESP_LOGI(TAG, "POGGIES");
         const command_t* existingCmd = *it;
 
         if (existingCmd->shockerId == cmd->shockerId) {
+          ESP_LOGI(TAG, "POGGIES");
           // Only replace the command if it should be overwritten
           if (existingCmd->overwrite) {
             delete *it;
@@ -181,15 +196,19 @@ void RFTransmitter::TransmitTask(void* arg) {
           break;
         }
       }
+      ESP_LOGI(TAG, "POGGIES");
 
       // If the command was not replaced, add it to the queue
       if (cmd != nullptr) {
+        ESP_LOGI(TAG, "POGGIES");
         commands.push_back(cmd);
       }
     }
+    ESP_LOGI(TAG, "POGGIES");
 
     // Send queued commands
     for (auto it = commands.begin(); it != commands.end();) {
+      ESP_LOGI(TAG, "POGGIES");
       cmd = *it;
 
       bool expired = cmd->until < OpenShock::millis();
@@ -198,6 +217,7 @@ void RFTransmitter::TransmitTask(void* arg) {
       // Remove expired or empty commands, else send the command.
       // After sending/receiving a command, move to the next one.
       if (expired || empty || OpenShock::EStopManager::IsEStopped()) {
+        ESP_LOGI(TAG, "POGGIES");
         // If the command is not empty, send the zero sequence to stop the shocker
         if (!empty) {
           rmtWriteBlocking(rmtHandle, cmd->zeroSequence->data(), cmd->zeroSequence->size());
@@ -207,6 +227,7 @@ void RFTransmitter::TransmitTask(void* arg) {
         it = commands.erase(it);
         delete cmd;
       } else {
+        ESP_LOGI(TAG, "POGGIES");
         // Send the command
         rmtWriteBlocking(rmtHandle, cmd->sequence.data(), cmd->sequence.size());
 
