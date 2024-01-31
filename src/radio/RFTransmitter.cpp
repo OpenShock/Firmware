@@ -137,11 +137,9 @@ void RFTransmitter::TransmitTask(void* arg) {
 
   std::vector<command_t*> commands;
   while (true) {
-    TickType_t waitTime = commands.empty() ? portMAX_DELAY : 0;
-
     // Receive commands
     command_t* cmd = nullptr;
-    while (xQueueReceive(queueHandle, &cmd, waitTime) == pdTRUE) {
+    while (xQueueReceive(queueHandle, &cmd, commands.empty() ? portMAX_DELAY : 0) == pdTRUE) {
       if (cmd == nullptr) {
         ESP_LOGD(TAG, "[pin-%u] Received nullptr (stop command), cleaning up...", m_txPin);
 
