@@ -1,3 +1,7 @@
+# Version 1.1.1-rc.5 Release Notes
+
+Fixed a bug where the RFTransmitter loop would never delay, causing other tasks running on the same core to completely halt.
+
 # Version 1.1.1-rc.4 Release Notes
 
 Fix tag check again, this time for real.
