@@ -1,3 +1,7 @@
+# Version 1.1.1-rc.6 Release Notes
+
+Inlined the wait time check in RFTransmitter to re-check if we added any commands on receiving a event.
+
 # Version 1.1.1-rc.5 Release Notes
 
 Fixed a bug where the RFTransmitter loop would never delay, causing other tasks running on the same core to completely halt.
