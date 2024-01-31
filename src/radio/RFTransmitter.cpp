@@ -12,7 +12,7 @@
 const char* const TAG = "RFTransmitter";
 
 const UBaseType_t RFTRANSMITTER_QUEUE_SIZE        = 64;
-const BaseType_t RFTRANSMITTER_TASK_PRIORITY      = 2;
+const BaseType_t RFTRANSMITTER_TASK_PRIORITY      = 1;
 const std::uint32_t RFTRANSMITTER_TASK_STACK_SIZE = 4096;
 const float RFTRANSMITTER_TICKRATE_NS             = 1000;
 
