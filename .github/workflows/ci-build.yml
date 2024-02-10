@@ -86,7 +86,7 @@ jobs:
       - uses: ./.github/actions/merge-partitions
         with:
           python-version: ${{ env.PYTHON_VERSION }}
-          release-channel: ${{ needs.getvars.outputs.release-channel }}
+          version: ${{ needs.getvars.outputs.version }}
           board: ${{ matrix.board }}
           skip-checkout: true
 
