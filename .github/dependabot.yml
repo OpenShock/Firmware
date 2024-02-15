@@ -9,7 +9,9 @@ updates:
   - package-ecosystem: 'github-actions'
     directory: '/'
     schedule:
-      interval: 'daily'
+      interval: 'weekly'
+      day: 'monday'
+      time: '06:00'
     groups:
       ci-cd:
         patterns:
@@ -19,7 +21,9 @@ updates:
   - package-ecosystem: 'npm'
     directory: '/.github/scripts'
     schedule:
-      interval: 'daily'
+      interval: 'weekly'
+      day: 'monday'
+      time: '06:00'
     groups:
       ci-cd:
         patterns:
@@ -29,7 +33,9 @@ updates:
   - package-ecosystem: 'pip'
     directory: '/'
     schedule:
-      interval: 'daily'
+      interval: 'weekly'
+      day: 'monday'
+      time: '06:00'
     groups:
       build-system:
         patterns:
@@ -39,7 +45,9 @@ updates:
   - package-ecosystem: 'npm'
     directory: '/frontend'
     schedule:
-      interval: 'daily'
+      interval: 'weekly'
+      day: 'monday'
+      time: '06:00'
     groups:
       frontend:
         patterns:
