@@ -121,7 +121,7 @@ discord.gg/OpenShock
   m_webServer.begin();
 
   if (fsOk) {
-    if (TaskUtils::TaskCreateExpensive(CaptivePortalInstance::task, TAG, 8192, this, 1, &m_taskHandle) != pdPASS) {
+    if (TaskUtils::TaskCreateExpensive(CaptivePortalInstance::task, TAG, 8192, this, 1, &m_taskHandle) != pdPASS) {  // PROFILED: 4-6KB stack usage
       ESP_LOGE(TAG, "Failed to create task");
     }
   }

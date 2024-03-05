@@ -53,7 +53,7 @@ void PinPatternManager::SetPattern(const State* pattern, std::size_t patternLeng
   snprintf(name, sizeof(name), "PinPatternManager-%d", m_gpioPin);
 
   // Start the task
-  BaseType_t result = xTaskCreate(RunPattern, name, 1024, this, 1, &m_taskHandle);
+  BaseType_t result = xTaskCreate(RunPattern, name, 1024, this, 1, &m_taskHandle);  // PROFILED: 0.5KB stack usage
   if (result != pdPASS) {
     ESP_LOGE(TAG, "[pin-%u] Failed to create task: %d", m_gpioPin, result);
 

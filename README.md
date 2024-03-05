@@ -7,11 +7,26 @@
 [![GitHub Sponsors](https://img.shields.io/badge/GitHub-Sponsors-ff69b4)](https://github.com/sponsors/openshock)
 [![Discord](https://img.shields.io/discord/1078124408775901204)](https://discord.gg/openshock)
 
-|         |                                                                                                                                                                                        |                                                                                                                                                                                     |                                                                                                                                                                    |
-|---------|----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|--------------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| Master  | [![Build Status](https://github.com/OpenShock/Firmware/actions/workflows/ci-build.yml/badge.svg?branch=master)](https://github.com/OpenShock/Firmware/actions/workflows/ci-build.yml)  | [![CodeQL Status](https://github.com/OpenShock/Firmware/actions/workflows/codeql.yml/badge.svg?branch=master)](https://github.com/OpenShock/Firmware/actions/workflows/codeql.yml)  | [![Coverage Status](https://coveralls.io/repos/github/openshock/firmware/badge.svg?branch=master)](https://coveralls.io/github/openshock/firmware?branch=master)   |
-| Beta    | [![Build Status](https://github.com/OpenShock/Firmware/actions/workflows/ci-build.yml/badge.svg?branch=beta)](https://github.com/OpenShock/Firmware/actions/workflows/ci-build.yml)    | [![CodeQL Status](https://github.com/OpenShock/Firmware/actions/workflows/codeql.yml/badge.svg?branch=beta)](https://github.com/OpenShock/Firmware/actions/workflows/codeql.yml)    | [![Coverage Status](https://coveralls.io/repos/github/openshock/firmware/badge.svg?branch=beta)](https://coveralls.io/github/openshock/firmware?branch=beta)       |
-| Develop | [![Build Status](https://github.com/OpenShock/Firmware/actions/workflows/ci-build.yml/badge.svg?branch=develop)](https://github.com/OpenShock/Firmware/actions/workflows/ci-build.yml) | [![CodeQL Status](https://github.com/OpenShock/Firmware/actions/workflows/codeql.yml/badge.svg?branch=develop)](https://github.com/OpenShock/Firmware/actions/workflows/codeql.yml) | [![Coverage Status](https://coveralls.io/repos/github/openshock/firmware/badge.svg?branch=develop)](https://coveralls.io/github/openshock/firmware?branch=develop) |
+<table>
+  <tr>
+    <td>master</td>
+    <td><a href="https://github.com/OpenShock/Firmware/actions/workflows/ci-build.yml"><img src="https://github.com/OpenShock/Firmware/actions/workflows/ci-build.yml/badge.svg?branch=master" alt="Build Status" /></a></td>
+    <td><a href="https://github.com/OpenShock/Firmware/actions/workflows/codeql.yml"><img src="https://github.com/OpenShock/Firmware/actions/workflows/codeql.yml/badge.svg?branch=master" alt="CodeQL Status" /></a></td>
+    <td><a href="https://coveralls.io/github/openshock/firmware?branch=master"><img src="https://coveralls.io/repos/github/openshock/firmware/badge.svg?branch=master" alt="Coverage Status" /></a></td>
+  </tr>
+  <tr>
+    <td>beta</td>
+    <td><a href="https://github.com/OpenShock/Firmware/actions/workflows/ci-build.yml"><img src="https://github.com/OpenShock/Firmware/actions/workflows/ci-build.yml/badge.svg?branch=beta" alt="Build Status" /></a></td>
+    <td><a href="https://github.com/OpenShock/Firmware/actions/workflows/codeql.yml"><img src="https://github.com/OpenShock/Firmware/actions/workflows/codeql.yml/badge.svg?branch=beta" alt="CodeQL Status" /></a></td>
+    <td><a href="https://coveralls.io/github/openshock/firmware?branch=master"><img src="https://coveralls.io/repos/github/openshock/firmware/badge.svg?branch=beta" alt="Coverage Status" /></a></td>
+  </tr>
+  <tr>
+    <td>develop</td>
+    <td><a href="https://github.com/OpenShock/Firmware/actions/workflows/ci-build.yml"><img src="https://github.com/OpenShock/Firmware/actions/workflows/ci-build.yml/badge.svg?branch=develop" alt="Build Status" /></a></td>
+    <td><a href="https://github.com/OpenShock/Firmware/actions/workflows/codeql.yml"><img src="https://github.com/OpenShock/Firmware/actions/workflows/codeql.yml/badge.svg?branch=develop" alt="CodeQL Status" /></a></td>
+    <td><a href="https://coveralls.io/github/openshock/firmware?branch=master"><img src="https://coveralls.io/repos/github/openshock/firmware/badge.svg?branch=develop" alt="Coverage Status" /></a></td>
+  </tr>
+</table>
 
 Espressif Firmware for OpenShock.
 

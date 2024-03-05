@@ -53,7 +53,7 @@ void RGBPatternManager::SetPattern(const RGBState* pattern, std::size_t patternL
   std::copy(pattern, pattern + patternLength, m_pattern.begin());
 
   // Start the task
-  BaseType_t result = TaskUtils::TaskCreateExpensive(RunPattern, TAG, 4096, this, 1, &m_taskHandle);
+  BaseType_t result = TaskUtils::TaskCreateExpensive(RunPattern, TAG, 4096, this, 1, &m_taskHandle);  // PROFILED: 1.7KB stack usage
   if (result != pdPASS) {
     ESP_LOGE(TAG, "[pin-%u] Failed to create task: %d", m_gpioPin, result);
 

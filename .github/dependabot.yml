@@ -5,14 +5,43 @@
 
 version: 2
 updates:
-
-  # Check for Github Actions version updates (for CI/CD)
-  - package-ecosystem: "github-actions"
-    directory: "/"
+  # Daily checks for updates in Github Actions (CI/CD workflows)
+  - package-ecosystem: 'github-actions'
+    directory: '/'
     schedule:
-      interval: "daily"
+      interval: 'weekly'
+      day: 'monday'
+      time: '06:00'
+    groups:
+      ci-cd:
+        patterns:
+          - '*' # Group all updates together
 
-  # Check for npm updates
+  # Daily checks for npm package updates in CI-CD scripts
+  - package-ecosystem: 'npm'
+    directory: '/.github/scripts'
+    schedule:
+      interval: 'weekly'
+      day: 'monday'
+      time: '06:00'
+    groups:
+      ci-cd:
+        patterns:
+          - '*' # Group all updates together
+
+  # Daily checks for pip package updates in build system scripts
+  - package-ecosystem: 'pip'
+    directory: '/'
+    schedule:
+      interval: 'weekly'
+      day: 'monday'
+      time: '06:00'
+    groups:
+      build-system:
+        patterns:
+          - '*' # Group all updates together
+
+  # Daily checks for npm package updates in frontend
   - package-ecosystem: 'npm'
     directory: '/frontend'
     schedule:
@@ -20,6 +49,6 @@ updates:
       day: 'monday'
       time: '06:00'
     groups:
-      npm-dependencies:
+      frontend:
         patterns:
           - '*' # Group all updates together
