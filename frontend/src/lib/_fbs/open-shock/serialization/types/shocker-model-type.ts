@@ -4,5 +4,6 @@
 
 export enum ShockerModelType {
   CaiXianlin = 0,
-  Petrainer = 1
+  Petrainer = 1,
+  PetrainerTwo = 2
 }

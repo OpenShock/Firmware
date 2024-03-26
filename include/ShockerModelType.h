@@ -24,6 +24,16 @@ namespace OpenShock {
       return true;
     }
 
+    if (strcasecmp(str, "petrainertwo") == 0) {
+      out = ShockerModelType::PetrainerTwo;
+      return true;
+    }
+
+    if (allowTypo && strcasecmp(str, "pettrainertwo") == 0) {
+      out = ShockerModelType::PetrainerTwo;
+      return true;
+    }
+
     return false;
   }
 }  // namespace OpenShock
