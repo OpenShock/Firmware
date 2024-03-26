@@ -3,5 +3,5 @@ namespace OpenShock.Serialization.Types;
 enum ShockerModelType : uint8 {
   CaiXianlin = 0,
   Petrainer = 1,
-  PetrainerTwo = 2
+  Petrainer998DR = 2
 }
