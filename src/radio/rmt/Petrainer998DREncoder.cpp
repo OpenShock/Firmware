@@ -18,20 +18,20 @@ std::vector<rmt_data_t> Rmt::Petrainer998DREncoder::GetSequence(std::uint16_t sh
   std::uint8_t typeInvert = 0;
   switch (type) {
   case ShockerCommandType::Shock:
-    typeVal = 0x01;
-    typeInvert = 0x07;
+    typeVal    = 0b0001;
+    typeInvert = 0b0111;
     break;
   case ShockerCommandType::Vibrate:
-    typeVal = 0x02;
-    typeInvert = 0x0D;
+    typeVal    = 0b0010;
+    typeInvert = 0b1011;
     break;
   case ShockerCommandType::Sound:
-    typeVal = 0x03;
-    typeInvert = 0x0C;
+    typeVal    = 0b0100;
+    typeInvert = 0b1101;
     break;
   // case ShockerCommandType::Light:
-  //   typeVal = 0x04;
-  //   typeInvert = 0x0E;
+  //   typeVal    = 0b1000;
+  //   typeInvert = 0b1110;
   //   break;
   default:
     return {}; // Invalid type
