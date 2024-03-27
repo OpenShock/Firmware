@@ -5,7 +5,6 @@
 const rmt_data_t kRmtPreamble  = {1500, 1, 750, 0};
 const rmt_data_t kRmtOne       = {750, 1, 250, 0};
 const rmt_data_t kRmtZero      = {250, 1, 750, 0};
-const rmt_data_t kRmtPostamble = {3000, 0, 3000, 0};
 
 using namespace OpenShock;
 
@@ -46,7 +45,7 @@ std::vector<rmt_data_t> Rmt::Petrainer998DREncoder::GetSequence(std::uint16_t sh
   std::uint64_t data = (static_cast<std::uint64_t>(channel & 0b111) << 35 | static_cast<std::uint64_t>(typeVal & 0b1111) << 31 | static_cast<std::uint64_t>(shockerId & 0x1FFFF) << 14 | static_cast<std::uint64_t>(intensity & 0x7F) << 7 | static_cast<std::uint64_t>(typeInvert & 0b1111) << 3 | static_cast<std::uint64_t>(channelInvert & 0b111));
 
   std::vector<rmt_data_t> pulses;
-  pulses.reserve(43);
+  pulses.reserve(42);
 
   // Generate the sequence
   pulses.push_back(kRmtPreamble);
@@ -54,7 +53,6 @@ std::vector<rmt_data_t> Rmt::Petrainer998DREncoder::GetSequence(std::uint16_t sh
   Internal::EncodeBits<38>(pulses, data, kRmtOne, kRmtZero);
   pulses.push_back(kRmtZero);
   pulses.push_back(kRmtZero);
-  pulses.push_back(kRmtPostamble);
 
   return pulses;
 }
