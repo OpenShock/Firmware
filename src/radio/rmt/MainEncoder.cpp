@@ -24,11 +24,12 @@ std::vector<rmt_data_t> Rmt::GetSequence(ShockerModelType model, std::uint16_t s
       return {};
   }
 }
+/*
 std::shared_ptr<std::vector<rmt_data_t>> Rmt::GetZeroSequence(ShockerModelType model, std::uint16_t shockerId) {
   static std::unordered_map<std::uint16_t, std::shared_ptr<std::vector<rmt_data_t>>> _sequences;
 
   auto it = _sequences.find(shockerId);
-  if (it != _sequences.end()) return it->second;
+  if (it != _sequences.end()) return it->second; // FIXME: This is not thread-safe, and does not check if model is the same, causing a protocol mismatch
 
   std::shared_ptr<std::vector<rmt_data_t>> sequence;
   switch (model) {
@@ -51,3 +52,4 @@ std::shared_ptr<std::vector<rmt_data_t>> Rmt::GetZeroSequence(ShockerModelType m
 
   return sequence;
 }
+*/
