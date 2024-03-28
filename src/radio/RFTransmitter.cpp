@@ -15,6 +15,7 @@ const UBaseType_t RFTRANSMITTER_QUEUE_SIZE        = 64;
 const BaseType_t RFTRANSMITTER_TASK_PRIORITY      = 1;
 const std::uint32_t RFTRANSMITTER_TASK_STACK_SIZE = 4096;  // PROFILED: 1.4KB stack usage
 const float RFTRANSMITTER_TICKRATE_NS             = 1000;
+const std::int64_t TRANSMIT_END_DURATION          = 300;
 
 using namespace OpenShock;
 
@@ -178,6 +179,17 @@ void RFTransmitter::TransmitTask(void* arg) {
       }
     }
 
+    if(OpenShock::EStopManager::IsEStopped()) {
+
+      std::int64_t whenEStoppedTime = EStopManager::WhenEStopped();
+
+      for (auto it = commands.begin(); it != commands.end(); ++it) {
+        cmd = *it;
+
+        cmd->until = whenEStoppedTime;
+      }
+    }
+
     // Send queued commands
     for (auto it = commands.begin(); it != commands.end();) {
       cmd = *it;
@@ -187,15 +199,20 @@ void RFTransmitter::TransmitTask(void* arg) {
 
       // Remove expired or empty commands, else send the command.
       // After sending/receiving a command, move to the next one.
-      if (expired || empty || OpenShock::EStopManager::IsEStopped()) {
+      if (expired || empty) {
         // If the command is not empty, send the zero sequence to stop the shocker
         if (!empty) {
           rmtWriteBlocking(rmtHandle, cmd->zeroSequence->data(), cmd->zeroSequence->size());
         }
 
-        // Remove the command and move to the next one
-        it = commands.erase(it);
-        delete cmd;
+        if(cmd->until + TRANSMIT_END_DURATION < OpenShock::millis()) {
+          // Remove the command and move to the next one
+          it = commands.erase(it);
+          delete cmd;
+        } else {
+          // Move to the next command
+          ++it;
+        }
       } else {
         // Send the command
         rmtWriteBlocking(rmtHandle, cmd->sequence.data(), cmd->sequence.size());
