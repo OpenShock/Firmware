@@ -22,7 +22,7 @@ using namespace OpenShock;
 struct command_t {
   std::int64_t until;
   std::vector<rmt_data_t> sequence;
-  std::shared_ptr<std::vector<rmt_data_t>> zeroSequence;
+  std::vector<rmt_data_t> zeroSequence;
   std::uint16_t shockerId;
   bool overwrite;
 };
@@ -202,7 +202,7 @@ void RFTransmitter::TransmitTask(void* arg) {
       if (expired || empty) {
         // If the command is not empty, send the zero sequence to stop the shocker
         if (!empty) {
-          rmtWriteBlocking(rmtHandle, cmd->zeroSequence->data(), cmd->zeroSequence->size());
+          rmtWriteBlocking(rmtHandle, cmd->zeroSequence.data(), cmd->zeroSequence.size());
         }
 
         if(cmd->until + TRANSMIT_END_DURATION < OpenShock::millis()) {
