@@ -18,6 +18,7 @@
 #include "wifi/WiFiManager.h"
 
 #include <esp_ota_ops.h>
+#include <esp_task_wdt.h>
 
 #include <LittleFS.h>
 #include <WiFi.h>
@@ -361,6 +362,10 @@ void _otaUpdateTask(void* arg) {
       continue;
     }
 
+    // Increase task watchdog timeout.
+    // Prevents panics on some ESP32s when clearing large partitions.
+    esp_task_wdt_init(15, true);
+
     // Flash app and filesystem partitions.
     if (!_flashFilesystemPartition(filesystemPartition, release.filesystemBinaryUrl, release.filesystemBinaryHash)) continue;
     if (!_flashAppPartition(appPartition, release.appBinaryUrl, release.appBinaryHash)) continue;
@@ -371,6 +376,9 @@ void _otaUpdateTask(void* arg) {
       _sendFailureMessage("Failed to set OTA update step");
       continue;
     }
+
+    // Set task watchdog timeout back to default.
+    esp_task_wdt_init(5, true);
 
     // Send reboot message.
     _sendProgressMessage(Serialization::Gateway::OtaInstallProgressTask::Rebooting, 0.0f);
