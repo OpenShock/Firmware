@@ -1,3 +1,7 @@
+# Version 1.1.2 Release Notes
+
+- Add support for OpenShock Core V2 Hardware
+
 # Version 1.1.1 Release Notes
 
 This release is increases the stability and performance of the firmware, as well as fixes some minor bugs.

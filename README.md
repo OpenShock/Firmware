@@ -1,5 +1,33 @@
 # OpenShock Espressif Firmware
 
+[![Documentation](https://img.shields.io/badge/docs-mkdocs-blue.svg)](https://openshock.org)
+[![GitHub license](https://img.shields.io/github/license/openshock/firmware.svg)](https://raw.githubusercontent.com/openshock/firmware/master/LICENSE)
+[![GitHub Releases](https://img.shields.io/github/release/openshock/firmware.svg)](https://github.com/openshock/firmware/releases)
+[![GitHub Downloads](https://img.shields.io/github/downloads/openshock/firmware/total)](https://github.com/openshock/firmware/releases)
+[![GitHub Sponsors](https://img.shields.io/badge/GitHub-Sponsors-ff69b4)](https://github.com/sponsors/openshock)
+[![Discord](https://img.shields.io/discord/1078124408775901204)](https://discord.gg/openshock)
+
+<table>
+  <tr>
+    <td>master</td>
+    <td><a href="https://github.com/OpenShock/Firmware/actions/workflows/ci-build.yml"><img src="https://github.com/OpenShock/Firmware/actions/workflows/ci-build.yml/badge.svg?branch=master" alt="Build Status" /></a></td>
+    <td><a href="https://github.com/OpenShock/Firmware/actions/workflows/codeql.yml"><img src="https://github.com/OpenShock/Firmware/actions/workflows/codeql.yml/badge.svg?branch=master" alt="CodeQL Status" /></a></td>
+    <td><a href="https://coveralls.io/github/openshock/firmware?branch=master"><img src="https://coveralls.io/repos/github/openshock/firmware/badge.svg?branch=master" alt="Coverage Status" /></a></td>
+  </tr>
+  <tr>
+    <td>beta</td>
+    <td><a href="https://github.com/OpenShock/Firmware/actions/workflows/ci-build.yml"><img src="https://github.com/OpenShock/Firmware/actions/workflows/ci-build.yml/badge.svg?branch=beta" alt="Build Status" /></a></td>
+    <td><a href="https://github.com/OpenShock/Firmware/actions/workflows/codeql.yml"><img src="https://github.com/OpenShock/Firmware/actions/workflows/codeql.yml/badge.svg?branch=beta" alt="CodeQL Status" /></a></td>
+    <td><a href="https://coveralls.io/github/openshock/firmware?branch=master"><img src="https://coveralls.io/repos/github/openshock/firmware/badge.svg?branch=beta" alt="Coverage Status" /></a></td>
+  </tr>
+  <tr>
+    <td>develop</td>
+    <td><a href="https://github.com/OpenShock/Firmware/actions/workflows/ci-build.yml"><img src="https://github.com/OpenShock/Firmware/actions/workflows/ci-build.yml/badge.svg?branch=develop" alt="Build Status" /></a></td>
+    <td><a href="https://github.com/OpenShock/Firmware/actions/workflows/codeql.yml"><img src="https://github.com/OpenShock/Firmware/actions/workflows/codeql.yml/badge.svg?branch=develop" alt="CodeQL Status" /></a></td>
+    <td><a href="https://coveralls.io/github/openshock/firmware?branch=master"><img src="https://coveralls.io/repos/github/openshock/firmware/badge.svg?branch=develop" alt="Coverage Status" /></a></td>
+  </tr>
+</table>
+
 Espressif Firmware for OpenShock.
 
 Controlling shockers via Reverse engineered proprietary Sub-1 GHz Protocols.

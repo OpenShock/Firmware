@@ -607,7 +607,7 @@ static const SerialCmdHandler kRfTransmitCmdHandler = {
   Transmit a RF command
   Arguments:
     <json> must be a JSON object with the following fields:
-      model      (string) Model of the shocker                    ("caixianlin", "petrainer")
+      model      (string) Model of the shocker                    ("caixianlin", "petrainer", "petrainer998dr")
       id         (number) ID of the shocker                       (0-65535)
       type       (string) Type of the command                     ("shock", "vibrate", "sound", "stop")
       intensity  (number) Intensity of the command                (0-255)
