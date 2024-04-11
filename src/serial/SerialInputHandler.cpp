@@ -131,6 +131,28 @@ void _handleRfTxPinCommand(char* arg, std::size_t argLength) {
   }
 }
 
+void _handleDomainCommand(char* arg, std::size_t argLength) {
+  if (arg == nullptr || argLength == 0) {
+    std::string domain;
+    if (!Config::GetBackendDomain(domain)) {
+      SERPR_ERROR("Failed to get domain from config");
+      return;
+    }
+
+    // Get domain
+    SERPR_RESPONSE("Domain|%s", domain.c_str());
+    return;
+  }
+
+  bool result = OpenShock::Config::SetBackendDomain(std::string(arg, argLength));
+
+  if (result) {
+    SERPR_SUCCESS("Saved config");
+  } else {
+    SERPR_ERROR("Failed to save config");
+  }
+}
+
 void _handleAuthtokenCommand(char* arg, std::size_t argLength) {
   if (arg == nullptr || argLength == 0) {
     std::string authToken;
@@ -444,6 +466,8 @@ echo         <bool>    set serial echo enabled
 validgpios             list all valid GPIO pins
 rftxpin                get radio transmit pin
 rftxpin      <pin>     set radio transmit pin
+domain                 get backend domain
+domain       <domain>  set backend domain
 authtoken              get auth token
 authtoken    <token>   set auth token
 networks               get all saved networks
@@ -523,6 +547,20 @@ rftxpin [<pin>]
     rftxpin 15
 )",
   _handleRfTxPinCommand,
+};
+static const SerialCmdHandler kDomainCmdHandler = {
+  "domain",
+  R"(domain
+  Get the backend domain.
+
+domain [<domain>]
+  Set the backend domain.
+  Arguments:
+    <domain> must be a string.
+  Example:
+    domain shocklink.net
+)",
+  _handleDomainCommand,
 };
 static const SerialCmdHandler kAuthTokenCmdHandler = {
   "authtoken",
@@ -728,6 +766,7 @@ bool SerialInputHandler::Init() {
   RegisterCommandHandler(kSerialEchoCmdHandler);
   RegisterCommandHandler(kValidGpiosCmdHandler);
   RegisterCommandHandler(kRfTxPinCmdHandler);
+  RegisterCommandHandler(kDomainCmdHandler);
   RegisterCommandHandler(kAuthTokenCmdHandler);
   RegisterCommandHandler(kNetworksCmdHandler);
   RegisterCommandHandler(kKeepAliveCmdHandler);
