@@ -17,8 +17,8 @@ bool JsonAPI::ParseBackendVersionJsonResponse(int code, const cJSON* root, JsonA
   }
 
   const cJSON* data = cJSON_GetObjectItemCaseSensitive(root, "data");
-  if (cJSON_IsString(data) == 0) {
-    ESP_LOGJSONE("value at 'data' is not a string", root);
+  if (cJSON_IsObject(data) == 0) {
+    ESP_LOGJSONE("value at 'data' is not an object", root);
     return false;
   }
 
