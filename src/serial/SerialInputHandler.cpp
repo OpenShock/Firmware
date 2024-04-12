@@ -5,7 +5,9 @@
 #include "config/Config.h"
 #include "config/SerialInputConfig.h"
 #include "FormatHelpers.h"
+#include "http/HTTPRequestManager.h"
 #include "Logging.h"
+#include "serialization/JsonAPI.h"
 #include "serialization/JsonSerial.h"
 #include "Time.h"
 #include "util/Base64Utils.h"
@@ -15,6 +17,8 @@
 #include <Esp.h>
 
 #include <unordered_map>
+
+#include <cstring>
 
 const char* const TAG = "SerialInputHandler";
 
@@ -143,6 +147,40 @@ void _handleDomainCommand(char* arg, std::size_t argLength) {
     SERPR_RESPONSE("Domain|%s", domain.c_str());
     return;
   }
+
+  char uri[OPENSHOCK_URI_BUFFER_SIZE];
+  int rv = snprintf(uri, sizeof(uri), "https://%.*s/1", static_cast<int>(argLength), arg);
+  if (rv < 0 || static_cast<std::size_t>(rv) >= sizeof(uri)) {
+    SERPR_ERROR("Domain name too long, please try increasing the \"OPENSHOCK_URI_BUFFER_SIZE\" constant in source code");
+    return;
+  }
+
+  auto resp = HTTP::GetJSON<Serialization::JsonAPI::BackendVersionResponse>(
+    uri,
+    {
+      {"Accept", "application/json"}
+  },
+    Serialization::JsonAPI::ParseBackendVersionJsonResponse,
+    {200}
+  );
+
+  if (resp.result != HTTP::RequestResult::Success) {
+    SERPR_ERROR("Tried to connect to \"%.*s\", but failed with status [%d], refusing to save domain to config", argLength, arg, resp.code);
+    return;
+  }
+
+  ESP_LOGI(
+    TAG,
+    "Successfully connected to \"%.*s\", version: %.*s, commit: %.*s, current time: %.*s",
+    argLength,
+    arg,
+    resp.data.version.size(),
+    resp.data.version.data(),
+    resp.data.commit.size(),
+    resp.data.commit.data(),
+    resp.data.currentTime.size(),
+    resp.data.currentTime.data()
+  );
 
   bool result = OpenShock::Config::SetBackendDomain(std::string(arg, argLength));
 
