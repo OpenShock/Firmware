@@ -629,6 +629,29 @@ bool Config::SetOtaUpdateStep(OtaUpdateStep updateStep) {
   return _trySaveConfig();
 }
 
+bool Config::GetBackendDomain(std::string& out) {
+  ScopedReadLock lock(&_configMutex);
+  if (!lock.isLocked()) {
+    ESP_LOGE(TAG, "Failed to acquire read lock");
+    return false;
+  }
+
+  out = _configData.backend.domain;
+
+  return true;
+}
+
+bool Config::SetBackendDomain(const std::string& domain) {
+  ScopedWriteLock lock(&_configMutex);
+  if (!lock.isLocked()) {
+    ESP_LOGE(TAG, "Failed to acquire write lock");
+    return false;
+  }
+
+  _configData.backend.domain = domain;
+  return _trySaveConfig();
+}
+
 bool Config::HasBackendAuthToken() {
   ScopedReadLock lock(&_configMutex);
   if (!lock.isLocked()) {

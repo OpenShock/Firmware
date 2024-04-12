@@ -69,6 +69,8 @@ namespace OpenShock::Config {
   bool GetOtaUpdateStep(OtaUpdateStep& out);
   bool SetOtaUpdateStep(OtaUpdateStep updateStep);
 
+  bool GetBackendDomain(std::string& out);
+  bool SetBackendDomain(const std::string& domain);
   bool HasBackendAuthToken();
   bool GetBackendAuthToken(std::string& out);
   bool SetBackendAuthToken(const std::string& token);

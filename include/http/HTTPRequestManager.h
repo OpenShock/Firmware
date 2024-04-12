@@ -10,6 +10,7 @@
 
 namespace OpenShock::HTTP {
   enum class RequestResult : std::uint8_t {
+    InternalError,  // Internal error
     InvalidURL,     // Invalid URL
     RequestFailed,  // Failed to start request
     TimedOut,       // Request timed out

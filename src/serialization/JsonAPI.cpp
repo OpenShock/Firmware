@@ -8,6 +8,47 @@ const char* const TAG = "JsonAPI";
 
 using namespace OpenShock::Serialization;
 
+bool JsonAPI::ParseBackendVersionJsonResponse(int code, const cJSON* root, JsonAPI::BackendVersionResponse& out) {
+  (void)code;
+
+  if (cJSON_IsObject(root) == 0) {
+    ESP_LOGJSONE("not an object", root);
+    return false;
+  }
+
+  const cJSON* data = cJSON_GetObjectItemCaseSensitive(root, "data");
+  if (cJSON_IsObject(data) == 0) {
+    ESP_LOGJSONE("value at 'data' is not an object", root);
+    return false;
+  }
+
+  out = {};
+
+  const cJSON* version = cJSON_GetObjectItemCaseSensitive(data, "version");
+  if (cJSON_IsString(version) == 0) {
+    ESP_LOGJSONE("value at 'data.version' is not a string", root);
+    return false;
+  }
+
+  const cJSON* commit = cJSON_GetObjectItemCaseSensitive(data, "commit");
+  if (cJSON_IsString(commit) == 0) {
+    ESP_LOGJSONE("value at 'data.commit' is not a string", root);
+    return false;
+  }
+
+  const cJSON* currentTime = cJSON_GetObjectItemCaseSensitive(data, "currentTime");
+  if (cJSON_IsString(currentTime) == 0) {
+    ESP_LOGJSONE("value at 'data.currentTime' is not a string", root);
+    return false;
+  }
+
+  out.version     = version->valuestring;
+  out.commit      = commit->valuestring;
+  out.currentTime = currentTime->valuestring;
+
+  return true;
+}
+
 bool JsonAPI::ParseAccountLinkJsonResponse(int code, const cJSON* root, JsonAPI::AccountLinkResponse& out) {
   (void)code;
 
