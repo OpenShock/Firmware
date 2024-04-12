@@ -148,12 +148,15 @@ void _handleDomainCommand(char* arg, std::size_t argLength) {
     return;
   }
 
-  char uri[OPENSHOCK_URI_BUFFER_SIZE];
-  int rv = snprintf(uri, sizeof(uri), "https://%.*s/1", static_cast<int>(argLength), arg);
-  if (rv < 0 || static_cast<std::size_t>(rv) >= sizeof(uri)) {
+  // Check if the domain is too long
+  // TODO: Remove magic number
+  if (argLength + 40 >= OPENSHOCK_URI_BUFFER_SIZE) {
     SERPR_ERROR("Domain name too long, please try increasing the \"OPENSHOCK_URI_BUFFER_SIZE\" constant in source code");
     return;
   }
+
+  char uri[OPENSHOCK_URI_BUFFER_SIZE];
+  sprintf(uri, "https://%.*s/1", static_cast<int>(argLength), arg);
 
   auto resp = HTTP::GetJSON<Serialization::JsonAPI::BackendVersionResponse>(
     uri,
