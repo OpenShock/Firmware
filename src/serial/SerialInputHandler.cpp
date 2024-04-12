@@ -558,7 +558,7 @@ domain [<domain>]
   Arguments:
     <domain> must be a string.
   Example:
-    domain shocklink.net
+    domain api.shocklink.net
 )",
   _handleDomainCommand,
 };
