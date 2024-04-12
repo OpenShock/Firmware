@@ -42,6 +42,9 @@ table BackendConfig {
 
   /// Authentication token for the backend server
   auth_token:string;
+
+  /// Override the Live-Control-Gateway (LCG) URL
+  lcg_override:string;
 }
 
 table SerialInputConfig {

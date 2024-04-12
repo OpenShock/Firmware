@@ -220,6 +220,28 @@ void _handleAuthtokenCommand(char* arg, std::size_t argLength) {
   }
 }
 
+void _handleLcgOverrideCommand(char* arg, std::size_t argLength) {
+  if (arg == nullptr || argLength == 0) {
+    std::string lcgOverride;
+    if (!Config::GetBackendLCGOverride(lcgOverride)) {
+      SERPR_ERROR("Failed to get LCG override from config");
+      return;
+    }
+
+    // Get LCG override
+    SERPR_RESPONSE("LcgOverride|%s", lcgOverride.c_str());
+    return;
+  }
+
+  bool result = OpenShock::Config::SetBackendLCGOverride(std::string(arg, argLength));
+
+  if (result) {
+    SERPR_SUCCESS("Saved config");
+  } else {
+    SERPR_ERROR("Failed to save config");
+  }
+}
+
 void _handleNetworksCommand(char* arg, std::size_t argLength) {
   cJSON* root;
 
@@ -515,6 +537,8 @@ domain                 get backend domain
 domain       <domain>  set backend domain
 authtoken              get auth token
 authtoken    <token>   set auth token
+lcg_override           get LCG override
+lcg_override <domain>  set LCG override
 networks               get all saved networks
 networks     <json>    set all saved networks
 keepalive              get shocker keep-alive enabled
@@ -620,6 +644,20 @@ authtoken [<token>]
     authtoken mytoken
 )",
   _handleAuthtokenCommand,
+};
+static const SerialCmdHandler kLcgOverrideCmdHandler = {
+  "lcg_override",
+  R"(lcg_override
+  Get the overridden LCG endpoint.
+
+lcg_override [<domain>]
+  Set the overridden LCG endpoint.
+  Arguments:
+    <domain> must be a string.
+  Example:
+    lcg_override eu1-gateway.shocklink.net
+)",
+  _handleLcgOverrideCommand,
 };
 static const SerialCmdHandler kNetworksCmdHandler = {
   "networks",
@@ -813,6 +851,7 @@ bool SerialInputHandler::Init() {
   RegisterCommandHandler(kRfTxPinCmdHandler);
   RegisterCommandHandler(kDomainCmdHandler);
   RegisterCommandHandler(kAuthTokenCmdHandler);
+  RegisterCommandHandler(kLcgOverrideCmdHandler);
   RegisterCommandHandler(kNetworksCmdHandler);
   RegisterCommandHandler(kKeepAliveCmdHandler);
   RegisterCommandHandler(kJsonConfigCmdHandler);
