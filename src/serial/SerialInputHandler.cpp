@@ -184,11 +184,15 @@ void _handleDomainCommand(char* arg, std::size_t argLength) {
 
   bool result = OpenShock::Config::SetBackendDomain(std::string(arg, argLength));
 
-  if (result) {
-    SERPR_SUCCESS("Saved config");
-  } else {
+  if (!result) {
     SERPR_ERROR("Failed to save config");
+    return;
   }
+
+  SERPR_SUCCESS("Saved config, restarting...");
+
+  // Restart to use the new domain
+  ESP.restart();
 }
 
 void _handleAuthtokenCommand(char* arg, std::size_t argLength) {
