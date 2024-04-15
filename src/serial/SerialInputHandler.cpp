@@ -233,13 +233,51 @@ void _handleLcgOverrideCommand(char* arg, std::size_t argLength) {
     return;
   }
 
-  bool result = OpenShock::Config::SetBackendLCGOverride(std::string(arg, argLength));
-
-  if (result) {
-    SERPR_SUCCESS("Saved config");
-  } else {
-    SERPR_ERROR("Failed to save config");
+  // Find next space
+  char* space = strchr(arg, ' ');
+  if (space == nullptr) {
+    SERPR_ERROR("Invalid argument (missing subcommand)");
+    return;
   }
+
+  char* subcmdPtr       = arg;
+  std::size_t subcmdLen = space - arg;
+
+  if (strncasecmp(subcmdPtr, "clear", subcmdLen) == 0) {
+    if (argLength != 5) {
+      SERPR_ERROR("Invalid command (clear command should not have any arguments)");
+      return;
+    }
+
+    bool result = OpenShock::Config::SetBackendLCGOverride(std::string());
+    if (result) {
+      SERPR_SUCCESS("Cleared LCG override");
+    } else {
+      SERPR_ERROR("Failed to clear LCG override");
+    }
+    return;
+  }
+
+  if (strncasecmp(subcmdPtr, "set", subcmdLen) == 0) {
+    if (argLength <= 4) {
+      SERPR_ERROR("Invalid command (set command should have an argument)");
+      return;
+    }
+
+    char* domain          = space + 1;
+    std::size_t domainLen = (arg + argLength) - domain;
+
+    bool result = OpenShock::Config::SetBackendLCGOverride(std::string(domain, domainLen));
+
+    if (result) {
+      SERPR_SUCCESS("Saved config");
+    } else {
+      SERPR_ERROR("Failed to save config");
+    }
+    return;
+  }
+
+  SERPR_ERROR("Invalid subcommand");
 }
 
 void _handleNetworksCommand(char* arg, std::size_t argLength) {
@@ -523,32 +561,35 @@ void _handleHelpCommand(char* arg, std::size_t argLength) {
 
   // Raw string literal (1+ to remove the first newline)
   Serial.print(1 + R"(
-help                   print this menu
-help         <command> print help for a command
-version                print version information
-restart                restart the board
-sysinfo                print debug information for various subsystems
-echo                   get serial echo enabled
-echo         <bool>    set serial echo enabled
-validgpios             list all valid GPIO pins
-rftxpin                get radio transmit pin
-rftxpin      <pin>     set radio transmit pin
-domain                 get backend domain
-domain       <domain>  set backend domain
-authtoken              get auth token
-authtoken    <token>   set auth token
-lcg_override           get LCG override
-lcg_override <domain>  set LCG override
-networks               get all saved networks
-networks     <json>    set all saved networks
-keepalive              get shocker keep-alive enabled
-keepalive    <bool>    set shocker keep-alive enabled
-jsonconfig             get configuration as JSON
-jsonconfig   <json>    set configuration from JSON
-rawconfig              get raw configuration as base64
-rawconfig    <base64>  set raw configuration from base64
-rftransmit   <json>    transmit a RF command
-factoryreset           reset device to factory defaults and restart
+help                        print this menu
+help              <command> print help for a command
+version                     print version information
+restart                     restart the board
+sysinfo                     print debug information for various subsystems
+echo                        get serial echo enabled
+echo              <bool>    set serial echo enabled
+validgpios                  list all valid GPIO pins
+rftxpin                     get radio transmit pin
+rftxpin           <pin>     set radio transmit pin
+domain                      get backend domain
+domain            <domain>  set backend domain
+authtoken                   get auth token
+authtoken         <token>   set auth token
+authtoken                   clear auth token
+lcgoverride                 get LCG override
+lcgoverride set   <domain>  set LCG override
+lcgoverride clear           clear LCG override
+networks                    get all saved networks
+networks          <json>    set all saved networks
+networks                    clear all saved networks
+keepalive                   get shocker keep-alive enabled
+keepalive         <bool>    set shocker keep-alive enabled
+jsonconfig                  get configuration as JSON
+jsonconfig        <json>    set configuration from JSON
+rawconfig                   get raw configuration as base64
+rawconfig         <base64>  set raw configuration from base64
+rftransmit        <json>    transmit a RF command
+factoryreset                reset device to factory defaults and restart
 )");
 }
 
@@ -646,16 +687,21 @@ authtoken [<token>]
   _handleAuthtokenCommand,
 };
 static const SerialCmdHandler kLcgOverrideCmdHandler = {
-  "lcg_override",
-  R"(lcg_override
+  "lcgoverride",
+  R"(lcgoverride
   Get the overridden LCG endpoint.
 
-lcg_override [<domain>]
+lcgoverride set <domain>
   Set the overridden LCG endpoint.
   Arguments:
     <domain> must be a string.
   Example:
-    lcg_override eu1-gateway.shocklink.net
+    lcgoverride eu1-gateway.shocklink.net
+
+lcgoverride clear
+  Clear the overridden LCG endpoint.
+  Example:
+    lcgoverride clear
 )",
   _handleLcgOverrideCommand,
 };
