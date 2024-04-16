@@ -325,6 +325,8 @@ namespace OpenShock {
     constexpr bool operator!=(const StringView& other) { return !(*this == other); }
     constexpr bool operator==(const char* const other) { return *this == StringView(other); }
     constexpr bool operator!=(const char* const other) { return !(*this == other); }
+    bool operator==(const std::string& other) { return *this == StringView(other); }
+    bool operator!=(const std::string& other) { return !(*this == other); }
 
     bool operator<(const StringView& other) const {
       if (this == &other) return false;
