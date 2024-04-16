@@ -27,11 +27,11 @@
 static const char* const TAG             = "GatewayConnectionManager";
 static const char* const AUTH_TOKEN_FILE = "/authToken";
 
-constexpr std::uint8_t FLAG_NONE   = 0;
-constexpr std::uint8_t FLAG_HAS_IP = 1 << 0;
-constexpr std::uint8_t FLAG_LINKED = 1 << 1;
+const std::uint8_t FLAG_NONE   = 0;
+const std::uint8_t FLAG_HAS_IP = 1 << 0;
+const std::uint8_t FLAG_LINKED = 1 << 1;
 
-constexpr std::uint8_t LINK_CODE_LENGTH = 6;
+const std::uint8_t LINK_CODE_LENGTH = 6;
 
 static std::uint8_t s_flags                                 = 0;
 static std::unique_ptr<OpenShock::GatewayClient> s_wsClient = nullptr;
