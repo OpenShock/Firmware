@@ -267,6 +267,45 @@ void _handleLcgOverrideCommand(char* arg, std::size_t argLength) {
     char* domain          = space + 1;
     std::size_t domainLen = (arg + argLength) - domain;
 
+    if (domainLen + 40 >= OPENSHOCK_URI_BUFFER_SIZE) {
+      SERPR_ERROR("Domain name too long, please try increasing the \"OPENSHOCK_URI_BUFFER_SIZE\" constant in source code");
+      return;
+    }
+
+    char uri[OPENSHOCK_URI_BUFFER_SIZE];
+    sprintf(uri, "https://%.*s/1", static_cast<int>(domainLen), domain);
+
+    auto resp = HTTP::GetJSON<Serialization::JsonAPI::LcgInstanceDetailsResponse>(
+      uri,
+      {
+        {"Accept", "application/json"}
+    },
+      Serialization::JsonAPI::ParseLcgInstanceDetailsJsonResponse,
+      {200}
+    );
+
+    if (resp.result != HTTP::RequestResult::Success) {
+      SERPR_ERROR("Tried to connect to \"%.*s\", but failed with status [%d], refusing to save domain to config", domainLen, domain, resp.code);
+      return;
+    }
+
+    ESP_LOGI(
+      TAG,
+      "Successfully connected to \"%.*s\", name: %.*s, version: %.*s, current time: %.*s, country code: %.*s, FQDN: %.*s",
+      domainLen,
+      domain,
+      resp.data.name.size(),
+      resp.data.name.data(),
+      resp.data.version.size(),
+      resp.data.version.data(),
+      resp.data.currentTime.size(),
+      resp.data.currentTime.data(),
+      resp.data.countryCode.size(),
+      resp.data.countryCode.data(),
+      resp.data.fqdn.size(),
+      resp.data.fqdn.data()
+    );
+
     bool result = OpenShock::Config::SetBackendLCGOverride(std::string(domain, domainLen));
 
     if (result) {
