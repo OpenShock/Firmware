@@ -187,7 +187,7 @@ bool FetchDeviceInfo(const String& authToken) {
 }
 
 static std::int64_t _lastConnectionAttempt = 0;
-bool ConnectToLCG() {
+bool StartConnectingToLCG() {
   // TODO: this function is very slow, should be optimized!
   if (s_wsClient == nullptr) {  // If wsClient is already initialized, we are already paired or connected
     ESP_LOGD(TAG, "wsClient is null");
@@ -273,9 +273,5 @@ void GatewayConnectionManager::Update() {
     return;
   }
 
-  if (ConnectToLCG()) {
-    ESP_LOGD(TAG, "Successfully connected to LCG");
-    OpenShock::VisualStateManager::SetWebSocketConnected(true);
-    return;
-  }
+  StartConnectingToLCG();
 }
