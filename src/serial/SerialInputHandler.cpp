@@ -29,8 +29,8 @@ const char* const TAG = "SerialInputHandler";
 
 using namespace OpenShock;
 
-constexpr std::int64_t PASTE_INTERVAL_THRESHOLD_MS  = 20;
-constexpr std::size_t SERIAL_BUFFER_CLEAR_THRESHOLD = 512;
+const std::int64_t PASTE_INTERVAL_THRESHOLD_MS  = 20;
+const std::size_t SERIAL_BUFFER_CLEAR_THRESHOLD = 512;
 
 struct SerialCmdHandler {
   const char* cmd;
