@@ -9,10 +9,10 @@
 #include "Logging.h"
 #include "serialization/JsonAPI.h"
 #include "serialization/JsonSerial.h"
+#include "StringView.h"
 #include "Time.h"
 #include "util/Base64Utils.h"
 #include "wifi/WiFiManager.h"
-#include "StringView.h"
 
 #include <cJSON.h>
 #include <Esp.h>
@@ -34,13 +34,33 @@ const std::int64_t PASTE_INTERVAL_THRESHOLD_MS  = 20;
 const std::size_t SERIAL_BUFFER_CLEAR_THRESHOLD = 512;
 
 struct SerialCmdHandler {
-  const char* cmd;
+  StringView cmd;
   const char* helpResponse;
   void (*commandHandler)(StringView);
 };
 
+constexpr char tolower_light(char c) {
+  if (c >= 'A' && c <= 'Z') return c - 20;
+  return c;
+}
+
+struct ci_hash {
+  // case-independent (ci) hash function
+  std::size_t operator()(StringView str) const {
+    std::size_t h = 7;
+    for (char c : str) {
+      h = h * 31 + tolower_light(c);
+    }
+    return h;
+  }
+};
+struct ci_less {
+  // case-independent (ci) compare_less binary function
+  bool operator()(StringView s1, StringView s2) const { return strncasecmp(s1.data(), s2.data(), std::min(s1.size(), s2.size())) < 0; }
+};
+
 static bool s_echoEnabled = true;
-static std::unordered_map<std::string, SerialCmdHandler> s_commandHandlers;
+static std::unordered_map<StringView, SerialCmdHandler, ci_hash, ci_less> s_commandHandlers;
 
 /// @brief Tries to parse a boolean from a string (case-insensitive)
 /// @param str Input string
@@ -518,12 +538,8 @@ factoryreset           reset device to factory defaults and restart
     return;
   }
 
-  // Convert argument to lowercase
-  std::vector<char> argLc(arg.length());
-  std::transform(arg.begin(), arg.end(), argLc.begin(), ::tolower);
-
   // Get help for a specific command
-  auto it = s_commandHandlers.find(std::string(argLc.begin(), argLc.end()));
+  auto it = s_commandHandlers.find(arg);
   if (it != s_commandHandlers.end()) {
     Serial.print(it->second.helpResponse);
     return;
@@ -533,7 +549,7 @@ factoryreset           reset device to factory defaults and restart
 }
 
 static const SerialCmdHandler kVersionCmdHandler = {
-  "version",
+  "version"_sv,
   R"(version
   Print version information
   Example:
@@ -542,7 +558,7 @@ static const SerialCmdHandler kVersionCmdHandler = {
   _handleVersionCommand,
 };
 static const SerialCmdHandler kRestartCmdHandler = {
-  "restart",
+  "restart"_sv,
   R"(restart
   Restart the board
   Example:
@@ -551,7 +567,7 @@ static const SerialCmdHandler kRestartCmdHandler = {
   _handleRestartCommand,
 };
 static const SerialCmdHandler kSystemInfoCmdHandler = {
-  "sysinfo",
+  "sysinfo"_sv,
   R"(sysinfo
   Get system information from RTOS, WiFi, etc.
   Example:
@@ -560,7 +576,7 @@ static const SerialCmdHandler kSystemInfoCmdHandler = {
   _handleDebugInfoCommand,
 };
 static const SerialCmdHandler kSerialEchoCmdHandler = {
-  "echo",
+  "echo"_sv,
   R"(echo
   Get the serial echo status.
   If enabled, typed characters are echoed back to the serial port.
@@ -575,7 +591,7 @@ echo [<bool>]
   _handleSerialEchoCommand,
 };
 static const SerialCmdHandler kValidGpiosCmdHandler = {
-  "validgpios",
+  "validgpios"_sv,
   R"(validgpios
   List all valid GPIO pins
   Example:
@@ -584,7 +600,7 @@ static const SerialCmdHandler kValidGpiosCmdHandler = {
   _handleValidGpiosCommand,
 };
 static const SerialCmdHandler kRfTxPinCmdHandler = {
-  "rftxpin",
+  "rftxpin"_sv,
   R"(rftxpin
   Get the GPIO pin used for the radio transmitter.
 
@@ -598,7 +614,7 @@ rftxpin [<pin>]
   _handleRfTxPinCommand,
 };
 static const SerialCmdHandler kDomainCmdHandler = {
-  "domain",
+  "domain"_sv,
   R"(domain
   Get the backend domain.
 
@@ -612,7 +628,7 @@ domain [<domain>]
   _handleDomainCommand,
 };
 static const SerialCmdHandler kAuthTokenCmdHandler = {
-  "authtoken",
+  "authtoken"_sv,
   R"(authtoken
   Get the backend auth token.
 
@@ -626,7 +642,7 @@ authtoken [<token>]
   _handleAuthtokenCommand,
 };
 static const SerialCmdHandler kNetworksCmdHandler = {
-  "networks",
+  "networks"_sv,
   R"(networks
   Get all saved networks.
 
@@ -643,7 +659,7 @@ networks [<json>]
   _handleNetworksCommand,
 };
 static const SerialCmdHandler kKeepAliveCmdHandler = {
-  "keepalive",
+  "keepalive"_sv,
   R"(keepalive
   Get the shocker keep-alive status.
 
@@ -657,7 +673,7 @@ keepalive [<bool>]
   _handleKeepAliveCommand,
 };
 static const SerialCmdHandler kJsonConfigCmdHandler = {
-  "jsonconfig",
+  "jsonconfig"_sv,
   R"(jsonconfig
   Get the configuration as JSON
   Example:
@@ -673,7 +689,7 @@ jsonconfig <json>
   _handleJsonConfigCommand,
 };
 static const SerialCmdHandler kRawConfigCmdHandler = {
-  "rawconfig",
+  "rawconfig"_sv,
   R"(rawconfig
   Get the raw binary config
   Example:
@@ -689,7 +705,7 @@ rawconfig <base64>
   _handleRawConfigCommand,
 };
 static const SerialCmdHandler kRfTransmitCmdHandler = {
-  "rftransmit",
+  "rftransmit"_sv,
   R"(rftransmit <json>
   Transmit a RF command
   Arguments:
@@ -705,7 +721,7 @@ static const SerialCmdHandler kRfTransmitCmdHandler = {
   _handleRFTransmitCommand,
 };
 static const SerialCmdHandler kFactoryResetCmdHandler = {
-  "factoryreset",
+  "factoryreset"_sv,
   R"(factoryreset
   Reset the device to factory defaults and restart
   Example:
@@ -714,7 +730,7 @@ static const SerialCmdHandler kFactoryResetCmdHandler = {
   _handleFactoryResetCommand,
 };
 static const SerialCmdHandler khelpCmdHandler = {
-  "help",
+  "help"_sv,
   R"(help [<command>]
   Print help information
   Arguments:
@@ -783,11 +799,8 @@ void processSerialLine(char* data, std::size_t length) {
     argLength       = length - delimiter - 1;
   }
 
-  // Convert command to lowercase
-  std::transform(command, command + commandLength, command, ::tolower);
-
   // TODO: Clean this up, test this
-  auto it = s_commandHandlers.find(std::string(command, commandLength));
+  auto it = s_commandHandlers.find(StringView(command, commandLength));
   if (it != s_commandHandlers.end()) {
     it->second.commandHandler(StringView(arg, argLength));
     return;
