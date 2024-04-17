@@ -718,10 +718,10 @@ authtoken [<token>]
 static const SerialCmdHandler kLcgOverrideCmdHandler = {
   "lcgoverride",
   R"(lcgoverride
-  Get the overridden LCG endpoint.
+  Get the domain overridden for LCG endpoint (if any).
 
 lcgoverride set <domain>
-  Set the overridden LCG endpoint.
+  Set a domain to override the LCG endpoint.
   Arguments:
     <domain> must be a string.
   Example:
