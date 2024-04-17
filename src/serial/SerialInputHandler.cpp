@@ -248,7 +248,7 @@ void _handleLcgOverrideCommand(char* arg, std::size_t argLength) {
     return;
   }
 
-  if (strncasecmp(arg, "set ", argLength) == 0) {
+  if (strncasecmp(arg, "set ", 4) == 0) {
     if (argLength <= 4) {
       SERPR_ERROR("Invalid command (set command should have an argument)");
       return;
