@@ -19,7 +19,6 @@
 #error "OPENSHOCK_FW_VERSION must be defined"
 #endif
 
-#define OPENSHOCK_API_URL(path)    "https://" OPENSHOCK_API_DOMAIN path
 #define OPENSHOCK_FW_CDN_URL(path) "https://" OPENSHOCK_FW_CDN_DOMAIN path
 
 #define OPENSHOCK_GPIO_INVALID 0

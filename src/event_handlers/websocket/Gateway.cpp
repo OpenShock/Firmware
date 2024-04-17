@@ -19,7 +19,7 @@ typedef Schemas::GatewayToDeviceMessagePayload PayloadType;
 
 using namespace OpenShock;
 
-constexpr std::size_t HANDLER_COUNT = static_cast<std::size_t>(PayloadType::MAX) + 1;
+const std::size_t HANDLER_COUNT = static_cast<std::size_t>(PayloadType::MAX) + 1;
 
 #define SET_HANDLER(payload, handler) handlers[static_cast<std::size_t>(payload)] = handler
 

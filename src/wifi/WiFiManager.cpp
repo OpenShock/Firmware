@@ -260,33 +260,48 @@ void _evWiFiScanStatusChanged(OpenShock::WiFiScanStatus status) {
     // Sort the networks by RSSI
     std::sort(s_wifiNetworks.begin(), s_wifiNetworks.end(), [](const WiFiNetwork& a, const WiFiNetwork& b) { return a.rssi > b.rssi; });
   }
+
+  // Send the scan status changed event
+  Serialization::Local::SerializeWiFiScanStatusChangedEvent(status, CaptivePortal::BroadcastMessageBIN);
 }
-void _evWiFiNetworkDiscovery(const wifi_ap_record_t* record) {
-  std::uint8_t credsId = Config::GetWiFiCredentialsIDbySSID(reinterpret_cast<const char*>(record->ssid));
+void _evWiFiNetworksDiscovery(const std::vector<const wifi_ap_record_t*>& records) {
+  std::vector<WiFiNetwork> updatedNetworks;
+  std::vector<WiFiNetwork> discoveredNetworks;
 
-  auto it = _findNetworkByBSSID(record->bssid);
-  if (it != s_wifiNetworks.end()) {
-    // Update the network
-    memcpy(it->ssid, record->ssid, sizeof(it->ssid));
-    it->channel       = record->primary;
-    it->rssi          = record->rssi;
-    it->authMode      = record->authmode;
-    it->credentialsID = credsId;  // TODO: I don't understand why I need to set this here, but it seems to fix a bug where the credentials ID is not set correctly
-    it->scansMissed   = 0;
+  for (const wifi_ap_record_t* record : records) {
+    std::uint8_t credsId = Config::GetWiFiCredentialsIDbySSID(reinterpret_cast<const char*>(record->ssid));
 
-    Serialization::Local::SerializeWiFiNetworkEvent(Serialization::Types::WifiNetworkEventType::Updated, *it, CaptivePortal::BroadcastMessageBIN);
-    ESP_LOGV(TAG, "Updated network %s (" BSSID_FMT ") with new scan info", it->ssid, BSSID_ARG(it->bssid));
+    auto it = _findNetworkByBSSID(record->bssid);
+    if (it != s_wifiNetworks.end()) {
+      // Update the network
+      memcpy(it->ssid, record->ssid, sizeof(it->ssid));
+      it->channel       = record->primary;
+      it->rssi          = record->rssi;
+      it->authMode      = record->authmode;
+      it->credentialsID = credsId;  // TODO: I don't understand why I need to set this here, but it seems to fix a bug where the credentials ID is not set correctly
+      it->scansMissed   = 0;
 
-    return;
+      updatedNetworks.push_back(*it);
+      ESP_LOGV(TAG, "Updated network %s (" BSSID_FMT ") with new scan info", it->ssid, BSSID_ARG(it->bssid));
+
+      continue;
+    }
+
+    WiFiNetwork network(record->ssid, record->bssid, record->primary, record->rssi, record->authmode, credsId);
+
+    discoveredNetworks.push_back(network);
+    ESP_LOGV(TAG, "Discovered new network %s (" BSSID_FMT ")", network.ssid, BSSID_ARG(network.bssid));
+
+    // Insert the network into the list of networks sorted by RSSI
+    s_wifiNetworks.insert(std::lower_bound(s_wifiNetworks.begin(), s_wifiNetworks.end(), network, [](const WiFiNetwork& a, const WiFiNetwork& b) { return a.rssi > b.rssi; }), std::move(network));
   }
 
-  WiFiNetwork network(record->ssid, record->bssid, record->primary, record->rssi, record->authmode, credsId);
-
-  Serialization::Local::SerializeWiFiNetworkEvent(Serialization::Types::WifiNetworkEventType::Discovered, network, CaptivePortal::BroadcastMessageBIN);
-  ESP_LOGV(TAG, "Discovered new network %s (" BSSID_FMT ")", network.ssid, BSSID_ARG(network.bssid));
-
-  // Insert the network into the list of networks sorted by RSSI
-  s_wifiNetworks.insert(std::lower_bound(s_wifiNetworks.begin(), s_wifiNetworks.end(), network, [](const WiFiNetwork& a, const WiFiNetwork& b) { return a.rssi > b.rssi; }), std::move(network));
+  if (!updatedNetworks.empty()) {
+    Serialization::Local::SerializeWiFiNetworksEvent(Serialization::Types::WifiNetworkEventType::Updated, updatedNetworks, CaptivePortal::BroadcastMessageBIN);
+  }
+  if (!discoveredNetworks.empty()) {
+    Serialization::Local::SerializeWiFiNetworksEvent(Serialization::Types::WifiNetworkEventType::Discovered, discoveredNetworks, CaptivePortal::BroadcastMessageBIN);
+  }
 }
 
 esp_err_t set_esp_interface_dns(esp_interface_t interface, IPAddress main_dns, IPAddress backup_dns, IPAddress fallback_dns);
@@ -296,7 +311,7 @@ bool WiFiManager::Init() {
   ESP_ERROR_CHECK(esp_event_handler_register(WIFI_EVENT, WIFI_EVENT_STA_DISCONNECTED, &_evWiFiScanStatusChanged, nullptr));
   WiFi.onEvent(_evWiFiDisconnected, ARDUINO_EVENT_WIFI_STA_DISCONNECTED);
   WiFiScanManager::RegisterStatusChangedHandler(_evWiFiScanStatusChanged);
-  WiFiScanManager::RegisterNetworkDiscoveryHandler(_evWiFiNetworkDiscovery);
+  WiFiScanManager::RegisterNetworksDiscoveredHandler(_evWiFiNetworksDiscovery);
 
   if (!WiFiScanManager::Init()) {
     ESP_LOGE(TAG, "Failed to initialize WiFiScanManager");
@@ -318,8 +333,7 @@ bool WiFiManager::Init() {
     }
   }
 
-
-  if (set_esp_interface_dns(ESP_IF_WIFI_STA, IPAddress(1,1,1,1), IPAddress(8,8,8,8), IPAddress(9,9,9,9)) != ESP_OK) {
+  if (set_esp_interface_dns(ESP_IF_WIFI_STA, IPAddress(1, 1, 1, 1), IPAddress(8, 8, 8, 8), IPAddress(9, 9, 9, 9)) != ESP_OK) {
     ESP_LOGE(TAG, "Failed to set DNS servers");
     return false;
   }
@@ -484,8 +498,8 @@ bool WiFiManager::GetIPv6Address(char* ipAddress) {
     return false;
   }
 
-  IPv6Address ip = WiFi.localIPv6();
-  const std::uint8_t* ipPtr = ip; // Using the implicit conversion operator of IPv6Address
+  IPv6Address ip            = WiFi.localIPv6();
+  const std::uint8_t* ipPtr = ip;  // Using the implicit conversion operator of IPv6Address
   snprintf(ipAddress, IPV6ADDR_FMT_LEN + 1, IPV6ADDR_FMT, IPV6ADDR_ARG(ipPtr));
 
   return true;
@@ -526,4 +540,8 @@ void WiFiManager::Update() {
   }
 
   _connect(creds.ssid, creds.password);
+}
+
+std::vector<WiFiNetwork> WiFiManager::GetDiscoveredWiFiNetworks() {
+  return s_wifiNetworks;
 }

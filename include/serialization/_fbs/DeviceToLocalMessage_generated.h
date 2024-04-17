@@ -8,9 +8,9 @@
 
 // Ensure the included flatbuffers.h is the same version as when this file was
 // generated, otherwise it may not be compatible.
-static_assert(FLATBUFFERS_VERSION_MAJOR == 23 &&
-              FLATBUFFERS_VERSION_MINOR == 5 &&
-              FLATBUFFERS_VERSION_REVISION == 26,
+static_assert(FLATBUFFERS_VERSION_MAJOR == 24 &&
+              FLATBUFFERS_VERSION_MINOR == 3 &&
+              FLATBUFFERS_VERSION_REVISION == 25,
              "Non-compatible flatbuffers version included");
 
 #include "ConfigFile_generated.h"
@@ -442,19 +442,20 @@ struct WifiNetworkEvent FLATBUFFERS_FINAL_CLASS : private ::flatbuffers::Table {
   }
   enum FlatBuffersVTableOffset FLATBUFFERS_VTABLE_UNDERLYING_TYPE {
     VT_EVENT_TYPE = 4,
-    VT_NETWORK = 6
+    VT_NETWORKS = 6
   };
   OpenShock::Serialization::Types::WifiNetworkEventType event_type() const {
     return static_cast<OpenShock::Serialization::Types::WifiNetworkEventType>(GetField<uint8_t>(VT_EVENT_TYPE, 0));
   }
-  const OpenShock::Serialization::Types::WifiNetwork *network() const {
-    return GetPointer<const OpenShock::Serialization::Types::WifiNetwork *>(VT_NETWORK);
+  const ::flatbuffers::Vector<::flatbuffers::Offset<OpenShock::Serialization::Types::WifiNetwork>> *networks() const {
+    return GetPointer<const ::flatbuffers::Vector<::flatbuffers::Offset<OpenShock::Serialization::Types::WifiNetwork>> *>(VT_NETWORKS);
   }
   bool Verify(::flatbuffers::Verifier &verifier) const {
     return VerifyTableStart(verifier) &&
            VerifyField<uint8_t>(verifier, VT_EVENT_TYPE, 1) &&
-           VerifyOffset(verifier, VT_NETWORK) &&
-           verifier.VerifyTable(network()) &&
+           VerifyOffset(verifier, VT_NETWORKS) &&
+           verifier.VerifyVector(networks()) &&
+           verifier.VerifyVectorOfTables(networks()) &&
            verifier.EndTable();
   }
 };
@@ -466,8 +467,8 @@ struct WifiNetworkEventBuilder {
   void add_event_type(OpenShock::Serialization::Types::WifiNetworkEventType event_type) {
     fbb_.AddElement<uint8_t>(WifiNetworkEvent::VT_EVENT_TYPE, static_cast<uint8_t>(event_type), 0);
   }
-  void add_network(::flatbuffers::Offset<OpenShock::Serialization::Types::WifiNetwork> network) {
-    fbb_.AddOffset(WifiNetworkEvent::VT_NETWORK, network);
+  void add_networks(::flatbuffers::Offset<::flatbuffers::Vector<::flatbuffers::Offset<OpenShock::Serialization::Types::WifiNetwork>>> networks) {
+    fbb_.AddOffset(WifiNetworkEvent::VT_NETWORKS, networks);
   }
   explicit WifiNetworkEventBuilder(::flatbuffers::FlatBufferBuilder &_fbb)
         : fbb_(_fbb) {
@@ -483,9 +484,9 @@ struct WifiNetworkEventBuilder {
 inline ::flatbuffers::Offset<WifiNetworkEvent> CreateWifiNetworkEvent(
     ::flatbuffers::FlatBufferBuilder &_fbb,
     OpenShock::Serialization::Types::WifiNetworkEventType event_type = OpenShock::Serialization::Types::WifiNetworkEventType::Discovered,
-    ::flatbuffers::Offset<OpenShock::Serialization::Types::WifiNetwork> network = 0) {
+    ::flatbuffers::Offset<::flatbuffers::Vector<::flatbuffers::Offset<OpenShock::Serialization::Types::WifiNetwork>>> networks = 0) {
   WifiNetworkEventBuilder builder_(_fbb);
-  builder_.add_network(network);
+  builder_.add_networks(networks);
   builder_.add_event_type(event_type);
   return builder_.Finish();
 }
@@ -494,6 +495,17 @@ struct WifiNetworkEvent::Traits {
   using type = WifiNetworkEvent;
   static auto constexpr Create = CreateWifiNetworkEvent;
 };
+
+inline ::flatbuffers::Offset<WifiNetworkEvent> CreateWifiNetworkEventDirect(
+    ::flatbuffers::FlatBufferBuilder &_fbb,
+    OpenShock::Serialization::Types::WifiNetworkEventType event_type = OpenShock::Serialization::Types::WifiNetworkEventType::Discovered,
+    const std::vector<::flatbuffers::Offset<OpenShock::Serialization::Types::WifiNetwork>> *networks = nullptr) {
+  auto networks__ = networks ? _fbb.CreateVector<::flatbuffers::Offset<OpenShock::Serialization::Types::WifiNetwork>>(*networks) : 0;
+  return OpenShock::Serialization::Local::CreateWifiNetworkEvent(
+      _fbb,
+      event_type,
+      networks__);
+}
 
 struct WifiGotIpEvent FLATBUFFERS_FINAL_CLASS : private ::flatbuffers::Table {
   typedef WifiGotIpEventBuilder Builder;

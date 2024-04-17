@@ -33,3 +33,8 @@ def is_github_pr():
 # Checks whether the event is a pull_request with the specified branch as base_ref.
 def is_github_pr_into(branch: str) -> bool:
     return is_github_pr() and get_github_base_ref() == branch
+
+
+# Checks if the run was triggered by a tag.
+def is_github_tag() -> bool:
+    return sysenv.get_string('GITHUB_REF_TYPE', 'branch') == 'tag'

@@ -4,6 +4,7 @@
 
 #include <cstdint>
 #include <string>
+#include <vector>
 
 namespace OpenShock::WiFiManager {
   /// @brief Initializes the WiFiManager
@@ -64,4 +65,8 @@ namespace OpenShock::WiFiManager {
 
   /// @brief Runs the WiFiManager loop
   void Update();
+
+  /// @brief Gets a copy of the vector of discovered WiFi networks
+  /// @return Vector of discovered WiFiNetworks
+  std::vector<WiFiNetwork> GetDiscoveredWiFiNetworks();
 }  // namespace OpenShock::WiFiManager

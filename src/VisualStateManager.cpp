@@ -10,15 +10,15 @@
 
 const char* const TAG = "VisualStateManager";
 
-constexpr std::uint64_t kCriticalErrorFlag        = 1 << 0;
-constexpr std::uint64_t kEmergencyStoppedFlag     = 1 << 1;
-constexpr std::uint64_t kEmergencyStopClearedFlag = 1 << 2;
-constexpr std::uint64_t kWebSocketConnectedFlag   = 1 << 3;
-constexpr std::uint64_t kWiFiConnectedFlag        = 1 << 4;
-constexpr std::uint64_t kWiFiScanningFlag         = 1 << 5;
+const std::uint64_t kCriticalErrorFlag        = 1 << 0;
+const std::uint64_t kEmergencyStoppedFlag     = 1 << 1;
+const std::uint64_t kEmergencyStopClearedFlag = 1 << 2;
+const std::uint64_t kWebSocketConnectedFlag   = 1 << 3;
+const std::uint64_t kWiFiConnectedFlag        = 1 << 4;
+const std::uint64_t kWiFiScanningFlag         = 1 << 5;
 
 // Bitmask of when the system is in a "all clear" state.
-constexpr std::uint64_t kStatusOKMask = kWebSocketConnectedFlag | kWiFiConnectedFlag;
+const std::uint64_t kStatusOKMask = kWebSocketConnectedFlag | kWiFiConnectedFlag;
 
 static std::uint64_t s_stateFlags = 0;
 static std::shared_ptr<OpenShock::PinPatternManager> s_builtInLedManager;
@@ -26,34 +26,34 @@ static std::shared_ptr<OpenShock::RGBPatternManager> s_RGBLedManager;
 
 using namespace OpenShock;
 
-constexpr PinPatternManager::State kCriticalErrorPattern[] = {
+const PinPatternManager::State kCriticalErrorPattern[] = {
   { true, 100}, // LED ON for 0.1 seconds
   {false, 100}  // LED OFF for 0.1 seconds
 };
-constexpr RGBPatternManager::RGBState kCriticalErrorRGBPattern[] = {
+const RGBPatternManager::RGBState kCriticalErrorRGBPattern[] = {
   {255, 0, 0, 100}, // Red ON for 0.1 seconds
   {  0, 0, 0, 100}  // OFF for 0.1 seconds
 };
 
-constexpr PinPatternManager::State kEmergencyStoppedPattern[] = {
+const PinPatternManager::State kEmergencyStoppedPattern[] = {
   { true, 500},
   {false, 500}
 };
-constexpr RGBPatternManager::RGBState kEmergencyStoppedRGBPattern[] = {
+const RGBPatternManager::RGBState kEmergencyStoppedRGBPattern[] = {
   {255, 0, 0, 500},
   {  0, 0, 0, 500}
 };
 
-constexpr PinPatternManager::State kEmergencyStopClearedPattern[] = {
+const PinPatternManager::State kEmergencyStopClearedPattern[] = {
   { true, 150},
   {false, 150}
 };
-constexpr RGBPatternManager::RGBState kEmergencyStopClearedRGBPattern[] = {
+const RGBPatternManager::RGBState kEmergencyStopClearedRGBPattern[] = {
   {0, 255, 0, 150},
   {0,   0, 0, 150}
 };
 
-constexpr PinPatternManager::State kWiFiDisconnectedPattern[] = {
+const PinPatternManager::State kWiFiDisconnectedPattern[] = {
   { true, 100},
   {false, 100},
   { true, 100},
@@ -61,7 +61,7 @@ constexpr PinPatternManager::State kWiFiDisconnectedPattern[] = {
   { true, 100},
   {false, 700}
 };
-constexpr RGBPatternManager::RGBState kWiFiDisconnectedRGBPattern[] = {
+const RGBPatternManager::RGBState kWiFiDisconnectedRGBPattern[] = {
   {0, 0, 255, 100},
   {0, 0,   0, 100},
   {0, 0, 255, 100},
@@ -70,20 +70,20 @@ constexpr RGBPatternManager::RGBState kWiFiDisconnectedRGBPattern[] = {
   {0, 0,   0, 700}
 };
 
-constexpr PinPatternManager::State kWiFiConnectedWithoutWSPattern[] = {
+const PinPatternManager::State kWiFiConnectedWithoutWSPattern[] = {
   { true, 100},
   {false, 100},
   { true, 100},
   {false, 700}
 };
-constexpr RGBPatternManager::RGBState kWiFiConnectedWithoutWSRGBPattern[] = {
+const RGBPatternManager::RGBState kWiFiConnectedWithoutWSRGBPattern[] = {
   {255, 165, 0, 100},
   {  0,   0, 0, 100},
   {255, 165, 0, 100},
   {  0,   0, 0, 700}
 };
 
-constexpr PinPatternManager::State kPingNoResponsePattern[] = {
+const PinPatternManager::State kPingNoResponsePattern[] = {
   { true, 100},
   {false, 100},
   { true, 100},
@@ -93,7 +93,7 @@ constexpr PinPatternManager::State kPingNoResponsePattern[] = {
   { true, 100},
   {false, 700}
 };
-constexpr RGBPatternManager::RGBState kPingNoResponseRGBPattern[] = {
+const RGBPatternManager::RGBState kPingNoResponseRGBPattern[] = {
   {0, 50, 255, 100},
   {0,  0,   0, 100},
   {0, 50, 255, 100},
@@ -104,7 +104,7 @@ constexpr RGBPatternManager::RGBState kPingNoResponseRGBPattern[] = {
   {0,  0,   0, 700}
 };
 
-constexpr PinPatternManager::State kWebSocketCantConnectPattern[] = {
+const PinPatternManager::State kWebSocketCantConnectPattern[] = {
   { true, 100},
   {false, 100},
   { true, 100},
@@ -116,7 +116,7 @@ constexpr PinPatternManager::State kWebSocketCantConnectPattern[] = {
   { true, 100},
   {false, 700}
 };
-constexpr RGBPatternManager::RGBState kWebSocketCantConnectRGBPattern[] = {
+const RGBPatternManager::RGBState kWebSocketCantConnectRGBPattern[] = {
   {255, 0, 0, 100},
   {  0, 0, 0, 100},
   {255, 0, 0, 100},
@@ -129,20 +129,20 @@ constexpr RGBPatternManager::RGBState kWebSocketCantConnectRGBPattern[] = {
   {  0, 0, 0, 700}
 };
 
-constexpr PinPatternManager::State kWebSocketConnectedPattern[] = {
+const PinPatternManager::State kWebSocketConnectedPattern[] = {
   { true,    100},
   {false, 10'000}
 };
-constexpr RGBPatternManager::RGBState kWebSocketConnectedRGBPattern[] = {
+const RGBPatternManager::RGBState kWebSocketConnectedRGBPattern[] = {
   {0, 255, 0,    100},
   {0,   0, 0, 10'000},
 };
 
-constexpr PinPatternManager::State kSolidOnPattern[] = {
+const PinPatternManager::State kSolidOnPattern[] = {
   {true, 100'000}
 };
 
-constexpr PinPatternManager::State kSolidOffPattern[] = {
+const PinPatternManager::State kSolidOffPattern[] = {
   {false, 100'000}
 };
 

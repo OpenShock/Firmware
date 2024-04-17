@@ -1,7 +1,7 @@
 #include "config/Config.h"
 
-#include "config/RootConfig.h"
 #include "Common.h"
+#include "config/RootConfig.h"
 #include "Logging.h"
 #include "ReadWriteMutex.h"
 
@@ -604,28 +604,51 @@ bool Config::SetOtaUpdateId(std::int32_t updateId) {
   return _trySaveConfig();
 }
 
-bool Config::GetOtaFirmwareBootType(FirmwareBootType& out) {
+bool Config::GetOtaUpdateStep(OtaUpdateStep& out) {
   ScopedReadLock lock(&_configMutex);
   if (!lock.isLocked()) {
     ESP_LOGE(TAG, "Failed to acquire read lock");
   }
 
-  out = _configData.otaUpdate.bootType;
+  out = _configData.otaUpdate.updateStep;
 
   return true;
 }
 
-bool Config::SetOtaFirmwareBootType(FirmwareBootType bootType) {
+bool Config::SetOtaUpdateStep(OtaUpdateStep updateStep) {
   ScopedWriteLock lock(&_configMutex);
   if (!lock.isLocked()) {
     ESP_LOGE(TAG, "Failed to acquire write lock");
   }
 
-  if (_configData.otaUpdate.bootType == bootType) {
+  if (_configData.otaUpdate.updateStep == updateStep) {
     return true;
   }
 
-  _configData.otaUpdate.bootType = bootType;
+  _configData.otaUpdate.updateStep = updateStep;
+  return _trySaveConfig();
+}
+
+bool Config::GetBackendDomain(std::string& out) {
+  ScopedReadLock lock(&_configMutex);
+  if (!lock.isLocked()) {
+    ESP_LOGE(TAG, "Failed to acquire read lock");
+    return false;
+  }
+
+  out = _configData.backend.domain;
+
+  return true;
+}
+
+bool Config::SetBackendDomain(const std::string& domain) {
+  ScopedWriteLock lock(&_configMutex);
+  if (!lock.isLocked()) {
+    ESP_LOGE(TAG, "Failed to acquire write lock");
+    return false;
+  }
+
+  _configData.backend.domain = domain;
   return _trySaveConfig();
 }
 

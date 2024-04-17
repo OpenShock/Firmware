@@ -5,7 +5,9 @@
 #include "config/Config.h"
 #include "config/SerialInputConfig.h"
 #include "FormatHelpers.h"
+#include "http/HTTPRequestManager.h"
 #include "Logging.h"
+#include "serialization/JsonAPI.h"
 #include "serialization/JsonSerial.h"
 #include "Time.h"
 #include "util/Base64Utils.h"
@@ -16,6 +18,8 @@
 
 #include <unordered_map>
 
+#include <cstring>
+
 const char* const TAG = "SerialInputHandler";
 
 #define SERPR_SYS(format, ...)      Serial.printf("$SYS$|" format "\n", ##__VA_ARGS__)
@@ -25,8 +29,8 @@ const char* const TAG = "SerialInputHandler";
 
 using namespace OpenShock;
 
-constexpr std::int64_t PASTE_INTERVAL_THRESHOLD_MS  = 20;
-constexpr std::size_t SERIAL_BUFFER_CLEAR_THRESHOLD = 512;
+const std::int64_t PASTE_INTERVAL_THRESHOLD_MS  = 20;
+const std::size_t SERIAL_BUFFER_CLEAR_THRESHOLD = 512;
 
 struct SerialCmdHandler {
   const char* cmd;
@@ -131,6 +135,69 @@ void _handleRfTxPinCommand(char* arg, std::size_t argLength) {
   }
 }
 
+void _handleDomainCommand(char* arg, std::size_t argLength) {
+  if (arg == nullptr || argLength == 0) {
+    std::string domain;
+    if (!Config::GetBackendDomain(domain)) {
+      SERPR_ERROR("Failed to get domain from config");
+      return;
+    }
+
+    // Get domain
+    SERPR_RESPONSE("Domain|%s", domain.c_str());
+    return;
+  }
+
+  // Check if the domain is too long
+  // TODO: Remove magic number
+  if (argLength + 40 >= OPENSHOCK_URI_BUFFER_SIZE) {
+    SERPR_ERROR("Domain name too long, please try increasing the \"OPENSHOCK_URI_BUFFER_SIZE\" constant in source code");
+    return;
+  }
+
+  char uri[OPENSHOCK_URI_BUFFER_SIZE];
+  sprintf(uri, "https://%.*s/1", static_cast<int>(argLength), arg);
+
+  auto resp = HTTP::GetJSON<Serialization::JsonAPI::BackendVersionResponse>(
+    uri,
+    {
+      {"Accept", "application/json"}
+  },
+    Serialization::JsonAPI::ParseBackendVersionJsonResponse,
+    {200}
+  );
+
+  if (resp.result != HTTP::RequestResult::Success) {
+    SERPR_ERROR("Tried to connect to \"%.*s\", but failed with status [%d], refusing to save domain to config", argLength, arg, resp.code);
+    return;
+  }
+
+  ESP_LOGI(
+    TAG,
+    "Successfully connected to \"%.*s\", version: %.*s, commit: %.*s, current time: %.*s",
+    argLength,
+    arg,
+    resp.data.version.size(),
+    resp.data.version.data(),
+    resp.data.commit.size(),
+    resp.data.commit.data(),
+    resp.data.currentTime.size(),
+    resp.data.currentTime.data()
+  );
+
+  bool result = OpenShock::Config::SetBackendDomain(std::string(arg, argLength));
+
+  if (!result) {
+    SERPR_ERROR("Failed to save config");
+    return;
+  }
+
+  SERPR_SUCCESS("Saved config, restarting...");
+
+  // Restart to use the new domain
+  ESP.restart();
+}
+
 void _handleAuthtokenCommand(char* arg, std::size_t argLength) {
   if (arg == nullptr || argLength == 0) {
     std::string authToken;
@@ -209,7 +276,7 @@ void _handleNetworksCommand(char* arg, std::size_t argLength) {
 
     ESP_LOGI(TAG, "Adding network \"%s\" to config, id=%u", cred.ssid.c_str(), cred.id);
 
-    creds.push_back(std::move(cred));
+    creds.emplace_back(std::move(cred));
   }
 
   if (!OpenShock::Config::SetWiFiCredentials(creds)) {
@@ -444,6 +511,8 @@ echo         <bool>    set serial echo enabled
 validgpios             list all valid GPIO pins
 rftxpin                get radio transmit pin
 rftxpin      <pin>     set radio transmit pin
+domain                 get backend domain
+domain       <domain>  set backend domain
 authtoken              get auth token
 authtoken    <token>   set auth token
 networks               get all saved networks
@@ -523,6 +592,20 @@ rftxpin [<pin>]
     rftxpin 15
 )",
   _handleRfTxPinCommand,
+};
+static const SerialCmdHandler kDomainCmdHandler = {
+  "domain",
+  R"(domain
+  Get the backend domain.
+
+domain [<domain>]
+  Set the backend domain.
+  Arguments:
+    <domain> must be a string.
+  Example:
+    domain api.shocklink.net
+)",
+  _handleDomainCommand,
 };
 static const SerialCmdHandler kAuthTokenCmdHandler = {
   "authtoken",
@@ -607,7 +690,7 @@ static const SerialCmdHandler kRfTransmitCmdHandler = {
   Transmit a RF command
   Arguments:
     <json> must be a JSON object with the following fields:
-      model      (string) Model of the shocker                    ("caixianlin", "petrainer")
+      model      (string) Model of the shocker                    ("caixianlin", "petrainer", "petrainer998dr")
       id         (number) ID of the shocker                       (0-65535)
       type       (string) Type of the command                     ("shock", "vibrate", "sound", "stop")
       intensity  (number) Intensity of the command                (0-255)
@@ -728,6 +811,7 @@ bool SerialInputHandler::Init() {
   RegisterCommandHandler(kSerialEchoCmdHandler);
   RegisterCommandHandler(kValidGpiosCmdHandler);
   RegisterCommandHandler(kRfTxPinCmdHandler);
+  RegisterCommandHandler(kDomainCmdHandler);
   RegisterCommandHandler(kAuthTokenCmdHandler);
   RegisterCommandHandler(kNetworksCmdHandler);
   RegisterCommandHandler(kKeepAliveCmdHandler);

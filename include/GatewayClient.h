@@ -32,6 +32,7 @@ namespace OpenShock {
     bool loop();
 
   private:
+    void _setState(State state);
     void _sendKeepAlive();
     void _sendBootStatus();
     void _handleEvent(WStype_t type, std::uint8_t* payload, std::size_t length);

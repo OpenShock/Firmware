@@ -12,8 +12,8 @@
 #include <unordered_map>
 #include <vector>
 
-constexpr std::size_t HTTP_BUFFER_SIZE = 4096LLU;
-constexpr int HTTP_DOWNLOAD_SIZE_LIMIT = 200 * 1024 * 1024;  // 200 MB
+const std::size_t HTTP_BUFFER_SIZE = 4096LLU;
+const int HTTP_DOWNLOAD_SIZE_LIMIT = 200 * 1024 * 1024;  // 200 MB
 
 const char* const TAG = "HTTPRequestManager";
 

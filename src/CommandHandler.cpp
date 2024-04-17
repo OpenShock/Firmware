@@ -121,7 +121,7 @@ bool _internalSetKeepAliveEnabled(bool enabled) {
       return false;
     }
 
-    if (TaskUtils::TaskCreateExpensive(_keepAliveTask, "KeepAliveTask", 4096, nullptr, 1, &s_keepAliveTaskHandle) != pdPASS) {
+    if (TaskUtils::TaskCreateExpensive(_keepAliveTask, "KeepAliveTask", 4096, nullptr, 1, &s_keepAliveTaskHandle) != pdPASS) {  // PROFILED: 1.5KB stack usage
       ESP_LOGE(TAG, "Failed to create keep-alive task");
 
       vQueueDelete(s_keepAliveQueue);

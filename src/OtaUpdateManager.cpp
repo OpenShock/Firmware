@@ -18,6 +18,7 @@
 #include "wifi/WiFiManager.h"
 
 #include <esp_ota_ops.h>
+#include <esp_task_wdt.h>
 
 #include <LittleFS.h>
 #include <WiFi.h>
@@ -58,7 +59,8 @@ enum OtaTaskEventFlag : std::uint32_t {
   OTA_TASK_EVENT_WIFI_CONNECTED    = 1 << 2,
 };
 
-static bool _otaValidatingApp = false;
+static esp_ota_img_states_t _otaImageState;
+static OpenShock::FirmwareBootType _bootType;
 static TaskHandle_t _taskHandle;
 static OpenShock::SemVer _requestedVersion;
 static SemaphoreHandle_t _requestedVersionMutex = xSemaphoreCreateMutex();
@@ -322,6 +324,10 @@ void _otaUpdateTask(void* arg) {
       ESP_LOGE(TAG, "Failed to set OTA update ID");
       continue;
     }
+    if (!Config::SetOtaUpdateStep(OpenShock::OtaUpdateStep::Updating)) {
+      ESP_LOGE(TAG, "Failed to set OTA update step");
+      continue;
+    }
 
     if (!Serialization::Gateway::SerializeOtaInstallStartedMessage(updateId, version, GatewayConnectionManager::SendMessageBIN)) {
       ESP_LOGE(TAG, "Failed to serialize OTA install started message");
@@ -364,22 +370,30 @@ void _otaUpdateTask(void* arg) {
       continue;
     }
 
+    // Increase task watchdog timeout.
+    // Prevents panics on some ESP32s when clearing large partitions.
+    esp_task_wdt_init(15, true);
+
     // Flash app and filesystem partitions.
     if (!_flashFilesystemPartition(filesystemPartition, release.filesystemBinaryUrl, release.filesystemBinaryHash)) continue;
     if (!_flashAppPartition(appPartition, release.appBinaryUrl, release.appBinaryHash)) continue;
 
     // Set OTA boot type in config.
-    if (!Config::SetOtaFirmwareBootType(OpenShock::FirmwareBootType::NewFirmware)) {
-      ESP_LOGE(TAG, "Failed to set OTA firmware boot type");
-      _sendFailureMessage("Failed to set OTA firmware boot type");
+    if (!Config::SetOtaUpdateStep(OpenShock::OtaUpdateStep::Updated)) {
+      ESP_LOGE(TAG, "Failed to set OTA update step");
+      _sendFailureMessage("Failed to set OTA update step");
       continue;
     }
+
+    // Set task watchdog timeout back to default.
+    esp_task_wdt_init(5, true);
 
     // Send reboot message.
     _sendProgressMessage(Serialization::Gateway::OtaInstallProgressTask::Rebooting, 0.0f);
 
     // Reboot into new firmware.
-    ESP_LOGI(TAG, "Restarting into new firmware");
+    ESP_LOGI(TAG, "Restarting into new firmware...");
+    vTaskDelay(pdMS_TO_TICKS(200));
     break;
   }
 
@@ -404,7 +418,10 @@ bool _tryGetStringList(StringView url, std::vector<std::string>& list) {
 
   OpenShock::StringView data = response.data;
 
-  for (auto line : data.splitLines()) {
+  auto lines = data.splitLines();
+  list.reserve(lines.size());
+
+  for (auto line : lines) {
     line = line.trim();
 
     if (line.isNullOrEmpty()) {
@@ -430,30 +447,45 @@ bool OtaUpdateManager::Init() {
   ESP_LOGD(TAG, "Fetching partition state");
 
   // Get OTA state for said partition.
-  esp_ota_img_states_t states;
-  esp_err_t err = esp_ota_get_state_partition(partition, &states);
+  esp_err_t err = esp_ota_get_state_partition(partition, &_otaImageState);
   if (err != ESP_OK) {
     ESP_PANIC(TAG, "Failed to get partition state: %s", esp_err_to_name(err));
     return false;  // This will never be reached, but the compiler doesn't know that.
   }
 
-  ESP_LOGD(TAG, "Partition state: %u", states);
-
-  // If the currently booting partition is being verified, set correct state.
-  _otaValidatingApp = states == ESP_OTA_IMG_PENDING_VERIFY;
-
-  // Configure event triggers.
-  Config::OtaUpdateConfig otaUpdateConfig;
-  if (!Config::GetOtaUpdateConfig(otaUpdateConfig)) {
-    ESP_LOGE(TAG, "Failed to get OTA update config");
+  ESP_LOGD(TAG, "Fetching previous update step");
+  OtaUpdateStep updateStep;
+  if (!Config::GetOtaUpdateStep(updateStep)) {
+    ESP_LOGE(TAG, "Failed to get OTA update step");
     return false;
   }
 
+  // Infer boot type from update step.
+  switch (updateStep) {
+    case OtaUpdateStep::Updated:
+      _bootType = FirmwareBootType::NewFirmware;
+      break;
+    case OtaUpdateStep::Validating:  // If the update step is validating, we have failed in the middle of validating the new firmware, meaning this is a rollback.
+    case OtaUpdateStep::RollingBack:
+      _bootType = FirmwareBootType::Rollback;
+      break;
+    default:
+      _bootType = FirmwareBootType::Normal;
+      break;
+  }
+
+  if (updateStep == OtaUpdateStep::Updated) {
+    if (!Config::SetOtaUpdateStep(OtaUpdateStep::Validating)) {
+      ESP_PANIC(TAG, "Failed to set OTA update step in critical section");  // TODO: THIS IS A CRITICAL SECTION, WHAT DO WE DO?
+    }
+  }
+
+  ESP_ERROR_CHECK(esp_event_handler_register(IP_EVENT, IP_EVENT_GOT_IP6, _otaEvGotIPHandler, nullptr));
   ESP_ERROR_CHECK(esp_event_handler_register(IP_EVENT, IP_EVENT_STA_GOT_IP, _otaEvGotIPHandler, nullptr));
   ESP_ERROR_CHECK(esp_event_handler_register(WIFI_EVENT, WIFI_EVENT_STA_DISCONNECTED, _otaEvWiFiDisconnectedHandler, nullptr));
 
   // Start OTA update task.
-  TaskUtils::TaskCreateExpensive(_otaUpdateTask, "OTA Update", 8192, nullptr, 1, &_taskHandle);
+  TaskUtils::TaskCreateExpensive(_otaUpdateTask, "OTA Update", 8192, nullptr, 1, &_taskHandle);  // PROFILED: 6.2KB stack usage
 
   return true;
 }
@@ -613,13 +645,17 @@ bool OtaUpdateManager::TryStartFirmwareInstallation(const OpenShock::SemVer& ver
   return _tryQueueUpdateRequest(version);
 }
 
+FirmwareBootType OtaUpdateManager::GetFirmwareBootType() {
+  return _bootType;
+}
+
 bool OtaUpdateManager::IsValidatingApp() {
-  return _otaValidatingApp;
+  return _otaImageState == ESP_OTA_IMG_PENDING_VERIFY;
 }
 
 void OtaUpdateManager::InvalidateAndRollback() {
   // Set OTA boot type in config.
-  if (!Config::SetOtaFirmwareBootType(OpenShock::FirmwareBootType::Rollback)) {
+  if (!Config::SetOtaUpdateStep(OpenShock::OtaUpdateStep::RollingBack)) {
     ESP_PANIC(TAG, "Failed to set OTA firmware boot type in critical section");  // TODO: THIS IS A CRITICAL SECTION, WHAT DO WE DO?
     return;
   }
@@ -637,7 +673,7 @@ void OtaUpdateManager::InvalidateAndRollback() {
   }
 
   // Set OTA boot type in config.
-  if (!Config::SetOtaFirmwareBootType(OpenShock::FirmwareBootType::Normal)) {
+  if (!Config::SetOtaUpdateStep(OpenShock::OtaUpdateStep::None)) {
     ESP_LOGE(TAG, "Failed to set OTA firmware boot type");
   }
 
@@ -646,16 +682,13 @@ void OtaUpdateManager::InvalidateAndRollback() {
 
 void OtaUpdateManager::ValidateApp() {
   if (esp_ota_mark_app_valid_cancel_rollback() != ESP_OK) {
-    // Set OTA boot type in config.
-    if (!Config::SetOtaFirmwareBootType(OpenShock::FirmwareBootType::Rollback)) {  // TODO: Check if we are in new firmware, if so set to rollback, else set to normal
-      ESP_LOGE(TAG, "Failed to set OTA firmware boot type");
-    }
-
     ESP_PANIC(TAG, "Unable to mark app as valid, WTF?");  // TODO: Wtf do we do here?
   }
 
   // Set OTA boot type in config.
-  if (!Config::SetOtaFirmwareBootType(OpenShock::FirmwareBootType::Normal)) {
+  if (!Config::SetOtaUpdateStep(OpenShock::OtaUpdateStep::Validated)) {
     ESP_PANIC(TAG, "Failed to set OTA firmware boot type in critical section");  // TODO: THIS IS A CRITICAL SECTION, WHAT DO WE DO?
   }
+
+  _otaImageState = ESP_OTA_IMG_VALID;
 }

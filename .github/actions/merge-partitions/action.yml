@@ -4,8 +4,8 @@ inputs:
   python-version:
     description: 'Python version to use'
     required: true
-  release-channel:
-    description: 'Release channel that describes this upload'
+  version:
+    description: 'Version of the firmware'
     required: true
   board:
     description: 'Board name to merge partitions for'
@@ -26,7 +26,7 @@ runs:
           boards
           chips
 
-    - uses: actions/setup-python@v4
+    - uses: actions/setup-python@v5
       with:
         python-version: ${{ inputs.python-version }}
         cache: 'pip'
@@ -49,7 +49,7 @@ runs:
       shell: bash
       run: |
         python scripts/merge_image.py ${{ inputs.board }}
-        mv merged.bin OpenShock_${{ inputs.board }}_${{ inputs.release-channel }}.bin
+        mv merged.bin OpenShock_${{ inputs.board }}_${{ inputs.version }}.bin
 
     - name: Upload merged firmware binary
       uses: actions/upload-artifact@v4

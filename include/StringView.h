@@ -198,7 +198,7 @@ namespace OpenShock {
       for (const char* ptr = _ptrBeg; ptr < _ptrEnd; ++ptr) {
         if (predicate(*ptr)) {
           if (start != nullptr) {
-            result.push_back(StringView(start, ptr));
+            result.emplace_back(StringView(start, ptr));
             start = nullptr;
           }
         } else if (start == nullptr) {
@@ -207,7 +207,7 @@ namespace OpenShock {
       }
 
       if (start != nullptr) {
-        result.push_back(StringView(start, _ptrEnd));
+        result.emplace_back(StringView(start, _ptrEnd));
       }
 
       return result;
