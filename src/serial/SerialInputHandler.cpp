@@ -229,6 +229,95 @@ void _handleAuthtokenCommand(StringView arg) {
   }
 }
 
+void _handleLcgOverrideCommand(char* arg, std::size_t argLength) {
+  if (arg == nullptr || argLength == 0) {
+    std::string lcgOverride;
+    if (!Config::GetBackendLCGOverride(lcgOverride)) {
+      SERPR_ERROR("Failed to get LCG override from config");
+      return;
+    }
+
+    // Get LCG override
+    SERPR_RESPONSE("LcgOverride|%s", lcgOverride.c_str());
+    return;
+  }
+
+  if (strncasecmp(arg, "clear", argLength) == 0) {
+    if (argLength != 5) {
+      SERPR_ERROR("Invalid command (clear command should not have any arguments)");
+      return;
+    }
+
+    bool result = OpenShock::Config::SetBackendLCGOverride(std::string());
+    if (result) {
+      SERPR_SUCCESS("Cleared LCG override");
+    } else {
+      SERPR_ERROR("Failed to clear LCG override");
+    }
+    return;
+  }
+
+  if (strncasecmp(arg, "set ", 4) == 0) {
+    if (argLength <= 4) {
+      SERPR_ERROR("Invalid command (set command should have an argument)");
+      return;
+    }
+
+    char* domain          = arg + 4;
+    std::size_t domainLen = (arg + argLength) - domain;
+
+    if (domainLen + 40 >= OPENSHOCK_URI_BUFFER_SIZE) {
+      SERPR_ERROR("Domain name too long, please try increasing the \"OPENSHOCK_URI_BUFFER_SIZE\" constant in source code");
+      return;
+    }
+
+    char uri[OPENSHOCK_URI_BUFFER_SIZE];
+    sprintf(uri, "https://%.*s/1", static_cast<int>(domainLen), domain);
+
+    auto resp = HTTP::GetJSON<Serialization::JsonAPI::LcgInstanceDetailsResponse>(
+      uri,
+      {
+        {"Accept", "application/json"}
+    },
+      Serialization::JsonAPI::ParseLcgInstanceDetailsJsonResponse,
+      {200}
+    );
+
+    if (resp.result != HTTP::RequestResult::Success) {
+      SERPR_ERROR("Tried to connect to \"%.*s\", but failed with status [%d], refusing to save domain to config", domainLen, domain, resp.code);
+      return;
+    }
+
+    ESP_LOGI(
+      TAG,
+      "Successfully connected to \"%.*s\", name: %.*s, version: %.*s, current time: %.*s, country code: %.*s, FQDN: %.*s",
+      domainLen,
+      domain,
+      resp.data.name.size(),
+      resp.data.name.data(),
+      resp.data.version.size(),
+      resp.data.version.data(),
+      resp.data.currentTime.size(),
+      resp.data.currentTime.data(),
+      resp.data.countryCode.size(),
+      resp.data.countryCode.data(),
+      resp.data.fqdn.size(),
+      resp.data.fqdn.data()
+    );
+
+    bool result = OpenShock::Config::SetBackendLCGOverride(std::string(domain, domainLen));
+
+    if (result) {
+      SERPR_SUCCESS("Saved config");
+    } else {
+      SERPR_ERROR("Failed to save config");
+    }
+    return;
+  }
+
+  SERPR_ERROR("Invalid subcommand");
+}
+
 void _handleNetworksCommand(StringView arg) {
   cJSON* root;
 
@@ -626,6 +715,25 @@ authtoken [<token>]
 )",
   _handleAuthtokenCommand,
 };
+static const SerialCmdHandler kLcgOverrideCmdHandler = {
+  "lcgoverride",
+  R"(lcgoverride
+  Get the domain overridden for LCG endpoint (if any).
+
+lcgoverride set <domain>
+  Set a domain to override the LCG endpoint.
+  Arguments:
+    <domain> must be a string.
+  Example:
+    lcgoverride set eu1-gateway.shocklink.net
+
+lcgoverride clear
+  Clear the overridden LCG endpoint.
+  Example:
+    lcgoverride clear
+)",
+  _handleLcgOverrideCommand,
+};
 static const SerialCmdHandler kNetworksCmdHandler = {
   "networks"_sv,
   R"(networks
@@ -815,6 +923,7 @@ bool SerialInputHandler::Init() {
   RegisterCommandHandler(kRfTxPinCmdHandler);
   RegisterCommandHandler(kDomainCmdHandler);
   RegisterCommandHandler(kAuthTokenCmdHandler);
+  RegisterCommandHandler(kLcgOverrideCmdHandler);
   RegisterCommandHandler(kNetworksCmdHandler);
   RegisterCommandHandler(kKeepAliveCmdHandler);
   RegisterCommandHandler(kJsonConfigCmdHandler);

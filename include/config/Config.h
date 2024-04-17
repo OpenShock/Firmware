@@ -75,4 +75,8 @@ namespace OpenShock::Config {
   bool GetBackendAuthToken(std::string& out);
   bool SetBackendAuthToken(StringView token);
   bool ClearBackendAuthToken();
+  bool HasBackendLCGOverride();
+  bool GetBackendLCGOverride(std::string& out);
+  bool SetBackendLCGOverride(const std::string& lcgOverride);
+  bool ClearBackendLCGOverride();
 }  // namespace OpenShock::Config

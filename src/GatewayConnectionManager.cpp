@@ -207,6 +207,15 @@ bool StartConnectingToLCG() {
 
   _lastConnectionAttempt = msNow;
 
+  if (Config::HasBackendLCGOverride()) {
+    std::string lcgOverride;
+    Config::GetBackendLCGOverride(lcgOverride);
+
+    ESP_LOGD(TAG, "Connecting to overridden LCG endpoint %.*s", lcgOverride.size(), lcgOverride.data());
+    s_wsClient->connect(lcgOverride.c_str());
+    return true;
+  }
+
   if (!Config::HasBackendAuthToken()) {
     ESP_LOGD(TAG, "No auth token, can't connect to LCG");
     return false;

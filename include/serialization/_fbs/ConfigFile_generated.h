@@ -419,7 +419,8 @@ struct BackendConfig FLATBUFFERS_FINAL_CLASS : private ::flatbuffers::Table {
   }
   enum FlatBuffersVTableOffset FLATBUFFERS_VTABLE_UNDERLYING_TYPE {
     VT_DOMAIN = 4,
-    VT_AUTH_TOKEN = 6
+    VT_AUTH_TOKEN = 6,
+    VT_LCG_OVERRIDE = 8
   };
   /// Domain name of the backend server, e.g. "api.shocklink.net"
   const ::flatbuffers::String *domain() const {
@@ -429,12 +430,18 @@ struct BackendConfig FLATBUFFERS_FINAL_CLASS : private ::flatbuffers::Table {
   const ::flatbuffers::String *auth_token() const {
     return GetPointer<const ::flatbuffers::String *>(VT_AUTH_TOKEN);
   }
+  /// Override the Live-Control-Gateway (LCG) URL
+  const ::flatbuffers::String *lcg_override() const {
+    return GetPointer<const ::flatbuffers::String *>(VT_LCG_OVERRIDE);
+  }
   bool Verify(::flatbuffers::Verifier &verifier) const {
     return VerifyTableStart(verifier) &&
            VerifyOffset(verifier, VT_DOMAIN) &&
            verifier.VerifyString(domain()) &&
            VerifyOffset(verifier, VT_AUTH_TOKEN) &&
            verifier.VerifyString(auth_token()) &&
+           VerifyOffset(verifier, VT_LCG_OVERRIDE) &&
+           verifier.VerifyString(lcg_override()) &&
            verifier.EndTable();
   }
 };
@@ -448,6 +455,9 @@ struct BackendConfigBuilder {
   }
   void add_auth_token(::flatbuffers::Offset<::flatbuffers::String> auth_token) {
     fbb_.AddOffset(BackendConfig::VT_AUTH_TOKEN, auth_token);
+  }
+  void add_lcg_override(::flatbuffers::Offset<::flatbuffers::String> lcg_override) {
+    fbb_.AddOffset(BackendConfig::VT_LCG_OVERRIDE, lcg_override);
   }
   explicit BackendConfigBuilder(::flatbuffers::FlatBufferBuilder &_fbb)
         : fbb_(_fbb) {
@@ -463,8 +473,10 @@ struct BackendConfigBuilder {
 inline ::flatbuffers::Offset<BackendConfig> CreateBackendConfig(
     ::flatbuffers::FlatBufferBuilder &_fbb,
     ::flatbuffers::Offset<::flatbuffers::String> domain = 0,
-    ::flatbuffers::Offset<::flatbuffers::String> auth_token = 0) {
+    ::flatbuffers::Offset<::flatbuffers::String> auth_token = 0,
+    ::flatbuffers::Offset<::flatbuffers::String> lcg_override = 0) {
   BackendConfigBuilder builder_(_fbb);
+  builder_.add_lcg_override(lcg_override);
   builder_.add_auth_token(auth_token);
   builder_.add_domain(domain);
   return builder_.Finish();
@@ -478,13 +490,16 @@ struct BackendConfig::Traits {
 inline ::flatbuffers::Offset<BackendConfig> CreateBackendConfigDirect(
     ::flatbuffers::FlatBufferBuilder &_fbb,
     const char *domain = nullptr,
-    const char *auth_token = nullptr) {
+    const char *auth_token = nullptr,
+    const char *lcg_override = nullptr) {
   auto domain__ = domain ? _fbb.CreateString(domain) : 0;
   auto auth_token__ = auth_token ? _fbb.CreateString(auth_token) : 0;
+  auto lcg_override__ = lcg_override ? _fbb.CreateString(lcg_override) : 0;
   return OpenShock::Serialization::Configuration::CreateBackendConfig(
       _fbb,
       domain__,
-      auth_token__);
+      auth_token__,
+      lcg_override__);
 }
 
 struct SerialInputConfig FLATBUFFERS_FINAL_CLASS : private ::flatbuffers::Table {
