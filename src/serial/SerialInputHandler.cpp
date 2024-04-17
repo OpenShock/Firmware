@@ -233,17 +233,7 @@ void _handleLcgOverrideCommand(char* arg, std::size_t argLength) {
     return;
   }
 
-  // Find next space
-  char* space = strchr(arg, ' ');
-  if (space == nullptr) {
-    SERPR_ERROR("Invalid argument (missing subcommand)");
-    return;
-  }
-
-  char* subcmdPtr       = arg;
-  std::size_t subcmdLen = space - arg;
-
-  if (strncasecmp(subcmdPtr, "clear", subcmdLen) == 0) {
+  if (strncasecmp(arg, "clear", argLength) == 0) {
     if (argLength != 5) {
       SERPR_ERROR("Invalid command (clear command should not have any arguments)");
       return;
@@ -258,13 +248,13 @@ void _handleLcgOverrideCommand(char* arg, std::size_t argLength) {
     return;
   }
 
-  if (strncasecmp(subcmdPtr, "set", subcmdLen) == 0) {
+  if (strncasecmp(arg, "set ", argLength) == 0) {
     if (argLength <= 4) {
       SERPR_ERROR("Invalid command (set command should have an argument)");
       return;
     }
 
-    char* domain          = space + 1;
+    char* domain          = arg + 4;
     std::size_t domainLen = (arg + argLength) - domain;
 
     if (domainLen + 40 >= OPENSHOCK_URI_BUFFER_SIZE) {
