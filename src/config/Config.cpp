@@ -629,6 +629,29 @@ bool Config::SetOtaUpdateStep(OtaUpdateStep updateStep) {
   return _trySaveConfig();
 }
 
+bool Config::GetBackendDomain(std::string& out) {
+  ScopedReadLock lock(&_configMutex);
+  if (!lock.isLocked()) {
+    ESP_LOGE(TAG, "Failed to acquire read lock");
+    return false;
+  }
+
+  out = _configData.backend.domain;
+
+  return true;
+}
+
+bool Config::SetBackendDomain(const std::string& domain) {
+  ScopedWriteLock lock(&_configMutex);
+  if (!lock.isLocked()) {
+    ESP_LOGE(TAG, "Failed to acquire write lock");
+    return false;
+  }
+
+  _configData.backend.domain = domain;
+  return _trySaveConfig();
+}
+
 bool Config::HasBackendAuthToken() {
   ScopedReadLock lock(&_configMutex);
   if (!lock.isLocked()) {
@@ -670,5 +693,49 @@ bool Config::ClearBackendAuthToken() {
   }
 
   _configData.backend.authToken.clear();
+  return _trySaveConfig();
+}
+
+bool Config::HasBackendLCGOverride() {
+  ScopedReadLock lock(&_configMutex);
+  if (!lock.isLocked()) {
+    ESP_LOGE(TAG, "Failed to acquire read lock");
+    return false;
+  }
+
+  return !_configData.backend.lcgOverride.empty();
+}
+
+bool Config::GetBackendLCGOverride(std::string& out) {
+  ScopedReadLock lock(&_configMutex);
+  if (!lock.isLocked()) {
+    ESP_LOGE(TAG, "Failed to acquire read lock");
+    return false;
+  }
+
+  out = _configData.backend.lcgOverride;
+
+  return true;
+}
+
+bool Config::SetBackendLCGOverride(const std::string& lcgOverride) {
+  ScopedWriteLock lock(&_configMutex);
+  if (!lock.isLocked()) {
+    ESP_LOGE(TAG, "Failed to acquire write lock");
+    return false;
+  }
+
+  _configData.backend.lcgOverride = lcgOverride;
+  return _trySaveConfig();
+}
+
+bool Config::ClearBackendLCGOverride() {
+  ScopedWriteLock lock(&_configMutex);
+  if (!lock.isLocked()) {
+    ESP_LOGE(TAG, "Failed to acquire write lock");
+    return false;
+  }
+
+  _configData.backend.lcgOverride.clear();
   return _trySaveConfig();
 }

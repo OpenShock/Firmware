@@ -8,7 +8,7 @@
 static const char* TAG = "StringUtils";
 
 bool OpenShock::FormatToString(std::string& out, const char* format, ...) {
-  constexpr std::size_t STACK_BUFFER_SIZE = 128;
+  const std::size_t STACK_BUFFER_SIZE = 128;
 
   char buffer[STACK_BUFFER_SIZE];
   char* bufferPtr = buffer;
