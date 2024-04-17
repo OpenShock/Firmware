@@ -16,13 +16,13 @@
 
 static const char* TAG = "CaptivePortalInstance";
 
-constexpr std::uint16_t HTTP_PORT                 = 80;
-constexpr std::uint16_t WEBSOCKET_PORT            = 81;
-constexpr std::uint16_t DNS_PORT                  = 53;
-constexpr std::uint32_t WEBSOCKET_PING_INTERVAL   = 10'000;
-constexpr std::uint32_t WEBSOCKET_PING_TIMEOUT    = 1000;
-constexpr std::uint8_t WEBSOCKET_PING_RETRIES     = 3;
-constexpr std::uint32_t WEBSOCKET_UPDATE_INTERVAL = 10;  // 10ms / 100Hz
+const std::uint16_t HTTP_PORT                 = 80;
+const std::uint16_t WEBSOCKET_PORT            = 81;
+const std::uint16_t DNS_PORT                  = 53;
+const std::uint32_t WEBSOCKET_PING_INTERVAL   = 10'000;
+const std::uint32_t WEBSOCKET_PING_TIMEOUT    = 1000;
+const std::uint8_t WEBSOCKET_PING_RETRIES     = 3;
+const std::uint32_t WEBSOCKET_UPDATE_INTERVAL = 10;  // 10ms / 100Hz
 
 using namespace OpenShock;
 

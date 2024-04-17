@@ -42,8 +42,18 @@ authToken(optionalEncoding?:any):string|Uint8Array|null {
   return offset ? this.bb!.__string(this.bb_pos + offset, optionalEncoding) : null;
 }
 
+/**
+ * Override the Live-Control-Gateway (LCG) URL
+ */
+lcgOverride():string|null
+lcgOverride(optionalEncoding:flatbuffers.Encoding):string|Uint8Array|null
+lcgOverride(optionalEncoding?:any):string|Uint8Array|null {
+  const offset = this.bb!.__offset(this.bb_pos, 8);
+  return offset ? this.bb!.__string(this.bb_pos + offset, optionalEncoding) : null;
+}
+
 static startBackendConfig(builder:flatbuffers.Builder) {
-  builder.startObject(2);
+  builder.startObject(3);
 }
 
 static addDomain(builder:flatbuffers.Builder, domainOffset:flatbuffers.Offset) {
@@ -54,15 +64,20 @@ static addAuthToken(builder:flatbuffers.Builder, authTokenOffset:flatbuffers.Off
   builder.addFieldOffset(1, authTokenOffset, 0);
 }
 
+static addLcgOverride(builder:flatbuffers.Builder, lcgOverrideOffset:flatbuffers.Offset) {
+  builder.addFieldOffset(2, lcgOverrideOffset, 0);
+}
+
 static endBackendConfig(builder:flatbuffers.Builder):flatbuffers.Offset {
   const offset = builder.endObject();
   return offset;
 }
 
-static createBackendConfig(builder:flatbuffers.Builder, domainOffset:flatbuffers.Offset, authTokenOffset:flatbuffers.Offset):flatbuffers.Offset {
+static createBackendConfig(builder:flatbuffers.Builder, domainOffset:flatbuffers.Offset, authTokenOffset:flatbuffers.Offset, lcgOverrideOffset:flatbuffers.Offset):flatbuffers.Offset {
   BackendConfig.startBackendConfig(builder);
   BackendConfig.addDomain(builder, domainOffset);
   BackendConfig.addAuthToken(builder, authTokenOffset);
+  BackendConfig.addLcgOverride(builder, lcgOverrideOffset);
   return BackendConfig.endBackendConfig(builder);
 }
 }

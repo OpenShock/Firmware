@@ -5,7 +5,9 @@
 #include "config/Config.h"
 #include "config/SerialInputConfig.h"
 #include "FormatHelpers.h"
+#include "http/HTTPRequestManager.h"
 #include "Logging.h"
+#include "serialization/JsonAPI.h"
 #include "serialization/JsonSerial.h"
 #include "Time.h"
 #include "util/Base64Utils.h"
@@ -16,6 +18,8 @@
 
 #include <unordered_map>
 
+#include <cstring>
+
 const char* const TAG = "SerialInputHandler";
 
 #define SERPR_SYS(format, ...)      Serial.printf("$SYS$|" format "\n", ##__VA_ARGS__)
@@ -25,8 +29,8 @@ const char* const TAG = "SerialInputHandler";
 
 using namespace OpenShock;
 
-constexpr std::int64_t PASTE_INTERVAL_THRESHOLD_MS  = 20;
-constexpr std::size_t SERIAL_BUFFER_CLEAR_THRESHOLD = 512;
+const std::int64_t PASTE_INTERVAL_THRESHOLD_MS  = 20;
+const std::size_t SERIAL_BUFFER_CLEAR_THRESHOLD = 512;
 
 struct SerialCmdHandler {
   const char* cmd;
@@ -131,6 +135,69 @@ void _handleRfTxPinCommand(char* arg, std::size_t argLength) {
   }
 }
 
+void _handleDomainCommand(char* arg, std::size_t argLength) {
+  if (arg == nullptr || argLength == 0) {
+    std::string domain;
+    if (!Config::GetBackendDomain(domain)) {
+      SERPR_ERROR("Failed to get domain from config");
+      return;
+    }
+
+    // Get domain
+    SERPR_RESPONSE("Domain|%s", domain.c_str());
+    return;
+  }
+
+  // Check if the domain is too long
+  // TODO: Remove magic number
+  if (argLength + 40 >= OPENSHOCK_URI_BUFFER_SIZE) {
+    SERPR_ERROR("Domain name too long, please try increasing the \"OPENSHOCK_URI_BUFFER_SIZE\" constant in source code");
+    return;
+  }
+
+  char uri[OPENSHOCK_URI_BUFFER_SIZE];
+  sprintf(uri, "https://%.*s/1", static_cast<int>(argLength), arg);
+
+  auto resp = HTTP::GetJSON<Serialization::JsonAPI::BackendVersionResponse>(
+    uri,
+    {
+      {"Accept", "application/json"}
+  },
+    Serialization::JsonAPI::ParseBackendVersionJsonResponse,
+    {200}
+  );
+
+  if (resp.result != HTTP::RequestResult::Success) {
+    SERPR_ERROR("Tried to connect to \"%.*s\", but failed with status [%d], refusing to save domain to config", argLength, arg, resp.code);
+    return;
+  }
+
+  ESP_LOGI(
+    TAG,
+    "Successfully connected to \"%.*s\", version: %.*s, commit: %.*s, current time: %.*s",
+    argLength,
+    arg,
+    resp.data.version.size(),
+    resp.data.version.data(),
+    resp.data.commit.size(),
+    resp.data.commit.data(),
+    resp.data.currentTime.size(),
+    resp.data.currentTime.data()
+  );
+
+  bool result = OpenShock::Config::SetBackendDomain(std::string(arg, argLength));
+
+  if (!result) {
+    SERPR_ERROR("Failed to save config");
+    return;
+  }
+
+  SERPR_SUCCESS("Saved config, restarting...");
+
+  // Restart to use the new domain
+  ESP.restart();
+}
+
 void _handleAuthtokenCommand(char* arg, std::size_t argLength) {
   if (arg == nullptr || argLength == 0) {
     std::string authToken;
@@ -151,6 +218,95 @@ void _handleAuthtokenCommand(char* arg, std::size_t argLength) {
   } else {
     SERPR_ERROR("Failed to save config");
   }
+}
+
+void _handleLcgOverrideCommand(char* arg, std::size_t argLength) {
+  if (arg == nullptr || argLength == 0) {
+    std::string lcgOverride;
+    if (!Config::GetBackendLCGOverride(lcgOverride)) {
+      SERPR_ERROR("Failed to get LCG override from config");
+      return;
+    }
+
+    // Get LCG override
+    SERPR_RESPONSE("LcgOverride|%s", lcgOverride.c_str());
+    return;
+  }
+
+  if (strncasecmp(arg, "clear", argLength) == 0) {
+    if (argLength != 5) {
+      SERPR_ERROR("Invalid command (clear command should not have any arguments)");
+      return;
+    }
+
+    bool result = OpenShock::Config::SetBackendLCGOverride(std::string());
+    if (result) {
+      SERPR_SUCCESS("Cleared LCG override");
+    } else {
+      SERPR_ERROR("Failed to clear LCG override");
+    }
+    return;
+  }
+
+  if (strncasecmp(arg, "set ", 4) == 0) {
+    if (argLength <= 4) {
+      SERPR_ERROR("Invalid command (set command should have an argument)");
+      return;
+    }
+
+    char* domain          = arg + 4;
+    std::size_t domainLen = (arg + argLength) - domain;
+
+    if (domainLen + 40 >= OPENSHOCK_URI_BUFFER_SIZE) {
+      SERPR_ERROR("Domain name too long, please try increasing the \"OPENSHOCK_URI_BUFFER_SIZE\" constant in source code");
+      return;
+    }
+
+    char uri[OPENSHOCK_URI_BUFFER_SIZE];
+    sprintf(uri, "https://%.*s/1", static_cast<int>(domainLen), domain);
+
+    auto resp = HTTP::GetJSON<Serialization::JsonAPI::LcgInstanceDetailsResponse>(
+      uri,
+      {
+        {"Accept", "application/json"}
+    },
+      Serialization::JsonAPI::ParseLcgInstanceDetailsJsonResponse,
+      {200}
+    );
+
+    if (resp.result != HTTP::RequestResult::Success) {
+      SERPR_ERROR("Tried to connect to \"%.*s\", but failed with status [%d], refusing to save domain to config", domainLen, domain, resp.code);
+      return;
+    }
+
+    ESP_LOGI(
+      TAG,
+      "Successfully connected to \"%.*s\", name: %.*s, version: %.*s, current time: %.*s, country code: %.*s, FQDN: %.*s",
+      domainLen,
+      domain,
+      resp.data.name.size(),
+      resp.data.name.data(),
+      resp.data.version.size(),
+      resp.data.version.data(),
+      resp.data.currentTime.size(),
+      resp.data.currentTime.data(),
+      resp.data.countryCode.size(),
+      resp.data.countryCode.data(),
+      resp.data.fqdn.size(),
+      resp.data.fqdn.data()
+    );
+
+    bool result = OpenShock::Config::SetBackendLCGOverride(std::string(domain, domainLen));
+
+    if (result) {
+      SERPR_SUCCESS("Saved config");
+    } else {
+      SERPR_ERROR("Failed to save config");
+    }
+    return;
+  }
+
+  SERPR_ERROR("Invalid subcommand");
 }
 
 void _handleNetworksCommand(char* arg, std::size_t argLength) {
@@ -434,28 +590,35 @@ void _handleHelpCommand(char* arg, std::size_t argLength) {
 
   // Raw string literal (1+ to remove the first newline)
   Serial.print(1 + R"(
-help                   print this menu
-help         <command> print help for a command
-version                print version information
-restart                restart the board
-sysinfo                print debug information for various subsystems
-echo                   get serial echo enabled
-echo         <bool>    set serial echo enabled
-validgpios             list all valid GPIO pins
-rftxpin                get radio transmit pin
-rftxpin      <pin>     set radio transmit pin
-authtoken              get auth token
-authtoken    <token>   set auth token
-networks               get all saved networks
-networks     <json>    set all saved networks
-keepalive              get shocker keep-alive enabled
-keepalive    <bool>    set shocker keep-alive enabled
-jsonconfig             get configuration as JSON
-jsonconfig   <json>    set configuration from JSON
-rawconfig              get raw configuration as base64
-rawconfig    <base64>  set raw configuration from base64
-rftransmit   <json>    transmit a RF command
-factoryreset           reset device to factory defaults and restart
+help                        print this menu
+help              <command> print help for a command
+version                     print version information
+restart                     restart the board
+sysinfo                     print debug information for various subsystems
+echo                        get serial echo enabled
+echo              <bool>    set serial echo enabled
+validgpios                  list all valid GPIO pins
+rftxpin                     get radio transmit pin
+rftxpin           <pin>     set radio transmit pin
+domain                      get backend domain
+domain            <domain>  set backend domain
+authtoken                   get auth token
+authtoken         <token>   set auth token
+authtoken                   clear auth token
+lcgoverride                 get LCG override
+lcgoverride set   <domain>  set LCG override
+lcgoverride clear           clear LCG override
+networks                    get all saved networks
+networks          <json>    set all saved networks
+networks                    clear all saved networks
+keepalive                   get shocker keep-alive enabled
+keepalive         <bool>    set shocker keep-alive enabled
+jsonconfig                  get configuration as JSON
+jsonconfig        <json>    set configuration from JSON
+rawconfig                   get raw configuration as base64
+rawconfig         <base64>  set raw configuration from base64
+rftransmit        <json>    transmit a RF command
+factoryreset                reset device to factory defaults and restart
 )");
 }
 
@@ -524,6 +687,20 @@ rftxpin [<pin>]
 )",
   _handleRfTxPinCommand,
 };
+static const SerialCmdHandler kDomainCmdHandler = {
+  "domain",
+  R"(domain
+  Get the backend domain.
+
+domain [<domain>]
+  Set the backend domain.
+  Arguments:
+    <domain> must be a string.
+  Example:
+    domain api.shocklink.net
+)",
+  _handleDomainCommand,
+};
 static const SerialCmdHandler kAuthTokenCmdHandler = {
   "authtoken",
   R"(authtoken
@@ -537,6 +714,25 @@ authtoken [<token>]
     authtoken mytoken
 )",
   _handleAuthtokenCommand,
+};
+static const SerialCmdHandler kLcgOverrideCmdHandler = {
+  "lcgoverride",
+  R"(lcgoverride
+  Get the domain overridden for LCG endpoint (if any).
+
+lcgoverride set <domain>
+  Set a domain to override the LCG endpoint.
+  Arguments:
+    <domain> must be a string.
+  Example:
+    lcgoverride set eu1-gateway.shocklink.net
+
+lcgoverride clear
+  Clear the overridden LCG endpoint.
+  Example:
+    lcgoverride clear
+)",
+  _handleLcgOverrideCommand,
 };
 static const SerialCmdHandler kNetworksCmdHandler = {
   "networks",
@@ -728,7 +924,9 @@ bool SerialInputHandler::Init() {
   RegisterCommandHandler(kSerialEchoCmdHandler);
   RegisterCommandHandler(kValidGpiosCmdHandler);
   RegisterCommandHandler(kRfTxPinCmdHandler);
+  RegisterCommandHandler(kDomainCmdHandler);
   RegisterCommandHandler(kAuthTokenCmdHandler);
+  RegisterCommandHandler(kLcgOverrideCmdHandler);
   RegisterCommandHandler(kNetworksCmdHandler);
   RegisterCommandHandler(kKeepAliveCmdHandler);
   RegisterCommandHandler(kJsonConfigCmdHandler);
