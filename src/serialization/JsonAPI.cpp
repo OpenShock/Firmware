@@ -8,6 +8,54 @@ const char* const TAG = "JsonAPI";
 
 using namespace OpenShock::Serialization;
 
+bool JsonAPI::ParseLcgInstanceDetailsJsonResponse(int code, const cJSON* root, JsonAPI::LcgInstanceDetailsResponse& out) {
+  (void)code;
+
+  if (cJSON_IsObject(root) == 0) {
+    ESP_LOGJSONE("not an object", root);
+    return false;
+  }
+
+  out = {};
+
+  const cJSON* name = cJSON_GetObjectItemCaseSensitive(root, "name");
+  if (cJSON_IsString(name) == 0) {
+    ESP_LOGJSONE("value at 'data.name' is not a string", root);
+    return false;
+  }
+
+  const cJSON* version = cJSON_GetObjectItemCaseSensitive(root, "version");
+  if (cJSON_IsString(version) == 0) {
+    ESP_LOGJSONE("value at 'data.version' is not a string", root);
+    return false;
+  }
+
+  const cJSON* currentTime = cJSON_GetObjectItemCaseSensitive(root, "currentTime");
+  if (cJSON_IsString(currentTime) == 0) {
+    ESP_LOGJSONE("value at 'data.currentTime' is not a string", root);
+    return false;
+  }
+
+  const cJSON* countryCode = cJSON_GetObjectItemCaseSensitive(root, "countryCode");
+  if (cJSON_IsString(countryCode) == 0) {
+    ESP_LOGJSONE("value at 'data.countryCode' is not a string", root);
+    return false;
+  }
+
+  const cJSON* fqdn = cJSON_GetObjectItemCaseSensitive(root, "fqdn");
+  if (cJSON_IsString(fqdn) == 0) {
+    ESP_LOGJSONE("value at 'data.fqdn' is not a string", root);
+    return false;
+  }
+
+  out.name        = name->valuestring;
+  out.version     = version->valuestring;
+  out.currentTime = currentTime->valuestring;
+  out.countryCode = countryCode->valuestring;
+  out.fqdn        = fqdn->valuestring;
+
+  return true;
+}
 bool JsonAPI::ParseBackendVersionJsonResponse(int code, const cJSON* root, JsonAPI::BackendVersionResponse& out) {
   (void)code;
 
