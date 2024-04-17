@@ -170,7 +170,7 @@ namespace OpenShock {
 
       std::size_t pos    = 0;
       std::size_t splits = 0;
-      while (pos < size() && splits++ < maxSplits) {
+      while (pos < size() && splits++ < maxSplits + 1) {
         std::size_t nextPos = find(delimiter, pos);
         if (nextPos == StringView::npos) {
           nextPos = size();
@@ -430,7 +430,9 @@ namespace std {
     bool operator()(OpenShock::StringView a, OpenShock::StringView b) const { return a < b; }
   };
 
-  struct less_ci {
-    bool operator()(OpenShock::StringView a, OpenShock::StringView b) const { return strncasecmp(a.data(), b.data(), std::max(a.size(), b.size())) < 0; }
+  struct equals_ci {
+    bool operator()(OpenShock::StringView a, OpenShock::StringView b) const {
+      return strncasecmp(a.data(), b.data(), std::max(a.size(), b.size())) == 0;
+    }
   };
 }  // namespace std

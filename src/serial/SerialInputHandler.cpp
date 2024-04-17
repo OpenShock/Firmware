@@ -39,13 +39,8 @@ struct SerialCmdHandler {
   void (*commandHandler)(StringView);
 };
 
-constexpr char tolower_light(char c) {
-  if (c >= 'A' && c <= 'Z') return c - 20;
-  return c;
-}
-
 static bool s_echoEnabled = true;
-static std::unordered_map<StringView, SerialCmdHandler, std::hash_ci, std::less_ci> s_commandHandlers;
+static std::unordered_map<StringView, SerialCmdHandler, std::hash_ci, std::equals_ci> s_commandHandlers;
 
 /// @brief Tries to parse a boolean from a string (case-insensitive)
 /// @param str Input string
@@ -866,38 +861,27 @@ int findLineStart(const char* buffer, int bufferSize, int lineEnd) {
   return -1;
 }
 
-void processSerialLine(char* data, std::size_t length) {
-  int delimiter = findChar(data, length, ' ');
-  if (delimiter == 0) {
-    SERPR_ERROR("Command cannot start with a space");
+void processSerialLine(StringView line) {
+  auto split = line.trim().split(' ', 1);
+  StringView command = split[0];
+  if (command.size() == 0) {
+    SERPR_ERROR("No command");
     return;
   }
 
-  char* command             = data;
-  std::size_t commandLength = length;
-  char* arg                 = nullptr;
-  std::size_t argLength     = 0;
-
-  // If there is a delimiter, split the command and argument
-  if (delimiter > 0) {
-    data[delimiter] = '\0';
-    commandLength   = delimiter;
-    arg             = data + delimiter + 1;
-    argLength       = length - delimiter - 1;
+  StringView arguments;
+  if (split.size() > 1) {
+    arguments = split[1];
   }
 
   // TODO: Clean this up, test this
-  auto it = s_commandHandlers.find(StringView(command, commandLength));
-  if (it != s_commandHandlers.end()) {
-    it->second.commandHandler(StringView(arg, argLength));
+  auto it = s_commandHandlers.find(command);
+  if (it == s_commandHandlers.end()) {
+    SERPR_ERROR("Command \"%.*s\" not found", command.size(), command.data());
     return;
   }
 
-  if (commandLength > 0) {
-    SERPR_ERROR("Command \"%.*s\" not found", commandLength, command);
-  } else {
-    SERPR_ERROR("No command");
-  }
+  it->second.commandHandler(arguments);
 }
 
 bool SerialInputHandler::Init() {
@@ -1011,7 +995,7 @@ void SerialInputHandler::Update() {
     buffer[lineEnd] = '\0';
     Serial.printf("\r> %s\n", buffer);
 
-    processSerialLine(buffer, lineEnd);
+    processSerialLine(StringView(buffer, lineEnd));
 
     int nextLine = findLineStart(buffer, bufferSize, lineEnd + 1);
     if (nextLine < 0) {
