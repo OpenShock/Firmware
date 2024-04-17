@@ -458,7 +458,7 @@ std::uint8_t Config::AddWiFiCredentials(StringView ssid, StringView password) {
   for (auto it = _configData.wifi.credentialsList.begin(); it != _configData.wifi.credentialsList.end(); ++it) {
     auto& creds = *it;
 
-    if (creds.ssid == ssid) {
+    if (StringView(creds.ssid) == ssid) {
       creds.password = password;
 
       id = creds.id;

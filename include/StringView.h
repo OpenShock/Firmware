@@ -395,3 +395,39 @@ namespace OpenShock {
 inline OpenShock::StringView operator"" _sv(const char* str, std::size_t len) {
   return OpenShock::StringView(str, len);
 }
+
+namespace std {
+  template<>
+  struct hash<OpenShock::StringView> {
+    std::size_t operator()(OpenShock::StringView str) const {
+      std::size_t hash = 7;
+
+      for (int i = 0; i < str.size(); ++i) {
+        hash = hash * 31 + str[i];
+      }
+
+      return hash;
+    }
+  };
+
+  struct hash_ci {
+    std::size_t operator()(OpenShock::StringView str) const {
+      std::size_t hash = 7;
+
+      for (int i = 0; i < str.size(); ++i) {
+        hash = hash * 31 + tolower(str[i]);
+      }
+
+      return hash;
+    }
+  };
+
+  template<>
+  struct less<OpenShock::StringView> {
+    bool operator()(OpenShock::StringView a, OpenShock::StringView b) const { return a < b; }
+  };
+
+  struct less_ci {
+    bool operator()(OpenShock::StringView a, OpenShock::StringView b) const { return strncasecmp(a.data(), b.data(), std::max(a.size(), b.size())) < 0; }
+  };
+}  // namespace std

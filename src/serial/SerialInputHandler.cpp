@@ -44,23 +44,8 @@ constexpr char tolower_light(char c) {
   return c;
 }
 
-struct ci_hash {
-  // case-independent (ci) hash function
-  std::size_t operator()(StringView str) const {
-    std::size_t h = 7;
-    for (char c : str) {
-      h = h * 31 + tolower_light(c);
-    }
-    return h;
-  }
-};
-struct ci_less {
-  // case-independent (ci) compare_less binary function
-  bool operator()(StringView s1, StringView s2) const { return strncasecmp(s1.data(), s2.data(), std::min(s1.size(), s2.size())) < 0; }
-};
-
 static bool s_echoEnabled = true;
-static std::unordered_map<StringView, SerialCmdHandler, ci_hash, ci_less> s_commandHandlers;
+static std::unordered_map<StringView, SerialCmdHandler, std::hash_ci, std::less_ci> s_commandHandlers;
 
 /// @brief Tries to parse a boolean from a string (case-insensitive)
 /// @param str Input string
