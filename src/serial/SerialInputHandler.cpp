@@ -287,11 +287,11 @@ void _handleLcgOverrideCommand(StringView arg) {
       "Successfully connected to \"%.*s\", name: %s, version: %s, current time: %s, country code: %s, FQDN: %s",
       domain.size(),
       domain.data(),
-      resp.data.name.data(),
-      resp.data.version.data(),
-      resp.data.currentTime.data(),
-      resp.data.countryCode.data(),
-      resp.data.fqdn.data()
+      resp.data.name.c_str(),
+      resp.data.version.c_str(),
+      resp.data.currentTime.c_str(),
+      resp.data.countryCode.c_str(),
+      resp.data.fqdn.c_str()
     );
 
     bool result = OpenShock::Config::SetBackendLCGOverride(domain.toString());
@@ -992,10 +992,11 @@ void SerialInputHandler::Update() {
       break;
     }
 
-    buffer[lineEnd] = '\0';
-    Serial.printf("\r> %s\n", buffer);
+    StringView line(buffer, lineEnd);
 
-    processSerialLine(StringView(buffer, lineEnd));
+    Serial.printf("\r> %.*s\n", line.size(), line.data());
+
+    processSerialLine(line);
 
     int nextLine = findLineStart(buffer, bufferSize, lineEnd + 1);
     if (nextLine < 0) {

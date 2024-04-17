@@ -253,7 +253,7 @@ std::string SemVer::toString() const {
 bool OpenShock::TryParseSemVer(StringView semverStr, SemVer& semver) {
   auto parts = semverStr.split('.');
   if (parts.size() < 3) {
-    ESP_LOGE(TAG, "Must have at least 3 parts: %s", semverStr.data());
+    ESP_LOGE(TAG, "Must have at least 3 parts: %s", semverStr.c_str());
     return false;
   }
 
@@ -272,27 +272,27 @@ bool OpenShock::TryParseSemVer(StringView semverStr, SemVer& semver) {
   }
 
   if (!_tryParseU16(majorStr, semver.major)) {
-    ESP_LOGE(TAG, "Invalid major version: %s", majorStr.data());
+    ESP_LOGE(TAG, "Invalid major version: %s", majorStr.c_str());
     return false;
   }
 
   if (!_tryParseU16(minorStr, semver.minor)) {
-    ESP_LOGE(TAG, "Invalid minor version: %s", minorStr.data());
+    ESP_LOGE(TAG, "Invalid minor version: %s", minorStr.c_str());
     return false;
   }
 
   if (!_tryParseU16(patchStr, semver.patch)) {
-    ESP_LOGE(TAG, "Invalid patch version: %s", patchStr.data());
+    ESP_LOGE(TAG, "Invalid patch version: %s", patchStr.c_str());
     return false;
   }
 
   if (!semver.prerelease.empty() && !_semverIsPrerelease(semver.prerelease)) {
-    ESP_LOGE(TAG, "Invalid prerelease: %s", semver.prerelease.data());
+    ESP_LOGE(TAG, "Invalid prerelease: %s", semver.prerelease.c_str());
     return false;
   }
 
   if (!semver.build.empty() && !_semverIsBuild(semver.build)) {
-    ESP_LOGE(TAG, "Invalid build: %s", semver.build.data());
+    ESP_LOGE(TAG, "Invalid build: %s", semver.build.c_str());
     return false;
   }
 
