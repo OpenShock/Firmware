@@ -12,7 +12,7 @@ namespace OpenShock::GatewayConnectionManager {
   bool IsConnected();
 
   bool IsLinked();
-  AccountLinkResultCode Link(const char* linkCode);
+  AccountLinkResultCode Link(StringView linkCode);
   void UnLink();
 
   bool SendMessageTXT(StringView data);

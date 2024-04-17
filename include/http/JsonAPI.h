@@ -12,10 +12,10 @@ namespace OpenShock::HTTP::JsonAPI {
   /// @brief Gets the device info for the given device token. Valid response codes: 200, 401
   /// @param deviceToken
   /// @return
-  HTTP::Response<Serialization::JsonAPI::DeviceInfoResponse> GetDeviceInfo(const String& deviceToken);
+  HTTP::Response<Serialization::JsonAPI::DeviceInfoResponse> GetDeviceInfo(StringView deviceToken);
 
   /// @brief Requests a Live Control Gateway to connect to. Valid response codes: 200, 401
   /// @param deviceToken
   /// @return
-  HTTP::Response<Serialization::JsonAPI::AssignLcgResponse> AssignLcg(const String& deviceToken);
+  HTTP::Response<Serialization::JsonAPI::AssignLcgResponse> AssignLcg(StringView deviceToken);
 }  // namespace OpenShock::HTTP::JsonAPI

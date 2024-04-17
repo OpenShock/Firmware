@@ -1,5 +1,7 @@
 #pragma once
 
+#include <flatbuffers/string.h>
+
 #include <Arduino.h>
 
 #include <algorithm>
@@ -27,6 +29,7 @@ namespace OpenShock {
     constexpr StringView(const StringView& str) : _ptrBeg(str._ptrBeg), _ptrEnd(str._ptrEnd) { }
     inline StringView(const String& str) : _ptrBeg(str.c_str()), _ptrEnd(str.c_str() + str.length()) { }
     inline StringView(const std::string& str) : _ptrBeg(str.c_str()), _ptrEnd(str.c_str() + str.size()) { }
+    inline StringView(const flatbuffers::String& str) : _ptrBeg(str.c_str()), _ptrEnd(str.c_str() + str.size()) { }
 
     constexpr bool isNull() const { return _ptrBeg == nullptr || _ptrEnd == nullptr; }
 
