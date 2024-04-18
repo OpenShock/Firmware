@@ -538,7 +538,7 @@ bool OtaUpdateManager::TryGetFirmwareBoards(const OpenShock::SemVer& version, st
   return true;
 }
 
-bool _tryParseIntoHash(const std::string& hash, std::uint8_t (&hashBytes)[32]) {
+bool _tryParseIntoHash(StringView hash, std::uint8_t (&hashBytes)[32]) {
   if (!HexUtils::TryParseHex(hash.data(), hash.size(), hashBytes, 32)) {
     ESP_LOGE(TAG, "Failed to parse hash: %.*s", hash.size(), hash.data());
     return false;
@@ -609,7 +609,7 @@ bool OtaUpdateManager::TryGetFirmwareRelease(const OpenShock::SemVer& version, F
         return false;
       }
 
-      if (!_tryParseIntoHash(hash.toString(), release.appBinaryHash)) {
+      if (!_tryParseIntoHash(hash, release.appBinaryHash)) {
         return false;
       }
 
@@ -620,7 +620,7 @@ bool OtaUpdateManager::TryGetFirmwareRelease(const OpenShock::SemVer& version, F
         return false;
       }
 
-      if (!_tryParseIntoHash(hash.toString(), release.filesystemBinaryHash)) {
+      if (!_tryParseIntoHash(hash, release.filesystemBinaryHash)) {
         return false;
       }
 

@@ -1,13 +1,14 @@
 #pragma once
 
 #include "config/ConfigBase.h"
+#include "StringView.h"
 
 #include <string>
 
 namespace OpenShock::Config {
   struct WiFiCredentials : public ConfigBase<Serialization::Configuration::WiFiCredentials> {
     WiFiCredentials();
-    WiFiCredentials(std::uint8_t id, const std::string& ssid, const std::string& password);
+    WiFiCredentials(std::uint8_t id, StringView ssid, StringView password);
 
     std::uint8_t id;
     std::string ssid;

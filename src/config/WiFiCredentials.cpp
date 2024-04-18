@@ -10,7 +10,7 @@ using namespace OpenShock::Config;
 
 WiFiCredentials::WiFiCredentials() : id(0), ssid(), password() { }
 
-WiFiCredentials::WiFiCredentials(std::uint8_t id, const std::string& ssid, const std::string& password) : id(id), ssid(ssid), password(password) { }
+WiFiCredentials::WiFiCredentials(std::uint8_t id, StringView ssid, StringView password) : id(id), ssid(ssid.toString()), password(password.toString()) { }
 
 void WiFiCredentials::ToDefault() {
   id = 0;
