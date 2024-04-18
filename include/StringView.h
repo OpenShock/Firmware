@@ -184,7 +184,7 @@ namespace OpenShock {
 
       std::size_t pos    = 0;
       std::size_t splits = 0;
-      while (pos < size() && splits++ < maxSplits + 1) {
+      while (pos < size() && splits < maxSplits) {
         std::size_t nextPos = find(delimiter, pos);
         if (nextPos == StringView::npos) {
           nextPos = size();
@@ -192,6 +192,11 @@ namespace OpenShock {
 
         result.push_back(substr(pos, nextPos - pos));
         pos = nextPos + 1;
+        ++splits;
+      }
+
+      if (pos < size()) {
+        result.push_back(substr(pos));
       }
 
       return result;

@@ -453,7 +453,6 @@ void _handleValidGpiosCommand(StringView arg) {
 }
 
 void _handleJsonConfigCommand(StringView arg) {
-  printf("arg: %.*s (%zu)\n", arg.length(), arg.data(), arg.length());
   if (arg.isNullOrEmpty()) {
     // Get raw config
     std::string json = Config::GetAsJSON(true);
