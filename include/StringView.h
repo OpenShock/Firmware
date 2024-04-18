@@ -180,7 +180,7 @@ namespace OpenShock {
         return {};
       }
 
-      std::vector<StringView> result;
+      std::vector<StringView> result = {};
 
       std::size_t pos    = 0;
       std::size_t splits = 0;

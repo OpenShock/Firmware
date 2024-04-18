@@ -718,14 +718,14 @@ bool Config::GetBackendLCGOverride(std::string& out) {
   return true;
 }
 
-bool Config::SetBackendLCGOverride(const std::string& lcgOverride) {
+bool Config::SetBackendLCGOverride(StringView lcgOverride) {
   ScopedWriteLock lock(&_configMutex);
   if (!lock.isLocked()) {
     ESP_LOGE(TAG, "Failed to acquire write lock");
     return false;
   }
 
-  _configData.backend.lcgOverride = lcgOverride;
+  _configData.backend.lcgOverride = lcgOverride.toString();
   return _trySaveConfig();
 }
 

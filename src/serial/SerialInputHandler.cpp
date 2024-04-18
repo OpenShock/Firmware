@@ -189,7 +189,7 @@ void _handleDomainCommand(StringView arg) {
     resp.data.currentTime.data()
   );
 
-  bool result = OpenShock::Config::SetBackendDomain(arg.toString());
+  bool result = OpenShock::Config::SetBackendDomain(arg);
 
   if (!result) {
     SERPR_ERROR("Failed to save config");
@@ -215,7 +215,7 @@ void _handleAuthtokenCommand(StringView arg) {
     return;
   }
 
-  bool result = OpenShock::Config::SetBackendAuthToken(arg.toString());
+  bool result = OpenShock::Config::SetBackendAuthToken(arg);
 
   if (result) {
     SERPR_SUCCESS("Saved config");
@@ -294,7 +294,7 @@ void _handleLcgOverrideCommand(StringView arg) {
       resp.data.fqdn.c_str()
     );
 
-    bool result = OpenShock::Config::SetBackendLCGOverride(domain.toString());
+    bool result = OpenShock::Config::SetBackendLCGOverride(domain);
 
     if (result) {
       SERPR_SUCCESS("Saved config");
@@ -453,6 +453,7 @@ void _handleValidGpiosCommand(StringView arg) {
 }
 
 void _handleJsonConfigCommand(StringView arg) {
+  printf("arg: %.*s (%zu)\n", arg.length(), arg.data(), arg.length());
   if (arg.isNullOrEmpty()) {
     // Get raw config
     std::string json = Config::GetAsJSON(true);
@@ -461,7 +462,7 @@ void _handleJsonConfigCommand(StringView arg) {
     return;
   }
 
-  if (!Config::SaveFromJSON(arg.toString())) {
+  if (!Config::SaveFromJSON(arg)) {
     SERPR_ERROR("Failed to save config");
     return;
   }
@@ -868,8 +869,9 @@ void processSerialLine(StringView line) {
     return;
   }
 
-  StringView command = line.beforeDelimiter(' ');
-  StringView arguments = line.afterDelimiter(' ');
+  auto parts = line.split(' ', 1);
+  StringView command = parts[0];
+  StringView arguments = parts.size() > 1 ? parts[1] : StringView();
 
   auto it = s_commandHandlers.find(command);
   if (it == s_commandHandlers.end()) {
