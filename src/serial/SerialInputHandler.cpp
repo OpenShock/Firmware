@@ -991,8 +991,12 @@ void SerialInputHandler::Update() {
       }
       break;
     }
+    StringView line = StringView(buffer, lineEnd).trim();
 
-    StringView line(buffer, lineEnd);
+    if (line.isNullOrEmpty()) {
+      bufferIndex = 0;
+      continue;
+    }
 
     Serial.printf("\r> %.*s\n", line.size(), line.data());
 
