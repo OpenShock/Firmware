@@ -862,19 +862,15 @@ int findLineStart(const char* buffer, int bufferSize, int lineEnd) {
 }
 
 void processSerialLine(StringView line) {
-  auto split = line.trim().split(' ', 1);
-  StringView command = split[0];
-  if (command.size() == 0) {
+  line = line.trim();
+  if (line.isNullOrEmpty()) {
     SERPR_ERROR("No command");
     return;
   }
 
-  StringView arguments;
-  if (split.size() > 1) {
-    arguments = split[1];
-  }
+  StringView command = line.beforeDelimiter(' ');
+  StringView arguments = line.afterDelimiter(' ');
 
-  // TODO: Clean this up, test this
   auto it = s_commandHandlers.find(command);
   if (it == s_commandHandlers.end()) {
     SERPR_ERROR("Command \"%.*s\" not found", command.size(), command.data());
@@ -991,12 +987,8 @@ void SerialInputHandler::Update() {
       }
       break;
     }
-    StringView line = StringView(buffer, lineEnd).trim();
 
-    if (line.isNullOrEmpty()) {
-      bufferIndex = 0;
-      continue;
-    }
+    StringView line = StringView(buffer, lineEnd).trim();
 
     Serial.printf("\r> %.*s\n", line.size(), line.data());
 

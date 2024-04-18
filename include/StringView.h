@@ -32,7 +32,7 @@ namespace OpenShock {
     inline StringView(const flatbuffers::String& str) : _ptrBeg(str.c_str()), _ptrEnd(str.c_str() + str.size()) { }
 
     constexpr bool isNull() const { return _ptrBeg == nullptr || _ptrEnd == nullptr; }
-    constexpr bool isEmpty() const { return _ptrBeg <= _ptrEnd; }
+    constexpr bool isEmpty() const { return _ptrBeg >= _ptrEnd; }
     constexpr bool isNullOrEmpty() const { return isNull() || isEmpty(); }
 
     constexpr const char* data() const { return _ptrBeg; }
