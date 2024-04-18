@@ -206,7 +206,7 @@ namespace OpenShock {
         return {};
       }
 
-      std::vector<StringView> result;
+      std::vector<StringView> result = {};
 
       std::size_t pos = 0;
       while (pos < size()) {
@@ -226,7 +226,7 @@ namespace OpenShock {
         return {};
       }
 
-      std::vector<StringView> result;
+      std::vector<StringView> result = {};
 
       const char* start = nullptr;
       for (const char* ptr = _ptrBeg; ptr < _ptrEnd; ++ptr) {
