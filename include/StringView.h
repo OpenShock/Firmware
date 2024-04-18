@@ -32,6 +32,8 @@ namespace OpenShock {
     inline StringView(const flatbuffers::String& str) : _ptrBeg(str.c_str()), _ptrEnd(str.c_str() + str.size()) { }
 
     constexpr bool isNull() const { return _ptrBeg == nullptr || _ptrEnd == nullptr; }
+    constexpr bool isEmpty() const { return _ptrBeg <= _ptrEnd; }
+    constexpr bool isNullOrEmpty() const { return isNull() || isEmpty(); }
 
     constexpr const char* data() const { return _ptrBeg; }
 
@@ -45,13 +47,13 @@ namespace OpenShock {
     constexpr char back() const { return *(_ptrEnd - 1); }
 
     constexpr std::size_t size() const {
-      if (isNull()) return 0;
+      if (isNullOrEmpty()) {
+        return 0;
+      }
 
       return _ptrEnd - _ptrBeg;
     }
     constexpr std::size_t length() const { return size(); }
-
-    constexpr bool isNullOrEmpty() const { return size() == 0; }
 
     constexpr StringView substr(std::size_t pos, std::size_t count = StringView::npos) const {
       if (isNullOrEmpty()) {
@@ -72,6 +74,10 @@ namespace OpenShock {
     }
 
     constexpr std::size_t find(char needle, std::size_t pos = 0) const {
+      if (isNullOrEmpty() || pos >= size()) {
+        return StringView::npos;
+      }
+
       std::size_t _size = this->size();
 
       for (std::size_t i = pos; i < _size; ++i) {
@@ -83,7 +89,7 @@ namespace OpenShock {
       return StringView::npos;
     }
     inline std::size_t find(StringView needle, std::size_t pos = 0) const {
-      if (isNullOrEmpty() || pos + needle.size() >= size()) {
+      if (isNullOrEmpty() || needle.isNullOrEmpty() || pos + needle.size() >= size()) {
         return StringView::npos;
       }
 
@@ -96,6 +102,10 @@ namespace OpenShock {
     }
 
     inline std::size_t rfind(char needle, std::size_t pos = StringView::npos) const {
+      if (isNullOrEmpty() || pos >= size()) {
+        return StringView::npos;
+      }
+
       std::size_t _size = this->size();
 
       if (pos == StringView::npos) {
@@ -113,7 +123,7 @@ namespace OpenShock {
       return StringView::npos;
     }
     inline std::size_t rfind(StringView needle, std::size_t pos = StringView::npos) const {
-      if (isNullOrEmpty()) {
+      if (isNullOrEmpty() || needle.isNullOrEmpty() || pos + needle.size() >= size()) {
         return StringView::npos;
       }
 
@@ -166,6 +176,10 @@ namespace OpenShock {
     }
 
     inline std::vector<StringView> split(char delimiter, std::size_t maxSplits = StringView::npos) const {
+      if (isNullOrEmpty()) {
+        return {};
+      }
+
       std::vector<StringView> result;
 
       std::size_t pos    = 0;
@@ -183,6 +197,10 @@ namespace OpenShock {
       return result;
     }
     inline std::vector<StringView> split(StringView delimiter) const {
+      if (isNullOrEmpty() || delimiter.isNullOrEmpty()) {
+        return {};
+      }
+
       std::vector<StringView> result;
 
       std::size_t pos = 0;
@@ -199,6 +217,10 @@ namespace OpenShock {
       return result;
     }
     inline std::vector<StringView> split(std::function<bool(char)> predicate) const {
+      if (isNullOrEmpty()) {
+        return {};
+      }
+
       std::vector<StringView> result;
 
       const char* start = nullptr;
@@ -234,29 +256,29 @@ namespace OpenShock {
     }
     constexpr bool startsWith(StringView needle) const {
       if (isNull()) {
-        return false;
+        return needle.isNullOrEmpty();
       }
 
       return _strEquals(_ptrBeg, _ptrBeg + needle.size(), needle._ptrBeg, needle._ptrEnd);
     }
 
     constexpr bool endsWith(char needle) const {
-      if (isNull()) {
+      if (isNullOrEmpty()) {
         return false;
       }
 
       return _ptrEnd[-1] == needle;
     }
     constexpr bool endsWith(StringView needle) const {
-      if (isNull()) {
-        return false;
+      if (isNullOrEmpty()) {
+        return needle.isNullOrEmpty();
       }
 
       return _strEquals(_ptrEnd - needle.size(), _ptrEnd, needle._ptrBeg, needle._ptrEnd);
     }
 
     constexpr StringView& trimLeft() {
-      if (isNull()) {
+      if (isNullOrEmpty()) {
         return *this;
       }
 
@@ -268,7 +290,7 @@ namespace OpenShock {
     }
 
     constexpr StringView& trimRight() {
-      if (isNull()) {
+      if (isNullOrEmpty()) {
         return *this;
       }
 
@@ -291,7 +313,7 @@ namespace OpenShock {
     }
 
     inline String toArduinoString() const {
-      if (isNull()) {
+      if (isNullOrEmpty()) {
         return String();
       }
 
@@ -299,7 +321,7 @@ namespace OpenShock {
     }
 
     inline std::string toString() const {
-      if (isNull()) {
+      if (isNullOrEmpty()) {
         return std::string();
       }
 
@@ -358,8 +380,14 @@ namespace OpenShock {
       if (aStart == bStart && aEnd == bEnd) {
         return true;
       }
-      if (aStart == nullptr || aEnd == nullptr || bStart == nullptr || bEnd == nullptr) {
+      if (aStart == nullptr || bStart == nullptr) {
         return false;
+      }
+      if (aEnd == nullptr) {
+        aEnd = _getStringEnd(aStart);
+      }
+      if (bEnd == nullptr) {
+        bEnd = _getStringEnd(bStart);
       }
 
       std::size_t aLen = aEnd - aStart;
@@ -431,8 +459,6 @@ namespace std {
   };
 
   struct equals_ci {
-    bool operator()(OpenShock::StringView a, OpenShock::StringView b) const {
-      return strncasecmp(a.data(), b.data(), std::max(a.size(), b.size())) == 0;
-    }
+    bool operator()(OpenShock::StringView a, OpenShock::StringView b) const { return strncasecmp(a.data(), b.data(), std::max(a.size(), b.size())) == 0; }
   };
 }  // namespace std
