@@ -28,6 +28,11 @@ bool WiFiCredentials::FromFlatbuffers(const Serialization::Configuration::WiFiCr
   Internal::Utils::FromFbsStr(ssid, config->ssid(), "");
   Internal::Utils::FromFbsStr(password, config->password(), "");
 
+  if (ssid.empty()) {
+    ESP_LOGE(TAG, "ssid is empty");
+    return false;
+  }
+
   return true;
 }
 
@@ -58,6 +63,11 @@ bool WiFiCredentials::FromJSON(const cJSON* json) {
   Internal::Utils::FromJsonU8(id, json, "id", 0);
   Internal::Utils::FromJsonStr(ssid, json, "ssid", "");
   Internal::Utils::FromJsonStr(password, json, "password", "");
+
+  if (ssid.empty()) {
+    ESP_LOGE(TAG, "ssid is empty");
+    return false;
+  }
 
   return true;
 }
