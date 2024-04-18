@@ -239,12 +239,12 @@ std::string SemVer::toString() const {
 
   if (!prerelease.empty()) {
     str += '-';
-    str.append(prerelease.data(), prerelease.length());
+    str.append(prerelease.c_str(), prerelease.length());
   }
 
   if (!build.empty()) {
     str += '+';
-    str.append(build.data(), build.length());
+    str.append(build.c_str(), build.length());
   }
 
   return str;

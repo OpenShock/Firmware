@@ -107,8 +107,10 @@ void _handleRfTxPinCommand(StringView arg) {
     return;
   }
 
+  auto str = arg.toString(); // Copy the string to null-terminate it (VERY IMPORTANT)
+
   unsigned int pin;
-  if (sscanf(arg.data(), "%u", &pin) != 1) {
+  if (sscanf(str.c_str(), "%u", &pin) != 1) {
     SERPR_ERROR("Invalid argument (not a number)");
     return;
   }
@@ -178,15 +180,12 @@ void _handleDomainCommand(StringView arg) {
 
   ESP_LOGI(
     TAG,
-    "Successfully connected to \"%.*s\", version: %.*s, commit: %.*s, current time: %.*s",
+    "Successfully connected to \"%.*s\", version: %s, commit: %s, current time: %s",
     arg.length(),
     arg.data(),
-    resp.data.version.size(),
-    resp.data.version.data(),
-    resp.data.commit.size(),
-    resp.data.commit.data(),
-    resp.data.currentTime.size(),
-    resp.data.currentTime.data()
+    resp.data.version.c_str(),
+    resp.data.commit.c_str(),
+    resp.data.currentTime.c_str()
   );
 
   bool result = OpenShock::Config::SetBackendDomain(arg);

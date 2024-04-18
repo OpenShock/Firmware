@@ -211,7 +211,7 @@ bool StartConnectingToLCG() {
     std::string lcgOverride;
     Config::GetBackendLCGOverride(lcgOverride);
 
-    ESP_LOGD(TAG, "Connecting to overridden LCG endpoint %.*s", lcgOverride.size(), lcgOverride.data());
+    ESP_LOGD(TAG, "Connecting to overridden LCG endpoint %s", lcgOverride.c_str());
     s_wsClient->connect(lcgOverride.c_str());
     return true;
   }
