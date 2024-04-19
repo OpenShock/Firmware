@@ -17,7 +17,7 @@ namespace OpenShock {
       : major(major), minor(minor), patch(patch), prerelease(), build()
     {}
     SemVer(std::uint16_t major, std::uint16_t minor, std::uint16_t patch, StringView prerelease, StringView build)
-      : major(major), minor(minor), patch(patch), prerelease(prerelease.data(), prerelease.length()), build(build.data(), build.length())
+      : major(major), minor(minor), patch(patch), prerelease(prerelease.toString()), build(build.toString())
     {}
 
     bool operator==(const SemVer& other) const {

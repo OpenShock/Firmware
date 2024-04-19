@@ -1,14 +1,14 @@
 #include "http/JsonAPI.h"
 
-#include "config/Config.h"
 #include "Common.h"
+#include "config/Config.h"
 
 using namespace OpenShock;
 
 HTTP::Response<Serialization::JsonAPI::AccountLinkResponse> HTTP::JsonAPI::LinkAccount(const char* accountLinkCode) {
   std::string domain;
   if (!Config::GetBackendDomain(domain)) {
-    return { HTTP::RequestResult::InternalError, 0, {} };
+    return {HTTP::RequestResult::InternalError, 0, {}};
   }
 
   char uri[OPENSHOCK_URI_BUFFER_SIZE];
@@ -24,10 +24,10 @@ HTTP::Response<Serialization::JsonAPI::AccountLinkResponse> HTTP::JsonAPI::LinkA
   );
 }
 
-HTTP::Response<Serialization::JsonAPI::DeviceInfoResponse> HTTP::JsonAPI::GetDeviceInfo(const String& deviceToken) {
+HTTP::Response<Serialization::JsonAPI::DeviceInfoResponse> HTTP::JsonAPI::GetDeviceInfo(StringView deviceToken) {
   std::string domain;
   if (!Config::GetBackendDomain(domain)) {
-    return { HTTP::RequestResult::InternalError, 0, {} };
+    return {HTTP::RequestResult::InternalError, 0, {}};
   }
 
   char uri[OPENSHOCK_URI_BUFFER_SIZE];
@@ -36,18 +36,18 @@ HTTP::Response<Serialization::JsonAPI::DeviceInfoResponse> HTTP::JsonAPI::GetDev
   return HTTP::GetJSON<Serialization::JsonAPI::DeviceInfoResponse>(
     uri,
     {
-      {     "Accept", "application/json"},
-      {"DeviceToken",        deviceToken}
+      {     "Accept",            "application/json"},
+      {"DeviceToken", deviceToken.toArduinoString()}
   },
     Serialization::JsonAPI::ParseDeviceInfoJsonResponse,
     {200, 401}
   );
 }
 
-HTTP::Response<Serialization::JsonAPI::AssignLcgResponse> HTTP::JsonAPI::AssignLcg(const String& deviceToken) {
+HTTP::Response<Serialization::JsonAPI::AssignLcgResponse> HTTP::JsonAPI::AssignLcg(StringView deviceToken) {
   std::string domain;
   if (!Config::GetBackendDomain(domain)) {
-    return { HTTP::RequestResult::InternalError, 0, {} };
+    return {HTTP::RequestResult::InternalError, 0, {}};
   }
 
   char uri[OPENSHOCK_URI_BUFFER_SIZE];
@@ -56,8 +56,8 @@ HTTP::Response<Serialization::JsonAPI::AssignLcgResponse> HTTP::JsonAPI::AssignL
   return HTTP::GetJSON<Serialization::JsonAPI::AssignLcgResponse>(
     uri,
     {
-      {     "Accept", "application/json"},
-      {"DeviceToken",        deviceToken}
+      {     "Accept",            "application/json"},
+      {"DeviceToken", deviceToken.toArduinoString()}
   },
     Serialization::JsonAPI::ParseAssignLcgJsonResponse,
     {200, 401}

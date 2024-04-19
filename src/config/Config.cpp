@@ -152,8 +152,8 @@ std::string Config::GetAsJSON(bool withSensitiveData) {
 
   return result;
 }
-bool Config::SaveFromJSON(const std::string& json) {
-  cJSON* root = cJSON_Parse(json.c_str());
+bool Config::SaveFromJSON(StringView json) {
+  cJSON* root = cJSON_ParseWithLength(json.data(), json.size());
   if (root == nullptr) {
     ESP_LOGE(TAG, "Failed to parse JSON: %s", cJSON_GetErrorPtr());
     return false;
@@ -445,7 +445,7 @@ bool Config::AnyWiFiCredentials(std::function<bool(const Config::WiFiCredentials
   return std::any_of(creds.begin(), creds.end(), predicate);
 }
 
-std::uint8_t Config::AddWiFiCredentials(const std::string& ssid, const std::string& password) {
+std::uint8_t Config::AddWiFiCredentials(StringView ssid, StringView password) {
   ScopedWriteLock lock(&_configMutex);
   if (!lock.isLocked()) {
     ESP_LOGE(TAG, "Failed to acquire write lock");
@@ -458,7 +458,7 @@ std::uint8_t Config::AddWiFiCredentials(const std::string& ssid, const std::stri
   for (auto it = _configData.wifi.credentialsList.begin(); it != _configData.wifi.credentialsList.end(); ++it) {
     auto& creds = *it;
 
-    if (creds.ssid == ssid) {
+    if (StringView(creds.ssid) == ssid) {
       creds.password = password;
 
       id = creds.id;
@@ -491,8 +491,8 @@ std::uint8_t Config::AddWiFiCredentials(const std::string& ssid, const std::stri
 
   _configData.wifi.credentialsList.push_back({
     .id       = id,
-    .ssid     = ssid,
-    .password = password,
+    .ssid     = ssid.toString(),
+    .password = password.toString(),
   });
   _trySaveConfig();
 
@@ -641,14 +641,14 @@ bool Config::GetBackendDomain(std::string& out) {
   return true;
 }
 
-bool Config::SetBackendDomain(const std::string& domain) {
+bool Config::SetBackendDomain(StringView domain) {
   ScopedWriteLock lock(&_configMutex);
   if (!lock.isLocked()) {
     ESP_LOGE(TAG, "Failed to acquire write lock");
     return false;
   }
 
-  _configData.backend.domain = domain;
+  _configData.backend.domain = domain.toString();
   return _trySaveConfig();
 }
 
@@ -674,14 +674,14 @@ bool Config::GetBackendAuthToken(std::string& out) {
   return true;
 }
 
-bool Config::SetBackendAuthToken(const std::string& token) {
+bool Config::SetBackendAuthToken(StringView token) {
   ScopedWriteLock lock(&_configMutex);
   if (!lock.isLocked()) {
     ESP_LOGE(TAG, "Failed to acquire write lock");
     return false;
   }
 
-  _configData.backend.authToken = token;
+  _configData.backend.authToken = token.toString();
   return _trySaveConfig();
 }
 
@@ -718,14 +718,14 @@ bool Config::GetBackendLCGOverride(std::string& out) {
   return true;
 }
 
-bool Config::SetBackendLCGOverride(const std::string& lcgOverride) {
+bool Config::SetBackendLCGOverride(StringView lcgOverride) {
   ScopedWriteLock lock(&_configMutex);
   if (!lock.isLocked()) {
     ESP_LOGE(TAG, "Failed to acquire write lock");
     return false;
   }
 
-  _configData.backend.lcgOverride = lcgOverride;
+  _configData.backend.lcgOverride = lcgOverride.toString();
   return _trySaveConfig();
 }
 

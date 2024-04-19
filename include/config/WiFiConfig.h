@@ -2,6 +2,7 @@
 
 #include "config/ConfigBase.h"
 #include "config/WiFiCredentials.h"
+#include "StringView.h"
 
 #include <string>
 #include <vector>
@@ -9,7 +10,7 @@
 namespace OpenShock::Config {
   struct WiFiConfig : public ConfigBase<Serialization::Configuration::WiFiConfig> {
     WiFiConfig();
-    WiFiConfig(const std::string& accessPointSSID, const std::string& hostname, const std::vector<WiFiCredentials>& credentialsList);
+    WiFiConfig(StringView accessPointSSID, StringView hostname, const std::vector<WiFiCredentials>& credentialsList);
 
     std::string accessPointSSID;
     std::string hostname;
