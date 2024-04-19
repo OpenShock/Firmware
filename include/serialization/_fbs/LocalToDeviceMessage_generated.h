@@ -59,6 +59,8 @@ struct AccountUnlinkCommand;
 
 struct SetRfTxPinCommand;
 
+struct SetEstopPinCommand;
+
 struct LocalToDeviceMessage;
 struct LocalToDeviceMessageBuilder;
 
@@ -81,11 +83,12 @@ enum class LocalToDeviceMessagePayload : uint8_t {
   AccountLinkCommand = 15,
   AccountUnlinkCommand = 16,
   SetRfTxPinCommand = 17,
+  SetEstopPinCommand = 18,
   MIN = NONE,
-  MAX = SetRfTxPinCommand
+  MAX = SetEstopPinCommand
 };
 
-inline const LocalToDeviceMessagePayload (&EnumValuesLocalToDeviceMessagePayload())[18] {
+inline const LocalToDeviceMessagePayload (&EnumValuesLocalToDeviceMessagePayload())[19] {
   static const LocalToDeviceMessagePayload values[] = {
     LocalToDeviceMessagePayload::NONE,
     LocalToDeviceMessagePayload::WifiScanCommand,
@@ -104,13 +107,14 @@ inline const LocalToDeviceMessagePayload (&EnumValuesLocalToDeviceMessagePayload
     LocalToDeviceMessagePayload::OtaUpdateStartUpdateCommand,
     LocalToDeviceMessagePayload::AccountLinkCommand,
     LocalToDeviceMessagePayload::AccountUnlinkCommand,
-    LocalToDeviceMessagePayload::SetRfTxPinCommand
+    LocalToDeviceMessagePayload::SetRfTxPinCommand,
+    LocalToDeviceMessagePayload::SetEstopPinCommand
   };
   return values;
 }
 
 inline const char * const *EnumNamesLocalToDeviceMessagePayload() {
-  static const char * const names[19] = {
+  static const char * const names[20] = {
     "NONE",
     "WifiScanCommand",
     "WifiNetworkSaveCommand",
@@ -129,13 +133,14 @@ inline const char * const *EnumNamesLocalToDeviceMessagePayload() {
     "AccountLinkCommand",
     "AccountUnlinkCommand",
     "SetRfTxPinCommand",
+    "SetEstopPinCommand",
     nullptr
   };
   return names;
 }
 
 inline const char *EnumNameLocalToDeviceMessagePayload(LocalToDeviceMessagePayload e) {
-  if (::flatbuffers::IsOutRange(e, LocalToDeviceMessagePayload::NONE, LocalToDeviceMessagePayload::SetRfTxPinCommand)) return "";
+  if (::flatbuffers::IsOutRange(e, LocalToDeviceMessagePayload::NONE, LocalToDeviceMessagePayload::SetEstopPinCommand)) return "";
   const size_t index = static_cast<size_t>(e);
   return EnumNamesLocalToDeviceMessagePayload()[index];
 }
@@ -210,6 +215,10 @@ template<> struct LocalToDeviceMessagePayloadTraits<OpenShock::Serialization::Lo
 
 template<> struct LocalToDeviceMessagePayloadTraits<OpenShock::Serialization::Local::SetRfTxPinCommand> {
   static const LocalToDeviceMessagePayload enum_value = LocalToDeviceMessagePayload::SetRfTxPinCommand;
+};
+
+template<> struct LocalToDeviceMessagePayloadTraits<OpenShock::Serialization::Local::SetEstopPinCommand> {
+  static const LocalToDeviceMessagePayload enum_value = LocalToDeviceMessagePayload::SetEstopPinCommand;
 };
 
 bool VerifyLocalToDeviceMessagePayload(::flatbuffers::Verifier &verifier, const void *obj, LocalToDeviceMessagePayload type);
@@ -438,6 +447,31 @@ FLATBUFFERS_STRUCT_END(SetRfTxPinCommand, 1);
 
 struct SetRfTxPinCommand::Traits {
   using type = SetRfTxPinCommand;
+};
+
+FLATBUFFERS_MANUALLY_ALIGNED_STRUCT(1) SetEstopPinCommand FLATBUFFERS_FINAL_CLASS {
+ private:
+  uint8_t pin_;
+
+ public:
+  struct Traits;
+  static FLATBUFFERS_CONSTEXPR_CPP11 const char *GetFullyQualifiedName() {
+    return "OpenShock.Serialization.Local.SetEstopPinCommand";
+  }
+  SetEstopPinCommand()
+      : pin_(0) {
+  }
+  SetEstopPinCommand(uint8_t _pin)
+      : pin_(::flatbuffers::EndianScalar(_pin)) {
+  }
+  uint8_t pin() const {
+    return ::flatbuffers::EndianScalar(pin_);
+  }
+};
+FLATBUFFERS_STRUCT_END(SetEstopPinCommand, 1);
+
+struct SetEstopPinCommand::Traits {
+  using type = SetEstopPinCommand;
 };
 
 struct WifiNetworkSaveCommand FLATBUFFERS_FINAL_CLASS : private ::flatbuffers::Table {
@@ -1028,6 +1062,9 @@ struct LocalToDeviceMessage FLATBUFFERS_FINAL_CLASS : private ::flatbuffers::Tab
   const OpenShock::Serialization::Local::SetRfTxPinCommand *payload_as_SetRfTxPinCommand() const {
     return payload_type() == OpenShock::Serialization::Local::LocalToDeviceMessagePayload::SetRfTxPinCommand ? static_cast<const OpenShock::Serialization::Local::SetRfTxPinCommand *>(payload()) : nullptr;
   }
+  const OpenShock::Serialization::Local::SetEstopPinCommand *payload_as_SetEstopPinCommand() const {
+    return payload_type() == OpenShock::Serialization::Local::LocalToDeviceMessagePayload::SetEstopPinCommand ? static_cast<const OpenShock::Serialization::Local::SetEstopPinCommand *>(payload()) : nullptr;
+  }
   bool Verify(::flatbuffers::Verifier &verifier) const {
     return VerifyTableStart(verifier) &&
            VerifyField<uint8_t>(verifier, VT_PAYLOAD_TYPE, 1) &&
@@ -1103,6 +1140,10 @@ template<> inline const OpenShock::Serialization::Local::AccountUnlinkCommand *L
 
 template<> inline const OpenShock::Serialization::Local::SetRfTxPinCommand *LocalToDeviceMessage::payload_as<OpenShock::Serialization::Local::SetRfTxPinCommand>() const {
   return payload_as_SetRfTxPinCommand();
+}
+
+template<> inline const OpenShock::Serialization::Local::SetEstopPinCommand *LocalToDeviceMessage::payload_as<OpenShock::Serialization::Local::SetEstopPinCommand>() const {
+  return payload_as_SetEstopPinCommand();
 }
 
 struct LocalToDeviceMessageBuilder {
@@ -1204,6 +1245,9 @@ inline bool VerifyLocalToDeviceMessagePayload(::flatbuffers::Verifier &verifier,
     }
     case LocalToDeviceMessagePayload::SetRfTxPinCommand: {
       return verifier.VerifyField<OpenShock::Serialization::Local::SetRfTxPinCommand>(static_cast<const uint8_t *>(obj), 0, 1);
+    }
+    case LocalToDeviceMessagePayload::SetEstopPinCommand: {
+      return verifier.VerifyField<OpenShock::Serialization::Local::SetEstopPinCommand>(static_cast<const uint8_t *>(obj), 0, 1);
     }
     default: return true;
   }

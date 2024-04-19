@@ -20,6 +20,9 @@ namespace Configuration {
 struct RFConfig;
 struct RFConfigBuilder;
 
+struct EStopConfig;
+struct EStopConfigBuilder;
+
 struct WiFiCredentials;
 struct WiFiCredentialsBuilder;
 
@@ -176,6 +179,57 @@ inline ::flatbuffers::Offset<RFConfig> CreateRFConfig(
 struct RFConfig::Traits {
   using type = RFConfig;
   static auto constexpr Create = CreateRFConfig;
+};
+
+struct EStopConfig FLATBUFFERS_FINAL_CLASS : private ::flatbuffers::Table {
+  typedef EStopConfigBuilder Builder;
+  struct Traits;
+  static FLATBUFFERS_CONSTEXPR_CPP11 const char *GetFullyQualifiedName() {
+    return "OpenShock.Serialization.Configuration.EStopConfig";
+  }
+  enum FlatBuffersVTableOffset FLATBUFFERS_VTABLE_UNDERLYING_TYPE {
+    VT_ESTOP_PIN = 4
+  };
+  /// The GPIO pin connected to the E-Stop button
+  uint8_t estop_pin() const {
+    return GetField<uint8_t>(VT_ESTOP_PIN, 0);
+  }
+  bool Verify(::flatbuffers::Verifier &verifier) const {
+    return VerifyTableStart(verifier) &&
+           VerifyField<uint8_t>(verifier, VT_ESTOP_PIN, 1) &&
+           verifier.EndTable();
+  }
+};
+
+struct EStopConfigBuilder {
+  typedef EStopConfig Table;
+  ::flatbuffers::FlatBufferBuilder &fbb_;
+  ::flatbuffers::uoffset_t start_;
+  void add_estop_pin(uint8_t estop_pin) {
+    fbb_.AddElement<uint8_t>(EStopConfig::VT_ESTOP_PIN, estop_pin, 0);
+  }
+  explicit EStopConfigBuilder(::flatbuffers::FlatBufferBuilder &_fbb)
+        : fbb_(_fbb) {
+    start_ = fbb_.StartTable();
+  }
+  ::flatbuffers::Offset<EStopConfig> Finish() {
+    const auto end = fbb_.EndTable(start_);
+    auto o = ::flatbuffers::Offset<EStopConfig>(end);
+    return o;
+  }
+};
+
+inline ::flatbuffers::Offset<EStopConfig> CreateEStopConfig(
+    ::flatbuffers::FlatBufferBuilder &_fbb,
+    uint8_t estop_pin = 0) {
+  EStopConfigBuilder builder_(_fbb);
+  builder_.add_estop_pin(estop_pin);
+  return builder_.Finish();
+}
+
+struct EStopConfig::Traits {
+  using type = EStopConfig;
+  static auto constexpr Create = CreateEStopConfig;
 };
 
 struct WiFiCredentials FLATBUFFERS_FINAL_CLASS : private ::flatbuffers::Table {
@@ -739,15 +793,20 @@ struct Config FLATBUFFERS_FINAL_CLASS : private ::flatbuffers::Table {
   }
   enum FlatBuffersVTableOffset FLATBUFFERS_VTABLE_UNDERLYING_TYPE {
     VT_RF = 4,
-    VT_WIFI = 6,
-    VT_CAPTIVE_PORTAL = 8,
-    VT_BACKEND = 10,
-    VT_SERIAL_INPUT = 12,
-    VT_OTA_UPDATE = 14
+    VT_ESTOP = 6,
+    VT_WIFI = 8,
+    VT_CAPTIVE_PORTAL = 10,
+    VT_BACKEND = 12,
+    VT_SERIAL_INPUT = 14,
+    VT_OTA_UPDATE = 16
   };
   /// RF Transmitter configuration
   const OpenShock::Serialization::Configuration::RFConfig *rf() const {
     return GetPointer<const OpenShock::Serialization::Configuration::RFConfig *>(VT_RF);
+  }
+  /// E-Stop configuration
+  const OpenShock::Serialization::Configuration::EStopConfig *estop() const {
+    return GetPointer<const OpenShock::Serialization::Configuration::EStopConfig *>(VT_ESTOP);
   }
   /// WiFi configuration
   const OpenShock::Serialization::Configuration::WiFiConfig *wifi() const {
@@ -773,6 +832,8 @@ struct Config FLATBUFFERS_FINAL_CLASS : private ::flatbuffers::Table {
     return VerifyTableStart(verifier) &&
            VerifyOffset(verifier, VT_RF) &&
            verifier.VerifyTable(rf()) &&
+           VerifyOffset(verifier, VT_ESTOP) &&
+           verifier.VerifyTable(estop()) &&
            VerifyOffset(verifier, VT_WIFI) &&
            verifier.VerifyTable(wifi()) &&
            VerifyOffset(verifier, VT_CAPTIVE_PORTAL) &&
@@ -793,6 +854,9 @@ struct ConfigBuilder {
   ::flatbuffers::uoffset_t start_;
   void add_rf(::flatbuffers::Offset<OpenShock::Serialization::Configuration::RFConfig> rf) {
     fbb_.AddOffset(Config::VT_RF, rf);
+  }
+  void add_estop(::flatbuffers::Offset<OpenShock::Serialization::Configuration::EStopConfig> estop) {
+    fbb_.AddOffset(Config::VT_ESTOP, estop);
   }
   void add_wifi(::flatbuffers::Offset<OpenShock::Serialization::Configuration::WiFiConfig> wifi) {
     fbb_.AddOffset(Config::VT_WIFI, wifi);
@@ -823,6 +887,7 @@ struct ConfigBuilder {
 inline ::flatbuffers::Offset<Config> CreateConfig(
     ::flatbuffers::FlatBufferBuilder &_fbb,
     ::flatbuffers::Offset<OpenShock::Serialization::Configuration::RFConfig> rf = 0,
+    ::flatbuffers::Offset<OpenShock::Serialization::Configuration::EStopConfig> estop = 0,
     ::flatbuffers::Offset<OpenShock::Serialization::Configuration::WiFiConfig> wifi = 0,
     ::flatbuffers::Offset<OpenShock::Serialization::Configuration::CaptivePortalConfig> captive_portal = 0,
     ::flatbuffers::Offset<OpenShock::Serialization::Configuration::BackendConfig> backend = 0,
@@ -834,6 +899,7 @@ inline ::flatbuffers::Offset<Config> CreateConfig(
   builder_.add_backend(backend);
   builder_.add_captive_portal(captive_portal);
   builder_.add_wifi(wifi);
+  builder_.add_estop(estop);
   builder_.add_rf(rf);
   return builder_.Finish();
 }

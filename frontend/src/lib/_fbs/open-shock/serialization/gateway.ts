@@ -2,9 +2,9 @@
 
 /* eslint-disable @typescript-eslint/no-unused-vars, @typescript-eslint/no-explicit-any, @typescript-eslint/no-non-null-assertion */
 
-export { CaptivePortalConfig } from './gateway/captive-portal-config';
-export { GatewayToDeviceMessage } from './gateway/gateway-to-device-message';
-export { GatewayToDeviceMessagePayload } from './gateway/gateway-to-device-message-payload';
-export { OtaInstall } from './gateway/ota-install';
-export { ShockerCommand } from './gateway/shocker-command';
-export { ShockerCommandList } from './gateway/shocker-command-list';
+export { CaptivePortalConfig } from './serialization/gateway/captive-portal-config';
+export { GatewayToDeviceMessage } from './serialization/gateway/gateway-to-device-message';
+export { GatewayToDeviceMessagePayload } from './serialization/gateway/gateway-to-device-message-payload';
+export { OtaInstall } from './serialization/gateway/ota-install';
+export { ShockerCommand } from './serialization/gateway/shocker-command';
+export { ShockerCommandList } from './serialization/gateway/shocker-command-list';

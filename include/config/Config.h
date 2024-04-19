@@ -2,6 +2,7 @@
 
 #include "config/BackendConfig.h"
 #include "config/CaptivePortalConfig.h"
+#include "config/EStopConfig.h"
 #include "config/OtaUpdateConfig.h"
 #include "config/RFConfig.h"
 #include "config/SerialInputConfig.h"
@@ -10,6 +11,7 @@
 #include "StringView.h"
 
 #include <functional>
+#include <string>
 #include <vector>
 
 namespace OpenShock::Config {
@@ -35,12 +37,14 @@ namespace OpenShock::Config {
   void FactoryReset();
 
   bool GetRFConfig(RFConfig& out);
+  bool GetEStopConfig(EStopConfig& out);
   bool GetWiFiConfig(WiFiConfig& out);
   bool GetOtaUpdateConfig(OtaUpdateConfig& out);
   bool GetWiFiCredentials(cJSON* array, bool withSensitiveData);
   bool GetWiFiCredentials(std::vector<WiFiCredentials>& out);
 
   bool SetRFConfig(const RFConfig& config);
+  bool SetEStopConfig(const EStopConfig& config);
   bool SetWiFiConfig(const WiFiConfig& config);
   bool SetWiFiCredentials(const std::vector<WiFiCredentials>& credentials);
   bool SetCaptivePortalConfig(const CaptivePortalConfig& config);
@@ -51,6 +55,9 @@ namespace OpenShock::Config {
   bool SetRFConfigTxPin(std::uint8_t txPin);
   bool GetRFConfigKeepAliveEnabled(bool& out);
   bool SetRFConfigKeepAliveEnabled(bool enabled);
+
+  bool GetEStopConfigPin(std::uint8_t& out);
+  bool SetEStopConfigPin(std::uint8_t estopPin);
 
   bool GetSerialInputConfigEchoEnabled(bool& out);
   bool SetSerialInputConfigEchoEnabled(bool enabled);

@@ -8,6 +8,7 @@ using namespace OpenShock::Config;
 
 void RootConfig::ToDefault() {
   rf.ToDefault();
+  estop.ToDefault();
   wifi.ToDefault();
   captivePortal.ToDefault();
   backend.ToDefault();
@@ -22,6 +23,11 @@ bool RootConfig::FromFlatbuffers(const Serialization::Configuration::Config* con
 
   if (!rf.FromFlatbuffers(config->rf())) {
     ESP_LOGE(TAG, "Unable to load rf config");
+    return false;
+  }
+
+  if (!estop.FromFlatbuffers(config->estop())) {
+    ESP_LOGE(TAG, "Unable to load estop config");
     return false;
   }
 
@@ -55,13 +61,14 @@ bool RootConfig::FromFlatbuffers(const Serialization::Configuration::Config* con
 
 flatbuffers::Offset<OpenShock::Serialization::Configuration::Config> RootConfig::ToFlatbuffers(flatbuffers::FlatBufferBuilder& builder, bool withSensitiveData) const {
   auto rfOffset            = rf.ToFlatbuffers(builder, withSensitiveData);
+  auto estopOffset         = estop.ToFlatbuffers(builder, withSensitiveData);
   auto wifiOffset          = wifi.ToFlatbuffers(builder, withSensitiveData);
   auto captivePortalOffset = captivePortal.ToFlatbuffers(builder, withSensitiveData);
   auto backendOffset       = backend.ToFlatbuffers(builder, withSensitiveData);
   auto serialInputOffset   = serialInput.ToFlatbuffers(builder, withSensitiveData);
   auto otaUpdateOffset     = otaUpdate.ToFlatbuffers(builder, withSensitiveData);
 
-  return Serialization::Configuration::CreateConfig(builder, rfOffset, wifiOffset, captivePortalOffset, backendOffset, serialInputOffset, otaUpdateOffset);
+  return Serialization::Configuration::CreateConfig(builder, rfOffset, estopOffset, wifiOffset, captivePortalOffset, backendOffset, serialInputOffset, otaUpdateOffset);
 }
 
 bool RootConfig::FromJSON(const cJSON* json) {
@@ -77,6 +84,11 @@ bool RootConfig::FromJSON(const cJSON* json) {
 
   if (!rf.FromJSON(cJSON_GetObjectItemCaseSensitive(json, "rf"))) {
     ESP_LOGE(TAG, "Unable to load rf config");
+    return false;
+  }
+
+  if (!estop.FromJSON(cJSON_GetObjectItemCaseSensitive(json, "estop"))) {
+    ESP_LOGE(TAG, "Unable to load estop config");
     return false;
   }
 
@@ -112,6 +124,7 @@ cJSON* RootConfig::ToJSON(bool withSensitiveData) const {
   cJSON* root = cJSON_CreateObject();
 
   cJSON_AddItemToObject(root, "rf", rf.ToJSON(withSensitiveData));
+  cJSON_AddItemToObject(root, "estop", estop.ToJSON(withSensitiveData));
   cJSON_AddItemToObject(root, "wifi", wifi.ToJSON(withSensitiveData));
   cJSON_AddItemToObject(root, "captivePortal", captivePortal.ToJSON(withSensitiveData));
   cJSON_AddItemToObject(root, "backend", backend.ToJSON(withSensitiveData));

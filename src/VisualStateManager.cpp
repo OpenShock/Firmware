@@ -349,6 +349,8 @@ void VisualStateManager::SetEmergencyStop(OpenShock::EStopManager::EStopStatus s
 
   switch (status) {
     // When there is no EStop currently active.
+    case OpenShock::EStopManager::EStopStatus::UNINITIALIZED:
+      break;
     case OpenShock::EStopManager::EStopStatus::ALL_CLEAR:
       s_stateFlags &= ~kEmergencyStoppedFlag;
       s_stateFlags &= ~kEmergencyStopClearedFlag;

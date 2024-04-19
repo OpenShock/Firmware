@@ -2,4 +2,4 @@
 
 /* eslint-disable @typescript-eslint/no-unused-vars, @typescript-eslint/no-explicit-any, @typescript-eslint/no-non-null-assertion */
 
-export { WifiScanStatus } from './types/wifi-scan-status';
+export { WifiScanStatus } from './serialization/types/wifi-scan-status';

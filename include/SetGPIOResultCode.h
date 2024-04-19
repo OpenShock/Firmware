@@ -5,5 +5,5 @@
 #include <cstdint>
 
 namespace OpenShock {
-  typedef OpenShock::Serialization::Local::SetRfPinResultCode SetRfPinResultCode;
+  typedef OpenShock::Serialization::Local::SetGPIOResultCode SetGPIOResultCode;
 }  // namespace OpenShock

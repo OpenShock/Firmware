@@ -107,7 +107,7 @@ void _handleRfTxPinCommand(StringView arg) {
     return;
   }
 
-  auto str = arg.toString(); // Copy the string to null-terminate it (VERY IMPORTANT)
+  auto str = arg.toString();  // Copy the string to null-terminate it (VERY IMPORTANT)
 
   unsigned int pin;
   if (sscanf(str.c_str(), "%u", &pin) != 1) {
@@ -120,23 +120,70 @@ void _handleRfTxPinCommand(StringView arg) {
     return;
   }
 
-  OpenShock::SetRfPinResultCode result = OpenShock::CommandHandler::SetRfTxPin(static_cast<std::uint8_t>(pin));
+  OpenShock::SetGPIOResultCode result = OpenShock::CommandHandler::SetRfTxPin(static_cast<std::uint8_t>(pin));
 
   switch (result) {
-    case OpenShock::SetRfPinResultCode::InvalidPin:
+    case OpenShock::SetGPIOResultCode::InvalidPin:
       SERPR_ERROR("Invalid argument (invalid pin)");
       break;
 
-    case OpenShock::SetRfPinResultCode::InternalError:
+    case OpenShock::SetGPIOResultCode::InternalError:
       SERPR_ERROR("Internal error while setting RF TX pin");
       break;
 
-    case OpenShock::SetRfPinResultCode::Success:
+    case OpenShock::SetGPIOResultCode::Success:
       SERPR_SUCCESS("Saved config");
       break;
 
     default:
       SERPR_ERROR("Unknown error while setting RF TX pin");
+      break;
+  }
+}
+
+void _handleEstopPinCommand(StringView arg) {
+  if (arg.isNullOrEmpty()) {
+    std::uint8_t estopPin;
+    if (!Config::GetEStopConfigPin(estopPin)) {
+      SERPR_ERROR("Failed to get EStop pin from config");
+      return;
+    }
+
+    // Get rmt pin
+    SERPR_RESPONSE("EstopPin|%u", estopPin);
+    return;
+  }
+
+  auto str = arg.toString();  // Copy the string to null-terminate it (VERY IMPORTANT)
+
+  unsigned int pin;
+  if (sscanf(str.c_str(), "%u", &pin) != 1) {
+    SERPR_ERROR("Invalid argument (not a number)");
+    return;
+  }
+
+  if (pin > UINT8_MAX) {
+    SERPR_ERROR("Invalid argument (out of range)");
+    return;
+  }
+
+  OpenShock::SetGPIOResultCode result = OpenShock::CommandHandler::SetEstopPin(static_cast<std::uint8_t>(pin));
+
+  switch (result) {
+    case OpenShock::SetGPIOResultCode::InvalidPin:
+      SERPR_ERROR("Invalid argument (invalid pin)");
+      break;
+
+    case OpenShock::SetGPIOResultCode::InternalError:
+      SERPR_ERROR("Internal error while setting EStop pin");
+      break;
+
+    case OpenShock::SetGPIOResultCode::Success:
+      SERPR_SUCCESS("Saved config");
+      break;
+
+    default:
+      SERPR_ERROR("Unknown error while setting EStop pin");
       break;
   }
 }
@@ -178,15 +225,7 @@ void _handleDomainCommand(StringView arg) {
     return;
   }
 
-  ESP_LOGI(
-    TAG,
-    "Successfully connected to \"%.*s\", version: %s, commit: %s, current time: %s",
-    arg.length(),
-    arg.data(),
-    resp.data.version.c_str(),
-    resp.data.commit.c_str(),
-    resp.data.currentTime.c_str()
-  );
+  ESP_LOGI(TAG, "Successfully connected to \"%.*s\", version: %s, commit: %s, current time: %s", arg.length(), arg.data(), resp.data.version.c_str(), resp.data.commit.c_str(), resp.data.currentTime.c_str());
 
   bool result = OpenShock::Config::SetBackendDomain(arg);
 
@@ -582,6 +621,8 @@ echo         <bool>    set serial echo enabled
 validgpios             list all valid GPIO pins
 rftxpin                get radio transmit pin
 rftxpin      <pin>     set radio transmit pin
+estoppin               get emergency stop pin
+estoppin     <pin>     set emergency stop pin
 domain                 get backend domain
 domain       <domain>  set backend domain
 authtoken              get auth token
@@ -674,6 +715,22 @@ rftxpin [<pin>]
     rftxpin 15
 )",
   _handleRfTxPinCommand,
+};
+static const SerialCmdHandler kEstopPinCmdHandler = {
+  "estoppin"_sv,
+  R"(estoppin
+  Get the GPIO pin used for the Emergency Stop (EStop).
+  0 means the EStop is disabled.
+
+rftxpin [<pin>]
+  Set the GPIO pin used for the Emergency Stop (EStop).
+  Using 0 will disable the EStop.
+  Arguments:
+    <pin> must be a number.
+  Example:
+    estoppin 16
+)",
+  _handleEstopPinCommand,
 };
 static const SerialCmdHandler kDomainCmdHandler = {
   "domain"_sv,
@@ -867,8 +924,8 @@ void processSerialLine(StringView line) {
     return;
   }
 
-  auto parts = line.split(' ', 1);
-  StringView command = parts[0];
+  auto parts           = line.split(' ', 1);
+  StringView command   = parts[0];
   StringView arguments = parts.size() > 1 ? parts[1] : StringView();
 
   auto it = s_commandHandlers.find(command);
@@ -895,6 +952,7 @@ bool SerialInputHandler::Init() {
   RegisterCommandHandler(kSerialEchoCmdHandler);
   RegisterCommandHandler(kValidGpiosCmdHandler);
   RegisterCommandHandler(kRfTxPinCmdHandler);
+  RegisterCommandHandler(kEstopPinCmdHandler);
   RegisterCommandHandler(kDomainCmdHandler);
   RegisterCommandHandler(kAuthTokenCmdHandler);
   RegisterCommandHandler(kLcgOverrideCmdHandler);

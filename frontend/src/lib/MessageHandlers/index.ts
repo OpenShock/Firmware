@@ -8,7 +8,8 @@ import { DeviceStateStore } from '$lib/stores';
 import { SerializeWifiScanCommand } from '$lib/Serializers/WifiScanCommand';
 import { toastDelegator } from '$lib/stores/ToastDelegator';
 import { SetRfTxPinCommandResult } from '$lib/_fbs/open-shock/serialization/local/set-rf-tx-pin-command-result';
-import { SetRfPinResultCode } from '$lib/_fbs/open-shock/serialization/local/set-rf-pin-result-code';
+import { SetEstopPinCommandResult } from '$lib/_fbs/open-shock/serialization/local/set-estop-pin-command-result';
+import { SetGPIOResultCode } from '$lib/_fbs/open-shock/serialization/local/set-gpioresult-code';
 import { AccountLinkCommandResult } from '$lib/_fbs/open-shock/serialization/local/account-link-command-result';
 import { AccountLinkResultCode } from '$lib/_fbs/open-shock/serialization/local/account-link-result-code';
 import { ErrorMessage } from '$lib/_fbs/open-shock/serialization/local/error-message';
@@ -116,7 +117,7 @@ PayloadHandlers[DeviceToLocalMessagePayload.SetRfTxPinCommandResult] = (cli, msg
 
   const result = payload.result();
 
-  if (result == SetRfPinResultCode.Success) {
+  if (result == SetGPIOResultCode.Success) {
     DeviceStateStore.setRfTxPin(payload.pin());
     toastDelegator.trigger({
       message: 'Changed RF TX pin to: ' + payload.pin(),
@@ -125,10 +126,10 @@ PayloadHandlers[DeviceToLocalMessagePayload.SetRfTxPinCommandResult] = (cli, msg
   } else {
     let reason: string;
     switch (result) {
-      case SetRfPinResultCode.InvalidPin:
+      case SetGPIOResultCode.InvalidPin:
         reason = 'Invalid pin';
         break;
-      case SetRfPinResultCode.InternalError:
+      case SetGPIOResultCode.InternalError:
         reason = 'Internal error';
         break;
       default:
@@ -137,6 +138,38 @@ PayloadHandlers[DeviceToLocalMessagePayload.SetRfTxPinCommandResult] = (cli, msg
     }
     toastDelegator.trigger({
       message: 'Failed to change RF TX pin: ' + reason,
+      background: 'bg-red-500',
+    });
+  }
+};
+
+PayloadHandlers[DeviceToLocalMessagePayload.SetEstopPinCommandResult] = (cli, msg) => {
+  const payload = new SetEstopPinCommandResult();
+  msg.payload(payload);
+
+  const result = payload.result();
+
+  if (result == SetGPIOResultCode.Success) {
+    DeviceStateStore.setEstopPin(payload.pin());
+    toastDelegator.trigger({
+      message: 'Changed EStop pin to: ' + payload.pin(),
+      background: 'bg-green-500',
+    });
+  } else {
+    let reason: string;
+    switch (result) {
+      case SetGPIOResultCode.InvalidPin:
+        reason = 'Invalid pin';
+        break;
+      case SetGPIOResultCode.InternalError:
+        reason = 'Internal error';
+        break;
+      default:
+        reason = 'Unknown';
+        break;
+    }
+    toastDelegator.trigger({
+      message: 'Failed to change EStop pin: ' + reason,
       background: 'bg-red-500',
     });
   }

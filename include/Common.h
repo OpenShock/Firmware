@@ -29,6 +29,11 @@
 #define OPENSHOCK_RF_TX_GPIO OPENSHOCK_GPIO_INVALID
 #endif
 
+#ifndef OPENSHOCK_ESTOP_PIN
+#warning "OPENSHOCK_ESTOP_PIN is not defined, setting to OPENSHOCK_GPIO_INVALID"
+#define OPENSHOCK_ESTOP_PIN OPENSHOCK_GPIO_INVALID
+#endif
+
 // Check if OPENSHOCK_FW_USERAGENT is overridden trough compiler flags, if not, generate a default useragent.
 #ifndef OPENSHOCK_FW_USERAGENT
 #define OPENSHOCK_FW_USERAGENT OPENSHOCK_FW_HOSTNAME "/" OPENSHOCK_FW_VERSION " (arduino-esp32; " OPENSHOCK_FW_BOARD "; " OPENSHOCK_FW_CHIP "; Espressif)"
@@ -42,5 +47,6 @@
 namespace OpenShock::Constants {
   const std::uint8_t GPIO_INVALID = OPENSHOCK_GPIO_INVALID;
   const std::uint8_t GPIO_RF_TX   = OPENSHOCK_RF_TX_GPIO;
+  const std::uint8_t GPIO_ESTOP   = OPENSHOCK_ESTOP_PIN;
   const char* const FW_USERAGENT  = OPENSHOCK_FW_USERAGENT;
 }  // namespace OpenShock::Constants

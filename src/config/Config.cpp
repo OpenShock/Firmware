@@ -260,6 +260,18 @@ bool Config::GetRFConfig(Config::RFConfig& out) {
   return true;
 }
 
+bool Config::GetEStopConfig(Config::EStopConfig& out) {
+  ScopedReadLock lock(&_configMutex);
+  if (!lock.isLocked()) {
+    ESP_LOGE(TAG, "Failed to acquire read lock");
+    return false;
+  }
+
+  out = _configData.estop;
+
+  return true;
+}
+
 bool Config::GetWiFiConfig(Config::WiFiConfig& out) {
   ScopedReadLock lock(&_configMutex);
   if (!lock.isLocked()) {
@@ -431,6 +443,29 @@ bool Config::SetRFConfigKeepAliveEnabled(bool enabled) {
   }
 
   _configData.rf.keepAliveEnabled = enabled;
+  return _trySaveConfig();
+}
+
+bool Config::GetEStopConfigPin(std::uint8_t& out) {
+  ScopedReadLock lock(&_configMutex);
+  if (!lock.isLocked()) {
+    ESP_LOGE(TAG, "Failed to acquire read lock");
+    return false;
+  }
+
+  out = _configData.estop.estopPin;
+
+  return true;
+}
+
+bool Config::SetEStopConfigPin(std::uint8_t estopPin) {
+  ScopedWriteLock lock(&_configMutex);
+  if (!lock.isLocked()) {
+    ESP_LOGE(TAG, "Failed to acquire write lock");
+    return false;
+  }
+
+  _configData.estop.estopPin = estopPin;
   return _trySaveConfig();
 }
 

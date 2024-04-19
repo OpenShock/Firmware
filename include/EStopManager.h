@@ -7,10 +7,13 @@ namespace OpenShock::EStopManager {
     ALL_CLEAR,          // The initial, idle state
     ESTOPPED_AND_HELD,  // The EStop has been pressed and has not yet been released
     ESTOPPED,           // Idle EStopped state
-    ESTOPPED_CLEARED    // The EStop has been cleared by the user, but we're waiting for the user to release the button (to avoid incidental estops)
+    ESTOPPED_CLEARED,   // The EStop has been cleared by the user, but we're waiting for the user to release the button (to avoid incidental estops)
+    UNINITIALIZED       // The EStopManager has not yet been initialized or is re-initializing
   };
 
-  void Init(std::uint16_t updateIntervalMs);
+  bool Init(std::uint8_t estopPin);
+  bool Destroy();
   bool IsEStopped();
+  bool IsRunning();
   std::int64_t WhenEStopped();
 }  // namespace OpenShock::EStopManager

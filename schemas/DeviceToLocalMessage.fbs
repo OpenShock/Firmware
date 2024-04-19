@@ -46,14 +46,18 @@ struct AccountLinkCommandResult {
   result:AccountLinkResultCode;
 }
 
-enum SetRfPinResultCode : uint8 {
+enum SetGPIOResultCode : uint8 {
   Success = 0,
   InvalidPin = 1,
   InternalError = 2
 }
 struct SetRfTxPinCommandResult {
   pin:uint8;
-  result:SetRfPinResultCode;
+  result:SetGPIOResultCode;
+}
+struct SetEstopPinCommandResult {
+  pin:uint8;
+  result:SetGPIOResultCode;
 }
 
 union DeviceToLocalMessagePayload {
@@ -72,7 +76,10 @@ union DeviceToLocalMessagePayload {
   AccountLinkCommandResult,
 
   // RF transmitter stuff
-  SetRfTxPinCommandResult
+  SetRfTxPinCommandResult,
+
+  // E-stop stuff
+  SetEstopPinCommandResult
 }
 
 table DeviceToLocalMessage (fs_serializer) {
