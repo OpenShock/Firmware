@@ -1,5 +1,7 @@
 #pragma once
 
+#include <flatbuffers/string.h>
+
 #include <Arduino.h>
 
 #include <algorithm>
@@ -25,10 +27,13 @@ namespace OpenShock {
     constexpr StringView(const char* const ptr, std::size_t len) : _ptrBeg(ptr), _ptrEnd(ptr + len) { }
     constexpr StringView(const char* const ptrBeg, const char* const ptrEnd) : _ptrBeg(ptrBeg), _ptrEnd(ptrEnd) { }
     constexpr StringView(const StringView& str) : _ptrBeg(str._ptrBeg), _ptrEnd(str._ptrEnd) { }
-    StringView(const String& str) : _ptrBeg(str.c_str()), _ptrEnd(str.c_str() + str.length()) { }
-    StringView(const std::string& str) : _ptrBeg(str.c_str()), _ptrEnd(str.c_str() + str.size()) { }
+    inline StringView(const String& str) : _ptrBeg(str.c_str()), _ptrEnd(str.c_str() + str.length()) { }
+    inline StringView(const std::string& str) : _ptrBeg(str.c_str()), _ptrEnd(str.c_str() + str.size()) { }
+    inline StringView(const flatbuffers::String& str) : _ptrBeg(str.c_str()), _ptrEnd(str.c_str() + str.size()) { }
 
     constexpr bool isNull() const { return _ptrBeg == nullptr || _ptrEnd == nullptr; }
+    constexpr bool isEmpty() const { return _ptrBeg >= _ptrEnd; }
+    constexpr bool isNullOrEmpty() const { return isNull() || isEmpty(); }
 
     constexpr const char* data() const { return _ptrBeg; }
 
@@ -42,13 +47,13 @@ namespace OpenShock {
     constexpr char back() const { return *(_ptrEnd - 1); }
 
     constexpr std::size_t size() const {
-      if (isNull()) return 0;
+      if (isNullOrEmpty()) {
+        return 0;
+      }
 
       return _ptrEnd - _ptrBeg;
     }
     constexpr std::size_t length() const { return size(); }
-
-    constexpr bool isNullOrEmpty() const { return size() == 0; }
 
     constexpr StringView substr(std::size_t pos, std::size_t count = StringView::npos) const {
       if (isNullOrEmpty()) {
@@ -69,6 +74,10 @@ namespace OpenShock {
     }
 
     constexpr std::size_t find(char needle, std::size_t pos = 0) const {
+      if (isNullOrEmpty() || pos >= size()) {
+        return StringView::npos;
+      }
+
       std::size_t _size = this->size();
 
       for (std::size_t i = pos; i < _size; ++i) {
@@ -79,8 +88,8 @@ namespace OpenShock {
 
       return StringView::npos;
     }
-    std::size_t find(StringView needle, std::size_t pos = 0) const {
-      if (isNullOrEmpty() || pos + needle.size() >= size()) {
+    inline std::size_t find(StringView needle, std::size_t pos = 0) const {
+      if (isNullOrEmpty() || needle.isNullOrEmpty() || pos + needle.size() >= size()) {
         return StringView::npos;
       }
 
@@ -92,7 +101,11 @@ namespace OpenShock {
       return ptr - _ptrBeg;
     }
 
-    std::size_t rfind(char needle, std::size_t pos = StringView::npos) const {
+    inline std::size_t rfind(char needle, std::size_t pos = StringView::npos) const {
+      if (isNullOrEmpty() || pos >= size()) {
+        return StringView::npos;
+      }
+
       std::size_t _size = this->size();
 
       if (pos == StringView::npos) {
@@ -109,8 +122,8 @@ namespace OpenShock {
 
       return StringView::npos;
     }
-    std::size_t rfind(StringView needle, std::size_t pos = StringView::npos) const {
-      if (isNullOrEmpty()) {
+    inline std::size_t rfind(StringView needle, std::size_t pos = StringView::npos) const {
+      if (isNullOrEmpty() || needle.isNullOrEmpty() || pos + needle.size() >= size()) {
         return StringView::npos;
       }
 
@@ -128,7 +141,7 @@ namespace OpenShock {
       return ptr - _ptrBeg;
     }
 
-    StringView beforeDelimiter(char delimiter) const {
+    inline StringView beforeDelimiter(char delimiter) const {
       std::size_t pos = find(delimiter);
       if (pos != StringView::npos) {
         return substr(0, pos);
@@ -136,7 +149,7 @@ namespace OpenShock {
 
       return *this;
     }
-    StringView beforeDelimiter(StringView delimiter) const {
+    inline StringView beforeDelimiter(StringView delimiter) const {
       std::size_t pos = find(delimiter);
       if (pos != StringView::npos) {
         return substr(0, pos);
@@ -145,7 +158,7 @@ namespace OpenShock {
       return *this;
     }
 
-    StringView afterDelimiter(char delimiter) const {
+    inline StringView afterDelimiter(char delimiter) const {
       std::size_t pos = find(delimiter);
       if (pos != StringView::npos) {
         return substr(pos + 1);
@@ -153,7 +166,7 @@ namespace OpenShock {
 
       return *this;
     }
-    StringView afterDelimiter(StringView delimiter) const {
+    inline StringView afterDelimiter(StringView delimiter) const {
       std::size_t pos = find(delimiter);
       if (pos != StringView::npos) {
         return substr(pos + delimiter.size());
@@ -162,11 +175,16 @@ namespace OpenShock {
       return *this;
     }
 
-    std::vector<StringView> split(char delimiter) const {
-      std::vector<StringView> result;
+    inline std::vector<StringView> split(char delimiter, std::size_t maxSplits = StringView::npos) const {
+      if (isNullOrEmpty()) {
+        return {};
+      }
 
-      std::size_t pos = 0;
-      while (pos < size()) {
+      std::vector<StringView> result = {};
+
+      std::size_t pos    = 0;
+      std::size_t splits = 0;
+      while (pos < size() && splits < maxSplits) {
         std::size_t nextPos = find(delimiter, pos);
         if (nextPos == StringView::npos) {
           nextPos = size();
@@ -174,12 +192,21 @@ namespace OpenShock {
 
         result.push_back(substr(pos, nextPos - pos));
         pos = nextPos + 1;
+        ++splits;
+      }
+
+      if (pos < size()) {
+        result.push_back(substr(pos));
       }
 
       return result;
     }
-    std::vector<StringView> split(StringView delimiter) const {
-      std::vector<StringView> result;
+    inline std::vector<StringView> split(StringView delimiter) const {
+      if (isNullOrEmpty() || delimiter.isNullOrEmpty()) {
+        return {};
+      }
+
+      std::vector<StringView> result = {};
 
       std::size_t pos = 0;
       while (pos < size()) {
@@ -194,8 +221,12 @@ namespace OpenShock {
 
       return result;
     }
-    std::vector<StringView> split(std::function<bool(char)> predicate) const {
-      std::vector<StringView> result;
+    inline std::vector<StringView> split(std::function<bool(char)> predicate) const {
+      if (isNullOrEmpty()) {
+        return {};
+      }
+
+      std::vector<StringView> result = {};
 
       const char* start = nullptr;
       for (const char* ptr = _ptrBeg; ptr < _ptrEnd; ++ptr) {
@@ -216,10 +247,10 @@ namespace OpenShock {
       return result;
     }
 
-    std::vector<StringView> splitLines() const {
+    inline std::vector<StringView> splitLines() const {
       return split([](char c) { return c == '\r' || c == '\n'; });
     }
-    std::vector<StringView> splitWhitespace() const { return split(isspace); }
+    inline std::vector<StringView> splitWhitespace() const { return split(isspace); }
 
     constexpr bool startsWith(char needle) const {
       if (isNull()) {
@@ -230,29 +261,29 @@ namespace OpenShock {
     }
     constexpr bool startsWith(StringView needle) const {
       if (isNull()) {
-        return false;
+        return needle.isNullOrEmpty();
       }
 
       return _strEquals(_ptrBeg, _ptrBeg + needle.size(), needle._ptrBeg, needle._ptrEnd);
     }
 
     constexpr bool endsWith(char needle) const {
-      if (isNull()) {
+      if (isNullOrEmpty()) {
         return false;
       }
 
       return _ptrEnd[-1] == needle;
     }
     constexpr bool endsWith(StringView needle) const {
-      if (isNull()) {
-        return false;
+      if (isNullOrEmpty()) {
+        return needle.isNullOrEmpty();
       }
 
       return _strEquals(_ptrEnd - needle.size(), _ptrEnd, needle._ptrBeg, needle._ptrEnd);
     }
 
     constexpr StringView& trimLeft() {
-      if (isNull()) {
+      if (isNullOrEmpty()) {
         return *this;
       }
 
@@ -264,7 +295,7 @@ namespace OpenShock {
     }
 
     constexpr StringView& trimRight() {
-      if (isNull()) {
+      if (isNullOrEmpty()) {
         return *this;
       }
 
@@ -286,16 +317,16 @@ namespace OpenShock {
       _ptrEnd = nullptr;
     }
 
-    String toArduinoString() const {
-      if (isNull()) {
+    inline String toArduinoString() const {
+      if (isNullOrEmpty()) {
         return String();
       }
 
       return String(_ptrBeg, size());
     }
 
-    std::string toString() const {
-      if (isNull()) {
+    inline std::string toString() const {
+      if (isNullOrEmpty()) {
         return std::string();
       }
 
@@ -309,13 +340,9 @@ namespace OpenShock {
     explicit operator std::string() const { return toString(); }
 
     /// Returns a reference to the character at the specified index, Going out of bounds is undefined behavior
-    constexpr char const& operator[](int index) const {
-      return _ptrBeg[index];
-    }
+    constexpr char const& operator[](int index) const { return _ptrBeg[index]; }
     /// Returns a const reference to the character at the specified index, Going out of bounds is undefined behavior
-    constexpr char const& operator[](std::size_t index) const {
-      return _ptrBeg[index];
-    }
+    constexpr char const& operator[](std::size_t index) const { return _ptrBeg[index]; }
 
     constexpr bool operator==(const StringView& other) {
       if (this == &other) return true;
@@ -325,15 +352,17 @@ namespace OpenShock {
     constexpr bool operator!=(const StringView& other) { return !(*this == other); }
     constexpr bool operator==(const char* const other) { return *this == StringView(other); }
     constexpr bool operator!=(const char* const other) { return !(*this == other); }
+    inline bool operator==(const std::string& other) { return *this == StringView(other); }
+    inline bool operator!=(const std::string& other) { return !(*this == other); }
 
-    bool operator<(const StringView& other) const {
+    inline bool operator<(const StringView& other) const {
       if (this == &other) return false;
 
       return std::lexicographical_compare(_ptrBeg, _ptrEnd, other._ptrBeg, other._ptrEnd);
     }
-    bool operator<=(const StringView& other) const { return *this < other || *this == other; }
-    bool operator>(const StringView& other) const { return !(*this <= other); }
-    bool operator>=(const StringView& other) const { return !(*this < other); }
+    inline bool operator<=(const StringView& other) const { return *this < other || *this == other; }
+    inline bool operator>(const StringView& other) const { return !(*this <= other); }
+    inline bool operator>=(const StringView& other) const { return !(*this < other); }
 
     constexpr StringView& operator=(const char* const ptr) {
       _ptrBeg = ptr;
@@ -345,7 +374,7 @@ namespace OpenShock {
       _ptrEnd = str._ptrEnd;
       return *this;
     }
-    StringView& operator=(const std::string& str) {
+    inline StringView& operator=(const std::string& str) {
       _ptrBeg = str.c_str();
       _ptrEnd = str.c_str() + str.size();
       return *this;
@@ -356,8 +385,14 @@ namespace OpenShock {
       if (aStart == bStart && aEnd == bEnd) {
         return true;
       }
-      if (aStart == nullptr || aEnd == nullptr || bStart == nullptr || bEnd == nullptr) {
+      if (aStart == nullptr || bStart == nullptr) {
         return false;
+      }
+      if (aEnd == nullptr) {
+        aEnd = _getStringEnd(aStart);
+      }
+      if (bEnd == nullptr) {
+        bEnd = _getStringEnd(bStart);
       }
 
       std::size_t aLen = aEnd - aStart;
@@ -392,3 +427,43 @@ namespace OpenShock {
     const char* _ptrEnd;
   };
 }  // namespace OpenShock
+
+inline OpenShock::StringView operator"" _sv(const char* str, std::size_t len) {
+  return OpenShock::StringView(str, len);
+}
+
+namespace std {
+  template<>
+  struct hash<OpenShock::StringView> {
+    std::size_t operator()(OpenShock::StringView str) const {
+      std::size_t hash = 7;
+
+      for (int i = 0; i < str.size(); ++i) {
+        hash = hash * 31 + str[i];
+      }
+
+      return hash;
+    }
+  };
+
+  struct hash_ci {
+    std::size_t operator()(OpenShock::StringView str) const {
+      std::size_t hash = 7;
+
+      for (int i = 0; i < str.size(); ++i) {
+        hash = hash * 31 + tolower(str[i]);
+      }
+
+      return hash;
+    }
+  };
+
+  template<>
+  struct less<OpenShock::StringView> {
+    bool operator()(OpenShock::StringView a, OpenShock::StringView b) const { return a < b; }
+  };
+
+  struct equals_ci {
+    bool operator()(OpenShock::StringView a, OpenShock::StringView b) const { return strncasecmp(a.data(), b.data(), std::max(a.size(), b.size())) == 0; }
+  };
+}  // namespace std

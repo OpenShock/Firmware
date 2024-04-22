@@ -107,7 +107,7 @@ StringView _getDomain(StringView url) {
   }
 
   // Remove the protocol, port, and path eg. "https://api.example.com:443/path" -> "api.example.com"
-  url = url.afterDelimiter("://").beforeDelimiter('/').beforeDelimiter(':');
+  url = url.afterDelimiter("://"_sv).beforeDelimiter('/').beforeDelimiter(':');
 
   // Remove all subdomains eg. "api.example.com" -> "example.com"
   auto domainSep = url.rfind('.');

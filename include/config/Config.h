@@ -7,9 +7,9 @@
 #include "config/SerialInputConfig.h"
 #include "config/WiFiConfig.h"
 #include "config/WiFiCredentials.h"
+#include "StringView.h"
 
 #include <functional>
-#include <string>
 #include <vector>
 
 namespace OpenShock::Config {
@@ -17,7 +17,7 @@ namespace OpenShock::Config {
 
   /* GetAsJSON and SaveFromJSON are used for Reading/Writing the config file in its human-readable form. */
   std::string GetAsJSON(bool withSensitiveData);
-  bool SaveFromJSON(const std::string& json);
+  bool SaveFromJSON(StringView json);
 
   /* GetAsFlatBuffer and SaveFromFlatBuffer are used for Reading/Writing the config file in its binary form. */
   flatbuffers::Offset<Serialization::Configuration::Config> GetAsFlatBuffer(flatbuffers::FlatBufferBuilder& builder, bool withSensitiveData);
@@ -57,7 +57,7 @@ namespace OpenShock::Config {
 
   bool AnyWiFiCredentials(std::function<bool(const Config::WiFiCredentials&)> predicate);
 
-  std::uint8_t AddWiFiCredentials(const std::string& ssid, const std::string& password);
+  std::uint8_t AddWiFiCredentials(StringView ssid, StringView password);
   bool TryGetWiFiCredentialsByID(std::uint8_t id, WiFiCredentials& out);
   bool TryGetWiFiCredentialsBySSID(const char* ssid, WiFiCredentials& out);
   std::uint8_t GetWiFiCredentialsIDbySSID(const char* ssid);
@@ -70,13 +70,13 @@ namespace OpenShock::Config {
   bool SetOtaUpdateStep(OtaUpdateStep updateStep);
 
   bool GetBackendDomain(std::string& out);
-  bool SetBackendDomain(const std::string& domain);
+  bool SetBackendDomain(StringView domain);
   bool HasBackendAuthToken();
   bool GetBackendAuthToken(std::string& out);
-  bool SetBackendAuthToken(const std::string& token);
+  bool SetBackendAuthToken(StringView token);
   bool ClearBackendAuthToken();
   bool HasBackendLCGOverride();
   bool GetBackendLCGOverride(std::string& out);
-  bool SetBackendLCGOverride(const std::string& lcgOverride);
+  bool SetBackendLCGOverride(StringView lcgOverride);
   bool ClearBackendLCGOverride();
 }  // namespace OpenShock::Config

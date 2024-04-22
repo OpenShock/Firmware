@@ -66,7 +66,7 @@ You will need:
 
 - VSCode
 - Knowledge about Arduino library and C++
-- Optimally compatible hardware to test your code
+- Compatible ESP-32 board with 433 MHz antenna
 
 ### Setting up
 

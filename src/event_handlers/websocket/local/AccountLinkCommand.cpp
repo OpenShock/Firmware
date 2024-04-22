@@ -44,7 +44,7 @@ void _Private::HandleAccountLinkCommand(std::uint8_t socketId, const OpenShock::
     return;
   }
 
-  auto result = GatewayConnectionManager::Link(code->data());
+  auto result = GatewayConnectionManager::Link(*code);
 
   serializeSetRfTxPinResult(socketId, result);
 }
