@@ -158,7 +158,7 @@ std::shared_ptr<RateLimit> _getRateLimiter(StringView url) {
 }
 
 void _setupClient(HTTPClient& client) {
-  client.setUserAgent(OpenShock::Constants::FW_USERAGENT);
+  client.setUserAgent(OpenShock::Constants::FW_USERAGENT_sv.toArduinoString());
 }
 
 struct StreamReaderResult {
