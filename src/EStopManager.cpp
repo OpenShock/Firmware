@@ -22,7 +22,7 @@ static std::int64_t s_lastEStopButtonStateChange = 0;
 static std::int64_t s_estoppedAt                 = 0;
 static int s_lastEStopButtonState                = HIGH;
 
-static std::uint8_t s_estopPin = Constants::GPIO_INVALID;
+static std::uint8_t s_estopPin = OPENSHOCK_GPIO_INVALID;
 
 static TimerHandle_t s_estopManagerTimer = nullptr;
 
@@ -106,7 +106,7 @@ bool EStopManager::Init(std::uint8_t estopPin) {
   s_estopPin                   = estopPin;
   s_lastEStopButtonState       = HIGH;
 
-  if (estopPin == Constants::GPIO_INVALID) {
+  if (estopPin == OPENSHOCK_GPIO_INVALID) {
     ESP_LOGE(TAG, "GPIO_INVALID supplied, assuming EStop is disabled.");
     _updateEstopStatus(EStopManager::EStopStatus::ALL_CLEAR);
     return true;

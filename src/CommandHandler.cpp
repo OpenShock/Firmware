@@ -208,17 +208,17 @@ bool CommandHandler::Init() {
   }
 
   std::uint8_t estopPin = estopConfig.estopPin;
-  if (!OpenShock::IsValidInputPin(estopPin)) {
-    if (!OpenShock::IsValidInputPin(Constants::GPIO_ESTOP)) {
-      ESP_LOGE(TAG, "Configured EStop pin (%u) is invalid, and default pin (%u) is invalid. Unable to initialize EStop Manager!!!", estopPin, Constants::GPIO_ESTOP);
-
-      ESP_LOGD(TAG, "Setting EStop pin to GPIO_INVALID");
-      // Todo:
-      return Config::SetEStopConfigPin(Constants::GPIO_INVALID);
+  if (!OpenShock::IsValidInputPin(estopPin) && estopPin != OPENSHOCK_GPIO_INVALID) {
+    if (OPENSHOCK_ESTOP_DEFAULT == OPENSHOCK_GPIO_INVALID) {
+      ESP_LOGE(TAG, "Configured EStop pin (%u) is invalid, and default has EStop disabled. Unable to initialize EStop Manager!!!", estopPin, OPENSHOCK_ESTOP_DEFAULT);
+      return false;
+    } else if (!OpenShock::IsValidInputPin(OPENSHOCK_ESTOP_DEFAULT)) {
+      ESP_LOGE(TAG, "Configured EStop pin (%u) is invalid, and default pin (%u) is invalid. Unable to initialize EStop Manager!!!", estopPin, OPENSHOCK_ESTOP_DEFAULT);
+      return false;
     }
 
-    ESP_LOGW(TAG, "Configured EStop pin (%u) is invalid, using default pin (%u)", estopPin, Constants::GPIO_ESTOP);
-    estopPin = Constants::GPIO_ESTOP;
+    ESP_LOGW(TAG, "Configured EStop pin (%u) is invalid, using default pin (%u)", estopPin, OPENSHOCK_ESTOP_DEFAULT);
+    estopPin = OPENSHOCK_ESTOP_DEFAULT;
     Config::SetEStopConfigPin(estopPin);
   }
 

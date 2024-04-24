@@ -31,6 +31,13 @@
 #define OPENSHOCK_RF_TX_GPIO OPENSHOCK_GPIO_INVALID
 #endif
 
+// To avoid needing to #ifdef in every file where we want the default EStop pin, it's defined again here.
+#ifdef OPENSHOCK_ESTOP_PIN
+#define OPENSHOCK_ESTOP_DEFAULT OPENSHOCK_ESTOP_PIN
+#else
+#define OPENSHOCK_ESTOP_DEFAULT OPENSHOCK_GPIO_INVALID
+#endif
+
 // Check if OPENSHOCK_FW_USERAGENT is overridden trough compiler flags, if not, generate a default useragent.
 #ifndef OPENSHOCK_FW_USERAGENT
 #define OPENSHOCK_FW_USERAGENT OPENSHOCK_FW_HOSTNAME "/" OPENSHOCK_FW_VERSION " (arduino-esp32; " OPENSHOCK_FW_BOARD "; " OPENSHOCK_FW_CHIP "; Espressif)"

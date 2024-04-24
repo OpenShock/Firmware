@@ -8,12 +8,12 @@ const char* const TAG = "Config::EStopConfig";
 
 using namespace OpenShock::Config;
 
-EStopConfig::EStopConfig() : estopPin(OpenShock::Constants::GPIO_ESTOP) { }
+EStopConfig::EStopConfig() : estopPin(OPENSHOCK_ESTOP_DEFAULT) { }
 
 EStopConfig::EStopConfig(std::uint8_t estopPin) : estopPin(estopPin) { }
 
 void EStopConfig::ToDefault() {
-  estopPin = OpenShock::Constants::GPIO_ESTOP;
+  estopPin = OPENSHOCK_ESTOP_DEFAULT;
 }
 
 bool EStopConfig::FromFlatbuffers(const Serialization::Configuration::EStopConfig* config) {
@@ -42,7 +42,7 @@ bool EStopConfig::FromJSON(const cJSON* json) {
     return false;
   }
 
-  Internal::Utils::FromJsonU8(estopPin, json, "estopPin", OpenShock::Constants::GPIO_ESTOP);
+  Internal::Utils::FromJsonU8(estopPin, json, "estopPin", OPENSHOCK_ESTOP_DEFAULT);
 
   return true;
 }
