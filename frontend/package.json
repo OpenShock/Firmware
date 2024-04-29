@@ -16,35 +16,35 @@
 	},
 	"devDependencies": {
 		"@playwright/test": "1.43.1",
-		"@skeletonlabs/skeleton": "2.9.1",
+		"@skeletonlabs/skeleton": "2.9.2",
 		"@skeletonlabs/tw-plugin": "0.4.0",
 		"@sveltejs/adapter-static": "^3.0.1",
 		"@sveltejs/kit": "2.5.7",
 		"@sveltejs/vite-plugin-svelte": "^3.1.0",
 		"@tailwindcss/forms": "0.5.7",
-		"@tailwindcss/typography": "0.5.12",
+		"@tailwindcss/typography": "0.5.13",
 		"@types/node": "20.12.7",
-		"@typescript-eslint/eslint-plugin": "7.7.0",
-		"@typescript-eslint/parser": "7.7.0",
+		"@typescript-eslint/eslint-plugin": "7.7.1",
+		"@typescript-eslint/parser": "7.7.1",
 		"autoprefixer": "10.4.19",
-		"eslint": "^8.57.0",
+		"eslint": "^9.1.1",
 		"eslint-config-prettier": "9.1.0",
-		"eslint-plugin-svelte": "2.37.0",
+		"eslint-plugin-svelte": "2.38.0",
 		"flatbuffers": "24.3.25",
 		"postcss": "8.4.38",
 		"prettier": "3.2.5",
 		"prettier-plugin-svelte": "3.2.3",
 		"svelte": "4.2.15",
-		"svelte-check": "3.6.9",
+		"svelte-check": "3.7.0",
 		"tailwindcss": "3.4.3",
 		"tslib": "2.6.2",
 		"typescript": "5.4.5",
 		"vite": "^5.2.10",
-		"vite-plugin-tailwind-purgecss": "^0.3.1",
-		"vitest": "1.5.0"
+		"vite-plugin-tailwind-purgecss": "^0.3.3",
+		"vitest": "1.5.2"
 	},
 	"type": "module",
 	"dependencies": {
-		"@floating-ui/dom": "1.6.3"
+		"@floating-ui/dom": "1.6.4"
 	}
 }
