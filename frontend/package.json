@@ -27,7 +27,7 @@
 		"@typescript-eslint/eslint-plugin": "7.8.0",
 		"@typescript-eslint/parser": "7.8.0",
 		"autoprefixer": "10.4.19",
-		"eslint": "^9.2.0",
+		"eslint": "^8.7.0",
 		"eslint-config-prettier": "9.1.0",
 		"eslint-plugin-svelte": "2.39.0",
 		"flatbuffers": "24.3.25",
