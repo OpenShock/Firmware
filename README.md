@@ -54,6 +54,10 @@ Confirmed working boards:
 - OpenShock (Legacy)
   - Core V1
 
+Experimental Boards:
+
+- DFRobot Firebeetle ESP32-E
+
 ## Flashing
 
 Refer to [OpenShock Wiki - Guides: First time setup](https://wiki.openshock.org/guides/openshock-first-setup/) on how to set up your microcontroller.
