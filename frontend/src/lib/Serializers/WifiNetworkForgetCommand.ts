@@ -1,6 +1,6 @@
 import { Builder as FlatbufferBuilder } from 'flatbuffers';
-import { LocalToHubMessage } from '$lib/_fbs/open-shock/serialization/local/local-to-device-message';
-import { LocalToHubMessagePayload } from '$lib/_fbs/open-shock/serialization/local/local-to-device-message-payload';
+import { LocalToHubMessage } from '$lib/_fbs/open-shock/serialization/local/local-to-hub-message';
+import { LocalToHubMessagePayload } from '$lib/_fbs/open-shock/serialization/local/local-to-hub-message-payload';
 import { WifiNetworkForgetCommand } from '$lib/_fbs/open-shock/serialization/local/wifi-network-forget-command';
 
 export function SerializeWifiNetworkForgetCommand(ssid: string): Uint8Array {

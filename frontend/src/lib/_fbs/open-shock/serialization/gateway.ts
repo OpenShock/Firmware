@@ -2,11 +2,11 @@
 
 /* eslint-disable @typescript-eslint/no-unused-vars, @typescript-eslint/no-explicit-any, @typescript-eslint/no-non-null-assertion */
 
-export { BootStatus } from './serialization/gateway/boot-status';
-export { HubToGatewayMessage } from './serialization/gateway/hub-to-gateway-message';
-export { HubToGatewayMessagePayload } from './serialization/gateway/hub-to-gateway-message-payload';
-export { KeepAlive } from './serialization/gateway/keep-alive';
-export { OtaInstallFailed } from './serialization/gateway/ota-install-failed';
-export { OtaInstallProgress } from './serialization/gateway/ota-install-progress';
-export { OtaInstallProgressTask } from './serialization/gateway/ota-install-progress-task';
-export { OtaInstallStarted } from './serialization/gateway/ota-install-started';
+export { BootStatus } from './gateway/boot-status';
+export { HubToGatewayMessage } from './gateway/hub-to-gateway-message';
+export { HubToGatewayMessagePayload } from './gateway/hub-to-gateway-message-payload';
+export { KeepAlive } from './gateway/keep-alive';
+export { OtaInstallFailed } from './gateway/ota-install-failed';
+export { OtaInstallProgress } from './gateway/ota-install-progress';
+export { OtaInstallProgressTask } from './gateway/ota-install-progress-task';
+export { OtaInstallStarted } from './gateway/ota-install-started';

@@ -1,6 +1,6 @@
 import type { WebSocketClient } from '$lib/WebSocketClient';
-import { HubToLocalMessage } from '$lib/_fbs/open-shock/serialization/local/device-to-local-message';
-import { HubToLocalMessagePayload } from '$lib/_fbs/open-shock/serialization/local/device-to-local-message-payload';
+import { HubToLocalMessage } from '$lib/_fbs/open-shock/serialization/local/hub-to-local-message';
+import { HubToLocalMessagePayload } from '$lib/_fbs/open-shock/serialization/local/hub-to-local-message-payload';
 import { ReadyMessage } from '$lib/_fbs/open-shock/serialization/local/ready-message';
 import { WifiScanStatusMessage } from '$lib/_fbs/open-shock/serialization/local/wifi-scan-status-message';
 import { ByteBuffer } from 'flatbuffers';

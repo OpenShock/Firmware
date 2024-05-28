@@ -1,6 +1,6 @@
 import { Builder as FlatbufferBuilder } from 'flatbuffers';
-import { LocalToHubMessage } from '$lib/_fbs/open-shock/serialization/local/local-to-device-message';
-import { LocalToHubMessagePayload } from '$lib/_fbs/open-shock/serialization/local/local-to-device-message-payload';
+import { LocalToHubMessage } from '$lib/_fbs/open-shock/serialization/local/local-to-hub-message';
+import { LocalToHubMessagePayload } from '$lib/_fbs/open-shock/serialization/local/local-to-hub-message-payload';
 import { AccountLinkCommand } from '$lib/_fbs/open-shock/serialization/local/account-link-command';
 
 export function SerializeAccountLinkCommand(linkCode: string): Uint8Array {

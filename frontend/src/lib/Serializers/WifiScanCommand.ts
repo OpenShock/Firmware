@@ -1,7 +1,7 @@
 import { Builder as FlatbufferBuilder } from 'flatbuffers';
 import { WifiScanCommand } from '$lib/_fbs/open-shock/serialization/local/wifi-scan-command';
-import { LocalToHubMessage } from '$lib/_fbs/open-shock/serialization/local/local-to-device-message';
-import { LocalToHubMessagePayload } from '$lib/_fbs/open-shock/serialization/local/local-to-device-message-payload';
+import { LocalToHubMessage } from '$lib/_fbs/open-shock/serialization/local/local-to-hub-message';
+import { LocalToHubMessagePayload } from '$lib/_fbs/open-shock/serialization/local/local-to-hub-message-payload';
 
 export function SerializeWifiScanCommand(scan: boolean): Uint8Array {
   const fbb = new FlatbufferBuilder(32);
