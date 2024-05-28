@@ -1,6 +1,6 @@
 import type { WebSocketClient } from '$lib/WebSocketClient';
-import { DeviceToLocalMessage } from '$lib/_fbs/open-shock/serialization/local/device-to-local-message';
-import { DeviceToLocalMessagePayload } from '$lib/_fbs/open-shock/serialization/local/device-to-local-message-payload';
+import { HubToLocalMessage } from '$lib/_fbs/open-shock/serialization/local/device-to-local-message';
+import { HubToLocalMessagePayload } from '$lib/_fbs/open-shock/serialization/local/device-to-local-message-payload';
 import { ReadyMessage } from '$lib/_fbs/open-shock/serialization/local/ready-message';
 import { WifiScanStatusMessage } from '$lib/_fbs/open-shock/serialization/local/wifi-scan-status-message';
 import { ByteBuffer } from 'flatbuffers';
@@ -15,16 +15,16 @@ import { ErrorMessage } from '$lib/_fbs/open-shock/serialization/local/error-mes
 import { WifiNetworkEventHandler } from './WifiNetworkEventHandler';
 import { mapConfig } from '$lib/mappers/ConfigMapper';
 
-export type MessageHandler = (wsClient: WebSocketClient, message: DeviceToLocalMessage) => void;
+export type MessageHandler = (wsClient: WebSocketClient, message: HubToLocalMessage) => void;
 
 function handleInvalidMessage() {
   console.warn('[WS] Received invalid message');
 }
 
-const PayloadTypes = Object.keys(DeviceToLocalMessagePayload).length / 2;
+const PayloadTypes = Object.keys(HubToLocalMessagePayload).length / 2;
 const PayloadHandlers: MessageHandler[] = new Array<MessageHandler>(PayloadTypes).fill(handleInvalidMessage);
 
-PayloadHandlers[DeviceToLocalMessagePayload.ReadyMessage] = (cli, msg) => {
+PayloadHandlers[HubToLocalMessagePayload.ReadyMessage] = (cli, msg) => {
   const payload = new ReadyMessage();
   msg.payload(payload);
 
@@ -49,7 +49,7 @@ PayloadHandlers[DeviceToLocalMessagePayload.ReadyMessage] = (cli, msg) => {
   });
 };
 
-PayloadHandlers[DeviceToLocalMessagePayload.ErrorMessage] = (cli, msg) => {
+PayloadHandlers[HubToLocalMessagePayload.ErrorMessage] = (cli, msg) => {
   const payload = new ErrorMessage();
   msg.payload(payload);
 
@@ -61,16 +61,16 @@ PayloadHandlers[DeviceToLocalMessagePayload.ErrorMessage] = (cli, msg) => {
   });
 };
 
-PayloadHandlers[DeviceToLocalMessagePayload.WifiScanStatusMessage] = (cli, msg) => {
+PayloadHandlers[HubToLocalMessagePayload.WifiScanStatusMessage] = (cli, msg) => {
   const payload = new WifiScanStatusMessage();
   msg.payload(payload);
 
   DeviceStateStore.setWifiScanStatus(payload.status());
 };
 
-PayloadHandlers[DeviceToLocalMessagePayload.WifiNetworkEvent] = WifiNetworkEventHandler;
+PayloadHandlers[HubToLocalMessagePayload.WifiNetworkEvent] = WifiNetworkEventHandler;
 
-PayloadHandlers[DeviceToLocalMessagePayload.AccountLinkCommandResult] = (cli, msg) => {
+PayloadHandlers[HubToLocalMessagePayload.AccountLinkCommandResult] = (cli, msg) => {
   const payload = new AccountLinkCommandResult();
   msg.payload(payload);
 
@@ -110,7 +110,7 @@ PayloadHandlers[DeviceToLocalMessagePayload.AccountLinkCommandResult] = (cli, ms
   }
 };
 
-PayloadHandlers[DeviceToLocalMessagePayload.SetRfTxPinCommandResult] = (cli, msg) => {
+PayloadHandlers[HubToLocalMessagePayload.SetRfTxPinCommandResult] = (cli, msg) => {
   const payload = new SetRfTxPinCommandResult();
   msg.payload(payload);
 
@@ -143,7 +143,7 @@ PayloadHandlers[DeviceToLocalMessagePayload.SetRfTxPinCommandResult] = (cli, msg
 };
 
 export function WebSocketMessageBinaryHandler(cli: WebSocketClient, data: ArrayBuffer) {
-  const msg = DeviceToLocalMessage.getRootAsDeviceToLocalMessage(new ByteBuffer(new Uint8Array(data)));
+  const msg = HubToLocalMessage.getRootAsHubToLocalMessage(new ByteBuffer(new Uint8Array(data)));
 
   const payloadType = msg.payloadType();
   if (payloadType < 0 || payloadType >= PayloadHandlers.length) {

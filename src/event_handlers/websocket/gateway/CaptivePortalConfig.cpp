@@ -9,7 +9,7 @@ const char* const TAG = "ServerMessageHandlers";
 
 using namespace OpenShock::MessageHandlers::Server;
 
-void _Private::HandleCaptivePortalConfig(const OpenShock::Serialization::Gateway::GatewayToDeviceMessage* root) {
+void _Private::HandleCaptivePortalConfig(const OpenShock::Serialization::Gateway::GatewayToHubMessage* root) {
   auto msg = root->payload_as_CaptivePortalConfig();
   if (msg == nullptr) {
     ESP_LOGE(TAG, "Payload cannot be parsed as CaptivePortalConfig");

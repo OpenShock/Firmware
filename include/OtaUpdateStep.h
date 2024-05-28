@@ -1,6 +1,6 @@
 #pragma once
 
-#include "serialization/_fbs/ConfigFile_generated.h"
+#include "serialization/_fbs/HubConfig_generated.h"
 
 #include <cstdint>
 #include <cstring>

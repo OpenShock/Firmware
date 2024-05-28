@@ -1,11 +1,11 @@
 #pragma once
 
-#include "serialization/_fbs/DeviceToLocalMessage_generated.h"
-#include "serialization/_fbs/LocalToDeviceMessage_generated.h"
+#include "serialization/_fbs/HubToLocalMessage_generated.h"
+#include "serialization/_fbs/LocalToHubMessage_generated.h"
 
 #include <cstdint>
 
-#define WS_EVENT_HANDLER_SIGNATURE(NAME) void NAME(std::uint8_t socketId, const OpenShock::Serialization::Local::LocalToDeviceMessage* msg)
+#define WS_EVENT_HANDLER_SIGNATURE(NAME) void NAME(std::uint8_t socketId, const OpenShock::Serialization::Local::LocalToHubMessage* msg)
 
 namespace OpenShock::MessageHandlers::Local::_Private {
   typedef WS_EVENT_HANDLER_SIGNATURE((*HandlerType));

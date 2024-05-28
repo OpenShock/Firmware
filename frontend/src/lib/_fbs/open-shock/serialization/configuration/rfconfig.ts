@@ -31,7 +31,7 @@ txPin():number {
 }
 
 /**
- * Whether to transmit keepalive messages to keep the devices from entering sleep mode
+ * Whether to transmit keepalive messages to keep the shockers from entering sleep mode
  */
 keepaliveEnabled():boolean {
   const offset = this.bb!.__offset(this.bb_pos, 6);

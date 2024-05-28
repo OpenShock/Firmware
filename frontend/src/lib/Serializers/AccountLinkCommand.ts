@@ -1,6 +1,6 @@
 import { Builder as FlatbufferBuilder } from 'flatbuffers';
-import { LocalToDeviceMessage } from '$lib/_fbs/open-shock/serialization/local/local-to-device-message';
-import { LocalToDeviceMessagePayload } from '$lib/_fbs/open-shock/serialization/local/local-to-device-message-payload';
+import { LocalToHubMessage } from '$lib/_fbs/open-shock/serialization/local/local-to-device-message';
+import { LocalToHubMessagePayload } from '$lib/_fbs/open-shock/serialization/local/local-to-device-message-payload';
 import { AccountLinkCommand } from '$lib/_fbs/open-shock/serialization/local/account-link-command';
 
 export function SerializeAccountLinkCommand(linkCode: string): Uint8Array {
@@ -10,7 +10,7 @@ export function SerializeAccountLinkCommand(linkCode: string): Uint8Array {
 
   const cmdOffset = AccountLinkCommand.createAccountLinkCommand(fbb, linkCodeOffset);
 
-  const payloadOffset = LocalToDeviceMessage.createLocalToDeviceMessage(fbb, LocalToDeviceMessagePayload.AccountLinkCommand, cmdOffset);
+  const payloadOffset = LocalToHubMessage.createLocalToHubMessage(fbb, LocalToHubMessagePayload.AccountLinkCommand, cmdOffset);
 
   fbb.finish(payloadOffset);
 

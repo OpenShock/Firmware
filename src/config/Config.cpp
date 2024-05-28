@@ -27,7 +27,7 @@ bool _tryDeserializeConfig(const std::uint8_t* buffer, std::size_t bufferLen, Op
   }
 
   // Deserialize
-  auto fbsConfig = flatbuffers::GetRoot<Serialization::Configuration::Config>(buffer);
+  auto fbsConfig = flatbuffers::GetRoot<Serialization::Configuration::HubConfig>(buffer);
   if (fbsConfig == nullptr) {
     ESP_LOGE(TAG, "Failed to get deserialization root for config file");
     return false;
@@ -178,7 +178,7 @@ bool Config::SaveFromJSON(StringView json) {
   return _trySaveConfig();
 }
 
-flatbuffers::Offset<Serialization::Configuration::Config> Config::GetAsFlatBuffer(flatbuffers::FlatBufferBuilder& builder, bool withSensitiveData) {
+flatbuffers::Offset<Serialization::Configuration::HubConfig> Config::GetAsFlatBuffer(flatbuffers::FlatBufferBuilder& builder, bool withSensitiveData) {
   ScopedReadLock lock(&_configMutex);
   if (!lock.isLocked()) {
     return 0;
@@ -187,7 +187,7 @@ flatbuffers::Offset<Serialization::Configuration::Config> Config::GetAsFlatBuffe
   return _configData.ToFlatbuffers(builder, withSensitiveData);
 }
 
-bool Config::SaveFromFlatBuffer(const Serialization::Configuration::Config* config) {
+bool Config::SaveFromFlatBuffer(const Serialization::Configuration::HubConfig* config) {
   ScopedWriteLock lock(&_configMutex);
   if (!lock.isLocked()) {
     ESP_LOGE(TAG, "Failed to acquire write lock");
