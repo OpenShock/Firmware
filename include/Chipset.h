@@ -192,6 +192,9 @@
 #ifdef OPENSHOCK_FW_BOARD_OPENSHOCKCOREV1
 #define OPENSHOCK_BYPASSED_GPIO(pin) ((pin) == 15 || (pin) == 35)
 #endif
+#ifdef OPENSHOCK_FW_BOARD_DFROBOTFIREBEETLE2ESP32E
+#define OPENSHOCK_BYPASSED_GPIO(pin) ((pin) == 2 || (pin) == 5 || (pin) == 13)
+#endif
 #ifndef OPENSHOCK_BYPASSED_GPIO
 #define OPENSHOCK_BYPASSED_GPIO(pin) (false)
 #endif
