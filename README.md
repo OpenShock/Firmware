@@ -53,10 +53,7 @@ Confirmed working boards:
   - Lolin S3
 - OpenShock (Legacy)
   - Core V1
-
-Experimental Boards:
-
-- DFRobot Firebeetle ESP32-E
+- DFRobot Firebeetle 2 ESP32-E
 
 ## Flashing
 
