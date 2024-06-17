@@ -334,7 +334,13 @@ bool WiFiManager::Init() {
     }
   }
 
-  if (set_esp_interface_dns(ESP_IF_WIFI_STA, IPAddress(1, 1, 1, 1), IPAddress(8, 8, 8, 8), IPAddress(9, 9, 9, 9)) != ESP_OK) {
+  Config::NetworkConfig networkConfig;
+  if (!Config::GetNetworkConfig(networkConfig)) {
+    ESP_LOGE(TAG, "Failed to get network config");
+    return false;
+  }
+
+  if (set_esp_interface_dns(ESP_IF_WIFI_STA, networkConfig.primaryDNS, networkConfig.secondaryDNS, networkConfig.fallbackDNS) != ESP_OK) {
     ESP_LOGE(TAG, "Failed to set DNS servers");
     return false;
   }

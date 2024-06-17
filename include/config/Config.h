@@ -6,6 +6,7 @@
 #include "config/RFConfig.h"
 #include "config/SerialInputConfig.h"
 #include "config/WiFiConfig.h"
+#include "config/NetworkConfig.h"
 #include "config/WiFiCredentials.h"
 #include "StringView.h"
 
@@ -36,12 +37,14 @@ namespace OpenShock::Config {
 
   bool GetRFConfig(RFConfig& out);
   bool GetWiFiConfig(WiFiConfig& out);
+  bool GetNetworkConfig(NetworkConfig& out);
   bool GetOtaUpdateConfig(OtaUpdateConfig& out);
   bool GetWiFiCredentials(cJSON* array, bool withSensitiveData);
   bool GetWiFiCredentials(std::vector<WiFiCredentials>& out);
 
   bool SetRFConfig(const RFConfig& config);
   bool SetWiFiConfig(const WiFiConfig& config);
+  bool SetNetworkConfig(const NetworkConfig& config);
   bool SetWiFiCredentials(const std::vector<WiFiCredentials>& credentials);
   bool SetCaptivePortalConfig(const CaptivePortalConfig& config);
   bool SetSerialInputConfig(const SerialInputConfig& config);

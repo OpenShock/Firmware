@@ -1,6 +1,7 @@
 #include "config/internal/utils.h"
 
 #include "Logging.h"
+#include "StringView.h"
 
 const char* const TAG = "Config::Internal::Utils";
 
@@ -38,12 +39,61 @@ bool _utilFromJsonInt(T& val, const cJSON* json, const char* name, T defaultVal,
   return true;
 }
 
+bool _ipaddressFromStringView(IPAddress& ip, StringView sv) {
+  if (sv.isNullOrEmpty()) {
+    return false;
+  }
+
+  std::uint8_t octets[4];
+  std::uint32_t octetIdx = 0;
+  for (char c : sv) {
+    if (c == '.') {
+      if (octetIdx == 4) {
+        return false;
+      }
+
+      octetIdx++;
+      continue;
+    }
+
+    if (c < '0' || c > '9') {
+      return false;
+    }
+
+    octets[octetIdx] = (octets[octetIdx] * 10) + (c - '0');
+  }
+
+  if (octetIdx != 3) {
+    return false;
+  }
+
+  ip = IPAddress(octets);
+
+  return true;
+}
+
 void Config::Internal::Utils::FromFbsStr(std::string& str, const flatbuffers::String* fbsStr, const char* defaultStr) {
   if (fbsStr != nullptr) {
     str = fbsStr->c_str();
   } else {
     str = defaultStr;
   }
+}
+
+bool Config::Internal::Utils::FromFbsIPAddress(IPAddress& ip, const flatbuffers::String* fbsIP, const IPAddress& defaultIP) {
+  if (fbsIP == nullptr) {
+    ip = defaultIP;
+    return true;
+  }
+
+  StringView view(*fbsIP);
+
+  if (!_ipaddressFromStringView(ip, view)) {
+    ESP_LOGE(TAG, "failed to parse IP address");
+    return false;
+  }
+
+  return true;
 }
 
 bool Config::Internal::Utils::FromJsonBool(bool& val, const cJSON* json, const char* name, bool defaultVal) {
@@ -88,6 +138,28 @@ bool Config::Internal::Utils::FromJsonStr(std::string& str, const cJSON* json, c
   }
 
   str = jsonVal->valuestring;
+
+  return true;
+}
+
+bool Config::Internal::Utils::FromJsonIPAddress(IPAddress& ip, const cJSON* json, const char* name, const IPAddress& defaultIP) {
+  const cJSON* jsonVal = cJSON_GetObjectItemCaseSensitive(json, name);
+  if (jsonVal == nullptr) {
+    ip = defaultIP;
+    return true;
+  }
+
+  if (cJSON_IsString(jsonVal) == 0) {
+    ESP_LOGE(TAG, "value at '%s' is not a string", name);
+    return false;
+  }
+
+  StringView view(jsonVal->valuestring);
+
+  if (!_ipaddressFromStringView(ip, view)) {
+    ESP_LOGE(TAG, "failed to parse IP address at '%s'", name);
+    return false;
+  }
 
   return true;
 }

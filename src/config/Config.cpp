@@ -272,6 +272,18 @@ bool Config::GetWiFiConfig(Config::WiFiConfig& out) {
   return true;
 }
 
+bool Config::GetNetworkConfig(Config::NetworkConfig& out) {
+  ScopedReadLock lock(&_configMutex);
+  if (!lock.isLocked()) {
+    ESP_LOGE(TAG, "Failed to acquire read lock");
+    return false;
+  }
+
+  out = _configData.network;
+
+  return true;
+}
+
 bool Config::GetOtaUpdateConfig(Config::OtaUpdateConfig& out) {
   ScopedReadLock lock(&_configMutex);
   if (!lock.isLocked()) {
@@ -331,6 +343,17 @@ bool Config::SetWiFiConfig(const Config::WiFiConfig& config) {
   }
 
   _configData.wifi = config;
+  return _trySaveConfig();
+}
+
+bool Config::SetNetworkConfig(const Config::NetworkConfig& config) {
+  ScopedWriteLock lock(&_configMutex);
+  if (!lock.isLocked()) {
+    ESP_LOGE(TAG, "Failed to acquire write lock");
+    return false;
+  }
+
+  _configData.network = config;
   return _trySaveConfig();
 }
 

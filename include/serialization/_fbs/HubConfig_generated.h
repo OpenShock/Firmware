@@ -38,6 +38,9 @@ struct SerialInputConfigBuilder;
 struct OtaUpdateConfig;
 struct OtaUpdateConfigBuilder;
 
+struct NetworkConfig;
+struct NetworkConfigBuilder;
+
 struct HubConfig;
 struct HubConfigBuilder;
 
@@ -731,6 +734,97 @@ inline ::flatbuffers::Offset<OtaUpdateConfig> CreateOtaUpdateConfigDirect(
       update_step);
 }
 
+struct NetworkConfig FLATBUFFERS_FINAL_CLASS : private ::flatbuffers::Table {
+  typedef NetworkConfigBuilder Builder;
+  struct Traits;
+  static FLATBUFFERS_CONSTEXPR_CPP11 const char *GetFullyQualifiedName() {
+    return "OpenShock.Serialization.Configuration.NetworkConfig";
+  }
+  enum FlatBuffersVTableOffset FLATBUFFERS_VTABLE_UNDERLYING_TYPE {
+    VT_DNS_PRIMARY = 4,
+    VT_DNS_SECONDARY = 6,
+    VT_DNS_FALLBACK = 8
+  };
+  /// The primary DNS server
+  const ::flatbuffers::String *dns_primary() const {
+    return GetPointer<const ::flatbuffers::String *>(VT_DNS_PRIMARY);
+  }
+  /// The secondary DNS server
+  const ::flatbuffers::String *dns_secondary() const {
+    return GetPointer<const ::flatbuffers::String *>(VT_DNS_SECONDARY);
+  }
+  /// The fallback DNS server (used if the primary and secondary DNS servers fail)
+  const ::flatbuffers::String *dns_fallback() const {
+    return GetPointer<const ::flatbuffers::String *>(VT_DNS_FALLBACK);
+  }
+  bool Verify(::flatbuffers::Verifier &verifier) const {
+    return VerifyTableStart(verifier) &&
+           VerifyOffset(verifier, VT_DNS_PRIMARY) &&
+           verifier.VerifyString(dns_primary()) &&
+           VerifyOffset(verifier, VT_DNS_SECONDARY) &&
+           verifier.VerifyString(dns_secondary()) &&
+           VerifyOffset(verifier, VT_DNS_FALLBACK) &&
+           verifier.VerifyString(dns_fallback()) &&
+           verifier.EndTable();
+  }
+};
+
+struct NetworkConfigBuilder {
+  typedef NetworkConfig Table;
+  ::flatbuffers::FlatBufferBuilder &fbb_;
+  ::flatbuffers::uoffset_t start_;
+  void add_dns_primary(::flatbuffers::Offset<::flatbuffers::String> dns_primary) {
+    fbb_.AddOffset(NetworkConfig::VT_DNS_PRIMARY, dns_primary);
+  }
+  void add_dns_secondary(::flatbuffers::Offset<::flatbuffers::String> dns_secondary) {
+    fbb_.AddOffset(NetworkConfig::VT_DNS_SECONDARY, dns_secondary);
+  }
+  void add_dns_fallback(::flatbuffers::Offset<::flatbuffers::String> dns_fallback) {
+    fbb_.AddOffset(NetworkConfig::VT_DNS_FALLBACK, dns_fallback);
+  }
+  explicit NetworkConfigBuilder(::flatbuffers::FlatBufferBuilder &_fbb)
+        : fbb_(_fbb) {
+    start_ = fbb_.StartTable();
+  }
+  ::flatbuffers::Offset<NetworkConfig> Finish() {
+    const auto end = fbb_.EndTable(start_);
+    auto o = ::flatbuffers::Offset<NetworkConfig>(end);
+    return o;
+  }
+};
+
+inline ::flatbuffers::Offset<NetworkConfig> CreateNetworkConfig(
+    ::flatbuffers::FlatBufferBuilder &_fbb,
+    ::flatbuffers::Offset<::flatbuffers::String> dns_primary = 0,
+    ::flatbuffers::Offset<::flatbuffers::String> dns_secondary = 0,
+    ::flatbuffers::Offset<::flatbuffers::String> dns_fallback = 0) {
+  NetworkConfigBuilder builder_(_fbb);
+  builder_.add_dns_fallback(dns_fallback);
+  builder_.add_dns_secondary(dns_secondary);
+  builder_.add_dns_primary(dns_primary);
+  return builder_.Finish();
+}
+
+struct NetworkConfig::Traits {
+  using type = NetworkConfig;
+  static auto constexpr Create = CreateNetworkConfig;
+};
+
+inline ::flatbuffers::Offset<NetworkConfig> CreateNetworkConfigDirect(
+    ::flatbuffers::FlatBufferBuilder &_fbb,
+    const char *dns_primary = nullptr,
+    const char *dns_secondary = nullptr,
+    const char *dns_fallback = nullptr) {
+  auto dns_primary__ = dns_primary ? _fbb.CreateString(dns_primary) : 0;
+  auto dns_secondary__ = dns_secondary ? _fbb.CreateString(dns_secondary) : 0;
+  auto dns_fallback__ = dns_fallback ? _fbb.CreateString(dns_fallback) : 0;
+  return OpenShock::Serialization::Configuration::CreateNetworkConfig(
+      _fbb,
+      dns_primary__,
+      dns_secondary__,
+      dns_fallback__);
+}
+
 struct HubConfig FLATBUFFERS_FINAL_CLASS : private ::flatbuffers::Table {
   typedef HubConfigBuilder Builder;
   struct Traits;
@@ -743,7 +837,8 @@ struct HubConfig FLATBUFFERS_FINAL_CLASS : private ::flatbuffers::Table {
     VT_CAPTIVE_PORTAL = 8,
     VT_BACKEND = 10,
     VT_SERIAL_INPUT = 12,
-    VT_OTA_UPDATE = 14
+    VT_OTA_UPDATE = 14,
+    VT_NETWORK = 16
   };
   /// RF Transmitter configuration
   const OpenShock::Serialization::Configuration::RFConfig *rf() const {
@@ -769,6 +864,10 @@ struct HubConfig FLATBUFFERS_FINAL_CLASS : private ::flatbuffers::Table {
   const OpenShock::Serialization::Configuration::OtaUpdateConfig *ota_update() const {
     return GetPointer<const OpenShock::Serialization::Configuration::OtaUpdateConfig *>(VT_OTA_UPDATE);
   }
+  /// Network configuration
+  const OpenShock::Serialization::Configuration::NetworkConfig *network() const {
+    return GetPointer<const OpenShock::Serialization::Configuration::NetworkConfig *>(VT_NETWORK);
+  }
   bool Verify(::flatbuffers::Verifier &verifier) const {
     return VerifyTableStart(verifier) &&
            VerifyOffset(verifier, VT_RF) &&
@@ -783,6 +882,8 @@ struct HubConfig FLATBUFFERS_FINAL_CLASS : private ::flatbuffers::Table {
            verifier.VerifyTable(serial_input()) &&
            VerifyOffset(verifier, VT_OTA_UPDATE) &&
            verifier.VerifyTable(ota_update()) &&
+           VerifyOffset(verifier, VT_NETWORK) &&
+           verifier.VerifyTable(network()) &&
            verifier.EndTable();
   }
 };
@@ -809,6 +910,9 @@ struct HubConfigBuilder {
   void add_ota_update(::flatbuffers::Offset<OpenShock::Serialization::Configuration::OtaUpdateConfig> ota_update) {
     fbb_.AddOffset(HubConfig::VT_OTA_UPDATE, ota_update);
   }
+  void add_network(::flatbuffers::Offset<OpenShock::Serialization::Configuration::NetworkConfig> network) {
+    fbb_.AddOffset(HubConfig::VT_NETWORK, network);
+  }
   explicit HubConfigBuilder(::flatbuffers::FlatBufferBuilder &_fbb)
         : fbb_(_fbb) {
     start_ = fbb_.StartTable();
@@ -827,8 +931,10 @@ inline ::flatbuffers::Offset<HubConfig> CreateHubConfig(
     ::flatbuffers::Offset<OpenShock::Serialization::Configuration::CaptivePortalConfig> captive_portal = 0,
     ::flatbuffers::Offset<OpenShock::Serialization::Configuration::BackendConfig> backend = 0,
     ::flatbuffers::Offset<OpenShock::Serialization::Configuration::SerialInputConfig> serial_input = 0,
-    ::flatbuffers::Offset<OpenShock::Serialization::Configuration::OtaUpdateConfig> ota_update = 0) {
+    ::flatbuffers::Offset<OpenShock::Serialization::Configuration::OtaUpdateConfig> ota_update = 0,
+    ::flatbuffers::Offset<OpenShock::Serialization::Configuration::NetworkConfig> network = 0) {
   HubConfigBuilder builder_(_fbb);
+  builder_.add_network(network);
   builder_.add_ota_update(ota_update);
   builder_.add_serial_input(serial_input);
   builder_.add_backend(backend);
