@@ -12,6 +12,7 @@ void RootConfig::ToDefault() {
   captivePortal.ToDefault();
   backend.ToDefault();
   serialInput.ToDefault();
+  otaUpdate.ToDefault();
 }
 
 bool RootConfig::FromFlatbuffers(const Serialization::Configuration::HubConfig* config) {
