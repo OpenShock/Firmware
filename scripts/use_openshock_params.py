@@ -46,8 +46,10 @@ def use_openshock_params():
         print('WARNING: OTA NOT SUPPORTED FOR THIS FLASH SIZE.')
         print('Using Non-OTA partition layout.')
         board_config.update('build.partitions', str(partitions))
+        board_config.update('upload.flash_size', boardconf.get_flash_size())
     else:   
         board_config.update('build.partitions', str(partitions_ota))
+        board_config.update('upload.flash_size', boardconf.get_flash_size())
 
 
 print_header()
