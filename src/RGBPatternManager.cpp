@@ -102,7 +102,7 @@ void RGBPatternManager::RunPattern(void* arg) {
       // But some actually expect RGB!
 
 #if defined(OPENSHOCK_LED_FLIP_RG_CHANNELS) && OPENSHOCK_LED_FLIP_RG_CHANNELS
-      // Default, GRB
+      // RG Flipped, RGB
       std::uint8_t g = static_cast<std::uint8_t>(static_cast<std::uint16_t>(state.red) * brightness / 255);
       std::uint8_t r = static_cast<std::uint8_t>(static_cast<std::uint16_t>(state.green) * brightness / 255);
 #else
