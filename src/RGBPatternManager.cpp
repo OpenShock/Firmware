@@ -97,12 +97,17 @@ void RGBPatternManager::RunPattern(void* arg) {
 
   while (true) {
     for (const auto& state : pattern) {
+      // WS2812B usually takes commands in GRB order
+      // https://cdn-shop.adafruit.com/datasheets/WS2812B.pdf - Page 5
+      // But some actually expect RGB!
+
       std::uint8_t r = static_cast<std::uint8_t>(static_cast<std::uint16_t>(state.red) * brightness / 255);
       std::uint8_t g = static_cast<std::uint8_t>(static_cast<std::uint16_t>(state.green) * brightness / 255);
       std::uint8_t b = static_cast<std::uint8_t>(static_cast<std::uint16_t>(state.blue) * brightness / 255);
+#if OPENSHOCK_LED_FLIP_RG_CHANNELS
+      std::swap(r, g);
+#endif
 
-      // WS2812B takes commands in GRB order
-      // https://cdn-shop.adafruit.com/datasheets/WS2812B.pdf - Page 5
       const std::uint32_t colors = (static_cast<std::uint32_t>(g) << 16) | (static_cast<std::uint32_t>(r) << 8) | static_cast<std::uint32_t>(b);
 
       // Encode the data
