@@ -30,21 +30,6 @@ bool DnsConfig::FromFlatbuffers(const Serialization::Configuration::DnsConfig* c
     return false;
   }
 
-  if (config->primary() == nullptr) {
-    ESP_LOGE(TAG, "dns_primary is null");
-    return false;
-  }
-
-  if (config->secondary() == nullptr) {
-    ESP_LOGE(TAG, "dns_secondary is null");
-    return false;
-  }
-
-  if (config->fallback() == nullptr) {
-    ESP_LOGE(TAG, "dns_fallback is null");
-    return false;
-  }
-
   useDhcp = config->use_dhcp();
 
   if (!Internal::Utils::FromFbsIPAddress(primary, config->primary(), IPAddress(DNS_PRIMARY))) {
