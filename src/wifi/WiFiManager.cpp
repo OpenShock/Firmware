@@ -334,13 +334,24 @@ bool WiFiManager::Init() {
     }
   }
 
-  Config::NetworkConfig networkConfig;
-  if (!Config::GetNetworkConfig(networkConfig)) {
+  Config::DnsConfig DnsConfig;
+  if (!Config::GetDnsConfig(DnsConfig)) {
     ESP_LOGE(TAG, "Failed to get network config");
     return false;
   }
 
-  if (set_esp_interface_dns(ESP_IF_WIFI_STA, networkConfig.primaryDNS, networkConfig.secondaryDNS, networkConfig.fallbackDNS) != ESP_OK) {
+  esp_err_t err;
+
+  // TODO: When converting to ESP-IDF use esp_netif_set_dns_info() instead of set_esp_interface_dns()
+  if (DnsConfig.useDhcp) {
+    // IPAddress() creates a 0.0.0.0 address
+    // if you look into the implementation of set_esp_interface_dns() you will see that it skips 0.0.0.0 addresses
+    err = set_esp_interface_dns(ESP_IF_WIFI_STA, IPAddress(), IPAddress(), DnsConfig.fallback);
+  } else {
+    err = set_esp_interface_dns(ESP_IF_WIFI_STA, DnsConfig.primary, DnsConfig.secondary, DnsConfig.fallback);
+  }
+
+  if (err != ESP_OK) {
     ESP_LOGE(TAG, "Failed to set DNS servers");
     return false;
   }

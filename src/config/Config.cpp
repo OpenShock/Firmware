@@ -272,14 +272,14 @@ bool Config::GetWiFiConfig(Config::WiFiConfig& out) {
   return true;
 }
 
-bool Config::GetNetworkConfig(Config::NetworkConfig& out) {
+bool Config::GetDnsConfig(Config::DnsConfig& out) {
   ScopedReadLock lock(&_configMutex);
   if (!lock.isLocked()) {
     ESP_LOGE(TAG, "Failed to acquire read lock");
     return false;
   }
 
-  out = _configData.network;
+  out = _configData.dns;
 
   return true;
 }
@@ -346,14 +346,14 @@ bool Config::SetWiFiConfig(const Config::WiFiConfig& config) {
   return _trySaveConfig();
 }
 
-bool Config::SetNetworkConfig(const Config::NetworkConfig& config) {
+bool Config::SetDnsConfig(const Config::DnsConfig& config) {
   ScopedWriteLock lock(&_configMutex);
   if (!lock.isLocked()) {
     ESP_LOGE(TAG, "Failed to acquire write lock");
     return false;
   }
 
-  _configData.network = config;
+  _configData.dns = config;
   return _trySaveConfig();
 }
 
@@ -411,6 +411,17 @@ bool Config::SetBackendConfig(const Config::BackendConfig& config) {
   return _trySaveConfig();
 }
 
+bool Config::ResetDnsConfig() {
+  ScopedWriteLock lock(&_configMutex);
+  if (!lock.isLocked()) {
+    ESP_LOGE(TAG, "Failed to acquire write lock");
+    return false;
+  }
+
+  _configData.dns.ToDefault();
+  return _trySaveConfig();
+}
+
 bool Config::GetRFConfigTxPin(std::uint8_t& out) {
   ScopedReadLock lock(&_configMutex);
   if (!lock.isLocked()) {
@@ -454,6 +465,98 @@ bool Config::SetRFConfigKeepAliveEnabled(bool enabled) {
   }
 
   _configData.rf.keepAliveEnabled = enabled;
+  return _trySaveConfig();
+}
+
+bool Config::GetDnsConfigUseDHCP(bool& out) {
+  ScopedReadLock lock(&_configMutex);
+  if (!lock.isLocked()) {
+    ESP_LOGE(TAG, "Failed to acquire read lock");
+    return false;
+  }
+
+  out = _configData.dns.useDhcp;
+
+  return true;
+}
+
+bool Config::SetDnsConfigUseDHCP(bool useDHCP) {
+  ScopedWriteLock lock(&_configMutex);
+  if (!lock.isLocked()) {
+    ESP_LOGE(TAG, "Failed to acquire write lock");
+    return false;
+  }
+
+  _configData.dns.useDhcp = useDHCP;
+  return _trySaveConfig();
+}
+
+bool Config::GetDnsConfigPrimaryIP(IPAddress& out) {
+  ScopedReadLock lock(&_configMutex);
+  if (!lock.isLocked()) {
+    ESP_LOGE(TAG, "Failed to acquire read lock");
+    return false;
+  }
+
+  out = _configData.dns.primary;
+
+  return true;
+}
+
+bool Config::SetDnsConfigPrimaryIP(const IPAddress& ip) {
+  ScopedWriteLock lock(&_configMutex);
+  if (!lock.isLocked()) {
+    ESP_LOGE(TAG, "Failed to acquire write lock");
+    return false;
+  }
+
+  _configData.dns.primary = ip;
+  return _trySaveConfig();
+}
+
+bool Config::GetDnsConfigSecondaryIP(IPAddress& out) {
+  ScopedReadLock lock(&_configMutex);
+  if (!lock.isLocked()) {
+    ESP_LOGE(TAG, "Failed to acquire read lock");
+    return false;
+  }
+
+  out = _configData.dns.secondary;
+
+  return true;
+}
+
+bool Config::SetDnsConfigSecondaryIP(const IPAddress& ip) {
+  ScopedWriteLock lock(&_configMutex);
+  if (!lock.isLocked()) {
+    ESP_LOGE(TAG, "Failed to acquire write lock");
+    return false;
+  }
+
+  _configData.dns.secondary = ip;
+  return _trySaveConfig();
+}
+
+bool Config::GetDnsConfigFallbackIP(IPAddress& out) {
+  ScopedReadLock lock(&_configMutex);
+  if (!lock.isLocked()) {
+    ESP_LOGE(TAG, "Failed to acquire read lock");
+    return false;
+  }
+
+  out = _configData.dns.fallback;
+
+  return true;
+}
+
+bool Config::SetDnsConfigFallbackIP(const IPAddress& ip) {
+  ScopedWriteLock lock(&_configMutex);
+  if (!lock.isLocked()) {
+    ESP_LOGE(TAG, "Failed to acquire write lock");
+    return false;
+  }
+
+  _configData.dns.fallback = ip;
   return _trySaveConfig();
 }
 

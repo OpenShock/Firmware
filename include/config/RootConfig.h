@@ -3,7 +3,7 @@
 #include "config/BackendConfig.h"
 #include "config/CaptivePortalConfig.h"
 #include "config/ConfigBase.h"
-#include "config/NetworkConfig.h"
+#include "config/DnsConfig.h"
 #include "config/OtaUpdateConfig.h"
 #include "config/RFConfig.h"
 #include "config/SerialInputConfig.h"
@@ -17,7 +17,7 @@ namespace OpenShock::Config {
     OpenShock::Config::BackendConfig backend;
     OpenShock::Config::SerialInputConfig serialInput;
     OpenShock::Config::OtaUpdateConfig otaUpdate;
-    OpenShock::Config::NetworkConfig network;
+    OpenShock::Config::DnsConfig dns;
 
     void ToDefault() override;
 

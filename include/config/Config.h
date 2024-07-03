@@ -2,11 +2,11 @@
 
 #include "config/BackendConfig.h"
 #include "config/CaptivePortalConfig.h"
+#include "config/DnsConfig.h"
 #include "config/OtaUpdateConfig.h"
 #include "config/RFConfig.h"
 #include "config/SerialInputConfig.h"
 #include "config/WiFiConfig.h"
-#include "config/NetworkConfig.h"
 #include "config/WiFiCredentials.h"
 #include "StringView.h"
 
@@ -36,24 +36,35 @@ namespace OpenShock::Config {
   void FactoryReset();
 
   bool GetRFConfig(RFConfig& out);
+  bool GetDnsConfig(DnsConfig& out);
   bool GetWiFiConfig(WiFiConfig& out);
-  bool GetNetworkConfig(NetworkConfig& out);
   bool GetOtaUpdateConfig(OtaUpdateConfig& out);
   bool GetWiFiCredentials(cJSON* array, bool withSensitiveData);
   bool GetWiFiCredentials(std::vector<WiFiCredentials>& out);
 
   bool SetRFConfig(const RFConfig& config);
+  bool SetDnsConfig(const DnsConfig& config);
   bool SetWiFiConfig(const WiFiConfig& config);
-  bool SetNetworkConfig(const NetworkConfig& config);
   bool SetWiFiCredentials(const std::vector<WiFiCredentials>& credentials);
   bool SetCaptivePortalConfig(const CaptivePortalConfig& config);
   bool SetSerialInputConfig(const SerialInputConfig& config);
   bool SetBackendConfig(const BackendConfig& config);
 
+  bool ResetDnsConfig();
+
   bool GetRFConfigTxPin(std::uint8_t& out);
   bool SetRFConfigTxPin(std::uint8_t txPin);
   bool GetRFConfigKeepAliveEnabled(bool& out);
   bool SetRFConfigKeepAliveEnabled(bool enabled);
+
+  bool GetDnsConfigUseDHCP(bool& out);
+  bool SetDnsConfigUseDHCP(bool useDHCP);
+  bool GetDnsConfigPrimaryIP(IPAddress& out);
+  bool SetDnsConfigPrimaryIP(const IPAddress& ip);
+  bool GetDnsConfigSecondaryIP(IPAddress& out);
+  bool SetDnsConfigSecondaryIP(const IPAddress& ip);
+  bool GetDnsConfigFallbackIP(IPAddress& out);
+  bool SetDnsConfigFallbackIP(const IPAddress& ip);
 
   bool GetSerialInputConfigEchoEnabled(bool& out);
   bool SetSerialInputConfigEchoEnabled(bool enabled);

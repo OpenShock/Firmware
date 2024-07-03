@@ -12,6 +12,7 @@
 #include "StringView.h"
 #include "Time.h"
 #include "util/Base64Utils.h"
+#include "util/IPAddressUtils.h"
 #include "wifi/WiFiManager.h"
 
 #include <cJSON.h>
@@ -107,7 +108,7 @@ void _handleRfTxPinCommand(StringView arg) {
     return;
   }
 
-  auto str = arg.toString(); // Copy the string to null-terminate it (VERY IMPORTANT)
+  auto str = arg.toString();  // Copy the string to null-terminate it (VERY IMPORTANT)
 
   unsigned int pin;
   if (sscanf(str.c_str(), "%u", &pin) != 1) {
@@ -139,6 +140,172 @@ void _handleRfTxPinCommand(StringView arg) {
       SERPR_ERROR("Unknown error while setting RF TX pin");
       break;
   }
+}
+
+void _handleDnsCommand(StringView arg) {
+  if (arg.isNullOrEmpty()) {
+    OpenShock::Config::DnsConfig config;
+    if (!Config::GetDnsConfig(config)) {
+      SERPR_ERROR("Failed to get DNS config from config");
+      return;
+    }
+
+    // Get DNS config
+    SERPR_RESPONSE("DNS|%s|" IPV4ADDR_FMT "|" IPV4ADDR_FMT "|" IPV4ADDR_FMT, config.useDhcp ? "auto" : "manual", IPV4ADDR_ARG(config.primary), IPV4ADDR_ARG(config.secondary), IPV4ADDR_ARG(config.fallback));
+    return;
+  }
+
+  if (arg == "reset") {
+    if (OpenShock::Config::ResetDnsConfig()) {
+      SERPR_SUCCESS("Saved config");
+    } else {
+      SERPR_ERROR("Failed to save config");
+    }
+    return;
+  }
+
+  if (arg == "json") {
+    OpenShock::Config::DnsConfig config;
+    if (!Config::GetDnsConfig(config)) {
+      SERPR_ERROR("Failed to get DNS config from config");
+      return;
+    }
+
+    cJSON* json = config.ToJSON(false);
+    if (json == nullptr) {
+      SERPR_ERROR("Failed to convert DNS config to JSON");
+      return;
+    }
+
+    char* out = cJSON_PrintUnformatted(json);
+    if (out == nullptr) {
+      cJSON_Delete(json);
+      SERPR_ERROR("Failed to print JSON");
+      return;
+    }
+
+    SERPR_RESPONSE("DNS|%s", out);
+
+    cJSON_free(out);
+    cJSON_Delete(json);
+    return;
+  }
+
+  auto parts = arg.split(' ', 1);
+
+  StringView subcommand = parts[0];
+  StringView subarg     = parts[1];
+
+  if (subcommand == "mode") {
+    bool useDhcp;
+
+    if (subarg.isNullOrEmpty()) {
+      if (!Config::GetDnsConfigUseDHCP(useDhcp)) {
+        SERPR_ERROR("Failed to get DNS mode from config");
+        return;
+      }
+
+      SERPR_RESPONSE("DnsMode|%s", useDhcp ? "auto" : "manual");
+      return;
+    }
+
+    if (subarg == "auto") {
+      useDhcp = true;
+    } else if (subarg == "manual") {
+      useDhcp = false;
+    } else {
+      SERPR_ERROR("Invalid argument (invalid mode)");
+      return;
+    }
+
+    if (!Config::SetDnsConfigUseDHCP(useDhcp)) {
+      SERPR_ERROR("Failed to save config");
+      return;
+    }
+
+    SERPR_SUCCESS("Saved config");
+    return;
+  }
+
+  if (subcommand == "primary") {
+    IPAddress ip;
+    if (subarg.isNullOrEmpty()) {
+      if (!Config::GetDnsConfigPrimaryIP(ip)) {
+        SERPR_ERROR("Failed to get primary DNS server from config");
+        return;
+      }
+
+      SERPR_RESPONSE("PrimaryDNS|" IPV4ADDR_FMT, IPV4ADDR_ARG(ip));
+      return;
+    }
+
+    if (!OpenShock::IPAddressFromStringView(ip, subarg)) {
+      SERPR_ERROR("Invalid argument (not an IP address)");
+      return;
+    }
+
+    if (!Config::SetDnsConfigPrimaryIP(ip)) {
+      SERPR_ERROR("Failed to save config");
+      return;
+    }
+
+    SERPR_SUCCESS("Saved config");
+    return;
+  }
+
+  if (subcommand == "secondary") {
+    IPAddress ip;
+    if (subarg.isNullOrEmpty()) {
+      if (!Config::GetDnsConfigSecondaryIP(ip)) {
+        SERPR_ERROR("Failed to get secondary DNS server from config");
+        return;
+      }
+
+      SERPR_RESPONSE("SecondaryDNS|" IPV4ADDR_FMT, IPV4ADDR_ARG(ip));
+      return;
+    }
+
+    if (!OpenShock::IPAddressFromStringView(ip, subarg)) {
+      SERPR_ERROR("Invalid argument (not an IP address)");
+      return;
+    }
+
+    if (!Config::SetDnsConfigSecondaryIP(ip)) {
+      SERPR_ERROR("Failed to save config");
+      return;
+    }
+
+    SERPR_SUCCESS("Saved config");
+    return;
+  }
+
+  if (subcommand == "fallback") {
+    IPAddress ip;
+    if (subarg.isNullOrEmpty()) {
+      if (!Config::GetDnsConfigFallbackIP(ip)) {
+        SERPR_ERROR("Failed to get fallback DNS server from config");
+        return;
+      }
+
+      SERPR_RESPONSE("FallbackDNS|" IPV4ADDR_FMT, IPV4ADDR_ARG(ip));
+      return;
+    }
+
+    if (!OpenShock::IPAddressFromStringView(ip, subarg)) {
+      SERPR_ERROR("Invalid argument (not an IP address)");
+      return;
+    }
+
+    if (!Config::SetDnsConfigFallbackIP(ip)) {
+      SERPR_ERROR("Failed to save config");
+      return;
+    }
+
+    SERPR_SUCCESS("Saved config");
+    return;
+  }
+
+  SERPR_ERROR("Invalid subcommand");
 }
 
 void _handleDomainCommand(StringView arg) {
@@ -178,15 +345,7 @@ void _handleDomainCommand(StringView arg) {
     return;
   }
 
-  ESP_LOGI(
-    TAG,
-    "Successfully connected to \"%.*s\", version: %s, commit: %s, current time: %s",
-    arg.length(),
-    arg.data(),
-    resp.data.version.c_str(),
-    resp.data.commit.c_str(),
-    resp.data.currentTime.c_str()
-  );
+  ESP_LOGI(TAG, "Successfully connected to \"%.*s\", version: %s, commit: %s, current time: %s", arg.length(), arg.data(), resp.data.version.c_str(), resp.data.commit.c_str(), resp.data.currentTime.c_str());
 
   bool result = OpenShock::Config::SetBackendDomain(arg);
 
@@ -572,30 +731,42 @@ void _handleHelpCommand(StringView arg) {
 
     // Raw string literal (1+ to remove the first newline)
     Serial.print(1 + R"(
-help                   print this menu
-help         <command> print help for a command
-version                print version information
-restart                restart the board
-sysinfo                print debug information for various subsystems
-echo                   get serial echo enabled
-echo         <bool>    set serial echo enabled
-validgpios             list all valid GPIO pins
-rftxpin                get radio transmit pin
-rftxpin      <pin>     set radio transmit pin
-domain                 get backend domain
-domain       <domain>  set backend domain
-authtoken              get auth token
-authtoken    <token>   set auth token
-networks               get all saved networks
-networks     <json>    set all saved networks
-keepalive              get shocker keep-alive enabled
-keepalive    <bool>    set shocker keep-alive enabled
-jsonconfig             get configuration as JSON
-jsonconfig   <json>    set configuration from JSON
-rawconfig              get raw configuration as base64
-rawconfig    <base64>  set raw configuration from base64
-rftransmit   <json>    transmit a RF command
-factoryreset           reset device to factory defaults and restart
+help                    print this menu
+help          <command> print help for a command
+version                 print version information
+restart                 restart the board
+sysinfo                 print debug information for various subsystems
+echo                    get serial echo enabled
+echo          <bool>    set serial echo enabled
+validgpios              list all valid GPIO pins
+rftxpin                 get radio transmit pin
+rftxpin       <pin>     set radio transmit pin
+dns                     print DNS configuration
+dns reset               reset DNS configuration
+dns json                print DNS configuration as JSON
+dns json      <json>    set DNS configuration from JSON
+dns mode                get DNS mode
+dns mode      <mode>    set DNS mode ("auto", "manual")
+dns primary             get primary DNS server
+dns primary   <ip>      set primary DNS server
+dns secondary           get secondary DNS server
+dns secondary <ip>      set secondary DNS server
+dns fallback            get fallback DNS server
+dns fallback  <ip>      set fallback DNS server
+domain                  get backend domain
+domain        <domain>  set backend domain
+authtoken               get auth token
+authtoken     <token>   set auth token
+networks                get all saved networks
+networks      <json>    set all saved networks
+keepalive               get shocker keep-alive enabled
+keepalive     <bool>    set shocker keep-alive enabled
+jsonconfig              get configuration as JSON
+jsonconfig    <json>    set configuration from JSON
+rawconfig               get raw configuration as base64
+rawconfig     <base64>  set raw configuration from base64
+rftransmit    <json>    transmit a RF command
+factoryreset            reset device to factory defaults and restart
 )");
     return;
   }
@@ -675,6 +846,67 @@ rftxpin [<pin>]
 )",
   _handleRfTxPinCommand,
 };
+static const SerialCmdHandler kDnsCmdHandler = {
+  "dns"_sv,
+  R"(dns
+  Print DNS configuration.
+
+dns reset
+  Reset DNS configuration.
+
+dns json
+  Print DNS configuration as JSON.
+
+dns json <json>
+  Set DNS configuration from JSON.
+  Arguments:
+    <json> must be a valid JSON object.
+  Example:
+    dns json {"mode":"auto","primary":"1.1.1.1","secondary":"8.8.8.8","backup":"9.9.9.9"}
+
+dns mode
+  Get the DNS mode.
+
+dns mode <mode>
+  Set the DNS mode.
+  Arguments:
+    <mode> must be a string ("auto", "manual").
+  Example:
+    dns mode manual
+
+dns primary
+  Get the primary DNS server.
+
+dns primary <ip>
+  Set the primary DNS server.
+  Arguments:
+    <ip> must be a string.
+  Example:
+    dns primary 1.1.1.1
+
+dns secondary
+  Get the secondary DNS server.
+
+dns secondary <ip>
+  Set the secondary DNS server.
+  Arguments:
+    <ip> must be a string.
+  Example:
+    dns secondary 8.8.8.8
+
+dns backup
+  Get the backup DNS server.
+
+dns backup <ip>
+  Set the backup DNS server.
+  Arguments:
+    <ip> must be a string.
+  Example:
+    dns backup 9.9.9.9
+)",
+  _handleDnsCommand,
+};
+
 static const SerialCmdHandler kDomainCmdHandler = {
   "domain"_sv,
   R"(domain
@@ -867,8 +1099,8 @@ void processSerialLine(StringView line) {
     return;
   }
 
-  auto parts = line.split(' ', 1);
-  StringView command = parts[0];
+  auto parts           = line.split(' ', 1);
+  StringView command   = parts[0];
   StringView arguments = parts.size() > 1 ? parts[1] : StringView();
 
   auto it = s_commandHandlers.find(command);
@@ -895,6 +1127,7 @@ bool SerialInputHandler::Init() {
   RegisterCommandHandler(kSerialEchoCmdHandler);
   RegisterCommandHandler(kValidGpiosCmdHandler);
   RegisterCommandHandler(kRfTxPinCmdHandler);
+  RegisterCommandHandler(kDnsCmdHandler);
   RegisterCommandHandler(kDomainCmdHandler);
   RegisterCommandHandler(kAuthTokenCmdHandler);
   RegisterCommandHandler(kLcgOverrideCmdHandler);

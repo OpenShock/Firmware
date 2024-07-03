@@ -2,6 +2,7 @@
 
 #include "Logging.h"
 #include "StringView.h"
+#include "util/IPAddressUtils.h"
 
 const char* const TAG = "Config::Internal::Utils";
 
@@ -39,39 +40,6 @@ bool _utilFromJsonInt(T& val, const cJSON* json, const char* name, T defaultVal,
   return true;
 }
 
-bool _ipaddressFromStringView(IPAddress& ip, StringView sv) {
-  if (sv.isNullOrEmpty()) {
-    return false;
-  }
-
-  std::uint8_t octets[4];
-  std::uint32_t octetIdx = 0;
-  for (char c : sv) {
-    if (c == '.') {
-      if (octetIdx == 4) {
-        return false;
-      }
-
-      octetIdx++;
-      continue;
-    }
-
-    if (c < '0' || c > '9') {
-      return false;
-    }
-
-    octets[octetIdx] = (octets[octetIdx] * 10) + (c - '0');
-  }
-
-  if (octetIdx != 3) {
-    return false;
-  }
-
-  ip = IPAddress(octets);
-
-  return true;
-}
-
 void Config::Internal::Utils::FromFbsStr(std::string& str, const flatbuffers::String* fbsStr, const char* defaultStr) {
   if (fbsStr != nullptr) {
     str = fbsStr->c_str();
@@ -88,7 +56,7 @@ bool Config::Internal::Utils::FromFbsIPAddress(IPAddress& ip, const flatbuffers:
 
   StringView view(*fbsIP);
 
-  if (!_ipaddressFromStringView(ip, view)) {
+  if (!OpenShock::IPAddressFromStringView(ip, view)) {
     ESP_LOGE(TAG, "failed to parse IP address");
     return false;
   }
@@ -156,7 +124,7 @@ bool Config::Internal::Utils::FromJsonIPAddress(IPAddress& ip, const cJSON* json
 
   StringView view(jsonVal->valuestring);
 
-  if (!_ipaddressFromStringView(ip, view)) {
+  if (!OpenShock::IPAddressFromStringView(ip, view)) {
     ESP_LOGE(TAG, "failed to parse IP address at '%s'", name);
     return false;
   }
