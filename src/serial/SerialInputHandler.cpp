@@ -142,6 +142,37 @@ void _handleRfTxPinCommand(StringView arg) {
   }
 }
 
+bool _handleDnsAddressSetCommand(StringView command, StringView arg, StringView commandName, StringView responseLabel, bool(getter)(IPAddress&), bool(setter)(const IPAddress&)) {
+  if (command == commandName) {
+    IPAddress ip;
+    if (arg.isNullOrEmpty()) {
+      if (!getter(ip)) {
+        SERPR_ERROR("Failed to get %.*s DNS server from config", commandName.length(), commandName.data());
+        return true;
+      }
+
+      SERPR_RESPONSE("%.*s|" IPV4ADDR_FMT, responseLabel.length(), responseLabel.data(), IPV4ADDR_ARG(ip));
+      return true;
+    }
+
+    if (!OpenShock::IPAddressFromStringView(ip, arg)) {
+      SERPR_ERROR("Invalid argument (not an IP address)");
+      return true;
+    }
+
+    if (!setter(ip)) {
+      SERPR_ERROR("Failed to save config");
+      return true;
+    }
+
+    SERPR_SUCCESS("Saved config");
+
+    return true;
+  }
+
+  return false;
+}
+
 void _handleDnsCommand(StringView arg) {
   if (arg.isNullOrEmpty()) {
     OpenShock::Config::DnsConfig config;
@@ -227,83 +258,9 @@ void _handleDnsCommand(StringView arg) {
     return;
   }
 
-  if (subcommand == "primary") {
-    IPAddress ip;
-    if (subarg.isNullOrEmpty()) {
-      if (!Config::GetDnsConfigPrimaryIP(ip)) {
-        SERPR_ERROR("Failed to get primary DNS server from config");
-        return;
-      }
-
-      SERPR_RESPONSE("PrimaryDNS|" IPV4ADDR_FMT, IPV4ADDR_ARG(ip));
-      return;
-    }
-
-    if (!OpenShock::IPAddressFromStringView(ip, subarg)) {
-      SERPR_ERROR("Invalid argument (not an IP address)");
-      return;
-    }
-
-    if (!Config::SetDnsConfigPrimaryIP(ip)) {
-      SERPR_ERROR("Failed to save config");
-      return;
-    }
-
-    SERPR_SUCCESS("Saved config");
-    return;
-  }
-
-  if (subcommand == "secondary") {
-    IPAddress ip;
-    if (subarg.isNullOrEmpty()) {
-      if (!Config::GetDnsConfigSecondaryIP(ip)) {
-        SERPR_ERROR("Failed to get secondary DNS server from config");
-        return;
-      }
-
-      SERPR_RESPONSE("SecondaryDNS|" IPV4ADDR_FMT, IPV4ADDR_ARG(ip));
-      return;
-    }
-
-    if (!OpenShock::IPAddressFromStringView(ip, subarg)) {
-      SERPR_ERROR("Invalid argument (not an IP address)");
-      return;
-    }
-
-    if (!Config::SetDnsConfigSecondaryIP(ip)) {
-      SERPR_ERROR("Failed to save config");
-      return;
-    }
-
-    SERPR_SUCCESS("Saved config");
-    return;
-  }
-
-  if (subcommand == "fallback") {
-    IPAddress ip;
-    if (subarg.isNullOrEmpty()) {
-      if (!Config::GetDnsConfigFallbackIP(ip)) {
-        SERPR_ERROR("Failed to get fallback DNS server from config");
-        return;
-      }
-
-      SERPR_RESPONSE("FallbackDNS|" IPV4ADDR_FMT, IPV4ADDR_ARG(ip));
-      return;
-    }
-
-    if (!OpenShock::IPAddressFromStringView(ip, subarg)) {
-      SERPR_ERROR("Invalid argument (not an IP address)");
-      return;
-    }
-
-    if (!Config::SetDnsConfigFallbackIP(ip)) {
-      SERPR_ERROR("Failed to save config");
-      return;
-    }
-
-    SERPR_SUCCESS("Saved config");
-    return;
-  }
+  if (_handleDnsAddressSetCommand(subcommand, subarg, "primary"_sv, "PrimaryDNS"_sv, Config::GetDnsConfigPrimaryIP, Config::SetDnsConfigPrimaryIP)) return;
+  if (_handleDnsAddressSetCommand(subcommand, subarg, "secondary"_sv, "PrimaryDNS"_sv, Config::GetDnsConfigSecondaryIP, Config::SetDnsConfigSecondaryIP)) return;
+  if (_handleDnsAddressSetCommand(subcommand, subarg, "fallback"_sv, "PrimaryDNS"_sv, Config::GetDnsConfigFallbackIP, Config::SetDnsConfigFallbackIP)) return;
 
   SERPR_ERROR("Invalid subcommand");
 }
