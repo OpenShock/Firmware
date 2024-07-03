@@ -870,7 +870,7 @@ dns json <json>
   Arguments:
     <json> must be a valid JSON object.
   Example:
-    dns json {"mode":"auto","primary":"1.1.1.1","secondary":"8.8.8.8","backup":"9.9.9.9"}
+    dns json {"mode":"auto","primary":"8.8.8.8","secondary":"8.8.4.4","fallback":"1.1.1.1"}
 
 dns mode
   Get the DNS mode.
@@ -890,7 +890,7 @@ dns primary <ip>
   Arguments:
     <ip> must be a string.
   Example:
-    dns primary 1.1.1.1
+    dns primary 8.8.8.8
 
 dns secondary
   Get the secondary DNS server.
@@ -900,17 +900,17 @@ dns secondary <ip>
   Arguments:
     <ip> must be a string.
   Example:
-    dns secondary 8.8.8.8
+    dns secondary 8.8.4.4
 
-dns backup
-  Get the backup DNS server.
+dns fallback
+  Get the fallback DNS server.
 
-dns backup <ip>
-  Set the backup DNS server.
+dns fallback <ip>
+  Set the fallback DNS server.
   Arguments:
     <ip> must be a string.
   Example:
-    dns backup 9.9.9.9
+    dns fallback 1.1.1.1
 )",
   _handleDnsCommand,
 };
