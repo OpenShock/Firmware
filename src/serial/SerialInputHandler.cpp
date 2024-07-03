@@ -108,7 +108,7 @@ void _handleRfTxPinCommand(StringView arg) {
     return;
   }
 
-  auto str = arg.toString();  // Copy the string to null-terminate it (VERY IMPORTANT)
+  auto str = arg.toString(); // Copy the string to null-terminate it (VERY IMPORTANT)
 
   unsigned int pin;
   if (sscanf(str.c_str(), "%u", &pin) != 1) {
@@ -345,7 +345,15 @@ void _handleDomainCommand(StringView arg) {
     return;
   }
 
-  ESP_LOGI(TAG, "Successfully connected to \"%.*s\", version: %s, commit: %s, current time: %s", arg.length(), arg.data(), resp.data.version.c_str(), resp.data.commit.c_str(), resp.data.currentTime.c_str());
+  ESP_LOGI(
+    TAG,
+    "Successfully connected to \"%.*s\", version: %s, commit: %s, current time: %s",
+    arg.length(),
+    arg.data(),
+    resp.data.version.c_str(),
+    resp.data.commit.c_str(),
+    resp.data.currentTime.c_str()
+  );
 
   bool result = OpenShock::Config::SetBackendDomain(arg);
 
@@ -1099,8 +1107,8 @@ void processSerialLine(StringView line) {
     return;
   }
 
-  auto parts           = line.split(' ', 1);
-  StringView command   = parts[0];
+  auto parts = line.split(' ', 1);
+  StringView command = parts[0];
   StringView arguments = parts.size() > 1 ? parts[1] : StringView();
 
   auto it = s_commandHandlers.find(command);
@@ -1127,7 +1135,6 @@ bool SerialInputHandler::Init() {
   RegisterCommandHandler(kSerialEchoCmdHandler);
   RegisterCommandHandler(kValidGpiosCmdHandler);
   RegisterCommandHandler(kRfTxPinCmdHandler);
-  RegisterCommandHandler(kDnsCmdHandler);
   RegisterCommandHandler(kDomainCmdHandler);
   RegisterCommandHandler(kAuthTokenCmdHandler);
   RegisterCommandHandler(kLcgOverrideCmdHandler);
