@@ -1,7 +1,6 @@
 #include "util/IPAddressUtils.h"
 
 #include "FormatHelpers.h"
-#include "Logging.h"
 
 const char* const TAG = "Util::IPAddressUtils";
 
