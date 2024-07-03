@@ -1135,6 +1135,7 @@ bool SerialInputHandler::Init() {
   RegisterCommandHandler(kSerialEchoCmdHandler);
   RegisterCommandHandler(kValidGpiosCmdHandler);
   RegisterCommandHandler(kRfTxPinCmdHandler);
+  RegisterCommandHandler(kDnsCmdHandler);
   RegisterCommandHandler(kDomainCmdHandler);
   RegisterCommandHandler(kAuthTokenCmdHandler);
   RegisterCommandHandler(kLcgOverrideCmdHandler);
