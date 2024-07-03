@@ -1,4 +1,4 @@
-import type { OtaUpdateChannel } from '$lib/_fbs/open-shock/serialization/configuration';
+import type { OtaUpdateChannel, OtaUpdateStep } from '$lib/_fbs/open-shock/serialization/configuration';
 import { HubConfig } from '$lib/_fbs/open-shock/serialization/configuration/hub-config';
 
 // TODO: Update these configs and ensure that typescript enforces them to be up to date
@@ -27,6 +27,7 @@ export interface CaptivePortalConfig {
 export interface BackendConfig {
   domain: string;
   authToken: string | null;
+  lcgOverride: string | null;
 }
 
 export interface SerialInputConfig {
@@ -38,9 +39,19 @@ export interface OtaUpdateConfig {
   cdnDomain: string;
   updateChannel: OtaUpdateChannel;
   checkOnStartup: boolean;
+  checkPeriodically: boolean;
   checkInterval: number;
   allowBackendManagement: boolean;
   requireManualApproval: boolean;
+  updateId: number;
+  updateStep: OtaUpdateStep;
+}
+
+export interface DnsConfig {
+  use_dhcp: boolean;
+  primary: string;
+  secondary: string;
+  fallback: string;
 }
 
 export interface Config {
@@ -50,6 +61,7 @@ export interface Config {
   backend: BackendConfig;
   serialInput: SerialInputConfig;
   otaUpdate: OtaUpdateConfig;
+  dns: DnsConfig;
 }
 
 function mapRfConfig(hubConfig: HubConfig): RFConfig {
@@ -119,12 +131,14 @@ function mapBackendConfig(hubConfig: HubConfig): BackendConfig {
 
   const domain = backend.domain();
   const authToken = backend.authToken();
+  const lcgOverride = backend.lcgOverride();
 
   if (!domain) throw new Error('backend.domain is null');
 
   return {
     domain,
     authToken,
+    lcgOverride,
   };
 }
 
@@ -147,9 +161,12 @@ function mapOtaUpdateConfig(hubConfig: HubConfig): OtaUpdateConfig {
   const cdnDomain = otaUpdate.cdnDomain();
   const updateChannel = otaUpdate.updateChannel();
   const checkOnStartup = otaUpdate.checkOnStartup();
+  const checkPeriodically = otaUpdate.checkPeriodically();
   const checkInterval = otaUpdate.checkInterval();
   const allowBackendManagement = otaUpdate.allowBackendManagement();
   const requireManualApproval = otaUpdate.requireManualApproval();
+  const updateId = otaUpdate.updateId();
+  const updateStep = otaUpdate.updateStep();
 
   if (!cdnDomain) throw new Error('otaUpdate.cdnDomain is null');
 
@@ -158,9 +175,33 @@ function mapOtaUpdateConfig(hubConfig: HubConfig): OtaUpdateConfig {
     cdnDomain,
     updateChannel,
     checkOnStartup,
+    checkPeriodically,
     checkInterval,
     allowBackendManagement,
     requireManualApproval,
+    updateId,
+    updateStep,
+  };
+}
+
+function mapDnsConfig(hubConfig: HubConfig): DnsConfig {
+  const dns = hubConfig.dns();
+  if (!dns) throw new Error('hubConfig.dns is null');
+
+  const use_dhcp = dns.useDhcp();
+  const primary = dns.primary();
+  const secondary = dns.secondary();
+  const fallback = dns.fallback();
+
+  if (!primary) throw new Error('dns.primary is null');
+  if (!secondary) throw new Error('dns.secondary is null');
+  if (!fallback) throw new Error('dns.fallback is null');
+
+  return {
+    use_dhcp,
+    primary,
+    secondary,
+    fallback,
   };
 }
 
@@ -174,5 +215,6 @@ export function mapConfig(hubConfig: HubConfig | null): Config | null {
     backend: mapBackendConfig(hubConfig),
     serialInput: mapSerialInputConfig(hubConfig),
     otaUpdate: mapOtaUpdateConfig(hubConfig),
+    dns: mapDnsConfig(hubConfig),
   };
 }
