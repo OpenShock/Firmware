@@ -4,7 +4,7 @@
 #define BSSID_ARG(bssid) bssid[0], bssid[1], bssid[2], bssid[3], bssid[4], bssid[5]
 #define BSSID_FMT_LEN    18
 
-#define IPV4ADDR_FMT       "%u.%u.%u.%u"
+#define IPV4ADDR_FMT       "%hhu.%hhu.%hhu.%hhu"
 #define IPV4ADDR_ARG(addr) addr[0], addr[1], addr[2], addr[3]
 #define IPV4ADDR_FMT_LEN   15
 
