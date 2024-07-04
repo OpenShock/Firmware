@@ -210,7 +210,7 @@ void _evWiFiGotIP(arduino_event_t* event) {
   std::uint8_t ip[4];
   memcpy(ip, &info.ip_info.ip.addr, sizeof(ip));
 
-  ESP_LOGI(TAG, "Got IP address %u.%u.%u.%u from network " BSSID_FMT, ip[0], ip[1], ip[2], ip[3], BSSID_ARG(s_connectedBSSID));
+  ESP_LOGI(TAG, "Got IP address " IPV4ADDR_FMT " from network " BSSID_FMT, IPV4ADDR_ARG(ip), BSSID_ARG(s_connectedBSSID));
 }
 void _evWiFiGotIP6(arduino_event_t* event) {
   auto& info = event->event_info.got_ip6;
