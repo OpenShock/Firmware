@@ -78,7 +78,7 @@ bool DnsConfig::FromJSON(const cJSON* json) {
     return false;
   }
 
-  if (!Internal::Utils::FromJsonBool(useDhcp, json, "use_fallback", DNS_USE_DHCP)) {
+  if (!Internal::Utils::FromJsonBool(useDhcp, json, "use_dhcp", DNS_USE_DHCP)) {
     ESP_LOGE(TAG, "failed to parse autoConfigDNS");
     return false;
   }
