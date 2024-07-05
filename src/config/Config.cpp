@@ -36,7 +36,7 @@ static ReadWriteMutex _configMutex;
     return retval;                                 \
   }
 
-#define CONFIG_LOCK_READ(retval) CONFIG_LOCK_READ_ACTION(retval, {})
+#define CONFIG_LOCK_READ(retval)  CONFIG_LOCK_READ_ACTION(retval, {})
 #define CONFIG_LOCK_WRITE(retval) CONFIG_LOCK_WRITE_ACTION(retval, {})
 
 bool _tryDeserializeConfig(const std::uint8_t* buffer, std::size_t bufferLen, OpenShock::Config::RootConfig& config) {
@@ -256,11 +256,7 @@ bool Config::GetWiFiConfig(Config::WiFiConfig& out) {
 }
 
 bool Config::GetDnsConfig(Config::DnsConfig& out) {
-  ScopedReadLock lock(&_configMutex);
-  if (!lock.isLocked()) {
-    ESP_LOGE(TAG, "Failed to acquire read lock");
-    return false;
-  }
+  CONFIG_LOCK_READ(false);
 
   out = _configData.dns;
 
@@ -310,11 +306,7 @@ bool Config::SetWiFiConfig(const Config::WiFiConfig& config) {
 }
 
 bool Config::SetDnsConfig(const Config::DnsConfig& config) {
-  ScopedWriteLock lock(&_configMutex);
-  if (!lock.isLocked()) {
-    ESP_LOGE(TAG, "Failed to acquire write lock");
-    return false;
-  }
+  CONFIG_LOCK_WRITE(false);
 
   _configData.dns = config;
   return _trySaveConfig();
@@ -369,11 +361,7 @@ bool Config::SetBackendConfig(const Config::BackendConfig& config) {
 }
 
 bool Config::ResetDnsConfig() {
-  ScopedWriteLock lock(&_configMutex);
-  if (!lock.isLocked()) {
-    ESP_LOGE(TAG, "Failed to acquire write lock");
-    return false;
-  }
+  CONFIG_LOCK_WRITE(false);
 
   _configData.dns.ToDefault();
   return _trySaveConfig();
@@ -410,11 +398,7 @@ bool Config::SetRFConfigKeepAliveEnabled(bool enabled) {
 }
 
 bool Config::GetDnsConfigUseDHCP(bool& out) {
-  ScopedReadLock lock(&_configMutex);
-  if (!lock.isLocked()) {
-    ESP_LOGE(TAG, "Failed to acquire read lock");
-    return false;
-  }
+  CONFIG_LOCK_READ(false);
 
   out = _configData.dns.useDhcp;
 
@@ -422,22 +406,14 @@ bool Config::GetDnsConfigUseDHCP(bool& out) {
 }
 
 bool Config::SetDnsConfigUseDHCP(bool useDHCP) {
-  ScopedWriteLock lock(&_configMutex);
-  if (!lock.isLocked()) {
-    ESP_LOGE(TAG, "Failed to acquire write lock");
-    return false;
-  }
+  CONFIG_LOCK_WRITE(false);
 
   _configData.dns.useDhcp = useDHCP;
   return _trySaveConfig();
 }
 
 bool Config::GetDnsConfigPrimaryIP(IPAddress& out) {
-  ScopedReadLock lock(&_configMutex);
-  if (!lock.isLocked()) {
-    ESP_LOGE(TAG, "Failed to acquire read lock");
-    return false;
-  }
+  CONFIG_LOCK_READ(false);
 
   out = _configData.dns.primary;
 
@@ -445,22 +421,14 @@ bool Config::GetDnsConfigPrimaryIP(IPAddress& out) {
 }
 
 bool Config::SetDnsConfigPrimaryIP(const IPAddress& ip) {
-  ScopedWriteLock lock(&_configMutex);
-  if (!lock.isLocked()) {
-    ESP_LOGE(TAG, "Failed to acquire write lock");
-    return false;
-  }
+  CONFIG_LOCK_WRITE(false);
 
   _configData.dns.primary = ip;
   return _trySaveConfig();
 }
 
 bool Config::GetDnsConfigSecondaryIP(IPAddress& out) {
-  ScopedReadLock lock(&_configMutex);
-  if (!lock.isLocked()) {
-    ESP_LOGE(TAG, "Failed to acquire read lock");
-    return false;
-  }
+  CONFIG_LOCK_READ(false);
 
   out = _configData.dns.secondary;
 
@@ -468,22 +436,14 @@ bool Config::GetDnsConfigSecondaryIP(IPAddress& out) {
 }
 
 bool Config::SetDnsConfigSecondaryIP(const IPAddress& ip) {
-  ScopedWriteLock lock(&_configMutex);
-  if (!lock.isLocked()) {
-    ESP_LOGE(TAG, "Failed to acquire write lock");
-    return false;
-  }
+  CONFIG_LOCK_WRITE(false);
 
   _configData.dns.secondary = ip;
   return _trySaveConfig();
 }
 
 bool Config::GetDnsConfigFallbackIP(IPAddress& out) {
-  ScopedReadLock lock(&_configMutex);
-  if (!lock.isLocked()) {
-    ESP_LOGE(TAG, "Failed to acquire read lock");
-    return false;
-  }
+  CONFIG_LOCK_READ(false);
 
   out = _configData.dns.fallback;
 
@@ -491,11 +451,7 @@ bool Config::GetDnsConfigFallbackIP(IPAddress& out) {
 }
 
 bool Config::SetDnsConfigFallbackIP(const IPAddress& ip) {
-  ScopedWriteLock lock(&_configMutex);
-  if (!lock.isLocked()) {
-    ESP_LOGE(TAG, "Failed to acquire write lock");
-    return false;
-  }
+  CONFIG_LOCK_WRITE(false);
 
   _configData.dns.fallback = ip;
   return _trySaveConfig();
