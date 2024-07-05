@@ -15,7 +15,7 @@ using namespace OpenShock::Config;
 
 DnsConfig::DnsConfig() : useDhcp(DNS_USE_DHCP), primary(DNS_PRIMARY), secondary(DNS_SECONDARY), fallback(DNS_FALLBACK) { }
 
-DnsConfig::DnsConfig(bool autoConfigDNS, IPAddress primary, IPAddress secondary, IPAddress fallback) : primary(primary), secondary(secondary), fallback(fallback) { }
+DnsConfig::DnsConfig(bool useDhcp, IPAddress primary, IPAddress secondary, IPAddress fallback) : useDhcp(useDhcp), primary(primary), secondary(secondary), fallback(fallback) { }
 
 void DnsConfig::ToDefault() {
   useDhcp   = DNS_USE_DHCP;
