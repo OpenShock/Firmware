@@ -13,9 +13,28 @@ using namespace OpenShock::Config;
 #define DNS_SECONDARY 8, 8, 4, 4  // Google Secondary
 #define DNS_FALLBACK  1, 1, 1, 1  // Cloudflare Primary
 
+bool IsUnassigned(const IPAddress& ip) {
+  return ip.operator std::uint32_t() == 0;
+}
+void LogDnsWarnings(const IPAddress& primary, const IPAddress& secondary, const IPAddress& fallback) {
+  if (IsUnassigned(primary)) {
+    ESP_LOGW(TAG, "Primary DNS is unassigned (0.0.0.0), device will fall back to DHCP");
+  }
+
+  if (IsUnassigned(secondary)) {
+    ESP_LOGW(TAG, "Secondary DNS is unassigned (0.0.0.0), device will fall back to DHCP");
+  }
+
+  if (IsUnassigned(fallback)) {
+    ESP_LOGW(TAG, "Fallback DNS is unassigned (0.0.0.0), if primary and secondary fail, device will not be able to resolve DNS");
+  }
+}
+
 DnsConfig::DnsConfig() : useDhcp(DNS_USE_DHCP), primary(DNS_PRIMARY), secondary(DNS_SECONDARY), fallback(DNS_FALLBACK) { }
 
-DnsConfig::DnsConfig(bool useDhcp, IPAddress primary, IPAddress secondary, IPAddress fallback) : useDhcp(useDhcp), primary(primary), secondary(secondary), fallback(fallback) { }
+DnsConfig::DnsConfig(bool useDhcp, IPAddress primary, IPAddress secondary, IPAddress fallback) : useDhcp(useDhcp), primary(primary), secondary(secondary), fallback(fallback) {
+  LogDnsWarnings(primary, secondary, fallback);
+}
 
 void DnsConfig::ToDefault() {
   useDhcp   = DNS_USE_DHCP;
@@ -46,6 +65,8 @@ bool DnsConfig::FromFlatbuffers(const Serialization::Configuration::DnsConfig* c
     ESP_LOGE(TAG, "failed to parse fallback");
     return false;
   }
+
+  LogDnsWarnings(primary, secondary, fallback);
 
   return true;
 }
@@ -97,6 +118,8 @@ bool DnsConfig::FromJSON(const cJSON* json) {
     ESP_LOGE(TAG, "failed to parse fallback");
     return false;
   }
+
+  LogDnsWarnings(primary, secondary, fallback);
 
   return true;
 }

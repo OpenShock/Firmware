@@ -824,6 +824,8 @@ dns json
 
 dns json <json>
   Set DNS configuration from JSON.
+  Note:
+    Any IP set to 0.0.0.0 will make the device use DHCP for that IP if possible.
   Arguments:
     <json> must be a valid JSON object.
   Example:
@@ -844,6 +846,8 @@ dns primary
 
 dns primary <ip>
   Set the primary DNS server.
+  Note:
+    Setting this to 0.0.0.0 will make the device use DHCP for its primary DNS server.
   Arguments:
     <ip> must be a string.
   Example:
@@ -854,6 +858,8 @@ dns secondary
 
 dns secondary <ip>
   Set the secondary DNS server.
+  Note:
+    Setting this to 0.0.0.0 will make the device use DHCP for its secondary DNS server.
   Arguments:
     <ip> must be a string.
   Example:
@@ -864,6 +870,8 @@ dns fallback
 
 dns fallback <ip>
   Set the fallback DNS server.
+  Note:
+    Setting this to 0.0.0.0 will disable the fallback DNS server, making DNS queries fail if the primary and secondary DNS servers fail.
   Arguments:
     <ip> must be a string.
   Example:
