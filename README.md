@@ -75,3 +75,7 @@ You will need:
 # Install dependencies
 pip install -r requirements.txt
 ```
+
+## Support
+
+You can support the openshock dev team here: [Sponsor OpenShock](https://github.com/sponsors/OpenShock)
