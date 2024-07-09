@@ -76,15 +76,15 @@ bool GatewayConnectionManager::IsLinked() {
   return (s_flags & FLAG_LINKED) != 0;
 }
 
-AccountLinkResultCode GatewayConnectionManager::Link(const char* linkCode) {
+AccountLinkResultCode GatewayConnectionManager::Link(StringView linkCode) {
   if ((s_flags & FLAG_HAS_IP) == 0) {
     return AccountLinkResultCode::NoInternetConnection;
   }
   s_wsClient = nullptr;
 
-  ESP_LOGD(TAG, "Attempting to link to account using code %s", linkCode);
+  ESP_LOGD(TAG, "Attempting to link to account using code %.*s", linkCode.length(), linkCode.data());
 
-  if (std::strlen(linkCode) != LINK_CODE_LENGTH) {
+  if (linkCode.length() != LINK_CODE_LENGTH) {
     ESP_LOGE(TAG, "Invalid link code length");
     return AccountLinkResultCode::InvalidCode;
   }
@@ -109,9 +109,9 @@ AccountLinkResultCode GatewayConnectionManager::Link(const char* linkCode) {
     return AccountLinkResultCode::InternalError;
   }
 
-  const std::string& authToken = response.data.authToken;
+  StringView authToken = response.data.authToken;
 
-  if (authToken.empty()) {
+  if (authToken.isNullOrEmpty()) {
     ESP_LOGE(TAG, "Received empty auth token");
     return AccountLinkResultCode::InternalError;
   }
@@ -148,7 +148,7 @@ bool GatewayConnectionManager::SendMessageBIN(const std::uint8_t* data, std::siz
   return s_wsClient->sendMessageBIN(data, length);
 }
 
-bool FetchDeviceInfo(const String& authToken) {
+bool FetchDeviceInfo(StringView authToken) {
   // TODO: this function is very slow, should be optimized!
   if ((s_flags & FLAG_HAS_IP) == 0) {
     return false;
@@ -208,6 +208,15 @@ bool StartConnectingToLCG() {
 
   _lastConnectionAttempt = msNow;
 
+  if (Config::HasBackendLCGOverride()) {
+    std::string lcgOverride;
+    Config::GetBackendLCGOverride(lcgOverride);
+
+    ESP_LOGD(TAG, "Connecting to overridden LCG endpoint %s", lcgOverride.c_str());
+    s_wsClient->connect(lcgOverride.c_str());
+    return true;
+  }
+
   if (!Config::HasBackendAuthToken()) {
     ESP_LOGD(TAG, "No auth token, can't connect to LCG");
     return false;
@@ -219,7 +228,7 @@ bool StartConnectingToLCG() {
     return false;
   }
 
-  auto response = HTTP::JsonAPI::AssignLcg(authToken.c_str());
+  auto response = HTTP::JsonAPI::AssignLcg(authToken);
 
   if (response.result == HTTP::RequestResult::RateLimited) {
     return false;  // Just return false, don't spam the console with errors

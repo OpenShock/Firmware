@@ -36,7 +36,7 @@ apSsid(optionalEncoding?:any):string|Uint8Array|null {
 }
 
 /**
- * Device hostname
+ * Hub hostname
  */
 hostname():string|null
 hostname(optionalEncoding:flatbuffers.Encoding):string|Uint8Array|null

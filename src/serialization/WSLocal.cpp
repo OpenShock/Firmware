@@ -5,7 +5,7 @@
 #include "util/HexUtils.h"
 #include "wifi/WiFiNetwork.h"
 
-#include "serialization/_fbs/DeviceToLocalMessage_generated.h"
+#include "serialization/_fbs/HubToLocalMessage_generated.h"
 
 const char* const TAG = "WSLocal";
 
@@ -50,7 +50,7 @@ bool Local::SerializeErrorMessage(const char* message, Common::SerializationCall
 
   auto wrapperOffset = Local::CreateErrorMessage(builder, builder.CreateString(message));
 
-  auto msg = Local::CreateDeviceToLocalMessage(builder, Local::DeviceToLocalMessagePayload::ErrorMessage, wrapperOffset.Union());
+  auto msg = Local::CreateHubToLocalMessage(builder, Local::HubToLocalMessagePayload::ErrorMessage, wrapperOffset.Union());
 
   builder.Finish(msg);
 
@@ -80,7 +80,7 @@ bool Local::SerializeReadyMessage(const WiFiNetwork* connectedNetwork, bool acco
 
   auto readyMessageOffset = Serialization::Local::CreateReadyMessage(builder, true, fbsNetwork, accountLinked, configOffset);
 
-  auto msg = Serialization::Local::CreateDeviceToLocalMessage(builder, Serialization::Local::DeviceToLocalMessagePayload::ReadyMessage, readyMessageOffset.Union());
+  auto msg = Serialization::Local::CreateHubToLocalMessage(builder, Serialization::Local::HubToLocalMessagePayload::ReadyMessage, readyMessageOffset.Union());
 
   builder.Finish(msg);
 
@@ -95,7 +95,7 @@ bool Local::SerializeWiFiScanStatusChangedEvent(OpenShock::WiFiScanStatus status
   Serialization::Local::WifiScanStatusMessage scanStatus(status);
   auto scanStatusOffset = builder.CreateStruct(scanStatus);
 
-  auto msg = Serialization::Local::CreateDeviceToLocalMessage(builder, Serialization::Local::DeviceToLocalMessagePayload::WifiScanStatusMessage, scanStatusOffset.Union());
+  auto msg = Serialization::Local::CreateHubToLocalMessage(builder, Serialization::Local::HubToLocalMessagePayload::WifiScanStatusMessage, scanStatusOffset.Union());
 
   builder.Finish(msg);
 
@@ -111,7 +111,7 @@ bool Local::SerializeWiFiNetworkEvent(Types::WifiNetworkEventType eventType, con
 
   auto wrapperOffset = Local::CreateWifiNetworkEvent(builder, eventType, builder.CreateVector(&networkOffset, 1));  // Resulting vector will have 1 element
 
-  auto msg = Local::CreateDeviceToLocalMessage(builder, Local::DeviceToLocalMessagePayload::WifiNetworkEvent, wrapperOffset.Union());
+  auto msg = Local::CreateHubToLocalMessage(builder, Local::HubToLocalMessagePayload::WifiNetworkEvent, wrapperOffset.Union());
 
   builder.Finish(msg);
 
@@ -132,7 +132,7 @@ bool Local::SerializeWiFiNetworksEvent(Types::WifiNetworkEventType eventType, co
 
   auto wrapperOffset = Local::CreateWifiNetworkEvent(builder, eventType, builder.CreateVector(fbsNetworks));
 
-  auto msg = Local::CreateDeviceToLocalMessage(builder, Local::DeviceToLocalMessagePayload::WifiNetworkEvent, wrapperOffset.Union());
+  auto msg = Local::CreateHubToLocalMessage(builder, Local::HubToLocalMessagePayload::WifiNetworkEvent, wrapperOffset.Union());
 
   builder.Finish(msg);
 

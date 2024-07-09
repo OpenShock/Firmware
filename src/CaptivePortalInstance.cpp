@@ -10,7 +10,7 @@
 #include "util/TaskUtils.h"
 #include "wifi/WiFiManager.h"
 
-#include "serialization/_fbs/DeviceToLocalMessage_generated.h"
+#include "serialization/_fbs/HubToLocalMessage_generated.h"
 
 #include <esp_http_server.h>
 

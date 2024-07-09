@@ -1,5 +1,7 @@
 #pragma once
 
+#include "Common.h"
+
 #include <driver/gpio.h>
 
 #include <bitset>
@@ -190,6 +192,9 @@
 #ifdef OPENSHOCK_FW_BOARD_OPENSHOCKCOREV1
 #define OPENSHOCK_BYPASSED_GPIO(pin) ((pin) == 15 || (pin) == 35)
 #endif
+#ifdef OPENSHOCK_FW_BOARD_DFROBOTFIREBEETLE2ESP32E
+#define OPENSHOCK_BYPASSED_GPIO(pin) ((pin) == 2 || (pin) == 5)
+#endif
 #ifndef OPENSHOCK_BYPASSED_GPIO
 #define OPENSHOCK_BYPASSED_GPIO(pin) (false)
 #endif
@@ -198,6 +203,10 @@
 
 namespace OpenShock {
   constexpr bool IsValidGPIOPin(std::uint8_t pin) {
+    if (pin == OPENSHOCK_GPIO_INVALID) {
+      return false;
+    }
+
     if (pin >= GPIO_NUM_MAX) {
       return false;
     }
@@ -230,27 +239,31 @@ namespace OpenShock {
 
     return true;
   }
-  constexpr std::bitset<UINT8_MAX+1> GetValidGPIOPins() {
-    std::bitset<UINT8_MAX+1> pins;
-    for (std::uint8_t i = 0; i < GPIO_NUM_MAX; i++) {
+
+  const std::size_t GPIOPinSetSize = GPIO_NUM_MAX + 1;
+  typedef std::bitset<GPIOPinSetSize> GPIOPinSet;
+
+  constexpr GPIOPinSet GetValidGPIOPins() {
+    GPIOPinSet pins;
+    for (std::size_t i = 0; i < GPIOPinSetSize; i++) {
       if (IsValidGPIOPin(i)) {
         pins.set(i);
       }
     }
     return pins;
   }
-  constexpr std::bitset<UINT8_MAX+1> GetValidInputPins() {
-    std::bitset<UINT8_MAX+1> pins;
-    for (std::uint8_t i = 0; i < GPIO_NUM_MAX; i++) {
+  constexpr GPIOPinSet GetValidInputPins() {
+    GPIOPinSet pins;
+    for (std::size_t i = 0; i < GPIOPinSetSize; i++) {
       if (IsValidInputPin(i)) {
         pins.set(i);
       }
     }
     return pins;
   }
-  constexpr std::bitset<UINT8_MAX+1> GetValidOutputPins() {
-    std::bitset<UINT8_MAX+1> pins;
-    for (std::uint8_t i = 0; i < GPIO_NUM_MAX; i++) {
+  constexpr GPIOPinSet GetValidOutputPins() {
+    GPIOPinSet pins;
+    for (std::size_t i = 0; i < GPIOPinSetSize; i++) {
       if (IsValidOutputPin(i)) {
         pins.set(i);
       }

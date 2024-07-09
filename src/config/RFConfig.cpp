@@ -8,12 +8,12 @@ const char* const TAG = "Config::RFConfig";
 
 using namespace OpenShock::Config;
 
-RFConfig::RFConfig() : txPin(OpenShock::Constants::GPIO_RF_TX), keepAliveEnabled(true) { }
+RFConfig::RFConfig() : txPin(OPENSHOCK_RF_TX_GPIO), keepAliveEnabled(true) { }
 
 RFConfig::RFConfig(std::uint8_t txPin, bool keepAliveEnabled) : txPin(txPin), keepAliveEnabled(keepAliveEnabled) { }
 
 void RFConfig::ToDefault() {
-  txPin            = OpenShock::Constants::GPIO_RF_TX;
+  txPin            = OPENSHOCK_RF_TX_GPIO;
   keepAliveEnabled = true;
 }
 
@@ -44,7 +44,7 @@ bool RFConfig::FromJSON(const cJSON* json) {
     return false;
   }
 
-  Internal::Utils::FromJsonU8(txPin, json, "txPin", OpenShock::Constants::GPIO_RF_TX);
+  Internal::Utils::FromJsonU8(txPin, json, "txPin", OPENSHOCK_RF_TX_GPIO);
   Internal::Utils::FromJsonBool(keepAliveEnabled, json, "keepAliveEnabled", true);
 
   return true;

@@ -29,6 +29,7 @@ std::vector<rmt_data_t> Rmt::CaiXianlinEncoder::GetSequence(std::uint16_t transm
     break;
   case ShockerCommandType::Sound:
     typeVal = 0x03;
+    intensity = 0; // Sound intensity must be 0 for some shockers, otherwise it wont work, or they soft lock until restarted
     break;
   default:
     return {}; // Invalid type

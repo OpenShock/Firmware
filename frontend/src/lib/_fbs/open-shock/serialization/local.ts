@@ -4,8 +4,8 @@
 
 export { AccountLinkCommand } from './local/account-link-command';
 export { AccountUnlinkCommand } from './local/account-unlink-command';
-export { LocalToDeviceMessage } from './local/local-to-device-message';
-export { LocalToDeviceMessagePayload } from './local/local-to-device-message-payload';
+export { LocalToHubMessage } from './local/local-to-hub-message';
+export { LocalToHubMessagePayload } from './local/local-to-hub-message-payload';
 export { OtaUpdateCheckForUpdatesCommand } from './local/ota-update-check-for-updates-command';
 export { OtaUpdateHandleUpdateRequestCommand } from './local/ota-update-handle-update-request-command';
 export { OtaUpdateSetAllowBackendManagementCommand } from './local/ota-update-set-allow-backend-management-command';

@@ -77,7 +77,7 @@ checkInterval():number {
 }
 
 /**
- * Indicates if the backend is authorized to manage the device's update version on behalf of the user.
+ * Indicates if the backend is authorized to manage the hub's update version on behalf of the user.
  */
 allowBackendManagement():boolean {
   const offset = this.bb!.__offset(this.bb_pos, 16);
@@ -101,7 +101,7 @@ updateId():number {
 }
 
 /**
- * Indicates what step of the update process the device is currently in, used to detect failed updates for status reporting.
+ * Indicates what step of the update process the hub is currently in, used to detect failed updates for status reporting.
  */
 updateStep():OtaUpdateStep {
   const offset = this.bb!.__offset(this.bb_pos, 22);

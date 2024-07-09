@@ -13,7 +13,7 @@ void serializeSetRfTxPinResult(std::uint8_t socketId, OpenShock::Serialization::
 
   auto responseOffset = builder.CreateStruct(OpenShock::Serialization::Local::AccountLinkCommandResult(result));
 
-  auto msgOffset = OpenShock::Serialization::Local::CreateDeviceToLocalMessage(builder, OpenShock::Serialization::Local::DeviceToLocalMessagePayload::AccountLinkCommandResult, responseOffset.Union());
+  auto msgOffset = OpenShock::Serialization::Local::CreateHubToLocalMessage(builder, OpenShock::Serialization::Local::HubToLocalMessagePayload::AccountLinkCommandResult, responseOffset.Union());
 
   builder.Finish(msgOffset);
 
@@ -25,7 +25,7 @@ void serializeSetRfTxPinResult(std::uint8_t socketId, OpenShock::Serialization::
 
 using namespace OpenShock::MessageHandlers::Local;
 
-void _Private::HandleAccountLinkCommand(std::uint8_t socketId, const OpenShock::Serialization::Local::LocalToDeviceMessage* root) {
+void _Private::HandleAccountLinkCommand(std::uint8_t socketId, const OpenShock::Serialization::Local::LocalToHubMessage* root) {
   auto msg = root->payload_as_AccountLinkCommand();
   if (msg == nullptr) {
     ESP_LOGE(TAG, "Payload cannot be parsed as AccountLinkCommand");
@@ -44,7 +44,7 @@ void _Private::HandleAccountLinkCommand(std::uint8_t socketId, const OpenShock::
     return;
   }
 
-  auto result = GatewayConnectionManager::Link(code->data());
+  auto result = GatewayConnectionManager::Link(*code);
 
   serializeSetRfTxPinResult(socketId, result);
 }

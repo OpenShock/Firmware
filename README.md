@@ -53,6 +53,7 @@ Confirmed working boards:
   - Lolin S3
 - OpenShock (Legacy)
   - Core V1
+- DFRobot Firebeetle 2 ESP32-E
 
 ## Flashing
 
@@ -66,7 +67,7 @@ You will need:
 
 - VSCode
 - Knowledge about Arduino library and C++
-- Optimally compatible hardware to test your code
+- Compatible ESP-32 board with 433 MHz antenna
 
 ### Setting up
 
@@ -74,3 +75,7 @@ You will need:
 # Install dependencies
 pip install -r requirements.txt
 ```
+
+## Support
+
+You can support the openshock dev team here: [Sponsor OpenShock](https://github.com/sponsors/OpenShock)

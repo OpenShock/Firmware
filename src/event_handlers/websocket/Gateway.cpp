@@ -4,7 +4,7 @@
 
 #include "Logging.h"
 
-#include "serialization/_fbs/GatewayToDeviceMessage_generated.h"
+#include "serialization/_fbs/GatewayToHubMessage_generated.h"
 
 #include <WebSockets.h>
 
@@ -15,7 +15,7 @@ static const char* TAG = "ServerMessageHandlers";
 
 namespace Schemas  = OpenShock::Serialization::Gateway;
 namespace Handlers = OpenShock::MessageHandlers::Server::_Private;
-typedef Schemas::GatewayToDeviceMessagePayload PayloadType;
+typedef Schemas::GatewayToHubMessagePayload PayloadType;
 
 using namespace OpenShock;
 
@@ -36,7 +36,7 @@ static std::array<Handlers::HandlerType, HANDLER_COUNT> s_serverHandlers = []() 
 
 void EventHandlers::WebSocket::HandleGatewayBinary(const std::uint8_t* data, std::size_t len) {
   // Deserialize
-  auto msg = flatbuffers::GetRoot<Schemas::GatewayToDeviceMessage>(data);
+  auto msg = flatbuffers::GetRoot<Schemas::GatewayToHubMessage>(data);
   if (msg == nullptr) {
     ESP_LOGE(TAG, "Failed to deserialize message");
     return;

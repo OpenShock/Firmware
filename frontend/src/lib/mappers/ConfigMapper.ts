@@ -1,5 +1,5 @@
 import type { OtaUpdateChannel } from '$lib/_fbs/open-shock/serialization/configuration';
-import { Config as FbsConfig } from '$lib/_fbs/open-shock/serialization/configuration/config';
+import { HubConfig } from '$lib/_fbs/open-shock/serialization/configuration/hub-config';
 
 // TODO: Update these configs and ensure that typescript enforces them to be up to date
 
@@ -52,9 +52,9 @@ export interface Config {
   otaUpdate: OtaUpdateConfig;
 }
 
-function mapRfConfig(fbsConfig: FbsConfig): RFConfig {
-  const rf = fbsConfig.rf();
-  if (!rf) throw new Error('fbsConfig.rf is null');
+function mapRfConfig(hubConfig: HubConfig): RFConfig {
+  const rf = hubConfig.rf();
+  if (!rf) throw new Error('hubConfig.rf is null');
 
   const txPin = rf.txPin();
   const keepaliveEnabled = rf.keepaliveEnabled();
@@ -65,9 +65,9 @@ function mapRfConfig(fbsConfig: FbsConfig): RFConfig {
   };
 }
 
-function mapWifiConfig(fbsConfig: FbsConfig): WifiConfig {
-  const wifi = fbsConfig.wifi();
-  if (!wifi) throw new Error('fbsConfig.wifi is null');
+function mapWifiConfig(hubConfig: HubConfig): WifiConfig {
+  const wifi = hubConfig.wifi();
+  if (!wifi) throw new Error('hubConfig.wifi is null');
 
   const apSsid = wifi.apSsid();
   const hostname = wifi.hostname();
@@ -102,9 +102,9 @@ function mapWifiConfig(fbsConfig: FbsConfig): WifiConfig {
   };
 }
 
-function mapCaptivePortalConfig(fbsConfig: FbsConfig): CaptivePortalConfig {
-  const captivePortal = fbsConfig.captivePortal();
-  if (!captivePortal) throw new Error('fbsConfig.captivePortal is null');
+function mapCaptivePortalConfig(hubConfig: HubConfig): CaptivePortalConfig {
+  const captivePortal = hubConfig.captivePortal();
+  if (!captivePortal) throw new Error('hubConfig.captivePortal is null');
 
   const alwaysEnabled = captivePortal.alwaysEnabled();
 
@@ -113,9 +113,9 @@ function mapCaptivePortalConfig(fbsConfig: FbsConfig): CaptivePortalConfig {
   };
 }
 
-function mapBackendConfig(fbsConfig: FbsConfig): BackendConfig {
-  const backend = fbsConfig.backend();
-  if (!backend) throw new Error('fbsConfig.backend is null');
+function mapBackendConfig(hubConfig: HubConfig): BackendConfig {
+  const backend = hubConfig.backend();
+  if (!backend) throw new Error('hubConfig.backend is null');
 
   const domain = backend.domain();
   const authToken = backend.authToken();
@@ -128,9 +128,9 @@ function mapBackendConfig(fbsConfig: FbsConfig): BackendConfig {
   };
 }
 
-function mapSerialInputConfig(fbsConfig: FbsConfig): SerialInputConfig {
-  const serialInput = fbsConfig.serialInput();
-  if (!serialInput) throw new Error('fbsConfig.serialInput is null');
+function mapSerialInputConfig(hubConfig: HubConfig): SerialInputConfig {
+  const serialInput = hubConfig.serialInput();
+  if (!serialInput) throw new Error('hubConfig.serialInput is null');
 
   const echoEnabled = serialInput.echoEnabled();
 
@@ -139,9 +139,9 @@ function mapSerialInputConfig(fbsConfig: FbsConfig): SerialInputConfig {
   };
 }
 
-function mapOtaUpdateConfig(fbsConfig: FbsConfig): OtaUpdateConfig {
-  const otaUpdate = fbsConfig.otaUpdate();
-  if (!otaUpdate) throw new Error('fbsConfig.otaUpdate is null');
+function mapOtaUpdateConfig(hubConfig: HubConfig): OtaUpdateConfig {
+  const otaUpdate = hubConfig.otaUpdate();
+  if (!otaUpdate) throw new Error('hubConfig.otaUpdate is null');
 
   const isEnabled = otaUpdate.isEnabled();
   const cdnDomain = otaUpdate.cdnDomain();
@@ -164,15 +164,15 @@ function mapOtaUpdateConfig(fbsConfig: FbsConfig): OtaUpdateConfig {
   };
 }
 
-export function mapConfig(fbsConfig: FbsConfig | null): Config | null {
-  if (!fbsConfig) return null;
+export function mapConfig(hubConfig: HubConfig | null): Config | null {
+  if (!hubConfig) return null;
 
   return {
-    rf: mapRfConfig(fbsConfig),
-    wifi: mapWifiConfig(fbsConfig),
-    captivePortal: mapCaptivePortalConfig(fbsConfig),
-    backend: mapBackendConfig(fbsConfig),
-    serialInput: mapSerialInputConfig(fbsConfig),
-    otaUpdate: mapOtaUpdateConfig(fbsConfig),
+    rf: mapRfConfig(hubConfig),
+    wifi: mapWifiConfig(hubConfig),
+    captivePortal: mapCaptivePortalConfig(hubConfig),
+    backend: mapBackendConfig(hubConfig),
+    serialInput: mapSerialInputConfig(hubConfig),
+    otaUpdate: mapOtaUpdateConfig(hubConfig),
   };
 }

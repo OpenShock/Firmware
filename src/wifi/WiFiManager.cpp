@@ -171,7 +171,7 @@ bool _connect(const std::uint8_t (&bssid)[6], const std::string& password) {
   return _connectImpl(it->ssid, password.c_str(), bssid);
 }
 
-bool _authenticate(const WiFiNetwork& net, const std::string& password) {
+bool _authenticate(const WiFiNetwork& net, StringView password) {
   std::uint8_t id = Config::AddWiFiCredentials(net.ssid, password);
   if (id == 0) {
     Serialization::Local::SerializeErrorMessage("too_many_credentials", CaptivePortal::BroadcastMessageBIN);
@@ -180,7 +180,7 @@ bool _authenticate(const WiFiNetwork& net, const std::string& password) {
 
   Serialization::Local::SerializeWiFiNetworkEvent(Serialization::Types::WifiNetworkEventType::Saved, net, CaptivePortal::BroadcastMessageBIN);
 
-  return _connect(net.ssid, password);
+  return _connect(net.ssid, password.toString());
 }
 
 void _evWiFiConnected(arduino_event_t* event) {
@@ -210,7 +210,7 @@ void _evWiFiGotIP(arduino_event_t* event) {
   std::uint8_t ip[4];
   memcpy(ip, &info.ip_info.ip.addr, sizeof(ip));
 
-  ESP_LOGI(TAG, "Got IP address %u.%u.%u.%u from network " BSSID_FMT, ip[0], ip[1], ip[2], ip[3], BSSID_ARG(s_connectedBSSID));
+  ESP_LOGI(TAG, "Got IP address " IPV4ADDR_FMT " from network " BSSID_FMT, IPV4ADDR_ARG(ip), BSSID_ARG(s_connectedBSSID));
 }
 void _evWiFiGotIP6(arduino_event_t* event) {
   auto& info = event->event_info.got_ip6;
@@ -341,7 +341,7 @@ bool WiFiManager::Init() {
   return true;
 }
 
-bool WiFiManager::Save(const char* ssid, const std::string& password) {
+bool WiFiManager::Save(const char* ssid, StringView password) {
   ESP_LOGV(TAG, "Authenticating to network %s", ssid);
 
   auto it = _findNetworkBySSID(ssid);

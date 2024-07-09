@@ -1,5 +1,7 @@
 #pragma once
 
+#include "StringView.h"
+
 #include <cstdint>
 
 #define DISABLE_COPY(TypeName)              \
@@ -34,7 +36,6 @@
 #endif
 
 namespace OpenShock::Constants {
-  const std::uint8_t GPIO_INVALID = OPENSHOCK_GPIO_INVALID;
-  const std::uint8_t GPIO_RF_TX   = OPENSHOCK_RF_TX_GPIO;
-  const char* const FW_USERAGENT  = OPENSHOCK_FW_USERAGENT;
+  const char* const FW_USERAGENT   = OPENSHOCK_FW_USERAGENT;
+  const StringView FW_USERAGENT_sv = OPENSHOCK_FW_USERAGENT ""_sv;
 }  // namespace OpenShock::Constants

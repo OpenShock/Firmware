@@ -171,16 +171,19 @@ bool CommandHandler::Init() {
 
   std::uint8_t txPin = rfConfig.txPin;
   if (!OpenShock::IsValidOutputPin(txPin)) {
-    if (!OpenShock::IsValidOutputPin(OpenShock::Constants::GPIO_RF_TX)) {
-      ESP_LOGE(TAG, "Configured RF TX pin (%u) is invalid, and default pin (%u) is invalid. Unable to initialize RF transmitter", txPin, OpenShock::Constants::GPIO_RF_TX);
+    if (!OpenShock::IsValidOutputPin(OPENSHOCK_RF_TX_GPIO)) {
+      ESP_LOGE(TAG, "Configured RF TX pin (%u) is invalid, and default pin (%u) is invalid. Unable to initialize RF transmitter", txPin, OPENSHOCK_RF_TX_GPIO);
 
       ESP_LOGD(TAG, "Setting RF TX pin to GPIO_INVALID");
-      return Config::SetRFConfigTxPin(OpenShock::Constants::GPIO_INVALID);  // This is not a error yet, unless we are unable to save the RF TX Pin as invalid
+      return Config::SetRFConfigTxPin(OPENSHOCK_GPIO_INVALID);  // This is not a error yet, unless we are unable to save the RF TX Pin as invalid
     }
 
-    ESP_LOGW(TAG, "Configured RF TX pin (%u) is invalid, using default pin (%u)", txPin, OpenShock::Constants::GPIO_RF_TX);
-    txPin = OpenShock::Constants::GPIO_RF_TX;
-    Config::SetRFConfigTxPin(txPin);
+    ESP_LOGW(TAG, "Configured RF TX pin (%u) is invalid, using default pin (%u)", txPin, OPENSHOCK_RF_TX_GPIO);
+    txPin = OPENSHOCK_RF_TX_GPIO;
+    if (!Config::SetRFConfigTxPin(txPin)) {
+      ESP_LOGE(TAG, "Failed to set RF TX pin in config");
+      return false;
+    }
   }
 
   s_rfTransmitter = std::make_unique<RFTransmitter>(txPin);
@@ -270,7 +273,7 @@ std::uint8_t CommandHandler::GetRfTxPin() {
   std::uint8_t txPin;
   if (!Config::GetRFConfigTxPin(txPin)) {
     ESP_LOGE(TAG, "Failed to get RF TX pin from config");
-    txPin = OpenShock::Constants::GPIO_INVALID;
+    txPin = OPENSHOCK_GPIO_INVALID;
   }
 
   return txPin;

@@ -3,7 +3,7 @@
 #include "event_handlers/impl/WSLocal.h"
 #include "Logging.h"
 
-#include "serialization/_fbs/LocalToDeviceMessage_generated.h"
+#include "serialization/_fbs/LocalToHubMessage_generated.h"
 
 #include <WebSockets.h>
 
@@ -14,7 +14,7 @@ static const char* TAG = "LocalMessageHandlers";
 
 namespace Schemas  = OpenShock::Serialization::Local;
 namespace Handlers = OpenShock::MessageHandlers::Local::_Private;
-typedef Schemas::LocalToDeviceMessagePayload PayloadType;
+typedef Schemas::LocalToHubMessagePayload PayloadType;
 
 using namespace OpenShock;
 
@@ -40,7 +40,7 @@ static std::array<Handlers::HandlerType, HANDLER_COUNT> s_localHandlers = []() {
 
 void EventHandlers::WebSocket::HandleLocalBinary(std::uint8_t socketId, const std::uint8_t* data, std::size_t len) {
   // Deserialize
-  auto msg = flatbuffers::GetRoot<Schemas::LocalToDeviceMessage>(data);
+  auto msg = flatbuffers::GetRoot<Schemas::LocalToHubMessage>(data);
   if (msg == nullptr) {
     ESP_LOGE(TAG, "Failed to deserialize message");
     return;

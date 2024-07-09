@@ -1,9 +1,0 @@
-namespace OpenShock.Serialization.Types;
-
-table SemVer {
-  major: uint16;
-  minor: uint16;
-  patch: uint16;
-  prerelease: string;
-  build: string;
-}

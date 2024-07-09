@@ -1,7 +1,0 @@
-namespace OpenShock.Serialization.Types;
-
-enum FirmwareBootType : uint8 {
-  Normal = 0,
-  NewFirmware = 1,
-  Rollback = 2,
-}

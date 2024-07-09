@@ -1,6 +1,6 @@
 import { Builder as FlatbufferBuilder } from 'flatbuffers';
-import { LocalToDeviceMessage } from '$lib/_fbs/open-shock/serialization/local/local-to-device-message';
-import { LocalToDeviceMessagePayload } from '$lib/_fbs/open-shock/serialization/local/local-to-device-message-payload';
+import { LocalToHubMessage } from '$lib/_fbs/open-shock/serialization/local/local-to-hub-message';
+import { LocalToHubMessagePayload } from '$lib/_fbs/open-shock/serialization/local/local-to-hub-message-payload';
 import { WifiNetworkSaveCommand } from '$lib/_fbs/open-shock/serialization/local/wifi-network-save-command';
 
 export function SerializeWifiNetworkSaveCommand(ssid: string, password: string | null, connect: boolean): Uint8Array {
@@ -14,7 +14,7 @@ export function SerializeWifiNetworkSaveCommand(ssid: string, password: string |
 
   const cmdOffset = WifiNetworkSaveCommand.createWifiNetworkSaveCommand(fbb, ssidOffset, passwordOffset, connect);
 
-  const payloadOffset = LocalToDeviceMessage.createLocalToDeviceMessage(fbb, LocalToDeviceMessagePayload.WifiNetworkSaveCommand, cmdOffset);
+  const payloadOffset = LocalToHubMessage.createLocalToHubMessage(fbb, LocalToHubMessagePayload.WifiNetworkSaveCommand, cmdOffset);
 
   fbb.finish(payloadOffset);
 
