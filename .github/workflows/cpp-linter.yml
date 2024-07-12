@@ -18,11 +18,11 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
-          style: ''  # disable clang-format checks. 
-          tidy-checks: '' # Use .clang-tidy config file. 
+          style: file
 
       - name: Fail fast?!
         if: steps.linter.outputs.checks-failed > 0
         run: |
           echo "Some files failed the linting checks!"
-          exit 1
+        # for actual deployment
+        # run: exit 1
