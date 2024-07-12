@@ -22,6 +22,10 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
           style: file
+          version: 18
+          step-summary: true
+          tidy-review: true
+          format-review: true
 
       - name: Fail fast?!
         if: steps.linter.outputs.checks-failed > 0
