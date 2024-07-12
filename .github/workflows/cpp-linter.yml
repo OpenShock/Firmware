@@ -2,10 +2,11 @@ name: cpp-linter
 
 on:
   pull_request:
-    types: [opened, reopened]
+    types: [opened, reopened, synchronize]
     paths: [ '**.c', '**.h', '**.cpp', '**.hpp', '.clang-format' ]
   push:
     paths: [ '**.c', '**.h', '**.cpp', '**.hpp', '.clang-format' ]
+  workflow_dispatch: # Manually invoked by user.
 
 jobs:
   cpp-linter:
