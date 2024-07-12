@@ -24,7 +24,6 @@ jobs:
           style: file
           version: 18
           step-summary: true
-          tidy-review: true
           format-review: true
 
       - name: Fail fast?!
