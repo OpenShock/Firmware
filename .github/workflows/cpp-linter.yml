@@ -1,0 +1,27 @@
+name: cpp-linter
+
+on:
+  pull_request:
+    types: [opened, reopened]
+    paths: [ '**.c', '**.h', '**.cpp', '**.hpp', '.clang-format' ]
+  push:
+    paths: [ '**.c', '**.h', '**.cpp', '**.hpp', '.clang-format' ]
+
+jobs:
+  cpp-linter:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - uses: cpp-linter/cpp-linter-action@v2
+        id: linter
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          style: ''  # disable clang-format checks. 
+          tidy-checks: '' # Use .clang-tidy config file. 
+
+      - name: Fail fast?!
+        if: steps.linter.outputs.checks-failed > 0
+        run: |
+          echo "Some files failed the linting checks!"
+          exit 1
