@@ -96,7 +96,8 @@ async function uploadDir(dirName: string, remoteDirKey: string) {
   }
 }
 async function uploadStdin(remoteFileKey: string, contentTypeMime: string | null) {
-  await uploadStream(process.stdin, remoteFileKey, undefined, contentTypeMime);
+  const stdin = stream.Readable.from(fs.readFileSync(0));
+  await uploadStream(stdin, remoteFileKey, undefined, contentTypeMime);
 }
 
 // Usage:
