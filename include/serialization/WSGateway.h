@@ -5,7 +5,7 @@
 #include "serialization/CallbackFn.h"
 #include "StringView.h"
 
-#include "serialization/_fbs/DeviceToGatewayMessage_generated.h"
+#include "serialization/_fbs/HubToGatewayMessage_generated.h"
 
 namespace OpenShock::Serialization::Gateway {
   bool SerializeKeepAliveMessage(Common::SerializationCallbackFn callback);

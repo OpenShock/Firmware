@@ -9,7 +9,7 @@
 #include "config/WiFiConfig.h"
 
 namespace OpenShock::Config {
-  struct RootConfig : public ConfigBase<Serialization::Configuration::Config> {
+  struct RootConfig : public ConfigBase<Serialization::Configuration::HubConfig> {
     OpenShock::Config::RFConfig rf;
     OpenShock::Config::WiFiConfig wifi;
     OpenShock::Config::CaptivePortalConfig captivePortal;
@@ -19,8 +19,8 @@ namespace OpenShock::Config {
 
     void ToDefault() override;
 
-    bool FromFlatbuffers(const Serialization::Configuration::Config* config) override;
-    flatbuffers::Offset<Serialization::Configuration::Config> ToFlatbuffers(flatbuffers::FlatBufferBuilder& builder, bool withSensitiveData) const override;
+    bool FromFlatbuffers(const Serialization::Configuration::HubConfig* config) override;
+    flatbuffers::Offset<Serialization::Configuration::HubConfig> ToFlatbuffers(flatbuffers::FlatBufferBuilder& builder, bool withSensitiveData) const override;
 
     bool FromJSON(const cJSON* json) override;
     cJSON* ToJSON(bool withSensitiveData) const override;

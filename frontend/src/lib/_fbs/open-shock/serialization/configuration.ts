@@ -4,7 +4,7 @@
 
 export { BackendConfig } from './configuration/backend-config';
 export { CaptivePortalConfig } from './configuration/captive-portal-config';
-export { Config } from './configuration/config';
+export { HubConfig } from './configuration/hub-config';
 export { OtaUpdateChannel } from './configuration/ota-update-channel';
 export { OtaUpdateConfig } from './configuration/ota-update-config';
 export { OtaUpdateStep } from './configuration/ota-update-step';

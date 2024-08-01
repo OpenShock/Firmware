@@ -2,9 +2,11 @@
 
 /* eslint-disable @typescript-eslint/no-unused-vars, @typescript-eslint/no-explicit-any, @typescript-eslint/no-non-null-assertion */
 
-export { CaptivePortalConfig } from './gateway/captive-portal-config';
-export { GatewayToDeviceMessage } from './gateway/gateway-to-device-message';
-export { GatewayToDeviceMessagePayload } from './gateway/gateway-to-device-message-payload';
-export { OtaInstall } from './gateway/ota-install';
-export { ShockerCommand } from './gateway/shocker-command';
-export { ShockerCommandList } from './gateway/shocker-command-list';
+export { BootStatus } from './gateway/boot-status';
+export { HubToGatewayMessage } from './gateway/hub-to-gateway-message';
+export { HubToGatewayMessagePayload } from './gateway/hub-to-gateway-message-payload';
+export { KeepAlive } from './gateway/keep-alive';
+export { OtaInstallFailed } from './gateway/ota-install-failed';
+export { OtaInstallProgress } from './gateway/ota-install-progress';
+export { OtaInstallProgressTask } from './gateway/ota-install-progress-task';
+export { OtaInstallStarted } from './gateway/ota-install-started';

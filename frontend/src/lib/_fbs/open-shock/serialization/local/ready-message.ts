@@ -4,7 +4,7 @@
 
 import * as flatbuffers from 'flatbuffers';
 
-import { Config } from '../../../open-shock/serialization/configuration/config';
+import { HubConfig } from '../../../open-shock/serialization/configuration/hub-config';
 import { WifiNetwork } from '../../../open-shock/serialization/types/wifi-network';
 
 
@@ -41,9 +41,9 @@ accountLinked():boolean {
   return offset ? !!this.bb!.readInt8(this.bb_pos + offset) : false;
 }
 
-config(obj?:Config):Config|null {
+config(obj?:HubConfig):HubConfig|null {
   const offset = this.bb!.__offset(this.bb_pos, 10);
-  return offset ? (obj || new Config()).__init(this.bb!.__indirect(this.bb_pos + offset), this.bb!) : null;
+  return offset ? (obj || new HubConfig()).__init(this.bb!.__indirect(this.bb_pos + offset), this.bb!) : null;
 }
 
 static startReadyMessage(builder:flatbuffers.Builder) {

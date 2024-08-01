@@ -12,9 +12,10 @@ void RootConfig::ToDefault() {
   captivePortal.ToDefault();
   backend.ToDefault();
   serialInput.ToDefault();
+  otaUpdate.ToDefault();
 }
 
-bool RootConfig::FromFlatbuffers(const Serialization::Configuration::Config* config) {
+bool RootConfig::FromFlatbuffers(const Serialization::Configuration::HubConfig* config) {
   if (config == nullptr) {
     ESP_LOGE(TAG, "config is null");
     return false;
@@ -53,7 +54,7 @@ bool RootConfig::FromFlatbuffers(const Serialization::Configuration::Config* con
   return true;
 }
 
-flatbuffers::Offset<OpenShock::Serialization::Configuration::Config> RootConfig::ToFlatbuffers(flatbuffers::FlatBufferBuilder& builder, bool withSensitiveData) const {
+flatbuffers::Offset<OpenShock::Serialization::Configuration::HubConfig> RootConfig::ToFlatbuffers(flatbuffers::FlatBufferBuilder& builder, bool withSensitiveData) const {
   auto rfOffset            = rf.ToFlatbuffers(builder, withSensitiveData);
   auto wifiOffset          = wifi.ToFlatbuffers(builder, withSensitiveData);
   auto captivePortalOffset = captivePortal.ToFlatbuffers(builder, withSensitiveData);
@@ -61,7 +62,7 @@ flatbuffers::Offset<OpenShock::Serialization::Configuration::Config> RootConfig:
   auto serialInputOffset   = serialInput.ToFlatbuffers(builder, withSensitiveData);
   auto otaUpdateOffset     = otaUpdate.ToFlatbuffers(builder, withSensitiveData);
 
-  return Serialization::Configuration::CreateConfig(builder, rfOffset, wifiOffset, captivePortalOffset, backendOffset, serialInputOffset, otaUpdateOffset);
+  return Serialization::Configuration::CreateHubConfig(builder, rfOffset, wifiOffset, captivePortalOffset, backendOffset, serialInputOffset, otaUpdateOffset);
 }
 
 bool RootConfig::FromJSON(const cJSON* json) {

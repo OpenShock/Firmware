@@ -20,7 +20,7 @@ bool Gateway::SerializeKeepAliveMessage(Common::SerializationCallbackFn callback
   Gateway::KeepAlive keepAlive(static_cast<std::uint64_t>(uptime));
   auto keepAliveOffset = builder.CreateStruct(keepAlive);
 
-  auto msg = Gateway::CreateDeviceToGatewayMessage(builder, Gateway::DeviceToGatewayMessagePayload::KeepAlive, keepAliveOffset.Union());
+  auto msg = Gateway::CreateHubToGatewayMessage(builder, Gateway::HubToGatewayMessagePayload::KeepAlive, keepAliveOffset.Union());
 
   builder.Finish(msg);
 
@@ -36,7 +36,7 @@ bool Gateway::SerializeBootStatusMessage(std::int32_t updateId, OpenShock::Firmw
 
   auto fbsBootStatus = Gateway::CreateBootStatus(builder, bootType, fbsVersion, updateId);
 
-  auto msg = Gateway::CreateDeviceToGatewayMessage(builder, Gateway::DeviceToGatewayMessagePayload::BootStatus, fbsBootStatus.Union());
+  auto msg = Gateway::CreateHubToGatewayMessage(builder, Gateway::HubToGatewayMessagePayload::BootStatus, fbsBootStatus.Union());
 
   builder.Finish(msg);
 
@@ -52,7 +52,7 @@ bool Gateway::SerializeOtaInstallStartedMessage(std::int32_t updateId, const Ope
 
   auto otaInstallStartedOffset = Gateway::CreateOtaInstallStarted(builder, updateId, versionOffset);
 
-  auto msg = Gateway::CreateDeviceToGatewayMessage(builder, Gateway::DeviceToGatewayMessagePayload::OtaInstallStarted, otaInstallStartedOffset.Union());
+  auto msg = Gateway::CreateHubToGatewayMessage(builder, Gateway::HubToGatewayMessagePayload::OtaInstallStarted, otaInstallStartedOffset.Union());
 
   builder.Finish(msg);
 
@@ -66,7 +66,7 @@ bool Gateway::SerializeOtaInstallProgressMessage(std::int32_t updateId, Gateway:
 
   auto otaInstallProgressOffset = Gateway::CreateOtaInstallProgress(builder, updateId, task, progress);
 
-  auto msg = Gateway::CreateDeviceToGatewayMessage(builder, Gateway::DeviceToGatewayMessagePayload::OtaInstallProgress, otaInstallProgressOffset.Union());
+  auto msg = Gateway::CreateHubToGatewayMessage(builder, Gateway::HubToGatewayMessagePayload::OtaInstallProgress, otaInstallProgressOffset.Union());
 
   builder.Finish(msg);
 
@@ -82,7 +82,7 @@ bool Gateway::SerializeOtaInstallFailedMessage(std::int32_t updateId, StringView
 
   auto otaInstallFailedOffset = Gateway::CreateOtaInstallFailed(builder, updateId, messageOffset, fatal);
 
-  auto msg = Gateway::CreateDeviceToGatewayMessage(builder, Gateway::DeviceToGatewayMessagePayload::OtaInstallFailed, otaInstallFailedOffset.Union());
+  auto msg = Gateway::CreateHubToGatewayMessage(builder, Gateway::HubToGatewayMessagePayload::OtaInstallFailed, otaInstallFailedOffset.Union());
 
   builder.Finish(msg);
 
