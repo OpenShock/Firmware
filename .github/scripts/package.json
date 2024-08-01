@@ -12,7 +12,6 @@
     "@actions/github": "^6.0.0",
     "@aws-sdk/client-s3": "^3.621.0",
     "@types/ini": "^4.1.1",
-    "@types/mime": "^4.0.0",
     "@types/node": "^22.0.2",
     "@types/semver": "^7.5.8",
     "ini": "^4.1.3",
