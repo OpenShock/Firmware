@@ -48,7 +48,7 @@ function getFileHashMD5(fileName: string): string {
   return md5sum.split(' ')[0];
 }
 
-async function uploadStream(Body: stream.Readable, Key: string, ContentLength: number | undefined = undefined, contentTypeMime: string | null = null, ContentMD5: string | undefined = undefined) {
+async function uploadStream(Body: stream.Readable | Buffer, Key: string, ContentLength: number | undefined = undefined, contentTypeMime: string | null = null, ContentMD5: string | undefined = undefined) {
   const command = new PutObjectCommand({
     Bucket: s3Bucket,
     Key,
@@ -96,7 +96,7 @@ async function uploadDir(dirName: string, remoteDirKey: string) {
   }
 }
 async function uploadStdin(remoteFileKey: string, contentTypeMime: string | null) {
-  const stdin = stream.Readable.from(fs.readFileSync(0));
+  const stdin = fs.readFileSync(0);
   await uploadStream(stdin, remoteFileKey, undefined, contentTypeMime);
 }
 
