@@ -11,7 +11,7 @@ using namespace OpenShock;
 
 std::vector<rmt_data_t> Rmt::Petrainer998DREncoder::GetSequence(std::uint16_t shockerId, ShockerCommandType type, std::uint8_t intensity) {
   // Intensity must be between 0 and 100
-  intensity = std::min(intensity, static_cast<std::uint8_t>(100));
+  intensity = std::min(intensity, static_cast<std::uint8_t>(100U));
 
   std::uint8_t typeVal = 0;
   // typeInvert has the value of typeVal but bits are reversed and inverted

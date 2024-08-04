@@ -17,7 +17,7 @@ using namespace OpenShock;
 
 std::vector<rmt_data_t> Rmt::CaiXianlinEncoder::GetSequence(std::uint16_t transmitterId, std::uint8_t channelId, ShockerCommandType type, std::uint8_t intensity) {
   // Intensity must be between 0 and 99
-  intensity = std::min(intensity, static_cast<std::uint8_t>(99));
+  intensity = std::min(intensity, static_cast<std::uint8_t>(99U));
 
   std::uint8_t typeVal = 0;
   switch (type) {
