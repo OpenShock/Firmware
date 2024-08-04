@@ -16,14 +16,14 @@ static EStopManager::EStopStatus s_estopStatus   = EStopManager::EStopStatus::AL
 static std::uint32_t s_estopHoldToClearTime      = 5000;
 static std::int64_t s_lastEStopButtonStateChange = 0;
 static std::int64_t s_estoppedAt                 = 0;
-static int s_lastEStopButtonState                = HIGH;
+static bool s_lastEStopButtonState               = true;
 
 static std::uint8_t s_estopPin;
 
 void _estopManagerTask(TimerHandle_t xTimer) {
   configASSERT(xTimer);
 
-  int buttonState = digitalRead(s_estopPin);
+  bool buttonState = digitalRead(s_estopPin) != 0;
   if (buttonState != s_lastEStopButtonState) {
     s_lastEStopButtonStateChange = OpenShock::millis();
   }
@@ -38,7 +38,7 @@ void _estopManagerTask(TimerHandle_t xTimer) {
       }
       break;
     case EStopManager::EStopStatus::ESTOPPED_AND_HELD:
-      if (buttonState == HIGH) {
+      if (buttonState) {
         // User has released the button, now we can trust them holding to clear it.
         s_estopStatus = EStopManager::EStopStatus::ESTOPPED;
         OpenShock::VisualStateManager::SetEmergencyStop(s_estopStatus);
@@ -46,7 +46,7 @@ void _estopManagerTask(TimerHandle_t xTimer) {
       break;
     case EStopManager::EStopStatus::ESTOPPED:
       // If the button is held again for the specified time after being released, clear the EStop
-      if (buttonState == LOW && s_lastEStopButtonState == LOW && s_lastEStopButtonStateChange + s_estopHoldToClearTime <= OpenShock::millis()) {
+      if (!buttonState && !s_lastEStopButtonState && s_lastEStopButtonStateChange + s_estopHoldToClearTime <= OpenShock::millis()) {
         s_estopStatus = EStopManager::EStopStatus::ESTOPPED_CLEARED;
         ESP_LOGI(TAG, "EStop cleared");
         OpenShock::VisualStateManager::SetEmergencyStop(s_estopStatus);
@@ -54,7 +54,7 @@ void _estopManagerTask(TimerHandle_t xTimer) {
       break;
     case EStopManager::EStopStatus::ESTOPPED_CLEARED:
       // If the button is released, report as ALL_CLEAR
-      if (buttonState == HIGH) {
+      if (buttonState) {
         s_estopStatus = EStopManager::EStopStatus::ALL_CLEAR;
         ESP_LOGI(TAG, "EStop cleared, all clear");
         OpenShock::VisualStateManager::SetEmergencyStop(s_estopStatus);
