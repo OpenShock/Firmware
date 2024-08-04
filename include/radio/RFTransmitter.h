@@ -3,6 +3,9 @@
 #include "ShockerCommandType.h"
 #include "ShockerModelType.h"
 
+#include <freertos/FreeRTOS.h>
+#include <freertos/task.h>
+
 #include <cstdint>
 
 // Forward definitions to remove clutter
@@ -10,7 +13,6 @@ struct rmt_obj_s;
 typedef rmt_obj_s rmt_obj_t;
 struct QueueDefinition;
 typedef QueueDefinition* QueueHandle_t;
-typedef void* TaskHandle_t;
 
 namespace OpenShock {
   class RFTransmitter {
