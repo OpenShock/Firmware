@@ -6,8 +6,6 @@
 #include "Time.h"
 #include "VisualStateManager.h"
 
-#include <Arduino.h>
-
 const char* const TAG = "EStopManager";
 
 using namespace OpenShock;
