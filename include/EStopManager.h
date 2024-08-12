@@ -10,7 +10,7 @@ namespace OpenShock::EStopManager {
     ESTOPPED_CLEARED    // The EStop has been cleared by the user, but we're waiting for the user to release the button (to avoid incidental estops)
   };
 
-  void Init(std::uint16_t updateIntervalMs);
+  void Init();
   bool IsEStopped();
-  std::int64_t WhenEStopped();
+  std::int64_t LastEStopped();
 }  // namespace OpenShock::EStopManager
