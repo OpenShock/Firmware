@@ -19,7 +19,7 @@ namespace OpenShock::Config::Internal::Utils {
   bool FromJsonStr(std::string& str, const cJSON* json, const char* name, const char* defaultStr);
   bool FromJsonIPAddress(IPAddress& ip, const cJSON* json, const char* name, const IPAddress& defaultIP);
 
-  template<typename T, typename U>  // T inherits from ConfigBase<U>
+  template<typename T, typename U> // T inherits from ConfigBase<U>
   void FromFbsVec(std::vector<T>& vec, const flatbuffers::Vector<flatbuffers::Offset<U>>* fbsVec) {
     vec.clear();
 
