@@ -9,9 +9,9 @@ const char* const TAG = "Config::DnsConfig";
 using namespace OpenShock::Config;
 
 #define DNS_USE_DHCP  true
-#define DNS_PRIMARY   8, 8, 8, 8  // Google Primary
-#define DNS_SECONDARY 8, 8, 4, 4  // Google Secondary
-#define DNS_FALLBACK  1, 1, 1, 1  // Cloudflare Primary
+#define DNS_PRIMARY   8, 8, 8, 8 // Google Primary
+#define DNS_SECONDARY 8, 8, 4, 4 // Google Secondary
+#define DNS_FALLBACK  1, 1, 1, 1 // Cloudflare Primary
 
 bool IsUnassigned(const IPAddress& ip) {
   return ip.operator std::uint32_t() == 0;
