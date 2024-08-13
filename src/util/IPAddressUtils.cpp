@@ -45,7 +45,7 @@ bool OpenShock::IPAddressFromStringView(IPAddress& ip, StringView sv) {
       return false; // Only 3 dots allowed
     }
     octetValue = 0;
-    digits = 0;
+    digits     = 0;
   }
 
   if (octetIndex != 3 || digits == 0) {
