@@ -26,4 +26,4 @@ namespace OpenShock::Config {
     bool FromJSON(const cJSON* json) override;
     cJSON* ToJSON(bool withSensitiveData) const override;
   };
-}  // namespace OpenShock::Config
+} // namespace OpenShock::Config
