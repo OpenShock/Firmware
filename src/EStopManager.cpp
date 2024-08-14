@@ -18,7 +18,6 @@ using namespace OpenShock;
 
 const std::uint32_t k_estopHoldToClearTime = 5000;
 const std::uint32_t k_estopDebounceTime    = 100;
-static TimerHandle_t s_estopHoldTimer;
 
 static TaskHandle_t s_estopEventHandlerTask;
 static QueueHandle_t s_estopEventQueue;
@@ -39,9 +38,24 @@ struct EstopEventQueueMessage {
 // This high-priority task is usually idling, waiting for
 // messages from the EStop interrupt or it's hold timer
 void _estopEventHandler(void* pvParameters) {
+  std::int64_t deactivatesAt = 0;
   for (;;) {
+    // Wait indefinitely for a message from the EStop interrupt routine
+    TickType_t waitTime = portMAX_DELAY;
+
+    // If the EStop is being deactivated, wait for the hold timer to trigger
+    if (deactivatesAt > 0) {
+      std::int64_t now = OpenShock::millis();
+      if (now >= deactivatesAt) {
+        waitTime = 0;
+      } else {
+        waitTime = pdMS_TO_TICKS(deactivatesAt - OpenShock::millis());
+      }
+    }
+
+    // Wait for a message from the EStop interrupt routine
     EstopEventQueueMessage message;
-    if (xQueueReceive(s_estopEventQueue, &message, portMAX_DELAY) == pdTRUE) {
+    if (xQueueReceive(s_estopEventQueue, &message, waitTime) == pdTRUE) {
       std::int64_t now = OpenShock::millis();
 
       bool pressed            = (message.flags & k_estopEventQueueMessageFlagPressed) != 0;
@@ -74,9 +88,9 @@ void _estopEventHandler(void* pvParameters) {
           break;
         case EStopManager::EStopStatus::ESTOPPED:
           if (pressed && (now - s_estopActivatedAt >= k_estopDebounceTime)) {
-            xTimerStart(s_estopHoldTimer, portMAX_DELAY);
+            deactivatesAt = now + k_estopHoldToClearTime;
           } else if (released) {
-            xTimerStop(s_estopHoldTimer, portMAX_DELAY);
+            deactivatesAt = 0;
           } else if (holdTimerTriggered) {
             // If the button is held again for the specified time after being released, clear the EStop
             s_estopStatus = EStopManager::EStopStatus::ESTOPPED_CLEARED;
@@ -96,6 +110,13 @@ void _estopEventHandler(void* pvParameters) {
       }
       OpenShock::VisualStateManager::SetEmergencyStop(s_estopStatus);
       OpenShock::CommandHandler::SetKeepAlivePaused(EStopManager::IsEStopped());
+    } else if (deactivatesAt > 0 && OpenShock::millis() >= deactivatesAt) { // If we didn't get a message, the time probably expired, check if the estop is pending deactivation and if we have reached that time
+      // Reset the deactivation time
+      deactivatesAt = 0;
+
+      // If the button is held for the specified time, clear the EStop
+      s_estopStatus = EStopManager::EStopStatus::ESTOPPED_CLEARED;
+      ESP_LOGI(TAG, "EStop cleared, awaiting release");
     }
   }
 }
@@ -127,7 +148,7 @@ void _estopEdgeInterrupt(void* arg) {
 
   EstopEventQueueMessage message = {.flags = flags};
 
-  xQueueSendToBackFromISR(s_estopEventQueue, &message, &higherPriorityTaskWoken);
+  xQueueSendToBackFromISR(s_estopEventQueue, &message, &higherPriorityTaskWoken); // TODO: Check if queue is full?
 
   if (higherPriorityTaskWoken) {
     portYIELD_FROM_ISR();
@@ -162,7 +183,6 @@ void EStopManager::Init() {
   gpio_config(&io_conf);
 
   // TODO?: Should we maybe use statically allocated queues and timers? See CreateStatic for both.
-  s_estopHoldTimer  = xTimerCreate("EStopHeld", pdMS_TO_TICKS(k_estopHoldToClearTime), false, nullptr, _estopHoldTimer);
   s_estopEventQueue = xQueueCreate(8, sizeof(EstopEventQueueMessage));
 
   if (gpio_install_isr_service(ESP_INTR_FLAG_EDGE) != ESP_OK) {
