@@ -20,8 +20,9 @@ const std::uint32_t k_estopDebounceTime    = 100;
 static TaskHandle_t s_estopEventHandlerTask;
 static QueueHandle_t s_estopEventQueue;
 
-static EStopManager::EStopStatus s_estopStatus = EStopManager::EStopStatus::ALL_CLEAR;
-static std::int64_t s_estopActivatedAt         = 0;
+static bool s_estopActive              = false;
+static bool s_estopAwaitingRelease     = false;
+static std::int64_t s_estopActivatedAt = 0;
 
 static gpio_num_t s_estopPin;
 
@@ -60,16 +61,19 @@ void _estopEventHandler(void* pvParameters) {
 
       if (message.deactivatesAtChanged) {
         ESP_LOGI(TAG, "EStop deactivation time changed");
+        deactivatesAt = message.deactivatesAt;
       }
 
-      OpenShock::VisualStateManager::SetEmergencyStop(s_estopStatus);
+      OpenShock::VisualStateManager::SetEmergencyStopStatus(s_estopActive, s_estopAwaitingRelease);
       OpenShock::CommandHandler::SetKeepAlivePaused(EStopManager::IsEStopped());
     } else if (deactivatesAt != 0 && OpenShock::millis() >= deactivatesAt) {  // If we didn't get a message, the time probably expired, check if the estop is pending deactivation and if we have reached that time
       // Reset the deactivation time
       deactivatesAt = 0;
 
       // If the button is held for the specified time, clear the EStop
-      s_estopStatus = EStopManager::EStopStatus::ESTOPPED_CLEARED;
+      s_estopAwaitingRelease = true;
+      OpenShock::VisualStateManager::SetEmergencyStopStatus(s_estopActive, s_estopAwaitingRelease);
+
       ESP_LOGI(TAG, "EStop cleared, awaiting release");
     }
   }
@@ -86,41 +90,18 @@ void _estopEdgeInterrupt(void* arg) {
   bool deactivatesAtChanged  = false;
   std::int64_t deactivatesAt = 0;
 
-  // Set the internal state here quickly, we'll do more complex notifications outside of the ISR.
-  switch (s_estopStatus) {
-    case EStopManager::EStopStatus::ALL_CLEAR:
-      if (pressed) {
-        s_estopStatus      = EStopManager::EStopStatus::ESTOPPED_AND_HELD;
-        s_estopActivatedAt = now;
-      }
-      break;
-    case EStopManager::EStopStatus::ESTOPPED_AND_HELD:
-      // Hypothetical edge case with this debounce would require the user to tap it again to exit AND_HELD state,
-      // However, I can't create the behavior in testing*, so a hypothetical annoyance is an acceptable trade-off.
-      // *(Likely due to extra release events being sent into the queue on each press)
-      if (!pressed && (now - s_estopActivatedAt >= k_estopDebounceTime)) {
-        // User has released the button, now we can trust them holding to clear it.
-        s_estopStatus = EStopManager::EStopStatus::ESTOPPED;
-      }
-      break;
-    case EStopManager::EStopStatus::ESTOPPED:
-      if (pressed && (now - s_estopActivatedAt >= k_estopDebounceTime)) {
-        deactivatesAtChanged = true;
-        deactivatesAt        = now + k_estopHoldToClearTime;
-      } else if (!pressed) {
-        deactivatesAtChanged = true;
-        deactivatesAt        = 0;
-      }
-      break;
-    case EStopManager::EStopStatus::ESTOPPED_CLEARED:
-      // If the button is released, report as ALL_CLEAR
-      if (!pressed) {
-        s_estopStatus = EStopManager::EStopStatus::ALL_CLEAR;
-      }
-      break;
-
-    default:
-      break;
+  if (!s_estopActive && pressed) {
+    s_estopActive      = true;
+    s_estopActivatedAt = now;
+  } else if (s_estopActive && pressed && (now - s_estopActivatedAt >= k_estopDebounceTime)) {
+    deactivatesAtChanged = true;
+    deactivatesAt        = now + k_estopHoldToClearTime;
+  } else if (s_estopActive && !pressed) {
+    deactivatesAtChanged = true;
+    deactivatesAt        = 0;
+  } else if (s_estopActive && s_estopAwaitingRelease) {
+    s_estopActive          = false;
+    s_estopAwaitingRelease = false;
   }
 
   BaseType_t higherPriorityTaskWoken = pdFALSE;
@@ -174,7 +155,7 @@ void EStopManager::Init() {
 }
 
 bool EStopManager::IsEStopped() {
-  return s_estopStatus != EStopManager::EStopStatus::ALL_CLEAR;
+  return s_estopActive;
 }
 
 std::int64_t EStopManager::LastEStopped() {
