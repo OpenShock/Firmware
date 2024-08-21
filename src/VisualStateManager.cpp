@@ -44,11 +44,11 @@ const RGBPatternManager::RGBState kEmergencyStoppedRGBPattern[] = {
   {  0, 0, 0, 500}
 };
 
-const PinPatternManager::State kEmergencyStopClearedPattern[] = {
+const PinPatternManager::State kEmergencyStopAwaitingReleasePattern[] = {
   { true, 150},
   {false, 150}
 };
-const RGBPatternManager::RGBState kEmergencyStopClearedRGBPattern[] = {
+const RGBPatternManager::RGBState kEmergencyStopAwaitingReleaseRGBPattern[] = {
   {0, 255, 0, 150},
   {0,   0, 0, 150}
 };
@@ -146,7 +146,7 @@ const PinPatternManager::State kSolidOffPattern[] = {
   {false, 100'000}
 };
 
-template <std::size_t N>
+template<std::size_t N>
 inline void _updateVisualStateGPIO(const PinPatternManager::State (&override)[N]) {
   s_builtInLedManager->SetPattern(override);
 }
@@ -163,7 +163,7 @@ void _updateVisualStateGPIO() {
   }
 
   if (s_stateFlags & kEmergencyStopAwaitingReleaseFlag) {
-    s_builtInLedManager->SetPattern(kEmergencyStopClearedPattern);
+    s_builtInLedManager->SetPattern(kEmergencyStopAwaitingReleasePattern);
     return;
   }
 
@@ -197,7 +197,7 @@ void _updateVisualStateRGB() {
   }
 
   if (s_stateFlags & kEmergencyStopAwaitingReleaseFlag) {
-    s_RGBLedManager->SetPattern(kEmergencyStopClearedRGBPattern);
+    s_RGBLedManager->SetPattern(kEmergencyStopAwaitingReleaseRGBPattern);
     return;
   }
 
@@ -221,7 +221,7 @@ void _updateVisualStateRGB() {
 
 void _updateVisualState() {
   bool gpioActive = s_builtInLedManager != nullptr;
-  bool rgbActive = s_RGBLedManager != nullptr;
+  bool rgbActive  = s_RGBLedManager != nullptr;
 
   if (gpioActive && rgbActive) {
     if (s_stateFlags == kStatusOKMask) {
@@ -282,10 +282,10 @@ void _handleWiFiScanDone(arduino_event_t* event) {
 
 #ifndef OPENSHOCK_LED_GPIO
 #define OPENSHOCK_LED_GPIO GPIO_NUM_NC
-#endif // OPENSHOCK_LED_GPIO
+#endif  // OPENSHOCK_LED_GPIO
 #ifndef OPENSHOCK_LED_WS2812B
 #define OPENSHOCK_LED_WS2812B GPIO_NUM_NC
-#endif // OPENSHOCK_LED_WS2812B
+#endif  // OPENSHOCK_LED_WS2812B
 
 bool VisualStateManager::Init() {
   bool ledActive = false;
