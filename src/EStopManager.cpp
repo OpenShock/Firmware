@@ -120,7 +120,7 @@ void _estopEdgeInterrupt(void* arg) {
 
 void EStopManager::Init() {
 #ifdef OPENSHOCK_ESTOP_PIN
-  s_estopPin = OPENSHOCK_ESTOP_PIN;
+  s_estopPin = static_cast<gpio_num_t>(OPENSHOCK_ESTOP_PIN);
 
   ESP_LOGI(TAG, "Initializing on pin %hhi", static_cast<std::int8_t>(s_estopPin));
 
