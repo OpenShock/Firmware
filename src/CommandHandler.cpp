@@ -104,7 +104,6 @@ bool _internalSetKeepAliveEnabled(bool enabled) {
   bool wasEnabled = s_keepAliveQueue != nullptr && s_keepAliveTaskHandle != nullptr;
 
   if (enabled == wasEnabled) {
-    ESP_LOGV(TAG, "keep-alive task is already %s", enabled ? "enabled" : "disabled");
     return true;
   }
 
