@@ -1,7 +1,5 @@
 #include "EStopManager.h"
 
-#define OPENSHOCK_ESTOP_PIN GPIO_NUM_38
-
 #include "CommandHandler.h"
 #include "config/Config.h"
 #include "Logging.h"
@@ -110,7 +108,7 @@ void _estopEventHandler(void* pvParameters) {
       }
       OpenShock::VisualStateManager::SetEmergencyStop(s_estopStatus);
       OpenShock::CommandHandler::SetKeepAlivePaused(EStopManager::IsEStopped());
-    } else if (deactivatesAt > 0 && OpenShock::millis() >= deactivatesAt) { // If we didn't get a message, the time probably expired, check if the estop is pending deactivation and if we have reached that time
+    } else if (deactivatesAt > 0 && OpenShock::millis() >= deactivatesAt) {  // If we didn't get a message, the time probably expired, check if the estop is pending deactivation and if we have reached that time
       // Reset the deactivation time
       deactivatesAt = 0;
 
@@ -148,7 +146,7 @@ void _estopEdgeInterrupt(void* arg) {
 
   EstopEventQueueMessage message = {.flags = flags};
 
-  xQueueSendToBackFromISR(s_estopEventQueue, &message, &higherPriorityTaskWoken); // TODO: Check if queue is full?
+  xQueueSendToBackFromISR(s_estopEventQueue, &message, &higherPriorityTaskWoken);  // TODO: Check if queue is full?
 
   if (higherPriorityTaskWoken) {
     portYIELD_FROM_ISR();
