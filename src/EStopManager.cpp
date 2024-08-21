@@ -196,8 +196,6 @@ void EStopManager::Init() {
   }
 
 #else
-  (void)updateIntervalMs;
-
   ESP_LOGI(TAG, "EStopManager disabled, no pin defined");
 #endif
 }
