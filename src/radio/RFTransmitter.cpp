@@ -179,9 +179,8 @@ void RFTransmitter::TransmitTask(void* arg) {
       }
     }
 
-    if(OpenShock::EStopManager::IsEStopped()) {
-
-      std::int64_t whenEStoppedTime = EStopManager::WhenEStopped();
+    if (OpenShock::EStopManager::IsEStopped()) {
+      std::int64_t whenEStoppedTime = EStopManager::LastEStopped();
 
       for (auto it = commands.begin(); it != commands.end(); ++it) {
         cmd = *it;
