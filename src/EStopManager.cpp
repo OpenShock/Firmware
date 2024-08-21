@@ -154,11 +154,13 @@ void EStopManager::Init() {
   // TODO?: Should we maybe use statically allocated queues and timers? See CreateStatic for both.
   s_estopEventQueue = xQueueCreate(8, sizeof(EstopEventQueueMessage));
 
-  if (gpio_install_isr_service(ESP_INTR_FLAG_EDGE) != ESP_OK) {
+  esp_err_t err = gpio_install_isr_service(ESP_INTR_FLAG_EDGE);
+  if (err != ESP_OK && err != ESP_ERR_INVALID_STATE) {  // ESP_ERR_INVALID_STATE is fine, it just means the ISR service is already installed
     ESP_PANIC(TAG, "Failed to install EStop ISR service");
   }
 
-  if (gpio_isr_handler_add(s_estopPin, _estopEdgeInterrupt, nullptr) != ESP_OK) {
+  err = gpio_isr_handler_add(s_estopPin, _estopEdgeInterrupt, nullptr);
+  if (err != ESP_OK) {
     ESP_PANIC(TAG, "Failed to add EStop ISR handler");
   }
 
