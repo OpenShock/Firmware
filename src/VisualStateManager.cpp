@@ -157,13 +157,13 @@ void _updateVisualStateGPIO() {
     return;
   }
 
-  if (s_stateFlags & kEmergencyStoppedFlag) {
-    s_builtInLedManager->SetPattern(kEmergencyStoppedPattern);
+  if (s_stateFlags & kEmergencyStopAwaitingReleaseFlag) {
+    s_builtInLedManager->SetPattern(kEmergencyStopAwaitingReleasePattern);
     return;
   }
 
-  if (s_stateFlags & kEmergencyStopAwaitingReleaseFlag) {
-    s_builtInLedManager->SetPattern(kEmergencyStopAwaitingReleasePattern);
+  if (s_stateFlags & kEmergencyStoppedFlag) {
+    s_builtInLedManager->SetPattern(kEmergencyStoppedPattern);
     return;
   }
 
@@ -191,13 +191,13 @@ void _updateVisualStateRGB() {
     return;
   }
 
-  if (s_stateFlags & kEmergencyStoppedFlag) {
-    s_RGBLedManager->SetPattern(kEmergencyStoppedRGBPattern);
+  if (s_stateFlags & kEmergencyStopAwaitingReleaseFlag) {
+    s_RGBLedManager->SetPattern(kEmergencyStopAwaitingReleaseRGBPattern);
     return;
   }
 
-  if (s_stateFlags & kEmergencyStopAwaitingReleaseFlag) {
-    s_RGBLedManager->SetPattern(kEmergencyStopAwaitingReleaseRGBPattern);
+  if (s_stateFlags & kEmergencyStoppedFlag) {
+    s_RGBLedManager->SetPattern(kEmergencyStoppedRGBPattern);
     return;
   }
 

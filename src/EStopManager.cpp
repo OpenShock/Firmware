@@ -96,12 +96,12 @@ void _estopEdgeInterrupt(void* arg) {
   } else if (s_estopActive && pressed && (now - s_estopActivatedAt >= k_estopDebounceTime)) {
     deactivatesAtChanged = true;
     deactivatesAt        = now + k_estopHoldToClearTime;
+  } else if (s_estopActive && !pressed && s_estopAwaitingRelease) {
+    s_estopActive          = false;
+    s_estopAwaitingRelease = false;
   } else if (s_estopActive && !pressed) {
     deactivatesAtChanged = true;
     deactivatesAt        = 0;
-  } else if (s_estopActive && s_estopAwaitingRelease) {
-    s_estopActive          = false;
-    s_estopAwaitingRelease = false;
   }
 
   BaseType_t higherPriorityTaskWoken = pdFALSE;
