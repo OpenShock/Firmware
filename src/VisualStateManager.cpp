@@ -305,6 +305,7 @@ bool VisualStateManager::Init() {
       ESP_LOGE(TAG, "Failed to initialize RGB LED manager");
       return false;
     }
+    s_RGBLedManager->SetBrightness(20);
     ledActive = true;
   }
 

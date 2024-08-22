@@ -34,8 +34,6 @@ RGBPatternManager::RGBPatternManager(gpio_num_t gpioPin) : m_gpioPin(GPIO_NUM_NC
   float realTick = rmtSetTick(m_rmtHandle, 100.F);
   ESP_LOGD(TAG, "RMT tick is %f ns for pin %d", realTick, gpioPin);
 
-  SetBrightness(20);
-
   m_gpioPin = gpioPin;
 }
 
