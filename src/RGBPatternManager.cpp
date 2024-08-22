@@ -102,7 +102,7 @@ void RGBPatternManager::RunPattern(void* arg) {
       std::uint8_t r = static_cast<std::uint8_t>(static_cast<std::uint16_t>(state.red) * brightness / 255);
       std::uint8_t g = static_cast<std::uint8_t>(static_cast<std::uint16_t>(state.green) * brightness / 255);
       std::uint8_t b = static_cast<std::uint8_t>(static_cast<std::uint16_t>(state.blue) * brightness / 255);
-#if OPENSHOCK_LED_FLIP_RG_CHANNELS
+#if OPENSHOCK_LED_SWAP_RG_CHANNELS
       std::swap(r, g);
 #endif
 
