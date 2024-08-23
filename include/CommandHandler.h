@@ -1,6 +1,6 @@
 #pragma once
 
-#include "SetRfPinResultCode.h"
+#include "SetGPIOResultCode.h"
 #include "ShockerCommandType.h"
 #include "ShockerModelType.h"
 
@@ -12,8 +12,11 @@ namespace OpenShock::CommandHandler {
   bool Init();
   bool Ok();
 
-  SetRfPinResultCode SetRfTxPin(std::uint8_t txPin);
+  SetGPIOResultCode SetRfTxPin(std::uint8_t txPin);
   std::uint8_t GetRfTxPin();
+
+  SetGPIOResultCode SetEstopPin(std::uint8_t estopPin);
+  std::uint8_t GetEstopPin();
 
   bool SetKeepAliveEnabled(bool enabled);
   bool SetKeepAlivePaused(bool paused);

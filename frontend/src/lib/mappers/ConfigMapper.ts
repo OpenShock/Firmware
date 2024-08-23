@@ -8,6 +8,10 @@ export interface RFConfig {
   keepaliveEnabled: boolean;
 }
 
+export interface EStopConfig {
+  estopPin: number;
+}
+
 export interface WifiCredentials {
   id: number;
   ssid: string;
@@ -45,6 +49,7 @@ export interface OtaUpdateConfig {
 
 export interface Config {
   rf: RFConfig;
+  estop: EStopConfig;
   wifi: WifiConfig;
   captivePortal: CaptivePortalConfig;
   backend: BackendConfig;
@@ -62,6 +67,17 @@ function mapRfConfig(hubConfig: HubConfig): RFConfig {
   return {
     txPin,
     keepaliveEnabled,
+  };
+}
+
+function mapEstopConfig(hubConfig: HubConfig): EStopConfig {
+  const estop = hubConfig.estop();
+  if (!estop) throw new Error('hubConfig.estop is null');
+
+  const estopPin = estop.estopPin();
+
+  return {
+    estopPin,
   };
 }
 
@@ -169,6 +185,7 @@ export function mapConfig(hubConfig: HubConfig | null): Config | null {
 
   return {
     rf: mapRfConfig(hubConfig),
+    estop: mapEstopConfig(hubConfig),
     wifi: mapWifiConfig(hubConfig),
     captivePortal: mapCaptivePortalConfig(hubConfig),
     backend: mapBackendConfig(hubConfig),

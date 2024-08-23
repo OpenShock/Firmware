@@ -109,4 +109,12 @@ export const DeviceStateStore = {
       return store;
     });
   },
+  setEstopPin(pin: number) {
+    update((store) => {
+      if (store.config) {
+        store.config.estop.estopPin = pin;
+      }
+      return store;
+    });
+  },
 };

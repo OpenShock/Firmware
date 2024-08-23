@@ -34,6 +34,7 @@ static std::array<Handlers::HandlerType, HANDLER_COUNT> s_localHandlers = []() {
   SET_HANDLER(PayloadType::AccountLinkCommand, Handlers::HandleAccountLinkCommand);
   SET_HANDLER(PayloadType::AccountUnlinkCommand, Handlers::HandleAccountUnlinkCommand);
   SET_HANDLER(PayloadType::SetRfTxPinCommand, Handlers::HandleSetRfTxPinCommand);
+  SET_HANDLER(PayloadType::SetEstopPinCommand, Handlers::HandleSetEstopPinCommand);
 
   return handlers;
 }();

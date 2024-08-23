@@ -107,7 +107,7 @@ void _handleRfTxPinCommand(StringView arg) {
     return;
   }
 
-  auto str = arg.toString(); // Copy the string to null-terminate it (VERY IMPORTANT)
+  auto str = arg.toString();  // Copy the string to null-terminate it (VERY IMPORTANT)
 
   unsigned int pin;
   if (sscanf(str.c_str(), "%u", &pin) != 1) {
@@ -120,18 +120,18 @@ void _handleRfTxPinCommand(StringView arg) {
     return;
   }
 
-  OpenShock::SetRfPinResultCode result = OpenShock::CommandHandler::SetRfTxPin(static_cast<std::uint8_t>(pin));
+  OpenShock::SetGPIOResultCode result = OpenShock::CommandHandler::SetRfTxPin(static_cast<std::uint8_t>(pin));
 
   switch (result) {
-    case OpenShock::SetRfPinResultCode::InvalidPin:
+    case OpenShock::SetGPIOResultCode::InvalidPin:
       SERPR_ERROR("Invalid argument (invalid pin)");
       break;
 
-    case OpenShock::SetRfPinResultCode::InternalError:
+    case OpenShock::SetGPIOResultCode::InternalError:
       SERPR_ERROR("Internal error while setting RF TX pin");
       break;
 
-    case OpenShock::SetRfPinResultCode::Success:
+    case OpenShock::SetGPIOResultCode::Success:
       SERPR_SUCCESS("Saved config");
       break;
 
@@ -178,15 +178,7 @@ void _handleDomainCommand(StringView arg) {
     return;
   }
 
-  ESP_LOGI(
-    TAG,
-    "Successfully connected to \"%.*s\", version: %s, commit: %s, current time: %s",
-    arg.length(),
-    arg.data(),
-    resp.data.version.c_str(),
-    resp.data.commit.c_str(),
-    resp.data.currentTime.c_str()
-  );
+  ESP_LOGI(TAG, "Successfully connected to \"%.*s\", version: %s, commit: %s, current time: %s", arg.length(), arg.data(), resp.data.version.c_str(), resp.data.commit.c_str(), resp.data.currentTime.c_str());
 
   bool result = OpenShock::Config::SetBackendDomain(arg);
 
@@ -867,8 +859,8 @@ void processSerialLine(StringView line) {
     return;
   }
 
-  auto parts = line.split(' ', 1);
-  StringView command = parts[0];
+  auto parts           = line.split(' ', 1);
+  StringView command   = parts[0];
   StringView arguments = parts.size() > 1 ? parts[1] : StringView();
 
   auto it = s_commandHandlers.find(command);

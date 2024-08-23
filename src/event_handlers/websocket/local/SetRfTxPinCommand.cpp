@@ -9,7 +9,7 @@
 
 const char* const TAG = "LocalMessageHandlers";
 
-void serializeSetRfTxPinResult(std::uint8_t socketId, std::uint8_t pin, OpenShock::Serialization::Local::SetRfPinResultCode result) {
+void serializeSetRfTxPinResult(std::uint8_t socketId, std::uint8_t pin, OpenShock::Serialization::Local::SetGPIOResultCode result) {
   flatbuffers::FlatBufferBuilder builder(1024);
 
   auto responseOffset = builder.CreateStruct(OpenShock::Serialization::Local::SetRfTxPinCommandResult(pin, result));
@@ -19,7 +19,7 @@ void serializeSetRfTxPinResult(std::uint8_t socketId, std::uint8_t pin, OpenShoc
   builder.Finish(msgOffset);
 
   const std::uint8_t* buffer = builder.GetBufferPointer();
-  std::uint8_t size   = builder.GetSize();
+  std::uint8_t size          = builder.GetSize();
 
   OpenShock::CaptivePortal::SendMessageBIN(socketId, buffer, size);
 }

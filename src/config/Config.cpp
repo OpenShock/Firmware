@@ -36,7 +36,7 @@ static ReadWriteMutex _configMutex;
     return retval;                                 \
   }
 
-#define CONFIG_LOCK_READ(retval) CONFIG_LOCK_READ_ACTION(retval, {})
+#define CONFIG_LOCK_READ(retval)  CONFIG_LOCK_READ_ACTION(retval, {})
 #define CONFIG_LOCK_WRITE(retval) CONFIG_LOCK_WRITE_ACTION(retval, {})
 
 bool _tryDeserializeConfig(const std::uint8_t* buffer, std::size_t bufferLen, OpenShock::Config::RootConfig& config) {
@@ -247,6 +247,14 @@ bool Config::GetRFConfig(Config::RFConfig& out) {
   return true;
 }
 
+bool Config::GetEStopConfig(Config::EStopConfig& out) {
+  CONFIG_LOCK_READ(false);
+
+  out = _configData.estop;
+
+  return true;
+}
+
 bool Config::GetWiFiConfig(Config::WiFiConfig& out) {
   CONFIG_LOCK_READ(false);
 
@@ -372,6 +380,21 @@ bool Config::SetRFConfigKeepAliveEnabled(bool enabled) {
   CONFIG_LOCK_WRITE(false);
 
   _configData.rf.keepAliveEnabled = enabled;
+  return _trySaveConfig();
+}
+
+bool Config::GetEStopConfigPin(std::uint8_t& out) {
+  CONFIG_LOCK_READ(false);
+
+  out = _configData.estop.estopPin;
+
+  return true;
+}
+
+bool Config::SetEStopConfigPin(std::uint8_t estopPin) {
+  CONFIG_LOCK_WRITE(false);
+
+  _configData.estop.estopPin = estopPin;
   return _trySaveConfig();
 }
 
