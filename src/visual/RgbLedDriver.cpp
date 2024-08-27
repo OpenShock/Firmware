@@ -68,6 +68,11 @@ void RgbLedDriver::ClearPattern() {
   xSemaphoreGive(m_taskMutex);
 }
 
+// Range: 0-255
+void RgbLedDriver::SetBrightness(std::uint8_t brightness) {
+  m_brightness = brightness;
+}
+
 void RgbLedDriver::ClearPatternInternal() {
   xSemaphoreTake(m_taskMutex, portMAX_DELAY);
 
@@ -77,11 +82,6 @@ void RgbLedDriver::ClearPatternInternal() {
   }
 
   m_pattern.clear();
-}
-
-// Range: 0-255
-void RgbLedDriver::SetBrightness(std::uint8_t brightness) {
-  m_brightness = brightness;
 }
 
 void RgbLedDriver::RunPattern(void* arg) {

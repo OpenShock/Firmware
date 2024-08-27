@@ -36,8 +36,9 @@ namespace OpenShock {
     inline void SetPattern(const RGBState (&pattern)[N]) {
       SetPattern(pattern, N);
     }
-    void SetBrightness(std::uint8_t brightness);
     void ClearPattern();
+
+    void SetBrightness(std::uint8_t brightness);
 
   private:
     void ClearPatternInternal();
