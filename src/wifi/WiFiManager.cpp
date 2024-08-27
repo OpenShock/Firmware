@@ -6,7 +6,7 @@
 #include "Logging.h"
 #include "serialization/WSLocal.h"
 #include "Time.h"
-#include "VisualStateManager.h"
+#include "visual/VisualStateManager.h"
 #include "wifi/WiFiNetwork.h"
 #include "wifi/WiFiScanManager.h"
 

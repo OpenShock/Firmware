@@ -1,4 +1,4 @@
-#include "RGBPatternManager.h"
+#include "visual/RGBPatternManager.h"
 
 #include "Chipset.h"
 #include "Logging.h"

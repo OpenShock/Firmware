@@ -8,7 +8,7 @@
 #include "serialization/WSGateway.h"
 #include "Time.h"
 #include "util/CertificateUtils.h"
-#include "VisualStateManager.h"
+#include "visual/VisualStateManager.h"
 
 const char* const TAG = "GatewayClient";
 

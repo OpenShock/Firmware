@@ -1,6 +1,6 @@
 #include "GatewayConnectionManager.h"
 
-#include "VisualStateManager.h"
+#include "visual/VisualStateManager.h"
 
 #include "config/Config.h"
 #include "GatewayClient.h"

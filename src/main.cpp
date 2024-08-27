@@ -9,7 +9,7 @@
 #include "OtaUpdateManager.h"
 #include "serial/SerialInputHandler.h"
 #include "util/TaskUtils.h"
-#include "VisualStateManager.h"
+#include "visual/VisualStateManager.h"
 #include "wifi/WiFiManager.h"
 #include "wifi/WiFiScanManager.h"
 

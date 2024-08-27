@@ -1,4 +1,4 @@
-#include "PinPatternManager.h"
+#include "visual/PinPatternManager.h"
 
 #include "Chipset.h"
 #include "Logging.h"

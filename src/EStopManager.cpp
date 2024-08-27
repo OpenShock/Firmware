@@ -4,7 +4,7 @@
 #include "config/Config.h"
 #include "Logging.h"
 #include "Time.h"
-#include "VisualStateManager.h"
+#include "visual/VisualStateManager.h"
 
 #include <driver/gpio.h>
 #include <freertos/FreeRTOS.h>
