@@ -3,7 +3,15 @@
 #include "Chipset.h"
 #include "Logging.h"
 
+#include <driver/ledc.h>
+
 const char* const TAG = "MonoLedDriver";
+
+#define OS_LEDC_TIMER      LEDC_TIMER_0
+#define OS_LEDC_SPEED      LEDC_HIGH_SPEED_MODE  // Work is offloaded to hardware ASIC instead of CPU
+#define OS_LEDC_CHANNEL    LEDC_CHANNEL_0
+#define OS_LEDC_RESOLUTION LEDC_TIMER_8_BIT
+#define OS_LEDC_FREQUENCY  4000  // https://en.wikipedia.org/wiki/Flicker_fusion_threshold
 
 using namespace OpenShock;
 
@@ -18,16 +26,27 @@ MonoLedDriver::MonoLedDriver(gpio_num_t gpioPin) : m_gpioPin(GPIO_NUM_NC), m_pat
     return;
   }
 
-  gpio_config_t config;
-  config.pin_bit_mask = (1ULL << gpioPin);
-  config.mode         = GPIO_MODE_OUTPUT;
-  config.pull_up_en   = GPIO_PULLUP_DISABLE;
-  config.pull_down_en = GPIO_PULLDOWN_DISABLE;
-  config.intr_type    = GPIO_INTR_DISABLE;
-  if (gpio_config(&config) != ESP_OK) {
-    ESP_LOGE(TAG, "Failed to configure pin %d", gpioPin);
-    return;
-  }
+  ledc_timer_config_t ledc_config = {
+    .speed_mode      = OS_LEDC_SPEED,
+    .duty_resolution = OS_LEDC_RESOLUTION,
+    .timer_num       = OS_LEDC_TIMER,
+    .freq_hz         = OS_LEDC_FREQUENCY,  // https://en.wikipedia.org/wiki/Flicker_fusion_threshold
+    .clk_cfg         = LEDC_AUTO_CLK,
+  };
+
+  ledc_timer_config(&ledc_config);  // TODO: Error handling
+
+  ledc_channel_config_t ledc_channel = {
+    .gpio_num   = gpioPin,
+    .speed_mode = OS_LEDC_SPEED,
+    .channel    = OS_LEDC_CHANNEL,
+    .intr_type  = LEDC_INTR_DISABLE,
+    .timer_sel  = OS_LEDC_TIMER,
+    .duty       = 0,
+    .hpoint     = 0,
+  };
+
+  ledc_channel_config(&ledc_channel);  // TODO: Error handling
 
   m_gpioPin = gpioPin;
 }
@@ -37,9 +56,7 @@ MonoLedDriver::~MonoLedDriver() {
 
   vSemaphoreDelete(m_taskMutex);
 
-  if (m_gpioPin != GPIO_NUM_NC) {
-    gpio_reset_pin(m_gpioPin);
-  }
+  ledc_stop(OS_LEDC_SPEED, OS_LEDC_CHANNEL, 0);  // TODO: Error handling
 }
 
 void MonoLedDriver::SetPattern(const State* pattern, std::size_t patternLength) {
@@ -70,6 +87,10 @@ void MonoLedDriver::ClearPattern() {
   xSemaphoreGive(m_taskMutex);
 }
 
+void MonoLedDriver::SetBrightness(std::uint8_t brightness) {
+  m_brightness = brightness;
+}
+
 void MonoLedDriver::ClearPatternInternal() {
   xSemaphoreTake(m_taskMutex, portMAX_DELAY);
 
@@ -85,11 +106,12 @@ void MonoLedDriver::RunPattern(void* arg) {
   MonoLedDriver* thisPtr = reinterpret_cast<MonoLedDriver*>(arg);
 
   gpio_num_t pin              = thisPtr->m_gpioPin;
+  std::uint8_t brightness     = thisPtr->m_brightness;
   std::vector<State>& pattern = thisPtr->m_pattern;
 
   while (true) {
     for (const auto& state : pattern) {
-      gpio_set_level(pin, state.level);
+      ledc_set_duty(LEDC_LOW_SPEED_MODE, LEDC_CHANNEL_0, state.level ? brightness : 0);
       vTaskDelay(pdMS_TO_TICKS(state.duration));
     }
   }

@@ -34,11 +34,14 @@ namespace OpenShock {
     }
     void ClearPattern();
 
+    void SetBrightness(std::uint8_t brightness);
+
   private:
     void ClearPatternInternal();
     static void RunPattern(void* arg);
 
     gpio_num_t m_gpioPin;
+    std::uint8_t m_brightness;
     std::vector<State> m_pattern;
     TaskHandle_t m_taskHandle;
     SemaphoreHandle_t m_taskMutex;
