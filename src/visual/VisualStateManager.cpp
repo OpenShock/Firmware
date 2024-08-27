@@ -1,8 +1,8 @@
 #include "visual/VisualStateManager.h"
 
 #include "Logging.h"
-#include "visual/PinPatternManager.h"
-#include "visual/RGBPatternManager.h"
+#include "visual/MonoLedDriver.h"
+#include "visual/RgbLedDriver.h"
 
 #include <WiFi.h>
 
@@ -21,39 +21,39 @@ const std::uint64_t kWiFiScanningFlag                 = 1 << 5;
 const std::uint64_t kStatusOKMask = kWebSocketConnectedFlag | kWiFiConnectedFlag;
 
 static std::uint64_t s_stateFlags = 0;
-static std::shared_ptr<OpenShock::PinPatternManager> s_builtInLedManager;
-static std::shared_ptr<OpenShock::RGBPatternManager> s_RGBLedManager;
+static std::shared_ptr<OpenShock::MonoLedDriver> s_monoLedDriver;
+static std::shared_ptr<OpenShock::RgbLedDriver> s_rgbLedDriver;
 
 using namespace OpenShock;
 
-const PinPatternManager::State kCriticalErrorPattern[] = {
+const MonoLedDriver::State kCriticalErrorPattern[] = {
   { true, 100}, // LED ON for 0.1 seconds
   {false, 100}  // LED OFF for 0.1 seconds
 };
-const RGBPatternManager::RGBState kCriticalErrorRGBPattern[] = {
+const RgbLedDriver::RGBState kCriticalErrorRGBPattern[] = {
   {255, 0, 0, 100}, // Red ON for 0.1 seconds
   {  0, 0, 0, 100}  // OFF for 0.1 seconds
 };
 
-const PinPatternManager::State kEmergencyStoppedPattern[] = {
+const MonoLedDriver::State kEmergencyStoppedPattern[] = {
   { true, 500},
   {false, 500}
 };
-const RGBPatternManager::RGBState kEmergencyStoppedRGBPattern[] = {
+const RgbLedDriver::RGBState kEmergencyStoppedRGBPattern[] = {
   {255, 0, 0, 500},
   {  0, 0, 0, 500}
 };
 
-const PinPatternManager::State kEmergencyStopAwaitingReleasePattern[] = {
+const MonoLedDriver::State kEmergencyStopAwaitingReleasePattern[] = {
   { true, 150},
   {false, 150}
 };
-const RGBPatternManager::RGBState kEmergencyStopAwaitingReleaseRGBPattern[] = {
+const RgbLedDriver::RGBState kEmergencyStopAwaitingReleaseRGBPattern[] = {
   {0, 255, 0, 150},
   {0,   0, 0, 150}
 };
 
-const PinPatternManager::State kWiFiDisconnectedPattern[] = {
+const MonoLedDriver::State kWiFiDisconnectedPattern[] = {
   { true, 100},
   {false, 100},
   { true, 100},
@@ -61,7 +61,7 @@ const PinPatternManager::State kWiFiDisconnectedPattern[] = {
   { true, 100},
   {false, 700}
 };
-const RGBPatternManager::RGBState kWiFiDisconnectedRGBPattern[] = {
+const RgbLedDriver::RGBState kWiFiDisconnectedRGBPattern[] = {
   {0, 0, 255, 100},
   {0, 0,   0, 100},
   {0, 0, 255, 100},
@@ -70,20 +70,20 @@ const RGBPatternManager::RGBState kWiFiDisconnectedRGBPattern[] = {
   {0, 0,   0, 700}
 };
 
-const PinPatternManager::State kWiFiConnectedWithoutWSPattern[] = {
+const MonoLedDriver::State kWiFiConnectedWithoutWSPattern[] = {
   { true, 100},
   {false, 100},
   { true, 100},
   {false, 700}
 };
-const RGBPatternManager::RGBState kWiFiConnectedWithoutWSRGBPattern[] = {
+const RgbLedDriver::RGBState kWiFiConnectedWithoutWSRGBPattern[] = {
   {255, 165, 0, 100},
   {  0,   0, 0, 100},
   {255, 165, 0, 100},
   {  0,   0, 0, 700}
 };
 
-const PinPatternManager::State kPingNoResponsePattern[] = {
+const MonoLedDriver::State kPingNoResponsePattern[] = {
   { true, 100},
   {false, 100},
   { true, 100},
@@ -93,7 +93,7 @@ const PinPatternManager::State kPingNoResponsePattern[] = {
   { true, 100},
   {false, 700}
 };
-const RGBPatternManager::RGBState kPingNoResponseRGBPattern[] = {
+const RgbLedDriver::RGBState kPingNoResponseRGBPattern[] = {
   {0, 50, 255, 100},
   {0,  0,   0, 100},
   {0, 50, 255, 100},
@@ -104,7 +104,7 @@ const RGBPatternManager::RGBState kPingNoResponseRGBPattern[] = {
   {0,  0,   0, 700}
 };
 
-const PinPatternManager::State kWebSocketCantConnectPattern[] = {
+const MonoLedDriver::State kWebSocketCantConnectPattern[] = {
   { true, 100},
   {false, 100},
   { true, 100},
@@ -116,7 +116,7 @@ const PinPatternManager::State kWebSocketCantConnectPattern[] = {
   { true, 100},
   {false, 700}
 };
-const RGBPatternManager::RGBState kWebSocketCantConnectRGBPattern[] = {
+const RgbLedDriver::RGBState kWebSocketCantConnectRGBPattern[] = {
   {255, 0, 0, 100},
   {  0, 0, 0, 100},
   {255, 0, 0, 100},
@@ -129,99 +129,99 @@ const RGBPatternManager::RGBState kWebSocketCantConnectRGBPattern[] = {
   {  0, 0, 0, 700}
 };
 
-const PinPatternManager::State kWebSocketConnectedPattern[] = {
+const MonoLedDriver::State kWebSocketConnectedPattern[] = {
   { true,    100},
   {false, 10'000}
 };
-const RGBPatternManager::RGBState kWebSocketConnectedRGBPattern[] = {
+const RgbLedDriver::RGBState kWebSocketConnectedRGBPattern[] = {
   {0, 255, 0,    100},
   {0,   0, 0, 10'000},
 };
 
-const PinPatternManager::State kSolidOnPattern[] = {
+const MonoLedDriver::State kSolidOnPattern[] = {
   {true, 100'000}
 };
 
-const PinPatternManager::State kSolidOffPattern[] = {
+const MonoLedDriver::State kSolidOffPattern[] = {
   {false, 100'000}
 };
 
 template<std::size_t N>
-inline void _updateVisualStateGPIO(const PinPatternManager::State (&override)[N]) {
-  s_builtInLedManager->SetPattern(override);
+inline void _updateVisualStateGPIO(const MonoLedDriver::State (&override)[N]) {
+  s_monoLedDriver->SetPattern(override);
 }
 
 void _updateVisualStateGPIO() {
   if (s_stateFlags & kCriticalErrorFlag) {
-    s_builtInLedManager->SetPattern(kCriticalErrorPattern);
+    s_monoLedDriver->SetPattern(kCriticalErrorPattern);
     return;
   }
 
   if (s_stateFlags & kEmergencyStopAwaitingReleaseFlag) {
-    s_builtInLedManager->SetPattern(kEmergencyStopAwaitingReleasePattern);
+    s_monoLedDriver->SetPattern(kEmergencyStopAwaitingReleasePattern);
     return;
   }
 
   if (s_stateFlags & kEmergencyStoppedFlag) {
-    s_builtInLedManager->SetPattern(kEmergencyStoppedPattern);
+    s_monoLedDriver->SetPattern(kEmergencyStoppedPattern);
     return;
   }
 
   if (s_stateFlags & kWebSocketConnectedFlag) {
-    s_builtInLedManager->SetPattern(kWebSocketConnectedPattern);
+    s_monoLedDriver->SetPattern(kWebSocketConnectedPattern);
     return;
   }
 
   if (s_stateFlags & kWiFiConnectedFlag) {
-    s_builtInLedManager->SetPattern(kWiFiConnectedWithoutWSPattern);
+    s_monoLedDriver->SetPattern(kWiFiConnectedWithoutWSPattern);
     return;
   }
 
   if (s_stateFlags & kWiFiScanningFlag) {
-    s_builtInLedManager->SetPattern(kPingNoResponsePattern);
+    s_monoLedDriver->SetPattern(kPingNoResponsePattern);
     return;
   }
 
-  s_builtInLedManager->SetPattern(kWiFiDisconnectedPattern);
+  s_monoLedDriver->SetPattern(kWiFiDisconnectedPattern);
 }
 
 void _updateVisualStateRGB() {
   if (s_stateFlags & kCriticalErrorFlag) {
-    s_RGBLedManager->SetPattern(kCriticalErrorRGBPattern);
+    s_rgbLedDriver->SetPattern(kCriticalErrorRGBPattern);
     return;
   }
 
   if (s_stateFlags & kEmergencyStopAwaitingReleaseFlag) {
-    s_RGBLedManager->SetPattern(kEmergencyStopAwaitingReleaseRGBPattern);
+    s_rgbLedDriver->SetPattern(kEmergencyStopAwaitingReleaseRGBPattern);
     return;
   }
 
   if (s_stateFlags & kEmergencyStoppedFlag) {
-    s_RGBLedManager->SetPattern(kEmergencyStoppedRGBPattern);
+    s_rgbLedDriver->SetPattern(kEmergencyStoppedRGBPattern);
     return;
   }
 
   if (s_stateFlags & kWebSocketConnectedFlag) {
-    s_RGBLedManager->SetPattern(kWebSocketConnectedRGBPattern);
+    s_rgbLedDriver->SetPattern(kWebSocketConnectedRGBPattern);
     return;
   }
 
   if (s_stateFlags & kWiFiConnectedFlag) {
-    s_RGBLedManager->SetPattern(kWiFiConnectedWithoutWSRGBPattern);
+    s_rgbLedDriver->SetPattern(kWiFiConnectedWithoutWSRGBPattern);
     return;
   }
 
   if (s_stateFlags & kWiFiScanningFlag) {
-    s_RGBLedManager->SetPattern(kPingNoResponseRGBPattern);
+    s_rgbLedDriver->SetPattern(kPingNoResponseRGBPattern);
     return;
   }
 
-  s_RGBLedManager->SetPattern(kWiFiDisconnectedRGBPattern);
+  s_rgbLedDriver->SetPattern(kWiFiDisconnectedRGBPattern);
 }
 
 void _updateVisualState() {
-  bool gpioActive = s_builtInLedManager != nullptr;
-  bool rgbActive  = s_RGBLedManager != nullptr;
+  bool gpioActive = s_monoLedDriver != nullptr;
+  bool rgbActive  = s_rgbLedDriver != nullptr;
 
   if (gpioActive && rgbActive) {
     if (s_stateFlags == kStatusOKMask) {
@@ -291,8 +291,8 @@ bool VisualStateManager::Init() {
   bool ledActive = false;
 
   if (OPENSHOCK_LED_GPIO != GPIO_NUM_NC) {
-    s_builtInLedManager = std::make_shared<PinPatternManager>(static_cast<gpio_num_t>(OPENSHOCK_LED_GPIO));
-    if (!s_builtInLedManager->IsValid()) {
+    s_monoLedDriver = std::make_shared<MonoLedDriver>(static_cast<gpio_num_t>(OPENSHOCK_LED_GPIO));
+    if (!s_monoLedDriver->IsValid()) {
       ESP_LOGE(TAG, "Failed to initialize built-in LED manager");
       return false;
     }
@@ -300,12 +300,12 @@ bool VisualStateManager::Init() {
   }
 
   if (OPENSHOCK_LED_WS2812B != GPIO_NUM_NC) {
-    s_RGBLedManager = std::make_shared<RGBPatternManager>(static_cast<gpio_num_t>(OPENSHOCK_LED_WS2812B));
-    if (!s_RGBLedManager->IsValid()) {
+    s_rgbLedDriver = std::make_shared<RgbLedDriver>(static_cast<gpio_num_t>(OPENSHOCK_LED_WS2812B));
+    if (!s_rgbLedDriver->IsValid()) {
       ESP_LOGE(TAG, "Failed to initialize RGB LED manager");
       return false;
     }
-    s_RGBLedManager->SetBrightness(20);
+    s_rgbLedDriver->SetBrightness(20);
     ledActive = true;
   }
 

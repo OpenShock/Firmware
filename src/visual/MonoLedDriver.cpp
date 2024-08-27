@@ -1,13 +1,13 @@
-#include "visual/PinPatternManager.h"
+#include "visual/MonoLedDriver.h"
 
 #include "Chipset.h"
 #include "Logging.h"
 
-const char* const TAG = "PinPatternManager";
+const char* const TAG = "MonoLedDriver";
 
 using namespace OpenShock;
 
-PinPatternManager::PinPatternManager(gpio_num_t gpioPin) : m_gpioPin(GPIO_NUM_NC), m_pattern(), m_taskHandle(nullptr), m_taskMutex(xSemaphoreCreateMutex()) {
+MonoLedDriver::MonoLedDriver(gpio_num_t gpioPin) : m_gpioPin(GPIO_NUM_NC), m_pattern(), m_taskHandle(nullptr), m_taskMutex(xSemaphoreCreateMutex()) {
   if (gpioPin == GPIO_NUM_NC) {
     ESP_LOGE(TAG, "Pin is not set");
     return;
@@ -32,7 +32,7 @@ PinPatternManager::PinPatternManager(gpio_num_t gpioPin) : m_gpioPin(GPIO_NUM_NC
   m_gpioPin = gpioPin;
 }
 
-PinPatternManager::~PinPatternManager() {
+MonoLedDriver::~MonoLedDriver() {
   ClearPattern();
 
   vSemaphoreDelete(m_taskMutex);
@@ -42,7 +42,7 @@ PinPatternManager::~PinPatternManager() {
   }
 }
 
-void PinPatternManager::SetPattern(const State* pattern, std::size_t patternLength) {
+void MonoLedDriver::SetPattern(const State* pattern, std::size_t patternLength) {
   ClearPatternInternal();
 
   // Set new values
@@ -50,7 +50,7 @@ void PinPatternManager::SetPattern(const State* pattern, std::size_t patternLeng
   std::copy(pattern, pattern + patternLength, m_pattern.begin());
 
   char name[32];
-  snprintf(name, sizeof(name), "PinPatternManager-%d", m_gpioPin);
+  snprintf(name, sizeof(name), "MonoLedDriver-%d", m_gpioPin);
 
   // Start the task
   BaseType_t result = xTaskCreate(RunPattern, name, 1024, this, 1, &m_taskHandle);  // PROFILED: 0.5KB stack usage
@@ -65,12 +65,12 @@ void PinPatternManager::SetPattern(const State* pattern, std::size_t patternLeng
   xSemaphoreGive(m_taskMutex);
 }
 
-void PinPatternManager::ClearPattern() {
+void MonoLedDriver::ClearPattern() {
   ClearPatternInternal();
   xSemaphoreGive(m_taskMutex);
 }
 
-void PinPatternManager::ClearPatternInternal() {
+void MonoLedDriver::ClearPatternInternal() {
   xSemaphoreTake(m_taskMutex, portMAX_DELAY);
 
   if (m_taskHandle != nullptr) {
@@ -81,8 +81,8 @@ void PinPatternManager::ClearPatternInternal() {
   m_pattern.clear();
 }
 
-void PinPatternManager::RunPattern(void* arg) {
-  PinPatternManager* thisPtr = reinterpret_cast<PinPatternManager*>(arg);
+void MonoLedDriver::RunPattern(void* arg) {
+  MonoLedDriver* thisPtr = reinterpret_cast<MonoLedDriver*>(arg);
 
   gpio_num_t pin              = thisPtr->m_gpioPin;
   std::vector<State>& pattern = thisPtr->m_pattern;

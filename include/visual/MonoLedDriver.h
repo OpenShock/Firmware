@@ -12,8 +12,8 @@
 #include <vector>
 
 namespace OpenShock {
-  class PinPatternManager {
-    DISABLE_COPY(PinPatternManager);
+  class MonoLedDriver {
+    DISABLE_COPY(MonoLedDriver);
 
   public:
     struct State {
@@ -21,9 +21,9 @@ namespace OpenShock {
       std::uint32_t duration;
     };
 
-    PinPatternManager() = delete;
-    PinPatternManager(gpio_num_t gpioPin);
-    ~PinPatternManager();
+    MonoLedDriver() = delete;
+    MonoLedDriver(gpio_num_t gpioPin);
+    ~MonoLedDriver();
 
     bool IsValid() const { return m_gpioPin != GPIO_NUM_NC; }
 

@@ -14,13 +14,13 @@
 #include <vector>
 
 namespace OpenShock {
-  class RGBPatternManager {
-    DISABLE_COPY(RGBPatternManager);
+  class RgbLedDriver {
+    DISABLE_COPY(RgbLedDriver);
 
   public:
-    RGBPatternManager() = delete;
-    RGBPatternManager(gpio_num_t gpioPin);
-    ~RGBPatternManager();
+    RgbLedDriver() = delete;
+    RgbLedDriver(gpio_num_t gpioPin);
+    ~RgbLedDriver();
 
     bool IsValid() const { return m_gpioPin != GPIO_NUM_NC; }
 

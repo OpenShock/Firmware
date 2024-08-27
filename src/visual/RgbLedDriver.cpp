@@ -1,4 +1,4 @@
-#include "visual/RGBPatternManager.h"
+#include "visual/RgbLedDriver.h"
 
 #include "Chipset.h"
 #include "Logging.h"
@@ -6,7 +6,7 @@
 
 #include <array>
 
-const char* const TAG = "RGBPatternManager";
+const char* const TAG = "RgbLedDriver";
 
 using namespace OpenShock;
 
@@ -14,7 +14,7 @@ using namespace OpenShock;
 // TODO: Support multiple LEDs ?
 // TODO: Support other LED types ?
 
-RGBPatternManager::RGBPatternManager(gpio_num_t gpioPin) : m_gpioPin(GPIO_NUM_NC), m_brightness(255), m_pattern(), m_rmtHandle(nullptr), m_taskHandle(nullptr), m_taskMutex(xSemaphoreCreateMutex()) {
+RgbLedDriver::RgbLedDriver(gpio_num_t gpioPin) : m_gpioPin(GPIO_NUM_NC), m_brightness(255), m_pattern(), m_rmtHandle(nullptr), m_taskHandle(nullptr), m_taskMutex(xSemaphoreCreateMutex()) {
   if (gpioPin == GPIO_NUM_NC) {
     ESP_LOGE(TAG, "Pin is not set");
     return;
@@ -37,13 +37,13 @@ RGBPatternManager::RGBPatternManager(gpio_num_t gpioPin) : m_gpioPin(GPIO_NUM_NC
   m_gpioPin = gpioPin;
 }
 
-RGBPatternManager::~RGBPatternManager() {
+RgbLedDriver::~RgbLedDriver() {
   ClearPattern();
 
   vSemaphoreDelete(m_taskMutex);
 }
 
-void RGBPatternManager::SetPattern(const RGBState* pattern, std::size_t patternLength) {
+void RgbLedDriver::SetPattern(const RGBState* pattern, std::size_t patternLength) {
   ClearPatternInternal();
 
   // Set new values
@@ -63,12 +63,12 @@ void RGBPatternManager::SetPattern(const RGBState* pattern, std::size_t patternL
   xSemaphoreGive(m_taskMutex);
 }
 
-void RGBPatternManager::ClearPattern() {
+void RgbLedDriver::ClearPattern() {
   ClearPatternInternal();
   xSemaphoreGive(m_taskMutex);
 }
 
-void RGBPatternManager::ClearPatternInternal() {
+void RgbLedDriver::ClearPatternInternal() {
   xSemaphoreTake(m_taskMutex, portMAX_DELAY);
 
   if (m_taskHandle != nullptr) {
@@ -80,12 +80,12 @@ void RGBPatternManager::ClearPatternInternal() {
 }
 
 // Range: 0-255
-void RGBPatternManager::SetBrightness(std::uint8_t brightness) {
+void RgbLedDriver::SetBrightness(std::uint8_t brightness) {
   m_brightness = brightness;
 }
 
-void RGBPatternManager::RunPattern(void* arg) {
-  RGBPatternManager* thisPtr = reinterpret_cast<RGBPatternManager*>(arg);
+void RgbLedDriver::RunPattern(void* arg) {
+  RgbLedDriver* thisPtr = reinterpret_cast<RgbLedDriver*>(arg);
 
   rmt_obj_t* rmtHandle           = thisPtr->m_rmtHandle;
   std::uint8_t brightness        = thisPtr->m_brightness;
