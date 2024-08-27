@@ -109,7 +109,10 @@ if (gitHeadRefName === 'master' || (isGitTag && isStableRelease(latestRelease)))
 } else if (gitHeadRefName === 'develop' || (isGitTag && isDevRelease(latestRelease))) {
   currentChannel = 'develop';
 } else {
-  currentChannel = gitHeadRefName.replace(/[^a-zA-Z0-9-]/g, '-').replace(/^\-+|\-+$/g, '');
+  currentChannel = gitHeadRefName
+    .replace(/[^a-zA-Z0-9-]/g, '-')
+    .replace(/\-{2,}/g, '-')
+    .replace(/^\-+|\-+$/g, '');
 }
 
 function getVersionChangeLog(lines: string[]) {
