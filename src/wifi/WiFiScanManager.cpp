@@ -8,9 +8,9 @@
 
 const char* const TAG = "WiFiScanManager";
 
-constexpr const std::uint8_t OPENSHOCK_WIFI_SCAN_MAX_CHANNEL         = 13;
-constexpr const std::uint32_t OPENSHOCK_WIFI_SCAN_MAX_MS_PER_CHANNEL = 300;  // Adjusting this value will affect the scan rate, but may also affect the scan results
-constexpr const std::uint32_t OPENSHOCK_WIFI_SCAN_TIMEOUT_MS         = 10 * 1000;
+const std::uint8_t OPENSHOCK_WIFI_SCAN_MAX_CHANNEL         = 13;
+const std::uint32_t OPENSHOCK_WIFI_SCAN_MAX_MS_PER_CHANNEL = 300;  // Adjusting this value will affect the scan rate, but may also affect the scan results
+const std::uint32_t OPENSHOCK_WIFI_SCAN_TIMEOUT_MS         = 10 * 1000;
 
 enum WiFiScanTaskNotificationFlags {
   CHANNEL_DONE  = 1 << 0,

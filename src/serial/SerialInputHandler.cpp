@@ -5,8 +5,11 @@
 #include "config/Config.h"
 #include "config/SerialInputConfig.h"
 #include "FormatHelpers.h"
+#include "http/HTTPRequestManager.h"
 #include "Logging.h"
+#include "serialization/JsonAPI.h"
 #include "serialization/JsonSerial.h"
+#include "StringView.h"
 #include "Time.h"
 #include "util/Base64Utils.h"
 #include "wifi/WiFiManager.h"
@@ -15,6 +18,8 @@
 #include <Esp.h>
 
 #include <unordered_map>
+
+#include <cstring>
 
 const char* const TAG = "SerialInputHandler";
 
@@ -25,34 +30,40 @@ const char* const TAG = "SerialInputHandler";
 
 using namespace OpenShock;
 
-constexpr std::int64_t PASTE_INTERVAL_THRESHOLD_MS  = 20;
-constexpr std::size_t SERIAL_BUFFER_CLEAR_THRESHOLD = 512;
+const std::int64_t PASTE_INTERVAL_THRESHOLD_MS  = 20;
+const std::size_t SERIAL_BUFFER_CLEAR_THRESHOLD = 512;
 
 struct SerialCmdHandler {
-  const char* cmd;
+  StringView cmd;
   const char* helpResponse;
-  void (*commandHandler)(char*, std::size_t);
+  void (*commandHandler)(StringView);
 };
 
 static bool s_echoEnabled = true;
-static std::unordered_map<std::string, SerialCmdHandler> s_commandHandlers;
+static std::unordered_map<StringView, SerialCmdHandler, std::hash_ci, std::equals_ci> s_commandHandlers;
 
 /// @brief Tries to parse a boolean from a string (case-insensitive)
 /// @param str Input string
 /// @param strLen Length of input string
 /// @param out Output boolean
 /// @return True if the argument is a boolean, false otherwise
-bool _tryParseBool(const char* str, std::size_t strLen, bool& out) {
-  if (str == nullptr || strLen == 0) {
+bool _tryParseBool(StringView str, bool& out) {
+  if (str.isNullOrEmpty()) {
     return false;
   }
 
-  if (strcasecmp(str, "true") == 0) {
+  str = str.trim();
+
+  if (str.length() > 5) {
+    return false;
+  }
+
+  if (strncasecmp(str.data(), "true", str.length()) == 0) {
     out = true;
     return true;
   }
 
-  if (strcasecmp(str, "false") == 0) {
+  if (strncasecmp(str.data(), "false", str.length()) == 0) {
     out = false;
     return true;
   }
@@ -60,25 +71,22 @@ bool _tryParseBool(const char* str, std::size_t strLen, bool& out) {
   return false;
 }
 
-void _handleVersionCommand(char* arg, std::size_t argLength) {
+void _handleVersionCommand(StringView arg) {
   (void)arg;
-  (void)argLength;
 
   Serial.print("\n");
   SerialInputHandler::PrintVersionInfo();
 }
 
-void _handleRestartCommand(char* arg, std::size_t argLength) {
+void _handleRestartCommand(StringView arg) {
   (void)arg;
-  (void)argLength;
 
   Serial.println("Restarting ESP...");
   ESP.restart();
 }
 
-void _handleFactoryResetCommand(char* arg, std::size_t argLength) {
+void _handleFactoryResetCommand(StringView arg) {
   (void)arg;
-  (void)argLength;
 
   Serial.println("Resetting to factory defaults...");
   Config::FactoryReset();
@@ -86,8 +94,8 @@ void _handleFactoryResetCommand(char* arg, std::size_t argLength) {
   ESP.restart();
 }
 
-void _handleRfTxPinCommand(char* arg, std::size_t argLength) {
-  if (arg == nullptr || argLength == 0) {
+void _handleRfTxPinCommand(StringView arg) {
+  if (arg.isNullOrEmpty()) {
     std::uint8_t txPin;
     if (!Config::GetRFConfigTxPin(txPin)) {
       SERPR_ERROR("Failed to get RF TX pin from config");
@@ -99,8 +107,10 @@ void _handleRfTxPinCommand(char* arg, std::size_t argLength) {
     return;
   }
 
+  auto str = arg.toString(); // Copy the string to null-terminate it (VERY IMPORTANT)
+
   unsigned int pin;
-  if (sscanf(arg, "%u", &pin) != 1) {
+  if (sscanf(str.c_str(), "%u", &pin) != 1) {
     SERPR_ERROR("Invalid argument (not a number)");
     return;
   }
@@ -131,8 +141,68 @@ void _handleRfTxPinCommand(char* arg, std::size_t argLength) {
   }
 }
 
-void _handleAuthtokenCommand(char* arg, std::size_t argLength) {
-  if (arg == nullptr || argLength == 0) {
+void _handleDomainCommand(StringView arg) {
+  if (arg.isNullOrEmpty()) {
+    std::string domain;
+    if (!Config::GetBackendDomain(domain)) {
+      SERPR_ERROR("Failed to get domain from config");
+      return;
+    }
+
+    // Get domain
+    SERPR_RESPONSE("Domain|%s", domain.c_str());
+    return;
+  }
+
+  // Check if the domain is too long
+  // TODO: Remove magic number
+  if (arg.length() + 40 >= OPENSHOCK_URI_BUFFER_SIZE) {
+    SERPR_ERROR("Domain name too long, please try increasing the \"OPENSHOCK_URI_BUFFER_SIZE\" constant in source code");
+    return;
+  }
+
+  char uri[OPENSHOCK_URI_BUFFER_SIZE];
+  sprintf(uri, "https://%.*s/1", arg.length(), arg.data());
+
+  auto resp = HTTP::GetJSON<Serialization::JsonAPI::BackendVersionResponse>(
+    uri,
+    {
+      {"Accept", "application/json"}
+  },
+    Serialization::JsonAPI::ParseBackendVersionJsonResponse,
+    {200}
+  );
+
+  if (resp.result != HTTP::RequestResult::Success) {
+    SERPR_ERROR("Tried to connect to \"%.*s\", but failed with status [%d], refusing to save domain to config", arg.length(), arg.data(), resp.code);
+    return;
+  }
+
+  ESP_LOGI(
+    TAG,
+    "Successfully connected to \"%.*s\", version: %s, commit: %s, current time: %s",
+    arg.length(),
+    arg.data(),
+    resp.data.version.c_str(),
+    resp.data.commit.c_str(),
+    resp.data.currentTime.c_str()
+  );
+
+  bool result = OpenShock::Config::SetBackendDomain(arg);
+
+  if (!result) {
+    SERPR_ERROR("Failed to save config");
+    return;
+  }
+
+  SERPR_SUCCESS("Saved config, restarting...");
+
+  // Restart to use the new domain
+  ESP.restart();
+}
+
+void _handleAuthtokenCommand(StringView arg) {
+  if (arg.isNullOrEmpty()) {
     std::string authToken;
     if (!Config::GetBackendAuthToken(authToken)) {
       SERPR_ERROR("Failed to get auth token from config");
@@ -144,7 +214,7 @@ void _handleAuthtokenCommand(char* arg, std::size_t argLength) {
     return;
   }
 
-  bool result = OpenShock::Config::SetBackendAuthToken(std::string(arg, argLength));
+  bool result = OpenShock::Config::SetBackendAuthToken(arg);
 
   if (result) {
     SERPR_SUCCESS("Saved config");
@@ -153,10 +223,93 @@ void _handleAuthtokenCommand(char* arg, std::size_t argLength) {
   }
 }
 
-void _handleNetworksCommand(char* arg, std::size_t argLength) {
+void _handleLcgOverrideCommand(StringView arg) {
+  if (arg.isNullOrEmpty()) {
+    std::string lcgOverride;
+    if (!Config::GetBackendLCGOverride(lcgOverride)) {
+      SERPR_ERROR("Failed to get LCG override from config");
+      return;
+    }
+
+    // Get LCG override
+    SERPR_RESPONSE("LcgOverride|%s", lcgOverride.c_str());
+    return;
+  }
+
+  if (arg.startsWith("clear")) {
+    if (arg.size() != 5) {
+      SERPR_ERROR("Invalid command (clear command should not have any arguments)");
+      return;
+    }
+
+    bool result = OpenShock::Config::SetBackendLCGOverride(std::string());
+    if (result) {
+      SERPR_SUCCESS("Cleared LCG override");
+    } else {
+      SERPR_ERROR("Failed to clear LCG override");
+    }
+    return;
+  }
+
+  if (arg.startsWith("set ")) {
+    if (arg.size() <= 4) {
+      SERPR_ERROR("Invalid command (set command should have an argument)");
+      return;
+    }
+
+    StringView domain = arg.substr(4);
+
+    if (domain.size() + 40 >= OPENSHOCK_URI_BUFFER_SIZE) {
+      SERPR_ERROR("Domain name too long, please try increasing the \"OPENSHOCK_URI_BUFFER_SIZE\" constant in source code");
+      return;
+    }
+
+    char uri[OPENSHOCK_URI_BUFFER_SIZE];
+    sprintf(uri, "https://%.*s/1", static_cast<int>(domain.size()), domain.data());
+
+    auto resp = HTTP::GetJSON<Serialization::JsonAPI::LcgInstanceDetailsResponse>(
+      uri,
+      {
+        {"Accept", "application/json"}
+    },
+      Serialization::JsonAPI::ParseLcgInstanceDetailsJsonResponse,
+      {200}
+    );
+
+    if (resp.result != HTTP::RequestResult::Success) {
+      SERPR_ERROR("Tried to connect to \"%.*s\", but failed with status [%d], refusing to save domain to config", domain.size(), domain.data(), resp.code);
+      return;
+    }
+
+    ESP_LOGI(
+      TAG,
+      "Successfully connected to \"%.*s\", name: %s, version: %s, current time: %s, country code: %s, FQDN: %s",
+      domain.size(),
+      domain.data(),
+      resp.data.name.c_str(),
+      resp.data.version.c_str(),
+      resp.data.currentTime.c_str(),
+      resp.data.countryCode.c_str(),
+      resp.data.fqdn.c_str()
+    );
+
+    bool result = OpenShock::Config::SetBackendLCGOverride(domain);
+
+    if (result) {
+      SERPR_SUCCESS("Saved config");
+    } else {
+      SERPR_ERROR("Failed to save config");
+    }
+    return;
+  }
+
+  SERPR_ERROR("Invalid subcommand");
+}
+
+void _handleNetworksCommand(StringView arg) {
   cJSON* root;
 
-  if (arg == nullptr || argLength == 0) {
+  if (arg.isNullOrEmpty()) {
     root = cJSON_CreateArray();
     if (root == nullptr) {
       SERPR_ERROR("Failed to create JSON array");
@@ -180,7 +333,7 @@ void _handleNetworksCommand(char* arg, std::size_t argLength) {
     return;
   }
 
-  root = cJSON_ParseWithLength(arg, argLength);
+  root = cJSON_ParseWithLength(arg.data(), arg.length());
   if (root == nullptr) {
     SERPR_ERROR("Failed to parse JSON: %s", cJSON_GetErrorPtr());
     return;
@@ -222,10 +375,10 @@ void _handleNetworksCommand(char* arg, std::size_t argLength) {
   OpenShock::WiFiManager::RefreshNetworkCredentials();
 }
 
-void _handleKeepAliveCommand(char* arg, std::size_t argLength) {
+void _handleKeepAliveCommand(StringView arg) {
   bool keepAliveEnabled;
 
-  if (arg == nullptr || argLength == 0) {
+  if (arg.isNullOrEmpty()) {
     // Get keep alive status
     if (!Config::GetRFConfigKeepAliveEnabled(keepAliveEnabled)) {
       SERPR_ERROR("Failed to get keep-alive status from config");
@@ -236,7 +389,7 @@ void _handleKeepAliveCommand(char* arg, std::size_t argLength) {
     return;
   }
 
-  if (!_tryParseBool(arg, argLength, keepAliveEnabled)) {
+  if (!_tryParseBool(arg, keepAliveEnabled)) {
     SERPR_ERROR("Invalid argument (not a boolean)");
     return;
   }
@@ -250,15 +403,15 @@ void _handleKeepAliveCommand(char* arg, std::size_t argLength) {
   }
 }
 
-void _handleSerialEchoCommand(char* arg, std::size_t argLength) {
-  if (arg == nullptr || argLength == 0) {
+void _handleSerialEchoCommand(StringView arg) {
+  if (arg.isNullOrEmpty()) {
     // Get current serial echo status
     SERPR_RESPONSE("SerialEcho|%s", s_echoEnabled ? "true" : "false");
     return;
   }
 
   bool enabled;
-  if (!_tryParseBool(arg, argLength, enabled)) {
+  if (!_tryParseBool(arg, enabled)) {
     SERPR_ERROR("Invalid argument (not a boolean)");
     return;
   }
@@ -273,8 +426,8 @@ void _handleSerialEchoCommand(char* arg, std::size_t argLength) {
   }
 }
 
-void _handleValidGpiosCommand(char* arg, std::size_t argLength) {
-  if (arg != nullptr && argLength > 0) {
+void _handleValidGpiosCommand(StringView arg) {
+  if (!arg.isNullOrEmpty()) {
     SERPR_ERROR("Invalid argument (too many arguments)");
     return;
   }
@@ -298,8 +451,8 @@ void _handleValidGpiosCommand(char* arg, std::size_t argLength) {
   SERPR_RESPONSE("ValidGPIOs|%s", buffer.c_str());
 }
 
-void _handleJsonConfigCommand(char* arg, std::size_t argLength) {
-  if (arg == nullptr || argLength == 0) {
+void _handleJsonConfigCommand(StringView arg) {
+  if (arg.isNullOrEmpty()) {
     // Get raw config
     std::string json = Config::GetAsJSON(true);
 
@@ -307,7 +460,7 @@ void _handleJsonConfigCommand(char* arg, std::size_t argLength) {
     return;
   }
 
-  if (!Config::SaveFromJSON(std::string(arg, argLength))) {
+  if (!Config::SaveFromJSON(arg)) {
     SERPR_ERROR("Failed to save config");
     return;
   }
@@ -317,8 +470,8 @@ void _handleJsonConfigCommand(char* arg, std::size_t argLength) {
   ESP.restart();
 }
 
-void _handleRawConfigCommand(char* arg, std::size_t argLength) {
-  if (arg == nullptr || argLength == 0) {
+void _handleRawConfigCommand(StringView arg) {
+  if (arg.isNullOrEmpty()) {
     std::vector<std::uint8_t> buffer;
 
     // Get raw config
@@ -338,7 +491,7 @@ void _handleRawConfigCommand(char* arg, std::size_t argLength) {
   }
 
   std::vector<std::uint8_t> buffer;
-  if (!OpenShock::Base64Utils::Decode(arg, argLength, buffer)) {
+  if (!OpenShock::Base64Utils::Decode(arg.data(), arg.length(), buffer)) {
     SERPR_ERROR("Failed to decode base64");
     return;
   }
@@ -353,9 +506,8 @@ void _handleRawConfigCommand(char* arg, std::size_t argLength) {
   ESP.restart();
 }
 
-void _handleDebugInfoCommand(char* arg, std::size_t argLength) {
+void _handleDebugInfoCommand(StringView arg) {
   (void)arg;
-  (void)argLength;
 
   SERPR_RESPONSE("RTOSInfo|Free Heap|%u", xPortGetFreeHeapSize());
   SERPR_RESPONSE("RTOSInfo|Min Free Heap|%u", xPortGetMinimumEverFreeHeapSize());
@@ -384,12 +536,12 @@ void _handleDebugInfoCommand(char* arg, std::size_t argLength) {
   }
 }
 
-void _handleRFTransmitCommand(char* arg, std::size_t argLength) {
-  if (arg == nullptr || argLength == 0) {
+void _handleRFTransmitCommand(StringView arg) {
+  if (arg.isNullOrEmpty()) {
     SERPR_ERROR("No command");
     return;
   }
-  cJSON* root = cJSON_ParseWithLength(arg, argLength);
+  cJSON* root = cJSON_ParseWithLength(arg.data(), arg.length());
   if (root == nullptr) {
     SERPR_ERROR("Failed to parse JSON: %s", cJSON_GetErrorPtr());
     return;
@@ -413,27 +565,13 @@ void _handleRFTransmitCommand(char* arg, std::size_t argLength) {
   SERPR_SUCCESS("Command sent");
 }
 
-void _handleHelpCommand(char* arg, std::size_t argLength) {
-  if (arg != nullptr && argLength > 0) {
-    // Convert argument to lowercase
-    std::transform(arg, arg + argLength, arg, ::tolower);
+void _handleHelpCommand(StringView arg) {
+  arg = arg.trim();
+  if (arg.isNullOrEmpty()) {
+    SerialInputHandler::PrintWelcomeHeader();
 
-    // Get help for a specific command
-    auto it = s_commandHandlers.find(std::string(arg, argLength));
-    if (it != s_commandHandlers.end()) {
-      Serial.print(it->second.helpResponse);
-      return;
-    }
-
-    SERPR_ERROR("Command \"%.*s\" not found", argLength, arg);
-
-    return;
-  }
-
-  SerialInputHandler::PrintWelcomeHeader();
-
-  // Raw string literal (1+ to remove the first newline)
-  Serial.print(1 + R"(
+    // Raw string literal (1+ to remove the first newline)
+    Serial.print(1 + R"(
 help                   print this menu
 help         <command> print help for a command
 version                print version information
@@ -444,6 +582,8 @@ echo         <bool>    set serial echo enabled
 validgpios             list all valid GPIO pins
 rftxpin                get radio transmit pin
 rftxpin      <pin>     set radio transmit pin
+domain                 get backend domain
+domain       <domain>  set backend domain
 authtoken              get auth token
 authtoken    <token>   set auth token
 networks               get all saved networks
@@ -457,10 +597,21 @@ rawconfig    <base64>  set raw configuration from base64
 rftransmit   <json>    transmit a RF command
 factoryreset           reset device to factory defaults and restart
 )");
+    return;
+  }
+
+  // Get help for a specific command
+  auto it = s_commandHandlers.find(arg);
+  if (it != s_commandHandlers.end()) {
+    Serial.print(it->second.helpResponse);
+    return;
+  }
+
+  SERPR_ERROR("Command \"%.*s\" not found", arg.length(), arg.data());
 }
 
 static const SerialCmdHandler kVersionCmdHandler = {
-  "version",
+  "version"_sv,
   R"(version
   Print version information
   Example:
@@ -469,7 +620,7 @@ static const SerialCmdHandler kVersionCmdHandler = {
   _handleVersionCommand,
 };
 static const SerialCmdHandler kRestartCmdHandler = {
-  "restart",
+  "restart"_sv,
   R"(restart
   Restart the board
   Example:
@@ -478,7 +629,7 @@ static const SerialCmdHandler kRestartCmdHandler = {
   _handleRestartCommand,
 };
 static const SerialCmdHandler kSystemInfoCmdHandler = {
-  "sysinfo",
+  "sysinfo"_sv,
   R"(sysinfo
   Get system information from RTOS, WiFi, etc.
   Example:
@@ -487,7 +638,7 @@ static const SerialCmdHandler kSystemInfoCmdHandler = {
   _handleDebugInfoCommand,
 };
 static const SerialCmdHandler kSerialEchoCmdHandler = {
-  "echo",
+  "echo"_sv,
   R"(echo
   Get the serial echo status.
   If enabled, typed characters are echoed back to the serial port.
@@ -502,7 +653,7 @@ echo [<bool>]
   _handleSerialEchoCommand,
 };
 static const SerialCmdHandler kValidGpiosCmdHandler = {
-  "validgpios",
+  "validgpios"_sv,
   R"(validgpios
   List all valid GPIO pins
   Example:
@@ -511,7 +662,7 @@ static const SerialCmdHandler kValidGpiosCmdHandler = {
   _handleValidGpiosCommand,
 };
 static const SerialCmdHandler kRfTxPinCmdHandler = {
-  "rftxpin",
+  "rftxpin"_sv,
   R"(rftxpin
   Get the GPIO pin used for the radio transmitter.
 
@@ -524,8 +675,22 @@ rftxpin [<pin>]
 )",
   _handleRfTxPinCommand,
 };
+static const SerialCmdHandler kDomainCmdHandler = {
+  "domain"_sv,
+  R"(domain
+  Get the backend domain.
+
+domain [<domain>]
+  Set the backend domain.
+  Arguments:
+    <domain> must be a string.
+  Example:
+    domain api.shocklink.net
+)",
+  _handleDomainCommand,
+};
 static const SerialCmdHandler kAuthTokenCmdHandler = {
-  "authtoken",
+  "authtoken"_sv,
   R"(authtoken
   Get the backend auth token.
 
@@ -538,8 +703,27 @@ authtoken [<token>]
 )",
   _handleAuthtokenCommand,
 };
+static const SerialCmdHandler kLcgOverrideCmdHandler = {
+  "lcgoverride",
+  R"(lcgoverride
+  Get the domain overridden for LCG endpoint (if any).
+
+lcgoverride set <domain>
+  Set a domain to override the LCG endpoint.
+  Arguments:
+    <domain> must be a string.
+  Example:
+    lcgoverride set eu1-gateway.shocklink.net
+
+lcgoverride clear
+  Clear the overridden LCG endpoint.
+  Example:
+    lcgoverride clear
+)",
+  _handleLcgOverrideCommand,
+};
 static const SerialCmdHandler kNetworksCmdHandler = {
-  "networks",
+  "networks"_sv,
   R"(networks
   Get all saved networks.
 
@@ -556,7 +740,7 @@ networks [<json>]
   _handleNetworksCommand,
 };
 static const SerialCmdHandler kKeepAliveCmdHandler = {
-  "keepalive",
+  "keepalive"_sv,
   R"(keepalive
   Get the shocker keep-alive status.
 
@@ -570,7 +754,7 @@ keepalive [<bool>]
   _handleKeepAliveCommand,
 };
 static const SerialCmdHandler kJsonConfigCmdHandler = {
-  "jsonconfig",
+  "jsonconfig"_sv,
   R"(jsonconfig
   Get the configuration as JSON
   Example:
@@ -586,7 +770,7 @@ jsonconfig <json>
   _handleJsonConfigCommand,
 };
 static const SerialCmdHandler kRawConfigCmdHandler = {
-  "rawconfig",
+  "rawconfig"_sv,
   R"(rawconfig
   Get the raw binary config
   Example:
@@ -602,12 +786,12 @@ rawconfig <base64>
   _handleRawConfigCommand,
 };
 static const SerialCmdHandler kRfTransmitCmdHandler = {
-  "rftransmit",
+  "rftransmit"_sv,
   R"(rftransmit <json>
   Transmit a RF command
   Arguments:
     <json> must be a JSON object with the following fields:
-      model      (string) Model of the shocker                    ("caixianlin", "petrainer")
+      model      (string) Model of the shocker                    ("caixianlin", "petrainer", "petrainer998dr")
       id         (number) ID of the shocker                       (0-65535)
       type       (string) Type of the command                     ("shock", "vibrate", "sound", "stop")
       intensity  (number) Intensity of the command                (0-255)
@@ -618,7 +802,7 @@ static const SerialCmdHandler kRfTransmitCmdHandler = {
   _handleRFTransmitCommand,
 };
 static const SerialCmdHandler kFactoryResetCmdHandler = {
-  "factoryreset",
+  "factoryreset"_sv,
   R"(factoryreset
   Reset the device to factory defaults and restart
   Example:
@@ -627,7 +811,7 @@ static const SerialCmdHandler kFactoryResetCmdHandler = {
   _handleFactoryResetCommand,
 };
 static const SerialCmdHandler khelpCmdHandler = {
-  "help",
+  "help"_sv,
   R"(help [<command>]
   Print help information
   Arguments:
@@ -676,41 +860,24 @@ int findLineStart(const char* buffer, int bufferSize, int lineEnd) {
   return -1;
 }
 
-void processSerialLine(char* data, std::size_t length) {
-  int delimiter = findChar(data, length, ' ');
-  if (delimiter == 0) {
-    SERPR_ERROR("Command cannot start with a space");
-    return;
-  }
-
-  char* command             = data;
-  std::size_t commandLength = length;
-  char* arg                 = nullptr;
-  std::size_t argLength     = 0;
-
-  // If there is a delimiter, split the command and argument
-  if (delimiter > 0) {
-    data[delimiter] = '\0';
-    commandLength   = delimiter;
-    arg             = data + delimiter + 1;
-    argLength       = length - delimiter - 1;
-  }
-
-  // Convert command to lowercase
-  std::transform(command, command + commandLength, command, ::tolower);
-
-  // TODO: Clean this up, test this
-  auto it = s_commandHandlers.find(std::string(command, commandLength));
-  if (it != s_commandHandlers.end()) {
-    it->second.commandHandler(arg, argLength);
-    return;
-  }
-
-  if (commandLength > 0) {
-    SERPR_ERROR("Command \"%.*s\" not found", commandLength, command);
-  } else {
+void processSerialLine(StringView line) {
+  line = line.trim();
+  if (line.isNullOrEmpty()) {
     SERPR_ERROR("No command");
+    return;
   }
+
+  auto parts = line.split(' ', 1);
+  StringView command = parts[0];
+  StringView arguments = parts.size() > 1 ? parts[1] : StringView();
+
+  auto it = s_commandHandlers.find(command);
+  if (it == s_commandHandlers.end()) {
+    SERPR_ERROR("Command \"%.*s\" not found", command.size(), command.data());
+    return;
+  }
+
+  it->second.commandHandler(arguments);
 }
 
 bool SerialInputHandler::Init() {
@@ -728,7 +895,9 @@ bool SerialInputHandler::Init() {
   RegisterCommandHandler(kSerialEchoCmdHandler);
   RegisterCommandHandler(kValidGpiosCmdHandler);
   RegisterCommandHandler(kRfTxPinCmdHandler);
+  RegisterCommandHandler(kDomainCmdHandler);
   RegisterCommandHandler(kAuthTokenCmdHandler);
+  RegisterCommandHandler(kLcgOverrideCmdHandler);
   RegisterCommandHandler(kNetworksCmdHandler);
   RegisterCommandHandler(kKeepAliveCmdHandler);
   RegisterCommandHandler(kJsonConfigCmdHandler);
@@ -819,10 +988,11 @@ void SerialInputHandler::Update() {
       break;
     }
 
-    buffer[lineEnd] = '\0';
-    Serial.printf("\r> %s\n", buffer);
+    StringView line = StringView(buffer, lineEnd).trim();
 
-    processSerialLine(buffer, lineEnd);
+    Serial.printf("\r> %.*s\n", line.size(), line.data());
+
+    processSerialLine(line);
 
     int nextLine = findLineStart(buffer, bufferSize, lineEnd + 1);
     if (nextLine < 0) {

@@ -11,8 +11,8 @@
 #include <unordered_map>
 #include <vector>
 
-constexpr std::size_t HTTP_BUFFER_SIZE = 4096LLU;
-constexpr int HTTP_DOWNLOAD_SIZE_LIMIT = 200 * 1024 * 1024;  // 200 MB
+const std::size_t HTTP_BUFFER_SIZE = 4096LLU;
+const int HTTP_DOWNLOAD_SIZE_LIMIT = 200 * 1024 * 1024;  // 200 MB
 
 const char* const TAG = "HTTPRequestManager";
 
@@ -107,7 +107,7 @@ StringView _getDomain(StringView url) {
   }
 
   // Remove the protocol, port, and path eg. "https://api.example.com:443/path" -> "api.example.com"
-  url = url.afterDelimiter("://").beforeDelimiter('/').beforeDelimiter(':');
+  url = url.afterDelimiter("://"_sv).beforeDelimiter('/').beforeDelimiter(':');
 
   // Remove all subdomains eg. "api.example.com" -> "example.com"
   auto domainSep = url.rfind('.');

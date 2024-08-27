@@ -134,7 +134,7 @@ bool _connectImpl(const char* ssid, const char* password, const std::uint8_t (&b
 }
 bool _connectHidden(const std::uint8_t (&bssid)[6], const std::string& password) {
   (void)password;
-  
+
   ESP_LOGV(TAG, "Connecting to hidden network " BSSID_FMT, BSSID_ARG(bssid));
 
   // TODO: Implement hidden network support
@@ -171,7 +171,7 @@ bool _connect(const std::uint8_t (&bssid)[6], const std::string& password) {
   return _connectImpl(it->ssid, password.c_str(), bssid);
 }
 
-bool _authenticate(const WiFiNetwork& net, const std::string& password) {
+bool _authenticate(const WiFiNetwork& net, StringView password) {
   std::uint8_t id = Config::AddWiFiCredentials(net.ssid, password);
   if (id == 0) {
     Serialization::Local::SerializeErrorMessage("too_many_credentials", CaptivePortal::BroadcastMessageBIN);
@@ -180,7 +180,7 @@ bool _authenticate(const WiFiNetwork& net, const std::string& password) {
 
   Serialization::Local::SerializeWiFiNetworkEvent(Serialization::Types::WifiNetworkEventType::Saved, net, CaptivePortal::BroadcastMessageBIN);
 
-  return _connect(net.ssid, password);
+  return _connect(net.ssid, password.toString());
 }
 
 void _evWiFiConnected(arduino_event_t* event) {
@@ -342,7 +342,7 @@ bool WiFiManager::Init() {
   return true;
 }
 
-bool WiFiManager::Save(const char* ssid, const std::string& password) {
+bool WiFiManager::Save(const char* ssid, StringView password) {
   ESP_LOGV(TAG, "Authenticating to network %s", ssid);
 
   auto it = _findNetworkBySSID(ssid);

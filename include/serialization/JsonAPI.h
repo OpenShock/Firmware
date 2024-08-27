@@ -9,6 +9,18 @@
 #include <vector>
 
 namespace OpenShock::Serialization::JsonAPI {
+  struct LcgInstanceDetailsResponse {
+    std::string name;
+    std::string version;
+    std::string currentTime;
+    std::string countryCode;
+    std::string fqdn;
+  };
+  struct BackendVersionResponse {
+    std::string version;
+    std::string commit;
+    std::string currentTime;
+  };
   struct AccountLinkResponse {
     std::string authToken;
   };
@@ -27,6 +39,8 @@ namespace OpenShock::Serialization::JsonAPI {
     std::string country;
   };
 
+  bool ParseLcgInstanceDetailsJsonResponse(int code, const cJSON* root, LcgInstanceDetailsResponse& out);
+  bool ParseBackendVersionJsonResponse(int code, const cJSON* root, BackendVersionResponse& out);
   bool ParseAccountLinkJsonResponse(int code, const cJSON* root, AccountLinkResponse& out);
   bool ParseDeviceInfoJsonResponse(int code, const cJSON* root, DeviceInfoResponse& out);
   bool ParseAssignLcgJsonResponse(int code, const cJSON* root, AssignLcgResponse& out);

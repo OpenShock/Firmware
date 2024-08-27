@@ -18,6 +18,7 @@
 #include "wifi/WiFiManager.h"
 
 #include <esp_ota_ops.h>
+#include <esp_task_wdt.h>
 
 #include <LittleFS.h>
 #include <WiFi.h>
@@ -147,7 +148,7 @@ bool _flashAppPartition(const esp_partition_t* partition, StringView remoteUrl, 
 
   if (!OpenShock::FlashPartitionFromUrl(partition, remoteUrl, remoteHash, onProgress)) {
     ESP_LOGE(TAG, "Failed to flash app partition");
-    _sendFailureMessage("Failed to flash app partition");
+    _sendFailureMessage("Failed to flash app partition"_sv);
     return false;
   }
 
@@ -158,7 +159,7 @@ bool _flashAppPartition(const esp_partition_t* partition, StringView remoteUrl, 
   // Set app partition bootable.
   if (esp_ota_set_boot_partition(partition) != ESP_OK) {
     ESP_LOGE(TAG, "Failed to set app partition bootable");
-    _sendFailureMessage("Failed to set app partition bootable");
+    _sendFailureMessage("Failed to set app partition bootable"_sv);
     return false;
   }
 
@@ -173,7 +174,7 @@ bool _flashFilesystemPartition(const esp_partition_t* parition, StringView remot
   // Make sure captive portal is stopped, timeout after 5 seconds.
   if (!CaptivePortal::ForceClose(5000U)) {
     ESP_LOGE(TAG, "Failed to force close captive portal (timed out)");
-    _sendFailureMessage("Failed to force close captive portal (timed out)");
+    _sendFailureMessage("Failed to force close captive portal (timed out)"_sv);
     return false;
   }
 
@@ -193,7 +194,7 @@ bool _flashFilesystemPartition(const esp_partition_t* parition, StringView remot
 
   if (!OpenShock::FlashPartitionFromUrl(parition, remoteUrl, remoteHash, onProgress)) {
     ESP_LOGE(TAG, "Failed to flash filesystem partition");
-    _sendFailureMessage("Failed to flash filesystem partition");
+    _sendFailureMessage("Failed to flash filesystem partition"_sv);
     return false;
   }
 
@@ -205,7 +206,7 @@ bool _flashFilesystemPartition(const esp_partition_t* parition, StringView remot
   fs::LittleFSFS test;
   if (!test.begin(false, "/static", 10, "static0")) {
     ESP_LOGE(TAG, "Failed to mount filesystem");
-    _sendFailureMessage("Failed to mount filesystem");
+    _sendFailureMessage("Failed to mount filesystem"_sv);
     return false;
   }
   test.end();
@@ -333,7 +334,7 @@ void _otaUpdateTask(void* arg) {
     OtaUpdateManager::FirmwareRelease release;
     if (!OtaUpdateManager::TryGetFirmwareRelease(version, release)) {
       ESP_LOGE(TAG, "Failed to fetch firmware release");  // TODO: Send error message to server
-      _sendFailureMessage("Failed to fetch firmware release");
+      _sendFailureMessage("Failed to fetch firmware release"_sv);
       continue;
     }
 
@@ -349,7 +350,7 @@ void _otaUpdateTask(void* arg) {
     const esp_partition_t* appPartition = esp_ota_get_next_update_partition(nullptr);
     if (appPartition == nullptr) {
       ESP_LOGE(TAG, "Failed to get app update partition");  // TODO: Send error message to server
-      _sendFailureMessage("Failed to get app update partition");
+      _sendFailureMessage("Failed to get app update partition"_sv);
       continue;
     }
 
@@ -357,9 +358,13 @@ void _otaUpdateTask(void* arg) {
     const esp_partition_t* filesystemPartition = esp_partition_find_first(ESP_PARTITION_TYPE_DATA, ESP_PARTITION_SUBTYPE_DATA_SPIFFS, "static0");
     if (filesystemPartition == nullptr) {
       ESP_LOGE(TAG, "Failed to find filesystem partition");  // TODO: Send error message to server
-      _sendFailureMessage("Failed to find filesystem partition");
+      _sendFailureMessage("Failed to find filesystem partition"_sv);
       continue;
     }
+
+    // Increase task watchdog timeout.
+    // Prevents panics on some ESP32s when clearing large partitions.
+    esp_task_wdt_init(15, true);
 
     // Flash app and filesystem partitions.
     if (!_flashFilesystemPartition(filesystemPartition, release.filesystemBinaryUrl, release.filesystemBinaryHash)) continue;
@@ -368,9 +373,12 @@ void _otaUpdateTask(void* arg) {
     // Set OTA boot type in config.
     if (!Config::SetOtaUpdateStep(OpenShock::OtaUpdateStep::Updated)) {
       ESP_LOGE(TAG, "Failed to set OTA update step");
-      _sendFailureMessage("Failed to set OTA update step");
+      _sendFailureMessage("Failed to set OTA update step"_sv);
       continue;
     }
+
+    // Set task watchdog timeout back to default.
+    esp_task_wdt_init(5, true);
 
     // Send reboot message.
     _sendProgressMessage(Serialization::Gateway::OtaInstallProgressTask::Rebooting, 0.0f);
@@ -475,16 +483,16 @@ bool OtaUpdateManager::Init() {
 }
 
 bool OtaUpdateManager::TryGetFirmwareVersion(OtaUpdateChannel channel, OpenShock::SemVer& version) {
-  const char* channelIndexUrl = nullptr;
+  StringView channelIndexUrl;
   switch (channel) {
     case OtaUpdateChannel::Stable:
-      channelIndexUrl = OPENSHOCK_FW_CDN_STABLE_URL;
+      channelIndexUrl = StringView(OPENSHOCK_FW_CDN_STABLE_URL);
       break;
     case OtaUpdateChannel::Beta:
-      channelIndexUrl = OPENSHOCK_FW_CDN_BETA_URL;
+      channelIndexUrl = StringView(OPENSHOCK_FW_CDN_BETA_URL);
       break;
     case OtaUpdateChannel::Develop:
-      channelIndexUrl = OPENSHOCK_FW_CDN_DEVELOP_URL;
+      channelIndexUrl = StringView(OPENSHOCK_FW_CDN_DEVELOP_URL);
       break;
     default:
       ESP_LOGE(TAG, "Unknown channel: %u", channel);
@@ -522,7 +530,7 @@ bool OtaUpdateManager::TryGetFirmwareBoards(const OpenShock::SemVer& version, st
 
   ESP_LOGD(TAG, "Fetching firmware boards from %s", channelIndexUrl.c_str());
 
-  if (!_tryGetStringList(channelIndexUrl.c_str(), boards)) {
+  if (!_tryGetStringList(channelIndexUrl, boards)) {
     ESP_LOGE(TAG, "Failed to fetch firmware boards");
     return false;
   }
@@ -530,7 +538,7 @@ bool OtaUpdateManager::TryGetFirmwareBoards(const OpenShock::SemVer& version, st
   return true;
 }
 
-bool _tryParseIntoHash(const std::string& hash, std::uint8_t (&hashBytes)[32]) {
+bool _tryParseIntoHash(StringView hash, std::uint8_t (&hashBytes)[32]) {
   if (!HexUtils::TryParseHex(hash.data(), hash.size(), hashBytes, 32)) {
     ESP_LOGE(TAG, "Failed to parse hash: %.*s", hash.size(), hash.data());
     return false;
@@ -561,7 +569,7 @@ bool OtaUpdateManager::TryGetFirmwareRelease(const OpenShock::SemVer& version, F
 
   // Fetch hashes.
   auto sha256HashesResponse = OpenShock::HTTP::GetString(
-    sha256HashesUrl.c_str(),
+    sha256HashesUrl,
     {
       {"Accept", "text/plain"}
   },
@@ -576,7 +584,7 @@ bool OtaUpdateManager::TryGetFirmwareRelease(const OpenShock::SemVer& version, F
 
   // Parse hashes.
   bool foundAppHash = false, foundFilesystemHash = false;
-  for (auto line : hashesLines) {
+  for (OpenShock::StringView line : hashesLines) {
     auto parts = line.splitWhitespace();
     if (parts.size() != 2) {
       ESP_LOGE(TAG, "Invalid hashes entry: %.*s", line.size(), line.data());
@@ -586,7 +594,7 @@ bool OtaUpdateManager::TryGetFirmwareRelease(const OpenShock::SemVer& version, F
     auto hash = parts[0].trim();
     auto file = parts[1].trim();
 
-    if (file.startsWith("./")) {
+    if (file.startsWith("./"_sv)) {
       file = file.substr(2);
     }
 
@@ -601,7 +609,7 @@ bool OtaUpdateManager::TryGetFirmwareRelease(const OpenShock::SemVer& version, F
         return false;
       }
 
-      if (!_tryParseIntoHash(hash.toString(), release.appBinaryHash)) {
+      if (!_tryParseIntoHash(hash, release.appBinaryHash)) {
         return false;
       }
 
@@ -612,7 +620,7 @@ bool OtaUpdateManager::TryGetFirmwareRelease(const OpenShock::SemVer& version, F
         return false;
       }
 
-      if (!_tryParseIntoHash(hash.toString(), release.filesystemBinaryHash)) {
+      if (!_tryParseIntoHash(hash, release.filesystemBinaryHash)) {
         return false;
       }
 

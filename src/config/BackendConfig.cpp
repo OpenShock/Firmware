@@ -7,7 +7,9 @@ const char* const TAG = "Config::BackendConfig";
 
 using namespace OpenShock::Config;
 
-BackendConfig::BackendConfig() : domain(OPENSHOCK_API_DOMAIN), authToken() { }
+BackendConfig::BackendConfig() : domain(OPENSHOCK_API_DOMAIN), authToken(), lcgOverride() { }
+
+BackendConfig::BackendConfig(StringView domain, StringView authToken, StringView lcgOverride) : domain(domain.toString()), authToken(authToken.toString()), lcgOverride(lcgOverride.toString()) { }
 
 void BackendConfig::ToDefault() {
   domain = OPENSHOCK_API_DOMAIN;
@@ -22,6 +24,7 @@ bool BackendConfig::FromFlatbuffers(const Serialization::Configuration::BackendC
 
   Internal::Utils::FromFbsStr(domain, config->domain(), OPENSHOCK_API_DOMAIN);
   Internal::Utils::FromFbsStr(authToken, config->auth_token(), "");
+  Internal::Utils::FromFbsStr(lcgOverride, config->lcg_override(), "");
 
   return true;
 }
@@ -36,7 +39,9 @@ flatbuffers::Offset<OpenShock::Serialization::Configuration::BackendConfig> Back
     authTokenOffset = 0;
   }
 
-  return Serialization::Configuration::CreateBackendConfig(builder, domainOffset, authTokenOffset);
+  auto lcgOverrideOffset = builder.CreateString(lcgOverride);
+
+  return Serialization::Configuration::CreateBackendConfig(builder, domainOffset, authTokenOffset, lcgOverrideOffset);
 }
 
 bool BackendConfig::FromJSON(const cJSON* json) {
@@ -52,6 +57,7 @@ bool BackendConfig::FromJSON(const cJSON* json) {
 
   Internal::Utils::FromJsonStr(domain, json, "domain", OPENSHOCK_API_DOMAIN);
   Internal::Utils::FromJsonStr(authToken, json, "authToken", "");
+  Internal::Utils::FromJsonStr(lcgOverride, json, "lcgOverride", "");
 
   return true;
 }
@@ -60,9 +66,12 @@ cJSON* BackendConfig::ToJSON(bool withSensitiveData) const {
   cJSON* root = cJSON_CreateObject();
 
   cJSON_AddStringToObject(root, "domain", domain.c_str());
+
   if (withSensitiveData) {
     cJSON_AddStringToObject(root, "authToken", authToken.c_str());
   }
+
+  cJSON_AddStringToObject(root, "lcgOverride", lcgOverride.c_str());
 
   return root;
 }
