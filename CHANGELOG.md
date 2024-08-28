@@ -1,3 +1,20 @@
+# Version 1.3.0-rc.1 Release Notes
+
+This is the first release candidate for version 1.3.0.
+
+## Highlight
+
+- Added support for **DFRobot Firebeetle**, **Wemos S3 Mini** and **WaveShare S3 Zero** boards.
+
+## Minor Updates
+
+- Re-Add **PET998DR** Quiet Postamble.
+- Fix CaiXianlin protocol sending non-zero when doing a beep command.
+- Moved schema files to seperate repository.
+- Improve error handling and logging.
+- Dependency updates.
+- Code cleanup, optimization and refactoring.
+
 # Version 1.2.0 Release Notes
 
 This release adds a new shocker protocol, more bugfixes, configurability, and performance improvements.
