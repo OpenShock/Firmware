@@ -4,7 +4,7 @@ This is the first release candidate for version 1.3.0.
 
 ## Highlight
 
-- Added support for **DFRobot Firebeetle** and **Wemos S3 Mini** boards.
+- Added support for **DFRobot Firebeetle**, **Wemos S3 Mini** and **WaveShare S3 Zero** boards.
 
 ## Minor Updates
 
