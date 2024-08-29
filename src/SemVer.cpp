@@ -191,12 +191,12 @@ bool _semverIsSemver(StringView str) {
   return false;
 }
 
-bool _tryParseU16(OpenShock::StringView str, std::uint16_t& out) {
+bool _tryParseU16(OpenShock::StringView str, uint16_t& out) {
   if (str.isNullOrEmpty()) {
     return false;
   }
 
-  std::uint32_t u32 = 0;
+  uint32_t u32 = 0;
   for (auto c : str) {
     if (c < '0' || c > '9') {
       return false;
@@ -205,12 +205,12 @@ bool _tryParseU16(OpenShock::StringView str, std::uint16_t& out) {
     u32 *= 10;
     u32 += c - '0';
 
-    if (u32 > std::numeric_limits<std::uint16_t>::max()) {
+    if (u32 > std::numeric_limits<uint16_t>::max()) {
       return false;
     }
   }
 
-  out = static_cast<std::uint16_t>(u32);
+  out = static_cast<uint16_t>(u32);
 
   return true;
 }

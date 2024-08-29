@@ -11,7 +11,7 @@ const char* const TAG = "RmtMainEncoder";
 
 using namespace OpenShock;
 
-std::vector<rmt_data_t> Rmt::GetSequence(ShockerModelType model, std::uint16_t shockerId, ShockerCommandType type, std::uint8_t intensity) {
+std::vector<rmt_data_t> Rmt::GetSequence(ShockerModelType model, uint16_t shockerId, ShockerCommandType type, uint8_t intensity) {
   switch (model) {
     case ShockerModelType::Petrainer:
       return Rmt::PetrainerEncoder::GetSequence(shockerId, type, intensity);
@@ -25,8 +25,8 @@ std::vector<rmt_data_t> Rmt::GetSequence(ShockerModelType model, std::uint16_t s
   }
 }
 /*
-std::shared_ptr<std::vector<rmt_data_t>> Rmt::GetZeroSequence(ShockerModelType model, std::uint16_t shockerId) {
-  static std::unordered_map<std::uint16_t, std::shared_ptr<std::vector<rmt_data_t>>> _sequences;
+std::shared_ptr<std::vector<rmt_data_t>> Rmt::GetZeroSequence(ShockerModelType model, uint16_t shockerId) {
+  static std::unordered_map<uint16_t, std::shared_ptr<std::vector<rmt_data_t>>> _sequences;
 
   auto it = _sequences.find(shockerId);
   if (it != _sequences.end()) return it->second; // FIXME: This is not thread-safe, and does not check if model is the same, causing a protocol mismatch

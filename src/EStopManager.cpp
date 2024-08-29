@@ -15,35 +15,35 @@ const char* const TAG = "EStopManager";
 
 using namespace OpenShock;
 
-const std::uint32_t k_estopHoldToClearTime = 5000;
-const std::uint32_t k_estopDebounceTime    = 100;
+const uint32_t k_estopHoldToClearTime = 5000;
+const uint32_t k_estopDebounceTime    = 100;
 
 static TaskHandle_t s_estopEventHandlerTask;
 static QueueHandle_t s_estopEventQueue;
 
 static bool s_estopActive              = false;
 static bool s_estopAwaitingRelease     = false;
-static std::int64_t s_estopActivatedAt = 0;
+static int64_t s_estopActivatedAt = 0;
 
 static gpio_num_t s_estopPin;
 
 struct EstopEventQueueMessage {
   bool pressed              : 1;
   bool deactivatesAtChanged : 1;
-  std::int64_t deactivatesAt;
+  int64_t deactivatesAt;
 };
 
 // This high-priority task is usually idling, waiting for
 // messages from the EStop interrupt or it's hold timer
 void _estopEventHandler(void* pvParameters) {
-  std::int64_t deactivatesAt = 0;
+  int64_t deactivatesAt = 0;
   for (;;) {
     // Wait indefinitely for a message from the EStop interrupt routine
     TickType_t waitTime = portMAX_DELAY;
 
     // If the EStop is being deactivated, wait for the hold timer to trigger
     if (deactivatesAt != 0) {
-      std::int64_t now = OpenShock::millis();
+      int64_t now = OpenShock::millis();
       if (now >= deactivatesAt) {
         waitTime = 0;
       } else {
@@ -83,13 +83,13 @@ void _estopEventHandler(void* pvParameters) {
 // Interrupt should only be a dumb sender of the GPIO change, additionally triggering if needed
 // Clearing and debouncing is handled by the task.
 void _estopEdgeInterrupt(void* arg) {
-  std::int64_t now = OpenShock::millis();
+  int64_t now = OpenShock::millis();
 
   // TODO: Allow active HIGH EStops?
   bool pressed = gpio_get_level(s_estopPin) == 0;
 
   bool deactivatesAtChanged  = false;
-  std::int64_t deactivatesAt = 0;
+  int64_t deactivatesAt = 0;
 
   if (!s_estopActive && pressed) {
     s_estopActive      = true;
@@ -123,7 +123,7 @@ void EStopManager::Init() {
 #ifdef OPENSHOCK_ESTOP_PIN
   s_estopPin = static_cast<gpio_num_t>(OPENSHOCK_ESTOP_PIN);
 
-  ESP_LOGI(TAG, "Initializing on pin %hhi", static_cast<std::int8_t>(s_estopPin));
+  ESP_LOGI(TAG, "Initializing on pin %hhi", static_cast<int8_t>(s_estopPin));
 
   gpio_config_t io_conf;
   io_conf.pin_bit_mask = 1ULL << s_estopPin;
@@ -159,6 +159,6 @@ bool EStopManager::IsEStopped() {
   return s_estopActive;
 }
 
-std::int64_t EStopManager::LastEStopped() {
+int64_t EStopManager::LastEStopped() {
   return s_estopActivatedAt;
 }

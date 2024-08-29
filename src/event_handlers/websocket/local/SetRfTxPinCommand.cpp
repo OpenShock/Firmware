@@ -9,7 +9,7 @@
 
 const char* const TAG = "LocalMessageHandlers";
 
-void serializeSetRfTxPinResult(std::uint8_t socketId, std::uint8_t pin, OpenShock::Serialization::Local::SetRfPinResultCode result) {
+void serializeSetRfTxPinResult(uint8_t socketId, uint8_t pin, OpenShock::Serialization::Local::SetRfPinResultCode result) {
   flatbuffers::FlatBufferBuilder builder(1024);
 
   auto responseOffset = builder.CreateStruct(OpenShock::Serialization::Local::SetRfTxPinCommandResult(pin, result));
@@ -18,15 +18,15 @@ void serializeSetRfTxPinResult(std::uint8_t socketId, std::uint8_t pin, OpenShoc
 
   builder.Finish(msgOffset);
 
-  const std::uint8_t* buffer = builder.GetBufferPointer();
-  std::uint8_t size   = builder.GetSize();
+  const uint8_t* buffer = builder.GetBufferPointer();
+  uint8_t size   = builder.GetSize();
 
   OpenShock::CaptivePortal::SendMessageBIN(socketId, buffer, size);
 }
 
 using namespace OpenShock::MessageHandlers::Local;
 
-void _Private::HandleSetRfTxPinCommand(std::uint8_t socketId, const OpenShock::Serialization::Local::LocalToHubMessage* root) {
+void _Private::HandleSetRfTxPinCommand(uint8_t socketId, const OpenShock::Serialization::Local::LocalToHubMessage* root) {
   auto msg = root->payload_as_SetRfTxPinCommand();
   if (msg == nullptr) {
     ESP_LOGE(TAG, "Payload cannot be parsed as SetRfTxPinCommand");
