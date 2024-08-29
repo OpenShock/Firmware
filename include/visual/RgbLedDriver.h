@@ -25,10 +25,10 @@ namespace OpenShock {
     bool IsValid() const { return m_gpioPin != GPIO_NUM_NC; }
 
     struct RGBState {
-      std::uint8_t red;
-      std::uint8_t green;
-      std::uint8_t blue;
-      std::uint32_t duration;
+      uint8_t red;
+      uint8_t green;
+      uint8_t blue;
+      uint32_t duration;
     };
 
     void SetPattern(const RGBState* pattern, std::size_t patternLength);
@@ -38,14 +38,14 @@ namespace OpenShock {
     }
     void ClearPattern();
 
-    void SetBrightness(std::uint8_t brightness);
+    void SetBrightness(uint8_t brightness);
 
   private:
     void ClearPatternInternal();
     static void RunPattern(void* arg);
 
     gpio_num_t m_gpioPin;
-    std::uint8_t m_brightness;  // 0-255
+    uint8_t m_brightness;  // 0-255
     std::vector<RGBState> m_pattern;
     rmt_obj_t* m_rmtHandle;
     TaskHandle_t m_taskHandle;

@@ -13,21 +13,21 @@ const char* const TAG = "RFTransmitter";
 
 const UBaseType_t RFTRANSMITTER_QUEUE_SIZE        = 64;
 const BaseType_t RFTRANSMITTER_TASK_PRIORITY      = 1;
-const std::uint32_t RFTRANSMITTER_TASK_STACK_SIZE = 4096;  // PROFILED: 1.4KB stack usage
+const uint32_t RFTRANSMITTER_TASK_STACK_SIZE = 4096;  // PROFILED: 1.4KB stack usage
 const float RFTRANSMITTER_TICKRATE_NS             = 1000;
-const std::int64_t TRANSMIT_END_DURATION          = 300;
+const int64_t TRANSMIT_END_DURATION          = 300;
 
 using namespace OpenShock;
 
 struct command_t {
-  std::int64_t until;
+  int64_t until;
   std::vector<rmt_data_t> sequence;
   std::vector<rmt_data_t> zeroSequence;
-  std::uint16_t shockerId;
+  uint16_t shockerId;
   bool overwrite;
 };
 
-RFTransmitter::RFTransmitter(std::uint8_t gpioPin) : m_txPin(gpioPin), m_rmtHandle(nullptr), m_queueHandle(nullptr), m_taskHandle(nullptr) {
+RFTransmitter::RFTransmitter(uint8_t gpioPin) : m_txPin(gpioPin), m_rmtHandle(nullptr), m_queueHandle(nullptr), m_taskHandle(nullptr) {
   ESP_LOGD(TAG, "[pin-%u] Creating RFTransmitter", m_txPin);
 
   m_rmtHandle = rmtInit(gpioPin, RMT_TX_MODE, RMT_MEM_64);
@@ -61,7 +61,7 @@ RFTransmitter::~RFTransmitter() {
   destroy();
 }
 
-bool RFTransmitter::SendCommand(ShockerModelType model, std::uint16_t shockerId, ShockerCommandType type, std::uint8_t intensity, std::uint16_t durationMs, bool overwriteExisting) {
+bool RFTransmitter::SendCommand(ShockerModelType model, uint16_t shockerId, ShockerCommandType type, uint8_t intensity, uint16_t durationMs, bool overwriteExisting) {
   if (m_queueHandle == nullptr) {
     ESP_LOGE(TAG, "[pin-%u] Queue is null", m_txPin);
     return false;
@@ -130,7 +130,7 @@ void RFTransmitter::destroy() {
 
 void RFTransmitter::TransmitTask(void* arg) {
   RFTransmitter* transmitter = reinterpret_cast<RFTransmitter*>(arg);
-  std::uint8_t m_txPin       = transmitter->m_txPin;  // This must be defined here, because the THIS_LOG macro uses it
+  uint8_t m_txPin       = transmitter->m_txPin;  // This must be defined here, because the THIS_LOG macro uses it
   rmt_obj_t* rmtHandle       = transmitter->m_rmtHandle;
   QueueHandle_t queueHandle  = transmitter->m_queueHandle;
 
@@ -180,7 +180,7 @@ void RFTransmitter::TransmitTask(void* arg) {
     }
 
     if (OpenShock::EStopManager::IsEStopped()) {
-      std::int64_t whenEStoppedTime = EStopManager::LastEStopped();
+      int64_t whenEStoppedTime = EStopManager::LastEStopped();
 
       for (auto it = commands.begin(); it != commands.end(); ++it) {
         cmd = *it;

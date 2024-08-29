@@ -16,13 +16,13 @@
 
 static const char* TAG = "CaptivePortalInstance";
 
-const std::uint16_t HTTP_PORT                 = 80;
-const std::uint16_t WEBSOCKET_PORT            = 81;
-const std::uint16_t DNS_PORT                  = 53;
-const std::uint32_t WEBSOCKET_PING_INTERVAL   = 10'000;
-const std::uint32_t WEBSOCKET_PING_TIMEOUT    = 1000;
-const std::uint8_t WEBSOCKET_PING_RETRIES     = 3;
-const std::uint32_t WEBSOCKET_UPDATE_INTERVAL = 10;  // 10ms / 100Hz
+const uint16_t HTTP_PORT                 = 80;
+const uint16_t WEBSOCKET_PORT            = 81;
+const uint16_t DNS_PORT                  = 53;
+const uint32_t WEBSOCKET_PING_INTERVAL   = 10'000;
+const uint32_t WEBSOCKET_PING_TIMEOUT    = 1000;
+const uint8_t WEBSOCKET_PING_RETRIES     = 3;
+const uint32_t WEBSOCKET_UPDATE_INTERVAL = 10;  // 10ms / 100Hz
 
 using namespace OpenShock;
 
@@ -148,7 +148,7 @@ void CaptivePortalInstance::task(void* arg) {
   }
 }
 
-void CaptivePortalInstance::handleWebSocketClientConnected(std::uint8_t socketId) {
+void CaptivePortalInstance::handleWebSocketClientConnected(uint8_t socketId) {
   ESP_LOGD(TAG, "WebSocket client #%u connected from %s", socketId, m_socketServer.remoteIP(socketId).toString().c_str());
 
   WiFiNetwork connectedNetwork;
@@ -165,15 +165,15 @@ void CaptivePortalInstance::handleWebSocketClientConnected(std::uint8_t socketId
   Serialization::Local::SerializeWiFiNetworksEvent(Serialization::Types::WifiNetworkEventType::Discovered, networks, std::bind(&CaptivePortalInstance::sendMessageBIN, this, socketId, std::placeholders::_1, std::placeholders::_2));
 }
 
-void CaptivePortalInstance::handleWebSocketClientDisconnected(std::uint8_t socketId) {
+void CaptivePortalInstance::handleWebSocketClientDisconnected(uint8_t socketId) {
   ESP_LOGD(TAG, "WebSocket client #%u disconnected", socketId);
 }
 
-void CaptivePortalInstance::handleWebSocketClientError(std::uint8_t socketId, std::uint16_t code, const char* message) {
+void CaptivePortalInstance::handleWebSocketClientError(uint8_t socketId, uint16_t code, const char* message) {
   ESP_LOGE(TAG, "WebSocket client #%u error %u: %s", socketId, code, message);
 }
 
-void CaptivePortalInstance::handleWebSocketEvent(std::uint8_t socketId, WebSocketMessageType type, const std::uint8_t* payload, std::size_t length) {
+void CaptivePortalInstance::handleWebSocketEvent(uint8_t socketId, WebSocketMessageType type, const uint8_t* payload, std::size_t length) {
   switch (type) {
     case WebSocketMessageType::Connected:
       handleWebSocketClientConnected(socketId);

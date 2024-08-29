@@ -72,7 +72,7 @@ bool GatewayClient::sendMessageTXT(StringView data) {
   return m_webSocket.sendTXT(data.data(), data.length());
 }
 
-bool GatewayClient::sendMessageBIN(const std::uint8_t* data, std::size_t length) {
+bool GatewayClient::sendMessageBIN(const uint8_t* data, std::size_t length) {
   if (m_state != State::Connected) {
     return false;
   }
@@ -93,9 +93,9 @@ bool GatewayClient::loop() {
     return true;
   }
 
-  std::int64_t msNow = OpenShock::millis();
+  int64_t msNow = OpenShock::millis();
 
-  std::int64_t timeSinceLastKA = msNow - m_lastKeepAlive;
+  int64_t timeSinceLastKA = msNow - m_lastKeepAlive;
 
   if (timeSinceLastKA >= 15'000) {
     _sendKeepAlive();
@@ -128,7 +128,7 @@ void GatewayClient::_setState(State state) {
 
 void GatewayClient::_sendKeepAlive() {
   ESP_LOGV(TAG, "Sending Gateway keep-alive message");
-  Serialization::Gateway::SerializeKeepAliveMessage([this](const std::uint8_t* data, std::size_t len) { return m_webSocket.sendBIN(data, len); });
+  Serialization::Gateway::SerializeKeepAliveMessage([this](const uint8_t* data, std::size_t len) { return m_webSocket.sendBIN(data, len); });
 }
 
 void GatewayClient::_sendBootStatus() {
@@ -136,7 +136,7 @@ void GatewayClient::_sendBootStatus() {
 
   ESP_LOGV(TAG, "Sending Gateway boot status message");
 
-  std::int32_t updateId;
+  int32_t updateId;
   if (!Config::GetOtaUpdateId(updateId)) {
     ESP_LOGE(TAG, "Failed to get OTA update ID");
     return;
@@ -154,7 +154,7 @@ void GatewayClient::_sendBootStatus() {
     return;
   }
 
-  s_bootStatusSent = Serialization::Gateway::SerializeBootStatusMessage(updateId, OtaUpdateManager::GetFirmwareBootType(), version, [this](const std::uint8_t* data, std::size_t len) { return m_webSocket.sendBIN(data, len); });
+  s_bootStatusSent = Serialization::Gateway::SerializeBootStatusMessage(updateId, OtaUpdateManager::GetFirmwareBootType(), version, [this](const uint8_t* data, std::size_t len) { return m_webSocket.sendBIN(data, len); });
 
   if (s_bootStatusSent && updateStep != OpenShock::OtaUpdateStep::None) {
     if (!Config::SetOtaUpdateStep(OpenShock::OtaUpdateStep::None)) {
@@ -163,7 +163,7 @@ void GatewayClient::_sendBootStatus() {
   }
 }
 
-void GatewayClient::_handleEvent(WStype_t type, std::uint8_t* payload, std::size_t length) {
+void GatewayClient::_handleEvent(WStype_t type, uint8_t* payload, std::size_t length) {
   (void)payload;
 
   switch (type) {

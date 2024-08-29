@@ -15,7 +15,7 @@ namespace OpenShock::Rmt::Internal {
     static_assert(N < std::numeric_limits<T>::digits, "N must be less or equal to the number of bits in T");
 
     pulses.reserve(pulses.size() + N);
-    for (std::int64_t bit_pos = N - 1; bit_pos >= 0; --bit_pos) {
+    for (int64_t bit_pos = N - 1; bit_pos >= 0; --bit_pos) {
       pulses.push_back((data >> bit_pos) & 1 ? rmtOne : rmtZero);
     }
   }

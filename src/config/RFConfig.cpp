@@ -10,7 +10,7 @@ using namespace OpenShock::Config;
 
 RFConfig::RFConfig() : txPin(OPENSHOCK_RF_TX_GPIO), keepAliveEnabled(true) { }
 
-RFConfig::RFConfig(std::uint8_t txPin, bool keepAliveEnabled) : txPin(txPin), keepAliveEnabled(keepAliveEnabled) { }
+RFConfig::RFConfig(uint8_t txPin, bool keepAliveEnabled) : txPin(txPin), keepAliveEnabled(keepAliveEnabled) { }
 
 void RFConfig::ToDefault() {
   txPin            = OPENSHOCK_RF_TX_GPIO;

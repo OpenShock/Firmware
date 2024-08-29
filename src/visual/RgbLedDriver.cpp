@@ -69,7 +69,7 @@ void RgbLedDriver::ClearPattern() {
 }
 
 // Range: 0-255
-void RgbLedDriver::SetBrightness(std::uint8_t brightness) {
+void RgbLedDriver::SetBrightness(uint8_t brightness) {
   m_brightness = brightness;
 }
 
@@ -88,7 +88,7 @@ void RgbLedDriver::RunPattern(void* arg) {
   RgbLedDriver* thisPtr = reinterpret_cast<RgbLedDriver*>(arg);
 
   rmt_obj_t* rmtHandle           = thisPtr->m_rmtHandle;
-  std::uint8_t brightness        = thisPtr->m_brightness;
+  uint8_t brightness        = thisPtr->m_brightness;
   std::vector<RGBState>& pattern = thisPtr->m_pattern;
 
   std::array<rmt_data_t, 24> led_data;  // 24 bits per LED (8 bits per color * 3 colors)
@@ -99,14 +99,14 @@ void RgbLedDriver::RunPattern(void* arg) {
       // https://cdn-shop.adafruit.com/datasheets/WS2812B.pdf - Page 5
       // But some actually expect RGB!
 
-      std::uint8_t r = static_cast<std::uint8_t>(static_cast<std::uint16_t>(state.red) * brightness / 255);
-      std::uint8_t g = static_cast<std::uint8_t>(static_cast<std::uint16_t>(state.green) * brightness / 255);
-      std::uint8_t b = static_cast<std::uint8_t>(static_cast<std::uint16_t>(state.blue) * brightness / 255);
+      uint8_t r = static_cast<uint8_t>(static_cast<uint16_t>(state.red) * brightness / 255);
+      uint8_t g = static_cast<uint8_t>(static_cast<uint16_t>(state.green) * brightness / 255);
+      uint8_t b = static_cast<uint8_t>(static_cast<uint16_t>(state.blue) * brightness / 255);
 #if OPENSHOCK_LED_SWAP_RG_CHANNELS
       std::swap(r, g);
 #endif
 
-      const std::uint32_t colors = (static_cast<std::uint32_t>(g) << 16) | (static_cast<std::uint32_t>(r) << 8) | static_cast<std::uint32_t>(b);
+      const uint32_t colors = (static_cast<uint32_t>(g) << 16) | (static_cast<uint32_t>(r) << 8) | static_cast<uint32_t>(b);
 
       // Encode the data
       for (std::size_t bit = 0; bit < 24; bit++) {

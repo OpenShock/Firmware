@@ -87,7 +87,7 @@ void MonoLedDriver::ClearPattern() {
   xSemaphoreGive(m_taskMutex);
 }
 
-void MonoLedDriver::SetBrightness(std::uint8_t brightness) {
+void MonoLedDriver::SetBrightness(uint8_t brightness) {
   m_brightness = brightness;
 }
 
@@ -106,7 +106,7 @@ void MonoLedDriver::RunPattern(void* arg) {
   MonoLedDriver* thisPtr = reinterpret_cast<MonoLedDriver*>(arg);
 
   gpio_num_t pin              = thisPtr->m_gpioPin;
-  std::uint8_t brightness     = thisPtr->m_brightness;
+  uint8_t brightness     = thisPtr->m_brightness;
   std::vector<State>& pattern = thisPtr->m_pattern;
 
   while (true) {

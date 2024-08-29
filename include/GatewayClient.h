@@ -14,7 +14,7 @@ namespace OpenShock {
     GatewayClient(const std::string& authToken);
     ~GatewayClient();
 
-    enum class State : std::uint8_t {
+    enum class State : uint8_t {
       Disconnected,
       Disconnecting,
       Connecting,
@@ -27,7 +27,7 @@ namespace OpenShock {
     void disconnect();
 
     bool sendMessageTXT(StringView data);
-    bool sendMessageBIN(const std::uint8_t* data, std::size_t length);
+    bool sendMessageBIN(const uint8_t* data, std::size_t length);
 
     bool loop();
 
@@ -35,10 +35,10 @@ namespace OpenShock {
     void _setState(State state);
     void _sendKeepAlive();
     void _sendBootStatus();
-    void _handleEvent(WStype_t type, std::uint8_t* payload, std::size_t length);
+    void _handleEvent(WStype_t type, uint8_t* payload, std::size_t length);
 
     WebSocketsClient m_webSocket;
-    std::int64_t m_lastKeepAlive;
+    int64_t m_lastKeepAlive;
     State m_state;
   };
 }  // namespace OpenShock
