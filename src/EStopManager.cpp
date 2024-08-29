@@ -2,6 +2,7 @@
 
 #include "EStopManager.h"
 
+#include "Chipset.h"
 #include "CommandHandler.h"
 #include "config/Config.h"
 #include "Logging.h"
@@ -119,9 +120,11 @@ void _estopEdgeInterrupt(void* arg) {
   }
 }
 
-void EStopManager::Init() {
-#ifdef OPENSHOCK_ESTOP_PIN
-  s_estopPin = static_cast<gpio_num_t>(OPENSHOCK_ESTOP_PIN);
+bool EStopManager::Init() {
+  if (!OpenShock::Config::GetEStopConfigPin(s_estopPin)) {
+    ESP_LOGE(TAG, "Failed to get EStop pin from config");
+    return false;
+  }
 
   ESP_LOGI(TAG, "Initializing on pin %hhi", static_cast<std::int8_t>(s_estopPin));
 
@@ -131,28 +134,32 @@ void EStopManager::Init() {
   io_conf.pull_up_en   = GPIO_PULLUP_ENABLE;
   io_conf.mode         = GPIO_MODE_INPUT;
   io_conf.intr_type    = GPIO_INTR_ANYEDGE;
-  gpio_config(&io_conf);
+  if (gpio_config(&io_conf) != ESP_OK) {
+    ESP_LOGE(TAG, "Failed to configure EStop pin");
+    return false;
+  }
 
   // TODO?: Should we maybe use statically allocated queues and timers? See CreateStatic for both.
   s_estopEventQueue = xQueueCreate(8, sizeof(EstopEventQueueMessage));
 
   esp_err_t err = gpio_install_isr_service(ESP_INTR_FLAG_EDGE);
   if (err != ESP_OK && err != ESP_ERR_INVALID_STATE) {  // ESP_ERR_INVALID_STATE is fine, it just means the ISR service is already installed
-    ESP_PANIC(TAG, "Failed to install EStop ISR service");
+    ESP_LOGE(TAG, "Failed to install EStop ISR service");
+    return false;
   }
 
   err = gpio_isr_handler_add(s_estopPin, _estopEdgeInterrupt, nullptr);
   if (err != ESP_OK) {
-    ESP_PANIC(TAG, "Failed to add EStop ISR handler");
+    ESP_LOGE(TAG, "Failed to add EStop ISR handler");
+    return false;
   }
 
   if (xTaskCreate(_estopEventHandler, TAG, 4096, nullptr, 5, &s_estopEventHandlerTask) != pdPASS) {
-    ESP_PANIC(TAG, "Failed to create EStop event handler task");
+    ESP_LOGE(TAG, "Failed to create EStop event handler task");
+    return false;
   }
 
-#else
-  ESP_LOGI(TAG, "EStopManager disabled, no pin defined");
-#endif
+  return true;
 }
 
 bool EStopManager::IsEStopped() {

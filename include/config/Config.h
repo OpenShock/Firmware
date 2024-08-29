@@ -10,6 +10,8 @@
 #include "config/WiFiCredentials.h"
 #include "StringView.h"
 
+#include <hal/gpio_types.h>
+
 #include <functional>
 #include <vector>
 
@@ -55,8 +57,8 @@ namespace OpenShock::Config {
   bool GetRFConfigKeepAliveEnabled(bool& out);
   bool SetRFConfigKeepAliveEnabled(bool enabled);
 
-  bool GetEStopConfigPin(std::uint8_t& out);
-  bool SetEStopConfigPin(std::uint8_t estopPin);
+  bool GetEStopConfigPin(gpio_num_t& out);
+  bool SetEStopConfigPin(gpio_num_t estopPin);
 
   bool GetSerialInputConfigEchoEnabled(bool& out);
   bool SetSerialInputConfigEchoEnabled(bool enabled);

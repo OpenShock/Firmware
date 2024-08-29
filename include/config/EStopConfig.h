@@ -2,12 +2,14 @@
 
 #include "config/ConfigBase.h"
 
+#include <hal/gpio_types.h>
+
 namespace OpenShock::Config {
   struct EStopConfig : public ConfigBase<Serialization::Configuration::EStopConfig> {
     EStopConfig();
-    EStopConfig(std::uint8_t estopPin);
+    EStopConfig(gpio_num_t estopPin);
 
-    std::uint8_t estopPin;
+    gpio_num_t estopPin;
 
     void ToDefault() override;
 

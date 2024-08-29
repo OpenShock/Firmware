@@ -27,6 +27,10 @@ bool trySetup() {
     ESP_PANIC(TAG, "Unable to initialize VisualStateManager");
   }
 
+  if (!OpenShock::EStopManager::Init()) {
+    ESP_PANIC(TAG, "Unable to initialize EStopManager");
+  }
+
   if (!OpenShock::SerialInputHandler::Init()) {
     ESP_LOGE(TAG, "Unable to initialize SerialInputHandler");
     return false;

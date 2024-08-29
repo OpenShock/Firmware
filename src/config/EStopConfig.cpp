@@ -1,5 +1,6 @@
 #include "config/EStopConfig.h"
 
+#include "Chipset.h"
 #include "Common.h"
 #include "config/internal/utils.h"
 #include "Logging.h"
@@ -8,12 +9,12 @@ const char* const TAG = "Config::EStopConfig";
 
 using namespace OpenShock::Config;
 
-EStopConfig::EStopConfig() : estopPin(OPENSHOCK_ESTOP_PIN) { }
+EStopConfig::EStopConfig() : estopPin(static_cast<gpio_num_t>(OPENSHOCK_ESTOP_PIN)) { }
 
-EStopConfig::EStopConfig(std::uint8_t estopPin) : estopPin(estopPin) { }
+EStopConfig::EStopConfig(gpio_num_t estopPin) : estopPin(estopPin) { }
 
 void EStopConfig::ToDefault() {
-  estopPin = OPENSHOCK_ESTOP_PIN;
+  estopPin = static_cast<gpio_num_t>(OPENSHOCK_ESTOP_PIN);
 }
 
 bool EStopConfig::FromFlatbuffers(const Serialization::Configuration::EStopConfig* config) {
@@ -22,7 +23,14 @@ bool EStopConfig::FromFlatbuffers(const Serialization::Configuration::EStopConfi
     return false;
   }
 
-  estopPin = config->estop_pin();
+  std::uint8_t val = config->estop_pin();
+
+  if (!OpenShock::IsValidInputPin(val)) {
+    ESP_LOGE(TAG, "Invalid estopPin: %d", val);
+    return false;
+  }
+
+  estopPin = static_cast<gpio_num_t>(val);
 
   return true;
 }
@@ -42,7 +50,16 @@ bool EStopConfig::FromJSON(const cJSON* json) {
     return false;
   }
 
-  Internal::Utils::FromJsonU8(estopPin, json, "estopPin", OPENSHOCK_ESTOP_PIN);
+  std::uint8_t val;
+  if (!Internal::Utils::FromJsonU8(val, json, "estopPin", OPENSHOCK_ESTOP_PIN)) {
+    ESP_LOGE(TAG, "Failed to parse estopPin");
+    return false;
+  }
+
+  if (!OpenShock::IsValidInputPin(val)) {
+    ESP_LOGE(TAG, "Invalid estopPin: %d", val);
+    return false;
+  }
 
   return true;
 }

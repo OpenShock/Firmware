@@ -1,5 +1,6 @@
 #include "config/Config.h"
 
+#include "Chipset.h"
 #include "Common.h"
 #include "config/RootConfig.h"
 #include "Logging.h"
@@ -383,7 +384,7 @@ bool Config::SetRFConfigKeepAliveEnabled(bool enabled) {
   return _trySaveConfig();
 }
 
-bool Config::GetEStopConfigPin(std::uint8_t& out) {
+bool Config::GetEStopConfigPin(gpio_num_t& out) {
   CONFIG_LOCK_READ(false);
 
   out = _configData.estop.estopPin;
@@ -391,8 +392,13 @@ bool Config::GetEStopConfigPin(std::uint8_t& out) {
   return true;
 }
 
-bool Config::SetEStopConfigPin(std::uint8_t estopPin) {
+bool Config::SetEStopConfigPin(gpio_num_t estopPin) {
   CONFIG_LOCK_WRITE(false);
+
+  if (!OpenShock::IsValidInputPin(estopPin)) {
+    ESP_LOGE(TAG, "Invalid estopPin: %d", estopPin);
+    return false;
+  }
 
   _configData.estop.estopPin = estopPin;
   return _trySaveConfig();

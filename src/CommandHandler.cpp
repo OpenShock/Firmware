@@ -256,7 +256,7 @@ SetGPIOResultCode CommandHandler::SetEstopPin(std::uint8_t estopPin) {
 
     // TODO: Implement EStopManager pin change logic
 
-    if (!Config::SetEStopConfigPin(estopPin)) {
+    if (!Config::SetEStopConfigPin(static_cast<gpio_num_t>(estopPin))) {
       ESP_LOGE(TAG, "Failed to set EStop pin in config");
 
       xSemaphoreGive(s_estopManagerMutex);
