@@ -1,3 +1,5 @@
+#include <freertos/FreeRTOS.h>
+
 #include "visual/RgbLedDriver.h"
 
 #include "Chipset.h"

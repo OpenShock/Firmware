@@ -37,9 +37,12 @@ class Package:
 
 # List of packages to install (pip name, package name)
 required = [
+    # Captive Portal building
     Package('fonttools', ['woff', 'unicode'], 'fontTools'),
     Package('brotli', [], 'brotli'),
     Package('gitpython', [], 'git'),
+    # esptool (while using custom version)
+    Package('intelhex', [], "IntelHex"),
 ]
 
 # Get all packages that are not installed
