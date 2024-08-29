@@ -9,7 +9,7 @@
 #include <vector>
 
 namespace OpenShock::HTTP {
-  enum class RequestResult : std::uint8_t {
+  enum class RequestResult : uint8_t {
     InternalError,  // Internal error
     InvalidURL,     // Invalid URL
     RequestFailed,  // Failed to start request
@@ -33,11 +33,11 @@ namespace OpenShock::HTTP {
   using GotContentLengthCallback = std::function<bool(int contentLength)>;
   using DownloadCallback         = std::function<bool(std::size_t offset, const uint8_t* data, std::size_t len)>;
 
-  Response<std::size_t> Download(StringView url, const std::map<String, String>& headers, GotContentLengthCallback contentLengthCallback, DownloadCallback downloadCallback, const std::vector<int>& acceptedCodes = {200}, std::uint32_t timeoutMs = 10'000);
-  Response<std::string> GetString(StringView url, const std::map<String, String>& headers, const std::vector<int>& acceptedCodes = {200}, std::uint32_t timeoutMs = 10'000);
+  Response<std::size_t> Download(StringView url, const std::map<String, String>& headers, GotContentLengthCallback contentLengthCallback, DownloadCallback downloadCallback, const std::vector<int>& acceptedCodes = {200}, uint32_t timeoutMs = 10'000);
+  Response<std::string> GetString(StringView url, const std::map<String, String>& headers, const std::vector<int>& acceptedCodes = {200}, uint32_t timeoutMs = 10'000);
 
   template<typename T>
-  Response<T> GetJSON(StringView url, const std::map<String, String>& headers, JsonParser<T> jsonParser, const std::vector<int>& acceptedCodes = {200}, std::uint32_t timeoutMs = 10'000) {
+  Response<T> GetJSON(StringView url, const std::map<String, String>& headers, JsonParser<T> jsonParser, const std::vector<int>& acceptedCodes = {200}, uint32_t timeoutMs = 10'000) {
     auto response = GetString(url, headers, acceptedCodes, timeoutMs);
     if (response.result != RequestResult::Success) {
       return {response.result, response.code, {}};

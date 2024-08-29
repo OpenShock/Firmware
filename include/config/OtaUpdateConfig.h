@@ -16,10 +16,10 @@ namespace OpenShock::Config {
       OtaUpdateChannel updateChannel,
       bool checkOnStartup,
       bool checkPeriodically,
-      std::uint16_t checkInterval,
+      uint16_t checkInterval,
       bool allowBackendManagement,
       bool requireManualApproval,
-      std::int32_t updateId,
+      int32_t updateId,
       OtaUpdateStep updateStep
     );
 
@@ -28,10 +28,10 @@ namespace OpenShock::Config {
     OtaUpdateChannel updateChannel;
     bool checkOnStartup;
     bool checkPeriodically;
-    std::uint16_t checkInterval;
+    uint16_t checkInterval;
     bool allowBackendManagement;
     bool requireManualApproval;
-    std::int32_t updateId;
+    int32_t updateId;
     OtaUpdateStep updateStep;
 
     void ToDefault() override;

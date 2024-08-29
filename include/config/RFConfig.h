@@ -5,9 +5,9 @@
 namespace OpenShock::Config {
   struct RFConfig : public ConfigBase<Serialization::Configuration::RFConfig> {
     RFConfig();
-    RFConfig(std::uint8_t txPin, bool keepAliveEnabled);
+    RFConfig(uint8_t txPin, bool keepAliveEnabled);
 
-    std::uint8_t txPin;
+    uint8_t txPin;
     bool keepAliveEnabled;
 
     void ToDefault() override;

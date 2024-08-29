@@ -63,15 +63,15 @@ bool Config::Internal::Utils::FromJsonBool(bool& val, const cJSON* json, const c
   return true;
 }
 
-bool Config::Internal::Utils::FromJsonU8(std::uint8_t& val, const cJSON* json, const char* name, std::uint8_t defaultVal) {
+bool Config::Internal::Utils::FromJsonU8(uint8_t& val, const cJSON* json, const char* name, uint8_t defaultVal) {
   return _utilFromJsonInt(val, json, name, defaultVal, 0, UINT8_MAX);
 }
 
-bool Config::Internal::Utils::FromJsonU16(std::uint16_t& val, const cJSON* json, const char* name, std::uint16_t defaultVal) {
+bool Config::Internal::Utils::FromJsonU16(uint16_t& val, const cJSON* json, const char* name, uint16_t defaultVal) {
   return _utilFromJsonInt(val, json, name, defaultVal, 0, UINT16_MAX);
 }
 
-bool Config::Internal::Utils::FromJsonI32(std::int32_t& val, const cJSON* json, const char* name, std::int32_t defaultVal) {
+bool Config::Internal::Utils::FromJsonI32(int32_t& val, const cJSON* json, const char* name, int32_t defaultVal) {
   return _utilFromJsonInt(val, json, name, defaultVal, INT32_MIN, INT32_MAX);
 }
 

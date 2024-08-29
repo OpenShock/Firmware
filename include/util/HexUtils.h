@@ -9,7 +9,7 @@ namespace OpenShock::HexUtils {
   /// @param data The byte to convert.
   /// @param output The output buffer to write to.
   /// @param upper Whether to use uppercase hex characters.
-  constexpr void ToHex(std::uint8_t data, char* output, bool upper = true) noexcept {
+  constexpr void ToHex(uint8_t data, char* output, bool upper = true) noexcept {
     const char* hex = upper ? "0123456789ABCDEF" : "0123456789abcdef";
     output[0]       = hex[data >> 4];
     output[1]       = hex[data & 0x0F];
@@ -21,7 +21,7 @@ namespace OpenShock::HexUtils {
   /// @param upper Whether to use uppercase hex characters.
   /// @remark To use this you must specify the size of the array in the template parameter. (e.g. ToHexMac<6>(...))
   template<std::size_t N>
-  constexpr void ToHex(const std::uint8_t (&data)[N], char (&output)[(N * 2) + 1], bool upper = true) noexcept {
+  constexpr void ToHex(const uint8_t (&data)[N], char (&output)[(N * 2) + 1], bool upper = true) noexcept {
     for (std::size_t i = 0; i < N; ++i) {
       ToHex(data[i], &output[i * 2], upper);
     }
@@ -34,7 +34,7 @@ namespace OpenShock::HexUtils {
   /// @param upper Whether to use uppercase hex characters.
   /// @remark To use this you must specify the size of the array in the template parameter. (e.g. ToHexMac<6>(...))
   template<std::size_t N>
-  constexpr void ToHex(const std::uint8_t (&data)[N], std::array<char, (N * 2) + 1>& output, bool upper = true) noexcept {
+  constexpr void ToHex(const uint8_t (&data)[N], std::array<char, (N * 2) + 1>& output, bool upper = true) noexcept {
     for (std::size_t i = 0; i < N; ++i) {
       ToHex(data[i], &output[i * 2], upper);
     }
@@ -47,7 +47,7 @@ namespace OpenShock::HexUtils {
   /// @return The hex string.
   /// @remark To use this you must specify the size of the array in the template parameter. (e.g. ToHexMac<6>(...))
   template<std::size_t N>
-  constexpr std::array<char, (N * 2) + 1> ToHex(const std::uint8_t (&data)[N], bool upper = true) noexcept {
+  constexpr std::array<char, (N * 2) + 1> ToHex(const uint8_t (&data)[N], bool upper = true) noexcept {
     std::array<char, (N * 2) + 1> output {};
     ToHex<N>(data, output, upper);
     return output;
@@ -59,7 +59,7 @@ namespace OpenShock::HexUtils {
   /// @param upper Whether to use uppercase hex characters.
   /// @remark To use this you must specify the size of the array in the template parameter. (e.g. ToHexMac<6>(...))
   template<std::size_t N>
-  constexpr void ToHexMac(const std::uint8_t (&data)[N], std::array<char, N * 3>& output, bool upper = true) noexcept {
+  constexpr void ToHexMac(const uint8_t (&data)[N], std::array<char, N * 3>& output, bool upper = true) noexcept {
     const std::size_t Last = N - 1;
     for (std::size_t i = 0; i < Last; ++i) {
       ToHex(data[i], &output[i * 3], upper);
@@ -75,7 +75,7 @@ namespace OpenShock::HexUtils {
   /// @return The hex string in a MAC address format.
   /// @remark To use this you must specify the size of the array in the template parameter. (e.g. ToHexMac<6>(...))
   template<std::size_t N>
-  constexpr std::array<char, N * 3> ToHexMac(const std::uint8_t (&data)[N], bool upper = true) noexcept {
+  constexpr std::array<char, N * 3> ToHexMac(const uint8_t (&data)[N], bool upper = true) noexcept {
     std::array<char, N * 3> output {};
     ToHexMac<N>(data, output, upper);
     return output;
@@ -86,7 +86,7 @@ namespace OpenShock::HexUtils {
   /// @param low The low nibble.
   /// @param output The output buffer to write to.
   /// @return Whether the conversion was successful.
-  constexpr bool TryParseHexPair(char high, char low, std::uint8_t& output) noexcept {
+  constexpr bool TryParseHexPair(char high, char low, uint8_t& output) noexcept {
     if (high >= '0' && high <= '9') {
       output = (high - '0') << 4;
     } else if (high >= 'A' && high <= 'F') {
@@ -110,7 +110,7 @@ namespace OpenShock::HexUtils {
     return true;
   }
 
-  constexpr std::size_t TryParseHexMac(const char* str, std::size_t strLen, std::uint8_t* out, std::size_t outLen) noexcept {
+  constexpr std::size_t TryParseHexMac(const char* str, std::size_t strLen, uint8_t* out, std::size_t outLen) noexcept {
     std::size_t parsedLength = (strLen + 1) / 3;
 
     if ((parsedLength * 3) - 1 != strLen) {
@@ -137,11 +137,11 @@ namespace OpenShock::HexUtils {
     return parsedLength;
   }
 
-  inline std::size_t TryParseHexMac(const char* str, std::uint8_t* out, std::size_t outLen) noexcept {
+  inline std::size_t TryParseHexMac(const char* str, uint8_t* out, std::size_t outLen) noexcept {
     return TryParseHexMac(str, strlen(str), out, outLen);
   }
 
-  constexpr std::size_t TryParseHex(const char* str, std::size_t strLen, std::uint8_t* out, std::size_t outLen) noexcept {
+  constexpr std::size_t TryParseHex(const char* str, std::size_t strLen, uint8_t* out, std::size_t outLen) noexcept {
     std::size_t parsedLength = strLen / 2;
 
     if (parsedLength * 2 != strLen) {
@@ -160,7 +160,7 @@ namespace OpenShock::HexUtils {
 
     return parsedLength;
   }
-  inline std::size_t TryParseHex(const char* str, std::uint8_t* out, std::size_t outLen) noexcept {
+  inline std::size_t TryParseHex(const char* str, uint8_t* out, std::size_t outLen) noexcept {
     return TryParseHex(str, strlen(str), out, outLen);
   }
 }  // namespace OpenShock::HexUtils

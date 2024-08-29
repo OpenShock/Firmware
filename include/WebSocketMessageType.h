@@ -3,7 +3,7 @@
 #include <cstdint>
 
 namespace OpenShock {
-  enum class WebSocketMessageType : std::uint8_t {
+  enum class WebSocketMessageType : uint8_t {
     Error,
     Disconnected,
     Connected,

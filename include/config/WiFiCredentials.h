@@ -8,9 +8,9 @@
 namespace OpenShock::Config {
   struct WiFiCredentials : public ConfigBase<Serialization::Configuration::WiFiCredentials> {
     WiFiCredentials();
-    WiFiCredentials(std::uint8_t id, StringView ssid, StringView password);
+    WiFiCredentials(uint8_t id, StringView ssid, StringView password);
 
-    std::uint8_t id;
+    uint8_t id;
     std::string ssid;
     std::string password;
 
