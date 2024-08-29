@@ -141,6 +141,51 @@ void _handleRfTxPinCommand(StringView arg) {
   }
 }
 
+void _handleEStopPinCommand(StringView arg) {
+  if (arg.isNullOrEmpty()) {
+    gpio_num_t estopPin;
+    if (!Config::GetEStopConfigPin(estopPin)) {
+      SERPR_ERROR("Failed to get EStop pin from config");
+      return;
+    }
+
+    // Get EStop pin
+    SERPR_RESPONSE("EStopPin|%hhi", static_cast<std::int8_t>(estopPin));
+    return;
+  }
+
+  auto str = arg.toString();  // Copy the string to null-terminate it (VERY IMPORTANT)
+
+  unsigned int pin;
+  if (sscanf(str.c_str(), "%u", &pin) != 1) {
+    SERPR_ERROR("Invalid argument (not a number)");
+    return;
+  }
+
+  if (pin < GPIO_NUM_NC || pin > GPIO_NUM_MAX) {
+    SERPR_ERROR("Invalid argument (out of range)");
+    return;
+  }
+
+  gpio_num_t estopPin = static_cast<gpio_num_t>(pin);
+
+  if (!OpenShock::IsValidInputPin(estopPin)) {
+    SERPR_ERROR("Invalid argument (invalid pin)");
+    return;
+  }
+
+  bool result = Config::SetEStopConfigPin(estopPin);
+
+  if (result) {
+    SERPR_SUCCESS("Saved config, restarting...");
+
+    // Restart to use the new pin
+    ESP.restart();
+  } else {
+    SERPR_ERROR("Failed to save config");
+  }
+}
+
 void _handleDomainCommand(StringView arg) {
   if (arg.isNullOrEmpty()) {
     std::string domain;
@@ -574,6 +619,8 @@ echo         <bool>    set serial echo enabled
 validgpios             list all valid GPIO pins
 rftxpin                get radio transmit pin
 rftxpin      <pin>     set radio transmit pin
+estoppin               get e-stop pin
+estoppin     <pin>     set e-stop pin
 domain                 get backend domain
 domain       <domain>  set backend domain
 authtoken              get auth token
@@ -666,6 +713,20 @@ rftxpin [<pin>]
     rftxpin 15
 )",
   _handleRfTxPinCommand,
+};
+static const SerialCmdHandler kEStopPinCmdHandler = {
+  "estoppin"_sv,
+  R"(estoppin
+  Get the GPIO pin used for the E-Stop.
+
+estoppin [<pin>]
+  Set the GPIO pin used for the E-Stop.
+  Arguments:
+    <pin> must be a number.
+  Example:
+    estoppin 4
+)",
+  _handleEStopPinCommand,
 };
 static const SerialCmdHandler kDomainCmdHandler = {
   "domain"_sv,
@@ -887,6 +948,7 @@ bool SerialInputHandler::Init() {
   RegisterCommandHandler(kSerialEchoCmdHandler);
   RegisterCommandHandler(kValidGpiosCmdHandler);
   RegisterCommandHandler(kRfTxPinCmdHandler);
+  RegisterCommandHandler(kEStopPinCmdHandler);
   RegisterCommandHandler(kDomainCmdHandler);
   RegisterCommandHandler(kAuthTokenCmdHandler);
   RegisterCommandHandler(kLcgOverrideCmdHandler);
