@@ -4,7 +4,6 @@
 
 #include <hal/gpio_types.h>
 
-#include <freertos/FreeRTOS.h>
 #include <freertos/semphr.h>
 #include <freertos/task.h>
 
@@ -18,7 +17,7 @@ namespace OpenShock {
   public:
     struct State {
       bool level;
-      std::uint32_t duration;
+      uint32_t duration;
     };
 
     PinPatternManager() = delete;

@@ -4,5 +4,5 @@
 #include <functional>
 
 namespace OpenShock::Serialization::Common {
-  typedef std::function<bool(const std::uint8_t* data, std::size_t len)> SerializationCallbackFn;
+  typedef std::function<bool(const uint8_t* data, std::size_t len)> SerializationCallbackFn;
 }

@@ -31,7 +31,7 @@ const char* const TAG = "SerialInputHandler";
 
 using namespace OpenShock;
 
-const std::int64_t PASTE_INTERVAL_THRESHOLD_MS  = 20;
+const int64_t PASTE_INTERVAL_THRESHOLD_MS  = 20;
 const std::size_t SERIAL_BUFFER_CLEAR_THRESHOLD = 512;
 
 struct SerialCmdHandler {
@@ -97,7 +97,7 @@ void _handleFactoryResetCommand(StringView arg) {
 
 void _handleRfTxPinCommand(StringView arg) {
   if (arg.isNullOrEmpty()) {
-    std::uint8_t txPin;
+    uint8_t txPin;
     if (!Config::GetRFConfigTxPin(txPin)) {
       SERPR_ERROR("Failed to get RF TX pin from config");
       return;
@@ -121,7 +121,7 @@ void _handleRfTxPinCommand(StringView arg) {
     return;
   }
 
-  OpenShock::SetRfPinResultCode result = OpenShock::CommandHandler::SetRfTxPin(static_cast<std::uint8_t>(pin));
+  OpenShock::SetRfPinResultCode result = OpenShock::CommandHandler::SetRfTxPin(static_cast<uint8_t>(pin));
 
   switch (result) {
     case OpenShock::SetRfPinResultCode::InvalidPin:
@@ -470,7 +470,7 @@ void _handleNetworksCommand(StringView arg) {
 
   std::vector<Config::WiFiCredentials> creds;
 
-  std::uint8_t id = 1;
+  uint8_t id = 1;
   cJSON* network  = nullptr;
   cJSON_ArrayForEach(network, root) {
     Config::WiFiCredentials cred;
@@ -596,7 +596,7 @@ void _handleJsonConfigCommand(StringView arg) {
 
 void _handleRawConfigCommand(StringView arg) {
   if (arg.isNullOrEmpty()) {
-    std::vector<std::uint8_t> buffer;
+    std::vector<uint8_t> buffer;
 
     // Get raw config
     if (!Config::GetRaw(buffer)) {
@@ -614,7 +614,7 @@ void _handleRawConfigCommand(StringView arg) {
     return;
   }
 
-  std::vector<std::uint8_t> buffer;
+  std::vector<uint8_t> buffer;
   if (!OpenShock::Base64Utils::Decode(arg.data(), arg.length(), buffer)) {
     SERPR_ERROR("Failed to decode base64");
     return;
@@ -636,13 +636,13 @@ void _handleDebugInfoCommand(StringView arg) {
   SERPR_RESPONSE("RTOSInfo|Free Heap|%u", xPortGetFreeHeapSize());
   SERPR_RESPONSE("RTOSInfo|Min Free Heap|%u", xPortGetMinimumEverFreeHeapSize());
 
-  const std::int64_t now = OpenShock::millis();
+  const int64_t now = OpenShock::millis();
   SERPR_RESPONSE("RTOSInfo|UptimeMS|%lli", now);
 
-  const std::int64_t seconds = now / 1000;
-  const std::int64_t minutes = seconds / 60;
-  const std::int64_t hours   = minutes / 60;
-  const std::int64_t days    = hours / 24;
+  const int64_t seconds = now / 1000;
+  const int64_t minutes = seconds / 60;
+  const int64_t hours   = minutes / 60;
+  const int64_t days    = hours / 24;
   SERPR_RESPONSE("RTOSInfo|Uptime|%llid %llih %llim %llis", days, hours % 24, minutes % 60, seconds % 60);
 
   OpenShock::WiFiNetwork network;
@@ -1128,7 +1128,7 @@ void SerialInputHandler::Update() {
   static char* buffer            = nullptr;  // TODO: Clean up this buffer every once in a while
   static std::size_t bufferSize  = 0;
   static std::size_t bufferIndex = 0;
-  static std::int64_t lastEcho   = 0;
+  static int64_t lastEcho   = 0;
   static bool suppressingPaste   = false;
 
   while (true) {

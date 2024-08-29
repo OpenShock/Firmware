@@ -183,7 +183,7 @@ bool JsonAPI::ParseDeviceInfoJsonResponse(int code, const cJSON* root, JsonAPI::
       ESP_LOGJSONE("value at 'shocker.rfId' is not a valid uint16_t", shocker);
       return false;
     }
-    std::uint16_t shockerRfIdU16 = static_cast<std::uint16_t>(shockerRfIdInt);
+    uint16_t shockerRfIdU16 = static_cast<uint16_t>(shockerRfIdInt);
 
     const cJSON* shockerModel = cJSON_GetObjectItemCaseSensitive(shocker, "model");
     if (cJSON_IsString(shockerModel) == 0) {

@@ -8,9 +8,9 @@
 
 const char* const TAG = "WiFiScanManager";
 
-const std::uint8_t OPENSHOCK_WIFI_SCAN_MAX_CHANNEL         = 13;
-const std::uint32_t OPENSHOCK_WIFI_SCAN_MAX_MS_PER_CHANNEL = 300;  // Adjusting this value will affect the scan rate, but may also affect the scan results
-const std::uint32_t OPENSHOCK_WIFI_SCAN_TIMEOUT_MS         = 10 * 1000;
+const uint8_t OPENSHOCK_WIFI_SCAN_MAX_CHANNEL         = 13;
+const uint32_t OPENSHOCK_WIFI_SCAN_MAX_MS_PER_CHANNEL = 300;  // Adjusting this value will affect the scan rate, but may also affect the scan results
+const uint32_t OPENSHOCK_WIFI_SCAN_TIMEOUT_MS         = 10 * 1000;
 
 enum WiFiScanTaskNotificationFlags {
   CHANNEL_DONE  = 1 << 0,
@@ -24,9 +24,9 @@ using namespace OpenShock;
 static bool s_initialized = false;
 static TaskHandle_t s_scanTaskHandle     = nullptr;
 static SemaphoreHandle_t s_scanTaskMutex = xSemaphoreCreateMutex();
-static std::uint8_t s_currentChannel     = 0;
-static std::map<std::uint64_t, WiFiScanManager::StatusChangedHandler> s_statusChangedHandlers;
-static std::map<std::uint64_t, WiFiScanManager::NetworksDiscoveredHandler> s_networksDiscoveredHandlers;
+static uint8_t s_currentChannel     = 0;
+static std::map<uint64_t, WiFiScanManager::StatusChangedHandler> s_statusChangedHandlers;
+static std::map<uint64_t, WiFiScanManager::NetworksDiscoveredHandler> s_networksDiscoveredHandlers;
 
 bool _notifyTask(WiFiScanTaskNotificationFlags flags) {
   xSemaphoreTake(s_scanTaskMutex, portMAX_DELAY);
@@ -48,11 +48,11 @@ void _notifyStatusChangedHandlers(OpenShock::WiFiScanStatus status) {
   }
 }
 
-bool _isScanError(std::int16_t retval) {
+bool _isScanError(int16_t retval) {
   return retval < 0 && retval != WIFI_SCAN_RUNNING;
 }
 
-void _handleScanError(std::int16_t retval) {
+void _handleScanError(int16_t retval) {
   if (retval >= 0) return;
 
   _notifyTask(WiFiScanTaskNotificationFlags::ERROR);
@@ -70,8 +70,8 @@ void _handleScanError(std::int16_t retval) {
   ESP_LOGE(TAG, "Scan returned an unknown error");
 }
 
-std::int16_t _scanChannel(std::uint8_t channel) {
-  std::int16_t retval = WiFi.scanNetworks(true, true, false, OPENSHOCK_WIFI_SCAN_MAX_MS_PER_CHANNEL, channel);
+int16_t _scanChannel(uint8_t channel) {
+  int16_t retval = WiFi.scanNetworks(true, true, false, OPENSHOCK_WIFI_SCAN_MAX_MS_PER_CHANNEL, channel);
   if (!_isScanError(retval)) {
     return retval;
   }
@@ -83,10 +83,10 @@ std::int16_t _scanChannel(std::uint8_t channel) {
 
 WiFiScanStatus _scanningTaskImpl() {
   // Start the scan on the highest channel and work our way down
-  std::uint8_t channel = OPENSHOCK_WIFI_SCAN_MAX_CHANNEL;
+  uint8_t channel = OPENSHOCK_WIFI_SCAN_MAX_CHANNEL;
 
   // Start the scan on the first channel
-  std::int16_t retval = _scanChannel(channel);
+  int16_t retval = _scanChannel(channel);
   if (_isScanError(retval)) {
     return WiFiScanStatus::Error;
   }
@@ -97,7 +97,7 @@ WiFiScanStatus _scanningTaskImpl() {
 
   // Scan each channel until we're done
   while (true) {
-    std::uint32_t notificationFlags = 0;
+    uint32_t notificationFlags = 0;
 
     // Wait for the scan to complete, _evScanCompleted will notify us when it's done
     if (xTaskNotifyWait(0, WiFiScanTaskNotificationFlags::CLEAR_FLAGS, &notificationFlags, pdMS_TO_TICKS(OPENSHOCK_WIFI_SCAN_TIMEOUT_MS)) != pdTRUE) {
@@ -157,7 +157,7 @@ void _evScanCompleted(arduino_event_id_t event, arduino_event_info_t info) {
   (void)event;
   (void)info;
 
-  std::int16_t numNetworks = WiFi.scanComplete();
+  int16_t numNetworks = WiFi.scanComplete();
   if (_isScanError(numNetworks)) {
     _handleScanError(numNetworks);
     return;
@@ -171,7 +171,7 @@ void _evScanCompleted(arduino_event_id_t event, arduino_event_info_t info) {
   std::vector<const wifi_ap_record_t*> networkRecords;
   networkRecords.reserve(numNetworks);
 
-  for (std::int16_t i = 0; i < numNetworks; i++) {
+  for (int16_t i = 0; i < numNetworks; i++) {
     wifi_ap_record_t* record = reinterpret_cast<wifi_ap_record_t*>(WiFi.getScanInfoByIndex(i));
     if (record == nullptr) {
       ESP_LOGE(TAG, "Failed to get scan info for network #%d", i);
@@ -260,13 +260,13 @@ bool WiFiScanManager::AbortScan() {
   return true;
 }
 
-std::uint64_t WiFiScanManager::RegisterStatusChangedHandler(const WiFiScanManager::StatusChangedHandler& handler) {
-  static std::uint64_t nextHandle = 0;
-  std::uint64_t handle            = nextHandle++;
+uint64_t WiFiScanManager::RegisterStatusChangedHandler(const WiFiScanManager::StatusChangedHandler& handler) {
+  static uint64_t nextHandle = 0;
+  uint64_t handle            = nextHandle++;
   s_statusChangedHandlers[handle] = handler;
   return handle;
 }
-void WiFiScanManager::UnregisterStatusChangedHandler(std::uint64_t handle) {
+void WiFiScanManager::UnregisterStatusChangedHandler(uint64_t handle) {
   auto it = s_statusChangedHandlers.find(handle);
 
   if (it != s_statusChangedHandlers.end()) {
@@ -274,13 +274,13 @@ void WiFiScanManager::UnregisterStatusChangedHandler(std::uint64_t handle) {
   }
 }
 
-std::uint64_t WiFiScanManager::RegisterNetworksDiscoveredHandler(const WiFiScanManager::NetworksDiscoveredHandler& handler) {
-  static std::uint64_t nextHandle      = 0;
-  std::uint64_t handle                 = nextHandle++;
+uint64_t WiFiScanManager::RegisterNetworksDiscoveredHandler(const WiFiScanManager::NetworksDiscoveredHandler& handler) {
+  static uint64_t nextHandle      = 0;
+  uint64_t handle                 = nextHandle++;
   s_networksDiscoveredHandlers[handle] = handler;
   return handle;
 }
-void WiFiScanManager::UnregisterNetworksDiscoveredHandler(std::uint64_t handle) {
+void WiFiScanManager::UnregisterNetworksDiscoveredHandler(uint64_t handle) {
   auto it = s_networksDiscoveredHandlers.find(handle);
 
   if (it != s_networksDiscoveredHandlers.end()) {

@@ -8,10 +8,10 @@ const char* const TAG = "Base64Utils";
 
 using namespace OpenShock;
 
-std::size_t Base64Utils::Encode(const std::uint8_t* data, std::size_t dataLen, char* output, std::size_t outputLen) noexcept {
+std::size_t Base64Utils::Encode(const uint8_t* data, std::size_t dataLen, char* output, std::size_t outputLen) noexcept {
   std::size_t requiredLen = 0;
 
-  int retval = mbedtls_base64_encode(reinterpret_cast<std::uint8_t*>(output), outputLen, &requiredLen, data, dataLen);
+  int retval = mbedtls_base64_encode(reinterpret_cast<uint8_t*>(output), outputLen, &requiredLen, data, dataLen);
   if (retval != 0) {
     if (retval == MBEDTLS_ERR_BASE64_BUFFER_TOO_SMALL) {
       ESP_LOGW(TAG, "Output buffer too small (expected %zu, got %zu)", requiredLen, outputLen);
@@ -24,7 +24,7 @@ std::size_t Base64Utils::Encode(const std::uint8_t* data, std::size_t dataLen, c
   return requiredLen;
 }
 
-bool Base64Utils::Encode(const std::uint8_t* data, std::size_t dataLen, std::string& output) {
+bool Base64Utils::Encode(const uint8_t* data, std::size_t dataLen, std::string& output) {
   std::size_t requiredLen = Base64Utils::CalculateEncodedSize(dataLen) + 1; // +1 for null terminator
   char* buffer = new char[requiredLen];
 
@@ -48,10 +48,10 @@ bool Base64Utils::Encode(const std::uint8_t* data, std::size_t dataLen, std::str
   return true;
 }
 
-std::size_t Base64Utils::Decode(const char* data, std::size_t dataLen, std::uint8_t* output, std::size_t outputLen) noexcept {
+std::size_t Base64Utils::Decode(const char* data, std::size_t dataLen, uint8_t* output, std::size_t outputLen) noexcept {
   std::size_t requiredLen = 0;
 
-  int retval = mbedtls_base64_decode(output, outputLen, &requiredLen, reinterpret_cast<const std::uint8_t*>(data), dataLen);
+  int retval = mbedtls_base64_decode(output, outputLen, &requiredLen, reinterpret_cast<const uint8_t*>(data), dataLen);
   if (retval != 0) {
     if (retval == MBEDTLS_ERR_BASE64_BUFFER_TOO_SMALL) {
       ESP_LOGW(TAG, "Output buffer too small (expected %zu, got %zu)", requiredLen, outputLen);
@@ -66,7 +66,7 @@ std::size_t Base64Utils::Decode(const char* data, std::size_t dataLen, std::uint
   return requiredLen;
 }
 
-bool Base64Utils::Decode(const char* data, std::size_t dataLen, std::vector<std::uint8_t>& output) noexcept {
+bool Base64Utils::Decode(const char* data, std::size_t dataLen, std::vector<uint8_t>& output) noexcept {
   std::size_t requiredLen = Base64Utils::CalculateDecodedSize(dataLen);
   output.resize(requiredLen);
 

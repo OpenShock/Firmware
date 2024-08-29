@@ -5,7 +5,7 @@
 
 #include <cstdint>
 
-#define WS_EVENT_HANDLER_SIGNATURE(NAME) void NAME(std::uint8_t socketId, const OpenShock::Serialization::Local::LocalToHubMessage* msg)
+#define WS_EVENT_HANDLER_SIGNATURE(NAME) void NAME(uint8_t socketId, const OpenShock::Serialization::Local::LocalToHubMessage* msg)
 
 namespace OpenShock::MessageHandlers::Local::_Private {
   typedef WS_EVENT_HANDLER_SIGNATURE((*HandlerType));
