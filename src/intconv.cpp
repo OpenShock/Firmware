@@ -130,101 +130,170 @@ static_assert(NumDigits<std::int16_t>() == 6, "NumDigits test for std::int16_t f
 static_assert(NumDigits<std::int32_t>() == 11, "NumDigits test for std::int32_t failed");
 static_assert(NumDigits<std::int64_t>() == 20, "NumDigits test for std::int64_t failed");
 
-// spanToUT Tests
-constexpr bool test_spanToUT() {
+constexpr bool test_spanToUT8() {
     std::uint8_t u8 = 0;
-    if (!spanToUT("255"_sv, u8) || u8 != 255) return false;
-
-    std::uint16_t u16 = 0;
-    if (!spanToUT("65535"_sv, u16) || u16 != 65535) return false;
-
-    std::uint32_t u32 = 0;
-    if (!spanToUT("4294967295"_sv, u32) || u32 != 4294967295U) return false;
-
-    std::uint64_t u64 = 0;
-    if (!spanToUT("18446744073709551615"_sv, u64) || u64 != 18446744073709551615ULL) return false;
-
-    return true;
+    return spanToUT("255"_sv, u8) && u8 == 255;
 }
 
-static_assert(test_spanToUT(), "spanToUT tests failed");
+static_assert(test_spanToUT8(), "test_spanToUT8 failed");
 
-// spanToUT Overflow Tests
-constexpr bool test_spanToUTOverflow() {
+constexpr bool test_spanToUT16() {
+    std::uint16_t u16 = 0;
+    return spanToUT("65535"_sv, u16) && u16 == 65535;
+}
+
+static_assert(test_spanToUT16(), "test_spanToUT16 failed");
+
+constexpr bool test_spanToUT32() {
+    std::uint32_t u32 = 0;
+    return spanToUT("4294967295"_sv, u32) && u32 == 4294967295U;
+}
+
+static_assert(test_spanToUT32(), "test_spanToUT32 failed");
+
+constexpr bool test_spanToUT64() {
+    std::uint64_t u64 = 0;
+    return spanToUT("18446744073709551615"_sv, u64) && u64 == 18446744073709551615ULL;
+}
+
+static_assert(test_spanToUT64(), "test_spanToUT64 failed");
+
+constexpr bool test_spanToUT8Overflow() {
     std::uint8_t u8 = 0;
-    if (spanToUT("256"_sv, u8)) return false;  // Overflow
+    return !spanToUT("256"_sv, u8);  // Overflow
+}
 
+static_assert(test_spanToUT8Overflow(), "test_spanToUT8Overflow failed");
+
+constexpr bool test_spanToUT16Overflow() {
     std::uint16_t u16 = 0;
-    if (spanToUT("70000"_sv, u16)) return false;  // Overflow
+    return !spanToUT("70000"_sv, u16);  // Overflow
+}
 
+static_assert(test_spanToUT16Overflow(), "test_spanToUT16Overflow failed");
+
+constexpr bool test_spanToUT32Overflow() {
     std::uint32_t u32 = 0;
-    if (spanToUT("4294967296"_sv, u32)) return false;  // Overflow
+    return !spanToUT("4294967296"_sv, u32);  // Overflow
+}
 
+static_assert(test_spanToUT32Overflow(), "test_spanToUT32Overflow failed");
+
+constexpr bool test_spanToUT64Overflow() {
     std::uint64_t u64 = 0;
-    if (spanToUT("18446744073709551616"_sv, u64)) return false;  // Overflow
-
-    return true;
+    return !spanToUT("18446744073709551616"_sv, u64);  // Overflow
 }
 
-static_assert(test_spanToUTOverflow(), "spanToUT overflow tests failed");
+static_assert(test_spanToUT64Overflow(), "test_spanToUT64Overflow failed");
 
-// spanToST Tests
-constexpr bool test_spanToST() {
+constexpr bool test_spanToST8() {
     std::int8_t i8 = 0;
-    if (!spanToST("-128"_sv, i8) || i8 != -128) return false;
-
-    std::int16_t i16 = 0;
-    if (!spanToST("32767"_sv, i16) || i16 != 32767) return false;
-
-    std::int32_t i32 = 0;
-    if (!spanToST("-2147483648"_sv, i32) || i32 != -2147483648) return false;
-
-    std::int64_t i64 = 0;
-    if (!spanToST("9223372036854775807"_sv, i64) || i64 != 9223372036854775807LL) return false;
-
-    return true;
+    return spanToST("-128"_sv, i8) && i8 == -128;
 }
 
-static_assert(test_spanToST(), "spanToST tests failed");
+static_assert(test_spanToST8(), "test_spanToST8 failed");
 
-// spanToST Overflow Tests
-constexpr bool test_spanToSTOverflow() {
+constexpr bool test_spanToST16() {
+    std::int16_t i16 = 0;
+    return spanToST("32767"_sv, i16) && i16 == 32767;
+}
+
+static_assert(test_spanToST16(), "test_spanToST16 failed");
+
+constexpr bool test_spanToST32() {
+    std::int32_t i32 = 0;
+    return spanToST("-2147483648"_sv, i32) && i32 == -2147483648;
+}
+
+static_assert(test_spanToST32(), "test_spanToST32 failed");
+
+constexpr bool test_spanToST64() {
+    std::int64_t i64 = 0;
+    return spanToST("9223372036854775807"_sv, i64) && i64 == 9223372036854775807LL;
+}
+
+static_assert(test_spanToST64(), "test_spanToST64 failed");
+
+constexpr bool test_spanToST8Underflow() {
     std::int8_t i8 = 0;
-    if (spanToST("-129"_sv, i8)) return false;  // Underflow
-    if (spanToST("128"_sv, i8)) return false;  // Overflow
-
-    std::int16_t i16 = 0;
-    if (spanToST("-32769"_sv, i16)) return false;  // Underflow
-    if (spanToST("32768"_sv, i16)) return false;  // Overflow
-
-    std::int32_t i32 = 0;
-    if (spanToST("-2147483649"_sv, i32)) return false;  // Underflow
-    if (spanToST("2147483648"_sv, i32)) return false;  // Overflow
-
-    std::int64_t i64 = 0;
-    if (spanToST("-9223372036854775809"_sv, i64)) return false;  // Underflow
-    if (spanToST("9223372036854775808"_sv, i64)) return false;  // Overflow
-
-    return true;
+    return !spanToST("-129"_sv, i8);  // Underflow
 }
 
-static_assert(test_spanToSTOverflow(), "spanToST overflow tests failed");
+static_assert(test_spanToST8Underflow(), "test_spanToST8Underflow failed");
 
-// Edge Cases Tests
-constexpr bool test_edgeCases() {
+constexpr bool test_spanToST8Overflow() {
     std::int8_t i8 = 0;
-    if (spanToST(""_sv, i8)) return false;  // Empty string
-
-    std::int16_t i16 = 0;
-    if (spanToST("-"_sv, i16)) return false;  // Just a negative sign
-
-    std::int32_t i32 = 0;
-    if (spanToST("+123"_sv, i32)) return false;  // Invalid character
-
-    std::int64_t i64 = 0;
-    if (spanToST(" 123"_sv, i64)) return false;  // Leading space
-
-    return true;
+    return !spanToST("128"_sv, i8);  // Overflow
 }
 
-static_assert(test_edgeCases(), "Edge cases tests failed");
+static_assert(test_spanToST8Overflow(), "test_spanToST8Overflow failed");
+
+constexpr bool test_spanToST16Underflow() {
+    std::int16_t i16 = 0;
+    return !spanToST("-32769"_sv, i16);  // Underflow
+}
+
+static_assert(test_spanToST16Underflow(), "test_spanToST16Underflow failed");
+
+constexpr bool test_spanToST16Overflow() {
+    std::int16_t i16 = 0;
+    return !spanToST("32768"_sv, i16);  // Overflow
+}
+
+static_assert(test_spanToST16Overflow(), "test_spanToST16Overflow failed");
+
+constexpr bool test_spanToST32Underflow() {
+    std::int32_t i32 = 0;
+    return !spanToST("-2147483649"_sv, i32);  // Underflow
+}
+
+static_assert(test_spanToST32Underflow(), "test_spanToST32Underflow failed");
+
+constexpr bool test_spanToST32Overflow() {
+    std::int32_t i32 = 0;
+    return !spanToST("2147483648"_sv, i32);  // Overflow
+}
+
+static_assert(test_spanToST32Overflow(), "test_spanToST32Overflow failed");
+
+constexpr bool test_spanToST64Underflow() {
+    std::int64_t i64 = 0;
+    return !spanToST("-9223372036854775809"_sv, i64);  // Underflow
+}
+
+static_assert(test_spanToST64Underflow(), "test_spanToST64Underflow failed");
+
+constexpr bool test_spanToST64Overflow() {
+    std::int64_t i64 = 0;
+    return !spanToST("9223372036854775808"_sv, i64);  // Overflow
+}
+
+static_assert(test_spanToST64Overflow(), "test_spanToST64Overflow failed");
+
+constexpr bool test_spanToSTEmptyString() {
+    std::int8_t i8 = 0;
+    return !spanToST(""_sv, i8);  // Empty string
+}
+
+static_assert(test_spanToSTEmptyString(), "test_spanToSTEmptyString failed");
+
+constexpr bool test_spanToSTJustNegativeSign() {
+    std::int16_t i16 = 0;
+    return !spanToST("-"_sv, i16);  // Just a negative sign
+}
+
+static_assert(test_spanToSTJustNegativeSign(), "test_spanToSTJustNegativeSign failed");
+
+constexpr bool test_spanToSTInvalidCharacter() {
+    std::int32_t i32 = 0;
+    return !spanToST("+123"_sv, i32);  // Invalid character
+}
+
+static_assert(test_spanToSTInvalidCharacter(), "test_spanToSTInvalidCharacter failed");
+
+constexpr bool test_spanToSTLeadingSpace() {
+    std::int64_t i64 = 0;
+    return !spanToST(" 123"_sv, i64);  // Leading space
+}
+
+static_assert(test_spanToSTLeadingSpace(), "test_spanToSTLeadingSpace failed");
