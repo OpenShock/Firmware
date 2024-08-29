@@ -1,4 +1,7 @@
+#include <freertos/FreeRTOS.h>
+
 #include "radio/RFTransmitter.h"
+
 #include "EStopManager.h"
 
 #include "Logging.h"
@@ -6,7 +9,6 @@
 #include "Time.h"
 #include "util/TaskUtils.h"
 
-#include <freertos/FreeRTOS.h>
 #include <freertos/queue.h>
 
 const char* const TAG = "RFTransmitter";

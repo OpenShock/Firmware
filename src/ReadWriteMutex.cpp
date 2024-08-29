@@ -1,3 +1,5 @@
+#include <freertos/FreeRTOS.h>
+
 #include "ReadWriteMutex.h"
 
 #include "Logging.h"

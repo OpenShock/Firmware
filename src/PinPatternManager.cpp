@@ -1,3 +1,5 @@
+#include <freertos/FreeRTOS.h>
+
 #include "PinPatternManager.h"
 
 #include "Chipset.h"
