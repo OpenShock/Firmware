@@ -1,3 +1,5 @@
+#include <freertos/FreeRTOS.h>
+
 #include "EStopManager.h"
 
 #include "CommandHandler.h"
@@ -7,7 +9,6 @@
 #include "VisualStateManager.h"
 
 #include <driver/gpio.h>
-#include <freertos/FreeRTOS.h>
 #include <freertos/timers.h>
 
 const char* const TAG = "EStopManager";

@@ -1,3 +1,5 @@
+#include <freertos/FreeRTOS.h>
+
 #include "CommandHandler.h"
 
 #include "Chipset.h"
@@ -9,7 +11,6 @@
 #include "Time.h"
 #include "util/TaskUtils.h"
 
-#include <freertos/FreeRTOS.h>
 #include <freertos/queue.h>
 #include <freertos/semphr.h>
 

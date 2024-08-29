@@ -1,3 +1,5 @@
+#include <freertos/FreeRTOS.h>
+
 #include "RGBPatternManager.h"
 
 #include "Chipset.h"

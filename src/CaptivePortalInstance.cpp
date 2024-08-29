@@ -1,3 +1,5 @@
+#include <freertos/FreeRTOS.h>
+
 #include "CaptivePortalInstance.h"
 
 #include "CommandHandler.h"
