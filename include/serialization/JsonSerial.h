@@ -10,10 +10,10 @@
 namespace OpenShock::Serialization::JsonSerial {
   struct ShockerCommand {
     OpenShock::ShockerModelType model;
-    std::uint16_t id;
+    uint16_t id;
     OpenShock::ShockerCommandType command;
-    std::uint8_t intensity;
-    std::uint16_t durationMs;
+    uint8_t intensity;
+    uint16_t durationMs;
   };
 
   bool ParseShockerCommand(const cJSON* root, ShockerCommand& out);

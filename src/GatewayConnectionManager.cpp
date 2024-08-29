@@ -27,13 +27,13 @@
 static const char* const TAG             = "GatewayConnectionManager";
 static const char* const AUTH_TOKEN_FILE = "/authToken";
 
-const std::uint8_t FLAG_NONE   = 0;
-const std::uint8_t FLAG_HAS_IP = 1 << 0;
-const std::uint8_t FLAG_LINKED = 1 << 1;
+const uint8_t FLAG_NONE   = 0;
+const uint8_t FLAG_HAS_IP = 1 << 0;
+const uint8_t FLAG_LINKED = 1 << 1;
 
-const std::uint8_t LINK_CODE_LENGTH = 6;
+const uint8_t LINK_CODE_LENGTH = 6;
 
-static std::uint8_t s_flags                                 = 0;
+static uint8_t s_flags                                 = 0;
 static std::unique_ptr<OpenShock::GatewayClient> s_wsClient = nullptr;
 
 void _evGotIPHandler(void* arg, esp_event_base_t event_base, int32_t event_id, void* event_data) {
@@ -140,7 +140,7 @@ bool GatewayConnectionManager::SendMessageTXT(StringView data) {
   return s_wsClient->sendMessageTXT(data);
 }
 
-bool GatewayConnectionManager::SendMessageBIN(const std::uint8_t* data, std::size_t length) {
+bool GatewayConnectionManager::SendMessageBIN(const uint8_t* data, std::size_t length) {
   if (s_wsClient == nullptr) {
     return false;
   }
@@ -187,7 +187,7 @@ bool FetchDeviceInfo(StringView authToken) {
   return true;
 }
 
-static std::int64_t _lastConnectionAttempt = 0;
+static int64_t _lastConnectionAttempt = 0;
 bool StartConnectingToLCG() {
   // TODO: this function is very slow, should be optimized!
   if (s_wsClient == nullptr) {  // If wsClient is already initialized, we are already paired or connected
@@ -201,7 +201,7 @@ bool StartConnectingToLCG() {
     return false;
   }
 
-  std::int64_t msNow = OpenShock::millis();
+  int64_t msNow = OpenShock::millis();
   if (_lastConnectionAttempt != 0 && (msNow - _lastConnectionAttempt) < 20'000) {  // Only try to connect every 20 seconds
     return false;
   }

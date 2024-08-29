@@ -40,7 +40,7 @@ namespace OpenShock::WiFiManager {
   /// @brief Connects to a saved network by it's BSSID
   /// @param bssid BSSID of the network
   /// @return True if the saved network was found and the connection process was started successfully
-  bool Connect(const std::uint8_t (&bssid)[6]);
+  bool Connect(const uint8_t (&bssid)[6]);
 
   /// @brief Disconnects from the currently connected network
   void Disconnect();

@@ -26,9 +26,9 @@ void _Private::HandleShockerCommandList(const OpenShock::Serialization::Gateway:
   ESP_LOGV(TAG, "Received command list from API (%lu commands)", commands->size());
 
   for (auto command : *commands) {
-    std::uint16_t id                   = command->id();
-    std::uint8_t intensity             = command->intensity();
-    std::uint16_t durationMs           = command->duration();
+    uint16_t id                   = command->id();
+    uint8_t intensity             = command->intensity();
+    uint16_t durationMs           = command->duration();
     OpenShock::ShockerModelType model  = command->model();
     OpenShock::ShockerCommandType type = command->type();
 

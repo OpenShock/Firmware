@@ -11,9 +11,9 @@
 namespace OpenShock::Config::Internal::Utils {
   void FromFbsStr(std::string& str, const flatbuffers::String* fbsStr, const char* defaultStr);
   bool FromJsonBool(bool& val, const cJSON* json, const char* name, bool defaultVal);
-  bool FromJsonU8(std::uint8_t& val, const cJSON* json, const char* name, std::uint8_t defaultVal);
-  bool FromJsonU16(std::uint16_t& val, const cJSON* json, const char* name, std::uint16_t defaultVal);
-  bool FromJsonI32(std::int32_t& val, const cJSON* json, const char* name, std::int32_t defaultVal);
+  bool FromJsonU8(uint8_t& val, const cJSON* json, const char* name, uint8_t defaultVal);
+  bool FromJsonU16(uint16_t& val, const cJSON* json, const char* name, uint16_t defaultVal);
+  bool FromJsonI32(int32_t& val, const cJSON* json, const char* name, int32_t defaultVal);
   bool FromJsonStr(std::string& str, const cJSON* json, const char* name, const char* defaultStr);
 
   template<typename T, typename U>  // T inherits from ConfigBase<U>

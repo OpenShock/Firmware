@@ -53,7 +53,7 @@ bool verifyRollbackLater() {
 
 using namespace OpenShock;
 
-enum OtaTaskEventFlag : std::uint32_t {
+enum OtaTaskEventFlag : uint32_t {
   OTA_TASK_EVENT_UPDATE_REQUESTED  = 1 << 0,
   OTA_TASK_EVENT_WIFI_DISCONNECTED = 1 << 1,  // If both connected and disconnected are set, disconnected takes priority.
   OTA_TASK_EVENT_WIFI_CONNECTED    = 1 << 2,
@@ -111,7 +111,7 @@ void _otaEvWiFiDisconnectedHandler(void* arg, esp_event_base_t event_base, int32
 }
 
 bool _sendProgressMessage(Serialization::Gateway::OtaInstallProgressTask task, float progress) {
-  std::int32_t updateId;
+  int32_t updateId;
   if (!Config::GetOtaUpdateId(updateId)) {
     ESP_LOGE(TAG, "Failed to get OTA update ID");
     return false;
@@ -125,7 +125,7 @@ bool _sendProgressMessage(Serialization::Gateway::OtaInstallProgressTask task, f
   return true;
 }
 bool _sendFailureMessage(StringView message, bool fatal = false) {
-  std::int32_t updateId;
+  int32_t updateId;
   if (!Config::GetOtaUpdateId(updateId)) {
     ESP_LOGE(TAG, "Failed to get OTA update ID");
     return false;
@@ -139,7 +139,7 @@ bool _sendFailureMessage(StringView message, bool fatal = false) {
   return true;
 }
 
-bool _flashAppPartition(const esp_partition_t* partition, StringView remoteUrl, const std::uint8_t (&remoteHash)[32]) {
+bool _flashAppPartition(const esp_partition_t* partition, StringView remoteUrl, const uint8_t (&remoteHash)[32]) {
   ESP_LOGD(TAG, "Flashing app partition");
 
   if (!_sendProgressMessage(Serialization::Gateway::OtaInstallProgressTask::FlashingApplication, 0.0f)) {
@@ -174,7 +174,7 @@ bool _flashAppPartition(const esp_partition_t* partition, StringView remoteUrl, 
   return true;
 }
 
-bool _flashFilesystemPartition(const esp_partition_t* parition, StringView remoteUrl, const std::uint8_t (&remoteHash)[32]) {
+bool _flashFilesystemPartition(const esp_partition_t* parition, StringView remoteUrl, const uint8_t (&remoteHash)[32]) {
   if (!_sendProgressMessage(Serialization::Gateway::OtaInstallProgressTask::PreparingForInstall, 0.0f)) {
     return false;
   }
@@ -231,7 +231,7 @@ void _otaUpdateTask(void* arg) {
 
   bool connected               = false;
   bool updateRequested         = false;
-  std::int64_t lastUpdateCheck = 0;
+  int64_t lastUpdateCheck = 0;
 
   // Update task loop.
   while (true) {
@@ -257,7 +257,7 @@ void _otaUpdateTask(void* arg) {
       continue;
     }
 
-    std::int64_t now = OpenShock::millis();
+    int64_t now = OpenShock::millis();
 
     Config::OtaUpdateConfig config;
     if (!Config::GetOtaUpdateConfig(config)) {
@@ -271,8 +271,8 @@ void _otaUpdateTask(void* arg) {
     }
 
     bool firstCheck       = lastUpdateCheck == 0;
-    std::int64_t diff     = now - lastUpdateCheck;
-    std::int64_t diffMins = diff / 60'000LL;
+    int64_t diff     = now - lastUpdateCheck;
+    int64_t diffMins = diff / 60'000LL;
 
     bool check = false;
     check |= config.checkOnStartup && firstCheck;                           // On startup
@@ -319,7 +319,7 @@ void _otaUpdateTask(void* arg) {
     }
 
     // Generate random int32_t for this update.
-    std::int32_t updateId = static_cast<std::int32_t>(esp_random());
+    int32_t updateId = static_cast<int32_t>(esp_random());
     if (!Config::SetOtaUpdateId(updateId)) {
       ESP_LOGE(TAG, "Failed to set OTA update ID");
       continue;
@@ -546,7 +546,7 @@ bool OtaUpdateManager::TryGetFirmwareBoards(const OpenShock::SemVer& version, st
   return true;
 }
 
-bool _tryParseIntoHash(StringView hash, std::uint8_t (&hashBytes)[32]) {
+bool _tryParseIntoHash(StringView hash, uint8_t (&hashBytes)[32]) {
   if (!HexUtils::TryParseHex(hash.data(), hash.size(), hashBytes, 32)) {
     ESP_LOGE(TAG, "Failed to parse hash: %.*s", hash.size(), hash.data());
     return false;

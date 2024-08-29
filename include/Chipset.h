@@ -202,7 +202,7 @@
 #pragma endregion
 
 namespace OpenShock {
-  constexpr bool IsValidGPIOPin(std::uint8_t pin) {
+  constexpr bool IsValidGPIOPin(uint8_t pin) {
     if (pin == OPENSHOCK_GPIO_INVALID) {
       return false;
     }
@@ -225,10 +225,10 @@ namespace OpenShock {
 
     return true;
   }
-  constexpr bool IsValidInputPin(std::uint8_t pin) {
+  constexpr bool IsValidInputPin(uint8_t pin) {
     return IsValidGPIOPin(pin);
   }
-  constexpr bool IsValidOutputPin(std::uint8_t pin) {
+  constexpr bool IsValidOutputPin(uint8_t pin) {
     if (!IsValidGPIOPin(pin)) {
       return false;
     }

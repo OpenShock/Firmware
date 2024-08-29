@@ -415,7 +415,7 @@ namespace OpenShock {
   };
 }  // namespace OpenShock
 
-inline OpenShock::StringView operator"" _sv(const char* str, std::size_t len) {
+constexpr OpenShock::StringView operator"" _sv(const char* str, std::size_t len) {
   return OpenShock::StringView(str, len);
 }
 

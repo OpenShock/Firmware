@@ -20,11 +20,11 @@ const char* const TAG = "HTTPRequestManager";
 struct RateLimit {
   RateLimit() : m_mutex(xSemaphoreCreateMutex()), m_blockUntilMs(0), m_limits(), m_requests() { }
 
-  void addLimit(std::uint32_t durationMs, std::uint16_t count) {
+  void addLimit(uint32_t durationMs, uint16_t count) {
     xSemaphoreTake(m_mutex, portMAX_DELAY);
 
     // Insert sorted
-    m_limits.insert(std::upper_bound(m_limits.begin(), m_limits.end(), durationMs, [](std::int64_t durationMs, const Limit& limit) { return durationMs > limit.durationMs; }), {durationMs, count});
+    m_limits.insert(std::upper_bound(m_limits.begin(), m_limits.end(), durationMs, [](int64_t durationMs, const Limit& limit) { return durationMs > limit.durationMs; }), {durationMs, count});
 
     xSemaphoreGive(m_mutex);
   }
@@ -37,7 +37,7 @@ struct RateLimit {
   }
 
   bool tryRequest() {
-    std::int64_t now = OpenShock::millis();
+    int64_t now = OpenShock::millis();
 
     xSemaphoreTake(m_mutex, portMAX_DELAY);
 
@@ -72,29 +72,29 @@ struct RateLimit {
     xSemaphoreGive(m_mutex);
   }
 
-  void blockUntil(std::int64_t blockUntilMs) {
+  void blockUntil(int64_t blockUntilMs) {
     xSemaphoreTake(m_mutex, portMAX_DELAY);
     m_blockUntilMs = blockUntilMs;
     xSemaphoreGive(m_mutex);
   }
 
-  std::uint32_t requestsSince(std::int64_t sinceMs) {
+  uint32_t requestsSince(int64_t sinceMs) {
     xSemaphoreTake(m_mutex, portMAX_DELAY);
-    std::uint32_t result = std::count_if(m_requests.begin(), m_requests.end(), [sinceMs](std::int64_t requestMs) { return requestMs >= sinceMs; });
+    uint32_t result = std::count_if(m_requests.begin(), m_requests.end(), [sinceMs](int64_t requestMs) { return requestMs >= sinceMs; });
     xSemaphoreGive(m_mutex);
     return result;
   }
 
 private:
   struct Limit {
-    std::int64_t durationMs;
-    std::uint16_t count;
+    int64_t durationMs;
+    uint16_t count;
   };
 
   SemaphoreHandle_t m_mutex;
-  std::int64_t m_blockUntilMs;
+  int64_t m_blockUntilMs;
   std::vector<Limit> m_limits;
-  std::vector<std::int64_t> m_requests;
+  std::vector<int64_t> m_requests;
 };
 
 SemaphoreHandle_t s_rateLimitsMutex = xSemaphoreCreateMutex();
@@ -171,8 +171,8 @@ constexpr bool _isCRLF(const uint8_t* buffer) {
   return buffer[0] == '\r' && buffer[1] == '\n';
 }
 constexpr bool _tryFindCRLF(std::size_t& pos, const uint8_t* buffer, std::size_t len) {
-  const std::uint8_t* cur = buffer;
-  const std::uint8_t* end = buffer + len - 1;
+  const uint8_t* cur = buffer;
+  const uint8_t* end = buffer + len - 1;
 
   while (cur < end) {
     if (_isCRLF(cur)) {
@@ -207,13 +207,13 @@ constexpr bool _tryParseHexSizeT(std::size_t& result, StringView str) {
   return true;
 }
 
-enum ParserState : std::uint8_t {
+enum ParserState : uint8_t {
   Ok,
   NeedMoreData,
   Invalid,
 };
 
-ParserState _parseChunkHeader(const std::uint8_t* buffer, std::size_t bufferLen, std::size_t& headerLen, std::size_t& payloadLen) {
+ParserState _parseChunkHeader(const uint8_t* buffer, std::size_t bufferLen, std::size_t& headerLen, std::size_t& payloadLen) {
   if (bufferLen < 5) {  // Bare minimum: "0\r\n\r\n"
     return ParserState::NeedMoreData;
   }
@@ -263,7 +263,7 @@ ParserState _parseChunkHeader(const std::uint8_t* buffer, std::size_t bufferLen,
   return ParserState::Ok;
 }
 
-ParserState _parseChunk(const std::uint8_t* buffer, std::size_t bufferLen, std::size_t& payloadPos, std::size_t& payloadLen) {
+ParserState _parseChunk(const uint8_t* buffer, std::size_t bufferLen, std::size_t& payloadPos, std::size_t& payloadLen) {
   if (payloadPos == 0) {
     ParserState state = _parseChunkHeader(buffer, bufferLen, payloadPos, payloadLen);
     if (state != ParserState::Ok) {
@@ -285,7 +285,7 @@ ParserState _parseChunk(const std::uint8_t* buffer, std::size_t bufferLen, std::
   return ParserState::Ok;
 }
 
-void _alignChunk(std::uint8_t* buffer, std::size_t& bufferCursor, std::size_t payloadPos, std::size_t payloadLen) {
+void _alignChunk(uint8_t* buffer, std::size_t& bufferCursor, std::size_t payloadPos, std::size_t payloadLen) {
   std::size_t totalLen  = payloadPos + payloadLen + 2;  // +2 for CRLF
   std::size_t remaining = bufferCursor - totalLen;
   if (remaining > 0) {
@@ -296,11 +296,11 @@ void _alignChunk(std::uint8_t* buffer, std::size_t& bufferCursor, std::size_t pa
   }
 }
 
-StreamReaderResult _readStreamDataChunked(HTTPClient& client, WiFiClient* stream, HTTP::DownloadCallback downloadCallback, std::int64_t begin, std::uint32_t timeoutMs) {
+StreamReaderResult _readStreamDataChunked(HTTPClient& client, WiFiClient* stream, HTTP::DownloadCallback downloadCallback, int64_t begin, uint32_t timeoutMs) {
   std::size_t totalWritten   = 0;
   HTTP::RequestResult result = HTTP::RequestResult::Success;
 
-  std::uint8_t* buffer = static_cast<std::uint8_t*>(malloc(HTTP_BUFFER_SIZE));
+  uint8_t* buffer = static_cast<uint8_t*>(malloc(HTTP_BUFFER_SIZE));
   if (buffer == nullptr) {
     ESP_LOGE(TAG, "Out of memory");
     return {HTTP::RequestResult::RequestFailed, 0};
@@ -376,11 +376,11 @@ parseMore:
   return {result, totalWritten};
 }
 
-StreamReaderResult _readStreamData(HTTPClient& client, WiFiClient* stream, std::size_t contentLength, HTTP::DownloadCallback downloadCallback, std::int64_t begin, std::uint32_t timeoutMs) {
+StreamReaderResult _readStreamData(HTTPClient& client, WiFiClient* stream, std::size_t contentLength, HTTP::DownloadCallback downloadCallback, int64_t begin, uint32_t timeoutMs) {
   std::size_t nWritten       = 0;
   HTTP::RequestResult result = HTTP::RequestResult::Success;
 
-  std::uint8_t* buffer = static_cast<std::uint8_t*>(malloc(HTTP_BUFFER_SIZE));
+  uint8_t* buffer = static_cast<uint8_t*>(malloc(HTTP_BUFFER_SIZE));
 
   while (client.connected() && nWritten < contentLength) {
     if (begin + timeoutMs < OpenShock::millis()) {
@@ -428,9 +428,9 @@ HTTP::Response<std::size_t> _doGetStream(
   std::shared_ptr<RateLimit> rateLimiter,
   HTTP::GotContentLengthCallback contentLengthCallback,
   HTTP::DownloadCallback downloadCallback,
-  std::uint32_t timeoutMs
+  uint32_t timeoutMs
 ) {
-  std::int64_t begin = OpenShock::millis();
+  int64_t begin = OpenShock::millis();
   if (!client.begin(url.toArduinoString())) {
     ESP_LOGE(TAG, "Failed to begin HTTP request");
     return {HTTP::RequestResult::RequestFailed, 0};
@@ -465,7 +465,7 @@ HTTP::Response<std::size_t> _doGetStream(
     }
 
     // Get the block-until time
-    std::int64_t blockUntilMs = OpenShock::millis() + retryAfter * 1000;
+    int64_t blockUntilMs = OpenShock::millis() + retryAfter * 1000;
 
     // Apply the block-until time
     rateLimiter->blockUntil(blockUntilMs);
@@ -516,7 +516,7 @@ HTTP::Response<std::size_t> _doGetStream(
 }
 
 HTTP::Response<std::size_t>
-  HTTP::Download(StringView url, const std::map<String, String>& headers, HTTP::GotContentLengthCallback contentLengthCallback, HTTP::DownloadCallback downloadCallback, const std::vector<int>& acceptedCodes, std::uint32_t timeoutMs) {
+  HTTP::Download(StringView url, const std::map<String, String>& headers, HTTP::GotContentLengthCallback contentLengthCallback, HTTP::DownloadCallback downloadCallback, const std::vector<int>& acceptedCodes, uint32_t timeoutMs) {
   std::shared_ptr<RateLimit> rateLimiter = _getRateLimiter(url);
   if (rateLimiter == nullptr) {
     return {RequestResult::InvalidURL, 0, 0};
@@ -532,7 +532,7 @@ HTTP::Response<std::size_t>
   return _doGetStream(client, url, headers, acceptedCodes, rateLimiter, contentLengthCallback, downloadCallback, timeoutMs);
 }
 
-HTTP::Response<std::string> HTTP::GetString(StringView url, const std::map<String, String>& headers, const std::vector<int>& acceptedCodes, std::uint32_t timeoutMs) {
+HTTP::Response<std::string> HTTP::GetString(StringView url, const std::map<String, String>& headers, const std::vector<int>& acceptedCodes, uint32_t timeoutMs) {
   std::string result;
 
   auto allocator = [&result](std::size_t contentLength) {

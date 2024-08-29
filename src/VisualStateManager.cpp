@@ -10,17 +10,17 @@
 
 const char* const TAG = "VisualStateManager";
 
-const std::uint64_t kCriticalErrorFlag                = 1 << 0;
-const std::uint64_t kEmergencyStoppedFlag             = 1 << 1;
-const std::uint64_t kEmergencyStopAwaitingReleaseFlag = 1 << 2;
-const std::uint64_t kWebSocketConnectedFlag           = 1 << 3;
-const std::uint64_t kWiFiConnectedFlag                = 1 << 4;
-const std::uint64_t kWiFiScanningFlag                 = 1 << 5;
+const uint64_t kCriticalErrorFlag                = 1 << 0;
+const uint64_t kEmergencyStoppedFlag             = 1 << 1;
+const uint64_t kEmergencyStopAwaitingReleaseFlag = 1 << 2;
+const uint64_t kWebSocketConnectedFlag           = 1 << 3;
+const uint64_t kWiFiConnectedFlag                = 1 << 4;
+const uint64_t kWiFiScanningFlag                 = 1 << 5;
 
 // Bitmask of when the system is in a "all clear" state.
-const std::uint64_t kStatusOKMask = kWebSocketConnectedFlag | kWiFiConnectedFlag;
+const uint64_t kStatusOKMask = kWebSocketConnectedFlag | kWiFiConnectedFlag;
 
-static std::uint64_t s_stateFlags = 0;
+static uint64_t s_stateFlags = 0;
 static std::shared_ptr<OpenShock::PinPatternManager> s_builtInLedManager;
 static std::shared_ptr<OpenShock::RGBPatternManager> s_RGBLedManager;
 
@@ -252,7 +252,7 @@ void _handleWiFiConnected(void* arg, esp_event_base_t event_base, int32_t event_
   (void)event_id;
   (void)event_data;
 
-  std::uint64_t oldState = s_stateFlags;
+  uint64_t oldState = s_stateFlags;
 
   s_stateFlags |= kWiFiConnectedFlag;
 
@@ -266,7 +266,7 @@ void _handleWiFiDisconnected(void* arg, esp_event_base_t event_base, int32_t eve
   (void)event_id;
   (void)event_data;
 
-  std::uint64_t oldState = s_stateFlags;
+  uint64_t oldState = s_stateFlags;
 
   s_stateFlags &= ~kWiFiConnectedFlag;
 
@@ -280,7 +280,7 @@ void _handleWiFiScanDone(void* arg, esp_event_base_t event_base, int32_t event_i
   (void)event_id;
   (void)event_data;
 
-  std::uint64_t oldState = s_stateFlags;
+  uint64_t oldState = s_stateFlags;
 
   s_stateFlags &= ~kWiFiScanningFlag;
 
@@ -334,7 +334,7 @@ bool VisualStateManager::Init() {
 }
 
 void VisualStateManager::SetCriticalError() {
-  std::uint64_t oldState = s_stateFlags;
+  uint64_t oldState = s_stateFlags;
 
   s_stateFlags |= kCriticalErrorFlag;
 
@@ -344,7 +344,7 @@ void VisualStateManager::SetCriticalError() {
 }
 
 void VisualStateManager::SetScanningStarted() {
-  std::uint64_t oldState = s_stateFlags;
+  uint64_t oldState = s_stateFlags;
 
   s_stateFlags |= kWiFiScanningFlag;
 
@@ -354,7 +354,7 @@ void VisualStateManager::SetScanningStarted() {
 }
 
 void VisualStateManager::SetEmergencyStopStatus(bool isActive, bool isAwaitingRelease) {
-  std::uint64_t oldState = s_stateFlags;
+  uint64_t oldState = s_stateFlags;
 
   if (isActive) {
     s_stateFlags |= kEmergencyStoppedFlag;
@@ -374,7 +374,7 @@ void VisualStateManager::SetEmergencyStopStatus(bool isActive, bool isAwaitingRe
 }
 
 void VisualStateManager::SetWebSocketConnected(bool isConnected) {
-  std::uint64_t oldState = s_stateFlags;
+  uint64_t oldState = s_stateFlags;
 
   if (isConnected) {
     s_stateFlags |= kWebSocketConnectedFlag;

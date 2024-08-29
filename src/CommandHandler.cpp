@@ -1,3 +1,5 @@
+#include <freertos/FreeRTOS.h>
+
 #include "CommandHandler.h"
 
 #include "Chipset.h"
@@ -8,7 +10,6 @@
 #include "Time.h"
 #include "util/TaskUtils.h"
 
-#include <freertos/FreeRTOS.h>
 #include <freertos/queue.h>
 #include <freertos/semphr.h>
 
@@ -17,8 +18,8 @@
 
 const char* const TAG = "CommandHandler";
 
-const std::int64_t KEEP_ALIVE_INTERVAL  = 60'000;
-const std::uint16_t KEEP_ALIVE_DURATION = 300;
+const int64_t KEEP_ALIVE_INTERVAL  = 60'000;
+const uint16_t KEEP_ALIVE_DURATION = 300;
 
 using namespace OpenShock;
 
@@ -26,16 +27,16 @@ template<typename T>
 constexpr T saturate(T value, T min, T max) {
   return std::min(std::max(value, min), max);
 }
-std::uint32_t calculateEepyTime(std::int64_t timeToKeepAlive) {
-  std::int64_t now = OpenShock::millis();
-  return static_cast<std::uint32_t>(saturate<std::int64_t>(timeToKeepAlive - now, 0LL, KEEP_ALIVE_INTERVAL));
+uint32_t calculateEepyTime(int64_t timeToKeepAlive) {
+  int64_t now = OpenShock::millis();
+  return static_cast<uint32_t>(saturate<int64_t>(timeToKeepAlive - now, 0LL, KEEP_ALIVE_INTERVAL));
 }
 
 struct KnownShocker {
   bool killTask;
   ShockerModelType model;
-  std::uint16_t shockerId;
-  std::int64_t lastActivityTimestamp;
+  uint16_t shockerId;
+  int64_t lastActivityTimestamp;
 };
 
 static SemaphoreHandle_t s_rfTransmitterMutex         = nullptr;
@@ -48,14 +49,14 @@ static TaskHandle_t s_keepAliveTaskHandle = nullptr;
 void _keepAliveTask(void* arg) {
   (void)arg;
 
-  std::int64_t timeToKeepAlive = KEEP_ALIVE_INTERVAL;
+  int64_t timeToKeepAlive = KEEP_ALIVE_INTERVAL;
 
   // Map of shocker IDs to time of next keep-alive
-  std::unordered_map<std::uint16_t, KnownShocker> activityMap;
+  std::unordered_map<uint16_t, KnownShocker> activityMap;
 
   while (true) {
     // Calculate eepyTime based on the timeToKeepAlive
-    std::uint32_t eepyTime = calculateEepyTime(timeToKeepAlive);
+    uint32_t eepyTime = calculateEepyTime(timeToKeepAlive);
 
     KnownShocker cmd;
     while (xQueueReceive(s_keepAliveQueue, &cmd, pdMS_TO_TICKS(eepyTime)) == pdTRUE) {
@@ -71,7 +72,7 @@ void _keepAliveTask(void* arg) {
     }
 
     // Update the time to now
-    std::int64_t now = OpenShock::millis();
+    int64_t now = OpenShock::millis();
 
     // Keep track of the minimum activity time, so we know when to wake up
     timeToKeepAlive = now + KEEP_ALIVE_INTERVAL;
@@ -171,7 +172,7 @@ bool CommandHandler::Init() {
     return false;
   }
 
-  std::uint8_t txPin = rfConfig.txPin;
+  uint8_t txPin = rfConfig.txPin;
   if (!OpenShock::IsValidOutputPin(txPin)) {
     if (!OpenShock::IsValidOutputPin(OPENSHOCK_RF_TX_GPIO)) {
       ESP_LOGE(TAG, "Configured RF TX pin (%u) is invalid, and default pin (%u) is invalid. Unable to initialize RF transmitter", txPin, OPENSHOCK_RF_TX_GPIO);
@@ -206,7 +207,7 @@ bool CommandHandler::Ok() {
   return s_rfTransmitter != nullptr;
 }
 
-SetRfPinResultCode CommandHandler::SetRfTxPin(std::uint8_t txPin) {
+SetRfPinResultCode CommandHandler::SetRfTxPin(uint8_t txPin) {
   if (!OpenShock::IsValidOutputPin(txPin)) {
     return SetRfPinResultCode::InvalidPin;
   }
@@ -271,8 +272,8 @@ bool CommandHandler::SetKeepAlivePaused(bool paused) {
   return true;
 }
 
-std::uint8_t CommandHandler::GetRfTxPin() {
-  std::uint8_t txPin;
+uint8_t CommandHandler::GetRfTxPin() {
+  uint8_t txPin;
   if (!Config::GetRFConfigTxPin(txPin)) {
     ESP_LOGE(TAG, "Failed to get RF TX pin from config");
     txPin = OPENSHOCK_GPIO_INVALID;
@@ -281,7 +282,7 @@ std::uint8_t CommandHandler::GetRfTxPin() {
   return txPin;
 }
 
-bool CommandHandler::HandleCommand(ShockerModelType model, std::uint16_t shockerId, ShockerCommandType type, std::uint8_t intensity, std::uint16_t durationMs) {
+bool CommandHandler::HandleCommand(ShockerModelType model, uint16_t shockerId, ShockerCommandType type, uint8_t intensity, uint16_t durationMs) {
   xSemaphoreTake(s_rfTransmitterMutex, portMAX_DELAY);
 
   if (s_rfTransmitter == nullptr) {
