@@ -8,6 +8,6 @@ namespace OpenShock::VisualStateManager {
 
   void SetCriticalError();
   void SetScanningStarted();
-  void SetEmergencyStop(OpenShock::EStopManager::EStopStatus status);
+  void SetEmergencyStopStatus(bool isActive, bool isAwaitingRelease);
   void SetWebSocketConnected(bool isConnected);
 }  // namespace OpenShock::VisualStateManager

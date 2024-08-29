@@ -10,17 +10,17 @@
 
 const char* const TAG = "VisualStateManager";
 
-const std::uint64_t kCriticalErrorFlag        = 1 << 0;
-const std::uint64_t kEmergencyStoppedFlag     = 1 << 1;
-const std::uint64_t kEmergencyStopClearedFlag = 1 << 2;
-const std::uint64_t kWebSocketConnectedFlag   = 1 << 3;
-const std::uint64_t kWiFiConnectedFlag        = 1 << 4;
-const std::uint64_t kWiFiScanningFlag         = 1 << 5;
+const uint64_t kCriticalErrorFlag                = 1 << 0;
+const uint64_t kEmergencyStoppedFlag             = 1 << 1;
+const uint64_t kEmergencyStopAwaitingReleaseFlag = 1 << 2;
+const uint64_t kWebSocketConnectedFlag           = 1 << 3;
+const uint64_t kWiFiConnectedFlag                = 1 << 4;
+const uint64_t kWiFiScanningFlag                 = 1 << 5;
 
 // Bitmask of when the system is in a "all clear" state.
-const std::uint64_t kStatusOKMask = kWebSocketConnectedFlag | kWiFiConnectedFlag;
+const uint64_t kStatusOKMask = kWebSocketConnectedFlag | kWiFiConnectedFlag;
 
-static std::uint64_t s_stateFlags = 0;
+static uint64_t s_stateFlags = 0;
 static std::shared_ptr<OpenShock::PinPatternManager> s_builtInLedManager;
 static std::shared_ptr<OpenShock::RGBPatternManager> s_RGBLedManager;
 
@@ -44,11 +44,11 @@ const RGBPatternManager::RGBState kEmergencyStoppedRGBPattern[] = {
   {  0, 0, 0, 500}
 };
 
-const PinPatternManager::State kEmergencyStopClearedPattern[] = {
+const PinPatternManager::State kEmergencyStopAwaitingReleasePattern[] = {
   { true, 150},
   {false, 150}
 };
-const RGBPatternManager::RGBState kEmergencyStopClearedRGBPattern[] = {
+const RGBPatternManager::RGBState kEmergencyStopAwaitingReleaseRGBPattern[] = {
   {0, 255, 0, 150},
   {0,   0, 0, 150}
 };
@@ -157,13 +157,13 @@ void _updateVisualStateGPIO() {
     return;
   }
 
-  if (s_stateFlags & kEmergencyStoppedFlag) {
-    s_builtInLedManager->SetPattern(kEmergencyStoppedPattern);
+  if (s_stateFlags & kEmergencyStopAwaitingReleaseFlag) {
+    s_builtInLedManager->SetPattern(kEmergencyStopAwaitingReleasePattern);
     return;
   }
 
-  if (s_stateFlags & kEmergencyStopClearedFlag) {
-    s_builtInLedManager->SetPattern(kEmergencyStopClearedPattern);
+  if (s_stateFlags & kEmergencyStoppedFlag) {
+    s_builtInLedManager->SetPattern(kEmergencyStoppedPattern);
     return;
   }
 
@@ -191,13 +191,13 @@ void _updateVisualStateRGB() {
     return;
   }
 
-  if (s_stateFlags & kEmergencyStoppedFlag) {
-    s_RGBLedManager->SetPattern(kEmergencyStoppedRGBPattern);
+  if (s_stateFlags & kEmergencyStopAwaitingReleaseFlag) {
+    s_RGBLedManager->SetPattern(kEmergencyStopAwaitingReleaseRGBPattern);
     return;
   }
 
-  if (s_stateFlags & kEmergencyStopClearedFlag) {
-    s_RGBLedManager->SetPattern(kEmergencyStopClearedRGBPattern);
+  if (s_stateFlags & kEmergencyStoppedFlag) {
+    s_RGBLedManager->SetPattern(kEmergencyStoppedRGBPattern);
     return;
   }
 
@@ -249,7 +249,7 @@ void _updateVisualState() {
 void _handleWiFiConnected(arduino_event_t* event) {
   (void)event;
 
-  std::uint64_t oldState = s_stateFlags;
+  uint64_t oldState = s_stateFlags;
 
   s_stateFlags |= kWiFiConnectedFlag;
 
@@ -260,7 +260,7 @@ void _handleWiFiConnected(arduino_event_t* event) {
 void _handleWiFiDisconnected(arduino_event_t* event) {
   (void)event;
 
-  std::uint64_t oldState = s_stateFlags;
+  uint64_t oldState = s_stateFlags;
 
   s_stateFlags &= ~kWiFiConnectedFlag;
 
@@ -271,7 +271,7 @@ void _handleWiFiDisconnected(arduino_event_t* event) {
 void _handleWiFiScanDone(arduino_event_t* event) {
   (void)event;
 
-  std::uint64_t oldState = s_stateFlags;
+  uint64_t oldState = s_stateFlags;
 
   s_stateFlags &= ~kWiFiScanningFlag;
 
@@ -325,7 +325,7 @@ bool VisualStateManager::Init() {
 }
 
 void VisualStateManager::SetCriticalError() {
-  std::uint64_t oldState = s_stateFlags;
+  uint64_t oldState = s_stateFlags;
 
   s_stateFlags |= kCriticalErrorFlag;
 
@@ -335,7 +335,7 @@ void VisualStateManager::SetCriticalError() {
 }
 
 void VisualStateManager::SetScanningStarted() {
-  std::uint64_t oldState = s_stateFlags;
+  uint64_t oldState = s_stateFlags;
 
   s_stateFlags |= kWiFiScanningFlag;
 
@@ -344,30 +344,19 @@ void VisualStateManager::SetScanningStarted() {
   }
 }
 
-void VisualStateManager::SetEmergencyStop(OpenShock::EStopManager::EStopStatus status) {
-  std::uint64_t oldState = s_stateFlags;
+void VisualStateManager::SetEmergencyStopStatus(bool isActive, bool isAwaitingRelease) {
+  uint64_t oldState = s_stateFlags;
 
-  switch (status) {
-    // When there is no EStop currently active.
-    case OpenShock::EStopManager::EStopStatus::ALL_CLEAR:
-      s_stateFlags &= ~kEmergencyStoppedFlag;
-      s_stateFlags &= ~kEmergencyStopClearedFlag;
-      break;
-    // EStop has been triggered!
-    case OpenShock::EStopManager::EStopStatus::ESTOPPED_AND_HELD:
-    // EStop still active, and user has released the button from the initial trigger.
-    case OpenShock::EStopManager::EStopStatus::ESTOPPED:
-      s_stateFlags |= kEmergencyStoppedFlag;
-      s_stateFlags &= ~kEmergencyStopClearedFlag;
-      break;
-    // User has held and cleared the EStop, now we're waiting for them to release the button.
-    case OpenShock::EStopManager::EStopStatus::ESTOPPED_CLEARED:
-      s_stateFlags &= ~kEmergencyStoppedFlag;
-      s_stateFlags |= kEmergencyStopClearedFlag;
-      break;
-    default:
-      ESP_LOGE(TAG, "Unhandled EStop status: %d", status);
-      break;
+  if (isActive) {
+    s_stateFlags |= kEmergencyStoppedFlag;
+  } else {
+    s_stateFlags &= ~kEmergencyStoppedFlag;
+  }
+
+  if (isAwaitingRelease) {
+    s_stateFlags |= kEmergencyStopAwaitingReleaseFlag;
+  } else {
+    s_stateFlags &= ~kEmergencyStopAwaitingReleaseFlag;
   }
 
   if (oldState != s_stateFlags) {
@@ -376,7 +365,7 @@ void VisualStateManager::SetEmergencyStop(OpenShock::EStopManager::EStopStatus s
 }
 
 void VisualStateManager::SetWebSocketConnected(bool isConnected) {
-  std::uint64_t oldState = s_stateFlags;
+  uint64_t oldState = s_stateFlags;
 
   if (isConnected) {
     s_stateFlags |= kWebSocketConnectedFlag;

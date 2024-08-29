@@ -1,3 +1,42 @@
+# Version 1.3.0-rc.1 Release Notes
+
+This is the first release candidate for version 1.3.0.
+
+## Highlight
+
+- Added support for **DFRobot Firebeetle**, **Wemos S3 Mini** and **WaveShare S3 Zero** boards.
+
+## Minor Updates
+
+- Re-Add **PET998DR** Quiet Postamble.
+- Fix CaiXianlin protocol sending non-zero when doing a beep command.
+- Moved schema files to seperate repository.
+- Improve error handling and logging.
+- Dependency updates.
+- Code cleanup, optimization and refactoring.
+
+# Version 1.2.0 Release Notes
+
+This release adds a new shocker protocol, more bugfixes, configurability, and performance improvements.
+
+## Highlight
+
+- Added support for **998DR** Petrainer RF protocol.
+
+## Major Updates
+
+- Add command to get/set api domain.
+- Add command to get/set/clear override for Live Control Gateway (LCG) domain.
+
+## Minor Updates
+
+- Change transmission end command to last for 300 ms.
+- Increase WDT timeout during OTA updates to prevent watchdog resets.
+- Remove non thread-safe RF sequence caching.
+- Update flatbuffers to 23.5.26.
+- Start utilizing StringView more to reduce memory and CPU usage.
+- Small code cleanup and refactoring.
+
 # Version 1.2.0-rc.1 Release Notes
 
 This is the first release candidate for version 1.2.0.
