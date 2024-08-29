@@ -8,14 +8,14 @@ const char* const TAG = "WebSocketDeFragger";
 
 using namespace OpenShock;
 
-std::uint8_t* _reallocOrFree(std::uint8_t* ptr, std::size_t size) {
+uint8_t* _reallocOrFree(uint8_t* ptr, std::size_t size) {
   void* newPtr = realloc(ptr, size);
   if (newPtr == nullptr) {
     free(ptr);
     ESP_PANIC(TAG, "Failed to allocate memory");
   }
 
-  return reinterpret_cast<std::uint8_t*>(newPtr);
+  return reinterpret_cast<uint8_t*>(newPtr);
 }
 
 WebSocketDeFragger::WebSocketDeFragger(EventCallback callback) : m_messages(), m_callback(callback) { }
@@ -24,7 +24,7 @@ WebSocketDeFragger::~WebSocketDeFragger() {
   clear();
 }
 
-void WebSocketDeFragger::handler(std::uint8_t socketId, WStype_t type, const std::uint8_t* payload, std::size_t length) {
+void WebSocketDeFragger::handler(uint8_t socketId, WStype_t type, const uint8_t* payload, std::size_t length) {
   switch (type) {
     case WStype_FRAGMENT_BIN_START:
       start(socketId, WebSocketMessageType::Binary, payload, length);
@@ -68,7 +68,7 @@ void WebSocketDeFragger::handler(std::uint8_t socketId, WStype_t type, const std
       break;
     [[unlikely]] default:
       const char* const errorMessage = "Unknown WebSocket event type";
-      m_callback(socketId, WebSocketMessageType::Error, reinterpret_cast<const std::uint8_t*>(errorMessage), strlen(errorMessage));
+      m_callback(socketId, WebSocketMessageType::Error, reinterpret_cast<const uint8_t*>(errorMessage), strlen(errorMessage));
       return;
   }
 
@@ -79,7 +79,7 @@ void WebSocketDeFragger::onEvent(const EventCallback& callback) {
   m_callback = callback;
 }
 
-void WebSocketDeFragger::clear(std::uint8_t socketId) {
+void WebSocketDeFragger::clear(uint8_t socketId) {
   auto it = m_messages.find(socketId);
   if (it != m_messages.end()) {
     free(it->second.data);
@@ -94,7 +94,7 @@ void WebSocketDeFragger::clear() {
   m_messages.clear();
 }
 
-void WebSocketDeFragger::start(std::uint8_t socketId, WebSocketMessageType type, const std::uint8_t* data, std::uint32_t length) {
+void WebSocketDeFragger::start(uint8_t socketId, WebSocketMessageType type, const uint8_t* data, uint32_t length) {
   auto it = m_messages.find(socketId);
   if (it != m_messages.end()) {
     auto& message = it->second;
@@ -110,14 +110,14 @@ void WebSocketDeFragger::start(std::uint8_t socketId, WebSocketMessageType type,
     return;
   }
 
-  Message message {.data = reinterpret_cast<std::uint8_t*>(malloc(length)), .size = length, .capacity = length, .type = type};
+  Message message {.data = reinterpret_cast<uint8_t*>(malloc(length)), .size = length, .capacity = length, .type = type};
 
   memcpy(message.data, data, length);
 
   m_messages.insert(std::make_pair(socketId, message));
 }
 
-void WebSocketDeFragger::append(std::uint8_t socketId, const std::uint8_t* data, std::uint32_t length) {
+void WebSocketDeFragger::append(uint8_t socketId, const uint8_t* data, uint32_t length) {
   auto it = m_messages.find(socketId);
   if (it == m_messages.end()) {
     return;
@@ -125,7 +125,7 @@ void WebSocketDeFragger::append(std::uint8_t socketId, const std::uint8_t* data,
 
   auto& message = it->second;
 
-  std::uint32_t newLength = message.size + length;
+  uint32_t newLength = message.size + length;
   if (message.capacity < newLength) {
     message.data     = _reallocOrFree(message.data, newLength);
     message.capacity = newLength;
@@ -135,7 +135,7 @@ void WebSocketDeFragger::append(std::uint8_t socketId, const std::uint8_t* data,
   message.size = newLength;
 }
 
-void WebSocketDeFragger::finish(std::uint8_t socketId, const std::uint8_t* data, std::uint32_t length) {
+void WebSocketDeFragger::finish(uint8_t socketId, const uint8_t* data, uint32_t length) {
   auto it = m_messages.find(socketId);
   if (it == m_messages.end()) {
     return;
@@ -143,7 +143,7 @@ void WebSocketDeFragger::finish(std::uint8_t socketId, const std::uint8_t* data,
 
   auto& message = it->second;
 
-  std::uint32_t newLength = message.size + length;
+  uint32_t newLength = message.size + length;
   if (message.capacity < newLength) {
     message.data     = _reallocOrFree(message.data, newLength);
     message.capacity = newLength;

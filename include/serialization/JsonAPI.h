@@ -29,7 +29,7 @@ namespace OpenShock::Serialization::JsonAPI {
     std::string deviceName;
     struct ShockerInfo {
       std::string id;
-      std::uint16_t rfId;
+      uint16_t rfId;
       OpenShock::ShockerModelType model;
     };
     std::vector<ShockerInfo> shockers;

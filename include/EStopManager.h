@@ -7,5 +7,5 @@
 namespace OpenShock::EStopManager {
   bool Init();
   bool IsEStopped();
-  std::int64_t LastEStopped();
+  int64_t LastEStopped();
 }  // namespace OpenShock::EStopManager

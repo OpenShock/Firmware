@@ -9,7 +9,7 @@ const char* const TAG = "CertificateUtils";
 const char* const PEM_HEADER = "-----BEGIN CERTIFICATE-----\n";
 const char* const PEM_FOOTER = "-----END CERTIFICATE-----\n";
 
-extern const std::uint8_t* const rootca_crt_bundle_start asm("_binary_certificates_x509_crt_bundle_start");
+extern const uint8_t* const rootca_crt_bundle_start asm("_binary_certificates_x509_crt_bundle_start");
 
 WiFiClientSecure OpenShock::CertificateUtils::GetSecureClient() {
   WiFiClientSecure client;
@@ -40,12 +40,12 @@ bool OpenShock::CertificateUtils::GetHostCertificate(const char* host, std::vect
 
   const mbedtls_x509_buf& der = cert->raw;
 
-  std::uint8_t c;
+  uint8_t c;
   std::size_t pemLen;
   mbedtls_pem_write_buffer(PEM_HEADER, PEM_FOOTER, der.p, der.len, &c, 1, &pemLen);
 
   pem.resize(pemLen);
-  int retval = mbedtls_pem_write_buffer(PEM_HEADER, PEM_FOOTER, der.p, der.len, reinterpret_cast<std::uint8_t*>(pem.data()), pem.size(), nullptr);
+  int retval = mbedtls_pem_write_buffer(PEM_HEADER, PEM_FOOTER, der.p, der.len, reinterpret_cast<uint8_t*>(pem.data()), pem.size(), nullptr);
   if (retval != 0) {
     ESP_LOGE(TAG, "Failed to write pem buffer: %d", retval);
     return false;

@@ -39,7 +39,7 @@ static std::array<Handlers::HandlerType, HANDLER_COUNT> s_localHandlers = []() {
   return handlers;
 }();
 
-void EventHandlers::WebSocket::HandleLocalBinary(std::uint8_t socketId, const std::uint8_t* data, std::size_t len) {
+void EventHandlers::WebSocket::HandleLocalBinary(uint8_t socketId, const uint8_t* data, std::size_t len) {
   // Deserialize
   auto msg = flatbuffers::GetRoot<Schemas::LocalToHubMessage>(data);
   if (msg == nullptr) {

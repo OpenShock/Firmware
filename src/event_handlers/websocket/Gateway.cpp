@@ -34,7 +34,7 @@ static std::array<Handlers::HandlerType, HANDLER_COUNT> s_serverHandlers = []() 
   return handlers;
 }();
 
-void EventHandlers::WebSocket::HandleGatewayBinary(const std::uint8_t* data, std::size_t len) {
+void EventHandlers::WebSocket::HandleGatewayBinary(const uint8_t* data, std::size_t len) {
   // Deserialize
   auto msg = flatbuffers::GetRoot<Schemas::GatewayToHubMessage>(data);
   if (msg == nullptr) {

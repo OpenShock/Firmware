@@ -27,8 +27,8 @@ namespace OpenShock::Config {
   bool SaveFromFlatBuffer(const Serialization::Configuration::HubConfig* config);
 
   /* GetRaw and SetRaw are used for Reading/Writing the config file in its binary form. */
-  bool GetRaw(std::vector<std::uint8_t>& buffer);
-  bool SetRaw(const std::uint8_t* buffer, std::size_t size);
+  bool GetRaw(std::vector<uint8_t>& buffer);
+  bool SetRaw(const uint8_t* buffer, std::size_t size);
 
   /**
    * @brief Resets the config file to the factory default values.
@@ -52,8 +52,8 @@ namespace OpenShock::Config {
   bool SetSerialInputConfig(const SerialInputConfig& config);
   bool SetBackendConfig(const BackendConfig& config);
 
-  bool GetRFConfigTxPin(std::uint8_t& out);
-  bool SetRFConfigTxPin(std::uint8_t txPin);
+  bool GetRFConfigTxPin(uint8_t& out);
+  bool SetRFConfigTxPin(uint8_t txPin);
   bool GetRFConfigKeepAliveEnabled(bool& out);
   bool SetRFConfigKeepAliveEnabled(bool enabled);
 
@@ -65,15 +65,15 @@ namespace OpenShock::Config {
 
   bool AnyWiFiCredentials(std::function<bool(const Config::WiFiCredentials&)> predicate);
 
-  std::uint8_t AddWiFiCredentials(StringView ssid, StringView password);
-  bool TryGetWiFiCredentialsByID(std::uint8_t id, WiFiCredentials& out);
+  uint8_t AddWiFiCredentials(StringView ssid, StringView password);
+  bool TryGetWiFiCredentialsByID(uint8_t id, WiFiCredentials& out);
   bool TryGetWiFiCredentialsBySSID(const char* ssid, WiFiCredentials& out);
-  std::uint8_t GetWiFiCredentialsIDbySSID(const char* ssid);
-  bool RemoveWiFiCredentials(std::uint8_t id);
+  uint8_t GetWiFiCredentialsIDbySSID(const char* ssid);
+  bool RemoveWiFiCredentials(uint8_t id);
   bool ClearWiFiCredentials();
 
-  bool GetOtaUpdateId(std::int32_t& out);
-  bool SetOtaUpdateId(std::int32_t updateId);
+  bool GetOtaUpdateId(int32_t& out);
+  bool SetOtaUpdateId(int32_t updateId);
   bool GetOtaUpdateStep(OtaUpdateStep& out);
   bool SetOtaUpdateStep(OtaUpdateStep updateStep);
 

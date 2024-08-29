@@ -17,7 +17,7 @@ namespace OpenShock {
   public:
     struct State {
       bool level;
-      std::uint32_t duration;
+      uint32_t duration;
     };
 
     PinPatternManager() = delete;

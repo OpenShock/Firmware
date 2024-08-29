@@ -41,7 +41,7 @@ bool JsonSerial::ParseShockerCommand(const cJSON* root, JsonSerial::ShockerComma
     ESP_LOGE(TAG, "value at 'id' is out of range (0-65535)");
     return false;
   }
-  std::uint16_t idU16 = static_cast<std::uint16_t>(idInt);
+  uint16_t idU16 = static_cast<uint16_t>(idInt);
 
   const cJSON* command = cJSON_GetObjectItemCaseSensitive(root, "type");
   if (command == nullptr) {
@@ -72,7 +72,7 @@ bool JsonSerial::ParseShockerCommand(const cJSON* root, JsonSerial::ShockerComma
     ESP_LOGE(TAG, "value at 'intensity' is out of range (0-255)");
     return false;
   }
-  std::uint8_t intensityU8 = static_cast<std::uint8_t>(intensityInt);
+  uint8_t intensityU8 = static_cast<uint8_t>(intensityInt);
 
   const cJSON* durationMs = cJSON_GetObjectItemCaseSensitive(root, "durationMs");
   if (durationMs == nullptr) {
@@ -87,7 +87,7 @@ bool JsonSerial::ParseShockerCommand(const cJSON* root, JsonSerial::ShockerComma
     ESP_LOGE(TAG, "value at 'durationMs' is out of range (0-65535)");
     return false;
   }
-  std::uint16_t durationMsU16 = static_cast<std::uint16_t>(durationMs->valueint);
+  uint16_t durationMsU16 = static_cast<uint16_t>(durationMs->valueint);
 
   out = {
     .model      = modelType,

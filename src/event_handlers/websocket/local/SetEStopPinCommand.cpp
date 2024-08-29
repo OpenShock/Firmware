@@ -9,7 +9,7 @@
 
 const char* const TAG = "LocalMessageHandlers";
 
-void serializeSetEStopPinResult(std::uint8_t socketId, std::uint8_t pin, OpenShock::Serialization::Local::SetGPIOResultCode result) {
+void serializeSetEStopPinResult(uint8_t socketId, uint8_t pin, OpenShock::Serialization::Local::SetGPIOResultCode result) {
   flatbuffers::FlatBufferBuilder builder(1024);
 
   auto responseOffset = builder.CreateStruct(OpenShock::Serialization::Local::SetEstopPinCommandResult(pin, result));
@@ -18,15 +18,15 @@ void serializeSetEStopPinResult(std::uint8_t socketId, std::uint8_t pin, OpenSho
 
   builder.Finish(msgOffset);
 
-  const std::uint8_t* buffer = builder.GetBufferPointer();
-  std::uint8_t size          = builder.GetSize();
+  const uint8_t* buffer = builder.GetBufferPointer();
+  uint8_t size          = builder.GetSize();
 
   OpenShock::CaptivePortal::SendMessageBIN(socketId, buffer, size);
 }
 
 using namespace OpenShock::MessageHandlers::Local;
 
-void _Private::HandleSetEstopPinCommand(std::uint8_t socketId, const OpenShock::Serialization::Local::LocalToHubMessage* root) {
+void _Private::HandleSetEstopPinCommand(uint8_t socketId, const OpenShock::Serialization::Local::LocalToHubMessage* root) {
   auto msg = root->payload_as_SetEstopPinCommand();
   if (msg == nullptr) {
     ESP_LOGE(TAG, "Payload cannot be parsed as SetEstopPinCommand");

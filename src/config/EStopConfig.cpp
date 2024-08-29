@@ -23,7 +23,7 @@ bool EStopConfig::FromFlatbuffers(const Serialization::Configuration::EStopConfi
     return false;
   }
 
-  std::uint8_t val = config->estop_pin();
+  uint8_t val = config->estop_pin();
 
   if (!OpenShock::IsValidInputPin(val)) {
     ESP_LOGE(TAG, "Invalid estopPin: %d", val);
@@ -50,7 +50,7 @@ bool EStopConfig::FromJSON(const cJSON* json) {
     return false;
   }
 
-  std::uint8_t val;
+  uint8_t val;
   if (!Internal::Utils::FromJsonU8(val, json, "estopPin", OPENSHOCK_ESTOP_PIN)) {
     ESP_LOGE(TAG, "Failed to parse estopPin");
     return false;

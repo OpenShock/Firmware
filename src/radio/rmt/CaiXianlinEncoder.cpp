@@ -15,11 +15,11 @@ const rmt_data_t kRmtZero     = {300, 1, 800, 0};
 
 using namespace OpenShock;
 
-std::vector<rmt_data_t> Rmt::CaiXianlinEncoder::GetSequence(std::uint16_t transmitterId, std::uint8_t channelId, ShockerCommandType type, std::uint8_t intensity) {
+std::vector<rmt_data_t> Rmt::CaiXianlinEncoder::GetSequence(uint16_t transmitterId, uint8_t channelId, ShockerCommandType type, uint8_t intensity) {
   // Intensity must be between 0 and 99
-  intensity = std::min(intensity, static_cast<std::uint8_t>(99));
+  intensity = std::min(intensity, static_cast<uint8_t>(99));
 
-  std::uint8_t typeVal = 0;
+  uint8_t typeVal = 0;
   switch (type) {
   case ShockerCommandType::Shock:
     typeVal = 0x01;
@@ -36,13 +36,13 @@ std::vector<rmt_data_t> Rmt::CaiXianlinEncoder::GetSequence(std::uint16_t transm
   }
 
   // Payload layout: [transmitterId:16][channelId:4][type:4][intensity:8]
-  std::uint32_t payload = (static_cast<std::uint32_t>(transmitterId & 0xFFFF) << 16) | (static_cast<std::uint32_t>(channelId & 0xF) << 12) | (static_cast<std::uint32_t>(typeVal) << 8) | static_cast<std::uint32_t>(intensity & 0xFF);
+  uint32_t payload = (static_cast<uint32_t>(transmitterId & 0xFFFF) << 16) | (static_cast<uint32_t>(channelId & 0xF) << 12) | (static_cast<uint32_t>(typeVal) << 8) | static_cast<uint32_t>(intensity & 0xFF);
 
   // Calculate the checksum of the payload
-  std::uint8_t checksum = Checksum::CRC8(payload);
+  uint8_t checksum = Checksum::CRC8(payload);
 
   // Add the checksum to the payload
-  std::uint64_t data = (static_cast<std::uint64_t>(payload) << 8) | static_cast<std::uint64_t>(checksum);
+  uint64_t data = (static_cast<uint64_t>(payload) << 8) | static_cast<uint64_t>(checksum);
 
   // Shift the data left by 3 bits to add the postamble (3 bits of 0)
   data <<= 3;

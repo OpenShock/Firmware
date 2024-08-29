@@ -94,13 +94,13 @@ bool CaptivePortal::IsAlwaysEnabled() {
   return s_alwaysEnabled;
 }
 
-bool CaptivePortal::ForceClose(std::uint32_t timeoutMs) {
+bool CaptivePortal::ForceClose(uint32_t timeoutMs) {
   s_forceClosed = true;
 
   if (s_instance == nullptr) return true;
 
   while (timeoutMs > 0) {
-    std::uint32_t delay = std::min(timeoutMs, static_cast<std::uint32_t>(10U));
+    uint32_t delay = std::min(timeoutMs, static_cast<uint32_t>(10U));
 
     vTaskDelay(pdMS_TO_TICKS(delay));
 
@@ -144,14 +144,14 @@ void CaptivePortal::Update() {
   }
 }
 
-bool CaptivePortal::SendMessageTXT(std::uint8_t socketId, StringView data) {
+bool CaptivePortal::SendMessageTXT(uint8_t socketId, StringView data) {
   if (s_instance == nullptr) return false;
 
   s_instance->sendMessageTXT(socketId, data);
 
   return true;
 }
-bool CaptivePortal::SendMessageBIN(std::uint8_t socketId, const std::uint8_t* data, std::size_t len) {
+bool CaptivePortal::SendMessageBIN(uint8_t socketId, const uint8_t* data, std::size_t len) {
   if (s_instance == nullptr) return false;
 
   s_instance->sendMessageBIN(socketId, data, len);
@@ -166,7 +166,7 @@ bool CaptivePortal::BroadcastMessageTXT(StringView data) {
 
   return true;
 }
-bool CaptivePortal::BroadcastMessageBIN(const std::uint8_t* data, std::size_t len) {
+bool CaptivePortal::BroadcastMessageBIN(const uint8_t* data, std::size_t len) {
   if (s_instance == nullptr) return false;
 
   s_instance->broadcastMessageBIN(data, len);

@@ -12,14 +12,14 @@ namespace OpenShock::CommandHandler {
   bool Init();
   bool Ok();
 
-  SetGPIOResultCode SetRfTxPin(std::uint8_t txPin);
-  std::uint8_t GetRfTxPin();
+  SetGPIOResultCode SetRfTxPin(uint8_t txPin);
+  uint8_t GetRfTxPin();
 
-  SetGPIOResultCode SetEstopPin(std::uint8_t estopPin);
-  std::uint8_t GetEstopPin();
+  SetGPIOResultCode SetEstopPin(uint8_t estopPin);
+  uint8_t GetEstopPin();
 
   bool SetKeepAliveEnabled(bool enabled);
   bool SetKeepAlivePaused(bool paused);
 
-  bool HandleCommand(ShockerModelType shockerModel, std::uint16_t shockerId, ShockerCommandType type, std::uint8_t intensity, std::uint16_t durationMs);
+  bool HandleCommand(ShockerModelType shockerModel, uint16_t shockerId, ShockerCommandType type, uint8_t intensity, uint16_t durationMs);
 }  // namespace OpenShock::CommandHandler

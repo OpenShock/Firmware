@@ -8,7 +8,7 @@
 
 const char* const TAG = "LocalMessageHandlers";
 
-void serializeAccountLinkCommandResult(std::uint8_t socketId, OpenShock::Serialization::Local::AccountLinkResultCode result) {
+void serializeAccountLinkCommandResult(uint8_t socketId, OpenShock::Serialization::Local::AccountLinkResultCode result) {
   flatbuffers::FlatBufferBuilder builder(1024);
 
   auto responseOffset = builder.CreateStruct(OpenShock::Serialization::Local::AccountLinkCommandResult(result));
@@ -25,7 +25,7 @@ void serializeAccountLinkCommandResult(std::uint8_t socketId, OpenShock::Seriali
 
 using namespace OpenShock::MessageHandlers::Local;
 
-void _Private::HandleAccountLinkCommand(std::uint8_t socketId, const OpenShock::Serialization::Local::LocalToHubMessage* root) {
+void _Private::HandleAccountLinkCommand(uint8_t socketId, const OpenShock::Serialization::Local::LocalToHubMessage* root) {
   auto msg = root->payload_as_AccountLinkCommand();
   if (msg == nullptr) {
     ESP_LOGE(TAG, "Payload cannot be parsed as AccountLinkCommand");
