@@ -23,13 +23,9 @@ const uint16_t KEEP_ALIVE_DURATION = 300;
 
 using namespace OpenShock;
 
-template<typename T>
-constexpr T saturate(T value, T min, T max) {
-  return std::min(std::max(value, min), max);
-}
 uint32_t calculateEepyTime(int64_t timeToKeepAlive) {
   int64_t now = OpenShock::millis();
-  return static_cast<uint32_t>(saturate<int64_t>(timeToKeepAlive - now, 0LL, KEEP_ALIVE_INTERVAL));
+  return static_cast<uint32_t>(std::clamp(timeToKeepAlive - now, 0LL, KEEP_ALIVE_INTERVAL));
 }
 
 struct KnownShocker {
