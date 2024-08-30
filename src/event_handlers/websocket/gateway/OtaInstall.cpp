@@ -23,12 +23,12 @@ void _Private::HandleOtaInstall(const OpenShock::Serialization::Gateway::Gateway
     return;
   }
 
-  StringView prerelease, build;
+  std::string_view prerelease, build;
   if (semver->prerelease() != nullptr) {
-    prerelease = StringView(semver->prerelease()->c_str(), semver->prerelease()->size());
+    prerelease = std::string_view(semver->prerelease()->c_str(), semver->prerelease()->size());
   }
   if (semver->build() != nullptr) {
-    build = StringView(semver->build()->c_str(), semver->build()->size());
+    build = std::string_view(semver->build()->c_str(), semver->build()->size());
   }
 
   OpenShock::SemVer version(semver->major(), semver->minor(), semver->patch(), prerelease, build);

@@ -1,8 +1,7 @@
 #pragma once
 
-#include "StringView.h"
-
 #include <cstdint>
+#include <string_view>
 
 #define DISABLE_COPY(TypeName)             \
   TypeName(const TypeName&) = delete;      \
@@ -60,6 +59,6 @@
 #endif
 
 namespace OpenShock::Constants {
-  const char* const FW_USERAGENT   = OPENSHOCK_FW_USERAGENT;
-  const StringView FW_USERAGENT_sv = OPENSHOCK_FW_USERAGENT ""_sv;
+  const char* const FW_USERAGENT         = OPENSHOCK_FW_USERAGENT;
+  const std::string_view FW_USERAGENT_sv = OPENSHOCK_FW_USERAGENT ""_sv;
 }  // namespace OpenShock::Constants

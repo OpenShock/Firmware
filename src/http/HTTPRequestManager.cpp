@@ -102,9 +102,9 @@ std::unordered_map<std::string, std::shared_ptr<RateLimit>> s_rateLimits;
 
 using namespace OpenShock;
 
-StringView _getDomain(StringView url) {
-  if (url.isNullOrEmpty()) {
-    return StringView::Null();
+std::string_view _getDomain(std::string_view url) {
+  if (url.empty()) {
+    return std::string_view::Null();
   }
 
   // Remove the protocol, port, and path eg. "https://api.example.com:443/path" -> "api.example.com"
@@ -112,18 +112,18 @@ StringView _getDomain(StringView url) {
 
   // Remove all subdomains eg. "api.example.com" -> "example.com"
   auto domainSep = url.rfind('.');
-  if (domainSep == StringView::npos) {
+  if (domainSep == std::string_view::npos) {
     return url;  // E.g. "localhost"
   }
   domainSep = url.rfind('.', domainSep - 1);
-  if (domainSep != StringView::npos) {
+  if (domainSep != std::string_view::npos) {
     url = url.substr(domainSep + 1);
   }
 
   return url;
 }
 
-std::shared_ptr<RateLimit> _rateLimitFactory(StringView domain) {
+std::shared_ptr<RateLimit> _rateLimitFactory(std::string_view domain) {
   auto rateLimit = std::make_shared<RateLimit>();
 
   // Add default limits
@@ -139,7 +139,7 @@ std::shared_ptr<RateLimit> _rateLimitFactory(StringView domain) {
   return rateLimit;
 }
 
-std::shared_ptr<RateLimit> _getRateLimiter(StringView url) {
+std::shared_ptr<RateLimit> _getRateLimiter(std::string_view url) {
   auto domain = _getDomain(url).toString();
   if (domain.empty()) {
     return nullptr;
@@ -185,8 +185,8 @@ constexpr bool _tryFindCRLF(std::size_t& pos, const uint8_t* buffer, std::size_t
 
   return false;
 }
-constexpr bool _tryParseHexSizeT(std::size_t& result, StringView str) {
-  if (str.isNullOrEmpty() || str.size() > sizeof(std::size_t) * 2) {
+constexpr bool _tryParseHexSizeT(std::size_t& result, std::string_view str) {
+  if (str.empty() || str.size() > sizeof(std::size_t) * 2) {
     return false;
   }
 
@@ -244,7 +244,7 @@ ParserState _parseChunkHeader(const uint8_t* buffer, std::size_t bufferLen, std:
     return ParserState::Invalid;
   }
 
-  StringView sizeField(reinterpret_cast<const char*>(buffer), sizeFieldEnd);
+  std::string_view sizeField(reinterpret_cast<const char*>(buffer), sizeFieldEnd);
 
   // Parse the chunk size
   if (!_tryParseHexSizeT(payloadLen, sizeField)) {
@@ -422,7 +422,7 @@ StreamReaderResult _readStreamData(HTTPClient& client, WiFiClient* stream, std::
 
 HTTP::Response<std::size_t> _doGetStream(
   HTTPClient& client,
-  StringView url,
+  std::string_view url,
   const std::map<String, String>& headers,
   const std::vector<int>& acceptedCodes,
   std::shared_ptr<RateLimit> rateLimiter,
@@ -516,7 +516,7 @@ HTTP::Response<std::size_t> _doGetStream(
 }
 
 HTTP::Response<std::size_t>
-  HTTP::Download(StringView url, const std::map<String, String>& headers, HTTP::GotContentLengthCallback contentLengthCallback, HTTP::DownloadCallback downloadCallback, const std::vector<int>& acceptedCodes, uint32_t timeoutMs) {
+  HTTP::Download(std::string_view url, const std::map<String, String>& headers, HTTP::GotContentLengthCallback contentLengthCallback, HTTP::DownloadCallback downloadCallback, const std::vector<int>& acceptedCodes, uint32_t timeoutMs) {
   std::shared_ptr<RateLimit> rateLimiter = _getRateLimiter(url);
   if (rateLimiter == nullptr) {
     return {RequestResult::InvalidURL, 0, 0};
@@ -532,7 +532,7 @@ HTTP::Response<std::size_t>
   return _doGetStream(client, url, headers, acceptedCodes, rateLimiter, contentLengthCallback, downloadCallback, timeoutMs);
 }
 
-HTTP::Response<std::string> HTTP::GetString(StringView url, const std::map<String, String>& headers, const std::vector<int>& acceptedCodes, uint32_t timeoutMs) {
+HTTP::Response<std::string> HTTP::GetString(std::string_view url, const std::map<String, String>& headers, const std::vector<int>& acceptedCodes, uint32_t timeoutMs) {
   std::string result;
 
   auto allocator = [&result](std::size_t contentLength) {

@@ -15,8 +15,8 @@ constexpr bool _semverIsPositiveDigit(char c) {
 constexpr bool _semverIsDigit(char c) {
   return c == '0' || _semverIsPositiveDigit(c);
 }
-constexpr bool _semverIsDigits(StringView str) {
-  if (str.isNullOrEmpty()) {
+constexpr bool _semverIsDigits(std::string_view str) {
+  if (str.empty()) {
     return false;
   }
 
@@ -34,8 +34,8 @@ constexpr bool _semverIsNonDigit(char c) {
 constexpr bool _semverIsIdentifierChararacter(char c) {
   return _semverIsDigit(c) || _semverIsNonDigit(c);
 }
-constexpr bool _semverIsIdentifierChararacters(StringView str) {
-  if (str.isNullOrEmpty()) {
+constexpr bool _semverIsIdentifierChararacters(std::string_view str) {
+  if (str.empty()) {
     return false;
   }
 
@@ -47,8 +47,8 @@ constexpr bool _semverIsIdentifierChararacters(StringView str) {
 
   return true;
 }
-constexpr bool _semverIsNumericIdentifier(StringView str) {
-  if (str.isNullOrEmpty()) {
+constexpr bool _semverIsNumericIdentifier(std::string_view str) {
+  if (str.empty()) {
     return false;
   }
 
@@ -58,8 +58,8 @@ constexpr bool _semverIsNumericIdentifier(StringView str) {
 
   return _semverIsPositiveDigit(str[0]) && _semverIsDigits(str.substr(1));
 }
-constexpr bool _semverIsAlphanumericIdentifier(StringView str) {
-  if (str.isNullOrEmpty()) {
+constexpr bool _semverIsAlphanumericIdentifier(std::string_view str) {
+  if (str.empty()) {
     return false;
   }
 
@@ -67,7 +67,7 @@ constexpr bool _semverIsAlphanumericIdentifier(StringView str) {
     return _semverIsNonDigit(str[0]);
   }
 
-  std::size_t nonDigitPos = StringView::npos;
+  std::size_t nonDigitPos = std::string_view::npos;
   for (std::size_t i = 0; i < str.length(); ++i) {
     if (_semverIsNonDigit(str[i])) {
       nonDigitPos = i;
@@ -75,7 +75,7 @@ constexpr bool _semverIsAlphanumericIdentifier(StringView str) {
     }
   }
 
-  if (nonDigitPos == StringView::npos) {
+  if (nonDigitPos == std::string_view::npos) {
     return false;
   }
 
@@ -93,19 +93,19 @@ constexpr bool _semverIsAlphanumericIdentifier(StringView str) {
 
   return _semverIsIdentifierChararacters(before) && _semverIsIdentifierChararacters(after);
 }
-constexpr bool _semverIsBuildIdentifier(StringView str) {
+constexpr bool _semverIsBuildIdentifier(std::string_view str) {
   return _semverIsAlphanumericIdentifier(str) || _semverIsDigits(str);
 }
-constexpr bool _semverIsPrereleaseIdentifier(StringView str) {
+constexpr bool _semverIsPrereleaseIdentifier(std::string_view str) {
   return _semverIsAlphanumericIdentifier(str) || _semverIsNumericIdentifier(str);
 }
-constexpr bool _semverIsDotSeperatedBuildIdentifiers(StringView str) {
-  if (str.isNullOrEmpty()) {
+constexpr bool _semverIsDotSeperatedBuildIdentifiers(std::string_view str) {
+  if (str.empty()) {
     return false;
   }
 
   auto dotIdx = str.find('.');
-  while (dotIdx != StringView::npos) {
+  while (dotIdx != std::string_view::npos) {
     auto part = str.substr(0, dotIdx);
     if (!_semverIsBuildIdentifier(part)) {
       return false;
@@ -117,13 +117,13 @@ constexpr bool _semverIsDotSeperatedBuildIdentifiers(StringView str) {
 
   return _semverIsBuildIdentifier(str);
 }
-constexpr bool _semverIsDotSeperatedPreleaseIdentifiers(StringView str) {
-  if (str.isNullOrEmpty()) {
+constexpr bool _semverIsDotSeperatedPreleaseIdentifiers(std::string_view str) {
+  if (str.empty()) {
     return false;
   }
 
   auto dotIdx = str.find('.');
-  while (dotIdx != StringView::npos) {
+  while (dotIdx != std::string_view::npos) {
     auto part = str.substr(0, dotIdx);
     if (!_semverIsPrereleaseIdentifier(part)) {
       return false;
@@ -139,9 +139,9 @@ const auto _semverIsPatch = _semverIsNumericIdentifier;
 const auto _semverIsMinor = _semverIsNumericIdentifier;
 const auto _semverIsMajor = _semverIsNumericIdentifier;
 const auto _semverIsPrerelease = _semverIsDotSeperatedPreleaseIdentifiers;
-const auto _semverIsBuild = _semverIsDotSeperatedBuildIdentifiers;
-bool _semverIsVersionCore(StringView str) {
-  if (str.isNullOrEmpty()) {
+const auto _semverIsBuild      = _semverIsDotSeperatedBuildIdentifiers;
+bool _semverIsVersionCore(std::string_view str) {
+  if (str.empty()) {
     return false;
   }
 
@@ -152,39 +152,39 @@ bool _semverIsVersionCore(StringView str) {
 
   return _semverIsMajor(parts[0]) && _semverIsMinor(parts[1]) && _semverIsPatch(parts[2]);
 }
-bool _semverIsSemver(StringView str) {
-  if (str.isNullOrEmpty()) {
+bool _semverIsSemver(std::string_view str) {
+  if (str.empty()) {
     return false;
   }
 
   auto dashPos = str.find('-');
   auto plusPos = str.find('+');
 
-  if (dashPos == StringView::npos && plusPos == StringView::npos) {
+  if (dashPos == std::string_view::npos && plusPos == std::string_view::npos) {
     return _semverIsVersionCore(str);
   }
 
-  if (dashPos != StringView::npos && plusPos != StringView::npos) {
+  if (dashPos != std::string_view::npos && plusPos != std::string_view::npos) {
     if (dashPos > plusPos) {
       return false;
     }
 
-    auto core = str.substr(0, dashPos);
+    auto core       = str.substr(0, dashPos);
     auto prerelease = str.substr(dashPos + 1, plusPos - dashPos - 1);
-    auto build = str.substr(plusPos + 1);
+    auto build      = str.substr(plusPos + 1);
 
     return _semverIsVersionCore(core) && _semverIsPrerelease(prerelease) && _semverIsBuild(build);
   }
 
-  if (dashPos != StringView::npos) {
-    auto core = str.substr(0, dashPos);
+  if (dashPos != std::string_view::npos) {
+    auto core       = str.substr(0, dashPos);
     auto prerelease = str.substr(dashPos + 1);
 
     return _semverIsVersionCore(core) && _semverIsPrerelease(prerelease);
   }
 
-  if (plusPos != StringView::npos) {
-    auto core = str.substr(0, plusPos);
+  if (plusPos != std::string_view::npos) {
+    auto core  = str.substr(0, plusPos);
     auto build = str.substr(plusPos + 1);
 
     return _semverIsVersionCore(core) && _semverIsBuild(build);
@@ -193,8 +193,8 @@ bool _semverIsSemver(StringView str) {
   return false;
 }
 
-bool _tryParseU16(OpenShock::StringView str, uint16_t& out) {
-  if (str.isNullOrEmpty()) {
+bool _tryParseU16(std::string_view str, uint16_t& out) {
+  if (str.empty()) {
     return false;
   }
 
@@ -252,24 +252,24 @@ std::string SemVer::toString() const {
   return str;
 }
 
-bool OpenShock::TryParseSemVer(StringView semverStr, SemVer& semver) {
+bool OpenShock::TryParseSemVer(std::string_view semverStr, SemVer& semver) {
   auto parts = semverStr.split('.');
   if (parts.size() < 3) {
     ESP_LOGE(TAG, "Must have at least 3 parts: %.*s", semverStr.length(), semverStr.data());
     return false;
   }
 
-  StringView majorStr = parts[0], minorStr = parts[1], patchStr = parts[2];
+  std::string_view majorStr = parts[0], minorStr = parts[1], patchStr = parts[2];
 
   auto dashIdx = patchStr.find('-');
-  if (dashIdx != StringView::npos) {
+  if (dashIdx != std::string_view::npos) {
     semver.prerelease = patchStr.substr(dashIdx + 1);
     patchStr = patchStr.substr(0, dashIdx);
   }
 
   auto plusIdx = semver.prerelease.find('+');
-  if (plusIdx != StringView::npos) {
-    semver.build = semver.prerelease.substr(plusIdx + 1);
+  if (plusIdx != std::string_view::npos) {
+    semver.build      = semver.prerelease.substr(plusIdx + 1);
     semver.prerelease = semver.prerelease.substr(0, plusIdx);
   }
 

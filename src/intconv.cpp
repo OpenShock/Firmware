@@ -20,7 +20,7 @@ constexpr unsigned int NumDigits() {
 
 // Base converter
 template<typename T>
-constexpr bool spanToT(OpenShock::StringView str, T& val) {
+constexpr bool spanToT(std::string_view str, T& val) {
   static_assert(std::is_integral<T>::value);
   const T Threshold = std::numeric_limits<T>::max() / 10;
 
@@ -55,10 +55,10 @@ constexpr bool spanToT(OpenShock::StringView str, T& val) {
 
 // Unsigned converter
 template<typename T>
-constexpr bool spanToUT(OpenShock::StringView str, T& val) {
+constexpr bool spanToUT(std::string_view str, T& val) {
   static_assert(std::is_unsigned<T>::value);
 
-  if (str.isNullOrEmpty() || str.length() > NumDigits<T>()) {
+  if (str.empty() || str.length() > NumDigits<T>()) {
     return false;
   }
 
@@ -67,17 +67,17 @@ constexpr bool spanToUT(OpenShock::StringView str, T& val) {
 
 // Signed converter
 template<typename T>
-constexpr bool spanToST(OpenShock::StringView str, T& val) {
+constexpr bool spanToST(std::string_view str, T& val) {
   static_assert(std::is_signed<T>::value);
 
-  if (str.isNullOrEmpty() || str.length() > NumDigits<T>()) {
+  if (str.empty() || str.length() > NumDigits<T>()) {
     return false;
   }
 
   bool negative = str.front() == '-';
   if (negative) {
     str = str.substr(1);
-    if (str.isNullOrEmpty()) {
+    if (str.empty()) {
       return false;
     }
   }
@@ -99,28 +99,28 @@ constexpr bool spanToST(OpenShock::StringView str, T& val) {
 using namespace OpenShock;
 
 // Specific converters
-bool IntConv::stoi8(OpenShock::StringView str, int8_t& val) {
+bool IntConv::stoi8(std::string_view str, int8_t& val) {
   return spanToST(str, val);
 }
-bool IntConv::stou8(OpenShock::StringView str, uint8_t& val) {
+bool IntConv::stou8(std::string_view str, uint8_t& val) {
   return spanToUT(str, val);
 }
-bool IntConv::stoi16(OpenShock::StringView str, int16_t& val) {
+bool IntConv::stoi16(std::string_view str, int16_t& val) {
   return spanToST(str, val);
 }
-bool IntConv::stou16(OpenShock::StringView str, uint16_t& val) {
+bool IntConv::stou16(std::string_view str, uint16_t& val) {
   return spanToUT(str, val);
 }
-bool IntConv::stoi32(OpenShock::StringView str, int32_t& val) {
+bool IntConv::stoi32(std::string_view str, int32_t& val) {
   return spanToST(str, val);
 }
-bool IntConv::stou32(OpenShock::StringView str, uint32_t& val) {
+bool IntConv::stou32(std::string_view str, uint32_t& val) {
   return spanToUT(str, val);
 }
-bool IntConv::stoi64(OpenShock::StringView str, int64_t& val) {
+bool IntConv::stoi64(std::string_view str, int64_t& val) {
   return spanToST(str, val);
 }
-bool IntConv::stou64(OpenShock::StringView str, uint64_t& val) {
+bool IntConv::stou64(std::string_view str, uint64_t& val) {
   return spanToUT(str, val);
 }
 

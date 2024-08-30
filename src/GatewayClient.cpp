@@ -64,7 +64,7 @@ void GatewayClient::disconnect() {
   m_webSocket.disconnect();
 }
 
-bool GatewayClient::sendMessageTXT(StringView data) {
+bool GatewayClient::sendMessageTXT(std::string_view data) {
   if (m_state != State::Connected) {
     return false;
   }

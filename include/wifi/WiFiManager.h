@@ -1,10 +1,10 @@
 #pragma once
 
 #include "wifi/WiFiNetwork.h"
-#include "StringView.h"
 
 #include <cstdint>
 #include <string>
+#include <string_view>
 #include <vector>
 
 namespace OpenShock::WiFiManager {
@@ -16,7 +16,7 @@ namespace OpenShock::WiFiManager {
   /// @param ssid SSID of the network
   /// @param password Password of the network
   /// @return True if the network was saved successfully
-  bool Save(const char* ssid, StringView password);
+  bool Save(const char* ssid, std::string_view password);
 
   /// @brief Removes a network from the config by it's SSID
   /// @param ssid SSID of the network

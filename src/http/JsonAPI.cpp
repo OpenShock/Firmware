@@ -5,14 +5,14 @@
 
 using namespace OpenShock;
 
-HTTP::Response<Serialization::JsonAPI::AccountLinkResponse> HTTP::JsonAPI::LinkAccount(const char* accountLinkCode) {
+HTTP::Response<Serialization::JsonAPI::AccountLinkResponse> HTTP::JsonAPI::LinkAccount(std::string_view accountLinkCode) {
   std::string domain;
   if (!Config::GetBackendDomain(domain)) {
     return {HTTP::RequestResult::InternalError, 0, {}};
   }
 
   char uri[OPENSHOCK_URI_BUFFER_SIZE];
-  sprintf(uri, "https://%s/1/device/pair/%s", domain.c_str(), accountLinkCode);
+  sprintf(uri, "https://%s/1/device/pair/%.*s", domain.c_str(), accountLinkCode.length(), accountLinkCode.data());
 
   return HTTP::GetJSON<Serialization::JsonAPI::AccountLinkResponse>(
     uri,
@@ -24,7 +24,7 @@ HTTP::Response<Serialization::JsonAPI::AccountLinkResponse> HTTP::JsonAPI::LinkA
   );
 }
 
-HTTP::Response<Serialization::JsonAPI::DeviceInfoResponse> HTTP::JsonAPI::GetDeviceInfo(StringView deviceToken) {
+HTTP::Response<Serialization::JsonAPI::DeviceInfoResponse> HTTP::JsonAPI::GetDeviceInfo(std::string_view deviceToken) {
   std::string domain;
   if (!Config::GetBackendDomain(domain)) {
     return {HTTP::RequestResult::InternalError, 0, {}};
@@ -44,7 +44,7 @@ HTTP::Response<Serialization::JsonAPI::DeviceInfoResponse> HTTP::JsonAPI::GetDev
   );
 }
 
-HTTP::Response<Serialization::JsonAPI::AssignLcgResponse> HTTP::JsonAPI::AssignLcg(StringView deviceToken) {
+HTTP::Response<Serialization::JsonAPI::AssignLcgResponse> HTTP::JsonAPI::AssignLcg(std::string_view deviceToken) {
   std::string domain;
   if (!Config::GetBackendDomain(domain)) {
     return {HTTP::RequestResult::InternalError, 0, {}};

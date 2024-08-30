@@ -11,7 +11,6 @@ const char* const TAG = "OtaUpdateManager";
 #include "Logging.h"
 #include "SemVer.h"
 #include "serialization/WSGateway.h"
-#include "StringView.h"
 #include "Time.h"
 #include "util/HexUtils.h"
 #include "util/PartitionUtils.h"
@@ -26,6 +25,7 @@ const char* const TAG = "OtaUpdateManager";
 #include <WiFi.h>
 
 #include <sstream>
+#include <string_view>
 
 #define OPENSHOCK_FW_CDN_CHANNEL_URL(ch) OPENSHOCK_FW_CDN_URL("/version-" ch ".txt")
 
@@ -116,7 +116,7 @@ bool _sendProgressMessage(Serialization::Gateway::OtaInstallProgressTask task, f
 
   return true;
 }
-bool _sendFailureMessage(StringView message, bool fatal = false) {
+bool _sendFailureMessage(std::string_view message, bool fatal = false) {
   int32_t updateId;
   if (!Config::GetOtaUpdateId(updateId)) {
     ESP_LOGE(TAG, "Failed to get OTA update ID");
@@ -131,7 +131,7 @@ bool _sendFailureMessage(StringView message, bool fatal = false) {
   return true;
 }
 
-bool _flashAppPartition(const esp_partition_t* partition, StringView remoteUrl, const uint8_t (&remoteHash)[32]) {
+bool _flashAppPartition(const esp_partition_t* partition, std::string_view remoteUrl, const uint8_t (&remoteHash)[32]) {
   ESP_LOGD(TAG, "Flashing app partition");
 
   if (!_sendProgressMessage(Serialization::Gateway::OtaInstallProgressTask::FlashingApplication, 0.0f)) {
@@ -166,7 +166,7 @@ bool _flashAppPartition(const esp_partition_t* partition, StringView remoteUrl, 
   return true;
 }
 
-bool _flashFilesystemPartition(const esp_partition_t* parition, StringView remoteUrl, const uint8_t (&remoteHash)[32]) {
+bool _flashFilesystemPartition(const esp_partition_t* parition, std::string_view remoteUrl, const uint8_t (&remoteHash)[32]) {
   if (!_sendProgressMessage(Serialization::Gateway::OtaInstallProgressTask::PreparingForInstall, 0.0f)) {
     return false;
   }
@@ -393,7 +393,7 @@ void _otaUpdateTask(void* arg) {
   esp_restart();
 }
 
-bool _tryGetStringList(StringView url, std::vector<std::string>& list) {
+bool _tryGetStringList(std::string_view url, std::vector<std::string>& list) {
   auto response = OpenShock::HTTP::GetString(
     url,
     {
@@ -408,7 +408,7 @@ bool _tryGetStringList(StringView url, std::vector<std::string>& list) {
 
   list.clear();
 
-  OpenShock::StringView data = response.data;
+  std::string_view data = response.data;
 
   auto lines = data.splitLines();
   list.reserve(lines.size());
@@ -416,7 +416,7 @@ bool _tryGetStringList(StringView url, std::vector<std::string>& list) {
   for (auto line : lines) {
     line = line.trim();
 
-    if (line.isNullOrEmpty()) {
+    if (line.empty()) {
       continue;
     }
 
@@ -483,16 +483,16 @@ bool OtaUpdateManager::Init() {
 }
 
 bool OtaUpdateManager::TryGetFirmwareVersion(OtaUpdateChannel channel, OpenShock::SemVer& version) {
-  StringView channelIndexUrl;
+  std::string_view channelIndexUrl;
   switch (channel) {
     case OtaUpdateChannel::Stable:
-      channelIndexUrl = StringView(OPENSHOCK_FW_CDN_STABLE_URL);
+      channelIndexUrl = std::string_view(OPENSHOCK_FW_CDN_STABLE_URL);
       break;
     case OtaUpdateChannel::Beta:
-      channelIndexUrl = StringView(OPENSHOCK_FW_CDN_BETA_URL);
+      channelIndexUrl = std::string_view(OPENSHOCK_FW_CDN_BETA_URL);
       break;
     case OtaUpdateChannel::Develop:
-      channelIndexUrl = StringView(OPENSHOCK_FW_CDN_DEVELOP_URL);
+      channelIndexUrl = std::string_view(OPENSHOCK_FW_CDN_DEVELOP_URL);
       break;
     default:
       ESP_LOGE(TAG, "Unknown channel: %u", channel);
@@ -538,7 +538,7 @@ bool OtaUpdateManager::TryGetFirmwareBoards(const OpenShock::SemVer& version, st
   return true;
 }
 
-bool _tryParseIntoHash(StringView hash, uint8_t (&hashBytes)[32]) {
+bool _tryParseIntoHash(std::string_view hash, uint8_t (&hashBytes)[32]) {
   if (!HexUtils::TryParseHex(hash.data(), hash.size(), hashBytes, 32)) {
     ESP_LOGE(TAG, "Failed to parse hash: %.*s", hash.size(), hash.data());
     return false;
@@ -580,11 +580,11 @@ bool OtaUpdateManager::TryGetFirmwareRelease(const OpenShock::SemVer& version, F
     return false;
   }
 
-  auto hashesLines = OpenShock::StringView(sha256HashesResponse.data).splitLines();
+  auto hashesLines = std::string_view(sha256HashesResponse.data).splitLines();
 
   // Parse hashes.
   bool foundAppHash = false, foundFilesystemHash = false;
-  for (OpenShock::StringView line : hashesLines) {
+  for (std::string_view line : hashesLines) {
     auto parts = line.splitWhitespace();
     if (parts.size() != 2) {
       ESP_LOGE(TAG, "Invalid hashes entry: %.*s", line.size(), line.data());

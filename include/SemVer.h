@@ -1,8 +1,8 @@
 #pragma once
 
-#include "StringView.h"
-
 #include <cstdint>
+#include <string>
+#include <string_view>
 
 namespace OpenShock {
   struct SemVer {
@@ -72,5 +72,5 @@ namespace OpenShock {
     std::string toString() const;
   };
 
-  bool TryParseSemVer(StringView str, SemVer& out);
-} // namespace OpenShock
+  bool TryParseSemVer(std::string_view str, SemVer& out);
+}  // namespace OpenShock
