@@ -8,6 +8,7 @@ const char* const TAG = "EStopManager";
 #include "config/Config.h"
 #include "Logging.h"
 #include "Time.h"
+#include "util/TaskUtils.h"
 #include "VisualStateManager.h"
 
 #include <driver/gpio.h>
@@ -146,7 +147,7 @@ void EStopManager::Init() {
     ESP_PANIC(TAG, "Failed to add EStop ISR handler");
   }
 
-  if (xTaskCreate(_estopEventHandler, TAG, 4096, nullptr, 5, &s_estopEventHandlerTask) != pdPASS) {
+  if (TaskUtils::TaskCreateUniversal(_estopEventHandler, TAG, 4096, nullptr, 5, &s_estopEventHandlerTask, 1) != pdPASS) {
     ESP_PANIC(TAG, "Failed to create EStop event handler task");
   }
 

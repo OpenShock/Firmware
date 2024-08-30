@@ -9,6 +9,7 @@ const char* const TAG = "RFTransmitter";
 #include "Logging.h"
 #include "radio/rmt/MainEncoder.h"
 #include "Time.h"
+#include "util/FnProxy.h"
 #include "util/TaskUtils.h"
 
 #include <freertos/queue.h>
@@ -52,7 +53,7 @@ RFTransmitter::RFTransmitter(uint8_t gpioPin) : m_txPin(gpioPin), m_rmtHandle(nu
   char name[32];
   snprintf(name, sizeof(name), "RFTransmitter-%u", m_txPin);
 
-  if (TaskUtils::TaskCreateExpensive(TransmitTask, name, RFTRANSMITTER_TASK_STACK_SIZE, this, RFTRANSMITTER_TASK_PRIORITY, &m_taskHandle) != pdPASS) {
+  if (TaskUtils::TaskCreateExpensive(&Util::FnProxy<&RFTransmitter::TransmitTask>, name, RFTRANSMITTER_TASK_STACK_SIZE, this, RFTRANSMITTER_TASK_PRIORITY, &m_taskHandle) != pdPASS) {
     ESP_LOGE(TAG, "[pin-%u] Failed to create task", m_txPin);
     destroy();
     return;
@@ -130,19 +131,14 @@ void RFTransmitter::destroy() {
   }
 }
 
-void RFTransmitter::TransmitTask(void* arg) {
-  RFTransmitter* transmitter = reinterpret_cast<RFTransmitter*>(arg);
-  uint8_t m_txPin       = transmitter->m_txPin;  // This must be defined here, because the THIS_LOG macro uses it
-  rmt_obj_t* rmtHandle       = transmitter->m_rmtHandle;
-  QueueHandle_t queueHandle  = transmitter->m_queueHandle;
-
+void RFTransmitter::TransmitTask() {
   ESP_LOGD(TAG, "[pin-%u] RMT loop running on core %d", m_txPin, xPortGetCoreID());
 
   std::vector<command_t*> commands;
   while (true) {
     // Receive commands
     command_t* cmd = nullptr;
-    while (xQueueReceive(queueHandle, &cmd, commands.empty() ? portMAX_DELAY : 0) == pdTRUE) {
+    while (xQueueReceive(m_queueHandle, &cmd, commands.empty() ? portMAX_DELAY : 0) == pdTRUE) {
       if (cmd == nullptr) {
         ESP_LOGD(TAG, "[pin-%u] Received nullptr (stop command), cleaning up...", m_txPin);
 
@@ -203,10 +199,10 @@ void RFTransmitter::TransmitTask(void* arg) {
       if (expired || empty) {
         // If the command is not empty, send the zero sequence to stop the shocker
         if (!empty) {
-          rmtWriteBlocking(rmtHandle, cmd->zeroSequence.data(), cmd->zeroSequence.size());
+          rmtWriteBlocking(m_rmtHandle, cmd->zeroSequence.data(), cmd->zeroSequence.size());
         }
 
-        if(cmd->until + TRANSMIT_END_DURATION < OpenShock::millis()) {
+        if (cmd->until + TRANSMIT_END_DURATION < OpenShock::millis()) {
           // Remove the command and move to the next one
           it = commands.erase(it);
           delete cmd;
@@ -216,7 +212,7 @@ void RFTransmitter::TransmitTask(void* arg) {
         }
       } else {
         // Send the command
-        rmtWriteBlocking(rmtHandle, cmd->sequence.data(), cmd->sequence.size());
+        rmtWriteBlocking(m_rmtHandle, cmd->sequence.data(), cmd->sequence.size());
 
         // Move to the next command
         ++it;
