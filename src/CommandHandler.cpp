@@ -2,6 +2,8 @@
 
 #include "CommandHandler.h"
 
+const char* const TAG = "CommandHandler";
+
 #include "Chipset.h"
 #include "Common.h"
 #include "config/Config.h"
@@ -15,8 +17,6 @@
 
 #include <memory>
 #include <unordered_map>
-
-const char* const TAG = "CommandHandler";
 
 const int64_t KEEP_ALIVE_INTERVAL  = 60'000;
 const uint16_t KEEP_ALIVE_DURATION = 300;

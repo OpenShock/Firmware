@@ -1,9 +1,9 @@
 #include "config/BackendConfig.h"
 
+const char* const TAG = "Config::BackendConfig";
+
 #include "config/internal/utils.h"
 #include "Logging.h"
-
-const char* const TAG = "Config::BackendConfig";
 
 using namespace OpenShock::Config;
 

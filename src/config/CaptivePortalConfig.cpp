@@ -1,9 +1,9 @@
 #include "config/CaptivePortalConfig.h"
 
+const char* const TAG = "Config::CaptivePortalConfig";
+
 #include "config/internal/utils.h"
 #include "Logging.h"
-
-const char* const TAG = "Config::CaptivePortalConfig";
 
 using namespace OpenShock::Config;
 

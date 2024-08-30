@@ -1,8 +1,8 @@
 #include "event_handlers/impl/WSLocal.h"
 
-#include "Logging.h"
-
 const char* const TAG = "LocalMessageHandlers";
+
+#include "Logging.h"
 
 using namespace OpenShock::MessageHandlers::Local;
 

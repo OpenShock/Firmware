@@ -1,8 +1,8 @@
 #include "SemVer.h"
 
-#include "Logging.h"
-
 const char* const TAG = "SemVer";
+
+#include "Logging.h"
 
 using namespace OpenShock;
 

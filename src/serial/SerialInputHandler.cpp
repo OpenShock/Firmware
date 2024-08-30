@@ -1,17 +1,19 @@
 #include "serial/SerialInputHandler.h"
 
+const char* const TAG = "SerialInputHandler";
+
 #include "Chipset.h"
 #include "CommandHandler.h"
 #include "config/Config.h"
 #include "config/SerialInputConfig.h"
 #include "FormatHelpers.h"
 #include "http/HTTPRequestManager.h"
+#include "intconv.h"
 #include "Logging.h"
 #include "serialization/JsonAPI.h"
 #include "serialization/JsonSerial.h"
 #include "StringView.h"
 #include "Time.h"
-#include "intconv.h"
 #include "util/Base64Utils.h"
 #include "wifi/WiFiManager.h"
 
@@ -21,8 +23,6 @@
 #include <unordered_map>
 
 #include <cstring>
-
-const char* const TAG = "SerialInputHandler";
 
 #define SERPR_SYS(format, ...)      Serial.printf("$SYS$|" format "\n", ##__VA_ARGS__)
 #define SERPR_RESPONSE(format, ...) SERPR_SYS("Response|" format, ##__VA_ARGS__)

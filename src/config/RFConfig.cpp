@@ -1,10 +1,10 @@
 #include "config/RFConfig.h"
 
-#include "config/internal/utils.h"
-#include "Common.h"
-#include "Logging.h"
-
 const char* const TAG = "Config::RFConfig";
+
+#include "Common.h"
+#include "config/internal/utils.h"
+#include "Logging.h"
 
 using namespace OpenShock::Config;
 

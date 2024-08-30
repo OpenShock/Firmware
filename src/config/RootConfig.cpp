@@ -1,8 +1,8 @@
 #include "config/RootConfig.h"
 
-#include "Logging.h"
-
 const char* const TAG = "Config::RootConfig";
+
+#include "Logging.h"
 
 using namespace OpenShock::Config;
 

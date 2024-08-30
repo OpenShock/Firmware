@@ -2,10 +2,10 @@
 
 #include "PinPatternManager.h"
 
+const char* const TAG = "PinPatternManager";
+
 #include "Chipset.h"
 #include "Logging.h"
-
-const char* const TAG = "PinPatternManager";
 
 using namespace OpenShock;
 

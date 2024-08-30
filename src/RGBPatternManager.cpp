@@ -2,13 +2,13 @@
 
 #include "RGBPatternManager.h"
 
+const char* const TAG = "RGBPatternManager";
+
 #include "Chipset.h"
 #include "Logging.h"
 #include "util/TaskUtils.h"
 
 #include <array>
-
-const char* const TAG = "RGBPatternManager";
 
 using namespace OpenShock;
 

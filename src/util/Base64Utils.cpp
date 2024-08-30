@@ -1,10 +1,10 @@
 #include "util/Base64Utils.h"
 
+const char* const TAG = "Base64Utils";
+
 #include "Logging.h"
 
 #include <mbedtls/base64.h>
-
-const char* const TAG = "Base64Utils";
 
 using namespace OpenShock;
 

@@ -2,6 +2,8 @@
 
 #include "EStopManager.h"
 
+const char* const TAG = "EStopManager";
+
 #include "CommandHandler.h"
 #include "config/Config.h"
 #include "Logging.h"
@@ -10,8 +12,6 @@
 
 #include <driver/gpio.h>
 #include <freertos/timers.h>
-
-const char* const TAG = "EStopManager";
 
 using namespace OpenShock;
 
