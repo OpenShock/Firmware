@@ -6,8 +6,6 @@
 #include "Time.h"
 #include "util/HexUtils.h"
 
-#include <esp_log.h>
-
 const char* const TAG = "PartitionUtils";
 
 bool OpenShock::TryGetPartitionHash(const esp_partition_t* partition, char (&hash)[65]) {
