@@ -11,7 +11,7 @@
 #include <vector>
 
 namespace OpenShock::OtaUpdateManager {
-  bool Init();
+  [[nodiscard]] bool Init();
 
   struct FirmwareRelease {
     std::string appBinaryUrl;

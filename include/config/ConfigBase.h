@@ -9,11 +9,11 @@ namespace OpenShock::Config {
   struct ConfigBase {
     virtual void ToDefault() = 0;
 
-    virtual bool FromFlatbuffers(const T* config)                                                                       = 0;
-    virtual flatbuffers::Offset<T> ToFlatbuffers(flatbuffers::FlatBufferBuilder& builder, bool withSensitiveData) const = 0;
+    virtual bool FromFlatbuffers(const T* config)                                                                                     = 0;
+    [[nodiscard]] virtual flatbuffers::Offset<T> ToFlatbuffers(flatbuffers::FlatBufferBuilder& builder, bool withSensitiveData) const = 0;
 
-    virtual bool FromJSON(const cJSON* json)            = 0;
-    virtual cJSON* ToJSON(bool withSensitiveData) const = 0;
+    virtual bool FromJSON(const cJSON* json)                          = 0;
+    [[nodiscard]] virtual cJSON* ToJSON(bool withSensitiveData) const = 0;
   };
 
 }  // namespace OpenShock::Config

@@ -8,7 +8,7 @@
 #include <functional>
 
 namespace OpenShock::WiFiScanManager {
-  bool Init();
+  [[nodiscard]] bool Init();
 
   bool IsScanning();
 

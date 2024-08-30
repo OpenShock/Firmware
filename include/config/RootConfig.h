@@ -20,9 +20,9 @@ namespace OpenShock::Config {
     void ToDefault() override;
 
     bool FromFlatbuffers(const Serialization::Configuration::HubConfig* config) override;
-    flatbuffers::Offset<Serialization::Configuration::HubConfig> ToFlatbuffers(flatbuffers::FlatBufferBuilder& builder, bool withSensitiveData) const override;
+    [[nodiscard]] flatbuffers::Offset<Serialization::Configuration::HubConfig> ToFlatbuffers(flatbuffers::FlatBufferBuilder& builder, bool withSensitiveData) const override;
 
     bool FromJSON(const cJSON* json) override;
-    cJSON* ToJSON(bool withSensitiveData) const override;
+    [[nodiscard]] cJSON* ToJSON(bool withSensitiveData) const override;
   };
 }  // namespace OpenShock::Config
