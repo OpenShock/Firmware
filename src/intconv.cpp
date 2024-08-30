@@ -24,11 +24,13 @@ constexpr bool spanToT(OpenShock::StringView str, T& val) {
   static_assert(std::is_integral<T>::value);
   const T Threshold = std::numeric_limits<T>::max() / 10;
 
-  if (str.isNullOrEmpty()) {
-    return false;
+  val = 0;
+
+  // Special case for zero, also handles leading zeros
+  if (str.front() == '0') {
+    return str.length() == 1;
   }
 
-  val = 0;
   for (char c : str) {
     if (c < '0' || c > '9') {
       return false;
@@ -56,7 +58,7 @@ template<typename T>
 constexpr bool spanToUT(OpenShock::StringView str, T& val) {
   static_assert(std::is_unsigned<T>::value);
 
-  if (str.length() > NumDigits<T>()) {
+  if (str.isNullOrEmpty() || str.length() > NumDigits<T>()) {
     return false;
   }
 
@@ -75,6 +77,9 @@ constexpr bool spanToST(OpenShock::StringView str, T& val) {
   bool negative = str.front() == '-';
   if (negative) {
     str = str.substr(1);
+    if (str.isNullOrEmpty()) {
+      return false;
+    }
   }
 
   typename std::make_unsigned<T>::type i = 0;
@@ -88,7 +93,7 @@ constexpr bool spanToST(OpenShock::StringView str, T& val) {
 
   val = negative ? -static_cast<T>(i) : static_cast<T>(i);
 
-  return true;
+  return !(negative && i == 0);  // "-0" is invalid
 }
 
 using namespace OpenShock;
@@ -283,6 +288,13 @@ constexpr bool test_spanToSTJustNegativeSign() {
 
 static_assert(test_spanToSTJustNegativeSign(), "test_spanToSTJustNegativeSign failed");
 
+constexpr bool test_spanToSTNegativeZero() {
+  int32_t i32 = 0;
+  return !spanToST("-0"_sv, i32);  // Negative zero
+}
+
+static_assert(test_spanToSTNegativeZero(), "test_spanToSTNegativeZero failed");
+
 constexpr bool test_spanToSTInvalidCharacter() {
   int32_t i32 = 0;
   return !spanToST("+123"_sv, i32);  // Invalid character
@@ -296,3 +308,17 @@ constexpr bool test_spanToSTLeadingSpace() {
 }
 
 static_assert(test_spanToSTLeadingSpace(), "test_spanToSTLeadingSpace failed");
+
+constexpr bool test_spanToSTTrailingSpace() {
+  int64_t i64 = 0;
+  return !spanToST("123 "_sv, i64);  // Trailing space
+}
+
+static_assert(test_spanToSTTrailingSpace(), "test_spanToSTTrailingSpace failed");
+
+constexpr bool test_spanToSTLeadingZero() {
+  int64_t i64 = 0;
+  return !spanToST("0123"_sv, i64);  // Leading zero
+}
+
+static_assert(test_spanToSTLeadingZero(), "test_spanToSTLeadingZero failed");
