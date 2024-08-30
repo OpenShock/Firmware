@@ -25,7 +25,7 @@ constexpr bool spanToT(OpenShock::StringView str, T& val) {
   static_assert(std::is_integral<T>::value);
   const T Threshold = std::numeric_limits<T>::max() / 10;
 
-  if (str.Empty()) {
+  if (str.isNullOrEmpty()) {
     return false;
   }
 
@@ -69,7 +69,7 @@ template <typename T>
 constexpr bool spanToST(OpenShock::StringView str, T& val) {
     static_assert(std::is_signed<T>::value);
 
-    if (str.Empty() || str.length() > NumDigits<T>()) {
+    if (str.isNullOrEmpty() || str.length() > NumDigits<T>()) {
         return false;
     }
 
