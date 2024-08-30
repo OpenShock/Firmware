@@ -2,6 +2,8 @@
 
 #include "radio/RFTransmitter.h"
 
+const char* const TAG = "RFTransmitter";
+
 #include "EStopManager.h"
 
 #include "Logging.h"
@@ -10,8 +12,6 @@
 #include "util/TaskUtils.h"
 
 #include <freertos/queue.h>
-
-const char* const TAG = "RFTransmitter";
 
 const UBaseType_t RFTRANSMITTER_QUEUE_SIZE        = 64;
 const BaseType_t RFTRANSMITTER_TASK_PRIORITY      = 1;

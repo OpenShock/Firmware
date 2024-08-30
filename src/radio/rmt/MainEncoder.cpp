@@ -1,13 +1,13 @@
 #include "radio/rmt/MainEncoder.h"
 
+const char* const TAG = "RmtMainEncoder";
+
 #include "Logging.h"
 #include "radio/rmt/CaiXianlinEncoder.h"
-#include "radio/rmt/PetrainerEncoder.h"
 #include "radio/rmt/Petrainer998DREncoder.h"
+#include "radio/rmt/PetrainerEncoder.h"
 
 #include <unordered_map>
-
-const char* const TAG = "RmtMainEncoder";
 
 using namespace OpenShock;
 

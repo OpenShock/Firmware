@@ -1,11 +1,14 @@
 #include "serial/SerialInputHandler.h"
 
+const char* const TAG = "SerialInputHandler";
+
 #include "Chipset.h"
 #include "CommandHandler.h"
 #include "config/Config.h"
 #include "config/SerialInputConfig.h"
 #include "FormatHelpers.h"
 #include "http/HTTPRequestManager.h"
+#include "intconv.h"
 #include "Logging.h"
 #include "serialization/JsonAPI.h"
 #include "serialization/JsonSerial.h"
@@ -20,8 +23,6 @@
 #include <unordered_map>
 
 #include <cstring>
-
-const char* const TAG = "SerialInputHandler";
 
 #define SERPR_SYS(format, ...)      Serial.printf("$SYS$|" format "\n", ##__VA_ARGS__)
 #define SERPR_RESPONSE(format, ...) SERPR_SYS("Response|" format, ##__VA_ARGS__)
@@ -107,20 +108,12 @@ void _handleRfTxPinCommand(StringView arg) {
     return;
   }
 
-  auto str = arg.toString(); // Copy the string to null-terminate it (VERY IMPORTANT)
-
-  unsigned int pin;
-  if (sscanf(str.c_str(), "%u", &pin) != 1) {
-    SERPR_ERROR("Invalid argument (not a number)");
-    return;
+  uint8_t pin;
+  if (!OpenShock::IntConv::stou8(arg, pin)) {
+    SERPR_ERROR("Invalid argument (number invalid or out of range)");
   }
 
-  if (pin > UINT8_MAX) {
-    SERPR_ERROR("Invalid argument (out of range)");
-    return;
-  }
-
-  OpenShock::SetRfPinResultCode result = OpenShock::CommandHandler::SetRfTxPin(static_cast<uint8_t>(pin));
+  OpenShock::SetRfPinResultCode result = OpenShock::CommandHandler::SetRfTxPin(pin);
 
   switch (result) {
     case OpenShock::SetRfPinResultCode::InvalidPin:

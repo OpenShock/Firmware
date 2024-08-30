@@ -1,8 +1,8 @@
 #include "config/internal/utils.h"
 
-#include "Logging.h"
-
 const char* const TAG = "Config::Internal::Utils";
+
+#include "Logging.h"
 
 using namespace OpenShock;
 

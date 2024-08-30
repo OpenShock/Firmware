@@ -2,13 +2,13 @@
 
 #include "visual/RgbLedDriver.h"
 
+const char* const TAG = "RGBLedDriver";
+
 #include "Chipset.h"
 #include "Logging.h"
 #include "util/TaskUtils.h"
 
 #include <array>
-
-const char* const TAG = "RgbLedDriver";
 
 using namespace OpenShock;
 
@@ -90,7 +90,7 @@ void RgbLedDriver::RunPattern(void* arg) {
   RgbLedDriver* thisPtr = reinterpret_cast<RgbLedDriver*>(arg);
 
   rmt_obj_t* rmtHandle           = thisPtr->m_rmtHandle;
-  uint8_t brightness        = thisPtr->m_brightness;
+  uint8_t brightness             = thisPtr->m_brightness;
   std::vector<RGBState>& pattern = thisPtr->m_pattern;
 
   std::array<rmt_data_t, 24> led_data;  // 24 bits per LED (8 bits per color * 3 colors)

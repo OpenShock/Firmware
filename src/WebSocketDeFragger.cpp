@@ -1,10 +1,10 @@
 #include "WebSocketDeFragger.h"
 
+const char* const TAG = "WebSocketDeFragger";
+
 #include "Logging.h"
 
 #include <cstring>
-
-const char* const TAG = "WebSocketDeFragger";
 
 using namespace OpenShock;
 

@@ -1,9 +1,9 @@
 #include "config/SerialInputConfig.h"
 
+const char* const TAG = "Config::SerialInputConfig";
+
 #include "config/internal/utils.h"
 #include "Logging.h"
-
-const char* const TAG = "Config::SerialInputConfig";
 
 using namespace OpenShock::Config;
 

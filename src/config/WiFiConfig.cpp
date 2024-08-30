@@ -1,9 +1,9 @@
 #include "config/WiFiConfig.h"
 
+const char* const TAG = "Config::WiFiConfig";
+
 #include "config/internal/utils.h"
 #include "Logging.h"
-
-const char* const TAG = "Config::WiFiConfig";
 
 using namespace OpenShock::Config;
 

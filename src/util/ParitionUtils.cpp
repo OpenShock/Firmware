@@ -1,13 +1,12 @@
 #include "util/PartitionUtils.h"
 
+const char* const TAG = "PartitionUtils";
+
 #include "Hashing.h"
 #include "http/HTTPRequestManager.h"
+#include "Logging.h"
 #include "Time.h"
 #include "util/HexUtils.h"
-
-#include <esp_log.h>
-
-const char* const TAG = "PartitionUtils";
 
 bool OpenShock::TryGetPartitionHash(const esp_partition_t* partition, char (&hash)[65]) {
   uint8_t buffer[32];

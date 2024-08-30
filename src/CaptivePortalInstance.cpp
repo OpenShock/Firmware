@@ -2,6 +2,8 @@
 
 #include "CaptivePortalInstance.h"
 
+const char* const TAG = "CaptivePortalInstance";
+
 #include "CommandHandler.h"
 #include "event_handlers/WebSocket.h"
 #include "GatewayConnectionManager.h"
@@ -15,8 +17,6 @@
 #include "serialization/_fbs/HubToLocalMessage_generated.h"
 
 #include <WiFi.h>
-
-static const char* TAG = "CaptivePortalInstance";
 
 const uint16_t HTTP_PORT                 = 80;
 const uint16_t WEBSOCKET_PORT            = 81;

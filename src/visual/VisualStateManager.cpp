@@ -1,5 +1,7 @@
 #include "visual/VisualStateManager.h"
 
+const char* const TAG = "VisualStateManager";
+
 #include "Logging.h"
 #include "visual/MonoLedDriver.h"
 #include "visual/RgbLedDriver.h"
@@ -7,8 +9,6 @@
 #include <WiFi.h>
 
 #include <memory>
-
-const char* const TAG = "VisualStateManager";
 
 const uint64_t kCriticalErrorFlag                = 1 << 0;
 const uint64_t kEmergencyStoppedFlag             = 1 << 1;

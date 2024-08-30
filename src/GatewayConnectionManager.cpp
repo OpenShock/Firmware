@@ -1,5 +1,7 @@
 #include "GatewayConnectionManager.h"
 
+const char* const TAG = "GatewayConnectionManager";
+
 #include "visual/VisualStateManager.h"
 
 #include "config/Config.h"
@@ -24,8 +26,7 @@
 //
 #warning SSL certificate verification is currently not implemented, by RFC definition this is a security risk, and allows for MITM attacks, but the realistic risk is low
 
-static const char* const TAG             = "GatewayConnectionManager";
-static const char* const AUTH_TOKEN_FILE = "/authToken";
+const char* const AUTH_TOKEN_FILE = "/authToken";
 
 const uint8_t FLAG_NONE   = 0;
 const uint8_t FLAG_HAS_IP = 1 << 0;
@@ -33,7 +34,7 @@ const uint8_t FLAG_LINKED = 1 << 1;
 
 const uint8_t LINK_CODE_LENGTH = 6;
 
-static uint8_t s_flags                                 = 0;
+static uint8_t s_flags                                      = 0;
 static std::unique_ptr<OpenShock::GatewayClient> s_wsClient = nullptr;
 
 void _evGotIPHandler(arduino_event_t* event) {

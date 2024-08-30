@@ -1,5 +1,7 @@
 #include "GatewayClient.h"
 
+const char* const TAG = "GatewayClient";
+
 #include "Common.h"
 #include "config/Config.h"
 #include "event_handlers/WebSocket.h"
@@ -9,8 +11,6 @@
 #include "Time.h"
 #include "util/CertificateUtils.h"
 #include "visual/VisualStateManager.h"
-
-const char* const TAG = "GatewayClient";
 
 using namespace OpenShock;
 

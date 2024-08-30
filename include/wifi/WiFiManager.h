@@ -10,7 +10,7 @@
 namespace OpenShock::WiFiManager {
   /// @brief Initializes the WiFiManager
   /// @return True if the WiFiManager was initialized successfully
-  bool Init();
+  [[nodiscard]] bool Init();
 
   /// @brief Saves a network to the config
   /// @param ssid SSID of the network

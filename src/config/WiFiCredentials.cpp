@@ -1,10 +1,10 @@
 #include "config/WiFiCredentials.h"
 
+const char* const TAG = "Config::WiFiCredentials";
+
 #include "config/internal/utils.h"
 #include "Logging.h"
 #include "util/HexUtils.h"
-
-const char* const TAG = "Config::WiFiCredentials";
 
 using namespace OpenShock::Config;
 

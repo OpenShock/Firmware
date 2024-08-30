@@ -1,12 +1,12 @@
 #include "wifi/WiFiScanManager.h"
 
+const char* const TAG = "WiFiScanManager";
+
 #include "Logging.h"
 
 #include <WiFi.h>
 
 #include <map>
-
-const char* const TAG = "WiFiScanManager";
 
 const uint8_t OPENSHOCK_WIFI_SCAN_MAX_CHANNEL         = 13;
 const uint32_t OPENSHOCK_WIFI_SCAN_MAX_MS_PER_CHANNEL = 300;  // Adjusting this value will affect the scan rate, but may also affect the scan results
