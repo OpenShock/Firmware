@@ -188,7 +188,7 @@ static_assert(test_spanToUT64Overflow(), "test_spanToUT64Overflow failed");
 
 constexpr bool test_spanToST8() {
     int8_t i8 = 0;
-    return spanToST("-128"_sv, i8) && i8 == -128;
+    return spanToST("-127"_sv, i8) && i8 == -127;
 }
 
 static_assert(test_spanToST8(), "test_spanToST8 failed");
@@ -202,7 +202,7 @@ static_assert(test_spanToST16(), "test_spanToST16 failed");
 
 constexpr bool test_spanToST32() {
     int32_t i32 = 0;
-    return spanToST("-2147483648"_sv, i32) && i32 == -2147483648;
+    return spanToST("-2147483647"_sv, i32) && i32 == -2147483647;
 }
 
 static_assert(test_spanToST32(), "test_spanToST32 failed");
@@ -216,7 +216,7 @@ static_assert(test_spanToST64(), "test_spanToST64 failed");
 
 constexpr bool test_spanToST8Underflow() {
     int8_t i8 = 0;
-    return !spanToST("-129"_sv, i8);  // Underflow
+    return !spanToST("-128"_sv, i8);  // Underflow
 }
 
 static_assert(test_spanToST8Underflow(), "test_spanToST8Underflow failed");
