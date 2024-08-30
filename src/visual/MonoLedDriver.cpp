@@ -5,6 +5,7 @@ const char* const TAG = "MonoLedDriver";
 #include "Chipset.h"
 #include "Logging.h"
 #include "util/FnProxy.h"
+#include "util/TaskUtils.h"
 
 #include <driver/ledc.h>
 
@@ -71,7 +72,7 @@ void MonoLedDriver::SetPattern(const State* pattern, std::size_t patternLength) 
   snprintf(name, sizeof(name), "MonoLedDriver-%d", m_gpioPin);
 
   // Start the task
-  BaseType_t result = xTaskCreate(&Util::FnProxy<&MonoLedDriver::RunPattern>, name, 1024, this, 1, &m_taskHandle);  // PROFILED: 0.5KB stack usage
+  BaseType_t result = TaskUtils::TaskCreateUniversal(&Util::FnProxy<&MonoLedDriver::RunPattern>, name, 1024, this, 1, &m_taskHandle, 1);  // PROFILED: 0.5KB stack usage
   if (result != pdPASS) {
     ESP_LOGE(TAG, "[pin-%u] Failed to create task: %d", m_gpioPin, result);
 
