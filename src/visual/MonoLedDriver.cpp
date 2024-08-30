@@ -1,11 +1,11 @@
 #include "visual/MonoLedDriver.h"
 
+const char* const TAG = "MonoLedDriver";
+
 #include "Chipset.h"
 #include "Logging.h"
 
 #include <driver/ledc.h>
-
-const char* const TAG = "MonoLedDriver";
 
 #define OS_LEDC_TIMER      LEDC_TIMER_0
 #define OS_LEDC_SPEED      LEDC_HIGH_SPEED_MODE  // Work is offloaded to hardware ASIC instead of CPU
