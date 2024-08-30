@@ -41,7 +41,7 @@ namespace OpenShock {
 
   private:
     void ClearPatternInternal();
-    static void RunPattern(void* arg);
+    void RunPattern();
 
     gpio_num_t m_gpioPin;
     uint8_t m_brightness;  // 0-255

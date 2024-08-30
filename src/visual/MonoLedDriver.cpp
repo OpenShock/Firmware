@@ -4,6 +4,7 @@ const char* const TAG = "MonoLedDriver";
 
 #include "Chipset.h"
 #include "Logging.h"
+#include "util/FnProxy.h"
 
 #include <driver/ledc.h>
 
@@ -70,7 +71,7 @@ void MonoLedDriver::SetPattern(const State* pattern, std::size_t patternLength) 
   snprintf(name, sizeof(name), "MonoLedDriver-%d", m_gpioPin);
 
   // Start the task
-  BaseType_t result = xTaskCreate(RunPattern, name, 1024, this, 1, &m_taskHandle);  // PROFILED: 0.5KB stack usage
+  BaseType_t result = xTaskCreate(&Util::FnProxy<&MonoLedDriver::RunPattern>, name, 1024, this, 1, &m_taskHandle);  // PROFILED: 0.5KB stack usage
   if (result != pdPASS) {
     ESP_LOGE(TAG, "[pin-%u] Failed to create task: %d", m_gpioPin, result);
 
@@ -102,16 +103,10 @@ void MonoLedDriver::ClearPatternInternal() {
   m_pattern.clear();
 }
 
-void MonoLedDriver::RunPattern(void* arg) {
-  MonoLedDriver* thisPtr = reinterpret_cast<MonoLedDriver*>(arg);
-
-  gpio_num_t pin              = thisPtr->m_gpioPin;
-  uint8_t brightness     = thisPtr->m_brightness;
-  std::vector<State>& pattern = thisPtr->m_pattern;
-
+void MonoLedDriver::RunPattern() {
   while (true) {
-    for (const auto& state : pattern) {
-      ledc_set_duty(LEDC_LOW_SPEED_MODE, LEDC_CHANNEL_0, state.level ? brightness : 0);
+    for (const auto& state : m_pattern) {
+      ledc_set_duty(LEDC_LOW_SPEED_MODE, LEDC_CHANNEL_0, state.level ? m_brightness : 0);
       vTaskDelay(pdMS_TO_TICKS(state.duration));
     }
   }

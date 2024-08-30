@@ -6,6 +6,7 @@ const char* const TAG = "RGBLedDriver";
 
 #include "Chipset.h"
 #include "Logging.h"
+#include "util/FnProxy.h"
 #include "util/TaskUtils.h"
 
 #include <array>
@@ -53,7 +54,7 @@ void RgbLedDriver::SetPattern(const RGBState* pattern, std::size_t patternLength
   std::copy(pattern, pattern + patternLength, m_pattern.begin());
 
   // Start the task
-  BaseType_t result = TaskUtils::TaskCreateExpensive(RunPattern, TAG, 4096, this, 1, &m_taskHandle);  // PROFILED: 1.7KB stack usage
+  BaseType_t result = TaskUtils::TaskCreateExpensive(&Util::FnProxy<&RgbLedDriver::RunPattern>, TAG, 4096, this, 1, &m_taskHandle);  // PROFILED: 1.7KB stack usage
   if (result != pdPASS) {
     ESP_LOGE(TAG, "[pin-%u] Failed to create task: %d", m_gpioPin, result);
 
@@ -86,24 +87,18 @@ void RgbLedDriver::ClearPatternInternal() {
   m_pattern.clear();
 }
 
-void RgbLedDriver::RunPattern(void* arg) {
-  RgbLedDriver* thisPtr = reinterpret_cast<RgbLedDriver*>(arg);
-
-  rmt_obj_t* rmtHandle           = thisPtr->m_rmtHandle;
-  uint8_t brightness             = thisPtr->m_brightness;
-  std::vector<RGBState>& pattern = thisPtr->m_pattern;
-
+void RgbLedDriver::RunPattern() {
   std::array<rmt_data_t, 24> led_data;  // 24 bits per LED (8 bits per color * 3 colors)
 
   while (true) {
-    for (const auto& state : pattern) {
+    for (const auto& state : m_pattern) {
       // WS2812B usually takes commands in GRB order
       // https://cdn-shop.adafruit.com/datasheets/WS2812B.pdf - Page 5
       // But some actually expect RGB!
 
-      uint8_t r = static_cast<uint8_t>(static_cast<uint16_t>(state.red) * brightness / 255);
-      uint8_t g = static_cast<uint8_t>(static_cast<uint16_t>(state.green) * brightness / 255);
-      uint8_t b = static_cast<uint8_t>(static_cast<uint16_t>(state.blue) * brightness / 255);
+      uint8_t r = static_cast<uint8_t>(static_cast<uint16_t>(state.red) * m_brightness / 255);
+      uint8_t g = static_cast<uint8_t>(static_cast<uint16_t>(state.green) * m_brightness / 255);
+      uint8_t b = static_cast<uint8_t>(static_cast<uint16_t>(state.blue) * m_brightness / 255);
 #if OPENSHOCK_LED_SWAP_RG_CHANNELS
       std::swap(r, g);
 #endif
@@ -126,7 +121,7 @@ void RgbLedDriver::RunPattern(void* arg) {
       }
 
       // Send the data
-      rmtWriteBlocking(rmtHandle, led_data.data(), led_data.size());
+      rmtWriteBlocking(m_rmtHandle, led_data.data(), led_data.size());
       vTaskDelay(pdMS_TO_TICKS(state.duration));
     }
   }
