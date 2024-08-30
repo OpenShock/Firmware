@@ -11,6 +11,7 @@
 #include "serialization/JsonSerial.h"
 #include "StringView.h"
 #include "Time.h"
+#include "intconv.h"
 #include "util/Base64Utils.h"
 #include "wifi/WiFiManager.h"
 
@@ -107,20 +108,12 @@ void _handleRfTxPinCommand(StringView arg) {
     return;
   }
 
-  auto str = arg.toString(); // Copy the string to null-terminate it (VERY IMPORTANT)
-
-  unsigned int pin;
-  if (sscanf(str.c_str(), "%u", &pin) != 1) {
-    SERPR_ERROR("Invalid argument (not a number)");
-    return;
+  uint8_t pin;
+  if (!OpenShock::IntConv::stou8(arg, pin)) {
+    SERPR_ERROR("Invalid argument (number invalid or out of range)");
   }
 
-  if (pin > UINT8_MAX) {
-    SERPR_ERROR("Invalid argument (out of range)");
-    return;
-  }
-
-  OpenShock::SetRfPinResultCode result = OpenShock::CommandHandler::SetRfTxPin(static_cast<uint8_t>(pin));
+  OpenShock::SetRfPinResultCode result = OpenShock::CommandHandler::SetRfTxPin(pin);
 
   switch (result) {
     case OpenShock::SetRfPinResultCode::InvalidPin:
