@@ -2,6 +2,7 @@
 
 #include "Hashing.h"
 #include "http/HTTPRequestManager.h"
+#include "Logging.h"
 #include "Time.h"
 #include "util/HexUtils.h"
 

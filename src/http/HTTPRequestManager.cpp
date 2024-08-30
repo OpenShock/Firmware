@@ -1,6 +1,7 @@
 #include "http/HTTPRequestManager.h"
 
 #include "Common.h"
+#include "Logging.h"
 #include "Time.h"
 
 #include <HTTPClient.h>
