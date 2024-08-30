@@ -1,6 +1,6 @@
 #pragma once
 
-#include <esp32-hal-log.h>
+#define USE_ESP_IDF_LOG 1
 
 #include <esp_log.h>
 #include <esp_ota_ops.h>
