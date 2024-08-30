@@ -1,7 +1,6 @@
 #pragma once
 
 #include "config/ConfigBase.h"
-#include "Logging.h"
 
 #include <cJSON.h>
 
