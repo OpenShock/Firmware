@@ -6,7 +6,6 @@ import * as flatbuffers from 'flatbuffers';
 
 import { BackendConfig } from '../../../open-shock/serialization/configuration/backend-config';
 import { CaptivePortalConfig } from '../../../open-shock/serialization/configuration/captive-portal-config';
-import { DnsConfig } from '../../../open-shock/serialization/configuration/dns-config';
 import { EStopConfig } from '../../../open-shock/serialization/configuration/estop-config';
 import { OtaUpdateConfig } from '../../../open-shock/serialization/configuration/ota-update-config';
 import { RFConfig } from '../../../open-shock/serialization/configuration/rfconfig';
@@ -88,16 +87,8 @@ otaUpdate(obj?:OtaUpdateConfig):OtaUpdateConfig|null {
   return offset ? (obj || new OtaUpdateConfig()).__init(this.bb!.__indirect(this.bb_pos + offset), this.bb!) : null;
 }
 
-/**
- * DNS configuration
- */
-dns(obj?:DnsConfig):DnsConfig|null {
-  const offset = this.bb!.__offset(this.bb_pos, 18);
-  return offset ? (obj || new DnsConfig()).__init(this.bb!.__indirect(this.bb_pos + offset), this.bb!) : null;
-}
-
 static startHubConfig(builder:flatbuffers.Builder) {
-  builder.startObject(8);
+  builder.startObject(7);
 }
 
 static addRf(builder:flatbuffers.Builder, rfOffset:flatbuffers.Offset) {
@@ -126,10 +117,6 @@ static addSerialInput(builder:flatbuffers.Builder, serialInputOffset:flatbuffers
 
 static addOtaUpdate(builder:flatbuffers.Builder, otaUpdateOffset:flatbuffers.Offset) {
   builder.addFieldOffset(6, otaUpdateOffset, 0);
-}
-
-static addDns(builder:flatbuffers.Builder, dnsOffset:flatbuffers.Offset) {
-  builder.addFieldOffset(7, dnsOffset, 0);
 }
 
 static endHubConfig(builder:flatbuffers.Builder):flatbuffers.Offset {
