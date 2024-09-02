@@ -1,12 +1,12 @@
 #include "event_handlers/impl/WSLocal.h"
 
+const char* const TAG = "LocalMessageHandlers";
+
 #include "CaptivePortal.h"
 #include "GatewayConnectionManager.h"
 #include "Logging.h"
 
 #include <cstdint>
-
-const char* const TAG = "LocalMessageHandlers";
 
 void serializeAccountLinkCommandResult(uint8_t socketId, OpenShock::Serialization::Local::AccountLinkResultCode result) {
   flatbuffers::FlatBufferBuilder builder(1024);

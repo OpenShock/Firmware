@@ -2,17 +2,18 @@
 
 #include "EStopManager.h"
 
+const char* const TAG = "EStopManager";
+
 #include "Chipset.h"
 #include "CommandHandler.h"
 #include "config/Config.h"
 #include "Logging.h"
 #include "Time.h"
+#include "util/TaskUtils.h"
 #include "VisualStateManager.h"
 
 #include <driver/gpio.h>
 #include <freertos/timers.h>
-
-const char* const TAG = "EStopManager";
 
 using namespace OpenShock;
 
@@ -22,9 +23,9 @@ const uint32_t k_estopDebounceTime    = 100;
 static TaskHandle_t s_estopEventHandlerTask;
 static QueueHandle_t s_estopEventQueue;
 
-static bool s_estopActive              = false;
-static bool s_estopAwaitingRelease     = false;
-static int64_t s_estopActivatedAt = 0;
+static bool s_estopActive          = false;
+static bool s_estopAwaitingRelease = false;
+static int64_t s_estopActivatedAt  = 0;
 
 static gpio_num_t s_estopPin;
 
@@ -89,8 +90,8 @@ void _estopEdgeInterrupt(void* arg) {
   // TODO: Allow active HIGH EStops?
   bool pressed = gpio_get_level(s_estopPin) == 0;
 
-  bool deactivatesAtChanged  = false;
-  int64_t deactivatesAt = 0;
+  bool deactivatesAtChanged = false;
+  int64_t deactivatesAt     = 0;
 
   if (!s_estopActive && pressed) {
     s_estopActive      = true;
@@ -154,7 +155,7 @@ bool EStopManager::Init() {
     return false;
   }
 
-  if (xTaskCreate(_estopEventHandler, TAG, 4096, nullptr, 5, &s_estopEventHandlerTask) != pdPASS) {
+  if (TaskUtils::TaskCreateUniversal(_estopEventHandler, TAG, 4096, nullptr, 5, &s_estopEventHandlerTask, 1) != pdPASS) {
     ESP_LOGE(TAG, "Failed to create EStop event handler task");
     return false;
   }

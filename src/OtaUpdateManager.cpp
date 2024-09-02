@@ -1,5 +1,7 @@
 #include "OtaUpdateManager.h"
 
+const char* const TAG = "OtaUpdateManager";
+
 #include "CaptivePortal.h"
 #include "Common.h"
 #include "config/Config.h"
@@ -39,8 +41,6 @@
 #define OPENSHOCK_FW_CDN_APP_URL_FORMAT           OPENSHOCK_FW_CDN_VERSION_BASE_URL_FORMAT "/app.bin"
 #define OPENSHOCK_FW_CDN_FILESYSTEM_URL_FORMAT    OPENSHOCK_FW_CDN_VERSION_BASE_URL_FORMAT "/staticfs.bin"
 #define OPENSHOCK_FW_CDN_SHA256_HASHES_URL_FORMAT OPENSHOCK_FW_CDN_VERSION_BASE_URL_FORMAT "/hashes.sha256.txt"
-
-const char* const TAG = "OtaUpdateManager";
 
 /// @brief Stops initArduino() from handling OTA rollbacks
 /// @todo Get rid of Arduino entirely. >:(

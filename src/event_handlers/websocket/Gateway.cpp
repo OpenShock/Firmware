@@ -1,5 +1,7 @@
 #include "event_handlers/WebSocket.h"
 
+const char* const TAG = "ServerMessageHandlers";
+
 #include "event_handlers/impl/WSGateway.h"
 
 #include "Logging.h"
@@ -10,8 +12,6 @@
 
 #include <array>
 #include <cstdint>
-
-static const char* TAG = "ServerMessageHandlers";
 
 namespace Schemas  = OpenShock::Serialization::Gateway;
 namespace Handlers = OpenShock::MessageHandlers::Server::_Private;

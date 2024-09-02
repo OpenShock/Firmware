@@ -1,11 +1,14 @@
 #include "serial/SerialInputHandler.h"
 
+const char* const TAG = "SerialInputHandler";
+
 #include "Chipset.h"
 #include "CommandHandler.h"
 #include "config/Config.h"
 #include "config/SerialInputConfig.h"
 #include "FormatHelpers.h"
 #include "http/HTTPRequestManager.h"
+#include "intconv.h"
 #include "Logging.h"
 #include "serialization/JsonAPI.h"
 #include "serialization/JsonSerial.h"
@@ -21,8 +24,6 @@
 
 #include <cstring>
 
-const char* const TAG = "SerialInputHandler";
-
 #define SERPR_SYS(format, ...)      Serial.printf("$SYS$|" format "\n", ##__VA_ARGS__)
 #define SERPR_RESPONSE(format, ...) SERPR_SYS("Response|" format, ##__VA_ARGS__)
 #define SERPR_SUCCESS(format, ...)  SERPR_SYS("Success|" format, ##__VA_ARGS__)
@@ -30,7 +31,7 @@ const char* const TAG = "SerialInputHandler";
 
 using namespace OpenShock;
 
-const int64_t PASTE_INTERVAL_THRESHOLD_MS  = 20;
+const int64_t PASTE_INTERVAL_THRESHOLD_MS       = 20;
 const std::size_t SERIAL_BUFFER_CLEAR_THRESHOLD = 512;
 
 struct SerialCmdHandler {
@@ -107,17 +108,9 @@ void _handleRfTxPinCommand(StringView arg) {
     return;
   }
 
-  auto str = arg.toString();  // Copy the string to null-terminate it (VERY IMPORTANT)
-
-  unsigned int pin;
-  if (sscanf(str.c_str(), "%u", &pin) != 1) {
-    SERPR_ERROR("Invalid argument (not a number)");
-    return;
-  }
-
-  if (pin > UINT8_MAX) {
-    SERPR_ERROR("Invalid argument (out of range)");
-    return;
+  uint8_t pin;
+  if (!OpenShock::IntConv::stou8(arg, pin)) {
+    SERPR_ERROR("Invalid argument (number invalid or out of range)");
   }
 
   OpenShock::SetGPIOResultCode result = OpenShock::CommandHandler::SetRfTxPin(static_cast<uint8_t>(pin));
@@ -383,8 +376,8 @@ void _handleNetworksCommand(StringView arg) {
 
   std::vector<Config::WiFiCredentials> creds;
 
-  uint8_t id = 1;
-  cJSON* network  = nullptr;
+  uint8_t id     = 1;
+  cJSON* network = nullptr;
   cJSON_ArrayForEach(network, root) {
     Config::WiFiCredentials cred;
 
@@ -976,7 +969,7 @@ void SerialInputHandler::Update() {
   static char* buffer            = nullptr;  // TODO: Clean up this buffer every once in a while
   static std::size_t bufferSize  = 0;
   static std::size_t bufferIndex = 0;
-  static int64_t lastEcho   = 0;
+  static int64_t lastEcho        = 0;
   static bool suppressingPaste   = false;
 
   while (true) {

@@ -1,5 +1,7 @@
 #include "event_handlers/WebSocket.h"
 
+const char* const TAG = "LocalMessageHandlers";
+
 #include "event_handlers/impl/WSLocal.h"
 #include "Logging.h"
 
@@ -9,8 +11,6 @@
 
 #include <array>
 #include <cstdint>
-
-static const char* TAG = "LocalMessageHandlers";
 
 namespace Schemas  = OpenShock::Serialization::Local;
 namespace Handlers = OpenShock::MessageHandlers::Local::_Private;

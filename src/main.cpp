@@ -1,3 +1,5 @@
+const char* const TAG = "main";
+
 #include "CaptivePortal.h"
 #include "CommandHandler.h"
 #include "Common.h"
@@ -16,8 +18,6 @@
 #include <Arduino.h>
 
 #include <memory>
-
-const char* const TAG = "OpenShock";
 
 // Internal setup function, returns true if setup succeeded, false otherwise.
 bool trySetup() {

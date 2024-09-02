@@ -2,6 +2,8 @@
 
 const char* const TAG = "SemVer";
 
+#include "Logging.h"
+
 using namespace OpenShock;
 
 constexpr bool _semverIsLetter(char c) {

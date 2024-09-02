@@ -3,14 +3,12 @@
 #include "ShockerCommandType.h"
 #include "ShockerModelType.h"
 
-#include <cstdint>
+#include <esp32-hal-rmt.h>
 
-// Forward definitions to remove clutter
-struct rmt_obj_s;
-typedef rmt_obj_s rmt_obj_t;
-struct QueueDefinition;
-typedef QueueDefinition* QueueHandle_t;
-typedef void* TaskHandle_t;
+#include <freertos/queue.h>
+#include <freertos/task.h>
+
+#include <cstdint>
 
 namespace OpenShock {
   class RFTransmitter {
@@ -27,7 +25,7 @@ namespace OpenShock {
 
   private:
     void destroy();
-    static void TransmitTask(void* arg);
+    void TransmitTask();
 
     uint8_t m_txPin;
     rmt_obj_t* m_rmtHandle;

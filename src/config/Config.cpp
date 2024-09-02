@@ -1,5 +1,7 @@
 #include "config/Config.h"
 
+const char* const TAG = "Config";
+
 #include "Chipset.h"
 #include "Common.h"
 #include "config/RootConfig.h"
@@ -12,8 +14,6 @@
 #include <cJSON.h>
 
 #include <bitset>
-
-const char* const TAG = "Config";
 
 using namespace OpenShock;
 

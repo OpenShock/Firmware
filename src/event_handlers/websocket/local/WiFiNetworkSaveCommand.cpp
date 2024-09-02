@@ -1,12 +1,12 @@
 #include "event_handlers/impl/WSLocal.h"
 
+const char* const TAG = "LocalMessageHandlers";
+
 #include "Logging.h"
 #include "util/HexUtils.h"
 #include "wifi/WiFiManager.h"
 
 #include <cstdint>
-
-const char* const TAG = "LocalMessageHandlers";
 
 using namespace OpenShock::MessageHandlers::Local;
 

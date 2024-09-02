@@ -4,7 +4,7 @@
 #include <cstdint>
 
 namespace OpenShock::VisualStateManager {
-  bool Init();
+  [[nodiscard]] bool Init();
 
   void SetCriticalError();
   void SetScanningStarted();

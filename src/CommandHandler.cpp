@@ -2,6 +2,8 @@
 
 #include "CommandHandler.h"
 
+const char* const TAG = "CommandHandler";
+
 #include "Chipset.h"
 #include "Common.h"
 #include "config/Config.h"
@@ -17,20 +19,14 @@
 #include <memory>
 #include <unordered_map>
 
-const char* const TAG = "CommandHandler";
-
 const int64_t KEEP_ALIVE_INTERVAL  = 60'000;
 const uint16_t KEEP_ALIVE_DURATION = 300;
 
 using namespace OpenShock;
 
-template<typename T>
-constexpr T saturate(T value, T min, T max) {
-  return std::min(std::max(value, min), max);
-}
 uint32_t calculateEepyTime(int64_t timeToKeepAlive) {
   int64_t now = OpenShock::millis();
-  return static_cast<uint32_t>(saturate<int64_t>(timeToKeepAlive - now, 0LL, KEEP_ALIVE_INTERVAL));
+  return static_cast<uint32_t>(std::clamp(timeToKeepAlive - now, 0LL, KEEP_ALIVE_INTERVAL));
 }
 
 struct KnownShocker {

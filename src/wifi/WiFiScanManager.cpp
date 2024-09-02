@@ -1,12 +1,15 @@
+#include <freertos/FreeRTOS.h>
+
 #include "wifi/WiFiScanManager.h"
 
+const char* const TAG = "WiFiScanManager";
+
 #include "Logging.h"
+#include "util/TaskUtils.h"
 
 #include <WiFi.h>
 
 #include <map>
-
-const char* const TAG = "WiFiScanManager";
 
 const uint8_t OPENSHOCK_WIFI_SCAN_MAX_CHANNEL         = 13;
 const uint32_t OPENSHOCK_WIFI_SCAN_MAX_MS_PER_CHANNEL = 300;  // Adjusting this value will affect the scan rate, but may also affect the scan results
@@ -226,7 +229,7 @@ bool WiFiScanManager::StartScan() {
   }
 
   // Start the scan task
-  if (xTaskCreate(_scanningTask, "WiFiScanManager", 4096, nullptr, 1, &s_scanTaskHandle) != pdPASS) {  // PROFILED: 1.8KB stack usage
+  if (TaskUtils::TaskCreateExpensive(_scanningTask, "WiFiScanManager", 4096, nullptr, 1, &s_scanTaskHandle) != pdPASS) {  // PROFILED: 1.8KB stack usage
     ESP_LOGE(TAG, "Failed to create scan task");
 
     xSemaphoreGive(s_scanTaskMutex);

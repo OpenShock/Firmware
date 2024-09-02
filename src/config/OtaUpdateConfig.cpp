@@ -1,9 +1,9 @@
 #include "config/OtaUpdateConfig.h"
 
+const char* const TAG = "Config::OtaUpdateConfig";
+
 #include "config/internal/utils.h"
 #include "Logging.h"
-
-const char* const TAG = "Config::OtaUpdateConfig";
 
 using namespace OpenShock::Config;
 

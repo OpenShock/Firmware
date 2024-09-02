@@ -1,13 +1,13 @@
 #include "event_handlers/impl/WSLocal.h"
 
+const char* const TAG = "LocalMessageHandlers";
+
 #include "CaptivePortal.h"
 #include "CommandHandler.h"
 #include "Common.h"
 #include "Logging.h"
 
 #include <cstdint>
-
-const char* const TAG = "LocalMessageHandlers";
 
 void serializeSetRfTxPinResult(uint8_t socketId, uint8_t pin, OpenShock::Serialization::Local::SetGPIOResultCode result) {
   flatbuffers::FlatBufferBuilder builder(1024);

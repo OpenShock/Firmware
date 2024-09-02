@@ -1,11 +1,11 @@
 #include "event_handlers/impl/WSLocal.h"
 
+const char* const TAG = "LocalMessageHandlers";
+
 #include "GatewayConnectionManager.h"
 #include "Logging.h"
 
 #include <cstdint>
-
-const char* const TAG = "LocalMessageHandlers";
 
 using namespace OpenShock::MessageHandlers::Local;
 

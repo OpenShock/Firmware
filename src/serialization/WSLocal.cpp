@@ -1,13 +1,13 @@
 #include "serialization/WSLocal.h"
 
+const char* const TAG = "WSLocal";
+
 #include "config/Config.h"
 #include "Logging.h"
 #include "util/HexUtils.h"
 #include "wifi/WiFiNetwork.h"
 
 #include "serialization/_fbs/HubToLocalMessage_generated.h"
-
-const char* const TAG = "WSLocal";
 
 using namespace OpenShock::Serialization;
 

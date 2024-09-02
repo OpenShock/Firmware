@@ -1,8 +1,9 @@
 #include "config/internal/utils.h"
 
-#include "Logging.h"
-
 const char* const TAG = "Config::Internal::Utils";
+
+#include "Logging.h"
+#include "util/IPAddressUtils.h"
 
 using namespace OpenShock;
 
@@ -44,6 +45,22 @@ void Config::Internal::Utils::FromFbsStr(std::string& str, const flatbuffers::St
   } else {
     str = defaultStr;
   }
+}
+
+bool Config::Internal::Utils::FromFbsIPAddress(IPAddress& ip, const flatbuffers::String* fbsIP, const IPAddress& defaultIP) {
+  if (fbsIP == nullptr) {
+    ESP_LOGE(TAG, "IP address is null");
+    return false;
+  }
+
+  StringView view(*fbsIP);
+
+  if (!OpenShock::IPV4AddressFromStringView(ip, view)) {
+    ESP_LOGE(TAG, "failed to parse IP address");
+    return false;
+  }
+
+  return true;
 }
 
 bool Config::Internal::Utils::FromJsonBool(bool& val, const cJSON* json, const char* name, bool defaultVal) {
@@ -88,6 +105,28 @@ bool Config::Internal::Utils::FromJsonStr(std::string& str, const cJSON* json, c
   }
 
   str = jsonVal->valuestring;
+
+  return true;
+}
+
+bool Config::Internal::Utils::FromJsonIPAddress(IPAddress& ip, const cJSON* json, const char* name, const IPAddress& defaultIP) {
+  const cJSON* jsonVal = cJSON_GetObjectItemCaseSensitive(json, name);
+  if (jsonVal == nullptr) {
+    ESP_LOGE(TAG, "value at '%s' is null", name);
+    return false;
+  }
+
+  if (cJSON_IsString(jsonVal) == 0) {
+    ESP_LOGE(TAG, "value at '%s' is not a string", name);
+    return false;
+  }
+
+  StringView view(jsonVal->valuestring);
+
+  if (!OpenShock::IPV4AddressFromStringView(ip, view)) {
+    ESP_LOGE(TAG, "failed to parse IP address at '%s'", name);
+    return false;
+  }
 
   return true;
 }

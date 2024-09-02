@@ -1,9 +1,8 @@
 #include "event_handlers/impl/WSGateway.h"
 
-#include "Logging.h"
-
-
 const char* const TAG = "ServerMessageHandlers";
+
+#include "Logging.h"
 
 using namespace OpenShock::MessageHandlers::Server;
 

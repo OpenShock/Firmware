@@ -1,5 +1,7 @@
 #include "CaptivePortal.h"
 
+const char* const TAG = "CaptivePortal";
+
 #include "CaptivePortalInstance.h"
 #include "CommandHandler.h"
 #include "config/Config.h"
@@ -14,8 +16,6 @@
 #include <mdns.h>
 
 #include <memory>
-
-static const char* TAG = "CaptivePortal";
 
 using namespace OpenShock;
 

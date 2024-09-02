@@ -2,11 +2,14 @@
 
 #include "CaptivePortalInstance.h"
 
+const char* const TAG = "CaptivePortalInstance";
+
 #include "CommandHandler.h"
 #include "event_handlers/WebSocket.h"
 #include "GatewayConnectionManager.h"
 #include "Logging.h"
 #include "serialization/WSLocal.h"
+#include "util/FnProxy.h"
 #include "util/HexUtils.h"
 #include "util/PartitionUtils.h"
 #include "util/TaskUtils.h"
@@ -15,8 +18,6 @@
 #include "serialization/_fbs/HubToLocalMessage_generated.h"
 
 #include <WiFi.h>
-
-static const char* TAG = "CaptivePortalInstance";
 
 const uint16_t HTTP_PORT                 = 80;
 const uint16_t WEBSOCKET_PORT            = 81;
@@ -123,7 +124,7 @@ discord.gg/OpenShock
   m_webServer.begin();
 
   if (fsOk) {
-    if (TaskUtils::TaskCreateExpensive(CaptivePortalInstance::task, TAG, 8192, this, 1, &m_taskHandle) != pdPASS) {  // PROFILED: 4-6KB stack usage
+    if (TaskUtils::TaskCreateExpensive(&Util::FnProxy<&CaptivePortalInstance::task>, TAG, 8192, this, 1, &m_taskHandle) != pdPASS) {  // PROFILED: 4-6KB stack usage
       ESP_LOGE(TAG, "Failed to create task");
     }
   }
@@ -140,11 +141,9 @@ CaptivePortalInstance::~CaptivePortalInstance() {
   m_dnsServer.stop();
 }
 
-void CaptivePortalInstance::task(void* arg) {
-  CaptivePortalInstance* instance = reinterpret_cast<CaptivePortalInstance*>(arg);
-
+void CaptivePortalInstance::task() {
   while (true) {
-    instance->m_socketServer.loop();
+    m_socketServer.loop();
     // instance->m_dnsServer.processNextRequest();
     vTaskDelay(pdMS_TO_TICKS(WEBSOCKET_UPDATE_INTERVAL));
   }
