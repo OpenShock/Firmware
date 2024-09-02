@@ -1,12 +1,12 @@
 #include "event_handlers/impl/WSGateway.h"
 
+const char* const TAG = "ServerMessageHandlers";
+
 #include "CommandHandler.h"
 #include "Logging.h"
 #include "ShockerModelType.h"
 
 #include <cstdint>
-
-const char* const TAG = "ServerMessageHandlers";
 
 using namespace OpenShock::MessageHandlers::Server;
 

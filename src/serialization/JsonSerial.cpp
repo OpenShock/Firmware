@@ -1,8 +1,8 @@
 #include "serialization/JsonSerial.h"
 
-#include "Logging.h"
-
 const char* const TAG = "JsonSerial";
+
+#include "Logging.h"
 
 using namespace OpenShock::Serialization;
 

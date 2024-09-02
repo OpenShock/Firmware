@@ -1,5 +1,7 @@
 #include "wifi/WiFiManager.h"
 
+const char* const TAG = "WiFiManager";
+
 #include "CaptivePortal.h"
 #include "config/Config.h"
 #include "FormatHelpers.h"
@@ -17,8 +19,6 @@
 
 #include <cstdint>
 #include <vector>
-
-const char* const TAG = "WiFiManager";
 
 using namespace OpenShock;
 

@@ -2,9 +2,9 @@
 
 #include "ReadWriteMutex.h"
 
-#include "Logging.h"
-
 const char* const TAG = "ReadWriteMutex";
+
+#include "Logging.h"
 
 OpenShock::ReadWriteMutex::ReadWriteMutex() : m_mutex(xSemaphoreCreateMutex()), m_readSem(xSemaphoreCreateBinary()), m_readers(0) {
   xSemaphoreGive(m_readSem);

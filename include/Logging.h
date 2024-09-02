@@ -1,6 +1,7 @@
 #pragma once
 
 #include <esp32-hal-log.h>
+
 #include <esp_log.h>
 #include <esp_ota_ops.h>
 #include <esp_system.h>

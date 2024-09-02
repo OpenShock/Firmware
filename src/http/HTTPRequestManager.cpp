@@ -1,6 +1,9 @@
 #include "http/HTTPRequestManager.h"
 
+const char* const TAG = "HTTPRequestManager";
+
 #include "Common.h"
+#include "Logging.h"
 #include "Time.h"
 
 #include <HTTPClient.h>
@@ -13,8 +16,6 @@
 
 const std::size_t HTTP_BUFFER_SIZE = 4096LLU;
 const int HTTP_DOWNLOAD_SIZE_LIMIT = 200 * 1024 * 1024;  // 200 MB
-
-const char* const TAG = "HTTPRequestManager";
 
 struct RateLimit {
   RateLimit() : m_mutex(xSemaphoreCreateMutex()), m_blockUntilMs(0), m_limits(), m_requests() { }

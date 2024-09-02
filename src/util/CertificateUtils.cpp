@@ -1,10 +1,10 @@
 #include "util/CertificateUtils.h"
 
+const char* const TAG = "CertificateUtils";
+
 #include "Logging.h"
 
 #include <mbedtls/pem.h>
-
-const char* const TAG = "CertificateUtils";
 
 const char* const PEM_HEADER = "-----BEGIN CERTIFICATE-----\n";
 const char* const PEM_FOOTER = "-----END CERTIFICATE-----\n";

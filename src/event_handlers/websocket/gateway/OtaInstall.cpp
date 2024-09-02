@@ -1,12 +1,12 @@
 #include "event_handlers/impl/WSGateway.h"
 
+const char* const TAG = "ServerMessageHandlers";
+
 #include "CaptivePortal.h"
 #include "Logging.h"
 #include "OtaUpdateManager.h"
 
 #include <cstdint>
-
-const char* const TAG = "ServerMessageHandlers";
 
 using namespace OpenShock::MessageHandlers::Server;
 

@@ -1,11 +1,11 @@
 #include "util/StringUtils.h"
 
+const char* const TAG = "StringUtils";
+
 #include "Logging.h"
 
 #include <cstdarg>
 #include <cstring>
-
-static const char* TAG = "StringUtils";
 
 bool OpenShock::FormatToString(std::string& out, const char* format, ...) {
   const std::size_t STACK_BUFFER_SIZE = 128;

@@ -1,10 +1,10 @@
 #include "serialization/WSGateway.h"
 
+const char* const TAG = "WSGateway";
+
 #include "config/Config.h"
 #include "Logging.h"
 #include "Time.h"
-
-const char* const TAG = "WSGateway";
 
 using namespace OpenShock::Serialization;
 
