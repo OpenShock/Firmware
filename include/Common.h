@@ -31,7 +31,6 @@
 #endif
 
 #ifndef OPENSHOCK_ESTOP_PIN
-#warning "OPENSHOCK_ESTOP_PIN is not defined, setting to OPENSHOCK_GPIO_INVALID"
 #define OPENSHOCK_ESTOP_PIN OPENSHOCK_GPIO_INVALID
 #endif
 
