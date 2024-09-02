@@ -147,16 +147,9 @@ void _handleEStopPinCommand(StringView arg) {
     return;
   }
 
-  auto str = arg.toString();  // Copy the string to null-terminate it (VERY IMPORTANT)
-
-  unsigned int pin;
-  if (sscanf(str.c_str(), "%u", &pin) != 1) {
-    SERPR_ERROR("Invalid argument (not a number)");
-    return;
-  }
-
-  if (pin < GPIO_NUM_NC || pin > GPIO_NUM_MAX) {
-    SERPR_ERROR("Invalid argument (out of range)");
+  uint8_t pin;
+  if (!OpenShock::IntConv::stou8(arg, pin)) {
+    SERPR_ERROR("Invalid argument (number invalid or out of range)");
     return;
   }
 
