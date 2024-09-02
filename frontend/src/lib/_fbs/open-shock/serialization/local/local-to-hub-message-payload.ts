@@ -13,6 +13,7 @@ import { OtaUpdateSetIsEnabledCommand } from '../../../open-shock/serialization/
 import { OtaUpdateSetRequireManualApprovalCommand } from '../../../open-shock/serialization/local/ota-update-set-require-manual-approval-command';
 import { OtaUpdateSetUpdateChannelCommand } from '../../../open-shock/serialization/local/ota-update-set-update-channel-command';
 import { OtaUpdateStartUpdateCommand } from '../../../open-shock/serialization/local/ota-update-start-update-command';
+import { SetEstopEnabledCommand } from '../../../open-shock/serialization/local/set-estop-enabled-command';
 import { SetEstopPinCommand } from '../../../open-shock/serialization/local/set-estop-pin-command';
 import { SetRfTxPinCommand } from '../../../open-shock/serialization/local/set-rf-tx-pin-command';
 import { WifiNetworkConnectCommand } from '../../../open-shock/serialization/local/wifi-network-connect-command';
@@ -41,13 +42,14 @@ export enum LocalToHubMessagePayload {
   AccountLinkCommand = 15,
   AccountUnlinkCommand = 16,
   SetRfTxPinCommand = 17,
-  SetEstopPinCommand = 18
+  SetEstopEnabledCommand = 18,
+  SetEstopPinCommand = 19
 }
 
 export function unionToLocalToHubMessagePayload(
   type: LocalToHubMessagePayload,
-  accessor: (obj:AccountLinkCommand|AccountUnlinkCommand|OtaUpdateCheckForUpdatesCommand|OtaUpdateHandleUpdateRequestCommand|OtaUpdateSetAllowBackendManagementCommand|OtaUpdateSetCheckIntervalCommand|OtaUpdateSetDomainCommand|OtaUpdateSetIsEnabledCommand|OtaUpdateSetRequireManualApprovalCommand|OtaUpdateSetUpdateChannelCommand|OtaUpdateStartUpdateCommand|SetEstopPinCommand|SetRfTxPinCommand|WifiNetworkConnectCommand|WifiNetworkDisconnectCommand|WifiNetworkForgetCommand|WifiNetworkSaveCommand|WifiScanCommand) => AccountLinkCommand|AccountUnlinkCommand|OtaUpdateCheckForUpdatesCommand|OtaUpdateHandleUpdateRequestCommand|OtaUpdateSetAllowBackendManagementCommand|OtaUpdateSetCheckIntervalCommand|OtaUpdateSetDomainCommand|OtaUpdateSetIsEnabledCommand|OtaUpdateSetRequireManualApprovalCommand|OtaUpdateSetUpdateChannelCommand|OtaUpdateStartUpdateCommand|SetEstopPinCommand|SetRfTxPinCommand|WifiNetworkConnectCommand|WifiNetworkDisconnectCommand|WifiNetworkForgetCommand|WifiNetworkSaveCommand|WifiScanCommand|null
-): AccountLinkCommand|AccountUnlinkCommand|OtaUpdateCheckForUpdatesCommand|OtaUpdateHandleUpdateRequestCommand|OtaUpdateSetAllowBackendManagementCommand|OtaUpdateSetCheckIntervalCommand|OtaUpdateSetDomainCommand|OtaUpdateSetIsEnabledCommand|OtaUpdateSetRequireManualApprovalCommand|OtaUpdateSetUpdateChannelCommand|OtaUpdateStartUpdateCommand|SetEstopPinCommand|SetRfTxPinCommand|WifiNetworkConnectCommand|WifiNetworkDisconnectCommand|WifiNetworkForgetCommand|WifiNetworkSaveCommand|WifiScanCommand|null {
+  accessor: (obj:AccountLinkCommand|AccountUnlinkCommand|OtaUpdateCheckForUpdatesCommand|OtaUpdateHandleUpdateRequestCommand|OtaUpdateSetAllowBackendManagementCommand|OtaUpdateSetCheckIntervalCommand|OtaUpdateSetDomainCommand|OtaUpdateSetIsEnabledCommand|OtaUpdateSetRequireManualApprovalCommand|OtaUpdateSetUpdateChannelCommand|OtaUpdateStartUpdateCommand|SetEstopEnabledCommand|SetEstopPinCommand|SetRfTxPinCommand|WifiNetworkConnectCommand|WifiNetworkDisconnectCommand|WifiNetworkForgetCommand|WifiNetworkSaveCommand|WifiScanCommand) => AccountLinkCommand|AccountUnlinkCommand|OtaUpdateCheckForUpdatesCommand|OtaUpdateHandleUpdateRequestCommand|OtaUpdateSetAllowBackendManagementCommand|OtaUpdateSetCheckIntervalCommand|OtaUpdateSetDomainCommand|OtaUpdateSetIsEnabledCommand|OtaUpdateSetRequireManualApprovalCommand|OtaUpdateSetUpdateChannelCommand|OtaUpdateStartUpdateCommand|SetEstopEnabledCommand|SetEstopPinCommand|SetRfTxPinCommand|WifiNetworkConnectCommand|WifiNetworkDisconnectCommand|WifiNetworkForgetCommand|WifiNetworkSaveCommand|WifiScanCommand|null
+): AccountLinkCommand|AccountUnlinkCommand|OtaUpdateCheckForUpdatesCommand|OtaUpdateHandleUpdateRequestCommand|OtaUpdateSetAllowBackendManagementCommand|OtaUpdateSetCheckIntervalCommand|OtaUpdateSetDomainCommand|OtaUpdateSetIsEnabledCommand|OtaUpdateSetRequireManualApprovalCommand|OtaUpdateSetUpdateChannelCommand|OtaUpdateStartUpdateCommand|SetEstopEnabledCommand|SetEstopPinCommand|SetRfTxPinCommand|WifiNetworkConnectCommand|WifiNetworkDisconnectCommand|WifiNetworkForgetCommand|WifiNetworkSaveCommand|WifiScanCommand|null {
   switch(LocalToHubMessagePayload[type]) {
     case 'NONE': return null; 
     case 'WifiScanCommand': return accessor(new WifiScanCommand())! as WifiScanCommand;
@@ -67,6 +69,7 @@ export function unionToLocalToHubMessagePayload(
     case 'AccountLinkCommand': return accessor(new AccountLinkCommand())! as AccountLinkCommand;
     case 'AccountUnlinkCommand': return accessor(new AccountUnlinkCommand())! as AccountUnlinkCommand;
     case 'SetRfTxPinCommand': return accessor(new SetRfTxPinCommand())! as SetRfTxPinCommand;
+    case 'SetEstopEnabledCommand': return accessor(new SetEstopEnabledCommand())! as SetEstopEnabledCommand;
     case 'SetEstopPinCommand': return accessor(new SetEstopPinCommand())! as SetEstopPinCommand;
     default: return null;
   }
@@ -74,9 +77,9 @@ export function unionToLocalToHubMessagePayload(
 
 export function unionListToLocalToHubMessagePayload(
   type: LocalToHubMessagePayload, 
-  accessor: (index: number, obj:AccountLinkCommand|AccountUnlinkCommand|OtaUpdateCheckForUpdatesCommand|OtaUpdateHandleUpdateRequestCommand|OtaUpdateSetAllowBackendManagementCommand|OtaUpdateSetCheckIntervalCommand|OtaUpdateSetDomainCommand|OtaUpdateSetIsEnabledCommand|OtaUpdateSetRequireManualApprovalCommand|OtaUpdateSetUpdateChannelCommand|OtaUpdateStartUpdateCommand|SetEstopPinCommand|SetRfTxPinCommand|WifiNetworkConnectCommand|WifiNetworkDisconnectCommand|WifiNetworkForgetCommand|WifiNetworkSaveCommand|WifiScanCommand) => AccountLinkCommand|AccountUnlinkCommand|OtaUpdateCheckForUpdatesCommand|OtaUpdateHandleUpdateRequestCommand|OtaUpdateSetAllowBackendManagementCommand|OtaUpdateSetCheckIntervalCommand|OtaUpdateSetDomainCommand|OtaUpdateSetIsEnabledCommand|OtaUpdateSetRequireManualApprovalCommand|OtaUpdateSetUpdateChannelCommand|OtaUpdateStartUpdateCommand|SetEstopPinCommand|SetRfTxPinCommand|WifiNetworkConnectCommand|WifiNetworkDisconnectCommand|WifiNetworkForgetCommand|WifiNetworkSaveCommand|WifiScanCommand|null, 
+  accessor: (index: number, obj:AccountLinkCommand|AccountUnlinkCommand|OtaUpdateCheckForUpdatesCommand|OtaUpdateHandleUpdateRequestCommand|OtaUpdateSetAllowBackendManagementCommand|OtaUpdateSetCheckIntervalCommand|OtaUpdateSetDomainCommand|OtaUpdateSetIsEnabledCommand|OtaUpdateSetRequireManualApprovalCommand|OtaUpdateSetUpdateChannelCommand|OtaUpdateStartUpdateCommand|SetEstopEnabledCommand|SetEstopPinCommand|SetRfTxPinCommand|WifiNetworkConnectCommand|WifiNetworkDisconnectCommand|WifiNetworkForgetCommand|WifiNetworkSaveCommand|WifiScanCommand) => AccountLinkCommand|AccountUnlinkCommand|OtaUpdateCheckForUpdatesCommand|OtaUpdateHandleUpdateRequestCommand|OtaUpdateSetAllowBackendManagementCommand|OtaUpdateSetCheckIntervalCommand|OtaUpdateSetDomainCommand|OtaUpdateSetIsEnabledCommand|OtaUpdateSetRequireManualApprovalCommand|OtaUpdateSetUpdateChannelCommand|OtaUpdateStartUpdateCommand|SetEstopEnabledCommand|SetEstopPinCommand|SetRfTxPinCommand|WifiNetworkConnectCommand|WifiNetworkDisconnectCommand|WifiNetworkForgetCommand|WifiNetworkSaveCommand|WifiScanCommand|null, 
   index: number
-): AccountLinkCommand|AccountUnlinkCommand|OtaUpdateCheckForUpdatesCommand|OtaUpdateHandleUpdateRequestCommand|OtaUpdateSetAllowBackendManagementCommand|OtaUpdateSetCheckIntervalCommand|OtaUpdateSetDomainCommand|OtaUpdateSetIsEnabledCommand|OtaUpdateSetRequireManualApprovalCommand|OtaUpdateSetUpdateChannelCommand|OtaUpdateStartUpdateCommand|SetEstopPinCommand|SetRfTxPinCommand|WifiNetworkConnectCommand|WifiNetworkDisconnectCommand|WifiNetworkForgetCommand|WifiNetworkSaveCommand|WifiScanCommand|null {
+): AccountLinkCommand|AccountUnlinkCommand|OtaUpdateCheckForUpdatesCommand|OtaUpdateHandleUpdateRequestCommand|OtaUpdateSetAllowBackendManagementCommand|OtaUpdateSetCheckIntervalCommand|OtaUpdateSetDomainCommand|OtaUpdateSetIsEnabledCommand|OtaUpdateSetRequireManualApprovalCommand|OtaUpdateSetUpdateChannelCommand|OtaUpdateStartUpdateCommand|SetEstopEnabledCommand|SetEstopPinCommand|SetRfTxPinCommand|WifiNetworkConnectCommand|WifiNetworkDisconnectCommand|WifiNetworkForgetCommand|WifiNetworkSaveCommand|WifiScanCommand|null {
   switch(LocalToHubMessagePayload[type]) {
     case 'NONE': return null; 
     case 'WifiScanCommand': return accessor(index, new WifiScanCommand())! as WifiScanCommand;
@@ -96,6 +99,7 @@ export function unionListToLocalToHubMessagePayload(
     case 'AccountLinkCommand': return accessor(index, new AccountLinkCommand())! as AccountLinkCommand;
     case 'AccountUnlinkCommand': return accessor(index, new AccountUnlinkCommand())! as AccountUnlinkCommand;
     case 'SetRfTxPinCommand': return accessor(index, new SetRfTxPinCommand())! as SetRfTxPinCommand;
+    case 'SetEstopEnabledCommand': return accessor(index, new SetEstopEnabledCommand())! as SetEstopEnabledCommand;
     case 'SetEstopPinCommand': return accessor(index, new SetEstopPinCommand())! as SetEstopPinCommand;
     default: return null;
   }

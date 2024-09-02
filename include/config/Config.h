@@ -57,8 +57,10 @@ namespace OpenShock::Config {
   bool GetRFConfigKeepAliveEnabled(bool& out);
   bool SetRFConfigKeepAliveEnabled(bool enabled);
 
-  bool GetEStopConfigPin(gpio_num_t& out);
-  bool SetEStopConfigPin(gpio_num_t estopPin);
+  bool GetEStopConfigEnabled(bool& out);
+  bool SetEStopConfigEnabled(bool enabled);
+  bool GetEStopConfigGpioPin(gpio_num_t& out);
+  bool SetEStopConfigGpioPin(gpio_num_t gpioPin);
 
   bool GetSerialInputConfigEchoEnabled(bool& out);
   bool SetSerialInputConfigEchoEnabled(bool enabled);

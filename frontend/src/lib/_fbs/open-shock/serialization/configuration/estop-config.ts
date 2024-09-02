@@ -22,20 +22,29 @@ static getSizePrefixedRootAsEStopConfig(bb:flatbuffers.ByteBuffer, obj?:EStopCon
   return (obj || new EStopConfig()).__init(bb.readInt32(bb.position()) + bb.position(), bb);
 }
 
+enabled():boolean {
+  const offset = this.bb!.__offset(this.bb_pos, 4);
+  return offset ? !!this.bb!.readInt8(this.bb_pos + offset) : false;
+}
+
 /**
  * The GPIO pin connected to the E-Stop button
  */
-estopPin():number {
-  const offset = this.bb!.__offset(this.bb_pos, 4);
+gpioPin():number {
+  const offset = this.bb!.__offset(this.bb_pos, 6);
   return offset ? this.bb!.readUint8(this.bb_pos + offset) : 0;
 }
 
 static startEStopConfig(builder:flatbuffers.Builder) {
-  builder.startObject(1);
+  builder.startObject(2);
 }
 
-static addEstopPin(builder:flatbuffers.Builder, estopPin:number) {
-  builder.addFieldInt8(0, estopPin, 0);
+static addEnabled(builder:flatbuffers.Builder, enabled:boolean) {
+  builder.addFieldInt8(0, +enabled, +false);
+}
+
+static addGpioPin(builder:flatbuffers.Builder, gpioPin:number) {
+  builder.addFieldInt8(1, gpioPin, 0);
 }
 
 static endEStopConfig(builder:flatbuffers.Builder):flatbuffers.Offset {
@@ -43,9 +52,10 @@ static endEStopConfig(builder:flatbuffers.Builder):flatbuffers.Offset {
   return offset;
 }
 
-static createEStopConfig(builder:flatbuffers.Builder, estopPin:number):flatbuffers.Offset {
+static createEStopConfig(builder:flatbuffers.Builder, enabled:boolean, gpioPin:number):flatbuffers.Offset {
   EStopConfig.startEStopConfig(builder);
-  EStopConfig.addEstopPin(builder, estopPin);
+  EStopConfig.addEnabled(builder, enabled);
+  EStopConfig.addGpioPin(builder, gpioPin);
   return EStopConfig.endEStopConfig(builder);
 }
 }

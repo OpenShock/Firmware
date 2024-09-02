@@ -16,7 +16,7 @@ export class SetEstopPinCommandResult {
   return this;
 }
 
-pin():number {
+gpioPin():number {
   return this.bb!.readUint8(this.bb_pos);
 }
 
@@ -28,10 +28,10 @@ static sizeOf():number {
   return 2;
 }
 
-static createSetEstopPinCommandResult(builder:flatbuffers.Builder, pin: number, result: SetGPIOResultCode):flatbuffers.Offset {
+static createSetEstopPinCommandResult(builder:flatbuffers.Builder, gpio_pin: number, result: SetGPIOResultCode):flatbuffers.Offset {
   builder.prep(1, 2);
   builder.writeInt8(result);
-  builder.writeInt8(pin);
+  builder.writeInt8(gpio_pin);
   return builder.offset();
 }
 

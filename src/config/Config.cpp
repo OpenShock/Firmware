@@ -384,23 +384,38 @@ bool Config::SetRFConfigKeepAliveEnabled(bool enabled) {
   return _trySaveConfig();
 }
 
-bool Config::GetEStopConfigPin(gpio_num_t& out) {
+bool Config::GetEStopConfigEnabled(bool& out) {
   CONFIG_LOCK_READ(false);
 
-  out = _configData.estop.estopPin;
+  out = _configData.estop.enabled;
 
   return true;
 }
 
-bool Config::SetEStopConfigPin(gpio_num_t estopPin) {
+bool Config::SetEStopConfigEnabled(bool enabled) {
   CONFIG_LOCK_WRITE(false);
 
-  if (!OpenShock::IsValidInputPin(estopPin)) {
-    ESP_LOGE(TAG, "Invalid estopPin: %d", estopPin);
+  _configData.estop.enabled = enabled;
+  return _trySaveConfig();
+}
+
+bool Config::GetEStopConfigGpioPin(gpio_num_t& out) {
+  CONFIG_LOCK_READ(false);
+
+  out = _configData.estop.gpioPin;
+
+  return true;
+}
+
+bool Config::SetEStopConfigGpioPin(gpio_num_t gpioPin) {
+  CONFIG_LOCK_WRITE(false);
+
+  if (!OpenShock::IsValidInputPin(gpioPin)) {
+    ESP_LOGE(TAG, "Invalid EStop GPIO Pin: %d", gpioPin);
     return false;
   }
 
-  _configData.estop.estopPin = estopPin;
+  _configData.estop.gpioPin = gpioPin;
   return _trySaveConfig();
 }
 

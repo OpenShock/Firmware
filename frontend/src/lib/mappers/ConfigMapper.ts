@@ -9,7 +9,8 @@ export interface RFConfig {
 }
 
 export interface EStopConfig {
-  estopPin: number;
+  enabled: boolean;
+  gpioPin: number;
 }
 
 export interface WifiCredentials {
@@ -74,10 +75,12 @@ function mapEstopConfig(hubConfig: HubConfig): EStopConfig {
   const estop = hubConfig.estop();
   if (!estop) throw new Error('hubConfig.estop is null');
 
-  const estopPin = estop.estopPin();
+  const enabled = estop.enabled();
+  const gpioPin = estop.gpioPin();
 
   return {
-    estopPin,
+    enabled,
+    gpioPin,
   };
 }
 

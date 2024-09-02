@@ -15,6 +15,8 @@ import { AccountLinkResultCode } from '$lib/_fbs/open-shock/serialization/local/
 import { ErrorMessage } from '$lib/_fbs/open-shock/serialization/local/error-message';
 import { WifiNetworkEventHandler } from './WifiNetworkEventHandler';
 import { mapConfig } from '$lib/mappers/ConfigMapper';
+import { SetEstopEnabledCommand } from '$lib/_fbs/open-shock/serialization/local';
+import { SetEstopEnabledCommandResult } from '$lib/_fbs/open-shock/serialization/local/set-estop-enabled-command-result';
 
 export type MessageHandler = (wsClient: WebSocketClient, message: HubToLocalMessage) => void;
 
@@ -143,6 +145,27 @@ PayloadHandlers[HubToLocalMessagePayload.SetRfTxPinCommandResult] = (cli, msg) =
   }
 };
 
+PayloadHandlers[HubToLocalMessagePayload.SetEstopEnabledCommandResult] = (cli, msg) => {
+  const payload = new SetEstopEnabledCommandResult();
+  msg.payload(payload);
+
+  const enabled = payload.enabled();
+  const success = payload.success();
+
+  if (success) {
+    DeviceStateStore.setEstopEnabled(payload.enabled());
+    toastDelegator.trigger({
+      message: 'Changed EStop enabled to: ' + enabled,
+      background: 'bg-green-500',
+    });
+  } else {
+    toastDelegator.trigger({
+      message: 'Failed to change EStop enabled',
+      background: 'bg-red-500',
+    });
+  }
+};
+
 PayloadHandlers[HubToLocalMessagePayload.SetEstopPinCommandResult] = (cli, msg) => {
   const payload = new SetEstopPinCommandResult();
   msg.payload(payload);
@@ -150,9 +173,10 @@ PayloadHandlers[HubToLocalMessagePayload.SetEstopPinCommandResult] = (cli, msg) 
   const result = payload.result();
 
   if (result == SetGPIOResultCode.Success) {
-    DeviceStateStore.setEstopPin(payload.pin());
+    const gpioPin = payload.gpioPin();
+    DeviceStateStore.setEstopGpioPin(gpioPin);
     toastDelegator.trigger({
-      message: 'Changed EStop pin to: ' + payload.pin(),
+      message: 'Changed EStop pin to: ' + gpioPin,
       background: 'bg-green-500',
     });
   } else {

@@ -23,7 +23,7 @@
   let rfTxPin: number | null = $DeviceStateStore.config?.rf.txPin ?? null;
   $: rfTxPinValid = rfTxPin !== null && rfTxPin >= 0 && rfTxPin < 255;
 
-  let estopPin: number | null = $DeviceStateStore.config?.estop.estopPin ?? null;
+  let estopPin: number | null = $DeviceStateStore.config?.estop.gpioPin ?? null;
   $: estopPinValid = estopPin !== null && estopPin >= 0 && estopPin < 255;
 
   function linkAccount() {
@@ -60,7 +60,7 @@
     <div class="flex flex-col space-y-2">
       <div class="flex flex-row space-x-2 items-center">
         <h3 class="h3">RF TX Pin</h3>
-        <span class="text-sm text-gray-500">(Currently {$DeviceStateStore.config == null ? ' not set' : $DeviceStateStore.config.rf.txPin}) </span>
+        <span class="text-sm text-gray-500">(Currently {$DeviceStateStore.config?.rf == null ? ' unavailable' : $DeviceStateStore.config.rf.txPin}) </span>
       </div>
       <div class="flex space-x-2">
         <input class="input variant-form-material" type="number" placeholder="TX Pin" bind:value={rfTxPin} />
@@ -68,10 +68,12 @@
       </div>
     </div>
 
+    <!-- TODO: Add EStop Enable/Disable toggle -->
+
     <div class="flex flex-col space-y-2">
       <div class="flex flex-row space-x-2 items-center">
-        <h3 class="h3">EStop Pin</h3>
-        <span class="text-sm text-gray-500">(Currently {$DeviceStateStore.config == null || $DeviceStateStore.config.estop.estopPin == 0 ? ' disabled' : $DeviceStateStore.config.estop.estopPin}) </span>
+        <h3 class="h3">EStop GPIO Pin</h3>
+        <span class="text-sm text-gray-500">(Currently {$DeviceStateStore.config?.estop == null ? ' unavailable' : $DeviceStateStore.config.estop.gpioPin}) </span>
       </div>
       <div class="flex space-x-2">
         <input class="input variant-form-material" type="number" placeholder="EStop Pin" bind:value={estopPin} />

@@ -138,7 +138,7 @@ void _handleRfTxPinCommand(StringView arg) {
 void _handleEStopPinCommand(StringView arg) {
   if (arg.isNullOrEmpty()) {
     gpio_num_t estopPin;
-    if (!Config::GetEStopConfigPin(estopPin)) {
+    if (!Config::GetEStopConfigGpioPin(estopPin)) {
       SERPR_ERROR("Failed to get EStop pin from config");
       return;
     }
@@ -161,7 +161,7 @@ void _handleEStopPinCommand(StringView arg) {
     return;
   }
 
-  if (!Config::SetEStopConfigPin(estopPin)) {
+  if (!Config::SetEStopConfigGpioPin(estopPin)) {
     SERPR_ERROR("Failed to save config");
     return;
   }

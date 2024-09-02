@@ -122,8 +122,18 @@ void _estopEdgeInterrupt(void* arg) {
 }
 
 bool EStopManager::Init() {
+  bool enabled = false;
+  if (!OpenShock::Config::GetEStopConfigEnabled(enabled)) {
+    ESP_LOGE(TAG, "Failed to get EStop enabled from config");
+    return false;
+  }
+  if (!enabled) {
+    ESP_LOGI(TAG, "EStop disabled in config");
+    return true;  // TODO: If we never initialize the EStop, how do we do this later for enabling/disabling?
+  }
+
   gpio_num_t pin = GPIO_NUM_NC;
-  if (!OpenShock::Config::GetEStopConfigPin(pin)) {
+  if (!OpenShock::Config::GetEStopConfigGpioPin(pin)) {
     ESP_LOGE(TAG, "Failed to get EStop pin from config");
     return false;
   }
@@ -142,6 +152,12 @@ bool EStopManager::Init() {
     ESP_LOGE(TAG, "Failed to create EStop event handler task");
     return false;
   }
+
+  return true;
+}
+
+bool EStopManager::SetEStopEnabled(bool enabled) {
+  // TODO: Implement
 
   return true;
 }
