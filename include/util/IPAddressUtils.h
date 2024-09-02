@@ -5,5 +5,5 @@
 #include "StringView.h"
 
 namespace OpenShock {
-  bool IPAddressFromStringView(IPAddress& ip, StringView sv);
+  bool IPV4AddressFromStringView(IPAddress& ip, StringView sv);
 }

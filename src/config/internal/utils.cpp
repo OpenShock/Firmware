@@ -55,7 +55,7 @@ bool Config::Internal::Utils::FromFbsIPAddress(IPAddress& ip, const flatbuffers:
 
   StringView view(*fbsIP);
 
-  if (!OpenShock::IPAddressFromStringView(ip, view)) {
+  if (!OpenShock::IPV4AddressFromStringView(ip, view)) {
     ESP_LOGE(TAG, "failed to parse IP address");
     return false;
   }
@@ -123,7 +123,7 @@ bool Config::Internal::Utils::FromJsonIPAddress(IPAddress& ip, const cJSON* json
 
   StringView view(jsonVal->valuestring);
 
-  if (!OpenShock::IPAddressFromStringView(ip, view)) {
+  if (!OpenShock::IPV4AddressFromStringView(ip, view)) {
     ESP_LOGE(TAG, "failed to parse IP address at '%s'", name);
     return false;
   }
