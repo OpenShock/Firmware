@@ -247,10 +247,15 @@ SetGPIOResultCode CommandHandler::SetRfTxPin(uint8_t txPin) {
 }
 
 SetGPIOResultCode CommandHandler::SetEstopPin(uint8_t estopPin) {
-  if (OpenShock::IsValidInputPin(estopPin) || estopPin == GPIO_NUM_0) {
+  if (OpenShock::IsValidInputPin(estopPin)) {
     xSemaphoreTake(s_estopManagerMutex, portMAX_DELAY);
 
-    // TODO: Implement EStopManager pin change logic
+    if (!EStopManager::SetEStopPin(static_cast<gpio_num_t>(estopPin))) {
+      ESP_LOGE(TAG, "Failed to set EStop pin");
+
+      xSemaphoreGive(s_estopManagerMutex);
+      return SetGPIOResultCode::InternalError;
+    }
 
     if (!Config::SetEStopConfigPin(static_cast<gpio_num_t>(estopPin))) {
       ESP_LOGE(TAG, "Failed to set EStop pin in config");

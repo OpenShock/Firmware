@@ -6,6 +6,7 @@ const char* const TAG = "SerialInputHandler";
 #include "CommandHandler.h"
 #include "config/Config.h"
 #include "config/SerialInputConfig.h"
+#include "EStopManager.h"
 #include "FormatHelpers.h"
 #include "http/HTTPRequestManager.h"
 #include "intconv.h"
@@ -155,21 +156,17 @@ void _handleEStopPinCommand(StringView arg) {
 
   gpio_num_t estopPin = static_cast<gpio_num_t>(pin);
 
-  if (!OpenShock::IsValidInputPin(estopPin)) {
-    SERPR_ERROR("Invalid argument (invalid pin)");
+  if (!OpenShock::EStopManager::SetEStopPin(estopPin)) {
+    SERPR_ERROR("Failed to set EStop pin");
     return;
   }
 
-  bool result = Config::SetEStopConfigPin(estopPin);
-
-  if (result) {
-    SERPR_SUCCESS("Saved config, restarting...");
-
-    // Restart to use the new pin
-    ESP.restart();
-  } else {
+  if (!Config::SetEStopConfigPin(estopPin)) {
     SERPR_ERROR("Failed to save config");
+    return;
   }
+
+  SERPR_SUCCESS("Saved config");
 }
 
 void _handleDomainCommand(StringView arg) {

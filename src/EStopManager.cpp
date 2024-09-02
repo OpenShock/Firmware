@@ -27,7 +27,7 @@ static bool s_estopActive          = false;
 static bool s_estopAwaitingRelease = false;
 static int64_t s_estopActivatedAt  = 0;
 
-static gpio_num_t s_estopPin;
+static gpio_num_t s_estopPin = GPIO_NUM_NC;
 
 struct EstopEventQueueMessage {
   bool pressed              : 1;
@@ -122,15 +122,45 @@ void _estopEdgeInterrupt(void* arg) {
 }
 
 bool EStopManager::Init() {
-  if (!OpenShock::Config::GetEStopConfigPin(s_estopPin)) {
+  gpio_num_t pin = GPIO_NUM_NC;
+  if (!OpenShock::Config::GetEStopConfigPin(pin)) {
     ESP_LOGE(TAG, "Failed to get EStop pin from config");
     return false;
   }
 
-  ESP_LOGI(TAG, "Initializing on pin %hhi", static_cast<int8_t>(s_estopPin));
+  ESP_LOGI(TAG, "Initializing on pin %hhi", static_cast<int8_t>(pin));
 
+  // TODO?: Should we maybe use statically allocated queues and timers? See CreateStatic for both.
+  s_estopEventQueue = xQueueCreate(8, sizeof(EstopEventQueueMessage));
+
+  if (!EStopManager::SetEStopPin(pin)) {
+    ESP_LOGE(TAG, "Failed to set EStop pin");
+    return false;
+  }
+
+  if (TaskUtils::TaskCreateUniversal(_estopEventHandler, TAG, 4096, nullptr, 5, &s_estopEventHandlerTask, 1) != pdPASS) {
+    ESP_LOGE(TAG, "Failed to create EStop event handler task");
+    return false;
+  }
+
+  return true;
+}
+
+bool EStopManager::SetEStopPin(gpio_num_t pin) {
+  if (!OpenShock::IsValidInputPin(pin)) {
+    ESP_LOGE(TAG, "Invalid EStop pin: %hhi", static_cast<int8_t>(pin));
+    return false;
+  }
+
+  esp_err_t err = gpio_install_isr_service(ESP_INTR_FLAG_EDGE);
+  if (err != ESP_OK && err != ESP_ERR_INVALID_STATE) {  // ESP_ERR_INVALID_STATE is fine, it just means the ISR service is already installed
+    ESP_LOGE(TAG, "Failed to install EStop ISR service");
+    return false;
+  }
+
+  // Configure the new pin
   gpio_config_t io_conf;
-  io_conf.pin_bit_mask = 1ULL << s_estopPin;
+  io_conf.pin_bit_mask = 1ULL << pin;
   io_conf.pull_down_en = GPIO_PULLDOWN_DISABLE;
   io_conf.pull_up_en   = GPIO_PULLUP_ENABLE;
   io_conf.mode         = GPIO_MODE_INPUT;
@@ -140,24 +170,32 @@ bool EStopManager::Init() {
     return false;
   }
 
-  // TODO?: Should we maybe use statically allocated queues and timers? See CreateStatic for both.
-  s_estopEventQueue = xQueueCreate(8, sizeof(EstopEventQueueMessage));
-
-  esp_err_t err = gpio_install_isr_service(ESP_INTR_FLAG_EDGE);
-  if (err != ESP_OK && err != ESP_ERR_INVALID_STATE) {  // ESP_ERR_INVALID_STATE is fine, it just means the ISR service is already installed
-    ESP_LOGE(TAG, "Failed to install EStop ISR service");
-    return false;
-  }
-
-  err = gpio_isr_handler_add(s_estopPin, _estopEdgeInterrupt, nullptr);
+  // Add the new interrupt
+  err = gpio_isr_handler_add(pin, _estopEdgeInterrupt, nullptr);
   if (err != ESP_OK) {
     ESP_LOGE(TAG, "Failed to add EStop ISR handler");
     return false;
   }
 
-  if (TaskUtils::TaskCreateUniversal(_estopEventHandler, TAG, 4096, nullptr, 5, &s_estopEventHandlerTask, 1) != pdPASS) {
-    ESP_LOGE(TAG, "Failed to create EStop event handler task");
-    return false;
+  gpio_num_t oldPin = s_estopPin;
+
+  // Set the new pin
+  s_estopPin = pin;
+
+  if (oldPin != GPIO_NUM_NC) {
+    // Remove the old interrupt
+    esp_err_t err = gpio_isr_handler_remove(oldPin);
+    if (err != ESP_OK) {
+      ESP_LOGE(TAG, "Failed to remove old EStop ISR handler");
+      return false;
+    }
+
+    // Reset the old pin
+    err = gpio_reset_pin(oldPin);
+    if (err != ESP_OK) {
+      ESP_LOGE(TAG, "Failed to reset old EStop pin");
+      return false;
+    }
   }
 
   return true;
