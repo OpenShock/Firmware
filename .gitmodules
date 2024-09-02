@@ -1,3 +1,4 @@
 [submodule "schemas"]
 	path = schemas
 	url = https://github.com/OpenShock/flatbuffers-schemas
+	branch = feature/hub-local-report-available-gpios

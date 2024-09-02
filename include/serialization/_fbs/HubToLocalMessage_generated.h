@@ -302,7 +302,9 @@ struct ReadyMessage FLATBUFFERS_FINAL_CLASS : private ::flatbuffers::Table {
     VT_POGGIES = 4,
     VT_CONNECTED_WIFI = 6,
     VT_ACCOUNT_LINKED = 8,
-    VT_CONFIG = 10
+    VT_CONFIG = 10,
+    VT_GPIO_VALID_INPUTS = 12,
+    VT_GPIO_VALID_OUTPUTS = 14
   };
   bool poggies() const {
     return GetField<uint8_t>(VT_POGGIES, 0) != 0;
@@ -316,6 +318,12 @@ struct ReadyMessage FLATBUFFERS_FINAL_CLASS : private ::flatbuffers::Table {
   const OpenShock::Serialization::Configuration::HubConfig *config() const {
     return GetPointer<const OpenShock::Serialization::Configuration::HubConfig *>(VT_CONFIG);
   }
+  const ::flatbuffers::Vector<uint8_t> *gpio_valid_inputs() const {
+    return GetPointer<const ::flatbuffers::Vector<uint8_t> *>(VT_GPIO_VALID_INPUTS);
+  }
+  const ::flatbuffers::Vector<uint8_t> *gpio_valid_outputs() const {
+    return GetPointer<const ::flatbuffers::Vector<uint8_t> *>(VT_GPIO_VALID_OUTPUTS);
+  }
   bool Verify(::flatbuffers::Verifier &verifier) const {
     return VerifyTableStart(verifier) &&
            VerifyField<uint8_t>(verifier, VT_POGGIES, 1) &&
@@ -324,6 +332,10 @@ struct ReadyMessage FLATBUFFERS_FINAL_CLASS : private ::flatbuffers::Table {
            VerifyField<uint8_t>(verifier, VT_ACCOUNT_LINKED, 1) &&
            VerifyOffset(verifier, VT_CONFIG) &&
            verifier.VerifyTable(config()) &&
+           VerifyOffset(verifier, VT_GPIO_VALID_INPUTS) &&
+           verifier.VerifyVector(gpio_valid_inputs()) &&
+           VerifyOffset(verifier, VT_GPIO_VALID_OUTPUTS) &&
+           verifier.VerifyVector(gpio_valid_outputs()) &&
            verifier.EndTable();
   }
 };
@@ -344,6 +356,12 @@ struct ReadyMessageBuilder {
   void add_config(::flatbuffers::Offset<OpenShock::Serialization::Configuration::HubConfig> config) {
     fbb_.AddOffset(ReadyMessage::VT_CONFIG, config);
   }
+  void add_gpio_valid_inputs(::flatbuffers::Offset<::flatbuffers::Vector<uint8_t>> gpio_valid_inputs) {
+    fbb_.AddOffset(ReadyMessage::VT_GPIO_VALID_INPUTS, gpio_valid_inputs);
+  }
+  void add_gpio_valid_outputs(::flatbuffers::Offset<::flatbuffers::Vector<uint8_t>> gpio_valid_outputs) {
+    fbb_.AddOffset(ReadyMessage::VT_GPIO_VALID_OUTPUTS, gpio_valid_outputs);
+  }
   explicit ReadyMessageBuilder(::flatbuffers::FlatBufferBuilder &_fbb)
         : fbb_(_fbb) {
     start_ = fbb_.StartTable();
@@ -360,8 +378,12 @@ inline ::flatbuffers::Offset<ReadyMessage> CreateReadyMessage(
     bool poggies = false,
     ::flatbuffers::Offset<OpenShock::Serialization::Types::WifiNetwork> connected_wifi = 0,
     bool account_linked = false,
-    ::flatbuffers::Offset<OpenShock::Serialization::Configuration::HubConfig> config = 0) {
+    ::flatbuffers::Offset<OpenShock::Serialization::Configuration::HubConfig> config = 0,
+    ::flatbuffers::Offset<::flatbuffers::Vector<uint8_t>> gpio_valid_inputs = 0,
+    ::flatbuffers::Offset<::flatbuffers::Vector<uint8_t>> gpio_valid_outputs = 0) {
   ReadyMessageBuilder builder_(_fbb);
+  builder_.add_gpio_valid_outputs(gpio_valid_outputs);
+  builder_.add_gpio_valid_inputs(gpio_valid_inputs);
   builder_.add_config(config);
   builder_.add_connected_wifi(connected_wifi);
   builder_.add_account_linked(account_linked);
@@ -373,6 +395,26 @@ struct ReadyMessage::Traits {
   using type = ReadyMessage;
   static auto constexpr Create = CreateReadyMessage;
 };
+
+inline ::flatbuffers::Offset<ReadyMessage> CreateReadyMessageDirect(
+    ::flatbuffers::FlatBufferBuilder &_fbb,
+    bool poggies = false,
+    ::flatbuffers::Offset<OpenShock::Serialization::Types::WifiNetwork> connected_wifi = 0,
+    bool account_linked = false,
+    ::flatbuffers::Offset<OpenShock::Serialization::Configuration::HubConfig> config = 0,
+    const std::vector<uint8_t> *gpio_valid_inputs = nullptr,
+    const std::vector<uint8_t> *gpio_valid_outputs = nullptr) {
+  auto gpio_valid_inputs__ = gpio_valid_inputs ? _fbb.CreateVector<uint8_t>(*gpio_valid_inputs) : 0;
+  auto gpio_valid_outputs__ = gpio_valid_outputs ? _fbb.CreateVector<uint8_t>(*gpio_valid_outputs) : 0;
+  return OpenShock::Serialization::Local::CreateReadyMessage(
+      _fbb,
+      poggies,
+      connected_wifi,
+      account_linked,
+      config,
+      gpio_valid_inputs__,
+      gpio_valid_outputs__);
+}
 
 struct ErrorMessage FLATBUFFERS_FINAL_CLASS : private ::flatbuffers::Table {
   typedef ErrorMessageBuilder Builder;

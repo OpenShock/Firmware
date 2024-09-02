@@ -35,6 +35,16 @@ PayloadHandlers[HubToLocalMessagePayload.ReadyMessage] = (cli, msg) => {
     store.accountLinked = payload.accountLinked();
     store.config = mapConfig(payload.config());
 
+    const gpioValidInputs = payload.gpioValidInputsArray();
+    if (gpioValidInputs) {
+      store.gpioValidInputs = gpioValidInputs;
+    }
+
+    const gpioValidOutputs = payload.gpioValidOutputsArray();
+    if (gpioValidOutputs) {
+      store.gpioValidOutputs = gpioValidOutputs;
+    }
+
     console.log('[WS] Updated device state store: ', store);
 
     return store;

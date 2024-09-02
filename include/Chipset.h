@@ -270,4 +270,24 @@ namespace OpenShock {
     }
     return pins;
   }
+  inline std::vector<uint8_t> GetValidInputPinsVector() {
+    std::vector<uint8_t> pins(GPIOPinSetSize);
+    for (std::size_t i = 0; i < GPIOPinSetSize; i++) {
+      if (IsValidInputPin(i)) {
+        pins.push_back(i);
+      }
+    }
+    pins.shrink_to_fit();
+    return pins;
+  }
+  inline std::vector<uint8_t> GetValidOutputPinsVector() {
+    std::vector<uint8_t> pins(GPIOPinSetSize);
+    for (std::size_t i = 0; i < GPIOPinSetSize; i++) {
+      if (IsValidOutputPin(i)) {
+        pins.push_back(i);
+      }
+    }
+    pins.shrink_to_fit();
+    return pins;
+  }
 }  // namespace OpenShock

@@ -10,6 +10,8 @@ const { subscribe, update } = writable<DeviceState>({
   wifiNetworkGroups: new Map<string, WiFiNetworkGroup>(),
   accountLinked: false,
   config: null,
+  gpioValidInputs: new Uint8Array(),
+  gpioValidOutputs: new Uint8Array(),
 });
 
 function insertSorted<T>(array: T[], value: T, compare: (a: T, b: T) => number) {

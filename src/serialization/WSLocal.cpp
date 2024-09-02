@@ -2,6 +2,7 @@
 
 const char* const TAG = "WSLocal";
 
+#include "Chipset.h"
 #include "config/Config.h"
 #include "Logging.h"
 #include "util/HexUtils.h"
@@ -78,7 +79,13 @@ bool Local::SerializeReadyMessage(const WiFiNetwork* connectedNetwork, bool acco
     return false;
   }
 
-  auto readyMessageOffset = Serialization::Local::CreateReadyMessage(builder, true, fbsNetwork, accountLinked, configOffset);
+  auto inputPins       = OpenShock::GetValidInputPinsVector();
+  auto inputPinsOffset = builder.CreateVector(inputPins);
+
+  auto outputPins       = OpenShock::GetValidOutputPinsVector();
+  auto outputPinsOffset = builder.CreateVector(outputPins);
+
+  auto readyMessageOffset = Serialization::Local::CreateReadyMessage(builder, true, fbsNetwork, accountLinked, configOffset, inputPinsOffset, outputPinsOffset);
 
   auto msg = Serialization::Local::CreateHubToLocalMessage(builder, Serialization::Local::HubToLocalMessagePayload::ReadyMessage, readyMessageOffset.Union());
 
