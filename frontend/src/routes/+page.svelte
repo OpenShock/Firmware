@@ -1,10 +1,8 @@
 <script lang="ts">
-  import { browser } from '$app/environment';
   import { SerializeAccountLinkCommand } from '$lib/Serializers/AccountLinkCommand';
-  import { SerializeSetRfTxPinCommand } from '$lib/Serializers/SetRfTxPinCommand';
   import { WebSocketClient } from '$lib/WebSocketClient';
+  import RfTxPinSelector from '$lib/components/RfTxPinSelector.svelte';
   import WiFiList from '$lib/components/WiFiList.svelte';
-  import { DeviceStateStore } from '$lib/stores';
 
   function isValidLinkCode(str: string) {
     if (typeof str != 'string') return false;
@@ -19,18 +17,9 @@
   let linkCode: string = '';
   $: linkCodeValid = isValidLinkCode(linkCode);
 
-  let rfTxPin: number | null = $DeviceStateStore.config?.rf.txPin ?? null;
-  $: rfTxPinValid = rfTxPin !== null && rfTxPin >= 0 && rfTxPin < 255;
-
   function linkAccount() {
     if (!linkCodeValid) return;
     const data = SerializeAccountLinkCommand(linkCode!);
-    WebSocketClient.Instance.Send(data);
-  }
-
-  function setRfTxPin() {
-    if (!rfTxPinValid) return;
-    const data = SerializeSetRfTxPinCommand(rfTxPin!);
     WebSocketClient.Instance.Send(data);
   }
 </script>
@@ -47,15 +36,6 @@
       </div>
     </div>
 
-    <div class="flex flex-col space-y-2">
-      <div class="flex flex-row space-x-2 items-center">
-        <h3 class="h3">RF TX Pin</h3>
-        <span class="text-sm text-gray-500">(Currently {$DeviceStateStore.config == null ? ' not set' : $DeviceStateStore.config.rf.txPin}) </span>
-      </div>
-      <div class="flex space-x-2">
-        <input class="input variant-form-material" type="number" placeholder="TX Pin" bind:value={rfTxPin} />
-        <button class="btn variant-filled" on:click={setRfTxPin} disabled={!rfTxPinValid}>Set</button>
-      </div>
-    </div>
+    <RfTxPinSelector />
   </div>
 </div>
