@@ -1,6 +1,7 @@
 <script lang="ts">
   import { SerializeAccountLinkCommand } from '$lib/Serializers/AccountLinkCommand';
   import { WebSocketClient } from '$lib/WebSocketClient';
+  import GpioConfigurator from '$lib/components/GpioConfigurator.svelte';
   import RfTxPinSelector from '$lib/components/RfTxPinSelector.svelte';
   import WiFiList from '$lib/components/WiFiList.svelte';
 
@@ -37,5 +38,7 @@
     </div>
 
     <RfTxPinSelector />
+
+    <GpioConfigurator />
   </div>
 </div>
