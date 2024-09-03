@@ -5,6 +5,7 @@
 #include <driver/gpio.h>
 
 #include <bitset>
+#include <limits>
 
 // The following chipsets are supported by the OpenShock firmware.
 // To find documentation for a specific chipset, see the docs link.
@@ -240,12 +241,34 @@ namespace OpenShock {
     return true;
   }
 
-  const std::size_t GPIOPinSetSize = GPIO_NUM_MAX + 1;
-  typedef std::bitset<GPIOPinSetSize> GPIOPinSet;
+  static_assert(GPIO_NUM_MAX < std::numeric_limits<uint8_t>::max(), "GPIO_NUM_MAX is too large for uint8_t.");
+
+  constexpr uint8_t GetValidInputPinsCount() {
+    uint8_t count = 0;
+    for (uint8_t i = 0; i < GPIO_NUM_MAX; i++) {
+      if (IsValidInputPin(i)) {
+        count++;
+      }
+    }
+    return count;
+  }
+  constexpr uint8_t GetValidOutputPinsCount() {
+    uint8_t count = 0;
+    for (uint8_t i = 0; i < GPIO_NUM_MAX; i++) {
+      if (IsValidOutputPin(i)) {
+        count++;
+      }
+    }
+    return count;
+  }
+
+  const uint8_t ValidInputPinsCount  = GetValidInputPinsCount();
+  const uint8_t ValidOutputPinsCount = GetValidOutputPinsCount();
+  typedef std::bitset<GPIO_NUM_MAX> GPIOPinSet;
 
   constexpr GPIOPinSet GetValidGPIOPins() {
     GPIOPinSet pins;
-    for (std::size_t i = 0; i < GPIOPinSetSize; i++) {
+    for (uint8_t i = 0; i < GPIO_NUM_MAX; i++) {
       if (IsValidGPIOPin(i)) {
         pins.set(i);
       }
@@ -254,7 +277,7 @@ namespace OpenShock {
   }
   constexpr GPIOPinSet GetValidInputPins() {
     GPIOPinSet pins;
-    for (std::size_t i = 0; i < GPIOPinSetSize; i++) {
+    for (uint8_t i = 0; i < GPIO_NUM_MAX; i++) {
       if (IsValidInputPin(i)) {
         pins.set(i);
       }
@@ -263,7 +286,7 @@ namespace OpenShock {
   }
   constexpr GPIOPinSet GetValidOutputPins() {
     GPIOPinSet pins;
-    for (std::size_t i = 0; i < GPIOPinSetSize; i++) {
+    for (uint8_t i = 0; i < GPIO_NUM_MAX; i++) {
       if (IsValidOutputPin(i)) {
         pins.set(i);
       }
@@ -271,23 +294,21 @@ namespace OpenShock {
     return pins;
   }
   inline std::vector<uint8_t> GetValidInputPinsVector() {
-    std::vector<uint8_t> pins(GPIOPinSetSize);
-    for (std::size_t i = 0; i < GPIOPinSetSize; i++) {
+    std::vector<uint8_t> pins(ValidInputPinsCount);
+    for (uint8_t i = 0; i < GPIO_NUM_MAX; i++) {
       if (IsValidInputPin(i)) {
         pins.push_back(i);
       }
     }
-    pins.shrink_to_fit();
     return pins;
   }
   inline std::vector<uint8_t> GetValidOutputPinsVector() {
-    std::vector<uint8_t> pins(GPIOPinSetSize);
-    for (std::size_t i = 0; i < GPIOPinSetSize; i++) {
+    std::vector<uint8_t> pins(ValidOutputPinsCount);
+    for (uint8_t i = 0; i < GPIO_NUM_MAX; i++) {
       if (IsValidOutputPin(i)) {
         pins.push_back(i);
       }
     }
-    pins.shrink_to_fit();
     return pins;
   }
 }  // namespace OpenShock
