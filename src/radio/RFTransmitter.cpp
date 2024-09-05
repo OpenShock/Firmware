@@ -31,21 +31,21 @@ struct command_t {
 };
 
 RFTransmitter::RFTransmitter(uint8_t gpioPin) : m_txPin(gpioPin), m_rmtHandle(nullptr), m_queueHandle(nullptr), m_taskHandle(nullptr) {
-  ESP_LOGD(TAG, "[pin-%u] Creating RFTransmitter", m_txPin);
+  OS_LOGD(TAG, "[pin-%u] Creating RFTransmitter", m_txPin);
 
   m_rmtHandle = rmtInit(gpioPin, RMT_TX_MODE, RMT_MEM_64);
   if (m_rmtHandle == nullptr) {
-    ESP_LOGE(TAG, "[pin-%u] Failed to create rmt object", m_txPin);
+    OS_LOGE(TAG, "[pin-%u] Failed to create rmt object", m_txPin);
     destroy();
     return;
   }
 
   float realTick = rmtSetTick(m_rmtHandle, RFTRANSMITTER_TICKRATE_NS);
-  ESP_LOGD(TAG, "[pin-%u] real tick set to: %fns", m_txPin, realTick);
+  OS_LOGD(TAG, "[pin-%u] real tick set to: %fns", m_txPin, realTick);
 
   m_queueHandle = xQueueCreate(RFTRANSMITTER_QUEUE_SIZE, sizeof(command_t*));
   if (m_queueHandle == nullptr) {
-    ESP_LOGE(TAG, "[pin-%u] Failed to create queue", m_txPin);
+    OS_LOGE(TAG, "[pin-%u] Failed to create queue", m_txPin);
     destroy();
     return;
   }
@@ -54,7 +54,7 @@ RFTransmitter::RFTransmitter(uint8_t gpioPin) : m_txPin(gpioPin), m_rmtHandle(nu
   snprintf(name, sizeof(name), "RFTransmitter-%u", m_txPin);
 
   if (TaskUtils::TaskCreateExpensive(&Util::FnProxy<&RFTransmitter::TransmitTask>, name, RFTRANSMITTER_TASK_STACK_SIZE, this, RFTRANSMITTER_TASK_PRIORITY, &m_taskHandle) != pdPASS) {
-    ESP_LOGE(TAG, "[pin-%u] Failed to create task", m_txPin);
+    OS_LOGE(TAG, "[pin-%u] Failed to create task", m_txPin);
     destroy();
     return;
   }
@@ -66,7 +66,7 @@ RFTransmitter::~RFTransmitter() {
 
 bool RFTransmitter::SendCommand(ShockerModelType model, uint16_t shockerId, ShockerCommandType type, uint8_t intensity, uint16_t durationMs, bool overwriteExisting) {
   if (m_queueHandle == nullptr) {
-    ESP_LOGE(TAG, "[pin-%u] Queue is null", m_txPin);
+    OS_LOGE(TAG, "[pin-%u] Queue is null", m_txPin);
     return false;
   }
 
@@ -74,13 +74,13 @@ bool RFTransmitter::SendCommand(ShockerModelType model, uint16_t shockerId, Shoc
 
   // We will use nullptr commands to end the task, if we got a nullptr here, we are out of memory... :(
   if (cmd == nullptr) {
-    ESP_LOGE(TAG, "[pin-%u] Failed to allocate command", m_txPin);
+    OS_LOGE(TAG, "[pin-%u] Failed to allocate command", m_txPin);
     return false;
   }
 
   // Add the command to the queue, wait max 10 ms (Adjust this)
   if (xQueueSend(m_queueHandle, &cmd, pdMS_TO_TICKS(10)) != pdTRUE) {
-    ESP_LOGE(TAG, "[pin-%u] Failed to send command to queue", m_txPin);
+    OS_LOGE(TAG, "[pin-%u] Failed to send command to queue", m_txPin);
     delete cmd;
     return false;
   }
@@ -93,7 +93,7 @@ void RFTransmitter::ClearPendingCommands() {
     return;
   }
 
-  ESP_LOGI(TAG, "[pin-%u] Clearing pending commands", m_txPin);
+  OS_LOGI(TAG, "[pin-%u] Clearing pending commands", m_txPin);
 
   command_t* command;
   while (xQueueReceive(m_queueHandle, &command, 0) == pdPASS) {
@@ -103,7 +103,7 @@ void RFTransmitter::ClearPendingCommands() {
 
 void RFTransmitter::destroy() {
   if (m_taskHandle != nullptr) {
-    ESP_LOGD(TAG, "[pin-%u] Stopping task", m_txPin);
+    OS_LOGD(TAG, "[pin-%u] Stopping task", m_txPin);
 
     // Wait for the task to stop
     command_t* cmd = nullptr;
@@ -114,7 +114,7 @@ void RFTransmitter::destroy() {
       xQueueSend(m_queueHandle, &cmd, pdMS_TO_TICKS(10));
     }
 
-    ESP_LOGD(TAG, "[pin-%u] Task stopped", m_txPin);
+    OS_LOGD(TAG, "[pin-%u] Task stopped", m_txPin);
 
     // Clear the queue
     ClearPendingCommands();
@@ -132,7 +132,7 @@ void RFTransmitter::destroy() {
 }
 
 void RFTransmitter::TransmitTask() {
-  ESP_LOGD(TAG, "[pin-%u] RMT loop running on core %d", m_txPin, xPortGetCoreID());
+  OS_LOGD(TAG, "[pin-%u] RMT loop running on core %d", m_txPin, xPortGetCoreID());
 
   std::vector<command_t*> commands;
   while (true) {
@@ -140,13 +140,13 @@ void RFTransmitter::TransmitTask() {
     command_t* cmd = nullptr;
     while (xQueueReceive(m_queueHandle, &cmd, commands.empty() ? portMAX_DELAY : 0) == pdTRUE) {
       if (cmd == nullptr) {
-        ESP_LOGD(TAG, "[pin-%u] Received nullptr (stop command), cleaning up...", m_txPin);
+        OS_LOGD(TAG, "[pin-%u] Received nullptr (stop command), cleaning up...", m_txPin);
 
         for (auto it = commands.begin(); it != commands.end(); ++it) {
           delete *it;
         }
 
-        ESP_LOGD(TAG, "[pin-%u] Cleanup done, stopping task", m_txPin);
+        OS_LOGD(TAG, "[pin-%u] Cleanup done, stopping task", m_txPin);
 
         vTaskDelete(nullptr);
         return;

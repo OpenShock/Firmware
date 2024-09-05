@@ -15,7 +15,7 @@ void _Private::HandleWiFiNetworkDisconnectCommand(uint8_t socketId, const OpenSh
   
   auto msg = root->payload_as_WifiNetworkDisconnectCommand();
   if (msg == nullptr) {
-    ESP_LOGE(TAG, "Payload cannot be parsed as WiFiNetworkDisconnectCommand");
+    OS_LOGE(TAG, "Payload cannot be parsed as WiFiNetworkDisconnectCommand");
     return;
   }
 
