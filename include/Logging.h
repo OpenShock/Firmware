@@ -8,7 +8,7 @@
 #include <esp_ota_ops.h>
 #include <esp_system.h>
 
-extern "C" int log_printf(const char *fmt, ...);
+extern "C" int log_printf(const char* fmt, ...);
 
 template<std::size_t N>
 constexpr const char* openshockPathToFileName(const char(&path)[N])
