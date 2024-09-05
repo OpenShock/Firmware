@@ -11,26 +11,25 @@
 extern "C" int log_printf(const char* fmt, ...);
 
 template<std::size_t N>
-constexpr const char* openshockPathToFileName(const char(&path)[N])
-{
+constexpr const char* openshockPathToFileName(const char (&path)[N]) {
   std::size_t pos = 0;
   for (std::size_t i = 0; i < N; i++) {
     char c = path[i];
-    if(c == '/' || c == '\\'){
+    if (c == '/' || c == '\\') {
       pos = i + 1;
     }
   }
   return path + pos;
 }
 
-#define OPENSHOCK_LOG_LEVEL_NONE       (0)
-#define OPENSHOCK_LOG_LEVEL_ERROR      (1)
-#define OPENSHOCK_LOG_LEVEL_WARN       (2)
-#define OPENSHOCK_LOG_LEVEL_INFO       (3)
-#define OPENSHOCK_LOG_LEVEL_DEBUG      (4)
-#define OPENSHOCK_LOG_LEVEL_VERBOSE    (5)
+#define OPENSHOCK_LOG_LEVEL_NONE    (0)
+#define OPENSHOCK_LOG_LEVEL_ERROR   (1)
+#define OPENSHOCK_LOG_LEVEL_WARN    (2)
+#define OPENSHOCK_LOG_LEVEL_INFO    (3)
+#define OPENSHOCK_LOG_LEVEL_DEBUG   (4)
+#define OPENSHOCK_LOG_LEVEL_VERBOSE (5)
 
-#define OPENSHOCK_LOG_FORMAT(letter, format)  "[%lli][" #letter "][%s:%u] %s(): " format "\r\n", OpenShock::millis(), openshockPathToFileName(__FILE__), __LINE__, __FUNCTION__
+#define OPENSHOCK_LOG_FORMAT(letter, format) "[%lli][" #letter "][%s:%u] %s(): " format "\r\n", OpenShock::millis(), openshockPathToFileName(__FILE__), __LINE__, __FUNCTION__
 
 #if OPENSHOCK_LOG_LEVEL >= OPENSHOCK_LOG_LEVEL_VERBOSE
 #define OS_LOGV(TAG, format, ...) log_printf(OPENSHOCK_LOG_FORMAT(V, "[%s] " format), TAG, ##__VA_ARGS__)
@@ -72,13 +71,13 @@ constexpr const char* openshockPathToFileName(const char(&path)[N])
 
 #define OS_PANIC(TAG, format, ...)                                           \
   OS_PANIC_PRINT(TAG, format ", restarting in 5 seconds...", ##__VA_ARGS__); \
-  vTaskDelay(pdMS_TO_TICKS(5000));                                            \
+  vTaskDelay(pdMS_TO_TICKS(5000));                                           \
   esp_restart()
 
 #define OS_PANIC_OTA(TAG, format, ...)                                                                         \
   OS_PANIC_PRINT(TAG, format ", invalidating update partition and restarting in 5 seconds...", ##__VA_ARGS__); \
-  vTaskDelay(pdMS_TO_TICKS(5000));                                                                              \
-  esp_ota_mark_app_invalid_rollback_and_reboot();                                                               \
+  vTaskDelay(pdMS_TO_TICKS(5000));                                                                             \
+  esp_ota_mark_app_invalid_rollback_and_reboot();                                                              \
   esp_restart()
 
 #define OS_PANIC_INSTANT(TAG, format, ...)    \

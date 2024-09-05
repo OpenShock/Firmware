@@ -20,20 +20,20 @@ static fs::LittleFSFS _configFS;
 static Config::RootConfig _configData;
 static ReadWriteMutex _configMutex;
 
-#define CONFIG_LOCK_READ_ACTION(retval, action)   \
-  ScopedReadLock lock__(&_configMutex);           \
-  if (!lock__.isLocked()) {                       \
+#define CONFIG_LOCK_READ_ACTION(retval, action)  \
+  ScopedReadLock lock__(&_configMutex);          \
+  if (!lock__.isLocked()) {                      \
     OS_LOGE(TAG, "Failed to acquire read lock"); \
-    action;                                       \
-    return retval;                                \
+    action;                                      \
+    return retval;                               \
   }
 
-#define CONFIG_LOCK_WRITE_ACTION(retval, action)   \
-  ScopedWriteLock lock__(&_configMutex);           \
-  if (!lock__.isLocked()) {                        \
+#define CONFIG_LOCK_WRITE_ACTION(retval, action)  \
+  ScopedWriteLock lock__(&_configMutex);          \
+  if (!lock__.isLocked()) {                       \
     OS_LOGE(TAG, "Failed to acquire write lock"); \
-    action;                                        \
-    return retval;                                 \
+    action;                                       \
+    return retval;                                \
   }
 
 #define CONFIG_LOCK_READ(retval) CONFIG_LOCK_READ_ACTION(retval, {})
