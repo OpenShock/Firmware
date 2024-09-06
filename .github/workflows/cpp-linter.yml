@@ -3,9 +3,9 @@ name: cpp-linter
 on:
   pull_request:
     types: [opened, reopened, synchronize]
-    paths: [ '**.c', '**.h', '**.cpp', '**.hpp', '.clang-format' ]
+    paths: ['**.c', '**.h', '**.cpp', '**.hpp', '.clang-format']
   push:
-    paths: [ '**.c', '**.h', '**.cpp', '**.hpp', '.clang-format' ]
+    paths: ['**.c', '**.h', '**.cpp', '**.hpp', '.clang-format']
   workflow_dispatch: # Manually invoked by user.
 
 jobs:
@@ -25,7 +25,7 @@ jobs:
           version: 18
           lines-changed-only: diff
           thread-comments: true
-          step-summary: false
+          file-annotations: false
 
       - name: Fail fast?!
         if: steps.linter.outputs.checks-failed > 0
