@@ -1,10 +1,10 @@
 #include "config/RFConfig.h"
 
-#include "config/internal/utils.h"
-#include "Common.h"
-#include "Logging.h"
-
 const char* const TAG = "Config::RFConfig";
+
+#include "Common.h"
+#include "config/internal/utils.h"
+#include "Logging.h"
 
 using namespace OpenShock::Config;
 
@@ -19,7 +19,7 @@ void RFConfig::ToDefault() {
 
 bool RFConfig::FromFlatbuffers(const Serialization::Configuration::RFConfig* config) {
   if (config == nullptr) {
-    ESP_LOGE(TAG, "config is null");
+    OS_LOGE(TAG, "config is null");
     return false;
   }
 
@@ -35,12 +35,12 @@ flatbuffers::Offset<OpenShock::Serialization::Configuration::RFConfig> RFConfig:
 
 bool RFConfig::FromJSON(const cJSON* json) {
   if (json == nullptr) {
-    ESP_LOGE(TAG, "json is null");
+    OS_LOGE(TAG, "json is null");
     return false;
   }
 
   if (cJSON_IsObject(json) == 0) {
-    ESP_LOGE(TAG, "json is not an object");
+    OS_LOGE(TAG, "json is not an object");
     return false;
   }
 

@@ -1,10 +1,10 @@
 #include "WebSocketDeFragger.h"
 
+const char* const TAG = "WebSocketDeFragger";
+
 #include "Logging.h"
 
 #include <cstring>
-
-const char* const TAG = "WebSocketDeFragger";
 
 using namespace OpenShock;
 
@@ -12,7 +12,7 @@ uint8_t* _reallocOrFree(uint8_t* ptr, std::size_t size) {
   void* newPtr = realloc(ptr, size);
   if (newPtr == nullptr) {
     free(ptr);
-    ESP_PANIC(TAG, "Failed to allocate memory");
+    OS_PANIC(TAG, "Failed to allocate memory");
   }
 
   return reinterpret_cast<uint8_t*>(newPtr);

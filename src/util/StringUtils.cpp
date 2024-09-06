@@ -1,11 +1,11 @@
 #include "util/StringUtils.h"
 
+const char* const TAG = "StringUtils";
+
 #include "Logging.h"
 
 #include <cstdarg>
 #include <cstring>
-
-static const char* TAG = "StringUtils";
 
 bool OpenShock::FormatToString(std::string& out, const char* format, ...) {
   const std::size_t STACK_BUFFER_SIZE = 128;
@@ -22,7 +22,7 @@ bool OpenShock::FormatToString(std::string& out, const char* format, ...) {
 
   // If result is negative, something went wrong.
   if (result < 0) {
-    ESP_LOGE(TAG, "Failed to format string");
+    OS_LOGE(TAG, "Failed to format string");
     return false;
   }
 
@@ -42,7 +42,7 @@ bool OpenShock::FormatToString(std::string& out, const char* format, ...) {
     // Free heap buffer and return false.
     if (result < 0) {
       delete[] bufferPtr;
-      ESP_LOGE(TAG, "Failed to format string");
+      OS_LOGE(TAG, "Failed to format string");
       return false;
     }
   }

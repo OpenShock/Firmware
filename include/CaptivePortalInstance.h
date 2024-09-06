@@ -24,7 +24,7 @@ namespace OpenShock {
     bool broadcastMessageBIN(const uint8_t* data, std::size_t len) { return m_socketServer.broadcastBIN(data, len); }
 
   private:
-    static void task(void* arg);
+    void task();
     void handleWebSocketClientConnected(uint8_t socketId);
     void handleWebSocketClientDisconnected(uint8_t socketId);
     void handleWebSocketClientError(uint8_t socketId, uint16_t code, const char* message);

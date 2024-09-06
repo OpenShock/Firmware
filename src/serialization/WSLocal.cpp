@@ -1,13 +1,13 @@
 #include "serialization/WSLocal.h"
 
+const char* const TAG = "WSLocal";
+
 #include "config/Config.h"
 #include "Logging.h"
 #include "util/HexUtils.h"
 #include "wifi/WiFiNetwork.h"
 
 #include "serialization/_fbs/HubToLocalMessage_generated.h"
-
-const char* const TAG = "WSLocal";
 
 using namespace OpenShock::Serialization;
 
@@ -74,7 +74,7 @@ bool Local::SerializeReadyMessage(const WiFiNetwork* connectedNetwork, bool acco
 
   auto configOffset = OpenShock::Config::GetAsFlatBuffer(builder, false);
   if (configOffset.IsNull()) {
-    ESP_LOGE(TAG, "Failed to serialize config");
+    OS_LOGE(TAG, "Failed to serialize config");
     return false;
   }
 

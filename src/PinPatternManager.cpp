@@ -2,21 +2,21 @@
 
 #include "PinPatternManager.h"
 
+const char* const TAG = "PinPatternManager";
+
 #include "Chipset.h"
 #include "Logging.h"
-
-const char* const TAG = "PinPatternManager";
 
 using namespace OpenShock;
 
 PinPatternManager::PinPatternManager(gpio_num_t gpioPin) : m_gpioPin(GPIO_NUM_NC), m_pattern(), m_taskHandle(nullptr), m_taskMutex(xSemaphoreCreateMutex()) {
   if (gpioPin == GPIO_NUM_NC) {
-    ESP_LOGE(TAG, "Pin is not set");
+    OS_LOGE(TAG, "Pin is not set");
     return;
   }
 
   if (!IsValidOutputPin(gpioPin)) {
-    ESP_LOGE(TAG, "Pin %d is not a valid output pin", gpioPin);
+    OS_LOGE(TAG, "Pin %d is not a valid output pin", gpioPin);
     return;
   }
 
@@ -27,7 +27,7 @@ PinPatternManager::PinPatternManager(gpio_num_t gpioPin) : m_gpioPin(GPIO_NUM_NC
   config.pull_down_en = GPIO_PULLDOWN_DISABLE;
   config.intr_type    = GPIO_INTR_DISABLE;
   if (gpio_config(&config) != ESP_OK) {
-    ESP_LOGE(TAG, "Failed to configure pin %d", gpioPin);
+    OS_LOGE(TAG, "Failed to configure pin %d", gpioPin);
     return;
   }
 
@@ -57,7 +57,7 @@ void PinPatternManager::SetPattern(const State* pattern, std::size_t patternLeng
   // Start the task
   BaseType_t result = xTaskCreate(RunPattern, name, 1024, this, 1, &m_taskHandle);  // PROFILED: 0.5KB stack usage
   if (result != pdPASS) {
-    ESP_LOGE(TAG, "[pin-%u] Failed to create task: %d", m_gpioPin, result);
+    OS_LOGE(TAG, "[pin-%u] Failed to create task: %d", m_gpioPin, result);
 
     m_taskHandle = nullptr;
     m_pattern.clear();

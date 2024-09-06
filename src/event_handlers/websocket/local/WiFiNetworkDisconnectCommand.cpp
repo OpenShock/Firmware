@@ -1,12 +1,12 @@
 #include "event_handlers/impl/WSLocal.h"
 
+const char* const TAG = "LocalMessageHandlers";
+
 #include "Logging.h"
 #include "util/HexUtils.h"
 #include "wifi/WiFiManager.h"
 
 #include <cstdint>
-
-const char* const TAG = "LocalMessageHandlers";
 
 using namespace OpenShock::MessageHandlers::Local;
 
@@ -15,7 +15,7 @@ void _Private::HandleWiFiNetworkDisconnectCommand(uint8_t socketId, const OpenSh
   
   auto msg = root->payload_as_WifiNetworkDisconnectCommand();
   if (msg == nullptr) {
-    ESP_LOGE(TAG, "Payload cannot be parsed as WiFiNetworkDisconnectCommand");
+    OS_LOGE(TAG, "Payload cannot be parsed as WiFiNetworkDisconnectCommand");
     return;
   }
 

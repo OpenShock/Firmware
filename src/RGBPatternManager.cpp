@@ -2,13 +2,13 @@
 
 #include "RGBPatternManager.h"
 
+const char* const TAG = "RGBPatternManager";
+
 #include "Chipset.h"
 #include "Logging.h"
 #include "util/TaskUtils.h"
 
 #include <array>
-
-const char* const TAG = "RGBPatternManager";
 
 using namespace OpenShock;
 
@@ -18,23 +18,23 @@ using namespace OpenShock;
 
 RGBPatternManager::RGBPatternManager(gpio_num_t gpioPin) : m_gpioPin(GPIO_NUM_NC), m_brightness(255), m_pattern(), m_rmtHandle(nullptr), m_taskHandle(nullptr), m_taskMutex(xSemaphoreCreateMutex()) {
   if (gpioPin == GPIO_NUM_NC) {
-    ESP_LOGE(TAG, "Pin is not set");
+    OS_LOGE(TAG, "Pin is not set");
     return;
   }
 
   if (!OpenShock::IsValidOutputPin(gpioPin)) {
-    ESP_LOGE(TAG, "Pin %d is not a valid output pin", gpioPin);
+    OS_LOGE(TAG, "Pin %d is not a valid output pin", gpioPin);
     return;
   }
 
   m_rmtHandle = rmtInit(gpioPin, RMT_TX_MODE, RMT_MEM_64);
   if (m_rmtHandle == NULL) {
-    ESP_LOGE(TAG, "Failed to initialize RMT for pin %d", gpioPin);
+    OS_LOGE(TAG, "Failed to initialize RMT for pin %d", gpioPin);
     return;
   }
 
   float realTick = rmtSetTick(m_rmtHandle, 100.F);
-  ESP_LOGD(TAG, "RMT tick is %f ns for pin %d", realTick, gpioPin);
+  OS_LOGD(TAG, "RMT tick is %f ns for pin %d", realTick, gpioPin);
 
   SetBrightness(20);
 
@@ -57,7 +57,7 @@ void RGBPatternManager::SetPattern(const RGBState* pattern, std::size_t patternL
   // Start the task
   BaseType_t result = TaskUtils::TaskCreateExpensive(RunPattern, TAG, 4096, this, 1, &m_taskHandle);  // PROFILED: 1.7KB stack usage
   if (result != pdPASS) {
-    ESP_LOGE(TAG, "[pin-%u] Failed to create task: %d", m_gpioPin, result);
+    OS_LOGE(TAG, "[pin-%u] Failed to create task: %d", m_gpioPin, result);
 
     m_taskHandle = nullptr;
     m_pattern.clear();

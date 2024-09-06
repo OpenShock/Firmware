@@ -1,9 +1,9 @@
 #include "config/CaptivePortalConfig.h"
 
+const char* const TAG = "Config::CaptivePortalConfig";
+
 #include "config/internal/utils.h"
 #include "Logging.h"
-
-const char* const TAG = "Config::CaptivePortalConfig";
 
 using namespace OpenShock::Config;
 
@@ -19,7 +19,7 @@ void CaptivePortalConfig::ToDefault() {
 
 bool CaptivePortalConfig::FromFlatbuffers(const Serialization::Configuration::CaptivePortalConfig* config) {
   if (config == nullptr) {
-    ESP_LOGE(TAG, "config is null");
+    OS_LOGE(TAG, "config is null");
     return false;
   }
 
@@ -34,12 +34,12 @@ flatbuffers::Offset<OpenShock::Serialization::Configuration::CaptivePortalConfig
 
 bool CaptivePortalConfig::FromJSON(const cJSON* json) {
   if (json == nullptr) {
-    ESP_LOGE(TAG, "json is null");
+    OS_LOGE(TAG, "json is null");
     return false;
   }
 
   if (cJSON_IsObject(json) == 0) {
-    ESP_LOGE(TAG, "json is not an object");
+    OS_LOGE(TAG, "json is not an object");
     return false;
   }
 

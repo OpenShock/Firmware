@@ -1,9 +1,9 @@
 #include "event_handlers/impl/WSLocal.h"
 
+const char* const TAG = "LocalMessageHandlers";
+
 #include "Logging.h"
 #include "wifi/WiFiScanManager.h"
-
-const char* const TAG = "LocalMessageHandlers";
 
 using namespace OpenShock::MessageHandlers::Local;
 
@@ -12,7 +12,7 @@ void _Private::HandleWiFiScanCommand(uint8_t socketId, const OpenShock::Serializ
   
   auto msg = root->payload_as_WifiScanCommand();
   if (msg == nullptr) {
-    ESP_LOGE(TAG, "Payload cannot be parsed as WiFiScanCommand");
+    OS_LOGE(TAG, "Payload cannot be parsed as WiFiScanCommand");
     return;
   }
 

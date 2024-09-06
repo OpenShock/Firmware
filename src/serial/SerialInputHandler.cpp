@@ -1,11 +1,14 @@
 #include "serial/SerialInputHandler.h"
 
+const char* const TAG = "SerialInputHandler";
+
 #include "Chipset.h"
 #include "CommandHandler.h"
 #include "config/Config.h"
 #include "config/SerialInputConfig.h"
 #include "FormatHelpers.h"
 #include "http/HTTPRequestManager.h"
+#include "intconv.h"
 #include "Logging.h"
 #include "serialization/JsonAPI.h"
 #include "serialization/JsonSerial.h"
@@ -20,8 +23,6 @@
 #include <unordered_map>
 
 #include <cstring>
-
-const char* const TAG = "SerialInputHandler";
 
 #define SERPR_SYS(format, ...)      Serial.printf("$SYS$|" format "\n", ##__VA_ARGS__)
 #define SERPR_RESPONSE(format, ...) SERPR_SYS("Response|" format, ##__VA_ARGS__)
@@ -107,20 +108,12 @@ void _handleRfTxPinCommand(StringView arg) {
     return;
   }
 
-  auto str = arg.toString(); // Copy the string to null-terminate it (VERY IMPORTANT)
-
-  unsigned int pin;
-  if (sscanf(str.c_str(), "%u", &pin) != 1) {
-    SERPR_ERROR("Invalid argument (not a number)");
-    return;
+  uint8_t pin;
+  if (!OpenShock::IntConv::stou8(arg, pin)) {
+    SERPR_ERROR("Invalid argument (number invalid or out of range)");
   }
 
-  if (pin > UINT8_MAX) {
-    SERPR_ERROR("Invalid argument (out of range)");
-    return;
-  }
-
-  OpenShock::SetRfPinResultCode result = OpenShock::CommandHandler::SetRfTxPin(static_cast<uint8_t>(pin));
+  OpenShock::SetRfPinResultCode result = OpenShock::CommandHandler::SetRfTxPin(pin);
 
   switch (result) {
     case OpenShock::SetRfPinResultCode::InvalidPin:
@@ -178,7 +171,7 @@ void _handleDomainCommand(StringView arg) {
     return;
   }
 
-  ESP_LOGI(
+  OS_LOGI(
     TAG,
     "Successfully connected to \"%.*s\", version: %s, commit: %s, current time: %s",
     arg.length(),
@@ -281,7 +274,7 @@ void _handleLcgOverrideCommand(StringView arg) {
       return;
     }
 
-    ESP_LOGI(
+    OS_LOGI(
       TAG,
       "Successfully connected to \"%.*s\", name: %s, version: %s, current time: %s, country code: %s, FQDN: %s",
       domain.size(),
@@ -360,7 +353,7 @@ void _handleNetworksCommand(StringView arg) {
       cred.id = id++;
     }
 
-    ESP_LOGI(TAG, "Adding network \"%s\" to config, id=%u", cred.ssid.c_str(), cred.id);
+    OS_LOGI(TAG, "Adding network \"%s\" to config, id=%u", cred.ssid.c_str(), cred.id);
 
     creds.emplace_back(std::move(cred));
   }
@@ -883,7 +876,7 @@ void processSerialLine(StringView line) {
 bool SerialInputHandler::Init() {
   static bool s_initialized = false;
   if (s_initialized) {
-    ESP_LOGW(TAG, "Serial input handler already initialized");
+    OS_LOGW(TAG, "Serial input handler already initialized");
     return false;
   }
   s_initialized = true;
@@ -911,7 +904,7 @@ bool SerialInputHandler::Init() {
   Serial.println();
 
   if (!Config::GetSerialInputConfigEchoEnabled(s_echoEnabled)) {
-    ESP_LOGE(TAG, "Failed to get serial echo status from config");
+    OS_LOGE(TAG, "Failed to get serial echo status from config");
     return false;
   }
 
@@ -999,7 +992,7 @@ void SerialInputHandler::Update() {
       bufferIndex = 0;
       // Free buffer if it's too big
       if (bufferSize > SERIAL_BUFFER_CLEAR_THRESHOLD) {
-        ESP_LOGV(TAG, "Clearing serial input buffer");
+        OS_LOGV(TAG, "Clearing serial input buffer");
         bufferSize = 0;
         free(buffer);
         buffer = nullptr;
@@ -1015,7 +1008,7 @@ void SerialInputHandler::Update() {
       bufferIndex = 0;
       // Free buffer if it's too big
       if (bufferSize > SERIAL_BUFFER_CLEAR_THRESHOLD) {
-        ESP_LOGV(TAG, "Clearing serial input buffer");
+        OS_LOGV(TAG, "Clearing serial input buffer");
         bufferSize = 0;
         free(buffer);
         buffer = nullptr;

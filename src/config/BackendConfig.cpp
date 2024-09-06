@@ -1,9 +1,9 @@
 #include "config/BackendConfig.h"
 
+const char* const TAG = "Config::BackendConfig";
+
 #include "config/internal/utils.h"
 #include "Logging.h"
-
-const char* const TAG = "Config::BackendConfig";
 
 using namespace OpenShock::Config;
 
@@ -18,7 +18,7 @@ void BackendConfig::ToDefault() {
 
 bool BackendConfig::FromFlatbuffers(const Serialization::Configuration::BackendConfig* config) {
   if (config == nullptr) {
-    ESP_LOGE(TAG, "config is null");
+    OS_LOGE(TAG, "config is null");
     return false;
   }
 
@@ -46,12 +46,12 @@ flatbuffers::Offset<OpenShock::Serialization::Configuration::BackendConfig> Back
 
 bool BackendConfig::FromJSON(const cJSON* json) {
   if (json == nullptr) {
-    ESP_LOGE(TAG, "json is null");
+    OS_LOGE(TAG, "json is null");
     return false;
   }
 
   if (cJSON_IsObject(json) == 0) {
-    ESP_LOGE(TAG, "json is not an object");
+    OS_LOGE(TAG, "json is not an object");
     return false;
   }
 

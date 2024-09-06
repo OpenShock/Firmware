@@ -1,9 +1,9 @@
 #include "config/SerialInputConfig.h"
 
+const char* const TAG = "Config::SerialInputConfig";
+
 #include "config/internal/utils.h"
 #include "Logging.h"
-
-const char* const TAG = "Config::SerialInputConfig";
 
 using namespace OpenShock::Config;
 
@@ -19,7 +19,7 @@ void SerialInputConfig::ToDefault() {
 
 bool SerialInputConfig::FromFlatbuffers(const Serialization::Configuration::SerialInputConfig* config) {
   if (config == nullptr) {
-    ESP_LOGE(TAG, "config is null");
+    OS_LOGE(TAG, "config is null");
     return false;
   }
 
@@ -34,12 +34,12 @@ flatbuffers::Offset<OpenShock::Serialization::Configuration::SerialInputConfig> 
 
 bool SerialInputConfig::FromJSON(const cJSON* json) {
   if (json == nullptr) {
-    ESP_LOGE(TAG, "json is null");
+    OS_LOGE(TAG, "json is null");
     return false;
   }
 
   if (cJSON_IsObject(json) == 0) {
-    ESP_LOGE(TAG, "json is not an object");
+    OS_LOGE(TAG, "json is not an object");
     return false;
   }
 

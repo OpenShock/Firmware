@@ -1,10 +1,10 @@
 #include "serialization/WSGateway.h"
 
+const char* const TAG = "WSGateway";
+
 #include "config/Config.h"
 #include "Logging.h"
 #include "Time.h"
-
-const char* const TAG = "WSGateway";
 
 using namespace OpenShock::Serialization;
 
@@ -13,7 +13,7 @@ bool Gateway::SerializeKeepAliveMessage(Common::SerializationCallbackFn callback
 
   int64_t uptime = OpenShock::millis();
   if (uptime < 0) {
-    ESP_LOGE(TAG, "Failed to get uptime");
+    OS_LOGE(TAG, "Failed to get uptime");
     return false;
   }
 

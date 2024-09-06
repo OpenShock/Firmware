@@ -1,5 +1,7 @@
 #include "event_handlers/WebSocket.h"
 
+const char* const TAG = "LocalMessageHandlers";
+
 #include "event_handlers/impl/WSLocal.h"
 #include "Logging.h"
 
@@ -9,8 +11,6 @@
 
 #include <array>
 #include <cstdint>
-
-static const char* TAG = "LocalMessageHandlers";
 
 namespace Schemas  = OpenShock::Serialization::Local;
 namespace Handlers = OpenShock::MessageHandlers::Local::_Private;
@@ -42,7 +42,7 @@ void EventHandlers::WebSocket::HandleLocalBinary(uint8_t socketId, const uint8_t
   // Deserialize
   auto msg = flatbuffers::GetRoot<Schemas::LocalToHubMessage>(data);
   if (msg == nullptr) {
-    ESP_LOGE(TAG, "Failed to deserialize message");
+    OS_LOGE(TAG, "Failed to deserialize message");
     return;
   }
 
@@ -52,7 +52,7 @@ void EventHandlers::WebSocket::HandleLocalBinary(uint8_t socketId, const uint8_t
   };
   flatbuffers::Verifier verifier(data, len, verifierOptions);
   if (!msg->Verify(verifier)) {
-    ESP_LOGE(TAG, "Failed to verify message");
+    OS_LOGE(TAG, "Failed to verify message");
     return;
   }
 
