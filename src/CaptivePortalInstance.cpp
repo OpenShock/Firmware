@@ -68,7 +68,7 @@ CaptivePortalInstance::CaptivePortalInstance()
   m_socketServer.begin();
   m_socketServer.enableHeartbeat(WEBSOCKET_PING_INTERVAL, WEBSOCKET_PING_TIMEOUT, WEBSOCKET_PING_RETRIES);
 
-  ESP_LOGI(TAG, "Setting up DNS server");
+  OS_LOGI(TAG, "Setting up DNS server");
   m_dnsServer.start(DNS_PORT, "*", WiFi.softAPIP());
 
   bool fsOk = true;
@@ -76,14 +76,14 @@ CaptivePortalInstance::CaptivePortalInstance()
   // Get the hash of the filesystem
   const char* fsHash = _getPartitionHash();
   if (fsHash == nullptr) {
-    ESP_LOGE(TAG, "Failed to get filesystem hash");
+    OS_LOGE(TAG, "Failed to get filesystem hash");
     fsOk = false;
   }
 
   if (fsOk) {
     // Mounting LittleFS
     if (!m_fileSystem.begin(false, "/static", 10U, "static0")) {
-      ESP_LOGE(TAG, "Failed to mount LittleFS");
+      OS_LOGE(TAG, "Failed to mount LittleFS");
       fsOk = false;
     } else {
       fsOk = m_fileSystem.exists("/www/index.html.gz");
@@ -91,8 +91,8 @@ CaptivePortalInstance::CaptivePortalInstance()
   }
 
   if (fsOk) {
-    ESP_LOGI(TAG, "Serving files from LittleFS");
-    ESP_LOGI(TAG, "Filesystem hash: %s", fsHash);
+    OS_LOGI(TAG, "Serving files from LittleFS");
+    OS_LOGI(TAG, "Filesystem hash: %s", fsHash);
 
     char softAPURL[64];
     snprintf(softAPURL, sizeof(softAPURL), "http://%s", WiFi.softAPIP().toString().c_str());
@@ -103,7 +103,7 @@ CaptivePortalInstance::CaptivePortalInstance()
     // Redirecting connection tests to the captive portal, triggering the "login to network" prompt
     m_webServer.onNotFound([softAPURL](AsyncWebServerRequest* request) { request->redirect(softAPURL); });
   } else {
-    ESP_LOGE(TAG, "/www/index.html or hash files not found, serving error page");
+    OS_LOGE(TAG, "/www/index.html or hash files not found, serving error page");
 
     m_webServer.onNotFound([](AsyncWebServerRequest* request) {
       request->send(
@@ -125,7 +125,7 @@ discord.gg/OpenShock
 
   if (fsOk) {
     if (TaskUtils::TaskCreateExpensive(&Util::FnProxy<&CaptivePortalInstance::task>, TAG, 8192, this, 1, &m_taskHandle) != pdPASS) {  // PROFILED: 4-6KB stack usage
-      ESP_LOGE(TAG, "Failed to create task");
+      OS_LOGE(TAG, "Failed to create task");
     }
   }
 }
@@ -150,7 +150,7 @@ void CaptivePortalInstance::task() {
 }
 
 void CaptivePortalInstance::handleWebSocketClientConnected(uint8_t socketId) {
-  ESP_LOGD(TAG, "WebSocket client #%u connected from %s", socketId, m_socketServer.remoteIP(socketId).toString().c_str());
+  OS_LOGD(TAG, "WebSocket client #%u connected from %s", socketId, m_socketServer.remoteIP(socketId).toString().c_str());
 
   WiFiNetwork connectedNetwork;
   WiFiNetwork* connectedNetworkPtr = nullptr;
@@ -167,11 +167,11 @@ void CaptivePortalInstance::handleWebSocketClientConnected(uint8_t socketId) {
 }
 
 void CaptivePortalInstance::handleWebSocketClientDisconnected(uint8_t socketId) {
-  ESP_LOGD(TAG, "WebSocket client #%u disconnected", socketId);
+  OS_LOGD(TAG, "WebSocket client #%u disconnected", socketId);
 }
 
 void CaptivePortalInstance::handleWebSocketClientError(uint8_t socketId, uint16_t code, const char* message) {
-  ESP_LOGE(TAG, "WebSocket client #%u error %u: %s", socketId, code, message);
+  OS_LOGE(TAG, "WebSocket client #%u error %u: %s", socketId, code, message);
 }
 
 void CaptivePortalInstance::handleWebSocketEvent(uint8_t socketId, WebSocketMessageType type, const uint8_t* payload, std::size_t length) {
@@ -183,7 +183,7 @@ void CaptivePortalInstance::handleWebSocketEvent(uint8_t socketId, WebSocketMess
       handleWebSocketClientDisconnected(socketId);
       break;
     case WebSocketMessageType::Text:
-      ESP_LOGE(TAG, "Message type is not supported");
+      OS_LOGE(TAG, "Message type is not supported");
       break;
     case WebSocketMessageType::Binary:
       EventHandlers::WebSocket::HandleLocalBinary(socketId, payload, length);
@@ -197,7 +197,7 @@ void CaptivePortalInstance::handleWebSocketEvent(uint8_t socketId, WebSocketMess
       break;
     default:
       m_socketDeFragger.clear();
-      ESP_LOGE(TAG, "Unknown WebSocket event type: %u", type);
+      OS_LOGE(TAG, "Unknown WebSocket event type: %u", type);
       break;
   }
 }
