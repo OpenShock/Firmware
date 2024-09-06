@@ -4,7 +4,7 @@ const char* const TAG = "JsonAPI";
 
 #include "Logging.h"
 
-#define ESP_LOGJSONE(err, root) ESP_LOGE(TAG, "Invalid JSON response (" err "): %s", cJSON_PrintUnformatted(root))
+#define ESP_LOGJSONE(err, root) OS_LOGE(TAG, "Invalid JSON response (" err "): %s", cJSON_PrintUnformatted(root))
 
 using namespace OpenShock::Serialization;
 

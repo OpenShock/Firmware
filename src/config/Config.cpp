@@ -21,20 +21,20 @@ static fs::LittleFSFS _configFS;
 static Config::RootConfig _configData;
 static ReadWriteMutex _configMutex;
 
-#define CONFIG_LOCK_READ_ACTION(retval, action)   \
-  ScopedReadLock lock__(&_configMutex);           \
-  if (!lock__.isLocked()) {                       \
-    ESP_LOGE(TAG, "Failed to acquire read lock"); \
-    action;                                       \
-    return retval;                                \
+#define CONFIG_LOCK_READ_ACTION(retval, action)  \
+  ScopedReadLock lock__(&_configMutex);          \
+  if (!lock__.isLocked()) {                      \
+    OS_LOGE(TAG, "Failed to acquire read lock"); \
+    action;                                      \
+    return retval;                               \
   }
 
-#define CONFIG_LOCK_WRITE_ACTION(retval, action)   \
-  ScopedWriteLock lock__(&_configMutex);           \
-  if (!lock__.isLocked()) {                        \
-    ESP_LOGE(TAG, "Failed to acquire write lock"); \
-    action;                                        \
-    return retval;                                 \
+#define CONFIG_LOCK_WRITE_ACTION(retval, action)  \
+  ScopedWriteLock lock__(&_configMutex);          \
+  if (!lock__.isLocked()) {                       \
+    OS_LOGE(TAG, "Failed to acquire write lock"); \
+    action;                                       \
+    return retval;                                \
   }
 
 #define CONFIG_LOCK_READ(retval)  CONFIG_LOCK_READ_ACTION(retval, {})
@@ -42,14 +42,14 @@ static ReadWriteMutex _configMutex;
 
 bool _tryDeserializeConfig(const uint8_t* buffer, std::size_t bufferLen, OpenShock::Config::RootConfig& config) {
   if (buffer == nullptr || bufferLen == 0) {
-    ESP_LOGE(TAG, "Buffer is null or empty");
+    OS_LOGE(TAG, "Buffer is null or empty");
     return false;
   }
 
   // Deserialize
   auto fbsConfig = flatbuffers::GetRoot<Serialization::Configuration::HubConfig>(buffer);
   if (fbsConfig == nullptr) {
-    ESP_LOGE(TAG, "Failed to get deserialization root for config file");
+    OS_LOGE(TAG, "Failed to get deserialization root for config file");
     return false;
   }
 
@@ -59,13 +59,13 @@ bool _tryDeserializeConfig(const uint8_t* buffer, std::size_t bufferLen, OpenSho
   };
   flatbuffers::Verifier verifier(buffer, bufferLen, verifierOptions);
   if (!fbsConfig->Verify(verifier)) {
-    ESP_LOGE(TAG, "Failed to verify config file integrity");
+    OS_LOGE(TAG, "Failed to verify config file integrity");
     return false;
   }
 
   // Read config
   if (!config.FromFlatbuffers(fbsConfig)) {
-    ESP_LOGE(TAG, "Failed to read config file");
+    OS_LOGE(TAG, "Failed to read config file");
     return false;
   }
 
@@ -74,7 +74,7 @@ bool _tryDeserializeConfig(const uint8_t* buffer, std::size_t bufferLen, OpenSho
 bool _tryLoadConfig(std::vector<uint8_t>& buffer) {
   File file = _configFS.open("/config", "rb");
   if (!file) {
-    ESP_LOGE(TAG, "Failed to open config file for reading");
+    OS_LOGE(TAG, "Failed to open config file for reading");
     return false;
   }
 
@@ -86,7 +86,7 @@ bool _tryLoadConfig(std::vector<uint8_t>& buffer) {
 
   // Read file
   if (file.read(buffer.data(), buffer.size()) != buffer.size()) {
-    ESP_LOGE(TAG, "Failed to read config file, size mismatch");
+    OS_LOGE(TAG, "Failed to read config file, size mismatch");
     return false;
   }
 
@@ -105,13 +105,13 @@ bool _tryLoadConfig() {
 bool _trySaveConfig(const uint8_t* data, std::size_t dataLen) {
   File file = _configFS.open("/config", "wb");
   if (!file) {
-    ESP_LOGE(TAG, "Failed to open config file for writing");
+    OS_LOGE(TAG, "Failed to open config file for writing");
     return false;
   }
 
   // Write file
   if (file.write(data, dataLen) != dataLen) {
-    ESP_LOGE(TAG, "Failed to write config file");
+    OS_LOGE(TAG, "Failed to write config file");
     return false;
   }
 
@@ -133,19 +133,19 @@ void Config::Init() {
   CONFIG_LOCK_WRITE();
 
   if (!_configFS.begin(true, "/config", 3, "config")) {
-    ESP_PANIC(TAG, "Unable to mount config LittleFS partition!");
+    OS_PANIC(TAG, "Unable to mount config LittleFS partition!");
   }
 
   if (_tryLoadConfig()) {
     return;
   }
 
-  ESP_LOGW(TAG, "Failed to load config, writing default config");
+  OS_LOGW(TAG, "Failed to load config, writing default config");
 
   _configData.ToDefault();
 
   if (!_trySaveConfig()) {
-    ESP_PANIC(TAG, "Failed to save default config. Recommend formatting microcontroller and re-flashing firmware");
+    OS_PANIC(TAG, "Failed to save default config. Recommend formatting microcontroller and re-flashing firmware");
   }
 }
 
@@ -171,7 +171,7 @@ std::string Config::GetAsJSON(bool withSensitiveData) {
 bool Config::SaveFromJSON(StringView json) {
   cJSON* root = cJSON_ParseWithLength(json.data(), json.size());
   if (root == nullptr) {
-    ESP_LOGE(TAG, "Failed to parse JSON: %s", cJSON_GetErrorPtr());
+    OS_LOGE(TAG, "Failed to parse JSON: %s", cJSON_GetErrorPtr());
     return false;
   }
 
@@ -182,7 +182,7 @@ bool Config::SaveFromJSON(StringView json) {
   cJSON_Delete(root);
 
   if (!result) {
-    ESP_LOGE(TAG, "Failed to read JSON");
+    OS_LOGE(TAG, "Failed to read JSON");
     return false;
   }
 
@@ -199,7 +199,7 @@ bool Config::SaveFromFlatBuffer(const Serialization::Configuration::HubConfig* c
   CONFIG_LOCK_WRITE(false);
 
   if (!_configData.FromFlatbuffers(config)) {
-    ESP_LOGE(TAG, "Failed to read config file");
+    OS_LOGE(TAG, "Failed to read config file");
     return false;
   }
 
@@ -217,7 +217,7 @@ bool Config::SetRaw(const uint8_t* buffer, std::size_t size) {
 
   OpenShock::Config::RootConfig config;
   if (!_tryDeserializeConfig(buffer, size, config)) {
-    ESP_LOGE(TAG, "Failed to deserialize config");
+    OS_LOGE(TAG, "Failed to deserialize config");
     return false;
   }
 
@@ -230,14 +230,14 @@ void Config::FactoryReset() {
   _configData.ToDefault();
 
   if (!_configFS.remove("/config") && _configFS.exists("/config")) {
-    ESP_PANIC(TAG, "Failed to remove existing config file for factory reset. Reccomend formatting microcontroller and re-flashing firmware");
+    OS_PANIC(TAG, "Failed to remove existing config file for factory reset. Reccomend formatting microcontroller and re-flashing firmware");
   }
 
   if (!_trySaveConfig()) {
-    ESP_PANIC(TAG, "Failed to save default config. Recommend formatting microcontroller and re-flashing firmware");
+    OS_PANIC(TAG, "Failed to save default config. Recommend formatting microcontroller and re-flashing firmware");
   }
 
-  ESP_LOGI(TAG, "Factory reset complete");
+  OS_LOGI(TAG, "Factory reset complete");
 }
 
 bool Config::GetRFConfig(Config::RFConfig& out) {
@@ -309,7 +309,7 @@ bool Config::SetWiFiConfig(const Config::WiFiConfig& config) {
 bool Config::SetWiFiCredentials(const std::vector<Config::WiFiCredentials>& credentials) {
   bool foundZeroId = std::any_of(credentials.begin(), credentials.end(), [](const Config::WiFiCredentials& creds) { return creds.id == 0; });
   if (foundZeroId) {
-    ESP_LOGE(TAG, "Cannot set WiFi credentials: credential ID cannot be 0");
+    OS_LOGE(TAG, "Cannot set WiFi credentials: credential ID cannot be 0");
     return false;
   }
 
@@ -445,7 +445,7 @@ uint8_t Config::AddWiFiCredentials(StringView ssid, StringView password) {
     }
 
     if (creds.id == 0) {
-      ESP_LOGW(TAG, "Found WiFi credentials with ID 0, removing");
+      OS_LOGW(TAG, "Found WiFi credentials with ID 0, removing");
       it = _configData.wifi.credentialsList.erase(it);
       continue;
     }
@@ -463,7 +463,7 @@ uint8_t Config::AddWiFiCredentials(StringView ssid, StringView password) {
   }
 
   if (id == 0) {
-    ESP_LOGE(TAG, "Failed to add WiFi credentials: no available IDs");
+    OS_LOGE(TAG, "Failed to add WiFi credentials: no available IDs");
     return 0;
   }
 

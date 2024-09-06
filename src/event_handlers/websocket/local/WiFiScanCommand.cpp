@@ -12,7 +12,7 @@ void _Private::HandleWiFiScanCommand(uint8_t socketId, const OpenShock::Serializ
   
   auto msg = root->payload_as_WifiScanCommand();
   if (msg == nullptr) {
-    ESP_LOGE(TAG, "Payload cannot be parsed as WiFiScanCommand");
+    OS_LOGE(TAG, "Payload cannot be parsed as WiFiScanCommand");
     return;
   }
 

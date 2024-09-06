@@ -28,7 +28,7 @@ using namespace OpenShock::MessageHandlers::Local;
 void _Private::HandleAccountLinkCommand(uint8_t socketId, const OpenShock::Serialization::Local::LocalToHubMessage* root) {
   auto msg = root->payload_as_AccountLinkCommand();
   if (msg == nullptr) {
-    ESP_LOGE(TAG, "Payload cannot be parsed as AccountLinkCommand");
+    OS_LOGE(TAG, "Payload cannot be parsed as AccountLinkCommand");
     return;
   }
 

@@ -43,7 +43,7 @@ void EventHandlers::WebSocket::HandleLocalBinary(uint8_t socketId, const uint8_t
   // Deserialize
   auto msg = flatbuffers::GetRoot<Schemas::LocalToHubMessage>(data);
   if (msg == nullptr) {
-    ESP_LOGE(TAG, "Failed to deserialize message");
+    OS_LOGE(TAG, "Failed to deserialize message");
     return;
   }
 
@@ -53,7 +53,7 @@ void EventHandlers::WebSocket::HandleLocalBinary(uint8_t socketId, const uint8_t
   };
   flatbuffers::Verifier verifier(data, len, verifierOptions);
   if (!msg->Verify(verifier)) {
-    ESP_LOGE(TAG, "Failed to verify message");
+    OS_LOGE(TAG, "Failed to verify message");
     return;
   }
 

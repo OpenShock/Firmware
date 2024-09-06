@@ -50,7 +50,7 @@ void OtaUpdateConfig::ToDefault() {
 
 bool OtaUpdateConfig::FromFlatbuffers(const Serialization::Configuration::OtaUpdateConfig* config) {
   if (config == nullptr) {
-    ESP_LOGE(TAG, "config is null");
+    OS_LOGE(TAG, "config is null");
     return false;
   }
 
@@ -74,12 +74,12 @@ flatbuffers::Offset<OpenShock::Serialization::Configuration::OtaUpdateConfig> Ot
 
 bool OtaUpdateConfig::FromJSON(const cJSON* json) {
   if (json == nullptr) {
-    ESP_LOGE(TAG, "json is null");
+    OS_LOGE(TAG, "json is null");
     return false;
   }
 
   if (!cJSON_IsObject(json)) {
-    ESP_LOGE(TAG, "json is not an object");
+    OS_LOGE(TAG, "json is not an object");
     return false;
   }
 
