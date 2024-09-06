@@ -3,6 +3,9 @@
 #include "config/Config.h"
 #include "http/HTTPRequestManager.h"
 #include "serialization/JsonAPI.h"
+#include "util/StringUtils.h"
+
+const char* TAG = "Serial::CommandHandlers::LcgOverride";
 
 void _handleLcgOverrideCommand(std::string_view arg) {
   if (arg.empty()) {
@@ -17,7 +20,7 @@ void _handleLcgOverrideCommand(std::string_view arg) {
     return;
   }
 
-  if (arg.startsWith("clear")) {
+  if (OpenShock::StringStartsWith(arg, "clear"sv)) {
     if (arg.size() != 5) {
       SERPR_ERROR("Invalid command (clear command should not have any arguments)");
       return;
@@ -32,7 +35,7 @@ void _handleLcgOverrideCommand(std::string_view arg) {
     return;
   }
 
-  if (arg.startsWith("set ")) {
+  if (OpenShock::StringStartsWith(arg, "set "sv)) {
     if (arg.size() <= 4) {
       SERPR_ERROR("Invalid command (set command should have an argument)");
       return;

@@ -8,9 +8,13 @@ void _handleVersionCommand(std::string_view arg) {
   (void)arg;
 
   ::Serial.print("\n");
-  SerialInputHandler::PrintVersionInfo();
+  OpenShock::SerialInputHandler::PrintVersionInfo();
 }
 
-std::vector<OpenShock::Serial::CommandHandlers::CommandEntry> OpenShock::Serial::CommandHandlers::VersionHandler() {
-  return {OpenShock::Serial::CommandHandlers::CommandEntry("version"sv, "Print version information"sv, _handleVersionCommand)};
+OpenShock::Serial::CommandGroup OpenShock::Serial::CommandHandlers::VersionHandler() {
+  auto group = OpenShock::Serial::CommandGroup("version"sv);
+
+  auto cmd = group.addCommand("Print version information"sv, _handleVersionCommand);
+
+  return group;
 }

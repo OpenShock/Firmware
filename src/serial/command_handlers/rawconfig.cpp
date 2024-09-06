@@ -42,20 +42,12 @@ void _handleRawConfigCommand(std::string_view arg) {
 }
 
 OpenShock::Serial::CommandGroup OpenShock::Serial::CommandHandlers::RawConfigHandler() {
-  return OpenShock::Serial::CommandGroup {
-    "rawconfig"sv,
-    R"(rawconfig
-  Get the raw binary config
-  Example:
-    rawconfig
+  auto group = OpenShock::Serial::CommandGroup("rawconfig"sv);
 
-rawconfig <base64>
-  Set the raw binary config, and restart
-  Arguments:
-    <base64> must be a base64 encoded string
-  Example:
-    rawconfig (base64 encoded binary data)
-)",
-    _handleRawConfigCommand,
-  };
+  auto getter = group.addCommand("Get the raw binary config"sv, _handleRawConfigCommand);
+
+  auto setter = group.addCommand("Set the raw binary config, and restart"sv, _handleRawConfigCommand);
+  setter.addArgument("<base64>"sv, "must be a base64 encoded string"sv, "(base64 encoded binary data)"sv);
+
+  return group;
 }

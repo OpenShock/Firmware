@@ -27,18 +27,12 @@ void _handleAuthtokenCommand(std::string_view arg) {
 }
 
 OpenShock::Serial::CommandGroup OpenShock::Serial::CommandHandlers::AuthTokenHandler() {
-  return OpenShock::Serial::CommandGroup {
-    "authtoken"sv,
-    R"(authtoken
-  Get the backend auth token.
+  auto group = OpenShock::Serial::CommandGroup("authtoken"sv);
 
-authtoken [<token>]
-  Set the auth token.
-  Arguments:
-    <token> must be a string.
-  Example:
-    authtoken mytoken
-)",
-    _handleAuthtokenCommand,
-  };
+  auto getter = group.addCommand("Get the backend auth token"sv, _handleAuthtokenCommand);
+
+  auto setter = group.addCommand("Set the auth token"sv, _handleAuthtokenCommand);
+  setter.addArgument("<token>"sv, "must be a string"sv, "mytoken"sv);
+
+  return group;
 }

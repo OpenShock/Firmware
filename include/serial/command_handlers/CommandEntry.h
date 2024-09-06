@@ -32,11 +32,12 @@ namespace OpenShock::Serial {
 
   class CommandGroup {
   public:
+    CommandGroup() = default;
     CommandGroup(std::string_view name);
-    inline CommandGroup(const CommandGroup& other) {
-      m_name = other.m_name;
-      m_commands = other.m_commands;
-    }
+    CommandGroup(CommandGroup&& other) = default;
+    CommandGroup(const CommandGroup& other) = default;
+    CommandGroup& operator=(CommandGroup&& other) = default;
+    CommandGroup& operator=(const CommandGroup& other) = default;
 
     inline std::string_view name() const { return m_name; }
     inline const std::vector<CommandEntry>& commands() const { return m_commands; }
