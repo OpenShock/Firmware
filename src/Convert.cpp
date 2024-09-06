@@ -103,31 +103,31 @@ constexpr bool spanToST(std::string_view str, T& val) {
 using namespace OpenShock;
 
 // Specific converters
-bool Convert::FromInt8(std::string_view str, int8_t& val) {
+bool Convert::ToInt8(std::string_view str, int8_t& val) {
   return spanToST(str, val);
 }
-bool Convert::FromUint8(std::string_view str, uint8_t& val) {
+bool Convert::ToUint8(std::string_view str, uint8_t& val) {
   return spanToUT(str, val);
 }
-bool Convert::FromInt16(std::string_view str, int16_t& val) {
+bool Convert::ToInt16(std::string_view str, int16_t& val) {
   return spanToST(str, val);
 }
-bool Convert::FromUint16(std::string_view str, uint16_t& val) {
+bool Convert::ToUint16(std::string_view str, uint16_t& val) {
   return spanToUT(str, val);
 }
-bool Convert::FromInt32(std::string_view str, int32_t& val) {
+bool Convert::ToInt32(std::string_view str, int32_t& val) {
   return spanToST(str, val);
 }
-bool Convert::FromUint32(std::string_view str, uint32_t& val) {
+bool Convert::ToUint32(std::string_view str, uint32_t& val) {
   return spanToUT(str, val);
 }
-bool Convert::FromInt64(std::string_view str, int64_t& val) {
+bool Convert::ToInt64(std::string_view str, int64_t& val) {
   return spanToST(str, val);
 }
-bool Convert::FromUint64(std::string_view str, uint64_t& val) {
+bool Convert::ToUint64(std::string_view str, uint64_t& val) {
   return spanToUT(str, val);
 }
-bool Convert::FromBool(std::string_view str, bool& val) {
+bool Convert::ToBool(std::string_view str, bool& val) {
   if (str.length() > 5) {
     return false;
   }
