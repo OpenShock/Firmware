@@ -8,7 +8,7 @@ const char* const TAG = "SerialInputHandler";
 #include "config/SerialInputConfig.h"
 #include "FormatHelpers.h"
 #include "http/HTTPRequestManager.h"
-#include "intconv.h"
+#include "Convert.h"
 #include "Logging.h"
 #include "serialization/JsonAPI.h"
 #include "serialization/JsonSerial.h"
@@ -74,27 +74,7 @@ static std::unordered_map<std::string_view, SerialCmdHandler, std::hash_ci, std:
 /// @param out Output boolean
 /// @return True if the argument is a boolean, false otherwise
 bool _tryParseBool(std::string_view str, bool& out) {
-  if (str.empty()) {
-    return false;
-  }
-
-  str = OpenShock::StringTrim(str);
-
-  if (str.length() > 5) {
-    return false;
-  }
-
-  if (strncasecmp(str.data(), "true", str.length()) == 0) {
-    out = true;
-    return true;
-  }
-
-  if (strncasecmp(str.data(), "false", str.length()) == 0) {
-    out = false;
-    return true;
-  }
-
-  return false;
+  return OpenShock::Convert::ToBool(OpenShock::StringTrim(str), out);
 }
 
 void _handleVersionCommand(std::string_view arg) {
@@ -134,7 +114,7 @@ void _handleRfTxPinCommand(std::string_view arg) {
   }
 
   uint8_t pin;
-  if (!OpenShock::IntConv::stou8(arg, pin)) {
+  if (!OpenShock::Convert::ToUInt8(arg, pin)) {
     SERPR_ERROR("Invalid argument (number invalid or out of range)");
   }
 
