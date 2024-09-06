@@ -106,25 +106,25 @@ using namespace OpenShock;
 bool Convert::ToInt8(std::string_view str, int8_t& val) {
   return spanToST(str, val);
 }
-bool Convert::ToUInt8(std::string_view str, uint8_t& val) {
+bool Convert::ToUint8(std::string_view str, uint8_t& val) {
   return spanToUT(str, val);
 }
 bool Convert::ToInt16(std::string_view str, int16_t& val) {
   return spanToST(str, val);
 }
-bool Convert::ToUInt16(std::string_view str, uint16_t& val) {
+bool Convert::ToUint16(std::string_view str, uint16_t& val) {
   return spanToUT(str, val);
 }
 bool Convert::ToInt32(std::string_view str, int32_t& val) {
   return spanToST(str, val);
 }
-bool Convert::ToUInt32(std::string_view str, uint32_t& val) {
+bool Convert::ToUint32(std::string_view str, uint32_t& val) {
   return spanToUT(str, val);
 }
 bool Convert::ToInt64(std::string_view str, int64_t& val) {
   return spanToST(str, val);
 }
-bool Convert::ToUInt64(std::string_view str, uint64_t& val) {
+bool Convert::ToUint64(std::string_view str, uint64_t& val) {
   return spanToUT(str, val);
 }
 bool Convert::ToBool(std::string_view str, bool& val) {
