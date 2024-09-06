@@ -146,8 +146,8 @@ bool _semverIsVersionCore(std::string_view str) {
     return false;
   }
 
-  auto parts = OpenShock::StringSplit(str, '.');
-  if (parts.size() != 3) {
+  std::string_view parts[3];
+  if (!OpenShock::TryStringSplit(str, '.', parts)) {
     return false;
   }
 
@@ -254,9 +254,9 @@ std::string SemVer::toString() const {
 }
 
 bool OpenShock::TryParseSemVer(std::string_view semverStr, SemVer& semver) {
-  auto parts = OpenShock::StringSplit(semverStr, '.');
-  if (parts.size() < 3) {
-    OS_LOGE(TAG, "Must have at least 3 parts: %.*s", semverStr.length(), semverStr.data());
+  std::string_view parts[3];
+  if (!OpenShock::TryStringSplit(semverStr, '.', parts)) {
+    OS_LOGE(TAG, "Failed to split version string: %.*s", semverStr.length(), semverStr.data());
     return false;
   }
 

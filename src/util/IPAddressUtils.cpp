@@ -10,8 +10,8 @@ bool OpenShock::IPV4AddressFromStringView(IPAddress& ip, std::string_view sv) {
     return false;
   }
 
-  auto parts = OpenShock::StringSplit(sv, '.');
-  if (parts.size() != 4) {
+  std::string_view parts[4];
+  if (!OpenShock::TryStringSplit(sv, '.', parts)) {
     return false;  // Must have 4 octets
   }
 
