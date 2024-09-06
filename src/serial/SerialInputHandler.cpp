@@ -12,17 +12,42 @@ const char* const TAG = "SerialInputHandler";
 #include "Logging.h"
 #include "serialization/JsonAPI.h"
 #include "serialization/JsonSerial.h"
-#include "StringView.h"
 #include "Time.h"
 #include "util/Base64Utils.h"
+#include "util/StringUtils.h"
 #include "wifi/WiFiManager.h"
 
 #include <cJSON.h>
 #include <Esp.h>
 
+#include <cstring>
+#include <string_view>
 #include <unordered_map>
 
-#include <cstring>
+namespace std {
+  struct hash_ci {
+    std::size_t operator()(std::string_view str) const {
+      std::size_t hash = 7;
+
+      for (int i = 0; i < str.size(); ++i) {
+        hash = hash * 31 + tolower(str[i]);
+      }
+
+      return hash;
+    }
+  };
+
+  template<>
+  struct less<std::string_view> {
+    bool operator()(std::string_view a, std::string_view b) const { return a < b; }
+  };
+
+  struct equals_ci {
+    bool operator()(std::string_view a, std::string_view b) const { return strncasecmp(a.data(), b.data(), std::max(a.size(), b.size())) == 0; }
+  };
+}  // namespace std
+
+using namespace std::string_view_literals;
 
 using namespace OpenShock;
 
@@ -30,19 +55,19 @@ const int64_t PASTE_INTERVAL_THRESHOLD_MS       = 20;
 const std::size_t SERIAL_BUFFER_CLEAR_THRESHOLD = 512;
 
 static bool s_echoEnabled = true;
-static std::unordered_map<StringView, SerialCmdHandler, std::hash_ci, std::equals_ci> s_commandHandlers;
+static std::unordered_map<std::string_view, SerialCmdHandler, std::hash_ci, std::equals_ci> s_commandHandlers;
 
 /// @brief Tries to parse a boolean from a string (case-insensitive)
 /// @param str Input string
 /// @param strLen Length of input string
 /// @param out Output boolean
 /// @return True if the argument is a boolean, false otherwise
-bool _tryParseBool(StringView str, bool& out) {
-  if (str.isNullOrEmpty()) {
+bool _tryParseBool(std::string_view str, bool& out) {
+  if (str.empty()) {
     return false;
   }
 
-  str = str.trim();
+  str = OpenShock::StringTrim(str);
 
   if (str.length() > 5) {
     return false;
@@ -156,16 +181,16 @@ int findLineStart(const char* buffer, int bufferSize, int lineEnd) {
   return -1;
 }
 
-void processSerialLine(StringView line) {
-  line = line.trim();
-  if (line.isNullOrEmpty()) {
+void processSerialLine(std::string_view line) {
+  line = OpenShock::StringTrim(line);
+  if (line.empty()) {
     SERPR_ERROR("No command");
     return;
   }
 
-  auto parts           = line.split(' ', 1);
-  StringView command   = parts[0];
-  StringView arguments = parts.size() > 1 ? parts[1] : StringView();
+  auto parts                 = OpenShock::StringSplit(line, ' ', 1);
+  std::string_view command   = parts[0];
+  std::string_view arguments = parts.size() > 1 ? parts[1] : std::string_view();
 
   auto it = s_commandHandlers.find(command);
   if (it == s_commandHandlers.end()) {
@@ -269,7 +294,7 @@ void SerialInputHandler::Update() {
       break;
     }
 
-    StringView line = StringView(buffer, lineEnd).trim();
+    std::string_view line = OpenShock::StringTrim(std::string_view(buffer, lineEnd));
 
     Serial.printf("\r> %.*s\n", line.size(), line.data());
 

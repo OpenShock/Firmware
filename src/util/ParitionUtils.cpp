@@ -22,7 +22,7 @@ bool OpenShock::TryGetPartitionHash(const esp_partition_t* partition, char (&has
   return true;
 }
 
-bool OpenShock::FlashPartitionFromUrl(const esp_partition_t* partition, StringView remoteUrl, const uint8_t (&remoteHash)[32], std::function<bool(std::size_t, std::size_t, float)> progressCallback) {
+bool OpenShock::FlashPartitionFromUrl(const esp_partition_t* partition, std::string_view remoteUrl, const uint8_t (&remoteHash)[32], std::function<bool(std::size_t, std::size_t, float)> progressCallback) {
   OpenShock::SHA256 sha256;
   if (!sha256.begin()) {
     OS_LOGE(TAG, "Failed to initialize SHA256 hash");
