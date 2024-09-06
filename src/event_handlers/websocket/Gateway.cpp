@@ -38,7 +38,7 @@ void EventHandlers::WebSocket::HandleGatewayBinary(const uint8_t* data, std::siz
   // Deserialize
   auto msg = flatbuffers::GetRoot<Schemas::GatewayToHubMessage>(data);
   if (msg == nullptr) {
-    ESP_LOGE(TAG, "Failed to deserialize message");
+    OS_LOGE(TAG, "Failed to deserialize message");
     return;
   }
 
@@ -48,7 +48,7 @@ void EventHandlers::WebSocket::HandleGatewayBinary(const uint8_t* data, std::siz
   };
   flatbuffers::Verifier verifier(data, len, verifierOptions);
   if (!msg->Verify(verifier)) {
-    ESP_LOGE(TAG, "Failed to verify message");
+    OS_LOGE(TAG, "Failed to verify message");
     return;
   }
 

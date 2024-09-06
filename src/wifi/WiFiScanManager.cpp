@@ -61,16 +61,16 @@ void _handleScanError(int16_t retval) {
   _notifyTask(WiFiScanTaskNotificationFlags::ERROR);
 
   if (retval == WIFI_SCAN_FAILED) {
-    ESP_LOGE(TAG, "Failed to start scan on channel %u", s_currentChannel);
+    OS_LOGE(TAG, "Failed to start scan on channel %u", s_currentChannel);
     return;
   }
 
   if (retval == WIFI_SCAN_RUNNING) {
-    ESP_LOGE(TAG, "Scan is running on channel %u", s_currentChannel);
+    OS_LOGE(TAG, "Scan is running on channel %u", s_currentChannel);
     return;
   }
 
-  ESP_LOGE(TAG, "Scan returned an unknown error");
+  OS_LOGE(TAG, "Scan returned an unknown error");
 }
 
 int16_t _scanChannel(uint8_t channel) {
@@ -104,19 +104,19 @@ WiFiScanStatus _scanningTaskImpl() {
 
     // Wait for the scan to complete, _evScanCompleted will notify us when it's done
     if (xTaskNotifyWait(0, WiFiScanTaskNotificationFlags::CLEAR_FLAGS, &notificationFlags, pdMS_TO_TICKS(OPENSHOCK_WIFI_SCAN_TIMEOUT_MS)) != pdTRUE) {
-      ESP_LOGE(TAG, "Scan timed out");
+      OS_LOGE(TAG, "Scan timed out");
       return WiFiScanStatus::TimedOut;
     }
 
     // Check if we were notified of an error or if WiFi was disabled
     if (notificationFlags != WiFiScanTaskNotificationFlags::CHANNEL_DONE) {
       if (notificationFlags & WiFiScanTaskNotificationFlags::WIFI_DISABLED) {
-        ESP_LOGE(TAG, "Scan task exiting due to being notified that WiFi was disabled");
+        OS_LOGE(TAG, "Scan task exiting due to being notified that WiFi was disabled");
         return WiFiScanStatus::Aborted;
       }
 
       if (notificationFlags & WiFiScanTaskNotificationFlags::ERROR) {
-        ESP_LOGE(TAG, "Scan task exiting due to being notified of an error");
+        OS_LOGE(TAG, "Scan task exiting due to being notified of an error");
         return WiFiScanStatus::Error;
       }
 
@@ -167,7 +167,7 @@ void _evScanCompleted(arduino_event_id_t event, arduino_event_info_t info) {
   }
 
   if (numNetworks == WIFI_SCAN_RUNNING) {
-    ESP_LOGE(TAG, "Scan completed but scan is still running... WTF?");
+    OS_LOGE(TAG, "Scan completed but scan is still running... WTF?");
     return;
   }
 
@@ -177,7 +177,7 @@ void _evScanCompleted(arduino_event_id_t event, arduino_event_info_t info) {
   for (int16_t i = 0; i < numNetworks; i++) {
     wifi_ap_record_t* record = reinterpret_cast<wifi_ap_record_t*>(WiFi.getScanInfoByIndex(i));
     if (record == nullptr) {
-      ESP_LOGE(TAG, "Failed to get scan info for network #%d", i);
+      OS_LOGE(TAG, "Failed to get scan info for network #%d", i);
       return;
     }
 
@@ -201,7 +201,7 @@ void _evSTAStopped(arduino_event_id_t event, arduino_event_info_t info) {
 
 bool WiFiScanManager::Init() {
   if (s_initialized) {
-    ESP_LOGW(TAG, "WiFiScanManager is already initialized");
+    OS_LOGW(TAG, "WiFiScanManager is already initialized");
     return true;
   }
 
@@ -222,7 +222,7 @@ bool WiFiScanManager::StartScan() {
 
   // Check if a scan is already in progress
   if (s_scanTaskHandle != nullptr && eTaskGetState(s_scanTaskHandle) != eDeleted) {
-    ESP_LOGW(TAG, "Cannot start scan: scan task is already running");
+    OS_LOGW(TAG, "Cannot start scan: scan task is already running");
 
     xSemaphoreGive(s_scanTaskMutex);
     return false;
@@ -230,7 +230,7 @@ bool WiFiScanManager::StartScan() {
 
   // Start the scan task
   if (TaskUtils::TaskCreateExpensive(_scanningTask, "WiFiScanManager", 4096, nullptr, 1, &s_scanTaskHandle) != pdPASS) {  // PROFILED: 1.8KB stack usage
-    ESP_LOGE(TAG, "Failed to create scan task");
+    OS_LOGE(TAG, "Failed to create scan task");
 
     xSemaphoreGive(s_scanTaskMutex);
     return false;
@@ -244,7 +244,7 @@ bool WiFiScanManager::AbortScan() {
 
   // Check if a scan is in progress
   if (s_scanTaskHandle == nullptr || eTaskGetState(s_scanTaskHandle) == eDeleted) {
-    ESP_LOGW(TAG, "Cannot abort scan: no scan is in progress");
+    OS_LOGW(TAG, "Cannot abort scan: no scan is in progress");
 
     xSemaphoreGive(s_scanTaskMutex);
     return false;

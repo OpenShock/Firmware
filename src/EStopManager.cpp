@@ -56,13 +56,13 @@ void _estopEventHandler(void* pvParameters) {
     EstopEventQueueMessage message;
     if (xQueueReceive(s_estopEventQueue, &message, waitTime) == pdTRUE) {
       if (message.pressed) {
-        ESP_LOGI(TAG, "EStop pressed");
+        OS_LOGI(TAG, "EStop pressed");
       } else {
-        ESP_LOGI(TAG, "EStop released");
+        OS_LOGI(TAG, "EStop released");
       }
 
       if (message.deactivatesAtChanged) {
-        ESP_LOGI(TAG, "EStop deactivation time changed");
+        OS_LOGI(TAG, "EStop deactivation time changed");
         deactivatesAt = message.deactivatesAt;
       }
 
@@ -76,7 +76,7 @@ void _estopEventHandler(void* pvParameters) {
       s_estopAwaitingRelease = true;
       OpenShock::VisualStateManager::SetEmergencyStopStatus(s_estopActive, s_estopAwaitingRelease);
 
-      ESP_LOGI(TAG, "EStop cleared, awaiting release");
+      OS_LOGI(TAG, "EStop cleared, awaiting release");
     }
   }
 }
@@ -124,7 +124,7 @@ void EStopManager::Init() {
 #ifdef OPENSHOCK_ESTOP_PIN
   s_estopPin = static_cast<gpio_num_t>(OPENSHOCK_ESTOP_PIN);
 
-  ESP_LOGI(TAG, "Initializing on pin %hhi", static_cast<int8_t>(s_estopPin));
+  OS_LOGI(TAG, "Initializing on pin %hhi", static_cast<int8_t>(s_estopPin));
 
   gpio_config_t io_conf;
   io_conf.pin_bit_mask = 1ULL << s_estopPin;
@@ -139,20 +139,20 @@ void EStopManager::Init() {
 
   esp_err_t err = gpio_install_isr_service(ESP_INTR_FLAG_EDGE);
   if (err != ESP_OK && err != ESP_ERR_INVALID_STATE) {  // ESP_ERR_INVALID_STATE is fine, it just means the ISR service is already installed
-    ESP_PANIC(TAG, "Failed to install EStop ISR service");
+    OS_PANIC(TAG, "Failed to install EStop ISR service");
   }
 
   err = gpio_isr_handler_add(s_estopPin, _estopEdgeInterrupt, nullptr);
   if (err != ESP_OK) {
-    ESP_PANIC(TAG, "Failed to add EStop ISR handler");
+    OS_PANIC(TAG, "Failed to add EStop ISR handler");
   }
 
   if (TaskUtils::TaskCreateUniversal(_estopEventHandler, TAG, 4096, nullptr, 5, &s_estopEventHandlerTask, 1) != pdPASS) {
-    ESP_PANIC(TAG, "Failed to create EStop event handler task");
+    OS_PANIC(TAG, "Failed to create EStop event handler task");
   }
 
 #else
-  ESP_LOGI(TAG, "EStopManager disabled, no pin defined");
+  OS_LOGI(TAG, "EStopManager disabled, no pin defined");
 #endif
 }
 

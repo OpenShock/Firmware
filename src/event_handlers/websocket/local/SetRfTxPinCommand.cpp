@@ -29,7 +29,7 @@ using namespace OpenShock::MessageHandlers::Local;
 void _Private::HandleSetRfTxPinCommand(uint8_t socketId, const OpenShock::Serialization::Local::LocalToHubMessage* root) {
   auto msg = root->payload_as_SetRfTxPinCommand();
   if (msg == nullptr) {
-    ESP_LOGE(TAG, "Payload cannot be parsed as SetRfTxPinCommand");
+    OS_LOGE(TAG, "Payload cannot be parsed as SetRfTxPinCommand");
     return;
   }
 
