@@ -23,7 +23,9 @@ jobs:
         with:
           style: file
           version: 18
-          step-summary: true
+          lines-changed-only: diff
+          thread-comments: true
+          step-summary: false
           format-review: true
 
       - name: Fail fast?!
