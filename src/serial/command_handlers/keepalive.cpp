@@ -19,7 +19,7 @@ void _handleKeepAliveCommand(std::string_view arg) {
     return;
   }
 
-  if (!OpenShock::Convert::FromBool(OpenShock::StringTrim(arg), keepAliveEnabled)) {
+  if (!OpenShock::Convert::ToBool(OpenShock::StringTrim(arg), keepAliveEnabled)) {
     SERPR_ERROR("Invalid argument (not a boolean)");
     return;
   }

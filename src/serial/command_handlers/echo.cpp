@@ -14,7 +14,7 @@ void _handleSerialEchoCommand(std::string_view arg) {
   }
 
   bool enabled;
-  if (!OpenShock::Convert::FromBool(OpenShock::StringTrim(arg), enabled)) {
+  if (!OpenShock::Convert::ToBool(OpenShock::StringTrim(arg), enabled)) {
     SERPR_ERROR("Invalid argument (not a boolean)");
     return;
   }
