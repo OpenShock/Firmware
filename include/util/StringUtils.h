@@ -11,7 +11,7 @@
 namespace OpenShock {
   bool FormatToString(std::string& out, const char* format, ...);
 
-  constexpr std::string_view StringTrimLeft(std::string_view view) {
+  constexpr std::string_view StringTrimLeft(const std::string_view view) {
     if (view.empty()) {
       return view;
     }
@@ -23,7 +23,7 @@ namespace OpenShock {
 
     return view.substr(pos);
   }
-  constexpr std::string_view StringTrimRight(std::string_view view) {
+  constexpr std::string_view StringTrimRight(const std::string_view view) {
     if (view.empty()) {
       return view;
     }
@@ -35,10 +35,10 @@ namespace OpenShock {
 
     return view.substr(0, pos + 1);
   }
-  constexpr std::string_view StringTrim(std::string_view view) {
+  constexpr std::string_view StringTrim(const std::string_view view) {
     return StringTrimLeft(StringTrimRight(view));
   }
-  constexpr bool StringStartsWith(std::string_view view, std::string_view prefix) {
+  constexpr bool StringStartsWith(const std::string_view view, std::string_view prefix) {
     return view.size() >= prefix.size() && view.substr(0, prefix.size()) == prefix;
   }
   template<std::size_t N>
