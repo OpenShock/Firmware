@@ -28,7 +28,7 @@ bool RootConfig::FromFlatbuffers(const Serialization::Configuration::HubConfig* 
   }
 
   if (!estop.FromFlatbuffers(config->estop())) {
-    ESP_LOGE(TAG, "Unable to load estop config");
+    OS_LOGE(TAG, "Unable to load estop config");
     return false;
   }
 
@@ -89,7 +89,7 @@ bool RootConfig::FromJSON(const cJSON* json) {
   }
 
   if (!estop.FromJSON(cJSON_GetObjectItemCaseSensitive(json, "estop"))) {
-    ESP_LOGE(TAG, "Unable to load estop config");
+    OS_LOGE(TAG, "Unable to load estop config");
     return false;
   }
 

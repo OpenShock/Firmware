@@ -411,7 +411,7 @@ bool Config::SetEStopConfigGpioPin(gpio_num_t gpioPin) {
   CONFIG_LOCK_WRITE(false);
 
   if (!OpenShock::IsValidInputPin(gpioPin)) {
-    ESP_LOGE(TAG, "Invalid EStop GPIO Pin: %d", gpioPin);
+    OS_LOGE(TAG, "Invalid EStop GPIO Pin: %d", gpioPin);
     return false;
   }
 

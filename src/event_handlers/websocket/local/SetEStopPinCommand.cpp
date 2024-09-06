@@ -29,7 +29,7 @@ using namespace OpenShock::MessageHandlers::Local;
 void _Private::HandleSetEstopPinCommand(uint8_t socketId, const OpenShock::Serialization::Local::LocalToHubMessage* root) {
   auto msg = root->payload_as_SetEstopPinCommand();
   if (msg == nullptr) {
-    ESP_LOGE(TAG, "Payload cannot be parsed as SetEstopPinCommand");
+    OS_LOGE(TAG, "Payload cannot be parsed as SetEstopPinCommand");
     return;
   }
 

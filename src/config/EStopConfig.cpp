@@ -20,7 +20,7 @@ void EStopConfig::ToDefault() {
 
 bool EStopConfig::FromFlatbuffers(const Serialization::Configuration::EStopConfig* config) {
   if (config == nullptr) {
-    ESP_LOGE(TAG, "config is null");
+    OS_LOGE(TAG, "config is null");
     return false;
   }
 
@@ -29,7 +29,7 @@ bool EStopConfig::FromFlatbuffers(const Serialization::Configuration::EStopConfi
   uint8_t val = config->gpio_pin();
 
   if (!OpenShock::IsValidInputPin(val)) {
-    ESP_LOGE(TAG, "Invalid EStop pin: %d", val);
+    OS_LOGE(TAG, "Invalid EStop pin: %d", val);
     return false;
   }
 
@@ -44,28 +44,28 @@ flatbuffers::Offset<OpenShock::Serialization::Configuration::EStopConfig> EStopC
 
 bool EStopConfig::FromJSON(const cJSON* json) {
   if (json == nullptr) {
-    ESP_LOGE(TAG, "json is null");
+    OS_LOGE(TAG, "json is null");
     return false;
   }
 
   if (cJSON_IsObject(json) == 0) {
-    ESP_LOGE(TAG, "json is not an object");
+    OS_LOGE(TAG, "json is not an object");
     return false;
   }
 
   if (!Internal::Utils::FromJsonBool(enabled, json, "enabled", false)) {
-    ESP_LOGE(TAG, "Failed to parse enabled");
+    OS_LOGE(TAG, "Failed to parse enabled");
     return false;
   }
 
   uint8_t val;
   if (!Internal::Utils::FromJsonU8(val, json, "gpioPin", OPENSHOCK_ESTOP_PIN)) {
-    ESP_LOGE(TAG, "Failed to parse gpioPin");
+    OS_LOGE(TAG, "Failed to parse gpioPin");
     return false;
   }
 
   if (!OpenShock::IsValidInputPin(val)) {
-    ESP_LOGE(TAG, "Invalid EStop pin: %d", val);
+    OS_LOGE(TAG, "Invalid EStop pin: %d", val);
     return false;
   }
 
