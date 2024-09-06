@@ -20,7 +20,7 @@ std::vector<rmt_data_t> Rmt::GetSequence(ShockerModelType model, uint16_t shocke
     case ShockerModelType::CaiXianlin:
       return Rmt::CaiXianlinEncoder::GetSequence(shockerId, 0, type, intensity);
     default:
-      ESP_LOGE(TAG, "Unknown shocker model: %u", model);
+      OS_LOGE(TAG, "Unknown shocker model: %u", model);
       return {};
   }
 }
@@ -43,7 +43,7 @@ std::shared_ptr<std::vector<rmt_data_t>> Rmt::GetZeroSequence(ShockerModelType m
       sequence = std::make_shared<std::vector<rmt_data_t>>(Rmt::CaiXianlinEncoder::GetSequence(shockerId, 0, ShockerCommandType::Vibrate, 0));
       break;
     default:
-      ESP_LOGE(TAG, "Unknown shocker model: %u", model);
+      OS_LOGE(TAG, "Unknown shocker model: %u", model);
       sequence = nullptr;
       break;
   }

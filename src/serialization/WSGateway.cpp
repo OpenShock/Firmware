@@ -13,7 +13,7 @@ bool Gateway::SerializeKeepAliveMessage(Common::SerializationCallbackFn callback
 
   int64_t uptime = OpenShock::millis();
   if (uptime < 0) {
-    ESP_LOGE(TAG, "Failed to get uptime");
+    OS_LOGE(TAG, "Failed to get uptime");
     return false;
   }
 

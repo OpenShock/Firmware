@@ -244,7 +244,7 @@ ParserState _parseChunkHeader(const uint8_t* buffer, std::size_t bufferLen, std:
 
   // Header must have at least one character
   if (headerLen == 0) {
-    ESP_LOGW(TAG, "Invalid chunk header length");
+    OS_LOGW(TAG, "Invalid chunk header length");
     return ParserState::Invalid;
   }
 
@@ -259,7 +259,7 @@ ParserState _parseChunkHeader(const uint8_t* buffer, std::size_t bufferLen, std:
 
   // Bounds check
   if (sizeFieldEnd == 0 || sizeFieldEnd > 16) {
-    ESP_LOGW(TAG, "Invalid chunk size field length");
+    OS_LOGW(TAG, "Invalid chunk size field length");
     return ParserState::Invalid;
   }
 
@@ -267,12 +267,12 @@ ParserState _parseChunkHeader(const uint8_t* buffer, std::size_t bufferLen, std:
 
   // Parse the chunk size
   if (!_tryParseHexSizeT(payloadLen, sizeField)) {
-    ESP_LOGW(TAG, "Failed to parse chunk size");
+    OS_LOGW(TAG, "Failed to parse chunk size");
     return ParserState::Invalid;
   }
 
   if (payloadLen > HTTP_DOWNLOAD_SIZE_LIMIT) {
-    ESP_LOGW(TAG, "Chunk size too large");
+    OS_LOGW(TAG, "Chunk size too large");
     return ParserState::Invalid;
   }
 
@@ -297,7 +297,7 @@ ParserState _parseChunk(const uint8_t* buffer, std::size_t bufferLen, std::size_
 
   // Check for CRLF
   if (!_isCRLF(buffer + totalLen - 2)) {
-    ESP_LOGW(TAG, "Invalid chunk payload CRLF");
+    OS_LOGW(TAG, "Invalid chunk payload CRLF");
     return ParserState::Invalid;
   }
 
@@ -321,7 +321,7 @@ StreamReaderResult _readStreamDataChunked(HTTPClient& client, WiFiClient* stream
 
   uint8_t* buffer = static_cast<uint8_t*>(malloc(HTTP_BUFFER_SIZE));
   if (buffer == nullptr) {
-    ESP_LOGE(TAG, "Out of memory");
+    OS_LOGE(TAG, "Out of memory");
     return {HTTP::RequestResult::RequestFailed, 0};
   }
 
@@ -330,7 +330,7 @@ StreamReaderResult _readStreamDataChunked(HTTPClient& client, WiFiClient* stream
 
   while (client.connected() && state != ParserState::Invalid) {
     if (begin + timeoutMs < OpenShock::millis()) {
-      ESP_LOGW(TAG, "Request timed out");
+      OS_LOGW(TAG, "Request timed out");
       result = HTTP::RequestResult::TimedOut;
       break;
     }
@@ -343,7 +343,7 @@ StreamReaderResult _readStreamDataChunked(HTTPClient& client, WiFiClient* stream
 
     std::size_t bytesRead = stream->readBytes(buffer + bufferCursor, HTTP_BUFFER_SIZE - bufferCursor);
     if (bytesRead == 0) {
-      ESP_LOGW(TAG, "No bytes read");
+      OS_LOGW(TAG, "No bytes read");
       result = HTTP::RequestResult::RequestFailed;
       break;
     }
@@ -353,15 +353,15 @@ StreamReaderResult _readStreamDataChunked(HTTPClient& client, WiFiClient* stream
 parseMore:
     state = _parseChunk(buffer, bufferCursor, payloadPos, payloadSize);
     if (state == ParserState::Invalid) {
-      ESP_LOGE(TAG, "Failed to parse chunk");
+      OS_LOGE(TAG, "Failed to parse chunk");
       result = HTTP::RequestResult::RequestFailed;
       break;
     }
-    ESP_LOGD(TAG, "Chunk parsed: %zu %zu", payloadPos, payloadSize);
+    OS_LOGD(TAG, "Chunk parsed: %zu %zu", payloadPos, payloadSize);
 
     if (state == ParserState::NeedMoreData) {
       if (bufferCursor == HTTP_BUFFER_SIZE) {
-        ESP_LOGE(TAG, "Chunk too large");
+        OS_LOGE(TAG, "Chunk too large");
         result = HTTP::RequestResult::RequestFailed;
         break;
       }
@@ -403,7 +403,7 @@ StreamReaderResult _readStreamData(HTTPClient& client, WiFiClient* stream, std::
 
   while (client.connected() && nWritten < contentLength) {
     if (begin + timeoutMs < OpenShock::millis()) {
-      ESP_LOGW(TAG, "Request timed out");
+      OS_LOGW(TAG, "Request timed out");
       result = HTTP::RequestResult::TimedOut;
       break;
     }
@@ -418,13 +418,13 @@ StreamReaderResult _readStreamData(HTTPClient& client, WiFiClient* stream, std::
 
     std::size_t bytesRead = stream->readBytes(buffer, bytesToRead);
     if (bytesRead == 0) {
-      ESP_LOGW(TAG, "No bytes read");
+      OS_LOGW(TAG, "No bytes read");
       result = HTTP::RequestResult::RequestFailed;
       break;
     }
 
     if (!downloadCallback(nWritten, buffer, bytesRead)) {
-      ESP_LOGW(TAG, "Request cancelled by callback");
+      OS_LOGW(TAG, "Request cancelled by callback");
       result = HTTP::RequestResult::Cancelled;
       break;
     }
@@ -451,7 +451,7 @@ HTTP::Response<std::size_t> _doGetStream(
 ) {
   int64_t begin = OpenShock::millis();
   if (!client.begin(OpenShock::StringToArduinoString(url))) {
-    ESP_LOGE(TAG, "Failed to begin HTTP request");
+    OS_LOGE(TAG, "Failed to begin HTTP request");
     return {HTTP::RequestResult::RequestFailed, 0};
   }
 
@@ -462,7 +462,7 @@ HTTP::Response<std::size_t> _doGetStream(
   int responseCode = client.GET();
 
   if (responseCode == HTTP_CODE_REQUEST_TIMEOUT || begin + timeoutMs < OpenShock::millis()) {
-    ESP_LOGW(TAG, "Request timed out");
+    OS_LOGW(TAG, "Request timed out");
     return {HTTP::RequestResult::TimedOut, responseCode, 0};
   }
 
@@ -493,11 +493,11 @@ HTTP::Response<std::size_t> _doGetStream(
   }
 
   if (responseCode == 418) {
-    ESP_LOGW(TAG, "The server refused to brew coffee because it is, permanently, a teapot.");
+    OS_LOGW(TAG, "The server refused to brew coffee because it is, permanently, a teapot.");
   }
 
   if (std::find(acceptedCodes.begin(), acceptedCodes.end(), responseCode) == acceptedCodes.end()) {
-    ESP_LOGE(TAG, "Received unexpected response code %d", responseCode);
+    OS_LOGE(TAG, "Received unexpected response code %d", responseCode);
     return {HTTP::RequestResult::CodeRejected, responseCode, 0};
   }
 
@@ -508,19 +508,19 @@ HTTP::Response<std::size_t> _doGetStream(
 
   if (contentLength > 0) {
     if (contentLength > HTTP_DOWNLOAD_SIZE_LIMIT) {
-      ESP_LOGE(TAG, "Content-Length too large");
+      OS_LOGE(TAG, "Content-Length too large");
       return {HTTP::RequestResult::RequestFailed, responseCode, 0};
     }
 
     if (!contentLengthCallback(contentLength)) {
-      ESP_LOGW(TAG, "Request cancelled by callback");
+      OS_LOGW(TAG, "Request cancelled by callback");
       return {HTTP::RequestResult::Cancelled, responseCode, 0};
     }
   }
 
   WiFiClient* stream = client.getStreamPtr();
   if (stream == nullptr) {
-    ESP_LOGE(TAG, "Failed to get stream");
+    OS_LOGE(TAG, "Failed to get stream");
     return {HTTP::RequestResult::RequestFailed, 0};
   }
 

@@ -12,13 +12,13 @@ using namespace OpenShock::MessageHandlers::Server;
 void _Private::HandleCaptivePortalConfig(const OpenShock::Serialization::Gateway::GatewayToHubMessage* root) {
   auto msg = root->payload_as_CaptivePortalConfig();
   if (msg == nullptr) {
-    ESP_LOGE(TAG, "Payload cannot be parsed as CaptivePortalConfig");
+    OS_LOGE(TAG, "Payload cannot be parsed as CaptivePortalConfig");
     return;
   }
 
   bool enabled = msg->enabled();
 
-  ESP_LOGD(TAG, "Captive portal is %s", enabled ? "force enabled" : "normal");
+  OS_LOGD(TAG, "Captive portal is %s", enabled ? "force enabled" : "normal");
 
   OpenShock::CaptivePortal::SetAlwaysEnabled(enabled);
 }

@@ -23,7 +23,7 @@ namespace OpenShock::HTTP {
   };
 
   template<typename T>
-  struct Response {
+  struct [[nodiscard]] Response {
     RequestResult result;
     int code;
     T data;

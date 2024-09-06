@@ -196,7 +196,7 @@ void _handleDomainCommand(std::string_view arg) {
     return;
   }
 
-  ESP_LOGI(TAG, "Successfully connected to \"%.*s\", version: %s, commit: %s, current time: %s", arg.length(), arg.data(), resp.data.version.c_str(), resp.data.commit.c_str(), resp.data.currentTime.c_str());
+  OS_LOGI(TAG, "Successfully connected to \"%.*s\", version: %s, commit: %s, current time: %s", arg.length(), arg.data(), resp.data.version.c_str(), resp.data.commit.c_str(), resp.data.currentTime.c_str());
 
   bool result = OpenShock::Config::SetBackendDomain(arg);
 
@@ -291,7 +291,7 @@ void _handleLcgOverrideCommand(std::string_view arg) {
       return;
     }
 
-    ESP_LOGI(
+    OS_LOGI(
       TAG,
       "Successfully connected to \"%.*s\", name: %s, version: %s, current time: %s, country code: %s, FQDN: %s",
       domain.size(),
@@ -370,7 +370,7 @@ void _handleNetworksCommand(std::string_view arg) {
       cred.id = id++;
     }
 
-    ESP_LOGI(TAG, "Adding network \"%s\" to config, id=%u", cred.ssid.c_str(), cred.id);
+    OS_LOGI(TAG, "Adding network \"%s\" to config, id=%u", cred.ssid.c_str(), cred.id);
 
     creds.emplace_back(std::move(cred));
   }
@@ -893,7 +893,7 @@ void processSerialLine(std::string_view line) {
 bool SerialInputHandler::Init() {
   static bool s_initialized = false;
   if (s_initialized) {
-    ESP_LOGW(TAG, "Serial input handler already initialized");
+    OS_LOGW(TAG, "Serial input handler already initialized");
     return false;
   }
   s_initialized = true;
@@ -921,7 +921,7 @@ bool SerialInputHandler::Init() {
   Serial.println();
 
   if (!Config::GetSerialInputConfigEchoEnabled(s_echoEnabled)) {
-    ESP_LOGE(TAG, "Failed to get serial echo status from config");
+    OS_LOGE(TAG, "Failed to get serial echo status from config");
     return false;
   }
 
@@ -1009,7 +1009,7 @@ void SerialInputHandler::Update() {
       bufferIndex = 0;
       // Free buffer if it's too big
       if (bufferSize > SERIAL_BUFFER_CLEAR_THRESHOLD) {
-        ESP_LOGV(TAG, "Clearing serial input buffer");
+        OS_LOGV(TAG, "Clearing serial input buffer");
         bufferSize = 0;
         free(buffer);
         buffer = nullptr;
@@ -1025,7 +1025,7 @@ void SerialInputHandler::Update() {
       bufferIndex = 0;
       // Free buffer if it's too big
       if (bufferSize > SERIAL_BUFFER_CLEAR_THRESHOLD) {
-        ESP_LOGV(TAG, "Clearing serial input buffer");
+        OS_LOGV(TAG, "Clearing serial input buffer");
         bufferSize = 0;
         free(buffer);
         buffer = nullptr;

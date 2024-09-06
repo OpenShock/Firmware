@@ -69,7 +69,7 @@ static SemaphoreHandle_t _requestedVersionMutex = xSemaphoreCreateMutex();
 
 bool _tryQueueUpdateRequest(const OpenShock::SemVer& version) {
   if (xSemaphoreTake(_requestedVersionMutex, pdMS_TO_TICKS(1000)) != pdTRUE) {
-    ESP_LOGE(TAG, "Failed to take requested version mutex");
+    OS_LOGE(TAG, "Failed to take requested version mutex");
     return false;
   }
 
@@ -84,7 +84,7 @@ bool _tryQueueUpdateRequest(const OpenShock::SemVer& version) {
 
 bool _tryGetRequestedVersion(OpenShock::SemVer& version) {
   if (xSemaphoreTake(_requestedVersionMutex, pdMS_TO_TICKS(1000)) != pdTRUE) {
-    ESP_LOGE(TAG, "Failed to take requested version mutex");
+    OS_LOGE(TAG, "Failed to take requested version mutex");
     return false;
   }
 
@@ -107,12 +107,12 @@ void _otaEvWiFiDisconnectedHandler(arduino_event_t* event) {
 bool _sendProgressMessage(Serialization::Gateway::OtaInstallProgressTask task, float progress) {
   int32_t updateId;
   if (!Config::GetOtaUpdateId(updateId)) {
-    ESP_LOGE(TAG, "Failed to get OTA update ID");
+    OS_LOGE(TAG, "Failed to get OTA update ID");
     return false;
   }
 
   if (!Serialization::Gateway::SerializeOtaInstallProgressMessage(updateId, task, progress, GatewayConnectionManager::SendMessageBIN)) {
-    ESP_LOGE(TAG, "Failed to send OTA install progress message");
+    OS_LOGE(TAG, "Failed to send OTA install progress message");
     return false;
   }
 
@@ -121,12 +121,12 @@ bool _sendProgressMessage(Serialization::Gateway::OtaInstallProgressTask task, f
 bool _sendFailureMessage(std::string_view message, bool fatal = false) {
   int32_t updateId;
   if (!Config::GetOtaUpdateId(updateId)) {
-    ESP_LOGE(TAG, "Failed to get OTA update ID");
+    OS_LOGE(TAG, "Failed to get OTA update ID");
     return false;
   }
 
   if (!Serialization::Gateway::SerializeOtaInstallFailedMessage(updateId, message, fatal, GatewayConnectionManager::SendMessageBIN)) {
-    ESP_LOGE(TAG, "Failed to send OTA install failed message");
+    OS_LOGE(TAG, "Failed to send OTA install failed message");
     return false;
   }
 
@@ -134,14 +134,14 @@ bool _sendFailureMessage(std::string_view message, bool fatal = false) {
 }
 
 bool _flashAppPartition(const esp_partition_t* partition, std::string_view remoteUrl, const uint8_t (&remoteHash)[32]) {
-  ESP_LOGD(TAG, "Flashing app partition");
+  OS_LOGD(TAG, "Flashing app partition");
 
   if (!_sendProgressMessage(Serialization::Gateway::OtaInstallProgressTask::FlashingApplication, 0.0f)) {
     return false;
   }
 
   auto onProgress = [](std::size_t current, std::size_t total, float progress) -> bool {
-    ESP_LOGD(TAG, "Flashing app partition: %u / %u (%.2f%%)", current, total, progress * 100.0f);
+    OS_LOGD(TAG, "Flashing app partition: %u / %u (%.2f%%)", current, total, progress * 100.0f);
 
     _sendProgressMessage(Serialization::Gateway::OtaInstallProgressTask::FlashingApplication, progress);
 
@@ -149,7 +149,7 @@ bool _flashAppPartition(const esp_partition_t* partition, std::string_view remot
   };
 
   if (!OpenShock::FlashPartitionFromUrl(partition, remoteUrl, remoteHash, onProgress)) {
-    ESP_LOGE(TAG, "Failed to flash app partition");
+    OS_LOGE(TAG, "Failed to flash app partition");
     _sendFailureMessage("Failed to flash app partition"sv);
     return false;
   }
@@ -160,7 +160,7 @@ bool _flashAppPartition(const esp_partition_t* partition, std::string_view remot
 
   // Set app partition bootable.
   if (esp_ota_set_boot_partition(partition) != ESP_OK) {
-    ESP_LOGE(TAG, "Failed to set app partition bootable");
+    OS_LOGE(TAG, "Failed to set app partition bootable");
     _sendFailureMessage("Failed to set app partition bootable"sv);
     return false;
   }
@@ -175,19 +175,19 @@ bool _flashFilesystemPartition(const esp_partition_t* parition, std::string_view
 
   // Make sure captive portal is stopped, timeout after 5 seconds.
   if (!CaptivePortal::ForceClose(5000U)) {
-    ESP_LOGE(TAG, "Failed to force close captive portal (timed out)");
+    OS_LOGE(TAG, "Failed to force close captive portal (timed out)");
     _sendFailureMessage("Failed to force close captive portal (timed out)"sv);
     return false;
   }
 
-  ESP_LOGD(TAG, "Flashing filesystem partition");
+  OS_LOGD(TAG, "Flashing filesystem partition");
 
   if (!_sendProgressMessage(Serialization::Gateway::OtaInstallProgressTask::FlashingFilesystem, 0.0f)) {
     return false;
   }
 
   auto onProgress = [](std::size_t current, std::size_t total, float progress) -> bool {
-    ESP_LOGD(TAG, "Flashing filesystem partition: %u / %u (%.2f%%)", current, total, progress * 100.0f);
+    OS_LOGD(TAG, "Flashing filesystem partition: %u / %u (%.2f%%)", current, total, progress * 100.0f);
 
     _sendProgressMessage(Serialization::Gateway::OtaInstallProgressTask::FlashingFilesystem, progress);
 
@@ -195,7 +195,7 @@ bool _flashFilesystemPartition(const esp_partition_t* parition, std::string_view
   };
 
   if (!OpenShock::FlashPartitionFromUrl(parition, remoteUrl, remoteHash, onProgress)) {
-    ESP_LOGE(TAG, "Failed to flash filesystem partition");
+    OS_LOGE(TAG, "Failed to flash filesystem partition");
     _sendFailureMessage("Failed to flash filesystem partition"sv);
     return false;
   }
@@ -207,7 +207,7 @@ bool _flashFilesystemPartition(const esp_partition_t* parition, std::string_view
   // Attempt to mount filesystem.
   fs::LittleFSFS test;
   if (!test.begin(false, "/static", 10, "static0")) {
-    ESP_LOGE(TAG, "Failed to mount filesystem");
+    OS_LOGE(TAG, "Failed to mount filesystem");
     _sendFailureMessage("Failed to mount filesystem"sv);
     return false;
   }
@@ -221,7 +221,7 @@ bool _flashFilesystemPartition(const esp_partition_t* parition, std::string_view
 void _otaUpdateTask(void* arg) {
   (void)arg;
 
-  ESP_LOGD(TAG, "OTA update task started");
+  OS_LOGD(TAG, "OTA update task started");
 
   bool connected               = false;
   bool updateRequested         = false;
@@ -236,13 +236,13 @@ void _otaUpdateTask(void* arg) {
     updateRequested |= (eventBits & OTA_TASK_EVENT_UPDATE_REQUESTED) != 0;
 
     if ((eventBits & OTA_TASK_EVENT_WIFI_DISCONNECTED) != 0) {
-      ESP_LOGD(TAG, "WiFi disconnected");
+      OS_LOGD(TAG, "WiFi disconnected");
       connected = false;
       continue;  // No further processing needed.
     }
 
     if ((eventBits & OTA_TASK_EVENT_WIFI_CONNECTED) != 0 && !connected) {
-      ESP_LOGD(TAG, "WiFi connected");
+      OS_LOGD(TAG, "WiFi connected");
       connected = true;
     }
 
@@ -255,12 +255,12 @@ void _otaUpdateTask(void* arg) {
 
     Config::OtaUpdateConfig config;
     if (!Config::GetOtaUpdateConfig(config)) {
-      ESP_LOGE(TAG, "Failed to get OTA update config");
+      OS_LOGE(TAG, "Failed to get OTA update config");
       continue;
     }
 
     if (!config.isEnabled) {
-      ESP_LOGD(TAG, "OTA updates are disabled, skipping update check");
+      OS_LOGD(TAG, "OTA updates are disabled, skipping update check");
       continue;
     }
 
@@ -280,7 +280,7 @@ void _otaUpdateTask(void* arg) {
     lastUpdateCheck = now;
 
     if (config.requireManualApproval) {
-      ESP_LOGD(TAG, "Manual approval required, skipping update check");
+      OS_LOGD(TAG, "Manual approval required, skipping update check");
       // TODO: IMPLEMENT
       continue;
     }
@@ -290,41 +290,41 @@ void _otaUpdateTask(void* arg) {
       updateRequested = false;
 
       if (!_tryGetRequestedVersion(version)) {
-        ESP_LOGE(TAG, "Failed to get requested version");
+        OS_LOGE(TAG, "Failed to get requested version");
         continue;
       }
 
-      ESP_LOGD(TAG, "Update requested for version %s", version.toString().c_str());  // TODO: This is abusing the SemVer::toString() method causing alot of string copies, fix this
+      OS_LOGD(TAG, "Update requested for version %s", version.toString().c_str());  // TODO: This is abusing the SemVer::toString() method causing alot of string copies, fix this
     } else {
-      ESP_LOGD(TAG, "Checking for updates");
+      OS_LOGD(TAG, "Checking for updates");
 
       // Fetch current version.
       if (!OtaUpdateManager::TryGetFirmwareVersion(config.updateChannel, version)) {
-        ESP_LOGE(TAG, "Failed to fetch firmware version");
+        OS_LOGE(TAG, "Failed to fetch firmware version");
         continue;
       }
 
-      ESP_LOGD(TAG, "Remote version: %s", version.toString().c_str());  // TODO: This is abusing the SemVer::toString() method causing alot of string copies, fix this
+      OS_LOGD(TAG, "Remote version: %s", version.toString().c_str());  // TODO: This is abusing the SemVer::toString() method causing alot of string copies, fix this
     }
 
     if (version.toString() == OPENSHOCK_FW_VERSION) {  // TODO: This is abusing the SemVer::toString() method causing alot of string copies, fix this
-      ESP_LOGI(TAG, "Requested version is already installed");
+      OS_LOGI(TAG, "Requested version is already installed");
       continue;
     }
 
     // Generate random int32_t for this update.
     int32_t updateId = static_cast<int32_t>(esp_random());
     if (!Config::SetOtaUpdateId(updateId)) {
-      ESP_LOGE(TAG, "Failed to set OTA update ID");
+      OS_LOGE(TAG, "Failed to set OTA update ID");
       continue;
     }
     if (!Config::SetOtaUpdateStep(OpenShock::OtaUpdateStep::Updating)) {
-      ESP_LOGE(TAG, "Failed to set OTA update step");
+      OS_LOGE(TAG, "Failed to set OTA update step");
       continue;
     }
 
     if (!Serialization::Gateway::SerializeOtaInstallStartedMessage(updateId, version, GatewayConnectionManager::SendMessageBIN)) {
-      ESP_LOGE(TAG, "Failed to serialize OTA install started message");
+      OS_LOGE(TAG, "Failed to serialize OTA install started message");
       continue;
     }
 
@@ -335,23 +335,23 @@ void _otaUpdateTask(void* arg) {
     // Fetch current release.
     OtaUpdateManager::FirmwareRelease release;
     if (!OtaUpdateManager::TryGetFirmwareRelease(version, release)) {
-      ESP_LOGE(TAG, "Failed to fetch firmware release");  // TODO: Send error message to server
+      OS_LOGE(TAG, "Failed to fetch firmware release");  // TODO: Send error message to server
       _sendFailureMessage("Failed to fetch firmware release"sv);
       continue;
     }
 
     // Print release.
-    ESP_LOGD(TAG, "Firmware release:");
-    ESP_LOGD(TAG, "  Version:                %s", version.toString().c_str());  // TODO: This is abusing the SemVer::toString() method causing alot of string copies, fix this
-    ESP_LOGD(TAG, "  App binary URL:         %s", release.appBinaryUrl.c_str());
-    ESP_LOGD(TAG, "  App binary hash:        %s", HexUtils::ToHex<32>(release.appBinaryHash).data());
-    ESP_LOGD(TAG, "  Filesystem binary URL:  %s", release.filesystemBinaryUrl.c_str());
-    ESP_LOGD(TAG, "  Filesystem binary hash: %s", HexUtils::ToHex<32>(release.filesystemBinaryHash).data());
+    OS_LOGD(TAG, "Firmware release:");
+    OS_LOGD(TAG, "  Version:                %s", version.toString().c_str());  // TODO: This is abusing the SemVer::toString() method causing alot of string copies, fix this
+    OS_LOGD(TAG, "  App binary URL:         %s", release.appBinaryUrl.c_str());
+    OS_LOGD(TAG, "  App binary hash:        %s", HexUtils::ToHex<32>(release.appBinaryHash).data());
+    OS_LOGD(TAG, "  Filesystem binary URL:  %s", release.filesystemBinaryUrl.c_str());
+    OS_LOGD(TAG, "  Filesystem binary hash: %s", HexUtils::ToHex<32>(release.filesystemBinaryHash).data());
 
     // Get available app update partition.
     const esp_partition_t* appPartition = esp_ota_get_next_update_partition(nullptr);
     if (appPartition == nullptr) {
-      ESP_LOGE(TAG, "Failed to get app update partition");  // TODO: Send error message to server
+      OS_LOGE(TAG, "Failed to get app update partition");  // TODO: Send error message to server
       _sendFailureMessage("Failed to get app update partition"sv);
       continue;
     }
@@ -359,7 +359,7 @@ void _otaUpdateTask(void* arg) {
     // Get filesystem partition.
     const esp_partition_t* filesystemPartition = esp_partition_find_first(ESP_PARTITION_TYPE_DATA, ESP_PARTITION_SUBTYPE_DATA_SPIFFS, "static0");
     if (filesystemPartition == nullptr) {
-      ESP_LOGE(TAG, "Failed to find filesystem partition");  // TODO: Send error message to server
+      OS_LOGE(TAG, "Failed to find filesystem partition");  // TODO: Send error message to server
       _sendFailureMessage("Failed to find filesystem partition"sv);
       continue;
     }
@@ -374,7 +374,7 @@ void _otaUpdateTask(void* arg) {
 
     // Set OTA boot type in config.
     if (!Config::SetOtaUpdateStep(OpenShock::OtaUpdateStep::Updated)) {
-      ESP_LOGE(TAG, "Failed to set OTA update step");
+      OS_LOGE(TAG, "Failed to set OTA update step");
       _sendFailureMessage("Failed to set OTA update step"sv);
       continue;
     }
@@ -386,7 +386,7 @@ void _otaUpdateTask(void* arg) {
     _sendProgressMessage(Serialization::Gateway::OtaInstallProgressTask::Rebooting, 0.0f);
 
     // Reboot into new firmware.
-    ESP_LOGI(TAG, "Restarting into new firmware...");
+    OS_LOGI(TAG, "Restarting into new firmware...");
     vTaskDelay(pdMS_TO_TICKS(200));
     break;
   }
@@ -404,7 +404,7 @@ bool _tryGetStringList(std::string_view url, std::vector<std::string>& list) {
     {200, 304}
   );
   if (response.result != OpenShock::HTTP::RequestResult::Success) {
-    ESP_LOGE(TAG, "Failed to fetch list: [%u] %s", response.code, response.data.c_str());
+    OS_LOGE(TAG, "Failed to fetch list: [%u] %s", response.code, response.data.c_str());
     return false;
   }
 
@@ -429,28 +429,28 @@ bool _tryGetStringList(std::string_view url, std::vector<std::string>& list) {
 }
 
 bool OtaUpdateManager::Init() {
-  ESP_LOGD(TAG, "Fetching current partition");
+  OS_LOGN(TAG, "Fetching current partition");
 
   // Fetch current partition info.
   const esp_partition_t* partition = esp_ota_get_running_partition();
   if (partition == nullptr) {
-    ESP_PANIC(TAG, "Failed to get currently running partition");
+    OS_PANIC(TAG, "Failed to get currently running partition");
     return false;  // This will never be reached, but the compiler doesn't know that.
   }
 
-  ESP_LOGD(TAG, "Fetching partition state");
+  OS_LOGD(TAG, "Fetching partition state");
 
   // Get OTA state for said partition.
   esp_err_t err = esp_ota_get_state_partition(partition, &_otaImageState);
   if (err != ESP_OK) {
-    ESP_PANIC(TAG, "Failed to get partition state: %s", esp_err_to_name(err));
+    OS_PANIC(TAG, "Failed to get partition state: %s", esp_err_to_name(err));
     return false;  // This will never be reached, but the compiler doesn't know that.
   }
 
-  ESP_LOGD(TAG, "Fetching previous update step");
+  OS_LOGD(TAG, "Fetching previous update step");
   OtaUpdateStep updateStep;
   if (!Config::GetOtaUpdateStep(updateStep)) {
-    ESP_LOGE(TAG, "Failed to get OTA update step");
+    OS_LOGE(TAG, "Failed to get OTA update step");
     return false;
   }
 
@@ -470,7 +470,7 @@ bool OtaUpdateManager::Init() {
 
   if (updateStep == OtaUpdateStep::Updated) {
     if (!Config::SetOtaUpdateStep(OtaUpdateStep::Validating)) {
-      ESP_PANIC(TAG, "Failed to set OTA update step in critical section");  // TODO: THIS IS A CRITICAL SECTION, WHAT DO WE DO?
+      OS_PANIC(TAG, "Failed to set OTA update step in critical section");  // TODO: THIS IS A CRITICAL SECTION, WHAT DO WE DO?
     }
   }
 
@@ -497,11 +497,11 @@ bool OtaUpdateManager::TryGetFirmwareVersion(OtaUpdateChannel channel, OpenShock
       channelIndexUrl = std::string_view(OPENSHOCK_FW_CDN_DEVELOP_URL);
       break;
     default:
-      ESP_LOGE(TAG, "Unknown channel: %u", channel);
+      OS_LOGE(TAG, "Unknown channel: %u", channel);
       return false;
   }
 
-  ESP_LOGD(TAG, "Fetching firmware version from %s", channelIndexUrl);
+  OS_LOGD(TAG, "Fetching firmware version from %s", channelIndexUrl);
 
   auto response = OpenShock::HTTP::GetString(
     channelIndexUrl,
@@ -511,12 +511,12 @@ bool OtaUpdateManager::TryGetFirmwareVersion(OtaUpdateChannel channel, OpenShock
     {200, 304}
   );
   if (response.result != OpenShock::HTTP::RequestResult::Success) {
-    ESP_LOGE(TAG, "Failed to fetch firmware version: [%u] %s", response.code, response.data.c_str());
+    OS_LOGE(TAG, "Failed to fetch firmware version: [%u] %s", response.code, response.data.c_str());
     return false;
   }
 
   if (!OpenShock::TryParseSemVer(response.data, version)) {
-    ESP_LOGE(TAG, "Failed to parse firmware version: %.*s", response.data.size(), response.data.data());
+    OS_LOGE(TAG, "Failed to parse firmware version: %.*s", response.data.size(), response.data.data());
     return false;
   }
 
@@ -526,14 +526,14 @@ bool OtaUpdateManager::TryGetFirmwareVersion(OtaUpdateChannel channel, OpenShock
 bool OtaUpdateManager::TryGetFirmwareBoards(const OpenShock::SemVer& version, std::vector<std::string>& boards) {
   std::string channelIndexUrl;
   if (!FormatToString(channelIndexUrl, OPENSHOCK_FW_CDN_BOARDS_INDEX_URL_FORMAT, version.toString().c_str())) {  // TODO: This is abusing the SemVer::toString() method causing alot of string copies, fix this
-    ESP_LOGE(TAG, "Failed to format URL");
+    OS_LOGE(TAG, "Failed to format URL");
     return false;
   }
 
-  ESP_LOGD(TAG, "Fetching firmware boards from %s", channelIndexUrl.c_str());
+  OS_LOGD(TAG, "Fetching firmware boards from %s", channelIndexUrl.c_str());
 
   if (!_tryGetStringList(channelIndexUrl, boards)) {
-    ESP_LOGE(TAG, "Failed to fetch firmware boards");
+    OS_LOGE(TAG, "Failed to fetch firmware boards");
     return false;
   }
 
@@ -542,7 +542,7 @@ bool OtaUpdateManager::TryGetFirmwareBoards(const OpenShock::SemVer& version, st
 
 bool _tryParseIntoHash(std::string_view hash, uint8_t (&hashBytes)[32]) {
   if (!HexUtils::TryParseHex(hash.data(), hash.size(), hashBytes, 32)) {
-    ESP_LOGE(TAG, "Failed to parse hash: %.*s", hash.size(), hash.data());
+    OS_LOGE(TAG, "Failed to parse hash: %.*s", hash.size(), hash.data());
     return false;
   }
 
@@ -553,19 +553,19 @@ bool OtaUpdateManager::TryGetFirmwareRelease(const OpenShock::SemVer& version, F
   auto versionStr = version.toString();  // TODO: This is abusing the SemVer::toString() method causing alot of string copies, fix this
 
   if (!FormatToString(release.appBinaryUrl, OPENSHOCK_FW_CDN_APP_URL_FORMAT, versionStr.c_str())) {
-    ESP_LOGE(TAG, "Failed to format URL");
+    OS_LOGE(TAG, "Failed to format URL");
     return false;
   }
 
   if (!FormatToString(release.filesystemBinaryUrl, OPENSHOCK_FW_CDN_FILESYSTEM_URL_FORMAT, versionStr.c_str())) {
-    ESP_LOGE(TAG, "Failed to format URL");
+    OS_LOGE(TAG, "Failed to format URL");
     return false;
   }
 
   // Construct hash URLs.
   std::string sha256HashesUrl;
   if (!FormatToString(sha256HashesUrl, OPENSHOCK_FW_CDN_SHA256_HASHES_URL_FORMAT, versionStr.c_str())) {
-    ESP_LOGE(TAG, "Failed to format URL");
+    OS_LOGE(TAG, "Failed to format URL");
     return false;
   }
 
@@ -578,7 +578,7 @@ bool OtaUpdateManager::TryGetFirmwareRelease(const OpenShock::SemVer& version, F
     {200, 304}
   );
   if (sha256HashesResponse.result != OpenShock::HTTP::RequestResult::Success) {
-    ESP_LOGE(TAG, "Failed to fetch hashes: [%u] %s", sha256HashesResponse.code, sha256HashesResponse.data.c_str());
+    OS_LOGE(TAG, "Failed to fetch hashes: [%u] %s", sha256HashesResponse.code, sha256HashesResponse.data.c_str());
     return false;
   }
 
@@ -589,7 +589,7 @@ bool OtaUpdateManager::TryGetFirmwareRelease(const OpenShock::SemVer& version, F
   for (std::string_view line : hashesLines) {
     auto parts = OpenShock::StringSplitWhiteSpace(line);
     if (parts.size() != 2) {
-      ESP_LOGE(TAG, "Invalid hashes entry: %.*s", line.size(), line.data());
+      OS_LOGE(TAG, "Invalid hashes entry: %.*s", line.size(), line.data());
       return false;
     }
 
@@ -601,13 +601,13 @@ bool OtaUpdateManager::TryGetFirmwareRelease(const OpenShock::SemVer& version, F
     }
 
     if (hash.size() != 64) {
-      ESP_LOGE(TAG, "Invalid hash: %.*s", hash.size(), hash.data());
+      OS_LOGE(TAG, "Invalid hash: %.*s", hash.size(), hash.data());
       return false;
     }
 
     if (file == "app.bin") {
       if (foundAppHash) {
-        ESP_LOGE(TAG, "Duplicate hash for app.bin");
+        OS_LOGE(TAG, "Duplicate hash for app.bin");
         return false;
       }
 
@@ -618,7 +618,7 @@ bool OtaUpdateManager::TryGetFirmwareRelease(const OpenShock::SemVer& version, F
       foundAppHash = true;
     } else if (file == "staticfs.bin") {
       if (foundFilesystemHash) {
-        ESP_LOGE(TAG, "Duplicate hash for staticfs.bin");
+        OS_LOGE(TAG, "Duplicate hash for staticfs.bin");
         return false;
       }
 
@@ -634,7 +634,7 @@ bool OtaUpdateManager::TryGetFirmwareRelease(const OpenShock::SemVer& version, F
 }
 
 bool OtaUpdateManager::TryStartFirmwareInstallation(const OpenShock::SemVer& version) {
-  ESP_LOGD(TAG, "Requesting firmware version %s", version.toString().c_str());  // TODO: This is abusing the SemVer::toString() method causing alot of string copies, fix this
+  OS_LOGD(TAG, "Requesting firmware version %s", version.toString().c_str());  // TODO: This is abusing the SemVer::toString() method causing alot of string copies, fix this
 
   return _tryQueueUpdateRequest(version);
 }
@@ -650,25 +650,25 @@ bool OtaUpdateManager::IsValidatingApp() {
 void OtaUpdateManager::InvalidateAndRollback() {
   // Set OTA boot type in config.
   if (!Config::SetOtaUpdateStep(OpenShock::OtaUpdateStep::RollingBack)) {
-    ESP_PANIC(TAG, "Failed to set OTA firmware boot type in critical section");  // TODO: THIS IS A CRITICAL SECTION, WHAT DO WE DO?
+    OS_PANIC(TAG, "Failed to set OTA firmware boot type in critical section");  // TODO: THIS IS A CRITICAL SECTION, WHAT DO WE DO?
     return;
   }
 
   switch (esp_ota_mark_app_invalid_rollback_and_reboot()) {
     case ESP_FAIL:
-      ESP_LOGE(TAG, "Rollback failed (ESP_FAIL)");
+      OS_LOGE(TAG, "Rollback failed (ESP_FAIL)");
       break;
     case ESP_ERR_OTA_ROLLBACK_FAILED:
-      ESP_LOGE(TAG, "Rollback failed (ESP_ERR_OTA_ROLLBACK_FAILED)");
+      OS_LOGE(TAG, "Rollback failed (ESP_ERR_OTA_ROLLBACK_FAILED)");
       break;
     default:
-      ESP_LOGE(TAG, "Rollback failed (Unknown)");
+      OS_LOGE(TAG, "Rollback failed (Unknown)");
       break;
   }
 
   // Set OTA boot type in config.
   if (!Config::SetOtaUpdateStep(OpenShock::OtaUpdateStep::None)) {
-    ESP_LOGE(TAG, "Failed to set OTA firmware boot type");
+    OS_LOGE(TAG, "Failed to set OTA firmware boot type");
   }
 
   esp_restart();
@@ -676,12 +676,12 @@ void OtaUpdateManager::InvalidateAndRollback() {
 
 void OtaUpdateManager::ValidateApp() {
   if (esp_ota_mark_app_valid_cancel_rollback() != ESP_OK) {
-    ESP_PANIC(TAG, "Unable to mark app as valid, WTF?");  // TODO: Wtf do we do here?
+    OS_PANIC(TAG, "Unable to mark app as valid, WTF?");  // TODO: Wtf do we do here?
   }
 
   // Set OTA boot type in config.
   if (!Config::SetOtaUpdateStep(OpenShock::OtaUpdateStep::Validated)) {
-    ESP_PANIC(TAG, "Failed to set OTA firmware boot type in critical section");  // TODO: THIS IS A CRITICAL SECTION, WHAT DO WE DO?
+    OS_PANIC(TAG, "Failed to set OTA firmware boot type in critical section");  // TODO: THIS IS A CRITICAL SECTION, WHAT DO WE DO?
   }
 
   _otaImageState = ESP_OTA_IMG_VALID;

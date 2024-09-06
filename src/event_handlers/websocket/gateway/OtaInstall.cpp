@@ -13,13 +13,13 @@ using namespace OpenShock::MessageHandlers::Server;
 void _Private::HandleOtaInstall(const OpenShock::Serialization::Gateway::GatewayToHubMessage* root) {
   auto msg = root->payload_as_OtaInstall();
   if (msg == nullptr) {
-    ESP_LOGE(TAG, "Payload cannot be parsed as OtaInstall");
+    OS_LOGE(TAG, "Payload cannot be parsed as OtaInstall");
     return;
   }
 
   auto semver = msg->version();
   if (semver == nullptr) {
-    ESP_LOGE(TAG, "Version cannot be parsed");
+    OS_LOGE(TAG, "Version cannot be parsed");
     return;
   }
 
@@ -33,10 +33,10 @@ void _Private::HandleOtaInstall(const OpenShock::Serialization::Gateway::Gateway
 
   OpenShock::SemVer version(semver->major(), semver->minor(), semver->patch(), prerelease, build);
 
-  ESP_LOGI(TAG, "OTA install requested for version %s", version.toString().c_str());  // TODO: This is abusing the SemVer::toString() method causing alot of string copies, fix this
+  OS_LOGI(TAG, "OTA install requested for version %s", version.toString().c_str());  // TODO: This is abusing the SemVer::toString() method causing alot of string copies, fix this
 
   if (!OpenShock::OtaUpdateManager::TryStartFirmwareInstallation(version)) {
-    ESP_LOGE(TAG, "Failed to install firmware");  // TODO: Send error message to server
+    OS_LOGE(TAG, "Failed to install firmware");  // TODO: Send error message to server
     return;
   }
 }

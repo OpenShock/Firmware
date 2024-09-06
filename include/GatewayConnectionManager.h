@@ -7,7 +7,7 @@
 #include <string_view>
 
 namespace OpenShock::GatewayConnectionManager {
-  bool Init();
+  [[nodiscard]] bool Init();
 
   bool IsConnected();
 
