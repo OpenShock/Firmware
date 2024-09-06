@@ -14,6 +14,7 @@ const char* const TAG = "SerialInputHandler";
 #include "serialization/JsonSerial.h"
 #include "Time.h"
 #include "util/Base64Utils.h"
+#include "util/StringUtils.h"
 #include "wifi/WiFiManager.h"
 
 #include <cJSON.h>
@@ -23,6 +24,31 @@ const char* const TAG = "SerialInputHandler";
 #include <string_view>
 #include <unordered_map>
 
+namespace std {
+  struct hash_ci {
+    std::size_t operator()(std::string_view str) const {
+      std::size_t hash = 7;
+
+      for (int i = 0; i < str.size(); ++i) {
+        hash = hash * 31 + tolower(str[i]);
+      }
+
+      return hash;
+    }
+  };
+
+  template<>
+  struct less<std::string_view> {
+    bool operator()(std::string_view a, std::string_view b) const { return a < b; }
+  };
+
+  struct equals_ci {
+    bool operator()(std::string_view a, std::string_view b) const { return strncasecmp(a.data(), b.data(), std::max(a.size(), b.size())) == 0; }
+  };
+}  // namespace std
+
+using namespace std::string_view_literals;
+
 #define SERPR_SYS(format, ...)      Serial.printf("$SYS$|" format "\n", ##__VA_ARGS__)
 #define SERPR_RESPONSE(format, ...) SERPR_SYS("Response|" format, ##__VA_ARGS__)
 #define SERPR_SUCCESS(format, ...)  SERPR_SYS("Success|" format, ##__VA_ARGS__)
@@ -30,7 +56,7 @@ const char* const TAG = "SerialInputHandler";
 
 using namespace OpenShock;
 
-const int64_t PASTE_INTERVAL_THRESHOLD_MS  = 20;
+const int64_t PASTE_INTERVAL_THRESHOLD_MS       = 20;
 const std::size_t SERIAL_BUFFER_CLEAR_THRESHOLD = 512;
 
 struct SerialCmdHandler {
@@ -52,7 +78,7 @@ bool _tryParseBool(std::string_view str, bool& out) {
     return false;
   }
 
-  str = str.trim();
+  str = OpenShock::StringTrim(str);
 
   if (str.length() > 5) {
     return false;
@@ -170,15 +196,7 @@ void _handleDomainCommand(std::string_view arg) {
     return;
   }
 
-  ESP_LOGI(
-    TAG,
-    "Successfully connected to \"%.*s\", version: %s, commit: %s, current time: %s",
-    arg.length(),
-    arg.data(),
-    resp.data.version.c_str(),
-    resp.data.commit.c_str(),
-    resp.data.currentTime.c_str()
-  );
+  ESP_LOGI(TAG, "Successfully connected to \"%.*s\", version: %s, commit: %s, current time: %s", arg.length(), arg.data(), resp.data.version.c_str(), resp.data.commit.c_str(), resp.data.currentTime.c_str());
 
   bool result = OpenShock::Config::SetBackendDomain(arg);
 
@@ -228,7 +246,7 @@ void _handleLcgOverrideCommand(std::string_view arg) {
     return;
   }
 
-  if (arg.startsWith("clear")) {
+  if (OpenShock::StringStartsWith(arg, "clear"sv)) {
     if (arg.size() != 5) {
       SERPR_ERROR("Invalid command (clear command should not have any arguments)");
       return;
@@ -243,7 +261,7 @@ void _handleLcgOverrideCommand(std::string_view arg) {
     return;
   }
 
-  if (arg.startsWith("set ")) {
+  if (OpenShock::StringStartsWith(arg, "set "sv)) {
     if (arg.size() <= 4) {
       SERPR_ERROR("Invalid command (set command should have an argument)");
       return;
@@ -338,8 +356,8 @@ void _handleNetworksCommand(std::string_view arg) {
 
   std::vector<Config::WiFiCredentials> creds;
 
-  uint8_t id = 1;
-  cJSON* network  = nullptr;
+  uint8_t id     = 1;
+  cJSON* network = nullptr;
   cJSON_ArrayForEach(network, root) {
     Config::WiFiCredentials cred;
 
@@ -558,7 +576,7 @@ void _handleRFTransmitCommand(std::string_view arg) {
 }
 
 void _handleHelpCommand(std::string_view arg) {
-  arg = arg.trim();
+  arg = OpenShock::StringTrim(arg);
   if (arg.empty()) {
     SerialInputHandler::PrintWelcomeHeader();
 
@@ -603,7 +621,7 @@ factoryreset           reset device to factory defaults and restart
 }
 
 static const SerialCmdHandler kVersionCmdHandler = {
-  "version"_sv,
+  "version"sv,
   R"(version
   Print version information
   Example:
@@ -612,7 +630,7 @@ static const SerialCmdHandler kVersionCmdHandler = {
   _handleVersionCommand,
 };
 static const SerialCmdHandler kRestartCmdHandler = {
-  "restart"_sv,
+  "restart"sv,
   R"(restart
   Restart the board
   Example:
@@ -621,7 +639,7 @@ static const SerialCmdHandler kRestartCmdHandler = {
   _handleRestartCommand,
 };
 static const SerialCmdHandler kSystemInfoCmdHandler = {
-  "sysinfo"_sv,
+  "sysinfo"sv,
   R"(sysinfo
   Get system information from RTOS, WiFi, etc.
   Example:
@@ -630,7 +648,7 @@ static const SerialCmdHandler kSystemInfoCmdHandler = {
   _handleDebugInfoCommand,
 };
 static const SerialCmdHandler kSerialEchoCmdHandler = {
-  "echo"_sv,
+  "echo"sv,
   R"(echo
   Get the serial echo status.
   If enabled, typed characters are echoed back to the serial port.
@@ -645,7 +663,7 @@ echo [<bool>]
   _handleSerialEchoCommand,
 };
 static const SerialCmdHandler kValidGpiosCmdHandler = {
-  "validgpios"_sv,
+  "validgpios"sv,
   R"(validgpios
   List all valid GPIO pins
   Example:
@@ -654,7 +672,7 @@ static const SerialCmdHandler kValidGpiosCmdHandler = {
   _handleValidGpiosCommand,
 };
 static const SerialCmdHandler kRfTxPinCmdHandler = {
-  "rftxpin"_sv,
+  "rftxpin"sv,
   R"(rftxpin
   Get the GPIO pin used for the radio transmitter.
 
@@ -668,7 +686,7 @@ rftxpin [<pin>]
   _handleRfTxPinCommand,
 };
 static const SerialCmdHandler kDomainCmdHandler = {
-  "domain"_sv,
+  "domain"sv,
   R"(domain
   Get the backend domain.
 
@@ -682,7 +700,7 @@ domain [<domain>]
   _handleDomainCommand,
 };
 static const SerialCmdHandler kAuthTokenCmdHandler = {
-  "authtoken"_sv,
+  "authtoken"sv,
   R"(authtoken
   Get the backend auth token.
 
@@ -715,7 +733,7 @@ lcgoverride clear
   _handleLcgOverrideCommand,
 };
 static const SerialCmdHandler kNetworksCmdHandler = {
-  "networks"_sv,
+  "networks"sv,
   R"(networks
   Get all saved networks.
 
@@ -732,7 +750,7 @@ networks [<json>]
   _handleNetworksCommand,
 };
 static const SerialCmdHandler kKeepAliveCmdHandler = {
-  "keepalive"_sv,
+  "keepalive"sv,
   R"(keepalive
   Get the shocker keep-alive status.
 
@@ -746,7 +764,7 @@ keepalive [<bool>]
   _handleKeepAliveCommand,
 };
 static const SerialCmdHandler kJsonConfigCmdHandler = {
-  "jsonconfig"_sv,
+  "jsonconfig"sv,
   R"(jsonconfig
   Get the configuration as JSON
   Example:
@@ -762,7 +780,7 @@ jsonconfig <json>
   _handleJsonConfigCommand,
 };
 static const SerialCmdHandler kRawConfigCmdHandler = {
-  "rawconfig"_sv,
+  "rawconfig"sv,
   R"(rawconfig
   Get the raw binary config
   Example:
@@ -778,7 +796,7 @@ rawconfig <base64>
   _handleRawConfigCommand,
 };
 static const SerialCmdHandler kRfTransmitCmdHandler = {
-  "rftransmit"_sv,
+  "rftransmit"sv,
   R"(rftransmit <json>
   Transmit a RF command
   Arguments:
@@ -794,7 +812,7 @@ static const SerialCmdHandler kRfTransmitCmdHandler = {
   _handleRFTransmitCommand,
 };
 static const SerialCmdHandler kFactoryResetCmdHandler = {
-  "factoryreset"_sv,
+  "factoryreset"sv,
   R"(factoryreset
   Reset the device to factory defaults and restart
   Example:
@@ -803,7 +821,7 @@ static const SerialCmdHandler kFactoryResetCmdHandler = {
   _handleFactoryResetCommand,
 };
 static const SerialCmdHandler khelpCmdHandler = {
-  "help"_sv,
+  "help"sv,
   R"(help [<command>]
   Print help information
   Arguments:
@@ -853,13 +871,13 @@ int findLineStart(const char* buffer, int bufferSize, int lineEnd) {
 }
 
 void processSerialLine(std::string_view line) {
-  line = line.trim();
+  line = OpenShock::StringTrim(line);
   if (line.empty()) {
     SERPR_ERROR("No command");
     return;
   }
 
-  auto parts                 = line.split(' ', 1);
+  auto parts                 = OpenShock::StringSplit(line, ' ', 1);
   std::string_view command   = parts[0];
   std::string_view arguments = parts.size() > 1 ? parts[1] : std::string_view();
 
@@ -914,7 +932,7 @@ void SerialInputHandler::Update() {
   static char* buffer            = nullptr;  // TODO: Clean up this buffer every once in a while
   static std::size_t bufferSize  = 0;
   static std::size_t bufferIndex = 0;
-  static int64_t lastEcho   = 0;
+  static int64_t lastEcho        = 0;
   static bool suppressingPaste   = false;
 
   while (true) {
@@ -980,7 +998,7 @@ void SerialInputHandler::Update() {
       break;
     }
 
-    std::string_view line = std::string_view(buffer, lineEnd).trim();
+    std::string_view line = OpenShock::StringTrim(std::string_view(buffer, lineEnd));
 
     Serial.printf("\r> %.*s\n", line.size(), line.data());
 

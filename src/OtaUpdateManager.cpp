@@ -27,6 +27,8 @@ const char* const TAG = "OtaUpdateManager";
 #include <sstream>
 #include <string_view>
 
+using namespace std::string_view_literals;
+
 #define OPENSHOCK_FW_CDN_CHANNEL_URL(ch) OPENSHOCK_FW_CDN_URL("/version-" ch ".txt")
 
 #define OPENSHOCK_FW_CDN_STABLE_URL  OPENSHOCK_FW_CDN_CHANNEL_URL("stable")
@@ -148,7 +150,7 @@ bool _flashAppPartition(const esp_partition_t* partition, std::string_view remot
 
   if (!OpenShock::FlashPartitionFromUrl(partition, remoteUrl, remoteHash, onProgress)) {
     ESP_LOGE(TAG, "Failed to flash app partition");
-    _sendFailureMessage("Failed to flash app partition"_sv);
+    _sendFailureMessage("Failed to flash app partition"sv);
     return false;
   }
 
@@ -159,7 +161,7 @@ bool _flashAppPartition(const esp_partition_t* partition, std::string_view remot
   // Set app partition bootable.
   if (esp_ota_set_boot_partition(partition) != ESP_OK) {
     ESP_LOGE(TAG, "Failed to set app partition bootable");
-    _sendFailureMessage("Failed to set app partition bootable"_sv);
+    _sendFailureMessage("Failed to set app partition bootable"sv);
     return false;
   }
 
@@ -174,7 +176,7 @@ bool _flashFilesystemPartition(const esp_partition_t* parition, std::string_view
   // Make sure captive portal is stopped, timeout after 5 seconds.
   if (!CaptivePortal::ForceClose(5000U)) {
     ESP_LOGE(TAG, "Failed to force close captive portal (timed out)");
-    _sendFailureMessage("Failed to force close captive portal (timed out)"_sv);
+    _sendFailureMessage("Failed to force close captive portal (timed out)"sv);
     return false;
   }
 
@@ -194,7 +196,7 @@ bool _flashFilesystemPartition(const esp_partition_t* parition, std::string_view
 
   if (!OpenShock::FlashPartitionFromUrl(parition, remoteUrl, remoteHash, onProgress)) {
     ESP_LOGE(TAG, "Failed to flash filesystem partition");
-    _sendFailureMessage("Failed to flash filesystem partition"_sv);
+    _sendFailureMessage("Failed to flash filesystem partition"sv);
     return false;
   }
 
@@ -206,7 +208,7 @@ bool _flashFilesystemPartition(const esp_partition_t* parition, std::string_view
   fs::LittleFSFS test;
   if (!test.begin(false, "/static", 10, "static0")) {
     ESP_LOGE(TAG, "Failed to mount filesystem");
-    _sendFailureMessage("Failed to mount filesystem"_sv);
+    _sendFailureMessage("Failed to mount filesystem"sv);
     return false;
   }
   test.end();
@@ -334,7 +336,7 @@ void _otaUpdateTask(void* arg) {
     OtaUpdateManager::FirmwareRelease release;
     if (!OtaUpdateManager::TryGetFirmwareRelease(version, release)) {
       ESP_LOGE(TAG, "Failed to fetch firmware release");  // TODO: Send error message to server
-      _sendFailureMessage("Failed to fetch firmware release"_sv);
+      _sendFailureMessage("Failed to fetch firmware release"sv);
       continue;
     }
 
@@ -350,7 +352,7 @@ void _otaUpdateTask(void* arg) {
     const esp_partition_t* appPartition = esp_ota_get_next_update_partition(nullptr);
     if (appPartition == nullptr) {
       ESP_LOGE(TAG, "Failed to get app update partition");  // TODO: Send error message to server
-      _sendFailureMessage("Failed to get app update partition"_sv);
+      _sendFailureMessage("Failed to get app update partition"sv);
       continue;
     }
 
@@ -358,7 +360,7 @@ void _otaUpdateTask(void* arg) {
     const esp_partition_t* filesystemPartition = esp_partition_find_first(ESP_PARTITION_TYPE_DATA, ESP_PARTITION_SUBTYPE_DATA_SPIFFS, "static0");
     if (filesystemPartition == nullptr) {
       ESP_LOGE(TAG, "Failed to find filesystem partition");  // TODO: Send error message to server
-      _sendFailureMessage("Failed to find filesystem partition"_sv);
+      _sendFailureMessage("Failed to find filesystem partition"sv);
       continue;
     }
 
@@ -373,7 +375,7 @@ void _otaUpdateTask(void* arg) {
     // Set OTA boot type in config.
     if (!Config::SetOtaUpdateStep(OpenShock::OtaUpdateStep::Updated)) {
       ESP_LOGE(TAG, "Failed to set OTA update step");
-      _sendFailureMessage("Failed to set OTA update step"_sv);
+      _sendFailureMessage("Failed to set OTA update step"sv);
       continue;
     }
 
@@ -410,17 +412,17 @@ bool _tryGetStringList(std::string_view url, std::vector<std::string>& list) {
 
   std::string_view data = response.data;
 
-  auto lines = data.splitLines();
+  auto lines = OpenShock::StringSplitNewLines(data);
   list.reserve(lines.size());
 
   for (auto line : lines) {
-    line = line.trim();
+    line = OpenShock::StringTrim(line);
 
     if (line.empty()) {
       continue;
     }
 
-    list.push_back(line.toString());
+    list.push_back(std::string(line));
   }
 
   return true;
@@ -580,21 +582,21 @@ bool OtaUpdateManager::TryGetFirmwareRelease(const OpenShock::SemVer& version, F
     return false;
   }
 
-  auto hashesLines = std::string_view(sha256HashesResponse.data).splitLines();
+  auto hashesLines = OpenShock::StringSplitNewLines(sha256HashesResponse.data);
 
   // Parse hashes.
   bool foundAppHash = false, foundFilesystemHash = false;
   for (std::string_view line : hashesLines) {
-    auto parts = line.splitWhitespace();
+    auto parts = OpenShock::StringSplitWhiteSpace(line);
     if (parts.size() != 2) {
       ESP_LOGE(TAG, "Invalid hashes entry: %.*s", line.size(), line.data());
       return false;
     }
 
-    auto hash = parts[0].trim();
-    auto file = parts[1].trim();
+    auto hash = OpenShock::StringTrim(parts[0]);
+    auto file = OpenShock::StringTrim(parts[1]);
 
-    if (file.startsWith("./"_sv)) {
+    if (OpenShock::StringStartsWith(file, "./"sv)) {
       file = file.substr(2);
     }
 

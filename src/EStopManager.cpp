@@ -11,6 +11,7 @@ const char* const TAG = "EStopManager";
 #include "VisualStateManager.h"
 
 #include <driver/gpio.h>
+#include <freertos/queue.h>
 #include <freertos/timers.h>
 
 using namespace OpenShock;

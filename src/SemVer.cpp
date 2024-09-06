@@ -3,6 +3,7 @@
 const char* const TAG = "SemVer";
 
 #include "Logging.h"
+#include "util/StringUtils.h"
 
 using namespace OpenShock;
 
@@ -145,7 +146,7 @@ bool _semverIsVersionCore(std::string_view str) {
     return false;
   }
 
-  auto parts = str.split('.');
+  auto parts = OpenShock::StringSplit(str, '.');
   if (parts.size() != 3) {
     return false;
   }
@@ -253,7 +254,7 @@ std::string SemVer::toString() const {
 }
 
 bool OpenShock::TryParseSemVer(std::string_view semverStr, SemVer& semver) {
-  auto parts = semverStr.split('.');
+  auto parts = OpenShock::StringSplit(semverStr, '.');
   if (parts.size() < 3) {
     ESP_LOGE(TAG, "Must have at least 3 parts: %.*s", semverStr.length(), semverStr.data());
     return false;

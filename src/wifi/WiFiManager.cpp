@@ -180,7 +180,7 @@ bool _authenticate(const WiFiNetwork& net, std::string_view password) {
 
   Serialization::Local::SerializeWiFiNetworkEvent(Serialization::Types::WifiNetworkEventType::Saved, net, CaptivePortal::BroadcastMessageBIN);
 
-  return _connect(net.ssid, password.toString());
+  return _connect(net.ssid, std::string(password));
 }
 
 void _evWiFiConnected(arduino_event_t* event) {

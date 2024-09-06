@@ -10,7 +10,6 @@
   TypeName(TypeName&&) = delete;           \
   void operator=(TypeName&&) = delete
 
-
 #ifndef OPENSHOCK_API_DOMAIN
 #error "OPENSHOCK_API_DOMAIN must be defined"
 #endif
@@ -59,6 +58,5 @@
 #endif
 
 namespace OpenShock::Constants {
-  const char* const FW_USERAGENT         = OPENSHOCK_FW_USERAGENT;
-  const std::string_view FW_USERAGENT_sv = OPENSHOCK_FW_USERAGENT ""_sv;
+  const char* const FW_USERAGENT = OPENSHOCK_FW_USERAGENT;
 }  // namespace OpenShock::Constants

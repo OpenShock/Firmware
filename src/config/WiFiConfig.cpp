@@ -9,7 +9,7 @@ using namespace OpenShock::Config;
 
 WiFiConfig::WiFiConfig() : accessPointSSID(OPENSHOCK_FW_AP_PREFIX), hostname(OPENSHOCK_FW_HOSTNAME), credentialsList() { }
 
-WiFiConfig::WiFiConfig(std::string_view accessPointSSID, std::string_view hostname, const std::vector<WiFiCredentials>& credentialsList) : accessPointSSID(accessPointSSID.toString()), hostname(hostname.toString()), credentialsList(credentialsList) { }
+WiFiConfig::WiFiConfig(std::string_view accessPointSSID, std::string_view hostname, const std::vector<WiFiCredentials>& credentialsList) : accessPointSSID(std::string(accessPointSSID)), hostname(std::string(hostname)), credentialsList(credentialsList) { }
 
 void WiFiConfig::ToDefault() {
   accessPointSSID = OPENSHOCK_FW_AP_PREFIX;

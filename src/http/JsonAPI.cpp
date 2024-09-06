@@ -2,6 +2,7 @@
 
 #include "Common.h"
 #include "config/Config.h"
+#include "util/StringUtils.h"
 
 using namespace OpenShock;
 
@@ -37,7 +38,7 @@ HTTP::Response<Serialization::JsonAPI::DeviceInfoResponse> HTTP::JsonAPI::GetDev
     uri,
     {
       {     "Accept",            "application/json"},
-      {"DeviceToken", deviceToken.toArduinoString()}
+      {"DeviceToken", OpenShock::StringToArduinoString(deviceToken)}
   },
     Serialization::JsonAPI::ParseDeviceInfoJsonResponse,
     {200, 401}
@@ -57,7 +58,7 @@ HTTP::Response<Serialization::JsonAPI::AssignLcgResponse> HTTP::JsonAPI::AssignL
     uri,
     {
       {     "Accept",            "application/json"},
-      {"DeviceToken", deviceToken.toArduinoString()}
+      {"DeviceToken", OpenShock::StringToArduinoString(deviceToken)}
   },
     Serialization::JsonAPI::ParseAssignLcgJsonResponse,
     {200, 401}
