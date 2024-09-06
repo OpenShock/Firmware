@@ -1,16 +1,17 @@
 #include "util/IPAddressUtils.h"
 
 #include "intconv.h"
+#include "util/StringUtils.h"
 
 const char* const TAG = "Util::IPAddressUtils";
 
-bool OpenShock::IPV4AddressFromStringView(IPAddress& ip, StringView sv) {
-  if (sv.isNullOrEmpty()) {
+bool OpenShock::IPV4AddressFromStringView(IPAddress& ip, std::string_view sv) {
+  if (sv.empty()) {
     return false;
   }
 
-  auto parts = sv.split('.');
-  if (parts.size() != 4) {
+  std::string_view parts[4];
+  if (!OpenShock::TryStringSplit(sv, '.', parts)) {
     return false;  // Must have 4 octets
   }
 

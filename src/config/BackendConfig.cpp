@@ -9,7 +9,7 @@ using namespace OpenShock::Config;
 
 BackendConfig::BackendConfig() : domain(OPENSHOCK_API_DOMAIN), authToken(), lcgOverride() { }
 
-BackendConfig::BackendConfig(StringView domain, StringView authToken, StringView lcgOverride) : domain(domain.toString()), authToken(authToken.toString()), lcgOverride(lcgOverride.toString()) { }
+BackendConfig::BackendConfig(std::string_view domain, std::string_view authToken, std::string_view lcgOverride) : domain(std::string(domain)), authToken(std::string(authToken)), lcgOverride(std::string(lcgOverride)) { }
 
 void BackendConfig::ToDefault() {
   domain = OPENSHOCK_API_DOMAIN;

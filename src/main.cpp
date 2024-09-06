@@ -1,3 +1,5 @@
+#include <freertos/FreeRTOS.h>
+
 const char* const TAG = "main";
 
 #include "CaptivePortal.h"

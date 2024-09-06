@@ -8,11 +8,11 @@
 #include "config/SerialInputConfig.h"
 #include "config/WiFiConfig.h"
 #include "config/WiFiCredentials.h"
-#include "StringView.h"
 
 #include <hal/gpio_types.h>
 
 #include <functional>
+#include <string_view>
 #include <vector>
 
 namespace OpenShock::Config {
@@ -20,7 +20,7 @@ namespace OpenShock::Config {
 
   /* GetAsJSON and SaveFromJSON are used for Reading/Writing the config file in its human-readable form. */
   std::string GetAsJSON(bool withSensitiveData);
-  bool SaveFromJSON(StringView json);
+  bool SaveFromJSON(std::string_view json);
 
   /* GetAsFlatBuffer and SaveFromFlatBuffer are used for Reading/Writing the config file in its binary form. */
   [[nodiscard]] flatbuffers::Offset<Serialization::Configuration::HubConfig> GetAsFlatBuffer(flatbuffers::FlatBufferBuilder& builder, bool withSensitiveData);
@@ -67,7 +67,7 @@ namespace OpenShock::Config {
 
   bool AnyWiFiCredentials(std::function<bool(const Config::WiFiCredentials&)> predicate);
 
-  uint8_t AddWiFiCredentials(StringView ssid, StringView password);
+  uint8_t AddWiFiCredentials(std::string_view ssid, std::string_view password);
   bool TryGetWiFiCredentialsByID(uint8_t id, WiFiCredentials& out);
   bool TryGetWiFiCredentialsBySSID(const char* ssid, WiFiCredentials& out);
   uint8_t GetWiFiCredentialsIDbySSID(const char* ssid);
@@ -80,13 +80,13 @@ namespace OpenShock::Config {
   bool SetOtaUpdateStep(OtaUpdateStep updateStep);
 
   bool GetBackendDomain(std::string& out);
-  bool SetBackendDomain(StringView domain);
+  bool SetBackendDomain(std::string_view domain);
   bool HasBackendAuthToken();
   bool GetBackendAuthToken(std::string& out);
-  bool SetBackendAuthToken(StringView token);
+  bool SetBackendAuthToken(std::string_view token);
   bool ClearBackendAuthToken();
   bool HasBackendLCGOverride();
   bool GetBackendLCGOverride(std::string& out);
-  bool SetBackendLCGOverride(StringView lcgOverride);
+  bool SetBackendLCGOverride(std::string_view lcgOverride);
   bool ClearBackendLCGOverride();
 }  // namespace OpenShock::Config
