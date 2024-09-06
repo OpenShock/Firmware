@@ -1,3 +1,5 @@
+#include <freertos/FreeRTOS.h>
+
 #include "VisualStateManager.h"
 
 const char* const TAG = "VisualStateManager";

@@ -1,3 +1,5 @@
+#include <freertos/FreeRTOS.h>
+
 #include "config/Config.h"
 
 const char* const TAG = "Config";
