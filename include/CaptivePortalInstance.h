@@ -1,6 +1,5 @@
 #pragma once
 
-#include "StringView.h"
 #include "WebSocketDeFragger.h"
 
 #include <DNSServer.h>
@@ -11,6 +10,7 @@
 #include <freertos/task.h>
 
 #include <cstdint>
+#include <string_view>
 
 namespace OpenShock {
   class CaptivePortalInstance {
@@ -18,13 +18,13 @@ namespace OpenShock {
     CaptivePortalInstance();
     ~CaptivePortalInstance();
 
-    bool sendMessageTXT(uint8_t socketId, StringView data) { return m_socketServer.sendTXT(socketId, data.data(), data.length()); }
+    bool sendMessageTXT(uint8_t socketId, std::string_view data) { return m_socketServer.sendTXT(socketId, data.data(), data.length()); }
     bool sendMessageBIN(uint8_t socketId, const uint8_t* data, std::size_t len) { return m_socketServer.sendBIN(socketId, data, len); }
-    bool broadcastMessageTXT(StringView data) { return m_socketServer.broadcastTXT(data.data(), data.length()); }
+    bool broadcastMessageTXT(std::string_view data) { return m_socketServer.broadcastTXT(data.data(), data.length()); }
     bool broadcastMessageBIN(const uint8_t* data, std::size_t len) { return m_socketServer.broadcastBIN(data, len); }
 
   private:
-    static void task(void* arg);
+    void task();
     void handleWebSocketClientConnected(uint8_t socketId);
     void handleWebSocketClientDisconnected(uint8_t socketId);
     void handleWebSocketClientError(uint8_t socketId, uint16_t code, const char* message);

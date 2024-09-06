@@ -9,7 +9,7 @@ using namespace OpenShock::Config;
 
 WiFiConfig::WiFiConfig() : accessPointSSID(OPENSHOCK_FW_AP_PREFIX), hostname(OPENSHOCK_FW_HOSTNAME), credentialsList() { }
 
-WiFiConfig::WiFiConfig(StringView accessPointSSID, StringView hostname, const std::vector<WiFiCredentials>& credentialsList) : accessPointSSID(accessPointSSID.toString()), hostname(hostname.toString()), credentialsList(credentialsList) { }
+WiFiConfig::WiFiConfig(std::string_view accessPointSSID, std::string_view hostname, const std::vector<WiFiCredentials>& credentialsList) : accessPointSSID(std::string(accessPointSSID)), hostname(std::string(hostname)), credentialsList(credentialsList) { }
 
 void WiFiConfig::ToDefault() {
   accessPointSSID = OPENSHOCK_FW_AP_PREFIX;
@@ -19,7 +19,7 @@ void WiFiConfig::ToDefault() {
 
 bool WiFiConfig::FromFlatbuffers(const Serialization::Configuration::WiFiConfig* config) {
   if (config == nullptr) {
-    ESP_LOGE(TAG, "config is null");
+    OS_LOGE(TAG, "config is null");
     return false;
   }
 
@@ -43,12 +43,12 @@ flatbuffers::Offset<OpenShock::Serialization::Configuration::WiFiConfig> WiFiCon
 
 bool WiFiConfig::FromJSON(const cJSON* json) {
   if (json == nullptr) {
-    ESP_LOGE(TAG, "json is null");
+    OS_LOGE(TAG, "json is null");
     return false;
   }
 
   if (cJSON_IsObject(json) == 0) {
-    ESP_LOGE(TAG, "json is not an object");
+    OS_LOGE(TAG, "json is not an object");
     return false;
   }
 
@@ -57,12 +57,12 @@ bool WiFiConfig::FromJSON(const cJSON* json) {
 
   const cJSON* credentialsListJson = cJSON_GetObjectItemCaseSensitive(json, "credentials");
   if (credentialsListJson == nullptr) {
-    ESP_LOGE(TAG, "credentials is null");
+    OS_LOGE(TAG, "credentials is null");
     return false;
   }
 
   if (cJSON_IsArray(credentialsListJson) == 0) {
-    ESP_LOGE(TAG, "credentials is not an array");
+    OS_LOGE(TAG, "credentials is not an array");
     return false;
   }
 

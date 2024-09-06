@@ -1,3 +1,5 @@
+#include <freertos/FreeRTOS.h>
+
 #include "visual/VisualStateManager.h"
 
 const char* const TAG = "VisualStateManager";
@@ -243,7 +245,7 @@ void _updateVisualState() {
     return;
   }
 
-  ESP_LOGW(TAG, "Trying to update visual state, but no LED is active!");
+  OS_LOGW(TAG, "Trying to update visual state, but no LED is active!");
 }
 
 void _handleWiFiConnected(arduino_event_t* event) {
@@ -293,7 +295,7 @@ bool VisualStateManager::Init() {
   if (OPENSHOCK_LED_GPIO != GPIO_NUM_NC) {
     s_monoLedDriver = std::make_shared<MonoLedDriver>(static_cast<gpio_num_t>(OPENSHOCK_LED_GPIO));
     if (!s_monoLedDriver->IsValid()) {
-      ESP_LOGE(TAG, "Failed to initialize built-in LED manager");
+      OS_LOGE(TAG, "Failed to initialize built-in LED manager");
       return false;
     }
     ledActive = true;
@@ -302,7 +304,7 @@ bool VisualStateManager::Init() {
   if (OPENSHOCK_LED_WS2812B != GPIO_NUM_NC) {
     s_rgbLedDriver = std::make_shared<RgbLedDriver>(static_cast<gpio_num_t>(OPENSHOCK_LED_WS2812B));
     if (!s_rgbLedDriver->IsValid()) {
-      ESP_LOGE(TAG, "Failed to initialize RGB LED manager");
+      OS_LOGE(TAG, "Failed to initialize RGB LED manager");
       return false;
     }
     s_rgbLedDriver->SetBrightness(20);
@@ -310,7 +312,7 @@ bool VisualStateManager::Init() {
   }
 
   if (!ledActive) {
-    ESP_LOGW(TAG, "No LED type is defined, aborting initialization of VisualStateManager");
+    OS_LOGW(TAG, "No LED type is defined, aborting initialization of VisualStateManager");
     return true;
   }
 

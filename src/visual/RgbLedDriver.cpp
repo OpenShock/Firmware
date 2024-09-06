@@ -19,23 +19,23 @@ using namespace OpenShock;
 
 RgbLedDriver::RgbLedDriver(gpio_num_t gpioPin) : m_gpioPin(GPIO_NUM_NC), m_brightness(255), m_pattern(), m_rmtHandle(nullptr), m_taskHandle(nullptr), m_taskMutex(xSemaphoreCreateMutex()) {
   if (gpioPin == GPIO_NUM_NC) {
-    ESP_LOGE(TAG, "Pin is not set");
+    OS_LOGE(TAG, "Pin is not set");
     return;
   }
 
   if (!OpenShock::IsValidOutputPin(gpioPin)) {
-    ESP_LOGE(TAG, "Pin %d is not a valid output pin", gpioPin);
+    OS_LOGE(TAG, "Pin %d is not a valid output pin", gpioPin);
     return;
   }
 
   m_rmtHandle = rmtInit(gpioPin, RMT_TX_MODE, RMT_MEM_64);
   if (m_rmtHandle == NULL) {
-    ESP_LOGE(TAG, "Failed to initialize RMT for pin %d", gpioPin);
+    OS_LOGE(TAG, "Failed to initialize RMT for pin %d", gpioPin);
     return;
   }
 
   float realTick = rmtSetTick(m_rmtHandle, 100.F);
-  ESP_LOGD(TAG, "RMT tick is %f ns for pin %d", realTick, gpioPin);
+  OS_LOGD(TAG, "RMT tick is %f ns for pin %d", realTick, gpioPin);
 
   m_gpioPin = gpioPin;
 }
@@ -56,7 +56,7 @@ void RgbLedDriver::SetPattern(const RGBState* pattern, std::size_t patternLength
   // Start the task
   BaseType_t result = TaskUtils::TaskCreateExpensive(&Util::FnProxy<&RgbLedDriver::RunPattern>, TAG, 4096, this, 1, &m_taskHandle);  // PROFILED: 1.7KB stack usage
   if (result != pdPASS) {
-    ESP_LOGE(TAG, "[pin-%u] Failed to create task: %d", m_gpioPin, result);
+    OS_LOGE(TAG, "[pin-%u] Failed to create task: %d", m_gpioPin, result);
 
     m_taskHandle = nullptr;
     m_pattern.clear();

@@ -1,3 +1,5 @@
+#include <freertos/FreeRTOS.h>
+
 const char* const TAG = "main";
 
 #include "CaptivePortal.h"
@@ -24,28 +26,28 @@ bool trySetup() {
   OpenShock::EventHandlers::Init();
 
   if (!OpenShock::VisualStateManager::Init()) {
-    ESP_PANIC(TAG, "Unable to initialize VisualStateManager");
+    OS_PANIC(TAG, "Unable to initialize VisualStateManager");
   }
 
   OpenShock::EStopManager::Init();
 
   if (!OpenShock::SerialInputHandler::Init()) {
-    ESP_LOGE(TAG, "Unable to initialize SerialInputHandler");
+    OS_LOGE(TAG, "Unable to initialize SerialInputHandler");
     return false;
   }
 
   if (!OpenShock::CommandHandler::Init()) {
-    ESP_LOGW(TAG, "Unable to initialize CommandHandler");
+    OS_LOGW(TAG, "Unable to initialize CommandHandler");
     return false;
   }
 
   if (!OpenShock::WiFiManager::Init()) {
-    ESP_LOGE(TAG, "Unable to initialize WiFiManager");
+    OS_LOGE(TAG, "Unable to initialize WiFiManager");
     return false;
   }
 
   if (!OpenShock::GatewayConnectionManager::Init()) {
-    ESP_LOGE(TAG, "Unable to initialize GatewayConnectionManager");
+    OS_LOGE(TAG, "Unable to initialize GatewayConnectionManager");
     return false;
   }
 
@@ -54,24 +56,24 @@ bool trySetup() {
 
 // OTA setup is the same as normal setup, but we invalidate the currently running app, and roll back if it fails.
 void otaSetup() {
-  ESP_LOGI(TAG, "Validating OTA app");
+  OS_LOGI(TAG, "Validating OTA app");
 
   if (!trySetup()) {
-    ESP_LOGE(TAG, "Unable to validate OTA app, rolling back");
+    OS_LOGE(TAG, "Unable to validate OTA app, rolling back");
     OpenShock::OtaUpdateManager::InvalidateAndRollback();
   }
 
-  ESP_LOGI(TAG, "Marking OTA app as valid");
+  OS_LOGI(TAG, "Marking OTA app as valid");
 
   OpenShock::OtaUpdateManager::ValidateApp();
 
-  ESP_LOGI(TAG, "Done validating OTA app");
+  OS_LOGI(TAG, "Done validating OTA app");
 }
 
 // App setup is the same as normal setup, but we restart if it fails.
 void appSetup() {
   if (!trySetup()) {
-    ESP_LOGI(TAG, "Restarting in 5 seconds...");
+    OS_LOGI(TAG, "Restarting in 5 seconds...");
     vTaskDelay(pdMS_TO_TICKS(5000));
     esp_restart();
   }

@@ -22,7 +22,7 @@ bool OpenShock::FormatToString(std::string& out, const char* format, ...) {
 
   // If result is negative, something went wrong.
   if (result < 0) {
-    ESP_LOGE(TAG, "Failed to format string");
+    OS_LOGE(TAG, "Failed to format string");
     return false;
   }
 
@@ -42,7 +42,7 @@ bool OpenShock::FormatToString(std::string& out, const char* format, ...) {
     // Free heap buffer and return false.
     if (result < 0) {
       delete[] bufferPtr;
-      ESP_LOGE(TAG, "Failed to format string");
+      OS_LOGE(TAG, "Failed to format string");
       return false;
     }
   }
@@ -56,4 +56,73 @@ bool OpenShock::FormatToString(std::string& out, const char* format, ...) {
   }
 
   return true;
+}
+
+std::vector<std::string_view> OpenShock::StringSplit(const std::string_view view, char delimiter, std::size_t maxSplits) {
+  if (view.empty()) {
+    return {};
+  }
+
+  std::vector<std::string_view> result = {};
+
+  std::size_t pos    = 0;
+  std::size_t splits = 0;
+  while (pos < view.size() && splits < maxSplits) {
+    std::size_t nextPos = view.find(delimiter, pos);
+    if (nextPos == std::string_view::npos) {
+      nextPos = view.size();
+    }
+
+    result.push_back(view.substr(pos, nextPos - pos));
+    pos = nextPos + 1;
+    ++splits;
+  }
+
+  if (pos < view.size()) {
+    result.push_back(view.substr(pos));
+  }
+
+  return result;
+}
+
+std::vector<std::string_view> OpenShock::StringSplit(const std::string_view view, bool (*predicate)(char delimiter), std::size_t maxSplits) {
+  if (view.empty()) {
+    return {};
+  }
+
+  std::vector<std::string_view> result = {};
+
+  const char* start = nullptr;
+  for (const char* ptr = view.begin(); ptr < view.end(); ++ptr) {
+    if (predicate(*ptr)) {
+      if (start != nullptr) {
+        result.emplace_back(std::string_view(start, ptr - start));
+        start = nullptr;
+      }
+    } else if (start == nullptr) {
+      start = ptr;
+    }
+  }
+
+  if (start != nullptr) {
+    result.emplace_back(std::string_view(start, view.end() - start));
+  }
+
+  return result;
+}
+
+std::vector<std::string_view> OpenShock::StringSplitNewLines(const std::string_view view, std::size_t maxSplits) {
+  return StringSplit(
+    view, [](char c) { return c == '\r' || c == '\n'; }, maxSplits
+  );
+}
+
+std::vector<std::string_view> OpenShock::StringSplitWhiteSpace(const std::string_view view, std::size_t maxSplits) {
+  return StringSplit(
+    view, [](char c) { return isspace(c) != 0; }, maxSplits
+  );
+}
+
+String OpenShock::StringToArduinoString(std::string_view view) {
+  return String(view.data(), view.size());
 }

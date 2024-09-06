@@ -41,7 +41,7 @@ void _evGotIPHandler(arduino_event_t* event) {
   (void)event;
 
   s_flags |= FLAG_HAS_IP;
-  ESP_LOGD(TAG, "Got IP address");
+  OS_LOGD(TAG, "Got IP address");
 }
 
 void _evWiFiDisconnectedHandler(arduino_event_t* event) {
@@ -49,7 +49,7 @@ void _evWiFiDisconnectedHandler(arduino_event_t* event) {
 
   s_flags    = FLAG_NONE;
   s_wsClient = nullptr;
-  ESP_LOGD(TAG, "Lost IP address");
+  OS_LOGD(TAG, "Lost IP address");
   OpenShock::VisualStateManager::SetWebSocketConnected(false);
 }
 
@@ -76,16 +76,16 @@ bool GatewayConnectionManager::IsLinked() {
   return (s_flags & FLAG_LINKED) != 0;
 }
 
-AccountLinkResultCode GatewayConnectionManager::Link(StringView linkCode) {
+AccountLinkResultCode GatewayConnectionManager::Link(std::string_view linkCode) {
   if ((s_flags & FLAG_HAS_IP) == 0) {
     return AccountLinkResultCode::NoInternetConnection;
   }
   s_wsClient = nullptr;
 
-  ESP_LOGD(TAG, "Attempting to link to account using code %.*s", linkCode.length(), linkCode.data());
+  OS_LOGD(TAG, "Attempting to link to account using code %.*s", linkCode.length(), linkCode.data());
 
   if (linkCode.length() != LINK_CODE_LENGTH) {
-    ESP_LOGE(TAG, "Invalid link code length");
+    OS_LOGE(TAG, "Invalid link code length");
     return AccountLinkResultCode::InvalidCode;
   }
 
@@ -95,7 +95,7 @@ AccountLinkResultCode GatewayConnectionManager::Link(StringView linkCode) {
     return AccountLinkResultCode::InternalError;  // Just return false, don't spam the console with errors
   }
   if (response.result != HTTP::RequestResult::Success) {
-    ESP_LOGE(TAG, "Error while getting auth token: %d %d", response.result, response.code);
+    OS_LOGE(TAG, "Error while getting auth token: %d %d", response.result, response.code);
 
     return AccountLinkResultCode::InternalError;
   }
@@ -105,24 +105,24 @@ AccountLinkResultCode GatewayConnectionManager::Link(StringView linkCode) {
   }
 
   if (response.code != 200) {
-    ESP_LOGE(TAG, "Unexpected response code: %d", response.code);
+    OS_LOGE(TAG, "Unexpected response code: %d", response.code);
     return AccountLinkResultCode::InternalError;
   }
 
-  StringView authToken = response.data.authToken;
+  std::string_view authToken = response.data.authToken;
 
-  if (authToken.isNullOrEmpty()) {
-    ESP_LOGE(TAG, "Received empty auth token");
+  if (authToken.empty()) {
+    OS_LOGE(TAG, "Received empty auth token");
     return AccountLinkResultCode::InternalError;
   }
 
   if (!Config::SetBackendAuthToken(authToken)) {
-    ESP_LOGE(TAG, "Failed to save auth token");
+    OS_LOGE(TAG, "Failed to save auth token");
     return AccountLinkResultCode::InternalError;
   }
 
   s_flags |= FLAG_LINKED;
-  ESP_LOGD(TAG, "Successfully linked to account");
+  OS_LOGD(TAG, "Successfully linked to account");
 
   return AccountLinkResultCode::Success;
 }
@@ -132,7 +132,7 @@ void GatewayConnectionManager::UnLink() {
   Config::ClearBackendAuthToken();
 }
 
-bool GatewayConnectionManager::SendMessageTXT(StringView data) {
+bool GatewayConnectionManager::SendMessageTXT(std::string_view data) {
   if (s_wsClient == nullptr) {
     return false;
   }
@@ -148,7 +148,7 @@ bool GatewayConnectionManager::SendMessageBIN(const uint8_t* data, std::size_t l
   return s_wsClient->sendMessageBIN(data, length);
 }
 
-bool FetchDeviceInfo(StringView authToken) {
+bool FetchDeviceInfo(std::string_view authToken) {
   // TODO: this function is very slow, should be optimized!
   if ((s_flags & FLAG_HAS_IP) == 0) {
     return false;
@@ -160,26 +160,26 @@ bool FetchDeviceInfo(StringView authToken) {
     return false;  // Just return false, don't spam the console with errors
   }
   if (response.result != HTTP::RequestResult::Success) {
-    ESP_LOGE(TAG, "Error while fetching device info: %d %d", response.result, response.code);
+    OS_LOGE(TAG, "Error while fetching device info: %d %d", response.result, response.code);
     return false;
   }
 
   if (response.code == 401) {
-    ESP_LOGD(TAG, "Auth token is invalid, clearing it");
+    OS_LOGD(TAG, "Auth token is invalid, clearing it");
     Config::ClearBackendAuthToken();
     return false;
   }
 
   if (response.code != 200) {
-    ESP_LOGE(TAG, "Unexpected response code: %d", response.code);
+    OS_LOGE(TAG, "Unexpected response code: %d", response.code);
     return false;
   }
 
-  ESP_LOGI(TAG, "Device ID:   %s", response.data.deviceId.c_str());
-  ESP_LOGI(TAG, "Device Name: %s", response.data.deviceName.c_str());
-  ESP_LOGI(TAG, "Shockers:");
+  OS_LOGI(TAG, "Device ID:   %s", response.data.deviceId.c_str());
+  OS_LOGI(TAG, "Device Name: %s", response.data.deviceName.c_str());
+  OS_LOGI(TAG, "Shockers:");
   for (auto& shocker : response.data.shockers) {
-    ESP_LOGI(TAG, "  [%s] rf=%u model=%u", shocker.id.c_str(), shocker.rfId, shocker.model);
+    OS_LOGI(TAG, "  [%s] rf=%u model=%u", shocker.id.c_str(), shocker.rfId, shocker.model);
   }
 
   s_flags |= FLAG_LINKED;
@@ -191,12 +191,12 @@ static int64_t _lastConnectionAttempt = 0;
 bool StartConnectingToLCG() {
   // TODO: this function is very slow, should be optimized!
   if (s_wsClient == nullptr) {  // If wsClient is already initialized, we are already paired or connected
-    ESP_LOGD(TAG, "wsClient is null");
+    OS_LOGD(TAG, "wsClient is null");
     return false;
   }
 
   if (s_wsClient->state() != GatewayClient::State::Disconnected) {
-    ESP_LOGD(TAG, "WebSocketClient is not disconnected, waiting...");
+    OS_LOGD(TAG, "WebSocketClient is not disconnected, waiting...");
     s_wsClient->disconnect();
     return false;
   }
@@ -212,19 +212,19 @@ bool StartConnectingToLCG() {
     std::string lcgOverride;
     Config::GetBackendLCGOverride(lcgOverride);
 
-    ESP_LOGD(TAG, "Connecting to overridden LCG endpoint %s", lcgOverride.c_str());
+    OS_LOGD(TAG, "Connecting to overridden LCG endpoint %s", lcgOverride.c_str());
     s_wsClient->connect(lcgOverride.c_str());
     return true;
   }
 
   if (!Config::HasBackendAuthToken()) {
-    ESP_LOGD(TAG, "No auth token, can't connect to LCG");
+    OS_LOGD(TAG, "No auth token, can't connect to LCG");
     return false;
   }
 
   std::string authToken;
   if (!Config::GetBackendAuthToken(authToken)) {
-    ESP_LOGE(TAG, "Failed to get auth token");
+    OS_LOGE(TAG, "Failed to get auth token");
     return false;
   }
 
@@ -234,22 +234,22 @@ bool StartConnectingToLCG() {
     return false;  // Just return false, don't spam the console with errors
   }
   if (response.result != HTTP::RequestResult::Success) {
-    ESP_LOGE(TAG, "Error while fetching LCG endpoint: %d %d", response.result, response.code);
+    OS_LOGE(TAG, "Error while fetching LCG endpoint: %d %d", response.result, response.code);
     return false;
   }
 
   if (response.code == 401) {
-    ESP_LOGD(TAG, "Auth token is invalid, clearing it");
+    OS_LOGD(TAG, "Auth token is invalid, clearing it");
     Config::ClearBackendAuthToken();
     return false;
   }
 
   if (response.code != 200) {
-    ESP_LOGE(TAG, "Unexpected response code: %d", response.code);
+    OS_LOGE(TAG, "Unexpected response code: %d", response.code);
     return false;
   }
 
-  ESP_LOGD(TAG, "Connecting to LCG endpoint %s in country %s", response.data.fqdn.c_str(), response.data.country.c_str());
+  OS_LOGD(TAG, "Connecting to LCG endpoint %s in country %s", response.data.fqdn.c_str(), response.data.country.c_str());
   s_wsClient->connect(response.data.fqdn.c_str());
 
   return true;
@@ -264,7 +264,7 @@ void GatewayConnectionManager::Update() {
 
     std::string authToken;
     if (!Config::GetBackendAuthToken(authToken)) {
-      ESP_LOGE(TAG, "Failed to get auth token");
+      OS_LOGE(TAG, "Failed to get auth token");
       return;
     }
 
@@ -274,7 +274,7 @@ void GatewayConnectionManager::Update() {
     }
 
     s_flags |= FLAG_LINKED;
-    ESP_LOGD(TAG, "Successfully verified auth token");
+    OS_LOGD(TAG, "Successfully verified auth token");
 
     s_wsClient = std::make_unique<GatewayClient>(authToken);
   }
