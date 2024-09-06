@@ -92,16 +92,19 @@ void _handleHelpCommand(std::string_view arg) {
     OS_LOGV(TAG, "Buffer size: %zu", buffer.capacity());
     
     for (const auto& cmd : s_commandGroups) {
+      ESP_LOGV(TAG, "Collecting help for command group: %.*s", cmd.name().size(), cmd.name().data());
       buffer.append(cmd.name());
-      buffer.append(paddedLength - cmd.name().size(), ' ');
+      //buffer.append(paddedLength - cmd.name().size(), ' ');
       buffer.append("\n");
 
       for (const auto& command : cmd.commands()) {
+        ESP_LOGV(TAG, "Collecting help for command: %.*s", command.description().size(), command.description().data());
         buffer.append("  ");
         buffer.append(command.description());
-        buffer.append(paddedLength - command.description().size(), ' ');
+        //buffer.append(paddedLength - command.description().size(), ' ');
 
         for (const auto& arg : command.arguments()) {
+          ESP_LOGV(TAG, "Collecting help for argument: %.*s", arg.name.size(), arg.name.data());
           buffer.append(arg.name);
           buffer.append(" ");
         }
@@ -178,8 +181,13 @@ void processSerialLine(std::string_view line) {
   }
 
   auto parts                 = OpenShock::StringSplit(line, ' ', 1);
-  std::string_view command   = parts[0];
+  std::string_view command   = OpenShock::StringTrim(parts[0]);
   std::string_view arguments = parts.size() > 1 ? parts[1] : std::string_view();
+
+  if (command == "help"sv) {
+    _handleHelpCommand(arguments);
+    return;
+  }
 
   auto it = s_commandHandlers.find(command);
   if (it == s_commandHandlers.end()) {
@@ -204,7 +212,9 @@ bool SerialInputHandler::Init() {
   s_initialized = true;
 
   // Register command handlers
-  for (const auto& handler : OpenShock::Serial::CommandHandlers::AllCommandHandlers()) {
+  s_commandGroups = OpenShock::Serial::CommandHandlers::AllCommandHandlers();
+  for (const auto& handler : s_commandGroups) {
+    ESP_LOGV(TAG, "Registering command handler: %.*s", handler.name().size(), handler.name().data());
     RegisterCommandHandler(handler);
   }
 
