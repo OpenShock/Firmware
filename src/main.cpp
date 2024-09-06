@@ -30,7 +30,7 @@ bool trySetup() {
   }
 
   if (!OpenShock::EStopManager::Init()) {
-    ESP_PANIC(TAG, "Unable to initialize EStopManager");
+    OS_PANIC(TAG, "Unable to initialize EStopManager");
   }
 
   if (!OpenShock::SerialInputHandler::Init()) {
