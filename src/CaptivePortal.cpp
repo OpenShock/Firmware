@@ -146,7 +146,7 @@ void CaptivePortal::Update() {
   }
 }
 
-bool CaptivePortal::SendMessageTXT(uint8_t socketId, StringView data) {
+bool CaptivePortal::SendMessageTXT(uint8_t socketId, std::string_view data) {
   if (s_instance == nullptr) return false;
 
   s_instance->sendMessageTXT(socketId, data);
@@ -161,7 +161,7 @@ bool CaptivePortal::SendMessageBIN(uint8_t socketId, const uint8_t* data, std::s
   return true;
 }
 
-bool CaptivePortal::BroadcastMessageTXT(StringView data) {
+bool CaptivePortal::BroadcastMessageTXT(std::string_view data) {
   if (s_instance == nullptr) return false;
 
   s_instance->broadcastMessageTXT(data);

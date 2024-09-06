@@ -1,14 +1,14 @@
 #pragma once
 
 #include "config/ConfigBase.h"
-#include "StringView.h"
 
 #include <string>
+#include <string_view>
 
 namespace OpenShock::Config {
   struct BackendConfig : public ConfigBase<Serialization::Configuration::BackendConfig> {
     BackendConfig();
-    BackendConfig(StringView domain, StringView authToken, StringView lcgOverride);
+    BackendConfig(std::string_view domain, std::string_view authToken, std::string_view lcgOverride);
 
     std::string domain;
     std::string authToken;
