@@ -64,7 +64,7 @@ void _handleNetworksCommand(OpenShock::StringView arg) {
       cred.id = id++;
     }
 
-    ESP_LOGI(TAG, "Adding network \"%s\" to config, id=%u", cred.ssid.c_str(), cred.id);
+    OS_LOGI(TAG, "Adding network \"%s\" to config, id=%u", cred.ssid.c_str(), cred.id);
 
     creds.emplace_back(std::move(cred));
   }

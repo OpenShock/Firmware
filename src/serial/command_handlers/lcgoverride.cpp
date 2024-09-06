@@ -66,7 +66,7 @@ void _handleLcgOverrideCommand(OpenShock::StringView arg) {
       return;
     }
 
-    ESP_LOGI(
+    OS_LOGI(
       TAG,
       "Successfully connected to \"%.*s\", name: %s, version: %s, current time: %s, country code: %s, FQDN: %s",
       domain.size(),

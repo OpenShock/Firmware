@@ -46,7 +46,7 @@ void _handleDomainCommand(OpenShock::StringView arg) {
     return;
   }
 
-  ESP_LOGI(TAG, "Successfully connected to \"%.*s\", version: %s, commit: %s, current time: %s", arg.length(), arg.data(), resp.data.version.c_str(), resp.data.commit.c_str(), resp.data.currentTime.c_str());
+  OS_LOGI(TAG, "Successfully connected to \"%.*s\", version: %s, commit: %s, current time: %s", arg.length(), arg.data(), resp.data.version.c_str(), resp.data.commit.c_str(), resp.data.currentTime.c_str());
 
   bool result = OpenShock::Config::SetBackendDomain(arg);
 
