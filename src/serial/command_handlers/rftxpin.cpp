@@ -1,14 +1,12 @@
-#include "serial/command_handlers/index.h"
-
-#include "serial/command_handlers/impl/CommandEntry.h"
-#include "serial/command_handlers/impl/common.h"
+#include "serial/command_handlers/common.h"
 
 #include "CommandHandler.h"
 #include "config/Config.h"
+#include "Convert.h"
 #include "SetRfPinResultCode.h"
 
-void _handleRfTxPinCommand(OpenShock::StringView arg) {
-  if (arg.isNullOrEmpty()) {
+void _handleRfTxPinCommand(std::string_view arg) {
+  if (arg.empty()) {
     uint8_t txPin;
     if (!OpenShock::Config::GetRFConfigTxPin(txPin)) {
       SERPR_ERROR("Failed to get RF TX pin from config");
@@ -21,7 +19,7 @@ void _handleRfTxPinCommand(OpenShock::StringView arg) {
   }
 
   uint8_t pin;
-  if (!OpenShock::IntConv::stou8(arg, pin)) {
+  if (!OpenShock::Convert::FromUint8(arg, pin)) {
     SERPR_ERROR("Invalid argument (number invalid or out of range)");
   }
 
@@ -46,9 +44,13 @@ void _handleRfTxPinCommand(OpenShock::StringView arg) {
   }
 }
 
-OpenShock::Serial::CommandHandlers::CommandEntry OpenShock::Serial::CommandHandlers::RfTxPinHandler() {
-  auto getter = OpenShock::Serial::CommandHandlers::CommandEntry("rftxpin"_sv, "Get the GPIO pin used for the radio transmitter"_sv, _handleRfTxPinCommand);
-  auto setter = OpenShock::Serial::CommandHandlers::CommandEntry("rftxpin"_sv, "Set the GPIO pin used for the radio transmitter"_sv, _handleRfTxPinCommand);
-  setter.addArgument("pin"_sv, "must be a number"_sv, "15"_sv);
+OpenShock::Serial::CommandGroup OpenShock::Serial::CommandHandlers::RfTxPinHandler() {
+  auto group = OpenShock::Serial::CommandGroup("rftxpin"sv);
 
+  auto getter = group.addCommand("Get the GPIO pin used for the radio transmitter"sv, _handleRfTxPinCommand);
+
+  auto setter = group.addCommand("Set the GPIO pin used for the radio transmitter"sv, _handleRfTxPinCommand);
+  setter.addArgument("pin"sv, "must be a number"sv, "15"sv);
+
+  return group;
 }

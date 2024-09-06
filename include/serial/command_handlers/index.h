@@ -1,21 +1,42 @@
 #pragma once
 
-#include "serial/command_handlers/impl/SerialCmdHandler.h"
+#include "serial/command_handlers/CommandEntry.h"
+
+#include <vector>
 
 namespace OpenShock::Serial::CommandHandlers {
-  std::vector<OpenShock::Serial::CommandHandlerEntry> AuthTokenHandler();
-  std::vector<OpenShock::Serial::CommandHandlerEntry> DomainHandler();
-  std::vector<OpenShock::Serial::CommandHandlerEntry> EchoHandler();
-  std::vector<OpenShock::Serial::CommandHandlerEntry> FactoryResetHandler();
-  std::vector<OpenShock::Serial::CommandHandlerEntry> JsonConfigHandler();
-  std::vector<OpenShock::Serial::CommandHandlerEntry> KeepAliveHandler();
-  std::vector<OpenShock::Serial::CommandHandlerEntry> LcgOverrideHandler();
-  std::vector<OpenShock::Serial::CommandHandlerEntry> NetworksHandler();
-  std::vector<OpenShock::Serial::CommandHandlerEntry> RawConfigHandler();
-  std::vector<OpenShock::Serial::CommandHandlerEntry> RestartHandler();
-  std::vector<OpenShock::Serial::CommandHandlerEntry> RfTransmitHandler();
-  std::vector<OpenShock::Serial::CommandHandlerEntry> RfTxPinHandler();
-  std::vector<OpenShock::Serial::CommandHandlerEntry> SysInfoHandler();
-  std::vector<OpenShock::Serial::CommandHandlerEntry> ValidGpiosHandler();
-  std::vector<OpenShock::Serial::CommandHandlerEntry> VersionHandler();
+  OpenShock::Serial::CommandGroup AuthTokenHandler();
+  OpenShock::Serial::CommandGroup DomainHandler();
+  OpenShock::Serial::CommandGroup EchoHandler();
+  OpenShock::Serial::CommandGroup FactoryResetHandler();
+  OpenShock::Serial::CommandGroup JsonConfigHandler();
+  OpenShock::Serial::CommandGroup KeepAliveHandler();
+  OpenShock::Serial::CommandGroup LcgOverrideHandler();
+  OpenShock::Serial::CommandGroup NetworksHandler();
+  OpenShock::Serial::CommandGroup RawConfigHandler();
+  OpenShock::Serial::CommandGroup RestartHandler();
+  OpenShock::Serial::CommandGroup RfTransmitHandler();
+  OpenShock::Serial::CommandGroup RfTxPinHandler();
+  OpenShock::Serial::CommandGroup SysInfoHandler();
+  OpenShock::Serial::CommandGroup ValidGpiosHandler();
+  OpenShock::Serial::CommandGroup VersionHandler();
+  inline std::vector<OpenShock::Serial::CommandGroup> AllCommandHandlers() {
+    return {
+      VersionHandler(),
+      RestartHandler(),
+      SysInfoHandler(),
+      EchoHandler(),
+      ValidGpiosHandler(),
+      RfTxPinHandler(),
+      DomainHandler(),
+      AuthTokenHandler(),
+      LcgOverrideHandler(),
+      NetworksHandler(),
+      KeepAliveHandler(),
+      JsonConfigHandler(),
+      RawConfigHandler(),
+      RfTransmitHandler(),
+      FactoryResetHandler(),
+    };
+  }
 }  // namespace OpenShock::Serial::CommandHandlers

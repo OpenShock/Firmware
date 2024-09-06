@@ -1,7 +1,4 @@
-#include "serial/command_handlers/index.h"
-
-#include "serial/command_handlers/impl/common.h"
-#include "serial/command_handlers/impl/SerialCmdHandler.h"
+#include "serial/command_handlers/common.h"
 
 #include "config/Config.h"
 #include "wifi/WiFiManager.h"
@@ -10,10 +7,12 @@
 
 #include <vector>
 
-void _handleNetworksCommand(OpenShock::StringView arg) {
+const char* const TAG = "Serial::CommandHandlers::Networks";
+
+void _handleNetworksCommand(std::string_view arg) {
   cJSON* root;
 
-  if (arg.isNullOrEmpty()) {
+  if (arg.empty()) {
     root = cJSON_CreateArray();
     if (root == nullptr) {
       SERPR_ERROR("Failed to create JSON array");
@@ -48,7 +47,7 @@ void _handleNetworksCommand(OpenShock::StringView arg) {
     return;
   }
 
-  std::vector<Config::WiFiCredentials> creds;
+  std::vector<OpenShock::Config::WiFiCredentials> creds;
 
   uint8_t id     = 1;
   cJSON* network = nullptr;
@@ -79,9 +78,20 @@ void _handleNetworksCommand(OpenShock::StringView arg) {
   OpenShock::WiFiManager::RefreshNetworkCredentials();
 }
 
-OpenShock::Serial::CommandHandlerEntry OpenShock::Serial::CommandHandlers::NetworksHandler() {
-  return OpenShock::Serial::CommandHandlerEntry {
-    "networks"_sv,
+OpenShock::Serial::CommandGroup OpenShock::Serial::CommandHandlers::NetworksHandler() {
+  auto group = OpenShock::Serial::CommandGroup("networks"sv);
+
+  auto getter = group.addCommand("Get all saved networks."sv, _handleNetworksCommand);
+
+  auto setter = group.addCommand("Set all saved networks."sv, _handleNetworksCommand);
+  setter.addArgument("json"sv, "must be a array of objects with the following fields:"sv, "[{\"ssid\":\"myssid\",\"password\":\"mypassword\"}]"sv);
+
+  return group;
+}
+
+/*
+  return OpenShock::Serial::CommandGroup {
+    "networks"sv,
     R"(networks
   Get all saved networks.
 
@@ -97,4 +107,4 @@ networks [<json>]
 )",
     _handleNetworksCommand,
   };
-}
+*/

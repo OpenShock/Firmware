@@ -1,15 +1,14 @@
-#include "serial/command_handlers/index.h"
-
-#include "serial/command_handlers/impl/common.h"
-#include "serial/command_handlers/impl/SerialCmdHandler.h"
+#include "serial/command_handlers/common.h"
 
 #include "CommandHandler.h"
+#include "Convert.h"
 #include "config/Config.h"
+#include "util/StringUtils.h"
 
-void _handleKeepAliveCommand(OpenShock::StringView arg) {
+void _handleKeepAliveCommand(std::string_view arg) {
   bool keepAliveEnabled;
 
-  if (arg.isNullOrEmpty()) {
+  if (arg.empty()) {
     // Get keep alive status
     if (!OpenShock::Config::GetRFConfigKeepAliveEnabled(keepAliveEnabled)) {
       SERPR_ERROR("Failed to get keep-alive status from config");
@@ -20,7 +19,7 @@ void _handleKeepAliveCommand(OpenShock::StringView arg) {
     return;
   }
 
-  if (!_tryParseBool(arg, keepAliveEnabled)) {
+  if (!OpenShock::Convert::FromBool(OpenShock::StringTrim(arg), keepAliveEnabled)) {
     SERPR_ERROR("Invalid argument (not a boolean)");
     return;
   }
@@ -34,19 +33,13 @@ void _handleKeepAliveCommand(OpenShock::StringView arg) {
   }
 }
 
-OpenShock::Serial::CommandHandlerEntry OpenShock::Serial::CommandHandlers::KeepAliveHandler() {
-  return OpenShock::Serial::CommandHandlerEntry {
-    "keepalive"_sv,
-    R"(keepalive
-  Get the shocker keep-alive status.
+OpenShock::Serial::CommandGroup OpenShock::Serial::CommandHandlers::KeepAliveHandler() {
+  auto group = OpenShock::Serial::CommandGroup("keepalive"sv);
 
-keepalive [<bool>]
-  Enable/disable shocker keep-alive.
-  Arguments:
-    <bool> must be a boolean.
-  Example:
-    keepalive true
-)",
-    _handleKeepAliveCommand,
-  };
+  auto getter = group.addCommand("Get the shocker keep-alive status"sv, _handleKeepAliveCommand);
+
+  auto setter = group.addCommand("Enable/disable shocker keep-alive"sv, _handleKeepAliveCommand);
+  setter.addArgument("enabled"sv, "must be a boolean"sv, "true"sv);
+
+  return group;
 }

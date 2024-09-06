@@ -8,14 +8,19 @@ const char* const TAG = "SerialInputHandler";
 #include "config/SerialInputConfig.h"
 #include "FormatHelpers.h"
 #include "http/HTTPRequestManager.h"
-#include "intconv.h"
+#include "Convert.h"
 #include "Logging.h"
 #include "serialization/JsonAPI.h"
 #include "serialization/JsonSerial.h"
+#include "serial/command_handlers/CommandEntry.h"
+#include "serial/command_handlers/common.h"
+#include "serial/command_handlers/index.h"
 #include "Time.h"
 #include "util/Base64Utils.h"
 #include "util/StringUtils.h"
 #include "wifi/WiFiManager.h"
+
+#include <Arduino.h>
 
 #include <cJSON.h>
 #include <Esp.h>
@@ -55,96 +60,80 @@ const int64_t PASTE_INTERVAL_THRESHOLD_MS       = 20;
 const std::size_t SERIAL_BUFFER_CLEAR_THRESHOLD = 512;
 
 static bool s_echoEnabled = true;
-static std::unordered_map<std::string_view, SerialCmdHandler, std::hash_ci, std::equals_ci> s_commandHandlers;
+static std::vector<OpenShock::Serial::CommandGroup> s_commandGroups;
+static std::unordered_map<std::string_view, OpenShock::Serial::CommandGroup, std::hash_ci, std::equals_ci> s_commandHandlers;
 
-/// @brief Tries to parse a boolean from a string (case-insensitive)
-/// @param str Input string
-/// @param strLen Length of input string
-/// @param out Output boolean
-/// @return True if the argument is a boolean, false otherwise
-bool _tryParseBool(std::string_view str, bool& out) {
-  if (str.empty()) {
-    return false;
-  }
-
-  str = OpenShock::StringTrim(str);
-
-  if (str.length() > 5) {
-    return false;
-  }
-
-  if (strncasecmp(str.data(), "true", str.length()) == 0) {
-    out = true;
-    return true;
-  }
-
-  if (strncasecmp(str.data(), "false", str.length()) == 0) {
-    out = false;
-    return true;
-  }
-
-  return false;
-}
-
-void _handleHelpCommand(OpenShock::StringView arg) {
-  arg = arg.trim();
-  if (arg.isNullOrEmpty()) {
+void _handleHelpCommand(std::string_view arg) {
+  arg = OpenShock::StringTrim(arg);
+  if (arg.empty()) {
     SerialInputHandler::PrintWelcomeHeader();
 
-    // Raw string literal (1+ to remove the first newline)
-    Serial.print(1 + R"(
-help                   print this menu
-help         <command> print help for a command
-version                print version information
-restart                restart the board
-sysinfo                print debug information for various subsystems
-echo                   get serial echo enabled
-echo         <bool>    set serial echo enabled
-validgpios             list all valid GPIO pins
-rftxpin                get radio transmit pin
-rftxpin      <pin>     set radio transmit pin
-domain                 get backend domain
-domain       <domain>  set backend domain
-authtoken              get auth token
-authtoken    <token>   set auth token
-networks               get all saved networks
-networks     <json>    set all saved networks
-keepalive              get shocker keep-alive enabled
-keepalive    <bool>    set shocker keep-alive enabled
-jsonconfig             get configuration as JSON
-jsonconfig   <json>    set configuration from JSON
-rawconfig              get raw configuration as base64
-rawconfig    <base64>  set raw configuration from base64
-rftransmit   <json>    transmit a RF command
-factoryreset           reset device to factory defaults and restart
-)");
+    std::size_t longestCommand  = 0;
+    std::size_t longestArgument = 0;
+    std::size_t descriptionSize = 0;
+    for (const auto& group : s_commandGroups) {
+      longestCommand = std::max(longestCommand, group.name().size());
+      for (const auto& command : group.commands()) {
+        std::size_t argumentSize = 0;
+        for (const auto& arg : command.arguments()) {
+          argumentSize += arg.name.size() + 1; // +1 for space
+        }
+        longestArgument = std::max(longestArgument, argumentSize);
+        descriptionSize += command.description().size();
+      }
+    }
+
+    std::size_t paddedLength = longestCommand + 1 + longestArgument + 1; // +1 for space, +1 for newline
+
+    std::string buffer;
+    buffer.reserve((paddedLength * s_commandGroups.size()) + descriptionSize); // Approximate size
+
+    OS_LOGV(TAG, "Longest command: %zu, longest argument: %zu, padded length: %zu", longestCommand, longestArgument, paddedLength);
+    OS_LOGV(TAG, "Buffer size: %zu", buffer.capacity());
+    
+    for (const auto& cmd : s_commandGroups) {
+      buffer.append(cmd.name());
+      buffer.append(paddedLength - cmd.name().size(), ' ');
+      buffer.append("\n");
+
+      for (const auto& command : cmd.commands()) {
+        buffer.append("  ");
+        buffer.append(command.description());
+        buffer.append(paddedLength - command.description().size(), ' ');
+
+        for (const auto& arg : command.arguments()) {
+          buffer.append(arg.name);
+          buffer.append(" ");
+        }
+
+        buffer.append("\n");
+      }
+    }
+
+    OS_LOGV(TAG, "Buffer size: %zu", buffer.size());
+
+    ::Serial.print(buffer.data());
     return;
   }
 
   // Get help for a specific command
   auto it = s_commandHandlers.find(arg);
   if (it != s_commandHandlers.end()) {
-    Serial.print(it->second.helpResponse);
+    std::string buffer;
+    for (const auto& command : it->second.commands()) {
+      buffer.append(command.description());
+      buffer.append("\n");
+    }
+
+    ::Serial.print(buffer.data());
     return;
   }
 
   SERPR_ERROR("Command \"%.*s\" not found", arg.length(), arg.data());
 }
 
-static const OpenShock::SerialCmdHandler khelpCmdHandler = {
-  "help"_sv,
-  R"(help [<command>]
-  Print help information
-  Arguments:
-    <command> (optional) command to print help for
-  Example:
-    help
-)",
-  _handleHelpCommand,
-};
-
-void RegisterCommandHandler(const OpenShock::SerialCmdHandler& handler) {
-  s_commandHandlers[handler.cmd] = handler;
+void RegisterCommandHandler(const OpenShock::Serial::CommandGroup& handler) {
+  s_commandHandlers[handler.name()] = handler;
 }
 int findChar(const char* buffer, std::size_t bufferSize, char c) {
   for (int i = 0; i < bufferSize; i++) {
@@ -198,7 +187,12 @@ void processSerialLine(std::string_view line) {
     return;
   }
 
-  it->second.commandHandler(arguments);
+  for (const auto& cmd : it->second.commands()) {
+    if (cmd.arguments().empty()) {
+      cmd.commandHandler()(arguments);
+      return;
+    }
+  }
 }
 
 bool SerialInputHandler::Init() {
@@ -210,11 +204,13 @@ bool SerialInputHandler::Init() {
   s_initialized = true;
 
   // Register command handlers
-  RegisterCommandHandler(khelpCmdHandler);
+  for (const auto& handler : OpenShock::Serial::CommandHandlers::AllCommandHandlers()) {
+    RegisterCommandHandler(handler);
+  }
 
   SerialInputHandler::PrintWelcomeHeader();
   SerialInputHandler::PrintVersionInfo();
-  Serial.println();
+  ::Serial.println();
 
   if (!Config::GetSerialInputConfigEchoEnabled(s_echoEnabled)) {
     OS_LOGE(TAG, "Failed to get serial echo status from config");
@@ -232,13 +228,13 @@ void SerialInputHandler::Update() {
   static bool suppressingPaste   = false;
 
   while (true) {
-    int available = Serial.available();
+    int available = ::Serial.available();
     if (available <= 0 && findLineEnd(buffer, bufferIndex) < 0) {
       // If we're suppressing paste, and we haven't printed anything in a while, print the buffer and stop suppressing
       if (buffer != nullptr && s_echoEnabled && suppressingPaste && OpenShock::millis() - lastEcho > PASTE_INTERVAL_THRESHOLD_MS) {
         // \r - carriage return, moves to start of line
         // \x1B[K - clears rest of line
-        Serial.printf("\r\x1B[K> %.*s", bufferIndex, buffer);
+        ::Serial.printf("\r\x1B[K> %.*s", bufferIndex, buffer);
         lastEcho         = OpenShock::millis();
         suppressingPaste = false;
       }
@@ -264,7 +260,7 @@ void SerialInputHandler::Update() {
     }
 
     while (available-- > 0) {
-      char c = Serial.read();
+      char c = ::Serial.read();
       // Handle backspace
       if (c == '\b') {
         if (bufferIndex > 0) {
@@ -283,7 +279,7 @@ void SerialInputHandler::Update() {
         if (OpenShock::millis() - lastEcho > PASTE_INTERVAL_THRESHOLD_MS) {
           // \r - carriage return, moves to start of line
           // \x1B[K - clears rest of line
-          Serial.printf("\r\x1B[K> %.*s", bufferIndex, buffer);
+          ::Serial.printf("\r\x1B[K> %.*s", bufferIndex, buffer);
           lastEcho         = OpenShock::millis();
           suppressingPaste = false;
         } else {
@@ -296,7 +292,7 @@ void SerialInputHandler::Update() {
 
     std::string_view line = OpenShock::StringTrim(std::string_view(buffer, lineEnd));
 
-    Serial.printf("\r> %.*s\n", line.size(), line.data());
+    ::Serial.printf("\r> %.*s\n", line.size(), line.data());
 
     processSerialLine(line);
 
@@ -330,8 +326,16 @@ void SerialInputHandler::Update() {
   }
 }
 
+bool SerialInputHandler::SerialEchoEnabled() {
+  return s_echoEnabled;
+}
+
+void SerialInputHandler::SetSerialEchoEnabled(bool enabled) {
+  s_echoEnabled = enabled;
+}
+
 void SerialInputHandler::PrintWelcomeHeader() {
-  Serial.print(R"(
+  ::Serial.print(R"(
 ============== OPENSHOCK ==============
   Contribute @ github.com/OpenShock
   Discuss    @ discord.gg/OpenShock
@@ -341,7 +345,7 @@ void SerialInputHandler::PrintWelcomeHeader() {
 }
 
 void SerialInputHandler::PrintVersionInfo() {
-  Serial.print("\
+  ::Serial.print("\
   Version:  " OPENSHOCK_FW_VERSION "\n\
     Build:  " OPENSHOCK_FW_MODE "\n\
    Commit:  " OPENSHOCK_FW_GIT_COMMIT "\n\

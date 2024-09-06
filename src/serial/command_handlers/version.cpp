@@ -1,18 +1,16 @@
-#include "serial/command_handlers/index.h"
+#include "serial/command_handlers/common.h"
 
-#include "serial/command_handlers/impl/CommandEntry.h"
-
-#include "SerialInputHandler.h"
+#include "serial/SerialInputHandler.h"
 
 #include <vector>
 
-void _handleVersionCommand(OpenShock::StringView arg) {
+void _handleVersionCommand(std::string_view arg) {
   (void)arg;
 
-  Serial.print("\n");
+  ::Serial.print("\n");
   SerialInputHandler::PrintVersionInfo();
 }
 
 std::vector<OpenShock::Serial::CommandHandlers::CommandEntry> OpenShock::Serial::CommandHandlers::VersionHandler() {
-  return {OpenShock::Serial::CommandHandlers::CommandEntry("version"_sv, "Print version information"_sv, _handleVersionCommand)};
+  return {OpenShock::Serial::CommandHandlers::CommandEntry("version"sv, "Print version information"sv, _handleVersionCommand)};
 }

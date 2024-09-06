@@ -1,15 +1,11 @@
-#include "serial/command_handlers/index.h"
-
-#include "serial/command_handlers/impl/common.h"
-#include "serial/command_handlers/impl/SerialCmdHandler.h"
+#include "serial/command_handlers/common.h"
 
 #include "config/Config.h"
 #include "http/HTTPRequestManager.h"
 #include "serialization/JsonAPI.h"
-#include "StringView.h"
 
-void _handleLcgOverrideCommand(OpenShock::StringView arg) {
-  if (arg.isNullOrEmpty()) {
+void _handleLcgOverrideCommand(std::string_view arg) {
+  if (arg.empty()) {
     std::string lcgOverride;
     if (!OpenShock::Config::GetBackendLCGOverride(lcgOverride)) {
       SERPR_ERROR("Failed to get LCG override from config");
@@ -42,7 +38,7 @@ void _handleLcgOverrideCommand(OpenShock::StringView arg) {
       return;
     }
 
-    OpenShock::StringView domain = arg.substr(4);
+    std::string_view domain = arg.substr(4);
 
     if (domain.size() + 40 >= OPENSHOCK_URI_BUFFER_SIZE) {
       SERPR_ERROR("Domain name too long, please try increasing the \"OPENSHOCK_URI_BUFFER_SIZE\" constant in source code");
@@ -91,24 +87,17 @@ void _handleLcgOverrideCommand(OpenShock::StringView arg) {
   SERPR_ERROR("Invalid subcommand");
 }
 
-OpenShock::Serial::CommandHandlerEntry OpenShock::Serial::CommandHandlers::LcgOverrideHandler() {
-  return OpenShock::Serial::CommandHandlerEntry {
-    "lcgoverride",
-    R"(lcgoverride
-  Get the domain overridden for LCG endpoint (if any).
+OpenShock::Serial::CommandGroup OpenShock::Serial::CommandHandlers::LcgOverrideHandler() {
+  auto group = OpenShock::Serial::CommandGroup("lcgoverride"sv);
 
-lcgoverride set <domain>
-  Set a domain to override the LCG endpoint.
-  Arguments:
-    <domain> must be a string.
-  Example:
-    lcgoverride set eu1-gateway.shocklink.net
+  auto getCommand = group.addCommand("Get the domain overridden for LCG endpoint (if any)."sv, _handleLcgOverrideCommand);
 
-lcgoverride clear
-  Clear the overridden LCG endpoint.
-  Example:
-    lcgoverride clear
-)",
-    _handleLcgOverrideCommand,
-  };
+  auto setCommand = group.addCommand("Set a domain to override the LCG endpoint."sv, _handleLcgOverrideCommand);
+  setCommand.addArgument("set"sv, "no arguments"sv, ""sv);
+  setCommand.addArgument("domain"sv, "must be a string"sv, "eu1-gateway.shocklink.net"sv);
+
+  auto clearCommand = group.addCommand("Clear the overridden LCG endpoint."sv, _handleLcgOverrideCommand);
+  clearCommand.addArgument("clear"sv, "no arguments"sv, ""sv);
+
+  return group;
 }

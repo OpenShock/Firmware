@@ -1,15 +1,11 @@
-#include "serial/command_handlers/index.h"
-
-#include "serial/command_handlers/impl/common.h"
-#include "serial/command_handlers/impl/SerialCmdHandler.h"
+#include "serial/command_handlers/common.h"
 
 #include "config/Config.h"
-#include "StringView.h"
 
 #include <string>
 
-void _handleAuthtokenCommand(OpenShock::StringView arg) {
-  if (arg.isNullOrEmpty()) {
+void _handleAuthtokenCommand(std::string_view arg) {
+  if (arg.empty()) {
     std::string authToken;
     if (!OpenShock::Config::GetBackendAuthToken(authToken)) {
       SERPR_ERROR("Failed to get auth token from config");
@@ -30,9 +26,9 @@ void _handleAuthtokenCommand(OpenShock::StringView arg) {
   }
 }
 
-OpenShock::Serial::CommandHandlerEntry OpenShock::Serial::CommandHandlers::AuthTokenHandler() {
-  return OpenShock::Serial::CommandHandlerEntry {
-    "authtoken"_sv,
+OpenShock::Serial::CommandGroup OpenShock::Serial::CommandHandlers::AuthTokenHandler() {
+  return OpenShock::Serial::CommandGroup {
+    "authtoken"sv,
     R"(authtoken
   Get the backend auth token.
 

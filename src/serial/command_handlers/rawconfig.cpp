@@ -1,15 +1,12 @@
-#include "serial/command_handlers/index.h"
-
-#include "serial/command_handlers/impl/common.h"
-#include "serial/command_handlers/impl/SerialCmdHandler.h"
+#include "serial/command_handlers/common.h"
 
 #include "config/Config.h"
-#include "utils/Base64Utils.h"
+#include "util/Base64Utils.h"
 
 #include <vector>
 
-void _handleRawConfigCommand(OpenShock::StringView arg) {
-  if (arg.isNullOrEmpty()) {
+void _handleRawConfigCommand(std::string_view arg) {
+  if (arg.empty()) {
     std::vector<uint8_t> buffer;
 
     // Get raw config
@@ -44,9 +41,9 @@ void _handleRawConfigCommand(OpenShock::StringView arg) {
   ESP.restart();
 }
 
-OpenShock::Serial::CommandHandlerEntry OpenShock::Serial::CommandHandlers::RawConfigHandler() {
-  return OpenShock::Serial::CommandHandlerEntry {
-    "rawconfig"_sv,
+OpenShock::Serial::CommandGroup OpenShock::Serial::CommandHandlers::RawConfigHandler() {
+  return OpenShock::Serial::CommandGroup {
+    "rawconfig"sv,
     R"(rawconfig
   Get the raw binary config
   Example:

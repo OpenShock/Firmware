@@ -1,27 +1,20 @@
-#include "serial/command_handlers/index.h"
-
-#include "serial/command_handlers/impl/common.h"
-#include "serial/command_handlers/impl/SerialCmdHandler.h"
+#include "serial/command_handlers/common.h"
 
 #include "config/Config.h"
 
-void _handleFactoryResetCommand(OpenShock::StringView arg) {
+void _handleFactoryResetCommand(std::string_view arg) {
   (void)arg;
 
-  Serial.println("Resetting to factory defaults...");
+  ::Serial.println("Resetting to factory defaults...");
   OpenShock::Config::FactoryReset();
-  Serial.println("Restarting...");
+  ::Serial.println("Restarting...");
   ESP.restart();
 }
 
-OpenShock::Serial::CommandHandlerEntry OpenShock::Serial::CommandHandlers::FactoryResetHandler() {
-  return OpenShock::Serial::CommandHandlerEntry {
-    "factoryreset"_sv,
-    R"(factoryreset
-  Reset the device to factory defaults and restart
-  Example:
-    factoryreset
-)",
-    _handleFactoryResetCommand,
-  };
+OpenShock::Serial::CommandGroup OpenShock::Serial::CommandHandlers::FactoryResetHandler() {
+  auto group = OpenShock::Serial::CommandGroup("factoryreset"sv);
+
+  auto cmd = group.addCommand("Reset the device to factory defaults and restart"sv, _handleFactoryResetCommand);
+
+  return group;
 }

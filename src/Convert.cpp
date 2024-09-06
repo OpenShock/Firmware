@@ -1,6 +1,7 @@
-#include "intconv.h"
+#include "Convert.h"
 
 #include <cstdint>
+#include <cstring>
 #include <limits>
 #include <string_view>
 #include <type_traits>
@@ -102,29 +103,46 @@ constexpr bool spanToST(std::string_view str, T& val) {
 using namespace OpenShock;
 
 // Specific converters
-bool IntConv::stoi8(std::string_view str, int8_t& val) {
+bool Convert::FromInt8(std::string_view str, int8_t& val) {
   return spanToST(str, val);
 }
-bool IntConv::stou8(std::string_view str, uint8_t& val) {
+bool Convert::FromUint8(std::string_view str, uint8_t& val) {
   return spanToUT(str, val);
 }
-bool IntConv::stoi16(std::string_view str, int16_t& val) {
+bool Convert::FromInt16(std::string_view str, int16_t& val) {
   return spanToST(str, val);
 }
-bool IntConv::stou16(std::string_view str, uint16_t& val) {
+bool Convert::FromUint16(std::string_view str, uint16_t& val) {
   return spanToUT(str, val);
 }
-bool IntConv::stoi32(std::string_view str, int32_t& val) {
+bool Convert::FromInt32(std::string_view str, int32_t& val) {
   return spanToST(str, val);
 }
-bool IntConv::stou32(std::string_view str, uint32_t& val) {
+bool Convert::FromUint32(std::string_view str, uint32_t& val) {
   return spanToUT(str, val);
 }
-bool IntConv::stoi64(std::string_view str, int64_t& val) {
+bool Convert::FromInt64(std::string_view str, int64_t& val) {
   return spanToST(str, val);
 }
-bool IntConv::stou64(std::string_view str, uint64_t& val) {
+bool Convert::FromUint64(std::string_view str, uint64_t& val) {
   return spanToUT(str, val);
+}
+bool Convert::FromBool(std::string_view str, bool& val) {
+  if (str.length() > 5) {
+    return false;
+  }
+
+  if (strncasecmp(str.data(), "true", str.length()) == 0) {
+    val = true;
+    return true;
+  }
+
+  if (strncasecmp(str.data(), "false", str.length()) == 0) {
+    val = false;
+    return true;
+  }
+
+  return false;
 }
 
 static_assert(NumDigits<uint8_t>() == 3, "NumDigits test for uint8_t failed");

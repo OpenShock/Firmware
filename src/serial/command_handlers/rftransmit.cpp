@@ -1,13 +1,10 @@
-#include "serial/command_handlers/index.h"
-
-#include "serial/command_handlers/impl/common.h"
-#include "serial/command_handlers/impl/SerialCmdHandler.h"
+#include "serial/command_handlers/common.h"
 
 #include "CommandHandler.h"
 #include "serialization/JsonSerial.h"
 
-void _handleRFTransmitCommand(OpenShock::StringView arg) {
-  if (arg.isNullOrEmpty()) {
+void _handleRFTransmitCommand(std::string_view arg) {
+  if (arg.empty()) {
     SERPR_ERROR("No command");
     return;
   }
@@ -35,9 +32,24 @@ void _handleRFTransmitCommand(OpenShock::StringView arg) {
   SERPR_SUCCESS("Command sent");
 }
 
-OpenShock::Serial::CommandHandlerEntry OpenShock::Serial::CommandHandlers::RfTransmitHandler() {
-  return OpenShock::Serial::CommandHandlerEntry {
-    "rftransmit"_sv,
+OpenShock::Serial::CommandGroup OpenShock::Serial::CommandHandlers::RfTransmitHandler() {
+  auto group = OpenShock::Serial::CommandGroup("rftransmit"sv);
+
+  auto cmd = group.addCommand("Transmit a RF command"sv, _handleRFTransmitCommand);
+  cmd.addArgument("json"sv, "must be a JSON object with the following fields"sv, R"(
+    model      (string) Model of the shocker                    ("caixianlin", "petrainer", "petrainer998dr")
+    id         (number) ID of the shocker                       (0-65535)
+    type       (string) Type of the command                     ("shock", "vibrate", "sound", "stop")
+    intensity  (number) Intensity of the command                (0-255)
+    durationMs (number) Duration of the command in milliseconds (0-65535)
+  )"sv);
+
+  return group;
+}
+
+/*
+  return OpenShock::Serial::CommandGroup {
+    "rftransmit"sv,
     R"(rftransmit <json>
   Transmit a RF command
   Arguments:
@@ -52,4 +64,4 @@ OpenShock::Serial::CommandHandlerEntry OpenShock::Serial::CommandHandlers::RfTra
 )",
     _handleRFTransmitCommand,
   };
-}
+*/

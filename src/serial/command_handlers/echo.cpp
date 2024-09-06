@@ -1,25 +1,26 @@
-#include "serial/command_handlers/index.h"
+#include "serial/command_handlers/common.h"
 
-#include "serial/command_handlers/impl/common.h"
-#include "serial/command_handlers/impl/SerialCmdHandler.h"
+#include "serial/SerialInputHandler.h"
 
 #include "config/Config.h"
+#include "Convert.h"
+#include "util/StringUtils.h"
 
-void _handleSerialEchoCommand(OpenShock::StringView arg) {
-  if (arg.isNullOrEmpty()) {
+void _handleSerialEchoCommand(std::string_view arg) {
+  if (arg.empty()) {
     // Get current serial echo status
-    SERPR_RESPONSE("SerialEcho|%s", s_echoEnabled ? "true" : "false");
+    SERPR_RESPONSE("SerialEcho|%s", OpenShock::SerialInputHandler::SerialEchoEnabled() ? "true" : "false");
     return;
   }
 
   bool enabled;
-  if (!_tryParseBool(arg, enabled)) {
+  if (!OpenShock::Convert::FromBool(OpenShock::StringTrim(arg), enabled)) {
     SERPR_ERROR("Invalid argument (not a boolean)");
     return;
   }
 
   bool result   = OpenShock::Config::SetSerialInputConfigEchoEnabled(enabled);
-  s_echoEnabled = enabled;
+  OpenShock::SerialInputHandler::SetSerialEchoEnabled(enabled);
 
   if (result) {
     SERPR_SUCCESS("Saved config");
@@ -28,20 +29,13 @@ void _handleSerialEchoCommand(OpenShock::StringView arg) {
   }
 }
 
-OpenShock::Serial::CommandHandlerEntry OpenShock::Serial::CommandHandlers::EchoHandler() {
-  return OpenShock::Serial::CommandHandlerEntry {
-    "echo"_sv,
-    R"(echo
-  Get the serial echo status.
-  If enabled, typed characters are echoed back to the serial port.
+OpenShock::Serial::CommandGroup OpenShock::Serial::CommandHandlers::EchoHandler() {
+  auto group = OpenShock::Serial::CommandGroup("echo"sv);
 
-echo [<bool>]
-  Enable/disable serial echo.
-  Arguments:
-    <bool> must be a boolean.
-  Example:
-    echo true
-)",
-    _handleSerialEchoCommand,
-  };
+  auto getter = group.addCommand("Get the serial echo status"sv, _handleSerialEchoCommand);
+
+  auto setter = group.addCommand("Enable/disable serial echo"sv, _handleSerialEchoCommand);
+  setter.addArgument("enabled"sv, "must be a boolean"sv, "true"sv);
+
+  return group;
 }

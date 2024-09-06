@@ -1,22 +1,18 @@
-#include "serial/command_handlers/index.h"
+#include "serial/command_handlers/common.h"
 
-#include "serial/command_handlers/impl/SerialCmdHandler.h"
+#include <Arduino.h>
 
-void _handleRestartCommand(OpenShock::StringView arg) {
+void _handleRestartCommand(std::string_view arg) {
   (void)arg;
 
-  Serial.println("Restarting ESP...");
+  ::Serial.println("Restarting ESP...");
   ESP.restart();
 }
 
-OpenShock::Serial::CommandHandlerEntry OpenShock::Serial::CommandHandlers::RestartHandler() {
-  return OpenShock::Serial::CommandHandlerEntry {
-    "restart"_sv,
-    R"(restart
-  Restart the board
-  Example:
-    restart
-)",
-    _handleRestartCommand,
-  };
+OpenShock::Serial::CommandGroup OpenShock::Serial::CommandHandlers::RestartHandler() {
+  auto group = OpenShock::Serial::CommandGroup("restart"sv);
+
+  auto cmd = group.addCommand("Restart the board"sv, _handleRestartCommand);
+
+  return group;
 }

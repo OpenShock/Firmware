@@ -1,7 +1,4 @@
-#include "serial/command_handlers/index.h"
-
-#include "serial/command_handlers/impl/common.h"
-#include "serial/command_handlers/impl/SerialCmdHandler.h"
+#include "serial/command_handlers/common.h"
 
 #include "config/Config.h"
 #include "http/HTTPRequestManager.h"
@@ -9,8 +6,10 @@
 
 #include <string>
 
-void _handleDomainCommand(OpenShock::StringView arg) {
-  if (arg.isNullOrEmpty()) {
+const char* const TAG = "Serial::CommandHandlers::Domain";
+
+void _handleDomainCommand(std::string_view arg) {
+  if (arg.empty()) {
     std::string domain;
     if (!OpenShock::Config::GetBackendDomain(domain)) {
       SERPR_ERROR("Failed to get domain from config");
@@ -61,19 +60,13 @@ void _handleDomainCommand(OpenShock::StringView arg) {
   ESP.restart();
 }
 
-OpenShock::Serial::CommandHandlerEntry OpenShock::Serial::CommandHandlers::DomainHandler() {
-  return OpenShock::Serial::CommandHandlerEntry {
-    "domain"_sv,
-    R"(domain
-  Get the backend domain.
+OpenShock::Serial::CommandGroup OpenShock::Serial::CommandHandlers::DomainHandler() {
+  auto group = OpenShock::Serial::CommandGroup("domain"sv);
 
-domain [<domain>]
-  Set the backend domain.
-  Arguments:
-    <domain> must be a string.
-  Example:
-    domain api.shocklink.net
-)",
-    _handleDomainCommand,
-  };
+  auto getCommand = group.addCommand("Get the backend domain."sv, _handleDomainCommand);
+
+  auto setCommand = group.addCommand("Set the backend domain."sv, _handleDomainCommand);
+  setCommand.addArgument("domain"sv, "must be a string"sv, "api.shocklink.net"sv);
+
+  return group;
 }

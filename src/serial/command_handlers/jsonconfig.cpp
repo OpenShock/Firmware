@@ -1,12 +1,9 @@
-#include "serial/command_handlers/index.h"
-
-#include "serial/command_handlers/impl/common.h"
-#include "serial/command_handlers/impl/SerialCmdHandler.h"
+#include "serial/command_handlers/common.h"
 
 #include "config/Config.h"
 
-void _handleJsonConfigCommand(OpenShock::StringView arg) {
-  if (arg.isNullOrEmpty()) {
+void _handleJsonConfigCommand(std::string_view arg) {
+  if (arg.empty()) {
     // Get raw config
     std::string json = OpenShock:: Config::GetAsJSON(true);
 
@@ -24,21 +21,13 @@ void _handleJsonConfigCommand(OpenShock::StringView arg) {
   ESP.restart();
 }
 
-OpenShock::Serial::CommandHandlerEntry OpenShock::Serial::CommandHandlers::JsonConfigHandler() {
-  return OpenShock::Serial::CommandHandlerEntry {
-    "jsonconfig"_sv,
-    R"(jsonconfig
-  Get the configuration as JSON
-  Example:
-    jsonconfig
+OpenShock::Serial::CommandGroup OpenShock::Serial::CommandHandlers::JsonConfigHandler() {
+  auto group = OpenShock::Serial::CommandGroup("jsonconfig"sv);
 
-jsonconfig <json>
-  Set the configuration from JSON, and restart
-  Arguments:
-    <json> must be a valid JSON object
-  Example:
-    jsonconfig { ... }
-)",
-    _handleJsonConfigCommand,
-  };
+  auto getter = group.addCommand("Get the configuration as JSON"sv, _handleJsonConfigCommand);
+
+  auto setter = group.addCommand("Set the configuration from JSON, and restart"sv, _handleJsonConfigCommand);
+  setter.addArgument("json"sv, "must be a valid JSON object"sv, "{ ... }"sv);
+  
+  return group;
 }
