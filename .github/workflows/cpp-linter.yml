@@ -25,7 +25,7 @@ jobs:
           version: 18
           lines-changed-only: diff
           thread-comments: true
-          step-summary: false
+          file-annotations: false
 
       - name: Fail fast?!
         if: steps.linter.outputs.checks-failed > 0
