@@ -1,3 +1,5 @@
+#include <freertos/FreeRTOS.h>
+
 #include "visual/MonoLedDriver.h"
 
 const char* const TAG = "MonoLedDriver";
@@ -19,12 +21,12 @@ using namespace OpenShock;
 
 MonoLedDriver::MonoLedDriver(gpio_num_t gpioPin) : m_gpioPin(GPIO_NUM_NC), m_pattern(), m_taskHandle(nullptr), m_taskMutex(xSemaphoreCreateMutex()) {
   if (gpioPin == GPIO_NUM_NC) {
-    ESP_LOGE(TAG, "Pin is not set");
+    OS_LOGE(TAG, "Pin is not set");
     return;
   }
 
   if (!IsValidOutputPin(gpioPin)) {
-    ESP_LOGE(TAG, "Pin %d is not a valid output pin", gpioPin);
+    OS_LOGE(TAG, "Pin %d is not a valid output pin", gpioPin);
     return;
   }
 
@@ -74,7 +76,7 @@ void MonoLedDriver::SetPattern(const State* pattern, std::size_t patternLength) 
   // Start the task
   BaseType_t result = TaskUtils::TaskCreateUniversal(&Util::FnProxy<&MonoLedDriver::RunPattern>, name, 1024, this, 1, &m_taskHandle, 1);  // PROFILED: 0.5KB stack usage
   if (result != pdPASS) {
-    ESP_LOGE(TAG, "[pin-%u] Failed to create task: %d", m_gpioPin, result);
+    OS_LOGE(TAG, "[pin-%u] Failed to create task: %d", m_gpioPin, result);
 
     m_taskHandle = nullptr;
     m_pattern.clear();
