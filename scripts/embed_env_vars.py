@@ -166,7 +166,8 @@ merge_missing_keys(cpp_defines, dot_openshock_vars)
 log_level_int = dot.get_loglevel('LOG_LEVEL')
 if log_level_int is None:
     raise ValueError('LOG_LEVEL must be set in environment variables.')
-cpp_defines['CORE_DEBUG_LEVEL'] = log_level_int
+cpp_defines['OPENSHOCK_LOG_LEVEL'] = log_level_int
+cpp_defines['CORE_DEBUG_LEVEL'] = 2 # Warning level. (FUCK Arduino)
 
 # Serialize and inject CPP Defines.
 print_dump('CPP Defines', cpp_defines)

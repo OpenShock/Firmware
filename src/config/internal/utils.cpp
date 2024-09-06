@@ -18,19 +18,19 @@ bool _utilFromJsonInt(T& val, const cJSON* json, const char* name, T defaultVal,
   }
 
   if (cJSON_IsNumber(jsonVal) == 0) {
-    ESP_LOGE(TAG, "value at '%s' is not a number", name);
+    OS_LOGE(TAG, "value at '%s' is not a number", name);
     return false;
   }
 
   int intVal = jsonVal->valueint;
 
   if (intVal < minVal) {
-    ESP_LOGE(TAG, "value at '%s' is less than %d", name, minVal);
+    OS_LOGE(TAG, "value at '%s' is less than %d", name, minVal);
     return false;
   }
 
   if (intVal > maxVal) {
-    ESP_LOGE(TAG, "value at '%s' is greater than %d", name, maxVal);
+    OS_LOGE(TAG, "value at '%s' is greater than %d", name, maxVal);
     return false;
   }
 
@@ -49,14 +49,14 @@ void Config::Internal::Utils::FromFbsStr(std::string& str, const flatbuffers::St
 
 bool Config::Internal::Utils::FromFbsIPAddress(IPAddress& ip, const flatbuffers::String* fbsIP, const IPAddress& defaultIP) {
   if (fbsIP == nullptr) {
-    ESP_LOGE(TAG, "IP address is null");
+    OS_LOGE(TAG, "IP address is null");
     return false;
   }
 
   StringView view(*fbsIP);
 
   if (!OpenShock::IPV4AddressFromStringView(ip, view)) {
-    ESP_LOGE(TAG, "failed to parse IP address");
+    OS_LOGE(TAG, "failed to parse IP address");
     return false;
   }
 
@@ -71,7 +71,7 @@ bool Config::Internal::Utils::FromJsonBool(bool& val, const cJSON* json, const c
   }
 
   if (cJSON_IsBool(jsonVal) == 0) {
-    ESP_LOGE(TAG, "value at '%s' is not a bool", name);
+    OS_LOGE(TAG, "value at '%s' is not a bool", name);
     return false;
   }
 
@@ -100,7 +100,7 @@ bool Config::Internal::Utils::FromJsonStr(std::string& str, const cJSON* json, c
   }
 
   if (cJSON_IsString(jsonVal) == 0) {
-    ESP_LOGE(TAG, "value at '%s' is not a string", name);
+    OS_LOGE(TAG, "value at '%s' is not a string", name);
     return false;
   }
 
@@ -112,19 +112,19 @@ bool Config::Internal::Utils::FromJsonStr(std::string& str, const cJSON* json, c
 bool Config::Internal::Utils::FromJsonIPAddress(IPAddress& ip, const cJSON* json, const char* name, const IPAddress& defaultIP) {
   const cJSON* jsonVal = cJSON_GetObjectItemCaseSensitive(json, name);
   if (jsonVal == nullptr) {
-    ESP_LOGE(TAG, "value at '%s' is null", name);
+    OS_LOGE(TAG, "value at '%s' is null", name);
     return false;
   }
 
   if (cJSON_IsString(jsonVal) == 0) {
-    ESP_LOGE(TAG, "value at '%s' is not a string", name);
+    OS_LOGE(TAG, "value at '%s' is not a string", name);
     return false;
   }
 
   StringView view(jsonVal->valuestring);
 
   if (!OpenShock::IPV4AddressFromStringView(ip, view)) {
-    ESP_LOGE(TAG, "failed to parse IP address at '%s'", name);
+    OS_LOGE(TAG, "failed to parse IP address at '%s'", name);
     return false;
   }
 

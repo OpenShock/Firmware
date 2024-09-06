@@ -14,7 +14,7 @@ void _Private::HandleAccountUnlinkCommand(uint8_t socketId, const OpenShock::Ser
 
   auto msg = root->payload_as_AccountUnlinkCommand();
   if (msg == nullptr) {
-    ESP_LOGE(TAG, "Payload cannot be parsed as AccountUnlinkCommand");
+    OS_LOGE(TAG, "Payload cannot be parsed as AccountUnlinkCommand");
     return;
   }
 

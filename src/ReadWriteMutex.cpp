@@ -17,7 +17,7 @@ OpenShock::ReadWriteMutex::~ReadWriteMutex() {
 
 bool OpenShock::ReadWriteMutex::lockRead(TickType_t xTicksToWait) {
   if (xSemaphoreTake(m_readSem, xTicksToWait) == pdFALSE) {
-    ESP_LOGE(TAG, "Failed to take read semaphore");
+    OS_LOGE(TAG, "Failed to take read semaphore");
     return false;
   }
 
@@ -35,7 +35,7 @@ bool OpenShock::ReadWriteMutex::lockRead(TickType_t xTicksToWait) {
 
 void OpenShock::ReadWriteMutex::unlockRead() {
   if (xSemaphoreTake(m_readSem, portMAX_DELAY) == pdFALSE) {
-    ESP_LOGE(TAG, "Failed to take read semaphore");
+    OS_LOGE(TAG, "Failed to take read semaphore");
     return;
   }
 
@@ -48,7 +48,7 @@ void OpenShock::ReadWriteMutex::unlockRead() {
 
 bool OpenShock::ReadWriteMutex::lockWrite(TickType_t xTicksToWait) {
   if (xSemaphoreTake(m_mutex, xTicksToWait) == pdFALSE) {
-    ESP_LOGE(TAG, "Failed to take mutex");
+    OS_LOGE(TAG, "Failed to take mutex");
     return false;
   }
 
