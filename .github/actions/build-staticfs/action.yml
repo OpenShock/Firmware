@@ -1,9 +1,6 @@
 name: build-staticfs
 description: Builds the static filesystem partition and uploads it as an artifact
 inputs:
-  python-version:
-    description: 'Python version to use'
-    required: true
   skip-checkout:
     description: 'If true, skips checkout'
     required: false
@@ -25,7 +22,6 @@ runs:
 
     - uses: actions/setup-python@v5
       with:
-        python-version: ${{ inputs.python-version }}
         cache: 'pip'
 
     - name: Install dependencies

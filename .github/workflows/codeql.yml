@@ -86,7 +86,6 @@ jobs:
 
       - uses: ./.github/actions/build-firmware
         with:
-          python-version: 3.12
           board: ${{ matrix.board }}
           skip-checkout: true
 
