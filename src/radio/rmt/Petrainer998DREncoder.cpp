@@ -39,8 +39,8 @@ std::vector<rmt_data_t> Rmt::Petrainer998DREncoder::GetSequence(uint16_t shocker
   uint8_t channel       =   0b0001 << channelShift;  // Can be [1000] or [1111], 4 bits wide
   uint8_t channelInvert = ~(0b1000 >> channelShift); // Can be [1110] or [0000], 4 bits wide
 
-  // Payload layout: [channel:4][typeVal:4][shockerID:17][intensity:7][typeInvert:4][channelInvert:4] (40 bits) (Maybe ShockerID is 16 bits, and intensity is 8 bits?? makes more sense as then they are both multiples of 4)
-  uint64_t data = (static_cast<uint64_t>(channel & 0b1111) << 36 | static_cast<uint64_t>(typeVal & 0b1111) << 32 | static_cast<uint64_t>(shockerId & 0x1FFFF) << 15 | static_cast<uint64_t>(intensity & 0x7F) << 8 | static_cast<uint64_t>(typeInvert & 0b1111) << 4 | static_cast<uint64_t>(channelInvert & 0b1111));
+  // Payload layout: [channel:4][typeVal:4][shockerID:16][intensity:8][typeInvert:4][channelInvert:4] (40 bits)
+  uint64_t data = (static_cast<uint64_t>(channel & 0b1111) << 36 | static_cast<uint64_t>(typeVal & 0b1111) << 32 | static_cast<uint64_t>(shockerId & 0xFFFF) << 16 | static_cast<uint64_t>(intensity & 0xF) << 8 | static_cast<uint64_t>(typeInvert & 0b1111) << 4 | static_cast<uint64_t>(channelInvert & 0b1111));
 
   std::vector<rmt_data_t> pulses;
   pulses.reserve(43);
@@ -48,7 +48,7 @@ std::vector<rmt_data_t> Rmt::Petrainer998DREncoder::GetSequence(uint16_t shocker
   // Generate the sequence
   pulses.push_back(kRmtPreamble);
   Internal::EncodeBits<40>(pulses, data, kRmtOne, kRmtZero);
-  pulses.push_back(kRmtZero);
+  pulses.push_back(kRmtZero); // Idk why this is here, the decoded protocol has it
   pulses.push_back(kRmtPostamble);
 
   return pulses;
