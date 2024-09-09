@@ -95,10 +95,6 @@ def transform_cpp_define_string(k: str, v: str) -> str:
     if v.startswith('"') and v.endswith('"'):
         v = v[1:-1]
 
-    # Special case for OPENSHOCK_FW_GIT_COMMIT.
-    if k == 'OPENSHOCK_FW_GIT_COMMIT' and len(v) > 7:
-        v = v[0:7]
-
     return env.StringifyMacro(v)
 
 
