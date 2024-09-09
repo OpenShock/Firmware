@@ -13,46 +13,41 @@ std::vector<rmt_data_t> Rmt::Petrainer998DREncoder::GetSequence(uint16_t shocker
   // Intensity must be between 0 and 100
   intensity = std::min(intensity, static_cast<uint8_t>(100));
 
-  uint8_t typeVal = 0;
-  // typeInvert has the value of typeVal but bits are reversed and inverted
-  uint8_t typeInvert = 0;
+  int typeShift = 0;
   switch (type) {
   case ShockerCommandType::Shock:
-    typeVal    = 0b0001;
-    typeInvert = 0b0111;
+    typeShift = 0;
     break;
   case ShockerCommandType::Vibrate:
-    typeVal    = 0b0010;
-    typeInvert = 0b1011;
+    typeShift = 1;
     break;
   case ShockerCommandType::Sound:
-    typeVal    = 0b0100;
-    typeInvert = 0b1101;
+    typeShift = 2;
     break;
   // case ShockerCommandType::Light:
-  //   typeVal    = 0b1000;
-  //   typeInvert = 0b1110;
+  //   nShift = 3;
   //   break;
   default:
     return {}; // Invalid type
   }
 
-  // TODO: Channel argument?
-  // Can be [000] or [111], 3 bits wide
-  uint8_t channel = 0b000;
-  uint8_t channelInvert = 0b111;
+  uint8_t typeVal    =   0b0001 << typeShift;
+  uint8_t typeInvert = ~(0b1000 >> typeShift);
 
-  // Payload layout: [channel:3][typeVal:4][shockerID:17][intensity:7][typeInvert:4][channelInvert:3]
-  uint64_t data = (static_cast<uint64_t>(channel & 0b111) << 35 | static_cast<uint64_t>(typeVal & 0b1111) << 31 | static_cast<uint64_t>(shockerId & 0x1FFFF) << 14 | static_cast<uint64_t>(intensity & 0x7F) << 7 | static_cast<uint64_t>(typeInvert & 0b1111) << 3 | static_cast<uint64_t>(channelInvert & 0b111));
+  // TODO: Channel argument?
+  int channelShift = 3;
+  uint8_t channel       =   0b0001 << channelShift;  // Can be [1000] or [1111], 4 bits wide
+  uint8_t channelInvert = ~(0b1000 >> channelShift); // Can be [1110] or [0000], 4 bits wide
+
+  // Payload layout: [channel:4][typeVal:4][shockerID:17][intensity:7][typeInvert:4][channelInvert:4] (40 bits) (Maybe ShockerID is 16 bits, and intensity is 8 bits?? makes more sense as then they are both multiples of 4)
+  uint64_t data = (static_cast<uint64_t>(channel & 0b1111) << 36 | static_cast<uint64_t>(typeVal & 0b1111) << 32 | static_cast<uint64_t>(shockerId & 0x1FFFF) << 15 | static_cast<uint64_t>(intensity & 0x7F) << 8 | static_cast<uint64_t>(typeInvert & 0b1111) << 4 | static_cast<uint64_t>(channelInvert & 0b1111));
 
   std::vector<rmt_data_t> pulses;
   pulses.reserve(43);
 
   // Generate the sequence
   pulses.push_back(kRmtPreamble);
-  pulses.push_back(kRmtOne);
-  Internal::EncodeBits<38>(pulses, data, kRmtOne, kRmtZero);
-  pulses.push_back(kRmtZero);
+  Internal::EncodeBits<40>(pulses, data, kRmtOne, kRmtZero);
   pulses.push_back(kRmtZero);
   pulses.push_back(kRmtPostamble);
 
