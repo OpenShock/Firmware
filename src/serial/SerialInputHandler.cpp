@@ -675,7 +675,7 @@ domain [<domain>]
   Arguments:
     <domain> must be a string.
   Example:
-    domain api.shocklink.net
+    domain api.openshock.app
 )",
   _handleDomainCommand,
 };
@@ -703,7 +703,7 @@ lcgoverride set <domain>
   Arguments:
     <domain> must be a string.
   Example:
-    lcgoverride set eu1-gateway.shocklink.net
+    lcgoverride set eu1-gateway.openshock.app
 
 lcgoverride clear
   Clear the overridden LCG endpoint.
