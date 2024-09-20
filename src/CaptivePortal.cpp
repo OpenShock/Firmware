@@ -58,7 +58,13 @@ bool _startCaptive() {
     return false;
   }
 
-  err = mdns_hostname_set(OPENSHOCK_FW_HOSTNAME);
+  std::string hostname;
+  if (!Config::GetWiFiHostname(hostname)) {
+    OS_LOGE(TAG, "Failed to get WiFi hostname, reverting to default");
+    hostname = OPENSHOCK_FW_HOSTNAME;
+  }
+
+  err = mdns_hostname_set(hostname.c_str());
   if (err != ESP_OK) {
     OS_LOGE(TAG, "Failed to set mDNS hostname");
     WiFi.softAPdisconnect(true);
