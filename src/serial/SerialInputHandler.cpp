@@ -296,6 +296,30 @@ void _handleLcgOverrideCommand(std::string_view arg) {
   SERPR_ERROR("Invalid subcommand");
 }
 
+void _handleHostnameCommand(std::string_view arg) {
+  if (arg.empty()) {
+    std::string hostname;
+    if (!Config::GetWiFiHostname(hostname)) {
+      SERPR_ERROR("Failed to get hostname from config");
+      return;
+    }
+
+    // Get hostname
+    SERPR_RESPONSE("Hostname|%s", hostname.c_str());
+    return;
+  }
+
+  bool result = OpenShock::Config::SetWiFiHostname(arg);
+
+  if (result) {
+    SERPR_SUCCESS("Saved config, restarting...");
+
+    ESP.restart();
+  } else {
+    SERPR_ERROR("Failed to save config");
+  }
+}
+
 void _handleNetworksCommand(std::string_view arg) {
   cJSON* root;
 
@@ -562,30 +586,32 @@ void _handleHelpCommand(std::string_view arg) {
 
     // Raw string literal (1+ to remove the first newline)
     Serial.print(1 + R"(
-help                   print this menu
-help         <command> print help for a command
-version                print version information
-restart                restart the board
-sysinfo                print debug information for various subsystems
-echo                   get serial echo enabled
-echo         <bool>    set serial echo enabled
-validgpios             list all valid GPIO pins
-rftxpin                get radio transmit pin
-rftxpin      <pin>     set radio transmit pin
-domain                 get backend domain
-domain       <domain>  set backend domain
-authtoken              get auth token
-authtoken    <token>   set auth token
-networks               get all saved networks
-networks     <json>    set all saved networks
-keepalive              get shocker keep-alive enabled
-keepalive    <bool>    set shocker keep-alive enabled
-jsonconfig             get configuration as JSON
-jsonconfig   <json>    set configuration from JSON
-rawconfig              get raw configuration as base64
-rawconfig    <base64>  set raw configuration from base64
-rftransmit   <json>    transmit a RF command
-factoryreset           reset device to factory defaults and restart
+help                    print this menu
+help         <command>  print help for a command
+version                 print version information
+restart                 restart the board
+sysinfo                 print debug information for various subsystems
+echo                    get serial echo enabled
+echo         <bool>     set serial echo enabled
+validgpios              list all valid GPIO pins
+rftxpin                 get radio transmit pin
+rftxpin      <pin>      set radio transmit pin
+domain                  get backend domain
+domain       <domain>   set backend domain
+authtoken               get auth token
+authtoken    <token>    set auth token
+hostname                get network hostname
+hostname     <hostname> set network hostname
+networks                get all saved networks
+networks     <json>     set all saved networks
+keepalive               get shocker keep-alive enabled
+keepalive    <bool>     set shocker keep-alive enabled
+jsonconfig              get configuration as JSON
+jsonconfig   <json>     set configuration from JSON
+rawconfig               get raw configuration as base64
+rawconfig    <base64>   set raw configuration from base64
+rftransmit   <json>     transmit a RF command
+factoryreset            reset device to factory defaults and restart
 )");
     return;
   }
@@ -711,6 +737,20 @@ lcgoverride clear
     lcgoverride clear
 )",
   _handleLcgOverrideCommand,
+};
+static const SerialCmdHandler kHostnameCmdHandler = {
+  "hostname"sv,
+  R"(hostname
+  Get the network hostname.
+
+hostname [<hostname>]
+  Set the network hostname.
+  Arguments:
+    <hostname> must be a string.
+  Example:
+    hostname OpenShock
+)",
+  _handleHostnameCommand,
 };
 static const SerialCmdHandler kNetworksCmdHandler = {
   "networks"sv,
@@ -888,6 +928,7 @@ bool SerialInputHandler::Init() {
   RegisterCommandHandler(kDomainCmdHandler);
   RegisterCommandHandler(kAuthTokenCmdHandler);
   RegisterCommandHandler(kLcgOverrideCmdHandler);
+  RegisterCommandHandler(kHostnameCmdHandler);
   RegisterCommandHandler(kNetworksCmdHandler);
   RegisterCommandHandler(kKeepAliveCmdHandler);
   RegisterCommandHandler(kJsonConfigCmdHandler);
