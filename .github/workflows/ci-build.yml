@@ -109,17 +109,13 @@ jobs:
           sparse-checkout: |
             .github
 
-      # Set up rclone for CDN uploads.
-      - uses: ./.github/actions/cdn-prepare
-        with:
-          cf-account-id: ${{ vars.S3_ACCOUNT_ID }}
-          cf-access-key-id: ${{ vars.S3_ACCESS_KEY_ID }}
-          cf-secret-access-key: ${{ secrets.S3_SECRET_ACCESS_KEY }}
-
       # Upload firmware to CDN.
       - uses: ./.github/actions/cdn-upload-firmware
         with:
-          cf-bucket: ${{ vars.S3_BUCKET }}
+          s3-bucket: ${{ vars.S3_BUCKET }}
+          s3-account-id: ${{ vars.S3_ACCOUNT_ID }}
+          s3-access-key-id: ${{ vars.S3_ACCESS_KEY_ID }}
+          s3-secret-access-key: ${{ secrets.S3_SECRET_ACCESS_KEY }}
           fw-version: ${{ needs.getvars.outputs.version }}
           board: ${{ matrix.board }}
 
@@ -135,17 +131,13 @@ jobs:
           sparse-checkout: |
             .github
 
-      # Set up rclone for CDN uploads.
-      - uses: ./.github/actions/cdn-prepare
-        with:
-          cf-account-id: ${{ vars.S3_ACCOUNT_ID }}
-          cf-access-key-id: ${{ vars.S3_ACCESS_KEY_ID }}
-          cf-secret-access-key: ${{ secrets.S3_SECRET_ACCESS_KEY }}
-
       # Upload firmware to CDN.
       - uses: ./.github/actions/cdn-upload-version-info
         with:
-          cf-bucket: ${{ vars.S3_BUCKET }}
+          s3-bucket: ${{ vars.S3_BUCKET }}
+          s3-account-id: ${{ vars.S3_ACCOUNT_ID }}
+          s3-access-key-id: ${{ vars.S3_ACCESS_KEY_ID }}
+          s3-secret-access-key: ${{ secrets.S3_SECRET_ACCESS_KEY }}
           fw-version: ${{ needs.getvars.outputs.version }}
           release-channel: ${{ needs.getvars.outputs.release-channel }}
           boards: ${{ needs.getvars.outputs.board-list }}
@@ -161,17 +153,13 @@ jobs:
           sparse-checkout: |
             .github
 
-      # Set up rclone for CDN uploads.
-      - uses: ./.github/actions/cdn-prepare
-        with:
-          cf-account-id: ${{ vars.S3_ACCOUNT_ID }}
-          cf-access-key-id: ${{ vars.S3_ACCESS_KEY_ID }}
-          cf-secret-access-key: ${{ secrets.S3_SECRET_ACCESS_KEY }}
-
       # Upload firmware to CDN.
       - uses: ./.github/actions/cdn-bump-version
         with:
-          cf-bucket: ${{ vars.S3_BUCKET }}
+          s3-bucket: ${{ vars.S3_BUCKET }}
+          s3-account-id: ${{ vars.S3_ACCOUNT_ID }}
+          s3-access-key-id: ${{ vars.S3_ACCESS_KEY_ID }}
+          s3-secret-access-key: ${{ secrets.S3_SECRET_ACCESS_KEY }}
           version: ${{ needs.getvars.outputs.version }}
           release-channel: ${{ needs.getvars.outputs.release-channel }}
 
