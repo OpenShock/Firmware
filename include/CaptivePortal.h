@@ -1,7 +1,5 @@
 #pragma once
 
-#include <freertos/portmacro.h>
-
 #include <cstdint>
 #include <string_view>
 

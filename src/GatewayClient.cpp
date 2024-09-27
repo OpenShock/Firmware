@@ -194,7 +194,7 @@ void GatewayClient::_handleEvent(WStype_t type, uint8_t* payload, std::size_t le
       OS_LOGD(TAG, "Received ping from API");
       break;
     case WStype_PONG:
-      OS_LOGD(TAG, "Received pong from API");
+      OS_LOGV(TAG, "Received pong from API");
       break;
     case WStype_BIN:
       EventHandlers::WebSocket::HandleGatewayBinary(payload, length);
