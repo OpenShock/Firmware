@@ -171,7 +171,7 @@ bool _connect(const uint8_t (&bssid)[6], const std::string& password) {
   return _connectImpl(it->ssid, password.c_str(), bssid);
 }
 
-bool _authenticate(const WiFiNetwork& net, StringView password) {
+bool _authenticate(const WiFiNetwork& net, std::string_view password) {
   uint8_t id = Config::AddWiFiCredentials(net.ssid, password);
   if (id == 0) {
     Serialization::Local::SerializeErrorMessage("too_many_credentials", CaptivePortal::BroadcastMessageBIN);
@@ -180,7 +180,7 @@ bool _authenticate(const WiFiNetwork& net, StringView password) {
 
   Serialization::Local::SerializeWiFiNetworkEvent(Serialization::Types::WifiNetworkEventType::Saved, net, CaptivePortal::BroadcastMessageBIN);
 
-  return _connect(net.ssid, password.toString());
+  return _connect(net.ssid, std::string(password));
 }
 
 void _evWiFiConnected(arduino_event_t* event) {
@@ -342,7 +342,7 @@ bool WiFiManager::Init() {
   return true;
 }
 
-bool WiFiManager::Save(const char* ssid, StringView password) {
+bool WiFiManager::Save(const char* ssid, std::string_view password) {
   OS_LOGV(TAG, "Authenticating to network %s", ssid);
 
   auto it = _findNetworkBySSID(ssid);

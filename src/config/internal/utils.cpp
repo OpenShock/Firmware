@@ -53,7 +53,7 @@ bool Config::Internal::Utils::FromFbsIPAddress(IPAddress& ip, const flatbuffers:
     return false;
   }
 
-  StringView view(*fbsIP);
+  std::string_view view(*fbsIP);
 
   if (!OpenShock::IPV4AddressFromStringView(ip, view)) {
     OS_LOGE(TAG, "failed to parse IP address");
@@ -121,7 +121,7 @@ bool Config::Internal::Utils::FromJsonIPAddress(IPAddress& ip, const cJSON* json
     return false;
   }
 
-  StringView view(jsonVal->valuestring);
+  std::string_view view(jsonVal->valuestring);
 
   if (!OpenShock::IPV4AddressFromStringView(ip, view)) {
     OS_LOGE(TAG, "failed to parse IP address at '%s'", name);

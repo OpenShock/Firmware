@@ -8,21 +8,46 @@ const char* const TAG = "SerialInputHandler";
 #include "config/SerialInputConfig.h"
 #include "FormatHelpers.h"
 #include "http/HTTPRequestManager.h"
-#include "intconv.h"
+#include "Convert.h"
 #include "Logging.h"
 #include "serialization/JsonAPI.h"
 #include "serialization/JsonSerial.h"
-#include "StringView.h"
 #include "Time.h"
 #include "util/Base64Utils.h"
+#include "util/StringUtils.h"
 #include "wifi/WiFiManager.h"
 
 #include <cJSON.h>
 #include <Esp.h>
 
+#include <cstring>
+#include <string_view>
 #include <unordered_map>
 
-#include <cstring>
+namespace std {
+  struct hash_ci {
+    std::size_t operator()(std::string_view str) const {
+      std::size_t hash = 7;
+
+      for (int i = 0; i < str.size(); ++i) {
+        hash = hash * 31 + tolower(str[i]);
+      }
+
+      return hash;
+    }
+  };
+
+  template<>
+  struct less<std::string_view> {
+    bool operator()(std::string_view a, std::string_view b) const { return a < b; }
+  };
+
+  struct equals_ci {
+    bool operator()(std::string_view a, std::string_view b) const { return strncasecmp(a.data(), b.data(), std::max(a.size(), b.size())) == 0; }
+  };
+}  // namespace std
+
+using namespace std::string_view_literals;
 
 #define SERPR_SYS(format, ...)      Serial.printf("$SYS$|" format "\n", ##__VA_ARGS__)
 #define SERPR_RESPONSE(format, ...) SERPR_SYS("Response|" format, ##__VA_ARGS__)
@@ -31,62 +56,42 @@ const char* const TAG = "SerialInputHandler";
 
 using namespace OpenShock;
 
-const int64_t PASTE_INTERVAL_THRESHOLD_MS  = 20;
+const int64_t PASTE_INTERVAL_THRESHOLD_MS       = 20;
 const std::size_t SERIAL_BUFFER_CLEAR_THRESHOLD = 512;
 
 struct SerialCmdHandler {
-  StringView cmd;
+  std::string_view cmd;
   const char* helpResponse;
-  void (*commandHandler)(StringView);
+  void (*commandHandler)(std::string_view);
 };
 
 static bool s_echoEnabled = true;
-static std::unordered_map<StringView, SerialCmdHandler, std::hash_ci, std::equals_ci> s_commandHandlers;
+static std::unordered_map<std::string_view, SerialCmdHandler, std::hash_ci, std::equals_ci> s_commandHandlers;
 
 /// @brief Tries to parse a boolean from a string (case-insensitive)
 /// @param str Input string
 /// @param strLen Length of input string
 /// @param out Output boolean
 /// @return True if the argument is a boolean, false otherwise
-bool _tryParseBool(StringView str, bool& out) {
-  if (str.isNullOrEmpty()) {
-    return false;
-  }
-
-  str = str.trim();
-
-  if (str.length() > 5) {
-    return false;
-  }
-
-  if (strncasecmp(str.data(), "true", str.length()) == 0) {
-    out = true;
-    return true;
-  }
-
-  if (strncasecmp(str.data(), "false", str.length()) == 0) {
-    out = false;
-    return true;
-  }
-
-  return false;
+bool _tryParseBool(std::string_view str, bool& out) {
+  return OpenShock::Convert::ToBool(OpenShock::StringTrim(str), out);
 }
 
-void _handleVersionCommand(StringView arg) {
+void _handleVersionCommand(std::string_view arg) {
   (void)arg;
 
   Serial.print("\n");
   SerialInputHandler::PrintVersionInfo();
 }
 
-void _handleRestartCommand(StringView arg) {
+void _handleRestartCommand(std::string_view arg) {
   (void)arg;
 
   Serial.println("Restarting ESP...");
   ESP.restart();
 }
 
-void _handleFactoryResetCommand(StringView arg) {
+void _handleFactoryResetCommand(std::string_view arg) {
   (void)arg;
 
   Serial.println("Resetting to factory defaults...");
@@ -95,8 +100,8 @@ void _handleFactoryResetCommand(StringView arg) {
   ESP.restart();
 }
 
-void _handleRfTxPinCommand(StringView arg) {
-  if (arg.isNullOrEmpty()) {
+void _handleRfTxPinCommand(std::string_view arg) {
+  if (arg.empty()) {
     uint8_t txPin;
     if (!Config::GetRFConfigTxPin(txPin)) {
       SERPR_ERROR("Failed to get RF TX pin from config");
@@ -109,7 +114,7 @@ void _handleRfTxPinCommand(StringView arg) {
   }
 
   uint8_t pin;
-  if (!OpenShock::IntConv::stou8(arg, pin)) {
+  if (!OpenShock::Convert::ToUint8(arg, pin)) {
     SERPR_ERROR("Invalid argument (number invalid or out of range)");
   }
 
@@ -134,8 +139,8 @@ void _handleRfTxPinCommand(StringView arg) {
   }
 }
 
-void _handleDomainCommand(StringView arg) {
-  if (arg.isNullOrEmpty()) {
+void _handleDomainCommand(std::string_view arg) {
+  if (arg.empty()) {
     std::string domain;
     if (!Config::GetBackendDomain(domain)) {
       SERPR_ERROR("Failed to get domain from config");
@@ -171,15 +176,7 @@ void _handleDomainCommand(StringView arg) {
     return;
   }
 
-  OS_LOGI(
-    TAG,
-    "Successfully connected to \"%.*s\", version: %s, commit: %s, current time: %s",
-    arg.length(),
-    arg.data(),
-    resp.data.version.c_str(),
-    resp.data.commit.c_str(),
-    resp.data.currentTime.c_str()
-  );
+  OS_LOGI(TAG, "Successfully connected to \"%.*s\", version: %s, commit: %s, current time: %s", arg.length(), arg.data(), resp.data.version.c_str(), resp.data.commit.c_str(), resp.data.currentTime.c_str());
 
   bool result = OpenShock::Config::SetBackendDomain(arg);
 
@@ -194,8 +191,8 @@ void _handleDomainCommand(StringView arg) {
   ESP.restart();
 }
 
-void _handleAuthtokenCommand(StringView arg) {
-  if (arg.isNullOrEmpty()) {
+void _handleAuthtokenCommand(std::string_view arg) {
+  if (arg.empty()) {
     std::string authToken;
     if (!Config::GetBackendAuthToken(authToken)) {
       SERPR_ERROR("Failed to get auth token from config");
@@ -216,8 +213,8 @@ void _handleAuthtokenCommand(StringView arg) {
   }
 }
 
-void _handleLcgOverrideCommand(StringView arg) {
-  if (arg.isNullOrEmpty()) {
+void _handleLcgOverrideCommand(std::string_view arg) {
+  if (arg.empty()) {
     std::string lcgOverride;
     if (!Config::GetBackendLCGOverride(lcgOverride)) {
       SERPR_ERROR("Failed to get LCG override from config");
@@ -229,7 +226,7 @@ void _handleLcgOverrideCommand(StringView arg) {
     return;
   }
 
-  if (arg.startsWith("clear")) {
+  if (OpenShock::StringStartsWith(arg, "clear"sv)) {
     if (arg.size() != 5) {
       SERPR_ERROR("Invalid command (clear command should not have any arguments)");
       return;
@@ -244,13 +241,13 @@ void _handleLcgOverrideCommand(StringView arg) {
     return;
   }
 
-  if (arg.startsWith("set ")) {
+  if (OpenShock::StringStartsWith(arg, "set "sv)) {
     if (arg.size() <= 4) {
       SERPR_ERROR("Invalid command (set command should have an argument)");
       return;
     }
 
-    StringView domain = arg.substr(4);
+    std::string_view domain = arg.substr(4);
 
     if (domain.size() + 40 >= OPENSHOCK_URI_BUFFER_SIZE) {
       SERPR_ERROR("Domain name too long, please try increasing the \"OPENSHOCK_URI_BUFFER_SIZE\" constant in source code");
@@ -299,10 +296,10 @@ void _handleLcgOverrideCommand(StringView arg) {
   SERPR_ERROR("Invalid subcommand");
 }
 
-void _handleNetworksCommand(StringView arg) {
+void _handleNetworksCommand(std::string_view arg) {
   cJSON* root;
 
-  if (arg.isNullOrEmpty()) {
+  if (arg.empty()) {
     root = cJSON_CreateArray();
     if (root == nullptr) {
       SERPR_ERROR("Failed to create JSON array");
@@ -339,8 +336,8 @@ void _handleNetworksCommand(StringView arg) {
 
   std::vector<Config::WiFiCredentials> creds;
 
-  uint8_t id = 1;
-  cJSON* network  = nullptr;
+  uint8_t id     = 1;
+  cJSON* network = nullptr;
   cJSON_ArrayForEach(network, root) {
     Config::WiFiCredentials cred;
 
@@ -368,10 +365,10 @@ void _handleNetworksCommand(StringView arg) {
   OpenShock::WiFiManager::RefreshNetworkCredentials();
 }
 
-void _handleKeepAliveCommand(StringView arg) {
+void _handleKeepAliveCommand(std::string_view arg) {
   bool keepAliveEnabled;
 
-  if (arg.isNullOrEmpty()) {
+  if (arg.empty()) {
     // Get keep alive status
     if (!Config::GetRFConfigKeepAliveEnabled(keepAliveEnabled)) {
       SERPR_ERROR("Failed to get keep-alive status from config");
@@ -396,8 +393,8 @@ void _handleKeepAliveCommand(StringView arg) {
   }
 }
 
-void _handleSerialEchoCommand(StringView arg) {
-  if (arg.isNullOrEmpty()) {
+void _handleSerialEchoCommand(std::string_view arg) {
+  if (arg.empty()) {
     // Get current serial echo status
     SERPR_RESPONSE("SerialEcho|%s", s_echoEnabled ? "true" : "false");
     return;
@@ -419,8 +416,8 @@ void _handleSerialEchoCommand(StringView arg) {
   }
 }
 
-void _handleValidGpiosCommand(StringView arg) {
-  if (!arg.isNullOrEmpty()) {
+void _handleValidGpiosCommand(std::string_view arg) {
+  if (!arg.empty()) {
     SERPR_ERROR("Invalid argument (too many arguments)");
     return;
   }
@@ -444,8 +441,8 @@ void _handleValidGpiosCommand(StringView arg) {
   SERPR_RESPONSE("ValidGPIOs|%s", buffer.c_str());
 }
 
-void _handleJsonConfigCommand(StringView arg) {
-  if (arg.isNullOrEmpty()) {
+void _handleJsonConfigCommand(std::string_view arg) {
+  if (arg.empty()) {
     // Get raw config
     std::string json = Config::GetAsJSON(true);
 
@@ -463,8 +460,8 @@ void _handleJsonConfigCommand(StringView arg) {
   ESP.restart();
 }
 
-void _handleRawConfigCommand(StringView arg) {
-  if (arg.isNullOrEmpty()) {
+void _handleRawConfigCommand(std::string_view arg) {
+  if (arg.empty()) {
     std::vector<uint8_t> buffer;
 
     // Get raw config
@@ -499,7 +496,7 @@ void _handleRawConfigCommand(StringView arg) {
   ESP.restart();
 }
 
-void _handleDebugInfoCommand(StringView arg) {
+void _handleDebugInfoCommand(std::string_view arg) {
   (void)arg;
 
   SERPR_RESPONSE("RTOSInfo|Free Heap|%u", xPortGetFreeHeapSize());
@@ -529,8 +526,8 @@ void _handleDebugInfoCommand(StringView arg) {
   }
 }
 
-void _handleRFTransmitCommand(StringView arg) {
-  if (arg.isNullOrEmpty()) {
+void _handleRFTransmitCommand(std::string_view arg) {
+  if (arg.empty()) {
     SERPR_ERROR("No command");
     return;
   }
@@ -558,9 +555,9 @@ void _handleRFTransmitCommand(StringView arg) {
   SERPR_SUCCESS("Command sent");
 }
 
-void _handleHelpCommand(StringView arg) {
-  arg = arg.trim();
-  if (arg.isNullOrEmpty()) {
+void _handleHelpCommand(std::string_view arg) {
+  arg = OpenShock::StringTrim(arg);
+  if (arg.empty()) {
     SerialInputHandler::PrintWelcomeHeader();
 
     // Raw string literal (1+ to remove the first newline)
@@ -604,7 +601,7 @@ factoryreset           reset device to factory defaults and restart
 }
 
 static const SerialCmdHandler kVersionCmdHandler = {
-  "version"_sv,
+  "version"sv,
   R"(version
   Print version information
   Example:
@@ -613,7 +610,7 @@ static const SerialCmdHandler kVersionCmdHandler = {
   _handleVersionCommand,
 };
 static const SerialCmdHandler kRestartCmdHandler = {
-  "restart"_sv,
+  "restart"sv,
   R"(restart
   Restart the board
   Example:
@@ -622,7 +619,7 @@ static const SerialCmdHandler kRestartCmdHandler = {
   _handleRestartCommand,
 };
 static const SerialCmdHandler kSystemInfoCmdHandler = {
-  "sysinfo"_sv,
+  "sysinfo"sv,
   R"(sysinfo
   Get system information from RTOS, WiFi, etc.
   Example:
@@ -631,7 +628,7 @@ static const SerialCmdHandler kSystemInfoCmdHandler = {
   _handleDebugInfoCommand,
 };
 static const SerialCmdHandler kSerialEchoCmdHandler = {
-  "echo"_sv,
+  "echo"sv,
   R"(echo
   Get the serial echo status.
   If enabled, typed characters are echoed back to the serial port.
@@ -646,7 +643,7 @@ echo [<bool>]
   _handleSerialEchoCommand,
 };
 static const SerialCmdHandler kValidGpiosCmdHandler = {
-  "validgpios"_sv,
+  "validgpios"sv,
   R"(validgpios
   List all valid GPIO pins
   Example:
@@ -655,7 +652,7 @@ static const SerialCmdHandler kValidGpiosCmdHandler = {
   _handleValidGpiosCommand,
 };
 static const SerialCmdHandler kRfTxPinCmdHandler = {
-  "rftxpin"_sv,
+  "rftxpin"sv,
   R"(rftxpin
   Get the GPIO pin used for the radio transmitter.
 
@@ -669,7 +666,7 @@ rftxpin [<pin>]
   _handleRfTxPinCommand,
 };
 static const SerialCmdHandler kDomainCmdHandler = {
-  "domain"_sv,
+  "domain"sv,
   R"(domain
   Get the backend domain.
 
@@ -678,12 +675,12 @@ domain [<domain>]
   Arguments:
     <domain> must be a string.
   Example:
-    domain api.shocklink.net
+    domain api.openshock.app
 )",
   _handleDomainCommand,
 };
 static const SerialCmdHandler kAuthTokenCmdHandler = {
-  "authtoken"_sv,
+  "authtoken"sv,
   R"(authtoken
   Get the backend auth token.
 
@@ -706,7 +703,7 @@ lcgoverride set <domain>
   Arguments:
     <domain> must be a string.
   Example:
-    lcgoverride set eu1-gateway.shocklink.net
+    lcgoverride set eu1-gateway.openshock.app
 
 lcgoverride clear
   Clear the overridden LCG endpoint.
@@ -716,7 +713,7 @@ lcgoverride clear
   _handleLcgOverrideCommand,
 };
 static const SerialCmdHandler kNetworksCmdHandler = {
-  "networks"_sv,
+  "networks"sv,
   R"(networks
   Get all saved networks.
 
@@ -733,7 +730,7 @@ networks [<json>]
   _handleNetworksCommand,
 };
 static const SerialCmdHandler kKeepAliveCmdHandler = {
-  "keepalive"_sv,
+  "keepalive"sv,
   R"(keepalive
   Get the shocker keep-alive status.
 
@@ -747,7 +744,7 @@ keepalive [<bool>]
   _handleKeepAliveCommand,
 };
 static const SerialCmdHandler kJsonConfigCmdHandler = {
-  "jsonconfig"_sv,
+  "jsonconfig"sv,
   R"(jsonconfig
   Get the configuration as JSON
   Example:
@@ -763,7 +760,7 @@ jsonconfig <json>
   _handleJsonConfigCommand,
 };
 static const SerialCmdHandler kRawConfigCmdHandler = {
-  "rawconfig"_sv,
+  "rawconfig"sv,
   R"(rawconfig
   Get the raw binary config
   Example:
@@ -779,7 +776,7 @@ rawconfig <base64>
   _handleRawConfigCommand,
 };
 static const SerialCmdHandler kRfTransmitCmdHandler = {
-  "rftransmit"_sv,
+  "rftransmit"sv,
   R"(rftransmit <json>
   Transmit a RF command
   Arguments:
@@ -795,7 +792,7 @@ static const SerialCmdHandler kRfTransmitCmdHandler = {
   _handleRFTransmitCommand,
 };
 static const SerialCmdHandler kFactoryResetCmdHandler = {
-  "factoryreset"_sv,
+  "factoryreset"sv,
   R"(factoryreset
   Reset the device to factory defaults and restart
   Example:
@@ -804,7 +801,7 @@ static const SerialCmdHandler kFactoryResetCmdHandler = {
   _handleFactoryResetCommand,
 };
 static const SerialCmdHandler khelpCmdHandler = {
-  "help"_sv,
+  "help"sv,
   R"(help [<command>]
   Print help information
   Arguments:
@@ -853,16 +850,16 @@ int findLineStart(const char* buffer, int bufferSize, int lineEnd) {
   return -1;
 }
 
-void processSerialLine(StringView line) {
-  line = line.trim();
-  if (line.isNullOrEmpty()) {
+void processSerialLine(std::string_view line) {
+  line = OpenShock::StringTrim(line);
+  if (line.empty()) {
     SERPR_ERROR("No command");
     return;
   }
 
-  auto parts = line.split(' ', 1);
-  StringView command = parts[0];
-  StringView arguments = parts.size() > 1 ? parts[1] : StringView();
+  auto parts                 = OpenShock::StringSplit(line, ' ', 1);
+  std::string_view command   = parts[0];
+  std::string_view arguments = parts.size() > 1 ? parts[1] : std::string_view();
 
   auto it = s_commandHandlers.find(command);
   if (it == s_commandHandlers.end()) {
@@ -915,7 +912,7 @@ void SerialInputHandler::Update() {
   static char* buffer            = nullptr;  // TODO: Clean up this buffer every once in a while
   static std::size_t bufferSize  = 0;
   static std::size_t bufferIndex = 0;
-  static int64_t lastEcho   = 0;
+  static int64_t lastEcho        = 0;
   static bool suppressingPaste   = false;
 
   while (true) {
@@ -981,7 +978,7 @@ void SerialInputHandler::Update() {
       break;
     }
 
-    StringView line = StringView(buffer, lineEnd).trim();
+    std::string_view line = OpenShock::StringTrim(std::string_view(buffer, lineEnd));
 
     Serial.printf("\r> %.*s\n", line.size(), line.data());
 

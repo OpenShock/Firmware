@@ -75,7 +75,7 @@ bool Gateway::SerializeOtaInstallProgressMessage(int32_t updateId, Gateway::OtaI
   return callback(span.data(), span.size());
 }
 
-bool Gateway::SerializeOtaInstallFailedMessage(int32_t updateId, StringView message, bool fatal, Common::SerializationCallbackFn callback) {
+bool Gateway::SerializeOtaInstallFailedMessage(int32_t updateId, std::string_view message, bool fatal, Common::SerializationCallbackFn callback) {
   flatbuffers::FlatBufferBuilder builder(256);  // TODO: Profile this and adjust the size accordingly
 
   auto messageOffset = builder.CreateString(message.data(), message.size());

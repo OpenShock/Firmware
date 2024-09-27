@@ -3,7 +3,6 @@
 #include "FirmwareBootType.h"
 #include "OtaUpdateChannel.h"
 #include "SemVer.h"
-#include "StringView.h"
 
 #include <array>
 #include <string>

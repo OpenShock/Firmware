@@ -21,7 +21,7 @@ if (!isGitTag && !isGitBranch && !isGitPullRequest) {
 }
 
 const gitCommitHash = process.env.GITHUB_SHA;
-const gitShortCommitHash = child_process.execSync('git rev-parse --short HEAD').toString().trim();
+const gitShortCommitHash = gitCommitHash.substring(0, 8);
 
 if (gitCommitHash === undefined) {
   core.setFailed('Environment variable "GITHUB_SHA" not found');

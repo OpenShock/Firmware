@@ -1,3 +1,5 @@
+#include <freertos/FreeRTOS.h>
+
 #include "config/Config.h"
 
 const char* const TAG = "Config";
@@ -167,7 +169,7 @@ std::string Config::GetAsJSON(bool withSensitiveData) {
 
   return result;
 }
-bool Config::SaveFromJSON(StringView json) {
+bool Config::SaveFromJSON(std::string_view json) {
   cJSON* root = cJSON_ParseWithLength(json.data(), json.size());
   if (root == nullptr) {
     OS_LOGE(TAG, "Failed to parse JSON: %s", cJSON_GetErrorPtr());
@@ -383,7 +385,7 @@ bool Config::AnyWiFiCredentials(std::function<bool(const Config::WiFiCredentials
   return std::any_of(creds.begin(), creds.end(), predicate);
 }
 
-uint8_t Config::AddWiFiCredentials(StringView ssid, StringView password) {
+uint8_t Config::AddWiFiCredentials(std::string_view ssid, std::string_view password) {
   CONFIG_LOCK_WRITE(0);
 
   uint8_t id = 0;
@@ -392,7 +394,7 @@ uint8_t Config::AddWiFiCredentials(StringView ssid, StringView password) {
   for (auto it = _configData.wifi.credentialsList.begin(); it != _configData.wifi.credentialsList.end(); ++it) {
     auto& creds = *it;
 
-    if (StringView(creds.ssid) == ssid) {
+    if (std::string_view(creds.ssid) == ssid) {
       creds.password = password;
 
       id = creds.id;
@@ -425,8 +427,8 @@ uint8_t Config::AddWiFiCredentials(StringView ssid, StringView password) {
 
   _configData.wifi.credentialsList.push_back({
     .id       = id,
-    .ssid     = ssid.toString(),
-    .password = password.toString(),
+    .ssid     = std::string(ssid),
+    .password = std::string(password),
   });
   _trySaveConfig();
 
@@ -539,10 +541,10 @@ bool Config::GetBackendDomain(std::string& out) {
   return true;
 }
 
-bool Config::SetBackendDomain(StringView domain) {
+bool Config::SetBackendDomain(std::string_view domain) {
   CONFIG_LOCK_WRITE(false);
 
-  _configData.backend.domain = domain.toString();
+  _configData.backend.domain = std::string(domain);
   return _trySaveConfig();
 }
 
@@ -560,10 +562,10 @@ bool Config::GetBackendAuthToken(std::string& out) {
   return true;
 }
 
-bool Config::SetBackendAuthToken(StringView token) {
+bool Config::SetBackendAuthToken(std::string_view token) {
   CONFIG_LOCK_WRITE(false);
 
-  _configData.backend.authToken = token.toString();
+  _configData.backend.authToken = std::string(token);
   return _trySaveConfig();
 }
 
@@ -588,10 +590,10 @@ bool Config::GetBackendLCGOverride(std::string& out) {
   return true;
 }
 
-bool Config::SetBackendLCGOverride(StringView lcgOverride) {
+bool Config::SetBackendLCGOverride(std::string_view lcgOverride) {
   CONFIG_LOCK_WRITE(false);
 
-  _configData.backend.lcgOverride = lcgOverride.toString();
+  _configData.backend.lcgOverride = std::string(lcgOverride);
   return _trySaveConfig();
 }
 
