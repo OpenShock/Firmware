@@ -9,7 +9,7 @@ on:
     - cron: '0 6 * * 1'
 
 env:
-  OPENSHOCK_API_DOMAIN: api.shocklink.net
+  OPENSHOCK_API_DOMAIN: api.openshock.app
   OPENSHOCK_FW_GIT_REF: ${{ github.ref }}
   OPENSHOCK_FW_GIT_COMMIT: ${{ github.sha }}
   OPENSHOCK_FW_BUILD_DATE: ${{ github.event.head_commit.timestamp }}
@@ -86,7 +86,6 @@ jobs:
 
       - uses: ./.github/actions/build-firmware
         with:
-          python-version: 3.12
           board: ${{ matrix.board }}
           skip-checkout: true
 

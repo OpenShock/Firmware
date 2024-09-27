@@ -1,9 +1,6 @@
 name: merge-partitions
 description: Merges multiple partitions into a single flashable binary
 inputs:
-  python-version:
-    description: 'Python version to use'
-    required: true
   version:
     description: 'Version of the firmware'
     required: true
@@ -28,12 +25,11 @@ runs:
 
     - uses: actions/setup-python@v5
       with:
-        python-version: ${{ inputs.python-version }}
         cache: 'pip'
 
     - name: Install dependencies
       shell: bash
-      run: pip install esptool
+      run: pip install -r requirements.txt
 
     - name: Download static filesystem partition
       uses: actions/download-artifact@v4

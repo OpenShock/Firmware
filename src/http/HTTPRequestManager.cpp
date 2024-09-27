@@ -5,14 +5,18 @@ const char* const TAG = "HTTPRequestManager";
 #include "Common.h"
 #include "Logging.h"
 #include "Time.h"
+#include "util/StringUtils.h"
 
 #include <esp_http_client.h>
 
 #include <algorithm>
 #include <memory>
 #include <numeric>
+#include <string_view>
 #include <unordered_map>
 #include <vector>
+
+using namespace std::string_view_literals;
 
 const std::size_t HTTP_BUFFER_SIZE = 4096LLU;
 const int HTTP_DOWNLOAD_SIZE_LIMIT = 200 * 1024 * 1024;  // 200 MB
@@ -102,28 +106,43 @@ std::unordered_map<std::string, std::shared_ptr<RateLimit>> s_rateLimits;
 
 using namespace OpenShock;
 
-StringView _getDomain(StringView url) {
-  if (url.isNullOrEmpty()) {
-    return StringView::Null();
+std::string_view _getDomain(std::string_view url) {
+  if (url.empty()) {
+    return {};
   }
 
-  // Remove the protocol, port, and path eg. "https://api.example.com:443/path" -> "api.example.com"
-  url = url.afterDelimiter("://"_sv).beforeDelimiter('/').beforeDelimiter(':');
+  // Remove the protocol eg. "https://api.example.com:443/path" -> "api.example.com:443/path"
+  auto seperator = url.find("://");
+  if (seperator != std::string_view::npos) {
+    url.substr(seperator + 3);
+  }
+
+  // Remove the path eg. "api.example.com:443/path" -> "api.example.com:443"
+  seperator = url.find('/');
+  if (seperator != std::string_view::npos) {
+    url = url.substr(0, seperator);
+  }
+
+  // Remove the port eg. "api.example.com:443" -> "api.example.com"
+  seperator = url.rfind(':');
+  if (seperator != std::string_view::npos) {
+    url = url.substr(0, seperator);
+  }
 
   // Remove all subdomains eg. "api.example.com" -> "example.com"
-  auto domainSep = url.rfind('.');
-  if (domainSep == StringView::npos) {
+  seperator = url.rfind('.');
+  if (seperator == std::string_view::npos) {
     return url;  // E.g. "localhost"
   }
-  domainSep = url.rfind('.', domainSep - 1);
-  if (domainSep != StringView::npos) {
-    url = url.substr(domainSep + 1);
+  seperator = url.rfind('.', seperator - 1);
+  if (seperator != std::string_view::npos) {
+    url = url.substr(seperator + 1);
   }
 
   return url;
 }
 
-std::shared_ptr<RateLimit> _rateLimitFactory(StringView domain) {
+std::shared_ptr<RateLimit> _rateLimitFactory(std::string_view domain) {
   auto rateLimit = std::make_shared<RateLimit>();
 
   // Add default limits
@@ -139,8 +158,8 @@ std::shared_ptr<RateLimit> _rateLimitFactory(StringView domain) {
   return rateLimit;
 }
 
-std::shared_ptr<RateLimit> _getRateLimiter(StringView url) {
-  auto domain = _getDomain(url).toString();
+std::shared_ptr<RateLimit> _getRateLimiter(std::string_view url) {
+  auto domain = std::string(_getDomain(url));
   if (domain.empty()) {
     return nullptr;
   }
@@ -159,7 +178,7 @@ std::shared_ptr<RateLimit> _getRateLimiter(StringView url) {
 }
 
 void _setupClient(HTTPClient& client) {
-  client.setUserAgent(OpenShock::Constants::FW_USERAGENT_sv.toArduinoString());
+  client.setUserAgent(OpenShock::Constants::FW_USERAGENT);
 }
 
 struct StreamReaderResult {
@@ -185,8 +204,8 @@ constexpr bool _tryFindCRLF(std::size_t& pos, const uint8_t* buffer, std::size_t
 
   return false;
 }
-constexpr bool _tryParseHexSizeT(std::size_t& result, StringView str) {
-  if (str.isNullOrEmpty() || str.size() > sizeof(std::size_t) * 2) {
+constexpr bool _tryParseHexSizeT(std::size_t& result, std::string_view str) {
+  if (str.empty() || str.size() > sizeof(std::size_t) * 2) {
     return false;
   }
 
@@ -244,7 +263,7 @@ ParserState _parseChunkHeader(const uint8_t* buffer, std::size_t bufferLen, std:
     return ParserState::Invalid;
   }
 
-  StringView sizeField(reinterpret_cast<const char*>(buffer), sizeFieldEnd);
+  std::string_view sizeField(reinterpret_cast<const char*>(buffer), sizeFieldEnd);
 
   // Parse the chunk size
   if (!_tryParseHexSizeT(payloadLen, sizeField)) {
@@ -422,7 +441,7 @@ StreamReaderResult _readStreamData(HTTPClient& client, WiFiClient* stream, std::
 
 HTTP::Response<std::size_t> _doGetStream(
   HTTPClient& client,
-  StringView url,
+  std::string_view url,
   const std::map<String, String>& headers,
   const std::vector<int>& acceptedCodes,
   std::shared_ptr<RateLimit> rateLimiter,
@@ -431,7 +450,7 @@ HTTP::Response<std::size_t> _doGetStream(
   uint32_t timeoutMs
 ) {
   int64_t begin = OpenShock::millis();
-  if (!client.begin(url.toArduinoString())) {
+  if (!client.begin(OpenShock::StringToArduinoString(url))) {
     OS_LOGE(TAG, "Failed to begin HTTP request");
     return {HTTP::RequestResult::RequestFailed, 0};
   }
@@ -516,7 +535,7 @@ HTTP::Response<std::size_t> _doGetStream(
 }
 
 HTTP::Response<std::size_t>
-  HTTP::Download(StringView url, const std::map<String, String>& headers, HTTP::GotContentLengthCallback contentLengthCallback, HTTP::DownloadCallback downloadCallback, const std::vector<int>& acceptedCodes, uint32_t timeoutMs) {
+  HTTP::Download(std::string_view url, const std::map<String, String>& headers, HTTP::GotContentLengthCallback contentLengthCallback, HTTP::DownloadCallback downloadCallback, const std::vector<int>& acceptedCodes, uint32_t timeoutMs) {
   std::shared_ptr<RateLimit> rateLimiter = _getRateLimiter(url);
   if (rateLimiter == nullptr) {
     return {RequestResult::InvalidURL, 0, 0};
@@ -532,7 +551,7 @@ HTTP::Response<std::size_t>
   return _doGetStream(client, url, headers, acceptedCodes, rateLimiter, contentLengthCallback, downloadCallback, timeoutMs);
 }
 
-HTTP::Response<std::string> HTTP::GetString(StringView url, const std::map<String, String>& headers, const std::vector<int>& acceptedCodes, uint32_t timeoutMs) {
+HTTP::Response<std::string> HTTP::GetString(std::string_view url, const std::map<String, String>& headers, const std::vector<int>& acceptedCodes, uint32_t timeoutMs) {
   std::string result;
 
   auto allocator = [&result](std::size_t contentLength) {

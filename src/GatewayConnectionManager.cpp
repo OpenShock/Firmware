@@ -77,7 +77,7 @@ bool GatewayConnectionManager::IsLinked() {
   return (s_flags & FLAG_LINKED) != 0;
 }
 
-AccountLinkResultCode GatewayConnectionManager::Link(StringView linkCode) {
+AccountLinkResultCode GatewayConnectionManager::Link(std::string_view linkCode) {
   if ((s_flags & FLAG_HAS_IP) == 0) {
     return AccountLinkResultCode::NoInternetConnection;
   }
@@ -110,9 +110,9 @@ AccountLinkResultCode GatewayConnectionManager::Link(StringView linkCode) {
     return AccountLinkResultCode::InternalError;
   }
 
-  StringView authToken = response.data.authToken;
+  std::string_view authToken = response.data.authToken;
 
-  if (authToken.isNullOrEmpty()) {
+  if (authToken.empty()) {
     OS_LOGE(TAG, "Received empty auth token");
     return AccountLinkResultCode::InternalError;
   }
@@ -133,7 +133,7 @@ void GatewayConnectionManager::UnLink() {
   Config::ClearBackendAuthToken();
 }
 
-bool GatewayConnectionManager::SendMessageTXT(StringView data) {
+bool GatewayConnectionManager::SendMessageTXT(std::string_view data) {
   if (s_wsClient == nullptr) {
     return false;
   }
@@ -149,7 +149,7 @@ bool GatewayConnectionManager::SendMessageBIN(const uint8_t* data, std::size_t l
   return s_wsClient->sendMessageBIN(data, length);
 }
 
-bool FetchDeviceInfo(StringView authToken) {
+bool FetchDeviceInfo(std::string_view authToken) {
   // TODO: this function is very slow, should be optimized!
   if ((s_flags & FLAG_HAS_IP) == 0) {
     return false;
