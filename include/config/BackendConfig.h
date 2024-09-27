@@ -1,14 +1,14 @@
 #pragma once
 
 #include "config/ConfigBase.h"
-#include "StringView.h"
 
 #include <string>
+#include <string_view>
 
 namespace OpenShock::Config {
   struct BackendConfig : public ConfigBase<Serialization::Configuration::BackendConfig> {
     BackendConfig();
-    BackendConfig(StringView domain, StringView authToken, StringView lcgOverride);
+    BackendConfig(std::string_view domain, std::string_view authToken, std::string_view lcgOverride);
 
     std::string domain;
     std::string authToken;
@@ -17,9 +17,9 @@ namespace OpenShock::Config {
     void ToDefault() override;
 
     bool FromFlatbuffers(const Serialization::Configuration::BackendConfig* config) override;
-    flatbuffers::Offset<Serialization::Configuration::BackendConfig> ToFlatbuffers(flatbuffers::FlatBufferBuilder& builder, bool withSensitiveData) const override;
+    [[nodiscard]] flatbuffers::Offset<Serialization::Configuration::BackendConfig> ToFlatbuffers(flatbuffers::FlatBufferBuilder& builder, bool withSensitiveData) const override;
 
     bool FromJSON(const cJSON* json) override;
-    cJSON* ToJSON(bool withSensitiveData) const override;
+    [[nodiscard]] cJSON* ToJSON(bool withSensitiveData) const override;
   };
 }  // namespace OpenShock::Config

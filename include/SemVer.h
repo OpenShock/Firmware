@@ -1,8 +1,8 @@
 #pragma once
 
-#include "StringView.h"
-
 #include <cstdint>
+#include <string>
+#include <string_view>
 
 namespace OpenShock {
   struct SemVer {
@@ -16,8 +16,8 @@ namespace OpenShock {
     SemVer(uint16_t major, uint16_t minor, uint16_t patch)
       : major(major), minor(minor), patch(patch), prerelease(), build()
     {}
-    SemVer(uint16_t major, uint16_t minor, uint16_t patch, StringView prerelease, StringView build)
-      : major(major), minor(minor), patch(patch), prerelease(prerelease.toString()), build(build.toString())
+    SemVer(uint16_t major, uint16_t minor, uint16_t patch, std::string_view prerelease, std::string_view build)
+      : major(major), minor(minor), patch(patch), prerelease(std::string(prerelease)), build(std::string(build))
     {}
 
     bool operator==(const SemVer& other) const {
@@ -72,5 +72,5 @@ namespace OpenShock {
     std::string toString() const;
   };
 
-  bool TryParseSemVer(StringView str, SemVer& out);
-} // namespace OpenShock
+  bool TryParseSemVer(std::string_view str, SemVer& out);
+}  // namespace OpenShock

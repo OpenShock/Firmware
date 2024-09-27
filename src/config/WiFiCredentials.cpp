@@ -1,16 +1,16 @@
 #include "config/WiFiCredentials.h"
 
+const char* const TAG = "Config::WiFiCredentials";
+
 #include "config/internal/utils.h"
 #include "Logging.h"
 #include "util/HexUtils.h"
-
-const char* const TAG = "Config::WiFiCredentials";
 
 using namespace OpenShock::Config;
 
 WiFiCredentials::WiFiCredentials() : id(0), ssid(), password() { }
 
-WiFiCredentials::WiFiCredentials(uint8_t id, StringView ssid, StringView password) : id(id), ssid(ssid.toString()), password(password.toString()) { }
+WiFiCredentials::WiFiCredentials(uint8_t id, std::string_view ssid, std::string_view password) : id(id), ssid(std::string(ssid)), password(std::string(password)) { }
 
 void WiFiCredentials::ToDefault() {
   id = 0;
@@ -20,7 +20,7 @@ void WiFiCredentials::ToDefault() {
 
 bool WiFiCredentials::FromFlatbuffers(const Serialization::Configuration::WiFiCredentials* config) {
   if (config == nullptr) {
-    ESP_LOGE(TAG, "config is null");
+    OS_LOGE(TAG, "config is null");
     return false;
   }
 
@@ -29,7 +29,7 @@ bool WiFiCredentials::FromFlatbuffers(const Serialization::Configuration::WiFiCr
   Internal::Utils::FromFbsStr(password, config->password(), "");
 
   if (ssid.empty()) {
-    ESP_LOGE(TAG, "ssid is empty");
+    OS_LOGE(TAG, "ssid is empty");
     return false;
   }
 
@@ -51,12 +51,12 @@ flatbuffers::Offset<OpenShock::Serialization::Configuration::WiFiCredentials> Wi
 
 bool WiFiCredentials::FromJSON(const cJSON* json) {
   if (json == nullptr) {
-    ESP_LOGE(TAG, "json is null");
+    OS_LOGE(TAG, "json is null");
     return false;
   }
 
   if (cJSON_IsObject(json) == 0) {
-    ESP_LOGE(TAG, "json is not an object");
+    OS_LOGE(TAG, "json is not an object");
     return false;
   }
 
@@ -65,7 +65,7 @@ bool WiFiCredentials::FromJSON(const cJSON* json) {
   Internal::Utils::FromJsonStr(password, json, "password", "");
 
   if (ssid.empty()) {
-    ESP_LOGE(TAG, "ssid is empty");
+    OS_LOGE(TAG, "ssid is empty");
     return false;
   }
 

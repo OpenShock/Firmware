@@ -1,11 +1,10 @@
 #pragma once
 
-#include "StringView.h"
-
 #include <WebSocketsClient.h>
 
 #include <cstdint>
 #include <string>
+#include <string_view>
 #include <unordered_map>
 
 namespace OpenShock {
@@ -26,7 +25,7 @@ namespace OpenShock {
     void connect(const char* lcgFqdn);
     void disconnect();
 
-    bool sendMessageTXT(StringView data);
+    bool sendMessageTXT(std::string_view data);
     bool sendMessageBIN(const uint8_t* data, std::size_t length);
 
     bool loop();

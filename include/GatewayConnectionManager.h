@@ -1,21 +1,21 @@
 #pragma once
 
 #include "AccountLinkResultCode.h"
-#include "StringView.h"
 
 #include <cstdint>
 #include <functional>
+#include <string_view>
 
 namespace OpenShock::GatewayConnectionManager {
-  bool Init();
+  [[nodiscard]] bool Init();
 
   bool IsConnected();
 
   bool IsLinked();
-  AccountLinkResultCode Link(StringView linkCode);
+  AccountLinkResultCode Link(std::string_view linkCode);
   void UnLink();
 
-  bool SendMessageTXT(StringView data);
+  bool SendMessageTXT(std::string_view data);
   bool SendMessageBIN(const uint8_t* data, std::size_t length);
 
   void Update();

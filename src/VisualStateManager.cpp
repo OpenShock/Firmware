@@ -1,4 +1,8 @@
+#include <freertos/FreeRTOS.h>
+
 #include "VisualStateManager.h"
+
+const char* const TAG = "VisualStateManager";
 
 #include "Logging.h"
 #include "PinPatternManager.h"
@@ -7,8 +11,6 @@
 #include <WiFi.h>
 
 #include <memory>
-
-const char* const TAG = "VisualStateManager";
 
 const uint64_t kCriticalErrorFlag                = 1 << 0;
 const uint64_t kEmergencyStoppedFlag             = 1 << 1;
@@ -243,7 +245,7 @@ void _updateVisualState() {
     return;
   }
 
-  ESP_LOGW(TAG, "Trying to update visual state, but no LED is active!");
+  OS_LOGW(TAG, "Trying to update visual state, but no LED is active!");
 }
 
 void _handleWiFiConnected(arduino_event_t* event) {
@@ -293,7 +295,7 @@ bool VisualStateManager::Init() {
   if (OPENSHOCK_LED_GPIO != GPIO_NUM_NC) {
     s_builtInLedManager = std::make_shared<PinPatternManager>(static_cast<gpio_num_t>(OPENSHOCK_LED_GPIO));
     if (!s_builtInLedManager->IsValid()) {
-      ESP_LOGE(TAG, "Failed to initialize built-in LED manager");
+      OS_LOGE(TAG, "Failed to initialize built-in LED manager");
       return false;
     }
     ledActive = true;
@@ -302,14 +304,14 @@ bool VisualStateManager::Init() {
   if (OPENSHOCK_LED_WS2812B != GPIO_NUM_NC) {
     s_RGBLedManager = std::make_shared<RGBPatternManager>(static_cast<gpio_num_t>(OPENSHOCK_LED_WS2812B));
     if (!s_RGBLedManager->IsValid()) {
-      ESP_LOGE(TAG, "Failed to initialize RGB LED manager");
+      OS_LOGE(TAG, "Failed to initialize RGB LED manager");
       return false;
     }
     ledActive = true;
   }
 
   if (!ledActive) {
-    ESP_LOGW(TAG, "No LED type is defined, aborting initialization of VisualStateManager");
+    OS_LOGW(TAG, "No LED type is defined, aborting initialization of VisualStateManager");
     return true;
   }
 

@@ -1,10 +1,10 @@
 #include "serialization/WSGateway.h"
 
+const char* const TAG = "WSGateway";
+
 #include "config/Config.h"
 #include "Logging.h"
 #include "Time.h"
-
-const char* const TAG = "WSGateway";
 
 using namespace OpenShock::Serialization;
 
@@ -13,7 +13,7 @@ bool Gateway::SerializeKeepAliveMessage(Common::SerializationCallbackFn callback
 
   int64_t uptime = OpenShock::millis();
   if (uptime < 0) {
-    ESP_LOGE(TAG, "Failed to get uptime");
+    OS_LOGE(TAG, "Failed to get uptime");
     return false;
   }
 
@@ -75,7 +75,7 @@ bool Gateway::SerializeOtaInstallProgressMessage(int32_t updateId, Gateway::OtaI
   return callback(span.data(), span.size());
 }
 
-bool Gateway::SerializeOtaInstallFailedMessage(int32_t updateId, StringView message, bool fatal, Common::SerializationCallbackFn callback) {
+bool Gateway::SerializeOtaInstallFailedMessage(int32_t updateId, std::string_view message, bool fatal, Common::SerializationCallbackFn callback) {
   flatbuffers::FlatBufferBuilder builder(256);  // TODO: Profile this and adjust the size accordingly
 
   auto messageOffset = builder.CreateString(message.data(), message.size());

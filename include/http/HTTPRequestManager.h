@@ -1,11 +1,12 @@
 #pragma once
 
-#include "StringView.h"
+#include <Arduino.h>
 
 #include <cJSON.h>
 
 #include <functional>
 #include <map>
+#include <string_view>
 #include <vector>
 
 namespace OpenShock::HTTP {
@@ -22,7 +23,7 @@ namespace OpenShock::HTTP {
   };
 
   template<typename T>
-  struct Response {
+  struct [[nodiscard]] Response {
     RequestResult result;
     int code;
     T data;
@@ -33,11 +34,11 @@ namespace OpenShock::HTTP {
   using GotContentLengthCallback = std::function<bool(int contentLength)>;
   using DownloadCallback         = std::function<bool(std::size_t offset, const uint8_t* data, std::size_t len)>;
 
-  Response<std::size_t> Download(StringView url, const std::map<String, String>& headers, GotContentLengthCallback contentLengthCallback, DownloadCallback downloadCallback, const std::vector<int>& acceptedCodes = {200}, uint32_t timeoutMs = 10'000);
-  Response<std::string> GetString(StringView url, const std::map<String, String>& headers, const std::vector<int>& acceptedCodes = {200}, uint32_t timeoutMs = 10'000);
+  Response<std::size_t> Download(std::string_view url, const std::map<String, String>& headers, GotContentLengthCallback contentLengthCallback, DownloadCallback downloadCallback, const std::vector<int>& acceptedCodes = {200}, uint32_t timeoutMs = 10'000);
+  Response<std::string> GetString(std::string_view url, const std::map<String, String>& headers, const std::vector<int>& acceptedCodes = {200}, uint32_t timeoutMs = 10'000);
 
   template<typename T>
-  Response<T> GetJSON(StringView url, const std::map<String, String>& headers, JsonParser<T> jsonParser, const std::vector<int>& acceptedCodes = {200}, uint32_t timeoutMs = 10'000) {
+  Response<T> GetJSON(std::string_view url, const std::map<String, String>& headers, JsonParser<T> jsonParser, const std::vector<int>& acceptedCodes = {200}, uint32_t timeoutMs = 10'000) {
     auto response = GetString(url, headers, acceptedCodes, timeoutMs);
     if (response.result != RequestResult::Success) {
       return {response.result, response.code, {}};

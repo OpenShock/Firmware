@@ -1,15 +1,15 @@
 #include "config/BackendConfig.h"
 
+const char* const TAG = "Config::BackendConfig";
+
 #include "config/internal/utils.h"
 #include "Logging.h"
-
-const char* const TAG = "Config::BackendConfig";
 
 using namespace OpenShock::Config;
 
 BackendConfig::BackendConfig() : domain(OPENSHOCK_API_DOMAIN), authToken(), lcgOverride() { }
 
-BackendConfig::BackendConfig(StringView domain, StringView authToken, StringView lcgOverride) : domain(domain.toString()), authToken(authToken.toString()), lcgOverride(lcgOverride.toString()) { }
+BackendConfig::BackendConfig(std::string_view domain, std::string_view authToken, std::string_view lcgOverride) : domain(std::string(domain)), authToken(std::string(authToken)), lcgOverride(std::string(lcgOverride)) { }
 
 void BackendConfig::ToDefault() {
   domain = OPENSHOCK_API_DOMAIN;
@@ -18,7 +18,7 @@ void BackendConfig::ToDefault() {
 
 bool BackendConfig::FromFlatbuffers(const Serialization::Configuration::BackendConfig* config) {
   if (config == nullptr) {
-    ESP_LOGE(TAG, "config is null");
+    OS_LOGE(TAG, "config is null");
     return false;
   }
 
@@ -46,12 +46,12 @@ flatbuffers::Offset<OpenShock::Serialization::Configuration::BackendConfig> Back
 
 bool BackendConfig::FromJSON(const cJSON* json) {
   if (json == nullptr) {
-    ESP_LOGE(TAG, "json is null");
+    OS_LOGE(TAG, "json is null");
     return false;
   }
 
   if (cJSON_IsObject(json) == 0) {
-    ESP_LOGE(TAG, "json is not an object");
+    OS_LOGE(TAG, "json is not an object");
     return false;
   }
 

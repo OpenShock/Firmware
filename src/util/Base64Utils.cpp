@@ -1,10 +1,10 @@
 #include "util/Base64Utils.h"
 
+const char* const TAG = "Base64Utils";
+
 #include "Logging.h"
 
 #include <mbedtls/base64.h>
-
-const char* const TAG = "Base64Utils";
 
 using namespace OpenShock;
 
@@ -14,9 +14,9 @@ std::size_t Base64Utils::Encode(const uint8_t* data, std::size_t dataLen, char* 
   int retval = mbedtls_base64_encode(reinterpret_cast<uint8_t*>(output), outputLen, &requiredLen, data, dataLen);
   if (retval != 0) {
     if (retval == MBEDTLS_ERR_BASE64_BUFFER_TOO_SMALL) {
-      ESP_LOGW(TAG, "Output buffer too small (expected %zu, got %zu)", requiredLen, outputLen);
+      OS_LOGW(TAG, "Output buffer too small (expected %zu, got %zu)", requiredLen, outputLen);
     } else {
-      ESP_LOGW(TAG, "Failed to encode data, unknown error: %d", retval);
+      OS_LOGW(TAG, "Failed to encode data, unknown error: %d", retval);
     }
     return 0;
   }
@@ -54,11 +54,11 @@ std::size_t Base64Utils::Decode(const char* data, std::size_t dataLen, uint8_t* 
   int retval = mbedtls_base64_decode(output, outputLen, &requiredLen, reinterpret_cast<const uint8_t*>(data), dataLen);
   if (retval != 0) {
     if (retval == MBEDTLS_ERR_BASE64_BUFFER_TOO_SMALL) {
-      ESP_LOGW(TAG, "Output buffer too small (expected %zu, got %zu)", requiredLen, outputLen);
+      OS_LOGW(TAG, "Output buffer too small (expected %zu, got %zu)", requiredLen, outputLen);
     } else if (retval == MBEDTLS_ERR_BASE64_INVALID_CHARACTER) {
-      ESP_LOGW(TAG, "Invalid character in input data");
+      OS_LOGW(TAG, "Invalid character in input data");
     } else {
-      ESP_LOGW(TAG, "Failed to decode data, unknown error: %d", retval);
+      OS_LOGW(TAG, "Failed to decode data, unknown error: %d", retval);
     }
     return 0;
   }

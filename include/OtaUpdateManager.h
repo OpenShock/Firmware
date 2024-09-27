@@ -3,7 +3,6 @@
 #include "FirmwareBootType.h"
 #include "OtaUpdateChannel.h"
 #include "SemVer.h"
-#include "StringView.h"
 
 #include <array>
 #include <string>
@@ -11,7 +10,7 @@
 #include <vector>
 
 namespace OpenShock::OtaUpdateManager {
-  bool Init();
+  [[nodiscard]] bool Init();
 
   struct FirmwareRelease {
     std::string appBinaryUrl;

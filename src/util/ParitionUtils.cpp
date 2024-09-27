@@ -1,19 +1,18 @@
 #include "util/PartitionUtils.h"
 
+const char* const TAG = "PartitionUtils";
+
 #include "Hashing.h"
 #include "http/HTTPRequestManager.h"
+#include "Logging.h"
 #include "Time.h"
 #include "util/HexUtils.h"
-
-#include <esp_log.h>
-
-const char* const TAG = "PartitionUtils";
 
 bool OpenShock::TryGetPartitionHash(const esp_partition_t* partition, char (&hash)[65]) {
   uint8_t buffer[32];
   esp_err_t err = esp_partition_get_sha256(partition, buffer);
   if (err != ESP_OK) {
-    ESP_LOGE(TAG, "Failed to get partition hash: %s", esp_err_to_name(err));
+    OS_LOGE(TAG, "Failed to get partition hash: %s", esp_err_to_name(err));
     return false;
   }
 
@@ -23,10 +22,10 @@ bool OpenShock::TryGetPartitionHash(const esp_partition_t* partition, char (&has
   return true;
 }
 
-bool OpenShock::FlashPartitionFromUrl(const esp_partition_t* partition, StringView remoteUrl, const uint8_t (&remoteHash)[32], std::function<bool(std::size_t, std::size_t, float)> progressCallback) {
+bool OpenShock::FlashPartitionFromUrl(const esp_partition_t* partition, std::string_view remoteUrl, const uint8_t (&remoteHash)[32], std::function<bool(std::size_t, std::size_t, float)> progressCallback) {
   OpenShock::SHA256 sha256;
   if (!sha256.begin()) {
-    ESP_LOGE(TAG, "Failed to initialize SHA256 hash");
+    OS_LOGE(TAG, "Failed to initialize SHA256 hash");
     return false;
   }
 
@@ -36,13 +35,13 @@ bool OpenShock::FlashPartitionFromUrl(const esp_partition_t* partition, StringVi
 
   auto sizeValidator = [partition, &contentLength, progressCallback, &lastProgress](std::size_t size) -> bool {
     if (size > partition->size) {
-      ESP_LOGE(TAG, "Remote partition binary is too large");
+      OS_LOGE(TAG, "Remote partition binary is too large");
       return false;
     }
 
     // Erase app partition.
     if (esp_partition_erase_range(partition, 0, partition->size) != ESP_OK) {
-      ESP_LOGE(TAG, "Failed to erase partition in preparation for update");
+      OS_LOGE(TAG, "Failed to erase partition in preparation for update");
       return false;
     }
 
@@ -55,12 +54,12 @@ bool OpenShock::FlashPartitionFromUrl(const esp_partition_t* partition, StringVi
   };
   auto dataWriter = [partition, &sha256, &contentLength, &contentWritten, progressCallback, &lastProgress](std::size_t offset, const uint8_t* data, std::size_t length) -> bool {
     if (esp_partition_write(partition, offset, data, length) != ESP_OK) {
-      ESP_LOGE(TAG, "Failed to write to partition");
+      OS_LOGE(TAG, "Failed to write to partition");
       return false;
     }
 
     if (!sha256.update(data, length)) {
-      ESP_LOGE(TAG, "Failed to update SHA256 hash");
+      OS_LOGE(TAG, "Failed to update SHA256 hash");
       return false;
     }
 
@@ -87,22 +86,22 @@ bool OpenShock::FlashPartitionFromUrl(const esp_partition_t* partition, StringVi
     180'000
   );  // 3 minutes
   if (appBinaryResponse.result != OpenShock::HTTP::RequestResult::Success) {
-    ESP_LOGE(TAG, "Failed to download remote partition binary: [%u]", appBinaryResponse.code);
+    OS_LOGE(TAG, "Failed to download remote partition binary: [%u]", appBinaryResponse.code);
     return false;
   }
 
   progressCallback(contentLength, contentLength, 1.0f);
-  ESP_LOGD(TAG, "Wrote %u bytes to partition", appBinaryResponse.data);
+  OS_LOGD(TAG, "Wrote %u bytes to partition", appBinaryResponse.data);
 
   std::array<uint8_t, 32> localHash;
   if (!sha256.finish(localHash)) {
-    ESP_LOGE(TAG, "Failed to finish SHA256 hash");
+    OS_LOGE(TAG, "Failed to finish SHA256 hash");
     return false;
   }
 
   // Compare hashes.
   if (memcmp(localHash.data(), remoteHash, 32) != 0) {
-    ESP_LOGE(TAG, "App binary hash mismatch");
+    OS_LOGE(TAG, "App binary hash mismatch");
     return false;
   }
 

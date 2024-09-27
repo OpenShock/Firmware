@@ -9,7 +9,7 @@
 // TODO: This is horrible architecture. Fix it.
 
 namespace OpenShock::CommandHandler {
-  bool Init();
+  [[nodiscard]] bool Init();
   bool Ok();
 
   SetRfPinResultCode SetRfTxPin(uint8_t txPin);

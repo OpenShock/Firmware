@@ -2,15 +2,15 @@
 
 #include "config/ConfigBase.h"
 #include "config/WiFiCredentials.h"
-#include "StringView.h"
 
 #include <string>
+#include <string_view>
 #include <vector>
 
 namespace OpenShock::Config {
   struct WiFiConfig : public ConfigBase<Serialization::Configuration::WiFiConfig> {
     WiFiConfig();
-    WiFiConfig(StringView accessPointSSID, StringView hostname, const std::vector<WiFiCredentials>& credentialsList);
+    WiFiConfig(std::string_view accessPointSSID, std::string_view hostname, const std::vector<WiFiCredentials>& credentialsList);
 
     std::string accessPointSSID;
     std::string hostname;
@@ -19,9 +19,9 @@ namespace OpenShock::Config {
     void ToDefault() override;
 
     bool FromFlatbuffers(const Serialization::Configuration::WiFiConfig* config) override;
-    flatbuffers::Offset<Serialization::Configuration::WiFiConfig> ToFlatbuffers(flatbuffers::FlatBufferBuilder& builder, bool withSensitiveData) const override;
+    [[nodiscard]] flatbuffers::Offset<Serialization::Configuration::WiFiConfig> ToFlatbuffers(flatbuffers::FlatBufferBuilder& builder, bool withSensitiveData) const override;
 
     bool FromJSON(const cJSON* json) override;
-    cJSON* ToJSON(bool withSensitiveData) const override;
+    [[nodiscard]] cJSON* ToJSON(bool withSensitiveData) const override;
   };
 }  // namespace OpenShock::Config
