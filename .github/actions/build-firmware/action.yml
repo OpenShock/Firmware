@@ -1,9 +1,6 @@
 name: build-firmware
 description: Builds the firmware partitions and uploads them as an artifact
 inputs:
-  python-version:
-    required: true
-    description: 'Python version to use'
   board:
     required: true
     description: 'Board name to build'
@@ -31,7 +28,6 @@ runs:
 
     - uses: actions/setup-python@v5
       with:
-        python-version: ${{ inputs.python-version }}
         cache: 'pip'
 
     - name: Install python dependencies
