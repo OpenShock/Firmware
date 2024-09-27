@@ -21,6 +21,8 @@ if (!isGitTag && !isGitBranch && !isGitPullRequest) {
 }
 
 const gitCommitHash = process.env.GITHUB_SHA;
+const gitShortCommitHash = gitCommitHash.substring(0, 8);
+
 if (gitCommitHash === undefined) {
   core.setFailed('Environment variable "GITHUB_SHA" not found');
   process.exit();
@@ -83,7 +85,7 @@ if (!isGitTag) {
   }
 
   // Add the git commit hash to the version string
-  currentVersion += `+${gitCommitHash}`;
+  currentVersion += `+${gitShortCommitHash}`;
 } else {
   if (latestRelease.prerelease.length > 0) {
     currentVersion += `-${latestRelease.prerelease.join('.')}`;
