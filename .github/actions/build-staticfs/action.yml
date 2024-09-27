@@ -1,6 +1,9 @@
 name: build-staticfs
 description: Builds the static filesystem partition and uploads it as an artifact
 inputs:
+  version:
+    required: true
+    description: 'Current firmware version'
   skip-checkout:
     description: 'If true, skips checkout'
     required: false
@@ -37,6 +40,11 @@ runs:
     - name: Build filesystem partition
       shell: bash
       run: pio run --target buildfs -e fs
+      env:
+        OPENSHOCK_FW_VERSION: ${{ inputs.version }}
+        OPENSHOCK_FW_GIT_REF: ${{ github.ref }}
+        OPENSHOCK_FW_GIT_COMMIT: ${{ github.sha }}
+        OPENSHOCK_FW_BUILD_DATE: ${{ github.event.head_commit.timestamp }}
 
     - name: Rename partition binary
       shell: bash
