@@ -38,3 +38,7 @@ def is_github_pr_into(branch: str) -> bool:
 # Checks if the run was triggered by a tag.
 def is_github_tag() -> bool:
     return sysenv.get_string('GITHUB_REF_TYPE', 'branch') == 'tag'
+
+def get_latest_tag():
+    # Use git to get the latest tag.
+    return os.popen('git describe --tags --abbrev=0').read().strip()

@@ -35,16 +35,45 @@ dotenv_type = 'production' if is_release_build else 'development'
 # Read the correct .env file.
 dot = dotenv.DotEnv(project_dir, dotenv_type)
 
-
-# Get the current git commit hash.
-def get_git_commit() -> str | None:
+def get_git_repo():
     try:
-        # Get the current git repository.
-        repo = git.Repo(search_parent_directories=True)
-        return repo.head.object.hexsha
+        return git.Repo(search_parent_directories=True)
     except git.exc.InvalidGitRepositoryError:
         return None
 
+import re
+
+def sort_semver(versions):
+    def parse_semver(v):
+        # Split version into main, prerelease, and build metadata parts
+        match = re.match(r'^v?(\d+\.\d+\.\d+)(?:-([0-9A-Za-z-.]+))?(?:\+([0-9A-Za-z-.]+))?$', v)
+        if not match:
+            raise ValueError(f"Invalid version: {v}")
+        main_version, prerelease, build = match.groups()
+        
+        return (main_version, prerelease, build)
+    
+    def has_suffix(version):
+        return 
+
+    def version_key(version):
+        main_version, _, _ = parse_semver(version)
+
+        # Convert the main version into a tuple of integers for natural sorting
+        main_version_tuple = tuple(map(int, main_version.split('.')))
+
+        return main_version_tuple
+
+    # Remove versions with prerelease/build suffixes
+    clean_only = [v for v in versions if not ('-' in v or '+' in v)]
+
+    # Sort by version key
+    return sorted(clean_only, key=lambda v: version_key(v))
+
+git_repo = get_git_repo()
+git_commit = git_repo.head.object.hexsha if git_repo is not None else None
+git_tags = [tag.name for tag in git_repo.tags] if git_repo is not None else []
+latest_git_tag = sort_semver(git_tags)[-1] if len(git_tags) > 0 else None
 
 # Find env variables based on only the pioenv and sysenv.
 def get_pio_firmware_vars() -> dict[str, str | int | bool]:
@@ -60,7 +89,6 @@ def get_pio_firmware_vars() -> dict[str, str | int | bool]:
     vars['OPENSHOCK_FW_CHIP'] = fw_chip.upper()
     vars['OPENSHOCK_FW_CHIP_' + macroify(fw_chip)] = True  # Used for conditional compilation.
     vars['OPENSHOCK_FW_MODE'] = pio_build_type
-    git_commit = get_git_commit()
     if git_commit is not None:
         vars['OPENSHOCK_FW_GIT_COMMIT'] = git_commit
     return vars
@@ -156,6 +184,21 @@ print_dump('Dotenv OpenShock vars', dot_openshock_vars)
 merge_missing_keys(cpp_defines, sys_openshock_vars)
 merge_missing_keys(cpp_defines, pio_openshock_vars)
 merge_missing_keys(cpp_defines, dot_openshock_vars)
+
+# Check if OPENSHOCK_FW_VERSION is set.
+if 'OPENSHOCK_FW_VERSION' not in cpp_defines:
+    if is_ci:
+        raise ValueError('OPENSHOCK_FW_VERSION must be set in environment variables for CI builds.')
+    
+    # If latest_git_tag is set, use it, else use 0.0.0, assign to variable.
+    version = (latest_git_tag if latest_git_tag is not None else '0.0.0') + '-local'
+
+    # If git_commit is set, append it to the version.
+    if git_commit is not None:
+        version += '+' + git_commit[0:7]
+    
+    # If not set, get the latest tag.
+    cpp_defines['OPENSHOCK_FW_VERSION'] = version
 
 # Gets the log level from environment variables.
 # TODO: Delete get_loglevel and use... something more generic.
