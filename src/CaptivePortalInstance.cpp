@@ -101,7 +101,7 @@ CaptivePortalInstance::CaptivePortalInstance()
     m_webServer.serveStatic("/", m_fileSystem, "/www/", "max-age=3600").setDefaultFile("index.html").setSharedEtag(fsHash);
 
     // Redirecting connection tests to the captive portal, triggering the "login to network" prompt
-    m_webServer.onNotFound([softAPURL](AsyncWebServerRequest* request) { request->redirect(softAPURL); });
+    m_webServer.onNotFound([&softAPURL](AsyncWebServerRequest* request) { request->redirect(softAPURL); });
   } else {
     OS_LOGE(TAG, "/www/index.html or hash files not found, serving error page");
 
