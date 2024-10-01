@@ -154,7 +154,7 @@ void _handleEStopPinCommand(std::string_view arg) {
   }
 
   uint8_t pin;
-  if (!OpenShock::IntConv::stou8(arg, pin)) {
+  if (!OpenShock::Convert::ToUint8(arg, pin)) {
     SERPR_ERROR("Invalid argument (number invalid or out of range)");
     return;
   }
