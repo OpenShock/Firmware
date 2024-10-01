@@ -2,12 +2,11 @@
 
 #include "Common.h"
 
+#include <driver/rmt_types.h>
 #include <hal/gpio_types.h>
 
 #include <freertos/semphr.h>
 #include <freertos/task.h>
-
-#include <esp32-hal-rmt.h>
 
 #include <cstdint>
 #include <vector>
@@ -45,7 +44,7 @@ namespace OpenShock {
     gpio_num_t m_gpioPin;
     uint8_t m_brightness;  // 0-255
     std::vector<RGBState> m_pattern;
-    rmt_obj_t* m_rmtHandle;
+    rmt_channel_handle_t m_channelHandle;
     TaskHandle_t m_taskHandle;
     SemaphoreHandle_t m_taskMutex;
   };

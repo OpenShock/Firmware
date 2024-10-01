@@ -30,8 +30,7 @@ namespace OpenShock {
     void handleWebSocketClientError(uint8_t socketId, uint16_t code, const char* message);
     void handleWebSocketEvent(uint8_t socketId, WebSocketMessageType type, const uint8_t* payload, std::size_t length);
 
-    AsyncWebServer m_webServer;
-    WebSocketsServer m_socketServer;
+    httpd_handle_t m_httpServer;
     WebSocketDeFragger m_socketDeFragger;
     fs::LittleFSFS m_fileSystem;
     DNSServer m_dnsServer;

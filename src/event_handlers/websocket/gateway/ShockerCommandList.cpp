@@ -23,7 +23,7 @@ void _Private::HandleShockerCommandList(const OpenShock::Serialization::Gateway:
     return;
   }
 
-  OS_LOGV(TAG, "Received command list from API (%u commands)", commands->size());
+  OS_LOGV(TAG, "Received command list from API (%lu commands)", commands->size());
 
   for (auto command : *commands) {
     uint16_t id                   = command->id();

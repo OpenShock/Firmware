@@ -7,7 +7,7 @@ const char* const TAG = "HTTPRequestManager";
 #include "Time.h"
 #include "util/StringUtils.h"
 
-#include <HTTPClient.h>
+#include <esp_http_client.h>
 
 #include <algorithm>
 #include <memory>

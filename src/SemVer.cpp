@@ -1,5 +1,7 @@
 #include "SemVer.h"
 
+#include "Logging.h"
+
 const char* const TAG = "SemVer";
 
 #include "Logging.h"
@@ -112,7 +114,7 @@ constexpr bool _semverIsDotSeperatedBuildIdentifiers(std::string_view str) {
       return false;
     }
 
-    str = str.substr(dotIdx + 1);
+    str    = str.substr(dotIdx + 1);
     dotIdx = str.find('.');
   }
 
@@ -130,15 +132,15 @@ constexpr bool _semverIsDotSeperatedPreleaseIdentifiers(std::string_view str) {
       return false;
     }
 
-    str = str.substr(dotIdx + 1);
+    str    = str.substr(dotIdx + 1);
     dotIdx = str.find('.');
   }
 
   return _semverIsPrereleaseIdentifier(str);
 }
-const auto _semverIsPatch = _semverIsNumericIdentifier;
-const auto _semverIsMinor = _semverIsNumericIdentifier;
-const auto _semverIsMajor = _semverIsNumericIdentifier;
+const auto _semverIsPatch      = _semverIsNumericIdentifier;
+const auto _semverIsMinor      = _semverIsNumericIdentifier;
+const auto _semverIsMajor      = _semverIsNumericIdentifier;
 const auto _semverIsPrerelease = _semverIsDotSeperatedPreleaseIdentifiers;
 const auto _semverIsBuild      = _semverIsDotSeperatedBuildIdentifiers;
 bool _semverIsVersionCore(std::string_view str) {
@@ -265,7 +267,7 @@ bool OpenShock::TryParseSemVer(std::string_view semverStr, SemVer& semver) {
   auto dashIdx = patchStr.find('-');
   if (dashIdx != std::string_view::npos) {
     semver.prerelease = patchStr.substr(dashIdx + 1);
-    patchStr = patchStr.substr(0, dashIdx);
+    patchStr          = patchStr.substr(0, dashIdx);
   }
 
   auto plusIdx = semver.prerelease.find('+');

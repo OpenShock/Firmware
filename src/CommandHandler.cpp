@@ -130,7 +130,10 @@ bool _internalSetKeepAliveEnabled(bool enabled) {
     OS_LOGV(TAG, "Disabling keep-alive task");
     if (s_keepAliveTaskHandle != nullptr && s_keepAliveQueue != nullptr) {
       // Wait for the task to stop
-      KnownShocker cmd {.killTask = true};
+      KnownShocker cmd;
+      memset(&cmd, 0, sizeof(cmd));
+      cmd.killTask = true;
+
       while (eTaskGetState(s_keepAliveTaskHandle) != eDeleted) {
         vTaskDelay(pdMS_TO_TICKS(10));
 
@@ -295,7 +298,7 @@ bool CommandHandler::HandleCommand(ShockerModelType model, uint16_t shockerId, S
 
     s_rfTransmitter->ClearPendingCommands();
   } else {
-    OS_LOGD(TAG, "Command received: %u %u %u %u", model, shockerId, type, intensity);
+    OS_LOGD(TAG, "Command received: %hhu %hu %hhu %hhu", static_cast<std::uint8_t>(model), shockerId, static_cast<std::uint8_t>(type), intensity);
   }
 
   bool ok = s_rfTransmitter->SendCommand(model, shockerId, type, intensity, durationMs);
@@ -304,7 +307,7 @@ bool CommandHandler::HandleCommand(ShockerModelType model, uint16_t shockerId, S
   xSemaphoreTake(s_keepAliveMutex, portMAX_DELAY);
 
   if (ok && s_keepAliveQueue != nullptr) {
-    KnownShocker cmd {.model = model, .shockerId = shockerId, .lastActivityTimestamp = OpenShock::millis() + durationMs};
+    KnownShocker cmd {.killTask = false, .model = model, .shockerId = shockerId, .lastActivityTimestamp = OpenShock::millis() + durationMs};
     if (xQueueSend(s_keepAliveQueue, &cmd, pdMS_TO_TICKS(10)) != pdTRUE) {
       OS_LOGE(TAG, "Failed to send keep-alive command to queue");
     }
