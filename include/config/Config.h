@@ -63,6 +63,8 @@ namespace OpenShock::Config {
   uint8_t GetWiFiCredentialsIDbySSID(const char* ssid);
   bool RemoveWiFiCredentials(uint8_t id);
   bool ClearWiFiCredentials();
+  bool GetWiFiHostname(std::string& out);
+  bool SetWiFiHostname(std::string_view hostname);
 
   bool GetOtaUpdateId(int32_t& out);
   bool SetOtaUpdateId(int32_t updateId);

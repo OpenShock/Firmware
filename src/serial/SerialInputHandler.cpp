@@ -90,7 +90,7 @@ void _handleHelpCommand(std::string_view arg) {
 
     OS_LOGV(TAG, "Longest command: %zu, longest argument: %zu, padded length: %zu", longestCommand, longestArgument, paddedLength);
     OS_LOGV(TAG, "Buffer size: %zu", buffer.capacity());
-    
+
     for (const auto& cmd : s_commandGroups) {
       ESP_LOGV(TAG, "Collecting help for command group: %.*s", cmd.name().size(), cmd.name().data());
       buffer.append(cmd.name());
