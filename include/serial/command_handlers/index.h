@@ -12,6 +12,7 @@ namespace OpenShock::Serial::CommandHandlers {
   OpenShock::Serial::CommandGroup JsonConfigHandler();
   OpenShock::Serial::CommandGroup KeepAliveHandler();
   OpenShock::Serial::CommandGroup LcgOverrideHandler();
+  OpenShock::Serial::CommandGroup HostnameHandler();
   OpenShock::Serial::CommandGroup NetworksHandler();
   OpenShock::Serial::CommandGroup RawConfigHandler();
   OpenShock::Serial::CommandGroup RestartHandler();
@@ -31,6 +32,7 @@ namespace OpenShock::Serial::CommandHandlers {
       DomainHandler(),
       AuthTokenHandler(),
       LcgOverrideHandler(),
+      HostnameHandler(),
       NetworksHandler(),
       KeepAliveHandler(),
       JsonConfigHandler(),
