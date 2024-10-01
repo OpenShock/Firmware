@@ -63,7 +63,7 @@ static bool s_echoEnabled = true;
 static std::vector<OpenShock::Serial::CommandGroup> s_commandGroups;
 static std::unordered_map<std::string_view, OpenShock::Serial::CommandGroup, std::hash_ci, std::equals_ci> s_commandHandlers;
 
-void _handleHelpCommand(std::string_view arg) {
+void _handleHelpCommand(std::string_view arg, bool isAutomated) {
   arg = OpenShock::StringTrim(arg);
   if (arg.empty()) {
     SerialInputHandler::PrintWelcomeHeader();
@@ -138,46 +138,122 @@ void _handleHelpCommand(std::string_view arg) {
 void RegisterCommandHandler(const OpenShock::Serial::CommandGroup& handler) {
   s_commandHandlers[handler.name()] = handler;
 }
-int findChar(const char* buffer, std::size_t bufferSize, char c) {
-  for (int i = 0; i < bufferSize; i++) {
-    if (buffer[i] == c) {
-      return i;
-    }
+
+#define CLEAR_LINE "\r\x1B[K"
+
+enum class SerialReadResult {
+  NoData,
+  Data,
+  LineEnd,
+  AutoCompleteRequest,
+};
+
+SerialReadResult _tryReadSerialLine(std::string& buffer) {
+  // Check if there's any data available
+  int available  = ::Serial.available();
+  if (available <= 0) {
+    return SerialReadResult::NoData;
   }
 
-  return -1;
-}
+  // Reserve space for the new data
+  buffer.reserve(buffer.size() + available);
 
-int findLineEnd(const char* buffer, int bufferSize) {
-  if (buffer == nullptr || bufferSize <= 0) return -1;
+  // Read the data into the buffer
+  while (available-- > 0) {
+    char c = ::Serial.read();
 
-  for (int i = 0; i < bufferSize; i++) {
-    if (buffer[i] == '\r' || buffer[i] == '\n' || buffer[i] == '\0') {
-      return i;
+    // Handle backspace
+    if (c == '\b') {
+      if (!buffer.empty()) {
+        buffer.pop_back();
+      }
+      continue;
     }
+
+    // Handle newline
+    if (c == '\r' || c == '\n') {
+      if (!buffer.empty()) {
+        return SerialReadResult::LineEnd;
+      }
+      continue;
+    }
+
+    // Handle leading whitespace
+    if (c == ' ' && buffer.empty()) {
+      continue;
+    }
+
+    if (c == '\t') {
+      return SerialReadResult::AutoCompleteRequest;
+    }
+
+    // Add the character to the buffer
+    buffer.push_back(c);
   }
 
-  return -1;
+  return SerialReadResult::Data;
 }
 
-int findLineStart(const char* buffer, int bufferSize, int lineEnd) {
-  if (lineEnd < 0) return -1;
-  if (lineEnd >= bufferSize) return -1;
+void _skipSerialWhitespaces(std::string& buffer) {
+  int available = ::Serial.available();
 
-  for (int i = lineEnd + 1; i < bufferSize; i++) {
-    if (buffer[i] != '\r' && buffer[i] != '\n' && buffer[i] != '\0') {
-      return i;
+  while (available-- > 0) {
+    char c = ::Serial.read();
+
+    if (c != ' ' && c != '\r' && c != '\n') {
+      buffer.push_back(c);
+      break;
     }
   }
-
-  return -1;
 }
 
-void processSerialLine(std::string_view line) {
+void _echoBuffer(std::string_view buffer) {
+  ::Serial.printf(CLEAR_LINE "> %.*s", buffer.size(), buffer.data());
+}
+
+void _echoHandleSerialInput(std::string_view buffer, bool hasData) {
+  static int64_t lastActivity = 0;
+  static bool hasChanges      = false;
+
+  // If serial echo is disabled, don't do anything past this point
+  if (!s_echoEnabled) {
+    return;
+  }
+
+  // If the command starts with a $, it's a automated command, don't echo it
+  if (!buffer.empty() && buffer[0] == '$') {
+    return;
+  }
+
+  // Update activity state
+  if (hasData) {
+    hasChanges   = true;
+    lastActivity = OpenShock::millis();
+  }
+
+  // If theres has been received data, but no new data for a while, echo the buffer
+  if (hasChanges && OpenShock::millis() - lastActivity > PASTE_INTERVAL_THRESHOLD_MS) {
+    _echoBuffer(buffer);
+    hasChanges   = false;
+    lastActivity = OpenShock::millis();
+  }
+}
+
+void _processSerialLine(std::string_view line) {
   line = OpenShock::StringTrim(line);
   if (line.empty()) {
-    SERPR_ERROR("No command");
     return;
+  }
+
+  bool isAutomated = line[0] == '$';
+
+  // If automated, remove the $ prefix
+  // If it's not automated, we can echo the command if echo is enabled
+  if (isAutomated) {
+    line = line.substr(1);
+  } else if (s_echoEnabled) {
+    _echoBuffer(line);
+    ::Serial.println();
   }
 
   auto parts                 = OpenShock::StringSplit(line, ' ', 1);
@@ -185,7 +261,7 @@ void processSerialLine(std::string_view line) {
   std::string_view arguments = parts.size() > 1 ? parts[1] : std::string_view();
 
   if (command == "help"sv) {
-    _handleHelpCommand(arguments);
+    _handleHelpCommand(arguments, isAutomated);
     return;
   }
 
@@ -231,108 +307,32 @@ bool SerialInputHandler::Init() {
 }
 
 void SerialInputHandler::Update() {
-  static char* buffer            = nullptr;  // TODO: Clean up this buffer every once in a while
-  static std::size_t bufferSize  = 0;
-  static std::size_t bufferIndex = 0;
-  static int64_t lastEcho        = 0;
-  static bool suppressingPaste   = false;
+  static std::string buffer = "";
 
-  while (true) {
-    int available = ::Serial.available();
-    if (available <= 0 && findLineEnd(buffer, bufferIndex) < 0) {
-      // If we're suppressing paste, and we haven't printed anything in a while, print the buffer and stop suppressing
-      if (buffer != nullptr && s_echoEnabled && suppressingPaste && OpenShock::millis() - lastEcho > PASTE_INTERVAL_THRESHOLD_MS) {
-        // \r - carriage return, moves to start of line
-        // \x1B[K - clears rest of line
-        ::Serial.printf("\r\x1B[K> %.*s", bufferIndex, buffer);
-        lastEcho         = OpenShock::millis();
-        suppressingPaste = false;
-      }
-      break;
-    }
+  switch (_tryReadSerialLine(buffer)) {
+  case SerialReadResult::LineEnd:
+    _processSerialLine(buffer);
 
-    if (bufferIndex + available > bufferSize) {
-      bufferSize = bufferIndex + available;
-
-      void* newBuffer = realloc(buffer, bufferSize);
-      if (newBuffer == nullptr) {
-        free(buffer);
-        buffer     = nullptr;
-        bufferSize = 0;
-        continue;
-      }
-
-      buffer = static_cast<char*>(newBuffer);
-    }
-
-    if (buffer == nullptr) {
-      continue;
-    }
-
-    while (available-- > 0) {
-      char c = ::Serial.read();
-      // Handle backspace
-      if (c == '\b') {
-        if (bufferIndex > 0) {
-          bufferIndex--;
-        }
-        continue;
-      }
-      buffer[bufferIndex++] = c;
-    }
-
-    int lineEnd = findLineEnd(buffer, bufferIndex);
-    // No newline found, wait for more input
-    if (lineEnd == -1) {
-      if (s_echoEnabled) {
-        // If we're typing without pasting, echo the buffer
-        if (OpenShock::millis() - lastEcho > PASTE_INTERVAL_THRESHOLD_MS) {
-          // \r - carriage return, moves to start of line
-          // \x1B[K - clears rest of line
-          ::Serial.printf("\r\x1B[K> %.*s", bufferIndex, buffer);
-          lastEcho         = OpenShock::millis();
-          suppressingPaste = false;
-        } else {
-          lastEcho         = OpenShock::millis();
-          suppressingPaste = true;
-        }
-      }
-      break;
-    }
-
-    std::string_view line = OpenShock::StringTrim(std::string_view(buffer, lineEnd));
-
-    ::Serial.printf("\r> %.*s\n", line.size(), line.data());
-
-    processSerialLine(line);
-
-    int nextLine = findLineStart(buffer, bufferSize, lineEnd + 1);
-    if (nextLine < 0) {
-      bufferIndex = 0;
-      // Free buffer if it's too big
-      if (bufferSize > SERIAL_BUFFER_CLEAR_THRESHOLD) {
-        OS_LOGV(TAG, "Clearing serial input buffer");
-        bufferSize = 0;
-        free(buffer);
-        buffer = nullptr;
-      }
-      break;
-    }
-
-    int remaining = bufferIndex - nextLine;
-    if (remaining > 0) {
-      memmove(buffer, buffer + nextLine, remaining);
-      bufferIndex = remaining;
+    // Deallocate memory if the buffer is too large
+    if (buffer.capacity() > SERIAL_BUFFER_CLEAR_THRESHOLD) {
+      buffer.clear();
+      buffer.shrink_to_fit();
     } else {
-      bufferIndex = 0;
-      // Free buffer if it's too big
-      if (bufferSize > SERIAL_BUFFER_CLEAR_THRESHOLD) {
-        OS_LOGV(TAG, "Clearing serial input buffer");
-        bufferSize = 0;
-        free(buffer);
-        buffer = nullptr;
-      }
+      buffer.resize(0); // Hopefully doesn't deallocate memory
     }
+
+    // Skip any remaining trailing whitespaces
+    _skipSerialWhitespaces(buffer);
+    break;
+  case SerialReadResult::AutoCompleteRequest:
+    ::Serial.printf(CLEAR_LINE "> %.*s [AutoComplete is not implemented]", buffer.size(), buffer.data());
+    break;
+  case SerialReadResult::Data:
+    _echoHandleSerialInput(buffer, true);
+    break;
+  default:
+    _echoHandleSerialInput(buffer, false);
+    break;
   }
 }
 
