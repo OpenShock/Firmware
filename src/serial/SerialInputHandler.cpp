@@ -141,6 +141,66 @@ void RegisterCommandHandler(const OpenShock::Serial::CommandGroup& handler) {
 
 #define CLEAR_LINE "\r\x1B[K"
 
+class SerialBuffer {
+  DISABLE_COPY(SerialBuffer);
+  DISABLE_MOVE(SerialBuffer);
+public:
+  constexpr SerialBuffer() : m_data(nullptr), m_size(0), m_capacity(0) {}
+  inline SerialBuffer(std::size_t capacity) : m_data(new char[capacity]), m_size(0), m_capacity(capacity) {}
+  inline ~SerialBuffer() { delete[] m_data; }
+
+  constexpr char* data() { return m_data; }
+  constexpr std::size_t size() const { return m_size; }
+  constexpr std::size_t capacity() const { return m_capacity; }
+  constexpr bool empty() const { return m_size == 0; }
+
+  constexpr void clear() { m_size = 0; }
+  inline void destroy() {
+    delete[] m_data;
+    m_data     = nullptr;
+    m_size     = 0;
+    m_capacity = 0;
+  }
+
+  inline void reserve(std::size_t size) {
+    size = (size + 31) & ~31; // Align to 32 bytes
+
+    if (size <= m_capacity) {
+      return;
+    }
+
+    char* newData = new char[size];
+    if (m_data != nullptr) {
+      std::memcpy(newData, m_data, m_size);
+      delete[] m_data;
+    }
+
+    m_data     = newData;
+    m_capacity = size;
+  }
+
+
+  inline void push_back(char c) {
+    if (m_size >= m_capacity) {
+      reserve(m_capacity + 16);
+    }
+
+    m_data[m_size++] = c;
+  }
+
+  constexpr void pop_back() {
+    if (m_size > 0) {
+      --m_size;
+    }
+  }
+
+  constexpr operator std::string_view() const { return std::string_view(m_data, m_size); }
+private:
+  char* m_data;
+  std::size_t m_size;
+  std::size_t m_capacity;
+};
+
 enum class SerialReadResult {
   NoData,
   Data,
@@ -148,7 +208,7 @@ enum class SerialReadResult {
   AutoCompleteRequest,
 };
 
-SerialReadResult _tryReadSerialLine(std::string& buffer) {
+SerialReadResult _tryReadSerialLine(SerialBuffer& buffer) {
   // Check if there's any data available
   int available  = ::Serial.available();
   if (available <= 0) {
@@ -164,9 +224,7 @@ SerialReadResult _tryReadSerialLine(std::string& buffer) {
 
     // Handle backspace
     if (c == '\b') {
-      if (!buffer.empty()) {
-        buffer.pop_back();
-      }
+      buffer.pop_back(); // Remove the last character from the buffer if it exists
       continue;
     }
 
@@ -196,7 +254,7 @@ SerialReadResult _tryReadSerialLine(std::string& buffer) {
   return SerialReadResult::Data;
 }
 
-void _skipSerialWhitespaces(std::string& buffer) {
+void _skipSerialWhitespaces(SerialBuffer& buffer) {
   int available = ::Serial.available();
 
   while (available-- > 0) {
@@ -309,7 +367,7 @@ bool SerialInputHandler::Init() {
 }
 
 void SerialInputHandler::Update() {
-  static std::string buffer = "";
+  static SerialBuffer buffer(32);
 
   switch (_tryReadSerialLine(buffer)) {
   case SerialReadResult::LineEnd:
@@ -317,10 +375,9 @@ void SerialInputHandler::Update() {
 
     // Deallocate memory if the buffer is too large
     if (buffer.capacity() > SERIAL_BUFFER_CLEAR_THRESHOLD) {
-      buffer.clear();
-      buffer.shrink_to_fit();
+      buffer.destroy();
     } else {
-      buffer.resize(0); // Hopefully doesn't deallocate memory
+      buffer.clear();
     }
 
     // Skip any remaining trailing whitespaces
