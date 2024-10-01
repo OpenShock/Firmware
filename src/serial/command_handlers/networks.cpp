@@ -9,7 +9,7 @@
 
 const char* const TAG = "Serial::CommandHandlers::Networks";
 
-void _handleNetworksCommand(std::string_view arg) {
+void _handleNetworksCommand(std::string_view arg, bool isAutomated) {
   cJSON* root;
 
   if (arg.empty()) {

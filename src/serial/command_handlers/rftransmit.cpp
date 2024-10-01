@@ -3,7 +3,7 @@
 #include "CommandHandler.h"
 #include "serialization/JsonSerial.h"
 
-void _handleRFTransmitCommand(std::string_view arg) {
+void _handleRFTransmitCommand(std::string_view arg, bool isAutomated) {
   if (arg.empty()) {
     SERPR_ERROR("No command");
     return;

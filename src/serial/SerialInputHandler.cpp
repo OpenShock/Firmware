@@ -273,7 +273,7 @@ void _processSerialLine(std::string_view line) {
 
   for (const auto& cmd : it->second.commands()) {
     if (cmd.arguments().empty()) {
-      cmd.commandHandler()(arguments);
+      cmd.commandHandler()(arguments, isAutomated);
       return;
     }
   }

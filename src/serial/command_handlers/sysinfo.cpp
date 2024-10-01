@@ -5,7 +5,7 @@
 #include "wifi/WiFiManager.h"
 #include "wifi/WiFiNetwork.h"
 
-void _handleDebugInfoCommand(std::string_view arg) {
+void _handleDebugInfoCommand(std::string_view arg, bool isAutomated) {
   (void)arg;
 
   SERPR_RESPONSE("RTOSInfo|Free Heap|%u", xPortGetFreeHeapSize());

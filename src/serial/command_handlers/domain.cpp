@@ -8,7 +8,7 @@
 
 const char* const TAG = "Serial::CommandHandlers::Domain";
 
-void _handleDomainCommand(std::string_view arg) {
+void _handleDomainCommand(std::string_view arg, bool isAutomated) {
   if (arg.empty()) {
     std::string domain;
     if (!OpenShock::Config::GetBackendDomain(domain)) {

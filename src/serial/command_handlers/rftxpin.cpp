@@ -5,7 +5,7 @@
 #include "Convert.h"
 #include "SetRfPinResultCode.h"
 
-void _handleRfTxPinCommand(std::string_view arg) {
+void _handleRfTxPinCommand(std::string_view arg, bool isAutomated) {
   if (arg.empty()) {
     uint8_t txPin;
     if (!OpenShock::Config::GetRFConfigTxPin(txPin)) {

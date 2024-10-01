@@ -6,7 +6,7 @@
 #include "Convert.h"
 #include "util/StringUtils.h"
 
-void _handleSerialEchoCommand(std::string_view arg) {
+void _handleSerialEchoCommand(std::string_view arg, bool isAutomated) {
   if (arg.empty()) {
     // Get current serial echo status
     SERPR_RESPONSE("SerialEcho|%s", OpenShock::SerialInputHandler::SerialEchoEnabled() ? "true" : "false");

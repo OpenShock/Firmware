@@ -7,7 +7,7 @@
 
 const char* TAG = "Serial::CommandHandlers::LcgOverride";
 
-void _handleLcgOverrideCommand(std::string_view arg) {
+void _handleLcgOverrideCommand(std::string_view arg, bool isAutomated) {
   if (arg.empty()) {
     std::string lcgOverride;
     if (!OpenShock::Config::GetBackendLCGOverride(lcgOverride)) {

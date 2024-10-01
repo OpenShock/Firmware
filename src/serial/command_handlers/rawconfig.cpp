@@ -5,7 +5,7 @@
 
 #include <vector>
 
-void _handleRawConfigCommand(std::string_view arg) {
+void _handleRawConfigCommand(std::string_view arg, bool isAutomated) {
   if (arg.empty()) {
     std::vector<uint8_t> buffer;
 

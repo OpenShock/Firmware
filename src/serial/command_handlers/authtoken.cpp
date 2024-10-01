@@ -4,7 +4,7 @@
 
 #include <string>
 
-void _handleAuthtokenCommand(std::string_view arg) {
+void _handleAuthtokenCommand(std::string_view arg, bool isAutomated) {
   if (arg.empty()) {
     std::string authToken;
     if (!OpenShock::Config::GetBackendAuthToken(authToken)) {

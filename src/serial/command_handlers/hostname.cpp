@@ -6,7 +6,7 @@
 
 const char* const TAG = "Serial::CommandHandlers::Domain";
 
-void _handleHostnameCommand(std::string_view arg) {
+void _handleHostnameCommand(std::string_view arg, bool isAutomated) {
   if (arg.empty()) {
     std::string hostname;
     if (!OpenShock::Config::GetWiFiHostname(hostname)) {

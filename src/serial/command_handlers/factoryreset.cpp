@@ -2,7 +2,7 @@
 
 #include "config/Config.h"
 
-void _handleFactoryResetCommand(std::string_view arg) {
+void _handleFactoryResetCommand(std::string_view arg, bool isAutomated) {
   (void)arg;
 
   ::Serial.println("Resetting to factory defaults...");

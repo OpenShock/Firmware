@@ -5,7 +5,7 @@
 #include "config/Config.h"
 #include "util/StringUtils.h"
 
-void _handleKeepAliveCommand(std::string_view arg) {
+void _handleKeepAliveCommand(std::string_view arg, bool isAutomated) {
   bool keepAliveEnabled;
 
   if (arg.empty()) {

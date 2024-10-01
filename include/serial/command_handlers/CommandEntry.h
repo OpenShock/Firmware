@@ -4,6 +4,8 @@
 #include <vector>
 
 namespace OpenShock::Serial {
+  typedef void (*CommandHandler)(std::string_view arg, bool isAutomated);
+
   class CommandArgument {
   public:
     std::string_view name;
@@ -14,9 +16,7 @@ namespace OpenShock::Serial {
 
   class CommandEntry {
   public:
-    typedef void (*CommandHandler)(std::string_view);
-
-    CommandEntry(std::string_view description, void (*commandHandler)(std::string_view));
+    CommandEntry(std::string_view description, CommandHandler commandHandler);
 
     inline std::string_view description() const { return m_description; }
     inline const std::vector<CommandArgument>& arguments() const { return m_arguments; }
@@ -42,7 +42,7 @@ namespace OpenShock::Serial {
     inline std::string_view name() const { return m_name; }
     inline const std::vector<CommandEntry>& commands() const { return m_commands; }
 
-    CommandEntry& addCommand(std::string_view description, void (*commandHandler)(std::string_view));
+    CommandEntry& addCommand(std::string_view description, CommandHandler commandHandler);
   private:
     std::string_view m_name;
     std::vector<CommandEntry> m_commands;

@@ -2,7 +2,7 @@
 
 using namespace OpenShock::Serial;
 
-CommandEntry::CommandEntry(std::string_view description, void (*commandHandler)(std::string_view))
+CommandEntry::CommandEntry(std::string_view description, CommandHandler commandHandler)
   : m_description(description)
   , m_commandHandler(commandHandler) 
 {
@@ -19,7 +19,7 @@ CommandGroup::CommandGroup(std::string_view name)
 {
 }
 
-CommandEntry& CommandGroup::addCommand(std::string_view description, void (*commandHandler)(std::string_view)) {
+CommandEntry& CommandGroup::addCommand(std::string_view description, CommandHandler commandHandler) {
   auto cmd = CommandEntry(description, commandHandler);
   m_commands.push_back(cmd);
   return m_commands.back();

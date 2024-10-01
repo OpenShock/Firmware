@@ -4,7 +4,7 @@
 
 #include <string>
 
-void _handleValidGpiosCommand(std::string_view arg) {
+void _handleValidGpiosCommand(std::string_view arg, bool isAutomated) {
   if (!arg.empty()) {
     SERPR_ERROR("Invalid argument (too many arguments)");
     return;
