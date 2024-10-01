@@ -9,13 +9,27 @@ on:
   workflow_dispatch: # Manually invoked by user.
 
 jobs:
+  get-vars:
+    uses: ./.github/workflows/get-vars.yml
+
   cpp-linter:
+    name: C/C++ Linter
     runs-on: ubuntu-latest
+    needs: get-vars
+
     permissions:
       contents: write
       pull-requests: write
+    
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - uses: ./.github/actions/build-compilationdb
+        with:
+          board: OpenShock-Core-V2 # Doesn't matter, just need the compilation database
+          skip-checkout: true
+      
       - uses: cpp-linter/cpp-linter-action@v2
         id: linter
         env:
