@@ -539,6 +539,22 @@ bool Config::ClearWiFiCredentials() {
   return _trySaveConfig();
 }
 
+bool Config::GetWiFiHostname(std::string& out) {
+  CONFIG_LOCK_READ(false);
+
+  out = _configData.wifi.hostname;
+
+  return true;
+}
+
+bool Config::SetWiFiHostname(std::string_view hostname) {
+  CONFIG_LOCK_WRITE(false);
+
+  _configData.wifi.hostname = std::string(hostname);
+
+  return _trySaveConfig();
+}
+
 bool Config::GetOtaUpdateId(int32_t& out) {
   CONFIG_LOCK_READ(false);
 
