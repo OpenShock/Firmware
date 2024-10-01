@@ -187,8 +187,10 @@ SerialReadResult _tryReadSerialLine(std::string& buffer) {
       return SerialReadResult::AutoCompleteRequest;
     }
 
-    // Add the character to the buffer
-    buffer.push_back(c);
+    // If character is printable, add it to the buffer
+    if (c > 31 && c < 127) {
+      buffer.push_back(c);
+    }
   }
 
   return SerialReadResult::Data;
