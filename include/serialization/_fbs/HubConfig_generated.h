@@ -803,20 +803,16 @@ struct HubConfig FLATBUFFERS_FINAL_CLASS : private ::flatbuffers::Table {
   }
   enum FlatBuffersVTableOffset FLATBUFFERS_VTABLE_UNDERLYING_TYPE {
     VT_RF = 4,
-    VT_ESTOP = 6,
-    VT_WIFI = 8,
-    VT_CAPTIVE_PORTAL = 10,
-    VT_BACKEND = 12,
-    VT_SERIAL_INPUT = 14,
-    VT_OTA_UPDATE = 16
+    VT_WIFI = 6,
+    VT_CAPTIVE_PORTAL = 8,
+    VT_BACKEND = 10,
+    VT_SERIAL_INPUT = 12,
+    VT_OTA_UPDATE = 14,
+    VT_ESTOP = 16
   };
   /// RF Transmitter configuration
   const OpenShock::Serialization::Configuration::RFConfig *rf() const {
     return GetPointer<const OpenShock::Serialization::Configuration::RFConfig *>(VT_RF);
-  }
-  /// E-Stop configuration
-  const OpenShock::Serialization::Configuration::EStopConfig *estop() const {
-    return GetPointer<const OpenShock::Serialization::Configuration::EStopConfig *>(VT_ESTOP);
   }
   /// WiFi configuration
   const OpenShock::Serialization::Configuration::WiFiConfig *wifi() const {
@@ -838,12 +834,14 @@ struct HubConfig FLATBUFFERS_FINAL_CLASS : private ::flatbuffers::Table {
   const OpenShock::Serialization::Configuration::OtaUpdateConfig *ota_update() const {
     return GetPointer<const OpenShock::Serialization::Configuration::OtaUpdateConfig *>(VT_OTA_UPDATE);
   }
+  /// E-Stop configuration
+  const OpenShock::Serialization::Configuration::EStopConfig *estop() const {
+    return GetPointer<const OpenShock::Serialization::Configuration::EStopConfig *>(VT_ESTOP);
+  }
   bool Verify(::flatbuffers::Verifier &verifier) const {
     return VerifyTableStart(verifier) &&
            VerifyOffset(verifier, VT_RF) &&
            verifier.VerifyTable(rf()) &&
-           VerifyOffset(verifier, VT_ESTOP) &&
-           verifier.VerifyTable(estop()) &&
            VerifyOffset(verifier, VT_WIFI) &&
            verifier.VerifyTable(wifi()) &&
            VerifyOffset(verifier, VT_CAPTIVE_PORTAL) &&
@@ -854,6 +852,8 @@ struct HubConfig FLATBUFFERS_FINAL_CLASS : private ::flatbuffers::Table {
            verifier.VerifyTable(serial_input()) &&
            VerifyOffset(verifier, VT_OTA_UPDATE) &&
            verifier.VerifyTable(ota_update()) &&
+           VerifyOffset(verifier, VT_ESTOP) &&
+           verifier.VerifyTable(estop()) &&
            verifier.EndTable();
   }
 };
@@ -864,9 +864,6 @@ struct HubConfigBuilder {
   ::flatbuffers::uoffset_t start_;
   void add_rf(::flatbuffers::Offset<OpenShock::Serialization::Configuration::RFConfig> rf) {
     fbb_.AddOffset(HubConfig::VT_RF, rf);
-  }
-  void add_estop(::flatbuffers::Offset<OpenShock::Serialization::Configuration::EStopConfig> estop) {
-    fbb_.AddOffset(HubConfig::VT_ESTOP, estop);
   }
   void add_wifi(::flatbuffers::Offset<OpenShock::Serialization::Configuration::WiFiConfig> wifi) {
     fbb_.AddOffset(HubConfig::VT_WIFI, wifi);
@@ -883,6 +880,9 @@ struct HubConfigBuilder {
   void add_ota_update(::flatbuffers::Offset<OpenShock::Serialization::Configuration::OtaUpdateConfig> ota_update) {
     fbb_.AddOffset(HubConfig::VT_OTA_UPDATE, ota_update);
   }
+  void add_estop(::flatbuffers::Offset<OpenShock::Serialization::Configuration::EStopConfig> estop) {
+    fbb_.AddOffset(HubConfig::VT_ESTOP, estop);
+  }
   explicit HubConfigBuilder(::flatbuffers::FlatBufferBuilder &_fbb)
         : fbb_(_fbb) {
     start_ = fbb_.StartTable();
@@ -897,19 +897,19 @@ struct HubConfigBuilder {
 inline ::flatbuffers::Offset<HubConfig> CreateHubConfig(
     ::flatbuffers::FlatBufferBuilder &_fbb,
     ::flatbuffers::Offset<OpenShock::Serialization::Configuration::RFConfig> rf = 0,
-    ::flatbuffers::Offset<OpenShock::Serialization::Configuration::EStopConfig> estop = 0,
     ::flatbuffers::Offset<OpenShock::Serialization::Configuration::WiFiConfig> wifi = 0,
     ::flatbuffers::Offset<OpenShock::Serialization::Configuration::CaptivePortalConfig> captive_portal = 0,
     ::flatbuffers::Offset<OpenShock::Serialization::Configuration::BackendConfig> backend = 0,
     ::flatbuffers::Offset<OpenShock::Serialization::Configuration::SerialInputConfig> serial_input = 0,
-    ::flatbuffers::Offset<OpenShock::Serialization::Configuration::OtaUpdateConfig> ota_update = 0) {
+    ::flatbuffers::Offset<OpenShock::Serialization::Configuration::OtaUpdateConfig> ota_update = 0,
+    ::flatbuffers::Offset<OpenShock::Serialization::Configuration::EStopConfig> estop = 0) {
   HubConfigBuilder builder_(_fbb);
+  builder_.add_estop(estop);
   builder_.add_ota_update(ota_update);
   builder_.add_serial_input(serial_input);
   builder_.add_backend(backend);
   builder_.add_captive_portal(captive_portal);
   builder_.add_wifi(wifi);
-  builder_.add_estop(estop);
   builder_.add_rf(rf);
   return builder_.Finish();
 }

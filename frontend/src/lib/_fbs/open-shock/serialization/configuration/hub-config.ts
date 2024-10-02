@@ -40,18 +40,10 @@ rf(obj?:RFConfig):RFConfig|null {
 }
 
 /**
- * E-Stop configuration
- */
-estop(obj?:EStopConfig):EStopConfig|null {
-  const offset = this.bb!.__offset(this.bb_pos, 6);
-  return offset ? (obj || new EStopConfig()).__init(this.bb!.__indirect(this.bb_pos + offset), this.bb!) : null;
-}
-
-/**
  * WiFi configuration
  */
 wifi(obj?:WiFiConfig):WiFiConfig|null {
-  const offset = this.bb!.__offset(this.bb_pos, 8);
+  const offset = this.bb!.__offset(this.bb_pos, 6);
   return offset ? (obj || new WiFiConfig()).__init(this.bb!.__indirect(this.bb_pos + offset), this.bb!) : null;
 }
 
@@ -59,7 +51,7 @@ wifi(obj?:WiFiConfig):WiFiConfig|null {
  * Captive portal configuration
  */
 captivePortal(obj?:CaptivePortalConfig):CaptivePortalConfig|null {
-  const offset = this.bb!.__offset(this.bb_pos, 10);
+  const offset = this.bb!.__offset(this.bb_pos, 8);
   return offset ? (obj || new CaptivePortalConfig()).__init(this.bb!.__indirect(this.bb_pos + offset), this.bb!) : null;
 }
 
@@ -67,7 +59,7 @@ captivePortal(obj?:CaptivePortalConfig):CaptivePortalConfig|null {
  * Backend configuration
  */
 backend(obj?:BackendConfig):BackendConfig|null {
-  const offset = this.bb!.__offset(this.bb_pos, 12);
+  const offset = this.bb!.__offset(this.bb_pos, 10);
   return offset ? (obj || new BackendConfig()).__init(this.bb!.__indirect(this.bb_pos + offset), this.bb!) : null;
 }
 
@@ -75,7 +67,7 @@ backend(obj?:BackendConfig):BackendConfig|null {
  * Serial input configuration
  */
 serialInput(obj?:SerialInputConfig):SerialInputConfig|null {
-  const offset = this.bb!.__offset(this.bb_pos, 14);
+  const offset = this.bb!.__offset(this.bb_pos, 12);
   return offset ? (obj || new SerialInputConfig()).__init(this.bb!.__indirect(this.bb_pos + offset), this.bb!) : null;
 }
 
@@ -83,8 +75,16 @@ serialInput(obj?:SerialInputConfig):SerialInputConfig|null {
  * OTA update configuration
  */
 otaUpdate(obj?:OtaUpdateConfig):OtaUpdateConfig|null {
-  const offset = this.bb!.__offset(this.bb_pos, 16);
+  const offset = this.bb!.__offset(this.bb_pos, 14);
   return offset ? (obj || new OtaUpdateConfig()).__init(this.bb!.__indirect(this.bb_pos + offset), this.bb!) : null;
+}
+
+/**
+ * E-Stop configuration
+ */
+estop(obj?:EStopConfig):EStopConfig|null {
+  const offset = this.bb!.__offset(this.bb_pos, 16);
+  return offset ? (obj || new EStopConfig()).__init(this.bb!.__indirect(this.bb_pos + offset), this.bb!) : null;
 }
 
 static startHubConfig(builder:flatbuffers.Builder) {
@@ -95,28 +95,28 @@ static addRf(builder:flatbuffers.Builder, rfOffset:flatbuffers.Offset) {
   builder.addFieldOffset(0, rfOffset, 0);
 }
 
-static addEstop(builder:flatbuffers.Builder, estopOffset:flatbuffers.Offset) {
-  builder.addFieldOffset(1, estopOffset, 0);
-}
-
 static addWifi(builder:flatbuffers.Builder, wifiOffset:flatbuffers.Offset) {
-  builder.addFieldOffset(2, wifiOffset, 0);
+  builder.addFieldOffset(1, wifiOffset, 0);
 }
 
 static addCaptivePortal(builder:flatbuffers.Builder, captivePortalOffset:flatbuffers.Offset) {
-  builder.addFieldOffset(3, captivePortalOffset, 0);
+  builder.addFieldOffset(2, captivePortalOffset, 0);
 }
 
 static addBackend(builder:flatbuffers.Builder, backendOffset:flatbuffers.Offset) {
-  builder.addFieldOffset(4, backendOffset, 0);
+  builder.addFieldOffset(3, backendOffset, 0);
 }
 
 static addSerialInput(builder:flatbuffers.Builder, serialInputOffset:flatbuffers.Offset) {
-  builder.addFieldOffset(5, serialInputOffset, 0);
+  builder.addFieldOffset(4, serialInputOffset, 0);
 }
 
 static addOtaUpdate(builder:flatbuffers.Builder, otaUpdateOffset:flatbuffers.Offset) {
-  builder.addFieldOffset(6, otaUpdateOffset, 0);
+  builder.addFieldOffset(5, otaUpdateOffset, 0);
+}
+
+static addEstop(builder:flatbuffers.Builder, estopOffset:flatbuffers.Offset) {
+  builder.addFieldOffset(6, estopOffset, 0);
 }
 
 static endHubConfig(builder:flatbuffers.Builder):flatbuffers.Offset {
