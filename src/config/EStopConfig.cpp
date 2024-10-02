@@ -20,8 +20,8 @@ void EStopConfig::ToDefault() {
 
 bool EStopConfig::FromFlatbuffers(const Serialization::Configuration::EStopConfig* config) {
   if (config == nullptr) {
-    OS_LOGE(TAG, "config is null");
-    return false;
+    ToDefault(); // Set to default if config is null
+    return true;
   }
 
   enabled = config->enabled();
@@ -44,8 +44,8 @@ flatbuffers::Offset<OpenShock::Serialization::Configuration::EStopConfig> EStopC
 
 bool EStopConfig::FromJSON(const cJSON* json) {
   if (json == nullptr) {
-    OS_LOGE(TAG, "json is null");
-    return false;
+    ToDefault(); // Set to default if config is null
+    return true;
   }
 
   if (cJSON_IsObject(json) == 0) {
