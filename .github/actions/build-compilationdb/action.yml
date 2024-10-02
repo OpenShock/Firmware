@@ -1,9 +1,6 @@
 name: build-compilationdb
 description: Builds the compilation database for the firmware for code analysis
 inputs:
-  board:
-    required: true
-    description: 'Board name to build'
   version:
     required: true
     description: 'Current firmware version'
@@ -37,7 +34,7 @@ runs:
     - name: Build firmware
       working-directory: .
       shell: bash
-      run: pio run -e ${{ inputs.board }} -t compiledb
+      run: pio run -e ci-build -t compiledb
       env:
         OPENSHOCK_FW_VERSION: ${{ inputs.version }}
         OPENSHOCK_FW_GIT_REF: ${{ github.ref }}
