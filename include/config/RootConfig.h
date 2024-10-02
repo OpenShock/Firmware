@@ -12,12 +12,12 @@
 namespace OpenShock::Config {
   struct RootConfig : public ConfigBase<Serialization::Configuration::HubConfig> {
     OpenShock::Config::RFConfig rf;
-    OpenShock::Config::EStopConfig estop;
     OpenShock::Config::WiFiConfig wifi;
     OpenShock::Config::CaptivePortalConfig captivePortal;
     OpenShock::Config::BackendConfig backend;
     OpenShock::Config::SerialInputConfig serialInput;
     OpenShock::Config::OtaUpdateConfig otaUpdate;
+    OpenShock::Config::EStopConfig estop;
 
     void ToDefault() override;
 

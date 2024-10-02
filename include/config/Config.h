@@ -38,20 +38,20 @@ namespace OpenShock::Config {
   void FactoryReset();
 
   bool GetRFConfig(RFConfig& out);
-  bool GetEStopConfig(EStopConfig& out);
   bool GetWiFiConfig(WiFiConfig& out);
   bool GetCaptivePortalConfig(CaptivePortalConfig& out);
   bool GetBackendConfig(BackendConfig& out);
   bool GetSerialInputConfig(SerialInputConfig& out);
   bool GetOtaUpdateConfig(OtaUpdateConfig& out);
+  bool GetEStop(EStopConfig& out);
 
   bool SetRFConfig(const RFConfig& config);
-  bool SetEStopConfig(const EStopConfig& config);
   bool SetWiFiConfig(const WiFiConfig& config);
   bool SetCaptivePortalConfig(const CaptivePortalConfig& config);
   bool SetBackendConfig(const BackendConfig& config);
   bool SetSerialInputConfig(const SerialInputConfig& config);
   bool SetOtaUpdateConfig(const OtaUpdateConfig& config);
+  bool SetEStop(const EStopConfig& config);
 
   bool GetWiFiCredentials(std::vector<WiFiCredentials>& out);
   bool GetWiFiCredentials(cJSON* array, bool withSensitiveData);
@@ -61,14 +61,6 @@ namespace OpenShock::Config {
   bool SetRFConfigTxPin(uint8_t txPin);
   bool GetRFConfigKeepAliveEnabled(bool& out);
   bool SetRFConfigKeepAliveEnabled(bool enabled);
-
-  bool GetEStopConfigEnabled(bool& out);
-  bool SetEStopConfigEnabled(bool enabled);
-  bool GetEStopConfigGpioPin(gpio_num_t& out);
-  bool SetEStopConfigGpioPin(gpio_num_t gpioPin);
-
-  bool GetSerialInputConfigEchoEnabled(bool& out);
-  bool SetSerialInputConfigEchoEnabled(bool enabled);
 
   bool AnyWiFiCredentials(std::function<bool(const Config::WiFiCredentials&)> predicate);
   uint8_t AddWiFiCredentials(std::string_view ssid, std::string_view password);
@@ -98,4 +90,9 @@ namespace OpenShock::Config {
   bool SetOtaUpdateId(int32_t updateId);
   bool GetOtaUpdateStep(OtaUpdateStep& out);
   bool SetOtaUpdateStep(OtaUpdateStep updateStep);
+
+  bool GetEStopEnabled(bool& out);
+  bool SetEStopEnabled(bool enabled);
+  bool GetEStopGpioPin(gpio_num_t& out);
+  bool SetEStopGpioPin(gpio_num_t gpioPin);
 }  // namespace OpenShock::Config

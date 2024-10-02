@@ -8,11 +8,6 @@ export interface RFConfig {
   keepaliveEnabled: boolean;
 }
 
-export interface EStopConfig {
-  enabled: boolean;
-  gpioPin: number;
-}
-
 export interface WifiCredentials {
   id: number;
   ssid: string;
@@ -48,14 +43,19 @@ export interface OtaUpdateConfig {
   requireManualApproval: boolean;
 }
 
+export interface EStopConfig {
+  enabled: boolean;
+  gpioPin: number;
+}
+
 export interface Config {
   rf: RFConfig;
-  estop: EStopConfig;
   wifi: WifiConfig;
   captivePortal: CaptivePortalConfig;
   backend: BackendConfig;
   serialInput: SerialInputConfig;
   otaUpdate: OtaUpdateConfig;
+  estop: EStopConfig;
 }
 
 function mapRfConfig(hubConfig: HubConfig): RFConfig {
@@ -68,19 +68,6 @@ function mapRfConfig(hubConfig: HubConfig): RFConfig {
   return {
     txPin,
     keepaliveEnabled,
-  };
-}
-
-function mapEstopConfig(hubConfig: HubConfig): EStopConfig {
-  const estop = hubConfig.estop();
-  if (!estop) throw new Error('hubConfig.estop is null');
-
-  const enabled = estop.enabled();
-  const gpioPin = estop.gpioPin();
-
-  return {
-    enabled,
-    gpioPin,
   };
 }
 
@@ -183,16 +170,29 @@ function mapOtaUpdateConfig(hubConfig: HubConfig): OtaUpdateConfig {
   };
 }
 
+function mapEstopConfig(hubConfig: HubConfig): EStopConfig {
+  const estop = hubConfig.estop();
+  if (!estop) throw new Error('hubConfig.estop is null');
+
+  const enabled = estop.enabled();
+  const gpioPin = estop.gpioPin();
+
+  return {
+    enabled,
+    gpioPin,
+  };
+}
+
 export function mapConfig(hubConfig: HubConfig | null): Config | null {
   if (!hubConfig) return null;
 
   return {
     rf: mapRfConfig(hubConfig),
-    estop: mapEstopConfig(hubConfig),
     wifi: mapWifiConfig(hubConfig),
     captivePortal: mapCaptivePortalConfig(hubConfig),
     backend: mapBackendConfig(hubConfig),
     serialInput: mapSerialInputConfig(hubConfig),
     otaUpdate: mapOtaUpdateConfig(hubConfig),
+    estop: mapEstopConfig(hubConfig),
   };
 }

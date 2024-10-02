@@ -250,14 +250,6 @@ bool Config::GetRFConfig(Config::RFConfig& out) {
   return true;
 }
 
-bool Config::GetEStopConfig(Config::EStopConfig& out) {
-  CONFIG_LOCK_READ(false);
-
-  out = _configData.estop;
-
-  return true;
-}
-
 bool Config::GetWiFiConfig(Config::WiFiConfig& out) {
   CONFIG_LOCK_READ(false);
 
@@ -294,6 +286,14 @@ bool Config::GetOtaUpdateConfig(Config::OtaUpdateConfig& out) {
   CONFIG_LOCK_READ(false);
 
   out = _configData.otaUpdate;
+
+  return true;
+}
+
+bool Config::GetEStop(Config::EStopConfig& out) {
+  CONFIG_LOCK_READ(false);
+
+  out = _configData.estop;
 
   return true;
 }
@@ -337,6 +337,13 @@ bool Config::SetOtaUpdateConfig(const Config::OtaUpdateConfig& config) {
   CONFIG_LOCK_WRITE(false);
 
   _configData.otaUpdate = config;
+  return _trySaveConfig();
+}
+
+bool Config::SetEStop(const Config::EStopConfig& config) {
+  CONFIG_LOCK_WRITE(false);
+
+  _configData.estop = config;
   return _trySaveConfig();
 }
 
@@ -400,41 +407,6 @@ bool Config::SetRFConfigKeepAliveEnabled(bool enabled) {
   CONFIG_LOCK_WRITE(false);
 
   _configData.rf.keepAliveEnabled = enabled;
-  return _trySaveConfig();
-}
-
-bool Config::GetEStopConfigEnabled(bool& out) {
-  CONFIG_LOCK_READ(false);
-
-  out = _configData.estop.enabled;
-
-  return true;
-}
-
-bool Config::SetEStopConfigEnabled(bool enabled) {
-  CONFIG_LOCK_WRITE(false);
-
-  _configData.estop.enabled = enabled;
-  return _trySaveConfig();
-}
-
-bool Config::GetEStopConfigGpioPin(gpio_num_t& out) {
-  CONFIG_LOCK_READ(false);
-
-  out = _configData.estop.gpioPin;
-
-  return true;
-}
-
-bool Config::SetEStopConfigGpioPin(gpio_num_t gpioPin) {
-  CONFIG_LOCK_WRITE(false);
-
-  if (!OpenShock::IsValidInputPin(gpioPin)) {
-    OS_LOGE(TAG, "Invalid EStop GPIO Pin: %d", gpioPin);
-    return false;
-  }
-
-  _configData.estop.gpioPin = gpioPin;
   return _trySaveConfig();
 }
 
@@ -692,5 +664,40 @@ bool Config::SetOtaUpdateStep(OtaUpdateStep updateStep) {
   }
 
   _configData.otaUpdate.updateStep = updateStep;
+  return _trySaveConfig();
+}
+
+bool Config::GetEStopEnabled(bool& out) {
+  CONFIG_LOCK_READ(false);
+
+  out = _configData.estop.enabled;
+
+  return true;
+}
+
+bool Config::SetEStopEnabled(bool enabled) {
+  CONFIG_LOCK_WRITE(false);
+
+  _configData.estop.enabled = enabled;
+  return _trySaveConfig();
+}
+
+bool Config::GetEStopGpioPin(gpio_num_t& out) {
+  CONFIG_LOCK_READ(false);
+
+  out = _configData.estop.gpioPin;
+
+  return true;
+}
+
+bool Config::SetEStopGpioPin(gpio_num_t gpioPin) {
+  CONFIG_LOCK_WRITE(false);
+
+  if (!OpenShock::IsValidInputPin(gpioPin)) {
+    OS_LOGE(TAG, "Invalid EStop GPIO Pin: %d", gpioPin);
+    return false;
+  }
+
+  _configData.estop.gpioPin = gpioPin;
   return _trySaveConfig();
 }

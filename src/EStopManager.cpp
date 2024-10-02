@@ -124,7 +124,7 @@ void _estopEdgeInterrupt(void* arg) {
 
 bool EStopManager::Init() {
   bool enabled = false;
-  if (!OpenShock::Config::GetEStopConfigEnabled(enabled)) {
+  if (!OpenShock::Config::GetEStopEnabled(enabled)) {
     OS_LOGE(TAG, "Failed to get EStop enabled from config");
     return false;
   }
@@ -134,7 +134,7 @@ bool EStopManager::Init() {
   }
 
   gpio_num_t pin = GPIO_NUM_NC;
-  if (!OpenShock::Config::GetEStopConfigGpioPin(pin)) {
+  if (!OpenShock::Config::GetEStopGpioPin(pin)) {
     OS_LOGE(TAG, "Failed to get EStop pin from config");
     return false;
   }

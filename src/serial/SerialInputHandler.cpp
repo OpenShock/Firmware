@@ -143,7 +143,7 @@ void _handleRfTxPinCommand(std::string_view arg, bool isAutomated) {
 void _handleEStopPinCommand(std::string_view arg, bool isAutomated) {
   if (arg.empty()) {
     gpio_num_t estopPin;
-    if (!Config::GetEStopConfigGpioPin(estopPin)) {
+    if (!Config::GetEStopGpioPin(estopPin)) {
       SERPR_ERROR("Failed to get EStop pin from config");
       return;
     }
@@ -166,7 +166,7 @@ void _handleEStopPinCommand(std::string_view arg, bool isAutomated) {
     return;
   }
 
-  if (!Config::SetEStopConfigGpioPin(estopPin)) {
+  if (!Config::SetEStopGpioPin(estopPin)) {
     SERPR_ERROR("Failed to save config");
     return;
   }

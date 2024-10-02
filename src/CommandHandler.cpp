@@ -198,7 +198,7 @@ bool CommandHandler::Init() {
   }
 
   Config::EStopConfig estopConfig;
-  if (!Config::GetEStopConfig(estopConfig)) {
+  if (!Config::GetEStop(estopConfig)) {
     OS_LOGE(TAG, "Failed to get EStop config");
     return false;
   }
@@ -257,7 +257,7 @@ SetGPIOResultCode CommandHandler::SetEstopPin(uint8_t estopPin) {
       return SetGPIOResultCode::InternalError;
     }
 
-    if (!Config::SetEStopConfigGpioPin(static_cast<gpio_num_t>(estopPin))) {
+    if (!Config::SetEStopGpioPin(static_cast<gpio_num_t>(estopPin))) {
       OS_LOGE(TAG, "Failed to set EStop pin in config");
 
       xSemaphoreGive(s_estopManagerMutex);
