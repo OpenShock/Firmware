@@ -19,8 +19,8 @@ void CaptivePortalConfig::ToDefault() {
 
 bool CaptivePortalConfig::FromFlatbuffers(const Serialization::Configuration::CaptivePortalConfig* config) {
   if (config == nullptr) {
-    OS_LOGE(TAG, "config is null");
-    return false;
+    ToDefault(); // Set to default if config is null
+    return true;
   }
 
   alwaysEnabled = config->always_enabled();
@@ -34,8 +34,8 @@ flatbuffers::Offset<OpenShock::Serialization::Configuration::CaptivePortalConfig
 
 bool CaptivePortalConfig::FromJSON(const cJSON* json) {
   if (json == nullptr) {
-    OS_LOGE(TAG, "json is null");
-    return false;
+    ToDefault(); // Set to default if config is null
+    return true;
   }
 
   if (cJSON_IsObject(json) == 0) {

@@ -19,8 +19,8 @@ void WiFiConfig::ToDefault() {
 
 bool WiFiConfig::FromFlatbuffers(const Serialization::Configuration::WiFiConfig* config) {
   if (config == nullptr) {
-    OS_LOGE(TAG, "config is null");
-    return false;
+    ToDefault(); // Set to default if config is null
+    return true;
   }
 
   Internal::Utils::FromFbsStr(accessPointSSID, config->ap_ssid(), OPENSHOCK_FW_AP_PREFIX);
@@ -43,8 +43,8 @@ flatbuffers::Offset<OpenShock::Serialization::Configuration::WiFiConfig> WiFiCon
 
 bool WiFiConfig::FromJSON(const cJSON* json) {
   if (json == nullptr) {
-    OS_LOGE(TAG, "json is null");
-    return false;
+    ToDefault(); // Set to default if config is null
+    return true;
   }
 
   if (cJSON_IsObject(json) == 0) {

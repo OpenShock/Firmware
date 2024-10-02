@@ -19,8 +19,8 @@ void RFConfig::ToDefault() {
 
 bool RFConfig::FromFlatbuffers(const Serialization::Configuration::RFConfig* config) {
   if (config == nullptr) {
-    OS_LOGE(TAG, "config is null");
-    return false;
+    ToDefault(); // Set to default if config is null
+    return true;
   }
 
   txPin            = config->tx_pin();
@@ -35,8 +35,8 @@ flatbuffers::Offset<OpenShock::Serialization::Configuration::RFConfig> RFConfig:
 
 bool RFConfig::FromJSON(const cJSON* json) {
   if (json == nullptr) {
-    OS_LOGE(TAG, "json is null");
-    return false;
+    ToDefault(); // Set to default if config is null
+    return true;
   }
 
   if (cJSON_IsObject(json) == 0) {

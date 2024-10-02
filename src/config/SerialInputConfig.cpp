@@ -19,8 +19,8 @@ void SerialInputConfig::ToDefault() {
 
 bool SerialInputConfig::FromFlatbuffers(const Serialization::Configuration::SerialInputConfig* config) {
   if (config == nullptr) {
-    OS_LOGE(TAG, "config is null");
-    return false;
+    ToDefault(); // Set to default if config is null
+    return true;
   }
 
   echoEnabled = config->echo_enabled();
@@ -34,8 +34,8 @@ flatbuffers::Offset<OpenShock::Serialization::Configuration::SerialInputConfig> 
 
 bool SerialInputConfig::FromJSON(const cJSON* json) {
   if (json == nullptr) {
-    OS_LOGE(TAG, "json is null");
-    return false;
+    ToDefault(); // Set to default if config is null
+    return true;
   }
 
   if (cJSON_IsObject(json) == 0) {
