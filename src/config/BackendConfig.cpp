@@ -18,8 +18,8 @@ void BackendConfig::ToDefault() {
 
 bool BackendConfig::FromFlatbuffers(const Serialization::Configuration::BackendConfig* config) {
   if (config == nullptr) {
-    OS_LOGE(TAG, "config is null");
-    return false;
+    ToDefault(); // Set to default if config is null
+    return true;
   }
 
   Internal::Utils::FromFbsStr(domain, config->domain(), OPENSHOCK_API_DOMAIN);
@@ -46,8 +46,8 @@ flatbuffers::Offset<OpenShock::Serialization::Configuration::BackendConfig> Back
 
 bool BackendConfig::FromJSON(const cJSON* json) {
   if (json == nullptr) {
-    OS_LOGE(TAG, "json is null");
-    return false;
+    ToDefault(); // Set to default if config is null
+    return true;
   }
 
   if (cJSON_IsObject(json) == 0) {

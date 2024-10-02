@@ -20,8 +20,8 @@ void WiFiCredentials::ToDefault() {
 
 bool WiFiCredentials::FromFlatbuffers(const Serialization::Configuration::WiFiCredentials* config) {
   if (config == nullptr) {
-    OS_LOGE(TAG, "config is null");
-    return false;
+    ToDefault(); // Set to default if config is null
+    return true;
   }
 
   id = config->id();
@@ -51,8 +51,8 @@ flatbuffers::Offset<OpenShock::Serialization::Configuration::WiFiCredentials> Wi
 
 bool WiFiCredentials::FromJSON(const cJSON* json) {
   if (json == nullptr) {
-    OS_LOGE(TAG, "json is null");
-    return false;
+    ToDefault(); // Set to default if config is null
+    return true;
   }
 
   if (cJSON_IsObject(json) == 0) {

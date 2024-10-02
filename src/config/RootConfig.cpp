@@ -17,8 +17,8 @@ void RootConfig::ToDefault() {
 
 bool RootConfig::FromFlatbuffers(const Serialization::Configuration::HubConfig* config) {
   if (config == nullptr) {
-    OS_LOGE(TAG, "config is null");
-    return false;
+    ToDefault(); // Set to default if config is null
+    return true;
   }
 
   if (!rf.FromFlatbuffers(config->rf())) {
@@ -67,8 +67,8 @@ flatbuffers::Offset<OpenShock::Serialization::Configuration::HubConfig> RootConf
 
 bool RootConfig::FromJSON(const cJSON* json) {
   if (json == nullptr) {
-    OS_LOGE(TAG, "json is null");
-    return false;
+    ToDefault(); // Set to default if config is null
+    return true;
   }
 
   if (cJSON_IsObject(json) == 0) {
