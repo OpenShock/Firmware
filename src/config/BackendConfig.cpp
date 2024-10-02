@@ -7,18 +7,30 @@ const char* const TAG = "Config::BackendConfig";
 
 using namespace OpenShock::Config;
 
-BackendConfig::BackendConfig() : domain(OPENSHOCK_API_DOMAIN), authToken(), lcgOverride() { }
+BackendConfig::BackendConfig()
+  : domain(OPENSHOCK_API_DOMAIN)
+  , authToken()
+  , lcgOverride()
+{
+}
 
-BackendConfig::BackendConfig(std::string_view domain, std::string_view authToken, std::string_view lcgOverride) : domain(std::string(domain)), authToken(std::string(authToken)), lcgOverride(std::string(lcgOverride)) { }
+BackendConfig::BackendConfig(std::string_view domain, std::string_view authToken, std::string_view lcgOverride)
+  : domain(domain)
+  , authToken(authToken)
+  , lcgOverride(lcgOverride)
+{
+}
 
 void BackendConfig::ToDefault() {
   domain = OPENSHOCK_API_DOMAIN;
   authToken.clear();
+  lcgOverride.clear();
 }
 
 bool BackendConfig::FromFlatbuffers(const Serialization::Configuration::BackendConfig* config) {
   if (config == nullptr) {
-    ToDefault(); // Set to default if config is null
+    OS_LOGW(TAG, "Config is null, setting to default");
+    ToDefault();
     return true;
   }
 
@@ -46,7 +58,8 @@ flatbuffers::Offset<OpenShock::Serialization::Configuration::BackendConfig> Back
 
 bool BackendConfig::FromJSON(const cJSON* json) {
   if (json == nullptr) {
-    ToDefault(); // Set to default if config is null
+    OS_LOGW(TAG, "Config is null, setting to default");
+    ToDefault();
     return true;
   }
 
