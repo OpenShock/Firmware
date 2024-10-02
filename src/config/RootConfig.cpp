@@ -6,6 +6,16 @@ const char* const TAG = "Config::RootConfig";
 
 using namespace OpenShock::Config;
 
+RootConfig::RootConfig()
+  : rf()
+  , wifi()
+  , captivePortal()
+  , backend()
+  , serialInput()
+  , otaUpdate()
+{
+}
+
 void RootConfig::ToDefault() {
   rf.ToDefault();
   wifi.ToDefault();
@@ -17,7 +27,8 @@ void RootConfig::ToDefault() {
 
 bool RootConfig::FromFlatbuffers(const Serialization::Configuration::HubConfig* config) {
   if (config == nullptr) {
-    ToDefault(); // Set to default if config is null
+    OS_LOGW(TAG, "Config is null, setting to default");
+    ToDefault();
     return true;
   }
 
@@ -67,7 +78,8 @@ flatbuffers::Offset<OpenShock::Serialization::Configuration::HubConfig> RootConf
 
 bool RootConfig::FromJSON(const cJSON* json) {
   if (json == nullptr) {
-    ToDefault(); // Set to default if config is null
+    OS_LOGW(TAG, "Config is null, setting to default");
+    ToDefault();
     return true;
   }
 

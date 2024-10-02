@@ -10,6 +10,8 @@
 
 namespace OpenShock::Config {
   struct RootConfig : public ConfigBase<Serialization::Configuration::HubConfig> {
+    RootConfig();
+
     OpenShock::Config::RFConfig rf;
     OpenShock::Config::WiFiConfig wifi;
     OpenShock::Config::CaptivePortalConfig captivePortal;
