@@ -7,10 +7,14 @@ const char* const TAG = "Config::CaptivePortalConfig";
 
 using namespace OpenShock::Config;
 
-CaptivePortalConfig::CaptivePortalConfig() : alwaysEnabled(false) { }
+CaptivePortalConfig::CaptivePortalConfig()
+  : alwaysEnabled(false)
+{
+}
 
-CaptivePortalConfig::CaptivePortalConfig(bool alwaysEnabled) {
-  this->alwaysEnabled = alwaysEnabled;
+CaptivePortalConfig::CaptivePortalConfig(bool alwaysEnabled)
+  : alwaysEnabled(alwaysEnabled)
+{
 }
 
 void CaptivePortalConfig::ToDefault() {
@@ -19,8 +23,9 @@ void CaptivePortalConfig::ToDefault() {
 
 bool CaptivePortalConfig::FromFlatbuffers(const Serialization::Configuration::CaptivePortalConfig* config) {
   if (config == nullptr) {
-    OS_LOGE(TAG, "config is null");
-    return false;
+    OS_LOGW(TAG, "Config is null, setting to default");
+    ToDefault();
+    return true;
   }
 
   alwaysEnabled = config->always_enabled();
@@ -34,8 +39,9 @@ flatbuffers::Offset<OpenShock::Serialization::Configuration::CaptivePortalConfig
 
 bool CaptivePortalConfig::FromJSON(const cJSON* json) {
   if (json == nullptr) {
-    OS_LOGE(TAG, "json is null");
-    return false;
+    OS_LOGW(TAG, "Config is null, setting to default");
+    ToDefault();
+    return true;
   }
 
   if (cJSON_IsObject(json) == 0) {

@@ -70,11 +70,6 @@ jobs:
       language: 'c-cpp'
       OPENSHOCK_FW_VERSION: ${{ needs.get-vars.outputs.version }}
 
-    strategy:
-      fail-fast: false
-      matrix:
-        board: ${{ fromJson(needs.get-vars.outputs.board-array) }}
-
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -86,7 +81,7 @@ jobs:
 
       - uses: ./.github/actions/build-firmware
         with:
-          board: ${{ matrix.board }}
+          board: ci-build
           skip-checkout: true
 
       - name: Perform CodeQL Analysis

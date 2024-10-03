@@ -16,18 +16,36 @@ export class AccountLinkCommandResult {
   return this;
 }
 
+static getRootAsAccountLinkCommandResult(bb:flatbuffers.ByteBuffer, obj?:AccountLinkCommandResult):AccountLinkCommandResult {
+  return (obj || new AccountLinkCommandResult()).__init(bb.readInt32(bb.position()) + bb.position(), bb);
+}
+
+static getSizePrefixedRootAsAccountLinkCommandResult(bb:flatbuffers.ByteBuffer, obj?:AccountLinkCommandResult):AccountLinkCommandResult {
+  bb.setPosition(bb.position() + flatbuffers.SIZE_PREFIX_LENGTH);
+  return (obj || new AccountLinkCommandResult()).__init(bb.readInt32(bb.position()) + bb.position(), bb);
+}
+
 result():AccountLinkResultCode {
-  return this.bb!.readUint8(this.bb_pos);
+  const offset = this.bb!.__offset(this.bb_pos, 4);
+  return offset ? this.bb!.readUint8(this.bb_pos + offset) : AccountLinkResultCode.Success;
 }
 
-static sizeOf():number {
-  return 1;
+static startAccountLinkCommandResult(builder:flatbuffers.Builder) {
+  builder.startObject(1);
 }
 
-static createAccountLinkCommandResult(builder:flatbuffers.Builder, result: AccountLinkResultCode):flatbuffers.Offset {
-  builder.prep(1, 1);
-  builder.writeInt8(result);
-  return builder.offset();
+static addResult(builder:flatbuffers.Builder, result:AccountLinkResultCode) {
+  builder.addFieldInt8(0, result, AccountLinkResultCode.Success);
 }
 
+static endAccountLinkCommandResult(builder:flatbuffers.Builder):flatbuffers.Offset {
+  const offset = builder.endObject();
+  return offset;
+}
+
+static createAccountLinkCommandResult(builder:flatbuffers.Builder, result:AccountLinkResultCode):flatbuffers.Offset {
+  AccountLinkCommandResult.startAccountLinkCommandResult(builder);
+  AccountLinkCommandResult.addResult(builder, result);
+  return AccountLinkCommandResult.endAccountLinkCommandResult(builder);
+}
 }

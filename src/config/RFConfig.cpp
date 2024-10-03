@@ -8,9 +8,17 @@ const char* const TAG = "Config::RFConfig";
 
 using namespace OpenShock::Config;
 
-RFConfig::RFConfig() : txPin(OPENSHOCK_RF_TX_GPIO), keepAliveEnabled(true) { }
+RFConfig::RFConfig()
+  : txPin(OPENSHOCK_RF_TX_GPIO)
+  , keepAliveEnabled(true)
+{
+}
 
-RFConfig::RFConfig(uint8_t txPin, bool keepAliveEnabled) : txPin(txPin), keepAliveEnabled(keepAliveEnabled) { }
+RFConfig::RFConfig(uint8_t txPin, bool keepAliveEnabled)
+  : txPin(txPin)
+  , keepAliveEnabled(keepAliveEnabled)
+{
+}
 
 void RFConfig::ToDefault() {
   txPin            = OPENSHOCK_RF_TX_GPIO;
@@ -19,8 +27,9 @@ void RFConfig::ToDefault() {
 
 bool RFConfig::FromFlatbuffers(const Serialization::Configuration::RFConfig* config) {
   if (config == nullptr) {
-    OS_LOGE(TAG, "config is null");
-    return false;
+    OS_LOGW(TAG, "Config is null, setting to default");
+    ToDefault();
+    return true;
   }
 
   txPin            = config->tx_pin();
@@ -35,8 +44,9 @@ flatbuffers::Offset<OpenShock::Serialization::Configuration::RFConfig> RFConfig:
 
 bool RFConfig::FromJSON(const cJSON* json) {
   if (json == nullptr) {
-    OS_LOGE(TAG, "json is null");
-    return false;
+    OS_LOGW(TAG, "Config is null, setting to default");
+    ToDefault();
+    return true;
   }
 
   if (cJSON_IsObject(json) == 0) {

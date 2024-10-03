@@ -13,18 +13,36 @@ export class OtaUpdateSetIsEnabledCommand {
   return this;
 }
 
+static getRootAsOtaUpdateSetIsEnabledCommand(bb:flatbuffers.ByteBuffer, obj?:OtaUpdateSetIsEnabledCommand):OtaUpdateSetIsEnabledCommand {
+  return (obj || new OtaUpdateSetIsEnabledCommand()).__init(bb.readInt32(bb.position()) + bb.position(), bb);
+}
+
+static getSizePrefixedRootAsOtaUpdateSetIsEnabledCommand(bb:flatbuffers.ByteBuffer, obj?:OtaUpdateSetIsEnabledCommand):OtaUpdateSetIsEnabledCommand {
+  bb.setPosition(bb.position() + flatbuffers.SIZE_PREFIX_LENGTH);
+  return (obj || new OtaUpdateSetIsEnabledCommand()).__init(bb.readInt32(bb.position()) + bb.position(), bb);
+}
+
 enabled():boolean {
-  return !!this.bb!.readInt8(this.bb_pos);
+  const offset = this.bb!.__offset(this.bb_pos, 4);
+  return offset ? !!this.bb!.readInt8(this.bb_pos + offset) : false;
 }
 
-static sizeOf():number {
-  return 1;
+static startOtaUpdateSetIsEnabledCommand(builder:flatbuffers.Builder) {
+  builder.startObject(1);
 }
 
-static createOtaUpdateSetIsEnabledCommand(builder:flatbuffers.Builder, enabled: boolean):flatbuffers.Offset {
-  builder.prep(1, 1);
-  builder.writeInt8(Number(Boolean(enabled)));
-  return builder.offset();
+static addEnabled(builder:flatbuffers.Builder, enabled:boolean) {
+  builder.addFieldInt8(0, +enabled, +false);
 }
 
+static endOtaUpdateSetIsEnabledCommand(builder:flatbuffers.Builder):flatbuffers.Offset {
+  const offset = builder.endObject();
+  return offset;
+}
+
+static createOtaUpdateSetIsEnabledCommand(builder:flatbuffers.Builder, enabled:boolean):flatbuffers.Offset {
+  OtaUpdateSetIsEnabledCommand.startOtaUpdateSetIsEnabledCommand(builder);
+  OtaUpdateSetIsEnabledCommand.addEnabled(builder, enabled);
+  return OtaUpdateSetIsEnabledCommand.endOtaUpdateSetIsEnabledCommand(builder);
+}
 }

@@ -4,6 +4,7 @@
 
 const char* const TAG = "EStopManager";
 
+#include "Chipset.h"
 #include "CommandHandler.h"
 #include "config/Config.h"
 #include "Logging.h"
@@ -23,11 +24,11 @@ const uint32_t k_estopDebounceTime    = 100;
 static TaskHandle_t s_estopEventHandlerTask;
 static QueueHandle_t s_estopEventQueue;
 
-static bool s_estopActive              = false;
-static bool s_estopAwaitingRelease     = false;
-static int64_t s_estopActivatedAt = 0;
+static bool s_estopActive          = false;
+static bool s_estopAwaitingRelease = false;
+static int64_t s_estopActivatedAt  = 0;
 
-static gpio_num_t s_estopPin;
+static gpio_num_t s_estopPin = GPIO_NUM_NC;
 
 struct EstopEventQueueMessage {
   bool pressed              : 1;
@@ -90,8 +91,8 @@ void _estopEdgeInterrupt(void* arg) {
   // TODO: Allow active HIGH EStops?
   bool pressed = gpio_get_level(s_estopPin) == 0;
 
-  bool deactivatesAtChanged  = false;
-  int64_t deactivatesAt = 0;
+  bool deactivatesAtChanged = false;
+  int64_t deactivatesAt     = 0;
 
   if (!s_estopActive && pressed) {
     s_estopActive      = true;
@@ -121,40 +122,100 @@ void _estopEdgeInterrupt(void* arg) {
   }
 }
 
-void EStopManager::Init() {
-#ifdef OPENSHOCK_ESTOP_PIN
-  s_estopPin = static_cast<gpio_num_t>(OPENSHOCK_ESTOP_PIN);
+bool EStopManager::Init() {
+  bool enabled = false;
+  if (!OpenShock::Config::GetEStopEnabled(enabled)) {
+    OS_LOGE(TAG, "Failed to get EStop enabled from config");
+    return false;
+  }
+  if (!enabled) {
+    OS_LOGI(TAG, "EStop disabled in config");
+    return true;  // TODO: If we never initialize the EStop, how do we do this later for enabling/disabling?
+  }
 
-  OS_LOGI(TAG, "Initializing on pin %hhi", static_cast<int8_t>(s_estopPin));
+  gpio_num_t pin = GPIO_NUM_NC;
+  if (!OpenShock::Config::GetEStopGpioPin(pin)) {
+    OS_LOGE(TAG, "Failed to get EStop pin from config");
+    return false;
+  }
 
-  gpio_config_t io_conf;
-  io_conf.pin_bit_mask = 1ULL << s_estopPin;
-  io_conf.pull_down_en = GPIO_PULLDOWN_DISABLE;
-  io_conf.pull_up_en   = GPIO_PULLUP_ENABLE;
-  io_conf.mode         = GPIO_MODE_INPUT;
-  io_conf.intr_type    = GPIO_INTR_ANYEDGE;
-  gpio_config(&io_conf);
+  OS_LOGI(TAG, "Initializing on pin %hhi", static_cast<int8_t>(pin));
 
   // TODO?: Should we maybe use statically allocated queues and timers? See CreateStatic for both.
   s_estopEventQueue = xQueueCreate(8, sizeof(EstopEventQueueMessage));
 
-  esp_err_t err = gpio_install_isr_service(ESP_INTR_FLAG_EDGE);
-  if (err != ESP_OK && err != ESP_ERR_INVALID_STATE) {  // ESP_ERR_INVALID_STATE is fine, it just means the ISR service is already installed
-    OS_PANIC(TAG, "Failed to install EStop ISR service");
-  }
-
-  err = gpio_isr_handler_add(s_estopPin, _estopEdgeInterrupt, nullptr);
-  if (err != ESP_OK) {
-    OS_PANIC(TAG, "Failed to add EStop ISR handler");
+  if (!EStopManager::SetEStopPin(pin)) {
+    OS_LOGE(TAG, "Failed to set EStop pin");
+    return false;
   }
 
   if (TaskUtils::TaskCreateUniversal(_estopEventHandler, TAG, 4096, nullptr, 5, &s_estopEventHandlerTask, 1) != pdPASS) {
-    OS_PANIC(TAG, "Failed to create EStop event handler task");
+    OS_LOGE(TAG, "Failed to create EStop event handler task");
+    return false;
   }
 
-#else
-  OS_LOGI(TAG, "EStopManager disabled, no pin defined");
-#endif
+  return true;
+}
+
+bool EStopManager::SetEStopEnabled(bool enabled) {
+  // TODO: Implement
+
+  return true;
+}
+
+bool EStopManager::SetEStopPin(gpio_num_t pin) {
+  if (!OpenShock::IsValidInputPin(pin)) {
+    OS_LOGE(TAG, "Invalid EStop pin: %hhi", static_cast<int8_t>(pin));
+    return false;
+  }
+
+  esp_err_t err = gpio_install_isr_service(ESP_INTR_FLAG_EDGE);
+  if (err != ESP_OK && err != ESP_ERR_INVALID_STATE) {  // ESP_ERR_INVALID_STATE is fine, it just means the ISR service is already installed
+    OS_LOGE(TAG, "Failed to install EStop ISR service");
+    return false;
+  }
+
+  // Configure the new pin
+  gpio_config_t io_conf;
+  io_conf.pin_bit_mask = 1ULL << pin;
+  io_conf.pull_down_en = GPIO_PULLDOWN_DISABLE;
+  io_conf.pull_up_en   = GPIO_PULLUP_ENABLE;
+  io_conf.mode         = GPIO_MODE_INPUT;
+  io_conf.intr_type    = GPIO_INTR_ANYEDGE;
+  if (gpio_config(&io_conf) != ESP_OK) {
+    OS_LOGE(TAG, "Failed to configure EStop pin");
+    return false;
+  }
+
+  // Add the new interrupt
+  err = gpio_isr_handler_add(pin, _estopEdgeInterrupt, nullptr);
+  if (err != ESP_OK) {
+    OS_LOGE(TAG, "Failed to add EStop ISR handler");
+    return false;
+  }
+
+  gpio_num_t oldPin = s_estopPin;
+
+  // Set the new pin
+  s_estopPin = pin;
+
+  if (oldPin != GPIO_NUM_NC) {
+    // Remove the old interrupt
+    esp_err_t err = gpio_isr_handler_remove(oldPin);
+    if (err != ESP_OK) {
+      OS_LOGE(TAG, "Failed to remove old EStop ISR handler");
+      return false;
+    }
+
+    // Reset the old pin
+    err = gpio_reset_pin(oldPin);
+    if (err != ESP_OK) {
+      OS_LOGE(TAG, "Failed to reset old EStop pin");
+      return false;
+    }
+  }
+
+  return true;
 }
 
 bool EStopManager::IsEStopped() {

@@ -17,3 +17,4 @@ data/www
 .vs
 packages
 *.sln
+compile_commands.json

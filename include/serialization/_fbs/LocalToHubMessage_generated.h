@@ -18,6 +18,7 @@ namespace Serialization {
 namespace Local {
 
 struct WifiScanCommand;
+struct WifiScanCommandBuilder;
 
 struct WifiNetworkSaveCommand;
 struct WifiNetworkSaveCommandBuilder;
@@ -29,8 +30,10 @@ struct WifiNetworkConnectCommand;
 struct WifiNetworkConnectCommandBuilder;
 
 struct WifiNetworkDisconnectCommand;
+struct WifiNetworkDisconnectCommandBuilder;
 
 struct OtaUpdateSetIsEnabledCommand;
+struct OtaUpdateSetIsEnabledCommandBuilder;
 
 struct OtaUpdateSetDomainCommand;
 struct OtaUpdateSetDomainCommandBuilder;
@@ -39,12 +42,16 @@ struct OtaUpdateSetUpdateChannelCommand;
 struct OtaUpdateSetUpdateChannelCommandBuilder;
 
 struct OtaUpdateSetCheckIntervalCommand;
+struct OtaUpdateSetCheckIntervalCommandBuilder;
 
 struct OtaUpdateSetAllowBackendManagementCommand;
+struct OtaUpdateSetAllowBackendManagementCommandBuilder;
 
 struct OtaUpdateSetRequireManualApprovalCommand;
+struct OtaUpdateSetRequireManualApprovalCommandBuilder;
 
 struct OtaUpdateHandleUpdateRequestCommand;
+struct OtaUpdateHandleUpdateRequestCommandBuilder;
 
 struct OtaUpdateCheckForUpdatesCommand;
 struct OtaUpdateCheckForUpdatesCommandBuilder;
@@ -56,8 +63,16 @@ struct AccountLinkCommand;
 struct AccountLinkCommandBuilder;
 
 struct AccountUnlinkCommand;
+struct AccountUnlinkCommandBuilder;
 
 struct SetRfTxPinCommand;
+struct SetRfTxPinCommandBuilder;
+
+struct SetEstopEnabledCommand;
+struct SetEstopEnabledCommandBuilder;
+
+struct SetEstopPinCommand;
+struct SetEstopPinCommandBuilder;
 
 struct LocalToHubMessage;
 struct LocalToHubMessageBuilder;
@@ -81,11 +96,13 @@ enum class LocalToHubMessagePayload : uint8_t {
   AccountLinkCommand = 15,
   AccountUnlinkCommand = 16,
   SetRfTxPinCommand = 17,
+  SetEstopEnabledCommand = 18,
+  SetEstopPinCommand = 19,
   MIN = NONE,
-  MAX = SetRfTxPinCommand
+  MAX = SetEstopPinCommand
 };
 
-inline const LocalToHubMessagePayload (&EnumValuesLocalToHubMessagePayload())[18] {
+inline const LocalToHubMessagePayload (&EnumValuesLocalToHubMessagePayload())[20] {
   static const LocalToHubMessagePayload values[] = {
     LocalToHubMessagePayload::NONE,
     LocalToHubMessagePayload::WifiScanCommand,
@@ -104,13 +121,15 @@ inline const LocalToHubMessagePayload (&EnumValuesLocalToHubMessagePayload())[18
     LocalToHubMessagePayload::OtaUpdateStartUpdateCommand,
     LocalToHubMessagePayload::AccountLinkCommand,
     LocalToHubMessagePayload::AccountUnlinkCommand,
-    LocalToHubMessagePayload::SetRfTxPinCommand
+    LocalToHubMessagePayload::SetRfTxPinCommand,
+    LocalToHubMessagePayload::SetEstopEnabledCommand,
+    LocalToHubMessagePayload::SetEstopPinCommand
   };
   return values;
 }
 
 inline const char * const *EnumNamesLocalToHubMessagePayload() {
-  static const char * const names[19] = {
+  static const char * const names[21] = {
     "NONE",
     "WifiScanCommand",
     "WifiNetworkSaveCommand",
@@ -129,13 +148,15 @@ inline const char * const *EnumNamesLocalToHubMessagePayload() {
     "AccountLinkCommand",
     "AccountUnlinkCommand",
     "SetRfTxPinCommand",
+    "SetEstopEnabledCommand",
+    "SetEstopPinCommand",
     nullptr
   };
   return names;
 }
 
 inline const char *EnumNameLocalToHubMessagePayload(LocalToHubMessagePayload e) {
-  if (::flatbuffers::IsOutRange(e, LocalToHubMessagePayload::NONE, LocalToHubMessagePayload::SetRfTxPinCommand)) return "";
+  if (::flatbuffers::IsOutRange(e, LocalToHubMessagePayload::NONE, LocalToHubMessagePayload::SetEstopPinCommand)) return "";
   const size_t index = static_cast<size_t>(e);
   return EnumNamesLocalToHubMessagePayload()[index];
 }
@@ -212,232 +233,65 @@ template<> struct LocalToHubMessagePayloadTraits<OpenShock::Serialization::Local
   static const LocalToHubMessagePayload enum_value = LocalToHubMessagePayload::SetRfTxPinCommand;
 };
 
+template<> struct LocalToHubMessagePayloadTraits<OpenShock::Serialization::Local::SetEstopEnabledCommand> {
+  static const LocalToHubMessagePayload enum_value = LocalToHubMessagePayload::SetEstopEnabledCommand;
+};
+
+template<> struct LocalToHubMessagePayloadTraits<OpenShock::Serialization::Local::SetEstopPinCommand> {
+  static const LocalToHubMessagePayload enum_value = LocalToHubMessagePayload::SetEstopPinCommand;
+};
+
 bool VerifyLocalToHubMessagePayload(::flatbuffers::Verifier &verifier, const void *obj, LocalToHubMessagePayload type);
 bool VerifyLocalToHubMessagePayloadVector(::flatbuffers::Verifier &verifier, const ::flatbuffers::Vector<::flatbuffers::Offset<void>> *values, const ::flatbuffers::Vector<LocalToHubMessagePayload> *types);
 
-FLATBUFFERS_MANUALLY_ALIGNED_STRUCT(1) WifiScanCommand FLATBUFFERS_FINAL_CLASS {
- private:
-  uint8_t run_;
-
- public:
+struct WifiScanCommand FLATBUFFERS_FINAL_CLASS : private ::flatbuffers::Table {
+  typedef WifiScanCommandBuilder Builder;
   struct Traits;
   static FLATBUFFERS_CONSTEXPR_CPP11 const char *GetFullyQualifiedName() {
     return "OpenShock.Serialization.Local.WifiScanCommand";
   }
-  WifiScanCommand()
-      : run_(0) {
-  }
-  WifiScanCommand(bool _run)
-      : run_(::flatbuffers::EndianScalar(static_cast<uint8_t>(_run))) {
-  }
+  enum FlatBuffersVTableOffset FLATBUFFERS_VTABLE_UNDERLYING_TYPE {
+    VT_RUN = 4
+  };
   bool run() const {
-    return ::flatbuffers::EndianScalar(run_) != 0;
+    return GetField<uint8_t>(VT_RUN, 0) != 0;
+  }
+  bool Verify(::flatbuffers::Verifier &verifier) const {
+    return VerifyTableStart(verifier) &&
+           VerifyField<uint8_t>(verifier, VT_RUN, 1) &&
+           verifier.EndTable();
   }
 };
-FLATBUFFERS_STRUCT_END(WifiScanCommand, 1);
+
+struct WifiScanCommandBuilder {
+  typedef WifiScanCommand Table;
+  ::flatbuffers::FlatBufferBuilder &fbb_;
+  ::flatbuffers::uoffset_t start_;
+  void add_run(bool run) {
+    fbb_.AddElement<uint8_t>(WifiScanCommand::VT_RUN, static_cast<uint8_t>(run), 0);
+  }
+  explicit WifiScanCommandBuilder(::flatbuffers::FlatBufferBuilder &_fbb)
+        : fbb_(_fbb) {
+    start_ = fbb_.StartTable();
+  }
+  ::flatbuffers::Offset<WifiScanCommand> Finish() {
+    const auto end = fbb_.EndTable(start_);
+    auto o = ::flatbuffers::Offset<WifiScanCommand>(end);
+    return o;
+  }
+};
+
+inline ::flatbuffers::Offset<WifiScanCommand> CreateWifiScanCommand(
+    ::flatbuffers::FlatBufferBuilder &_fbb,
+    bool run = false) {
+  WifiScanCommandBuilder builder_(_fbb);
+  builder_.add_run(run);
+  return builder_.Finish();
+}
 
 struct WifiScanCommand::Traits {
   using type = WifiScanCommand;
-};
-
-FLATBUFFERS_MANUALLY_ALIGNED_STRUCT(1) WifiNetworkDisconnectCommand FLATBUFFERS_FINAL_CLASS {
- private:
-  uint8_t placeholder_;
-
- public:
-  struct Traits;
-  static FLATBUFFERS_CONSTEXPR_CPP11 const char *GetFullyQualifiedName() {
-    return "OpenShock.Serialization.Local.WifiNetworkDisconnectCommand";
-  }
-  WifiNetworkDisconnectCommand()
-      : placeholder_(0) {
-  }
-  WifiNetworkDisconnectCommand(bool _placeholder)
-      : placeholder_(::flatbuffers::EndianScalar(static_cast<uint8_t>(_placeholder))) {
-  }
-  bool placeholder() const {
-    return ::flatbuffers::EndianScalar(placeholder_) != 0;
-  }
-};
-FLATBUFFERS_STRUCT_END(WifiNetworkDisconnectCommand, 1);
-
-struct WifiNetworkDisconnectCommand::Traits {
-  using type = WifiNetworkDisconnectCommand;
-};
-
-FLATBUFFERS_MANUALLY_ALIGNED_STRUCT(1) OtaUpdateSetIsEnabledCommand FLATBUFFERS_FINAL_CLASS {
- private:
-  uint8_t enabled_;
-
- public:
-  struct Traits;
-  static FLATBUFFERS_CONSTEXPR_CPP11 const char *GetFullyQualifiedName() {
-    return "OpenShock.Serialization.Local.OtaUpdateSetIsEnabledCommand";
-  }
-  OtaUpdateSetIsEnabledCommand()
-      : enabled_(0) {
-  }
-  OtaUpdateSetIsEnabledCommand(bool _enabled)
-      : enabled_(::flatbuffers::EndianScalar(static_cast<uint8_t>(_enabled))) {
-  }
-  bool enabled() const {
-    return ::flatbuffers::EndianScalar(enabled_) != 0;
-  }
-};
-FLATBUFFERS_STRUCT_END(OtaUpdateSetIsEnabledCommand, 1);
-
-struct OtaUpdateSetIsEnabledCommand::Traits {
-  using type = OtaUpdateSetIsEnabledCommand;
-};
-
-FLATBUFFERS_MANUALLY_ALIGNED_STRUCT(2) OtaUpdateSetCheckIntervalCommand FLATBUFFERS_FINAL_CLASS {
- private:
-  uint16_t interval_;
-
- public:
-  struct Traits;
-  static FLATBUFFERS_CONSTEXPR_CPP11 const char *GetFullyQualifiedName() {
-    return "OpenShock.Serialization.Local.OtaUpdateSetCheckIntervalCommand";
-  }
-  OtaUpdateSetCheckIntervalCommand()
-      : interval_(0) {
-  }
-  OtaUpdateSetCheckIntervalCommand(uint16_t _interval)
-      : interval_(::flatbuffers::EndianScalar(_interval)) {
-  }
-  uint16_t interval() const {
-    return ::flatbuffers::EndianScalar(interval_);
-  }
-};
-FLATBUFFERS_STRUCT_END(OtaUpdateSetCheckIntervalCommand, 2);
-
-struct OtaUpdateSetCheckIntervalCommand::Traits {
-  using type = OtaUpdateSetCheckIntervalCommand;
-};
-
-FLATBUFFERS_MANUALLY_ALIGNED_STRUCT(1) OtaUpdateSetAllowBackendManagementCommand FLATBUFFERS_FINAL_CLASS {
- private:
-  uint8_t allow_;
-
- public:
-  struct Traits;
-  static FLATBUFFERS_CONSTEXPR_CPP11 const char *GetFullyQualifiedName() {
-    return "OpenShock.Serialization.Local.OtaUpdateSetAllowBackendManagementCommand";
-  }
-  OtaUpdateSetAllowBackendManagementCommand()
-      : allow_(0) {
-  }
-  OtaUpdateSetAllowBackendManagementCommand(bool _allow)
-      : allow_(::flatbuffers::EndianScalar(static_cast<uint8_t>(_allow))) {
-  }
-  bool allow() const {
-    return ::flatbuffers::EndianScalar(allow_) != 0;
-  }
-};
-FLATBUFFERS_STRUCT_END(OtaUpdateSetAllowBackendManagementCommand, 1);
-
-struct OtaUpdateSetAllowBackendManagementCommand::Traits {
-  using type = OtaUpdateSetAllowBackendManagementCommand;
-};
-
-FLATBUFFERS_MANUALLY_ALIGNED_STRUCT(1) OtaUpdateSetRequireManualApprovalCommand FLATBUFFERS_FINAL_CLASS {
- private:
-  uint8_t require_;
-
- public:
-  struct Traits;
-  static FLATBUFFERS_CONSTEXPR_CPP11 const char *GetFullyQualifiedName() {
-    return "OpenShock.Serialization.Local.OtaUpdateSetRequireManualApprovalCommand";
-  }
-  OtaUpdateSetRequireManualApprovalCommand()
-      : require_(0) {
-  }
-  OtaUpdateSetRequireManualApprovalCommand(bool _require)
-      : require_(::flatbuffers::EndianScalar(static_cast<uint8_t>(_require))) {
-  }
-  bool require() const {
-    return ::flatbuffers::EndianScalar(require_) != 0;
-  }
-};
-FLATBUFFERS_STRUCT_END(OtaUpdateSetRequireManualApprovalCommand, 1);
-
-struct OtaUpdateSetRequireManualApprovalCommand::Traits {
-  using type = OtaUpdateSetRequireManualApprovalCommand;
-};
-
-FLATBUFFERS_MANUALLY_ALIGNED_STRUCT(1) OtaUpdateHandleUpdateRequestCommand FLATBUFFERS_FINAL_CLASS {
- private:
-  uint8_t accept_;
-
- public:
-  struct Traits;
-  static FLATBUFFERS_CONSTEXPR_CPP11 const char *GetFullyQualifiedName() {
-    return "OpenShock.Serialization.Local.OtaUpdateHandleUpdateRequestCommand";
-  }
-  OtaUpdateHandleUpdateRequestCommand()
-      : accept_(0) {
-  }
-  OtaUpdateHandleUpdateRequestCommand(bool _accept)
-      : accept_(::flatbuffers::EndianScalar(static_cast<uint8_t>(_accept))) {
-  }
-  bool accept() const {
-    return ::flatbuffers::EndianScalar(accept_) != 0;
-  }
-};
-FLATBUFFERS_STRUCT_END(OtaUpdateHandleUpdateRequestCommand, 1);
-
-struct OtaUpdateHandleUpdateRequestCommand::Traits {
-  using type = OtaUpdateHandleUpdateRequestCommand;
-};
-
-FLATBUFFERS_MANUALLY_ALIGNED_STRUCT(1) AccountUnlinkCommand FLATBUFFERS_FINAL_CLASS {
- private:
-  uint8_t placeholder_;
-
- public:
-  struct Traits;
-  static FLATBUFFERS_CONSTEXPR_CPP11 const char *GetFullyQualifiedName() {
-    return "OpenShock.Serialization.Local.AccountUnlinkCommand";
-  }
-  AccountUnlinkCommand()
-      : placeholder_(0) {
-  }
-  AccountUnlinkCommand(bool _placeholder)
-      : placeholder_(::flatbuffers::EndianScalar(static_cast<uint8_t>(_placeholder))) {
-  }
-  bool placeholder() const {
-    return ::flatbuffers::EndianScalar(placeholder_) != 0;
-  }
-};
-FLATBUFFERS_STRUCT_END(AccountUnlinkCommand, 1);
-
-struct AccountUnlinkCommand::Traits {
-  using type = AccountUnlinkCommand;
-};
-
-FLATBUFFERS_MANUALLY_ALIGNED_STRUCT(1) SetRfTxPinCommand FLATBUFFERS_FINAL_CLASS {
- private:
-  uint8_t pin_;
-
- public:
-  struct Traits;
-  static FLATBUFFERS_CONSTEXPR_CPP11 const char *GetFullyQualifiedName() {
-    return "OpenShock.Serialization.Local.SetRfTxPinCommand";
-  }
-  SetRfTxPinCommand()
-      : pin_(0) {
-  }
-  SetRfTxPinCommand(uint8_t _pin)
-      : pin_(::flatbuffers::EndianScalar(_pin)) {
-  }
-  uint8_t pin() const {
-    return ::flatbuffers::EndianScalar(pin_);
-  }
-};
-FLATBUFFERS_STRUCT_END(SetRfTxPinCommand, 1);
-
-struct SetRfTxPinCommand::Traits {
-  using type = SetRfTxPinCommand;
+  static auto constexpr Create = CreateWifiScanCommand;
 };
 
 struct WifiNetworkSaveCommand FLATBUFFERS_FINAL_CLASS : private ::flatbuffers::Table {
@@ -646,6 +500,106 @@ inline ::flatbuffers::Offset<WifiNetworkConnectCommand> CreateWifiNetworkConnect
       ssid__);
 }
 
+struct WifiNetworkDisconnectCommand FLATBUFFERS_FINAL_CLASS : private ::flatbuffers::Table {
+  typedef WifiNetworkDisconnectCommandBuilder Builder;
+  struct Traits;
+  static FLATBUFFERS_CONSTEXPR_CPP11 const char *GetFullyQualifiedName() {
+    return "OpenShock.Serialization.Local.WifiNetworkDisconnectCommand";
+  }
+  enum FlatBuffersVTableOffset FLATBUFFERS_VTABLE_UNDERLYING_TYPE {
+    VT_PLACEHOLDER = 4
+  };
+  bool placeholder() const {
+    return GetField<uint8_t>(VT_PLACEHOLDER, 0) != 0;
+  }
+  bool Verify(::flatbuffers::Verifier &verifier) const {
+    return VerifyTableStart(verifier) &&
+           VerifyField<uint8_t>(verifier, VT_PLACEHOLDER, 1) &&
+           verifier.EndTable();
+  }
+};
+
+struct WifiNetworkDisconnectCommandBuilder {
+  typedef WifiNetworkDisconnectCommand Table;
+  ::flatbuffers::FlatBufferBuilder &fbb_;
+  ::flatbuffers::uoffset_t start_;
+  void add_placeholder(bool placeholder) {
+    fbb_.AddElement<uint8_t>(WifiNetworkDisconnectCommand::VT_PLACEHOLDER, static_cast<uint8_t>(placeholder), 0);
+  }
+  explicit WifiNetworkDisconnectCommandBuilder(::flatbuffers::FlatBufferBuilder &_fbb)
+        : fbb_(_fbb) {
+    start_ = fbb_.StartTable();
+  }
+  ::flatbuffers::Offset<WifiNetworkDisconnectCommand> Finish() {
+    const auto end = fbb_.EndTable(start_);
+    auto o = ::flatbuffers::Offset<WifiNetworkDisconnectCommand>(end);
+    return o;
+  }
+};
+
+inline ::flatbuffers::Offset<WifiNetworkDisconnectCommand> CreateWifiNetworkDisconnectCommand(
+    ::flatbuffers::FlatBufferBuilder &_fbb,
+    bool placeholder = false) {
+  WifiNetworkDisconnectCommandBuilder builder_(_fbb);
+  builder_.add_placeholder(placeholder);
+  return builder_.Finish();
+}
+
+struct WifiNetworkDisconnectCommand::Traits {
+  using type = WifiNetworkDisconnectCommand;
+  static auto constexpr Create = CreateWifiNetworkDisconnectCommand;
+};
+
+struct OtaUpdateSetIsEnabledCommand FLATBUFFERS_FINAL_CLASS : private ::flatbuffers::Table {
+  typedef OtaUpdateSetIsEnabledCommandBuilder Builder;
+  struct Traits;
+  static FLATBUFFERS_CONSTEXPR_CPP11 const char *GetFullyQualifiedName() {
+    return "OpenShock.Serialization.Local.OtaUpdateSetIsEnabledCommand";
+  }
+  enum FlatBuffersVTableOffset FLATBUFFERS_VTABLE_UNDERLYING_TYPE {
+    VT_ENABLED = 4
+  };
+  bool enabled() const {
+    return GetField<uint8_t>(VT_ENABLED, 0) != 0;
+  }
+  bool Verify(::flatbuffers::Verifier &verifier) const {
+    return VerifyTableStart(verifier) &&
+           VerifyField<uint8_t>(verifier, VT_ENABLED, 1) &&
+           verifier.EndTable();
+  }
+};
+
+struct OtaUpdateSetIsEnabledCommandBuilder {
+  typedef OtaUpdateSetIsEnabledCommand Table;
+  ::flatbuffers::FlatBufferBuilder &fbb_;
+  ::flatbuffers::uoffset_t start_;
+  void add_enabled(bool enabled) {
+    fbb_.AddElement<uint8_t>(OtaUpdateSetIsEnabledCommand::VT_ENABLED, static_cast<uint8_t>(enabled), 0);
+  }
+  explicit OtaUpdateSetIsEnabledCommandBuilder(::flatbuffers::FlatBufferBuilder &_fbb)
+        : fbb_(_fbb) {
+    start_ = fbb_.StartTable();
+  }
+  ::flatbuffers::Offset<OtaUpdateSetIsEnabledCommand> Finish() {
+    const auto end = fbb_.EndTable(start_);
+    auto o = ::flatbuffers::Offset<OtaUpdateSetIsEnabledCommand>(end);
+    return o;
+  }
+};
+
+inline ::flatbuffers::Offset<OtaUpdateSetIsEnabledCommand> CreateOtaUpdateSetIsEnabledCommand(
+    ::flatbuffers::FlatBufferBuilder &_fbb,
+    bool enabled = false) {
+  OtaUpdateSetIsEnabledCommandBuilder builder_(_fbb);
+  builder_.add_enabled(enabled);
+  return builder_.Finish();
+}
+
+struct OtaUpdateSetIsEnabledCommand::Traits {
+  using type = OtaUpdateSetIsEnabledCommand;
+  static auto constexpr Create = CreateOtaUpdateSetIsEnabledCommand;
+};
+
 struct OtaUpdateSetDomainCommand FLATBUFFERS_FINAL_CLASS : private ::flatbuffers::Table {
   typedef OtaUpdateSetDomainCommandBuilder Builder;
   struct Traits;
@@ -765,6 +719,206 @@ inline ::flatbuffers::Offset<OtaUpdateSetUpdateChannelCommand> CreateOtaUpdateSe
       _fbb,
       channel__);
 }
+
+struct OtaUpdateSetCheckIntervalCommand FLATBUFFERS_FINAL_CLASS : private ::flatbuffers::Table {
+  typedef OtaUpdateSetCheckIntervalCommandBuilder Builder;
+  struct Traits;
+  static FLATBUFFERS_CONSTEXPR_CPP11 const char *GetFullyQualifiedName() {
+    return "OpenShock.Serialization.Local.OtaUpdateSetCheckIntervalCommand";
+  }
+  enum FlatBuffersVTableOffset FLATBUFFERS_VTABLE_UNDERLYING_TYPE {
+    VT_INTERVAL = 4
+  };
+  uint16_t interval() const {
+    return GetField<uint16_t>(VT_INTERVAL, 0);
+  }
+  bool Verify(::flatbuffers::Verifier &verifier) const {
+    return VerifyTableStart(verifier) &&
+           VerifyField<uint16_t>(verifier, VT_INTERVAL, 2) &&
+           verifier.EndTable();
+  }
+};
+
+struct OtaUpdateSetCheckIntervalCommandBuilder {
+  typedef OtaUpdateSetCheckIntervalCommand Table;
+  ::flatbuffers::FlatBufferBuilder &fbb_;
+  ::flatbuffers::uoffset_t start_;
+  void add_interval(uint16_t interval) {
+    fbb_.AddElement<uint16_t>(OtaUpdateSetCheckIntervalCommand::VT_INTERVAL, interval, 0);
+  }
+  explicit OtaUpdateSetCheckIntervalCommandBuilder(::flatbuffers::FlatBufferBuilder &_fbb)
+        : fbb_(_fbb) {
+    start_ = fbb_.StartTable();
+  }
+  ::flatbuffers::Offset<OtaUpdateSetCheckIntervalCommand> Finish() {
+    const auto end = fbb_.EndTable(start_);
+    auto o = ::flatbuffers::Offset<OtaUpdateSetCheckIntervalCommand>(end);
+    return o;
+  }
+};
+
+inline ::flatbuffers::Offset<OtaUpdateSetCheckIntervalCommand> CreateOtaUpdateSetCheckIntervalCommand(
+    ::flatbuffers::FlatBufferBuilder &_fbb,
+    uint16_t interval = 0) {
+  OtaUpdateSetCheckIntervalCommandBuilder builder_(_fbb);
+  builder_.add_interval(interval);
+  return builder_.Finish();
+}
+
+struct OtaUpdateSetCheckIntervalCommand::Traits {
+  using type = OtaUpdateSetCheckIntervalCommand;
+  static auto constexpr Create = CreateOtaUpdateSetCheckIntervalCommand;
+};
+
+struct OtaUpdateSetAllowBackendManagementCommand FLATBUFFERS_FINAL_CLASS : private ::flatbuffers::Table {
+  typedef OtaUpdateSetAllowBackendManagementCommandBuilder Builder;
+  struct Traits;
+  static FLATBUFFERS_CONSTEXPR_CPP11 const char *GetFullyQualifiedName() {
+    return "OpenShock.Serialization.Local.OtaUpdateSetAllowBackendManagementCommand";
+  }
+  enum FlatBuffersVTableOffset FLATBUFFERS_VTABLE_UNDERLYING_TYPE {
+    VT_ALLOW = 4
+  };
+  bool allow() const {
+    return GetField<uint8_t>(VT_ALLOW, 0) != 0;
+  }
+  bool Verify(::flatbuffers::Verifier &verifier) const {
+    return VerifyTableStart(verifier) &&
+           VerifyField<uint8_t>(verifier, VT_ALLOW, 1) &&
+           verifier.EndTable();
+  }
+};
+
+struct OtaUpdateSetAllowBackendManagementCommandBuilder {
+  typedef OtaUpdateSetAllowBackendManagementCommand Table;
+  ::flatbuffers::FlatBufferBuilder &fbb_;
+  ::flatbuffers::uoffset_t start_;
+  void add_allow(bool allow) {
+    fbb_.AddElement<uint8_t>(OtaUpdateSetAllowBackendManagementCommand::VT_ALLOW, static_cast<uint8_t>(allow), 0);
+  }
+  explicit OtaUpdateSetAllowBackendManagementCommandBuilder(::flatbuffers::FlatBufferBuilder &_fbb)
+        : fbb_(_fbb) {
+    start_ = fbb_.StartTable();
+  }
+  ::flatbuffers::Offset<OtaUpdateSetAllowBackendManagementCommand> Finish() {
+    const auto end = fbb_.EndTable(start_);
+    auto o = ::flatbuffers::Offset<OtaUpdateSetAllowBackendManagementCommand>(end);
+    return o;
+  }
+};
+
+inline ::flatbuffers::Offset<OtaUpdateSetAllowBackendManagementCommand> CreateOtaUpdateSetAllowBackendManagementCommand(
+    ::flatbuffers::FlatBufferBuilder &_fbb,
+    bool allow = false) {
+  OtaUpdateSetAllowBackendManagementCommandBuilder builder_(_fbb);
+  builder_.add_allow(allow);
+  return builder_.Finish();
+}
+
+struct OtaUpdateSetAllowBackendManagementCommand::Traits {
+  using type = OtaUpdateSetAllowBackendManagementCommand;
+  static auto constexpr Create = CreateOtaUpdateSetAllowBackendManagementCommand;
+};
+
+struct OtaUpdateSetRequireManualApprovalCommand FLATBUFFERS_FINAL_CLASS : private ::flatbuffers::Table {
+  typedef OtaUpdateSetRequireManualApprovalCommandBuilder Builder;
+  struct Traits;
+  static FLATBUFFERS_CONSTEXPR_CPP11 const char *GetFullyQualifiedName() {
+    return "OpenShock.Serialization.Local.OtaUpdateSetRequireManualApprovalCommand";
+  }
+  enum FlatBuffersVTableOffset FLATBUFFERS_VTABLE_UNDERLYING_TYPE {
+    VT_REQUIRE = 4
+  };
+  bool require() const {
+    return GetField<uint8_t>(VT_REQUIRE, 0) != 0;
+  }
+  bool Verify(::flatbuffers::Verifier &verifier) const {
+    return VerifyTableStart(verifier) &&
+           VerifyField<uint8_t>(verifier, VT_REQUIRE, 1) &&
+           verifier.EndTable();
+  }
+};
+
+struct OtaUpdateSetRequireManualApprovalCommandBuilder {
+  typedef OtaUpdateSetRequireManualApprovalCommand Table;
+  ::flatbuffers::FlatBufferBuilder &fbb_;
+  ::flatbuffers::uoffset_t start_;
+  void add_require(bool require) {
+    fbb_.AddElement<uint8_t>(OtaUpdateSetRequireManualApprovalCommand::VT_REQUIRE, static_cast<uint8_t>(require), 0);
+  }
+  explicit OtaUpdateSetRequireManualApprovalCommandBuilder(::flatbuffers::FlatBufferBuilder &_fbb)
+        : fbb_(_fbb) {
+    start_ = fbb_.StartTable();
+  }
+  ::flatbuffers::Offset<OtaUpdateSetRequireManualApprovalCommand> Finish() {
+    const auto end = fbb_.EndTable(start_);
+    auto o = ::flatbuffers::Offset<OtaUpdateSetRequireManualApprovalCommand>(end);
+    return o;
+  }
+};
+
+inline ::flatbuffers::Offset<OtaUpdateSetRequireManualApprovalCommand> CreateOtaUpdateSetRequireManualApprovalCommand(
+    ::flatbuffers::FlatBufferBuilder &_fbb,
+    bool require = false) {
+  OtaUpdateSetRequireManualApprovalCommandBuilder builder_(_fbb);
+  builder_.add_require(require);
+  return builder_.Finish();
+}
+
+struct OtaUpdateSetRequireManualApprovalCommand::Traits {
+  using type = OtaUpdateSetRequireManualApprovalCommand;
+  static auto constexpr Create = CreateOtaUpdateSetRequireManualApprovalCommand;
+};
+
+struct OtaUpdateHandleUpdateRequestCommand FLATBUFFERS_FINAL_CLASS : private ::flatbuffers::Table {
+  typedef OtaUpdateHandleUpdateRequestCommandBuilder Builder;
+  struct Traits;
+  static FLATBUFFERS_CONSTEXPR_CPP11 const char *GetFullyQualifiedName() {
+    return "OpenShock.Serialization.Local.OtaUpdateHandleUpdateRequestCommand";
+  }
+  enum FlatBuffersVTableOffset FLATBUFFERS_VTABLE_UNDERLYING_TYPE {
+    VT_ACCEPT = 4
+  };
+  bool accept() const {
+    return GetField<uint8_t>(VT_ACCEPT, 0) != 0;
+  }
+  bool Verify(::flatbuffers::Verifier &verifier) const {
+    return VerifyTableStart(verifier) &&
+           VerifyField<uint8_t>(verifier, VT_ACCEPT, 1) &&
+           verifier.EndTable();
+  }
+};
+
+struct OtaUpdateHandleUpdateRequestCommandBuilder {
+  typedef OtaUpdateHandleUpdateRequestCommand Table;
+  ::flatbuffers::FlatBufferBuilder &fbb_;
+  ::flatbuffers::uoffset_t start_;
+  void add_accept(bool accept) {
+    fbb_.AddElement<uint8_t>(OtaUpdateHandleUpdateRequestCommand::VT_ACCEPT, static_cast<uint8_t>(accept), 0);
+  }
+  explicit OtaUpdateHandleUpdateRequestCommandBuilder(::flatbuffers::FlatBufferBuilder &_fbb)
+        : fbb_(_fbb) {
+    start_ = fbb_.StartTable();
+  }
+  ::flatbuffers::Offset<OtaUpdateHandleUpdateRequestCommand> Finish() {
+    const auto end = fbb_.EndTable(start_);
+    auto o = ::flatbuffers::Offset<OtaUpdateHandleUpdateRequestCommand>(end);
+    return o;
+  }
+};
+
+inline ::flatbuffers::Offset<OtaUpdateHandleUpdateRequestCommand> CreateOtaUpdateHandleUpdateRequestCommand(
+    ::flatbuffers::FlatBufferBuilder &_fbb,
+    bool accept = false) {
+  OtaUpdateHandleUpdateRequestCommandBuilder builder_(_fbb);
+  builder_.add_accept(accept);
+  return builder_.Finish();
+}
+
+struct OtaUpdateHandleUpdateRequestCommand::Traits {
+  using type = OtaUpdateHandleUpdateRequestCommand;
+  static auto constexpr Create = CreateOtaUpdateHandleUpdateRequestCommand;
+};
 
 struct OtaUpdateCheckForUpdatesCommand FLATBUFFERS_FINAL_CLASS : private ::flatbuffers::Table {
   typedef OtaUpdateCheckForUpdatesCommandBuilder Builder;
@@ -960,6 +1114,206 @@ inline ::flatbuffers::Offset<AccountLinkCommand> CreateAccountLinkCommandDirect(
       code__);
 }
 
+struct AccountUnlinkCommand FLATBUFFERS_FINAL_CLASS : private ::flatbuffers::Table {
+  typedef AccountUnlinkCommandBuilder Builder;
+  struct Traits;
+  static FLATBUFFERS_CONSTEXPR_CPP11 const char *GetFullyQualifiedName() {
+    return "OpenShock.Serialization.Local.AccountUnlinkCommand";
+  }
+  enum FlatBuffersVTableOffset FLATBUFFERS_VTABLE_UNDERLYING_TYPE {
+    VT_PLACEHOLDER = 4
+  };
+  bool placeholder() const {
+    return GetField<uint8_t>(VT_PLACEHOLDER, 0) != 0;
+  }
+  bool Verify(::flatbuffers::Verifier &verifier) const {
+    return VerifyTableStart(verifier) &&
+           VerifyField<uint8_t>(verifier, VT_PLACEHOLDER, 1) &&
+           verifier.EndTable();
+  }
+};
+
+struct AccountUnlinkCommandBuilder {
+  typedef AccountUnlinkCommand Table;
+  ::flatbuffers::FlatBufferBuilder &fbb_;
+  ::flatbuffers::uoffset_t start_;
+  void add_placeholder(bool placeholder) {
+    fbb_.AddElement<uint8_t>(AccountUnlinkCommand::VT_PLACEHOLDER, static_cast<uint8_t>(placeholder), 0);
+  }
+  explicit AccountUnlinkCommandBuilder(::flatbuffers::FlatBufferBuilder &_fbb)
+        : fbb_(_fbb) {
+    start_ = fbb_.StartTable();
+  }
+  ::flatbuffers::Offset<AccountUnlinkCommand> Finish() {
+    const auto end = fbb_.EndTable(start_);
+    auto o = ::flatbuffers::Offset<AccountUnlinkCommand>(end);
+    return o;
+  }
+};
+
+inline ::flatbuffers::Offset<AccountUnlinkCommand> CreateAccountUnlinkCommand(
+    ::flatbuffers::FlatBufferBuilder &_fbb,
+    bool placeholder = false) {
+  AccountUnlinkCommandBuilder builder_(_fbb);
+  builder_.add_placeholder(placeholder);
+  return builder_.Finish();
+}
+
+struct AccountUnlinkCommand::Traits {
+  using type = AccountUnlinkCommand;
+  static auto constexpr Create = CreateAccountUnlinkCommand;
+};
+
+struct SetRfTxPinCommand FLATBUFFERS_FINAL_CLASS : private ::flatbuffers::Table {
+  typedef SetRfTxPinCommandBuilder Builder;
+  struct Traits;
+  static FLATBUFFERS_CONSTEXPR_CPP11 const char *GetFullyQualifiedName() {
+    return "OpenShock.Serialization.Local.SetRfTxPinCommand";
+  }
+  enum FlatBuffersVTableOffset FLATBUFFERS_VTABLE_UNDERLYING_TYPE {
+    VT_PIN = 4
+  };
+  uint8_t pin() const {
+    return GetField<uint8_t>(VT_PIN, 0);
+  }
+  bool Verify(::flatbuffers::Verifier &verifier) const {
+    return VerifyTableStart(verifier) &&
+           VerifyField<uint8_t>(verifier, VT_PIN, 1) &&
+           verifier.EndTable();
+  }
+};
+
+struct SetRfTxPinCommandBuilder {
+  typedef SetRfTxPinCommand Table;
+  ::flatbuffers::FlatBufferBuilder &fbb_;
+  ::flatbuffers::uoffset_t start_;
+  void add_pin(uint8_t pin) {
+    fbb_.AddElement<uint8_t>(SetRfTxPinCommand::VT_PIN, pin, 0);
+  }
+  explicit SetRfTxPinCommandBuilder(::flatbuffers::FlatBufferBuilder &_fbb)
+        : fbb_(_fbb) {
+    start_ = fbb_.StartTable();
+  }
+  ::flatbuffers::Offset<SetRfTxPinCommand> Finish() {
+    const auto end = fbb_.EndTable(start_);
+    auto o = ::flatbuffers::Offset<SetRfTxPinCommand>(end);
+    return o;
+  }
+};
+
+inline ::flatbuffers::Offset<SetRfTxPinCommand> CreateSetRfTxPinCommand(
+    ::flatbuffers::FlatBufferBuilder &_fbb,
+    uint8_t pin = 0) {
+  SetRfTxPinCommandBuilder builder_(_fbb);
+  builder_.add_pin(pin);
+  return builder_.Finish();
+}
+
+struct SetRfTxPinCommand::Traits {
+  using type = SetRfTxPinCommand;
+  static auto constexpr Create = CreateSetRfTxPinCommand;
+};
+
+struct SetEstopEnabledCommand FLATBUFFERS_FINAL_CLASS : private ::flatbuffers::Table {
+  typedef SetEstopEnabledCommandBuilder Builder;
+  struct Traits;
+  static FLATBUFFERS_CONSTEXPR_CPP11 const char *GetFullyQualifiedName() {
+    return "OpenShock.Serialization.Local.SetEstopEnabledCommand";
+  }
+  enum FlatBuffersVTableOffset FLATBUFFERS_VTABLE_UNDERLYING_TYPE {
+    VT_ENABLED = 4
+  };
+  bool enabled() const {
+    return GetField<uint8_t>(VT_ENABLED, 0) != 0;
+  }
+  bool Verify(::flatbuffers::Verifier &verifier) const {
+    return VerifyTableStart(verifier) &&
+           VerifyField<uint8_t>(verifier, VT_ENABLED, 1) &&
+           verifier.EndTable();
+  }
+};
+
+struct SetEstopEnabledCommandBuilder {
+  typedef SetEstopEnabledCommand Table;
+  ::flatbuffers::FlatBufferBuilder &fbb_;
+  ::flatbuffers::uoffset_t start_;
+  void add_enabled(bool enabled) {
+    fbb_.AddElement<uint8_t>(SetEstopEnabledCommand::VT_ENABLED, static_cast<uint8_t>(enabled), 0);
+  }
+  explicit SetEstopEnabledCommandBuilder(::flatbuffers::FlatBufferBuilder &_fbb)
+        : fbb_(_fbb) {
+    start_ = fbb_.StartTable();
+  }
+  ::flatbuffers::Offset<SetEstopEnabledCommand> Finish() {
+    const auto end = fbb_.EndTable(start_);
+    auto o = ::flatbuffers::Offset<SetEstopEnabledCommand>(end);
+    return o;
+  }
+};
+
+inline ::flatbuffers::Offset<SetEstopEnabledCommand> CreateSetEstopEnabledCommand(
+    ::flatbuffers::FlatBufferBuilder &_fbb,
+    bool enabled = false) {
+  SetEstopEnabledCommandBuilder builder_(_fbb);
+  builder_.add_enabled(enabled);
+  return builder_.Finish();
+}
+
+struct SetEstopEnabledCommand::Traits {
+  using type = SetEstopEnabledCommand;
+  static auto constexpr Create = CreateSetEstopEnabledCommand;
+};
+
+struct SetEstopPinCommand FLATBUFFERS_FINAL_CLASS : private ::flatbuffers::Table {
+  typedef SetEstopPinCommandBuilder Builder;
+  struct Traits;
+  static FLATBUFFERS_CONSTEXPR_CPP11 const char *GetFullyQualifiedName() {
+    return "OpenShock.Serialization.Local.SetEstopPinCommand";
+  }
+  enum FlatBuffersVTableOffset FLATBUFFERS_VTABLE_UNDERLYING_TYPE {
+    VT_PIN = 4
+  };
+  uint8_t pin() const {
+    return GetField<uint8_t>(VT_PIN, 0);
+  }
+  bool Verify(::flatbuffers::Verifier &verifier) const {
+    return VerifyTableStart(verifier) &&
+           VerifyField<uint8_t>(verifier, VT_PIN, 1) &&
+           verifier.EndTable();
+  }
+};
+
+struct SetEstopPinCommandBuilder {
+  typedef SetEstopPinCommand Table;
+  ::flatbuffers::FlatBufferBuilder &fbb_;
+  ::flatbuffers::uoffset_t start_;
+  void add_pin(uint8_t pin) {
+    fbb_.AddElement<uint8_t>(SetEstopPinCommand::VT_PIN, pin, 0);
+  }
+  explicit SetEstopPinCommandBuilder(::flatbuffers::FlatBufferBuilder &_fbb)
+        : fbb_(_fbb) {
+    start_ = fbb_.StartTable();
+  }
+  ::flatbuffers::Offset<SetEstopPinCommand> Finish() {
+    const auto end = fbb_.EndTable(start_);
+    auto o = ::flatbuffers::Offset<SetEstopPinCommand>(end);
+    return o;
+  }
+};
+
+inline ::flatbuffers::Offset<SetEstopPinCommand> CreateSetEstopPinCommand(
+    ::flatbuffers::FlatBufferBuilder &_fbb,
+    uint8_t pin = 0) {
+  SetEstopPinCommandBuilder builder_(_fbb);
+  builder_.add_pin(pin);
+  return builder_.Finish();
+}
+
+struct SetEstopPinCommand::Traits {
+  using type = SetEstopPinCommand;
+  static auto constexpr Create = CreateSetEstopPinCommand;
+};
+
 struct LocalToHubMessage FLATBUFFERS_FINAL_CLASS : private ::flatbuffers::Table {
   typedef LocalToHubMessageBuilder Builder;
   struct Traits;
@@ -1027,6 +1381,12 @@ struct LocalToHubMessage FLATBUFFERS_FINAL_CLASS : private ::flatbuffers::Table 
   }
   const OpenShock::Serialization::Local::SetRfTxPinCommand *payload_as_SetRfTxPinCommand() const {
     return payload_type() == OpenShock::Serialization::Local::LocalToHubMessagePayload::SetRfTxPinCommand ? static_cast<const OpenShock::Serialization::Local::SetRfTxPinCommand *>(payload()) : nullptr;
+  }
+  const OpenShock::Serialization::Local::SetEstopEnabledCommand *payload_as_SetEstopEnabledCommand() const {
+    return payload_type() == OpenShock::Serialization::Local::LocalToHubMessagePayload::SetEstopEnabledCommand ? static_cast<const OpenShock::Serialization::Local::SetEstopEnabledCommand *>(payload()) : nullptr;
+  }
+  const OpenShock::Serialization::Local::SetEstopPinCommand *payload_as_SetEstopPinCommand() const {
+    return payload_type() == OpenShock::Serialization::Local::LocalToHubMessagePayload::SetEstopPinCommand ? static_cast<const OpenShock::Serialization::Local::SetEstopPinCommand *>(payload()) : nullptr;
   }
   bool Verify(::flatbuffers::Verifier &verifier) const {
     return VerifyTableStart(verifier) &&
@@ -1105,6 +1465,14 @@ template<> inline const OpenShock::Serialization::Local::SetRfTxPinCommand *Loca
   return payload_as_SetRfTxPinCommand();
 }
 
+template<> inline const OpenShock::Serialization::Local::SetEstopEnabledCommand *LocalToHubMessage::payload_as<OpenShock::Serialization::Local::SetEstopEnabledCommand>() const {
+  return payload_as_SetEstopEnabledCommand();
+}
+
+template<> inline const OpenShock::Serialization::Local::SetEstopPinCommand *LocalToHubMessage::payload_as<OpenShock::Serialization::Local::SetEstopPinCommand>() const {
+  return payload_as_SetEstopPinCommand();
+}
+
 struct LocalToHubMessageBuilder {
   typedef LocalToHubMessage Table;
   ::flatbuffers::FlatBufferBuilder &fbb_;
@@ -1147,7 +1515,8 @@ inline bool VerifyLocalToHubMessagePayload(::flatbuffers::Verifier &verifier, co
       return true;
     }
     case LocalToHubMessagePayload::WifiScanCommand: {
-      return verifier.VerifyField<OpenShock::Serialization::Local::WifiScanCommand>(static_cast<const uint8_t *>(obj), 0, 1);
+      auto ptr = reinterpret_cast<const OpenShock::Serialization::Local::WifiScanCommand *>(obj);
+      return verifier.VerifyTable(ptr);
     }
     case LocalToHubMessagePayload::WifiNetworkSaveCommand: {
       auto ptr = reinterpret_cast<const OpenShock::Serialization::Local::WifiNetworkSaveCommand *>(obj);
@@ -1162,10 +1531,12 @@ inline bool VerifyLocalToHubMessagePayload(::flatbuffers::Verifier &verifier, co
       return verifier.VerifyTable(ptr);
     }
     case LocalToHubMessagePayload::WifiNetworkDisconnectCommand: {
-      return verifier.VerifyField<OpenShock::Serialization::Local::WifiNetworkDisconnectCommand>(static_cast<const uint8_t *>(obj), 0, 1);
+      auto ptr = reinterpret_cast<const OpenShock::Serialization::Local::WifiNetworkDisconnectCommand *>(obj);
+      return verifier.VerifyTable(ptr);
     }
     case LocalToHubMessagePayload::OtaUpdateSetIsEnabledCommand: {
-      return verifier.VerifyField<OpenShock::Serialization::Local::OtaUpdateSetIsEnabledCommand>(static_cast<const uint8_t *>(obj), 0, 1);
+      auto ptr = reinterpret_cast<const OpenShock::Serialization::Local::OtaUpdateSetIsEnabledCommand *>(obj);
+      return verifier.VerifyTable(ptr);
     }
     case LocalToHubMessagePayload::OtaUpdateSetDomainCommand: {
       auto ptr = reinterpret_cast<const OpenShock::Serialization::Local::OtaUpdateSetDomainCommand *>(obj);
@@ -1176,16 +1547,20 @@ inline bool VerifyLocalToHubMessagePayload(::flatbuffers::Verifier &verifier, co
       return verifier.VerifyTable(ptr);
     }
     case LocalToHubMessagePayload::OtaUpdateSetCheckIntervalCommand: {
-      return verifier.VerifyField<OpenShock::Serialization::Local::OtaUpdateSetCheckIntervalCommand>(static_cast<const uint8_t *>(obj), 0, 2);
+      auto ptr = reinterpret_cast<const OpenShock::Serialization::Local::OtaUpdateSetCheckIntervalCommand *>(obj);
+      return verifier.VerifyTable(ptr);
     }
     case LocalToHubMessagePayload::OtaUpdateSetAllowBackendManagementCommand: {
-      return verifier.VerifyField<OpenShock::Serialization::Local::OtaUpdateSetAllowBackendManagementCommand>(static_cast<const uint8_t *>(obj), 0, 1);
+      auto ptr = reinterpret_cast<const OpenShock::Serialization::Local::OtaUpdateSetAllowBackendManagementCommand *>(obj);
+      return verifier.VerifyTable(ptr);
     }
     case LocalToHubMessagePayload::OtaUpdateSetRequireManualApprovalCommand: {
-      return verifier.VerifyField<OpenShock::Serialization::Local::OtaUpdateSetRequireManualApprovalCommand>(static_cast<const uint8_t *>(obj), 0, 1);
+      auto ptr = reinterpret_cast<const OpenShock::Serialization::Local::OtaUpdateSetRequireManualApprovalCommand *>(obj);
+      return verifier.VerifyTable(ptr);
     }
     case LocalToHubMessagePayload::OtaUpdateHandleUpdateRequestCommand: {
-      return verifier.VerifyField<OpenShock::Serialization::Local::OtaUpdateHandleUpdateRequestCommand>(static_cast<const uint8_t *>(obj), 0, 1);
+      auto ptr = reinterpret_cast<const OpenShock::Serialization::Local::OtaUpdateHandleUpdateRequestCommand *>(obj);
+      return verifier.VerifyTable(ptr);
     }
     case LocalToHubMessagePayload::OtaUpdateCheckForUpdatesCommand: {
       auto ptr = reinterpret_cast<const OpenShock::Serialization::Local::OtaUpdateCheckForUpdatesCommand *>(obj);
@@ -1200,10 +1575,20 @@ inline bool VerifyLocalToHubMessagePayload(::flatbuffers::Verifier &verifier, co
       return verifier.VerifyTable(ptr);
     }
     case LocalToHubMessagePayload::AccountUnlinkCommand: {
-      return verifier.VerifyField<OpenShock::Serialization::Local::AccountUnlinkCommand>(static_cast<const uint8_t *>(obj), 0, 1);
+      auto ptr = reinterpret_cast<const OpenShock::Serialization::Local::AccountUnlinkCommand *>(obj);
+      return verifier.VerifyTable(ptr);
     }
     case LocalToHubMessagePayload::SetRfTxPinCommand: {
-      return verifier.VerifyField<OpenShock::Serialization::Local::SetRfTxPinCommand>(static_cast<const uint8_t *>(obj), 0, 1);
+      auto ptr = reinterpret_cast<const OpenShock::Serialization::Local::SetRfTxPinCommand *>(obj);
+      return verifier.VerifyTable(ptr);
+    }
+    case LocalToHubMessagePayload::SetEstopEnabledCommand: {
+      auto ptr = reinterpret_cast<const OpenShock::Serialization::Local::SetEstopEnabledCommand *>(obj);
+      return verifier.VerifyTable(ptr);
+    }
+    case LocalToHubMessagePayload::SetEstopPinCommand: {
+      auto ptr = reinterpret_cast<const OpenShock::Serialization::Local::SetEstopPinCommand *>(obj);
+      return verifier.VerifyTable(ptr);
     }
     default: return true;
   }

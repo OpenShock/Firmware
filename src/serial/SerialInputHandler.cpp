@@ -6,15 +6,16 @@ const char* const TAG = "SerialInputHandler";
 #include "CommandHandler.h"
 #include "config/Config.h"
 #include "config/SerialInputConfig.h"
+#include "Convert.h"
+#include "EStopManager.h"
 #include "FormatHelpers.h"
 #include "http/HTTPRequestManager.h"
-#include "Convert.h"
 #include "Logging.h"
-#include "serialization/JsonAPI.h"
-#include "serialization/JsonSerial.h"
 #include "serial/command_handlers/CommandEntry.h"
 #include "serial/command_handlers/common.h"
 #include "serial/command_handlers/index.h"
+#include "serialization/JsonAPI.h"
+#include "serialization/JsonSerial.h"
 #include "Time.h"
 #include "util/Base64Utils.h"
 #include "util/StringUtils.h"
@@ -76,17 +77,17 @@ void _handleHelpCommand(std::string_view arg, bool isAutomated) {
       for (const auto& command : group.commands()) {
         std::size_t argumentSize = 0;
         for (const auto& arg : command.arguments()) {
-          argumentSize += arg.name.size() + 1; // +1 for space
+          argumentSize += arg.name.size() + 1;  // +1 for space
         }
         longestArgument = std::max(longestArgument, argumentSize);
         descriptionSize += command.description().size();
       }
     }
 
-    std::size_t paddedLength = longestCommand + 1 + longestArgument + 1; // +1 for space, +1 for newline
+    std::size_t paddedLength = longestCommand + 1 + longestArgument + 1;  // +1 for space, +1 for newline
 
     std::string buffer;
-    buffer.reserve((paddedLength * s_commandGroups.size()) + descriptionSize); // Approximate size
+    buffer.reserve((paddedLength * s_commandGroups.size()) + descriptionSize);  // Approximate size
 
     OS_LOGV(TAG, "Longest command: %zu, longest argument: %zu, padded length: %zu", longestCommand, longestArgument, paddedLength);
     OS_LOGV(TAG, "Buffer size: %zu", buffer.capacity());
@@ -94,14 +95,14 @@ void _handleHelpCommand(std::string_view arg, bool isAutomated) {
     for (const auto& cmd : s_commandGroups) {
       ESP_LOGV(TAG, "Collecting help for command group: %.*s", cmd.name().size(), cmd.name().data());
       buffer.append(cmd.name());
-      //buffer.append(paddedLength - cmd.name().size(), ' ');
+      // buffer.append(paddedLength - cmd.name().size(), ' ');
       buffer.append("\n");
 
       for (const auto& command : cmd.commands()) {
         ESP_LOGV(TAG, "Collecting help for command: %.*s", command.description().size(), command.description().data());
         buffer.append("  ");
         buffer.append(command.description());
-        //buffer.append(paddedLength - command.description().size(), ' ');
+        // buffer.append(paddedLength - command.description().size(), ' ');
 
         for (const auto& arg : command.arguments()) {
           ESP_LOGV(TAG, "Collecting help for argument: %.*s", arg.name.size(), arg.name.data());
@@ -144,9 +145,10 @@ void RegisterCommandHandler(const OpenShock::Serial::CommandGroup& handler) {
 class SerialBuffer {
   DISABLE_COPY(SerialBuffer);
   DISABLE_MOVE(SerialBuffer);
+
 public:
-  constexpr SerialBuffer() : m_data(nullptr), m_size(0), m_capacity(0) {}
-  inline SerialBuffer(std::size_t capacity) : m_data(new char[capacity]), m_size(0), m_capacity(capacity) {}
+  constexpr SerialBuffer() : m_data(nullptr), m_size(0), m_capacity(0) { }
+  inline SerialBuffer(std::size_t capacity) : m_data(new char[capacity]), m_size(0), m_capacity(capacity) { }
   inline ~SerialBuffer() { delete[] m_data; }
 
   constexpr char* data() { return m_data; }
@@ -163,7 +165,7 @@ public:
   }
 
   inline void reserve(std::size_t size) {
-    size = (size + 31) & ~31; // Align to 32 bytes
+    size = (size + 31) & ~31;  // Align to 32 bytes
 
     if (size <= m_capacity) {
       return;
@@ -178,7 +180,6 @@ public:
     m_data     = newData;
     m_capacity = size;
   }
-
 
   inline void push_back(char c) {
     if (m_size >= m_capacity) {
@@ -195,6 +196,7 @@ public:
   }
 
   constexpr operator std::string_view() const { return std::string_view(m_data, m_size); }
+
 private:
   char* m_data;
   std::size_t m_size;
@@ -210,7 +212,7 @@ enum class SerialReadResult {
 
 SerialReadResult _tryReadSerialLine(SerialBuffer& buffer) {
   // Check if there's any data available
-  int available  = ::Serial.available();
+  int available = ::Serial.available();
   if (available <= 0) {
     return SerialReadResult::NoData;
   }
@@ -224,7 +226,7 @@ SerialReadResult _tryReadSerialLine(SerialBuffer& buffer) {
 
     // Handle backspace
     if (c == '\b') {
-      buffer.pop_back(); // Remove the last character from the buffer if it exists
+      buffer.pop_back();  // Remove the last character from the buffer if it exists
       continue;
     }
 
@@ -370,28 +372,28 @@ void SerialInputHandler::Update() {
   static SerialBuffer buffer(32);
 
   switch (_tryReadSerialLine(buffer)) {
-  case SerialReadResult::LineEnd:
-    _processSerialLine(buffer);
+    case SerialReadResult::LineEnd:
+      _processSerialLine(buffer);
 
-    // Deallocate memory if the buffer is too large
-    if (buffer.capacity() > SERIAL_BUFFER_CLEAR_THRESHOLD) {
-      buffer.destroy();
-    } else {
-      buffer.clear();
-    }
+      // Deallocate memory if the buffer is too large
+      if (buffer.capacity() > SERIAL_BUFFER_CLEAR_THRESHOLD) {
+        buffer.destroy();
+      } else {
+        buffer.clear();
+      }
 
-    // Skip any remaining trailing whitespaces
-    _skipSerialWhitespaces(buffer);
-    break;
-  case SerialReadResult::AutoCompleteRequest:
-    ::Serial.printf(CLEAR_LINE "> %.*s [AutoComplete is not implemented]", buffer.size(), buffer.data());
-    break;
-  case SerialReadResult::Data:
-    _echoHandleSerialInput(buffer, true);
-    break;
-  default:
-    _echoHandleSerialInput(buffer, false);
-    break;
+      // Skip any remaining trailing whitespaces
+      _skipSerialWhitespaces(buffer);
+      break;
+    case SerialReadResult::AutoCompleteRequest:
+      ::Serial.printf(CLEAR_LINE "> %.*s [AutoComplete is not implemented]", buffer.size(), buffer.data());
+      break;
+    case SerialReadResult::Data:
+      _echoHandleSerialInput(buffer, true);
+      break;
+    default:
+      _echoHandleSerialInput(buffer, false);
+      break;
   }
 }
 

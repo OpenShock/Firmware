@@ -9,17 +9,17 @@ const char* const TAG = "LocalMessageHandlers";
 
 #include <cstdint>
 
-void serializeSetRfTxPinResult(uint8_t socketId, uint8_t pin, OpenShock::Serialization::Local::SetRfPinResultCode result) {
+void serializeSetRfTxPinResult(uint8_t socketId, uint8_t pin, OpenShock::Serialization::Local::SetGPIOResultCode result) {
   flatbuffers::FlatBufferBuilder builder(1024);
 
-  auto responseOffset = builder.CreateStruct(OpenShock::Serialization::Local::SetRfTxPinCommandResult(pin, result));
+  auto responseOffset = OpenShock::Serialization::Local::CreateSetRfTxPinCommandResult(builder, pin, result);
 
-  auto msgOffset = OpenShock::Serialization::Local::CreateHubToLocalMessage(builder, OpenShock::Serialization::Local::HubToLocalMessagePayload::SetRfTxPinCommandResult, responseOffset.Union());
+  auto msg = OpenShock::Serialization::Local::CreateHubToLocalMessage(builder, OpenShock::Serialization::Local::HubToLocalMessagePayload::SetRfTxPinCommandResult, responseOffset.Union());
 
-  builder.Finish(msgOffset);
+  OpenShock::Serialization::Local::FinishHubToLocalMessageBuffer(builder, msg);
 
   const uint8_t* buffer = builder.GetBufferPointer();
-  uint8_t size   = builder.GetSize();
+  uint8_t size          = builder.GetSize();
 
   OpenShock::CaptivePortal::SendMessageBIN(socketId, buffer, size);
 }

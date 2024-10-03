@@ -13,18 +13,36 @@ export class WifiScanCommand {
   return this;
 }
 
+static getRootAsWifiScanCommand(bb:flatbuffers.ByteBuffer, obj?:WifiScanCommand):WifiScanCommand {
+  return (obj || new WifiScanCommand()).__init(bb.readInt32(bb.position()) + bb.position(), bb);
+}
+
+static getSizePrefixedRootAsWifiScanCommand(bb:flatbuffers.ByteBuffer, obj?:WifiScanCommand):WifiScanCommand {
+  bb.setPosition(bb.position() + flatbuffers.SIZE_PREFIX_LENGTH);
+  return (obj || new WifiScanCommand()).__init(bb.readInt32(bb.position()) + bb.position(), bb);
+}
+
 run():boolean {
-  return !!this.bb!.readInt8(this.bb_pos);
+  const offset = this.bb!.__offset(this.bb_pos, 4);
+  return offset ? !!this.bb!.readInt8(this.bb_pos + offset) : false;
 }
 
-static sizeOf():number {
-  return 1;
+static startWifiScanCommand(builder:flatbuffers.Builder) {
+  builder.startObject(1);
 }
 
-static createWifiScanCommand(builder:flatbuffers.Builder, run: boolean):flatbuffers.Offset {
-  builder.prep(1, 1);
-  builder.writeInt8(Number(Boolean(run)));
-  return builder.offset();
+static addRun(builder:flatbuffers.Builder, run:boolean) {
+  builder.addFieldInt8(0, +run, +false);
 }
 
+static endWifiScanCommand(builder:flatbuffers.Builder):flatbuffers.Offset {
+  const offset = builder.endObject();
+  return offset;
+}
+
+static createWifiScanCommand(builder:flatbuffers.Builder, run:boolean):flatbuffers.Offset {
+  WifiScanCommand.startWifiScanCommand(builder);
+  WifiScanCommand.addRun(builder, run);
+  return WifiScanCommand.endWifiScanCommand(builder);
+}
 }
