@@ -27,7 +27,7 @@ static getSizePrefixedRootAsSetRfTxPinCommandResult(bb:flatbuffers.ByteBuffer, o
 
 pin():number {
   const offset = this.bb!.__offset(this.bb_pos, 4);
-  return offset ? this.bb!.readUint8(this.bb_pos + offset) : 0;
+  return offset ? this.bb!.readInt8(this.bb_pos + offset) : 0;
 }
 
 result():SetGPIOResultCode {

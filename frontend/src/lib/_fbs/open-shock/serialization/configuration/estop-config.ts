@@ -32,7 +32,7 @@ enabled():boolean {
  */
 gpioPin():number {
   const offset = this.bb!.__offset(this.bb_pos, 6);
-  return offset ? this.bb!.readUint8(this.bb_pos + offset) : 0;
+  return offset ? this.bb!.readInt8(this.bb_pos + offset) : 0;
 }
 
 static startEStopConfig(builder:flatbuffers.Builder) {
