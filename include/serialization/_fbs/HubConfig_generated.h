@@ -919,6 +919,36 @@ struct HubConfig::Traits {
   static auto constexpr Create = CreateHubConfig;
 };
 
+inline const OpenShock::Serialization::Configuration::HubConfig *GetHubConfig(const void *buf) {
+  return ::flatbuffers::GetRoot<OpenShock::Serialization::Configuration::HubConfig>(buf);
+}
+
+inline const OpenShock::Serialization::Configuration::HubConfig *GetSizePrefixedHubConfig(const void *buf) {
+  return ::flatbuffers::GetSizePrefixedRoot<OpenShock::Serialization::Configuration::HubConfig>(buf);
+}
+
+inline bool VerifyHubConfigBuffer(
+    ::flatbuffers::Verifier &verifier) {
+  return verifier.VerifyBuffer<OpenShock::Serialization::Configuration::HubConfig>(nullptr);
+}
+
+inline bool VerifySizePrefixedHubConfigBuffer(
+    ::flatbuffers::Verifier &verifier) {
+  return verifier.VerifySizePrefixedBuffer<OpenShock::Serialization::Configuration::HubConfig>(nullptr);
+}
+
+inline void FinishHubConfigBuffer(
+    ::flatbuffers::FlatBufferBuilder &fbb,
+    ::flatbuffers::Offset<OpenShock::Serialization::Configuration::HubConfig> root) {
+  fbb.Finish(root);
+}
+
+inline void FinishSizePrefixedHubConfigBuffer(
+    ::flatbuffers::FlatBufferBuilder &fbb,
+    ::flatbuffers::Offset<OpenShock::Serialization::Configuration::HubConfig> root) {
+  fbb.FinishSizePrefixed(root);
+}
+
 }  // namespace Configuration
 }  // namespace Serialization
 }  // namespace OpenShock

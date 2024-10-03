@@ -14,9 +14,9 @@ void serializeSetRfTxPinResult(uint8_t socketId, uint8_t pin, OpenShock::Seriali
 
   auto responseOffset = OpenShock::Serialization::Local::CreateSetRfTxPinCommandResult(builder, pin, result);
 
-  auto msgOffset = OpenShock::Serialization::Local::CreateHubToLocalMessage(builder, OpenShock::Serialization::Local::HubToLocalMessagePayload::SetRfTxPinCommandResult, responseOffset.Union());
+  auto msg = OpenShock::Serialization::Local::CreateHubToLocalMessage(builder, OpenShock::Serialization::Local::HubToLocalMessagePayload::SetRfTxPinCommandResult, responseOffset.Union());
 
-  builder.Finish(msgOffset);
+  OpenShock::Serialization::Local::FinishHubToLocalMessageBuffer(builder, msg);
 
   const uint8_t* buffer = builder.GetBufferPointer();
   uint8_t size          = builder.GetSize();

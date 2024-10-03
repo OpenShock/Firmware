@@ -124,4 +124,12 @@ static endHubConfig(builder:flatbuffers.Builder):flatbuffers.Offset {
   return offset;
 }
 
+static finishHubConfigBuffer(builder:flatbuffers.Builder, offset:flatbuffers.Offset) {
+  builder.finish(offset);
+}
+
+static finishSizePrefixedHubConfigBuffer(builder:flatbuffers.Builder, offset:flatbuffers.Offset) {
+  builder.finish(offset, undefined, true);
+}
+
 }

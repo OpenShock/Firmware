@@ -13,9 +13,9 @@ void serializeAccountLinkCommandResult(uint8_t socketId, OpenShock::Serializatio
 
   auto responseOffset = OpenShock::Serialization::Local::CreateAccountLinkCommandResult(builder, result);
 
-  auto msgOffset = OpenShock::Serialization::Local::CreateHubToLocalMessage(builder, OpenShock::Serialization::Local::HubToLocalMessagePayload::AccountLinkCommandResult, responseOffset.Union());
+  auto msg = OpenShock::Serialization::Local::CreateHubToLocalMessage(builder, OpenShock::Serialization::Local::HubToLocalMessagePayload::AccountLinkCommandResult, responseOffset.Union());
 
-  builder.Finish(msgOffset);
+  OpenShock::Serialization::Local::FinishHubToLocalMessageBuffer(builder, msg);
 
   auto buffer = builder.GetBufferPointer();
   auto size   = builder.GetSize();
