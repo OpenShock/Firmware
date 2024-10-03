@@ -119,7 +119,7 @@ void _handleRfTxPinCommand(std::string_view arg, bool isAutomated) {
     SERPR_ERROR("Invalid argument (number invalid or out of range)");
   }
 
-  OpenShock::SetGPIOResultCode result = OpenShock::CommandHandler::SetRfTxPin(static_cast<uint8_t>(pin));
+  OpenShock::SetGPIOResultCode result = OpenShock::CommandHandler::SetRfTxPin(pin);
 
   switch (result) {
     case OpenShock::SetGPIOResultCode::InvalidPin:

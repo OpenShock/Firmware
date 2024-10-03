@@ -14,6 +14,7 @@ namespace OpenShock::CommandHandler {
   [[nodiscard]] bool Init();
   bool Ok();
 
+  gpio_num_t GetRfTxPin();
   SetGPIOResultCode SetRfTxPin(gpio_num_t txPin);
 
   SetGPIOResultCode SetEstopPin(uint8_t estopPin);
