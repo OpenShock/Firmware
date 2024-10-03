@@ -145,6 +145,21 @@ bool Convert::ToBool(std::string_view str, bool& val) {
   return false;
 }
 
+bool Convert::ToGpioNum(std::string_view str, gpio_num_t& val) {
+  int8_t i8 = 0;
+  if (!spanToST(str, i8)) {
+    return false;
+  }
+
+  if (i8 < GPIO_NUM_NC || i8 >= GPIO_NUM_MAX) {
+    return false;
+  }
+
+  val = static_cast<gpio_num_t>(i8);
+
+  return true;
+}
+
 static_assert(NumDigits<uint8_t>() == 3, "NumDigits test for uint8_t failed");
 static_assert(NumDigits<uint16_t>() == 5, "NumDigits test for uint16_t failed");
 static_assert(NumDigits<uint32_t>() == 10, "NumDigits test for uint32_t failed");

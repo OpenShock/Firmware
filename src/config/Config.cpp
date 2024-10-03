@@ -364,7 +364,7 @@ bool Config::SetWiFiCredentials(const std::vector<Config::WiFiCredentials>& cred
   return _trySaveConfig();
 }
 
-bool Config::GetRFConfigTxPin(uint8_t& out) {
+bool Config::GetRFConfigTxPin(gpio_num_t& out) {
   CONFIG_LOCK_READ(false);
 
   out = _configData.rf.txPin;

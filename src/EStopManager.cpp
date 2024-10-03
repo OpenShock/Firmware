@@ -125,7 +125,7 @@ void EStopManager::Init() {
 #ifdef OPENSHOCK_ESTOP_PIN
   s_estopPin = static_cast<gpio_num_t>(OPENSHOCK_ESTOP_PIN);
 
-  OS_LOGI(TAG, "Initializing on pin %hhi", static_cast<int8_t>(s_estopPin));
+  OS_LOGI(TAG, "Initializing on pin %hhi", s_estopPin);
 
   gpio_config_t io_conf;
   io_conf.pin_bit_mask = 1ULL << s_estopPin;

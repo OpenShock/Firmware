@@ -20,7 +20,7 @@
   $: linkCodeValid = isValidLinkCode(linkCode);
 
   let rfTxPin: number | null = $DeviceStateStore.config?.rf.txPin ?? null;
-  $: rfTxPinValid = rfTxPin !== null && rfTxPin >= 0 && rfTxPin < 255;
+  $: rfTxPinValid = rfTxPin !== null && rfTxPin > 0;
 
   function linkAccount() {
     if (!linkCodeValid) return;

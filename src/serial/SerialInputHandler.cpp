@@ -101,20 +101,20 @@ void _handleFactoryResetCommand(std::string_view arg, bool isAutomated) {
 }
 
 void _handleRfTxPinCommand(std::string_view arg, bool isAutomated) {
+  gpio_num_t pin;
+
   if (arg.empty()) {
-    gpio_num_t txPin;
-    if (!Config::GetRFConfigTxPin(txPin)) {
+    if (!Config::GetRFConfigTxPin(pin)) {
       SERPR_ERROR("Failed to get RF TX pin from config");
       return;
     }
 
     // Get rmt pin
-    SERPR_RESPONSE("RmtPin|%u", static_cast<uint8_t>(txPin));
+    SERPR_RESPONSE("RmtPin|%hhi", pin);
     return;
   }
 
-  uint8_t pin;
-  if (!OpenShock::Convert::ToUint8(arg, pin)) {
+  if (!OpenShock::Convert::ToGpioNum(arg, pin)) {
     SERPR_ERROR("Invalid argument (number invalid or out of range)");
   }
 

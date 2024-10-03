@@ -165,17 +165,17 @@ bool CommandHandler::Init() {
     return false;
   }
 
-  uint8_t txPin = rfConfig.txPin;
+  gpio_num_t txPin = rfConfig.txPin;
   if (!OpenShock::IsValidOutputPin(txPin)) {
     if (!OpenShock::IsValidOutputPin(OPENSHOCK_RF_TX_GPIO)) {
-      OS_LOGE(TAG, "Configured RF TX pin (%u) is invalid, and default pin (%u) is invalid. Unable to initialize RF transmitter", txPin, OPENSHOCK_RF_TX_GPIO);
+      OS_LOGE(TAG, "Configured RF TX pin (%hhi) is invalid, and default pin (%hhi) is invalid. Unable to initialize RF transmitter", txPin, OPENSHOCK_RF_TX_GPIO);
 
       OS_LOGD(TAG, "Setting RF TX pin to GPIO_INVALID");
-      return Config::SetRFConfigTxPin(OPENSHOCK_GPIO_INVALID);  // This is not a error yet, unless we are unable to save the RF TX Pin as invalid
+      return Config::SetRFConfigTxPin(static_cast<gpio_num_t>(OPENSHOCK_GPIO_INVALID));  // This is not a error yet, unless we are unable to save the RF TX Pin as invalid
     }
 
-    OS_LOGW(TAG, "Configured RF TX pin (%u) is invalid, using default pin (%u)", txPin, OPENSHOCK_RF_TX_GPIO);
-    txPin = OPENSHOCK_RF_TX_GPIO;
+    OS_LOGW(TAG, "Configured RF TX pin (%hhi) is invalid, using default pin (%hhi)", txPin, OPENSHOCK_RF_TX_GPIO);
+    txPin = static_cast<gpio_num_t>(OPENSHOCK_RF_TX_GPIO);
     if (!Config::SetRFConfigTxPin(txPin)) {
       OS_LOGE(TAG, "Failed to set RF TX pin in config");
       return false;
@@ -200,7 +200,7 @@ bool CommandHandler::Ok() {
   return s_rfTransmitter != nullptr;
 }
 
-SetRfPinResultCode CommandHandler::SetRfTxPin(uint8_t txPin) {
+SetRfPinResultCode CommandHandler::SetRfTxPin(gpio_num_t txPin) {
   if (!OpenShock::IsValidOutputPin(txPin)) {
     return SetRfPinResultCode::InvalidPin;
   }
@@ -265,11 +265,15 @@ bool CommandHandler::SetKeepAlivePaused(bool paused) {
   return true;
 }
 
-uint8_t CommandHandler::GetRfTxPin() {
-  uint8_t txPin;
+gpio_num_t CommandHandler::GetRfTxPin() {
+  if (s_rfTransmitter != nullptr) {
+    return s_rfTransmitter->GetTxPin();
+  }
+
+  gpio_num_t txPin;
   if (!Config::GetRFConfigTxPin(txPin)) {
     OS_LOGE(TAG, "Failed to get RF TX pin from config");
-    txPin = OPENSHOCK_GPIO_INVALID;
+    txPin = static_cast<gpio_num_t>(OPENSHOCK_GPIO_INVALID);
   }
 
   return txPin;
