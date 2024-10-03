@@ -34,7 +34,7 @@ bool EStopConfig::FromFlatbuffers(const Serialization::Configuration::EStopConfi
 
   gpioPin = static_cast<gpio_num_t>(config->gpio_pin());
 
-  if (OpenShock::IsValidInputPin(val)) {
+  if (OpenShock::IsValidInputPin(static_cast<uint8_t>(gpioPin))) {
     enabled = config->enabled();
   } else {
     enabled = false;
