@@ -9,6 +9,7 @@ const char* const TAG = "CommandHandler";
 #include "config/Config.h"
 #include "Logging.h"
 #include "radio/RFTransmitter.h"
+#include "ReadWriteMutex.h"
 #include "Time.h"
 #include "util/TaskUtils.h"
 
@@ -35,10 +36,10 @@ struct KnownShocker {
   int64_t lastActivityTimestamp;
 };
 
-static SemaphoreHandle_t s_rfTransmitterMutex         = nullptr;
+static ReadWriteMutex s_rfTransmitterMutex            = {};
 static std::unique_ptr<RFTransmitter> s_rfTransmitter = nullptr;
 
-static SemaphoreHandle_t s_keepAliveMutex = nullptr;
+static ReadWriteMutex s_keepAliveMutex    = {};
 static QueueHandle_t s_keepAliveQueue     = nullptr;
 static TaskHandle_t s_keepAliveTaskHandle = nullptr;
 
@@ -104,7 +105,7 @@ bool _internalSetKeepAliveEnabled(bool enabled) {
     return true;
   }
 
-  xSemaphoreTake(s_keepAliveMutex, portMAX_DELAY);
+  ScopedWriteLock keepAliveLock(&s_keepAliveMutex);
 
   if (enabled) {
     OS_LOGV(TAG, "Enabling keep-alive task");
@@ -112,8 +113,6 @@ bool _internalSetKeepAliveEnabled(bool enabled) {
     s_keepAliveQueue = xQueueCreate(32, sizeof(KnownShocker));
     if (s_keepAliveQueue == nullptr) {
       OS_LOGE(TAG, "Failed to create keep-alive task");
-
-      xSemaphoreGive(s_keepAliveMutex);
       return false;
     }
 
@@ -123,7 +122,6 @@ bool _internalSetKeepAliveEnabled(bool enabled) {
       vQueueDelete(s_keepAliveQueue);
       s_keepAliveQueue = nullptr;
 
-      xSemaphoreGive(s_keepAliveMutex);
       return false;
     }
   } else {
@@ -144,20 +142,16 @@ bool _internalSetKeepAliveEnabled(bool enabled) {
     }
   }
 
-  xSemaphoreGive(s_keepAliveMutex);
-
   return true;
 }
 
 bool CommandHandler::Init() {
-  if (s_rfTransmitterMutex != nullptr) {
+  static bool initialized = false;
+  if (initialized) {
     OS_LOGW(TAG, "RF Transmitter is already initialized");
     return true;
   }
-
-  // Initialize mutexes
-  s_rfTransmitterMutex = xSemaphoreCreateMutex();
-  s_keepAliveMutex     = xSemaphoreCreateMutex();
+  initialized = true;
 
   Config::RFConfig rfConfig;
   if (!Config::GetRFConfig(rfConfig)) {
@@ -205,7 +199,7 @@ SetRfPinResultCode CommandHandler::SetRfTxPin(gpio_num_t txPin) {
     return SetRfPinResultCode::InvalidPin;
   }
 
-  xSemaphoreTake(s_rfTransmitterMutex, portMAX_DELAY);
+  ScopedWriteLock rftxLock(&s_rfTransmitterMutex);
 
   if (s_rfTransmitter != nullptr) {
     OS_LOGV(TAG, "Destroying existing RF transmitter");
@@ -216,21 +210,16 @@ SetRfPinResultCode CommandHandler::SetRfTxPin(gpio_num_t txPin) {
   auto rfxmit = std::make_unique<RFTransmitter>(txPin);
   if (!rfxmit->ok()) {
     OS_LOGE(TAG, "Failed to initialize RF transmitter");
-
-    xSemaphoreGive(s_rfTransmitterMutex);
     return SetRfPinResultCode::InternalError;
   }
 
   if (!Config::SetRFConfigTxPin(txPin)) {
     OS_LOGE(TAG, "Failed to set RF TX pin in config");
-
-    xSemaphoreGive(s_rfTransmitterMutex);
     return SetRfPinResultCode::InternalError;
   }
 
   s_rfTransmitter = std::move(rfxmit);
 
-  xSemaphoreGive(s_rfTransmitterMutex);
   return SetRfPinResultCode::Success;
 }
 
@@ -280,12 +269,10 @@ gpio_num_t CommandHandler::GetRfTxPin() {
 }
 
 bool CommandHandler::HandleCommand(ShockerModelType model, uint16_t shockerId, ShockerCommandType type, uint8_t intensity, uint16_t durationMs) {
-  xSemaphoreTake(s_rfTransmitterMutex, portMAX_DELAY);
+  ScopedReadLock rftxLock(&s_rfTransmitterMutex);
 
   if (s_rfTransmitter == nullptr) {
     OS_LOGW(TAG, "RF Transmitter is not initialized, ignoring command");
-
-    xSemaphoreGive(s_rfTransmitterMutex);
     return false;
   }
 
@@ -304,8 +291,8 @@ bool CommandHandler::HandleCommand(ShockerModelType model, uint16_t shockerId, S
 
   bool ok = s_rfTransmitter->SendCommand(model, shockerId, type, intensity, durationMs);
 
-  xSemaphoreGive(s_rfTransmitterMutex);
-  xSemaphoreTake(s_keepAliveMutex, portMAX_DELAY);
+  rftxLock.unlock();
+  ScopedReadLock keepAliveLock(&s_keepAliveMutex);
 
   if (ok && s_keepAliveQueue != nullptr) {
     KnownShocker cmd {.model = model, .shockerId = shockerId, .lastActivityTimestamp = OpenShock::millis() + durationMs};
@@ -313,8 +300,6 @@ bool CommandHandler::HandleCommand(ShockerModelType model, uint16_t shockerId, S
       OS_LOGE(TAG, "Failed to send keep-alive command to queue");
     }
   }
-
-  xSemaphoreGive(s_keepAliveMutex);
 
   return ok;
 }
