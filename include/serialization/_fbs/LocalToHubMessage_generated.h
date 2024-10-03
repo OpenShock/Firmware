@@ -59,6 +59,10 @@ struct AccountUnlinkCommand;
 
 struct SetRfTxPinCommand;
 
+struct SetEstopEnabledCommand;
+
+struct SetEstopPinCommand;
+
 struct LocalToHubMessage;
 struct LocalToHubMessageBuilder;
 
@@ -81,11 +85,13 @@ enum class LocalToHubMessagePayload : uint8_t {
   AccountLinkCommand = 15,
   AccountUnlinkCommand = 16,
   SetRfTxPinCommand = 17,
+  SetEstopEnabledCommand = 18,
+  SetEstopPinCommand = 19,
   MIN = NONE,
-  MAX = SetRfTxPinCommand
+  MAX = SetEstopPinCommand
 };
 
-inline const LocalToHubMessagePayload (&EnumValuesLocalToHubMessagePayload())[18] {
+inline const LocalToHubMessagePayload (&EnumValuesLocalToHubMessagePayload())[20] {
   static const LocalToHubMessagePayload values[] = {
     LocalToHubMessagePayload::NONE,
     LocalToHubMessagePayload::WifiScanCommand,
@@ -104,13 +110,15 @@ inline const LocalToHubMessagePayload (&EnumValuesLocalToHubMessagePayload())[18
     LocalToHubMessagePayload::OtaUpdateStartUpdateCommand,
     LocalToHubMessagePayload::AccountLinkCommand,
     LocalToHubMessagePayload::AccountUnlinkCommand,
-    LocalToHubMessagePayload::SetRfTxPinCommand
+    LocalToHubMessagePayload::SetRfTxPinCommand,
+    LocalToHubMessagePayload::SetEstopEnabledCommand,
+    LocalToHubMessagePayload::SetEstopPinCommand
   };
   return values;
 }
 
 inline const char * const *EnumNamesLocalToHubMessagePayload() {
-  static const char * const names[19] = {
+  static const char * const names[21] = {
     "NONE",
     "WifiScanCommand",
     "WifiNetworkSaveCommand",
@@ -129,13 +137,15 @@ inline const char * const *EnumNamesLocalToHubMessagePayload() {
     "AccountLinkCommand",
     "AccountUnlinkCommand",
     "SetRfTxPinCommand",
+    "SetEstopEnabledCommand",
+    "SetEstopPinCommand",
     nullptr
   };
   return names;
 }
 
 inline const char *EnumNameLocalToHubMessagePayload(LocalToHubMessagePayload e) {
-  if (::flatbuffers::IsOutRange(e, LocalToHubMessagePayload::NONE, LocalToHubMessagePayload::SetRfTxPinCommand)) return "";
+  if (::flatbuffers::IsOutRange(e, LocalToHubMessagePayload::NONE, LocalToHubMessagePayload::SetEstopPinCommand)) return "";
   const size_t index = static_cast<size_t>(e);
   return EnumNamesLocalToHubMessagePayload()[index];
 }
@@ -210,6 +220,14 @@ template<> struct LocalToHubMessagePayloadTraits<OpenShock::Serialization::Local
 
 template<> struct LocalToHubMessagePayloadTraits<OpenShock::Serialization::Local::SetRfTxPinCommand> {
   static const LocalToHubMessagePayload enum_value = LocalToHubMessagePayload::SetRfTxPinCommand;
+};
+
+template<> struct LocalToHubMessagePayloadTraits<OpenShock::Serialization::Local::SetEstopEnabledCommand> {
+  static const LocalToHubMessagePayload enum_value = LocalToHubMessagePayload::SetEstopEnabledCommand;
+};
+
+template<> struct LocalToHubMessagePayloadTraits<OpenShock::Serialization::Local::SetEstopPinCommand> {
+  static const LocalToHubMessagePayload enum_value = LocalToHubMessagePayload::SetEstopPinCommand;
 };
 
 bool VerifyLocalToHubMessagePayload(::flatbuffers::Verifier &verifier, const void *obj, LocalToHubMessagePayload type);
@@ -438,6 +456,56 @@ FLATBUFFERS_STRUCT_END(SetRfTxPinCommand, 1);
 
 struct SetRfTxPinCommand::Traits {
   using type = SetRfTxPinCommand;
+};
+
+FLATBUFFERS_MANUALLY_ALIGNED_STRUCT(1) SetEstopEnabledCommand FLATBUFFERS_FINAL_CLASS {
+ private:
+  uint8_t enabled_;
+
+ public:
+  struct Traits;
+  static FLATBUFFERS_CONSTEXPR_CPP11 const char *GetFullyQualifiedName() {
+    return "OpenShock.Serialization.Local.SetEstopEnabledCommand";
+  }
+  SetEstopEnabledCommand()
+      : enabled_(0) {
+  }
+  SetEstopEnabledCommand(bool _enabled)
+      : enabled_(::flatbuffers::EndianScalar(static_cast<uint8_t>(_enabled))) {
+  }
+  bool enabled() const {
+    return ::flatbuffers::EndianScalar(enabled_) != 0;
+  }
+};
+FLATBUFFERS_STRUCT_END(SetEstopEnabledCommand, 1);
+
+struct SetEstopEnabledCommand::Traits {
+  using type = SetEstopEnabledCommand;
+};
+
+FLATBUFFERS_MANUALLY_ALIGNED_STRUCT(1) SetEstopPinCommand FLATBUFFERS_FINAL_CLASS {
+ private:
+  uint8_t pin_;
+
+ public:
+  struct Traits;
+  static FLATBUFFERS_CONSTEXPR_CPP11 const char *GetFullyQualifiedName() {
+    return "OpenShock.Serialization.Local.SetEstopPinCommand";
+  }
+  SetEstopPinCommand()
+      : pin_(0) {
+  }
+  SetEstopPinCommand(uint8_t _pin)
+      : pin_(::flatbuffers::EndianScalar(_pin)) {
+  }
+  uint8_t pin() const {
+    return ::flatbuffers::EndianScalar(pin_);
+  }
+};
+FLATBUFFERS_STRUCT_END(SetEstopPinCommand, 1);
+
+struct SetEstopPinCommand::Traits {
+  using type = SetEstopPinCommand;
 };
 
 struct WifiNetworkSaveCommand FLATBUFFERS_FINAL_CLASS : private ::flatbuffers::Table {
@@ -1028,6 +1096,12 @@ struct LocalToHubMessage FLATBUFFERS_FINAL_CLASS : private ::flatbuffers::Table 
   const OpenShock::Serialization::Local::SetRfTxPinCommand *payload_as_SetRfTxPinCommand() const {
     return payload_type() == OpenShock::Serialization::Local::LocalToHubMessagePayload::SetRfTxPinCommand ? static_cast<const OpenShock::Serialization::Local::SetRfTxPinCommand *>(payload()) : nullptr;
   }
+  const OpenShock::Serialization::Local::SetEstopEnabledCommand *payload_as_SetEstopEnabledCommand() const {
+    return payload_type() == OpenShock::Serialization::Local::LocalToHubMessagePayload::SetEstopEnabledCommand ? static_cast<const OpenShock::Serialization::Local::SetEstopEnabledCommand *>(payload()) : nullptr;
+  }
+  const OpenShock::Serialization::Local::SetEstopPinCommand *payload_as_SetEstopPinCommand() const {
+    return payload_type() == OpenShock::Serialization::Local::LocalToHubMessagePayload::SetEstopPinCommand ? static_cast<const OpenShock::Serialization::Local::SetEstopPinCommand *>(payload()) : nullptr;
+  }
   bool Verify(::flatbuffers::Verifier &verifier) const {
     return VerifyTableStart(verifier) &&
            VerifyField<uint8_t>(verifier, VT_PAYLOAD_TYPE, 1) &&
@@ -1103,6 +1177,14 @@ template<> inline const OpenShock::Serialization::Local::AccountUnlinkCommand *L
 
 template<> inline const OpenShock::Serialization::Local::SetRfTxPinCommand *LocalToHubMessage::payload_as<OpenShock::Serialization::Local::SetRfTxPinCommand>() const {
   return payload_as_SetRfTxPinCommand();
+}
+
+template<> inline const OpenShock::Serialization::Local::SetEstopEnabledCommand *LocalToHubMessage::payload_as<OpenShock::Serialization::Local::SetEstopEnabledCommand>() const {
+  return payload_as_SetEstopEnabledCommand();
+}
+
+template<> inline const OpenShock::Serialization::Local::SetEstopPinCommand *LocalToHubMessage::payload_as<OpenShock::Serialization::Local::SetEstopPinCommand>() const {
+  return payload_as_SetEstopPinCommand();
 }
 
 struct LocalToHubMessageBuilder {
@@ -1204,6 +1286,12 @@ inline bool VerifyLocalToHubMessagePayload(::flatbuffers::Verifier &verifier, co
     }
     case LocalToHubMessagePayload::SetRfTxPinCommand: {
       return verifier.VerifyField<OpenShock::Serialization::Local::SetRfTxPinCommand>(static_cast<const uint8_t *>(obj), 0, 1);
+    }
+    case LocalToHubMessagePayload::SetEstopEnabledCommand: {
+      return verifier.VerifyField<OpenShock::Serialization::Local::SetEstopEnabledCommand>(static_cast<const uint8_t *>(obj), 0, 1);
+    }
+    case LocalToHubMessagePayload::SetEstopPinCommand: {
+      return verifier.VerifyField<OpenShock::Serialization::Local::SetEstopPinCommand>(static_cast<const uint8_t *>(obj), 0, 1);
     }
     default: return true;
   }

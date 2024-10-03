@@ -6,6 +6,7 @@ const char* const TAG = "SerialInputHandler";
 #include "CommandHandler.h"
 #include "config/Config.h"
 #include "config/SerialInputConfig.h"
+#include "EStopManager.h"
 #include "FormatHelpers.h"
 #include "http/HTTPRequestManager.h"
 #include "Convert.h"
@@ -118,18 +119,18 @@ void _handleRfTxPinCommand(std::string_view arg, bool isAutomated) {
     SERPR_ERROR("Invalid argument (number invalid or out of range)");
   }
 
-  OpenShock::SetRfPinResultCode result = OpenShock::CommandHandler::SetRfTxPin(pin);
+  OpenShock::SetGPIOResultCode result = OpenShock::CommandHandler::SetRfTxPin(static_cast<uint8_t>(pin));
 
   switch (result) {
-    case OpenShock::SetRfPinResultCode::InvalidPin:
+    case OpenShock::SetGPIOResultCode::InvalidPin:
       SERPR_ERROR("Invalid argument (invalid pin)");
       break;
 
-    case OpenShock::SetRfPinResultCode::InternalError:
+    case OpenShock::SetGPIOResultCode::InternalError:
       SERPR_ERROR("Internal error while setting RF TX pin");
       break;
 
-    case OpenShock::SetRfPinResultCode::Success:
+    case OpenShock::SetGPIOResultCode::Success:
       SERPR_SUCCESS("Saved config");
       break;
 
@@ -137,6 +138,40 @@ void _handleRfTxPinCommand(std::string_view arg, bool isAutomated) {
       SERPR_ERROR("Unknown error while setting RF TX pin");
       break;
   }
+}
+
+void _handleEStopPinCommand(std::string_view arg, bool isAutomated) {
+  if (arg.empty()) {
+    gpio_num_t estopPin;
+    if (!Config::GetEStopGpioPin(estopPin)) {
+      SERPR_ERROR("Failed to get EStop pin from config");
+      return;
+    }
+
+    // Get EStop pin
+    SERPR_RESPONSE("EStopPin|%hhi", static_cast<int8_t>(estopPin));
+    return;
+  }
+
+  uint8_t pin;
+  if (!OpenShock::Convert::ToUint8(arg, pin)) {
+    SERPR_ERROR("Invalid argument (number invalid or out of range)");
+    return;
+  }
+
+  gpio_num_t estopPin = static_cast<gpio_num_t>(pin);
+
+  if (!OpenShock::EStopManager::SetEStopPin(estopPin)) {
+    SERPR_ERROR("Failed to set EStop pin");
+    return;
+  }
+
+  if (!Config::SetEStopGpioPin(estopPin)) {
+    SERPR_ERROR("Failed to save config");
+    return;
+  }
+
+  SERPR_SUCCESS("Saved config");
 }
 
 void _handleDomainCommand(std::string_view arg, bool isAutomated) {
@@ -596,6 +631,8 @@ echo         <bool>     set serial echo enabled
 validgpios              list all valid GPIO pins
 rftxpin                 get radio transmit pin
 rftxpin      <pin>      set radio transmit pin
+estoppin                get e-stop pin
+estoppin     <pin>      set e-stop pin
 domain                  get backend domain
 domain       <domain>   set backend domain
 authtoken               get auth token
@@ -690,6 +727,20 @@ rftxpin [<pin>]
     rftxpin 15
 )",
   _handleRfTxPinCommand,
+};
+static const SerialCmdHandler kEStopPinCmdHandler = {
+  "estoppin"sv,
+  R"(estoppin
+  Get the GPIO pin used for the E-Stop.
+
+estoppin [<pin>]
+  Set the GPIO pin used for the E-Stop.
+  Arguments:
+    <pin> must be a number.
+  Example:
+    estoppin 4
+)",
+  _handleEStopPinCommand,
 };
 static const SerialCmdHandler kDomainCmdHandler = {
   "domain"sv,
@@ -1001,6 +1052,7 @@ bool SerialInputHandler::Init() {
   RegisterCommandHandler(kSerialEchoCmdHandler);
   RegisterCommandHandler(kValidGpiosCmdHandler);
   RegisterCommandHandler(kRfTxPinCmdHandler);
+  RegisterCommandHandler(kEStopPinCmdHandler);
   RegisterCommandHandler(kDomainCmdHandler);
   RegisterCommandHandler(kAuthTokenCmdHandler);
   RegisterCommandHandler(kLcgOverrideCmdHandler);

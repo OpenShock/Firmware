@@ -7,6 +7,7 @@ const char* const TAG = "CommandHandler";
 #include "Chipset.h"
 #include "Common.h"
 #include "config/Config.h"
+#include "EStopManager.h"
 #include "Logging.h"
 #include "radio/RFTransmitter.h"
 #include "ReadWriteMutex.h"
@@ -38,6 +39,8 @@ struct KnownShocker {
 
 static ReadWriteMutex s_rfTransmitterMutex            = {};
 static std::unique_ptr<RFTransmitter> s_rfTransmitter = nullptr;
+
+static SemaphoreHandle_t s_estopManagerMutex = nullptr;
 
 static ReadWriteMutex s_keepAliveMutex    = {};
 static QueueHandle_t s_keepAliveQueue     = nullptr;
@@ -148,7 +151,7 @@ bool _internalSetKeepAliveEnabled(bool enabled) {
 bool CommandHandler::Init() {
   static bool initialized = false;
   if (initialized) {
-    OS_LOGW(TAG, "RF Transmitter is already initialized");
+    OS_LOGW(TAG, "RF Transmitter and EStopManager are already initialized?");
     return true;
   }
   initialized = true;
@@ -187,6 +190,14 @@ bool CommandHandler::Init() {
     _internalSetKeepAliveEnabled(true);
   }
 
+  Config::EStopConfig estopConfig;
+  if (!Config::GetEStop(estopConfig)) {
+    OS_LOGE(TAG, "Failed to get EStop config");
+    return false;
+  }
+
+  // TODO: Implement EStopManager pin change logic
+
   return true;
 }
 
@@ -194,9 +205,9 @@ bool CommandHandler::Ok() {
   return s_rfTransmitter != nullptr;
 }
 
-SetRfPinResultCode CommandHandler::SetRfTxPin(gpio_num_t txPin) {
+SetGPIOResultCode CommandHandler::SetRfTxPin(gpio_num_t txPin) {
   if (!OpenShock::IsValidOutputPin(txPin)) {
-    return SetRfPinResultCode::InvalidPin;
+    return SetGPIOResultCode::InvalidPin;
   }
 
   ScopedWriteLock rftxLock(&s_rfTransmitterMutex);
@@ -210,17 +221,42 @@ SetRfPinResultCode CommandHandler::SetRfTxPin(gpio_num_t txPin) {
   auto rfxmit = std::make_unique<RFTransmitter>(txPin);
   if (!rfxmit->ok()) {
     OS_LOGE(TAG, "Failed to initialize RF transmitter");
-    return SetRfPinResultCode::InternalError;
+    return SetGPIOResultCode::InternalError;
   }
 
   if (!Config::SetRFConfigTxPin(txPin)) {
     OS_LOGE(TAG, "Failed to set RF TX pin in config");
-    return SetRfPinResultCode::InternalError;
+    return SetGPIOResultCode::InternalError;
   }
 
   s_rfTransmitter = std::move(rfxmit);
 
-  return SetRfPinResultCode::Success;
+  return SetGPIOResultCode::Success;
+}
+
+SetGPIOResultCode CommandHandler::SetEstopPin(uint8_t estopPin) {
+  if (OpenShock::IsValidInputPin(estopPin)) {
+    xSemaphoreTake(s_estopManagerMutex, portMAX_DELAY);
+
+    if (!EStopManager::SetEStopPin(static_cast<gpio_num_t>(estopPin))) {
+      OS_LOGE(TAG, "Failed to set EStop pin");
+
+      xSemaphoreGive(s_estopManagerMutex);
+      return SetGPIOResultCode::InternalError;
+    }
+
+    if (!Config::SetEStopGpioPin(static_cast<gpio_num_t>(estopPin))) {
+      OS_LOGE(TAG, "Failed to set EStop pin in config");
+
+      xSemaphoreGive(s_estopManagerMutex);
+      return SetGPIOResultCode::InternalError;
+    }
+
+    xSemaphoreGive(s_estopManagerMutex);
+    return SetGPIOResultCode::Success;
+  } else {
+    return SetGPIOResultCode::InvalidPin;
+  }
 }
 
 bool CommandHandler::SetKeepAliveEnabled(bool enabled) {

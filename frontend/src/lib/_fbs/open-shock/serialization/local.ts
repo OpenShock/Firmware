@@ -15,6 +15,8 @@ export { OtaUpdateSetIsEnabledCommand } from './local/ota-update-set-is-enabled-
 export { OtaUpdateSetRequireManualApprovalCommand } from './local/ota-update-set-require-manual-approval-command';
 export { OtaUpdateSetUpdateChannelCommand } from './local/ota-update-set-update-channel-command';
 export { OtaUpdateStartUpdateCommand } from './local/ota-update-start-update-command';
+export { SetEstopEnabledCommand } from './local/set-estop-enabled-command';
+export { SetEstopPinCommand } from './local/set-estop-pin-command';
 export { SetRfTxPinCommand } from './local/set-rf-tx-pin-command';
 export { WifiNetworkConnectCommand } from './local/wifi-network-connect-command';
 export { WifiNetworkDisconnectCommand } from './local/wifi-network-disconnect-command';

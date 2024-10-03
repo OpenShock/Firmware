@@ -3,6 +3,7 @@
 #include "config/BackendConfig.h"
 #include "config/CaptivePortalConfig.h"
 #include "config/ConfigBase.h"
+#include "config/EStopConfig.h"
 #include "config/OtaUpdateConfig.h"
 #include "config/RFConfig.h"
 #include "config/SerialInputConfig.h"
@@ -18,6 +19,7 @@ namespace OpenShock::Config {
     OpenShock::Config::BackendConfig backend;
     OpenShock::Config::SerialInputConfig serialInput;
     OpenShock::Config::OtaUpdateConfig otaUpdate;
+    OpenShock::Config::EStopConfig estop;
 
     void ToDefault() override;
 

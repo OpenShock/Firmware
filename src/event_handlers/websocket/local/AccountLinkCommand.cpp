@@ -8,7 +8,7 @@ const char* const TAG = "LocalMessageHandlers";
 
 #include <cstdint>
 
-void serializeSetRfTxPinResult(uint8_t socketId, OpenShock::Serialization::Local::AccountLinkResultCode result) {
+void serializeAccountLinkCommandResult(uint8_t socketId, OpenShock::Serialization::Local::AccountLinkResultCode result) {
   flatbuffers::FlatBufferBuilder builder(1024);
 
   auto responseOffset = builder.CreateStruct(OpenShock::Serialization::Local::AccountLinkCommandResult(result));
@@ -35,16 +35,16 @@ void _Private::HandleAccountLinkCommand(uint8_t socketId, const OpenShock::Seria
   auto code = msg->code();
 
   if (code == nullptr) {
-    serializeSetRfTxPinResult(socketId, OpenShock::Serialization::Local::AccountLinkResultCode::CodeRequired);
+    serializeAccountLinkCommandResult(socketId, OpenShock::Serialization::Local::AccountLinkResultCode::CodeRequired);
     return;
   }
 
   if (code->size() != 6) {
-    serializeSetRfTxPinResult(socketId, OpenShock::Serialization::Local::AccountLinkResultCode::InvalidCodeLength);
+    serializeAccountLinkCommandResult(socketId, OpenShock::Serialization::Local::AccountLinkResultCode::InvalidCodeLength);
     return;
   }
 
   auto result = GatewayConnectionManager::Link(*code);
 
-  serializeSetRfTxPinResult(socketId, result);
+  serializeAccountLinkCommandResult(socketId, result);
 }
