@@ -2,8 +2,12 @@
 
 #include <freertos/semphr.h>
 
+#include "Common.h"
+
 namespace OpenShock {
   class ReadWriteMutex {
+    DISABLE_COPY(ReadWriteMutex);
+    DISABLE_MOVE(ReadWriteMutex);
   public:
     ReadWriteMutex();
     ~ReadWriteMutex();
@@ -20,6 +24,8 @@ namespace OpenShock {
   };
 
   class ScopedReadLock {
+    DISABLE_COPY(ScopedReadLock);
+    DISABLE_MOVE(ScopedReadLock);
   public:
     ScopedReadLock(ReadWriteMutex* mutex, TickType_t xTicksToWait = portMAX_DELAY) : m_mutex(mutex) {
       bool result = false;
@@ -60,6 +66,8 @@ namespace OpenShock {
   };
 
   class ScopedWriteLock {
+    DISABLE_COPY(ScopedWriteLock);
+    DISABLE_MOVE(ScopedWriteLock);
   public:
     ScopedWriteLock(ReadWriteMutex* mutex, TickType_t xTicksToWait = portMAX_DELAY) : m_mutex(mutex) {
       bool result = false;
