@@ -3,7 +3,7 @@
 #include "CommandHandler.h"
 #include "config/Config.h"
 #include "Convert.h"
-#include "SetRfPinResultCode.h"
+#include "SetGPIOResultCode.h"
 
 void _handleRfTxPinCommand(std::string_view arg, bool isAutomated) {
   if (arg.empty()) {
@@ -23,18 +23,18 @@ void _handleRfTxPinCommand(std::string_view arg, bool isAutomated) {
     SERPR_ERROR("Invalid argument (number invalid or out of range)");
   }
 
-  OpenShock::SetRfPinResultCode result = OpenShock::CommandHandler::SetRfTxPin(pin);
+  OpenShock::SetGPIOResultCode result = OpenShock::CommandHandler::SetRfTxPin(static_cast<uint8_t>(pin));
 
   switch (result) {
-    case OpenShock::SetRfPinResultCode::InvalidPin:
+    case OpenShock::SetGPIOResultCode::InvalidPin:
       SERPR_ERROR("Invalid argument (invalid pin)");
       break;
 
-    case OpenShock::SetRfPinResultCode::InternalError:
+    case OpenShock::SetGPIOResultCode::InternalError:
       SERPR_ERROR("Internal error while setting RF TX pin");
       break;
 
-    case OpenShock::SetRfPinResultCode::Success:
+    case OpenShock::SetGPIOResultCode::Success:
       SERPR_SUCCESS("Saved config");
       break;
 
