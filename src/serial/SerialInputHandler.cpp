@@ -102,14 +102,14 @@ void _handleFactoryResetCommand(std::string_view arg, bool isAutomated) {
 
 void _handleRfTxPinCommand(std::string_view arg, bool isAutomated) {
   if (arg.empty()) {
-    uint8_t txPin;
+    gpio_num_t txPin;
     if (!Config::GetRFConfigTxPin(txPin)) {
       SERPR_ERROR("Failed to get RF TX pin from config");
       return;
     }
 
     // Get rmt pin
-    SERPR_RESPONSE("RmtPin|%u", txPin);
+    SERPR_RESPONSE("RmtPin|%u", static_cast<uint8_t>(txPin));
     return;
   }
 

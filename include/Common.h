@@ -1,5 +1,7 @@
 #pragma once
 
+#include <hal/gpio_types.h>
+
 #include <cstdint>
 #include <string_view>
 
@@ -22,7 +24,7 @@
 
 #define OPENSHOCK_FW_CDN_URL(path) "https://" OPENSHOCK_FW_CDN_DOMAIN path
 
-#define OPENSHOCK_GPIO_INVALID 0
+#define OPENSHOCK_GPIO_INVALID static_cast<gpio_num_t>(0)
 
 #ifndef OPENSHOCK_RF_TX_GPIO
 #warning "OPENSHOCK_RF_TX_GPIO is not defined, setting to OPENSHOCK_GPIO_INVALID"

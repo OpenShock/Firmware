@@ -4,19 +4,30 @@
 
 #include <cJSON.h>
 #include <IPAddress.h>
+#include <hal/gpio_types.h>
 
 #include <string>
 #include <vector>
 
 namespace OpenShock::Config::Internal::Utils {
+  bool FromU8GpioNum(gpio_num_t& val, uint8_t u8Val);
+  void FromU8GpioNum(gpio_num_t& val, uint8_t u8Val, gpio_num_t defaultVal);
+
   void FromFbsStr(std::string& str, const flatbuffers::String* fbsStr, const char* defaultStr);
   bool FromFbsIPAddress(IPAddress& ip, const flatbuffers::String* fbsIP, const IPAddress& defaultIP);
   bool FromJsonBool(bool& val, const cJSON* json, const char* name, bool defaultVal);
   bool FromJsonU8(uint8_t& val, const cJSON* json, const char* name, uint8_t defaultVal);
   bool FromJsonU16(uint16_t& val, const cJSON* json, const char* name, uint16_t defaultVal);
   bool FromJsonI32(int32_t& val, const cJSON* json, const char* name, int32_t defaultVal);
-  bool FromJsonStr(std::string& str, const cJSON* json, const char* name, const char* defaultStr);
-  bool FromJsonIPAddress(IPAddress& ip, const cJSON* json, const char* name, const IPAddress& defaultIP);
+  
+  bool FromJsonStr(std::string& str, const cJSON* json, const char* name);
+  void FromJsonStr(std::string& str, const cJSON* json, const char* name, const char* defaultStr);
+
+  bool FromJsonIPAddress(IPAddress& ip, const cJSON* json, const char* name);
+  void FromJsonIPAddress(IPAddress& ip, const cJSON* json, const char* name, const IPAddress& defaultIP);
+
+  bool FromJsonGpioNum(gpio_num_t& val, const cJSON* json, const char* name);
+  void FromJsonGpioNum(gpio_num_t& val, const cJSON* json, const char* name, gpio_num_t defaultVal);
 
   template<typename T, typename U>  // T inherits from ConfigBase<U>
   void FromFbsVec(std::vector<T>& vec, const flatbuffers::Vector<flatbuffers::Offset<U>>* fbsVec) {

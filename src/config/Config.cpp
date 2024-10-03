@@ -372,7 +372,7 @@ bool Config::GetRFConfigTxPin(uint8_t& out) {
   return true;
 }
 
-bool Config::SetRFConfigTxPin(uint8_t txPin) {
+bool Config::SetRFConfigTxPin(gpio_num_t txPin) {
   CONFIG_LOCK_WRITE(false);
 
   _configData.rf.txPin = txPin;
