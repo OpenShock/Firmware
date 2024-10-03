@@ -6,10 +6,10 @@ const char* const TAG = "SerialInputHandler";
 #include "CommandHandler.h"
 #include "config/Config.h"
 #include "config/SerialInputConfig.h"
+#include "Convert.h"
 #include "EStopManager.h"
 #include "FormatHelpers.h"
 #include "http/HTTPRequestManager.h"
-#include "Convert.h"
 #include "Logging.h"
 #include "serialization/JsonAPI.h"
 #include "serialization/JsonSerial.h"
@@ -27,7 +27,8 @@ const char* const TAG = "SerialInputHandler";
 
 namespace std {
   struct hash_ci {
-    std::size_t operator()(std::string_view str) const {
+    std::size_t operator()(std::string_view str) const
+    {
       std::size_t hash = 7;
 
       for (int i = 0; i < str.size(); ++i) {
@@ -74,25 +75,29 @@ static std::unordered_map<std::string_view, SerialCmdHandler, std::hash_ci, std:
 /// @param strLen Length of input string
 /// @param out Output boolean
 /// @return True if the argument is a boolean, false otherwise
-bool _tryParseBool(std::string_view str, bool& out) {
+bool _tryParseBool(std::string_view str, bool& out)
+{
   return OpenShock::Convert::ToBool(OpenShock::StringTrim(str), out);
 }
 
-void _handleVersionCommand(std::string_view arg, bool isAutomated) {
+void _handleVersionCommand(std::string_view arg, bool isAutomated)
+{
   (void)arg;
 
   Serial.print("\n");
   SerialInputHandler::PrintVersionInfo();
 }
 
-void _handleRestartCommand(std::string_view arg, bool isAutomated) {
+void _handleRestartCommand(std::string_view arg, bool isAutomated)
+{
   (void)arg;
 
   Serial.println("Restarting ESP...");
   ESP.restart();
 }
 
-void _handleFactoryResetCommand(std::string_view arg, bool isAutomated) {
+void _handleFactoryResetCommand(std::string_view arg, bool isAutomated)
+{
   (void)arg;
 
   Serial.println("Resetting to factory defaults...");
@@ -101,7 +106,8 @@ void _handleFactoryResetCommand(std::string_view arg, bool isAutomated) {
   ESP.restart();
 }
 
-void _handleRfTxPinCommand(std::string_view arg, bool isAutomated) {
+void _handleRfTxPinCommand(std::string_view arg, bool isAutomated)
+{
   gpio_num_t pin;
 
   if (arg.empty()) {
@@ -140,7 +146,8 @@ void _handleRfTxPinCommand(std::string_view arg, bool isAutomated) {
   }
 }
 
-void _handleEStopPinCommand(std::string_view arg, bool isAutomated) {
+void _handleEStopPinCommand(std::string_view arg, bool isAutomated)
+{
   if (arg.empty()) {
     gpio_num_t estopPin;
     if (!Config::GetEStopGpioPin(estopPin)) {
@@ -153,13 +160,11 @@ void _handleEStopPinCommand(std::string_view arg, bool isAutomated) {
     return;
   }
 
-  uint8_t pin;
-  if (!OpenShock::Convert::ToUint8(arg, pin)) {
+  gpio_num_t estopPin;
+  if (!OpenShock::Convert::ToGpioNum(arg, estopPin)) {
     SERPR_ERROR("Invalid argument (number invalid or out of range)");
     return;
   }
-
-  gpio_num_t estopPin = static_cast<gpio_num_t>(pin);
 
   if (!OpenShock::EStopManager::SetEStopPin(estopPin)) {
     SERPR_ERROR("Failed to set EStop pin");
@@ -174,7 +179,8 @@ void _handleEStopPinCommand(std::string_view arg, bool isAutomated) {
   SERPR_SUCCESS("Saved config");
 }
 
-void _handleDomainCommand(std::string_view arg, bool isAutomated) {
+void _handleDomainCommand(std::string_view arg, bool isAutomated)
+{
   if (arg.empty()) {
     std::string domain;
     if (!Config::GetBackendDomain(domain)) {
@@ -226,7 +232,8 @@ void _handleDomainCommand(std::string_view arg, bool isAutomated) {
   ESP.restart();
 }
 
-void _handleAuthtokenCommand(std::string_view arg, bool isAutomated) {
+void _handleAuthtokenCommand(std::string_view arg, bool isAutomated)
+{
   if (arg.empty()) {
     std::string authToken;
     if (!Config::GetBackendAuthToken(authToken)) {
@@ -248,7 +255,8 @@ void _handleAuthtokenCommand(std::string_view arg, bool isAutomated) {
   }
 }
 
-void _handleLcgOverrideCommand(std::string_view arg, bool isAutomated) {
+void _handleLcgOverrideCommand(std::string_view arg, bool isAutomated)
+{
   if (arg.empty()) {
     std::string lcgOverride;
     if (!Config::GetBackendLCGOverride(lcgOverride)) {
@@ -331,7 +339,8 @@ void _handleLcgOverrideCommand(std::string_view arg, bool isAutomated) {
   SERPR_ERROR("Invalid subcommand");
 }
 
-void _handleHostnameCommand(std::string_view arg, bool isAutomated) {
+void _handleHostnameCommand(std::string_view arg, bool isAutomated)
+{
   if (arg.empty()) {
     std::string hostname;
     if (!Config::GetWiFiHostname(hostname)) {
@@ -355,7 +364,8 @@ void _handleHostnameCommand(std::string_view arg, bool isAutomated) {
   }
 }
 
-void _handleNetworksCommand(std::string_view arg, bool isAutomated) {
+void _handleNetworksCommand(std::string_view arg, bool isAutomated)
+{
   cJSON* root;
 
   if (arg.empty()) {
@@ -397,7 +407,8 @@ void _handleNetworksCommand(std::string_view arg, bool isAutomated) {
 
   uint8_t id     = 1;
   cJSON* network = nullptr;
-  cJSON_ArrayForEach(network, root) {
+  cJSON_ArrayForEach(network, root)
+  {
     Config::WiFiCredentials cred;
 
     if (!cred.FromJSON(network)) {
@@ -424,7 +435,8 @@ void _handleNetworksCommand(std::string_view arg, bool isAutomated) {
   OpenShock::WiFiManager::RefreshNetworkCredentials();
 }
 
-void _handleKeepAliveCommand(std::string_view arg, bool isAutomated) {
+void _handleKeepAliveCommand(std::string_view arg, bool isAutomated)
+{
   bool keepAliveEnabled;
 
   if (arg.empty()) {
@@ -452,7 +464,8 @@ void _handleKeepAliveCommand(std::string_view arg, bool isAutomated) {
   }
 }
 
-void _handleSerialEchoCommand(std::string_view arg, bool isAutomated) {
+void _handleSerialEchoCommand(std::string_view arg, bool isAutomated)
+{
   if (arg.empty()) {
     // Get current serial echo status
     SERPR_RESPONSE("SerialEcho|%s", s_echoEnabled ? "true" : "false");
@@ -475,7 +488,8 @@ void _handleSerialEchoCommand(std::string_view arg, bool isAutomated) {
   }
 }
 
-void _handleValidGpiosCommand(std::string_view arg, bool isAutomated) {
+void _handleValidGpiosCommand(std::string_view arg, bool isAutomated)
+{
   if (!arg.empty()) {
     SERPR_ERROR("Invalid argument (too many arguments)");
     return;
@@ -500,7 +514,8 @@ void _handleValidGpiosCommand(std::string_view arg, bool isAutomated) {
   SERPR_RESPONSE("ValidGPIOs|%s", buffer.c_str());
 }
 
-void _handleJsonConfigCommand(std::string_view arg, bool isAutomated) {
+void _handleJsonConfigCommand(std::string_view arg, bool isAutomated)
+{
   if (arg.empty()) {
     // Get raw config
     std::string json = Config::GetAsJSON(true);
@@ -519,7 +534,8 @@ void _handleJsonConfigCommand(std::string_view arg, bool isAutomated) {
   ESP.restart();
 }
 
-void _handleRawConfigCommand(std::string_view arg, bool isAutomated) {
+void _handleRawConfigCommand(std::string_view arg, bool isAutomated)
+{
   if (arg.empty()) {
     std::vector<uint8_t> buffer;
 
@@ -555,7 +571,8 @@ void _handleRawConfigCommand(std::string_view arg, bool isAutomated) {
   ESP.restart();
 }
 
-void _handleDebugInfoCommand(std::string_view arg, bool isAutomated) {
+void _handleDebugInfoCommand(std::string_view arg, bool isAutomated)
+{
   (void)arg;
 
   SERPR_RESPONSE("RTOSInfo|Free Heap|%u", xPortGetFreeHeapSize());
@@ -585,7 +602,8 @@ void _handleDebugInfoCommand(std::string_view arg, bool isAutomated) {
   }
 }
 
-void _handleRFTransmitCommand(std::string_view arg, bool isAutomated) {
+void _handleRFTransmitCommand(std::string_view arg, bool isAutomated)
+{
   if (arg.empty()) {
     SERPR_ERROR("No command");
     return;
@@ -614,7 +632,8 @@ void _handleRFTransmitCommand(std::string_view arg, bool isAutomated) {
   SERPR_SUCCESS("Command sent");
 }
 
-void _handleHelpCommand(std::string_view arg, bool isAutomated) {
+void _handleHelpCommand(std::string_view arg, bool isAutomated)
+{
   arg = OpenShock::StringTrim(arg);
   if (arg.empty()) {
     SerialInputHandler::PrintWelcomeHeader();
@@ -903,7 +922,8 @@ static const SerialCmdHandler khelpCmdHandler = {
   _handleHelpCommand,
 };
 
-void RegisterCommandHandler(const SerialCmdHandler& handler) {
+void RegisterCommandHandler(const SerialCmdHandler& handler)
+{
   s_commandHandlers[handler.cmd] = handler;
 }
 
@@ -916,9 +936,10 @@ enum class SerialReadResult {
   AutoCompleteRequest,
 };
 
-SerialReadResult _tryReadSerialLine(std::string& buffer) {
+SerialReadResult _tryReadSerialLine(std::string& buffer)
+{
   // Check if there's any data available
-  int available  = ::Serial.available();
+  int available = ::Serial.available();
   if (available <= 0) {
     return SerialReadResult::NoData;
   }
@@ -962,7 +983,8 @@ SerialReadResult _tryReadSerialLine(std::string& buffer) {
   return SerialReadResult::Data;
 }
 
-void _skipSerialWhitespaces(std::string& buffer) {
+void _skipSerialWhitespaces(std::string& buffer)
+{
   int available = ::Serial.available();
 
   while (available-- > 0) {
@@ -975,11 +997,13 @@ void _skipSerialWhitespaces(std::string& buffer) {
   }
 }
 
-void _echoBuffer(std::string_view buffer) {
+void _echoBuffer(std::string_view buffer)
+{
   ::Serial.printf(CLEAR_LINE "> %.*s", buffer.size(), buffer.data());
 }
 
-void _echoHandleSerialInput(std::string_view buffer, bool hasData) {
+void _echoHandleSerialInput(std::string_view buffer, bool hasData)
+{
   static int64_t lastActivity = 0;
   static bool hasChanges      = false;
 
@@ -1007,7 +1031,8 @@ void _echoHandleSerialInput(std::string_view buffer, bool hasData) {
   }
 }
 
-void _processSerialLine(std::string_view line) {
+void _processSerialLine(std::string_view line)
+{
   line = OpenShock::StringTrim(line);
   if (line.empty()) {
     return;
@@ -1037,7 +1062,8 @@ void _processSerialLine(std::string_view line) {
   it->second.commandHandler(arguments, isAutomated);
 }
 
-bool SerialInputHandler::Init() {
+bool SerialInputHandler::Init()
+{
   static bool s_initialized = false;
   if (s_initialized) {
     OS_LOGW(TAG, "Serial input handler already initialized");
@@ -1077,37 +1103,39 @@ bool SerialInputHandler::Init() {
   return true;
 }
 
-void SerialInputHandler::Update() {
+void SerialInputHandler::Update()
+{
   static std::string buffer = "";
 
   switch (_tryReadSerialLine(buffer)) {
-  case SerialReadResult::LineEnd:
-    _processSerialLine(buffer);
+    case SerialReadResult::LineEnd:
+      _processSerialLine(buffer);
 
-    // Deallocate memory if the buffer is too large
-    if (buffer.capacity() > SERIAL_BUFFER_CLEAR_THRESHOLD) {
-      buffer.clear();
-      buffer.shrink_to_fit();
-    } else {
-      buffer.resize(0); // Hopefully doesn't deallocate memory
-    }
+      // Deallocate memory if the buffer is too large
+      if (buffer.capacity() > SERIAL_BUFFER_CLEAR_THRESHOLD) {
+        buffer.clear();
+        buffer.shrink_to_fit();
+      } else {
+        buffer.resize(0);  // Hopefully doesn't deallocate memory
+      }
 
-    // Skip any remaining trailing whitespaces
-    _skipSerialWhitespaces(buffer);
-    break;
-  case SerialReadResult::AutoCompleteRequest:
-    ::Serial.printf(CLEAR_LINE "> %.*s [AutoComplete is not implemented]", buffer.size(), buffer.data());
-    break;
-  case SerialReadResult::Data:
-    _echoHandleSerialInput(buffer, true);
-    break;
-  default:
-    _echoHandleSerialInput(buffer, false);
-    break;
+      // Skip any remaining trailing whitespaces
+      _skipSerialWhitespaces(buffer);
+      break;
+    case SerialReadResult::AutoCompleteRequest:
+      ::Serial.printf(CLEAR_LINE "> %.*s [AutoComplete is not implemented]", buffer.size(), buffer.data());
+      break;
+    case SerialReadResult::Data:
+      _echoHandleSerialInput(buffer, true);
+      break;
+    default:
+      _echoHandleSerialInput(buffer, false);
+      break;
   }
 }
 
-void SerialInputHandler::PrintWelcomeHeader() {
+void SerialInputHandler::PrintWelcomeHeader()
+{
   Serial.print(R"(
 ============== OPENSHOCK ==============
   Contribute @ github.com/OpenShock
@@ -1117,7 +1145,8 @@ void SerialInputHandler::PrintWelcomeHeader() {
 )");
 }
 
-void SerialInputHandler::PrintVersionInfo() {
+void SerialInputHandler::PrintVersionInfo()
+{
   Serial.print("\
   Version:  " OPENSHOCK_FW_VERSION "\n\
     Build:  " OPENSHOCK_FW_MODE "\n\
