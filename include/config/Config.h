@@ -2,11 +2,14 @@
 
 #include "config/BackendConfig.h"
 #include "config/CaptivePortalConfig.h"
+#include "config/EStopConfig.h"
 #include "config/OtaUpdateConfig.h"
 #include "config/RFConfig.h"
 #include "config/SerialInputConfig.h"
 #include "config/WiFiConfig.h"
 #include "config/WiFiCredentials.h"
+
+#include <hal/gpio_types.h>
 
 #include <functional>
 #include <string_view>
@@ -40,6 +43,7 @@ namespace OpenShock::Config {
   bool GetBackendConfig(BackendConfig& out);
   bool GetSerialInputConfig(SerialInputConfig& out);
   bool GetOtaUpdateConfig(OtaUpdateConfig& out);
+  bool GetEStop(EStopConfig& out);
 
   bool SetRFConfig(const RFConfig& config);
   bool SetWiFiConfig(const WiFiConfig& config);
@@ -47,6 +51,7 @@ namespace OpenShock::Config {
   bool SetBackendConfig(const BackendConfig& config);
   bool SetSerialInputConfig(const SerialInputConfig& config);
   bool SetOtaUpdateConfig(const OtaUpdateConfig& config);
+  bool SetEStop(const EStopConfig& config);
 
   bool GetWiFiCredentials(std::vector<WiFiCredentials>& out);
   bool GetWiFiCredentials(cJSON* array, bool withSensitiveData);
@@ -85,4 +90,9 @@ namespace OpenShock::Config {
   bool SetOtaUpdateId(int32_t updateId);
   bool GetOtaUpdateStep(OtaUpdateStep& out);
   bool SetOtaUpdateStep(OtaUpdateStep updateStep);
+
+  bool GetEStopEnabled(bool& out);
+  bool SetEStopEnabled(bool enabled);
+  bool GetEStopGpioPin(gpio_num_t& out);
+  bool SetEStopGpioPin(gpio_num_t gpioPin);
 }  // namespace OpenShock::Config

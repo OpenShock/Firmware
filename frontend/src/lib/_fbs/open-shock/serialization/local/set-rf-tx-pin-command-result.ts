@@ -4,7 +4,7 @@
 
 import * as flatbuffers from 'flatbuffers';
 
-import { SetRfPinResultCode } from '../../../open-shock/serialization/local/set-rf-pin-result-code';
+import { SetGPIOResultCode } from '../../../open-shock/serialization/local/set-gpioresult-code';
 
 
 export class SetRfTxPinCommandResult {
@@ -20,7 +20,7 @@ pin():number {
   return this.bb!.readUint8(this.bb_pos);
 }
 
-result():SetRfPinResultCode {
+result():SetGPIOResultCode {
   return this.bb!.readUint8(this.bb_pos + 1);
 }
 
@@ -28,7 +28,7 @@ static sizeOf():number {
   return 2;
 }
 
-static createSetRfTxPinCommandResult(builder:flatbuffers.Builder, pin: number, result: SetRfPinResultCode):flatbuffers.Offset {
+static createSetRfTxPinCommandResult(builder:flatbuffers.Builder, pin: number, result: SetGPIOResultCode):flatbuffers.Offset {
   builder.prep(1, 2);
   builder.writeInt8(result);
   builder.writeInt8(pin);
