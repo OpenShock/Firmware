@@ -126,7 +126,7 @@ bool _trySaveConfig() {
 
   auto fbsConfig = _configData.ToFlatbuffers(builder, true);
 
-  builder.Finish(fbsConfig);
+  Serialization::Configuration::FinishHubConfigBuffer(builder, fbsConfig);
 
   return _trySaveConfig(builder.GetBufferPointer(), builder.GetSize());
 }

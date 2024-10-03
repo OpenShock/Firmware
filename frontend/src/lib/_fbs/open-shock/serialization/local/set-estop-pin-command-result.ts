@@ -16,23 +16,46 @@ export class SetEstopPinCommandResult {
   return this;
 }
 
+static getRootAsSetEstopPinCommandResult(bb:flatbuffers.ByteBuffer, obj?:SetEstopPinCommandResult):SetEstopPinCommandResult {
+  return (obj || new SetEstopPinCommandResult()).__init(bb.readInt32(bb.position()) + bb.position(), bb);
+}
+
+static getSizePrefixedRootAsSetEstopPinCommandResult(bb:flatbuffers.ByteBuffer, obj?:SetEstopPinCommandResult):SetEstopPinCommandResult {
+  bb.setPosition(bb.position() + flatbuffers.SIZE_PREFIX_LENGTH);
+  return (obj || new SetEstopPinCommandResult()).__init(bb.readInt32(bb.position()) + bb.position(), bb);
+}
+
 gpioPin():number {
-  return this.bb!.readUint8(this.bb_pos);
+  const offset = this.bb!.__offset(this.bb_pos, 4);
+  return offset ? this.bb!.readUint8(this.bb_pos + offset) : 0;
 }
 
 result():SetGPIOResultCode {
-  return this.bb!.readUint8(this.bb_pos + 1);
+  const offset = this.bb!.__offset(this.bb_pos, 6);
+  return offset ? this.bb!.readUint8(this.bb_pos + offset) : SetGPIOResultCode.Success;
 }
 
-static sizeOf():number {
-  return 2;
+static startSetEstopPinCommandResult(builder:flatbuffers.Builder) {
+  builder.startObject(2);
 }
 
-static createSetEstopPinCommandResult(builder:flatbuffers.Builder, gpio_pin: number, result: SetGPIOResultCode):flatbuffers.Offset {
-  builder.prep(1, 2);
-  builder.writeInt8(result);
-  builder.writeInt8(gpio_pin);
-  return builder.offset();
+static addGpioPin(builder:flatbuffers.Builder, gpioPin:number) {
+  builder.addFieldInt8(0, gpioPin, 0);
 }
 
+static addResult(builder:flatbuffers.Builder, result:SetGPIOResultCode) {
+  builder.addFieldInt8(1, result, SetGPIOResultCode.Success);
+}
+
+static endSetEstopPinCommandResult(builder:flatbuffers.Builder):flatbuffers.Offset {
+  const offset = builder.endObject();
+  return offset;
+}
+
+static createSetEstopPinCommandResult(builder:flatbuffers.Builder, gpioPin:number, result:SetGPIOResultCode):flatbuffers.Offset {
+  SetEstopPinCommandResult.startSetEstopPinCommandResult(builder);
+  SetEstopPinCommandResult.addGpioPin(builder, gpioPin);
+  SetEstopPinCommandResult.addResult(builder, result);
+  return SetEstopPinCommandResult.endSetEstopPinCommandResult(builder);
+}
 }

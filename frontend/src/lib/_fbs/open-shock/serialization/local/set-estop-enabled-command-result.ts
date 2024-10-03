@@ -13,23 +13,46 @@ export class SetEstopEnabledCommandResult {
   return this;
 }
 
+static getRootAsSetEstopEnabledCommandResult(bb:flatbuffers.ByteBuffer, obj?:SetEstopEnabledCommandResult):SetEstopEnabledCommandResult {
+  return (obj || new SetEstopEnabledCommandResult()).__init(bb.readInt32(bb.position()) + bb.position(), bb);
+}
+
+static getSizePrefixedRootAsSetEstopEnabledCommandResult(bb:flatbuffers.ByteBuffer, obj?:SetEstopEnabledCommandResult):SetEstopEnabledCommandResult {
+  bb.setPosition(bb.position() + flatbuffers.SIZE_PREFIX_LENGTH);
+  return (obj || new SetEstopEnabledCommandResult()).__init(bb.readInt32(bb.position()) + bb.position(), bb);
+}
+
 enabled():boolean {
-  return !!this.bb!.readInt8(this.bb_pos);
+  const offset = this.bb!.__offset(this.bb_pos, 4);
+  return offset ? !!this.bb!.readInt8(this.bb_pos + offset) : false;
 }
 
 success():boolean {
-  return !!this.bb!.readInt8(this.bb_pos + 1);
+  const offset = this.bb!.__offset(this.bb_pos, 6);
+  return offset ? !!this.bb!.readInt8(this.bb_pos + offset) : false;
 }
 
-static sizeOf():number {
-  return 2;
+static startSetEstopEnabledCommandResult(builder:flatbuffers.Builder) {
+  builder.startObject(2);
 }
 
-static createSetEstopEnabledCommandResult(builder:flatbuffers.Builder, enabled: boolean, success: boolean):flatbuffers.Offset {
-  builder.prep(1, 2);
-  builder.writeInt8(Number(Boolean(success)));
-  builder.writeInt8(Number(Boolean(enabled)));
-  return builder.offset();
+static addEnabled(builder:flatbuffers.Builder, enabled:boolean) {
+  builder.addFieldInt8(0, +enabled, +false);
 }
 
+static addSuccess(builder:flatbuffers.Builder, success:boolean) {
+  builder.addFieldInt8(1, +success, +false);
+}
+
+static endSetEstopEnabledCommandResult(builder:flatbuffers.Builder):flatbuffers.Offset {
+  const offset = builder.endObject();
+  return offset;
+}
+
+static createSetEstopEnabledCommandResult(builder:flatbuffers.Builder, enabled:boolean, success:boolean):flatbuffers.Offset {
+  SetEstopEnabledCommandResult.startSetEstopEnabledCommandResult(builder);
+  SetEstopEnabledCommandResult.addEnabled(builder, enabled);
+  SetEstopEnabledCommandResult.addSuccess(builder, success);
+  return SetEstopEnabledCommandResult.endSetEstopEnabledCommandResult(builder);
+}
 }

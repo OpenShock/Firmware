@@ -13,18 +13,36 @@ export class SetRfTxPinCommand {
   return this;
 }
 
+static getRootAsSetRfTxPinCommand(bb:flatbuffers.ByteBuffer, obj?:SetRfTxPinCommand):SetRfTxPinCommand {
+  return (obj || new SetRfTxPinCommand()).__init(bb.readInt32(bb.position()) + bb.position(), bb);
+}
+
+static getSizePrefixedRootAsSetRfTxPinCommand(bb:flatbuffers.ByteBuffer, obj?:SetRfTxPinCommand):SetRfTxPinCommand {
+  bb.setPosition(bb.position() + flatbuffers.SIZE_PREFIX_LENGTH);
+  return (obj || new SetRfTxPinCommand()).__init(bb.readInt32(bb.position()) + bb.position(), bb);
+}
+
 pin():number {
-  return this.bb!.readUint8(this.bb_pos);
+  const offset = this.bb!.__offset(this.bb_pos, 4);
+  return offset ? this.bb!.readUint8(this.bb_pos + offset) : 0;
 }
 
-static sizeOf():number {
-  return 1;
+static startSetRfTxPinCommand(builder:flatbuffers.Builder) {
+  builder.startObject(1);
 }
 
-static createSetRfTxPinCommand(builder:flatbuffers.Builder, pin: number):flatbuffers.Offset {
-  builder.prep(1, 1);
-  builder.writeInt8(pin);
-  return builder.offset();
+static addPin(builder:flatbuffers.Builder, pin:number) {
+  builder.addFieldInt8(0, pin, 0);
 }
 
+static endSetRfTxPinCommand(builder:flatbuffers.Builder):flatbuffers.Offset {
+  const offset = builder.endObject();
+  return offset;
+}
+
+static createSetRfTxPinCommand(builder:flatbuffers.Builder, pin:number):flatbuffers.Offset {
+  SetRfTxPinCommand.startSetRfTxPinCommand(builder);
+  SetRfTxPinCommand.addPin(builder, pin);
+  return SetRfTxPinCommand.endSetRfTxPinCommand(builder);
+}
 }
