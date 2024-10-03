@@ -16,18 +16,36 @@ export class WifiScanStatusMessage {
   return this;
 }
 
+static getRootAsWifiScanStatusMessage(bb:flatbuffers.ByteBuffer, obj?:WifiScanStatusMessage):WifiScanStatusMessage {
+  return (obj || new WifiScanStatusMessage()).__init(bb.readInt32(bb.position()) + bb.position(), bb);
+}
+
+static getSizePrefixedRootAsWifiScanStatusMessage(bb:flatbuffers.ByteBuffer, obj?:WifiScanStatusMessage):WifiScanStatusMessage {
+  bb.setPosition(bb.position() + flatbuffers.SIZE_PREFIX_LENGTH);
+  return (obj || new WifiScanStatusMessage()).__init(bb.readInt32(bb.position()) + bb.position(), bb);
+}
+
 status():WifiScanStatus {
-  return this.bb!.readUint8(this.bb_pos);
+  const offset = this.bb!.__offset(this.bb_pos, 4);
+  return offset ? this.bb!.readUint8(this.bb_pos + offset) : WifiScanStatus.Started;
 }
 
-static sizeOf():number {
-  return 1;
+static startWifiScanStatusMessage(builder:flatbuffers.Builder) {
+  builder.startObject(1);
 }
 
-static createWifiScanStatusMessage(builder:flatbuffers.Builder, status: WifiScanStatus):flatbuffers.Offset {
-  builder.prep(1, 1);
-  builder.writeInt8(status);
-  return builder.offset();
+static addStatus(builder:flatbuffers.Builder, status:WifiScanStatus) {
+  builder.addFieldInt8(0, status, WifiScanStatus.Started);
 }
 
+static endWifiScanStatusMessage(builder:flatbuffers.Builder):flatbuffers.Offset {
+  const offset = builder.endObject();
+  return offset;
+}
+
+static createWifiScanStatusMessage(builder:flatbuffers.Builder, status:WifiScanStatus):flatbuffers.Offset {
+  WifiScanStatusMessage.startWifiScanStatusMessage(builder);
+  WifiScanStatusMessage.addStatus(builder, status);
+  return WifiScanStatusMessage.endWifiScanStatusMessage(builder);
+}
 }

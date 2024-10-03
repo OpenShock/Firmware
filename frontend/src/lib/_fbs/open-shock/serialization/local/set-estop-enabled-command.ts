@@ -13,18 +13,36 @@ export class SetEstopEnabledCommand {
   return this;
 }
 
+static getRootAsSetEstopEnabledCommand(bb:flatbuffers.ByteBuffer, obj?:SetEstopEnabledCommand):SetEstopEnabledCommand {
+  return (obj || new SetEstopEnabledCommand()).__init(bb.readInt32(bb.position()) + bb.position(), bb);
+}
+
+static getSizePrefixedRootAsSetEstopEnabledCommand(bb:flatbuffers.ByteBuffer, obj?:SetEstopEnabledCommand):SetEstopEnabledCommand {
+  bb.setPosition(bb.position() + flatbuffers.SIZE_PREFIX_LENGTH);
+  return (obj || new SetEstopEnabledCommand()).__init(bb.readInt32(bb.position()) + bb.position(), bb);
+}
+
 enabled():boolean {
-  return !!this.bb!.readInt8(this.bb_pos);
+  const offset = this.bb!.__offset(this.bb_pos, 4);
+  return offset ? !!this.bb!.readInt8(this.bb_pos + offset) : false;
 }
 
-static sizeOf():number {
-  return 1;
+static startSetEstopEnabledCommand(builder:flatbuffers.Builder) {
+  builder.startObject(1);
 }
 
-static createSetEstopEnabledCommand(builder:flatbuffers.Builder, enabled: boolean):flatbuffers.Offset {
-  builder.prep(1, 1);
-  builder.writeInt8(Number(Boolean(enabled)));
-  return builder.offset();
+static addEnabled(builder:flatbuffers.Builder, enabled:boolean) {
+  builder.addFieldInt8(0, +enabled, +false);
 }
 
+static endSetEstopEnabledCommand(builder:flatbuffers.Builder):flatbuffers.Offset {
+  const offset = builder.endObject();
+  return offset;
+}
+
+static createSetEstopEnabledCommand(builder:flatbuffers.Builder, enabled:boolean):flatbuffers.Offset {
+  SetEstopEnabledCommand.startSetEstopEnabledCommand(builder);
+  SetEstopEnabledCommand.addEnabled(builder, enabled);
+  return SetEstopEnabledCommand.endSetEstopEnabledCommand(builder);
+}
 }

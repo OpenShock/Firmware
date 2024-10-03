@@ -13,18 +13,36 @@ export class SetEstopPinCommand {
   return this;
 }
 
+static getRootAsSetEstopPinCommand(bb:flatbuffers.ByteBuffer, obj?:SetEstopPinCommand):SetEstopPinCommand {
+  return (obj || new SetEstopPinCommand()).__init(bb.readInt32(bb.position()) + bb.position(), bb);
+}
+
+static getSizePrefixedRootAsSetEstopPinCommand(bb:flatbuffers.ByteBuffer, obj?:SetEstopPinCommand):SetEstopPinCommand {
+  bb.setPosition(bb.position() + flatbuffers.SIZE_PREFIX_LENGTH);
+  return (obj || new SetEstopPinCommand()).__init(bb.readInt32(bb.position()) + bb.position(), bb);
+}
+
 pin():number {
-  return this.bb!.readUint8(this.bb_pos);
+  const offset = this.bb!.__offset(this.bb_pos, 4);
+  return offset ? this.bb!.readUint8(this.bb_pos + offset) : 0;
 }
 
-static sizeOf():number {
-  return 1;
+static startSetEstopPinCommand(builder:flatbuffers.Builder) {
+  builder.startObject(1);
 }
 
-static createSetEstopPinCommand(builder:flatbuffers.Builder, pin: number):flatbuffers.Offset {
-  builder.prep(1, 1);
-  builder.writeInt8(pin);
-  return builder.offset();
+static addPin(builder:flatbuffers.Builder, pin:number) {
+  builder.addFieldInt8(0, pin, 0);
 }
 
+static endSetEstopPinCommand(builder:flatbuffers.Builder):flatbuffers.Offset {
+  const offset = builder.endObject();
+  return offset;
+}
+
+static createSetEstopPinCommand(builder:flatbuffers.Builder, pin:number):flatbuffers.Offset {
+  SetEstopPinCommand.startSetEstopPinCommand(builder);
+  SetEstopPinCommand.addPin(builder, pin);
+  return SetEstopPinCommand.endSetEstopPinCommand(builder);
+}
 }

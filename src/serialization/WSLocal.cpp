@@ -92,8 +92,7 @@ bool Local::SerializeReadyMessage(const WiFiNetwork* connectedNetwork, bool acco
 bool Local::SerializeWiFiScanStatusChangedEvent(OpenShock::WiFiScanStatus status, Common::SerializationCallbackFn callback) {
   flatbuffers::FlatBufferBuilder builder(32);  // TODO: Profile this and adjust the size accordingly
 
-  Serialization::Local::WifiScanStatusMessage scanStatus(status);
-  auto scanStatusOffset = builder.CreateStruct(scanStatus);
+  auto scanStatusOffset = Serialization::Local::CreateWifiScanStatusMessage(builder, status);
 
   auto msg = Serialization::Local::CreateHubToLocalMessage(builder, Serialization::Local::HubToLocalMessagePayload::WifiScanStatusMessage, scanStatusOffset.Union());
 

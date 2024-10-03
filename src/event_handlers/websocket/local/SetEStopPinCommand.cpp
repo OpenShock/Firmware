@@ -12,7 +12,7 @@ const char* const TAG = "LocalMessageHandlers";
 void serializeSetEStopPinResult(uint8_t socketId, uint8_t pin, OpenShock::Serialization::Local::SetGPIOResultCode result) {
   flatbuffers::FlatBufferBuilder builder(1024);
 
-  auto responseOffset = builder.CreateStruct(OpenShock::Serialization::Local::SetEstopPinCommandResult(pin, result));
+  auto responseOffset = OpenShock::Serialization::Local::CreateSetEstopPinCommandResult(builder, pin, result);
 
   auto msgOffset = OpenShock::Serialization::Local::CreateHubToLocalMessage(builder, OpenShock::Serialization::Local::HubToLocalMessagePayload::SetEstopPinCommandResult, responseOffset.Union());
 

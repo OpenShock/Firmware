@@ -9,9 +9,9 @@ const char* const TAG = "LocalMessageHandlers";
 #include <cstdint>
 
 void serializeAccountLinkCommandResult(uint8_t socketId, OpenShock::Serialization::Local::AccountLinkResultCode result) {
-  flatbuffers::FlatBufferBuilder builder(1024);
+  flatbuffers::FlatBufferBuilder builder(1024);  // TODO: Determine a good size
 
-  auto responseOffset = builder.CreateStruct(OpenShock::Serialization::Local::AccountLinkCommandResult(result));
+  auto responseOffset = OpenShock::Serialization::Local::CreateAccountLinkCommandResult(builder, result);
 
   auto msgOffset = OpenShock::Serialization::Local::CreateHubToLocalMessage(builder, OpenShock::Serialization::Local::HubToLocalMessagePayload::AccountLinkCommandResult, responseOffset.Union());
 
