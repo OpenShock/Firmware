@@ -8,9 +8,19 @@ const char* const TAG = "Config::WiFiCredentials";
 
 using namespace OpenShock::Config;
 
-WiFiCredentials::WiFiCredentials() : id(0), ssid(), password() { }
+WiFiCredentials::WiFiCredentials()
+  : id(0)
+  , ssid()
+  , password()
+{
+}
 
-WiFiCredentials::WiFiCredentials(uint8_t id, std::string_view ssid, std::string_view password) : id(id), ssid(std::string(ssid)), password(std::string(password)) { }
+WiFiCredentials::WiFiCredentials(uint8_t id, std::string_view ssid, std::string_view password)
+  : id(id)
+  , ssid(ssid)
+  , password(password)
+{
+}
 
 void WiFiCredentials::ToDefault() {
   id = 0;
@@ -20,8 +30,9 @@ void WiFiCredentials::ToDefault() {
 
 bool WiFiCredentials::FromFlatbuffers(const Serialization::Configuration::WiFiCredentials* config) {
   if (config == nullptr) {
-    OS_LOGE(TAG, "config is null");
-    return false;
+    OS_LOGW(TAG, "Config is null, setting to default");
+    ToDefault();
+    return true;
   }
 
   id = config->id();
@@ -51,8 +62,9 @@ flatbuffers::Offset<OpenShock::Serialization::Configuration::WiFiCredentials> Wi
 
 bool WiFiCredentials::FromJSON(const cJSON* json) {
   if (json == nullptr) {
-    OS_LOGE(TAG, "json is null");
-    return false;
+    OS_LOGW(TAG, "Config is null, setting to default");
+    ToDefault();
+    return true;
   }
 
   if (cJSON_IsObject(json) == 0) {

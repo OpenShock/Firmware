@@ -22,7 +22,7 @@ bool Gateway::SerializeKeepAliveMessage(Common::SerializationCallbackFn callback
 
   auto msg = Gateway::CreateHubToGatewayMessage(builder, Gateway::HubToGatewayMessagePayload::KeepAlive, keepAliveOffset.Union());
 
-  builder.Finish(msg);
+  Gateway::FinishHubToGatewayMessageBuffer(builder, msg);
 
   auto span = builder.GetBufferSpan();
 
@@ -38,7 +38,7 @@ bool Gateway::SerializeBootStatusMessage(int32_t updateId, OpenShock::FirmwareBo
 
   auto msg = Gateway::CreateHubToGatewayMessage(builder, Gateway::HubToGatewayMessagePayload::BootStatus, fbsBootStatus.Union());
 
-  builder.Finish(msg);
+  Gateway::FinishHubToGatewayMessageBuffer(builder, msg);
 
   auto span = builder.GetBufferSpan();
 
@@ -54,7 +54,7 @@ bool Gateway::SerializeOtaInstallStartedMessage(int32_t updateId, const OpenShoc
 
   auto msg = Gateway::CreateHubToGatewayMessage(builder, Gateway::HubToGatewayMessagePayload::OtaInstallStarted, otaInstallStartedOffset.Union());
 
-  builder.Finish(msg);
+  Gateway::FinishHubToGatewayMessageBuffer(builder, msg);
 
   auto span = builder.GetBufferSpan();
 
@@ -68,7 +68,7 @@ bool Gateway::SerializeOtaInstallProgressMessage(int32_t updateId, Gateway::OtaI
 
   auto msg = Gateway::CreateHubToGatewayMessage(builder, Gateway::HubToGatewayMessagePayload::OtaInstallProgress, otaInstallProgressOffset.Union());
 
-  builder.Finish(msg);
+  Gateway::FinishHubToGatewayMessageBuffer(builder, msg);
 
   auto span = builder.GetBufferSpan();
 
@@ -84,7 +84,7 @@ bool Gateway::SerializeOtaInstallFailedMessage(int32_t updateId, std::string_vie
 
   auto msg = Gateway::CreateHubToGatewayMessage(builder, Gateway::HubToGatewayMessagePayload::OtaInstallFailed, otaInstallFailedOffset.Union());
 
-  builder.Finish(msg);
+  Gateway::FinishHubToGatewayMessageBuffer(builder, msg);
 
   auto span = builder.GetBufferSpan();
 

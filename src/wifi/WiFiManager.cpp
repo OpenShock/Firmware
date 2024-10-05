@@ -319,10 +319,16 @@ bool WiFiManager::Init() {
     return false;
   }
 
+  std::string hostname;
+  if (!Config::GetWiFiHostname(hostname)) {
+    OS_LOGE(TAG, "Failed to get WiFi hostname, reverting to default");
+    hostname = OPENSHOCK_FW_HOSTNAME;
+  }
+
   WiFi.setAutoConnect(false);
   WiFi.setAutoReconnect(false);
   WiFi.enableSTA(true);
-  WiFi.setHostname(OPENSHOCK_FW_HOSTNAME);  // TODO: Add the device name to the hostname (retrieve from API and store in LittleFS)
+  WiFi.setHostname(hostname.c_str());
 
   // If we recognize the network in the ESP's WiFi cache, try to connect to it
   wifi_config_t current_conf;

@@ -7,9 +7,19 @@ const char* const TAG = "Config::WiFiConfig";
 
 using namespace OpenShock::Config;
 
-WiFiConfig::WiFiConfig() : accessPointSSID(OPENSHOCK_FW_AP_PREFIX), hostname(OPENSHOCK_FW_HOSTNAME), credentialsList() { }
+WiFiConfig::WiFiConfig()
+  : accessPointSSID(OPENSHOCK_FW_AP_PREFIX)
+  , hostname(OPENSHOCK_FW_HOSTNAME)
+  , credentialsList()
+{
+}
 
-WiFiConfig::WiFiConfig(std::string_view accessPointSSID, std::string_view hostname, const std::vector<WiFiCredentials>& credentialsList) : accessPointSSID(std::string(accessPointSSID)), hostname(std::string(hostname)), credentialsList(credentialsList) { }
+WiFiConfig::WiFiConfig(std::string_view accessPointSSID, std::string_view hostname, const std::vector<WiFiCredentials>& credentialsList)
+  : accessPointSSID(accessPointSSID)
+  , hostname(hostname)
+  , credentialsList(credentialsList)
+{
+}
 
 void WiFiConfig::ToDefault() {
   accessPointSSID = OPENSHOCK_FW_AP_PREFIX;
@@ -19,8 +29,9 @@ void WiFiConfig::ToDefault() {
 
 bool WiFiConfig::FromFlatbuffers(const Serialization::Configuration::WiFiConfig* config) {
   if (config == nullptr) {
-    OS_LOGE(TAG, "config is null");
-    return false;
+    OS_LOGW(TAG, "Config is null, setting to default");
+    ToDefault();
+    return true;
   }
 
   Internal::Utils::FromFbsStr(accessPointSSID, config->ap_ssid(), OPENSHOCK_FW_AP_PREFIX);
@@ -43,8 +54,9 @@ flatbuffers::Offset<OpenShock::Serialization::Configuration::WiFiConfig> WiFiCon
 
 bool WiFiConfig::FromJSON(const cJSON* json) {
   if (json == nullptr) {
-    OS_LOGE(TAG, "json is null");
-    return false;
+    OS_LOGW(TAG, "Config is null, setting to default");
+    ToDefault();
+    return true;
   }
 
   if (cJSON_IsObject(json) == 0) {

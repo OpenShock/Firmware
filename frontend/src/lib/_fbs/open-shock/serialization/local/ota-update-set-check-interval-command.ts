@@ -13,18 +13,36 @@ export class OtaUpdateSetCheckIntervalCommand {
   return this;
 }
 
+static getRootAsOtaUpdateSetCheckIntervalCommand(bb:flatbuffers.ByteBuffer, obj?:OtaUpdateSetCheckIntervalCommand):OtaUpdateSetCheckIntervalCommand {
+  return (obj || new OtaUpdateSetCheckIntervalCommand()).__init(bb.readInt32(bb.position()) + bb.position(), bb);
+}
+
+static getSizePrefixedRootAsOtaUpdateSetCheckIntervalCommand(bb:flatbuffers.ByteBuffer, obj?:OtaUpdateSetCheckIntervalCommand):OtaUpdateSetCheckIntervalCommand {
+  bb.setPosition(bb.position() + flatbuffers.SIZE_PREFIX_LENGTH);
+  return (obj || new OtaUpdateSetCheckIntervalCommand()).__init(bb.readInt32(bb.position()) + bb.position(), bb);
+}
+
 interval():number {
-  return this.bb!.readUint16(this.bb_pos);
+  const offset = this.bb!.__offset(this.bb_pos, 4);
+  return offset ? this.bb!.readUint16(this.bb_pos + offset) : 0;
 }
 
-static sizeOf():number {
-  return 2;
+static startOtaUpdateSetCheckIntervalCommand(builder:flatbuffers.Builder) {
+  builder.startObject(1);
 }
 
-static createOtaUpdateSetCheckIntervalCommand(builder:flatbuffers.Builder, interval: number):flatbuffers.Offset {
-  builder.prep(2, 2);
-  builder.writeInt16(interval);
-  return builder.offset();
+static addInterval(builder:flatbuffers.Builder, interval:number) {
+  builder.addFieldInt16(0, interval, 0);
 }
 
+static endOtaUpdateSetCheckIntervalCommand(builder:flatbuffers.Builder):flatbuffers.Offset {
+  const offset = builder.endObject();
+  return offset;
+}
+
+static createOtaUpdateSetCheckIntervalCommand(builder:flatbuffers.Builder, interval:number):flatbuffers.Offset {
+  OtaUpdateSetCheckIntervalCommand.startOtaUpdateSetCheckIntervalCommand(builder);
+  OtaUpdateSetCheckIntervalCommand.addInterval(builder, interval);
+  return OtaUpdateSetCheckIntervalCommand.endOtaUpdateSetCheckIntervalCommand(builder);
+}
 }

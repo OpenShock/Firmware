@@ -13,18 +13,36 @@ export class WifiNetworkDisconnectCommand {
   return this;
 }
 
+static getRootAsWifiNetworkDisconnectCommand(bb:flatbuffers.ByteBuffer, obj?:WifiNetworkDisconnectCommand):WifiNetworkDisconnectCommand {
+  return (obj || new WifiNetworkDisconnectCommand()).__init(bb.readInt32(bb.position()) + bb.position(), bb);
+}
+
+static getSizePrefixedRootAsWifiNetworkDisconnectCommand(bb:flatbuffers.ByteBuffer, obj?:WifiNetworkDisconnectCommand):WifiNetworkDisconnectCommand {
+  bb.setPosition(bb.position() + flatbuffers.SIZE_PREFIX_LENGTH);
+  return (obj || new WifiNetworkDisconnectCommand()).__init(bb.readInt32(bb.position()) + bb.position(), bb);
+}
+
 placeholder():boolean {
-  return !!this.bb!.readInt8(this.bb_pos);
+  const offset = this.bb!.__offset(this.bb_pos, 4);
+  return offset ? !!this.bb!.readInt8(this.bb_pos + offset) : false;
 }
 
-static sizeOf():number {
-  return 1;
+static startWifiNetworkDisconnectCommand(builder:flatbuffers.Builder) {
+  builder.startObject(1);
 }
 
-static createWifiNetworkDisconnectCommand(builder:flatbuffers.Builder, placeholder: boolean):flatbuffers.Offset {
-  builder.prep(1, 1);
-  builder.writeInt8(Number(Boolean(placeholder)));
-  return builder.offset();
+static addPlaceholder(builder:flatbuffers.Builder, placeholder:boolean) {
+  builder.addFieldInt8(0, +placeholder, +false);
 }
 
+static endWifiNetworkDisconnectCommand(builder:flatbuffers.Builder):flatbuffers.Offset {
+  const offset = builder.endObject();
+  return offset;
+}
+
+static createWifiNetworkDisconnectCommand(builder:flatbuffers.Builder, placeholder:boolean):flatbuffers.Offset {
+  WifiNetworkDisconnectCommand.startWifiNetworkDisconnectCommand(builder);
+  WifiNetworkDisconnectCommand.addPlaceholder(builder, placeholder);
+  return WifiNetworkDisconnectCommand.endWifiNetworkDisconnectCommand(builder);
+}
 }

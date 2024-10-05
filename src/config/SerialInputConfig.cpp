@@ -7,10 +7,14 @@ const char* const TAG = "Config::SerialInputConfig";
 
 using namespace OpenShock::Config;
 
-SerialInputConfig::SerialInputConfig() : echoEnabled(true) { }
+SerialInputConfig::SerialInputConfig()
+  : echoEnabled(true)
+{
+}
 
-SerialInputConfig::SerialInputConfig(bool echoEnabled) {
-  this->echoEnabled = echoEnabled;
+SerialInputConfig::SerialInputConfig(bool echoEnabled)
+  : echoEnabled(echoEnabled)
+{
 }
 
 void SerialInputConfig::ToDefault() {
@@ -19,8 +23,9 @@ void SerialInputConfig::ToDefault() {
 
 bool SerialInputConfig::FromFlatbuffers(const Serialization::Configuration::SerialInputConfig* config) {
   if (config == nullptr) {
-    OS_LOGE(TAG, "config is null");
-    return false;
+    OS_LOGW(TAG, "Config is null, setting to default");
+    ToDefault();
+    return true;
   }
 
   echoEnabled = config->echo_enabled();
@@ -34,8 +39,9 @@ flatbuffers::Offset<OpenShock::Serialization::Configuration::SerialInputConfig> 
 
 bool SerialInputConfig::FromJSON(const cJSON* json) {
   if (json == nullptr) {
-    OS_LOGE(TAG, "json is null");
-    return false;
+    OS_LOGW(TAG, "Config is null, setting to default");
+    ToDefault();
+    return true;
   }
 
   if (cJSON_IsObject(json) == 0) {

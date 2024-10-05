@@ -13,18 +13,36 @@ export class OtaUpdateSetRequireManualApprovalCommand {
   return this;
 }
 
+static getRootAsOtaUpdateSetRequireManualApprovalCommand(bb:flatbuffers.ByteBuffer, obj?:OtaUpdateSetRequireManualApprovalCommand):OtaUpdateSetRequireManualApprovalCommand {
+  return (obj || new OtaUpdateSetRequireManualApprovalCommand()).__init(bb.readInt32(bb.position()) + bb.position(), bb);
+}
+
+static getSizePrefixedRootAsOtaUpdateSetRequireManualApprovalCommand(bb:flatbuffers.ByteBuffer, obj?:OtaUpdateSetRequireManualApprovalCommand):OtaUpdateSetRequireManualApprovalCommand {
+  bb.setPosition(bb.position() + flatbuffers.SIZE_PREFIX_LENGTH);
+  return (obj || new OtaUpdateSetRequireManualApprovalCommand()).__init(bb.readInt32(bb.position()) + bb.position(), bb);
+}
+
 require():boolean {
-  return !!this.bb!.readInt8(this.bb_pos);
+  const offset = this.bb!.__offset(this.bb_pos, 4);
+  return offset ? !!this.bb!.readInt8(this.bb_pos + offset) : false;
 }
 
-static sizeOf():number {
-  return 1;
+static startOtaUpdateSetRequireManualApprovalCommand(builder:flatbuffers.Builder) {
+  builder.startObject(1);
 }
 
-static createOtaUpdateSetRequireManualApprovalCommand(builder:flatbuffers.Builder, require: boolean):flatbuffers.Offset {
-  builder.prep(1, 1);
-  builder.writeInt8(Number(Boolean(require)));
-  return builder.offset();
+static addRequire(builder:flatbuffers.Builder, require:boolean) {
+  builder.addFieldInt8(0, +require, +false);
 }
 
+static endOtaUpdateSetRequireManualApprovalCommand(builder:flatbuffers.Builder):flatbuffers.Offset {
+  const offset = builder.endObject();
+  return offset;
+}
+
+static createOtaUpdateSetRequireManualApprovalCommand(builder:flatbuffers.Builder, require:boolean):flatbuffers.Offset {
+  OtaUpdateSetRequireManualApprovalCommand.startOtaUpdateSetRequireManualApprovalCommand(builder);
+  OtaUpdateSetRequireManualApprovalCommand.addRequire(builder, require);
+  return OtaUpdateSetRequireManualApprovalCommand.endOtaUpdateSetRequireManualApprovalCommand(builder);
+}
 }

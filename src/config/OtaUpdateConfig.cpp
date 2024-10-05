@@ -7,32 +7,43 @@ const char* const TAG = "Config::OtaUpdateConfig";
 
 using namespace OpenShock::Config;
 
-OtaUpdateConfig::OtaUpdateConfig() {
-  ToDefault();
+OtaUpdateConfig::OtaUpdateConfig()
+  : isEnabled(true)
+  , cdnDomain(OPENSHOCK_FW_CDN_DOMAIN)
+  , updateChannel(OtaUpdateChannel::Stable)
+  , checkOnStartup(false)
+  , checkPeriodically(false)
+  , checkInterval(30)
+  , allowBackendManagement(true)
+  , requireManualApproval(false)
+  , updateId(0)
+  , updateStep(OtaUpdateStep::None)
+{
 }
 
 OtaUpdateConfig::OtaUpdateConfig(
-  bool isEnabled,
-  std::string cdnDomain,
-  OtaUpdateChannel updateChannel,
-  bool checkOnStartup,
-  bool checkPeriodically,
-  uint16_t checkInterval,
-  bool allowBackendManagement,
-  bool requireManualApproval,
-  int32_t updateId,
-  OtaUpdateStep updateStep
-) {
-  this->isEnabled              = isEnabled;
-  this->cdnDomain              = cdnDomain;
-  this->updateChannel          = updateChannel;
-  this->checkOnStartup         = checkOnStartup;
-  this->checkPeriodically      = checkPeriodically;
-  this->checkInterval          = checkInterval;
-  this->allowBackendManagement = allowBackendManagement;
-  this->requireManualApproval  = requireManualApproval;
-  this->updateId               = updateId;
-  this->updateStep             = updateStep;
+    bool isEnabled,
+    std::string cdnDomain,
+    OtaUpdateChannel updateChannel,
+    bool checkOnStartup,
+    bool checkPeriodically,
+    uint16_t checkInterval,
+    bool allowBackendManagement,
+    bool requireManualApproval,
+    int32_t updateId,
+    OtaUpdateStep updateStep
+  )
+  : isEnabled(isEnabled)
+  , cdnDomain(std::move(cdnDomain))
+  , updateChannel(updateChannel)
+  , checkOnStartup(checkOnStartup)
+  , checkPeriodically(checkPeriodically)
+  , checkInterval(checkInterval)
+  , allowBackendManagement(allowBackendManagement)
+  , requireManualApproval(requireManualApproval)
+  , updateId(updateId)
+  , updateStep(updateStep)
+{
 }
 
 void OtaUpdateConfig::ToDefault() {
@@ -50,8 +61,9 @@ void OtaUpdateConfig::ToDefault() {
 
 bool OtaUpdateConfig::FromFlatbuffers(const Serialization::Configuration::OtaUpdateConfig* config) {
   if (config == nullptr) {
-    OS_LOGE(TAG, "config is null");
-    return false;
+    OS_LOGW(TAG, "Config is null, setting to default");
+    ToDefault();
+    return true;
   }
 
   isEnabled = config->is_enabled();
@@ -74,8 +86,9 @@ flatbuffers::Offset<OpenShock::Serialization::Configuration::OtaUpdateConfig> Ot
 
 bool OtaUpdateConfig::FromJSON(const cJSON* json) {
   if (json == nullptr) {
-    OS_LOGE(TAG, "json is null");
-    return false;
+    OS_LOGW(TAG, "Config is null, setting to default");
+    ToDefault();
+    return true;
   }
 
   if (!cJSON_IsObject(json)) {
@@ -86,9 +99,9 @@ bool OtaUpdateConfig::FromJSON(const cJSON* json) {
   Internal::Utils::FromJsonBool(isEnabled, json, "isEnabled", true);
   Internal::Utils::FromJsonStr(cdnDomain, json, "cdnDomain", OPENSHOCK_FW_CDN_DOMAIN);
   Internal::Utils::FromJsonStrParsed(updateChannel, json, "updateChannel", OpenShock::TryParseOtaUpdateChannel, OpenShock::OtaUpdateChannel::Stable);
-  Internal::Utils::FromJsonBool(checkOnStartup, json, "checkOnStartup", true);
+  Internal::Utils::FromJsonBool(checkOnStartup, json, "checkOnStartup", false);
   Internal::Utils::FromJsonBool(checkPeriodically, json, "checkPeriodically", false);
-  Internal::Utils::FromJsonU16(checkInterval, json, "checkInterval", 0);
+  Internal::Utils::FromJsonU16(checkInterval, json, "checkInterval", 30);
   Internal::Utils::FromJsonBool(allowBackendManagement, json, "allowBackendManagement", true);
   Internal::Utils::FromJsonBool(requireManualApproval, json, "requireManualApproval", false);
   Internal::Utils::FromJsonI32(updateId, json, "updateId", 0);

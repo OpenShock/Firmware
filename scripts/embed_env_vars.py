@@ -46,15 +46,12 @@ import re
 def sort_semver(versions):
     def parse_semver(v):
         # Split version into main, prerelease, and build metadata parts
-        match = re.match(r'^v?(\d+\.\d+\.\d+)(?:-([0-9A-Za-z-.]+))?(?:\+([0-9A-Za-z-.]+))?$', v)
+        match = re.match(r'^v?(\d+(?:\.\d+)*)(?:-([0-9A-Za-z-.]+))?(?:\+([0-9A-Za-z-.]+))?$', v)
         if not match:
             raise ValueError(f"Invalid version: {v}")
         main_version, prerelease, build = match.groups()
         
         return (main_version, prerelease, build)
-    
-    def has_suffix(version):
-        return 
 
     def version_key(version):
         main_version, _, _ = parse_semver(version)

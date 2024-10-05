@@ -13,18 +13,36 @@ export class OtaUpdateHandleUpdateRequestCommand {
   return this;
 }
 
+static getRootAsOtaUpdateHandleUpdateRequestCommand(bb:flatbuffers.ByteBuffer, obj?:OtaUpdateHandleUpdateRequestCommand):OtaUpdateHandleUpdateRequestCommand {
+  return (obj || new OtaUpdateHandleUpdateRequestCommand()).__init(bb.readInt32(bb.position()) + bb.position(), bb);
+}
+
+static getSizePrefixedRootAsOtaUpdateHandleUpdateRequestCommand(bb:flatbuffers.ByteBuffer, obj?:OtaUpdateHandleUpdateRequestCommand):OtaUpdateHandleUpdateRequestCommand {
+  bb.setPosition(bb.position() + flatbuffers.SIZE_PREFIX_LENGTH);
+  return (obj || new OtaUpdateHandleUpdateRequestCommand()).__init(bb.readInt32(bb.position()) + bb.position(), bb);
+}
+
 accept():boolean {
-  return !!this.bb!.readInt8(this.bb_pos);
+  const offset = this.bb!.__offset(this.bb_pos, 4);
+  return offset ? !!this.bb!.readInt8(this.bb_pos + offset) : false;
 }
 
-static sizeOf():number {
-  return 1;
+static startOtaUpdateHandleUpdateRequestCommand(builder:flatbuffers.Builder) {
+  builder.startObject(1);
 }
 
-static createOtaUpdateHandleUpdateRequestCommand(builder:flatbuffers.Builder, accept: boolean):flatbuffers.Offset {
-  builder.prep(1, 1);
-  builder.writeInt8(Number(Boolean(accept)));
-  return builder.offset();
+static addAccept(builder:flatbuffers.Builder, accept:boolean) {
+  builder.addFieldInt8(0, +accept, +false);
 }
 
+static endOtaUpdateHandleUpdateRequestCommand(builder:flatbuffers.Builder):flatbuffers.Offset {
+  const offset = builder.endObject();
+  return offset;
+}
+
+static createOtaUpdateHandleUpdateRequestCommand(builder:flatbuffers.Builder, accept:boolean):flatbuffers.Offset {
+  OtaUpdateHandleUpdateRequestCommand.startOtaUpdateHandleUpdateRequestCommand(builder);
+  OtaUpdateHandleUpdateRequestCommand.addAccept(builder, accept);
+  return OtaUpdateHandleUpdateRequestCommand.endOtaUpdateHandleUpdateRequestCommand(builder);
+}
 }
