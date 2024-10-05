@@ -18,4 +18,5 @@ namespace OpenShock::MessageHandlers::Local::_Private {
   WS_EVENT_HANDLER_SIGNATURE(HandleAccountLinkCommand);
   WS_EVENT_HANDLER_SIGNATURE(HandleAccountUnlinkCommand);
   WS_EVENT_HANDLER_SIGNATURE(HandleSetRfTxPinCommand);
+  WS_EVENT_HANDLER_SIGNATURE(HandleSetEstopPinCommand);
 }  // namespace OpenShock::MessageHandlers::Local::_Private

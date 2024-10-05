@@ -201,9 +201,9 @@ if (versionChangeLog !== '') {
 // Parse platformio.ini and extract the different boards
 const platformioIni = ini.parse(platformioIniStr);
 
-// Get every key that starts with "env:", and that isnt "env:fs" (which is the filesystem)
+// Get every key that starts with "env:", and that isnt "env:fs" (which is the filesystem) or "env:ci-build" (which is for CI CodeQL and cppcheck)
 const boards = Object.keys(platformioIni)
-  .filter((key) => key.startsWith('env:') && key !== 'env:fs')
+  .filter((key) => key.startsWith('env:') && key !== 'env:fs' && key !== 'env:ci-build')
   .reduce((arr, key) => {
     arr.push(key.substring(4));
     return arr;
