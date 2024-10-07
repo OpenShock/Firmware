@@ -39,7 +39,7 @@ std::vector<rmt_data_t> Rmt::Petrainer998DREncoder::GetSequence(uint16_t shocker
   uint8_t channel       = 0b1000;  // Can be [1000] or [1111], 4 bits wide
   uint8_t channelInvert = 0b1110;  // Can be [1110] or [0000], 4 bits wide
 
-  // TODO: Below ShockerID is 17 bits wide, and intensity is 7 bits wide. This is weird as shockerId nas 1 more bit and intensity has 1 less bit than 8 bit alignment. This needs investigation.
+  // TODO: Below ShockerID is 17 bits wide, and intensity is 7 bits wide. This is weird as ShockerID has 1 more bit and intensity has 1 less bit than 8 bit alignment. This needs investigation.
   // Payload layout: [channel:4][typeVal:4][shockerID:17][intensity:7][typeInvert:4][channelInvert:4] (40 bits)
   uint64_t data
     = (static_cast<uint64_t>(channel & 0b1111) << 36 | static_cast<uint64_t>(typeVal & 0b1111) << 32 | static_cast<uint64_t>(shockerId & 0x1FFFF) << 15 | static_cast<uint64_t>(intensity & 0x7F) << 8 | static_cast<uint64_t>(typeInvert & 0b1111) << 4 | static_cast<uint64_t>(channelInvert & 0b1111));
