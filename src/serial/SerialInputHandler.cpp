@@ -67,8 +67,6 @@ static std::unordered_map<std::string_view, OpenShock::Serial::CommandGroup, std
 void _handleHelpCommand(std::string_view arg, bool isAutomated) {
   arg = OpenShock::StringTrim(arg);
   if (arg.empty()) {
-    SerialInputHandler::PrintWelcomeHeader();
-
     std::size_t longestCommand  = 0;
     std::size_t longestArgument = 0;
     std::size_t descriptionSize = 0;
@@ -116,6 +114,7 @@ void _handleHelpCommand(std::string_view arg, bool isAutomated) {
 
     OS_LOGV(TAG, "Buffer size: %zu", buffer.size());
 
+    SerialInputHandler::PrintWelcomeHeader();
     ::Serial.print(buffer.data());
     return;
   }
