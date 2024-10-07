@@ -8,9 +8,8 @@ CommandEntry::CommandEntry(std::string_view description, CommandHandler commandH
 {
 }
 
-CommandArgument& CommandEntry::addArgument(std::string_view name, std::string_view constraint, std::string_view exampleValue) {
-  auto arg = CommandArgument{name, constraint, exampleValue};
-  m_arguments.push_back(arg);
+CommandArgument& CommandEntry::addArgument(std::string_view name, std::string_view constraint, std::string_view exampleValue, std::string_view constraintExtension) {
+  m_arguments.push_back(CommandArgument{name, constraint, exampleValue, constraintExtension});
   return m_arguments.back();
 }
 
