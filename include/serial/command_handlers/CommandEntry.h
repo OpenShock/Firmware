@@ -17,7 +17,9 @@ namespace OpenShock::Serial {
   class CommandEntry {
   public:
     CommandEntry(std::string_view description, CommandHandler commandHandler);
+    CommandEntry(std::string_view name, std::string_view description, CommandHandler commandHandler);
 
+    inline std::string_view name() const { return m_name; }
     inline std::string_view description() const { return m_description; }
     inline const std::vector<CommandArgument>& arguments() const { return m_arguments; }
     inline const CommandHandler commandHandler() const { return m_commandHandler; }
@@ -25,6 +27,7 @@ namespace OpenShock::Serial {
     CommandArgument& addArgument(std::string_view name, std::string_view constraint, std::string_view exampleValue, std::string_view constraintExtension = {});
 
   private:
+    std::string_view m_name;
     std::string_view m_description;
     std::vector<CommandArgument> m_arguments;
     CommandHandler m_commandHandler;
@@ -43,6 +46,7 @@ namespace OpenShock::Serial {
     inline const std::vector<CommandEntry>& commands() const { return m_commands; }
 
     CommandEntry& addCommand(std::string_view description, CommandHandler commandHandler);
+    CommandEntry& addCommand(std::string_view name, std::string_view description, CommandHandler commandHandler);
 
   private:
     std::string_view m_name;

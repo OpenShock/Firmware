@@ -95,12 +95,10 @@ OpenShock::Serial::CommandGroup OpenShock::Serial::CommandHandlers::LcgOverrideH
 
   auto& getCommand = group.addCommand("Get the domain overridden for LCG endpoint (if any)."sv, _handleLcgOverrideCommand);
 
-  auto& setCommand = group.addCommand("Set a domain to override the LCG endpoint."sv, _handleLcgOverrideCommand);
-  setCommand.addArgument("set"sv, "no arguments"sv, ""sv);
+  auto& setCommand = group.addCommand("set"sv, "Set a domain to override the LCG endpoint."sv, _handleLcgOverrideCommand);
   setCommand.addArgument("domain"sv, "must be a string"sv, "eu1-gateway.shocklink.net"sv);
 
-  auto& clearCommand = group.addCommand("Clear the overridden LCG endpoint."sv, _handleLcgOverrideCommand);
-  clearCommand.addArgument("clear"sv, "no arguments"sv, ""sv);
+  auto& clearCommand = group.addCommand("clear"sv, "Clear the overridden LCG endpoint."sv, _handleLcgOverrideCommand);
 
   return group;
 }
