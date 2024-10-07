@@ -125,14 +125,19 @@ void _printCompleteHelp() {
 void _printCommandHelp(Serial::CommandGroup& group) {
   std::size_t size = 0;
   for (const auto& command : group.commands()) {
+    size++;  // +1 for newline
     size += group.name().size();
+    size++;  // +1 for space
+
     if (command.name().size() > 0) {
       size += command.name().size() + 1;  // +1 for space
     }
+
     for (const auto& arg : command.arguments()) {
       size += arg.name.size() + 3;  // +1 for space, +2 for <>
     }
-    size++;                         // +1 for newline
+
+    size++;  // +1 for newline
 
     if (command.description().size() > 0) {
       size = command.description().size() + 3;  // +2 for indent, +1 for newline
@@ -141,18 +146,17 @@ void _printCommandHelp(Serial::CommandGroup& group) {
     if (command.arguments().size() > 0) {
       size += 13;                     // +13 for "  Arguments:\n"
       for (const auto& arg : command.arguments()) {
-        size += arg.name.size() + 3;  // +1 for space, +2 for indent
+        size += arg.name.size() + 7;  // +4 for indent, +2 for <>, +1 for space
         size += arg.constraint.size();
         if (arg.constraintExtensions.size() > 0) {
-          size += 2;                 // +2 for ":"
+          size += 2;                 // +1 for ':', +1 for newline
           for (const auto& ext : arg.constraintExtensions) {
-            size += ext.size() + 2;  // +2 for indent
+            size += ext.size() + 7;  // +1 for newline, +6 for indent
           }
+        } else {
+          size++;  // +1 for newline
         }
-        size++;  // +1 for newline
       }
-    } else {
-      size++;  // +1 for newline
     }
 
     size += 11;                       // +11 for "  Example:\n"
@@ -163,7 +167,7 @@ void _printCommandHelp(Serial::CommandGroup& group) {
     }
 
     for (const auto& arg : command.arguments()) {
-      size += arg.exampleValue.size() + 3;  // +1 for space
+      size += arg.exampleValue.size() + 1;  // +1 for space
     }
 
     size++;  // +1 for newline
@@ -172,9 +176,7 @@ void _printCommandHelp(Serial::CommandGroup& group) {
   size++;  // +1 for newline
 
   std::string buffer;
-  buffer.reserve(size);
-
-  OS_LOGI(TAG, "Buffer size: %zu", size);
+  buffer.reserve(size);  // TODO: Should be exact size, is 20 bytes off, figure out why
 
   for (const auto& command : group.commands()) {
     buffer.push_back('\n');
@@ -224,7 +226,7 @@ void _printCommandHelp(Serial::CommandGroup& group) {
       }
     }
 
-    buffer.append("  Example:\n    "sv);
+    buffer.append("  Example:\n"sv);
     buffer.append(group.name());
     buffer.push_back(' ');
 
