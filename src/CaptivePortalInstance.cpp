@@ -59,7 +59,7 @@ const char* _getPartitionHash() {
 
 CaptivePortalInstance::CaptivePortalInstance()
   : m_webServer(HTTP_PORT)
-  , m_socketServer(WEBSOCKET_PORT, "/ws", "json")
+  , m_socketServer(WEBSOCKET_PORT, "/ws", "flatbuffers")  // Sec-WebSocket-Protocol = flatbuffers
   , m_socketDeFragger(std::bind(&CaptivePortalInstance::handleWebSocketEvent, this, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3, std::placeholders::_4))
   , m_fileSystem()
   , m_dnsServer()

@@ -119,7 +119,7 @@ bool JsonAPI::ParseAccountLinkJsonResponse(int code, const cJSON* root, JsonAPI:
 }
 bool JsonAPI::ParseDeviceInfoJsonResponse(int code, const cJSON* root, JsonAPI::DeviceInfoResponse& out) {
   (void)code;
-  
+
   if (cJSON_IsObject(root) == 0) {
     ESP_LOGJSONE("not an object", root);
     return false;
@@ -198,7 +198,7 @@ bool JsonAPI::ParseDeviceInfoJsonResponse(int code, const cJSON* root, JsonAPI::
     }
 
     OpenShock::ShockerModelType shockerModelType;
-    if (!OpenShock::ShockerModelTypeFromString(shockerModelStr, shockerModelType, true)) { // PetTrainer is a typo in the API, we pass true to allow it
+    if (!OpenShock::ShockerModelTypeFromString(shockerModelStr, shockerModelType, true)) {  // PetTrainer is a typo in the API, we pass true to allow it
       ESP_LOGJSONE("value at 'shocker.model' is not a valid shocker model", shocker);
       return false;
     }
