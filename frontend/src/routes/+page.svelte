@@ -21,7 +21,7 @@
   $: linkCodeValid = isValidLinkCode(linkCode);
 
   let rfTxPin: number | null = $DeviceStateStore.config?.rf.txPin ?? null;
-  $: rfTxPinValid = rfTxPin !== null && rfTxPin > 0;
+  $: rfTxPinValid = rfTxPin !== null && rfTxPin >= 0 && rfTxPin < 255;
 
   let estopPin: number | null = $DeviceStateStore.config?.estop.gpioPin ?? null;
   $: estopPinValid = estopPin !== null && estopPin >= 0 && estopPin < 255;
