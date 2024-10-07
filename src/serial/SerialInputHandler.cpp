@@ -93,19 +93,19 @@ void _handleHelpCommand(std::string_view arg, bool isAutomated) {
     OS_LOGV(TAG, "Buffer size: %zu", buffer.capacity());
 
     for (const auto& cmd : s_commandGroups) {
-      ESP_LOGV(TAG, "Collecting help for command group: %.*s", cmd.name().size(), cmd.name().data());
+      OS_LOGV(TAG, "Collecting help for command group: %.*s", cmd.name().size(), cmd.name().data());
       buffer.append(cmd.name());
       // buffer.append(paddedLength - cmd.name().size(), ' ');
       buffer.append("\n");
 
       for (const auto& command : cmd.commands()) {
-        ESP_LOGV(TAG, "Collecting help for command: %.*s", command.description().size(), command.description().data());
+        OS_LOGV(TAG, "Collecting help for command: %.*s", command.description().size(), command.description().data());
         buffer.append("  ");
         buffer.append(command.description());
         // buffer.append(paddedLength - command.description().size(), ' ');
 
         for (const auto& arg : command.arguments()) {
-          ESP_LOGV(TAG, "Collecting help for argument: %.*s", arg.name.size(), arg.name.data());
+          OS_LOGV(TAG, "Collecting help for argument: %.*s", arg.name.size(), arg.name.data());
           buffer.append(arg.name);
           buffer.append(" ");
         }
@@ -352,7 +352,7 @@ bool SerialInputHandler::Init() {
   // Register command handlers
   s_commandGroups = OpenShock::Serial::CommandHandlers::AllCommandHandlers();
   for (const auto& handler : s_commandGroups) {
-    ESP_LOGV(TAG, "Registering command handler: %.*s", handler.name().size(), handler.name().data());
+    OS_LOGV(TAG, "Registering command handler: %.*s", handler.name().size(), handler.name().data());
     RegisterCommandHandler(handler);
   }
 
