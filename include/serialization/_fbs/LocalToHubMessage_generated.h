@@ -1173,12 +1173,12 @@ struct SetRfTxPinCommand FLATBUFFERS_FINAL_CLASS : private ::flatbuffers::Table 
   enum FlatBuffersVTableOffset FLATBUFFERS_VTABLE_UNDERLYING_TYPE {
     VT_PIN = 4
   };
-  uint8_t pin() const {
-    return GetField<uint8_t>(VT_PIN, 0);
+  int8_t pin() const {
+    return GetField<int8_t>(VT_PIN, 0);
   }
   bool Verify(::flatbuffers::Verifier &verifier) const {
     return VerifyTableStart(verifier) &&
-           VerifyField<uint8_t>(verifier, VT_PIN, 1) &&
+           VerifyField<int8_t>(verifier, VT_PIN, 1) &&
            verifier.EndTable();
   }
 };
@@ -1187,8 +1187,8 @@ struct SetRfTxPinCommandBuilder {
   typedef SetRfTxPinCommand Table;
   ::flatbuffers::FlatBufferBuilder &fbb_;
   ::flatbuffers::uoffset_t start_;
-  void add_pin(uint8_t pin) {
-    fbb_.AddElement<uint8_t>(SetRfTxPinCommand::VT_PIN, pin, 0);
+  void add_pin(int8_t pin) {
+    fbb_.AddElement<int8_t>(SetRfTxPinCommand::VT_PIN, pin, 0);
   }
   explicit SetRfTxPinCommandBuilder(::flatbuffers::FlatBufferBuilder &_fbb)
         : fbb_(_fbb) {
@@ -1203,7 +1203,7 @@ struct SetRfTxPinCommandBuilder {
 
 inline ::flatbuffers::Offset<SetRfTxPinCommand> CreateSetRfTxPinCommand(
     ::flatbuffers::FlatBufferBuilder &_fbb,
-    uint8_t pin = 0) {
+    int8_t pin = 0) {
   SetRfTxPinCommandBuilder builder_(_fbb);
   builder_.add_pin(pin);
   return builder_.Finish();
@@ -1273,12 +1273,12 @@ struct SetEstopPinCommand FLATBUFFERS_FINAL_CLASS : private ::flatbuffers::Table
   enum FlatBuffersVTableOffset FLATBUFFERS_VTABLE_UNDERLYING_TYPE {
     VT_PIN = 4
   };
-  uint8_t pin() const {
-    return GetField<uint8_t>(VT_PIN, 0);
+  int8_t pin() const {
+    return GetField<int8_t>(VT_PIN, 0);
   }
   bool Verify(::flatbuffers::Verifier &verifier) const {
     return VerifyTableStart(verifier) &&
-           VerifyField<uint8_t>(verifier, VT_PIN, 1) &&
+           VerifyField<int8_t>(verifier, VT_PIN, 1) &&
            verifier.EndTable();
   }
 };
@@ -1287,8 +1287,8 @@ struct SetEstopPinCommandBuilder {
   typedef SetEstopPinCommand Table;
   ::flatbuffers::FlatBufferBuilder &fbb_;
   ::flatbuffers::uoffset_t start_;
-  void add_pin(uint8_t pin) {
-    fbb_.AddElement<uint8_t>(SetEstopPinCommand::VT_PIN, pin, 0);
+  void add_pin(int8_t pin) {
+    fbb_.AddElement<int8_t>(SetEstopPinCommand::VT_PIN, pin, 0);
   }
   explicit SetEstopPinCommandBuilder(::flatbuffers::FlatBufferBuilder &_fbb)
         : fbb_(_fbb) {
@@ -1303,7 +1303,7 @@ struct SetEstopPinCommandBuilder {
 
 inline ::flatbuffers::Offset<SetEstopPinCommand> CreateSetEstopPinCommand(
     ::flatbuffers::FlatBufferBuilder &_fbb,
-    uint8_t pin = 0) {
+    int8_t pin = 0) {
   SetEstopPinCommandBuilder builder_(_fbb);
   builder_.add_pin(pin);
   return builder_.Finish();

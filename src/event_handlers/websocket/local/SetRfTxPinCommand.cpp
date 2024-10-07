@@ -9,10 +9,11 @@ const char* const TAG = "LocalMessageHandlers";
 
 #include <cstdint>
 
-void serializeSetRfTxPinResult(uint8_t socketId, uint8_t pin, OpenShock::Serialization::Local::SetGPIOResultCode result) {
+void serializeSetRfTxPinResult(uint8_t socketId, gpio_num_t pin, OpenShock::Serialization::Local::SetGPIOResultCode result)
+{
   flatbuffers::FlatBufferBuilder builder(1024);
 
-  auto responseOffset = OpenShock::Serialization::Local::CreateSetRfTxPinCommandResult(builder, pin, result);
+  auto responseOffset = OpenShock::Serialization::Local::CreateSetRfTxPinCommandResult(builder, static_cast<int8_t>(pin), result);
 
   auto msg = OpenShock::Serialization::Local::CreateHubToLocalMessage(builder, OpenShock::Serialization::Local::HubToLocalMessagePayload::SetRfTxPinCommandResult, responseOffset.Union());
 
@@ -26,7 +27,8 @@ void serializeSetRfTxPinResult(uint8_t socketId, uint8_t pin, OpenShock::Seriali
 
 using namespace OpenShock::MessageHandlers::Local;
 
-void _Private::HandleSetRfTxPinCommand(uint8_t socketId, const OpenShock::Serialization::Local::LocalToHubMessage* root) {
+void _Private::HandleSetRfTxPinCommand(uint8_t socketId, const OpenShock::Serialization::Local::LocalToHubMessage* root)
+{
   auto msg = root->payload_as_SetRfTxPinCommand();
   if (msg == nullptr) {
     OS_LOGE(TAG, "Payload cannot be parsed as SetRfTxPinCommand");
@@ -35,7 +37,7 @@ void _Private::HandleSetRfTxPinCommand(uint8_t socketId, const OpenShock::Serial
 
   auto pin = msg->pin();
 
-  auto result = OpenShock::CommandHandler::SetRfTxPin(pin);
+  auto result = OpenShock::CommandHandler::SetRfTxPin(static_cast<gpio_num_t>(pin));
 
-  serializeSetRfTxPinResult(socketId, pin, result);
+  serializeSetRfTxPinResult(socketId, static_cast<gpio_num_t>(pin), result);
 }
