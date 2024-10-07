@@ -1,8 +1,8 @@
 #include "serial/command_handlers/common.h"
 
 #include "CommandHandler.h"
-#include "Convert.h"
 #include "config/Config.h"
+#include "Convert.h"
 #include "util/StringUtils.h"
 
 void _handleKeepAliveCommand(std::string_view arg, bool isAutomated) {

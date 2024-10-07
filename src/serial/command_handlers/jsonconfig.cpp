@@ -5,13 +5,13 @@
 void _handleJsonConfigCommand(std::string_view arg, bool isAutomated) {
   if (arg.empty()) {
     // Get raw config
-    std::string json = OpenShock:: Config::GetAsJSON(true);
+    std::string json = OpenShock::Config::GetAsJSON(true);
 
     SERPR_RESPONSE("JsonConfig|%s", json.c_str());
     return;
   }
 
-  if (!OpenShock:: Config::SaveFromJSON(arg)) {
+  if (!OpenShock::Config::SaveFromJSON(arg)) {
     SERPR_ERROR("Failed to save config");
     return;
   }

@@ -19,7 +19,7 @@ void _handleSerialEchoCommand(std::string_view arg, bool isAutomated) {
     return;
   }
 
-  bool result   = OpenShock::Config::SetSerialInputConfigEchoEnabled(enabled);
+  bool result = OpenShock::Config::SetSerialInputConfigEchoEnabled(enabled);
   OpenShock::SerialInputHandler::SetSerialEchoEnabled(enabled);
 
   if (result) {
