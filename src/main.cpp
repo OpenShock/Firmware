@@ -83,7 +83,7 @@ void appSetup() {
 
 // Arduino setup function
 void setup() {
-  Serial.begin(115'200);
+  ::Serial.begin(115'200);
 
   OpenShock::Config::Init();
   OpenShock::OtaUpdateManager::Init();
