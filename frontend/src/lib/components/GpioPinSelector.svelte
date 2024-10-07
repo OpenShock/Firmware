@@ -1,19 +1,23 @@
 <script lang="ts">
   import { DeviceStateStore } from '$lib/stores';
+  import { UsedPinsStore } from '$lib/stores/UsedPinsStore';
   import { WebSocketClient } from '$lib/WebSocketClient';
 
   export let name: string;
   export let currentPin: number | null;
   export let serializer: (gpio: number) => Uint8Array;
 
-  function isValidPin(pin: number) {
-    return pin >= 0 && pin <= 255 && $DeviceStateStore.gpioValidOutputs.includes(pin);
-  }
-
   let pendingPin: number | null = null;
+  let statusText: string = 'Loading...';
 
-  $: statusText = currentPin === null ? 'Loading...' : currentPin >= 0 ? 'Currently ' + currentPin : 'Invalid pin';
-  $: canSet = pendingPin !== null && pendingPin !== currentPin && isValidPin(pendingPin);
+  $: canSet = pendingPin !== null && pendingPin !== currentPin && pendingPin >= 0 && pendingPin <= 255 && $DeviceStateStore.gpioValidOutputs.includes(pendingPin) && !$UsedPinsStore.has(pendingPin);
+
+  $: if (currentPin !== null) {
+    UsedPinsStore.markPinUsed(currentPin, name);
+    statusText = currentPin >= 0 ? 'Currently ' + currentPin : 'Invalid pin';
+  } else {
+    statusText = 'Loading...';
+  }
 
   $: if (pendingPin !== null) {
     if (pendingPin < 0) {
@@ -25,7 +29,7 @@
 
   function setGpioPin() {
     if (!canSet) return;
-    const data = serializer(currentPin!);
+    const data = serializer(pendingPin!);
     WebSocketClient.Instance.Send(data);
   }
 </script>
