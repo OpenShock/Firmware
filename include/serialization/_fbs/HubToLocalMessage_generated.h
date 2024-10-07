@@ -679,15 +679,15 @@ struct SetRfTxPinCommandResult FLATBUFFERS_FINAL_CLASS : private ::flatbuffers::
     VT_PIN = 4,
     VT_RESULT = 6
   };
-  uint8_t pin() const {
-    return GetField<uint8_t>(VT_PIN, 0);
+  int8_t pin() const {
+    return GetField<int8_t>(VT_PIN, 0);
   }
   OpenShock::Serialization::Local::SetGPIOResultCode result() const {
     return static_cast<OpenShock::Serialization::Local::SetGPIOResultCode>(GetField<uint8_t>(VT_RESULT, 0));
   }
   bool Verify(::flatbuffers::Verifier &verifier) const {
     return VerifyTableStart(verifier) &&
-           VerifyField<uint8_t>(verifier, VT_PIN, 1) &&
+           VerifyField<int8_t>(verifier, VT_PIN, 1) &&
            VerifyField<uint8_t>(verifier, VT_RESULT, 1) &&
            verifier.EndTable();
   }
@@ -697,8 +697,8 @@ struct SetRfTxPinCommandResultBuilder {
   typedef SetRfTxPinCommandResult Table;
   ::flatbuffers::FlatBufferBuilder &fbb_;
   ::flatbuffers::uoffset_t start_;
-  void add_pin(uint8_t pin) {
-    fbb_.AddElement<uint8_t>(SetRfTxPinCommandResult::VT_PIN, pin, 0);
+  void add_pin(int8_t pin) {
+    fbb_.AddElement<int8_t>(SetRfTxPinCommandResult::VT_PIN, pin, 0);
   }
   void add_result(OpenShock::Serialization::Local::SetGPIOResultCode result) {
     fbb_.AddElement<uint8_t>(SetRfTxPinCommandResult::VT_RESULT, static_cast<uint8_t>(result), 0);
@@ -716,7 +716,7 @@ struct SetRfTxPinCommandResultBuilder {
 
 inline ::flatbuffers::Offset<SetRfTxPinCommandResult> CreateSetRfTxPinCommandResult(
     ::flatbuffers::FlatBufferBuilder &_fbb,
-    uint8_t pin = 0,
+    int8_t pin = 0,
     OpenShock::Serialization::Local::SetGPIOResultCode result = OpenShock::Serialization::Local::SetGPIOResultCode::Success) {
   SetRfTxPinCommandResultBuilder builder_(_fbb);
   builder_.add_result(result);
@@ -799,15 +799,15 @@ struct SetEstopPinCommandResult FLATBUFFERS_FINAL_CLASS : private ::flatbuffers:
     VT_GPIO_PIN = 4,
     VT_RESULT = 6
   };
-  uint8_t gpio_pin() const {
-    return GetField<uint8_t>(VT_GPIO_PIN, 0);
+  int8_t gpio_pin() const {
+    return GetField<int8_t>(VT_GPIO_PIN, 0);
   }
   OpenShock::Serialization::Local::SetGPIOResultCode result() const {
     return static_cast<OpenShock::Serialization::Local::SetGPIOResultCode>(GetField<uint8_t>(VT_RESULT, 0));
   }
   bool Verify(::flatbuffers::Verifier &verifier) const {
     return VerifyTableStart(verifier) &&
-           VerifyField<uint8_t>(verifier, VT_GPIO_PIN, 1) &&
+           VerifyField<int8_t>(verifier, VT_GPIO_PIN, 1) &&
            VerifyField<uint8_t>(verifier, VT_RESULT, 1) &&
            verifier.EndTable();
   }
@@ -817,8 +817,8 @@ struct SetEstopPinCommandResultBuilder {
   typedef SetEstopPinCommandResult Table;
   ::flatbuffers::FlatBufferBuilder &fbb_;
   ::flatbuffers::uoffset_t start_;
-  void add_gpio_pin(uint8_t gpio_pin) {
-    fbb_.AddElement<uint8_t>(SetEstopPinCommandResult::VT_GPIO_PIN, gpio_pin, 0);
+  void add_gpio_pin(int8_t gpio_pin) {
+    fbb_.AddElement<int8_t>(SetEstopPinCommandResult::VT_GPIO_PIN, gpio_pin, 0);
   }
   void add_result(OpenShock::Serialization::Local::SetGPIOResultCode result) {
     fbb_.AddElement<uint8_t>(SetEstopPinCommandResult::VT_RESULT, static_cast<uint8_t>(result), 0);
@@ -836,7 +836,7 @@ struct SetEstopPinCommandResultBuilder {
 
 inline ::flatbuffers::Offset<SetEstopPinCommandResult> CreateSetEstopPinCommandResult(
     ::flatbuffers::FlatBufferBuilder &_fbb,
-    uint8_t gpio_pin = 0,
+    int8_t gpio_pin = 0,
     OpenShock::Serialization::Local::SetGPIOResultCode result = OpenShock::Serialization::Local::SetGPIOResultCode::Success) {
   SetEstopPinCommandResultBuilder builder_(_fbb);
   builder_.add_result(result);

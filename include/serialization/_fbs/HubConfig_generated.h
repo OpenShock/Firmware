@@ -130,8 +130,8 @@ struct RFConfig FLATBUFFERS_FINAL_CLASS : private ::flatbuffers::Table {
     VT_KEEPALIVE_ENABLED = 6
   };
   /// The GPIO pin connected to the RF modulator's data pin for transmitting (TX)
-  uint8_t tx_pin() const {
-    return GetField<uint8_t>(VT_TX_PIN, 0);
+  int8_t tx_pin() const {
+    return GetField<int8_t>(VT_TX_PIN, 0);
   }
   /// Whether to transmit keepalive messages to keep the shockers from entering sleep mode
   bool keepalive_enabled() const {
@@ -139,7 +139,7 @@ struct RFConfig FLATBUFFERS_FINAL_CLASS : private ::flatbuffers::Table {
   }
   bool Verify(::flatbuffers::Verifier &verifier) const {
     return VerifyTableStart(verifier) &&
-           VerifyField<uint8_t>(verifier, VT_TX_PIN, 1) &&
+           VerifyField<int8_t>(verifier, VT_TX_PIN, 1) &&
            VerifyField<uint8_t>(verifier, VT_KEEPALIVE_ENABLED, 1) &&
            verifier.EndTable();
   }
@@ -149,8 +149,8 @@ struct RFConfigBuilder {
   typedef RFConfig Table;
   ::flatbuffers::FlatBufferBuilder &fbb_;
   ::flatbuffers::uoffset_t start_;
-  void add_tx_pin(uint8_t tx_pin) {
-    fbb_.AddElement<uint8_t>(RFConfig::VT_TX_PIN, tx_pin, 0);
+  void add_tx_pin(int8_t tx_pin) {
+    fbb_.AddElement<int8_t>(RFConfig::VT_TX_PIN, tx_pin, 0);
   }
   void add_keepalive_enabled(bool keepalive_enabled) {
     fbb_.AddElement<uint8_t>(RFConfig::VT_KEEPALIVE_ENABLED, static_cast<uint8_t>(keepalive_enabled), 0);
@@ -168,7 +168,7 @@ struct RFConfigBuilder {
 
 inline ::flatbuffers::Offset<RFConfig> CreateRFConfig(
     ::flatbuffers::FlatBufferBuilder &_fbb,
-    uint8_t tx_pin = 0,
+    int8_t tx_pin = 0,
     bool keepalive_enabled = false) {
   RFConfigBuilder builder_(_fbb);
   builder_.add_keepalive_enabled(keepalive_enabled);
@@ -195,13 +195,13 @@ struct EStopConfig FLATBUFFERS_FINAL_CLASS : private ::flatbuffers::Table {
     return GetField<uint8_t>(VT_ENABLED, 0) != 0;
   }
   /// The GPIO pin connected to the E-Stop button
-  uint8_t gpio_pin() const {
-    return GetField<uint8_t>(VT_GPIO_PIN, 0);
+  int8_t gpio_pin() const {
+    return GetField<int8_t>(VT_GPIO_PIN, 0);
   }
   bool Verify(::flatbuffers::Verifier &verifier) const {
     return VerifyTableStart(verifier) &&
            VerifyField<uint8_t>(verifier, VT_ENABLED, 1) &&
-           VerifyField<uint8_t>(verifier, VT_GPIO_PIN, 1) &&
+           VerifyField<int8_t>(verifier, VT_GPIO_PIN, 1) &&
            verifier.EndTable();
   }
 };
@@ -213,8 +213,8 @@ struct EStopConfigBuilder {
   void add_enabled(bool enabled) {
     fbb_.AddElement<uint8_t>(EStopConfig::VT_ENABLED, static_cast<uint8_t>(enabled), 0);
   }
-  void add_gpio_pin(uint8_t gpio_pin) {
-    fbb_.AddElement<uint8_t>(EStopConfig::VT_GPIO_PIN, gpio_pin, 0);
+  void add_gpio_pin(int8_t gpio_pin) {
+    fbb_.AddElement<int8_t>(EStopConfig::VT_GPIO_PIN, gpio_pin, 0);
   }
   explicit EStopConfigBuilder(::flatbuffers::FlatBufferBuilder &_fbb)
         : fbb_(_fbb) {
@@ -230,7 +230,7 @@ struct EStopConfigBuilder {
 inline ::flatbuffers::Offset<EStopConfig> CreateEStopConfig(
     ::flatbuffers::FlatBufferBuilder &_fbb,
     bool enabled = false,
-    uint8_t gpio_pin = 0) {
+    int8_t gpio_pin = 0) {
   EStopConfigBuilder builder_(_fbb);
   builder_.add_gpio_pin(gpio_pin);
   builder_.add_enabled(enabled);
