@@ -1,8 +1,10 @@
 #pragma once
 
-#include "SetRfPinResultCode.h"
+#include "SetGPIOResultCode.h"
 #include "ShockerCommandType.h"
 #include "ShockerModelType.h"
+
+#include <hal/gpio_types.h>
 
 #include <cstdint>
 
@@ -12,8 +14,11 @@ namespace OpenShock::CommandHandler {
   [[nodiscard]] bool Init();
   bool Ok();
 
-  SetRfPinResultCode SetRfTxPin(uint8_t txPin);
-  uint8_t GetRfTxPin();
+  gpio_num_t GetRfTxPin();
+  SetGPIOResultCode SetRfTxPin(gpio_num_t txPin);
+
+  SetGPIOResultCode SetEstopPin(gpio_num_t estopPin);
+  gpio_num_t GetEstopPin();
 
   bool SetKeepAliveEnabled(bool enabled);
   bool SetKeepAlivePaused(bool paused);

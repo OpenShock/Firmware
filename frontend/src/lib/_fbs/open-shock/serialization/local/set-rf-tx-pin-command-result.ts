@@ -4,7 +4,7 @@
 
 import * as flatbuffers from 'flatbuffers';
 
-import { SetRfPinResultCode } from '../../../open-shock/serialization/local/set-rf-pin-result-code';
+import { SetGPIOResultCode } from '../../../open-shock/serialization/local/set-gpioresult-code';
 
 
 export class SetRfTxPinCommandResult {
@@ -16,23 +16,46 @@ export class SetRfTxPinCommandResult {
   return this;
 }
 
+static getRootAsSetRfTxPinCommandResult(bb:flatbuffers.ByteBuffer, obj?:SetRfTxPinCommandResult):SetRfTxPinCommandResult {
+  return (obj || new SetRfTxPinCommandResult()).__init(bb.readInt32(bb.position()) + bb.position(), bb);
+}
+
+static getSizePrefixedRootAsSetRfTxPinCommandResult(bb:flatbuffers.ByteBuffer, obj?:SetRfTxPinCommandResult):SetRfTxPinCommandResult {
+  bb.setPosition(bb.position() + flatbuffers.SIZE_PREFIX_LENGTH);
+  return (obj || new SetRfTxPinCommandResult()).__init(bb.readInt32(bb.position()) + bb.position(), bb);
+}
+
 pin():number {
-  return this.bb!.readUint8(this.bb_pos);
+  const offset = this.bb!.__offset(this.bb_pos, 4);
+  return offset ? this.bb!.readInt8(this.bb_pos + offset) : 0;
 }
 
-result():SetRfPinResultCode {
-  return this.bb!.readUint8(this.bb_pos + 1);
+result():SetGPIOResultCode {
+  const offset = this.bb!.__offset(this.bb_pos, 6);
+  return offset ? this.bb!.readUint8(this.bb_pos + offset) : SetGPIOResultCode.Success;
 }
 
-static sizeOf():number {
-  return 2;
+static startSetRfTxPinCommandResult(builder:flatbuffers.Builder) {
+  builder.startObject(2);
 }
 
-static createSetRfTxPinCommandResult(builder:flatbuffers.Builder, pin: number, result: SetRfPinResultCode):flatbuffers.Offset {
-  builder.prep(1, 2);
-  builder.writeInt8(result);
-  builder.writeInt8(pin);
-  return builder.offset();
+static addPin(builder:flatbuffers.Builder, pin:number) {
+  builder.addFieldInt8(0, pin, 0);
 }
 
+static addResult(builder:flatbuffers.Builder, result:SetGPIOResultCode) {
+  builder.addFieldInt8(1, result, SetGPIOResultCode.Success);
+}
+
+static endSetRfTxPinCommandResult(builder:flatbuffers.Builder):flatbuffers.Offset {
+  const offset = builder.endObject();
+  return offset;
+}
+
+static createSetRfTxPinCommandResult(builder:flatbuffers.Builder, pin:number, result:SetGPIOResultCode):flatbuffers.Offset {
+  SetRfTxPinCommandResult.startSetRfTxPinCommandResult(builder);
+  SetRfTxPinCommandResult.addPin(builder, pin);
+  SetRfTxPinCommandResult.addResult(builder, result);
+  return SetRfTxPinCommandResult.endSetRfTxPinCommandResult(builder);
+}
 }

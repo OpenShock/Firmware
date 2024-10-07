@@ -53,7 +53,7 @@ bool Local::SerializeErrorMessage(const char* message, Common::SerializationCall
 
   auto msg = Local::CreateHubToLocalMessage(builder, Local::HubToLocalMessagePayload::ErrorMessage, wrapperOffset.Union());
 
-  builder.Finish(msg);
+  Serialization::Local::FinishHubToLocalMessageBuffer(builder, msg);
 
   auto span = builder.GetBufferSpan();
 
@@ -89,7 +89,7 @@ bool Local::SerializeReadyMessage(const WiFiNetwork* connectedNetwork, bool acco
 
   auto msg = Serialization::Local::CreateHubToLocalMessage(builder, Serialization::Local::HubToLocalMessagePayload::ReadyMessage, readyMessageOffset.Union());
 
-  builder.Finish(msg);
+  Serialization::Local::FinishHubToLocalMessageBuffer(builder, msg);
 
   auto span = builder.GetBufferSpan();
 
@@ -99,12 +99,11 @@ bool Local::SerializeReadyMessage(const WiFiNetwork* connectedNetwork, bool acco
 bool Local::SerializeWiFiScanStatusChangedEvent(OpenShock::WiFiScanStatus status, Common::SerializationCallbackFn callback) {
   flatbuffers::FlatBufferBuilder builder(32);  // TODO: Profile this and adjust the size accordingly
 
-  Serialization::Local::WifiScanStatusMessage scanStatus(status);
-  auto scanStatusOffset = builder.CreateStruct(scanStatus);
+  auto scanStatusOffset = Serialization::Local::CreateWifiScanStatusMessage(builder, status);
 
   auto msg = Serialization::Local::CreateHubToLocalMessage(builder, Serialization::Local::HubToLocalMessagePayload::WifiScanStatusMessage, scanStatusOffset.Union());
 
-  builder.Finish(msg);
+  Serialization::Local::FinishHubToLocalMessageBuffer(builder, msg);
 
   auto span = builder.GetBufferSpan();
 
@@ -120,7 +119,7 @@ bool Local::SerializeWiFiNetworkEvent(Types::WifiNetworkEventType eventType, con
 
   auto msg = Local::CreateHubToLocalMessage(builder, Local::HubToLocalMessagePayload::WifiNetworkEvent, wrapperOffset.Union());
 
-  builder.Finish(msg);
+  Serialization::Local::FinishHubToLocalMessageBuffer(builder, msg);
 
   auto span = builder.GetBufferSpan();
 
@@ -141,7 +140,7 @@ bool Local::SerializeWiFiNetworksEvent(Types::WifiNetworkEventType eventType, co
 
   auto msg = Local::CreateHubToLocalMessage(builder, Local::HubToLocalMessagePayload::WifiNetworkEvent, wrapperOffset.Union());
 
-  builder.Finish(msg);
+  Serialization::Local::FinishHubToLocalMessageBuffer(builder, msg);
 
   auto span = builder.GetBufferSpan();
 

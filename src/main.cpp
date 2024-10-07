@@ -29,7 +29,9 @@ bool trySetup() {
     OS_PANIC(TAG, "Unable to initialize VisualStateManager");
   }
 
-  OpenShock::EStopManager::Init();
+  if (!OpenShock::EStopManager::Init()) {
+    OS_PANIC(TAG, "Unable to initialize EStopManager");
+  }
 
   if (!OpenShock::SerialInputHandler::Init()) {
     OS_LOGE(TAG, "Unable to initialize SerialInputHandler");
@@ -81,7 +83,7 @@ void appSetup() {
 
 // Arduino setup function
 void setup() {
-  Serial.begin(115'200);
+  ::Serial.begin(115'200);
 
   OpenShock::Config::Init();
   OpenShock::OtaUpdateManager::Init();

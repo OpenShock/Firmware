@@ -2,11 +2,14 @@
 
 #include "config/BackendConfig.h"
 #include "config/CaptivePortalConfig.h"
+#include "config/EStopConfig.h"
 #include "config/OtaUpdateConfig.h"
 #include "config/RFConfig.h"
 #include "config/SerialInputConfig.h"
 #include "config/WiFiConfig.h"
 #include "config/WiFiCredentials.h"
+
+#include <hal/gpio_types.h>
 
 #include <functional>
 #include <string_view>
@@ -36,38 +39,38 @@ namespace OpenShock::Config {
 
   bool GetRFConfig(RFConfig& out);
   bool GetWiFiConfig(WiFiConfig& out);
+  bool GetCaptivePortalConfig(CaptivePortalConfig& out);
+  bool GetBackendConfig(BackendConfig& out);
+  bool GetSerialInputConfig(SerialInputConfig& out);
   bool GetOtaUpdateConfig(OtaUpdateConfig& out);
-  bool GetWiFiCredentials(cJSON* array, bool withSensitiveData);
-  bool GetWiFiCredentials(std::vector<WiFiCredentials>& out);
+  bool GetEStop(EStopConfig& out);
 
   bool SetRFConfig(const RFConfig& config);
   bool SetWiFiConfig(const WiFiConfig& config);
-  bool SetWiFiCredentials(const std::vector<WiFiCredentials>& credentials);
   bool SetCaptivePortalConfig(const CaptivePortalConfig& config);
-  bool SetSerialInputConfig(const SerialInputConfig& config);
   bool SetBackendConfig(const BackendConfig& config);
+  bool SetSerialInputConfig(const SerialInputConfig& config);
+  bool SetOtaUpdateConfig(const OtaUpdateConfig& config);
+  bool SetEStop(const EStopConfig& config);
 
-  bool GetRFConfigTxPin(uint8_t& out);
-  bool SetRFConfigTxPin(uint8_t txPin);
+  bool GetWiFiCredentials(std::vector<WiFiCredentials>& out);
+  bool GetWiFiCredentials(cJSON* array, bool withSensitiveData);
+  bool SetWiFiCredentials(const std::vector<WiFiCredentials>& credentials);
+
+  bool GetRFConfigTxPin(gpio_num_t& out);
+  bool SetRFConfigTxPin(gpio_num_t txPin);
   bool GetRFConfigKeepAliveEnabled(bool& out);
   bool SetRFConfigKeepAliveEnabled(bool enabled);
 
-  bool GetSerialInputConfigEchoEnabled(bool& out);
-  bool SetSerialInputConfigEchoEnabled(bool enabled);
-
   bool AnyWiFiCredentials(std::function<bool(const Config::WiFiCredentials&)> predicate);
-
   uint8_t AddWiFiCredentials(std::string_view ssid, std::string_view password);
   bool TryGetWiFiCredentialsByID(uint8_t id, WiFiCredentials& out);
   bool TryGetWiFiCredentialsBySSID(const char* ssid, WiFiCredentials& out);
   uint8_t GetWiFiCredentialsIDbySSID(const char* ssid);
   bool RemoveWiFiCredentials(uint8_t id);
   bool ClearWiFiCredentials();
-
-  bool GetOtaUpdateId(int32_t& out);
-  bool SetOtaUpdateId(int32_t updateId);
-  bool GetOtaUpdateStep(OtaUpdateStep& out);
-  bool SetOtaUpdateStep(OtaUpdateStep updateStep);
+  bool GetWiFiHostname(std::string& out);
+  bool SetWiFiHostname(std::string_view hostname);
 
   bool GetBackendDomain(std::string& out);
   bool SetBackendDomain(std::string_view domain);
@@ -79,4 +82,17 @@ namespace OpenShock::Config {
   bool GetBackendLCGOverride(std::string& out);
   bool SetBackendLCGOverride(std::string_view lcgOverride);
   bool ClearBackendLCGOverride();
+
+  bool GetSerialInputConfigEchoEnabled(bool& out);
+  bool SetSerialInputConfigEchoEnabled(bool enabled);
+
+  bool GetOtaUpdateId(int32_t& out);
+  bool SetOtaUpdateId(int32_t updateId);
+  bool GetOtaUpdateStep(OtaUpdateStep& out);
+  bool SetOtaUpdateStep(OtaUpdateStep updateStep);
+
+  bool GetEStopEnabled(bool& out);
+  bool SetEStopEnabled(bool enabled);
+  bool GetEStopGpioPin(gpio_num_t& out);
+  bool SetEStopGpioPin(gpio_num_t gpioPin);
 }  // namespace OpenShock::Config

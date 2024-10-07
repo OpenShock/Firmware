@@ -8,14 +8,14 @@ const char* const TAG = "LocalMessageHandlers";
 
 #include <cstdint>
 
-void serializeSetRfTxPinResult(uint8_t socketId, OpenShock::Serialization::Local::AccountLinkResultCode result) {
-  flatbuffers::FlatBufferBuilder builder(1024);
+void serializeAccountLinkCommandResult(uint8_t socketId, OpenShock::Serialization::Local::AccountLinkResultCode result) {
+  flatbuffers::FlatBufferBuilder builder(1024);  // TODO: Determine a good size
 
-  auto responseOffset = builder.CreateStruct(OpenShock::Serialization::Local::AccountLinkCommandResult(result));
+  auto responseOffset = OpenShock::Serialization::Local::CreateAccountLinkCommandResult(builder, result);
 
-  auto msgOffset = OpenShock::Serialization::Local::CreateHubToLocalMessage(builder, OpenShock::Serialization::Local::HubToLocalMessagePayload::AccountLinkCommandResult, responseOffset.Union());
+  auto msg = OpenShock::Serialization::Local::CreateHubToLocalMessage(builder, OpenShock::Serialization::Local::HubToLocalMessagePayload::AccountLinkCommandResult, responseOffset.Union());
 
-  builder.Finish(msgOffset);
+  OpenShock::Serialization::Local::FinishHubToLocalMessageBuffer(builder, msg);
 
   auto buffer = builder.GetBufferPointer();
   auto size   = builder.GetSize();
@@ -35,16 +35,16 @@ void _Private::HandleAccountLinkCommand(uint8_t socketId, const OpenShock::Seria
   auto code = msg->code();
 
   if (code == nullptr) {
-    serializeSetRfTxPinResult(socketId, OpenShock::Serialization::Local::AccountLinkResultCode::CodeRequired);
+    serializeAccountLinkCommandResult(socketId, OpenShock::Serialization::Local::AccountLinkResultCode::CodeRequired);
     return;
   }
 
   if (code->size() != 6) {
-    serializeSetRfTxPinResult(socketId, OpenShock::Serialization::Local::AccountLinkResultCode::InvalidCodeLength);
+    serializeAccountLinkCommandResult(socketId, OpenShock::Serialization::Local::AccountLinkResultCode::InvalidCodeLength);
     return;
   }
 
   auto result = GatewayConnectionManager::Link(*code);
 
-  serializeSetRfTxPinResult(socketId, result);
+  serializeAccountLinkCommandResult(socketId, result);
 }

@@ -67,11 +67,11 @@ AlignTrailingComments:
   Kind: Always
   OverEmptyLines: 1
 AllowAllArgumentsOnNextLine: true
-AllowAllParametersOfDeclarationOnNextLine: false
+AllowAllParametersOfDeclarationOnNextLine: true
 AllowShortBlocksOnASingleLine: Always
 AllowShortCaseLabelsOnASingleLine: false
 AllowShortEnumsOnASingleLine: false
-AllowShortFunctionsOnASingleLine: Inline
+AllowShortFunctionsOnASingleLine: InlineOnly
 AllowShortIfStatementsOnASingleLine: WithoutElse
 AllowShortLambdasOnASingleLine: Inline
 AllowShortLoopsOnASingleLine: true
@@ -87,7 +87,7 @@ BraceWrapping:
   AfterClass: false
   AfterControlStatement: MultiLine
   AfterEnum: false
-  AfterFunction: false
+  AfterFunction: true
   AfterNamespace: false
   AfterStruct: false
   AfterUnion: false
@@ -97,10 +97,10 @@ BraceWrapping:
   BeforeLambdaBody: false
   BeforeWhile: false
   IndentBraces: false
-  SplitEmptyFunction: false
+  SplitEmptyFunction: true
   SplitEmptyRecord: true
   SplitEmptyNamespace: true
-BreakAfterAttributes: Never
+BreakAfterAttributes: Leave
 BreakBeforeBinaryOperators: All
 BreakBeforeConceptDeclarations: Allowed
 BreakBeforeInlineASMColon: Always
@@ -137,7 +137,7 @@ LambdaBodyIndentation: OuterScope
 MaxEmptyLinesToKeep: 1
 NamespaceIndentation: All
 PPIndentWidth: -1
-PackConstructorInitializers: NextLine
+PackConstructorInitializers: Never
 
 PointerAlignment: Left
 ReferenceAlignment: Left

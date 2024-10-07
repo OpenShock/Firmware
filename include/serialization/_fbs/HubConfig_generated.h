@@ -20,6 +20,9 @@ namespace Configuration {
 struct RFConfig;
 struct RFConfigBuilder;
 
+struct EStopConfig;
+struct EStopConfigBuilder;
+
 struct WiFiCredentials;
 struct WiFiCredentialsBuilder;
 
@@ -127,8 +130,8 @@ struct RFConfig FLATBUFFERS_FINAL_CLASS : private ::flatbuffers::Table {
     VT_KEEPALIVE_ENABLED = 6
   };
   /// The GPIO pin connected to the RF modulator's data pin for transmitting (TX)
-  uint8_t tx_pin() const {
-    return GetField<uint8_t>(VT_TX_PIN, 0);
+  int8_t tx_pin() const {
+    return GetField<int8_t>(VT_TX_PIN, 0);
   }
   /// Whether to transmit keepalive messages to keep the shockers from entering sleep mode
   bool keepalive_enabled() const {
@@ -136,7 +139,7 @@ struct RFConfig FLATBUFFERS_FINAL_CLASS : private ::flatbuffers::Table {
   }
   bool Verify(::flatbuffers::Verifier &verifier) const {
     return VerifyTableStart(verifier) &&
-           VerifyField<uint8_t>(verifier, VT_TX_PIN, 1) &&
+           VerifyField<int8_t>(verifier, VT_TX_PIN, 1) &&
            VerifyField<uint8_t>(verifier, VT_KEEPALIVE_ENABLED, 1) &&
            verifier.EndTable();
   }
@@ -146,8 +149,8 @@ struct RFConfigBuilder {
   typedef RFConfig Table;
   ::flatbuffers::FlatBufferBuilder &fbb_;
   ::flatbuffers::uoffset_t start_;
-  void add_tx_pin(uint8_t tx_pin) {
-    fbb_.AddElement<uint8_t>(RFConfig::VT_TX_PIN, tx_pin, 0);
+  void add_tx_pin(int8_t tx_pin) {
+    fbb_.AddElement<int8_t>(RFConfig::VT_TX_PIN, tx_pin, 0);
   }
   void add_keepalive_enabled(bool keepalive_enabled) {
     fbb_.AddElement<uint8_t>(RFConfig::VT_KEEPALIVE_ENABLED, static_cast<uint8_t>(keepalive_enabled), 0);
@@ -165,7 +168,7 @@ struct RFConfigBuilder {
 
 inline ::flatbuffers::Offset<RFConfig> CreateRFConfig(
     ::flatbuffers::FlatBufferBuilder &_fbb,
-    uint8_t tx_pin = 0,
+    int8_t tx_pin = 0,
     bool keepalive_enabled = false) {
   RFConfigBuilder builder_(_fbb);
   builder_.add_keepalive_enabled(keepalive_enabled);
@@ -176,6 +179,67 @@ inline ::flatbuffers::Offset<RFConfig> CreateRFConfig(
 struct RFConfig::Traits {
   using type = RFConfig;
   static auto constexpr Create = CreateRFConfig;
+};
+
+struct EStopConfig FLATBUFFERS_FINAL_CLASS : private ::flatbuffers::Table {
+  typedef EStopConfigBuilder Builder;
+  struct Traits;
+  static FLATBUFFERS_CONSTEXPR_CPP11 const char *GetFullyQualifiedName() {
+    return "OpenShock.Serialization.Configuration.EStopConfig";
+  }
+  enum FlatBuffersVTableOffset FLATBUFFERS_VTABLE_UNDERLYING_TYPE {
+    VT_ENABLED = 4,
+    VT_GPIO_PIN = 6
+  };
+  bool enabled() const {
+    return GetField<uint8_t>(VT_ENABLED, 0) != 0;
+  }
+  /// The GPIO pin connected to the E-Stop button
+  int8_t gpio_pin() const {
+    return GetField<int8_t>(VT_GPIO_PIN, 0);
+  }
+  bool Verify(::flatbuffers::Verifier &verifier) const {
+    return VerifyTableStart(verifier) &&
+           VerifyField<uint8_t>(verifier, VT_ENABLED, 1) &&
+           VerifyField<int8_t>(verifier, VT_GPIO_PIN, 1) &&
+           verifier.EndTable();
+  }
+};
+
+struct EStopConfigBuilder {
+  typedef EStopConfig Table;
+  ::flatbuffers::FlatBufferBuilder &fbb_;
+  ::flatbuffers::uoffset_t start_;
+  void add_enabled(bool enabled) {
+    fbb_.AddElement<uint8_t>(EStopConfig::VT_ENABLED, static_cast<uint8_t>(enabled), 0);
+  }
+  void add_gpio_pin(int8_t gpio_pin) {
+    fbb_.AddElement<int8_t>(EStopConfig::VT_GPIO_PIN, gpio_pin, 0);
+  }
+  explicit EStopConfigBuilder(::flatbuffers::FlatBufferBuilder &_fbb)
+        : fbb_(_fbb) {
+    start_ = fbb_.StartTable();
+  }
+  ::flatbuffers::Offset<EStopConfig> Finish() {
+    const auto end = fbb_.EndTable(start_);
+    auto o = ::flatbuffers::Offset<EStopConfig>(end);
+    return o;
+  }
+};
+
+inline ::flatbuffers::Offset<EStopConfig> CreateEStopConfig(
+    ::flatbuffers::FlatBufferBuilder &_fbb,
+    bool enabled = false,
+    int8_t gpio_pin = 0) {
+  EStopConfigBuilder builder_(_fbb);
+  builder_.add_gpio_pin(gpio_pin);
+  builder_.add_enabled(enabled);
+  return builder_.Finish();
+}
+
+struct EStopConfig::Traits {
+  using type = EStopConfig;
+  static auto constexpr Create = CreateEStopConfig;
 };
 
 struct WiFiCredentials FLATBUFFERS_FINAL_CLASS : private ::flatbuffers::Table {
@@ -743,7 +807,8 @@ struct HubConfig FLATBUFFERS_FINAL_CLASS : private ::flatbuffers::Table {
     VT_CAPTIVE_PORTAL = 8,
     VT_BACKEND = 10,
     VT_SERIAL_INPUT = 12,
-    VT_OTA_UPDATE = 14
+    VT_OTA_UPDATE = 14,
+    VT_ESTOP = 16
   };
   /// RF Transmitter configuration
   const OpenShock::Serialization::Configuration::RFConfig *rf() const {
@@ -769,6 +834,10 @@ struct HubConfig FLATBUFFERS_FINAL_CLASS : private ::flatbuffers::Table {
   const OpenShock::Serialization::Configuration::OtaUpdateConfig *ota_update() const {
     return GetPointer<const OpenShock::Serialization::Configuration::OtaUpdateConfig *>(VT_OTA_UPDATE);
   }
+  /// E-Stop configuration
+  const OpenShock::Serialization::Configuration::EStopConfig *estop() const {
+    return GetPointer<const OpenShock::Serialization::Configuration::EStopConfig *>(VT_ESTOP);
+  }
   bool Verify(::flatbuffers::Verifier &verifier) const {
     return VerifyTableStart(verifier) &&
            VerifyOffset(verifier, VT_RF) &&
@@ -783,6 +852,8 @@ struct HubConfig FLATBUFFERS_FINAL_CLASS : private ::flatbuffers::Table {
            verifier.VerifyTable(serial_input()) &&
            VerifyOffset(verifier, VT_OTA_UPDATE) &&
            verifier.VerifyTable(ota_update()) &&
+           VerifyOffset(verifier, VT_ESTOP) &&
+           verifier.VerifyTable(estop()) &&
            verifier.EndTable();
   }
 };
@@ -809,6 +880,9 @@ struct HubConfigBuilder {
   void add_ota_update(::flatbuffers::Offset<OpenShock::Serialization::Configuration::OtaUpdateConfig> ota_update) {
     fbb_.AddOffset(HubConfig::VT_OTA_UPDATE, ota_update);
   }
+  void add_estop(::flatbuffers::Offset<OpenShock::Serialization::Configuration::EStopConfig> estop) {
+    fbb_.AddOffset(HubConfig::VT_ESTOP, estop);
+  }
   explicit HubConfigBuilder(::flatbuffers::FlatBufferBuilder &_fbb)
         : fbb_(_fbb) {
     start_ = fbb_.StartTable();
@@ -827,8 +901,10 @@ inline ::flatbuffers::Offset<HubConfig> CreateHubConfig(
     ::flatbuffers::Offset<OpenShock::Serialization::Configuration::CaptivePortalConfig> captive_portal = 0,
     ::flatbuffers::Offset<OpenShock::Serialization::Configuration::BackendConfig> backend = 0,
     ::flatbuffers::Offset<OpenShock::Serialization::Configuration::SerialInputConfig> serial_input = 0,
-    ::flatbuffers::Offset<OpenShock::Serialization::Configuration::OtaUpdateConfig> ota_update = 0) {
+    ::flatbuffers::Offset<OpenShock::Serialization::Configuration::OtaUpdateConfig> ota_update = 0,
+    ::flatbuffers::Offset<OpenShock::Serialization::Configuration::EStopConfig> estop = 0) {
   HubConfigBuilder builder_(_fbb);
+  builder_.add_estop(estop);
   builder_.add_ota_update(ota_update);
   builder_.add_serial_input(serial_input);
   builder_.add_backend(backend);
@@ -842,6 +918,36 @@ struct HubConfig::Traits {
   using type = HubConfig;
   static auto constexpr Create = CreateHubConfig;
 };
+
+inline const OpenShock::Serialization::Configuration::HubConfig *GetHubConfig(const void *buf) {
+  return ::flatbuffers::GetRoot<OpenShock::Serialization::Configuration::HubConfig>(buf);
+}
+
+inline const OpenShock::Serialization::Configuration::HubConfig *GetSizePrefixedHubConfig(const void *buf) {
+  return ::flatbuffers::GetSizePrefixedRoot<OpenShock::Serialization::Configuration::HubConfig>(buf);
+}
+
+inline bool VerifyHubConfigBuffer(
+    ::flatbuffers::Verifier &verifier) {
+  return verifier.VerifyBuffer<OpenShock::Serialization::Configuration::HubConfig>(nullptr);
+}
+
+inline bool VerifySizePrefixedHubConfigBuffer(
+    ::flatbuffers::Verifier &verifier) {
+  return verifier.VerifySizePrefixedBuffer<OpenShock::Serialization::Configuration::HubConfig>(nullptr);
+}
+
+inline void FinishHubConfigBuffer(
+    ::flatbuffers::FlatBufferBuilder &fbb,
+    ::flatbuffers::Offset<OpenShock::Serialization::Configuration::HubConfig> root) {
+  fbb.Finish(root);
+}
+
+inline void FinishSizePrefixedHubConfigBuffer(
+    ::flatbuffers::FlatBufferBuilder &fbb,
+    ::flatbuffers::Offset<OpenShock::Serialization::Configuration::HubConfig> root) {
+  fbb.FinishSizePrefixed(root);
+}
 
 }  // namespace Configuration
 }  // namespace Serialization

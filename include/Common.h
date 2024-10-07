@@ -22,11 +22,15 @@
 
 #define OPENSHOCK_FW_CDN_URL(path) "https://" OPENSHOCK_FW_CDN_DOMAIN path
 
-#define OPENSHOCK_GPIO_INVALID 0
+#define OPENSHOCK_GPIO_INVALID -1
 
 #ifndef OPENSHOCK_RF_TX_GPIO
 #warning "OPENSHOCK_RF_TX_GPIO is not defined, setting to OPENSHOCK_GPIO_INVALID"
 #define OPENSHOCK_RF_TX_GPIO OPENSHOCK_GPIO_INVALID
+#endif
+
+#ifndef OPENSHOCK_ESTOP_PIN
+#define OPENSHOCK_ESTOP_PIN OPENSHOCK_GPIO_INVALID
 #endif
 
 // Check if OPENSHOCK_FW_USERAGENT is overridden trough compiler flags, if not, generate a default useragent.
