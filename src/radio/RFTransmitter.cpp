@@ -14,10 +14,10 @@ const char* const TAG = "RFTransmitter";
 
 #include <freertos/queue.h>
 
-const UBaseType_t RFTRANSMITTER_QUEUE_SIZE        = 64;
-const BaseType_t RFTRANSMITTER_TASK_PRIORITY      = 1;
+const UBaseType_t RFTRANSMITTER_QUEUE_SIZE   = 64;
+const BaseType_t RFTRANSMITTER_TASK_PRIORITY = 1;
 const uint32_t RFTRANSMITTER_TASK_STACK_SIZE = 4096;  // PROFILED: 1.4KB stack usage
-const float RFTRANSMITTER_TICKRATE_NS             = 1000;
+const float RFTRANSMITTER_TICKRATE_NS        = 1000;
 const int64_t TRANSMIT_END_DURATION          = 300;
 
 using namespace OpenShock;
@@ -30,7 +30,12 @@ struct command_t {
   bool overwrite;
 };
 
-RFTransmitter::RFTransmitter(gpio_num_t gpioPin) : m_txPin(gpioPin), m_rmtHandle(nullptr), m_queueHandle(nullptr), m_taskHandle(nullptr) {
+RFTransmitter::RFTransmitter(gpio_num_t gpioPin)
+  : m_txPin(gpioPin)
+  , m_rmtHandle(nullptr)
+  , m_queueHandle(nullptr)
+  , m_taskHandle(nullptr)
+{
   OS_LOGD(TAG, "[pin-%hhi] Creating RFTransmitter", m_txPin);
 
   m_rmtHandle = rmtInit(static_cast<int>(m_txPin), RMT_TX_MODE, RMT_MEM_64);
@@ -60,11 +65,13 @@ RFTransmitter::RFTransmitter(gpio_num_t gpioPin) : m_txPin(gpioPin), m_rmtHandle
   }
 }
 
-RFTransmitter::~RFTransmitter() {
+RFTransmitter::~RFTransmitter()
+{
   destroy();
 }
 
-bool RFTransmitter::SendCommand(ShockerModelType model, uint16_t shockerId, ShockerCommandType type, uint8_t intensity, uint16_t durationMs, bool overwriteExisting) {
+bool RFTransmitter::SendCommand(ShockerModelType model, uint16_t shockerId, ShockerCommandType type, uint8_t intensity, uint16_t durationMs, bool overwriteExisting)
+{
   if (m_queueHandle == nullptr) {
     OS_LOGE(TAG, "[pin-%hhi] Queue is null", m_txPin);
     return false;
@@ -88,7 +95,8 @@ bool RFTransmitter::SendCommand(ShockerModelType model, uint16_t shockerId, Shoc
   return true;
 }
 
-void RFTransmitter::ClearPendingCommands() {
+void RFTransmitter::ClearPendingCommands()
+{
   if (m_queueHandle == nullptr) {
     return;
   }
@@ -101,7 +109,8 @@ void RFTransmitter::ClearPendingCommands() {
   }
 }
 
-void RFTransmitter::destroy() {
+void RFTransmitter::destroy()
+{
   if (m_taskHandle != nullptr) {
     OS_LOGD(TAG, "[pin-%hhi] Stopping task", m_txPin);
 
@@ -131,7 +140,8 @@ void RFTransmitter::destroy() {
   }
 }
 
-void RFTransmitter::TransmitTask() {
+void RFTransmitter::TransmitTask()
+{
   OS_LOGD(TAG, "[pin-%hhi] RMT loop running on core %d", m_txPin, xPortGetCoreID());
 
   std::vector<command_t*> commands;

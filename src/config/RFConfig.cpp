@@ -20,12 +20,14 @@ RFConfig::RFConfig(gpio_num_t txPin, bool keepAliveEnabled)
 {
 }
 
-void RFConfig::ToDefault() {
+void RFConfig::ToDefault()
+{
   txPin            = static_cast<gpio_num_t>(OPENSHOCK_RF_TX_GPIO);
   keepAliveEnabled = true;
 }
 
-bool RFConfig::FromFlatbuffers(const Serialization::Configuration::RFConfig* config) {
+bool RFConfig::FromFlatbuffers(const Serialization::Configuration::RFConfig* config)
+{
   if (config == nullptr) {
     OS_LOGW(TAG, "Config is null, setting to default");
     ToDefault();
@@ -38,11 +40,13 @@ bool RFConfig::FromFlatbuffers(const Serialization::Configuration::RFConfig* con
   return true;
 }
 
-flatbuffers::Offset<OpenShock::Serialization::Configuration::RFConfig> RFConfig::ToFlatbuffers(flatbuffers::FlatBufferBuilder& builder, bool withSensitiveData) const {
+flatbuffers::Offset<OpenShock::Serialization::Configuration::RFConfig> RFConfig::ToFlatbuffers(flatbuffers::FlatBufferBuilder& builder, bool withSensitiveData) const
+{
   return Serialization::Configuration::CreateRFConfig(builder, txPin, keepAliveEnabled);
 }
 
-bool RFConfig::FromJSON(const cJSON* json) {
+bool RFConfig::FromJSON(const cJSON* json)
+{
   if (json == nullptr) {
     OS_LOGW(TAG, "Config is null, setting to default");
     ToDefault();
@@ -60,10 +64,11 @@ bool RFConfig::FromJSON(const cJSON* json) {
   return true;
 }
 
-cJSON* RFConfig::ToJSON(bool withSensitiveData) const {
+cJSON* RFConfig::ToJSON(bool withSensitiveData) const
+{
   cJSON* root = cJSON_CreateObject();
 
-  cJSON_AddNumberToObject(root, "txPin", static_cast<int>(txPin)); //-V2564
+  cJSON_AddNumberToObject(root, "txPin", static_cast<int>(txPin));  //-V2564
   cJSON_AddBoolToObject(root, "keepAliveEnabled", keepAliveEnabled);
 
   return root;

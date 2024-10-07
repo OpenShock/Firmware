@@ -3,8 +3,8 @@
 #include "config/ConfigBase.h"
 
 #include <cJSON.h>
-#include <IPAddress.h>
 #include <hal/gpio_types.h>
+#include <IPAddress.h>
 
 #include <string>
 #include <vector>
@@ -19,7 +19,7 @@ namespace OpenShock::Config::Internal::Utils {
   bool FromJsonU8(uint8_t& val, const cJSON* json, const char* name, uint8_t defaultVal);
   bool FromJsonU16(uint16_t& val, const cJSON* json, const char* name, uint16_t defaultVal);
   bool FromJsonI32(int32_t& val, const cJSON* json, const char* name, int32_t defaultVal);
-  
+
   bool FromJsonStr(std::string& str, const cJSON* json, const char* name);
   void FromJsonStr(std::string& str, const cJSON* json, const char* name, const char* defaultStr);
 
@@ -30,7 +30,8 @@ namespace OpenShock::Config::Internal::Utils {
   void FromJsonGpioNum(gpio_num_t& val, const cJSON* json, const char* name, gpio_num_t defaultVal);
 
   template<typename T, typename U>  // T inherits from ConfigBase<U>
-  void FromFbsVec(std::vector<T>& vec, const flatbuffers::Vector<flatbuffers::Offset<U>>* fbsVec) {
+  void FromFbsVec(std::vector<T>& vec, const flatbuffers::Vector<flatbuffers::Offset<U>>* fbsVec)
+  {
     vec.clear();
 
     if (fbsVec == nullptr) {
@@ -45,7 +46,8 @@ namespace OpenShock::Config::Internal::Utils {
     }
   }
   template<typename T>  // T inherits from ConfigBase<T>
-  bool FromJsonStrParsed(T& val, const cJSON* json, const char* name, bool (*StringParser)(T&, const char*), T defaultVal) {
+  bool FromJsonStrParsed(T& val, const cJSON* json, const char* name, bool (*StringParser)(T&, const char*), T defaultVal)
+  {
     const cJSON* jsonVal = cJSON_GetObjectItemCaseSensitive(json, name);
     if (jsonVal == nullptr) {
       val = defaultVal;
@@ -63,14 +65,16 @@ namespace OpenShock::Config::Internal::Utils {
     return true;
   }
   template<typename T>  // T inherits from ConfigBase<T>
-  bool FromJsonArray(std::vector<T>& vec, const cJSON* jsonArray) {
+  bool FromJsonArray(std::vector<T>& vec, const cJSON* jsonArray)
+  {
     vec.clear();
     if (jsonArray == nullptr) {
       return true;
     }
 
     const cJSON* jsonItem = nullptr;
-    cJSON_ArrayForEach(jsonItem, jsonArray) {
+    cJSON_ArrayForEach(jsonItem, jsonArray)
+    {
       T item;
       if (item.FromJSON(jsonItem)) {
         vec.emplace_back(std::move(item));

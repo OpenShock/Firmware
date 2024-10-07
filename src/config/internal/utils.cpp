@@ -2,14 +2,15 @@
 
 const char* const TAG = "Config::Internal::Utils";
 
-#include "Logging.h"
 #include "Chipset.h"
+#include "Logging.h"
 #include "util/IPAddressUtils.h"
 
 using namespace OpenShock;
 
 template<typename T>
-bool _utilFromJsonInt(T& val, const cJSON* json, const char* name, T defaultVal, int minVal, int maxVal) {
+bool _utilFromJsonInt(T& val, const cJSON* json, const char* name, T defaultVal, int minVal, int maxVal)
+{
   static_assert(std::is_integral<T>::value, "T must be an integral type");
 
   const cJSON* jsonVal = cJSON_GetObjectItemCaseSensitive(json, name);
@@ -39,7 +40,8 @@ bool _utilFromJsonInt(T& val, const cJSON* json, const char* name, T defaultVal,
   return true;
 }
 
-bool Config::Internal::Utils::FromU8GpioNum(gpio_num_t& val, uint8_t u8Val) {
+bool Config::Internal::Utils::FromU8GpioNum(gpio_num_t& val, uint8_t u8Val)
+{
   if (u8Val >= GPIO_NUM_MAX || !GPIO_IS_VALID_GPIO(u8Val)) {
     OS_LOGE(TAG, "invalid GPIO number");
     return false;
@@ -50,13 +52,15 @@ bool Config::Internal::Utils::FromU8GpioNum(gpio_num_t& val, uint8_t u8Val) {
   return true;
 }
 
-void Config::Internal::Utils::FromU8GpioNum(gpio_num_t& val, uint8_t u8Val, gpio_num_t defaultVal) {
+void Config::Internal::Utils::FromU8GpioNum(gpio_num_t& val, uint8_t u8Val, gpio_num_t defaultVal)
+{
   if (!FromU8GpioNum(val, u8Val)) {
     val = defaultVal;
   }
 }
 
-void Config::Internal::Utils::FromFbsStr(std::string& str, const flatbuffers::String* fbsStr, const char* defaultStr) {
+void Config::Internal::Utils::FromFbsStr(std::string& str, const flatbuffers::String* fbsStr, const char* defaultStr)
+{
   if (fbsStr != nullptr) {
     str = fbsStr->c_str();
   } else {
@@ -64,7 +68,8 @@ void Config::Internal::Utils::FromFbsStr(std::string& str, const flatbuffers::St
   }
 }
 
-bool Config::Internal::Utils::FromFbsIPAddress(IPAddress& ip, const flatbuffers::String* fbsIP, const IPAddress& defaultIP) {
+bool Config::Internal::Utils::FromFbsIPAddress(IPAddress& ip, const flatbuffers::String* fbsIP, const IPAddress& defaultIP)
+{
   if (fbsIP == nullptr) {
     ip = defaultIP;
     return true;
@@ -80,7 +85,8 @@ bool Config::Internal::Utils::FromFbsIPAddress(IPAddress& ip, const flatbuffers:
   return true;
 }
 
-bool Config::Internal::Utils::FromJsonBool(bool& val, const cJSON* json, const char* name, bool defaultVal) {
+bool Config::Internal::Utils::FromJsonBool(bool& val, const cJSON* json, const char* name, bool defaultVal)
+{
   const cJSON* jsonVal = cJSON_GetObjectItemCaseSensitive(json, name);
   if (jsonVal == nullptr) {
     val = defaultVal;
@@ -97,19 +103,23 @@ bool Config::Internal::Utils::FromJsonBool(bool& val, const cJSON* json, const c
   return true;
 }
 
-bool Config::Internal::Utils::FromJsonU8(uint8_t& val, const cJSON* json, const char* name, uint8_t defaultVal) {
+bool Config::Internal::Utils::FromJsonU8(uint8_t& val, const cJSON* json, const char* name, uint8_t defaultVal)
+{
   return _utilFromJsonInt(val, json, name, defaultVal, 0, UINT8_MAX);
 }
 
-bool Config::Internal::Utils::FromJsonU16(uint16_t& val, const cJSON* json, const char* name, uint16_t defaultVal) {
+bool Config::Internal::Utils::FromJsonU16(uint16_t& val, const cJSON* json, const char* name, uint16_t defaultVal)
+{
   return _utilFromJsonInt(val, json, name, defaultVal, 0, UINT16_MAX);
 }
 
-bool Config::Internal::Utils::FromJsonI32(int32_t& val, const cJSON* json, const char* name, int32_t defaultVal) {
+bool Config::Internal::Utils::FromJsonI32(int32_t& val, const cJSON* json, const char* name, int32_t defaultVal)
+{
   return _utilFromJsonInt(val, json, name, defaultVal, INT32_MIN, INT32_MAX);
 }
 
-bool Config::Internal::Utils::FromJsonStr(std::string& str, const cJSON* json, const char* name) {
+bool Config::Internal::Utils::FromJsonStr(std::string& str, const cJSON* json, const char* name)
+{
   const cJSON* jsonVal = cJSON_GetObjectItemCaseSensitive(json, name);
   if (jsonVal == nullptr) {
     OS_LOGE(TAG, "value at '%s' is null", name);
@@ -126,13 +136,15 @@ bool Config::Internal::Utils::FromJsonStr(std::string& str, const cJSON* json, c
   return true;
 }
 
-void Config::Internal::Utils::FromJsonStr(std::string& str, const cJSON* json, const char* name, const char* defaultStr) {
+void Config::Internal::Utils::FromJsonStr(std::string& str, const cJSON* json, const char* name, const char* defaultStr)
+{
   if (!FromJsonStr(str, json, name)) {
     str = defaultStr;
   }
 }
 
-bool Config::Internal::Utils::FromJsonIPAddress(IPAddress& ip, const cJSON* json, const char* name) {
+bool Config::Internal::Utils::FromJsonIPAddress(IPAddress& ip, const cJSON* json, const char* name)
+{
   const cJSON* jsonVal = cJSON_GetObjectItemCaseSensitive(json, name);
   if (jsonVal == nullptr) {
     OS_LOGE(TAG, "value at '%s' is null", name);
@@ -154,13 +166,15 @@ bool Config::Internal::Utils::FromJsonIPAddress(IPAddress& ip, const cJSON* json
   return true;
 }
 
-void Config::Internal::Utils::FromJsonIPAddress(IPAddress& ip, const cJSON* json, const char* name, const IPAddress& defaultIP) {
+void Config::Internal::Utils::FromJsonIPAddress(IPAddress& ip, const cJSON* json, const char* name, const IPAddress& defaultIP)
+{
   if (!FromJsonIPAddress(ip, json, name)) {
     ip = defaultIP;
   }
 }
 
-bool Config::Internal::Utils::FromJsonGpioNum(gpio_num_t& val, const cJSON* json, const char* name) {
+bool Config::Internal::Utils::FromJsonGpioNum(gpio_num_t& val, const cJSON* json, const char* name)
+{
   uint8_t u8Val;
   if (!FromJsonU8(u8Val, json, name, 0)) {
     return false;
@@ -169,7 +183,8 @@ bool Config::Internal::Utils::FromJsonGpioNum(gpio_num_t& val, const cJSON* json
   return FromU8GpioNum(val, u8Val);
 }
 
-void Config::Internal::Utils::FromJsonGpioNum(gpio_num_t& val, const cJSON* json, const char* name, gpio_num_t defaultVal) {
+void Config::Internal::Utils::FromJsonGpioNum(gpio_num_t& val, const cJSON* json, const char* name, gpio_num_t defaultVal)
+{
   if (!FromJsonGpioNum(val, json, name)) {
     val = defaultVal;
   }
