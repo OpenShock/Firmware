@@ -32,7 +32,7 @@ OpenShock::Serial::CommandGroup OpenShock::Serial::CommandHandlers::AuthTokenHan
   auto& getCommand = group.addCommand("Get the backend auth token"sv, _handleAuthtokenCommand);
 
   auto& setCommand = group.addCommand("Set the auth token"sv, _handleAuthtokenCommand);
-  setCommand.addArgument("<token>"sv, "must be a string"sv, "mytoken"sv);
+  setCommand.addArgument("token"sv, "must be a string"sv, "mytoken"sv);
 
   return group;
 }
