@@ -67,15 +67,21 @@ static std::unordered_map<std::string_view, OpenShock::Serial::CommandGroup, std
 void _handleHelpCommand(std::string_view arg, bool isAutomated) {
   arg = OpenShock::StringTrim(arg);
   if (arg.empty()) {
+    std::size_t commandCount    = 0;
     std::size_t longestCommand  = 0;
     std::size_t longestArgument = 0;
     std::size_t descriptionSize = 0;
     for (const auto& group : s_commandGroups) {
       longestCommand = std::max(longestCommand, group.name().size());
       for (const auto& command : group.commands()) {
+        commandCount++;
+
         std::size_t argumentSize = 0;
+        if (command.name().size() > 0) {
+          argumentSize += command.name().size() + 1;  // +1 for space
+        }
         for (const auto& arg : command.arguments()) {
-          argumentSize += arg.name.size() + 1;  // +1 for space
+          argumentSize += arg.name.size() + 3;  // +1 for space, +2 for <>
         }
         longestArgument = std::max(longestArgument, argumentSize);
         descriptionSize += command.description().size();
@@ -85,34 +91,34 @@ void _handleHelpCommand(std::string_view arg, bool isAutomated) {
     std::size_t paddedLength = longestCommand + 1 + longestArgument + 1;  // +1 for space, +1 for newline
 
     std::string buffer;
-    buffer.reserve((paddedLength * s_commandGroups.size()) + descriptionSize);  // Approximate size
+    buffer.reserve((paddedLength * commandCount) + descriptionSize);  // Approximate size
 
-    OS_LOGV(TAG, "Longest command: %zu, longest argument: %zu, padded length: %zu", longestCommand, longestArgument, paddedLength);
-    OS_LOGV(TAG, "Buffer size: %zu", buffer.capacity());
+    for (const auto& group : s_commandGroups) {
+      for (const auto& command : group.commands()) {
+        buffer.append(group.name());
+        buffer.append((longestCommand - group.name().size()) + 1, ' ');
 
-    for (const auto& cmd : s_commandGroups) {
-      OS_LOGV(TAG, "Collecting help for command group: %.*s", cmd.name().size(), cmd.name().data());
-      buffer.append(cmd.name());
-      // buffer.append(paddedLength - cmd.name().size(), ' ');
-      buffer.append("\n");
+        std::size_t startSize = buffer.size();
 
-      for (const auto& command : cmd.commands()) {
-        OS_LOGV(TAG, "Collecting help for command: %.*s", command.description().size(), command.description().data());
-        buffer.append("  ");
-        buffer.append(command.description());
-        // buffer.append(paddedLength - command.description().size(), ' ');
-
-        for (const auto& arg : command.arguments()) {
-          OS_LOGV(TAG, "Collecting help for argument: %.*s", arg.name.size(), arg.name.data());
-          buffer.append(arg.name);
-          buffer.append(" ");
+        if (command.name().size() > 0) {
+          buffer.append(command.name());
+          buffer.push_back(' ');
         }
 
-        buffer.append("\n");
+        for (const auto& arg : command.arguments()) {
+          buffer.push_back('<');
+          buffer.append(arg.name);
+          buffer.push_back('>');
+          buffer.push_back(' ');
+        }
+
+        buffer.append(longestArgument - (buffer.size() - startSize), ' ');
+
+        buffer.append(command.description());
+
+        buffer.push_back('\n');
       }
     }
-
-    OS_LOGV(TAG, "Buffer size: %zu", buffer.size());
 
     SerialInputHandler::PrintWelcomeHeader();
     ::Serial.print(buffer.data());
