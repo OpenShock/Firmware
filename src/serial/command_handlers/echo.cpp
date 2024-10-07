@@ -32,10 +32,10 @@ void _handleSerialEchoCommand(std::string_view arg, bool isAutomated) {
 OpenShock::Serial::CommandGroup OpenShock::Serial::CommandHandlers::EchoHandler() {
   auto group = OpenShock::Serial::CommandGroup("echo"sv);
 
-  auto getter = group.addCommand("Get the serial echo status"sv, _handleSerialEchoCommand);
+  auto& getCommand = group.addCommand("Get the serial echo status"sv, _handleSerialEchoCommand);
 
-  auto setter = group.addCommand("Enable/disable serial echo"sv, _handleSerialEchoCommand);
-  setter.addArgument("enabled"sv, "must be a boolean"sv, "true"sv);
+  auto& setCommand = group.addCommand("Enable/disable serial echo"sv, _handleSerialEchoCommand);
+  setCommand.addArgument("enabled"sv, "must be a boolean"sv, "true"sv);
 
   return group;
 }

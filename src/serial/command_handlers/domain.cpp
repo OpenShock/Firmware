@@ -63,9 +63,9 @@ void _handleDomainCommand(std::string_view arg, bool isAutomated) {
 OpenShock::Serial::CommandGroup OpenShock::Serial::CommandHandlers::DomainHandler() {
   auto group = OpenShock::Serial::CommandGroup("domain"sv);
 
-  auto getCommand = group.addCommand("Get the backend domain."sv, _handleDomainCommand);
+  auto& getCommand = group.addCommand("Get the backend domain."sv, _handleDomainCommand);
 
-  auto setCommand = group.addCommand("Set the backend domain."sv, _handleDomainCommand);
+  auto& setCommand = group.addCommand("Set the backend domain."sv, _handleDomainCommand);
   setCommand.addArgument("domain"sv, "must be a string"sv, "api.shocklink.net"sv);
 
   return group;

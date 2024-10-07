@@ -93,13 +93,13 @@ void _handleLcgOverrideCommand(std::string_view arg, bool isAutomated) {
 OpenShock::Serial::CommandGroup OpenShock::Serial::CommandHandlers::LcgOverrideHandler() {
   auto group = OpenShock::Serial::CommandGroup("lcgoverride"sv);
 
-  auto getCommand = group.addCommand("Get the domain overridden for LCG endpoint (if any)."sv, _handleLcgOverrideCommand);
+  auto& getCommand = group.addCommand("Get the domain overridden for LCG endpoint (if any)."sv, _handleLcgOverrideCommand);
 
-  auto setCommand = group.addCommand("Set a domain to override the LCG endpoint."sv, _handleLcgOverrideCommand);
+  auto& setCommand = group.addCommand("Set a domain to override the LCG endpoint."sv, _handleLcgOverrideCommand);
   setCommand.addArgument("set"sv, "no arguments"sv, ""sv);
   setCommand.addArgument("domain"sv, "must be a string"sv, "eu1-gateway.shocklink.net"sv);
 
-  auto clearCommand = group.addCommand("Clear the overridden LCG endpoint."sv, _handleLcgOverrideCommand);
+  auto& clearCommand = group.addCommand("Clear the overridden LCG endpoint."sv, _handleLcgOverrideCommand);
   clearCommand.addArgument("clear"sv, "no arguments"sv, ""sv);
 
   return group;

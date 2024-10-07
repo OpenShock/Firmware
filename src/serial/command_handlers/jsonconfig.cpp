@@ -24,10 +24,10 @@ void _handleJsonConfigCommand(std::string_view arg, bool isAutomated) {
 OpenShock::Serial::CommandGroup OpenShock::Serial::CommandHandlers::JsonConfigHandler() {
   auto group = OpenShock::Serial::CommandGroup("jsonconfig"sv);
 
-  auto getter = group.addCommand("Get the configuration as JSON"sv, _handleJsonConfigCommand);
+  auto& getCommand = group.addCommand("Get the configuration as JSON"sv, _handleJsonConfigCommand);
 
-  auto setter = group.addCommand("Set the configuration from JSON, and restart"sv, _handleJsonConfigCommand);
-  setter.addArgument("json"sv, "must be a valid JSON object"sv, "{ ... }"sv);
-  
+  auto& setCommand = group.addCommand("Set the configuration from JSON, and restart"sv, _handleJsonConfigCommand);
+  setCommand.addArgument("json"sv, "must be a valid JSON object"sv, "{ ... }"sv);
+
   return group;
 }

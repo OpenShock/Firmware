@@ -30,9 +30,9 @@ void _handleHostnameCommand(std::string_view arg, bool isAutomated) {
 OpenShock::Serial::CommandGroup OpenShock::Serial::CommandHandlers::HostnameHandler() {
   auto group = OpenShock::Serial::CommandGroup("hostname"sv);
 
-  auto getCommand = group.addCommand("Get the network hostname."sv, _handleHostnameCommand);
+  auto& getCommand = group.addCommand("Get the network hostname."sv, _handleHostnameCommand);
 
-  auto setCommand = group.addCommand("Set the network hostname."sv, _handleHostnameCommand);
+  auto& setCommand = group.addCommand("Set the network hostname."sv, _handleHostnameCommand);
   setCommand.addArgument("hostname"sv, "must be a string"sv, "OpenShock"sv);
 
   return group;

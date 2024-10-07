@@ -44,10 +44,10 @@ void _handleRawConfigCommand(std::string_view arg, bool isAutomated) {
 OpenShock::Serial::CommandGroup OpenShock::Serial::CommandHandlers::RawConfigHandler() {
   auto group = OpenShock::Serial::CommandGroup("rawconfig"sv);
 
-  auto getter = group.addCommand("Get the raw binary config"sv, _handleRawConfigCommand);
+  auto& getCommand = group.addCommand("Get the raw binary config"sv, _handleRawConfigCommand);
 
-  auto setter = group.addCommand("Set the raw binary config, and restart"sv, _handleRawConfigCommand);
-  setter.addArgument("<base64>"sv, "must be a base64 encoded string"sv, "(base64 encoded binary data)"sv);
+  auto& setCommand = group.addCommand("Set the raw binary config, and restart"sv, _handleRawConfigCommand);
+  setCommand.addArgument("<base64>"sv, "must be a base64 encoded string"sv, "(base64 encoded binary data)"sv);
 
   return group;
 }

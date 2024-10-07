@@ -35,8 +35,8 @@ void _handleRFTransmitCommand(std::string_view arg, bool isAutomated) {
 OpenShock::Serial::CommandGroup OpenShock::Serial::CommandHandlers::RfTransmitHandler() {
   auto group = OpenShock::Serial::CommandGroup("rftransmit"sv);
 
-  auto cmd = group.addCommand("Transmit a RF command"sv, _handleRFTransmitCommand);
-  cmd.addArgument("json"sv, "must be a JSON object with the following fields"sv, R"(
+  auto& cmd = group.addCommand("Transmit a RF command"sv, _handleRFTransmitCommand);
+  cmd.addArgument("json"sv, "must be a JSON object with the following fields"sv, "{\"model\":\"caixianlin\",\"id\":12345,\"type\":\"vibrate\",\"intensity\":99,\"durationMs\":500}", R"(
     model      (string) Model of the shocker                    ("caixianlin", "petrainer", "petrainer998dr")
     id         (number) ID of the shocker                       (0-65535)
     type       (string) Type of the command                     ("shock", "vibrate", "sound", "stop")

@@ -36,10 +36,10 @@ void _handleKeepAliveCommand(std::string_view arg, bool isAutomated) {
 OpenShock::Serial::CommandGroup OpenShock::Serial::CommandHandlers::KeepAliveHandler() {
   auto group = OpenShock::Serial::CommandGroup("keepalive"sv);
 
-  auto getter = group.addCommand("Get the shocker keep-alive status"sv, _handleKeepAliveCommand);
+  auto& getCommand = group.addCommand("Get the shocker keep-alive status"sv, _handleKeepAliveCommand);
 
-  auto setter = group.addCommand("Enable/disable shocker keep-alive"sv, _handleKeepAliveCommand);
-  setter.addArgument("enabled"sv, "must be a boolean"sv, "true"sv);
+  auto& setCommand = group.addCommand("Enable/disable shocker keep-alive"sv, _handleKeepAliveCommand);
+  setCommand.addArgument("enabled"sv, "must be a boolean"sv, "true"sv);
 
   return group;
 }

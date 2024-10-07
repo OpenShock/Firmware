@@ -47,10 +47,10 @@ void _handleRfTxPinCommand(std::string_view arg, bool isAutomated) {
 OpenShock::Serial::CommandGroup OpenShock::Serial::CommandHandlers::RfTxPinHandler() {
   auto group = OpenShock::Serial::CommandGroup("rftxpin"sv);
 
-  auto getter = group.addCommand("Get the GPIO pin used for the radio transmitter"sv, _handleRfTxPinCommand);
+  auto& getCommand = group.addCommand("Get the GPIO pin used for the radio transmitter"sv, _handleRfTxPinCommand);
 
-  auto setter = group.addCommand("Set the GPIO pin used for the radio transmitter"sv, _handleRfTxPinCommand);
-  setter.addArgument("pin"sv, "must be a number"sv, "15"sv);
+  auto& setCommand = group.addCommand("Set the GPIO pin used for the radio transmitter"sv, _handleRfTxPinCommand);
+  setCommand.addArgument("pin"sv, "must be a number"sv, "15"sv);
 
   return group;
 }

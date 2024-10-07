@@ -14,7 +14,7 @@ void _handleFactoryResetCommand(std::string_view arg, bool isAutomated) {
 OpenShock::Serial::CommandGroup OpenShock::Serial::CommandHandlers::FactoryResetHandler() {
   auto group = OpenShock::Serial::CommandGroup("factoryreset"sv);
 
-  auto cmd = group.addCommand("Reset the device to factory defaults and restart"sv, _handleFactoryResetCommand);
+  auto& cmd = group.addCommand("Reset the device to factory defaults and restart"sv, _handleFactoryResetCommand);
 
   return group;
 }

@@ -81,10 +81,10 @@ void _handleNetworksCommand(std::string_view arg, bool isAutomated) {
 OpenShock::Serial::CommandGroup OpenShock::Serial::CommandHandlers::NetworksHandler() {
   auto group = OpenShock::Serial::CommandGroup("networks"sv);
 
-  auto getter = group.addCommand("Get all saved networks."sv, _handleNetworksCommand);
+  auto& getCommand = group.addCommand("Get all saved networks."sv, _handleNetworksCommand);
 
-  auto setter = group.addCommand("Set all saved networks."sv, _handleNetworksCommand);
-  setter.addArgument("json"sv, "must be a array of objects with the following fields:"sv, "[{\"ssid\":\"myssid\",\"password\":\"mypassword\"}]"sv);
+  auto& setCommand = group.addCommand("Set all saved networks."sv, _handleNetworksCommand);
+  setCommand.addArgument("json"sv, "must be a array of objects with the following fields:"sv, "[{\"ssid\":\"myssid\",\"password\":\"mypassword\"}]"sv);
 
   return group;
 }

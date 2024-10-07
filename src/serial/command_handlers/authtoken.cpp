@@ -29,10 +29,10 @@ void _handleAuthtokenCommand(std::string_view arg, bool isAutomated) {
 OpenShock::Serial::CommandGroup OpenShock::Serial::CommandHandlers::AuthTokenHandler() {
   auto group = OpenShock::Serial::CommandGroup("authtoken"sv);
 
-  auto getter = group.addCommand("Get the backend auth token"sv, _handleAuthtokenCommand);
+  auto& getCommand = group.addCommand("Get the backend auth token"sv, _handleAuthtokenCommand);
 
-  auto setter = group.addCommand("Set the auth token"sv, _handleAuthtokenCommand);
-  setter.addArgument("<token>"sv, "must be a string"sv, "mytoken"sv);
+  auto& setCommand = group.addCommand("Set the auth token"sv, _handleAuthtokenCommand);
+  setCommand.addArgument("<token>"sv, "must be a string"sv, "mytoken"sv);
 
   return group;
 }
