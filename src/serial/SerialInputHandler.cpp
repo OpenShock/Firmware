@@ -277,8 +277,14 @@ class SerialBuffer {
   DISABLE_MOVE(SerialBuffer);
 
 public:
-  constexpr SerialBuffer() : m_data(nullptr), m_size(0), m_capacity(0) { }
-  inline SerialBuffer(std::size_t capacity) : m_data(new char[capacity]), m_size(0), m_capacity(capacity) { }
+  constexpr SerialBuffer()
+    : m_data(nullptr)
+    , m_size(0)
+    , m_capacity(0) { }
+  inline SerialBuffer(std::size_t capacity)
+    : m_data(new char[capacity])
+    , m_size(0)
+    , m_capacity(capacity) { }
   inline ~SerialBuffer() { delete[] m_data; }
 
   constexpr char* data() { return m_data; }

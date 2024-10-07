@@ -36,15 +36,16 @@ OpenShock::Serial::CommandGroup OpenShock::Serial::CommandHandlers::RfTransmitHa
   auto group = OpenShock::Serial::CommandGroup("rftransmit"sv);
 
   auto& cmd = group.addCommand("Transmit a RF command"sv, _handleRFTransmitCommand);
-  cmd.addArgument("json"sv, "must be a JSON object with the following fields"sv, "{\"model\":\"caixianlin\",\"id\":12345,\"type\":\"vibrate\",\"intensity\":99,\"durationMs\":500}", 
-    {
-      "model      (string) Model of the shocker                    (\"caixianlin\", \"petrainer\", \"petrainer998dr\")"sv,
-      "id         (number) ID of the shocker                       (0-65535)"sv,
-      "type       (string) Type of the command                     (\"shock\", \"vibrate\", \"sound\", \"stop\")"sv,
-      "intensity  (number) Intensity of the command                (0-255)"sv,
-      "durationMs (number) Duration of the command in milliseconds (0-65535)"sv
-    }
-    );
+  cmd.addArgument(
+    "json"sv,
+    "must be a JSON object with the following fields"sv,
+    "{\"model\":\"caixianlin\",\"id\":12345,\"type\":\"vibrate\",\"intensity\":99,\"durationMs\":500}",
+    {"model      (string) Model of the shocker                    (\"caixianlin\", \"petrainer\", \"petrainer998dr\")"sv,
+     "id         (number) ID of the shocker                       (0-65535)"sv,
+     "type       (string) Type of the command                     (\"shock\", \"vibrate\", \"sound\", \"stop\")"sv,
+     "intensity  (number) Intensity of the command                (0-255)"sv,
+     "durationMs (number) Duration of the command in milliseconds (0-65535)"sv}
+  );
 
   return group;
 }
