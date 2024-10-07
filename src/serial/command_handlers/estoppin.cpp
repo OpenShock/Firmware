@@ -4,9 +4,10 @@
 #include "Convert.h"
 #include "EStopManager.h"
 
-void _handleEStopPinCommand(std::string_view arg, bool isAutomated) {
+void _handleEStopPinCommand(std::string_view arg, bool isAutomated)
+{
+  gpio_num_t estopPin;
   if (arg.empty()) {
-    gpio_num_t estopPin;
     if (!OpenShock::Config::GetEStopGpioPin(estopPin)) {
       SERPR_ERROR("Failed to get EStop pin from config");
       return;
@@ -17,13 +18,10 @@ void _handleEStopPinCommand(std::string_view arg, bool isAutomated) {
     return;
   }
 
-  uint8_t pin;
-  if (!OpenShock::Convert::ToUint8(arg, pin)) {
+  if (!OpenShock::Convert::ToGpioNum(arg, estopPin)) {
     SERPR_ERROR("Invalid argument (number invalid or out of range)");
     return;
   }
-
-  gpio_num_t estopPin = static_cast<gpio_num_t>(pin);
 
   if (!OpenShock::EStopManager::SetEStopPin(estopPin)) {
     SERPR_ERROR("Failed to set EStop pin");
@@ -38,7 +36,8 @@ void _handleEStopPinCommand(std::string_view arg, bool isAutomated) {
   SERPR_SUCCESS("Saved config");
 }
 
-OpenShock::Serial::CommandGroup OpenShock::Serial::CommandHandlers::ESStopPinHandler() {
+OpenShock::Serial::CommandGroup OpenShock::Serial::CommandHandlers::ESStopPinHandler()
+{
   auto group = OpenShock::Serial::CommandGroup("estoppin"sv);
 
   auto& getCommand = group.addCommand("Get the GPIO pin used for the E-Stop."sv, _handleEStopPinCommand);

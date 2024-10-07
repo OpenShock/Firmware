@@ -37,9 +37,7 @@ void _Private::HandleSetRfTxPinCommand(uint8_t socketId, const OpenShock::Serial
 
   auto pin = msg->pin();
 
-  // TODO: Check if pin is valid
-
   auto result = OpenShock::CommandHandler::SetRfTxPin(static_cast<gpio_num_t>(pin));
 
-  serializeSetRfTxPinResult(socketId, pin, result);
+  serializeSetRfTxPinResult(socketId, static_cast<gpio_num_t>(pin), result);
 }
