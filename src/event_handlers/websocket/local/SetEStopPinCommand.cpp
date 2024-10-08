@@ -37,7 +37,7 @@ void _Private::HandleSetEstopPinCommand(uint8_t socketId, const OpenShock::Seria
 
   auto pin = msg->pin();
 
-  auto result = OpenShock::CommandHandler::SetEstopPin(static_cast<gpio_num_t>(pin));
+  auto result = OpenShock::CommandHandler::SetEStopPin(static_cast<gpio_num_t>(pin));
 
   serializeSetEStopPinResult(socketId, static_cast<gpio_num_t>(pin), result);
 }

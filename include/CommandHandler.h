@@ -17,7 +17,7 @@ namespace OpenShock::CommandHandler {
   gpio_num_t GetRfTxPin();
   SetGPIOResultCode SetRfTxPin(gpio_num_t txPin);
 
-  SetGPIOResultCode SetEstopPin(gpio_num_t estopPin);
+  SetGPIOResultCode SetEStopPin(gpio_num_t estopPin);
   gpio_num_t GetEstopPin();
 
   bool SetKeepAliveEnabled(bool enabled);

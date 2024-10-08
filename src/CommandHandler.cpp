@@ -242,7 +242,7 @@ SetGPIOResultCode CommandHandler::SetRfTxPin(gpio_num_t txPin)
   return SetGPIOResultCode::Success;
 }
 
-SetGPIOResultCode CommandHandler::SetEstopPin(gpio_num_t estopPin)
+SetGPIOResultCode CommandHandler::SetEStopPin(gpio_num_t estopPin)
 {
   if (OpenShock::IsValidInputPin(static_cast<int8_t>(estopPin))) {
     xSemaphoreTake(s_estopManagerMutex, portMAX_DELAY);
