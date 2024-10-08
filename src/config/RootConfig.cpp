@@ -13,6 +13,7 @@ RootConfig::RootConfig()
   , backend()
   , serialInput()
   , otaUpdate()
+  , estop()
 {
 }
 
