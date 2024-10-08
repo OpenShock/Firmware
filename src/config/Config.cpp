@@ -42,7 +42,8 @@ static ReadWriteMutex _configMutex;
 #define CONFIG_LOCK_READ(retval)  CONFIG_LOCK_READ_ACTION(retval, {})
 #define CONFIG_LOCK_WRITE(retval) CONFIG_LOCK_WRITE_ACTION(retval, {})
 
-bool _tryDeserializeConfig(const uint8_t* buffer, std::size_t bufferLen, OpenShock::Config::RootConfig& config) {
+bool _tryDeserializeConfig(const uint8_t* buffer, std::size_t bufferLen, OpenShock::Config::RootConfig& config)
+{
   if (buffer == nullptr || bufferLen == 0) {
     OS_LOGE(TAG, "Buffer is null or empty");
     return false;
@@ -73,7 +74,8 @@ bool _tryDeserializeConfig(const uint8_t* buffer, std::size_t bufferLen, OpenSho
 
   return true;
 }
-bool _tryLoadConfig(std::vector<uint8_t>& buffer) {
+bool _tryLoadConfig(std::vector<uint8_t>& buffer)
+{
   File file = _configFS.open("/config", "rb");
   if (!file) {
     OS_LOGE(TAG, "Failed to open config file for reading");
@@ -96,7 +98,8 @@ bool _tryLoadConfig(std::vector<uint8_t>& buffer) {
 
   return true;
 }
-bool _tryLoadConfig() {
+bool _tryLoadConfig()
+{
   std::vector<uint8_t> buffer;
   if (!_tryLoadConfig(buffer)) {
     return false;
@@ -104,7 +107,8 @@ bool _tryLoadConfig() {
 
   return _tryDeserializeConfig(buffer.data(), buffer.size(), _configData);
 }
-bool _trySaveConfig(const uint8_t* data, std::size_t dataLen) {
+bool _trySaveConfig(const uint8_t* data, std::size_t dataLen)
+{
   File file = _configFS.open("/config", "wb");
   if (!file) {
     OS_LOGE(TAG, "Failed to open config file for writing");
@@ -121,7 +125,8 @@ bool _trySaveConfig(const uint8_t* data, std::size_t dataLen) {
 
   return true;
 }
-bool _trySaveConfig() {
+bool _trySaveConfig()
+{
   flatbuffers::FlatBufferBuilder builder;
 
   auto fbsConfig = _configData.ToFlatbuffers(builder, true);
@@ -131,7 +136,8 @@ bool _trySaveConfig() {
   return _trySaveConfig(builder.GetBufferPointer(), builder.GetSize());
 }
 
-void Config::Init() {
+void Config::Init()
+{
   CONFIG_LOCK_WRITE();
 
   if (!_configFS.begin(true, "/config", 3, "config")) {
@@ -151,13 +157,15 @@ void Config::Init() {
   }
 }
 
-cJSON* _getAsCJSON(bool withSensitiveData) {
+cJSON* _getAsCJSON(bool withSensitiveData)
+{
   CONFIG_LOCK_READ(nullptr);
 
   return _configData.ToJSON(withSensitiveData);
 }
 
-std::string Config::GetAsJSON(bool withSensitiveData) {
+std::string Config::GetAsJSON(bool withSensitiveData)
+{
   cJSON* root = _getAsCJSON(withSensitiveData);
 
   char* json = cJSON_PrintUnformatted(root);
@@ -170,7 +178,8 @@ std::string Config::GetAsJSON(bool withSensitiveData) {
 
   return result;
 }
-bool Config::SaveFromJSON(std::string_view json) {
+bool Config::SaveFromJSON(std::string_view json)
+{
   cJSON* root = cJSON_ParseWithLength(json.data(), json.size());
   if (root == nullptr) {
     OS_LOGE(TAG, "Failed to parse JSON: %s", cJSON_GetErrorPtr());
@@ -191,13 +200,15 @@ bool Config::SaveFromJSON(std::string_view json) {
   return _trySaveConfig();
 }
 
-flatbuffers::Offset<Serialization::Configuration::HubConfig> Config::GetAsFlatBuffer(flatbuffers::FlatBufferBuilder& builder, bool withSensitiveData) {
+flatbuffers::Offset<Serialization::Configuration::HubConfig> Config::GetAsFlatBuffer(flatbuffers::FlatBufferBuilder& builder, bool withSensitiveData)
+{
   CONFIG_LOCK_READ(0);
 
   return _configData.ToFlatbuffers(builder, withSensitiveData);
 }
 
-bool Config::SaveFromFlatBuffer(const Serialization::Configuration::HubConfig* config) {
+bool Config::SaveFromFlatBuffer(const Serialization::Configuration::HubConfig* config)
+{
   CONFIG_LOCK_WRITE(false);
 
   if (!_configData.FromFlatbuffers(config)) {
@@ -208,13 +219,15 @@ bool Config::SaveFromFlatBuffer(const Serialization::Configuration::HubConfig* c
   return _trySaveConfig();
 }
 
-bool Config::GetRaw(std::vector<uint8_t>& buffer) {
+bool Config::GetRaw(std::vector<uint8_t>& buffer)
+{
   CONFIG_LOCK_READ(false);
 
   return _tryLoadConfig(buffer);
 }
 
-bool Config::SetRaw(const uint8_t* buffer, std::size_t size) {
+bool Config::SetRaw(const uint8_t* buffer, std::size_t size)
+{
   CONFIG_LOCK_WRITE(false);
 
   OpenShock::Config::RootConfig config;
@@ -226,7 +239,8 @@ bool Config::SetRaw(const uint8_t* buffer, std::size_t size) {
   return _trySaveConfig(buffer, size);
 }
 
-void Config::FactoryReset() {
+void Config::FactoryReset()
+{
   CONFIG_LOCK_WRITE();
 
   _configData.ToDefault();
@@ -242,7 +256,8 @@ void Config::FactoryReset() {
   OS_LOGI(TAG, "Factory reset complete");
 }
 
-bool Config::GetRFConfig(Config::RFConfig& out) {
+bool Config::GetRFConfig(Config::RFConfig& out)
+{
   CONFIG_LOCK_READ(false);
 
   out = _configData.rf;
@@ -250,7 +265,8 @@ bool Config::GetRFConfig(Config::RFConfig& out) {
   return true;
 }
 
-bool Config::GetWiFiConfig(Config::WiFiConfig& out) {
+bool Config::GetWiFiConfig(Config::WiFiConfig& out)
+{
   CONFIG_LOCK_READ(false);
 
   out = _configData.wifi;
@@ -258,7 +274,8 @@ bool Config::GetWiFiConfig(Config::WiFiConfig& out) {
   return true;
 }
 
-bool Config::GetCaptivePortalConfig(Config::CaptivePortalConfig& out) {
+bool Config::GetCaptivePortalConfig(Config::CaptivePortalConfig& out)
+{
   CONFIG_LOCK_READ(false);
 
   out = _configData.captivePortal;
@@ -266,7 +283,8 @@ bool Config::GetCaptivePortalConfig(Config::CaptivePortalConfig& out) {
   return true;
 }
 
-bool Config::GetBackendConfig(Config::BackendConfig& out) {
+bool Config::GetBackendConfig(Config::BackendConfig& out)
+{
   CONFIG_LOCK_READ(false);
 
   out = _configData.backend;
@@ -274,7 +292,8 @@ bool Config::GetBackendConfig(Config::BackendConfig& out) {
   return true;
 }
 
-bool Config::GetSerialInputConfig(Config::SerialInputConfig& out) {
+bool Config::GetSerialInputConfig(Config::SerialInputConfig& out)
+{
   CONFIG_LOCK_READ(false);
 
   out = _configData.serialInput;
@@ -282,7 +301,8 @@ bool Config::GetSerialInputConfig(Config::SerialInputConfig& out) {
   return true;
 }
 
-bool Config::GetOtaUpdateConfig(Config::OtaUpdateConfig& out) {
+bool Config::GetOtaUpdateConfig(Config::OtaUpdateConfig& out)
+{
   CONFIG_LOCK_READ(false);
 
   out = _configData.otaUpdate;
@@ -290,7 +310,8 @@ bool Config::GetOtaUpdateConfig(Config::OtaUpdateConfig& out) {
   return true;
 }
 
-bool Config::GetEStop(Config::EStopConfig& out) {
+bool Config::GetEStop(Config::EStopConfig& out)
+{
   CONFIG_LOCK_READ(false);
 
   out = _configData.estop;
@@ -298,56 +319,64 @@ bool Config::GetEStop(Config::EStopConfig& out) {
   return true;
 }
 
-bool Config::SetRFConfig(const Config::RFConfig& config) {
+bool Config::SetRFConfig(const Config::RFConfig& config)
+{
   CONFIG_LOCK_WRITE(false);
 
   _configData.rf = config;
   return _trySaveConfig();
 }
 
-bool Config::SetWiFiConfig(const Config::WiFiConfig& config) {
+bool Config::SetWiFiConfig(const Config::WiFiConfig& config)
+{
   CONFIG_LOCK_WRITE(false);
 
   _configData.wifi = config;
   return _trySaveConfig();
 }
 
-bool Config::SetCaptivePortalConfig(const Config::CaptivePortalConfig& config) {
+bool Config::SetCaptivePortalConfig(const Config::CaptivePortalConfig& config)
+{
   CONFIG_LOCK_WRITE(false);
 
   _configData.captivePortal = config;
   return _trySaveConfig();
 }
 
-bool Config::SetBackendConfig(const Config::BackendConfig& config) {
+bool Config::SetBackendConfig(const Config::BackendConfig& config)
+{
   CONFIG_LOCK_WRITE(false);
 
   _configData.backend = config;
   return _trySaveConfig();
 }
 
-bool Config::SetSerialInputConfig(const Config::SerialInputConfig& config) {
+bool Config::SetSerialInputConfig(const Config::SerialInputConfig& config)
+{
   CONFIG_LOCK_WRITE(false);
 
   _configData.serialInput = config;
   return _trySaveConfig();
 }
 
-bool Config::SetOtaUpdateConfig(const Config::OtaUpdateConfig& config) {
+bool Config::SetOtaUpdateConfig(const Config::OtaUpdateConfig& config)
+{
   CONFIG_LOCK_WRITE(false);
 
   _configData.otaUpdate = config;
   return _trySaveConfig();
 }
 
-bool Config::SetEStop(const Config::EStopConfig& config) {
+bool Config::SetEStop(const Config::EStopConfig& config)
+{
   CONFIG_LOCK_WRITE(false);
 
   _configData.estop = config;
   return _trySaveConfig();
 }
 
-bool Config::GetWiFiCredentials(std::vector<Config::WiFiCredentials>& out) {
+bool Config::GetWiFiCredentials(std::vector<Config::WiFiCredentials>& out)
+{
   CONFIG_LOCK_READ(false);
 
   out = _configData.wifi.credentialsList;
@@ -355,7 +384,8 @@ bool Config::GetWiFiCredentials(std::vector<Config::WiFiCredentials>& out) {
   return true;
 }
 
-bool Config::GetWiFiCredentials(cJSON* array, bool withSensitiveData) {
+bool Config::GetWiFiCredentials(cJSON* array, bool withSensitiveData)
+{
   CONFIG_LOCK_READ(false);
 
   for (auto& creds : _configData.wifi.credentialsList) {
@@ -367,7 +397,8 @@ bool Config::GetWiFiCredentials(cJSON* array, bool withSensitiveData) {
   return true;
 }
 
-bool Config::SetWiFiCredentials(const std::vector<Config::WiFiCredentials>& credentials) {
+bool Config::SetWiFiCredentials(const std::vector<Config::WiFiCredentials>& credentials)
+{
   bool foundZeroId = std::any_of(credentials.begin(), credentials.end(), [](const Config::WiFiCredentials& creds) { return creds.id == 0; });
   if (foundZeroId) {
     OS_LOGE(TAG, "Cannot set WiFi credentials: credential ID cannot be 0");
@@ -380,7 +411,8 @@ bool Config::SetWiFiCredentials(const std::vector<Config::WiFiCredentials>& cred
   return _trySaveConfig();
 }
 
-bool Config::GetRFConfigTxPin(uint8_t& out) {
+bool Config::GetRFConfigTxPin(gpio_num_t& out)
+{
   CONFIG_LOCK_READ(false);
 
   out = _configData.rf.txPin;
@@ -388,14 +420,16 @@ bool Config::GetRFConfigTxPin(uint8_t& out) {
   return true;
 }
 
-bool Config::SetRFConfigTxPin(uint8_t txPin) {
+bool Config::SetRFConfigTxPin(gpio_num_t txPin)
+{
   CONFIG_LOCK_WRITE(false);
 
   _configData.rf.txPin = txPin;
   return _trySaveConfig();
 }
 
-bool Config::GetRFConfigKeepAliveEnabled(bool& out) {
+bool Config::GetRFConfigKeepAliveEnabled(bool& out)
+{
   CONFIG_LOCK_READ(false);
 
   out = _configData.rf.keepAliveEnabled;
@@ -403,14 +437,16 @@ bool Config::GetRFConfigKeepAliveEnabled(bool& out) {
   return true;
 }
 
-bool Config::SetRFConfigKeepAliveEnabled(bool enabled) {
+bool Config::SetRFConfigKeepAliveEnabled(bool enabled)
+{
   CONFIG_LOCK_WRITE(false);
 
   _configData.rf.keepAliveEnabled = enabled;
   return _trySaveConfig();
 }
 
-bool Config::AnyWiFiCredentials(std::function<bool(const Config::WiFiCredentials&)> predicate) {
+bool Config::AnyWiFiCredentials(std::function<bool(const Config::WiFiCredentials&)> predicate)
+{
   CONFIG_LOCK_READ(false);
 
   auto& creds = _configData.wifi.credentialsList;
@@ -418,7 +454,8 @@ bool Config::AnyWiFiCredentials(std::function<bool(const Config::WiFiCredentials
   return std::any_of(creds.begin(), creds.end(), predicate);
 }
 
-uint8_t Config::AddWiFiCredentials(std::string_view ssid, std::string_view password) {
+uint8_t Config::AddWiFiCredentials(std::string_view ssid, std::string_view password)
+{
   CONFIG_LOCK_WRITE(0);
 
   uint8_t id = 0;
@@ -468,7 +505,8 @@ uint8_t Config::AddWiFiCredentials(std::string_view ssid, std::string_view passw
   return id;
 }
 
-bool Config::TryGetWiFiCredentialsByID(uint8_t id, Config::WiFiCredentials& credentials) {
+bool Config::TryGetWiFiCredentialsByID(uint8_t id, Config::WiFiCredentials& credentials)
+{
   CONFIG_LOCK_READ(false);
 
   for (const auto& creds : _configData.wifi.credentialsList) {
@@ -481,7 +519,8 @@ bool Config::TryGetWiFiCredentialsByID(uint8_t id, Config::WiFiCredentials& cred
   return false;
 }
 
-bool Config::TryGetWiFiCredentialsBySSID(const char* ssid, Config::WiFiCredentials& credentials) {
+bool Config::TryGetWiFiCredentialsBySSID(const char* ssid, Config::WiFiCredentials& credentials)
+{
   CONFIG_LOCK_READ(false);
 
   for (const auto& creds : _configData.wifi.credentialsList) {
@@ -494,7 +533,8 @@ bool Config::TryGetWiFiCredentialsBySSID(const char* ssid, Config::WiFiCredentia
   return false;
 }
 
-uint8_t Config::GetWiFiCredentialsIDbySSID(const char* ssid) {
+uint8_t Config::GetWiFiCredentialsIDbySSID(const char* ssid)
+{
   CONFIG_LOCK_READ(0);
 
   for (const auto& creds : _configData.wifi.credentialsList) {
@@ -506,7 +546,8 @@ uint8_t Config::GetWiFiCredentialsIDbySSID(const char* ssid) {
   return 0;
 }
 
-bool Config::RemoveWiFiCredentials(uint8_t id) {
+bool Config::RemoveWiFiCredentials(uint8_t id)
+{
   CONFIG_LOCK_WRITE(false);
 
   for (auto it = _configData.wifi.credentialsList.begin(); it != _configData.wifi.credentialsList.end(); ++it) {
@@ -520,7 +561,8 @@ bool Config::RemoveWiFiCredentials(uint8_t id) {
   return false;
 }
 
-bool Config::ClearWiFiCredentials() {
+bool Config::ClearWiFiCredentials()
+{
   CONFIG_LOCK_WRITE(false);
 
   _configData.wifi.credentialsList.clear();
@@ -528,7 +570,8 @@ bool Config::ClearWiFiCredentials() {
   return _trySaveConfig();
 }
 
-bool Config::GetWiFiHostname(std::string& out) {
+bool Config::GetWiFiHostname(std::string& out)
+{
   CONFIG_LOCK_READ(false);
 
   out = _configData.wifi.hostname;
@@ -536,7 +579,8 @@ bool Config::GetWiFiHostname(std::string& out) {
   return true;
 }
 
-bool Config::SetWiFiHostname(std::string_view hostname) {
+bool Config::SetWiFiHostname(std::string_view hostname)
+{
   CONFIG_LOCK_WRITE(false);
 
   _configData.wifi.hostname = std::string(hostname);
@@ -544,7 +588,8 @@ bool Config::SetWiFiHostname(std::string_view hostname) {
   return _trySaveConfig();
 }
 
-bool Config::GetBackendDomain(std::string& out) {
+bool Config::GetBackendDomain(std::string& out)
+{
   CONFIG_LOCK_READ(false);
 
   out = _configData.backend.domain;
@@ -552,20 +597,23 @@ bool Config::GetBackendDomain(std::string& out) {
   return true;
 }
 
-bool Config::SetBackendDomain(std::string_view domain) {
+bool Config::SetBackendDomain(std::string_view domain)
+{
   CONFIG_LOCK_WRITE(false);
 
   _configData.backend.domain = std::string(domain);
   return _trySaveConfig();
 }
 
-bool Config::HasBackendAuthToken() {
+bool Config::HasBackendAuthToken()
+{
   CONFIG_LOCK_READ(false);
 
   return !_configData.backend.authToken.empty();
 }
 
-bool Config::GetBackendAuthToken(std::string& out) {
+bool Config::GetBackendAuthToken(std::string& out)
+{
   CONFIG_LOCK_READ(false);
 
   out = _configData.backend.authToken;
@@ -573,27 +621,31 @@ bool Config::GetBackendAuthToken(std::string& out) {
   return true;
 }
 
-bool Config::SetBackendAuthToken(std::string_view token) {
+bool Config::SetBackendAuthToken(std::string_view token)
+{
   CONFIG_LOCK_WRITE(false);
 
   _configData.backend.authToken = std::string(token);
   return _trySaveConfig();
 }
 
-bool Config::ClearBackendAuthToken() {
+bool Config::ClearBackendAuthToken()
+{
   CONFIG_LOCK_WRITE(false);
 
   _configData.backend.authToken.clear();
   return _trySaveConfig();
 }
 
-bool Config::HasBackendLCGOverride() {
+bool Config::HasBackendLCGOverride()
+{
   CONFIG_LOCK_READ(false);
 
   return !_configData.backend.lcgOverride.empty();
 }
 
-bool Config::GetBackendLCGOverride(std::string& out) {
+bool Config::GetBackendLCGOverride(std::string& out)
+{
   CONFIG_LOCK_READ(false);
 
   out = _configData.backend.lcgOverride;
@@ -601,35 +653,40 @@ bool Config::GetBackendLCGOverride(std::string& out) {
   return true;
 }
 
-bool Config::SetBackendLCGOverride(std::string_view lcgOverride) {
+bool Config::SetBackendLCGOverride(std::string_view lcgOverride)
+{
   CONFIG_LOCK_WRITE(false);
 
   _configData.backend.lcgOverride = std::string(lcgOverride);
   return _trySaveConfig();
 }
 
-bool Config::ClearBackendLCGOverride() {
+bool Config::ClearBackendLCGOverride()
+{
   CONFIG_LOCK_WRITE(false);
 
   _configData.backend.lcgOverride.clear();
   return _trySaveConfig();
 }
 
-bool Config::GetSerialInputConfigEchoEnabled(bool& out) {
+bool Config::GetSerialInputConfigEchoEnabled(bool& out)
+{
   CONFIG_LOCK_READ(false);
 
   out = _configData.serialInput.echoEnabled;
   return true;
 }
 
-bool Config::SetSerialInputConfigEchoEnabled(bool enabled) {
+bool Config::SetSerialInputConfigEchoEnabled(bool enabled)
+{
   CONFIG_LOCK_WRITE(false);
 
   _configData.serialInput.echoEnabled = enabled;
   return _trySaveConfig();
 }
 
-bool Config::GetOtaUpdateId(int32_t& out) {
+bool Config::GetOtaUpdateId(int32_t& out)
+{
   CONFIG_LOCK_READ(false);
 
   out = _configData.otaUpdate.updateId;
@@ -637,7 +694,8 @@ bool Config::GetOtaUpdateId(int32_t& out) {
   return true;
 }
 
-bool Config::SetOtaUpdateId(int32_t updateId) {
+bool Config::SetOtaUpdateId(int32_t updateId)
+{
   CONFIG_LOCK_WRITE(false);
 
   if (_configData.otaUpdate.updateId == updateId) {
@@ -648,7 +706,8 @@ bool Config::SetOtaUpdateId(int32_t updateId) {
   return _trySaveConfig();
 }
 
-bool Config::GetOtaUpdateStep(OtaUpdateStep& out) {
+bool Config::GetOtaUpdateStep(OtaUpdateStep& out)
+{
   CONFIG_LOCK_READ(false);
 
   out = _configData.otaUpdate.updateStep;
@@ -656,7 +715,8 @@ bool Config::GetOtaUpdateStep(OtaUpdateStep& out) {
   return true;
 }
 
-bool Config::SetOtaUpdateStep(OtaUpdateStep updateStep) {
+bool Config::SetOtaUpdateStep(OtaUpdateStep updateStep)
+{
   CONFIG_LOCK_WRITE(false);
 
   if (_configData.otaUpdate.updateStep == updateStep) {
@@ -667,7 +727,8 @@ bool Config::SetOtaUpdateStep(OtaUpdateStep updateStep) {
   return _trySaveConfig();
 }
 
-bool Config::GetEStopEnabled(bool& out) {
+bool Config::GetEStopEnabled(bool& out)
+{
   CONFIG_LOCK_READ(false);
 
   out = _configData.estop.enabled;
@@ -675,14 +736,16 @@ bool Config::GetEStopEnabled(bool& out) {
   return true;
 }
 
-bool Config::SetEStopEnabled(bool enabled) {
+bool Config::SetEStopEnabled(bool enabled)
+{
   CONFIG_LOCK_WRITE(false);
 
   _configData.estop.enabled = enabled;
   return _trySaveConfig();
 }
 
-bool Config::GetEStopGpioPin(gpio_num_t& out) {
+bool Config::GetEStopGpioPin(gpio_num_t& out)
+{
   CONFIG_LOCK_READ(false);
 
   out = _configData.estop.gpioPin;
@@ -690,7 +753,8 @@ bool Config::GetEStopGpioPin(gpio_num_t& out) {
   return true;
 }
 
-bool Config::SetEStopGpioPin(gpio_num_t gpioPin) {
+bool Config::SetEStopGpioPin(gpio_num_t gpioPin)
+{
   CONFIG_LOCK_WRITE(false);
 
   if (!OpenShock::IsValidInputPin(gpioPin)) {

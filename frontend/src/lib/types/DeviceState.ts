@@ -9,4 +9,6 @@ export type DeviceState = {
   wifiNetworkGroups: Map<string, WiFiNetworkGroup>;
   accountLinked: boolean;
   config: Config | null;
+  gpioValidInputs: Int8Array;
+  gpioValidOutputs: Int8Array;
 };

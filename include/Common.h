@@ -22,7 +22,7 @@
 
 #define OPENSHOCK_FW_CDN_URL(path) "https://" OPENSHOCK_FW_CDN_DOMAIN path
 
-#define OPENSHOCK_GPIO_INVALID 0
+#define OPENSHOCK_GPIO_INVALID -1
 
 #ifndef OPENSHOCK_RF_TX_GPIO
 #warning "OPENSHOCK_RF_TX_GPIO is not defined, setting to OPENSHOCK_GPIO_INVALID"

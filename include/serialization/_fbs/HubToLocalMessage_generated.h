@@ -244,7 +244,9 @@ struct ReadyMessage FLATBUFFERS_FINAL_CLASS : private ::flatbuffers::Table {
     VT_POGGIES = 4,
     VT_CONNECTED_WIFI = 6,
     VT_ACCOUNT_LINKED = 8,
-    VT_CONFIG = 10
+    VT_CONFIG = 10,
+    VT_GPIO_VALID_INPUTS = 12,
+    VT_GPIO_VALID_OUTPUTS = 14
   };
   bool poggies() const {
     return GetField<uint8_t>(VT_POGGIES, 0) != 0;
@@ -258,6 +260,12 @@ struct ReadyMessage FLATBUFFERS_FINAL_CLASS : private ::flatbuffers::Table {
   const OpenShock::Serialization::Configuration::HubConfig *config() const {
     return GetPointer<const OpenShock::Serialization::Configuration::HubConfig *>(VT_CONFIG);
   }
+  const ::flatbuffers::Vector<int8_t> *gpio_valid_inputs() const {
+    return GetPointer<const ::flatbuffers::Vector<int8_t> *>(VT_GPIO_VALID_INPUTS);
+  }
+  const ::flatbuffers::Vector<int8_t> *gpio_valid_outputs() const {
+    return GetPointer<const ::flatbuffers::Vector<int8_t> *>(VT_GPIO_VALID_OUTPUTS);
+  }
   bool Verify(::flatbuffers::Verifier &verifier) const {
     return VerifyTableStart(verifier) &&
            VerifyField<uint8_t>(verifier, VT_POGGIES, 1) &&
@@ -266,6 +274,10 @@ struct ReadyMessage FLATBUFFERS_FINAL_CLASS : private ::flatbuffers::Table {
            VerifyField<uint8_t>(verifier, VT_ACCOUNT_LINKED, 1) &&
            VerifyOffset(verifier, VT_CONFIG) &&
            verifier.VerifyTable(config()) &&
+           VerifyOffset(verifier, VT_GPIO_VALID_INPUTS) &&
+           verifier.VerifyVector(gpio_valid_inputs()) &&
+           VerifyOffset(verifier, VT_GPIO_VALID_OUTPUTS) &&
+           verifier.VerifyVector(gpio_valid_outputs()) &&
            verifier.EndTable();
   }
 };
@@ -286,6 +298,12 @@ struct ReadyMessageBuilder {
   void add_config(::flatbuffers::Offset<OpenShock::Serialization::Configuration::HubConfig> config) {
     fbb_.AddOffset(ReadyMessage::VT_CONFIG, config);
   }
+  void add_gpio_valid_inputs(::flatbuffers::Offset<::flatbuffers::Vector<int8_t>> gpio_valid_inputs) {
+    fbb_.AddOffset(ReadyMessage::VT_GPIO_VALID_INPUTS, gpio_valid_inputs);
+  }
+  void add_gpio_valid_outputs(::flatbuffers::Offset<::flatbuffers::Vector<int8_t>> gpio_valid_outputs) {
+    fbb_.AddOffset(ReadyMessage::VT_GPIO_VALID_OUTPUTS, gpio_valid_outputs);
+  }
   explicit ReadyMessageBuilder(::flatbuffers::FlatBufferBuilder &_fbb)
         : fbb_(_fbb) {
     start_ = fbb_.StartTable();
@@ -302,8 +320,12 @@ inline ::flatbuffers::Offset<ReadyMessage> CreateReadyMessage(
     bool poggies = false,
     ::flatbuffers::Offset<OpenShock::Serialization::Types::WifiNetwork> connected_wifi = 0,
     bool account_linked = false,
-    ::flatbuffers::Offset<OpenShock::Serialization::Configuration::HubConfig> config = 0) {
+    ::flatbuffers::Offset<OpenShock::Serialization::Configuration::HubConfig> config = 0,
+    ::flatbuffers::Offset<::flatbuffers::Vector<int8_t>> gpio_valid_inputs = 0,
+    ::flatbuffers::Offset<::flatbuffers::Vector<int8_t>> gpio_valid_outputs = 0) {
   ReadyMessageBuilder builder_(_fbb);
+  builder_.add_gpio_valid_outputs(gpio_valid_outputs);
+  builder_.add_gpio_valid_inputs(gpio_valid_inputs);
   builder_.add_config(config);
   builder_.add_connected_wifi(connected_wifi);
   builder_.add_account_linked(account_linked);
@@ -315,6 +337,26 @@ struct ReadyMessage::Traits {
   using type = ReadyMessage;
   static auto constexpr Create = CreateReadyMessage;
 };
+
+inline ::flatbuffers::Offset<ReadyMessage> CreateReadyMessageDirect(
+    ::flatbuffers::FlatBufferBuilder &_fbb,
+    bool poggies = false,
+    ::flatbuffers::Offset<OpenShock::Serialization::Types::WifiNetwork> connected_wifi = 0,
+    bool account_linked = false,
+    ::flatbuffers::Offset<OpenShock::Serialization::Configuration::HubConfig> config = 0,
+    const std::vector<int8_t> *gpio_valid_inputs = nullptr,
+    const std::vector<int8_t> *gpio_valid_outputs = nullptr) {
+  auto gpio_valid_inputs__ = gpio_valid_inputs ? _fbb.CreateVector<int8_t>(*gpio_valid_inputs) : 0;
+  auto gpio_valid_outputs__ = gpio_valid_outputs ? _fbb.CreateVector<int8_t>(*gpio_valid_outputs) : 0;
+  return OpenShock::Serialization::Local::CreateReadyMessage(
+      _fbb,
+      poggies,
+      connected_wifi,
+      account_linked,
+      config,
+      gpio_valid_inputs__,
+      gpio_valid_outputs__);
+}
 
 struct ErrorMessage FLATBUFFERS_FINAL_CLASS : private ::flatbuffers::Table {
   typedef ErrorMessageBuilder Builder;
@@ -679,15 +721,15 @@ struct SetRfTxPinCommandResult FLATBUFFERS_FINAL_CLASS : private ::flatbuffers::
     VT_PIN = 4,
     VT_RESULT = 6
   };
-  uint8_t pin() const {
-    return GetField<uint8_t>(VT_PIN, 0);
+  int8_t pin() const {
+    return GetField<int8_t>(VT_PIN, 0);
   }
   OpenShock::Serialization::Local::SetGPIOResultCode result() const {
     return static_cast<OpenShock::Serialization::Local::SetGPIOResultCode>(GetField<uint8_t>(VT_RESULT, 0));
   }
   bool Verify(::flatbuffers::Verifier &verifier) const {
     return VerifyTableStart(verifier) &&
-           VerifyField<uint8_t>(verifier, VT_PIN, 1) &&
+           VerifyField<int8_t>(verifier, VT_PIN, 1) &&
            VerifyField<uint8_t>(verifier, VT_RESULT, 1) &&
            verifier.EndTable();
   }
@@ -697,8 +739,8 @@ struct SetRfTxPinCommandResultBuilder {
   typedef SetRfTxPinCommandResult Table;
   ::flatbuffers::FlatBufferBuilder &fbb_;
   ::flatbuffers::uoffset_t start_;
-  void add_pin(uint8_t pin) {
-    fbb_.AddElement<uint8_t>(SetRfTxPinCommandResult::VT_PIN, pin, 0);
+  void add_pin(int8_t pin) {
+    fbb_.AddElement<int8_t>(SetRfTxPinCommandResult::VT_PIN, pin, 0);
   }
   void add_result(OpenShock::Serialization::Local::SetGPIOResultCode result) {
     fbb_.AddElement<uint8_t>(SetRfTxPinCommandResult::VT_RESULT, static_cast<uint8_t>(result), 0);
@@ -716,7 +758,7 @@ struct SetRfTxPinCommandResultBuilder {
 
 inline ::flatbuffers::Offset<SetRfTxPinCommandResult> CreateSetRfTxPinCommandResult(
     ::flatbuffers::FlatBufferBuilder &_fbb,
-    uint8_t pin = 0,
+    int8_t pin = 0,
     OpenShock::Serialization::Local::SetGPIOResultCode result = OpenShock::Serialization::Local::SetGPIOResultCode::Success) {
   SetRfTxPinCommandResultBuilder builder_(_fbb);
   builder_.add_result(result);
@@ -799,15 +841,15 @@ struct SetEstopPinCommandResult FLATBUFFERS_FINAL_CLASS : private ::flatbuffers:
     VT_GPIO_PIN = 4,
     VT_RESULT = 6
   };
-  uint8_t gpio_pin() const {
-    return GetField<uint8_t>(VT_GPIO_PIN, 0);
+  int8_t gpio_pin() const {
+    return GetField<int8_t>(VT_GPIO_PIN, 0);
   }
   OpenShock::Serialization::Local::SetGPIOResultCode result() const {
     return static_cast<OpenShock::Serialization::Local::SetGPIOResultCode>(GetField<uint8_t>(VT_RESULT, 0));
   }
   bool Verify(::flatbuffers::Verifier &verifier) const {
     return VerifyTableStart(verifier) &&
-           VerifyField<uint8_t>(verifier, VT_GPIO_PIN, 1) &&
+           VerifyField<int8_t>(verifier, VT_GPIO_PIN, 1) &&
            VerifyField<uint8_t>(verifier, VT_RESULT, 1) &&
            verifier.EndTable();
   }
@@ -817,8 +859,8 @@ struct SetEstopPinCommandResultBuilder {
   typedef SetEstopPinCommandResult Table;
   ::flatbuffers::FlatBufferBuilder &fbb_;
   ::flatbuffers::uoffset_t start_;
-  void add_gpio_pin(uint8_t gpio_pin) {
-    fbb_.AddElement<uint8_t>(SetEstopPinCommandResult::VT_GPIO_PIN, gpio_pin, 0);
+  void add_gpio_pin(int8_t gpio_pin) {
+    fbb_.AddElement<int8_t>(SetEstopPinCommandResult::VT_GPIO_PIN, gpio_pin, 0);
   }
   void add_result(OpenShock::Serialization::Local::SetGPIOResultCode result) {
     fbb_.AddElement<uint8_t>(SetEstopPinCommandResult::VT_RESULT, static_cast<uint8_t>(result), 0);
@@ -836,7 +878,7 @@ struct SetEstopPinCommandResultBuilder {
 
 inline ::flatbuffers::Offset<SetEstopPinCommandResult> CreateSetEstopPinCommandResult(
     ::flatbuffers::FlatBufferBuilder &_fbb,
-    uint8_t gpio_pin = 0,
+    int8_t gpio_pin = 0,
     OpenShock::Serialization::Local::SetGPIOResultCode result = OpenShock::Serialization::Local::SetGPIOResultCode::Success) {
   SetEstopPinCommandResultBuilder builder_(_fbb);
   builder_.add_result(result);

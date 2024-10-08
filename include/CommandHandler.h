@@ -4,6 +4,8 @@
 #include "ShockerCommandType.h"
 #include "ShockerModelType.h"
 
+#include <hal/gpio_types.h>
+
 #include <cstdint>
 
 // TODO: This is horrible architecture. Fix it.
@@ -12,11 +14,11 @@ namespace OpenShock::CommandHandler {
   [[nodiscard]] bool Init();
   bool Ok();
 
-  SetGPIOResultCode SetRfTxPin(uint8_t txPin);
-  uint8_t GetRfTxPin();
+  gpio_num_t GetRfTxPin();
+  SetGPIOResultCode SetRfTxPin(gpio_num_t txPin);
 
-  SetGPIOResultCode SetEstopPin(uint8_t estopPin);
-  uint8_t GetEstopPin();
+  SetGPIOResultCode SetEstopPin(gpio_num_t estopPin);
+  gpio_num_t GetEstopPin();
 
   bool SetKeepAliveEnabled(bool enabled);
   bool SetKeepAlivePaused(bool paused);

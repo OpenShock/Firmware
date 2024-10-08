@@ -57,8 +57,8 @@ namespace OpenShock::Config {
   bool GetWiFiCredentials(cJSON* array, bool withSensitiveData);
   bool SetWiFiCredentials(const std::vector<WiFiCredentials>& credentials);
 
-  bool GetRFConfigTxPin(uint8_t& out);
-  bool SetRFConfigTxPin(uint8_t txPin);
+  bool GetRFConfigTxPin(gpio_num_t& out);
+  bool SetRFConfigTxPin(gpio_num_t txPin);
   bool GetRFConfigKeepAliveEnabled(bool& out);
   bool SetRFConfigKeepAliveEnabled(bool enabled);
 

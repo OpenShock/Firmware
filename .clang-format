@@ -67,7 +67,7 @@ AlignTrailingComments:
   Kind: Always
   OverEmptyLines: 1
 AllowAllArgumentsOnNextLine: true
-AllowAllParametersOfDeclarationOnNextLine: false
+AllowAllParametersOfDeclarationOnNextLine: true
 AllowShortBlocksOnASingleLine: Always
 AllowShortCaseLabelsOnASingleLine: false
 AllowShortEnumsOnASingleLine: false
@@ -87,7 +87,7 @@ BraceWrapping:
   AfterClass: false
   AfterControlStatement: MultiLine
   AfterEnum: false
-  AfterFunction: false
+  AfterFunction: true
   AfterNamespace: false
   AfterStruct: false
   AfterUnion: false
@@ -100,7 +100,7 @@ BraceWrapping:
   SplitEmptyFunction: true
   SplitEmptyRecord: true
   SplitEmptyNamespace: true
-BreakAfterAttributes: Never
+BreakAfterAttributes: Leave
 BreakBeforeBinaryOperators: All
 BreakBeforeConceptDeclarations: Allowed
 BreakBeforeInlineASMColon: Always

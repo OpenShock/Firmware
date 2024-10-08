@@ -21,20 +21,22 @@ EStopConfig::EStopConfig(bool enabled, gpio_num_t gpioPin)
 {
 }
 
-void EStopConfig::ToDefault() {
+void EStopConfig::ToDefault()
+{
   enabled = OpenShock::IsValidInputPin(OPENSHOCK_ESTOP_PIN);
   gpioPin = static_cast<gpio_num_t>(OPENSHOCK_ESTOP_PIN);
 }
 
-bool EStopConfig::FromFlatbuffers(const Serialization::Configuration::EStopConfig* config) {
+bool EStopConfig::FromFlatbuffers(const Serialization::Configuration::EStopConfig* config)
+{
   if (config == nullptr) {
-    ToDefault(); // Set to default if config is null
+    ToDefault();  // Set to default if config is null
     return true;
   }
 
   gpioPin = static_cast<gpio_num_t>(config->gpio_pin());
 
-  if (OpenShock::IsValidInputPin(static_cast<uint8_t>(gpioPin))) {
+  if (OpenShock::IsValidInputPin(static_cast<int8_t>(gpioPin))) {
     enabled = config->enabled();
   } else {
     enabled = false;
@@ -43,13 +45,15 @@ bool EStopConfig::FromFlatbuffers(const Serialization::Configuration::EStopConfi
   return true;
 }
 
-flatbuffers::Offset<OpenShock::Serialization::Configuration::EStopConfig> EStopConfig::ToFlatbuffers(flatbuffers::FlatBufferBuilder& builder, bool withSensitiveData) const {
+flatbuffers::Offset<OpenShock::Serialization::Configuration::EStopConfig> EStopConfig::ToFlatbuffers(flatbuffers::FlatBufferBuilder& builder, bool withSensitiveData) const
+{
   return Serialization::Configuration::CreateEStopConfig(builder, gpioPin);
 }
 
-bool EStopConfig::FromJSON(const cJSON* json) {
+bool EStopConfig::FromJSON(const cJSON* json)
+{
   if (json == nullptr) {
-    ToDefault(); // Set to default if config is null
+    ToDefault();  // Set to default if config is null
     return true;
   }
 
@@ -58,13 +62,9 @@ bool EStopConfig::FromJSON(const cJSON* json) {
     return false;
   }
 
-  uint8_t val;
-  if (!Internal::Utils::FromJsonU8(val, json, "gpioPin", OPENSHOCK_ESTOP_PIN)) {
-    OS_LOGE(TAG, "Failed to parse gpioPin");
-    return false;
-  }
+  Internal::Utils::FromJsonGpioNum(gpioPin, json, "gpioPin", static_cast<gpio_num_t>(OPENSHOCK_ESTOP_PIN));
 
-  if (!Internal::Utils::FromJsonBool(enabled, json, "enabled", OpenShock::IsValidInputPin(val))) {
+  if (!Internal::Utils::FromJsonBool(enabled, json, "enabled", OpenShock::IsValidInputPin(gpioPin))) {
     OS_LOGE(TAG, "Failed to parse enabled");
     return false;
   }
@@ -72,7 +72,8 @@ bool EStopConfig::FromJSON(const cJSON* json) {
   return true;
 }
 
-cJSON* EStopConfig::ToJSON(bool withSensitiveData) const {
+cJSON* EStopConfig::ToJSON(bool withSensitiveData) const
+{
   cJSON* root = cJSON_CreateObject();
 
   cJSON_AddBoolToObject(root, "enabled", enabled);

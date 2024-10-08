@@ -25,7 +25,8 @@ const uint16_t KEEP_ALIVE_DURATION = 300;
 
 using namespace OpenShock;
 
-uint32_t calculateEepyTime(int64_t timeToKeepAlive) {
+uint32_t calculateEepyTime(int64_t timeToKeepAlive)
+{
   int64_t now = OpenShock::millis();
   return static_cast<uint32_t>(std::clamp(timeToKeepAlive - now, 0LL, KEEP_ALIVE_INTERVAL));
 }
@@ -46,7 +47,8 @@ static ReadWriteMutex s_keepAliveMutex    = {};
 static QueueHandle_t s_keepAliveQueue     = nullptr;
 static TaskHandle_t s_keepAliveTaskHandle = nullptr;
 
-void _keepAliveTask(void* arg) {
+void _keepAliveTask(void* arg)
+{
   (void)arg;
 
   int64_t timeToKeepAlive = KEEP_ALIVE_INTERVAL;
@@ -101,7 +103,8 @@ void _keepAliveTask(void* arg) {
   }
 }
 
-bool _internalSetKeepAliveEnabled(bool enabled) {
+bool _internalSetKeepAliveEnabled(bool enabled)
+{
   bool wasEnabled = s_keepAliveQueue != nullptr && s_keepAliveTaskHandle != nullptr;
 
   if (enabled == wasEnabled) {
@@ -148,7 +151,8 @@ bool _internalSetKeepAliveEnabled(bool enabled) {
   return true;
 }
 
-bool CommandHandler::Init() {
+bool CommandHandler::Init()
+{
   static bool initialized = false;
   if (initialized) {
     OS_LOGW(TAG, "RF Transmitter and EStopManager are already initialized?");
@@ -156,23 +160,25 @@ bool CommandHandler::Init() {
   }
   initialized = true;
 
+  s_estopManagerMutex = xSemaphoreCreateMutex();
+
   Config::RFConfig rfConfig;
   if (!Config::GetRFConfig(rfConfig)) {
     OS_LOGE(TAG, "Failed to get RF config");
     return false;
   }
 
-  uint8_t txPin = rfConfig.txPin;
+  gpio_num_t txPin = rfConfig.txPin;
   if (!OpenShock::IsValidOutputPin(txPin)) {
     if (!OpenShock::IsValidOutputPin(OPENSHOCK_RF_TX_GPIO)) {
-      OS_LOGE(TAG, "Configured RF TX pin (%u) is invalid, and default pin (%u) is invalid. Unable to initialize RF transmitter", txPin, OPENSHOCK_RF_TX_GPIO);
+      OS_LOGE(TAG, "Configured RF TX pin (%hhi) is invalid, and default pin (%hhi) is invalid. Unable to initialize RF transmitter", txPin, OPENSHOCK_RF_TX_GPIO);
 
       OS_LOGD(TAG, "Setting RF TX pin to GPIO_INVALID");
-      return Config::SetRFConfigTxPin(OPENSHOCK_GPIO_INVALID);  // This is not a error yet, unless we are unable to save the RF TX Pin as invalid
+      return Config::SetRFConfigTxPin(static_cast<gpio_num_t>(OPENSHOCK_GPIO_INVALID));  // This is not a error yet, unless we are unable to save the RF TX Pin as invalid
     }
 
-    OS_LOGW(TAG, "Configured RF TX pin (%u) is invalid, using default pin (%u)", txPin, OPENSHOCK_RF_TX_GPIO);
-    txPin = OPENSHOCK_RF_TX_GPIO;
+    OS_LOGW(TAG, "Configured RF TX pin (%hhi) is invalid, using default pin (%hhi)", txPin, OPENSHOCK_RF_TX_GPIO);
+    txPin = static_cast<gpio_num_t>(OPENSHOCK_RF_TX_GPIO);
     if (!Config::SetRFConfigTxPin(txPin)) {
       OS_LOGE(TAG, "Failed to set RF TX pin in config");
       return false;
@@ -201,11 +207,13 @@ bool CommandHandler::Init() {
   return true;
 }
 
-bool CommandHandler::Ok() {
+bool CommandHandler::Ok()
+{
   return s_rfTransmitter != nullptr;
 }
 
-SetGPIOResultCode CommandHandler::SetRfTxPin(uint8_t txPin) {
+SetGPIOResultCode CommandHandler::SetRfTxPin(gpio_num_t txPin)
+{
   if (!OpenShock::IsValidOutputPin(txPin)) {
     return SetGPIOResultCode::InvalidPin;
   }
@@ -234,18 +242,19 @@ SetGPIOResultCode CommandHandler::SetRfTxPin(uint8_t txPin) {
   return SetGPIOResultCode::Success;
 }
 
-SetGPIOResultCode CommandHandler::SetEstopPin(uint8_t estopPin) {
-  if (OpenShock::IsValidInputPin(estopPin)) {
+SetGPIOResultCode CommandHandler::SetEstopPin(gpio_num_t estopPin)
+{
+  if (OpenShock::IsValidInputPin(static_cast<int8_t>(estopPin))) {
     xSemaphoreTake(s_estopManagerMutex, portMAX_DELAY);
 
-    if (!EStopManager::SetEStopPin(static_cast<gpio_num_t>(estopPin))) {
+    if (!EStopManager::SetEStopPin(estopPin)) {
       OS_LOGE(TAG, "Failed to set EStop pin");
 
       xSemaphoreGive(s_estopManagerMutex);
       return SetGPIOResultCode::InternalError;
     }
 
-    if (!Config::SetEStopGpioPin(static_cast<gpio_num_t>(estopPin))) {
+    if (!Config::SetEStopGpioPin(estopPin)) {
       OS_LOGE(TAG, "Failed to set EStop pin in config");
 
       xSemaphoreGive(s_estopManagerMutex);
@@ -259,7 +268,8 @@ SetGPIOResultCode CommandHandler::SetEstopPin(uint8_t estopPin) {
   }
 }
 
-bool CommandHandler::SetKeepAliveEnabled(bool enabled) {
+bool CommandHandler::SetKeepAliveEnabled(bool enabled)
+{
   if (!_internalSetKeepAliveEnabled(enabled)) {
     return false;
   }
@@ -272,7 +282,8 @@ bool CommandHandler::SetKeepAliveEnabled(bool enabled) {
   return true;
 }
 
-bool CommandHandler::SetKeepAlivePaused(bool paused) {
+bool CommandHandler::SetKeepAlivePaused(bool paused)
+{
   bool keepAliveEnabled = false;
   if (!Config::GetRFConfigKeepAliveEnabled(keepAliveEnabled)) {
     OS_LOGE(TAG, "Failed to get keep-alive enabled from config");
@@ -290,17 +301,23 @@ bool CommandHandler::SetKeepAlivePaused(bool paused) {
   return true;
 }
 
-uint8_t CommandHandler::GetRfTxPin() {
-  uint8_t txPin;
+gpio_num_t CommandHandler::GetRfTxPin()
+{
+  if (s_rfTransmitter != nullptr) {
+    return s_rfTransmitter->GetTxPin();
+  }
+
+  gpio_num_t txPin;
   if (!Config::GetRFConfigTxPin(txPin)) {
     OS_LOGE(TAG, "Failed to get RF TX pin from config");
-    txPin = OPENSHOCK_GPIO_INVALID;
+    txPin = static_cast<gpio_num_t>(OPENSHOCK_GPIO_INVALID);
   }
 
   return txPin;
 }
 
-bool CommandHandler::HandleCommand(ShockerModelType model, uint16_t shockerId, ShockerCommandType type, uint8_t intensity, uint16_t durationMs) {
+bool CommandHandler::HandleCommand(ShockerModelType model, uint16_t shockerId, ShockerCommandType type, uint8_t intensity, uint16_t durationMs)
+{
   ScopedReadLock rftxLock(&s_rfTransmitterMutex);
 
   if (s_rfTransmitter == nullptr) {
