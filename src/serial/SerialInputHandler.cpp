@@ -272,8 +272,6 @@ void RegisterCommandHandler(const OpenShock::Serial::CommandGroup& handler)
   s_commandHandlers[handler.name()] = handler;
 }
 
-#define CLEAR_LINE "\r\x1B[K"
-
 class SerialBuffer {
   DISABLE_COPY(SerialBuffer);
   DISABLE_MOVE(SerialBuffer);
