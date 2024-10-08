@@ -32,7 +32,8 @@ const char* const TAG = "SerialInputHandler";
 
 namespace std {
   struct hash_ci {
-    std::size_t operator()(std::string_view str) const {
+    std::size_t operator()(std::string_view str) const
+    {
       std::size_t hash = 7;
 
       for (int i = 0; i < str.size(); ++i) {
@@ -64,7 +65,8 @@ static bool s_echoEnabled = true;
 static std::vector<OpenShock::Serial::CommandGroup> s_commandGroups;
 static std::unordered_map<std::string_view, OpenShock::Serial::CommandGroup, std::hash_ci, std::equals_ci> s_commandHandlers;
 
-void _printCompleteHelp() {
+void _printCompleteHelp()
+{
   std::size_t commandCount    = 0;
   std::size_t longestCommand  = 0;
   std::size_t longestArgument = 0;
@@ -122,7 +124,8 @@ void _printCompleteHelp() {
   ::Serial.print(buffer.data());
 }
 
-void _printCommandHelp(Serial::CommandGroup& group) {
+void _printCommandHelp(Serial::CommandGroup& group)
+{
   std::size_t size = 0;
   for (const auto& command : group.commands()) {
     size++;  // +1 for newline
@@ -247,7 +250,8 @@ void _printCommandHelp(Serial::CommandGroup& group) {
   ::Serial.print(buffer.data());
 }
 
-void _handleHelpCommand(std::string_view arg, bool isAutomated) {
+void _handleHelpCommand(std::string_view arg, bool isAutomated)
+{
   arg = OpenShock::StringTrim(arg);
   if (arg.empty()) {
     _printCompleteHelp();
@@ -264,7 +268,8 @@ void _handleHelpCommand(std::string_view arg, bool isAutomated) {
   SERPR_ERROR("Command \"%.*s\" not found", arg.length(), arg.data());
 }
 
-void RegisterCommandHandler(const OpenShock::Serial::CommandGroup& handler) {
+void RegisterCommandHandler(const OpenShock::Serial::CommandGroup& handler)
+{
   s_commandHandlers[handler.name()] = handler;
 }
 
@@ -278,11 +283,15 @@ public:
   constexpr SerialBuffer()
     : m_data(nullptr)
     , m_size(0)
-    , m_capacity(0) { }
+    , m_capacity(0)
+  {
+  }
   inline SerialBuffer(std::size_t capacity)
     : m_data(new char[capacity])
     , m_size(0)
-    , m_capacity(capacity) { }
+    , m_capacity(capacity)
+  {
+  }
   inline ~SerialBuffer() { delete[] m_data; }
 
   constexpr char* data() { return m_data; }
@@ -291,14 +300,16 @@ public:
   constexpr bool empty() const { return m_size == 0; }
 
   constexpr void clear() { m_size = 0; }
-  inline void destroy() {
+  inline void destroy()
+  {
     delete[] m_data;
     m_data     = nullptr;
     m_size     = 0;
     m_capacity = 0;
   }
 
-  inline void reserve(std::size_t size) {
+  inline void reserve(std::size_t size)
+  {
     size = (size + 31) & ~31;  // Align to 32 bytes
 
     if (size <= m_capacity) {
@@ -315,7 +326,8 @@ public:
     m_capacity = size;
   }
 
-  inline void push_back(char c) {
+  inline void push_back(char c)
+  {
     if (m_size >= m_capacity) {
       reserve(m_capacity + 16);
     }
@@ -323,7 +335,8 @@ public:
     m_data[m_size++] = c;
   }
 
-  constexpr void pop_back() {
+  constexpr void pop_back()
+  {
     if (m_size > 0) {
       --m_size;
     }
@@ -344,7 +357,8 @@ enum class SerialReadResult {
   AutoCompleteRequest,
 };
 
-SerialReadResult _tryReadSerialLine(SerialBuffer& buffer) {
+SerialReadResult _tryReadSerialLine(SerialBuffer& buffer)
+{
   // Check if there's any data available
   int available = ::Serial.available();
   if (available <= 0) {
@@ -390,7 +404,8 @@ SerialReadResult _tryReadSerialLine(SerialBuffer& buffer) {
   return SerialReadResult::Data;
 }
 
-void _skipSerialWhitespaces(SerialBuffer& buffer) {
+void _skipSerialWhitespaces(SerialBuffer& buffer)
+{
   int available = ::Serial.available();
 
   while (available-- > 0) {
@@ -403,11 +418,13 @@ void _skipSerialWhitespaces(SerialBuffer& buffer) {
   }
 }
 
-void _echoBuffer(std::string_view buffer) {
+void _echoBuffer(std::string_view buffer)
+{
   ::Serial.printf(CLEAR_LINE "> %.*s", buffer.size(), buffer.data());
 }
 
-void _echoHandleSerialInput(std::string_view buffer, bool hasData) {
+void _echoHandleSerialInput(std::string_view buffer, bool hasData)
+{
   static int64_t lastActivity = 0;
   static bool hasChanges      = false;
 
@@ -435,7 +452,8 @@ void _echoHandleSerialInput(std::string_view buffer, bool hasData) {
   }
 }
 
-void _processSerialLine(std::string_view line) {
+void _processSerialLine(std::string_view line)
+{
   line = OpenShock::StringTrim(line);
   if (line.empty()) {
     return;
@@ -475,7 +493,8 @@ void _processSerialLine(std::string_view line) {
   }
 }
 
-bool SerialInputHandler::Init() {
+bool SerialInputHandler::Init()
+{
   static bool s_initialized = false;
   if (s_initialized) {
     OS_LOGW(TAG, "Serial input handler already initialized");
@@ -502,7 +521,8 @@ bool SerialInputHandler::Init() {
   return true;
 }
 
-void SerialInputHandler::Update() {
+void SerialInputHandler::Update()
+{
   static SerialBuffer buffer(32);
 
   switch (_tryReadSerialLine(buffer)) {
@@ -531,15 +551,18 @@ void SerialInputHandler::Update() {
   }
 }
 
-bool SerialInputHandler::SerialEchoEnabled() {
+bool SerialInputHandler::SerialEchoEnabled()
+{
   return s_echoEnabled;
 }
 
-void SerialInputHandler::SetSerialEchoEnabled(bool enabled) {
+void SerialInputHandler::SetSerialEchoEnabled(bool enabled)
+{
   s_echoEnabled = enabled;
 }
 
-void SerialInputHandler::PrintWelcomeHeader() {
+void SerialInputHandler::PrintWelcomeHeader()
+{
   ::Serial.print(R"(
 ============== OPENSHOCK ==============
   Contribute @ github.com/OpenShock
@@ -549,7 +572,8 @@ void SerialInputHandler::PrintWelcomeHeader() {
 )");
 }
 
-void SerialInputHandler::PrintVersionInfo() {
+void SerialInputHandler::PrintVersionInfo()
+{
   ::Serial.print("\
   Version:  " OPENSHOCK_FW_VERSION "\n\
     Build:  " OPENSHOCK_FW_MODE "\n\
