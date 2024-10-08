@@ -48,7 +48,7 @@ config(obj?:HubConfig):HubConfig|null {
 
 gpioValidInputs(index: number):number|null {
   const offset = this.bb!.__offset(this.bb_pos, 12);
-  return offset ? this.bb!.readUint8(this.bb!.__vector(this.bb_pos + offset) + index) : 0;
+  return offset ? this.bb!.readInt8(this.bb!.__vector(this.bb_pos + offset) + index) : 0;
 }
 
 gpioValidInputsLength():number {
@@ -56,14 +56,14 @@ gpioValidInputsLength():number {
   return offset ? this.bb!.__vector_len(this.bb_pos + offset) : 0;
 }
 
-gpioValidInputsArray():Uint8Array|null {
+gpioValidInputsArray():Int8Array|null {
   const offset = this.bb!.__offset(this.bb_pos, 12);
-  return offset ? new Uint8Array(this.bb!.bytes().buffer, this.bb!.bytes().byteOffset + this.bb!.__vector(this.bb_pos + offset), this.bb!.__vector_len(this.bb_pos + offset)) : null;
+  return offset ? new Int8Array(this.bb!.bytes().buffer, this.bb!.bytes().byteOffset + this.bb!.__vector(this.bb_pos + offset), this.bb!.__vector_len(this.bb_pos + offset)) : null;
 }
 
 gpioValidOutputs(index: number):number|null {
   const offset = this.bb!.__offset(this.bb_pos, 14);
-  return offset ? this.bb!.readUint8(this.bb!.__vector(this.bb_pos + offset) + index) : 0;
+  return offset ? this.bb!.readInt8(this.bb!.__vector(this.bb_pos + offset) + index) : 0;
 }
 
 gpioValidOutputsLength():number {
@@ -71,9 +71,9 @@ gpioValidOutputsLength():number {
   return offset ? this.bb!.__vector_len(this.bb_pos + offset) : 0;
 }
 
-gpioValidOutputsArray():Uint8Array|null {
+gpioValidOutputsArray():Int8Array|null {
   const offset = this.bb!.__offset(this.bb_pos, 14);
-  return offset ? new Uint8Array(this.bb!.bytes().buffer, this.bb!.bytes().byteOffset + this.bb!.__vector(this.bb_pos + offset), this.bb!.__vector_len(this.bb_pos + offset)) : null;
+  return offset ? new Int8Array(this.bb!.bytes().buffer, this.bb!.bytes().byteOffset + this.bb!.__vector(this.bb_pos + offset), this.bb!.__vector_len(this.bb_pos + offset)) : null;
 }
 
 static startReadyMessage(builder:flatbuffers.Builder) {
@@ -100,7 +100,12 @@ static addGpioValidInputs(builder:flatbuffers.Builder, gpioValidInputsOffset:fla
   builder.addFieldOffset(4, gpioValidInputsOffset, 0);
 }
 
-static createGpioValidInputsVector(builder:flatbuffers.Builder, data:number[]|Uint8Array):flatbuffers.Offset {
+static createGpioValidInputsVector(builder:flatbuffers.Builder, data:number[]|Int8Array):flatbuffers.Offset;
+/**
+ * @deprecated This Uint8Array overload will be removed in the future.
+ */
+static createGpioValidInputsVector(builder:flatbuffers.Builder, data:number[]|Uint8Array):flatbuffers.Offset;
+static createGpioValidInputsVector(builder:flatbuffers.Builder, data:number[]|Int8Array|Uint8Array):flatbuffers.Offset {
   builder.startVector(1, data.length, 1);
   for (let i = data.length - 1; i >= 0; i--) {
     builder.addInt8(data[i]!);
@@ -116,7 +121,12 @@ static addGpioValidOutputs(builder:flatbuffers.Builder, gpioValidOutputsOffset:f
   builder.addFieldOffset(5, gpioValidOutputsOffset, 0);
 }
 
-static createGpioValidOutputsVector(builder:flatbuffers.Builder, data:number[]|Uint8Array):flatbuffers.Offset {
+static createGpioValidOutputsVector(builder:flatbuffers.Builder, data:number[]|Int8Array):flatbuffers.Offset;
+/**
+ * @deprecated This Uint8Array overload will be removed in the future.
+ */
+static createGpioValidOutputsVector(builder:flatbuffers.Builder, data:number[]|Uint8Array):flatbuffers.Offset;
+static createGpioValidOutputsVector(builder:flatbuffers.Builder, data:number[]|Int8Array|Uint8Array):flatbuffers.Offset {
   builder.startVector(1, data.length, 1);
   for (let i = data.length - 1; i >= 0; i--) {
     builder.addInt8(data[i]!);

@@ -6,6 +6,7 @@
 
 #include <bitset>
 #include <limits>
+#include <vector>
 
 // The following chipsets are supported by the OpenShock firmware.
 // To find documentation for a specific chipset, see the docs link.
@@ -254,12 +255,12 @@ namespace OpenShock {
     return true;
   }
 
-  static_assert(GPIO_NUM_MAX > std::numeric_limits<int8_t>::max(), "GPIO_NUM_MAX is too large for int8_t.");
+  static_assert(GPIO_NUM_MAX < std::numeric_limits<int8_t>::max(), "GPIO_NUM_MAX is too large for int8_t.");
 
   constexpr uint8_t GetValidInputPinsCount()
   {
     uint8_t count = 0;
-    for (int8_t i = 0; i < GPIO_NUM_MAX; i++) {
+    for (int8_t i = GPIO_NUM_NC; i < GPIO_NUM_MAX; i++) {
       if (IsValidInputPin(i)) {
         count++;
       }
@@ -269,7 +270,7 @@ namespace OpenShock {
   constexpr uint8_t GetValidOutputPinsCount()
   {
     uint8_t count = 0;
-    for (int8_t i = 0; i < GPIO_NUM_MAX; i++) {
+    for (int8_t i = GPIO_NUM_NC; i < GPIO_NUM_MAX; i++) {
       if (IsValidOutputPin(i)) {
         count++;
       }
@@ -311,20 +312,22 @@ namespace OpenShock {
     }
     return pins;
   }
-  inline std::vector<uint8_t> GetValidInputPinsVector()
+  inline std::vector<int8_t> GetValidInputPinsVector()
   {
-    std::vector<uint8_t> pins(ValidInputPinsCount);
-    for (uint8_t i = 0; i < GPIO_NUM_MAX; i++) {
+    std::vector<int8_t> pins;
+    pins.reserve(ValidInputPinsCount);
+    for (int8_t i = GPIO_NUM_NC; i < GPIO_NUM_MAX; i++) {
       if (IsValidInputPin(i)) {
         pins.push_back(i);
       }
     }
     return pins;
   }
-  inline std::vector<uint8_t> GetValidOutputPinsVector()
+  inline std::vector<int8_t> GetValidOutputPinsVector()
   {
-    std::vector<uint8_t> pins(ValidOutputPinsCount);
-    for (uint8_t i = 0; i < GPIO_NUM_MAX; i++) {
+    std::vector<int8_t> pins;
+    pins.reserve(ValidOutputPinsCount);
+    for (int8_t i = GPIO_NUM_NC; i < GPIO_NUM_MAX; i++) {
       if (IsValidOutputPin(i)) {
         pins.push_back(i);
       }

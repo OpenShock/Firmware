@@ -260,11 +260,11 @@ struct ReadyMessage FLATBUFFERS_FINAL_CLASS : private ::flatbuffers::Table {
   const OpenShock::Serialization::Configuration::HubConfig *config() const {
     return GetPointer<const OpenShock::Serialization::Configuration::HubConfig *>(VT_CONFIG);
   }
-  const ::flatbuffers::Vector<uint8_t> *gpio_valid_inputs() const {
-    return GetPointer<const ::flatbuffers::Vector<uint8_t> *>(VT_GPIO_VALID_INPUTS);
+  const ::flatbuffers::Vector<int8_t> *gpio_valid_inputs() const {
+    return GetPointer<const ::flatbuffers::Vector<int8_t> *>(VT_GPIO_VALID_INPUTS);
   }
-  const ::flatbuffers::Vector<uint8_t> *gpio_valid_outputs() const {
-    return GetPointer<const ::flatbuffers::Vector<uint8_t> *>(VT_GPIO_VALID_OUTPUTS);
+  const ::flatbuffers::Vector<int8_t> *gpio_valid_outputs() const {
+    return GetPointer<const ::flatbuffers::Vector<int8_t> *>(VT_GPIO_VALID_OUTPUTS);
   }
   bool Verify(::flatbuffers::Verifier &verifier) const {
     return VerifyTableStart(verifier) &&
@@ -298,10 +298,10 @@ struct ReadyMessageBuilder {
   void add_config(::flatbuffers::Offset<OpenShock::Serialization::Configuration::HubConfig> config) {
     fbb_.AddOffset(ReadyMessage::VT_CONFIG, config);
   }
-  void add_gpio_valid_inputs(::flatbuffers::Offset<::flatbuffers::Vector<uint8_t>> gpio_valid_inputs) {
+  void add_gpio_valid_inputs(::flatbuffers::Offset<::flatbuffers::Vector<int8_t>> gpio_valid_inputs) {
     fbb_.AddOffset(ReadyMessage::VT_GPIO_VALID_INPUTS, gpio_valid_inputs);
   }
-  void add_gpio_valid_outputs(::flatbuffers::Offset<::flatbuffers::Vector<uint8_t>> gpio_valid_outputs) {
+  void add_gpio_valid_outputs(::flatbuffers::Offset<::flatbuffers::Vector<int8_t>> gpio_valid_outputs) {
     fbb_.AddOffset(ReadyMessage::VT_GPIO_VALID_OUTPUTS, gpio_valid_outputs);
   }
   explicit ReadyMessageBuilder(::flatbuffers::FlatBufferBuilder &_fbb)
@@ -321,8 +321,8 @@ inline ::flatbuffers::Offset<ReadyMessage> CreateReadyMessage(
     ::flatbuffers::Offset<OpenShock::Serialization::Types::WifiNetwork> connected_wifi = 0,
     bool account_linked = false,
     ::flatbuffers::Offset<OpenShock::Serialization::Configuration::HubConfig> config = 0,
-    ::flatbuffers::Offset<::flatbuffers::Vector<uint8_t>> gpio_valid_inputs = 0,
-    ::flatbuffers::Offset<::flatbuffers::Vector<uint8_t>> gpio_valid_outputs = 0) {
+    ::flatbuffers::Offset<::flatbuffers::Vector<int8_t>> gpio_valid_inputs = 0,
+    ::flatbuffers::Offset<::flatbuffers::Vector<int8_t>> gpio_valid_outputs = 0) {
   ReadyMessageBuilder builder_(_fbb);
   builder_.add_gpio_valid_outputs(gpio_valid_outputs);
   builder_.add_gpio_valid_inputs(gpio_valid_inputs);
@@ -344,10 +344,10 @@ inline ::flatbuffers::Offset<ReadyMessage> CreateReadyMessageDirect(
     ::flatbuffers::Offset<OpenShock::Serialization::Types::WifiNetwork> connected_wifi = 0,
     bool account_linked = false,
     ::flatbuffers::Offset<OpenShock::Serialization::Configuration::HubConfig> config = 0,
-    const std::vector<uint8_t> *gpio_valid_inputs = nullptr,
-    const std::vector<uint8_t> *gpio_valid_outputs = nullptr) {
-  auto gpio_valid_inputs__ = gpio_valid_inputs ? _fbb.CreateVector<uint8_t>(*gpio_valid_inputs) : 0;
-  auto gpio_valid_outputs__ = gpio_valid_outputs ? _fbb.CreateVector<uint8_t>(*gpio_valid_outputs) : 0;
+    const std::vector<int8_t> *gpio_valid_inputs = nullptr,
+    const std::vector<int8_t> *gpio_valid_outputs = nullptr) {
+  auto gpio_valid_inputs__ = gpio_valid_inputs ? _fbb.CreateVector<int8_t>(*gpio_valid_inputs) : 0;
+  auto gpio_valid_outputs__ = gpio_valid_outputs ? _fbb.CreateVector<int8_t>(*gpio_valid_outputs) : 0;
   return OpenShock::Serialization::Local::CreateReadyMessage(
       _fbb,
       poggies,
