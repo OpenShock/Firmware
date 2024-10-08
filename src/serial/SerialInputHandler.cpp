@@ -244,8 +244,6 @@ void _printCommandHelp(Serial::CommandGroup& group) {
   }
   buffer.push_back('\n');
 
-  OS_LOGI(TAG, "Buffer size: %zu", buffer.size());
-
   ::Serial.print(buffer.data());
 }
 
