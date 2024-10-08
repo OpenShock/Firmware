@@ -485,12 +485,57 @@ void _processSerialLine(std::string_view line)
     return;
   }
 
-  for (const auto& cmd : it->second.commands()) {
-    if (cmd.arguments().empty()) {
+  // Get potential subcommand
+  std::string_view firstArg;
+  parts = OpenShock::StringSplit(arguments, ' ');
+  if (parts.size() > 1) {
+    firstArg = OpenShock::StringTrim(parts[0]);
+  } else {
+    firstArg = arguments;
+  }
+
+  // If the first argument is not empty, try to find a subcommand that matches
+  if (!firstArg.empty()) {
+    for (const auto& cmd : it->second.commands()) {
+      // Check subcommand name
+      if (cmd.name() != firstArg) {
+        continue;
+      }
+
+      // Check if the subcommand requires arguments
+      if (cmd.arguments().size() > 1 && parts.size() < 2) {
+        _printCommandHelp(it->second);
+        return;
+      }
+
+      // Command found, remove the subcommand from the arguments
+      arguments = OpenShock::StringTrim(arguments.substr(firstArg.size()));
+
+      // Execute the subcommand
       cmd.commandHandler()(arguments, isAutomated);
       return;
     }
   }
+
+  // If no subcommand was found, try to find a default command
+  for (const auto& cmd : it->second.commands()) {
+    // Skip subcommands
+    if (!cmd.name().empty()) {
+      continue;
+    }
+
+    // Check if the command requires arguments
+    if (cmd.arguments().size() > 0 && arguments.empty()) {
+      _printCommandHelp(it->second);
+      return;
+    }
+
+    // Execute the default command
+    cmd.commandHandler()(arguments, isAutomated);
+    return;
+  }
+
+  SERPR_ERROR("Command \"%.*s\" not found", command.size(), command.data());
 }
 
 bool SerialInputHandler::Init()
