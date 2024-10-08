@@ -162,7 +162,7 @@ void _printCommandHelp(Serial::CommandGroup& group)
       }
     }
 
-    size += 11;                       // +11 for "  Example:\n"
+    size += 15;                       // +15 for "  Example:    \n"
     size += group.name().size() + 1;  // +1 for space
 
     if (command.name().size() > 0) {
@@ -228,7 +228,7 @@ void _printCommandHelp(Serial::CommandGroup& group)
       }
     }
 
-    buffer.append("  Example:\n"sv);
+    buffer.append("  Example:\n    "sv);
     buffer.append(group.name());
     buffer.push_back(' ');
 
