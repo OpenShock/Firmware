@@ -216,7 +216,6 @@ void _printCommandHelp(Serial::CommandGroup& group)
         buffer.push_back(' ');
         buffer.append(arg.constraint);
         if (arg.constraintExtensions.size() > 0) {
-          buffer.push_back(':');
           buffer.push_back('\n');
           for (const auto& ext : arg.constraintExtensions) {
             buffer.append(6, ' ');

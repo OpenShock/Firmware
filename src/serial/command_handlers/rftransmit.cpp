@@ -40,7 +40,7 @@ OpenShock::Serial::CommandGroup OpenShock::Serial::CommandHandlers::RfTransmitHa
   auto& cmd = group.addCommand("Transmit a RF command"sv, _handleRFTransmitCommand);
   cmd.addArgument(
     "json"sv,
-    "must be a JSON object with the following fields"sv,
+    "must be a JSON object with the following fields:"sv,
     "{\"model\":\"caixianlin\",\"id\":12345,\"type\":\"vibrate\",\"intensity\":99,\"durationMs\":500}"sv,
     {"model      (string) Model of the shocker                    (\"caixianlin\", \"petrainer\", \"petrainer998dr\")"sv,
      "id         (number) ID of the shocker                       (0-65535)"sv,
