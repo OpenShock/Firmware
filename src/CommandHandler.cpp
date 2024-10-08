@@ -160,6 +160,8 @@ bool CommandHandler::Init()
   }
   initialized = true;
 
+  s_estopManagerMutex = xSemaphoreCreateMutex();
+
   Config::RFConfig rfConfig;
   if (!Config::GetRFConfig(rfConfig)) {
     OS_LOGE(TAG, "Failed to get RF config");
