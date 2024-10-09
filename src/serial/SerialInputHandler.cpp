@@ -598,8 +598,7 @@ bool SerialInputHandler::Init()
   }
 
   if (TaskUtils::TaskCreateExpensive(_serialRxTask, "SerialRX", 4096, nullptr, 1, nullptr) != pdPASS) {  // TODO: Profile stack size
-    OS_LOGE(TAG, "Available heap: %d", xPortGetFreeHeapSize());
-    OS_LOGE(TAG, "Failed to create serial RX task: %s", esp_err_to_name(err));
+    OS_LOGE(TAG, "Failed to create serial RX task");
     return false;
   }
 
