@@ -54,6 +54,11 @@ bool trySetup()
     return false;
   }
 
+  if (!OpenShock::CaptivePortal::Init()) {
+    OS_LOGE(TAG, "Unable to initialize CaptivePortal");
+    return false;
+  }
+
   return true;
 }
 
@@ -101,7 +106,6 @@ void setup()
 void main_app(void* arg)
 {
   while (true) {
-    OpenShock::CaptivePortal::Update();
     OpenShock::GatewayConnectionManager::Update();
     OpenShock::WiFiManager::Update();
 
