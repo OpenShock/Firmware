@@ -27,7 +27,8 @@ static bool s_forceClosed                                = false;
 static esp_timer_handle_t s_captivePortalUpdateLoopTimer = nullptr;
 static std::unique_ptr<CaptivePortalInstance> s_instance = nullptr;
 
-bool _startCaptive() {
+bool _startCaptive()
+{
   if (s_instance != nullptr) {
     OS_LOGD(TAG, "Already started");
     return true;
@@ -77,7 +78,8 @@ bool _startCaptive() {
 
   return true;
 }
-void _stopCaptive() {
+void _stopCaptive()
+{
   if (s_instance == nullptr) {
     OS_LOGD(TAG, "Already stopped");
     return;
@@ -92,7 +94,8 @@ void _stopCaptive() {
   WiFi.softAPdisconnect(true);
 }
 
-void _captivePortalUpdateLoop(void*) {
+void _captivePortalUpdateLoop(void*)
+{
   bool gatewayConnected = GatewayConnectionManager::IsConnected();
   bool commandHandlerOk = CommandHandler::Ok();
   bool shouldBeRunning  = (s_alwaysEnabled || !gatewayConnected || !commandHandlerOk) && !s_forceClosed;
@@ -122,7 +125,8 @@ void _captivePortalUpdateLoop(void*) {
 
 using namespace OpenShock;
 
-bool CaptivePortal::Init() {
+bool CaptivePortal::Init()
+{
   esp_timer_create_args_t args = {
     .callback              = _captivePortalUpdateLoop,
     .arg                   = nullptr,
@@ -139,7 +143,7 @@ bool CaptivePortal::Init() {
     return false;
   }
 
-  err = esp_timer_start_periodic(s_captivePortalUpdateLoopTimer, 500'000); // 500ms
+  err = esp_timer_start_periodic(s_captivePortalUpdateLoopTimer, 500'000);  // 500ms
   if (err != ESP_OK) {
     OS_LOGE(TAG, "Failed to start captive portal update timer");
     return false;
@@ -148,17 +152,20 @@ bool CaptivePortal::Init() {
   return true;
 }
 
-void CaptivePortal::SetAlwaysEnabled(bool alwaysEnabled) {
+void CaptivePortal::SetAlwaysEnabled(bool alwaysEnabled)
+{
   s_alwaysEnabled = alwaysEnabled;
   Config::SetCaptivePortalConfig({
     .alwaysEnabled = alwaysEnabled,
   });
 }
-bool CaptivePortal::IsAlwaysEnabled() {
+bool CaptivePortal::IsAlwaysEnabled()
+{
   return s_alwaysEnabled;
 }
 
-bool CaptivePortal::ForceClose(uint32_t timeoutMs) {
+bool CaptivePortal::ForceClose(uint32_t timeoutMs)
+{
   s_forceClosed = true;
 
   if (s_instance == nullptr) return true;
@@ -176,18 +183,21 @@ bool CaptivePortal::ForceClose(uint32_t timeoutMs) {
   return false;
 }
 
-bool CaptivePortal::IsRunning() {
+bool CaptivePortal::IsRunning()
+{
   return s_instance != nullptr;
 }
 
-bool CaptivePortal::SendMessageTXT(uint8_t socketId, std::string_view data) {
+bool CaptivePortal::SendMessageTXT(uint8_t socketId, std::string_view data)
+{
   if (s_instance == nullptr) return false;
 
   s_instance->sendMessageTXT(socketId, data);
 
   return true;
 }
-bool CaptivePortal::SendMessageBIN(uint8_t socketId, const uint8_t* data, std::size_t len) {
+bool CaptivePortal::SendMessageBIN(uint8_t socketId, const uint8_t* data, std::size_t len)
+{
   if (s_instance == nullptr) return false;
 
   s_instance->sendMessageBIN(socketId, data, len);
@@ -195,14 +205,16 @@ bool CaptivePortal::SendMessageBIN(uint8_t socketId, const uint8_t* data, std::s
   return true;
 }
 
-bool CaptivePortal::BroadcastMessageTXT(std::string_view data) {
+bool CaptivePortal::BroadcastMessageTXT(std::string_view data)
+{
   if (s_instance == nullptr) return false;
 
   s_instance->broadcastMessageTXT(data);
 
   return true;
 }
-bool CaptivePortal::BroadcastMessageBIN(const uint8_t* data, std::size_t len) {
+bool CaptivePortal::BroadcastMessageBIN(const uint8_t* data, std::size_t len)
+{
   if (s_instance == nullptr) return false;
 
   s_instance->broadcastMessageBIN(data, len);
