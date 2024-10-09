@@ -86,7 +86,15 @@ void _estopEventHandler(void* pvParameters) {
 // Interrupt should only be a dumb sender of the GPIO change, additionally triggering if needed
 // Clearing and debouncing is handled by the task.
 void _estopEdgeInterrupt(void* arg) {
+  static int64_t lastStateChange = 0;
+
   int64_t now = OpenShock::millis();
+
+  // Debounce the EStop
+  if (now - lastStateChange < k_estopDebounceTime) {
+    return;
+  }
+  lastStateChange = now;
 
   // TODO: Allow active HIGH EStops?
   bool pressed = gpio_get_level(s_estopPin) == 0;
@@ -97,7 +105,7 @@ void _estopEdgeInterrupt(void* arg) {
   if (!s_estopActive && pressed) {
     s_estopActive      = true;
     s_estopActivatedAt = now;
-  } else if (s_estopActive && pressed && (now - s_estopActivatedAt >= k_estopDebounceTime)) {
+  } else if (s_estopActive && pressed) {
     deactivatesAtChanged = true;
     deactivatesAt        = now + k_estopHoldToClearTime;
   } else if (s_estopActive && !pressed && s_estopAwaitingRelease) {
