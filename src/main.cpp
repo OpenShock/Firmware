@@ -22,7 +22,8 @@ const char* const TAG = "main";
 #include <memory>
 
 // Internal setup function, returns true if setup succeeded, false otherwise.
-bool trySetup() {
+bool trySetup()
+{
   OpenShock::EventHandlers::Init();
 
   if (!OpenShock::VisualStateManager::Init()) {
@@ -53,11 +54,17 @@ bool trySetup() {
     return false;
   }
 
+  if (!OpenShock::CaptivePortal::Init()) {
+    OS_LOGE(TAG, "Unable to initialize CaptivePortal");
+    return false;
+  }
+
   return true;
 }
 
 // OTA setup is the same as normal setup, but we invalidate the currently running app, and roll back if it fails.
-void otaSetup() {
+void otaSetup()
+{
   OS_LOGI(TAG, "Validating OTA app");
 
   if (!trySetup()) {
@@ -73,7 +80,8 @@ void otaSetup() {
 }
 
 // App setup is the same as normal setup, but we restart if it fails.
-void appSetup() {
+void appSetup()
+{
   if (!trySetup()) {
     OS_LOGI(TAG, "Restarting in 5 seconds...");
     vTaskDelay(pdMS_TO_TICKS(5000));
@@ -82,7 +90,8 @@ void appSetup() {
 }
 
 // Arduino setup function
-void setup() {
+void setup()
+{
   ::Serial.begin(115'200);
 
   OpenShock::Config::Init();
@@ -94,10 +103,9 @@ void setup() {
   }
 }
 
-void main_app(void* arg) {
+void main_app(void* arg)
+{
   while (true) {
-    OpenShock::SerialInputHandler::Update();
-    OpenShock::CaptivePortal::Update();
     OpenShock::GatewayConnectionManager::Update();
     OpenShock::WiFiManager::Update();
 
@@ -105,7 +113,8 @@ void main_app(void* arg) {
   }
 }
 
-void loop() {
+void loop()
+{
   // Start the main task
   OpenShock::TaskUtils::TaskCreateExpensive(main_app, "main_app", 8192, nullptr, 1, nullptr);  // PROFILED: 6KB stack usage
 
