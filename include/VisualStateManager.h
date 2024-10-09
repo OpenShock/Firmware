@@ -9,5 +9,4 @@ namespace OpenShock::VisualStateManager {
   void SetCriticalError();
   void SetScanningStarted();
   void SetEmergencyStopStatus(bool isActive, bool isAwaitingRelease);
-  void SetWebSocketConnected(bool isConnected);
 }  // namespace OpenShock::VisualStateManager

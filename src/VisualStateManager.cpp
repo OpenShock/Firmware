@@ -4,6 +4,8 @@
 
 const char* const TAG = "VisualStateManager";
 
+#include "events/Events.h"
+#include "GatewayClientState.h"
 #include "Logging.h"
 #include "PinPatternManager.h"
 #include "RGBPatternManager.h"
@@ -11,6 +13,22 @@ const char* const TAG = "VisualStateManager";
 #include <WiFi.h>
 
 #include <memory>
+
+#ifndef OPENSHOCK_LED_GPIO
+#define OPENSHOCK_LED_GPIO GPIO_NUM_NC
+#endif  // OPENSHOCK_LED_GPIO
+#ifndef OPENSHOCK_LED_WS2812B
+#define OPENSHOCK_LED_WS2812B GPIO_NUM_NC
+#endif  // OPENSHOCK_LED_WS2812B
+
+#define REGISTER_EVENT_HANDLER(base, event, handler)                                             \
+  do {                                                                                           \
+    esp_err_t err = esp_event_handler_register(base, event, handler, nullptr);                   \
+    if (err != ESP_OK) {                                                                         \
+      OS_LOGE(TAG, "Failed to register event handler for " #event ": %s", esp_err_to_name(err)); \
+      return false;                                                                              \
+    }                                                                                            \
+  } while (0)
 
 const uint64_t kCriticalErrorFlag                = 1 << 0;
 const uint64_t kEmergencyStoppedFlag             = 1 << 1;
@@ -148,12 +166,14 @@ const PinPatternManager::State kSolidOffPattern[] = {
   {false, 100'000}
 };
 
-template <std::size_t N>
-inline void _updateVisualStateGPIO(const PinPatternManager::State (&override)[N]) {
+template<std::size_t N>
+inline void _updateVisualStateGPIO(const PinPatternManager::State (&override)[N])
+{
   s_builtInLedManager->SetPattern(override);
 }
 
-void _updateVisualStateGPIO() {
+void _updateVisualStateGPIO()
+{
   if (s_stateFlags & kCriticalErrorFlag) {
     s_builtInLedManager->SetPattern(kCriticalErrorPattern);
     return;
@@ -187,7 +207,8 @@ void _updateVisualStateGPIO() {
   s_builtInLedManager->SetPattern(kWiFiDisconnectedPattern);
 }
 
-void _updateVisualStateRGB() {
+void _updateVisualStateRGB()
+{
   if (s_stateFlags & kCriticalErrorFlag) {
     s_RGBLedManager->SetPattern(kCriticalErrorRGBPattern);
     return;
@@ -221,9 +242,10 @@ void _updateVisualStateRGB() {
   s_RGBLedManager->SetPattern(kWiFiDisconnectedRGBPattern);
 }
 
-void _updateVisualState() {
+void _updateVisualState()
+{
   bool gpioActive = s_builtInLedManager != nullptr;
-  bool rgbActive = s_RGBLedManager != nullptr;
+  bool rgbActive  = s_RGBLedManager != nullptr;
 
   if (gpioActive && rgbActive) {
     if (s_stateFlags == kStatusOKMask) {
@@ -248,7 +270,8 @@ void _updateVisualState() {
   OS_LOGW(TAG, "Trying to update visual state, but no LED is active!");
 }
 
-void _handleWiFiConnected(arduino_event_t* event) {
+void _handleWiFiConnected(arduino_event_t* event)
+{
   (void)event;
 
   uint64_t oldState = s_stateFlags;
@@ -259,7 +282,8 @@ void _handleWiFiConnected(arduino_event_t* event) {
     _updateVisualState();
   }
 }
-void _handleWiFiDisconnected(arduino_event_t* event) {
+void _handleWiFiDisconnected(arduino_event_t* event)
+{
   (void)event;
 
   uint64_t oldState = s_stateFlags;
@@ -270,7 +294,8 @@ void _handleWiFiDisconnected(arduino_event_t* event) {
     _updateVisualState();
   }
 }
-void _handleWiFiScanDone(arduino_event_t* event) {
+void _handleWiFiScanDone(arduino_event_t* event)
+{
   (void)event;
 
   uint64_t oldState = s_stateFlags;
@@ -282,14 +307,34 @@ void _handleWiFiScanDone(arduino_event_t* event) {
   }
 }
 
-#ifndef OPENSHOCK_LED_GPIO
-#define OPENSHOCK_LED_GPIO GPIO_NUM_NC
-#endif // OPENSHOCK_LED_GPIO
-#ifndef OPENSHOCK_LED_WS2812B
-#define OPENSHOCK_LED_WS2812B GPIO_NUM_NC
-#endif // OPENSHOCK_LED_WS2812B
+void _handleOpenShockGatewayStateChanged(void* event_handler_arg, esp_event_base_t event_base, int32_t event_id, void* event_data)
+{
+  (void)event_handler_arg;
+  (void)event_base;
+  (void)event_id;
 
-bool VisualStateManager::Init() {
+  uint64_t oldState = s_stateFlags;
+
+  GatewayClientState state = *reinterpret_cast<GatewayClientState*>(event_data);
+
+  switch (state) {
+    case GatewayClientState::Connected:
+      s_stateFlags |= kWebSocketConnectedFlag;
+      break;
+    case GatewayClientState::Disconnected:
+      s_stateFlags &= ~kWebSocketConnectedFlag;
+      break;
+    default:
+      break;
+  }
+
+  if (oldState != s_stateFlags) {
+    _updateVisualState();
+  }
+}
+
+bool VisualStateManager::Init()
+{
   bool ledActive = false;
 
   if (OPENSHOCK_LED_GPIO != GPIO_NUM_NC) {
@@ -320,13 +365,16 @@ bool VisualStateManager::Init() {
   WiFi.onEvent(_handleWiFiDisconnected, ARDUINO_EVENT_WIFI_STA_DISCONNECTED);
   WiFi.onEvent(_handleWiFiScanDone, ARDUINO_EVENT_WIFI_SCAN_DONE);
 
+  REGISTER_EVENT_HANDLER(OPENSHOCK_EVENTS, OPENSHOCK_EVENT_GATEWAY_STATE_CHANGED, _handleOpenShockGatewayStateChanged);
+
   // Run the update on init, otherwise no inital pattern is set.
   _updateVisualState();
 
   return true;
 }
 
-void VisualStateManager::SetCriticalError() {
+void VisualStateManager::SetCriticalError()
+{
   uint64_t oldState = s_stateFlags;
 
   s_stateFlags |= kCriticalErrorFlag;
@@ -336,7 +384,8 @@ void VisualStateManager::SetCriticalError() {
   }
 }
 
-void VisualStateManager::SetScanningStarted() {
+void VisualStateManager::SetScanningStarted()
+{
   uint64_t oldState = s_stateFlags;
 
   s_stateFlags |= kWiFiScanningFlag;
@@ -346,7 +395,8 @@ void VisualStateManager::SetScanningStarted() {
   }
 }
 
-void VisualStateManager::SetEmergencyStopStatus(bool isActive, bool isAwaitingRelease) {
+void VisualStateManager::SetEmergencyStopStatus(bool isActive, bool isAwaitingRelease)
+{
   uint64_t oldState = s_stateFlags;
 
   if (isActive) {
@@ -359,20 +409,6 @@ void VisualStateManager::SetEmergencyStopStatus(bool isActive, bool isAwaitingRe
     s_stateFlags |= kEmergencyStopAwaitingReleaseFlag;
   } else {
     s_stateFlags &= ~kEmergencyStopAwaitingReleaseFlag;
-  }
-
-  if (oldState != s_stateFlags) {
-    _updateVisualState();
-  }
-}
-
-void VisualStateManager::SetWebSocketConnected(bool isConnected) {
-  uint64_t oldState = s_stateFlags;
-
-  if (isConnected) {
-    s_stateFlags |= kWebSocketConnectedFlag;
-  } else {
-    s_stateFlags &= ~kWebSocketConnectedFlag;
   }
 
   if (oldState != s_stateFlags) {

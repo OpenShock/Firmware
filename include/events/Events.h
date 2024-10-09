@@ -9,10 +9,14 @@ extern "C" {
 ESP_EVENT_DECLARE_BASE(OPENSHOCK_EVENTS);
 
 enum {
-  OPENSHOCK_EVENT_GATEWAY_CONNECTED,
-  OPENSHOCK_EVENT_GATEWAY_DISCONNECTED,
+  // Event for when the gateway connection state changes
+  OPENSHOCK_EVENT_GATEWAY_STATE_CHANGED,
 };
 
 #ifdef __cplusplus
 }
 #endif
+
+namespace OpenShock::Events {
+  bool Init();
+}
