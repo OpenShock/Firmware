@@ -64,9 +64,6 @@ namespace OpenShock::WiFiManager {
   /// @return True if the device is connected to a network
   bool GetIPv6Address(char* ipAddress);
 
-  /// @brief Runs the WiFiManager loop
-  void Update();
-
   /// @brief Gets a copy of the vector of discovered WiFi networks
   /// @return Vector of discovered WiFiNetworks
   std::vector<WiFiNetwork> GetDiscoveredWiFiNetworks();
