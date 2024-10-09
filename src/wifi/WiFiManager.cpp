@@ -307,43 +307,48 @@ void _evWiFiNetworksDiscovery(const std::vector<const wifi_ap_record_t*>& record
 
 esp_err_t set_esp_interface_dns(esp_interface_t interface, IPAddress main_dns, IPAddress backup_dns, IPAddress fallback_dns);
 
-static int64_t s_lastScanRequest = 0;
-void _wifimanagerUpdateTask(void*) {
+bool _tryConnect()
+{
+  Config::WiFiCredentials creds;
+  if (s_preferredCredentialsID != 0) {
+    bool foundCreds = Config::TryGetWiFiCredentialsByID(s_preferredCredentialsID, creds);
+
+    s_preferredCredentialsID = 0;
+
+    if (!foundCreds) {
+      OS_LOGE(TAG, "Failed to find credentials with ID %u", s_preferredCredentialsID);
+      return false;
+    }
+
+    if (_connect(creds.ssid, creds.password)) {
+      return true;
+    }
+
+    OS_LOGE(TAG, "Failed to connect to network %s", creds.ssid.c_str());
+  }
+
+  if (!_getNextWiFiNetwork(creds)) {
+    return false;
+  }
+
+  return _connect(creds.ssid, creds.password);
+}
+
+void _wifimanagerUpdateTask(void*)
+{
+  int64_t lastScanRequest = 0;
   while (true) {
-    if (s_wifiState != WiFiState::Disconnected || WiFiScanManager::IsScanning()) return;
+    if (s_wifiState == WiFiState::Disconnected && !WiFiScanManager::IsScanning()) {
+      if (!_tryConnect()) {
+        int64_t now = OpenShock::millis();
+        if (lastScanRequest == 0 || now - lastScanRequest > 30'000) {
+          lastScanRequest = now;
 
-    if (s_preferredCredentialsID != 0) {
-      Config::WiFiCredentials creds;
-      bool foundCreds = Config::TryGetWiFiCredentialsByID(s_preferredCredentialsID, creds);
-
-      s_preferredCredentialsID = 0;
-
-      if (!foundCreds) {
-        OS_LOGE(TAG, "Failed to find credentials with ID %u", s_preferredCredentialsID);
-        return;
+          OS_LOGV(TAG, "No networks to connect to, starting scan...");
+          WiFiScanManager::StartScan();
+        }
       }
-
-      if (_connect(creds.ssid, creds.password)) {
-        return;
-      }
-
-      OS_LOGE(TAG, "Failed to connect to network %s", creds.ssid.c_str());
     }
-
-    Config::WiFiCredentials creds;
-    if (!_getNextWiFiNetwork(creds)) {
-      int64_t now = OpenShock::millis();
-      if (s_lastScanRequest == 0 || now - s_lastScanRequest > 30'000) {
-        s_lastScanRequest = now;
-
-        OS_LOGV(TAG, "No networks to connect to, starting scan...");
-        WiFiScanManager::StartScan();
-      }
-      return;
-    }
-
-    _connect(creds.ssid, creds.password);
-
     vTaskDelay(pdMS_TO_TICKS(1000));
   }
 }
@@ -387,7 +392,7 @@ bool WiFiManager::Init() {
     return false;
   }
 
-  if (TaskUtils::TaskCreateUniversal(_wifimanagerUpdateTask, TAG, 4096, nullptr, 5, nullptr, 1) != pdPASS) {
+  if (TaskUtils::TaskCreateUniversal(_wifimanagerUpdateTask, TAG, 2048, nullptr, 5, nullptr, 1) != pdPASS) {  // Profiled: 1.716KB stack usage
     OS_LOGE(TAG, "Failed to create WiFiManager update task");
     return false;
   }
