@@ -92,7 +92,6 @@ void _estopEdgeInterrupt(void* arg) {
 
   // Debounce the EStop
   bool debounce = now - s_lastStateChange < k_estopDebounceTime;
-  s_lastStateChange = now;
   if (debounce) {
     return;
   }
@@ -104,6 +103,8 @@ void _estopEdgeInterrupt(void* arg) {
   if (pressed == s_lastState) {
     return;
   }
+  s_lastState       = pressed;
+  s_lastStateChange = now;
 
   bool deactivatesAtChanged = false;
   int64_t deactivatesAt     = 0;
