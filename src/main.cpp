@@ -96,7 +96,6 @@ void setup() {
 
 void main_app(void* arg) {
   while (true) {
-    OpenShock::SerialInputHandler::Update();
     OpenShock::CaptivePortal::Update();
     OpenShock::GatewayConnectionManager::Update();
     OpenShock::WiFiManager::Update();
