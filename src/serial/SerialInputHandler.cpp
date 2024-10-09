@@ -16,10 +16,10 @@ const char* const TAG = "SerialInputHandler";
 #include "serial/command_handlers/index.h"
 #include "serialization/JsonAPI.h"
 #include "serialization/JsonSerial.h"
-#include "util/TaskUtils.h"
 #include "Time.h"
 #include "util/Base64Utils.h"
 #include "util/StringUtils.h"
+#include "util/TaskUtils.h"
 #include "wifi/WiFiManager.h"
 
 #include <Arduino.h>
@@ -568,7 +568,7 @@ void _serialRxTask(void*)
         break;
     }
 
-    vTaskDelay(pdMS_TO_TICKS(20)); // 50 Hz update rate
+    vTaskDelay(pdMS_TO_TICKS(20));  // 50 Hz update rate
   }
 }
 
@@ -597,9 +597,9 @@ bool SerialInputHandler::Init()
     return false;
   }
 
-  esp_err_t err = TaskUtils::TaskCreateExpensive(_serialRxTask, "SerialRX", 4096, nullptr, 1, nullptr);  // TODO: Profile stack size
-  if (err != ESP_OK) {
-    OS_LOGE(TAG, "Failed to create serial RX task: %d", err);
+  if (TaskUtils::TaskCreateExpensive(_serialRxTask, "SerialRX", 4096, nullptr, 1, nullptr) != pdPASS) {  // TODO: Profile stack size
+    OS_LOGE(TAG, "Available heap: %d", xPortGetFreeHeapSize());
+    OS_LOGE(TAG, "Failed to create serial RX task: %s", esp_err_to_name(err));
     return false;
   }
 
