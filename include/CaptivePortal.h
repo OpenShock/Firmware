@@ -4,13 +4,14 @@
 #include <string_view>
 
 namespace OpenShock::CaptivePortal {
+  [[nodiscard]] bool Init();
+
   void SetAlwaysEnabled(bool alwaysEnabled);
   bool IsAlwaysEnabled();
 
   bool ForceClose(uint32_t timeoutMs);
 
   bool IsRunning();
-  void Update();
 
   bool SendMessageTXT(uint8_t socketId, std::string_view data);
   bool SendMessageBIN(uint8_t socketId, const uint8_t* data, std::size_t len);

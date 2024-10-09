@@ -15,6 +15,7 @@ const char* const TAG = "CaptivePortal";
 #include <WebSocketsServer.h>
 #include <WiFi.h>
 
+#include <esp_timer.h>
 #include <mdns.h>
 
 #include <memory>
@@ -23,6 +24,7 @@ using namespace OpenShock;
 
 static bool s_alwaysEnabled                              = false;
 static bool s_forceClosed                                = false;
+static esp_timer_handle_t s_captivePortalUpdateLoopTimer = nullptr;
 static std::unique_ptr<CaptivePortalInstance> s_instance = nullptr;
 
 bool _startCaptive() {
@@ -90,7 +92,61 @@ void _stopCaptive() {
   WiFi.softAPdisconnect(true);
 }
 
+void _captivePortalUpdateLoop(void*) {
+  bool gatewayConnected = GatewayConnectionManager::IsConnected();
+  bool commandHandlerOk = CommandHandler::Ok();
+  bool shouldBeRunning  = (s_alwaysEnabled || !gatewayConnected || !commandHandlerOk) && !s_forceClosed;
+
+  if (s_instance == nullptr) {
+    if (shouldBeRunning) {
+      OS_LOGD(TAG, "Starting captive portal");
+      OS_LOGD(TAG, "  alwaysEnabled: %s", s_alwaysEnabled ? "true" : "false");
+      OS_LOGD(TAG, "  forceClosed: %s", s_forceClosed ? "true" : "false");
+      OS_LOGD(TAG, "  isConnected: %s", gatewayConnected ? "true" : "false");
+      OS_LOGD(TAG, "  commandHandlerOk: %s", commandHandlerOk ? "true" : "false");
+      _startCaptive();
+    }
+    return;
+  }
+
+  if (!shouldBeRunning) {
+    OS_LOGD(TAG, "Stopping captive portal");
+    OS_LOGD(TAG, "  alwaysEnabled: %s", s_alwaysEnabled ? "true" : "false");
+    OS_LOGD(TAG, "  forceClosed: %s", s_forceClosed ? "true" : "false");
+    OS_LOGD(TAG, "  isConnected: %s", gatewayConnected ? "true" : "false");
+    OS_LOGD(TAG, "  commandHandlerOk: %s", commandHandlerOk ? "true" : "false");
+    _stopCaptive();
+    return;
+  }
+}
+
 using namespace OpenShock;
+
+bool CaptivePortal::Init() {
+  esp_timer_create_args_t args = {
+    .callback              = _captivePortalUpdateLoop,
+    .arg                   = nullptr,
+    .dispatch_method       = ESP_TIMER_TASK,
+    .name                  = "captive_portal_update",
+    .skip_unhandled_events = true,
+  };
+
+  esp_err_t err;
+
+  err = esp_timer_create(&args, &s_captivePortalUpdateLoopTimer);
+  if (err != ESP_OK) {
+    OS_LOGE(TAG, "Failed to create captive portal update timer");
+    return false;
+  }
+
+  err = esp_timer_start_periodic(s_captivePortalUpdateLoopTimer, 500'000); // 500ms
+  if (err != ESP_OK) {
+    OS_LOGE(TAG, "Failed to start captive portal update timer");
+    return false;
+  }
+
+  return true;
+}
 
 void CaptivePortal::SetAlwaysEnabled(bool alwaysEnabled) {
   s_alwaysEnabled = alwaysEnabled;
@@ -122,34 +178,6 @@ bool CaptivePortal::ForceClose(uint32_t timeoutMs) {
 
 bool CaptivePortal::IsRunning() {
   return s_instance != nullptr;
-}
-
-void CaptivePortal::Update() {
-  bool gatewayConnected = GatewayConnectionManager::IsConnected();
-  bool commandHandlerOk = CommandHandler::Ok();
-  bool shouldBeRunning  = (s_alwaysEnabled || !gatewayConnected || !commandHandlerOk) && !s_forceClosed;
-
-  if (s_instance == nullptr) {
-    if (shouldBeRunning) {
-      OS_LOGD(TAG, "Starting captive portal");
-      OS_LOGD(TAG, "  alwaysEnabled: %s", s_alwaysEnabled ? "true" : "false");
-      OS_LOGD(TAG, "  forceClosed: %s", s_forceClosed ? "true" : "false");
-      OS_LOGD(TAG, "  isConnected: %s", gatewayConnected ? "true" : "false");
-      OS_LOGD(TAG, "  commandHandlerOk: %s", commandHandlerOk ? "true" : "false");
-      _startCaptive();
-    }
-    return;
-  }
-
-  if (!shouldBeRunning) {
-    OS_LOGD(TAG, "Stopping captive portal");
-    OS_LOGD(TAG, "  alwaysEnabled: %s", s_alwaysEnabled ? "true" : "false");
-    OS_LOGD(TAG, "  forceClosed: %s", s_forceClosed ? "true" : "false");
-    OS_LOGD(TAG, "  isConnected: %s", gatewayConnected ? "true" : "false");
-    OS_LOGD(TAG, "  commandHandlerOk: %s", commandHandlerOk ? "true" : "false");
-    _stopCaptive();
-    return;
-  }
 }
 
 bool CaptivePortal::SendMessageTXT(uint8_t socketId, std::string_view data) {
