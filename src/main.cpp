@@ -11,13 +11,12 @@ const char* const TAG = "main";
 #include "GatewayConnectionManager.h"
 #include "Logging.h"
 #include "OtaUpdateManager.h"
+#include "serial/Serial.h"
 #include "serial/SerialInputHandler.h"
 #include "util/TaskUtils.h"
 #include "VisualStateManager.h"
 #include "wifi/WiFiManager.h"
 #include "wifi/WiFiScanManager.h"
-
-#include <Arduino.h>
 
 #include <memory>
 
@@ -83,7 +82,11 @@ void appSetup() {
 
 // Arduino setup function
 void setup() {
-  ::Serial.begin(115'200);
+  // esp_log_level_set(ESP_LOG_VERBOSE);
+
+  Serial::Init();
+
+  // esp_log_level_set(ESP_LOG_VERBOSE);
 
   OpenShock::Config::Init();
   OpenShock::OtaUpdateManager::Init();
