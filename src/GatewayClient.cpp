@@ -4,6 +4,7 @@ const char* const TAG = "GatewayClient";
 
 #include "Common.h"
 #include "config/Config.h"
+#include "events/Events.h"
 #include "event_handlers/WebSocket.h"
 #include "Logging.h"
 #include "OtaUpdateManager.h"
@@ -115,10 +116,12 @@ void GatewayClient::_setState(State state) {
   switch (m_state) {
     case State::Disconnected:
       OS_LOGI(TAG, "Disconnected from API");
+      ESP_ERROR_CHECK(esp_event_post(OPENSHOCK_EVENTS, OPENSHOCK_EVENT_GATEWAY_DISCONNECTED, nullptr, 0, portMAX_DELAY));
       OpenShock::VisualStateManager::SetWebSocketConnected(false);
       break;
     case State::Connected:
       OS_LOGI(TAG, "Connected to API");
+      ESP_ERROR_CHECK(esp_event_post(OPENSHOCK_EVENTS, OPENSHOCK_EVENT_GATEWAY_CONNECTED, nullptr, 0, portMAX_DELAY));
       OpenShock::VisualStateManager::SetWebSocketConnected(true);
       break;
     default:
