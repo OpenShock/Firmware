@@ -19,6 +19,7 @@ const char* const TAG = "SerialInputHandler";
 #include "Time.h"
 #include "util/Base64Utils.h"
 #include "util/StringUtils.h"
+#include "util/TaskUtils.h"
 #include "wifi/WiFiManager.h"
 
 #include <Arduino.h>
@@ -537,6 +538,40 @@ void _processSerialLine(std::string_view line)
   SERPR_ERROR("Command \"%.*s\" not found", command.size(), command.data());
 }
 
+void _serialRxTask(void*)
+{
+  SerialBuffer buffer(32);
+
+  while (true) {
+    switch (_tryReadSerialLine(buffer)) {
+      case SerialReadResult::LineEnd:
+        _processSerialLine(buffer);
+
+        // Deallocate memory if the buffer is too large
+        if (buffer.capacity() > SERIAL_BUFFER_CLEAR_THRESHOLD) {
+          buffer.destroy();
+        } else {
+          buffer.clear();
+        }
+
+        // Skip any remaining trailing whitespaces
+        _skipSerialWhitespaces(buffer);
+        break;
+      case SerialReadResult::AutoCompleteRequest:
+        ::Serial.printf(CLEAR_LINE "> %.*s [AutoComplete is not implemented]", buffer.size(), buffer.data());
+        break;
+      case SerialReadResult::Data:
+        _echoHandleSerialInput(buffer, true);
+        break;
+      default:
+        _echoHandleSerialInput(buffer, false);
+        break;
+    }
+
+    vTaskDelay(pdMS_TO_TICKS(20));  // 50 Hz update rate
+  }
+}
+
 bool SerialInputHandler::Init()
 {
   static bool s_initialized = false;
@@ -562,39 +597,13 @@ bool SerialInputHandler::Init()
     return false;
   }
 
+  if (TaskUtils::TaskCreateExpensive(_serialRxTask, "SerialRX", 4096, nullptr, 1, nullptr) != pdPASS) {  // TODO: Profile stack size
+    OS_LOGE(TAG, "Failed to create serial RX task");
+    return false;
+  }
+
   return true;
 }
-
-void SerialInputHandler::Update()
-{
-  static SerialBuffer buffer(32);
-
-  switch (_tryReadSerialLine(buffer)) {
-    case SerialReadResult::LineEnd:
-      _processSerialLine(buffer);
-
-      // Deallocate memory if the buffer is too large
-      if (buffer.capacity() > SERIAL_BUFFER_CLEAR_THRESHOLD) {
-        buffer.destroy();
-      } else {
-        buffer.clear();
-      }
-
-      // Skip any remaining trailing whitespaces
-      _skipSerialWhitespaces(buffer);
-      break;
-    case SerialReadResult::AutoCompleteRequest:
-      ::Serial.printf(CLEAR_LINE "> %.*s [AutoComplete is not implemented]", buffer.size(), buffer.data());
-      break;
-    case SerialReadResult::Data:
-      _echoHandleSerialInput(buffer, true);
-      break;
-    default:
-      _echoHandleSerialInput(buffer, false);
-      break;
-  }
-}
-
 bool SerialInputHandler::SerialEchoEnabled()
 {
   return s_echoEnabled;
