@@ -99,7 +99,6 @@ void main_app(void* arg) {
     OpenShock::SerialInputHandler::Update();
     OpenShock::CaptivePortal::Update();
     OpenShock::GatewayConnectionManager::Update();
-    OpenShock::WiFiManager::Update();
 
     vTaskDelay(5);  // 5 ticks update interval
   }

@@ -8,6 +8,7 @@ const char* const TAG = "WiFiManager";
 #include "Logging.h"
 #include "serialization/WSLocal.h"
 #include "Time.h"
+#include "util/TaskUtils.h"
 #include "VisualStateManager.h"
 #include "wifi/WiFiNetwork.h"
 #include "wifi/WiFiScanManager.h"
@@ -306,6 +307,47 @@ void _evWiFiNetworksDiscovery(const std::vector<const wifi_ap_record_t*>& record
 
 esp_err_t set_esp_interface_dns(esp_interface_t interface, IPAddress main_dns, IPAddress backup_dns, IPAddress fallback_dns);
 
+static int64_t s_lastScanRequest = 0;
+void _wifimanagerUpdateTask(void*) {
+  while (true) {
+    if (s_wifiState != WiFiState::Disconnected || WiFiScanManager::IsScanning()) return;
+
+    if (s_preferredCredentialsID != 0) {
+      Config::WiFiCredentials creds;
+      bool foundCreds = Config::TryGetWiFiCredentialsByID(s_preferredCredentialsID, creds);
+
+      s_preferredCredentialsID = 0;
+
+      if (!foundCreds) {
+        OS_LOGE(TAG, "Failed to find credentials with ID %u", s_preferredCredentialsID);
+        return;
+      }
+
+      if (_connect(creds.ssid, creds.password)) {
+        return;
+      }
+
+      OS_LOGE(TAG, "Failed to connect to network %s", creds.ssid.c_str());
+    }
+
+    Config::WiFiCredentials creds;
+    if (!_getNextWiFiNetwork(creds)) {
+      int64_t now = OpenShock::millis();
+      if (s_lastScanRequest == 0 || now - s_lastScanRequest > 30'000) {
+        s_lastScanRequest = now;
+
+        OS_LOGV(TAG, "No networks to connect to, starting scan...");
+        WiFiScanManager::StartScan();
+      }
+      return;
+    }
+
+    _connect(creds.ssid, creds.password);
+
+    vTaskDelay(pdMS_TO_TICKS(1000));
+  }
+}
+
 bool WiFiManager::Init() {
   WiFi.onEvent(_evWiFiConnected, ARDUINO_EVENT_WIFI_STA_CONNECTED);
   WiFi.onEvent(_evWiFiGotIP, ARDUINO_EVENT_WIFI_STA_GOT_IP);
@@ -342,6 +384,11 @@ bool WiFiManager::Init() {
 
   if (set_esp_interface_dns(ESP_IF_WIFI_STA, IPAddress(1, 1, 1, 1), IPAddress(8, 8, 8, 8), IPAddress(9, 9, 9, 9)) != ESP_OK) {
     OS_LOGE(TAG, "Failed to set DNS servers");
+    return false;
+  }
+
+  if (TaskUtils::TaskCreateUniversal(_wifimanagerUpdateTask, TAG, 4096, nullptr, 5, nullptr, 1) != pdPASS) {
+    OS_LOGE(TAG, "Failed to create WiFiManager update task");
     return false;
   }
 
@@ -510,43 +557,6 @@ bool WiFiManager::GetIPv6Address(char* ipAddress) {
   snprintf(ipAddress, IPV6ADDR_FMT_LEN + 1, IPV6ADDR_FMT, IPV6ADDR_ARG(ipPtr));
 
   return true;
-}
-
-static int64_t s_lastScanRequest = 0;
-void WiFiManager::Update() {
-  if (s_wifiState != WiFiState::Disconnected || WiFiScanManager::IsScanning()) return;
-
-  if (s_preferredCredentialsID != 0) {
-    Config::WiFiCredentials creds;
-    bool foundCreds = Config::TryGetWiFiCredentialsByID(s_preferredCredentialsID, creds);
-
-    s_preferredCredentialsID = 0;
-
-    if (!foundCreds) {
-      OS_LOGE(TAG, "Failed to find credentials with ID %u", s_preferredCredentialsID);
-      return;
-    }
-
-    if (_connect(creds.ssid, creds.password)) {
-      return;
-    }
-
-    OS_LOGE(TAG, "Failed to connect to network %s", creds.ssid.c_str());
-  }
-
-  Config::WiFiCredentials creds;
-  if (!_getNextWiFiNetwork(creds)) {
-    int64_t now = OpenShock::millis();
-    if (s_lastScanRequest == 0 || now - s_lastScanRequest > 30'000) {
-      s_lastScanRequest = now;
-
-      OS_LOGV(TAG, "No networks to connect to, starting scan...");
-      WiFiScanManager::StartScan();
-    }
-    return;
-  }
-
-  _connect(creds.ssid, creds.password);
 }
 
 std::vector<WiFiNetwork> WiFiManager::GetDiscoveredWiFiNetworks() {
