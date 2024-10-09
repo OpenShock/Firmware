@@ -26,6 +26,8 @@ static QueueHandle_t s_estopEventQueue;
 
 static bool s_estopActive          = false;
 static bool s_estopAwaitingRelease = false;
+static bool s_lastState            = false;
+static int64_t s_lastStateChange   = 0;
 static int64_t s_estopActivatedAt  = 0;
 
 static gpio_num_t s_estopPin = GPIO_NUM_NC;
@@ -88,8 +90,21 @@ void _estopEventHandler(void* pvParameters) {
 void _estopEdgeInterrupt(void* arg) {
   int64_t now = OpenShock::millis();
 
+  // Debounce the EStop
+  bool debounce = now - s_lastStateChange < k_estopDebounceTime;
+  if (debounce) {
+    return;
+  }
+
   // TODO: Allow active HIGH EStops?
   bool pressed = gpio_get_level(s_estopPin) == 0;
+
+  // If the state hasn't changed, ignore it (debounce will skip state changes)
+  if (pressed == s_lastState) {
+    return;
+  }
+  s_lastState       = pressed;
+  s_lastStateChange = now;
 
   bool deactivatesAtChanged = false;
   int64_t deactivatesAt     = 0;
@@ -97,7 +112,7 @@ void _estopEdgeInterrupt(void* arg) {
   if (!s_estopActive && pressed) {
     s_estopActive      = true;
     s_estopActivatedAt = now;
-  } else if (s_estopActive && pressed && (now - s_estopActivatedAt >= k_estopDebounceTime)) {
+  } else if (s_estopActive && pressed) {
     deactivatesAtChanged = true;
     deactivatesAt        = now + k_estopHoldToClearTime;
   } else if (s_estopActive && !pressed && s_estopAwaitingRelease) {
