@@ -20,7 +20,8 @@ const char* const TAG = "OtaUpdateClient";
 
 using namespace OpenShock;
 
-bool _tryStartUpdate(const OpenShock::SemVer& version) {
+bool _tryStartUpdate(const OpenShock::SemVer& version)
+{
   if (xSemaphoreTake(_requestedVersionMutex, pdMS_TO_TICKS(1000)) != pdTRUE) {
     OS_LOGE(TAG, "Failed to take requested version mutex");
     return false;
@@ -35,7 +36,8 @@ bool _tryStartUpdate(const OpenShock::SemVer& version) {
   return true;
 }
 
-bool _tryGetRequestedVersion(OpenShock::SemVer& version) {
+bool _tryGetRequestedVersion(OpenShock::SemVer& version)
+{
   if (xSemaphoreTake(_requestedVersionMutex, pdMS_TO_TICKS(1000)) != pdTRUE) {
     OS_LOGE(TAG, "Failed to take requested version mutex");
     return false;
@@ -48,7 +50,8 @@ bool _tryGetRequestedVersion(OpenShock::SemVer& version) {
   return true;
 }
 
-bool _sendProgressMessage(Serialization::Gateway::OtaInstallProgressTask task, float progress) {
+bool _sendProgressMessage(Serialization::Gateway::OtaInstallProgressTask task, float progress)
+{
   int32_t updateId;
   if (!Config::GetOtaUpdateId(updateId)) {
     OS_LOGE(TAG, "Failed to get OTA update ID");
@@ -62,7 +65,8 @@ bool _sendProgressMessage(Serialization::Gateway::OtaInstallProgressTask task, f
 
   return true;
 }
-bool _sendFailureMessage(std::string_view message, bool fatal = false) {
+bool _sendFailureMessage(std::string_view message, bool fatal = false)
+{
   int32_t updateId;
   if (!Config::GetOtaUpdateId(updateId)) {
     OS_LOGE(TAG, "Failed to get OTA update ID");
@@ -77,7 +81,8 @@ bool _sendFailureMessage(std::string_view message, bool fatal = false) {
   return true;
 }
 
-bool _flashAppPartition(const esp_partition_t* partition, std::string_view remoteUrl, const uint8_t (&remoteHash)[32]) {
+bool _flashAppPartition(const esp_partition_t* partition, std::string_view remoteUrl, const uint8_t (&remoteHash)[32])
+{
   OS_LOGD(TAG, "Flashing app partition");
 
   if (!_sendProgressMessage(Serialization::Gateway::OtaInstallProgressTask::FlashingApplication, 0.0f)) {
@@ -112,7 +117,8 @@ bool _flashAppPartition(const esp_partition_t* partition, std::string_view remot
   return true;
 }
 
-bool _flashFilesystemPartition(const esp_partition_t* parition, std::string_view remoteUrl, const uint8_t (&remoteHash)[32]) {
+bool _flashFilesystemPartition(const esp_partition_t* parition, std::string_view remoteUrl, const uint8_t (&remoteHash)[32])
+{
   if (!_sendProgressMessage(Serialization::Gateway::OtaInstallProgressTask::PreparingForInstall, 0.0f)) {
     return false;
   }

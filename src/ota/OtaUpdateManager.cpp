@@ -7,14 +7,14 @@ const char* const TAG = "OtaUpdateManager";
 #include "Common.h"
 #include "config/Config.h"
 #include "http/FirmwareCDN.h"
+#include "Logging.h"
 #include "ota/OtaUpdateClient.h"
 #include "ota/OtaUpdateStep.h"
+#include "SemVer.h"
 #include "util/StringUtils.h"
 #include "util/TaskUtils.h"
-#include "Logging.h"
-#include "SemVer.h"
 
-#include <WiFi.h> // TODO: Get rid of Arduino entirely. >:(
+#include <WiFi.h>  // TODO: Get rid of Arduino entirely. >:(
 
 #include <esp_ota_ops.h>
 #include <freertos/task.h>
@@ -30,7 +30,8 @@ using namespace std::string_view_literals;
 ///
 /// @see .platformio/packages/framework-arduinoespressif32/cores/esp32/esp32-hal-misc.c
 /// @return true
-bool verifyRollbackLater() {
+bool verifyRollbackLater()
+{
   return true;
 }
 
@@ -44,11 +45,12 @@ enum OtaTaskEventFlag : uint32_t {
 
 static esp_ota_img_states_t _otaImageState;
 static OpenShock::FirmwareBootType _bootType;
-static TaskHandle_t _watcherTaskHandle = nullptr;
-static SemaphoreHandle_t _updateClientMutex = xSemaphoreCreateMutex();
+static TaskHandle_t _watcherTaskHandle                = nullptr;
+static SemaphoreHandle_t _updateClientMutex           = xSemaphoreCreateMutex();
 static std::unique_ptr<OtaUpdateClient> _updateClient = nullptr;
 
-bool _tryStartUpdate(const OpenShock::SemVer& version) {
+bool _tryStartUpdate(const OpenShock::SemVer& version)
+{
   if (xSemaphoreTake(_updateClientMutex, pdMS_TO_TICKS(1000)) != pdTRUE) {
     OS_LOGE(TAG, "Failed to take requested version mutex");
     return false;
@@ -76,19 +78,21 @@ bool _tryStartUpdate(const OpenShock::SemVer& version) {
   return true;
 }
 
-void _otaEvGotIPHandler(arduino_event_t*) {
+void _otaEvGotIPHandler(arduino_event_t*)
+{
   xTaskNotify(_watcherTaskHandle, OTA_TASK_EVENT_WIFI_CONNECTED, eSetBits);
 }
-void _otaEvWiFiDisconnectedHandler(arduino_event_t*) {
+void _otaEvWiFiDisconnectedHandler(arduino_event_t*)
+{
   xTaskNotify(_watcherTaskHandle, OTA_TASK_EVENT_WIFI_DISCONNECTED, eSetBits);
 }
 
-void _otaWatcherTask(void*) {
-
+void _otaWatcherTask(void*)
+{
   OS_LOGD(TAG, "OTA update task started");
 
-  bool connected               = false;
-  bool updateRequested         = false;
+  bool connected          = false;
+  bool updateRequested    = false;
   int64_t lastUpdateCheck = 0;
 
   // Update task loop.
@@ -128,7 +132,7 @@ void _otaWatcherTask(void*) {
       continue;
     }
 
-    bool firstCheck       = lastUpdateCheck == 0;
+    bool firstCheck  = lastUpdateCheck == 0;
     int64_t diff     = now - lastUpdateCheck;
     int64_t diffMins = diff / 60'000LL;
 
@@ -175,12 +179,11 @@ void _otaWatcherTask(void*) {
       OS_LOGI(TAG, "Requested version is already installed");
       continue;
     }
-
-
   }
 }
 
-bool OtaUpdateManager::Init() {
+bool OtaUpdateManager::Init()
+{
   OS_LOGN(TAG, "Fetching current partition");
 
   // Fetch current partition info.
@@ -238,7 +241,8 @@ bool OtaUpdateManager::Init() {
   return true;
 }
 
-bool OtaUpdateManager::TryGetFirmwareRelease(const OpenShock::SemVer& version, FirmwareReleaseInfo& release) {
+bool OtaUpdateManager::TryGetFirmwareRelease(const OpenShock::SemVer& version, FirmwareReleaseInfo& release)
+{
   auto versionStr = version.toString();  // TODO: This is abusing the SemVer::toString() method causing alot of string copies, fix this
 
   if (!FormatToString(release.appBinaryUrl, OPENSHOCK_FW_CDN_APP_URL_FORMAT, versionStr.c_str())) {
@@ -271,21 +275,25 @@ bool OtaUpdateManager::TryGetFirmwareRelease(const OpenShock::SemVer& version, F
   return true;
 }
 
-bool OtaUpdateManager::TryStartFirmwareInstallation(const OpenShock::SemVer& version) {
+bool OtaUpdateManager::TryStartFirmwareInstallation(const OpenShock::SemVer& version)
+{
   OS_LOGD(TAG, "Requesting firmware version %s", version.toString().c_str());  // TODO: This is abusing the SemVer::toString() method causing alot of string copies, fix this
 
   return _tryStartUpdate(version);
 }
 
-FirmwareBootType OtaUpdateManager::GetFirmwareBootType() {
+FirmwareBootType OtaUpdateManager::GetFirmwareBootType()
+{
   return _bootType;
 }
 
-bool OtaUpdateManager::IsValidatingApp() {
+bool OtaUpdateManager::IsValidatingApp()
+{
   return _otaImageState == ESP_OTA_IMG_PENDING_VERIFY;
 }
 
-void OtaUpdateManager::InvalidateAndRollback() {
+void OtaUpdateManager::InvalidateAndRollback()
+{
   // Set OTA boot type in config.
   if (!Config::SetOtaUpdateStep(OpenShock::OtaUpdateStep::RollingBack)) {
     OS_PANIC(TAG, "Failed to set OTA firmware boot type in critical section");  // TODO: THIS IS A CRITICAL SECTION, WHAT DO WE DO?
@@ -312,7 +320,8 @@ void OtaUpdateManager::InvalidateAndRollback() {
   esp_restart();
 }
 
-void OtaUpdateManager::ValidateApp() {
+void OtaUpdateManager::ValidateApp()
+{
   if (esp_ota_mark_app_valid_cancel_rollback() != ESP_OK) {
     OS_PANIC(TAG, "Unable to mark app as valid, WTF?");  // TODO: Wtf do we do here?
   }

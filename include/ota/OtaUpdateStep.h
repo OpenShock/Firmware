@@ -8,7 +8,8 @@
 namespace OpenShock {
   typedef OpenShock::Serialization::Configuration::OtaUpdateStep OtaUpdateStep;
 
-  inline bool TryParseOtaUpdateStep(OtaUpdateStep& channel, const char* str) {
+  inline bool TryParseOtaUpdateStep(OtaUpdateStep& channel, const char* str)
+  {
     if (strcasecmp(str, "none") == 0) {
       channel = OtaUpdateStep::None;
       return true;

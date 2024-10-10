@@ -3,11 +3,11 @@
 #include <cstdint>
 #include <string_view>
 
-#define DISABLE_COPY(TypeName)             \
-  TypeName(const TypeName&) = delete;      \
+#define DISABLE_COPY(TypeName)              \
+  TypeName(const TypeName&)       = delete; \
   void operator=(const TypeName&) = delete
-#define DISABLE_MOVE(TypeName)             \
-  TypeName(TypeName&&) = delete;           \
+#define DISABLE_MOVE(TypeName)         \
+  TypeName(TypeName&&)       = delete; \
   void operator=(TypeName&&) = delete
 
 #ifndef OPENSHOCK_API_DOMAIN
@@ -20,14 +20,14 @@
 #error "OPENSHOCK_FW_VERSION must be defined"
 #endif
 
-#define OPENSHOCK_FW_CDN_URL(path) "https://" OPENSHOCK_FW_CDN_DOMAIN path
-#define OPENSHOCK_FW_CDN_CHANNEL_URL(ch) OPENSHOCK_FW_CDN_URL("/version-" ch ".txt")
-#define OPENSHOCK_FW_CDN_STABLE_URL  OPENSHOCK_FW_CDN_CHANNEL_URL("stable")
-#define OPENSHOCK_FW_CDN_BETA_URL    OPENSHOCK_FW_CDN_CHANNEL_URL("beta")
-#define OPENSHOCK_FW_CDN_DEVELOP_URL OPENSHOCK_FW_CDN_CHANNEL_URL("develop")
-#define OPENSHOCK_FW_CDN_BOARDS_BASE_URL_FORMAT  OPENSHOCK_FW_CDN_URL("/%s")
-#define OPENSHOCK_FW_CDN_BOARDS_INDEX_URL_FORMAT OPENSHOCK_FW_CDN_BOARDS_BASE_URL_FORMAT "/boards.txt"
-#define OPENSHOCK_FW_CDN_VERSION_BASE_URL_FORMAT OPENSHOCK_FW_CDN_BOARDS_BASE_URL_FORMAT "/" OPENSHOCK_FW_BOARD
+#define OPENSHOCK_FW_CDN_URL(path)                "https://" OPENSHOCK_FW_CDN_DOMAIN path
+#define OPENSHOCK_FW_CDN_CHANNEL_URL(ch)          OPENSHOCK_FW_CDN_URL("/version-" ch ".txt")
+#define OPENSHOCK_FW_CDN_STABLE_URL               OPENSHOCK_FW_CDN_CHANNEL_URL("stable")
+#define OPENSHOCK_FW_CDN_BETA_URL                 OPENSHOCK_FW_CDN_CHANNEL_URL("beta")
+#define OPENSHOCK_FW_CDN_DEVELOP_URL              OPENSHOCK_FW_CDN_CHANNEL_URL("develop")
+#define OPENSHOCK_FW_CDN_BOARDS_BASE_URL_FORMAT   OPENSHOCK_FW_CDN_URL("/%s")
+#define OPENSHOCK_FW_CDN_BOARDS_INDEX_URL_FORMAT  OPENSHOCK_FW_CDN_BOARDS_BASE_URL_FORMAT "/boards.txt"
+#define OPENSHOCK_FW_CDN_VERSION_BASE_URL_FORMAT  OPENSHOCK_FW_CDN_BOARDS_BASE_URL_FORMAT "/" OPENSHOCK_FW_BOARD
 #define OPENSHOCK_FW_CDN_APP_URL_FORMAT           OPENSHOCK_FW_CDN_VERSION_BASE_URL_FORMAT "/app.bin"
 #define OPENSHOCK_FW_CDN_FILESYSTEM_URL_FORMAT    OPENSHOCK_FW_CDN_VERSION_BASE_URL_FORMAT "/staticfs.bin"
 #define OPENSHOCK_FW_CDN_SHA256_HASHES_URL_FORMAT OPENSHOCK_FW_CDN_VERSION_BASE_URL_FORMAT "/hashes.sha256.txt"
@@ -50,7 +50,8 @@
 
 // Check if Arduino.h exists, if not instruct the developer to remove "arduino-esp32" from the useragent and replace it with "ESP-IDF", after which the developer may remove this warning.
 #if defined(__has_include) && !__has_include("Arduino.h")
-#warning "Let it be known that Arduino hath finally been cast aside in favor of the noble ESP-IDF! I beseech thee, kind sir or madam, wouldst thou kindly partake in the honors of expunging 'arduino-esp32' from yonder useragent aloft, and in its stead, bestow the illustrious 'ESP-IDF'?"
+#warning \
+  "Let it be known that Arduino hath finally been cast aside in favor of the noble ESP-IDF! I beseech thee, kind sir or madam, wouldst thou kindly partake in the honors of expunging 'arduino-esp32' from yonder useragent aloft, and in its stead, bestow the illustrious 'ESP-IDF'?"
 #endif
 
 #if __cplusplus >= 202'302L

@@ -3,12 +3,11 @@
 #include <cstdint>
 #include <string>
 
-namespace OpenShock
-{
+namespace OpenShock {
   struct FirmwareReleaseInfo {
     std::string appBinaryUrl;
     uint8_t appBinaryHash[32];
     std::string filesystemBinaryUrl;
     uint8_t filesystemBinaryHash[32];
   };
-} // namespace OpenShock
+}  // namespace OpenShock

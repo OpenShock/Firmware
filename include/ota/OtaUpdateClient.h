@@ -11,10 +11,11 @@ namespace OpenShock {
     ~OtaUpdateClient();
 
     bool Start();
+
   private:
     void _task();
 
     OpenShock::SemVer m_version;
     TaskHandle_t m_taskHandle;
   };
-}
+}  // namespace OpenShock
