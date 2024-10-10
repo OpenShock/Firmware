@@ -95,13 +95,33 @@ bool _tryGetRequestedVersion(OpenShock::SemVer& version) {
   return true;
 }
 
-void _otaEvGotIPHandler(arduino_event_t* event) {
-  (void)event;
-  xTaskNotify(_taskHandle, OTA_TASK_EVENT_WIFI_CONNECTED, eSetBits);
-}
-void _otaEvWiFiDisconnectedHandler(arduino_event_t* event) {
-  (void)event;
+void _otaEvWiFiDisconnectedHandler(void* event_handler_arg, esp_event_base_t event_base, int32_t event_id, void* event_data)
+{
+  (void)event_handler_arg;
+  (void)event_base;
+  (void)event_id;
+  (void)event_data;
+
   xTaskNotify(_taskHandle, OTA_TASK_EVENT_WIFI_DISCONNECTED, eSetBits);
+}
+
+void _otaEvIpEventHandler(void* event_handler_arg, esp_event_base_t event_base, int32_t event_id, void* event_data)
+{
+  (void)event_handler_arg;
+  (void)event_base;
+  (void)event_data;
+
+  switch (event_id) {
+  case IP_EVENT_GOT_IP6:
+  case IP_EVENT_STA_GOT_IP:
+    xTaskNotify(_taskHandle, OTA_TASK_EVENT_WIFI_CONNECTED, eSetBits);
+    break;
+  case IP_EVENT_STA_LOST_IP:
+    xTaskNotify(_taskHandle, OTA_TASK_EVENT_WIFI_DISCONNECTED, eSetBits);
+    break;
+  default:
+    return;
+  }
 }
 
 bool _sendProgressMessage(Serialization::Gateway::OtaInstallProgressTask task, float progress) {
@@ -429,6 +449,8 @@ bool _tryGetStringList(std::string_view url, std::vector<std::string>& list) {
 }
 
 bool OtaUpdateManager::Init() {
+  esp_err_t err;
+
   OS_LOGN(TAG, "Fetching current partition");
 
   // Fetch current partition info.
@@ -441,7 +463,7 @@ bool OtaUpdateManager::Init() {
   OS_LOGD(TAG, "Fetching partition state");
 
   // Get OTA state for said partition.
-  esp_err_t err = esp_ota_get_state_partition(partition, &_otaImageState);
+  err = esp_ota_get_state_partition(partition, &_otaImageState);
   if (err != ESP_OK) {
     OS_PANIC(TAG, "Failed to get partition state: %s", esp_err_to_name(err));
     return false;  // This will never be reached, but the compiler doesn't know that.
@@ -474,9 +496,17 @@ bool OtaUpdateManager::Init() {
     }
   }
 
-  WiFi.onEvent(_otaEvGotIPHandler, ARDUINO_EVENT_WIFI_STA_GOT_IP);
-  WiFi.onEvent(_otaEvGotIPHandler, ARDUINO_EVENT_WIFI_STA_GOT_IP6);
-  WiFi.onEvent(_otaEvWiFiDisconnectedHandler, ARDUINO_EVENT_WIFI_STA_DISCONNECTED);
+  err = esp_event_handler_register(IP_EVENT, ESP_EVENT_ANY_ID, _otaEvIpEventHandler, nullptr);
+  if (err != ESP_OK) {
+    OS_LOGE(TAG, "Failed to register event handler for IP_EVENT: %s", esp_err_to_name(err));
+    return false;
+  }
+
+  err = esp_event_handler_register(WIFI_EVENT, WIFI_EVENT_STA_DISCONNECTED, _otaEvWiFiDisconnectedHandler, nullptr);
+  if (err != ESP_OK) {
+    OS_LOGE(TAG, "Failed to register event handler for WIFI_EVENT: %s", esp_err_to_name(err));
+    return false;
+  }
 
   // Start OTA update task.
   TaskUtils::TaskCreateExpensive(_otaUpdateTask, "OTA Update", 8192, nullptr, 1, &_taskHandle);  // PROFILED: 6.2KB stack usage
