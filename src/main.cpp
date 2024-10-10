@@ -7,7 +7,6 @@ const char* const TAG = "main";
 #include "Common.h"
 #include "config/Config.h"
 #include "EStopManager.h"
-#include "event_handlers/Init.h"
 #include "events/Events.h"
 #include "GatewayConnectionManager.h"
 #include "Logging.h"
@@ -26,14 +25,15 @@ const char* const TAG = "main";
 bool trySetup()
 {
   OpenShock::Events::Init();
-  OpenShock::EventHandlers::Init();
 
   if (!OpenShock::VisualStateManager::Init()) {
-    OS_PANIC(TAG, "Unable to initialize VisualStateManager");
+    OS_LOGE(TAG, "Unable to initialize VisualStateManager");
+    return false;
   }
 
   if (!OpenShock::EStopManager::Init()) {
-    OS_PANIC(TAG, "Unable to initialize EStopManager");
+    OS_LOGE(TAG, "Unable to initialize EStopManager");
+    return false;
   }
 
   if (!OpenShock::SerialInputHandler::Init()) {
@@ -97,7 +97,11 @@ void setup()
   ::Serial.begin(115'200);
 
   OpenShock::Config::Init();
-  OpenShock::OtaUpdateManager::Init();
+
+  if (!OpenShock::OtaUpdateManager::Init()) {
+    OS_PANIC(TAG, "Unable to initialize OTA Update Manager");
+  }
+
   if (OpenShock::OtaUpdateManager::IsValidatingApp()) {
     otaSetup();
   } else {

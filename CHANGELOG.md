@@ -1,3 +1,7 @@
+# Version 1.4.0-rc.2 Release Notes
+
+Fixed EStop debouncing logic.
+
 # Version 1.4.0-rc.1 Release Notes
 
 This release is packed with bugfixes, optimizations, code cleanup, prepwork for ESP-IDF, and some features!
