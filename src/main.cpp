@@ -9,7 +9,7 @@ const char* const TAG = "main";
 #include "EStopManager.h"
 #include "GatewayConnectionManager.h"
 #include "Logging.h"
-#include "OtaUpdateManager.h"
+#include "ota/OtaUpdateManager.h"
 #include "serial/SerialInputHandler.h"
 #include "util/TaskUtils.h"
 #include "VisualStateManager.h"

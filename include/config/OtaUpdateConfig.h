@@ -2,8 +2,8 @@
 
 #include "config/ConfigBase.h"
 #include "FirmwareBootType.h"
-#include "OtaUpdateChannel.h"
-#include "OtaUpdateStep.h"
+#include "ota/OtaUpdateChannel.h"
+#include "ota/OtaUpdateStep.h"
 
 #include <string>
 
