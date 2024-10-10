@@ -7,6 +7,7 @@ const char* const TAG = "main";
 #include "Common.h"
 #include "config/Config.h"
 #include "EStopManager.h"
+#include "events/Events.h"
 #include "GatewayConnectionManager.h"
 #include "Logging.h"
 #include "OtaUpdateManager.h"
@@ -23,6 +24,11 @@ const char* const TAG = "main";
 // Internal setup function, returns true if setup succeeded, false otherwise.
 bool trySetup()
 {
+  if (!OpenShock::Events::Init()) {
+    OS_LOGE(TAG, "Unable to initialize Events");
+    return false;
+  }
+
   if (!OpenShock::VisualStateManager::Init()) {
     OS_LOGE(TAG, "Unable to initialize VisualStateManager");
     return false;

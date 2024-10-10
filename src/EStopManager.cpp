@@ -7,6 +7,7 @@ const char* const TAG = "EStopManager";
 #include "Chipset.h"
 #include "CommandHandler.h"
 #include "config/Config.h"
+#include "events/Events.h"
 #include "Logging.h"
 #include "Time.h"
 #include "util/TaskUtils.h"
@@ -24,8 +25,7 @@ const uint32_t k_estopDebounceTime    = 100;
 static TaskHandle_t s_estopEventHandlerTask;
 static QueueHandle_t s_estopEventQueue;
 
-static bool s_estopActive          = false;
-static bool s_estopAwaitingRelease = false;
+static EStopState s_estopState = EStopState::Idle;
 static bool s_lastState            = false;
 static int64_t s_lastStateChange   = 0;
 static int64_t s_estopActivatedAt  = 0;
@@ -70,15 +70,17 @@ void _estopEventHandler(void* pvParameters) {
         deactivatesAt = message.deactivatesAt;
       }
 
-      OpenShock::VisualStateManager::SetEmergencyStopStatus(s_estopActive, s_estopAwaitingRelease);
+      ESP_ERROR_CHECK(esp_event_post(OPENSHOCK_EVENTS, OPENSHOCK_EVENT_ESTOP_STATE_CHANGED, &s_estopState, sizeof(s_estopState), portMAX_DELAY));
+
       OpenShock::CommandHandler::SetKeepAlivePaused(EStopManager::IsEStopped());
     } else if (deactivatesAt != 0 && OpenShock::millis() >= deactivatesAt) {  // If we didn't get a message, the time probably expired, check if the estop is pending deactivation and if we have reached that time
       // Reset the deactivation time
       deactivatesAt = 0;
 
       // If the button is held for the specified time, clear the EStop
-      s_estopAwaitingRelease = true;
-      OpenShock::VisualStateManager::SetEmergencyStopStatus(s_estopActive, s_estopAwaitingRelease);
+      s_estopState = EStopState::AwaitingRelease;
+
+      ESP_ERROR_CHECK(esp_event_post(OPENSHOCK_EVENTS, OPENSHOCK_EVENT_ESTOP_STATE_CHANGED, &s_estopState, sizeof(s_estopState), portMAX_DELAY));
 
       OS_LOGI(TAG, "EStop cleared, awaiting release");
     }
@@ -109,18 +111,19 @@ void _estopEdgeInterrupt(void* arg) {
   bool deactivatesAtChanged = false;
   int64_t deactivatesAt     = 0;
 
-  if (!s_estopActive && pressed) {
-    s_estopActive      = true;
+  if (pressed && s_estopState == EStopState::Idle) {
+    s_estopState = EStopState::Active;
     s_estopActivatedAt = now;
-  } else if (s_estopActive && pressed) {
+  } else if (pressed && s_estopState == EStopState::Active) {
     deactivatesAtChanged = true;
     deactivatesAt        = now + k_estopHoldToClearTime;
-  } else if (s_estopActive && !pressed && s_estopAwaitingRelease) {
-    s_estopActive          = false;
-    s_estopAwaitingRelease = false;
-  } else if (s_estopActive && !pressed) {
+  } else if (!pressed && s_estopState == EStopState::AwaitingRelease) {
+    s_estopState = EStopState::Idle;
+  } else if (!pressed && s_estopState == EStopState::Active) {
     deactivatesAtChanged = true;
     deactivatesAt        = 0;
+  } else {
+    return;
   }
 
   BaseType_t higherPriorityTaskWoken = pdFALSE;
@@ -234,7 +237,7 @@ bool EStopManager::SetEStopPin(gpio_num_t pin) {
 }
 
 bool EStopManager::IsEStopped() {
-  return s_estopActive;
+  return s_estopState != EStopState::Idle;
 }
 
 int64_t EStopManager::LastEStopped() {
