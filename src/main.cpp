@@ -24,7 +24,10 @@ const char* const TAG = "main";
 // Internal setup function, returns true if setup succeeded, false otherwise.
 bool trySetup()
 {
-  OpenShock::Events::Init();
+  if (!OpenShock::Events::Init()) {
+    OS_LOGE(TAG, "Unable to initialize Events");
+    return false;
+  }
 
   if (!OpenShock::VisualStateManager::Init()) {
     OS_LOGE(TAG, "Unable to initialize VisualStateManager");
