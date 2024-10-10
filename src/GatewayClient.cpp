@@ -126,7 +126,7 @@ void GatewayClient::_setState(GatewayClientState state)
 
   m_state = state;
 
-  ESP_ERROR_CHECK(esp_event_post(OPENSHOCK_EVENTS, OPENSHOCK_EVENT_GATEWAY_STATE_CHANGED, &m_state, sizeof(m_state), portMAX_DELAY));
+  ESP_ERROR_CHECK(esp_event_post(OPENSHOCK_EVENTS, OPENSHOCK_EVENT_GATEWAY_CLIENT_STATE_CHANGED, &m_state, sizeof(m_state), portMAX_DELAY));
 }
 
 void GatewayClient::_sendKeepAlive()

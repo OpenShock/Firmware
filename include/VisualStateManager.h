@@ -8,5 +8,4 @@ namespace OpenShock::VisualStateManager {
 
   void SetCriticalError();
   void SetScanningStarted();
-  void SetEmergencyStopStatus(bool isActive, bool isAwaitingRelease);
 }  // namespace OpenShock::VisualStateManager
