@@ -6,7 +6,7 @@
 #include "serialization/WSGateway.h"
 
 #include "util/FnProxy.h"
-#include "util/HextUtils.h"
+#include "util/HexUtils.h"
 #include "util/PartitionUtils.h"
 #include "util/TaskUtils.h"
 
