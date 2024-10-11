@@ -271,6 +271,64 @@ std::string SemVer::toString() const
   return str;
 }
 
+bool SemVer::operator==(const SemVer& other) const
+{
+  return major == other.major && minor == other.minor && patch == other.patch && prerelease == other.prerelease && build == other.build;
+}
+
+bool SemVer::operator<(const SemVer& other) const
+{
+  if (major < other.major) {
+    return true;
+  }
+  if (major > other.major) {
+    return false;
+  }
+
+  if (minor < other.minor) {
+    return true;
+  }
+  if (minor > other.minor) {
+    return false;
+  }
+
+  if (patch < other.patch) {
+    return true;
+  }
+  if (patch > other.patch) {
+    return false;
+  }
+
+  if (prerelease < other.prerelease) {
+    return true;
+  }
+  if (prerelease > other.prerelease) {
+    return false;
+  }
+
+  return build < other.build;
+}
+
+bool SemVer::operator==(const std::string_view& other) const
+{
+  SemVer otherSemVer;
+  if (!OpenShock::TryParseSemVer(other, otherSemVer)) {
+    return false;
+  }
+
+  return *this == otherSemVer;
+}
+
+bool SemVer::operator<(const std::string_view& other) const
+{
+  SemVer otherSemVer;
+  if (!OpenShock::TryParseSemVer(other, otherSemVer)) {
+    return false;
+  }
+
+  return *this < otherSemVer;
+}
+
 bool OpenShock::TryParseSemVer(std::string_view semverStr, SemVer& semver)
 {
   std::string_view parts[3];
