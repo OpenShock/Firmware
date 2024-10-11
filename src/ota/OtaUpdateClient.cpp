@@ -1,24 +1,33 @@
 #include <freertos/FreeRTOS.h>
 
+#include "CaptivePortal.h"
+#include "config/Config.h"
+#include "GatewayConnectionManager.h"
+#include "http/FirmwareCDN.h"
 #include "Logging.h"
+#include "ota/FirmwareReleaseInfo.h"
 #include "ota/OtaUpdateClient.h"
+#include "ota/OtaUpdateManager.h"
 #include "ota/OtaUpdateStep.h"
 #include "serialization/WSGateway.h"
-
 #include "util/FnProxy.h"
 #include "util/HexUtils.h"
 #include "util/PartitionUtils.h"
 #include "util/TaskUtils.h"
 
+#include <LittleFS.h>
+
 #include <esp_ota_ops.h>
 #include <esp_system.h>
 #include <esp_task_wdt.h>
+#include <freertos/semphr.h>
 
 #include <cstring>
 
 const char* const TAG = "OtaUpdateClient";
 
 using namespace OpenShock;
+using namespace std::string_view_literals;
 
 bool _tryStartUpdate(const OpenShock::SemVer& version)
 {
@@ -209,7 +218,7 @@ void OtaUpdateClient::_task()
     continue;
   }
 
-  if (!Serialization::Gateway::SerializeOtaInstallStartedMessage(updateId, version, GatewayConnectionManager::SendMessageBIN)) {
+  if (!Serialization::Gateway::SerializeOtaInstallStartedMessage(updateId, m_version, GatewayConnectionManager::SendMessageBIN)) {
     OS_LOGE(TAG, "Failed to serialize OTA install started message");
     continue;
   }
@@ -219,16 +228,18 @@ void OtaUpdateClient::_task()
   }
 
   // Fetch current release.
-  OtaUpdateManager::FirmwareRelease release;
-  if (!OtaUpdateManager::TryGetFirmwareRelease(version, release)) {
-    OS_LOGE(TAG, "Failed to fetch firmware release");  // TODO: Send error message to server
+  auto response = HTTP::FirmwareCDN::GetFirmwareReleaseInfo(m_version);
+  if (response.result != HTTP::RequestResult::Success) {
+    OS_LOGE(TAG, "Failed to fetch firmware release: [%u]", response.code);
     _sendFailureMessage("Failed to fetch firmware release"sv);
     continue;
   }
 
+  auto& release = response.data;
+
   // Print release.
   OS_LOGD(TAG, "Firmware release:");
-  OS_LOGD(TAG, "  Version:                %s", version.toString().c_str());  // TODO: This is abusing the SemVer::toString() method causing alot of string copies, fix this
+  OS_LOGD(TAG, "  Version:                %s", m_version.toString().c_str());  // TODO: This is abusing the SemVer::toString() method causing alot of string copies, fix this
   OS_LOGD(TAG, "  App binary URL:         %s", release.appBinaryUrl.c_str());
   OS_LOGD(TAG, "  App binary hash:        %s", HexUtils::ToHex<32>(release.appBinaryHash).data());
   OS_LOGD(TAG, "  Filesystem binary URL:  %s", release.filesystemBinaryUrl.c_str());

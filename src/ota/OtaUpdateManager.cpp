@@ -38,9 +38,8 @@ bool verifyRollbackLater()
 using namespace OpenShock;
 
 enum OtaTaskEventFlag : uint32_t {
-  OTA_TASK_EVENT_UPDATE_REQUESTED  = 1 << 0,
-  OTA_TASK_EVENT_WIFI_DISCONNECTED = 1 << 1,  // If both connected and disconnected are set, disconnected takes priority.
-  OTA_TASK_EVENT_WIFI_CONNECTED    = 1 << 2,
+  OTA_TASK_EVENT_WIFI_DISCONNECTED = 1 << 0,  // If both connected and disconnected are set, disconnected takes priority.
+  OTA_TASK_EVENT_WIFI_CONNECTED    = 1 << 1,
 };
 
 static esp_ota_img_states_t _otaImageState;
@@ -92,7 +91,6 @@ void _otaWatcherTask(void*)
   OS_LOGD(TAG, "OTA update task started");
 
   bool connected          = false;
-  bool updateRequested    = false;
   int64_t lastUpdateCheck = 0;
 
   // Update task loop.
@@ -100,8 +98,6 @@ void _otaWatcherTask(void*)
     // Wait for event.
     uint32_t eventBits = 0;
     xTaskNotifyWait(0, UINT32_MAX, &eventBits, pdMS_TO_TICKS(5000));  // TODO: wait for rest time
-
-    updateRequested |= (eventBits & OTA_TASK_EVENT_UPDATE_REQUESTED) != 0;
 
     if ((eventBits & OTA_TASK_EVENT_WIFI_DISCONNECTED) != 0) {
       OS_LOGD(TAG, "WiFi disconnected");
@@ -139,7 +135,6 @@ void _otaWatcherTask(void*)
     bool check = false;
     check |= config.checkOnStartup && firstCheck;                           // On startup
     check |= config.checkPeriodically && diffMins >= config.checkInterval;  // Periodically
-    check |= updateRequested && (firstCheck || diffMins >= 1);              // Update requested
 
     if (!check) {
       continue;
@@ -153,33 +148,16 @@ void _otaWatcherTask(void*)
       continue;
     }
 
-    OpenShock::SemVer version;
-    if (updateRequested) {
-      updateRequested = false;
+    OS_LOGD(TAG, "Checking for updates");
 
-      if (!_tryGetRequestedVersion(version)) {
-        OS_LOGE(TAG, "Failed to get requested version");
-        continue;
-      }
-
-      OS_LOGD(TAG, "Update requested for version %s", version.toString().c_str());  // TODO: This is abusing the SemVer::toString() method causing alot of string copies, fix this
-    } else {
-      OS_LOGD(TAG, "Checking for updates");
-
-      // Fetch current version.
-      auto result = HTTP::FirmwareCDN::GetFirmwareVersion(config.updateChannel);
-      if (result.result != HTTP::RequestResult::Success) {
-        OS_LOGE(TAG, "Failed to fetch firmware version");
-        continue;
-      }
-
-      OS_LOGD(TAG, "Remote version: %s", version.toString().c_str());  // TODO: This is abusing the SemVer::toString() method causing alot of string copies, fix this
-    }
-
-    if (version.toString() == OPENSHOCK_FW_VERSION) {  // TODO: This is abusing the SemVer::toString() method causing alot of string copies, fix this
-      OS_LOGI(TAG, "Requested version is already installed");
+    // Fetch current version.
+    auto result = HTTP::FirmwareCDN::GetFirmwareVersion(config.updateChannel);
+    if (result.result != HTTP::RequestResult::Success) {
+      OS_LOGE(TAG, "Failed to fetch firmware version");
       continue;
     }
+
+    OS_LOGD(TAG, "Remote version: %s", result.data.toString().c_str());  // TODO: This is abusing the SemVer::toString() method causing alot of string copies, fix this
   }
 }
 
@@ -242,42 +220,13 @@ bool OtaUpdateManager::Init()
   return true;
 }
 
-bool OtaUpdateManager::TryGetFirmwareRelease(const OpenShock::SemVer& version, FirmwareReleaseInfo& release)
-{
-  auto versionStr = version.toString();  // TODO: This is abusing the SemVer::toString() method causing alot of string copies, fix this
-
-  if (!FormatToString(release.appBinaryUrl, OPENSHOCK_FW_CDN_APP_URL_FORMAT, versionStr.c_str())) {
-    OS_LOGE(TAG, "Failed to format URL");
-    return false;
-  }
-
-  if (!FormatToString(release.filesystemBinaryUrl, OPENSHOCK_FW_CDN_FILESYSTEM_URL_FORMAT, versionStr.c_str())) {
-    OS_LOGE(TAG, "Failed to format URL");
-    return false;
-  }
-
-  // Fetch hashes.
-  auto response = HTTP::FirmwareCDN::GetFirmwareBinaryHashes(version);
-  if (response.result != HTTP::RequestResult::Success) {
-    OS_LOGE(TAG, "Failed to fetch hashes: [%u]", response.code);
-    return false;
-  }
-
-  for (auto binaryHash : response.data) {
-    if (binaryHash.name == "app.bin") {
-      static_assert(sizeof(release.appBinaryHash) == sizeof(binaryHash.hash), "Hash size mismatch");
-      memcpy(release.appBinaryHash, binaryHash.hash, sizeof(release.appBinaryHash));
-    } else if (binaryHash.name == "staticfs.bin") {
-      static_assert(sizeof(release.filesystemBinaryHash) == sizeof(binaryHash.hash), "Hash size mismatch");
-      memcpy(release.filesystemBinaryHash, binaryHash.hash, sizeof(release.filesystemBinaryHash));
-    }
-  }
-
-  return true;
-}
-
 bool OtaUpdateManager::TryStartFirmwareInstallation(const OpenShock::SemVer& version)
 {
+  if (version == OPENSHOCK_FW_VERSION ""sv) {
+    OS_LOGI(TAG, "Requested version is already installed");
+    return true;
+  }
+
   OS_LOGD(TAG, "Requesting firmware version %s", version.toString().c_str());  // TODO: This is abusing the SemVer::toString() method causing alot of string copies, fix this
 
   return _tryStartUpdate(version);

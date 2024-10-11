@@ -2,6 +2,7 @@
 
 #include "http/HTTPRequestManager.h"
 #include "ota/FirmwareBinaryHash.h"
+#include "ota/FirmwareReleaseInfo.h"
 #include "ota/OtaUpdateChannel.h"
 #include "SemVer.h"
 
@@ -25,4 +26,10 @@ namespace OpenShock::HTTP::FirmwareCDN {
   /// @param version The firmware version to fetch the binary hashes for.
   /// @return The binary hashes or an error response.
   HTTP::Response<std::vector<FirmwareBinaryHash>> GetFirmwareBinaryHashes(const OpenShock::SemVer& version);
+
+  /// @brief Fetches the firmware release information for the given firmware version from the firmware CDN.
+  /// Valid response codes: 200, 304
+  /// @param version The firmware version to fetch the release information for.
+  /// @return The firmware release information or an error response.
+  HTTP::Response<FirmwareReleaseInfo> GetFirmwareReleaseInfo(const OpenShock::SemVer& version);
 }  // namespace OpenShock::HTTP::FirmwareCDN

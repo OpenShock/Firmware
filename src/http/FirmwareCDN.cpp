@@ -4,27 +4,27 @@
 
 #include "Common.h"
 #include "Logging.h"
-#include "util/StringUtils.h"
 #include "util/HexUtils.h"
+#include "util/StringUtils.h"
 
 const char* const TAG = "FirmwareCDN";
 
 using namespace std::string_view_literals;
 
-
 using namespace OpenShock;
 
-HTTP::Response<OpenShock::SemVer> HTTP::FirmwareCDN::GetFirmwareVersion(OtaUpdateChannel channel) {
+HTTP::Response<OpenShock::SemVer> HTTP::FirmwareCDN::GetFirmwareVersion(OtaUpdateChannel channel)
+{
   std::string_view channelIndexUrl;
   switch (channel) {
     case OtaUpdateChannel::Stable:
-      channelIndexUrl = OPENSHOCK_FW_CDN_STABLE_URL""sv;
+      channelIndexUrl = OPENSHOCK_FW_CDN_STABLE_URL ""sv;
       break;
     case OtaUpdateChannel::Beta:
-      channelIndexUrl = OPENSHOCK_FW_CDN_BETA_URL""sv;
+      channelIndexUrl = OPENSHOCK_FW_CDN_BETA_URL ""sv;
       break;
     case OtaUpdateChannel::Develop:
-      channelIndexUrl = OPENSHOCK_FW_CDN_DEVELOP_URL""sv;
+      channelIndexUrl = OPENSHOCK_FW_CDN_DEVELOP_URL ""sv;
       break;
     default:
       OS_LOGE(TAG, "Unknown channel: %u", channel);
@@ -55,7 +55,8 @@ HTTP::Response<OpenShock::SemVer> HTTP::FirmwareCDN::GetFirmwareVersion(OtaUpdat
   return {response.result, response.code, version};
 }
 
-HTTP::Response<std::vector<std::string>> HTTP::FirmwareCDN::GetFirmwareBoards(const OpenShock::SemVer& version) {
+HTTP::Response<std::vector<std::string>> HTTP::FirmwareCDN::GetFirmwareBoards(const OpenShock::SemVer& version)
+{
   std::string channelIndexUrl;
   if (!FormatToString(channelIndexUrl, OPENSHOCK_FW_CDN_BOARDS_INDEX_URL_FORMAT, version.toString().c_str())) {  // TODO: This is abusing the SemVer::toString() method causing alot of string copies, fix this
     OS_LOGE(TAG, "Failed to format URL");
@@ -95,7 +96,8 @@ HTTP::Response<std::vector<std::string>> HTTP::FirmwareCDN::GetFirmwareBoards(co
   return {response.result, response.code, std::move(boards)};
 }
 
-HTTP::Response<std::vector<FirmwareBinaryHash>> HTTP::FirmwareCDN::GetFirmwareBinaryHashes(const OpenShock::SemVer& version) {
+HTTP::Response<std::vector<FirmwareBinaryHash>> HTTP::FirmwareCDN::GetFirmwareBinaryHashes(const OpenShock::SemVer& version)
+{
   auto versionStr = version.toString();  // TODO: This is abusing the SemVer::toString() method causing alot of string copies, fix this
 
   // Construct hash URLs.
@@ -154,4 +156,39 @@ HTTP::Response<std::vector<FirmwareBinaryHash>> HTTP::FirmwareCDN::GetFirmwareBi
   }
 
   return {RequestResult::Success, 200, std::move(hashes)};
+}
+
+HTTP::Response<FirmwareReleaseInfo> HTTP::FirmwareCDN::GetFirmwareReleaseInfo(const OpenShock::SemVer& version)
+{
+  auto versionStr = version.toString();  // TODO: This is abusing the SemVer::toString() method causing alot of string copies, fix this
+
+  FirmwareReleaseInfo release;
+  if (!FormatToString(release.appBinaryUrl, OPENSHOCK_FW_CDN_APP_URL_FORMAT, versionStr.c_str())) {
+    OS_LOGE(TAG, "Failed to format URL");
+    return {RequestResult::InternalError, 0, {}};
+  }
+
+  if (!FormatToString(release.filesystemBinaryUrl, OPENSHOCK_FW_CDN_FILESYSTEM_URL_FORMAT, versionStr.c_str())) {
+    OS_LOGE(TAG, "Failed to format URL");
+    return {RequestResult::InternalError, 0, {}};
+  }
+
+  // Fetch hashes.
+  auto response = GetFirmwareBinaryHashes(version);
+  if (response.result != HTTP::RequestResult::Success) {
+    OS_LOGE(TAG, "Failed to fetch hashes: [%u]", response.code);
+    return {response.result, response.code, {}};
+  }
+
+  for (auto binaryHash : response.data) {
+    if (binaryHash.name == "app.bin") {
+      static_assert(sizeof(release.appBinaryHash) == sizeof(binaryHash.hash), "Hash size mismatch");
+      memcpy(release.appBinaryHash, binaryHash.hash, sizeof(release.appBinaryHash));
+    } else if (binaryHash.name == "staticfs.bin") {
+      static_assert(sizeof(release.filesystemBinaryHash) == sizeof(binaryHash.hash), "Hash size mismatch");
+      memcpy(release.filesystemBinaryHash, binaryHash.hash, sizeof(release.filesystemBinaryHash));
+    }
+  }
+
+  return {response.result, response.code, release};
 }
