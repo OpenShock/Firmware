@@ -7,16 +7,20 @@ const char* const TAG = "SemVer";
 
 using namespace OpenShock;
 
-constexpr bool _semverIsLetter(char c) {
+constexpr bool _semverIsLetter(char c)
+{
   return (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z');
 }
-constexpr bool _semverIsPositiveDigit(char c) {
+constexpr bool _semverIsPositiveDigit(char c)
+{
   return c >= '1' && c <= '9';
 }
-constexpr bool _semverIsDigit(char c) {
+constexpr bool _semverIsDigit(char c)
+{
   return c == '0' || _semverIsPositiveDigit(c);
 }
-constexpr bool _semverIsDigits(std::string_view str) {
+constexpr bool _semverIsDigits(std::string_view str)
+{
   if (str.empty()) {
     return false;
   }
@@ -29,13 +33,16 @@ constexpr bool _semverIsDigits(std::string_view str) {
 
   return true;
 }
-constexpr bool _semverIsNonDigit(char c) {
+constexpr bool _semverIsNonDigit(char c)
+{
   return _semverIsLetter(c) || c == '-';
 }
-constexpr bool _semverIsIdentifierChararacter(char c) {
+constexpr bool _semverIsIdentifierChararacter(char c)
+{
   return _semverIsDigit(c) || _semverIsNonDigit(c);
 }
-constexpr bool _semverIsIdentifierChararacters(std::string_view str) {
+constexpr bool _semverIsIdentifierChararacters(std::string_view str)
+{
   if (str.empty()) {
     return false;
   }
@@ -48,7 +55,8 @@ constexpr bool _semverIsIdentifierChararacters(std::string_view str) {
 
   return true;
 }
-constexpr bool _semverIsNumericIdentifier(std::string_view str) {
+constexpr bool _semverIsNumericIdentifier(std::string_view str)
+{
   if (str.empty()) {
     return false;
   }
@@ -59,7 +67,8 @@ constexpr bool _semverIsNumericIdentifier(std::string_view str) {
 
   return _semverIsPositiveDigit(str[0]) && _semverIsDigits(str.substr(1));
 }
-constexpr bool _semverIsAlphanumericIdentifier(std::string_view str) {
+constexpr bool _semverIsAlphanumericIdentifier(std::string_view str)
+{
   if (str.empty()) {
     return false;
   }
@@ -94,13 +103,16 @@ constexpr bool _semverIsAlphanumericIdentifier(std::string_view str) {
 
   return _semverIsIdentifierChararacters(before) && _semverIsIdentifierChararacters(after);
 }
-constexpr bool _semverIsBuildIdentifier(std::string_view str) {
+constexpr bool _semverIsBuildIdentifier(std::string_view str)
+{
   return _semverIsAlphanumericIdentifier(str) || _semverIsDigits(str);
 }
-constexpr bool _semverIsPrereleaseIdentifier(std::string_view str) {
+constexpr bool _semverIsPrereleaseIdentifier(std::string_view str)
+{
   return _semverIsAlphanumericIdentifier(str) || _semverIsNumericIdentifier(str);
 }
-constexpr bool _semverIsDotSeperatedBuildIdentifiers(std::string_view str) {
+constexpr bool _semverIsDotSeperatedBuildIdentifiers(std::string_view str)
+{
   if (str.empty()) {
     return false;
   }
@@ -112,13 +124,14 @@ constexpr bool _semverIsDotSeperatedBuildIdentifiers(std::string_view str) {
       return false;
     }
 
-    str = str.substr(dotIdx + 1);
+    str    = str.substr(dotIdx + 1);
     dotIdx = str.find('.');
   }
 
   return _semverIsBuildIdentifier(str);
 }
-constexpr bool _semverIsDotSeperatedPreleaseIdentifiers(std::string_view str) {
+constexpr bool _semverIsDotSeperatedPreleaseIdentifiers(std::string_view str)
+{
   if (str.empty()) {
     return false;
   }
@@ -130,18 +143,19 @@ constexpr bool _semverIsDotSeperatedPreleaseIdentifiers(std::string_view str) {
       return false;
     }
 
-    str = str.substr(dotIdx + 1);
+    str    = str.substr(dotIdx + 1);
     dotIdx = str.find('.');
   }
 
   return _semverIsPrereleaseIdentifier(str);
 }
-const auto _semverIsPatch = _semverIsNumericIdentifier;
-const auto _semverIsMinor = _semverIsNumericIdentifier;
-const auto _semverIsMajor = _semverIsNumericIdentifier;
+const auto _semverIsPatch      = _semverIsNumericIdentifier;
+const auto _semverIsMinor      = _semverIsNumericIdentifier;
+const auto _semverIsMajor      = _semverIsNumericIdentifier;
 const auto _semverIsPrerelease = _semverIsDotSeperatedPreleaseIdentifiers;
 const auto _semverIsBuild      = _semverIsDotSeperatedBuildIdentifiers;
-bool _semverIsVersionCore(std::string_view str) {
+bool _semverIsVersionCore(std::string_view str)
+{
   if (str.empty()) {
     return false;
   }
@@ -153,7 +167,8 @@ bool _semverIsVersionCore(std::string_view str) {
 
   return _semverIsMajor(parts[0]) && _semverIsMinor(parts[1]) && _semverIsPatch(parts[2]);
 }
-bool _semverIsSemver(std::string_view str) {
+bool _semverIsSemver(std::string_view str)
+{
   if (str.empty()) {
     return false;
   }
@@ -194,7 +209,8 @@ bool _semverIsSemver(std::string_view str) {
   return false;
 }
 
-bool _tryParseU16(std::string_view str, uint16_t& out) {
+bool _tryParseU16(std::string_view str, uint16_t& out)
+{
   if (str.empty()) {
     return false;
   }
@@ -218,7 +234,8 @@ bool _tryParseU16(std::string_view str, uint16_t& out) {
   return true;
 }
 
-bool SemVer::isValid() const {
+bool SemVer::isValid() const
+{
   if (!this->prerelease.empty() && !_semverIsPrereleaseIdentifier(this->prerelease)) {
     return false;
   }
@@ -230,7 +247,8 @@ bool SemVer::isValid() const {
   return true;
 }
 
-std::string SemVer::toString() const {
+std::string SemVer::toString() const
+{
   std::string str;
   str.reserve(32);
 
@@ -253,7 +271,8 @@ std::string SemVer::toString() const {
   return str;
 }
 
-bool OpenShock::TryParseSemVer(std::string_view semverStr, SemVer& semver) {
+bool OpenShock::TryParseSemVer(std::string_view semverStr, SemVer& semver)
+{
   std::string_view parts[3];
   if (!OpenShock::TryStringSplit(semverStr, '.', parts)) {
     OS_LOGE(TAG, "Failed to split version string: %.*s", semverStr.length(), semverStr.data());
@@ -265,7 +284,7 @@ bool OpenShock::TryParseSemVer(std::string_view semverStr, SemVer& semver) {
   auto dashIdx = patchStr.find('-');
   if (dashIdx != std::string_view::npos) {
     semver.prerelease = patchStr.substr(dashIdx + 1);
-    patchStr = patchStr.substr(0, dashIdx);
+    patchStr          = patchStr.substr(0, dashIdx);
   }
 
   auto plusIdx = semver.prerelease.find('+');
