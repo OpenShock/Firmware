@@ -167,7 +167,8 @@ void _otaWatcherTask(void*)
       OS_LOGD(TAG, "Checking for updates");
 
       // Fetch current version.
-      if (!OtaUpdateManager::TryGetFirmwareVersion(config.updateChannel, version)) {
+      auto result = HTTP::FirmwareCDN::GetFirmwareVersion(config.updateChannel);
+      if (result.result != HTTP::RequestResult::Success) {
         OS_LOGE(TAG, "Failed to fetch firmware version");
         continue;
       }
