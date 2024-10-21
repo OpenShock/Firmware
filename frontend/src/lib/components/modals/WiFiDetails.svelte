@@ -9,8 +9,12 @@
 
   const modalStore = getModalStore();
 
-  export let groupKey: string;
-  $: group = $DeviceStateStore.wifiNetworkGroups.get(groupKey);
+  interface Props {
+    groupKey: string;
+  }
+
+  let { groupKey }: Props = $props();
+  let group = $derived($DeviceStateStore.wifiNetworkGroups.get(groupKey));
 
   function GetWifiAuthModeString(type: WifiAuthMode) {
     switch (type) {
@@ -38,17 +42,17 @@
     }
   }
 
-  $: rows = group
+  let rows = $derived(group
     ? [
         { key: 'SSID', value: group.ssid },
         { key: 'Security', value: GetWifiAuthModeString(group.security) },
         { key: 'Saved', value: group.saved.toString() },
       ]
-    : [];
+    : []);
 
-  let password: string | null = null;
-  $: validPassword = password && password.length > 0 && password.length <= 63;
-  let showPasswordPrompt = false;
+  let password: string | null = $state(null);
+  let validPassword = $derived(password && password.length > 0 && password.length <= 63);
+  let showPasswordPrompt = $state(false);
 
   function ConnectWiFi() {
     if (!group) return;
@@ -85,7 +89,7 @@
   {#if group}
     <div class="flex justify-between space-x-2">
       <h2 class="h2">Network Info</h2>
-      <button class="btn-icon variant-outline" on:click={() => modalStore.close()}><i class="fa fa-xmark"></i></button>
+      <button class="btn-icon variant-outline" onclick={() => modalStore.close()}><i class="fa fa-xmark"></i></button>
     </div>
     <div>
       {#each rows as row (row.key)}
@@ -115,18 +119,18 @@
     <div class="flex justify-end space-x-2">
       <div class="btn-group variant-outline">
         {#if showPasswordPrompt}
-          <button on:click={() => (showPasswordPrompt = false)}>Cancel</button>
+          <button onclick={() => (showPasswordPrompt = false)}>Cancel</button>
         {/if}
-        <button on:click={ConnectWiFi} disabled={showPasswordPrompt && !validPassword}><i class={'fa mr-2 text-green-500' + (group.saved ? ' fa-wifi' : ' fa-link')}></i>Connect</button>
+        <button onclick={ConnectWiFi} disabled={showPasswordPrompt && !validPassword}><i class={'fa mr-2 text-green-500' + (group.saved ? ' fa-wifi' : ' fa-link')}></i>Connect</button>
         {#if group.saved}
-          <button on:click={ForgetWiFi}><i class="fa fa-trash mr-2 text-red-500"></i>Forget</button>
+          <button onclick={ForgetWiFi}><i class="fa fa-trash mr-2 text-red-500"></i>Forget</button>
         {/if}
       </div>
     </div>
   {:else}
     <div class="flex justify-between space-x-2">
       <h2 class="h2">WiFi Info</h2>
-      <button class="btn-icon variant-outline" on:click={() => modalStore.close()}><i class="fa fa-xmark"></i></button>
+      <button class="btn-icon variant-outline" onclick={() => modalStore.close()}><i class="fa fa-xmark"></i></button>
     </div>
     <div class="flex justify-center">
       <i class="fa fa-spinner fa-spin"></i>

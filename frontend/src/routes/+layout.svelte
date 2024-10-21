@@ -1,4 +1,6 @@
 <script lang="ts">
+  import { run } from 'svelte/legacy';
+
   import '../app.postcss';
   import { computePosition, autoUpdate, flip, shift, offset, arrow } from '@floating-ui/dom';
   import { AppShell, Modal, Toast, getToastStore, initializeStores, storePopup } from '@skeletonlabs/skeleton';
@@ -6,6 +8,11 @@
   import Header from '$lib/components/Layout/Header.svelte';
   import { WebSocketClient } from '$lib/WebSocketClient';
   import { toastDelegator } from '$lib/stores/ToastDelegator';
+  interface Props {
+    children?: import('svelte').Snippet;
+  }
+
+  let { children }: Props = $props();
 
   storePopup.set({ computePosition, autoUpdate, flip, shift, offset, arrow });
   initializeStores();
@@ -14,26 +21,32 @@
 
   WebSocketClient.Instance.Connect();
 
-  $: if ($toastDelegator.length > 0) {
-    const actions = $toastDelegator;
+  run(() => {
+    if ($toastDelegator.length > 0) {
+      const actions = $toastDelegator;
 
-    for (let i = 0; i < actions.length; i++) {
-      const action = actions[i];
-      if (action.type === 'trigger') {
-        toastStore.trigger(action.toast);
-      } else if (action.type === 'clear') {
-        toastStore.clear();
+      for (let i = 0; i < actions.length; i++) {
+        const action = actions[i];
+        if (action.type === 'trigger') {
+          toastStore.trigger(action.toast);
+        } else if (action.type === 'clear') {
+          toastStore.clear();
+        }
       }
+      $toastDelegator = [];
     }
-    $toastDelegator = [];
-  }
+  });
 </script>
 
 <Modal />
 <Toast position="bl" max={5} />
 
 <AppShell>
-  <Header slot="header" />
-  <slot />
-  <Footer slot="pageFooter" />
+  {#snippet header()}
+    <Header  />
+  {/snippet}
+  {@render children?.()}
+  {#snippet pageFooter()}
+    <Footer  />
+  {/snippet}
 </AppShell>

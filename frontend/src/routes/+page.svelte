@@ -17,8 +17,8 @@
     return true;
   }
 
-  let linkCode: string = '';
-  $: linkCodeValid = isValidLinkCode(linkCode);
+  let linkCode: string = $state('');
+  let linkCodeValid = $derived(isValidLinkCode(linkCode));
 
   function linkAccount() {
     if (!linkCodeValid) return;
@@ -35,7 +35,7 @@
       <h3 class="h3">Account Linking</h3>
       <div class="flex space-x-2">
         <input class={'input variant-form-material ' + (linkCodeValid ? '' : 'input-error')} type="text" inputmode="numeric" pattern="[0-9]*" placeholder="Link Code" bind:value={linkCode} />
-        <button class="btn variant-filled" on:click={linkAccount} disabled={!linkCodeValid || linkCode.length < 6}>Link</button>
+        <button class="btn variant-filled" onclick={linkAccount} disabled={!linkCodeValid || linkCode.length < 6}>Link</button>
       </div>
     </div>
 
