@@ -29,8 +29,9 @@ runs:
 
     - uses: actions/setup-node@v4
       with:
-        node-version: ${{ inputs.node-version }}
+        node-version-file: ./frontend/.nvmrc
         cache: 'pnpm'
+        cache-dependency-path: ./frontend/pnpm-lock.yaml
 
     - name: Install dependencies
       working-directory: ./frontend
