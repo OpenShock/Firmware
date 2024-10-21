@@ -8,9 +8,13 @@
 on:
   workflow_call:
     inputs:
+      pnpm-version:
+        type: string
+        default: '9'
+        description: 'The pnpm version to use'
       node-version:
         type: string
-        default: '18'
+        default: '20'
         description: 'The Node.js version to use'
     outputs:
       version:
@@ -88,16 +92,20 @@ jobs:
           sparse-checkout: |
             .github
 
+      - uses: pnpm/action-setup@v4
+        name: Install pnpm
+        with:
+          version: ${{ inputs.pnpm-version }}
+          run_install: false
+
       - uses: actions/setup-node@v4
         with:
           node-version: ${{ inputs.node-version }}
-          cache: 'npm'
-          cache-dependency-path: ./.github/scripts/package-lock.json
+          cache: 'pnpm'
 
       - name: Install dependencies
-        working-directory: ./.github/scripts
         shell: bash
-        run: npm ci
+        run: pnpm install --frozen-lockfile
 
       - name: Get variables
         id: get-vars
