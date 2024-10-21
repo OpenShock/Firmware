@@ -92,20 +92,22 @@ jobs:
           sparse-checkout: |
             .github
 
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: ./.github/scripts/package.json
+          cache: 'pnpm'
+          cache-dependency-path: ./.github/scripts/pnpm-lock.yaml
+
       - uses: pnpm/action-setup@v4
         name: Install pnpm
         with:
           version: ${{ inputs.pnpm-version }}
           run_install: false
 
-      - uses: actions/setup-node@v4
-        with:
-          node-version: ${{ inputs.node-version }}
-          cache: 'pnpm'
-
       - name: Install dependencies
+        working-directory: ./.github/scripts
         shell: bash
-        run: pnpm install --frozen-lockfile
+        run: pnpm install --frozen-lockfile --strict-peer-dependencies
 
       - name: Get variables
         id: get-vars

@@ -35,7 +35,7 @@ runs:
     - name: Install dependencies
       working-directory: ./frontend
       shell: bash
-      run: pnpm install --frozen-lockfile
+      run: pnpm install --frozen-lockfile --strict-peer-dependencies
 
     - name: Check
       working-directory: ./frontend
