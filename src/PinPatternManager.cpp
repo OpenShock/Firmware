@@ -6,6 +6,8 @@ const char* const TAG = "PinPatternManager";
 
 #include "Chipset.h"
 #include "Logging.h"
+#include "util/FnProxy.h"
+#include "util/TaskUtils.h"
 
 using namespace OpenShock;
 
@@ -62,7 +64,7 @@ void PinPatternManager::SetPattern(const State* pattern, std::size_t patternLeng
   snprintf(name, sizeof(name), "PinPatternManager-%hhi", m_gpioPin);
 
   // Start the task
-  BaseType_t result = xTaskCreate(RunPattern, name, 1024, this, 1, &m_taskHandle);  // PROFILED: 0.5KB stack usage
+  BaseType_t result = TaskUtils::TaskCreateUniversal(&Util::FnProxy<&PinPatternManager::RunPattern>, name, 1024, this, 1, &m_taskHandle, 1);  // PROFILED: 0.5KB stack usage
   if (result != pdPASS) {
     OS_LOGE(TAG, "[pin-%hhi] Failed to create task: %d", m_gpioPin, result);
 
@@ -92,16 +94,11 @@ void PinPatternManager::ClearPatternInternal()
   m_pattern.clear();
 }
 
-void PinPatternManager::RunPattern(void* arg)
+void PinPatternManager::RunPattern()
 {
-  PinPatternManager* thisPtr = reinterpret_cast<PinPatternManager*>(arg);
-
-  gpio_num_t pin              = thisPtr->m_gpioPin;
-  std::vector<State>& pattern = thisPtr->m_pattern;
-
   while (true) {
-    for (const auto& state : pattern) {
-      gpio_set_level(pin, state.level);
+    for (const auto& state : m_pattern) {
+      gpio_set_level(m_gpioPin, state.level);
       vTaskDelay(pdMS_TO_TICKS(state.duration));
     }
   }

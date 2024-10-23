@@ -28,14 +28,15 @@ namespace OpenShock {
 
     void SetPattern(const State* pattern, std::size_t patternLength);
     template<std::size_t N>
-    inline void SetPattern(const State (&pattern)[N]) {
+    inline void SetPattern(const State (&pattern)[N])
+    {
       SetPattern(pattern, N);
     }
     void ClearPattern();
 
   private:
     void ClearPatternInternal();
-    static void RunPattern(void* arg);
+    void RunPattern();
 
     gpio_num_t m_gpioPin;
     std::vector<State> m_pattern;
