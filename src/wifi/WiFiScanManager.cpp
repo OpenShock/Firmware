@@ -5,6 +5,7 @@
 const char* const TAG = "WiFiScanManager";
 
 #include "Logging.h"
+#include "SimpleMutex.h"
 #include "util/TaskUtils.h"
 
 #include <WiFi.h>
@@ -22,40 +23,40 @@ enum WiFiScanTaskNotificationFlags {
   CLEAR_FLAGS   = CHANNEL_DONE | ERROR
 };
 
+static bool s_initialized                     = false;
+static TaskHandle_t s_scanTaskHandle          = nullptr;
+static OpenShock::SimpleMutex s_scanTaskMutex = {};
+static uint8_t s_currentChannel               = 0;
+static std::map<uint64_t, OpenShock::WiFiScanManager::StatusChangedHandler> s_statusChangedHandlers;
+static std::map<uint64_t, OpenShock::WiFiScanManager::NetworksDiscoveredHandler> s_networksDiscoveredHandlers;
+
 using namespace OpenShock;
 
-static bool s_initialized = false;
-static TaskHandle_t s_scanTaskHandle     = nullptr;
-static SemaphoreHandle_t s_scanTaskMutex = xSemaphoreCreateMutex();
-static uint8_t s_currentChannel     = 0;
-static std::map<uint64_t, WiFiScanManager::StatusChangedHandler> s_statusChangedHandlers;
-static std::map<uint64_t, WiFiScanManager::NetworksDiscoveredHandler> s_networksDiscoveredHandlers;
+bool _notifyTask(WiFiScanTaskNotificationFlags flags)
+{
+  ScopedLock lock__(&s_scanTaskMutex);
 
-bool _notifyTask(WiFiScanTaskNotificationFlags flags) {
-  xSemaphoreTake(s_scanTaskMutex, portMAX_DELAY);
-
-  bool success = false;
-
-  if (s_scanTaskHandle != nullptr) {
-    success = xTaskNotify(s_scanTaskHandle, flags, eSetBits) == pdPASS;
+  if (s_scanTaskHandle == nullptr) {
+    return false;
   }
 
-  xSemaphoreGive(s_scanTaskMutex);
-
-  return success;
+  return xTaskNotify(s_scanTaskHandle, flags, eSetBits) == pdPASS;
 }
 
-void _notifyStatusChangedHandlers(OpenShock::WiFiScanStatus status) {
+void _notifyStatusChangedHandlers(OpenShock::WiFiScanStatus status)
+{
   for (auto& it : s_statusChangedHandlers) {
     it.second(status);
   }
 }
 
-bool _isScanError(int16_t retval) {
+bool _isScanError(int16_t retval)
+{
   return retval < 0 && retval != WIFI_SCAN_RUNNING;
 }
 
-void _handleScanError(int16_t retval) {
+void _handleScanError(int16_t retval)
+{
   if (retval >= 0) return;
 
   _notifyTask(WiFiScanTaskNotificationFlags::ERROR);
@@ -73,7 +74,8 @@ void _handleScanError(int16_t retval) {
   OS_LOGE(TAG, "Scan returned an unknown error");
 }
 
-int16_t _scanChannel(uint8_t channel) {
+int16_t _scanChannel(uint8_t channel)
+{
   int16_t retval = WiFi.scanNetworks(true, true, false, OPENSHOCK_WIFI_SCAN_MAX_MS_PER_CHANNEL, channel);
   if (!_isScanError(retval)) {
     return retval;
@@ -84,7 +86,8 @@ int16_t _scanChannel(uint8_t channel) {
   return retval;
 }
 
-WiFiScanStatus _scanningTaskImpl() {
+WiFiScanStatus _scanningTaskImpl()
+{
   // Start the scan on the highest channel and work our way down
   uint8_t channel = OPENSHOCK_WIFI_SCAN_MAX_CHANNEL;
 
@@ -138,25 +141,29 @@ WiFiScanStatus _scanningTaskImpl() {
   return WiFiScanStatus::Completed;
 }
 
-void _scanningTask(void* arg) {
+void _scanningTask(void* arg)
+{
   (void)arg;
-  
+
   // Start the scan
   WiFiScanStatus status = _scanningTaskImpl();
 
   // Notify the status changed handlers of the scan result
   _notifyStatusChangedHandlers(status);
 
+  s_scanTaskMutex.lock(portMAX_DELAY);
+
   // Clear the task handle
-  xSemaphoreTake(s_scanTaskMutex, portMAX_DELAY);
   s_scanTaskHandle = nullptr;
-  xSemaphoreGive(s_scanTaskMutex);
+
+  s_scanTaskMutex.unlock();
 
   // Kill this task
   vTaskDelete(nullptr);
 }
 
-void _evScanCompleted(arduino_event_id_t event, arduino_event_info_t info) {
+void _evScanCompleted(arduino_event_id_t event, arduino_event_info_t info)
+{
   (void)event;
   (void)info;
 
@@ -192,14 +199,16 @@ void _evScanCompleted(arduino_event_id_t event, arduino_event_info_t info) {
   // Notify the scan task that we're done
   _notifyTask(WiFiScanTaskNotificationFlags::CHANNEL_DONE);
 }
-void _evSTAStopped(arduino_event_id_t event, arduino_event_info_t info) {
+void _evSTAStopped(arduino_event_id_t event, arduino_event_info_t info)
+{
   (void)event;
   (void)info;
 
   _notifyTask(WiFiScanTaskNotificationFlags::WIFI_DISABLED);
 }
 
-bool WiFiScanManager::Init() {
+bool WiFiScanManager::Init()
+{
   if (s_initialized) {
     OS_LOGW(TAG, "WiFiScanManager is already initialized");
     return true;
@@ -213,40 +222,36 @@ bool WiFiScanManager::Init() {
   return true;
 }
 
-bool WiFiScanManager::IsScanning() {
+bool WiFiScanManager::IsScanning()
+{
   return s_scanTaskHandle != nullptr;
 }
 
-bool WiFiScanManager::StartScan() {
-  xSemaphoreTake(s_scanTaskMutex, portMAX_DELAY);
+bool WiFiScanManager::StartScan()
+{
+  ScopedLock lock__(&s_scanTaskMutex);
 
   // Check if a scan is already in progress
   if (s_scanTaskHandle != nullptr && eTaskGetState(s_scanTaskHandle) != eDeleted) {
     OS_LOGW(TAG, "Cannot start scan: scan task is already running");
-
-    xSemaphoreGive(s_scanTaskMutex);
     return false;
   }
 
   // Start the scan task
   if (TaskUtils::TaskCreateExpensive(_scanningTask, "WiFiScanManager", 4096, nullptr, 1, &s_scanTaskHandle) != pdPASS) {  // PROFILED: 1.8KB stack usage
     OS_LOGE(TAG, "Failed to create scan task");
-
-    xSemaphoreGive(s_scanTaskMutex);
     return false;
   }
 
-  xSemaphoreGive(s_scanTaskMutex);
   return true;
 }
-bool WiFiScanManager::AbortScan() {
-  xSemaphoreTake(s_scanTaskMutex, portMAX_DELAY);
+bool WiFiScanManager::AbortScan()
+{
+  ScopedLock lock__(&s_scanTaskMutex);
 
   // Check if a scan is in progress
   if (s_scanTaskHandle == nullptr || eTaskGetState(s_scanTaskHandle) == eDeleted) {
     OS_LOGW(TAG, "Cannot abort scan: no scan is in progress");
-
-    xSemaphoreGive(s_scanTaskMutex);
     return false;
   }
 
@@ -259,17 +264,18 @@ bool WiFiScanManager::AbortScan() {
     it.second(WiFiScanStatus::Aborted);
   }
 
-  xSemaphoreGive(s_scanTaskMutex);
   return true;
 }
 
-uint64_t WiFiScanManager::RegisterStatusChangedHandler(const WiFiScanManager::StatusChangedHandler& handler) {
-  static uint64_t nextHandle = 0;
-  uint64_t handle            = nextHandle++;
+uint64_t WiFiScanManager::RegisterStatusChangedHandler(const WiFiScanManager::StatusChangedHandler& handler)
+{
+  static uint64_t nextHandle      = 0;
+  uint64_t handle                 = nextHandle++;
   s_statusChangedHandlers[handle] = handler;
   return handle;
 }
-void WiFiScanManager::UnregisterStatusChangedHandler(uint64_t handle) {
+void WiFiScanManager::UnregisterStatusChangedHandler(uint64_t handle)
+{
   auto it = s_statusChangedHandlers.find(handle);
 
   if (it != s_statusChangedHandlers.end()) {
@@ -277,13 +283,15 @@ void WiFiScanManager::UnregisterStatusChangedHandler(uint64_t handle) {
   }
 }
 
-uint64_t WiFiScanManager::RegisterNetworksDiscoveredHandler(const WiFiScanManager::NetworksDiscoveredHandler& handler) {
-  static uint64_t nextHandle      = 0;
-  uint64_t handle                 = nextHandle++;
+uint64_t WiFiScanManager::RegisterNetworksDiscoveredHandler(const WiFiScanManager::NetworksDiscoveredHandler& handler)
+{
+  static uint64_t nextHandle           = 0;
+  uint64_t handle                      = nextHandle++;
   s_networksDiscoveredHandlers[handle] = handler;
   return handle;
 }
-void WiFiScanManager::UnregisterNetworksDiscoveredHandler(uint64_t handle) {
+void WiFiScanManager::UnregisterNetworksDiscoveredHandler(uint64_t handle)
+{
   auto it = s_networksDiscoveredHandlers.find(handle);
 
   if (it != s_networksDiscoveredHandlers.end()) {

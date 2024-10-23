@@ -15,7 +15,7 @@ PinPatternManager::PinPatternManager(gpio_num_t gpioPin)
   : m_gpioPin(GPIO_NUM_NC)
   , m_pattern()
   , m_taskHandle(nullptr)
-  , m_taskMutex(xSemaphoreCreateMutex())
+  , m_taskMutex()
 {
   if (gpioPin == GPIO_NUM_NC) {
     OS_LOGE(TAG, "Pin is not set");
@@ -45,8 +45,6 @@ PinPatternManager::~PinPatternManager()
 {
   ClearPattern();
 
-  vSemaphoreDelete(m_taskMutex);
-
   if (m_gpioPin != GPIO_NUM_NC) {
     gpio_reset_pin(m_gpioPin);
   }
@@ -54,6 +52,8 @@ PinPatternManager::~PinPatternManager()
 
 void PinPatternManager::SetPattern(const State* pattern, std::size_t patternLength)
 {
+  m_taskMutex.lock(portMAX_DELAY);
+
   ClearPatternInternal();
 
   // Set new values
@@ -72,20 +72,20 @@ void PinPatternManager::SetPattern(const State* pattern, std::size_t patternLeng
     m_pattern.clear();
   }
 
-  // Give the semaphore back
-  xSemaphoreGive(m_taskMutex);
+  m_taskMutex.unlock();
 }
 
 void PinPatternManager::ClearPattern()
 {
+  m_taskMutex.lock(portMAX_DELAY);
+
   ClearPatternInternal();
-  xSemaphoreGive(m_taskMutex);
+
+  m_taskMutex.unlock();
 }
 
 void PinPatternManager::ClearPatternInternal()
 {
-  xSemaphoreTake(m_taskMutex, portMAX_DELAY);
-
   if (m_taskHandle != nullptr) {
     vTaskDelete(m_taskHandle);
     m_taskHandle = nullptr;
