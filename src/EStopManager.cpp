@@ -202,7 +202,7 @@ bool EStopManager::Init()
     return false;
   }
 
-  OpenShock::ScopedLock lock(&s_estopMutex);
+  OpenShock::ScopedLock lock__(&s_estopMutex);
 
   if (!_setEStopPinImpl(cfg.gpioPin)) {
     OS_LOGE(TAG, "Failed to set EStop pin");
@@ -219,7 +219,7 @@ bool EStopManager::Init()
 
 bool EStopManager::SetEStopEnabled(bool enabled)
 {
-  OpenShock::ScopedLock lock(&s_estopMutex);
+  OpenShock::ScopedLock lock__(&s_estopMutex);
 
   if (s_estopPin == GPIO_NUM_NC) {
     gpio_num_t pin;
@@ -240,7 +240,7 @@ bool EStopManager::SetEStopEnabled(bool enabled)
 
 bool EStopManager::SetEStopPin(gpio_num_t pin)
 {
-  OpenShock::ScopedLock lock(&s_estopMutex);
+  OpenShock::ScopedLock lock__(&s_estopMutex);
 
   return _setEStopPinImpl(pin);
 }
