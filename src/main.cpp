@@ -24,11 +24,6 @@ const char* const TAG = "main";
 // Internal setup function, returns true if setup succeeded, false otherwise.
 bool trySetup()
 {
-  if (!OpenShock::Events::Init()) {
-    OS_LOGE(TAG, "Unable to initialize Events");
-    return false;
-  }
-
   if (!OpenShock::VisualStateManager::Init()) {
     OS_LOGE(TAG, "Unable to initialize VisualStateManager");
     return false;
@@ -100,6 +95,10 @@ void setup()
   ::Serial.begin(115'200);
 
   OpenShock::Config::Init();
+
+  if (!OpenShock::Events::Init()) {
+    OS_PANIC(TAG, "Unable to initialize Events");
+  }
 
   if (!OpenShock::OtaUpdateManager::Init()) {
     OS_PANIC(TAG, "Unable to initialize OTA Update Manager");
