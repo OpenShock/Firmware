@@ -7,6 +7,7 @@ const char* const TAG = "main";
 #include "Common.h"
 #include "config/Config.h"
 #include "EStopManager.h"
+#include "events/Events.h"
 #include "GatewayConnectionManager.h"
 #include "Logging.h"
 #include "OtaUpdateManager.h"
@@ -94,6 +95,10 @@ void setup()
   ::Serial.begin(115'200);
 
   OpenShock::Config::Init();
+
+  if (!OpenShock::Events::Init()) {
+    OS_PANIC(TAG, "Unable to initialize Events");
+  }
 
   if (!OpenShock::OtaUpdateManager::Init()) {
     OS_PANIC(TAG, "Unable to initialize OTA Update Manager");

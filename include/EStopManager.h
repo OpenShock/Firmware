@@ -1,5 +1,7 @@
 #pragma once
 
+#include "EStopState.h"
+
 #include <hal/gpio_types.h>
 
 #include <cstdint>
