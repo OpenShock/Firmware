@@ -8,6 +8,8 @@ const char* const TAG = "CommandHandler";
 #include "Common.h"
 #include "config/Config.h"
 #include "EStopManager.h"
+#include "EStopState.h"
+#include "events/Events.h"
 #include "Logging.h"
 #include "radio/RFTransmitter.h"
 #include "ReadWriteMutex.h"
@@ -151,8 +153,21 @@ bool _internalSetKeepAliveEnabled(bool enabled)
   return true;
 }
 
+void _handleOpenShockEStopStateChangeEvent(void* event_handler_arg, esp_event_base_t event_base, int32_t event_id, void* event_data)
+{
+  (void)event_handler_arg;
+  (void)event_base;
+  (void)event_id;
+
+  EStopState state = *reinterpret_cast<EStopState*>(event_data);
+
+  _internalSetKeepAliveEnabled(state == EStopState::Idle);
+}
+
 bool CommandHandler::Init()
 {
+  esp_err_t err;
+
   static bool initialized = false;
   if (initialized) {
     OS_LOGW(TAG, "RF Transmitter and EStopManager are already initialized?");
@@ -197,6 +212,12 @@ bool CommandHandler::Init()
   Config::EStopConfig estopConfig;
   if (!Config::GetEStop(estopConfig)) {
     OS_LOGE(TAG, "Failed to get EStop config");
+    return false;
+  }
+
+  err = esp_event_handler_register(OPENSHOCK_EVENTS, OPENSHOCK_EVENT_ESTOP_STATE_CHANGED, _handleOpenShockEStopStateChangeEvent, nullptr);
+  if (err != ESP_OK) {
+    OS_LOGE(TAG, "Failed to register event handler for OPENSHOCK_EVENTS: %s", esp_err_to_name(err));
     return false;
   }
 
@@ -271,25 +292,6 @@ bool CommandHandler::SetKeepAliveEnabled(bool enabled)
 
   if (!Config::SetRFConfigKeepAliveEnabled(enabled)) {
     OS_LOGE(TAG, "Failed to set keep-alive enabled in config");
-    return false;
-  }
-
-  return true;
-}
-
-bool CommandHandler::SetKeepAlivePaused(bool paused)
-{
-  bool keepAliveEnabled = false;
-  if (!Config::GetRFConfigKeepAliveEnabled(keepAliveEnabled)) {
-    OS_LOGE(TAG, "Failed to get keep-alive enabled from config");
-    return false;
-  }
-
-  if (keepAliveEnabled == false && paused == false) {
-    OS_LOGW(TAG, "Keep-alive is disabled in config, ignoring unpause command");
-    return false;
-  }
-  if (!_internalSetKeepAliveEnabled(!paused)) {
     return false;
   }
 

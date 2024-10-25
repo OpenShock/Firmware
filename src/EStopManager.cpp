@@ -35,9 +35,6 @@ static int64_t s_estopActivatedAt = 0;
 
 void _estopUpdateExternals(bool isActive, bool isAwaitingRelease)
 {
-  // Set KeepAlive state
-  OpenShock::CommandHandler::SetKeepAlivePaused(isActive);
-
   // Post an event
   ESP_ERROR_CHECK(esp_event_post(OPENSHOCK_EVENTS, OPENSHOCK_EVENT_ESTOP_STATE_CHANGED, &s_estopState, sizeof(s_estopState), portMAX_DELAY));
 }

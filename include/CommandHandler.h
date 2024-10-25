@@ -21,7 +21,6 @@ namespace OpenShock::CommandHandler {
   gpio_num_t GetEstopPin();
 
   bool SetKeepAliveEnabled(bool enabled);
-  bool SetKeepAlivePaused(bool paused);
 
   bool HandleCommand(ShockerModelType shockerModel, uint16_t shockerId, ShockerCommandType type, uint8_t intensity, uint16_t durationMs);
 }  // namespace OpenShock::CommandHandler
