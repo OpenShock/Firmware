@@ -236,7 +236,6 @@ void _updateVisualState()
   OS_LOGW(TAG, "Trying to update visual state, but no LED is active!");
 }
 
-
 void _handleEspWiFiEvent(void* event_handler_arg, esp_event_base_t event_base, int32_t event_id, void* event_data)
 {
   (void)event_handler_arg;
@@ -246,18 +245,18 @@ void _handleEspWiFiEvent(void* event_handler_arg, esp_event_base_t event_base, i
   uint64_t oldState = s_stateFlags;
 
   switch (event_id) {
-  case WIFI_EVENT_STA_CONNECTED:
-    _setStateFlag(kWiFiConnectedFlag, true);
-    break;
-  case WIFI_EVENT_STA_DISCONNECTED:
-    _setStateFlag(kWiFiConnectedFlag, false);
-    _setStateFlag(kHasIpAddressFlag, false);
-    break;
-  case WIFI_EVENT_SCAN_DONE:
-    _setStateFlag(kWiFiScanningFlag, false);
-    break;
-  default:
-    return;
+    case WIFI_EVENT_STA_CONNECTED:
+      _setStateFlag(kWiFiConnectedFlag, true);
+      break;
+    case WIFI_EVENT_STA_DISCONNECTED:
+      _setStateFlag(kWiFiConnectedFlag, false);
+      _setStateFlag(kHasIpAddressFlag, false);
+      break;
+    case WIFI_EVENT_SCAN_DONE:
+      _setStateFlag(kWiFiScanningFlag, false);
+      break;
+    default:
+      return;
   }
 
   if (oldState != s_stateFlags) {
@@ -274,19 +273,19 @@ void _handleEspIpEvent(void* event_handler_arg, esp_event_base_t event_base, int
   uint64_t oldState = s_stateFlags;
 
   switch (event_id) {
-  case IP_EVENT_GOT_IP6:
-  case IP_EVENT_STA_GOT_IP:
-  case IP_EVENT_ETH_GOT_IP:
-  case IP_EVENT_PPP_GOT_IP:
-    _setStateFlag(kHasIpAddressFlag, true);
-    break;
-  case IP_EVENT_STA_LOST_IP:
-  case IP_EVENT_ETH_LOST_IP:
-  case IP_EVENT_PPP_LOST_IP:
-    _setStateFlag(kHasIpAddressFlag, false);
-    break;
-  default:
-    return;
+    case IP_EVENT_GOT_IP6:
+    case IP_EVENT_STA_GOT_IP:
+    case IP_EVENT_ETH_GOT_IP:
+    case IP_EVENT_PPP_GOT_IP:
+      _setStateFlag(kHasIpAddressFlag, true);
+      break;
+    case IP_EVENT_STA_LOST_IP:
+    case IP_EVENT_ETH_LOST_IP:
+    case IP_EVENT_PPP_LOST_IP:
+      _setStateFlag(kHasIpAddressFlag, false);
+      break;
+    default:
+      return;
   }
 
   if (oldState != s_stateFlags) {
@@ -309,7 +308,6 @@ void _handleOpenShockGatewayStateChanged(void* event_data)
   _setStateFlag(kWebSocketConnectedFlag, state == GatewayClientState::Connected);
 }
 
-
 void _handleOpenShockEvent(void* event_handler_arg, esp_event_base_t event_base, int32_t event_id, void* event_data)
 {
   (void)event_handler_arg;
@@ -317,19 +315,17 @@ void _handleOpenShockEvent(void* event_handler_arg, esp_event_base_t event_base,
 
   uint64_t oldState = s_stateFlags;
 
-  switch (event_id)
-  {
-  case OPENSHOCK_EVENT_ESTOP_STATE_CHANGED:
-    _handleOpenShockEStopStateChanged(event_data);
-    break;
-  case OPENSHOCK_EVENT_GATEWAY_CLIENT_STATE_CHANGED:
-    _handleOpenShockGatewayStateChanged(event_data);
-    break;
-  default:
-    ESP_LOGW(TAG, "Received unknown event ID: %i", event_id);
-    return;
+  switch (event_id) {
+    case OPENSHOCK_EVENT_ESTOP_STATE_CHANGED:
+      _handleOpenShockEStopStateChanged(event_data);
+      break;
+    case OPENSHOCK_EVENT_GATEWAY_CLIENT_STATE_CHANGED:
+      _handleOpenShockGatewayStateChanged(event_data);
+      break;
+    default:
+      ESP_LOGW(TAG, "Received unknown event ID: %i", event_id);
+      return;
   }
-
 
   if (oldState != s_stateFlags) {
     _updateVisualState();

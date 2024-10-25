@@ -9,4 +9,4 @@ namespace OpenShock {
     ActiveClearing,
     AwaitingRelease
   };
-}
+}  // namespace OpenShock
