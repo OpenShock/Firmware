@@ -1,8 +1,8 @@
-#include "event_handlers/WebSocket.h"
+#include "message_handlers/WebSocket.h"
 
 const char* const TAG = "ServerMessageHandlers";
 
-#include "event_handlers/impl/WSGateway.h"
+#include "message_handlers/impl/WSGateway.h"
 
 #include "Logging.h"
 
@@ -34,7 +34,8 @@ static std::array<Handlers::HandlerType, HANDLER_COUNT> s_serverHandlers = []() 
   return handlers;
 }();
 
-void EventHandlers::WebSocket::HandleGatewayBinary(const uint8_t* data, std::size_t len) {
+void MessageHandlers::WebSocket::HandleGatewayBinary(const uint8_t* data, std::size_t len)
+{
   // Deserialize
   auto msg = flatbuffers::GetRoot<Schemas::GatewayToHubMessage>(data);
   if (msg == nullptr) {

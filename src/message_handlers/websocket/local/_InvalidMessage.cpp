@@ -1,4 +1,4 @@
-#include "event_handlers/impl/WSLocal.h"
+#include "message_handlers/impl/WSLocal.h"
 
 const char* const TAG = "LocalMessageHandlers";
 
@@ -6,9 +6,10 @@ const char* const TAG = "LocalMessageHandlers";
 
 using namespace OpenShock::MessageHandlers::Local;
 
-void _Private::HandleInvalidMessage(uint8_t socketId, const OpenShock::Serialization::Local::LocalToHubMessage* root) {
+void _Private::HandleInvalidMessage(uint8_t socketId, const OpenShock::Serialization::Local::LocalToHubMessage* root)
+{
   (void)socketId;
-  
+
   if (root == nullptr) {
     OS_LOGE(TAG, "Message cannot be parsed");
     return;

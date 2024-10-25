@@ -1,4 +1,4 @@
-#include "event_handlers/impl/WSLocal.h"
+#include "message_handlers/impl/WSLocal.h"
 
 const char* const TAG = "LocalMessageHandlers";
 
@@ -10,12 +10,13 @@ const char* const TAG = "LocalMessageHandlers";
 
 using namespace OpenShock::MessageHandlers::Local;
 
-void _Private::HandleWiFiNetworkConnectCommand(uint8_t socketId, const OpenShock::Serialization::Local::LocalToHubMessage* root) {
+void _Private::HandleWiFiNetworkForgetCommand(uint8_t socketId, const OpenShock::Serialization::Local::LocalToHubMessage* root)
+{
   (void)socketId;
-  
-  auto msg = root->payload_as_WifiNetworkConnectCommand();
+
+  auto msg = root->payload_as_WifiNetworkForgetCommand();
   if (msg == nullptr) {
-    OS_LOGE(TAG, "Payload cannot be parsed as WiFiNetworkConnectCommand");
+    OS_LOGE(TAG, "Payload cannot be parsed as WiFiNetworkForgetCommand");
     return;
   }
 
@@ -31,7 +32,7 @@ void _Private::HandleWiFiNetworkConnectCommand(uint8_t socketId, const OpenShock
     return;
   }
 
-  if (!WiFiManager::Connect(ssid->c_str())) {  // TODO: support hidden networks
-    OS_LOGE(TAG, "Failed to connect to WiFi network");
+  if (!WiFiManager::Forget(ssid->c_str())) {  // TODO: support hidden networks
+    OS_LOGE(TAG, "Failed to forget WiFi network");
   }
 }

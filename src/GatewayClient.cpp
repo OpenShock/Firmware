@@ -4,9 +4,9 @@ const char* const TAG = "GatewayClient";
 
 #include "Common.h"
 #include "config/Config.h"
-#include "event_handlers/WebSocket.h"
 #include "events/Events.h"
 #include "Logging.h"
+#include "message_handlers/WebSocket.h"
 #include "OtaUpdateManager.h"
 #include "serialization/WSGateway.h"
 #include "Time.h"
@@ -203,7 +203,7 @@ void GatewayClient::_handleEvent(WStype_t type, uint8_t* payload, std::size_t le
       OS_LOGV(TAG, "Received pong from API");
       break;
     case WStype_BIN:
-      EventHandlers::WebSocket::HandleGatewayBinary(payload, length);
+      MessageHandlers::WebSocket::HandleGatewayBinary(payload, length);
       break;
     case WStype_FRAGMENT_BIN_START:
       OS_LOGE(TAG, "Received binary fragment start from API, this is not supported!");

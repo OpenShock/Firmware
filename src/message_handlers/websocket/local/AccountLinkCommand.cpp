@@ -1,4 +1,4 @@
-#include "event_handlers/impl/WSLocal.h"
+#include "message_handlers/impl/WSLocal.h"
 
 const char* const TAG = "LocalMessageHandlers";
 
@@ -8,7 +8,8 @@ const char* const TAG = "LocalMessageHandlers";
 
 #include <cstdint>
 
-void serializeAccountLinkCommandResult(uint8_t socketId, OpenShock::Serialization::Local::AccountLinkResultCode result) {
+void serializeAccountLinkCommandResult(uint8_t socketId, OpenShock::Serialization::Local::AccountLinkResultCode result)
+{
   flatbuffers::FlatBufferBuilder builder(1024);  // TODO: Determine a good size
 
   auto responseOffset = OpenShock::Serialization::Local::CreateAccountLinkCommandResult(builder, result);
@@ -25,7 +26,8 @@ void serializeAccountLinkCommandResult(uint8_t socketId, OpenShock::Serializatio
 
 using namespace OpenShock::MessageHandlers::Local;
 
-void _Private::HandleAccountLinkCommand(uint8_t socketId, const OpenShock::Serialization::Local::LocalToHubMessage* root) {
+void _Private::HandleAccountLinkCommand(uint8_t socketId, const OpenShock::Serialization::Local::LocalToHubMessage* root)
+{
   auto msg = root->payload_as_AccountLinkCommand();
   if (msg == nullptr) {
     OS_LOGE(TAG, "Payload cannot be parsed as AccountLinkCommand");
