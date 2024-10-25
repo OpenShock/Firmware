@@ -5,18 +5,19 @@
 const char* const TAG = "EStopManager";
 
 #include "Chipset.h"
-#include "CommandHandler.h"
 #include "config/Config.h"
 #include "events/Events.h"
 #include "Logging.h"
 #include "SimpleMutex.h"
 #include "Time.h"
 #include "util/TaskUtils.h"
-#include "VisualStateManager.h"
 
 #include <driver/gpio.h>
 #include <freertos/queue.h>
+#include <freertos/task.h>
 #include <freertos/timers.h>
+
+#include <cstdint>
 
 using namespace OpenShock;
 
