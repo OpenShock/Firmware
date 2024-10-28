@@ -11,19 +11,17 @@ const char* const TAG = "CommandHandler";
 #include "Logging.h"
 #include "radio/RFTransmitter.h"
 #include "ReadWriteMutex.h"
+#include "SimpleMutex.h"
 #include "Time.h"
 #include "util/TaskUtils.h"
 
 #include <freertos/queue.h>
-#include <freertos/semphr.h>
 
 #include <memory>
 #include <unordered_map>
 
 const int64_t KEEP_ALIVE_INTERVAL  = 60'000;
 const uint16_t KEEP_ALIVE_DURATION = 300;
-
-using namespace OpenShock;
 
 uint32_t calculateEepyTime(int64_t timeToKeepAlive)
 {
@@ -33,19 +31,21 @@ uint32_t calculateEepyTime(int64_t timeToKeepAlive)
 
 struct KnownShocker {
   bool killTask;
-  ShockerModelType model;
+  OpenShock::ShockerModelType model;
   uint16_t shockerId;
   int64_t lastActivityTimestamp;
 };
 
-static ReadWriteMutex s_rfTransmitterMutex            = {};
-static std::unique_ptr<RFTransmitter> s_rfTransmitter = nullptr;
+static OpenShock::ReadWriteMutex s_rfTransmitterMutex            = {};
+static std::unique_ptr<OpenShock::RFTransmitter> s_rfTransmitter = nullptr;
 
-static SemaphoreHandle_t s_estopManagerMutex = nullptr;
+static OpenShock::SimpleMutex s_estopManagerMutex = {};
 
-static ReadWriteMutex s_keepAliveMutex    = {};
-static QueueHandle_t s_keepAliveQueue     = nullptr;
-static TaskHandle_t s_keepAliveTaskHandle = nullptr;
+static OpenShock::ReadWriteMutex s_keepAliveMutex = {};
+static QueueHandle_t s_keepAliveQueue             = nullptr;
+static TaskHandle_t s_keepAliveTaskHandle         = nullptr;
+
+using namespace OpenShock;
 
 void _keepAliveTask(void* arg)
 {
@@ -111,7 +111,7 @@ bool _internalSetKeepAliveEnabled(bool enabled)
     return true;
   }
 
-  ScopedWriteLock keepAliveLock(&s_keepAliveMutex);
+  ScopedWriteLock lock__(&s_keepAliveMutex);
 
   if (enabled) {
     OS_LOGV(TAG, "Enabling keep-alive task");
@@ -159,8 +159,6 @@ bool CommandHandler::Init()
     return true;
   }
   initialized = true;
-
-  s_estopManagerMutex = xSemaphoreCreateMutex();
 
   Config::RFConfig rfConfig;
   if (!Config::GetRFConfig(rfConfig)) {
@@ -218,7 +216,7 @@ SetGPIOResultCode CommandHandler::SetRfTxPin(gpio_num_t txPin)
     return SetGPIOResultCode::InvalidPin;
   }
 
-  ScopedWriteLock rftxLock(&s_rfTransmitterMutex);
+  ScopedWriteLock lock__(&s_rfTransmitterMutex);
 
   if (s_rfTransmitter != nullptr) {
     OS_LOGV(TAG, "Destroying existing RF transmitter");
@@ -245,23 +243,20 @@ SetGPIOResultCode CommandHandler::SetRfTxPin(gpio_num_t txPin)
 SetGPIOResultCode CommandHandler::SetEStopPin(gpio_num_t estopPin)
 {
   if (OpenShock::IsValidInputPin(static_cast<int8_t>(estopPin))) {
-    xSemaphoreTake(s_estopManagerMutex, portMAX_DELAY);
+    ScopedLock lock__(&s_estopManagerMutex);
 
     if (!EStopManager::SetEStopPin(estopPin)) {
       OS_LOGE(TAG, "Failed to set EStop pin");
 
-      xSemaphoreGive(s_estopManagerMutex);
       return SetGPIOResultCode::InternalError;
     }
 
     if (!Config::SetEStopGpioPin(estopPin)) {
       OS_LOGE(TAG, "Failed to set EStop pin in config");
 
-      xSemaphoreGive(s_estopManagerMutex);
       return SetGPIOResultCode::InternalError;
     }
 
-    xSemaphoreGive(s_estopManagerMutex);
     return SetGPIOResultCode::Success;
   } else {
     return SetGPIOResultCode::InvalidPin;
@@ -318,7 +313,7 @@ gpio_num_t CommandHandler::GetRfTxPin()
 
 bool CommandHandler::HandleCommand(ShockerModelType model, uint16_t shockerId, ShockerCommandType type, uint8_t intensity, uint16_t durationMs)
 {
-  ScopedReadLock rftxLock(&s_rfTransmitterMutex);
+  ScopedReadLock lock__rf(&s_rfTransmitterMutex);
 
   if (s_rfTransmitter == nullptr) {
     OS_LOGW(TAG, "RF Transmitter is not initialized, ignoring command");
@@ -340,8 +335,8 @@ bool CommandHandler::HandleCommand(ShockerModelType model, uint16_t shockerId, S
 
   bool ok = s_rfTransmitter->SendCommand(model, shockerId, type, intensity, durationMs);
 
-  rftxLock.unlock();
-  ScopedReadLock keepAliveLock(&s_keepAliveMutex);
+  lock__rf.unlock();
+  ScopedReadLock lock__ka(&s_keepAliveMutex);
 
   if (ok && s_keepAliveQueue != nullptr) {
     KnownShocker cmd {.model = model, .shockerId = shockerId, .lastActivityTimestamp = OpenShock::millis() + durationMs};

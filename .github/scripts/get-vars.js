@@ -1,8 +1,8 @@
-const fs = require('fs');
-const ini = require('ini');
-const semver = require('semver');
-const core = require('@actions/core');
-const child_process = require('child_process');
+import fs from 'fs';
+import ini from 'ini';
+import semver from 'semver';
+import core from '@actions/core';
+import child_process from 'child_process';
 
 // Get branch name
 const gitRef = process.env.GITHUB_REF;
