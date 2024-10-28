@@ -210,12 +210,6 @@
 #ifdef OPENSHOCK_FW_BOARD_NODEMCU32S
 #define OPENSHOCK_BYPASSED_GPIO(pin) ((pin) == 2)
 #endif
-#ifdef OPENSHOCK_FW_BOARD_UPESYWROOM
-// Pin 35 is NC
-#define CHIP_UNSAFE_GPIO(pin)                                                                                                                                                                                                                                  \
-  ((pin) == GPIO_NUM_1 || (pin) == GPIO_NUM_3 || (pin) == GPIO_NUM_0 || (pin) == GPIO_NUM_2 || (pin) == GPIO_NUM_5 || (pin) == GPIO_NUM_15 || (pin) == GPIO_NUM_6 || (pin) == GPIO_NUM_7 || (pin) == GPIO_NUM_8 || (pin) == GPIO_NUM_9 || (pin) == GPIO_NUM_11 \
-   || (pin) == GPIO_NUM_16 || (pin) == GPIO_NUM_17 || (pin) == GPIO_NUM_35)
-#endif
 #ifndef OPENSHOCK_BYPASSED_GPIO
 #define OPENSHOCK_BYPASSED_GPIO(pin) (false)
 #endif
