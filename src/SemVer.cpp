@@ -2,10 +2,15 @@
 
 const char* const TAG = "SemVer";
 
+#include "Convert.h"
 #include "Logging.h"
+#include "util/DigitCounter.h"
 #include "util/StringUtils.h"
 
 using namespace OpenShock;
+
+// https://semver.org/#backusnaur-form-grammar-for-valid-semver-versions
+#pragma region Validation Functions
 
 constexpr bool _semverIsLetter(char c)
 {
@@ -208,31 +213,7 @@ bool _semverIsSemver(std::string_view str)
 
   return false;
 }
-
-bool _tryParseU16(std::string_view str, uint16_t& out)
-{
-  if (str.empty()) {
-    return false;
-  }
-
-  uint32_t u32 = 0;
-  for (auto c : str) {
-    if (c < '0' || c > '9') {
-      return false;
-    }
-
-    u32 *= 10;
-    u32 += c - '0';
-
-    if (u32 > std::numeric_limits<uint16_t>::max()) {
-      return false;
-    }
-  }
-
-  out = static_cast<uint16_t>(u32);
-
-  return true;
-}
+#pragma endregion
 
 bool SemVer::isValid() const
 {
@@ -249,14 +230,22 @@ bool SemVer::isValid() const
 
 std::string SemVer::toString() const
 {
-  std::string str;
-  str.reserve(32);
+  std::size_t length = 2 + Util::Digits10Count(major) + Util::Digits10Count(minor) + Util::Digits10Count(patch);
+  if (!prerelease.empty()) {
+    length += 1 + prerelease.length();
+  }
+  if (!build.empty()) {
+    length += 1 + build.length();
+  }
 
-  str += std::to_string(major);
+  std::string str;
+  str.reserve(length);
+
+  Convert::FromUint16(major, str);
   str += '.';
-  str += std::to_string(minor);
+  Convert::FromUint16(minor, str);
   str += '.';
-  str += std::to_string(patch);
+  Convert::FromUint16(patch, str);
 
   if (!prerelease.empty()) {
     str += '-';
@@ -351,17 +340,17 @@ bool OpenShock::TryParseSemVer(std::string_view semverStr, SemVer& semver)
     semver.prerelease = semver.prerelease.substr(0, plusIdx);
   }
 
-  if (!_tryParseU16(majorStr, semver.major)) {
+  if (!Convert::ToUint16(majorStr, semver.major)) {
     OS_LOGE(TAG, "Invalid major version: %.*s", majorStr.length(), majorStr.data());
     return false;
   }
 
-  if (!_tryParseU16(minorStr, semver.minor)) {
+  if (!Convert::ToUint16(minorStr, semver.minor)) {
     OS_LOGE(TAG, "Invalid minor version: %.*s", minorStr.length(), minorStr.data());
     return false;
   }
 
-  if (!_tryParseU16(patchStr, semver.patch)) {
+  if (!Convert::ToUint16(patchStr, semver.patch)) {
     OS_LOGE(TAG, "Invalid patch version: %.*s", patchStr.length(), patchStr.data());
     return false;
   }
