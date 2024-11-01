@@ -1,6 +1,15 @@
 name: cdn-bump-version
 description: Uploads version file to CDN
 inputs:
+  bunny-stor-host:
+    description: Bunny SFTP Hostname
+    required: true
+  bunny-stor-username:
+    description: Bunny SFTP Username
+    required: true
+  bunny-stor-password:
+    description: Bunny SFTP Password
+    required: true
   cf-bucket:
     description: Name of the S3 bucket
     required: true
@@ -19,4 +28,4 @@ runs:
       run: |
         mkdir -p upload
         echo "${{ inputs.version }}" >> upload/version-${{ inputs.release-channel }}.txt
-        rclone copy upload cdn:/
+        sshpass -p "${{ inputs.bunny-stor-password }}" scp -r upload/ ${{ inputs.bunny-stor-username }}@${{ inputs.bunny-stor-host }}:/

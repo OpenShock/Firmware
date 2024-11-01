@@ -1,35 +1,19 @@
-name: bunny-prepare
-description: Bunny rclone setup
+name: cdn-prepare
+description: Bunny sshpass and knowhosts setup
 inputs:
-  bunny-stor-hostname:
+  bunny-ssh-knownhosts:
     description: Bunny SFTP Hostname
-    required: true
-  bunny-stor-port:
-    description: Bunny SFTP Port
-    required: true
-  bunny-stor-username:
-    description: Bunny SFTP Username
-    required: true
-  bunny-stor-password:
-    description: Bunny SFTP Password
     required: true
 
 runs:
   using: composite
   steps:
-    - name: Install rclone
+    - name: Install sshpass
       shell: bash
-      run: sudo apt-get install -y rclone
+      run: sudo apt-get install -y sshpass
 
-    - name: Configure rclone
+    - name: Configure known hosts
       shell: bash
       run: |
-        mkdir -p ~/.config/rclone/
-        conf=~/.config/rclone/rclone.conf
-        echo "[cdn]" >> $conf
-        echo "type = sftp" >> $conf
-        echo "host = ${{ inputs.bunny-stor-hostname }}" >> $conf
-        echo "user = ${{ inputs.bunny-stor-username }}" >> $conf
-        echo "port = ${{ inputs.bunny-stor-port }}" >> $conf
-        echo "pass = ${{ inputs.bunny-stor-password }}" >> $conf
+        echo "${{ inputs.bunny-ssh-knownhosts }}" >> ~/.ssh/known_hosts
 

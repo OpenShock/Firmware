@@ -114,14 +114,14 @@ jobs:
       # Set up rclone for CDN uploads.
       - uses: ./.github/actions/cdn-prepare
         with:
-          bunny-stor-hostname: ${{ vars.BUNNY_STOR_HOSTNAME }}
-          bunny-stor-port: ${{ vars.BUNNY_STOR_PORT }}
-          bunny-stor-username: ${{ secrets.BUNNY_STOR_USERNAME }}
-          bunny-stor-password: ${{ secrets.BUNNY_STOR_PASSWORD }}
+          bunny-ssh-knownhosts: ${{ vars.BUNNY_SSH_KNOWNHOSTS }}
 
       # Upload firmware to CDN.
       - uses: ./.github/actions/cdn-upload-firmware
         with:
+          bunny-stor-hostname: ${{ vars.BUNNY_STOR_HOSTNAME }}
+          bunny-stor-username: ${{ secrets.BUNNY_STOR_USERNAME }}
+          bunny-stor-password: ${{ secrets.BUNNY_STOR_PASSWORD }}
           fw-version: ${{ needs.getvars.outputs.version }}
           board: ${{ matrix.board }}
 
@@ -140,14 +140,14 @@ jobs:
       # Set up rclone for CDN uploads.
       - uses: ./.github/actions/cdn-prepare
         with:
-          bunny-stor-hostname: ${{ vars.BUNNY_STOR_HOSTNAME }}
-          bunny-stor-port: ${{ vars.BUNNY_STOR_PORT }}
-          bunny-stor-username: ${{ secrets.BUNNY_STOR_USERNAME }}
-          bunny-stor-password: ${{ secrets.BUNNY_STOR_PASSWORD }}
+          bunny-ssh-knownhosts: ${{ vars.BUNNY_SSH_KNOWNHOSTS }}
 
       # Upload firmware to CDN.
       - uses: ./.github/actions/cdn-upload-version-info
         with:
+          bunny-stor-hostname: ${{ vars.BUNNY_STOR_HOSTNAME }}
+          bunny-stor-username: ${{ secrets.BUNNY_STOR_USERNAME }}
+          bunny-stor-password: ${{ secrets.BUNNY_STOR_PASSWORD }}
           fw-version: ${{ needs.getvars.outputs.version }}
           release-channel: ${{ needs.getvars.outputs.release-channel }}
           boards: ${{ needs.getvars.outputs.board-list }}
@@ -166,14 +166,14 @@ jobs:
       # Set up rclone for CDN uploads.
       - uses: ./.github/actions/cdn-prepare
         with:
-          bunny-stor-hostname: ${{ vars.BUNNY_STOR_HOSTNAME }}
-          bunny-stor-port: ${{ vars.BUNNY_STOR_PORT }}
-          bunny-stor-username: ${{ secrets.BUNNY_STOR_USERNAME }}
-          bunny-stor-password: ${{ secrets.BUNNY_STOR_PASSWORD }}
+          bunny-ssh-knownhosts: ${{ vars.BUNNY_SSH_KNOWNHOSTS }}
 
       # Upload firmware to CDN.
       - uses: ./.github/actions/cdn-bump-version
         with:
+          bunny-stor-hostname: ${{ vars.BUNNY_STOR_HOSTNAME }}
+          bunny-stor-username: ${{ secrets.BUNNY_STOR_USERNAME }}
+          bunny-stor-password: ${{ secrets.BUNNY_STOR_PASSWORD }}
           version: ${{ needs.getvars.outputs.version }}
           release-channel: ${{ needs.getvars.outputs.release-channel }}
 

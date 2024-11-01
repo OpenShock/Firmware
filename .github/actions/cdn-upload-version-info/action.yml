@@ -1,6 +1,15 @@
 name: cdn-upload-version-info
 description: Uploads version specific info to CDN
 inputs:
+  bunny-stor-host:
+    description: Bunny SFTP Hostname
+    required: true
+  bunny-stor-username:
+    description: Bunny SFTP Username
+    required: true
+  bunny-stor-password:
+    description: Bunny SFTP Password
+    required: true
   fw-version:
     description: Firmware version
     required: true
@@ -24,4 +33,4 @@ runs:
       run: |
         mkdir -p upload
         mv boards.txt upload/
-        rclone copy upload 'cdn:${{ inputs.fw-version }}/${{ inputs.board }}/'
+        sshpass -p "${{ inputs.bunny-stor-password }}" scp -r upload/ ${{ inputs.bunny-stor-username }}@${{ inputs.bunny-stor-host }}:/${{ inputs.fw-version }}/${{ inputs.board }}

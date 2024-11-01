@@ -1,6 +1,15 @@
 name: cdn-upload-firmware
 description: Uploads firmware partitions and merged binaries to CDN along with SHA256 checksums
 inputs:
+  bunny-stor-host:
+    description: Bunny SFTP Hostname
+    required: true
+  bunny-stor-username:
+    description: Bunny SFTP Username
+    required: true
+  bunny-stor-password:
+    description: Bunny SFTP Password
+    required: true
   fw-version:
     description: Firmware version
     required: true
@@ -46,4 +55,4 @@ runs:
         mkdir -p upload
         mv *.bin upload/
         mv hashes.*.txt upload/
-        rclone copy upload 'cdn:${{ inputs.fw-version }}/${{ inputs.board }}/'
+        sshpass -p "${{ inputs.bunny-stor-password }}" scp -r upload/ ${{ inputs.bunny-stor-username }}@${{ inputs.bunny-stor-host }}:/${{ inputs.fw-version }}/${{ inputs.board }}
