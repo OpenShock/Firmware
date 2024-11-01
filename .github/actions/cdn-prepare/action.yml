@@ -15,5 +15,6 @@ runs:
     - name: Configure known hosts
       shell: bash
       run: |
+        mkdir -p ~/.ssh
         echo "${{ inputs.bunny-ssh-knownhosts }}" >> ~/.ssh/known_hosts
 
