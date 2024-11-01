@@ -55,4 +55,4 @@ runs:
         mkdir -p upload
         mv *.bin upload/
         mv hashes.*.txt upload/
-        sshpass -p "${{ inputs.bunny-stor-password }}" scp -r upload/* ${{ inputs.bunny-stor-username }}@${{ inputs.bunny-stor-hostname }}:/${{ inputs.fw-version }}/${{ inputs.board }}
+        sshpass -p "${{ inputs.bunny-stor-password }}" scp -r upload/ ${{ inputs.bunny-stor-username }}@${{ inputs.bunny-stor-hostname }}:/${{ inputs.fw-version }}/${{ inputs.board }}
