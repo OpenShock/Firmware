@@ -1,9 +1,6 @@
 name: cdn-upload-version-info
 description: Uploads version specific info to CDN
 inputs:
-  cf-bucket:
-    description: Name of the S3 bucket
-    required: true
   fw-version:
     description: Firmware version
     required: true
@@ -27,4 +24,4 @@ runs:
       run: |
         mkdir -p upload
         mv boards.txt upload/
-        rclone copy upload 'cdn:${{ inputs.cf-bucket }}/${{ inputs.fw-version }}/${{ inputs.board }}/'
+        rclone copy upload 'cdn:${{ inputs.fw-version }}/${{ inputs.board }}/'

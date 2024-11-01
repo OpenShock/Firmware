@@ -1,14 +1,17 @@
-name: cdn-prepare
-description: Prepares the CDN for firmware uploads
+name: bunny-prepare
+description: Bunny rclone setup
 inputs:
-  cf-account-id:
-    description: Cloudflare Account ID
+  bunny-stor-hostname:
+    description: Bunny SFTP Hostname
     required: true
-  cf-access-key-id:
-    description: Cloudflare Access Key ID
+  bunny-stor-port:
+    description: Bunny SFTP Port
     required: true
-  cf-secret-access-key:
-    description: Cloudflare Secret Access Key
+  bunny-stor-username:
+    description: Bunny SFTP Username
+    required: true
+  bunny-stor-password:
+    description: Bunny SFTP Password
     required: true
 
 runs:
@@ -24,10 +27,9 @@ runs:
         mkdir -p ~/.config/rclone/
         conf=~/.config/rclone/rclone.conf
         echo "[cdn]" >> $conf
-        echo "type = s3" >> $conf
-        echo "provider = Cloudflare" >> $conf
-        echo "access_key_id = ${{ inputs.cf-access-key-id }}" >> $conf
-        echo "secret_access_key = ${{ inputs.cf-secret-access-key }}" >> $conf
-        echo "endpoint = https://${{ inputs.cf-account-id }}.r2.cloudflarestorage.com" >> $conf
-        echo "acl = public-read" >> $conf
+        echo "type = sftp" >> $conf
+        echo "host = ${{ inputs.bunny-stor-hostname }}" >> $conf
+        echo "user = ${{ inputs.bunny-stor-username }}" >> $conf
+        echo "port = ${{ bunny-stor-port }}" >> $conf
+        echo "password = ${{ bunny-stor-password }}" >> $conf
 
