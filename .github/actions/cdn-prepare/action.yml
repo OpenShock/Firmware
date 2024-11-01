@@ -31,5 +31,5 @@ runs:
         echo "host = ${{ inputs.bunny-stor-hostname }}" >> $conf
         echo "user = ${{ inputs.bunny-stor-username }}" >> $conf
         echo "port = ${{ inputs.bunny-stor-port }}" >> $conf
-        echo "password = ${{ inputs.bunny-stor-password }}" >> $conf
+        echo "pass = ${{ inputs.bunny-stor-password }}" >> $conf
 
