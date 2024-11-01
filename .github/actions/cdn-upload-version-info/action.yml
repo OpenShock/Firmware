@@ -33,4 +33,4 @@ runs:
       run: |
         mkdir -p upload
         mv boards.txt upload/
-        sshpass -p "${{ inputs.bunny-stor-password }}" scp -r upload/ ${{ inputs.bunny-stor-username }}@${{ inputs.bunny-stor-host }}:/${{ inputs.fw-version }}/${{ inputs.board }}
+        sshpass -p "${{ inputs.bunny-stor-password }}" scp -r upload/ ${{ inputs.bunny-stor-username }}@${{ inputs.bunny-stor-hostname }}:/${{ inputs.fw-version }}/${{ inputs.board }}
