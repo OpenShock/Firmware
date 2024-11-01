@@ -1,7 +1,7 @@
 name: cdn-upload-firmware
 description: Uploads firmware partitions and merged binaries to CDN along with SHA256 checksums
 inputs:
-  bunny-stor-host:
+  bunny-stor-hostname:
     description: Bunny SFTP Hostname
     required: true
   bunny-stor-username:

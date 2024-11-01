@@ -1,7 +1,7 @@
 name: cdn-bump-version
 description: Uploads version file to CDN
 inputs:
-  bunny-stor-host:
+  bunny-stor-hostname:
     description: Bunny SFTP Hostname
     required: true
   bunny-stor-username:

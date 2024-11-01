@@ -1,7 +1,7 @@
 name: cdn-upload-version-info
 description: Uploads version specific info to CDN
 inputs:
-  bunny-stor-host:
+  bunny-stor-hostname:
     description: Bunny SFTP Hostname
     required: true
   bunny-stor-username:
