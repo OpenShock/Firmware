@@ -10,8 +10,11 @@ inputs:
   bunny-stor-password:
     description: Bunny SFTP Password
     required: true
-  cf-bucket:
-    description: Name of the S3 bucket
+  bunny-api-key:
+    description: Bunny API key
+    required: true
+  bunny-cdn-url:
+    description: Bunny pull zone base url e.g. https://firmware.openshock.org (no trailing slash)
     required: true
   version:
     description: 'Version of the release'
@@ -29,3 +32,10 @@ runs:
         mkdir -p upload
         echo "${{ inputs.version }}" >> upload/version-${{ inputs.release-channel }}.txt
         sshpass -p "${{ inputs.bunny-stor-password }}" scp -v -r upload/* ${{ inputs.bunny-stor-username }}@${{ inputs.bunny-stor-hostname }}:/
+
+    - name: Purge CDN cache
+      shell: bash
+      run: |
+        curl -X POST "https://api.bunny.net/purge?url=${{inputs.bunny-cdn-url}}/version-${{ inputs.release-channel }}.txt" \
+          -H "Content-Type: application/json" \
+          -H "AccessKey: ${{ input.bunny-api-key }}" \'
