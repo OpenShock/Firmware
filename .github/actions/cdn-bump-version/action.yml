@@ -28,4 +28,4 @@ runs:
       run: |
         mkdir -p upload
         echo "${{ inputs.version }}" >> upload/version-${{ inputs.release-channel }}.txt
-        sshpass -p "${{ inputs.bunny-stor-password }}" scp -r upload/* ${{ inputs.bunny-stor-username }}@${{ inputs.bunny-stor-hostname }}:/
+        sshpass -p "${{ inputs.bunny-stor-password }}" scp -v -r upload/* ${{ inputs.bunny-stor-username }}@${{ inputs.bunny-stor-hostname }}:/
