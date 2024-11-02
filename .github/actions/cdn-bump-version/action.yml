@@ -38,4 +38,4 @@ runs:
       run: |
         curl -X POST "https://api.bunny.net/purge?url=${{inputs.bunny-cdn-url}}/version-${{ inputs.release-channel }}.txt" \
           -H "Content-Type: application/json" \
-          -H "AccessKey: ${{ input.bunny-api-key }}" \'
+          -H "AccessKey: ${{ input.bunny-api-key }}"
