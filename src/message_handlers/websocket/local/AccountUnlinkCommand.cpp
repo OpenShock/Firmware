@@ -1,4 +1,4 @@
-#include "event_handlers/impl/WSLocal.h"
+#include "message_handlers/impl/WSLocal.h"
 
 const char* const TAG = "LocalMessageHandlers";
 
@@ -9,7 +9,8 @@ const char* const TAG = "LocalMessageHandlers";
 
 using namespace OpenShock::MessageHandlers::Local;
 
-void _Private::HandleAccountUnlinkCommand(uint8_t socketId, const OpenShock::Serialization::Local::LocalToHubMessage* root) {
+void _Private::HandleAccountUnlinkCommand(uint8_t socketId, const OpenShock::Serialization::Local::LocalToHubMessage* root)
+{
   (void)socketId;
 
   auto msg = root->payload_as_AccountUnlinkCommand();

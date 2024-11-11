@@ -1,9 +1,9 @@
-#include "event_handlers/WebSocket.h"
+#include "message_handlers/WebSocket.h"
 
 const char* const TAG = "LocalMessageHandlers";
 
-#include "event_handlers/impl/WSLocal.h"
 #include "Logging.h"
+#include "message_handlers/impl/WSLocal.h"
 
 #include "serialization/_fbs/LocalToHubMessage_generated.h"
 
@@ -39,7 +39,8 @@ static std::array<Handlers::HandlerType, HANDLER_COUNT> s_localHandlers = []() {
   return handlers;
 }();
 
-void EventHandlers::WebSocket::HandleLocalBinary(uint8_t socketId, const uint8_t* data, std::size_t len) {
+void MessageHandlers::WebSocket::HandleLocalBinary(uint8_t socketId, const uint8_t* data, std::size_t len)
+{
   // Deserialize
   auto msg = flatbuffers::GetRoot<Schemas::LocalToHubMessage>(data);
   if (msg == nullptr) {

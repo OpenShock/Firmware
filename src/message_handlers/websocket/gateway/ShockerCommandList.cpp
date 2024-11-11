@@ -1,4 +1,4 @@
-#include "event_handlers/impl/WSGateway.h"
+#include "message_handlers/impl/WSGateway.h"
 
 const char* const TAG = "ServerMessageHandlers";
 
@@ -10,7 +10,8 @@ const char* const TAG = "ServerMessageHandlers";
 
 using namespace OpenShock::MessageHandlers::Server;
 
-void _Private::HandleShockerCommandList(const OpenShock::Serialization::Gateway::GatewayToHubMessage* root) {
+void _Private::HandleShockerCommandList(const OpenShock::Serialization::Gateway::GatewayToHubMessage* root)
+{
   auto msg = root->payload_as_ShockerCommandList();
   if (msg == nullptr) {
     OS_LOGE(TAG, "Payload cannot be parsed as ShockerCommandList");
@@ -26,9 +27,9 @@ void _Private::HandleShockerCommandList(const OpenShock::Serialization::Gateway:
   OS_LOGV(TAG, "Received command list from API (%u commands)", commands->size());
 
   for (auto command : *commands) {
-    uint16_t id                   = command->id();
-    uint8_t intensity             = command->intensity();
-    uint16_t durationMs           = command->duration();
+    uint16_t id                        = command->id();
+    uint8_t intensity                  = command->intensity();
+    uint16_t durationMs                = command->duration();
     OpenShock::ShockerModelType model  = command->model();
     OpenShock::ShockerCommandType type = command->type();
 
