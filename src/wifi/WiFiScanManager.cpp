@@ -224,7 +224,15 @@ bool WiFiScanManager::Init()
 
 bool WiFiScanManager::IsScanning()
 {
-  return s_scanTaskHandle != nullptr;
+  // Quick check
+  if (s_scanTaskHandle == nullptr) {
+    return false;
+  }
+
+  // It wasnt null, lock and perform proper check
+  ScopedLock lock__(&s_scanTaskMutex);
+
+  return s_scanTaskHandle != nullptr && eTaskGetState(s_scanTaskHandle) != eDeleted;
 }
 
 bool WiFiScanManager::StartScan()
