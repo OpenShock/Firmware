@@ -1,5 +1,7 @@
 #include <freertos/FreeRTOS.h>
 
+#include "wifi/WiFiManager.h"
+
 const char* const TAG = "WiFiManager";
 
 #include <freertos/task.h>
@@ -14,11 +16,18 @@ const char* const TAG = "WiFiManager";
 #include "ReadWriteMutex.h"
 #include "Time.h"
 #include "util/TaskUtils.h"
+#include "wifi/WiFiNetwork.h"
 
 // Temporary fix to ensure that CDC+JTAG stay on on ESP32-C3
 #if CONFIG_IDF_TARGET_ESP32C3
 extern "C" void phy_bbpll_en_usb(bool en);
 #endif
+
+const uint8_t OPENSHOCK_WIFI_SCAN_MAX_CHANNEL         = 13;
+const uint32_t OPENSHOCK_WIFI_SCAN_DWELL_PER_CHANNEL  = 100;
+const uint32_t OPENSHOCK_WIFI_SCAN_MIN_MS_PER_CHANNEL = 100;
+const uint32_t OPENSHOCK_WIFI_SCAN_MAX_MS_PER_CHANNEL = 300;  // Adjusting this value will affect the scan rate, but may also affect the scan results
+const uint32_t OPENSHOCK_WIFI_SCAN_TIMEOUT_MS         = 10 * 1000;
 
 enum class WiFiState : uint8_t {
   Disconnected = 0,
@@ -27,10 +36,19 @@ enum class WiFiState : uint8_t {
   Connected    = 1 << 2,
 };
 
-static esp_netif_t* s_wifi_sta = nullptr;
-static esp_netif_t* s_wifi_ap  = nullptr;
-static WiFiState s_state       = WiFiState::Disconnected;
-static uint8_t s_target_creds  = 0;
+struct ScanResult {
+  uint8_t scanId;
+  uint8_t size;
+  uint8_t capacity;
+  wifi_ap_record_t* records;
+};
+
+static esp_netif_t* s_wifi_sta                                    = nullptr;
+static esp_netif_t* s_wifi_ap                                     = nullptr;
+static WiFiState s_state                                          = WiFiState::Disconnected;
+static uint8_t s_target_creds                                     = 0;
+static uint8_t s_scan_current_ch                                  = 0;
+static ScanResult s_scan_results[OPENSHOCK_WIFI_SCAN_MAX_CHANNEL] = {};
 
 template<std::size_t N>
 static bool is_zero(const uint8_t (&array)[N])
@@ -117,7 +135,7 @@ static bool set_ap_enabled(bool enabled)
   return true;
 }
 
-static bool is_connect_ratelimited(const WiFiNetwork& net)
+static bool is_connect_ratelimited(const OpenShock::WiFiNetwork& net)
 {
   if (net.lastConnectAttempt == 0) {
     return false;
@@ -132,7 +150,7 @@ static bool is_connect_ratelimited(const WiFiNetwork& net)
   return false;
 }
 
-static std::vector<WiFiNetwork>::iterator find_network(std::function<bool(WiFiNetwork&)> predicate, bool sortByAttractivity = true)
+static std::vector<OpenShock::WiFiNetwork>::iterator find_network(std::function<bool(OpenShock::WiFiNetwork&)> predicate, bool sortByAttractivity = true)
 {
   if (sortByAttractivity) {
     std::sort(s_wifiNetworks.begin(), s_wifiNetworks.end(), _attractivityComparer);
@@ -140,9 +158,87 @@ static std::vector<WiFiNetwork>::iterator find_network(std::function<bool(WiFiNe
   return std::find_if(s_wifiNetworks.begin(), s_wifiNetworks.end(), predicate);
 }
 
+static bool mark_network_as_attempted(const uint8_t (&bssid)[6])
+{
+  auto it = _findNetworkByBSSID(bssid);
+  if (it == s_wifiNetworks.end()) {
+    return false;
+  }
+
+  it->connectAttempts++;
+  it->lastConnectAttempt = OpenShock::millis();
+
+  return true;
+}
+
+static void wifi_event_wifi_ready_handler(void* event_data)
+{
+  OS_LOGV(TAG, "WiFi Ready!");
+}
+
+static void wifi_event_scan_done_handler(void* event_data)
+{
+  auto data = reinterpret_cast<wifi_event_sta_scan_done_t*>(event_data);
+
+  if (data->status == 1) {
+    // TODO: what to do?
+    OS_LOGE(TAG, "WiFi Scan failed!");
+    return;
+  }
+
+  if (s_scan_current_ch <= 0 || s_scan_current_ch >= OPENSHOCK_WIFI_SCAN_MAX_CHANNEL) {
+    // TODO: what to do?
+    OS_LOGE(TAG, "WiFi Scanned channel is invalid!");
+    return;
+  }
+
+  OS_LOGD(TAG, "WiFi scan completed, results: %hhu scan id: %hhu", data->number, data->scan_id);
+
+  ScanResult* result = s_scan_results[s_scan_current_ch];
+
+  result->scanId = data->scan_id;
+  result->size   = data->number;
+
+  if (result->records == nullptr || result->capacity < data->number) {
+    OS_LOGD(TAG, "Initializing scan results at %hhu to %hhu elements", s_scan_current_ch, data->number);
+    result->capacity = data->number;
+    result->records  = reinterpret_cast<wifi_ap_record_t*>(malloc(data->number * sizeof(wifi_ap_record_t)));
+  } else if (result->capacity < data->number) {
+    OS_LOGD(TAG, "Resizing scan results at %hhu from %hhu to %hhu elements", s_scan_current_ch, data->number);
+    free(result->records);
+    result->capacity = data->number;
+    result->records  = reinterpret_cast<wifi_ap_record_t*>(malloc(data->number * sizeof(wifi_ap_record_t)));
+  }
+
+  esp_err_t err = esp_wifi_scan_get_ap_records(result->size, result->records);
+  if (err != nullptr) {
+    OS_LOGE(TAG, "Failed to get scan results: %d", err);
+    return;
+  }
+
+  // TODO: Check if scan is finished, start next channel scan if not.
+}
+
+static void wifi_event_handler(void* event_handler_arg, esp_event_base_t event_base, int32_t event_id, void* event_data)
+{
+  (void)event_handler_arg;
+  (void)event_base;
+
+  switch (event_id) {
+    case WIFI_EVENT_WIFI_READY:
+      wifi_event_wifi_ready_handler(event_data);
+      break;
+    case WIFI_EVENT_SCAN_DONE:
+      wifi_event_scan_done_handler(event_data);
+      break;
+    default:
+      break;
+  }
+}
+
 static bool get_next_network(OpenShock::Config::WiFiCredentials& creds)
 {
-  return find_network([&creds](const WiFiNetwork& net) {
+  return find_network([&creds](const OpenShock::WiFiNetwork& net) {
     if (net.credentialsID == 0) {
       return false;
     }
@@ -157,6 +253,32 @@ static bool get_next_network(OpenShock::Config::WiFiCredentials& creds)
 
     return true;
   }) != s_wifiNetworks.end();
+}
+
+static bool wifi_start_scan(uint8_t channel = OPENSHOCK_WIFI_SCAN_MAX_CHANNEL)
+{
+  wifi_scan_config_t scan_cfg = {
+    .ssid                 = nullptr,
+    .bssid                = nullptr,
+    .channel              = channel,
+    .show_hidden          = true,
+    .scan_type            = WIFI_SCAN_TYPE_ACTIVE,
+    .scan_time = {
+      .active = {
+        .min = OPENSHOCK_WIFI_SCAN_MIN_MS_PER_CHANNEL,
+        .max = OPENSHOCK_WIFI_SCAN_MAX_MS_PER_CHANNEL,
+      },
+    },
+    .home_chan_dwell_time = OPENSHOCK_WIFI_SCAN_DWELL_PER_CHANNEL,
+  };
+
+  esp_err_t err = esp_wifi_scan_start(&scan_cfg, /* block: */ false);
+  if (err != ERR_OK) {
+    OS_LOGE(TAG, "Failed to start scan: %d", err);
+    return false;
+  }
+
+  return true;
 }
 
 static bool wifi_start_connect(std::string_view ssid, std::string_view password, uint8_t (&bssid)[6])
@@ -175,7 +297,10 @@ static bool wifi_start_connect(std::string_view ssid, std::string_view password,
 
   OS_LOGV(TAG, "Connecting to network %s (" BSSID_FMT ")", ssid, BSSID_ARG(bssid));
 
-  // TODO: Mark network as attempted
+  if (!mark_network_as_attempted(bssid)) {
+    OS_LOGE(TAG, "Network not recognized!");
+    return false;
+  }
 
   // Create WiFi config
   wifi_config_t wifi_cfg;
@@ -185,7 +310,7 @@ static bool wifi_start_connect(std::string_view ssid, std::string_view password,
   wifi_cfg.sta.threshold.rssi = -127;
   if (try_str_copy_fixed(wifi_cfg.sta.ssid, ssid) > 0) {
     if (try_str_copy_fixed(wifi_cfg.sta.password, password) > 0) {
-      wifi_cfg.sta.authmode = WIFI_AUTH_WEP;
+      wifi_cfg.sta.threshold.authmode = WIFI_AUTH_WEP;
     }
     if (!is_zero(bssid)) {
       wifi_cfg.sta.bssid_set = 1;
@@ -196,7 +321,7 @@ static bool wifi_start_connect(std::string_view ssid, std::string_view password,
   // Set config before connnect
   err = esp_wifi_set_config(WIFI_IF_STA, &wifi_cfg);
   if (err != ERR_OK) {
-    OS_LOGE("Failed to set config: %d", err);
+    OS_LOGE(TAG, "Failed to set config: %d", err);
     return false;
   }
 
@@ -205,7 +330,7 @@ static bool wifi_start_connect(std::string_view ssid, std::string_view password,
   err = esp_wifi_connect();
   if (err != ERR_OK) {
     s_state = WiFiState::Disconnected;
-    OS_LOGE("Failed to stat wifi connect: %d", err);
+    OS_LOGE(TAG, "Failed to stat wifi connect: %d", err);
     return false;
   }
 
@@ -225,7 +350,7 @@ static bool wifi_connect_target_or_next()
       return false;
     }
 
-    if (wifi_start_connect(creds.ssid, creds.password, nullptr)) {
+    if (wifi_start_connect(creds.ssid, creds.password, creds.)) {
       return true;
     }
 
@@ -250,7 +375,7 @@ static void wifi_task(void*)
           lastScanRequest = now;
 
           OS_LOGV(TAG, "No networks to connect to, starting scan...");
-          start_scanning();
+          wifi_start_scan();
         }
       }
     }
@@ -258,7 +383,7 @@ static void wifi_task(void*)
   }
 }
 
-bool WiFiManager::Init()
+bool OpenShock::WiFiManager::Init()
 {
   // Initializtion guard
   static bool initialized = false;
@@ -267,7 +392,13 @@ bool WiFiManager::Init()
 
   esp_err_t err;
 
-  // TODO: register event handlers
+  memset(s_scan_results, 0, sizeof(ScanResult) * OPENSHOCK_WIFI_SCAN_MAX_CHANNEL);
+
+  err = esp_event_handler_register(WIFI_EVENT, ESP_EVENT_ANY_ID, wifi_event_handler, nullptr);
+  if (err != ERR_OK) {
+    OS_LOGE(TAG, "Failed to subscribe to WiFi events: %d", err);
+    return false;
+  }
 
   // Get saved config
   std::string hostname;

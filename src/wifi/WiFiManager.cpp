@@ -1,6 +1,3 @@
-#include "wifi/WiFiManager.h"
-
-const char* const TAG = "WiFiManager";
 
 #include "CaptivePortal.h"
 #include "config/Config.h"
@@ -27,7 +24,6 @@ static uint8_t s_connectedBSSID[6]      = {0};
 static uint8_t s_connectedCredentialsID = 0;
 static uint8_t s_preferredCredentialsID = 0;
 static std::vector<WiFiNetwork> s_wifiNetworks;
-
 
 bool _attractivityComparer(const WiFiNetwork& a, const WiFiNetwork& b)
 {
@@ -71,7 +67,6 @@ bool _markNetworkAsAttempted(const uint8_t (&bssid)[6])
 
   return true;
 }
-
 
 bool _connectHidden(const uint8_t (&bssid)[6], const std::string& password)
 {
@@ -380,10 +375,6 @@ void WiFiManager::Disconnect()
   WiFi.disconnect(false);
 }
 
-bool WiFiManager::IsConnected()
-{
-  return s_wifiState == WiFiState::Connected;
-}
 bool WiFiManager::GetConnectedNetwork(OpenShock::WiFiNetwork& network)
 {
   if (s_connectedCredentialsID == 0) {

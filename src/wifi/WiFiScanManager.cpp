@@ -12,10 +12,6 @@ const char* const TAG = "WiFiScanManager";
 
 #include <map>
 
-const uint8_t OPENSHOCK_WIFI_SCAN_MAX_CHANNEL         = 13;
-const uint32_t OPENSHOCK_WIFI_SCAN_MAX_MS_PER_CHANNEL = 300;  // Adjusting this value will affect the scan rate, but may also affect the scan results
-const uint32_t OPENSHOCK_WIFI_SCAN_TIMEOUT_MS         = 10 * 1000;
-
 enum WiFiScanTaskNotificationFlags {
   CHANNEL_DONE  = 1 << 0,
   ERROR         = 1 << 1,
@@ -207,21 +203,6 @@ void _evSTAStopped(arduino_event_id_t event, arduino_event_info_t info)
   _notifyTask(WiFiScanTaskNotificationFlags::WIFI_DISABLED);
 }
 
-bool WiFiScanManager::Init()
-{
-  if (s_initialized) {
-    OS_LOGW(TAG, "WiFiScanManager is already initialized");
-    return true;
-  }
-
-  WiFi.onEvent(_evScanCompleted, ARDUINO_EVENT_WIFI_SCAN_DONE);
-  WiFi.onEvent(_evSTAStopped, ARDUINO_EVENT_WIFI_STA_STOP);
-
-  s_initialized = true;
-
-  return true;
-}
-
 bool WiFiScanManager::IsScanning()
 {
   // Quick check
@@ -278,36 +259,4 @@ bool WiFiScanManager::AbortScan()
   }
 
   return true;
-}
-
-uint64_t WiFiScanManager::RegisterStatusChangedHandler(const WiFiScanManager::StatusChangedHandler& handler)
-{
-  static uint64_t nextHandle      = 0;
-  uint64_t handle                 = nextHandle++;
-  s_statusChangedHandlers[handle] = handler;
-  return handle;
-}
-void WiFiScanManager::UnregisterStatusChangedHandler(uint64_t handle)
-{
-  auto it = s_statusChangedHandlers.find(handle);
-
-  if (it != s_statusChangedHandlers.end()) {
-    s_statusChangedHandlers.erase(it);
-  }
-}
-
-uint64_t WiFiScanManager::RegisterNetworksDiscoveredHandler(const WiFiScanManager::NetworksDiscoveredHandler& handler)
-{
-  static uint64_t nextHandle           = 0;
-  uint64_t handle                      = nextHandle++;
-  s_networksDiscoveredHandlers[handle] = handler;
-  return handle;
-}
-void WiFiScanManager::UnregisterNetworksDiscoveredHandler(uint64_t handle)
-{
-  auto it = s_networksDiscoveredHandlers.find(handle);
-
-  if (it != s_networksDiscoveredHandlers.end()) {
-    s_networksDiscoveredHandlers.erase(it);
-  }
 }
