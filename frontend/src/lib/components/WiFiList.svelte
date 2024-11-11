@@ -1,5 +1,4 @@
 <script lang="ts">
-  import { getModalStore } from '@skeletonlabs/skeleton';
   import { DeviceStateStore } from '$lib/stores';
   import { WebSocketClient } from '$lib/WebSocketClient';
   import { WifiAuthMode } from '$lib/_fbs/open-shock/serialization/types/wifi-auth-mode';
@@ -10,8 +9,6 @@
   import { SerializeWifiNetworkSaveCommand } from '$lib/Serializers/WifiNetworkSaveCommand';
   import WiFiDetails from './modals/WiFiDetails.svelte';
   import type { WiFiNetworkGroup } from '$lib/types';
-
-  const modalStore = getModalStore();
 
   let scanStatus = $derived($DeviceStateStore.wifiScanStatus);
   let isScanning = $derived(scanStatus === WifiScanStatus.Started || scanStatus === WifiScanStatus.InProgress);

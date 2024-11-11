@@ -3,13 +3,10 @@
   import { SerializeWifiNetworkConnectCommand } from '$lib/Serializers/WifiNetworkConnectCommand';
   import { WebSocketClient } from '$lib/WebSocketClient';
   import { DeviceStateStore } from '$lib/stores';
-  import { getModalStore } from '@skeletonlabs/skeleton';
   import { SerializeWifiNetworkForgetCommand } from '$lib/Serializers/WifiNetworkForgetCommand';
   import { WifiAuthMode } from '$lib/_fbs/open-shock/serialization/types/wifi-auth-mode';
 
-  const modalStore = getModalStore();
-
-  interface Props {
+  type Props = {
     groupKey: string;
   }
 

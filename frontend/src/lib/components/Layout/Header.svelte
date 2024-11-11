@@ -1,9 +1,11 @@
 <script lang="ts">
-  import { AppBar, LightSwitch } from '@skeletonlabs/skeleton';
+  import LightSwitch from '$lib/components/LightSwitch.svelte';
 </script>
 
-<AppBar slot="header">
-  <div slot="lead" class="flex items-center space-x-4">
+<header
+  class="sticky top-0 z-50 w-full flex flex-row border-border/40 bg-background/95 supports-[backdrop-filter]:bg-background/60 border-b backdrop-blur"
+>
+  <div class="flex items-center space-x-4">
     <!-- Logo -->
     <a
       href="/"
@@ -13,7 +15,8 @@
       <img class="inline-block h-12 pointer-events-none" src="/logo.svg" alt="OpenShock Logo" />
     </a>
   </div>
-  <svelte:fragment slot="trail">
+  <div class="flex-1"></div>
+  <div>
     <LightSwitch />
-  </svelte:fragment>
-</AppBar>
+  </div>
+</header>
