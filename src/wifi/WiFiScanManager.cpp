@@ -237,6 +237,11 @@ bool WiFiScanManager::StartScan()
     return false;
   }
 
+  // Free the TCB
+  if (s_scanTaskHandle != nullptr) {
+    vTaskDelete(s_scanTaskHandle);
+  }
+
   // Start the scan task
   if (TaskUtils::TaskCreateExpensive(_scanningTask, "WiFiScanManager", 4096, nullptr, 1, &s_scanTaskHandle) != pdPASS) {  // PROFILED: 1.8KB stack usage
     OS_LOGE(TAG, "Failed to create scan task");
