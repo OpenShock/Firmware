@@ -445,6 +445,13 @@ bool Config::SetRFConfigKeepAliveEnabled(bool enabled)
   return _trySaveConfig();
 }
 
+bool Config::AnyWiFiCredentials()
+{
+  CONFIG_LOCK_READ(false);
+
+  return _configData.wifi.credentialsList.size() > 0;
+}
+
 bool Config::AnyWiFiCredentials(std::function<bool(const Config::WiFiCredentials&)> predicate)
 {
   CONFIG_LOCK_READ(false);
