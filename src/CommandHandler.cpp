@@ -41,8 +41,6 @@ struct KnownShocker {
 static OpenShock::ReadWriteMutex s_rfTransmitterMutex            = {};
 static std::unique_ptr<OpenShock::RFTransmitter> s_rfTransmitter = nullptr;
 
-static OpenShock::SimpleMutex s_estopManagerMutex = {};
-
 static OpenShock::ReadWriteMutex s_keepAliveMutex = {};
 static QueueHandle_t s_keepAliveQueue             = nullptr;
 static TaskHandle_t s_keepAliveTaskHandle         = nullptr;
@@ -259,29 +257,6 @@ SetGPIOResultCode CommandHandler::SetRfTxPin(gpio_num_t txPin)
   s_rfTransmitter = std::move(rfxmit);
 
   return SetGPIOResultCode::Success;
-}
-
-SetGPIOResultCode CommandHandler::SetEStopPin(gpio_num_t estopPin)
-{
-  if (OpenShock::IsValidInputPin(static_cast<int8_t>(estopPin))) {
-    ScopedLock lock__(&s_estopManagerMutex);
-
-    if (!EStopManager::SetEStopPin(estopPin)) {
-      OS_LOGE(TAG, "Failed to set EStop pin");
-
-      return SetGPIOResultCode::InternalError;
-    }
-
-    if (!Config::SetEStopGpioPin(estopPin)) {
-      OS_LOGE(TAG, "Failed to set EStop pin in config");
-
-      return SetGPIOResultCode::InternalError;
-    }
-
-    return SetGPIOResultCode::Success;
-  } else {
-    return SetGPIOResultCode::InvalidPin;
-  }
 }
 
 bool CommandHandler::SetKeepAliveEnabled(bool enabled)

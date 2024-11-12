@@ -1,19 +1,20 @@
 #include "message_handlers/impl/WSLocal.h"
 
 #include "CaptivePortal.h"
-#include "CommandHandler.h"
-#include "Common.h"
+#include "Chipset.h"
+#include "config/Config.h"
+#include "EStopManager.h"
 #include "Logging.h"
 
 #include <cstdint>
 
 const char* const TAG = "LocalMessageHandlers";
 
-void serializeSetEStopPinResult(uint8_t socketId, gpio_num_t pin, OpenShock::Serialization::Local::SetGPIOResultCode result)
+static void serializeResult(uint8_t socketId, int8_t pin, OpenShock::Serialization::Local::SetGPIOResultCode result)
 {
-  flatbuffers::FlatBufferBuilder builder(1024);
+  flatbuffers::FlatBufferBuilder builder(1024);  // TODO: Profile this
 
-  auto responseOffset = OpenShock::Serialization::Local::CreateSetEstopPinCommandResult(builder, static_cast<int8_t>(pin), result);
+  auto responseOffset = OpenShock::Serialization::Local::CreateSetEstopPinCommandResult(builder, pin, result);
 
   auto msg = OpenShock::Serialization::Local::CreateHubToLocalMessage(builder, OpenShock::Serialization::Local::HubToLocalMessagePayload::SetEstopPinCommandResult, responseOffset.Union());
 
@@ -27,6 +28,27 @@ void serializeSetEStopPinResult(uint8_t socketId, gpio_num_t pin, OpenShock::Ser
 
 using namespace OpenShock::MessageHandlers::Local;
 
+static OpenShock::Serialization::Local::SetGPIOResultCode setEstopPin(int8_t pin)
+{
+  if (OpenShock::IsValidInputPin(pin)) {
+    if (!OpenShock::EStopManager::SetEStopPin(static_cast<gpio_num_t>(pin))) {
+      OS_LOGE(TAG, "Failed to set EStop pin");
+
+      return OpenShock::Serialization::Local::SetGPIOResultCode::InternalError;
+    }
+
+    if (!OpenShock::Config::SetEStopGpioPin(static_cast<gpio_num_t>(pin))) {
+      OS_LOGE(TAG, "Failed to set EStop pin in config");
+
+      return OpenShock::Serialization::Local::SetGPIOResultCode::InternalError;
+    }
+
+    return OpenShock::Serialization::Local::SetGPIOResultCode::Success;
+  } else {
+    return OpenShock::Serialization::Local::SetGPIOResultCode::InvalidPin;
+  }
+}
+
 void _Private::HandleSetEstopPinCommand(uint8_t socketId, const OpenShock::Serialization::Local::LocalToHubMessage* root)
 {
   auto msg = root->payload_as_SetEstopPinCommand();
@@ -35,9 +57,9 @@ void _Private::HandleSetEstopPinCommand(uint8_t socketId, const OpenShock::Seria
     return;
   }
 
-  auto pin = msg->pin();
+  int8_t pin = msg->pin();
 
-  auto result = OpenShock::CommandHandler::SetEStopPin(static_cast<gpio_num_t>(pin));
+  auto result = setEstopPin(pin);
 
-  serializeSetEStopPinResult(socketId, static_cast<gpio_num_t>(pin), result);
+  serializeResult(socketId, pin, result);
 }

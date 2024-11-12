@@ -20,21 +20,31 @@ using namespace OpenShock;
 
 const std::size_t HANDLER_COUNT = static_cast<std::size_t>(PayloadType::MAX) + 1;
 
-#define SET_HANDLER(payload, handler) handlers[static_cast<std::size_t>(payload)] = handler
+#define SET_HANDLER(payload) handlers[static_cast<std::size_t>(PayloadType::payload)] = Handlers::Handle##payload
 
 static std::array<Handlers::HandlerType, HANDLER_COUNT> s_localHandlers = []() {
   std::array<Handlers::HandlerType, HANDLER_COUNT> handlers {};
   handlers.fill(Handlers::HandleInvalidMessage);
 
-  SET_HANDLER(PayloadType::WifiScanCommand, Handlers::HandleWiFiScanCommand);
-  SET_HANDLER(PayloadType::WifiNetworkSaveCommand, Handlers::HandleWiFiNetworkSaveCommand);
-  SET_HANDLER(PayloadType::WifiNetworkForgetCommand, Handlers::HandleWiFiNetworkForgetCommand);
-  SET_HANDLER(PayloadType::WifiNetworkConnectCommand, Handlers::HandleWiFiNetworkConnectCommand);
-  SET_HANDLER(PayloadType::WifiNetworkDisconnectCommand, Handlers::HandleWiFiNetworkDisconnectCommand);
-  SET_HANDLER(PayloadType::AccountLinkCommand, Handlers::HandleAccountLinkCommand);
-  SET_HANDLER(PayloadType::AccountUnlinkCommand, Handlers::HandleAccountUnlinkCommand);
-  SET_HANDLER(PayloadType::SetRfTxPinCommand, Handlers::HandleSetRfTxPinCommand);
-  SET_HANDLER(PayloadType::SetEstopPinCommand, Handlers::HandleSetEstopPinCommand);
+  SET_HANDLER(WifiScanCommand);
+  SET_HANDLER(WifiNetworkSaveCommand);
+  SET_HANDLER(WifiNetworkForgetCommand);
+  SET_HANDLER(WifiNetworkConnectCommand);
+  SET_HANDLER(WifiNetworkDisconnectCommand);
+  SET_HANDLER(OtaUpdateSetIsEnabledCommand);
+  SET_HANDLER(OtaUpdateSetDomainCommand);
+  SET_HANDLER(OtaUpdateSetUpdateChannelCommand);
+  SET_HANDLER(OtaUpdateSetCheckIntervalCommand);
+  SET_HANDLER(OtaUpdateSetAllowBackendManagementCommand);
+  SET_HANDLER(OtaUpdateSetRequireManualApprovalCommand);
+  SET_HANDLER(OtaUpdateHandleUpdateRequestCommand);
+  SET_HANDLER(OtaUpdateCheckForUpdatesCommand);
+  SET_HANDLER(OtaUpdateStartUpdateCommand);
+  SET_HANDLER(AccountLinkCommand);
+  SET_HANDLER(AccountUnlinkCommand);
+  SET_HANDLER(SetRfTxPinCommand);
+  SET_HANDLER(SetEstopEnabledCommand);
+  SET_HANDLER(SetEstopPinCommand);
 
   return handlers;
 }();
