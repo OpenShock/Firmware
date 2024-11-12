@@ -10,11 +10,11 @@ const char* const TAG = "ServerMessageHandlers";
 
 using namespace OpenShock::MessageHandlers::Server;
 
-void _Private::HandleOtaInstall(const OpenShock::Serialization::Gateway::GatewayToHubMessage* root)
+void _Private::HandleOtaUpdateRequest(const OpenShock::Serialization::Gateway::GatewayToHubMessage* root)
 {
-  auto msg = root->payload_as_OtaInstall();
+  auto msg = root->payload_as_OtaUpdateRequest();
   if (msg == nullptr) {
-    OS_LOGE(TAG, "Payload cannot be parsed as OtaInstall");
+    OS_LOGE(TAG, "Payload cannot be parsed as OtaUpdate");
     return;
   }
 
@@ -34,10 +34,10 @@ void _Private::HandleOtaInstall(const OpenShock::Serialization::Gateway::Gateway
 
   OpenShock::SemVer version(semver->major(), semver->minor(), semver->patch(), prerelease, build);
 
-  OS_LOGI(TAG, "OTA install requested for version %s", version.toString().c_str());  // TODO: This is abusing the SemVer::toString() method causing alot of string copies, fix this
+  OS_LOGI(TAG, "OTA update requested for version %s", version.toString().c_str());  // TODO: This is abusing the SemVer::toString() method causing alot of string copies, fix this
 
-  if (!OpenShock::OtaUpdateManager::TryStartFirmwareInstallation(version)) {
-    OS_LOGE(TAG, "Failed to install firmware");  // TODO: Send error message to server
+  if (!OpenShock::OtaUpdateManager::TryStartFirmwareUpdate(version)) {
+    OS_LOGE(TAG, "Failed to update firmware");  // TODO: Send error message to server
     return;
   }
 }

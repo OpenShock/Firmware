@@ -5,18 +5,32 @@
 
 #include <cstdint>
 
-#define WS_EVENT_HANDLER_SIGNATURE(NAME) void NAME(uint8_t socketId, const OpenShock::Serialization::Local::LocalToHubMessage* msg)
+#define HANDLER_SIG(NAME) void NAME(uint8_t socketId, const OpenShock::Serialization::Local::LocalToHubMessage* msg)
+#define HANDLER_FN(NAME)  HANDLER_SIG(Handle##NAME)
 
 namespace OpenShock::MessageHandlers::Local::_Private {
-  typedef WS_EVENT_HANDLER_SIGNATURE((*HandlerType));
-  WS_EVENT_HANDLER_SIGNATURE(HandleInvalidMessage);
-  WS_EVENT_HANDLER_SIGNATURE(HandleWiFiScanCommand);
-  WS_EVENT_HANDLER_SIGNATURE(HandleWiFiNetworkSaveCommand);
-  WS_EVENT_HANDLER_SIGNATURE(HandleWiFiNetworkForgetCommand);
-  WS_EVENT_HANDLER_SIGNATURE(HandleWiFiNetworkConnectCommand);
-  WS_EVENT_HANDLER_SIGNATURE(HandleWiFiNetworkDisconnectCommand);
-  WS_EVENT_HANDLER_SIGNATURE(HandleAccountLinkCommand);
-  WS_EVENT_HANDLER_SIGNATURE(HandleAccountUnlinkCommand);
-  WS_EVENT_HANDLER_SIGNATURE(HandleSetRfTxPinCommand);
-  WS_EVENT_HANDLER_SIGNATURE(HandleSetEstopPinCommand);
+  typedef HANDLER_SIG((*HandlerType));
+  HANDLER_FN(WifiScanCommand);
+  HANDLER_FN(WifiNetworkSaveCommand);
+  HANDLER_FN(WifiNetworkForgetCommand);
+  HANDLER_FN(WifiNetworkConnectCommand);
+  HANDLER_FN(WifiNetworkDisconnectCommand);
+  HANDLER_FN(OtaUpdateSetIsEnabledCommand);
+  HANDLER_FN(OtaUpdateSetDomainCommand);
+  HANDLER_FN(OtaUpdateSetUpdateChannelCommand);
+  HANDLER_FN(OtaUpdateSetCheckIntervalCommand);
+  HANDLER_FN(OtaUpdateSetAllowBackendManagementCommand);
+  HANDLER_FN(OtaUpdateSetRequireManualApprovalCommand);
+  HANDLER_FN(OtaUpdateHandleUpdateRequestCommand);
+  HANDLER_FN(OtaUpdateCheckForUpdatesCommand);
+  HANDLER_FN(OtaUpdateStartUpdateCommand);
+  HANDLER_FN(AccountLinkCommand);
+  HANDLER_FN(AccountUnlinkCommand);
+  HANDLER_FN(SetRfTxPinCommand);
+  HANDLER_FN(SetEstopEnabledCommand);
+  HANDLER_FN(SetEstopPinCommand);
+  HANDLER_FN(InvalidMessage);
 }  // namespace OpenShock::MessageHandlers::Local::_Private
+
+#undef HANDLER_FN
+#undef HANDLER_SIG

@@ -27,12 +27,10 @@ namespace OpenShock {
 
   private:
     void _setState(GatewayClientState state);
-    void _sendKeepAlive();
     void _sendBootStatus();
     void _handleEvent(WStype_t type, uint8_t* payload, std::size_t length);
 
     WebSocketsClient m_webSocket;
-    int64_t m_lastKeepAlive;
     GatewayClientState m_state;
   };
 }  // namespace OpenShock

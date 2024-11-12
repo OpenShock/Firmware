@@ -19,7 +19,6 @@ static bool s_bootStatusSent = false;
 
 GatewayClient::GatewayClient(const std::string& authToken)
   : m_webSocket()
-  , m_lastKeepAlive(0)
   , m_state(GatewayClientState::Disconnected)
 {
   OS_LOGD(TAG, "Creating GatewayClient");
@@ -106,15 +105,6 @@ bool GatewayClient::loop()
     return true;
   }
 
-  int64_t msNow = OpenShock::millis();
-
-  int64_t timeSinceLastKA = msNow - m_lastKeepAlive;
-
-  if (timeSinceLastKA >= 15'000) {
-    _sendKeepAlive();
-    m_lastKeepAlive = msNow;
-  }
-
   return true;
 }
 
@@ -127,12 +117,6 @@ void GatewayClient::_setState(GatewayClientState state)
   m_state = state;
 
   ESP_ERROR_CHECK(esp_event_post(OPENSHOCK_EVENTS, OPENSHOCK_EVENT_GATEWAY_CLIENT_STATE_CHANGED, &m_state, sizeof(m_state), portMAX_DELAY));
-}
-
-void GatewayClient::_sendKeepAlive()
-{
-  OS_LOGV(TAG, "Sending Gateway keep-alive message");
-  Serialization::Gateway::SerializeKeepAliveMessage([this](const uint8_t* data, std::size_t len) { return m_webSocket.sendBIN(data, len); });
 }
 
 void GatewayClient::_sendBootStatus()
@@ -159,7 +143,7 @@ void GatewayClient::_sendBootStatus()
     return;
   }
 
-  s_bootStatusSent = Serialization::Gateway::SerializeBootStatusMessage(updateId, OtaUpdateManager::GetFirmwareBootType(), version, [this](const uint8_t* data, std::size_t len) { return m_webSocket.sendBIN(data, len); });
+  s_bootStatusSent = Serialization::Gateway::SerializeBootStatusMessage(updateId, OtaUpdateManager::GetFirmwareBootType(), [this](const uint8_t* data, std::size_t len) { return m_webSocket.sendBIN(data, len); });
 
   if (s_bootStatusSent && updateStep != OpenShock::OtaUpdateStep::None) {
     if (!Config::SetOtaUpdateStep(OpenShock::OtaUpdateStep::None)) {
@@ -178,7 +162,6 @@ void GatewayClient::_handleEvent(WStype_t type, uint8_t* payload, std::size_t le
       break;
     case WStype_CONNECTED:
       _setState(GatewayClientState::Connected);
-      _sendKeepAlive();
       _sendBootStatus();
       break;
     case WStype_TEXT:
