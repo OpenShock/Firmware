@@ -10,7 +10,7 @@ const char* const TAG = "ServerMessageHandlers";
 
 using namespace OpenShock::MessageHandlers::Server;
 
-void _Private::HandleTrigger(const OpenShock::Serialization::Gateway::GatewayToHubMessage* root)
+void _Private::HandlePing(const OpenShock::Serialization::Gateway::GatewayToHubMessage* root)
 {
   auto msg = root->payload_as_Ping();
   if (msg == nullptr) {
