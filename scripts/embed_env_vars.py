@@ -221,7 +221,9 @@ if 'OPENSHOCK_FW_VERSION' not in cpp_defines:
     cpp_defines['OPENSHOCK_FW_VERSION'] = version
 
 
-version_major, version_minor, version_patch, version_prerelease, version_build = split_semver(version)
+version_major, version_minor, version_patch, version_prerelease, version_build = split_semver(
+    cpp_defines['OPENSHOCK_FW_VERSION']
+)
 
 cpp_defines['OPENSHOCK_FW_VERSION_MAJOR'] = version_major
 cpp_defines['OPENSHOCK_FW_VERSION_MINOR'] = version_minor
