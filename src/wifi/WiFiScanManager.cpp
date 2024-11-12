@@ -28,62 +28,8 @@ static std::map<uint64_t, OpenShock::WiFiScanManager::NetworksDiscoveredHandler>
 
 using namespace OpenShock;
 
-bool _notifyTask(WiFiScanTaskNotificationFlags flags)
-{
-  ScopedLock lock__(&s_scanTaskMutex);
-
-  if (s_scanTaskHandle == nullptr) {
-    return false;
-  }
-
-  return xTaskNotify(s_scanTaskHandle, flags, eSetBits) == pdPASS;
-}
-
-void _notifyStatusChangedHandlers(OpenShock::WiFiScanStatus status)
-{
-  for (auto& it : s_statusChangedHandlers) {
-    it.second(status);
-  }
-}
-
-bool _isScanError(int16_t retval)
-{
-  return retval < 0 && retval != WIFI_SCAN_RUNNING;
-}
-
-void _handleScanError(int16_t retval)
-{
-  if (retval >= 0) return;
-
-  _notifyTask(WiFiScanTaskNotificationFlags::ERROR);
-
-  if (retval == WIFI_SCAN_FAILED) {
-    OS_LOGE(TAG, "Failed to start scan on channel %u", s_currentChannel);
-    return;
-  }
-
-  if (retval == WIFI_SCAN_RUNNING) {
-    OS_LOGE(TAG, "Scan is running on channel %u", s_currentChannel);
-    return;
-  }
-
-  OS_LOGE(TAG, "Scan returned an unknown error");
-}
-
-int16_t _scanChannel(uint8_t channel)
-{
-  int16_t retval = WiFi.scanNetworks(true, true, false, OPENSHOCK_WIFI_SCAN_MAX_MS_PER_CHANNEL, channel);
-  if (!_isScanError(retval)) {
-    return retval;
-  }
-
-  _handleScanError(retval);
-
-  return retval;
-}
-
 WiFiScanStatus _scanningTaskImpl()
-{
+{WiFi.scanNetworks
   // Start the scan on the highest channel and work our way down
   uint8_t channel = OPENSHOCK_WIFI_SCAN_MAX_CHANNEL;
 
