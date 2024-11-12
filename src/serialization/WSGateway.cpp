@@ -18,7 +18,7 @@ bool Gateway::SerializePongMessage(Common::SerializationCallbackFn callback)
     return false;
   }
 
-  int32_t rssi;
+  int rssi;
   esp_err_t err = esp_wifi_sta_get_rssi(&rssi);
   if (err != ERR_OK) {
     OS_LOGE(TAG, "Failed to get WiFi RSSI: %d", err);
@@ -27,7 +27,7 @@ bool Gateway::SerializePongMessage(Common::SerializationCallbackFn callback)
 
   flatbuffers::FlatBufferBuilder builder(256);  // TODO: Profile this and adjust the size accordingly
 
-  auto pong = Gateway::CreatePong(builder, static_cast<uint64_t>(uptime), rssi);
+  auto pong = Gateway::CreatePong(builder, static_cast<uint64_t>(uptime), static_cast<int32_t>(rssi));
 
   auto msg = Gateway::CreateHubToGatewayMessage(builder, Gateway::HubToGatewayMessagePayload::Pong, pong.Union());
 
