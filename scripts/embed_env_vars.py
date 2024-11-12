@@ -145,6 +145,24 @@ def serialize_cpp_define(k: str, v: str | int | bool) -> str | int:
     return v
 
 
+def split_semver(version):
+    # Match the semver pattern
+    pattern = r'^(?P<major>\d+)\.(?P<minor>\d+)\.(?P<patch>\d+)(?:-(?P<prerelease>[0-9A-Za-z.-]+))?(?:\+(?P<build>[0-9A-Za-z.-]+))?$'
+    match = re.match(pattern, version)
+
+    if not match:
+        raise ValueError("Invalid semver format")
+
+    # Extract components and convert major, minor, patch to integers
+    major = int(match.group('major'))
+    minor = int(match.group('minor'))
+    patch = int(match.group('patch'))
+    prerelease = match.group('prerelease')  # None if not present
+    build = match.group('build')  # None if not present
+
+    return major, minor, patch, prerelease, build
+
+
 # Serialize CPP Defines.
 #   Strings are escaped to be a correct CPP macro.
 #   Booleans are turned into integers, True => 1 and False => 0.
@@ -201,6 +219,17 @@ if 'OPENSHOCK_FW_VERSION' not in cpp_defines:
     
     # If not set, get the latest tag.
     cpp_defines['OPENSHOCK_FW_VERSION'] = version
+
+
+version_major, version_minor, version_patch, version_prerelease, version_build = split_semver(
+    cpp_defines['OPENSHOCK_FW_VERSION']
+)
+
+cpp_defines['OPENSHOCK_FW_VERSION_MAJOR'] = version_major
+cpp_defines['OPENSHOCK_FW_VERSION_MINOR'] = version_minor
+cpp_defines['OPENSHOCK_FW_VERSION_PATCH'] = version_patch
+cpp_defines['OPENSHOCK_FW_VERSION_PRERELEASE'] = version_prerelease
+cpp_defines['OPENSHOCK_FW_VERSION_BUILD'] = version_build
 
 # Gets the log level from environment variables.
 # TODO: Delete get_loglevel and use... something more generic.

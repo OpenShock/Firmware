@@ -10,7 +10,7 @@ const char* const TAG = "LocalMessageHandlers";
 
 using namespace OpenShock::MessageHandlers::Local;
 
-void _Private::HandleWiFiNetworkDisconnectCommand(uint8_t socketId, const OpenShock::Serialization::Local::LocalToHubMessage* root)
+void _Private::HandleWifiNetworkDisconnectCommand(uint8_t socketId, const OpenShock::Serialization::Local::LocalToHubMessage* root)
 {
   (void)socketId;
 
