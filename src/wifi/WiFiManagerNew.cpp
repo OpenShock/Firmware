@@ -24,27 +24,14 @@ const char* const TAG = "WiFiManager";
 extern "C" void phy_bbpll_en_usb(bool en);
 #endif
 
-const uint8_t OPENSHOCK_WIFI_SCAN_MAX_CHANNEL         = 13;
-const uint32_t OPENSHOCK_WIFI_SCAN_DWELL_PER_CHANNEL  = 100;
-const uint32_t OPENSHOCK_WIFI_SCAN_MIN_MS_PER_CHANNEL = 100;
-const uint32_t OPENSHOCK_WIFI_SCAN_MAX_MS_PER_CHANNEL = 300;  // Adjusting this value will affect the scan rate, but may also affect the scan results
-const uint32_t OPENSHOCK_WIFI_SCAN_TIMEOUT_MS         = 10 * 1000;
-
 const uint32_t OPENSHOCK_DNS_MAIN     = 0x01010101;  // 1.1.1.1
 const uint32_t OPENSHOCK_DNS_BACKUP   = 0x08080808;  // 8.8.8.8
 const uint32_t OPENSHOCK_DNS_FALLBACK = 0x09090909;  // 9.9.9.9
 
-enum class WiFiTaskNotification : uint8_t {
-  None,
-  ScanFailed,
-  ScanCompleted
-}
-
 enum class WiFiState : uint8_t {
   Disconnected = 0,
-  Scanning     = 1 << 0,
-  Connecting   = 1 << 1,
-  Connected    = 1 << 2,
+  Connecting   = 1 << 0,
+  Connected    = 1 << 1,
 };
 
 struct ScanResult {
@@ -54,13 +41,12 @@ struct ScanResult {
   wifi_ap_record_t* records;
 };
 
-static QueueHandle_t s_event_queue                                = nullptr;
-static esp_netif_t* s_wifi_sta                                    = nullptr;
-static esp_netif_t* s_wifi_ap                                     = nullptr;
-static WiFiState s_state                                          = WiFiState::Disconnected;
-static uint8_t s_target_creds                                     = 0;
-static uint8_t s_scan_channel_current                             = 0;
-static ScanResult s_scan_channel[OPENSHOCK_WIFI_SCAN_MAX_CHANNEL] = {};
+static QueueHandle_t s_event_queue = nullptr;
+static esp_netif_t* s_wifi_sta     = nullptr;
+static esp_netif_t* s_wifi_ap      = nullptr;
+
+static WiFiState s_state      = WiFiState::Disconnected;
+static uint8_t s_target_creds = 0;
 
 template<std::size_t N>
 static bool is_zero(const uint8_t (&array)[N])
@@ -202,39 +188,6 @@ static bool get_next_network(OpenShock::Config::WiFiCredentials& creds)
   }) != s_wifiNetworks.end();
 }
 
-static bool wifi_scan_start(uint8_t channel = OPENSHOCK_WIFI_SCAN_MAX_CHANNEL)
-{
-  wifi_scan_config_t scan_cfg = {
-    .ssid                 = nullptr,
-    .bssid                = nullptr,
-    .channel              = channel,
-    .show_hidden          = true,
-    .scan_type            = WIFI_SCAN_TYPE_ACTIVE,
-    .scan_time = {
-      .active = {
-        .min = OPENSHOCK_WIFI_SCAN_MIN_MS_PER_CHANNEL,
-        .max = OPENSHOCK_WIFI_SCAN_MAX_MS_PER_CHANNEL,
-      },
-    },
-    .home_chan_dwell_time = OPENSHOCK_WIFI_SCAN_DWELL_PER_CHANNEL,
-  };
-
-  uint8_t lastChannel    = s_scan_channel_current;
-  s_scan_channel_current = channel;
-
-  esp_err_t err = esp_wifi_scan_start(&scan_cfg, /* block: */ false);
-  if (err != ERR_OK) {
-    // Restore previous variable ASAP
-    s_scan_channel_current = lastChannel;
-
-    OS_LOGE(TAG, "Failed to start scan: %d", err);
-
-    return false;
-  }
-
-  return true;
-}
-
 static bool wifi_start_connect(std::string_view ssid, std::string_view password, uint8_t (&bssid)[6])
 {
   esp_err_t err;
@@ -318,15 +271,6 @@ static bool wifi_connect_target_or_next()
   return wifi_start_connect(creds.ssid, creds.password, nullptr);
 }
 
-static void task_handle_scan_failed()
-{
-  // TODO: Wtf to do here?
-}
-
-static void task_handle_scan_completed()
-{
-}
-
 static void task_handle_disconnected()
 {
   static int64_t lastScanRequest = 0;
@@ -362,77 +306,9 @@ static void task_main(void*)
   }
 }
 
-static void event_notify_task(WiFiTaskNotification notification)
-{
-  if (xQueueSend(s_event_queue, &notification, portMAX_DELAY) != pdTRUE) {
-    OS_PANIC(TAG, "Unable to queue wifi event!");
-  }
-}
-
 static void event_wifi_ready_handler(void* event_data)
 {
   OS_LOGV(TAG, "WiFi Ready!");
-}
-
-static void event_wifi_scan_done_handler(void* event_data)
-{
-  auto data = reinterpret_cast<wifi_event_sta_scan_done_t*>(event_data);
-
-  if (data->status == 1) {
-    OS_LOGE(TAG, "WiFi Scan failed!");
-    event_notify_task(WiFiTaskNotification::ScanFailed);
-    return;
-  }
-
-  if (s_scan_channel_current <= 0 || s_scan_channel_current > OPENSHOCK_WIFI_SCAN_MAX_CHANNEL) {
-    OS_LOGE(TAG, "WiFi Scanned channel is invalid!");
-    event_notify_task(WiFiTaskNotification::ScanFailed);
-    return;
-  }
-
-  OS_LOGD(TAG, "WiFi scan completed, results: %hhu scan id: %hhu", data->number, data->scan_id);
-
-  ScanResult& result = s_scan_channel[s_scan_channel_current];
-
-  esp_err_t err;
-
-  uint16_t numRecords;
-  err = esp_wifi_scan_get_ap_num(&numRecords);
-  if (err != ERR_OK) {
-    OS_LOGE(TAG, "Failed to get scan result count: %d", err);
-    event_notify_task(WiFiTaskNotification::ScanFailed);
-    return;
-  }
-
-  OS_LOGI(TAG, "Values: %hhu <-> %hu", data->number, numRecords);
-
-  result.scanId = data->scan_id;
-  result.size   = numRecords;
-
-  if (result.records == nullptr || result.capacity < numRecords) {
-    OS_LOGD(TAG, "Initializing scan results at %hhu to %hhu elements", s_scan_channel_current, numRecords);
-    result.capacity = numRecords;
-    result.records  = reinterpret_cast<wifi_ap_record_t*>(malloc(numRecords * sizeof(wifi_ap_record_t)));
-  } else if (result.capacity < numRecords) {
-    OS_LOGD(TAG, "Resizing scan results at %hhu from %hhu to %hhu elements", s_scan_channel_current, numRecords);
-    free(result.records);
-    result.capacity = numRecords;
-    result.records  = reinterpret_cast<wifi_ap_record_t*>(malloc(numRecords * sizeof(wifi_ap_record_t)));
-  }
-
-  err = esp_wifi_scan_get_ap_records(&result.size, result.records);
-  if (err != ERR_OK) {
-    OS_LOGE(TAG, "Failed to get scan results: %d", err);
-    event_notify_task(WiFiTaskNotification::ScanFailed);
-    return;
-  }
-
-  if (--s_scan_channel_current == 0) {
-    event_notify_task(WiFiTaskNotification::ScanCompleted);
-    return;
-  }
-
-  wifi_scan_start(s_scan_channel_current);
 }
 
 static void event_wifi_handler(void* event_handler_arg, esp_event_base_t event_base, int32_t event_id, void* event_data)
@@ -443,9 +319,6 @@ static void event_wifi_handler(void* event_handler_arg, esp_event_base_t event_b
   switch (event_id) {
     case WIFI_EVENT_WIFI_READY:
       event_wifi_ready_handler(event_data);
-      break;
-    case WIFI_EVENT_SCAN_DONE:
-      event_wifi_scan_done_handler(event_data);
       break;
     case WIFI_EVENT_STA_START:
       break;
@@ -482,8 +355,6 @@ bool OpenShock::WiFiManager::Init()
   if (s_event_queue == nullptr) {
     OS_PANIC(TAG, "Failed to allocate event queue, probably out of memory!");
   }
-
-  memset(s_scan_channel, 0, sizeof(ScanResult) * OPENSHOCK_WIFI_SCAN_MAX_CHANNEL);
 
   err = esp_event_handler_register(WIFI_EVENT, ESP_EVENT_ANY_ID, event_wifi_handler, nullptr);
   if (err != ERR_OK) {
@@ -526,6 +397,12 @@ bool OpenShock::WiFiManager::Init()
 #if CONFIG_IDF_TARGET_ESP32C3
   phy_bbpll_en_usb(true);
 #endif
+
+  err = esp_wifi_set_country_code("01", true);  // TODO: Make country code configurable ("01" - World safe mode)
+  if (err != ERR_OK) {
+    OS_LOGE(TAG, "Failed to set country code: %d", err);
+    return false;
+  }
 
   // Set hostname for station interface
   err = esp_netif_set_hostname(s_wifi_sta, hostname.c_str());
