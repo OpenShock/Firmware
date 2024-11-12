@@ -62,7 +62,7 @@ for root, dirs, files in os.walk(schemas_path):
     root = root.replace('\\', '/')
     for filename in files:
         filepath = os.path.join(root, filename)
-        if filename.endswith('.fbs'):
+        if filename.endswith('.fbs') and not filename.startswith('Deprecated'):
             schema_files.append(filepath)
 
 # Compile the schemas for C++ and TypeScript.
