@@ -237,7 +237,7 @@ static bool wifi_start_connect(std::string_view ssid, std::string_view password,
   err = esp_wifi_connect();
   if (err != ERR_OK) {
     s_state = WiFiState::Disconnected;
-    OS_LOGE(TAG, "Failed to stat wifi conhuhnect: %d", err);
+    OS_LOGE(TAG, "Failed to start wifi connect: %d", err);
     return false;
   }
 

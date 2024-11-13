@@ -143,7 +143,7 @@ bool OpenShock::WiFiScanManager::IsScanning()
 
 bool OpenShock::WiFiScanManager::StartScan()
 {
-  OpenShock::ScopedLock lock__(s_mtx);
+  OpenShock::ScopedLock lock__(&s_mtx);
   if (!lock__.isLocked()) {
     return false;
   }
@@ -182,7 +182,7 @@ void OpenShock::WiFiScanManager::AbortScan()
 
 bool OpenShock::WiFiScanManager::FreeResources()
 {
-  OpenShock::ScopedLock lock__(s_mtx);
+  OpenShock::ScopedLock lock__(&s_mtx);
   if (!lock__.isLocked()) {
     return false;
   }
