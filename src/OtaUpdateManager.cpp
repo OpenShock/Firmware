@@ -159,7 +159,7 @@ static bool _sendFailureMessage(std::string_view message, bool fatal = false)
   return true;
 }
 
-static bool _flashAppPartition(const esp_partition_t* partition, std::string_view remoteUrl, const uint8_t (&remoteHash)[32])
+static bool _flashAppPartition(const esp_partition_t* partition, const char* remoteUrl, const uint8_t (&remoteHash)[32])
 {
   OS_LOGD(TAG, "Flashing app partition");
 
@@ -195,7 +195,7 @@ static bool _flashAppPartition(const esp_partition_t* partition, std::string_vie
   return true;
 }
 
-static bool _flashFilesystemPartition(const esp_partition_t* parition, std::string_view remoteUrl, const uint8_t (&remoteHash)[32])
+static bool _flashFilesystemPartition(const esp_partition_t* parition, const char* remoteUrl, const uint8_t (&remoteHash)[32])
 {
   if (!_sendProgressMessage(Serialization::Types::OtaUpdateProgressTask::PreparingForUpdate, 0.0f)) {
     return false;
@@ -396,8 +396,8 @@ static void _otaUpdateTask(void* arg)
     esp_task_wdt_init(15, true);
 
     // Flash app and filesystem partitions.
-    if (!_flashFilesystemPartition(filesystemPartition, release.filesystemBinaryUrl, release.filesystemBinaryHash)) continue;
-    if (!_flashAppPartition(appPartition, release.appBinaryUrl, release.appBinaryHash)) continue;
+    if (!_flashFilesystemPartition(filesystemPartition, release.filesystemBinaryUrl.c_str(), release.filesystemBinaryHash)) continue;
+    if (!_flashAppPartition(appPartition, release.appBinaryUrl.c_str(), release.appBinaryHash)) continue;
 
     // Set OTA boot type in config.
     if (!Config::SetOtaUpdateStep(OpenShock::OtaUpdateStep::Updated)) {
@@ -422,7 +422,7 @@ static void _otaUpdateTask(void* arg)
   esp_restart();
 }
 
-static bool _tryGetStringList(std::string_view url, std::vector<std::string>& list)
+static bool _tryGetStringList(const char* url, std::vector<std::string>& list)
 {
   auto response = OpenShock::HTTP::GetString(
     url,
@@ -525,16 +525,16 @@ bool OtaUpdateManager::Init()
 
 bool OtaUpdateManager::TryGetFirmwareVersion(OtaUpdateChannel channel, OpenShock::SemVer& version)
 {
-  std::string_view channelIndexUrl;
+  const char* channelIndexUrl;
   switch (channel) {
     case OtaUpdateChannel::Stable:
-      channelIndexUrl = OPENSHOCK_FW_CDN_STABLE_URL ""sv;
+      channelIndexUrl = OPENSHOCK_FW_CDN_STABLE_URL;
       break;
     case OtaUpdateChannel::Beta:
-      channelIndexUrl = OPENSHOCK_FW_CDN_BETA_URL ""sv;
+      channelIndexUrl = OPENSHOCK_FW_CDN_BETA_URL;
       break;
     case OtaUpdateChannel::Develop:
-      channelIndexUrl = OPENSHOCK_FW_CDN_DEVELOP_URL ""sv;
+      channelIndexUrl = OPENSHOCK_FW_CDN_DEVELOP_URL;
       break;
     default:
       OS_LOGE(TAG, "Unknown channel: %u", channel);
@@ -573,7 +573,7 @@ bool OtaUpdateManager::TryGetFirmwareBoards(const OpenShock::SemVer& version, st
 
   OS_LOGD(TAG, "Fetching firmware boards from %s", channelIndexUrl.c_str());
 
-  if (!_tryGetStringList(channelIndexUrl, boards)) {
+  if (!_tryGetStringList(channelIndexUrl.c_str(), boards)) {
     OS_LOGE(TAG, "Failed to fetch firmware boards");
     return false;
   }
@@ -614,7 +614,7 @@ bool OtaUpdateManager::TryGetFirmwareRelease(const OpenShock::SemVer& version, F
 
   // Fetch hashes.
   auto sha256HashesResponse = OpenShock::HTTP::GetString(
-    sha256HashesUrl,
+    sha256HashesUrl.c_str(),
     {
       {"Accept", "text/plain"}
   },

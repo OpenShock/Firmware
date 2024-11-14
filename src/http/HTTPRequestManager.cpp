@@ -3,12 +3,11 @@
 const char* const TAG = "HTTPRequestManager";
 
 #include "Common.h"
+#include "http/HTTPClient.h"
 #include "Logging.h"
 #include "SimpleMutex.h"
 #include "Time.h"
 #include "util/StringUtils.h"
-
-#include <HTTPClient.h>
 
 #include <algorithm>
 #include <memory>
@@ -193,11 +192,6 @@ std::shared_ptr<RateLimit> _getRateLimiter(std::string_view url)
   return it->second;
 }
 
-void _setupClient(HTTPClient& client)
-{
-  client.setUserAgent(OpenShock::Constants::FW_USERAGENT);
-}
-
 struct StreamReaderResult {
   HTTP::RequestResult result;
   std::size_t nWritten;
@@ -338,7 +332,7 @@ void _alignChunk(uint8_t* buffer, std::size_t& bufferCursor, std::size_t payload
   }
 }
 
-StreamReaderResult _readStreamDataChunked(HTTPClient& client, WiFiClient* stream, HTTP::DownloadCallback downloadCallback, int64_t begin, uint32_t timeoutMs)
+StreamReaderResult _readStreamDataChunked(HTTPClient& client, WiFiClient* stream, HTTP::DownloadCallback downloadCallback, int64_t begin, int timeoutMs)
 {
   std::size_t totalWritten   = 0;
   HTTP::RequestResult result = HTTP::RequestResult::Success;
@@ -419,7 +413,7 @@ parseMore:
   return {result, totalWritten};
 }
 
-StreamReaderResult _readStreamData(HTTPClient& client, WiFiClient* stream, std::size_t contentLength, HTTP::DownloadCallback downloadCallback, int64_t begin, uint32_t timeoutMs)
+StreamReaderResult _readStreamData(HTTPClient& client, WiFiClient* stream, std::size_t contentLength, HTTP::DownloadCallback downloadCallback, int64_t begin, int timeoutMs)
 {
   std::size_t nWritten       = 0;
   HTTP::RequestResult result = HTTP::RequestResult::Success;
@@ -466,13 +460,13 @@ StreamReaderResult _readStreamData(HTTPClient& client, WiFiClient* stream, std::
 
 HTTP::Response<std::size_t> _doGetStream(
   HTTPClient& client,
-  std::string_view url,
+  const char* url,
   const std::map<String, String>& headers,
   const std::vector<int>& acceptedCodes,
   std::shared_ptr<RateLimit> rateLimiter,
   HTTP::GotContentLengthCallback contentLengthCallback,
   HTTP::DownloadCallback downloadCallback,
-  uint32_t timeoutMs
+  int timeoutMs
 )
 {
   int64_t begin = OpenShock::millis();
@@ -560,8 +554,7 @@ HTTP::Response<std::size_t> _doGetStream(
   return {result.result, responseCode, result.nWritten};
 }
 
-HTTP::Response<std::size_t>
-  HTTP::Download(std::string_view url, const std::map<String, String>& headers, HTTP::GotContentLengthCallback contentLengthCallback, HTTP::DownloadCallback downloadCallback, const std::vector<int>& acceptedCodes, uint32_t timeoutMs)
+HTTP::Response<std::size_t> HTTP::Download(const char* url, const std::map<String, String>& headers, HTTP::GotContentLengthCallback contentLengthCallback, HTTP::DownloadCallback downloadCallback, const std::vector<int>& acceptedCodes, int timeoutMs)
 {
   std::shared_ptr<RateLimit> rateLimiter = _getRateLimiter(url);
   if (rateLimiter == nullptr) {
@@ -572,13 +565,12 @@ HTTP::Response<std::size_t>
     return {RequestResult::RateLimited, 0, 0};
   }
 
-  HTTPClient client;
-  _setupClient(client);
+  HTTP::HTTPClient client(url);
 
   return _doGetStream(client, url, headers, acceptedCodes, rateLimiter, contentLengthCallback, downloadCallback, timeoutMs);
 }
 
-HTTP::Response<std::string> HTTP::GetString(std::string_view url, const std::map<String, String>& headers, const std::vector<int>& acceptedCodes, uint32_t timeoutMs)
+HTTP::Response<std::string> HTTP::GetString(const char* url, const std::map<String, String>& headers, const std::vector<int>& acceptedCodes, int timeoutMs)
 {
   std::string result;
 
