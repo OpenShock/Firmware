@@ -13,7 +13,7 @@
 namespace OpenShock::OtaUpdateManager {
   [[nodiscard]] bool Init();
 
-  bool TryStartFirmwareInstallation(const OpenShock::SemVer& version);
+  bool TryStartFirmwareUpdate(const OpenShock::SemVer& version);
 
   FirmwareBootType GetFirmwareBootType();
   bool IsValidatingApp();

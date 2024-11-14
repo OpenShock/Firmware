@@ -1,8 +1,20 @@
 name: cdn-bump-version
 description: Uploads version file to CDN
 inputs:
-  cf-bucket:
-    description: Name of the S3 bucket
+  bunny-stor-hostname:
+    description: Bunny SFTP Hostname
+    required: true
+  bunny-stor-username:
+    description: Bunny SFTP Username
+    required: true
+  bunny-stor-password:
+    description: Bunny SFTP Password
+    required: true
+  bunny-api-key:
+    description: Bunny API key
+    required: true
+  bunny-cdn-url:
+    description: Bunny pull zone base url e.g. https://firmware.openshock.org (no trailing slash)
     required: true
   version:
     description: 'Version of the release'
@@ -19,4 +31,11 @@ runs:
       run: |
         mkdir -p upload
         echo "${{ inputs.version }}" >> upload/version-${{ inputs.release-channel }}.txt
-        rclone copy upload cdn:${{ inputs.cf-bucket }}/
+        sshpass -p "${{ inputs.bunny-stor-password }}" scp -v -r upload/* ${{ inputs.bunny-stor-username }}@${{ inputs.bunny-stor-hostname }}:/
+
+    - name: Purge CDN cache
+      shell: bash
+      run: |
+        curl -X POST "https://api.bunny.net/purge?url=${{ inputs.bunny-cdn-url }}/version-${{ inputs.release-channel }}.txt" \
+          -H "Content-Type: application/json" \
+          -H "AccessKey: ${{ inputs.bunny-api-key }}"

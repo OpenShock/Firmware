@@ -59,6 +59,7 @@ static addOtaUpdateId(builder:flatbuffers.Builder, otaUpdateId:number) {
 
 static endBootStatus(builder:flatbuffers.Builder):flatbuffers.Offset {
   const offset = builder.endObject();
+  builder.requiredField(offset, 6) // firmware_version
   return offset;
 }
 

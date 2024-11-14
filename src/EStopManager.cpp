@@ -5,207 +5,174 @@
 const char* const TAG = "EStopManager";
 
 #include "Chipset.h"
-#include "CommandHandler.h"
 #include "config/Config.h"
+#include "events/Events.h"
 #include "Logging.h"
+#include "SimpleMutex.h"
 #include "Time.h"
 #include "util/TaskUtils.h"
-#include "VisualStateManager.h"
 
 #include <driver/gpio.h>
 #include <freertos/queue.h>
+#include <freertos/task.h>
 #include <freertos/timers.h>
+
+#include <cstdint>
 
 using namespace OpenShock;
 
 const uint32_t k_estopHoldToClearTime = 5000;
-const uint32_t k_estopDebounceTime    = 100;
+const uint32_t k_estopUpdateRate      = 5;   // 200 Hz
+const uint32_t k_estopCheckCount      = 13;  // 65 ms at 200 Hz
+const uint16_t k_estopCheckMask       = 0xFFFF >> ((sizeof(uint16_t) * 8) - k_estopCheckCount);
 
-static TaskHandle_t s_estopEventHandlerTask;
-static QueueHandle_t s_estopEventQueue;
+static OpenShock::SimpleMutex s_estopMutex = {};
+static gpio_num_t s_estopPin               = GPIO_NUM_NC;
+static TaskHandle_t s_estopTask;
 
-static bool s_estopActive          = false;
-static bool s_estopAwaitingRelease = false;
-static bool s_lastState            = false;
-static int64_t s_lastStateChange   = 0;
-static int64_t s_estopActivatedAt  = 0;
+static EStopState s_estopState    = EStopState::Idle;
+static bool s_estopActive         = false;
+static int64_t s_estopActivatedAt = 0;
 
-static gpio_num_t s_estopPin = GPIO_NUM_NC;
+static volatile bool s_externallyTriggered = false;
 
-struct EstopEventQueueMessage {
-  bool pressed              : 1;
-  bool deactivatesAtChanged : 1;
-  int64_t deactivatesAt;
-};
+static void _estopUpdateExternals(bool isActive, bool isAwaitingRelease)
+{
+  // Post an event
+  ESP_ERROR_CHECK(esp_event_post(OPENSHOCK_EVENTS, OPENSHOCK_EVENT_ESTOP_STATE_CHANGED, &s_estopState, sizeof(s_estopState), portMAX_DELAY));
+}
 
-// This high-priority task is usually idling, waiting for
-// messages from the EStop interrupt or it's hold timer
-void _estopEventHandler(void* pvParameters) {
+// Samples the estop at a fixed rate and sends messages to the estop event handler task
+static void _estopCheckerTask(void* pvParameters)
+{
+  uint16_t history = 0xFFFF;  // Bit history of samples, 0 is pressed
+
+  EStopState state      = EStopState::Idle;
   int64_t deactivatesAt = 0;
+
+  bool lastBtnState = false;
+
   for (;;) {
-    // Wait indefinitely for a message from the EStop interrupt routine
-    TickType_t waitTime = portMAX_DELAY;
+    // Sleep for the update rate
+    vTaskDelay(pdMS_TO_TICKS(k_estopUpdateRate));
 
-    // If the EStop is being deactivated, wait for the hold timer to trigger
-    if (deactivatesAt != 0) {
-      int64_t now = OpenShock::millis();
-      if (now >= deactivatesAt) {
-        waitTime = 0;
-      } else {
-        waitTime = pdMS_TO_TICKS(deactivatesAt - OpenShock::millis());
-      }
-    }
+    // Get current time
+    int64_t now = OpenShock::millis();
 
-    // Wait for a message from the EStop interrupt routine
-    EstopEventQueueMessage message;
-    if (xQueueReceive(s_estopEventQueue, &message, waitTime) == pdTRUE) {
-      if (message.pressed) {
-        OS_LOGI(TAG, "EStop pressed");
-      } else {
-        OS_LOGI(TAG, "EStop released");
-      }
+    bool btnState;
+    if (s_externallyTriggered) {
+      s_externallyTriggered = false;
 
-      if (message.deactivatesAtChanged) {
-        OS_LOGI(TAG, "EStop deactivation time changed");
-        deactivatesAt = message.deactivatesAt;
-      }
-
-      OpenShock::VisualStateManager::SetEmergencyStopStatus(s_estopActive, s_estopAwaitingRelease);
-      OpenShock::CommandHandler::SetKeepAlivePaused(EStopManager::IsEStopped());
-    } else if (deactivatesAt != 0 && OpenShock::millis() >= deactivatesAt) {  // If we didn't get a message, the time probably expired, check if the estop is pending deactivation and if we have reached that time
-      // Reset the deactivation time
+      // Emulate an EStop activation
+      history       = 0xFFFF;
+      state         = EStopState::Active;
       deactivatesAt = 0;
+      lastBtnState  = false;
+      btnState      = false;
+    } else {
+      // Sample the EStop
+      history = (history << 1) | gpio_get_level(s_estopPin);
 
-      // If the button is held for the specified time, clear the EStop
-      s_estopAwaitingRelease = true;
-      OpenShock::VisualStateManager::SetEmergencyStopStatus(s_estopActive, s_estopAwaitingRelease);
+      // Check if the EStop is released (not all bits are 1)
+      btnState = (history & k_estopCheckMask) != k_estopCheckMask;
+      if (btnState == lastBtnState) {
+        // If the state hasn't changed, handle timing transitions
+        if (state == EStopState::ActiveClearing && now > deactivatesAt) {
+          state = EStopState::AwaitingRelease;
+          _estopUpdateExternals(s_estopActive, true);
+        }
+        continue;
+      }
+      lastBtnState = btnState;
+    }
 
-      OS_LOGI(TAG, "EStop cleared, awaiting release");
+    switch (state) {
+      case EStopState::Idle:
+        if (btnState) {
+          state              = EStopState::Active;
+          s_estopActive      = true;
+          s_estopActivatedAt = now;
+        }
+        break;
+      case EStopState::Active:
+        if (btnState) {
+          state         = EStopState::ActiveClearing;
+          deactivatesAt = now + k_estopHoldToClearTime;
+        }
+        break;
+      case EStopState::ActiveClearing:
+        if (!btnState) {
+          state = EStopState::Active;
+        } else if (now > deactivatesAt) {
+          state = EStopState::AwaitingRelease;
+        }
+        break;
+      case EStopState::AwaitingRelease:
+        if (!btnState) {
+          state         = EStopState::Idle;
+          s_estopActive = false;
+        }
+        break;
+      default:
+        continue;
+    }
+
+    _estopUpdateExternals(s_estopActive, state == EStopState::AwaitingRelease);
+  }
+}
+
+static bool _setEStopEnabledImpl(bool enabled)
+{
+  if (enabled) {
+    if (s_estopTask == nullptr) {
+      if (TaskUtils::TaskCreateUniversal(_estopCheckerTask, TAG, 4096, nullptr, 5, &s_estopTask, 1) != pdPASS) {  // TODO: Profile stack size and set priority
+        OS_LOGE(TAG, "Failed to create EStop event handler task");
+        return false;
+      }
+    }
+  } else {
+    if (s_estopTask != nullptr) {
+      vTaskDelete(s_estopTask);
+      s_estopTask = nullptr;
     }
   }
-}
-
-// Interrupt should only be a dumb sender of the GPIO change, additionally triggering if needed
-// Clearing and debouncing is handled by the task.
-void _estopEdgeInterrupt(void* arg) {
-  int64_t now = OpenShock::millis();
-
-  // Debounce the EStop
-  bool debounce = now - s_lastStateChange < k_estopDebounceTime;
-  if (debounce) {
-    return;
-  }
-
-  // TODO: Allow active HIGH EStops?
-  bool pressed = gpio_get_level(s_estopPin) == 0;
-
-  // If the state hasn't changed, ignore it (debounce will skip state changes)
-  if (pressed == s_lastState) {
-    return;
-  }
-  s_lastState       = pressed;
-  s_lastStateChange = now;
-
-  bool deactivatesAtChanged = false;
-  int64_t deactivatesAt     = 0;
-
-  if (!s_estopActive && pressed) {
-    s_estopActive      = true;
-    s_estopActivatedAt = now;
-  } else if (s_estopActive && pressed) {
-    deactivatesAtChanged = true;
-    deactivatesAt        = now + k_estopHoldToClearTime;
-  } else if (s_estopActive && !pressed && s_estopAwaitingRelease) {
-    s_estopActive          = false;
-    s_estopAwaitingRelease = false;
-  } else if (s_estopActive && !pressed) {
-    deactivatesAtChanged = true;
-    deactivatesAt        = 0;
-  }
-
-  BaseType_t higherPriorityTaskWoken = pdFALSE;
-  EstopEventQueueMessage message     = {
-        .pressed              = pressed,
-        .deactivatesAtChanged = deactivatesAtChanged,
-        .deactivatesAt        = deactivatesAt,
-  };
-
-  xQueueSendToBackFromISR(s_estopEventQueue, &message, &higherPriorityTaskWoken);  // TODO: Check if queue is full?
-
-  if (higherPriorityTaskWoken) {
-    portYIELD_FROM_ISR();
-  }
-}
-
-bool EStopManager::Init() {
-  bool enabled = false;
-  if (!OpenShock::Config::GetEStopEnabled(enabled)) {
-    OS_LOGE(TAG, "Failed to get EStop enabled from config");
-    return false;
-  }
-  if (!enabled) {
-    OS_LOGI(TAG, "EStop disabled in config");
-    return true;  // TODO: If we never initialize the EStop, how do we do this later for enabling/disabling?
-  }
-
-  gpio_num_t pin = GPIO_NUM_NC;
-  if (!OpenShock::Config::GetEStopGpioPin(pin)) {
-    OS_LOGE(TAG, "Failed to get EStop pin from config");
-    return false;
-  }
-
-  OS_LOGI(TAG, "Initializing on pin %hhi", static_cast<int8_t>(pin));
-
-  // TODO?: Should we maybe use statically allocated queues and timers? See CreateStatic for both.
-  s_estopEventQueue = xQueueCreate(8, sizeof(EstopEventQueueMessage));
-
-  if (!EStopManager::SetEStopPin(pin)) {
-    OS_LOGE(TAG, "Failed to set EStop pin");
-    return false;
-  }
-
-  if (TaskUtils::TaskCreateUniversal(_estopEventHandler, TAG, 4096, nullptr, 5, &s_estopEventHandlerTask, 1) != pdPASS) {
-    OS_LOGE(TAG, "Failed to create EStop event handler task");
-    return false;
-  }
 
   return true;
 }
 
-bool EStopManager::SetEStopEnabled(bool enabled) {
-  // TODO: Implement
+static bool _setEStopPinImpl(gpio_num_t pin)
+{
+  esp_err_t err;
 
-  return true;
-}
+  if (s_estopPin == pin) {
+    return true;
+  }
 
-bool EStopManager::SetEStopPin(gpio_num_t pin) {
   if (!OpenShock::IsValidInputPin(pin)) {
     OS_LOGE(TAG, "Invalid EStop pin: %hhi", static_cast<int8_t>(pin));
     return false;
   }
 
-  esp_err_t err = gpio_install_isr_service(ESP_INTR_FLAG_EDGE);
-  if (err != ESP_OK && err != ESP_ERR_INVALID_STATE) {  // ESP_ERR_INVALID_STATE is fine, it just means the ISR service is already installed
-    OS_LOGE(TAG, "Failed to install EStop ISR service");
-    return false;
+  bool wasRunning = s_estopTask != nullptr;
+  if (wasRunning) {
+    if (!_setEStopEnabledImpl(false)) {
+      OS_LOGE(TAG, "Failed to disable EStop event handler task");
+      return false;
+    }
   }
 
   // Configure the new pin
-  gpio_config_t io_conf;
-  io_conf.pin_bit_mask = 1ULL << pin;
-  io_conf.pull_down_en = GPIO_PULLDOWN_DISABLE;
-  io_conf.pull_up_en   = GPIO_PULLUP_ENABLE;
-  io_conf.mode         = GPIO_MODE_INPUT;
-  io_conf.intr_type    = GPIO_INTR_ANYEDGE;
-  if (gpio_config(&io_conf) != ESP_OK) {
-    OS_LOGE(TAG, "Failed to configure EStop pin");
-    return false;
-  }
+  gpio_config_t io_conf = {
+    .pin_bit_mask = 1ULL << pin,
+    .mode         = GPIO_MODE_INPUT,
+    .pull_up_en   = GPIO_PULLUP_ENABLE,
+    .pull_down_en = GPIO_PULLDOWN_DISABLE,
+    .intr_type    = GPIO_INTR_DISABLE,
+  };
 
-  // Add the new interrupt
-  err = gpio_isr_handler_add(pin, _estopEdgeInterrupt, nullptr);
+  err = gpio_config(&io_conf);
   if (err != ESP_OK) {
-    OS_LOGE(TAG, "Failed to add EStop ISR handler");
+    OS_LOGE(TAG, "Failed to configure EStop pin");
     return false;
   }
 
@@ -215,13 +182,6 @@ bool EStopManager::SetEStopPin(gpio_num_t pin) {
   s_estopPin = pin;
 
   if (oldPin != GPIO_NUM_NC) {
-    // Remove the old interrupt
-    esp_err_t err = gpio_isr_handler_remove(oldPin);
-    if (err != ESP_OK) {
-      OS_LOGE(TAG, "Failed to remove old EStop ISR handler");
-      return false;
-    }
-
     // Reset the old pin
     err = gpio_reset_pin(oldPin);
     if (err != ESP_OK) {
@@ -230,13 +190,84 @@ bool EStopManager::SetEStopPin(gpio_num_t pin) {
     }
   }
 
+  if (wasRunning) {
+    if (!_setEStopEnabledImpl(true)) {
+      OS_LOGE(TAG, "Failed to re-enable EStop event handler task");
+      return false;
+    }
+  }
+
   return true;
 }
 
-bool EStopManager::IsEStopped() {
+static bool s_estopInitialized = false;
+bool EStopManager::Init()
+{
+  if (s_estopInitialized) {
+    return true;
+  }
+  s_estopInitialized = true;
+
+  Config::EStopConfig cfg;
+  if (!OpenShock::Config::GetEStop(cfg)) {
+    OS_LOGE(TAG, "Failed to get EStop pin from config");
+    return false;
+  }
+
+  OpenShock::ScopedLock lock__(&s_estopMutex);
+
+  if (!_setEStopPinImpl(cfg.gpioPin)) {
+    OS_LOGE(TAG, "Failed to set EStop pin");
+    return false;
+  }
+
+  if (!_setEStopEnabledImpl(cfg.enabled)) {
+    OS_LOGE(TAG, "Failed to create EStop event handler task");
+    return false;
+  }
+
+  return true;
+}
+
+bool EStopManager::SetEStopEnabled(bool enabled)
+{
+  OpenShock::ScopedLock lock__(&s_estopMutex);
+
+  if (s_estopPin == GPIO_NUM_NC) {
+    gpio_num_t pin;
+    if (!OpenShock::Config::GetEStopGpioPin(pin)) {
+      OS_LOGE(TAG, "Failed to get EStop pin from config");
+      return false;
+    }
+    if (!_setEStopPinImpl(pin)) {
+      OS_LOGE(TAG, "Failed to set EStop pin");
+      return false;
+    }
+  }
+
+  bool success = _setEStopEnabledImpl(enabled);
+
+  return success;
+}
+
+bool EStopManager::SetEStopPin(gpio_num_t pin)
+{
+  OpenShock::ScopedLock lock__(&s_estopMutex);
+
+  return _setEStopPinImpl(pin);
+}
+
+bool EStopManager::IsEStopped()
+{
   return s_estopActive;
 }
 
-int64_t EStopManager::LastEStopped() {
+int64_t EStopManager::LastEStopped()
+{
   return s_estopActivatedAt;
+}
+
+void EStopManager::Trigger()
+{
+  s_externallyTriggered = true;
 }
