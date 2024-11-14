@@ -420,7 +420,7 @@ static void serialSkipWhitespaces(SerialBuffer& buffer)
 
 static void serialEchoBuffer(std::string_view buffer)
 {
-  ::Serial.printf(CLEAR_LINE "> %.*s\n", buffer.size(), buffer.data());
+  ::Serial.printf(CLEAR_LINE "> %.*s", buffer.size(), buffer.data());
   ::Serial.flush();
 }
 
@@ -474,13 +474,13 @@ static const OpenShock::Serial::CommandEntry* getCommandEntry(const std::vector<
 
     if (commandName.empty()) {
       // Unnamed commands: select if argument size fits and has the closest to that many arguments seen yet
-      if (commandArgs.size() <= arguments.size() && commandArgs.size() > bestMatchArgsCount) {
+      if (commandArgs.size() <= arguments.size() && commandArgs.size() >= bestMatchArgsCount) {
         bestMatch          = &command;
         bestMatchArgsCount = commandArgs.size();
       }
     } else {
       // Named commands: exact name match, argument size fits and has the closest to that many arguments seen yet
-      if (command.name() == arguments[0] && commandArgs.size() < arguments.size() && commandArgs.size() > bestMatchArgsCount) {
+      if (commandName == arguments[0] && commandArgs.size() < arguments.size() && commandArgs.size() >= bestMatchArgsCount) {
         bestMatch          = &command;
         bestMatchArgsCount = commandArgs.size();
       }
@@ -523,11 +523,17 @@ static void serialProcessLine(std::string_view line)
   }
 
   auto commandEntry = getCommandEntry(OpenShock::StringSplit(arguments, ' '), it->second.commands());
-  if (commandEntry != nullptr) {
-    commandEntry->commandHandler()(arguments, isAutomated);
+  if (commandEntry == nullptr) {
+    printCommandHelp(it->second);
+    return;
   }
 
-  printCommandHelp(it->second);
+  auto commandEntryName = commandEntry->name();
+  if (!commandEntryName.empty()) {
+    arguments = OpenShock::StringTrim(arguments.substr(commandEntryName.size()))
+  }
+
+  commandEntry->commandHandler()(arguments, isAutomated);
 }
 
 static void serialTaskRX(void*)
