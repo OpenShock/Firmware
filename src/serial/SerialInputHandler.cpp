@@ -66,7 +66,7 @@ static bool s_echoEnabled = true;
 static std::vector<OpenShock::Serial::CommandGroup> s_commandGroups;
 static std::unordered_map<std::string_view, OpenShock::Serial::CommandGroup, std::hash_ci, std::equals_ci> s_commandHandlers;
 
-void _printCompleteHelp()
+static void printCommandsHelp()
 {
   std::size_t commandCount    = 0;
   std::size_t longestCommand  = 0;
@@ -125,7 +125,7 @@ void _printCompleteHelp()
   ::Serial.print(buffer.data());
 }
 
-void _printCommandHelp(Serial::CommandGroup& group)
+static void printCommandHelp(Serial::CommandGroup& group)
 {
   std::size_t size = 0;
   for (const auto& command : group.commands()) {
@@ -250,25 +250,25 @@ void _printCommandHelp(Serial::CommandGroup& group)
   ::Serial.print(buffer.data());
 }
 
-void _handleHelpCommand(std::string_view arg, bool isAutomated)
+static void handleHelpCommand(std::string_view arg, bool isAutomated)
 {
   arg = OpenShock::StringTrim(arg);
   if (arg.empty()) {
-    _printCompleteHelp();
+    printCommandsHelp();
     return;
   }
 
   // Get help for a specific command
   auto it = s_commandHandlers.find(arg);
   if (it != s_commandHandlers.end()) {
-    _printCommandHelp(it->second);
+    printCommandHelp(it->second);
     return;
   }
 
   SERPR_ERROR("Command \"%.*s\" not found", arg.length(), arg.data());
 }
 
-void RegisterCommandHandler(const OpenShock::Serial::CommandGroup& handler)
+static void registerCommandHandler(const OpenShock::Serial::CommandGroup& handler)
 {
   s_commandHandlers[handler.name()] = handler;
 }
@@ -357,7 +357,7 @@ enum class SerialReadResult {
   AutoCompleteRequest,
 };
 
-SerialReadResult _tryReadSerialLine(SerialBuffer& buffer)
+static SerialReadResult serialTryReadLine(SerialBuffer& buffer)
 {
   // Check if there's any data available
   int available = ::Serial.available();
@@ -404,7 +404,7 @@ SerialReadResult _tryReadSerialLine(SerialBuffer& buffer)
   return SerialReadResult::Data;
 }
 
-void _skipSerialWhitespaces(SerialBuffer& buffer)
+static void serialSkipWhitespaces(SerialBuffer& buffer)
 {
   int available = ::Serial.available();
 
@@ -418,12 +418,13 @@ void _skipSerialWhitespaces(SerialBuffer& buffer)
   }
 }
 
-void _echoBuffer(std::string_view buffer)
+static void serialEchoBuffer(std::string_view buffer)
 {
-  ::Serial.printf(CLEAR_LINE "> %.*s", buffer.size(), buffer.data());
+  ::Serial.printf(CLEAR_LINE "> %.*s\n", buffer.size(), buffer.data());
+  ::Serial.flush();
 }
 
-void _echoHandleSerialInput(std::string_view buffer, bool hasData)
+static void serialHandleActivity(std::string_view buffer, bool hasData)
 {
   static int64_t lastActivity = 0;
   static bool hasChanges      = false;
@@ -446,13 +447,50 @@ void _echoHandleSerialInput(std::string_view buffer, bool hasData)
 
   // If theres has been received data, but no new data for a while, echo the buffer
   if (hasChanges && OpenShock::millis() - lastActivity > PASTE_INTERVAL_THRESHOLD_MS) {
-    _echoBuffer(buffer);
+    serialEchoBuffer(buffer);
     hasChanges   = false;
     lastActivity = OpenShock::millis();
   }
 }
 
-void _processSerialLine(std::string_view line)
+static const OpenShock::Serial::CommandEntry* getCommandEntry(const std::vector<std::string_view>& arguments, const std::vector<OpenShock::Serial::CommandEntry>& commandsEntries)
+{
+  if (arguments.empty()) {
+    // If no arguments, check for the first command with no name and no arguments
+    for (const auto& command : commandsEntries) {
+      if (command.name().empty() && command.arguments().empty()) {
+        return &command;
+      }
+    }
+    return nullptr;
+  }
+
+  const OpenShock::Serial::CommandEntry* bestMatch = nullptr;
+  size_t bestMatchArgsCount                        = 0;
+
+  for (const auto& command : commandsEntries) {
+    auto commandName = command.name();
+    auto commandArgs = command.arguments();
+
+    if (commandName.empty()) {
+      // Unnamed commands: select if argument size fits and has the closest to that many arguments seen yet
+      if (commandArgs.size() <= arguments.size() && commandArgs.size() > bestMatchArgsCount) {
+        bestMatch          = &command;
+        bestMatchArgsCount = commandArgs.size();
+      }
+    } else {
+      // Named commands: exact name match, argument size fits and has the closest to that many arguments seen yet
+      if (command.name() == arguments[0] && commandArgs.size() < arguments.size() && commandArgs.size() > bestMatchArgsCount) {
+        bestMatch          = &command;
+        bestMatchArgsCount = commandArgs.size();
+      }
+    }
+  }
+
+  return bestMatch;
+}
+
+static void serialProcessLine(std::string_view line)
 {
   line = OpenShock::StringTrim(line);
   if (line.empty()) {
@@ -466,16 +504,15 @@ void _processSerialLine(std::string_view line)
   if (isAutomated) {
     line = line.substr(1);
   } else if (s_echoEnabled) {
-    _echoBuffer(line);
-    ::Serial.println();
+    serialEchoBuffer(line);
   }
 
-  auto parts                 = OpenShock::StringSplit(line, ' ', 1);
-  std::string_view command   = OpenShock::StringTrim(parts[0]);
-  std::string_view arguments = parts.size() > 1 ? parts[1] : std::string_view();
+  auto splitArguments        = OpenShock::StringSplit(line, ' ', 1);
+  std::string_view command   = OpenShock::StringTrim(splitArguments[0]);
+  std::string_view arguments = splitArguments.size() > 1 ? splitArguments[1] : std::string_view();
 
   if (command == "help"sv) {
-    _handleHelpCommand(arguments, isAutomated);
+    handleHelpCommand(arguments, isAutomated);
     return;
   }
 
@@ -485,67 +522,22 @@ void _processSerialLine(std::string_view line)
     return;
   }
 
-  // Get potential subcommand
-  std::string_view firstArg;
-  parts = OpenShock::StringSplit(arguments, ' ');
-  if (parts.size() > 1) {
-    firstArg = OpenShock::StringTrim(parts[0]);
-  } else {
-    firstArg = arguments;
+  auto commandEntry = getCommandEntry(OpenShock::StringSplit(arguments, ' '), it->second.commands());
+  if (commandEntry != nullptr) {
+    commandEntry->commandHandler()(arguments, isAutomated);
   }
 
-  // If the first argument is not empty, try to find a subcommand that matches
-  if (!firstArg.empty()) {
-    for (const auto& cmd : it->second.commands()) {
-      // Check subcommand name
-      if (cmd.name() != firstArg) {
-        continue;
-      }
-
-      // Check if the subcommand requires arguments
-      if (cmd.arguments().size() > 1 && parts.size() < 2) {
-        _printCommandHelp(it->second);
-        return;
-      }
-
-      // Command found, remove the subcommand from the arguments
-      arguments = OpenShock::StringTrim(arguments.substr(firstArg.size()));
-
-      // Execute the subcommand
-      cmd.commandHandler()(arguments, isAutomated);
-      return;
-    }
-  }
-
-  // If no subcommand was found, try to find a default command
-  for (const auto& cmd : it->second.commands()) {
-    // Skip subcommands
-    if (!cmd.name().empty()) {
-      continue;
-    }
-
-    // Check if the command requires arguments
-    if (cmd.arguments().size() > 0 && arguments.empty()) {
-      _printCommandHelp(it->second);
-      return;
-    }
-
-    // Execute the default command
-    cmd.commandHandler()(arguments, isAutomated);
-    return;
-  }
-
-  SERPR_ERROR("Command \"%.*s\" not found", command.size(), command.data());
+  printCommandHelp(it->second);
 }
 
-void _serialRxTask(void*)
+static void serialTaskRX(void*)
 {
   SerialBuffer buffer(32);
 
   while (true) {
-    switch (_tryReadSerialLine(buffer)) {
+    switch (serialTryReadLine(buffer)) {
       case SerialReadResult::LineEnd:
-        _processSerialLine(buffer);
+        serialProcessLine(buffer);
 
         // Deallocate memory if the buffer is too large
         if (buffer.capacity() > SERIAL_BUFFER_CLEAR_THRESHOLD) {
@@ -555,16 +547,16 @@ void _serialRxTask(void*)
         }
 
         // Skip any remaining trailing whitespaces
-        _skipSerialWhitespaces(buffer);
+        serialSkipWhitespaces(buffer);
         break;
       case SerialReadResult::AutoCompleteRequest:
         ::Serial.printf(CLEAR_LINE "> %.*s [AutoComplete is not implemented]", buffer.size(), buffer.data());
         break;
       case SerialReadResult::Data:
-        _echoHandleSerialInput(buffer, true);
+        serialHandleActivity(buffer, true);
         break;
       default:
-        _echoHandleSerialInput(buffer, false);
+        serialHandleActivity(buffer, false);
         break;
     }
 
@@ -585,7 +577,7 @@ bool SerialInputHandler::Init()
   s_commandGroups = OpenShock::Serial::CommandHandlers::AllCommandHandlers();
   for (const auto& handler : s_commandGroups) {
     OS_LOGV(TAG, "Registering command handler: %.*s", handler.name().size(), handler.name().data());
-    RegisterCommandHandler(handler);
+    registerCommandHandler(handler);
   }
 
   SerialInputHandler::PrintWelcomeHeader();
@@ -597,7 +589,7 @@ bool SerialInputHandler::Init()
     return false;
   }
 
-  if (TaskUtils::TaskCreateExpensive(_serialRxTask, "SerialRX", 3200, nullptr, 1, nullptr) != pdPASS) {  // Profiled: 2.96KB stack usage
+  if (TaskUtils::TaskCreateExpensive(serialTaskRX, "SerialRX", 3200, nullptr, 1, nullptr) != pdPASS) {  // Profiled: 2.96KB stack usage
     OS_LOGE(TAG, "Failed to create serial RX task");
     return false;
   }
