@@ -7,7 +7,7 @@ const char* const TAG = "main";
 #include "Common.h"
 #include "config/Config.h"
 #include "EStopManager.h"
-#include "event_handlers/Init.h"
+#include "events/Events.h"
 #include "GatewayConnectionManager.h"
 #include "Logging.h"
 #include "OtaUpdateManager.h"
@@ -21,15 +21,16 @@ const char* const TAG = "main";
 #include <memory>
 
 // Internal setup function, returns true if setup succeeded, false otherwise.
-bool trySetup() {
-  OpenShock::EventHandlers::Init();
-
+bool trySetup()
+{
   if (!OpenShock::VisualStateManager::Init()) {
-    OS_PANIC(TAG, "Unable to initialize VisualStateManager");
+    OS_LOGE(TAG, "Unable to initialize VisualStateManager");
+    return false;
   }
 
   if (!OpenShock::EStopManager::Init()) {
-    OS_PANIC(TAG, "Unable to initialize EStopManager");
+    OS_LOGE(TAG, "Unable to initialize EStopManager");
+    return false;
   }
 
   if (!OpenShock::SerialInputHandler::Init()) {
@@ -52,11 +53,17 @@ bool trySetup() {
     return false;
   }
 
+  if (!OpenShock::CaptivePortal::Init()) {
+    OS_LOGE(TAG, "Unable to initialize CaptivePortal");
+    return false;
+  }
+
   return true;
 }
 
 // OTA setup is the same as normal setup, but we invalidate the currently running app, and roll back if it fails.
-void otaSetup() {
+void otaSetup()
+{
   OS_LOGI(TAG, "Validating OTA app");
 
   if (!trySetup()) {
@@ -72,7 +79,8 @@ void otaSetup() {
 }
 
 // App setup is the same as normal setup, but we restart if it fails.
-void appSetup() {
+void appSetup()
+{
   if (!trySetup()) {
     OS_LOGI(TAG, "Restarting in 5 seconds...");
     vTaskDelay(pdMS_TO_TICKS(5000));
@@ -81,7 +89,8 @@ void appSetup() {
 }
 
 // Arduino setup function
-void setup() {
+void setup()
+{
   // esp_log_level_set(ESP_LOG_VERBOSE);
 
   Serial::Init();
@@ -89,7 +98,15 @@ void setup() {
   // esp_log_level_set(ESP_LOG_VERBOSE);
 
   OpenShock::Config::Init();
-  OpenShock::OtaUpdateManager::Init();
+
+  if (!OpenShock::Events::Init()) {
+    OS_PANIC(TAG, "Unable to initialize Events");
+  }
+
+  if (!OpenShock::OtaUpdateManager::Init()) {
+    OS_PANIC(TAG, "Unable to initialize OTA Update Manager");
+  }
+
   if (OpenShock::OtaUpdateManager::IsValidatingApp()) {
     otaSetup();
   } else {
@@ -97,18 +114,17 @@ void setup() {
   }
 }
 
-void main_app(void* arg) {
+void main_app(void* arg)
+{
   while (true) {
-    OpenShock::SerialInputHandler::Update();
-    OpenShock::CaptivePortal::Update();
     OpenShock::GatewayConnectionManager::Update();
-    OpenShock::WiFiManager::Update();
 
     vTaskDelay(5);  // 5 ticks update interval
   }
 }
 
-void loop() {
+void loop()
+{
   // Start the main task
   OpenShock::TaskUtils::TaskCreateExpensive(main_app, "main_app", 8192, nullptr, 1, nullptr);  // PROFILED: 6KB stack usage
 

@@ -1,5 +1,7 @@
 #pragma once
 
+#include "GatewayClientState.h"
+
 #include <WebSocketsClient.h>
 
 #include <cstdint>
@@ -13,14 +15,7 @@ namespace OpenShock {
     GatewayClient(const std::string& authToken);
     ~GatewayClient();
 
-    enum class State : uint8_t {
-      Disconnected,
-      Disconnecting,
-      Connecting,
-      Connected,
-    };
-
-    constexpr State state() const { return m_state; }
+    constexpr GatewayClientState state() const { return m_state; }
 
     void connect(const char* lcgFqdn);
     void disconnect();
@@ -31,13 +26,11 @@ namespace OpenShock {
     bool loop();
 
   private:
-    void _setState(State state);
-    void _sendKeepAlive();
+    void _setState(GatewayClientState state);
     void _sendBootStatus();
     void _handleEvent(WStype_t type, uint8_t* payload, std::size_t length);
 
     WebSocketsClient m_webSocket;
-    int64_t m_lastKeepAlive;
-    State m_state;
+    GatewayClientState m_state;
   };
 }  // namespace OpenShock

@@ -1,8 +1,14 @@
 name: cdn-upload-version-info
 description: Uploads version specific info to CDN
 inputs:
-  cf-bucket:
-    description: Name of the S3 bucket
+  bunny-stor-hostname:
+    description: Bunny SFTP Hostname
+    required: true
+  bunny-stor-username:
+    description: Bunny SFTP Username
+    required: true
+  bunny-stor-password:
+    description: Bunny SFTP Password
     required: true
   fw-version:
     description: Firmware version
@@ -27,4 +33,4 @@ runs:
       run: |
         mkdir -p upload
         mv boards.txt upload/
-        rclone copy upload 'cdn:${{ inputs.cf-bucket }}/${{ inputs.fw-version }}/${{ inputs.board }}/'
+        sshpass -p "${{ inputs.bunny-stor-password }}" scp -r upload/* ${{ inputs.bunny-stor-username }}@${{ inputs.bunny-stor-hostname }}:/${{ inputs.fw-version }}/${{ inputs.board }}

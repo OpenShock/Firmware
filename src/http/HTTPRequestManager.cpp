@@ -4,6 +4,7 @@ const char* const TAG = "HTTPRequestManager";
 
 #include "Common.h"
 #include "Logging.h"
+#include "SimpleMutex.h"
 #include "Time.h"
 #include "util/StringUtils.h"
 
@@ -22,31 +23,40 @@ const std::size_t HTTP_BUFFER_SIZE = 4096LLU;
 const int HTTP_DOWNLOAD_SIZE_LIMIT = 200 * 1024 * 1024;  // 200 MB
 
 struct RateLimit {
-  RateLimit() : m_mutex(xSemaphoreCreateMutex()), m_blockUntilMs(0), m_limits(), m_requests() { }
+  RateLimit()
+    : m_mutex()
+    , m_blockUntilMs(0)
+    , m_limits()
+    , m_requests()
+  {
+  }
 
-  void addLimit(uint32_t durationMs, uint16_t count) {
-    xSemaphoreTake(m_mutex, portMAX_DELAY);
+  void addLimit(uint32_t durationMs, uint16_t count)
+  {
+    m_mutex.lock(portMAX_DELAY);
 
     // Insert sorted
     m_limits.insert(std::upper_bound(m_limits.begin(), m_limits.end(), durationMs, [](int64_t durationMs, const Limit& limit) { return durationMs > limit.durationMs; }), {durationMs, count});
 
-    xSemaphoreGive(m_mutex);
+    m_mutex.unlock();
   }
-  void clearLimits() {
-    xSemaphoreTake(m_mutex, portMAX_DELAY);
+
+  void clearLimits()
+  {
+    m_mutex.lock(portMAX_DELAY);
 
     m_limits.clear();
 
-    xSemaphoreGive(m_mutex);
+    m_mutex.unlock();
   }
 
-  bool tryRequest() {
+  bool tryRequest()
+  {
     int64_t now = OpenShock::millis();
 
-    xSemaphoreTake(m_mutex, portMAX_DELAY);
+    OpenShock::ScopedLock lock__(&m_mutex);
 
     if (m_blockUntilMs > now) {
-      xSemaphoreGive(m_mutex);
       return false;
     }
 
@@ -59,34 +69,37 @@ struct RateLimit {
     auto it = std::find_if(m_limits.begin(), m_limits.end(), [this](const RateLimit::Limit& limit) { return m_requests.size() >= limit.count; });
     if (it != m_limits.end()) {
       m_blockUntilMs = now + it->durationMs;
-      xSemaphoreGive(m_mutex);
       return false;
     }
 
     // Add the request
     m_requests.push_back(now);
 
-    xSemaphoreGive(m_mutex);
-
     return true;
   }
-  void clearRequests() {
-    xSemaphoreTake(m_mutex, portMAX_DELAY);
+  void clearRequests()
+  {
+    m_mutex.lock(portMAX_DELAY);
+
     m_requests.clear();
-    xSemaphoreGive(m_mutex);
+
+    m_mutex.unlock();
   }
 
-  void blockUntil(int64_t blockUntilMs) {
-    xSemaphoreTake(m_mutex, portMAX_DELAY);
+  void blockUntil(int64_t blockUntilMs)
+  {
+    m_mutex.lock(portMAX_DELAY);
+
     m_blockUntilMs = blockUntilMs;
-    xSemaphoreGive(m_mutex);
+
+    m_mutex.unlock();
   }
 
-  uint32_t requestsSince(int64_t sinceMs) {
-    xSemaphoreTake(m_mutex, portMAX_DELAY);
-    uint32_t result = std::count_if(m_requests.begin(), m_requests.end(), [sinceMs](int64_t requestMs) { return requestMs >= sinceMs; });
-    xSemaphoreGive(m_mutex);
-    return result;
+  uint32_t requestsSince(int64_t sinceMs)
+  {
+    OpenShock::ScopedLock lock__(&m_mutex);
+
+    return std::count_if(m_requests.begin(), m_requests.end(), [sinceMs](int64_t requestMs) { return requestMs >= sinceMs; });
   }
 
 private:
@@ -95,18 +108,19 @@ private:
     uint16_t count;
   };
 
-  SemaphoreHandle_t m_mutex;
+  OpenShock::SimpleMutex m_mutex;
   int64_t m_blockUntilMs;
   std::vector<Limit> m_limits;
   std::vector<int64_t> m_requests;
 };
 
-SemaphoreHandle_t s_rateLimitsMutex = xSemaphoreCreateMutex();
-std::unordered_map<std::string, std::shared_ptr<RateLimit>> s_rateLimits;
+static OpenShock::SimpleMutex s_rateLimitsMutex                                 = {};
+static std::unordered_map<std::string, std::shared_ptr<RateLimit>> s_rateLimits = {};
 
 using namespace OpenShock;
 
-std::string_view _getDomain(std::string_view url) {
+std::string_view _getDomain(std::string_view url)
+{
   if (url.empty()) {
     return {};
   }
@@ -142,7 +156,8 @@ std::string_view _getDomain(std::string_view url) {
   return url;
 }
 
-std::shared_ptr<RateLimit> _rateLimitFactory(std::string_view domain) {
+std::shared_ptr<RateLimit> _rateLimitFactory(std::string_view domain)
+{
   auto rateLimit = std::make_shared<RateLimit>();
 
   // Add default limits
@@ -158,13 +173,14 @@ std::shared_ptr<RateLimit> _rateLimitFactory(std::string_view domain) {
   return rateLimit;
 }
 
-std::shared_ptr<RateLimit> _getRateLimiter(std::string_view url) {
+std::shared_ptr<RateLimit> _getRateLimiter(std::string_view url)
+{
   auto domain = std::string(_getDomain(url));
   if (domain.empty()) {
     return nullptr;
   }
 
-  xSemaphoreTake(s_rateLimitsMutex, portMAX_DELAY);
+  s_rateLimitsMutex.lock(portMAX_DELAY);
 
   auto it = s_rateLimits.find(domain);
   if (it == s_rateLimits.end()) {
@@ -172,12 +188,13 @@ std::shared_ptr<RateLimit> _getRateLimiter(std::string_view url) {
     it = s_rateLimits.find(domain);
   }
 
-  xSemaphoreGive(s_rateLimitsMutex);
+  s_rateLimitsMutex.unlock();
 
   return it->second;
 }
 
-void _setupClient(HTTPClient& client) {
+void _setupClient(HTTPClient& client)
+{
   client.setUserAgent(OpenShock::Constants::FW_USERAGENT);
 }
 
@@ -186,10 +203,12 @@ struct StreamReaderResult {
   std::size_t nWritten;
 };
 
-constexpr bool _isCRLF(const uint8_t* buffer) {
+constexpr bool _isCRLF(const uint8_t* buffer)
+{
   return buffer[0] == '\r' && buffer[1] == '\n';
 }
-constexpr bool _tryFindCRLF(std::size_t& pos, const uint8_t* buffer, std::size_t len) {
+constexpr bool _tryFindCRLF(std::size_t& pos, const uint8_t* buffer, std::size_t len)
+{
   const uint8_t* cur = buffer;
   const uint8_t* end = buffer + len - 1;
 
@@ -204,7 +223,8 @@ constexpr bool _tryFindCRLF(std::size_t& pos, const uint8_t* buffer, std::size_t
 
   return false;
 }
-constexpr bool _tryParseHexSizeT(std::size_t& result, std::string_view str) {
+constexpr bool _tryParseHexSizeT(std::size_t& result, std::string_view str)
+{
   if (str.empty() || str.size() > sizeof(std::size_t) * 2) {
     return false;
   }
@@ -232,7 +252,8 @@ enum ParserState : uint8_t {
   Invalid,
 };
 
-ParserState _parseChunkHeader(const uint8_t* buffer, std::size_t bufferLen, std::size_t& headerLen, std::size_t& payloadLen) {
+ParserState _parseChunkHeader(const uint8_t* buffer, std::size_t bufferLen, std::size_t& headerLen, std::size_t& payloadLen)
+{
   if (bufferLen < 5) {  // Bare minimum: "0\r\n\r\n"
     return ParserState::NeedMoreData;
   }
@@ -282,7 +303,8 @@ ParserState _parseChunkHeader(const uint8_t* buffer, std::size_t bufferLen, std:
   return ParserState::Ok;
 }
 
-ParserState _parseChunk(const uint8_t* buffer, std::size_t bufferLen, std::size_t& payloadPos, std::size_t& payloadLen) {
+ParserState _parseChunk(const uint8_t* buffer, std::size_t bufferLen, std::size_t& payloadPos, std::size_t& payloadLen)
+{
   if (payloadPos == 0) {
     ParserState state = _parseChunkHeader(buffer, bufferLen, payloadPos, payloadLen);
     if (state != ParserState::Ok) {
@@ -304,7 +326,8 @@ ParserState _parseChunk(const uint8_t* buffer, std::size_t bufferLen, std::size_
   return ParserState::Ok;
 }
 
-void _alignChunk(uint8_t* buffer, std::size_t& bufferCursor, std::size_t payloadPos, std::size_t payloadLen) {
+void _alignChunk(uint8_t* buffer, std::size_t& bufferCursor, std::size_t payloadPos, std::size_t payloadLen)
+{
   std::size_t totalLen  = payloadPos + payloadLen + 2;  // +2 for CRLF
   std::size_t remaining = bufferCursor - totalLen;
   if (remaining > 0) {
@@ -315,7 +338,8 @@ void _alignChunk(uint8_t* buffer, std::size_t& bufferCursor, std::size_t payload
   }
 }
 
-StreamReaderResult _readStreamDataChunked(HTTPClient& client, WiFiClient* stream, HTTP::DownloadCallback downloadCallback, int64_t begin, uint32_t timeoutMs) {
+StreamReaderResult _readStreamDataChunked(HTTPClient& client, WiFiClient* stream, HTTP::DownloadCallback downloadCallback, int64_t begin, uint32_t timeoutMs)
+{
   std::size_t totalWritten   = 0;
   HTTP::RequestResult result = HTTP::RequestResult::Success;
 
@@ -395,7 +419,8 @@ parseMore:
   return {result, totalWritten};
 }
 
-StreamReaderResult _readStreamData(HTTPClient& client, WiFiClient* stream, std::size_t contentLength, HTTP::DownloadCallback downloadCallback, int64_t begin, uint32_t timeoutMs) {
+StreamReaderResult _readStreamData(HTTPClient& client, WiFiClient* stream, std::size_t contentLength, HTTP::DownloadCallback downloadCallback, int64_t begin, uint32_t timeoutMs)
+{
   std::size_t nWritten       = 0;
   HTTP::RequestResult result = HTTP::RequestResult::Success;
 
@@ -448,7 +473,8 @@ HTTP::Response<std::size_t> _doGetStream(
   HTTP::GotContentLengthCallback contentLengthCallback,
   HTTP::DownloadCallback downloadCallback,
   uint32_t timeoutMs
-) {
+)
+{
   int64_t begin = OpenShock::millis();
   if (!client.begin(OpenShock::StringToArduinoString(url))) {
     OS_LOGE(TAG, "Failed to begin HTTP request");
@@ -535,7 +561,8 @@ HTTP::Response<std::size_t> _doGetStream(
 }
 
 HTTP::Response<std::size_t>
-  HTTP::Download(std::string_view url, const std::map<String, String>& headers, HTTP::GotContentLengthCallback contentLengthCallback, HTTP::DownloadCallback downloadCallback, const std::vector<int>& acceptedCodes, uint32_t timeoutMs) {
+  HTTP::Download(std::string_view url, const std::map<String, String>& headers, HTTP::GotContentLengthCallback contentLengthCallback, HTTP::DownloadCallback downloadCallback, const std::vector<int>& acceptedCodes, uint32_t timeoutMs)
+{
   std::shared_ptr<RateLimit> rateLimiter = _getRateLimiter(url);
   if (rateLimiter == nullptr) {
     return {RequestResult::InvalidURL, 0, 0};
@@ -551,7 +578,8 @@ HTTP::Response<std::size_t>
   return _doGetStream(client, url, headers, acceptedCodes, rateLimiter, contentLengthCallback, downloadCallback, timeoutMs);
 }
 
-HTTP::Response<std::string> HTTP::GetString(std::string_view url, const std::map<String, String>& headers, const std::vector<int>& acceptedCodes, uint32_t timeoutMs) {
+HTTP::Response<std::string> HTTP::GetString(std::string_view url, const std::map<String, String>& headers, const std::vector<int>& acceptedCodes, uint32_t timeoutMs)
+{
   std::string result;
 
   auto allocator = [&result](std::size_t contentLength) {

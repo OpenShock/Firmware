@@ -21,51 +21,103 @@ namespace OpenShock {
 namespace Serialization {
 namespace Gateway {
 
+struct Ping;
+struct PingBuilder;
+
+struct Trigger;
+struct TriggerBuilder;
+
 struct ShockerCommand;
+struct ShockerCommandBuilder;
 
 struct ShockerCommandList;
 struct ShockerCommandListBuilder;
 
-struct CaptivePortalConfig;
-
-struct OtaInstall;
-struct OtaInstallBuilder;
+struct OtaUpdateRequest;
+struct OtaUpdateRequestBuilder;
 
 struct GatewayToHubMessage;
 struct GatewayToHubMessageBuilder;
 
-enum class GatewayToHubMessagePayload : uint8_t {
-  NONE = 0,
-  ShockerCommandList = 1,
-  CaptivePortalConfig = 2,
-  OtaInstall = 3,
-  MIN = NONE,
-  MAX = OtaInstall
+enum class TriggerType : uint8_t {
+  /// Restart the hub
+  Restart = 0,
+  /// Trigger the emergency stop on the hub, this does however not allow for resetting it
+  EmergencyStop = 1,
+  /// Enable the captive portal
+  CaptivePortalEnable = 2,
+  /// Disable the captive portal
+  CaptivePortalDisable = 3,
+  MIN = Restart,
+  MAX = CaptivePortalDisable
 };
 
-inline const GatewayToHubMessagePayload (&EnumValuesGatewayToHubMessagePayload())[4] {
+inline const TriggerType (&EnumValuesTriggerType())[4] {
+  static const TriggerType values[] = {
+    TriggerType::Restart,
+    TriggerType::EmergencyStop,
+    TriggerType::CaptivePortalEnable,
+    TriggerType::CaptivePortalDisable
+  };
+  return values;
+}
+
+inline const char * const *EnumNamesTriggerType() {
+  static const char * const names[5] = {
+    "Restart",
+    "EmergencyStop",
+    "CaptivePortalEnable",
+    "CaptivePortalDisable",
+    nullptr
+  };
+  return names;
+}
+
+inline const char *EnumNameTriggerType(TriggerType e) {
+  if (::flatbuffers::IsOutRange(e, TriggerType::Restart, TriggerType::CaptivePortalDisable)) return "";
+  const size_t index = static_cast<size_t>(e);
+  return EnumNamesTriggerType()[index];
+}
+
+enum class GatewayToHubMessagePayload : uint8_t {
+  NONE = 0,
+  /// Ping message, should immediately be responded to with a pong
+  Ping = 1,
+  /// Trigger a specific action on the hub
+  Trigger = 2,
+  /// Send a list of shocker commands to the hub
+  ShockerCommandList = 3,
+  /// Request an OTA update to be performed
+  OtaUpdateRequest = 4,
+  MIN = NONE,
+  MAX = OtaUpdateRequest
+};
+
+inline const GatewayToHubMessagePayload (&EnumValuesGatewayToHubMessagePayload())[5] {
   static const GatewayToHubMessagePayload values[] = {
     GatewayToHubMessagePayload::NONE,
+    GatewayToHubMessagePayload::Ping,
+    GatewayToHubMessagePayload::Trigger,
     GatewayToHubMessagePayload::ShockerCommandList,
-    GatewayToHubMessagePayload::CaptivePortalConfig,
-    GatewayToHubMessagePayload::OtaInstall
+    GatewayToHubMessagePayload::OtaUpdateRequest
   };
   return values;
 }
 
 inline const char * const *EnumNamesGatewayToHubMessagePayload() {
-  static const char * const names[5] = {
+  static const char * const names[6] = {
     "NONE",
+    "Ping",
+    "Trigger",
     "ShockerCommandList",
-    "CaptivePortalConfig",
-    "OtaInstall",
+    "OtaUpdateRequest",
     nullptr
   };
   return names;
 }
 
 inline const char *EnumNameGatewayToHubMessagePayload(GatewayToHubMessagePayload e) {
-  if (::flatbuffers::IsOutRange(e, GatewayToHubMessagePayload::NONE, GatewayToHubMessagePayload::OtaInstall)) return "";
+  if (::flatbuffers::IsOutRange(e, GatewayToHubMessagePayload::NONE, GatewayToHubMessagePayload::OtaUpdateRequest)) return "";
   const size_t index = static_cast<size_t>(e);
   return EnumNamesGatewayToHubMessagePayload()[index];
 }
@@ -74,98 +126,213 @@ template<typename T> struct GatewayToHubMessagePayloadTraits {
   static const GatewayToHubMessagePayload enum_value = GatewayToHubMessagePayload::NONE;
 };
 
+template<> struct GatewayToHubMessagePayloadTraits<OpenShock::Serialization::Gateway::Ping> {
+  static const GatewayToHubMessagePayload enum_value = GatewayToHubMessagePayload::Ping;
+};
+
+template<> struct GatewayToHubMessagePayloadTraits<OpenShock::Serialization::Gateway::Trigger> {
+  static const GatewayToHubMessagePayload enum_value = GatewayToHubMessagePayload::Trigger;
+};
+
 template<> struct GatewayToHubMessagePayloadTraits<OpenShock::Serialization::Gateway::ShockerCommandList> {
   static const GatewayToHubMessagePayload enum_value = GatewayToHubMessagePayload::ShockerCommandList;
 };
 
-template<> struct GatewayToHubMessagePayloadTraits<OpenShock::Serialization::Gateway::CaptivePortalConfig> {
-  static const GatewayToHubMessagePayload enum_value = GatewayToHubMessagePayload::CaptivePortalConfig;
-};
-
-template<> struct GatewayToHubMessagePayloadTraits<OpenShock::Serialization::Gateway::OtaInstall> {
-  static const GatewayToHubMessagePayload enum_value = GatewayToHubMessagePayload::OtaInstall;
+template<> struct GatewayToHubMessagePayloadTraits<OpenShock::Serialization::Gateway::OtaUpdateRequest> {
+  static const GatewayToHubMessagePayload enum_value = GatewayToHubMessagePayload::OtaUpdateRequest;
 };
 
 bool VerifyGatewayToHubMessagePayload(::flatbuffers::Verifier &verifier, const void *obj, GatewayToHubMessagePayload type);
 bool VerifyGatewayToHubMessagePayloadVector(::flatbuffers::Verifier &verifier, const ::flatbuffers::Vector<::flatbuffers::Offset<void>> *values, const ::flatbuffers::Vector<GatewayToHubMessagePayload> *types);
 
-FLATBUFFERS_MANUALLY_ALIGNED_STRUCT(2) ShockerCommand FLATBUFFERS_FINAL_CLASS {
- private:
-  uint8_t model_;
-  int8_t padding0__;
-  uint16_t id_;
-  uint8_t type_;
-  uint8_t intensity_;
-  uint16_t duration_;
+struct Ping FLATBUFFERS_FINAL_CLASS : private ::flatbuffers::Table {
+  typedef PingBuilder Builder;
+  struct Traits;
+  static FLATBUFFERS_CONSTEXPR_CPP11 const char *GetFullyQualifiedName() {
+    return "OpenShock.Serialization.Gateway.Ping";
+  }
+  enum FlatBuffersVTableOffset FLATBUFFERS_VTABLE_UNDERLYING_TYPE {
+    VT_UNIX_UTC_TIME = 4
+  };
+  uint64_t unix_utc_time() const {
+    return GetField<uint64_t>(VT_UNIX_UTC_TIME, 0);
+  }
+  bool Verify(::flatbuffers::Verifier &verifier) const {
+    return VerifyTableStart(verifier) &&
+           VerifyField<uint64_t>(verifier, VT_UNIX_UTC_TIME, 8) &&
+           verifier.EndTable();
+  }
+};
 
- public:
+struct PingBuilder {
+  typedef Ping Table;
+  ::flatbuffers::FlatBufferBuilder &fbb_;
+  ::flatbuffers::uoffset_t start_;
+  void add_unix_utc_time(uint64_t unix_utc_time) {
+    fbb_.AddElement<uint64_t>(Ping::VT_UNIX_UTC_TIME, unix_utc_time, 0);
+  }
+  explicit PingBuilder(::flatbuffers::FlatBufferBuilder &_fbb)
+        : fbb_(_fbb) {
+    start_ = fbb_.StartTable();
+  }
+  ::flatbuffers::Offset<Ping> Finish() {
+    const auto end = fbb_.EndTable(start_);
+    auto o = ::flatbuffers::Offset<Ping>(end);
+    return o;
+  }
+};
+
+inline ::flatbuffers::Offset<Ping> CreatePing(
+    ::flatbuffers::FlatBufferBuilder &_fbb,
+    uint64_t unix_utc_time = 0) {
+  PingBuilder builder_(_fbb);
+  builder_.add_unix_utc_time(unix_utc_time);
+  return builder_.Finish();
+}
+
+struct Ping::Traits {
+  using type = Ping;
+  static auto constexpr Create = CreatePing;
+};
+
+struct Trigger FLATBUFFERS_FINAL_CLASS : private ::flatbuffers::Table {
+  typedef TriggerBuilder Builder;
+  struct Traits;
+  static FLATBUFFERS_CONSTEXPR_CPP11 const char *GetFullyQualifiedName() {
+    return "OpenShock.Serialization.Gateway.Trigger";
+  }
+  enum FlatBuffersVTableOffset FLATBUFFERS_VTABLE_UNDERLYING_TYPE {
+    VT_TYPE = 4
+  };
+  OpenShock::Serialization::Gateway::TriggerType type() const {
+    return static_cast<OpenShock::Serialization::Gateway::TriggerType>(GetField<uint8_t>(VT_TYPE, 0));
+  }
+  bool Verify(::flatbuffers::Verifier &verifier) const {
+    return VerifyTableStart(verifier) &&
+           VerifyField<uint8_t>(verifier, VT_TYPE, 1) &&
+           verifier.EndTable();
+  }
+};
+
+struct TriggerBuilder {
+  typedef Trigger Table;
+  ::flatbuffers::FlatBufferBuilder &fbb_;
+  ::flatbuffers::uoffset_t start_;
+  void add_type(OpenShock::Serialization::Gateway::TriggerType type) {
+    fbb_.AddElement<uint8_t>(Trigger::VT_TYPE, static_cast<uint8_t>(type), 0);
+  }
+  explicit TriggerBuilder(::flatbuffers::FlatBufferBuilder &_fbb)
+        : fbb_(_fbb) {
+    start_ = fbb_.StartTable();
+  }
+  ::flatbuffers::Offset<Trigger> Finish() {
+    const auto end = fbb_.EndTable(start_);
+    auto o = ::flatbuffers::Offset<Trigger>(end);
+    return o;
+  }
+};
+
+inline ::flatbuffers::Offset<Trigger> CreateTrigger(
+    ::flatbuffers::FlatBufferBuilder &_fbb,
+    OpenShock::Serialization::Gateway::TriggerType type = OpenShock::Serialization::Gateway::TriggerType::Restart) {
+  TriggerBuilder builder_(_fbb);
+  builder_.add_type(type);
+  return builder_.Finish();
+}
+
+struct Trigger::Traits {
+  using type = Trigger;
+  static auto constexpr Create = CreateTrigger;
+};
+
+struct ShockerCommand FLATBUFFERS_FINAL_CLASS : private ::flatbuffers::Table {
+  typedef ShockerCommandBuilder Builder;
   struct Traits;
   static FLATBUFFERS_CONSTEXPR_CPP11 const char *GetFullyQualifiedName() {
     return "OpenShock.Serialization.Gateway.ShockerCommand";
   }
-  ShockerCommand()
-      : model_(0),
-        padding0__(0),
-        id_(0),
-        type_(0),
-        intensity_(0),
-        duration_(0) {
-    (void)padding0__;
-  }
-  ShockerCommand(OpenShock::Serialization::Types::ShockerModelType _model, uint16_t _id, OpenShock::Serialization::Types::ShockerCommandType _type, uint8_t _intensity, uint16_t _duration)
-      : model_(::flatbuffers::EndianScalar(static_cast<uint8_t>(_model))),
-        padding0__(0),
-        id_(::flatbuffers::EndianScalar(_id)),
-        type_(::flatbuffers::EndianScalar(static_cast<uint8_t>(_type))),
-        intensity_(::flatbuffers::EndianScalar(_intensity)),
-        duration_(::flatbuffers::EndianScalar(_duration)) {
-    (void)padding0__;
-  }
+  enum FlatBuffersVTableOffset FLATBUFFERS_VTABLE_UNDERLYING_TYPE {
+    VT_MODEL = 4,
+    VT_ID = 6,
+    VT_TYPE = 8,
+    VT_INTENSITY = 10,
+    VT_DURATION = 12
+  };
   OpenShock::Serialization::Types::ShockerModelType model() const {
-    return static_cast<OpenShock::Serialization::Types::ShockerModelType>(::flatbuffers::EndianScalar(model_));
+    return static_cast<OpenShock::Serialization::Types::ShockerModelType>(GetField<uint8_t>(VT_MODEL, 0));
   }
   uint16_t id() const {
-    return ::flatbuffers::EndianScalar(id_);
+    return GetField<uint16_t>(VT_ID, 0);
   }
   OpenShock::Serialization::Types::ShockerCommandType type() const {
-    return static_cast<OpenShock::Serialization::Types::ShockerCommandType>(::flatbuffers::EndianScalar(type_));
+    return static_cast<OpenShock::Serialization::Types::ShockerCommandType>(GetField<uint8_t>(VT_TYPE, 0));
   }
   uint8_t intensity() const {
-    return ::flatbuffers::EndianScalar(intensity_);
+    return GetField<uint8_t>(VT_INTENSITY, 0);
   }
   uint16_t duration() const {
-    return ::flatbuffers::EndianScalar(duration_);
+    return GetField<uint16_t>(VT_DURATION, 0);
+  }
+  bool Verify(::flatbuffers::Verifier &verifier) const {
+    return VerifyTableStart(verifier) &&
+           VerifyField<uint8_t>(verifier, VT_MODEL, 1) &&
+           VerifyField<uint16_t>(verifier, VT_ID, 2) &&
+           VerifyField<uint8_t>(verifier, VT_TYPE, 1) &&
+           VerifyField<uint8_t>(verifier, VT_INTENSITY, 1) &&
+           VerifyField<uint16_t>(verifier, VT_DURATION, 2) &&
+           verifier.EndTable();
   }
 };
-FLATBUFFERS_STRUCT_END(ShockerCommand, 8);
+
+struct ShockerCommandBuilder {
+  typedef ShockerCommand Table;
+  ::flatbuffers::FlatBufferBuilder &fbb_;
+  ::flatbuffers::uoffset_t start_;
+  void add_model(OpenShock::Serialization::Types::ShockerModelType model) {
+    fbb_.AddElement<uint8_t>(ShockerCommand::VT_MODEL, static_cast<uint8_t>(model), 0);
+  }
+  void add_id(uint16_t id) {
+    fbb_.AddElement<uint16_t>(ShockerCommand::VT_ID, id, 0);
+  }
+  void add_type(OpenShock::Serialization::Types::ShockerCommandType type) {
+    fbb_.AddElement<uint8_t>(ShockerCommand::VT_TYPE, static_cast<uint8_t>(type), 0);
+  }
+  void add_intensity(uint8_t intensity) {
+    fbb_.AddElement<uint8_t>(ShockerCommand::VT_INTENSITY, intensity, 0);
+  }
+  void add_duration(uint16_t duration) {
+    fbb_.AddElement<uint16_t>(ShockerCommand::VT_DURATION, duration, 0);
+  }
+  explicit ShockerCommandBuilder(::flatbuffers::FlatBufferBuilder &_fbb)
+        : fbb_(_fbb) {
+    start_ = fbb_.StartTable();
+  }
+  ::flatbuffers::Offset<ShockerCommand> Finish() {
+    const auto end = fbb_.EndTable(start_);
+    auto o = ::flatbuffers::Offset<ShockerCommand>(end);
+    return o;
+  }
+};
+
+inline ::flatbuffers::Offset<ShockerCommand> CreateShockerCommand(
+    ::flatbuffers::FlatBufferBuilder &_fbb,
+    OpenShock::Serialization::Types::ShockerModelType model = OpenShock::Serialization::Types::ShockerModelType::CaiXianlin,
+    uint16_t id = 0,
+    OpenShock::Serialization::Types::ShockerCommandType type = OpenShock::Serialization::Types::ShockerCommandType::Stop,
+    uint8_t intensity = 0,
+    uint16_t duration = 0) {
+  ShockerCommandBuilder builder_(_fbb);
+  builder_.add_duration(duration);
+  builder_.add_id(id);
+  builder_.add_intensity(intensity);
+  builder_.add_type(type);
+  builder_.add_model(model);
+  return builder_.Finish();
+}
 
 struct ShockerCommand::Traits {
   using type = ShockerCommand;
-};
-
-FLATBUFFERS_MANUALLY_ALIGNED_STRUCT(1) CaptivePortalConfig FLATBUFFERS_FINAL_CLASS {
- private:
-  uint8_t enabled_;
-
- public:
-  struct Traits;
-  static FLATBUFFERS_CONSTEXPR_CPP11 const char *GetFullyQualifiedName() {
-    return "OpenShock.Serialization.Gateway.CaptivePortalConfig";
-  }
-  CaptivePortalConfig()
-      : enabled_(0) {
-  }
-  CaptivePortalConfig(bool _enabled)
-      : enabled_(::flatbuffers::EndianScalar(static_cast<uint8_t>(_enabled))) {
-  }
-  bool enabled() const {
-    return ::flatbuffers::EndianScalar(enabled_) != 0;
-  }
-};
-FLATBUFFERS_STRUCT_END(CaptivePortalConfig, 1);
-
-struct CaptivePortalConfig::Traits {
-  using type = CaptivePortalConfig;
+  static auto constexpr Create = CreateShockerCommand;
 };
 
 struct ShockerCommandList FLATBUFFERS_FINAL_CLASS : private ::flatbuffers::Table {
@@ -177,13 +344,14 @@ struct ShockerCommandList FLATBUFFERS_FINAL_CLASS : private ::flatbuffers::Table
   enum FlatBuffersVTableOffset FLATBUFFERS_VTABLE_UNDERLYING_TYPE {
     VT_COMMANDS = 4
   };
-  const ::flatbuffers::Vector<const OpenShock::Serialization::Gateway::ShockerCommand *> *commands() const {
-    return GetPointer<const ::flatbuffers::Vector<const OpenShock::Serialization::Gateway::ShockerCommand *> *>(VT_COMMANDS);
+  const ::flatbuffers::Vector<::flatbuffers::Offset<OpenShock::Serialization::Gateway::ShockerCommand>> *commands() const {
+    return GetPointer<const ::flatbuffers::Vector<::flatbuffers::Offset<OpenShock::Serialization::Gateway::ShockerCommand>> *>(VT_COMMANDS);
   }
   bool Verify(::flatbuffers::Verifier &verifier) const {
     return VerifyTableStart(verifier) &&
            VerifyOffsetRequired(verifier, VT_COMMANDS) &&
            verifier.VerifyVector(commands()) &&
+           verifier.VerifyVectorOfTables(commands()) &&
            verifier.EndTable();
   }
 };
@@ -192,7 +360,7 @@ struct ShockerCommandListBuilder {
   typedef ShockerCommandList Table;
   ::flatbuffers::FlatBufferBuilder &fbb_;
   ::flatbuffers::uoffset_t start_;
-  void add_commands(::flatbuffers::Offset<::flatbuffers::Vector<const OpenShock::Serialization::Gateway::ShockerCommand *>> commands) {
+  void add_commands(::flatbuffers::Offset<::flatbuffers::Vector<::flatbuffers::Offset<OpenShock::Serialization::Gateway::ShockerCommand>>> commands) {
     fbb_.AddOffset(ShockerCommandList::VT_COMMANDS, commands);
   }
   explicit ShockerCommandListBuilder(::flatbuffers::FlatBufferBuilder &_fbb)
@@ -209,7 +377,7 @@ struct ShockerCommandListBuilder {
 
 inline ::flatbuffers::Offset<ShockerCommandList> CreateShockerCommandList(
     ::flatbuffers::FlatBufferBuilder &_fbb,
-    ::flatbuffers::Offset<::flatbuffers::Vector<const OpenShock::Serialization::Gateway::ShockerCommand *>> commands = 0) {
+    ::flatbuffers::Offset<::flatbuffers::Vector<::flatbuffers::Offset<OpenShock::Serialization::Gateway::ShockerCommand>>> commands = 0) {
   ShockerCommandListBuilder builder_(_fbb);
   builder_.add_commands(commands);
   return builder_.Finish();
@@ -222,18 +390,18 @@ struct ShockerCommandList::Traits {
 
 inline ::flatbuffers::Offset<ShockerCommandList> CreateShockerCommandListDirect(
     ::flatbuffers::FlatBufferBuilder &_fbb,
-    const std::vector<OpenShock::Serialization::Gateway::ShockerCommand> *commands = nullptr) {
-  auto commands__ = commands ? _fbb.CreateVectorOfStructs<OpenShock::Serialization::Gateway::ShockerCommand>(*commands) : 0;
+    const std::vector<::flatbuffers::Offset<OpenShock::Serialization::Gateway::ShockerCommand>> *commands = nullptr) {
+  auto commands__ = commands ? _fbb.CreateVector<::flatbuffers::Offset<OpenShock::Serialization::Gateway::ShockerCommand>>(*commands) : 0;
   return OpenShock::Serialization::Gateway::CreateShockerCommandList(
       _fbb,
       commands__);
 }
 
-struct OtaInstall FLATBUFFERS_FINAL_CLASS : private ::flatbuffers::Table {
-  typedef OtaInstallBuilder Builder;
+struct OtaUpdateRequest FLATBUFFERS_FINAL_CLASS : private ::flatbuffers::Table {
+  typedef OtaUpdateRequestBuilder Builder;
   struct Traits;
   static FLATBUFFERS_CONSTEXPR_CPP11 const char *GetFullyQualifiedName() {
-    return "OpenShock.Serialization.Gateway.OtaInstall";
+    return "OpenShock.Serialization.Gateway.OtaUpdateRequest";
   }
   enum FlatBuffersVTableOffset FLATBUFFERS_VTABLE_UNDERLYING_TYPE {
     VT_VERSION = 4
@@ -243,41 +411,42 @@ struct OtaInstall FLATBUFFERS_FINAL_CLASS : private ::flatbuffers::Table {
   }
   bool Verify(::flatbuffers::Verifier &verifier) const {
     return VerifyTableStart(verifier) &&
-           VerifyOffset(verifier, VT_VERSION) &&
+           VerifyOffsetRequired(verifier, VT_VERSION) &&
            verifier.VerifyTable(version()) &&
            verifier.EndTable();
   }
 };
 
-struct OtaInstallBuilder {
-  typedef OtaInstall Table;
+struct OtaUpdateRequestBuilder {
+  typedef OtaUpdateRequest Table;
   ::flatbuffers::FlatBufferBuilder &fbb_;
   ::flatbuffers::uoffset_t start_;
   void add_version(::flatbuffers::Offset<OpenShock::Serialization::Types::SemVer> version) {
-    fbb_.AddOffset(OtaInstall::VT_VERSION, version);
+    fbb_.AddOffset(OtaUpdateRequest::VT_VERSION, version);
   }
-  explicit OtaInstallBuilder(::flatbuffers::FlatBufferBuilder &_fbb)
+  explicit OtaUpdateRequestBuilder(::flatbuffers::FlatBufferBuilder &_fbb)
         : fbb_(_fbb) {
     start_ = fbb_.StartTable();
   }
-  ::flatbuffers::Offset<OtaInstall> Finish() {
+  ::flatbuffers::Offset<OtaUpdateRequest> Finish() {
     const auto end = fbb_.EndTable(start_);
-    auto o = ::flatbuffers::Offset<OtaInstall>(end);
+    auto o = ::flatbuffers::Offset<OtaUpdateRequest>(end);
+    fbb_.Required(o, OtaUpdateRequest::VT_VERSION);
     return o;
   }
 };
 
-inline ::flatbuffers::Offset<OtaInstall> CreateOtaInstall(
+inline ::flatbuffers::Offset<OtaUpdateRequest> CreateOtaUpdateRequest(
     ::flatbuffers::FlatBufferBuilder &_fbb,
     ::flatbuffers::Offset<OpenShock::Serialization::Types::SemVer> version = 0) {
-  OtaInstallBuilder builder_(_fbb);
+  OtaUpdateRequestBuilder builder_(_fbb);
   builder_.add_version(version);
   return builder_.Finish();
 }
 
-struct OtaInstall::Traits {
-  using type = OtaInstall;
-  static auto constexpr Create = CreateOtaInstall;
+struct OtaUpdateRequest::Traits {
+  using type = OtaUpdateRequest;
+  static auto constexpr Create = CreateOtaUpdateRequest;
 };
 
 struct GatewayToHubMessage FLATBUFFERS_FINAL_CLASS : private ::flatbuffers::Table {
@@ -297,34 +466,41 @@ struct GatewayToHubMessage FLATBUFFERS_FINAL_CLASS : private ::flatbuffers::Tabl
     return GetPointer<const void *>(VT_PAYLOAD);
   }
   template<typename T> const T *payload_as() const;
+  const OpenShock::Serialization::Gateway::Ping *payload_as_Ping() const {
+    return payload_type() == OpenShock::Serialization::Gateway::GatewayToHubMessagePayload::Ping ? static_cast<const OpenShock::Serialization::Gateway::Ping *>(payload()) : nullptr;
+  }
+  const OpenShock::Serialization::Gateway::Trigger *payload_as_Trigger() const {
+    return payload_type() == OpenShock::Serialization::Gateway::GatewayToHubMessagePayload::Trigger ? static_cast<const OpenShock::Serialization::Gateway::Trigger *>(payload()) : nullptr;
+  }
   const OpenShock::Serialization::Gateway::ShockerCommandList *payload_as_ShockerCommandList() const {
     return payload_type() == OpenShock::Serialization::Gateway::GatewayToHubMessagePayload::ShockerCommandList ? static_cast<const OpenShock::Serialization::Gateway::ShockerCommandList *>(payload()) : nullptr;
   }
-  const OpenShock::Serialization::Gateway::CaptivePortalConfig *payload_as_CaptivePortalConfig() const {
-    return payload_type() == OpenShock::Serialization::Gateway::GatewayToHubMessagePayload::CaptivePortalConfig ? static_cast<const OpenShock::Serialization::Gateway::CaptivePortalConfig *>(payload()) : nullptr;
-  }
-  const OpenShock::Serialization::Gateway::OtaInstall *payload_as_OtaInstall() const {
-    return payload_type() == OpenShock::Serialization::Gateway::GatewayToHubMessagePayload::OtaInstall ? static_cast<const OpenShock::Serialization::Gateway::OtaInstall *>(payload()) : nullptr;
+  const OpenShock::Serialization::Gateway::OtaUpdateRequest *payload_as_OtaUpdateRequest() const {
+    return payload_type() == OpenShock::Serialization::Gateway::GatewayToHubMessagePayload::OtaUpdateRequest ? static_cast<const OpenShock::Serialization::Gateway::OtaUpdateRequest *>(payload()) : nullptr;
   }
   bool Verify(::flatbuffers::Verifier &verifier) const {
     return VerifyTableStart(verifier) &&
            VerifyField<uint8_t>(verifier, VT_PAYLOAD_TYPE, 1) &&
-           VerifyOffset(verifier, VT_PAYLOAD) &&
+           VerifyOffsetRequired(verifier, VT_PAYLOAD) &&
            VerifyGatewayToHubMessagePayload(verifier, payload(), payload_type()) &&
            verifier.EndTable();
   }
 };
 
+template<> inline const OpenShock::Serialization::Gateway::Ping *GatewayToHubMessage::payload_as<OpenShock::Serialization::Gateway::Ping>() const {
+  return payload_as_Ping();
+}
+
+template<> inline const OpenShock::Serialization::Gateway::Trigger *GatewayToHubMessage::payload_as<OpenShock::Serialization::Gateway::Trigger>() const {
+  return payload_as_Trigger();
+}
+
 template<> inline const OpenShock::Serialization::Gateway::ShockerCommandList *GatewayToHubMessage::payload_as<OpenShock::Serialization::Gateway::ShockerCommandList>() const {
   return payload_as_ShockerCommandList();
 }
 
-template<> inline const OpenShock::Serialization::Gateway::CaptivePortalConfig *GatewayToHubMessage::payload_as<OpenShock::Serialization::Gateway::CaptivePortalConfig>() const {
-  return payload_as_CaptivePortalConfig();
-}
-
-template<> inline const OpenShock::Serialization::Gateway::OtaInstall *GatewayToHubMessage::payload_as<OpenShock::Serialization::Gateway::OtaInstall>() const {
-  return payload_as_OtaInstall();
+template<> inline const OpenShock::Serialization::Gateway::OtaUpdateRequest *GatewayToHubMessage::payload_as<OpenShock::Serialization::Gateway::OtaUpdateRequest>() const {
+  return payload_as_OtaUpdateRequest();
 }
 
 struct GatewayToHubMessageBuilder {
@@ -344,6 +520,7 @@ struct GatewayToHubMessageBuilder {
   ::flatbuffers::Offset<GatewayToHubMessage> Finish() {
     const auto end = fbb_.EndTable(start_);
     auto o = ::flatbuffers::Offset<GatewayToHubMessage>(end);
+    fbb_.Required(o, GatewayToHubMessage::VT_PAYLOAD);
     return o;
   }
 };
@@ -368,15 +545,20 @@ inline bool VerifyGatewayToHubMessagePayload(::flatbuffers::Verifier &verifier, 
     case GatewayToHubMessagePayload::NONE: {
       return true;
     }
+    case GatewayToHubMessagePayload::Ping: {
+      auto ptr = reinterpret_cast<const OpenShock::Serialization::Gateway::Ping *>(obj);
+      return verifier.VerifyTable(ptr);
+    }
+    case GatewayToHubMessagePayload::Trigger: {
+      auto ptr = reinterpret_cast<const OpenShock::Serialization::Gateway::Trigger *>(obj);
+      return verifier.VerifyTable(ptr);
+    }
     case GatewayToHubMessagePayload::ShockerCommandList: {
       auto ptr = reinterpret_cast<const OpenShock::Serialization::Gateway::ShockerCommandList *>(obj);
       return verifier.VerifyTable(ptr);
     }
-    case GatewayToHubMessagePayload::CaptivePortalConfig: {
-      return verifier.VerifyField<OpenShock::Serialization::Gateway::CaptivePortalConfig>(static_cast<const uint8_t *>(obj), 0, 1);
-    }
-    case GatewayToHubMessagePayload::OtaInstall: {
-      auto ptr = reinterpret_cast<const OpenShock::Serialization::Gateway::OtaInstall *>(obj);
+    case GatewayToHubMessagePayload::OtaUpdateRequest: {
+      auto ptr = reinterpret_cast<const OpenShock::Serialization::Gateway::OtaUpdateRequest *>(obj);
       return verifier.VerifyTable(ptr);
     }
     default: return true;

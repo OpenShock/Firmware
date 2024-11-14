@@ -1,5 +1,7 @@
 #include "Convert.h"
 
+#include "util/DigitCounter.h"
+
 #include <cstdint>
 #include <cstring>
 #include <limits>
@@ -8,19 +10,52 @@
 
 using namespace std::string_view_literals;
 
+// Base converter
 template<typename T>
-constexpr unsigned int NumDigits()
+void fromNonZeroT(T val, std::string& str)
 {
   static_assert(std::is_integral<T>::value);
-  uint64_t num = std::numeric_limits<T>::max();
+  const std::size_t MaxDigits = OpenShock::Util::Digits10CountMax<T>();
 
-  unsigned int digits = std::is_signed<T>::value ? 2 : 1;
-  while (num >= 10) {
-    num /= 10;
-    digits++;
+  char buf[MaxDigits + 1];  // +1 for null terminator
+
+  char* ptr = buf + MaxDigits;
+
+  // Null terminator
+  *ptr-- = '\0';
+
+  // Handle negative numbers
+  bool negative = val < 0;
+  if (negative) {
+    val = -val;
   }
 
-  return digits;
+  // Convert to string
+  while (val > 0) {
+    *ptr-- = '0' + (val % 10);
+    val /= 10;
+  }
+
+  if (negative) {
+    *ptr-- = '-';
+  }
+
+  // Append to string with length
+  str.append(ptr + 1, buf + MaxDigits + 1);
+}
+
+// Base converter
+template<typename T>
+void fromT(T val, std::string& str)
+{
+  static_assert(std::is_integral<T>::value);
+
+  if (val == 0) {
+    str.push_back('0');
+    return;
+  }
+
+  fromNonZeroT(val, str);
 }
 
 // Base converter
@@ -65,7 +100,7 @@ constexpr bool spanToUT(std::string_view str, T& val)
 {
   static_assert(std::is_unsigned<T>::value);
 
-  if (str.empty() || str.length() > NumDigits<T>()) {
+  if (str.empty() || str.length() > OpenShock::Util::Digits10CountMax<T>()) {
     return false;
   }
 
@@ -78,7 +113,7 @@ constexpr bool spanToST(std::string_view str, T& val)
 {
   static_assert(std::is_signed<T>::value);
 
-  if (str.empty() || str.length() > NumDigits<T>()) {
+  if (str.empty() || str.length() > OpenShock::Util::Digits10CountMax<T>()) {
     return false;
   }
 
@@ -107,6 +142,60 @@ constexpr bool spanToST(std::string_view str, T& val)
 using namespace OpenShock;
 
 // Specific converters
+void Convert::FromInt8(int8_t val, std::string& str)
+{
+  fromT(val, str);
+}
+
+void Convert::FromUint8(uint8_t val, std::string& str)
+{
+  fromT(val, str);
+}
+
+void Convert::FromInt16(int16_t val, std::string& str)
+{
+  fromT(val, str);
+}
+
+void Convert::FromUint16(uint16_t val, std::string& str)
+{
+  fromT(val, str);
+}
+
+void Convert::FromInt32(int32_t val, std::string& str)
+{
+  fromT(val, str);
+}
+
+void Convert::FromUint32(uint32_t val, std::string& str)
+{
+  fromT(val, str);
+}
+
+void Convert::FromInt64(int64_t val, std::string& str)
+{
+  fromT(val, str);
+}
+
+void Convert::FromUint64(uint64_t val, std::string& str)
+{
+  fromT(val, str);
+}
+
+void Convert::FromBool(bool val, std::string& str)
+{
+  if (val) {
+    str += "true";
+  } else {
+    str += "false";
+  }
+}
+
+void Convert::FromGpioNum(gpio_num_t val, std::string& str)
+{
+  fromT(static_cast<int8_t>(val), str);
+}
+
 bool Convert::ToInt8(std::string_view str, int8_t& val)
 {
   return spanToST(str, val);
@@ -173,16 +262,6 @@ bool Convert::ToGpioNum(std::string_view str, gpio_num_t& val)
 
   return true;
 }
-
-static_assert(NumDigits<uint8_t>() == 3, "NumDigits test for uint8_t failed");
-static_assert(NumDigits<uint16_t>() == 5, "NumDigits test for uint16_t failed");
-static_assert(NumDigits<uint32_t>() == 10, "NumDigits test for uint32_t failed");
-static_assert(NumDigits<uint64_t>() == 20, "NumDigits test for uint64_t failed");
-
-static_assert(NumDigits<int8_t>() == 4, "NumDigits test for int8_t failed");
-static_assert(NumDigits<int16_t>() == 6, "NumDigits test for int16_t failed");
-static_assert(NumDigits<int32_t>() == 11, "NumDigits test for int32_t failed");
-static_assert(NumDigits<int64_t>() == 20, "NumDigits test for int64_t failed");
 
 constexpr bool test_spanToUT8()
 {

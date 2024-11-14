@@ -1,3 +1,29 @@
+# Version 1.4.0 Release Notes
+
+This release is packed with bugfixes, optimizations, code cleanup, prepwork for ESP-IDF, and some features!
+
+## Highlights
+
+- Add support for configuring hostname of ESP via Serial.
+- Add support for configuring Emergency Stop via Captive Portal and Serial.
+- Report available GPIO pins to Captive Portal Frontend.
+- Massively refactor serial command handler.
+
+## Optimizations
+
+- Bump platform-espressif32 to version 6.9.
+- Start using C++17 features including std::string_view.
+- Clean up platformio.ini file.
+- Lots of miscellanious code cleanup.
+- Implement custom zero-copy type conversion methods with better error checking.
+- Reduce log spam by the arduino library.
+- Improve error handling of gpio pin selection.
+- Attempt to make more sense out of the 998DR protocol serializer.
+
+# Version 1.4.0-rc.2 Release Notes
+
+Fixed EStop debouncing logic.
+
 # Version 1.4.0-rc.1 Release Notes
 
 This release is packed with bugfixes, optimizations, code cleanup, prepwork for ESP-IDF, and some features!
