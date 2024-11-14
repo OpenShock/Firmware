@@ -4,8 +4,13 @@
 #include "Convert.h"
 #include "EStopManager.h"
 
-void _handleEStopEnabledGetCommand(std::string_view arg, bool isAutomated)
+static void handleGetEnabled(std::string_view arg, bool isAutomated)
 {
+  if (!arg.empty()) {
+    SERPR_ERROR("Get command does not support parameters");
+    return;
+  }
+
   bool enabled;
   if (!OpenShock::Config::GetEStopEnabled(enabled)) {
     SERPR_ERROR("Failed to get EStop enabled from config");
@@ -16,7 +21,7 @@ void _handleEStopEnabledGetCommand(std::string_view arg, bool isAutomated)
   SERPR_RESPONSE("EStopEnabled|%s", enabled ? "true" : "false");
 }
 
-void _handleEStopEnabledSetCommand(std::string_view arg, bool isAutomated)
+static void handleSetEnabled(std::string_view arg, bool isAutomated)
 {
   bool enabled;
   if (!OpenShock::Convert::ToBool(arg, enabled)) {
@@ -37,8 +42,13 @@ void _handleEStopEnabledSetCommand(std::string_view arg, bool isAutomated)
   SERPR_SUCCESS("Saved config");
 }
 
-void _handleEStopPinGetCommand(std::string_view arg, bool isAutomated)
+static void handleGetPin(std::string_view arg, bool isAutomated)
 {
+  if (!arg.empty()) {
+    SERPR_ERROR("Get command does not support parameters");
+    return;
+  }
+
   gpio_num_t estopPin;
   if (!OpenShock::Config::GetEStopGpioPin(estopPin)) {
     SERPR_ERROR("Failed to get EStop pin from config");
@@ -49,7 +59,7 @@ void _handleEStopPinGetCommand(std::string_view arg, bool isAutomated)
   SERPR_RESPONSE("EStopPin|%hhi", static_cast<int8_t>(estopPin));
 }
 
-void _handleEStopPinSetCommand(std::string_view arg, bool isAutomated)
+static void handleSetPin(std::string_view arg, bool isAutomated)
 {
   gpio_num_t estopPin;
   if (!OpenShock::Convert::ToGpioNum(arg, estopPin)) {
@@ -74,12 +84,12 @@ OpenShock::Serial::CommandGroup OpenShock::Serial::CommandHandlers::EStopHandler
 {
   auto group = OpenShock::Serial::CommandGroup("estop"sv);
 
-  auto& getEnabledCommand = group.addCommand("enabled"sv, "Get the E-Stop enabled state."sv, _handleEStopEnabledGetCommand);
-  auto& setEnabledCommand = group.addCommand("enabled"sv, "Set the E-Stop enabled state."sv, _handleEStopEnabledSetCommand);
+  auto& getEnabledCommand = group.addCommand("enabled"sv, "Get the E-Stop enabled state."sv, handleGetEnabled);
+  auto& setEnabledCommand = group.addCommand("enabled"sv, "Set the E-Stop enabled state."sv, handleSetEnabled);
   setEnabledCommand.addArgument("enabled"sv, "must be a boolean"sv, "true"sv);
 
-  auto& getPinCommand = group.addCommand("pin"sv, "Get the GPIO pin used for the E-Stop."sv, _handleEStopPinGetCommand);
-  auto& setPinCommand = group.addCommand("pin"sv, "Set the GPIO pin used for the E-Stop."sv, _handleEStopPinSetCommand);
+  auto& getPinCommand = group.addCommand("pin"sv, "Get the GPIO pin used for the E-Stop."sv, handleGetPin);
+  auto& setPinCommand = group.addCommand("pin"sv, "Set the GPIO pin used for the E-Stop."sv, handleSetPin);
   setPinCommand.addArgument("pin"sv, "must be a number"sv, "4"sv);
 
   return group;

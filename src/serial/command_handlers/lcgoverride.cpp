@@ -7,7 +7,7 @@
 
 const char* TAG = "Serial::CommandHandlers::LcgOverride";
 
-void _handleLcgOverrideCommand(std::string_view arg, bool isAutomated)
+static void handleGet(std::string_view arg, bool isAutomated)
 {
   std::string lcgOverride;
   if (!OpenShock::Config::GetBackendLCGOverride(lcgOverride)) {
@@ -19,7 +19,7 @@ void _handleLcgOverrideCommand(std::string_view arg, bool isAutomated)
   SERPR_RESPONSE("LcgOverride|%s", lcgOverride.c_str());
 }
 
-void _handleLcgOverrideClearCommand(std::string_view arg, bool isAutomated)
+static void handleClear(std::string_view arg, bool isAutomated)
 {
   if (arg.size() != 5) {
     SERPR_ERROR("Invalid command (clear command should not have any arguments)");
@@ -34,7 +34,7 @@ void _handleLcgOverrideClearCommand(std::string_view arg, bool isAutomated)
   }
 }
 
-void _handleLcgOverrideSetCommand(std::string_view arg, bool isAutomated)
+static void handleSet(std::string_view arg, bool isAutomated)
 {
   if (arg.size() <= 4) {
     SERPR_ERROR("Invalid command (set command should have an argument)");
@@ -86,15 +86,16 @@ void _handleLcgOverrideSetCommand(std::string_view arg, bool isAutomated)
   }
 }
 
-OpenShock::Serial::CommandGroup OpenShock::Serial::CommandHandlers::LcgOverrideHandler() {
+OpenShock::Serial::CommandGroup OpenShock::Serial::CommandHandlers::LcgOverrideHandler()
+{
   auto group = OpenShock::Serial::CommandGroup("lcgoverride"sv);
 
-  auto& getCommand = group.addCommand("Get the domain overridden for LCG endpoint (if any)."sv, _handleLcgOverrideCommand);
+  auto& getCommand = group.addCommand("Get the domain overridden for LCG endpoint (if any)."sv, handleGet);
 
-  auto& setCommand = group.addCommand("set"sv, "Set a domain to override the LCG endpoint."sv, _handleLcgOverrideSetCommand);
+  auto& setCommand = group.addCommand("set"sv, "Set a domain to override the LCG endpoint."sv, handleSet);
   setCommand.addArgument("domain"sv, "must be a string"sv, "eu1-gateway.shocklink.net"sv);
 
-  auto& clearCommand = group.addCommand("clear"sv, "Clear the overridden LCG endpoint."sv, _handleLcgOverrideClearCommand);
+  auto& clearCommand = group.addCommand("clear"sv, "Clear the overridden LCG endpoint."sv, handleClear);
 
   return group;
 }

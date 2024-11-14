@@ -8,16 +8,27 @@
 
 const char* const TAG = "Serial::CommandHandlers::Domain";
 
-void _handleDomainCommand(std::string_view arg, bool isAutomated) {
-  if (arg.empty()) {
-    std::string domain;
-    if (!OpenShock::Config::GetBackendDomain(domain)) {
-      SERPR_ERROR("Failed to get domain from config");
-      return;
-    }
+static void handleGet(std::string_view arg, bool isAutomated)
+{
+  if (!arg.empty()) {
+    SERPR_ERROR("Get command does not support parameters");
+    return;
+  }
 
-    // Get domain
-    SERPR_RESPONSE("Domain|%s", domain.c_str());
+  std::string domain;
+  if (!OpenShock::Config::GetBackendDomain(domain)) {
+    SERPR_ERROR("Failed to get domain from config");
+    return;
+  }
+
+  // Get domain
+  SERPR_RESPONSE("Domain|%s", domain.c_str());
+}
+
+static void handleSet(std::string_view arg, bool isAutomated)
+{
+  if (arg.empty()) {
+    SERPR_ERROR("Domain cannot be empty");
     return;
   }
 
@@ -60,13 +71,14 @@ void _handleDomainCommand(std::string_view arg, bool isAutomated) {
   ESP.restart();
 }
 
-OpenShock::Serial::CommandGroup OpenShock::Serial::CommandHandlers::DomainHandler() {
+OpenShock::Serial::CommandGroup OpenShock::Serial::CommandHandlers::DomainHandler()
+{
   auto group = OpenShock::Serial::CommandGroup("domain"sv);
 
-  auto& getCommand = group.addCommand("Get the backend domain."sv, _handleDomainCommand);
+  auto& getCommand = group.addCommand("get"sv, "Get the backend domain."sv, handleGet);
 
-  auto& setCommand = group.addCommand("Set the backend domain."sv, _handleDomainCommand);
-  setCommand.addArgument("domain"sv, "must be a string"sv, "api.shocklink.net"sv);
+  auto& setCommand = group.addCommand("set"sv, "Set the backend domain."sv, handleSet);
+  setCommand.addArgument("domain"sv, "must be a string"sv, "api.openshock.app"sv);
 
   return group;
 }
