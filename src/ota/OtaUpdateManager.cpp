@@ -11,6 +11,7 @@ const char* const TAG = "OtaUpdateManager";
 #include "ota/OtaUpdateClient.h"
 #include "ota/OtaUpdateStep.h"
 #include "SemVer.h"
+#include "SimpleMutex.h"
 #include "util/StringUtils.h"
 #include "util/TaskUtils.h"
 
@@ -35,58 +36,78 @@ bool verifyRollbackLater()
   return true;
 }
 
-using namespace OpenShock;
-
 enum OtaTaskEventFlag : uint32_t {
   OTA_TASK_EVENT_WIFI_DISCONNECTED = 1 << 0,  // If both connected and disconnected are set, disconnected takes priority.
   OTA_TASK_EVENT_WIFI_CONNECTED    = 1 << 1,
 };
 
-static esp_ota_img_states_t _otaImageState;
-static OpenShock::FirmwareBootType _bootType;
-static TaskHandle_t _watcherTaskHandle                = nullptr;
-static SemaphoreHandle_t _updateClientMutex           = xSemaphoreCreateMutex();
-static std::unique_ptr<OtaUpdateClient> _updateClient = nullptr;
+static esp_ota_img_states_t s_otaImageState;
+static OpenShock::FirmwareBootType s_bootType;
+static TaskHandle_t s_taskHandle                            = nullptr;
+static OpenShock::SimpleMutex s_clientMtx                   = {};
+static std::unique_ptr<OpenShock::OtaUpdateClient> s_client = nullptr;
 
-bool _tryStartUpdate(const OpenShock::SemVer& version)
+using namespace OpenShock;
+
+static bool tryStartUpdate(const OpenShock::SemVer& version)
 {
-  if (xSemaphoreTake(_updateClientMutex, pdMS_TO_TICKS(1000)) != pdTRUE) {
+  if (!s_clientMtx.lock(pdMS_TO_TICKS(1000))) {
     OS_LOGE(TAG, "Failed to take requested version mutex");
     return false;
   }
 
-  if (_updateClient != nullptr) {
-    xSemaphoreGive(_updateClientMutex);
+  if (s_client != nullptr) {
+    s_clientMtx.unlock();
     OS_LOGE(TAG, "Update client already started");
     return false;
   }
 
-  _updateClient = std::make_unique<OtaUpdateClient>(version);
+  s_client = std::make_unique<OtaUpdateClient>(version);
 
-  if (!_updateClient->Start()) {
-    _updateClient.reset();
-    xSemaphoreGive(_updateClientMutex);
+  if (!s_client->Start()) {
+    s_client.reset();
+    s_clientMtx.unlock();
     OS_LOGE(TAG, "Failed to start update client");
     return false;
   }
 
-  xSemaphoreGive(_updateClientMutex);
+  s_clientMtx.unlock();
 
   OS_LOGD(TAG, "Update client started");
 
   return true;
 }
 
-void _otaEvGotIPHandler(arduino_event_t*)
+static void wifiDisconnectedEventHandler(void* event_handler_arg, esp_event_base_t event_base, int32_t event_id, void* event_data)
 {
-  xTaskNotify(_watcherTaskHandle, OTA_TASK_EVENT_WIFI_CONNECTED, eSetBits);
-}
-void _otaEvWiFiDisconnectedHandler(arduino_event_t*)
-{
-  xTaskNotify(_watcherTaskHandle, OTA_TASK_EVENT_WIFI_DISCONNECTED, eSetBits);
+  (void)event_handler_arg;
+  (void)event_base;
+  (void)event_id;
+  (void)event_data;
+
+  xTaskNotify(s_taskHandle, OTA_TASK_EVENT_WIFI_DISCONNECTED, eSetBits);
 }
 
-void _otaWatcherTask(void*)
+static void ipEventHandler(void* event_handler_arg, esp_event_base_t event_base, int32_t event_id, void* event_data)
+{
+  (void)event_handler_arg;
+  (void)event_base;
+  (void)event_data;
+
+  switch (event_id) {
+    case IP_EVENT_GOT_IP6:
+    case IP_EVENT_STA_GOT_IP:
+      xTaskNotify(s_taskHandle, OTA_TASK_EVENT_WIFI_CONNECTED, eSetBits);
+      break;
+    case IP_EVENT_STA_LOST_IP:
+      xTaskNotify(s_taskHandle, OTA_TASK_EVENT_WIFI_DISCONNECTED, eSetBits);
+      break;
+    default:
+      return;
+  }
+}
+
+static void watcherTask(void*)
 {
   OS_LOGD(TAG, "OTA update task started");
 
@@ -163,6 +184,8 @@ void _otaWatcherTask(void*)
 
 bool OtaUpdateManager::Init()
 {
+  esp_err_t err;
+
   OS_LOGN(TAG, "Fetching current partition");
 
   // Fetch current partition info.
@@ -175,7 +198,7 @@ bool OtaUpdateManager::Init()
   OS_LOGD(TAG, "Fetching partition state");
 
   // Get OTA state for said partition.
-  esp_err_t err = esp_ota_get_state_partition(partition, &_otaImageState);
+  err = esp_ota_get_state_partition(partition, &s_otaImageState);
   if (err != ESP_OK) {
     OS_PANIC(TAG, "Failed to get partition state: %s", esp_err_to_name(err));
     return false;  // This will never be reached, but the compiler doesn't know that.
@@ -191,14 +214,14 @@ bool OtaUpdateManager::Init()
   // Infer boot type from update step.
   switch (updateStep) {
     case OtaUpdateStep::Updated:
-      _bootType = FirmwareBootType::NewFirmware;
+      s_bootType = FirmwareBootType::NewFirmware;
       break;
     case OtaUpdateStep::Validating:  // If the update step is validating, we have failed in the middle of validating the new firmware, meaning this is a rollback.
     case OtaUpdateStep::RollingBack:
-      _bootType = FirmwareBootType::Rollback;
+      s_bootType = FirmwareBootType::Rollback;
       break;
     default:
-      _bootType = FirmwareBootType::Normal;
+      s_bootType = FirmwareBootType::Normal;
       break;
   }
 
@@ -208,11 +231,19 @@ bool OtaUpdateManager::Init()
     }
   }
 
-  WiFi.onEvent(_otaEvGotIPHandler, ARDUINO_EVENT_WIFI_STA_GOT_IP);
-  WiFi.onEvent(_otaEvGotIPHandler, ARDUINO_EVENT_WIFI_STA_GOT_IP6);
-  WiFi.onEvent(_otaEvWiFiDisconnectedHandler, ARDUINO_EVENT_WIFI_STA_DISCONNECTED);
+  err = esp_event_handler_register(IP_EVENT, ESP_EVENT_ANY_ID, ipEventHandler, nullptr);
+  if (err != ESP_OK) {
+    OS_LOGE(TAG, "Failed to register event handler for IP_EVENT: %s", esp_err_to_name(err));
+    return false;
+  }
 
-  if (TaskUtils::TaskCreateExpensive(_otaWatcherTask, "OtaWatcherTask", 8192, nullptr, 1, &_watcherTaskHandle) != pdPASS) {
+  err = esp_event_handler_register(WIFI_EVENT, WIFI_EVENT_STA_DISCONNECTED, wifiDisconnectedEventHandler, nullptr);
+  if (err != ESP_OK) {
+    OS_LOGE(TAG, "Failed to register event handler for WIFI_EVENT: %s", esp_err_to_name(err));
+    return false;
+  }
+
+  if (TaskUtils::TaskCreateExpensive(watcherTask, "OtaWatcherTask", 8192, nullptr, 1, &s_taskHandle) != pdPASS) {
     OS_LOGE(TAG, "Failed to create OTA watcher task");
     return false;
   }
@@ -220,7 +251,7 @@ bool OtaUpdateManager::Init()
   return true;
 }
 
-bool OtaUpdateManager::TryStartFirmwareInstallation(const OpenShock::SemVer& version)
+bool OtaUpdateManager::TryStartFirmwareUpdate(const OpenShock::SemVer& version)
 {
   if (version == OPENSHOCK_FW_VERSION ""sv) {
     OS_LOGI(TAG, "Requested version is already installed");
@@ -229,17 +260,17 @@ bool OtaUpdateManager::TryStartFirmwareInstallation(const OpenShock::SemVer& ver
 
   OS_LOGD(TAG, "Requesting firmware version %s", version.toString().c_str());  // TODO: This is abusing the SemVer::toString() method causing alot of string copies, fix this
 
-  return _tryStartUpdate(version);
+  return tryStartUpdate(version);
 }
 
 FirmwareBootType OtaUpdateManager::GetFirmwareBootType()
 {
-  return _bootType;
+  return s_bootType;
 }
 
 bool OtaUpdateManager::IsValidatingApp()
 {
-  return _otaImageState == ESP_OTA_IMG_PENDING_VERIFY;
+  return s_otaImageState == ESP_OTA_IMG_PENDING_VERIFY;
 }
 
 void OtaUpdateManager::InvalidateAndRollback()
@@ -281,5 +312,5 @@ void OtaUpdateManager::ValidateApp()
     OS_PANIC(TAG, "Failed to set OTA firmware boot type in critical section");  // TODO: THIS IS A CRITICAL SECTION, WHAT DO WE DO?
   }
 
-  _otaImageState = ESP_OTA_IMG_VALID;
+  s_otaImageState = ESP_OTA_IMG_VALID;
 }

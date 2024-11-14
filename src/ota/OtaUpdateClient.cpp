@@ -172,8 +172,6 @@ bool _flashFilesystemPartition(const esp_partition_t* parition, std::string_view
   }
   test.end();
 
-  OpenShock::CaptivePortal::ForceClose(false);
-
   return true;
 }
 
