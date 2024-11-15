@@ -25,7 +25,9 @@ function handleInvalidMessage() {
 }
 
 const PayloadTypes = Object.keys(HubToLocalMessagePayload).length / 2;
-const PayloadHandlers: MessageHandler[] = new Array<MessageHandler>(PayloadTypes).fill(handleInvalidMessage);
+const PayloadHandlers: MessageHandler[] = new Array<MessageHandler>(PayloadTypes).fill(
+  handleInvalidMessage
+);
 
 PayloadHandlers[HubToLocalMessagePayload.ReadyMessage] = (cli, msg) => {
   const payload = new ReadyMessage();
@@ -108,6 +110,9 @@ PayloadHandlers[HubToLocalMessagePayload.AccountLinkCommandResult] = (cli, msg) 
         break;
       case AccountLinkResultCode.InvalidCode:
         reason = 'Invalid code';
+        break;
+      case AccountLinkResultCode.RateLimited:
+        reason = 'Too many requests';
         break;
       case AccountLinkResultCode.InternalError:
         reason = 'Internal error';

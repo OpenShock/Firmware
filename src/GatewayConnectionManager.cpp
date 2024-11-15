@@ -97,7 +97,8 @@ AccountLinkResultCode GatewayConnectionManager::Link(std::string_view linkCode)
   auto response = HTTP::JsonAPI::LinkAccount(linkCode);
 
   if (response.result == HTTP::RequestResult::RateLimited) {
-    return AccountLinkResultCode::InternalError;  // Just return false, don't spam the console with errors
+    OS_LOGW(TAG, "Account Link request got ratelimited");
+    return AccountLinkResultCode::RateLimited;
   }
   if (response.result != HTTP::RequestResult::Success) {
     OS_LOGE(TAG, "Error while getting auth token: %d %d", response.result, response.code);
