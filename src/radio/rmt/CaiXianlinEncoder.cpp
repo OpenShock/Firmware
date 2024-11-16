@@ -37,7 +37,7 @@ std::vector<rmt_data_t> Rmt::CaiXianlinEncoder::GetSequence(uint16_t transmitter
   }
 
   // Payload layout: [transmitterId:16][channelId:4][type:4][intensity:8]
-  uint32_t payload = (static_cast<uint32_t>(transmitterId & 0xFFFF) << 16) | (static_cast<uint32_t>(channelId & 0xF) << 12) | (static_cast<uint32_t>(typeVal) << 8) | static_cast<uint32_t>(intensity & 0xFF);
+  uint32_t payload = (static_cast<uint32_t>(transmitterId) << 16) | (static_cast<uint32_t>(channelId & 0xF) << 12) | (static_cast<uint32_t>(typeVal & 0xF) << 8) | static_cast<uint32_t>(intensity);
 
   // Calculate the checksum of the payload
   uint8_t checksum = Checksum::Sum8(payload);
