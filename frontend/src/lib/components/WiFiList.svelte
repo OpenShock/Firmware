@@ -1,6 +1,6 @@
 <script lang="ts">
   import { getModalStore } from '@skeletonlabs/skeleton';
-  import { DeviceStateStore } from '$lib/stores';
+  import { HubStateStore } from '$lib/stores';
   import { WebSocketClient } from '$lib/WebSocketClient';
   import { WifiAuthMode } from '$lib/_fbs/open-shock/serialization/types/wifi-auth-mode';
   import { WifiScanStatus } from '$lib/_fbs/open-shock/serialization/types/wifi-scan-status';
@@ -13,14 +13,16 @@
 
   const modalStore = getModalStore();
 
-  $: scanStatus = $DeviceStateStore.wifiScanStatus;
+  $: scanStatus = $HubStateStore.wifiScanStatus;
   $: isScanning = scanStatus === WifiScanStatus.Started || scanStatus === WifiScanStatus.InProgress;
 
-  $: connectedBSSID = $DeviceStateStore.wifiConnectedBSSID;
+  $: connectedBSSID = $HubStateStore.wifiConnectedBSSID;
 
   // Sorting the groups themselves by each one's strongest network (by RSSI, higher is stronger)
   // Only need to check the first network in each group, since they're already sorted by signal strength
-  $: strengthSortedGroups = Array.from($DeviceStateStore.wifiNetworkGroups.entries()).sort((a, b) => b[1].networks[0].rssi - a[1].networks[0].rssi);
+  $: strengthSortedGroups = Array.from($HubStateStore.wifiNetworkGroups.entries()).sort(
+    (a, b) => b[1].networks[0].rssi - a[1].networks[0].rssi
+  );
 
   function wifiScan() {
     const data = SerializeWifiScanCommand(!isScanning);
@@ -87,14 +89,20 @@
           {#if netgroup.ssid}
             <span class="ml-2">{netgroup.ssid}</span>
           {:else}
-            <span class="ml-2">{netgroup.networks[0].bssid}</span><span class="text-gray-500 ml-1">(Hidden)</span>
+            <span class="ml-2">{netgroup.networks[0].bssid}</span><span class="text-gray-500 ml-1"
+              >(Hidden)</span
+            >
           {/if}
         </span>
         <div class="btn-group variant-outline">
           {#if netgroup.saved}
-            <button on:click={() => wifiConnect(netgroup)}><i class="fa fa-arrow-right text-green-500" /></button>
+            <button on:click={() => wifiConnect(netgroup)}
+              ><i class="fa fa-arrow-right text-green-500" /></button
+            >
           {:else}
-            <button on:click={() => wifiAuthenticate(netgroup)}><i class="fa fa-link text-green-500" /></button>
+            <button on:click={() => wifiAuthenticate(netgroup)}
+              ><i class="fa fa-link text-green-500" /></button
+            >
           {/if}
           <button on:click={() => wifiSettings(netgroupKey)}><i class="fa fa-cog" /></button>
         </div>

@@ -1,7 +1,7 @@
 import { WifiNetworkEvent } from '$lib/_fbs/open-shock/serialization/local/wifi-network-event';
 import { WifiNetwork as FbsWifiNetwork } from '$lib/_fbs/open-shock/serialization/types/wifi-network';
 import { WifiNetworkEventType } from '$lib/_fbs/open-shock/serialization/types/wifi-network-event-type';
-import { DeviceStateStore } from '$lib/stores';
+import { HubStateStore } from '$lib/stores';
 import { toastDelegator } from '$lib/stores/ToastDelegator';
 import type { WiFiNetwork } from '$lib/types/WiFiNetwork';
 import type { MessageHandler } from '.';
@@ -27,7 +27,7 @@ function handleDiscoveredEvent(fbsNetwork: FbsWifiNetwork) {
     saved: fbsNetwork.saved(),
   };
 
-  DeviceStateStore.setWifiNetwork(network);
+  HubStateStore.setWifiNetwork(network);
 }
 function handleUpdatedEvent(fbsNetwork: FbsWifiNetwork) {
   const ssid = fbsNetwork.ssid();
@@ -47,7 +47,7 @@ function handleUpdatedEvent(fbsNetwork: FbsWifiNetwork) {
     saved: fbsNetwork.saved(),
   };
 
-  DeviceStateStore.setWifiNetwork(network);
+  HubStateStore.setWifiNetwork(network);
 }
 function handleLostEvent(fbsNetwork: FbsWifiNetwork) {
   const bssid = fbsNetwork.bssid();
@@ -57,7 +57,7 @@ function handleLostEvent(fbsNetwork: FbsWifiNetwork) {
     return;
   }
 
-  DeviceStateStore.removeWifiNetwork(bssid);
+  HubStateStore.removeWifiNetwork(bssid);
 }
 function handleSavedEvent(fbsNetwork: FbsWifiNetwork) {
   const ssid = fbsNetwork.ssid();
@@ -68,7 +68,7 @@ function handleSavedEvent(fbsNetwork: FbsWifiNetwork) {
     return;
   }
 
-  DeviceStateStore.updateWifiNetwork(bssid, (network) => {
+  HubStateStore.updateWifiNetwork(bssid, (network) => {
     network.saved = true;
     return network;
   });
@@ -87,7 +87,7 @@ function handleRemovedEvent(fbsNetwork: FbsWifiNetwork) {
     return;
   }
 
-  DeviceStateStore.updateWifiNetwork(bssid, (network) => {
+  HubStateStore.updateWifiNetwork(bssid, (network) => {
     network.saved = false;
     return network;
   });
@@ -106,7 +106,7 @@ function handleConnectedEvent(fbsNetwork: FbsWifiNetwork) {
     return;
   }
 
-  DeviceStateStore.setWifiConnectedBSSID(bssid);
+  HubStateStore.setWifiConnectedBSSID(bssid);
 
   toastDelegator.trigger({
     message: 'WiFi network connected: ' + ssid,
@@ -122,7 +122,7 @@ function handleDisconnectedEvent(fbsNetwork: FbsWifiNetwork) {
     return;
   }
 
-  DeviceStateStore.setWifiConnectedBSSID(null);
+  HubStateStore.setWifiConnectedBSSID(null);
 
   toastDelegator.trigger({
     message: 'WiFi network disconnected: ' + ssid,

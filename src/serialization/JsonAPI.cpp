@@ -8,7 +8,8 @@ const char* const TAG = "JsonAPI";
 
 using namespace OpenShock::Serialization;
 
-bool JsonAPI::ParseLcgInstanceDetailsJsonResponse(int code, const cJSON* root, JsonAPI::LcgInstanceDetailsResponse& out) {
+bool JsonAPI::ParseLcgInstanceDetailsJsonResponse(int code, const cJSON* root, JsonAPI::LcgInstanceDetailsResponse& out)
+{
   (void)code;
 
   if (cJSON_IsObject(root) == 0) {
@@ -56,7 +57,8 @@ bool JsonAPI::ParseLcgInstanceDetailsJsonResponse(int code, const cJSON* root, J
 
   return true;
 }
-bool JsonAPI::ParseBackendVersionJsonResponse(int code, const cJSON* root, JsonAPI::BackendVersionResponse& out) {
+bool JsonAPI::ParseBackendVersionJsonResponse(int code, const cJSON* root, JsonAPI::BackendVersionResponse& out)
+{
   (void)code;
 
   if (cJSON_IsObject(root) == 0) {
@@ -97,7 +99,8 @@ bool JsonAPI::ParseBackendVersionJsonResponse(int code, const cJSON* root, JsonA
   return true;
 }
 
-bool JsonAPI::ParseAccountLinkJsonResponse(int code, const cJSON* root, JsonAPI::AccountLinkResponse& out) {
+bool JsonAPI::ParseAccountLinkJsonResponse(int code, const cJSON* root, JsonAPI::AccountLinkResponse& out)
+{
   (void)code;
 
   if (cJSON_IsObject(root) == 0) {
@@ -117,7 +120,8 @@ bool JsonAPI::ParseAccountLinkJsonResponse(int code, const cJSON* root, JsonAPI:
 
   return true;
 }
-bool JsonAPI::ParseDeviceInfoJsonResponse(int code, const cJSON* root, JsonAPI::DeviceInfoResponse& out) {
+bool JsonAPI::ParseHubInfoJsonResponse(int code, const cJSON* root, JsonAPI::HubInfoResponse& out)
+{
   (void)code;
 
   if (cJSON_IsObject(root) == 0) {
@@ -131,36 +135,37 @@ bool JsonAPI::ParseDeviceInfoJsonResponse(int code, const cJSON* root, JsonAPI::
     return false;
   }
 
-  const cJSON* deviceId = cJSON_GetObjectItemCaseSensitive(data, "id");
-  if (cJSON_IsString(deviceId) == 0) {
+  const cJSON* hubId = cJSON_GetObjectItemCaseSensitive(data, "id");
+  if (cJSON_IsString(hubId) == 0) {
     ESP_LOGJSONE("value at 'data.id' is not a string", root);
     return false;
   }
 
-  const cJSON* deviceName = cJSON_GetObjectItemCaseSensitive(data, "name");
-  if (cJSON_IsString(deviceName) == 0) {
+  const cJSON* hubName = cJSON_GetObjectItemCaseSensitive(data, "name");
+  if (cJSON_IsString(hubName) == 0) {
     ESP_LOGJSONE("value at 'data.name' is not a string", root);
     return false;
   }
 
-  const cJSON* deviceShockers = cJSON_GetObjectItemCaseSensitive(data, "shockers");
-  if (cJSON_IsArray(deviceShockers) == 0) {
+  const cJSON* hubShockers = cJSON_GetObjectItemCaseSensitive(data, "shockers");
+  if (cJSON_IsArray(hubShockers) == 0) {
     ESP_LOGJSONE("value at 'data.shockers' is not an array", root);
     return false;
   }
 
   out = {};
 
-  out.deviceId   = deviceId->valuestring;
-  out.deviceName = deviceName->valuestring;
+  out.hubId   = hubId->valuestring;
+  out.hubName = hubName->valuestring;
 
-  if (out.deviceId.empty() || out.deviceName.empty()) {
+  if (out.hubId.empty() || out.hubName.empty()) {
     ESP_LOGJSONE("value at 'data.id' or 'data.name' is empty", root);
     return false;
   }
 
   cJSON* shocker = nullptr;
-  cJSON_ArrayForEach(shocker, deviceShockers) {
+  cJSON_ArrayForEach(shocker, hubShockers)
+  {
     const cJSON* shockerId = cJSON_GetObjectItemCaseSensitive(shocker, "id");
     if (cJSON_IsString(shockerId) == 0) {
       ESP_LOGJSONE("value at 'shocker.id' is not a string", shocker);
@@ -208,7 +213,8 @@ bool JsonAPI::ParseDeviceInfoJsonResponse(int code, const cJSON* root, JsonAPI::
 
   return true;
 }
-bool JsonAPI::ParseAssignLcgJsonResponse(int code, const cJSON* root, JsonAPI::AssignLcgResponse& out) {
+bool JsonAPI::ParseAssignLcgJsonResponse(int code, const cJSON* root, JsonAPI::AssignLcgResponse& out)
+{
   (void)code;
 
   if (cJSON_IsObject(root) == 0) {
