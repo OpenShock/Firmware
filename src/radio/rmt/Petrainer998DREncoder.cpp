@@ -34,7 +34,7 @@ std::vector<rmt_data_t> Rmt::Petrainer998DREncoder::GetSequence(uint16_t shocker
       return {};  // Invalid type
   }
 
-  uint8_t typeVal    = 0b0001 << typeShift;
+  uint8_t typeVal    = 1 << typeShift;
   uint8_t typeInvert = Checksum::ReverseInverseNibble(typeVal);
 
   // TODO: Channel argument?
@@ -43,7 +43,7 @@ std::vector<rmt_data_t> Rmt::Petrainer998DREncoder::GetSequence(uint16_t shocker
 
   // Payload layout: [channel:4][typeVal:4][shockerID:16][intensity:8][typeInvert:4][channelInvert:4] (40 bits)
   uint64_t data
-    = (static_cast<uint64_t>(channel & 0b1111) << 36 | static_cast<uint64_t>(typeVal & 0b1111) << 32 | static_cast<uint64_t>(shockerId & 0x1FFFF) << 15 | static_cast<uint64_t>(intensity & 0x7F) << 8 | static_cast<uint64_t>(typeInvert & 0b1111) << 4 | static_cast<uint64_t>(channelInvert & 0b1111));
+    = (static_cast<uint64_t>(channel & 0xF) << 36 | static_cast<uint64_t>(typeVal & 0xF) << 32 | static_cast<uint64_t>(shockerId & 0x1FFFF) << 15 | static_cast<uint64_t>(intensity & 0x7F) << 8 | static_cast<uint64_t>(typeInvert & 0xF) << 4 | static_cast<uint64_t>(channelInvert & 0xF));
 
   std::vector<rmt_data_t> pulses;
   pulses.reserve(42);

@@ -50,7 +50,7 @@ namespace OpenShock::Checksum {
    * Make sure the uint8 only has its high bits (0x0F) set before using this function
    */
   constexpr uint8_t ReverseInverseNibble(uint8_t b) {
-    return ~ReverseNibble(b);
+    return (0x084C2A6E195D3B7F >> (b * 4)) & 0xF; // Trust me bro
   }
 }  // namespace OpenShock::Checksum
 
