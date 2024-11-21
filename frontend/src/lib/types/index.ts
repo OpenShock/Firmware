@@ -1,3 +1,3 @@
-export * from './DeviceState';
+export * from './HubState';
 export * from './WiFiNetwork';
 export * from './WiFiNetworkGroup';

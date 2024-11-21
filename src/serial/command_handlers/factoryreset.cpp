@@ -2,12 +2,9 @@
 
 #include "config/Config.h"
 
-static void handleReset(std::string_view arg, bool isAutomated)
+void handleReset(std::string_view arg, bool isAutomated)
 {
-  if (!arg.empty()) {
-    SERPR_ERROR("Command does not support parameters");
-    return;
-  }
+  (void)arg;
 
   ::Serial.println("Resetting to factory defaults...");
   OpenShock::Config::FactoryReset();
@@ -19,7 +16,7 @@ OpenShock::Serial::CommandGroup OpenShock::Serial::CommandHandlers::FactoryReset
 {
   auto group = OpenShock::Serial::CommandGroup("factoryreset"sv);
 
-  auto& cmd = group.addCommand("Reset the device to factory defaults and restart"sv, handleReset);
+  auto& cmd = group.addCommand("Reset the hub to factory defaults and restart"sv, handleReset);
 
   return group;
 }

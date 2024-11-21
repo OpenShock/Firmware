@@ -5,7 +5,7 @@
   import { WebSocketClient } from '$lib/WebSocketClient';
   import GpioPinSelector from '$lib/components/GpioPinSelector.svelte';
   import WiFiList from '$lib/components/WiFiList.svelte';
-  import { DeviceStateStore } from '$lib/stores';
+  import { HubStateStore } from '$lib/stores';
 
   function isValidLinkCode(str: string) {
     if (typeof str != 'string') return false;
@@ -34,15 +34,34 @@
     <div class="flex flex-col space-y-2">
       <h3 class="h3">Account Linking</h3>
       <div class="flex space-x-2">
-        <input class={'input variant-form-material ' + (linkCodeValid ? '' : 'input-error')} type="text" inputmode="numeric" pattern="[0-9]*" placeholder="Link Code" bind:value={linkCode} />
-        <button class="btn variant-filled" on:click={linkAccount} disabled={!linkCodeValid || linkCode.length < 6}>Link</button>
+        <input
+          class={'input variant-form-material ' + (linkCodeValid ? '' : 'input-error')}
+          type="text"
+          inputmode="numeric"
+          pattern="[0-9]*"
+          placeholder="Link Code"
+          bind:value={linkCode}
+        />
+        <button
+          class="btn variant-filled"
+          on:click={linkAccount}
+          disabled={!linkCodeValid || linkCode.length < 6}>Link</button
+        >
       </div>
     </div>
 
-    <GpioPinSelector name="RF TX Pin" currentPin={$DeviceStateStore.config?.rf?.txPin ?? null} serializer={SerializeSetRfTxPinCommand} />
+    <GpioPinSelector
+      name="RF TX Pin"
+      currentPin={$HubStateStore.config?.rf?.txPin ?? null}
+      serializer={SerializeSetRfTxPinCommand}
+    />
 
     <!-- TODO: Add EStop Enable/Disable toggle -->
 
-    <GpioPinSelector name="EStop Pin" currentPin={$DeviceStateStore.config?.estop?.gpioPin ?? null} serializer={SerializeSetEstopPinCommand} />
+    <GpioPinSelector
+      name="EStop Pin"
+      currentPin={$HubStateStore.config?.estop?.gpioPin ?? null}
+      serializer={SerializeSetEstopPinCommand}
+    />
   </div>
 </div>

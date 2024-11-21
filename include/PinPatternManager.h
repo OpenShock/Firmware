@@ -13,6 +13,7 @@
 namespace OpenShock {
   class PinPatternManager {
     DISABLE_COPY(PinPatternManager);
+    DISABLE_MOVE(PinPatternManager);
 
   public:
     struct State {

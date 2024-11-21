@@ -9,6 +9,8 @@ const char* const TAG = "ServerMessageHandlers";
 #include <cstdint>
 
 using namespace OpenShock::MessageHandlers::Server;
+using FbsModelType   = OpenShock::Serialization::Types::ShockerModelType;
+using FbsCommandType = OpenShock::Serialization::Types::ShockerCommandType;
 
 void _Private::HandleShockerCommandList(const OpenShock::Serialization::Gateway::GatewayToHubMessage* root)
 {
@@ -27,18 +29,35 @@ void _Private::HandleShockerCommandList(const OpenShock::Serialization::Gateway:
   OS_LOGV(TAG, "Received command list from API (%u commands)", commands->size());
 
   for (auto command : *commands) {
-    uint16_t id                        = command->id();
-    uint8_t intensity                  = command->intensity();
-    uint16_t durationMs                = command->duration();
-    OpenShock::ShockerModelType model  = command->model();
-    OpenShock::ShockerCommandType type = command->type();
+    uint16_t id                   = command->id();
+    uint8_t intensity             = command->intensity();
+    uint16_t durationMs           = command->duration();
+    FbsModelType fbsModel         = command->model();
+    FbsCommandType fbsCommandType = command->type();
 
-    const char* modelStr = OpenShock::Serialization::Types::EnumNameShockerModelType(model);
-    const char* typeStr  = OpenShock::Serialization::Types::EnumNameShockerCommandType(type);
+    OpenShock::ShockerCommandType commandType;
+    switch (fbsCommandType) {
+      case FbsCommandType::Stop:
+        commandType = OpenShock::ShockerCommandType::Stop;
+        break;
+      case FbsCommandType::Shock:
+        commandType = OpenShock::ShockerCommandType::Shock;
+        break;
+      case FbsCommandType::Vibrate:
+        commandType = OpenShock::ShockerCommandType::Vibrate;
+        break;
+      case FbsCommandType::Sound:
+        commandType = OpenShock::ShockerCommandType::Sound;
+        break;
+      // case FbsCommandType::Light:
+      //   commandType = OpenShock::ShockerCommandType::Light;
+      //   break;
+      default:
+        OS_LOGE(TAG, "Unsupported command type: %s", OpenShock::Serialization::Types::EnumNameShockerCommandType(fbsCommandType));
+        continue;
+    }
 
-    OS_LOGV(TAG, "   ID %u, Intensity %u, Duration %u, Model %s, Type %s", id, intensity, durationMs, modelStr, typeStr);
-
-    if (!OpenShock::CommandHandler::HandleCommand(model, id, type, intensity, durationMs)) {
+    if (!OpenShock::CommandHandler::HandleCommand(fbsModel, id, commandType, intensity, durationMs)) {
       OS_LOGE(TAG, "Remote command failed/rejected!");
     }
   }

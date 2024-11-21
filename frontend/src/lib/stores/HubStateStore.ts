@@ -1,9 +1,9 @@
 import type { WifiScanStatus } from '$lib/_fbs/open-shock/serialization/types/wifi-scan-status';
-import type { WiFiNetwork, WiFiNetworkGroup, DeviceState } from '$lib/types';
+import type { WiFiNetwork, WiFiNetworkGroup, HubState } from '$lib/types';
 import { writable } from 'svelte/store';
 import { WifiAuthMode } from '$lib/_fbs/open-shock/serialization/types/wifi-auth-mode';
 
-const { subscribe, update } = writable<DeviceState>({
+const { subscribe, update } = writable<HubState>({
   wifiConnectedBSSID: null,
   wifiScanStatus: null,
   wifiNetworks: new Map<string, WiFiNetwork>(),
@@ -47,11 +47,11 @@ function SsidMapReducer(groups: Map<string, WiFiNetworkGroup>, [, value]: [strin
   return groups;
 }
 
-function updateWifiNetworkGroups(store: DeviceState) {
+function updateWifiNetworkGroups(store: HubState) {
   store.wifiNetworkGroups = Array.from(store.wifiNetworks.entries()).reduce(SsidMapReducer, new Map<string, WiFiNetworkGroup>());
 }
 
-export const DeviceStateStore = {
+export const HubStateStore = {
   subscribe,
   update,
   setWifiConnectedBSSID(connectedBSSID: string | null) {
