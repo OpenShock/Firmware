@@ -37,6 +37,21 @@ namespace OpenShock::Checksum {
   SUM8_INT_FN(uint32_t)
   SUM8_INT_FN(int64_t)
   SUM8_INT_FN(uint64_t)
+
+  
+  /**
+   * Make sure the uint8 only has its high bits (0x0F) set before using this function
+   */
+  constexpr uint8_t ReverseNibble(uint8_t b) {
+    return (0xF7B3D591E6A2C480 >> (b * 4)) & 0xF; // Trust me bro
+  }
+  
+  /**
+   * Make sure the uint8 only has its high bits (0x0F) set before using this function
+   */
+  constexpr uint8_t ReverseInverseNibble(uint8_t b) {
+    return ~ReverseNibble(b);
+  }
 }  // namespace OpenShock::Checksum
 
 #undef SUM8_INT_FN
