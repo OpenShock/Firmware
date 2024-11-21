@@ -530,7 +530,7 @@ static void serialProcessLine(std::string_view line)
 
   auto commandEntryName = commandEntry->name();
   if (!commandEntryName.empty()) {
-    arguments = OpenShock::StringTrim(arguments.substr(commandEntryName.size()))
+    arguments = OpenShock::StringTrim(arguments.substr(commandEntryName.size()));
   }
 
   commandEntry->commandHandler()(arguments, isAutomated);
