@@ -2,7 +2,7 @@
   import { SerializeWifiNetworkSaveCommand } from '$lib/Serializers/WifiNetworkSaveCommand';
   import { SerializeWifiNetworkConnectCommand } from '$lib/Serializers/WifiNetworkConnectCommand';
   import { WebSocketClient } from '$lib/WebSocketClient';
-  import { DeviceStateStore } from '$lib/stores';
+  import { HubStateStore } from '$lib/stores';
   import { getModalStore } from '@skeletonlabs/skeleton';
   import { SerializeWifiNetworkForgetCommand } from '$lib/Serializers/WifiNetworkForgetCommand';
   import { WifiAuthMode } from '$lib/_fbs/open-shock/serialization/types/wifi-auth-mode';
@@ -10,7 +10,7 @@
   const modalStore = getModalStore();
 
   export let groupKey: string;
-  $: group = $DeviceStateStore.wifiNetworkGroups.get(groupKey);
+  $: group = $HubStateStore.wifiNetworkGroups.get(groupKey);
 
   function GetWifiAuthModeString(type: WifiAuthMode) {
     switch (type) {
@@ -85,11 +85,17 @@
   {#if group}
     <div class="flex justify-between space-x-2">
       <h2 class="h2">Network Info</h2>
-      <button class="btn-icon variant-outline" on:click={() => modalStore.close()}><i class="fa fa-xmark"></i></button>
+      <button class="btn-icon variant-outline" on:click={() => modalStore.close()}
+        ><i class="fa fa-xmark"></i></button
+      >
     </div>
     <div>
       {#each rows as row (row.key)}
-        <span class="flex justify-between"><span class="font-bold">{row.key}:</span><span class="text-gray-700 dark:text-gray-300">{row.value}</span></span>
+        <span class="flex justify-between"
+          ><span class="font-bold">{row.key}:</span><span class="text-gray-700 dark:text-gray-300"
+            >{row.value}</span
+          ></span
+        >
       {/each}
     </div>
     <!-- Per-AP info -->
@@ -117,7 +123,10 @@
         {#if showPasswordPrompt}
           <button on:click={() => (showPasswordPrompt = false)}>Cancel</button>
         {/if}
-        <button on:click={ConnectWiFi} disabled={showPasswordPrompt && !validPassword}><i class={'fa mr-2 text-green-500' + (group.saved ? ' fa-wifi' : ' fa-link')}></i>Connect</button>
+        <button on:click={ConnectWiFi} disabled={showPasswordPrompt && !validPassword}
+          ><i class={'fa mr-2 text-green-500' + (group.saved ? ' fa-wifi' : ' fa-link')}
+          ></i>Connect</button
+        >
         {#if group.saved}
           <button on:click={ForgetWiFi}><i class="fa fa-trash mr-2 text-red-500"></i>Forget</button>
         {/if}
@@ -126,7 +135,9 @@
   {:else}
     <div class="flex justify-between space-x-2">
       <h2 class="h2">WiFi Info</h2>
-      <button class="btn-icon variant-outline" on:click={() => modalStore.close()}><i class="fa fa-xmark"></i></button>
+      <button class="btn-icon variant-outline" on:click={() => modalStore.close()}
+        ><i class="fa fa-xmark"></i></button
+      >
     </div>
     <div class="flex justify-center">
       <i class="fa fa-spinner fa-spin"></i>

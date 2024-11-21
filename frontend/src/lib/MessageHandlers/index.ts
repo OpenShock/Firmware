@@ -4,7 +4,7 @@ import { HubToLocalMessagePayload } from '$lib/_fbs/open-shock/serialization/loc
 import { ReadyMessage } from '$lib/_fbs/open-shock/serialization/local/ready-message';
 import { WifiScanStatusMessage } from '$lib/_fbs/open-shock/serialization/local/wifi-scan-status-message';
 import { ByteBuffer } from 'flatbuffers';
-import { DeviceStateStore } from '$lib/stores';
+import { HubStateStore } from '$lib/stores';
 import { SerializeWifiScanCommand } from '$lib/Serializers/WifiScanCommand';
 import { toastDelegator } from '$lib/stores/ToastDelegator';
 import { SetRfTxPinCommandResult } from '$lib/_fbs/open-shock/serialization/local/set-rf-tx-pin-command-result';
@@ -25,15 +25,17 @@ function handleInvalidMessage() {
 }
 
 const PayloadTypes = Object.keys(HubToLocalMessagePayload).length / 2;
-const PayloadHandlers: MessageHandler[] = new Array<MessageHandler>(PayloadTypes).fill(handleInvalidMessage);
+const PayloadHandlers: MessageHandler[] = new Array<MessageHandler>(PayloadTypes).fill(
+  handleInvalidMessage
+);
 
 PayloadHandlers[HubToLocalMessagePayload.ReadyMessage] = (cli, msg) => {
   const payload = new ReadyMessage();
   msg.payload(payload);
 
-  console.log('[WS] Connected to device, poggies: ', payload.poggies());
+  console.log('[WS] Connected to hub, poggies: ', payload.poggies());
 
-  DeviceStateStore.update((store) => {
+  HubStateStore.update((store) => {
     store.wifiConnectedBSSID = payload.connectedWifi()?.bssid() || null;
     store.accountLinked = payload.accountLinked();
     store.config = mapConfig(payload.config());
@@ -48,7 +50,7 @@ PayloadHandlers[HubToLocalMessagePayload.ReadyMessage] = (cli, msg) => {
       store.gpioValidOutputs = gpioValidOutputs;
     }
 
-    console.log('[WS] Updated device state store: ', store);
+    console.log('[WS] Updated hub state store: ', store);
 
     return store;
   });
@@ -78,7 +80,7 @@ PayloadHandlers[HubToLocalMessagePayload.WifiScanStatusMessage] = (cli, msg) => 
   const payload = new WifiScanStatusMessage();
   msg.payload(payload);
 
-  DeviceStateStore.setWifiScanStatus(payload.status());
+  HubStateStore.setWifiScanStatus(payload.status());
 };
 
 PayloadHandlers[HubToLocalMessagePayload.WifiNetworkEvent] = WifiNetworkEventHandler;
@@ -109,6 +111,9 @@ PayloadHandlers[HubToLocalMessagePayload.AccountLinkCommandResult] = (cli, msg) 
       case AccountLinkResultCode.InvalidCode:
         reason = 'Invalid code';
         break;
+      case AccountLinkResultCode.RateLimited:
+        reason = 'Too many requests';
+        break;
       case AccountLinkResultCode.InternalError:
         reason = 'Internal error';
         break;
@@ -130,7 +135,7 @@ PayloadHandlers[HubToLocalMessagePayload.SetRfTxPinCommandResult] = (cli, msg) =
   const result = payload.result();
 
   if (result == SetGPIOResultCode.Success) {
-    DeviceStateStore.setRfTxPin(payload.pin());
+    HubStateStore.setRfTxPin(payload.pin());
     toastDelegator.trigger({
       message: 'Changed RF TX pin to: ' + payload.pin(),
       background: 'bg-green-500',
@@ -163,7 +168,7 @@ PayloadHandlers[HubToLocalMessagePayload.SetEstopEnabledCommandResult] = (cli, m
   const success = payload.success();
 
   if (success) {
-    DeviceStateStore.setEstopEnabled(payload.enabled());
+    HubStateStore.setEstopEnabled(payload.enabled());
     toastDelegator.trigger({
       message: 'Changed EStop enabled to: ' + enabled,
       background: 'bg-green-500',
@@ -184,7 +189,7 @@ PayloadHandlers[HubToLocalMessagePayload.SetEstopPinCommandResult] = (cli, msg) 
 
   if (result == SetGPIOResultCode.Success) {
     const gpioPin = payload.gpioPin();
-    DeviceStateStore.setEstopGpioPin(gpioPin);
+    HubStateStore.setEstopGpioPin(gpioPin);
     toastDelegator.trigger({
       message: 'Changed EStop pin to: ' + gpioPin,
       background: 'bg-green-500',

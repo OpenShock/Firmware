@@ -18,8 +18,5 @@ void _Private::HandlePing(const OpenShock::Serialization::Gateway::GatewayToHubM
     return;
   }
 
-  OS_LOGV(TAG, "Unix time: %llu", msg->unix_utc_time());
-
-  OS_LOGV(TAG, "Sending Gateway pong message");
   Serialization::Gateway::SerializePongMessage(GatewayConnectionManager::SendMessageBIN);
 }

@@ -495,11 +495,7 @@ uint8_t Config::AddWiFiCredentials(std::string_view ssid, std::string_view passw
     return 0;
   }
 
-  _configData.wifi.credentialsList.push_back({
-    .id       = id,
-    .ssid     = std::string(ssid),
-    .password = std::string(password),
-  });
+  _configData.wifi.credentialsList.emplace_back(id, ssid, password);
   _trySaveConfig();
 
   return id;

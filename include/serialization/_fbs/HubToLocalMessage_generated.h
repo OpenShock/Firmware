@@ -61,30 +61,33 @@ enum class AccountLinkResultCode : uint8_t {
   InvalidCodeLength = 2,
   NoInternetConnection = 3,
   InvalidCode = 4,
-  InternalError = 5,
+  RateLimited = 5,
+  InternalError = 6,
   MIN = Success,
   MAX = InternalError
 };
 
-inline const AccountLinkResultCode (&EnumValuesAccountLinkResultCode())[6] {
+inline const AccountLinkResultCode (&EnumValuesAccountLinkResultCode())[7] {
   static const AccountLinkResultCode values[] = {
     AccountLinkResultCode::Success,
     AccountLinkResultCode::CodeRequired,
     AccountLinkResultCode::InvalidCodeLength,
     AccountLinkResultCode::NoInternetConnection,
     AccountLinkResultCode::InvalidCode,
+    AccountLinkResultCode::RateLimited,
     AccountLinkResultCode::InternalError
   };
   return values;
 }
 
 inline const char * const *EnumNamesAccountLinkResultCode() {
-  static const char * const names[7] = {
+  static const char * const names[8] = {
     "Success",
     "CodeRequired",
     "InvalidCodeLength",
     "NoInternetConnection",
     "InvalidCode",
+    "RateLimited",
     "InternalError",
     nullptr
   };

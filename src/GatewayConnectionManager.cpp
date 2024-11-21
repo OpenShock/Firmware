@@ -97,7 +97,8 @@ AccountLinkResultCode GatewayConnectionManager::Link(std::string_view linkCode)
   auto response = HTTP::JsonAPI::LinkAccount(linkCode);
 
   if (response.result == HTTP::RequestResult::RateLimited) {
-    return AccountLinkResultCode::InternalError;  // Just return false, don't spam the console with errors
+    OS_LOGW(TAG, "Account Link request got ratelimited");
+    return AccountLinkResultCode::RateLimited;
   }
   if (response.result != HTTP::RequestResult::Success) {
     OS_LOGE(TAG, "Error while getting auth token: %d %d", response.result, response.code);
@@ -156,20 +157,20 @@ bool GatewayConnectionManager::SendMessageBIN(const uint8_t* data, std::size_t l
   return s_wsClient->sendMessageBIN(data, length);
 }
 
-bool FetchDeviceInfo(std::string_view authToken)
+bool FetchHubInfo(std::string_view authToken)
 {
   // TODO: this function is very slow, should be optimized!
   if ((s_flags & FLAG_HAS_IP) == 0) {
     return false;
   }
 
-  auto response = HTTP::JsonAPI::GetDeviceInfo(authToken);
+  auto response = HTTP::JsonAPI::GetHubInfo(authToken);
 
   if (response.result == HTTP::RequestResult::RateLimited) {
     return false;  // Just return false, don't spam the console with errors
   }
   if (response.result != HTTP::RequestResult::Success) {
-    OS_LOGE(TAG, "Error while fetching device info: %d %d", response.result, response.code);
+    OS_LOGE(TAG, "Error while fetching hub info: %d %d", response.result, response.code);
     return false;
   }
 
@@ -184,8 +185,8 @@ bool FetchDeviceInfo(std::string_view authToken)
     return false;
   }
 
-  OS_LOGI(TAG, "Device ID:   %s", response.data.deviceId.c_str());
-  OS_LOGI(TAG, "Device Name: %s", response.data.deviceName.c_str());
+  OS_LOGI(TAG, "Hub ID:   %s", response.data.hubId.c_str());
+  OS_LOGI(TAG, "Hub Name: %s", response.data.hubName.c_str());
   OS_LOGI(TAG, "Shockers:");
   for (auto& shocker : response.data.shockers) {
     OS_LOGI(TAG, "  [%s] rf=%u model=%u", shocker.id.c_str(), shocker.rfId, shocker.model);
@@ -279,8 +280,8 @@ void GatewayConnectionManager::Update()
       return;
     }
 
-    // Fetch device info
-    if (!FetchDeviceInfo(authToken.c_str())) {
+    // Fetch hub info
+    if (!FetchHubInfo(authToken.c_str())) {
       return;
     }
 

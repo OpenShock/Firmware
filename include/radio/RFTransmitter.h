@@ -1,5 +1,6 @@
 #pragma once
 
+#include "Common.h"
 #include "ShockerCommandType.h"
 #include "ShockerModelType.h"
 
@@ -13,6 +14,9 @@
 
 namespace OpenShock {
   class RFTransmitter {
+    DISABLE_COPY(RFTransmitter);
+    DISABLE_MOVE(RFTransmitter);
+
   public:
     RFTransmitter(gpio_num_t gpioPin);
     ~RFTransmitter();

@@ -450,7 +450,7 @@ static bool _tryGetStringList(std::string_view url, std::vector<std::string>& li
       continue;
     }
 
-    list.push_back(std::string(line));
+    list.emplace_back(line);
   }
 
   return true;

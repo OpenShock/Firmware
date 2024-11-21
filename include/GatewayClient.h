@@ -1,5 +1,6 @@
 #pragma once
 
+#include "Common.h"
 #include "GatewayClientState.h"
 
 #include <WebSocketsClient.h>
@@ -11,6 +12,9 @@
 
 namespace OpenShock {
   class GatewayClient {
+    DISABLE_COPY(GatewayClient);
+    DISABLE_MOVE(GatewayClient);
+
   public:
     GatewayClient(const std::string& authToken);
     ~GatewayClient();
