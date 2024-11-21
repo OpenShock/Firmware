@@ -17,6 +17,4 @@ namespace OpenShock::GatewayConnectionManager {
 
   bool SendMessageTXT(std::string_view data);
   bool SendMessageBIN(const uint8_t* data, std::size_t length);
-
-  void Update();
 }  // namespace OpenShock::GatewayConnectionManager

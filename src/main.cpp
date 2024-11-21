@@ -111,20 +111,8 @@ void setup()
   }
 }
 
-void main_app(void* arg)
-{
-  while (true) {
-    OpenShock::GatewayConnectionManager::Update();
-
-    vTaskDelay(5);  // 5 ticks update interval
-  }
-}
-
 void loop()
 {
-  // Start the main task
-  OpenShock::TaskUtils::TaskCreateExpensive(main_app, "main_app", 8192, nullptr, 1, nullptr);  // PROFILED: 6KB stack usage
-
   // Kill the loop task (Arduino is stinky)
   vTaskDelete(nullptr);
 }

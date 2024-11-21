@@ -1,3 +1,5 @@
+#include <freertos/FreeRTOS.h>
+
 #include "GatewayClient.h"
 
 const char* const TAG = "GatewayClient";
@@ -11,6 +13,8 @@ const char* const TAG = "GatewayClient";
 #include "serialization/WSGateway.h"
 #include "Time.h"
 #include "util/CertificateUtils.h"
+#include "util/FnProxy.h"
+#include "util/TaskUtils.h"
 #include "VisualStateManager.h"
 
 using namespace OpenShock;
@@ -20,6 +24,7 @@ static bool s_bootStatusSent = false;
 GatewayClient::GatewayClient(const std::string& authToken)
   : m_webSocket()
   , m_state(GatewayClientState::Disconnected)
+  , m_loopTask(nullptr)
 {
   OS_LOGD(TAG, "Creating GatewayClient");
 
@@ -36,12 +41,26 @@ GatewayClient::~GatewayClient()
   _setState(GatewayClientState::Disconnected);
 
   OS_LOGD(TAG, "Destroying GatewayClient");
+  if (m_loopTask != nullptr) {
+    vTaskDelete(m_loopTask);
+  }
   m_webSocket.disconnect();
 }
 
 void GatewayClient::connect(const char* lcgFqdn)
 {
   if (m_state != GatewayClientState::Disconnected) {
+    return;
+  }
+
+  if (m_loopTask != nullptr) {
+    vTaskDelete(m_loopTask);
+  }
+
+  esp_err_t err;
+  err = TaskUtils::TaskCreateExpensive(&Util::FnProxy<&GatewayClient::_loop>, "GatewayClientLoop", 8192, this, 1, &m_loopTask); // TODO: Profile stack size
+  if (err != ESP_OK) {
+    OS_LOGE(TAG, "Failed to create GatewayClient loop task: %s", esp_err_to_name(err));
     return;
   }
 
@@ -91,21 +110,15 @@ bool GatewayClient::sendMessageBIN(const uint8_t* data, std::size_t length)
   return m_webSocket.sendBIN(data, length);
 }
 
-bool GatewayClient::loop()
+void GatewayClient::_loop()
 {
-  if (m_state == GatewayClientState::Disconnected) {
-    return false;
+  while (m_state != GatewayClientState::Disconnected) {
+    m_webSocket.loop();
+    vTaskDelay(pdMS_TO_TICKS(10));  // 100 Hz update rate
   }
 
-  m_webSocket.loop();
-
-  // We are still in the process of connecting or disconnecting
-  if (m_state != GatewayClientState::Connected) {
-    // return true to indicate that we are still busy
-    return true;
-  }
-
-  return true;
+  m_loopTask = nullptr;  // Clear the task handle
+  vTaskDelete(nullptr);  // Delete the task
 }
 
 void GatewayClient::_setState(GatewayClientState state)
