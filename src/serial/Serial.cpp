@@ -3,20 +3,38 @@
 #include "serial/Serial.h"
 
 #include <driver/uart.h>
+#include <driver/usb_serial_jtag.h>
 #include <freertos/task.h>
+#include <sdkconfig.h>
 
 #define TAG "serial::Serial"
 
-#define UART_NUM UART_NUM_0
-#define UART_TXP 1
-#define UART_RXP 3
-#define UART_BUFFER_SIZE 1024
+#define USE_USB_JTAG false
+
+#define UART_NUM        UART_NUM_2  // Only for ESP32 and ESP32S3
+#define UART_TXP        4
+#define UART_RXP        5
 #define UART_QUEUE_SIZE 10
-#define UART_BAUD_RATE 115200
+#define UART_BAUD_RATE  115'200
+
+#define BUFFER_SIZE 1024
 
 using namespace OpenShock;
 
-bool Serial::Init() {
+bool Serial::Init()
+{
+  esp_err_t err;
+#if USE_USB_JTAG
+  usb_serial_jtag_driver_config_t usb_serial_jtag_config = {
+    .tx_buffer_size = BUFFER_SIZE,
+    .rx_buffer_size = BUFFER_SIZE,
+  };
+
+  err = usb_serial_jtag_driver_install(&usb_serial_jtag_config);
+  if (err != ESP_OK) {
+    return false;
+  }
+#else
   if (uart_is_driver_installed(UART_NUM)) {
     return true;
   }
@@ -25,15 +43,19 @@ bool Serial::Init() {
   uart_config_t uart_config = {
     .baud_rate = UART_BAUD_RATE,
     .data_bits = UART_DATA_8_BITS,
-    .parity = UART_PARITY_DISABLE,
+    .parity    = UART_PARITY_DISABLE,
     .stop_bits = UART_STOP_BITS_1,
     .flow_ctrl = UART_HW_FLOWCTRL_DISABLE,
-    .source_clk = UART_SCLK_DEFAULT,
-  }; // default values
+#ifdef UART_SCLK_DEFAULT
+    .source_clk = UART_SCLK_REF_TICK,
+#elif SOC_UART_SUPPORT_REF_TICK
+    .source_clk = UART_SCLK_REF_TICK,
+#else
+    .source_clk = UART_SCLK_APB,
+#endif
+  };  // default values
 
-  esp_err_t err;
-
-  err = uart_driver_install(UART_NUM, UART_BUFFER_SIZE, UART_BUFFER_SIZE, UART_QUEUE_SIZE, nullptr, 0);
+  err = uart_driver_install(UART_NUM, BUFFER_SIZE, BUFFER_SIZE, UART_QUEUE_SIZE, nullptr, 0);
   if (err != ESP_OK) {
     return false;
   }
@@ -47,8 +69,7 @@ bool Serial::Init() {
   if (err != ESP_OK) {
     return false;
   }
-
-  uart_
+#endif
 
   return true;
 }

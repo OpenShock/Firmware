@@ -93,7 +93,7 @@ void setup()
 {
   // esp_log_level_set(ESP_LOG_VERBOSE);
 
-  Serial::Init();
+  OpenShock::Serial::Init();
 
   // esp_log_level_set(ESP_LOG_VERBOSE);
 
