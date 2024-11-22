@@ -9,35 +9,33 @@
 
 const char* const TAG = "Serial::CommandHandlers::Networks";
 
-void _handleNetworksCommand(std::string_view arg, bool isAutomated)
+static void handleGet(std::string_view arg, bool isAutomated)
 {
-  cJSON* root;
-
-  if (arg.empty()) {
-    root = cJSON_CreateArray();
-    if (root == nullptr) {
-      SERPR_ERROR("Failed to create JSON array");
-      return;
-    }
-
-    if (!OpenShock::Config::GetWiFiCredentials(root, true)) {
-      SERPR_ERROR("Failed to get WiFi credentials from config");
-      return;
-    }
-
-    char* out = cJSON_PrintUnformatted(root);
-    if (out == nullptr) {
-      SERPR_ERROR("Failed to print JSON");
-      return;
-    }
-
-    SERPR_RESPONSE("Networks|%s", out);
-
-    cJSON_free(out);
+  cJSON* root = cJSON_CreateArray();
+  if (root == nullptr) {
+    SERPR_ERROR("Failed to create JSON array");
     return;
   }
 
-  root = cJSON_ParseWithLength(arg.data(), arg.length());
+  if (!OpenShock::Config::GetWiFiCredentials(root, true)) {
+    SERPR_ERROR("Failed to get WiFi credentials from config");
+    return;
+  }
+
+  char* out = cJSON_PrintUnformatted(root);
+  if (out == nullptr) {
+    SERPR_ERROR("Failed to print JSON");
+    return;
+  }
+
+  SERPR_RESPONSE("Networks|%s", out);
+
+  cJSON_free(out);
+}
+
+static void handleSet(std::string_view arg, bool isAutomated)
+{
+  cJSON* root = cJSON_ParseWithLength(arg.data(), arg.length());
   if (root == nullptr) {
     SERPR_ERROR("Failed to parse JSON: %s", cJSON_GetErrorPtr());
     return;
@@ -84,9 +82,9 @@ OpenShock::Serial::CommandGroup OpenShock::Serial::CommandHandlers::NetworksHand
 {
   auto group = OpenShock::Serial::CommandGroup("networks"sv);
 
-  auto& getCommand = group.addCommand("Get all saved networks."sv, _handleNetworksCommand);
+  auto& getCommand = group.addCommand("get"sv, "Get all saved networks."sv, handleGet);
 
-  auto& setCommand = group.addCommand("Set all saved networks."sv, _handleNetworksCommand);
+  auto& setCommand = group.addCommand("set"sv, "Set all saved networks."sv, handleSet);
   setCommand.addArgument(
     "json"sv,
     "must be a array of objects with the following fields:"sv,
