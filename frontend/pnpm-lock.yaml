@@ -9,19 +9,19 @@ importers:
   .:
     devDependencies:
       '@eslint/compat':
-        specifier: ^1.2.3
+        specifier: ^1.2.4
         version: 1.2.4(eslint@9.17.0(jiti@1.21.6))
       '@playwright/test':
-        specifier: ^1.45.3
+        specifier: ^1.49.1
         version: 1.49.1
       '@sveltejs/adapter-static':
         specifier: ^3.0.6
         version: 3.0.6(@sveltejs/kit@2.12.1(@sveltejs/vite-plugin-svelte@5.0.2(svelte@5.14.1)(vite@6.0.3(jiti@1.21.6)(yaml@2.6.1)))(svelte@5.14.1)(vite@6.0.3(jiti@1.21.6)(yaml@2.6.1)))
       '@sveltejs/kit':
-        specifier: ^2.9.0
+        specifier: ^2.12.1
         version: 2.12.1(@sveltejs/vite-plugin-svelte@5.0.2(svelte@5.14.1)(vite@6.0.3(jiti@1.21.6)(yaml@2.6.1)))(svelte@5.14.1)(vite@6.0.3(jiti@1.21.6)(yaml@2.6.1))
       '@sveltejs/vite-plugin-svelte':
-        specifier: ^5.0.0
+        specifier: ^5.0.2
         version: 5.0.2(svelte@5.14.1)(vite@6.0.3(jiti@1.21.6)(yaml@2.6.1))
       '@tailwindcss/forms':
         specifier: ^0.5.9
@@ -39,37 +39,40 @@ importers:
         specifier: ^2.1.1
         version: 2.1.1
       eslint:
-        specifier: ^9.7.0
+        specifier: ^9.17.0
         version: 9.17.0(jiti@1.21.6)
       eslint-config-prettier:
         specifier: ^9.1.0
         version: 9.1.0(eslint@9.17.0(jiti@1.21.6))
       eslint-plugin-svelte:
-        specifier: ^2.36.0
+        specifier: ^2.46.1
         version: 2.46.1(eslint@9.17.0(jiti@1.21.6))(svelte@5.14.1)
       flatbuffers:
         specifier: ^24.3.25
         version: 24.3.25
       globals:
-        specifier: ^15.0.0
+        specifier: ^15.13.0
         version: 15.13.0
       lucide-svelte:
         specifier: ^0.468.0
         version: 0.468.0(svelte@5.14.1)
+      mode-watcher:
+        specifier: ^0.5.0
+        version: 0.5.0(svelte@5.14.1)
       prettier:
-        specifier: ^3.3.2
+        specifier: ^3.4.2
         version: 3.4.2
       prettier-plugin-svelte:
-        specifier: ^3.2.6
+        specifier: ^3.3.2
         version: 3.3.2(prettier@3.4.2)(svelte@5.14.1)
       prettier-plugin-tailwindcss:
-        specifier: ^0.6.5
+        specifier: ^0.6.9
         version: 0.6.9(prettier-plugin-svelte@3.3.2(prettier@3.4.2)(svelte@5.14.1))(prettier@3.4.2)
       svelte:
-        specifier: ^5.0.0
+        specifier: ^5.14.1
         version: 5.14.1
       svelte-check:
-        specifier: ^4.0.0
+        specifier: ^4.1.1
         version: 4.1.1(svelte@5.14.1)(typescript@5.7.2)
       svelte-sonner:
         specifier: ^0.3.28
@@ -81,22 +84,22 @@ importers:
         specifier: ^0.3.0
         version: 0.3.0(tailwindcss@3.4.16)
       tailwindcss:
-        specifier: ^3.4.9
+        specifier: ^3.4.16
         version: 3.4.16
       tailwindcss-animate:
         specifier: ^1.0.7
         version: 1.0.7(tailwindcss@3.4.16)
       typescript:
-        specifier: ^5.0.0
+        specifier: ^5.7.2
         version: 5.7.2
       typescript-eslint:
-        specifier: ^8.0.0
+        specifier: ^8.18.1
         version: 8.18.1(eslint@9.17.0(jiti@1.21.6))(typescript@5.7.2)
       vite:
-        specifier: ^6.0.0
+        specifier: ^6.0.3
         version: 6.0.3(jiti@1.21.6)(yaml@2.6.1)
       vitest:
-        specifier: ^2.0.4
+        specifier: ^2.1.8
         version: 2.1.8
 
 packages:
@@ -1289,6 +1292,11 @@ packages:
   minipass@7.1.2:
     resolution: {integrity: sha512-qOOzS1cBTWYF4BH8fVePDBOO9iptMnGUEZwNc/cMWnTV2nVLZ7VoNWEPHkYczZA0pdoA7dl6e7FL659nX9S2aw==}
     engines: {node: '>=16 || 14 >=14.17'}
+
+  mode-watcher@0.5.0:
+    resolution: {integrity: sha512-5E6fh/aXhAVv+U+DbeM0hCmskQE9u7WSmvnCRijJB/MJu7HtB73sjiCaZ9n1M8QHmzLrBFo8XBAUcWXkDm8Z9A==}
+    peerDependencies:
+      svelte: ^4.0.0 || ^5.0.0-next.1
 
   mri@1.2.0:
     resolution: {integrity: sha512-tzzskb3bG8LvYGFF/mDTpq3jpI6Q9wc3LEmBaghu+DdCssd1FakN7Bc0hVNmEyGq1bq3RgfkCb3cmQLpNPOroA==}
@@ -2999,6 +3007,10 @@ snapshots:
       brace-expansion: 2.0.1
 
   minipass@7.1.2: {}
+
+  mode-watcher@0.5.0(svelte@5.14.1):
+    dependencies:
+      svelte: 5.14.1
 
   mri@1.2.0: {}
 
