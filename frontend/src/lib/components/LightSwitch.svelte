@@ -35,7 +35,7 @@
     <Dialog.Header>
       <Dialog.Title>Switch to light mode</Dialog.Title>
       <Dialog.Description>
-        <span class="text-red-500 font-bold">Warning:</span> You are about to switch to light mode.
+        <span class="font-bold text-red-500">Warning:</span> You are about to switch to light mode.
         <br />
         Are you sure you want to do this?
       </Dialog.Description>

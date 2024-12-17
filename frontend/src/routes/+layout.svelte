@@ -1,5 +1,5 @@
 <script lang="ts">
-  import '../app.postcss';
+  import '../app.css';
   import Footer from '$lib/components/Layout/Footer.svelte';
   import Header from '$lib/components/Layout/Header.svelte';
   import { WebSocketClient } from '$lib/WebSocketClient';
@@ -19,7 +19,7 @@
 
 <Toaster />
 
-<div class="flex flex-col min-h-screen">
+<div class="flex min-h-screen flex-col">
   <Header />
   <main class="flex-1">
     {@render children?.()}

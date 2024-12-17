@@ -2,8 +2,8 @@ import { WifiNetworkEvent } from '$lib/_fbs/open-shock/serialization/local/wifi-
 import { WifiNetwork as FbsWifiNetwork } from '$lib/_fbs/open-shock/serialization/types/wifi-network';
 import { WifiNetworkEventType } from '$lib/_fbs/open-shock/serialization/types/wifi-network-event-type';
 import { DeviceStateStore } from '$lib/stores';
-import { toastDelegator } from '$lib/stores/ToastDelegator';
 import type { WiFiNetwork } from '$lib/types/WiFiNetwork';
+import { toast } from 'svelte-sonner';
 import type { MessageHandler } from '.';
 
 function handleInvalidEvent() {
@@ -73,10 +73,7 @@ function handleSavedEvent(fbsNetwork: FbsWifiNetwork) {
     return network;
   });
 
-  toastDelegator.trigger({
-    message: 'WiFi network saved: ' + ssid,
-    background: 'bg-green-500',
-  });
+  toast.success('WiFi network saved: ' + ssid);
 }
 function handleRemovedEvent(fbsNetwork: FbsWifiNetwork) {
   const ssid = fbsNetwork.ssid();
@@ -92,10 +89,7 @@ function handleRemovedEvent(fbsNetwork: FbsWifiNetwork) {
     return network;
   });
 
-  toastDelegator.trigger({
-    message: 'WiFi network forgotten: ' + ssid,
-    background: 'bg-green-500',
-  });
+  toast.success('WiFi network forgotten: ' + ssid);
 }
 function handleConnectedEvent(fbsNetwork: FbsWifiNetwork) {
   const ssid = fbsNetwork.ssid();
@@ -108,10 +102,7 @@ function handleConnectedEvent(fbsNetwork: FbsWifiNetwork) {
 
   DeviceStateStore.setWifiConnectedBSSID(bssid);
 
-  toastDelegator.trigger({
-    message: 'WiFi network connected: ' + ssid,
-    background: 'bg-green-500',
-  });
+  toast.info('WiFi network connected: ' + ssid);
 }
 function handleDisconnectedEvent(fbsNetwork: FbsWifiNetwork) {
   const ssid = fbsNetwork.ssid();
@@ -124,16 +115,15 @@ function handleDisconnectedEvent(fbsNetwork: FbsWifiNetwork) {
 
   DeviceStateStore.setWifiConnectedBSSID(null);
 
-  toastDelegator.trigger({
-    message: 'WiFi network disconnected: ' + ssid,
-    background: 'bg-green-500',
-  });
+  toast.info('WiFi network disconnected: ' + ssid);
 }
 
 type WifiNetworkEventHandler = (fbsNetwork: FbsWifiNetwork) => void;
 
 const EventTypes = Object.keys(WifiNetworkEventType).length / 2;
-const EventHandlers: WifiNetworkEventHandler[] = new Array<WifiNetworkEventHandler>(EventTypes).fill(handleInvalidEvent);
+const EventHandlers: WifiNetworkEventHandler[] = new Array<WifiNetworkEventHandler>(
+  EventTypes
+).fill(handleInvalidEvent);
 
 EventHandlers[WifiNetworkEventType.Discovered] = handleDiscoveredEvent;
 EventHandlers[WifiNetworkEventType.Updated] = handleUpdatedEvent;

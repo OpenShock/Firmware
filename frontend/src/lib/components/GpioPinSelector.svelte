@@ -16,7 +16,14 @@
   let pendingPin: number | null = $state(null);
   let statusText: string = $state('Loading...');
 
-  let canSet = $derived(pendingPin !== null && pendingPin !== currentPin && pendingPin >= 0 && pendingPin <= 255 && $DeviceStateStore.gpioValidOutputs.includes(pendingPin) && !$UsedPinsStore.has(pendingPin));
+  let canSet = $derived(
+    pendingPin !== null &&
+      pendingPin !== currentPin &&
+      pendingPin >= 0 &&
+      pendingPin <= 255 &&
+      $DeviceStateStore.gpioValidOutputs.includes(pendingPin) &&
+      !$UsedPinsStore.has(pendingPin)
+  );
 
   run(() => {
     if (currentPin !== null) {
@@ -45,12 +52,17 @@
 </script>
 
 <div class="flex flex-col space-y-2">
-  <div class="flex flex-row space-x-2 items-center">
+  <div class="flex flex-row items-center space-x-2">
     <h3 class="h3">{name}</h3>
     <span class="text-sm text-gray-500">{statusText}</span>
   </div>
   <div class="flex space-x-2">
-    <input class="input variant-form-material" type="number" placeholder="GPIO Pin" bind:value={pendingPin} />
+    <input
+      class="input variant-form-material"
+      type="number"
+      placeholder="GPIO Pin"
+      bind:value={pendingPin}
+    />
     <button class="btn variant-filled" onclick={setGpioPin} disabled={!canSet}>Set</button>
   </div>
 </div>

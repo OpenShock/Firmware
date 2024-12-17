@@ -28,11 +28,21 @@ function insertSorted<T>(array: T[], value: T, compare: (a: T, b: T) => number) 
   array.splice(low, 0, value);
 }
 
-function SsidMapReducer(groups: Map<string, WiFiNetworkGroup>, [, value]: [string, WiFiNetwork]): Map<string, WiFiNetworkGroup> {
+function SsidMapReducer(
+  groups: Map<string, WiFiNetworkGroup>,
+  [, value]: [string, WiFiNetwork]
+): Map<string, WiFiNetworkGroup> {
   const key = `${value.ssid || value.bssid}_${WifiAuthMode[value.security]}`;
 
   // Get the group for this SSID, or create a new one
-  const group = groups.get(key) ?? ({ ssid: value.ssid, saved: false, security: value.security, networks: [] } as WiFiNetworkGroup);
+  const group =
+    groups.get(key) ??
+    ({
+      ssid: value.ssid,
+      saved: false,
+      security: value.security,
+      networks: [],
+    } as WiFiNetworkGroup);
 
   // Update the group's saved status
   group.saved = group.saved || value.saved;
@@ -48,7 +58,10 @@ function SsidMapReducer(groups: Map<string, WiFiNetworkGroup>, [, value]: [strin
 }
 
 function updateWifiNetworkGroups(store: DeviceState) {
-  store.wifiNetworkGroups = Array.from(store.wifiNetworks.entries()).reduce(SsidMapReducer, new Map<string, WiFiNetworkGroup>());
+  store.wifiNetworkGroups = Array.from(store.wifiNetworks.entries()).reduce(
+    SsidMapReducer,
+    new Map<string, WiFiNetworkGroup>()
+  );
 }
 
 export const DeviceStateStore = {

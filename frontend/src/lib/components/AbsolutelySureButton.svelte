@@ -60,7 +60,7 @@
 
 <style lang="postcss">
   button {
-    @apply h-10 py-2 px-4 text-sm font-medium whitespace-nowrap select-none rounded-md;
+    @apply h-10 select-none whitespace-nowrap rounded-md px-4 py-2 text-sm font-medium;
     background: rgb(127, 29, 29);
   }
   button:hover {

@@ -11,13 +11,19 @@
   import type { WiFiNetworkGroup } from '$lib/types';
 
   let scanStatus = $derived($DeviceStateStore.wifiScanStatus);
-  let isScanning = $derived(scanStatus === WifiScanStatus.Started || scanStatus === WifiScanStatus.InProgress);
+  let isScanning = $derived(
+    scanStatus === WifiScanStatus.Started || scanStatus === WifiScanStatus.InProgress
+  );
 
   let connectedBSSID = $derived($DeviceStateStore.wifiConnectedBSSID);
 
   // Sorting the groups themselves by each one's strongest network (by RSSI, higher is stronger)
   // Only need to check the first network in each group, since they're already sorted by signal strength
-  let strengthSortedGroups = $derived(Array.from($DeviceStateStore.wifiNetworkGroups.entries()).sort((a, b) => b[1].networks[0].rssi - a[1].networks[0].rssi));
+  let strengthSortedGroups = $derived(
+    Array.from($DeviceStateStore.wifiNetworkGroups.entries()).sort(
+      (a, b) => b[1].networks[0].rssi - a[1].networks[0].rssi
+    )
+  );
 
   function wifiScan() {
     const data = SerializeWifiScanCommand(!isScanning);
@@ -62,7 +68,7 @@
 </script>
 
 <div>
-  <div class="flex justify-between items-center mb-2">
+  <div class="mb-2 flex items-center justify-between">
     <h3 class="h3">Configure WiFi</h3>
     <button class="btn variant-outline" onclick={wifiScan}>
       {#if isScanning}
@@ -74,7 +80,7 @@
   </div>
   <div class="max-h-64 overflow-auto">
     {#each strengthSortedGroups as [netgroupKey, netgroup] (netgroupKey)}
-      <div class="card mb-2 p-2 flex justify-between items-center">
+      <div class="card mb-2 flex items-center justify-between p-2">
         <span>
           {#if netgroup.networks.some((n) => n.bssid === connectedBSSID)}
             <i class="fa fa-wifi text-green-500"></i>
@@ -84,14 +90,20 @@
           {#if netgroup.ssid}
             <span class="ml-2">{netgroup.ssid}</span>
           {:else}
-            <span class="ml-2">{netgroup.networks[0].bssid}</span><span class="text-gray-500 ml-1">(Hidden)</span>
+            <span class="ml-2">{netgroup.networks[0].bssid}</span><span class="ml-1 text-gray-500"
+              >(Hidden)</span
+            >
           {/if}
         </span>
         <div class="btn-group variant-outline">
           {#if netgroup.saved}
-            <button onclick={() => wifiConnect(netgroup)}><i class="fa fa-arrow-right text-green-500"></i></button>
+            <button onclick={() => wifiConnect(netgroup)}
+              ><i class="fa fa-arrow-right text-green-500"></i></button
+            >
           {:else}
-            <button onclick={() => wifiAuthenticate(netgroup)}><i class="fa fa-link text-green-500"></i></button>
+            <button onclick={() => wifiAuthenticate(netgroup)}
+              ><i class="fa fa-link text-green-500"></i></button
+            >
           {/if}
           <button onclick={() => wifiSettings(netgroupKey)}><i class="fa fa-cog"></i></button>
         </div>
