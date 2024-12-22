@@ -12,7 +12,7 @@ function getLocalStoreState() {
   return 'system';
 }
 
-function getDarkReaderState() {
+export function getDarkReaderState() {
   const rootHtml = document.documentElement;
 
   const proxyInjected = rootHtml.getAttribute('data-darkreader-proxy-injected');

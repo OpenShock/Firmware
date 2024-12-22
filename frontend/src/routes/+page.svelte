@@ -6,6 +6,7 @@
   import GpioPinSelector from '$lib/components/GpioPinSelector.svelte';
   import WiFiList from '$lib/components/WiFiList.svelte';
   import { DeviceStateStore } from '$lib/stores';
+  import { Button } from '$lib/components/ui/button';
 
   function isValidLinkCode(str: string) {
     if (typeof str != 'string') return false;
@@ -42,11 +43,7 @@
           placeholder="Link Code"
           bind:value={linkCode}
         />
-        <button
-          class="btn variant-filled"
-          onclick={linkAccount}
-          disabled={!linkCodeValid || linkCode.length < 6}>Link</button
-        >
+        <Button onclick={linkAccount} disabled={!linkCodeValid || linkCode.length < 6}>Link</Button>
       </div>
     </div>
 

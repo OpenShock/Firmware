@@ -1,9 +1,9 @@
 <script lang="ts">
   import { run } from 'svelte/legacy';
 
-  import { DeviceStateStore } from '$lib/stores';
-  import { UsedPinsStore } from '$lib/stores/UsedPinsStore';
+  import { DeviceStateStore, UsedPinsStore } from '$lib/stores';
   import { WebSocketClient } from '$lib/WebSocketClient';
+  import { Button } from '$lib/components/ui/button';
 
   interface Props {
     name: string;
@@ -63,6 +63,6 @@
       placeholder="GPIO Pin"
       bind:value={pendingPin}
     />
-    <button class="btn variant-filled" onclick={setGpioPin} disabled={!canSet}>Set</button>
+    <Button onclick={setGpioPin} disabled={!canSet}>Set</Button>
   </div>
 </div>

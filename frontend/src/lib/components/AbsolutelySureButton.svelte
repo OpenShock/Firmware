@@ -66,6 +66,9 @@
   button:hover {
     background: rgb(115, 26, 26);
   }
+  button:focus {
+    outline: none;
+  }
   button.violent-shake {
     /* Start the shake animation and make the animation last for 0.5 seconds */
     animation:

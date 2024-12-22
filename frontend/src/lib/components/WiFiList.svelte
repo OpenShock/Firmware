@@ -7,8 +7,9 @@
   import { SerializeWifiNetworkDisconnectCommand } from '$lib/Serializers/WifiNetworkDisconnectCommand';
   import { SerializeWifiNetworkConnectCommand } from '$lib/Serializers/WifiNetworkConnectCommand';
   import { SerializeWifiNetworkSaveCommand } from '$lib/Serializers/WifiNetworkSaveCommand';
-  import WiFiDetails from './modals/WiFiDetails.svelte';
+  import WiFiDetails from '$lib/components/modals/WiFiDetails.svelte';
   import type { WiFiNetworkGroup } from '$lib/types';
+  import Button from '$lib/components/ui/button/button.svelte';
 
   let scanStatus = $derived($DeviceStateStore.wifiScanStatus);
   let isScanning = $derived(
@@ -70,13 +71,13 @@
 <div>
   <div class="mb-2 flex items-center justify-between">
     <h3 class="h3">Configure WiFi</h3>
-    <button class="btn variant-outline" onclick={wifiScan}>
+    <Button onclick={wifiScan}>
       {#if isScanning}
         <i class="fa fa-spinner fa-spin"></i>
       {:else}
         <i class="fa fa-rotate-right"></i>
       {/if}
-    </button>
+    </Button>
   </div>
   <div class="max-h-64 overflow-auto">
     {#each strengthSortedGroups as [netgroupKey, netgroup] (netgroupKey)}
@@ -97,15 +98,15 @@
         </span>
         <div class="btn-group variant-outline">
           {#if netgroup.saved}
-            <button onclick={() => wifiConnect(netgroup)}
-              ><i class="fa fa-arrow-right text-green-500"></i></button
-            >
+            <Button onclick={() => wifiConnect(netgroup)}>
+              <i class="fa fa-arrow-right text-green-500"></i>
+            </Button>
           {:else}
-            <button onclick={() => wifiAuthenticate(netgroup)}
-              ><i class="fa fa-link text-green-500"></i></button
-            >
+            <Button onclick={() => wifiAuthenticate(netgroup)}>
+              <i class="fa fa-link text-green-500"></i>
+            </Button>
           {/if}
-          <button onclick={() => wifiSettings(netgroupKey)}><i class="fa fa-cog"></i></button>
+          <Button onclick={() => wifiSettings(netgroupKey)}><i class="fa fa-cog"></i></Button>
         </div>
       </div>
     {/each}

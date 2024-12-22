@@ -3,20 +3,26 @@
 </script>
 
 <header
-  class="sticky top-0 z-50 flex w-full flex-row border-b border-border/40 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60"
+  class="border-border/40 bg-background/95 supports-[backdrop-filter]:bg-background/60 sticky top-0 z-50 flex w-full flex-row border-b backdrop-blur"
 >
-  <div class="flex items-center space-x-4">
-    <!-- Logo -->
-    <a
-      href="/"
-      class="select-none overflow-hidden lg:!ml-0 lg:w-auto"
-      data-sveltekit-preload-data="hover"
-    >
-      <img class="pointer-events-none inline-block h-12" src="/logo.svg" alt="OpenShock Logo" />
-    </a>
-  </div>
-  <div class="flex-1"></div>
-  <div>
+  <div class="flex flex-1 flex-row items-center justify-between space-x-2 py-2 pr-4">
+    <div class="flex items-center space-x-4">
+      <a
+        href="/"
+        class="select-none overflow-hidden lg:!ml-0 lg:w-auto"
+        data-sveltekit-preload-data="hover"
+        aria-label="OpenShock"
+      >
+        <img
+          class="pointer-events-none inline-block h-6 sm:h-10"
+          src="/logo.svg"
+          alt="OpenShock Logo"
+        />
+      </a>
+    </div>
+
+    <div class="flex-1"></div>
+
     <LightSwitch />
   </div>
 </header>
