@@ -7,6 +7,8 @@
   import WiFiList from '$lib/components/WiFiList.svelte';
   import { DeviceStateStore } from '$lib/stores';
   import { Button } from '$lib/components/ui/button';
+  import { Input } from '$lib/components/ui/input';
+  import { Label } from '$lib/components/ui/label';
 
   function isValidLinkCode(str: string) {
     if (typeof str != 'string') return false;
@@ -33,11 +35,14 @@
     <WiFiList />
 
     <div class="flex flex-col space-y-2">
-      <h3 class="h3">Account Linking</h3>
+      <Label for="account-link-code" class="scroll-m-20 text-xl font-semibold tracking-tight">
+        Account Linking
+      </Label>
       <div class="flex space-x-2">
-        <input
-          class={'input variant-form-material ' + (linkCodeValid ? '' : 'input-error')}
+        <Input
+          class={linkCodeValid ? '' : 'input-error'}
           type="text"
+          id="account-link-code"
           inputmode="numeric"
           pattern="[0-9]*"
           placeholder="Link Code"

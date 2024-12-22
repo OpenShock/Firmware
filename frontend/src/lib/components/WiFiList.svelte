@@ -7,9 +7,9 @@
   import { SerializeWifiNetworkDisconnectCommand } from '$lib/Serializers/WifiNetworkDisconnectCommand';
   import { SerializeWifiNetworkConnectCommand } from '$lib/Serializers/WifiNetworkConnectCommand';
   import { SerializeWifiNetworkSaveCommand } from '$lib/Serializers/WifiNetworkSaveCommand';
-  import WiFiDetails from '$lib/components/modals/WiFiDetails.svelte';
+  import WiFiDetailsDialog from '$lib/components/modals/WiFiDetailsDialog.svelte';
   import type { WiFiNetworkGroup } from '$lib/types';
-  import Button from '$lib/components/ui/button/button.svelte';
+  import { Button } from '$lib/components/ui/button';
 
   let scanStatus = $derived($DeviceStateStore.wifiScanStatus);
   let isScanning = $derived(
@@ -57,15 +57,6 @@
     const data = SerializeWifiNetworkDisconnectCommand();
     WebSocketClient.Instance.Send(data);
   }
-  function wifiSettings(groupKey: string) {
-    modalStore.trigger({
-      type: 'component',
-      component: {
-        ref: WiFiDetails,
-        props: { groupKey },
-      },
-    });
-  }
 </script>
 
 <div>
@@ -106,7 +97,7 @@
               <i class="fa fa-link text-green-500"></i>
             </Button>
           {/if}
-          <Button onclick={() => wifiSettings(netgroupKey)}><i class="fa fa-cog"></i></Button>
+          <WiFiDetailsDialog group={netgroup} />
         </div>
       </div>
     {/each}
