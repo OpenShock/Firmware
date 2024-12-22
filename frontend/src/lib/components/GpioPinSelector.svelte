@@ -68,7 +68,7 @@
 <div class="flex flex-col space-y-2">
   <div class="flex flex-row items-center space-x-2">
     <h4 class="scroll-m-20 text-xl font-semibold tracking-tight">{name}</h4>
-    <p class="text-muted-foreground text-sm">{statusText}</p>
+    <p class="text-sm text-muted-foreground">{statusText}</p>
   </div>
   <div class="flex space-x-2">
     <Input

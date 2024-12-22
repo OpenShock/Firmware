@@ -3,7 +3,7 @@
 </script>
 
 <header
-  class="border-border/40 bg-background/95 supports-[backdrop-filter]:bg-background/60 sticky top-0 z-50 flex w-full flex-row border-b backdrop-blur"
+  class="sticky top-0 z-50 flex w-full flex-row border-b border-border/40 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60"
 >
   <div class="flex flex-1 flex-row items-center justify-between space-x-2 py-2 pr-4">
     <div class="flex items-center space-x-4">
