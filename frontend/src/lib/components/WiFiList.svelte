@@ -7,7 +7,7 @@
   import { SerializeWifiNetworkDisconnectCommand } from '$lib/Serializers/WifiNetworkDisconnectCommand';
   import { SerializeWifiNetworkConnectCommand } from '$lib/Serializers/WifiNetworkConnectCommand';
   import { SerializeWifiNetworkSaveCommand } from '$lib/Serializers/WifiNetworkSaveCommand';
-  import WiFiDetailsDialog from '$lib/components/modals/WiFiDetailsDialog.svelte';
+  import WiFiDetailsDialog from '$lib/components/WiFiDetailsDialog.svelte';
   import type { WiFiNetworkGroup } from '$lib/types';
   import { Button } from '$lib/components/ui/button';
 
