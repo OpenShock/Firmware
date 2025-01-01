@@ -30,7 +30,7 @@
 		"eslint": "^9.15.0",
 		"eslint-config-prettier": "9.1.0",
 		"eslint-plugin-svelte": "2.46.0",
-		"flatbuffers": "24.3.25",
+		"flatbuffers": "24.12.23",
 		"postcss": "8.4.49",
 		"prettier": "3.3.3",
 		"prettier-plugin-svelte": "3.3.2",
