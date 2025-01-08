@@ -1,3 +1,3 @@
 export * from './ColorSchemeStore';
-export * from './DeviceStateStore';
+export * from './HubStateStore';
 export * from './UsedPinsStore';

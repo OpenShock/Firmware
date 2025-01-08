@@ -8,6 +8,8 @@ const char* const TAG = "CommandHandler";
 #include "Common.h"
 #include "config/Config.h"
 #include "EStopManager.h"
+#include "EStopState.h"
+#include "events/Events.h"
 #include "Logging.h"
 #include "radio/RFTransmitter.h"
 #include "ReadWriteMutex.h"
@@ -38,8 +40,6 @@ struct KnownShocker {
 
 static OpenShock::ReadWriteMutex s_rfTransmitterMutex            = {};
 static std::unique_ptr<OpenShock::RFTransmitter> s_rfTransmitter = nullptr;
-
-static OpenShock::SimpleMutex s_estopManagerMutex = {};
 
 static OpenShock::ReadWriteMutex s_keepAliveMutex = {};
 static QueueHandle_t s_keepAliveQueue             = nullptr;
@@ -151,8 +151,21 @@ bool _internalSetKeepAliveEnabled(bool enabled)
   return true;
 }
 
+void _handleOpenShockEStopStateChangeEvent(void* event_handler_arg, esp_event_base_t event_base, int32_t event_id, void* event_data)
+{
+  (void)event_handler_arg;
+  (void)event_base;
+  (void)event_id;
+
+  EStopState state = *reinterpret_cast<EStopState*>(event_data);
+
+  _internalSetKeepAliveEnabled(state == EStopState::Idle);
+}
+
 bool CommandHandler::Init()
 {
+  esp_err_t err;
+
   static bool initialized = false;
   if (initialized) {
     OS_LOGW(TAG, "RF Transmitter and EStopManager are already initialized?");
@@ -200,6 +213,12 @@ bool CommandHandler::Init()
     return false;
   }
 
+  err = esp_event_handler_register(OPENSHOCK_EVENTS, OPENSHOCK_EVENT_ESTOP_STATE_CHANGED, _handleOpenShockEStopStateChangeEvent, nullptr);
+  if (err != ESP_OK) {
+    OS_LOGE(TAG, "Failed to register event handler for OPENSHOCK_EVENTS: %s", esp_err_to_name(err));
+    return false;
+  }
+
   // TODO: Implement EStopManager pin change logic
 
   return true;
@@ -240,29 +259,6 @@ SetGPIOResultCode CommandHandler::SetRfTxPin(gpio_num_t txPin)
   return SetGPIOResultCode::Success;
 }
 
-SetGPIOResultCode CommandHandler::SetEStopPin(gpio_num_t estopPin)
-{
-  if (OpenShock::IsValidInputPin(static_cast<int8_t>(estopPin))) {
-    ScopedLock lock__(&s_estopManagerMutex);
-
-    if (!EStopManager::SetEStopPin(estopPin)) {
-      OS_LOGE(TAG, "Failed to set EStop pin");
-
-      return SetGPIOResultCode::InternalError;
-    }
-
-    if (!Config::SetEStopGpioPin(estopPin)) {
-      OS_LOGE(TAG, "Failed to set EStop pin in config");
-
-      return SetGPIOResultCode::InternalError;
-    }
-
-    return SetGPIOResultCode::Success;
-  } else {
-    return SetGPIOResultCode::InvalidPin;
-  }
-}
-
 bool CommandHandler::SetKeepAliveEnabled(bool enabled)
 {
   if (!_internalSetKeepAliveEnabled(enabled)) {
@@ -271,25 +267,6 @@ bool CommandHandler::SetKeepAliveEnabled(bool enabled)
 
   if (!Config::SetRFConfigKeepAliveEnabled(enabled)) {
     OS_LOGE(TAG, "Failed to set keep-alive enabled in config");
-    return false;
-  }
-
-  return true;
-}
-
-bool CommandHandler::SetKeepAlivePaused(bool paused)
-{
-  bool keepAliveEnabled = false;
-  if (!Config::GetRFConfigKeepAliveEnabled(keepAliveEnabled)) {
-    OS_LOGE(TAG, "Failed to get keep-alive enabled from config");
-    return false;
-  }
-
-  if (keepAliveEnabled == false && paused == false) {
-    OS_LOGW(TAG, "Keep-alive is disabled in config, ignoring unpause command");
-    return false;
-  }
-  if (!_internalSetKeepAliveEnabled(!paused)) {
     return false;
   }
 

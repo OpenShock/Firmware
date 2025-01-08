@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { DeviceStateStore } from '$lib/stores';
+  import { HubStateStore } from '$lib/stores';
   import { WebSocketClient } from '$lib/WebSocketClient';
   import { WifiAuthMode } from '$lib/_fbs/open-shock/serialization/types/wifi-auth-mode';
   import { WifiScanStatus } from '$lib/_fbs/open-shock/serialization/types/wifi-scan-status';
@@ -11,17 +11,17 @@
   import type { WiFiNetworkGroup } from '$lib/types';
   import { Button } from '$lib/components/ui/button';
 
-  let scanStatus = $derived($DeviceStateStore.wifiScanStatus);
+  let scanStatus = $derived($HubStateStore.wifiScanStatus);
   let isScanning = $derived(
     scanStatus === WifiScanStatus.Started || scanStatus === WifiScanStatus.InProgress
   );
 
-  let connectedBSSID = $derived($DeviceStateStore.wifiConnectedBSSID);
+  let connectedBSSID = $derived($HubStateStore.wifiConnectedBSSID);
 
   // Sorting the groups themselves by each one's strongest network (by RSSI, higher is stronger)
   // Only need to check the first network in each group, since they're already sorted by signal strength
   let strengthSortedGroups = $derived(
-    Array.from($DeviceStateStore.wifiNetworkGroups.entries()).sort(
+    Array.from($HubStateStore.wifiNetworkGroups.entries()).sort(
       (a, b) => b[1].networks[0].rssi - a[1].networks[0].rssi
     )
   );
@@ -82,7 +82,7 @@
           {#if netgroup.ssid}
             <span class="ml-2">{netgroup.ssid}</span>
           {:else}
-            <span class="ml-2">{netgroup.networks[0].bssid}</span><span class="ml-1 text-gray-500"
+            <span class="ml-2">{netgroup.networks[0].bssid}</span><span class="text-gray-500 ml-1"
               >(Hidden)</span
             >
           {/if}

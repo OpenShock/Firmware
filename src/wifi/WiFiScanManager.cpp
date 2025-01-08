@@ -224,7 +224,15 @@ bool WiFiScanManager::Init()
 
 bool WiFiScanManager::IsScanning()
 {
-  return s_scanTaskHandle != nullptr;
+  // Quick check
+  if (s_scanTaskHandle == nullptr) {
+    return false;
+  }
+
+  // It wasnt null, lock and perform proper check
+  ScopedLock lock__(&s_scanTaskMutex);
+
+  return s_scanTaskHandle != nullptr && eTaskGetState(s_scanTaskHandle) != eDeleted;
 }
 
 bool WiFiScanManager::StartScan()
@@ -235,6 +243,11 @@ bool WiFiScanManager::StartScan()
   if (s_scanTaskHandle != nullptr && eTaskGetState(s_scanTaskHandle) != eDeleted) {
     OS_LOGW(TAG, "Cannot start scan: scan task is already running");
     return false;
+  }
+
+  // Free the TCB
+  if (s_scanTaskHandle != nullptr) {
+    vTaskDelete(s_scanTaskHandle);
   }
 
   // Start the scan task

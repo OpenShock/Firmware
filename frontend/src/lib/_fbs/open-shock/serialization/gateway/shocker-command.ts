@@ -17,39 +17,76 @@ export class ShockerCommand {
   return this;
 }
 
+static getRootAsShockerCommand(bb:flatbuffers.ByteBuffer, obj?:ShockerCommand):ShockerCommand {
+  return (obj || new ShockerCommand()).__init(bb.readInt32(bb.position()) + bb.position(), bb);
+}
+
+static getSizePrefixedRootAsShockerCommand(bb:flatbuffers.ByteBuffer, obj?:ShockerCommand):ShockerCommand {
+  bb.setPosition(bb.position() + flatbuffers.SIZE_PREFIX_LENGTH);
+  return (obj || new ShockerCommand()).__init(bb.readInt32(bb.position()) + bb.position(), bb);
+}
+
 model():ShockerModelType {
-  return this.bb!.readUint8(this.bb_pos);
+  const offset = this.bb!.__offset(this.bb_pos, 4);
+  return offset ? this.bb!.readUint8(this.bb_pos + offset) : ShockerModelType.CaiXianlin;
 }
 
 id():number {
-  return this.bb!.readUint16(this.bb_pos + 2);
+  const offset = this.bb!.__offset(this.bb_pos, 6);
+  return offset ? this.bb!.readUint16(this.bb_pos + offset) : 0;
 }
 
 type():ShockerCommandType {
-  return this.bb!.readUint8(this.bb_pos + 4);
+  const offset = this.bb!.__offset(this.bb_pos, 8);
+  return offset ? this.bb!.readUint8(this.bb_pos + offset) : ShockerCommandType.Stop;
 }
 
 intensity():number {
-  return this.bb!.readUint8(this.bb_pos + 5);
+  const offset = this.bb!.__offset(this.bb_pos, 10);
+  return offset ? this.bb!.readUint8(this.bb_pos + offset) : 0;
 }
 
 duration():number {
-  return this.bb!.readUint16(this.bb_pos + 6);
+  const offset = this.bb!.__offset(this.bb_pos, 12);
+  return offset ? this.bb!.readUint16(this.bb_pos + offset) : 0;
 }
 
-static sizeOf():number {
-  return 8;
+static startShockerCommand(builder:flatbuffers.Builder) {
+  builder.startObject(5);
 }
 
-static createShockerCommand(builder:flatbuffers.Builder, model: ShockerModelType, id: number, type: ShockerCommandType, intensity: number, duration: number):flatbuffers.Offset {
-  builder.prep(2, 8);
-  builder.writeInt16(duration);
-  builder.writeInt8(intensity);
-  builder.writeInt8(type);
-  builder.writeInt16(id);
-  builder.pad(1);
-  builder.writeInt8(model);
-  return builder.offset();
+static addModel(builder:flatbuffers.Builder, model:ShockerModelType) {
+  builder.addFieldInt8(0, model, ShockerModelType.CaiXianlin);
 }
 
+static addId(builder:flatbuffers.Builder, id:number) {
+  builder.addFieldInt16(1, id, 0);
+}
+
+static addType(builder:flatbuffers.Builder, type:ShockerCommandType) {
+  builder.addFieldInt8(2, type, ShockerCommandType.Stop);
+}
+
+static addIntensity(builder:flatbuffers.Builder, intensity:number) {
+  builder.addFieldInt8(3, intensity, 0);
+}
+
+static addDuration(builder:flatbuffers.Builder, duration:number) {
+  builder.addFieldInt16(4, duration, 0);
+}
+
+static endShockerCommand(builder:flatbuffers.Builder):flatbuffers.Offset {
+  const offset = builder.endObject();
+  return offset;
+}
+
+static createShockerCommand(builder:flatbuffers.Builder, model:ShockerModelType, id:number, type:ShockerCommandType, intensity:number, duration:number):flatbuffers.Offset {
+  ShockerCommand.startShockerCommand(builder);
+  ShockerCommand.addModel(builder, model);
+  ShockerCommand.addId(builder, id);
+  ShockerCommand.addType(builder, type);
+  ShockerCommand.addIntensity(builder, intensity);
+  ShockerCommand.addDuration(builder, duration);
+  return ShockerCommand.endShockerCommand(builder);
+}
 }

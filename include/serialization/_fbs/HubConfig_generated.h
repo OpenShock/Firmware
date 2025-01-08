@@ -9,8 +9,8 @@
 // Ensure the included flatbuffers.h is the same version as when this file was
 // generated, otherwise it may not be compatible.
 static_assert(FLATBUFFERS_VERSION_MAJOR == 24 &&
-              FLATBUFFERS_VERSION_MINOR == 3 &&
-              FLATBUFFERS_VERSION_REVISION == 25,
+              FLATBUFFERS_VERSION_MINOR == 12 &&
+              FLATBUFFERS_VERSION_REVISION == 23,
              "Non-compatible flatbuffers version included");
 
 namespace OpenShock {
@@ -189,7 +189,8 @@ struct EStopConfig FLATBUFFERS_FINAL_CLASS : private ::flatbuffers::Table {
   }
   enum FlatBuffersVTableOffset FLATBUFFERS_VTABLE_UNDERLYING_TYPE {
     VT_ENABLED = 4,
-    VT_GPIO_PIN = 6
+    VT_GPIO_PIN = 6,
+    VT_ACTIVE = 8
   };
   bool enabled() const {
     return GetField<uint8_t>(VT_ENABLED, 0) != 0;
@@ -198,10 +199,15 @@ struct EStopConfig FLATBUFFERS_FINAL_CLASS : private ::flatbuffers::Table {
   int8_t gpio_pin() const {
     return GetField<int8_t>(VT_GPIO_PIN, 0);
   }
+  /// Persistent state of the E-Stop button
+  bool active() const {
+    return GetField<uint8_t>(VT_ACTIVE, 0) != 0;
+  }
   bool Verify(::flatbuffers::Verifier &verifier) const {
     return VerifyTableStart(verifier) &&
            VerifyField<uint8_t>(verifier, VT_ENABLED, 1) &&
            VerifyField<int8_t>(verifier, VT_GPIO_PIN, 1) &&
+           VerifyField<uint8_t>(verifier, VT_ACTIVE, 1) &&
            verifier.EndTable();
   }
 };
@@ -215,6 +221,9 @@ struct EStopConfigBuilder {
   }
   void add_gpio_pin(int8_t gpio_pin) {
     fbb_.AddElement<int8_t>(EStopConfig::VT_GPIO_PIN, gpio_pin, 0);
+  }
+  void add_active(bool active) {
+    fbb_.AddElement<uint8_t>(EStopConfig::VT_ACTIVE, static_cast<uint8_t>(active), 0);
   }
   explicit EStopConfigBuilder(::flatbuffers::FlatBufferBuilder &_fbb)
         : fbb_(_fbb) {
@@ -230,8 +239,10 @@ struct EStopConfigBuilder {
 inline ::flatbuffers::Offset<EStopConfig> CreateEStopConfig(
     ::flatbuffers::FlatBufferBuilder &_fbb,
     bool enabled = false,
-    int8_t gpio_pin = 0) {
+    int8_t gpio_pin = 0,
+    bool active = false) {
   EStopConfigBuilder builder_(_fbb);
+  builder_.add_active(active);
   builder_.add_gpio_pin(gpio_pin);
   builder_.add_enabled(enabled);
   return builder_.Finish();

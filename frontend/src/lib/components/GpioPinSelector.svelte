@@ -1,7 +1,5 @@
 <script lang="ts">
-  import { run } from 'svelte/legacy';
-
-  import { DeviceStateStore, UsedPinsStore } from '$lib/stores';
+  import { HubStateStore, UsedPinsStore } from '$lib/stores';
   import { WebSocketClient } from '$lib/WebSocketClient';
   import { Button } from '$lib/components/ui/button';
   import { Input } from '$lib/components/ui/input';
@@ -19,12 +17,12 @@
   }
 
   let currentPinValid = $derived(
-    isPinValid(currentPin) && $DeviceStateStore.gpioValidOutputs.includes(currentPin)
+    isPinValid(currentPin) && $HubStateStore.gpioValidOutputs.includes(currentPin)
   );
 
   let pendingPin = $state<number | null>(null);
   let pendingPinValid = $derived(
-    isPinValid(pendingPin) && $DeviceStateStore.gpioValidOutputs.includes(pendingPin)
+    isPinValid(pendingPin) && $HubStateStore.gpioValidOutputs.includes(pendingPin)
   );
 
   let statusText = $derived.by<string>(() => {

@@ -5,10 +5,10 @@
   import { WebSocketClient } from '$lib/WebSocketClient';
   import GpioPinSelector from '$lib/components/GpioPinSelector.svelte';
   import WiFiList from '$lib/components/WiFiList.svelte';
-  import { DeviceStateStore } from '$lib/stores';
   import { Button } from '$lib/components/ui/button';
   import { Input } from '$lib/components/ui/input';
   import { Label } from '$lib/components/ui/label';
+  import { HubStateStore } from '$lib/stores';
 
   function isValidLinkCode(str: string) {
     if (typeof str != 'string') return false;
@@ -54,7 +54,7 @@
 
     <GpioPinSelector
       name="RF TX Pin"
-      currentPin={$DeviceStateStore.config?.rf?.txPin ?? null}
+      currentPin={$HubStateStore.config?.rf?.txPin ?? null}
       serializer={SerializeSetRfTxPinCommand}
     />
 
@@ -62,7 +62,7 @@
 
     <GpioPinSelector
       name="EStop Pin"
-      currentPin={$DeviceStateStore.config?.estop?.gpioPin ?? null}
+      currentPin={$HubStateStore.config?.estop?.gpioPin ?? null}
       serializer={SerializeSetEstopPinCommand}
     />
   </div>
