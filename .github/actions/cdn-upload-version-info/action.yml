@@ -23,18 +23,19 @@ inputs:
 runs:
   using: composite
   steps:
-    - name: Create boards.txt
-      shell: bash
-      run: |
-        echo -e '${{ inputs.boards }}' >> boards.txt
 
     - name: Prepare Upload Folder
       shell: bash
       run: |
-        mkdir -p upload
-        mv boards.txt upload/
+        rm -rf upload/
+        mkdir -p upload/${{ inputs.fw-version }}/${{ inputs.board }}
+
+    - name: Create boards.txt
+      shell: bash
+      run: |
+        echo -e '${{ inputs.boards }}' >> upload/${{ inputs.fw-version }}/${{ inputs.board }}/boards.txt
 
     - name: Upload artifacts to CDN
       shell: bash
       run: |
-        sshpass -p "${{ inputs.bunny-stor-password }}" scp -vvv -r upload/* ${{ inputs.bunny-stor-username }}@${{ inputs.bunny-stor-hostname }}:/${{ inputs.fw-version }}/${{ inputs.board }}
+        sshpass -p "${{ inputs.bunny-stor-password }}" scp -vvv -r upload/* ${{ inputs.bunny-stor-username }}@${{ inputs.bunny-stor-hostname }}:/
