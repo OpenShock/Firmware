@@ -37,4 +37,4 @@ runs:
     - name: Upload artifacts to CDN
       shell: bash
       run: |
-        sshpass -p "${{ inputs.bunny-stor-password }}" scp -v -r upload/* ${{ inputs.bunny-stor-username }}@${{ inputs.bunny-stor-hostname }}:/${{ inputs.fw-version }}/${{ inputs.board }}
+        sshpass -p "${{ inputs.bunny-stor-password }}" scp -vvv -r upload/* ${{ inputs.bunny-stor-username }}@${{ inputs.bunny-stor-hostname }}:/${{ inputs.fw-version }}/${{ inputs.board }}
