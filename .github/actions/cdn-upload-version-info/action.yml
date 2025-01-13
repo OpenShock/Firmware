@@ -23,14 +23,25 @@ inputs:
 runs:
   using: composite
   steps:
+
+    - name: Prepare Upload Folder
+      shell: bash
+      run: |
+        rm -rf upload/
+        mkdir -p upload/
+
     - name: Create boards.txt
       shell: bash
       run: |
-        echo -e '${{ inputs.boards }}' >> boards.txt
+        echo -e '${{ inputs.boards }}' >> upload/boards.txt
 
     - name: Upload artifacts to CDN
-      shell: bash
-      run: |
-        mkdir -p upload
-        mv boards.txt upload/
-        sshpass -p "${{ inputs.bunny-stor-password }}" scp -r upload/* ${{ inputs.bunny-stor-username }}@${{ inputs.bunny-stor-hostname }}:/${{ inputs.fw-version }}/${{ inputs.board }}
+      uses: milanmk/actions-file-deployer@master
+      with:
+        remote-protocol: "sftp"
+        remote-host: "${{ inputs.bunny-stor-hostname }}"
+        remote-user: "${{ inputs.bunny-stor-username }}"
+        remote-password: "${{ inputs.bunny-stor-password }}"
+        remote-path: "/${{ inputs.fw-version }}/${{ inputs.board }}"
+        local-path: "upload"
+        sync: "full"

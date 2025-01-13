@@ -5,6 +5,7 @@ const char* const TAG = "HTTPRequestManager";
 #include "Common.h"
 #include "http/HTTPClient.h"
 #include "Logging.h"
+#include "RateLimiter.h"
 #include "SimpleMutex.h"
 #include "Time.h"
 #include "util/StringUtils.h"
@@ -21,100 +22,8 @@ using namespace std::string_view_literals;
 const std::size_t HTTP_BUFFER_SIZE = 4096LLU;
 const int HTTP_DOWNLOAD_SIZE_LIMIT = 200 * 1024 * 1024;  // 200 MB
 
-struct RateLimit {
-  RateLimit()
-    : m_mutex()
-    , m_blockUntilMs(0)
-    , m_limits()
-    , m_requests()
-  {
-  }
-
-  void addLimit(uint32_t durationMs, uint16_t count)
-  {
-    m_mutex.lock(portMAX_DELAY);
-
-    // Insert sorted
-    m_limits.insert(std::upper_bound(m_limits.begin(), m_limits.end(), durationMs, [](int64_t durationMs, const Limit& limit) { return durationMs > limit.durationMs; }), {durationMs, count});
-
-    m_mutex.unlock();
-  }
-
-  void clearLimits()
-  {
-    m_mutex.lock(portMAX_DELAY);
-
-    m_limits.clear();
-
-    m_mutex.unlock();
-  }
-
-  bool tryRequest()
-  {
-    int64_t now = OpenShock::millis();
-
-    OpenShock::ScopedLock lock__(&m_mutex);
-
-    if (m_blockUntilMs > now) {
-      return false;
-    }
-
-    // Remove all requests that are older than the biggest limit
-    while (!m_requests.empty() && m_requests.front() < now - m_limits.back().durationMs) {
-      m_requests.erase(m_requests.begin());
-    }
-
-    // Check if we've exceeded any limits
-    auto it = std::find_if(m_limits.begin(), m_limits.end(), [this](const RateLimit::Limit& limit) { return m_requests.size() >= limit.count; });
-    if (it != m_limits.end()) {
-      m_blockUntilMs = now + it->durationMs;
-      return false;
-    }
-
-    // Add the request
-    m_requests.push_back(now);
-
-    return true;
-  }
-  void clearRequests()
-  {
-    m_mutex.lock(portMAX_DELAY);
-
-    m_requests.clear();
-
-    m_mutex.unlock();
-  }
-
-  void blockUntil(int64_t blockUntilMs)
-  {
-    m_mutex.lock(portMAX_DELAY);
-
-    m_blockUntilMs = blockUntilMs;
-
-    m_mutex.unlock();
-  }
-
-  uint32_t requestsSince(int64_t sinceMs)
-  {
-    OpenShock::ScopedLock lock__(&m_mutex);
-
-    return std::count_if(m_requests.begin(), m_requests.end(), [sinceMs](int64_t requestMs) { return requestMs >= sinceMs; });
-  }
-
-private:
-  struct Limit {
-    int64_t durationMs;
-    uint16_t count;
-  };
-
-  OpenShock::SimpleMutex m_mutex;
-  int64_t m_blockUntilMs;
-  std::vector<Limit> m_limits;
-  std::vector<int64_t> m_requests;
-};
-
-static OpenShock::SimpleMutex s_rateLimitsMutex                                 = {};
-static std::unordered_map<std::string, std::shared_ptr<RateLimit>> s_rateLimits = {};
+static OpenShock::SimpleMutex s_rateLimitsMutex                                              = {};
+static std::unordered_map<std::string, std::shared_ptr<OpenShock::RateLimiter>> s_rateLimits = {};
 
 using namespace OpenShock;
 
@@ -155,9 +64,9 @@ std::string_view _getDomain(std::string_view url)
   return url;
 }
 
-std::shared_ptr<RateLimit> _rateLimitFactory(std::string_view domain)
+std::shared_ptr<OpenShock::RateLimiter> _rateLimiterFactory(std::string_view domain)
 {
-  auto rateLimit = std::make_shared<RateLimit>();
+  auto rateLimit = std::make_shared<OpenShock::RateLimiter>();
 
   // Add default limits
   rateLimit->addLimit(1000, 5);        // 5 per second
@@ -172,7 +81,7 @@ std::shared_ptr<RateLimit> _rateLimitFactory(std::string_view domain)
   return rateLimit;
 }
 
-std::shared_ptr<RateLimit> _getRateLimiter(std::string_view url)
+std::shared_ptr<OpenShock::RateLimiter> _getRateLimiter(std::string_view url)
 {
   auto domain = std::string(_getDomain(url));
   if (domain.empty()) {
@@ -183,7 +92,7 @@ std::shared_ptr<RateLimit> _getRateLimiter(std::string_view url)
 
   auto it = s_rateLimits.find(domain);
   if (it == s_rateLimits.end()) {
-    s_rateLimits.emplace(domain, _rateLimitFactory(domain));
+    s_rateLimits.emplace(domain, _rateLimiterFactory(domain));
     it = s_rateLimits.find(domain);
   }
 
@@ -463,7 +372,7 @@ HTTP::Response<std::size_t> _doGetStream(
   const char* url,
   const std::map<String, String>& headers,
   const std::vector<int>& acceptedCodes,
-  std::shared_ptr<RateLimit> rateLimiter,
+  std::shared_ptr<OpenShock::RateLimiter> rateLimiter,
   HTTP::GotContentLengthCallback contentLengthCallback,
   HTTP::DownloadCallback downloadCallback,
   int timeoutMs
@@ -503,11 +412,8 @@ HTTP::Response<std::size_t> _doGetStream(
       retryAfter = 15;
     }
 
-    // Get the block-until time
-    int64_t blockUntilMs = OpenShock::millis() + retryAfter * 1000;
-
-    // Apply the block-until time
-    rateLimiter->blockUntil(blockUntilMs);
+    // Apply the block-for time
+    rateLimiter->blockFor(retryAfter * 1000);
 
     return {HTTP::RequestResult::RateLimited, responseCode, 0};
   }
@@ -556,7 +462,7 @@ HTTP::Response<std::size_t> _doGetStream(
 
 HTTP::Response<std::size_t> HTTP::Download(const char* url, const std::map<String, String>& headers, HTTP::GotContentLengthCallback contentLengthCallback, HTTP::DownloadCallback downloadCallback, const std::vector<int>& acceptedCodes, int timeoutMs)
 {
-  std::shared_ptr<RateLimit> rateLimiter = _getRateLimiter(url);
+  std::shared_ptr<OpenShock::RateLimiter> rateLimiter = _getRateLimiter(url);
   if (rateLimiter == nullptr) {
     return {RequestResult::InvalidURL, 0, 0};
   }

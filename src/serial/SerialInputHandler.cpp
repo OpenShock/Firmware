@@ -597,7 +597,7 @@ bool SerialInputHandler::Init()
     return false;
   }
 
-  if (TaskUtils::TaskCreateExpensive(_serialRxTask, "SerialRX", 3200, nullptr, 1, nullptr) != pdPASS) {  // Profiled: 2.96KB stack usage
+  if (TaskUtils::TaskCreateExpensive(_serialRxTask, "SerialRX", 4800, nullptr, 1, nullptr) != pdPASS) {  // TODO: Profile stack size
     OS_LOGE(TAG, "Failed to create serial RX task");
     return false;
   }

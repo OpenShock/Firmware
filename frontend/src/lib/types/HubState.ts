@@ -2,7 +2,7 @@ import type { WifiScanStatus } from '$lib/_fbs/open-shock/serialization/types/wi
 import type { Config } from '$lib/mappers/ConfigMapper';
 import type { WiFiNetwork, WiFiNetworkGroup } from './';
 
-export type DeviceState = {
+export type HubState = {
   wifiConnectedBSSID: string | null;
   wifiScanStatus: WifiScanStatus | null;
   wifiNetworks: Map<string, WiFiNetwork>;

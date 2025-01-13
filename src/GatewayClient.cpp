@@ -60,7 +60,7 @@ void GatewayClient::connect(const char* lcgFqdn)
 //
 #warning SSL certificate verification is currently not implemented, by RFC definition this is a security risk, and allows for MITM attacks, but the realistic risk is low
 
-  m_webSocket.beginSSL(lcgFqdn, 443, "/2/ws/device");
+  m_webSocket.beginSSL(lcgFqdn, 443, "/2/ws/hub");
   OS_LOGW(TAG, "WEBSOCKET CONNECTION BY RFC DEFINITION IS INSECURE, remote endpoint can not be verified due to lack of CA verification support, theoretically this is a security risk and allows for MITM attacks, but the realistic risk is low");
 }
 
