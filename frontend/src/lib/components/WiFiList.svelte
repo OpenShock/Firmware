@@ -10,6 +10,7 @@
   import WiFiDetailsDialog from '$lib/components/WiFiDetailsDialog.svelte';
   import type { WiFiNetworkGroup } from '$lib/types';
   import { Button } from '$lib/components/ui/button';
+  import { ArrowRight, Link, LoaderCircle, RotateCcw, Wifi } from 'lucide-svelte';
 
   let scanStatus = $derived($HubStateStore.wifiScanStatus);
   let isScanning = $derived(
@@ -64,9 +65,9 @@
     <h3 class="h3">Configure WiFi</h3>
     <Button onclick={wifiScan}>
       {#if isScanning}
-        <i class="fa fa-spinner fa-spin"></i>
+        <LoaderCircle class="animate-spin" />
       {:else}
-        <i class="fa fa-rotate-right"></i>
+        <RotateCcw />
       {/if}
     </Button>
   </div>
@@ -75,14 +76,14 @@
       <div class="card mb-2 flex items-center justify-between p-2">
         <span>
           {#if netgroup.networks.some((n) => n.bssid === connectedBSSID)}
-            <i class="fa fa-wifi text-green-500"></i>
+            <Wifi color="#22c55e" />
           {:else}
-            <i class="fa fa-wifi"></i>
+            <Wifi />
           {/if}
           {#if netgroup.ssid}
             <span class="ml-2">{netgroup.ssid}</span>
           {:else}
-            <span class="ml-2">{netgroup.networks[0].bssid}</span><span class="text-gray-500 ml-1"
+            <span class="ml-2">{netgroup.networks[0].bssid}</span><span class="ml-1 text-gray-500"
               >(Hidden)</span
             >
           {/if}
@@ -90,11 +91,11 @@
         <div class="btn-group variant-outline">
           {#if netgroup.saved}
             <Button onclick={() => wifiConnect(netgroup)}>
-              <i class="fa fa-arrow-right text-green-500"></i>
+              <ArrowRight color="#22c55e" />
             </Button>
           {:else}
             <Button onclick={() => wifiAuthenticate(netgroup)}>
-              <i class="fa fa-link text-green-500"></i>
+              <Link color="#22c55e" />
             </Button>
           {/if}
           <WiFiDetailsDialog group={netgroup} />
