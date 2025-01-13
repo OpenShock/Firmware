@@ -32,11 +32,7 @@
   }
 </script>
 
-<Dialog.Root
-  open={pendingScheme !== undefined}
-  onOpenChange={handleOpenChanged}
-  controlledOpen={true}
->
+<Dialog.Root bind:open={() => pendingScheme !== undefined, handleOpenChanged}>
   <Dialog.Content>
     <Dialog.Header>
       <Dialog.Title>Switch to light mode</Dialog.Title>
