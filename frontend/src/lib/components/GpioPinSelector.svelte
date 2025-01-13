@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { DeviceStateStore } from '$lib/stores';
+  import { HubStateStore } from '$lib/stores';
   import { UsedPinsStore } from '$lib/stores/UsedPinsStore';
   import { WebSocketClient } from '$lib/WebSocketClient';
 
@@ -10,7 +10,13 @@
   let pendingPin: number | null = null;
   let statusText: string = 'Loading...';
 
-  $: canSet = pendingPin !== null && pendingPin !== currentPin && pendingPin >= 0 && pendingPin <= 255 && $DeviceStateStore.gpioValidOutputs.includes(pendingPin) && !$UsedPinsStore.has(pendingPin);
+  $: canSet =
+    pendingPin !== null &&
+    pendingPin !== currentPin &&
+    pendingPin >= 0 &&
+    pendingPin <= 255 &&
+    $HubStateStore.gpioValidOutputs.includes(pendingPin) &&
+    !$UsedPinsStore.has(pendingPin);
 
   $: if (currentPin !== null) {
     UsedPinsStore.markPinUsed(currentPin, name);
@@ -40,7 +46,12 @@
     <span class="text-sm text-gray-500">{statusText}</span>
   </div>
   <div class="flex space-x-2">
-    <input class="input variant-form-material" type="number" placeholder="GPIO Pin" bind:value={pendingPin} />
+    <input
+      class="input variant-form-material"
+      type="number"
+      placeholder="GPIO Pin"
+      bind:value={pendingPin}
+    />
     <button class="btn variant-filled" on:click={setGpioPin} disabled={!canSet}>Set</button>
   </div>
 </div>

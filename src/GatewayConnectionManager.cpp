@@ -34,29 +34,31 @@ const uint8_t FLAG_LINKED = 1 << 1;
 
 const uint8_t LINK_CODE_LENGTH = 6;
 
-static uint8_t s_flags                                 = 0;
+static uint8_t s_flags                                      = 0;
 static std::unique_ptr<OpenShock::GatewayClient> s_wsClient = nullptr;
 
-void _evGotIPHandler(arduino_event_t* event) {
+void _evGotIPHandler(arduino_event_t* event)
+{
   (void)event;
 
   s_flags |= FLAG_HAS_IP;
   OS_LOGD(TAG, "Got IP address");
 }
 
-void _evWiFiDisconnectedHandler(arduino_event_t* event) {
+void _evWiFiDisconnectedHandler(arduino_event_t* event)
+{
   (void)event;
 
   s_flags    = FLAG_NONE;
   s_wsClient = nullptr;
   OS_LOGD(TAG, "Lost IP address");
-  OpenShock::VisualStateManager::SetWebSocketConnected(false);
 }
 
 using namespace OpenShock;
 namespace JsonAPI = OpenShock::Serialization::JsonAPI;
 
-bool GatewayConnectionManager::Init() {
+bool GatewayConnectionManager::Init()
+{
   WiFi.onEvent(_evGotIPHandler, ARDUINO_EVENT_WIFI_STA_GOT_IP);
   WiFi.onEvent(_evGotIPHandler, ARDUINO_EVENT_WIFI_STA_GOT_IP6);
   WiFi.onEvent(_evWiFiDisconnectedHandler, ARDUINO_EVENT_WIFI_STA_DISCONNECTED);
@@ -64,19 +66,22 @@ bool GatewayConnectionManager::Init() {
   return true;
 }
 
-bool GatewayConnectionManager::IsConnected() {
+bool GatewayConnectionManager::IsConnected()
+{
   if (s_wsClient == nullptr) {
     return false;
   }
 
-  return s_wsClient->state() == GatewayClient::State::Connected;
+  return s_wsClient->state() == GatewayClientState::Connected;
 }
 
-bool GatewayConnectionManager::IsLinked() {
+bool GatewayConnectionManager::IsLinked()
+{
   return (s_flags & FLAG_LINKED) != 0;
 }
 
-AccountLinkResultCode GatewayConnectionManager::Link(std::string_view linkCode) {
+AccountLinkResultCode GatewayConnectionManager::Link(std::string_view linkCode)
+{
   if ((s_flags & FLAG_HAS_IP) == 0) {
     return AccountLinkResultCode::NoInternetConnection;
   }
@@ -92,7 +97,8 @@ AccountLinkResultCode GatewayConnectionManager::Link(std::string_view linkCode) 
   auto response = HTTP::JsonAPI::LinkAccount(linkCode);
 
   if (response.result == HTTP::RequestResult::RateLimited) {
-    return AccountLinkResultCode::InternalError;  // Just return false, don't spam the console with errors
+    OS_LOGW(TAG, "Account Link request got ratelimited");
+    return AccountLinkResultCode::RateLimited;
   }
   if (response.result != HTTP::RequestResult::Success) {
     OS_LOGE(TAG, "Error while getting auth token: %d %d", response.result, response.code);
@@ -126,13 +132,15 @@ AccountLinkResultCode GatewayConnectionManager::Link(std::string_view linkCode) 
 
   return AccountLinkResultCode::Success;
 }
-void GatewayConnectionManager::UnLink() {
+void GatewayConnectionManager::UnLink()
+{
   s_flags &= FLAG_HAS_IP;
   s_wsClient = nullptr;
   Config::ClearBackendAuthToken();
 }
 
-bool GatewayConnectionManager::SendMessageTXT(std::string_view data) {
+bool GatewayConnectionManager::SendMessageTXT(std::string_view data)
+{
   if (s_wsClient == nullptr) {
     return false;
   }
@@ -140,7 +148,8 @@ bool GatewayConnectionManager::SendMessageTXT(std::string_view data) {
   return s_wsClient->sendMessageTXT(data);
 }
 
-bool GatewayConnectionManager::SendMessageBIN(const uint8_t* data, std::size_t length) {
+bool GatewayConnectionManager::SendMessageBIN(const uint8_t* data, std::size_t length)
+{
   if (s_wsClient == nullptr) {
     return false;
   }
@@ -148,19 +157,20 @@ bool GatewayConnectionManager::SendMessageBIN(const uint8_t* data, std::size_t l
   return s_wsClient->sendMessageBIN(data, length);
 }
 
-bool FetchDeviceInfo(std::string_view authToken) {
+bool FetchHubInfo(std::string_view authToken)
+{
   // TODO: this function is very slow, should be optimized!
   if ((s_flags & FLAG_HAS_IP) == 0) {
     return false;
   }
 
-  auto response = HTTP::JsonAPI::GetDeviceInfo(authToken);
+  auto response = HTTP::JsonAPI::GetHubInfo(authToken);
 
   if (response.result == HTTP::RequestResult::RateLimited) {
     return false;  // Just return false, don't spam the console with errors
   }
   if (response.result != HTTP::RequestResult::Success) {
-    OS_LOGE(TAG, "Error while fetching device info: %d %d", response.result, response.code);
+    OS_LOGE(TAG, "Error while fetching hub info: %d %d", response.result, response.code);
     return false;
   }
 
@@ -175,8 +185,8 @@ bool FetchDeviceInfo(std::string_view authToken) {
     return false;
   }
 
-  OS_LOGI(TAG, "Device ID:   %s", response.data.deviceId.c_str());
-  OS_LOGI(TAG, "Device Name: %s", response.data.deviceName.c_str());
+  OS_LOGI(TAG, "Hub ID:   %s", response.data.hubId.c_str());
+  OS_LOGI(TAG, "Hub Name: %s", response.data.hubName.c_str());
   OS_LOGI(TAG, "Shockers:");
   for (auto& shocker : response.data.shockers) {
     OS_LOGI(TAG, "  [%s] rf=%u model=%u", shocker.id.c_str(), shocker.rfId, shocker.model);
@@ -188,14 +198,15 @@ bool FetchDeviceInfo(std::string_view authToken) {
 }
 
 static int64_t _lastConnectionAttempt = 0;
-bool StartConnectingToLCG() {
+bool StartConnectingToLCG()
+{
   // TODO: this function is very slow, should be optimized!
   if (s_wsClient == nullptr) {  // If wsClient is already initialized, we are already paired or connected
     OS_LOGD(TAG, "wsClient is null");
     return false;
   }
 
-  if (s_wsClient->state() != GatewayClient::State::Disconnected) {
+  if (s_wsClient->state() != GatewayClientState::Disconnected) {
     OS_LOGD(TAG, "WebSocketClient is not disconnected, waiting...");
     s_wsClient->disconnect();
     return false;
@@ -255,7 +266,8 @@ bool StartConnectingToLCG() {
   return true;
 }
 
-void GatewayConnectionManager::Update() {
+void GatewayConnectionManager::Update()
+{
   if (s_wsClient == nullptr) {
     // Can't connect to the API without WiFi or an auth token
     if ((s_flags & FLAG_HAS_IP) == 0 || !Config::HasBackendAuthToken()) {
@@ -268,8 +280,8 @@ void GatewayConnectionManager::Update() {
       return;
     }
 
-    // Fetch device info
-    if (!FetchDeviceInfo(authToken.c_str())) {
+    // Fetch hub info
+    if (!FetchHubInfo(authToken.c_str())) {
       return;
     }
 
