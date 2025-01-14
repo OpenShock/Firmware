@@ -44,12 +44,12 @@ namespace OpenShock {
     inline bool operator>(const SemVer& other) const { return !(*this <= other); }
     inline bool operator>=(const SemVer& other) const { return !(*this < other); }
 
-    bool operator==(const std::string_view& other) const;
-    inline bool operator!=(const std::string_view& other) const { return !(*this == other); }
-    bool operator<(const std::string_view& other) const;
-    inline bool operator<=(const std::string_view& other) const { return *this < other || *this == other; }
-    inline bool operator>(const std::string_view& other) const { return !(*this <= other); }
-    inline bool operator>=(const std::string_view& other) const { return !(*this < other); }
+    bool operator==(std::string_view other) const;
+    inline bool operator!=(std::string_view other) const { return !(*this == other); }
+    bool operator<(std::string_view other) const;
+    inline bool operator<=(std::string_view other) const { return *this < other || *this == other; }
+    inline bool operator>(std::string_view other) const { return !(*this <= other); }
+    inline bool operator>=(std::string_view other) const { return !(*this < other); }
 
     bool isValid() const;
 

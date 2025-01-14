@@ -298,7 +298,7 @@ bool SemVer::operator<(const SemVer& other) const
   return build < other.build;
 }
 
-bool SemVer::operator==(const std::string_view& other) const
+bool SemVer::operator==(std::string_view other) const
 {
   SemVer otherSemVer;
   if (!OpenShock::TryParseSemVer(other, otherSemVer)) {
@@ -308,7 +308,7 @@ bool SemVer::operator==(const std::string_view& other) const
   return *this == otherSemVer;
 }
 
-bool SemVer::operator<(const std::string_view& other) const
+bool SemVer::operator<(std::string_view other) const
 {
   SemVer otherSemVer;
   if (!OpenShock::TryParseSemVer(other, otherSemVer)) {

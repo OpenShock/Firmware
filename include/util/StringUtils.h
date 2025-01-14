@@ -11,7 +11,7 @@
 namespace OpenShock {
   bool FormatToString(std::string& out, const char* format, ...);
 
-  constexpr std::string_view StringTrimLeft(const std::string_view view) {
+  constexpr std::string_view StringTrimLeft(std::string_view view) {
     if (view.empty()) {
       return view;
     }
@@ -23,7 +23,7 @@ namespace OpenShock {
 
     return view.substr(pos);
   }
-  constexpr std::string_view StringTrimRight(const std::string_view view) {
+  constexpr std::string_view StringTrimRight(std::string_view view) {
     if (view.empty()) {
       return view;
     }
@@ -35,14 +35,14 @@ namespace OpenShock {
 
     return view.substr(0, pos + 1);
   }
-  constexpr std::string_view StringTrim(const std::string_view view) {
+  constexpr std::string_view StringTrim(std::string_view view) {
     return StringTrimLeft(StringTrimRight(view));
   }
-  constexpr bool StringStartsWith(const std::string_view view, std::string_view prefix) {
+  constexpr bool StringStartsWith(std::string_view view, std::string_view prefix) {
     return view.size() >= prefix.size() && view.substr(0, prefix.size()) == prefix;
   }
   template<std::size_t N>
-  constexpr bool TryStringSplit(const std::string_view view, char delimiter, std::string_view (&out)[N]) {
+  constexpr bool TryStringSplit(std::string_view view, char delimiter, std::string_view (&out)[N]) {
     std::size_t pos = 0;
     std::size_t idx = 0;
     while (pos < view.size() && idx < N) {
@@ -58,12 +58,12 @@ namespace OpenShock {
 
     return idx == N;
   }
-  std::vector<std::string_view> StringSplit(const std::string_view view, char delimiter, std::size_t maxSplits = std::numeric_limits<std::size_t>::max());
-  std::vector<std::string_view> StringSplit(const std::string_view view, bool (*predicate)(char delimiter), std::size_t maxSplits = std::numeric_limits<std::size_t>::max());
-  std::vector<std::string_view> StringSplitNewLines(const std::string_view view, std::size_t maxSplits = std::numeric_limits<std::size_t>::max());
-  std::vector<std::string_view> StringSplitWhiteSpace(const std::string_view view, std::size_t maxSplits = std::numeric_limits<std::size_t>::max());
+  std::vector<std::string_view> StringSplit(std::string_view view, char delimiter, std::size_t maxSplits = std::numeric_limits<std::size_t>::max());
+  std::vector<std::string_view> StringSplit(std::string_view view, bool (*predicate)(char delimiter), std::size_t maxSplits = std::numeric_limits<std::size_t>::max());
+  std::vector<std::string_view> StringSplitNewLines(std::string_view view, std::size_t maxSplits = std::numeric_limits<std::size_t>::max());
+  std::vector<std::string_view> StringSplitWhiteSpace(std::string_view view, std::size_t maxSplits = std::numeric_limits<std::size_t>::max());
 
-  bool StringIEquals(const std::string_view a, const std::string_view b);
+  bool StringIEquals(std::string_view a, std::string_view b);
 
   String StringToArduinoString(std::string_view view);
 }  // namespace OpenShock
