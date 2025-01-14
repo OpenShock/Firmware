@@ -184,7 +184,7 @@ ParserState _parseChunkHeader(const uint8_t* buffer, std::size_t bufferLen, std:
   std::string_view sizeField(reinterpret_cast<const char*>(buffer), sizeFieldEnd);
 
   // Parse the chunk size
-  if (!_tryParseHexSizeT(payloadLen, sizeField)) {
+  if (!_tryParseHexSizeT(sizeField, payloadLen)) {
     OS_LOGW(TAG, "Failed to parse chunk size");
     return ParserState::Invalid;
   }
