@@ -7,6 +7,7 @@ const char* const TAG = "HTTPRequestManager";
 #include "RateLimiter.h"
 #include "SimpleMutex.h"
 #include "Time.h"
+#include "util/HexUtils.h"
 #include "util/StringUtils.h"
 
 #include <HTTPClient.h>
@@ -132,27 +133,14 @@ constexpr bool _tryFindCRLF(std::size_t& pos, const uint8_t* buffer, std::size_t
 
   return false;
 }
-constexpr bool _tryParseHexSizeT(std::size_t& result, std::string_view str)
+constexpr bool _tryParseHexSizeT(std::string_view str, std::size_t& result)
 {
-  if (str.empty() || str.size() > sizeof(std::size_t) * 2) {
+  if (str.empty()) {
     return false;
   }
 
   result = 0;
-
-  for (char c : str) {
-    if (c >= '0' && c <= '9') {
-      result = (result << 4) | (c - '0');
-    } else if (c >= 'a' && c <= 'f') {
-      result = (result << 4) | (c - 'a' + 10);
-    } else if (c >= 'A' && c <= 'F') {
-      result = (result << 4) | (c - 'A' + 10);
-    } else {
-      return false;
-    }
-  }
-
-  return true;
+  return OpenShock::HexUtils::TryParseHex(str.data(), str.size(), reinterpret_cast<uint8_t*>(&result), sizeof(std::size_t)) != 0;
 }
 
 enum ParserState : uint8_t {
