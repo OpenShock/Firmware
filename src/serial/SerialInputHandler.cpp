@@ -51,7 +51,7 @@ namespace std {
   };
 
   struct equals_ci {
-    bool operator()(std::string_view a, std::string_view b) const { return strncasecmp(a.data(), b.data(), std::max(a.size(), b.size())) == 0; }
+    bool operator()(std::string_view a, std::string_view b) const { return OpenShock::StringIEquals(a, b); }
   };
 }  // namespace std
 

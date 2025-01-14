@@ -62,5 +62,8 @@ namespace OpenShock {
   std::vector<std::string_view> StringSplit(const std::string_view view, bool (*predicate)(char delimiter), std::size_t maxSplits = std::numeric_limits<std::size_t>::max());
   std::vector<std::string_view> StringSplitNewLines(const std::string_view view, std::size_t maxSplits = std::numeric_limits<std::size_t>::max());
   std::vector<std::string_view> StringSplitWhiteSpace(const std::string_view view, std::size_t maxSplits = std::numeric_limits<std::size_t>::max());
+
+  bool StringIEquals(const std::string_view a, const std::string_view b);
+
   String StringToArduinoString(std::string_view view);
 }  // namespace OpenShock

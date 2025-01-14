@@ -123,6 +123,12 @@ std::vector<std::string_view> OpenShock::StringSplitWhiteSpace(const std::string
   );
 }
 
+bool OpenShock::StringIEquals(const std::string_view a, const std::string_view b)
+{
+  if (a.size() != b.size()) return false;
+  return strncasecmp(a.data(), b.data(), a.size()) == 0;
+}
+
 String OpenShock::StringToArduinoString(std::string_view view) {
   return String(view.data(), view.size());
 }
