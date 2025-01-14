@@ -154,12 +154,15 @@ constexpr bool _semverIsDotSeperatedPreleaseIdentifiers(std::string_view str)
 
   return _semverIsPrereleaseIdentifier(str);
 }
-const auto _semverIsPatch      = _semverIsNumericIdentifier;
-const auto _semverIsMinor      = _semverIsNumericIdentifier;
-const auto _semverIsMajor      = _semverIsNumericIdentifier;
-const auto _semverIsPrerelease = _semverIsDotSeperatedPreleaseIdentifiers;
-const auto _semverIsBuild      = _semverIsDotSeperatedBuildIdentifiers;
-bool _semverIsVersionCore(std::string_view str)
+
+// For readability
+#define _semverIsPatch      _semverIsNumericIdentifier
+#define _semverIsMinor      _semverIsNumericIdentifier
+#define _semverIsMajor      _semverIsNumericIdentifier
+#define _semverIsPrerelease _semverIsDotSeperatedPreleaseIdentifiers
+#define _semverIsBuild      _semverIsDotSeperatedBuildIdentifiers
+
+constexpr bool _semverIsVersionCore(std::string_view str)
 {
   if (str.empty()) {
     return false;
@@ -172,7 +175,7 @@ bool _semverIsVersionCore(std::string_view str)
 
   return _semverIsMajor(parts[0]) && _semverIsMinor(parts[1]) && _semverIsPatch(parts[2]);
 }
-bool _semverIsSemver(std::string_view str)
+constexpr bool _semverIsSemver(std::string_view str)
 {
   if (str.empty()) {
     return false;

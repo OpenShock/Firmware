@@ -281,8 +281,8 @@ namespace OpenShock {
     return count;
   }
 
-  const uint8_t ValidInputPinsCount  = GetValidInputPinsCount();
-  const uint8_t ValidOutputPinsCount = GetValidOutputPinsCount();
+  constexpr uint8_t ValidInputPinsCount  = GetValidInputPinsCount();
+  constexpr uint8_t ValidOutputPinsCount = GetValidOutputPinsCount();
   typedef std::bitset<GPIO_NUM_MAX> GPIOPinSet;
 
   constexpr GPIOPinSet GetValidGPIOPins()
