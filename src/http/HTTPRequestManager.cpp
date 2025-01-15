@@ -133,15 +133,6 @@ constexpr bool _tryFindCRLF(std::size_t& pos, const uint8_t* buffer, std::size_t
 
   return false;
 }
-constexpr bool _tryParseHexSizeT(std::string_view str, std::size_t& result)
-{
-  if (str.empty()) {
-    return false;
-  }
-
-  result = 0;
-  return OpenShock::HexUtils::TryParseHex(str.data(), str.size(), reinterpret_cast<uint8_t*>(&result), sizeof(std::size_t)) != 0;
-}
 
 enum ParserState : uint8_t {
   Ok,
@@ -184,7 +175,7 @@ ParserState _parseChunkHeader(const uint8_t* buffer, std::size_t bufferLen, std:
   std::string_view sizeField(reinterpret_cast<const char*>(buffer), sizeFieldEnd);
 
   // Parse the chunk size
-  if (!_tryParseHexSizeT(sizeField, payloadLen)) {
+  if (!HexUtils::TryParseHexToInt(sizeField.data(), sizeField.length(), payloadLen)) {
     OS_LOGW(TAG, "Failed to parse chunk size");
     return ParserState::Invalid;
   }
