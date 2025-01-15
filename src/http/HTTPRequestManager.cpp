@@ -276,6 +276,7 @@ StreamReaderResult _readStreamDataChunked(HTTPClient& client, WiFiClient* stream
       if (state == ParserState::Invalid) {
         OS_LOGE(TAG, "Failed to parse chunk");
         result = HTTP::RequestResult::RequestFailed;
+        state  = ParserState::Invalid;  // Mark to exit both loops
         break;
       }
       OS_LOGD(TAG, "Chunk parsed: %zu %zu", payloadPos, payloadSize);
@@ -284,18 +285,20 @@ StreamReaderResult _readStreamDataChunked(HTTPClient& client, WiFiClient* stream
         if (bufferCursor == HTTP_BUFFER_SIZE) {
           OS_LOGE(TAG, "Chunk too large");
           result = HTTP::RequestResult::RequestFailed;
-          break;
+          state  = ParserState::Invalid;  // Mark to exit both loops
         }
-        continue;
+        break;                            // If chunk size good, this only exits one loop
       }
 
       // Check for zero chunk size (end of transfer)
       if (payloadSize == 0) {
+        state = ParserState::Invalid;  // Mark to exit both loops
         break;
       }
 
       if (!downloadCallback(totalWritten, buffer + payloadPos, payloadSize)) {
         result = HTTP::RequestResult::Cancelled;
+        state  = ParserState::Invalid;  // Mark to exit both loops
         break;
       }
 
@@ -305,7 +308,9 @@ StreamReaderResult _readStreamDataChunked(HTTPClient& client, WiFiClient* stream
       payloadPos  = 0;
     }
 
-    vTaskDelay(pdMS_TO_TICKS(5));
+    if (state == ParserState::NeedMoreData) {
+      vTaskDelay(pdMS_TO_TICKS(5));
+    }
   }
 
   free(buffer);
