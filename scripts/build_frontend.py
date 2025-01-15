@@ -63,106 +63,6 @@ def file_write_text(file, text, enc):
         return False
 
 
-def pyftsubset(font_path, fa_unicode_csv, output_path):
-    # Use pyftsubset to remove all the unused icons.
-    # pyftsubset does not support reading from and writing to the same file, so we need to write to a temporary file.
-    # Then delete the original file and rename the temporary file to the original file.
-    pyftsubset_cmd = (
-        f'{sys.executable} -m fontTools.subset {font_path} --unicodes={fa_unicode_csv} --output-file={output_path}'
-    )
-
-    print('Running: ' + pyftsubset_cmd)
-
-    # Run pyftsubset.
-    os.system(pyftsubset_cmd)
-
-
-def get_fa_icon_map(srcdir, csspath):
-    ext = csspath.split('.')[-1]
-    if ext != 'css':
-        return []
-
-    fa_icon_set = set()
-    for root, dirs, files in os.walk(srcdir):
-        root = root.replace('\\', '/')
-        for filename in files:
-            filepath = os.path.join(root, filename)
-            ext = filename.split('.')[-1]
-            if ext == 'ico' or ext == 'woff2':  # Skip binary files.
-                continue
-
-            (s, _) = file_read_text(filepath)
-            if s == None or s == '':
-                continue
-
-            icons = re.findall(r'(fa-[a-z0-9-]+)', s)
-
-            fa_icon_set.update(icons)
-
-    # Find all the fa icon classes.
-    (s, _) = file_read_text(csspath)
-    if s == None or s == '':
-        return []
-
-    css_classes = re.findall(r'((?:.fa-[a-z0-9-]+:before,?)+){content:"(\\[a-f0-9]+)";?}', s)
-
-    # For each class, extract the fa-names.
-    icon_map = {}
-    unused_css_selectors = []
-    for css_class in css_classes:
-        fa_names = re.findall(r'.(fa-[a-z0-9-]+):before', css_class[0])
-
-        any_in_set = False
-        for fa_name in fa_names:
-            if fa_name in fa_icon_set:
-                icon_map[fa_name] = {'unicode': css_class[1], 'selector': css_class[0]}
-                any_in_set = True
-
-        if not any_in_set:
-            unused_css_selectors.append(css_class[0])
-
-    return (icon_map, unused_css_selectors)
-
-
-def minify_fa_css(css_path, unused_css_selectors):
-    size_before = os.path.getsize(css_path)
-    (s, enc) = file_read_text(css_path)
-    if s == None or s == '':
-        return
-    # Use regex to remove all the unused icons.
-    for selector in unused_css_selectors:
-        regex = re.escape(selector) + r'{content:"\\[a-f0-9]+";?}'
-        s = re.sub(regex, '', s)
-    try:
-        with open(css_path, 'w', encoding=enc) as f_out:
-            f_out.write(s)
-    except Exception as e:
-        print('Error writing to ' + css_path + ': ' + str(e))
-    size_after = os.path.getsize(css_path)
-    print('Minified ' + css_path + ': ' + str(size_before) + ' => ' + str(size_after) + ' bytes')
-
-
-def minify_fa_font(font_path, icon_map):
-    print('Minifying font: ' + font_path)
-    values = []
-    for icon in icon_map:
-        values.append(icon_map[icon]['unicode'])
-    fa_unicode_csv = ','.join(values)
-
-    tmp_path = font_path + '.tmp'
-
-    size_before = os.path.getsize(font_path)
-
-    # Use pyftsubset to remove all the unused icons.
-    pyftsubset(font_path, fa_unicode_csv, tmp_path)
-
-    # Delete the original font file and rename the temporary file to the original file.
-    file_delete(font_path)
-    os.rename(tmp_path, font_path)
-    size_after = os.path.getsize(font_path)
-    print('Minified ' + font_path + ': ' + str(size_before) + ' => ' + str(size_after) + ' bytes')
-
-
 def build_frontend(source, target, env):
     # Change working directory to frontend.
     os.chdir('frontend')
@@ -178,17 +78,6 @@ def build_frontend(source, target, env):
 
     # Change working directory back to root.
     os.chdir('..')
-
-    fa_css = 'frontend/build/fa/fa-all.css'
-    fa_woff2 = 'frontend/build/fa/fa-solid-900.woff2'
-
-    # Analyze the frontend to find all the font awesome icons in use and which css selectors from fa-all.css are unused.
-    (icon_map, unused_css_selectors) = get_fa_icon_map('frontend/src', fa_css)
-    print('Found ' + str(len(icon_map)) + ' font awesome icons.')
-
-    # Write a minified css and font file to the static directory.
-    minify_fa_css(fa_css, unused_css_selectors)
-    minify_fa_font(fa_woff2, icon_map)
 
     # Shorten all the filenames in the data/www/_app/immutable directory.
     fileIndex = 0
