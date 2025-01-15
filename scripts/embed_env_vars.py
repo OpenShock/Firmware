@@ -129,8 +129,6 @@ def transform_cpp_define_string(k: str, v: str) -> str:
 
 
 def serialize_cpp_define(k: str, v: str | int | bool) -> str | int:
-    # Special case for OPENSHOCK_FW_GIT_COMMIT.
-    if k == 'OPENSHOCK_FW_GIT_COMMIT':
         return transform_cpp_define_string(k, str(v))
 
     try:
