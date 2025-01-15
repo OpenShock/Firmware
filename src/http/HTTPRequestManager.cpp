@@ -271,41 +271,38 @@ StreamReaderResult _readStreamDataChunked(HTTPClient& client, WiFiClient* stream
 
     bufferCursor += bytesRead;
 
-parseMore:
-    state = _parseChunk(buffer, bufferCursor, payloadPos, payloadSize);
-    if (state == ParserState::Invalid) {
-      OS_LOGE(TAG, "Failed to parse chunk");
-      result = HTTP::RequestResult::RequestFailed;
-      break;
-    }
-    OS_LOGD(TAG, "Chunk parsed: %zu %zu", payloadPos, payloadSize);
-
-    if (state == ParserState::NeedMoreData) {
-      if (bufferCursor == HTTP_BUFFER_SIZE) {
-        OS_LOGE(TAG, "Chunk too large");
+    while (bufferCursor > 0) {
+      state = _parseChunk(buffer, bufferCursor, payloadPos, payloadSize);
+      if (state == ParserState::Invalid) {
+        OS_LOGE(TAG, "Failed to parse chunk");
         result = HTTP::RequestResult::RequestFailed;
         break;
       }
-      continue;
-    }
+      OS_LOGD(TAG, "Chunk parsed: %zu %zu", payloadPos, payloadSize);
 
-    // Check for zero chunk size (end of transfer)
-    if (payloadSize == 0) {
-      break;
-    }
+      if (state == ParserState::NeedMoreData) {
+        if (bufferCursor == HTTP_BUFFER_SIZE) {
+          OS_LOGE(TAG, "Chunk too large");
+          result = HTTP::RequestResult::RequestFailed;
+          break;
+        }
+        continue;
+      }
 
-    if (!downloadCallback(totalWritten, buffer + payloadPos, payloadSize)) {
-      result = HTTP::RequestResult::Cancelled;
-      break;
-    }
+      // Check for zero chunk size (end of transfer)
+      if (payloadSize == 0) {
+        break;
+      }
 
-    totalWritten += payloadSize;
-    _alignChunk(buffer, bufferCursor, payloadPos, payloadSize);
-    payloadSize = 0;
-    payloadPos  = 0;
+      if (!downloadCallback(totalWritten, buffer + payloadPos, payloadSize)) {
+        result = HTTP::RequestResult::Cancelled;
+        break;
+      }
 
-    if (bufferCursor > 0) {
-      goto parseMore;
+      totalWritten += payloadSize;
+      _alignChunk(buffer, bufferCursor, payloadPos, payloadSize);
+      payloadSize = 0;
+      payloadPos  = 0;
     }
 
     vTaskDelay(pdMS_TO_TICKS(5));
