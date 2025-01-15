@@ -9,7 +9,18 @@
   import { SerializeWifiNetworkSaveCommand } from '$lib/Serializers/WifiNetworkSaveCommand';
   import WiFiDetailsDialog from '$lib/components/WiFiDetailsDialog.svelte';
   import type { WiFiNetworkGroup } from '$lib/types';
-  import { Button } from '$lib/components/ui/button';
+  import { Button, buttonVariants } from '$lib/components/ui/button';
+  import {
+    Dialog,
+    DialogContent,
+    DialogDescription,
+    DialogFooter,
+    DialogHeader,
+    DialogTitle,
+    DialogTrigger,
+  } from '$lib/components/ui/dialog';
+  import { Input } from '$lib/components/ui/input';
+  import { Label } from '$lib/components/ui/label';
   import { ArrowRight, Link, LoaderCircle, RotateCcw, Wifi } from 'lucide-svelte';
 
   let scanStatus = $derived($HubStateStore.wifiScanStatus);
@@ -27,28 +38,17 @@
     )
   );
 
+  let dialogOpen = $state(false);
+  let pendingPassword = $state<string | null>(null);
+
   function wifiScan() {
     const data = SerializeWifiScanCommand(!isScanning);
     WebSocketClient.Instance.Send(data);
   }
-  function wifiAuthenticate(item: WiFiNetworkGroup) {
-    if (item.security !== WifiAuthMode.Open) {
-      modalStore.trigger({
-        type: 'prompt',
-        title: 'Enter password',
-        body: 'Enter the password for the network',
-        value: '',
-        valueAttr: { type: 'password', minlength: 1, maxlength: 63, required: true },
-        response: (password: string) => {
-          if (!password) return;
-          const data = SerializeWifiNetworkSaveCommand(item.ssid, password, true);
-          WebSocketClient.Instance.Send(data);
-        },
-      });
-    } else {
-      const data = SerializeWifiNetworkSaveCommand(item.ssid, null, true);
-      WebSocketClient.Instance.Send(data);
-    }
+  function wifiAuthenticate(ssid: string, password: string | null) {
+    dialogOpen = false;
+    const data = SerializeWifiNetworkSaveCommand(ssid, null, true);
+    WebSocketClient.Instance.Send(data);
   }
   function wifiConnect(item: WiFiNetworkGroup) {
     const data = SerializeWifiNetworkConnectCommand(item.ssid);
@@ -57,6 +57,13 @@
   function wifiDisconnect(item: WiFiNetworkGroup) {
     const data = SerializeWifiNetworkDisconnectCommand();
     WebSocketClient.Instance.Send(data);
+  }
+
+  function handleWifiAuthDialogOpenChange(open: boolean) {
+    dialogOpen = open;
+    if (!open) {
+      pendingPassword = null;
+    }
   }
 </script>
 
@@ -93,10 +100,35 @@
             <Button onclick={() => wifiConnect(netgroup)}>
               <ArrowRight color="#22c55e" />
             </Button>
-          {:else}
-            <Button onclick={() => wifiAuthenticate(netgroup)}>
-              <Link color="#22c55e" />
+          {:else if netgroup.security === WifiAuthMode.Open}
+            <Button onclick={() => wifiAuthenticate(netgroup.ssid, null)}>
+              <ArrowRight color="#22c55e" />
             </Button>
+          {:else}
+            <Dialog bind:open={() => dialogOpen, handleWifiAuthDialogOpenChange}>
+              <DialogTrigger class={buttonVariants({ variant: 'outline' })}>
+                <Link color="#22c55e" />
+              </DialogTrigger>
+              <DialogContent class="sm:max-w-[425px]">
+                <DialogHeader>
+                  <DialogTitle>Enter password</DialogTitle>
+                  <DialogDescription>Enter the password for the network</DialogDescription>
+                </DialogHeader>
+                <div class="flex flex-row items-center gap-4 py-4">
+                  <Label for="name" class="text-right">Password</Label>
+                  <Input id="name" class="col-span-3" bind:value={pendingPassword} />
+                </div>
+                <DialogFooter>
+                  <Button
+                    type="button"
+                    onclick={() => wifiAuthenticate(netgroup.ssid, pendingPassword)}
+                    disabled={!pendingPassword || pendingPassword.length > 63}
+                  >
+                    Save changes
+                  </Button>
+                </DialogFooter>
+              </DialogContent>
+            </Dialog>
           {/if}
           <WiFiDetailsDialog group={netgroup} />
         </div>
