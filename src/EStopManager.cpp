@@ -1,6 +1,6 @@
 #include <freertos/FreeRTOS.h>
 
-#include "EStopManager.h"
+#include "estop/EStopManager.h"
 
 const char* const TAG = "EStopManager";
 

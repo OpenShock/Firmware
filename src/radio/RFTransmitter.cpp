@@ -4,7 +4,7 @@
 
 const char* const TAG = "RFTransmitter";
 
-#include "EStopManager.h"
+#include "estop/EStopManager.h"
 
 #include "Logging.h"
 #include "radio/rmt/MainEncoder.h"

@@ -1,6 +1,6 @@
 #pragma once
 
-#include "EStopState.h"
+#include "estop/EStopState.h"
 
 #include <hal/gpio_types.h>
 

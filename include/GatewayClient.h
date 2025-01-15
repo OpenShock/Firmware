@@ -19,7 +19,7 @@ namespace OpenShock {
     GatewayClient(const std::string& authToken);
     ~GatewayClient();
 
-    constexpr GatewayClientState state() const { return m_state; }
+    inline GatewayClientState state() const { return m_state; }
 
     void connect(const char* lcgFqdn);
     void disconnect();

@@ -1,6 +1,7 @@
 #include "Convert.h"
 
 #include "util/DigitCounter.h"
+#include "util/StringUtils.h"
 
 #include <cstdint>
 #include <cstring>
@@ -234,12 +235,12 @@ bool Convert::ToBool(std::string_view str, bool& val)
     return false;
   }
 
-  if (strncasecmp(str.data(), "true", str.length()) == 0) {
+  if (OpenShock::StringIEquals(str, "true"sv)) {
     val = true;
     return true;
   }
 
-  if (strncasecmp(str.data(), "false", str.length()) == 0) {
+  if (OpenShock::StringIEquals(str, "false"sv)) {
     val = false;
     return true;
   }

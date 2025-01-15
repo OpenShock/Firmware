@@ -98,7 +98,7 @@ CaptivePortalInstance::CaptivePortalInstance()
     OS_LOGI(TAG, "Filesystem hash: %s", fsHash);
 
     char softAPURL[64];
-    snprintf(softAPURL, sizeof(softAPURL), "http://%s", WiFi.softAPIP().toString().c_str());
+    snprintf(softAPURL, sizeof(softAPURL), "http://%s", WiFi.softAPIP().toString().c_str());  // TODO: this is wasteful, optimize this
 
     // Serving the captive portal files from LittleFS
     m_webServer.serveStatic("/", m_fileSystem, "/www/", "max-age=3600").setDefaultFile("index.html").setSharedEtag(fsHash);
