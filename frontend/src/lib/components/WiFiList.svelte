@@ -21,7 +21,8 @@
   } from '$lib/components/ui/dialog';
   import { Input } from '$lib/components/ui/input';
   import { Label } from '$lib/components/ui/label';
-  import { ArrowRight, Link, LoaderCircle, RotateCcw, Wifi } from 'lucide-svelte';
+  import { ArrowRight, Link, LoaderCircle, RotateCcw, Scroll, Wifi } from 'lucide-svelte';
+  import ScrollArea from './ui/scroll-area/scroll-area.svelte';
 
   let scanStatus = $derived($HubStateStore.wifiScanStatus);
   let isScanning = $derived(
@@ -78,10 +79,10 @@
       {/if}
     </Button>
   </div>
-  <div class="max-h-64 overflow-auto">
+  <ScrollArea class="h-64">
     {#each strengthSortedGroups as [netgroupKey, netgroup] (netgroupKey)}
-      <div class="card mb-2 flex items-center justify-between p-2">
-        <span>
+      <div class="mb-2 flex items-center justify-between p-2">
+        <span class="flex flex-row">
           {#if netgroup.networks.some((n) => n.bssid === connectedBSSID)}
             <Wifi color="#22c55e" />
           {:else}
@@ -95,7 +96,7 @@
             >
           {/if}
         </span>
-        <div class="btn-group variant-outline">
+        <div>
           {#if netgroup.saved}
             <Button onclick={() => wifiConnect(netgroup)}>
               <ArrowRight color="#22c55e" />
@@ -134,5 +135,5 @@
         </div>
       </div>
     {/each}
-  </div>
+  </ScrollArea>
 </div>

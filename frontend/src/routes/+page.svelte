@@ -30,7 +30,7 @@
   }
 </script>
 
-<div class="flex h-full flex-col items-center justify-center">
+<div class="flex flex-1 flex-col items-center justify-center px-2">
   <div class="w-full max-w-md flex-col space-y-5">
     <WiFiList />
 
