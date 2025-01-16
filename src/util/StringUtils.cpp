@@ -96,7 +96,7 @@ std::vector<std::string_view> OpenShock::StringSplit(std::string_view view, bool
   for (const char* ptr = view.begin(); ptr < view.end(); ++ptr) {
     if (predicate(*ptr)) {
       if (start != nullptr) {
-        result.emplace_back(std::string_view(start, ptr - start));
+        result.emplace_back(start, ptr - start);
         start = nullptr;
       }
     } else if (start == nullptr) {
@@ -105,7 +105,7 @@ std::vector<std::string_view> OpenShock::StringSplit(std::string_view view, bool
   }
 
   if (start != nullptr) {
-    result.emplace_back(std::string_view(start, view.end() - start));
+    result.emplace_back(start, view.end() - start);
   }
 
   return result;
