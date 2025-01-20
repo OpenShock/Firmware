@@ -1,10 +1,12 @@
 #pragma once
 
-#include "RmtSequence.h"
 #include "ShockerCommandType.h"
+
+#include <esp32-hal-rmt.h>
 
 #include <cstdint>
 
 namespace OpenShock::Rmt::T330Encoder {
-  RmtSequence GetSequence(uint16_t shockerId, OpenShock::ShockerCommandType type, uint8_t intensity);
+  size_t GetBufferSize();
+  bool FillBuffer(rmt_data_t* data, uint16_t shockerId, ShockerCommandType type, uint8_t intensity);
 }

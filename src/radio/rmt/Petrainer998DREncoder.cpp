@@ -4,6 +4,8 @@
 
 #include "Checksum.h"
 
+#include <algorithm>
+
 const rmt_data_t kRmtPreamble  = {1500, 1, 750, 0};
 const rmt_data_t kRmtOne       = {750, 1, 250, 0};
 const rmt_data_t kRmtZero      = {250, 1, 750, 0};
@@ -11,7 +13,12 @@ const rmt_data_t kRmtPostamble = {250, 1, 3750, 0};  // Some subvariants expect 
 
 using namespace OpenShock;
 
-static bool fillSequence(rmt_data_t* sequence, uint16_t shockerId, ShockerCommandType type, uint8_t intensity)
+size_t Rmt::Petrainer998DREncoder::GetBufferSize()
+{
+  return 42;
+}
+
+bool Rmt::Petrainer998DREncoder::FillBuffer(rmt_data_t* sequence, uint16_t shockerId, ShockerCommandType type, uint8_t intensity)
 {
   // Intensity must be between 0 and 100
   intensity = std::min(intensity, static_cast<uint8_t>(100));
@@ -51,14 +58,4 @@ static bool fillSequence(rmt_data_t* sequence, uint16_t shockerId, ShockerComman
   sequence[41] = kRmtPostamble;
 
   return true;
-}
-
-Rmt::RmtSequence Rmt::Petrainer998DREncoder::GetSequence(uint16_t shockerId, ShockerCommandType type, uint8_t intensity)
-{
-  Rmt::RmtSequence sequence(42);
-
-  if (!fillSequence(sequence.payload(), shockerId, type, intensity)) return {};
-  if (!fillSequence(sequence.terminator(), shockerId, ShockerCommandType::Vibrate, 0)) return {};
-
-  return sequence;
 }

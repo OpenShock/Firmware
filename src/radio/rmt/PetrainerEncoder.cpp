@@ -2,6 +2,8 @@
 
 #include "radio/rmt/internal/Shared.h"
 
+#include <algorithm>
+
 const rmt_data_t kRmtPreamble  = {750, 1, 750, 0};
 const rmt_data_t kRmtOne       = {200, 1, 1500, 0};
 const rmt_data_t kRmtZero      = {200, 1, 750, 0};
@@ -9,7 +11,12 @@ const rmt_data_t kRmtPostamble = {200, 1, 7000, 0};
 
 using namespace OpenShock;
 
-static bool fillSequence(rmt_data_t* sequence, uint16_t shockerId, ShockerCommandType type, uint8_t intensity)
+size_t Rmt::PetrainerEncoder::GetBufferSize()
+{
+  return 42;
+}
+
+bool Rmt::PetrainerEncoder::FillBuffer(rmt_data_t* sequence, uint16_t shockerId, ShockerCommandType type, uint8_t intensity)
 {
   // Intensity must be between 0 and 100
   intensity = std::min(intensity, static_cast<uint8_t>(100));
@@ -44,14 +51,4 @@ static bool fillSequence(rmt_data_t* sequence, uint16_t shockerId, ShockerComman
   sequence[41] = kRmtPostamble;
 
   return true;
-}
-
-Rmt::RmtSequence Rmt::PetrainerEncoder::GetSequence(uint16_t shockerId, ShockerCommandType type, uint8_t intensity)
-{
-  Rmt::RmtSequence sequence(42);
-
-  if (!fillSequence(sequence.payload(), shockerId, type, intensity)) return {};
-  if (!fillSequence(sequence.terminator(), shockerId, ShockerCommandType::Vibrate, 0)) return {};
-
-  return sequence;
 }

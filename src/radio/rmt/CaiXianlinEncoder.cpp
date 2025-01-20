@@ -4,6 +4,8 @@
 
 #include "Checksum.h"
 
+#include <algorithm>
+
 // This is the encoder for the CaiXianlin shocker.
 //
 // It is based on the following documentation:
@@ -15,7 +17,12 @@ const rmt_data_t kRmtZero     = {250, 1, 750, 0};
 
 using namespace OpenShock;
 
-static bool fillSequence(rmt_data_t* sequence, uint16_t shockerId, uint8_t channelId, ShockerCommandType type, uint8_t intensity)
+size_t Rmt::CaiXianlinEncoder::GetBufferSize()
+{
+  return 44;
+}
+
+bool Rmt::CaiXianlinEncoder::FillBuffer(rmt_data_t* sequence, uint16_t shockerId, uint8_t channelId, ShockerCommandType type, uint8_t intensity)
 {
   // Intensity must be between 0 and 99
   intensity = std::min(intensity, static_cast<uint8_t>(99));
@@ -53,14 +60,4 @@ static bool fillSequence(rmt_data_t* sequence, uint16_t shockerId, uint8_t chann
   Rmt::Internal::EncodeBits<43>(sequence + 1, data, kRmtOne, kRmtZero);
 
   return true;
-}
-
-Rmt::RmtSequence Rmt::CaiXianlinEncoder::GetSequence(uint16_t shockerId, uint8_t channelId, ShockerCommandType type, uint8_t intensity)
-{
-  Rmt::RmtSequence sequence(44);
-
-  if (!fillSequence(sequence.payload(), shockerId, channelId, type, intensity)) return {};
-  if (!fillSequence(sequence.terminator(), shockerId, channelId, ShockerCommandType::Vibrate, 0)) return {};
-
-  return sequence;
 }
