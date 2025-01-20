@@ -5,9 +5,9 @@
 const char* const TAG = "RFTransmitter";
 
 #include "estop/EStopManager.h"
-
 #include "Logging.h"
 #include "radio/rmt/MainEncoder.h"
+#include "radio/rmt/RmtSequence.h"
 #include "Time.h"
 #include "util/FnProxy.h"
 #include "util/TaskUtils.h"
@@ -24,8 +24,7 @@ using namespace OpenShock;
 
 struct command_t {
   int64_t until;
-  std::vector<rmt_data_t> sequence;
-  std::vector<rmt_data_t> zeroSequence;
+  Rmt::RmtSequence sequence;
   uint16_t shockerId;
   bool overwrite;
 };
@@ -77,7 +76,13 @@ bool RFTransmitter::SendCommand(ShockerModelType model, uint16_t shockerId, Shoc
     return false;
   }
 
-  command_t* cmd = new command_t {.until = OpenShock::millis() + durationMs, .sequence = Rmt::GetSequence(model, shockerId, type, intensity), .zeroSequence = Rmt::GetZeroSequence(model, shockerId), .shockerId = shockerId, .overwrite = overwriteExisting};
+  auto sequence = Rmt::GetSequence(model, shockerId, type, intensity);
+  if (!sequence.is_valid()) {
+    OS_LOGE(TAG, "[pin-%hhi] Failed to create sequence for command, refusing to send", m_txPin);
+    return false;
+  }
+
+  command_t* cmd = new command_t {.until = OpenShock::millis() + durationMs, .sequence = std::move(sequence), .shockerId = shockerId, .overwrite = overwriteExisting};
 
   // We will use nullptr commands to end the task, if we got a nullptr here, we are out of memory... :(
   if (cmd == nullptr) {
@@ -202,15 +207,12 @@ void RFTransmitter::TransmitTask()
       cmd = *it;
 
       bool expired = cmd->until < OpenShock::millis();
-      bool empty   = cmd->sequence.empty();
 
-      // Remove expired or empty commands, else send the command.
+      // Remove expired commands, else send the command.
       // After sending/receiving a command, move to the next one.
-      if (expired || empty) {
-        // If the command is not empty, send the zero sequence to stop the shocker
-        if (!empty) {
-          rmtWriteBlocking(m_rmtHandle, cmd->zeroSequence.data(), cmd->zeroSequence.size());
-        }
+      if (expired) {
+        // Send the zero sequence to stop the shocker
+        rmtWriteBlocking(m_rmtHandle, cmd->sequence.terminator(), cmd->sequence.size());
 
         if (cmd->until + TRANSMIT_END_DURATION < OpenShock::millis()) {
           // Remove the command and move to the next one
@@ -222,7 +224,7 @@ void RFTransmitter::TransmitTask()
         }
       } else {
         // Send the command
-        rmtWriteBlocking(m_rmtHandle, cmd->sequence.data(), cmd->sequence.size());
+        rmtWriteBlocking(m_rmtHandle, cmd->sequence.payload(), cmd->sequence.size());
 
         // Move to the next command
         ++it;
