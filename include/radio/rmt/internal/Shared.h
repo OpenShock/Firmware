@@ -8,7 +8,7 @@
 
 namespace OpenShock::Rmt::Internal {
   template<size_t N, typename T>
-  constexpr void EncodeBits(rmt_data_t* sequence, T data, const rmt_data_t& rmtOne, const rmt_data_t& rmtZero)
+  constexpr void EncodeBits(rmt_data_t* sequence, T data, rmt_data_t rmtOne, rmt_data_t rmtZero)
   {
     static_assert(std::is_unsigned<T>::value, "T must be an unsigned integer");
     static_assert(N > 0, "N must be greater than 0");
