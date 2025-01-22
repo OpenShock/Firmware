@@ -4,7 +4,6 @@ const char* const TAG = "RmtMainEncoder";
 
 #include "Logging.h"
 #include "radio/rmt/CaiXianlinEncoder.h"
-#include "radio/rmt/Petrainer998DREncoder.h"
 #include "radio/rmt/PetrainerEncoder.h"
 #include "radio/rmt/T330Encoder.h"
 
@@ -16,7 +15,6 @@ static size_t getSequenceBufferSize(ShockerModelType shockerModelType)
     case ShockerModelType::CaiXianlin:
       return Rmt::CaiXianlinEncoder::GetBufferSize();
     case ShockerModelType::Petrainer998DR:
-      return Rmt::Petrainer998DREncoder::GetBufferSize();
     case ShockerModelType::Petrainer:
       return Rmt::PetrainerEncoder::GetBufferSize();
     default:
@@ -39,11 +37,38 @@ bool Rmt::MainEncoder::fillSequence(ShockerCommandType commandType, uint8_t inte
 {
   switch (m_shockerModel) {
     case ShockerModelType::CaiXianlin:
-      return Rmt::CaiXianlinEncoder::FillBuffer(m_data, m_shockerId, 0, commandType, intensity) && Rmt::CaiXianlinEncoder::FillBuffer(m_data + m_size, m_shockerId, 0, ShockerCommandType::Vibrate, 0);
+    {
+      uint64_t payload    = Rmt::CaiXianlinEncoder::MakePayload(m_shockerId, 0, commandType, intensity);
+      uint64_t terminator = Rmt::CaiXianlinEncoder::MakePayload(m_shockerId, 0, ShockerCommandType::Vibrate, 0);
+      if (payload == 0 || terminator == 0) return false;
+
+      Rmt::CaiXianlinEncoder::EncodePayload(m_data, payload);
+      Rmt::CaiXianlinEncoder::EncodePayload(m_data + m_size, terminator);
+
+      return true;
+    }
     case ShockerModelType::Petrainer:
-      return Rmt::PetrainerEncoder::FillBuffer(m_data, m_shockerId, commandType, intensity) && Rmt::PetrainerEncoder::FillBuffer(m_data + m_size, m_shockerId, ShockerCommandType::Vibrate, 0);
     case ShockerModelType::Petrainer998DR:
-      return Rmt::Petrainer998DREncoder::FillBuffer(m_data, m_shockerId, commandType, intensity) && Rmt::Petrainer998DREncoder::FillBuffer(m_data + m_size, m_shockerId, ShockerCommandType::Vibrate, 0);
+    {
+      uint64_t payload    = Rmt::PetrainerEncoder::MakePayload(m_shockerId, 1, commandType, intensity);
+      uint64_t terminator = Rmt::PetrainerEncoder::MakePayload(m_shockerId, 1, ShockerCommandType::Vibrate, 0);
+      if (payload == 0 || terminator == 0) return false;
+
+      switch (m_shockerModel) {
+        case ShockerModelType::Petrainer:
+          Rmt::PetrainerEncoder::EncodeType1Payload(m_data, payload);
+          Rmt::PetrainerEncoder::EncodeType1Payload(m_data + m_size, terminator);
+          break;
+        case ShockerModelType::Petrainer998DR:
+          Rmt::PetrainerEncoder::EncodeType2Payload(m_data, payload);
+          Rmt::PetrainerEncoder::EncodeType2Payload(m_data + m_size, terminator);
+          break;
+        default:
+          return false;
+      }
+
+      return true;
+    }
     default:
       OS_LOGE(TAG, "Unknown shocker model: %u", m_shockerModel);
       return false;

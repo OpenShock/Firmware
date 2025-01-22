@@ -22,11 +22,8 @@ size_t Rmt::CaiXianlinEncoder::GetBufferSize()
   return 44;
 }
 
-bool Rmt::CaiXianlinEncoder::FillBuffer(rmt_data_t* sequence, uint16_t shockerId, uint8_t channelId, ShockerCommandType type, uint8_t intensity)
+uint64_t Rmt::CaiXianlinEncoder::MakePayload(uint16_t shockerId, uint8_t channel, ShockerCommandType type, uint8_t intensity)
 {
-  // Intensity must be between 0 and 99
-  intensity = std::min(intensity, static_cast<uint8_t>(99));
-
   uint8_t typeVal = 0;
   switch (type) {
     case ShockerCommandType::Shock:
@@ -40,11 +37,14 @@ bool Rmt::CaiXianlinEncoder::FillBuffer(rmt_data_t* sequence, uint16_t shockerId
       intensity = 0;  // Sound intensity must be 0 for some shockers, otherwise it wont work, or they soft lock until restarted
       break;
     default:
-      return false;  // Invalid type
+      return 0;  // Invalid type
   }
 
-  // Payload layout: [shockerId:16][channelId:4][type:4][intensity:8]
-  uint32_t payload = (static_cast<uint32_t>(shockerId) << 16) | (static_cast<uint32_t>(channelId & 0xF) << 12) | (static_cast<uint32_t>(typeVal & 0xF) << 8) | static_cast<uint32_t>(intensity);
+  // Intensity must be between 0 and 99
+  intensity = std::min(intensity, static_cast<uint8_t>(99));
+
+  // Payload layout: [shockerId:16][channel:4][type:4][intensity:8]
+  uint32_t payload = (static_cast<uint32_t>(shockerId) << 16) | (static_cast<uint32_t>(channel & 0xF) << 12) | (static_cast<uint32_t>(typeVal & 0xF) << 8) | static_cast<uint32_t>(intensity);
 
   // Calculate the checksum of the payload
   uint8_t checksum = Checksum::Sum8(payload);
@@ -53,11 +53,11 @@ bool Rmt::CaiXianlinEncoder::FillBuffer(rmt_data_t* sequence, uint16_t shockerId
   uint64_t data = (static_cast<uint64_t>(payload) << 8) | static_cast<uint64_t>(checksum);
 
   // Shift the data left by 3 bits to add the postamble (3 bits of 0)
-  data <<= 3;
+  return data << 3;
+}
 
-  // Generate the sequence
+void Rmt::CaiXianlinEncoder::EncodePayload(rmt_data_t* sequence, uint64_t payload)
+{
   sequence[0] = kRmtPreamble;
-  Rmt::Internal::EncodeBits<43>(sequence + 1, data, kRmtOne, kRmtZero);
-
-  return true;
+  Rmt::Internal::EncodeBits<43>(sequence + 1, payload, kRmtOne, kRmtZero);
 }

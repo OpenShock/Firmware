@@ -16,11 +16,8 @@ size_t Rmt::T330Encoder::GetBufferSize()
   return 43;
 }
 
-bool Rmt::T330Encoder::FillBuffer(rmt_data_t* sequence, uint16_t shockerId, ShockerCommandType type, uint8_t intensity)
+uint64_t Rmt::T330Encoder::MakePayload(uint16_t shockerId, uint8_t channel, ShockerCommandType type, uint8_t intensity)
 {
-  // Intensity must be between 0 and 100
-  intensity = std::min(intensity, static_cast<uint8_t>(100));
-
   uint8_t typeVal = 0;
   switch (type) {
     case ShockerCommandType::Shock:
@@ -37,19 +34,32 @@ bool Rmt::T330Encoder::FillBuffer(rmt_data_t* sequence, uint16_t shockerId, Shoc
       return false;  // Invalid type
   }
 
-  uint8_t channelId = 0;  // CH1 is 0b0000 and CH2 is 0b1110 on my remote but other values probably work.
+  uint8_t channelVal = 0;  // CH1 is 0b0000 and CH2 is 0b1110 on my remote but other values probably work.
+  switch (channel) {
+    case 1:
+      channelVal = 0b0000;
+      break;
+    case 2:
+      channelVal = 0b1110;
+      break;
+    default:
+      return false;  // Invalid channel
+  }
 
-  // Payload layout: [channelId:4][typeU:4][transmitterId:16][intensity:8][typeL:4][channelId:4]
-  uint64_t data = (static_cast<uint64_t>(channelId & 0xF) << 36) | (static_cast<uint64_t>(typeVal & 0xF0) << 28) | (static_cast<uint64_t>(shockerId) << 16) | (static_cast<uint64_t>(intensity) << 8) | (static_cast<uint64_t>(typeVal & 0xF) << 4)
-                | static_cast<uint64_t>(channelId & 0xF);
+  // Intensity must be between 0 and 100
+  intensity = std::min(intensity, static_cast<uint8_t>(100));
+
+  // Payload layout: [channel:4][typeU:4][transmitterId:16][intensity:8][typeL:4][channel:4]
+  uint64_t payload = (static_cast<uint64_t>(channelVal & 0xF) << 36) | (static_cast<uint64_t>(typeVal & 0xF0) << 28) | (static_cast<uint64_t>(shockerId) << 16) | (static_cast<uint64_t>(intensity) << 8) | (static_cast<uint64_t>(typeVal & 0xF) << 4)
+                   | static_cast<uint64_t>(channelVal & 0xF);
 
   // Shift the data left by 1 bit to append a zero
-  data <<= 1;
+  return payload << 1;
+}
 
-  // Generate the sequence
+void Rmt::T330Encoder::EncodePayload(rmt_data_t* sequence, uint64_t payload)
+{
   sequence[0] = kRmtPreamble;
-  Rmt::Internal::EncodeBits<41>(sequence + 1, data, kRmtOne, kRmtZero);
+  Rmt::Internal::EncodeBits<41>(sequence + 1, payload, kRmtOne, kRmtZero);
   sequence[42] = kRmtPostamble;
-
-  return true;
 }

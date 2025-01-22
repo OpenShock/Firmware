@@ -8,5 +8,6 @@
 
 namespace OpenShock::Rmt::T330Encoder {
   size_t GetBufferSize();
-  bool FillBuffer(rmt_data_t* data, uint16_t shockerId, ShockerCommandType type, uint8_t intensity);
-}
+  uint64_t MakePayload(uint16_t shockerId, uint8_t channel, ShockerCommandType type, uint8_t intensity);
+  void EncodePayload(rmt_data_t* data, uint64_t payload);
+}  // namespace OpenShock::Rmt::T330Encoder
