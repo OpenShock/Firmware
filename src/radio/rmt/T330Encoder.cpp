@@ -31,7 +31,7 @@ uint64_t Rmt::T330Encoder::MakePayload(uint16_t shockerId, uint8_t channel, Shoc
       intensity = 0;  // The remote always sends 0, I don't know what happens if you send something else.
       break;
     default:
-      return false;  // Invalid type
+      return 0;  // Invalid type
   }
 
   uint8_t channelVal = 0;  // CH1 is 0b0000 and CH2 is 0b1110 on my remote but other values probably work.
@@ -43,7 +43,7 @@ uint64_t Rmt::T330Encoder::MakePayload(uint16_t shockerId, uint8_t channel, Shoc
       channelVal = 0b1110;
       break;
     default:
-      return false;  // Invalid channel
+      return 0;  // Invalid channel
   }
 
   // Intensity must be between 0 and 100
