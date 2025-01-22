@@ -50,8 +50,8 @@ uint64_t Rmt::T330Encoder::MakePayload(uint16_t shockerId, uint8_t channel, Shoc
   intensity = std::min(intensity, static_cast<uint8_t>(100));
 
   // Payload layout: [channel:4][typeU:4][transmitterId:16][intensity:8][typeL:4][channel:4]
-  uint64_t payload = (static_cast<uint64_t>(channelVal & 0xF) << 36) | (static_cast<uint64_t>(typeVal & 0xF0) << 28) | (static_cast<uint64_t>(shockerId) << 16) | (static_cast<uint64_t>(intensity) << 8) | (static_cast<uint64_t>(typeVal & 0xF) << 4)
-                   | static_cast<uint64_t>(channelVal & 0xF);
+  uint64_t payload = (static_cast<uint64_t>(channelVal) << 36) | (static_cast<uint64_t>(typeVal & 0xF0) << 28) | (static_cast<uint64_t>(shockerId) << 16) | (static_cast<uint64_t>(intensity) << 8) | (static_cast<uint64_t>(typeVal & 0xF) << 4)
+                   | static_cast<uint64_t>(channelVal);
 
   // Shift the data left by 1 bit to append a zero
   return payload << 1;

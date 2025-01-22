@@ -44,7 +44,7 @@ uint64_t Rmt::CaiXianlinEncoder::MakePayload(uint16_t shockerId, uint8_t channel
   intensity = std::min(intensity, static_cast<uint8_t>(99));
 
   // Payload layout: [shockerId:16][channel:4][type:4][intensity:8]
-  uint32_t payload = (static_cast<uint32_t>(shockerId) << 16) | (static_cast<uint32_t>(channel & 0xF) << 12) | (static_cast<uint32_t>(typeVal & 0xF) << 8) | static_cast<uint32_t>(intensity);
+  uint32_t payload = (static_cast<uint32_t>(shockerId) << 16) | (static_cast<uint32_t>(channel & 0xF) << 12) | (static_cast<uint32_t>(typeVal) << 8) | static_cast<uint32_t>(intensity);
 
   // Calculate the checksum of the payload
   uint8_t checksum = Checksum::Sum8(payload);
