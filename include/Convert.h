@@ -6,7 +6,7 @@
 #include <string>
 #include <string_view>
 
-namespace OpenShock::Convert {
+namespace OpenShock::Convert {  // TODO: C++23 make this use std::from_chars instead
   void FromInt8(int8_t val, std::string& str);
   void FromUint8(uint8_t val, std::string& str);
   void FromInt16(int16_t val, std::string& str);
@@ -26,6 +26,7 @@ namespace OpenShock::Convert {
   bool ToUint32(std::string_view str, uint32_t& val);
   bool ToInt64(std::string_view str, int64_t& val);
   bool ToUint64(std::string_view str, uint64_t& val);
+  bool ToSizeT(std::string_view str, size_t& val);
   bool ToBool(std::string_view str, bool& val);
   bool ToGpioNum(std::string_view str, gpio_num_t& val);
 }  // namespace OpenShock::Convert
