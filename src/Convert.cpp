@@ -160,15 +160,8 @@ constexpr bool spanToT(std::string_view str, T& out)
         return false;
       }
 
-      // Handle the edge case where the value exactly matches the signed minimum.
-      // Casting to a signed type directly would cause overflow, so assign it explicitly.
-      if (val == LowerLimit) {
-        out = std::numeric_limits<T>::min();
-        return true;
-      }
-
       // Assign negative value and return
-      out = -static_cast<T>(val);
+      out = static_cast<T>(~val + 1);
       return true;
     }
 
