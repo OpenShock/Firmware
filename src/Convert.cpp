@@ -59,54 +59,88 @@ void fromT(T val, std::string& str)
   fromNonZeroT(val, str);
 }
 
+/**
+ * @brief Converts a string view to an integral value of type T.
+ *
+ * This function attempts to parse a string representation of a number into an integer of the specified integral type T.
+ * It performs validation to ensure the string is a valid representation of a number within the range of the target type and checks for overflow or invalid input.
+ *
+ * @tparam T The integral type to which the string should be converted.
+ * @param[in] str The input string view representing the number.
+ * @param[out] out The reference where the converted value will be stored, if successful.
+ * @return true if the conversion was successful and `out` contains the parsed value.
+ * @return false if the conversion failed due to invalid input, overflow, or out-of-range value.
+ *
+ * @note The function handles both signed and unsigned types, for signed types, it processes negative numbers correctly.
+ * @note It also validates the input for edge cases like empty strings, leading zeros, or excessive length.
+ *
+ * @warning Ensure the input string is sanitized if sourced from untrusted input, as this function does not strip whitespace or handle non-numeric characters beyond validation.
+ */
 template<typename T>
 constexpr bool spanToT(std::string_view str, T& out)
 {
-  static_assert(std::is_integral_v<T>);
+  static_assert(std::is_integral_v<T>, "Template type T must be an integral type.");
 
+  // Define the unsigned type equivalent for T.
   using UT = typename std::make_unsigned<T>::type;
 
   constexpr bool IsSigned = std::is_signed_v<T>;
-  constexpr T Threshold   = std::numeric_limits<T>::max() / 10;
 
+  // Define an overflow threshold for type T.
+  // If an integer of type T exceeds this value, multiplying it by 10 will cause an overflow.
+  constexpr T Threshold = std::numeric_limits<T>::max() / 10;
+
+  // Fail on empty input strings.
   if (str.empty()) {
     return false;
   }
 
-  // Handle negative for signed types
+  // Handle negative numbers for signed types.
   bool isNegative = false;
   if constexpr (IsSigned) {
     if (str.front() == '-') {
-      str.remove_prefix(1);
+      str.remove_prefix(1);  // Remove the negative sign.
       isNegative = true;
-      if (str.empty()) return false;
+
+      // Fail if the string only contained a negative sign with no numeric characters
+      if (str.empty()) {
+        return false;
+      }
     }
   }
 
+  // Fail on strings that are too long to be valid integers.
   if (str.length() > OpenShock::Util::Digits10CountMax<T>) {
     return false;
   }
 
   // Special case for zero, also handles leading zeros and negative zero
   if (str.front() == '0') {
+    // Fail if string has leading or negative zero's
     if (str.length() > 1 || isNegative) return false;
+
+    // Simple "0" string
     out = 0;
     return true;
   }
 
+  // Value accumulator.
   UT val = 0;
 
   for (char c : str) {
+    // Return false if the character is not a digit.
     if (c < '0' || c > '9') {
       return false;
     }
 
+    // Check for multiplication overflow before multiplying by 10.
     if (val > Threshold) {
       return false;
     }
 
     val *= 10;
 
+    // Convert the character to a digit and check for addition overflow.
     uint8_t digit = c - '0';
     if (digit > std::numeric_limits<UT>::max() - val) {
       return false;
@@ -115,28 +149,36 @@ constexpr bool spanToT(std::string_view str, T& out)
     val += digit;
   }
 
+  // Special case handling for signed integers.
   if constexpr (IsSigned) {
     if (isNegative) {
+      // Calculate the inverted lower limit for the signed type (e.g., 128 for int8_t).
       constexpr UT LowerLimit = static_cast<UT>(std::numeric_limits<T>::max()) + 1;
 
+      // Signed cast undeflow check
       if (val > LowerLimit) {
         return false;
       }
 
+      // Handle the edge case where the value exactly matches the signed minimum.
+      // Casting to a signed type directly would cause overflow, so assign it explicitly.
       if (val == LowerLimit) {
         out = std::numeric_limits<T>::min();
         return true;
       }
 
+      // Assign negative value and return
       out = -static_cast<T>(val);
       return true;
     }
 
+    // Signed cast overflow check
     if (val > std::numeric_limits<T>::max()) {
       return false;
     }
   }
 
+  // Assign the result for unsigned or positive values.
   out = static_cast<T>(val);
 
   return true;
