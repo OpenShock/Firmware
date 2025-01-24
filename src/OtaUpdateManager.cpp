@@ -639,9 +639,7 @@ bool OtaUpdateManager::TryGetFirmwareRelease(const OpenShock::SemVer& version, F
     auto hash = OpenShock::StringTrim(parts[0]);
     auto file = OpenShock::StringTrim(parts[1]);
 
-    if (OpenShock::StringStartsWith(file, "./"sv)) {
-      file = file.substr(2);
-    }
+    file = OpenShock::StringRemovePrefix(file, "./"sv);
 
     if (hash.size() != 64) {
       OS_LOGE(TAG, "Invalid hash: %.*s", hash.size(), hash.data());
