@@ -8,6 +8,7 @@
 
 #include <array>  // TODO: When we use C++20, change this to <span>
 #include <cstdint>
+#include <string_view>
 
 namespace OpenShock {
   class MD5 {
@@ -20,6 +21,7 @@ namespace OpenShock {
 
     inline bool begin() { return mbedtls_md5_starts_ret(&ctx) == 0; }
     inline bool update(const uint8_t* data, std::size_t dataLen) { return mbedtls_md5_update_ret(&ctx, data, dataLen) == 0; }
+    inline bool update(std::string_view data) { return update(reinterpret_cast<const uint8_t*>(data.data()), data.length()); }
     inline bool finish(std::array<uint8_t, 16>& hash) { return mbedtls_md5_finish_ret(&ctx, hash.data()) == 0; }
 
   private:
@@ -35,6 +37,7 @@ namespace OpenShock {
 
     inline bool begin() { return mbedtls_sha1_starts_ret(&ctx) == 0; }
     inline bool update(const uint8_t* data, std::size_t dataLen) { return mbedtls_sha1_update_ret(&ctx, data, dataLen) == 0; }
+    inline bool update(std::string_view data) { return update(reinterpret_cast<const uint8_t*>(data.data()), data.length()); }
     inline bool finish(std::array<uint8_t, 20>& hash) { return mbedtls_sha1_finish_ret(&ctx, hash.data()) == 0; }
 
   private:
@@ -50,6 +53,7 @@ namespace OpenShock {
 
     inline bool begin() { return mbedtls_sha256_starts_ret(&ctx, 0) == 0; }
     inline bool update(const uint8_t* data, std::size_t dataLen) { return mbedtls_sha256_update_ret(&ctx, data, dataLen) == 0; }
+    inline bool update(std::string_view data) { return update(reinterpret_cast<const uint8_t*>(data.data()), data.length()); }
     inline bool finish(std::array<uint8_t, 32>& hash) { return mbedtls_sha256_finish_ret(&ctx, hash.data()) == 0; }
 
   private:

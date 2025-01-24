@@ -4,8 +4,7 @@
 
 const char* const TAG = "RFTransmitter";
 
-#include "EStopManager.h"
-
+#include "estop/EStopManager.h"
 #include "Logging.h"
 #include "radio/rmt/MainEncoder.h"
 #include "Time.h"
@@ -19,15 +18,22 @@ const BaseType_t RFTRANSMITTER_TASK_PRIORITY = 1;
 const uint32_t RFTRANSMITTER_TASK_STACK_SIZE = 4096;  // PROFILED: 1.4KB stack usage
 const float RFTRANSMITTER_TICKRATE_NS        = 1000;
 const int64_t TRANSMIT_END_DURATION          = 300;
+const int64_t SEQUENCE_TIME_TO_LIVE          = 1000;
 
 using namespace OpenShock;
 
 struct command_t {
   int64_t until;
-  std::vector<rmt_data_t> sequence;
-  std::vector<rmt_data_t> zeroSequence;
+  ShockerModelType model;
+  ShockerCommandType type;
   uint16_t shockerId;
-  bool overwrite;
+  uint8_t intensity;
+  bool overwrite : 1;
+  bool destroy   : 1;
+};
+struct sequence_t {
+  int64_t until;
+  Rmt::MainEncoder encoder;
 };
 
 RFTransmitter::RFTransmitter(gpio_num_t gpioPin)
@@ -48,7 +54,7 @@ RFTransmitter::RFTransmitter(gpio_num_t gpioPin)
   float realTick = rmtSetTick(m_rmtHandle, RFTRANSMITTER_TICKRATE_NS);
   OS_LOGD(TAG, "[pin-%hhi] real tick set to: %fns", m_txPin, realTick);
 
-  m_queueHandle = xQueueCreate(RFTRANSMITTER_QUEUE_SIZE, sizeof(command_t*));
+  m_queueHandle = xQueueCreate(RFTRANSMITTER_QUEUE_SIZE, sizeof(command_t));
   if (m_queueHandle == nullptr) {
     OS_LOGE(TAG, "[pin-%hhi] Failed to create queue", m_txPin);
     destroy();
@@ -77,18 +83,11 @@ bool RFTransmitter::SendCommand(ShockerModelType model, uint16_t shockerId, Shoc
     return false;
   }
 
-  command_t* cmd = new command_t {.until = OpenShock::millis() + durationMs, .sequence = Rmt::GetSequence(model, shockerId, type, intensity), .zeroSequence = Rmt::GetZeroSequence(model, shockerId), .shockerId = shockerId, .overwrite = overwriteExisting};
-
-  // We will use nullptr commands to end the task, if we got a nullptr here, we are out of memory... :(
-  if (cmd == nullptr) {
-    OS_LOGE(TAG, "[pin-%hhi] Failed to allocate command", m_txPin);
-    return false;
-  }
+  command_t cmd = command_t {.until = OpenShock::millis() + durationMs, .model = model, .type = type, .shockerId = shockerId, .intensity = intensity, .overwrite = overwriteExisting, .destroy = false};
 
   // Add the command to the queue, wait max 10 ms (Adjust this)
   if (xQueueSend(m_queueHandle, &cmd, pdMS_TO_TICKS(10)) != pdTRUE) {
     OS_LOGE(TAG, "[pin-%hhi] Failed to send command to queue", m_txPin);
-    delete cmd;
     return false;
   }
 
@@ -103,9 +102,8 @@ void RFTransmitter::ClearPendingCommands()
 
   OS_LOGI(TAG, "[pin-%hhi] Clearing pending commands", m_txPin);
 
-  command_t* command;
+  command_t command;
   while (xQueueReceive(m_queueHandle, &command, 0) == pdPASS) {
-    delete command;
   }
 }
 
@@ -115,7 +113,7 @@ void RFTransmitter::destroy()
     OS_LOGD(TAG, "[pin-%hhi] Stopping task", m_txPin);
 
     // Wait for the task to stop
-    command_t* cmd = nullptr;
+    command_t cmd {.destroy = true};
     while (eTaskGetState(m_taskHandle) != eDeleted) {
       vTaskDelay(pdMS_TO_TICKS(10));
 
@@ -144,88 +142,67 @@ void RFTransmitter::TransmitTask()
 {
   OS_LOGD(TAG, "[pin-%hhi] RMT loop running on core %d", m_txPin, xPortGetCoreID());
 
-  std::vector<command_t*> commands;
+  std::vector<sequence_t> sequences;
   while (true) {
     // Receive commands
-    command_t* cmd = nullptr;
-    while (xQueueReceive(m_queueHandle, &cmd, commands.empty() ? portMAX_DELAY : 0) == pdTRUE) {
-      if (cmd == nullptr) {
-        OS_LOGD(TAG, "[pin-%hhi] Received nullptr (stop command), cleaning up...", m_txPin);
-
-        for (auto it = commands.begin(); it != commands.end(); ++it) {
-          delete *it;
-        }
-
-        OS_LOGD(TAG, "[pin-%hhi] Cleanup done, stopping task", m_txPin);
-
+    command_t cmd;
+    while (xQueueReceive(m_queueHandle, &cmd, sequences.empty() ? portMAX_DELAY : 0) == pdTRUE) {
+      // Destroy task if we receive destroy command
+      if (cmd.destroy) {
+        sequences.clear();
         vTaskDelete(nullptr);
         return;
       }
 
-      // Replace the command if it already exists
-      for (auto it = commands.begin(); it != commands.end(); ++it) {
-        const command_t* existingCmd = *it;
-
-        if (existingCmd->shockerId == cmd->shockerId) {
-          // Only replace the command if it should be overwritten
-          if (existingCmd->overwrite) {
-            delete *it;
-            *it = cmd;
-          } else {
-            delete cmd;
-          }
-
-          cmd = nullptr;
-
-          break;
+      if (cmd.overwrite) {
+        // Replace the sequence if it already exists
+        auto it = std::find_if(sequences.begin(), sequences.end(), [&cmd](const sequence_t& seq) { return seq.encoder.shockerId() == cmd.shockerId; });
+        if (it != sequences.end()) {
+          it->encoder.fillSequence(cmd.type, cmd.intensity);
+          continue;
         }
       }
 
-      // If the command was not replaced, add it to the queue
-      if (cmd != nullptr) {
-        commands.push_back(cmd);
+      Rmt::MainEncoder encoder(cmd.model, cmd.shockerId);
+      if (encoder.is_valid()) {
+        encoder.fillSequence(cmd.type, cmd.intensity);
+
+        // If the command was not replaced, add it to the queue
+        sequences.push_back(sequence_t {.until = cmd.until, .encoder = std::move(encoder)});
       }
     }
 
     if (OpenShock::EStopManager::IsEStopped()) {
       int64_t whenEStoppedTime = EStopManager::LastEStopped();
 
-      for (auto it = commands.begin(); it != commands.end(); ++it) {
-        cmd = *it;
-
-        cmd->until = whenEStoppedTime;
+      for (auto seq = sequences.begin(); seq != sequences.end(); ++seq) {
+        seq->until = whenEStoppedTime;
       }
     }
 
     // Send queued commands
-    for (auto it = commands.begin(); it != commands.end();) {
-      cmd = *it;
+    for (auto seq = sequences.begin(); seq != sequences.end();) {
+      bool expired = seq->until < OpenShock::millis();
 
-      bool expired = cmd->until < OpenShock::millis();
-      bool empty   = cmd->sequence.empty();
-
-      // Remove expired or empty commands, else send the command.
+      // Remove expired commands, else send the command.
       // After sending/receiving a command, move to the next one.
-      if (expired || empty) {
-        // If the command is not empty, send the zero sequence to stop the shocker
-        if (!empty) {
-          rmtWriteBlocking(m_rmtHandle, cmd->zeroSequence.data(), cmd->zeroSequence.size());
-        }
+      if (expired) {
+        // Send the zero sequence to stop the shocker
+        rmtWriteBlocking(m_rmtHandle, seq->encoder.terminator(), seq->encoder.size());
 
-        if (cmd->until + TRANSMIT_END_DURATION < OpenShock::millis()) {
+        if (seq->until + TRANSMIT_END_DURATION < OpenShock::millis()) {
           // Remove the command and move to the next one
-          it = commands.erase(it);
-          delete cmd;
+          seq = sequences.erase(seq);
         } else {
           // Move to the next command
-          ++it;
+          ++seq;
         }
       } else {
         // Send the command
-        rmtWriteBlocking(m_rmtHandle, cmd->sequence.data(), cmd->sequence.size());
+        rmtWriteBlocking(m_rmtHandle, seq->encoder.payload(), seq->encoder.size());
 
         // Move to the next command
-        ++it;
+        ++seq;
       }
     }
   }

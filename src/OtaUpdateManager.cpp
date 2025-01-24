@@ -583,7 +583,7 @@ bool OtaUpdateManager::TryGetFirmwareBoards(const OpenShock::SemVer& version, st
 
 static bool _tryParseIntoHash(std::string_view hash, uint8_t (&hashBytes)[32])
 {
-  if (!HexUtils::TryParseHex(hash.data(), hash.size(), hashBytes, 32)) {
+  if (!HexUtils::TryParseHex(hash.data(), hash.size(), hashBytes, 32) != 16) {
     OS_LOGE(TAG, "Failed to parse hash: %.*s", hash.size(), hash.data());
     return false;
   }
@@ -639,9 +639,7 @@ bool OtaUpdateManager::TryGetFirmwareRelease(const OpenShock::SemVer& version, F
     auto hash = OpenShock::StringTrim(parts[0]);
     auto file = OpenShock::StringTrim(parts[1]);
 
-    if (OpenShock::StringStartsWith(file, "./"sv)) {
-      file = file.substr(2);
-    }
+    file = OpenShock::StringRemovePrefix(file, "./"sv);
 
     if (hash.size() != 64) {
       OS_LOGE(TAG, "Invalid hash: %.*s", hash.size(), hash.data());

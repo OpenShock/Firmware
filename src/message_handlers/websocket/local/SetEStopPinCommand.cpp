@@ -3,7 +3,7 @@
 #include "CaptivePortal.h"
 #include "Chipset.h"
 #include "config/Config.h"
-#include "EStopManager.h"
+#include "estop/EStopManager.h"
 #include "Logging.h"
 
 #include <cstdint>

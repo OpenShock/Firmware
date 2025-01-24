@@ -2,7 +2,7 @@
 
 #include "config/Config.h"
 #include "Convert.h"
-#include "EStopManager.h"
+#include "estop/EStopManager.h"
 
 static void handleGetEnabled(std::string_view arg, bool isAutomated)
 {

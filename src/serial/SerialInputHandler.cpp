@@ -7,7 +7,7 @@ const char* const TAG = "SerialInputHandler";
 #include "config/Config.h"
 #include "config/SerialInputConfig.h"
 #include "Convert.h"
-#include "EStopManager.h"
+#include "estop/EStopManager.h"
 #include "FormatHelpers.h"
 #include "http/HTTPRequestManager.h"
 #include "Logging.h"
@@ -51,7 +51,7 @@ namespace std {
   };
 
   struct equals_ci {
-    bool operator()(std::string_view a, std::string_view b) const { return strncasecmp(a.data(), b.data(), std::max(a.size(), b.size())) == 0; }
+    bool operator()(std::string_view a, std::string_view b) const { return OpenShock::StringIEquals(a, b); }
   };
 }  // namespace std
 
@@ -435,7 +435,7 @@ static void serialHandleActivity(std::string_view buffer, bool hasData)
   }
 
   // If the command starts with a $, it's a automated command, don't echo it
-  if (!buffer.empty() && buffer[0] == '$') {
+  if (OpenShock::StringHasPrefix(buffer, '$')) {
     return;
   }
 
@@ -595,7 +595,7 @@ bool SerialInputHandler::Init()
     return false;
   }
 
-  if (TaskUtils::TaskCreateExpensive(serialTaskRX, "SerialRX", 4800, nullptr, 1, nullptr) != pdPASS) {  // TODO: Profile stack size
+  if (TaskUtils::TaskCreateExpensive(serialTaskRX, "SerialRX", 10'000, nullptr, 1, nullptr) != pdPASS) {  // TODO: Profile stack size
     OS_LOGE(TAG, "Failed to create serial RX task");
     return false;
   }

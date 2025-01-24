@@ -154,12 +154,15 @@ constexpr bool _semverIsDotSeperatedPreleaseIdentifiers(std::string_view str)
 
   return _semverIsPrereleaseIdentifier(str);
 }
-const auto _semverIsPatch      = _semverIsNumericIdentifier;
-const auto _semverIsMinor      = _semverIsNumericIdentifier;
-const auto _semverIsMajor      = _semverIsNumericIdentifier;
-const auto _semverIsPrerelease = _semverIsDotSeperatedPreleaseIdentifiers;
-const auto _semverIsBuild      = _semverIsDotSeperatedBuildIdentifiers;
-bool _semverIsVersionCore(std::string_view str)
+
+// For readability
+#define _semverIsPatch      _semverIsNumericIdentifier
+#define _semverIsMinor      _semverIsNumericIdentifier
+#define _semverIsMajor      _semverIsNumericIdentifier
+#define _semverIsPrerelease _semverIsDotSeperatedPreleaseIdentifiers
+#define _semverIsBuild      _semverIsDotSeperatedBuildIdentifiers
+
+constexpr bool _semverIsVersionCore(std::string_view str)
 {
   if (str.empty()) {
     return false;
@@ -172,7 +175,7 @@ bool _semverIsVersionCore(std::string_view str)
 
   return _semverIsMajor(parts[0]) && _semverIsMinor(parts[1]) && _semverIsPatch(parts[2]);
 }
-bool _semverIsSemver(std::string_view str)
+constexpr bool _semverIsSemver(std::string_view str)
 {
   if (str.empty()) {
     return false;
@@ -298,7 +301,7 @@ bool SemVer::operator<(const SemVer& other) const
   return build < other.build;
 }
 
-bool SemVer::operator==(const std::string_view& other) const
+bool SemVer::operator==(std::string_view other) const
 {
   SemVer otherSemVer;
   if (!OpenShock::TryParseSemVer(other, otherSemVer)) {
@@ -308,7 +311,7 @@ bool SemVer::operator==(const std::string_view& other) const
   return *this == otherSemVer;
 }
 
-bool SemVer::operator<(const std::string_view& other) const
+bool SemVer::operator<(std::string_view other) const
 {
   SemVer otherSemVer;
   if (!OpenShock::TryParseSemVer(other, otherSemVer)) {
@@ -328,17 +331,11 @@ bool OpenShock::TryParseSemVer(std::string_view semverStr, SemVer& semver)
 
   std::string_view majorStr = parts[0], minorStr = parts[1], patchStr = parts[2];
 
-  auto dashIdx = patchStr.find('-');
-  if (dashIdx != std::string_view::npos) {
-    semver.prerelease = patchStr.substr(dashIdx + 1);
-    patchStr          = patchStr.substr(0, dashIdx);
-  }
+  size_t plusIdx = patchStr.find('+');
+  size_t dashIdx = patchStr.find('-');
 
-  auto plusIdx = semver.prerelease.find('+');
-  if (plusIdx != std::string_view::npos) {
-    semver.build      = semver.prerelease.substr(plusIdx + 1);
-    semver.prerelease = semver.prerelease.substr(0, plusIdx);
-  }
+  std::string_view restStr = patchStr.substr(std::min(dashIdx, plusIdx));
+  patchStr.remove_suffix(restStr.length());
 
   if (!Convert::ToUint16(majorStr, semver.major)) {
     OS_LOGE(TAG, "Invalid major version: %.*s", majorStr.length(), majorStr.data());
@@ -355,14 +352,25 @@ bool OpenShock::TryParseSemVer(std::string_view semverStr, SemVer& semver)
     return false;
   }
 
-  if (!semver.prerelease.empty() && !_semverIsPrerelease(semver.prerelease)) {
-    OS_LOGE(TAG, "Invalid prerelease: %s", semver.prerelease.c_str());
-    return false;
-  }
+  if (!restStr.empty()) {
+    if (plusIdx != std::string_view::npos) {
+      semver.build = restStr.substr((plusIdx - patchStr.length()) + 1);
+      patchStr.remove_suffix(semver.build.length() + 1);
 
-  if (!semver.build.empty() && !_semverIsBuild(semver.build)) {
-    OS_LOGE(TAG, "Invalid build: %s", semver.build.c_str());
-    return false;
+      if (!semver.build.empty() && !_semverIsBuild(semver.build)) {
+        OS_LOGE(TAG, "Invalid build: %s", semver.build.c_str());
+        return false;
+      }
+    }
+
+    if (dashIdx != std::string_view::npos) {
+      semver.prerelease = patchStr.substr(1);
+
+      if (!semver.prerelease.empty() && !_semverIsPrerelease(semver.prerelease)) {
+        OS_LOGE(TAG, "Invalid prerelease: %s", semver.prerelease.c_str());
+        return false;
+      }
+    }
   }
 
   return true;
