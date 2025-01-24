@@ -159,6 +159,7 @@ void RFTransmitter::TransmitTask()
         auto it = std::find_if(sequences.begin(), sequences.end(), [&cmd](const sequence_t& seq) { return seq.encoder.shockerId() == cmd.shockerId; });
         if (it != sequences.end()) {
           it->encoder.fillSequence(cmd.type, cmd.intensity);
+          it->until = cmd.until;
           continue;
         }
       }
