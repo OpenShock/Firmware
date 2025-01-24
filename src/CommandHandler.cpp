@@ -25,7 +25,7 @@ const char* const TAG = "CommandHandler";
 const int64_t KEEP_ALIVE_INTERVAL  = 60'000;
 const uint16_t KEEP_ALIVE_DURATION = 300;
 
-uint32_t calculateEepyTime(int64_t timeToKeepAlive)
+static uint32_t calculateEepyTime(int64_t timeToKeepAlive)
 {
   int64_t now = OpenShock::millis();
   return static_cast<uint32_t>(std::clamp(timeToKeepAlive - now, 0LL, KEEP_ALIVE_INTERVAL));
