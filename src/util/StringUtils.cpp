@@ -4,6 +4,7 @@ const char* const TAG = "StringUtils";
 
 #include "Logging.h"
 
+#include <algorithm>
 #include <cstdarg>
 #include <cstring>
 
@@ -127,6 +128,18 @@ bool OpenShock::StringIEquals(std::string_view a, std::string_view b)
 {
   if (a.size() != b.size()) return false;
   return strncasecmp(a.data(), b.data(), a.size()) == 0;
+}
+bool OpenShock::StringIContains(std::string_view haystack, std::string_view needle)
+{
+  if (haystack.size() < needle.size()) return false;
+  if (haystack.size() == needle.size()) return StringIEquals(haystack, needle);
+
+  return std::search(haystack.begin(), haystack.end(), needle.begin(), needle.end(), [](char hc, char nc) { return tolower(hc) == tolower(nc); }) != haystack.end();
+}
+bool OpenShock::StringHasPrefixIC(std::string_view view, std::string_view prefix)
+{
+  if (view.size() < prefix.size()) return false;
+  return StringIEquals(view.substr(0, prefix.size()), prefix);
 }
 
 String OpenShock::StringToArduinoString(std::string_view view) {
