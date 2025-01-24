@@ -355,7 +355,7 @@ bool OpenShock::TryParseSemVer(std::string_view semverStr, SemVer& semver)
   if (!restStr.empty()) {
     if (plusIdx != std::string_view::npos) {
       semver.build = restStr.substr((plusIdx - patchStr.length()) + 1);
-      patchStr.remove_suffix(semver.build.length() + 1);
+      restStr.remove_suffix(semver.build.length() + 1);
 
       if (!semver.build.empty() && !_semverIsBuild(semver.build)) {
         OS_LOGE(TAG, "Invalid build: %s", semver.build.c_str());
@@ -364,7 +364,7 @@ bool OpenShock::TryParseSemVer(std::string_view semverStr, SemVer& semver)
     }
 
     if (dashIdx != std::string_view::npos) {
-      semver.prerelease = patchStr.substr(1);
+      semver.prerelease = restStr.substr(1);
 
       if (!semver.prerelease.empty() && !_semverIsPrerelease(semver.prerelease)) {
         OS_LOGE(TAG, "Invalid prerelease: %s", semver.prerelease.c_str());
