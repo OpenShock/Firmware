@@ -152,28 +152,21 @@ constexpr bool spanToT(std::string_view str, T& out)
   // Special case handling for signed integers.
   if constexpr (IsSigned) {
     if (isNegative) {
-      // Calculate the inverted lower limit for the signed type (e.g., 128 for int8_t).
-      constexpr UT LowerLimit = static_cast<UT>(std::numeric_limits<T>::max()) + 1;
-
-      // Signed cast undeflow check
-      if (val > LowerLimit) {
+      // Signed cast undeflow check, checks against the inverse lower limit for the signed type (e.g., 128 for int8_t).
+      if (val > static_cast<UT>(std::numeric_limits<T>::max()) + 1) {
         return false;
       }
 
-      // Assign negative value and return
-      out = static_cast<T>(~val + 1);
-      return true;
-    }
-
-    // Signed cast overflow check
-    if (val > std::numeric_limits<T>::max()) {
+      // Assign negative value bits
+      val = ~val + 1;
+    } else if (val > std::numeric_limits<T>::max()) {
+      // Fail on signed cast overflow
       return false;
     }
   }
 
-  // Assign the result for unsigned or positive values.
+  // Cast result to output and return
   out = static_cast<T>(val);
-
   return true;
 }
 
