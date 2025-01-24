@@ -15,6 +15,7 @@ namespace OpenShock::Convert {  // TODO: C++23 make this use std::from_chars ins
   void FromUint32(uint32_t val, std::string& str);
   void FromInt64(int64_t val, std::string& str);
   void FromUint64(uint64_t val, std::string& str);
+  void FromSizeT(size_t val, std::string& str);
   void FromBool(bool val, std::string& str);
   void FromGpioNum(gpio_num_t val, std::string& str);
 

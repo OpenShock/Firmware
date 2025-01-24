@@ -185,6 +185,11 @@ void Convert::FromUint64(uint64_t val, std::string& str)
   fromT(val, str);
 }
 
+void Convert::FromSizeT(size_t val, std::string& str)
+{
+  fromT(val, str);
+}
+
 void Convert::FromBool(bool val, std::string& str)
 {
   if (val) {
