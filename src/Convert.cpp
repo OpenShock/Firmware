@@ -18,12 +18,9 @@ void fromNonZeroT(T val, std::string& str)
   static_assert(std::is_integral_v<T>);
   constexpr std::size_t MaxDigits = OpenShock::Util::Digits10CountMax<T>;
 
-  char buf[MaxDigits + 1];  // +1 for null terminator
+  char buf[MaxDigits];
 
   char* ptr = buf + MaxDigits;
-
-  // Null terminator
-  *ptr-- = '\0';
 
   // Handle negative numbers
   bool negative = val < 0;
@@ -33,16 +30,16 @@ void fromNonZeroT(T val, std::string& str)
 
   // Convert to string
   while (val > 0) {
-    *ptr-- = '0' + (val % 10);
+    *--ptr = '0' + (val % 10);
     val /= 10;
   }
 
   if (negative) {
-    *ptr-- = '-';
+    *--ptr = '-';
   }
 
   // Append to string with length
-  str.append(ptr + 1, buf + MaxDigits + 1);
+  str.append(ptr, buf + MaxDigits);
 }
 
 // Base converter

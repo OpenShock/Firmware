@@ -245,19 +245,19 @@ std::string SemVer::toString() const
   str.reserve(length);
 
   Convert::FromUint16(major, str);
-  str += '.';
+  str.push_back('.');
   Convert::FromUint16(minor, str);
-  str += '.';
+  str.push_back('.');
   Convert::FromUint16(patch, str);
 
   if (!prerelease.empty()) {
-    str += '-';
-    str.append(prerelease.c_str(), prerelease.length());
+    str.push_back('-');
+    str.append(prerelease.data(), prerelease.length());
   }
 
   if (!build.empty()) {
-    str += '+';
-    str.append(build.c_str(), build.length());
+    str.push_back('+');
+    str.append(build.data(), build.length());
   }
 
   return str;
