@@ -583,7 +583,7 @@ bool OtaUpdateManager::TryGetFirmwareBoards(const OpenShock::SemVer& version, st
 
 static bool _tryParseIntoHash(std::string_view hash, uint8_t (&hashBytes)[32])
 {
-  if (!HexUtils::TryParseHex(hash.data(), hash.size(), hashBytes, 32) != 16) {
+  if (HexUtils::TryParseHex(hash.data(), hash.size(), hashBytes, 32) != 32) {
     OS_LOGE(TAG, "Failed to parse hash: %.*s", hash.size(), hash.data());
     return false;
   }
