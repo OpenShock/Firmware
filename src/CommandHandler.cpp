@@ -316,7 +316,7 @@ bool CommandHandler::HandleCommand(ShockerModelType model, uint16_t shockerId, S
   ScopedReadLock lock__ka(&s_keepAliveMutex);
 
   if (ok && s_keepAliveQueue != nullptr) {
-    KnownShocker cmd {.model = model, .shockerId = shockerId, .lastActivityTimestamp = OpenShock::millis() + durationMs};
+    KnownShocker cmd {.killTask = false, .model = model, .shockerId = shockerId, .lastActivityTimestamp = OpenShock::millis() + durationMs};
     if (xQueueSend(s_keepAliveQueue, &cmd, pdMS_TO_TICKS(10)) != pdTRUE) {
       OS_LOGE(TAG, "Failed to send keep-alive command to queue");
     }
