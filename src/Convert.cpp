@@ -13,33 +13,35 @@ using namespace std::string_view_literals;
 
 // Base converter
 template<typename T>
-void fromNonZeroT(T val, std::string& str)
+void fromNonZeroT(T val, std::string& out)
 {
-  static_assert(std::is_integral_v<T>);
+  // Ensure the template type T is an integral type
+  static_assert(std::is_integral_v<T>, "T must be an integral type");
   constexpr std::size_t MaxDigits = OpenShock::Util::Digits10CountMax<T>;
 
   char buf[MaxDigits];
 
+  // Start from the end of the buffer to construct the number in reverse (from least to most significant digit)
   char* ptr = buf + MaxDigits;
 
-  // Handle negative numbers
   bool negative = val < 0;
   if (negative) {
-    val = -val;
+    val = -val;  // Make the value positive for digit extraction
   }
 
-  // Convert to string
+  // Extract digits and store them in reverse order in the buffer
   while (val > 0) {
     *--ptr = '0' + (val % 10);
     val /= 10;
   }
 
+  // If the number was negative, add the negative sign
   if (negative) {
     *--ptr = '-';
   }
 
-  // Append to string with length
-  str.append(ptr, buf + MaxDigits);
+  // Append the resulting string to the output
+  out.append(ptr, buf + MaxDigits);
 }
 
 // Base converter
