@@ -1,5 +1,6 @@
 #pragma once
 
+#include "Common.h"
 #include "GatewayClientState.h"
 
 #include <WebSocketsClient.h>
@@ -11,11 +12,14 @@
 
 namespace OpenShock {
   class GatewayClient {
+    DISABLE_COPY(GatewayClient);
+    DISABLE_MOVE(GatewayClient);
+
   public:
     GatewayClient(const std::string& authToken);
     ~GatewayClient();
 
-    constexpr GatewayClientState state() const { return m_state; }
+    inline GatewayClientState state() const { return m_state; }
 
     void connect(const char* lcgFqdn);
     void disconnect();

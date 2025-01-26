@@ -9,8 +9,8 @@
 // Ensure the included flatbuffers.h is the same version as when this file was
 // generated, otherwise it may not be compatible.
 static_assert(FLATBUFFERS_VERSION_MAJOR == 24 &&
-              FLATBUFFERS_VERSION_MINOR == 3 &&
-              FLATBUFFERS_VERSION_REVISION == 25,
+              FLATBUFFERS_VERSION_MINOR == 12 &&
+              FLATBUFFERS_VERSION_REVISION == 23,
              "Non-compatible flatbuffers version included");
 
 #include "HubConfig_generated.h"
@@ -61,30 +61,33 @@ enum class AccountLinkResultCode : uint8_t {
   InvalidCodeLength = 2,
   NoInternetConnection = 3,
   InvalidCode = 4,
-  InternalError = 5,
+  RateLimited = 5,
+  InternalError = 6,
   MIN = Success,
   MAX = InternalError
 };
 
-inline const AccountLinkResultCode (&EnumValuesAccountLinkResultCode())[6] {
+inline const AccountLinkResultCode (&EnumValuesAccountLinkResultCode())[7] {
   static const AccountLinkResultCode values[] = {
     AccountLinkResultCode::Success,
     AccountLinkResultCode::CodeRequired,
     AccountLinkResultCode::InvalidCodeLength,
     AccountLinkResultCode::NoInternetConnection,
     AccountLinkResultCode::InvalidCode,
+    AccountLinkResultCode::RateLimited,
     AccountLinkResultCode::InternalError
   };
   return values;
 }
 
 inline const char * const *EnumNamesAccountLinkResultCode() {
-  static const char * const names[7] = {
+  static const char * const names[8] = {
     "Success",
     "CodeRequired",
     "InvalidCodeLength",
     "NoInternetConnection",
     "InvalidCode",
+    "RateLimited",
     "InternalError",
     nullptr
   };

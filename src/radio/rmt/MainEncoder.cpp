@@ -6,50 +6,46 @@ const char* const TAG = "RmtMainEncoder";
 #include "radio/rmt/CaiXianlinEncoder.h"
 #include "radio/rmt/Petrainer998DREncoder.h"
 #include "radio/rmt/PetrainerEncoder.h"
-
-#include <unordered_map>
+#include "radio/rmt/T330Encoder.h"
 
 using namespace OpenShock;
 
-std::vector<rmt_data_t> Rmt::GetSequence(ShockerModelType model, uint16_t shockerId, ShockerCommandType type, uint8_t intensity) {
-  switch (model) {
-    case ShockerModelType::Petrainer:
-      return Rmt::PetrainerEncoder::GetSequence(shockerId, type, intensity);
-    case ShockerModelType::Petrainer998DR:
-      return Rmt::Petrainer998DREncoder::GetSequence(shockerId, type, intensity);
+static size_t getSequenceBufferSize(ShockerModelType shockerModelType)
+{
+  switch (shockerModelType) {
     case ShockerModelType::CaiXianlin:
-      return Rmt::CaiXianlinEncoder::GetSequence(shockerId, 0, type, intensity);
+      return Rmt::CaiXianlinEncoder::GetBufferSize();
+    case ShockerModelType::Petrainer998DR:
+      return Rmt::Petrainer998DREncoder::GetBufferSize();
+    case ShockerModelType::Petrainer:
+      return Rmt::PetrainerEncoder::GetBufferSize();
     default:
-      OS_LOGE(TAG, "Unknown shocker model: %u", model);
-      return {};
+      return 0;
   }
 }
-/*
-std::shared_ptr<std::vector<rmt_data_t>> Rmt::GetZeroSequence(ShockerModelType model, uint16_t shockerId) {
-  static std::unordered_map<uint16_t, std::shared_ptr<std::vector<rmt_data_t>>> _sequences;
 
-  auto it = _sequences.find(shockerId);
-  if (it != _sequences.end()) return it->second; // FIXME: This is not thread-safe, and does not check if model is the same, causing a protocol mismatch
-
-  std::shared_ptr<std::vector<rmt_data_t>> sequence;
-  switch (model) {
-    case ShockerModelType::Petrainer:
-      sequence = std::make_shared<std::vector<rmt_data_t>>(Rmt::PetrainerEncoder::GetSequence(shockerId, ShockerCommandType::Vibrate, 0));
-      break;
-    case ShockerModelType::Petrainer998DR:
-      sequence = std::make_shared<std::vector<rmt_data_t>>(Rmt::Petrainer998DREncoder::GetSequence(shockerId, ShockerCommandType::Vibrate, 0));
-      break;
-    case ShockerModelType::CaiXianlin:
-      sequence = std::make_shared<std::vector<rmt_data_t>>(Rmt::CaiXianlinEncoder::GetSequence(shockerId, 0, ShockerCommandType::Vibrate, 0));
-      break;
-    default:
-      OS_LOGE(TAG, "Unknown shocker model: %u", model);
-      sequence = nullptr;
-      break;
+Rmt::MainEncoder::MainEncoder(ShockerModelType shockerModel, uint16_t shockerId)
+  : m_data(nullptr)
+  , m_size(getSequenceBufferSize(shockerModel))
+  , m_shockerModel(shockerModel)
+  , m_shockerId(shockerId)
+{
+  if (m_size > 0) {
+    m_data = reinterpret_cast<rmt_data_t*>(malloc(m_size * 2 * sizeof(rmt_data_t)));
   }
-
-  _sequences[shockerId] = sequence;
-
-  return sequence;
 }
-*/
+
+bool Rmt::MainEncoder::fillSequence(ShockerCommandType commandType, uint8_t intensity)
+{
+  switch (m_shockerModel) {
+    case ShockerModelType::CaiXianlin:
+      return Rmt::CaiXianlinEncoder::FillBuffer(m_data, m_shockerId, 0, commandType, intensity) && Rmt::CaiXianlinEncoder::FillBuffer(m_data + m_size, m_shockerId, 0, ShockerCommandType::Vibrate, 0);
+    case ShockerModelType::Petrainer:
+      return Rmt::PetrainerEncoder::FillBuffer(m_data, m_shockerId, commandType, intensity) && Rmt::PetrainerEncoder::FillBuffer(m_data + m_size, m_shockerId, ShockerCommandType::Vibrate, 0);
+    case ShockerModelType::Petrainer998DR:
+      return Rmt::Petrainer998DREncoder::FillBuffer(m_data, m_shockerId, commandType, intensity) && Rmt::Petrainer998DREncoder::FillBuffer(m_data + m_size, m_shockerId, ShockerCommandType::Vibrate, 0);
+    default:
+      OS_LOGE(TAG, "Unknown shocker model: %u", m_shockerModel);
+      return false;
+  }
+}

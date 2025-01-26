@@ -8,5 +8,6 @@ export enum AccountLinkResultCode {
   InvalidCodeLength = 2,
   NoInternetConnection = 3,
   InvalidCode = 4,
-  InternalError = 5
+  RateLimited = 5,
+  InternalError = 6
 }

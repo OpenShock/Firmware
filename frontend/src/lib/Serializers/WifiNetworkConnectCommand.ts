@@ -10,7 +10,11 @@ export function SerializeWifiNetworkConnectCommand(ssid: string): Uint8Array {
 
   const cmdOffset = WifiNetworkConnectCommand.createWifiNetworkConnectCommand(fbb, ssidOffset);
 
-  const payloadOffset = LocalToHubMessage.createLocalToHubMessage(fbb, LocalToHubMessagePayload.WifiNetworkConnectCommand, cmdOffset);
+  const payloadOffset = LocalToHubMessage.createLocalToHubMessage(
+    fbb,
+    LocalToHubMessagePayload.WifiNetworkConnectCommand,
+    cmdOffset
+  );
 
   fbb.finish(payloadOffset);
 

@@ -6,7 +6,8 @@ const char* const TAG = "JsonSerial";
 
 using namespace OpenShock::Serialization;
 
-bool JsonSerial::ParseShockerCommand(const cJSON* root, JsonSerial::ShockerCommand& out) {
+bool JsonSerial::ParseShockerCommand(const cJSON* root, JsonSerial::ShockerCommand& out)
+{
   if (cJSON_IsObject(root) == 0) {
     OS_LOGE(TAG, "not an object");
     return false;
@@ -52,9 +53,9 @@ bool JsonSerial::ParseShockerCommand(const cJSON* root, JsonSerial::ShockerComma
     OS_LOGE(TAG, "value at 'type' is not a string");
     return false;
   }
-  ShockerCommandType commandType;
+  ShockerCommandType commandType = ShockerCommandType::Stop;
   if (!ShockerCommandTypeFromString(command->valuestring, commandType)) {
-    OS_LOGE(TAG, "value at 'type' is not a valid shocker command (stop, shock, vibrate, sound)");
+    OS_LOGE(TAG, "value at 'type' is not a valid shocker command (shock, vibrate, sound, light, stop)");
     return false;
   }
 

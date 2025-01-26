@@ -5,15 +5,16 @@
 
 #include <WebSockets.h>
 
-#include <map>
 #include <cstdint>
 #include <functional>
+#include <map>
 
 namespace OpenShock {
   class WebSocketDeFragger {
     DISABLE_COPY(WebSocketDeFragger);
-  public:
+    DISABLE_MOVE(WebSocketDeFragger);
 
+  public:
     typedef std::function<void(uint8_t socketId, WebSocketMessageType type, const uint8_t* data, uint32_t length)> EventCallback;
 
     WebSocketDeFragger(EventCallback callback);
@@ -23,6 +24,7 @@ namespace OpenShock {
     void onEvent(const EventCallback& callback);
     void clear(uint8_t socketId);
     void clear();
+
   private:
     void start(uint8_t socketId, WebSocketMessageType type, const uint8_t* data, uint32_t length);
     void append(uint8_t socketId, const uint8_t* data, uint32_t length);
@@ -38,4 +40,4 @@ namespace OpenShock {
     std::map<uint8_t, Message> m_messages;
     EventCallback m_callback;
   };
-}
+}  // namespace OpenShock

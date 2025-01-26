@@ -44,7 +44,7 @@ OpenShock::Serial::CommandGroup OpenShock::Serial::CommandHandlers::RfTransmitHa
     "{\"model\":\"caixianlin\",\"id\":12345,\"type\":\"vibrate\",\"intensity\":99,\"durationMs\":500}"sv,
     {"model      (string) Model of the shocker                    (\"caixianlin\", \"petrainer\", \"petrainer998dr\")"sv,
      "id         (number) ID of the shocker                       (0-65535)"sv,
-     "type       (string) Type of the command                     (\"shock\", \"vibrate\", \"sound\", \"stop\")"sv,
+     "type       (string) Type of the command                     (\"shock\", \"vibrate\", \"sound\", \"light\", \"stop\")"sv,
      "intensity  (number) Intensity of the command                (0-255)"sv,
      "durationMs (number) Duration of the command in milliseconds (0-65535)"sv}
   );

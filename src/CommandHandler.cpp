@@ -7,8 +7,8 @@ const char* const TAG = "CommandHandler";
 #include "Chipset.h"
 #include "Common.h"
 #include "config/Config.h"
-#include "EStopManager.h"
-#include "EStopState.h"
+#include "estop/EStopManager.h"
+#include "estop/EStopState.h"
 #include "events/Events.h"
 #include "Logging.h"
 #include "radio/RFTransmitter.h"
@@ -25,7 +25,7 @@ const char* const TAG = "CommandHandler";
 const int64_t KEEP_ALIVE_INTERVAL  = 60'000;
 const uint16_t KEEP_ALIVE_DURATION = 300;
 
-uint32_t calculateEepyTime(int64_t timeToKeepAlive)
+static uint32_t calculateEepyTime(int64_t timeToKeepAlive)
 {
   int64_t now = OpenShock::millis();
   return static_cast<uint32_t>(std::clamp(timeToKeepAlive - now, 0LL, KEEP_ALIVE_INTERVAL));
@@ -316,7 +316,7 @@ bool CommandHandler::HandleCommand(ShockerModelType model, uint16_t shockerId, S
   ScopedReadLock lock__ka(&s_keepAliveMutex);
 
   if (ok && s_keepAliveQueue != nullptr) {
-    KnownShocker cmd {.model = model, .shockerId = shockerId, .lastActivityTimestamp = OpenShock::millis() + durationMs};
+    KnownShocker cmd {.killTask = false, .model = model, .shockerId = shockerId, .lastActivityTimestamp = OpenShock::millis() + durationMs};
     if (xQueueSend(s_keepAliveQueue, &cmd, pdMS_TO_TICKS(10)) != pdTRUE) {
       OS_LOGE(TAG, "Failed to send keep-alive command to queue");
     }

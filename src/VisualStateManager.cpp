@@ -4,7 +4,7 @@
 
 const char* const TAG = "VisualStateManager";
 
-#include "EStopState.h"
+#include "estop/EStopState.h"
 #include "events/Events.h"
 #include "GatewayClientState.h"
 #include "Logging.h"
@@ -323,7 +323,7 @@ void _handleOpenShockEvent(void* event_handler_arg, esp_event_base_t event_base,
       _handleOpenShockGatewayStateChanged(event_data);
       break;
     default:
-      ESP_LOGW(TAG, "Received unknown event ID: %i", event_id);
+      OS_LOGW(TAG, "Received unknown event ID: %i", event_id);
       return;
   }
 

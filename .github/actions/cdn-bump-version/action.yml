@@ -26,12 +26,22 @@ inputs:
 runs:
   using: composite
   steps:
-    - name: Upload version file
+    - name: Prepare Upload Folder
       shell: bash
       run: |
         mkdir -p upload
         echo "${{ inputs.version }}" >> upload/version-${{ inputs.release-channel }}.txt
-        sshpass -p "${{ inputs.bunny-stor-password }}" scp -v -r upload/* ${{ inputs.bunny-stor-username }}@${{ inputs.bunny-stor-hostname }}:/
+
+    - name: Upload version file
+      uses: milanmk/actions-file-deployer@master
+      with:
+        remote-protocol: "sftp"
+        remote-host: "${{ inputs.bunny-stor-hostname }}"
+        remote-user: "${{ inputs.bunny-stor-username }}"
+        remote-password: "${{ inputs.bunny-stor-password }}"
+        remote-path: "/"
+        local-path: "upload"
+        sync: "full"
 
     - name: Purge CDN cache
       shell: bash

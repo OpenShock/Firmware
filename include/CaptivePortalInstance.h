@@ -1,5 +1,6 @@
 #pragma once
 
+#include "Common.h"
 #include "WebSocketDeFragger.h"
 
 #include <DNSServer.h>
@@ -14,6 +15,9 @@
 
 namespace OpenShock {
   class CaptivePortalInstance {
+    DISABLE_COPY(CaptivePortalInstance);
+    DISABLE_MOVE(CaptivePortalInstance);
+
   public:
     CaptivePortalInstance();
     ~CaptivePortalInstance();

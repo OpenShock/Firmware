@@ -8,7 +8,11 @@ export function SerializeWifiNetworkDisconnectCommand(): Uint8Array {
 
   const cmdOffset = WifiNetworkDisconnectCommand.createWifiNetworkDisconnectCommand(fbb, true);
 
-  const payloadOffset = LocalToHubMessage.createLocalToHubMessage(fbb, LocalToHubMessagePayload.WifiNetworkDisconnectCommand, cmdOffset);
+  const payloadOffset = LocalToHubMessage.createLocalToHubMessage(
+    fbb,
+    LocalToHubMessagePayload.WifiNetworkDisconnectCommand,
+    cmdOffset
+  );
 
   fbb.finish(payloadOffset);
 

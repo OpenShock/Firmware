@@ -7,7 +7,12 @@ node_modules
 .env.*
 !.env.example
 
-# Ignore files for PNPM, NPM and YARN
+# Package Managers
 pnpm-lock.yaml
 package-lock.json
 yarn.lock
+
+# Generated or imported files
+/components.json
+/src/lib/_fbs
+/src/lib/components/ui

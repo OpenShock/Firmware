@@ -3,7 +3,7 @@
 const char* const TAG = "ServerMessageHandlers";
 
 #include "CaptivePortal.h"
-#include "EStopManager.h"
+#include "estop/EStopManager.h"
 #include "Logging.h"
 
 #include <cstdint>

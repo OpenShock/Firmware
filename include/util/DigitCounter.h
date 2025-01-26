@@ -6,28 +6,16 @@
 
 namespace OpenShock::Util {
   template<typename T>
-  constexpr std::size_t Digits10CountMax()
-  {
-    static_assert(std::is_integral<T>::value);
-    uint64_t num = std::numeric_limits<T>::max();
-
-    std::size_t digits = std::is_signed<T>::value ? 2 : 1;
-    while (num >= 10) {
-      num /= 10;
-      digits++;
-    }
-
-    return digits;
-  }
+  inline constexpr int Digits10CountMax = std::numeric_limits<T>::digits10 + (std::is_signed_v<T> ? 2 : 1);
 
   template<typename T>
   constexpr std::size_t Digits10Count(T val)
   {
-    static_assert(std::is_integral<T>::value);
+    static_assert(std::is_integral_v<T>);
 
     std::size_t digits = 1;
 
-    if (std::is_signed<T>::value && val < 0) {
+    if constexpr (std::is_signed_v<T> && val < 0) {
       digits++;
       val = -val;
     }

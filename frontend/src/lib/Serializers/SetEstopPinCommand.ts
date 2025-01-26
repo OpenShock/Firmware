@@ -8,7 +8,11 @@ export function SerializeSetEstopPinCommand(pin: number): Uint8Array {
 
   const cmdOffset = SetEstopPinCommand.createSetEstopPinCommand(fbb, pin);
 
-  const payloadOffset = LocalToHubMessage.createLocalToHubMessage(fbb, LocalToHubMessagePayload.SetEstopPinCommand, cmdOffset);
+  const payloadOffset = LocalToHubMessage.createLocalToHubMessage(
+    fbb,
+    LocalToHubMessagePayload.SetEstopPinCommand,
+    cmdOffset
+  );
 
   fbb.finish(payloadOffset);
 

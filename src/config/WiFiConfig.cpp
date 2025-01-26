@@ -46,7 +46,7 @@ flatbuffers::Offset<OpenShock::Serialization::Configuration::WiFiConfig> WiFiCon
   fbsCredentialsList.reserve(credentialsList.size());
 
   for (auto& credentials : credentialsList) {
-    fbsCredentialsList.emplace_back(credentials.ToFlatbuffers(builder, withSensitiveData));
+    fbsCredentialsList.push_back(credentials.ToFlatbuffers(builder, withSensitiveData));
   }
 
   return Serialization::Configuration::CreateWiFiConfig(builder, builder.CreateString(accessPointSSID), builder.CreateString(hostname), builder.CreateVector(fbsCredentialsList));

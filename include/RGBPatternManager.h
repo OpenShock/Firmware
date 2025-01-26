@@ -15,6 +15,7 @@
 namespace OpenShock {
   class RGBPatternManager {
     DISABLE_COPY(RGBPatternManager);
+    DISABLE_MOVE(RGBPatternManager);
 
   public:
     RGBPatternManager() = delete;
