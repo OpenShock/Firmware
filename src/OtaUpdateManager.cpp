@@ -320,8 +320,6 @@ static void _otaUpdateTask(void* arg)
         OS_LOGE(TAG, "Failed to get requested version");
         continue;
       }
-
-      OS_LOGD(TAG, "Update requested for version %s", version.toString().c_str());  // TODO: This is abusing the SemVer::toString() method causing alot of string copies, fix this
     } else {
       OS_LOGD(TAG, "Checking for updates");
 
@@ -330,14 +328,16 @@ static void _otaUpdateTask(void* arg)
         OS_LOGE(TAG, "Failed to fetch firmware version");
         continue;
       }
-
-      OS_LOGD(TAG, "Remote version: %s", version.toString().c_str());  // TODO: This is abusing the SemVer::toString() method causing alot of string copies, fix this
     }
 
-    if (version.toString() == OPENSHOCK_FW_VERSION) {  // TODO: This is abusing the SemVer::toString() method causing alot of string copies, fix this
+    std::string versionStr = version.toString();  // TODO: This is abusing the SemVer::toString() method causing alot of string copies, fix this
+
+    if (versionStr == OPENSHOCK_FW_VERSION ""sv) {
       OS_LOGI(TAG, "Requested version is already installed");
       continue;
     }
+
+    OS_LOGD(TAG, "Updating to version: %.*s", versionStr.length(), versionStr.data());
 
     // Generate random int32_t for this update.
     int32_t updateId = static_cast<int32_t>(esp_random());
@@ -369,16 +369,16 @@ static void _otaUpdateTask(void* arg)
 
     // Print release.
     OS_LOGD(TAG, "Firmware release:");
-    OS_LOGD(TAG, "  Version:                %s", version.toString().c_str());  // TODO: This is abusing the SemVer::toString() method causing alot of string copies, fix this
-    OS_LOGD(TAG, "  App binary URL:         %s", release.appBinaryUrl.c_str());
+    OS_LOGD(TAG, "  Version:                %.*s", versionStr.length(), versionStr.data());
+    OS_LOGD(TAG, "  App binary URL:         %.*s", release.appBinaryUrl.length(), release.appBinaryUrl.data());
     OS_LOGD(TAG, "  App binary hash:        %s", HexUtils::ToHex<32>(release.appBinaryHash).data());
-    OS_LOGD(TAG, "  Filesystem binary URL:  %s", release.filesystemBinaryUrl.c_str());
+    OS_LOGD(TAG, "  Filesystem binary URL:  %.*s", release.filesystemBinaryUrl.length(), release.filesystemBinaryUrl.data());
     OS_LOGD(TAG, "  Filesystem binary hash: %s", HexUtils::ToHex<32>(release.filesystemBinaryHash).data());
 
     // Get available app update partition.
     const esp_partition_t* appPartition = esp_ota_get_next_update_partition(nullptr);
     if (appPartition == nullptr) {
-      OS_LOGE(TAG, "Failed to get app update partition");  // TODO: Send error message to server
+      OS_LOGE(TAG, "Failed to get app update partition");
       _sendFailureMessage("Failed to get app update partition"sv);
       continue;
     }
@@ -386,7 +386,7 @@ static void _otaUpdateTask(void* arg)
     // Get filesystem partition.
     const esp_partition_t* filesystemPartition = esp_partition_find_first(ESP_PARTITION_TYPE_DATA, ESP_PARTITION_SUBTYPE_DATA_SPIFFS, "static0");
     if (filesystemPartition == nullptr) {
-      OS_LOGE(TAG, "Failed to find filesystem partition");  // TODO: Send error message to server
+      OS_LOGE(TAG, "Failed to find filesystem partition");
       _sendFailureMessage("Failed to find filesystem partition"sv);
       continue;
     }

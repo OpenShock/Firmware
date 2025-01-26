@@ -137,8 +137,10 @@ void GatewayClient::_sendBootStatus()
     return;
   }
 
+  using namespace std::string_view_literals;
+
   OpenShock::SemVer version;
-  if (!OpenShock::TryParseSemVer(OPENSHOCK_FW_VERSION, version)) {
+  if (!OpenShock::TryParseSemVer(OPENSHOCK_FW_VERSION ""sv, version)) {
     OS_LOGE(TAG, "Failed to parse firmware version");
     return;
   }
