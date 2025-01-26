@@ -44,7 +44,7 @@ OpenShock::Serial::CommandGroup OpenShock::Serial::CommandHandlers::RawConfigHan
 {
   auto group = OpenShock::Serial::CommandGroup("rawconfig"sv);
 
-  auto& getCommand = group.addCommand("get"sv, "Get the raw binary config"sv, handleGet);
+  auto& getCommand = group.addCommand("Get the raw binary config"sv, handleGet);
 
   auto& setCommand = group.addCommand("set"sv, "Set the raw binary config, and restart"sv, handleSet);
   setCommand.addArgument("base64"sv, "must be a base64 encoded string"sv, "(base64 encoded binary data)"sv);

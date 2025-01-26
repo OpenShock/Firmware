@@ -82,7 +82,7 @@ OpenShock::Serial::CommandGroup OpenShock::Serial::CommandHandlers::NetworksHand
 {
   auto group = OpenShock::Serial::CommandGroup("networks"sv);
 
-  auto& getCommand = group.addCommand("get"sv, "Get all saved networks."sv, handleGet);
+  auto& getCommand = group.addCommand("Get all saved networks."sv, handleGet);
 
   auto& setCommand = group.addCommand("set"sv, "Set all saved networks."sv, handleSet);
   setCommand.addArgument(

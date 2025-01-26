@@ -59,6 +59,22 @@ using namespace std::string_view_literals;
 
 using namespace OpenShock;
 
+#define OPENSHOCK_WELCOME_HEADER_STR \
+  "\n\
+============== OPENSHOCK ==============\n\
+  Contribute @ github.com/OpenShock\n\
+  Discuss    @ discord.gg/OpenShock\n\
+  Type 'help' for available commands\n\
+=======================================\n"
+
+#define OPENSHOCK_VERSION_INFO_STR \
+  "\
+  Version:  " OPENSHOCK_FW_VERSION "\n\
+    Build:  " OPENSHOCK_FW_MODE "\n\
+   Commit:  " OPENSHOCK_FW_GIT_COMMIT "\n\
+    Board:  " OPENSHOCK_FW_BOARD "\n\
+     Chip:  " OPENSHOCK_FW_CHIP "\n"
+
 const int64_t PASTE_INTERVAL_THRESHOLD_MS       = 20;
 const std::size_t SERIAL_BUFFER_CLEAR_THRESHOLD = 512;
 
@@ -121,7 +137,7 @@ static void printCommandsHelp()
     }
   }
 
-  SerialInputHandler::PrintWelcomeHeader();
+  SerialInputHandler::PrintBootInfo();
   ::Serial.print(buffer.data());
 }
 
@@ -586,9 +602,7 @@ bool SerialInputHandler::Init()
     registerCommandHandler(handler);
   }
 
-  SerialInputHandler::PrintWelcomeHeader();
-  SerialInputHandler::PrintVersionInfo();
-  ::Serial.println();
+  SerialInputHandler::PrintBootInfo();
 
   if (!Config::GetSerialInputConfigEchoEnabled(s_echoEnabled)) {
     OS_LOGE(TAG, "Failed to get serial echo status from config");
@@ -612,24 +626,12 @@ void SerialInputHandler::SetSerialEchoEnabled(bool enabled)
   s_echoEnabled = enabled;
 }
 
-void SerialInputHandler::PrintWelcomeHeader()
+void SerialInputHandler::PrintBootInfo()
 {
-  ::Serial.print(R"(
-============== OPENSHOCK ==============
-  Contribute @ github.com/OpenShock
-  Discuss    @ discord.gg/OpenShock
-  Type 'help' for available commands
-=======================================
-)");
+  ::Serial.print(OpenShock::StringToArduinoString(OPENSHOCK_WELCOME_HEADER_STR OPENSHOCK_VERSION_INFO_STR "\n"sv));
 }
 
 void SerialInputHandler::PrintVersionInfo()
 {
-  ::Serial.print("\
-  Version:  " OPENSHOCK_FW_VERSION "\n\
-    Build:  " OPENSHOCK_FW_MODE "\n\
-   Commit:  " OPENSHOCK_FW_GIT_COMMIT "\n\
-    Board:  " OPENSHOCK_FW_BOARD "\n\
-     Chip:  " OPENSHOCK_FW_CHIP "\n\
-");
+  ::Serial.print(OpenShock::StringToArduinoString("\n" OPENSHOCK_VERSION_INFO_STR ""sv));
 }

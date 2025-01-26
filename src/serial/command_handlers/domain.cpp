@@ -75,7 +75,7 @@ OpenShock::Serial::CommandGroup OpenShock::Serial::CommandHandlers::DomainHandle
 {
   auto group = OpenShock::Serial::CommandGroup("domain"sv);
 
-  auto& getCommand = group.addCommand("get"sv, "Get the backend domain."sv, handleGet);
+  auto& getCommand = group.addCommand("Get the backend domain."sv, handleGet);
 
   auto& setCommand = group.addCommand("set"sv, "Set the backend domain."sv, handleSet);
   setCommand.addArgument("domain"sv, "must be a string"sv, "api.openshock.app"sv);

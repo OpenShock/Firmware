@@ -39,7 +39,7 @@ OpenShock::Serial::CommandGroup OpenShock::Serial::CommandHandlers::EchoHandler(
 {
   auto group = OpenShock::Serial::CommandGroup("echo"sv);
 
-  auto& getCommand = group.addCommand("get"sv, "Get the serial echo status"sv, handleGet);
+  auto& getCommand = group.addCommand("Get the serial echo status"sv, handleGet);
 
   auto& setCommand = group.addCommand("set"sv, "Enable/disable serial echo"sv, handleSet);
   setCommand.addArgument("enabled"sv, "must be a boolean"sv, "true"sv);

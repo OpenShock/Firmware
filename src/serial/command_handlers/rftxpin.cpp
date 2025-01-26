@@ -49,7 +49,7 @@ OpenShock::Serial::CommandGroup OpenShock::Serial::CommandHandlers::RfTxPinHandl
 {
   auto group = OpenShock::Serial::CommandGroup("rftxpin"sv);
 
-  auto& getCommand = group.addCommand("get"sv, "Get the GPIO pin used for the radio transmitter"sv, handleGet);
+  auto& getCommand = group.addCommand("Get the GPIO pin used for the radio transmitter"sv, handleGet);
 
   auto& setCommand = group.addCommand("set"sv, "Set the GPIO pin used for the radio transmitter"sv, handleSet);
   setCommand.addArgument("pin"sv, "must be a number"sv, "15"sv);

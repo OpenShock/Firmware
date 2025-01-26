@@ -42,7 +42,7 @@ OpenShock::Serial::CommandGroup OpenShock::Serial::CommandHandlers::KeepAliveHan
 {
   auto group = OpenShock::Serial::CommandGroup("keepalive"sv);
 
-  auto& getCommand = group.addCommand("get"sv, "Get the shocker keep-alive status"sv, handleGet);
+  auto& getCommand = group.addCommand("Get the shocker keep-alive status"sv, handleGet);
 
   auto& setCommand = group.addCommand("set"sv, "Enable/disable shocker keep-alive"sv, handleSet);
   setCommand.addArgument("enabled"sv, "must be a boolean"sv, "true"sv);
