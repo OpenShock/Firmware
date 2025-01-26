@@ -1,3 +1,4 @@
+#include "serial/command_handlers/CommandGroup.h"
 #include "serial/command_handlers/common.h"
 
 #include "serial/SerialInputHandler.h"

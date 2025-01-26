@@ -1,5 +1,4 @@
 #include "serial/command_handlers/common.h"
-
 #include "serial/SerialInputHandler.h"
 
 #include "config/Config.h"
