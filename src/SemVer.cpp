@@ -245,19 +245,19 @@ std::string SemVer::toString() const
   str.reserve(length);
 
   Convert::FromUint16(major, str);
-  str += '.';
+  str.push_back('.');
   Convert::FromUint16(minor, str);
-  str += '.';
+  str.push_back('.');
   Convert::FromUint16(patch, str);
 
   if (!prerelease.empty()) {
-    str += '-';
-    str.append(prerelease.c_str(), prerelease.length());
+    str.push_back('-');
+    str.append(prerelease);
   }
 
   if (!build.empty()) {
-    str += '+';
-    str.append(build.c_str(), build.length());
+    str.push_back('+');
+    str.append(build);
   }
 
   return str;
@@ -355,7 +355,7 @@ bool OpenShock::TryParseSemVer(std::string_view semverStr, SemVer& semver)
   if (!restStr.empty()) {
     if (plusIdx != std::string_view::npos) {
       semver.build = restStr.substr((plusIdx - patchStr.length()) + 1);
-      patchStr.remove_suffix(semver.build.length() + 1);
+      restStr.remove_suffix(semver.build.length() + 1);
 
       if (!semver.build.empty() && !_semverIsBuild(semver.build)) {
         OS_LOGE(TAG, "Invalid build: %s", semver.build.c_str());
@@ -364,7 +364,7 @@ bool OpenShock::TryParseSemVer(std::string_view semverStr, SemVer& semver)
     }
 
     if (dashIdx != std::string_view::npos) {
-      semver.prerelease = patchStr.substr(1);
+      semver.prerelease = restStr.substr(1);
 
       if (!semver.prerelease.empty() && !_semverIsPrerelease(semver.prerelease)) {
         OS_LOGE(TAG, "Invalid prerelease: %s", semver.prerelease.c_str());
