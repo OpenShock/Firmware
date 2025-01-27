@@ -29,7 +29,7 @@
 		"eslint": "^9.19.0",
 		"eslint-config-prettier": "^10.0.1",
 		"eslint-plugin-svelte": "^2.46.1",
-		"flatbuffers": "^24.12.23",
+		"flatbuffers": "^25.1.24",
 		"globals": "^15.14.0",
 		"lucide-svelte": "^0.474.0",
 		"prettier": "^3.4.2",
