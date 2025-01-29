@@ -7,10 +7,12 @@
 namespace OpenShock::Config {
   struct EStopConfig : public ConfigBase<Serialization::Configuration::EStopConfig> {
     EStopConfig();
-    EStopConfig(bool enabled, gpio_num_t gpioPin);
+    EStopConfig(bool enabled, gpio_num_t gpioPin, bool latching, bool active);
 
     bool enabled;
     gpio_num_t gpioPin;
+    bool latching;
+    bool active;
 
     void ToDefault() override;
 
