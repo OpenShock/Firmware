@@ -368,7 +368,7 @@ HTTP::Response<std::size_t> _doGetStream(
   int64_t begin = OpenShock::millis();
   if (!client.begin(OpenShock::StringToArduinoString(url))) {
     OS_LOGE(TAG, "Failed to begin HTTP request");
-    return {HTTP::RequestResult::RequestFailed, 0};
+    return {HTTP::RequestResult::RequestFailed, 0, 0};
   }
 
   for (auto& header : headers) {
@@ -434,7 +434,7 @@ HTTP::Response<std::size_t> _doGetStream(
   WiFiClient* stream = client.getStreamPtr();
   if (stream == nullptr) {
     OS_LOGE(TAG, "Failed to get stream");
-    return {HTTP::RequestResult::RequestFailed, 0};
+    return {HTTP::RequestResult::RequestFailed, 0, 0};
   }
 
   StreamReaderResult result;

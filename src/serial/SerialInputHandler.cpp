@@ -434,7 +434,7 @@ void _echoHandleSerialInput(std::string_view buffer, bool hasData)
   }
 
   // If the command starts with a $, it's a automated command, don't echo it
-  if (!buffer.empty() && buffer[0] == '$') {
+  if (OpenShock::StringHasPrefix(buffer, '$')) {
     return;
   }
 

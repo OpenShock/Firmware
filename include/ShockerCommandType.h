@@ -4,7 +4,7 @@
 #include <cstring>
 
 namespace OpenShock {
-  enum class ShockerCommandType {
+  enum class ShockerCommandType : uint8_t {
     Stop,
     Shock,
     Vibrate,

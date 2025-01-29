@@ -245,19 +245,19 @@ std::string SemVer::toString() const
   str.reserve(length);
 
   Convert::FromUint16(major, str);
-  str += '.';
+  str.push_back('.');
   Convert::FromUint16(minor, str);
-  str += '.';
+  str.push_back('.');
   Convert::FromUint16(patch, str);
 
   if (!prerelease.empty()) {
-    str += '-';
-    str.append(prerelease.c_str(), prerelease.length());
+    str.push_back('-');
+    str.append(prerelease);
   }
 
   if (!build.empty()) {
-    str += '+';
-    str.append(build.c_str(), build.length());
+    str.push_back('+');
+    str.append(build);
   }
 
   return str;
@@ -331,17 +331,11 @@ bool OpenShock::TryParseSemVer(std::string_view semverStr, SemVer& semver)
 
   std::string_view majorStr = parts[0], minorStr = parts[1], patchStr = parts[2];
 
-  auto dashIdx = patchStr.find('-');
-  if (dashIdx != std::string_view::npos) {
-    semver.prerelease = patchStr.substr(dashIdx + 1);
-    patchStr          = patchStr.substr(0, dashIdx);
-  }
+  size_t plusIdx = patchStr.find('+');
+  size_t dashIdx = patchStr.find('-');
 
-  auto plusIdx = semver.prerelease.find('+');
-  if (plusIdx != std::string_view::npos) {
-    semver.build      = semver.prerelease.substr(plusIdx + 1);
-    semver.prerelease = semver.prerelease.substr(0, plusIdx);
-  }
+  std::string_view restStr = patchStr.substr(std::min(dashIdx, plusIdx));
+  patchStr.remove_suffix(restStr.length());
 
   if (!Convert::ToUint16(majorStr, semver.major)) {
     OS_LOGE(TAG, "Invalid major version: %.*s", majorStr.length(), majorStr.data());
@@ -358,14 +352,25 @@ bool OpenShock::TryParseSemVer(std::string_view semverStr, SemVer& semver)
     return false;
   }
 
-  if (!semver.prerelease.empty() && !_semverIsPrerelease(semver.prerelease)) {
-    OS_LOGE(TAG, "Invalid prerelease: %s", semver.prerelease.c_str());
-    return false;
-  }
+  if (!restStr.empty()) {
+    if (plusIdx != std::string_view::npos) {
+      semver.build = restStr.substr((plusIdx - patchStr.length()) + 1);
+      restStr.remove_suffix(semver.build.length() + 1);
 
-  if (!semver.build.empty() && !_semverIsBuild(semver.build)) {
-    OS_LOGE(TAG, "Invalid build: %s", semver.build.c_str());
-    return false;
+      if (!semver.build.empty() && !_semverIsBuild(semver.build)) {
+        OS_LOGE(TAG, "Invalid build: %s", semver.build.c_str());
+        return false;
+      }
+    }
+
+    if (dashIdx != std::string_view::npos) {
+      semver.prerelease = restStr.substr(1);
+
+      if (!semver.prerelease.empty() && !_semverIsPrerelease(semver.prerelease)) {
+        OS_LOGE(TAG, "Invalid prerelease: %s", semver.prerelease.c_str());
+        return false;
+      }
+    }
   }
 
   return true;
