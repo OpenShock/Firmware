@@ -14,7 +14,8 @@ using namespace OpenShock::Serialization;
 
 typedef OpenShock::Serialization::Types::WifiAuthMode WiFiAuthMode;
 
-constexpr WiFiAuthMode GetWiFiAuthModeEnum(wifi_auth_mode_t authMode) {
+constexpr WiFiAuthMode GetWiFiAuthModeEnum(wifi_auth_mode_t authMode)
+{
   switch (authMode) {
     case wifi_auth_mode_t::WIFI_AUTH_OPEN:
       return WiFiAuthMode::Open;
@@ -39,17 +40,19 @@ constexpr WiFiAuthMode GetWiFiAuthModeEnum(wifi_auth_mode_t authMode) {
   }
 }
 
-flatbuffers::Offset<OpenShock::Serialization::Types::WifiNetwork> _createWiFiNetwork(flatbuffers::FlatBufferBuilder& builder, const OpenShock::WiFiNetwork& network) {
+flatbuffers::Offset<OpenShock::Serialization::Types::WifiNetwork> _createWiFiNetwork(flatbuffers::FlatBufferBuilder& builder, const OpenShock::WiFiNetwork& network)
+{
   auto bssid    = network.GetHexBSSID();
   auto authMode = GetWiFiAuthModeEnum(network.authMode);
 
   return Types::CreateWifiNetworkDirect(builder, network.ssid, bssid.data(), network.channel, network.rssi, authMode, network.IsSaved());
 }
 
-bool Local::SerializeErrorMessage(const char* message, Common::SerializationCallbackFn callback) {
-  flatbuffers::FlatBufferBuilder builder(256);  // TODO: Profile this and adjust the size accordingly
+bool Local::SerializeErrorMessage(std::string_view message, Common::SerializationCallbackFn callback)
+{
+  flatbuffers::FlatBufferBuilder builder(64 + message.length());
 
-  auto wrapperOffset = Local::CreateErrorMessage(builder, builder.CreateString(message));
+  auto wrapperOffset = Local::CreateErrorMessage(builder, builder.CreateString(message.data(), message.length()));
 
   auto msg = Local::CreateHubToLocalMessage(builder, Local::HubToLocalMessagePayload::ErrorMessage, wrapperOffset.Union());
 
@@ -57,13 +60,12 @@ bool Local::SerializeErrorMessage(const char* message, Common::SerializationCall
 
   auto span = builder.GetBufferSpan();
 
-  callback(span.data(), span.size());
-
-  return true;
+  return callback(span.data(), span.size());
 }
 
-bool Local::SerializeReadyMessage(const WiFiNetwork* connectedNetwork, bool accountLinked, Common::SerializationCallbackFn callback) {
-  flatbuffers::FlatBufferBuilder builder(256);
+bool Local::SerializeReadyMessage(const WiFiNetwork* connectedNetwork, bool accountLinked, Common::SerializationCallbackFn callback)
+{
+  flatbuffers::FlatBufferBuilder builder(768);
 
   flatbuffers::Offset<Serialization::Types::WifiNetwork> fbsNetwork = 0;
 
@@ -96,8 +98,9 @@ bool Local::SerializeReadyMessage(const WiFiNetwork* connectedNetwork, bool acco
   return callback(span.data(), span.size());
 }
 
-bool Local::SerializeWiFiScanStatusChangedEvent(OpenShock::WiFiScanStatus status, Common::SerializationCallbackFn callback) {
-  flatbuffers::FlatBufferBuilder builder(32);  // TODO: Profile this and adjust the size accordingly
+bool Local::SerializeWiFiScanStatusChangedEvent(OpenShock::WiFiScanStatus status, Common::SerializationCallbackFn callback)
+{
+  flatbuffers::FlatBufferBuilder builder(64);
 
   auto scanStatusOffset = Serialization::Local::CreateWifiScanStatusMessage(builder, status);
 
@@ -110,8 +113,9 @@ bool Local::SerializeWiFiScanStatusChangedEvent(OpenShock::WiFiScanStatus status
   return callback(span.data(), span.size());
 }
 
-bool Local::SerializeWiFiNetworkEvent(Types::WifiNetworkEventType eventType, const WiFiNetwork& network, Common::SerializationCallbackFn callback) {
-  flatbuffers::FlatBufferBuilder builder(256);  // TODO: Profile this and adjust the size accordingly
+bool Local::SerializeWiFiNetworkEvent(Types::WifiNetworkEventType eventType, const WiFiNetwork& network, Common::SerializationCallbackFn callback)
+{
+  flatbuffers::FlatBufferBuilder builder(64);
 
   auto networkOffset = _createWiFiNetwork(builder, network);
 
@@ -126,8 +130,9 @@ bool Local::SerializeWiFiNetworkEvent(Types::WifiNetworkEventType eventType, con
   return callback(span.data(), span.size());
 }
 
-bool Local::SerializeWiFiNetworksEvent(Types::WifiNetworkEventType eventType, const std::vector<WiFiNetwork>& networks, Common::SerializationCallbackFn callback) {
-  flatbuffers::FlatBufferBuilder builder(256);  // TODO: Profile this and adjust the size accordingly
+bool Local::SerializeWiFiNetworksEvent(Types::WifiNetworkEventType eventType, const std::vector<WiFiNetwork>& networks, Common::SerializationCallbackFn callback)
+{
+  flatbuffers::FlatBufferBuilder builder(256);
 
   std::vector<flatbuffers::Offset<Serialization::Types::WifiNetwork>> fbsNetworks;
   fbsNetworks.reserve(networks.size());
