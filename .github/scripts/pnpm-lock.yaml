@@ -18,8 +18,8 @@ importers:
         specifier: ^5.0.0
         version: 5.0.0
       semver:
-        specifier: ^7.6.0
-        version: 7.6.3
+        specifier: ^7.7.0
+        version: 7.7.0
 
 packages:
 
@@ -103,8 +103,8 @@ packages:
   once@1.4.0:
     resolution: {integrity: sha512-lNaJgI+2Q5URQBkccEKHTQOPaXdUxnZZElQTZY0MFUAuaEqe1E+Nyvgdz/aIyNi6Z9MzO5dv1H8n58/GELp3+w==}
 
-  semver@7.6.3:
-    resolution: {integrity: sha512-oVekP1cKtI+CTDvHWYFUcMtsK/00wmAEfyqKfNdARm8u1wNVhSgaX7A8d4UuIlUI5e84iEwOhs7ZPYRmzU9U6A==}
+  semver@7.7.0:
+    resolution: {integrity: sha512-DrfFnPzblFmNrIZzg5RzHegbiRWg7KMR7btwi2yjHwx06zsUbO5g613sVwEV7FTwmzJu+Io0lJe2GJ3LxqpvBQ==}
     engines: {node: '>=10'}
     hasBin: true
 
@@ -217,7 +217,7 @@ snapshots:
     dependencies:
       wrappy: 1.0.2
 
-  semver@7.6.3: {}
+  semver@7.7.0: {}
 
   tunnel@0.0.6: {}
 
