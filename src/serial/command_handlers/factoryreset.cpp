@@ -4,13 +4,15 @@
 
 #include <esp_system.h>
 
+#include <cstdio>
+
 void _handleFactoryResetCommand(std::string_view arg, bool isAutomated)
 {
   (void)arg;
 
-  ::Serial.println("Resetting to factory defaults...");
+  printf("Resetting to factory defaults...\n");
   OpenShock::Config::FactoryReset();
-  ::Serial.println("Restarting...");
+  printf("Restarting...\n");
   esp_restart();
 }
 

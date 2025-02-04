@@ -27,6 +27,7 @@ const char* const TAG = "SerialInputHandler";
 #include <cJSON.h>
 #include <Esp.h>
 
+#include <cstdio>
 #include <cstring>
 #include <string_view>
 #include <unordered_map>
@@ -420,7 +421,7 @@ void _skipSerialWhitespaces(SerialBuffer& buffer)
 
 void _echoBuffer(std::string_view buffer)
 {
-  ::Serial.printf(CLEAR_LINE "> %.*s", buffer.size(), buffer.data());
+  printf(CLEAR_LINE "> %.*s", buffer.size(), buffer.data());
 }
 
 void _echoHandleSerialInput(std::string_view buffer, bool hasData)
@@ -467,7 +468,7 @@ void _processSerialLine(std::string_view line)
     line = line.substr(1);
   } else if (s_echoEnabled) {
     _echoBuffer(line);
-    ::Serial.println();
+    putchar('\n');
   }
 
   auto parts                 = OpenShock::StringSplit(line, ' ', 1);
@@ -558,7 +559,7 @@ void _serialRxTask(void*)
         _skipSerialWhitespaces(buffer);
         break;
       case SerialReadResult::AutoCompleteRequest:
-        ::Serial.printf(CLEAR_LINE "> %.*s [AutoComplete is not implemented]", buffer.size(), buffer.data());
+        printf(CLEAR_LINE "> %.*s [AutoComplete is not implemented]", buffer.size(), buffer.data());
         break;
       case SerialReadResult::Data:
         _echoHandleSerialInput(buffer, true);
@@ -590,7 +591,7 @@ bool SerialInputHandler::Init()
 
   SerialInputHandler::PrintWelcomeHeader();
   SerialInputHandler::PrintVersionInfo();
-  ::Serial.println();
+  putchar('\n');
 
   if (!Config::GetSerialInputConfigEchoEnabled(s_echoEnabled)) {
     OS_LOGE(TAG, "Failed to get serial echo status from config");
