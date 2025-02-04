@@ -8,7 +8,11 @@ export function SerializeSetEstopEnabledCommand(enabled: boolean): Uint8Array {
 
   const cmdOffset = SetEstopEnabledCommand.createSetEstopEnabledCommand(fbb, enabled);
 
-  const payloadOffset = LocalToHubMessage.createLocalToHubMessage(fbb, LocalToHubMessagePayload.SetEstopEnabledCommand, cmdOffset);
+  const payloadOffset = LocalToHubMessage.createLocalToHubMessage(
+    fbb,
+    LocalToHubMessagePayload.SetEstopEnabledCommand,
+    cmdOffset
+  );
 
   fbb.finish(payloadOffset);
 

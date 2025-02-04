@@ -4,6 +4,8 @@
 
 #include "Checksum.h"
 
+#include <algorithm>
+
 const rmt_data_t kRmtPreamble  = {1500, 1, 750, 0};
 const rmt_data_t kRmtOne       = {750, 1, 250, 0};
 const rmt_data_t kRmtZero      = {250, 1, 750, 0};
@@ -11,7 +13,12 @@ const rmt_data_t kRmtPostamble = {250, 1, 3750, 0};  // Some subvariants expect 
 
 using namespace OpenShock;
 
-std::vector<rmt_data_t> Rmt::Petrainer998DREncoder::GetSequence(uint16_t shockerId, ShockerCommandType type, uint8_t intensity)
+size_t Rmt::Petrainer998DREncoder::GetBufferSize()
+{
+  return 42;
+}
+
+bool Rmt::Petrainer998DREncoder::FillBuffer(rmt_data_t* sequence, uint16_t shockerId, ShockerCommandType type, uint8_t intensity)
 {
   // Intensity must be between 0 and 100
   intensity = std::min(intensity, static_cast<uint8_t>(100));
@@ -31,7 +38,7 @@ std::vector<rmt_data_t> Rmt::Petrainer998DREncoder::GetSequence(uint16_t shocker
       typeShift = 3;
       break;
     default:
-      return {};  // Invalid type
+      return false;  // Invalid type
   }
 
   uint8_t typeVal    = 1 << typeShift;
@@ -45,13 +52,10 @@ std::vector<rmt_data_t> Rmt::Petrainer998DREncoder::GetSequence(uint16_t shocker
   uint64_t data
     = (static_cast<uint64_t>(channel & 0xF) << 36 | static_cast<uint64_t>(typeVal & 0xF) << 32 | static_cast<uint64_t>(shockerId & 0xFFFF) << 16 | static_cast<uint64_t>(intensity & 0xFF) << 8 | static_cast<uint64_t>(typeInvert & 0xF) << 4 | static_cast<uint64_t>(channelInvert & 0xF));
 
-  std::vector<rmt_data_t> pulses;
-  pulses.reserve(42);
-
   // Generate the sequence
-  pulses.push_back(kRmtPreamble);
-  Internal::EncodeBits<40>(pulses, data, kRmtOne, kRmtZero);
-  pulses.push_back(kRmtPostamble);
+  sequence[0] = kRmtPreamble;
+  Rmt::Internal::EncodeBits<40>(sequence + 1, data, kRmtOne, kRmtZero);
+  sequence[41] = kRmtPostamble;
 
-  return pulses;
+  return true;
 }

@@ -7,7 +7,8 @@
 
 const char* TAG = "Serial::CommandHandlers::LcgOverride";
 
-void _handleLcgOverrideCommand(std::string_view arg, bool isAutomated) {
+void _handleLcgOverrideCommand(std::string_view arg, bool isAutomated)
+{
   if (arg.empty()) {
     std::string lcgOverride;
     if (!OpenShock::Config::GetBackendLCGOverride(lcgOverride)) {
@@ -20,7 +21,7 @@ void _handleLcgOverrideCommand(std::string_view arg, bool isAutomated) {
     return;
   }
 
-  if (OpenShock::StringStartsWith(arg, "clear"sv)) {
+  if (OpenShock::StringHasPrefix(arg, "clear"sv)) {
     if (arg.size() != 5) {
       SERPR_ERROR("Invalid command (clear command should not have any arguments)");
       return;
@@ -35,7 +36,7 @@ void _handleLcgOverrideCommand(std::string_view arg, bool isAutomated) {
     return;
   }
 
-  if (OpenShock::StringStartsWith(arg, "set "sv)) {
+  if (OpenShock::StringHasPrefix(arg, "set "sv)) {
     if (arg.size() <= 4) {
       SERPR_ERROR("Invalid command (set command should have an argument)");
       return;
@@ -90,7 +91,8 @@ void _handleLcgOverrideCommand(std::string_view arg, bool isAutomated) {
   SERPR_ERROR("Invalid subcommand");
 }
 
-OpenShock::Serial::CommandGroup OpenShock::Serial::CommandHandlers::LcgOverrideHandler() {
+OpenShock::Serial::CommandGroup OpenShock::Serial::CommandHandlers::LcgOverrideHandler()
+{
   auto group = OpenShock::Serial::CommandGroup("lcgoverride"sv);
 
   auto& getCommand = group.addCommand("Get the domain overridden for LCG endpoint (if any)."sv, _handleLcgOverrideCommand);

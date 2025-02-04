@@ -67,7 +67,7 @@ void _handleNetworksCommand(std::string_view arg, bool isAutomated)
 
     OS_LOGI(TAG, "Adding network \"%s\" to config, id=%u", cred.ssid.c_str(), cred.id);
 
-    creds.emplace_back(std::move(cred));
+    creds.push_back(std::move(cred));
   }
 
   if (!OpenShock::Config::SetWiFiCredentials(creds)) {

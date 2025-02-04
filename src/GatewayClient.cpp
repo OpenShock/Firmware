@@ -137,8 +137,10 @@ void GatewayClient::_sendBootStatus()
     return;
   }
 
+  using namespace std::string_view_literals;
+
   OpenShock::SemVer version;
-  if (!OpenShock::TryParseSemVer(OPENSHOCK_FW_VERSION, version)) {
+  if (!OpenShock::TryParseSemVer(OPENSHOCK_FW_VERSION ""sv, version)) {
     OS_LOGE(TAG, "Failed to parse firmware version");
     return;
   }
@@ -179,17 +181,14 @@ void GatewayClient::_handleEvent(WStype_t type, uint8_t* payload, std::size_t le
     case WStype_FRAGMENT_FIN:
       OS_LOGD(TAG, "Received fragment fin from API");
       break;
-    case WStype_PING:
-      OS_LOGD(TAG, "Received ping from API");
-      break;
-    case WStype_PONG:
-      OS_LOGV(TAG, "Received pong from API");
-      break;
     case WStype_BIN:
       MessageHandlers::WebSocket::HandleGatewayBinary(payload, length);
       break;
     case WStype_FRAGMENT_BIN_START:
       OS_LOGE(TAG, "Received binary fragment start from API, this is not supported!");
+      break;
+    case WStype_PING:
+    case WStype_PONG:
       break;
     default:
       OS_LOGE(TAG, "Received unknown event from API");

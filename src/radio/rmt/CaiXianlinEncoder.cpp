@@ -4,6 +4,8 @@
 
 #include "Checksum.h"
 
+#include <algorithm>
+
 // This is the encoder for the CaiXianlin shocker.
 //
 // It is based on the following documentation:
@@ -15,7 +17,12 @@ const rmt_data_t kRmtZero     = {250, 1, 750, 0};
 
 using namespace OpenShock;
 
-std::vector<rmt_data_t> Rmt::CaiXianlinEncoder::GetSequence(uint16_t transmitterId, uint8_t channelId, ShockerCommandType type, uint8_t intensity)
+size_t Rmt::CaiXianlinEncoder::GetBufferSize()
+{
+  return 44;
+}
+
+bool Rmt::CaiXianlinEncoder::FillBuffer(rmt_data_t* sequence, uint16_t shockerId, uint8_t channelId, ShockerCommandType type, uint8_t intensity)
 {
   // Intensity must be between 0 and 99
   intensity = std::min(intensity, static_cast<uint8_t>(99));
@@ -33,11 +40,11 @@ std::vector<rmt_data_t> Rmt::CaiXianlinEncoder::GetSequence(uint16_t transmitter
       intensity = 0;  // Sound intensity must be 0 for some shockers, otherwise it wont work, or they soft lock until restarted
       break;
     default:
-      return {};  // Invalid type
+      return false;  // Invalid type
   }
 
-  // Payload layout: [transmitterId:16][channelId:4][type:4][intensity:8]
-  uint32_t payload = (static_cast<uint32_t>(transmitterId) << 16) | (static_cast<uint32_t>(channelId & 0xF) << 12) | (static_cast<uint32_t>(typeVal & 0xF) << 8) | static_cast<uint32_t>(intensity);
+  // Payload layout: [shockerId:16][channelId:4][type:4][intensity:8]
+  uint32_t payload = (static_cast<uint32_t>(shockerId) << 16) | (static_cast<uint32_t>(channelId & 0xF) << 12) | (static_cast<uint32_t>(typeVal & 0xF) << 8) | static_cast<uint32_t>(intensity);
 
   // Calculate the checksum of the payload
   uint8_t checksum = Checksum::Sum8(payload);
@@ -48,12 +55,9 @@ std::vector<rmt_data_t> Rmt::CaiXianlinEncoder::GetSequence(uint16_t transmitter
   // Shift the data left by 3 bits to add the postamble (3 bits of 0)
   data <<= 3;
 
-  std::vector<rmt_data_t> pulses;
-  pulses.reserve(44);
-
   // Generate the sequence
-  pulses.push_back(kRmtPreamble);
-  Internal::EncodeBits<43>(pulses, data, kRmtOne, kRmtZero);
+  sequence[0] = kRmtPreamble;
+  Rmt::Internal::EncodeBits<43>(sequence + 1, data, kRmtOne, kRmtZero);
 
-  return pulses;
+  return true;
 }

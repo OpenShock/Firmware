@@ -10,7 +10,11 @@ export function SerializeAccountLinkCommand(linkCode: string): Uint8Array {
 
   const cmdOffset = AccountLinkCommand.createAccountLinkCommand(fbb, linkCodeOffset);
 
-  const payloadOffset = LocalToHubMessage.createLocalToHubMessage(fbb, LocalToHubMessagePayload.AccountLinkCommand, cmdOffset);
+  const payloadOffset = LocalToHubMessage.createLocalToHubMessage(
+    fbb,
+    LocalToHubMessagePayload.AccountLinkCommand,
+    cmdOffset
+  );
 
   fbb.finish(payloadOffset);
 

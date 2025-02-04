@@ -41,7 +41,7 @@ namespace OpenShock::Config::Internal::Utils {
     for (auto fbsItem : *fbsVec) {
       T item;
       if (item.FromFlatbuffers(fbsItem)) {
-        vec.emplace_back(std::move(item));
+        vec.push_back(std::move(item));
       }
     }
   }
@@ -77,7 +77,7 @@ namespace OpenShock::Config::Internal::Utils {
     {
       T item;
       if (item.FromJSON(jsonItem)) {
-        vec.emplace_back(std::move(item));
+        vec.push_back(std::move(item));
       }
     }
 
