@@ -3,6 +3,8 @@
 #include "config/Config.h"
 #include "util/Base64Utils.h"
 
+#include <esp_system.h>
+
 #include <vector>
 
 void _handleRawConfigCommand(std::string_view arg, bool isAutomated) {
@@ -38,7 +40,7 @@ void _handleRawConfigCommand(std::string_view arg, bool isAutomated) {
 
   SERPR_SUCCESS("Saved config, restarting...");
 
-  ESP.restart();
+  esp_restart();
 }
 
 OpenShock::Serial::CommandGroup OpenShock::Serial::CommandHandlers::RawConfigHandler() {

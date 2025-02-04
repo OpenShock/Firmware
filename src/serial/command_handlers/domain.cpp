@@ -4,6 +4,8 @@
 #include "http/HTTPRequestManager.h"
 #include "serialization/JsonAPI.h"
 
+#include <esp_system.h>
+
 #include <string>
 
 const char* const TAG = "Serial::CommandHandlers::Domain";
@@ -57,7 +59,7 @@ void _handleDomainCommand(std::string_view arg, bool isAutomated) {
   SERPR_SUCCESS("Saved config, restarting...");
 
   // Restart to use the new domain
-  ESP.restart();
+  esp_restart();
 }
 
 OpenShock::Serial::CommandGroup OpenShock::Serial::CommandHandlers::DomainHandler() {

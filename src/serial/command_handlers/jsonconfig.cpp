@@ -2,6 +2,8 @@
 
 #include "config/Config.h"
 
+#include <esp_system.h>
+
 void _handleJsonConfigCommand(std::string_view arg, bool isAutomated) {
   if (arg.empty()) {
     // Get raw config
@@ -18,7 +20,7 @@ void _handleJsonConfigCommand(std::string_view arg, bool isAutomated) {
 
   SERPR_SUCCESS("Saved config, restarting...");
 
-  ESP.restart();
+  esp_restart();
 }
 
 OpenShock::Serial::CommandGroup OpenShock::Serial::CommandHandlers::JsonConfigHandler() {
