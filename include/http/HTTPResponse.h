@@ -9,6 +9,9 @@
 namespace OpenShock::HTTP {
   class HTTPClient;
   class HTTPResponse {
+    DISABLE_DEFAULT(HTTPResponse);
+    DISABLE_COPY(HTTPResponse);
+
     friend class HTTPClient;
 
     HTTPResponse(esp_err_t error)
@@ -28,7 +31,6 @@ namespace OpenShock::HTTP {
     }
 
   public:
-    HTTPResponse(const HTTPResponse&) = delete;
     HTTPResponse(HTTPResponse&& other)
     {
       m_handle       = other.m_handle;
@@ -37,8 +39,6 @@ namespace OpenShock::HTTP {
 
     constexpr bool IsValid() const { return m_handle != nullptr; }
     constexpr esp_err_t GetError() const { return m_handle == nullptr ? m_error : ESP_OK; }
-
-    HTTPResponse& operator=(const HTTPResponse&) = delete;
 
   private:
     esp_http_client_handle_t m_handle;

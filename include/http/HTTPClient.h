@@ -11,6 +11,9 @@
 
 namespace OpenShock::HTTP {
   class HTTPClient {
+    DISABLE_DEFAULT(HTTPClient);
+    DISABLE_COPY(HTTPClient);
+
   public:
     HTTPClient(const char* url, int timeout_ms = 10'000)
     {
@@ -30,7 +33,6 @@ namespace OpenShock::HTTP {
         esp_http_client_cleanup(handle);
       }
     }
-    HTTPClient(const HTTPClient&) = delete;
     HTTPClient(HTTPClient&& other)
     {
       handle       = other.handle;
@@ -80,8 +82,6 @@ namespace OpenShock::HTTP {
     }
 
     HTTPResponse Get(const char* url) { return Send(url, HTTP_METHOD_GET); }
-
-    HTTPClient& operator=(const HTTPClient&) = delete;
 
   private:
     esp_http_client_handle_t handle;
