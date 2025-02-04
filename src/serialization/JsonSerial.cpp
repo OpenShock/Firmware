@@ -53,7 +53,7 @@ bool JsonSerial::ParseShockerCommand(const cJSON* root, JsonSerial::ShockerComma
     OS_LOGE(TAG, "value at 'type' is not a string");
     return false;
   }
-  ShockerCommandType commandType;
+  ShockerCommandType commandType = ShockerCommandType::Stop;
   if (!ShockerCommandTypeFromString(command->valuestring, commandType)) {
     OS_LOGE(TAG, "value at 'type' is not a valid shocker command (shock, vibrate, sound, light, stop)");
     return false;

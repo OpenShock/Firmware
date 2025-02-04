@@ -7,6 +7,7 @@ const char* const TAG = "HTTPRequestManager";
 #include "RateLimiter.h"
 #include "SimpleMutex.h"
 #include "Time.h"
+#include "util/HexUtils.h"
 #include "util/StringUtils.h"
 
 #include <HTTPClient.h>
@@ -132,28 +133,6 @@ constexpr bool _tryFindCRLF(std::size_t& pos, const uint8_t* buffer, std::size_t
 
   return false;
 }
-constexpr bool _tryParseHexSizeT(std::size_t& result, std::string_view str)
-{
-  if (str.empty() || str.size() > sizeof(std::size_t) * 2) {
-    return false;
-  }
-
-  result = 0;
-
-  for (char c : str) {
-    if (c >= '0' && c <= '9') {
-      result = (result << 4) | (c - '0');
-    } else if (c >= 'a' && c <= 'f') {
-      result = (result << 4) | (c - 'a' + 10);
-    } else if (c >= 'A' && c <= 'F') {
-      result = (result << 4) | (c - 'A' + 10);
-    } else {
-      return false;
-    }
-  }
-
-  return true;
-}
 
 enum ParserState : uint8_t {
   Ok,
@@ -196,7 +175,7 @@ ParserState _parseChunkHeader(const uint8_t* buffer, std::size_t bufferLen, std:
   std::string_view sizeField(reinterpret_cast<const char*>(buffer), sizeFieldEnd);
 
   // Parse the chunk size
-  if (!_tryParseHexSizeT(payloadLen, sizeField)) {
+  if (!HexUtils::TryParseHexToInt(sizeField.data(), sizeField.length(), payloadLen)) {
     OS_LOGW(TAG, "Failed to parse chunk size");
     return ParserState::Invalid;
   }
@@ -283,44 +262,46 @@ StreamReaderResult _readStreamDataChunked(HTTPClient& client, WiFiClient* stream
 
     bufferCursor += bytesRead;
 
-parseMore:
-    state = _parseChunk(buffer, bufferCursor, payloadPos, payloadSize);
-    if (state == ParserState::Invalid) {
-      OS_LOGE(TAG, "Failed to parse chunk");
-      result = HTTP::RequestResult::RequestFailed;
-      break;
-    }
-    OS_LOGD(TAG, "Chunk parsed: %zu %zu", payloadPos, payloadSize);
-
-    if (state == ParserState::NeedMoreData) {
-      if (bufferCursor == HTTP_BUFFER_SIZE) {
-        OS_LOGE(TAG, "Chunk too large");
+    while (bufferCursor > 0) {
+      state = _parseChunk(buffer, bufferCursor, payloadPos, payloadSize);
+      if (state == ParserState::Invalid) {
+        OS_LOGE(TAG, "Failed to parse chunk");
         result = HTTP::RequestResult::RequestFailed;
+        state  = ParserState::Invalid;  // Mark to exit both loops
         break;
       }
-      continue;
+      OS_LOGD(TAG, "Chunk parsed: %zu %zu", payloadPos, payloadSize);
+
+      if (state == ParserState::NeedMoreData) {
+        if (bufferCursor == HTTP_BUFFER_SIZE) {
+          OS_LOGE(TAG, "Chunk too large");
+          result = HTTP::RequestResult::RequestFailed;
+          state  = ParserState::Invalid;  // Mark to exit both loops
+        }
+        break;                            // If chunk size good, this only exits one loop
+      }
+
+      // Check for zero chunk size (end of transfer)
+      if (payloadSize == 0) {
+        state = ParserState::Invalid;  // Mark to exit both loops
+        break;
+      }
+
+      if (!downloadCallback(totalWritten, buffer + payloadPos, payloadSize)) {
+        result = HTTP::RequestResult::Cancelled;
+        state  = ParserState::Invalid;  // Mark to exit both loops
+        break;
+      }
+
+      totalWritten += payloadSize;
+      _alignChunk(buffer, bufferCursor, payloadPos, payloadSize);
+      payloadSize = 0;
+      payloadPos  = 0;
     }
 
-    // Check for zero chunk size (end of transfer)
-    if (payloadSize == 0) {
-      break;
+    if (state == ParserState::NeedMoreData) {
+      vTaskDelay(pdMS_TO_TICKS(5));
     }
-
-    if (!downloadCallback(totalWritten, buffer + payloadPos, payloadSize)) {
-      result = HTTP::RequestResult::Cancelled;
-      break;
-    }
-
-    totalWritten += payloadSize;
-    _alignChunk(buffer, bufferCursor, payloadPos, payloadSize);
-    payloadSize = 0;
-    payloadPos  = 0;
-
-    if (bufferCursor > 0) {
-      goto parseMore;
-    }
-
-    vTaskDelay(pdMS_TO_TICKS(5));
   }
 
   free(buffer);
@@ -387,7 +368,7 @@ HTTP::Response<std::size_t> _doGetStream(
   int64_t begin = OpenShock::millis();
   if (!client.begin(OpenShock::StringToArduinoString(url))) {
     OS_LOGE(TAG, "Failed to begin HTTP request");
-    return {HTTP::RequestResult::RequestFailed, 0};
+    return {HTTP::RequestResult::RequestFailed, 0, 0};
   }
 
   for (auto& header : headers) {
@@ -453,7 +434,7 @@ HTTP::Response<std::size_t> _doGetStream(
   WiFiClient* stream = client.getStreamPtr();
   if (stream == nullptr) {
     OS_LOGE(TAG, "Failed to get stream");
-    return {HTTP::RequestResult::RequestFailed, 0};
+    return {HTTP::RequestResult::RequestFailed, 0, 0};
   }
 
   StreamReaderResult result;

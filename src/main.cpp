@@ -6,7 +6,7 @@ const char* const TAG = "main";
 #include "CommandHandler.h"
 #include "Common.h"
 #include "config/Config.h"
-#include "EStopManager.h"
+#include "estop/EStopManager.h"
 #include "events/Events.h"
 #include "GatewayConnectionManager.h"
 #include "Logging.h"

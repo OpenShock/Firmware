@@ -42,6 +42,6 @@ runs:
         remote-host: "${{ inputs.bunny-stor-hostname }}"
         remote-user: "${{ inputs.bunny-stor-username }}"
         remote-password: "${{ inputs.bunny-stor-password }}"
-        remote-path: "/${{ inputs.fw-version }}/${{ inputs.board }}"
+        remote-path: "/${{ inputs.fw-version }}/"
         local-path: "upload"
         sync: "full"
