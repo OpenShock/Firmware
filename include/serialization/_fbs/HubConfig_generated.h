@@ -9,8 +9,8 @@
 // Ensure the included flatbuffers.h is the same version as when this file was
 // generated, otherwise it may not be compatible.
 static_assert(FLATBUFFERS_VERSION_MAJOR == 25 &&
-              FLATBUFFERS_VERSION_MINOR == 1 &&
-              FLATBUFFERS_VERSION_REVISION == 24,
+              FLATBUFFERS_VERSION_MINOR == 2 &&
+              FLATBUFFERS_VERSION_REVISION == 10,
              "Non-compatible flatbuffers version included");
 
 namespace OpenShock {
@@ -190,7 +190,8 @@ struct EStopConfig FLATBUFFERS_FINAL_CLASS : private ::flatbuffers::Table {
   enum FlatBuffersVTableOffset FLATBUFFERS_VTABLE_UNDERLYING_TYPE {
     VT_ENABLED = 4,
     VT_GPIO_PIN = 6,
-    VT_ACTIVE = 8
+    VT_ACTIVE = 8,
+    VT_LATCHING = 10
   };
   bool enabled() const {
     return GetField<uint8_t>(VT_ENABLED, 0) != 0;
@@ -203,11 +204,16 @@ struct EStopConfig FLATBUFFERS_FINAL_CLASS : private ::flatbuffers::Table {
   bool active() const {
     return GetField<uint8_t>(VT_ACTIVE, 0) != 0;
   }
+  /// Set When EmergencyStop is a latching switch
+  bool latching() const {
+    return GetField<uint8_t>(VT_LATCHING, 0) != 0;
+  }
   bool Verify(::flatbuffers::Verifier &verifier) const {
     return VerifyTableStart(verifier) &&
            VerifyField<uint8_t>(verifier, VT_ENABLED, 1) &&
            VerifyField<int8_t>(verifier, VT_GPIO_PIN, 1) &&
            VerifyField<uint8_t>(verifier, VT_ACTIVE, 1) &&
+           VerifyField<uint8_t>(verifier, VT_LATCHING, 1) &&
            verifier.EndTable();
   }
 };
@@ -225,6 +231,9 @@ struct EStopConfigBuilder {
   void add_active(bool active) {
     fbb_.AddElement<uint8_t>(EStopConfig::VT_ACTIVE, static_cast<uint8_t>(active), 0);
   }
+  void add_latching(bool latching) {
+    fbb_.AddElement<uint8_t>(EStopConfig::VT_LATCHING, static_cast<uint8_t>(latching), 0);
+  }
   explicit EStopConfigBuilder(::flatbuffers::FlatBufferBuilder &_fbb)
         : fbb_(_fbb) {
     start_ = fbb_.StartTable();
@@ -240,8 +249,10 @@ inline ::flatbuffers::Offset<EStopConfig> CreateEStopConfig(
     ::flatbuffers::FlatBufferBuilder &_fbb,
     bool enabled = false,
     int8_t gpio_pin = 0,
-    bool active = false) {
+    bool active = false,
+    bool latching = false) {
   EStopConfigBuilder builder_(_fbb);
+  builder_.add_latching(latching);
   builder_.add_active(active);
   builder_.add_gpio_pin(gpio_pin);
   builder_.add_enabled(enabled);
