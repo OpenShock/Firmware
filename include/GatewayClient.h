@@ -21,7 +21,7 @@ namespace OpenShock {
 
     inline GatewayClientState state() const { return m_state; }
 
-    void connect(const char* lcgFqdn);
+    void connect(std::string_view lcgAddress);
     void disconnect();
 
     bool sendMessageTXT(std::string_view data);
