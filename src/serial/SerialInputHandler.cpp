@@ -117,6 +117,7 @@ void _printCompleteHelp()
 
       buffer.append(command.description());
 
+      buffer.push_back('\r');
       buffer.push_back('\n');
     }
   }
@@ -129,7 +130,7 @@ void _printCommandHelp(Serial::CommandGroup& group)
 {
   std::size_t size = 0;
   for (const auto& command : group.commands()) {
-    size++;  // +1 for newline
+    size += 2;  // +2 for newline
     size += group.name().size();
     size++;  // +1 for space
 
@@ -141,7 +142,7 @@ void _printCommandHelp(Serial::CommandGroup& group)
       size += arg.name.size() + 3;  // +1 for space, +2 for <>
     }
 
-    size++;  // +1 for newline
+    size += 2;  // +2 for newline
 
     if (command.description().size() > 0) {
       size = command.description().size() + 3;  // +2 for indent, +1 for newline
@@ -153,17 +154,17 @@ void _printCommandHelp(Serial::CommandGroup& group)
         size += arg.name.size() + 7;  // +4 for indent, +2 for <>, +1 for space
         size += arg.constraint.size();
         if (arg.constraintExtensions.size() > 0) {
-          size += 2;                 // +1 for ':', +1 for newline
+          size += 3;                 // +1 for ':', +2 for newline
           for (const auto& ext : arg.constraintExtensions) {
-            size += ext.size() + 7;  // +1 for newline, +6 for indent
+            size += ext.size() + 8;  // +2 for newline, +6 for indent
           }
         } else {
-          size++;  // +1 for newline
+          size += 2;  // +2 for newline
         }
       }
     }
 
-    size += 15;                       // +15 for "  Example:    \n"
+    size += 16;                       // +16 for "  Example:    \n"
     size += group.name().size() + 1;  // +1 for space
 
     if (command.name().size() > 0) {
@@ -174,15 +175,16 @@ void _printCommandHelp(Serial::CommandGroup& group)
       size += arg.exampleValue.size() + 1;  // +1 for space
     }
 
-    size++;  // +1 for newline
+    size += 2;  // +2 for newline
   }
 
-  size++;  // +1 for newline
+  size += 2;  // +2 for newline
 
   std::string buffer;
   buffer.reserve(size);  // TODO: Should be exact size, is 20 bytes off, figure out why
 
   for (const auto& command : group.commands()) {
+    buffer.push_back('\r');
     buffer.push_back('\n');
     buffer.append(group.name());
     buffer.push_back(' ');
@@ -199,11 +201,13 @@ void _printCommandHelp(Serial::CommandGroup& group)
       buffer.push_back(' ');
     }
 
+    buffer.push_back('\r');
     buffer.push_back('\n');
 
     if (command.description().size() > 0) {
       buffer.append(2, ' ');
       buffer.append(command.description());
+      buffer.push_back('\r');
       buffer.push_back('\n');
     }
 
@@ -217,19 +221,22 @@ void _printCommandHelp(Serial::CommandGroup& group)
         buffer.push_back(' ');
         buffer.append(arg.constraint);
         if (arg.constraintExtensions.size() > 0) {
+          buffer.push_back('\r');
           buffer.push_back('\n');
           for (const auto& ext : arg.constraintExtensions) {
             buffer.append(6, ' ');
             buffer.append(ext);
+            buffer.push_back('\r');
             buffer.push_back('\n');
           }
         } else {
+          buffer.push_back('\r');
           buffer.push_back('\n');
         }
       }
     }
 
-    buffer.append("  Example:\n    "sv);
+    buffer.append("  Example:\r\n    "sv);
     buffer.append(group.name());
     buffer.push_back(' ');
 
@@ -243,8 +250,10 @@ void _printCommandHelp(Serial::CommandGroup& group)
       buffer.push_back(' ');
     }
 
+    buffer.push_back('\r');
     buffer.push_back('\n');
   }
+  buffer.push_back('\r');
   buffer.push_back('\n');
 
   ::Serial.print(buffer.data());
@@ -616,22 +625,20 @@ void SerialInputHandler::SetSerialEchoEnabled(bool enabled)
 
 void SerialInputHandler::PrintWelcomeHeader()
 {
-  ::Serial.print(R"(
-============== OPENSHOCK ==============
-  Contribute @ github.com/OpenShock
-  Discuss    @ discord.gg/OpenShock
-  Type 'help' for available commands
-=======================================
-)");
+  ::Serial.println("============== OPENSHOCK ==============");
+  ::Serial.println("  Contribute @ github.com/OpenShock");
+  ::Serial.println("  Discuss    @ discord.gg/OpenShock");
+  ::Serial.println("  Type 'help' for available commands");
+  ::Serial.println("=======================================");
 }
 
 void SerialInputHandler::PrintVersionInfo()
 {
   ::Serial.print("\
-  Version:  " OPENSHOCK_FW_VERSION "\n\
-    Build:  " OPENSHOCK_FW_MODE "\n\
-   Commit:  " OPENSHOCK_FW_GIT_COMMIT "\n\
-    Board:  " OPENSHOCK_FW_BOARD "\n\
-     Chip:  " OPENSHOCK_FW_CHIP "\n\
+  Version:  " OPENSHOCK_FW_VERSION "\r\n\
+    Build:  " OPENSHOCK_FW_MODE "\r\n\
+   Commit:  " OPENSHOCK_FW_GIT_COMMIT "\r\n\
+    Board:  " OPENSHOCK_FW_BOARD "\r\n\
+     Chip:  " OPENSHOCK_FW_CHIP "\r\n\
 ");
 }
