@@ -89,7 +89,7 @@ void _printCompleteHelp()
     }
   }
 
-  std::size_t paddedLength = longestCommand + 1 + longestArgument + 1;  // +1 for space, +1 for newline
+  std::size_t paddedLength = longestCommand + 1 + longestArgument + 2;  // +1 for space, +2 for newline
 
   std::string buffer;
   buffer.reserve((paddedLength * commandCount) + descriptionSize);  // Approximate size
@@ -145,11 +145,11 @@ void _printCommandHelp(Serial::CommandGroup& group)
     size += 2;  // +2 for newline
 
     if (command.description().size() > 0) {
-      size = command.description().size() + 3;  // +2 for indent, +1 for newline
+      size = command.description().size() + 4;  // +2 for indent, +2 for newline
     }
 
     if (command.arguments().size() > 0) {
-      size += 13;                     // +13 for "  Arguments:\n"
+      size += 14;                     // +14 for "  Arguments:\r\n"
       for (const auto& arg : command.arguments()) {
         size += arg.name.size() + 7;  // +4 for indent, +2 for <>, +1 for space
         size += arg.constraint.size();
@@ -164,7 +164,7 @@ void _printCommandHelp(Serial::CommandGroup& group)
       }
     }
 
-    size += 16;                       // +16 for "  Example:    \n"
+    size += 16;                       // +16 for "  Example:    \r\n"
     size += group.name().size() + 1;  // +1 for space
 
     if (command.name().size() > 0) {
@@ -212,7 +212,7 @@ void _printCommandHelp(Serial::CommandGroup& group)
     }
 
     if (command.arguments().size() > 0) {
-      buffer.append("  Arguments:\n"sv);
+      buffer.append("  Arguments:\r\n"sv);
       for (const auto& arg : command.arguments()) {
         buffer.append(4, ' ');
         buffer.push_back('<');
@@ -625,11 +625,13 @@ void SerialInputHandler::SetSerialEchoEnabled(bool enabled)
 
 void SerialInputHandler::PrintWelcomeHeader()
 {
-  ::Serial.println("============== OPENSHOCK ==============");
-  ::Serial.println("  Contribute @ github.com/OpenShock");
-  ::Serial.println("  Discuss    @ discord.gg/OpenShock");
-  ::Serial.println("  Type 'help' for available commands");
-  ::Serial.println("=======================================");
+  ::Serial.println("\
+============== OPENSHOCK ==============\r\n\
+  Contribute @ github.com/OpenShock\r\n\
+  Discuss    @ discord.gg/OpenShock\r\n\
+  Type 'help' for available commands\r\n\
+=======================================\r\n\
+");
 }
 
 void SerialInputHandler::PrintVersionInfo()
