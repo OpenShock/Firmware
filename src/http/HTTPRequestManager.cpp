@@ -409,7 +409,7 @@ HTTP::Response<std::size_t> _doGetStream(
   }
 
   if (std::find(acceptedCodes.begin(), acceptedCodes.end(), responseCode) == acceptedCodes.end()) {
-    OS_LOGE(TAG, "Received unexpected response code %d", responseCode);
+    OS_LOGD(TAG, "Received unexpected response code %d", responseCode);
     return {HTTP::RequestResult::CodeRejected, responseCode, 0};
   }
 
