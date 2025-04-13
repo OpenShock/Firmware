@@ -429,7 +429,7 @@ static bool _tryGetStringList(std::string_view url, std::vector<std::string>& li
     {
       {"Accept", "text/plain"}
   },
-    {200, 304}
+    std::array<uint16_t, 2> {200, 304}
   );
   if (response.result != OpenShock::HTTP::RequestResult::Success) {
     OS_LOGE(TAG, "Failed to fetch list: [%u] %s", response.code, response.data.c_str());
@@ -548,7 +548,7 @@ bool OtaUpdateManager::TryGetFirmwareVersion(OtaUpdateChannel channel, OpenShock
     {
       {"Accept", "text/plain"}
   },
-    {200, 304}
+    std::array<uint16_t, 2> {200, 304}
   );
   if (response.result != OpenShock::HTTP::RequestResult::Success) {
     OS_LOGE(TAG, "Failed to fetch firmware version: [%u] %s", response.code, response.data.c_str());
@@ -618,7 +618,7 @@ bool OtaUpdateManager::TryGetFirmwareRelease(const OpenShock::SemVer& version, F
     {
       {"Accept", "text/plain"}
   },
-    {200, 304}
+    std::array<uint16_t, 2> {200, 304}
   );
   if (sha256HashesResponse.result != OpenShock::HTTP::RequestResult::Success) {
     OS_LOGE(TAG, "Failed to fetch hashes: [%u] %s", sha256HashesResponse.code, sha256HashesResponse.data.c_str());

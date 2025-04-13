@@ -96,6 +96,10 @@ AccountLinkResultCode GatewayConnectionManager::Link(std::string_view linkCode)
 
   auto response = HTTP::JsonAPI::LinkAccount(linkCode);
 
+  if (response.code == 404) {
+    return AccountLinkResultCode::InvalidCode;
+  }
+
   if (response.result == HTTP::RequestResult::RateLimited) {
     OS_LOGW(TAG, "Account Link request got ratelimited");
     return AccountLinkResultCode::RateLimited;
@@ -104,10 +108,6 @@ AccountLinkResultCode GatewayConnectionManager::Link(std::string_view linkCode)
     OS_LOGE(TAG, "Error while getting auth token: %d %d", response.result, response.code);
 
     return AccountLinkResultCode::InternalError;
-  }
-
-  if (response.code == 404) {
-    return AccountLinkResultCode::InvalidCode;
   }
 
   if (response.code != 200) {
@@ -166,17 +166,17 @@ bool FetchHubInfo(std::string_view authToken)
 
   auto response = HTTP::JsonAPI::GetHubInfo(authToken);
 
+  if (response.code == 401) {
+    OS_LOGD(TAG, "Auth token is invalid, clearing it");
+    Config::ClearBackendAuthToken();
+    return false;
+  }
+
   if (response.result == HTTP::RequestResult::RateLimited) {
     return false;  // Just return false, don't spam the console with errors
   }
   if (response.result != HTTP::RequestResult::Success) {
     OS_LOGE(TAG, "Error while fetching hub info: %d %d", response.result, response.code);
-    return false;
-  }
-
-  if (response.code == 401) {
-    OS_LOGD(TAG, "Auth token is invalid, clearing it");
-    Config::ClearBackendAuthToken();
     return false;
   }
 
@@ -241,17 +241,17 @@ bool StartConnectingToLCG()
 
   auto response = HTTP::JsonAPI::AssignLcg(authToken);
 
+  if (response.code == 401) {
+    OS_LOGD(TAG, "Auth token is invalid, clearing it");
+    Config::ClearBackendAuthToken();
+    return false;
+  }
+
   if (response.result == HTTP::RequestResult::RateLimited) {
     return false;  // Just return false, don't spam the console with errors
   }
   if (response.result != HTTP::RequestResult::Success) {
     OS_LOGE(TAG, "Error while fetching LCG endpoint: %d %d", response.result, response.code);
-    return false;
-  }
-
-  if (response.code == 401) {
-    OS_LOGD(TAG, "Auth token is invalid, clearing it");
-    Config::ClearBackendAuthToken();
     return false;
   }
 

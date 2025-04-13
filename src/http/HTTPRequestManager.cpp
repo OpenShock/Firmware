@@ -17,7 +17,6 @@ const char* const TAG = "HTTPRequestManager";
 #include <numeric>
 #include <string_view>
 #include <unordered_map>
-#include <vector>
 
 using namespace std::string_view_literals;
 
@@ -358,7 +357,7 @@ HTTP::Response<std::size_t> _doGetStream(
   HTTPClient& client,
   std::string_view url,
   const std::map<String, String>& headers,
-  const std::vector<int>& acceptedCodes,
+  tcb::span<const uint16_t> acceptedCodes,
   std::shared_ptr<OpenShock::RateLimiter> rateLimiter,
   HTTP::GotContentLengthCallback contentLengthCallback,
   HTTP::DownloadCallback downloadCallback,
@@ -448,7 +447,7 @@ HTTP::Response<std::size_t> _doGetStream(
 }
 
 HTTP::Response<std::size_t>
-  HTTP::Download(std::string_view url, const std::map<String, String>& headers, HTTP::GotContentLengthCallback contentLengthCallback, HTTP::DownloadCallback downloadCallback, const std::vector<int>& acceptedCodes, uint32_t timeoutMs)
+  HTTP::Download(std::string_view url, const std::map<String, String>& headers, HTTP::GotContentLengthCallback contentLengthCallback, HTTP::DownloadCallback downloadCallback, tcb::span<const uint16_t> acceptedCodes, uint32_t timeoutMs)
 {
   std::shared_ptr<OpenShock::RateLimiter> rateLimiter = _getRateLimiter(url);
   if (rateLimiter == nullptr) {
@@ -465,7 +464,7 @@ HTTP::Response<std::size_t>
   return _doGetStream(client, url, headers, acceptedCodes, rateLimiter, contentLengthCallback, downloadCallback, timeoutMs);
 }
 
-HTTP::Response<std::string> HTTP::GetString(std::string_view url, const std::map<String, String>& headers, const std::vector<int>& acceptedCodes, uint32_t timeoutMs)
+HTTP::Response<std::string> HTTP::GetString(std::string_view url, const std::map<String, String>& headers, tcb::span<const uint16_t> acceptedCodes, uint32_t timeoutMs)
 {
   std::string result;
 

@@ -39,7 +39,7 @@ void _handleDomainCommand(std::string_view arg, bool isAutomated) {
       {"Accept", "application/json"}
   },
     OpenShock::Serialization::JsonAPI::ParseBackendVersionJsonResponse,
-    {200}
+    std::array<uint16_t, 2> {200}
   );
 
   if (resp.result != OpenShock::HTTP::RequestResult::Success) {
