@@ -35,6 +35,8 @@ const uint8_t FLAG_LINKED = 1 << 1;
 const uint8_t LINK_CODE_LENGTH = 6;
 
 static uint8_t s_flags                                      = 0;
+static int64_t s_lastAuthFailure                            = 0;
+static int64_t s_lastConnectionAttempt                      = 0;
 static std::unique_ptr<OpenShock::GatewayClient> s_wsClient = nullptr;
 
 void _evGotIPHandler(arduino_event_t* event)
@@ -52,6 +54,15 @@ void _evWiFiDisconnectedHandler(arduino_event_t* event)
   s_flags    = FLAG_NONE;
   s_wsClient = nullptr;
   OS_LOGD(TAG, "Lost IP address");
+}
+
+static bool checkIsDeAuthRateLimited(int64_t millis)
+{
+  return s_lastAuthFailure != 0 && (millis - s_lastAuthFailure) < 300'000;  // 5 Minutes
+}
+static bool checkIsConnectionRateLimited(int64_t millis)
+{
+  return s_lastConnectionAttempt != 0 && (millis - s_lastConnectionAttempt) < 20'000;  // 20 seconds
 }
 
 using namespace OpenShock;
@@ -164,11 +175,15 @@ bool FetchHubInfo(std::string_view authToken)
     return false;
   }
 
+  if (checkIsDeAuthRateLimited(OpenShock::millis())) {
+    return false;
+  }
+
   auto response = HTTP::JsonAPI::GetHubInfo(authToken);
 
   if (response.code == 401) {
-    OS_LOGD(TAG, "Auth token is invalid, clearing it");
-    Config::ClearBackendAuthToken();
+    OS_LOGD(TAG, "Auth token is invalid, waiting 5 minutes before checking again");
+    s_lastAuthFailure = OpenShock::micros();
     return false;
   }
 
@@ -197,7 +212,6 @@ bool FetchHubInfo(std::string_view authToken)
   return true;
 }
 
-static int64_t _lastConnectionAttempt = 0;
 bool StartConnectingToLCG()
 {
   // TODO: this function is very slow, should be optimized!
@@ -213,11 +227,10 @@ bool StartConnectingToLCG()
   }
 
   int64_t msNow = OpenShock::millis();
-  if (_lastConnectionAttempt != 0 && (msNow - _lastConnectionAttempt) < 20'000) {  // Only try to connect every 20 seconds
+  if (checkIsDeAuthRateLimited(msNow) || checkIsConnectionRateLimited(msNow)) {
     return false;
   }
-
-  _lastConnectionAttempt = msNow;
+  s_lastConnectionAttempt = msNow;
 
   if (Config::HasBackendLCGOverride()) {
     std::string lcgOverride;
@@ -242,8 +255,8 @@ bool StartConnectingToLCG()
   auto response = HTTP::JsonAPI::AssignLcg(authToken);
 
   if (response.code == 401) {
-    OS_LOGD(TAG, "Auth token is invalid, clearing it");
-    Config::ClearBackendAuthToken();
+    OS_LOGD(TAG, "Auth token is invalid, waiting 5 minutes before retrying");
+    s_lastAuthFailure = OpenShock::micros();
     return false;
   }
 
