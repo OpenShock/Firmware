@@ -237,7 +237,7 @@ bool StartConnectingToLCG()
     Config::GetBackendLCGOverride(lcgOverride);
 
     OS_LOGD(TAG, "Connecting to overridden LCG endpoint %s", lcgOverride.c_str());
-    s_wsClient->connect(lcgOverride.c_str());
+    s_wsClient->connect(lcgOverride);
     return true;
   }
 
@@ -274,7 +274,7 @@ bool StartConnectingToLCG()
   }
 
   OS_LOGD(TAG, "Connecting to LCG endpoint %s in country %s", response.data.fqdn.c_str(), response.data.country.c_str());
-  s_wsClient->connect(response.data.fqdn.c_str());
+  s_wsClient->connect(response.data.fqdn);
 
   return true;
 }
