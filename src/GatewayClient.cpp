@@ -36,7 +36,7 @@ static bool parse_supplied_address(std::string_view input, std::string& host, ui
   // Extract path if present
   if (auto path_pos = input.find('/'); path_pos != std::string_view::npos) {
     path = std::string(input.substr(path_pos));
-    path += (path.back() == '/' ? "/2/ws/hub" + 1 : "/2/ws/hub");  // I cant be bothered to do anything else so have a conditional assignment combined with C-style pointer arithmetic :>
+    path += ("/2/ws/hub" + (path.back() == '/' ? 1 : 0));  // I cant be bothered to do anything else so have a conditional assignment combined with C-style pointer arithmetic :>
     input.remove_suffix(input.size() - path_pos);
   } else {
     path = "/2/ws/hub";
