@@ -7,9 +7,9 @@ const char* const TAG = "CaptivePortal";
 #include "CaptivePortalInstance.h"
 #include "CommandHandler.h"
 #include "config/Config.h"
+#include "Core.h"
 #include "GatewayConnectionManager.h"
 #include "Logging.h"
-#include "Time.h"
 
 #include <ESPAsyncWebServer.h>
 #include <WebSocketsServer.h>

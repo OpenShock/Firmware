@@ -5,10 +5,10 @@ const char* const TAG = "GatewayConnectionManager";
 #include "VisualStateManager.h"
 
 #include "config/Config.h"
+#include "Core.h"
 #include "GatewayClient.h"
 #include "http/JsonAPI.h"
 #include "Logging.h"
-#include "Time.h"
 
 #include <unordered_map>
 

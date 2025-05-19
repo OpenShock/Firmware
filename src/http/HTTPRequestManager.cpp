@@ -3,10 +3,10 @@
 const char* const TAG = "HTTPRequestManager";
 
 #include "Common.h"
+#include "Core.h"
 #include "Logging.h"
 #include "RateLimiter.h"
 #include "SimpleMutex.h"
-#include "Time.h"
 #include "util/HexUtils.h"
 #include "util/StringUtils.h"
 

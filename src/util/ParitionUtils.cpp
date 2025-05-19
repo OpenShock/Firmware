@@ -2,10 +2,10 @@
 
 const char* const TAG = "PartitionUtils";
 
+#include "Core.h"
 #include "Hashing.h"
 #include "http/HTTPRequestManager.h"
 #include "Logging.h"
-#include "Time.h"
 #include "util/HexUtils.h"
 
 bool OpenShock::TryGetPartitionHash(const esp_partition_t* partition, char (&hash)[65]) {

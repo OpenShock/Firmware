@@ -5,8 +5,8 @@ const char* const TAG = "WSGateway";
 #include <esp_wifi.h>
 
 #include "config/Config.h"
+#include "Core.h"
 #include "Logging.h"
-#include "Time.h"
 
 using namespace OpenShock::Serialization;
 

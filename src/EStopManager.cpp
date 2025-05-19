@@ -6,10 +6,10 @@ const char* const TAG = "EStopManager";
 
 #include "Chipset.h"
 #include "config/Config.h"
+#include "Core.h"
 #include "events/Events.h"
 #include "Logging.h"
 #include "SimpleMutex.h"
-#include "Time.h"
 #include "util/TaskUtils.h"
 
 #include <driver/gpio.h>
