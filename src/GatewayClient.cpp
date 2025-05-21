@@ -13,70 +13,9 @@ const char* const TAG = "GatewayClient";
 #include "util/CertificateUtils.h"
 #include "VisualStateManager.h"
 
-#include <charconv>
-
 using namespace OpenShock;
 
 static bool s_bootStatusSent = false;
-
-// TODO: THIS IS HORRIBLE!
-static bool parse_supplied_address(std::string_view input, std::string& host, uint16_t& port, std::string& path)
-{
-  host.clear();
-  path.clear();
-  port = 0;
-
-  if (input.empty()) return false;  // Input cannot be empty
-
-  // Remove scheme if present (e.g., "http://")
-  if (auto scheme_pos = input.find("://"); scheme_pos != std::string_view::npos) {
-    input.remove_prefix(scheme_pos + 3);
-  }
-
-  // Extract path if present
-  if (auto path_pos = input.find('/'); path_pos != std::string_view::npos) {
-    path = std::string(input.substr(path_pos));
-    path += ("/2/ws/hub" + (path.back() == '/' ? 1 : 0));  // I cant be bothered to do anything else so have a conditional assignment combined with C-style pointer arithmetic :>
-    input.remove_suffix(input.size() - path_pos);
-  } else {
-    path = "/2/ws/hub";
-  }
-
-  if (input.empty()) return false;
-
-  std::string_view port_part;
-
-  // Check for IPv6 address (e.g., [::1]:8080)
-  if (input.front() == '[') {
-    auto closing_bracket = input.find(']');
-    if (closing_bracket == std::string_view::npos) return false;  // Malformed IPv6
-
-    host = std::string(input.substr(1, closing_bracket - 1));
-
-    if (closing_bracket + 1 < input.size()) {
-      if (input[closing_bracket + 1] != ':') return false;  // Expecting ':' after ']'
-      port_part = input.substr(closing_bracket + 2);        // Skip "]:" for port
-    }
-  } else {
-    // IPv4 or hostname
-    if (auto colon_pos = input.rfind(':'); colon_pos != std::string_view::npos) {
-      host      = std::string(input.substr(0, colon_pos));
-      port_part = input.substr(colon_pos + 1);
-    } else {
-      host = std::string(input);
-    }
-  }
-
-  // Parse port if present
-  if (!port_part.empty()) {
-    auto result = std::from_chars(port_part.data(), port_part.data() + port_part.size(), port);
-    if (result.ec != std::errc()) return false;  // Failed to parse port
-  } else {
-    port = 443;
-  }
-
-  return true;
-}
 
 GatewayClient::GatewayClient(const std::string& authToken)
   : m_webSocket()
@@ -100,17 +39,9 @@ GatewayClient::~GatewayClient()
   m_webSocket.disconnect();
 }
 
-void GatewayClient::connect(std::string_view lcgAddress)
+void GatewayClient::connect(std::string host, uint16_t port, std::string path)
 {
   if (m_state != GatewayClientState::Disconnected) {
-    return;
-  }
-
-  std::string host;
-  uint16_t port;
-  std::string path;
-  if (!parse_supplied_address(lcgAddress, host, port, path)) {
-    // TODO: Log error
     return;
   }
 
