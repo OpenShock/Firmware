@@ -39,7 +39,7 @@ GatewayClient::~GatewayClient()
   m_webSocket.disconnect();
 }
 
-void GatewayClient::connect(std::string host, uint16_t port, std::string path)
+void GatewayClient::connect(const std::string& host, uint16_t port, const std::string& path)
 {
   if (m_state != GatewayClientState::Disconnected) {
     return;
