@@ -19,12 +19,14 @@ BackendConfig::BackendConfig(std::string_view domain, std::string_view authToken
 {
 }
 
-void BackendConfig::ToDefault() {
+void BackendConfig::ToDefault()
+{
   domain = OPENSHOCK_API_DOMAIN;
   authToken.clear();
 }
 
-bool BackendConfig::FromFlatbuffers(const Serialization::Configuration::BackendConfig* config) {
+bool BackendConfig::FromFlatbuffers(const Serialization::Configuration::BackendConfig* config)
+{
   if (config == nullptr) {
     OS_LOGW(TAG, "Config is null, setting to default");
     ToDefault();
@@ -37,7 +39,8 @@ bool BackendConfig::FromFlatbuffers(const Serialization::Configuration::BackendC
   return true;
 }
 
-flatbuffers::Offset<OpenShock::Serialization::Configuration::BackendConfig> BackendConfig::ToFlatbuffers(flatbuffers::FlatBufferBuilder& builder, bool withSensitiveData) const {
+flatbuffers::Offset<OpenShock::Serialization::Configuration::BackendConfig> BackendConfig::ToFlatbuffers(flatbuffers::FlatBufferBuilder& builder, bool withSensitiveData) const
+{
   auto domainOffset = builder.CreateString(domain);
 
   flatbuffers::Offset<flatbuffers::String> authTokenOffset;
@@ -50,7 +53,8 @@ flatbuffers::Offset<OpenShock::Serialization::Configuration::BackendConfig> Back
   return Serialization::Configuration::CreateBackendConfig(builder, domainOffset, authTokenOffset);
 }
 
-bool BackendConfig::FromJSON(const cJSON* json) {
+bool BackendConfig::FromJSON(const cJSON* json)
+{
   if (json == nullptr) {
     OS_LOGW(TAG, "Config is null, setting to default");
     ToDefault();
@@ -68,7 +72,8 @@ bool BackendConfig::FromJSON(const cJSON* json) {
   return true;
 }
 
-cJSON* BackendConfig::ToJSON(bool withSensitiveData) const {
+cJSON* BackendConfig::ToJSON(bool withSensitiveData) const
+{
   cJSON* root = cJSON_CreateObject();
 
   cJSON_AddStringToObject(root, "domain", domain.c_str());
