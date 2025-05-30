@@ -78,10 +78,6 @@ namespace OpenShock::Config {
   bool GetBackendAuthToken(std::string& out);
   bool SetBackendAuthToken(std::string_view token);
   bool ClearBackendAuthToken();
-  bool HasBackendLCGOverride();
-  bool GetBackendLCGOverride(std::string& out);
-  bool SetBackendLCGOverride(std::string_view lcgOverride);
-  bool ClearBackendLCGOverride();
 
   bool GetSerialInputConfigEchoEnabled(bool& out);
   bool SetSerialInputConfigEchoEnabled(bool enabled);

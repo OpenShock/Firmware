@@ -35,7 +35,9 @@ namespace OpenShock::Serialization::JsonAPI {
     std::vector<ShockerInfo> shockers;
   };
   struct AssignLcgResponse {
-    std::string fqdn;
+    std::string host;
+    uint16_t port;
+    std::string path;
     std::string country;
   };
 
