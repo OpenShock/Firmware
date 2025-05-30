@@ -633,38 +633,6 @@ bool Config::ClearBackendAuthToken()
   return _trySaveConfig();
 }
 
-bool Config::HasBackendLCGOverride()
-{
-  CONFIG_LOCK_READ(false);
-
-  return !_configData.backend.lcgOverride.empty();
-}
-
-bool Config::GetBackendLCGOverride(std::string& out)
-{
-  CONFIG_LOCK_READ(false);
-
-  out = _configData.backend.lcgOverride;
-
-  return true;
-}
-
-bool Config::SetBackendLCGOverride(std::string_view lcgOverride)
-{
-  CONFIG_LOCK_WRITE(false);
-
-  _configData.backend.lcgOverride = std::string(lcgOverride);
-  return _trySaveConfig();
-}
-
-bool Config::ClearBackendLCGOverride()
-{
-  CONFIG_LOCK_WRITE(false);
-
-  _configData.backend.lcgOverride.clear();
-  return _trySaveConfig();
-}
-
 bool Config::GetSerialInputConfigEchoEnabled(bool& out)
 {
   CONFIG_LOCK_READ(false);
