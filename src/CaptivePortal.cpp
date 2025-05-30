@@ -27,7 +27,7 @@ static bool s_forceClosed                                = false;
 static esp_timer_handle_t s_captivePortalUpdateLoopTimer = nullptr;
 static std::unique_ptr<CaptivePortalInstance> s_instance = nullptr;
 
-bool _startCaptive()
+static bool captiveportal_start()
 {
   if (s_instance != nullptr) {
     OS_LOGD(TAG, "Already started");
@@ -78,7 +78,7 @@ bool _startCaptive()
 
   return true;
 }
-void _stopCaptive()
+static void captiveportal_stop()
 {
   if (s_instance == nullptr) {
     OS_LOGD(TAG, "Already stopped");
@@ -94,7 +94,7 @@ void _stopCaptive()
   WiFi.softAPdisconnect(true);
 }
 
-void _captivePortalUpdateLoop(void*)
+static void captiveportal_updateloop(void*)
 {
   bool gatewayConnected = GatewayConnectionManager::IsConnected();
   bool commandHandlerOk = CommandHandler::Ok();
@@ -107,7 +107,7 @@ void _captivePortalUpdateLoop(void*)
       OS_LOGD(TAG, "  forceClosed: %s", s_forceClosed ? "true" : "false");
       OS_LOGD(TAG, "  isConnected: %s", gatewayConnected ? "true" : "false");
       OS_LOGD(TAG, "  commandHandlerOk: %s", commandHandlerOk ? "true" : "false");
-      _startCaptive();
+      captiveportal_start();
     }
     return;
   }
@@ -118,7 +118,7 @@ void _captivePortalUpdateLoop(void*)
     OS_LOGD(TAG, "  forceClosed: %s", s_forceClosed ? "true" : "false");
     OS_LOGD(TAG, "  isConnected: %s", gatewayConnected ? "true" : "false");
     OS_LOGD(TAG, "  commandHandlerOk: %s", commandHandlerOk ? "true" : "false");
-    _stopCaptive();
+    captiveportal_stop();
     return;
   }
 }
@@ -128,7 +128,7 @@ using namespace OpenShock;
 bool CaptivePortal::Init()
 {
   esp_timer_create_args_t args = {
-    .callback              = _captivePortalUpdateLoop,
+    .callback              = captiveportal_updateloop,
     .arg                   = nullptr,
     .dispatch_method       = ESP_TIMER_TASK,
     .name                  = "captive_portal_update",

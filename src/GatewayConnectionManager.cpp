@@ -39,7 +39,7 @@ static int64_t s_lastAuthFailure                            = 0;
 static int64_t s_lastConnectionAttempt                      = 0;
 static std::unique_ptr<OpenShock::GatewayClient> s_wsClient = nullptr;
 
-void _evGotIPHandler(arduino_event_t* event)
+static void evh_gotIP(arduino_event_t* event)
 {
   (void)event;
 
@@ -47,7 +47,7 @@ void _evGotIPHandler(arduino_event_t* event)
   OS_LOGD(TAG, "Got IP address");
 }
 
-void _evWiFiDisconnectedHandler(arduino_event_t* event)
+static void evh_wiFiDisconnected(arduino_event_t* event)
 {
   (void)event;
 
@@ -70,9 +70,9 @@ namespace JsonAPI = OpenShock::Serialization::JsonAPI;
 
 bool GatewayConnectionManager::Init()
 {
-  WiFi.onEvent(_evGotIPHandler, ARDUINO_EVENT_WIFI_STA_GOT_IP);
-  WiFi.onEvent(_evGotIPHandler, ARDUINO_EVENT_WIFI_STA_GOT_IP6);
-  WiFi.onEvent(_evWiFiDisconnectedHandler, ARDUINO_EVENT_WIFI_STA_DISCONNECTED);
+  WiFi.onEvent(evh_gotIP, ARDUINO_EVENT_WIFI_STA_GOT_IP);
+  WiFi.onEvent(evh_gotIP, ARDUINO_EVENT_WIFI_STA_GOT_IP6);
+  WiFi.onEvent(evh_wiFiDisconnected, ARDUINO_EVENT_WIFI_STA_DISCONNECTED);
 
   return true;
 }
