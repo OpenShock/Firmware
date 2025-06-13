@@ -116,7 +116,7 @@ AccountLinkResultCode GatewayConnectionManager::Link(std::string_view linkCode)
     return AccountLinkResultCode::RateLimited;
   }
   if (response.result != HTTP::RequestResult::Success) {
-    OS_LOGE(TAG, "Error while getting auth token: %d %d", response.result, response.code);
+    OS_LOGE(TAG, "Error while getting auth token: %s %d", response.ResultToString(), response.code);
 
     return AccountLinkResultCode::InternalError;
   }
@@ -191,7 +191,7 @@ bool FetchHubInfo(std::string_view authToken)
     return false;  // Just return false, don't spam the console with errors
   }
   if (response.result != HTTP::RequestResult::Success) {
-    OS_LOGE(TAG, "Error while fetching hub info: %d %d", response.result, response.code);
+    OS_LOGE(TAG, "Error while fetching hub info: %s %d", response.ResultToString(), response.code);
     return false;
   }
 
@@ -255,7 +255,7 @@ bool StartConnectingToLCG()
     return false;  // Just return false, don't spam the console with errors
   }
   if (response.result != HTTP::RequestResult::Success) {
-    OS_LOGE(TAG, "Error while fetching LCG endpoint: %d %d", response.result, response.code);
+    OS_LOGE(TAG, "Error while fetching LCG endpoint: %s %d", response.ResultToString(), response.code);
     return false;
   }
 

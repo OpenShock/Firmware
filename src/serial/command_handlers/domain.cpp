@@ -43,7 +43,7 @@ void _handleDomainCommand(std::string_view arg, bool isAutomated) {
   );
 
   if (resp.result != OpenShock::HTTP::RequestResult::Success) {
-    SERPR_ERROR("Tried to connect to \"%.*s\", but failed with status [%d], refusing to save domain to config", arg.length(), arg.data(), resp.code);
+    SERPR_ERROR("Tried to connect to \"%.*s\", but failed with status [%d] (%s), refusing to save domain to config", arg.length(), arg.data(), resp.code, resp.ResultToString());
     return;
   }
 

@@ -28,6 +28,32 @@ namespace OpenShock::HTTP {
     RequestResult result;
     int code;
     T data;
+
+    inline const char* ResultToString() const
+    {
+      switch (result) {
+        case RequestResult::InternalError:
+          return "Internal error";
+        case RequestResult::InvalidURL:
+          return "Requested url was invalid";
+        case RequestResult::RequestFailed:
+          return "Request failed";
+        case RequestResult::TimedOut:
+          return "Request timed out";
+        case RequestResult::RateLimited:
+          return "Client was ratelimited";
+        case RequestResult::CodeRejected:
+          return "Unexpected response code";
+        case RequestResult::ParseFailed:
+          return "Parsing the response failed";
+        case RequestResult::Cancelled:
+          return "Request was cancelled";
+        case RequestResult::Success:
+          return "Success";
+        default:
+          return "Unknown reason";
+      }
+    }
   };
 
   template<typename T>
