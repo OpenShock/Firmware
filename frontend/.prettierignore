@@ -2,17 +2,16 @@
 node_modules
 /build
 /.svelte-kit
+/.vscode
 /package
+/src/lib/api/internal
+/src/lib/components/ui
+/static
 .env
 .env.*
 !.env.example
 
-# Package Managers
+# Ignore files for PNPM, NPM and YARN
 pnpm-lock.yaml
 package-lock.json
 yarn.lock
-
-# Generated or imported files
-/components.json
-/src/lib/_fbs
-/src/lib/components/ui

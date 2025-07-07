@@ -1,14 +1,13 @@
 <script lang="ts">
-  import { HubStateStore } from '$lib/stores';
+  import { ArrowRight, Link, LoaderCircle, RotateCcw, Scroll, Wifi } from '@lucide/svelte';
+  import { SerializeWifiNetworkConnectCommand } from '$lib/Serializers/WifiNetworkConnectCommand';
+  import { SerializeWifiNetworkDisconnectCommand } from '$lib/Serializers/WifiNetworkDisconnectCommand';
+  import { SerializeWifiNetworkSaveCommand } from '$lib/Serializers/WifiNetworkSaveCommand';
+  import { SerializeWifiScanCommand } from '$lib/Serializers/WifiScanCommand';
   import { WebSocketClient } from '$lib/WebSocketClient';
   import { WifiAuthMode } from '$lib/_fbs/open-shock/serialization/types/wifi-auth-mode';
   import { WifiScanStatus } from '$lib/_fbs/open-shock/serialization/types/wifi-scan-status';
-  import { SerializeWifiScanCommand } from '$lib/Serializers/WifiScanCommand';
-  import { SerializeWifiNetworkDisconnectCommand } from '$lib/Serializers/WifiNetworkDisconnectCommand';
-  import { SerializeWifiNetworkConnectCommand } from '$lib/Serializers/WifiNetworkConnectCommand';
-  import { SerializeWifiNetworkSaveCommand } from '$lib/Serializers/WifiNetworkSaveCommand';
   import WiFiDetailsDialog from '$lib/components/WiFiDetailsDialog.svelte';
-  import type { WiFiNetworkGroup } from '$lib/types';
   import { Button, buttonVariants } from '$lib/components/ui/button';
   import {
     Dialog,
@@ -21,7 +20,8 @@
   } from '$lib/components/ui/dialog';
   import { Input } from '$lib/components/ui/input';
   import { Label } from '$lib/components/ui/label';
-  import { ArrowRight, Link, LoaderCircle, RotateCcw, Scroll, Wifi } from '@lucide/svelte';
+  import { HubStateStore } from '$lib/stores';
+  import type { WiFiNetworkGroup } from '$lib/types';
   import ScrollArea from './ui/scroll-area/scroll-area.svelte';
 
   let scanStatus = $derived($HubStateStore.wifiScanStatus);
