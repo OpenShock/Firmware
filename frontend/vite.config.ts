@@ -1,11 +1,14 @@
-import { defineConfig, type UserConfig } from 'vite';
 import { sveltekit } from '@sveltejs/kit/vite';
 import tailwindcss from '@tailwindcss/vite';
+import { defineConfig } from 'vite';
+import devtoolsJson from 'vite-plugin-devtools-json';
 
 export default defineConfig({
-  plugins: [sveltekit(), tailwindcss()],
-
+  build: {
+    target: 'es2022',
+  },
+  plugins: [sveltekit(), tailwindcss(), devtoolsJson()],
   test: {
     include: ['src/**/*.{test,spec}.{js,ts}'],
   },
-} as UserConfig); // TODO: "test" is not a valid property of the defineconfig argument? This needs to get fixed
+});

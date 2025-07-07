@@ -1,8 +1,8 @@
 <script lang="ts">
-  import { HubStateStore, UsedPinsStore } from '$lib/stores';
   import { WebSocketClient } from '$lib/WebSocketClient';
   import { Button } from '$lib/components/ui/button';
   import { Input } from '$lib/components/ui/input';
+  import { HubStateStore, UsedPinsStore } from '$lib/stores';
 
   interface Props {
     name: string;

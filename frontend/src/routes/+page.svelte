@@ -1,7 +1,7 @@
 <script lang="ts">
   import { SerializeAccountLinkCommand } from '$lib/Serializers/AccountLinkCommand';
-  import { SerializeSetRfTxPinCommand } from '$lib/Serializers/SetRfTxPinCommand';
   import { SerializeSetEstopPinCommand } from '$lib/Serializers/SetEstopPinCommand';
+  import { SerializeSetRfTxPinCommand } from '$lib/Serializers/SetRfTxPinCommand';
   import { WebSocketClient } from '$lib/WebSocketClient';
   import GpioPinSelector from '$lib/components/GpioPinSelector.svelte';
   import WiFiList from '$lib/components/WiFiList.svelte';

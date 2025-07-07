@@ -8,6 +8,9 @@ declare global {
     // interface PageState {}
     // interface Platform {}
   }
+  interface ObjectConstructor {
+    hasOwn<T extends object, K extends PropertyKey>(o: T, prop: K): o is T & Record<K, unknown>;
+  }
 }
 
 export {};

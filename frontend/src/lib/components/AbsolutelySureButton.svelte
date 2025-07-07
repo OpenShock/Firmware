@@ -1,21 +1,23 @@
 <script lang="ts">
+  import type { IntervalHandle, TimeoutHandle } from '$lib/types/WAPI';
+  import { cn } from '$lib/utils';
   import { onDestroy } from 'svelte';
 
-  type Props = {
+  interface Props {
     text: string;
     onconfirm: () => void;
-  };
+  }
 
   let { text, onconfirm }: Props = $props();
 
-  let clickedAt = $state<number | undefined>();
+  let clickedAt = $state<number | null>(null);
   let buttonText = $state<string>(text);
   function updateText() {
-    if (clickedAt === undefined) {
+    if (clickedAt === null) {
       buttonText = text;
       return;
     }
-    const timeLeft = 5 - (Date.now() - clickedAt) / 1000;
+    const timeLeft = 3 - (Date.now() - clickedAt) / 1000;
     if (timeLeft <= 0) {
       buttonText = text;
       return;
@@ -23,24 +25,24 @@
     buttonText = `Hold for ${timeLeft.toFixed(1)}s`;
   }
 
-  let timer = $state<ReturnType<typeof setTimeout> | undefined>();
-  let interval = $state<ReturnType<typeof setInterval> | undefined>();
+  let timer = $state<TimeoutHandle | null>(null);
+  let interval: IntervalHandle | null = null;
   function stopTimers() {
     if (timer) {
       clearTimeout(timer);
-      timer = undefined;
+      timer = null;
     }
     if (interval) {
       clearInterval(interval);
-      interval = undefined;
+      interval = null;
     }
-    clickedAt = undefined;
+    clickedAt = null;
     updateText();
   }
   function startConfirm() {
     stopTimers();
     clickedAt = Date.now();
-    timer = setTimeout(onconfirm, 5000);
+    timer = setTimeout(onconfirm, 3000);
     interval = setInterval(updateText, 100);
   }
 
@@ -48,12 +50,13 @@
 </script>
 
 <button
-  onmousedown={startConfirm}
-  ontouchstart={startConfirm}
-  onmouseup={stopTimers}
-  ontouchend={stopTimers}
-  onmouseleave={stopTimers}
-  class={`focus:outline-hidden h-10 select-none whitespace-nowrap rounded-md bg-[#7f1d1d] px-4 py-2 text-sm font-medium hover:bg-[#731a1a] ${timer ? 'violent-shake' : ''}`}
+  onpointerdown={startConfirm}
+  onpointerup={stopTimers}
+  onpointerleave={stopTimers}
+  class={cn(
+    'h-10 rounded-md bg-[#7f1d1d] px-4 py-2 text-sm font-medium whitespace-nowrap select-none hover:bg-[#731a1a] focus:outline-hidden',
+    { 'violent-shake': timer !== null }
+  )}
 >
   {buttonText}
 </button>
@@ -63,7 +66,7 @@
     /* Start the shake animation and make the animation last for 0.5 seconds */
     animation:
       shake 0.5s,
-      glow 5s;
+      glow 3s;
 
     /* When the animation is finished, start again */
     animation-iteration-count: infinite;

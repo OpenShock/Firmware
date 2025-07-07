@@ -1,7 +1,7 @@
-import type { WifiScanStatus } from '$lib/_fbs/open-shock/serialization/types/wifi-scan-status';
-import type { WiFiNetwork, WiFiNetworkGroup, HubState } from '$lib/types';
-import { writable } from 'svelte/store';
 import { WifiAuthMode } from '$lib/_fbs/open-shock/serialization/types/wifi-auth-mode';
+import type { WifiScanStatus } from '$lib/_fbs/open-shock/serialization/types/wifi-scan-status';
+import type { HubState, WiFiNetwork, WiFiNetworkGroup } from '$lib/types';
+import { writable } from 'svelte/store';
 
 const { subscribe, update } = writable<HubState>({
   wifiConnectedBSSID: null,

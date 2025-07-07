@@ -1,5 +1,5 @@
 import { browser } from '$app/environment';
-import { writable, type Updater } from 'svelte/store';
+import { type Updater, writable } from 'svelte/store';
 
 function getLocalStoreState() {
   const scheme = localStorage.getItem('theme');
@@ -100,7 +100,6 @@ export function willActivateLightMode(value: 'dark' | 'light' | 'system') {
 export function initializeDarkModeStore() {
   const schemePreference = getColorSchemePreference();
   setHtmlDarkModeSelector(schemePreference === 'dark');
-  set(schemePreference);
 
   window
     .matchMedia('(prefers-color-scheme: light)')

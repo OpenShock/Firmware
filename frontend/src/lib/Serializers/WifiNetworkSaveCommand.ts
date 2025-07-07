@@ -1,7 +1,7 @@
-import { Builder as FlatbufferBuilder } from 'flatbuffers';
 import { LocalToHubMessage } from '$lib/_fbs/open-shock/serialization/local/local-to-hub-message';
 import { LocalToHubMessagePayload } from '$lib/_fbs/open-shock/serialization/local/local-to-hub-message-payload';
 import { WifiNetworkSaveCommand } from '$lib/_fbs/open-shock/serialization/local/wifi-network-save-command';
+import { Builder as FlatbufferBuilder } from 'flatbuffers';
 
 export function SerializeWifiNetworkSaveCommand(
   ssid: string,

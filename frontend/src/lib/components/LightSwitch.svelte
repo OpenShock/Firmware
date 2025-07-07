@@ -1,12 +1,16 @@
 <script lang="ts">
+  import { Moon, Sun } from '@lucide/svelte';
+  import AbsolutelySureButton from '$lib/components/AbsolutelySureButton.svelte';
   import { buttonVariants } from '$lib/components/ui/button';
   import * as Dialog from '$lib/components/ui/dialog';
   import * as DropdownMenu from '$lib/components/ui/dropdown-menu';
-  import { ColorSchemeStore, willActivateLightMode, getDarkReaderState } from '$lib/stores';
+  import {
+    ColorSchemeStore,
+    getDarkReaderState,
+    willActivateLightMode,
+  } from '$lib/stores/ColorSchemeStore';
+  import { cn } from '$lib/utils';
   import { toast } from 'svelte-sonner';
-  import AbsolutelySureButton from './AbsolutelySureButton.svelte';
-
-  import { Moon, Sun } from '@lucide/svelte';
 
   let pendingScheme = $state<'light' | 'dark' | 'system' | undefined>();
   function handleOpenChanged(open: boolean) {
@@ -47,16 +51,24 @@
 </Dialog.Root>
 
 <DropdownMenu.Root>
-  <DropdownMenu.Trigger class={buttonVariants({ variant: 'outline', size: 'icon' })}>
-    <Sun class="size-[1.2rem] rotate-0 scale-100 transition-all dark:-rotate-90 dark:scale-0" />
+  <DropdownMenu.Trigger
+    class={cn(buttonVariants({ variant: 'ghost' }), 'size-8! text-gray-600 dark:text-gray-300')}
+  >
+    <Sun class="size-[1.2rem] scale-100 rotate-0 transition-all dark:scale-0 dark:-rotate-90" />
     <Moon
-      class="absolute size-[1.2rem] rotate-90 scale-0 transition-all dark:rotate-0 dark:scale-100"
+      class="absolute size-[1.2rem] scale-0 rotate-90 transition-all dark:scale-100 dark:rotate-0"
     />
     <span class="sr-only">Toggle theme</span>
   </DropdownMenu.Trigger>
   <DropdownMenu.Content align="end">
-    <DropdownMenu.Item onclick={() => evaluateLightSwitch('light')}>Light</DropdownMenu.Item>
-    <DropdownMenu.Item onclick={() => evaluateLightSwitch('dark')}>Dark</DropdownMenu.Item>
-    <DropdownMenu.Item onclick={() => evaluateLightSwitch('system')}>System</DropdownMenu.Item>
+    <DropdownMenu.Item class="cursor-pointer" onclick={() => evaluateLightSwitch('light')}
+      >Light</DropdownMenu.Item
+    >
+    <DropdownMenu.Item class="cursor-pointer" onclick={() => evaluateLightSwitch('dark')}
+      >Dark</DropdownMenu.Item
+    >
+    <DropdownMenu.Item class="cursor-pointer" onclick={() => evaluateLightSwitch('system')}
+      >System</DropdownMenu.Item
+    >
   </DropdownMenu.Content>
 </DropdownMenu.Root>

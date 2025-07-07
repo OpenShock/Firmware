@@ -5,7 +5,15 @@
   "singleQuote": true,
   "trailingComma": "es5",
   "printWidth": 100,
-  "plugins": ["prettier-plugin-svelte", "prettier-plugin-tailwindcss"],
+  "importOrder": ["^@.*", "^\\$.*", "^[a-zA-Z].*", "^\\..*"],
+  "importOrderSeparation": false,
+  "importOrderSortSpecifiers": true,
+  "importOrderSideEffects": false,
+  "plugins": [
+    "prettier-plugin-svelte",
+    "prettier-plugin-tailwindcss",
+    "@trivago/prettier-plugin-sort-imports"
+  ],
   "overrides": [
     { "files": "*.svelte", "options": { "parser": "svelte" } },
     { "files": "package*.json", "options": { "tabWidth": 2, "useTabs": true } }

@@ -1,7 +1,7 @@
 <script lang="ts">
+  import { Settings } from '@lucide/svelte';
   import { WifiAuthMode } from '$lib/_fbs/open-shock/serialization/types/wifi-auth-mode';
   import { buttonVariants } from '$lib/components/ui/button';
-  import type { WiFiNetworkGroup } from '$lib/types';
   import {
     Dialog,
     DialogContent,
@@ -9,8 +9,7 @@
     DialogTitle,
     DialogTrigger,
   } from '$lib/components/ui/dialog';
-
-  import { Settings } from '@lucide/svelte';
+  import type { WiFiNetworkGroup } from '$lib/types';
 
   type Props = {
     group: WiFiNetworkGroup;

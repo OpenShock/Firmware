@@ -18,8 +18,8 @@ on:
 name: ci-build
 
 env:
-  PNPM_VERSION: 10.6.4
-  NODE_VERSION: 22.14.0
+  PNPM_VERSION: 10.12.4
+  NODE_VERSION: 22.16.0
   PYTHON_VERSION: 3.12
 
 jobs:

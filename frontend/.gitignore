@@ -1,5 +1,6 @@
 test-results
 node_modules
+playwright-report
 
 # Output
 .output
@@ -13,12 +14,16 @@ node_modules
 .DS_Store
 Thumbs.db
 
+# IDE
+.idea
+
 # Env
-.env
-.env.*
-!.env.example
-!.env.test
+.env*.local
 
 # Vite
 vite.config.js.timestamp-*
 vite.config.ts.timestamp-*
+
+# Other package managers
+package-lock.json
+yarn.lock
