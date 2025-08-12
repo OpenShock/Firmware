@@ -28,9 +28,6 @@ namespace OpenShock {
     bool SendCommand(ShockerModelType model, uint16_t shockerId, ShockerCommandType type, uint8_t intensity, uint16_t durationMs, bool overwriteExisting = true);
     void ClearPendingCommands();
 
-    bool Halt();
-    bool Continue();
-
   private:
     void destroy();
     void TransmitTask();

@@ -16,16 +16,16 @@ namespace OpenShock::Rmt {
     Sequence()
       : m_data(nullptr)
       , m_size(0)
-      , m_lifetimeEnd(0)
+      , m_transmitEnd(0)
       , m_shockerId(0)
       , m_shockerModel()
     {
     }
-    Sequence(ShockerModelType shockerModel, uint16_t shockerId, int64_t lifetimeEnd);
+    Sequence(ShockerModelType shockerModel, uint16_t shockerId, int64_t transmitEnd);
     Sequence(Sequence&& other) noexcept
       : m_data(other.m_data)
       , m_size(other.m_size)
-      , m_lifetimeEnd(other.m_lifetimeEnd)
+      , m_transmitEnd(other.m_transmitEnd)
       , m_shockerId(other.m_shockerId)
       , m_shockerModel(other.m_shockerModel)
     {
@@ -37,9 +37,9 @@ namespace OpenShock::Rmt {
 
     inline ShockerModelType shockerModel() const noexcept { return m_shockerModel; }
     inline uint16_t shockerId() const noexcept { return m_shockerId; }
-    inline int64_t lifetimeEnd() const noexcept { return m_lifetimeEnd; }
 
-    inline void setLifetimeEnd(int64_t lifetimeEnd) noexcept { m_lifetimeEnd = lifetimeEnd; }
+    inline int64_t transmitEnd() const noexcept { return m_transmitEnd; }
+    inline void setTransmitEnd(int64_t transmitEnd) noexcept { m_transmitEnd = transmitEnd; }
 
     inline rmt_data_t* payload() noexcept { return m_data; }
     inline const rmt_data_t* payload() const noexcept { return m_data; }
@@ -57,7 +57,7 @@ namespace OpenShock::Rmt {
 
       m_data         = other.m_data;
       m_size         = other.m_size;
-      m_lifetimeEnd  = other.m_lifetimeEnd;
+      m_transmitEnd  = other.m_transmitEnd;
       m_shockerId    = other.m_shockerId;
       m_shockerModel = other.m_shockerModel;
 
@@ -71,14 +71,14 @@ namespace OpenShock::Rmt {
     {
       m_data         = nullptr;
       m_size         = 0;
-      m_lifetimeEnd  = 0;
+      m_transmitEnd  = 0;
       m_shockerId    = 0;
       m_shockerModel = (ShockerModelType)0;
     }
 
     rmt_data_t* m_data;
     size_t m_size;
-    int64_t m_lifetimeEnd;
+    int64_t m_transmitEnd;
     uint16_t m_shockerId;
     ShockerModelType m_shockerModel;
   };

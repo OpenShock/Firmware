@@ -19,13 +19,13 @@ const uint32_t kTaskStackSize       = 4096;  // PROFILED: 1.4KB stack usage
 const float kTickrateNs             = 1000;
 const int64_t kTerminatorDurationMs = 300;
 const uint8_t kFlagOverwrite        = 1 << 0;
-const uint8_t kFlagDeleteTask       = 1 << 0;
+const uint8_t kFlagDeleteTask       = 1 << 1;
 const TickType_t kTaskIdleDelay     = pdMS_TO_TICKS(5);
 
 using namespace OpenShock;
 
 struct RFTransmitter::Command {
-  int64_t lifetimeEnd;
+  int64_t transmitEnd;
   ShockerModelType modelType;
   ShockerCommandType type;
   uint16_t shockerId;
@@ -84,14 +84,15 @@ bool RFTransmitter::SendCommand(ShockerModelType model, uint16_t shockerId, Shoc
   if (type == ShockerCommandType::Stop) {
     OS_LOGV(TAG, "Stop command received");
 
-    type       = ShockerCommandType::Vibrate;
-    intensity  = 0;
-    durationMs = 300;
+    type              = ShockerCommandType::Vibrate;
+    intensity         = 0;
+    durationMs        = 300;
+    overwriteExisting = true;
   } else {
     OS_LOGD(TAG, "Command received: %u %u %u %u", model, shockerId, type, intensity);
   }
 
-  Command cmd = Command {.lifetimeEnd = OpenShock::millis() + durationMs, .modelType = model, .type = type, .shockerId = shockerId, .intensity = intensity, .flags = overwriteExisting ? kFlagOverwrite : (uint8_t)0};
+  Command cmd = Command {.transmitEnd = OpenShock::millis() + durationMs, .modelType = model, .type = type, .shockerId = shockerId, .intensity = intensity, .flags = overwriteExisting ? kFlagOverwrite : (uint8_t)0};
 
   // Add the command to the queue, wait max 10 ms (Adjust this)
   if (xQueueSend(m_queueHandle, &cmd, pdMS_TO_TICKS(10)) != pdTRUE) {
@@ -146,9 +147,9 @@ void RFTransmitter::destroy()
   }
 }
 
-static bool addSequence(std::vector<Rmt::Sequence>& sequences, ShockerModelType modelType, uint16_t shockerId, ShockerCommandType commandType, uint8_t intensity, int64_t lifetimeEnd)
+static bool addSequence(std::vector<Rmt::Sequence>& sequences, ShockerModelType modelType, uint16_t shockerId, ShockerCommandType commandType, uint8_t intensity, int64_t transmitEnd)
 {
-  Rmt::Sequence sequence(modelType, shockerId, lifetimeEnd);
+  Rmt::Sequence sequence(modelType, shockerId, transmitEnd);
   if (!sequence.is_valid()) return false;
 
   if (!sequence.fill(commandType, intensity)) return false;
@@ -158,12 +159,12 @@ static bool addSequence(std::vector<Rmt::Sequence>& sequences, ShockerModelType 
   return true;
 }
 
-static bool modifySequence(std::vector<Rmt::Sequence>& sequences, ShockerModelType modelType, uint16_t shockerId, ShockerCommandType commandType, uint8_t intensity, int64_t lifetimeEnd)
+static bool modifySequence(std::vector<Rmt::Sequence>& sequences, ShockerModelType modelType, uint16_t shockerId, ShockerCommandType commandType, uint8_t intensity, int64_t transmitEnd)
 {
   for (auto& seq : sequences) {
     if (seq.shockerModel() == modelType && seq.shockerId() == shockerId) {
       bool ok = seq.fill(commandType, intensity);
-      seq.setLifetimeEnd(ok ? lifetimeEnd : 0);  // Remove this immidiatley if fill didnt succeed
+      seq.setTransmitEnd(ok ? transmitEnd : 0);  // Remove this immidiatley if fill didnt succeed
       return ok;                                 // Will generate a new sequence if fill failed
     }
   }
@@ -175,7 +176,7 @@ static void writeSequences(rmt_obj_t* rmt_handle, std::vector<Rmt::Sequence>& se
 {
   // Send queued commands
   for (auto seq = sequences.begin(); seq != sequences.end();) {
-    int64_t timeToLive = seq->lifetimeEnd() - OpenShock::millis();
+    int64_t timeToLive = seq->transmitEnd() - OpenShock::millis();
 
     if (timeToLive > 0) {
       // Send the command
@@ -200,6 +201,7 @@ void RFTransmitter::TransmitTask()
 {
   OS_LOGD(TAG, "[pin-%hhi] RMT loop running on core %d", m_txPin, xPortGetCoreID());
 
+  bool wasEstopped = false;
   std::vector<Rmt::Sequence> sequences;
   while (true) {
     // Receive commands
@@ -214,18 +216,26 @@ void RFTransmitter::TransmitTask()
 
       if ((cmd.flags & kFlagOverwrite) != 0) {
         // Replace the sequence if it already exists
-        modifySequence(sequences, cmd.modelType, cmd.shockerId, cmd.type, cmd.intensity, cmd.lifetimeEnd);
-        continue;
+        if (modifySequence(sequences, cmd.modelType, cmd.shockerId, cmd.type, cmd.intensity, cmd.transmitEnd)) {
+          continue;
+        }
       }
 
-      addSequence(sequences, cmd.modelType, cmd.shockerId, cmd.type, cmd.intensity, cmd.lifetimeEnd);
+      if (!addSequence(sequences, cmd.modelType, cmd.shockerId, cmd.type, cmd.intensity, cmd.transmitEnd)) {
+        OS_LOGD(TAG, "[pin-%hhi] Failed to add sequence");
+      }
     }
 
-    if (OpenShock::EStopManager::IsEStopped()) {
-      // Set all sequences to transmit their terminators
-      int64_t now = OpenShock::millis();
-      for (auto seq = sequences.begin(); seq != sequences.end(); ++seq) {
-        seq->setLifetimeEnd(now);
+    bool isEstopped = OpenShock::EStopManager::IsEStopped();
+    if (isEstopped != wasEstopped) {
+      wasEstopped = isEstopped;
+
+      if (isEstopped) {
+        // Set all sequences to transmit their terminators
+        int64_t now = OpenShock::millis();
+        for (auto seq = sequences.begin(); seq != sequences.end(); ++seq) {
+          seq->setTransmitEnd(now);
+        }
       }
     }
 

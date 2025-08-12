@@ -39,10 +39,10 @@ inline static bool fillSequenceImpl(rmt_data_t* data, ShockerModelType modelType
   }
 }
 
-Rmt::Sequence::Sequence(ShockerModelType shockerModel, uint16_t shockerId, int64_t lifetimeEnd)
+Rmt::Sequence::Sequence(ShockerModelType shockerModel, uint16_t shockerId, int64_t transmitEnd)
   : m_data(nullptr)
   , m_size(getSequenceBufferSize(shockerModel))
-  , m_lifetimeEnd(lifetimeEnd)
+  , m_transmitEnd(transmitEnd)
   , m_shockerId(shockerId)
   , m_shockerModel(shockerModel)
 {
