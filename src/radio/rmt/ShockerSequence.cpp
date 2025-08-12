@@ -1,0 +1,68 @@
+#include "radio/rmt/ShockerSequence.h"
+
+const char* const TAG = "ShockerSequence";
+
+#include "Logging.h"
+#include "radio/rmt/CaiXianlinEncoder.h"
+#include "radio/rmt/Petrainer998DREncoder.h"
+#include "radio/rmt/PetrainerEncoder.h"
+#include "radio/rmt/T330Encoder.h"
+
+using namespace OpenShock;
+
+inline static size_t getSequenceBufferSize(ShockerModelType shockerModelType)
+{
+  switch (shockerModelType) {
+    case ShockerModelType::CaiXianlin:
+      return Rmt::CaiXianlinEncoder::GetBufferSize();
+    case ShockerModelType::Petrainer998DR:
+      return Rmt::Petrainer998DREncoder::GetBufferSize();
+    case ShockerModelType::Petrainer:
+      return Rmt::PetrainerEncoder::GetBufferSize();
+    default:
+      return 0;
+  }
+}
+
+inline static bool fillSequenceImpl(rmt_data_t* data, ShockerModelType modelType, uint16_t shockerId, ShockerCommandType commandType, uint8_t intensity)
+{
+  switch (modelType) {
+    case ShockerModelType::CaiXianlin:
+      return Rmt::CaiXianlinEncoder::FillBuffer(data, shockerId, 0, commandType, intensity);
+    case ShockerModelType::Petrainer:
+      return Rmt::PetrainerEncoder::FillBuffer(data, shockerId, commandType, intensity);
+    case ShockerModelType::Petrainer998DR:
+      return Rmt::Petrainer998DREncoder::FillBuffer(data, shockerId, commandType, intensity);
+    default:
+      OS_LOGE(TAG, "Unknown shocker model: %u", modelType);
+      return false;
+  }
+}
+
+Rmt::ShockerSequence::ShockerSequence(ShockerModelType shockerModel, uint16_t shockerId, int64_t lifetimeEnd)
+  : m_data(nullptr)
+  , m_size(getSequenceBufferSize(shockerModel))
+  , m_lifetimeEnd(lifetimeEnd)
+  , m_shockerId(shockerId)
+  , m_shockerModel(shockerModel)
+{
+  if (m_size <= 0) return;
+
+  m_data = reinterpret_cast<rmt_data_t*>(malloc(m_size * 2 * sizeof(rmt_data_t)));
+  if (m_data == nullptr) {
+    m_size = 0;
+    return;
+  }
+
+  if (!fillSequenceImpl(terminator(), m_shockerModel, m_shockerId, ShockerCommandType::Vibrate, 0)) {
+    free(m_data);
+    m_data = nullptr;
+    m_size = 0;
+    return;
+  }
+}
+
+bool Rmt::ShockerSequence::fill(ShockerCommandType commandType, uint8_t intensity)
+{
+  return fillSequenceImpl(payload(), m_shockerModel, m_shockerId, commandType, intensity);
+}
