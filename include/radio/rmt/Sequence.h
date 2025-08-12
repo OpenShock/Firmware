@@ -9,11 +9,11 @@
 #include <cstdint>
 
 namespace OpenShock::Rmt {
-  class ShockerSequence {
-    DISABLE_COPY(ShockerSequence);
+  class Sequence {
+    DISABLE_COPY(Sequence);
 
   public:
-    ShockerSequence()
+    Sequence()
       : m_data(nullptr)
       , m_size(0)
       , m_lifetimeEnd(0)
@@ -21,8 +21,8 @@ namespace OpenShock::Rmt {
       , m_shockerModel()
     {
     }
-    ShockerSequence(ShockerModelType shockerModel, uint16_t shockerId, int64_t lifetimeEnd);
-    ShockerSequence(ShockerSequence&& other) noexcept
+    Sequence(ShockerModelType shockerModel, uint16_t shockerId, int64_t lifetimeEnd);
+    Sequence(Sequence&& other) noexcept
       : m_data(other.m_data)
       , m_size(other.m_size)
       , m_lifetimeEnd(other.m_lifetimeEnd)
@@ -31,7 +31,7 @@ namespace OpenShock::Rmt {
     {
       other.reset();
     }
-    ~ShockerSequence() { free(m_data); }
+    ~Sequence() { free(m_data); }
 
     inline bool is_valid() const noexcept { return m_data != nullptr && m_size > 0; }
 
@@ -49,7 +49,7 @@ namespace OpenShock::Rmt {
 
     bool fill(ShockerCommandType commandType, uint8_t intensity);
 
-    ShockerSequence& operator=(ShockerSequence&& other)
+    Sequence& operator=(Sequence&& other)
     {
       if (this == &other) return *this;
 

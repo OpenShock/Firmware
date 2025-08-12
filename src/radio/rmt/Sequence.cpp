@@ -1,6 +1,6 @@
-#include "radio/rmt/ShockerSequence.h"
+#include "radio/rmt/Sequence.h"
 
-const char* const TAG = "ShockerSequence";
+const char* const TAG = "Sequence";
 
 #include "Logging.h"
 #include "radio/rmt/CaiXianlinEncoder.h"
@@ -39,7 +39,7 @@ inline static bool fillSequenceImpl(rmt_data_t* data, ShockerModelType modelType
   }
 }
 
-Rmt::ShockerSequence::ShockerSequence(ShockerModelType shockerModel, uint16_t shockerId, int64_t lifetimeEnd)
+Rmt::Sequence::Sequence(ShockerModelType shockerModel, uint16_t shockerId, int64_t lifetimeEnd)
   : m_data(nullptr)
   , m_size(getSequenceBufferSize(shockerModel))
   , m_lifetimeEnd(lifetimeEnd)
@@ -62,7 +62,7 @@ Rmt::ShockerSequence::ShockerSequence(ShockerModelType shockerModel, uint16_t sh
   }
 }
 
-bool Rmt::ShockerSequence::fill(ShockerCommandType commandType, uint8_t intensity)
+bool Rmt::Sequence::fill(ShockerCommandType commandType, uint8_t intensity)
 {
   return fillSequenceImpl(payload(), m_shockerModel, m_shockerId, commandType, intensity);
 }

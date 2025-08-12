@@ -5,25 +5,22 @@
 const char* const TAG = "RFTransmitter";
 
 #include "Core.h"
+#include "estop/EStopManager.h"
 #include "Logging.h"
-#include "radio/rmt/ShockerSequence.h"
+#include "radio/rmt/Sequence.h"
 #include "util/FnProxy.h"
 #include "util/TaskUtils.h"
 
 #include <freertos/queue.h>
 
-namespace Const {
-  const UBaseType_t kQueueSize         = 64;
-  const BaseType_t kTaskPriority       = 1;
-  const uint32_t kTaskStackSize        = 4096;  // PROFILED: 1.4KB stack usage
-  const float kTickrateNs              = 1000;
-  const int64_t kTransmitEndDurationMs = 300;
-  const uint8_t kFlagOverwrite         = 1 << 0;
-  const UBaseType_t kNotifKillFlag     = 1 << 0;
-  const UBaseType_t kNotifHaltFlag     = 1 << 1;
-  const UBaseType_t kNotifContinueFlag = 1 << 2;
-  const UBaseType_t kTaskIdleDelay     = pdMS_TO_TICKS(5);
-}  // namespace Const
+const UBaseType_t kQueueSize        = 64;
+const BaseType_t kTaskPriority      = 1;
+const uint32_t kTaskStackSize       = 4096;  // PROFILED: 1.4KB stack usage
+const float kTickrateNs             = 1000;
+const int64_t kTerminatorDurationMs = 300;
+const uint8_t kFlagOverwrite        = 1 << 0;
+const uint8_t kFlagDeleteTask       = 1 << 0;
+const TickType_t kTaskIdleDelay     = pdMS_TO_TICKS(5);
 
 using namespace OpenShock;
 
@@ -51,10 +48,10 @@ RFTransmitter::RFTransmitter(gpio_num_t gpioPin)
     return;
   }
 
-  float realTick = rmtSetTick(m_rmtHandle, Const::kTickrateNs);
+  float realTick = rmtSetTick(m_rmtHandle, kTickrateNs);
   OS_LOGD(TAG, "[pin-%hhi] real tick set to: %fns", m_txPin, realTick);
 
-  m_queueHandle = xQueueCreate(Const::kQueueSize, sizeof(Command));
+  m_queueHandle = xQueueCreate(kQueueSize, sizeof(Command));
   if (m_queueHandle == nullptr) {
     OS_LOGE(TAG, "[pin-%hhi] Failed to create queue", m_txPin);
     destroy();
@@ -62,9 +59,9 @@ RFTransmitter::RFTransmitter(gpio_num_t gpioPin)
   }
 
   char name[32];
-  snprintf(name, sizeof(name), "RFTransmitter-%hhi", m_txPin);
+  snprintf(name, sizeof(name), "RFTransmitter-%u", m_txPin);
 
-  if (TaskUtils::TaskCreateExpensive(&Util::FnProxy<&RFTransmitter::TransmitTask>, name, Const::kTaskStackSize, this, Const::kTaskPriority, &m_taskHandle) != pdPASS) {
+  if (TaskUtils::TaskCreateExpensive(&Util::FnProxy<&RFTransmitter::TransmitTask>, name, kTaskStackSize, this, kTaskPriority, &m_taskHandle) != pdPASS) {
     OS_LOGE(TAG, "[pin-%hhi] Failed to create task", m_txPin);
     destroy();
     return;
@@ -83,7 +80,18 @@ bool RFTransmitter::SendCommand(ShockerModelType model, uint16_t shockerId, Shoc
     return false;
   }
 
-  Command cmd = Command {.lifetimeEnd = OpenShock::millis() + durationMs, .modelType = model, .type = type, .shockerId = shockerId, .intensity = intensity, .flags = overwriteExisting ? Const::kFlagOverwrite : (uint8_t)0u};
+  // Stop logic
+  if (type == ShockerCommandType::Stop) {
+    OS_LOGV(TAG, "Stop command received");
+
+    type       = ShockerCommandType::Vibrate;
+    intensity  = 0;
+    durationMs = 300;
+  } else {
+    OS_LOGD(TAG, "Command received: %u %u %u %u", model, shockerId, type, intensity);
+  }
+
+  Command cmd = Command {.lifetimeEnd = OpenShock::millis() + durationMs, .modelType = model, .type = type, .shockerId = shockerId, .intensity = intensity, .flags = overwriteExisting ? kFlagOverwrite : (uint8_t)0};
 
   // Add the command to the queue, wait max 10 ms (Adjust this)
   if (xQueueSend(m_queueHandle, &cmd, pdMS_TO_TICKS(10)) != pdTRUE) {
@@ -104,37 +112,7 @@ void RFTransmitter::ClearPendingCommands()
 
   Command command;
   while (xQueueReceive(m_queueHandle, &command, 0) == pdPASS) {
-    // discard command
   }
-}
-
-static void SendTaskNotif(TaskHandle_t handle, uint32_t flags)
-{
-  xTaskNotifyIndexed(handle, 0, flags, eSetBits);
-}
-static bool TryGetTaskNotif(uint32_t& flags, TickType_t ticksToWait)
-{
-  return xTaskGenericNotifyWait(0, 0, ULONG_MAX, &flags, ticksToWait) == pdPASS;
-}
-
-bool RFTransmitter::Halt()
-{
-  ClearPendingCommands();
-
-  if (m_taskHandle == nullptr) return false;
-
-  SendTaskNotif(m_taskHandle, Const::kNotifHaltFlag);
-
-  return true;
-}
-
-bool RFTransmitter::Continue()
-{
-  if (m_taskHandle == nullptr) return false;
-
-  SendTaskNotif(m_taskHandle, Const::kNotifContinueFlag);
-
-  return true;
 }
 
 void RFTransmitter::destroy()
@@ -142,21 +120,16 @@ void RFTransmitter::destroy()
   if (m_taskHandle != nullptr) {
     OS_LOGD(TAG, "[pin-%hhi] Stopping task", m_txPin);
 
-    // Signal task to stop
-    SendTaskNotif(m_taskHandle, Const::kNotifKillFlag);
-
     // Wait for the task to stop
-    uint16_t msWaited = 0;
-    while (eTaskGetState(m_taskHandle) != eDeleted && msWaited < 250) {
+    Command cmd {.flags = kFlagDeleteTask};
+    while (eTaskGetState(m_taskHandle) != eDeleted) {
       vTaskDelay(pdMS_TO_TICKS(10));
-      msWaited += 10;
+
+      // Send nullptr to stop the task gracefully
+      xQueueSend(m_queueHandle, &cmd, pdMS_TO_TICKS(10));
     }
-    if (msWaited < 250) {
-      OS_LOGD(TAG, "[pin-%hhi] Task stopped", m_txPin);
-    } else {
-      OS_LOGD(TAG, "[pin-%hhi] Task failed to stop, forcing.", m_txPin);
-      vTaskDelete(m_taskHandle);
-    }
+
+    OS_LOGD(TAG, "[pin-%hhi] Task stopped", m_txPin);
 
     // Clear the queue
     ClearPendingCommands();
@@ -173,9 +146,9 @@ void RFTransmitter::destroy()
   }
 }
 
-static bool addSequence(std::vector<Rmt::ShockerSequence>& sequences, ShockerModelType modelType, uint16_t shockerId, ShockerCommandType commandType, uint8_t intensity, int64_t lifetimeEnd)
+static bool addSequence(std::vector<Rmt::Sequence>& sequences, ShockerModelType modelType, uint16_t shockerId, ShockerCommandType commandType, uint8_t intensity, int64_t lifetimeEnd)
 {
-  Rmt::ShockerSequence sequence(modelType, shockerId, lifetimeEnd);
+  Rmt::Sequence sequence(modelType, shockerId, lifetimeEnd);
   if (!sequence.is_valid()) return false;
 
   if (!sequence.fill(commandType, intensity)) return false;
@@ -185,7 +158,7 @@ static bool addSequence(std::vector<Rmt::ShockerSequence>& sequences, ShockerMod
   return true;
 }
 
-static bool modifySequence(std::vector<Rmt::ShockerSequence>& sequences, ShockerModelType modelType, uint16_t shockerId, ShockerCommandType commandType, uint8_t intensity, int64_t lifetimeEnd)
+static bool modifySequence(std::vector<Rmt::Sequence>& sequences, ShockerModelType modelType, uint16_t shockerId, ShockerCommandType commandType, uint8_t intensity, int64_t lifetimeEnd)
 {
   for (auto& seq : sequences) {
     if (seq.shockerModel() == modelType && seq.shockerId() == shockerId) {
@@ -198,7 +171,7 @@ static bool modifySequence(std::vector<Rmt::ShockerSequence>& sequences, Shocker
   return false;
 }
 
-static void writeSequences(rmt_obj_t* rmt_handle, std::vector<Rmt::ShockerSequence>& sequences)
+static void writeSequences(rmt_obj_t* rmt_handle, std::vector<Rmt::Sequence>& sequences)
 {
   // Send queued commands
   for (auto seq = sequences.begin(); seq != sequences.end();) {
@@ -209,7 +182,7 @@ static void writeSequences(rmt_obj_t* rmt_handle, std::vector<Rmt::ShockerSequen
       rmtWriteBlocking(rmt_handle, seq->payload(), seq->size());
     } else {
       // Remove command if it has sent out its termination sequence for long enough
-      if (timeToLive + Const::kTransmitEndDurationMs <= 0) {
+      if (timeToLive + kTerminatorDurationMs <= 0) {
         seq = sequences.erase(seq);
         continue;
       }
@@ -227,63 +200,35 @@ void RFTransmitter::TransmitTask()
 {
   OS_LOGD(TAG, "[pin-%hhi] RMT loop running on core %d", m_txPin, xPortGetCoreID());
 
-  std::vector<Rmt::ShockerSequence> sequences;
+  std::vector<Rmt::Sequence> sequences;
   while (true) {
-    uint32_t data = 0;
-    if (TryGetTaskNotif(data, 0)) {
-      // Check if task is being killed
-      if ((data & Const::kNotifKillFlag) != 0) break;
-
-      // Check if task is being halted
-      if ((data & Const::kNotifHaltFlag) != 0) {
-        // Kill all sequences by expiring their lifetime and starting their termination transmissions
-        int64_t now = OpenShock::millis();
-        for (auto& seq : sequences) {
-          seq.setLifetimeEnd(now);
-        }
-
-        // Write terminators
-        while (!sequences.empty()) {
-          writeSequences(m_rmtHandle, sequences);
-        }
-
-        // Constantly clear pending commands while waiting for continue or kill flag
-        while (true) {
-          data = 0;
-          if (TryGetTaskNotif(data, Const::kTaskIdleDelay)) {
-            // Check if task is being killed
-            if ((data & Const::kNotifKillFlag) != 0) {
-              vTaskDelete(nullptr);
-            }
-
-            if ((data & Const::kNotifContinueFlag) != 0) {
-              break;
-            }
-          }
-
-          ClearPendingCommands();
-        }
-        continue;
-      }
-    }
-
     // Receive commands
     Command cmd;
-    while (xQueueReceive(m_queueHandle, &cmd, sequences.empty() ? Const::kTaskIdleDelay : 0) == pdTRUE) {
-      if ((cmd.flags & Const::kFlagOverwrite) != 0) {
-        // Replace the sequence if it already exists
-        if (modifySequence(sequences, cmd.modelType, cmd.shockerId, cmd.type, cmd.intensity, cmd.lifetimeEnd)) {
-          continue;
-        }
+    while (xQueueReceive(m_queueHandle, &cmd, sequences.empty() ? portMAX_DELAY : 0) == pdTRUE) {
+      // Destroy task if we receive destroy command
+      if ((cmd.flags & kFlagDeleteTask) != 0) {
+        sequences.clear();
+        vTaskDelete(nullptr);
+        return;
       }
 
-      if (!addSequence(sequences, cmd.modelType, cmd.shockerId, cmd.type, cmd.intensity, cmd.lifetimeEnd)) {
-        OS_LOGD(TAG, "[pin-%hhi] Failed to add sequence", m_txPin);
+      if ((cmd.flags & kFlagOverwrite) != 0) {
+        // Replace the sequence if it already exists
+        modifySequence(sequences, cmd.modelType, cmd.shockerId, cmd.type, cmd.intensity, cmd.lifetimeEnd);
+        continue;
+      }
+
+      addSequence(sequences, cmd.modelType, cmd.shockerId, cmd.type, cmd.intensity, cmd.lifetimeEnd);
+    }
+
+    if (OpenShock::EStopManager::IsEStopped()) {
+      // Set all sequences to transmit their terminators
+      int64_t now = OpenShock::millis();
+      for (auto seq = sequences.begin(); seq != sequences.end(); ++seq) {
+        seq->setLifetimeEnd(now);
       }
     }
 
     writeSequences(m_rmtHandle, sequences);
   }
-
-  vTaskDelete(nullptr);  // kill current task
 }
