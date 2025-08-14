@@ -1,6 +1,6 @@
 #include "util/Base64Utils.h"
 
-const char* const TAG = TAG;
+const char* const TAG = "Base64Utils";
 
 #include "Logging.h"
 
