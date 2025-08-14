@@ -164,7 +164,7 @@ static bool modifySequence(std::vector<Rmt::Sequence>& sequences, ShockerModelTy
   for (auto& seq : sequences) {
     if (seq.shockerModel() == modelType && seq.shockerId() == shockerId) {
       bool ok = seq.fill(commandType, intensity);
-      seq.setTransmitEnd(ok ? transmitEnd : 0);  // Remove this immidiatley if fill didnt succeed
+      seq.setTransmitEnd(ok ? transmitEnd : 0);  // Remove this immediately if fill didnt succeed
       return ok;                                 // Will generate a new sequence if fill failed
     }
   }
