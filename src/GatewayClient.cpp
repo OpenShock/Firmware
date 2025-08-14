@@ -10,7 +10,6 @@ const char* const TAG = "GatewayClient";
 #include "message_handlers/WebSocket.h"
 #include "OtaUpdateManager.h"
 #include "serialization/WSGateway.h"
-#include "util/CertificateUtils.h"
 #include "VisualStateManager.h"
 
 using namespace OpenShock;
