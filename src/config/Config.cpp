@@ -74,7 +74,7 @@ bool _tryDeserializeConfig(const uint8_t* buffer, std::size_t bufferLen, OpenSho
 
   return true;
 }
-bool _tryLoadConfig(std::vector<uint8_t>& buffer)
+bool _tryLoadConfig(TinyVec<uint8_t>& buffer)
 {
   File file = _configFS.open("/config", "rb");
   if (!file) {
@@ -100,7 +100,7 @@ bool _tryLoadConfig(std::vector<uint8_t>& buffer)
 }
 bool _tryLoadConfig()
 {
-  std::vector<uint8_t> buffer;
+  TinyVec<uint8_t> buffer;
   if (!_tryLoadConfig(buffer)) {
     return false;
   }
@@ -219,7 +219,7 @@ bool Config::SaveFromFlatBuffer(const Serialization::Configuration::HubConfig* c
   return _trySaveConfig();
 }
 
-bool Config::GetRaw(std::vector<uint8_t>& buffer)
+bool Config::GetRaw(TinyVec<uint8_t>& buffer)
 {
   CONFIG_LOCK_READ(false);
 

@@ -1,6 +1,6 @@
 #include "util/Base64Utils.h"
 
-const char* const TAG = "Base64Utils";
+const char* const TAG = TAG;
 
 #include "Logging.h"
 
@@ -8,77 +8,65 @@ const char* const TAG = "Base64Utils";
 
 using namespace OpenShock;
 
-std::size_t Base64Utils::Encode(const uint8_t* data, std::size_t dataLen, char* output, std::size_t outputLen) noexcept {
-  std::size_t requiredLen = 0;
-
-  int retval = mbedtls_base64_encode(reinterpret_cast<uint8_t*>(output), outputLen, &requiredLen, data, dataLen);
-  if (retval != 0) {
-    if (retval == MBEDTLS_ERR_BASE64_BUFFER_TOO_SMALL) {
-      OS_LOGW(TAG, "Output buffer too small (expected %zu, got %zu)", requiredLen, outputLen);
-    } else {
-      OS_LOGW(TAG, "Failed to encode data, unknown error: %d", retval);
-    }
-    return 0;
-  }
-
-  return requiredLen;
+constexpr std::size_t CalculateEncodedSize(std::size_t size) noexcept
+{
+  return (4 * (size / 3)) + 4;  // TODO: This is wrong, but what mbedtls requires???
 }
 
-bool Base64Utils::Encode(const uint8_t* data, std::size_t dataLen, std::string& output) {
-  std::size_t requiredLen = Base64Utils::CalculateEncodedSize(dataLen) + 1; // +1 for null terminator
-  char* buffer = new char[requiredLen];
+constexpr std::size_t CalculateDecodedSize(std::size_t size) noexcept
+{
+  // 3 bytes for every 4 base64 chars
+  return (size / 4) * 3;
+}
 
-  std::size_t written = Encode(data, dataLen, buffer, requiredLen);
-  if (written == 0) {
+bool Base64Utils::Encode(tcb::span<const uint8_t> data, std::string& output)
+{
+  std::size_t requiredLen = CalculateEncodedSize(data.size());
+
+  // Allocate buffer for base64 string
+  TinyVec<uint8_t> buffer(requiredLen);
+
+  std::size_t written = 0;
+
+  int retval = mbedtls_base64_encode(buffer.data(), buffer.size(), &written, data.data(), data.size());
+
+  if (retval != 0) {
+    if (retval == MBEDTLS_ERR_BASE64_BUFFER_TOO_SMALL)
+      OS_LOGW(TAG, "Output buffer too small (expected %zu, got %zu)", requiredLen, buffer.size());
+    else
+      OS_LOGW(TAG, "Failed to encode data, error: %d", retval);
     output.clear();
-    delete[] buffer;
     return false;
   }
 
-  buffer[written] = '\0';
-
-  output.assign(buffer, written);
-  
-  delete[] buffer;
-
-  if (written < requiredLen) {
-    output.resize(written);
-  }
-
+  output.assign(reinterpret_cast<char*>(buffer.data()), written);
   return true;
 }
 
-std::size_t Base64Utils::Decode(const char* data, std::size_t dataLen, uint8_t* output, std::size_t outputLen) noexcept {
-  std::size_t requiredLen = 0;
+bool Base64Utils::Decode(std::string_view data, TinyVec<uint8_t>& output) noexcept
+{
+  std::size_t requiredLen = CalculateDecodedSize(data.size());
 
-  int retval = mbedtls_base64_decode(output, outputLen, &requiredLen, reinterpret_cast<const uint8_t*>(data), dataLen);
-  if (retval != 0) {
-    if (retval == MBEDTLS_ERR_BASE64_BUFFER_TOO_SMALL) {
-      OS_LOGW(TAG, "Output buffer too small (expected %zu, got %zu)", requiredLen, outputLen);
-    } else if (retval == MBEDTLS_ERR_BASE64_INVALID_CHARACTER) {
-      OS_LOGW(TAG, "Invalid character in input data");
-    } else {
-      OS_LOGW(TAG, "Failed to decode data, unknown error: %d", retval);
-    }
-    return 0;
-  }
-
-  return requiredLen;
-}
-
-bool Base64Utils::Decode(const char* data, std::size_t dataLen, std::vector<uint8_t>& output) noexcept {
-  std::size_t requiredLen = Base64Utils::CalculateDecodedSize(dataLen);
+  // Preallocate
   output.resize(requiredLen);
 
-  std::size_t written = Decode(data, dataLen, output.data(), output.size());
-  if (written == 0) {
+  std::size_t written = 0;
+
+  int retval = mbedtls_base64_decode(output.data(), output.size(), &written, reinterpret_cast<const uint8_t*>(data.data()), data.size());
+
+  if (retval != 0) {
+    if (retval == MBEDTLS_ERR_BASE64_BUFFER_TOO_SMALL)
+      OS_LOGW(TAG, "Output buffer too small (expected %zu, got %zu)", requiredLen, output.size());
+    else if (retval == MBEDTLS_ERR_BASE64_INVALID_CHARACTER)
+      OS_LOGW(TAG, "Invalid character in input data");
+    else
+      OS_LOGW(TAG, "Failed to decode data, error: %d", retval);
+
     output.clear();
     return false;
   }
 
-  if (written < requiredLen) {
-    output.resize(written);
-  }
-
+  // Trim to actual size
+  output.resize(written);
   return true;
 }
