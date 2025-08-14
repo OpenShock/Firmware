@@ -71,7 +71,7 @@ public:
     if (new_cap <= _cap) return;
     if (sizeof(T) && new_cap > std::numeric_limits<size_t>::max() / sizeof(T)) throw std::bad_alloc();
 
-    void* newbuf = calloc(new_cap, sizeof(T));
+    void* newbuf = malloc(size_t(new_cap) * sizeof(T));
     if (!newbuf) throw std::bad_alloc();
     if (_data) {
       memcpy(newbuf, _data, size_t(_len) * sizeof(T));
