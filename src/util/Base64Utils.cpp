@@ -10,13 +10,12 @@ using namespace OpenShock;
 
 constexpr std::size_t CalculateEncodedSize(std::size_t size) noexcept
 {
-  return (4 * (size / 3)) + 4;  // TODO: This is wrong, but what mbedtls requires???
+  return 4 * ((size + 2) / 3) + 1;
 }
 
 constexpr std::size_t CalculateDecodedSize(std::size_t size) noexcept
 {
-  // 3 bytes for every 4 base64 chars
-  return (size / 4) * 3;
+  return ((size / 4) * 3) + 3;  // +3 guards against missing padding variants
 }
 
 bool Base64Utils::Encode(tcb::span<const uint8_t> data, std::string& output)
@@ -32,7 +31,7 @@ bool Base64Utils::Encode(tcb::span<const uint8_t> data, std::string& output)
 
   if (retval != 0) {
     if (retval == MBEDTLS_ERR_BASE64_BUFFER_TOO_SMALL)
-      OS_LOGW(TAG, "Output buffer too small (expected %zu, got %zu)", requiredLen, buffer.size());
+      OS_LOGW(TAG, "Output buffer too small (expected %zu, got %zu)", written, buffer.size());
     else
       OS_LOGW(TAG, "Failed to encode data, error: %d", retval);
     output.clear();
@@ -56,7 +55,7 @@ bool Base64Utils::Decode(std::string_view data, TinyVec<uint8_t>& output) noexce
 
   if (retval != 0) {
     if (retval == MBEDTLS_ERR_BASE64_BUFFER_TOO_SMALL)
-      OS_LOGW(TAG, "Output buffer too small (expected %zu, got %zu)", requiredLen, output.size());
+      OS_LOGW(TAG, "Output buffer too small (expected %zu, got %zu)", written, output.size());
     else if (retval == MBEDTLS_ERR_BASE64_INVALID_CHARACTER)
       OS_LOGW(TAG, "Invalid character in input data");
     else
