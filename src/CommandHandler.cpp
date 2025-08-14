@@ -297,18 +297,6 @@ bool CommandHandler::HandleCommand(ShockerModelType model, uint16_t shockerId, S
     return false;
   }
 
-  // Stop logic
-  if (type == ShockerCommandType::Stop) {
-    OS_LOGV(TAG, "Stop command received, clearing pending commands");
-
-    type       = ShockerCommandType::Vibrate;
-    intensity  = 0;
-    durationMs = 300;
-
-    s_rfTransmitter->ClearPendingCommands();
-  } else {
-    OS_LOGD(TAG, "Command received: %u %u %u %u", model, shockerId, type, intensity);
-  }
 
   bool ok = s_rfTransmitter->SendCommand(model, shockerId, type, intensity, durationMs);
 
