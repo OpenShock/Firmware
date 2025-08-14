@@ -69,7 +69,7 @@ public:
   void reserve(SizeType new_cap)
   {
     if (new_cap <= _cap) return;
-    if (sizeof(T) && new_cap > std::numeric_limits<size_t>::max() / sizeof(T)) throw std::bad_alloc();
+    if (sizeof(T) && new_cap > std::numeric_limits<SizeType>::max() / sizeof(T)) throw std::bad_alloc();
 
     void* newbuf = malloc(size_t(new_cap) * sizeof(T));
     if (!newbuf) throw std::bad_alloc();
