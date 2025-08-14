@@ -8,6 +8,7 @@
 #include "config/SerialInputConfig.h"
 #include "config/WiFiConfig.h"
 #include "config/WiFiCredentials.h"
+#include "TinyVec.h"
 
 #include <hal/gpio_types.h>
 
@@ -27,7 +28,7 @@ namespace OpenShock::Config {
   bool SaveFromFlatBuffer(const Serialization::Configuration::HubConfig* config);
 
   /* GetRaw and SetRaw are used for Reading/Writing the config file in its binary form. */
-  bool GetRaw(std::vector<uint8_t>& buffer);
+  bool GetRaw(TinyVec<uint8_t>& buffer);
   bool SetRaw(const uint8_t* buffer, std::size_t size);
 
   /**

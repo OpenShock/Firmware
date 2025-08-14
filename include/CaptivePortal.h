@@ -3,6 +3,8 @@
 #include <cstdint>
 #include <string_view>
 
+#include "span.h"
+
 namespace OpenShock::CaptivePortal {
   [[nodiscard]] bool Init();
 
@@ -14,8 +16,8 @@ namespace OpenShock::CaptivePortal {
   bool IsRunning();
 
   bool SendMessageTXT(uint8_t socketId, std::string_view data);
-  bool SendMessageBIN(uint8_t socketId, const uint8_t* data, std::size_t len);
+  bool SendMessageBIN(uint8_t socketId, tcb::span<const uint8_t> data);
 
   bool BroadcastMessageTXT(std::string_view data);
-  bool BroadcastMessageBIN(const uint8_t* data, std::size_t len);
+  bool BroadcastMessageBIN(tcb::span<const uint8_t> data);
 }  // namespace OpenShock::CaptivePortal

@@ -159,13 +159,13 @@ bool GatewayConnectionManager::SendMessageTXT(std::string_view data)
   return s_wsClient->sendMessageTXT(data);
 }
 
-bool GatewayConnectionManager::SendMessageBIN(const uint8_t* data, std::size_t length)
+bool GatewayConnectionManager::SendMessageBIN(tcb::span<const uint8_t> data)
 {
   if (s_wsClient == nullptr) {
     return false;
   }
 
-  return s_wsClient->sendMessageBIN(data, length);
+  return s_wsClient->sendMessageBIN(data);
 }
 
 bool FetchHubInfo(std::string_view authToken)
