@@ -196,11 +196,11 @@ bool CaptivePortal::SendMessageTXT(uint8_t socketId, std::string_view data)
 
   return true;
 }
-bool CaptivePortal::SendMessageBIN(uint8_t socketId, const uint8_t* data, std::size_t len)
+bool CaptivePortal::SendMessageBIN(uint8_t socketId, tcb::span<const uint8_t> data)
 {
   if (s_instance == nullptr) return false;
 
-  s_instance->sendMessageBIN(socketId, data, len);
+  s_instance->sendMessageBIN(socketId, data);
 
   return true;
 }
@@ -213,11 +213,11 @@ bool CaptivePortal::BroadcastMessageTXT(std::string_view data)
 
   return true;
 }
-bool CaptivePortal::BroadcastMessageBIN(const uint8_t* data, std::size_t len)
+bool CaptivePortal::BroadcastMessageBIN(tcb::span<const uint8_t> data)
 {
   if (s_instance == nullptr) return false;
 
-  s_instance->broadcastMessageBIN(data, len);
+  s_instance->broadcastMessageBIN(data);
 
   return true;
 }

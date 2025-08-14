@@ -1,3 +1,4 @@
+#pragma once
 
 /*
 This is an implementation of C++20's std::span
@@ -8,9 +9,6 @@ http://www.open-std.org/jtc1/sc22/wg21/docs/papers/2019/n4820.pdf
 // Distributed under the Boost Software License, Version 1.0.
 //    (See accompanying file ../../LICENSE_1_0.txt or copy at
 //          https://www.boost.org/LICENSE_1_0.txt)
-
-#ifndef TCB_SPAN_HPP_INCLUDED
-#define TCB_SPAN_HPP_INCLUDED
 
 #include <array>
 #include <cstddef>
@@ -614,5 +612,3 @@ public:
 };
 
 } // end namespace std
-
-#endif // TCB_SPAN_HPP_INCLUDED
