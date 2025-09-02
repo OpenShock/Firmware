@@ -2,7 +2,7 @@
   import { ColorSchemeStore } from "$lib/stores/ColorSchemeStore";
 	import { Toaster as Sonner, type ToasterProps as SonnerProps } from "svelte-sonner";
 
-	let restProps: SonnerProps = $props();
+	let { ...restProps }: SonnerProps = $props();
 </script>
 
 <Sonner

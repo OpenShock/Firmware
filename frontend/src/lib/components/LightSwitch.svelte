@@ -6,7 +6,7 @@
   import { toast } from 'svelte-sonner';
   import AbsolutelySureButton from './AbsolutelySureButton.svelte';
 
-  import { Moon, Sun } from 'lucide-svelte';
+  import { Moon, Sun } from '@lucide/svelte';
 
   let pendingScheme = $state<'light' | 'dark' | 'system' | undefined>();
   function handleOpenChanged(open: boolean) {

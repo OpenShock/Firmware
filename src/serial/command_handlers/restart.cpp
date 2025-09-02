@@ -1,7 +1,7 @@
 #include "serial/command_handlers/CommandGroup.h"
 #include "serial/command_handlers/common.h"
 
-#include <Arduino.h>
+#include <esp_system.h>
 
 #include <esp_system.h>
 

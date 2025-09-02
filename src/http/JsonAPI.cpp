@@ -22,7 +22,7 @@ HTTP::Response<Serialization::JsonAPI::AccountLinkResponse> HTTP::JsonAPI::LinkA
       {"Accept", "application/json"}
   },
     Serialization::JsonAPI::ParseAccountLinkJsonResponse,
-    {200, 404}
+    std::array<uint16_t, 2> {200}
   );
 }
 
@@ -43,7 +43,7 @@ HTTP::Response<Serialization::JsonAPI::HubInfoResponse> HTTP::JsonAPI::GetHubInf
       {"DeviceToken", OpenShock::StringToArduinoString(hubToken)}
   },
     Serialization::JsonAPI::ParseHubInfoJsonResponse,
-    {200, 401}
+    std::array<uint16_t, 2> {200}
   );
 }
 
@@ -55,7 +55,7 @@ HTTP::Response<Serialization::JsonAPI::AssignLcgResponse> HTTP::JsonAPI::AssignL
   }
 
   char uri[OPENSHOCK_URI_BUFFER_SIZE];
-  sprintf(uri, "https://%s/1/device/assignLCG", domain.c_str());
+  sprintf(uri, "https://%s/2/device/assignLCG?version=2", domain.c_str());
 
   return HTTP::GetJSON<Serialization::JsonAPI::AssignLcgResponse>(
     uri,
@@ -64,6 +64,6 @@ HTTP::Response<Serialization::JsonAPI::AssignLcgResponse> HTTP::JsonAPI::AssignL
       {"DeviceToken", OpenShock::StringToArduinoString(hubToken)}
   },
     Serialization::JsonAPI::ParseAssignLcgJsonResponse,
-    {200, 401}
+    std::array<uint16_t, 2> {200}
   );
 }

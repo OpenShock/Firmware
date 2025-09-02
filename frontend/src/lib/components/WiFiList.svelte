@@ -21,7 +21,7 @@
   } from '$lib/components/ui/dialog';
   import { Input } from '$lib/components/ui/input';
   import { Label } from '$lib/components/ui/label';
-  import { ArrowRight, Link, LoaderCircle, RotateCcw, Scroll, Wifi } from 'lucide-svelte';
+  import { ArrowRight, Link, LoaderCircle, RotateCcw, Scroll, Wifi } from '@lucide/svelte';
   import ScrollArea from './ui/scroll-area/scroll-area.svelte';
 
   let scanStatus = $derived($HubStateStore.wifiScanStatus);

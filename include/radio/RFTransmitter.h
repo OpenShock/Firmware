@@ -32,6 +32,8 @@ namespace OpenShock {
     void destroy();
     void TransmitTask();
 
+    struct Command;
+
     gpio_num_t m_txPin;
     rmt_obj_t* m_rmtHandle;
     QueueHandle_t m_queueHandle;

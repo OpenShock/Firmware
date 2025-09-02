@@ -25,7 +25,7 @@ static void handleSet(std::string_view arg, bool isAutomated)
 
   SERPR_SUCCESS("Saved config, restarting...");
 
-  ESP.restart();
+  esp_restart();
 }
 
 OpenShock::Serial::CommandGroup OpenShock::Serial::CommandHandlers::JsonConfigHandler()

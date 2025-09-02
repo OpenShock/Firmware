@@ -5,10 +5,10 @@ const char* const TAG = "GatewayConnectionManager";
 #include "VisualStateManager.h"
 
 #include "config/Config.h"
+#include "Core.h"
 #include "GatewayClient.h"
 #include "http/JsonAPI.h"
 #include "Logging.h"
-#include "Time.h"
 
 #include <unordered_map>
 
@@ -35,9 +35,11 @@ const uint8_t FLAG_LINKED = 1 << 1;
 const uint8_t LINK_CODE_LENGTH = 6;
 
 static uint8_t s_flags                                      = 0;
+static int64_t s_lastAuthFailure                            = 0;
+static int64_t s_lastConnectionAttempt                      = 0;
 static std::unique_ptr<OpenShock::GatewayClient> s_wsClient = nullptr;
 
-void _evGotIPHandler(arduino_event_t* event)
+static void evh_gotIP(arduino_event_t* event)
 {
   (void)event;
 
@@ -45,7 +47,7 @@ void _evGotIPHandler(arduino_event_t* event)
   OS_LOGD(TAG, "Got IP address");
 }
 
-void _evWiFiDisconnectedHandler(arduino_event_t* event)
+static void evh_wiFiDisconnected(arduino_event_t* event)
 {
   (void)event;
 
@@ -54,14 +56,23 @@ void _evWiFiDisconnectedHandler(arduino_event_t* event)
   OS_LOGD(TAG, "Lost IP address");
 }
 
+static bool checkIsDeAuthRateLimited(int64_t millis)
+{
+  return s_lastAuthFailure != 0 && (millis - s_lastAuthFailure) < 300'000;  // 5 Minutes
+}
+static bool checkIsConnectionRateLimited(int64_t millis)
+{
+  return s_lastConnectionAttempt != 0 && (millis - s_lastConnectionAttempt) < 20'000;  // 20 seconds
+}
+
 using namespace OpenShock;
 namespace JsonAPI = OpenShock::Serialization::JsonAPI;
 
 bool GatewayConnectionManager::Init()
 {
-  WiFi.onEvent(_evGotIPHandler, ARDUINO_EVENT_WIFI_STA_GOT_IP);
-  WiFi.onEvent(_evGotIPHandler, ARDUINO_EVENT_WIFI_STA_GOT_IP6);
-  WiFi.onEvent(_evWiFiDisconnectedHandler, ARDUINO_EVENT_WIFI_STA_DISCONNECTED);
+  WiFi.onEvent(evh_gotIP, ARDUINO_EVENT_WIFI_STA_GOT_IP);
+  WiFi.onEvent(evh_gotIP, ARDUINO_EVENT_WIFI_STA_GOT_IP6);
+  WiFi.onEvent(evh_wiFiDisconnected, ARDUINO_EVENT_WIFI_STA_DISCONNECTED);
 
   return true;
 }
@@ -96,18 +107,18 @@ AccountLinkResultCode GatewayConnectionManager::Link(std::string_view linkCode)
 
   auto response = HTTP::JsonAPI::LinkAccount(linkCode);
 
+  if (response.code == 404) {
+    return AccountLinkResultCode::InvalidCode;
+  }
+
   if (response.result == HTTP::RequestResult::RateLimited) {
     OS_LOGW(TAG, "Account Link request got ratelimited");
     return AccountLinkResultCode::RateLimited;
   }
   if (response.result != HTTP::RequestResult::Success) {
-    OS_LOGE(TAG, "Error while getting auth token: %d %d", response.result, response.code);
+    OS_LOGE(TAG, "Error while getting auth token: %s %d", response.ResultToString(), response.code);
 
     return AccountLinkResultCode::InternalError;
-  }
-
-  if (response.code == 404) {
-    return AccountLinkResultCode::InvalidCode;
   }
 
   if (response.code != 200) {
@@ -148,13 +159,13 @@ bool GatewayConnectionManager::SendMessageTXT(std::string_view data)
   return s_wsClient->sendMessageTXT(data);
 }
 
-bool GatewayConnectionManager::SendMessageBIN(const uint8_t* data, std::size_t length)
+bool GatewayConnectionManager::SendMessageBIN(tcb::span<const uint8_t> data)
 {
   if (s_wsClient == nullptr) {
     return false;
   }
 
-  return s_wsClient->sendMessageBIN(data, length);
+  return s_wsClient->sendMessageBIN(data);
 }
 
 bool FetchHubInfo(std::string_view authToken)
@@ -164,19 +175,23 @@ bool FetchHubInfo(std::string_view authToken)
     return false;
   }
 
+  if (checkIsDeAuthRateLimited(OpenShock::millis())) {
+    return false;
+  }
+
   auto response = HTTP::JsonAPI::GetHubInfo(authToken);
+
+  if (response.code == 401) {
+    OS_LOGD(TAG, "Auth token is invalid, waiting 5 minutes before checking again");
+    s_lastAuthFailure = OpenShock::micros();
+    return false;
+  }
 
   if (response.result == HTTP::RequestResult::RateLimited) {
     return false;  // Just return false, don't spam the console with errors
   }
   if (response.result != HTTP::RequestResult::Success) {
-    OS_LOGE(TAG, "Error while fetching hub info: %d %d", response.result, response.code);
-    return false;
-  }
-
-  if (response.code == 401) {
-    OS_LOGD(TAG, "Auth token is invalid, clearing it");
-    Config::ClearBackendAuthToken();
+    OS_LOGE(TAG, "Error while fetching hub info: %s %d", response.ResultToString(), response.code);
     return false;
   }
 
@@ -197,7 +212,6 @@ bool FetchHubInfo(std::string_view authToken)
   return true;
 }
 
-static int64_t _lastConnectionAttempt = 0;
 bool StartConnectingToLCG()
 {
   // TODO: this function is very slow, should be optimized!
@@ -213,20 +227,10 @@ bool StartConnectingToLCG()
   }
 
   int64_t msNow = OpenShock::millis();
-  if (_lastConnectionAttempt != 0 && (msNow - _lastConnectionAttempt) < 20'000) {  // Only try to connect every 20 seconds
+  if (checkIsDeAuthRateLimited(msNow) || checkIsConnectionRateLimited(msNow)) {
     return false;
   }
-
-  _lastConnectionAttempt = msNow;
-
-  if (Config::HasBackendLCGOverride()) {
-    std::string lcgOverride;
-    Config::GetBackendLCGOverride(lcgOverride);
-
-    OS_LOGD(TAG, "Connecting to overridden LCG endpoint %s", lcgOverride.c_str());
-    s_wsClient->connect(lcgOverride.c_str());
-    return true;
-  }
+  s_lastConnectionAttempt = msNow;
 
   if (!Config::HasBackendAuthToken()) {
     OS_LOGD(TAG, "No auth token, can't connect to LCG");
@@ -241,17 +245,17 @@ bool StartConnectingToLCG()
 
   auto response = HTTP::JsonAPI::AssignLcg(authToken);
 
+  if (response.code == 401) {
+    OS_LOGD(TAG, "Auth token is invalid, waiting 5 minutes before retrying");
+    s_lastAuthFailure = OpenShock::micros();
+    return false;
+  }
+
   if (response.result == HTTP::RequestResult::RateLimited) {
     return false;  // Just return false, don't spam the console with errors
   }
   if (response.result != HTTP::RequestResult::Success) {
-    OS_LOGE(TAG, "Error while fetching LCG endpoint: %d %d", response.result, response.code);
-    return false;
-  }
-
-  if (response.code == 401) {
-    OS_LOGD(TAG, "Auth token is invalid, clearing it");
-    Config::ClearBackendAuthToken();
+    OS_LOGE(TAG, "Error while fetching LCG endpoint: %s %d", response.ResultToString(), response.code);
     return false;
   }
 
@@ -260,8 +264,8 @@ bool StartConnectingToLCG()
     return false;
   }
 
-  OS_LOGD(TAG, "Connecting to LCG endpoint %s in country %s", response.data.fqdn.c_str(), response.data.country.c_str());
-  s_wsClient->connect(response.data.fqdn.c_str());
+  OS_LOGD(TAG, "Connecting to LCG endpoint { host: '%s', port: %hu, path: '%s' } %s in country %s", response.data.host.c_str(), response.data.port, response.data.path.c_str(), response.data.country.c_str());
+  s_wsClient->connect(response.data.host, response.data.port, response.data.path);
 
   return true;
 }

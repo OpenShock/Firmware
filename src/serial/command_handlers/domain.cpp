@@ -5,6 +5,8 @@
 #include "http/HTTPRequestManager.h"
 #include "serialization/JsonAPI.h"
 
+#include <esp_system.h>
+
 #include <string>
 
 const char* const TAG = "Serial::CommandHandlers::Domain";
@@ -49,11 +51,11 @@ static void handleSet(std::string_view arg, bool isAutomated)
       {"Accept", "application/json"}
   },
     OpenShock::Serialization::JsonAPI::ParseBackendVersionJsonResponse,
-    {200}
+    std::array<uint16_t, 2> {200}
   );
 
   if (resp.result != OpenShock::HTTP::RequestResult::Success) {
-    SERPR_ERROR("Tried to connect to \"%.*s\", but failed with status [%d], refusing to save domain to config", arg.length(), arg.data(), resp.code);
+    SERPR_ERROR("Tried to connect to \"%.*s\", but failed with status [%d] (%s), refusing to save domain to config", arg.length(), arg.data(), resp.code, resp.ResultToString());
     return;
   }
 
@@ -69,7 +71,7 @@ static void handleSet(std::string_view arg, bool isAutomated)
   SERPR_SUCCESS("Saved config, restarting...");
 
   // Restart to use the new domain
-  ESP.restart();
+  esp_restart();
 }
 
 OpenShock::Serial::CommandGroup OpenShock::Serial::CommandHandlers::DomainHandler()

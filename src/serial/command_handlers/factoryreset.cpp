@@ -3,14 +3,16 @@
 
 #include "config/Config.h"
 
-void handleReset(std::string_view arg, bool isAutomated)
+#include <esp_system.h>
+
+static void handleReset(std::string_view arg, bool isAutomated)
 {
   (void)arg;
 
   ::Serial.println("Resetting to factory defaults...");
   OpenShock::Config::FactoryReset();
   ::Serial.println("Restarting...");
-  ESP.restart();
+  esp_restart();
 }
 
 OpenShock::Serial::CommandGroup OpenShock::Serial::CommandHandlers::FactoryResetHandler()

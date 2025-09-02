@@ -12,6 +12,7 @@ static void handleVersion(std::string_view arg, bool isAutomated)
     return;
   }
 
+  ::Serial.println();
   OpenShock::SerialInputHandler::PrintVersionInfo();
 }
 

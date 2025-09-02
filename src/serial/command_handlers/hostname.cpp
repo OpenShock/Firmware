@@ -3,6 +3,8 @@
 
 #include "config/Config.h"
 
+#include <esp_system.h>
+
 #include <string>
 
 const char* const TAG = "Serial::CommandHandlers::Domain";
@@ -28,7 +30,7 @@ static void handleSet(std::string_view arg, bool isAutomated)
   bool result = OpenShock::Config::SetWiFiHostname(arg);
   if (result) {
     SERPR_SUCCESS("Saved config, restarting...");
-    ESP.restart();
+    esp_restart();
   } else {
     SERPR_ERROR("Failed to save config");
   }

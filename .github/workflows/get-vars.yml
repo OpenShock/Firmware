@@ -10,11 +10,11 @@ on:
     inputs:
       pnpm-version:
         type: string
-        default: '9'
+        default: '10.6.4'
         description: 'The pnpm version to use'
       node-version:
         type: string
-        default: '20'
+        default: '22.14.0'
         description: 'The Node.js version to use'
     outputs:
       version:
