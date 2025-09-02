@@ -9,7 +9,7 @@
 
 const char* const TAG = "Serial::CommandHandlers::Domain";
 
-static void handeGet(std::string_view arg, bool isAutomated)
+static void handleGet(std::string_view arg, bool isAutomated)
 {
   if (!arg.empty()) {
     SERPR_ERROR("Get command does not support parameters");
@@ -40,7 +40,7 @@ OpenShock::Serial::CommandGroup OpenShock::Serial::CommandHandlers::HostnameHand
 {
   auto group = OpenShock::Serial::CommandGroup("hostname"sv);
 
-  auto& getCommand = group.addCommand("Get the network hostname."sv, handeGet);
+  auto& getCommand = group.addCommand("Get the network hostname."sv, handleGet);
 
   auto& setCommand = group.addCommand("set"sv, "Set the network hostname."sv, handleSet);
   setCommand.addArgument("hostname"sv, "must be a string"sv, "OpenShock"sv);

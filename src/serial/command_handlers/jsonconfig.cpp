@@ -3,6 +3,8 @@
 
 #include "config/Config.h"
 
+#include <esp_system.h>
+
 static void handleGet(std::string_view arg, bool isAutomated)
 {
   if (!arg.empty()) {

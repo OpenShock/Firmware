@@ -3,8 +3,6 @@
 
 #include <esp_system.h>
 
-#include <esp_system.h>
-
 static void handleRestart(std::string_view arg, bool isAutomated)
 {
   (void)arg;
