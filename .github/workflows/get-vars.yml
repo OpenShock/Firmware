@@ -86,7 +86,7 @@ jobs:
       release-dev-array: ${{ steps.get-vars.outputs.release-dev-array }}
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
         with:
           fetch-depth: 0
           sparse-checkout: |
@@ -98,7 +98,7 @@ jobs:
           version: ${{ inputs.pnpm-version }}
           run_install: false
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v5
         with:
           node-version-file: ./.github/scripts/package.json
           cache: 'pnpm'
