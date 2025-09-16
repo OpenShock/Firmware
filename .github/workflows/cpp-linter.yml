@@ -15,6 +15,7 @@ jobs:
   cpp-linter:
     name: C/C++ Linter
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     needs: get-vars
 
     permissions:

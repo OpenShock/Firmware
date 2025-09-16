@@ -22,7 +22,7 @@ jobs:
     name: Analyze JS/PY
     runs-on: 'ubuntu-latest'
     needs: get-vars
-    timeout-minutes: 360
+    timeout-minutes: 10
     permissions:
       actions: read
       contents: read
@@ -60,7 +60,7 @@ jobs:
     name: Analyze C/C++
     runs-on: 'ubuntu-latest'
     needs: get-vars
-    timeout-minutes: 360
+    timeout-minutes: 15
     permissions:
       actions: read
       contents: read
