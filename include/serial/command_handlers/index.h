@@ -11,10 +11,9 @@ namespace OpenShock::Serial::CommandHandlers {
   OpenShock::Serial::CommandGroup EchoHandler();
   OpenShock::Serial::CommandGroup ValidGpiosHandler();
   OpenShock::Serial::CommandGroup RfTxPinHandler();
-  OpenShock::Serial::CommandGroup ESStopPinHandler();
+  OpenShock::Serial::CommandGroup EStopHandler();
   OpenShock::Serial::CommandGroup DomainHandler();
   OpenShock::Serial::CommandGroup AuthTokenHandler();
-  OpenShock::Serial::CommandGroup LcgOverrideHandler();
   OpenShock::Serial::CommandGroup HostnameHandler();
   OpenShock::Serial::CommandGroup NetworksHandler();
   OpenShock::Serial::CommandGroup KeepAliveHandler();
@@ -23,7 +22,8 @@ namespace OpenShock::Serial::CommandHandlers {
   OpenShock::Serial::CommandGroup RfTransmitHandler();
   OpenShock::Serial::CommandGroup FactoryResetHandler();
 
-  inline std::vector<OpenShock::Serial::CommandGroup> AllCommandHandlers() {
+  inline std::vector<OpenShock::Serial::CommandGroup> AllCommandHandlers()
+  {
     return {
       VersionHandler(),
       RestartHandler(),
@@ -31,10 +31,9 @@ namespace OpenShock::Serial::CommandHandlers {
       EchoHandler(),
       ValidGpiosHandler(),
       RfTxPinHandler(),
-      ESStopPinHandler(),
+      EStopHandler(),
       DomainHandler(),
       AuthTokenHandler(),
-      LcgOverrideHandler(),
       HostnameHandler(),
       NetworksHandler(),
       KeepAliveHandler(),

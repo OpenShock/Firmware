@@ -22,7 +22,7 @@ RGBPatternManager::RGBPatternManager(gpio_num_t gpioPin)
   , m_pattern()
   , m_rmtHandle(nullptr)
   , m_taskHandle(nullptr)
-  , m_taskMutex(xSemaphoreCreateMutex())
+  , m_taskMutex()
 {
   if (gpioPin == GPIO_NUM_NC) {
     OS_LOGE(TAG, "Pin is not set");
@@ -52,11 +52,13 @@ RGBPatternManager::~RGBPatternManager()
 {
   ClearPattern();
 
-  vSemaphoreDelete(m_taskMutex);
+  rmtDeinit(m_rmtHandle);
 }
 
 void RGBPatternManager::SetPattern(const RGBState* pattern, std::size_t patternLength)
 {
+  m_taskMutex.lock(portMAX_DELAY);
+
   ClearPatternInternal();
 
   // Set new values
@@ -72,20 +74,20 @@ void RGBPatternManager::SetPattern(const RGBState* pattern, std::size_t patternL
     m_pattern.clear();
   }
 
-  // Give the semaphore back
-  xSemaphoreGive(m_taskMutex);
+  m_taskMutex.unlock();
 }
 
 void RGBPatternManager::ClearPattern()
 {
+  m_taskMutex.lock(portMAX_DELAY);
+
   ClearPatternInternal();
-  xSemaphoreGive(m_taskMutex);
+
+  m_taskMutex.unlock();
 }
 
 void RGBPatternManager::ClearPatternInternal()
 {
-  xSemaphoreTake(m_taskMutex, portMAX_DELAY);
-
   if (m_taskHandle != nullptr) {
     vTaskDelete(m_taskHandle);
     m_taskHandle = nullptr;

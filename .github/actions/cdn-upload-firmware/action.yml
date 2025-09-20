@@ -1,8 +1,14 @@
 name: cdn-upload-firmware
 description: Uploads firmware partitions and merged binaries to CDN along with SHA256 checksums
 inputs:
-  cf-bucket:
-    description: Name of the S3 bucket
+  bunny-stor-hostname:
+    description: Bunny SFTP Hostname
+    required: true
+  bunny-stor-username:
+    description: Bunny SFTP Username
+    required: true
+  bunny-stor-password:
+    description: Bunny SFTP Password
     required: true
   fw-version:
     description: Firmware version
@@ -43,10 +49,20 @@ runs:
         find . -type f -name '*.bin' -exec md5sum {} \; > hashes.md5.txt
         find . -type f -name '*.bin' -exec sha256sum {} \; > hashes.sha256.txt
 
-    - name: Upload artifacts to CDN
+    - name: Prepare Upload Folder
       shell: bash
       run: |
         mkdir -p upload
         mv *.bin upload/
         mv hashes.*.txt upload/
-        rclone copy upload 'cdn:${{ inputs.cf-bucket }}/${{ inputs.fw-version }}/${{ inputs.board }}/'
+
+    - name: Upload artifacts to CDN
+      uses: milanmk/actions-file-deployer@master
+      with:
+        remote-protocol: "sftp"
+        remote-host: "${{ inputs.bunny-stor-hostname }}"
+        remote-user: "${{ inputs.bunny-stor-username }}"
+        remote-password: "${{ inputs.bunny-stor-password }}"
+        remote-path: "/${{ inputs.fw-version }}/${{ inputs.board }}"
+        local-path: "upload"
+        sync: "full"

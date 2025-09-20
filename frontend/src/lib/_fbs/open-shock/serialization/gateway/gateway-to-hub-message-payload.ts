@@ -2,41 +2,61 @@
 
 /* eslint-disable @typescript-eslint/no-unused-vars, @typescript-eslint/no-explicit-any, @typescript-eslint/no-non-null-assertion */
 
-import { CaptivePortalConfig } from '../../../open-shock/serialization/gateway/captive-portal-config';
-import { OtaInstall } from '../../../open-shock/serialization/gateway/ota-install';
+import { OtaUpdateRequest } from '../../../open-shock/serialization/gateway/ota-update-request';
+import { Ping } from '../../../open-shock/serialization/gateway/ping';
 import { ShockerCommandList } from '../../../open-shock/serialization/gateway/shocker-command-list';
+import { Trigger } from '../../../open-shock/serialization/gateway/trigger';
 
 
 export enum GatewayToHubMessagePayload {
   NONE = 0,
-  ShockerCommandList = 1,
-  CaptivePortalConfig = 2,
-  OtaInstall = 3
+
+  /**
+   * Ping message, should immediately be responded to with a pong
+   */
+  Ping = 1,
+
+  /**
+   * Trigger a specific action on the hub
+   */
+  Trigger = 2,
+
+  /**
+   * Send a list of shocker commands to the hub
+   */
+  ShockerCommandList = 3,
+
+  /**
+   * Request an OTA update to be performed
+   */
+  OtaUpdateRequest = 4
 }
 
 export function unionToGatewayToHubMessagePayload(
   type: GatewayToHubMessagePayload,
-  accessor: (obj:CaptivePortalConfig|OtaInstall|ShockerCommandList) => CaptivePortalConfig|OtaInstall|ShockerCommandList|null
-): CaptivePortalConfig|OtaInstall|ShockerCommandList|null {
+  accessor: (obj:OtaUpdateRequest|Ping|ShockerCommandList|Trigger) => OtaUpdateRequest|Ping|ShockerCommandList|Trigger|null
+): OtaUpdateRequest|Ping|ShockerCommandList|Trigger|null {
   switch(GatewayToHubMessagePayload[type]) {
     case 'NONE': return null; 
+    case 'Ping': return accessor(new Ping())! as Ping;
+    case 'Trigger': return accessor(new Trigger())! as Trigger;
     case 'ShockerCommandList': return accessor(new ShockerCommandList())! as ShockerCommandList;
-    case 'CaptivePortalConfig': return accessor(new CaptivePortalConfig())! as CaptivePortalConfig;
-    case 'OtaInstall': return accessor(new OtaInstall())! as OtaInstall;
+    case 'OtaUpdateRequest': return accessor(new OtaUpdateRequest())! as OtaUpdateRequest;
     default: return null;
   }
 }
 
 export function unionListToGatewayToHubMessagePayload(
   type: GatewayToHubMessagePayload, 
-  accessor: (index: number, obj:CaptivePortalConfig|OtaInstall|ShockerCommandList) => CaptivePortalConfig|OtaInstall|ShockerCommandList|null, 
+  accessor: (index: number, obj:OtaUpdateRequest|Ping|ShockerCommandList|Trigger) => OtaUpdateRequest|Ping|ShockerCommandList|Trigger|null, 
   index: number
-): CaptivePortalConfig|OtaInstall|ShockerCommandList|null {
+): OtaUpdateRequest|Ping|ShockerCommandList|Trigger|null {
   switch(GatewayToHubMessagePayload[type]) {
     case 'NONE': return null; 
+    case 'Ping': return accessor(index, new Ping())! as Ping;
+    case 'Trigger': return accessor(index, new Trigger())! as Trigger;
     case 'ShockerCommandList': return accessor(index, new ShockerCommandList())! as ShockerCommandList;
-    case 'CaptivePortalConfig': return accessor(index, new CaptivePortalConfig())! as CaptivePortalConfig;
-    case 'OtaInstall': return accessor(index, new OtaInstall())! as OtaInstall;
+    case 'OtaUpdateRequest': return accessor(index, new OtaUpdateRequest())! as OtaUpdateRequest;
     default: return null;
   }
 }

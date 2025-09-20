@@ -35,8 +35,24 @@ gpioPin():number {
   return offset ? this.bb!.readInt8(this.bb_pos + offset) : 0;
 }
 
+/**
+ * Persistent state of the E-Stop button
+ */
+active():boolean {
+  const offset = this.bb!.__offset(this.bb_pos, 8);
+  return offset ? !!this.bb!.readInt8(this.bb_pos + offset) : false;
+}
+
+/**
+ * Set When EmergencyStop is a latching switch
+ */
+latching():boolean {
+  const offset = this.bb!.__offset(this.bb_pos, 10);
+  return offset ? !!this.bb!.readInt8(this.bb_pos + offset) : false;
+}
+
 static startEStopConfig(builder:flatbuffers.Builder) {
-  builder.startObject(2);
+  builder.startObject(4);
 }
 
 static addEnabled(builder:flatbuffers.Builder, enabled:boolean) {
@@ -47,15 +63,25 @@ static addGpioPin(builder:flatbuffers.Builder, gpioPin:number) {
   builder.addFieldInt8(1, gpioPin, 0);
 }
 
+static addActive(builder:flatbuffers.Builder, active:boolean) {
+  builder.addFieldInt8(2, +active, +false);
+}
+
+static addLatching(builder:flatbuffers.Builder, latching:boolean) {
+  builder.addFieldInt8(3, +latching, +false);
+}
+
 static endEStopConfig(builder:flatbuffers.Builder):flatbuffers.Offset {
   const offset = builder.endObject();
   return offset;
 }
 
-static createEStopConfig(builder:flatbuffers.Builder, enabled:boolean, gpioPin:number):flatbuffers.Offset {
+static createEStopConfig(builder:flatbuffers.Builder, enabled:boolean, gpioPin:number, active:boolean, latching:boolean):flatbuffers.Offset {
   EStopConfig.startEStopConfig(builder);
   EStopConfig.addEnabled(builder, enabled);
   EStopConfig.addGpioPin(builder, gpioPin);
+  EStopConfig.addActive(builder, active);
+  EStopConfig.addLatching(builder, latching);
   return EStopConfig.endEStopConfig(builder);
 }
 }

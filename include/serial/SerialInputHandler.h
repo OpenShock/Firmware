@@ -4,7 +4,6 @@
 
 namespace OpenShock::SerialInputHandler {
   [[nodiscard]] bool Init();
-  void Update();
 
   bool SerialEchoEnabled();
   void SetSerialEchoEnabled(bool enabled);

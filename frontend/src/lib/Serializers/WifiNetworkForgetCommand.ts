@@ -10,7 +10,11 @@ export function SerializeWifiNetworkForgetCommand(ssid: string): Uint8Array {
 
   const cmdOffset = WifiNetworkForgetCommand.createWifiNetworkForgetCommand(fbb, ssidOffset);
 
-  const payloadOffset = LocalToHubMessage.createLocalToHubMessage(fbb, LocalToHubMessagePayload.WifiNetworkForgetCommand, cmdOffset);
+  const payloadOffset = LocalToHubMessage.createLocalToHubMessage(
+    fbb,
+    LocalToHubMessagePayload.WifiNetworkForgetCommand,
+    cmdOffset
+  );
 
   fbb.finish(payloadOffset);
 

@@ -4,9 +4,8 @@
   "useTabs": false,
   "singleQuote": true,
   "trailingComma": "es5",
-  "printWidth": 256,
-  "plugins": ["prettier-plugin-svelte"],
-  "pluginSearchDirs": ["."],
+  "printWidth": 100,
+  "plugins": ["prettier-plugin-svelte", "prettier-plugin-tailwindcss"],
   "overrides": [
     { "files": "*.svelte", "options": { "parser": "svelte" } },
     { "files": "package*.json", "options": { "tabWidth": 2, "useTabs": true } }

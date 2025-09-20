@@ -13,10 +13,12 @@ RootConfig::RootConfig()
   , backend()
   , serialInput()
   , otaUpdate()
+  , estop()
 {
 }
 
-void RootConfig::ToDefault() {
+void RootConfig::ToDefault()
+{
   rf.ToDefault();
   wifi.ToDefault();
   captivePortal.ToDefault();
@@ -26,7 +28,8 @@ void RootConfig::ToDefault() {
   estop.ToDefault();
 }
 
-bool RootConfig::FromFlatbuffers(const Serialization::Configuration::HubConfig* config) {
+bool RootConfig::FromFlatbuffers(const Serialization::Configuration::HubConfig* config)
+{
   if (config == nullptr) {
     OS_LOGW(TAG, "Config is null, setting to default");
     ToDefault();
@@ -71,7 +74,8 @@ bool RootConfig::FromFlatbuffers(const Serialization::Configuration::HubConfig* 
   return true;
 }
 
-flatbuffers::Offset<OpenShock::Serialization::Configuration::HubConfig> RootConfig::ToFlatbuffers(flatbuffers::FlatBufferBuilder& builder, bool withSensitiveData) const {
+flatbuffers::Offset<OpenShock::Serialization::Configuration::HubConfig> RootConfig::ToFlatbuffers(flatbuffers::FlatBufferBuilder& builder, bool withSensitiveData) const
+{
   auto rfOffset            = rf.ToFlatbuffers(builder, withSensitiveData);
   auto wifiOffset          = wifi.ToFlatbuffers(builder, withSensitiveData);
   auto captivePortalOffset = captivePortal.ToFlatbuffers(builder, withSensitiveData);
@@ -83,7 +87,8 @@ flatbuffers::Offset<OpenShock::Serialization::Configuration::HubConfig> RootConf
   return Serialization::Configuration::CreateHubConfig(builder, rfOffset, wifiOffset, captivePortalOffset, backendOffset, serialInputOffset, otaUpdateOffset, estopOffset);
 }
 
-bool RootConfig::FromJSON(const cJSON* json) {
+bool RootConfig::FromJSON(const cJSON* json)
+{
   if (json == nullptr) {
     OS_LOGW(TAG, "Config is null, setting to default");
     ToDefault();
@@ -133,7 +138,8 @@ bool RootConfig::FromJSON(const cJSON* json) {
   return true;
 }
 
-cJSON* RootConfig::ToJSON(bool withSensitiveData) const {
+cJSON* RootConfig::ToJSON(bool withSensitiveData) const
+{
   cJSON* root = cJSON_CreateObject();
 
   cJSON_AddItemToObject(root, "rf", rf.ToJSON(withSensitiveData));

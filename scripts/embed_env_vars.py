@@ -1,6 +1,7 @@
 from typing import Mapping
 from utils import pioenv, sysenv, dotenv, shorthands
 import git
+import re
 
 # This file is invoked by PlatformIO during build.
 # See 'extra_scripts' in 'platformio.ini'.
@@ -41,9 +42,10 @@ def get_git_repo():
     except git.exc.InvalidGitRepositoryError:
         return None
 
-import re
-
 def sort_semver(versions):
+    if not versions or len(versions) == 0:
+        return []
+    
     def parse_semver(v):
         # Split version into main, prerelease, and build metadata parts
         match = re.match(r'^v?(\d+(?:\.\d+)*)(?:-([0-9A-Za-z-.]+))?(?:\+([0-9A-Za-z-.]+))?$', v)
@@ -67,10 +69,13 @@ def sort_semver(versions):
     # Sort by version key
     return sorted(clean_only, key=lambda v: version_key(v))
 
+def last_element(arr):
+    return arr[-1] if len(arr) > 0 else None
+
 git_repo = get_git_repo()
 git_commit = git_repo.head.object.hexsha if git_repo is not None else None
 git_tags = [tag.name for tag in git_repo.tags] if git_repo is not None else []
-latest_git_tag = sort_semver(git_tags)[-1] if len(git_tags) > 0 else None
+git_latest_clean_tag = last_element(sort_semver(git_tags))
 
 # Find env variables based on only the pioenv and sysenv.
 def get_pio_firmware_vars() -> dict[str, str | int | bool]:
@@ -124,8 +129,8 @@ def transform_cpp_define_string(k: str, v: str) -> str:
 
 
 def serialize_cpp_define(k: str, v: str | int | bool) -> str | int:
-    # Special case for OPENSHOCK_FW_GIT_COMMIT.
-    if k == 'OPENSHOCK_FW_GIT_COMMIT':
+    # Special case for variables that can sometimes be fully made up of numeric characters, breaking builds in specific situations.
+    if k in ['OPENSHOCK_FW_GIT_COMMIT', 'OPENSHOCK_FW_VERSION_BUILD']:
         return transform_cpp_define_string(k, str(v))
 
     try:
@@ -138,6 +143,24 @@ def serialize_cpp_define(k: str, v: str | int | bool) -> str | int:
     # TODO: Handle booleans.
 
     return v
+
+
+def split_semver(version):
+    # Match the semver pattern
+    pattern = r'^(?P<major>\d+)\.(?P<minor>\d+)\.(?P<patch>\d+)(?:-(?P<prerelease>[0-9A-Za-z.-]+))?(?:\+(?P<build>[0-9A-Za-z.-]+))?$'
+    match = re.match(pattern, version)
+
+    if not match:
+        raise ValueError("Invalid semver format")
+
+    # Extract components and convert major, minor, patch to integers
+    major = int(match.group('major'))
+    minor = int(match.group('minor'))
+    patch = int(match.group('patch'))
+    prerelease = match.group('prerelease')  # None if not present
+    build = match.group('build')  # None if not present
+
+    return major, minor, patch, prerelease, build
 
 
 # Serialize CPP Defines.
@@ -188,7 +211,7 @@ if 'OPENSHOCK_FW_VERSION' not in cpp_defines:
         raise ValueError('OPENSHOCK_FW_VERSION must be set in environment variables for CI builds.')
     
     # If latest_git_tag is set, use it, else use 0.0.0, assign to variable.
-    version = (latest_git_tag if latest_git_tag is not None else '0.0.0') + '-local'
+    version = (git_latest_clean_tag if git_latest_clean_tag is not None else '0.0.0') + '-local'
 
     # If git_commit is set, append it to the version.
     if git_commit is not None:
@@ -196,6 +219,17 @@ if 'OPENSHOCK_FW_VERSION' not in cpp_defines:
     
     # If not set, get the latest tag.
     cpp_defines['OPENSHOCK_FW_VERSION'] = version
+
+
+version_major, version_minor, version_patch, version_prerelease, version_build = split_semver(
+    cpp_defines['OPENSHOCK_FW_VERSION']
+)
+
+cpp_defines['OPENSHOCK_FW_VERSION_MAJOR'] = version_major
+cpp_defines['OPENSHOCK_FW_VERSION_MINOR'] = version_minor
+cpp_defines['OPENSHOCK_FW_VERSION_PATCH'] = version_patch
+cpp_defines['OPENSHOCK_FW_VERSION_PRERELEASE'] = version_prerelease
+cpp_defines['OPENSHOCK_FW_VERSION_BUILD'] = version_build
 
 # Gets the log level from environment variables.
 # TODO: Delete get_loglevel and use... something more generic.

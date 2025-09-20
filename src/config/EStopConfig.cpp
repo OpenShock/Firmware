@@ -47,7 +47,7 @@ bool EStopConfig::FromFlatbuffers(const Serialization::Configuration::EStopConfi
 
 flatbuffers::Offset<OpenShock::Serialization::Configuration::EStopConfig> EStopConfig::ToFlatbuffers(flatbuffers::FlatBufferBuilder& builder, bool withSensitiveData) const
 {
-  return Serialization::Configuration::CreateEStopConfig(builder, gpioPin);
+  return Serialization::Configuration::CreateEStopConfig(builder, enabled, gpioPin);
 }
 
 bool EStopConfig::FromJSON(const cJSON* json)
