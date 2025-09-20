@@ -4,13 +4,12 @@ const char* const TAG = "GatewayClient";
 
 #include "Common.h"
 #include "config/Config.h"
+#include "Core.h"
 #include "events/Events.h"
 #include "Logging.h"
 #include "message_handlers/WebSocket.h"
 #include "OtaUpdateManager.h"
 #include "serialization/WSGateway.h"
-#include "Time.h"
-#include "util/CertificateUtils.h"
 #include "VisualStateManager.h"
 
 using namespace OpenShock;
@@ -39,7 +38,7 @@ GatewayClient::~GatewayClient()
   m_webSocket.disconnect();
 }
 
-void GatewayClient::connect(const char* lcgFqdn)
+void GatewayClient::connect(const std::string& host, uint16_t port, const std::string& path)
 {
   if (m_state != GatewayClientState::Disconnected) {
     return;
@@ -60,7 +59,7 @@ void GatewayClient::connect(const char* lcgFqdn)
 //
 #warning SSL certificate verification is currently not implemented, by RFC definition this is a security risk, and allows for MITM attacks, but the realistic risk is low
 
-  m_webSocket.beginSSL(lcgFqdn, 443, "/2/ws/device");
+  m_webSocket.beginSSL(host.c_str(), port, path.c_str());
   OS_LOGW(TAG, "WEBSOCKET CONNECTION BY RFC DEFINITION IS INSECURE, remote endpoint can not be verified due to lack of CA verification support, theoretically this is a security risk and allows for MITM attacks, but the realistic risk is low");
 }
 
@@ -82,13 +81,13 @@ bool GatewayClient::sendMessageTXT(std::string_view data)
   return m_webSocket.sendTXT(data.data(), data.length());
 }
 
-bool GatewayClient::sendMessageBIN(const uint8_t* data, std::size_t length)
+bool GatewayClient::sendMessageBIN(tcb::span<const uint8_t> data)
 {
   if (m_state != GatewayClientState::Connected) {
     return false;
   }
 
-  return m_webSocket.sendBIN(data, length);
+  return m_webSocket.sendBIN(data.data(), data.size());
 }
 
 bool GatewayClient::loop()
@@ -137,13 +136,15 @@ void GatewayClient::_sendBootStatus()
     return;
   }
 
+  using namespace std::string_view_literals;
+
   OpenShock::SemVer version;
-  if (!OpenShock::TryParseSemVer(OPENSHOCK_FW_VERSION, version)) {
+  if (!OpenShock::TryParseSemVer(OPENSHOCK_FW_VERSION ""sv, version)) {
     OS_LOGE(TAG, "Failed to parse firmware version");
     return;
   }
 
-  s_bootStatusSent = Serialization::Gateway::SerializeBootStatusMessage(updateId, OtaUpdateManager::GetFirmwareBootType(), [this](const uint8_t* data, std::size_t len) { return m_webSocket.sendBIN(data, len); });
+  s_bootStatusSent = Serialization::Gateway::SerializeBootStatusMessage(updateId, OtaUpdateManager::GetFirmwareBootType(), [this](tcb::span<const uint8_t> data) { return m_webSocket.sendBIN(data.data(), data.size()); });
 
   if (s_bootStatusSent && updateStep != OpenShock::OtaUpdateStep::None) {
     if (!Config::SetOtaUpdateStep(OpenShock::OtaUpdateStep::None)) {
@@ -179,17 +180,14 @@ void GatewayClient::_handleEvent(WStype_t type, uint8_t* payload, std::size_t le
     case WStype_FRAGMENT_FIN:
       OS_LOGD(TAG, "Received fragment fin from API");
       break;
-    case WStype_PING:
-      OS_LOGD(TAG, "Received ping from API");
-      break;
-    case WStype_PONG:
-      OS_LOGV(TAG, "Received pong from API");
-      break;
     case WStype_BIN:
-      MessageHandlers::WebSocket::HandleGatewayBinary(payload, length);
+      MessageHandlers::WebSocket::HandleGatewayBinary(tcb::span<const uint8_t>(payload, length));
       break;
     case WStype_FRAGMENT_BIN_START:
       OS_LOGE(TAG, "Received binary fragment start from API, this is not supported!");
+      break;
+    case WStype_PING:
+    case WStype_PONG:
       break;
     default:
       OS_LOGE(TAG, "Received unknown event from API");

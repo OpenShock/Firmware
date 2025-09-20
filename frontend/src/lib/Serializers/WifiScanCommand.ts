@@ -8,7 +8,11 @@ export function SerializeWifiScanCommand(scan: boolean): Uint8Array {
 
   const cmdOffset = WifiScanCommand.createWifiScanCommand(fbb, scan);
 
-  const payloadOffset = LocalToHubMessage.createLocalToHubMessage(fbb, LocalToHubMessagePayload.WifiScanCommand, cmdOffset);
+  const payloadOffset = LocalToHubMessage.createLocalToHubMessage(
+    fbb,
+    LocalToHubMessagePayload.WifiScanCommand,
+    cmdOffset
+  );
 
   fbb.finish(payloadOffset);
 

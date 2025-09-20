@@ -3,9 +3,11 @@
 const char* const TAG = "HTTPRequestManager";
 
 #include "Common.h"
+#include "Core.h"
 #include "Logging.h"
+#include "RateLimiter.h"
 #include "SimpleMutex.h"
-#include "Time.h"
+#include "util/HexUtils.h"
 #include "util/StringUtils.h"
 
 #include <HTTPClient.h>
@@ -15,107 +17,14 @@ const char* const TAG = "HTTPRequestManager";
 #include <numeric>
 #include <string_view>
 #include <unordered_map>
-#include <vector>
 
 using namespace std::string_view_literals;
 
 const std::size_t HTTP_BUFFER_SIZE = 4096LLU;
 const int HTTP_DOWNLOAD_SIZE_LIMIT = 200 * 1024 * 1024;  // 200 MB
 
-struct RateLimit {
-  RateLimit()
-    : m_mutex()
-    , m_blockUntilMs(0)
-    , m_limits()
-    , m_requests()
-  {
-  }
-
-  void addLimit(uint32_t durationMs, uint16_t count)
-  {
-    m_mutex.lock(portMAX_DELAY);
-
-    // Insert sorted
-    m_limits.insert(std::upper_bound(m_limits.begin(), m_limits.end(), durationMs, [](int64_t durationMs, const Limit& limit) { return durationMs > limit.durationMs; }), {durationMs, count});
-
-    m_mutex.unlock();
-  }
-
-  void clearLimits()
-  {
-    m_mutex.lock(portMAX_DELAY);
-
-    m_limits.clear();
-
-    m_mutex.unlock();
-  }
-
-  bool tryRequest()
-  {
-    int64_t now = OpenShock::millis();
-
-    OpenShock::ScopedLock lock__(&m_mutex);
-
-    if (m_blockUntilMs > now) {
-      return false;
-    }
-
-    // Remove all requests that are older than the biggest limit
-    while (!m_requests.empty() && m_requests.front() < now - m_limits.back().durationMs) {
-      m_requests.erase(m_requests.begin());
-    }
-
-    // Check if we've exceeded any limits
-    auto it = std::find_if(m_limits.begin(), m_limits.end(), [this](const RateLimit::Limit& limit) { return m_requests.size() >= limit.count; });
-    if (it != m_limits.end()) {
-      m_blockUntilMs = now + it->durationMs;
-      return false;
-    }
-
-    // Add the request
-    m_requests.push_back(now);
-
-    return true;
-  }
-  void clearRequests()
-  {
-    m_mutex.lock(portMAX_DELAY);
-
-    m_requests.clear();
-
-    m_mutex.unlock();
-  }
-
-  void blockUntil(int64_t blockUntilMs)
-  {
-    m_mutex.lock(portMAX_DELAY);
-
-    m_blockUntilMs = blockUntilMs;
-
-    m_mutex.unlock();
-  }
-
-  uint32_t requestsSince(int64_t sinceMs)
-  {
-    OpenShock::ScopedLock lock__(&m_mutex);
-
-    return std::count_if(m_requests.begin(), m_requests.end(), [sinceMs](int64_t requestMs) { return requestMs >= sinceMs; });
-  }
-
-private:
-  struct Limit {
-    int64_t durationMs;
-    uint16_t count;
-  };
-
-  OpenShock::SimpleMutex m_mutex;
-  int64_t m_blockUntilMs;
-  std::vector<Limit> m_limits;
-  std::vector<int64_t> m_requests;
-};
-
-static OpenShock::SimpleMutex s_rateLimitsMutex                                 = {};
-static std::unordered_map<std::string, std::shared_ptr<RateLimit>> s_rateLimits = {};
+static OpenShock::SimpleMutex s_rateLimitsMutex                                              = {};
+static std::unordered_map<std::string, std::shared_ptr<OpenShock::RateLimiter>> s_rateLimits = {};
 
 using namespace OpenShock;
 
@@ -156,9 +65,9 @@ std::string_view _getDomain(std::string_view url)
   return url;
 }
 
-std::shared_ptr<RateLimit> _rateLimitFactory(std::string_view domain)
+std::shared_ptr<OpenShock::RateLimiter> _rateLimiterFactory(std::string_view domain)
 {
-  auto rateLimit = std::make_shared<RateLimit>();
+  auto rateLimit = std::make_shared<OpenShock::RateLimiter>();
 
   // Add default limits
   rateLimit->addLimit(1000, 5);        // 5 per second
@@ -173,7 +82,7 @@ std::shared_ptr<RateLimit> _rateLimitFactory(std::string_view domain)
   return rateLimit;
 }
 
-std::shared_ptr<RateLimit> _getRateLimiter(std::string_view url)
+std::shared_ptr<OpenShock::RateLimiter> _getRateLimiter(std::string_view url)
 {
   auto domain = std::string(_getDomain(url));
   if (domain.empty()) {
@@ -184,7 +93,7 @@ std::shared_ptr<RateLimit> _getRateLimiter(std::string_view url)
 
   auto it = s_rateLimits.find(domain);
   if (it == s_rateLimits.end()) {
-    s_rateLimits.emplace(domain, _rateLimitFactory(domain));
+    s_rateLimits.emplace(domain, _rateLimiterFactory(domain));
     it = s_rateLimits.find(domain);
   }
 
@@ -222,28 +131,6 @@ constexpr bool _tryFindCRLF(std::size_t& pos, const uint8_t* buffer, std::size_t
   }
 
   return false;
-}
-constexpr bool _tryParseHexSizeT(std::size_t& result, std::string_view str)
-{
-  if (str.empty() || str.size() > sizeof(std::size_t) * 2) {
-    return false;
-  }
-
-  result = 0;
-
-  for (char c : str) {
-    if (c >= '0' && c <= '9') {
-      result = (result << 4) | (c - '0');
-    } else if (c >= 'a' && c <= 'f') {
-      result = (result << 4) | (c - 'a' + 10);
-    } else if (c >= 'A' && c <= 'F') {
-      result = (result << 4) | (c - 'A' + 10);
-    } else {
-      return false;
-    }
-  }
-
-  return true;
 }
 
 enum ParserState : uint8_t {
@@ -287,7 +174,7 @@ ParserState _parseChunkHeader(const uint8_t* buffer, std::size_t bufferLen, std:
   std::string_view sizeField(reinterpret_cast<const char*>(buffer), sizeFieldEnd);
 
   // Parse the chunk size
-  if (!_tryParseHexSizeT(payloadLen, sizeField)) {
+  if (!HexUtils::TryParseHexToInt(sizeField.data(), sizeField.length(), payloadLen)) {
     OS_LOGW(TAG, "Failed to parse chunk size");
     return ParserState::Invalid;
   }
@@ -374,44 +261,46 @@ StreamReaderResult _readStreamDataChunked(HTTPClient& client, WiFiClient* stream
 
     bufferCursor += bytesRead;
 
-parseMore:
-    state = _parseChunk(buffer, bufferCursor, payloadPos, payloadSize);
-    if (state == ParserState::Invalid) {
-      OS_LOGE(TAG, "Failed to parse chunk");
-      result = HTTP::RequestResult::RequestFailed;
-      break;
-    }
-    OS_LOGD(TAG, "Chunk parsed: %zu %zu", payloadPos, payloadSize);
-
-    if (state == ParserState::NeedMoreData) {
-      if (bufferCursor == HTTP_BUFFER_SIZE) {
-        OS_LOGE(TAG, "Chunk too large");
+    while (bufferCursor > 0) {
+      state = _parseChunk(buffer, bufferCursor, payloadPos, payloadSize);
+      if (state == ParserState::Invalid) {
+        OS_LOGE(TAG, "Failed to parse chunk");
         result = HTTP::RequestResult::RequestFailed;
+        state  = ParserState::Invalid;  // Mark to exit both loops
         break;
       }
-      continue;
+      OS_LOGD(TAG, "Chunk parsed: %zu %zu", payloadPos, payloadSize);
+
+      if (state == ParserState::NeedMoreData) {
+        if (bufferCursor == HTTP_BUFFER_SIZE) {
+          OS_LOGE(TAG, "Chunk too large");
+          result = HTTP::RequestResult::RequestFailed;
+          state  = ParserState::Invalid;  // Mark to exit both loops
+        }
+        break;                            // If chunk size good, this only exits one loop
+      }
+
+      // Check for zero chunk size (end of transfer)
+      if (payloadSize == 0) {
+        state = ParserState::Invalid;  // Mark to exit both loops
+        break;
+      }
+
+      if (!downloadCallback(totalWritten, buffer + payloadPos, payloadSize)) {
+        result = HTTP::RequestResult::Cancelled;
+        state  = ParserState::Invalid;  // Mark to exit both loops
+        break;
+      }
+
+      totalWritten += payloadSize;
+      _alignChunk(buffer, bufferCursor, payloadPos, payloadSize);
+      payloadSize = 0;
+      payloadPos  = 0;
     }
 
-    // Check for zero chunk size (end of transfer)
-    if (payloadSize == 0) {
-      break;
+    if (state == ParserState::NeedMoreData) {
+      vTaskDelay(pdMS_TO_TICKS(5));
     }
-
-    if (!downloadCallback(totalWritten, buffer + payloadPos, payloadSize)) {
-      result = HTTP::RequestResult::Cancelled;
-      break;
-    }
-
-    totalWritten += payloadSize;
-    _alignChunk(buffer, bufferCursor, payloadPos, payloadSize);
-    payloadSize = 0;
-    payloadPos  = 0;
-
-    if (bufferCursor > 0) {
-      goto parseMore;
-    }
-
-    vTaskDelay(pdMS_TO_TICKS(5));
   }
 
   free(buffer);
@@ -468,8 +357,8 @@ HTTP::Response<std::size_t> _doGetStream(
   HTTPClient& client,
   std::string_view url,
   const std::map<String, String>& headers,
-  const std::vector<int>& acceptedCodes,
-  std::shared_ptr<RateLimit> rateLimiter,
+  tcb::span<const uint16_t> acceptedCodes,
+  std::shared_ptr<OpenShock::RateLimiter> rateLimiter,
   HTTP::GotContentLengthCallback contentLengthCallback,
   HTTP::DownloadCallback downloadCallback,
   uint32_t timeoutMs
@@ -478,7 +367,7 @@ HTTP::Response<std::size_t> _doGetStream(
   int64_t begin = OpenShock::millis();
   if (!client.begin(OpenShock::StringToArduinoString(url))) {
     OS_LOGE(TAG, "Failed to begin HTTP request");
-    return {HTTP::RequestResult::RequestFailed, 0};
+    return {HTTP::RequestResult::RequestFailed, 0, 0};
   }
 
   for (auto& header : headers) {
@@ -509,11 +398,8 @@ HTTP::Response<std::size_t> _doGetStream(
       retryAfter = 15;
     }
 
-    // Get the block-until time
-    int64_t blockUntilMs = OpenShock::millis() + retryAfter * 1000;
-
-    // Apply the block-until time
-    rateLimiter->blockUntil(blockUntilMs);
+    // Apply the block-for time
+    rateLimiter->blockFor(retryAfter * 1000);
 
     return {HTTP::RequestResult::RateLimited, responseCode, 0};
   }
@@ -523,7 +409,7 @@ HTTP::Response<std::size_t> _doGetStream(
   }
 
   if (std::find(acceptedCodes.begin(), acceptedCodes.end(), responseCode) == acceptedCodes.end()) {
-    OS_LOGE(TAG, "Received unexpected response code %d", responseCode);
+    OS_LOGD(TAG, "Received unexpected response code %d", responseCode);
     return {HTTP::RequestResult::CodeRejected, responseCode, 0};
   }
 
@@ -547,7 +433,7 @@ HTTP::Response<std::size_t> _doGetStream(
   WiFiClient* stream = client.getStreamPtr();
   if (stream == nullptr) {
     OS_LOGE(TAG, "Failed to get stream");
-    return {HTTP::RequestResult::RequestFailed, 0};
+    return {HTTP::RequestResult::RequestFailed, 0, 0};
   }
 
   StreamReaderResult result;
@@ -561,9 +447,9 @@ HTTP::Response<std::size_t> _doGetStream(
 }
 
 HTTP::Response<std::size_t>
-  HTTP::Download(std::string_view url, const std::map<String, String>& headers, HTTP::GotContentLengthCallback contentLengthCallback, HTTP::DownloadCallback downloadCallback, const std::vector<int>& acceptedCodes, uint32_t timeoutMs)
+  HTTP::Download(std::string_view url, const std::map<String, String>& headers, HTTP::GotContentLengthCallback contentLengthCallback, HTTP::DownloadCallback downloadCallback, tcb::span<const uint16_t> acceptedCodes, uint32_t timeoutMs)
 {
-  std::shared_ptr<RateLimit> rateLimiter = _getRateLimiter(url);
+  std::shared_ptr<OpenShock::RateLimiter> rateLimiter = _getRateLimiter(url);
   if (rateLimiter == nullptr) {
     return {RequestResult::InvalidURL, 0, 0};
   }
@@ -578,7 +464,7 @@ HTTP::Response<std::size_t>
   return _doGetStream(client, url, headers, acceptedCodes, rateLimiter, contentLengthCallback, downloadCallback, timeoutMs);
 }
 
-HTTP::Response<std::string> HTTP::GetString(std::string_view url, const std::map<String, String>& headers, const std::vector<int>& acceptedCodes, uint32_t timeoutMs)
+HTTP::Response<std::string> HTTP::GetString(std::string_view url, const std::map<String, String>& headers, tcb::span<const uint16_t> acceptedCodes, uint32_t timeoutMs)
 {
   std::string result;
 

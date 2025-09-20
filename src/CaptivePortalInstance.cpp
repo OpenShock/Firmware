@@ -62,7 +62,7 @@ const char* _getPartitionHash()
 CaptivePortalInstance::CaptivePortalInstance()
   : m_webServer(HTTP_PORT)
   , m_socketServer(WEBSOCKET_PORT, "/ws", "flatbuffers")  // Sec-WebSocket-Protocol = flatbuffers
-  , m_socketDeFragger(std::bind(&CaptivePortalInstance::handleWebSocketEvent, this, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3, std::placeholders::_4))
+  , m_socketDeFragger(std::bind(&CaptivePortalInstance::handleWebSocketEvent, this, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3))
   , m_fileSystem()
   , m_dnsServer()
   , m_taskHandle(nullptr)
@@ -98,7 +98,7 @@ CaptivePortalInstance::CaptivePortalInstance()
     OS_LOGI(TAG, "Filesystem hash: %s", fsHash);
 
     char softAPURL[64];
-    snprintf(softAPURL, sizeof(softAPURL), "http://%s", WiFi.softAPIP().toString().c_str());
+    snprintf(softAPURL, sizeof(softAPURL), "http://%s", WiFi.softAPIP().toString().c_str());  // TODO: this is wasteful, optimize this
 
     // Serving the captive portal files from LittleFS
     m_webServer.serveStatic("/", m_fileSystem, "/www/", "max-age=3600").setDefaultFile("index.html").setSharedEtag(fsHash);
@@ -164,12 +164,12 @@ void CaptivePortalInstance::handleWebSocketClientConnected(uint8_t socketId)
     connectedNetworkPtr = &connectedNetwork;
   }
 
-  Serialization::Local::SerializeReadyMessage(connectedNetworkPtr, GatewayConnectionManager::IsLinked(), std::bind(&CaptivePortalInstance::sendMessageBIN, this, socketId, std::placeholders::_1, std::placeholders::_2));
+  Serialization::Local::SerializeReadyMessage(connectedNetworkPtr, GatewayConnectionManager::IsLinked(), std::bind(&CaptivePortalInstance::sendMessageBIN, this, socketId, std::placeholders::_1));
 
   // Send all previously scanned wifi networks
   auto networks = OpenShock::WiFiManager::GetDiscoveredWiFiNetworks();
 
-  Serialization::Local::SerializeWiFiNetworksEvent(Serialization::Types::WifiNetworkEventType::Discovered, networks, std::bind(&CaptivePortalInstance::sendMessageBIN, this, socketId, std::placeholders::_1, std::placeholders::_2));
+  Serialization::Local::SerializeWiFiNetworksEvent(Serialization::Types::WifiNetworkEventType::Discovered, networks, std::bind(&CaptivePortalInstance::sendMessageBIN, this, socketId, std::placeholders::_1));
 }
 
 void CaptivePortalInstance::handleWebSocketClientDisconnected(uint8_t socketId)
@@ -177,12 +177,7 @@ void CaptivePortalInstance::handleWebSocketClientDisconnected(uint8_t socketId)
   OS_LOGD(TAG, "WebSocket client #%u disconnected", socketId);
 }
 
-void CaptivePortalInstance::handleWebSocketClientError(uint8_t socketId, uint16_t code, const char* message)
-{
-  OS_LOGE(TAG, "WebSocket client #%u error %u: %s", socketId, code, message);
-}
-
-void CaptivePortalInstance::handleWebSocketEvent(uint8_t socketId, WebSocketMessageType type, const uint8_t* payload, std::size_t length)
+void CaptivePortalInstance::handleWebSocketEvent(uint8_t socketId, WebSocketMessageType type, tcb::span<const uint8_t> payload)
 {
   switch (type) {
     case WebSocketMessageType::Connected:
@@ -195,10 +190,7 @@ void CaptivePortalInstance::handleWebSocketEvent(uint8_t socketId, WebSocketMess
       OS_LOGE(TAG, "Message type is not supported");
       break;
     case WebSocketMessageType::Binary:
-      MessageHandlers::WebSocket::HandleLocalBinary(socketId, payload, length);
-      break;
-    case WebSocketMessageType::Error:
-      handleWebSocketClientError(socketId, length, reinterpret_cast<const char*>(payload));
+      MessageHandlers::WebSocket::HandleLocalBinary(socketId, payload);
       break;
     case WebSocketMessageType::Ping:
     case WebSocketMessageType::Pong:

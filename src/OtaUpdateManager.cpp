@@ -5,6 +5,7 @@ const char* const TAG = "OtaUpdateManager";
 #include "CaptivePortal.h"
 #include "Common.h"
 #include "config/Config.h"
+#include "Core.h"
 #include "GatewayConnectionManager.h"
 #include "Hashing.h"
 #include "http/HTTPRequestManager.h"
@@ -12,7 +13,6 @@ const char* const TAG = "OtaUpdateManager";
 #include "SemVer.h"
 #include "serialization/WSGateway.h"
 #include "SimpleMutex.h"
-#include "Time.h"
 #include "util/HexUtils.h"
 #include "util/PartitionUtils.h"
 #include "util/StringUtils.h"
@@ -99,7 +99,7 @@ static bool _tryGetRequestedVersion(OpenShock::SemVer& version)
   return true;
 }
 
-static void _otaEvWiFiDisconnectedHandler(void* event_handler_arg, esp_event_base_t event_base, int32_t event_id, void* event_data)
+static void otaum_evh_wifidisconnected(void* event_handler_arg, esp_event_base_t event_base, int32_t event_id, void* event_data)
 {
   (void)event_handler_arg;
   (void)event_base;
@@ -109,7 +109,7 @@ static void _otaEvWiFiDisconnectedHandler(void* event_handler_arg, esp_event_bas
   xTaskNotify(_taskHandle, OTA_TASK_EVENT_WIFI_DISCONNECTED, eSetBits);
 }
 
-static void _otaEvIpEventHandler(void* event_handler_arg, esp_event_base_t event_base, int32_t event_id, void* event_data)
+static void otaum_evh_ipevent(void* event_handler_arg, esp_event_base_t event_base, int32_t event_id, void* event_data)
 {
   (void)event_handler_arg;
   (void)event_base;
@@ -244,7 +244,7 @@ static bool _flashFilesystemPartition(const esp_partition_t* parition, std::stri
   return true;
 }
 
-static void _otaUpdateTask(void* arg)
+static void otaum_updatetask(void* arg)
 {
   (void)arg;
 
@@ -320,8 +320,6 @@ static void _otaUpdateTask(void* arg)
         OS_LOGE(TAG, "Failed to get requested version");
         continue;
       }
-
-      OS_LOGD(TAG, "Update requested for version %s", version.toString().c_str());  // TODO: This is abusing the SemVer::toString() method causing alot of string copies, fix this
     } else {
       OS_LOGD(TAG, "Checking for updates");
 
@@ -330,14 +328,16 @@ static void _otaUpdateTask(void* arg)
         OS_LOGE(TAG, "Failed to fetch firmware version");
         continue;
       }
-
-      OS_LOGD(TAG, "Remote version: %s", version.toString().c_str());  // TODO: This is abusing the SemVer::toString() method causing alot of string copies, fix this
     }
 
-    if (version.toString() == OPENSHOCK_FW_VERSION) {  // TODO: This is abusing the SemVer::toString() method causing alot of string copies, fix this
+    std::string versionStr = version.toString();  // TODO: This is abusing the SemVer::toString() method causing alot of string copies, fix this
+
+    if (versionStr == OPENSHOCK_FW_VERSION ""sv) {
       OS_LOGI(TAG, "Requested version is already installed");
       continue;
     }
+
+    OS_LOGD(TAG, "Updating to version: %.*s", versionStr.length(), versionStr.data());
 
     // Generate random int32_t for this update.
     int32_t updateId = static_cast<int32_t>(esp_random());
@@ -369,16 +369,16 @@ static void _otaUpdateTask(void* arg)
 
     // Print release.
     OS_LOGD(TAG, "Firmware release:");
-    OS_LOGD(TAG, "  Version:                %s", version.toString().c_str());  // TODO: This is abusing the SemVer::toString() method causing alot of string copies, fix this
-    OS_LOGD(TAG, "  App binary URL:         %s", release.appBinaryUrl.c_str());
+    OS_LOGD(TAG, "  Version:                %.*s", versionStr.length(), versionStr.data());
+    OS_LOGD(TAG, "  App binary URL:         %.*s", release.appBinaryUrl.length(), release.appBinaryUrl.data());
     OS_LOGD(TAG, "  App binary hash:        %s", HexUtils::ToHex<32>(release.appBinaryHash).data());
-    OS_LOGD(TAG, "  Filesystem binary URL:  %s", release.filesystemBinaryUrl.c_str());
+    OS_LOGD(TAG, "  Filesystem binary URL:  %.*s", release.filesystemBinaryUrl.length(), release.filesystemBinaryUrl.data());
     OS_LOGD(TAG, "  Filesystem binary hash: %s", HexUtils::ToHex<32>(release.filesystemBinaryHash).data());
 
     // Get available app update partition.
     const esp_partition_t* appPartition = esp_ota_get_next_update_partition(nullptr);
     if (appPartition == nullptr) {
-      OS_LOGE(TAG, "Failed to get app update partition");  // TODO: Send error message to server
+      OS_LOGE(TAG, "Failed to get app update partition");
       _sendFailureMessage("Failed to get app update partition"sv);
       continue;
     }
@@ -386,7 +386,7 @@ static void _otaUpdateTask(void* arg)
     // Get filesystem partition.
     const esp_partition_t* filesystemPartition = esp_partition_find_first(ESP_PARTITION_TYPE_DATA, ESP_PARTITION_SUBTYPE_DATA_SPIFFS, "static0");
     if (filesystemPartition == nullptr) {
-      OS_LOGE(TAG, "Failed to find filesystem partition");  // TODO: Send error message to server
+      OS_LOGE(TAG, "Failed to find filesystem partition");
       _sendFailureMessage("Failed to find filesystem partition"sv);
       continue;
     }
@@ -429,10 +429,10 @@ static bool _tryGetStringList(std::string_view url, std::vector<std::string>& li
     {
       {"Accept", "text/plain"}
   },
-    {200, 304}
+    std::array<uint16_t, 2> {200, 304}
   );
   if (response.result != OpenShock::HTTP::RequestResult::Success) {
-    OS_LOGE(TAG, "Failed to fetch list: [%u] %s", response.code, response.data.c_str());
+    OS_LOGE(TAG, "Failed to fetch list: %s [%u] %s", response.ResultToString(), response.code, response.data.c_str());
     return false;
   }
 
@@ -450,7 +450,7 @@ static bool _tryGetStringList(std::string_view url, std::vector<std::string>& li
       continue;
     }
 
-    list.push_back(std::string(line));
+    list.emplace_back(line);
   }
 
   return true;
@@ -505,20 +505,20 @@ bool OtaUpdateManager::Init()
     }
   }
 
-  err = esp_event_handler_register(IP_EVENT, ESP_EVENT_ANY_ID, _otaEvIpEventHandler, nullptr);
+  err = esp_event_handler_register(IP_EVENT, ESP_EVENT_ANY_ID, otaum_evh_ipevent, nullptr);
   if (err != ESP_OK) {
     OS_LOGE(TAG, "Failed to register event handler for IP_EVENT: %s", esp_err_to_name(err));
     return false;
   }
 
-  err = esp_event_handler_register(WIFI_EVENT, WIFI_EVENT_STA_DISCONNECTED, _otaEvWiFiDisconnectedHandler, nullptr);
+  err = esp_event_handler_register(WIFI_EVENT, WIFI_EVENT_STA_DISCONNECTED, otaum_evh_wifidisconnected, nullptr);
   if (err != ESP_OK) {
     OS_LOGE(TAG, "Failed to register event handler for WIFI_EVENT: %s", esp_err_to_name(err));
     return false;
   }
 
   // Start OTA update task.
-  TaskUtils::TaskCreateExpensive(_otaUpdateTask, "OTA Update", 8192, nullptr, 1, &_taskHandle);  // PROFILED: 6.2KB stack usage
+  TaskUtils::TaskCreateExpensive(otaum_updatetask, "OTA Update", 8192, nullptr, 1, &_taskHandle);  // PROFILED: 6.2KB stack usage
 
   return true;
 }
@@ -548,10 +548,10 @@ bool OtaUpdateManager::TryGetFirmwareVersion(OtaUpdateChannel channel, OpenShock
     {
       {"Accept", "text/plain"}
   },
-    {200, 304}
+    std::array<uint16_t, 2> {200, 304}
   );
   if (response.result != OpenShock::HTTP::RequestResult::Success) {
-    OS_LOGE(TAG, "Failed to fetch firmware version: [%u] %s", response.code, response.data.c_str());
+    OS_LOGE(TAG, "Failed to fetch firmware version: %s [%u] %s", response.ResultToString(), response.code, response.data.c_str());
     return false;
   }
 
@@ -583,7 +583,7 @@ bool OtaUpdateManager::TryGetFirmwareBoards(const OpenShock::SemVer& version, st
 
 static bool _tryParseIntoHash(std::string_view hash, uint8_t (&hashBytes)[32])
 {
-  if (!HexUtils::TryParseHex(hash.data(), hash.size(), hashBytes, 32)) {
+  if (HexUtils::TryParseHex(hash.data(), hash.size(), hashBytes, 32) != 32) {
     OS_LOGE(TAG, "Failed to parse hash: %.*s", hash.size(), hash.data());
     return false;
   }
@@ -618,10 +618,10 @@ bool OtaUpdateManager::TryGetFirmwareRelease(const OpenShock::SemVer& version, F
     {
       {"Accept", "text/plain"}
   },
-    {200, 304}
+    std::array<uint16_t, 2> {200, 304}
   );
   if (sha256HashesResponse.result != OpenShock::HTTP::RequestResult::Success) {
-    OS_LOGE(TAG, "Failed to fetch hashes: [%u] %s", sha256HashesResponse.code, sha256HashesResponse.data.c_str());
+    OS_LOGE(TAG, "Failed to fetch hashes: %s [%u] %s", sha256HashesResponse.ResultToString(), sha256HashesResponse.code, sha256HashesResponse.data.c_str());
     return false;
   }
 
@@ -639,9 +639,7 @@ bool OtaUpdateManager::TryGetFirmwareRelease(const OpenShock::SemVer& version, F
     auto hash = OpenShock::StringTrim(parts[0]);
     auto file = OpenShock::StringTrim(parts[1]);
 
-    if (OpenShock::StringStartsWith(file, "./"sv)) {
-      file = file.substr(2);
-    }
+    file = OpenShock::StringRemovePrefix(file, "./"sv);
 
     if (hash.size() != 64) {
       OS_LOGE(TAG, "Invalid hash: %.*s", hash.size(), hash.data());

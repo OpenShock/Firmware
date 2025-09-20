@@ -3,7 +3,7 @@
 #include "CaptivePortal.h"
 #include "Chipset.h"
 #include "config/Config.h"
-#include "EStopManager.h"
+#include "estop/EStopManager.h"
 #include "Logging.h"
 
 #include <cstdint>
@@ -20,10 +20,7 @@ static void serializeResult(uint8_t socketId, int8_t pin, OpenShock::Serializati
 
   OpenShock::Serialization::Local::FinishHubToLocalMessageBuffer(builder, msg);
 
-  const uint8_t* buffer = builder.GetBufferPointer();
-  uint8_t size          = builder.GetSize();
-
-  OpenShock::CaptivePortal::SendMessageBIN(socketId, buffer, size);
+  OpenShock::CaptivePortal::SendMessageBIN(socketId, builder.GetBufferSpan());
 }
 
 using namespace OpenShock::MessageHandlers::Local;

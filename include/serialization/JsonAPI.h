@@ -24,9 +24,9 @@ namespace OpenShock::Serialization::JsonAPI {
   struct AccountLinkResponse {
     std::string authToken;
   };
-  struct DeviceInfoResponse {
-    std::string deviceId;
-    std::string deviceName;
+  struct HubInfoResponse {
+    std::string hubId;
+    std::string hubName;
     struct ShockerInfo {
       std::string id;
       uint16_t rfId;
@@ -35,13 +35,15 @@ namespace OpenShock::Serialization::JsonAPI {
     std::vector<ShockerInfo> shockers;
   };
   struct AssignLcgResponse {
-    std::string fqdn;
+    std::string host;
+    uint16_t port;
+    std::string path;
     std::string country;
   };
 
   bool ParseLcgInstanceDetailsJsonResponse(int code, const cJSON* root, LcgInstanceDetailsResponse& out);
   bool ParseBackendVersionJsonResponse(int code, const cJSON* root, BackendVersionResponse& out);
   bool ParseAccountLinkJsonResponse(int code, const cJSON* root, AccountLinkResponse& out);
-  bool ParseDeviceInfoJsonResponse(int code, const cJSON* root, DeviceInfoResponse& out);
+  bool ParseHubInfoJsonResponse(int code, const cJSON* root, HubInfoResponse& out);
   bool ParseAssignLcgJsonResponse(int code, const cJSON* root, AssignLcgResponse& out);
 }  // namespace OpenShock::Serialization::JsonAPI

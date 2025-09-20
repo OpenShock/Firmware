@@ -2,10 +2,10 @@
 
 const char* const TAG = "PartitionUtils";
 
+#include "Core.h"
 #include "Hashing.h"
 #include "http/HTTPRequestManager.h"
 #include "Logging.h"
-#include "Time.h"
 #include "util/HexUtils.h"
 
 bool OpenShock::TryGetPartitionHash(const esp_partition_t* partition, char (&hash)[65]) {
@@ -82,7 +82,7 @@ bool OpenShock::FlashPartitionFromUrl(const esp_partition_t* partition, std::str
   },
     sizeValidator,
     dataWriter,
-    {200, 304},
+    std::array<uint16_t, 2> {200, 304},
     180'000
   );  // 3 minutes
   if (appBinaryResponse.result != OpenShock::HTTP::RequestResult::Success) {

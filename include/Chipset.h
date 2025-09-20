@@ -207,6 +207,9 @@
 #ifdef OPENSHOCK_FW_BOARD_DFROBOTFIREBEETLE2ESP32E
 #define OPENSHOCK_BYPASSED_GPIO(pin) ((pin) == 2 || (pin) == 5)
 #endif
+#ifdef OPENSHOCK_FW_BOARD_NODEMCU32S
+#define OPENSHOCK_BYPASSED_GPIO(pin) ((pin) == 2)
+#endif
 #ifndef OPENSHOCK_BYPASSED_GPIO
 #define OPENSHOCK_BYPASSED_GPIO(pin) (false)
 #endif
@@ -278,8 +281,8 @@ namespace OpenShock {
     return count;
   }
 
-  const uint8_t ValidInputPinsCount  = GetValidInputPinsCount();
-  const uint8_t ValidOutputPinsCount = GetValidOutputPinsCount();
+  constexpr uint8_t ValidInputPinsCount  = GetValidInputPinsCount();
+  constexpr uint8_t ValidOutputPinsCount = GetValidOutputPinsCount();
   typedef std::bitset<GPIO_NUM_MAX> GPIOPinSet;
 
   constexpr GPIOPinSet GetValidGPIOPins()

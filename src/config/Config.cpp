@@ -74,7 +74,7 @@ bool _tryDeserializeConfig(const uint8_t* buffer, std::size_t bufferLen, OpenSho
 
   return true;
 }
-bool _tryLoadConfig(std::vector<uint8_t>& buffer)
+bool _tryLoadConfig(TinyVec<uint8_t>& buffer)
 {
   File file = _configFS.open("/config", "rb");
   if (!file) {
@@ -100,7 +100,7 @@ bool _tryLoadConfig(std::vector<uint8_t>& buffer)
 }
 bool _tryLoadConfig()
 {
-  std::vector<uint8_t> buffer;
+  TinyVec<uint8_t> buffer;
   if (!_tryLoadConfig(buffer)) {
     return false;
   }
@@ -219,7 +219,7 @@ bool Config::SaveFromFlatBuffer(const Serialization::Configuration::HubConfig* c
   return _trySaveConfig();
 }
 
-bool Config::GetRaw(std::vector<uint8_t>& buffer)
+bool Config::GetRaw(TinyVec<uint8_t>& buffer)
 {
   CONFIG_LOCK_READ(false);
 
@@ -502,11 +502,7 @@ uint8_t Config::AddWiFiCredentials(std::string_view ssid, std::string_view passw
     return 0;
   }
 
-  _configData.wifi.credentialsList.push_back({
-    .id       = id,
-    .ssid     = std::string(ssid),
-    .password = std::string(password),
-  });
+  _configData.wifi.credentialsList.emplace_back(id, ssid, password);
   _trySaveConfig();
 
   return id;
@@ -641,38 +637,6 @@ bool Config::ClearBackendAuthToken()
   CONFIG_LOCK_WRITE(false);
 
   _configData.backend.authToken.clear();
-  return _trySaveConfig();
-}
-
-bool Config::HasBackendLCGOverride()
-{
-  CONFIG_LOCK_READ(false);
-
-  return !_configData.backend.lcgOverride.empty();
-}
-
-bool Config::GetBackendLCGOverride(std::string& out)
-{
-  CONFIG_LOCK_READ(false);
-
-  out = _configData.backend.lcgOverride;
-
-  return true;
-}
-
-bool Config::SetBackendLCGOverride(std::string_view lcgOverride)
-{
-  CONFIG_LOCK_WRITE(false);
-
-  _configData.backend.lcgOverride = std::string(lcgOverride);
-  return _trySaveConfig();
-}
-
-bool Config::ClearBackendLCGOverride()
-{
-  CONFIG_LOCK_WRITE(false);
-
-  _configData.backend.lcgOverride.clear();
   return _trySaveConfig();
 }
 

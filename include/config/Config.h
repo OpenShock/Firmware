@@ -8,6 +8,7 @@
 #include "config/SerialInputConfig.h"
 #include "config/WiFiConfig.h"
 #include "config/WiFiCredentials.h"
+#include "TinyVec.h"
 
 #include <hal/gpio_types.h>
 
@@ -27,7 +28,7 @@ namespace OpenShock::Config {
   bool SaveFromFlatBuffer(const Serialization::Configuration::HubConfig* config);
 
   /* GetRaw and SetRaw are used for Reading/Writing the config file in its binary form. */
-  bool GetRaw(std::vector<uint8_t>& buffer);
+  bool GetRaw(TinyVec<uint8_t>& buffer);
   bool SetRaw(const uint8_t* buffer, std::size_t size);
 
   /**
@@ -79,10 +80,6 @@ namespace OpenShock::Config {
   bool GetBackendAuthToken(std::string& out);
   bool SetBackendAuthToken(std::string_view token);
   bool ClearBackendAuthToken();
-  bool HasBackendLCGOverride();
-  bool GetBackendLCGOverride(std::string& out);
-  bool SetBackendLCGOverride(std::string_view lcgOverride);
-  bool ClearBackendLCGOverride();
 
   bool GetSerialInputConfigEchoEnabled(bool& out);
   bool SetSerialInputConfigEchoEnabled(bool enabled);

@@ -3,7 +3,7 @@ import { isArrayBuffer, isString } from './TypeGuards/BasicGuards';
 import { WebSocketMessageBinaryHandler } from './MessageHandlers';
 import { page } from '$app/stores';
 import { get } from 'svelte/store';
-import { toastDelegator } from './stores/ToastDelegator';
+import { toast } from 'svelte-sonner';
 
 function getWebSocketHostname() {
   if (!browser) {
@@ -60,7 +60,11 @@ export class WebSocketClient {
   private _autoReconnect = false;
   public Connect() {
     const connectionState = this.ConnectionState;
-    if (!browser || connectionState === ConnectionState.CONNECTED || connectionState === ConnectionState.CONNECTING) {
+    if (
+      !browser ||
+      connectionState === ConnectionState.CONNECTED ||
+      connectionState === ConnectionState.CONNECTING
+    ) {
       return;
     }
 
@@ -86,7 +90,10 @@ export class WebSocketClient {
   public Disconnect() {
     this._autoReconnect = false;
     const connectionState = this.ConnectionState;
-    if (connectionState === ConnectionState.DISCONNECTED || connectionState === ConnectionState.DISCONNECTING) {
+    if (
+      connectionState === ConnectionState.DISCONNECTED ||
+      connectionState === ConnectionState.DISCONNECTING
+    ) {
       return;
     }
     this.ConnectionState = ConnectionState.DISCONNECTING;
@@ -126,10 +133,7 @@ export class WebSocketClient {
   private handleClose(ev: CloseEvent) {
     if (!ev.wasClean) {
       console.error('[WS] ERROR: Connection closed unexpectedly');
-      toastDelegator.trigger({
-        message: 'Websocket connection closed unexpectedly',
-        background: 'bg-red-500',
-      });
+      toast.error('Websocket connection closed unexpectedly');
     } else {
       console.log('[WS] Received disconnect: ', ev.reason);
     }
