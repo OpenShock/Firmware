@@ -22,15 +22,31 @@ LOGLEVEL_MAP = {
 
 class DotEnv:
     def __read_dotenv(self, path: str | Path):
-        with open(path, 'r') as f:
-            for line in f:
-                line = line.strip()
-                if line == '' or line.startswith('#'):
-                    continue
+        text_data = ''
 
-                key, value = line.strip().split('=', 1)
+        with open(path, 'rb') as f:  # Open the file in binary mode first to detect BOM
+            raw_data = f.read()
 
-                self.dotenv_vars[key] = value
+            # Check for BOM and strip it if present
+            if raw_data.startswith(b'\xef\xbb\xbf'):  # UTF-8 BOM
+                text_data = raw_data[3:].decode('utf-8')
+            elif raw_data.startswith(b'\xff\xfe'):  # UTF-16 LE BOM
+                text_data = raw_data[2:].decode('utf-16le')
+            elif raw_data.startswith(b'\xfe\xff'):  # UTF-16 BE BOM
+                text_data = raw_data[2:].decode('utf-16be')
+
+        # Now process the text data
+        for line in text_data.splitlines():
+            line = line.strip()
+            if line == '' or line.startswith('#'):
+                continue
+
+            split = line.strip().split('=', 1)
+            if len(split) != 2:
+                print('Failed to parse: ' + line)
+                continue
+
+            self.dotenv_vars[line[0]] = line[1]
 
     def __init__(self, path: str | Path, environment: str):
         self.dotenv_vars: dict[str, str] = {}
