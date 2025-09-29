@@ -1,3 +1,86 @@
+# Version 1.5.0-rc.1 Release Notes
+
+This release candidate focuses on **radio reliability**, **safer execution**, and a big round of **dependency & tooling updates** plus a few UX touches for Serial and the Captive Portal/frontend.
+
+## ✨ Highlights
+
+- **Time limits on actions** to prevent runaway operations and improve device safety.
+- **Reworked RMT/RF transmitter pipeline** for more accurate timing, fewer allocations, and better throughput.
+- **Safer data handling** across Base64 utilities, tiny containers, and general conversion helpers.
+- **HTTP stack improvements** with clearer status/error codes and stronger 401 handling.
+- **AssignLCG integration refresh** using the improved backend endpoint; removes legacy LCG override config.
+- **Serial output now uses CRLF** (Windows-friendly) for broader terminal compatibility.
+- **Frontend updates**: Svelte 5 + shadcn migration, Tailwind CSS v4, smaller/minified artifacts, and palette sync with the website.
+
+---
+
+## 📡 Radio, Timing & Encoding
+
+- Significant **RMT and RF TX logic** rework and tuning for stability and timing accuracy.
+- **Reduced allocations** and shared buffers in RF encoders; separate terminator encoding for correctness.
+- Fixed **CaiXianlin timing inaccuracies** and multiple **Petrainer 998DR** bitfield/handling improvements.
+- **SerialRX stack** increased to 10k; additional RF crash-loop fixes and guard rails.
+- Added **T330 collar encoder** support.
+
+## 🛡️ Reliability, Safety & Resilience
+
+- **Introduce time limits on actions** to bound operation durations.
+- Replace all direct **`ESP.restart()`** calls with safer control paths.
+- Multiple crash-loop and event-init ordering fixes (esp. around OTA and Wi-Fi events).
+- More robust loop exit logic; removed fragile goto patterns in favor of structured loops.
+
+## 🌐 HTTP & Gateway
+
+- **More readable HTTP error codes** and improved status handling.
+- Better **auth token 401** handling and recovery paths.
+- **HTTP RateLimiter** fixed and abstracted; proper rate-limit handling for Account Link.
+- **AssignLCG** now uses the **improved endpoint**, passes firmware version, and **removes LCG override** config.
+
+## 🧰 Data & Utilities
+
+- **Safer data handling** in Base64 and TinyVec utilities; converter and constexpr cleanup.
+- Added **C++20 `std::span`** implementation (local) and continued adoption of `string_view`.
+- Integer parsing/conversion: performance optimizations and clearer docs.
+
+## 💻 Frontend & UX
+
+- **Svelte 5 + shadcn** transition; updated components, icons (lucide), and build tooling.
+- **Tailwind CSS v4**; set ESLint ECMAScript version and fix shadcn typos.
+- Smaller, **more minified artifacts** and simplified filesystem build; applied website color schemes.
+- **Serial now outputs CRLF** for better terminal compatibility.
+
+## 🧱 Dependencies & CI/CD
+
+- Updated **platformio**, **espressif32**, **FlatBuffers**, Node, pnpm and various frontend deps.
+- Locked platformio dependencies to **commit hashes** for reproducibility.
+- Phased out outdated deps where possible; tried removing **esptool** fork.
+- CI fixes: action-based uploads, path corrections, verbosity for debugging.
+
+## 🐛 Fixes
+
+- RMT timing and crash-loop fixes.
+- HTTP chunked body hex parser corrected.
+- Memory leak plugs, include fixes (`<memory>`), and warning cleanups.
+- SemVer: `toString()` and build-number edge cases fixed.
+- Misc: header logo spacing, ping/pong log noise removal, Wi-Fi scan robustness.
+
+---
+
+## ⚠️ Upgrade Notes / Potentially Breaking
+
+- **AssignLCG:** Uses the new endpoint and **removes the LCG override config**. If you previously relied on the override, review your setup.
+- **Serial line endings:** Now **CRLF**. If you parse logs/scripts expecting `\n`, adjust accordingly.
+- **Stricter timing & safety limits:** New **action time limits** may surface issues in scripts or hosts that assume unbounded durations.
+
+## Known Areas to Watch
+
+- Radio timing changes are significant; please report edge-case regressions with collar models and exact scenarios.
+- If you scripted against the old AssignLCG behavior, verify your automation after upgrading.
+
+---
+
+As always, thanks to everyone contributing commits, reviews, and testing! If you hit issues, include device model, board, collar/protocol, firmware version, and a minimal repro.
+
 # Version 1.4.0 Release Notes
 
 This release is packed with bugfixes, optimizations, code cleanup, prepwork for ESP-IDF, and some features!
