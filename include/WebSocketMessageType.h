@@ -4,7 +4,6 @@
 
 namespace OpenShock {
   enum class WebSocketMessageType : uint8_t {
-    Error,
     Disconnected,
     Connected,
     Text,
@@ -12,4 +11,4 @@ namespace OpenShock {
     Ping,
     Pong
   };
-}
+}  // namespace OpenShock

@@ -5,6 +5,7 @@ const char* const TAG = "OtaUpdateManager";
 #include "CaptivePortal.h"
 #include "Common.h"
 #include "config/Config.h"
+#include "Core.h"
 #include "GatewayConnectionManager.h"
 #include "Hashing.h"
 #include "http/HTTPRequestManager.h"
@@ -12,7 +13,6 @@ const char* const TAG = "OtaUpdateManager";
 #include "SemVer.h"
 #include "serialization/WSGateway.h"
 #include "SimpleMutex.h"
-#include "Time.h"
 #include "util/HexUtils.h"
 #include "util/PartitionUtils.h"
 #include "util/StringUtils.h"
@@ -99,7 +99,7 @@ static bool _tryGetRequestedVersion(OpenShock::SemVer& version)
   return true;
 }
 
-static void _otaEvWiFiDisconnectedHandler(void* event_handler_arg, esp_event_base_t event_base, int32_t event_id, void* event_data)
+static void otaum_evh_wifidisconnected(void* event_handler_arg, esp_event_base_t event_base, int32_t event_id, void* event_data)
 {
   (void)event_handler_arg;
   (void)event_base;
@@ -109,7 +109,7 @@ static void _otaEvWiFiDisconnectedHandler(void* event_handler_arg, esp_event_bas
   xTaskNotify(_taskHandle, OTA_TASK_EVENT_WIFI_DISCONNECTED, eSetBits);
 }
 
-static void _otaEvIpEventHandler(void* event_handler_arg, esp_event_base_t event_base, int32_t event_id, void* event_data)
+static void otaum_evh_ipevent(void* event_handler_arg, esp_event_base_t event_base, int32_t event_id, void* event_data)
 {
   (void)event_handler_arg;
   (void)event_base;
@@ -244,7 +244,7 @@ static bool _flashFilesystemPartition(const esp_partition_t* parition, const cha
   return true;
 }
 
-static void _otaUpdateTask(void* arg)
+static void otaum_updatetask(void* arg)
 {
   (void)arg;
 
@@ -429,10 +429,10 @@ static bool _tryGetStringList(const char* url, std::vector<std::string>& list)
     {
       {"Accept", "text/plain"}
   },
-    {200, 304}
+    std::array<uint16_t, 2> {200, 304}
   );
   if (response.result != OpenShock::HTTP::RequestResult::Success) {
-    OS_LOGE(TAG, "Failed to fetch list: [%u] %s", response.code, response.data.c_str());
+    OS_LOGE(TAG, "Failed to fetch list: %s [%u] %s", response.ResultToString(), response.code, response.data.c_str());
     return false;
   }
 
@@ -505,20 +505,20 @@ bool OtaUpdateManager::Init()
     }
   }
 
-  err = esp_event_handler_register(IP_EVENT, ESP_EVENT_ANY_ID, _otaEvIpEventHandler, nullptr);
+  err = esp_event_handler_register(IP_EVENT, ESP_EVENT_ANY_ID, otaum_evh_ipevent, nullptr);
   if (err != ESP_OK) {
     OS_LOGE(TAG, "Failed to register event handler for IP_EVENT: %s", esp_err_to_name(err));
     return false;
   }
 
-  err = esp_event_handler_register(WIFI_EVENT, WIFI_EVENT_STA_DISCONNECTED, _otaEvWiFiDisconnectedHandler, nullptr);
+  err = esp_event_handler_register(WIFI_EVENT, WIFI_EVENT_STA_DISCONNECTED, otaum_evh_wifidisconnected, nullptr);
   if (err != ESP_OK) {
     OS_LOGE(TAG, "Failed to register event handler for WIFI_EVENT: %s", esp_err_to_name(err));
     return false;
   }
 
   // Start OTA update task.
-  TaskUtils::TaskCreateExpensive(_otaUpdateTask, "OTA Update", 8192, nullptr, 1, &_taskHandle);  // PROFILED: 6.2KB stack usage
+  TaskUtils::TaskCreateExpensive(otaum_updatetask, "OTA Update", 8192, nullptr, 1, &_taskHandle);  // PROFILED: 6.2KB stack usage
 
   return true;
 }
@@ -548,10 +548,10 @@ bool OtaUpdateManager::TryGetFirmwareVersion(OtaUpdateChannel channel, OpenShock
     {
       {"Accept", "text/plain"}
   },
-    {200, 304}
+    std::array<uint16_t, 2> {200, 304}
   );
   if (response.result != OpenShock::HTTP::RequestResult::Success) {
-    OS_LOGE(TAG, "Failed to fetch firmware version: [%u] %s", response.code, response.data.c_str());
+    OS_LOGE(TAG, "Failed to fetch firmware version: %s [%u] %s", response.ResultToString(), response.code, response.data.c_str());
     return false;
   }
 
@@ -618,10 +618,10 @@ bool OtaUpdateManager::TryGetFirmwareRelease(const OpenShock::SemVer& version, F
     {
       {"Accept", "text/plain"}
   },
-    {200, 304}
+    std::array<uint16_t, 2> {200, 304}
   );
   if (sha256HashesResponse.result != OpenShock::HTTP::RequestResult::Success) {
-    OS_LOGE(TAG, "Failed to fetch hashes: [%u] %s", sha256HashesResponse.code, sha256HashesResponse.data.c_str());
+    OS_LOGE(TAG, "Failed to fetch hashes: %s [%u] %s", sha256HashesResponse.ResultToString(), sha256HashesResponse.code, sha256HashesResponse.data.c_str());
     return false;
   }
 

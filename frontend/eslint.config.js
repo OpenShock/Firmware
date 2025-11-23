@@ -28,6 +28,7 @@ export default ts.config(
     languageOptions: {
       parserOptions: {
         parser: ts.parser,
+        ecmaVersion: 2020,
       },
     },
   }

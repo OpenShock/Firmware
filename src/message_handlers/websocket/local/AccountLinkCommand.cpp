@@ -18,10 +18,7 @@ void serializeAccountLinkCommandResult(uint8_t socketId, OpenShock::Serializatio
 
   OpenShock::Serialization::Local::FinishHubToLocalMessageBuffer(builder, msg);
 
-  auto buffer = builder.GetBufferPointer();
-  auto size   = builder.GetSize();
-
-  OpenShock::CaptivePortal::SendMessageBIN(socketId, buffer, size);
+  OpenShock::CaptivePortal::SendMessageBIN(socketId, builder.GetBufferSpan());
 }
 
 using namespace OpenShock::MessageHandlers::Local;

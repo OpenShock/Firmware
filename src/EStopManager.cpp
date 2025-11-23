@@ -6,10 +6,10 @@ const char* const TAG = "EStopManager";
 
 #include "Chipset.h"
 #include "config/Config.h"
+#include "Core.h"
 #include "events/Events.h"
 #include "Logging.h"
 #include "SimpleMutex.h"
-#include "Time.h"
 #include "util/TaskUtils.h"
 
 #include <driver/gpio.h>
@@ -36,14 +36,14 @@ static int64_t s_estopActivatedAt = 0;
 
 static volatile bool s_externallyTriggered = false;
 
-static void _estopUpdateExternals(bool isActive, bool isAwaitingRelease)
+static void estopmanager_updateexternals(bool isActive, bool isAwaitingRelease)
 {
   // Post an event
   ESP_ERROR_CHECK(esp_event_post(OPENSHOCK_EVENTS, OPENSHOCK_EVENT_ESTOP_STATE_CHANGED, &s_estopState, sizeof(s_estopState), portMAX_DELAY));
 }
 
 // Samples the estop at a fixed rate and sends messages to the estop event handler task
-static void _estopCheckerTask(void* pvParameters)
+static void estopmgr_checkertask(void* pvParameters)
 {
   uint16_t history = 0xFFFF;  // Bit history of samples, 0 is pressed
 
@@ -79,7 +79,7 @@ static void _estopCheckerTask(void* pvParameters)
         // If the state hasn't changed, handle timing transitions
         if (state == EStopState::ActiveClearing && now > deactivatesAt) {
           state = EStopState::AwaitingRelease;
-          _estopUpdateExternals(s_estopActive, true);
+          estopmanager_updateexternals(s_estopActive, true);
         }
         continue;
       }
@@ -117,15 +117,15 @@ static void _estopCheckerTask(void* pvParameters)
         continue;
     }
 
-    _estopUpdateExternals(s_estopActive, state == EStopState::AwaitingRelease);
+    estopmanager_updateexternals(s_estopActive, state == EStopState::AwaitingRelease);
   }
 }
 
-static bool _setEStopEnabledImpl(bool enabled)
+static bool estopmgr_setestopenabled(bool enabled)
 {
   if (enabled) {
     if (s_estopTask == nullptr) {
-      if (TaskUtils::TaskCreateUniversal(_estopCheckerTask, TAG, 4096, nullptr, 5, &s_estopTask, 1) != pdPASS) {  // TODO: Profile stack size and set priority
+      if (TaskUtils::TaskCreateUniversal(estopmgr_checkertask, TAG, 4096, nullptr, 5, &s_estopTask, 1) != pdPASS) {  // TODO: Profile stack size and set priority
         OS_LOGE(TAG, "Failed to create EStop event handler task");
         return false;
       }
@@ -155,7 +155,7 @@ static bool _setEStopPinImpl(gpio_num_t pin)
 
   bool wasRunning = s_estopTask != nullptr;
   if (wasRunning) {
-    if (!_setEStopEnabledImpl(false)) {
+    if (!estopmgr_setestopenabled(false)) {
       OS_LOGE(TAG, "Failed to disable EStop event handler task");
       return false;
     }
@@ -191,7 +191,7 @@ static bool _setEStopPinImpl(gpio_num_t pin)
   }
 
   if (wasRunning) {
-    if (!_setEStopEnabledImpl(true)) {
+    if (!estopmgr_setestopenabled(true)) {
       OS_LOGE(TAG, "Failed to re-enable EStop event handler task");
       return false;
     }
@@ -221,7 +221,7 @@ bool EStopManager::Init()
     return false;
   }
 
-  if (!_setEStopEnabledImpl(cfg.enabled)) {
+  if (!estopmgr_setestopenabled(cfg.enabled)) {
     OS_LOGE(TAG, "Failed to create EStop event handler task");
     return false;
   }
@@ -245,7 +245,7 @@ bool EStopManager::SetEStopEnabled(bool enabled)
     }
   }
 
-  bool success = _setEStopEnabledImpl(enabled);
+  bool success = estopmgr_setestopenabled(enabled);
 
   return success;
 }

@@ -4,10 +4,10 @@ const char* const TAG = "WiFiManager";
 
 #include "CaptivePortal.h"
 #include "config/Config.h"
+#include "Core.h"
 #include "FormatHelpers.h"
 #include "Logging.h"
 #include "serialization/WSLocal.h"
-#include "Time.h"
 #include "util/TaskUtils.h"
 #include "VisualStateManager.h"
 #include "wifi/WiFiNetwork.h"

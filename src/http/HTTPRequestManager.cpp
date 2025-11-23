@@ -3,11 +3,11 @@
 const char* const TAG = "HTTPRequestManager";
 
 #include "Common.h"
+#include "Core.h"
 #include "http/HTTPClient.h"
 #include "Logging.h"
 #include "RateLimiter.h"
 #include "SimpleMutex.h"
-#include "Time.h"
 #include "util/HexUtils.h"
 #include "util/StringUtils.h"
 
@@ -16,7 +16,6 @@ const char* const TAG = "HTTPRequestManager";
 #include <numeric>
 #include <string_view>
 #include <unordered_map>
-#include <vector>
 
 using namespace std::string_view_literals;
 
@@ -352,7 +351,7 @@ HTTP::Response<std::size_t> _doGetStream(
   HTTPClient& client,
   const char* url,
   const std::map<String, String>& headers,
-  const std::vector<int>& acceptedCodes,
+  tcb::span<const uint16_t> acceptedCodes,
   std::shared_ptr<OpenShock::RateLimiter> rateLimiter,
   HTTP::GotContentLengthCallback contentLengthCallback,
   HTTP::DownloadCallback downloadCallback,
@@ -404,7 +403,7 @@ HTTP::Response<std::size_t> _doGetStream(
   }
 
   if (std::find(acceptedCodes.begin(), acceptedCodes.end(), responseCode) == acceptedCodes.end()) {
-    OS_LOGE(TAG, "Received unexpected response code %d", responseCode);
+    OS_LOGD(TAG, "Received unexpected response code %d", responseCode);
     return {HTTP::RequestResult::CodeRejected, responseCode, 0};
   }
 
@@ -441,7 +440,7 @@ HTTP::Response<std::size_t> _doGetStream(
   return {result.result, responseCode, result.nWritten};
 }
 
-HTTP::Response<std::size_t> HTTP::Download(const char* url, const std::map<String, String>& headers, HTTP::GotContentLengthCallback contentLengthCallback, HTTP::DownloadCallback downloadCallback, const std::vector<int>& acceptedCodes, int timeoutMs)
+HTTP::Response<std::size_t> HTTP::Download(const char* url, const std::map<String, String>& headers, HTTP::GotContentLengthCallback contentLengthCallback, HTTP::DownloadCallback downloadCallback, tcb::span<const uint16_t> acceptedCodes, uint32_t timeoutMs)
 {
   std::shared_ptr<OpenShock::RateLimiter> rateLimiter = _getRateLimiter(url);
   if (rateLimiter == nullptr) {
@@ -457,7 +456,7 @@ HTTP::Response<std::size_t> HTTP::Download(const char* url, const std::map<Strin
   return _doGetStream(client, url, headers, acceptedCodes, rateLimiter, contentLengthCallback, downloadCallback, timeoutMs);
 }
 
-HTTP::Response<std::string> HTTP::GetString(const char* url, const std::map<String, String>& headers, const std::vector<int>& acceptedCodes, int timeoutMs)
+HTTP::Response<std::string> HTTP::GetString(const char* url, const std::map<String, String>& headers, tcb::span<const uint16_t> acceptedCodes, uint32_t timeoutMs)
 {
   std::string result;
 

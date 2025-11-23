@@ -10,7 +10,7 @@
     DialogTrigger,
   } from '$lib/components/ui/dialog';
 
-  import { Settings } from 'lucide-svelte';
+  import { Settings } from '@lucide/svelte';
 
   type Props = {
     group: WiFiNetworkGroup;

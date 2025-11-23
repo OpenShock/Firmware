@@ -8,11 +8,10 @@
 namespace OpenShock::Config {
   struct BackendConfig : public ConfigBase<Serialization::Configuration::BackendConfig> {
     BackendConfig();
-    BackendConfig(std::string_view domain, std::string_view authToken, std::string_view lcgOverride);
+    BackendConfig(std::string_view domain, std::string_view authToken);
 
     std::string domain;
     std::string authToken;
-    std::string lcgOverride;
 
     void ToDefault() override;
 
