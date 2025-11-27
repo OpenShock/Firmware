@@ -1,85 +1,55 @@
 # Version 1.5.0-rc.1 Release Notes
 
-This release candidate focuses on **radio reliability**, **safer execution**, and a big round of **dependency & tooling updates** plus a few UX touches for Serial and the Captive Portal/frontend.
+This release candidate focuses on **radio reliability**, **firmware behavior improvements**, and a refreshed **frontend**.
 
-## ✨ Highlights
+## Highlights (User-Visible Firmware Changes)
 
-- **Time limits on actions** to prevent runaway operations and improve device safety.
-- **Reworked RMT/RF transmitter pipeline** for more accurate timing, fewer allocations, and better throughput.
-- **Safer data handling** across Base64 utilities, tiny containers, and general conversion helpers.
-- **HTTP stack improvements** with clearer status/error codes and stronger 401 handling.
-- **AssignLCG integration refresh** using the improved backend endpoint; removes legacy LCG override config.
-- **Serial output now uses CRLF** (Windows-friendly) for broader terminal compatibility.
-- **Frontend updates**: Svelte 5 + shadcn migration, Tailwind CSS v4, smaller/minified artifacts, and palette sync with the website.
+- Major **RF/RMT transmitter rework** for improved timing accuracy and more reliable shocker communication.
+- Updated **AssignLCG** integration using the new backend endpoint (removes the old LCG override setting).
+- **Serial output now uses CRLF** line endings for improved compatibility with Windows terminals.
+- Added **T330 collar protocol** support.
 
----
+## Radio & Timing
 
-## 📡 Radio, Timing & Encoding
+- Reworked RF pipeline with more consistent timing and fewer internal allocations.
+- Fixed timing issues for **CaiXianlin** and improved **PET998DR** handling.
+- Additional guardrails added to the RF subsystem to prevent stalls/crash loops.
 
-- Significant **RMT and RF TX logic** rework and tuning for stability and timing accuracy.
-- **Reduced allocations** and shared buffers in RF encoders; separate terminator encoding for correctness.
-- Fixed **CaiXianlin timing inaccuracies** and multiple **Petrainer 998DR** bitfield/handling improvements.
-- **SerialRX stack** increased to 10k; additional RF crash-loop fixes and guard rails.
-- Added **T330 collar encoder** support.
+## Firmware Behavior / System
 
-## 🛡️ Reliability, Safety & Resilience
+- Introduced internal **execution time limits** to prevent firmware from getting stuck in long-running operations (internal stability, not a user-facing “safety feature”).
+- Replaced all direct `ESP.restart()` usage with controlled transitions.
+- Improved OTA, Wi-Fi initialization, and crash-loop resilience.
 
-- **Introduce time limits on actions** to bound operation durations.
-- Replace all direct **`ESP.restart()`** calls with safer control paths.
-- Multiple crash-loop and event-init ordering fixes (esp. around OTA and Wi-Fi events).
-- More robust loop exit logic; removed fragile goto patterns in favor of structured loops.
+## HTTP & Gateway
 
-## 🌐 HTTP & Gateway
+- Clearer/more consistent HTTP error and status behavior.
+- Improved 401 handling and token recovery.
+- AssignLCG now reports firmware version and uses the updated endpoint.
 
-- **More readable HTTP error codes** and improved status handling.
-- Better **auth token 401** handling and recovery paths.
-- **HTTP RateLimiter** fixed and abstracted; proper rate-limit handling for Account Link.
-- **AssignLCG** now uses the **improved endpoint**, passes firmware version, and **removes LCG override** config.
+## Frontend & UX
 
-## 🧰 Data & Utilities
+- Migrated to **Svelte 5 + shadcn**.
+- Updated to **Tailwind CSS v4** and reduced frontend bundle size.
+- UI palette synced with website.
 
-- **Safer data handling** in Base64 and TinyVec utilities; converter and constexpr cleanup.
-- Added **C++20 `std::span`** implementation (local) and continued adoption of `string_view`.
-- Integer parsing/conversion: performance optimizations and clearer docs.
+## Misc / Internal Changes
 
-## 💻 Frontend & UX
-
-- **Svelte 5 + shadcn** transition; updated components, icons (lucide), and build tooling.
-- **Tailwind CSS v4**; set ESLint ECMAScript version and fix shadcn typos.
-- Smaller, **more minified artifacts** and simplified filesystem build; applied website color schemes.
-- **Serial now outputs CRLF** for better terminal compatibility.
-
-## 🧱 Dependencies & CI/CD
-
-- Updated **platformio**, **espressif32**, **FlatBuffers**, Node, pnpm and various frontend deps.
-- Locked platformio dependencies to **commit hashes** for reproducibility.
-- Phased out outdated deps where possible; tried removing **esptool** fork.
-- CI fixes: action-based uploads, path corrections, verbosity for debugging.
-
-## 🐛 Fixes
-
-- RMT timing and crash-loop fixes.
-- HTTP chunked body hex parser corrected.
-- Memory leak plugs, include fixes (`<memory>`), and warning cleanups.
-- SemVer: `toString()` and build-number edge cases fixed.
-- Misc: header logo spacing, ping/pong log noise removal, Wi-Fi scan robustness.
+- PlatformIO, espressif32, FlatBuffers, Node, pnpm, and other dependency updates.
+- Build reproducibility improvements and CI cleanup.
+- Various memory fixes, warning cleanups, and improved parsing logic.
 
 ---
 
-## ⚠️ Upgrade Notes / Potentially Breaking
+## Breaking Changes
 
-- **AssignLCG:** Uses the new endpoint and **removes the LCG override config**. If you previously relied on the override, review your setup.
-- **Serial line endings:** Now **CRLF**. If you parse logs/scripts expecting `\n`, adjust accordingly.
-- **Stricter timing & safety limits:** New **action time limits** may surface issues in scripts or hosts that assume unbounded durations.
+- **LCG override removed** (new AssignLCG endpoint required).
+- **Serial output now uses CRLF** (update scripts if needed).
 
-## Known Areas to Watch
+## Notes
 
-- Radio timing changes are significant; please report edge-case regressions with collar models and exact scenarios.
-- If you scripted against the old AssignLCG behavior, verify your automation after upgrading.
-
----
-
-As always, thanks to everyone contributing commits, reviews, and testing! If you hit issues, include device model, board, collar/protocol, firmware version, and a minimal repro.
+- RF timing changes are substantial; please report collar-specific regressions.
+- Scripts relying on legacy AssignLCG behavior may need updates.
 
 # Version 1.4.0 Release Notes
 
