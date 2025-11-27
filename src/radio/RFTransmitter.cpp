@@ -4,30 +4,33 @@
 
 const char* const TAG = "RFTransmitter";
 
-#include "EStopManager.h"
-
+#include "Core.h"
+#include "estop/EStopManager.h"
 #include "Logging.h"
-#include "radio/rmt/MainEncoder.h"
-#include "Time.h"
+#include "radio/rmt/Sequence.h"
 #include "util/FnProxy.h"
 #include "util/TaskUtils.h"
 
 #include <freertos/queue.h>
 
-const UBaseType_t RFTRANSMITTER_QUEUE_SIZE   = 64;
-const BaseType_t RFTRANSMITTER_TASK_PRIORITY = 1;
-const uint32_t RFTRANSMITTER_TASK_STACK_SIZE = 4096;  // PROFILED: 1.4KB stack usage
-const float RFTRANSMITTER_TICKRATE_NS        = 1000;
-const int64_t TRANSMIT_END_DURATION          = 300;
+const UBaseType_t kQueueSize        = 64;
+const BaseType_t kTaskPriority      = 1;
+const uint32_t kTaskStackSize       = 4096;  // PROFILED: 1.4KB stack usage
+const float kTickrateNs             = 1000;
+const int64_t kTerminatorDurationMs = 300;
+const uint8_t kFlagOverwrite        = 1 << 0;
+const uint8_t kFlagDeleteTask       = 1 << 1;
+const TickType_t kTaskIdleDelay     = pdMS_TO_TICKS(5);
 
 using namespace OpenShock;
 
-struct command_t {
-  int64_t until;
-  std::vector<rmt_data_t> sequence;
-  std::vector<rmt_data_t> zeroSequence;
+struct RFTransmitter::Command {
+  int64_t transmitEnd;
+  ShockerModelType modelType;
+  ShockerCommandType type;
   uint16_t shockerId;
-  bool overwrite;
+  uint8_t intensity;
+  uint8_t flags;
 };
 
 RFTransmitter::RFTransmitter(gpio_num_t gpioPin)
@@ -45,10 +48,10 @@ RFTransmitter::RFTransmitter(gpio_num_t gpioPin)
     return;
   }
 
-  float realTick = rmtSetTick(m_rmtHandle, RFTRANSMITTER_TICKRATE_NS);
+  float realTick = rmtSetTick(m_rmtHandle, kTickrateNs);
   OS_LOGD(TAG, "[pin-%hhi] real tick set to: %fns", m_txPin, realTick);
 
-  m_queueHandle = xQueueCreate(RFTRANSMITTER_QUEUE_SIZE, sizeof(command_t*));
+  m_queueHandle = xQueueCreate(kQueueSize, sizeof(Command));
   if (m_queueHandle == nullptr) {
     OS_LOGE(TAG, "[pin-%hhi] Failed to create queue", m_txPin);
     destroy();
@@ -58,7 +61,7 @@ RFTransmitter::RFTransmitter(gpio_num_t gpioPin)
   char name[32];
   snprintf(name, sizeof(name), "RFTransmitter-%u", m_txPin);
 
-  if (TaskUtils::TaskCreateExpensive(&Util::FnProxy<&RFTransmitter::TransmitTask>, name, RFTRANSMITTER_TASK_STACK_SIZE, this, RFTRANSMITTER_TASK_PRIORITY, &m_taskHandle) != pdPASS) {
+  if (TaskUtils::TaskCreateExpensive(&Util::FnProxy<&RFTransmitter::TransmitTask>, name, kTaskStackSize, this, kTaskPriority, &m_taskHandle) != pdPASS) {
     OS_LOGE(TAG, "[pin-%hhi] Failed to create task", m_txPin);
     destroy();
     return;
@@ -77,18 +80,23 @@ bool RFTransmitter::SendCommand(ShockerModelType model, uint16_t shockerId, Shoc
     return false;
   }
 
-  command_t* cmd = new command_t {.until = OpenShock::millis() + durationMs, .sequence = Rmt::GetSequence(model, shockerId, type, intensity), .zeroSequence = Rmt::GetZeroSequence(model, shockerId), .shockerId = shockerId, .overwrite = overwriteExisting};
+  // Stop logic
+  if (type == ShockerCommandType::Stop) {
+    OS_LOGV(TAG, "Stop command received");
 
-  // We will use nullptr commands to end the task, if we got a nullptr here, we are out of memory... :(
-  if (cmd == nullptr) {
-    OS_LOGE(TAG, "[pin-%hhi] Failed to allocate command", m_txPin);
-    return false;
+    type              = ShockerCommandType::Vibrate;
+    intensity         = 0;
+    durationMs        = 300;
+    overwriteExisting = true;
+  } else {
+    OS_LOGD(TAG, "Command received: %u %u %u %u", model, shockerId, type, intensity);
   }
+
+  Command cmd = Command {.transmitEnd = OpenShock::millis() + durationMs, .modelType = model, .type = type, .shockerId = shockerId, .intensity = intensity, .flags = overwriteExisting ? kFlagOverwrite : (uint8_t)0};
 
   // Add the command to the queue, wait max 10 ms (Adjust this)
   if (xQueueSend(m_queueHandle, &cmd, pdMS_TO_TICKS(10)) != pdTRUE) {
     OS_LOGE(TAG, "[pin-%hhi] Failed to send command to queue", m_txPin);
-    delete cmd;
     return false;
   }
 
@@ -103,9 +111,8 @@ void RFTransmitter::ClearPendingCommands()
 
   OS_LOGI(TAG, "[pin-%hhi] Clearing pending commands", m_txPin);
 
-  command_t* command;
+  Command command;
   while (xQueueReceive(m_queueHandle, &command, 0) == pdPASS) {
-    delete command;
   }
 }
 
@@ -115,7 +122,7 @@ void RFTransmitter::destroy()
     OS_LOGD(TAG, "[pin-%hhi] Stopping task", m_txPin);
 
     // Wait for the task to stop
-    command_t* cmd = nullptr;
+    Command cmd {.flags = kFlagDeleteTask};
     while (eTaskGetState(m_taskHandle) != eDeleted) {
       vTaskDelay(pdMS_TO_TICKS(10));
 
@@ -140,93 +147,98 @@ void RFTransmitter::destroy()
   }
 }
 
+static bool addSequence(std::vector<Rmt::Sequence>& sequences, ShockerModelType modelType, uint16_t shockerId, ShockerCommandType commandType, uint8_t intensity, int64_t transmitEnd)
+{
+  Rmt::Sequence sequence(modelType, shockerId, transmitEnd);
+  if (!sequence.is_valid()) return false;
+
+  if (!sequence.fill(commandType, intensity)) return false;
+
+  sequences.push_back(std::move(sequence));
+
+  return true;
+}
+
+static bool modifySequence(std::vector<Rmt::Sequence>& sequences, ShockerModelType modelType, uint16_t shockerId, ShockerCommandType commandType, uint8_t intensity, int64_t transmitEnd)
+{
+  for (auto& seq : sequences) {
+    if (seq.shockerModel() == modelType && seq.shockerId() == shockerId) {
+      bool ok = seq.fill(commandType, intensity);
+      seq.setTransmitEnd(ok ? transmitEnd : 0);  // Remove this immediately if fill didnt succeed
+      return ok;                                 // Returns whether modification succeeded; caller should generate a new sequence if this fails
+    }
+  }
+
+  return false;
+}
+
+static void writeSequences(rmt_obj_t* rmt_handle, std::vector<Rmt::Sequence>& sequences)
+{
+  // Send queued commands
+  for (auto seq = sequences.begin(); seq != sequences.end();) {
+    int64_t timeToLive = seq->transmitEnd() - OpenShock::millis();
+
+    if (timeToLive > 0) {
+      // Send the command
+      rmtWriteBlocking(rmt_handle, seq->payload(), seq->size());
+    } else {
+      // Remove command if it has sent out its termination sequence for long enough
+      if (timeToLive + kTerminatorDurationMs <= 0) {
+        seq = sequences.erase(seq);
+        continue;
+      }
+
+      // Send the termination sequence to stop the shocker
+      rmtWriteBlocking(rmt_handle, seq->terminator(), seq->size());
+    }
+
+    // Move to the next command
+    ++seq;
+  }
+}
+
 void RFTransmitter::TransmitTask()
 {
   OS_LOGD(TAG, "[pin-%hhi] RMT loop running on core %d", m_txPin, xPortGetCoreID());
 
-  std::vector<command_t*> commands;
+  bool wasEstopped = false;
+  std::vector<Rmt::Sequence> sequences;
   while (true) {
     // Receive commands
-    command_t* cmd = nullptr;
-    while (xQueueReceive(m_queueHandle, &cmd, commands.empty() ? portMAX_DELAY : 0) == pdTRUE) {
-      if (cmd == nullptr) {
-        OS_LOGD(TAG, "[pin-%hhi] Received nullptr (stop command), cleaning up...", m_txPin);
-
-        for (auto it = commands.begin(); it != commands.end(); ++it) {
-          delete *it;
-        }
-
-        OS_LOGD(TAG, "[pin-%hhi] Cleanup done, stopping task", m_txPin);
-
+    Command cmd;
+    while (xQueueReceive(m_queueHandle, &cmd, sequences.empty() ? portMAX_DELAY : 0) == pdTRUE) {
+      // Destroy task if we receive destroy command
+      if ((cmd.flags & kFlagDeleteTask) != 0) {
+        sequences.clear();
         vTaskDelete(nullptr);
         return;
       }
 
-      // Replace the command if it already exists
-      for (auto it = commands.begin(); it != commands.end(); ++it) {
-        const command_t* existingCmd = *it;
-
-        if (existingCmd->shockerId == cmd->shockerId) {
-          // Only replace the command if it should be overwritten
-          if (existingCmd->overwrite) {
-            delete *it;
-            *it = cmd;
-          } else {
-            delete cmd;
-          }
-
-          cmd = nullptr;
-
-          break;
+      if ((cmd.flags & kFlagOverwrite) != 0) {
+        // Replace the sequence if it already exists
+        if (modifySequence(sequences, cmd.modelType, cmd.shockerId, cmd.type, cmd.intensity, cmd.transmitEnd)) {
+          continue;
         }
       }
 
-      // If the command was not replaced, add it to the queue
-      if (cmd != nullptr) {
-        commands.push_back(cmd);
+      if (!addSequence(sequences, cmd.modelType, cmd.shockerId, cmd.type, cmd.intensity, cmd.transmitEnd)) {
+        OS_LOGD(TAG, "[pin-%hhi] Failed to add sequence");
       }
     }
 
-    if (OpenShock::EStopManager::IsEStopped()) {
-      int64_t whenEStoppedTime = EStopManager::LastEStopped();
+    bool isEstopped = OpenShock::EStopManager::IsEStopped();
+    if (isEstopped != wasEstopped) {
+      wasEstopped = isEstopped;
 
-      for (auto it = commands.begin(); it != commands.end(); ++it) {
-        cmd = *it;
-
-        cmd->until = whenEStoppedTime;
-      }
-    }
-
-    // Send queued commands
-    for (auto it = commands.begin(); it != commands.end();) {
-      cmd = *it;
-
-      bool expired = cmd->until < OpenShock::millis();
-      bool empty   = cmd->sequence.empty();
-
-      // Remove expired or empty commands, else send the command.
-      // After sending/receiving a command, move to the next one.
-      if (expired || empty) {
-        // If the command is not empty, send the zero sequence to stop the shocker
-        if (!empty) {
-          rmtWriteBlocking(m_rmtHandle, cmd->zeroSequence.data(), cmd->zeroSequence.size());
+      if (isEstopped) {
+        // Set all sequences to transmit their terminators
+        int64_t now = OpenShock::millis();
+        for (auto seq = sequences.begin(); seq != sequences.end(); ++seq) {
+          seq->setTransmitEnd(now);
         }
-
-        if (cmd->until + TRANSMIT_END_DURATION < OpenShock::millis()) {
-          // Remove the command and move to the next one
-          it = commands.erase(it);
-          delete cmd;
-        } else {
-          // Move to the next command
-          ++it;
-        }
-      } else {
-        // Send the command
-        rmtWriteBlocking(m_rmtHandle, cmd->sequence.data(), cmd->sequence.size());
-
-        // Move to the next command
-        ++it;
       }
     }
+
+    writeSequences(m_rmtHandle, sequences);
   }
 }

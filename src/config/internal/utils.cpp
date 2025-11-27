@@ -11,7 +11,7 @@ using namespace OpenShock;
 template<typename T>
 bool _utilFromJsonInt(T& val, const cJSON* json, const char* name, T defaultVal, int minVal, int maxVal)
 {
-  static_assert(std::is_integral<T>::value, "T must be an integral type");
+  static_assert(std::is_integral_v<T>, "T must be an integral type");
 
   const cJSON* jsonVal = cJSON_GetObjectItemCaseSensitive(json, name);
   if (jsonVal == nullptr) {

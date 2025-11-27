@@ -8,9 +8,13 @@
 on:
   workflow_call:
     inputs:
+      pnpm-version:
+        type: string
+        default: '10.6.4'
+        description: 'The pnpm version to use'
       node-version:
         type: string
-        default: '18'
+        default: '22.14.0'
         description: 'The Node.js version to use'
     outputs:
       version:
@@ -64,6 +68,7 @@ name: get-vars
 jobs:
   get-vars:
     runs-on: ubuntu-latest
+    timeout-minutes: 5
     outputs:
       version: ${{ steps.get-vars.outputs.version }}
       changelog: ${{ steps.get-vars.outputs.changelog }}
@@ -82,22 +87,28 @@ jobs:
       release-dev-array: ${{ steps.get-vars.outputs.release-dev-array }}
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
         with:
           fetch-depth: 0
           sparse-checkout: |
             .github
 
-      - uses: actions/setup-node@v4
+      - uses: pnpm/action-setup@v4
+        name: Install pnpm
         with:
-          node-version: ${{ inputs.node-version }}
-          cache: 'npm'
-          cache-dependency-path: ./.github/scripts/package-lock.json
+          version: ${{ inputs.pnpm-version }}
+          run_install: false
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version-file: ./.github/scripts/package.json
+          cache: 'pnpm'
+          cache-dependency-path: ./.github/scripts/pnpm-lock.yaml
 
       - name: Install dependencies
         working-directory: ./.github/scripts
         shell: bash
-        run: npm ci
+        run: pnpm install --frozen-lockfile --strict-peer-dependencies
 
       - name: Get variables
         id: get-vars

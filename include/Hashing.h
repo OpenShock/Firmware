@@ -1,40 +1,62 @@
 #pragma once
 
+#include "Common.h"
+
 #include <mbedtls/md5.h>
 #include <mbedtls/sha1.h>
 #include <mbedtls/sha256.h>
 
-#include <array>
+#include <array>  // TODO: When we use C++20, change this to <span>
+#include <cstdint>
+#include <string_view>
 
 namespace OpenShock {
-struct MD5 {
-  MD5() { mbedtls_md5_init(&ctx); }
-  ~MD5() { mbedtls_md5_free(&ctx); }
+  class MD5 {
+    DISABLE_COPY(MD5);
+    DISABLE_MOVE(MD5);
 
-  bool begin() { return mbedtls_md5_starts_ret(&ctx) == 0; }
-  bool update(const uint8_t* data, std::size_t dataLen) { return mbedtls_md5_update_ret(&ctx, data, dataLen) == 0; }
-  bool finish(std::array<uint8_t, 16>& hash) { return mbedtls_md5_finish_ret(&ctx, hash.data()) == 0; }
+  public:
+    MD5() { mbedtls_md5_init(&ctx); }
+    ~MD5() { mbedtls_md5_free(&ctx); }
 
-  mbedtls_md5_context ctx;
-};
-struct SHA1 {
-  SHA1() { mbedtls_sha1_init(&ctx); }
-  ~SHA1() { mbedtls_sha1_free(&ctx); }
+    inline bool begin() { return mbedtls_md5_starts_ret(&ctx) == 0; }
+    inline bool update(const uint8_t* data, std::size_t dataLen) { return mbedtls_md5_update_ret(&ctx, data, dataLen) == 0; }
+    inline bool update(std::string_view data) { return update(reinterpret_cast<const uint8_t*>(data.data()), data.length()); }
+    inline bool finish(std::array<uint8_t, 16>& hash) { return mbedtls_md5_finish_ret(&ctx, hash.data()) == 0; }
 
-  bool begin() { return mbedtls_sha1_starts_ret(&ctx) == 0; }
-  bool update(const uint8_t* data, std::size_t dataLen) { return mbedtls_sha1_update_ret(&ctx, data, dataLen) == 0; }
-  bool finish(std::array<uint8_t, 20>& hash) { return mbedtls_sha1_finish_ret(&ctx, hash.data()) == 0; }
+  private:
+    mbedtls_md5_context ctx;
+  };
+  class SHA1 {
+    DISABLE_COPY(SHA1);
+    DISABLE_MOVE(SHA1);
 
-  mbedtls_sha1_context ctx;
-};
-struct SHA256 {
-  SHA256() { mbedtls_sha256_init(&ctx); }
-  ~SHA256() { mbedtls_sha256_free(&ctx); }
+  public:
+    SHA1() { mbedtls_sha1_init(&ctx); }
+    ~SHA1() { mbedtls_sha1_free(&ctx); }
 
-  bool begin() { return mbedtls_sha256_starts_ret(&ctx, 0) == 0; }
-  bool update(const uint8_t* data, std::size_t dataLen) { return mbedtls_sha256_update_ret(&ctx, data, dataLen) == 0; }
-  bool finish(std::array<uint8_t, 32>& hash) { return mbedtls_sha256_finish_ret(&ctx, hash.data()) == 0; }
+    inline bool begin() { return mbedtls_sha1_starts_ret(&ctx) == 0; }
+    inline bool update(const uint8_t* data, std::size_t dataLen) { return mbedtls_sha1_update_ret(&ctx, data, dataLen) == 0; }
+    inline bool update(std::string_view data) { return update(reinterpret_cast<const uint8_t*>(data.data()), data.length()); }
+    inline bool finish(std::array<uint8_t, 20>& hash) { return mbedtls_sha1_finish_ret(&ctx, hash.data()) == 0; }
 
-  mbedtls_sha256_context ctx;
-};
-} // namespace OpenShock
+  private:
+    mbedtls_sha1_context ctx;
+  };
+  class SHA256 {
+    DISABLE_COPY(SHA256);
+    DISABLE_MOVE(SHA256);
+
+  public:
+    SHA256() { mbedtls_sha256_init(&ctx); }
+    ~SHA256() { mbedtls_sha256_free(&ctx); }
+
+    inline bool begin() { return mbedtls_sha256_starts_ret(&ctx, 0) == 0; }
+    inline bool update(const uint8_t* data, std::size_t dataLen) { return mbedtls_sha256_update_ret(&ctx, data, dataLen) == 0; }
+    inline bool update(std::string_view data) { return update(reinterpret_cast<const uint8_t*>(data.data()), data.length()); }
+    inline bool finish(std::array<uint8_t, 32>& hash) { return mbedtls_sha256_finish_ret(&ctx, hash.data()) == 0; }
+
+  private:
+    mbedtls_sha256_context ctx;
+  };
+}  // namespace OpenShock

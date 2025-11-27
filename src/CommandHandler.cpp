@@ -7,15 +7,17 @@ const char* const TAG = "CommandHandler";
 #include "Chipset.h"
 #include "Common.h"
 #include "config/Config.h"
-#include "EStopManager.h"
+#include "Core.h"
+#include "estop/EStopManager.h"
+#include "estop/EStopState.h"
+#include "events/Events.h"
 #include "Logging.h"
 #include "radio/RFTransmitter.h"
 #include "ReadWriteMutex.h"
-#include "Time.h"
+#include "SimpleMutex.h"
 #include "util/TaskUtils.h"
 
 #include <freertos/queue.h>
-#include <freertos/semphr.h>
 
 #include <memory>
 #include <unordered_map>
@@ -23,9 +25,7 @@ const char* const TAG = "CommandHandler";
 const int64_t KEEP_ALIVE_INTERVAL  = 60'000;
 const uint16_t KEEP_ALIVE_DURATION = 300;
 
-using namespace OpenShock;
-
-uint32_t calculateEepyTime(int64_t timeToKeepAlive)
+static uint32_t calculateEepyTime(int64_t timeToKeepAlive)
 {
   int64_t now = OpenShock::millis();
   return static_cast<uint32_t>(std::clamp(timeToKeepAlive - now, 0LL, KEEP_ALIVE_INTERVAL));
@@ -33,21 +33,21 @@ uint32_t calculateEepyTime(int64_t timeToKeepAlive)
 
 struct KnownShocker {
   bool killTask;
-  ShockerModelType model;
+  OpenShock::ShockerModelType model;
   uint16_t shockerId;
   int64_t lastActivityTimestamp;
 };
 
-static ReadWriteMutex s_rfTransmitterMutex            = {};
-static std::unique_ptr<RFTransmitter> s_rfTransmitter = nullptr;
+static OpenShock::ReadWriteMutex s_rfTransmitterMutex            = {};
+static std::unique_ptr<OpenShock::RFTransmitter> s_rfTransmitter = nullptr;
 
-static SemaphoreHandle_t s_estopManagerMutex = nullptr;
+static OpenShock::ReadWriteMutex s_keepAliveMutex = {};
+static QueueHandle_t s_keepAliveQueue             = nullptr;
+static TaskHandle_t s_keepAliveTaskHandle         = nullptr;
 
-static ReadWriteMutex s_keepAliveMutex    = {};
-static QueueHandle_t s_keepAliveQueue     = nullptr;
-static TaskHandle_t s_keepAliveTaskHandle = nullptr;
+using namespace OpenShock;
 
-void _keepAliveTask(void* arg)
+static void commandhandler_keepalivetask(void* arg)
 {
   (void)arg;
 
@@ -111,7 +111,7 @@ bool _internalSetKeepAliveEnabled(bool enabled)
     return true;
   }
 
-  ScopedWriteLock keepAliveLock(&s_keepAliveMutex);
+  ScopedWriteLock lock__(&s_keepAliveMutex);
 
   if (enabled) {
     OS_LOGV(TAG, "Enabling keep-alive task");
@@ -122,7 +122,7 @@ bool _internalSetKeepAliveEnabled(bool enabled)
       return false;
     }
 
-    if (TaskUtils::TaskCreateExpensive(_keepAliveTask, "KeepAliveTask", 4096, nullptr, 1, &s_keepAliveTaskHandle) != pdPASS) {  // PROFILED: 1.5KB stack usage
+    if (TaskUtils::TaskCreateExpensive(commandhandler_keepalivetask, "KeepAliveTask", 4096, nullptr, 1, &s_keepAliveTaskHandle) != pdPASS) {  // PROFILED: 1.5KB stack usage
       OS_LOGE(TAG, "Failed to create keep-alive task");
 
       vQueueDelete(s_keepAliveQueue);
@@ -151,16 +151,27 @@ bool _internalSetKeepAliveEnabled(bool enabled)
   return true;
 }
 
+static void commandhandler_handleestopstatechange(void* event_handler_arg, esp_event_base_t event_base, int32_t event_id, void* event_data)
+{
+  (void)event_handler_arg;
+  (void)event_base;
+  (void)event_id;
+
+  EStopState state = *reinterpret_cast<EStopState*>(event_data);
+
+  _internalSetKeepAliveEnabled(state == EStopState::Idle);
+}
+
 bool CommandHandler::Init()
 {
+  esp_err_t err;
+
   static bool initialized = false;
   if (initialized) {
     OS_LOGW(TAG, "RF Transmitter and EStopManager are already initialized?");
     return true;
   }
   initialized = true;
-
-  s_estopManagerMutex = xSemaphoreCreateMutex();
 
   Config::RFConfig rfConfig;
   if (!Config::GetRFConfig(rfConfig)) {
@@ -202,6 +213,12 @@ bool CommandHandler::Init()
     return false;
   }
 
+  err = esp_event_handler_register(OPENSHOCK_EVENTS, OPENSHOCK_EVENT_ESTOP_STATE_CHANGED, commandhandler_handleestopstatechange, nullptr);
+  if (err != ESP_OK) {
+    OS_LOGE(TAG, "Failed to register event handler for OPENSHOCK_EVENTS: %s", esp_err_to_name(err));
+    return false;
+  }
+
   // TODO: Implement EStopManager pin change logic
 
   return true;
@@ -218,7 +235,7 @@ SetGPIOResultCode CommandHandler::SetRfTxPin(gpio_num_t txPin)
     return SetGPIOResultCode::InvalidPin;
   }
 
-  ScopedWriteLock rftxLock(&s_rfTransmitterMutex);
+  ScopedWriteLock lock__(&s_rfTransmitterMutex);
 
   if (s_rfTransmitter != nullptr) {
     OS_LOGV(TAG, "Destroying existing RF transmitter");
@@ -242,32 +259,6 @@ SetGPIOResultCode CommandHandler::SetRfTxPin(gpio_num_t txPin)
   return SetGPIOResultCode::Success;
 }
 
-SetGPIOResultCode CommandHandler::SetEStopPin(gpio_num_t estopPin)
-{
-  if (OpenShock::IsValidInputPin(static_cast<int8_t>(estopPin))) {
-    xSemaphoreTake(s_estopManagerMutex, portMAX_DELAY);
-
-    if (!EStopManager::SetEStopPin(estopPin)) {
-      OS_LOGE(TAG, "Failed to set EStop pin");
-
-      xSemaphoreGive(s_estopManagerMutex);
-      return SetGPIOResultCode::InternalError;
-    }
-
-    if (!Config::SetEStopGpioPin(estopPin)) {
-      OS_LOGE(TAG, "Failed to set EStop pin in config");
-
-      xSemaphoreGive(s_estopManagerMutex);
-      return SetGPIOResultCode::InternalError;
-    }
-
-    xSemaphoreGive(s_estopManagerMutex);
-    return SetGPIOResultCode::Success;
-  } else {
-    return SetGPIOResultCode::InvalidPin;
-  }
-}
-
 bool CommandHandler::SetKeepAliveEnabled(bool enabled)
 {
   if (!_internalSetKeepAliveEnabled(enabled)) {
@@ -276,25 +267,6 @@ bool CommandHandler::SetKeepAliveEnabled(bool enabled)
 
   if (!Config::SetRFConfigKeepAliveEnabled(enabled)) {
     OS_LOGE(TAG, "Failed to set keep-alive enabled in config");
-    return false;
-  }
-
-  return true;
-}
-
-bool CommandHandler::SetKeepAlivePaused(bool paused)
-{
-  bool keepAliveEnabled = false;
-  if (!Config::GetRFConfigKeepAliveEnabled(keepAliveEnabled)) {
-    OS_LOGE(TAG, "Failed to get keep-alive enabled from config");
-    return false;
-  }
-
-  if (keepAliveEnabled == false && paused == false) {
-    OS_LOGW(TAG, "Keep-alive is disabled in config, ignoring unpause command");
-    return false;
-  }
-  if (!_internalSetKeepAliveEnabled(!paused)) {
     return false;
   }
 
@@ -318,33 +290,21 @@ gpio_num_t CommandHandler::GetRfTxPin()
 
 bool CommandHandler::HandleCommand(ShockerModelType model, uint16_t shockerId, ShockerCommandType type, uint8_t intensity, uint16_t durationMs)
 {
-  ScopedReadLock rftxLock(&s_rfTransmitterMutex);
+  ScopedReadLock lock__rf(&s_rfTransmitterMutex);
 
   if (s_rfTransmitter == nullptr) {
     OS_LOGW(TAG, "RF Transmitter is not initialized, ignoring command");
     return false;
   }
 
-  // Stop logic
-  if (type == ShockerCommandType::Stop) {
-    OS_LOGV(TAG, "Stop command received, clearing pending commands");
-
-    type       = ShockerCommandType::Vibrate;
-    intensity  = 0;
-    durationMs = 300;
-
-    s_rfTransmitter->ClearPendingCommands();
-  } else {
-    OS_LOGD(TAG, "Command received: %u %u %u %u", model, shockerId, type, intensity);
-  }
 
   bool ok = s_rfTransmitter->SendCommand(model, shockerId, type, intensity, durationMs);
 
-  rftxLock.unlock();
-  ScopedReadLock keepAliveLock(&s_keepAliveMutex);
+  lock__rf.unlock();
+  ScopedReadLock lock__ka(&s_keepAliveMutex);
 
   if (ok && s_keepAliveQueue != nullptr) {
-    KnownShocker cmd {.model = model, .shockerId = shockerId, .lastActivityTimestamp = OpenShock::millis() + durationMs};
+    KnownShocker cmd {.killTask = false, .model = model, .shockerId = shockerId, .lastActivityTimestamp = OpenShock::millis() + durationMs};
     if (xQueueSend(s_keepAliveQueue, &cmd, pdMS_TO_TICKS(10)) != pdTRUE) {
       OS_LOGE(TAG, "Failed to send keep-alive command to queue");
     }

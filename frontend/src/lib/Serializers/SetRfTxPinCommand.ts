@@ -8,7 +8,11 @@ export function SerializeSetRfTxPinCommand(pin: number): Uint8Array {
 
   const cmdOffset = SetRfTxPinCommand.createSetRfTxPinCommand(fbb, pin);
 
-  const payloadOffset = LocalToHubMessage.createLocalToHubMessage(fbb, LocalToHubMessagePayload.SetRfTxPinCommand, cmdOffset);
+  const payloadOffset = LocalToHubMessage.createLocalToHubMessage(
+    fbb,
+    LocalToHubMessagePayload.SetRfTxPinCommand,
+    cmdOffset
+  );
 
   fbb.finish(payloadOffset);
 

@@ -1,6 +1,9 @@
 name: build-frontend
 description: Builds the frontend and uploads it as an artifact
 inputs:
+  pnpm-version:
+    description: 'pnpm version to use'
+    required: true
   node-version:
     description: 'NodeJS runtime version to use'
     required: true
@@ -18,21 +21,43 @@ runs:
           frontend
         path: ${{ github.repository }}
 
+    - uses: pnpm/action-setup@v4
+      name: Install pnpm
+      with:
+        version: ${{ inputs.pnpm-version }}
+        run_install: false
+
     - uses: actions/setup-node@v4
       with:
-        node-version: ${{ inputs.node-version }}
-        cache: 'npm'
-        cache-dependency-path: ./frontend/package-lock.json
+        node-version-file: ./frontend/.nvmrc
+        cache: 'pnpm'
+        cache-dependency-path: ./frontend/pnpm-lock.yaml
 
     - name: Install dependencies
       working-directory: ./frontend
       shell: bash
-      run: npm ci
+      run: pnpm install --frozen-lockfile --strict-peer-dependencies
+
+    - name: Check
+      working-directory: ./frontend
+      shell: bash
+      run: pnpm run check
+
+    # FIXME: Playwirght is not working: Error: browserType.launch: Executable doesn't exist at /home/runner/.cache/ms-playwright/chromium_headless_shell-1161/chrome-linux/headless_shell
+    #    - name: Install playwright
+    #      working-directory: ./frontend
+    #      shell: bash
+    #      run: pnpx playwright install --with-deps
+
+    - name: Test
+      working-directory: ./frontend
+      shell: bash
+      run: pnpm test:unit # TODO: Change back to pnpm test when playwright is working
 
     - name: Build
       working-directory: ./frontend
       shell: bash
-      run: npm run build
+      run: pnpm run build
 
     - name: Upload artifacts
       uses: actions/upload-artifact@v4

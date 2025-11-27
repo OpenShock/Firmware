@@ -14,7 +14,7 @@ CommandEntry::CommandEntry(std::string_view name, std::string_view description, 
 }
 
 CommandArgument& CommandEntry::addArgument(std::string_view name, std::string_view constraint, std::string_view exampleValue, std::vector<std::string_view> constraintExtensions) {
-  m_arguments.push_back(CommandArgument {name, constraint, exampleValue, constraintExtensions});
+  m_arguments.push_back({name, constraint, exampleValue, constraintExtensions});
   return m_arguments.back();
 }
 
@@ -23,13 +23,11 @@ CommandGroup::CommandGroup(std::string_view name)
 }
 
 CommandEntry& CommandGroup::addCommand(std::string_view description, CommandHandler commandHandler) {
-  auto cmd = CommandEntry(description, commandHandler);
-  m_commands.push_back(cmd);
+  m_commands.emplace_back(description, commandHandler);
   return m_commands.back();
 }
 
 CommandEntry& CommandGroup::addCommand(std::string_view name, std::string_view description, CommandHandler commandHandler) {
-  auto cmd = CommandEntry(name, description, commandHandler);
-  m_commands.push_back(cmd);
+  m_commands.emplace_back(name, description, commandHandler);
   return m_commands.back();
 }

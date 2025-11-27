@@ -18,7 +18,8 @@ on:
 name: ci-build
 
 env:
-  NODE_VERSION: 20
+  PNPM_VERSION: 10.6.4
+  NODE_VERSION: 22.14.0
   PYTHON_VERSION: 3.12
 
 jobs:
@@ -27,9 +28,10 @@ jobs:
 
   build-frontend:
     runs-on: ubuntu-latest
+    timeout-minutes: 5
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
         with:
           sparse-checkout: |
             .github
@@ -37,28 +39,31 @@ jobs:
 
       - uses: ./.github/actions/build-frontend
         with:
+          pnpm-version: ${{ env.PNPM_VERSION }}
           node-version: ${{ env.NODE_VERSION }}
 
   build-staticfs:
     runs-on: ubuntu-latest
-    needs: build-frontend
+    needs: [getvars, build-frontend]
+    timeout-minutes: 5
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
       - uses: ./.github/actions/build-staticfs
         with:
           version: ${{ needs.getvars.outputs.version }}
           skip-checkout: true
 
   build-firmware:
-    needs: [getvars]
     runs-on: ubuntu-latest
+    needs: [getvars]
+    timeout-minutes: 10
     strategy:
       fail-fast: false
       matrix: ${{ fromJSON(needs.getvars.outputs.board-matrix) }}
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
       - uses: ./.github/actions/build-firmware
         with:
@@ -67,14 +72,15 @@ jobs:
           skip-checkout: true
 
   merge-partitions:
-    needs: [getvars, build-staticfs, build-firmware]
     runs-on: ubuntu-latest
+    needs: [getvars, build-staticfs, build-firmware]
+    timeout-minutes: 5
     strategy:
       fail-fast: false
       matrix: ${{ fromJSON(needs.getvars.outputs.board-matrix) }}
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
         with:
           sparse-checkout: |
             .github
@@ -91,20 +97,22 @@ jobs:
   checkpoint-build:
     runs-on: ubuntu-latest
     needs: [merge-partitions]
+    timeout-minutes: 1
     steps:
       - run: echo "Builds checkpoint reached"
 
   cdn-upload-firmware:
-    needs: [getvars, checkpoint-build]
-    if: ${{ needs.getvars.outputs.should-deploy == 'true' }}
     runs-on: ubuntu-latest
+    needs: [getvars, checkpoint-build]
+    timeout-minutes: 15
+    if: ${{ needs.getvars.outputs.should-deploy == 'true' }}
     environment: cdn-firmware-r2
     strategy:
       fail-fast: true
       matrix: ${{ fromJson(needs.getvars.outputs.board-matrix) }}
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
         with:
           sparse-checkout: |
             .github
@@ -112,25 +120,26 @@ jobs:
       # Set up rclone for CDN uploads.
       - uses: ./.github/actions/cdn-prepare
         with:
-          cf-account-id: ${{ vars.S3_ACCOUNT_ID }}
-          cf-access-key-id: ${{ vars.S3_ACCESS_KEY_ID }}
-          cf-secret-access-key: ${{ secrets.S3_SECRET_ACCESS_KEY }}
+          bunny-ssh-knownhosts: ${{ vars.BUNNY_SSH_KNOWNHOSTS }}
 
       # Upload firmware to CDN.
       - uses: ./.github/actions/cdn-upload-firmware
         with:
-          cf-bucket: ${{ vars.S3_BUCKET }}
+          bunny-stor-hostname: ${{ vars.BUNNY_STOR_HOSTNAME }}
+          bunny-stor-username: ${{ secrets.BUNNY_STOR_USERNAME }}
+          bunny-stor-password: ${{ secrets.BUNNY_STOR_PASSWORD }}
           fw-version: ${{ needs.getvars.outputs.version }}
           board: ${{ matrix.board }}
 
   cdn-upload-version-info:
-    needs: [getvars, checkpoint-build]
-    if: ${{ needs.getvars.outputs.should-deploy == 'true' }}
     runs-on: ubuntu-latest
+    needs: [getvars, checkpoint-build]
+    timeout-minutes: 10
+    if: ${{ needs.getvars.outputs.should-deploy == 'true' }}
     environment: cdn-firmware-r2
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
         with:
           sparse-checkout: |
             .github
@@ -138,14 +147,14 @@ jobs:
       # Set up rclone for CDN uploads.
       - uses: ./.github/actions/cdn-prepare
         with:
-          cf-account-id: ${{ vars.S3_ACCOUNT_ID }}
-          cf-access-key-id: ${{ vars.S3_ACCESS_KEY_ID }}
-          cf-secret-access-key: ${{ secrets.S3_SECRET_ACCESS_KEY }}
+          bunny-ssh-knownhosts: ${{ vars.BUNNY_SSH_KNOWNHOSTS }}
 
       # Upload firmware to CDN.
       - uses: ./.github/actions/cdn-upload-version-info
         with:
-          cf-bucket: ${{ vars.S3_BUCKET }}
+          bunny-stor-hostname: ${{ vars.BUNNY_STOR_HOSTNAME }}
+          bunny-stor-username: ${{ secrets.BUNNY_STOR_USERNAME }}
+          bunny-stor-password: ${{ secrets.BUNNY_STOR_PASSWORD }}
           fw-version: ${{ needs.getvars.outputs.version }}
           release-channel: ${{ needs.getvars.outputs.release-channel }}
           boards: ${{ needs.getvars.outputs.board-list }}
@@ -153,10 +162,11 @@ jobs:
   cdn-bump-version:
     runs-on: ubuntu-latest
     needs: [getvars, cdn-upload-firmware] # only after version is complete
+    timeout-minutes: 5
     environment: cdn-firmware-r2
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
         with:
           sparse-checkout: |
             .github
@@ -164,31 +174,35 @@ jobs:
       # Set up rclone for CDN uploads.
       - uses: ./.github/actions/cdn-prepare
         with:
-          cf-account-id: ${{ vars.S3_ACCOUNT_ID }}
-          cf-access-key-id: ${{ vars.S3_ACCESS_KEY_ID }}
-          cf-secret-access-key: ${{ secrets.S3_SECRET_ACCESS_KEY }}
+          bunny-ssh-knownhosts: ${{ vars.BUNNY_SSH_KNOWNHOSTS }}
 
       # Upload firmware to CDN.
       - uses: ./.github/actions/cdn-bump-version
         with:
-          cf-bucket: ${{ vars.S3_BUCKET }}
+          bunny-stor-hostname: ${{ vars.BUNNY_STOR_HOSTNAME }}
+          bunny-stor-username: ${{ secrets.BUNNY_STOR_USERNAME }}
+          bunny-stor-password: ${{ secrets.BUNNY_STOR_PASSWORD }}
+          bunny-api-key: ${{ secrets.BUNNY_APIKEY }}
+          bunny-cdn-url: ${{ vars.BUNNY_CDN_URL }}
           version: ${{ needs.getvars.outputs.version }}
           release-channel: ${{ needs.getvars.outputs.release-channel }}
 
   checkpoint-cdn:
     runs-on: ubuntu-latest
     needs: [cdn-upload-firmware, cdn-upload-version-info, cdn-bump-version]
+    timeout-minutes: 1
     steps:
       - run: echo "CDN checkpoint reached"
 
   release:
-    needs: [getvars, checkpoint-cdn]
-    if: (needs.getvars.outputs.release-channel == 'stable' || needs.getvars.outputs.release-channel == 'beta')
     runs-on: ubuntu-latest
+    needs: [getvars, checkpoint-cdn]
+    timeout-minutes: 1
+    if: (needs.getvars.outputs.release-channel == 'stable' || needs.getvars.outputs.release-channel == 'beta')
 
     steps:
       - name: Download release artifacts
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v6
 
       - name: Display artifacts
         run: ls -R
