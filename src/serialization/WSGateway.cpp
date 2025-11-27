@@ -20,7 +20,7 @@ bool Gateway::SerializePongMessage(Common::SerializationCallbackFn callback)
 
   int rssi;
   esp_err_t err = esp_wifi_sta_get_rssi(&rssi);
-  if (err != ERR_OK) {
+  if (err != ESP_OK) {
     OS_LOGE(TAG, "Failed to get WiFi RSSI: %d", err);
     return false;
   }
