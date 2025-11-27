@@ -6,8 +6,9 @@ This release candidate focuses on **radio reliability**, **firmware behavior imp
 
 - Major **RF/RMT transmitter rework** for improved timing accuracy and more reliable shocker communication.
 - Updated **AssignLCG** integration using the new backend endpoint (removes the old LCG override setting).
+- Hub now reports its Wi-Fi signal strength (RSSI), this will be used to show connection health in UI's.
 - **Serial output now uses CRLF** line endings for improved compatibility with Windows terminals.
-- Added **T330 collar protocol** support.
+- Added **T330 shocker protocol** support.
 
 ## Radio & Timing
 
@@ -17,8 +18,8 @@ This release candidate focuses on **radio reliability**, **firmware behavior imp
 
 ## Firmware Behavior / System
 
-- Introduced internal **execution time limits** to prevent firmware from getting stuck in long-running operations (internal stability, not a user-facing “safety feature”).
-- Replaced all direct `ESP.restart()` usage with controlled transitions.
+- Introduced internal **execution time limits** to prevent firmware from getting stuck in long-running operations.
+- Replaced all `ESP.restart()` usage with ESP-IDF native `esp_restart()` calls
 - Improved OTA, Wi-Fi initialization, and crash-loop resilience.
 
 ## HTTP & Gateway
@@ -48,7 +49,7 @@ This release candidate focuses on **radio reliability**, **firmware behavior imp
 
 ## Notes
 
-- RF timing changes are substantial; please report collar-specific regressions.
+- RF timing changes are substantial; please report shocker-specific regressions.
 - Scripts relying on legacy AssignLCG behavior may need updates.
 
 # Version 1.4.0 Release Notes
