@@ -8,6 +8,6 @@ namespace OpenShock::SerialInputHandler {
   bool SerialEchoEnabled();
   void SetSerialEchoEnabled(bool enabled);
 
-  void PrintWelcomeHeader();
+  void PrintBootInfo();
   void PrintVersionInfo();
 }  // namespace OpenShock::SerialInputHandler

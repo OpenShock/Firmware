@@ -1,10 +1,12 @@
+#include "serial/command_handlers/CommandGroup.h"
 #include "serial/command_handlers/common.h"
 
 #include "Chipset.h"
 
 #include <string>
 
-void _handleValidGpiosCommand(std::string_view arg, bool isAutomated) {
+static void handleValidGpios(std::string_view arg, bool isAutomated)
+{
   if (!arg.empty()) {
     SERPR_ERROR("Invalid argument (too many arguments)");
     return;
@@ -18,7 +20,7 @@ void _handleValidGpiosCommand(std::string_view arg, bool isAutomated) {
   for (std::size_t i = 0; i < pins.size(); i++) {
     if (pins[i]) {
       buffer.append(std::to_string(i));
-      buffer.append(",");
+      buffer.append(',');
     }
   }
 
@@ -29,10 +31,11 @@ void _handleValidGpiosCommand(std::string_view arg, bool isAutomated) {
   SERPR_RESPONSE("ValidGPIOs|%s", buffer.c_str());
 }
 
-OpenShock::Serial::CommandGroup OpenShock::Serial::CommandHandlers::ValidGpiosHandler() {
+OpenShock::Serial::CommandGroup OpenShock::Serial::CommandHandlers::ValidGpiosHandler()
+{
   auto group = OpenShock::Serial::CommandGroup("validgpios"sv);
 
-  auto& cmd = group.addCommand("List all valid GPIO pins"sv, _handleValidGpiosCommand);
+  auto& cmd = group.addCommand("List all valid GPIO pins"sv, handleValidGpios);
 
   return group;
 }

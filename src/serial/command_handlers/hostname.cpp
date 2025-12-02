@@ -1,3 +1,4 @@
+#include "serial/command_handlers/CommandGroup.h"
 #include "serial/command_handlers/common.h"
 
 #include "config/Config.h"
@@ -8,18 +9,24 @@
 
 const char* const TAG = "Serial::CommandHandlers::Domain";
 
-void _handleHostnameCommand(std::string_view arg, bool isAutomated) {
-  if (arg.empty()) {
-    std::string hostname;
-    if (!OpenShock::Config::GetWiFiHostname(hostname)) {
-      SERPR_ERROR("Failed to get hostname from config");
-      return;
-    }
-    // Get hostname
-    SERPR_RESPONSE("Hostname|%s", hostname.c_str());
+static void handleGet(std::string_view arg, bool isAutomated)
+{
+  if (!arg.empty()) {
+    SERPR_ERROR("Get command does not support parameters");
     return;
   }
 
+  std::string hostname;
+  if (!OpenShock::Config::GetWiFiHostname(hostname)) {
+    SERPR_ERROR("Failed to get hostname from config");
+    return;
+  }
+  // Get hostname
+  SERPR_RESPONSE("Hostname|%s", hostname.c_str());
+}
+
+static void handleSet(std::string_view arg, bool isAutomated)
+{
   bool result = OpenShock::Config::SetWiFiHostname(arg);
   if (result) {
     SERPR_SUCCESS("Saved config, restarting...");
@@ -29,12 +36,13 @@ void _handleHostnameCommand(std::string_view arg, bool isAutomated) {
   }
 }
 
-OpenShock::Serial::CommandGroup OpenShock::Serial::CommandHandlers::HostnameHandler() {
+OpenShock::Serial::CommandGroup OpenShock::Serial::CommandHandlers::HostnameHandler()
+{
   auto group = OpenShock::Serial::CommandGroup("hostname"sv);
 
-  auto& getCommand = group.addCommand("Get the network hostname."sv, _handleHostnameCommand);
+  auto& getCommand = group.addCommand("Get the network hostname."sv, handleGet);
 
-  auto& setCommand = group.addCommand("Set the network hostname."sv, _handleHostnameCommand);
+  auto& setCommand = group.addCommand("set"sv, "Set the network hostname."sv, handleSet);
   setCommand.addArgument("hostname"sv, "must be a string"sv, "OpenShock"sv);
 
   return group;

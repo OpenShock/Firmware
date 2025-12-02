@@ -1,3 +1,4 @@
+#include "serial/command_handlers/CommandGroup.h"
 #include "serial/command_handlers/common.h"
 
 #include "CommandHandler.h"
@@ -5,21 +6,21 @@
 #include "Convert.h"
 #include "SetGPIOResultCode.h"
 
-void _handleRfTxPinCommand(std::string_view arg, bool isAutomated)
+static void handleGet(std::string_view arg, bool isAutomated)
 {
   gpio_num_t txPin;
-
-  if (arg.empty()) {
-    if (!OpenShock::Config::GetRFConfigTxPin(txPin)) {
-      SERPR_ERROR("Failed to get RF TX pin from config");
-      return;
-    }
-
-    // Get rmt pin
-    SERPR_RESPONSE("RmtPin|%hhi", static_cast<int8_t>(txPin));
+  if (!OpenShock::Config::GetRFConfigTxPin(txPin)) {
+    SERPR_ERROR("Failed to get RF TX pin from config");
     return;
   }
 
+  // Get rmt pin
+  SERPR_RESPONSE("RmtPin|%hhi", static_cast<int8_t>(txPin));
+}
+
+static void handleSet(std::string_view arg, bool isAutomated)
+{
+  gpio_num_t txPin;
   if (!OpenShock::Convert::ToGpioNum(arg, txPin)) {
     SERPR_ERROR("Invalid argument (number invalid or out of range)");
   }
@@ -49,9 +50,9 @@ OpenShock::Serial::CommandGroup OpenShock::Serial::CommandHandlers::RfTxPinHandl
 {
   auto group = OpenShock::Serial::CommandGroup("rftxpin"sv);
 
-  auto& getCommand = group.addCommand("Get the GPIO pin used for the radio transmitter"sv, _handleRfTxPinCommand);
+  auto& getCommand = group.addCommand("Get the GPIO pin used for the radio transmitter"sv, handleGet);
 
-  auto& setCommand = group.addCommand("Set the GPIO pin used for the radio transmitter"sv, _handleRfTxPinCommand);
+  auto& setCommand = group.addCommand("set"sv, "Set the GPIO pin used for the radio transmitter"sv, handleSet);
   setCommand.addArgument("pin"sv, "must be a number"sv, "15"sv);
 
   return group;
