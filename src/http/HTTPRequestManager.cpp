@@ -11,6 +11,8 @@ const char* const TAG = "HTTPRequestManager";
 #include "util/HexUtils.h"
 #include "util/StringUtils.h"
 
+#include "WiFiClient.h"
+
 #include <algorithm>
 #include <memory>
 #include <numeric>
@@ -219,7 +221,7 @@ void _alignChunk(uint8_t* buffer, std::size_t& bufferCursor, std::size_t payload
   }
 }
 
-StreamReaderResult _readStreamDataChunked(HTTPClient& client, WiFiClient* stream, HTTP::DownloadCallback downloadCallback, int64_t begin, int timeoutMs)
+StreamReaderResult _readStreamDataChunked(HTTP::HTTPClient& client, WiFiClient* stream, HTTP::DownloadCallback downloadCallback, int64_t begin, int timeoutMs)
 {
   std::size_t totalWritten   = 0;
   HTTP::RequestResult result = HTTP::RequestResult::Success;
@@ -302,7 +304,7 @@ StreamReaderResult _readStreamDataChunked(HTTPClient& client, WiFiClient* stream
   return {result, totalWritten};
 }
 
-StreamReaderResult _readStreamData(HTTPClient& client, WiFiClient* stream, std::size_t contentLength, HTTP::DownloadCallback downloadCallback, int64_t begin, int timeoutMs)
+StreamReaderResult _readStreamData(HTTP::HTTPClient& client, WiFiClient* stream, std::size_t contentLength, HTTP::DownloadCallback downloadCallback, int64_t begin, int timeoutMs)
 {
   std::size_t nWritten       = 0;
   HTTP::RequestResult result = HTTP::RequestResult::Success;
@@ -348,7 +350,7 @@ StreamReaderResult _readStreamData(HTTPClient& client, WiFiClient* stream, std::
 }
 
 HTTP::Response<std::size_t> _doGetStream(
-  HTTPClient& client,
+  HTTP::HTTPClient& client,
   const char* url,
   const std::map<String, String>& headers,
   tcb::span<const uint16_t> acceptedCodes,
@@ -359,17 +361,19 @@ HTTP::Response<std::size_t> _doGetStream(
 )
 {
   int64_t begin = OpenShock::millis();
-  if (!client.begin(OpenShock::StringToArduinoString(url))) {
+
+  for (auto& header : headers) {
+    client.SetHeader(header.first, header.second);
+  }
+
+  auto response = client.Get(url);
+  if (!response.IsValid()) {
+    esp_err_t err = response.GetError();
     OS_LOGE(TAG, "Failed to begin HTTP request");
     return {HTTP::RequestResult::RequestFailed, 0, 0};
   }
 
-  for (auto& header : headers) {
-    client.addHeader(header.first, header.second);
-  }
-
-  int responseCode = client.GET();
-
+  auto responseCode = response.ResponseCode();
   if (responseCode == HTTP_CODE_REQUEST_TIMEOUT || begin + timeoutMs < OpenShock::millis()) {
     OS_LOGW(TAG, "Request timed out");
     return {HTTP::RequestResult::TimedOut, responseCode, 0};

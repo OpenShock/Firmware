@@ -40,6 +40,8 @@ namespace OpenShock::HTTP {
     constexpr bool IsValid() const { return m_handle != nullptr; }
     constexpr esp_err_t GetError() const { return m_handle == nullptr ? m_error : ESP_OK; }
 
+    int ResponseCode() const { return esp_http_client_get_status_code(m_handle); }
+
   private:
     esp_http_client_handle_t m_handle;
     union {

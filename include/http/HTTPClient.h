@@ -22,6 +22,8 @@ namespace OpenShock::HTTP {
         .user_agent            = OpenShock::Constants::FW_USERAGENT,
         .timeout_ms            = timeout_ms,
         .disable_auto_redirect = true,
+        .event_handler         = HTTPClient::EventHandler,
+        .user_data             = reinterpret_cast<void*>(this),
         .is_async              = true,
         .use_global_ca_store   = true,
       };
@@ -84,6 +86,18 @@ namespace OpenShock::HTTP {
     HTTPResponse Get(const char* url) { return Send(url, HTTP_METHOD_GET); }
 
   private:
+    static esp_err_t EventHandler(esp_http_client_event_t* evt)
+    {
+      HTTPClient* client = reinterpret_cast<HTTPClient*>(evt->user_data);
+
+      if (evt->event_id == HTTP_EVENT_ON_HEADER) {
+        // evt->header_key;
+        // evt->header_value;
+      }
+
+      return ESP_OK;
+    }
+
     esp_http_client_handle_t handle;
   };
 }  // namespace OpenShock::HTTP
