@@ -4,14 +4,13 @@ const char* const TAG = "HTTPRequestManager";
 
 #include "Common.h"
 #include "Core.h"
-#include "http/HTTPClient.h"
 #include "Logging.h"
 #include "RateLimiter.h"
 #include "SimpleMutex.h"
 #include "util/HexUtils.h"
 #include "util/StringUtils.h"
 
-#include "WiFiClient.h"
+#include <esp_http_client.h>
 
 #include <algorithm>
 #include <memory>
@@ -350,9 +349,9 @@ StreamReaderResult _readStreamData(HTTP::HTTPClient& client, WiFiClient* stream,
 }
 
 HTTP::Response<std::size_t> _doGetStream(
-  HTTP::HTTPClient& client,
+  esp_http_client_handle_t client,
   const char* url,
-  const std::map<String, String>& headers,
+  const std::map<std::string, std::string>& headers,
   tcb::span<const uint16_t> acceptedCodes,
   std::shared_ptr<OpenShock::RateLimiter> rateLimiter,
   HTTP::GotContentLengthCallback contentLengthCallback,
@@ -360,19 +359,25 @@ HTTP::Response<std::size_t> _doGetStream(
   int timeoutMs
 )
 {
+  esp_err_t err;
+
   int64_t begin = OpenShock::millis();
 
   for (auto& header : headers) {
-    client.SetHeader(header.first, header.second);
+    err = esp_http_client_set_header(client, header.first.c_str(), header.second.c_str());
+    if (err != ESP_OK) {
+      // TODO: Handle error
+    }
+    return {HTTP::RequestResult::RequestFailed, 0, 0};
   }
 
-  auto response = client.Get(url);
-  if (!response.IsValid()) {
-    esp_err_t err = response.GetError();
+  err = esp_http_client_open(client, 0);
+  if (err != ESP_OK) {
     OS_LOGE(TAG, "Failed to begin HTTP request");
     return {HTTP::RequestResult::RequestFailed, 0, 0};
   }
 
+  err = esp_http_
   auto responseCode = response.ResponseCode();
   if (responseCode == HTTP_CODE_REQUEST_TIMEOUT || begin + timeoutMs < OpenShock::millis()) {
     OS_LOGW(TAG, "Request timed out");
@@ -383,7 +388,7 @@ HTTP::Response<std::size_t> _doGetStream(
     // https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers/Retry-After
 
     // Get "Retry-After" header
-    String retryAfterStr = client.header("Retry-After");
+    std::string retryAfterStr = client.header("Retry-After");
 
     // Try to parse it as an integer (delay-seconds)
     long retryAfter = 0;
@@ -444,7 +449,7 @@ HTTP::Response<std::size_t> _doGetStream(
   return {result.result, responseCode, result.nWritten};
 }
 
-HTTP::Response<std::size_t> HTTP::Download(const char* url, const std::map<String, String>& headers, HTTP::GotContentLengthCallback contentLengthCallback, HTTP::DownloadCallback downloadCallback, tcb::span<const uint16_t> acceptedCodes, uint32_t timeoutMs)
+HTTP::Response<std::size_t> HTTP::Download(const char* url, const std::map<std::string, std::string>& headers, HTTP::GotContentLengthCallback contentLengthCallback, HTTP::DownloadCallback downloadCallback, tcb::span<const uint16_t> acceptedCodes, uint32_t timeoutMs)
 {
   std::shared_ptr<OpenShock::RateLimiter> rateLimiter = _getRateLimiter(url);
   if (rateLimiter == nullptr) {
@@ -455,12 +460,29 @@ HTTP::Response<std::size_t> HTTP::Download(const char* url, const std::map<Strin
     return {RequestResult::RateLimited, 0, 0};
   }
 
-  HTTP::HTTPClient client(url);
+  esp_http_client_config_t cfg = {
+    .url                   = url,
+    .user_agent            = OpenShock::Constants::FW_USERAGENT,
+    .timeout_ms            = 10'000,
+    .disable_auto_redirect = true,
+    .event_handler         = HTTPClient::EventHandler,
+    .user_data             = reinterpret_cast<void*>(this),
+    .is_async              = true,
+    .use_global_ca_store   = true,
+  };
+  esp_http_client_handle_t client = esp_http_client_init(&cfg);
 
-  return _doGetStream(client, url, headers, acceptedCodes, rateLimiter, contentLengthCallback, downloadCallback, timeoutMs);
+  auto result = _doGetStream(client, url, headers, acceptedCodes, rateLimiter, contentLengthCallback, downloadCallback, timeoutMs);
+
+  esp_err_t err = esp_http_client_cleanup(client);
+  if (err != ESP_OK) {
+    // TODO: Handle error
+  }
+
+  return result;
 }
 
-HTTP::Response<std::string> HTTP::GetString(const char* url, const std::map<String, String>& headers, tcb::span<const uint16_t> acceptedCodes, uint32_t timeoutMs)
+HTTP::Response<std::string> HTTP::GetString(const char* url, const std::map<std::string, std::string>& headers, tcb::span<const uint16_t> acceptedCodes, uint32_t timeoutMs)
 {
   std::string result;
 

@@ -26,7 +26,7 @@ HTTP::Response<Serialization::JsonAPI::AccountLinkResponse> HTTP::JsonAPI::LinkA
   );
 }
 
-HTTP::Response<Serialization::JsonAPI::HubInfoResponse> HTTP::JsonAPI::GetHubInfo(std::string_view hubToken)
+HTTP::Response<Serialization::JsonAPI::HubInfoResponse> HTTP::JsonAPI::GetHubInfo(std::string hubToken)
 {
   std::string domain;
   if (!Config::GetBackendDomain(domain)) {
@@ -39,15 +39,15 @@ HTTP::Response<Serialization::JsonAPI::HubInfoResponse> HTTP::JsonAPI::GetHubInf
   return HTTP::GetJSON<Serialization::JsonAPI::HubInfoResponse>(
     uri,
     {
-      {     "Accept",                         "application/json"},
-      {"DeviceToken", OpenShock::StringToArduinoString(hubToken)}
-  },
+      {     "Accept",  "application/json"},
+      {"DeviceToken", std::move(hubToken)}
+    },
     Serialization::JsonAPI::ParseHubInfoJsonResponse,
     std::array<uint16_t, 2> {200}
   );
 }
 
-HTTP::Response<Serialization::JsonAPI::AssignLcgResponse> HTTP::JsonAPI::AssignLcg(std::string_view hubToken)
+HTTP::Response<Serialization::JsonAPI::AssignLcgResponse> HTTP::JsonAPI::AssignLcg(std::string hubToken)
 {
   std::string domain;
   if (!Config::GetBackendDomain(domain)) {
@@ -60,9 +60,9 @@ HTTP::Response<Serialization::JsonAPI::AssignLcgResponse> HTTP::JsonAPI::AssignL
   return HTTP::GetJSON<Serialization::JsonAPI::AssignLcgResponse>(
     uri,
     {
-      {     "Accept",                         "application/json"},
-      {"DeviceToken", OpenShock::StringToArduinoString(hubToken)}
-  },
+      {     "Accept",  "application/json"},
+      {"DeviceToken", std::move(hubToken)}
+    },
     Serialization::JsonAPI::ParseAssignLcgJsonResponse,
     std::array<uint16_t, 2> {200}
   );

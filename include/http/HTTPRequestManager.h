@@ -1,7 +1,5 @@
 #pragma once
 
-#include <Arduino.h>
-
 #include <cJSON.h>
 
 #include <functional>
@@ -61,11 +59,11 @@ namespace OpenShock::HTTP {
   using GotContentLengthCallback = std::function<bool(int contentLength)>;
   using DownloadCallback         = std::function<bool(std::size_t offset, const uint8_t* data, std::size_t len)>;
 
-  Response<std::size_t> Download(const char* url, const std::map<String, String>& headers, GotContentLengthCallback contentLengthCallback, DownloadCallback downloadCallback, tcb::span<const uint16_t> acceptedCodes, uint32_t timeoutMs = 10'000);
-  Response<std::string> GetString(const char* url, const std::map<String, String>& headers, tcb::span<const uint16_t> acceptedCodes, uint32_t timeoutMs = 10'000);
+  Response<std::size_t> Download(const char* url, const std::map<std::string, std::string>& headers, GotContentLengthCallback contentLengthCallback, DownloadCallback downloadCallback, tcb::span<const uint16_t> acceptedCodes, uint32_t timeoutMs = 10'000);
+  Response<std::string> GetString(const char* url, const std::map<std::string, std::string>& headers, tcb::span<const uint16_t> acceptedCodes, uint32_t timeoutMs = 10'000);
 
   template<typename T>
-  Response<T> GetJSON(const char* url, const std::map<String, String>& headers, JsonParser<T> jsonParser, tcb::span<const uint16_t> acceptedCodes, uint32_t timeoutMs = 10'000)
+  Response<T> GetJSON(const char* url, const std::map<std::string, std::string>& headers, JsonParser<T> jsonParser, tcb::span<const uint16_t> acceptedCodes, uint32_t timeoutMs = 10'000)
   {
     auto response = GetString(url, headers, acceptedCodes, timeoutMs);
     if (response.result != RequestResult::Success) {
