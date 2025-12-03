@@ -126,14 +126,12 @@ AccountLinkResultCode GatewayConnectionManager::Link(std::string_view linkCode)
     return AccountLinkResultCode::InternalError;
   }
 
-  std::string_view authToken = response.data.authToken;
-
-  if (authToken.empty()) {
+  if (response.data.authToken.empty()) {
     OS_LOGE(TAG, "Received empty auth token");
     return AccountLinkResultCode::InternalError;
   }
 
-  if (!Config::SetBackendAuthToken(authToken)) {
+  if (!Config::SetBackendAuthToken(std::move(response.data.authToken))) {
     OS_LOGE(TAG, "Failed to save auth token");
     return AccountLinkResultCode::InternalError;
   }
@@ -168,7 +166,7 @@ bool GatewayConnectionManager::SendMessageBIN(tcb::span<const uint8_t> data)
   return s_wsClient->sendMessageBIN(data);
 }
 
-bool FetchHubInfo(std::string_view authToken)
+bool FetchHubInfo(std::string authToken)
 {
   // TODO: this function is very slow, should be optimized!
   if ((s_flags & FLAG_HAS_IP) == 0) {
@@ -179,7 +177,7 @@ bool FetchHubInfo(std::string_view authToken)
     return false;
   }
 
-  auto response = HTTP::JsonAPI::GetHubInfo(authToken);
+  auto response = HTTP::JsonAPI::GetHubInfo(std::move(authToken));
 
   if (response.code == 401) {
     OS_LOGD(TAG, "Auth token is invalid, waiting 5 minutes before checking again");
@@ -243,7 +241,7 @@ bool StartConnectingToLCG()
     return false;
   }
 
-  auto response = HTTP::JsonAPI::AssignLcg(authToken);
+  auto response = HTTP::JsonAPI::AssignLcg(std::move(authToken));
 
   if (response.code == 401) {
     OS_LOGD(TAG, "Auth token is invalid, waiting 5 minutes before retrying");
@@ -264,7 +262,7 @@ bool StartConnectingToLCG()
     return false;
   }
 
-  OS_LOGD(TAG, "Connecting to LCG endpoint { host: '%s', port: %hu, path: '%s' } %s in country %s", response.data.host.c_str(), response.data.port, response.data.path.c_str(), response.data.country.c_str());
+  OS_LOGD(TAG, "Connecting to LCG endpoint { host: '%s', port: %hu, path: '%s' } in country %s", response.data.host.c_str(), response.data.port, response.data.path.c_str(), response.data.country.c_str());
   s_wsClient->connect(response.data.host, response.data.port, response.data.path);
 
   return true;
@@ -285,7 +283,7 @@ void GatewayConnectionManager::Update()
     }
 
     // Fetch hub info
-    if (!FetchHubInfo(authToken.c_str())) {
+    if (!FetchHubInfo(std::move(authToken))) {
       return;
     }
 
