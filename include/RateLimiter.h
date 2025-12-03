@@ -4,6 +4,7 @@
 #include "SimpleMutex.h"
 
 #include <cstdint>
+#include <deque>
 #include <vector>
 
 namespace OpenShock {
@@ -33,6 +34,6 @@ namespace OpenShock {
     int64_t m_nextSlot;
     int64_t m_nextCleanup;
     std::vector<Limit> m_limits;
-    std::vector<int64_t> m_requests;
+    std::deque<int64_t> m_requests;
   };
 }  // namespace OpenShock
