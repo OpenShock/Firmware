@@ -575,11 +575,11 @@ bool Config::GetWiFiHostname(std::string& out)
   return true;
 }
 
-bool Config::SetWiFiHostname(std::string_view hostname)
+bool Config::SetWiFiHostname(std::string hostname)
 {
   CONFIG_LOCK_WRITE(false);
 
-  _configData.wifi.hostname = std::string(hostname);
+  _configData.wifi.hostname = std::move(hostname);
 
   return _trySaveConfig();
 }
@@ -593,11 +593,11 @@ bool Config::GetBackendDomain(std::string& out)
   return true;
 }
 
-bool Config::SetBackendDomain(std::string_view domain)
+bool Config::SetBackendDomain(std::string domain)
 {
   CONFIG_LOCK_WRITE(false);
 
-  _configData.backend.domain = std::string(domain);
+  _configData.backend.domain = std::move(domain);
   return _trySaveConfig();
 }
 
@@ -617,11 +617,11 @@ bool Config::GetBackendAuthToken(std::string& out)
   return true;
 }
 
-bool Config::SetBackendAuthToken(std::string_view token)
+bool Config::SetBackendAuthToken(std::string token)
 {
   CONFIG_LOCK_WRITE(false);
 
-  _configData.backend.authToken = std::string(token);
+  _configData.backend.authToken = std::move(token);
   return _trySaveConfig();
 }
 
