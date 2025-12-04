@@ -63,12 +63,12 @@ esp_err_t HTTP::HTTPClient::Get(const char* url) {
 
 HTTP::Response<std::size_t> HTTP::HTTPClient::ReadResponseStream(DownloadCallback downloadCallback) {
   if (!m_connected) {
-    return {DownloadResult::Closed, ESP_FAIL, 0};
+    return {ResponseResult::Closed, ESP_FAIL, 0};
   }
 
   std::size_t nWritten;
 
-  return {DownloadResult::Success, ESP_OK, nWritten};
+  return {ResponseResult::Success, ESP_OK, nWritten};
 }
 
 HTTP::Response<std::string> HTTP::HTTPClient::ReadResponseString() {
@@ -83,7 +83,7 @@ HTTP::Response<std::string> HTTP::HTTPClient::ReadResponseString() {
   };
 
   auto response = ReadResponseStream(writer);
-  if (response.result != DownloadResult::Success) {
+  if (response.result != ResponseResult::Success) {
     return {response.result, response.error, {}};
   }
 

@@ -2,6 +2,7 @@
 
 #include "Common.h"
 #include "RateLimiter.h"
+#include "http/Response.h"
 
 #include <cJSON.h>
 
@@ -13,21 +14,6 @@
 #include <string>
 
 namespace OpenShock::HTTP {
-  enum class DownloadResult : uint8_t {
-    Closed,       // Connection closed
-    Success,      // Request completed successfully
-    TimedOut,     // Request timed out
-    ParseFailed,  // Request completed, but JSON parsing failed
-    Cancelled,    // Request was cancelled
-  };
-
-  template<typename T>
-  struct [[nodiscard]] Response {
-    DownloadResult result;
-    esp_err_t error;
-    T data;
-  };
-
   template<typename T>
   using JsonParser               = std::function<bool(const cJSON* json, T& data)>;
   using GotContentLengthCallback = std::function<bool(int contentLength)>;

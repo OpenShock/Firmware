@@ -1,6 +1,7 @@
 #pragma once
 
 #include "FirmwareBootType.h"
+#include "http/HTTPClient.h"
 #include "OtaUpdateChannel.h"
 #include "SemVer.h"
 
@@ -19,9 +20,9 @@ namespace OpenShock::OtaUpdateManager {
     uint8_t filesystemBinaryHash[32];
   };
 
-  bool TryGetFirmwareVersion(OtaUpdateChannel channel, OpenShock::SemVer& version);
-  bool TryGetFirmwareBoards(const OpenShock::SemVer& version, std::vector<std::string>& boards);
-  bool TryGetFirmwareRelease(const OpenShock::SemVer& version, FirmwareRelease& release);
+  bool TryGetFirmwareVersion(HTTP::HTTPClient& client, OtaUpdateChannel channel, OpenShock::SemVer& version);
+  bool TryGetFirmwareBoards(HTTP::HTTPClient& client, const OpenShock::SemVer& version, std::vector<std::string>& boards);
+  bool TryGetFirmwareRelease(HTTP::HTTPClient& client, const OpenShock::SemVer& version, FirmwareRelease& release);
 
   bool TryStartFirmwareUpdate(const OpenShock::SemVer& version);
 

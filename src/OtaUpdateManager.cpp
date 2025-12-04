@@ -8,7 +8,7 @@ const char* const TAG = "OtaUpdateManager";
 #include "Core.h"
 #include "GatewayConnectionManager.h"
 #include "Hashing.h"
-#include "http/HTTPRequestManager.h"
+#include "http/HTTPClient.h"
 #include "Logging.h"
 #include "SemVer.h"
 #include "serialization/WSGateway.h"
@@ -324,7 +324,7 @@ static void otaum_updatetask(void* arg)
       OS_LOGD(TAG, "Checking for updates");
 
       // Fetch current version.
-      if (!OtaUpdateManager::TryGetFirmwareVersion(config.updateChannel, version)) {
+      if (!OtaUpdateManager::TryGetFirmwareVersion(client, config.updateChannel, version)) {
         OS_LOGE(TAG, "Failed to fetch firmware version");
         continue;
       }
@@ -361,7 +361,7 @@ static void otaum_updatetask(void* arg)
 
     // Fetch current release.
     OtaUpdateManager::FirmwareRelease release;
-    if (!OtaUpdateManager::TryGetFirmwareRelease(version, release)) {
+    if (!OtaUpdateManager::TryGetFirmwareRelease(client, version, release)) {
       OS_LOGE(TAG, "Failed to fetch firmware release");  // TODO: Send error message to server
       _sendFailureMessage("Failed to fetch firmware release"sv);
       continue;
@@ -422,16 +422,23 @@ static void otaum_updatetask(void* arg)
   esp_restart();
 }
 
-static bool _tryGetStringList(const char* url, std::vector<std::string>& list)
+static bool _tryGetStringList(HTTP::HTTPClient& client, const char* url, std::vector<std::string>& list)
 {
-  auto response = OpenShock::HTTP::GetString(
-    url,
-    {
-      {"Accept", "text/plain"}
-  },
-    std::array<uint16_t, 2> {200, 304}
-  );
-  if (response.result != OpenShock::HTTP::RequestResult::Success) {
+  ;
+  esp_err_t err = client.Get(url);
+  if (err != ESP_OK) {
+    OS_LOGE(TAG, "Failed to fetch list");
+    return false;
+  }
+
+  int statusCode = client.StatusCode();
+  if (statusCode != 200 && statusCode != 304) {
+    OS_LOGE(TAG, "Failed to fetch list");
+    return false;
+  }
+
+  auto response = client.ReadResponseString();
+  if (response.result != HTTP::ResponseResult::Success) {
     OS_LOGE(TAG, "Failed to fetch list: %s [%u] %s", response.ResultToString(), response.code, response.data.c_str());
     return false;
   }
@@ -523,7 +530,7 @@ bool OtaUpdateManager::Init()
   return true;
 }
 
-bool OtaUpdateManager::TryGetFirmwareVersion(OtaUpdateChannel channel, OpenShock::SemVer& version)
+bool OtaUpdateManager::TryGetFirmwareVersion(HTTP::HTTPClient& client, OtaUpdateChannel channel, OpenShock::SemVer& version)
 {
   const char* channelIndexUrl;
   switch (channel) {
@@ -543,14 +550,20 @@ bool OtaUpdateManager::TryGetFirmwareVersion(OtaUpdateChannel channel, OpenShock
 
   OS_LOGD(TAG, "Fetching firmware version from %s", channelIndexUrl);
 
-  auto response = OpenShock::HTTP::GetString(
-    channelIndexUrl,
-    {
-      {"Accept", "text/plain"}
-  },
-    std::array<uint16_t, 2> {200, 304}
-  );
-  if (response.result != OpenShock::HTTP::RequestResult::Success) {
+  esp_err_t err = client.Get(channelIndexUrl);
+  if (err != ESP_OK) {
+    OS_LOGE(TAG, "Failed to fetch firmware version");
+    return false;
+  }
+
+  int statusCode = client.StatusCode();
+  if (statusCode != 200 && statusCode != 304) {
+    OS_LOGE(TAG, "Failed to fetch firmware version");
+    return false;
+  }
+
+  auto response = client.ReadResponseString();
+  if (response.result != HTTP::ResponseResult::Success) {
     OS_LOGE(TAG, "Failed to fetch firmware version: %s [%u] %s", response.ResultToString(), response.code, response.data.c_str());
     return false;
   }
@@ -563,7 +576,7 @@ bool OtaUpdateManager::TryGetFirmwareVersion(OtaUpdateChannel channel, OpenShock
   return true;
 }
 
-bool OtaUpdateManager::TryGetFirmwareBoards(const OpenShock::SemVer& version, std::vector<std::string>& boards)
+bool OtaUpdateManager::TryGetFirmwareBoards(HTTP::HTTPClient& client, const OpenShock::SemVer& version, std::vector<std::string>& boards)
 {
   std::string channelIndexUrl;
   if (!FormatToString(channelIndexUrl, OPENSHOCK_FW_CDN_BOARDS_INDEX_URL_FORMAT, version.toString().c_str())) {  // TODO: This is abusing the SemVer::toString() method causing alot of string copies, fix this
@@ -573,7 +586,7 @@ bool OtaUpdateManager::TryGetFirmwareBoards(const OpenShock::SemVer& version, st
 
   OS_LOGD(TAG, "Fetching firmware boards from %s", channelIndexUrl.c_str());
 
-  if (!_tryGetStringList(channelIndexUrl.c_str(), boards)) {
+  if (!_tryGetStringList(client, channelIndexUrl.c_str(), boards)) {
     OS_LOGE(TAG, "Failed to fetch firmware boards");
     return false;
   }
@@ -591,7 +604,7 @@ static bool _tryParseIntoHash(std::string_view hash, uint8_t (&hashBytes)[32])
   return true;
 }
 
-bool OtaUpdateManager::TryGetFirmwareRelease(const OpenShock::SemVer& version, FirmwareRelease& release)
+bool OtaUpdateManager::TryGetFirmwareRelease(HTTP::HTTPClient& client, const OpenShock::SemVer& version, FirmwareRelease& release)
 {
   auto versionStr = version.toString();  // TODO: This is abusing the SemVer::toString() method causing alot of string copies, fix this
 
@@ -613,19 +626,25 @@ bool OtaUpdateManager::TryGetFirmwareRelease(const OpenShock::SemVer& version, F
   }
 
   // Fetch hashes.
-  auto sha256HashesResponse = OpenShock::HTTP::GetString(
-    sha256HashesUrl.c_str(),
-    {
-      {"Accept", "text/plain"}
-  },
-    std::array<uint16_t, 2> {200, 304}
-  );
-  if (sha256HashesResponse.result != OpenShock::HTTP::RequestResult::Success) {
-    OS_LOGE(TAG, "Failed to fetch hashes: %s [%u] %s", sha256HashesResponse.ResultToString(), sha256HashesResponse.code, sha256HashesResponse.data.c_str());
+  esp_err_t err = client.Get(sha256HashesUrl.c_str());
+  if (err != ESP_OK) {
+    OS_LOGE(TAG, "Failed to fetch hashes");
     return false;
   }
 
-  auto hashesLines = OpenShock::StringSplitNewLines(sha256HashesResponse.data);
+  int statusCode = client.StatusCode();
+  if (statusCode != 200 && statusCode != 304) {
+    OS_LOGE(TAG, "Failed to fetch hashes");
+    return false;
+  }
+
+  auto response = client.ReadResponseString();
+  if (response.result != HTTP::ResponseResult::Success) {
+    OS_LOGE(TAG, "Failed to fetch hashes: %s [%u] %s", response.ResultToString(), response.code, response.data.c_str());
+    return false;
+  }
+
+  auto hashesLines = OpenShock::StringSplitNewLines(response.data);
 
   // Parse hashes.
   bool foundAppHash = false, foundFilesystemHash = false;

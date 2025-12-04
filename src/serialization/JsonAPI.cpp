@@ -10,8 +10,6 @@ using namespace OpenShock::Serialization;
 
 bool JsonAPI::ParseLcgInstanceDetailsJsonResponse(const cJSON* root, JsonAPI::LcgInstanceDetailsResponse& out)
 {
-  (void)code;
-
   if (cJSON_IsObject(root) == 0) {
     ESP_LOGJSONE("not an object", root);
     return false;
@@ -59,8 +57,6 @@ bool JsonAPI::ParseLcgInstanceDetailsJsonResponse(const cJSON* root, JsonAPI::Lc
 }
 bool JsonAPI::ParseBackendVersionJsonResponse(const cJSON* root, JsonAPI::BackendVersionResponse& out)
 {
-  (void)code;
-
   if (cJSON_IsObject(root) == 0) {
     ESP_LOGJSONE("not an object", root);
     return false;
@@ -101,8 +97,6 @@ bool JsonAPI::ParseBackendVersionJsonResponse(const cJSON* root, JsonAPI::Backen
 
 bool JsonAPI::ParseAccountLinkJsonResponse(const cJSON* root, JsonAPI::AccountLinkResponse& out)
 {
-  (void)code;
-
   if (cJSON_IsObject(root) == 0) {
     ESP_LOGJSONE("not an object", root);
     return false;
@@ -122,8 +116,6 @@ bool JsonAPI::ParseAccountLinkJsonResponse(const cJSON* root, JsonAPI::AccountLi
 }
 bool JsonAPI::ParseHubInfoJsonResponse(const cJSON* root, JsonAPI::HubInfoResponse& out)
 {
-  (void)code;
-
   if (cJSON_IsObject(root) == 0) {
     ESP_LOGJSONE("not an object", root);
     return false;
@@ -215,8 +207,6 @@ bool JsonAPI::ParseHubInfoJsonResponse(const cJSON* root, JsonAPI::HubInfoRespon
 }
 bool JsonAPI::ParseAssignLcgJsonResponse(const cJSON* root, JsonAPI::AssignLcgResponse& out)
 {
-  (void)code;
-
   if (cJSON_IsObject(root) == 0) {
     ESP_LOGJSONE("not an object", root);
     return false;
