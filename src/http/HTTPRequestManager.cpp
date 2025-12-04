@@ -1,16 +1,15 @@
-#include "http/HTTPRequestManager.h"
 
+/*
 const char* const TAG = "HTTPRequestManager";
 
 #include "Common.h"
 #include "Core.h"
 #include "Logging.h"
+#include "http/HTTPClient.h"
 #include "RateLimiter.h"
 #include "SimpleMutex.h"
 #include "util/HexUtils.h"
 #include "util/StringUtils.h"
-
-#include <esp_http_client.h>
 
 #include <algorithm>
 #include <memory>
@@ -23,87 +22,10 @@ using namespace std::string_view_literals;
 const std::size_t HTTP_BUFFER_SIZE = 4096LLU;
 const int HTTP_DOWNLOAD_SIZE_LIMIT = 200 * 1024 * 1024;  // 200 MB
 
-static OpenShock::SimpleMutex s_rateLimitsMutex                                              = {};
-static std::unordered_map<std::string, std::shared_ptr<OpenShock::RateLimiter>> s_rateLimits = {};
-
 using namespace OpenShock;
 
-std::string_view _getDomain(std::string_view url)
-{
-  if (url.empty()) {
-    return {};
-  }
-
-  // Remove the protocol eg. "https://api.example.com:443/path" -> "api.example.com:443/path"
-  auto seperator = url.find("://");
-  if (seperator != std::string_view::npos) {
-    url.substr(seperator + 3);
-  }
-
-  // Remove the path eg. "api.example.com:443/path" -> "api.example.com:443"
-  seperator = url.find('/');
-  if (seperator != std::string_view::npos) {
-    url = url.substr(0, seperator);
-  }
-
-  // Remove the port eg. "api.example.com:443" -> "api.example.com"
-  seperator = url.rfind(':');
-  if (seperator != std::string_view::npos) {
-    url = url.substr(0, seperator);
-  }
-
-  // Remove all subdomains eg. "api.example.com" -> "example.com"
-  seperator = url.rfind('.');
-  if (seperator == std::string_view::npos) {
-    return url;  // E.g. "localhost"
-  }
-  seperator = url.rfind('.', seperator - 1);
-  if (seperator != std::string_view::npos) {
-    url = url.substr(seperator + 1);
-  }
-
-  return url;
-}
-
-std::shared_ptr<OpenShock::RateLimiter> _rateLimiterFactory(std::string_view domain)
-{
-  auto rateLimit = std::make_shared<OpenShock::RateLimiter>();
-
-  // Add default limits
-  rateLimit->addLimit(1000, 5);        // 5 per second
-  rateLimit->addLimit(10 * 1000, 10);  // 10 per 10 seconds
-
-  // per-domain limits
-  if (domain == OPENSHOCK_API_DOMAIN) {
-    rateLimit->addLimit(60 * 1000, 12);        // 12 per minute
-    rateLimit->addLimit(60 * 60 * 1000, 120);  // 120 per hour
-  }
-
-  return rateLimit;
-}
-
-std::shared_ptr<OpenShock::RateLimiter> _getRateLimiter(std::string_view url)
-{
-  auto domain = std::string(_getDomain(url));
-  if (domain.empty()) {
-    return nullptr;
-  }
-
-  s_rateLimitsMutex.lock(portMAX_DELAY);
-
-  auto it = s_rateLimits.find(domain);
-  if (it == s_rateLimits.end()) {
-    s_rateLimits.emplace(domain, _rateLimiterFactory(domain));
-    it = s_rateLimits.find(domain);
-  }
-
-  s_rateLimitsMutex.unlock();
-
-  return it->second;
-}
-
 struct StreamReaderResult {
-  HTTP::RequestResult result;
+  HTTP::DownloadResult result;
   std::size_t nWritten;
 };
 
@@ -220,15 +142,15 @@ void _alignChunk(uint8_t* buffer, std::size_t& bufferCursor, std::size_t payload
   }
 }
 
-StreamReaderResult _readStreamDataChunked(HTTP::HTTPClient& client, WiFiClient* stream, HTTP::DownloadCallback downloadCallback, int64_t begin, int timeoutMs)
+StreamReaderResult _readStreamDataChunked(HTTP::HTTPClient client, WiFiClient* stream, HTTP::DownloadCallback downloadCallback, int64_t begin, int timeoutMs)
 {
   std::size_t totalWritten   = 0;
-  HTTP::RequestResult result = HTTP::RequestResult::Success;
+  HTTP::DownloadResult result = HTTP::DownloadResult::Success;
 
   uint8_t* buffer = static_cast<uint8_t*>(malloc(HTTP_BUFFER_SIZE));
   if (buffer == nullptr) {
     OS_LOGE(TAG, "Out of memory");
-    return {HTTP::RequestResult::RequestFailed, 0};
+    return {HTTP::DownloadResult::RequestFailed, 0};
   }
 
   ParserState state        = ParserState::NeedMoreData;
@@ -237,7 +159,7 @@ StreamReaderResult _readStreamDataChunked(HTTP::HTTPClient& client, WiFiClient* 
   while (client.connected() && state != ParserState::Invalid) {
     if (begin + timeoutMs < OpenShock::millis()) {
       OS_LOGW(TAG, "Request timed out");
-      result = HTTP::RequestResult::TimedOut;
+      result = HTTP::DownloadResult::TimedOut;
       break;
     }
 
@@ -250,7 +172,7 @@ StreamReaderResult _readStreamDataChunked(HTTP::HTTPClient& client, WiFiClient* 
     std::size_t bytesRead = stream->readBytes(buffer + bufferCursor, HTTP_BUFFER_SIZE - bufferCursor);
     if (bytesRead == 0) {
       OS_LOGW(TAG, "No bytes read");
-      result = HTTP::RequestResult::RequestFailed;
+      result = HTTP::DownloadResult::RequestFailed;
       break;
     }
 
@@ -260,7 +182,7 @@ StreamReaderResult _readStreamDataChunked(HTTP::HTTPClient& client, WiFiClient* 
       state = _parseChunk(buffer, bufferCursor, payloadPos, payloadSize);
       if (state == ParserState::Invalid) {
         OS_LOGE(TAG, "Failed to parse chunk");
-        result = HTTP::RequestResult::RequestFailed;
+        result = HTTP::DownloadResult::RequestFailed;
         state  = ParserState::Invalid;  // Mark to exit both loops
         break;
       }
@@ -269,7 +191,7 @@ StreamReaderResult _readStreamDataChunked(HTTP::HTTPClient& client, WiFiClient* 
       if (state == ParserState::NeedMoreData) {
         if (bufferCursor == HTTP_BUFFER_SIZE) {
           OS_LOGE(TAG, "Chunk too large");
-          result = HTTP::RequestResult::RequestFailed;
+          result = HTTP::DownloadResult::RequestFailed;
           state  = ParserState::Invalid;  // Mark to exit both loops
         }
         break;                            // If chunk size good, this only exits one loop
@@ -282,7 +204,7 @@ StreamReaderResult _readStreamDataChunked(HTTP::HTTPClient& client, WiFiClient* 
       }
 
       if (!downloadCallback(totalWritten, buffer + payloadPos, payloadSize)) {
-        result = HTTP::RequestResult::Cancelled;
+        result = HTTP::DownloadResult::Cancelled;
         state  = ParserState::Invalid;  // Mark to exit both loops
         break;
       }
@@ -303,17 +225,17 @@ StreamReaderResult _readStreamDataChunked(HTTP::HTTPClient& client, WiFiClient* 
   return {result, totalWritten};
 }
 
-StreamReaderResult _readStreamData(HTTP::HTTPClient& client, WiFiClient* stream, std::size_t contentLength, HTTP::DownloadCallback downloadCallback, int64_t begin, int timeoutMs)
+StreamReaderResult _readStreamData(HTTP::HTTPClient client, WiFiClient* stream, std::size_t contentLength, HTTP::DownloadCallback downloadCallback, int64_t begin, int timeoutMs)
 {
   std::size_t nWritten       = 0;
-  HTTP::RequestResult result = HTTP::RequestResult::Success;
+  HTTP::DownloadResult result = HTTP::DownloadResult::Success;
 
   uint8_t* buffer = static_cast<uint8_t*>(malloc(HTTP_BUFFER_SIZE));
 
   while (client.connected() && nWritten < contentLength) {
     if (begin + timeoutMs < OpenShock::millis()) {
       OS_LOGW(TAG, "Request timed out");
-      result = HTTP::RequestResult::TimedOut;
+      result = HTTP::DownloadResult::TimedOut;
       break;
     }
 
@@ -328,13 +250,13 @@ StreamReaderResult _readStreamData(HTTP::HTTPClient& client, WiFiClient* stream,
     std::size_t bytesRead = stream->readBytes(buffer, bytesToRead);
     if (bytesRead == 0) {
       OS_LOGW(TAG, "No bytes read");
-      result = HTTP::RequestResult::RequestFailed;
+      result = HTTP::DownloadResult::RequestFailed;
       break;
     }
 
     if (!downloadCallback(nWritten, buffer, bytesRead)) {
       OS_LOGW(TAG, "Request cancelled by callback");
-      result = HTTP::RequestResult::Cancelled;
+      result = HTTP::DownloadResult::Cancelled;
       break;
     }
 
@@ -349,11 +271,9 @@ StreamReaderResult _readStreamData(HTTP::HTTPClient& client, WiFiClient* stream,
 }
 
 HTTP::Response<std::size_t> _doGetStream(
-  esp_http_client_handle_t client,
+  HTTP::HTTPClient& client,
   const char* url,
-  const std::map<std::string, std::string>& headers,
   tcb::span<const uint16_t> acceptedCodes,
-  std::shared_ptr<OpenShock::RateLimiter> rateLimiter,
   HTTP::GotContentLengthCallback contentLengthCallback,
   HTTP::DownloadCallback downloadCallback,
   int timeoutMs
@@ -363,25 +283,17 @@ HTTP::Response<std::size_t> _doGetStream(
 
   int64_t begin = OpenShock::millis();
 
-  for (auto& header : headers) {
-    err = esp_http_client_set_header(client, header.first.c_str(), header.second.c_str());
-    if (err != ESP_OK) {
-      // TODO: Handle error
-    }
-    return {HTTP::RequestResult::RequestFailed, 0, 0};
-  }
-
-  err = esp_http_client_open(client, 0);
+  err = client.Get(url);
   if (err != ESP_OK) {
     OS_LOGE(TAG, "Failed to begin HTTP request");
-    return {HTTP::RequestResult::RequestFailed, 0, 0};
+    return {HTTP::DownloadResult::RequestFailed, 0, 0};
   }
 
-  err = esp_http_
+  err = esp_http_res
   auto responseCode = response.ResponseCode();
   if (responseCode == HTTP_CODE_REQUEST_TIMEOUT || begin + timeoutMs < OpenShock::millis()) {
     OS_LOGW(TAG, "Request timed out");
-    return {HTTP::RequestResult::TimedOut, responseCode, 0};
+    return {HTTP::DownloadResult::TimedOut, responseCode, 0};
   }
 
   if (responseCode == HTTP_CODE_TOO_MANY_REQUESTS) {
@@ -404,7 +316,7 @@ HTTP::Response<std::size_t> _doGetStream(
     // Apply the block-for time
     rateLimiter->blockFor(retryAfter * 1000);
 
-    return {HTTP::RequestResult::RateLimited, responseCode, 0};
+    return {HTTP::DownloadResult::RateLimited, responseCode, 0};
   }
 
   if (responseCode == 418) {
@@ -413,30 +325,30 @@ HTTP::Response<std::size_t> _doGetStream(
 
   if (std::find(acceptedCodes.begin(), acceptedCodes.end(), responseCode) == acceptedCodes.end()) {
     OS_LOGD(TAG, "Received unexpected response code %d", responseCode);
-    return {HTTP::RequestResult::CodeRejected, responseCode, 0};
+    return {HTTP::DownloadResult::CodeRejected, responseCode, 0};
   }
 
   int contentLength = client.getSize();
   if (contentLength == 0) {
-    return {HTTP::RequestResult::Success, responseCode, 0};
+    return {HTTP::DownloadResult::Success, responseCode, 0};
   }
 
   if (contentLength > 0) {
     if (contentLength > HTTP_DOWNLOAD_SIZE_LIMIT) {
       OS_LOGE(TAG, "Content-Length too large");
-      return {HTTP::RequestResult::RequestFailed, responseCode, 0};
+      return {HTTP::DownloadResult::RequestFailed, responseCode, 0};
     }
 
     if (!contentLengthCallback(contentLength)) {
       OS_LOGW(TAG, "Request cancelled by callback");
-      return {HTTP::RequestResult::Cancelled, responseCode, 0};
+      return {HTTP::DownloadResult::Cancelled, responseCode, 0};
     }
   }
 
   WiFiClient* stream = client.getStreamPtr();
   if (stream == nullptr) {
     OS_LOGE(TAG, "Failed to get stream");
-    return {HTTP::RequestResult::RequestFailed, 0, 0};
+    return {HTTP::DownloadResult::RequestFailed, 0, 0};
   }
 
   StreamReaderResult result;
@@ -448,57 +360,4 @@ HTTP::Response<std::size_t> _doGetStream(
 
   return {result.result, responseCode, result.nWritten};
 }
-
-HTTP::Response<std::size_t> HTTP::Download(const char* url, const std::map<std::string, std::string>& headers, HTTP::GotContentLengthCallback contentLengthCallback, HTTP::DownloadCallback downloadCallback, tcb::span<const uint16_t> acceptedCodes, uint32_t timeoutMs)
-{
-  std::shared_ptr<OpenShock::RateLimiter> rateLimiter = _getRateLimiter(url);
-  if (rateLimiter == nullptr) {
-    return {RequestResult::InvalidURL, 0, 0};
-  }
-
-  if (!rateLimiter->tryRequest()) {
-    return {RequestResult::RateLimited, 0, 0};
-  }
-
-  esp_http_client_config_t cfg = {
-    .url                   = url,
-    .user_agent            = OpenShock::Constants::FW_USERAGENT,
-    .timeout_ms            = 10'000,
-    .disable_auto_redirect = true,
-    .event_handler         = HTTPClient::EventHandler,
-    .user_data             = reinterpret_cast<void*>(this),
-    .is_async              = true,
-    .use_global_ca_store   = true,
-  };
-  esp_http_client_handle_t client = esp_http_client_init(&cfg);
-
-  auto result = _doGetStream(client, url, headers, acceptedCodes, rateLimiter, contentLengthCallback, downloadCallback, timeoutMs);
-
-  esp_err_t err = esp_http_client_cleanup(client);
-  if (err != ESP_OK) {
-    // TODO: Handle error
-  }
-
-  return result;
-}
-
-HTTP::Response<std::string> HTTP::GetString(const char* url, const std::map<std::string, std::string>& headers, tcb::span<const uint16_t> acceptedCodes, uint32_t timeoutMs)
-{
-  std::string result;
-
-  auto allocator = [&result](std::size_t contentLength) {
-    result.reserve(contentLength);
-    return true;
-  };
-  auto writer = [&result](std::size_t offset, const uint8_t* data, std::size_t len) {
-    result.append(reinterpret_cast<const char*>(data), len);
-    return true;
-  };
-
-  auto response = Download(url, headers, allocator, writer, acceptedCodes, timeoutMs);
-  if (response.result != RequestResult::Success) {
-    return {response.result, response.code, {}};
-  }
-
-  return {response.result, response.code, result};
-}
+*/

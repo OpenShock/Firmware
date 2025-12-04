@@ -105,7 +105,8 @@ AccountLinkResultCode GatewayConnectionManager::Link(std::string_view linkCode)
     return AccountLinkResultCode::InvalidCode;
   }
 
-  auto response = HTTP::JsonAPI::LinkAccount(linkCode);
+  HTTP::HTTPClient client;
+  auto response = HTTP::JsonAPI::LinkAccount(client, linkCode);
 
   if (response.code == 404) {
     return AccountLinkResultCode::InvalidCode;
@@ -166,7 +167,7 @@ bool GatewayConnectionManager::SendMessageBIN(tcb::span<const uint8_t> data)
   return s_wsClient->sendMessageBIN(data);
 }
 
-bool FetchHubInfo(std::string authToken)
+bool FetchHubInfo(const char* authToken)
 {
   // TODO: this function is very slow, should be optimized!
   if ((s_flags & FLAG_HAS_IP) == 0) {
@@ -177,7 +178,8 @@ bool FetchHubInfo(std::string authToken)
     return false;
   }
 
-  auto response = HTTP::JsonAPI::GetHubInfo(std::move(authToken));
+  HTTP::HTTPClient client;
+  auto response = HTTP::JsonAPI::GetHubInfo(client, authToken);
 
   if (response.code == 401) {
     OS_LOGD(TAG, "Auth token is invalid, waiting 5 minutes before checking again");
@@ -241,7 +243,8 @@ bool StartConnectingToLCG()
     return false;
   }
 
-  auto response = HTTP::JsonAPI::AssignLcg(std::move(authToken));
+  HTTP::HTTPClient client;
+  auto response = HTTP::JsonAPI::AssignLcg(client, authToken.c_str());
 
   if (response.code == 401) {
     OS_LOGD(TAG, "Auth token is invalid, waiting 5 minutes before retrying");
@@ -283,7 +286,7 @@ void GatewayConnectionManager::Update()
     }
 
     // Fetch hub info
-    if (!FetchHubInfo(std::move(authToken))) {
+    if (!FetchHubInfo(authToken.c_str())) {
       return;
     }
 

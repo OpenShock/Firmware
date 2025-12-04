@@ -8,7 +8,7 @@ const char* const TAG = "JsonAPI";
 
 using namespace OpenShock::Serialization;
 
-bool JsonAPI::ParseLcgInstanceDetailsJsonResponse(int code, const cJSON* root, JsonAPI::LcgInstanceDetailsResponse& out)
+bool JsonAPI::ParseLcgInstanceDetailsJsonResponse(const cJSON* root, JsonAPI::LcgInstanceDetailsResponse& out)
 {
   (void)code;
 
@@ -57,7 +57,7 @@ bool JsonAPI::ParseLcgInstanceDetailsJsonResponse(int code, const cJSON* root, J
 
   return true;
 }
-bool JsonAPI::ParseBackendVersionJsonResponse(int code, const cJSON* root, JsonAPI::BackendVersionResponse& out)
+bool JsonAPI::ParseBackendVersionJsonResponse(const cJSON* root, JsonAPI::BackendVersionResponse& out)
 {
   (void)code;
 
@@ -99,7 +99,7 @@ bool JsonAPI::ParseBackendVersionJsonResponse(int code, const cJSON* root, JsonA
   return true;
 }
 
-bool JsonAPI::ParseAccountLinkJsonResponse(int code, const cJSON* root, JsonAPI::AccountLinkResponse& out)
+bool JsonAPI::ParseAccountLinkJsonResponse(const cJSON* root, JsonAPI::AccountLinkResponse& out)
 {
   (void)code;
 
@@ -120,7 +120,7 @@ bool JsonAPI::ParseAccountLinkJsonResponse(int code, const cJSON* root, JsonAPI:
 
   return true;
 }
-bool JsonAPI::ParseHubInfoJsonResponse(int code, const cJSON* root, JsonAPI::HubInfoResponse& out)
+bool JsonAPI::ParseHubInfoJsonResponse(const cJSON* root, JsonAPI::HubInfoResponse& out)
 {
   (void)code;
 
@@ -213,7 +213,7 @@ bool JsonAPI::ParseHubInfoJsonResponse(int code, const cJSON* root, JsonAPI::Hub
 
   return true;
 }
-bool JsonAPI::ParseAssignLcgJsonResponse(int code, const cJSON* root, JsonAPI::AssignLcgResponse& out)
+bool JsonAPI::ParseAssignLcgJsonResponse(const cJSON* root, JsonAPI::AssignLcgResponse& out)
 {
   (void)code;
 
