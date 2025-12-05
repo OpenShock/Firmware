@@ -3,12 +3,11 @@
 #include "Common.h"
 #include "http/HTTPClientState.h"
 #include "http/HTTPResponse.h"
+#include "http/JsonResponse.h"
 
 #include <esp_http_client.h>
 
 #include <memory>
-#include <string>
-#include <string_view>
 
 namespace OpenShock::HTTP {
   class HTTPClient {
@@ -17,7 +16,7 @@ namespace OpenShock::HTTP {
 
   public:
     HTTPClient(uint32_t timeoutMs = 10'000)
-      : m_state(std::make_shared<HTTPClientState>())
+      : m_state(std::make_shared<HTTPClientState>(timeoutMs))
     {
     }
 
@@ -25,11 +24,29 @@ namespace OpenShock::HTTP {
       return m_state->SetHeader(key, value);
     }
 
-    HTTPResponse Get(const char* url);
+    inline HTTPResponse Get(const char* url) {
+      auto response = GetInternal(url);
+      if (response.error != HTTPError::None) return response.error;
 
-    esp_err_t Close();
+      return HTTP::HTTPResponse(m_state, response.data.statusCode, response.data.contentLength);
+    }
+    template<typename T>
+    inline JsonResponse<T> GetJson(const char* url, JsonParserFn<T> jsonParser) {
+      auto response = GetInternal(url);
+      if (response.error != HTTPError::None) return response.error;
+
+      return HTTP::JsonResponse(m_state, jsonParser, response.data.statusCode, response.data.contentLength);
+    }
+
+    inline esp_err_t Close() {
+      return m_state->Close();
+    }
   private:
-    esp_err_t Start(esp_http_client_method_t method, const char* url, int writeLen);
+    struct InternalResult {
+      HTTPError error;
+      HTTPClientState::StartRequestResult data;
+    };
+    InternalResult GetInternal(const char* url);
 
     std::shared_ptr<HTTPClientState> m_state;
   };

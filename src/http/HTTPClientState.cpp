@@ -3,18 +3,20 @@
 const char* const TAG = "HTTPClientState";
 
 #include "Common.h"
+#include "Convert.h"
 #include "Logging.h"
 
 #include <algorithm>
 
-static const std::size_t HTTP_BUFFER_SIZE = 4096LLU;
-static const std::size_t HTTP_DOWNLOAD_SIZE_LIMIT = 200 * 1024 * 1024;  // 200 MB
+static const uint32_t HTTP_BUFFER_SIZE = 4096LLU;
+static const uint32_t HTTP_DOWNLOAD_SIZE_LIMIT = 200 * 1024 * 1024;  // 200 MB
 
 using namespace OpenShock;
 
 HTTP::HTTPClientState::HTTPClientState(uint32_t timeoutMs)
   : m_handle(nullptr)
   , m_reading(false)
+  , m_headers(false)
 {
   esp_http_client_config_t cfg;
   memset(&cfg, 0, sizeof(cfg));
@@ -40,48 +42,50 @@ HTTP::HTTPClientState::~HTTPClientState()
   }
 }
 
-HTTP::HTTPClientState::StartRequestResult HTTP::HTTPClientState::StartRequest(esp_http_client_method_t method, const char* url, int writeLen)
+std::variant<HTTP::HTTPClientState::StartRequestResult, HTTP::HTTPError> HTTP::HTTPClientState::StartRequest(esp_http_client_method_t method, const char* url, int writeLen)
 {
   esp_err_t err;
 
   err = esp_http_client_set_url(m_handle, url);
-  if (err != ESP_OK) return {err, false, 0};
+  if (err != ESP_OK) return HTTPError::InvalidUrl;
 
   err = esp_http_client_set_method(m_handle, method);
-  if (err != ESP_OK) return {err, false, 0};
+  if (err != ESP_OK) return HTTPError::InvalidHttpMethod;
 
   err = esp_http_client_open(m_handle, writeLen);
-  if (err != ESP_OK) return {err, false, 0};
+  if (err != ESP_OK) return HTTPError::NetworkError;
 
-  int responseLength = esp_http_client_fetch_headers(m_handle);
-  if (responseLength == ESP_FAIL) return {err, false, 0};
+  int contentLength = esp_http_client_fetch_headers(m_handle);
+  if (contentLength == ESP_FAIL) return HTTPError::NetworkError;
 
   bool isChunked = false;
-  if (responseLength == 0) {
+  if (contentLength == 0) {
     isChunked = esp_http_client_is_chunked_response(m_handle);
   }
 
-  return {ESP_OK, isChunked, static_cast<uint32_t>(responseLength)};
+  int code = esp_http_client_get_status_code(m_handle);
+
+  return StartRequestResult {code, isChunked, static_cast<uint32_t>(contentLength)};
 }
 
-HTTP::HTTPClientState::ReadResult HTTP::HTTPClientState::ReadStreamImpl(DownloadCallback cb)
+HTTP::ReadResult<uint32_t> HTTP::HTTPClientState::ReadStreamImpl(DownloadCallback cb)
 {
   if (m_handle == nullptr || !m_reading) {
     m_reading = false;
-    return {ReadResultCode::ConnectionClosed, 0};
+    return HTTPError::ConnectionClosed;
   }
 
-  std::size_t totalWritten = 0;
-  uint8_t     buffer[HTTP_BUFFER_SIZE];
+  uint32_t totalWritten = 0;
+  uint8_t  buffer[HTTP_BUFFER_SIZE];
 
   while (true) {
     if (totalWritten >= HTTP_DOWNLOAD_SIZE_LIMIT) {
       m_reading = false;
-      return {ReadResultCode::SizeLimitExceeded, totalWritten};
+      return HTTPError::SizeLimitExceeded;
     }
 
-    std::size_t remaining = HTTP_DOWNLOAD_SIZE_LIMIT - totalWritten;
-    int toRead = static_cast<int>(std::min<std::size_t>(HTTP_BUFFER_SIZE, remaining));
+    uint32_t remaining = HTTP_DOWNLOAD_SIZE_LIMIT - totalWritten;
+    int toRead = static_cast<int>(std::min<uint32_t>(HTTP_BUFFER_SIZE, remaining));
 
     int n = esp_http_client_read(
       m_handle,
@@ -91,7 +95,7 @@ HTTP::HTTPClientState::ReadResult HTTP::HTTPClientState::ReadStreamImpl(Download
 
     if (n < 0) {
       m_reading = false;
-      return {ReadResultCode::NetworkError, totalWritten};
+      return HTTPError::NetworkError;
     }
 
     if (n == 0) {
@@ -99,17 +103,37 @@ HTTP::HTTPClientState::ReadResult HTTP::HTTPClientState::ReadStreamImpl(Download
       break;
     }
 
-    std::size_t chunkLen = static_cast<std::size_t>(n);
+    uint32_t chunkLen = static_cast<uint32_t>(n);
     if (!cb(totalWritten, buffer, chunkLen)) {
       m_reading = false;
-      return {ReadResultCode::Aborted, totalWritten};
+      return HTTPError::Aborted;
     }
 
     totalWritten += chunkLen;
   }
 
   m_reading = false;
-  return {ReadResultCode::Success, totalWritten};
+  return totalWritten;
+}
+
+HTTP::ReadResult<std::string> HTTP::HTTPClientState::ReadStringImpl(uint32_t reserve)
+{
+  std::string result;
+  if (reserve > 0) {
+    result.reserve(reserve);
+  }
+
+  auto writer = [&result](std::size_t offset, const uint8_t* data, std::size_t len) {
+    result.append(reinterpret_cast<const char*>(data), len);
+    return true;
+  };
+
+  auto response = ReadStreamImpl(writer);
+  if (response.error != HTTPError::None) {
+    return response.error;
+  }
+
+  return result;
 }
 
 esp_err_t HTTP::HTTPClientState::EventHandler(esp_http_client_event_t* evt)
@@ -122,7 +146,6 @@ esp_err_t HTTP::HTTPClientState::EventHandler(esp_http_client_event_t* evt)
     OS_LOGE(TAG, "Got error event");
     break;
   case HTTP_EVENT_ON_CONNECTED:
-    client->m_connected = true;
     OS_LOGI(TAG, "Got connected event");
     break;
   case HTTP_EVENT_HEADERS_SENT:
@@ -137,7 +160,6 @@ esp_err_t HTTP::HTTPClientState::EventHandler(esp_http_client_event_t* evt)
     OS_LOGI(TAG, "Got on_finish event");
     break;
   case HTTP_EVENT_DISCONNECTED:
-    client->m_connected = false;
     OS_LOGI(TAG, "Got disconnected event");
     break;
   default:
@@ -148,7 +170,19 @@ esp_err_t HTTP::HTTPClientState::EventHandler(esp_http_client_event_t* evt)
   return ESP_OK;
 }
 
-esp_err_t HTTP::HTTPClientState::EventHeaderHandler(std::string_view key, std::string_view value)
+esp_err_t HTTP::HTTPClientState::EventHeaderHandler(std::string key, std::string value)
 {
-    OS_LOGI(TAG, "Got header_received event: %s - %s", evt->header_key, evt->header_value);
+  OS_LOGI(TAG, "Got header_received event: %.*s - %.*s", key.length(), key.c_str(), key.length(), key.c_str());
+
+  if (key == "Retry-After") {
+    uint32_t seconds;
+    if (!Convert::ToUint32(value, seconds) || seconds <= 0) {
+      seconds = 15;
+    }
+
+    OS_LOGI(TAG, "Retry-After: %d seconds, applying delay to rate limiter", seconds);
+    // TODO: Inform caller
+  }
+
+  m_headers.emplace_back(std::move(key), std::move(value));
 }

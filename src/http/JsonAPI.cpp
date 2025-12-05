@@ -2,15 +2,16 @@
 
 #include "Common.h"
 #include "config/Config.h"
+#include "http/HTTPClient.h"
 #include "util/StringUtils.h"
 
 using namespace OpenShock;
 
-HTTP::Response<Serialization::JsonAPI::AccountLinkResponse> HTTP::JsonAPI::LinkAccount(HTTP::HTTPClient& client, std::string_view accountLinkCode)
+HTTP::JsonResponse<Serialization::JsonAPI::AccountLinkResponse> HTTP::JsonAPI::LinkAccount(HTTP::HTTPClient& client, std::string_view accountLinkCode)
 {
   std::string domain;
   if (!Config::GetBackendDomain(domain)) {
-    return {HTTP::RequestResult::InternalError, 0, {}};
+    return HTTPError::InternalError;
   }
 
   char uri[OPENSHOCK_URI_BUFFER_SIZE];
@@ -18,23 +19,14 @@ HTTP::Response<Serialization::JsonAPI::AccountLinkResponse> HTTP::JsonAPI::LinkA
 
   client.SetHeader("Accept", "application/json");
 
-  esp_err_t err = client.Get(uri);
-  if (err != ESP_OK) {
-    return {HTTP::RequestResult::InternalError, 0, {}};
-  }
-
-  if (client.StatusCode() != 200) {
-    return {HTTP::RequestResult::InternalError, 0, {}};
-  }
-
-  return client.ReadResponseJSON(Serialization::JsonAPI::ParseAccountLinkJsonResponse);
+  return client.GetJson<Serialization::JsonAPI::AccountLinkResponse>(uri, Serialization::JsonAPI::ParseAccountLinkJsonResponse);
 }
 
-HTTP::Response<Serialization::JsonAPI::HubInfoResponse> HTTP::JsonAPI::GetHubInfo(HTTP::HTTPClient& client, const char* hubToken)
+HTTP::JsonResponse<Serialization::JsonAPI::HubInfoResponse> HTTP::JsonAPI::GetHubInfo(HTTP::HTTPClient& client, const char* hubToken)
 {
   std::string domain;
   if (!Config::GetBackendDomain(domain)) {
-    return {HTTP::RequestResult::InternalError, 0, {}};
+    return HTTPError::InternalError;
   }
 
   char uri[OPENSHOCK_URI_BUFFER_SIZE];
@@ -43,23 +35,14 @@ HTTP::Response<Serialization::JsonAPI::HubInfoResponse> HTTP::JsonAPI::GetHubInf
   client.SetHeader("Accept", "application/json");
   client.SetHeader("DeviceToken", hubToken);
 
-  esp_err_t err = client.Get(uri);
-  if (err != ESP_OK) {
-    return {HTTP::RequestResult::InternalError, 0, {}};
-  }
-
-  if (client.StatusCode() != 200) {
-    return {HTTP::RequestResult::InternalError, 0, {}};
-  }
-
-  return client.ReadResponseJSON(Serialization::JsonAPI::ParseHubInfoJsonResponse);
+  return client.GetJson<Serialization::JsonAPI::HubInfoResponse>(uri, Serialization::JsonAPI::ParseHubInfoJsonResponse);
 }
 
-HTTP::Response<Serialization::JsonAPI::AssignLcgResponse> HTTP::JsonAPI::AssignLcg(HTTP::HTTPClient& client, const char* hubToken)
+HTTP::JsonResponse<Serialization::JsonAPI::AssignLcgResponse> HTTP::JsonAPI::AssignLcg(HTTP::HTTPClient& client, const char* hubToken)
 {
   std::string domain;
   if (!Config::GetBackendDomain(domain)) {
-    return {HTTP::RequestResult::InternalError, 0, {}};
+    return HTTPError::InternalError;
   }
 
   char uri[OPENSHOCK_URI_BUFFER_SIZE];
@@ -68,14 +51,5 @@ HTTP::Response<Serialization::JsonAPI::AssignLcgResponse> HTTP::JsonAPI::AssignL
   client.SetHeader("Accept", "application/json");
   client.SetHeader("DeviceToken", hubToken);
 
-  esp_err_t err = client.Get(uri);
-  if (err != ESP_OK) {
-    return {HTTP::RequestResult::InternalError, 0, {}};
-  }
-
-  if (client.StatusCode() != 200) {
-    return {HTTP::RequestResult::InternalError, 0, {}};
-  }
-
-  return client.ReadResponseJSON(Serialization::JsonAPI::ParseAssignLcgJsonResponse);
+  return client.GetJson<Serialization::JsonAPI::AssignLcgResponse>(uri, Serialization::JsonAPI::ParseAssignLcgJsonResponse);
 }

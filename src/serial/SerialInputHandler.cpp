@@ -10,7 +10,6 @@ const char* const TAG = "SerialInputHandler";
 #include "Core.h"
 #include "estop/EStopManager.h"
 #include "FormatHelpers.h"
-#include "http/HTTPRequestManager.h"
 #include "Logging.h"
 #include "serial/command_handlers/CommandEntry.h"
 #include "serial/command_handlers/common.h"

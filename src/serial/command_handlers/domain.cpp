@@ -1,7 +1,6 @@
 #include "serial/command_handlers/common.h"
 
 #include "config/Config.h"
-#include "http/HTTPRequestManager.h"
 #include "serialization/JsonAPI.h"
 
 #include <esp_system.h>
