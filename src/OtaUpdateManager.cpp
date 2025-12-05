@@ -1,3 +1,5 @@
+#include <freertos/FreeRTOS.h>
+
 #include "OtaUpdateManager.h"
 
 const char* const TAG = "OtaUpdateManager";
@@ -431,7 +433,7 @@ static bool _tryGetStringList(const char* url, std::vector<std::string>& list)
     return false;
   }
 
-  int statusCode = response.StatusCode();
+  uint16_t statusCode = response.StatusCode();
   if (statusCode != 200 && statusCode != 304) {
     OS_LOGE(TAG, "Failed to fetch list");
     return false;
@@ -555,7 +557,7 @@ bool OtaUpdateManager::TryGetFirmwareVersion(OtaUpdateChannel channel, OpenShock
     return false;
   }
 
-  int statusCode = response.StatusCode();
+  uint16_t statusCode = response.StatusCode();
   if (statusCode != 200 && statusCode != 304) {
     OS_LOGE(TAG, "Failed to fetch firmware version");
     return false;
@@ -632,7 +634,7 @@ bool OtaUpdateManager::TryGetFirmwareRelease(const OpenShock::SemVer& version, F
     return false;
   }
 
-  int statusCode = response.StatusCode();
+  uint16_t statusCode = response.StatusCode();
   if (statusCode != 200 && statusCode != 304) {
     OS_LOGE(TAG, "Failed to fetch hashes");
     return false;

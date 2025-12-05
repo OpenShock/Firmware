@@ -1,3 +1,5 @@
+#include <freertos/FreeRTOS.h>
+
 #include "http/HTTPClientState.h"
 
 const char* const TAG = "HTTPClientState";
@@ -64,9 +66,12 @@ std::variant<HTTP::HTTPClientState::StartRequestResult, HTTP::HTTPError> HTTP::H
   }
 
   int code = esp_http_client_get_status_code(m_handle);
-  if (code < 0) code = 0;
+  if (code < 0 || code > 599) {
+    OS_LOGE(TAG, "Returned statusCode is invalid (%i)", code);
+    return HTTPError::InternalError;
+  }
 
-  return StartRequestResult {static_cast<uint32_t>(code), isChunked, static_cast<uint32_t>(contentLength)};
+  return StartRequestResult {static_cast<uint16_t>(code), isChunked, static_cast<uint32_t>(contentLength)};
 }
 
 HTTP::ReadResult<uint32_t> HTTP::HTTPClientState::ReadStreamImpl(DownloadCallback cb)
@@ -186,4 +191,6 @@ esp_err_t HTTP::HTTPClientState::EventHeaderHandler(std::string key, std::string
   }
 
   m_headers.emplace_back(std::move(key), std::move(value));
+
+  return ESP_OK;
 }

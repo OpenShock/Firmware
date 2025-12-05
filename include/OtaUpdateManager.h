@@ -1,7 +1,6 @@
 #pragma once
 
 #include "FirmwareBootType.h"
-#include "http/HTTPClient.h"
 #include "OtaUpdateChannel.h"
 #include "SemVer.h"
 

@@ -1,3 +1,5 @@
+#include <freertos/FreeRTOS.h>
+
 #include "http/HTTPClient.h"
 
 const char* const TAG = "HTTPClient";

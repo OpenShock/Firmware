@@ -6,8 +6,6 @@
 #include "http/JsonParserFn.h"
 #include "http/ReadResult.h"
 
-#include <cJSON.h>
-
 #include <cstdint>
 #include <memory>
 #include <string>
@@ -21,7 +19,7 @@ namespace OpenShock::HTTP {
 
     friend class HTTPClient;
 
-    HTTPResponse(std::shared_ptr<HTTPClientState> state, int statusCode, uint32_t contentLength)
+    HTTPResponse(std::shared_ptr<HTTPClientState> state, uint16_t statusCode, uint32_t contentLength)
       : m_state(state)
       , m_error(HTTPError::None)
       , m_statusCode(statusCode)
@@ -39,7 +37,7 @@ namespace OpenShock::HTTP {
 
     inline bool Ok() const { return m_error == HTTPError::None && !m_state.expired(); }
     inline HTTPError Error() const { return m_error; }
-    inline uint32_t StatusCode() const { return m_statusCode; }
+    inline uint16_t StatusCode() const { return m_statusCode; }
     inline uint32_t ContentLength() const { return m_contentLength; }
 
     inline ReadResult<uint32_t> ReadStream(DownloadCallback downloadCallback) {
@@ -67,7 +65,7 @@ namespace OpenShock::HTTP {
   private:
     std::weak_ptr<HTTPClientState> m_state;
     HTTPError m_error;
-    uint32_t m_statusCode;
+    uint16_t m_statusCode;
     uint32_t m_contentLength;
   };
 } // namespace OpenShock::HTTP

@@ -8,7 +8,6 @@
 
 #include <cstdint>
 #include <memory>
-#include <string>
 
 namespace OpenShock::HTTP {
   class HTTPClient;
@@ -20,7 +19,7 @@ namespace OpenShock::HTTP {
 
     friend class HTTPClient;
 
-    JsonResponse(std::shared_ptr<HTTPClientState> state, JsonParserFn<T> jsonParser, int statusCode, uint32_t contentLength)
+    JsonResponse(std::shared_ptr<HTTPClientState> state, JsonParserFn<T> jsonParser, uint16_t statusCode, uint32_t contentLength)
       : m_state(state)
       , m_jsonParser(jsonParser)
       , m_error(HTTPError::None)
@@ -40,7 +39,7 @@ namespace OpenShock::HTTP {
 
     inline bool Ok() const { return m_error == HTTPError::None && !m_state.expired(); }
     inline HTTPError Error() const { return m_error; }
-    inline int StatusCode() const { return m_statusCode; }
+    inline uint16_t StatusCode() const { return m_statusCode; }
     inline uint32_t ContentLength() const { return m_contentLength; }
 
     inline ReadResult<T> ReadJson()
@@ -54,7 +53,7 @@ namespace OpenShock::HTTP {
     std::weak_ptr<HTTPClientState> m_state;
     JsonParserFn<T> m_jsonParser;
     HTTPError m_error;
-    int m_statusCode;
+    uint16_t m_statusCode;
     uint32_t m_contentLength;
   };
 } // namespace OpenShock::HTTP

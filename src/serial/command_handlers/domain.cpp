@@ -42,7 +42,8 @@ void _handleDomainCommand(std::string_view arg, bool isAutomated) {
 
   auto content = response.ReadJson();
   if (content.error != OpenShock::HTTP::HTTPError::None) {
-    #error TODO: Handle this
+    SERPR_ERROR("Tried to read response from backend, but failed (%s), refusing to save domain to config", OpenShock::HTTP::HTTPErrorToString(response.Error()));
+    return;
   }
 
   OS_LOGI(TAG, "Successfully connected to \"%.*s\", version: %s, commit: %s, current time: %s", arg.length(), arg.data(), content.data.version.c_str(), content.data.commit.c_str(), content.data.currentTime.c_str());

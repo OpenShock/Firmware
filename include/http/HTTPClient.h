@@ -5,8 +5,9 @@
 #include "http/HTTPResponse.h"
 #include "http/JsonResponse.h"
 
-#include <esp_http_client.h>
+#include<esp_err.h>
 
+#include <cstdint>
 #include <memory>
 
 namespace OpenShock::HTTP {
