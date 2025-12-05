@@ -113,7 +113,7 @@ AccountLinkResultCode GatewayConnectionManager::Link(std::string_view linkCode)
       return AccountLinkResultCode::InternalError;  // Just return false, don't spam the console with errors
     }
 
-    OS_LOGE(TAG, "Error while fetching auth token: %s %d", HTTP::HTTPErrorToString(response.Error()), response.StatusCode());
+    OS_LOGE(TAG, "Error while linking account: %s %d", HTTP::HTTPErrorToString(response.Error()), response.StatusCode());
     return AccountLinkResultCode::InternalError;
   }
 

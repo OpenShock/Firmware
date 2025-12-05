@@ -2,11 +2,11 @@
 
 #include "ShockerModelType.h"
 
-#include <cJSON.h>
-
 #include <cstdint>
 #include <string>
 #include <vector>
+
+class cJSON;
 
 namespace OpenShock::Serialization::JsonAPI {
   struct LcgInstanceDetailsResponse {

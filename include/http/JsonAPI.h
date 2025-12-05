@@ -1,6 +1,7 @@
 #pragma once
 
 #include "http/HTTPClient.h"
+#include "http/JsonResponse.h"
 #include "serialization/JsonAPI.h"
 
 #include <string_view>

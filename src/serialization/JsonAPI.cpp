@@ -2,6 +2,8 @@
 
 const char* const TAG = "JsonAPI";
 
+#include <cJSON.h>
+
 #include "Logging.h"
 
 #define ESP_LOGJSONE(err, root) OS_LOGE(TAG, "Invalid JSON response (" err "): %s", cJSON_PrintUnformatted(root))
