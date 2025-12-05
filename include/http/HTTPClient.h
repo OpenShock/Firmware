@@ -27,27 +27,23 @@ namespace OpenShock::HTTP {
 
     inline HTTPResponse Get(const char* url) {
       auto response = GetInternal(url);
-      if (response.error != HTTPError::None) return response.error;
+      if (response.error != HTTPError::None) return HTTP::HTTPResponse(response.error, response.retryAfterSeconds);
 
-      return HTTP::HTTPResponse(m_state, response.data.statusCode, response.data.contentLength);
+      return HTTP::HTTPResponse(m_state, response.statusCode, response.contentLength, std::move(response.headers));
     }
     template<typename T>
     inline JsonResponse<T> GetJson(const char* url, JsonParserFn<T> jsonParser) {
       auto response = GetInternal(url);
-      if (response.error != HTTPError::None) return response.error;
+      if (response.error != HTTPError::None) return HTTP::JsonResponse<T>(response.error, response.retryAfterSeconds);
 
-      return HTTP::JsonResponse(m_state, jsonParser, response.data.statusCode, response.data.contentLength);
+      return HTTP::JsonResponse(m_state, jsonParser, response.statusCode, response.contentLength, std::move(response.headers));
     }
 
     inline esp_err_t Close() {
       return m_state->Close();
     }
   private:
-    struct InternalResult {
-      HTTPError error;
-      HTTPClientState::StartRequestResult data;
-    };
-    InternalResult GetInternal(const char* url);
+    HTTPClientState::StartRequestResult GetInternal(const char* url);
 
     std::shared_ptr<HTTPClientState> m_state;
   };

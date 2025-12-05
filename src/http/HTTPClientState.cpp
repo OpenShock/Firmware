@@ -18,7 +18,8 @@ using namespace OpenShock;
 HTTP::HTTPClientState::HTTPClientState(uint32_t timeoutMs)
   : m_handle(nullptr)
   , m_reading(false)
-  , m_headers(false)
+  , m_retryAfterSeconds(0)
+  , m_headers()
 {
   esp_http_client_config_t cfg;
   memset(&cfg, 0, sizeof(cfg));
@@ -44,34 +45,45 @@ HTTP::HTTPClientState::~HTTPClientState()
   }
 }
 
-std::variant<HTTP::HTTPClientState::StartRequestResult, HTTP::HTTPError> HTTP::HTTPClientState::StartRequest(esp_http_client_method_t method, const char* url, int writeLen)
+HTTP::HTTPClientState::StartRequestResult HTTP::HTTPClientState::StartRequest(esp_http_client_method_t method, const char* url, int writeLen)
 {
   esp_err_t err;
 
+  m_headers.clear();
+
   err = esp_http_client_set_url(m_handle, url);
-  if (err != ESP_OK) return HTTPError::InvalidUrl;
+  if (err != ESP_OK) return { .error = HTTPError::InvalidUrl };
 
   err = esp_http_client_set_method(m_handle, method);
-  if (err != ESP_OK) return HTTPError::InvalidHttpMethod;
+  if (err != ESP_OK) return { .error = HTTPError::InvalidHttpMethod };
 
   err = esp_http_client_open(m_handle, writeLen);
-  if (err != ESP_OK) return HTTPError::NetworkError;
+  if (err != ESP_OK) return { .error = HTTPError::NetworkError };
 
   int contentLength = esp_http_client_fetch_headers(m_handle);
-  if (contentLength == ESP_FAIL) return HTTPError::NetworkError;
+  if (contentLength == ESP_FAIL) return { .error = HTTPError::NetworkError };
+
+  if (m_retryAfterSeconds > 0) {
+    return { .error = HTTPError::RateLimited, .retryAfterSeconds = m_retryAfterSeconds };
+  }
 
   bool isChunked = false;
   if (contentLength == 0) {
     isChunked = esp_http_client_is_chunked_response(m_handle);
   }
 
-  int code = esp_http_client_get_status_code(m_handle);
-  if (code < 0 || code > 599) {
-    OS_LOGE(TAG, "Returned statusCode is invalid (%i)", code);
-    return HTTPError::NetworkError;
+  int statusCode = esp_http_client_get_status_code(m_handle);
+  if (statusCode < 0 || statusCode > 599) {
+    OS_LOGE(TAG, "Returned statusCode is invalid (%i)", statusCode);
+    return { .error = HTTPError::NetworkError };
   }
 
-  return StartRequestResult {static_cast<uint16_t>(code), isChunked, static_cast<uint32_t>(contentLength)};
+  return StartRequestResult {
+    .statusCode = static_cast<uint16_t>(statusCode),
+    .isChunked = isChunked,
+    .contentLength = static_cast<uint32_t>(contentLength),
+    .headers = std::move(m_headers)
+  };
 }
 
 HTTP::ReadResult<uint32_t> HTTP::HTTPClientState::ReadStreamImpl(DownloadCallback cb)
@@ -181,16 +193,16 @@ esp_err_t HTTP::HTTPClientState::EventHeaderHandler(std::string key, std::string
   OS_LOGI(TAG, "Got header_received event: %.*s - %.*s", key.length(), key.c_str(), key.length(), key.c_str());
 
   if (key == "Retry-After") {
-    uint32_t seconds;
+    uint32_t seconds = 0;
     if (!Convert::ToUint32(value, seconds) || seconds <= 0) {
       seconds = 15;
     }
 
     OS_LOGI(TAG, "Retry-After: %d seconds, applying delay to rate limiter", seconds);
-    // TODO: Inform caller
+    m_retryAfterSeconds = seconds;
   }
 
-  m_headers.emplace_back(std::move(key), std::move(value));
+  m_headers[key] = std::move(value);
 
   return ESP_OK;
 }

@@ -11,23 +11,18 @@ const char* const TAG = "HTTPClient";
 
 using namespace OpenShock;
 
-HTTP::HTTPClient::InternalResult HTTP::HTTPClient::GetInternal(const char* url) {
+HTTP::HTTPClientState::StartRequestResult HTTP::HTTPClient::GetInternal(const char* url) {
   auto ratelimiter = HTTP::RateLimiters::GetRateLimiter(url);
   if (ratelimiter == nullptr) {
     OS_LOGW(TAG, "Invalid URL!");
-    return {HTTPError::InvalidUrl, {}};
+    return { .error = HTTPError::InvalidUrl };
   }
 
   if (!ratelimiter->tryRequest()) {
     OS_LOGW(TAG, "Hit ratelimit, refusing to send request!");
-    return {HTTPError::RateLimited, {}};
+    return { .error = HTTPError::RateLimited };
   }
 
 
-  auto result = m_state->StartRequest(HTTP_METHOD_GET, url, 0);
-  if (auto error = std::get_if<HTTPError>(&result)) {
-    return {*error, {}};
-  }
-
-  return {HTTPError::None, std::get<HTTPClientState::StartRequestResult>(result)};
+  return m_state->StartRequest(HTTP_METHOD_GET, url, 0);
 }

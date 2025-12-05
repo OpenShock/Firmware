@@ -10,10 +10,9 @@
 
 #include <esp_http_client.h>
 
+#include <map>
 #include <string>
 #include <string_view>
-#include <variant>
-#include <vector>
 
 namespace OpenShock::HTTP {
   class HTTPClientState {
@@ -27,13 +26,21 @@ namespace OpenShock::HTTP {
       return esp_http_client_set_header(m_handle, key, value);
     }
 
-    struct [[nodiscard]] StartRequestResult {
-      uint16_t statusCode;
-      bool isChunked;
-      uint32_t contentLength;
+    struct HeaderEntry {
+      std::string key;
+      std::string value;
     };
 
-    std::variant<StartRequestResult, HTTPError> StartRequest(esp_http_client_method_t method, const char* url, int writeLen);
+    struct [[nodiscard]] StartRequestResult {
+      HTTPError error{};
+      uint32_t retryAfterSeconds{};
+      uint16_t statusCode{};
+      bool isChunked{};
+      uint32_t contentLength{};
+      std::map<std::string, std::string> headers{};
+    };
+
+    StartRequestResult StartRequest(esp_http_client_method_t method, const char* url, int writeLen);
 
     // High-throughput streaming logic
     ReadResult<uint32_t> ReadStreamImpl(DownloadCallback cb);
@@ -72,6 +79,7 @@ namespace OpenShock::HTTP {
 
     esp_http_client_handle_t m_handle;
     bool m_reading;
-    std::vector<std::pair<std::string, std::string>> m_headers;
+    uint32_t m_retryAfterSeconds;
+    std::map<std::string, std::string> m_headers;
   };
 } // namespace OpenShock::HTTP

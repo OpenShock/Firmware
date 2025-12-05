@@ -7,6 +7,7 @@
 #include "http/ReadResult.h"
 
 #include <cstdint>
+#include <map>
 #include <memory>
 #include <string>
 
@@ -19,24 +20,38 @@ namespace OpenShock::HTTP {
 
     friend class HTTPClient;
 
-    HTTPResponse(std::shared_ptr<HTTPClientState> state, uint16_t statusCode, uint32_t contentLength)
+    HTTPResponse(std::shared_ptr<HTTPClientState> state, uint16_t statusCode, uint32_t contentLength, std::map<std::string, std::string> headers)
       : m_state(state)
       , m_error(HTTPError::None)
+      , m_retryAfterSeconds(0)
       , m_statusCode(statusCode)
       , m_contentLength(contentLength)
+      , m_headers(std::move(headers))
     {
     }
   public:
     HTTPResponse(HTTPError error)
       : m_state()
       , m_error(error)
+      , m_retryAfterSeconds()
       , m_statusCode(0)
       , m_contentLength(0)
+      , m_headers()
+    {
+    }
+    HTTPResponse(HTTPError error, uint32_t retryAfterSeconds)
+      : m_state()
+      , m_error(error)
+      , m_retryAfterSeconds(retryAfterSeconds)
+      , m_statusCode(0)
+      , m_contentLength(0)
+      , m_headers()
     {
     }
 
     inline bool Ok() const { return m_error == HTTPError::None && !m_state.expired(); }
     inline HTTPError Error() const { return m_error; }
+    inline uint32_t RetryAfterSeconds() const { return m_retryAfterSeconds; }
     inline uint16_t StatusCode() const { return m_statusCode; }
     inline uint32_t ContentLength() const { return m_contentLength; }
 
@@ -65,7 +80,9 @@ namespace OpenShock::HTTP {
   private:
     std::weak_ptr<HTTPClientState> m_state;
     HTTPError m_error;
+    uint32_t m_retryAfterSeconds;
     uint16_t m_statusCode;
     uint32_t m_contentLength;
+    std::map<std::string, std::string> m_headers;
   };
 } // namespace OpenShock::HTTP
