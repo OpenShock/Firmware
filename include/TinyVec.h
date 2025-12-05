@@ -1,5 +1,7 @@
 #pragma once
 
+#include "Common.h"
+
 #include <cstdint>
 #include <cstdlib>
 #include <cstring>
@@ -13,6 +15,7 @@ template<typename T, typename SizeType = uint32_t>
 class TinyVec {
   static_assert(std::is_trivially_copyable_v<T> && std::is_trivially_destructible_v<T>, "TinyVec requires a trivially copyable & destructible type (POD).");
 
+  DISABLE_COPY(TinyVec);
 public:
   TinyVec() noexcept = default;
 
@@ -31,9 +34,6 @@ public:
   }
 
   ~TinyVec() { free(_data); }
-
-  TinyVec(const TinyVec&)            = delete;
-  TinyVec& operator=(const TinyVec&) = delete;
 
   TinyVec(TinyVec&& other) noexcept
   {
