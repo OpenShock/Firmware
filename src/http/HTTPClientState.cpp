@@ -68,7 +68,7 @@ std::variant<HTTP::HTTPClientState::StartRequestResult, HTTP::HTTPError> HTTP::H
   int code = esp_http_client_get_status_code(m_handle);
   if (code < 0 || code > 599) {
     OS_LOGE(TAG, "Returned statusCode is invalid (%i)", code);
-    return HTTPError::InternalError;
+    return HTTPError::NetworkError;
   }
 
   return StartRequestResult {static_cast<uint16_t>(code), isChunked, static_cast<uint32_t>(contentLength)};
