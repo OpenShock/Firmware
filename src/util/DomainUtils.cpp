@@ -8,7 +8,7 @@ std::string_view OpenShock::DomainUtils::GetDomainFromUrl(std::string_view url) 
   // Remove the protocol eg. "https://api.example.com:443/path" -> "api.example.com:443/path"
   auto seperator = url.find("://");
   if (seperator != std::string_view::npos) {
-    url.substr(seperator + 3);
+    url = url.substr(seperator + 3);
   }
 
   // Remove the path eg. "api.example.com:443/path" -> "api.example.com:443"
