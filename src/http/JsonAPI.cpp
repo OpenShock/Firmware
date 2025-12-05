@@ -19,7 +19,7 @@ HTTP::JsonResponse<Serialization::JsonAPI::AccountLinkResponse> HTTP::JsonAPI::L
 
   client.SetHeader("Accept", "application/json");
 
-  return client.GetJson(uri, Serialization::JsonAPI::ParseAccountLinkJsonResponse);
+  return client.GetJson<Serialization::JsonAPI::AccountLinkResponse>(uri, Serialization::JsonAPI::ParseAccountLinkJsonResponse);
 }
 
 HTTP::JsonResponse<Serialization::JsonAPI::HubInfoResponse> HTTP::JsonAPI::GetHubInfo(HTTP::HTTPClient& client, const char* hubToken)
@@ -35,7 +35,7 @@ HTTP::JsonResponse<Serialization::JsonAPI::HubInfoResponse> HTTP::JsonAPI::GetHu
   client.SetHeader("Accept", "application/json");
   client.SetHeader("DeviceToken", hubToken);
 
-  return client.GetJson(uri, Serialization::JsonAPI::ParseHubInfoJsonResponse);
+  return client.GetJson<Serialization::JsonAPI::HubInfoResponse>(uri, Serialization::JsonAPI::ParseHubInfoJsonResponse);
 }
 
 HTTP::JsonResponse<Serialization::JsonAPI::AssignLcgResponse> HTTP::JsonAPI::AssignLcg(HTTP::HTTPClient& client, const char* hubToken)
@@ -51,5 +51,5 @@ HTTP::JsonResponse<Serialization::JsonAPI::AssignLcgResponse> HTTP::JsonAPI::Ass
   client.SetHeader("Accept", "application/json");
   client.SetHeader("DeviceToken", hubToken);
 
-  return client.GetJson(uri, Serialization::JsonAPI::ParseAssignLcgJsonResponse);
+  return client.GetJson<Serialization::JsonAPI::AssignLcgResponse>(uri, Serialization::JsonAPI::ParseAssignLcgJsonResponse);
 }
