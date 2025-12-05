@@ -49,6 +49,11 @@ HTTP::HTTPClientState::StartRequestResult HTTP::HTTPClientState::StartRequest(es
 {
   esp_err_t err;
 
+  if (m_reading) {
+    return { .error = HTTPError::ClientBusy };
+  }
+
+  m_retryAfterSeconds = 0;
   m_headers.clear();
 
   err = esp_http_client_set_url(m_handle, url);
@@ -61,10 +66,12 @@ HTTP::HTTPClientState::StartRequestResult HTTP::HTTPClientState::StartRequest(es
   if (err != ESP_OK) return { .error = HTTPError::NetworkError };
 
   int contentLength = esp_http_client_fetch_headers(m_handle);
-  if (contentLength == ESP_FAIL) return { .error = HTTPError::NetworkError };
+  if (contentLength < 0) return { .error = HTTPError::NetworkError };
 
   if (m_retryAfterSeconds > 0) {
-    return { .error = HTTPError::RateLimited, .retryAfterSeconds = m_retryAfterSeconds };
+    uint32_t retryAfterSeconds = m_retryAfterSeconds;
+    m_retryAfterSeconds = 0;
+    return { .error = HTTPError::RateLimited, .retryAfterSeconds = retryAfterSeconds };
   }
 
   bool isChunked = false;
@@ -77,6 +84,8 @@ HTTP::HTTPClientState::StartRequestResult HTTP::HTTPClientState::StartRequest(es
     OS_LOGE(TAG, "Returned statusCode is invalid (%i)", statusCode);
     return { .error = HTTPError::NetworkError };
   }
+
+  m_reading = true;
 
   return StartRequestResult {
     .statusCode = static_cast<uint16_t>(statusCode),
@@ -192,7 +201,9 @@ esp_err_t HTTP::HTTPClientState::EventHeaderHandler(std::string key, std::string
 {
   OS_LOGI(TAG, "Got header_received event: %.*s - %.*s", key.length(), key.c_str(), key.length(), key.c_str());
 
-  if (key == "Retry-After") {
+  std::transform(key.begin(), key.end(), key.begin(), [](unsigned char c) { return std::tolower(c); });
+
+  if (key == "retry-after") {
     uint32_t seconds = 0;
     if (!Convert::ToUint32(value, seconds) || seconds <= 0) {
       seconds = 15;

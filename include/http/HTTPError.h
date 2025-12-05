@@ -3,6 +3,7 @@
 namespace OpenShock::HTTP {
   enum class HTTPError {
     None,
+    ClientBusy,
     InternalError,
     RateLimited,
     InvalidUrl,
@@ -18,27 +19,27 @@ namespace OpenShock::HTTP {
     switch (error)
     {
     case HTTPError::None:
-      return "";
+      return "None";
     case HTTPError::InternalError:
-      return "";
+      return "InternalError";
     case HTTPError::RateLimited:
-      return "";
+      return "RateLimited";
     case HTTPError::InvalidUrl:
-      return "";
+      return "InvalidUrl";
     case HTTPError::InvalidHttpMethod:
-      return "";
+      return "InvalidHttpMethod";
     case HTTPError::NetworkError:
-      return "";
+      return "NetworkError";
     case HTTPError::ConnectionClosed:
-      return "";
+      return "ConnectionClosed";
     case HTTPError::SizeLimitExceeded:
-      return "";
+      return "SizeLimitExceeded";
     case HTTPError::Aborted:
-      return "";
+      return "Aborted";
     case HTTPError::ParseFailed:
-      return "";
+      return "ParseFailed";
     default:
-      return "";
+      return "Unknown";
     }
   }
 } // namespace OpenShock::HTTP
