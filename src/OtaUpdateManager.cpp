@@ -1,5 +1,8 @@
 #include <freertos/FreeRTOS.h>
 
+#include <LittleFS.h>
+#include <WiFi.h>
+
 #include "OtaUpdateManager.h"
 
 const char* const TAG = "OtaUpdateManager";
@@ -23,9 +26,6 @@ const char* const TAG = "OtaUpdateManager";
 
 #include <esp_ota_ops.h>
 #include <esp_task_wdt.h>
-
-#include <LittleFS.h>
-#include <WiFi.h>
 
 #include <sstream>
 #include <string_view>
