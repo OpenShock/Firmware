@@ -20,6 +20,8 @@ namespace OpenShock::HTTP {
     {
     case HTTPError::None:
       return "None";
+    case HTTPError::ClientBusy:
+      return "ClientBusy";
     case HTTPError::InternalError:
       return "InternalError";
     case HTTPError::RateLimited:

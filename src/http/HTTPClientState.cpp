@@ -199,7 +199,7 @@ esp_err_t HTTP::HTTPClientState::EventHandler(esp_http_client_event_t* evt)
 
 esp_err_t HTTP::HTTPClientState::EventHeaderHandler(std::string key, std::string value)
 {
-  OS_LOGI(TAG, "Got header_received event: %.*s - %.*s", key.length(), key.c_str(), key.length(), key.c_str());
+  OS_LOGI(TAG, "Got header_received event: %.*s - %.*s", key.length(), key.c_str(), value.length(), value.c_str());
 
   std::transform(key.begin(), key.end(), key.begin(), [](unsigned char c) { return std::tolower(c); });
 
