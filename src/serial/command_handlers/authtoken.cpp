@@ -21,7 +21,7 @@ void _handleAuthtokenCommand(std::string_view arg, bool isAutomated) {
 
   std::string token = std::string(arg);
 
-  // Scope to immidiatley destroy client after use
+  // Scope to immediately destroy client after use
   {
     OpenShock::HTTP::HTTPClient client;
     auto apiResponse = OpenShock::HTTP::JsonAPI::GetHubInfo(client, token.c_str());
