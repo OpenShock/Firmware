@@ -22,7 +22,7 @@ bool JsonSerial::ParseShockerCommand(const cJSON* root, JsonSerial::ShockerComma
     OS_LOGE(TAG, "value at 'model' is not a string");
     return false;
   }
-  ShockerModelType modelType = ShockerModelType::MIN;
+  ShockerModelType modelType;
   if (!ShockerModelTypeFromString(model->valuestring, modelType)) {
     OS_LOGE(TAG, "value at 'model' is not a valid shocker model (caixianlin, petrainer, petrainer998dr)");
     return false;
