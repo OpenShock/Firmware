@@ -64,8 +64,9 @@ std::variant<HTTP::HTTPClientState::StartRequestResult, HTTP::HTTPError> HTTP::H
   }
 
   int code = esp_http_client_get_status_code(m_handle);
+  if (code < 0) code = 0;
 
-  return StartRequestResult {code, isChunked, static_cast<uint32_t>(contentLength)};
+  return StartRequestResult {static_cast<uint32_t>(code), isChunked, static_cast<uint32_t>(contentLength)};
 }
 
 HTTP::ReadResult<uint32_t> HTTP::HTTPClientState::ReadStreamImpl(DownloadCallback cb)

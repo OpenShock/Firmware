@@ -28,7 +28,7 @@ namespace OpenShock::HTTP {
     }
 
     struct [[nodiscard]] StartRequestResult {
-      int statusCode;
+      uint32_t statusCode;
       bool isChunked;
       uint32_t contentLength;
     };

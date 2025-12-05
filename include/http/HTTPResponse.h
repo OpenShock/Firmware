@@ -36,10 +36,10 @@ namespace OpenShock::HTTP {
       , m_contentLength(0)
     {
     }
-    
+
     inline bool Ok() const { return m_error == HTTPError::None && !m_state.expired(); }
     inline HTTPError Error() const { return m_error; }
-    inline int StatusCode() const { return m_statusCode; }
+    inline uint32_t StatusCode() const { return m_statusCode; }
     inline uint32_t ContentLength() const { return m_contentLength; }
 
     inline ReadResult<uint32_t> ReadStream(DownloadCallback downloadCallback) {
@@ -67,7 +67,7 @@ namespace OpenShock::HTTP {
   private:
     std::weak_ptr<HTTPClientState> m_state;
     HTTPError m_error;
-    int m_statusCode;
+    uint32_t m_statusCode;
     uint32_t m_contentLength;
   };
 } // namespace OpenShock::HTTP

@@ -4,6 +4,7 @@ const char* const TAG = "PartitionUtils";
 
 #include "Core.h"
 #include "Hashing.h"
+#include "http/HTTPClient.h"
 #include "Logging.h"
 #include "util/HexUtils.h"
 
@@ -34,25 +35,6 @@ bool OpenShock::FlashPartitionFromUrl(const esp_partition_t* partition, const ch
   std::size_t contentWritten = 0;
   int64_t lastProgress       = 0;
 
-  auto sizeValidator = [partition, &contentLength, progressCallback, &lastProgress](std::size_t size) -> bool {
-    if (size > partition->size) {
-      OS_LOGE(TAG, "Remote partition binary is too large");
-      return false;
-    }
-
-    // Erase app partition.
-    if (esp_partition_erase_range(partition, 0, partition->size) != ESP_OK) {
-      OS_LOGE(TAG, "Failed to erase partition in preparation for update");
-      return false;
-    }
-
-    contentLength = size;
-
-    lastProgress = OpenShock::millis();
-    progressCallback(0, contentLength, 0.0f);
-
-    return true;
-  };
   auto dataWriter = [partition, &sha256, &contentLength, &contentWritten, progressCallback, &lastProgress](std::size_t offset, const uint8_t* data, std::size_t length) -> bool {
     if (esp_partition_write(partition, offset, data, length) != ESP_OK) {
       OS_LOGE(TAG, "Failed to write to partition");
@@ -76,23 +58,33 @@ bool OpenShock::FlashPartitionFromUrl(const esp_partition_t* partition, const ch
   };
 
   // Start streaming binary to app partition.
-  auto appBinaryResponse = OpenShock::HTTP::Download(
-    remoteUrl,
-    {
-      {"Accept", "application/octet-stream"}
-  },
-    sizeValidator,
-    dataWriter,
-    std::array<uint16_t, 2> {200, 304},
-    180'000
-  );  // 3 minutes
-  if (appBinaryResponse.result != OpenShock::HTTP::RequestResult::Success) {
-    OS_LOGE(TAG, "Failed to download remote partition binary: [%u]", appBinaryResponse.code);
+  OpenShock::HTTP::HTTPClient client(180'000); // 3 minutes timeout
+  auto response = client.Get(remoteUrl);
+  if (!response.Ok() || response.StatusCode() != 200 || response.StatusCode() != 304) {
+    OS_LOGE(TAG, "Failed to download remote partition binary: [%u]", response.StatusCode());
     return false;
   }
 
+  if (response.ContentLength() > partition->size) {
+    OS_LOGE(TAG, "Remote partition binary is too large");
+    return false;
+  }
+
+  // Erase app partition.
+  if (esp_partition_erase_range(partition, 0, partition->size) != ESP_OK) {
+    OS_LOGE(TAG, "Failed to erase partition in preparation for update");
+    return false;
+  }
+
+  contentLength = response.ContentLength();
+
+  lastProgress = OpenShock::millis();
+  progressCallback(0, contentLength, 0.0f);
+
+  contentLength = response.ReadStream(dataWriter);
+
   progressCallback(contentLength, contentLength, 1.0f);
-  OS_LOGD(TAG, "Wrote %u bytes to partition", appBinaryResponse.data);
+  OS_LOGD(TAG, "Wrote %u bytes to partition", contentLength);
 
   std::array<uint8_t, 32> localHash;
   if (!sha256.finish(localHash)) {
