@@ -6,31 +6,31 @@ std::string_view OpenShock::DomainUtils::GetDomainFromUrl(std::string_view url) 
   }
 
   // Remove the protocol eg. "https://api.example.com:443/path" -> "api.example.com:443/path"
-  auto seperator = url.find("://");
-  if (seperator != std::string_view::npos) {
-    url = url.substr(seperator + 3);
+  auto separator = url.find("://");
+  if (separator != std::string_view::npos) {
+    url.substr(separator + 3);
   }
 
   // Remove the path eg. "api.example.com:443/path" -> "api.example.com:443"
-  seperator = url.find('/');
-  if (seperator != std::string_view::npos) {
-    url = url.substr(0, seperator);
+  separator = url.find('/');
+  if (separator != std::string_view::npos) {
+    url = url.substr(0, separator);
   }
 
   // Remove the port eg. "api.example.com:443" -> "api.example.com"
-  seperator = url.rfind(':');
-  if (seperator != std::string_view::npos) {
-    url = url.substr(0, seperator);
+  separator = url.rfind(':');
+  if (separator != std::string_view::npos) {
+    url = url.substr(0, separator);
   }
 
   // Remove all subdomains eg. "api.example.com" -> "example.com"
-  seperator = url.rfind('.');
-  if (seperator == std::string_view::npos) {
+  separator = url.rfind('.');
+  if (separator == std::string_view::npos) {
     return url;  // E.g. "localhost"
   }
-  seperator = url.rfind('.', seperator - 1);
-  if (seperator != std::string_view::npos) {
-    url = url.substr(seperator + 1);
+  separator = url.rfind('.', separator - 1);
+  if (separator != std::string_view::npos) {
+    url = url.substr(separator + 1);
   }
 
   return url;
