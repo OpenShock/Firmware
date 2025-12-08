@@ -28,28 +28,45 @@ const uint16_t k_estopCheckMask       = 0xFFFF >> ((sizeof(uint16_t) * 8) - k_es
 
 static OpenShock::SimpleMutex s_estopMutex = {};
 static gpio_num_t s_estopPin               = GPIO_NUM_NC;
-static TaskHandle_t s_estopTask;
+static TaskHandle_t s_estopTask            = nullptr;
 
-static EStopState s_estopState    = EStopState::Idle;
-static bool s_estopActive         = false;
-static int64_t s_estopActivatedAt = 0;
+static EStopState s_estopState       = EStopState::Idle;
+static bool       s_estopActive      = false;
+static int64_t    s_estopActivatedAt = 0;
 
 static volatile bool s_externallyTriggered = false;
 
+static bool s_estopInitialized = false;
+
+// Forward declarations
+static bool estopmgr_setestopenabled(bool enabled);
+static bool _setEStopPinImpl(gpio_num_t pin);
+
 static void estopmanager_updateexternals(bool isActive, bool isAwaitingRelease)
 {
-  // Post an event
-  ESP_ERROR_CHECK(esp_event_post(OPENSHOCK_EVENTS, OPENSHOCK_EVENT_ESTOP_STATE_CHANGED, &s_estopState, sizeof(s_estopState), portMAX_DELAY));
+  // Parameters are here for future extension (e.g. different event payload types).
+  (void)isActive;
+  (void)isAwaitingRelease;
+
+  // Post the current state as the event payload
+  ESP_ERROR_CHECK(esp_event_post(OPENSHOCK_EVENTS,
+                                 OPENSHOCK_EVENT_ESTOP_STATE_CHANGED,
+                                 &s_estopState,
+                                 sizeof(s_estopState),
+                                 portMAX_DELAY));
 }
 
-// Samples the estop at a fixed rate and sends messages to the estop event handler task
+// Samples the estop at a fixed rate and updates internal state + events
 static void estopmgr_checkertask(void* pvParameters)
 {
-  uint16_t history = 0xFFFF;  // Bit history of samples, 0 is pressed
+  (void)pvParameters;
 
-  EStopState state      = EStopState::Idle;
+  // Bit history of samples, 0 is pressed, 1 is released.
+  uint16_t history = 0xFFFF;
+
   int64_t deactivatesAt = 0;
 
+  // Debounced button state: true == pressed, false == released
   bool lastBtnState = false;
 
   for (;;) {
@@ -60,64 +77,79 @@ static void estopmgr_checkertask(void* pvParameters)
     int64_t now = OpenShock::millis();
 
     bool btnState;
+
+    // Handle external trigger: forcibly set the E-Stop active.
     if (s_externallyTriggered) {
       s_externallyTriggered = false;
 
-      // Emulate an EStop activation
-      history       = 0xFFFF;
-      state         = EStopState::Active;
-      deactivatesAt = 0;
-      lastBtnState  = false;
-      btnState      = false;
-    } else {
-      // Sample the EStop
-      history = (history << 1) | gpio_get_level(s_estopPin);
+      s_estopActive      = true;
+      s_estopActivatedAt = now;
+      s_estopState       = EStopState::Active;
 
-      // Check if the EStop is released (not all bits are 1)
-      btnState = (history & k_estopCheckMask) != k_estopCheckMask;
-      if (btnState == lastBtnState) {
-        // If the state hasn't changed, handle timing transitions
-        if (state == EStopState::ActiveClearing && now > deactivatesAt) {
-          state = EStopState::AwaitingRelease;
-          estopmanager_updateexternals(s_estopActive, true);
-        }
-        continue;
-      }
-      lastBtnState = btnState;
+      estopmanager_updateexternals(s_estopActive, false);
+
+      // Do not modify history/lastBtnState here; allow hardware to take over
+      // on subsequent iterations.
+      continue;
     }
 
-    switch (state) {
+    // Sample the EStop input
+    history = static_cast<uint16_t>((history << 1) | gpio_get_level(s_estopPin));
+
+    // Debounce:
+    // If all recent bits (k_estopCheckCount) are 1 -> fully released.
+    // If any bit is 0 -> we consider it pressed (or bouncing toward pressed).
+    btnState = (history & k_estopCheckMask) != k_estopCheckMask;  // true == pressed
+
+    // If the debounced state hasn't changed, we only care about timing transitions.
+    if (btnState == lastBtnState) {
+      if (s_estopState == EStopState::ActiveClearing && now > deactivatesAt) {
+        s_estopState = EStopState::AwaitingRelease;
+        estopmanager_updateexternals(s_estopActive, true);
+      }
+      continue;
+    }
+
+    // State changed: update lastBtnState and run the state machine.
+    lastBtnState = btnState;
+
+    switch (s_estopState) {
       case EStopState::Idle:
-        if (btnState) {
-          state              = EStopState::Active;
+        if (btnState) {  // pressed
+          s_estopState       = EStopState::Active;
           s_estopActive      = true;
           s_estopActivatedAt = now;
         }
         break;
+
       case EStopState::Active:
-        if (btnState) {
-          state         = EStopState::ActiveClearing;
+        if (btnState) {  // still pressed -> start hold-to-clear timer
+          s_estopState  = EStopState::ActiveClearing;
           deactivatesAt = now + k_estopHoldToClearTime;
         }
         break;
+
       case EStopState::ActiveClearing:
-        if (!btnState) {
-          state = EStopState::Active;
+        if (!btnState) {  // released before hold time -> go back to Active
+          s_estopState = EStopState::Active;
         } else if (now > deactivatesAt) {
-          state = EStopState::AwaitingRelease;
+          s_estopState = EStopState::AwaitingRelease;
         }
         break;
+
       case EStopState::AwaitingRelease:
-        if (!btnState) {
-          state         = EStopState::Idle;
+        if (!btnState) {  // fully released -> clear E-Stop
+          s_estopState  = EStopState::Idle;
           s_estopActive = false;
         }
         break;
+
       default:
-        continue;
+        // Should never happen
+        break;
     }
 
-    estopmanager_updateexternals(s_estopActive, state == EStopState::AwaitingRelease);
+    estopmanager_updateexternals(s_estopActive, s_estopState == EStopState::AwaitingRelease);
   }
 }
 
@@ -127,6 +159,7 @@ static bool estopmgr_setestopenabled(bool enabled)
     if (s_estopTask == nullptr) {
       if (TaskUtils::TaskCreateUniversal(estopmgr_checkertask, TAG, 4096, nullptr, 5, &s_estopTask, 1) != pdPASS) {  // TODO: Profile stack size and set priority
         OS_LOGE(TAG, "Failed to create EStop event handler task");
+        s_estopTask = nullptr;
         return false;
       }
     }
@@ -200,7 +233,6 @@ static bool _setEStopPinImpl(gpio_num_t pin)
   return true;
 }
 
-static bool s_estopInitialized = false;
 bool EStopManager::Init()
 {
   if (s_estopInitialized) {
@@ -226,6 +258,11 @@ bool EStopManager::Init()
     return false;
   }
 
+  // Ensure known initial state
+  s_estopState       = EStopState::Idle;
+  s_estopActive      = false;
+  s_estopActivatedAt = 0;
+
   return true;
 }
 
@@ -245,9 +282,7 @@ bool EStopManager::SetEStopEnabled(bool enabled)
     }
   }
 
-  bool success = estopmgr_setestopenabled(enabled);
-
-  return success;
+  return estopmgr_setestopenabled(enabled);
 }
 
 bool EStopManager::SetEStopPin(gpio_num_t pin)
@@ -269,5 +304,7 @@ int64_t EStopManager::LastEStopped()
 
 void EStopManager::Trigger()
 {
+  // This will be picked up by the checker task and converted into an
+  // E-Stop activation (s_estopState = Active, s_estopActive = true, etc.)
   s_externallyTriggered = true;
 }
