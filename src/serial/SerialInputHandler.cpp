@@ -22,10 +22,7 @@ const char* const TAG = "SerialInputHandler";
 #include "util/TaskUtils.h"
 #include "wifi/WiFiManager.h"
 
-#include <Arduino.h>
-
 #include <cJSON.h>
-#include <Esp.h>
 
 #include <cstdio>
 #include <cstring>
@@ -124,7 +121,7 @@ void _printCompleteHelp()
   }
 
   SerialInputHandler::PrintWelcomeHeader();
-  ::Serial.print(buffer.data());
+  write(STDOUT_FILENO, buffer.data(), buffer.size());
 }
 
 void _printCommandHelp(Serial::CommandGroup& group)
@@ -257,7 +254,7 @@ void _printCommandHelp(Serial::CommandGroup& group)
   buffer.push_back('\r');
   buffer.push_back('\n');
 
-  ::Serial.print(buffer.data());
+  write(STDOUT_FILENO, buffer.data(), buffer.size());
 }
 
 void _handleHelpCommand(std::string_view arg, bool isAutomated)
@@ -626,22 +623,27 @@ void SerialInputHandler::SetSerialEchoEnabled(bool enabled)
 
 void SerialInputHandler::PrintWelcomeHeader()
 {
-  ::Serial.println("\
+  auto string = "\
 ============== OPENSHOCK ==============\r\n\
   Contribute @ github.com/OpenShock\r\n\
   Discuss    @ discord.gg/OpenShock\r\n\
   Type 'help' for available commands\r\n\
 =======================================\r\n\
-");
+\r\n\
+"sv;
+
+  write(STDOUT_FILENO, string.data(), string.size());
 }
 
 void SerialInputHandler::PrintVersionInfo()
 {
-  ::Serial.print("\
+  auto string = "\
   Version:  " OPENSHOCK_FW_VERSION "\r\n\
     Build:  " OPENSHOCK_FW_MODE "\r\n\
    Commit:  " OPENSHOCK_FW_GIT_COMMIT "\r\n\
     Board:  " OPENSHOCK_FW_BOARD "\r\n\
      Chip:  " OPENSHOCK_FW_CHIP "\r\n\
-");
+"sv;
+
+  write(STDOUT_FILENO, string.data(), string.size());
 }
