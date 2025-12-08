@@ -1,3 +1,57 @@
+# Version 1.5.0-rc.1 Release Notes
+
+This release candidate focuses on **radio reliability**, **firmware behavior improvements**, and a refreshed **frontend**.
+
+## Highlights (User-Visible Firmware Changes)
+
+- Major **RF/RMT transmitter rework** for improved timing accuracy and more reliable shocker communication.
+- Updated **AssignLCG** integration using the new backend endpoint (removes the old LCG override setting).
+- Hub now reports its Wi-Fi signal strength (RSSI), this will be used to show connection health in UI's.
+- **Serial output now uses CRLF** line endings for improved compatibility with Windows terminals.
+- Added **T330 shocker protocol** support.
+
+## Radio & Timing
+
+- Reworked RF pipeline with more consistent timing and fewer internal allocations.
+- Fixed timing issues for **CaiXianlin** and improved **PET998DR** handling.
+- Additional guardrails added to the RF subsystem to prevent stalls/crash loops.
+
+## Firmware Behavior / System
+
+- Introduced internal **execution time limits** to prevent firmware from getting stuck in long-running operations.
+- Replaced all `ESP.restart()` usage with ESP-IDF native `esp_restart()` calls
+- Improved OTA, Wi-Fi initialization, and crash-loop resilience.
+
+## HTTP & Gateway
+
+- Clearer/more consistent HTTP error and status behavior.
+- Improved 401 handling and token recovery.
+- AssignLCG now reports firmware version and uses the updated endpoint.
+
+## Frontend & UX
+
+- Migrated to **Svelte 5 + shadcn**.
+- Updated to **Tailwind CSS v4** and reduced frontend bundle size.
+- UI palette synced with website.
+
+## Misc / Internal Changes
+
+- PlatformIO, espressif32, FlatBuffers, Node, pnpm, and other dependency updates.
+- Build reproducibility improvements and CI cleanup.
+- Various memory fixes, warning cleanups, and improved parsing logic.
+
+---
+
+## Breaking Changes
+
+- **LCG override removed** (new AssignLCG endpoint required).
+- **Serial output now uses CRLF** (update scripts if needed).
+
+## Notes
+
+- RF timing changes are substantial; please report shocker-specific regressions.
+- Scripts relying on legacy AssignLCG behavior may need updates.
+
 # Version 1.4.0 Release Notes
 
 This release is packed with bugfixes, optimizations, code cleanup, prepwork for ESP-IDF, and some features!

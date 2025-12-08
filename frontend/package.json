@@ -1,6 +1,6 @@
 {
 	"name": "frontend",
-	"version": "0.0.1",
+	"version": "1.5.0-rc.1",
 	"private": true,
 	"type": "module",
 	"scripts": {
@@ -45,7 +45,7 @@
 		"tailwindcss-animate": "^1.0.7",
 		"typescript": "^5.8.2",
 		"typescript-eslint": "^8.26.1",
-		"vite": "^6.3.6",
+		"vite": "^6.4.1",
 		"vitest": "^3.0.9"
 	},
 	"engines": {

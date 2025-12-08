@@ -12,6 +12,7 @@
 
 namespace OpenShock {
   class PinPatternManager {
+    DISABLE_DEFAULT(PinPatternManager);
     DISABLE_COPY(PinPatternManager);
     DISABLE_MOVE(PinPatternManager);
 
@@ -21,7 +22,6 @@ namespace OpenShock {
       uint32_t duration;
     };
 
-    PinPatternManager() = delete;
     PinPatternManager(gpio_num_t gpioPin);
     ~PinPatternManager();
 
