@@ -506,7 +506,7 @@ void _processSerialLine(std::string_view line)
 
   // If the first argument is not empty, try to find a subcommand that matches
   if (!firstArg.empty()) {
-    for (const auto& cmd : it->second.commands()) {
+    for (Serial::CommandEntry& cmd : it->second.commands()) {
       // Check subcommand name
       if (cmd.name() != firstArg) {
         continue;
@@ -528,7 +528,7 @@ void _processSerialLine(std::string_view line)
   }
 
   // If no subcommand was found, try to find a default command
-  for (const auto& cmd : it->second.commands()) {
+  for (Serial::CommandEntry& cmd : it->second.commands()) {
     // Skip subcommands
     if (!cmd.name().empty()) {
       continue;
