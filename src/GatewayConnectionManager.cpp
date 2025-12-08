@@ -105,8 +105,7 @@ AccountLinkResultCode GatewayConnectionManager::Link(std::string_view linkCode)
     return AccountLinkResultCode::InvalidCode;
   }
 
-  HTTP::HTTPClient client;
-  auto response = HTTP::JsonAPI::LinkAccount(client, linkCode);
+  auto response = HTTP::JsonAPI::LinkAccount(linkCode);
   if (!response.Ok()) {
 
     if (response.Error() == HTTP::HTTPError::RateLimited) {
@@ -183,8 +182,7 @@ bool FetchHubInfo(const char* authToken)
     return false;
   }
 
-  HTTP::HTTPClient client;
-  auto response = HTTP::JsonAPI::GetHubInfo(client, authToken);
+  auto response = HTTP::JsonAPI::GetHubInfo(authToken);
   if (!response.Ok()) {
     if (response.Error() == HTTP::HTTPError::RateLimited) {
       return false;  // Just return false, don't spam the console with errors
@@ -254,8 +252,7 @@ bool StartConnectingToLCG()
     return false;
   }
 
-  HTTP::HTTPClient client;
-  auto response = HTTP::JsonAPI::AssignLcg(client, authToken.c_str());
+  auto response = HTTP::JsonAPI::AssignLcg(authToken.c_str());
   if (!response.Ok()) {
     if (response.Error() == HTTP::HTTPError::RateLimited) {
       return false;  // Just return false, don't spam the console with errors

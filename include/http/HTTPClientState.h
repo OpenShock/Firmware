@@ -19,12 +19,12 @@ namespace OpenShock::HTTP {
     DISABLE_COPY(HTTPClientState);
     DISABLE_MOVE(HTTPClientState);
   public:
-    HTTPClientState(uint32_t timeoutMs);
+    HTTPClientState(const char* url, uint32_t timeoutMs);
     ~HTTPClientState();
 
-    inline esp_err_t SetHeader(const char* key, const char* value) {
-      return esp_http_client_set_header(m_handle, key, value);
-    }
+    esp_err_t SetUrl(const char* url);
+
+    esp_err_t SetHeader(const char* key, const char* value);
 
     struct HeaderEntry {
       std::string key;
@@ -40,7 +40,7 @@ namespace OpenShock::HTTP {
       std::map<std::string, std::string> headers{};
     };
 
-    StartRequestResult StartRequest(esp_http_client_method_t method, const char* url, int writeLen);
+    StartRequestResult StartRequest(esp_http_client_method_t method, int writeLen);
 
     // High-throughput streaming logic
     ReadResult<uint32_t> ReadStreamImpl(DownloadCallback cb);
@@ -71,6 +71,7 @@ namespace OpenShock::HTTP {
     }
 
     inline esp_err_t Close() {
+      if (m_handle == nullptr) return ESP_FAIL;
       return esp_http_client_close(m_handle);
     }
   private:

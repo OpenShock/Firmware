@@ -426,8 +426,8 @@ static void otaum_updatetask(void* arg)
 
 static bool _tryGetStringList(const char* url, std::vector<std::string>& list)
 {
-  HTTP::HTTPClient client;
-  auto response = client.Get(url);
+  HTTP::HTTPClient client(url);
+  auto response = client.Get();
   if (!response.Ok()) {
     OS_LOGE(TAG, "Failed to fetch list");
     return false;
@@ -550,8 +550,8 @@ bool OtaUpdateManager::TryGetFirmwareVersion(OtaUpdateChannel channel, OpenShock
 
   OS_LOGD(TAG, "Fetching firmware version from %s", channelIndexUrl);
 
-  HTTP::HTTPClient client;
-  auto response = client.Get(channelIndexUrl);
+  HTTP::HTTPClient client(channelIndexUrl);
+  auto response = client.Get();
   if (!response.Ok()) {
     OS_LOGE(TAG, "Failed to fetch firmware version");
     return false;
@@ -627,8 +627,8 @@ bool OtaUpdateManager::TryGetFirmwareRelease(const OpenShock::SemVer& version, F
   }
 
   // Fetch hashes.
-  HTTP::HTTPClient client;
-  auto response = client.Get(sha256HashesUrl.c_str());
+  HTTP::HTTPClient client(sha256HashesUrl.c_str());
+  auto response = client.Get();
   if (!response.Ok()) {
     OS_LOGE(TAG, "Failed to fetch hashes");
     return false;

@@ -58,8 +58,8 @@ bool OpenShock::FlashPartitionFromUrl(const esp_partition_t* partition, const ch
   };
 
   // Start streaming binary to app partition.
-  HTTP::HTTPClient client(180'000); // 3 minutes timeout
-  auto response = client.Get(remoteUrl);
+  HTTP::HTTPClient client(remoteUrl, 180'000); // 3 minutes timeout
+  auto response = client.Get();
   if (!response.Ok() || (response.StatusCode() != 200 && response.StatusCode() != 304)) {
     OS_LOGE(TAG, "Failed to download remote partition binary: [%u]", response.StatusCode());
     return false;

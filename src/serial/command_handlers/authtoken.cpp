@@ -21,15 +21,11 @@ void _handleAuthtokenCommand(std::string_view arg, bool isAutomated) {
 
   std::string token = std::string(arg);
 
-  // Scope to immediately destroy client after use
-  {
-    OpenShock::HTTP::HTTPClient client;
-    auto apiResponse = OpenShock::HTTP::JsonAPI::GetHubInfo(client, token.c_str());
+  auto apiResponse = OpenShock::HTTP::JsonAPI::GetHubInfo(token.c_str());
 
-    if (apiResponse.StatusCode() == 401) {
-      SERPR_ERROR("Invalid auth token, refusing to save it!");
-      return;
-    }
+  if (apiResponse.StatusCode() == 401) {
+    SERPR_ERROR("Invalid auth token, refusing to save it!");
+    return;
   }
 
   // If we have some other kind of request fault just set it anyway, we probably arent connected to a network

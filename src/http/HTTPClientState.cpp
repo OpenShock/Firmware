@@ -15,7 +15,7 @@ static const uint32_t HTTP_DOWNLOAD_SIZE_LIMIT = 200 * 1024 * 1024;  // 200 MB
 
 using namespace OpenShock;
 
-HTTP::HTTPClientState::HTTPClientState(uint32_t timeoutMs)
+HTTP::HTTPClientState::HTTPClientState(const char* url, uint32_t timeoutMs)
   : m_handle(nullptr)
   , m_reading(false)
   , m_retryAfterSeconds(0)
@@ -24,6 +24,7 @@ HTTP::HTTPClientState::HTTPClientState(uint32_t timeoutMs)
   esp_http_client_config_t cfg;
   memset(&cfg, 0, sizeof(cfg));
 
+  cfg.url                   = url;
   cfg.user_agent            = OpenShock::Constants::FW_USERAGENT;
   cfg.timeout_ms            = static_cast<int>(std::min<uint32_t>(timeoutMs, INT32_MAX));
   cfg.disable_auto_redirect = true;
@@ -31,8 +32,7 @@ HTTP::HTTPClientState::HTTPClientState(uint32_t timeoutMs)
   cfg.transport_type        = HTTP_TRANSPORT_OVER_SSL;
   cfg.user_data             = reinterpret_cast<void*>(this);
   cfg.is_async              = false;
-  cfg.use_global_ca_store   = true;
-  #warning This still uses SSL, upgrade to TLS! (latest ESP-IDF)
+  cfg.use_global_ca_store   = false;
 
   m_handle = esp_http_client_init(&cfg);
 }
@@ -45,8 +45,30 @@ HTTP::HTTPClientState::~HTTPClientState()
   }
 }
 
-HTTP::HTTPClientState::StartRequestResult HTTP::HTTPClientState::StartRequest(esp_http_client_method_t method, const char* url, int writeLen)
+esp_err_t HTTP::HTTPClientState::SetUrl(const char* url)
 {
+  if (m_handle == nullptr) {
+    return ESP_FAIL;
+  }
+
+  return esp_http_client_set_url(m_handle, url);
+}
+
+esp_err_t HTTP::HTTPClientState::SetHeader(const char* key, const char* value)
+{
+  if (m_handle == nullptr) {
+    return ESP_FAIL;
+  }
+
+  return esp_http_client_set_header(m_handle, key, value);
+}
+
+HTTP::HTTPClientState::StartRequestResult HTTP::HTTPClientState::StartRequest(esp_http_client_method_t method, int writeLen)
+{
+  if (m_handle == nullptr) {
+    return { .error = HTTPError::ConnectionClosed };
+  }
+
   esp_err_t err;
 
   if (m_reading) {
@@ -55,9 +77,6 @@ HTTP::HTTPClientState::StartRequestResult HTTP::HTTPClientState::StartRequest(es
 
   m_retryAfterSeconds = 0;
   m_headers.clear();
-
-  err = esp_http_client_set_url(m_handle, url);
-  if (err != ESP_OK) return { .error = HTTPError::InvalidUrl };
 
   err = esp_http_client_set_method(m_handle, method);
   if (err != ESP_OK) return { .error = HTTPError::InvalidHttpMethod };

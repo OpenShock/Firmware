@@ -33,8 +33,8 @@ void _handleDomainCommand(std::string_view arg, bool isAutomated) {
   char uri[OPENSHOCK_URI_BUFFER_SIZE];
   sprintf(uri, "https://%.*s/1", arg.length(), arg.data());
 
-  OpenShock::HTTP::HTTPClient client;
-  auto response = client.GetJson<OpenShock::Serialization::JsonAPI::BackendVersionResponse>(uri, OpenShock::Serialization::JsonAPI::ParseBackendVersionJsonResponse);
+  OpenShock::HTTP::HTTPClient client(uri);
+  auto response = client.GetJson<OpenShock::Serialization::JsonAPI::BackendVersionResponse>(OpenShock::Serialization::JsonAPI::ParseBackendVersionJsonResponse);
   if (!response.Ok() || response.StatusCode() != 200) {
     SERPR_ERROR("Tried to connect to \"%.*s\", but failed with status [%d] (%s), refusing to save domain to config", arg.length(), arg.data(), response.StatusCode(), OpenShock::HTTP::HTTPErrorToString(response.Error()));
     return;
