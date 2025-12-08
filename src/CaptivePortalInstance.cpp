@@ -198,7 +198,7 @@ void CaptivePortalInstance::handleWebSocketEvent(uint8_t socketId, WebSocketMess
       break;
     default:
       m_socketDeFragger.clear();
-      OS_LOGE(TAG, "Unknown WebSocket event type: %u", type);
+      OS_LOGE(TAG, "Unknown WebSocket event type: %hhu", static_cast<uint8_t>(type));
       break;
   }
 }

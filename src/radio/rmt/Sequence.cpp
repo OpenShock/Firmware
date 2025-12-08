@@ -34,7 +34,7 @@ inline static bool fillSequenceImpl(rmt_data_t* data, ShockerModelType modelType
     case ShockerModelType::Petrainer998DR:
       return Rmt::Petrainer998DREncoder::FillBuffer(data, shockerId, commandType, intensity);
     default:
-      OS_LOGE(TAG, "Unknown shocker model: %u", modelType);
+      OS_LOGE(TAG, "Unknown shocker model: %hhu", static_cast<uint8_t>(modelType));
       return false;
   }
 }
