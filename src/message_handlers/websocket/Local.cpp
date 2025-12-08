@@ -49,10 +49,10 @@ static std::array<Handlers::HandlerType, HANDLER_COUNT> s_localHandlers = []() {
   return handlers;
 }();
 
-void MessageHandlers::WebSocket::HandleLocalBinary(uint8_t socketId, const uint8_t* data, std::size_t len)
+void MessageHandlers::WebSocket::HandleLocalBinary(uint8_t socketId, tcb::span<const uint8_t> data)
 {
   // Deserialize
-  auto msg = flatbuffers::GetRoot<Schemas::LocalToHubMessage>(data);
+  auto msg = flatbuffers::GetRoot<Schemas::LocalToHubMessage>(data.data());
   if (msg == nullptr) {
     OS_LOGE(TAG, "Failed to deserialize message");
     return;
@@ -62,7 +62,7 @@ void MessageHandlers::WebSocket::HandleLocalBinary(uint8_t socketId, const uint8
   flatbuffers::Verifier::Options verifierOptions {
     .max_size = 4096,  // TODO: Profile this
   };
-  flatbuffers::Verifier verifier(data, len, verifierOptions);
+  flatbuffers::Verifier verifier(data.data(), data.size(), verifierOptions);
   if (!msg->Verify(verifier)) {
     OS_LOGE(TAG, "Failed to verify message");
     return;

@@ -74,7 +74,7 @@ bool _tryDeserializeConfig(const uint8_t* buffer, std::size_t bufferLen, OpenSho
 
   return true;
 }
-bool _tryLoadConfig(std::vector<uint8_t>& buffer)
+bool _tryLoadConfig(TinyVec<uint8_t>& buffer)
 {
   File file = _configFS.open("/config", "rb");
   if (!file) {
@@ -100,7 +100,7 @@ bool _tryLoadConfig(std::vector<uint8_t>& buffer)
 }
 bool _tryLoadConfig()
 {
-  std::vector<uint8_t> buffer;
+  TinyVec<uint8_t> buffer;
   if (!_tryLoadConfig(buffer)) {
     return false;
   }
@@ -219,7 +219,7 @@ bool Config::SaveFromFlatBuffer(const Serialization::Configuration::HubConfig* c
   return _trySaveConfig();
 }
 
-bool Config::GetRaw(std::vector<uint8_t>& buffer)
+bool Config::GetRaw(TinyVec<uint8_t>& buffer)
 {
   CONFIG_LOCK_READ(false);
 
@@ -575,11 +575,11 @@ bool Config::GetWiFiHostname(std::string& out)
   return true;
 }
 
-bool Config::SetWiFiHostname(std::string_view hostname)
+bool Config::SetWiFiHostname(std::string hostname)
 {
   CONFIG_LOCK_WRITE(false);
 
-  _configData.wifi.hostname = std::string(hostname);
+  _configData.wifi.hostname = std::move(hostname);
 
   return _trySaveConfig();
 }
@@ -593,11 +593,11 @@ bool Config::GetBackendDomain(std::string& out)
   return true;
 }
 
-bool Config::SetBackendDomain(std::string_view domain)
+bool Config::SetBackendDomain(std::string domain)
 {
   CONFIG_LOCK_WRITE(false);
 
-  _configData.backend.domain = std::string(domain);
+  _configData.backend.domain = std::move(domain);
   return _trySaveConfig();
 }
 
@@ -617,11 +617,11 @@ bool Config::GetBackendAuthToken(std::string& out)
   return true;
 }
 
-bool Config::SetBackendAuthToken(std::string_view token)
+bool Config::SetBackendAuthToken(std::string token)
 {
   CONFIG_LOCK_WRITE(false);
 
-  _configData.backend.authToken = std::string(token);
+  _configData.backend.authToken = std::move(token);
   return _trySaveConfig();
 }
 
@@ -630,38 +630,6 @@ bool Config::ClearBackendAuthToken()
   CONFIG_LOCK_WRITE(false);
 
   _configData.backend.authToken.clear();
-  return _trySaveConfig();
-}
-
-bool Config::HasBackendLCGOverride()
-{
-  CONFIG_LOCK_READ(false);
-
-  return !_configData.backend.lcgOverride.empty();
-}
-
-bool Config::GetBackendLCGOverride(std::string& out)
-{
-  CONFIG_LOCK_READ(false);
-
-  out = _configData.backend.lcgOverride;
-
-  return true;
-}
-
-bool Config::SetBackendLCGOverride(std::string_view lcgOverride)
-{
-  CONFIG_LOCK_WRITE(false);
-
-  _configData.backend.lcgOverride = std::string(lcgOverride);
-  return _trySaveConfig();
-}
-
-bool Config::ClearBackendLCGOverride()
-{
-  CONFIG_LOCK_WRITE(false);
-
-  _configData.backend.lcgOverride.clear();
   return _trySaveConfig();
 }
 

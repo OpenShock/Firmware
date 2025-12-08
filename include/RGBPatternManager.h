@@ -14,11 +14,11 @@
 
 namespace OpenShock {
   class RGBPatternManager {
+    DISABLE_DEFAULT(RGBPatternManager);
     DISABLE_COPY(RGBPatternManager);
     DISABLE_MOVE(RGBPatternManager);
 
   public:
-    RGBPatternManager() = delete;
     RGBPatternManager(gpio_num_t gpioPin);
     ~RGBPatternManager();
 

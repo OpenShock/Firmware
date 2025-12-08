@@ -5,8 +5,8 @@ const char* const TAG = "WSGateway";
 #include <esp_wifi.h>
 
 #include "config/Config.h"
+#include "Core.h"
 #include "Logging.h"
-#include "Time.h"
 
 using namespace OpenShock::Serialization;
 
@@ -20,7 +20,7 @@ bool Gateway::SerializePongMessage(Common::SerializationCallbackFn callback)
 
   int rssi;
   esp_err_t err = esp_wifi_sta_get_rssi(&rssi);
-  if (err != ERR_OK) {
+  if (err != ESP_OK) {
     OS_LOGE(TAG, "Failed to get WiFi RSSI: %d", err);
     return false;
   }
@@ -33,9 +33,7 @@ bool Gateway::SerializePongMessage(Common::SerializationCallbackFn callback)
 
   Gateway::FinishHubToGatewayMessageBuffer(builder, msg);
 
-  auto span = builder.GetBufferSpan();
-
-  return callback(span.data(), span.size());
+  return callback(builder.GetBufferSpan());
 }
 
 bool Gateway::SerializeBootStatusMessage(int32_t updateId, OpenShock::FirmwareBootType bootType, Common::SerializationCallbackFn callback)
@@ -50,9 +48,7 @@ bool Gateway::SerializeBootStatusMessage(int32_t updateId, OpenShock::FirmwareBo
 
   Gateway::FinishHubToGatewayMessageBuffer(builder, msg);
 
-  auto span = builder.GetBufferSpan();
-
-  return callback(span.data(), span.size());
+  return callback(builder.GetBufferSpan());
 }
 
 bool Gateway::SerializeOtaUpdateStartedMessage(int32_t updateId, const OpenShock::SemVer& version, Common::SerializationCallbackFn callback)
@@ -67,9 +63,7 @@ bool Gateway::SerializeOtaUpdateStartedMessage(int32_t updateId, const OpenShock
 
   Gateway::FinishHubToGatewayMessageBuffer(builder, msg);
 
-  auto span = builder.GetBufferSpan();
-
-  return callback(span.data(), span.size());
+  return callback(builder.GetBufferSpan());
 }
 
 bool Gateway::SerializeOtaUpdateProgressMessage(int32_t updateId, Types::OtaUpdateProgressTask task, float progress, Common::SerializationCallbackFn callback)
@@ -82,9 +76,7 @@ bool Gateway::SerializeOtaUpdateProgressMessage(int32_t updateId, Types::OtaUpda
 
   Gateway::FinishHubToGatewayMessageBuffer(builder, msg);
 
-  auto span = builder.GetBufferSpan();
-
-  return callback(span.data(), span.size());
+  return callback(builder.GetBufferSpan());
 }
 
 bool Gateway::SerializeOtaUpdateFailedMessage(int32_t updateId, std::string_view message, bool fatal, Common::SerializationCallbackFn callback)
@@ -99,7 +91,5 @@ bool Gateway::SerializeOtaUpdateFailedMessage(int32_t updateId, std::string_view
 
   Gateway::FinishHubToGatewayMessageBuffer(builder, msg);
 
-  auto span = builder.GetBufferSpan();
-
-  return callback(span.data(), span.size());
+  return callback(builder.GetBufferSpan());
 }

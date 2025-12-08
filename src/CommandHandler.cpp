@@ -7,6 +7,7 @@ const char* const TAG = "CommandHandler";
 #include "Chipset.h"
 #include "Common.h"
 #include "config/Config.h"
+#include "Core.h"
 #include "estop/EStopManager.h"
 #include "estop/EStopState.h"
 #include "events/Events.h"
@@ -14,7 +15,6 @@ const char* const TAG = "CommandHandler";
 #include "radio/RFTransmitter.h"
 #include "ReadWriteMutex.h"
 #include "SimpleMutex.h"
-#include "Time.h"
 #include "util/TaskUtils.h"
 
 #include <freertos/queue.h>
@@ -47,7 +47,7 @@ static TaskHandle_t s_keepAliveTaskHandle         = nullptr;
 
 using namespace OpenShock;
 
-void _keepAliveTask(void* arg)
+static void commandhandler_keepalivetask(void* arg)
 {
   (void)arg;
 
@@ -122,7 +122,7 @@ bool _internalSetKeepAliveEnabled(bool enabled)
       return false;
     }
 
-    if (TaskUtils::TaskCreateExpensive(_keepAliveTask, "KeepAliveTask", 4096, nullptr, 1, &s_keepAliveTaskHandle) != pdPASS) {  // PROFILED: 1.5KB stack usage
+    if (TaskUtils::TaskCreateExpensive(commandhandler_keepalivetask, "KeepAliveTask", 4096, nullptr, 1, &s_keepAliveTaskHandle) != pdPASS) {  // PROFILED: 1.5KB stack usage
       OS_LOGE(TAG, "Failed to create keep-alive task");
 
       vQueueDelete(s_keepAliveQueue);
@@ -151,7 +151,7 @@ bool _internalSetKeepAliveEnabled(bool enabled)
   return true;
 }
 
-void _handleOpenShockEStopStateChangeEvent(void* event_handler_arg, esp_event_base_t event_base, int32_t event_id, void* event_data)
+static void commandhandler_handleestopstatechange(void* event_handler_arg, esp_event_base_t event_base, int32_t event_id, void* event_data)
 {
   (void)event_handler_arg;
   (void)event_base;
@@ -213,7 +213,7 @@ bool CommandHandler::Init()
     return false;
   }
 
-  err = esp_event_handler_register(OPENSHOCK_EVENTS, OPENSHOCK_EVENT_ESTOP_STATE_CHANGED, _handleOpenShockEStopStateChangeEvent, nullptr);
+  err = esp_event_handler_register(OPENSHOCK_EVENTS, OPENSHOCK_EVENT_ESTOP_STATE_CHANGED, commandhandler_handleestopstatechange, nullptr);
   if (err != ESP_OK) {
     OS_LOGE(TAG, "Failed to register event handler for OPENSHOCK_EVENTS: %s", esp_err_to_name(err));
     return false;
@@ -297,18 +297,6 @@ bool CommandHandler::HandleCommand(ShockerModelType model, uint16_t shockerId, S
     return false;
   }
 
-  // Stop logic
-  if (type == ShockerCommandType::Stop) {
-    OS_LOGV(TAG, "Stop command received, clearing pending commands");
-
-    type       = ShockerCommandType::Vibrate;
-    intensity  = 0;
-    durationMs = 300;
-
-    s_rfTransmitter->ClearPendingCommands();
-  } else {
-    OS_LOGD(TAG, "Command received: %u %u %u %u", model, shockerId, type, intensity);
-  }
 
   bool ok = s_rfTransmitter->SendCommand(model, shockerId, type, intensity, durationMs);
 

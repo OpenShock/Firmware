@@ -53,23 +53,13 @@
   onmouseup={stopTimers}
   ontouchend={stopTimers}
   onmouseleave={stopTimers}
-  class={timer ? 'violent-shake' : undefined}
+  class={`focus:outline-hidden h-10 select-none whitespace-nowrap rounded-md bg-[#7f1d1d] px-4 py-2 text-sm font-medium hover:bg-[#731a1a] ${timer ? 'violent-shake' : ''}`}
 >
   {buttonText}
 </button>
 
-<style lang="postcss">
-  button {
-    @apply h-10 select-none whitespace-nowrap rounded-md px-4 py-2 text-sm font-medium;
-    background: rgb(127, 29, 29);
-  }
-  button:hover {
-    background: rgb(115, 26, 26);
-  }
-  button:focus {
-    outline: none;
-  }
-  button.violent-shake {
+<style>
+  .violent-shake {
     /* Start the shake animation and make the animation last for 0.5 seconds */
     animation:
       shake 0.5s,

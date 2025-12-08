@@ -39,17 +39,17 @@ void _handleDomainCommand(std::string_view arg, bool isAutomated) {
       {"Accept", "application/json"}
   },
     OpenShock::Serialization::JsonAPI::ParseBackendVersionJsonResponse,
-    {200}
+    std::array<uint16_t, 2> {200}
   );
 
   if (resp.result != OpenShock::HTTP::RequestResult::Success) {
-    SERPR_ERROR("Tried to connect to \"%.*s\", but failed with status [%d], refusing to save domain to config", arg.length(), arg.data(), resp.code);
+    SERPR_ERROR("Tried to connect to \"%.*s\", but failed with status [%d] (%s), refusing to save domain to config", arg.length(), arg.data(), resp.code, resp.ResultToString());
     return;
   }
 
   OS_LOGI(TAG, "Successfully connected to \"%.*s\", version: %s, commit: %s, current time: %s", arg.length(), arg.data(), resp.data.version.c_str(), resp.data.commit.c_str(), resp.data.currentTime.c_str());
 
-  bool result = OpenShock::Config::SetBackendDomain(arg);
+  bool result = OpenShock::Config::SetBackendDomain(std::string(arg));
 
   if (!result) {
     SERPR_ERROR("Failed to save config");

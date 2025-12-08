@@ -14,7 +14,6 @@ namespace OpenShock::Serial::CommandHandlers {
   OpenShock::Serial::CommandGroup EStopHandler();
   OpenShock::Serial::CommandGroup DomainHandler();
   OpenShock::Serial::CommandGroup AuthTokenHandler();
-  OpenShock::Serial::CommandGroup LcgOverrideHandler();
   OpenShock::Serial::CommandGroup HostnameHandler();
   OpenShock::Serial::CommandGroup NetworksHandler();
   OpenShock::Serial::CommandGroup KeepAliveHandler();
@@ -35,7 +34,6 @@ namespace OpenShock::Serial::CommandHandlers {
       EStopHandler(),
       DomainHandler(),
       AuthTokenHandler(),
-      LcgOverrideHandler(),
       HostnameHandler(),
       NetworksHandler(),
       KeepAliveHandler(),

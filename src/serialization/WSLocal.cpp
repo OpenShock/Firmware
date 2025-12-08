@@ -58,9 +58,7 @@ bool Local::SerializeErrorMessage(std::string_view message, Common::Serializatio
 
   Serialization::Local::FinishHubToLocalMessageBuffer(builder, msg);
 
-  auto span = builder.GetBufferSpan();
-
-  return callback(span.data(), span.size());
+  return callback(builder.GetBufferSpan());
 }
 
 bool Local::SerializeReadyMessage(const WiFiNetwork* connectedNetwork, bool accountLinked, Common::SerializationCallbackFn callback)
@@ -93,9 +91,7 @@ bool Local::SerializeReadyMessage(const WiFiNetwork* connectedNetwork, bool acco
 
   Serialization::Local::FinishHubToLocalMessageBuffer(builder, msg);
 
-  auto span = builder.GetBufferSpan();
-
-  return callback(span.data(), span.size());
+  return callback(builder.GetBufferSpan());
 }
 
 bool Local::SerializeWiFiScanStatusChangedEvent(OpenShock::WiFiScanStatus status, Common::SerializationCallbackFn callback)
@@ -108,9 +104,7 @@ bool Local::SerializeWiFiScanStatusChangedEvent(OpenShock::WiFiScanStatus status
 
   Serialization::Local::FinishHubToLocalMessageBuffer(builder, msg);
 
-  auto span = builder.GetBufferSpan();
-
-  return callback(span.data(), span.size());
+  return callback(builder.GetBufferSpan());
 }
 
 bool Local::SerializeWiFiNetworkEvent(Types::WifiNetworkEventType eventType, const WiFiNetwork& network, Common::SerializationCallbackFn callback)
@@ -125,9 +119,7 @@ bool Local::SerializeWiFiNetworkEvent(Types::WifiNetworkEventType eventType, con
 
   Serialization::Local::FinishHubToLocalMessageBuffer(builder, msg);
 
-  auto span = builder.GetBufferSpan();
-
-  return callback(span.data(), span.size());
+  return callback(builder.GetBufferSpan());
 }
 
 bool Local::SerializeWiFiNetworksEvent(Types::WifiNetworkEventType eventType, const std::vector<WiFiNetwork>& networks, Common::SerializationCallbackFn callback)
@@ -147,7 +139,5 @@ bool Local::SerializeWiFiNetworksEvent(Types::WifiNetworkEventType eventType, co
 
   Serialization::Local::FinishHubToLocalMessageBuffer(builder, msg);
 
-  auto span = builder.GetBufferSpan();
-
-  return callback(span.data(), span.size());
+  return callback(builder.GetBufferSpan());
 }

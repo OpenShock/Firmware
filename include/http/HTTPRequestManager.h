@@ -7,7 +7,8 @@
 #include <functional>
 #include <map>
 #include <string_view>
-#include <vector>
+
+#include "span.h"
 
 namespace OpenShock::HTTP {
   enum class RequestResult : uint8_t {
@@ -27,6 +28,32 @@ namespace OpenShock::HTTP {
     RequestResult result;
     int code;
     T data;
+
+    inline const char* ResultToString() const
+    {
+      switch (result) {
+        case RequestResult::InternalError:
+          return "Internal error";
+        case RequestResult::InvalidURL:
+          return "Requested url was invalid";
+        case RequestResult::RequestFailed:
+          return "Request failed";
+        case RequestResult::TimedOut:
+          return "Request timed out";
+        case RequestResult::RateLimited:
+          return "Client was ratelimited";
+        case RequestResult::CodeRejected:
+          return "Unexpected response code";
+        case RequestResult::ParseFailed:
+          return "Parsing the response failed";
+        case RequestResult::Cancelled:
+          return "Request was cancelled";
+        case RequestResult::Success:
+          return "Success";
+        default:
+          return "Unknown reason";
+      }
+    }
   };
 
   template<typename T>
@@ -34,11 +61,11 @@ namespace OpenShock::HTTP {
   using GotContentLengthCallback = std::function<bool(int contentLength)>;
   using DownloadCallback         = std::function<bool(std::size_t offset, const uint8_t* data, std::size_t len)>;
 
-  Response<std::size_t> Download(std::string_view url, const std::map<String, String>& headers, GotContentLengthCallback contentLengthCallback, DownloadCallback downloadCallback, const std::vector<int>& acceptedCodes = {200}, uint32_t timeoutMs = 10'000);
-  Response<std::string> GetString(std::string_view url, const std::map<String, String>& headers, const std::vector<int>& acceptedCodes = {200}, uint32_t timeoutMs = 10'000);
+  Response<std::size_t> Download(std::string_view url, const std::map<String, String>& headers, GotContentLengthCallback contentLengthCallback, DownloadCallback downloadCallback, tcb::span<const uint16_t> acceptedCodes, uint32_t timeoutMs = 10'000);
+  Response<std::string> GetString(std::string_view url, const std::map<String, String>& headers, tcb::span<const uint16_t> acceptedCodes, uint32_t timeoutMs = 10'000);
 
   template<typename T>
-  Response<T> GetJSON(std::string_view url, const std::map<String, String>& headers, JsonParser<T> jsonParser, const std::vector<int>& acceptedCodes = {200}, uint32_t timeoutMs = 10'000) {
+  Response<T> GetJSON(std::string_view url, const std::map<String, String>& headers, JsonParser<T> jsonParser, tcb::span<const uint16_t> acceptedCodes, uint32_t timeoutMs = 10'000) {
     auto response = GetString(url, headers, acceptedCodes, timeoutMs);
     if (response.result != RequestResult::Success) {
       return {response.result, response.code, {}};
@@ -56,6 +83,6 @@ namespace OpenShock::HTTP {
 
     cJSON_Delete(json);
 
-    return {response.result, response.code, data};
+    return {response.result, response.code, std::move(data)};
   }
 }  // namespace OpenShock::HTTP
