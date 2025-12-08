@@ -26,7 +26,7 @@ def read_text_with_fallback(
     """
     Read a text file using multiple attempted encodings in order.
 
-    Supports BOM-stripping for UTF-8, UTF-16-LE, UTF-16-BE.
+    Handles BOM automatically via utf-8-sig and utf-16 encodings.
     Raises a clean, descriptive error if all encodings fail.
     """
 
@@ -47,18 +47,8 @@ def read_text_with_fallback(
 
     for encoding in encodings:
         try:
-            # Special handling for UTF-16 because utf-16 may incorrectly detect encoding without BOM.
-            if encoding in ('utf-16', 'utf-16-le', 'utf-16-be'):
-                try:
-                    text = raw.decode(encoding)
-                except UnicodeError as e:
-                    last_error = e
-                    continue
-            else:
-                text = raw.decode(encoding)
-
+            text = raw.decode(encoding)
             return text
-
         except UnicodeError as e:
             last_error = e
             continue
@@ -92,9 +82,13 @@ class DotEnv:
             key = key.strip()
             value = value.strip()
 
-            # Strip optional surrounding quotes
-            if (value.startswith('"') and value.endswith('"')) or (value.startswith("'") and value.endswith("'")):
-                value = value[1:-1]
+            # Skip lines with empty keys
+            if not key:
+                continue
+            # Strip optional surrounding quotes (must match)
+            if len(value) >= 2:
+                if (value[0] == '"' and value[-1] == '"') or (value[0] == "'" and value[-1] == "'"):
+                    value = value[1:-1]
 
             self.dotenv_vars[key] = value
 
