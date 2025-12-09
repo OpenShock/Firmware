@@ -1,6 +1,3 @@
-#include "wifi/WiFiManager.h"
-
-const char* const TAG = "WiFiManager";
 
 #include "CaptivePortal.h"
 #include "config/Config.h"
@@ -23,28 +20,10 @@ const char* const TAG = "WiFiManager";
 
 using namespace OpenShock;
 
-enum class WiFiState : uint8_t {
-  Disconnected = 0,
-  Connecting   = 1 << 0,
-  Connected    = 1 << 1,
-};
-
-static WiFiState s_wifiState            = WiFiState::Disconnected;
 static uint8_t s_connectedBSSID[6]      = {0};
 static uint8_t s_connectedCredentialsID = 0;
 static uint8_t s_preferredCredentialsID = 0;
 static std::vector<WiFiNetwork> s_wifiNetworks;
-
-bool _isZeroBSSID(const uint8_t (&bssid)[6])
-{
-  for (std::size_t i = 0; i < sizeof(bssid); i++) {
-    if (bssid[i] != 0) {
-      return false;
-    }
-  }
-
-  return true;
-}
 
 bool _attractivityComparer(const WiFiNetwork& a, const WiFiNetwork& b)
 {
@@ -58,31 +37,10 @@ bool _attractivityComparer(const WiFiNetwork& a, const WiFiNetwork& b)
 
   return a.rssi > b.rssi;
 }
-bool _isConnectRateLimited(const WiFiNetwork& net)
-{
-  if (net.lastConnectAttempt == 0) {
-    return false;
-  }
-
-  int64_t now  = OpenShock::millis();
-  int64_t diff = now - net.lastConnectAttempt;
-  if ((net.connectAttempts > 5 && diff < 5000) || (net.connectAttempts > 10 && diff < 10'000) || (net.connectAttempts > 15 && diff < 30'000) || (net.connectAttempts > 20 && diff < 60'000)) {
-    return true;
-  }
-
-  return false;
-}
 
 bool _isSaved(std::function<bool(const Config::WiFiCredentials&)> predicate)
 {
   return Config::AnyWiFiCredentials(predicate);
-}
-std::vector<WiFiNetwork>::iterator _findNetwork(std::function<bool(WiFiNetwork&)> predicate, bool sortByAttractivity = true)
-{
-  if (sortByAttractivity) {
-    std::sort(s_wifiNetworks.begin(), s_wifiNetworks.end(), _attractivityComparer);
-  }
-  return std::find_if(s_wifiNetworks.begin(), s_wifiNetworks.end(), predicate);
 }
 std::vector<WiFiNetwork>::iterator _findNetworkBySSID(const char* ssid, bool sortByAttractivity = true)
 {
@@ -110,40 +68,6 @@ bool _markNetworkAsAttempted(const uint8_t (&bssid)[6])
   return true;
 }
 
-bool _getNextWiFiNetwork(OpenShock::Config::WiFiCredentials& creds)
-{
-  return _findNetwork([&creds](const WiFiNetwork& net) {
-    if (net.credentialsID == 0) {
-      return false;
-    }
-
-    if (_isConnectRateLimited(net)) {
-      return false;
-    }
-
-    if (!Config::TryGetWiFiCredentialsByID(net.credentialsID, creds)) {
-      return false;
-    }
-
-    return true;
-  }) != s_wifiNetworks.end();
-}
-
-bool _connectImpl(const char* ssid, const char* password, const uint8_t (&bssid)[6])
-{
-  OS_LOGV(TAG, "Connecting to network %s (" BSSID_FMT ")", ssid, BSSID_ARG(bssid));
-
-  _markNetworkAsAttempted(bssid);
-
-  // Connect to the network
-  s_wifiState = WiFiState::Connecting;
-  if (WiFi.begin(ssid, password, 0, bssid, true) == WL_CONNECT_FAILED) {
-    s_wifiState = WiFiState::Disconnected;
-    return false;
-  }
-
-  return true;
-}
 bool _connectHidden(const uint8_t (&bssid)[6], const std::string& password)
 {
   (void)password;
@@ -330,100 +254,6 @@ void _evWiFiNetworksDiscovery(const std::vector<const wifi_ap_record_t*>& record
 
 esp_err_t set_esp_interface_dns(esp_interface_t interface, IPAddress main_dns, IPAddress backup_dns, IPAddress fallback_dns);
 
-bool _tryConnect()
-{
-  Config::WiFiCredentials creds;
-  if (s_preferredCredentialsID != 0) {
-    bool foundCreds = Config::TryGetWiFiCredentialsByID(s_preferredCredentialsID, creds);
-
-    s_preferredCredentialsID = 0;
-
-    if (!foundCreds) {
-      OS_LOGE(TAG, "Failed to find credentials with ID %u", s_preferredCredentialsID);
-      return false;
-    }
-
-    if (_connect(creds.ssid, creds.password)) {
-      return true;
-    }
-
-    OS_LOGE(TAG, "Failed to connect to network %s", creds.ssid.c_str());
-  }
-
-  if (!_getNextWiFiNetwork(creds)) {
-    return false;
-  }
-
-  return _connect(creds.ssid, creds.password);
-}
-
-void _wifimanagerUpdateTask(void*)
-{
-  int64_t lastScanRequest = 0;
-  while (true) {
-    if (s_wifiState == WiFiState::Disconnected && !WiFiScanManager::IsScanning()) {
-      if (!_tryConnect()) {
-        int64_t now = OpenShock::millis();
-        if (lastScanRequest == 0 || now - lastScanRequest > 30'000) {
-          lastScanRequest = now;
-
-          OS_LOGV(TAG, "No networks to connect to, starting scan...");
-          WiFiScanManager::StartScan();
-        }
-      }
-    }
-    vTaskDelay(pdMS_TO_TICKS(1000));
-  }
-}
-
-bool WiFiManager::Init()
-{
-  WiFi.onEvent(_evWiFiConnected, ARDUINO_EVENT_WIFI_STA_CONNECTED);
-  WiFi.onEvent(_evWiFiGotIP, ARDUINO_EVENT_WIFI_STA_GOT_IP);
-  WiFi.onEvent(_evWiFiGotIP6, ARDUINO_EVENT_WIFI_STA_GOT_IP6);
-  WiFi.onEvent(_evWiFiDisconnected, ARDUINO_EVENT_WIFI_STA_DISCONNECTED);
-  WiFiScanManager::RegisterStatusChangedHandler(_evWiFiScanStatusChanged);
-  WiFiScanManager::RegisterNetworksDiscoveredHandler(_evWiFiNetworksDiscovery);
-
-  if (!WiFiScanManager::Init()) {
-    OS_LOGE(TAG, "Failed to initialize WiFiScanManager");
-    return false;
-  }
-
-  std::string hostname;
-  if (!Config::GetWiFiHostname(hostname)) {
-    OS_LOGE(TAG, "Failed to get WiFi hostname, reverting to default");
-    hostname = OPENSHOCK_FW_HOSTNAME;
-  }
-
-  WiFi.setAutoConnect(false);
-  WiFi.setAutoReconnect(false);
-  WiFi.enableSTA(true);
-  WiFi.setHostname(hostname.c_str());
-
-  // If we recognize the network in the ESP's WiFi cache, try to connect to it
-  wifi_config_t current_conf;
-  if (esp_wifi_get_config(static_cast<wifi_interface_t>(ESP_IF_WIFI_STA), &current_conf) == ESP_OK) {
-    if (current_conf.sta.ssid[0] != '\0') {
-      if (Config::GetWiFiCredentialsIDbySSID(reinterpret_cast<const char*>(current_conf.sta.ssid)) != 0) {
-        WiFi.begin();
-      }
-    }
-  }
-
-  if (set_esp_interface_dns(ESP_IF_WIFI_STA, IPAddress(1, 1, 1, 1), IPAddress(8, 8, 8, 8), IPAddress(9, 9, 9, 9)) != ESP_OK) {
-    OS_LOGE(TAG, "Failed to set DNS servers");
-    return false;
-  }
-
-  if (TaskUtils::TaskCreateUniversal(_wifimanagerUpdateTask, TAG, 2048, nullptr, 5, nullptr, 1) != pdPASS) {  // Profiled: 1.716KB stack usage
-    OS_LOGE(TAG, "Failed to create WiFiManager update task");
-    return false;
-  }
-
-  return true;
-}
-
 bool WiFiManager::Save(const char* ssid, std::string_view password)
 {
   OS_LOGV(TAG, "Authenticating to network %s", ssid);
@@ -545,10 +375,6 @@ void WiFiManager::Disconnect()
   WiFi.disconnect(false);
 }
 
-bool WiFiManager::IsConnected()
-{
-  return s_wifiState == WiFiState::Connected;
-}
 bool WiFiManager::GetConnectedNetwork(OpenShock::WiFiNetwork& network)
 {
   if (s_connectedCredentialsID == 0) {

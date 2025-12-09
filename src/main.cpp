@@ -24,6 +24,18 @@ const char* const TAG = "main";
 // Internal setup function, returns true if setup succeeded, false otherwise.
 bool trySetup()
 {
+  // Try to initialize TCP/IP mac address
+  uint8_t mac[8];
+  if (esp_efuse_mac_get_default(mac) == ESP_OK) {
+    esp_base_mac_addr_set(mac);
+  }
+
+  // Try to initialize global TCP/IP stack
+  if (esp_netif_init() != ERR_OK) {
+    OS_LOGE(TAG, "Failed to initialize TCP/IP stack!");
+    return false;
+  }
+
   if (!OpenShock::VisualStateManager::Init()) {
     OS_LOGE(TAG, "Unable to initialize VisualStateManager");
     return false;
