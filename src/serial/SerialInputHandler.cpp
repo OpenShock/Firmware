@@ -121,7 +121,7 @@ void _printCompleteHelp()
   }
 
   SerialInputHandler::PrintWelcomeHeader();
-  write(STDOUT_FILENO, buffer.data(), buffer.size());
+  fwrite(buffer.data(), 1, buffer.size(), stdout);
 }
 
 void _printCommandHelp(Serial::CommandGroup& group)
@@ -254,7 +254,7 @@ void _printCommandHelp(Serial::CommandGroup& group)
   buffer.push_back('\r');
   buffer.push_back('\n');
 
-  write(STDOUT_FILENO, buffer.data(), buffer.size());
+  fwrite(buffer.data(), 1, buffer.size(), stdout);
 }
 
 void _handleHelpCommand(std::string_view arg, bool isAutomated)
@@ -632,7 +632,7 @@ void SerialInputHandler::PrintWelcomeHeader()
 \r\n\
 "sv;
 
-  write(STDOUT_FILENO, string.data(), string.size());
+  fwrite(string.data(), 1, string.size(), stdout);
 }
 
 void SerialInputHandler::PrintVersionInfo()
@@ -645,5 +645,5 @@ void SerialInputHandler::PrintVersionInfo()
      Chip:  " OPENSHOCK_FW_CHIP "\r\n\
 "sv;
 
-  write(STDOUT_FILENO, string.data(), string.size());
+  fwrite(string.data(), 1, string.size(), stdout);
 }
