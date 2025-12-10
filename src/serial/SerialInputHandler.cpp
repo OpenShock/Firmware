@@ -12,6 +12,7 @@ const char* const TAG = "SerialInputHandler";
 #include "FormatHelpers.h"
 #include "http/HTTPRequestManager.h"
 #include "Logging.h"
+#include "serial/SerialCompat.h"
 #include "serial/command_handlers/CommandEntry.h"
 #include "serial/command_handlers/common.h"
 #include "serial/command_handlers/index.h"
@@ -367,7 +368,7 @@ enum class SerialReadResult {
 SerialReadResult _tryReadSerialLine(SerialBuffer& buffer)
 {
   // Check if there's any data available
-  int available = ::Serial.available();
+  int available = OpenShockSerialAvailable();
   if (available <= 0) {
     return SerialReadResult::NoData;
   }
@@ -377,11 +378,18 @@ SerialReadResult _tryReadSerialLine(SerialBuffer& buffer)
 
   // Read the data into the buffer
   while (available-- > 0) {
-    char c = ::Serial.read();
+    int r = OpenShockSerialRead();
+    if (r < 0) {
+      break; // no more data even though the previous length said otherwise
+    }
+
+    char c = static_cast<char>(r);
 
     // Handle backspace
     if (c == '\b') {
-      buffer.pop_back();  // Remove the last character from the buffer if it exists
+      if (!buffer.empty()) {
+        buffer.pop_back();  // Remove the last character from the buffer if it exists
+      }
       continue;
     }
 
@@ -413,10 +421,15 @@ SerialReadResult _tryReadSerialLine(SerialBuffer& buffer)
 
 void _skipSerialWhitespaces(SerialBuffer& buffer)
 {
-  int available = ::Serial.available();
+  int available = OpenShockSerialAvailable();
 
   while (available-- > 0) {
-    char c = ::Serial.read();
+    int r = OpenShockSerialRead();
+    if (r < 0) {
+      break;
+    }
+
+    char c = static_cast<char>(r);
 
     if (c != ' ' && c != '\r' && c != '\n') {
       buffer.push_back(c);
