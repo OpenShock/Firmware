@@ -85,7 +85,13 @@ def download_bytes(url: str, timeout: int = 30) -> bytes:
         method='GET',
     )
     with urllib.request.urlopen(req, context=ctx, timeout=timeout) as resp:
-        status = getattr(resp, 'status', 200)
+        # urllib responses vary; handle both .status and .getcode()
+        status = getattr(resp, 'status', None)
+        if status is None:
+            try:
+                status = resp.getcode()
+            except Exception:
+                status = 200
         if status != 200:
             raise InputError(f'Download failed: HTTP {status} for {url}')
         data = resp.read()
@@ -94,16 +100,34 @@ def download_bytes(url: str, timeout: int = 30) -> bytes:
         return data
 
 
-def parse_sha256_file(content: bytes) -> str:
+def parse_sha256_file(content: bytes, *, expect_filename: str | None = None) -> str:
+    """
+    Parse a .sha256 file.
+    Common formats include:
+      - '<hash>  cacert.pem'
+      - '<hash>'
+    We accept the first line and extract a leading 64-hex hash.
+    If expect_filename is provided and a filename appears on the line,
+    we sanity-check that it matches.
+    """
     text = content.decode('utf-8', errors='replace').strip()
     if not text:
         raise InputError('Downloaded sha256 file is empty')
 
     first = text.splitlines()[0].strip()
-    m = re.match(r'^([0-9a-fA-F]{64})\b', first)
+    m = re.match(r'^([0-9a-fA-F]{64})(?:\s+[* ]?(.+))?$', first)
     if not m:
         raise InputError(f'Could not parse SHA-256 from sha256 file: {first!r}')
-    return m.group(1).lower()
+
+    h = m.group(1).lower()
+    fn = (m.group(2) or '').strip()
+
+    if expect_filename and fn:
+        # Some sha256sum formats include full paths; compare basename.
+        if os.path.basename(fn) != expect_filename:
+            raise InputError(f'SHA-256 file refers to unexpected filename {fn!r} (expected {expect_filename!r})')
+
+    return h
 
 
 def extract_pem_cert_blocks(pem_bytes: bytes, *, source: str) -> list[bytes]:
@@ -174,27 +198,29 @@ def _load_single_pem_cert_block_from_file(path: Path) -> bytes:
     return _load_single_pem_cert_block_from_bytes_strict(data, source=f'custom cert file: {path}')
 
 
-def load_custom_cert_blocks() -> list[bytes]:
+def load_custom_cert_blocks() -> tuple[list[bytes], list[Path]]:
     """
     Load user-provided custom CA certificate PEM blocks from custom_certs/*.pem.
 
+    Returns: (blocks, paths)
+
     Behavior:
-      - If custom_certs/ does not exist -> return []
+      - If custom_certs/ does not exist -> return ([], [])
       - Only *.pem files are considered
-      - If the directory exists but contains no *.pem -> return []
+      - If the directory exists but contains no *.pem -> return ([], [])
       - Non-.pem files are ignored (we do not scan them)
       - Each .pem must contain exactly one certificate
     """
     d = Path(CUSTOM_CERTS_DIR)
     if not d.exists():
-        return []
+        return ([], [])
 
     if not d.is_dir():
         raise InputError(f'{CUSTOM_CERTS_DIR} exists but is not a directory')
 
     paths = sorted(d.glob(CUSTOM_CERTS_GLOB))
     if not paths:
-        return []
+        return ([], [])
 
     critical(f'Loading custom certificates from: {CUSTOM_CERTS_DIR}/ ({len(paths)} file(s))')
 
@@ -205,7 +231,7 @@ def load_custom_cert_blocks() -> list[bytes]:
             raise InputError(f'Custom cert file must have .pem extension: {p}')
         blocks.append(_load_single_pem_cert_block_from_file(p))
 
-    return blocks
+    return (blocks, paths)
 
 
 def _is_ca_certificate(cert: x509.Certificate) -> bool:
@@ -221,10 +247,19 @@ def _is_ca_certificate(cert: x509.Certificate) -> bool:
     return bool(getattr(bc, 'ca', False))
 
 
-def load_all_certs(blocks: list[bytes], *, label: str = 'CA') -> list[x509.Certificate]:
+def load_all_certs(
+    blocks: list[bytes],
+    *,
+    label: str = 'CA',
+    origins: list[str] | None = None,
+) -> list[x509.Certificate]:
     certs: list[x509.Certificate] = []
 
     for idx, b in enumerate(blocks, start=1):
+        origin = ''
+        if origins and 0 <= (idx - 1) < len(origins):
+            origin = origins[idx - 1]
+
         with warnings.catch_warnings(record=True) as w:
             warnings.simplefilter('always', CryptographyDeprecationWarning)
 
@@ -232,6 +267,8 @@ def load_all_certs(blocks: list[bytes], *, label: str = 'CA') -> list[x509.Certi
                 cert = x509.load_pem_x509_certificate(b)
             except Exception as e:
                 critical(f'FATAL: Invalid certificate at index {idx} ({label})')
+                if origin:
+                    critical(f'  Origin : {origin}')
                 critical(f'  Reason: {e}')
                 critical('  Offending PEM:')
                 critical(b.decode('ascii', errors='replace').rstrip())
@@ -245,6 +282,8 @@ def load_all_certs(blocks: list[bytes], *, label: str = 'CA') -> list[x509.Certi
                     critical('WARNING: CA certificate triggers CryptographyDeprecationWarning')
                     critical('         This may become fatal in future cryptography releases.')
                     critical(f'  Index   : {idx} ({label})')
+                    if origin:
+                        critical(f'  Origin  : {origin}')
                     critical(f'  Subject : {subject}')
                     critical(f'  Issuer  : {issuer}')
                     critical(f'  Reason  : {warn.message}')
@@ -322,8 +361,10 @@ def main() -> int:
     critical(f'Downloaded {len(pem)} bytes')
     critical(f'SHA-256(cacert.pem) = {got_hash}')
 
-    critical(f'Saving downloaded PEM to {LOCAL_PEM_FILE} (atomic)')
-    atomic_write(LOCAL_PEM_FILE, pem)
+    critical(f'Downloading published hash from: {URL_SHA256}')
+    sha_file = download_bytes(URL_SHA256)
+    expected_hash = parse_sha256_file(sha_file, expect_filename=os.path.basename(LOCAL_PEM_FILE))
+    critical(f'Published SHA-256     = {expected_hash}')
 
     critical('')
     critical('MANUAL VERIFICATION REQUIRED')
@@ -331,42 +372,44 @@ def main() -> int:
     critical(f'    {MANUAL_HASH_PAGE}')
     critical('')
 
-    critical(f'Downloading published hash from: {URL_SHA256}')
-    sha_file = download_bytes(URL_SHA256)
-    expected_hash = parse_sha256_file(sha_file)
-    critical(f'Published SHA-256     = {expected_hash}')
-
     if got_hash != expected_hash:
         raise InputError('SHA-256 mismatch against cacert.pem.sha256 — refusing to proceed')
 
     critical('Automatic SHA-256 validation passed')
 
+    # Only write cacert.pem after verification passes
+    critical(f'Saving verified PEM to {LOCAL_PEM_FILE} (atomic)')
+    atomic_write(LOCAL_PEM_FILE, pem)
+
     blocks = extract_pem_cert_blocks(pem, source='downloaded curl CA bundle (cacert.pem)')
     critical(f'Found {len(blocks)} certificate blocks in curl bundle')
 
-    custom_blocks = load_custom_cert_blocks()
+    (custom_blocks, custom_paths) = load_custom_cert_blocks()
+    custom_certs: list[x509.Certificate] = []
     if custom_blocks:
         critical(f'Found {len(custom_blocks)} custom certificate(s)')
-        blocks = blocks + custom_blocks
-    else:
-        critical('No custom certificates found (custom_certs/*.pem)')
+        custom_origins = [f'custom cert file: {p}' for p in custom_paths]
+        custom_certs = load_all_certs(custom_blocks, label='custom', origins=custom_origins)
 
-    certs = load_all_certs(blocks)
-    critical(f'Parsed {len(certs)} certificates total')
-
-    # Enforce that custom certs are CA certs (best-effort) and prevent accidental leaf addition.
-    # Note: curl bundle includes many CAs; custom certs are appended and checked here by CA constraint.
-    if custom_blocks:
-        custom_certs = load_all_certs(custom_blocks, label='custom')
-        non_ca = [c for c in custom_certs if not _is_ca_certificate(c)]
+        # Enforce that custom certs are CA certs (best-effort) and prevent accidental leaf addition.
+        non_ca = [(c, o) for (c, o) in zip(custom_certs, custom_origins) if not _is_ca_certificate(c)]
         if non_ca:
             critical(
                 'FATAL: One or more custom certificates are not CA certificates (BasicConstraints CA=TRUE missing)'
             )
-            for c in non_ca:
+            for c, origin in non_ca:
+                critical(f'  Origin : {origin}')
                 critical(f'  Subject: {c.subject.rfc4514_string()}')
                 critical(f'  Issuer : {c.issuer.rfc4514_string()}')
             raise InputError('Refusing to include non-CA custom certificates')
+    else:
+        critical('No custom certificates found (custom_certs/*.pem)')
+
+    curl_origins = ['curl bundle'] * len(blocks)
+    curl_certs = load_all_certs(blocks, label='CA', origins=curl_origins)
+    certs = curl_certs + custom_certs
+
+    critical(f'Parsed {len(certs)} certificates total')
 
     bundle = create_bundle(certs)
     critical(f'Writing bundle to {OUTPUT_FILE} (atomic)')
