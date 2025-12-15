@@ -30,9 +30,10 @@ static OpenShock::SimpleMutex s_estopMutex = {};
 static gpio_num_t s_estopPin               = GPIO_NUM_NC;
 static TaskHandle_t s_estopTask            = nullptr;
 
-static EStopState s_estopState       = EStopState::Idle;
-static bool       s_estopActive      = false;
-static int64_t    s_estopActivatedAt = 0;
+static EStopState s_estopState         = EStopState::Idle;
+static EStopState s_lastPublishedState = EStopState::Idle;
+static bool       s_estopActive        = false;
+static int64_t    s_estopActivatedAt   = 0;
 
 static volatile bool s_externallyTriggered = false;
 
@@ -47,6 +48,12 @@ static void estopmanager_updateexternals(bool isActive, bool isAwaitingRelease)
   // Parameters are here for future extension (e.g. different event payload types).
   (void)isActive;
   (void)isAwaitingRelease;
+
+  if (s_estopState == s_lastPublishedState) {
+    return; // No state change → no event
+  }
+
+  s_lastPublishedState = s_estopState;
 
   // Post the current state as the event payload
   ESP_ERROR_CHECK(esp_event_post(OPENSHOCK_EVENTS,
