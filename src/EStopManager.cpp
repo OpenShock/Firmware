@@ -72,8 +72,7 @@ static void estopmgr_checkertask(void* pvParameters)
 {
   (void)pvParameters;
 
-  // Bit history of samples, 0 is pressed, 1 is released.
-  uint16_t history = 0xFFFF;
+  uint16_t history = 0xFFFF;  // Bit history of samples, 0 is pressed
 
   EStopState state      = EStopState::Idle;
   int64_t deactivatesAt = 0;
@@ -97,8 +96,6 @@ static void estopmgr_checkertask(void* pvParameters)
       s_externallyTriggered = false;
 
       estopmgr_setactive(state, now);
-      deactivatesAt = 0;
-
       estopmanager_updateexternals(state);
 
       // Do not modify history/lastBtnState here; allow hardware to take over
