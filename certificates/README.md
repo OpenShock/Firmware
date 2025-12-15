@@ -63,9 +63,8 @@ If they do not:
 
 After successful manual verification, commit:
 
-- `x509_crt_bundle`
 - `cacert.pem`
-- `cacert.pem.sha256`
+- `x509_crt_bundle`
 
 ❌ **Never commit anything under `custom_certs/`.**
 
