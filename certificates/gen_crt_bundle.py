@@ -8,7 +8,7 @@
 #  - Perform automatic SHA-256 integrity verification of downloads
 #  - Emit warnings for certificates that trigger cryptography deprecation notices
 #  - Write the output bundle atomically to avoid partial updates
-#  - Optionally include user-provided custom certificates from custom_certs/*.pem
+#  - Optionally include user-provided custom CA certificates from custom_certs/*.pem
 #
 # Copyright 2018-2019 Espressif Systems (Shanghai) PTE LTD
 #
@@ -177,14 +177,14 @@ def _load_single_pem_cert_block_from_file(path: Path) -> bytes:
 
 def load_custom_cert_blocks() -> list[bytes]:
     """
-    Load user-provided custom certificate PEM blocks from custom_certs/*.pem.
+    Load user-provided custom CA certificate PEM blocks from custom_certs/*.pem.
 
     Behavior:
       - If custom_certs/ does not exist -> return []
       - Only *.pem files are considered
       - If the directory exists but contains no *.pem -> return []
+      - Non-.pem files are ignored (we do not scan them)
       - Each .pem must contain exactly one certificate
-      - Certificates may be CA OR leaf/server certificates
     """
     d = Path(CUSTOM_CERTS_DIR)
     if not d.exists():
@@ -209,6 +209,19 @@ def load_custom_cert_blocks() -> list[bytes]:
     return blocks
 
 
+def _is_ca_certificate(cert: x509.Certificate) -> bool:
+    """
+    Best-effort CA check:
+      - Requires BasicConstraints CA=TRUE
+    (We keep this strict to avoid adding leaf/server certs by mistake.)
+    """
+    try:
+        bc = cert.extensions.get_extension_for_class(x509.BasicConstraints).value
+    except Exception:
+        return False
+    return bool(getattr(bc, 'ca', False))
+
+
 def load_all_certs(blocks: list[bytes], *, label: str = 'CA') -> list[x509.Certificate]:
     certs: list[x509.Certificate] = []
 
@@ -223,14 +236,14 @@ def load_all_certs(blocks: list[bytes], *, label: str = 'CA') -> list[x509.Certi
                 critical(f'  Reason: {e}')
                 critical('  Offending PEM:')
                 critical(b.decode('ascii', errors='replace').rstrip())
-                raise InputError('Aborting due to invalid certificate') from e
+                raise InputError('Aborting due to invalid CA certificate') from e
 
             for warn in w:
                 if issubclass(warn.category, CryptographyDeprecationWarning):
                     subject = cert.subject.rfc4514_string()
                     issuer = cert.issuer.rfc4514_string()
 
-                    critical('WARNING: Certificate triggers CryptographyDeprecationWarning')
+                    critical('WARNING: CA certificate triggers CryptographyDeprecationWarning')
                     critical('         This may become fatal in future cryptography releases.')
                     critical(f'  Index   : {idx} ({label})')
                     critical(f'  Subject : {subject}')
@@ -345,6 +358,20 @@ def main() -> int:
 
     certs = load_all_certs(blocks)
     critical(f'Parsed {len(certs)} certificates total')
+
+    # Enforce that custom certs are CA certs (best-effort) and prevent accidental leaf addition.
+    # Note: curl bundle includes many CAs; custom certs are appended and checked here by CA constraint.
+    if custom_blocks:
+        custom_certs = load_all_certs(custom_blocks, label='custom')
+        non_ca = [c for c in custom_certs if not _is_ca_certificate(c)]
+        if non_ca:
+            critical(
+                'FATAL: One or more custom certificates are not CA certificates (BasicConstraints CA=TRUE missing)'
+            )
+            for c in non_ca:
+                critical(f'  Subject: {c.subject.rfc4514_string()}')
+                critical(f'  Issuer : {c.issuer.rfc4514_string()}')
+            raise InputError('Refusing to include non-CA custom certificates')
 
     bundle = create_bundle(certs)
     critical(f'Writing bundle to {OUTPUT_FILE} (atomic)')
