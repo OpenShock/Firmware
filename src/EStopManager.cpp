@@ -45,7 +45,7 @@ static bool s_estopInitialized = false;
 static void estopmanager_updateexternals()
 {
   if (s_estopState == s_lastPublishedState) {
-    return; // No state change → no event
+    return; // No state change -> no event
   }
 
   s_lastPublishedState = s_estopState;
