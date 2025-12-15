@@ -8,6 +8,7 @@
 #  - Perform automatic SHA-256 integrity verification of downloads
 #  - Emit warnings for certificates that trigger cryptography deprecation notices
 #  - Write the output bundle atomically to avoid partial updates
+#  - Optionally include user-provided custom CA certificates from custom_certs/*.pem
 #
 # Copyright 2018-2019 Espressif Systems (Shanghai) PTE LTD
 #
@@ -35,6 +36,7 @@ import tempfile
 import urllib.request
 import ssl
 import warnings
+from pathlib import Path
 
 try:
     from cryptography import x509
@@ -53,6 +55,10 @@ MANUAL_HASH_PAGE = 'https://curl.se/docs/caextract.html'
 OUTPUT_FILE = 'x509_crt_bundle'
 LOCAL_PEM_FILE = 'cacert.pem'
 LOCAL_SHA256_FILE = 'cacert.pem.sha256'
+
+# Custom certs (self-hosted/internal PKI)
+CUSTOM_CERTS_DIR = 'custom_certs'  # optional; if missing -> ignored
+CUSTOM_CERTS_GLOB = '*.pem'  # required extension
 
 PEM_BLOCK_RE = re.compile(
     br'-----BEGIN CERTIFICATE-----\s*[\s\S]+?\s*-----END CERTIFICATE-----\s*',
@@ -100,14 +106,73 @@ def parse_sha256_file(content: bytes) -> str:
     return m.group(1).lower()
 
 
-def extract_pem_cert_blocks(pem_bytes: bytes) -> list[bytes]:
+def extract_pem_cert_blocks(pem_bytes: bytes, *, source: str) -> list[bytes]:
     blocks = PEM_BLOCK_RE.findall(pem_bytes)
     if not blocks:
-        raise InputError('No PEM certificate blocks found in downloaded file')
+        raise InputError(f'No PEM certificate blocks found in {source}')
     return blocks
 
 
-def load_all_certs(blocks: list[bytes]) -> list[x509.Certificate]:
+def _load_single_pem_cert_block_from_file(path: Path) -> bytes:
+    try:
+        data = path.read_bytes()
+    except Exception as e:
+        raise InputError(f'Failed to read custom cert file: {path}') from e
+
+    blocks = extract_pem_cert_blocks(data, source=f'custom cert file: {path}')
+    if len(blocks) != 1:
+        raise InputError(f'Custom cert file must contain exactly 1 certificate: {path}')
+    return blocks[0]
+
+
+def load_custom_cert_blocks() -> list[bytes]:
+    """
+    Load user-provided custom CA certificate PEM blocks from custom_certs/*.pem.
+
+    Behavior:
+      - If custom_certs/ does not exist -> return []
+      - Only *.pem files are considered
+      - If the directory exists but contains no *.pem -> return []
+      - Non-.pem files are ignored (we do not scan them)
+      - Each .pem must contain exactly one certificate
+    """
+    d = Path(CUSTOM_CERTS_DIR)
+    if not d.exists():
+        return []
+
+    if not d.is_dir():
+        raise InputError(f'{CUSTOM_CERTS_DIR} exists but is not a directory')
+
+    paths = sorted(d.glob(CUSTOM_CERTS_GLOB))
+    if not paths:
+        return []
+
+    critical(f'Loading custom certificates from: {CUSTOM_CERTS_DIR}/ ({len(paths)} file(s))')
+
+    blocks: list[bytes] = []
+    for p in paths:
+        if p.suffix.lower() != '.pem':
+            # Should not happen due to glob, but keep strict.
+            raise InputError(f'Custom cert file must have .pem extension: {p}')
+        blocks.append(_load_single_pem_cert_block_from_file(p))
+
+    return blocks
+
+
+def _is_ca_certificate(cert: x509.Certificate) -> bool:
+    """
+    Best-effort CA check:
+      - Requires BasicConstraints CA=TRUE
+    (We keep this strict to avoid adding leaf/server certs by mistake.)
+    """
+    try:
+        bc = cert.extensions.get_extension_for_class(x509.BasicConstraints).value
+    except Exception:
+        return False
+    return bool(getattr(bc, 'ca', False))
+
+
+def load_all_certs(blocks: list[bytes], *, label: str = 'CA') -> list[x509.Certificate]:
     certs: list[x509.Certificate] = []
 
     for idx, b in enumerate(blocks, start=1):
@@ -117,7 +182,7 @@ def load_all_certs(blocks: list[bytes]) -> list[x509.Certificate]:
             try:
                 cert = x509.load_pem_x509_certificate(b)
             except Exception as e:
-                critical(f'FATAL: Invalid certificate at index {idx}')
+                critical(f'FATAL: Invalid certificate at index {idx} ({label})')
                 critical(f'  Reason: {e}')
                 critical('  Offending PEM:')
                 critical(b.decode('ascii', errors='replace').rstrip())
@@ -130,7 +195,7 @@ def load_all_certs(blocks: list[bytes]) -> list[x509.Certificate]:
 
                     critical('WARNING: CA certificate triggers CryptographyDeprecationWarning')
                     critical('         This may become fatal in future cryptography releases.')
-                    critical(f'  Index   : {idx}')
+                    critical(f'  Index   : {idx} ({label})')
                     critical(f'  Subject : {subject}')
                     critical(f'  Issuer  : {issuer}')
                     critical(f'  Reason  : {warn.message}')
@@ -143,13 +208,11 @@ def load_all_certs(blocks: list[bytes]) -> list[x509.Certificate]:
 
 
 def create_bundle(certs: list[x509.Certificate]) -> bytes:
-    # DER-encoded subject names are a good binary-search key for ESP-IDF bundles. :contentReference[oaicite:2]{index=2}
     def subject_der(c: x509.Certificate) -> bytes:
         return c.subject.public_bytes(serialization.Encoding.DER)
 
     certs_sorted = sorted(certs, key=subject_der)
 
-    # Optional: reject duplicate subjects (recommended)
     for i in range(1, len(certs_sorted)):
         if subject_der(certs_sorted[i - 1]) == subject_der(certs_sorted[i]):
             raise InputError(
@@ -210,7 +273,6 @@ def main() -> int:
     critical(f'Downloaded {len(pem)} bytes')
     critical(f'SHA-256(cacert.pem) = {got_hash}')
 
-    # NEW: save downloaded PEM + computed hash locally (atomic)
     critical(f'Saving downloaded PEM to {LOCAL_PEM_FILE} (atomic)')
     atomic_write(LOCAL_PEM_FILE, pem)
 
@@ -234,11 +296,32 @@ def main() -> int:
 
     critical('Automatic SHA-256 validation passed')
 
-    blocks = extract_pem_cert_blocks(pem)
-    critical(f'Found {len(blocks)} certificate blocks')
+    blocks = extract_pem_cert_blocks(pem, source='downloaded curl CA bundle (cacert.pem)')
+    critical(f'Found {len(blocks)} certificate blocks in curl bundle')
+
+    custom_blocks = load_custom_cert_blocks()
+    if custom_blocks:
+        critical(f'Found {len(custom_blocks)} custom certificate(s)')
+        blocks = blocks + custom_blocks
+    else:
+        critical('No custom certificates found (custom_certs/*.pem)')
 
     certs = load_all_certs(blocks)
-    critical(f'Parsed {len(certs)} certificates')
+    critical(f'Parsed {len(certs)} certificates total')
+
+    # Enforce that custom certs are CA certs (best-effort) and prevent accidental leaf addition.
+    # Note: curl bundle includes many CAs; custom certs are appended and checked here by CA constraint.
+    if custom_blocks:
+        custom_certs = load_all_certs(custom_blocks, label='custom')
+        non_ca = [c for c in custom_certs if not _is_ca_certificate(c)]
+        if non_ca:
+            critical(
+                'FATAL: One or more custom certificates are not CA certificates (BasicConstraints CA=TRUE missing)'
+            )
+            for c in non_ca:
+                critical(f'  Subject: {c.subject.rfc4514_string()}')
+                critical(f'  Issuer : {c.issuer.rfc4514_string()}')
+            raise InputError('Refusing to include non-CA custom certificates')
 
     bundle = create_bundle(certs)
     critical(f'Writing bundle to {OUTPUT_FILE} (atomic)')

@@ -11,6 +11,7 @@ The bundle is generated as follows:
   - Verified against the downloaded `cacert.pem.sha256`
 
 - **The user must manually validate the downloaded file and checksum against curl’s official published SHA-256**
+- Optionally extended with **user-provided custom CA certificates** (see below)
 - Parsed using `cryptography`, aborting on any invalid certificate
 
 > **Important trust note:**
@@ -41,7 +42,8 @@ The script will:
 
   - The downloaded PEM matches the downloaded checksum
 
-- Abort immediately on any mismatch, parsing error, or invalid certificate
+- Load optional custom certificates from `custom_certs/` (if present)
+- Abort immediately on any mismatch, parsing error, invalid certificate, or duplicate subject
 
 ---
 
@@ -89,13 +91,65 @@ cat cacert.pem.sha256
 
 ---
 
+## Adding custom certificates (self-hosted / internal PKI)
+
+Self-hosters may need to trust additional Certificate Authorities (for example internal PKI or private reverse proxies).
+
+Custom certificates can be explicitly added to the bundle.
+
+### Requirements for custom certificates
+
+All custom certificates **must**:
+
+- Be PEM-encoded CA certificates
+- Be stored in files with a **`.pem` extension (mandatory)**
+- Contain **exactly one** `BEGIN CERTIFICATE` block
+- Contain **no private key material**
+- Be intentionally reviewed and trusted by the user
+
+> ⚠️ Adding a custom CA expands the ESP32’s trust boundary.
+> Only add certificates you **fully control and trust**.
+
+### Directory layout (strict)
+
+Place custom certificates in:
+
+```
+custom_certs/
+```
+
+Example:
+
+```
+custom_certs/
+├── internal-root-ca.pem
+├── homelab-intermediate.pem
+```
+
+Only files ending in `.pem` are considered.
+Files with other extensions, multiple certificates, or invalid contents will be rejected.
+
+### Inclusion behavior
+
+- All valid `.pem` files in `custom_certs/` are:
+
+  - Parsed using `cryptography`
+  - Validated as CA certificates
+  - Subject-sorted alongside curl’s certificates
+
+- Duplicate subject names are rejected
+- If `custom_certs/` does not exist, only curl’s CA bundle is used
+
+---
+
 ### 3. Commit the updated bundle
 
-Only after **both** validation steps succeed, commit the newly generated artifacts:
+Only after successful **manual verification** and review of any custom certificates, commit the newly generated artifacts:
 
 - `x509_crt_bundle`
 - `cacert.pem`
 - `cacert.pem.sha256`
+- `custom_certs/` (if used)
 
 ---
 
@@ -104,7 +158,8 @@ Only after **both** validation steps succeed, commit the newly generated artifac
 - Automatic SHA-256 verification ensures internal consistency of downloaded files.
 - Validating `cacert.pem` against `cacert.pem.sha256` ensures file integrity.
 - Manual verification against curl’s official publication establishes external trust.
-- The generated `x509_crt_bundle` is deterministic for a given `cacert.pem`.
+- Custom certificates explicitly extend the trust boundary and must be reviewed.
+- The generated `x509_crt_bundle` is deterministic for a given set of input certificates.
 
 ---
 
