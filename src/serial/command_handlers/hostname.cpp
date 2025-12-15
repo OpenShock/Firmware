@@ -20,7 +20,7 @@ void _handleHostnameCommand(std::string_view arg, bool isAutomated) {
     return;
   }
 
-  bool result = OpenShock::Config::SetWiFiHostname(arg);
+  bool result = OpenShock::Config::SetWiFiHostname(std::string(arg));
   if (result) {
     SERPR_SUCCESS("Saved config, restarting...");
     esp_restart();
