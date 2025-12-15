@@ -58,6 +58,11 @@ static void estopmgr_checkertask(void* pvParameters)
 {
   (void)pvParameters;
 
+  // Ensure known initial state
+  s_lastPublishedState = EStopState::Idle;
+  s_estopActive        = false;
+  s_estopActivatedAt   = 0;
+
   uint16_t history = 0xFFFF;  // Bit history of samples, 0 is pressed
 
   EStopState state      = EStopState::Idle;
@@ -87,6 +92,7 @@ static void estopmgr_checkertask(void* pvParameters)
 
       s_estopActive = true;
       state         = EStopState::Active;
+      rearmBlocked  = false;
 
       estopmanager_updateexternals(state);
 
@@ -102,10 +108,7 @@ static void estopmgr_checkertask(void* pvParameters)
     // If all recent bits are 1 -> fully released.
     // If any bit is 0 -> pressed (or bouncing toward pressed).
     bool btnState = (history & k_estopCheckMask) != k_estopCheckMask;  // true == pressed
-
-    // State changed: update lastBtnState and run the state machine.
     bool pressedEdge  = (btnState && !lastBtnState);
-    bool releasedEdge = (!btnState && lastBtnState);
     lastBtnState = btnState;
 
     switch (state) {
@@ -115,12 +118,12 @@ static void estopmgr_checkertask(void* pvParameters)
         if (rearmBlocked) {
           if (now < rearmAt) {
             // Still in grace window: ignore any press. Track input to avoid phantom edges later.
-            continue;
+            break;
           }
 
           if (btnState) {
             // Still pressed/glitching: keep blocking until released.
-            continue;
+            break;
           }
 
           // Grace window ended: only re-arm once we see released.
@@ -145,7 +148,7 @@ static void estopmgr_checkertask(void* pvParameters)
       case EStopState::ActiveClearing:
         if (!btnState) {  // released before hold time -> go back to Active
           state = EStopState::Active;
-        } else if (now > deactivatesAt) {
+        } else if (now >= deactivatesAt) {
           // Hold complete -> now wait for release edge to fully clear
           state = EStopState::AwaitingRelease;
         }
@@ -164,7 +167,7 @@ static void estopmgr_checkertask(void* pvParameters)
 
       default:
         // Should never happen
-        continue;
+        break;
     }
 
     estopmanager_updateexternals(state);
@@ -191,7 +194,7 @@ static bool estopmgr_setestopenabled(bool enabled)
   return true;
 }
 
-static bool estopmgr_setpin_impl(gpio_num_t pin)
+static bool estopmgr_set_pin_impl(gpio_num_t pin)
 {
   esp_err_t err;
 
@@ -266,7 +269,7 @@ bool EStopManager::Init()
 
   OpenShock::ScopedLock lock__(&s_estopMutex);
 
-  if (!estopmgr_setpin_impl(cfg.gpioPin)) {
+  if (!estopmgr_set_pin_impl(cfg.gpioPin)) {
     OS_LOGE(TAG, "Failed to set EStop pin");
     return false;
   }
@@ -275,11 +278,6 @@ bool EStopManager::Init()
     OS_LOGE(TAG, "Failed to create EStop event handler task");
     return false;
   }
-
-  // Ensure known initial state
-  s_lastPublishedState = EStopState::Idle;
-  s_estopActive        = false;
-  s_estopActivatedAt   = 0;
 
   return true;
 }
@@ -294,7 +292,7 @@ bool EStopManager::SetEStopEnabled(bool enabled)
       OS_LOGE(TAG, "Failed to get EStop pin from config");
       return false;
     }
-    if (!estopmgr_setpin_impl(pin)) {
+    if (!estopmgr_set_pin_impl(pin)) {
       OS_LOGE(TAG, "Failed to set EStop pin");
       return false;
     }
@@ -307,7 +305,7 @@ bool EStopManager::SetEStopPin(gpio_num_t pin)
 {
   OpenShock::ScopedLock lock__(&s_estopMutex);
 
-  return estopmgr_setpin_impl(pin);
+  return estopmgr_set_pin_impl(pin);
 }
 
 bool EStopManager::IsEStopped()
