@@ -121,11 +121,6 @@ static void estopmgr_checkertask(void* pvParameters)
             break;
           }
 
-          if (btnState) {
-            // Still pressed/glitching: keep blocking until released.
-            break;
-          }
-
           // Grace window ended: only re-arm once we see released.
           rearmBlocked = false;
         }
