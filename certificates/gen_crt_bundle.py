@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 #
 # ESP32 x509 certificate bundle download and conversion script with SHA-256 Verification
 #
@@ -8,7 +8,7 @@
 #  - Perform automatic SHA-256 integrity verification of downloads
 #  - Emit warnings for certificates that trigger cryptography deprecation notices
 #  - Write the output bundle atomically to avoid partial updates
-#  - Optionally include user-provided custom CA certificates from custom_certs/*.pem
+#  - Optionally include user-provided custom certificates from custom_certs/*.pem
 #
 # Copyright 2018-2019 Espressif Systems (Shanghai) PTE LTD
 #
@@ -27,6 +27,7 @@
 
 from __future__ import annotations
 
+import base64
 import hashlib
 import os
 import re
@@ -113,28 +114,77 @@ def extract_pem_cert_blocks(pem_bytes: bytes, *, source: str) -> list[bytes]:
     return blocks
 
 
+def _load_single_pem_cert_block_from_bytes_strict(data: bytes, *, source: str) -> bytes:
+    # Hard fail if file contains any private key material.
+    if b'PRIVATE KEY' in data:
+        raise InputError(f'Custom cert file contains private key material (PRIVATE KEY): {source}')
+
+    begin = b'-----BEGIN CERTIFICATE-----'
+    end = b'-----END CERTIFICATE-----'
+
+    begin_idx = data.find(begin)
+    end_idx = data.find(end)
+    if begin_idx == -1 or end_idx == -1:
+        raise InputError(f'Custom cert file must contain exactly 1 certificate: {source}')
+
+    end_idx += len(end)
+
+    # Disallow any non-whitespace bytes before/after the public certificate
+    if data[:begin_idx].strip(b' \t\r\n'):
+        raise InputError(f'Non-whitespace data before certificate in {source}')
+    if data[end_idx:].strip(b' \t\r\n'):
+        raise InputError(f'Non-whitespace data after certificate in {source}')
+
+    # Exactly one cert block (no extra PEM blocks)
+    if data.count(begin) != 1 or data.count(end) != 1:
+        raise InputError(f'Custom cert file must contain exactly 1 certificate: {source}')
+    tmp = data.replace(begin, b'')
+    if b'-----BEGIN ' in tmp:
+        raise InputError(f'Custom cert file contains additional PEM blocks besides the certificate: {source}')
+
+    # Validate base64 payload decodes cleanly
+    pem = data[begin_idx:end_idx]
+    lines = pem.splitlines()
+    if not lines or lines[0].strip() != begin or lines[-1].strip() != end:
+        raise InputError(f'Malformed CERTIFICATE PEM boundaries in {source}')
+
+    b64_lines = [ln.strip() for ln in lines[1:-1] if ln.strip()]
+    if not b64_lines:
+        raise InputError(f'Empty certificate payload in {source}')
+
+    b64_blob = b''.join(b64_lines)
+    try:
+        der = base64.b64decode(b64_blob, validate=True)
+    except Exception as e:
+        raise InputError(f'Invalid base64 payload in certificate: {source}') from e
+    if not der or len(der) < 64:
+        raise InputError(f'Certificate DER payload too small / invalid: {source}')
+
+    # Canonicalize output PEM (stable formatting)
+    b64_canon = base64.b64encode(der)
+    out_lines = [b64_canon[i : i + 64] for i in range(0, len(b64_canon), 64)]
+    return b'-----BEGIN CERTIFICATE-----\n' + b'\n'.join(out_lines) + b'\n-----END CERTIFICATE-----\n'
+
+
 def _load_single_pem_cert_block_from_file(path: Path) -> bytes:
     try:
         data = path.read_bytes()
     except Exception as e:
         raise InputError(f'Failed to read custom cert file: {path}') from e
 
-    blocks = extract_pem_cert_blocks(data, source=f'custom cert file: {path}')
-    if len(blocks) != 1:
-        raise InputError(f'Custom cert file must contain exactly 1 certificate: {path}')
-    return blocks[0]
+    return _load_single_pem_cert_block_from_bytes_strict(data, source=f'custom cert file: {path}')
 
 
 def load_custom_cert_blocks() -> list[bytes]:
     """
-    Load user-provided custom CA certificate PEM blocks from custom_certs/*.pem.
+    Load user-provided custom certificate PEM blocks from custom_certs/*.pem.
 
     Behavior:
       - If custom_certs/ does not exist -> return []
       - Only *.pem files are considered
       - If the directory exists but contains no *.pem -> return []
-      - Non-.pem files are ignored (we do not scan them)
       - Each .pem must contain exactly one certificate
+      - Certificates may be CA OR leaf/server certificates
     """
     d = Path(CUSTOM_CERTS_DIR)
     if not d.exists():
@@ -159,19 +209,6 @@ def load_custom_cert_blocks() -> list[bytes]:
     return blocks
 
 
-def _is_ca_certificate(cert: x509.Certificate) -> bool:
-    """
-    Best-effort CA check:
-      - Requires BasicConstraints CA=TRUE
-    (We keep this strict to avoid adding leaf/server certs by mistake.)
-    """
-    try:
-        bc = cert.extensions.get_extension_for_class(x509.BasicConstraints).value
-    except Exception:
-        return False
-    return bool(getattr(bc, 'ca', False))
-
-
 def load_all_certs(blocks: list[bytes], *, label: str = 'CA') -> list[x509.Certificate]:
     certs: list[x509.Certificate] = []
 
@@ -186,14 +223,14 @@ def load_all_certs(blocks: list[bytes], *, label: str = 'CA') -> list[x509.Certi
                 critical(f'  Reason: {e}')
                 critical('  Offending PEM:')
                 critical(b.decode('ascii', errors='replace').rstrip())
-                raise InputError('Aborting due to invalid CA certificate') from e
+                raise InputError('Aborting due to invalid certificate') from e
 
             for warn in w:
                 if issubclass(warn.category, CryptographyDeprecationWarning):
                     subject = cert.subject.rfc4514_string()
                     issuer = cert.issuer.rfc4514_string()
 
-                    critical('WARNING: CA certificate triggers CryptographyDeprecationWarning')
+                    critical('WARNING: Certificate triggers CryptographyDeprecationWarning')
                     critical('         This may become fatal in future cryptography releases.')
                     critical(f'  Index   : {idx} ({label})')
                     critical(f'  Subject : {subject}')
@@ -308,20 +345,6 @@ def main() -> int:
 
     certs = load_all_certs(blocks)
     critical(f'Parsed {len(certs)} certificates total')
-
-    # Enforce that custom certs are CA certs (best-effort) and prevent accidental leaf addition.
-    # Note: curl bundle includes many CAs; custom certs are appended and checked here by CA constraint.
-    if custom_blocks:
-        custom_certs = load_all_certs(custom_blocks, label='custom')
-        non_ca = [c for c in custom_certs if not _is_ca_certificate(c)]
-        if non_ca:
-            critical(
-                'FATAL: One or more custom certificates are not CA certificates (BasicConstraints CA=TRUE missing)'
-            )
-            for c in non_ca:
-                critical(f'  Subject: {c.subject.rfc4514_string()}')
-                critical(f'  Issuer : {c.issuer.rfc4514_string()}')
-            raise InputError('Refusing to include non-CA custom certificates')
 
     bundle = create_bundle(certs)
     critical(f'Writing bundle to {OUTPUT_FILE} (atomic)')

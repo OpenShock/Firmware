@@ -1,165 +1,135 @@
 # Certificates used for HTTPS
 
-These certificates are sourced from [curl’s CA bundle](https://curl.se/docs/caextract.html) and are used for TLS/SSL verification on the ESP32.
+This project uses a curated CA certificate bundle for TLS/SSL verification on the ESP32.
 
-The bundle is generated as follows:
-
-- Downloaded directly from curl.se
-- The downloaded `cacert.pem` is:
-
-  - Hashed locally using SHA-256
-  - Verified against the downloaded `cacert.pem.sha256`
-
-- **The user must manually validate the downloaded file and checksum against curl’s official published SHA-256**
-- Optionally extended with **user-provided custom CA certificates** (see below)
-- Parsed using `cryptography`, aborting on any invalid certificate
-
-> **Important trust note:**
-> The PEM file and the `.sha256` file are fetched from the same domain.
-> If curl.se were compromised or a TLS trust failure occurred during update, **both files could be malicious but internally consistent**.
-> This is why **manual verification against curl’s website is mandatory**.
+The bundle is sourced from **curl’s official CA extract** and optionally extended with **user-provided custom CA certificates**.
 
 ---
 
-## How to update
+## Source of Trust
 
-### 1. Generate the bundle
+- The base CA bundle comes from:
+  [https://curl.se/docs/caextract.html](https://curl.se/docs/caextract.html)
+- `cacert.pem` is downloaded directly from curl.se
+- A SHA-256 checksum is computed locally and compared against curl’s published checksum
+- All certificates are parsed and validated using `cryptography`
+- Any parsing error, mismatch, or invalid certificate **aborts generation**
+
+> ⚠️ **Trust warning**
+> The PEM file and its checksum are fetched from the same domain.
+> If curl.se were compromised or TLS trust failed, both could be malicious but internally consistent.
+> **Manual verification against curl’s website is therefore mandatory.**
+
+---
+
+## Updating the Bundle
+
+### 1. Generate
 
 Run:
 
 ```sh
-python gen_crt_bundle.py
+python3 gen_crt_bundle.py
 ```
 
 The script will:
 
-- Download `cacert.pem` from curl.se
-- Save it locally as `cacert.pem`
-- Compute and print its SHA-256 hash
-- Save the computed hash locally as `cacert.pem.sha256`
-- Download curl’s published `cacert.pem.sha256`
-- Automatically verify that:
-
-  - The downloaded PEM matches the downloaded checksum
-
-- Load optional custom certificates from `custom_certs/` (if present)
-- Abort immediately on any mismatch, parsing error, invalid certificate, or duplicate subject
+- Download `cacert.pem`
+- Compute and store its SHA-256 hash
+- Download curl’s published checksum
+- Verify the PEM matches the downloaded checksum
+- Optionally include custom certificates (see below)
+- Abort on any error or inconsistency
 
 ---
 
-### 2. **MANDATORY: SHA-256 validation (two-step trust check)**
+### 2. **Mandatory Manual Verification**
 
-⚠️ **This step is REQUIRED before committing any changes.**
+⚠️ **Do not commit anything before completing both steps below.**
 
-#### Step A — Validate file ↔ checksum
-
-Verify that the downloaded file matches the downloaded checksum:
+#### Step A — Local integrity check
 
 ```sh
 sha256sum cacert.pem
 cat cacert.pem.sha256
 ```
 
-✅ The hash printed by `sha256sum` **must exactly match** the contents of `cacert.pem.sha256`.
+The values **must match exactly**.
 
-❌ If it does not match:
+If they do not:
 
 - Treat both files as untrusted
-- Do **not** commit anything
-- Investigate the failure before proceeding
+- Do not commit
+- Investigate before proceeding
 
-#### Step B — Validate checksum ↔ curl’s official publication
+#### Step B — External trust check
 
-1. Open curl’s official CA extract page:
-   [https://curl.se/docs/caextract.html](https://curl.se/docs/caextract.html)
-2. Locate the published SHA-256 checksum for `cacert.pem`
-3. **Manually compare** it against:
+1. Open: [https://curl.se/docs/caextract.html](https://curl.se/docs/caextract.html)
+2. Locate the published SHA-256 checksum
+3. Manually compare it against:
 
-   - The hash printed by the script
-   - The contents of the local `cacert.pem.sha256`
+   - The script output
+   - `cacert.pem.sha256`
 
-✅ **All three values must match exactly**.
+All values **must match exactly**.
 
-❌ If they do **not** match:
+If they do not:
 
-- **Do not commit the bundle**
-- Treat the output as untrusted
-- Investigate the discrepancy before proceeding
+- Do not commit
+- Treat the bundle as untrusted
 
-> Automatic checksum verification protects against corruption and mismatched downloads.
-> **Manual verification establishes the external trust boundary and is the final authority.**
+> Automatic checks ensure internal consistency.
+> Manual verification establishes the external trust boundary.
 
 ---
 
-## Adding custom certificates (self-hosted / internal PKI)
+### 3. Commit
 
-Self-hosters may need to trust additional Certificate Authorities (for example internal PKI or private reverse proxies).
-
-Custom certificates can be explicitly added to the bundle.
-
-### Requirements for custom certificates
-
-All custom certificates **must**:
-
-- Be PEM-encoded CA certificates
-- Be stored in files with a **`.pem` extension (mandatory)**
-- Contain **exactly one** `BEGIN CERTIFICATE` block
-- Contain **no private key material**
-- Be intentionally reviewed and trusted by the user
-
-> ⚠️ Adding a custom CA expands the ESP32’s trust boundary.
-> Only add certificates you **fully control and trust**.
-
-### Directory layout (strict)
-
-Place custom certificates in:
-
-```
-custom_certs/
-```
-
-Example:
-
-```
-custom_certs/
-├── internal-root-ca.pem
-├── homelab-intermediate.pem
-```
-
-Only files ending in `.pem` are considered.
-Files with other extensions, multiple certificates, or invalid contents will be rejected.
-
-### Inclusion behavior
-
-- All valid `.pem` files in `custom_certs/` are:
-
-  - Parsed using `cryptography`
-  - Validated as CA certificates
-  - Subject-sorted alongside curl’s certificates
-
-- Duplicate subject names are rejected
-- If `custom_certs/` does not exist, only curl’s CA bundle is used
-
----
-
-### 3. Commit the updated bundle
-
-Only after successful **manual verification** and review of any custom certificates, commit the newly generated artifacts:
+After successful manual verification, commit:
 
 - `x509_crt_bundle`
 - `cacert.pem`
 - `cacert.pem.sha256`
-- `custom_certs/` (if used)
+
+❌ **Never commit anything under `custom_certs/`.**
 
 ---
 
-## Notes on trust
+## Custom Certificates (Optional)
 
-- Automatic SHA-256 verification ensures internal consistency of downloaded files.
-- Validating `cacert.pem` against `cacert.pem.sha256` ensures file integrity.
-- Manual verification against curl’s official publication establishes external trust.
-- Custom certificates explicitly extend the trust boundary and must be reviewed.
-- The generated `x509_crt_bundle` is deterministic for a given set of input certificates.
+Self-hosted setups may require trusting additional Certificate Authorities (e.g. internal PKI or private reverse proxies).
+
+Custom CA certificates can be added locally and merged into the bundle.
+
+### How to add
+
+Place certificates in:
+
+```text
+custom_certs/
+```
+
+Only files ending in `.pem` are considered.
+
+### Requirements
+
+Each custom certificate file must contain exactly one PEM certificate block and nothing else.
+
+The script will parse and validate them as CA certificates and reject anything invalid or duplicated.
+
+> ⚠️ Adding custom CAs expands the ESP32’s trust boundary.
+> Only add certificates you fully trust and control.
+
+If `custom_certs/` does not exist or doesn't contain any .pem certificates, only curl’s CA bundle is used.
+
+---
+
+## Trust Model Summary
+
+- Automatic verification protects against corruption and mismatched downloads
+- Manual verification anchors trust outside the update mechanism
+- Custom certificates explicitly extend trust and are opt-in only
+- The generated bundle is deterministic for a given input set
 
 ---
 
