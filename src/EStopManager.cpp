@@ -58,6 +58,16 @@ static void estopmanager_updateexternals()
                                  portMAX_DELAY));
 }
 
+static void estopmgr_setactive(int64_t now)
+{
+  if (!s_estopActive) {
+    s_estopActivatedAt = now;
+  }
+
+  s_estopActive = true;
+  s_estopState  = EStopState::Active;
+}
+
 // Samples the estop at a fixed rate and updates internal state + events
 static void estopmgr_checkertask(void* pvParameters)
 {
@@ -82,15 +92,12 @@ static void estopmgr_checkertask(void* pvParameters)
     // Get current time
     int64_t now = OpenShock::millis();
 
-    bool btnState;
-
     // Handle external trigger: forcibly set the E-Stop active.
     if (s_externallyTriggered) {
       s_externallyTriggered = false;
 
-      s_estopActive      = true;
-      s_estopActivatedAt = now;
-      s_estopState       = EStopState::Active;
+      estopmgr_setactive(now);
+      deactivatesAt = 0;
 
       estopmanager_updateexternals();
 
@@ -103,53 +110,42 @@ static void estopmgr_checkertask(void* pvParameters)
     history = static_cast<uint16_t>((history << 1) | gpio_get_level(s_estopPin));
 
     // Debounce:
-    // If all recent bits (k_estopCheckCount) are 1 -> fully released.
-    // If any bit is 0 -> we consider it pressed (or bouncing toward pressed).
-    btnState = (history & k_estopCheckMask) != k_estopCheckMask;  // true == pressed
-
-    // Rearm grace: after clearing, ignore presses for a short window.
-    // After the window ends, require a released state before re-arming.
-    if (s_estopState == EStopState::Idle && rearmBlocked) {
-      if (now < rearmAt) {
-        // Still in grace window: ignore any press. Track input to avoid phantom edges later.
-        lastBtnState = btnState;
-        continue;
-      }
-
-      // Grace window ended: only re-arm once we see released.
-      if (!btnState) {
-        rearmBlocked = false;
-        // continue normally (allows next press edge to trip)
-      } else {
-        // Still pressed/glitching: keep blocking until released.
-        lastBtnState = btnState;
-        continue;
-      }
-    }
-
-    // If the debounced state hasn't changed, we only care about timing transitions.
-    if (btnState == lastBtnState) {
-      if (s_estopState == EStopState::ActiveClearing && now > deactivatesAt) {
-        s_estopState = EStopState::AwaitingRelease;
-        estopmanager_updateexternals();
-      }
-      continue;
-    }
+    // If all recent bits are 1 -> fully released.
+    // If any bit is 0 -> pressed (or bouncing toward pressed).
+    bool btnState = (history & k_estopCheckMask) != k_estopCheckMask;  // true == pressed
 
     // State changed: update lastBtnState and run the state machine.
+    bool pressedEdge  = (btnState && !lastBtnState);
+    bool releasedEdge = (!btnState && lastBtnState);
     lastBtnState = btnState;
 
     switch (s_estopState) {
       case EStopState::Idle:
-        if (btnState) {  // pressed
-          s_estopState       = EStopState::Active;
-          s_estopActive      = true;
-          s_estopActivatedAt = now;
+        // Rearm grace: after clearing, ignore presses for a short window.
+        // After the window ends, require a released state before re-arming.
+        if (rearmBlocked) {
+          if (now < rearmAt) {
+            // Still in grace window: ignore any press. Track input to avoid phantom edges later.
+            continue;
+          }
+
+          if (btnState) {
+            // Still pressed/glitching: keep blocking until released.
+            continue;
+          }
+
+          // Grace window ended: only re-arm once we see released.
+          rearmBlocked = false;
+        }
+
+        if (btnState) {
+          estopmgr_setactive(now);
         }
         break;
 
       case EStopState::Active:
-        if (btnState) {  // still pressed -> start hold-to-clear timer
+        // Once active, if the input gets pressed, start hold-to-clear timing.
+        if (pressedEdge) {
           s_estopState  = EStopState::ActiveClearing;
           deactivatesAt = now + k_estopHoldToClearTime;
         }
@@ -159,6 +155,7 @@ static void estopmgr_checkertask(void* pvParameters)
         if (!btnState) {  // released before hold time -> go back to Active
           s_estopState = EStopState::Active;
         } else if (now > deactivatesAt) {
+          // Hold complete -> now wait for release edge to fully clear
           s_estopState = EStopState::AwaitingRelease;
         }
         break;
