@@ -128,16 +128,16 @@ static void estopmgr_checkertask(void* pvParameters)
         }
 
         if (btnState) {
+          state              = EStopState::Active;
           s_estopActive      = true;
           s_estopActivatedAt = now;
-          state              = EStopState::Active;
         }
         break;
 
       case EStopState::Active:
         // Once active, if the input gets pressed, start hold-to-clear timing.
         if (pressedEdge) {
-          state  = EStopState::ActiveClearing;
+          state         = EStopState::ActiveClearing;
           deactivatesAt = now + k_estopHoldToClearTime;
         }
         break;
@@ -153,7 +153,7 @@ static void estopmgr_checkertask(void* pvParameters)
 
       case EStopState::AwaitingRelease:
         if (!btnState) {  // fully released -> clear E-Stop
-          state  = EStopState::Idle;
+          state         = EStopState::Idle;
           s_estopActive = false;
 
           // Start grace period to prevent immediate re-trigger.
@@ -164,7 +164,7 @@ static void estopmgr_checkertask(void* pvParameters)
 
       default:
         // Should never happen
-        break;
+        continue;
     }
 
     estopmanager_updateexternals(state);
