@@ -26,6 +26,9 @@ const uint32_t k_estopUpdateRate      = 5;   // 200 Hz
 const uint32_t k_estopCheckCount      = 13;  // 65 ms at 200 Hz
 const uint16_t k_estopCheckMask       = 0xFFFF >> ((sizeof(uint16_t) * 8) - k_estopCheckCount);
 
+// Grace period after deactivation (prevents immediate re-trigger on release bounce/EMI)
+const uint32_t k_estopRearmGraceTime  = 250;  // tune as needed
+
 static OpenShock::SimpleMutex s_estopMutex = {};
 static gpio_num_t s_estopPin               = GPIO_NUM_NC;
 static TaskHandle_t s_estopTask            = nullptr;
@@ -65,6 +68,10 @@ static void estopmgr_checkertask(void* pvParameters)
 
   int64_t deactivatesAt = 0;
 
+  // Rearm grace state
+  int64_t rearmAt      = 0;
+  bool    rearmBlocked = false;
+
   // Debounced button state: true == pressed, false == released
   bool lastBtnState = false;
 
@@ -99,6 +106,26 @@ static void estopmgr_checkertask(void* pvParameters)
     // If all recent bits (k_estopCheckCount) are 1 -> fully released.
     // If any bit is 0 -> we consider it pressed (or bouncing toward pressed).
     btnState = (history & k_estopCheckMask) != k_estopCheckMask;  // true == pressed
+
+    // Rearm grace: after clearing, ignore presses for a short window.
+    // After the window ends, require a released state before re-arming.
+    if (s_estopState == EStopState::Idle && rearmBlocked) {
+      if (now < rearmAt) {
+        // Still in grace window: ignore any press. Track input to avoid phantom edges later.
+        lastBtnState = btnState;
+        continue;
+      }
+
+      // Grace window ended: only re-arm once we see released.
+      if (!btnState) {
+        rearmBlocked = false;
+        // continue normally (allows next press edge to trip)
+      } else {
+        // Still pressed/glitching: keep blocking until released.
+        lastBtnState = btnState;
+        continue;
+      }
+    }
 
     // If the debounced state hasn't changed, we only care about timing transitions.
     if (btnState == lastBtnState) {
@@ -140,6 +167,10 @@ static void estopmgr_checkertask(void* pvParameters)
         if (!btnState) {  // fully released -> clear E-Stop
           s_estopState  = EStopState::Idle;
           s_estopActive = false;
+
+          // Start grace period to prevent immediate re-trigger.
+          rearmBlocked = true;
+          rearmAt      = now + k_estopRearmGraceTime;
         }
         break;
 
@@ -258,9 +289,10 @@ bool EStopManager::Init()
   }
 
   // Ensure known initial state
-  s_estopState       = EStopState::Idle;
-  s_estopActive      = false;
-  s_estopActivatedAt = 0;
+  s_estopState         = EStopState::Idle;
+  s_lastPublishedState = EStopState::Idle;
+  s_estopActive        = false;
+  s_estopActivatedAt   = 0;
 
   return true;
 }
