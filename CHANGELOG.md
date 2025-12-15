@@ -1,3 +1,34 @@
+# Version 1.5.0-rc.2 Release Notes
+
+This release candidate focuses on **E-Stop reliability**, **rate limiting behavior**, and **general internal cleanup and correctness improvements**.
+
+## Highlights
+
+* **Improved E-Stop handling**
+
+  * More reliable state transitions.
+  * Removed event spamming by introducing change detection.
+  * Added a short **re-arm grace period** after clearing to prevent immediate re-triggering due to switch bounce or noise.
+  * Cleaner handling of external E-Stop triggers.
+
+* **Rate limiter improvements**
+
+  * More efficient internal tracking of recent requests.
+  * Corrected cleanup and timing behavior under sustained load.
+  * More predictable blocking behavior when limits are exceeded.
+
+## Stability & Internal Cleanup
+
+* Safer handling of integer formatting and digit counting (avoids edge-case overflows).
+* Reduced unnecessary string copying by tightening ownership where appropriate.
+* Command handling and serial logic cleaned up for clearer control flow.
+* General warning cleanups, minor API refinements, and consistency improvements across the codebase.
+
+## Build & Tooling
+
+* Minor CI and dependency updates.
+* Expanded compiler warnings where possible to catch issues earlier during development.
+
 # Version 1.5.0-rc.1 Release Notes
 
 This release candidate focuses on **radio reliability**, **firmware behavior improvements**, and a refreshed **frontend**.
