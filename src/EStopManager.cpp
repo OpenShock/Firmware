@@ -50,21 +50,7 @@ static void estopmanager_updateexternals(EStopState state)
   s_lastPublishedState = state;
 
   // Post the current state as the event payload
-  ESP_ERROR_CHECK(esp_event_post(OPENSHOCK_EVENTS,
-                                 OPENSHOCK_EVENT_ESTOP_STATE_CHANGED,
-                                 &state,
-                                 sizeof(state),
-                                 portMAX_DELAY));
-}
-
-static void estopmgr_setactive(EStopState state, int64_t now)
-{
-  if (!s_estopActive) {
-    s_estopActivatedAt = now;
-  }
-
-  s_estopActive = true;
-  state         = EStopState::Active;
+  ESP_ERROR_CHECK(esp_event_post(OPENSHOCK_EVENTS, OPENSHOCK_EVENT_ESTOP_STATE_CHANGED, &state, sizeof(state), portMAX_DELAY));
 }
 
 // Samples the estop at a fixed rate and updates internal state + events
@@ -95,7 +81,13 @@ static void estopmgr_checkertask(void* pvParameters)
     if (s_externallyTriggered) {
       s_externallyTriggered = false;
 
-      estopmgr_setactive(state, now);
+      if (!s_estopActive) {
+        s_estopActivatedAt = now;
+      }
+
+      s_estopActive = true;
+      state         = EStopState::Active;
+
       estopmanager_updateexternals(state);
 
       // Do not modify history/lastBtnState here; allow hardware to take over
@@ -136,7 +128,9 @@ static void estopmgr_checkertask(void* pvParameters)
         }
 
         if (btnState) {
-          estopmgr_setactive(state, now);
+          s_estopActive      = true;
+          s_estopActivatedAt = now;
+          state              = EStopState::Active;
         }
         break;
 
