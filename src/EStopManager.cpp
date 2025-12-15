@@ -33,7 +33,6 @@ static OpenShock::SimpleMutex s_estopMutex = {};
 static gpio_num_t s_estopPin               = GPIO_NUM_NC;
 static TaskHandle_t s_estopTask            = nullptr;
 
-static EStopState s_estopState         = EStopState::Idle;
 static EStopState s_lastPublishedState = EStopState::Idle;
 static bool       s_estopActive        = false;
 static int64_t    s_estopActivatedAt   = 0;
@@ -42,30 +41,30 @@ static volatile bool s_externallyTriggered = false;
 
 static bool s_estopInitialized = false;
 
-static void estopmanager_updateexternals()
+static void estopmanager_updateexternals(EStopState state)
 {
-  if (s_estopState == s_lastPublishedState) {
+  if (state == s_lastPublishedState) {
     return; // No state change -> no event
   }
 
-  s_lastPublishedState = s_estopState;
+  s_lastPublishedState = state;
 
   // Post the current state as the event payload
   ESP_ERROR_CHECK(esp_event_post(OPENSHOCK_EVENTS,
                                  OPENSHOCK_EVENT_ESTOP_STATE_CHANGED,
-                                 &s_estopState,
-                                 sizeof(s_estopState),
+                                 &state,
+                                 sizeof(state),
                                  portMAX_DELAY));
 }
 
-static void estopmgr_setactive(int64_t now)
+static void estopmgr_setactive(EStopState state, int64_t now)
 {
   if (!s_estopActive) {
     s_estopActivatedAt = now;
   }
 
   s_estopActive = true;
-  s_estopState  = EStopState::Active;
+  state         = EStopState::Active;
 }
 
 // Samples the estop at a fixed rate and updates internal state + events
@@ -76,6 +75,7 @@ static void estopmgr_checkertask(void* pvParameters)
   // Bit history of samples, 0 is pressed, 1 is released.
   uint16_t history = 0xFFFF;
 
+  EStopState state      = EStopState::Idle;
   int64_t deactivatesAt = 0;
 
   // Rearm grace state
@@ -96,10 +96,10 @@ static void estopmgr_checkertask(void* pvParameters)
     if (s_externallyTriggered) {
       s_externallyTriggered = false;
 
-      estopmgr_setactive(now);
+      estopmgr_setactive(state, now);
       deactivatesAt = 0;
 
-      estopmanager_updateexternals();
+      estopmanager_updateexternals(state);
 
       // Do not modify history/lastBtnState here; allow hardware to take over
       // on subsequent iterations.
@@ -119,7 +119,7 @@ static void estopmgr_checkertask(void* pvParameters)
     bool releasedEdge = (!btnState && lastBtnState);
     lastBtnState = btnState;
 
-    switch (s_estopState) {
+    switch (state) {
       case EStopState::Idle:
         // Rearm grace: after clearing, ignore presses for a short window.
         // After the window ends, require a released state before re-arming.
@@ -139,30 +139,30 @@ static void estopmgr_checkertask(void* pvParameters)
         }
 
         if (btnState) {
-          estopmgr_setactive(now);
+          estopmgr_setactive(state, now);
         }
         break;
 
       case EStopState::Active:
         // Once active, if the input gets pressed, start hold-to-clear timing.
         if (pressedEdge) {
-          s_estopState  = EStopState::ActiveClearing;
+          state  = EStopState::ActiveClearing;
           deactivatesAt = now + k_estopHoldToClearTime;
         }
         break;
 
       case EStopState::ActiveClearing:
         if (!btnState) {  // released before hold time -> go back to Active
-          s_estopState = EStopState::Active;
+          state = EStopState::Active;
         } else if (now > deactivatesAt) {
           // Hold complete -> now wait for release edge to fully clear
-          s_estopState = EStopState::AwaitingRelease;
+          state = EStopState::AwaitingRelease;
         }
         break;
 
       case EStopState::AwaitingRelease:
         if (!btnState) {  // fully released -> clear E-Stop
-          s_estopState  = EStopState::Idle;
+          state  = EStopState::Idle;
           s_estopActive = false;
 
           // Start grace period to prevent immediate re-trigger.
@@ -176,7 +176,7 @@ static void estopmgr_checkertask(void* pvParameters)
         break;
     }
 
-    estopmanager_updateexternals();
+    estopmanager_updateexternals(state);
   }
 }
 
@@ -286,7 +286,6 @@ bool EStopManager::Init()
   }
 
   // Ensure known initial state
-  s_estopState         = EStopState::Idle;
   s_lastPublishedState = EStopState::Idle;
   s_estopActive        = false;
   s_estopActivatedAt   = 0;
@@ -332,7 +331,6 @@ int64_t EStopManager::LastEStopped()
 
 void EStopManager::Trigger()
 {
-  // This will be picked up by the checker task and converted into an
-  // E-Stop activation (s_estopState = Active, s_estopActive = true, etc.)
+  // This will be picked up by the checker task and lead to an E-Stop activation
   s_externallyTriggered = true;
 }
