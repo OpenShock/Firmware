@@ -17,22 +17,38 @@ void fromNonZeroT(T val, std::string& out)
 {
   // Ensure the template type T is an integral type
   static_assert(std::is_integral_v<T>, "T must be an integral type");
+  using U = std::make_unsigned_t<T>;
+
   constexpr std::size_t MaxDigits = OpenShock::Util::Digits10CountMax<T>;
 
   char buf[MaxDigits];
 
   // Start from the end of the buffer to construct the number in reverse (from least to most significant digit)
-  char* ptr = buf + MaxDigits;
+  char* const end = buf + MaxDigits;
+  char* ptr = end;
 
-  bool negative = val < 0;
-  if (negative) {
-    val = -val;  // Make the value positive for digit extraction
+  U u;
+  bool negative = false;
+
+  if constexpr (std::is_signed_v<T>) {
+    if (val < 0) {
+      negative = true;
+
+      // Convert to unsigned, then take the modular negation.
+      // This is well-defined and yields the magnitude of val.
+      u = U(0) - U(val);
+    } else {
+      u = U(val);
+    }
+  } else {
+    // Unsigned types: just use the value as-is.
+    u = U(val);
   }
 
   // Extract digits and store them in reverse order in the buffer
-  while (val > 0) {
-    *--ptr = '0' + (val % 10);
-    val /= 10;
+  while (u > 0) {
+    *--ptr = char('0' + (u % 10));
+    u /= 10;
   }
 
   // If the number was negative, add the negative sign
@@ -41,7 +57,7 @@ void fromNonZeroT(T val, std::string& out)
   }
 
   // Append the resulting string to the output
-  out.append(ptr, buf + MaxDigits);
+  out.append(ptr, end - ptr);
 }
 
 // Base converter
