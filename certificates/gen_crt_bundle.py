@@ -55,7 +55,6 @@ URL_SHA256 = 'https://curl.se/ca/cacert.pem.sha256'
 MANUAL_HASH_PAGE = 'https://curl.se/docs/caextract.html'
 OUTPUT_FILE = 'x509_crt_bundle'
 LOCAL_PEM_FILE = 'cacert.pem'
-LOCAL_SHA256_FILE = 'cacert.pem.sha256'
 
 # Custom certs (self-hosted/internal PKI)
 CUSTOM_CERTS_DIR = 'custom_certs'  # optional; if missing -> ignored
@@ -325,10 +324,6 @@ def main() -> int:
 
     critical(f'Saving downloaded PEM to {LOCAL_PEM_FILE} (atomic)')
     atomic_write(LOCAL_PEM_FILE, pem)
-
-    hash_line = f'{got_hash}  {LOCAL_PEM_FILE}\n'.encode('utf-8')
-    critical(f'Saving computed SHA-256 to {LOCAL_SHA256_FILE} (atomic)')
-    atomic_write(LOCAL_SHA256_FILE, hash_line)
 
     critical('')
     critical('MANUAL VERIFICATION REQUIRED')

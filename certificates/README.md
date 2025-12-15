@@ -2,9 +2,7 @@
 
 This project uses a curated CA certificate bundle for TLS/SSL verification on the ESP32.
 
-The bundle is sourced from **curl’s official CA extract** and optionally extended with **user-provided custom CA certificates**.
-
----
+The bundle is sourced from **curl’s official CA extract** and can optionally be extended with **user-provided custom CA certificates**.
 
 ## Source of Trust
 
@@ -20,8 +18,6 @@ The bundle is sourced from **curl’s official CA extract** and optionally exten
 > If curl.se were compromised or TLS trust failed, both could be malicious but internally consistent.
 > **Manual verification against curl’s website is therefore mandatory.**
 
----
-
 ## Updating the Bundle
 
 ### 1. Generate
@@ -35,43 +31,25 @@ python3 gen_crt_bundle.py
 The script will:
 
 - Download `cacert.pem`
-- Compute and store its SHA-256 hash
+- Compute its SHA-256 hash
 - Download curl’s published checksum
-- Verify the PEM matches the downloaded checksum
+- Verify the PEM matches the computed checksum
 - Optionally include custom certificates (see below)
 - Abort on any error or inconsistency
 
----
-
 ### 2. **Mandatory Manual Verification**
 
-⚠️ **Do not commit anything before completing both steps below.**
+⚠️ **Do not commit anything before completing the steps below.**
 
-#### Step A — Local integrity check
+1. Open: [https://curl.se/docs/caextract.html](https://curl.se/docs/caextract.html)
+2. Locate the latest published SHA-256 checksum
+3. Manually compare it against:
 
 ```sh
 sha256sum cacert.pem
-cat cacert.pem.sha256
 ```
 
-The values **must match exactly**.
-
-If they do not:
-
-- Treat both files as untrusted
-- Do not commit
-- Investigate before proceeding
-
-#### Step B — External trust check
-
-1. Open: [https://curl.se/docs/caextract.html](https://curl.se/docs/caextract.html)
-2. Locate the published SHA-256 checksum
-3. Manually compare it against:
-
-   - The script output
-   - `cacert.pem.sha256`
-
-All values **must match exactly**.
+Both values **must match exactly**.
 
 If they do not:
 
@@ -80,8 +58,6 @@ If they do not:
 
 > Automatic checks ensure internal consistency.
 > Manual verification establishes the external trust boundary.
-
----
 
 ### 3. Commit
 
@@ -92,8 +68,6 @@ After successful manual verification, commit:
 - `cacert.pem.sha256`
 
 ❌ **Never commit anything under `custom_certs/`.**
-
----
 
 ## Custom Certificates (Optional)
 
@@ -122,16 +96,12 @@ The script will parse and validate them as CA certificates and reject anything i
 
 If `custom_certs/` does not exist or doesn't contain any .pem certificates, only curl’s CA bundle is used.
 
----
-
 ## Trust Model Summary
 
 - Automatic verification protects against corruption and mismatched downloads
 - Manual verification anchors trust outside the update mechanism
 - Custom certificates explicitly extend trust and are opt-in only
 - The generated bundle is deterministic for a given input set
-
----
 
 ## References
 
