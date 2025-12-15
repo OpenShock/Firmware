@@ -39,16 +39,8 @@ static volatile bool s_externallyTriggered = false;
 
 static bool s_estopInitialized = false;
 
-// Forward declarations
-static bool estopmgr_setestopenabled(bool enabled);
-static bool _setEStopPinImpl(gpio_num_t pin);
-
-static void estopmanager_updateexternals(bool isActive, bool isAwaitingRelease)
+static void estopmanager_updateexternals()
 {
-  // Parameters are here for future extension (e.g. different event payload types).
-  (void)isActive;
-  (void)isAwaitingRelease;
-
   if (s_estopState == s_lastPublishedState) {
     return; // No state change → no event
   }
@@ -93,7 +85,7 @@ static void estopmgr_checkertask(void* pvParameters)
       s_estopActivatedAt = now;
       s_estopState       = EStopState::Active;
 
-      estopmanager_updateexternals(s_estopActive, false);
+      estopmanager_updateexternals();
 
       // Do not modify history/lastBtnState here; allow hardware to take over
       // on subsequent iterations.
@@ -112,7 +104,7 @@ static void estopmgr_checkertask(void* pvParameters)
     if (btnState == lastBtnState) {
       if (s_estopState == EStopState::ActiveClearing && now > deactivatesAt) {
         s_estopState = EStopState::AwaitingRelease;
-        estopmanager_updateexternals(s_estopActive, true);
+        estopmanager_updateexternals();
       }
       continue;
     }
@@ -156,7 +148,7 @@ static void estopmgr_checkertask(void* pvParameters)
         break;
     }
 
-    estopmanager_updateexternals(s_estopActive, s_estopState == EStopState::AwaitingRelease);
+    estopmanager_updateexternals();
   }
 }
 
@@ -180,7 +172,7 @@ static bool estopmgr_setestopenabled(bool enabled)
   return true;
 }
 
-static bool _setEStopPinImpl(gpio_num_t pin)
+static bool estopmgr_setpin_impl(gpio_num_t pin)
 {
   esp_err_t err;
 
@@ -255,7 +247,7 @@ bool EStopManager::Init()
 
   OpenShock::ScopedLock lock__(&s_estopMutex);
 
-  if (!_setEStopPinImpl(cfg.gpioPin)) {
+  if (!estopmgr_setpin_impl(cfg.gpioPin)) {
     OS_LOGE(TAG, "Failed to set EStop pin");
     return false;
   }
@@ -283,7 +275,7 @@ bool EStopManager::SetEStopEnabled(bool enabled)
       OS_LOGE(TAG, "Failed to get EStop pin from config");
       return false;
     }
-    if (!_setEStopPinImpl(pin)) {
+    if (!estopmgr_setpin_impl(pin)) {
       OS_LOGE(TAG, "Failed to set EStop pin");
       return false;
     }
@@ -296,7 +288,7 @@ bool EStopManager::SetEStopPin(gpio_num_t pin)
 {
   OpenShock::ScopedLock lock__(&s_estopMutex);
 
-  return _setEStopPinImpl(pin);
+  return estopmgr_setpin_impl(pin);
 }
 
 bool EStopManager::IsEStopped()
