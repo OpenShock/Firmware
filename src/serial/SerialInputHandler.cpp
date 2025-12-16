@@ -33,7 +33,7 @@ const char* const TAG = "SerialInputHandler";
 
 namespace std {
   struct hash_ci {
-    std::size_t operator()(std::string_view str) const
+    std::size_t operator()(std::string_view str) const noexcept
     {
       std::size_t hash = 7;
 

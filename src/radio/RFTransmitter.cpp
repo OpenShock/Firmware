@@ -183,7 +183,7 @@ static void writeSequences(rmt_obj_t* rmt_handle, std::vector<Rmt::Sequence>& se
       rmtWriteBlocking(rmt_handle, seq->payload(), seq->size());
     } else {
       // Remove command if it has sent out its termination sequence for long enough
-      if (timeToLive + kTerminatorDurationMs <= 0) {
+      if (timeToLive <= -kTerminatorDurationMs) {
         seq = sequences.erase(seq);
         continue;
       }
