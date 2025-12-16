@@ -1,0 +1,12 @@
+# -----------------------------------------------------------------------------
+# Custom CA certificates (local / self-hosted trust extensions)
+# -----------------------------------------------------------------------------
+# These files expand the TLS trust boundary and are intentionally NOT tracked.
+# Add only in local or deployment-specific environments.
+custom_certs/
+
+# Safety net: never commit private keys if mis-placed
+*.key
+*.pem.key
+*.p12
+*.pfx

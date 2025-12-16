@@ -18,8 +18,8 @@ on:
 name: ci-build
 
 env:
-  PNPM_VERSION: 9
-  NODE_VERSION: 20
+  PNPM_VERSION: 10.6.4
+  NODE_VERSION: 22.14.0
   PYTHON_VERSION: 3.12
 
 jobs:
@@ -28,9 +28,10 @@ jobs:
 
   build-frontend:
     runs-on: ubuntu-latest
+    timeout-minutes: 5
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
         with:
           sparse-checkout: |
             .github
@@ -44,23 +45,25 @@ jobs:
   build-staticfs:
     runs-on: ubuntu-latest
     needs: [getvars, build-frontend]
+    timeout-minutes: 5
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
       - uses: ./.github/actions/build-staticfs
         with:
           version: ${{ needs.getvars.outputs.version }}
           skip-checkout: true
 
   build-firmware:
-    needs: [getvars]
     runs-on: ubuntu-latest
+    needs: [getvars]
+    timeout-minutes: 10
     strategy:
       fail-fast: false
       matrix: ${{ fromJSON(needs.getvars.outputs.board-matrix) }}
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
       - uses: ./.github/actions/build-firmware
         with:
@@ -69,14 +72,15 @@ jobs:
           skip-checkout: true
 
   merge-partitions:
-    needs: [getvars, build-staticfs, build-firmware]
     runs-on: ubuntu-latest
+    needs: [getvars, build-staticfs, build-firmware]
+    timeout-minutes: 5
     strategy:
       fail-fast: false
       matrix: ${{ fromJSON(needs.getvars.outputs.board-matrix) }}
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
         with:
           sparse-checkout: |
             .github
@@ -93,20 +97,22 @@ jobs:
   checkpoint-build:
     runs-on: ubuntu-latest
     needs: [merge-partitions]
+    timeout-minutes: 1
     steps:
       - run: echo "Builds checkpoint reached"
 
   cdn-upload-firmware:
-    needs: [getvars, checkpoint-build]
-    if: ${{ needs.getvars.outputs.should-deploy == 'true' }}
     runs-on: ubuntu-latest
+    needs: [getvars, checkpoint-build]
+    timeout-minutes: 15
+    if: ${{ needs.getvars.outputs.should-deploy == 'true' }}
     environment: cdn-firmware-r2
     strategy:
       fail-fast: true
       matrix: ${{ fromJson(needs.getvars.outputs.board-matrix) }}
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
         with:
           sparse-checkout: |
             .github
@@ -126,13 +132,14 @@ jobs:
           board: ${{ matrix.board }}
 
   cdn-upload-version-info:
-    needs: [getvars, checkpoint-build]
-    if: ${{ needs.getvars.outputs.should-deploy == 'true' }}
     runs-on: ubuntu-latest
+    needs: [getvars, checkpoint-build]
+    timeout-minutes: 10
+    if: ${{ needs.getvars.outputs.should-deploy == 'true' }}
     environment: cdn-firmware-r2
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
         with:
           sparse-checkout: |
             .github
@@ -155,10 +162,11 @@ jobs:
   cdn-bump-version:
     runs-on: ubuntu-latest
     needs: [getvars, cdn-upload-firmware] # only after version is complete
+    timeout-minutes: 5
     environment: cdn-firmware-r2
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
         with:
           sparse-checkout: |
             .github
@@ -182,17 +190,19 @@ jobs:
   checkpoint-cdn:
     runs-on: ubuntu-latest
     needs: [cdn-upload-firmware, cdn-upload-version-info, cdn-bump-version]
+    timeout-minutes: 1
     steps:
       - run: echo "CDN checkpoint reached"
 
   release:
-    needs: [getvars, checkpoint-cdn]
-    if: (needs.getvars.outputs.release-channel == 'stable' || needs.getvars.outputs.release-channel == 'beta')
     runs-on: ubuntu-latest
+    needs: [getvars, checkpoint-cdn]
+    timeout-minutes: 1
+    if: (needs.getvars.outputs.release-channel == 'stable' || needs.getvars.outputs.release-channel == 'beta')
 
     steps:
       - name: Download release artifacts
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v7
 
       - name: Display artifacts
         run: ls -R

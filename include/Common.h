@@ -3,6 +3,7 @@
 #include <cstdint>
 #include <string_view>
 
+#define DISABLE_DEFAULT(TypeName) TypeName() = delete
 #define DISABLE_COPY(TypeName)                   \
   TypeName(const TypeName&)            = delete; \
   TypeName& operator=(const TypeName&) = delete

@@ -2,6 +2,8 @@
 
 #include "config/Config.h"
 
+#include <esp_system.h>
+
 #include <string>
 
 const char* const TAG = "Serial::CommandHandlers::Domain";
@@ -18,10 +20,10 @@ void _handleHostnameCommand(std::string_view arg, bool isAutomated) {
     return;
   }
 
-  bool result = OpenShock::Config::SetWiFiHostname(arg);
+  bool result = OpenShock::Config::SetWiFiHostname(std::string(arg));
   if (result) {
     SERPR_SUCCESS("Saved config, restarting...");
-    ESP.restart();
+    esp_restart();
   } else {
     SERPR_ERROR("Failed to save config");
   }

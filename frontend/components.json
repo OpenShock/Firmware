@@ -3,8 +3,8 @@
 	"style": "default",
 	"tailwind": {
 		"config": "tailwind.config.ts",
-		"css": "src\\app.tcss",
-		"baseColor": "slate"
+		"css": "src\\app.css",
+		"baseColor": "neutral"
 	},
 	"aliases": {
 		"components": "$lib/components",
