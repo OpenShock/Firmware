@@ -32,7 +32,7 @@ HTTP::HTTPClientState::HTTPClientState(const char* url, uint32_t timeoutMs)
   cfg.transport_type        = HTTP_TRANSPORT_OVER_SSL;
   cfg.user_data             = reinterpret_cast<void*>(this);
   cfg.is_async              = false;
-  cfg.use_global_ca_store   = false;
+  cfg.use_global_ca_store   = true;
 
   m_handle = esp_http_client_init(&cfg);
 }

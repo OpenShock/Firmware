@@ -19,6 +19,8 @@ const char* const TAG = "main";
 
 #include <Arduino.h>
 
+#include <esp_tls.h>
+
 #include <memory>
 
 // Internal setup function, returns true if setup succeeded, false otherwise.
@@ -89,10 +91,16 @@ void appSetup()
   }
 }
 
+extern const uint8_t* global_ca_crt_bundle_start  asm("_binary_certificates_x509_crt_bundle_start");
+extern const uint8_t* global_ca_crt_bundle_end    asm("_binary_certificates_x509_crt_bundle_end");
+
 // Arduino setup function
 void setup()
 {
   ::Serial.begin(115'200);
+
+  esp_tls_init_global_ca_store();
+  esp_tls_set_global_ca_store(global_ca_crt_bundle_start, static_cast<uint32_t>(global_ca_crt_bundle_end - global_ca_crt_bundle_start));
 
   OpenShock::Config::Init();
 
