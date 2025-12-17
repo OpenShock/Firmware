@@ -1,6 +1,7 @@
 #include "serial/command_handlers/common.h"
 
 #include "config/Config.h"
+#include "http/HTTPClient.h"
 #include "http/JsonAPI.h"
 
 #include <string>
@@ -18,15 +19,17 @@ void _handleAuthtokenCommand(std::string_view arg, bool isAutomated) {
     return;
   }
 
-  auto apiResponse = OpenShock::HTTP::JsonAPI::GetHubInfo(arg);
-  if (apiResponse.code == 401) {
+  std::string token = std::string(arg);
+
+  auto apiResponse = OpenShock::HTTP::JsonAPI::GetHubInfo(token.c_str());
+
+  if (apiResponse.StatusCode() == 401) {
     SERPR_ERROR("Invalid auth token, refusing to save it!");
     return;
   }
 
   // If we have some other kind of request fault just set it anyway, we probably arent connected to a network
-
-  bool result = OpenShock::Config::SetBackendAuthToken(std::string(arg));
+  bool result = OpenShock::Config::SetBackendAuthToken(std::move(token));
 
   if (result) {
     SERPR_SUCCESS("Saved config");

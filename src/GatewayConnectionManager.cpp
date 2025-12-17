@@ -106,32 +106,37 @@ AccountLinkResultCode GatewayConnectionManager::Link(std::string_view linkCode)
   }
 
   auto response = HTTP::JsonAPI::LinkAccount(linkCode);
+  if (!response.Ok()) {
 
-  if (response.code == 404) {
+    if (response.Error() == HTTP::HTTPError::RateLimited) {
+      return AccountLinkResultCode::InternalError;  // Just return false, don't spam the console with errors
+    }
+
+    OS_LOGE(TAG, "Error while linking account: %s %d", HTTP::HTTPErrorToString(response.Error()), response.StatusCode());
+    return AccountLinkResultCode::InternalError;
+  }
+
+  if (response.StatusCode() == 404) {
     return AccountLinkResultCode::InvalidCode;
   }
 
-  if (response.result == HTTP::RequestResult::RateLimited) {
-    OS_LOGW(TAG, "Account Link request got ratelimited");
-    return AccountLinkResultCode::RateLimited;
-  }
-  if (response.result != HTTP::RequestResult::Success) {
-    OS_LOGE(TAG, "Error while getting auth token: %s %d", response.ResultToString(), response.code);
-
+  if (response.StatusCode() != 200) {
+    OS_LOGE(TAG, "Unexpected response code: %d", response.StatusCode());
     return AccountLinkResultCode::InternalError;
   }
 
-  if (response.code != 200) {
-    OS_LOGE(TAG, "Unexpected response code: %d", response.code);
+  auto content = response.ReadJson();
+  if (content.error != HTTP::HTTPError::None) {
+    OS_LOGE(TAG, "Error while reading response: %s %d", HTTP::HTTPErrorToString(response.Error()), response.StatusCode());
     return AccountLinkResultCode::InternalError;
   }
 
-  if (response.data.authToken.empty()) {
+  if (content.data.authToken.empty()) {
     OS_LOGE(TAG, "Received empty auth token");
     return AccountLinkResultCode::InternalError;
   }
 
-  if (!Config::SetBackendAuthToken(std::move(response.data.authToken))) {
+  if (!Config::SetBackendAuthToken(std::move(content.data.authToken))) {
     OS_LOGE(TAG, "Failed to save auth token");
     return AccountLinkResultCode::InternalError;
   }
@@ -166,7 +171,7 @@ bool GatewayConnectionManager::SendMessageBIN(tcb::span<const uint8_t> data)
   return s_wsClient->sendMessageBIN(data);
 }
 
-bool FetchHubInfo(std::string authToken)
+bool FetchHubInfo(const char* authToken)
 {
   // TODO: this function is very slow, should be optimized!
   if ((s_flags & FLAG_HAS_IP) == 0) {
@@ -177,31 +182,37 @@ bool FetchHubInfo(std::string authToken)
     return false;
   }
 
-  auto response = HTTP::JsonAPI::GetHubInfo(std::move(authToken));
+  auto response = HTTP::JsonAPI::GetHubInfo(authToken);
+  if (!response.Ok()) {
+    if (response.Error() == HTTP::HTTPError::RateLimited) {
+      return false;  // Just return false, don't spam the console with errors
+    }
 
-  if (response.code == 401) {
-    OS_LOGD(TAG, "Auth token is invalid, waiting 5 minutes before checking again");
+    OS_LOGE(TAG, "Error while fetching hub info: %s %d", HTTP::HTTPErrorToString(response.Error()), response.StatusCode());
+    return false;
+  }
+
+  if (response.StatusCode() == 401) {
+    OS_LOGD(TAG, "Auth token is invalid, waiting 5 minutes before retrying");
     s_lastAuthFailure = OpenShock::micros();
     return false;
   }
 
-  if (response.result == HTTP::RequestResult::RateLimited) {
-    return false;  // Just return false, don't spam the console with errors
-  }
-  if (response.result != HTTP::RequestResult::Success) {
-    OS_LOGE(TAG, "Error while fetching hub info: %s %d", response.ResultToString(), response.code);
+  if (response.StatusCode() != 200) {
+    OS_LOGE(TAG, "Unexpected response code: %d", response.StatusCode());
     return false;
   }
 
-  if (response.code != 200) {
-    OS_LOGE(TAG, "Unexpected response code: %d", response.code);
+  auto content = response.ReadJson();
+  if (content.error != HTTP::HTTPError::None) {
+    OS_LOGE(TAG, "Error while reading response: %s %d", HTTP::HTTPErrorToString(response.Error()), response.StatusCode());
     return false;
   }
 
-  OS_LOGI(TAG, "Hub ID:   %s", response.data.hubId.c_str());
-  OS_LOGI(TAG, "Hub Name: %s", response.data.hubName.c_str());
+  OS_LOGI(TAG, "Hub ID:   %s", content.data.hubId.c_str());
+  OS_LOGI(TAG, "Hub Name: %s", content.data.hubName.c_str());
   OS_LOGI(TAG, "Shockers:");
-  for (auto& shocker : response.data.shockers) {
+  for (auto& shocker : content.data.shockers) {
     OS_LOGI(TAG, "  [%s] rf=%u model=%u", shocker.id.c_str(), shocker.rfId, shocker.model);
   }
 
@@ -241,29 +252,35 @@ bool StartConnectingToLCG()
     return false;
   }
 
-  auto response = HTTP::JsonAPI::AssignLcg(std::move(authToken));
+  auto response = HTTP::JsonAPI::AssignLcg(authToken.c_str());
+  if (!response.Ok()) {
+    if (response.Error() == HTTP::HTTPError::RateLimited) {
+      return false;  // Just return false, don't spam the console with errors
+    }
 
-  if (response.code == 401) {
+    OS_LOGE(TAG, "Error while fetching LCG endpoint: %s %d", HTTP::HTTPErrorToString(response.Error()), response.StatusCode());
+    return false;
+  }
+
+  if (response.StatusCode() == 401) {
     OS_LOGD(TAG, "Auth token is invalid, waiting 5 minutes before retrying");
     s_lastAuthFailure = OpenShock::micros();
     return false;
   }
 
-  if (response.result == HTTP::RequestResult::RateLimited) {
-    return false;  // Just return false, don't spam the console with errors
-  }
-  if (response.result != HTTP::RequestResult::Success) {
-    OS_LOGE(TAG, "Error while fetching LCG endpoint: %s %d", response.ResultToString(), response.code);
+  if (response.StatusCode() != 200) {
+    OS_LOGE(TAG, "Unexpected response code: %d", response.StatusCode());
     return false;
   }
 
-  if (response.code != 200) {
-    OS_LOGE(TAG, "Unexpected response code: %d", response.code);
+  auto content = response.ReadJson();
+  if (content.error != HTTP::HTTPError::None) {
+    OS_LOGE(TAG, "Error while reading response: %s %d", HTTP::HTTPErrorToString(response.Error()), response.StatusCode());
     return false;
   }
 
-  OS_LOGD(TAG, "Connecting to LCG endpoint { host: '%s', port: %hu, path: '%s' } in country %s", response.data.host.c_str(), response.data.port, response.data.path.c_str(), response.data.country.c_str());
-  s_wsClient->connect(response.data.host, response.data.port, response.data.path);
+  OS_LOGD(TAG, "Connecting to LCG endpoint { host: '%s', port: %hu, path: '%s' } in country %s", content.data.host.c_str(), content.data.port, content.data.path.c_str(), content.data.country.c_str());
+  s_wsClient->connect(content.data.host, content.data.port, content.data.path);
 
   return true;
 }
@@ -283,7 +300,7 @@ void GatewayConnectionManager::Update()
     }
 
     // Fetch hub info
-    if (!FetchHubInfo(std::move(authToken))) {
+    if (!FetchHubInfo(authToken.c_str())) {
       return;
     }
 

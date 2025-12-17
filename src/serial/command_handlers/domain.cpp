@@ -1,8 +1,8 @@
 #include "serial/command_handlers/common.h"
 
 #include "config/Config.h"
-#include "http/HTTPRequestManager.h"
-#include "serialization/JsonAPI.h"
+#include "http/HTTPClient.h"
+#include "http/JsonAPI.h"
 
 #include <esp_system.h>
 
@@ -33,21 +33,20 @@ void _handleDomainCommand(std::string_view arg, bool isAutomated) {
   char uri[OPENSHOCK_URI_BUFFER_SIZE];
   sprintf(uri, "https://%.*s/1", arg.length(), arg.data());
 
-  auto resp = OpenShock::HTTP::GetJSON<OpenShock::Serialization::JsonAPI::BackendVersionResponse>(
-    uri,
-    {
-      {"Accept", "application/json"}
-  },
-    OpenShock::Serialization::JsonAPI::ParseBackendVersionJsonResponse,
-    std::array<uint16_t, 2> {200}
-  );
-
-  if (resp.result != OpenShock::HTTP::RequestResult::Success) {
-    SERPR_ERROR("Tried to connect to \"%.*s\", but failed with status [%d] (%s), refusing to save domain to config", arg.length(), arg.data(), resp.code, resp.ResultToString());
+  OpenShock::HTTP::HTTPClient client(uri);
+  auto response = client.GetJson<OpenShock::Serialization::JsonAPI::BackendVersionResponse>(OpenShock::Serialization::JsonAPI::ParseBackendVersionJsonResponse);
+  if (!response.Ok() || response.StatusCode() != 200) {
+    SERPR_ERROR("Tried to connect to \"%.*s\", but failed with status [%d] (%s), refusing to save domain to config", arg.length(), arg.data(), response.StatusCode(), OpenShock::HTTP::HTTPErrorToString(response.Error()));
     return;
   }
 
-  OS_LOGI(TAG, "Successfully connected to \"%.*s\", version: %s, commit: %s, current time: %s", arg.length(), arg.data(), resp.data.version.c_str(), resp.data.commit.c_str(), resp.data.currentTime.c_str());
+  auto content = response.ReadJson();
+  if (content.error != OpenShock::HTTP::HTTPError::None) {
+    SERPR_ERROR("Tried to read response from backend, but failed (%s), refusing to save domain to config", OpenShock::HTTP::HTTPErrorToString(response.Error()));
+    return;
+  }
+
+  OS_LOGI(TAG, "Successfully connected to \"%.*s\", version: %s, commit: %s, current time: %s", arg.length(), arg.data(), content.data.version.c_str(), content.data.commit.c_str(), content.data.currentTime.c_str());
 
   bool result = OpenShock::Config::SetBackendDomain(std::string(arg));
 

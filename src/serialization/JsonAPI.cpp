@@ -2,16 +2,16 @@
 
 const char* const TAG = "JsonAPI";
 
+#include <cJSON.h>
+
 #include "Logging.h"
 
 #define ESP_LOGJSONE(err, root) OS_LOGE(TAG, "Invalid JSON response (" err "): %s", cJSON_PrintUnformatted(root))
 
 using namespace OpenShock::Serialization;
 
-bool JsonAPI::ParseLcgInstanceDetailsJsonResponse(int code, const cJSON* root, JsonAPI::LcgInstanceDetailsResponse& out)
+bool JsonAPI::ParseLcgInstanceDetailsJsonResponse(const cJSON* root, JsonAPI::LcgInstanceDetailsResponse& out)
 {
-  (void)code;
-
   if (cJSON_IsObject(root) == 0) {
     ESP_LOGJSONE("not an object", root);
     return false;
@@ -57,10 +57,8 @@ bool JsonAPI::ParseLcgInstanceDetailsJsonResponse(int code, const cJSON* root, J
 
   return true;
 }
-bool JsonAPI::ParseBackendVersionJsonResponse(int code, const cJSON* root, JsonAPI::BackendVersionResponse& out)
+bool JsonAPI::ParseBackendVersionJsonResponse(const cJSON* root, JsonAPI::BackendVersionResponse& out)
 {
-  (void)code;
-
   if (cJSON_IsObject(root) == 0) {
     ESP_LOGJSONE("not an object", root);
     return false;
@@ -99,10 +97,8 @@ bool JsonAPI::ParseBackendVersionJsonResponse(int code, const cJSON* root, JsonA
   return true;
 }
 
-bool JsonAPI::ParseAccountLinkJsonResponse(int code, const cJSON* root, JsonAPI::AccountLinkResponse& out)
+bool JsonAPI::ParseAccountLinkJsonResponse(const cJSON* root, JsonAPI::AccountLinkResponse& out)
 {
-  (void)code;
-
   if (cJSON_IsObject(root) == 0) {
     ESP_LOGJSONE("not an object", root);
     return false;
@@ -120,10 +116,8 @@ bool JsonAPI::ParseAccountLinkJsonResponse(int code, const cJSON* root, JsonAPI:
 
   return true;
 }
-bool JsonAPI::ParseHubInfoJsonResponse(int code, const cJSON* root, JsonAPI::HubInfoResponse& out)
+bool JsonAPI::ParseHubInfoJsonResponse(const cJSON* root, JsonAPI::HubInfoResponse& out)
 {
-  (void)code;
-
   if (cJSON_IsObject(root) == 0) {
     ESP_LOGJSONE("not an object", root);
     return false;
@@ -213,10 +207,8 @@ bool JsonAPI::ParseHubInfoJsonResponse(int code, const cJSON* root, JsonAPI::Hub
 
   return true;
 }
-bool JsonAPI::ParseAssignLcgJsonResponse(int code, const cJSON* root, JsonAPI::AssignLcgResponse& out)
+bool JsonAPI::ParseAssignLcgJsonResponse(const cJSON* root, JsonAPI::AssignLcgResponse& out)
 {
-  (void)code;
-
   if (cJSON_IsObject(root) == 0) {
     ESP_LOGJSONE("not an object", root);
     return false;

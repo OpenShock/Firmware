@@ -2,11 +2,11 @@
 
 #include "ShockerModelType.h"
 
-#include <cJSON.h>
-
 #include <cstdint>
 #include <string>
 #include <vector>
+
+class cJSON;
 
 namespace OpenShock::Serialization::JsonAPI {
   struct LcgInstanceDetailsResponse {
@@ -41,9 +41,9 @@ namespace OpenShock::Serialization::JsonAPI {
     std::string country;
   };
 
-  bool ParseLcgInstanceDetailsJsonResponse(int code, const cJSON* root, LcgInstanceDetailsResponse& out);
-  bool ParseBackendVersionJsonResponse(int code, const cJSON* root, BackendVersionResponse& out);
-  bool ParseAccountLinkJsonResponse(int code, const cJSON* root, AccountLinkResponse& out);
-  bool ParseHubInfoJsonResponse(int code, const cJSON* root, HubInfoResponse& out);
-  bool ParseAssignLcgJsonResponse(int code, const cJSON* root, AssignLcgResponse& out);
+  bool ParseLcgInstanceDetailsJsonResponse(const cJSON* root, LcgInstanceDetailsResponse& out);
+  bool ParseBackendVersionJsonResponse(const cJSON* root, BackendVersionResponse& out);
+  bool ParseAccountLinkJsonResponse(const cJSON* root, AccountLinkResponse& out);
+  bool ParseHubInfoJsonResponse(const cJSON* root, HubInfoResponse& out);
+  bool ParseAssignLcgJsonResponse(const cJSON* root, AssignLcgResponse& out);
 }  // namespace OpenShock::Serialization::JsonAPI

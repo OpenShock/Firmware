@@ -4,11 +4,12 @@ const char* const TAG = "PartitionUtils";
 
 #include "Core.h"
 #include "Hashing.h"
-#include "http/HTTPRequestManager.h"
+#include "http/HTTPClient.h"
 #include "Logging.h"
 #include "util/HexUtils.h"
 
-bool OpenShock::TryGetPartitionHash(const esp_partition_t* partition, char (&hash)[65]) {
+bool OpenShock::TryGetPartitionHash(const esp_partition_t* partition, char (&hash)[65])
+{
   uint8_t buffer[32];
   esp_err_t err = esp_partition_get_sha256(partition, buffer);
   if (err != ESP_OK) {
@@ -22,7 +23,8 @@ bool OpenShock::TryGetPartitionHash(const esp_partition_t* partition, char (&has
   return true;
 }
 
-bool OpenShock::FlashPartitionFromUrl(const esp_partition_t* partition, std::string_view remoteUrl, const uint8_t (&remoteHash)[32], std::function<bool(std::size_t, std::size_t, float)> progressCallback) {
+bool OpenShock::FlashPartitionFromUrl(const esp_partition_t* partition, const char* remoteUrl, const uint8_t (&remoteHash)[32], std::function<bool(std::size_t, std::size_t, float)> progressCallback)
+{
   OpenShock::SHA256 sha256;
   if (!sha256.begin()) {
     OS_LOGE(TAG, "Failed to initialize SHA256 hash");
@@ -31,27 +33,8 @@ bool OpenShock::FlashPartitionFromUrl(const esp_partition_t* partition, std::str
 
   std::size_t contentLength  = 0;
   std::size_t contentWritten = 0;
-  int64_t lastProgress  = 0;
+  int64_t lastProgress       = 0;
 
-  auto sizeValidator = [partition, &contentLength, progressCallback, &lastProgress](std::size_t size) -> bool {
-    if (size > partition->size) {
-      OS_LOGE(TAG, "Remote partition binary is too large");
-      return false;
-    }
-
-    // Erase app partition.
-    if (esp_partition_erase_range(partition, 0, partition->size) != ESP_OK) {
-      OS_LOGE(TAG, "Failed to erase partition in preparation for update");
-      return false;
-    }
-
-    contentLength = size;
-
-    lastProgress = OpenShock::millis();
-    progressCallback(0, contentLength, 0.0f);
-
-    return true;
-  };
   auto dataWriter = [partition, &sha256, &contentLength, &contentWritten, progressCallback, &lastProgress](std::size_t offset, const uint8_t* data, std::size_t length) -> bool {
     if (esp_partition_write(partition, offset, data, length) != ESP_OK) {
       OS_LOGE(TAG, "Failed to write to partition");
@@ -75,23 +58,37 @@ bool OpenShock::FlashPartitionFromUrl(const esp_partition_t* partition, std::str
   };
 
   // Start streaming binary to app partition.
-  auto appBinaryResponse = OpenShock::HTTP::Download(
-    remoteUrl,
-    {
-      {"Accept", "application/octet-stream"}
-  },
-    sizeValidator,
-    dataWriter,
-    std::array<uint16_t, 2> {200, 304},
-    180'000
-  );  // 3 minutes
-  if (appBinaryResponse.result != OpenShock::HTTP::RequestResult::Success) {
-    OS_LOGE(TAG, "Failed to download remote partition binary: [%u]", appBinaryResponse.code);
+  HTTP::HTTPClient client(remoteUrl, 180'000); // 3 minutes timeout
+  auto response = client.Get();
+  if (!response.Ok() || (response.StatusCode() != 200 && response.StatusCode() != 304)) {
+    OS_LOGE(TAG, "Failed to download remote partition binary: [%u]", response.StatusCode());
+    return false;
+  }
+
+  if (response.ContentLength() > partition->size) {
+    OS_LOGE(TAG, "Remote partition binary is too large");
+    return false;
+  }
+
+  // Erase app partition.
+  if (esp_partition_erase_range(partition, 0, partition->size) != ESP_OK) {
+    OS_LOGE(TAG, "Failed to erase partition in preparation for update");
+    return false;
+  }
+
+  contentLength = response.ContentLength();
+
+  lastProgress = OpenShock::millis();
+  progressCallback(0, contentLength, 0.0f);
+
+  auto streamResult = response.ReadStream(dataWriter);
+  if (streamResult.error != HTTP::HTTPError::None) {
+    OS_LOGE(TAG, "Failed to download partition: %s", HTTP::HTTPErrorToString(streamResult.error));
     return false;
   }
 
   progressCallback(contentLength, contentLength, 1.0f);
-  OS_LOGD(TAG, "Wrote %u bytes to partition", appBinaryResponse.data);
+  OS_LOGD(TAG, "Wrote %u bytes to partition", contentLength);
 
   std::array<uint8_t, 32> localHash;
   if (!sha256.finish(localHash)) {

@@ -1,3 +1,8 @@
+#include <freertos/FreeRTOS.h>
+
+#include <LittleFS.h>
+#include <WiFi.h>
+
 #include "OtaUpdateManager.h"
 
 const char* const TAG = "OtaUpdateManager";
@@ -8,7 +13,7 @@ const char* const TAG = "OtaUpdateManager";
 #include "Core.h"
 #include "GatewayConnectionManager.h"
 #include "Hashing.h"
-#include "http/HTTPRequestManager.h"
+#include "http/HTTPClient.h"
 #include "Logging.h"
 #include "SemVer.h"
 #include "serialization/WSGateway.h"
@@ -21,9 +26,6 @@ const char* const TAG = "OtaUpdateManager";
 
 #include <esp_ota_ops.h>
 #include <esp_task_wdt.h>
-
-#include <LittleFS.h>
-#include <WiFi.h>
 
 #include <sstream>
 #include <string_view>
@@ -159,7 +161,7 @@ static bool _sendFailureMessage(std::string_view message, bool fatal = false)
   return true;
 }
 
-static bool _flashAppPartition(const esp_partition_t* partition, std::string_view remoteUrl, const uint8_t (&remoteHash)[32])
+static bool _flashAppPartition(const esp_partition_t* partition, const char* remoteUrl, const uint8_t (&remoteHash)[32])
 {
   OS_LOGD(TAG, "Flashing app partition");
 
@@ -195,7 +197,7 @@ static bool _flashAppPartition(const esp_partition_t* partition, std::string_vie
   return true;
 }
 
-static bool _flashFilesystemPartition(const esp_partition_t* parition, std::string_view remoteUrl, const uint8_t (&remoteHash)[32])
+static bool _flashFilesystemPartition(const esp_partition_t* parition, const char* remoteUrl, const uint8_t (&remoteHash)[32])
 {
   if (!_sendProgressMessage(Serialization::Types::OtaUpdateProgressTask::PreparingForUpdate, 0.0f)) {
     return false;
@@ -396,8 +398,8 @@ static void otaum_updatetask(void* arg)
     esp_task_wdt_init(15, true);
 
     // Flash app and filesystem partitions.
-    if (!_flashFilesystemPartition(filesystemPartition, release.filesystemBinaryUrl, release.filesystemBinaryHash)) continue;
-    if (!_flashAppPartition(appPartition, release.appBinaryUrl, release.appBinaryHash)) continue;
+    if (!_flashFilesystemPartition(filesystemPartition, release.filesystemBinaryUrl.c_str(), release.filesystemBinaryHash)) continue;
+    if (!_flashAppPartition(appPartition, release.appBinaryUrl.c_str(), release.appBinaryHash)) continue;
 
     // Set OTA boot type in config.
     if (!Config::SetOtaUpdateStep(OpenShock::OtaUpdateStep::Updated)) {
@@ -422,25 +424,30 @@ static void otaum_updatetask(void* arg)
   esp_restart();
 }
 
-static bool _tryGetStringList(std::string_view url, std::vector<std::string>& list)
+static bool _tryGetStringList(const char* url, std::vector<std::string>& list)
 {
-  auto response = OpenShock::HTTP::GetString(
-    url,
-    {
-      {"Accept", "text/plain"}
-  },
-    std::array<uint16_t, 2> {200, 304}
-  );
-  if (response.result != OpenShock::HTTP::RequestResult::Success) {
-    OS_LOGE(TAG, "Failed to fetch list: %s [%u] %s", response.ResultToString(), response.code, response.data.c_str());
+  HTTP::HTTPClient client(url);
+  auto response = client.Get();
+  if (!response.Ok()) {
+    OS_LOGE(TAG, "Failed to fetch list");
+    return false;
+  }
+
+  uint16_t statusCode = response.StatusCode();
+  if (statusCode != 200 && statusCode != 304) {
+    OS_LOGE(TAG, "Failed to fetch list");
+    return false;
+  }
+
+  auto content = response.ReadString();
+  if (content.error != HTTP::HTTPError::None) {
+    OS_LOGE(TAG, "Failed to fetch list: %s [%u] %s", HTTP::HTTPErrorToString(response.Error()), response.StatusCode(), content.data.c_str());
     return false;
   }
 
   list.clear();
 
-  std::string_view data = response.data;
-
-  auto lines = OpenShock::StringSplitNewLines(data);
+  auto lines = OpenShock::StringSplitNewLines(content.data);
   list.reserve(lines.size());
 
   for (auto line : lines) {
@@ -525,16 +532,16 @@ bool OtaUpdateManager::Init()
 
 bool OtaUpdateManager::TryGetFirmwareVersion(OtaUpdateChannel channel, OpenShock::SemVer& version)
 {
-  std::string_view channelIndexUrl;
+  const char* channelIndexUrl;
   switch (channel) {
     case OtaUpdateChannel::Stable:
-      channelIndexUrl = OPENSHOCK_FW_CDN_STABLE_URL ""sv;
+      channelIndexUrl = OPENSHOCK_FW_CDN_STABLE_URL;
       break;
     case OtaUpdateChannel::Beta:
-      channelIndexUrl = OPENSHOCK_FW_CDN_BETA_URL ""sv;
+      channelIndexUrl = OPENSHOCK_FW_CDN_BETA_URL;
       break;
     case OtaUpdateChannel::Develop:
-      channelIndexUrl = OPENSHOCK_FW_CDN_DEVELOP_URL ""sv;
+      channelIndexUrl = OPENSHOCK_FW_CDN_DEVELOP_URL;
       break;
     default:
       OS_LOGE(TAG, "Unknown channel: %u", channel);
@@ -543,20 +550,27 @@ bool OtaUpdateManager::TryGetFirmwareVersion(OtaUpdateChannel channel, OpenShock
 
   OS_LOGD(TAG, "Fetching firmware version from %s", channelIndexUrl);
 
-  auto response = OpenShock::HTTP::GetString(
-    channelIndexUrl,
-    {
-      {"Accept", "text/plain"}
-  },
-    std::array<uint16_t, 2> {200, 304}
-  );
-  if (response.result != OpenShock::HTTP::RequestResult::Success) {
-    OS_LOGE(TAG, "Failed to fetch firmware version: %s [%u] %s", response.ResultToString(), response.code, response.data.c_str());
+  HTTP::HTTPClient client(channelIndexUrl);
+  auto response = client.Get();
+  if (!response.Ok()) {
+    OS_LOGE(TAG, "Failed to fetch firmware version");
     return false;
   }
 
-  if (!OpenShock::TryParseSemVer(response.data, version)) {
-    OS_LOGE(TAG, "Failed to parse firmware version: %.*s", response.data.size(), response.data.data());
+  uint16_t statusCode = response.StatusCode();
+  if (statusCode != 200 && statusCode != 304) {
+    OS_LOGE(TAG, "Failed to fetch firmware version");
+    return false;
+  }
+
+  auto content = response.ReadString();
+  if (content.error != HTTP::HTTPError::None) {
+    OS_LOGE(TAG, "Failed to fetch firmware version: %s [%u] %s", HTTP::HTTPErrorToString(response.Error()), response.StatusCode(), content.data.c_str());
+    return false;
+  }
+
+  if (!OpenShock::TryParseSemVer(content.data, version)) {
+    OS_LOGE(TAG, "Failed to parse firmware version: %.*s", content.data.size(), content.data.data());
     return false;
   }
 
@@ -573,7 +587,7 @@ bool OtaUpdateManager::TryGetFirmwareBoards(const OpenShock::SemVer& version, st
 
   OS_LOGD(TAG, "Fetching firmware boards from %s", channelIndexUrl.c_str());
 
-  if (!_tryGetStringList(channelIndexUrl, boards)) {
+  if (!_tryGetStringList(channelIndexUrl.c_str(), boards)) {
     OS_LOGE(TAG, "Failed to fetch firmware boards");
     return false;
   }
@@ -613,19 +627,26 @@ bool OtaUpdateManager::TryGetFirmwareRelease(const OpenShock::SemVer& version, F
   }
 
   // Fetch hashes.
-  auto sha256HashesResponse = OpenShock::HTTP::GetString(
-    sha256HashesUrl,
-    {
-      {"Accept", "text/plain"}
-  },
-    std::array<uint16_t, 2> {200, 304}
-  );
-  if (sha256HashesResponse.result != OpenShock::HTTP::RequestResult::Success) {
-    OS_LOGE(TAG, "Failed to fetch hashes: %s [%u] %s", sha256HashesResponse.ResultToString(), sha256HashesResponse.code, sha256HashesResponse.data.c_str());
+  HTTP::HTTPClient client(sha256HashesUrl.c_str());
+  auto response = client.Get();
+  if (!response.Ok()) {
+    OS_LOGE(TAG, "Failed to fetch hashes");
     return false;
   }
 
-  auto hashesLines = OpenShock::StringSplitNewLines(sha256HashesResponse.data);
+  uint16_t statusCode = response.StatusCode();
+  if (statusCode != 200 && statusCode != 304) {
+    OS_LOGE(TAG, "Failed to fetch hashes");
+    return false;
+  }
+
+  auto content = response.ReadString();
+  if (content.error != HTTP::HTTPError::None) {
+    OS_LOGE(TAG, "Failed to fetch hashes: %s [%u] %s", HTTP::HTTPErrorToString(response.Error()), response.StatusCode(), content.data.c_str());
+    return false;
+  }
+
+  auto hashesLines = OpenShock::StringSplitNewLines(content.data);
 
   // Parse hashes.
   bool foundAppHash = false, foundFilesystemHash = false;
