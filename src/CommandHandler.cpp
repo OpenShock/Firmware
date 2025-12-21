@@ -134,7 +134,10 @@ bool _internalSetKeepAliveEnabled(bool enabled)
     OS_LOGV(TAG, "Disabling keep-alive task");
     if (s_keepAliveTaskHandle != nullptr && s_keepAliveQueue != nullptr) {
       // Wait for the task to stop
-      KnownShocker cmd {.killTask = true};
+      KnownShocker cmd;
+      memset(&cmd, 0, sizeof(cmd));
+      cmd.killTask = true;
+
       while (eTaskGetState(s_keepAliveTaskHandle) != eDeleted) {
         vTaskDelay(pdMS_TO_TICKS(10));
 

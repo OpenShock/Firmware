@@ -1,6 +1,7 @@
 #pragma once
 
 #include "Common.h"
+#include "Logging.h"
 
 #include <cstdint>
 #include <cstdlib>
@@ -69,10 +70,10 @@ public:
   void reserve(SizeType new_cap)
   {
     if (new_cap <= _cap) return;
-    if (sizeof(T) && new_cap > std::numeric_limits<SizeType>::max() / sizeof(T)) throw std::bad_alloc();
+    if (sizeof(T) && new_cap > std::numeric_limits<SizeType>::max() / sizeof(T)) OS_PANIC_INSTANT("TVEC", "Cannot allocate a buffer of given size!");
 
     void* newbuf = malloc(size_t(new_cap) * sizeof(T));
-    if (!newbuf) throw std::bad_alloc();
+    if (!newbuf) OS_PANIC_INSTANT("TVEC", "Could not allocate a buffer of given size!");
     if (_data) {
       memcpy(newbuf, _data, size_t(_len) * sizeof(T));
       free(_data);
