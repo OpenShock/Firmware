@@ -1,3 +1,7 @@
+# Version 1.5.0-rc.3 Release Notes
+
+Fixed a critical bug where the firmware could never connect to LCG, and addressed code correctness issues (variable initialization and type casting) along with compiler warning cleanups.
+
 # Version 1.5.0-rc.2 Release Notes
 
 This release candidate focuses on **E-Stop reliability**, **rate limiting behavior**, and **general internal cleanup and correctness improvements**.
