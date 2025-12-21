@@ -283,7 +283,7 @@ void GatewayConnectionManager::Update()
     }
 
     // Fetch hub info
-    if (!FetchHubInfo(std::move(authToken))) {
+    if (!FetchHubInfo(authToken)) {
       return;
     }
 
