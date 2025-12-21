@@ -122,7 +122,10 @@ void RFTransmitter::destroy()
     OS_LOGD(TAG, "[pin-%hhi] Stopping task", m_txPin);
 
     // Wait for the task to stop
-    Command cmd {.flags = kFlagDeleteTask};
+    Command cmd;
+    memset(&cmd, 0, sizeof(cmd));
+    cmd.flags = kFlagDeleteTask;
+
     while (eTaskGetState(m_taskHandle) != eDeleted) {
       vTaskDelay(pdMS_TO_TICKS(10));
 
@@ -183,7 +186,7 @@ static void writeSequences(rmt_obj_t* rmt_handle, std::vector<Rmt::Sequence>& se
       rmtWriteBlocking(rmt_handle, seq->payload(), seq->size());
     } else {
       // Remove command if it has sent out its termination sequence for long enough
-      if (timeToLive + kTerminatorDurationMs <= 0) {
+      if (timeToLive <= -kTerminatorDurationMs) {
         seq = sequences.erase(seq);
         continue;
       }

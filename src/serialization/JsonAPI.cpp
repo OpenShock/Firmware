@@ -245,7 +245,7 @@ bool JsonAPI::ParseAssignLcgJsonResponse(int code, const cJSON* root, JsonAPI::A
   out = {};
 
   out.host    = host->valuestring;
-  out.port    = (uint16_t)portInt;
+  out.port    = static_cast<uint16_t>(portInt);
   out.path    = path->valuestring;
   out.country = country->valuestring;
 

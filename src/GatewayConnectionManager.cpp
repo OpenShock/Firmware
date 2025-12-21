@@ -262,7 +262,7 @@ bool StartConnectingToLCG()
     return false;
   }
 
-  OS_LOGD(TAG, "Connecting to LCG endpoint { host: '%s', port: %hu, path: '%s' } in country %s", response.data.host.c_str(), response.data.port, response.data.path.c_str(), response.data.country.c_str());
+  OS_LOGI(TAG, "Connecting to LCG endpoint { host: '%s', port: %hu, path: '%s' } in country %s", response.data.host.c_str(), response.data.port, response.data.path.c_str(), response.data.country.c_str());
   s_wsClient->connect(response.data.host, response.data.port, response.data.path);
 
   return true;
@@ -283,7 +283,7 @@ void GatewayConnectionManager::Update()
     }
 
     // Fetch hub info
-    if (!FetchHubInfo(std::move(authToken))) {
+    if (!FetchHubInfo(authToken)) {
       return;
     }
 

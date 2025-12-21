@@ -73,7 +73,7 @@ namespace OpenShock::Rmt {
       m_size         = 0;
       m_transmitEnd  = 0;
       m_shockerId    = 0;
-      m_shockerModel = (ShockerModelType)0;
+      m_shockerModel = static_cast<ShockerModelType>(0);
     }
 
     rmt_data_t* m_data;

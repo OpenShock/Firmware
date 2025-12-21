@@ -245,12 +245,12 @@ print_dump('CPP Defines', cpp_defines)
 cpp_defines = serialize_cpp_defines(cpp_defines)
 
 print('Build type: ' + pio_build_type)
-print('Build defines: ' + str(cpp_defines))
 
 # Set PIO variables.
 env['BUILD_TYPE'] = pio_build_type
 env['BUILD_FLAGS'] = remaining_build_flags
 env.Append(CPPDEFINES=list(cpp_defines.items()))
+env.Append(CXXFLAGS=['-fno-rtti', '-fno-threadsafe-statics', '-fno-use-cxa-atexit'])
 
 # Rename the firmware.bin to app.bin.
 env.Replace(PROGNAME='app')
