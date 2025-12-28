@@ -13,6 +13,8 @@ const char* const TAG = "RFTransmitter";
 
 #include <freertos/queue.h>
 
+#include <vector>
+
 const UBaseType_t kQueueSize        = 64;
 const BaseType_t kTaskPriority      = 1;
 const uint32_t kTaskStackSize       = 4096;  // PROFILED: 1.4KB stack usage

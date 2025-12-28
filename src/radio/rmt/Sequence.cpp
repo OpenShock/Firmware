@@ -7,6 +7,7 @@ const char* const TAG = "Sequence";
 #include "radio/rmt/Petrainer998DREncoder.h"
 #include "radio/rmt/PetrainerEncoder.h"
 #include "radio/rmt/T330Encoder.h"
+#include "radio/rmt/D80Encoder.h"
 
 using namespace OpenShock;
 
@@ -19,6 +20,10 @@ inline static size_t getSequenceBufferSize(ShockerModelType shockerModelType)
       return Rmt::Petrainer998DREncoder::GetBufferSize();
     case ShockerModelType::Petrainer:
       return Rmt::PetrainerEncoder::GetBufferSize();
+    case ShockerModelType::T330:
+      return Rmt::T330Encoder::GetBufferSize();
+    case ShockerModelType::D80:
+      return Rmt::D80Encoder::GetBufferSize();
     default:
       return 0;
   }
@@ -33,6 +38,10 @@ inline static bool fillSequenceImpl(rmt_data_t* data, ShockerModelType modelType
       return Rmt::PetrainerEncoder::FillBuffer(data, shockerId, commandType, intensity);
     case ShockerModelType::Petrainer998DR:
       return Rmt::Petrainer998DREncoder::FillBuffer(data, shockerId, commandType, intensity);
+    case ShockerModelType::T330:
+      return Rmt::T330Encoder::FillBuffer(data, shockerId, commandType, intensity);
+    case ShockerModelType::D80:
+      return Rmt::D80Encoder::FillBuffer(data, shockerId, commandType, intensity);
     default:
       OS_LOGE(TAG, "Unknown shocker model: %u", modelType);
       return false;
