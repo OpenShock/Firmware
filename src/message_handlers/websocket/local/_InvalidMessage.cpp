@@ -15,5 +15,5 @@ void _Private::HandleInvalidMessage(uint8_t socketId, const OpenShock::Serializa
     return;
   }
 
-  OS_LOGE(TAG, "Invalid message type: %d", root->payload_type());
+  OS_LOGE(TAG, "Invalid message type: %hhu", static_cast<uint8_t>(root->payload_type()));
 }

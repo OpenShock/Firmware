@@ -537,11 +537,11 @@ bool OtaUpdateManager::TryGetFirmwareVersion(OtaUpdateChannel channel, OpenShock
       channelIndexUrl = OPENSHOCK_FW_CDN_DEVELOP_URL ""sv;
       break;
     default:
-      OS_LOGE(TAG, "Unknown channel: %u", channel);
+      OS_LOGE(TAG, "Unknown channel: %hhu", static_cast<uint8_t>(channel));
       return false;
   }
 
-  OS_LOGD(TAG, "Fetching firmware version from %s", channelIndexUrl);
+  OS_LOGD(TAG, "Fetching firmware version from %s", channelIndexUrl.data());
 
   auto response = OpenShock::HTTP::GetString(
     channelIndexUrl,

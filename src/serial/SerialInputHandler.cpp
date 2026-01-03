@@ -12,6 +12,7 @@ const char* const TAG = "SerialInputHandler";
 #include "FormatHelpers.h"
 #include "http/HTTPRequestManager.h"
 #include "Logging.h"
+#include "serial/SerialCompat.h"
 #include "serial/command_handlers/CommandEntry.h"
 #include "serial/command_handlers/common.h"
 #include "serial/command_handlers/index.h"
@@ -22,11 +23,9 @@ const char* const TAG = "SerialInputHandler";
 #include "util/TaskUtils.h"
 #include "wifi/WiFiManager.h"
 
-#include <Arduino.h>
-
 #include <cJSON.h>
-#include <Esp.h>
 
+#include <cstdio>
 #include <cstring>
 #include <string_view>
 #include <unordered_map>
@@ -123,7 +122,7 @@ void _printCompleteHelp()
   }
 
   SerialInputHandler::PrintWelcomeHeader();
-  ::Serial.print(buffer.data());
+  fwrite(buffer.data(), 1, buffer.size(), stdout);
 }
 
 void _printCommandHelp(Serial::CommandGroup& group)
@@ -256,7 +255,7 @@ void _printCommandHelp(Serial::CommandGroup& group)
   buffer.push_back('\r');
   buffer.push_back('\n');
 
-  ::Serial.print(buffer.data());
+  fwrite(buffer.data(), 1, buffer.size(), stdout);
 }
 
 void _handleHelpCommand(std::string_view arg, bool isAutomated)
@@ -369,7 +368,7 @@ enum class SerialReadResult {
 SerialReadResult _tryReadSerialLine(SerialBuffer& buffer)
 {
   // Check if there's any data available
-  int available = ::Serial.available();
+  int available = OpenShockSerialAvailable();
   if (available <= 0) {
     return SerialReadResult::NoData;
   }
@@ -379,11 +378,18 @@ SerialReadResult _tryReadSerialLine(SerialBuffer& buffer)
 
   // Read the data into the buffer
   while (available-- > 0) {
-    char c = ::Serial.read();
+    int r = OpenShockSerialRead();
+    if (r < 0) {
+      break; // no more data even though the previous length said otherwise
+    }
+
+    char c = static_cast<char>(r);
 
     // Handle backspace
     if (c == '\b') {
-      buffer.pop_back();  // Remove the last character from the buffer if it exists
+      if (!buffer.empty()) {
+        buffer.pop_back();  // Remove the last character from the buffer if it exists
+      }
       continue;
     }
 
@@ -415,10 +421,15 @@ SerialReadResult _tryReadSerialLine(SerialBuffer& buffer)
 
 void _skipSerialWhitespaces(SerialBuffer& buffer)
 {
-  int available = ::Serial.available();
+  int available = OpenShockSerialAvailable();
 
   while (available-- > 0) {
-    char c = ::Serial.read();
+    int r = OpenShockSerialRead();
+    if (r < 0) {
+      break;
+    }
+
+    char c = static_cast<char>(r);
 
     if (c != ' ' && c != '\r' && c != '\n') {
       buffer.push_back(c);
@@ -429,7 +440,7 @@ void _skipSerialWhitespaces(SerialBuffer& buffer)
 
 void _echoBuffer(std::string_view buffer)
 {
-  ::Serial.printf(CLEAR_LINE "> %.*s", buffer.size(), buffer.data());
+  printf(CLEAR_LINE "> %.*s", buffer.size(), buffer.data());
 }
 
 void _echoHandleSerialInput(std::string_view buffer, bool hasData)
@@ -476,7 +487,7 @@ void _processSerialLine(std::string_view line)
     line = line.substr(1);
   } else if (s_echoEnabled) {
     _echoBuffer(line);
-    ::Serial.println();
+    putchar('\n');
   }
 
   auto parts                 = OpenShock::StringSplit(line, ' ', 1);
@@ -567,7 +578,7 @@ void _serialRxTask(void*)
         _skipSerialWhitespaces(buffer);
         break;
       case SerialReadResult::AutoCompleteRequest:
-        ::Serial.printf(CLEAR_LINE "> %.*s [AutoComplete is not implemented]", buffer.size(), buffer.data());
+        printf(CLEAR_LINE "> %.*s [AutoComplete is not implemented]", buffer.size(), buffer.data());
         break;
       case SerialReadResult::Data:
         _echoHandleSerialInput(buffer, true);
@@ -599,7 +610,7 @@ bool SerialInputHandler::Init()
 
   SerialInputHandler::PrintWelcomeHeader();
   SerialInputHandler::PrintVersionInfo();
-  ::Serial.println();
+  putchar('\n');
 
   if (!Config::GetSerialInputConfigEchoEnabled(s_echoEnabled)) {
     OS_LOGE(TAG, "Failed to get serial echo status from config");
@@ -625,22 +636,27 @@ void SerialInputHandler::SetSerialEchoEnabled(bool enabled)
 
 void SerialInputHandler::PrintWelcomeHeader()
 {
-  ::Serial.println("\
+  auto string = "\
 ============== OPENSHOCK ==============\r\n\
   Contribute @ github.com/OpenShock\r\n\
   Discuss    @ discord.gg/OpenShock\r\n\
   Type 'help' for available commands\r\n\
 =======================================\r\n\
-");
+\r\n\
+"sv;
+
+  fwrite(string.data(), 1, string.size(), stdout);
 }
 
 void SerialInputHandler::PrintVersionInfo()
 {
-  ::Serial.print("\
+  auto string = "\
   Version:  " OPENSHOCK_FW_VERSION "\r\n\
     Build:  " OPENSHOCK_FW_MODE "\r\n\
    Commit:  " OPENSHOCK_FW_GIT_COMMIT "\r\n\
     Board:  " OPENSHOCK_FW_BOARD "\r\n\
      Chip:  " OPENSHOCK_FW_CHIP "\r\n\
-");
+"sv;
+
+  fwrite(string.data(), 1, string.size(), stdout);
 }

@@ -2,12 +2,15 @@
 
 #include "serial/SerialInputHandler.h"
 
+#include <cstdio>
 #include <vector>
 
 void _handleVersionCommand(std::string_view arg, bool isAutomated) {
   (void)arg;
 
-  ::Serial.println();
+  putchar('\r');
+  putchar('\n');
+
   OpenShock::SerialInputHandler::PrintVersionInfo();
 }
 

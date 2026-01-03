@@ -5,7 +5,7 @@
 void _handleRestartCommand(std::string_view arg, bool isAutomated) {
   (void)arg;
 
-  ::Serial.println("Restarting ESP...");
+  printf("Restarting ESP...\n");
   esp_restart();
 }
 
