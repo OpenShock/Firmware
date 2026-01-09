@@ -75,14 +75,14 @@ const PinPatternManager::State kEmergencyStopAwaitingReleasePattern[] = {
   {false, 150}
 };
 const RGBPatternManager::RGBState kEmergencyStopActiveClearingRGBPattern[] = {
-  {0,   0, 0, 50},
-  {64,   0, 0, 50},
-  {128,   0, 0, 50},
-  {192,   0, 0, 50},
-  {255,   0, 0, 50},
-  {192,   0, 0, 50},
-  {128,   0, 0, 50},
-  {64,   0, 0, 50},
+  {  0,   0, 0, 50},
+  { 64,  69, 0, 50},
+  {128, 101, 0, 50},
+  {192, 133, 0, 50},
+  {255, 165, 0, 50},
+  {192, 133, 0, 50},
+  {128, 101, 0, 50},
+  { 64,  69, 0, 50},
 };
 
 const RGBPatternManager::RGBState kEmergencyStopAwaitingReleaseRGBPattern[] = {
