@@ -16,11 +16,12 @@ using namespace OpenShock;
 // TODO: Support multiple LEDs ?
 // TODO: Support other LED types ?
 
+const int32_t kRmtTimeoutMs         = 100;
+
 RGBPatternManager::RGBPatternManager(gpio_num_t gpioPin)
   : m_gpioPin(GPIO_NUM_NC)
   , m_brightness(255)
   , m_pattern()
-  , m_rmtHandle(nullptr)
   , m_taskHandle(nullptr)
   , m_taskMutex()
 {
@@ -34,14 +35,17 @@ RGBPatternManager::RGBPatternManager(gpio_num_t gpioPin)
     return;
   }
 
-  m_rmtHandle = rmtInit(gpioPin, RMT_TX_MODE, RMT_MEM_64);
-  if (m_rmtHandle == NULL) {
+  bool success = rmtInit(gpioPin, RMT_TX_MODE, RMT_MEM_NUM_BLOCKS_1, 10'000'000); // RMT_MEM_64, 10MHz
+  if (!success) {
     OS_LOGE(TAG, "Failed to initialize RMT for pin %hhi", gpioPin);
     return;
   }
 
-  float realTick = rmtSetTick(m_rmtHandle, 100.F);
-  OS_LOGD(TAG, "RMT tick is %f ns for pin %hhi", realTick, gpioPin);
+  success = rmtSetEOT(gpioPin, 0);
+  if (!success) {
+    OS_LOGE(TAG, "Failed to set EOT level for pin %hhi", gpioPin);
+    return;
+  }
 
   SetBrightness(20);
 
@@ -52,7 +56,7 @@ RGBPatternManager::~RGBPatternManager()
 {
   ClearPattern();
 
-  rmtDeinit(m_rmtHandle);
+  rmtDeinit(m_gpioPin);
 }
 
 void RGBPatternManager::SetPattern(const RGBState* pattern, std::size_t patternLength)
@@ -106,8 +110,8 @@ void RGBPatternManager::RunPattern(void* arg)
 {
   RGBPatternManager* thisPtr = reinterpret_cast<RGBPatternManager*>(arg);
 
-  rmt_obj_t* rmtHandle           = thisPtr->m_rmtHandle;
   uint8_t brightness             = thisPtr->m_brightness;
+  gpio_num_t gpioPin             = thisPtr->m_gpioPin;
   std::vector<RGBState>& pattern = thisPtr->m_pattern;
 
   std::array<rmt_data_t, 24> led_data;  // 24 bits per LED (8 bits per color * 3 colors)
@@ -143,7 +147,7 @@ void RGBPatternManager::RunPattern(void* arg)
       }
 
       // Send the data
-      rmtWriteBlocking(rmtHandle, led_data.data(), led_data.size());
+      rmtWrite(gpioPin, led_data.data(), led_data.size(), kRmtTimeoutMs);
       vTaskDelay(pdMS_TO_TICKS(state.duration));
     }
   }

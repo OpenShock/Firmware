@@ -11,6 +11,7 @@ const char* const TAG = "HTTPRequestManager";
 #include "util/StringUtils.h"
 
 #include <HTTPClient.h>
+#include <WiFi.h>
 
 #include <algorithm>
 #include <memory>

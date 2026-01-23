@@ -13,6 +13,8 @@ const char* const TAG = "VisualStateManager";
 
 #include <memory>
 
+#include "esp_wifi.h"
+
 #ifndef OPENSHOCK_LED_GPIO
 #define OPENSHOCK_LED_GPIO GPIO_NUM_NC
 #endif  // OPENSHOCK_LED_GPIO

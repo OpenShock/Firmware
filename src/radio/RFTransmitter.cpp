@@ -18,6 +18,7 @@ const BaseType_t kTaskPriority      = 1;
 const uint32_t kTaskStackSize       = 4096;  // PROFILED: 1.4KB stack usage
 const float kTickrateNs             = 1000;
 const int64_t kTerminatorDurationMs = 300;
+const int32_t kRmtTimeoutMs         = 100;
 const uint8_t kFlagOverwrite        = 1 << 0;
 const uint8_t kFlagDeleteTask       = 1 << 1;
 const TickType_t kTaskIdleDelay     = pdMS_TO_TICKS(5);
@@ -35,21 +36,24 @@ struct RFTransmitter::Command {
 
 RFTransmitter::RFTransmitter(gpio_num_t gpioPin)
   : m_txPin(gpioPin)
-  , m_rmtHandle(nullptr)
   , m_queueHandle(nullptr)
   , m_taskHandle(nullptr)
 {
   OS_LOGD(TAG, "[pin-%hhi] Creating RFTransmitter", m_txPin);
 
-  m_rmtHandle = rmtInit(static_cast<int>(m_txPin), RMT_TX_MODE, RMT_MEM_64);
-  if (m_rmtHandle == nullptr) {
+  bool success = rmtInit(gpioPin, RMT_TX_MODE, RMT_MEM_NUM_BLOCKS_1, 1'000'000); // RMT_MEM_64, 1MHz
+  if (!success) {
     OS_LOGE(TAG, "[pin-%hhi] Failed to create rmt object", m_txPin);
     destroy();
     return;
   }
 
-  float realTick = rmtSetTick(m_rmtHandle, kTickrateNs);
-  OS_LOGD(TAG, "[pin-%hhi] real tick set to: %fns", m_txPin, realTick);
+  success = rmtSetEOT(gpioPin, 0);
+  if (!success) {
+    OS_LOGE(TAG, "Failed to set EOT level for pin %hhi", gpioPin);
+    destroy();
+    return;
+  }
 
   m_queueHandle = xQueueCreate(kQueueSize, sizeof(Command));
   if (m_queueHandle == nullptr) {
@@ -144,9 +148,8 @@ void RFTransmitter::destroy()
     vQueueDelete(m_queueHandle);
     m_queueHandle = nullptr;
   }
-  if (m_rmtHandle != nullptr) {
-    rmtDeinit(m_rmtHandle);
-    m_rmtHandle = nullptr;
+  if (m_txPin != GPIO_NUM_NC) {
+    rmtDeinit(m_txPin);
   }
 }
 
@@ -175,7 +178,7 @@ static bool modifySequence(std::vector<Rmt::Sequence>& sequences, ShockerModelTy
   return false;
 }
 
-static void writeSequences(rmt_obj_t* rmt_handle, std::vector<Rmt::Sequence>& sequences)
+static void writeSequences(gpio_num_t m_txPin, std::vector<Rmt::Sequence>& sequences)
 {
   // Send queued commands
   for (auto seq = sequences.begin(); seq != sequences.end();) {
@@ -183,7 +186,7 @@ static void writeSequences(rmt_obj_t* rmt_handle, std::vector<Rmt::Sequence>& se
 
     if (timeToLive > 0) {
       // Send the command
-      rmtWriteBlocking(rmt_handle, seq->payload(), seq->size());
+      rmtWrite(m_txPin, seq->payload(), seq->size(), kRmtTimeoutMs);
     } else {
       // Remove command if it has sent out its termination sequence for long enough
       if (timeToLive <= -kTerminatorDurationMs) {
@@ -192,7 +195,7 @@ static void writeSequences(rmt_obj_t* rmt_handle, std::vector<Rmt::Sequence>& se
       }
 
       // Send the termination sequence to stop the shocker
-      rmtWriteBlocking(rmt_handle, seq->terminator(), seq->size());
+      rmtWrite(m_txPin, seq->terminator(), seq->size(), kRmtTimeoutMs);
     }
 
     // Move to the next command
@@ -242,6 +245,6 @@ void RFTransmitter::TransmitTask()
       }
     }
 
-    writeSequences(m_rmtHandle, sequences);
+    writeSequences(m_txPin, sequences);
   }
 }

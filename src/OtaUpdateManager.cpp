@@ -393,7 +393,12 @@ static void otaum_updatetask(void* arg)
 
     // Increase task watchdog timeout.
     // Prevents panics on some ESP32s when clearing large partitions.
-    esp_task_wdt_init(15, true);
+    esp_task_wdt_config_t twdt_config = {
+        .timeout_ms = 15,
+        .idle_core_mask = (1 << CONFIG_FREERTOS_NUMBER_OF_CORES) - 1,    // Bitmask of all cores
+        .trigger_panic = true,
+    };
+    ESP_ERROR_CHECK(esp_task_wdt_init(&twdt_config));
 
     // Flash app and filesystem partitions.
     if (!_flashFilesystemPartition(filesystemPartition, release.filesystemBinaryUrl, release.filesystemBinaryHash)) continue;
@@ -407,7 +412,8 @@ static void otaum_updatetask(void* arg)
     }
 
     // Set task watchdog timeout back to default.
-    esp_task_wdt_init(5, true);
+    twdt_config.timeout_ms = 5;
+    ESP_ERROR_CHECK(esp_task_wdt_init(&twdt_config));
 
     // Send reboot message.
     _sendProgressMessage(Serialization::Types::OtaUpdateProgressTask::Rebooting, 0.0f);

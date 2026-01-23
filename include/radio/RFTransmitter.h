@@ -23,7 +23,7 @@ namespace OpenShock {
 
     inline gpio_num_t GetTxPin() const { return m_txPin; }
 
-    inline bool ok() const { return m_rmtHandle != nullptr && m_queueHandle != nullptr && m_taskHandle != nullptr; }
+    inline bool ok() const { return m_txPin != GPIO_NUM_NC && m_queueHandle != nullptr && m_taskHandle != nullptr; }
 
     bool SendCommand(ShockerModelType model, uint16_t shockerId, ShockerCommandType type, uint8_t intensity, uint16_t durationMs, bool overwriteExisting = true);
     void ClearPendingCommands();
@@ -35,7 +35,6 @@ namespace OpenShock {
     struct Command;
 
     gpio_num_t m_txPin;
-    rmt_obj_t* m_rmtHandle;
     QueueHandle_t m_queueHandle;
     TaskHandle_t m_taskHandle;
   };

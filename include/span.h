@@ -14,6 +14,7 @@ http://www.open-std.org/jtc1/sc22/wg21/docs/papers/2019/n4820.pdf
 #include <cstddef>
 #include <cstdint>
 #include <type_traits>
+#include <exception>
 
 #ifndef TCB_SPAN_NO_EXCEPTIONS
 // Attempt to discover whether we're being compiled with exception support

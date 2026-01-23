@@ -47,7 +47,6 @@ namespace OpenShock {
     gpio_num_t m_gpioPin;
     uint8_t m_brightness;  // 0-255
     std::vector<RGBState> m_pattern;
-    rmt_obj_t* m_rmtHandle;
     TaskHandle_t m_taskHandle;
     SimpleMutex m_taskMutex;
   };
