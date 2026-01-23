@@ -4,7 +4,7 @@
 
 const char* const TAG = "CaptivePortal";
 
-#include "CaptivePortalConfig.h"
+#include "config/CaptivePortalConfig.h"
 #include "CaptivePortalInstance.h"
 #include "CommandHandler.h"
 #include "config/Config.h"
@@ -156,10 +156,9 @@ bool CaptivePortal::Init()
 void CaptivePortal::SetAlwaysEnabled(bool alwaysEnabled)
 {
   s_alwaysEnabled = alwaysEnabled;
-  CaptivePortalConfig config = {
-    .alwaysEnabled = alwaysEnabled,
-  };
-  Config::SetCaptivePortalConfig(config);
+  Config::SetCaptivePortalConfig(Config::CaptivePortalConfig(
+    alwaysEnabled
+  ));
 }
 bool CaptivePortal::IsAlwaysEnabled()
 {
