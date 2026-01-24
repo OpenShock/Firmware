@@ -30,8 +30,8 @@ void _handleDebugInfoCommand(std::string_view arg, bool isAutomated) {
     char ipAddressBuffer[64];
     OpenShock::WiFiManager::GetIPAddress(ipAddressBuffer);
     SERPR_RESPONSE("WiFiInfo|IPv4|%s", ipAddressBuffer);
-    OpenShock::WiFiManager::GetIPv6Address(ipAddressBuffer);
-    SERPR_RESPONSE("WiFiInfo|IPv6|%s", ipAddressBuffer);
+    // OpenShock::WiFiManager::GetIPv6Address(ipAddressBuffer);
+    // SERPR_RESPONSE("WiFiInfo|IPv6|%s", ipAddressBuffer);
   }
 }
 

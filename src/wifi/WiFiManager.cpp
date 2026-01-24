@@ -411,10 +411,10 @@ bool WiFiManager::Init()
     }
   }
 
-  if (set_esp_interface_dns(ESP_IF_WIFI_STA, IPAddress(1, 1, 1, 1), IPAddress(8, 8, 8, 8), IPAddress(9, 9, 9, 9)) != ESP_OK) {
-    OS_LOGE(TAG, "Failed to set DNS servers");
-    return false;
-  }
+  // if (set_esp_interface_dns(ESP_IF_WIFI_STA, IPAddress(1, 1, 1, 1), IPAddress(8, 8, 8, 8), IPAddress(9, 9, 9, 9)) != ESP_OK) {
+  //   OS_LOGE(TAG, "Failed to set DNS servers");
+  //   return false;
+  // }
 
   if (TaskUtils::TaskCreateUniversal(_wifimanagerUpdateTask, TAG, 2048, nullptr, 5, nullptr, 1) != pdPASS) {  // Profiled: 1.716KB stack usage
     OS_LOGE(TAG, "Failed to create WiFiManager update task");
@@ -581,20 +581,7 @@ bool WiFiManager::GetIPAddress(char* ipAddress)
   }
 
   IPAddress ip = WiFi.localIP();
-  snprintf(ipAddress, IPV4ADDR_FMT_LEN + 1, IPV4ADDR_FMT, IPV4ADDR_ARG(ip));
-
-  return true;
-}
-
-bool WiFiManager::GetIPv6Address(char* ipAddress)
-{
-  if (!IsConnected()) {
-    return false;
-  }
-
-  IPv6Address ip       = WiFi.localIPv6();
-  const uint8_t* ipPtr = ip;  // Using the implicit conversion operator of IPv6Address
-  snprintf(ipAddress, IPV6ADDR_FMT_LEN + 1, IPV6ADDR_FMT, IPV6ADDR_ARG(ipPtr));
+  snprintf(ipAddress, IPV6ADDR_FMT_LEN + 1, "%s", ip.toString());
 
   return true;
 }

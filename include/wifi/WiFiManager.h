@@ -59,10 +59,10 @@ namespace OpenShock::WiFiManager {
   /// @return True if the hub is connected to a network
   bool GetIPAddress(char* ipAddress);
 
-  /// @brief Gets the hubs IP address if it's connected to a network (IPv6)
-  /// @param ipAddress Variable to store the IP address in
-  /// @return True if the hub is connected to a network
-  bool GetIPv6Address(char* ipAddress);
+  // /// @brief Gets the hubs IP address if it's connected to a network (IPv6)
+  // /// @param ipAddress Variable to store the IP address in
+  // /// @return True if the hub is connected to a network
+  // bool GetIPv6Address(char* ipAddress);
 
   /// @brief Gets a copy of the vector of discovered WiFi networks
   /// @return Vector of discovered WiFiNetworks
