@@ -6,6 +6,7 @@
 
 #include <functional>
 #include <map>
+#include <string>
 #include <string_view>
 
 #include "span.h"
@@ -28,6 +29,9 @@ namespace OpenShock::HTTP {
     RequestResult result;
     int code;
     T data;
+
+    Response(RequestResult r, int c, T d)
+        : result(r), code(c), data(std::move(d)) {}
 
     inline const char* ResultToString() const
     {

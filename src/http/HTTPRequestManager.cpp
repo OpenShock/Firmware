@@ -16,6 +16,7 @@ const char* const TAG = "HTTPRequestManager";
 #include <algorithm>
 #include <memory>
 #include <numeric>
+#include <string>
 #include <string_view>
 #include <unordered_map>
 
@@ -480,8 +481,8 @@ HTTP::Response<std::string> HTTP::GetString(std::string_view url, const std::map
 
   auto response = Download(url, headers, allocator, writer, acceptedCodes, timeoutMs);
   if (response.result != RequestResult::Success) {
-    return {response.result, response.code, {}};
+    return Response<std::string>{response.result, response.code, {}};
   }
 
-  return {response.result, response.code, result};
+  return Response<std::string>{response.result, response.code, result};
 }
