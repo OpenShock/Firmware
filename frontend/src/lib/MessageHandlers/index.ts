@@ -55,7 +55,7 @@ PayloadHandlers[HubToLocalMessagePayload.ReadyMessage] = (cli, msg) => {
     return store;
   });
 
-  const data = SerializeWifiScanCommand(true);
+  const data = SerializeWifiScanCommand(false);
   cli.Send(data);
 
   toast.success('Websocket connection established');
