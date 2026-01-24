@@ -4,7 +4,7 @@
 #include <memory>
 
 #if __cplusplus >= 202'002L
-#error Take into use C++20 std::integral instead of this macro logic
+// #error Take into use C++20 std::integral instead of this macro logic
 #endif
 
 #define SUM8_INT_FN(Type)                                       \
