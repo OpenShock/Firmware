@@ -37,20 +37,26 @@ static bool captiveportal_start()
 
   OS_LOGI(TAG, "Starting captive portal");
 
-  if (!WiFi.enableAP(true)) {
+  if (!WiFi.AP.begin()) {
     OS_LOGE(TAG, "Failed to enable AP mode");
     return false;
   }
 
-  if (!WiFi.softAP((OPENSHOCK_FW_AP_PREFIX + WiFi.macAddress()).c_str())) {
+  if (!WiFi.AP.create((OPENSHOCK_FW_AP_PREFIX + WiFi.macAddress()).c_str())) {
     OS_LOGE(TAG, "Failed to start AP");
     WiFi.enableAP(false);
     return false;
   }
 
   IPAddress apIP(10, 10, 10, 10);
-  if (!WiFi.softAPConfig(apIP, apIP, IPAddress(255, 255, 255, 0))) {
+  if (!WiFi.AP.config(apIP, apIP, IPAddress(255, 255, 255, 0))) {
     OS_LOGE(TAG, "Failed to configure AP");
+    WiFi.softAPdisconnect(true);
+    return false;
+  }
+
+    if (!WiFi.AP.enableDhcpCaptivePortal()) {
+    OS_LOGE(TAG, "Failed to enable captive portal mode");
     WiFi.softAPdisconnect(true);
     return false;
   }
