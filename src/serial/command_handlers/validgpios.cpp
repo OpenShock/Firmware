@@ -29,8 +29,8 @@ void _handleValidGpiosCommand(std::string_view arg, bool isAutomated) {
   SERPR_RESPONSE("ValidGPIOs|%s", buffer.c_str());
 }
 
-OpenShock::Serial::CommandGroup OpenShock::Serial::CommandHandlers::ValidGpiosHandler() {
-  auto group = OpenShock::Serial::CommandGroup("validgpios"sv);
+OpenShock::SerialCmds::CommandGroup OpenShock::SerialCmds::CommandHandlers::ValidGpiosHandler() {
+  auto group = OpenShock::SerialCmds::CommandGroup("validgpios"sv);
 
   auto& cmd = group.addCommand("List all valid GPIO pins"sv, _handleValidGpiosCommand);
 

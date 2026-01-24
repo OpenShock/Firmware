@@ -33,9 +33,9 @@ void _handleRFTransmitCommand(std::string_view arg, bool isAutomated)
   SERPR_SUCCESS("Command sent");
 }
 
-OpenShock::Serial::CommandGroup OpenShock::Serial::CommandHandlers::RfTransmitHandler()
+OpenShock::SerialCmds::CommandGroup OpenShock::SerialCmds::CommandHandlers::RfTransmitHandler()
 {
-  auto group = OpenShock::Serial::CommandGroup("rftransmit"sv);
+  auto group = OpenShock::SerialCmds::CommandGroup("rftransmit"sv);
 
   auto& cmd = group.addCommand("Transmit a RF command"sv, _handleRFTransmitCommand);
   cmd.addArgument(

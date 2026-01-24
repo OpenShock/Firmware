@@ -23,8 +23,8 @@ void _handleJsonConfigCommand(std::string_view arg, bool isAutomated) {
   esp_restart();
 }
 
-OpenShock::Serial::CommandGroup OpenShock::Serial::CommandHandlers::JsonConfigHandler() {
-  auto group = OpenShock::Serial::CommandGroup("jsonconfig"sv);
+OpenShock::SerialCmds::CommandGroup OpenShock::SerialCmds::CommandHandlers::JsonConfigHandler() {
+  auto group = OpenShock::SerialCmds::CommandGroup("jsonconfig"sv);
 
   auto& getCommand = group.addCommand("Get the configuration as JSON"sv, _handleJsonConfigCommand);
 

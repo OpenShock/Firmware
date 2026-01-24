@@ -11,8 +11,8 @@ void _handleVersionCommand(std::string_view arg, bool isAutomated) {
   OpenShock::SerialInputHandler::PrintVersionInfo();
 }
 
-OpenShock::Serial::CommandGroup OpenShock::Serial::CommandHandlers::VersionHandler() {
-  auto group = OpenShock::Serial::CommandGroup("version"sv);
+OpenShock::SerialCmds::CommandGroup OpenShock::SerialCmds::CommandHandlers::VersionHandler() {
+  auto group = OpenShock::SerialCmds::CommandGroup("version"sv);
 
   auto cmd = group.addCommand("Print version information"sv, _handleVersionCommand);
 

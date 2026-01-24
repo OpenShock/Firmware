@@ -1,6 +1,6 @@
 #include "serial/command_handlers/CommandEntry.h"
 
-using namespace OpenShock::Serial;
+using namespace OpenShock::SerialCmds;
 
 CommandEntry::CommandEntry(std::string_view description, CommandHandler commandHandler)
   : m_description(description)

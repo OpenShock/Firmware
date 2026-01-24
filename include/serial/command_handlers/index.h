@@ -4,25 +4,25 @@
 
 #include <vector>
 
-namespace OpenShock::Serial::CommandHandlers {
-  OpenShock::Serial::CommandGroup VersionHandler();
-  OpenShock::Serial::CommandGroup RestartHandler();
-  OpenShock::Serial::CommandGroup SysInfoHandler();
-  OpenShock::Serial::CommandGroup EchoHandler();
-  OpenShock::Serial::CommandGroup ValidGpiosHandler();
-  OpenShock::Serial::CommandGroup RfTxPinHandler();
-  OpenShock::Serial::CommandGroup EStopHandler();
-  OpenShock::Serial::CommandGroup DomainHandler();
-  OpenShock::Serial::CommandGroup AuthTokenHandler();
-  OpenShock::Serial::CommandGroup HostnameHandler();
-  OpenShock::Serial::CommandGroup NetworksHandler();
-  OpenShock::Serial::CommandGroup KeepAliveHandler();
-  OpenShock::Serial::CommandGroup JsonConfigHandler();
-  OpenShock::Serial::CommandGroup RawConfigHandler();
-  OpenShock::Serial::CommandGroup RfTransmitHandler();
-  OpenShock::Serial::CommandGroup FactoryResetHandler();
+namespace OpenShock::SerialCmds::CommandHandlers {
+  OpenShock::SerialCmds::CommandGroup VersionHandler();
+  OpenShock::SerialCmds::CommandGroup RestartHandler();
+  OpenShock::SerialCmds::CommandGroup SysInfoHandler();
+  OpenShock::SerialCmds::CommandGroup EchoHandler();
+  OpenShock::SerialCmds::CommandGroup ValidGpiosHandler();
+  OpenShock::SerialCmds::CommandGroup RfTxPinHandler();
+  OpenShock::SerialCmds::CommandGroup EStopHandler();
+  OpenShock::SerialCmds::CommandGroup DomainHandler();
+  OpenShock::SerialCmds::CommandGroup AuthTokenHandler();
+  OpenShock::SerialCmds::CommandGroup HostnameHandler();
+  OpenShock::SerialCmds::CommandGroup NetworksHandler();
+  OpenShock::SerialCmds::CommandGroup KeepAliveHandler();
+  OpenShock::SerialCmds::CommandGroup JsonConfigHandler();
+  OpenShock::SerialCmds::CommandGroup RawConfigHandler();
+  OpenShock::SerialCmds::CommandGroup RfTransmitHandler();
+  OpenShock::SerialCmds::CommandGroup FactoryResetHandler();
 
-  inline std::vector<OpenShock::Serial::CommandGroup> AllCommandHandlers()
+  inline std::vector<OpenShock::SerialCmds::CommandGroup> AllCommandHandlers()
   {
     return {
       VersionHandler(),

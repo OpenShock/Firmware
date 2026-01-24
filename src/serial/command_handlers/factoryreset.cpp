@@ -14,9 +14,9 @@ void _handleFactoryResetCommand(std::string_view arg, bool isAutomated)
   esp_restart();
 }
 
-OpenShock::Serial::CommandGroup OpenShock::Serial::CommandHandlers::FactoryResetHandler()
+OpenShock::SerialCmds::CommandGroup OpenShock::SerialCmds::CommandHandlers::FactoryResetHandler()
 {
-  auto group = OpenShock::Serial::CommandGroup("factoryreset"sv);
+  auto group = OpenShock::SerialCmds::CommandGroup("factoryreset"sv);
 
   auto& cmd = group.addCommand("Reset the hub to factory defaults and restart"sv, _handleFactoryResetCommand);
 

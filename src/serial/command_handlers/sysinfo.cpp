@@ -35,8 +35,8 @@ void _handleDebugInfoCommand(std::string_view arg, bool isAutomated) {
   }
 }
 
-OpenShock::Serial::CommandGroup OpenShock::Serial::CommandHandlers::SysInfoHandler() {
-  auto group = OpenShock::Serial::CommandGroup("sysinfo"sv);
+OpenShock::SerialCmds::CommandGroup OpenShock::SerialCmds::CommandHandlers::SysInfoHandler() {
+  auto group = OpenShock::SerialCmds::CommandGroup("sysinfo"sv);
 
   auto& cmd = group.addCommand("Get system information from RTOS, WiFi, etc."sv, _handleDebugInfoCommand);
 

@@ -68,9 +68,9 @@ void _handleEStopPinCommand(std::string_view arg, bool isAutomated)
   SERPR_SUCCESS("Saved config");
 }
 
-OpenShock::Serial::CommandGroup OpenShock::Serial::CommandHandlers::EStopHandler()
+OpenShock::SerialCmds::CommandGroup OpenShock::SerialCmds::CommandHandlers::EStopHandler()
 {
-  auto group = OpenShock::Serial::CommandGroup("estop"sv);
+  auto group = OpenShock::SerialCmds::CommandGroup("estop"sv);
 
   auto& getEnabledCommand = group.addCommand("enabled"sv, "Get the E-Stop enabled state."sv, _handleEStopEnabledCommand);
   auto& setEnabledCommand = group.addCommand("enabled"sv, "Set the E-Stop enabled state."sv, _handleEStopEnabledCommand);
