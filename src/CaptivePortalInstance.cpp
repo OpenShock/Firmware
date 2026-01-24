@@ -108,7 +108,8 @@ CaptivePortalInstance::CaptivePortalInstance()
 
     // Redirecting connection tests to the captive portal, triggering the "login to network" prompt
     m_webServer.onNotFound([](AsyncWebServerRequest* request) { 
-      String redirect_target = String("http://") + WiFi.softAPIP().toString();
+      // String redirect_target = String("http://") + WiFi.softAPIP().toString();
+      String redirect_target = String("/");
       request->redirect(redirect_target);
       OS_LOGE(TAG, "%s", redirect_target.c_str());
     });
