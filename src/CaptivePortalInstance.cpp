@@ -110,8 +110,13 @@ CaptivePortalInstance::CaptivePortalInstance()
     m_webServer.onNotFound([](AsyncWebServerRequest* request) { 
       // String redirect_target = String("http://") + WiFi.softAPIP().toString();
       String redirect_target = String("/");
-      request->redirect(redirect_target);
-      OS_LOGE(TAG, "%s", redirect_target.c_str());
+      // request->redirect(redirect_target);
+      AsyncWebServerResponse *response = request->beginResponse(302, "text/html", "<html><body>Redirecting...</body></html>");
+      response->addHeader(asyncsrv::T_LOCATION, redirect_target);
+      request->send(response);
+      // send(response);
+      String localme = WiFi.softAPIP().toString();
+      OS_LOGE(TAG, "%s", localme.c_str());
     });
     
   } else {
