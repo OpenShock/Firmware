@@ -92,10 +92,10 @@ void appSetup()
 // Arduino setup function
 void setup()
 {
-  ::Serial.begin(115'200);
+  OS_SERIAL.begin(115'200);
 
 #if ARDUINO_USB_MODE 
-  ::USBSerial.begin(115'200);
+  OS_SERIAL_USB.begin(115'200);
 #endif
 
   OpenShock::Config::Init();

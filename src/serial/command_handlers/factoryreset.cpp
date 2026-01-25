@@ -1,4 +1,5 @@
 #include "serial/command_handlers/common.h"
+#include "serial/SerialInputHandler.h"
 
 #include "config/Config.h"
 
@@ -8,14 +9,14 @@ void _handleFactoryResetCommand(std::string_view arg, bool isAutomated)
 {
   (void)arg;
 
-  ::Serial.println("Resetting to factory defaults...");
+  OS_SERIAL.println("Resetting to factory defaults...");
 #if ARDUINO_USB_MODE 
-  ::USBSerial.println("Resetting to factory defaults...");
+  OS_SERIAL_USB.println("Resetting to factory defaults...");
 #endif
   OpenShock::Config::FactoryReset();
-  ::Serial.println("Restarting...");
+  OS_SERIAL.println("Restarting...");
 #if ARDUINO_USB_MODE 
-  ::USBSerial.println("Restarting...");
+  OS_SERIAL_USB.println("Restarting...");
 #endif
   esp_restart();
 }

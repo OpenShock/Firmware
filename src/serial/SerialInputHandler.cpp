@@ -124,9 +124,9 @@ void _printCompleteHelp()
 
   SerialInputHandler::PrintWelcomeHeader();
 
-  ::Serial.print(buffer.data());
+  OS_SERIAL.print(buffer.data());
 #if ARDUINO_USB_MODE 
-  ::USBSerial.print(buffer.data());
+  OS_SERIAL_USB.print(buffer.data());
 #endif
 }
 
@@ -260,9 +260,9 @@ void _printCommandHelp(Serial::CommandGroup& group)
   buffer.push_back('\r');
   buffer.push_back('\n');
 
-  ::Serial.print(buffer.data());
+  OS_SERIAL.print(buffer.data());
 #if ARDUINO_USB_MODE 
-  ::USBSerial.print(buffer.data());
+  OS_SERIAL_USB.print(buffer.data());
 #endif
 }
 
@@ -376,7 +376,7 @@ enum class SerialReadResult {
 SerialReadResult _tryReadSerialLine(SerialBuffer& buffer)
 {
   // Check if there's any data available
-  int available = ::Serial.available();
+  int available = OS_SERIAL.available();
   if (available <= 0) {
     return SerialReadResult::NoData;
   }
@@ -386,7 +386,7 @@ SerialReadResult _tryReadSerialLine(SerialBuffer& buffer)
 
   // Read the data into the buffer
   while (available-- > 0) {
-    char c = ::Serial.read();
+    char c = OS_SERIAL.read();
 
     // Handle backspace
     if (c == '\b') {
@@ -422,10 +422,10 @@ SerialReadResult _tryReadSerialLine(SerialBuffer& buffer)
 
 void _skipSerialWhitespaces(SerialBuffer& buffer)
 {
-  int available = ::Serial.available();
+  int available = OS_SERIAL.available();
 
   while (available-- > 0) {
-    char c = ::Serial.read();
+    char c = OS_SERIAL.read();
 
     if (c != ' ' && c != '\r' && c != '\n') {
       buffer.push_back(c);
@@ -438,7 +438,7 @@ void _skipSerialWhitespaces(SerialBuffer& buffer)
 SerialReadResult _tryReadUSBSerialLine(SerialBuffer& buffer)
 {
   // Check if there's any data available
-  int available = ::USBSerial.available();
+  int available = OS_SERIAL_USB.available();
   if (available <= 0) {
     return SerialReadResult::NoData;
   }
@@ -448,7 +448,7 @@ SerialReadResult _tryReadUSBSerialLine(SerialBuffer& buffer)
 
   // Read the data into the buffer
   while (available-- > 0) {
-    char c = ::USBSerial.read();
+    char c = OS_SERIAL_USB.read();
 
     // Handle backspace
     if (c == '\b') {
@@ -484,10 +484,10 @@ SerialReadResult _tryReadUSBSerialLine(SerialBuffer& buffer)
 
 void _skipUSBSerialWhitespaces(SerialBuffer& buffer)
 {
-  int available = ::USBSerial.available();
+  int available = OS_SERIAL_USB.available();
 
   while (available-- > 0) {
-    char c = ::USBSerial.read();
+    char c = OS_SERIAL_USB.read();
 
     if (c != ' ' && c != '\r' && c != '\n') {
       buffer.push_back(c);
@@ -499,9 +499,9 @@ void _skipUSBSerialWhitespaces(SerialBuffer& buffer)
 
 void _echoBuffer(std::string_view buffer)
 {
-  ::Serial.printf(CLEAR_LINE "> %.*s", buffer.size(), buffer.data());
+  OS_SERIAL.printf(CLEAR_LINE "> %.*s", buffer.size(), buffer.data());
 #if ARDUINO_USB_MODE 
-  ::USBSerial.printf(CLEAR_LINE "> %.*s", buffer.size(), buffer.data());
+  OS_SERIAL_USB.printf(CLEAR_LINE "> %.*s", buffer.size(), buffer.data());
 #endif
 }
 
@@ -549,9 +549,9 @@ void _processSerialLine(std::string_view line)
     line = line.substr(1);
   } else if (s_echoEnabled) {
     _echoBuffer(line);
-    ::Serial.println();
+    OS_SERIAL.println();
   #if ARDUINO_USB_MODE 
-    ::USBSerial.println();
+    OS_SERIAL_USB.println();
   #endif
   }
 
@@ -643,7 +643,7 @@ void _serialRxTask(void*)
         _skipSerialWhitespaces(buffer);
         break;
       case SerialReadResult::AutoCompleteRequest:
-        ::Serial.printf(CLEAR_LINE "> %.*s [AutoComplete is not implemented]", buffer.size(), buffer.data());
+        OS_SERIAL.printf(CLEAR_LINE "> %.*s [AutoComplete is not implemented]", buffer.size(), buffer.data());
         break;
       case SerialReadResult::Data:
         _echoHandleSerialInput(buffer, true);
@@ -669,7 +669,7 @@ void _serialRxTask(void*)
         _skipUSBSerialWhitespaces(buffer);
         break;
       case SerialReadResult::AutoCompleteRequest:
-        ::USBSerial.printf(CLEAR_LINE "> %.*s [AutoComplete is not implemented]", buffer.size(), buffer.data());
+        OS_SERIAL_USB.printf(CLEAR_LINE "> %.*s [AutoComplete is not implemented]", buffer.size(), buffer.data());
         break;
       case SerialReadResult::Data:
         _echoHandleSerialInput(buffer, true);
@@ -702,9 +702,9 @@ bool SerialInputHandler::Init()
 
   SerialInputHandler::PrintWelcomeHeader();
   SerialInputHandler::PrintVersionInfo();
-  ::Serial.println();
+  OS_SERIAL.println();
 #if ARDUINO_USB_MODE 
-  ::USBSerial.println();
+  OS_SERIAL_USB.println();
 #endif
 
   if (!Config::GetSerialInputConfigEchoEnabled(s_echoEnabled)) {
@@ -731,7 +731,7 @@ void SerialInputHandler::SetSerialEchoEnabled(bool enabled)
 
 void SerialInputHandler::PrintWelcomeHeader()
 {
-  ::Serial.println("\
+  OS_SERIAL.println("\
 ============== OPENSHOCK ==============\r\n\
   Contribute @ github.com/OpenShock\r\n\
   Discuss    @ discord.gg/OpenShock\r\n\
@@ -739,7 +739,7 @@ void SerialInputHandler::PrintWelcomeHeader()
 =======================================\r\n\
 ");
 #if ARDUINO_USB_MODE 
-  ::USBSerial.println("\
+  OS_SERIAL_USB.println("\
 ============== OPENSHOCK ==============\r\n\
   Contribute @ github.com/OpenShock\r\n\
   Discuss    @ discord.gg/OpenShock\r\n\
@@ -751,7 +751,7 @@ void SerialInputHandler::PrintWelcomeHeader()
 
 void SerialInputHandler::PrintVersionInfo()
 {
-  ::Serial.print("\
+  OS_SERIAL.print("\
   Version:  " OPENSHOCK_FW_VERSION "\r\n\
     Build:  " OPENSHOCK_FW_MODE "\r\n\
    Commit:  " OPENSHOCK_FW_GIT_COMMIT "\r\n\
@@ -759,7 +759,7 @@ void SerialInputHandler::PrintVersionInfo()
      Chip:  " OPENSHOCK_FW_CHIP "\r\n\
 ");
 #if ARDUINO_USB_MODE 
-  ::USBSerial.print("\
+  OS_SERIAL_USB.print("\
   Version:  " OPENSHOCK_FW_VERSION "\r\n\
     Build:  " OPENSHOCK_FW_MODE "\r\n\
    Commit:  " OPENSHOCK_FW_GIT_COMMIT "\r\n\
