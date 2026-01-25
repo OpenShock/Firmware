@@ -123,7 +123,11 @@ void _printCompleteHelp()
   }
 
   SerialInputHandler::PrintWelcomeHeader();
+
   ::Serial.print(buffer.data());
+#if ARDUINO_USB_MODE 
+  ::USBSerial.print(buffer.data());
+#endif
 }
 
 void _printCommandHelp(Serial::CommandGroup& group)
@@ -257,6 +261,9 @@ void _printCommandHelp(Serial::CommandGroup& group)
   buffer.push_back('\n');
 
   ::Serial.print(buffer.data());
+#if ARDUINO_USB_MODE 
+  ::USBSerial.print(buffer.data());
+#endif
 }
 
 void _handleHelpCommand(std::string_view arg, bool isAutomated)
@@ -427,9 +434,75 @@ void _skipSerialWhitespaces(SerialBuffer& buffer)
   }
 }
 
+#if ARDUINO_USB_MODE 
+SerialReadResult _tryReadUSBSerialLine(SerialBuffer& buffer)
+{
+  // Check if there's any data available
+  int available = ::USBSerial.available();
+  if (available <= 0) {
+    return SerialReadResult::NoData;
+  }
+
+  // Reserve space for the new data
+  buffer.reserve(buffer.size() + available);
+
+  // Read the data into the buffer
+  while (available-- > 0) {
+    char c = ::USBSerial.read();
+
+    // Handle backspace
+    if (c == '\b') {
+      buffer.pop_back();  // Remove the last character from the buffer if it exists
+      continue;
+    }
+
+    // Handle newline
+    if (c == '\r' || c == '\n') {
+      if (!buffer.empty()) {
+        return SerialReadResult::LineEnd;
+      }
+      continue;
+    }
+
+    // Handle leading whitespace
+    if (c == ' ' && buffer.empty()) {
+      continue;
+    }
+
+    if (c == '\t') {
+      return SerialReadResult::AutoCompleteRequest;
+    }
+
+    // If character is printable, add it to the buffer
+    if (c > 31 && c < 127) {
+      buffer.push_back(c);
+    }
+  }
+
+  return SerialReadResult::Data;
+}
+
+void _skipUSBSerialWhitespaces(SerialBuffer& buffer)
+{
+  int available = ::USBSerial.available();
+
+  while (available-- > 0) {
+    char c = ::USBSerial.read();
+
+    if (c != ' ' && c != '\r' && c != '\n') {
+      buffer.push_back(c);
+      break;
+    }
+  }
+}
+#endif
+
 void _echoBuffer(std::string_view buffer)
 {
   ::Serial.printf(CLEAR_LINE "> %.*s", buffer.size(), buffer.data());
+#if ARDUINO_USB_MODE 
+  ::USBSerial.printf(CLEAR_LINE "> %.*s", buffer.size(), buffer.data());
+#endif
 }
 
 void _echoHandleSerialInput(std::string_view buffer, bool hasData)
@@ -477,6 +550,9 @@ void _processSerialLine(std::string_view line)
   } else if (s_echoEnabled) {
     _echoBuffer(line);
     ::Serial.println();
+  #if ARDUINO_USB_MODE 
+    ::USBSerial.println();
+  #endif
   }
 
   auto parts                 = OpenShock::StringSplit(line, ' ', 1);
@@ -577,6 +653,33 @@ void _serialRxTask(void*)
         break;
     }
 
+#if ARDUINO_USB_MODE 
+    switch (_tryReadUSBSerialLine(buffer)) {
+      case SerialReadResult::LineEnd:
+        _processSerialLine(buffer);
+
+        // Deallocate memory if the buffer is too large
+        if (buffer.capacity() > SERIAL_BUFFER_CLEAR_THRESHOLD) {
+          buffer.destroy();
+        } else {
+          buffer.clear();
+        }
+
+        // Skip any remaining trailing whitespaces
+        _skipUSBSerialWhitespaces(buffer);
+        break;
+      case SerialReadResult::AutoCompleteRequest:
+        ::USBSerial.printf(CLEAR_LINE "> %.*s [AutoComplete is not implemented]", buffer.size(), buffer.data());
+        break;
+      case SerialReadResult::Data:
+        _echoHandleSerialInput(buffer, true);
+        break;
+      default:
+        _echoHandleSerialInput(buffer, false);
+        break;
+    }
+#endif
+
     vTaskDelay(pdMS_TO_TICKS(20));  // 50 Hz update rate
   }
 }
@@ -600,6 +703,9 @@ bool SerialInputHandler::Init()
   SerialInputHandler::PrintWelcomeHeader();
   SerialInputHandler::PrintVersionInfo();
   ::Serial.println();
+#if ARDUINO_USB_MODE 
+  ::USBSerial.println();
+#endif
 
   if (!Config::GetSerialInputConfigEchoEnabled(s_echoEnabled)) {
     OS_LOGE(TAG, "Failed to get serial echo status from config");
@@ -632,6 +738,15 @@ void SerialInputHandler::PrintWelcomeHeader()
   Type 'help' for available commands\r\n\
 =======================================\r\n\
 ");
+#if ARDUINO_USB_MODE 
+  ::USBSerial.println("\
+============== OPENSHOCK ==============\r\n\
+  Contribute @ github.com/OpenShock\r\n\
+  Discuss    @ discord.gg/OpenShock\r\n\
+  Type 'help' for available commands\r\n\
+=======================================\r\n\
+");
+#endif
 }
 
 void SerialInputHandler::PrintVersionInfo()
@@ -643,4 +758,13 @@ void SerialInputHandler::PrintVersionInfo()
     Board:  " OPENSHOCK_FW_BOARD "\r\n\
      Chip:  " OPENSHOCK_FW_CHIP "\r\n\
 ");
+#if ARDUINO_USB_MODE 
+  ::USBSerial.print("\
+  Version:  " OPENSHOCK_FW_VERSION "\r\n\
+    Build:  " OPENSHOCK_FW_MODE "\r\n\
+   Commit:  " OPENSHOCK_FW_GIT_COMMIT "\r\n\
+    Board:  " OPENSHOCK_FW_BOARD "\r\n\
+     Chip:  " OPENSHOCK_FW_CHIP "\r\n\
+");
+#endif
 }

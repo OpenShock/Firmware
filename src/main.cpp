@@ -94,6 +94,10 @@ void setup()
 {
   ::Serial.begin(115'200);
 
+#if ARDUINO_USB_MODE 
+  ::USBSerial.begin(115'200);
+#endif
+
   OpenShock::Config::Init();
 
   if (!OpenShock::Events::Init()) {

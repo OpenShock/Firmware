@@ -8,6 +8,9 @@ void _handleVersionCommand(std::string_view arg, bool isAutomated) {
   (void)arg;
 
   ::Serial.println();
+#if ARDUINO_USB_MODE 
+    ::USBSerial.println();
+#endif
   OpenShock::SerialInputHandler::PrintVersionInfo();
 }
 
