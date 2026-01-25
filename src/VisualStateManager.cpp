@@ -72,10 +72,11 @@ const RGBPatternManager::RGBState kEmergencyStoppedRGBPattern[] = {
   {  0, 0, 0, 500}
 };
 
-const PinPatternManager::State kEmergencyStopAwaitingReleasePattern[] = {
-  { true, 150},
-  {false, 150}
+const PinPatternManager::State kEmergencyStopActiveClearingPattern[] = {
+  { true, 200},
+  {false, 200}
 };
+
 const RGBPatternManager::RGBState kEmergencyStopActiveClearingRGBPattern[] = {
   {  0,   0, 0, 50},
   { 64,  69, 0, 50},
@@ -85,6 +86,11 @@ const RGBPatternManager::RGBState kEmergencyStopActiveClearingRGBPattern[] = {
   {192, 133, 0, 50},
   {128, 101, 0, 50},
   { 64,  69, 0, 50},
+};
+
+const PinPatternManager::State kEmergencyStopAwaitingReleasePattern[] = {
+  { true, 100},
+  {false, 100}
 };
 
 const RGBPatternManager::RGBState kEmergencyStopAwaitingReleaseRGBPattern[] = {
@@ -202,7 +208,7 @@ void _updateVisualStateGPIO()
 {
   CSR_PATTERN(s_builtInLedManager, kCriticalErrorFlag, kCriticalErrorPattern);
   CSR_PATTERN(s_builtInLedManager, kEmergencyStopAwaitingReleaseFlag, kEmergencyStopAwaitingReleasePattern);
-  CSR_PATTERN(s_builtInLedManager, kEmergencyStopActiveClearingFlag, kEmergencyStopAwaitingReleasePattern);
+  CSR_PATTERN(s_builtInLedManager, kEmergencyStopActiveClearingFlag, kEmergencyStopActiveClearingPattern);
   CSR_PATTERN(s_builtInLedManager, kEmergencyStoppedFlag, kEmergencyStoppedPattern);
   CSR_PATTERN(s_builtInLedManager, kWebSocketConnectedFlag, kWebSocketConnectedPattern);
   CSR_PATTERN(s_builtInLedManager, kHasIpAddressFlag, kWiFiConnectedWithoutWSPattern);
