@@ -69,10 +69,15 @@ CaptivePortalInstance::CaptivePortalInstance()
 {
   m_socketServer.onEvent(std::bind(&WebSocketDeFragger::handler, &m_socketDeFragger, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3, std::placeholders::_4));
   m_socketServer.begin();
+  
   m_socketServer.enableHeartbeat(WEBSOCKET_PING_INTERVAL, WEBSOCKET_PING_TIMEOUT, WEBSOCKET_PING_RETRIES);
 
   OS_LOGI(TAG, "Setting up DNS server");
-  m_dnsServer.start(DNS_PORT, "*", WiFi.softAPIP());
+  bool dnsStarted = m_dnsServer.start(DNS_PORT, "*", WiFi.softAPIP());
+
+  if (!dnsStarted) {
+    OS_LOGE(TAG, "Failed to start DNS server!");
+  }
 
   bool fsOk = true;
 
@@ -97,14 +102,19 @@ CaptivePortalInstance::CaptivePortalInstance()
     OS_LOGI(TAG, "Serving files from LittleFS");
     OS_LOGI(TAG, "Filesystem hash: %s", fsHash);
 
-    char softAPURL[64];
-    snprintf(softAPURL, sizeof(softAPURL), "http://%s", WiFi.softAPIP().toString().c_str());  // TODO: this is wasteful, optimize this
 
     // Serving the captive portal files from LittleFS
     m_webServer.serveStatic("/", m_fileSystem, "/www/", "max-age=3600").setDefaultFile("index.html").setSharedEtag(fsHash);
 
     // Redirecting connection tests to the captive portal, triggering the "login to network" prompt
-    m_webServer.onNotFound([&softAPURL](AsyncWebServerRequest* request) { request->redirect(softAPURL); });
+    m_webServer.onNotFound([](AsyncWebServerRequest* request) { 
+      String redirect_target = String("http://") + WiFi.softAPIP().toString();
+      // String redirect_target = String("/");
+      AsyncWebServerResponse *response = request->beginResponse(302, "text/html", "<html><body>Redirecting...</body></html>");
+      response->addHeader(asyncsrv::T_LOCATION, redirect_target);
+      request->send(response);
+    });
+    
   } else {
     OS_LOGE(TAG, "/www/index.html or hash files not found, serving error page");
 
@@ -149,7 +159,7 @@ void CaptivePortalInstance::task()
 {
   while (true) {
     m_socketServer.loop();
-    // instance->m_dnsServer.processNextRequest();
+    m_dnsServer.processNextRequest();
     vTaskDelay(pdMS_TO_TICKS(WEBSOCKET_UPDATE_INTERVAL));
   }
 }

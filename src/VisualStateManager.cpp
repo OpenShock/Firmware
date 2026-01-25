@@ -22,11 +22,12 @@ const char* const TAG = "VisualStateManager";
 
 const uint64_t kCriticalErrorFlag                = 1 << 0;
 const uint64_t kEmergencyStoppedFlag             = 1 << 1;
-const uint64_t kEmergencyStopAwaitingReleaseFlag = 1 << 2;
-const uint64_t kWebSocketConnectedFlag           = 1 << 3;
-const uint64_t kHasIpAddressFlag                 = 1 << 4;
-const uint64_t kWiFiConnectedFlag                = 1 << 5;
-const uint64_t kWiFiScanningFlag                 = 1 << 6;
+const uint64_t kEmergencyStopActiveClearingFlag  = 1 << 2;
+const uint64_t kEmergencyStopAwaitingReleaseFlag = 1 << 3;
+const uint64_t kWebSocketConnectedFlag           = 1 << 4;
+const uint64_t kHasIpAddressFlag                 = 1 << 5;
+const uint64_t kWiFiConnectedFlag                = 1 << 6;
+const uint64_t kWiFiScanningFlag                 = 1 << 7;
 
 // Bitmask of when the system is running normally
 const uint64_t kStatusOKMask = kWebSocketConnectedFlag | kHasIpAddressFlag | kWiFiConnectedFlag;
@@ -69,10 +70,27 @@ const RGBPatternManager::RGBState kEmergencyStoppedRGBPattern[] = {
   {  0, 0, 0, 500}
 };
 
-const PinPatternManager::State kEmergencyStopAwaitingReleasePattern[] = {
-  { true, 150},
-  {false, 150}
+const PinPatternManager::State kEmergencyStopActiveClearingPattern[] = {
+  { true, 200},
+  {false, 200}
 };
+
+const RGBPatternManager::RGBState kEmergencyStopActiveClearingRGBPattern[] = {
+  {  0,   0, 0, 50},
+  { 64,  69, 0, 50},
+  {128, 101, 0, 50},
+  {192, 133, 0, 50},
+  {255, 165, 0, 50},
+  {192, 133, 0, 50},
+  {128, 101, 0, 50},
+  { 64,  69, 0, 50},
+};
+
+const PinPatternManager::State kEmergencyStopAwaitingReleasePattern[] = {
+  { true, 100},
+  {false, 100}
+};
+
 const RGBPatternManager::RGBState kEmergencyStopAwaitingReleaseRGBPattern[] = {
   {0, 255, 0, 150},
   {0,   0, 0, 150}
@@ -188,6 +206,7 @@ void _updateVisualStateGPIO()
 {
   CSR_PATTERN(s_builtInLedManager, kCriticalErrorFlag, kCriticalErrorPattern);
   CSR_PATTERN(s_builtInLedManager, kEmergencyStopAwaitingReleaseFlag, kEmergencyStopAwaitingReleasePattern);
+  CSR_PATTERN(s_builtInLedManager, kEmergencyStopActiveClearingFlag, kEmergencyStopActiveClearingPattern);
   CSR_PATTERN(s_builtInLedManager, kEmergencyStoppedFlag, kEmergencyStoppedPattern);
   CSR_PATTERN(s_builtInLedManager, kWebSocketConnectedFlag, kWebSocketConnectedPattern);
   CSR_PATTERN(s_builtInLedManager, kHasIpAddressFlag, kWiFiConnectedWithoutWSPattern);
@@ -200,6 +219,7 @@ void _updateVisualStateRGB()
 {
   CSR_PATTERN(s_RGBLedManager, kCriticalErrorFlag, kCriticalErrorRGBPattern);
   CSR_PATTERN(s_RGBLedManager, kEmergencyStopAwaitingReleaseFlag, kEmergencyStopAwaitingReleaseRGBPattern);
+  CSR_PATTERN(s_RGBLedManager, kEmergencyStopActiveClearingFlag, kEmergencyStopActiveClearingRGBPattern);
   CSR_PATTERN(s_RGBLedManager, kEmergencyStoppedFlag, kEmergencyStoppedRGBPattern);
   CSR_PATTERN(s_RGBLedManager, kWebSocketConnectedFlag, kWebSocketConnectedRGBPattern);
   CSR_PATTERN(s_RGBLedManager, kHasIpAddressFlag, kWiFiConnectedWithoutWSRGBPattern);
@@ -298,7 +318,8 @@ void _handleOpenShockEStopStateChanged(void* event_data)
   auto state = *reinterpret_cast<EStopState*>(event_data);
 
   _setStateFlag(kEmergencyStoppedFlag, state != EStopState::Idle);
-  _setStateFlag(kEmergencyStopAwaitingReleaseFlag, state == EStopState::ActiveClearing);
+  _setStateFlag(kEmergencyStopActiveClearingFlag, state == EStopState::ActiveClearing);
+  _setStateFlag(kEmergencyStopAwaitingReleaseFlag, state == EStopState::AwaitingRelease);
 }
 
 void _handleOpenShockGatewayStateChanged(void* event_data)
