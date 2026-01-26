@@ -124,10 +124,7 @@ void _printCompleteHelp()
 
   SerialInputHandler::PrintWelcomeHeader();
 
-  OS_SERIAL.print(buffer.data());
-#if ARDUINO_USB_MODE 
-  OS_SERIAL_USB.print(buffer.data());
-#endif
+  OS_SERIAL_PRINT(buffer.data());
 }
 
 void _printCommandHelp(Serial::CommandGroup& group)
@@ -260,10 +257,7 @@ void _printCommandHelp(Serial::CommandGroup& group)
   buffer.push_back('\r');
   buffer.push_back('\n');
 
-  OS_SERIAL.print(buffer.data());
-#if ARDUINO_USB_MODE 
-  OS_SERIAL_USB.print(buffer.data());
-#endif
+  OS_SERIAL_PRINT(buffer.data());
 }
 
 void _handleHelpCommand(std::string_view arg, bool isAutomated)
@@ -499,10 +493,7 @@ void _skipUSBSerialWhitespaces(SerialBuffer& buffer)
 
 void _echoBuffer(std::string_view buffer)
 {
-  OS_SERIAL.printf(CLEAR_LINE "> %.*s", buffer.size(), buffer.data());
-#if ARDUINO_USB_MODE 
-  OS_SERIAL_USB.printf(CLEAR_LINE "> %.*s", buffer.size(), buffer.data());
-#endif
+  OS_SERIAL_PRINTF(CLEAR_LINE "> %.*s", buffer.size(), buffer.data());
 }
 
 void _echoHandleSerialInput(std::string_view buffer, bool hasData)
@@ -549,10 +540,7 @@ void _processSerialLine(std::string_view line)
     line = line.substr(1);
   } else if (s_echoEnabled) {
     _echoBuffer(line);
-    OS_SERIAL.println();
-  #if ARDUINO_USB_MODE 
-    OS_SERIAL_USB.println();
-  #endif
+    OS_SERIAL_PRINTLN();
   }
 
   auto parts                 = OpenShock::StringSplit(line, ' ', 1);
@@ -643,7 +631,7 @@ void _serialRxTask(void*)
         _skipSerialWhitespaces(buffer);
         break;
       case SerialReadResult::AutoCompleteRequest:
-        OS_SERIAL.printf(CLEAR_LINE "> %.*s [AutoComplete is not implemented]", buffer.size(), buffer.data());
+        OS_SERIAL_PRINTF(CLEAR_LINE "> %.*s [AutoComplete is not implemented]", buffer.size(), buffer.data());
         break;
       case SerialReadResult::Data:
         _echoHandleSerialInput(buffer, true);
@@ -669,7 +657,7 @@ void _serialRxTask(void*)
         _skipUSBSerialWhitespaces(buffer);
         break;
       case SerialReadResult::AutoCompleteRequest:
-        OS_SERIAL_USB.printf(CLEAR_LINE "> %.*s [AutoComplete is not implemented]", buffer.size(), buffer.data());
+        OS_SERIAL_PRINTF(CLEAR_LINE "> %.*s [AutoComplete is not implemented]", buffer.size(), buffer.data());
         break;
       case SerialReadResult::Data:
         _echoHandleSerialInput(buffer, true);
@@ -702,10 +690,7 @@ bool SerialInputHandler::Init()
 
   SerialInputHandler::PrintWelcomeHeader();
   SerialInputHandler::PrintVersionInfo();
-  OS_SERIAL.println();
-#if ARDUINO_USB_MODE 
-  OS_SERIAL_USB.println();
-#endif
+  OS_SERIAL_PRINTLN();
 
   if (!Config::GetSerialInputConfigEchoEnabled(s_echoEnabled)) {
     OS_LOGE(TAG, "Failed to get serial echo status from config");
@@ -731,40 +716,22 @@ void SerialInputHandler::SetSerialEchoEnabled(bool enabled)
 
 void SerialInputHandler::PrintWelcomeHeader()
 {
-  OS_SERIAL.println("\
+  OS_SERIAL_PRINTLN("\
 ============== OPENSHOCK ==============\r\n\
   Contribute @ github.com/OpenShock\r\n\
   Discuss    @ discord.gg/OpenShock\r\n\
   Type 'help' for available commands\r\n\
 =======================================\r\n\
 ");
-#if ARDUINO_USB_MODE 
-  OS_SERIAL_USB.println("\
-============== OPENSHOCK ==============\r\n\
-  Contribute @ github.com/OpenShock\r\n\
-  Discuss    @ discord.gg/OpenShock\r\n\
-  Type 'help' for available commands\r\n\
-=======================================\r\n\
-");
-#endif
 }
 
 void SerialInputHandler::PrintVersionInfo()
 {
-  OS_SERIAL.print("\
+  OS_SERIAL_PRINT("\
   Version:  " OPENSHOCK_FW_VERSION "\r\n\
     Build:  " OPENSHOCK_FW_MODE "\r\n\
    Commit:  " OPENSHOCK_FW_GIT_COMMIT "\r\n\
     Board:  " OPENSHOCK_FW_BOARD "\r\n\
      Chip:  " OPENSHOCK_FW_CHIP "\r\n\
 ");
-#if ARDUINO_USB_MODE 
-  OS_SERIAL_USB.print("\
-  Version:  " OPENSHOCK_FW_VERSION "\r\n\
-    Build:  " OPENSHOCK_FW_MODE "\r\n\
-   Commit:  " OPENSHOCK_FW_GIT_COMMIT "\r\n\
-    Board:  " OPENSHOCK_FW_BOARD "\r\n\
-     Chip:  " OPENSHOCK_FW_CHIP "\r\n\
-");
-#endif
 }

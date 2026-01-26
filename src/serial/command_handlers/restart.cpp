@@ -6,10 +6,7 @@
 void _handleRestartCommand(std::string_view arg, bool isAutomated) {
   (void)arg;
 
-  OS_SERIAL.println("Restarting ESP...");
-#if ARDUINO_USB_MODE 
-  OS_SERIAL_USB.println("Restarting ESP...");
-#endif
+  OS_SERIAL_PRINTLN("Restarting ESP...");
   esp_restart();
 }
 

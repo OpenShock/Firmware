@@ -7,10 +7,7 @@
 void _handleVersionCommand(std::string_view arg, bool isAutomated) {
   (void)arg;
 
-  OS_SERIAL.println();
-#if ARDUINO_USB_MODE 
-  OS_SERIAL_USB.println();
-#endif
+  OS_SERIAL_PRINTLN();
   OpenShock::SerialInputHandler::PrintVersionInfo();
 }
 

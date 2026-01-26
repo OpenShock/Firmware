@@ -9,15 +9,9 @@ void _handleFactoryResetCommand(std::string_view arg, bool isAutomated)
 {
   (void)arg;
 
-  OS_SERIAL.println("Resetting to factory defaults...");
-#if ARDUINO_USB_MODE 
-  OS_SERIAL_USB.println("Resetting to factory defaults...");
-#endif
+  OS_SERIAL_PRINTLN("Resetting to factory defaults...");
   OpenShock::Config::FactoryReset();
-  OS_SERIAL.println("Restarting...");
-#if ARDUINO_USB_MODE 
-  OS_SERIAL_USB.println("Restarting...");
-#endif
+  OS_SERIAL_PRINTLN("Restarting...");
   esp_restart();
 }
 
