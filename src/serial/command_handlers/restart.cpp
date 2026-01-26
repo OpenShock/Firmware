@@ -1,11 +1,12 @@
 #include "serial/command_handlers/common.h"
+#include "serial/SerialInputHandler.h"
 
 #include <esp_system.h>
 
 void _handleRestartCommand(std::string_view arg, bool isAutomated) {
   (void)arg;
 
-  ::Serial.println("Restarting ESP...");
+  OS_SERIAL_PRINTLN("Restarting ESP...");
   esp_restart();
 }
 
