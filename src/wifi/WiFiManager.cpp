@@ -396,7 +396,6 @@ bool WiFiManager::Init()
     hostname = OPENSHOCK_FW_HOSTNAME;
   }
 
-  WiFi.setAutoConnect(false);
   WiFi.setAutoReconnect(false);
   WiFi.enableSTA(true);
   WiFi.setHostname(hostname.c_str());

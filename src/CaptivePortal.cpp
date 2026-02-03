@@ -16,7 +16,6 @@ const char* const TAG = "CaptivePortal";
 #include <WiFi.h>
 
 #include <esp_timer.h>
-#include <mdns.h>
 
 #include <memory>
 
@@ -50,26 +49,6 @@ static bool captiveportal_start()
   IPAddress apIP(4,3,2,1);
   if (!WiFi.softAPConfig(apIP, apIP, IPAddress(255, 255, 255, 0))) {
     OS_LOGE(TAG, "Failed to configure AP");
-    WiFi.softAPdisconnect(true);
-    return false;
-  }
-
-  esp_err_t err = mdns_init();
-  if (err != ESP_OK) {
-    OS_LOGE(TAG, "Failed to initialize mDNS");
-    WiFi.softAPdisconnect(true);
-    return false;
-  }
-
-  std::string hostname;
-  if (!Config::GetWiFiHostname(hostname)) {
-    OS_LOGE(TAG, "Failed to get WiFi hostname, reverting to default");
-    hostname = OPENSHOCK_FW_HOSTNAME;
-  }
-
-  err = mdns_hostname_set(hostname.c_str());
-  if (err != ESP_OK) {
-    OS_LOGE(TAG, "Failed to set mDNS hostname");
     WiFi.softAPdisconnect(true);
     return false;
   }
