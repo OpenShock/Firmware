@@ -210,6 +210,9 @@
 #ifdef OPENSHOCK_FW_BOARD_NODEMCU32S
 #define OPENSHOCK_BYPASSED_GPIO(pin) ((pin) == 2)
 #endif
+#ifdef OPENSHOCK_FW_BOARD_ESPC3SUPERMINI
+#define OPENSHOCK_BYPASSED_GPIO(pin) ((pin) == 8)
+#endif
 #ifndef OPENSHOCK_BYPASSED_GPIO
 #define OPENSHOCK_BYPASSED_GPIO(pin) (false)
 #endif

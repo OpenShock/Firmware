@@ -18,3 +18,5 @@ data/www
 packages
 *.sln
 compile_commands.json
+
+node_modules
