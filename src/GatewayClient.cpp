@@ -2,7 +2,7 @@
 
 const char* const TAG = "GatewayClient";
 
-#include "Common.h"
+#include "Board.h"
 #include "config/Config.h"
 #include "Core.h"
 #include "events/Events.h"

@@ -1,5 +1,6 @@
 #pragma once
 
+#include "Board.h"
 #include "Common.h"
 
 #include <driver/gpio.h>
