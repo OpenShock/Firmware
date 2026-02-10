@@ -1,3 +1,7 @@
+# Version 1.5.0-rc.5 Release Notes
+
+Fixed a bug where password was not being supplied to websocket serialization function, causing WiFi network to try to authenticate with no password.
+
 # Version 1.5.0-rc.4 Release Notes
 
 Fixed a bug where using Captive Portal to connect to a WiFi network would pair the password entered with another the network than selected, removed obnoxious "AbsolutelySureButton"

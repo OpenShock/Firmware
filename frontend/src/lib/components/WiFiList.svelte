@@ -3,10 +3,6 @@
   import { WebSocketClient } from '$lib/WebSocketClient';
   import { WifiScanStatus } from '$lib/_fbs/open-shock/serialization/types/wifi-scan-status';
   import { SerializeWifiScanCommand } from '$lib/Serializers/WifiScanCommand';
-  import { SerializeWifiNetworkDisconnectCommand } from '$lib/Serializers/WifiNetworkDisconnectCommand';
-  import { SerializeWifiNetworkConnectCommand } from '$lib/Serializers/WifiNetworkConnectCommand';
-  import { SerializeWifiNetworkSaveCommand } from '$lib/Serializers/WifiNetworkSaveCommand';
-  import type { WiFiNetworkGroup } from '$lib/types';
   import { Button } from '$lib/components/ui/button';
   import { LoaderCircle, RotateCcw } from '@lucide/svelte';
   import ScrollArea from './ui/scroll-area/scroll-area.svelte';
@@ -25,32 +21,9 @@
     )
   );
 
-  let dialogOpen = $state(false);
-  let pendingPassword = $state<string | null>(null);
-
   function wifiScan() {
     const data = SerializeWifiScanCommand(!isScanning);
     WebSocketClient.Instance.Send(data);
-  }
-  function wifiAuthenticate(ssid: string, password: string | null) {
-    dialogOpen = false;
-    const data = SerializeWifiNetworkSaveCommand(ssid, null, true);
-    WebSocketClient.Instance.Send(data);
-  }
-  function wifiConnect(item: WiFiNetworkGroup) {
-    const data = SerializeWifiNetworkConnectCommand(item.ssid);
-    WebSocketClient.Instance.Send(data);
-  }
-  function wifiDisconnect(item: WiFiNetworkGroup) {
-    const data = SerializeWifiNetworkDisconnectCommand();
-    WebSocketClient.Instance.Send(data);
-  }
-
-  function handleWifiAuthDialogOpenChange(open: boolean) {
-    dialogOpen = open;
-    if (!open) {
-      pendingPassword = null;
-    }
   }
 </script>
 

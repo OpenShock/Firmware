@@ -2,8 +2,6 @@
   import { HubStateStore } from '$lib/stores';
   import { WebSocketClient } from '$lib/WebSocketClient';
   import { WifiAuthMode } from '$lib/_fbs/open-shock/serialization/types/wifi-auth-mode';
-  import { WifiScanStatus } from '$lib/_fbs/open-shock/serialization/types/wifi-scan-status';
-  import { SerializeWifiScanCommand } from '$lib/Serializers/WifiScanCommand';
   import { SerializeWifiNetworkDisconnectCommand } from '$lib/Serializers/WifiNetworkDisconnectCommand';
   import { SerializeWifiNetworkConnectCommand } from '$lib/Serializers/WifiNetworkConnectCommand';
   import { SerializeWifiNetworkSaveCommand } from '$lib/Serializers/WifiNetworkSaveCommand';
@@ -29,31 +27,14 @@
 
   let { netgroup }: Props = $props();
 
-  let scanStatus = $derived($HubStateStore.wifiScanStatus);
-  let isScanning = $derived(
-    scanStatus === WifiScanStatus.Started || scanStatus === WifiScanStatus.InProgress
-  );
-
   let connectedBSSID = $derived($HubStateStore.wifiConnectedBSSID);
-
-  // Sorting the groups themselves by each one's strongest network (by RSSI, higher is stronger)
-  // Only need to check the first network in each group, since they're already sorted by signal strength
-  let strengthSortedGroups = $derived(
-    Array.from($HubStateStore.wifiNetworkGroups.entries()).sort(
-      (a, b) => b[1].networks[0].rssi - a[1].networks[0].rssi
-    )
-  );
 
   let dialogOpen = $state(false);
   let pendingPassword = $state<string | null>(null);
 
-  function wifiScan() {
-    const data = SerializeWifiScanCommand(!isScanning);
-    WebSocketClient.Instance.Send(data);
-  }
   function wifiAuthenticate(ssid: string, password: string | null) {
     dialogOpen = false;
-    const data = SerializeWifiNetworkSaveCommand(ssid, null, true);
+    const data = SerializeWifiNetworkSaveCommand(ssid, password, true);
     WebSocketClient.Instance.Send(data);
   }
   function wifiConnect(item: WiFiNetworkGroup) {
