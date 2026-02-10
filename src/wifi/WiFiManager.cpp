@@ -2,7 +2,7 @@
 
 const char* const TAG = "WiFiManager";
 
-#include "CaptivePortal.h"
+#include "captiveportal/Manager.h"
 #include "config/Config.h"
 #include "Core.h"
 #include "FormatHelpers.h"

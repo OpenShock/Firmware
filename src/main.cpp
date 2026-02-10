@@ -2,7 +2,7 @@
 
 const char* const TAG = "main";
 
-#include "CaptivePortal.h"
+#include "captiveportal/Manager.h"
 #include "CommandHandler.h"
 #include "Common.h"
 #include "config/Config.h"

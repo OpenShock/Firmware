@@ -1,6 +1,6 @@
 #include <freertos/FreeRTOS.h>
 
-#include "CaptivePortalInstance.h"
+#include "captiveportal/CaptivePortalInstance.h"
 
 const char* const TAG = "CaptivePortalInstance";
 
@@ -29,7 +29,7 @@ const uint32_t WEBSOCKET_UPDATE_INTERVAL = 10;  // 10ms / 100Hz
 
 using namespace OpenShock;
 
-const esp_partition_t* _getStaticPartition()
+static const esp_partition_t* getStaticPartition()
 {
   const esp_partition_t* partition = esp_partition_find_first(ESP_PARTITION_TYPE_DATA, ESP_PARTITION_SUBTYPE_DATA_SPIFFS, "static0");
   if (partition != nullptr) {
@@ -44,9 +44,9 @@ const esp_partition_t* _getStaticPartition()
   return nullptr;
 }
 
-const char* _getPartitionHash()
+static const char* getPartitionHash()
 {
-  const esp_partition_t* partition = _getStaticPartition();
+  const esp_partition_t* partition = getStaticPartition();
   if (partition == nullptr) {
     return nullptr;
   }
@@ -59,8 +59,9 @@ const char* _getPartitionHash()
   return hash;
 }
 
-CaptivePortalInstance::CaptivePortalInstance()
+CaptivePortal::CaptivePortalInstance::CaptivePortalInstance()
   : m_webServer(HTTP_PORT)
+  , m_rfc8908()
   , m_socketServer(WEBSOCKET_PORT, "/ws", "flatbuffers")  // Sec-WebSocket-Protocol = flatbuffers
   , m_socketDeFragger(std::bind(&CaptivePortalInstance::handleWebSocketEvent, this, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3))
   , m_fileSystem()
@@ -82,7 +83,7 @@ CaptivePortalInstance::CaptivePortalInstance()
   bool fsOk = true;
 
   // Get the hash of the filesystem
-  const char* fsHash = _getPartitionHash();
+  const char* fsHash = getPartitionHash();
   if (fsHash == nullptr) {
     OS_LOGE(TAG, "Failed to get filesystem hash");
     fsOk = false;
@@ -102,17 +103,12 @@ CaptivePortalInstance::CaptivePortalInstance()
     OS_LOGI(TAG, "Serving files from LittleFS");
     OS_LOGI(TAG, "Filesystem hash: %s", fsHash);
 
+    m_webServer.addHandler(&m_rfc8908);
+
     // Serving the captive portal files from LittleFS
     m_webServer.serveStatic("/", m_fileSystem, "/www/", "max-age=3600").setDefaultFile("index.html").setSharedEtag(fsHash);
 
-    // Redirecting connection tests to the captive portal, triggering the "login to network" prompt
-    m_webServer.onNotFound([](AsyncWebServerRequest* request) {
-      String redirect_target = String("http://") + WiFi.softAPIP().toString();
-      // String redirect_target = String("/");
-      AsyncWebServerResponse* response = request->beginResponse(302, "text/html", "<html><body>Redirecting...</body></html>");
-      response->addHeader(asyncsrv::T_LOCATION, redirect_target);
-      request->send(response);
-    });
+    m_webServer.onNotFound(&RFC8908Handler::CatchAll);
 
   } else {
     OS_LOGE(TAG, "/www/index.html or hash files not found, serving error page");
@@ -136,13 +132,13 @@ discord.gg/OpenShock
   m_webServer.begin();
 
   if (fsOk) {
-    if (TaskUtils::TaskCreateExpensive(&Util::FnProxy<&CaptivePortalInstance::task>, TAG, 8192, this, 1, &m_taskHandle) != pdPASS) {  // PROFILED: 4-6KB stack usage
+    if (TaskUtils::TaskCreateExpensive(&Util::FnProxy<&CaptivePortal::CaptivePortalInstance::task>, TAG, 8192, this, 1, &m_taskHandle) != pdPASS) {  // PROFILED: 4-6KB stack usage
       OS_LOGE(TAG, "Failed to create task");
     }
   }
 }
 
-CaptivePortalInstance::~CaptivePortalInstance()
+CaptivePortal::CaptivePortalInstance::~CaptivePortalInstance()
 {
   if (m_taskHandle != nullptr) {
     vTaskDelete(m_taskHandle);
@@ -154,7 +150,7 @@ CaptivePortalInstance::~CaptivePortalInstance()
   m_dnsServer.stop();
 }
 
-void CaptivePortalInstance::task()
+void CaptivePortal::CaptivePortalInstance::task()
 {
   while (true) {
     m_socketServer.loop();
@@ -163,7 +159,7 @@ void CaptivePortalInstance::task()
   }
 }
 
-void CaptivePortalInstance::handleWebSocketClientConnected(uint8_t socketId)
+void CaptivePortal::CaptivePortalInstance::handleWebSocketClientConnected(uint8_t socketId)
 {
   OS_LOGD(TAG, "WebSocket client #%u connected from %s", socketId, m_socketServer.remoteIP(socketId).toString().c_str());
 
@@ -173,20 +169,20 @@ void CaptivePortalInstance::handleWebSocketClientConnected(uint8_t socketId)
     connectedNetworkPtr = &connectedNetwork;
   }
 
-  Serialization::Local::SerializeReadyMessage(connectedNetworkPtr, GatewayConnectionManager::IsLinked(), std::bind(&CaptivePortalInstance::sendMessageBIN, this, socketId, std::placeholders::_1));
+  Serialization::Local::SerializeReadyMessage(connectedNetworkPtr, GatewayConnectionManager::IsLinked(), std::bind(&CaptivePortal::CaptivePortalInstance::sendMessageBIN, this, socketId, std::placeholders::_1));
 
   // Send all previously scanned wifi networks
   auto networks = OpenShock::WiFiManager::GetDiscoveredWiFiNetworks();
 
-  Serialization::Local::SerializeWiFiNetworksEvent(Serialization::Types::WifiNetworkEventType::Discovered, networks, std::bind(&CaptivePortalInstance::sendMessageBIN, this, socketId, std::placeholders::_1));
+  Serialization::Local::SerializeWiFiNetworksEvent(Serialization::Types::WifiNetworkEventType::Discovered, networks, std::bind(&CaptivePortal::CaptivePortalInstance::sendMessageBIN, this, socketId, std::placeholders::_1));
 }
 
-void CaptivePortalInstance::handleWebSocketClientDisconnected(uint8_t socketId)
+void CaptivePortal::CaptivePortalInstance::handleWebSocketClientDisconnected(uint8_t socketId)
 {
   OS_LOGD(TAG, "WebSocket client #%u disconnected", socketId);
 }
 
-void CaptivePortalInstance::handleWebSocketEvent(uint8_t socketId, WebSocketMessageType type, tcb::span<const uint8_t> payload)
+void CaptivePortal::CaptivePortalInstance::handleWebSocketEvent(uint8_t socketId, WebSocketMessageType type, tcb::span<const uint8_t> payload)
 {
   switch (type) {
     case WebSocketMessageType::Connected:
