@@ -69,7 +69,7 @@ CaptivePortalInstance::CaptivePortalInstance()
 {
   m_socketServer.onEvent(std::bind(&WebSocketDeFragger::handler, &m_socketDeFragger, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3, std::placeholders::_4));
   m_socketServer.begin();
-  
+
   m_socketServer.enableHeartbeat(WEBSOCKET_PING_INTERVAL, WEBSOCKET_PING_TIMEOUT, WEBSOCKET_PING_RETRIES);
 
   OS_LOGI(TAG, "Setting up DNS server");
@@ -102,19 +102,18 @@ CaptivePortalInstance::CaptivePortalInstance()
     OS_LOGI(TAG, "Serving files from LittleFS");
     OS_LOGI(TAG, "Filesystem hash: %s", fsHash);
 
-
     // Serving the captive portal files from LittleFS
     m_webServer.serveStatic("/", m_fileSystem, "/www/", "max-age=3600").setDefaultFile("index.html").setSharedEtag(fsHash);
 
     // Redirecting connection tests to the captive portal, triggering the "login to network" prompt
-    m_webServer.onNotFound([](AsyncWebServerRequest* request) { 
+    m_webServer.onNotFound([](AsyncWebServerRequest* request) {
       String redirect_target = String("http://") + WiFi.softAPIP().toString();
       // String redirect_target = String("/");
-      AsyncWebServerResponse *response = request->beginResponse(302, "text/html", "<html><body>Redirecting...</body></html>");
+      AsyncWebServerResponse* response = request->beginResponse(302, "text/html", "<html><body>Redirecting...</body></html>");
       response->addHeader(asyncsrv::T_LOCATION, redirect_target);
       request->send(response);
     });
-    
+
   } else {
     OS_LOGE(TAG, "/www/index.html or hash files not found, serving error page");
 

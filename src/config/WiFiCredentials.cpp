@@ -22,13 +22,15 @@ WiFiCredentials::WiFiCredentials(uint8_t id, std::string_view ssid, std::string_
 {
 }
 
-void WiFiCredentials::ToDefault() {
+void WiFiCredentials::ToDefault()
+{
   id = 0;
   ssid.clear();
   password.clear();
 }
 
-bool WiFiCredentials::FromFlatbuffers(const Serialization::Configuration::WiFiCredentials* config) {
+bool WiFiCredentials::FromFlatbuffers(const Serialization::Configuration::WiFiCredentials* config)
+{
   if (config == nullptr) {
     OS_LOGW(TAG, "Config is null, setting to default");
     ToDefault();
@@ -47,7 +49,8 @@ bool WiFiCredentials::FromFlatbuffers(const Serialization::Configuration::WiFiCr
   return true;
 }
 
-flatbuffers::Offset<OpenShock::Serialization::Configuration::WiFiCredentials> WiFiCredentials::ToFlatbuffers(flatbuffers::FlatBufferBuilder& builder, bool withSensitiveData) const {
+flatbuffers::Offset<OpenShock::Serialization::Configuration::WiFiCredentials> WiFiCredentials::ToFlatbuffers(flatbuffers::FlatBufferBuilder& builder, bool withSensitiveData) const
+{
   auto ssidOffset = builder.CreateString(ssid);
 
   flatbuffers::Offset<flatbuffers::String> passwordOffset;
@@ -60,7 +63,8 @@ flatbuffers::Offset<OpenShock::Serialization::Configuration::WiFiCredentials> Wi
   return Serialization::Configuration::CreateWiFiCredentials(builder, id, ssidOffset, passwordOffset);
 }
 
-bool WiFiCredentials::FromJSON(const cJSON* json) {
+bool WiFiCredentials::FromJSON(const cJSON* json)
+{
   if (json == nullptr) {
     OS_LOGW(TAG, "Config is null, setting to default");
     ToDefault();
@@ -84,7 +88,8 @@ bool WiFiCredentials::FromJSON(const cJSON* json) {
   return true;
 }
 
-cJSON* WiFiCredentials::ToJSON(bool withSensitiveData) const {
+cJSON* WiFiCredentials::ToJSON(bool withSensitiveData) const
+{
   cJSON* root = cJSON_CreateObject();
 
   cJSON_AddNumberToObject(root, "id", id);  //-V2564

@@ -85,7 +85,7 @@ bool OpenShock::RateLimiter::tryRequest()
 
     // Check how many requests are inside the limit window and track earliest in-window element
     std::size_t insideWindow = 0;
-    auto it = m_requests.rbegin();
+    auto it                  = m_requests.rbegin();
     for (; it != m_requests.rend(); ++it) {
       if (*it < windowStart) break;
       ++insideWindow;
@@ -93,9 +93,7 @@ bool OpenShock::RateLimiter::tryRequest()
 
     // If the window is full, set the wait time until its available, and reject the request
     if (insideWindow >= limit.count) {
-      auto firstInWindow = (it == m_requests.rend())
-        ? m_requests.begin()
-        : it.base();
+      auto firstInWindow = (it == m_requests.rend()) ? m_requests.begin() : it.base();
 
       m_nextSlot = *firstInWindow + limit.durationMs;
       return false;
@@ -121,5 +119,5 @@ void OpenShock::RateLimiter::blockFor(int64_t blockForMs)
   OpenShock::ScopedLock lock__(&m_mutex);
 
   int64_t blockUntil = OpenShock::millis() + blockForMs;
-  m_nextSlot = std::max(m_nextSlot, blockUntil);
+  m_nextSlot         = std::max(m_nextSlot, blockUntil);
 }

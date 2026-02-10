@@ -2,13 +2,14 @@
 
 #include "serialization/_fbs/FirmwareBootType_generated.h"
 
-#include <cstring>
 #include <cstdint>
+#include <cstring>
 
 namespace OpenShock {
   typedef OpenShock::Serialization::Types::FirmwareBootType FirmwareBootType;
 
-  inline bool TryParseFirmwareBootType(FirmwareBootType& bootType, const char* str) {
+  inline bool TryParseFirmwareBootType(FirmwareBootType& bootType, const char* str)
+  {
     if (strcasecmp(str, "normal") == 0) {
       bootType = FirmwareBootType::Normal;
       return true;

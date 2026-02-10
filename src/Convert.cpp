@@ -25,7 +25,7 @@ void fromNonZeroT(T val, std::string& out)
 
   // Start from the end of the buffer to construct the number in reverse (from least to most significant digit)
   char* const end = buf + MaxDigits;
-  char* ptr = end;
+  char* ptr       = end;
 
   U u;
   bool negative = false;

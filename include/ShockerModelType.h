@@ -12,7 +12,8 @@ namespace OpenShock {
     D80
   };
 
-  inline bool ShockerModelTypeFromString(const char* str, ShockerModelType& out, bool allowTypo = false) {
+  inline bool ShockerModelTypeFromString(const char* str, ShockerModelType& out, bool allowTypo = false)
+  {
     if (strcasecmp(str, "caixianlin") == 0 || strcasecmp(str, "cai-xianlin") == 0) {
       out = ShockerModelType::CaiXianlin;
       return true;
