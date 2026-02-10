@@ -1,12 +1,16 @@
 #pragma once
 
-#include "serialization/_fbs/ShockerModelType_generated.h"
-
 #include <cstdint>
 #include <cstring>
 
 namespace OpenShock {
-  typedef OpenShock::Serialization::Types::ShockerModelType ShockerModelType;
+  enum class ShockerModelType : uint8_t {
+    CaiXianlin,
+    Petrainer,
+    Petrainer998DR,
+    T330,
+    D80
+  };
 
   inline bool ShockerModelTypeFromString(const char* str, ShockerModelType& out, bool allowTypo = false) {
     if (strcasecmp(str, "caixianlin") == 0 || strcasecmp(str, "cai-xianlin") == 0) {
@@ -31,6 +35,16 @@ namespace OpenShock {
 
     if (allowTypo && strcasecmp(str, "pettrainer998dr") == 0) {
       out = ShockerModelType::Petrainer998DR;
+      return true;
+    }
+
+    if (strcasecmp(str, "t330") == 0) {
+      out = ShockerModelType::T330;
+      return true;
+    }
+
+    if (strcasecmp(str, "d80") == 0) {
+      out = ShockerModelType::D80;
       return true;
     }
 

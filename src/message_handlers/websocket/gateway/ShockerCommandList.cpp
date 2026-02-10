@@ -35,6 +35,28 @@ void _Private::HandleShockerCommandList(const OpenShock::Serialization::Gateway:
     FbsModelType fbsModel         = command->model();
     FbsCommandType fbsCommandType = command->type();
 
+    OpenShock::ShockerModelType model;
+    switch (fbsModel) {
+      case FbsModelType::CaiXianlin:
+        model = OpenShock::ShockerModelType::CaiXianlin;
+        break;
+      case FbsModelType::Petrainer:
+        model = OpenShock::ShockerModelType::Petrainer;
+        break;
+      case FbsModelType::Petrainer998DR:
+        model = OpenShock::ShockerModelType::Petrainer998DR;
+        break;
+      // case FbsModelType::T330:
+      //   model = OpenShock::ShockerModelType::T330;
+      //   break;
+      // case FbsModelType::D80:
+      //   model = OpenShock::ShockerModelType::D80;
+      //   break;
+      default:
+        OS_LOGE(TAG, "Unsupported shocker model: %s", OpenShock::Serialization::Types::EnumNameShockerModelType(fbsModel));
+        continue;
+    }
+
     OpenShock::ShockerCommandType commandType;
     switch (fbsCommandType) {
       case FbsCommandType::Stop:
@@ -57,7 +79,7 @@ void _Private::HandleShockerCommandList(const OpenShock::Serialization::Gateway:
         continue;
     }
 
-    if (!OpenShock::CommandHandler::HandleCommand(fbsModel, id, commandType, intensity, durationMs)) {
+    if (!OpenShock::CommandHandler::HandleCommand(model, id, commandType, intensity, durationMs)) {
       OS_LOGE(TAG, "Remote command failed/rejected!");
     }
   }
