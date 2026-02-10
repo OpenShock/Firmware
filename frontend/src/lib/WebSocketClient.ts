@@ -1,5 +1,5 @@
 import { browser } from '$app/environment';
-import { isArrayBuffer, isString } from './TypeGuards/BasicGuards';
+import { isArrayBuffer, isString } from './Typeguards';
 import { WebSocketMessageBinaryHandler } from './MessageHandlers';
 import { page } from '$app/stores';
 import { get } from 'svelte/store';
