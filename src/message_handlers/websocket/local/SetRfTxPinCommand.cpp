@@ -2,7 +2,7 @@
 
 const char* const TAG = "LocalMessageHandlers";
 
-#include "CaptivePortal.h"
+#include "captiveportal/Manager.h"
 #include "CommandHandler.h"
 #include "Common.h"
 #include "Logging.h"

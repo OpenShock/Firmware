@@ -1,5 +1,6 @@
 #pragma once
 
+#include "captiveportal/RFC8908Handler.h"
 #include "Common.h"
 #include "span.h"
 #include "WebSocketDeFragger.h"
@@ -14,7 +15,7 @@
 #include <cstdint>
 #include <string_view>
 
-namespace OpenShock {
+namespace OpenShock::CaptivePortal {
   class CaptivePortalInstance {
     DISABLE_COPY(CaptivePortalInstance);
     DISABLE_MOVE(CaptivePortalInstance);
@@ -35,10 +36,11 @@ namespace OpenShock {
     void handleWebSocketEvent(uint8_t socketId, WebSocketMessageType type, tcb::span<const uint8_t> payload);
 
     AsyncWebServer m_webServer;
+    RFC8908Handler m_rfc8908;
     WebSocketsServer m_socketServer;
     WebSocketDeFragger m_socketDeFragger;
     fs::LittleFSFS m_fileSystem;
     DNSServer m_dnsServer;
     TaskHandle_t m_taskHandle;
   };
-}  // namespace OpenShock
+}  // namespace OpenShock::CaptivePortal

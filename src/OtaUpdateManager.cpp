@@ -2,7 +2,7 @@
 
 const char* const TAG = "OtaUpdateManager";
 
-#include "CaptivePortal.h"
+#include "captiveportal/Manager.h"
 #include "Common.h"
 #include "config/Config.h"
 #include "Core.h"

@@ -1,10 +1,10 @@
 #include <freertos/FreeRTOS.h>
 
-#include "CaptivePortal.h"
+#include "captiveportal/Manager.h"
 
 const char* const TAG = "CaptivePortal";
 
-#include "CaptivePortalInstance.h"
+#include "captiveportal/CaptivePortalInstance.h"
 #include "CommandHandler.h"
 #include "config/Config.h"
 #include "Core.h"
@@ -22,10 +22,10 @@ const char* const TAG = "CaptivePortal";
 
 using namespace OpenShock;
 
-static bool s_alwaysEnabled                              = false;
-static bool s_forceClosed                                = false;
-static esp_timer_handle_t s_captivePortalUpdateLoopTimer = nullptr;
-static std::unique_ptr<CaptivePortalInstance> s_instance = nullptr;
+static bool s_alwaysEnabled                                             = false;
+static bool s_forceClosed                                               = false;
+static esp_timer_handle_t s_captivePortalUpdateLoopTimer                = nullptr;
+static std::unique_ptr<CaptivePortal::CaptivePortalInstance> s_instance = nullptr;
 
 static bool captiveportal_start()
 {
@@ -74,7 +74,7 @@ static bool captiveportal_start()
     return false;
   }
 
-  s_instance = std::make_unique<CaptivePortalInstance>();
+  s_instance = std::make_unique<CaptivePortal::CaptivePortalInstance>();
 
   return true;
 }
@@ -122,8 +122,6 @@ static void captiveportal_updateloop(void*)
     return;
   }
 }
-
-using namespace OpenShock;
 
 bool CaptivePortal::Init()
 {
