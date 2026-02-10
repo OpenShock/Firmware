@@ -133,7 +133,7 @@ void _printCommandHelp(Serial::CommandGroup& group)
   for (const auto& command : group.commands()) {
     size += 2;  // +2 for newline
     size += group.name().size();
-    size++;  // +1 for space
+    size++;     // +1 for space
 
     if (command.name().size() > 0) {
       size += command.name().size() + 1;  // +1 for space
@@ -428,7 +428,7 @@ void _skipSerialWhitespaces(SerialBuffer& buffer)
   }
 }
 
-#if ARDUINO_USB_MODE 
+#if ARDUINO_USB_MODE
 SerialReadResult _tryReadUSBSerialLine(SerialBuffer& buffer)
 {
   // Check if there's any data available
@@ -641,7 +641,7 @@ void _serialRxTask(void*)
         break;
     }
 
-#if ARDUINO_USB_MODE 
+#if ARDUINO_USB_MODE
     switch (_tryReadUSBSerialLine(buffer)) {
       case SerialReadResult::LineEnd:
         _processSerialLine(buffer);

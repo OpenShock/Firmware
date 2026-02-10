@@ -4,10 +4,10 @@ const char* const TAG = "Sequence";
 
 #include "Logging.h"
 #include "radio/rmt/CaiXianlinEncoder.h"
+#include "radio/rmt/D80Encoder.h"
 #include "radio/rmt/Petrainer998DREncoder.h"
 #include "radio/rmt/PetrainerEncoder.h"
 #include "radio/rmt/T330Encoder.h"
-#include "radio/rmt/D80Encoder.h"
 
 using namespace OpenShock;
 

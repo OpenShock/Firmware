@@ -94,7 +94,7 @@ void setup()
 {
   OS_SERIAL.begin(115'200);
 
-#if ARDUINO_USB_MODE 
+#if ARDUINO_USB_MODE
   OS_SERIAL_USB.begin(115'200);
 #endif
 

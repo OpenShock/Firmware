@@ -47,7 +47,7 @@ static bool captiveportal_start()
     return false;
   }
 
-  IPAddress apIP(4,3,2,1);
+  IPAddress apIP(4, 3, 2, 1);
   if (!WiFi.softAPConfig(apIP, apIP, IPAddress(255, 255, 255, 0))) {
     OS_LOGE(TAG, "Failed to configure AP");
     WiFi.softAPdisconnect(true);

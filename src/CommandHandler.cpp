@@ -300,7 +300,6 @@ bool CommandHandler::HandleCommand(ShockerModelType model, uint16_t shockerId, S
     return false;
   }
 
-
   bool ok = s_rfTransmitter->SendCommand(model, shockerId, type, intensity, durationMs);
 
   lock__rf.unlock();

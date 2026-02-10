@@ -22,8 +22,7 @@ bool Rmt::D80Encoder::FillBuffer(rmt_data_t* sequence, uint16_t shockerId, Shock
 {
   // Intensity must be between 0 and 15, this should mimic the rounding of the original remote which
   // allows you to select from 1-99 when the protocol only has 4 bits for intensity (0-15).
-  if (intensity > 0)
-    intensity = std::max((intensity*15)/100, 1);
+  if (intensity > 0) intensity = std::max((intensity * 15) / 100, 1);
 
   uint8_t typeVal = 0;
   switch (type) {
