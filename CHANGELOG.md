@@ -1,3 +1,7 @@
+# Version 1.5.0-rc.4 Release Notes
+
+Fixed a bug where using Captive Portal to connect to a WiFi network would pair the password entered with another the network than selected, removed obnoxious "AbsolutelySureButton"
+
 # Version 1.5.0-rc.3 Release Notes
 
 Fixed a critical bug where the firmware could never connect to LCG, and addressed code correctness issues (variable initialization and type casting) along with compiler warning cleanups.
