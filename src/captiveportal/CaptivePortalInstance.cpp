@@ -60,12 +60,12 @@ static const char* getPartitionHash()
   return hash;
 }
 
-CaptivePortal::CaptivePortalInstance::CaptivePortalInstance()
+CaptivePortal::CaptivePortalInstance::CaptivePortalInstance(IPAddress apIP)
   : m_webServer(HTTP_PORT)
   , m_socketServer(WEBSOCKET_PORT, "/ws", "flatbuffers")  // Sec-WebSocket-Protocol = flatbuffers
   , m_socketDeFragger(std::bind(&CaptivePortalInstance::handleWebSocketEvent, this, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3))
   , m_fileSystem()
-  , m_dnsServer()
+  , m_dnsServer(apIP)
   , m_taskHandle(nullptr)
 {
   m_socketServer.onEvent(std::bind(&WebSocketDeFragger::handler, &m_socketDeFragger, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3, std::placeholders::_4));
@@ -73,12 +73,8 @@ CaptivePortal::CaptivePortalInstance::CaptivePortalInstance()
 
   m_socketServer.enableHeartbeat(WEBSOCKET_PING_INTERVAL, WEBSOCKET_PING_TIMEOUT, WEBSOCKET_PING_RETRIES);
 
-  OS_LOGI(TAG, "Setting up DNS server");
-  bool dnsStarted = m_dnsServer.start(DNS_PORT, "*", WiFi.softAPIP());
-
-  if (!dnsStarted) {
-    OS_LOGE(TAG, "Failed to start DNS server!");
-  }
+  OS_LOGI(TAG, "Starting DNS server");
+  m_dnsServer.start();
 
   bool fsOk = true;
 
@@ -154,7 +150,6 @@ void CaptivePortal::CaptivePortalInstance::task()
 {
   while (true) {
     m_socketServer.loop();
-    m_dnsServer.processNextRequest();
     vTaskDelay(pdMS_TO_TICKS(WEBSOCKET_UPDATE_INTERVAL));
   }
 }

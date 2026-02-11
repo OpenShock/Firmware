@@ -1,10 +1,10 @@
 #pragma once
 
+#include "captiveportal/CaptiveDNSServer.h"
 #include "Common.h"
 #include "span.h"
 #include "WebSocketDeFragger.h"
 
-#include <DNSServer.h>
 #include <ESPAsyncWebServer.h>
 #include <LittleFS.h>
 #include <WebSocketsServer.h>
@@ -20,7 +20,7 @@ namespace OpenShock::CaptivePortal {
     DISABLE_MOVE(CaptivePortalInstance);
 
   public:
-    CaptivePortalInstance();
+    CaptivePortalInstance(IPAddress apIP);
     ~CaptivePortalInstance();
 
     bool sendMessageTXT(uint8_t socketId, std::string_view data) { return m_socketServer.sendTXT(socketId, data.data(), data.length()); }
@@ -38,7 +38,7 @@ namespace OpenShock::CaptivePortal {
     WebSocketsServer m_socketServer;
     WebSocketDeFragger m_socketDeFragger;
     fs::LittleFSFS m_fileSystem;
-    DNSServer m_dnsServer;
+    CaptiveDNSServer m_dnsServer;
     TaskHandle_t m_taskHandle;
   };
 }  // namespace OpenShock::CaptivePortal

@@ -59,7 +59,7 @@ static bool captiveportal_start()
     hostname = OPENSHOCK_FW_HOSTNAME;
   }
 
-  s_instance = std::make_unique<CaptivePortal::CaptivePortalInstance>();
+  s_instance = std::make_unique<CaptivePortal::CaptivePortalInstance>(apIP);
 
   return true;
 }
