@@ -36,7 +36,7 @@ This release focuses on **radio reliability**, **Captive Portal overhaul**, **E-
 - Introduced internal **execution time limits** to prevent firmware from getting stuck in long-running operations.
 - Replaced all `ESP.restart()` usage with ESP-IDF native `esp_restart()` calls.
 - Improved OTA, Wi-Fi initialization, and crash-loop resilience.
-- Fixed crashloop due to invalid free.
+- Fixed crash-loop due to invalid free.
 
 ## HTTP & Gateway
 
