@@ -228,8 +228,10 @@ version_major, version_minor, version_patch, version_prerelease, version_build =
 cpp_defines['OPENSHOCK_FW_VERSION_MAJOR'] = version_major
 cpp_defines['OPENSHOCK_FW_VERSION_MINOR'] = version_minor
 cpp_defines['OPENSHOCK_FW_VERSION_PATCH'] = version_patch
-cpp_defines['OPENSHOCK_FW_VERSION_PRERELEASE'] = version_prerelease
-cpp_defines['OPENSHOCK_FW_VERSION_BUILD'] = version_build
+if version_prerelease is not None:
+    cpp_defines['OPENSHOCK_FW_VERSION_PRERELEASE'] = version_prerelease
+if version_build is not None:
+    cpp_defines['OPENSHOCK_FW_VERSION_BUILD'] = version_build
 
 # Gets the log level from environment variables.
 # TODO: Delete get_loglevel and use... something more generic.
