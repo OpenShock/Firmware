@@ -1,3 +1,7 @@
+# Version 1.5.0-rc.6 Release Notes
+
+Improved Captive-Portal responsiveness, removed mDNS server from Captive-Portal, some code cleanup.
+
 # Version 1.5.0-rc.5 Release Notes
 
 Fixed a bug where password was not being supplied to websocket serialization function, causing WiFi network to try to authenticate with no password.
