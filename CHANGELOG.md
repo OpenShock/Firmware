@@ -47,7 +47,7 @@ This release focuses on **radio reliability**, **Captive Portal overhaul**, **E-
 
 ## Bug Fixes
 
-- Fixed WiFi SSID/password confusion when connecting via Captive Portal.
+- Fixed Wi-Fi SSID/password confusion when connecting via Captive Portal.
 - Fixed password not being supplied to websocket serialization function.
 - Removed obnoxious "AbsolutelySureButton".
 
