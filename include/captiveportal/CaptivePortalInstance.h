@@ -1,6 +1,5 @@
 #pragma once
 
-#include "captiveportal/RFC8908Handler.h"
 #include "Common.h"
 #include "span.h"
 #include "WebSocketDeFragger.h"
@@ -36,7 +35,6 @@ namespace OpenShock::CaptivePortal {
     void handleWebSocketEvent(uint8_t socketId, WebSocketMessageType type, tcb::span<const uint8_t> payload);
 
     AsyncWebServer m_webServer;
-    RFC8908Handler m_rfc8908;
     WebSocketsServer m_socketServer;
     WebSocketDeFragger m_socketDeFragger;
     fs::LittleFSFS m_fileSystem;

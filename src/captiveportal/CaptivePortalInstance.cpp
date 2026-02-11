@@ -4,6 +4,7 @@
 
 const char* const TAG = "CaptivePortalInstance";
 
+#include "captiveportal/RFC8908Handler.h"
 #include "CommandHandler.h"
 #include "GatewayConnectionManager.h"
 #include "Logging.h"
@@ -61,7 +62,6 @@ static const char* getPartitionHash()
 
 CaptivePortal::CaptivePortalInstance::CaptivePortalInstance()
   : m_webServer(HTTP_PORT)
-  , m_rfc8908()
   , m_socketServer(WEBSOCKET_PORT, "/ws", "flatbuffers")  // Sec-WebSocket-Protocol = flatbuffers
   , m_socketDeFragger(std::bind(&CaptivePortalInstance::handleWebSocketEvent, this, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3))
   , m_fileSystem()
@@ -103,7 +103,7 @@ CaptivePortal::CaptivePortalInstance::CaptivePortalInstance()
     OS_LOGI(TAG, "Serving files from LittleFS");
     OS_LOGI(TAG, "Filesystem hash: %s", fsHash);
 
-    m_webServer.addHandler(&m_rfc8908);
+    m_webServer.addHandler(new RFC8908Handler());
 
     // Serving the captive portal files from LittleFS
     m_webServer.serveStatic("/", m_fileSystem, "/www/", "max-age=3600").setDefaultFile("index.html").setSharedEtag(fsHash);

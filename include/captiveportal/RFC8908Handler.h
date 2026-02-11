@@ -13,7 +13,5 @@ namespace OpenShock::CaptivePortal {
 
     bool canHandle(AsyncWebServerRequest* request) const override;
     void handleRequest(AsyncWebServerRequest* request) override;
-
-  private:
   };
 }  // namespace OpenShock::CaptivePortal
