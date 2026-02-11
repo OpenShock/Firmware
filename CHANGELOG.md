@@ -1,3 +1,77 @@
+# Version 1.5.0 Release Notes
+
+This release focuses on **radio reliability**, **Captive Portal overhaul**, **E-Stop improvements**, and a fully refreshed **frontend**.
+
+## Highlights
+
+- Major **RF/RMT transmitter rework** for improved timing accuracy and more reliable shocker communication.
+- Added **T330** and **D80** shocker protocol support, plus **CaiXianlin light** support.
+- Proper **RFC-8908 Captive Portal** implementation with improved responsiveness.
+- Migrated frontend to **Svelte 5 + shadcn** with **Tailwind CSS v4**, reduced bundle size, and synced UI palette with website.
+- Updated **AssignLCG** integration using the new backend endpoint (removes the old LCG override setting).
+- Hub now reports its Wi-Fi signal strength (RSSI) for connection health in UIs.
+- **Serial output now uses CRLF** line endings for improved compatibility with Windows terminals.
+- Serial commands now work via hardware UART **and** native USB CDC (if available).
+
+## Radio & Timing
+
+- Reworked RF pipeline with more consistent timing and fewer internal allocations.
+- Fixed timing issues for **CaiXianlin** and improved **PET998DR** handling.
+- Additional guardrails added to the RF subsystem to prevent stalls/crash loops.
+
+## Captive Portal
+
+- Implemented proper RFC-8908 Captive Portal.
+- Removed mDNS server from Captive Portal for better stability.
+- Improved responsiveness and general stability.
+
+## E-Stop
+
+- More reliable state transitions with change detection to prevent event spamming.
+- Added a short re-arm grace period after clearing to prevent immediate re-triggering due to switch bounce or noise.
+- Fixed LED patterns for E-Stop clearing states.
+
+## Firmware Behavior / System
+
+- Introduced internal **execution time limits** to prevent firmware from getting stuck in long-running operations.
+- Replaced all `ESP.restart()` usage with ESP-IDF native `esp_restart()` calls.
+- Improved OTA, Wi-Fi initialization, and crash-loop resilience.
+- Fixed crashloop due to invalid free.
+
+## HTTP & Gateway
+
+- Clearer/more consistent HTTP error and status behavior.
+- Improved 401 handling and token recovery.
+- Fixed a critical bug where the firmware could never connect to LCG.
+- Rate limiter improvements with more efficient tracking and predictable blocking behavior.
+
+## Bug Fixes
+
+- Fixed WiFi SSID/password confusion when connecting via Captive Portal.
+- Fixed password not being supplied to websocket serialization function.
+- Removed obnoxious "AbsolutelySureButton".
+
+## Misc / Internal Changes
+
+- PlatformIO, espressif32, FlatBuffers, Node, pnpm, and other dependency updates.
+- Build reproducibility improvements and CI cleanup.
+- Various memory fixes, warning cleanups, and improved parsing logic.
+- Decoupled ShockerModelType from FlatBuffers.
+- Expanded compiler warnings to catch issues earlier during development.
+
+---
+
+## Breaking Changes
+
+- **Petrainer shockers need to be re-paired** due to a fix in the encoder that corrected the remote ID bit shifting.
+- **LCG override removed** (new AssignLCG endpoint required).
+- **Serial output now uses CRLF** (update scripts if needed).
+
+## Notes
+
+- RF timing changes are substantial; please report shocker-specific regressions.
+- Scripts relying on legacy AssignLCG behavior may need updates.
+
 # Version 1.5.0-rc.6 Release Notes
 
 Improved Captive-Portal responsiveness, removed mDNS server from Captive-Portal, some code cleanup.
