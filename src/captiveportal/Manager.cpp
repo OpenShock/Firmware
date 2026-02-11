@@ -16,7 +16,6 @@ const char* const TAG = "CaptivePortal";
 #include <WiFi.h>
 
 #include <esp_timer.h>
-#include <mdns.h>
 
 #include <memory>
 
@@ -54,24 +53,10 @@ static bool captiveportal_start()
     return false;
   }
 
-  esp_err_t err = mdns_init();
-  if (err != ESP_OK) {
-    OS_LOGE(TAG, "Failed to initialize mDNS");
-    WiFi.softAPdisconnect(true);
-    return false;
-  }
-
   std::string hostname;
   if (!Config::GetWiFiHostname(hostname)) {
     OS_LOGE(TAG, "Failed to get WiFi hostname, reverting to default");
     hostname = OPENSHOCK_FW_HOSTNAME;
-  }
-
-  err = mdns_hostname_set(hostname.c_str());
-  if (err != ESP_OK) {
-    OS_LOGE(TAG, "Failed to set mDNS hostname");
-    WiFi.softAPdisconnect(true);
-    return false;
   }
 
   s_instance = std::make_unique<CaptivePortal::CaptivePortalInstance>();
@@ -88,8 +73,6 @@ static void captiveportal_stop()
   OS_LOGI(TAG, "Stopping captive portal");
 
   s_instance = nullptr;
-
-  mdns_free();
 
   WiFi.softAPdisconnect(true);
 }
