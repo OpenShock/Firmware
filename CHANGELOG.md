@@ -60,6 +60,15 @@ This release is a major firmware update bringing a fully reworked RF transmitter
 
 
 
+# Version 1.5.0-rc.7 Release Notes
+
+Fix stable Semver parsing error, make beta builds more verbose, increase OTA task stack size, implement more guards in OTA code.
+
+**Full Changelog: [1.5.0-rc.6 -> 1.5.0-rc.7](https://github.com/OpenShock/Firmware/compare/1.5.0-rc.6...1.5.0-rc.7)**
+
+
+
+
 # Version 1.5.0-rc.6 Release Notes
 
 Improved Captive-Portal responsiveness, removed mDNS server from Captive-Portal, some code cleanup.
