@@ -334,8 +334,11 @@ bool OpenShock::TryParseSemVer(std::string_view semverStr, SemVer& semver)
   size_t plusIdx = patchStr.find('+');
   size_t dashIdx = patchStr.find('-');
 
-  std::string_view restStr = patchStr.substr(std::min(dashIdx, plusIdx));
-  patchStr.remove_suffix(restStr.length());
+  std::string_view restStr;
+  if (dashIdx != std::string_view::npos || plusIdx != std::string_view::npos) {
+    restStr = patchStr.substr(std::min(dashIdx, plusIdx));
+    patchStr.remove_suffix(restStr.length());
+  }
 
   if (!Convert::ToUint16(majorStr, semver.major)) {
     OS_LOGE(TAG, "Invalid major version: %.*s", majorStr.length(), majorStr.data());

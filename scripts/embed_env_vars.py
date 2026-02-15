@@ -21,13 +21,17 @@ project_dir = pio.get_string('PROJECT_DIR')
 # If we are running in CI and either building the master branch, beta branch, or a tag, then we are in RELEASE mode.
 is_ci = shorthands.is_github_ci()
 branch_name = shorthands.get_github_ref_name()
-is_release_build = is_ci and (
+is_stable = is_ci and (
     branch_name == 'master'
     or shorthands.is_github_pr_into('master')
-    or branch_name == 'beta'
-    or shorthands.is_github_pr_into('beta')
-    or shorthands.is_github_tag()
 )
+is_beta = is_ci and (
+    branch_name == 'beta'
+    or shorthands.is_github_pr_into('beta')
+)
+is_tag = is_ci and shorthands.is_github_tag()
+
+is_release_build = is_stable or is_beta or is_tag
 
 # Get the build type string.
 pio_build_type = 'release' if is_release_build else 'debug'
@@ -146,8 +150,8 @@ def serialize_cpp_define(k: str, v: str | int | bool) -> str | int:
 
 
 def split_semver(version):
-    # Match the semver pattern
-    pattern = r'^(?P<major>\d+)\.(?P<minor>\d+)\.(?P<patch>\d+)(?:-(?P<prerelease>[0-9A-Za-z.-]+))?(?:\+(?P<build>[0-9A-Za-z.-]+))?$'
+    # Match the semver pattern (with optional 'v' prefix)
+    pattern = r'^v?(?P<major>\d+)\.(?P<minor>\d+)\.(?P<patch>\d+)(?:-(?P<prerelease>[0-9A-Za-z.-]+))?(?:\+(?P<build>[0-9A-Za-z.-]+))?$'
     match = re.match(pattern, version)
 
     if not match:
@@ -210,8 +214,9 @@ if 'OPENSHOCK_FW_VERSION' not in cpp_defines:
     if is_ci:
         raise ValueError('OPENSHOCK_FW_VERSION must be set in environment variables for CI builds.')
     
-    # If latest_git_tag is set, use it, else use 0.0.0, assign to variable.
-    version = (git_latest_clean_tag if git_latest_clean_tag is not None else '0.0.0') + '-local'
+    # If latest_git_tag is set, use it (stripped of 'v' prefix), else use 0.0.0, assign to variable.
+    clean_tag = git_latest_clean_tag.lstrip('v') if git_latest_clean_tag is not None else '0.0.0'
+    version = clean_tag + '-local'
 
     # If git_commit is set, append it to the version.
     if git_commit is not None:
@@ -228,23 +233,30 @@ version_major, version_minor, version_patch, version_prerelease, version_build =
 cpp_defines['OPENSHOCK_FW_VERSION_MAJOR'] = version_major
 cpp_defines['OPENSHOCK_FW_VERSION_MINOR'] = version_minor
 cpp_defines['OPENSHOCK_FW_VERSION_PATCH'] = version_patch
-cpp_defines['OPENSHOCK_FW_VERSION_PRERELEASE'] = version_prerelease
-cpp_defines['OPENSHOCK_FW_VERSION_BUILD'] = version_build
+if version_prerelease is not None:
+    cpp_defines['OPENSHOCK_FW_VERSION_PRERELEASE'] = version_prerelease
+if version_build is not None:
+    cpp_defines['OPENSHOCK_FW_VERSION_BUILD'] = version_build
 
 # Gets the log level from environment variables.
 # TODO: Delete get_loglevel and use... something more generic.
 log_level_int = dot.get_loglevel('LOG_LEVEL')
 if log_level_int is None:
     raise ValueError('LOG_LEVEL must be set in environment variables.')
+
+# Beta builds are release builds but with debug-level logging.
+if is_beta:
+    log_level_int = 4  # Debug level.
+
 cpp_defines['OPENSHOCK_LOG_LEVEL'] = log_level_int
-cpp_defines['CORE_DEBUG_LEVEL'] = 2 # Warning level. (FUCK Arduino)
+cpp_defines['CORE_DEBUG_LEVEL'] = log_level_int if not is_release_build or is_beta else 2  # Warning level for release, match log level for dev/beta.
 
 # Serialize and inject CPP Defines.
 print_dump('CPP Defines', cpp_defines)
 
 cpp_defines = serialize_cpp_defines(cpp_defines)
 
-print('Build type: ' + pio_build_type)
+print('Build type: ' + pio_build_type + (' (beta, debug logging)' if is_beta else ''))
 
 # Set PIO variables.
 env['BUILD_TYPE'] = pio_build_type
