@@ -63,9 +63,9 @@ void _handleDomainCommand(std::string_view arg, bool isAutomated)
   esp_restart();
 }
 
-OpenShock::Serial::CommandGroup OpenShock::Serial::CommandHandlers::DomainHandler()
+OpenShock::SerialCmds::CommandGroup OpenShock::SerialCmds::CommandHandlers::DomainHandler()
 {
-  auto group = OpenShock::Serial::CommandGroup("domain"sv);
+  auto group = OpenShock::SerialCmds::CommandGroup("domain"sv);
 
   auto& getCommand = group.addCommand("Get the backend domain."sv, _handleDomainCommand);
 

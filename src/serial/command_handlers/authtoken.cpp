@@ -36,9 +36,9 @@ void _handleAuthtokenCommand(std::string_view arg, bool isAutomated)
   }
 }
 
-OpenShock::Serial::CommandGroup OpenShock::Serial::CommandHandlers::AuthTokenHandler()
+OpenShock::SerialCmds::CommandGroup OpenShock::SerialCmds::CommandHandlers::AuthTokenHandler()
 {
-  auto group = OpenShock::Serial::CommandGroup("authtoken"sv);
+  auto group = OpenShock::SerialCmds::CommandGroup("authtoken"sv);
 
   auto& getCommand = group.addCommand("Get the backend auth token"sv, _handleAuthtokenCommand);
 

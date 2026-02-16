@@ -45,9 +45,9 @@ void _handleRawConfigCommand(std::string_view arg, bool isAutomated)
   esp_restart();
 }
 
-OpenShock::Serial::CommandGroup OpenShock::Serial::CommandHandlers::RawConfigHandler()
+OpenShock::SerialCmds::CommandGroup OpenShock::SerialCmds::CommandHandlers::RawConfigHandler()
 {
-  auto group = OpenShock::Serial::CommandGroup("rawconfig"sv);
+  auto group = OpenShock::SerialCmds::CommandGroup("rawconfig"sv);
 
   auto& getCommand = group.addCommand("Get the raw binary config"sv, _handleRawConfigCommand);
 

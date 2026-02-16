@@ -34,9 +34,9 @@ void _handleKeepAliveCommand(std::string_view arg, bool isAutomated)
   }
 }
 
-OpenShock::Serial::CommandGroup OpenShock::Serial::CommandHandlers::KeepAliveHandler()
+OpenShock::SerialCmds::CommandGroup OpenShock::SerialCmds::CommandHandlers::KeepAliveHandler()
 {
-  auto group = OpenShock::Serial::CommandGroup("keepalive"sv);
+  auto group = OpenShock::SerialCmds::CommandGroup("keepalive"sv);
 
   auto& getCommand = group.addCommand("Get the shocker keep-alive status"sv, _handleKeepAliveCommand);
 

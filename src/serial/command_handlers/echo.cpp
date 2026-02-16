@@ -30,9 +30,9 @@ void _handleSerialEchoCommand(std::string_view arg, bool isAutomated)
   }
 }
 
-OpenShock::Serial::CommandGroup OpenShock::Serial::CommandHandlers::EchoHandler()
+OpenShock::SerialCmds::CommandGroup OpenShock::SerialCmds::CommandHandlers::EchoHandler()
 {
-  auto group = OpenShock::Serial::CommandGroup("echo"sv);
+  auto group = OpenShock::SerialCmds::CommandGroup("echo"sv);
 
   auto& getCommand = group.addCommand("Get the serial echo status"sv, _handleSerialEchoCommand);
 
