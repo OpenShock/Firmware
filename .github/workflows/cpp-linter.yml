@@ -37,10 +37,12 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
           style: file
-          version: 18
-          lines-changed-only: diff
-          thread-comments: true
-          file-annotations: false
+          version: 21
+          ignore: |
+            .github
+            include/serialization/_fbs
+          thread-comments: update
+          no-lgtm: false
 
       - name: Fail fast?!
         if: steps.linter.outputs.checks-failed > 0
