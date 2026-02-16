@@ -9,8 +9,8 @@
 // Ensure the included flatbuffers.h is the same version as when this file was
 // generated, otherwise it may not be compatible.
 static_assert(FLATBUFFERS_VERSION_MAJOR == 25 &&
-              FLATBUFFERS_VERSION_MINOR == 9 &&
-              FLATBUFFERS_VERSION_REVISION == 23,
+              FLATBUFFERS_VERSION_MINOR == 12 &&
+              FLATBUFFERS_VERSION_REVISION == 19,
              "Non-compatible flatbuffers version included");
 
 namespace OpenShock {
@@ -241,8 +241,10 @@ template<> struct LocalToHubMessagePayloadTraits<OpenShock::Serialization::Local
   static const LocalToHubMessagePayload enum_value = LocalToHubMessagePayload::SetEstopPinCommand;
 };
 
-bool VerifyLocalToHubMessagePayload(::flatbuffers::Verifier &verifier, const void *obj, LocalToHubMessagePayload type);
-bool VerifyLocalToHubMessagePayloadVector(::flatbuffers::Verifier &verifier, const ::flatbuffers::Vector<::flatbuffers::Offset<void>> *values, const ::flatbuffers::Vector<LocalToHubMessagePayload> *types);
+template <bool B = false>
+bool VerifyLocalToHubMessagePayload(::flatbuffers::VerifierTemplate<B> &verifier, const void *obj, LocalToHubMessagePayload type);
+template <bool B = false>
+bool VerifyLocalToHubMessagePayloadVector(::flatbuffers::VerifierTemplate<B> &verifier, const ::flatbuffers::Vector<::flatbuffers::Offset<void>> *values, const ::flatbuffers::Vector<LocalToHubMessagePayload> *types);
 
 struct WifiScanCommand FLATBUFFERS_FINAL_CLASS : private ::flatbuffers::Table {
   typedef WifiScanCommandBuilder Builder;
@@ -256,7 +258,8 @@ struct WifiScanCommand FLATBUFFERS_FINAL_CLASS : private ::flatbuffers::Table {
   bool run() const {
     return GetField<uint8_t>(VT_RUN, 0) != 0;
   }
-  bool Verify(::flatbuffers::Verifier &verifier) const {
+  template <bool B = false>
+  bool Verify(::flatbuffers::VerifierTemplate<B> &verifier) const {
     return VerifyTableStart(verifier) &&
            VerifyField<uint8_t>(verifier, VT_RUN, 1) &&
            verifier.EndTable();
@@ -314,7 +317,8 @@ struct WifiNetworkSaveCommand FLATBUFFERS_FINAL_CLASS : private ::flatbuffers::T
   bool connect() const {
     return GetField<uint8_t>(VT_CONNECT, 0) != 0;
   }
-  bool Verify(::flatbuffers::Verifier &verifier) const {
+  template <bool B = false>
+  bool Verify(::flatbuffers::VerifierTemplate<B> &verifier) const {
     return VerifyTableStart(verifier) &&
            VerifyOffset(verifier, VT_SSID) &&
            verifier.VerifyString(ssid()) &&
@@ -392,7 +396,8 @@ struct WifiNetworkForgetCommand FLATBUFFERS_FINAL_CLASS : private ::flatbuffers:
   const ::flatbuffers::String *ssid() const {
     return GetPointer<const ::flatbuffers::String *>(VT_SSID);
   }
-  bool Verify(::flatbuffers::Verifier &verifier) const {
+  template <bool B = false>
+  bool Verify(::flatbuffers::VerifierTemplate<B> &verifier) const {
     return VerifyTableStart(verifier) &&
            VerifyOffset(verifier, VT_SSID) &&
            verifier.VerifyString(ssid()) &&
@@ -452,7 +457,8 @@ struct WifiNetworkConnectCommand FLATBUFFERS_FINAL_CLASS : private ::flatbuffers
   const ::flatbuffers::String *ssid() const {
     return GetPointer<const ::flatbuffers::String *>(VT_SSID);
   }
-  bool Verify(::flatbuffers::Verifier &verifier) const {
+  template <bool B = false>
+  bool Verify(::flatbuffers::VerifierTemplate<B> &verifier) const {
     return VerifyTableStart(verifier) &&
            VerifyOffset(verifier, VT_SSID) &&
            verifier.VerifyString(ssid()) &&
@@ -512,7 +518,8 @@ struct WifiNetworkDisconnectCommand FLATBUFFERS_FINAL_CLASS : private ::flatbuff
   bool placeholder() const {
     return GetField<uint8_t>(VT_PLACEHOLDER, 0) != 0;
   }
-  bool Verify(::flatbuffers::Verifier &verifier) const {
+  template <bool B = false>
+  bool Verify(::flatbuffers::VerifierTemplate<B> &verifier) const {
     return VerifyTableStart(verifier) &&
            VerifyField<uint8_t>(verifier, VT_PLACEHOLDER, 1) &&
            verifier.EndTable();
@@ -562,7 +569,8 @@ struct OtaUpdateSetIsEnabledCommand FLATBUFFERS_FINAL_CLASS : private ::flatbuff
   bool enabled() const {
     return GetField<uint8_t>(VT_ENABLED, 0) != 0;
   }
-  bool Verify(::flatbuffers::Verifier &verifier) const {
+  template <bool B = false>
+  bool Verify(::flatbuffers::VerifierTemplate<B> &verifier) const {
     return VerifyTableStart(verifier) &&
            VerifyField<uint8_t>(verifier, VT_ENABLED, 1) &&
            verifier.EndTable();
@@ -612,7 +620,8 @@ struct OtaUpdateSetDomainCommand FLATBUFFERS_FINAL_CLASS : private ::flatbuffers
   const ::flatbuffers::String *domain() const {
     return GetPointer<const ::flatbuffers::String *>(VT_DOMAIN);
   }
-  bool Verify(::flatbuffers::Verifier &verifier) const {
+  template <bool B = false>
+  bool Verify(::flatbuffers::VerifierTemplate<B> &verifier) const {
     return VerifyTableStart(verifier) &&
            VerifyOffset(verifier, VT_DOMAIN) &&
            verifier.VerifyString(domain()) &&
@@ -672,7 +681,8 @@ struct OtaUpdateSetUpdateChannelCommand FLATBUFFERS_FINAL_CLASS : private ::flat
   const ::flatbuffers::String *channel() const {
     return GetPointer<const ::flatbuffers::String *>(VT_CHANNEL);
   }
-  bool Verify(::flatbuffers::Verifier &verifier) const {
+  template <bool B = false>
+  bool Verify(::flatbuffers::VerifierTemplate<B> &verifier) const {
     return VerifyTableStart(verifier) &&
            VerifyOffset(verifier, VT_CHANNEL) &&
            verifier.VerifyString(channel()) &&
@@ -732,7 +742,8 @@ struct OtaUpdateSetCheckIntervalCommand FLATBUFFERS_FINAL_CLASS : private ::flat
   uint16_t interval() const {
     return GetField<uint16_t>(VT_INTERVAL, 0);
   }
-  bool Verify(::flatbuffers::Verifier &verifier) const {
+  template <bool B = false>
+  bool Verify(::flatbuffers::VerifierTemplate<B> &verifier) const {
     return VerifyTableStart(verifier) &&
            VerifyField<uint16_t>(verifier, VT_INTERVAL, 2) &&
            verifier.EndTable();
@@ -782,7 +793,8 @@ struct OtaUpdateSetAllowBackendManagementCommand FLATBUFFERS_FINAL_CLASS : priva
   bool allow() const {
     return GetField<uint8_t>(VT_ALLOW, 0) != 0;
   }
-  bool Verify(::flatbuffers::Verifier &verifier) const {
+  template <bool B = false>
+  bool Verify(::flatbuffers::VerifierTemplate<B> &verifier) const {
     return VerifyTableStart(verifier) &&
            VerifyField<uint8_t>(verifier, VT_ALLOW, 1) &&
            verifier.EndTable();
@@ -832,7 +844,8 @@ struct OtaUpdateSetRequireManualApprovalCommand FLATBUFFERS_FINAL_CLASS : privat
   bool require() const {
     return GetField<uint8_t>(VT_REQUIRE, 0) != 0;
   }
-  bool Verify(::flatbuffers::Verifier &verifier) const {
+  template <bool B = false>
+  bool Verify(::flatbuffers::VerifierTemplate<B> &verifier) const {
     return VerifyTableStart(verifier) &&
            VerifyField<uint8_t>(verifier, VT_REQUIRE, 1) &&
            verifier.EndTable();
@@ -882,7 +895,8 @@ struct OtaUpdateHandleUpdateRequestCommand FLATBUFFERS_FINAL_CLASS : private ::f
   bool accept() const {
     return GetField<uint8_t>(VT_ACCEPT, 0) != 0;
   }
-  bool Verify(::flatbuffers::Verifier &verifier) const {
+  template <bool B = false>
+  bool Verify(::flatbuffers::VerifierTemplate<B> &verifier) const {
     return VerifyTableStart(verifier) &&
            VerifyField<uint8_t>(verifier, VT_ACCEPT, 1) &&
            verifier.EndTable();
@@ -932,7 +946,8 @@ struct OtaUpdateCheckForUpdatesCommand FLATBUFFERS_FINAL_CLASS : private ::flatb
   const ::flatbuffers::String *channel() const {
     return GetPointer<const ::flatbuffers::String *>(VT_CHANNEL);
   }
-  bool Verify(::flatbuffers::Verifier &verifier) const {
+  template <bool B = false>
+  bool Verify(::flatbuffers::VerifierTemplate<B> &verifier) const {
     return VerifyTableStart(verifier) &&
            VerifyOffset(verifier, VT_CHANNEL) &&
            verifier.VerifyString(channel()) &&
@@ -996,7 +1011,8 @@ struct OtaUpdateStartUpdateCommand FLATBUFFERS_FINAL_CLASS : private ::flatbuffe
   const ::flatbuffers::String *version() const {
     return GetPointer<const ::flatbuffers::String *>(VT_VERSION);
   }
-  bool Verify(::flatbuffers::Verifier &verifier) const {
+  template <bool B = false>
+  bool Verify(::flatbuffers::VerifierTemplate<B> &verifier) const {
     return VerifyTableStart(verifier) &&
            VerifyOffset(verifier, VT_CHANNEL) &&
            verifier.VerifyString(channel()) &&
@@ -1066,7 +1082,8 @@ struct AccountLinkCommand FLATBUFFERS_FINAL_CLASS : private ::flatbuffers::Table
   const ::flatbuffers::String *code() const {
     return GetPointer<const ::flatbuffers::String *>(VT_CODE);
   }
-  bool Verify(::flatbuffers::Verifier &verifier) const {
+  template <bool B = false>
+  bool Verify(::flatbuffers::VerifierTemplate<B> &verifier) const {
     return VerifyTableStart(verifier) &&
            VerifyOffset(verifier, VT_CODE) &&
            verifier.VerifyString(code()) &&
@@ -1126,7 +1143,8 @@ struct AccountUnlinkCommand FLATBUFFERS_FINAL_CLASS : private ::flatbuffers::Tab
   bool placeholder() const {
     return GetField<uint8_t>(VT_PLACEHOLDER, 0) != 0;
   }
-  bool Verify(::flatbuffers::Verifier &verifier) const {
+  template <bool B = false>
+  bool Verify(::flatbuffers::VerifierTemplate<B> &verifier) const {
     return VerifyTableStart(verifier) &&
            VerifyField<uint8_t>(verifier, VT_PLACEHOLDER, 1) &&
            verifier.EndTable();
@@ -1176,7 +1194,8 @@ struct SetRfTxPinCommand FLATBUFFERS_FINAL_CLASS : private ::flatbuffers::Table 
   int8_t pin() const {
     return GetField<int8_t>(VT_PIN, 0);
   }
-  bool Verify(::flatbuffers::Verifier &verifier) const {
+  template <bool B = false>
+  bool Verify(::flatbuffers::VerifierTemplate<B> &verifier) const {
     return VerifyTableStart(verifier) &&
            VerifyField<int8_t>(verifier, VT_PIN, 1) &&
            verifier.EndTable();
@@ -1226,7 +1245,8 @@ struct SetEstopEnabledCommand FLATBUFFERS_FINAL_CLASS : private ::flatbuffers::T
   bool enabled() const {
     return GetField<uint8_t>(VT_ENABLED, 0) != 0;
   }
-  bool Verify(::flatbuffers::Verifier &verifier) const {
+  template <bool B = false>
+  bool Verify(::flatbuffers::VerifierTemplate<B> &verifier) const {
     return VerifyTableStart(verifier) &&
            VerifyField<uint8_t>(verifier, VT_ENABLED, 1) &&
            verifier.EndTable();
@@ -1276,7 +1296,8 @@ struct SetEstopPinCommand FLATBUFFERS_FINAL_CLASS : private ::flatbuffers::Table
   int8_t pin() const {
     return GetField<int8_t>(VT_PIN, 0);
   }
-  bool Verify(::flatbuffers::Verifier &verifier) const {
+  template <bool B = false>
+  bool Verify(::flatbuffers::VerifierTemplate<B> &verifier) const {
     return VerifyTableStart(verifier) &&
            VerifyField<int8_t>(verifier, VT_PIN, 1) &&
            verifier.EndTable();
@@ -1388,7 +1409,8 @@ struct LocalToHubMessage FLATBUFFERS_FINAL_CLASS : private ::flatbuffers::Table 
   const OpenShock::Serialization::Local::SetEstopPinCommand *payload_as_SetEstopPinCommand() const {
     return payload_type() == OpenShock::Serialization::Local::LocalToHubMessagePayload::SetEstopPinCommand ? static_cast<const OpenShock::Serialization::Local::SetEstopPinCommand *>(payload()) : nullptr;
   }
-  bool Verify(::flatbuffers::Verifier &verifier) const {
+  template <bool B = false>
+  bool Verify(::flatbuffers::VerifierTemplate<B> &verifier) const {
     return VerifyTableStart(verifier) &&
            VerifyField<uint8_t>(verifier, VT_PAYLOAD_TYPE, 1) &&
            VerifyOffset(verifier, VT_PAYLOAD) &&
@@ -1509,7 +1531,8 @@ struct LocalToHubMessage::Traits {
   static auto constexpr Create = CreateLocalToHubMessage;
 };
 
-inline bool VerifyLocalToHubMessagePayload(::flatbuffers::Verifier &verifier, const void *obj, LocalToHubMessagePayload type) {
+template <bool B>
+inline bool VerifyLocalToHubMessagePayload(::flatbuffers::VerifierTemplate<B> &verifier, const void *obj, LocalToHubMessagePayload type) {
   switch (type) {
     case LocalToHubMessagePayload::NONE: {
       return true;
@@ -1594,7 +1617,8 @@ inline bool VerifyLocalToHubMessagePayload(::flatbuffers::Verifier &verifier, co
   }
 }
 
-inline bool VerifyLocalToHubMessagePayloadVector(::flatbuffers::Verifier &verifier, const ::flatbuffers::Vector<::flatbuffers::Offset<void>> *values, const ::flatbuffers::Vector<LocalToHubMessagePayload> *types) {
+template <bool B>
+inline bool VerifyLocalToHubMessagePayloadVector(::flatbuffers::VerifierTemplate<B> &verifier, const ::flatbuffers::Vector<::flatbuffers::Offset<void>> *values, const ::flatbuffers::Vector<LocalToHubMessagePayload> *types) {
   if (!values || !types) return !values && !types;
   if (values->size() != types->size()) return false;
   for (::flatbuffers::uoffset_t i = 0; i < values->size(); ++i) {
@@ -1614,14 +1638,16 @@ inline const OpenShock::Serialization::Local::LocalToHubMessage *GetSizePrefixed
   return ::flatbuffers::GetSizePrefixedRoot<OpenShock::Serialization::Local::LocalToHubMessage>(buf);
 }
 
+template <bool B = false>
 inline bool VerifyLocalToHubMessageBuffer(
-    ::flatbuffers::Verifier &verifier) {
-  return verifier.VerifyBuffer<OpenShock::Serialization::Local::LocalToHubMessage>(nullptr);
+    ::flatbuffers::VerifierTemplate<B> &verifier) {
+  return verifier.template VerifyBuffer<OpenShock::Serialization::Local::LocalToHubMessage>(nullptr);
 }
 
+template <bool B = false>
 inline bool VerifySizePrefixedLocalToHubMessageBuffer(
-    ::flatbuffers::Verifier &verifier) {
-  return verifier.VerifySizePrefixedBuffer<OpenShock::Serialization::Local::LocalToHubMessage>(nullptr);
+    ::flatbuffers::VerifierTemplate<B> &verifier) {
+  return verifier.template VerifySizePrefixedBuffer<OpenShock::Serialization::Local::LocalToHubMessage>(nullptr);
 }
 
 inline void FinishLocalToHubMessageBuffer(

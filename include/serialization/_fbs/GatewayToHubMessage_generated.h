@@ -9,8 +9,8 @@
 // Ensure the included flatbuffers.h is the same version as when this file was
 // generated, otherwise it may not be compatible.
 static_assert(FLATBUFFERS_VERSION_MAJOR == 25 &&
-              FLATBUFFERS_VERSION_MINOR == 9 &&
-              FLATBUFFERS_VERSION_REVISION == 23,
+              FLATBUFFERS_VERSION_MINOR == 12 &&
+              FLATBUFFERS_VERSION_REVISION == 19,
              "Non-compatible flatbuffers version included");
 
 #include "SemVer_generated.h"
@@ -142,8 +142,10 @@ template<> struct GatewayToHubMessagePayloadTraits<OpenShock::Serialization::Gat
   static const GatewayToHubMessagePayload enum_value = GatewayToHubMessagePayload::OtaUpdateRequest;
 };
 
-bool VerifyGatewayToHubMessagePayload(::flatbuffers::Verifier &verifier, const void *obj, GatewayToHubMessagePayload type);
-bool VerifyGatewayToHubMessagePayloadVector(::flatbuffers::Verifier &verifier, const ::flatbuffers::Vector<::flatbuffers::Offset<void>> *values, const ::flatbuffers::Vector<GatewayToHubMessagePayload> *types);
+template <bool B = false>
+bool VerifyGatewayToHubMessagePayload(::flatbuffers::VerifierTemplate<B> &verifier, const void *obj, GatewayToHubMessagePayload type);
+template <bool B = false>
+bool VerifyGatewayToHubMessagePayloadVector(::flatbuffers::VerifierTemplate<B> &verifier, const ::flatbuffers::Vector<::flatbuffers::Offset<void>> *values, const ::flatbuffers::Vector<GatewayToHubMessagePayload> *types);
 
 struct Ping FLATBUFFERS_FINAL_CLASS : private ::flatbuffers::Table {
   typedef PingBuilder Builder;
@@ -157,7 +159,8 @@ struct Ping FLATBUFFERS_FINAL_CLASS : private ::flatbuffers::Table {
   uint64_t unix_utc_time() const {
     return GetField<uint64_t>(VT_UNIX_UTC_TIME, 0);
   }
-  bool Verify(::flatbuffers::Verifier &verifier) const {
+  template <bool B = false>
+  bool Verify(::flatbuffers::VerifierTemplate<B> &verifier) const {
     return VerifyTableStart(verifier) &&
            VerifyField<uint64_t>(verifier, VT_UNIX_UTC_TIME, 8) &&
            verifier.EndTable();
@@ -207,7 +210,8 @@ struct Trigger FLATBUFFERS_FINAL_CLASS : private ::flatbuffers::Table {
   OpenShock::Serialization::Gateway::TriggerType type() const {
     return static_cast<OpenShock::Serialization::Gateway::TriggerType>(GetField<uint8_t>(VT_TYPE, 0));
   }
-  bool Verify(::flatbuffers::Verifier &verifier) const {
+  template <bool B = false>
+  bool Verify(::flatbuffers::VerifierTemplate<B> &verifier) const {
     return VerifyTableStart(verifier) &&
            VerifyField<uint8_t>(verifier, VT_TYPE, 1) &&
            verifier.EndTable();
@@ -273,7 +277,8 @@ struct ShockerCommand FLATBUFFERS_FINAL_CLASS : private ::flatbuffers::Table {
   uint16_t duration() const {
     return GetField<uint16_t>(VT_DURATION, 0);
   }
-  bool Verify(::flatbuffers::Verifier &verifier) const {
+  template <bool B = false>
+  bool Verify(::flatbuffers::VerifierTemplate<B> &verifier) const {
     return VerifyTableStart(verifier) &&
            VerifyField<uint8_t>(verifier, VT_MODEL, 1) &&
            VerifyField<uint16_t>(verifier, VT_ID, 2) &&
@@ -347,7 +352,8 @@ struct ShockerCommandList FLATBUFFERS_FINAL_CLASS : private ::flatbuffers::Table
   const ::flatbuffers::Vector<::flatbuffers::Offset<OpenShock::Serialization::Gateway::ShockerCommand>> *commands() const {
     return GetPointer<const ::flatbuffers::Vector<::flatbuffers::Offset<OpenShock::Serialization::Gateway::ShockerCommand>> *>(VT_COMMANDS);
   }
-  bool Verify(::flatbuffers::Verifier &verifier) const {
+  template <bool B = false>
+  bool Verify(::flatbuffers::VerifierTemplate<B> &verifier) const {
     return VerifyTableStart(verifier) &&
            VerifyOffsetRequired(verifier, VT_COMMANDS) &&
            verifier.VerifyVector(commands()) &&
@@ -409,7 +415,8 @@ struct OtaUpdateRequest FLATBUFFERS_FINAL_CLASS : private ::flatbuffers::Table {
   const OpenShock::Serialization::Types::SemVer *version() const {
     return GetPointer<const OpenShock::Serialization::Types::SemVer *>(VT_VERSION);
   }
-  bool Verify(::flatbuffers::Verifier &verifier) const {
+  template <bool B = false>
+  bool Verify(::flatbuffers::VerifierTemplate<B> &verifier) const {
     return VerifyTableStart(verifier) &&
            VerifyOffsetRequired(verifier, VT_VERSION) &&
            verifier.VerifyTable(version()) &&
@@ -478,7 +485,8 @@ struct GatewayToHubMessage FLATBUFFERS_FINAL_CLASS : private ::flatbuffers::Tabl
   const OpenShock::Serialization::Gateway::OtaUpdateRequest *payload_as_OtaUpdateRequest() const {
     return payload_type() == OpenShock::Serialization::Gateway::GatewayToHubMessagePayload::OtaUpdateRequest ? static_cast<const OpenShock::Serialization::Gateway::OtaUpdateRequest *>(payload()) : nullptr;
   }
-  bool Verify(::flatbuffers::Verifier &verifier) const {
+  template <bool B = false>
+  bool Verify(::flatbuffers::VerifierTemplate<B> &verifier) const {
     return VerifyTableStart(verifier) &&
            VerifyField<uint8_t>(verifier, VT_PAYLOAD_TYPE, 1) &&
            VerifyOffsetRequired(verifier, VT_PAYLOAD) &&
@@ -540,7 +548,8 @@ struct GatewayToHubMessage::Traits {
   static auto constexpr Create = CreateGatewayToHubMessage;
 };
 
-inline bool VerifyGatewayToHubMessagePayload(::flatbuffers::Verifier &verifier, const void *obj, GatewayToHubMessagePayload type) {
+template <bool B>
+inline bool VerifyGatewayToHubMessagePayload(::flatbuffers::VerifierTemplate<B> &verifier, const void *obj, GatewayToHubMessagePayload type) {
   switch (type) {
     case GatewayToHubMessagePayload::NONE: {
       return true;
@@ -565,7 +574,8 @@ inline bool VerifyGatewayToHubMessagePayload(::flatbuffers::Verifier &verifier, 
   }
 }
 
-inline bool VerifyGatewayToHubMessagePayloadVector(::flatbuffers::Verifier &verifier, const ::flatbuffers::Vector<::flatbuffers::Offset<void>> *values, const ::flatbuffers::Vector<GatewayToHubMessagePayload> *types) {
+template <bool B>
+inline bool VerifyGatewayToHubMessagePayloadVector(::flatbuffers::VerifierTemplate<B> &verifier, const ::flatbuffers::Vector<::flatbuffers::Offset<void>> *values, const ::flatbuffers::Vector<GatewayToHubMessagePayload> *types) {
   if (!values || !types) return !values && !types;
   if (values->size() != types->size()) return false;
   for (::flatbuffers::uoffset_t i = 0; i < values->size(); ++i) {
@@ -585,14 +595,16 @@ inline const OpenShock::Serialization::Gateway::GatewayToHubMessage *GetSizePref
   return ::flatbuffers::GetSizePrefixedRoot<OpenShock::Serialization::Gateway::GatewayToHubMessage>(buf);
 }
 
+template <bool B = false>
 inline bool VerifyGatewayToHubMessageBuffer(
-    ::flatbuffers::Verifier &verifier) {
-  return verifier.VerifyBuffer<OpenShock::Serialization::Gateway::GatewayToHubMessage>(nullptr);
+    ::flatbuffers::VerifierTemplate<B> &verifier) {
+  return verifier.template VerifyBuffer<OpenShock::Serialization::Gateway::GatewayToHubMessage>(nullptr);
 }
 
+template <bool B = false>
 inline bool VerifySizePrefixedGatewayToHubMessageBuffer(
-    ::flatbuffers::Verifier &verifier) {
-  return verifier.VerifySizePrefixedBuffer<OpenShock::Serialization::Gateway::GatewayToHubMessage>(nullptr);
+    ::flatbuffers::VerifierTemplate<B> &verifier) {
+  return verifier.template VerifySizePrefixedBuffer<OpenShock::Serialization::Gateway::GatewayToHubMessage>(nullptr);
 }
 
 inline void FinishGatewayToHubMessageBuffer(
