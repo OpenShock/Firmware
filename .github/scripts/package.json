@@ -8,17 +8,17 @@
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "dependencies": {
-    "@actions/core": "^2.0.1",
-    "@actions/github": "^6.0.1",
+    "@actions/core": "^3.0.0",
+    "@actions/github": "^9.0.0",
     "ini": "^6.0.0",
-    "semver": "^7.7.3"
+    "semver": "^7.7.4"
   },
   "engines": {
-    "node": "^22.14.0",
-    "pnpm": "^10.6.4"
+    "node": "^24.13.1",
+    "pnpm": "^10.29.3"
   },
   "volta": {
-    "node": "22.14.0"
+    "node": "24.13.1"
   },
-  "packageManager": "pnpm@10.6.4"
+  "packageManager": "pnpm@10.29.3"
 }

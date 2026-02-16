@@ -1,12 +1,6 @@
 name: build-frontend
 description: Builds the frontend and uploads it as an artifact
 inputs:
-  pnpm-version:
-    description: 'pnpm version to use'
-    required: true
-  node-version:
-    description: 'NodeJS runtime version to use'
-    required: true
   skip-checkout:
     description: 'If true, skips checkout'
     default: false
@@ -24,12 +18,12 @@ runs:
     - uses: pnpm/action-setup@v4
       name: Install pnpm
       with:
-        version: ${{ inputs.pnpm-version }}
+        package_json_file: ./frontend/package.json
         run_install: false
 
     - uses: actions/setup-node@v4
       with:
-        node-version-file: ./frontend/.nvmrc
+        node-version-file: ./frontend/package.json
         cache: 'pnpm'
         cache-dependency-path: ./frontend/pnpm-lock.yaml
 
