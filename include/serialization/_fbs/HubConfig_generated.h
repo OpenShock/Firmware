@@ -9,8 +9,8 @@
 // Ensure the included flatbuffers.h is the same version as when this file was
 // generated, otherwise it may not be compatible.
 static_assert(FLATBUFFERS_VERSION_MAJOR == 25 &&
-              FLATBUFFERS_VERSION_MINOR == 9 &&
-              FLATBUFFERS_VERSION_REVISION == 23,
+              FLATBUFFERS_VERSION_MINOR == 12 &&
+              FLATBUFFERS_VERSION_REVISION == 19,
              "Non-compatible flatbuffers version included");
 
 namespace OpenShock {
@@ -137,7 +137,8 @@ struct RFConfig FLATBUFFERS_FINAL_CLASS : private ::flatbuffers::Table {
   bool keepalive_enabled() const {
     return GetField<uint8_t>(VT_KEEPALIVE_ENABLED, 0) != 0;
   }
-  bool Verify(::flatbuffers::Verifier &verifier) const {
+  template <bool B = false>
+  bool Verify(::flatbuffers::VerifierTemplate<B> &verifier) const {
     return VerifyTableStart(verifier) &&
            VerifyField<int8_t>(verifier, VT_TX_PIN, 1) &&
            VerifyField<uint8_t>(verifier, VT_KEEPALIVE_ENABLED, 1) &&
@@ -208,7 +209,8 @@ struct EStopConfig FLATBUFFERS_FINAL_CLASS : private ::flatbuffers::Table {
   bool latching() const {
     return GetField<uint8_t>(VT_LATCHING, 0) != 0;
   }
-  bool Verify(::flatbuffers::Verifier &verifier) const {
+  template <bool B = false>
+  bool Verify(::flatbuffers::VerifierTemplate<B> &verifier) const {
     return VerifyTableStart(verifier) &&
            VerifyField<uint8_t>(verifier, VT_ENABLED, 1) &&
            VerifyField<int8_t>(verifier, VT_GPIO_PIN, 1) &&
@@ -287,7 +289,8 @@ struct WiFiCredentials FLATBUFFERS_FINAL_CLASS : private ::flatbuffers::Table {
   const ::flatbuffers::String *password() const {
     return GetPointer<const ::flatbuffers::String *>(VT_PASSWORD);
   }
-  bool Verify(::flatbuffers::Verifier &verifier) const {
+  template <bool B = false>
+  bool Verify(::flatbuffers::VerifierTemplate<B> &verifier) const {
     return VerifyTableStart(verifier) &&
            VerifyField<uint8_t>(verifier, VT_ID, 1) &&
            VerifyOffset(verifier, VT_SSID) &&
@@ -376,7 +379,8 @@ struct WiFiConfig FLATBUFFERS_FINAL_CLASS : private ::flatbuffers::Table {
   const ::flatbuffers::Vector<::flatbuffers::Offset<OpenShock::Serialization::Configuration::WiFiCredentials>> *credentials() const {
     return GetPointer<const ::flatbuffers::Vector<::flatbuffers::Offset<OpenShock::Serialization::Configuration::WiFiCredentials>> *>(VT_CREDENTIALS);
   }
-  bool Verify(::flatbuffers::Verifier &verifier) const {
+  template <bool B = false>
+  bool Verify(::flatbuffers::VerifierTemplate<B> &verifier) const {
     return VerifyTableStart(verifier) &&
            VerifyOffset(verifier, VT_AP_SSID) &&
            verifier.VerifyString(ap_ssid()) &&
@@ -459,7 +463,8 @@ struct CaptivePortalConfig FLATBUFFERS_FINAL_CLASS : private ::flatbuffers::Tabl
   bool always_enabled() const {
     return GetField<uint8_t>(VT_ALWAYS_ENABLED, 0) != 0;
   }
-  bool Verify(::flatbuffers::Verifier &verifier) const {
+  template <bool B = false>
+  bool Verify(::flatbuffers::VerifierTemplate<B> &verifier) const {
     return VerifyTableStart(verifier) &&
            VerifyField<uint8_t>(verifier, VT_ALWAYS_ENABLED, 1) &&
            verifier.EndTable();
@@ -515,7 +520,8 @@ struct BackendConfig FLATBUFFERS_FINAL_CLASS : private ::flatbuffers::Table {
   const ::flatbuffers::String *auth_token() const {
     return GetPointer<const ::flatbuffers::String *>(VT_AUTH_TOKEN);
   }
-  bool Verify(::flatbuffers::Verifier &verifier) const {
+  template <bool B = false>
+  bool Verify(::flatbuffers::VerifierTemplate<B> &verifier) const {
     return VerifyTableStart(verifier) &&
            VerifyOffset(verifier, VT_DOMAIN) &&
            verifier.VerifyString(domain()) &&
@@ -586,7 +592,8 @@ struct SerialInputConfig FLATBUFFERS_FINAL_CLASS : private ::flatbuffers::Table 
   bool echo_enabled() const {
     return GetField<uint8_t>(VT_ECHO_ENABLED, 1) != 0;
   }
-  bool Verify(::flatbuffers::Verifier &verifier) const {
+  template <bool B = false>
+  bool Verify(::flatbuffers::VerifierTemplate<B> &verifier) const {
     return VerifyTableStart(verifier) &&
            VerifyField<uint8_t>(verifier, VT_ECHO_ENABLED, 1) &&
            verifier.EndTable();
@@ -682,7 +689,8 @@ struct OtaUpdateConfig FLATBUFFERS_FINAL_CLASS : private ::flatbuffers::Table {
   OpenShock::Serialization::Configuration::OtaUpdateStep update_step() const {
     return static_cast<OpenShock::Serialization::Configuration::OtaUpdateStep>(GetField<uint8_t>(VT_UPDATE_STEP, 0));
   }
-  bool Verify(::flatbuffers::Verifier &verifier) const {
+  template <bool B = false>
+  bool Verify(::flatbuffers::VerifierTemplate<B> &verifier) const {
     return VerifyTableStart(verifier) &&
            VerifyField<uint8_t>(verifier, VT_IS_ENABLED, 1) &&
            VerifyOffset(verifier, VT_CDN_DOMAIN) &&
@@ -845,7 +853,8 @@ struct HubConfig FLATBUFFERS_FINAL_CLASS : private ::flatbuffers::Table {
   const OpenShock::Serialization::Configuration::EStopConfig *estop() const {
     return GetPointer<const OpenShock::Serialization::Configuration::EStopConfig *>(VT_ESTOP);
   }
-  bool Verify(::flatbuffers::Verifier &verifier) const {
+  template <bool B = false>
+  bool Verify(::flatbuffers::VerifierTemplate<B> &verifier) const {
     return VerifyTableStart(verifier) &&
            VerifyOffset(verifier, VT_RF) &&
            verifier.VerifyTable(rf()) &&
@@ -934,14 +943,16 @@ inline const OpenShock::Serialization::Configuration::HubConfig *GetSizePrefixed
   return ::flatbuffers::GetSizePrefixedRoot<OpenShock::Serialization::Configuration::HubConfig>(buf);
 }
 
+template <bool B = false>
 inline bool VerifyHubConfigBuffer(
-    ::flatbuffers::Verifier &verifier) {
-  return verifier.VerifyBuffer<OpenShock::Serialization::Configuration::HubConfig>(nullptr);
+    ::flatbuffers::VerifierTemplate<B> &verifier) {
+  return verifier.template VerifyBuffer<OpenShock::Serialization::Configuration::HubConfig>(nullptr);
 }
 
+template <bool B = false>
 inline bool VerifySizePrefixedHubConfigBuffer(
-    ::flatbuffers::Verifier &verifier) {
-  return verifier.VerifySizePrefixedBuffer<OpenShock::Serialization::Configuration::HubConfig>(nullptr);
+    ::flatbuffers::VerifierTemplate<B> &verifier) {
+  return verifier.template VerifySizePrefixedBuffer<OpenShock::Serialization::Configuration::HubConfig>(nullptr);
 }
 
 inline void FinishHubConfigBuffer(
