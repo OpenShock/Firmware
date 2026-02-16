@@ -64,7 +64,7 @@ void WebSocketDeFragger::handler(uint8_t socketId, WStype_t type, const uint8_t*
       return;
   }
 
-  m_callback(socketId, messageType, tcb::span<const uint8_t>(payload, length));
+  m_callback(socketId, messageType, std::span<const uint8_t>(payload, length));
 }
 
 void WebSocketDeFragger::onEvent(const EventCallback& callback)

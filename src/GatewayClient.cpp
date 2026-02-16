@@ -81,7 +81,7 @@ bool GatewayClient::sendMessageTXT(std::string_view data)
   return m_webSocket.sendTXT(data.data(), data.length());
 }
 
-bool GatewayClient::sendMessageBIN(tcb::span<const uint8_t> data)
+bool GatewayClient::sendMessageBIN(std::span<const uint8_t> data)
 {
   if (m_state != GatewayClientState::Connected) {
     return false;
@@ -144,7 +144,7 @@ void GatewayClient::_sendBootStatus()
     return;
   }
 
-  s_bootStatusSent = Serialization::Gateway::SerializeBootStatusMessage(updateId, OtaUpdateManager::GetFirmwareBootType(), [this](tcb::span<const uint8_t> data) { return m_webSocket.sendBIN(data.data(), data.size()); });
+  s_bootStatusSent = Serialization::Gateway::SerializeBootStatusMessage(updateId, OtaUpdateManager::GetFirmwareBootType(), [this](std::span<const uint8_t> data) { return m_webSocket.sendBIN(data.data(), data.size()); });
 
   if (s_bootStatusSent && updateStep != OpenShock::OtaUpdateStep::None) {
     if (!Config::SetOtaUpdateStep(OpenShock::OtaUpdateStep::None)) {
@@ -181,7 +181,7 @@ void GatewayClient::_handleEvent(WStype_t type, uint8_t* payload, std::size_t le
       OS_LOGD(TAG, "Received fragment fin from API");
       break;
     case WStype_BIN:
-      MessageHandlers::WebSocket::HandleGatewayBinary(tcb::span<const uint8_t>(payload, length));
+      MessageHandlers::WebSocket::HandleGatewayBinary(std::span<const uint8_t>(payload, length));
       break;
     case WStype_FRAGMENT_BIN_START:
       OS_LOGE(TAG, "Received binary fragment start from API, this is not supported!");

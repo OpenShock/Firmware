@@ -18,7 +18,7 @@ constexpr std::size_t CalculateDecodedSize(std::size_t size) noexcept
   return ((size / 4) * 3) + 3;  // +3 guards against missing padding variants
 }
 
-bool Base64Utils::Encode(tcb::span<const uint8_t> data, std::string& output)
+bool Base64Utils::Encode(std::span<const uint8_t> data, std::string& output)
 {
   std::size_t requiredLen = CalculateEncodedSize(data.size());
 

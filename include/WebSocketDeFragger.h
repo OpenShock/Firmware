@@ -1,7 +1,6 @@
 #pragma once
 
 #include "Common.h"
-#include "span.h"
 #include "TinyVec.h"
 #include "WebSocketMessageType.h"
 
@@ -10,6 +9,7 @@
 #include <cstdint>
 #include <functional>
 #include <map>
+#include <span>
 
 namespace OpenShock {
   class WebSocketDeFragger {
@@ -17,7 +17,7 @@ namespace OpenShock {
     DISABLE_MOVE(WebSocketDeFragger);
 
   public:
-    typedef std::function<void(uint8_t socketId, WebSocketMessageType type, tcb::span<const uint8_t> data)> EventCallback;
+    typedef std::function<void(uint8_t socketId, WebSocketMessageType type, std::span<const uint8_t> data)> EventCallback;
 
     WebSocketDeFragger(EventCallback callback);
     ~WebSocketDeFragger();

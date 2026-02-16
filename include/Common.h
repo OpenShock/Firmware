@@ -48,19 +48,19 @@
 #if __cplusplus >= 202'302L
 #warning "C++23 compiler detected"
 #elif __cplusplus >= 202'002L
-#warning "C++20 compiler detected"
+// C++20 :3
 #elif __cplusplus >= 201'703L
-// C++17 :3
+#error "C++17 compiler detected, OpenShock requires a C++20 compliant compiler"
 #elif __cplusplus >= 201'402L
-#error "C++14 compiler detected, OpenShock requires a C++17 compliant compiler"
+#error "C++14 compiler detected, OpenShock requires a C++20 compliant compiler"
 #elif __cplusplus >= 201'103L
-#error "C++11 compiler detected, OpenShock requires a C++17 compliant compiler"
+#error "C++11 compiler detected, OpenShock requires a C++20 compliant compiler"
 #elif __cplusplus >= 199'711L
-#error "C++98 compiler detected, OpenShock requires a C++17 compliant compiler"
+#error "C++98 compiler detected, OpenShock requires a C++20 compliant compiler"
 #elif __cplusplus == 1
-#error "Pre-C++98 compiler detected, OpenShock requires a C++17 compliant compiler"
+#error "Pre-C++98 compiler detected, OpenShock requires a C++20 compliant compiler"
 #else
-#error "Unknown C++ standard detected, OpenShock requires a C++17 compliant compiler"
+#error "Unknown C++ standard detected, OpenShock requires a C++20 compliant compiler"
 #endif
 
 namespace OpenShock::Constants {

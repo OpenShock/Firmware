@@ -157,7 +157,7 @@ bool GatewayConnectionManager::SendMessageTXT(std::string_view data)
   return s_wsClient->sendMessageTXT(data);
 }
 
-bool GatewayConnectionManager::SendMessageBIN(tcb::span<const uint8_t> data)
+bool GatewayConnectionManager::SendMessageBIN(std::span<const uint8_t> data)
 {
   if (s_wsClient == nullptr) {
     return false;

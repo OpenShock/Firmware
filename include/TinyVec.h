@@ -8,7 +8,7 @@
 #include <cstring>
 #include <limits>
 #include <new>
-#include <span.h>
+#include <span>
 #include <type_traits>
 #include <utility>
 
@@ -67,6 +67,14 @@ public:
 
   T& operator[](SizeType i) noexcept { return _data[i]; }
   const T& operator[](SizeType i) const noexcept { return _data[i]; }
+
+  T* begin() noexcept { return _data; }
+  const T* begin() const noexcept { return _data; }
+  T* end() noexcept { return _data + _len; }
+  const T* end() const noexcept { return _data + _len; }
+
+  operator std::span<T>() noexcept { return {_data, static_cast<std::size_t>(_len)}; }
+  operator std::span<const T>() const noexcept { return {_data, static_cast<std::size_t>(_len)}; }
 
   void reserve(SizeType new_cap)
   {

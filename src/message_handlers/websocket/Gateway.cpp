@@ -37,7 +37,7 @@ static std::array<Handlers::HandlerType, HANDLER_COUNT> s_serverHandlers = []() 
 
 #undef SET_HANDLER
 
-void MessageHandlers::WebSocket::HandleGatewayBinary(tcb::span<const uint8_t> data)
+void MessageHandlers::WebSocket::HandleGatewayBinary(std::span<const uint8_t> data)
 {
   // Deserialize
   auto msg = flatbuffers::GetRoot<Schemas::GatewayToHubMessage>(data.data());

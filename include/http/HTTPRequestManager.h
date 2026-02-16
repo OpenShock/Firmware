@@ -6,10 +6,9 @@
 
 #include <functional>
 #include <map>
+#include <span>
 #include <string>
 #include <string_view>
-
-#include "span.h"
 
 namespace OpenShock::HTTP {
   enum class RequestResult : uint8_t {
@@ -31,7 +30,11 @@ namespace OpenShock::HTTP {
     T data;
 
     Response(RequestResult r, int c, T d)
-        : result(r), code(c), data(std::move(d)) {}
+      : result(r)
+      , code(c)
+      , data(std::move(d))
+    {
+    }
 
     inline const char* ResultToString() const
     {
@@ -65,11 +68,11 @@ namespace OpenShock::HTTP {
   using GotContentLengthCallback = std::function<bool(int contentLength)>;
   using DownloadCallback         = std::function<bool(std::size_t offset, const uint8_t* data, std::size_t len)>;
 
-  Response<std::size_t> Download(std::string_view url, const std::map<String, String>& headers, GotContentLengthCallback contentLengthCallback, DownloadCallback downloadCallback, tcb::span<const uint16_t> acceptedCodes, uint32_t timeoutMs = 10'000);
-  Response<std::string> GetString(std::string_view url, const std::map<String, String>& headers, tcb::span<const uint16_t> acceptedCodes, uint32_t timeoutMs = 10'000);
+  Response<std::size_t> Download(std::string_view url, const std::map<String, String>& headers, GotContentLengthCallback contentLengthCallback, DownloadCallback downloadCallback, std::span<const uint16_t> acceptedCodes, uint32_t timeoutMs = 10'000);
+  Response<std::string> GetString(std::string_view url, const std::map<String, String>& headers, std::span<const uint16_t> acceptedCodes, uint32_t timeoutMs = 10'000);
 
   template<typename T>
-  Response<T> GetJSON(std::string_view url, const std::map<String, String>& headers, JsonParser<T> jsonParser, tcb::span<const uint16_t> acceptedCodes, uint32_t timeoutMs = 10'000)
+  Response<T> GetJSON(std::string_view url, const std::map<String, String>& headers, JsonParser<T> jsonParser, std::span<const uint16_t> acceptedCodes, uint32_t timeoutMs = 10'000)
   {
     auto response = GetString(url, headers, acceptedCodes, timeoutMs);
     if (response.result != RequestResult::Success) {

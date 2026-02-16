@@ -43,7 +43,7 @@ RFTransmitter::RFTransmitter(gpio_num_t gpioPin)
 {
   OS_LOGD(TAG, "[pin-%hhi] Creating RFTransmitter", m_txPin);
 
-  bool success = rmtInit(gpioPin, RMT_TX_MODE, RMT_MEM_NUM_BLOCKS_1, 1'000'000); // RMT_MEM_64, 1MHz
+  bool success = rmtInit(gpioPin, RMT_TX_MODE, RMT_MEM_NUM_BLOCKS_1, 1'000'000);  // RMT_MEM_64, 1MHz
   if (!success) {
     OS_LOGE(TAG, "[pin-%hhi] Failed to create rmt object", m_txPin);
     destroy();

@@ -43,4 +43,4 @@ namespace OpenShock::SerialCmds::CommandHandlers {
       FactoryResetHandler(),
     };
   }
-}  // namespace OpenShock::Serial::CommandHandlers
+}  // namespace OpenShock::SerialCmds::CommandHandlers

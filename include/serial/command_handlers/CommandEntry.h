@@ -53,4 +53,4 @@ namespace OpenShock::SerialCmds {
     std::string_view m_name;
     std::vector<CommandEntry> m_commands;
   };
-}  // namespace OpenShock::Serial
+}  // namespace OpenShock::SerialCmds

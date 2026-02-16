@@ -16,7 +16,7 @@ using namespace OpenShock;
 // TODO: Support multiple LEDs ?
 // TODO: Support other LED types ?
 
-const int32_t kRmtTimeoutMs         = 100;
+const int32_t kRmtTimeoutMs = 100;
 
 RGBPatternManager::RGBPatternManager(gpio_num_t gpioPin)
   : m_gpioPin(GPIO_NUM_NC)
@@ -35,7 +35,7 @@ RGBPatternManager::RGBPatternManager(gpio_num_t gpioPin)
     return;
   }
 
-  bool success = rmtInit(gpioPin, RMT_TX_MODE, RMT_MEM_NUM_BLOCKS_1, 10'000'000); // RMT_MEM_64, 10MHz
+  bool success = rmtInit(gpioPin, RMT_TX_MODE, RMT_MEM_NUM_BLOCKS_1, 10'000'000);  // RMT_MEM_64, 10MHz
   if (!success) {
     OS_LOGE(TAG, "Failed to initialize RMT for pin %hhi", gpioPin);
     return;
