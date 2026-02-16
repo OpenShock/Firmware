@@ -1,43 +1,151 @@
+# Version 1.5.0 Release Notes
+
+This release is a major firmware update bringing a fully reworked RF transmitter pipeline for more reliable shocker communication, a new T330 shocker protocol, an RFC 8908-compliant captive portal, a rebuilt frontend (Svelte 5 + shadcn), and significant improvements to E-Stop handling and rate limiting.
+
+***Warning: Petrainer users will need to re-pair their shockers once they update their hub due to protocol changes.***
+
+### Highlights
+
+- Added **T330 shocker protocol** support
+- Completely reworked RF behaviour for more reliable shocker control
+- ***WAY*** more and responsive stable captive portal (It's a night and day difference)
+- Rebuilt Captive Portal UI to match frontend style.
+- **E-Stop button** is now significantly more reliable with a re-arm grace period
+- **Wi-Fi RSSI telemetry** reported by the hub for connection health display in frontend
+
+### Major Improvements
+
+- **RMT / Radio Transmitter**
+  - Added **T330** shocker protocol support
+  - Fixed timing issues for **CaiXianlin** and improved **PET998DR** handling
+  - Lots of minor optimizations, refactors and guardrails to improve radio reliability
+
+- **E-Stop**
+  - More reliable E-Stop state transitions with change detection, eliminating event spamming
+  - Re-arm grace period after clearing prevents re-triggering from switch bounce or noise
+
+- **HTTP**
+  - Rate limiter now tracks requests more efficiently with corrected cleanup timing and more predictable blocking
+
+- **Captive Portal**
+  - Captive portal is now refactored to operate more like **RFC 8908 spec** with improved responsiveness
+  - Migrated from Svelte 4 + Skeleton UI to **Svelte 5 + shadcn-svelte** with **Tailwind CSS v4**
+  - UI palette synced with OpenShock website; reduced bundle size
+  - Added unit testing and Svelte check steps; migrated from npm to **pnpm**
+  - Removed mDNS server from captive portal
+  - Removed the "AbsolutelySureButton" UI element, meant as a joke but it got old and obnoxious
+
+- **AssignLCG & Gateway**
+  - AssignLCG uses the new backend endpoint and reports firmware version; legacy LCG override removed
+  - Improved HTTP error/status consistency and 401 token recovery
+
+### Minor Updates / Optimizations
+
+- **Wi-Fi RSSI telemetry** now reported by the hub so the OpenShock.app frontend can display connection health
+- Replaced all `ESP.restart()` calls with ESP-IDF native `esp_restart()`
+- Improved OTA update flow and crash-loop resilience
+- Safer integer formatting, reduced unnecessary string copying, and cleaner command/serial logic
+- **CA certificate bundle** updated to December 2025 Mozilla extract, this bundle is not used yet but will be once we drop Arduino for ESP-IDF
+- **CDN** migrated from Cloudflare R2 (rclone) to Bunny CDN (SFTP) with cache purge support
+- **CI/CD** updated: Actions bumped (checkout v6, codeql v4, download-artifact v7), timeout limits on all jobs, pnpm adopted, Node.js updated
+- Expanded and cleaned up compiler warnings; PlatformIO, espressif32, FlatBuffers, and other dependency updates
+
+### Bug Fixes
+
+- Addressed variable initialization and type casting correctness issues
+- Fixed timing issues in **CaiXianlin** and **PET998DR** shocker protocols
+
+**Full Changelog: [1.4.0 -> 1.5.0](https://github.com/OpenShock/Firmware/compare/1.4.0...1.5.0)**
+
+
+
+
+# Version 1.5.0-rc.7 Release Notes
+
+Fix stable Semver parsing error, make beta builds more verbose, increase OTA task stack size, implement more guards in OTA code.
+
+**Full Changelog: [1.5.0-rc.6 -> 1.5.0-rc.7](https://github.com/OpenShock/Firmware/compare/1.5.0-rc.6...1.5.0-rc.7)**
+
+
+
+
+# Version 1.5.0-rc.6 Release Notes
+
+Improved Captive-Portal responsiveness, removed mDNS server from Captive-Portal, some code cleanup.
+
+**Full Changelog: [1.5.0-rc.5 -> 1.5.0-rc.6](https://github.com/OpenShock/Firmware/compare/1.5.0-rc.5...1.5.0-rc.6)**
+
+
+
+
+# Version 1.5.0-rc.5 Release Notes
+
+Fixed a bug where password was not being supplied to websocket serialization function, causing WiFi network to try to authenticate with no password.
+
+**Full Changelog: [1.5.0-rc.4 -> 1.5.0-rc.5](https://github.com/OpenShock/Firmware/compare/1.5.0-rc.4...1.5.0-rc.5)**
+
+
+
+
+# Version 1.5.0-rc.4 Release Notes
+
+Fixed a bug where using Captive Portal to connect to a WiFi network would pair the password entered with another the network than selected, removed obnoxious "AbsolutelySureButton"
+
+**Full Changelog: [1.5.0-rc.3 -> 1.5.0-rc.4](https://github.com/OpenShock/Firmware/compare/1.5.0-rc.3...1.5.0-rc.4)**
+
+
+
+
 # Version 1.5.0-rc.3 Release Notes
 
 Fixed a critical bug where the firmware could never connect to LCG, and addressed code correctness issues (variable initialization and type casting) along with compiler warning cleanups.
+
+**Full Changelog: [1.5.0-rc.2 -> 1.5.0-rc.3](https://github.com/OpenShock/Firmware/compare/1.5.0-rc.2...1.5.0-rc.3)**
+
+
+
 
 # Version 1.5.0-rc.2 Release Notes
 
 This release candidate focuses on **E-Stop reliability**, **rate limiting behavior**, and **general internal cleanup and correctness improvements**.
 
-## Highlights
+### Highlights
 
-* **Improved E-Stop handling**
+- **Improved E-Stop handling**
 
-  * More reliable state transitions.
-  * Removed event spamming by introducing change detection.
-  * Added a short **re-arm grace period** after clearing to prevent immediate re-triggering due to switch bounce or noise.
-  * Cleaner handling of external E-Stop triggers.
+  - More reliable state transitions.
+  - Removed event spamming by introducing change detection.
+  - Added a short **re-arm grace period** after clearing to prevent immediate re-triggering due to switch bounce or noise.
+  - Cleaner handling of external E-Stop triggers.
 
-* **Rate limiter improvements**
+- **Rate limiter improvements**
 
-  * More efficient internal tracking of recent requests.
-  * Corrected cleanup and timing behavior under sustained load.
-  * More predictable blocking behavior when limits are exceeded.
+  - More efficient internal tracking of recent requests.
+  - Corrected cleanup and timing behavior under sustained load.
+  - More predictable blocking behavior when limits are exceeded.
 
-## Stability & Internal Cleanup
+### Stability & Internal Cleanup
 
-* Safer handling of integer formatting and digit counting (avoids edge-case overflows).
-* Reduced unnecessary string copying by tightening ownership where appropriate.
-* Command handling and serial logic cleaned up for clearer control flow.
-* General warning cleanups, minor API refinements, and consistency improvements across the codebase.
+- Safer handling of integer formatting and digit counting (avoids edge-case overflows).
+- Reduced unnecessary string copying by tightening ownership where appropriate.
+- Command handling and serial logic cleaned up for clearer control flow.
+- General warning cleanups, minor API refinements, and consistency improvements across the codebase.
 
-## Build & Tooling
+### Build & Tooling
 
-* Minor CI and dependency updates.
-* Expanded compiler warnings where possible to catch issues earlier during development.
+- Minor CI and dependency updates.
+- Expanded compiler warnings where possible to catch issues earlier during development.
+
+**Full Changelog: [1.5.0-rc.1 -> 1.5.0-rc.2](https://github.com/OpenShock/Firmware/compare/1.5.0-rc.1...1.5.0-rc.2)**
+
+
+
 
 # Version 1.5.0-rc.1 Release Notes
 
 This release candidate focuses on **radio reliability**, **firmware behavior improvements**, and a refreshed **frontend**.
 
-## Highlights (User-Visible Firmware Changes)
+### Highlights
 
 - Major **RF/RMT transmitter rework** for improved timing accuracy and more reliable shocker communication.
 - Updated **AssignLCG** integration using the new backend endpoint (removes the old LCG override setting).
@@ -45,60 +153,63 @@ This release candidate focuses on **radio reliability**, **firmware behavior imp
 - **Serial output now uses CRLF** line endings for improved compatibility with Windows terminals.
 - Added **T330 shocker protocol** support.
 
-## Radio & Timing
+### Radio & Timing
 
 - Reworked RF pipeline with more consistent timing and fewer internal allocations.
 - Fixed timing issues for **CaiXianlin** and improved **PET998DR** handling.
 - Additional guardrails added to the RF subsystem to prevent stalls/crash loops.
 
-## Firmware Behavior / System
+### Firmware Behavior / System
 
 - Introduced internal **execution time limits** to prevent firmware from getting stuck in long-running operations.
 - Replaced all `ESP.restart()` usage with ESP-IDF native `esp_restart()` calls
 - Improved OTA, Wi-Fi initialization, and crash-loop resilience.
 
-## HTTP & Gateway
+### HTTP & Gateway
 
 - Clearer/more consistent HTTP error and status behavior.
 - Improved 401 handling and token recovery.
 - AssignLCG now reports firmware version and uses the updated endpoint.
 
-## Frontend & UX
+### Frontend & UX
 
 - Migrated to **Svelte 5 + shadcn**.
 - Updated to **Tailwind CSS v4** and reduced frontend bundle size.
 - UI palette synced with website.
 
-## Misc / Internal Changes
+### Misc / Internal Changes
 
 - PlatformIO, espressif32, FlatBuffers, Node, pnpm, and other dependency updates.
 - Build reproducibility improvements and CI cleanup.
 - Various memory fixes, warning cleanups, and improved parsing logic.
 
----
-
-## Breaking Changes
+### Breaking Changes
 
 - **LCG override removed** (new AssignLCG endpoint required).
 - **Serial output now uses CRLF** (update scripts if needed).
 
-## Notes
+### Notes
 
 - RF timing changes are substantial; please report shocker-specific regressions.
 - Scripts relying on legacy AssignLCG behavior may need updates.
+
+**Full Changelog: [1.4.0 -> 1.5.0-rc.1](https://github.com/OpenShock/Firmware/compare/1.4.0...1.5.0-rc.1)**
+
+
+
 
 # Version 1.4.0 Release Notes
 
 This release is packed with bugfixes, optimizations, code cleanup, prepwork for ESP-IDF, and some features!
 
-## Highlights
+### Highlights
 
 - Add support for configuring hostname of ESP via Serial.
 - Add support for configuring Emergency Stop via Captive Portal and Serial.
 - Report available GPIO pins to Captive Portal Frontend.
 - Massively refactor serial command handler.
 
-## Optimizations
+### Optimizations
 
 - Bump platform-espressif32 to version 6.9.
 - Start using C++17 features including std::string_view.
@@ -108,23 +219,33 @@ This release is packed with bugfixes, optimizations, code cleanup, prepwork for 
 - Reduce log spam by the arduino library.
 - Improve error handling of gpio pin selection.
 - Attempt to make more sense out of the 998DR protocol serializer.
+
+**Full Changelog: [1.3.0 -> 1.4.0](https://github.com/OpenShock/Firmware/compare/1.3.0...1.4.0)**
+
+
+
 
 # Version 1.4.0-rc.2 Release Notes
 
 Fixed EStop debouncing logic.
 
+**Full Changelog: [1.4.0-rc.1 -> 1.4.0-rc.2](https://github.com/OpenShock/Firmware/compare/1.4.0-rc.1...1.4.0-rc.2)**
+
+
+
+
 # Version 1.4.0-rc.1 Release Notes
 
 This release is packed with bugfixes, optimizations, code cleanup, prepwork for ESP-IDF, and some features!
 
-## Highlights
+### Highlights
 
 - Add support for configuring hostname of ESP via Serial.
 - Add support for configuring Emergency Stop via Captive Portal and Serial.
 - Report available GPIO pins to Captive Portal Frontend.
 - Massively refactor serial command handler.
 
-## Optimizations
+### Optimizations
 
 - Bump platform-espressif32 to version 6.9.
 - Start using C++17 features including std::string_view.
@@ -135,15 +256,20 @@ This release is packed with bugfixes, optimizations, code cleanup, prepwork for 
 - Improve error handling of gpio pin selection.
 - Attempt to make more sense out of the 998DR protocol serializer.
 
+**Full Changelog: [1.3.0 -> 1.4.0-rc.1](https://github.com/OpenShock/Firmware/compare/1.3.0...1.4.0-rc.1)**
+
+
+
+
 # Version 1.3.0 Release Notes
 
 This release adds support for more boards, has more bugfixes, better error handling, and optimization/cleanup.
 
-## Highlight
+### Highlight
 
 - Added support for **DFRobot Firebeetle**, **Wemos S3 Mini** and **WaveShare S3 Zero** boards.
 
-## Minor Updates
+### Minor Updates
 
 - Re-Add **PET998DR** Quiet Postamble.
 - Fix CaiXianlin protocol sending non-zero when doing a beep command.
@@ -151,16 +277,21 @@ This release adds support for more boards, has more bugfixes, better error handl
 - Improve error handling and logging.
 - Dependency updates.
 - Code cleanup, optimization and refactoring.
+
+**Full Changelog: [1.2.0 -> 1.3.0](https://github.com/OpenShock/Firmware/compare/1.2.0...1.3.0)**
+
+
+
 
 # Version 1.3.0-rc.1 Release Notes
 
 This is the first release candidate for version 1.3.0.
 
-## Highlight
+### Highlight
 
 - Added support for **DFRobot Firebeetle**, **Wemos S3 Mini** and **WaveShare S3 Zero** boards.
 
-## Minor Updates
+### Minor Updates
 
 - Re-Add **PET998DR** Quiet Postamble.
 - Fix CaiXianlin protocol sending non-zero when doing a beep command.
@@ -169,20 +300,25 @@ This is the first release candidate for version 1.3.0.
 - Dependency updates.
 - Code cleanup, optimization and refactoring.
 
+**Full Changelog: [1.2.0 -> 1.3.0-rc.1](https://github.com/OpenShock/Firmware/compare/1.2.0...1.3.0-rc.1)**
+
+
+
+
 # Version 1.2.0 Release Notes
 
 This release adds a new shocker protocol, more bugfixes, configurability, and performance improvements.
 
-## Highlight
+### Highlight
 
 - Added support for **998DR** Petrainer RF protocol.
 
-## Major Updates
+### Major Updates
 
 - Add command to get/set api domain.
 - Add command to get/set/clear override for Live Control Gateway (LCG) domain.
 
-## Minor Updates
+### Minor Updates
 
 - Change transmission end command to last for 300 ms.
 - Increase WDT timeout during OTA updates to prevent watchdog resets.
@@ -190,21 +326,26 @@ This release adds a new shocker protocol, more bugfixes, configurability, and pe
 - Update flatbuffers to 23.5.26.
 - Start utilizing StringView more to reduce memory and CPU usage.
 - Small code cleanup and refactoring.
+
+**Full Changelog: [1.1.2 -> 1.2.0](https://github.com/OpenShock/Firmware/compare/1.1.2...1.2.0)**
+
+
+
 
 # Version 1.2.0-rc.1 Release Notes
 
 This is the first release candidate for version 1.2.0.
 
-## Highlight
+### Highlight
 
 - Added support for **998DR** Petrainer RF protocol.
 
-## Major Updates
+### Major Updates
 
 - Add command to get/set api domain.
 - Add command to get/set/clear override for Live Control Gateway (LCG) domain.
 
-## Minor Updates
+### Minor Updates
 
 - Change transmission end command to last for 300 ms.
 - Increase WDT timeout during OTA updates to prevent watchdog resets.
@@ -213,40 +354,70 @@ This is the first release candidate for version 1.2.0.
 - Start utilizing StringView more to reduce memory and CPU usage.
 - Small code cleanup and refactoring.
 
+**Full Changelog: [1.1.2 -> 1.2.0-rc.1](https://github.com/OpenShock/Firmware/compare/1.1.2...1.2.0-rc.1)**
+
+
+
+
 # Version 1.1.2 Release Notes
 
 - Add support for OpenShock Core V2 Hardware
+
+**Full Changelog: [1.1.1 -> 1.1.2](https://github.com/OpenShock/Firmware/compare/1.1.1...1.1.2)**
+
+
+
 
 # Version 1.1.1 Release Notes
 
 This release is increases the stability and performance of the firmware, as well as fixes some minor bugs.
 
-## Highlight
+### Highlight
 
 - Enabled release builds for improved firmware size, performance, and stability.
 
-## Minor Updates
+### Minor Updates
 
 - Improved RFTransmitter delay logic to wait patiently for commands if it has no transmissions to send.
 - Increased RFTransmitter performance margins to avoid command stacking and delays.
 - Updated build script to properly identify git-tag triggered github action runs.
 
-## Bug Fixes
+### Bug Fixes
 
 - Fixed a bug where the RFTransmitter loop would never delay, causing other tasks running on the same core to completely halt.
 - Removed null check on credentials password received in frontend, as null is expected due to sensitive data removal.
+
+**Full Changelog: [1.1.0 -> 1.1.1](https://github.com/OpenShock/Firmware/compare/1.1.0...1.1.1)**
+
+
+
 
 # Version 1.1.1-rc.6 Release Notes
 
 Inlined the wait time check in RFTransmitter to re-check if we added any commands on receiving a event.
 
+**Full Changelog: [1.1.1-rc.5 -> 1.1.1-rc.6](https://github.com/OpenShock/Firmware/compare/1.1.1-rc.5...1.1.1-rc.6)**
+
+
+
+
 # Version 1.1.1-rc.5 Release Notes
 
 Fixed a bug where the RFTransmitter loop would never delay, causing other tasks running on the same core to completely halt.
 
+**Full Changelog: [1.1.1-rc.4 -> 1.1.1-rc.5](https://github.com/OpenShock/Firmware/compare/1.1.1-rc.4...1.1.1-rc.5)**
+
+
+
+
 # Version 1.1.1-rc.4 Release Notes
 
 Fix tag check again, this time for real.
+
+**Full Changelog: [1.1.1-rc.3 -> 1.1.1-rc.4](https://github.com/OpenShock/Firmware/compare/1.1.1-rc.3...1.1.1-rc.4)**
+
+
+
 
 # Version 1.1.1-rc.3 Release Notes
 
@@ -254,13 +425,28 @@ Increased performance margins for RFTransmitter to prevent commands from stackin
 
 Fixed python build script git-tag check to check `GIT_REF_NAME` instead of incorrect `GIT_BASE_REF` which caused it to build in debug mode.
 
+**Full Changelog: [1.1.1-rc.2 -> 1.1.1-rc.3](https://github.com/OpenShock/Firmware/compare/1.1.1-rc.2...1.1.1-rc.3)**
+
+
+
+
 # Version 1.1.1-rc.2 Release Notes
 
 Removed null check on credentials password received in frontend, as null is expected due to sensitive data removal.
 
+**Full Changelog: [1.1.1-rc.1 -> 1.1.1-rc.2](https://github.com/OpenShock/Firmware/compare/1.1.1-rc.1...1.1.1-rc.2)**
+
+
+
+
 # Version 1.1.1-rc.1 Release Notes
 
 In this release we enabled release builds, resulting in smaller, faster, and more stable firmware.
+
+**Full Changelog: [1.1.0 -> 1.1.1-rc.1](https://github.com/OpenShock/Firmware/compare/1.1.0...1.1.1-rc.1)**
+
+
+
 
 # Version 1.1.0 Release Notes
 
@@ -274,7 +460,7 @@ We've also squashed some pesky bugs and made various minor updates to streamline
 
 Here’s what’s new:
 
-## Major Updates
+### Major Updates
 
 - **OTA (Over-The-Air) Updates**:
   - Introduced a seamless OTA update capability, device can now be updated with the click of a button.
@@ -303,7 +489,7 @@ Here’s what’s new:
   - Rewrote config handler to be more modular and make it easier to expand upon the code base.
   - Each config section is now seperated into its own file and class.
 
-## Minor Updates
+### Minor Updates
 
 - Firmware upload now includes an MD5 sum.
 - Enhanced reliability of WiFi scanning.
@@ -324,7 +510,7 @@ Here’s what’s new:
 - Improved logs to be more consise and verbose.
 - Miscellaneous code cleanup, refactoring, and optimizations.
 
-## Bug Fixes
+### Bug Fixes
 
 - Resolved issue with WiFi scans getting stuck.
 - Fixed connection problems with unsecured networks.
@@ -335,11 +521,21 @@ Here’s what’s new:
 - Fix what firmware boot type firmware reports to server.
 - Reduced latency, allocations, and network traffic for reporting wifi network scan results, making the networks instantly available in the frontend and improving the reliability of the captive portal.
 
+**Full Changelog: [1.0.0 -> 1.1.0](https://github.com/OpenShock/Firmware/compare/1.0.0...1.1.0)**
+
+
+
+
 # Version 1.1.0-rc.6 Release Notes
 
 Bugfixes:
 
 - Reduced latency, allocations, and network traffic for reporting wifi network scan results, making the networks instantly available in the frontend and improving the reliability of the captive portal.
+
+**Full Changelog: [1.1.0-rc.5 -> 1.1.0-rc.6](https://github.com/OpenShock/Firmware/compare/1.1.0-rc.5...1.1.0-rc.6)**
+
+
+
 
 # Version 1.1.0-rc.5 Release Notes
 
@@ -347,17 +543,32 @@ Bugfixes:
 
 - Fix what firmware boot type firmware reports to server.
 
+**Full Changelog: [1.1.0-rc.4 -> 1.1.0-rc.5](https://github.com/OpenShock/Firmware/compare/1.1.0-rc.4...1.1.0-rc.5)**
+
+
+
+
 # Version 1.1.0-rc.4 Release Notes
 
 Bugfixes:
 
 - Make OTA update status reporting smoother.
 
+**Full Changelog: [1.1.0-rc.3 -> 1.1.0-rc.4](https://github.com/OpenShock/Firmware/compare/1.1.0-rc.3...1.1.0-rc.4)**
+
+
+
+
 # Version 1.1.0-rc.3 Release Notes
 
 Bugfixes:
 
 - Fixed updateID not being sent with BootStatus message.
+
+**Full Changelog: [1.1.0-rc.2 -> 1.1.0-rc.3](https://github.com/OpenShock/Firmware/compare/1.1.0-rc.2...1.1.0-rc.3)**
+
+
+
 
 # Version 1.1.0-rc.2 Release Notes
 
@@ -369,6 +580,11 @@ We did a couple of bugfixes:
 - Stopped frontend from requesting to connect to a secured network without a password.
 - Do sanity checking on pairing code length in firmware to return a proper error message early.
 - Fixed some SemVer parsing logic.
+
+**Full Changelog: [1.1.0-rc.1 -> 1.1.0-rc.2](https://github.com/OpenShock/Firmware/compare/1.1.0-rc.1...1.1.0-rc.2)**
+
+
+
 
 # Version 1.1.0-rc.1 Release Notes
 
@@ -384,7 +600,7 @@ We've also squashed some pesky bugs and made various minor updates to streamline
 
 Here’s what’s new:
 
-## Major Updates
+### Major Updates
 
 - **OTA (Over-The-Air) Updates**:
   - Introduced a seamless OTA update capability, device can now be updated with the click of a button.
@@ -413,7 +629,7 @@ Here’s what’s new:
   - Rewrote config handler to be more modular and make it easier to expand upon the code base.
   - Each config section is now seperated into its own file and class.
 
-## Minor Updates
+### Minor Updates
 
 - Firmware upload now includes an MD5 sum.
 - Enhanced reliability of WiFi scanning.
@@ -434,14 +650,19 @@ Here’s what’s new:
 - Improved logs to be more consise and verbose.
 - Miscellaneous code cleanup, refactoring, and optimizations.
 
-## Bug Fixes
+### Bug Fixes
 
 - Resolved issue with WiFi scans getting stuck.
 - Fixed connection problems with unsecured networks.
 - Altered CommandHandler to use a queue kill message, preventing panic when deleting a mid-listening queue.
 - Fixed ESP becoming unresponsive when the looptask would get deleted by captive portal deconstructor due to a missing null check.
 
-# Version 1.0.0
+**Full Changelog: [1.0.0 -> 1.1.0-rc.1](https://github.com/OpenShock/Firmware/compare/1.0.0...1.1.0-rc.1)**
+
+
+
+
+# Version 1.0.0 Release Notes
 
 - We now support **six different boards**:
   - Pishock (2023)
@@ -457,12 +678,37 @@ Here’s what’s new:
 - Added support for having a E-Stop (emergency stop) connected to ESP as a panic button. Thanks to @nullstalgia ❤️
 - And _much, much_ more behind the scenes, including bugfixes and code cleanup.
 
+**Full Changelog: [v0.8.1 -> 1.0.0](https://github.com/OpenShock/Firmware/compare/v0.8.1...1.0.0)**
+
+
+
+
 # Version 1.0.0-rc.4
+
+**Full Changelog: [1.0.0-rc.3 -> 1.0.0-rc.4](https://github.com/OpenShock/Firmware/compare/1.0.0-rc.3...1.0.0-rc.4)**
+
+
+
 
 # Version 1.0.0-rc.3
 
+**Full Changelog: [1.0.0-rc.2 -> 1.0.0-rc.3](https://github.com/OpenShock/Firmware/compare/1.0.0-rc.2...1.0.0-rc.3)**
+
+
+
+
 # Version 1.0.0-rc.2
 
+**Full Changelog: [1.0.0-rc.1 -> 1.0.0-rc.2](https://github.com/OpenShock/Firmware/compare/1.0.0-rc.1...1.0.0-rc.2)**
+
+
+
+
 # Version 1.0.0-rc.1
+
+**Full Changelog: [v0.8.1 -> 1.0.0-rc.1](https://github.com/OpenShock/Firmware/compare/v0.8.1...1.0.0-rc.1)**
+
+
+
 
 # Version v0.8.1

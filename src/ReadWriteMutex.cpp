@@ -6,16 +6,22 @@ const char* const TAG = "ReadWriteMutex";
 
 #include "Logging.h"
 
-OpenShock::ReadWriteMutex::ReadWriteMutex() : m_mutex(xSemaphoreCreateMutex()), m_readSem(xSemaphoreCreateBinary()), m_readers(0) {
+OpenShock::ReadWriteMutex::ReadWriteMutex()
+  : m_mutex(xSemaphoreCreateMutex())
+  , m_readSem(xSemaphoreCreateBinary())
+  , m_readers(0)
+{
   xSemaphoreGive(m_readSem);
 }
 
-OpenShock::ReadWriteMutex::~ReadWriteMutex() {
+OpenShock::ReadWriteMutex::~ReadWriteMutex()
+{
   vSemaphoreDelete(m_mutex);
   vSemaphoreDelete(m_readSem);
 }
 
-bool OpenShock::ReadWriteMutex::lockRead(TickType_t xTicksToWait) {
+bool OpenShock::ReadWriteMutex::lockRead(TickType_t xTicksToWait)
+{
   if (xSemaphoreTake(m_readSem, xTicksToWait) == pdFALSE) {
     OS_LOGE(TAG, "Failed to take read semaphore");
     return false;
@@ -33,7 +39,8 @@ bool OpenShock::ReadWriteMutex::lockRead(TickType_t xTicksToWait) {
   return true;
 }
 
-void OpenShock::ReadWriteMutex::unlockRead() {
+void OpenShock::ReadWriteMutex::unlockRead()
+{
   if (xSemaphoreTake(m_readSem, portMAX_DELAY) == pdFALSE) {
     OS_LOGE(TAG, "Failed to take read semaphore");
     return;
@@ -46,7 +53,8 @@ void OpenShock::ReadWriteMutex::unlockRead() {
   xSemaphoreGive(m_readSem);
 }
 
-bool OpenShock::ReadWriteMutex::lockWrite(TickType_t xTicksToWait) {
+bool OpenShock::ReadWriteMutex::lockWrite(TickType_t xTicksToWait)
+{
   if (xSemaphoreTake(m_mutex, xTicksToWait) == pdFALSE) {
     OS_LOGE(TAG, "Failed to take mutex");
     return false;
@@ -55,6 +63,7 @@ bool OpenShock::ReadWriteMutex::lockWrite(TickType_t xTicksToWait) {
   return true;
 }
 
-void OpenShock::ReadWriteMutex::unlockWrite() {
+void OpenShock::ReadWriteMutex::unlockWrite()
+{
   xSemaphoreGive(m_mutex);
 }

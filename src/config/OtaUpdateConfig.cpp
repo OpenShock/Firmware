@@ -22,17 +22,8 @@ OtaUpdateConfig::OtaUpdateConfig()
 }
 
 OtaUpdateConfig::OtaUpdateConfig(
-    bool isEnabled,
-    std::string cdnDomain,
-    OtaUpdateChannel updateChannel,
-    bool checkOnStartup,
-    bool checkPeriodically,
-    uint16_t checkInterval,
-    bool allowBackendManagement,
-    bool requireManualApproval,
-    int32_t updateId,
-    OtaUpdateStep updateStep
-  )
+  bool isEnabled, std::string cdnDomain, OtaUpdateChannel updateChannel, bool checkOnStartup, bool checkPeriodically, uint16_t checkInterval, bool allowBackendManagement, bool requireManualApproval, int32_t updateId, OtaUpdateStep updateStep
+)
   : isEnabled(isEnabled)
   , cdnDomain(std::move(cdnDomain))
   , updateChannel(updateChannel)
@@ -46,7 +37,8 @@ OtaUpdateConfig::OtaUpdateConfig(
 {
 }
 
-void OtaUpdateConfig::ToDefault() {
+void OtaUpdateConfig::ToDefault()
+{
   isEnabled              = true;
   cdnDomain              = OPENSHOCK_FW_CDN_DOMAIN;
   updateChannel          = OtaUpdateChannel::Stable;
@@ -59,7 +51,8 @@ void OtaUpdateConfig::ToDefault() {
   updateStep             = OtaUpdateStep::None;
 }
 
-bool OtaUpdateConfig::FromFlatbuffers(const Serialization::Configuration::OtaUpdateConfig* config) {
+bool OtaUpdateConfig::FromFlatbuffers(const Serialization::Configuration::OtaUpdateConfig* config)
+{
   if (config == nullptr) {
     OS_LOGW(TAG, "Config is null, setting to default");
     ToDefault();
@@ -80,11 +73,13 @@ bool OtaUpdateConfig::FromFlatbuffers(const Serialization::Configuration::OtaUpd
   return true;
 }
 
-flatbuffers::Offset<OpenShock::Serialization::Configuration::OtaUpdateConfig> OtaUpdateConfig::ToFlatbuffers(flatbuffers::FlatBufferBuilder& builder, bool withSensitiveData) const {
+flatbuffers::Offset<OpenShock::Serialization::Configuration::OtaUpdateConfig> OtaUpdateConfig::ToFlatbuffers(flatbuffers::FlatBufferBuilder& builder, bool withSensitiveData) const
+{
   return Serialization::Configuration::CreateOtaUpdateConfig(builder, isEnabled, builder.CreateString(cdnDomain), updateChannel, checkOnStartup, checkPeriodically, checkInterval, allowBackendManagement, requireManualApproval, updateId, updateStep);
 }
 
-bool OtaUpdateConfig::FromJSON(const cJSON* json) {
+bool OtaUpdateConfig::FromJSON(const cJSON* json)
+{
   if (json == nullptr) {
     OS_LOGW(TAG, "Config is null, setting to default");
     ToDefault();
@@ -110,7 +105,8 @@ bool OtaUpdateConfig::FromJSON(const cJSON* json) {
   return true;
 }
 
-cJSON* OtaUpdateConfig::ToJSON(bool withSensitiveData) const {
+cJSON* OtaUpdateConfig::ToJSON(bool withSensitiveData) const
+{
   cJSON* root = cJSON_CreateObject();
 
   cJSON_AddBoolToObject(root, "isEnabled", isEnabled);

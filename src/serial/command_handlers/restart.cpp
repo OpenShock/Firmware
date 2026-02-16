@@ -1,16 +1,19 @@
 #include "serial/command_handlers/common.h"
+#include "serial/SerialInputHandler.h"
 
 #include <esp_system.h>
 
-void _handleRestartCommand(std::string_view arg, bool isAutomated) {
+void _handleRestartCommand(std::string_view arg, bool isAutomated)
+{
   (void)arg;
 
-  ::Serial.println("Restarting ESP...");
+  OS_SERIAL_PRINTLN("Restarting ESP...");
   esp_restart();
 }
 
-OpenShock::SerialCmds::CommandGroup OpenShock::SerialCmds::CommandHandlers::RestartHandler() {
-  auto group = OpenShock::SerialCmds::CommandGroup("restart"sv);
+OpenShock::Serial::CommandGroup OpenShock::Serial::CommandHandlers::RestartHandler()
+{
+  auto group = OpenShock::Serial::CommandGroup("restart"sv);
 
   auto& cmd = group.addCommand("Restart the board"sv, _handleRestartCommand);
 

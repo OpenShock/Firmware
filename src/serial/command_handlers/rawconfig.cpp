@@ -8,7 +8,8 @@
 
 #include <vector>
 
-void _handleRawConfigCommand(std::string_view arg, bool isAutomated) {
+void _handleRawConfigCommand(std::string_view arg, bool isAutomated)
+{
   if (arg.empty()) {
     TinyVec<uint8_t> buffer;
 
@@ -44,8 +45,9 @@ void _handleRawConfigCommand(std::string_view arg, bool isAutomated) {
   esp_restart();
 }
 
-OpenShock::SerialCmds::CommandGroup OpenShock::SerialCmds::CommandHandlers::RawConfigHandler() {
-  auto group = OpenShock::SerialCmds::CommandGroup("rawconfig"sv);
+OpenShock::Serial::CommandGroup OpenShock::Serial::CommandHandlers::RawConfigHandler()
+{
+  auto group = OpenShock::Serial::CommandGroup("rawconfig"sv);
 
   auto& getCommand = group.addCommand("Get the raw binary config"sv, _handleRawConfigCommand);
 

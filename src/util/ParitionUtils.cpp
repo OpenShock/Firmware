@@ -8,7 +8,8 @@ const char* const TAG = "PartitionUtils";
 #include "Logging.h"
 #include "util/HexUtils.h"
 
-bool OpenShock::TryGetPartitionHash(const esp_partition_t* partition, char (&hash)[65]) {
+bool OpenShock::TryGetPartitionHash(const esp_partition_t* partition, char (&hash)[65])
+{
   uint8_t buffer[32];
   esp_err_t err = esp_partition_get_sha256(partition, buffer);
   if (err != ESP_OK) {
@@ -22,7 +23,8 @@ bool OpenShock::TryGetPartitionHash(const esp_partition_t* partition, char (&has
   return true;
 }
 
-bool OpenShock::FlashPartitionFromUrl(const esp_partition_t* partition, std::string_view remoteUrl, const uint8_t (&remoteHash)[32], std::function<bool(std::size_t, std::size_t, float)> progressCallback) {
+bool OpenShock::FlashPartitionFromUrl(const esp_partition_t* partition, std::string_view remoteUrl, const uint8_t (&remoteHash)[32], std::function<bool(std::size_t, std::size_t, float)> progressCallback)
+{
   OpenShock::SHA256 sha256;
   if (!sha256.begin()) {
     OS_LOGE(TAG, "Failed to initialize SHA256 hash");
@@ -31,7 +33,7 @@ bool OpenShock::FlashPartitionFromUrl(const esp_partition_t* partition, std::str
 
   std::size_t contentLength  = 0;
   std::size_t contentWritten = 0;
-  int64_t lastProgress  = 0;
+  int64_t lastProgress       = 0;
 
   auto sizeValidator = [partition, &contentLength, progressCallback, &lastProgress](std::size_t size) -> bool {
     if (size > partition->size) {

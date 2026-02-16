@@ -6,7 +6,8 @@
 #include "Convert.h"
 #include "util/StringUtils.h"
 
-void _handleSerialEchoCommand(std::string_view arg, bool isAutomated) {
+void _handleSerialEchoCommand(std::string_view arg, bool isAutomated)
+{
   if (arg.empty()) {
     // Get current serial echo status
     SERPR_RESPONSE("SerialEcho|%s", OpenShock::SerialInputHandler::SerialEchoEnabled() ? "true" : "false");
@@ -29,8 +30,9 @@ void _handleSerialEchoCommand(std::string_view arg, bool isAutomated) {
   }
 }
 
-OpenShock::SerialCmds::CommandGroup OpenShock::SerialCmds::CommandHandlers::EchoHandler() {
-  auto group = OpenShock::SerialCmds::CommandGroup("echo"sv);
+OpenShock::Serial::CommandGroup OpenShock::Serial::CommandHandlers::EchoHandler()
+{
+  auto group = OpenShock::Serial::CommandGroup("echo"sv);
 
   auto& getCommand = group.addCommand("Get the serial echo status"sv, _handleSerialEchoCommand);
 

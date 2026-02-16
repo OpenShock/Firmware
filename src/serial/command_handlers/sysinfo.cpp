@@ -5,7 +5,8 @@
 #include "wifi/WiFiManager.h"
 #include "wifi/WiFiNetwork.h"
 
-void _handleDebugInfoCommand(std::string_view arg, bool isAutomated) {
+void _handleDebugInfoCommand(std::string_view arg, bool isAutomated)
+{
   (void)arg;
 
   SERPR_RESPONSE("RTOSInfo|Free Heap|%u", xPortGetFreeHeapSize());
@@ -30,13 +31,14 @@ void _handleDebugInfoCommand(std::string_view arg, bool isAutomated) {
     char ipAddressBuffer[64];
     OpenShock::WiFiManager::GetIPAddress(ipAddressBuffer);
     SERPR_RESPONSE("WiFiInfo|IPv4|%s", ipAddressBuffer);
-    // OpenShock::WiFiManager::GetIPv6Address(ipAddressBuffer);
-    // SERPR_RESPONSE("WiFiInfo|IPv6|%s", ipAddressBuffer);
+    OpenShock::WiFiManager::GetIPv6Address(ipAddressBuffer);
+    SERPR_RESPONSE("WiFiInfo|IPv6|%s", ipAddressBuffer);
   }
 }
 
-OpenShock::SerialCmds::CommandGroup OpenShock::SerialCmds::CommandHandlers::SysInfoHandler() {
-  auto group = OpenShock::SerialCmds::CommandGroup("sysinfo"sv);
+OpenShock::Serial::CommandGroup OpenShock::Serial::CommandHandlers::SysInfoHandler()
+{
+  auto group = OpenShock::Serial::CommandGroup("sysinfo"sv);
 
   auto& cmd = group.addCommand("Get system information from RTOS, WiFi, etc."sv, _handleDebugInfoCommand);
 

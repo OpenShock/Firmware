@@ -27,15 +27,15 @@ const uint32_t k_estopCheckCount      = 13;  // 65 ms at 200 Hz
 const uint16_t k_estopCheckMask       = 0xFFFF >> ((sizeof(uint16_t) * 8) - k_estopCheckCount);
 
 // Grace period after deactivation (prevents immediate re-trigger on release bounce/EMI)
-const uint32_t k_estopRearmGraceTime  = 250;  // tune as needed
+const uint32_t k_estopRearmGraceTime = 250;  // tune as needed
 
 static OpenShock::SimpleMutex s_estopMutex = {};
 static gpio_num_t s_estopPin               = GPIO_NUM_NC;
 static TaskHandle_t s_estopTask            = nullptr;
 
 static EStopState s_lastPublishedState = EStopState::Idle;
-static bool       s_estopActive        = false;
-static int64_t    s_estopActivatedAt   = 0;
+static bool s_estopActive              = false;
+static int64_t s_estopActivatedAt      = 0;
 
 static volatile bool s_externallyTriggered = false;
 
@@ -44,7 +44,7 @@ static bool s_estopInitialized = false;
 static void estopmanager_updateexternals(EStopState state)
 {
   if (state == s_lastPublishedState) {
-    return; // No state change -> no event
+    return;  // No state change -> no event
   }
 
   s_lastPublishedState = state;
@@ -69,8 +69,8 @@ static void estopmgr_checkertask(void* pvParameters)
   int64_t deactivatesAt = 0;
 
   // Rearm grace state
-  int64_t rearmAt      = 0;
-  bool    rearmBlocked = false;
+  int64_t rearmAt   = 0;
+  bool rearmBlocked = false;
 
   // Debounced button state: true == pressed, false == released
   bool lastBtnState = false;
@@ -107,9 +107,9 @@ static void estopmgr_checkertask(void* pvParameters)
     // Debounce:
     // If all recent bits are 1 -> fully released.
     // If any bit is 0 -> pressed (or bouncing toward pressed).
-    bool btnState = (history & k_estopCheckMask) != k_estopCheckMask;  // true == pressed
-    bool pressedEdge  = (btnState && !lastBtnState);
-    lastBtnState = btnState;
+    bool btnState    = (history & k_estopCheckMask) != k_estopCheckMask;  // true == pressed
+    bool pressedEdge = (btnState && !lastBtnState);
+    lastBtnState     = btnState;
 
     switch (state) {
       case EStopState::Idle:

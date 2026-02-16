@@ -4,15 +4,17 @@
 
 #include <vector>
 
-void _handleVersionCommand(std::string_view arg, bool isAutomated) {
+void _handleVersionCommand(std::string_view arg, bool isAutomated)
+{
   (void)arg;
 
-  ::Serial.println();
+  OS_SERIAL_PRINTLN();
   OpenShock::SerialInputHandler::PrintVersionInfo();
 }
 
-OpenShock::SerialCmds::CommandGroup OpenShock::SerialCmds::CommandHandlers::VersionHandler() {
-  auto group = OpenShock::SerialCmds::CommandGroup("version"sv);
+OpenShock::Serial::CommandGroup OpenShock::Serial::CommandHandlers::VersionHandler()
+{
+  auto group = OpenShock::Serial::CommandGroup("version"sv);
 
   auto cmd = group.addCommand("Print version information"sv, _handleVersionCommand);
 
