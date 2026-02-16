@@ -92,6 +92,7 @@ jobs:
 
       - uses: actions/setup-node@v6
         with:
+          node-version-file: ./.github/scripts/package.json
           cache: 'pnpm'
           cache-dependency-path: ./.github/scripts/pnpm-lock.yaml
 

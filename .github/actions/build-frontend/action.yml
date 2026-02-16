@@ -23,6 +23,7 @@ runs:
 
     - uses: actions/setup-node@v4
       with:
+        node-version-file: ./frontend/package.json
         cache: 'pnpm'
         cache-dependency-path: ./frontend/pnpm-lock.yaml
 
