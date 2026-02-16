@@ -14,11 +14,11 @@
     "semver": "^7.7.4"
   },
   "engines": {
-    "node": "^22.14.0",
-    "pnpm": "^10.6.4"
+    "node": "^24.13.1",
+    "pnpm": "^10.29.3"
   },
   "volta": {
-    "node": "22.14.0"
+    "node": "24.13.1"
   },
-  "packageManager": "pnpm@10.6.4"
+  "packageManager": "pnpm@10.29.3"
 }

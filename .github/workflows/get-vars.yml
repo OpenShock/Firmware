@@ -7,15 +7,6 @@
 
 on:
   workflow_call:
-    inputs:
-      pnpm-version:
-        type: string
-        default: '10.6.4'
-        description: 'The pnpm version to use'
-      node-version:
-        type: string
-        default: '22.14.0'
-        description: 'The Node.js version to use'
     outputs:
       version:
         description: 'The current version of the project, e.g.  1.0.0-rc.1+build.1'
@@ -96,12 +87,10 @@ jobs:
       - uses: pnpm/action-setup@v4
         name: Install pnpm
         with:
-          version: ${{ inputs.pnpm-version }}
           run_install: false
 
       - uses: actions/setup-node@v6
         with:
-          node-version-file: ./.github/scripts/package.json
           cache: 'pnpm'
           cache-dependency-path: ./.github/scripts/pnpm-lock.yaml
 

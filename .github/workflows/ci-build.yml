@@ -18,9 +18,7 @@ on:
 name: ci-build
 
 env:
-  PNPM_VERSION: 10.6.4
-  NODE_VERSION: 22.14.0
-  PYTHON_VERSION: 3.12
+  PYTHON_VERSION: 3.13
 
 jobs:
   getvars:
@@ -38,9 +36,6 @@ jobs:
             frontend
 
       - uses: ./.github/actions/build-frontend
-        with:
-          pnpm-version: ${{ env.PNPM_VERSION }}
-          node-version: ${{ env.NODE_VERSION }}
 
   build-staticfs:
     runs-on: ubuntu-latest
