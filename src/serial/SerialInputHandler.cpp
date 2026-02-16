@@ -59,8 +59,8 @@ using namespace std::string_view_literals;
 
 using namespace OpenShock;
 
-const int64_t PASTE_INTERVAL_THRESHOLD_MS       = 20;
-const std::size_t SERIAL_BUFFER_CLEAR_THRESHOLD = 512;
+const int64_t PASTE_INTERVAL_THRESHOLD_MS    = 20;
+const std::size_t SERIAL_BUFFER_MAX_CAPACITY = 4096;
 
 static bool s_echoEnabled = true;
 static std::vector<OpenShock::Serial::CommandGroup> s_commandGroups;
@@ -133,7 +133,7 @@ void _printCommandHelp(Serial::CommandGroup& group)
   for (const auto& command : group.commands()) {
     size += 2;  // +2 for newline
     size += group.name().size();
-    size++;  // +1 for space
+    size++;     // +1 for space
 
     if (command.name().size() > 0) {
       size += command.name().size() + 1;  // +1 for space
@@ -290,7 +290,7 @@ class SerialBuffer {
   DISABLE_MOVE(SerialBuffer);
 
 public:
-  constexpr SerialBuffer()
+  SerialBuffer()
     : m_data(nullptr)
     , m_size(0)
     , m_capacity(0)
@@ -304,12 +304,12 @@ public:
   }
   inline ~SerialBuffer() { delete[] m_data; }
 
-  constexpr char* data() { return m_data; }
-  constexpr std::size_t size() const { return m_size; }
-  constexpr std::size_t capacity() const { return m_capacity; }
-  constexpr bool empty() const { return m_size == 0; }
+  constexpr const char* data() const noexcept { return m_data == nullptr ? "" : m_data; }
+  constexpr std::size_t size() const noexcept { return m_size; }
+  constexpr std::size_t capacity() const noexcept { return m_capacity; }
+  constexpr bool empty() const noexcept { return m_size == 0; }
 
-  constexpr void clear() { m_size = 0; }
+  constexpr void clear() noexcept { m_size = 0; }
   inline void destroy()
   {
     delete[] m_data;
@@ -322,6 +322,11 @@ public:
   {
     size = (size + 31) & ~31;  // Align to 32 bytes
 
+    if (size > SERIAL_BUFFER_MAX_CAPACITY) {
+      OS_LOGE(TAG, "Refused to reserve %zu bytes, clearing buffer", size);
+      size   = SERIAL_BUFFER_MAX_CAPACITY;
+      m_size = 0;
+    }
     if (size <= m_capacity) {
       return;
     }
@@ -332,27 +337,28 @@ public:
       delete[] m_data;
     }
 
-    m_data     = newData;
-    m_capacity = size;
+    m_data                 = newData;
+    m_capacity             = size;
+    m_data[m_capacity - 1] = 0;
   }
 
   inline void push_back(char c)
   {
     if (m_size >= m_capacity) {
-      reserve(m_capacity + 16);
+      reserve(m_size + 16);
     }
 
     m_data[m_size++] = c;
   }
 
-  constexpr void pop_back()
+  constexpr void pop_back() noexcept
   {
     if (m_size > 0) {
       --m_size;
     }
   }
 
-  constexpr operator std::string_view() const { return std::string_view(m_data, m_size); }
+  constexpr operator std::string_view() const { return std::string_view(data(), m_size); }
 
 private:
   char* m_data;
@@ -428,7 +434,7 @@ void _skipSerialWhitespaces(SerialBuffer& buffer)
   }
 }
 
-#if ARDUINO_USB_MODE 
+#if ARDUINO_USB_MODE
 SerialReadResult _tryReadUSBSerialLine(SerialBuffer& buffer)
 {
   // Check if there's any data available
@@ -621,7 +627,7 @@ void _serialRxTask(void*)
         _processSerialLine(buffer);
 
         // Deallocate memory if the buffer is too large
-        if (buffer.capacity() > SERIAL_BUFFER_CLEAR_THRESHOLD) {
+        if (buffer.capacity() > SERIAL_BUFFER_MAX_CAPACITY) {
           buffer.destroy();
         } else {
           buffer.clear();
@@ -641,13 +647,13 @@ void _serialRxTask(void*)
         break;
     }
 
-#if ARDUINO_USB_MODE 
+#if ARDUINO_USB_MODE
     switch (_tryReadUSBSerialLine(buffer)) {
       case SerialReadResult::LineEnd:
         _processSerialLine(buffer);
 
         // Deallocate memory if the buffer is too large
-        if (buffer.capacity() > SERIAL_BUFFER_CLEAR_THRESHOLD) {
+        if (buffer.capacity() > SERIAL_BUFFER_MAX_CAPACITY) {
           buffer.destroy();
         } else {
           buffer.clear();

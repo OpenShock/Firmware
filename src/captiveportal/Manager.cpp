@@ -1,10 +1,10 @@
 #include <freertos/FreeRTOS.h>
 
-#include "CaptivePortal.h"
+#include "captiveportal/Manager.h"
 
 const char* const TAG = "CaptivePortal";
 
-#include "CaptivePortalInstance.h"
+#include "captiveportal/CaptivePortalInstance.h"
 #include "CommandHandler.h"
 #include "config/Config.h"
 #include "Core.h"
@@ -16,16 +16,15 @@ const char* const TAG = "CaptivePortal";
 #include <WiFi.h>
 
 #include <esp_timer.h>
-#include <mdns.h>
 
 #include <memory>
 
 using namespace OpenShock;
 
-static bool s_alwaysEnabled                              = false;
-static bool s_forceClosed                                = false;
-static esp_timer_handle_t s_captivePortalUpdateLoopTimer = nullptr;
-static std::unique_ptr<CaptivePortalInstance> s_instance = nullptr;
+static bool s_alwaysEnabled                                             = false;
+static bool s_forceClosed                                               = false;
+static esp_timer_handle_t s_captivePortalUpdateLoopTimer                = nullptr;
+static std::unique_ptr<CaptivePortal::CaptivePortalInstance> s_instance = nullptr;
 
 static bool captiveportal_start()
 {
@@ -47,16 +46,9 @@ static bool captiveportal_start()
     return false;
   }
 
-  IPAddress apIP(4,3,2,1);
+  IPAddress apIP(4, 3, 2, 1);
   if (!WiFi.softAPConfig(apIP, apIP, IPAddress(255, 255, 255, 0))) {
     OS_LOGE(TAG, "Failed to configure AP");
-    WiFi.softAPdisconnect(true);
-    return false;
-  }
-
-  esp_err_t err = mdns_init();
-  if (err != ESP_OK) {
-    OS_LOGE(TAG, "Failed to initialize mDNS");
     WiFi.softAPdisconnect(true);
     return false;
   }
@@ -67,14 +59,7 @@ static bool captiveportal_start()
     hostname = OPENSHOCK_FW_HOSTNAME;
   }
 
-  err = mdns_hostname_set(hostname.c_str());
-  if (err != ESP_OK) {
-    OS_LOGE(TAG, "Failed to set mDNS hostname");
-    WiFi.softAPdisconnect(true);
-    return false;
-  }
-
-  s_instance = std::make_unique<CaptivePortalInstance>();
+  s_instance = std::make_unique<CaptivePortal::CaptivePortalInstance>();
 
   return true;
 }
@@ -88,8 +73,6 @@ static void captiveportal_stop()
   OS_LOGI(TAG, "Stopping captive portal");
 
   s_instance = nullptr;
-
-  mdns_free();
 
   WiFi.softAPdisconnect(true);
 }
@@ -122,8 +105,6 @@ static void captiveportal_updateloop(void*)
     return;
   }
 }
-
-using namespace OpenShock;
 
 bool CaptivePortal::Init()
 {

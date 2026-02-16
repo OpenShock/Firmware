@@ -1,6 +1,6 @@
 #include "message_handlers/impl/WSLocal.h"
 
-#include "CaptivePortal.h"
+#include "captiveportal/Manager.h"
 #include "config/Config.h"
 #include "estop/EStopManager.h"
 #include "Logging.h"

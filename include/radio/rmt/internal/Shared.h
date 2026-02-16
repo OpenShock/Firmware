@@ -18,12 +18,12 @@ namespace OpenShock::Rmt::Internal {
 
     // Align MSB to the top bit we care about
     data <<= (BitCount - N);
-    
+
     constexpr T MsbMask = T(1) << (BitCount - 1);
 
     for (std::size_t i = 0; i < N; ++i) {
-        sequence[i] = (data & MsbMask) ? rmtOne : rmtZero;
-        data <<= 1;
+      sequence[i] = (data & MsbMask) ? rmtOne : rmtZero;
+      data <<= 1;
     }
   }
 }  // namespace OpenShock::Rmt::Internal

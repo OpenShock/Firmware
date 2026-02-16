@@ -17,11 +17,13 @@ CaptivePortalConfig::CaptivePortalConfig(bool alwaysEnabled)
 {
 }
 
-void CaptivePortalConfig::ToDefault() {
+void CaptivePortalConfig::ToDefault()
+{
   alwaysEnabled = false;
 }
 
-bool CaptivePortalConfig::FromFlatbuffers(const Serialization::Configuration::CaptivePortalConfig* config) {
+bool CaptivePortalConfig::FromFlatbuffers(const Serialization::Configuration::CaptivePortalConfig* config)
+{
   if (config == nullptr) {
     OS_LOGW(TAG, "Config is null, setting to default");
     ToDefault();
@@ -33,11 +35,13 @@ bool CaptivePortalConfig::FromFlatbuffers(const Serialization::Configuration::Ca
   return true;
 }
 
-flatbuffers::Offset<OpenShock::Serialization::Configuration::CaptivePortalConfig> CaptivePortalConfig::ToFlatbuffers(flatbuffers::FlatBufferBuilder& builder, bool withSensitiveData) const {
+flatbuffers::Offset<OpenShock::Serialization::Configuration::CaptivePortalConfig> CaptivePortalConfig::ToFlatbuffers(flatbuffers::FlatBufferBuilder& builder, bool withSensitiveData) const
+{
   return Serialization::Configuration::CreateCaptivePortalConfig(builder, alwaysEnabled);
 }
 
-bool CaptivePortalConfig::FromJSON(const cJSON* json) {
+bool CaptivePortalConfig::FromJSON(const cJSON* json)
+{
   if (json == nullptr) {
     OS_LOGW(TAG, "Config is null, setting to default");
     ToDefault();
@@ -54,7 +58,8 @@ bool CaptivePortalConfig::FromJSON(const cJSON* json) {
   return true;
 }
 
-cJSON* CaptivePortalConfig::ToJSON(bool withSensitiveData) const {
+cJSON* CaptivePortalConfig::ToJSON(bool withSensitiveData) const
+{
   cJSON* root = cJSON_CreateObject();
 
   cJSON_AddBoolToObject(root, "alwaysEnabled", alwaysEnabled);

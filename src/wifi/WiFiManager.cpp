@@ -2,7 +2,7 @@
 
 const char* const TAG = "WiFiManager";
 
-#include "CaptivePortal.h"
+#include "captiveportal/Manager.h"
 #include "config/Config.h"
 #include "Core.h"
 #include "FormatHelpers.h"
@@ -364,7 +364,7 @@ void _wifimanagerUpdateTask(void*)
     if (s_wifiState == WiFiState::Disconnected && !WiFiScanManager::IsScanning()) {
       if (!_tryConnect()) {
         int64_t now = OpenShock::millis();
-        if (lastScanRequest == 0 || now - lastScanRequest > 120'000) { // Auto-scan at boot and then every 2 mins
+        if (lastScanRequest == 0 || now - lastScanRequest > 120'000) {  // Auto-scan at boot and then every 2 mins
           lastScanRequest = now;
 
           OS_LOGV(TAG, "No networks to connect to, starting scan...");

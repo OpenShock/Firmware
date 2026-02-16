@@ -2,7 +2,7 @@
 
 const char* const TAG = "OtaUpdateManager";
 
-#include "CaptivePortal.h"
+#include "captiveportal/Manager.h"
 #include "Common.h"
 #include "config/Config.h"
 #include "Core.h"
@@ -63,13 +63,28 @@ enum OtaTaskEventFlag : uint32_t {
 
 static esp_ota_img_states_t _otaImageState;
 static OpenShock::FirmwareBootType _bootType;
-static TaskHandle_t _taskHandle;
+static TaskHandle_t _taskHandle = nullptr;
 static OpenShock::SemVer _requestedVersion;
 static OpenShock::SimpleMutex _requestedVersionMutex = {};
 
 using namespace OpenShock;
 
-static bool _tryQueueUpdateRequest(const OpenShock::SemVer& version)
+static bool otaum_try_notify_task(uint32_t eventFlag)
+{
+  if (_taskHandle == nullptr) {
+    OS_LOGW(TAG, "Unable to notify OTA task, task handle is null");
+    return false;
+  }
+
+  if (xTaskNotify(_taskHandle, eventFlag, eSetBits) != pdPASS) {
+    OS_LOGE(TAG, "Failed to notify OTA task (event: 0x%08x)", eventFlag);
+    return false;
+  }
+
+  return true;
+}
+
+static bool otaum_try_queue_update_request(const OpenShock::SemVer& version)
 {
   if (!_requestedVersionMutex.lock(pdMS_TO_TICKS(1000))) {
     OS_LOGE(TAG, "Failed to take requested version mutex");
@@ -80,7 +95,7 @@ static bool _tryQueueUpdateRequest(const OpenShock::SemVer& version)
 
   _requestedVersionMutex.unlock();
 
-  xTaskNotify(_taskHandle, OTA_TASK_EVENT_UPDATE_REQUESTED, eSetBits);
+  otaum_try_notify_task(OTA_TASK_EVENT_UPDATE_REQUESTED);
 
   return true;
 }
@@ -106,7 +121,7 @@ static void otaum_evh_wifidisconnected(void* event_handler_arg, esp_event_base_t
   (void)event_id;
   (void)event_data;
 
-  xTaskNotify(_taskHandle, OTA_TASK_EVENT_WIFI_DISCONNECTED, eSetBits);
+  otaum_try_notify_task(OTA_TASK_EVENT_WIFI_DISCONNECTED);
 }
 
 static void otaum_evh_ipevent(void* event_handler_arg, esp_event_base_t event_base, int32_t event_id, void* event_data)
@@ -118,17 +133,17 @@ static void otaum_evh_ipevent(void* event_handler_arg, esp_event_base_t event_ba
   switch (event_id) {
     case IP_EVENT_GOT_IP6:
     case IP_EVENT_STA_GOT_IP:
-      xTaskNotify(_taskHandle, OTA_TASK_EVENT_WIFI_CONNECTED, eSetBits);
+      otaum_try_notify_task(OTA_TASK_EVENT_WIFI_CONNECTED);
       break;
     case IP_EVENT_STA_LOST_IP:
-      xTaskNotify(_taskHandle, OTA_TASK_EVENT_WIFI_DISCONNECTED, eSetBits);
+      otaum_try_notify_task(OTA_TASK_EVENT_WIFI_DISCONNECTED);
       break;
     default:
       return;
   }
 }
 
-static bool _sendProgressMessage(Serialization::Types::OtaUpdateProgressTask task, float progress)
+static bool otaum_send_progress_msg(Serialization::Types::OtaUpdateProgressTask task, float progress)
 {
   int32_t updateId;
   if (!Config::GetOtaUpdateId(updateId)) {
@@ -159,18 +174,18 @@ static bool _sendFailureMessage(std::string_view message, bool fatal = false)
   return true;
 }
 
-static bool _flashAppPartition(const esp_partition_t* partition, std::string_view remoteUrl, const uint8_t (&remoteHash)[32])
+static bool otaum_flash_app_partition(const esp_partition_t* partition, std::string_view remoteUrl, const uint8_t (&remoteHash)[32])
 {
   OS_LOGD(TAG, "Flashing app partition");
 
-  if (!_sendProgressMessage(Serialization::Types::OtaUpdateProgressTask::FlashingApplication, 0.0f)) {
+  if (!otaum_send_progress_msg(Serialization::Types::OtaUpdateProgressTask::FlashingApplication, 0.0f)) {
     return false;
   }
 
   auto onProgress = [](std::size_t current, std::size_t total, float progress) -> bool {
     OS_LOGD(TAG, "Flashing app partition: %u / %u (%.2f%%)", current, total, progress * 100.0f);
 
-    _sendProgressMessage(Serialization::Types::OtaUpdateProgressTask::FlashingApplication, progress);
+    otaum_send_progress_msg(Serialization::Types::OtaUpdateProgressTask::FlashingApplication, progress);
 
     return true;
   };
@@ -181,7 +196,7 @@ static bool _flashAppPartition(const esp_partition_t* partition, std::string_vie
     return false;
   }
 
-  if (!_sendProgressMessage(Serialization::Types::OtaUpdateProgressTask::MarkingApplicationBootable, 0.0f)) {
+  if (!otaum_send_progress_msg(Serialization::Types::OtaUpdateProgressTask::MarkingApplicationBootable, 0.0f)) {
     return false;
   }
 
@@ -195,9 +210,9 @@ static bool _flashAppPartition(const esp_partition_t* partition, std::string_vie
   return true;
 }
 
-static bool _flashFilesystemPartition(const esp_partition_t* parition, std::string_view remoteUrl, const uint8_t (&remoteHash)[32])
+static bool otaum_flash_fs_partition(const esp_partition_t* parition, std::string_view remoteUrl, const uint8_t (&remoteHash)[32])
 {
-  if (!_sendProgressMessage(Serialization::Types::OtaUpdateProgressTask::PreparingForUpdate, 0.0f)) {
+  if (!otaum_send_progress_msg(Serialization::Types::OtaUpdateProgressTask::PreparingForUpdate, 0.0f)) {
     return false;
   }
 
@@ -210,14 +225,14 @@ static bool _flashFilesystemPartition(const esp_partition_t* parition, std::stri
 
   OS_LOGD(TAG, "Flashing filesystem partition");
 
-  if (!_sendProgressMessage(Serialization::Types::OtaUpdateProgressTask::FlashingFilesystem, 0.0f)) {
+  if (!otaum_send_progress_msg(Serialization::Types::OtaUpdateProgressTask::FlashingFilesystem, 0.0f)) {
     return false;
   }
 
   auto onProgress = [](std::size_t current, std::size_t total, float progress) -> bool {
     OS_LOGD(TAG, "Flashing filesystem partition: %u / %u (%.2f%%)", current, total, progress * 100.0f);
 
-    _sendProgressMessage(Serialization::Types::OtaUpdateProgressTask::FlashingFilesystem, progress);
+    otaum_send_progress_msg(Serialization::Types::OtaUpdateProgressTask::FlashingFilesystem, progress);
 
     return true;
   };
@@ -228,7 +243,7 @@ static bool _flashFilesystemPartition(const esp_partition_t* parition, std::stri
     return false;
   }
 
-  if (!_sendProgressMessage(Serialization::Types::OtaUpdateProgressTask::VerifyingFilesystem, 0.0f)) {
+  if (!otaum_send_progress_msg(Serialization::Types::OtaUpdateProgressTask::VerifyingFilesystem, 0.0f)) {
     return false;
   }
 
@@ -243,6 +258,13 @@ static bool _flashFilesystemPartition(const esp_partition_t* parition, std::stri
 
   return true;
 }
+
+static void otaum_restore_wdt_timeout()
+{
+  if (esp_task_wdt_init(5, true) != ESP_OK) {
+    OS_LOGE(TAG, "Failed to restore task watchdog timeout");
+  }
+};
 
 static void otaum_updatetask(void* arg)
 {
@@ -355,7 +377,7 @@ static void otaum_updatetask(void* arg)
       continue;
     }
 
-    if (!_sendProgressMessage(Serialization::Types::OtaUpdateProgressTask::FetchingMetadata, 0.0f)) {
+    if (!otaum_send_progress_msg(Serialization::Types::OtaUpdateProgressTask::FetchingMetadata, 0.0f)) {
       continue;
     }
 
@@ -393,24 +415,36 @@ static void otaum_updatetask(void* arg)
 
     // Increase task watchdog timeout.
     // Prevents panics on some ESP32s when clearing large partitions.
-    esp_task_wdt_init(15, true);
+    if (esp_task_wdt_init(15, true) != ESP_OK) {
+      OS_LOGE(TAG, "Failed to increase task watchdog timeout");
+      _sendFailureMessage("Failed to increase task watchdog timeout"sv);
+      continue;
+    }
+
 
     // Flash app and filesystem partitions.
-    if (!_flashFilesystemPartition(filesystemPartition, release.filesystemBinaryUrl, release.filesystemBinaryHash)) continue;
-    if (!_flashAppPartition(appPartition, release.appBinaryUrl, release.appBinaryHash)) continue;
+    if (!otaum_flash_fs_partition(filesystemPartition, release.filesystemBinaryUrl, release.filesystemBinaryHash)) {
+      otaum_restore_wdt_timeout();
+      continue;
+    }
+    if (!otaum_flash_app_partition(appPartition, release.appBinaryUrl, release.appBinaryHash)) {
+      otaum_restore_wdt_timeout();
+      continue;
+    }
 
     // Set OTA boot type in config.
     if (!Config::SetOtaUpdateStep(OpenShock::OtaUpdateStep::Updated)) {
       OS_LOGE(TAG, "Failed to set OTA update step");
       _sendFailureMessage("Failed to set OTA update step"sv);
+      otaum_restore_wdt_timeout();
       continue;
     }
 
     // Set task watchdog timeout back to default.
-    esp_task_wdt_init(5, true);
+    otaum_restore_wdt_timeout();
 
     // Send reboot message.
-    _sendProgressMessage(Serialization::Types::OtaUpdateProgressTask::Rebooting, 0.0f);
+    otaum_send_progress_msg(Serialization::Types::OtaUpdateProgressTask::Rebooting, 0.0f);
 
     // Reboot into new firmware.
     OS_LOGI(TAG, "Restarting into new firmware...");
@@ -505,6 +539,12 @@ bool OtaUpdateManager::Init()
     }
   }
 
+  // Start OTA update task.
+  if (TaskUtils::TaskCreateExpensive(otaum_updatetask, "OTA Update", 16'384, nullptr, 1, &_taskHandle) != pdPASS) {  // PROFILED: 6.2KB stack usage
+    OS_LOGE(TAG, "Failed to create OTA update task");
+    return false;
+  }
+
   err = esp_event_handler_register(IP_EVENT, ESP_EVENT_ANY_ID, otaum_evh_ipevent, nullptr);
   if (err != ESP_OK) {
     OS_LOGE(TAG, "Failed to register event handler for IP_EVENT: %s", esp_err_to_name(err));
@@ -516,9 +556,6 @@ bool OtaUpdateManager::Init()
     OS_LOGE(TAG, "Failed to register event handler for WIFI_EVENT: %s", esp_err_to_name(err));
     return false;
   }
-
-  // Start OTA update task.
-  TaskUtils::TaskCreateExpensive(otaum_updatetask, "OTA Update", 8192, nullptr, 1, &_taskHandle);  // PROFILED: 6.2KB stack usage
 
   return true;
 }
@@ -671,6 +708,16 @@ bool OtaUpdateManager::TryGetFirmwareRelease(const OpenShock::SemVer& version, F
     }
   }
 
+  if (!foundAppHash) {
+    OS_LOGE(TAG, "Missing hash for app.bin");
+    return false;
+  }
+
+  if (!foundFilesystemHash) {
+    OS_LOGE(TAG, "Missing hash for staticfs.bin");
+    return false;
+  }
+
   return true;
 }
 
@@ -678,7 +725,7 @@ bool OtaUpdateManager::TryStartFirmwareUpdate(const OpenShock::SemVer& version)
 {
   OS_LOGD(TAG, "Requesting firmware version %s", version.toString().c_str());  // TODO: This is abusing the SemVer::toString() method causing alot of string copies, fix this
 
-  return _tryQueueUpdateRequest(version);
+  return otaum_try_queue_update_request(version);
 }
 
 FirmwareBootType OtaUpdateManager::GetFirmwareBootType()

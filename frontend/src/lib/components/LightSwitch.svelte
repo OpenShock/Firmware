@@ -1,10 +1,9 @@
 <script lang="ts">
-  import { buttonVariants } from '$lib/components/ui/button';
+  import { Button, buttonVariants } from '$lib/components/ui/button';
   import * as Dialog from '$lib/components/ui/dialog';
   import * as DropdownMenu from '$lib/components/ui/dropdown-menu';
   import { ColorSchemeStore, willActivateLightMode, getDarkReaderState } from '$lib/stores';
   import { toast } from 'svelte-sonner';
-  import AbsolutelySureButton from './AbsolutelySureButton.svelte';
 
   import { Moon, Sun } from '@lucide/svelte';
 
@@ -42,7 +41,7 @@
         Are you sure you want to do this?
       </Dialog.Description>
     </Dialog.Header>
-    <AbsolutelySureButton text="I am willing to take the risk" onconfirm={confirm} />
+    <Button variant="destructive" onclick={confirm}>I am willing to take the risk</Button>
   </Dialog.Content>
 </Dialog.Root>
 

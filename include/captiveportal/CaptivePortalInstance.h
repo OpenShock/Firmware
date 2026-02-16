@@ -14,7 +14,7 @@
 #include <cstdint>
 #include <string_view>
 
-namespace OpenShock {
+namespace OpenShock::CaptivePortal {
   class CaptivePortalInstance {
     DISABLE_COPY(CaptivePortalInstance);
     DISABLE_MOVE(CaptivePortalInstance);
@@ -41,4 +41,4 @@ namespace OpenShock {
     DNSServer m_dnsServer;
     TaskHandle_t m_taskHandle;
   };
-}  // namespace OpenShock
+}  // namespace OpenShock::CaptivePortal

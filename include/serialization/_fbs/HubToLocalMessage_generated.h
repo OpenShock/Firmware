@@ -9,8 +9,8 @@
 // Ensure the included flatbuffers.h is the same version as when this file was
 // generated, otherwise it may not be compatible.
 static_assert(FLATBUFFERS_VERSION_MAJOR == 25 &&
-              FLATBUFFERS_VERSION_MINOR == 9 &&
-              FLATBUFFERS_VERSION_REVISION == 23,
+              FLATBUFFERS_VERSION_MINOR == 12 &&
+              FLATBUFFERS_VERSION_REVISION == 19,
              "Non-compatible flatbuffers version included");
 
 #include "HubConfig_generated.h"
@@ -234,8 +234,10 @@ template<> struct HubToLocalMessagePayloadTraits<OpenShock::Serialization::Local
   static const HubToLocalMessagePayload enum_value = HubToLocalMessagePayload::SetEstopPinCommandResult;
 };
 
-bool VerifyHubToLocalMessagePayload(::flatbuffers::Verifier &verifier, const void *obj, HubToLocalMessagePayload type);
-bool VerifyHubToLocalMessagePayloadVector(::flatbuffers::Verifier &verifier, const ::flatbuffers::Vector<::flatbuffers::Offset<void>> *values, const ::flatbuffers::Vector<HubToLocalMessagePayload> *types);
+template <bool B = false>
+bool VerifyHubToLocalMessagePayload(::flatbuffers::VerifierTemplate<B> &verifier, const void *obj, HubToLocalMessagePayload type);
+template <bool B = false>
+bool VerifyHubToLocalMessagePayloadVector(::flatbuffers::VerifierTemplate<B> &verifier, const ::flatbuffers::Vector<::flatbuffers::Offset<void>> *values, const ::flatbuffers::Vector<HubToLocalMessagePayload> *types);
 
 struct ReadyMessage FLATBUFFERS_FINAL_CLASS : private ::flatbuffers::Table {
   typedef ReadyMessageBuilder Builder;
@@ -269,7 +271,8 @@ struct ReadyMessage FLATBUFFERS_FINAL_CLASS : private ::flatbuffers::Table {
   const ::flatbuffers::Vector<int8_t> *gpio_valid_outputs() const {
     return GetPointer<const ::flatbuffers::Vector<int8_t> *>(VT_GPIO_VALID_OUTPUTS);
   }
-  bool Verify(::flatbuffers::Verifier &verifier) const {
+  template <bool B = false>
+  bool Verify(::flatbuffers::VerifierTemplate<B> &verifier) const {
     return VerifyTableStart(verifier) &&
            VerifyField<uint8_t>(verifier, VT_POGGIES, 1) &&
            VerifyOffset(verifier, VT_CONNECTED_WIFI) &&
@@ -373,7 +376,8 @@ struct ErrorMessage FLATBUFFERS_FINAL_CLASS : private ::flatbuffers::Table {
   const ::flatbuffers::String *message() const {
     return GetPointer<const ::flatbuffers::String *>(VT_MESSAGE);
   }
-  bool Verify(::flatbuffers::Verifier &verifier) const {
+  template <bool B = false>
+  bool Verify(::flatbuffers::VerifierTemplate<B> &verifier) const {
     return VerifyTableStart(verifier) &&
            VerifyOffset(verifier, VT_MESSAGE) &&
            verifier.VerifyString(message()) &&
@@ -433,7 +437,8 @@ struct WifiScanStatusMessage FLATBUFFERS_FINAL_CLASS : private ::flatbuffers::Ta
   OpenShock::Serialization::Types::WifiScanStatus status() const {
     return static_cast<OpenShock::Serialization::Types::WifiScanStatus>(GetField<uint8_t>(VT_STATUS, 0));
   }
-  bool Verify(::flatbuffers::Verifier &verifier) const {
+  template <bool B = false>
+  bool Verify(::flatbuffers::VerifierTemplate<B> &verifier) const {
     return VerifyTableStart(verifier) &&
            VerifyField<uint8_t>(verifier, VT_STATUS, 1) &&
            verifier.EndTable();
@@ -487,7 +492,8 @@ struct WifiNetworkEvent FLATBUFFERS_FINAL_CLASS : private ::flatbuffers::Table {
   const ::flatbuffers::Vector<::flatbuffers::Offset<OpenShock::Serialization::Types::WifiNetwork>> *networks() const {
     return GetPointer<const ::flatbuffers::Vector<::flatbuffers::Offset<OpenShock::Serialization::Types::WifiNetwork>> *>(VT_NETWORKS);
   }
-  bool Verify(::flatbuffers::Verifier &verifier) const {
+  template <bool B = false>
+  bool Verify(::flatbuffers::VerifierTemplate<B> &verifier) const {
     return VerifyTableStart(verifier) &&
            VerifyField<uint8_t>(verifier, VT_EVENT_TYPE, 1) &&
            VerifyOffset(verifier, VT_NETWORKS) &&
@@ -556,7 +562,8 @@ struct WifiGotIpEvent FLATBUFFERS_FINAL_CLASS : private ::flatbuffers::Table {
   const ::flatbuffers::String *ip() const {
     return GetPointer<const ::flatbuffers::String *>(VT_IP);
   }
-  bool Verify(::flatbuffers::Verifier &verifier) const {
+  template <bool B = false>
+  bool Verify(::flatbuffers::VerifierTemplate<B> &verifier) const {
     return VerifyTableStart(verifier) &&
            VerifyOffset(verifier, VT_IP) &&
            verifier.VerifyString(ip()) &&
@@ -616,7 +623,8 @@ struct WifiLostIpEvent FLATBUFFERS_FINAL_CLASS : private ::flatbuffers::Table {
   const ::flatbuffers::String *ip() const {
     return GetPointer<const ::flatbuffers::String *>(VT_IP);
   }
-  bool Verify(::flatbuffers::Verifier &verifier) const {
+  template <bool B = false>
+  bool Verify(::flatbuffers::VerifierTemplate<B> &verifier) const {
     return VerifyTableStart(verifier) &&
            VerifyOffset(verifier, VT_IP) &&
            verifier.VerifyString(ip()) &&
@@ -676,7 +684,8 @@ struct AccountLinkCommandResult FLATBUFFERS_FINAL_CLASS : private ::flatbuffers:
   OpenShock::Serialization::Local::AccountLinkResultCode result() const {
     return static_cast<OpenShock::Serialization::Local::AccountLinkResultCode>(GetField<uint8_t>(VT_RESULT, 0));
   }
-  bool Verify(::flatbuffers::Verifier &verifier) const {
+  template <bool B = false>
+  bool Verify(::flatbuffers::VerifierTemplate<B> &verifier) const {
     return VerifyTableStart(verifier) &&
            VerifyField<uint8_t>(verifier, VT_RESULT, 1) &&
            verifier.EndTable();
@@ -730,7 +739,8 @@ struct SetRfTxPinCommandResult FLATBUFFERS_FINAL_CLASS : private ::flatbuffers::
   OpenShock::Serialization::Local::SetGPIOResultCode result() const {
     return static_cast<OpenShock::Serialization::Local::SetGPIOResultCode>(GetField<uint8_t>(VT_RESULT, 0));
   }
-  bool Verify(::flatbuffers::Verifier &verifier) const {
+  template <bool B = false>
+  bool Verify(::flatbuffers::VerifierTemplate<B> &verifier) const {
     return VerifyTableStart(verifier) &&
            VerifyField<int8_t>(verifier, VT_PIN, 1) &&
            VerifyField<uint8_t>(verifier, VT_RESULT, 1) &&
@@ -790,7 +800,8 @@ struct SetEstopEnabledCommandResult FLATBUFFERS_FINAL_CLASS : private ::flatbuff
   bool success() const {
     return GetField<uint8_t>(VT_SUCCESS, 0) != 0;
   }
-  bool Verify(::flatbuffers::Verifier &verifier) const {
+  template <bool B = false>
+  bool Verify(::flatbuffers::VerifierTemplate<B> &verifier) const {
     return VerifyTableStart(verifier) &&
            VerifyField<uint8_t>(verifier, VT_ENABLED, 1) &&
            VerifyField<uint8_t>(verifier, VT_SUCCESS, 1) &&
@@ -850,7 +861,8 @@ struct SetEstopPinCommandResult FLATBUFFERS_FINAL_CLASS : private ::flatbuffers:
   OpenShock::Serialization::Local::SetGPIOResultCode result() const {
     return static_cast<OpenShock::Serialization::Local::SetGPIOResultCode>(GetField<uint8_t>(VT_RESULT, 0));
   }
-  bool Verify(::flatbuffers::Verifier &verifier) const {
+  template <bool B = false>
+  bool Verify(::flatbuffers::VerifierTemplate<B> &verifier) const {
     return VerifyTableStart(verifier) &&
            VerifyField<int8_t>(verifier, VT_GPIO_PIN, 1) &&
            VerifyField<uint8_t>(verifier, VT_RESULT, 1) &&
@@ -941,7 +953,8 @@ struct HubToLocalMessage FLATBUFFERS_FINAL_CLASS : private ::flatbuffers::Table 
   const OpenShock::Serialization::Local::SetEstopPinCommandResult *payload_as_SetEstopPinCommandResult() const {
     return payload_type() == OpenShock::Serialization::Local::HubToLocalMessagePayload::SetEstopPinCommandResult ? static_cast<const OpenShock::Serialization::Local::SetEstopPinCommandResult *>(payload()) : nullptr;
   }
-  bool Verify(::flatbuffers::Verifier &verifier) const {
+  template <bool B = false>
+  bool Verify(::flatbuffers::VerifierTemplate<B> &verifier) const {
     return VerifyTableStart(verifier) &&
            VerifyField<uint8_t>(verifier, VT_PAYLOAD_TYPE, 1) &&
            VerifyOffset(verifier, VT_PAYLOAD) &&
@@ -1026,7 +1039,8 @@ struct HubToLocalMessage::Traits {
   static auto constexpr Create = CreateHubToLocalMessage;
 };
 
-inline bool VerifyHubToLocalMessagePayload(::flatbuffers::Verifier &verifier, const void *obj, HubToLocalMessagePayload type) {
+template <bool B>
+inline bool VerifyHubToLocalMessagePayload(::flatbuffers::VerifierTemplate<B> &verifier, const void *obj, HubToLocalMessagePayload type) {
   switch (type) {
     case HubToLocalMessagePayload::NONE: {
       return true;
@@ -1075,7 +1089,8 @@ inline bool VerifyHubToLocalMessagePayload(::flatbuffers::Verifier &verifier, co
   }
 }
 
-inline bool VerifyHubToLocalMessagePayloadVector(::flatbuffers::Verifier &verifier, const ::flatbuffers::Vector<::flatbuffers::Offset<void>> *values, const ::flatbuffers::Vector<HubToLocalMessagePayload> *types) {
+template <bool B>
+inline bool VerifyHubToLocalMessagePayloadVector(::flatbuffers::VerifierTemplate<B> &verifier, const ::flatbuffers::Vector<::flatbuffers::Offset<void>> *values, const ::flatbuffers::Vector<HubToLocalMessagePayload> *types) {
   if (!values || !types) return !values && !types;
   if (values->size() != types->size()) return false;
   for (::flatbuffers::uoffset_t i = 0; i < values->size(); ++i) {
@@ -1095,14 +1110,16 @@ inline const OpenShock::Serialization::Local::HubToLocalMessage *GetSizePrefixed
   return ::flatbuffers::GetSizePrefixedRoot<OpenShock::Serialization::Local::HubToLocalMessage>(buf);
 }
 
+template <bool B = false>
 inline bool VerifyHubToLocalMessageBuffer(
-    ::flatbuffers::Verifier &verifier) {
-  return verifier.VerifyBuffer<OpenShock::Serialization::Local::HubToLocalMessage>(nullptr);
+    ::flatbuffers::VerifierTemplate<B> &verifier) {
+  return verifier.template VerifyBuffer<OpenShock::Serialization::Local::HubToLocalMessage>(nullptr);
 }
 
+template <bool B = false>
 inline bool VerifySizePrefixedHubToLocalMessageBuffer(
-    ::flatbuffers::Verifier &verifier) {
-  return verifier.VerifySizePrefixedBuffer<OpenShock::Serialization::Local::HubToLocalMessage>(nullptr);
+    ::flatbuffers::VerifierTemplate<B> &verifier) {
+  return verifier.template VerifySizePrefixedBuffer<OpenShock::Serialization::Local::HubToLocalMessage>(nullptr);
 }
 
 inline void FinishHubToLocalMessageBuffer(

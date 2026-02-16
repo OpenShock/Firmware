@@ -18,7 +18,8 @@ namespace OpenShock::Util {
 
   // Proxies a member function pointer to a void(void*) function pointer, allowing it to be passed to C-style APIs that expect a callback.
   template<auto MemberFunction, typename... Args>
-  inline void FnProxy(void* p, Args... args) {
+  inline void FnProxy(void* p, Args... args)
+  {
     using T = decltype(MemberFunction);
     using C = typename FnProxyImpl::MemFunTraits<T>::Class;
     (reinterpret_cast<C*>(p)->*MemberFunction)(std::forward<Args>(args)...);
