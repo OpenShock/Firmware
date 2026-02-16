@@ -18,6 +18,7 @@ runs:
     - uses: pnpm/action-setup@v4
       name: Install pnpm
       with:
+        package_json_file: ./frontend/package.json
         run_install: false
 
     - uses: actions/setup-node@v4
