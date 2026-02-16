@@ -86,15 +86,15 @@ std::vector<WiFiNetwork>::iterator _findNetwork(std::function<bool(WiFiNetwork&)
 }
 std::vector<WiFiNetwork>::iterator _findNetworkBySSID(const char* ssid, bool sortByAttractivity = true)
 {
-  return _findNetwork([ssid](const WiFiNetwork& net) { return strcmp(net.ssid, ssid) == 0; }, sortByAttractivity);
+  return _findNetwork([ssid](const WiFiNetwork& net) noexcept { return strcmp(net.ssid, ssid) == 0; }, sortByAttractivity);
 }
 std::vector<WiFiNetwork>::iterator _findNetworkByBSSID(const uint8_t (&bssid)[6])
 {
-  return _findNetwork([bssid](const WiFiNetwork& net) { return memcmp(net.bssid, bssid, sizeof(bssid)) == 0; }, false);
+  return _findNetwork([bssid](const WiFiNetwork& net) noexcept { return memcmp(net.bssid, bssid, sizeof(bssid)) == 0; }, false);
 }
 std::vector<WiFiNetwork>::iterator _findNetworkByCredentialsID(uint8_t credentialsID, bool sortByAttractivity = true)
 {
-  return _findNetwork([credentialsID](const WiFiNetwork& net) { return net.credentialsID == credentialsID; }, sortByAttractivity);
+  return _findNetwork([credentialsID](const WiFiNetwork& net) noexcept { return net.credentialsID == credentialsID; }, sortByAttractivity);
 }
 
 bool _markNetworkAsAttempted(const uint8_t (&bssid)[6])
@@ -564,7 +564,7 @@ bool WiFiManager::GetConnectedNetwork(OpenShock::WiFiNetwork& network)
     return false;
   }
 
-  auto it = _findNetwork([](const WiFiNetwork& net) { return net.credentialsID == s_connectedCredentialsID; });
+  auto it = _findNetwork([](const WiFiNetwork& net) noexcept { return net.credentialsID == s_connectedCredentialsID; });
   if (it == s_wifiNetworks.end()) {
     return false;
   }

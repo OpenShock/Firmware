@@ -16,8 +16,8 @@ namespace OpenShock::SerialCmds {
 
   class CommandEntry {
   public:
-    CommandEntry(std::string_view description, CommandHandler commandHandler);
-    CommandEntry(std::string_view name, std::string_view description, CommandHandler commandHandler);
+    CommandEntry(std::string_view description, CommandHandler commandHandler) noexcept;
+    CommandEntry(std::string_view name, std::string_view description, CommandHandler commandHandler) noexcept;
 
     inline std::string_view name() const { return m_name; }
     inline std::string_view description() const { return m_description; }

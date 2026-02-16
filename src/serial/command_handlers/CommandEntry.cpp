@@ -2,13 +2,13 @@
 
 using namespace OpenShock::SerialCmds;
 
-CommandEntry::CommandEntry(std::string_view description, CommandHandler commandHandler)
+CommandEntry::CommandEntry(std::string_view description, CommandHandler commandHandler) noexcept
   : m_description(description)
   , m_commandHandler(commandHandler)
 {
 }
 
-CommandEntry::CommandEntry(std::string_view name, std::string_view description, CommandHandler commandHandler)
+CommandEntry::CommandEntry(std::string_view name, std::string_view description, CommandHandler commandHandler) noexcept
   : m_name(name)
   , m_description(description)
   , m_commandHandler(commandHandler)
