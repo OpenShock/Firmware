@@ -421,7 +421,6 @@ static void otaum_updatetask(void* arg)
       continue;
     }
 
-
     // Flash app and filesystem partitions.
     if (!otaum_flash_fs_partition(filesystemPartition, release.filesystemBinaryUrl, release.filesystemBinaryHash)) {
       otaum_restore_wdt_timeout();
