@@ -182,7 +182,7 @@ void _evScanCompleted(arduino_event_id_t event, arduino_event_info_t info)
   networkRecords.reserve(numNetworks);
 
   for (int16_t i = 0; i < numNetworks; i++) {
-    wifi_ap_record_t* record = reinterpret_cast<wifi_ap_record_t*>(WiFi.getScanInfoByIndex(i));
+    wifi_ap_record_t* record = static_cast<wifi_ap_record_t*>(WiFi.getScanInfoByIndex(i));
     if (record == nullptr) {
       OS_LOGE(TAG, "Failed to get scan info for network #%d", i);
       return;

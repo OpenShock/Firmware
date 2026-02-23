@@ -132,7 +132,7 @@ discord.gg/OpenShock
   m_webServer.begin();
 
   if (fsOk) {
-    if (TaskUtils::TaskCreateExpensive(&Util::FnProxy<&CaptivePortal::CaptivePortalInstance::task>, TAG, 8192, this, 1, &m_taskHandle) != pdPASS) {  // PROFILED: 4-6KB stack usage
+    if (TaskUtils::TaskCreateExpensive(Util::FnProxy<&CaptivePortal::CaptivePortalInstance::task>, TAG, 8192, this, 1, &m_taskHandle) != pdPASS) {  // PROFILED: 4-6KB stack usage
       OS_LOGE(TAG, "Failed to create task");
     }
   }

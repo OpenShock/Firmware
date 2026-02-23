@@ -104,7 +104,7 @@ void RGBPatternManager::SetBrightness(uint8_t brightness)
 
 void RGBPatternManager::RunPattern(void* arg)
 {
-  RGBPatternManager* thisPtr = reinterpret_cast<RGBPatternManager*>(arg);
+  RGBPatternManager* thisPtr = static_cast<RGBPatternManager*>(arg);
 
   rmt_obj_t* rmtHandle           = thisPtr->m_rmtHandle;
   uint8_t brightness             = thisPtr->m_brightness;

@@ -160,7 +160,7 @@ static void commandhandler_handleestopstatechange(void* event_handler_arg, esp_e
   (void)event_base;
   (void)event_id;
 
-  EStopState state = *reinterpret_cast<EStopState*>(event_data);
+  EStopState state = *static_cast<EStopState*>(event_data);
 
   _internalSetKeepAliveEnabled(state == EStopState::Idle);
 }

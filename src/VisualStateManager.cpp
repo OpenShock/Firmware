@@ -315,7 +315,7 @@ void _handleEspIpEvent(void* event_handler_arg, esp_event_base_t event_base, int
 
 void _handleOpenShockEStopStateChanged(void* event_data)
 {
-  auto state = *reinterpret_cast<EStopState*>(event_data);
+  auto state = *static_cast<EStopState*>(event_data);
 
   _setStateFlag(kEmergencyStoppedFlag, state != EStopState::Idle);
   _setStateFlag(kEmergencyStopActiveClearingFlag, state == EStopState::ActiveClearing);
@@ -324,7 +324,7 @@ void _handleOpenShockEStopStateChanged(void* event_data)
 
 void _handleOpenShockGatewayStateChanged(void* event_data)
 {
-  auto state = *reinterpret_cast<GatewayClientState*>(event_data);
+  auto state = *static_cast<GatewayClientState*>(event_data);
 
   _setStateFlag(kWebSocketConnectedFlag, state == GatewayClientState::Connected);
 }

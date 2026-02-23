@@ -64,7 +64,7 @@ void PinPatternManager::SetPattern(const State* pattern, std::size_t patternLeng
   snprintf(name, sizeof(name), "PinPatternManager-%hhi", m_gpioPin);
 
   // Start the task
-  BaseType_t result = TaskUtils::TaskCreateUniversal(&Util::FnProxy<&PinPatternManager::RunPattern>, name, 1024, this, 1, &m_taskHandle, 1);  // PROFILED: 0.5KB stack usage
+  BaseType_t result = TaskUtils::TaskCreateUniversal(Util::FnProxy<&PinPatternManager::RunPattern>, name, 1024, this, 1, &m_taskHandle, 1);  // PROFILED: 0.5KB stack usage
   if (result != pdPASS) {
     OS_LOGE(TAG, "[pin-%hhi] Failed to create task: %d", m_gpioPin, result);
 

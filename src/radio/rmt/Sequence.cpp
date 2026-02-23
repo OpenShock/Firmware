@@ -57,7 +57,7 @@ Rmt::Sequence::Sequence(ShockerModelType shockerModel, uint16_t shockerId, int64
 {
   if (m_size == 0) return;
 
-  m_data = reinterpret_cast<rmt_data_t*>(malloc(m_size * 2 * sizeof(rmt_data_t)));
+  m_data = static_cast<rmt_data_t*>(malloc(m_size * 2 * sizeof(rmt_data_t)));
   if (m_data == nullptr) {
     m_size = 0;
     return;

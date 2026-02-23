@@ -29,6 +29,8 @@ namespace OpenShock::Checksum {
   template<typename T>
   constexpr uint8_t Sum8(const T& data)
   {
+    static_assert(std::is_trivially_copyable_v<T>, "Sum8 only supports trivially copyable types");
+
     return Sum8(reinterpret_cast<const uint8_t*>(std::addressof(data)), sizeof(T));
   }
 
