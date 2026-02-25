@@ -11,12 +11,12 @@ const rmt_data_t kRmtPostamble = {220, 1, 135, 0};
 
 using namespace OpenShock;
 
-size_t Rmt::T330Encoder::GetBufferSize()
+size_t Rmt::WellturnT330Encoder::GetBufferSize()
 {
   return 43;
 }
 
-bool Rmt::T330Encoder::FillBuffer(rmt_data_t* sequence, uint16_t shockerId, ShockerCommandType type, uint8_t intensity)
+bool Rmt::WellturnT330Encoder::FillBuffer(rmt_data_t* sequence, uint16_t shockerId, ShockerCommandType type, uint8_t intensity)
 {
   // Intensity must be between 0 and 100
   intensity = std::min(intensity, static_cast<uint8_t>(100));

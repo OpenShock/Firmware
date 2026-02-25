@@ -21,21 +21,21 @@ using namespace OpenShock;
 
 const std::size_t HANDLER_COUNT = static_cast<std::size_t>(PayloadType::MAX) + 1;
 
-#define SET_HANDLER(payload) handlers[static_cast<std::size_t>(PayloadType::payload)] = Handlers::Handle##payload
-
 static std::array<Handlers::HandlerType, HANDLER_COUNT> s_serverHandlers = []() {
   std::array<Handlers::HandlerType, HANDLER_COUNT> handlers {};
   handlers.fill(Handlers::HandleInvalidMessage);
 
-  SET_HANDLER(Ping);
-  SET_HANDLER(Trigger);
-  SET_HANDLER(ShockerCommandList);
-  SET_HANDLER(OtaUpdateRequest);
+  auto set = [&](PayloadType p, Handlers::HandlerType h) {
+    handlers[static_cast<std::size_t>(p)] = h;
+  };
+
+  set(PayloadType::Ping, Handlers::HandlePing);
+  set(PayloadType::Trigger, Handlers::HandleTrigger);
+  set(PayloadType::ShockerCommandList, Handlers::HandleShockerCommandList);
+  set(PayloadType::OtaUpdateRequest, Handlers::HandleOtaUpdateRequest);
 
   return handlers;
 }();
-
-#undef SET_HANDLER
 
 void MessageHandlers::WebSocket::HandleGatewayBinary(tcb::span<const uint8_t> data)
 {
