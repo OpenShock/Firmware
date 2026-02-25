@@ -46,9 +46,9 @@ void _Private::HandleShockerCommandList(const OpenShock::Serialization::Gateway:
       case FbsModelType::Petrainer998DR:
         model = OpenShock::ShockerModelType::Petrainer998DR;
         break;
-      // case FbsModelType::T330:
-      //   model = OpenShock::ShockerModelType::T330;
-      //   break;
+      case FbsModelType::WellturnT330:
+        model = OpenShock::ShockerModelType::WellturnT330;
+        break;
       // case FbsModelType::D80:
       //   model = OpenShock::ShockerModelType::D80;
       //   break;
