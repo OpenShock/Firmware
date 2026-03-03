@@ -86,6 +86,7 @@ static void commandhandler_keepalivetask(void* arg)
       if (cmdRef.lastActivityTimestamp + KEEP_ALIVE_INTERVAL < now) {
         OS_LOGV(TAG, "Sending keep-alive for shocker %u", cmdRef.shockerId);
 
+        ScopedReadLock rfLock__(&s_rfTransmitterMutex);
         if (s_rfTransmitter == nullptr) {
           OS_LOGW(TAG, "RF Transmitter is not initialized, ignoring keep-alive");
           break;
@@ -229,6 +230,7 @@ bool CommandHandler::Init()
 
 bool CommandHandler::Ok()
 {
+  ScopedReadLock lock__(&s_rfTransmitterMutex);
   return s_rfTransmitter != nullptr;
 }
 
@@ -278,6 +280,7 @@ bool CommandHandler::SetKeepAliveEnabled(bool enabled)
 
 gpio_num_t CommandHandler::GetRfTxPin()
 {
+  ScopedReadLock lock__(&s_rfTransmitterMutex);
   if (s_rfTransmitter != nullptr) {
     return s_rfTransmitter->GetTxPin();
   }

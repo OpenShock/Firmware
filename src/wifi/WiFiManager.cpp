@@ -18,6 +18,8 @@ const char* const TAG = "WiFiManager";
 #include <esp_wifi.h>
 #include <esp_wifi_types.h>
 
+#include "SimpleMutex.h"
+
 #include <cstdint>
 #include <vector>
 
@@ -29,10 +31,11 @@ enum class WiFiState : uint8_t {
   Connected    = 1 << 1,
 };
 
-static WiFiState s_wifiState            = WiFiState::Disconnected;
+static volatile WiFiState s_wifiState   = WiFiState::Disconnected;
 static uint8_t s_connectedBSSID[6]      = {0};
 static uint8_t s_connectedCredentialsID = 0;
 static uint8_t s_preferredCredentialsID = 0;
+static OpenShock::SimpleMutex s_networksMutex;
 static std::vector<WiFiNetwork> s_wifiNetworks;
 
 bool _isZeroBSSID(const uint8_t (&bssid)[6])
@@ -48,14 +51,14 @@ bool _isZeroBSSID(const uint8_t (&bssid)[6])
 
 bool _attractivityComparer(const WiFiNetwork& a, const WiFiNetwork& b)
 {
-  if (a.credentialsID == 0) {
-    return false;
-  }
+  // Networks with credentials sort before those without
+  if (a.credentialsID != 0 && b.credentialsID == 0) return true;
+  if (a.credentialsID == 0 && b.credentialsID != 0) return false;
 
-  if (a.connectAttempts > b.connectAttempts) {
-    return false;
-  }
+  // Fewer connect attempts is more attractive
+  if (a.connectAttempts != b.connectAttempts) return a.connectAttempts < b.connectAttempts;
 
+  // Higher RSSI is more attractive
   return a.rssi > b.rssi;
 }
 bool _isConnectRateLimited(const WiFiNetwork& net)
@@ -206,6 +209,8 @@ void _evWiFiConnected(arduino_event_t* event)
   s_wifiState = WiFiState::Connected;
   memcpy(s_connectedBSSID, info.bssid, sizeof(s_connectedBSSID));
 
+  ScopedLock lock__(&s_networksMutex);
+
   auto it = _findNetworkByBSSID(info.bssid);
   if (it == s_wifiNetworks.end()) {
     s_connectedCredentialsID = 0;
@@ -265,6 +270,8 @@ void _evWiFiScanStarted()
 }
 void _evWiFiScanStatusChanged(OpenShock::WiFiScanStatus status)
 {
+  ScopedLock lock__(&s_networksMutex);
+
   // If the scan started, remove any networks that have not been seen in 3 scans
   if (status == OpenShock::WiFiScanStatus::Started) {
     for (auto it = s_wifiNetworks.begin(); it != s_wifiNetworks.end();) {
@@ -289,6 +296,8 @@ void _evWiFiScanStatusChanged(OpenShock::WiFiScanStatus status)
 }
 void _evWiFiNetworksDiscovery(const std::vector<const wifi_ap_record_t*>& records)
 {
+  ScopedLock lock__(&s_networksMutex);
+
   std::vector<WiFiNetwork> updatedNetworks;
   std::vector<WiFiNetwork> discoveredNetworks;
 
@@ -332,14 +341,17 @@ esp_err_t set_esp_interface_dns(esp_interface_t interface, IPAddress main_dns, I
 
 bool _tryConnect()
 {
+  ScopedLock lock__(&s_networksMutex);
+
   Config::WiFiCredentials creds;
   if (s_preferredCredentialsID != 0) {
-    bool foundCreds = Config::TryGetWiFiCredentialsByID(s_preferredCredentialsID, creds);
-
+    uint8_t preferredId      = s_preferredCredentialsID;
     s_preferredCredentialsID = 0;
 
+    bool foundCreds = Config::TryGetWiFiCredentialsByID(preferredId, creds);
+
     if (!foundCreds) {
-      OS_LOGE(TAG, "Failed to find credentials with ID %u", s_preferredCredentialsID);
+      OS_LOGE(TAG, "Failed to find credentials with ID %u", preferredId);
       return false;
     }
 
@@ -428,6 +440,8 @@ bool WiFiManager::Save(const char* ssid, std::string_view password)
 {
   OS_LOGV(TAG, "Authenticating to network %s", ssid);
 
+  ScopedLock lock__(&s_networksMutex);
+
   auto it = _findNetworkBySSID(ssid);
   if (it == s_wifiNetworks.end()) {
     OS_LOGE(TAG, "Failed to find network with SSID %s", ssid);
@@ -443,6 +457,8 @@ bool WiFiManager::Save(const char* ssid, std::string_view password)
 bool WiFiManager::Forget(const char* ssid)
 {
   OS_LOGV(TAG, "Forgetting network %s", ssid);
+
+  ScopedLock lock__(&s_networksMutex);
 
   auto it = _findNetworkBySSID(ssid);
   if (it == s_wifiNetworks.end()) {
@@ -470,6 +486,8 @@ bool WiFiManager::Forget(const char* ssid)
 bool WiFiManager::RefreshNetworkCredentials()
 {
   OS_LOGV(TAG, "Refreshing network credentials");
+
+  ScopedLock lock__(&s_networksMutex);
 
   for (auto& net : s_wifiNetworks) {
     Config::WiFiCredentials creds;
@@ -555,7 +573,12 @@ bool WiFiManager::GetConnectedNetwork(OpenShock::WiFiNetwork& network)
     if (IsConnected()) {
       // We connected without a scan, so populate the network with the current connection info manually
       network.credentialsID = 0;
-      memcpy(network.ssid, WiFi.SSID().c_str(), WiFi.SSID().length() + 1);
+      {
+        auto ssid             = WiFi.SSID();
+        size_t len            = std::min(static_cast<size_t>(ssid.length()), sizeof(network.ssid) - 1);
+        memcpy(network.ssid, ssid.c_str(), len);
+        network.ssid[len] = '\0';
+      }
       memcpy(network.bssid, WiFi.BSSID(), sizeof(network.bssid));
       network.channel = WiFi.channel();
       network.rssi    = WiFi.RSSI();
@@ -601,5 +624,6 @@ bool WiFiManager::GetIPv6Address(char* ipAddress)
 
 std::vector<WiFiNetwork> WiFiManager::GetDiscoveredWiFiNetworks()
 {
+  ScopedLock lock__(&s_networksMutex);
   return s_wifiNetworks;
 }

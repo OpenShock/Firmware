@@ -14,7 +14,7 @@ HTTP::Response<Serialization::JsonAPI::AccountLinkResponse> HTTP::JsonAPI::LinkA
   }
 
   char uri[OPENSHOCK_URI_BUFFER_SIZE];
-  sprintf(uri, "https://%s/1/device/pair/%.*s", domain.c_str(), accountLinkCode.length(), accountLinkCode.data());
+  snprintf(uri, sizeof(uri), "https://%s/1/device/pair/%.*s", domain.c_str(), static_cast<int>(accountLinkCode.length()), accountLinkCode.data());
 
   return HTTP::GetJSON<Serialization::JsonAPI::AccountLinkResponse>(
     uri,
@@ -34,7 +34,7 @@ HTTP::Response<Serialization::JsonAPI::HubInfoResponse> HTTP::JsonAPI::GetHubInf
   }
 
   char uri[OPENSHOCK_URI_BUFFER_SIZE];
-  sprintf(uri, "https://%s/1/device/self", domain.c_str());
+  snprintf(uri, sizeof(uri), "https://%s/1/device/self", domain.c_str());
 
   return HTTP::GetJSON<Serialization::JsonAPI::HubInfoResponse>(
     uri,
@@ -55,7 +55,7 @@ HTTP::Response<Serialization::JsonAPI::AssignLcgResponse> HTTP::JsonAPI::AssignL
   }
 
   char uri[OPENSHOCK_URI_BUFFER_SIZE];
-  sprintf(uri, "https://%s/2/device/assignLCG?version=2", domain.c_str());
+  snprintf(uri, sizeof(uri), "https://%s/2/device/assignLCG?version=2", domain.c_str());
 
   return HTTP::GetJSON<Serialization::JsonAPI::AssignLcgResponse>(
     uri,

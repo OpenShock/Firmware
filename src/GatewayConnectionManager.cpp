@@ -10,6 +10,9 @@ const char* const TAG = "GatewayConnectionManager";
 #include "http/JsonAPI.h"
 #include "Logging.h"
 
+#include "SimpleMutex.h"
+
+#include <atomic>
 #include <unordered_map>
 
 //
@@ -34,16 +37,17 @@ const uint8_t FLAG_LINKED = 1 << 1;
 
 const uint8_t LINK_CODE_LENGTH = 6;
 
-static uint8_t s_flags                                      = 0;
-static int64_t s_lastAuthFailure                            = 0;
-static int64_t s_lastConnectionAttempt                      = 0;
+static std::atomic<uint8_t> s_flags                 = 0;
+static std::atomic<int64_t> s_lastAuthFailure       = 0;
+static std::atomic<int64_t> s_lastConnectionAttempt = 0;
+static OpenShock::SimpleMutex s_clientMutex;
 static std::unique_ptr<OpenShock::GatewayClient> s_wsClient = nullptr;
 
 static void evh_gotIP(arduino_event_t* event)
 {
   (void)event;
 
-  s_flags |= FLAG_HAS_IP;
+  s_flags.fetch_or(FLAG_HAS_IP, std::memory_order_relaxed);
   OS_LOGD(TAG, "Got IP address");
 }
 
@@ -51,8 +55,11 @@ static void evh_wiFiDisconnected(arduino_event_t* event)
 {
   (void)event;
 
-  s_flags    = FLAG_NONE;
-  s_wsClient = nullptr;
+  s_flags.store(FLAG_NONE, std::memory_order_relaxed);
+  {
+    OpenShock::ScopedLock lock__(&s_clientMutex);
+    s_wsClient = nullptr;
+  }
   OS_LOGD(TAG, "Lost IP address");
 }
 
@@ -79,6 +86,7 @@ bool GatewayConnectionManager::Init()
 
 bool GatewayConnectionManager::IsConnected()
 {
+  ScopedLock lock__(&s_clientMutex);
   if (s_wsClient == nullptr) {
     return false;
   }
@@ -88,15 +96,18 @@ bool GatewayConnectionManager::IsConnected()
 
 bool GatewayConnectionManager::IsLinked()
 {
-  return (s_flags & FLAG_LINKED) != 0;
+  return (s_flags.load(std::memory_order_relaxed) & FLAG_LINKED) != 0;
 }
 
 AccountLinkResultCode GatewayConnectionManager::Link(std::string_view linkCode)
 {
-  if ((s_flags & FLAG_HAS_IP) == 0) {
+  if ((s_flags.load(std::memory_order_relaxed) & FLAG_HAS_IP) == 0) {
     return AccountLinkResultCode::NoInternetConnection;
   }
-  s_wsClient = nullptr;
+  {
+    ScopedLock lock__(&s_clientMutex);
+    s_wsClient = nullptr;
+  }
 
   OS_LOGD(TAG, "Attempting to link to account using code %.*s", linkCode.length(), linkCode.data());
 
@@ -136,20 +147,24 @@ AccountLinkResultCode GatewayConnectionManager::Link(std::string_view linkCode)
     return AccountLinkResultCode::InternalError;
   }
 
-  s_flags |= FLAG_LINKED;
+  s_flags.fetch_or(FLAG_LINKED, std::memory_order_relaxed);
   OS_LOGD(TAG, "Successfully linked to account");
 
   return AccountLinkResultCode::Success;
 }
 void GatewayConnectionManager::UnLink()
 {
-  s_flags &= FLAG_HAS_IP;
-  s_wsClient = nullptr;
+  s_flags.fetch_and(static_cast<uint8_t>(~FLAG_LINKED), std::memory_order_relaxed);
+  {
+    ScopedLock lock__(&s_clientMutex);
+    s_wsClient = nullptr;
+  }
   Config::ClearBackendAuthToken();
 }
 
 bool GatewayConnectionManager::SendMessageTXT(std::string_view data)
 {
+  ScopedLock lock__(&s_clientMutex);
   if (s_wsClient == nullptr) {
     return false;
   }
@@ -159,6 +174,7 @@ bool GatewayConnectionManager::SendMessageTXT(std::string_view data)
 
 bool GatewayConnectionManager::SendMessageBIN(tcb::span<const uint8_t> data)
 {
+  ScopedLock lock__(&s_clientMutex);
   if (s_wsClient == nullptr) {
     return false;
   }
@@ -169,7 +185,7 @@ bool GatewayConnectionManager::SendMessageBIN(tcb::span<const uint8_t> data)
 bool FetchHubInfo(std::string authToken)
 {
   // TODO: this function is very slow, should be optimized!
-  if ((s_flags & FLAG_HAS_IP) == 0) {
+  if ((s_flags.load(std::memory_order_relaxed) & FLAG_HAS_IP) == 0) {
     return false;
   }
 
@@ -181,7 +197,7 @@ bool FetchHubInfo(std::string authToken)
 
   if (response.code == 401) {
     OS_LOGD(TAG, "Auth token is invalid, waiting 5 minutes before checking again");
-    s_lastAuthFailure = OpenShock::micros();
+    s_lastAuthFailure = OpenShock::millis();
     return false;
   }
 
@@ -205,7 +221,7 @@ bool FetchHubInfo(std::string authToken)
     OS_LOGI(TAG, "  [%s] rf=%u model=%u", shocker.id.c_str(), shocker.rfId, shocker.model);
   }
 
-  s_flags |= FLAG_LINKED;
+  s_flags.fetch_or(FLAG_LINKED, std::memory_order_relaxed);
 
   return true;
 }
@@ -245,7 +261,7 @@ bool StartConnectingToLCG()
 
   if (response.code == 401) {
     OS_LOGD(TAG, "Auth token is invalid, waiting 5 minutes before retrying");
-    s_lastAuthFailure = OpenShock::micros();
+    s_lastAuthFailure = OpenShock::millis();
     return false;
   }
 
@@ -270,9 +286,11 @@ bool StartConnectingToLCG()
 
 void GatewayConnectionManager::Update()
 {
+  ScopedLock lock__(&s_clientMutex);
+
   if (s_wsClient == nullptr) {
     // Can't connect to the API without WiFi or an auth token
-    if ((s_flags & FLAG_HAS_IP) == 0 || !Config::HasBackendAuthToken()) {
+    if ((s_flags.load(std::memory_order_relaxed) & FLAG_HAS_IP) == 0 || !Config::HasBackendAuthToken()) {
       return;
     }
 
@@ -287,7 +305,7 @@ void GatewayConnectionManager::Update()
       return;
     }
 
-    s_flags |= FLAG_LINKED;
+    s_flags.fetch_or(FLAG_LINKED, std::memory_order_relaxed);
     OS_LOGD(TAG, "Successfully verified auth token");
 
     s_wsClient = std::make_unique<GatewayClient>(authToken);

@@ -11,6 +11,7 @@ const char* const TAG = "VisualStateManager";
 #include "PinPatternManager.h"
 #include "RGBPatternManager.h"
 
+#include <atomic>
 #include <memory>
 
 #ifndef OPENSHOCK_LED_GPIO
@@ -32,22 +33,22 @@ const uint64_t kWiFiScanningFlag                 = 1 << 7;
 // Bitmask of when the system is running normally
 const uint64_t kStatusOKMask = kWebSocketConnectedFlag | kHasIpAddressFlag | kWiFiConnectedFlag;
 
-static uint64_t s_stateFlags = 0;
+static std::atomic<uint64_t> s_stateFlags = 0;
 static std::shared_ptr<OpenShock::PinPatternManager> s_builtInLedManager;
 static std::shared_ptr<OpenShock::RGBPatternManager> s_RGBLedManager;
 
 inline void _setStateFlag(uint64_t flag, bool state)
 {
   if (state) {
-    s_stateFlags |= flag;
+    s_stateFlags.fetch_or(flag, std::memory_order_relaxed);
   } else {
-    s_stateFlags &= ~flag;
+    s_stateFlags.fetch_and(~flag, std::memory_order_relaxed);
   }
 }
 
 inline bool _isStateFlagSet(uint64_t flag)
 {
-  return s_stateFlags & flag;
+  return s_stateFlags.load(std::memory_order_relaxed) & flag;
 }
 
 using namespace OpenShock;
@@ -384,7 +385,7 @@ bool VisualStateManager::Init()
 
   err = esp_event_handler_register(WIFI_EVENT, ESP_EVENT_ANY_ID, _handleEspWiFiEvent, nullptr);
   if (err != ESP_OK) {
-    OS_LOGE(TAG, "Failed to register event handler for IP_EVENT: %s", esp_err_to_name(err));
+    OS_LOGE(TAG, "Failed to register event handler for WIFI_EVENT: %s", esp_err_to_name(err));
     return false;
   }
 

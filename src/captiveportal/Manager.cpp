@@ -17,13 +17,16 @@ const char* const TAG = "CaptivePortal";
 
 #include <esp_timer.h>
 
+#include "SimpleMutex.h"
+
 #include <memory>
 
 using namespace OpenShock;
 
-static bool s_alwaysEnabled                                             = false;
-static bool s_forceClosed                                               = false;
-static esp_timer_handle_t s_captivePortalUpdateLoopTimer                = nullptr;
+static volatile bool s_alwaysEnabled                     = false;
+static volatile bool s_forceClosed                       = false;
+static esp_timer_handle_t s_captivePortalUpdateLoopTimer = nullptr;
+static SimpleMutex s_instanceMutex;
 static std::unique_ptr<CaptivePortal::CaptivePortalInstance> s_instance = nullptr;
 
 static bool captiveportal_start()
@@ -82,6 +85,8 @@ static void captiveportal_updateloop(void*)
   bool gatewayConnected = GatewayConnectionManager::IsConnected();
   bool commandHandlerOk = CommandHandler::Ok();
   bool shouldBeRunning  = (s_alwaysEnabled || !gatewayConnected || !commandHandlerOk) && !s_forceClosed;
+
+  ScopedLock lock__(&s_instanceMutex);
 
   if (s_instance == nullptr) {
     if (shouldBeRunning) {
@@ -166,11 +171,13 @@ bool CaptivePortal::ForceClose(uint32_t timeoutMs)
 
 bool CaptivePortal::IsRunning()
 {
+  ScopedLock lock__(&s_instanceMutex);
   return s_instance != nullptr;
 }
 
 bool CaptivePortal::SendMessageTXT(uint8_t socketId, std::string_view data)
 {
+  ScopedLock lock__(&s_instanceMutex);
   if (s_instance == nullptr) return false;
 
   s_instance->sendMessageTXT(socketId, data);
@@ -179,6 +186,7 @@ bool CaptivePortal::SendMessageTXT(uint8_t socketId, std::string_view data)
 }
 bool CaptivePortal::SendMessageBIN(uint8_t socketId, tcb::span<const uint8_t> data)
 {
+  ScopedLock lock__(&s_instanceMutex);
   if (s_instance == nullptr) return false;
 
   s_instance->sendMessageBIN(socketId, data);
@@ -188,6 +196,7 @@ bool CaptivePortal::SendMessageBIN(uint8_t socketId, tcb::span<const uint8_t> da
 
 bool CaptivePortal::BroadcastMessageTXT(std::string_view data)
 {
+  ScopedLock lock__(&s_instanceMutex);
   if (s_instance == nullptr) return false;
 
   s_instance->broadcastMessageTXT(data);
@@ -196,6 +205,7 @@ bool CaptivePortal::BroadcastMessageTXT(std::string_view data)
 }
 bool CaptivePortal::BroadcastMessageBIN(tcb::span<const uint8_t> data)
 {
+  ScopedLock lock__(&s_instanceMutex);
   if (s_instance == nullptr) return false;
 
   s_instance->broadcastMessageBIN(data);

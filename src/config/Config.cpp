@@ -44,27 +44,23 @@ static ReadWriteMutex _configMutex;
 
 bool _tryDeserializeConfig(const uint8_t* buffer, std::size_t bufferLen, OpenShock::Config::RootConfig& config)
 {
-  if (buffer == nullptr || bufferLen == 0) {
-    OS_LOGE(TAG, "Buffer is null or empty");
+  if (buffer == nullptr || bufferLen < sizeof(flatbuffers::uoffset_t)) {
+    OS_LOGE(TAG, "Buffer is null or too small");
     return false;
   }
 
-  // Deserialize
-  auto fbsConfig = flatbuffers::GetRoot<Serialization::Configuration::HubConfig>(buffer);
-  if (fbsConfig == nullptr) {
-    OS_LOGE(TAG, "Failed to get deserialization root for config file");
-    return false;
-  }
-
-  // Validate buffer
+  // Validate buffer before accessing
   flatbuffers::Verifier::Options verifierOptions {
     .max_size = 4096,  // Should be enough
   };
   flatbuffers::Verifier verifier(buffer, bufferLen, verifierOptions);
-  if (!fbsConfig->Verify(verifier)) {
+  if (!verifier.VerifyBuffer<Serialization::Configuration::HubConfig>()) {
     OS_LOGE(TAG, "Failed to verify config file integrity");
     return false;
   }
+
+  // Deserialize (safe after verification)
+  auto fbsConfig = flatbuffers::GetRoot<Serialization::Configuration::HubConfig>(buffer);
 
   // Read config
   if (!config.FromFlatbuffers(fbsConfig)) {
@@ -167,6 +163,10 @@ cJSON* _getAsCJSON(bool withSensitiveData)
 std::string Config::GetAsJSON(bool withSensitiveData)
 {
   cJSON* root = _getAsCJSON(withSensitiveData);
+  if (root == nullptr) {
+    OS_LOGE(TAG, "Failed to get config as JSON");
+    return {};
+  }
 
   char* json = cJSON_PrintUnformatted(root);
 
@@ -467,14 +467,14 @@ uint8_t Config::AddWiFiCredentials(std::string_view ssid, std::string_view passw
     if (std::string_view(creds.ssid) == ssid) {
       creds.password = password;
 
-      id = creds.id;
-
-      break;
+      _trySaveConfig();
+      return creds.id;
     }
 
     if (creds.id == 0) {
       OS_LOGW(TAG, "Found WiFi credentials with ID 0, removing");
       it = _configData.wifi.credentialsList.erase(it);
+      if (it == _configData.wifi.credentialsList.end()) break;
       continue;
     }
 

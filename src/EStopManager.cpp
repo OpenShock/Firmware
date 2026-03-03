@@ -33,9 +33,9 @@ static OpenShock::SimpleMutex s_estopMutex = {};
 static gpio_num_t s_estopPin               = GPIO_NUM_NC;
 static TaskHandle_t s_estopTask            = nullptr;
 
-static EStopState s_lastPublishedState = EStopState::Idle;
-static bool s_estopActive              = false;
-static int64_t s_estopActivatedAt      = 0;
+static EStopState s_lastPublishedState     = EStopState::Idle;
+static volatile bool s_estopActive         = false;
+static volatile int64_t s_estopActivatedAt = 0;
 
 static volatile bool s_externallyTriggered = false;
 

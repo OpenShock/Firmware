@@ -85,7 +85,9 @@ void CaptivePortal::RFC8908Handler::handleRequest(AsyncWebServerRequest* request
     cJSON_AddStringToObject(doc, "user-portal-url", portalUrl.c_str());
     cJSON_AddStringToObject(doc, "venue-info-url", "https://openshock.org");
 
-    AsyncWebServerResponse* response = request->beginResponse(200, "application/captive+json", cJSON_Print(doc));
+    char* jsonStr                    = cJSON_Print(doc);
+    AsyncWebServerResponse* response = request->beginResponse(200, "application/captive+json", jsonStr);
+    cJSON_free(jsonStr);
 
     response->addHeader("Cache-Control", "private");
     request->send(response);
