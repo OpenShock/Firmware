@@ -286,34 +286,45 @@ bool StartConnectingToLCG()
 
 void GatewayConnectionManager::Update()
 {
-  ScopedLock lock__(&s_clientMutex);
+  // Check if client already exists (short lock)
+  {
+    ScopedLock lock__(&s_clientMutex);
+    if (s_wsClient != nullptr) {
+      // Client exists — run its loop and optionally reconnect
+      if (s_wsClient->loop()) {
+        return;
+      }
 
-  if (s_wsClient == nullptr) {
-    // Can't connect to the API without WiFi or an auth token
-    if ((s_flags.load(std::memory_order_relaxed) & FLAG_HAS_IP) == 0 || !Config::HasBackendAuthToken()) {
+      StartConnectingToLCG();
       return;
     }
-
-    std::string authToken;
-    if (!Config::GetBackendAuthToken(authToken)) {
-      OS_LOGE(TAG, "Failed to get auth token");
-      return;
-    }
-
-    // Fetch hub info
-    if (!FetchHubInfo(authToken)) {
-      return;
-    }
-
-    s_flags.fetch_or(FLAG_LINKED, std::memory_order_relaxed);
-    OS_LOGD(TAG, "Successfully verified auth token");
-
-    s_wsClient = std::make_unique<GatewayClient>(authToken);
   }
 
-  if (s_wsClient->loop()) {
+  // No client — check prerequisites without holding the mutex
+  if ((s_flags.load(std::memory_order_relaxed) & FLAG_HAS_IP) == 0 || !Config::HasBackendAuthToken()) {
     return;
   }
 
-  StartConnectingToLCG();
+  std::string authToken;
+  if (!Config::GetBackendAuthToken(authToken)) {
+    OS_LOGE(TAG, "Failed to get auth token");
+    return;
+  }
+
+  // Fetch hub info (HTTP call — done without mutex)
+  if (!FetchHubInfo(authToken)) {
+    return;
+  }
+
+  s_flags.fetch_or(FLAG_LINKED, std::memory_order_relaxed);
+  OS_LOGD(TAG, "Successfully verified auth token");
+
+  // Create client under lock
+  {
+    ScopedLock lock__(&s_clientMutex);
+    // Double-check: another task may have created it while we were fetching hub info
+    if (s_wsClient == nullptr) {
+      s_wsClient = std::make_unique<GatewayClient>(authToken);
+    }
+  }
 }

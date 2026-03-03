@@ -20,6 +20,7 @@ const char* const TAG = "WiFiManager";
 
 #include "SimpleMutex.h"
 
+#include <atomic>
 #include <cstdint>
 #include <vector>
 
@@ -31,7 +32,7 @@ enum class WiFiState : uint8_t {
   Connected    = 1 << 1,
 };
 
-static volatile WiFiState s_wifiState   = WiFiState::Disconnected;
+static std::atomic<WiFiState> s_wifiState {WiFiState::Disconnected};
 static uint8_t s_connectedBSSID[6]      = {0};
 static uint8_t s_connectedCredentialsID = 0;
 static uint8_t s_preferredCredentialsID = 0;
@@ -139,9 +140,9 @@ bool _connectImpl(const char* ssid, const char* password, const uint8_t (&bssid)
   _markNetworkAsAttempted(bssid);
 
   // Connect to the network
-  s_wifiState = WiFiState::Connecting;
+  s_wifiState.store(WiFiState::Connecting, std::memory_order_relaxed);
   if (WiFi.begin(ssid, password, 0, bssid, true) == WL_CONNECT_FAILED) {
-    s_wifiState = WiFiState::Disconnected;
+    s_wifiState.store(WiFiState::Disconnected, std::memory_order_relaxed);
     return false;
   }
 
@@ -206,7 +207,7 @@ void _evWiFiConnected(arduino_event_t* event)
 {
   auto& info = event->event_info.wifi_sta_connected;
 
-  s_wifiState = WiFiState::Connected;
+  s_wifiState.store(WiFiState::Connected, std::memory_order_relaxed);
   memcpy(s_connectedBSSID, info.bssid, sizeof(s_connectedBSSID));
 
   ScopedLock lock__(&s_networksMutex);
@@ -245,7 +246,7 @@ void _evWiFiGotIP6(arduino_event_t* event)
 }
 void _evWiFiDisconnected(arduino_event_t* event)
 {
-  s_wifiState = WiFiState::Disconnected;
+  s_wifiState.store(WiFiState::Disconnected, std::memory_order_relaxed);
 
   auto& info = event->event_info.wifi_sta_disconnected;
 
@@ -341,39 +342,40 @@ esp_err_t set_esp_interface_dns(esp_interface_t interface, IPAddress main_dns, I
 
 bool _tryConnect()
 {
-  ScopedLock lock__(&s_networksMutex);
-
   Config::WiFiCredentials creds;
-  if (s_preferredCredentialsID != 0) {
-    uint8_t preferredId      = s_preferredCredentialsID;
-    s_preferredCredentialsID = 0;
 
-    bool foundCreds = Config::TryGetWiFiCredentialsByID(preferredId, creds);
+  // Select target network under lock, then release before connecting
+  {
+    ScopedLock lock__(&s_networksMutex);
 
-    if (!foundCreds) {
-      OS_LOGE(TAG, "Failed to find credentials with ID %u", preferredId);
+    if (s_preferredCredentialsID != 0) {
+      uint8_t preferredId      = s_preferredCredentialsID;
+      s_preferredCredentialsID = 0;
+
+      if (!Config::TryGetWiFiCredentialsByID(preferredId, creds)) {
+        OS_LOGE(TAG, "Failed to find credentials with ID %u", preferredId);
+        return false;
+      }
+
+      // creds populated — connect outside the lock
+    } else if (!_getNextWiFiNetwork(creds)) {
       return false;
     }
-
-    if (_connect(creds.ssid, creds.password)) {
-      return true;
-    }
-
-    OS_LOGE(TAG, "Failed to connect to network %s", creds.ssid.c_str());
   }
 
-  if (!_getNextWiFiNetwork(creds)) {
-    return false;
+  if (_connect(creds.ssid, creds.password)) {
+    return true;
   }
 
-  return _connect(creds.ssid, creds.password);
+  OS_LOGE(TAG, "Failed to connect to network %s", creds.ssid.c_str());
+  return false;
 }
 
 void _wifimanagerUpdateTask(void*)
 {
   int64_t lastScanRequest = 0;
   while (true) {
-    if (s_wifiState == WiFiState::Disconnected && !WiFiScanManager::IsScanning()) {
+    if (s_wifiState.load(std::memory_order_relaxed) == WiFiState::Disconnected && !WiFiScanManager::IsScanning()) {
       if (!_tryConnect()) {
         int64_t now = OpenShock::millis();
         if (lastScanRequest == 0 || now - lastScanRequest > 120'000) {  // Auto-scan at boot and then every 2 mins
@@ -522,7 +524,7 @@ bool WiFiManager::Connect(const char* ssid)
     return true;
   }
 
-  if (s_wifiState == WiFiState::Disconnected) {
+  if (s_wifiState.load(std::memory_order_relaxed) == WiFiState::Disconnected) {
     s_preferredCredentialsID = creds.id;
     return true;
   }
@@ -550,7 +552,7 @@ bool WiFiManager::Connect(const uint8_t (&bssid)[6])
     return true;
   }
 
-  if (s_wifiState == WiFiState::Disconnected) {
+  if (s_wifiState.load(std::memory_order_relaxed) == WiFiState::Disconnected) {
     s_preferredCredentialsID = creds.id;
     return true;
   }
@@ -565,7 +567,7 @@ void WiFiManager::Disconnect()
 
 bool WiFiManager::IsConnected()
 {
-  return s_wifiState == WiFiState::Connected;
+  return s_wifiState.load(std::memory_order_relaxed) == WiFiState::Connected;
 }
 bool WiFiManager::GetConnectedNetwork(OpenShock::WiFiNetwork& network)
 {

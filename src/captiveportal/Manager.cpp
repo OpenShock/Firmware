@@ -154,7 +154,10 @@ bool CaptivePortal::ForceClose(uint32_t timeoutMs)
 {
   s_forceClosed = true;
 
-  if (s_instance == nullptr) return true;
+  {
+    ScopedLock lock__(&s_instanceMutex);
+    if (s_instance == nullptr) return true;
+  }
 
   while (timeoutMs > 0) {
     uint32_t delay = std::min(timeoutMs, static_cast<uint32_t>(10U));
@@ -163,7 +166,10 @@ bool CaptivePortal::ForceClose(uint32_t timeoutMs)
 
     timeoutMs -= delay;
 
-    if (s_instance == nullptr) return true;
+    {
+      ScopedLock lock__(&s_instanceMutex);
+      if (s_instance == nullptr) return true;
+    }
   }
 
   return false;

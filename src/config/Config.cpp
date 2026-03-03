@@ -461,25 +461,28 @@ uint8_t Config::AddWiFiCredentials(std::string_view ssid, std::string_view passw
   uint8_t id = 0;
 
   std::bitset<255> bits;
-  for (auto it = _configData.wifi.credentialsList.begin(); it != _configData.wifi.credentialsList.end(); ++it) {
+  for (auto it = _configData.wifi.credentialsList.begin(); it != _configData.wifi.credentialsList.end();) {
     auto& creds = *it;
 
     if (std::string_view(creds.ssid) == ssid) {
       creds.password = password;
 
-      _trySaveConfig();
+      if (!_trySaveConfig()) {
+        OS_LOGE(TAG, "Failed to persist updated WiFi credentials for SSID %.*s", static_cast<int>(ssid.size()), ssid.data());
+        return 0;
+      }
       return creds.id;
     }
 
     if (creds.id == 0) {
       OS_LOGW(TAG, "Found WiFi credentials with ID 0, removing");
       it = _configData.wifi.credentialsList.erase(it);
-      if (it == _configData.wifi.credentialsList.end()) break;
       continue;
     }
 
     // Mark ID as used
     bits[creds.id - 1] = true;
+    ++it;
   }
 
   // Get first available ID
