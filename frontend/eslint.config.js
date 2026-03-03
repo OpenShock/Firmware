@@ -31,5 +31,15 @@ export default ts.config(
         ecmaVersion: 2020,
       },
     },
+  },
+  {
+    files: ['**/*.svelte.ts', '**/*.svelte.js'],
+
+    languageOptions: {
+      parser: ts.parser,
+      parserOptions: {
+        ecmaVersion: 2020,
+      },
+    },
   }
 );

@@ -424,20 +424,42 @@ bool WiFiManager::Init()
   return true;
 }
 
-bool WiFiManager::Save(const char* ssid, std::string_view password)
+bool WiFiManager::Save(const char* ssid, std::string_view password, bool connect)
 {
-  OS_LOGV(TAG, "Authenticating to network %s", ssid);
+  OS_LOGV(TAG, "Saving network %s (connect=%s)", ssid, connect ? "true" : "false");
 
   auto it = _findNetworkBySSID(ssid);
-  if (it == s_wifiNetworks.end()) {
-    OS_LOGE(TAG, "Failed to find network with SSID %s", ssid);
+  if (it != s_wifiNetworks.end()) {
+    // Network is in scan results — save credentials and optionally connect
+    uint8_t id = Config::AddWiFiCredentials(it->ssid, password);
+    if (id == 0) {
+      Serialization::Local::SerializeErrorMessage("too_many_credentials", CaptivePortal::BroadcastMessageBIN);
+      return false;
+    }
 
-    Serialization::Local::SerializeErrorMessage("network_not_found", CaptivePortal::BroadcastMessageBIN);
+    it->credentialsID = id;
+    Serialization::Local::SerializeWiFiNetworkEvent(Serialization::Types::WifiNetworkEventType::Saved, *it, CaptivePortal::BroadcastMessageBIN);
 
+    if (connect) {
+      return _connect(it->ssid, std::string(password));
+    }
+    return true;
+  }
+
+  // Network not in scan results (hidden or out of range) — save credentials directly
+  OS_LOGI(TAG, "Network %s not in scan results, saving credentials directly", ssid);
+
+  uint8_t id = Config::AddWiFiCredentials(ssid, password);
+  if (id == 0) {
+    Serialization::Local::SerializeErrorMessage("too_many_credentials", CaptivePortal::BroadcastMessageBIN);
     return false;
   }
 
-  return _authenticate(*it, password);
+  if (connect) {
+    s_preferredCredentialsID = id;
+  }
+
+  return true;
 }
 
 bool WiFiManager::Forget(const char* ssid)
@@ -445,24 +467,36 @@ bool WiFiManager::Forget(const char* ssid)
   OS_LOGV(TAG, "Forgetting network %s", ssid);
 
   auto it = _findNetworkBySSID(ssid);
-  if (it == s_wifiNetworks.end()) {
-    OS_LOGE(TAG, "Failed to find network with SSID %s", ssid);
+  if (it != s_wifiNetworks.end()) {
+    uint8_t credsId = it->credentialsID;
+
+    // Check if the network is currently connected
+    if (s_connectedCredentialsID == credsId) {
+      WiFiManager::Disconnect();
+    }
+
+    // Remove the credentials from the config
+    if (Config::RemoveWiFiCredentials(credsId)) {
+      it->credentialsID = 0;
+      Serialization::Local::SerializeWiFiNetworkEvent(Serialization::Types::WifiNetworkEventType::Removed, *it, CaptivePortal::BroadcastMessageBIN);
+    }
+
+    return true;
+  }
+
+  // Network not in scan results — look up credentials directly
+  Config::WiFiCredentials creds;
+  if (!Config::TryGetWiFiCredentialsBySSID(ssid, creds)) {
+    OS_LOGE(TAG, "Failed to find credentials for network %s", ssid);
     return false;
   }
 
-  uint8_t credsId = it->credentialsID;
-
   // Check if the network is currently connected
-  if (s_connectedCredentialsID == credsId) {
-    // Disconnect from the network
+  if (s_connectedCredentialsID == creds.id) {
     WiFiManager::Disconnect();
   }
 
-  // Remove the credentials from the config
-  if (Config::RemoveWiFiCredentials(credsId)) {
-    it->credentialsID = 0;
-    Serialization::Local::SerializeWiFiNetworkEvent(Serialization::Types::WifiNetworkEventType::Removed, *it, CaptivePortal::BroadcastMessageBIN);
-  }
+  Config::RemoveWiFiCredentials(creds.id);
 
   return true;
 }
