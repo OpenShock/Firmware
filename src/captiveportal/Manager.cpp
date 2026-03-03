@@ -19,12 +19,13 @@ const char* const TAG = "CaptivePortal";
 
 #include "SimpleMutex.h"
 
+#include <atomic>
 #include <memory>
 
 using namespace OpenShock;
 
-static volatile bool s_alwaysEnabled                     = false;
-static volatile bool s_forceClosed                       = false;
+static std::atomic<bool> s_alwaysEnabled                 = false;
+static std::atomic<bool> s_forceClosed                   = false;
 static esp_timer_handle_t s_captivePortalUpdateLoopTimer = nullptr;
 static SimpleMutex s_instanceMutex;
 static std::unique_ptr<CaptivePortal::CaptivePortalInstance> s_instance = nullptr;
