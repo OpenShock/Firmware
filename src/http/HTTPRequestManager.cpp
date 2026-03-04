@@ -89,19 +89,14 @@ static std::shared_ptr<OpenShock::RateLimiter> createRateLimiterForURL(std::stri
     return nullptr;
   }
 
-  s_rateLimitsMutex.lock(portMAX_DELAY);
+  OpenShock::ScopedLock lock__(&s_rateLimitsMutex);
 
   auto it = s_rateLimits.find(domain);
   if (it == s_rateLimits.end()) {
-    s_rateLimits.emplace(domain, createRateLimiterForDomain(domain));
-    it = s_rateLimits.find(domain);
+    it = s_rateLimits.emplace(domain, createRateLimiterForDomain(domain)).first;
   }
 
-  auto result = it->second;
-
-  s_rateLimitsMutex.unlock();
-
-  return result;
+  return it->second;
 }
 
 struct StreamReaderResult {

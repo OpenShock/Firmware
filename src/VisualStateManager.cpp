@@ -34,8 +34,8 @@ const uint64_t kWiFiScanningFlag                 = 1 << 7;
 const uint64_t kStatusOKMask = kWebSocketConnectedFlag | kHasIpAddressFlag | kWiFiConnectedFlag;
 
 static std::atomic<uint64_t> s_stateFlags = 0;
-static std::shared_ptr<OpenShock::PinPatternManager> s_builtInLedManager;
-static std::shared_ptr<OpenShock::RGBPatternManager> s_RGBLedManager;
+static std::unique_ptr<OpenShock::PinPatternManager> s_builtInLedManager;
+static std::unique_ptr<OpenShock::RGBPatternManager> s_RGBLedManager;
 
 inline void _setStateFlag(uint64_t flag, bool state)
 {
@@ -359,7 +359,7 @@ bool VisualStateManager::Init()
   bool ledActive = false;
 
   if (OPENSHOCK_LED_GPIO != GPIO_NUM_NC) {
-    s_builtInLedManager = std::make_shared<PinPatternManager>(static_cast<gpio_num_t>(OPENSHOCK_LED_GPIO));
+    s_builtInLedManager = std::make_unique<PinPatternManager>(static_cast<gpio_num_t>(OPENSHOCK_LED_GPIO));
     if (!s_builtInLedManager->IsValid()) {
       OS_LOGE(TAG, "Failed to initialize built-in LED manager");
       return false;
@@ -368,7 +368,7 @@ bool VisualStateManager::Init()
   }
 
   if (OPENSHOCK_LED_WS2812B != GPIO_NUM_NC) {
-    s_RGBLedManager = std::make_shared<RGBPatternManager>(static_cast<gpio_num_t>(OPENSHOCK_LED_WS2812B));
+    s_RGBLedManager = std::make_unique<RGBPatternManager>(static_cast<gpio_num_t>(OPENSHOCK_LED_WS2812B));
     if (!s_RGBLedManager->IsValid()) {
       OS_LOGE(TAG, "Failed to initialize RGB LED manager");
       return false;

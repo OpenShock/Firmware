@@ -28,11 +28,27 @@ static std::atomic<bool> s_alwaysEnabled                 = false;
 static std::atomic<bool> s_forceClosed                   = false;
 static esp_timer_handle_t s_captivePortalUpdateLoopTimer = nullptr;
 static SimpleMutex s_instanceMutex;
-static std::unique_ptr<CaptivePortal::CaptivePortalInstance> s_instance = nullptr;
+static std::shared_ptr<CaptivePortal::CaptivePortalInstance> s_instance = nullptr;
+
+static std::shared_ptr<CaptivePortal::CaptivePortalInstance> GetInstance()
+{
+  ScopedLock lock__(&s_instanceMutex);
+  return s_instance;
+}
+static void CreateInstance()
+{
+  ScopedLock lock__(&s_instanceMutex);
+  s_instance = std::make_shared<CaptivePortal::CaptivePortalInstance>();
+}
+static void DestroyInstance()
+{
+  ScopedLock lock__(&s_instanceMutex);
+  s_instance = nullptr;
+}
 
 static bool captiveportal_start()
 {
-  if (s_instance != nullptr) {
+  if (GetInstance() != nullptr) {
     OS_LOGD(TAG, "Already started");
     return true;
   }
@@ -63,20 +79,20 @@ static bool captiveportal_start()
     hostname = OPENSHOCK_FW_HOSTNAME;
   }
 
-  s_instance = std::make_unique<CaptivePortal::CaptivePortalInstance>();
+  CreateInstance();
 
   return true;
 }
 static void captiveportal_stop()
 {
-  if (s_instance == nullptr) {
+  if (GetInstance() == nullptr) {
     OS_LOGD(TAG, "Already stopped");
     return;
   }
 
   OS_LOGI(TAG, "Stopping captive portal");
 
-  s_instance = nullptr;
+  DestroyInstance();
 
   WiFi.softAPdisconnect(true);
 }
@@ -87,9 +103,7 @@ static void captiveportal_updateloop(void*)
   bool commandHandlerOk = CommandHandler::Ok();
   bool shouldBeRunning  = (s_alwaysEnabled || !gatewayConnected || !commandHandlerOk) && !s_forceClosed;
 
-  ScopedLock lock__(&s_instanceMutex);
-
-  if (s_instance == nullptr) {
+  if (GetInstance() == nullptr) {
     if (shouldBeRunning) {
       OS_LOGD(TAG, "Starting captive portal");
       OS_LOGD(TAG, "  alwaysEnabled: %s", s_alwaysEnabled ? "true" : "false");
@@ -155,10 +169,7 @@ bool CaptivePortal::ForceClose(uint32_t timeoutMs)
 {
   s_forceClosed = true;
 
-  {
-    ScopedLock lock__(&s_instanceMutex);
-    if (s_instance == nullptr) return true;
-  }
+  if (GetInstance() == nullptr) return true;
 
   while (timeoutMs > 0) {
     uint32_t delay = std::min(timeoutMs, static_cast<uint32_t>(10U));
@@ -167,10 +178,7 @@ bool CaptivePortal::ForceClose(uint32_t timeoutMs)
 
     timeoutMs -= delay;
 
-    {
-      ScopedLock lock__(&s_instanceMutex);
-      if (s_instance == nullptr) return true;
-    }
+    if (GetInstance() == nullptr) return true;
   }
 
   return false;
@@ -178,44 +186,43 @@ bool CaptivePortal::ForceClose(uint32_t timeoutMs)
 
 bool CaptivePortal::IsRunning()
 {
-  ScopedLock lock__(&s_instanceMutex);
-  return s_instance != nullptr;
+  return GetInstance() != nullptr;
 }
 
 bool CaptivePortal::SendMessageTXT(uint8_t socketId, std::string_view data)
 {
-  ScopedLock lock__(&s_instanceMutex);
-  if (s_instance == nullptr) return false;
+  auto instance = GetInstance();
+  if (instance == nullptr) return false;
 
-  s_instance->sendMessageTXT(socketId, data);
+  instance->sendMessageTXT(socketId, data);
 
   return true;
 }
 bool CaptivePortal::SendMessageBIN(uint8_t socketId, tcb::span<const uint8_t> data)
 {
-  ScopedLock lock__(&s_instanceMutex);
-  if (s_instance == nullptr) return false;
+  auto instance = GetInstance();
+  if (instance == nullptr) return false;
 
-  s_instance->sendMessageBIN(socketId, data);
+  instance->sendMessageBIN(socketId, data);
 
   return true;
 }
 
 bool CaptivePortal::BroadcastMessageTXT(std::string_view data)
 {
-  ScopedLock lock__(&s_instanceMutex);
-  if (s_instance == nullptr) return false;
+  auto instance = GetInstance();
+  if (instance == nullptr) return false;
 
-  s_instance->broadcastMessageTXT(data);
+  instance->broadcastMessageTXT(data);
 
   return true;
 }
 bool CaptivePortal::BroadcastMessageBIN(tcb::span<const uint8_t> data)
 {
-  ScopedLock lock__(&s_instanceMutex);
-  if (s_instance == nullptr) return false;
+  auto instance = GetInstance();
+  if (instance == nullptr) return false;
 
-  s_instance->broadcastMessageBIN(data);
+  instance->broadcastMessageBIN(data);
 
   return true;
 }
