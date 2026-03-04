@@ -41,7 +41,7 @@ const uint8_t LINK_CODE_LENGTH = 6;
 static std::atomic<uint8_t> s_flags                 = 0;
 static std::atomic<int64_t> s_lastAuthFailure       = 0;
 static std::atomic<int64_t> s_lastConnectionAttempt = 0;
-static std::atomic_flag s_isInitializing            = false;
+static std::atomic_flag s_isInitializing            = ATOMIC_FLAG_INIT;
 static OpenShock::SimpleMutex s_clientMutex;
 static std::shared_ptr<OpenShock::GatewayClient> s_wsClient = nullptr;
 
