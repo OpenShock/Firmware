@@ -13,6 +13,7 @@ const char* const TAG = "GatewayConnectionManager";
 #include "SimpleMutex.h"
 
 #include <atomic>
+#include <memory>
 #include <unordered_map>
 
 //
@@ -40,8 +41,25 @@ const uint8_t LINK_CODE_LENGTH = 6;
 static std::atomic<uint8_t> s_flags                 = 0;
 static std::atomic<int64_t> s_lastAuthFailure       = 0;
 static std::atomic<int64_t> s_lastConnectionAttempt = 0;
+static std::atomic_flag s_isInitializing            = false;
 static OpenShock::SimpleMutex s_clientMutex;
-static std::unique_ptr<OpenShock::GatewayClient> s_wsClient = nullptr;
+static std::shared_ptr<OpenShock::GatewayClient> s_wsClient = nullptr;
+
+static std::shared_ptr<OpenShock::GatewayClient> GetClient()
+{
+  OpenShock::ScopedLock lock__(&s_clientMutex);
+  return s_wsClient;
+}
+static void CreateClient(const std::string& authToken)
+{
+  OpenShock::ScopedLock lock__(&s_clientMutex);
+  s_wsClient = std::make_shared<OpenShock::GatewayClient>(authToken);
+}
+static void DestroyClient()
+{
+  OpenShock::ScopedLock lock__(&s_clientMutex);
+  s_wsClient = nullptr;
+}
 
 static void evh_gotIP(arduino_event_t* event)
 {
@@ -56,10 +74,7 @@ static void evh_wiFiDisconnected(arduino_event_t* event)
   (void)event;
 
   s_flags.store(FLAG_NONE, std::memory_order_relaxed);
-  {
-    OpenShock::ScopedLock lock__(&s_clientMutex);
-    s_wsClient = nullptr;
-  }
+  DestroyClient();
   OS_LOGD(TAG, "Lost IP address");
 }
 
@@ -86,12 +101,12 @@ bool GatewayConnectionManager::Init()
 
 bool GatewayConnectionManager::IsConnected()
 {
-  ScopedLock lock__(&s_clientMutex);
-  if (s_wsClient == nullptr) {
+  auto client = GetClient();
+  if (client == nullptr) {
     return false;
   }
 
-  return s_wsClient->state() == GatewayClientState::Connected;
+  return client->state() == GatewayClientState::Connected;
 }
 
 bool GatewayConnectionManager::IsLinked()
@@ -104,10 +119,8 @@ AccountLinkResultCode GatewayConnectionManager::Link(std::string_view linkCode)
   if ((s_flags.load(std::memory_order_relaxed) & FLAG_HAS_IP) == 0) {
     return AccountLinkResultCode::NoInternetConnection;
   }
-  {
-    ScopedLock lock__(&s_clientMutex);
-    s_wsClient = nullptr;
-  }
+
+  DestroyClient();
 
   OS_LOGD(TAG, "Attempting to link to account using code %.*s", linkCode.length(), linkCode.data());
 
@@ -155,31 +168,28 @@ AccountLinkResultCode GatewayConnectionManager::Link(std::string_view linkCode)
 void GatewayConnectionManager::UnLink()
 {
   s_flags.fetch_and(static_cast<uint8_t>(~FLAG_LINKED), std::memory_order_relaxed);
-  {
-    ScopedLock lock__(&s_clientMutex);
-    s_wsClient = nullptr;
-  }
+  DestroyClient();
   Config::ClearBackendAuthToken();
 }
 
 bool GatewayConnectionManager::SendMessageTXT(std::string_view data)
 {
-  ScopedLock lock__(&s_clientMutex);
-  if (s_wsClient == nullptr) {
+  auto client = GetClient();
+  if (client == nullptr) {
     return false;
   }
 
-  return s_wsClient->sendMessageTXT(data);
+  return client->sendMessageTXT(data);
 }
 
 bool GatewayConnectionManager::SendMessageBIN(tcb::span<const uint8_t> data)
 {
-  ScopedLock lock__(&s_clientMutex);
-  if (s_wsClient == nullptr) {
+  auto client = GetClient();
+  if (client == nullptr) {
     return false;
   }
 
-  return s_wsClient->sendMessageBIN(data);
+  return client->sendMessageBIN(data);
 }
 
 bool FetchHubInfo(std::string authToken)
@@ -228,15 +238,15 @@ bool FetchHubInfo(std::string authToken)
 
 bool StartConnectingToLCG()
 {
-  // TODO: this function is very slow, should be optimized!
-  if (s_wsClient == nullptr) {  // If wsClient is already initialized, we are already paired or connected
+  auto client = GetClient();
+  if (client == nullptr) {
     OS_LOGD(TAG, "wsClient is null");
     return false;
   }
 
-  if (s_wsClient->state() != GatewayClientState::Disconnected) {
+  if (client->state() != GatewayClientState::Disconnected) {
     OS_LOGD(TAG, "WebSocketClient is not disconnected, waiting...");
-    s_wsClient->disconnect();
+    client->disconnect();
     return false;
   }
 
@@ -279,28 +289,16 @@ bool StartConnectingToLCG()
   }
 
   OS_LOGI(TAG, "Connecting to LCG endpoint { host: '%s', port: %hu, path: '%s' } in country %s", response.data.host.c_str(), response.data.port, response.data.path.c_str(), response.data.country.c_str());
-  s_wsClient->connect(response.data.host, response.data.port, response.data.path);
+  client->connect(response.data.host, response.data.port, response.data.path);
 
   return true;
 }
 
-void GatewayConnectionManager::Update()
+void InitializeClient()
 {
-  // Check if client already exists (short lock)
-  {
-    ScopedLock lock__(&s_clientMutex);
-    if (s_wsClient != nullptr) {
-      // Client exists — run its loop and optionally reconnect
-      if (s_wsClient->loop()) {
-        return;
-      }
+  DestroyClient();
 
-      StartConnectingToLCG();
-      return;
-    }
-  }
-
-  // No client — check prerequisites without holding the mutex
+  // No client — check prerequisites
   if ((s_flags.load(std::memory_order_relaxed) & FLAG_HAS_IP) == 0 || !Config::HasBackendAuthToken()) {
     return;
   }
@@ -311,7 +309,6 @@ void GatewayConnectionManager::Update()
     return;
   }
 
-  // Fetch hub info (HTTP call — done without mutex)
   if (!FetchHubInfo(authToken)) {
     return;
   }
@@ -319,12 +316,28 @@ void GatewayConnectionManager::Update()
   s_flags.fetch_or(FLAG_LINKED, std::memory_order_relaxed);
   OS_LOGD(TAG, "Successfully verified auth token");
 
-  // Create client under lock
-  {
-    ScopedLock lock__(&s_clientMutex);
-    // Double-check: another task may have created it while we were fetching hub info
-    if (s_wsClient == nullptr) {
-      s_wsClient = std::make_unique<GatewayClient>(authToken);
+  CreateClient(authToken);
+}
+
+void GatewayConnectionManager::Update()
+{
+  auto client = GetClient();
+  if (client != nullptr) {
+    // Client exists — run its loop and optionally reconnect
+    if (client->loop()) {
+      return;
     }
+
+    StartConnectingToLCG();
+    return;
   }
+
+  if (s_isInitializing.test_and_set()) {
+    OS_LOGE(TAG, "Was about to initialize GatewayClient, but encountered race condition, yielding.");
+    return;
+  }
+
+  InitializeClient();
+
+  s_isInitializing.clear();
 }
