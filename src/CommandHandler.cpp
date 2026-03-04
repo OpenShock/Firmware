@@ -37,12 +37,12 @@ struct KnownShocker {
   int64_t lastActivityTimestamp;
 };
 
-static OpenShock::SimpleMutex s_rfTransmitterMutex                = {};
+static OpenShock::SimpleMutex s_rfTransmitterMutex               = {};
 static std::shared_ptr<OpenShock::RFTransmitter> s_rfTransmitter = nullptr;
 
 static std::shared_ptr<OpenShock::RFTransmitter> GetTransmitter()
 {
-  ScopedLock lock__(&s_rfTransmitterMutex);
+  OpenShock::ScopedLock lock__(&s_rfTransmitterMutex);
   return s_rfTransmitter;
 }
 static bool TryCreateTransmitter(gpio_num_t txPin)
@@ -52,19 +52,19 @@ static bool TryCreateTransmitter(gpio_num_t txPin)
     return false;
   }
 
-  ScopedLock lock__(&s_rfTransmitterMutex);
+  OpenShock::ScopedLock lock__(&s_rfTransmitterMutex);
   s_rfTransmitter = std::move(transmitter);
   return true;
 }
 static void DestroyTransmitter()
 {
-  ScopedLock lock__(&s_rfTransmitterMutex);
+  OpenShock::ScopedLock lock__(&s_rfTransmitterMutex);
   s_rfTransmitter = nullptr;
 }
 
 static OpenShock::SimpleMutex s_keepAliveMutex = {};
-static QueueHandle_t s_keepAliveQueue             = nullptr;
-static TaskHandle_t s_keepAliveTaskHandle         = nullptr;
+static QueueHandle_t s_keepAliveQueue          = nullptr;
+static TaskHandle_t s_keepAliveTaskHandle      = nullptr;
 
 using namespace OpenShock;
 
