@@ -523,7 +523,7 @@ bool WiFiManager::Forget(const char* ssid)
   }
 
   // Check if the network is currently connected
-  if (s_connectedCredentialsID.load(std::memory_order_relaxed) == credsId) {
+  if (s_connectedCredentialsID.load(std::memory_order_relaxed) == creds.id) {
     // Disconnect from the network
     WiFiManager::Disconnect();
   }
