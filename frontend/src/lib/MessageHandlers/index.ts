@@ -12,7 +12,7 @@ import { SetGPIOResultCode } from '$lib/_fbs/open-shock/serialization/local/set-
 import { SetRfTxPinCommandResult } from '$lib/_fbs/open-shock/serialization/local/set-rf-tx-pin-command-result';
 import { WifiScanStatusMessage } from '$lib/_fbs/open-shock/serialization/local/wifi-scan-status-message';
 import { mapConfig } from '$lib/mappers/ConfigMapper';
-import { HubStateStore } from '$lib/stores';
+import { hubState } from '$lib/stores';
 import { ByteBuffer } from 'flatbuffers';
 import { toast } from 'svelte-sonner';
 import { WifiNetworkEventHandler } from './WifiNetworkEventHandler';
@@ -34,25 +34,21 @@ PayloadHandlers[HubToLocalMessagePayload.ReadyMessage] = (cli, msg) => {
 
   console.log('[WS] Connected to hub, poggies: ', payload.poggies());
 
-  HubStateStore.update((store) => {
-    store.wifiConnectedBSSID = payload.connectedWifi()?.bssid() || null;
-    store.accountLinked = payload.accountLinked();
-    store.config = mapConfig(payload.config());
+  hubState.wifiConnectedBSSID = payload.connectedWifi()?.bssid() || null;
+  hubState.accountLinked = payload.accountLinked();
+  hubState.config = mapConfig(payload.config());
 
-    const gpioValidInputs = payload.gpioValidInputsArray();
-    if (gpioValidInputs) {
-      store.gpioValidInputs = gpioValidInputs;
-    }
+  const gpioValidInputs = payload.gpioValidInputsArray();
+  if (gpioValidInputs) {
+    hubState.gpioValidInputs = gpioValidInputs;
+  }
 
-    const gpioValidOutputs = payload.gpioValidOutputsArray();
-    if (gpioValidOutputs) {
-      store.gpioValidOutputs = gpioValidOutputs;
-    }
+  const gpioValidOutputs = payload.gpioValidOutputsArray();
+  if (gpioValidOutputs) {
+    hubState.gpioValidOutputs = gpioValidOutputs;
+  }
 
-    console.log('[WS] Updated hub state store: ', store);
-
-    return store;
-  });
+  console.log('[WS] Updated hub state: ', hubState);
 
   const data = SerializeWifiScanCommand(false);
   cli.Send(data);
@@ -73,7 +69,7 @@ PayloadHandlers[HubToLocalMessagePayload.WifiScanStatusMessage] = (cli, msg) => 
   const payload = new WifiScanStatusMessage();
   msg.payload(payload);
 
-  HubStateStore.setWifiScanStatus(payload.status());
+  hubState.wifiScanStatus = payload.status();
 };
 
 PayloadHandlers[HubToLocalMessagePayload.WifiNetworkEvent] = WifiNetworkEventHandler;
@@ -122,7 +118,7 @@ PayloadHandlers[HubToLocalMessagePayload.SetRfTxPinCommandResult] = (cli, msg) =
   const result = payload.result();
 
   if (result == SetGPIOResultCode.Success) {
-    HubStateStore.setRfTxPin(payload.pin());
+    if (hubState.config) hubState.config.rf.txPin = payload.pin();
     toast.success('Changed RF TX pin to: ' + payload.pin());
   } else {
     let reason: string;
@@ -149,7 +145,7 @@ PayloadHandlers[HubToLocalMessagePayload.SetEstopEnabledCommandResult] = (cli, m
   const success = payload.success();
 
   if (success) {
-    HubStateStore.setEstopEnabled(payload.enabled());
+    if (hubState.config) hubState.config.estop.enabled = payload.enabled();
     toast.success('Changed EStop enabled to: ' + enabled);
   } else {
     toast.error('Failed to change EStop enabled');
@@ -164,7 +160,7 @@ PayloadHandlers[HubToLocalMessagePayload.SetEstopPinCommandResult] = (cli, msg) 
 
   if (result == SetGPIOResultCode.Success) {
     const gpioPin = payload.gpioPin();
-    HubStateStore.setEstopGpioPin(gpioPin);
+    if (hubState.config) hubState.config.estop.gpioPin = gpioPin;
     toast.success('Changed EStop pin to: ' + gpioPin);
   } else {
     let reason: string;

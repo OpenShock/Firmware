@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { HubStateStore } from '$lib/stores';
+  import { hubState } from '$lib/stores';
   import { WebSocketClient } from '$lib/WebSocketClient';
   import { WifiAuthMode } from '$lib/_fbs/open-shock/serialization/types/wifi-auth-mode';
   import { SerializeWifiNetworkConnectCommand } from '$lib/Serializers/WifiNetworkConnectCommand';
@@ -26,7 +26,7 @@
 
   let { netgroup }: Props = $props();
 
-  let connectedBSSID = $derived($HubStateStore.wifiConnectedBSSID);
+  let connectedBSSID = $derived(hubState.wifiConnectedBSSID);
 
   let dialogOpen = $state(false);
   let pendingPassword = $state<string | null>(null);

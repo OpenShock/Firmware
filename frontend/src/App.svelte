@@ -11,7 +11,7 @@
   import { Input } from '$lib/components/ui/input';
   import { Label } from '$lib/components/ui/label';
   import { Toaster } from '$lib/components/ui/sonner';
-  import { HubStateStore, initializeDarkModeStore } from '$lib/stores';
+  import { hubState, initializeDarkModeStore } from '$lib/stores';
   import { onMount } from 'svelte';
 
   onMount(() => {
@@ -70,7 +70,7 @@
 
       <GpioPinSelector
         name="RF TX Pin"
-        currentPin={$HubStateStore.config?.rf?.txPin ?? null}
+        currentPin={hubState.config?.rf?.txPin ?? null}
         serializer={SerializeSetRfTxPinCommand}
       />
 
@@ -78,7 +78,7 @@
 
       <GpioPinSelector
         name="EStop Pin"
-        currentPin={$HubStateStore.config?.estop?.gpioPin ?? null}
+        currentPin={hubState.config?.estop?.gpioPin ?? null}
         serializer={SerializeSetEstopPinCommand}
       />
     </div>

@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { HubStateStore, UsedPinsStore } from '$lib/stores';
+  import { hubState, usedPins } from '$lib/stores';
   import { WebSocketClient } from '$lib/WebSocketClient';
   import { Button } from '$lib/components/ui/button';
   import { Input } from '$lib/components/ui/input';
@@ -17,18 +17,18 @@
   }
 
   let currentPinValid = $derived(
-    isPinValid(currentPin) && $HubStateStore.gpioValidOutputs.includes(currentPin)
+    isPinValid(currentPin) && hubState.gpioValidOutputs.includes(currentPin)
   );
 
   let pendingPin = $state<number | null>(null);
   let pendingPinValid = $derived(
-    isPinValid(pendingPin) && $HubStateStore.gpioValidOutputs.includes(pendingPin)
+    isPinValid(pendingPin) && hubState.gpioValidOutputs.includes(pendingPin)
   );
 
   let statusText = $derived.by<string>(() => {
     if (pendingPin !== null) {
       if (!pendingPinValid) return 'Invalid pin';
-      if ($UsedPinsStore.has(pendingPin)) return 'Pin already in use';
+      if (usedPins.has(pendingPin)) return 'Pin already in use';
     }
     if (currentPin === null) return 'Loading...';
     if (!currentPinValid) return 'Invalid pin';
@@ -36,9 +36,7 @@
     return 'Currently ' + currentPin;
   });
 
-  let canSet = $derived(
-    pendingPin !== currentPin && pendingPinValid && !$UsedPinsStore.has(pendingPin!)
-  );
+  let canSet = $derived(pendingPin !== currentPin && pendingPinValid && !usedPins.has(pendingPin!));
 
   $effect(() => {
     if (pendingPin !== null) {
@@ -52,7 +50,7 @@
 
   $effect(() => {
     if (currentPin !== null) {
-      UsedPinsStore.markPinUsed(currentPin, name);
+      usedPins.markPinUsed(currentPin, name);
     }
   });
 
