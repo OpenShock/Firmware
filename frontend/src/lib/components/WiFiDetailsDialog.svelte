@@ -73,7 +73,7 @@
       <h3 class="h3">Access Points</h3>
       <!-- Scrollable list of APs -->
       <div class="flex max-h-64 flex-col space-y-2 overflow-y-auto p-2">
-        {#each group.networks as network}
+        {#each group.networks as network (network.bssid)}
           <div class="card flex items-center justify-between p-2">
             <span class="font-bold">{network.bssid}</span>
             <span class="text-gray-700 dark:text-gray-300">{network.rssi} dBm</span>

@@ -89,15 +89,12 @@ static std::shared_ptr<OpenShock::RateLimiter> createRateLimiterForURL(std::stri
     return nullptr;
   }
 
-  s_rateLimitsMutex.lock(portMAX_DELAY);
+  OpenShock::ScopedLock lock__(&s_rateLimitsMutex);
 
   auto it = s_rateLimits.find(domain);
   if (it == s_rateLimits.end()) {
-    s_rateLimits.emplace(domain, createRateLimiterForDomain(domain));
-    it = s_rateLimits.find(domain);
+    it = s_rateLimits.emplace(domain, createRateLimiterForDomain(domain)).first;
   }
-
-  s_rateLimitsMutex.unlock();
 
   return it->second;
 }
@@ -309,6 +306,10 @@ static StreamReaderResult readHttpStreamData(HTTPClient& client, WiFiClient* str
   HTTP::RequestResult result = HTTP::RequestResult::Success;
 
   uint8_t* buffer = static_cast<uint8_t*>(malloc(HTTP_BUFFER_SIZE));
+  if (buffer == nullptr) {
+    OS_LOGE(TAG, "Failed to allocate HTTP buffer");
+    return {HTTP::RequestResult::InternalError, 0};
+  }
 
   while (client.connected() && nWritten < contentLength) {
     if (begin + timeoutMs < OpenShock::millis()) {

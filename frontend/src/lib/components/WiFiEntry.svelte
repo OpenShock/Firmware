@@ -1,11 +1,11 @@
 <script lang="ts">
-  import { HubStateStore } from '$lib/stores';
+  import { hubState } from '$lib/stores';
   import { WebSocketClient } from '$lib/WebSocketClient';
   import { WifiAuthMode } from '$lib/_fbs/open-shock/serialization/types/wifi-auth-mode';
-  import { SerializeWifiNetworkDisconnectCommand } from '$lib/Serializers/WifiNetworkDisconnectCommand';
   import { SerializeWifiNetworkConnectCommand } from '$lib/Serializers/WifiNetworkConnectCommand';
   import { SerializeWifiNetworkSaveCommand } from '$lib/Serializers/WifiNetworkSaveCommand';
   import { SerializeWifiNetworkForgetCommand } from '$lib/Serializers/WifiNetworkForgetCommand';
+  import { SerializeWifiNetworkDisconnectCommand } from '$lib/Serializers/WifiNetworkDisconnectCommand';
   import WiFiDetailsDialog from '$lib/components/WiFiDetailsDialog.svelte';
   import type { WiFiNetworkGroup } from '$lib/types';
   import { Button, buttonVariants } from '$lib/components/ui/button';
@@ -39,7 +39,7 @@
 
   let { netgroup }: Props = $props();
 
-  let connectedBSSID = $derived($HubStateStore.wifiConnectedBSSID);
+  let connectedBSSID = $derived(hubState.wifiConnectedBSSID);
   let isConnected = $derived(netgroup.networks.some((n) => n.bssid === connectedBSSID));
   let bestRssi = $derived(netgroup.networks[0]?.rssi ?? -100);
 

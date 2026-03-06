@@ -39,10 +39,8 @@ static std::array<Handlers::HandlerType, HANDLER_COUNT> s_serverHandlers = []() 
 
 void MessageHandlers::WebSocket::HandleGatewayBinary(tcb::span<const uint8_t> data)
 {
-  // Deserialize
-  auto msg = flatbuffers::GetRoot<Schemas::GatewayToHubMessage>(data.data());
-  if (msg == nullptr) {
-    OS_LOGE(TAG, "Failed to deserialize message");
+  if (data.size() < sizeof(flatbuffers::uoffset_t)) {
+    OS_LOGE(TAG, "Message too small to be a valid FlatBuffer");
     return;
   }
 
@@ -51,10 +49,13 @@ void MessageHandlers::WebSocket::HandleGatewayBinary(tcb::span<const uint8_t> da
     .max_size = 4096,  // TODO: Profile this
   };
   flatbuffers::Verifier verifier(data.data(), data.size(), verifierOptions);
-  if (!msg->Verify(verifier)) {
+  if (!verifier.VerifyBuffer<Schemas::GatewayToHubMessage>()) {
     OS_LOGE(TAG, "Failed to verify message");
     return;
   }
+
+  // Deserialize (safe after verification)
+  auto msg = flatbuffers::GetRoot<Schemas::GatewayToHubMessage>(data.data());
 
   if (msg->payload_type() < PayloadType::MIN || msg->payload_type() > PayloadType::MAX) {
     Handlers::HandleInvalidMessage(msg);

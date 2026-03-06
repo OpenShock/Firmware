@@ -155,8 +155,6 @@ void GatewayClient::_sendBootStatus()
 
 void GatewayClient::_handleEvent(WStype_t type, uint8_t* payload, std::size_t length)
 {
-  (void)payload;
-
   switch (type) {
     case WStype_DISCONNECTED:
       _setState(GatewayClientState::Disconnected);

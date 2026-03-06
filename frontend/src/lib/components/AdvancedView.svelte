@@ -7,7 +7,7 @@
   import { SerializeAccountLinkCommand } from '$lib/Serializers/AccountLinkCommand';
   import { SerializeAccountUnlinkCommand } from '$lib/Serializers/AccountUnlinkCommand';
   import { WebSocketClient } from '$lib/WebSocketClient';
-  import { HubStateStore } from '$lib/stores';
+  import { hubState } from '$lib/stores';
   import { Button } from '$lib/components/ui/button';
   import { Input } from '$lib/components/ui/input';
   import { Label } from '$lib/components/ui/label';
@@ -26,7 +26,7 @@
 
   let linkCode: string = $state('');
   let linkCodeValid = $derived(isValidLinkCode(linkCode));
-  let accountLinked = $derived($HubStateStore.accountLinked);
+  let accountLinked = $derived(hubState.accountLinked);
 
   function linkAccount() {
     if (!linkCodeValid) return;
@@ -40,7 +40,7 @@
   }
 
   function toggleEstop() {
-    const data = SerializeSetEstopEnabledCommand(!$HubStateStore.config?.estop?.enabled);
+    const data = SerializeSetEstopEnabledCommand(!hubState.config?.estop?.enabled);
     WebSocketClient.Instance.Send(data);
   }
 </script>
@@ -66,7 +66,7 @@
           </p>
           <GpioPinSelector
             name="RF TX Pin"
-            currentPin={$HubStateStore.config?.rf?.txPin ?? null}
+            currentPin={hubState.config?.rf?.txPin ?? null}
             serializer={SerializeSetRfTxPinCommand}
           />
         </div>
@@ -79,14 +79,14 @@
             <p class="text-sm font-medium">EStop Enabled</p>
             <input
               type="checkbox"
-              checked={$HubStateStore.config?.estop?.enabled ?? false}
+              checked={hubState.config?.estop?.enabled ?? false}
               onchange={toggleEstop}
               class="h-4 w-4"
             />
           </label>
           <GpioPinSelector
             name="EStop Pin"
-            currentPin={$HubStateStore.config?.estop?.gpioPin ?? null}
+            currentPin={hubState.config?.estop?.gpioPin ?? null}
             serializer={SerializeSetEstopPinCommand}
           />
         </div>

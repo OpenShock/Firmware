@@ -44,27 +44,23 @@ static ReadWriteMutex _configMutex;
 
 bool _tryDeserializeConfig(const uint8_t* buffer, std::size_t bufferLen, OpenShock::Config::RootConfig& config)
 {
-  if (buffer == nullptr || bufferLen == 0) {
-    OS_LOGE(TAG, "Buffer is null or empty");
+  if (buffer == nullptr || bufferLen < sizeof(flatbuffers::uoffset_t)) {
+    OS_LOGE(TAG, "Buffer is null or too small");
     return false;
   }
 
-  // Deserialize
-  auto fbsConfig = flatbuffers::GetRoot<Serialization::Configuration::HubConfig>(buffer);
-  if (fbsConfig == nullptr) {
-    OS_LOGE(TAG, "Failed to get deserialization root for config file");
-    return false;
-  }
-
-  // Validate buffer
+  // Validate buffer before accessing
   flatbuffers::Verifier::Options verifierOptions {
     .max_size = 4096,  // Should be enough
   };
   flatbuffers::Verifier verifier(buffer, bufferLen, verifierOptions);
-  if (!fbsConfig->Verify(verifier)) {
+  if (!verifier.VerifyBuffer<Serialization::Configuration::HubConfig>()) {
     OS_LOGE(TAG, "Failed to verify config file integrity");
     return false;
   }
+
+  // Deserialize (safe after verification)
+  auto fbsConfig = flatbuffers::GetRoot<Serialization::Configuration::HubConfig>(buffer);
 
   // Read config
   if (!config.FromFlatbuffers(fbsConfig)) {
@@ -167,6 +163,10 @@ cJSON* _getAsCJSON(bool withSensitiveData)
 std::string Config::GetAsJSON(bool withSensitiveData)
 {
   cJSON* root = _getAsCJSON(withSensitiveData);
+  if (root == nullptr) {
+    OS_LOGE(TAG, "Failed to get config as JSON");
+    return {};
+  }
 
   char* json = cJSON_PrintUnformatted(root);
 
@@ -461,15 +461,17 @@ uint8_t Config::AddWiFiCredentials(std::string_view ssid, std::string_view passw
   uint8_t id = 0;
 
   std::bitset<255> bits;
-  for (auto it = _configData.wifi.credentialsList.begin(); it != _configData.wifi.credentialsList.end(); ++it) {
+  for (auto it = _configData.wifi.credentialsList.begin(); it != _configData.wifi.credentialsList.end();) {
     auto& creds = *it;
 
     if (std::string_view(creds.ssid) == ssid) {
       creds.password = password;
 
-      id = creds.id;
-
-      break;
+      if (!_trySaveConfig()) {
+        OS_LOGE(TAG, "Failed to persist updated WiFi credentials for SSID %.*s", static_cast<int>(ssid.size()), ssid.data());
+        return 0;
+      }
+      return creds.id;
     }
 
     if (creds.id == 0) {
@@ -480,6 +482,7 @@ uint8_t Config::AddWiFiCredentials(std::string_view ssid, std::string_view passw
 
     // Mark ID as used
     bits[creds.id - 1] = true;
+    ++it;
   }
 
   // Get first available ID

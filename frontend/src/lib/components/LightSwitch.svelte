@@ -2,23 +2,23 @@
   import { Button, buttonVariants } from '$lib/components/ui/button';
   import * as Dialog from '$lib/components/ui/dialog';
   import * as DropdownMenu from '$lib/components/ui/dropdown-menu';
-  import { ColorSchemeStore, willActivateLightMode, getDarkReaderState } from '$lib/stores';
+  import { colorScheme, ColorScheme, willActivateLightMode, getDarkReaderState } from '$lib/stores';
   import { toast } from 'svelte-sonner';
 
   import { Moon, Sun } from '@lucide/svelte';
 
-  let pendingScheme = $state<'light' | 'dark' | 'system' | undefined>();
+  let pendingScheme = $state<ColorScheme | undefined>();
   function handleOpenChanged(open: boolean) {
     if (open) return;
     pendingScheme = undefined;
   }
   function confirm() {
     if (!pendingScheme) return;
-    ColorSchemeStore.set(pendingScheme);
+    colorScheme.Value = pendingScheme;
     pendingScheme = undefined;
   }
-  function evaluateLightSwitch(scheme: 'light' | 'dark' | 'system') {
-    if (willActivateLightMode(scheme) && scheme !== $ColorSchemeStore) {
+  function evaluateLightSwitch(scheme: ColorScheme) {
+    if (willActivateLightMode(scheme) && scheme !== colorScheme.Value) {
       const darkreader = getDarkReaderState();
       if (darkreader.isActive) {
         toast.warning('DarkReader is enabled, activating light mode will have no effect!');
@@ -27,7 +27,7 @@
       pendingScheme = scheme;
       return;
     }
-    ColorSchemeStore.set(scheme);
+    colorScheme.Value = scheme;
   }
 </script>
 
@@ -54,8 +54,13 @@
     <span class="sr-only">Toggle theme</span>
   </DropdownMenu.Trigger>
   <DropdownMenu.Content align="end">
-    <DropdownMenu.Item onclick={() => evaluateLightSwitch('light')}>Light</DropdownMenu.Item>
-    <DropdownMenu.Item onclick={() => evaluateLightSwitch('dark')}>Dark</DropdownMenu.Item>
-    <DropdownMenu.Item onclick={() => evaluateLightSwitch('system')}>System</DropdownMenu.Item>
+    <DropdownMenu.Item onclick={() => evaluateLightSwitch(ColorScheme.Light)}
+      >Light</DropdownMenu.Item
+    >
+    <DropdownMenu.Item onclick={() => evaluateLightSwitch(ColorScheme.Dark)}>Dark</DropdownMenu.Item
+    >
+    <DropdownMenu.Item onclick={() => evaluateLightSwitch(ColorScheme.System)}
+      >System</DropdownMenu.Item
+    >
   </DropdownMenu.Content>
 </DropdownMenu.Root>
