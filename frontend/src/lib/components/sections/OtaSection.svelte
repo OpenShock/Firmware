@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { HubStateStore } from '$lib/stores';
+  import { hubState } from '$lib/stores';
   import { WebSocketClient } from '$lib/WebSocketClient';
   import { OtaUpdateChannel } from '$lib/_fbs/open-shock/serialization/configuration/ota-update-channel';
   import { SerializeOtaUpdateSetIsEnabledCommand } from '$lib/Serializers/OtaUpdateSetIsEnabledCommand';
@@ -13,7 +13,7 @@
   import { Input } from '$lib/components/ui/input';
   import { Label } from '$lib/components/ui/label';
 
-  let otaConfig = $derived($HubStateStore.config?.otaUpdate);
+  let otaConfig = $derived(hubState.config?.otaUpdate);
 
   let cdnDomain = $state('');
   let checkInterval = $state(0);

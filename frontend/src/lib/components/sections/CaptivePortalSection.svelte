@@ -1,8 +1,8 @@
 <script lang="ts">
-  import { HubStateStore } from '$lib/stores';
+  import { hubState } from '$lib/stores';
   import { TriangleAlert } from '@lucide/svelte';
 
-  let alwaysEnabled = $derived($HubStateStore.config?.captivePortal?.alwaysEnabled ?? false);
+  let alwaysEnabled = $derived(hubState.config?.captivePortal?.alwaysEnabled ?? false);
 </script>
 
 <div class="flex flex-col gap-4">

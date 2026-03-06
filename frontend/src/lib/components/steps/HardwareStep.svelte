@@ -2,7 +2,7 @@
   import { SerializeSetRfTxPinCommand } from '$lib/Serializers/SetRfTxPinCommand';
   import { SerializeSetEstopPinCommand } from '$lib/Serializers/SetEstopPinCommand';
   import GpioPinSelector from '$lib/components/GpioPinSelector.svelte';
-  import { HubStateStore } from '$lib/stores';
+  import { hubState } from '$lib/stores';
 </script>
 
 <div class="flex flex-col gap-6">
@@ -20,7 +20,7 @@
       </p>
       <GpioPinSelector
         name="RF TX Pin"
-        currentPin={$HubStateStore.config?.rf?.txPin ?? null}
+        currentPin={hubState.config?.rf?.txPin ?? null}
         serializer={SerializeSetRfTxPinCommand}
       />
     </div>
@@ -32,7 +32,7 @@
       <!-- TODO: Add EStop Enable/Disable toggle -->
       <GpioPinSelector
         name="EStop Pin"
-        currentPin={$HubStateStore.config?.estop?.gpioPin ?? null}
+        currentPin={hubState.config?.estop?.gpioPin ?? null}
         serializer={SerializeSetEstopPinCommand}
       />
     </div>

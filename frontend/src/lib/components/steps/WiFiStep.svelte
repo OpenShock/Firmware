@@ -1,9 +1,9 @@
 <script lang="ts">
   import WiFiManager from '$lib/components/WiFiManager.svelte';
-  import { HubStateStore } from '$lib/stores';
+  import { hubState } from '$lib/stores';
   import { CircleCheck } from '@lucide/svelte';
 
-  let isConnected = $derived($HubStateStore.wifiConnectedBSSID !== null);
+  let isConnected = $derived(hubState.wifiConnectedBSSID !== null);
 </script>
 
 <div class="flex flex-col gap-4">

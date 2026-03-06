@@ -1,12 +1,12 @@
 <script lang="ts">
-  import { HubStateStore } from '$lib/stores';
+  import { hubState } from '$lib/stores';
   import { Input } from '$lib/components/ui/input';
   import { Label } from '$lib/components/ui/label';
 
-  let domain = $state($HubStateStore.config?.backend?.domain ?? '');
+  let domain = $state(hubState.config?.backend?.domain ?? '');
 
   $effect(() => {
-    const d = $HubStateStore.config?.backend?.domain;
+    const d = hubState.config?.backend?.domain;
     if (d) domain = d;
   });
 </script>

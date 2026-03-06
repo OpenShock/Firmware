@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { cn } from "$lib/utils.js";
+  import { cn } from "$lib/utils/shadcn.js";
   import { buttonVariants } from "$lib/components/ui/button/index.js";
   import { getStepperRootContext } from "./stepper.svelte.js";
   import type { StepperNextProps } from "./types.js";

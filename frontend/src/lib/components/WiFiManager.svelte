@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { HubStateStore } from '$lib/stores';
+  import { hubState } from '$lib/stores';
   import { WebSocketClient } from '$lib/WebSocketClient';
   import { WifiScanStatus } from '$lib/_fbs/open-shock/serialization/types/wifi-scan-status';
   import { SerializeWifiScanCommand } from '$lib/Serializers/WifiScanCommand';
@@ -10,14 +10,14 @@
   import AddHiddenNetworkDialog from '$lib/components/AddHiddenNetworkDialog.svelte';
   import { LoaderCircle, RotateCcw, Wifi, WifiOff } from '@lucide/svelte';
 
-  let scanStatus = $derived($HubStateStore.wifiScanStatus);
+  let scanStatus = $derived(hubState.wifiScanStatus);
   let isScanning = $derived(
     scanStatus === WifiScanStatus.Started || scanStatus === WifiScanStatus.InProgress
   );
-  let connectedBSSID = $derived($HubStateStore.wifiConnectedBSSID);
+  let connectedBSSID = $derived(hubState.wifiConnectedBSSID);
 
   let strengthSortedGroups = $derived(
-    Array.from($HubStateStore.wifiNetworkGroups.entries()).sort(
+    Array.from(hubState.wifiNetworkGroups.entries()).sort(
       (a, b) => b[1].networks[0].rssi - a[1].networks[0].rssi
     )
   );

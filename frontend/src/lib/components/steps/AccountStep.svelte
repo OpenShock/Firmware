@@ -1,7 +1,7 @@
 <script lang="ts">
   import { SerializeAccountLinkCommand } from '$lib/Serializers/AccountLinkCommand';
   import { WebSocketClient } from '$lib/WebSocketClient';
-  import { HubStateStore } from '$lib/stores';
+  import { hubState } from '$lib/stores';
   import { Button } from '$lib/components/ui/button';
   import { Input } from '$lib/components/ui/input';
   import { Label } from '$lib/components/ui/label';
@@ -17,7 +17,7 @@
 
   let linkCode: string = $state('');
   let linkCodeValid = $derived(isValidLinkCode(linkCode));
-  let accountLinked = $derived($HubStateStore.accountLinked);
+  let accountLinked = $derived(hubState.accountLinked);
 
   function linkAccount() {
     if (!linkCodeValid) return;
