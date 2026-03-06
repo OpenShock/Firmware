@@ -4,6 +4,7 @@ import (
 	"log"
 	"math/rand"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	Types "openshock.dev/mock-portal/fbs/OpenShock/Serialization/Types"
@@ -25,8 +26,8 @@ var chaosErrors = []string{
 }
 
 type ChaosEngine struct {
+	enabled      atomic.Bool
 	mu           sync.Mutex
-	enabled      bool
 	nextScanFail *Types.WifiScanStatus
 	srv          *Server
 }
@@ -36,21 +37,15 @@ func newChaosEngine(srv *Server) *ChaosEngine {
 }
 
 func (c *ChaosEngine) Enable() {
-	c.mu.Lock()
-	c.enabled = true
-	c.mu.Unlock()
+	c.enabled.Store(true)
 }
 
 func (c *ChaosEngine) Disable() {
-	c.mu.Lock()
-	c.enabled = false
-	c.mu.Unlock()
+	c.enabled.Store(false)
 }
 
 func (c *ChaosEngine) IsEnabled() bool {
-	c.mu.Lock()
-	defer c.mu.Unlock()
-	return c.enabled
+	return c.enabled.Load()
 }
 
 func (c *ChaosEngine) SetNextScanFail(s Types.WifiScanStatus) {
@@ -94,7 +89,7 @@ func (c *ChaosEngine) fireRandom() {
 	case 0:
 		// Disconnect all clients
 		log.Println("[chaos] disconnecting all clients")
-		srv.cmdDisconnectAll()
+		srv.cmdDisconnectAll(log.Writer())
 
 	case 1:
 		// Broadcast a random error

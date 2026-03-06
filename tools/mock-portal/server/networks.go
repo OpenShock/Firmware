@@ -143,10 +143,3 @@ func GenerateNetworks(count int) []WifiNetwork {
 	rand.Shuffle(len(nets), func(i, j int) { nets[i], nets[j] = nets[j], nets[i] })
 	return nets
 }
-
-func max(a, b int) int {
-	if a > b {
-		return a
-	}
-	return b
-}

@@ -105,12 +105,10 @@ func (srv *Server) handleWS(w http.ResponseWriter, r *http.Request) {
 	srv.state.mu.RLock()
 	nets := make([]WifiNetwork, len(srv.state.AvailableNetworks))
 	copy(nets, srv.state.AvailableNetworks)
-	srv.state.mu.RUnlock()
 	for i := range nets {
-		srv.state.mu.RLock()
 		nets[i].Saved = srv.state.savedCredentialIndex(nets[i].SSID) >= 0
-		srv.state.mu.RUnlock()
 	}
+	srv.state.mu.RUnlock()
 	c.send(BuildWifiNetworkEvent(Types.WifiNetworkEventTypeDiscovered, nets))
 
 	go srv.writePump(c)

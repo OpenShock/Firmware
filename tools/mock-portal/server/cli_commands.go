@@ -1,10 +1,9 @@
 package server
 
 import (
-	"bufio"
 	"fmt"
+	"io"
 	"math/rand"
-	"os"
 	"strconv"
 	"strings"
 
@@ -19,6 +18,7 @@ OpenShock mock portal — runtime commands
   help                          this help
   status                        dump current state summary
   clients                       list connected WS clients
+  exit                          shut down the mock portal
 
   ── Network list ────────────────────────────────────────────
   add-networks [n]              add n random networks, broadcast Discovered (default 10)
@@ -58,19 +58,9 @@ OpenShock mock portal — runtime commands
   chaos [on|off]                toggle automatic random fault injection
 `
 
-func (srv *Server) RunCLI() {
-	scanner := bufio.NewScanner(os.Stdin)
-	fmt.Fprint(os.Stderr, "\n> ")
-	for scanner.Scan() {
-		line := strings.TrimSpace(scanner.Text())
-		if line != "" {
-			srv.execCommand(line)
-		}
-		fmt.Fprint(os.Stderr, "> ")
-	}
-}
-
-func (srv *Server) execCommand(line string) {
+// ExecCommand parses and executes a single CLI command line.
+// All output is written to out so callers can route it through the Console.
+func (srv *Server) ExecCommand(line string, out io.Writer) {
 	parts := strings.Fields(line)
 	if len(parts) == 0 {
 		return
@@ -79,13 +69,13 @@ func (srv *Server) execCommand(line string) {
 
 	switch cmd {
 	case "help":
-		fmt.Fprint(os.Stderr, cliHelp)
+		fmt.Fprint(out, cliHelp)
 
 	case "status":
-		srv.cmdStatus()
+		srv.cmdStatus(out)
 
 	case "clients":
-		srv.cmdClients()
+		srv.cmdClients(out)
 
 	// ── Network list ─────────────────────────────────────────────────────────
 
@@ -99,18 +89,19 @@ func (srv *Server) execCommand(line string) {
 		nets := GenerateNetworks(n)
 		srv.state.mu.Lock()
 		srv.state.AvailableNetworks = append(srv.state.AvailableNetworks, nets...)
+		total := len(srv.state.AvailableNetworks)
 		srv.state.mu.Unlock()
 		srv.broadcast(BuildWifiNetworkEvent(Types.WifiNetworkEventTypeDiscovered, nets))
-		fmt.Fprintf(os.Stderr, "[CLI] added %d networks (total %d)\n", n, len(srv.state.AvailableNetworks))
+		fmt.Fprintf(out, "[CLI] added %d networks (total %d)\n", n, total)
 
 	case "set-networks":
 		if len(args) == 0 {
-			fmt.Fprintln(os.Stderr, "usage: set-networks <n>")
+			fmt.Fprintln(out, "usage: set-networks <n>")
 			return
 		}
 		n, err := strconv.Atoi(args[0])
 		if err != nil || n < 0 {
-			fmt.Fprintln(os.Stderr, "usage: set-networks <n>")
+			fmt.Fprintln(out, "usage: set-networks <n>")
 			return
 		}
 		srv.state.mu.Lock()
@@ -118,16 +109,15 @@ func (srv *Server) execCommand(line string) {
 		nets := GenerateNetworks(n)
 		srv.state.AvailableNetworks = nets
 		srv.state.mu.Unlock()
-		// Broadcast Lost for old, Discovered for new
 		srv.broadcast(BuildWifiNetworkEvent(Types.WifiNetworkEventTypeLost, old))
 		if len(nets) > 0 {
 			srv.broadcast(BuildWifiNetworkEvent(Types.WifiNetworkEventTypeDiscovered, nets))
 		}
-		fmt.Fprintf(os.Stderr, "[CLI] replaced with %d networks\n", n)
+		fmt.Fprintf(out, "[CLI] replaced with %d networks\n", n)
 
 	case "remove-network":
 		if len(args) == 0 {
-			fmt.Fprintln(os.Stderr, "usage: remove-network <ssid>")
+			fmt.Fprintln(out, "usage: remove-network <ssid>")
 			return
 		}
 		ssid := strings.Join(args, " ")
@@ -142,22 +132,22 @@ func (srv *Server) execCommand(line string) {
 		}
 		srv.state.mu.Unlock()
 		if !found {
-			fmt.Fprintf(os.Stderr, "[CLI] network %q not found\n", ssid)
+			fmt.Fprintf(out, "[CLI] network %q not found\n", ssid)
 			return
 		}
 		srv.broadcast(BuildWifiNetworkEvent(Types.WifiNetworkEventTypeLost, []WifiNetwork{{SSID: ssid}}))
-		fmt.Fprintf(os.Stderr, "[CLI] removed %q\n", ssid)
+		fmt.Fprintf(out, "[CLI] removed %q\n", ssid)
 
 	case "list-networks":
 		srv.state.mu.RLock()
 		defer srv.state.mu.RUnlock()
-		fmt.Fprintf(os.Stderr, "[networks] %d total:\n", len(srv.state.AvailableNetworks))
+		fmt.Fprintf(out, "[networks] %d total:\n", len(srv.state.AvailableNetworks))
 		for i, n := range srv.state.AvailableNetworks {
 			ssid := n.SSID
 			if ssid == "" {
 				ssid = "<hidden>"
 			}
-			fmt.Fprintf(os.Stderr, "  %3d  %-34q  ch%-3d  %4ddBm  %-14s  saved=%v\n",
+			fmt.Fprintf(out, "  %3d  %-34q  ch%-3d  %4ddBm  %-14s  saved=%v\n",
 				i+1, ssid, n.Channel, n.RSSI, authModeName(n.AuthMode), n.Saved)
 		}
 
@@ -169,22 +159,22 @@ func (srv *Server) execCommand(line string) {
 		if len(old) > 0 {
 			srv.broadcast(BuildWifiNetworkEvent(Types.WifiNetworkEventTypeLost, old))
 		}
-		fmt.Fprintf(os.Stderr, "[CLI] cleared %d networks\n", len(old))
+		fmt.Fprintf(out, "[CLI] cleared %d networks\n", len(old))
 
 	// ── Single-network manipulation ───────────────────────────────────────────
 
 	case "network":
 		if len(args) == 0 {
-			fmt.Fprintln(os.Stderr, "usage: network <add|update|rssi|auth|save|forget> ...")
+			fmt.Fprintln(out, "usage: network <add|update|rssi|auth|save|forget> ...")
 			return
 		}
-		srv.cmdNetwork(args)
+		srv.cmdNetwork(args, out)
 
 	// ── Mesh ──────────────────────────────────────────────────────────────────
 
 	case "mesh":
 		if len(args) == 0 {
-			fmt.Fprintln(os.Stderr, "usage: mesh <ssid> [count]")
+			fmt.Fprintln(out, "usage: mesh <ssid> [count]")
 			return
 		}
 		ssid := args[0]
@@ -199,15 +189,14 @@ func (srv *Server) execCommand(line string) {
 		srv.state.AvailableNetworks = append(srv.state.AvailableNetworks, nets...)
 		srv.state.mu.Unlock()
 		srv.broadcast(BuildWifiNetworkEvent(Types.WifiNetworkEventTypeDiscovered, nets))
-		fmt.Fprintf(os.Stderr, "[CLI] mesh %q: added %d nodes\n", ssid, count)
+		fmt.Fprintf(out, "[CLI] mesh %q: added %d nodes\n", ssid, count)
 
 	case "mesh-roam":
 		if len(args) == 0 {
-			fmt.Fprintln(os.Stderr, "usage: mesh-roam <ssid>")
+			fmt.Fprintln(out, "usage: mesh-roam <ssid>")
 			return
 		}
-		ssid := args[0]
-		srv.cmdMeshRoam(ssid)
+		srv.cmdMeshRoam(args[0], out)
 
 	// ── WiFi events ───────────────────────────────────────────────────────────
 
@@ -216,7 +205,7 @@ func (srv *Server) execCommand(line string) {
 
 	case "wifi-got":
 		if len(args) == 0 {
-			fmt.Fprintln(os.Stderr, "usage: wifi-got <ssid>")
+			fmt.Fprintln(out, "usage: wifi-got <ssid>")
 			return
 		}
 		ssid := strings.Join(args, " ")
@@ -237,7 +226,7 @@ func (srv *Server) execCommand(line string) {
 		srv.state.mu.Unlock()
 		srv.broadcast(BuildWifiNetworkEvent(Types.WifiNetworkEventTypeConnected, []WifiNetwork{net}))
 		srv.broadcast(BuildWifiGotIpEvent(ip))
-		fmt.Fprintf(os.Stderr, "[CLI] simulated connect to %q, IP=%s\n", ssid, ip)
+		fmt.Fprintf(out, "[CLI] simulated connect to %q, IP=%s\n", ssid, ip)
 
 	case "scan":
 		go srv.handleWifiScan(nil, true)
@@ -246,15 +235,15 @@ func (srv *Server) execCommand(line string) {
 
 	case "error":
 		if len(args) == 0 {
-			fmt.Fprintln(os.Stderr, "usage: error <message>")
+			fmt.Fprintln(out, "usage: error <message>")
 			return
 		}
 		msg := strings.Join(args, " ")
 		srv.broadcast(BuildErrorMessage(msg))
-		fmt.Fprintf(os.Stderr, "[CLI] broadcast error: %q\n", msg)
+		fmt.Fprintf(out, "[CLI] broadcast error: %q\n", msg)
 
 	case "disconnect":
-		srv.cmdDisconnectAll()
+		srv.cmdDisconnectAll(out)
 
 	case "spike":
 		n := 100
@@ -264,7 +253,7 @@ func (srv *Server) execCommand(line string) {
 			}
 		}
 		go srv.cmdSpike(n)
-		fmt.Fprintf(os.Stderr, "[CLI] spiking %d events\n", n)
+		fmt.Fprintf(out, "[CLI] spiking %d events\n", n)
 
 	case "corrupt":
 		n := 1
@@ -274,7 +263,7 @@ func (srv *Server) execCommand(line string) {
 			}
 		}
 		srv.cmdCorrupt(n)
-		fmt.Fprintf(os.Stderr, "[CLI] sent %d corrupt frames\n", n)
+		fmt.Fprintf(out, "[CLI] sent %d corrupt frames\n", n)
 
 	case "scan-fail":
 		status := Types.WifiScanStatusError
@@ -287,11 +276,11 @@ func (srv *Server) execCommand(line string) {
 			case "error":
 				status = Types.WifiScanStatusError
 			default:
-				fmt.Fprintf(os.Stderr, "[CLI] unknown status %q, using Error\n", args[0])
+				fmt.Fprintf(out, "[CLI] unknown status %q, using Error\n", args[0])
 			}
 		}
 		srv.chaos.SetNextScanFail(status)
-		fmt.Fprintf(os.Stderr, "[CLI] next scan will fail with status %d\n", status)
+		fmt.Fprintf(out, "[CLI] next scan will fail with status %d\n", status)
 
 	case "chaos":
 		toggle := ""
@@ -301,34 +290,34 @@ func (srv *Server) execCommand(line string) {
 		switch toggle {
 		case "on":
 			srv.chaos.Enable()
-			fmt.Fprintln(os.Stderr, "[CLI] chaos mode ON")
+			fmt.Fprintln(out, "[CLI] chaos mode ON")
 		case "off":
 			srv.chaos.Disable()
-			fmt.Fprintln(os.Stderr, "[CLI] chaos mode OFF")
+			fmt.Fprintln(out, "[CLI] chaos mode OFF")
 		default:
 			if srv.chaos.IsEnabled() {
 				srv.chaos.Disable()
-				fmt.Fprintln(os.Stderr, "[CLI] chaos mode OFF")
+				fmt.Fprintln(out, "[CLI] chaos mode OFF")
 			} else {
 				srv.chaos.Enable()
-				fmt.Fprintln(os.Stderr, "[CLI] chaos mode ON")
+				fmt.Fprintln(out, "[CLI] chaos mode ON")
 			}
 		}
 
 	default:
-		fmt.Fprintf(os.Stderr, "[CLI] unknown command %q — type 'help'\n", cmd)
+		fmt.Fprintf(out, "[CLI] unknown command %q — type 'help'\n", cmd)
 	}
 }
 
 // ── network subcommand ────────────────────────────────────────────────────────
 
-func (srv *Server) cmdNetwork(args []string) {
+func (srv *Server) cmdNetwork(args []string, out io.Writer) {
 	sub, rest := args[0], args[1:]
 
 	switch sub {
 	case "add":
 		if len(rest) == 0 {
-			fmt.Fprintln(os.Stderr, "usage: network add <ssid> [opts]")
+			fmt.Fprintln(out, "usage: network add <ssid> [opts]")
 			return
 		}
 		net := parseNetworkOpts(rest[0], rest[1:])
@@ -336,12 +325,12 @@ func (srv *Server) cmdNetwork(args []string) {
 		srv.state.AvailableNetworks = append(srv.state.AvailableNetworks, net)
 		srv.state.mu.Unlock()
 		srv.broadcast(BuildWifiNetworkEvent(Types.WifiNetworkEventTypeDiscovered, []WifiNetwork{net}))
-		fmt.Fprintf(os.Stderr, "[CLI] added %q ch%d %ddBm auth=%s saved=%v\n",
+		fmt.Fprintf(out, "[CLI] added %q ch%d %ddBm auth=%s saved=%v\n",
 			net.SSID, net.Channel, net.RSSI, authModeName(net.AuthMode), net.Saved)
 
 	case "update":
 		if len(rest) == 0 {
-			fmt.Fprintln(os.Stderr, "usage: network update <ssid> [opts]")
+			fmt.Fprintln(out, "usage: network update <ssid> [opts]")
 			return
 		}
 		ssid := rest[0]
@@ -355,65 +344,65 @@ func (srv *Server) cmdNetwork(args []string) {
 		}
 		if idx < 0 {
 			srv.state.mu.Unlock()
-			fmt.Fprintf(os.Stderr, "[CLI] network %q not found\n", ssid)
+			fmt.Fprintf(out, "[CLI] network %q not found\n", ssid)
 			return
 		}
 		applyNetworkOpts(&srv.state.AvailableNetworks[idx], rest[1:])
 		net := srv.state.AvailableNetworks[idx]
 		srv.state.mu.Unlock()
 		srv.broadcast(BuildWifiNetworkEvent(Types.WifiNetworkEventTypeUpdated, []WifiNetwork{net}))
-		fmt.Fprintf(os.Stderr, "[CLI] updated %q\n", ssid)
+		fmt.Fprintf(out, "[CLI] updated %q\n", ssid)
 
 	case "rssi":
 		if len(rest) < 2 {
-			fmt.Fprintln(os.Stderr, "usage: network rssi <ssid> <dBm>")
+			fmt.Fprintln(out, "usage: network rssi <ssid> <dBm>")
 			return
 		}
 		ssid := rest[0]
 		val, err := strconv.Atoi(rest[1])
 		if err != nil {
-			fmt.Fprintln(os.Stderr, "[CLI] invalid rssi value")
+			fmt.Fprintln(out, "[CLI] invalid rssi value")
 			return
 		}
-		srv.updateNetworkField(ssid, func(n *WifiNetwork) { n.RSSI = int8(val) })
+		srv.updateNetworkField(ssid, func(n *WifiNetwork) { n.RSSI = int8(val) }, out)
 
 	case "auth":
 		if len(rest) < 2 {
-			fmt.Fprintln(os.Stderr, "usage: network auth <ssid> <mode>")
+			fmt.Fprintln(out, "usage: network auth <ssid> <mode>")
 			return
 		}
 		ssid := rest[0]
 		mode, ok := parseAuthMode(rest[1])
 		if !ok {
-			fmt.Fprintf(os.Stderr, "[CLI] unknown auth mode %q\n", rest[1])
+			fmt.Fprintf(out, "[CLI] unknown auth mode %q\n", rest[1])
 			return
 		}
-		srv.updateNetworkField(ssid, func(n *WifiNetwork) { n.AuthMode = mode })
+		srv.updateNetworkField(ssid, func(n *WifiNetwork) { n.AuthMode = mode }, out)
 
 	case "save":
 		if len(rest) == 0 {
-			fmt.Fprintln(os.Stderr, "usage: network save <ssid>")
+			fmt.Fprintln(out, "usage: network save <ssid>")
 			return
 		}
 		ssid := rest[0]
-		srv.updateNetworkField(ssid, func(n *WifiNetwork) { n.Saved = true })
+		srv.updateNetworkField(ssid, func(n *WifiNetwork) { n.Saved = true }, out)
 		srv.broadcast(BuildWifiNetworkEvent(Types.WifiNetworkEventTypeSaved, []WifiNetwork{{SSID: ssid, Saved: true}}))
 
 	case "forget":
 		if len(rest) == 0 {
-			fmt.Fprintln(os.Stderr, "usage: network forget <ssid>")
+			fmt.Fprintln(out, "usage: network forget <ssid>")
 			return
 		}
 		ssid := rest[0]
-		srv.updateNetworkField(ssid, func(n *WifiNetwork) { n.Saved = false })
+		srv.updateNetworkField(ssid, func(n *WifiNetwork) { n.Saved = false }, out)
 		srv.broadcast(BuildWifiNetworkEvent(Types.WifiNetworkEventTypeRemoved, []WifiNetwork{{SSID: ssid}}))
 
 	default:
-		fmt.Fprintf(os.Stderr, "[CLI] unknown network subcommand %q\n", sub)
+		fmt.Fprintf(out, "[CLI] unknown network subcommand %q\n", sub)
 	}
 }
 
-func (srv *Server) updateNetworkField(ssid string, fn func(*WifiNetwork)) {
+func (srv *Server) updateNetworkField(ssid string, fn func(*WifiNetwork), out io.Writer) {
 	srv.state.mu.Lock()
 	var updated WifiNetwork
 	found := false
@@ -427,17 +416,16 @@ func (srv *Server) updateNetworkField(ssid string, fn func(*WifiNetwork)) {
 	}
 	srv.state.mu.Unlock()
 	if !found {
-		fmt.Fprintf(os.Stderr, "[CLI] network %q not found\n", ssid)
+		fmt.Fprintf(out, "[CLI] network %q not found\n", ssid)
 		return
 	}
 	srv.broadcast(BuildWifiNetworkEvent(Types.WifiNetworkEventTypeUpdated, []WifiNetwork{updated}))
-	fmt.Fprintf(os.Stderr, "[CLI] updated %q\n", ssid)
+	fmt.Fprintf(out, "[CLI] updated %q\n", ssid)
 }
 
 // ── Mesh helpers ──────────────────────────────────────────────────────────────
 
 func makeMeshNodes(ssid string, count int) []WifiNetwork {
-	// Spread across 3 non-overlapping channels; RSSI descends so first node is "nearest"
 	channels := []uint8{1, 6, 11, 36, 40, 44, 48}
 	nets := make([]WifiNetwork, count)
 	for i := range nets {
@@ -454,7 +442,7 @@ func makeMeshNodes(ssid string, count int) []WifiNetwork {
 	return nets
 }
 
-func (srv *Server) cmdMeshRoam(ssid string) {
+func (srv *Server) cmdMeshRoam(ssid string, out io.Writer) {
 	srv.state.mu.Lock()
 	var nodes []int
 	for i, n := range srv.state.AvailableNetworks {
@@ -464,10 +452,9 @@ func (srv *Server) cmdMeshRoam(ssid string) {
 	}
 	if len(nodes) < 2 {
 		srv.state.mu.Unlock()
-		fmt.Fprintf(os.Stderr, "[CLI] fewer than 2 mesh nodes for %q\n", ssid)
+		fmt.Fprintf(out, "[CLI] fewer than 2 mesh nodes for %q\n", ssid)
 		return
 	}
-	// Shuffle RSSI values among nodes to simulate roam
 	rssis := make([]int8, len(nodes))
 	for i, idx := range nodes {
 		rssis[i] = srv.state.AvailableNetworks[idx].RSSI
@@ -480,13 +467,84 @@ func (srv *Server) cmdMeshRoam(ssid string) {
 	}
 	srv.state.mu.Unlock()
 	srv.broadcast(BuildWifiNetworkEvent(Types.WifiNetworkEventTypeUpdated, updated))
-	fmt.Fprintf(os.Stderr, "[CLI] mesh-roam on %q (%d nodes updated)\n", ssid, len(nodes))
+	fmt.Fprintf(out, "[CLI] mesh-roam on %q (%d nodes updated)\n", ssid, len(nodes))
+}
+
+// ── Misc commands ─────────────────────────────────────────────────────────────
+
+func (srv *Server) cmdStatus(out io.Writer) {
+	srv.state.mu.RLock()
+	networks := len(srv.state.AvailableNetworks)
+	connected := srv.state.ConnectedSSID
+	ip := srv.state.ConnectedIP
+	linked := srv.state.AccountLinked
+	srv.state.mu.RUnlock()
+
+	srv.mu.Lock()
+	nClients := len(srv.clients)
+	srv.mu.Unlock()
+
+	fmt.Fprintf(out,
+		"[status] clients=%d networks=%d connected=%q ip=%q linked=%v chaos=%v\n",
+		nClients, networks, connected, ip, linked,
+		srv.chaos.IsEnabled(),
+	)
+}
+
+func (srv *Server) cmdClients(out io.Writer) {
+	srv.mu.Lock()
+	defer srv.mu.Unlock()
+	if len(srv.clients) == 0 {
+		fmt.Fprintln(out, "[clients] none connected")
+		return
+	}
+	for c := range srv.clients {
+		fmt.Fprintf(out, "  %s\n", c.conn.RemoteAddr())
+	}
+}
+
+func (srv *Server) cmdDisconnectAll(out io.Writer) {
+	srv.mu.Lock()
+	conns := make([]*client, 0, len(srv.clients))
+	for c := range srv.clients {
+		conns = append(conns, c)
+	}
+	srv.mu.Unlock()
+	for _, c := range conns {
+		c.conn.Close()
+	}
+	fmt.Fprintf(out, "[CLI] disconnected %d client(s)\n", len(conns))
+}
+
+func (srv *Server) cmdSpike(n int) {
+	nets := GenerateNetworks(5)
+	for i := range n {
+		switch i % 3 {
+		case 0:
+			srv.broadcast(BuildWifiNetworkEvent(Types.WifiNetworkEventTypeDiscovered, GenerateNetworks(3)))
+		case 1:
+			srv.broadcast(BuildWifiNetworkEvent(Types.WifiNetworkEventTypeUpdated, nets))
+		case 2:
+			srv.broadcast(BuildWifiScanStatus(Types.WifiScanStatusInProgress))
+		}
+	}
+}
+
+func (srv *Server) cmdCorrupt(n int) {
+	garbage := [][]byte{
+		{0x00, 0x00, 0x00, 0x00},
+		{0xFF, 0xFE, 0xFD, 0xFC},
+		{0x04, 0x00, 0x00, 0x00, 0xAB},
+		[]byte("not flatbuffers at all"),
+		{},
+	}
+	for i := range n {
+		srv.broadcastRaw(garbage[i%len(garbage)])
+	}
 }
 
 // ── Option parsing ────────────────────────────────────────────────────────────
 
-// parseNetworkOpts builds a WifiNetwork from a base SSID and key=value tokens.
-// Recognised opts: rssi=<n>  channel=<n>  auth=<mode>  saved  hidden
 func parseNetworkOpts(ssid string, opts []string) WifiNetwork {
 	net := WifiNetwork{
 		SSID:     ssid,
@@ -513,7 +571,6 @@ func parseNetworkOpts(ssid string, opts []string) WifiNetwork {
 	return net
 }
 
-// applyNetworkOpts applies opts in-place to an existing WifiNetwork.
 func applyNetworkOpts(net *WifiNetwork, opts []string) {
 	for _, opt := range opts {
 		if opt == "saved" {
@@ -602,76 +659,5 @@ func authModeName(m Types.WifiAuthMode) string {
 		return "wapi"
 	default:
 		return "unknown"
-	}
-}
-
-func (srv *Server) cmdStatus() {
-	srv.state.mu.RLock()
-	defer srv.state.mu.RUnlock()
-	srv.mu.Lock()
-	nClients := len(srv.clients)
-	srv.mu.Unlock()
-	fmt.Fprintf(os.Stderr,
-		"[status] clients=%d networks=%d connected=%q ip=%q linked=%v chaos=%v\n",
-		nClients,
-		len(srv.state.AvailableNetworks),
-		srv.state.ConnectedSSID,
-		srv.state.ConnectedIP,
-		srv.state.AccountLinked,
-		srv.chaos.IsEnabled(),
-	)
-}
-
-func (srv *Server) cmdClients() {
-	srv.mu.Lock()
-	defer srv.mu.Unlock()
-	if len(srv.clients) == 0 {
-		fmt.Fprintln(os.Stderr, "[clients] none connected")
-		return
-	}
-	for c := range srv.clients {
-		fmt.Fprintf(os.Stderr, "  %s\n", c.conn.RemoteAddr())
-	}
-}
-
-func (srv *Server) cmdDisconnectAll() {
-	srv.mu.Lock()
-	conns := make([]*client, 0, len(srv.clients))
-	for c := range srv.clients {
-		conns = append(conns, c)
-	}
-	srv.mu.Unlock()
-	for _, c := range conns {
-		c.conn.Close()
-	}
-	fmt.Fprintf(os.Stderr, "[CLI] disconnected %d client(s)\n", len(conns))
-}
-
-func (srv *Server) cmdSpike(n int) {
-	nets := GenerateNetworks(5)
-	for range n {
-		// Alternate between a few event types to really stress the client
-		switch n % 3 {
-		case 0:
-			srv.broadcast(BuildWifiNetworkEvent(Types.WifiNetworkEventTypeDiscovered, GenerateNetworks(3)))
-		case 1:
-			srv.broadcast(BuildWifiNetworkEvent(Types.WifiNetworkEventTypeUpdated, nets))
-		case 2:
-			srv.broadcast(BuildWifiScanStatus(Types.WifiScanStatusInProgress))
-		}
-		n--
-	}
-}
-
-func (srv *Server) cmdCorrupt(n int) {
-	garbage := [][]byte{
-		{0x00, 0x00, 0x00, 0x00},           // all zeros
-		{0xFF, 0xFE, 0xFD, 0xFC},           // all ones-ish
-		{0x04, 0x00, 0x00, 0x00, 0xAB},     // valid size prefix, garbage body
-		[]byte("not flatbuffers at all"),   // text in binary frame
-		{},                                  // empty frame
-	}
-	for i := range n {
-		srv.broadcastRaw(garbage[i%len(garbage)])
 	}
 }

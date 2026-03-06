@@ -7,6 +7,7 @@ import (
 	"os"
 
 	"openshock.dev/mock-portal/server"
+	"openshock.dev/mock-portal/server/cli"
 )
 
 func main() {
@@ -32,10 +33,11 @@ func main() {
 	}
 
 	srv := server.New(state, *configPath)
-	srv.StartChaosEngine()
 	if *chaos {
 		srv.StartChaos()
 		log.Println("[chaos] chaos mode enabled at startup")
+	} else {
+		srv.StartChaosEngine()
 	}
 
 	log.Printf("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
@@ -47,7 +49,8 @@ func main() {
 	log.Printf("  Type 'help' for runtime commands")
 	log.Printf("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
 
-	go srv.RunCLI()
+	con := cli.NewConsole()
+	go cli.RunCLI(srv, con)
 
 	if err := http.ListenAndServe(*addr, srv.Handler()); err != nil {
 		log.Fatalf("server error: %v", err)
