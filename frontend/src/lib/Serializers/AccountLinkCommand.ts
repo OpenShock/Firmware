@@ -1,7 +1,7 @@
-import { Builder as FlatbufferBuilder } from 'flatbuffers';
+import { AccountLinkCommand } from '$lib/_fbs/open-shock/serialization/local/account-link-command';
 import { LocalToHubMessage } from '$lib/_fbs/open-shock/serialization/local/local-to-hub-message';
 import { LocalToHubMessagePayload } from '$lib/_fbs/open-shock/serialization/local/local-to-hub-message-payload';
-import { AccountLinkCommand } from '$lib/_fbs/open-shock/serialization/local/account-link-command';
+import { Builder as FlatbufferBuilder } from 'flatbuffers';
 
 export function SerializeAccountLinkCommand(linkCode: string): Uint8Array {
   const fbb = new FlatbufferBuilder(64);

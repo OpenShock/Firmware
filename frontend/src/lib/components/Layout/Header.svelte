@@ -9,7 +9,7 @@
     <div class="flex items-center space-x-4">
       <a
         href="/"
-        class="select-none overflow-hidden lg:ml-0! lg:w-auto"
+        class="overflow-hidden select-none lg:ml-0! lg:w-auto"
         data-sveltekit-preload-data="hover"
         aria-label="OpenShock"
       >

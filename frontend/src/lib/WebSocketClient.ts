@@ -1,9 +1,9 @@
 import { browser } from '$app/environment';
-import { isArrayBuffer, isString } from '$lib/typeguards';
-import { WebSocketMessageBinaryHandler } from './MessageHandlers';
 import { page } from '$app/stores';
-import { get } from 'svelte/store';
+import { isArrayBuffer, isString } from '$lib/typeguards';
 import { toast } from 'svelte-sonner';
+import { get } from 'svelte/store';
+import { WebSocketMessageBinaryHandler } from './MessageHandlers';
 
 function getWebSocketHostname() {
   if (!browser) {

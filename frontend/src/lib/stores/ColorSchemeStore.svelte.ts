@@ -84,6 +84,13 @@ class ColorSchemeState {
 
 export const colorScheme = new ColorSchemeState();
 
+export function willActivateLightMode(value: ColorScheme): boolean {
+  return (
+    value === ColorScheme.Light ||
+    (value === ColorScheme.System && !window.matchMedia('(prefers-color-scheme: dark)').matches)
+  );
+}
+
 function handleMediaQueryChange() {
   setDarkMode(getLocalStoreState());
 }

@@ -1,7 +1,7 @@
-import { defineConfig } from 'vitest/config';
 import { sveltekit } from '@sveltejs/kit/vite';
 import tailwindcss from '@tailwindcss/vite';
 import { visualizer } from 'rollup-plugin-visualizer';
+import { defineConfig } from 'vitest/config';
 
 export default defineConfig(() => {
   const analyze = process.env.ANALYZE === 'true';
@@ -18,18 +18,18 @@ export default defineConfig(() => {
               template: 'treemap',
               gzipSize: true,
               brotliSize: true,
-              open: true
+              open: true,
             }),
             visualizer({
               filename: 'dist/stats.json',
-              template: 'raw-data'
-            })
+              template: 'raw-data',
+            }),
           ]
-        : [])
+        : []),
     ],
 
     test: {
-      include: ['src/**/*.{test,spec}.{js,ts}']
-    }
+      include: ['src/**/*.{test,spec}.{js,ts}'],
+    },
   };
 });

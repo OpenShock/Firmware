@@ -2,23 +2,23 @@
   import { Button, buttonVariants } from '$lib/components/ui/button';
   import * as Dialog from '$lib/components/ui/dialog';
   import * as DropdownMenu from '$lib/components/ui/dropdown-menu';
-  import { ColorSchemeStore, willActivateLightMode, getDarkReaderState } from '$lib/stores';
+  import { colorScheme, ColorScheme, willActivateLightMode, getDarkReaderState } from '$lib/stores';
   import { toast } from 'svelte-sonner';
 
   import { Moon, Sun } from '@lucide/svelte';
 
-  let pendingScheme = $state<'light' | 'dark' | 'system' | undefined>();
+  let pendingScheme = $state<ColorScheme | undefined>();
   function handleOpenChanged(open: boolean) {
     if (open) return;
     pendingScheme = undefined;
   }
   function confirm() {
     if (!pendingScheme) return;
-    ColorSchemeStore.set(pendingScheme);
+    colorScheme.Value = pendingScheme;
     pendingScheme = undefined;
   }
-  function evaluateLightSwitch(scheme: 'light' | 'dark' | 'system') {
-    if (willActivateLightMode(scheme) && scheme !== $ColorSchemeStore) {
+  function evaluateLightSwitch(scheme: ColorScheme) {
+    if (willActivateLightMode(scheme) && scheme !== colorScheme.Value) {
       const darkreader = getDarkReaderState();
       if (darkreader.isActive) {
         toast.warning('DarkReader is enabled, activating light mode will have no effect!');
@@ -27,7 +27,7 @@
       pendingScheme = scheme;
       return;
     }
-    ColorSchemeStore.set(scheme);
+    colorScheme.Value = scheme;
   }
 </script>
 
@@ -47,15 +47,20 @@
 
 <DropdownMenu.Root>
   <DropdownMenu.Trigger class={buttonVariants({ variant: 'outline', size: 'icon' })}>
-    <Sun class="size-[1.2rem] rotate-0 scale-100 transition-all dark:-rotate-90 dark:scale-0" />
+    <Sun class="size-[1.2rem] scale-100 rotate-0 transition-all dark:scale-0 dark:-rotate-90" />
     <Moon
-      class="absolute size-[1.2rem] rotate-90 scale-0 transition-all dark:rotate-0 dark:scale-100"
+      class="absolute size-[1.2rem] scale-0 rotate-90 transition-all dark:scale-100 dark:rotate-0"
     />
     <span class="sr-only">Toggle theme</span>
   </DropdownMenu.Trigger>
   <DropdownMenu.Content align="end">
-    <DropdownMenu.Item onclick={() => evaluateLightSwitch('light')}>Light</DropdownMenu.Item>
-    <DropdownMenu.Item onclick={() => evaluateLightSwitch('dark')}>Dark</DropdownMenu.Item>
-    <DropdownMenu.Item onclick={() => evaluateLightSwitch('system')}>System</DropdownMenu.Item>
+    <DropdownMenu.Item onclick={() => evaluateLightSwitch(ColorScheme.Light)}
+      >Light</DropdownMenu.Item
+    >
+    <DropdownMenu.Item onclick={() => evaluateLightSwitch(ColorScheme.Dark)}>Dark</DropdownMenu.Item
+    >
+    <DropdownMenu.Item onclick={() => evaluateLightSwitch(ColorScheme.System)}
+      >System</DropdownMenu.Item
+    >
   </DropdownMenu.Content>
 </DropdownMenu.Root>

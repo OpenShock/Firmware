@@ -2,7 +2,6 @@
   import { HubStateStore } from '$lib/stores';
   import { WebSocketClient } from '$lib/WebSocketClient';
   import { WifiAuthMode } from '$lib/_fbs/open-shock/serialization/types/wifi-auth-mode';
-  import { SerializeWifiNetworkDisconnectCommand } from '$lib/Serializers/WifiNetworkDisconnectCommand';
   import { SerializeWifiNetworkConnectCommand } from '$lib/Serializers/WifiNetworkConnectCommand';
   import { SerializeWifiNetworkSaveCommand } from '$lib/Serializers/WifiNetworkSaveCommand';
   import WiFiDetailsDialog from '$lib/components/WiFiDetailsDialog.svelte';
@@ -39,10 +38,6 @@
   }
   function wifiConnect(item: WiFiNetworkGroup) {
     const data = SerializeWifiNetworkConnectCommand(item.ssid);
-    WebSocketClient.Instance.Send(data);
-  }
-  function wifiDisconnect(item: WiFiNetworkGroup) {
-    const data = SerializeWifiNetworkDisconnectCommand();
     WebSocketClient.Instance.Send(data);
   }
 
