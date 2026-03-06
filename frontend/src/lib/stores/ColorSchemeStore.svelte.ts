@@ -1,4 +1,3 @@
-import { browser } from '$app/environment';
 import { isString } from '$lib/typeguards';
 
 export enum ColorScheme {
@@ -13,11 +12,6 @@ function isColorSchemeEnum(value: unknown): value is ColorScheme {
 }
 
 function getLocalStoreState(): ColorScheme {
-  // If we are not in a browser environment, return default
-  if (!browser) {
-    return ColorScheme.System;
-  }
-
   // If the stored value is invalid, reset it and return default
   const scheme = localStorage.getItem('theme');
   if (!isColorSchemeEnum(scheme)) {

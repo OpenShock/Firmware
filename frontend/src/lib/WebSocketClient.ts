@@ -1,17 +1,9 @@
-import { browser } from '$app/environment';
-import { page } from '$app/stores';
 import { isArrayBuffer, isString } from '$lib/typeguards';
 import { toast } from 'svelte-sonner';
-import { get } from 'svelte/store';
 import { WebSocketMessageBinaryHandler } from './MessageHandlers';
 
 function getWebSocketHostname() {
-  if (!browser) {
-    return null;
-  }
-
-  const { url } = get(page);
-  const hostname = url.hostname;
+  const hostname = window.location.hostname;
 
   switch (hostname) {
     case 'localhost':
@@ -61,7 +53,6 @@ export class WebSocketClient {
   public Connect() {
     const connectionState = this.ConnectionState;
     if (
-      !browser ||
       connectionState === ConnectionState.CONNECTED ||
       connectionState === ConnectionState.CONNECTING
     ) {

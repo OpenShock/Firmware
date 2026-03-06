@@ -1,7 +1,9 @@
-import { sveltekit } from '@sveltejs/kit/vite';
+import { svelte } from '@sveltejs/vite-plugin-svelte';
 import tailwindcss from '@tailwindcss/vite';
+import { fileURLToPath } from 'node:url';
 import license from 'rollup-plugin-license';
 import { visualizer } from 'rollup-plugin-visualizer';
+import { viteSingleFile } from 'vite-plugin-singlefile';
 import { defineConfig } from 'vitest/config';
 
 export default defineConfig(({ mode }) => {
@@ -9,19 +11,30 @@ export default defineConfig(({ mode }) => {
   const isProduction = mode === 'production';
 
   return {
+    resolve: {
+      alias: {
+        $lib: fileURLToPath(new URL('./src/lib', import.meta.url)),
+      },
+    },
+
+    publicDir: 'static',
+
     build: {
       target: 'es2022',
+      outDir: 'build',
     },
+
     plugins: [
-      sveltekit(),
+      svelte(),
       tailwindcss(),
+      viteSingleFile(),
       license({
         thirdParty: {
           includePrivate: true,
           includeSelf: true,
           multipleVersions: true,
           output: {
-            file: './.svelte-kit/output/client/LICENSES.txt',
+            file: './build/LICENSES.txt',
           },
         },
       }),
@@ -29,14 +42,14 @@ export default defineConfig(({ mode }) => {
       ...(analyze
         ? [
             visualizer({
-              filename: 'dist/stats.html',
+              filename: 'build/stats.html',
               template: 'treemap',
               gzipSize: true,
               brotliSize: true,
               open: true,
             }),
             visualizer({
-              filename: 'dist/stats.json',
+              filename: 'build/stats.json',
               template: 'raw-data',
             }),
           ]
