@@ -11,51 +11,57 @@ import (
 
 // ssidTemplates are expanded with random data to produce realistic WiFi names.
 var ssidTemplates = []func() string{
-	func() string { return fmt.Sprintf("%s's %s", gofakeit.FirstName(), gofakeit.RandomString([]string{"WiFi", "Network", "Home", "WLAN", "Internet", "Hub"})) },
+	// ── Router vendor defaults ────────────────────────────────────────────────
 	func() string { return fmt.Sprintf("NETGEAR_%s", gofakeit.Lexify("??????")) },
 	func() string { return fmt.Sprintf("Xfinity_%s", gofakeit.Lexify("????????")) },
 	func() string { return fmt.Sprintf("TP-Link_%s", gofakeit.Lexify("######")) },
 	func() string { return fmt.Sprintf("ASUS_%s", gofakeit.Lexify("######")) },
 	func() string { return fmt.Sprintf("AT&T-WiFi-%s", gofakeit.Lexify("####")) },
-	func() string { return fmt.Sprintf("%s_%s", gofakeit.City(), gofakeit.Lexify("####")) },
-	func() string { return fmt.Sprintf("%s Office", gofakeit.Company()) },
-	func() string { return fmt.Sprintf("%s Guest", gofakeit.Company()) },
-	func() string { return fmt.Sprintf("%s IoT", gofakeit.AnimalType()) },
-	func() string { return gofakeit.HackerNoun() + "_net" },
-	func() string { return fmt.Sprintf("FBI Surveillance Van %d", gofakeit.Number(1, 9)) },
-	func() string { return fmt.Sprintf("Pretty Fly for a WiFi") },
-	func() string { return fmt.Sprintf("No Internet Access") },
-	func() string { return fmt.Sprintf("Loading...") },
-	func() string { return fmt.Sprintf("Not %s's WiFi", gofakeit.LastName()) },
-	func() string { return fmt.Sprintf("Definitely Not A Spy Network") },
-	func() string { return fmt.Sprintf("Bill Wi The Science Fi") },
-	func() string { return fmt.Sprintf("The Promised LAN") },
-	func() string { return fmt.Sprintf("LAN Solo") },
-	func() string { return fmt.Sprintf("404 Network Not Found") },
-	func() string { return fmt.Sprintf("drop table wifi;--") },           // SQL injection
-	func() string { return fmt.Sprintf("<script>alert(1)</script>") },    // XSS
-	func() string { return fmt.Sprintf("../../etc/passwd") },             // path traversal
-	func() string { return fmt.Sprintf("%s\x00hidden", gofakeit.Word()) }, // null byte
-	func() string { return fmt.Sprintf("🔥WiFi🔥") },
-	func() string { return fmt.Sprintf("☠️ Pirate Network ☠️") },
-	func() string { return fmt.Sprintf("Café_WiFi_Ñoño") },
-	func() string { return fmt.Sprintf("网络_%s", gofakeit.Lexify("####")) },
-	func() string { return fmt.Sprintf("Ω≈ç√∫˜µ≤≥÷") },
-	// Very long name (near/at 32-char limit)
+	func() string { return fmt.Sprintf("Linksys%s", gofakeit.Lexify("?????")) },
+	func() string { return fmt.Sprintf("dlink-%s", gofakeit.Lexify("####")) },
+	func() string { return fmt.Sprintf("2WIRE%s", gofakeit.Lexify("###")) },
+	func() string { return fmt.Sprintf("belkin.%s", gofakeit.Lexify("######")) },
+	func() string { return fmt.Sprintf("Spectrum-%s-2.4G", gofakeit.Lexify("####")) },
+	func() string { return fmt.Sprintf("Spectrum-%s-5G", gofakeit.Lexify("####")) },
+	func() string { return fmt.Sprintf("MySpectrumWiFi%s", gofakeit.Lexify("####")) },
+	func() string { return fmt.Sprintf("Fios-G%s", gofakeit.Lexify("####")) },
+	func() string { return fmt.Sprintf("CenturyLink%s", gofakeit.Lexify("####")) },
+	func() string { return fmt.Sprintf("HOME-%s-2.4", gofakeit.Lexify("####")) },
+	func() string { return fmt.Sprintf("BELL%s", gofakeit.Lexify("###")) },
+	// ── Personal ─────────────────────────────────────────────────────────────
 	func() string {
-		s := gofakeit.LoremIpsumWord() + "_" + gofakeit.LoremIpsumWord() + "_" + gofakeit.LoremIpsumWord()
+		return fmt.Sprintf("%s's %s", gofakeit.FirstName(), gofakeit.RandomString([]string{"WiFi", "Network", "Home", "WLAN", "Internet", "Hub"}))
+	},
+	func() string {
+		return fmt.Sprintf("The %s %s", gofakeit.LastName(), gofakeit.RandomString([]string{"Network", "WiFi", "LAN", "Internet", "Household"}))
+	},
+	func() string { return fmt.Sprintf("%s_%s", gofakeit.City(), gofakeit.Lexify("####")) },
+	func() string { return fmt.Sprintf("Apt%s", gofakeit.Numerify("##")) },
+	func() string { return fmt.Sprintf("Unit%s_WiFi", gofakeit.Numerify("##")) },
+	// ── Business / venue ─────────────────────────────────────────────────────
+	func() string { return fmt.Sprintf("%s_Office", gofakeit.Company()) },
+	func() string { return fmt.Sprintf("%s_Guest", gofakeit.Company()) },
+	func() string { return fmt.Sprintf("%s_IoT", gofakeit.AnimalType()) },
+	func() string { return gofakeit.HackerNoun() + "_net" },
+	// ── Short names ───────────────────────────────────────────────────────────
+	func() string { return gofakeit.Lexify("WiFi-??") },
+	func() string { return gofakeit.Lexify("NET##") },
+	func() string { return gofakeit.LastName()[:3] + gofakeit.Numerify("##") },
+	// ── Long names (near 32-char limit) ──────────────────────────────────────
+	func() string {
+		s := fmt.Sprintf("%s_%s_%s", gofakeit.LastName(), gofakeit.City(), gofakeit.Lexify("####"))
 		if len(s) > 32 {
 			s = s[:32]
 		}
 		return s
 	},
-	// Whitespace-heavy
-	func() string { return fmt.Sprintf("   %s   ", gofakeit.Word()) },
-	// Repeated chars
-	func() string { return "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAaaa" },
-	func() string { return "\t\r\n" },
-	// Zero-width space
-	func() string { return fmt.Sprintf("%s\u200B%s", gofakeit.Word(), gofakeit.Word()) },
+	func() string {
+		s := fmt.Sprintf("%s_Guest_Network_%s", gofakeit.Company(), gofakeit.Lexify("##"))
+		if len(s) > 32 {
+			s = s[:32]
+		}
+		return s
+	},
 }
 
 var allAuthModes = []Types.WifiAuthMode{
@@ -92,12 +98,14 @@ func randomAuthMode() Types.WifiAuthMode {
 	}
 }
 
+var wifiChannels = []uint8{1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 36, 40, 44, 48, 52, 100, 149}
+
 func RandomNetwork(saved bool) WifiNetwork {
 	ssid := ssidTemplates[rand.Intn(len(ssidTemplates))]()
 	return WifiNetwork{
 		SSID:     ssid,
 		BSSID:    randomBSSID(),
-		Channel:  uint8(gofakeit.RandomString([]string{"1", "6", "11", "2", "3", "4", "5", "7", "8", "9", "10", "12", "13", "36", "40", "44", "48", "52", "100", "149"})[0] % 16),
+		Channel:  wifiChannels[rand.Intn(len(wifiChannels))],
 		RSSI:     int8(-gofakeit.Number(30, 95)),
 		AuthMode: randomAuthMode(),
 		Saved:    saved,
