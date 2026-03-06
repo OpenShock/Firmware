@@ -1,3 +1,3 @@
-export * from './ColorSchemeStore';
-export * from './HubStateStore';
-export * from './UsedPinsStore';
+export * from './ColorSchemeStore.svelte';
+export * from './HubStateStore.svelte';
+export * from './UsedPinsStore.svelte';

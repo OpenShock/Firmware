@@ -7,6 +7,16 @@ export function isString(value: unknown): value is string {
 export function isNumber(value: unknown): value is number {
   return typeof value === 'number' && isFinite(value);
 }
+export function isBoolean(value: unknown): value is boolean {
+  return typeof value === 'boolean';
+}
 export function isArrayBuffer(value: unknown): value is ArrayBuffer {
   return value instanceof ArrayBuffer;
+}
+export function isDate(value: unknown): value is Date {
+  return value instanceof Date;
+}
+
+export function isStringOrNull(value: unknown): value is string | null {
+  return isString(value) || value === null;
 }
