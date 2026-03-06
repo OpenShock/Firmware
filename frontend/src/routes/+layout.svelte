@@ -19,7 +19,7 @@
   });
 </script>
 
-<Toaster />
+<Toaster position="top-center" />
 
 <div class="flex min-h-screen flex-col">
   <Header />
