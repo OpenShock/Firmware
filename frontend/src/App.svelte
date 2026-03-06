@@ -2,6 +2,7 @@
   import { WebSocketClient } from '$lib/WebSocketClient';
   import Footer from '$lib/components/Layout/Footer.svelte';
   import Header from '$lib/components/Layout/Header.svelte';
+  import SuccessScreen from '$lib/components/SuccessScreen.svelte';
   import { Toaster } from '$lib/components/ui/sonner';
   import {
     Stepper,
@@ -15,11 +16,13 @@
     StepperNext,
     StepperPrevious,
   } from '$lib/components/ui/stepper';
+  import PinsStep from '$lib/components/steps/HardwareStep.svelte';
   import WiFiStep from '$lib/components/steps/WiFiStep.svelte';
-  import HardwareStep from '$lib/components/steps/HardwareStep.svelte';
   import AccountStep from '$lib/components/steps/AccountStep.svelte';
   import AdvancedView from '$lib/components/AdvancedView.svelte';
   import { hubState, initializeDarkModeStore, ViewModeStore } from '$lib/stores';
+  import { closePortal } from '$lib/portalClose';
+  import { Button } from '$lib/components/ui/button';
   import { onMount } from 'svelte';
 
   onMount(() => {
@@ -27,81 +30,139 @@
     WebSocketClient.Instance.Connect();
   });
 
+  // Wizard state
   let currentStep = $state(1);
+  let showSuccess = $state(false);
+
+  // Prebuilt boards skip the Pins step
+  let isDIY = $derived(!hubState.hasPredefinedPins);
+
+  // Gate conditions
   let wifiConnected = $derived(hubState.wifiConnectedBSSID !== null);
+  let pinConfigured = $derived(hubState.config?.rf?.txPin != null);
+
+  // Step gate: can the user advance from the current step?
+  let canAdvance = $derived(
+    isDIY
+      ? currentStep === 1
+        ? pinConfigured
+        : currentStep === 2
+          ? wifiConnected
+          : false
+      : currentStep === 1
+        ? wifiConnected
+        : false
+  );
+
+  // Total steps
+  let totalSteps = $derived(isDIY ? 3 : 2);
+
+  // For prebuilt: show success when WiFi + account are both done
+  $effect(() => {
+    if (!isDIY && wifiConnected && hubState.accountLinked && !showSuccess) {
+      showSuccess = true;
+    }
+  });
+
+  function handleDone() {
+    closePortal();
+  }
 </script>
 
 <Toaster position="top-center" />
 
-<div class="flex min-h-screen flex-col">
-  <Header />
+{#if showSuccess}
+  <SuccessScreen onClose={closePortal} />
+{:else}
+  <div class="flex min-h-screen flex-col">
+    <Header />
 
-  {#if $ViewModeStore === 'advanced'}
-    <AdvancedView />
-  {:else}
-    <div class="flex flex-1 flex-col items-center px-2 py-4">
-      <div class="w-full max-w-md">
-        <Stepper bind:value={currentStep} linear>
-          <StepperNav>
-            <StepperItem step={1}>
-              <StepperTrigger>
-                <StepperIndicator />
-                <div class="hidden sm:block">
-                  <StepperTitle>WiFi</StepperTitle>
-                  <StepperDescription>Network setup</StepperDescription>
-                </div>
-              </StepperTrigger>
-              <StepperSeparator />
-            </StepperItem>
+    {#if $ViewModeStore === 'advanced'}
+      <AdvancedView />
+    {:else}
+      <div class="flex flex-1 flex-col items-center px-2 py-4">
+        <div class="w-full max-w-md">
+          <Stepper bind:value={currentStep} linear>
+            <!-- Step navigation header -->
+            <StepperNav>
+              {#if isDIY}
+                <StepperItem step={1}>
+                  <StepperTrigger>
+                    <StepperIndicator />
+                    <div class="hidden sm:block">
+                      <StepperTitle>Pins</StepperTitle>
+                      <StepperDescription>Hardware setup</StepperDescription>
+                    </div>
+                  </StepperTrigger>
+                  <StepperSeparator />
+                </StepperItem>
+              {/if}
 
-            <StepperItem step={2}>
-              <StepperTrigger>
-                <StepperIndicator />
-                <div class="hidden sm:block">
-                  <StepperTitle>Hardware</StepperTitle>
-                  <StepperDescription>Pin config</StepperDescription>
-                </div>
-              </StepperTrigger>
-              <StepperSeparator />
-            </StepperItem>
+              <StepperItem step={isDIY ? 2 : 1}>
+                <StepperTrigger>
+                  <StepperIndicator />
+                  <div class="hidden sm:block">
+                    <StepperTitle>WiFi</StepperTitle>
+                    <StepperDescription>Network setup</StepperDescription>
+                  </div>
+                </StepperTrigger>
+                <StepperSeparator />
+              </StepperItem>
 
-            <StepperItem step={3}>
-              <StepperTrigger>
-                <StepperIndicator />
-                <div class="hidden sm:block">
-                  <StepperTitle>Account</StepperTitle>
-                  <StepperDescription>Link device</StepperDescription>
-                </div>
-              </StepperTrigger>
-            </StepperItem>
-          </StepperNav>
+              <StepperItem step={isDIY ? 3 : 2}>
+                <StepperTrigger>
+                  <StepperIndicator />
+                  <div class="hidden sm:block">
+                    <StepperTitle>Account</StepperTitle>
+                    <StepperDescription>Link device</StepperDescription>
+                  </div>
+                </StepperTrigger>
+              </StepperItem>
+            </StepperNav>
 
-          <div class="rounded-lg border p-4">
-            {#if currentStep === 1}
-              <WiFiStep />
-            {:else if currentStep === 2}
-              <HardwareStep />
-            {:else if currentStep === 3}
-              <AccountStep />
-            {/if}
-          </div>
-
-          <div class="flex justify-between">
-            <StepperPrevious />
-            {#if currentStep < 3}
-              <StepperNext disabled={currentStep === 1 && !wifiConnected}>
-                {#if currentStep === 1 && !wifiConnected}
-                  Connect WiFi first
+            <!-- Step content -->
+            <div class="rounded-lg border p-4">
+              {#if isDIY}
+                {#if currentStep === 1}
+                  <PinsStep />
+                {:else if currentStep === 2}
+                  <WiFiStep />
                 {:else}
-                  Next
+                  <AccountStep />
                 {/if}
-              </StepperNext>
-            {/if}
-          </div>
-        </Stepper>
-      </div>
-    </div>
-  {/if}
+              {:else if currentStep === 1}
+                <WiFiStep />
+              {:else}
+                <AccountStep />
+              {/if}
+            </div>
 
-  <Footer />
-</div>
+            <!-- Navigation buttons -->
+            <div class="flex justify-between">
+              <StepperPrevious />
+
+              {#if currentStep < totalSteps}
+                <StepperNext disabled={!canAdvance}>
+                  {#if !canAdvance}
+                    {isDIY && currentStep === 1
+                      ? 'Configure pins first'
+                      : 'Connect WiFi first'}
+                  {:else}
+                    Next
+                  {/if}
+                </StepperNext>
+              {:else if isDIY}
+                <!-- Final step for DIY: explicit Done button -->
+                <Button onclick={handleDone} disabled={!hubState.accountLinked}>
+                  {hubState.accountLinked ? 'Done' : 'Link account first'}
+                </Button>
+              {/if}
+            </div>
+          </Stepper>
+        </div>
+      </div>
+    {/if}
+
+    <Footer />
+  </div>
+{/if}

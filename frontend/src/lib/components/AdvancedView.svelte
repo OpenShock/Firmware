@@ -1,12 +1,13 @@
 <script lang="ts">
   import WiFiManager from '$lib/components/WiFiManager.svelte';
   import GpioPinSelector from '$lib/components/GpioPinSelector.svelte';
-  import { SerializeSetRfTxPinCommand } from '$lib/Serializers/SetRfTxPinCommand';
-  import { SerializeSetEstopPinCommand } from '$lib/Serializers/SetEstopPinCommand';
-  import { SerializeSetEstopEnabledCommand } from '$lib/Serializers/SetEstopEnabledCommand';
-  import { SerializeAccountLinkCommand } from '$lib/Serializers/AccountLinkCommand';
-  import { SerializeAccountUnlinkCommand } from '$lib/Serializers/AccountUnlinkCommand';
-  import { WebSocketClient } from '$lib/WebSocketClient';
+  import {
+    linkAccount as apiLinkAccount,
+    unlinkAccount as apiUnlinkAccount,
+    setEstopEnabled,
+    setRfTxPin,
+    setEstopPin,
+  } from '$lib/api';
   import { hubState } from '$lib/stores';
   import { Button } from '$lib/components/ui/button';
   import { Input } from '$lib/components/ui/input';
@@ -28,20 +29,17 @@
   let linkCodeValid = $derived(isValidLinkCode(linkCode));
   let accountLinked = $derived(hubState.accountLinked);
 
-  function linkAccount() {
+  async function linkAccount() {
     if (!linkCodeValid) return;
-    const data = SerializeAccountLinkCommand(linkCode!);
-    WebSocketClient.Instance.Send(data);
+    await apiLinkAccount(linkCode!);
   }
 
-  function unlinkAccount() {
-    const data = SerializeAccountUnlinkCommand();
-    WebSocketClient.Instance.Send(data);
+  async function unlinkAccount() {
+    await apiUnlinkAccount();
   }
 
-  function toggleEstop() {
-    const data = SerializeSetEstopEnabledCommand(!hubState.config?.estop?.enabled);
-    WebSocketClient.Instance.Send(data);
+  async function toggleEstop() {
+    await setEstopEnabled(!(hubState.config?.estop?.enabled ?? false));
   }
 </script>
 
@@ -67,7 +65,7 @@
           <GpioPinSelector
             name="RF TX Pin"
             currentPin={hubState.config?.rf?.txPin ?? null}
-            serializer={SerializeSetRfTxPinCommand}
+            setter={setRfTxPin}
           />
         </div>
 
@@ -87,7 +85,7 @@
           <GpioPinSelector
             name="EStop Pin"
             currentPin={hubState.config?.estop?.gpioPin ?? null}
-            serializer={SerializeSetEstopPinCommand}
+            setter={setEstopPin}
           />
         </div>
       </div>

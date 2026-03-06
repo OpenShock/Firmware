@@ -4,7 +4,7 @@
   import { WifiAuthMode } from '$lib/_fbs/open-shock/serialization/types/wifi-auth-mode';
   import { SerializeWifiNetworkConnectCommand } from '$lib/Serializers/WifiNetworkConnectCommand';
   import { SerializeWifiNetworkSaveCommand } from '$lib/Serializers/WifiNetworkSaveCommand';
-  import { SerializeWifiNetworkForgetCommand } from '$lib/Serializers/WifiNetworkForgetCommand';
+  import { forgetWifiNetwork } from '$lib/api';
   import { SerializeWifiNetworkDisconnectCommand } from '$lib/Serializers/WifiNetworkDisconnectCommand';
   import WiFiDetailsDialog from '$lib/components/WiFiDetailsDialog.svelte';
   import type { WiFiNetworkGroup } from '$lib/types';
@@ -65,8 +65,7 @@
   }
 
   function wifiForget(ssid: string) {
-    const data = SerializeWifiNetworkForgetCommand(ssid);
-    WebSocketClient.Instance.Send(data);
+    forgetWifiNetwork(ssid);
   }
 
   function wifiEditPassword(ssid: string, password: string | null) {

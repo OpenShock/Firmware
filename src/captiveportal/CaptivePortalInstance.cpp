@@ -4,8 +4,12 @@
 
 const char* const TAG = "CaptivePortalInstance";
 
+#include "captiveportal/Manager.h"
 #include "captiveportal/RFC8908Handler.h"
+#include "Chipset.h"
 #include "CommandHandler.h"
+#include "config/Config.h"
+#include "estop/EStopManager.h"
 #include "GatewayConnectionManager.h"
 #include "Logging.h"
 #include "message_handlers/WebSocket.h"
@@ -15,6 +19,7 @@ const char* const TAG = "CaptivePortalInstance";
 #include "util/PartitionUtils.h"
 #include "util/TaskUtils.h"
 #include "wifi/WiFiManager.h"
+#include "wifi/WiFiScanManager.h"
 
 #include "serialization/_fbs/HubToLocalMessage_generated.h"
 
@@ -104,6 +109,137 @@ CaptivePortal::CaptivePortalInstance::CaptivePortalInstance()
     OS_LOGI(TAG, "Filesystem hash: %s", fsHash);
 
     m_webServer.addHandler(new RFC8908Handler());
+
+    // API endpoints — must be registered before serveStatic so they take priority
+    m_webServer.on("/api/portal/close", HTTP_POST, [](AsyncWebServerRequest* request) {
+      request->send(200, "text/plain", "Closing portal");
+      CaptivePortal::ForceClose(0);
+    });
+
+    m_webServer.on("/api/wifi/scan", HTTP_POST, [](AsyncWebServerRequest* request) {
+      bool run = true;
+      if (request->hasParam("run")) {
+        run = request->getParam("run")->value().toInt() != 0;
+      }
+      if (run) {
+        WiFiScanManager::StartScan();
+      } else {
+        WiFiScanManager::AbortScan();
+      }
+      request->send(200, "application/json", "{\"ok\":true}");
+    });
+
+    m_webServer.on("/api/wifi/networks", HTTP_DELETE, [](AsyncWebServerRequest* request) {
+      if (!request->hasParam("ssid")) {
+        request->send(400, "application/json", "{\"ok\":false,\"error\":\"Missing ssid parameter\"}");
+        return;
+      }
+      String ssid = request->getParam("ssid")->value();
+      if (!WiFiManager::Forget(ssid.c_str())) {
+        request->send(500, "application/json", "{\"ok\":false,\"error\":\"InternalError\"}");
+        return;
+      }
+      request->send(200, "application/json", "{\"ok\":true}");
+    });
+
+    m_webServer.on("/api/account/link", HTTP_POST, [](AsyncWebServerRequest* request) {
+      if (!request->hasParam("code")) {
+        request->send(400, "application/json", "{\"ok\":false,\"error\":\"CodeRequired\"}");
+        return;
+      }
+      String code     = request->getParam("code")->value();
+      auto result     = GatewayConnectionManager::Link(std::string_view(code.c_str(), code.length()));
+      using ResultCode = Serialization::Local::AccountLinkResultCode;
+      if (result == ResultCode::Success) {
+        request->send(200, "application/json", "{\"ok\":true}");
+        return;
+      }
+      const char* error;
+      switch (result) {
+        case ResultCode::CodeRequired:
+          error = "CodeRequired";
+          break;
+        case ResultCode::InvalidCodeLength:
+          error = "InvalidCodeLength";
+          break;
+        case ResultCode::NoInternetConnection:
+          error = "NoInternetConnection";
+          break;
+        case ResultCode::InvalidCode:
+          error = "InvalidCode";
+          break;
+        case ResultCode::RateLimited:
+          error = "RateLimited";
+          break;
+        default:
+          error = "InternalError";
+          break;
+      }
+      String resp = String("{\"ok\":false,\"error\":\"") + error + "\"}";
+      request->send(400, "application/json", resp);
+    });
+
+    m_webServer.on("/api/account", HTTP_DELETE, [](AsyncWebServerRequest* request) {
+      GatewayConnectionManager::UnLink();
+      request->send(200, "application/json", "{\"ok\":true}");
+    });
+
+    m_webServer.on("/api/config/rf/pin", HTTP_PUT, [](AsyncWebServerRequest* request) {
+      if (!request->hasParam("pin")) {
+        request->send(400, "application/json", "{\"ok\":false,\"error\":\"InvalidPin\"}");
+        return;
+      }
+      int pin         = request->getParam("pin")->value().toInt();
+      auto result     = CommandHandler::SetRfTxPin(static_cast<gpio_num_t>(pin));
+      using ResultCode = Serialization::Local::SetGPIOResultCode;
+      if (result == ResultCode::Success) {
+        String resp = String("{\"ok\":true,\"pin\":") + pin + "}";
+        request->send(200, "application/json", resp);
+        return;
+      }
+      const char* error = (result == ResultCode::InvalidPin) ? "InvalidPin" : "InternalError";
+      String resp       = String("{\"ok\":false,\"error\":\"") + error + "\"}";
+      request->send(400, "application/json", resp);
+    });
+
+    m_webServer.on("/api/config/estop/pin", HTTP_PUT, [](AsyncWebServerRequest* request) {
+      if (!request->hasParam("pin")) {
+        request->send(400, "application/json", "{\"ok\":false,\"error\":\"InvalidPin\"}");
+        return;
+      }
+      int8_t pin        = static_cast<int8_t>(request->getParam("pin")->value().toInt());
+      const char* error = nullptr;
+      if (IsValidInputPin(pin)) {
+        if (!EStopManager::SetEStopPin(static_cast<gpio_num_t>(pin))) {
+          error = "InternalError";
+        } else if (!Config::SetEStopGpioPin(static_cast<gpio_num_t>(pin))) {
+          error = "InternalError";
+        }
+      } else {
+        error = "InvalidPin";
+      }
+      if (error == nullptr) {
+        String resp = String("{\"ok\":true,\"pin\":") + pin + "}";
+        request->send(200, "application/json", resp);
+      } else {
+        String resp = String("{\"ok\":false,\"error\":\"") + error + "\"}";
+        request->send(400, "application/json", resp);
+      }
+    });
+
+    m_webServer.on("/api/config/estop/enabled", HTTP_PUT, [](AsyncWebServerRequest* request) {
+      if (!request->hasParam("enabled")) {
+        request->send(400, "application/json", "{\"ok\":false,\"error\":\"InternalError\"}");
+        return;
+      }
+      bool enabled = request->getParam("enabled")->value().toInt() != 0;
+      bool success = EStopManager::SetEStopEnabled(enabled) && Config::SetEStopEnabled(enabled);
+      if (success) {
+        request->send(200, "application/json", "{\"ok\":true}");
+      } else {
+        request->send(500, "application/json", "{\"ok\":false,\"error\":\"InternalError\"}");
+      }
+    });
 
     // Serving the captive portal files from LittleFS
     m_webServer.serveStatic("/", m_fileSystem, "/www/", "max-age=3600").setDefaultFile("index.html").setSharedEtag(fsHash);

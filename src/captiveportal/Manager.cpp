@@ -30,6 +30,22 @@ static esp_timer_handle_t s_captivePortalUpdateLoopTimer = nullptr;
 static SimpleMutex s_instanceMutex;
 static std::shared_ptr<CaptivePortal::CaptivePortalInstance> s_instance = nullptr;
 
+// Absolute esp_timer timestamps (microseconds). 0 = not armed.
+static std::atomic<int64_t> s_startupGraceExpiry = 0;  // Don't open portal until this time passes
+static std::atomic<int64_t> s_autoCloseExpiry    = 0;  // Auto-close portal when this time passes
+
+static constexpr int64_t STARTUP_GRACE_PERIOD_US = 30LL * 1'000'000;   // 30 seconds
+static constexpr int64_t AUTO_CLOSE_DELAY_US     = 5LL * 60 * 1'000'000;  // 5 minutes
+
+static bool isDeviceFullyConfigured()
+{
+  std::vector<Config::WiFiCredentials> credentialsList;
+  if (!Config::GetWiFiCredentials(credentialsList) || credentialsList.empty()) {
+    return false;
+  }
+  return Config::HasBackendAuthToken();
+}
+
 static std::shared_ptr<CaptivePortal::CaptivePortalInstance> GetInstance()
 {
   ScopedLock lock__(&s_instanceMutex);
@@ -99,9 +115,42 @@ static void captiveportal_stop()
 
 static void captiveportal_updateloop(void*)
 {
+  int64_t now = esp_timer_get_time();
+
+  // Startup grace period: device is fully configured, wait for gateway connection
+  int64_t graceExpiry = s_startupGraceExpiry.load(std::memory_order_relaxed);
+  if (graceExpiry != 0) {
+    if (GatewayConnectionManager::IsConnected()) {
+      // Gateway connected during grace — clear grace, never open portal
+      s_startupGraceExpiry.store(0, std::memory_order_relaxed);
+      return;
+    }
+    if (now < graceExpiry) {
+      // Still within grace period, don't open portal yet
+      return;
+    }
+    // Grace expired without gateway connection — open portal normally
+    s_startupGraceExpiry.store(0, std::memory_order_relaxed);
+  }
+
   bool gatewayConnected = GatewayConnectionManager::IsConnected();
   bool commandHandlerOk = CommandHandler::Ok();
   bool shouldBeRunning  = (s_alwaysEnabled || !gatewayConnected || !commandHandlerOk) && !s_forceClosed;
+
+  // Auto-close: arm timer when gateway connects (portal still open, not alwaysEnabled)
+  if (gatewayConnected && !s_alwaysEnabled && GetInstance() != nullptr) {
+    if (s_autoCloseExpiry.load(std::memory_order_relaxed) == 0) {
+      s_autoCloseExpiry.store(now + AUTO_CLOSE_DELAY_US, std::memory_order_relaxed);
+    } else if (now >= s_autoCloseExpiry.load(std::memory_order_relaxed)) {
+      OS_LOGI(TAG, "Auto-closing captive portal after gateway connection (5-minute timeout)");
+      s_forceClosed = true;
+      captiveportal_stop();
+      return;
+    }
+  } else {
+    // Gateway disconnected — reset auto-close timer
+    s_autoCloseExpiry.store(0, std::memory_order_relaxed);
+  }
 
   if (GetInstance() == nullptr) {
     if (shouldBeRunning) {
@@ -128,6 +177,12 @@ static void captiveportal_updateloop(void*)
 
 bool CaptivePortal::Init()
 {
+  // If device is already fully configured, set a startup grace period before opening portal
+  if (isDeviceFullyConfigured()) {
+    s_startupGraceExpiry.store(esp_timer_get_time() + STARTUP_GRACE_PERIOD_US, std::memory_order_relaxed);
+    OS_LOGI(TAG, "Device fully configured, startup grace period of 30s before opening portal");
+  }
+
   esp_timer_create_args_t args = {
     .callback              = captiveportal_updateloop,
     .arg                   = nullptr,

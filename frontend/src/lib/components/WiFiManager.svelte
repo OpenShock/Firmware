@@ -2,7 +2,7 @@
   import { hubState } from '$lib/stores';
   import { WebSocketClient } from '$lib/WebSocketClient';
   import { WifiScanStatus } from '$lib/_fbs/open-shock/serialization/types/wifi-scan-status';
-  import { SerializeWifiScanCommand } from '$lib/Serializers/WifiScanCommand';
+  import { startWifiScan, stopWifiScan } from '$lib/api';
   import { SerializeWifiNetworkDisconnectCommand } from '$lib/Serializers/WifiNetworkDisconnectCommand';
   import { Button } from '$lib/components/ui/button';
   import ScrollArea from '$lib/components/ui/scroll-area/scroll-area.svelte';
@@ -35,9 +35,12 @@
     return null;
   });
 
-  function wifiScan() {
-    const data = SerializeWifiScanCommand(!isScanning);
-    WebSocketClient.Instance.Send(data);
+  async function wifiScan() {
+    if (isScanning) {
+      await stopWifiScan();
+    } else {
+      await startWifiScan();
+    }
   }
 
   function wifiDisconnect() {

@@ -1,6 +1,5 @@
 <script lang="ts">
-  import { SerializeAccountLinkCommand } from '$lib/Serializers/AccountLinkCommand';
-  import { WebSocketClient } from '$lib/WebSocketClient';
+  import { linkAccount } from '$lib/api';
   import { hubState } from '$lib/stores';
   import { Button } from '$lib/components/ui/button';
   import { Input } from '$lib/components/ui/input';
@@ -19,10 +18,9 @@
   let linkCodeValid = $derived(isValidLinkCode(linkCode));
   let accountLinked = $derived(hubState.accountLinked);
 
-  function linkAccount() {
+  async function handleLinkAccount() {
     if (!linkCodeValid) return;
-    const data = SerializeAccountLinkCommand(linkCode!);
-    WebSocketClient.Instance.Send(data);
+    await linkAccount(linkCode!);
   }
 </script>
 
@@ -67,7 +65,7 @@
           placeholder="Enter link code"
           bind:value={linkCode}
         />
-        <Button onclick={linkAccount} disabled={!linkCodeValid || linkCode.length < 6}>Link</Button>
+        <Button onclick={handleLinkAccount} disabled={!linkCodeValid || linkCode.length < 6}>Link</Button>
       </div>
     </div>
   {/if}

@@ -85,7 +85,8 @@ bool Local::SerializeReadyMessage(const WiFiNetwork* connectedNetwork, bool acco
   auto outputPins       = OpenShock::GetValidOutputPinsVector();
   auto outputPinsOffset = builder.CreateVector(outputPins);
 
-  auto readyMessageOffset = Serialization::Local::CreateReadyMessage(builder, true, fbsNetwork, accountLinked, configOffset, inputPinsOffset, outputPinsOffset);
+  bool hasPredefinedPins  = OPENSHOCK_RF_TX_GPIO != OPENSHOCK_GPIO_INVALID;
+  auto readyMessageOffset = Serialization::Local::CreateReadyMessage(builder, hasPredefinedPins, fbsNetwork, accountLinked, configOffset, inputPinsOffset, outputPinsOffset);
 
   auto msg = Serialization::Local::CreateHubToLocalMessage(builder, Serialization::Local::HubToLocalMessagePayload::ReadyMessage, readyMessageOffset.Union());
 

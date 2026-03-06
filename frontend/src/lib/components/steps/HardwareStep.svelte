@@ -1,6 +1,5 @@
 <script lang="ts">
-  import { SerializeSetRfTxPinCommand } from '$lib/Serializers/SetRfTxPinCommand';
-  import { SerializeSetEstopPinCommand } from '$lib/Serializers/SetEstopPinCommand';
+  import { setRfTxPin, setEstopPin } from '$lib/api';
   import GpioPinSelector from '$lib/components/GpioPinSelector.svelte';
   import { hubState } from '$lib/stores';
 </script>
@@ -21,7 +20,7 @@
       <GpioPinSelector
         name="RF TX Pin"
         currentPin={hubState.config?.rf?.txPin ?? null}
-        serializer={SerializeSetRfTxPinCommand}
+        setter={setRfTxPin}
       />
     </div>
 
@@ -33,7 +32,7 @@
       <GpioPinSelector
         name="EStop Pin"
         currentPin={hubState.config?.estop?.gpioPin ?? null}
-        serializer={SerializeSetEstopPinCommand}
+        setter={setEstopPin}
       />
     </div>
   </div>
