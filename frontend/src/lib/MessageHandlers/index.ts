@@ -26,7 +26,6 @@ PayloadHandlers[HubToLocalMessagePayload.ReadyMessage] = (cli, msg) => {
   const payload = new ReadyMessage();
   msg.payload(payload);
 
-  hubState.hasPredefinedPins = payload.poggies();
   hubState.wifiConnectedBSSID = payload.connectedWifi()?.bssid() || null;
   hubState.accountLinked = payload.accountLinked();
   hubState.config = mapConfig(payload.config());

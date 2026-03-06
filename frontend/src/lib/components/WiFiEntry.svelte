@@ -1,11 +1,12 @@
 <script lang="ts">
   import { hubState } from '$lib/stores';
-  import { WebSocketClient } from '$lib/WebSocketClient';
   import { WifiAuthMode } from '$lib/_fbs/open-shock/serialization/types/wifi-auth-mode';
-  import { SerializeWifiNetworkConnectCommand } from '$lib/Serializers/WifiNetworkConnectCommand';
-  import { SerializeWifiNetworkSaveCommand } from '$lib/Serializers/WifiNetworkSaveCommand';
-  import { forgetWifiNetwork } from '$lib/api';
-  import { SerializeWifiNetworkDisconnectCommand } from '$lib/Serializers/WifiNetworkDisconnectCommand';
+  import {
+    forgetWifiNetwork,
+    saveWifiNetwork,
+    connectWifiNetwork,
+    disconnectWifiNetwork,
+  } from '$lib/api';
   import WiFiDetailsDialog from '$lib/components/WiFiDetailsDialog.svelte';
   import type { WiFiNetworkGroup } from '$lib/types';
   import { Button, buttonVariants } from '$lib/components/ui/button';
@@ -50,18 +51,15 @@
 
   function wifiAuthenticate(ssid: string, password: string | null) {
     connectDialogOpen = false;
-    const data = SerializeWifiNetworkSaveCommand(ssid, password, true);
-    WebSocketClient.Instance.Send(data);
+    saveWifiNetwork(ssid, password, true);
   }
 
   function wifiConnect(item: WiFiNetworkGroup) {
-    const data = SerializeWifiNetworkConnectCommand(item.ssid);
-    WebSocketClient.Instance.Send(data);
+    connectWifiNetwork(item.ssid);
   }
 
   function wifiDisconnect() {
-    const data = SerializeWifiNetworkDisconnectCommand();
-    WebSocketClient.Instance.Send(data);
+    disconnectWifiNetwork();
   }
 
   function wifiForget(ssid: string) {
@@ -70,8 +68,7 @@
 
   function wifiEditPassword(ssid: string, password: string | null) {
     editPasswordDialogOpen = false;
-    const data = SerializeWifiNetworkSaveCommand(ssid, password, false);
-    WebSocketClient.Instance.Send(data);
+    saveWifiNetwork(ssid, password, false);
   }
 
   function handleConnectDialogOpenChange(open: boolean) {

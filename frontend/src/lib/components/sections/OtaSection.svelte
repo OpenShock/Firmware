@@ -1,14 +1,15 @@
 <script lang="ts">
   import { hubState } from '$lib/stores';
-  import { WebSocketClient } from '$lib/WebSocketClient';
   import { OtaUpdateChannel } from '$lib/_fbs/open-shock/serialization/configuration/ota-update-channel';
-  import { SerializeOtaUpdateSetIsEnabledCommand } from '$lib/Serializers/OtaUpdateSetIsEnabledCommand';
-  import { SerializeOtaUpdateSetDomainCommand } from '$lib/Serializers/OtaUpdateSetDomainCommand';
-  import { SerializeOtaUpdateSetUpdateChannelCommand } from '$lib/Serializers/OtaUpdateSetUpdateChannelCommand';
-  import { SerializeOtaUpdateSetCheckIntervalCommand } from '$lib/Serializers/OtaUpdateSetCheckIntervalCommand';
-  import { SerializeOtaUpdateSetAllowBackendManagementCommand } from '$lib/Serializers/OtaUpdateSetAllowBackendManagementCommand';
-  import { SerializeOtaUpdateSetRequireManualApprovalCommand } from '$lib/Serializers/OtaUpdateSetRequireManualApprovalCommand';
-  import { SerializeOtaUpdateCheckForUpdatesCommand } from '$lib/Serializers/OtaUpdateCheckForUpdatesCommand';
+  import {
+    setOtaEnabled,
+    setOtaDomain,
+    setOtaChannel,
+    setOtaCheckInterval,
+    setOtaAllowBackendManagement,
+    setOtaRequireManualApproval,
+    checkOtaUpdates,
+  } from '$lib/api';
   import { Button } from '$lib/components/ui/button';
   import { Input } from '$lib/components/ui/input';
   import { Label } from '$lib/components/ui/label';
@@ -24,43 +25,32 @@
   });
 
   function toggleEnabled() {
-    const data = SerializeOtaUpdateSetIsEnabledCommand(!otaConfig?.isEnabled);
-    WebSocketClient.Instance.Send(data);
+    setOtaEnabled(!otaConfig?.isEnabled);
   }
 
   function saveDomain() {
-    const data = SerializeOtaUpdateSetDomainCommand(cdnDomain);
-    WebSocketClient.Instance.Send(data);
+    setOtaDomain(cdnDomain);
   }
 
   function setChannel(channel: string) {
-    const data = SerializeOtaUpdateSetUpdateChannelCommand(channel);
-    WebSocketClient.Instance.Send(data);
+    setOtaChannel(channel);
   }
 
   function saveCheckInterval() {
-    const data = SerializeOtaUpdateSetCheckIntervalCommand(checkInterval);
-    WebSocketClient.Instance.Send(data);
+    setOtaCheckInterval(checkInterval);
   }
 
   function toggleBackendManagement() {
-    const data = SerializeOtaUpdateSetAllowBackendManagementCommand(
-      !otaConfig?.allowBackendManagement
-    );
-    WebSocketClient.Instance.Send(data);
+    setOtaAllowBackendManagement(!otaConfig?.allowBackendManagement);
   }
 
   function toggleManualApproval() {
-    const data = SerializeOtaUpdateSetRequireManualApprovalCommand(
-      !otaConfig?.requireManualApproval
-    );
-    WebSocketClient.Instance.Send(data);
+    setOtaRequireManualApproval(!otaConfig?.requireManualApproval);
   }
 
   function checkForUpdates() {
     const channelName = channelToString(otaConfig?.updateChannel ?? OtaUpdateChannel.Stable);
-    const data = SerializeOtaUpdateCheckForUpdatesCommand(channelName);
-    WebSocketClient.Instance.Send(data);
+    checkOtaUpdates(channelName);
   }
 
   function channelToString(ch: OtaUpdateChannel): string {

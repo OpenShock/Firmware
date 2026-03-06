@@ -1,9 +1,7 @@
 <script lang="ts">
   import { hubState } from '$lib/stores';
-  import { WebSocketClient } from '$lib/WebSocketClient';
   import { WifiScanStatus } from '$lib/_fbs/open-shock/serialization/types/wifi-scan-status';
-  import { startWifiScan, stopWifiScan } from '$lib/api';
-  import { SerializeWifiNetworkDisconnectCommand } from '$lib/Serializers/WifiNetworkDisconnectCommand';
+  import { startWifiScan, stopWifiScan, disconnectWifiNetwork } from '$lib/api';
   import { Button } from '$lib/components/ui/button';
   import ScrollArea from '$lib/components/ui/scroll-area/scroll-area.svelte';
   import WiFiEntry from '$lib/components/WiFiEntry.svelte';
@@ -44,8 +42,7 @@
   }
 
   function wifiDisconnect() {
-    const data = SerializeWifiNetworkDisconnectCommand();
-    WebSocketClient.Instance.Send(data);
+    disconnectWifiNetwork();
   }
 </script>
 

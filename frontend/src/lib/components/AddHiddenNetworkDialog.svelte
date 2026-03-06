@@ -1,6 +1,5 @@
 <script lang="ts">
-  import { WebSocketClient } from '$lib/WebSocketClient';
-  import { SerializeWifiNetworkSaveCommand } from '$lib/Serializers/WifiNetworkSaveCommand';
+  import { saveWifiNetwork } from '$lib/api';
   import { Button, buttonVariants } from '$lib/components/ui/button';
   import {
     Dialog,
@@ -23,8 +22,7 @@
 
   function handleSave() {
     if (!canSave) return;
-    const data = SerializeWifiNetworkSaveCommand(ssid, password || null, true);
-    WebSocketClient.Instance.Send(data);
+    saveWifiNetwork(ssid, password || null, true);
     dialogOpen = false;
     ssid = '';
     password = '';

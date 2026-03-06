@@ -22,11 +22,13 @@
   import AdvancedView from '$lib/components/AdvancedView.svelte';
   import { hubState, initializeDarkModeStore, ViewModeStore } from '$lib/stores';
   import { closePortal } from '$lib/portalClose';
+  import { fetchBoardInfo } from '$lib/api';
   import { Button } from '$lib/components/ui/button';
   import { onMount } from 'svelte';
 
   onMount(() => {
     initializeDarkModeStore();
+    fetchBoardInfo();
     WebSocketClient.Instance.Connect();
   });
 

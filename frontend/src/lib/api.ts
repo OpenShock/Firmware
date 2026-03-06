@@ -1,6 +1,18 @@
 import { toast } from 'svelte-sonner';
 import { hubState } from '$lib/stores';
 
+// Board info
+
+export async function fetchBoardInfo(): Promise<void> {
+  try {
+    const res = await fetch('/api/board');
+    const data = await res.json();
+    hubState.hasPredefinedPins = data.has_predefined_pins ?? false;
+  } catch {
+    // Non-fatal — hasPredefinedPins stays false (DIY flow shown)
+  }
+}
+
 // WiFi
 
 export async function startWifiScan(): Promise<void> {
@@ -161,5 +173,105 @@ export async function setEstopEnabled(enabled: boolean): Promise<boolean> {
   } catch {
     toast.error('Failed to change EStop enabled');
     return false;
+  }
+}
+
+// WiFi network management
+
+export async function saveWifiNetwork(
+  ssid: string,
+  password: string | null,
+  connect: boolean,
+): Promise<void> {
+  try {
+    const params = new URLSearchParams({ ssid, connect: connect ? '1' : '0' });
+    if (password) params.set('password', password);
+    await fetch('/api/wifi/networks', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: params.toString(),
+    });
+  } catch {
+    toast.error('Failed to save WiFi network');
+  }
+}
+
+export async function connectWifiNetwork(ssid: string): Promise<void> {
+  try {
+    await fetch('/api/wifi/connect', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: new URLSearchParams({ ssid }).toString(),
+    });
+  } catch {
+    toast.error('Failed to connect to WiFi network');
+  }
+}
+
+export async function disconnectWifiNetwork(): Promise<void> {
+  try {
+    await fetch('/api/wifi/disconnect', { method: 'POST' });
+  } catch {
+    toast.error('Failed to disconnect from WiFi network');
+  }
+}
+
+// OTA
+
+export async function setOtaEnabled(enabled: boolean): Promise<void> {
+  try {
+    await fetch(`/api/ota/enabled?enabled=${enabled ? '1' : '0'}`, { method: 'PUT' });
+  } catch {
+    toast.error('Failed to update OTA setting');
+  }
+}
+
+export async function setOtaDomain(domain: string): Promise<void> {
+  try {
+    await fetch(`/api/ota/domain?` + new URLSearchParams({ domain }), { method: 'PUT' });
+  } catch {
+    toast.error('Failed to update OTA domain');
+  }
+}
+
+export async function setOtaChannel(channel: string): Promise<void> {
+  try {
+    await fetch(`/api/ota/channel?` + new URLSearchParams({ channel }), { method: 'PUT' });
+  } catch {
+    toast.error('Failed to update OTA channel');
+  }
+}
+
+export async function setOtaCheckInterval(interval: number): Promise<void> {
+  try {
+    await fetch(`/api/ota/check-interval?interval=${interval}`, { method: 'PUT' });
+  } catch {
+    toast.error('Failed to update OTA check interval');
+  }
+}
+
+export async function setOtaAllowBackendManagement(allow: boolean): Promise<void> {
+  try {
+    await fetch(`/api/ota/allow-backend-management?allow=${allow ? '1' : '0'}`, { method: 'PUT' });
+  } catch {
+    toast.error('Failed to update OTA backend management setting');
+  }
+}
+
+export async function setOtaRequireManualApproval(require: boolean): Promise<void> {
+  try {
+    await fetch(`/api/ota/require-manual-approval?require=${require ? '1' : '0'}`, {
+      method: 'PUT',
+    });
+  } catch {
+    toast.error('Failed to update OTA manual approval setting');
+  }
+}
+
+export async function checkOtaUpdates(channel: string): Promise<void> {
+  try {
+    await fetch(`/api/ota/check?` + new URLSearchParams({ channel }), { method: 'POST' });
+  } catch {
+    toast.error('Failed to check for OTA updates');
   }
 }
