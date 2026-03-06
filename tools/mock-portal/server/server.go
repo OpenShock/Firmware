@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"log"
 	"net/http"
+	"net/url"
 	"sync"
 
 	"github.com/gorilla/websocket"
@@ -12,7 +13,18 @@ import (
 )
 
 var upgrader = websocket.Upgrader{
-	CheckOrigin:  func(r *http.Request) bool { return true },
+	CheckOrigin: func(r *http.Request) bool {
+		origin := r.Header.Get("Origin")
+		if origin == "" {
+			return true // same-origin (non-browser) request
+		}
+		u, err := url.Parse(origin)
+		if err != nil {
+			return false
+		}
+		host := u.Hostname()
+		return host == "localhost" || host == "127.0.0.1" || host == "::1"
+	},
 	Subprotocols: []string{"flatbuffers"},
 }
 
@@ -145,6 +157,7 @@ func (srv *Server) writePump(c *client) {
 	for msg := range c.outbox {
 		if err := c.conn.WriteMessage(websocket.BinaryMessage, msg); err != nil {
 			log.Printf("[WS] write error: %v", err)
+			c.conn.Close() // triggers readPump to exit and run cleanup
 			return
 		}
 	}

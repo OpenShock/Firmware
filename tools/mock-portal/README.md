@@ -53,7 +53,7 @@ All messages are FlatBuffers binary, matching the firmware's `LocalToHub` / `Hub
 
 The server immediately sends two messages to every new client:
 
-1. A `ReadyMessage` containing full device state — firmware version, boot type, OTA config, RF config, EStop config, and account link status.
+1. A `ReadyMessage` containing current device state — OTA config, RF config, EStop config, connected WiFi (if any), account link status, and valid GPIO pins.
 2. A `WifiNetworkEvent(Discovered)` listing all currently known networks.
 
 ### Supported incoming commands (`LocalToHub`)
@@ -142,13 +142,14 @@ help                          Show all commands
 
 ### Random network generation
 
-On startup, the server generates 40 random networks using [gofakeit](https://github.com/brianvoe/gofakeit). SSIDs cover a wide range of edge cases useful for frontend testing:
+On startup, the server generates 40 random networks using [gofakeit](https://github.com/brianvoe/gofakeit). SSIDs provide a mix of realistic and randomised names useful for frontend testing:
 
-- Normal names, emoji, and Unicode
-- XSS payloads and SQL injection strings
-- Path traversal sequences and null bytes
-- Very long names and whitespace-only strings
-- All auth modes: Open, WEP, WPA, WPA2, WPA3, Enterprise, and hidden networks
+- Router vendor defaults (NETGEAR, Xfinity, TP-Link, ASUS, AT&T, etc.)
+- Personal names using random first/last names and city names
+- Business and venue names
+- Short names and near-32-character-limit names
+- All auth modes: Open, WEP, WPA, WPA2, WPA3, Enterprise
+- A few hidden networks (empty SSID)
 - Channels spread across 2.4 GHz (1–13) and 5 GHz (36–165)
 
 ---

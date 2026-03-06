@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"os"
 
+	"github.com/brianvoe/gofakeit/v6"
 	"openshock.dev/mock-portal/server"
 	"openshock.dev/mock-portal/server/cli"
 )
@@ -17,6 +18,8 @@ func main() {
 	flag.Parse()
 
 	log.SetFlags(log.Ltime | log.Lmsgprefix)
+
+	gofakeit.Seed(0) // 0 = time-based seed for per-run randomness
 
 	state := server.NewState()
 

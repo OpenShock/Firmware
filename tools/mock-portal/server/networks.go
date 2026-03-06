@@ -126,10 +126,14 @@ func RandomHiddenNetwork() WifiNetwork {
 // GenerateNetworks produces a large randomised set of networks including
 // hidden ones and weird edge-case SSIDs.
 func GenerateNetworks(count int) []WifiNetwork {
+	if count <= 0 {
+		return nil
+	}
+
 	nets := make([]WifiNetwork, 0, count)
 
 	// A few hidden networks
-	hiddenCount := max(1, count/8)
+	hiddenCount := count / 8
 	for range hiddenCount {
 		nets = append(nets, RandomHiddenNetwork())
 	}

@@ -19,7 +19,7 @@ func (s *State) SaveConfig(path string) error {
 	s.mu.RUnlock()
 
 	Configuration.FinishHubConfigBuffer(b, cfg)
-	return os.WriteFile(path, b.FinishedBytes(), 0o644)
+	return os.WriteFile(path, b.FinishedBytes(), 0o600)
 }
 
 // LoadConfig reads a HubConfig FlatBuffers binary from path and applies it

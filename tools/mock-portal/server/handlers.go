@@ -7,6 +7,7 @@ import (
 
 	flatbuffers "github.com/google/flatbuffers/go"
 
+	Configuration "openshock.dev/mock-portal/fbs/OpenShock/Serialization/Configuration"
 	Local "openshock.dev/mock-portal/fbs/OpenShock/Serialization/Local"
 	Types "openshock.dev/mock-portal/fbs/OpenShock/Serialization/Types"
 )
@@ -66,7 +67,18 @@ func (srv *Server) handleMessage(c *client, data []byte) {
 	case Local.LocalToHubMessagePayloadOtaUpdateSetUpdateChannelCommand:
 		cmd := &Local.OtaUpdateSetUpdateChannelCommand{}
 		cmd.Init(tbl.Bytes, tbl.Pos)
-		log.Printf("[OTA] UpdateChannel command: %q (no-op in mock)", string(cmd.Channel()))
+		channelStr := string(cmd.Channel())
+		ch, ok := Configuration.EnumValuesOtaUpdateChannel[channelStr]
+		if !ok {
+			log.Printf("[OTA] UpdateChannel: unknown channel %q", channelStr)
+			c.send(BuildErrorMessage(fmt.Sprintf("unknown OTA update channel %q", channelStr)))
+			break
+		}
+		srv.state.mu.Lock()
+		srv.state.OtaUpdate.UpdateChannel = ch
+		srv.state.mu.Unlock()
+		log.Printf("[OTA] UpdateChannel = %q", channelStr)
+		srv.autoSave()
 
 	case Local.LocalToHubMessagePayloadOtaUpdateSetCheckIntervalCommand:
 		cmd := &Local.OtaUpdateSetCheckIntervalCommand{}
