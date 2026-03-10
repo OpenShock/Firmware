@@ -2,10 +2,9 @@
 
 /* eslint-disable @typescript-eslint/no-unused-vars, @typescript-eslint/no-explicit-any, @typescript-eslint/no-non-null-assertion */
 
-export { BootStatus } from './gateway/boot-status';
-export { HubToGatewayMessage } from './gateway/hub-to-gateway-message';
-export { HubToGatewayMessagePayload } from './gateway/hub-to-gateway-message-payload';
-export { OtaUpdateFailed } from './gateway/ota-update-failed';
-export { OtaUpdateProgress } from './gateway/ota-update-progress';
-export { OtaUpdateStarted } from './gateway/ota-update-started';
-export { Pong } from './gateway/pong';
+export { GatewayToHubMessage } from './gateway/gateway-to-hub-message';
+export { GatewayToHubMessagePayload } from './gateway/gateway-to-hub-message-payload';
+export { OtaUpdateRequest } from './gateway/ota-update-request';
+export { Ping } from './gateway/ping';
+export { Trigger } from './gateway/trigger';
+export { TriggerType } from './gateway/trigger-type';

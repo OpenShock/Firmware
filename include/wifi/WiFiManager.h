@@ -15,8 +15,9 @@ namespace OpenShock::WiFiManager {
   /// @brief Saves a network to the config
   /// @param ssid SSID of the network
   /// @param password Password of the network
+  /// @param connect Whether to connect to the network after saving
   /// @return True if the network was saved successfully
-  bool Save(const char* ssid, std::string_view password);
+  bool Save(const char* ssid, std::string_view password, bool connect = true);
 
   /// @brief Removes a network from the config by it's SSID
   /// @param ssid SSID of the network

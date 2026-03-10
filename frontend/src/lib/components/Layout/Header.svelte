@@ -1,5 +1,8 @@
 <script lang="ts">
   import LightSwitch from '$lib/components/LightSwitch.svelte';
+  import { Button } from '$lib/components/ui/button';
+  import { ViewModeStore } from '$lib/stores';
+  import { WandSparkles, Settings } from '@lucide/svelte';
 </script>
 
 <header
@@ -15,6 +18,21 @@
         />
       </a>
     </div>
+
+    <Button
+      variant="ghost"
+      size="sm"
+      onclick={() => ViewModeStore.toggle()}
+      title={$ViewModeStore === 'wizard' ? 'Switch to Advanced' : 'Switch to Setup'}
+    >
+      {#if $ViewModeStore === 'wizard'}
+        <Settings class="mr-1.5 h-4 w-4" />
+        Advanced
+      {:else}
+        <WandSparkles class="mr-1.5 h-4 w-4" />
+        Setup
+      {/if}
+    </Button>
 
     <div class="flex-1"></div>
 

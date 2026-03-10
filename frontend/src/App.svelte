@@ -1,88 +1,170 @@
 <script lang="ts">
-  import { SerializeAccountLinkCommand } from '$lib/Serializers/AccountLinkCommand';
-  import { SerializeSetEstopPinCommand } from '$lib/Serializers/SetEstopPinCommand';
-  import { SerializeSetRfTxPinCommand } from '$lib/Serializers/SetRfTxPinCommand';
   import { WebSocketClient } from '$lib/WebSocketClient';
-  import GpioPinSelector from '$lib/components/GpioPinSelector.svelte';
   import Footer from '$lib/components/Layout/Footer.svelte';
   import Header from '$lib/components/Layout/Header.svelte';
-  import WiFiList from '$lib/components/WiFiList.svelte';
-  import { Button } from '$lib/components/ui/button';
-  import { Input } from '$lib/components/ui/input';
-  import { Label } from '$lib/components/ui/label';
+  import SuccessScreen from '$lib/components/SuccessScreen.svelte';
   import { Toaster } from '$lib/components/ui/sonner';
-  import { hubState, initializeDarkModeStore } from '$lib/stores';
+  import {
+    Stepper,
+    StepperNav,
+    StepperItem,
+    StepperTrigger,
+    StepperIndicator,
+    StepperSeparator,
+    StepperTitle,
+    StepperDescription,
+    StepperNext,
+    StepperPrevious,
+  } from '$lib/components/ui/stepper';
+  import PinsStep from '$lib/components/steps/HardwareStep.svelte';
+  import WiFiStep from '$lib/components/steps/WiFiStep.svelte';
+  import AccountStep from '$lib/components/steps/AccountStep.svelte';
+  import AdvancedView from '$lib/components/AdvancedView.svelte';
+  import { hubState, initializeDarkModeStore, ViewModeStore } from '$lib/stores';
+  import { closePortal } from '$lib/portalClose';
+  import { fetchBoardInfo } from '$lib/api';
+  import { Button } from '$lib/components/ui/button';
   import { onMount } from 'svelte';
 
   onMount(() => {
     initializeDarkModeStore();
+    fetchBoardInfo();
     WebSocketClient.Instance.Connect();
   });
 
-  function isValidLinkCode(str: string) {
-    if (typeof str != 'string') return false;
+  // Wizard state
+  let currentStep = $state(1);
+  let showSuccess = $state(false);
 
-    for (var i = 0; i < str.length; i++) {
-      if (str[i] < '0' || str[i] > '9') return false;
+  // Prebuilt boards skip the Pins step
+  let isDIY = $derived(!hubState.hasPredefinedPins);
+
+  // Gate conditions
+  let wifiConnected = $derived(hubState.wifiConnectedBSSID !== null);
+  let pinConfigured = $derived(hubState.config?.rf?.txPin != null);
+
+  // Step gate: can the user advance from the current step?
+  let canAdvance = $derived(
+    isDIY
+      ? currentStep === 1
+        ? pinConfigured
+        : currentStep === 2
+          ? wifiConnected
+          : false
+      : currentStep === 1
+        ? wifiConnected
+        : false
+  );
+
+  // Total steps
+  let totalSteps = $derived(isDIY ? 3 : 2);
+
+  // For prebuilt: show success when WiFi + account are both done
+  $effect(() => {
+    if (!isDIY && wifiConnected && hubState.accountLinked && !showSuccess) {
+      showSuccess = true;
     }
+  });
 
-    return true;
-  }
-
-  let linkCode: string = $state('');
-  let linkCodeValid = $derived(isValidLinkCode(linkCode));
-
-  function linkAccount() {
-    if (!linkCodeValid) return;
-    const data = SerializeAccountLinkCommand(linkCode!);
-    WebSocketClient.Instance.Send(data);
+  function handleDone() {
+    closePortal();
   }
 </script>
 
 <Toaster position="top-center" />
 
-<div class="flex min-h-screen flex-col">
-  <Header />
+{#if showSuccess}
+  <SuccessScreen onClose={closePortal} />
+{:else}
+  <div class="flex min-h-screen flex-col">
+    <Header />
 
-  <div class="flex flex-1 flex-col items-center justify-center px-2">
-    <div class="w-full max-w-md flex-col space-y-5">
-      <WiFiList />
+    {#if $ViewModeStore === 'advanced'}
+      <AdvancedView />
+    {:else}
+      <div class="flex flex-1 flex-col items-center px-2 py-4">
+        <div class="w-full max-w-md">
+          <Stepper bind:value={currentStep} linear>
+            <!-- Step navigation header -->
+            <StepperNav>
+              {#if isDIY}
+                <StepperItem step={1}>
+                  <StepperTrigger>
+                    <StepperIndicator />
+                    <div class="hidden sm:block">
+                      <StepperTitle>Pins</StepperTitle>
+                      <StepperDescription>Hardware setup</StepperDescription>
+                    </div>
+                  </StepperTrigger>
+                  <StepperSeparator />
+                </StepperItem>
+              {/if}
 
-      <div class="flex flex-col space-y-2">
-        <Label for="account-link-code" class="scroll-m-20 text-xl font-semibold tracking-tight">
-          Account Linking
-        </Label>
-        <div class="flex space-x-2">
-          <Input
-            class={linkCodeValid ? '' : 'input-error'}
-            type="text"
-            id="account-link-code"
-            inputmode="numeric"
-            pattern="[0-9]*"
-            placeholder="Link Code"
-            bind:value={linkCode}
-          />
-          <Button onclick={linkAccount} disabled={!linkCodeValid || linkCode.length < 6}>
-            Link
-          </Button>
+              <StepperItem step={isDIY ? 2 : 1}>
+                <StepperTrigger>
+                  <StepperIndicator />
+                  <div class="hidden sm:block">
+                    <StepperTitle>WiFi</StepperTitle>
+                    <StepperDescription>Network setup</StepperDescription>
+                  </div>
+                </StepperTrigger>
+                <StepperSeparator />
+              </StepperItem>
+
+              <StepperItem step={isDIY ? 3 : 2}>
+                <StepperTrigger>
+                  <StepperIndicator />
+                  <div class="hidden sm:block">
+                    <StepperTitle>Account</StepperTitle>
+                    <StepperDescription>Link device</StepperDescription>
+                  </div>
+                </StepperTrigger>
+              </StepperItem>
+            </StepperNav>
+
+            <!-- Step content -->
+            <div class="rounded-lg border p-4">
+              {#if isDIY}
+                {#if currentStep === 1}
+                  <PinsStep />
+                {:else if currentStep === 2}
+                  <WiFiStep />
+                {:else}
+                  <AccountStep />
+                {/if}
+              {:else if currentStep === 1}
+                <WiFiStep />
+              {:else}
+                <AccountStep />
+              {/if}
+            </div>
+
+            <!-- Navigation buttons -->
+            <div class="flex justify-between">
+              <StepperPrevious />
+
+              {#if currentStep < totalSteps}
+                <StepperNext disabled={!canAdvance}>
+                  {#if !canAdvance}
+                    {isDIY && currentStep === 1
+                      ? 'Configure pins first'
+                      : 'Connect WiFi first'}
+                  {:else}
+                    Next
+                  {/if}
+                </StepperNext>
+              {:else if isDIY}
+                <!-- Final step for DIY: explicit Done button -->
+                <Button onclick={handleDone} disabled={!hubState.accountLinked}>
+                  {hubState.accountLinked ? 'Done' : 'Link account first'}
+                </Button>
+              {/if}
+            </div>
+          </Stepper>
         </div>
       </div>
+    {/if}
 
-      <GpioPinSelector
-        name="RF TX Pin"
-        currentPin={hubState.config?.rf?.txPin ?? null}
-        serializer={SerializeSetRfTxPinCommand}
-      />
-
-      <!-- TODO: Add EStop Enable/Disable toggle -->
-
-      <GpioPinSelector
-        name="EStop Pin"
-        currentPin={hubState.config?.estop?.gpioPin ?? null}
-        serializer={SerializeSetEstopPinCommand}
-      />
-    </div>
+    <Footer />
   </div>
-
-  <Footer />
-</div>
+{/if}

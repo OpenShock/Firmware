@@ -45,7 +45,7 @@ void _Private::HandleWifiNetworkSaveCommand(uint8_t socketId, const OpenShock::S
     return;
   }
 
-  if (!WiFiManager::Save(ssid->c_str(), password)) {
+  if (!WiFiManager::Save(ssid->c_str(), password, msg->connect())) {
     OS_LOGE(TAG, "Failed to save WiFi network");
   }
 }

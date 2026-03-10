@@ -41,6 +41,9 @@ struct SerialInputConfigBuilder;
 struct OtaUpdateConfig;
 struct OtaUpdateConfigBuilder;
 
+struct LanConfig;
+struct LanConfigBuilder;
+
 struct HubConfig;
 struct HubConfigBuilder;
 
@@ -135,7 +138,7 @@ struct RFConfig FLATBUFFERS_FINAL_CLASS : private ::flatbuffers::Table {
   }
   /// Whether to transmit keepalive messages to keep the shockers from entering sleep mode
   bool keepalive_enabled() const {
-    return GetField<uint8_t>(VT_KEEPALIVE_ENABLED, 0) != 0;
+    return GetField<uint8_t>(VT_KEEPALIVE_ENABLED, 1) != 0;
   }
   template <bool B = false>
   bool Verify(::flatbuffers::VerifierTemplate<B> &verifier) const {
@@ -154,7 +157,7 @@ struct RFConfigBuilder {
     fbb_.AddElement<int8_t>(RFConfig::VT_TX_PIN, tx_pin, 0);
   }
   void add_keepalive_enabled(bool keepalive_enabled) {
-    fbb_.AddElement<uint8_t>(RFConfig::VT_KEEPALIVE_ENABLED, static_cast<uint8_t>(keepalive_enabled), 0);
+    fbb_.AddElement<uint8_t>(RFConfig::VT_KEEPALIVE_ENABLED, static_cast<uint8_t>(keepalive_enabled), 1);
   }
   explicit RFConfigBuilder(::flatbuffers::FlatBufferBuilder &_fbb)
         : fbb_(_fbb) {
@@ -170,7 +173,7 @@ struct RFConfigBuilder {
 inline ::flatbuffers::Offset<RFConfig> CreateRFConfig(
     ::flatbuffers::FlatBufferBuilder &_fbb,
     int8_t tx_pin = 0,
-    bool keepalive_enabled = false) {
+    bool keepalive_enabled = true) {
   RFConfigBuilder builder_(_fbb);
   builder_.add_keepalive_enabled(keepalive_enabled);
   builder_.add_tx_pin(tx_pin);
@@ -365,7 +368,11 @@ struct WiFiConfig FLATBUFFERS_FINAL_CLASS : private ::flatbuffers::Table {
   enum FlatBuffersVTableOffset FLATBUFFERS_VTABLE_UNDERLYING_TYPE {
     VT_AP_SSID = 4,
     VT_HOSTNAME = 6,
-    VT_CREDENTIALS = 8
+    VT_CREDENTIALS = 8,
+    VT_AP_PASSWORD = 10,
+    VT_AP_DISABLED = 12,
+    VT_STA_DISABLED = 14,
+    VT_OFFLINE_MODE = 16
   };
   /// Access point SSID
   const ::flatbuffers::String *ap_ssid() const {
@@ -379,6 +386,22 @@ struct WiFiConfig FLATBUFFERS_FINAL_CLASS : private ::flatbuffers::Table {
   const ::flatbuffers::Vector<::flatbuffers::Offset<OpenShock::Serialization::Configuration::WiFiCredentials>> *credentials() const {
     return GetPointer<const ::flatbuffers::Vector<::flatbuffers::Offset<OpenShock::Serialization::Configuration::WiFiCredentials>> *>(VT_CREDENTIALS);
   }
+  /// Access point password (empty = open network)
+  const ::flatbuffers::String *ap_password() const {
+    return GetPointer<const ::flatbuffers::String *>(VT_AP_PASSWORD);
+  }
+  /// Disable WiFi Access Point mode completely
+  bool ap_disabled() const {
+    return GetField<uint8_t>(VT_AP_DISABLED, 0) != 0;
+  }
+  /// Disable WiFi Station mode completely
+  bool sta_disabled() const {
+    return GetField<uint8_t>(VT_STA_DISABLED, 0) != 0;
+  }
+  /// Don't connect to any cloud services
+  bool offline_mode() const {
+    return GetField<uint8_t>(VT_OFFLINE_MODE, 0) != 0;
+  }
   template <bool B = false>
   bool Verify(::flatbuffers::VerifierTemplate<B> &verifier) const {
     return VerifyTableStart(verifier) &&
@@ -389,6 +412,11 @@ struct WiFiConfig FLATBUFFERS_FINAL_CLASS : private ::flatbuffers::Table {
            VerifyOffset(verifier, VT_CREDENTIALS) &&
            verifier.VerifyVector(credentials()) &&
            verifier.VerifyVectorOfTables(credentials()) &&
+           VerifyOffset(verifier, VT_AP_PASSWORD) &&
+           verifier.VerifyString(ap_password()) &&
+           VerifyField<uint8_t>(verifier, VT_AP_DISABLED, 1) &&
+           VerifyField<uint8_t>(verifier, VT_STA_DISABLED, 1) &&
+           VerifyField<uint8_t>(verifier, VT_OFFLINE_MODE, 1) &&
            verifier.EndTable();
   }
 };
@@ -406,6 +434,18 @@ struct WiFiConfigBuilder {
   void add_credentials(::flatbuffers::Offset<::flatbuffers::Vector<::flatbuffers::Offset<OpenShock::Serialization::Configuration::WiFiCredentials>>> credentials) {
     fbb_.AddOffset(WiFiConfig::VT_CREDENTIALS, credentials);
   }
+  void add_ap_password(::flatbuffers::Offset<::flatbuffers::String> ap_password) {
+    fbb_.AddOffset(WiFiConfig::VT_AP_PASSWORD, ap_password);
+  }
+  void add_ap_disabled(bool ap_disabled) {
+    fbb_.AddElement<uint8_t>(WiFiConfig::VT_AP_DISABLED, static_cast<uint8_t>(ap_disabled), 0);
+  }
+  void add_sta_disabled(bool sta_disabled) {
+    fbb_.AddElement<uint8_t>(WiFiConfig::VT_STA_DISABLED, static_cast<uint8_t>(sta_disabled), 0);
+  }
+  void add_offline_mode(bool offline_mode) {
+    fbb_.AddElement<uint8_t>(WiFiConfig::VT_OFFLINE_MODE, static_cast<uint8_t>(offline_mode), 0);
+  }
   explicit WiFiConfigBuilder(::flatbuffers::FlatBufferBuilder &_fbb)
         : fbb_(_fbb) {
     start_ = fbb_.StartTable();
@@ -421,11 +461,19 @@ inline ::flatbuffers::Offset<WiFiConfig> CreateWiFiConfig(
     ::flatbuffers::FlatBufferBuilder &_fbb,
     ::flatbuffers::Offset<::flatbuffers::String> ap_ssid = 0,
     ::flatbuffers::Offset<::flatbuffers::String> hostname = 0,
-    ::flatbuffers::Offset<::flatbuffers::Vector<::flatbuffers::Offset<OpenShock::Serialization::Configuration::WiFiCredentials>>> credentials = 0) {
+    ::flatbuffers::Offset<::flatbuffers::Vector<::flatbuffers::Offset<OpenShock::Serialization::Configuration::WiFiCredentials>>> credentials = 0,
+    ::flatbuffers::Offset<::flatbuffers::String> ap_password = 0,
+    bool ap_disabled = false,
+    bool sta_disabled = false,
+    bool offline_mode = false) {
   WiFiConfigBuilder builder_(_fbb);
+  builder_.add_ap_password(ap_password);
   builder_.add_credentials(credentials);
   builder_.add_hostname(hostname);
   builder_.add_ap_ssid(ap_ssid);
+  builder_.add_offline_mode(offline_mode);
+  builder_.add_sta_disabled(sta_disabled);
+  builder_.add_ap_disabled(ap_disabled);
   return builder_.Finish();
 }
 
@@ -438,15 +486,24 @@ inline ::flatbuffers::Offset<WiFiConfig> CreateWiFiConfigDirect(
     ::flatbuffers::FlatBufferBuilder &_fbb,
     const char *ap_ssid = nullptr,
     const char *hostname = nullptr,
-    const std::vector<::flatbuffers::Offset<OpenShock::Serialization::Configuration::WiFiCredentials>> *credentials = nullptr) {
+    const std::vector<::flatbuffers::Offset<OpenShock::Serialization::Configuration::WiFiCredentials>> *credentials = nullptr,
+    const char *ap_password = nullptr,
+    bool ap_disabled = false,
+    bool sta_disabled = false,
+    bool offline_mode = false) {
   auto ap_ssid__ = ap_ssid ? _fbb.CreateString(ap_ssid) : 0;
   auto hostname__ = hostname ? _fbb.CreateString(hostname) : 0;
   auto credentials__ = credentials ? _fbb.CreateVector<::flatbuffers::Offset<OpenShock::Serialization::Configuration::WiFiCredentials>>(*credentials) : 0;
+  auto ap_password__ = ap_password ? _fbb.CreateString(ap_password) : 0;
   return OpenShock::Serialization::Configuration::CreateWiFiConfig(
       _fbb,
       ap_ssid__,
       hostname__,
-      credentials__);
+      credentials__,
+      ap_password__,
+      ap_disabled,
+      sta_disabled,
+      offline_mode);
 }
 
 struct CaptivePortalConfig FLATBUFFERS_FINAL_CLASS : private ::flatbuffers::Table {
@@ -651,7 +708,7 @@ struct OtaUpdateConfig FLATBUFFERS_FINAL_CLASS : private ::flatbuffers::Table {
   };
   /// Indicates whether OTA updates are enabled.
   bool is_enabled() const {
-    return GetField<uint8_t>(VT_IS_ENABLED, 0) != 0;
+    return GetField<uint8_t>(VT_IS_ENABLED, 1) != 0;
   }
   /// The domain name of the OTA Content Delivery Network (CDN).
   const ::flatbuffers::String *cdn_domain() const {
@@ -675,7 +732,7 @@ struct OtaUpdateConfig FLATBUFFERS_FINAL_CLASS : private ::flatbuffers::Table {
   }
   /// Indicates if the backend is authorized to manage the hub's update version on behalf of the user.
   bool allow_backend_management() const {
-    return GetField<uint8_t>(VT_ALLOW_BACKEND_MANAGEMENT, 0) != 0;
+    return GetField<uint8_t>(VT_ALLOW_BACKEND_MANAGEMENT, 1) != 0;
   }
   /// Indicates if manual approval via serial input or captive portal is required before installing updates.
   bool require_manual_approval() const {
@@ -712,7 +769,7 @@ struct OtaUpdateConfigBuilder {
   ::flatbuffers::FlatBufferBuilder &fbb_;
   ::flatbuffers::uoffset_t start_;
   void add_is_enabled(bool is_enabled) {
-    fbb_.AddElement<uint8_t>(OtaUpdateConfig::VT_IS_ENABLED, static_cast<uint8_t>(is_enabled), 0);
+    fbb_.AddElement<uint8_t>(OtaUpdateConfig::VT_IS_ENABLED, static_cast<uint8_t>(is_enabled), 1);
   }
   void add_cdn_domain(::flatbuffers::Offset<::flatbuffers::String> cdn_domain) {
     fbb_.AddOffset(OtaUpdateConfig::VT_CDN_DOMAIN, cdn_domain);
@@ -730,7 +787,7 @@ struct OtaUpdateConfigBuilder {
     fbb_.AddElement<uint16_t>(OtaUpdateConfig::VT_CHECK_INTERVAL, check_interval, 0);
   }
   void add_allow_backend_management(bool allow_backend_management) {
-    fbb_.AddElement<uint8_t>(OtaUpdateConfig::VT_ALLOW_BACKEND_MANAGEMENT, static_cast<uint8_t>(allow_backend_management), 0);
+    fbb_.AddElement<uint8_t>(OtaUpdateConfig::VT_ALLOW_BACKEND_MANAGEMENT, static_cast<uint8_t>(allow_backend_management), 1);
   }
   void add_require_manual_approval(bool require_manual_approval) {
     fbb_.AddElement<uint8_t>(OtaUpdateConfig::VT_REQUIRE_MANUAL_APPROVAL, static_cast<uint8_t>(require_manual_approval), 0);
@@ -754,13 +811,13 @@ struct OtaUpdateConfigBuilder {
 
 inline ::flatbuffers::Offset<OtaUpdateConfig> CreateOtaUpdateConfig(
     ::flatbuffers::FlatBufferBuilder &_fbb,
-    bool is_enabled = false,
+    bool is_enabled = true,
     ::flatbuffers::Offset<::flatbuffers::String> cdn_domain = 0,
     OpenShock::Serialization::Configuration::OtaUpdateChannel update_channel = OpenShock::Serialization::Configuration::OtaUpdateChannel::Stable,
     bool check_on_startup = false,
     bool check_periodically = false,
     uint16_t check_interval = 0,
-    bool allow_backend_management = false,
+    bool allow_backend_management = true,
     bool require_manual_approval = false,
     int32_t update_id = 0,
     OpenShock::Serialization::Configuration::OtaUpdateStep update_step = OpenShock::Serialization::Configuration::OtaUpdateStep::None) {
@@ -785,13 +842,13 @@ struct OtaUpdateConfig::Traits {
 
 inline ::flatbuffers::Offset<OtaUpdateConfig> CreateOtaUpdateConfigDirect(
     ::flatbuffers::FlatBufferBuilder &_fbb,
-    bool is_enabled = false,
+    bool is_enabled = true,
     const char *cdn_domain = nullptr,
     OpenShock::Serialization::Configuration::OtaUpdateChannel update_channel = OpenShock::Serialization::Configuration::OtaUpdateChannel::Stable,
     bool check_on_startup = false,
     bool check_periodically = false,
     uint16_t check_interval = 0,
-    bool allow_backend_management = false,
+    bool allow_backend_management = true,
     bool require_manual_approval = false,
     int32_t update_id = 0,
     OpenShock::Serialization::Configuration::OtaUpdateStep update_step = OpenShock::Serialization::Configuration::OtaUpdateStep::None) {
@@ -810,6 +867,81 @@ inline ::flatbuffers::Offset<OtaUpdateConfig> CreateOtaUpdateConfigDirect(
       update_step);
 }
 
+struct LanConfig FLATBUFFERS_FINAL_CLASS : private ::flatbuffers::Table {
+  typedef LanConfigBuilder Builder;
+  struct Traits;
+  static FLATBUFFERS_CONSTEXPR_CPP11 const char *GetFullyQualifiedName() {
+    return "OpenShock.Serialization.Configuration.LanConfig";
+  }
+  enum FlatBuffersVTableOffset FLATBUFFERS_VTABLE_UNDERLYING_TYPE {
+    VT_API_KEY_ENABLED = 4,
+    VT_API_KEY = 6
+  };
+  /// Whether an API key is required for LAN endpoints
+  bool api_key_enabled() const {
+    return GetField<uint8_t>(VT_API_KEY_ENABLED, 0) != 0;
+  }
+  /// API key for authenticating LAN requests (generated or user-set)
+  const ::flatbuffers::String *api_key() const {
+    return GetPointer<const ::flatbuffers::String *>(VT_API_KEY);
+  }
+  template <bool B = false>
+  bool Verify(::flatbuffers::VerifierTemplate<B> &verifier) const {
+    return VerifyTableStart(verifier) &&
+           VerifyField<uint8_t>(verifier, VT_API_KEY_ENABLED, 1) &&
+           VerifyOffset(verifier, VT_API_KEY) &&
+           verifier.VerifyString(api_key()) &&
+           verifier.EndTable();
+  }
+};
+
+struct LanConfigBuilder {
+  typedef LanConfig Table;
+  ::flatbuffers::FlatBufferBuilder &fbb_;
+  ::flatbuffers::uoffset_t start_;
+  void add_api_key_enabled(bool api_key_enabled) {
+    fbb_.AddElement<uint8_t>(LanConfig::VT_API_KEY_ENABLED, static_cast<uint8_t>(api_key_enabled), 0);
+  }
+  void add_api_key(::flatbuffers::Offset<::flatbuffers::String> api_key) {
+    fbb_.AddOffset(LanConfig::VT_API_KEY, api_key);
+  }
+  explicit LanConfigBuilder(::flatbuffers::FlatBufferBuilder &_fbb)
+        : fbb_(_fbb) {
+    start_ = fbb_.StartTable();
+  }
+  ::flatbuffers::Offset<LanConfig> Finish() {
+    const auto end = fbb_.EndTable(start_);
+    auto o = ::flatbuffers::Offset<LanConfig>(end);
+    return o;
+  }
+};
+
+inline ::flatbuffers::Offset<LanConfig> CreateLanConfig(
+    ::flatbuffers::FlatBufferBuilder &_fbb,
+    bool api_key_enabled = false,
+    ::flatbuffers::Offset<::flatbuffers::String> api_key = 0) {
+  LanConfigBuilder builder_(_fbb);
+  builder_.add_api_key(api_key);
+  builder_.add_api_key_enabled(api_key_enabled);
+  return builder_.Finish();
+}
+
+struct LanConfig::Traits {
+  using type = LanConfig;
+  static auto constexpr Create = CreateLanConfig;
+};
+
+inline ::flatbuffers::Offset<LanConfig> CreateLanConfigDirect(
+    ::flatbuffers::FlatBufferBuilder &_fbb,
+    bool api_key_enabled = false,
+    const char *api_key = nullptr) {
+  auto api_key__ = api_key ? _fbb.CreateString(api_key) : 0;
+  return OpenShock::Serialization::Configuration::CreateLanConfig(
+      _fbb,
+      api_key_enabled,
+      api_key__);
+}
+
 struct HubConfig FLATBUFFERS_FINAL_CLASS : private ::flatbuffers::Table {
   typedef HubConfigBuilder Builder;
   struct Traits;
@@ -823,7 +955,8 @@ struct HubConfig FLATBUFFERS_FINAL_CLASS : private ::flatbuffers::Table {
     VT_BACKEND = 10,
     VT_SERIAL_INPUT = 12,
     VT_OTA_UPDATE = 14,
-    VT_ESTOP = 16
+    VT_ESTOP = 16,
+    VT_LAN = 18
   };
   /// RF Transmitter configuration
   const OpenShock::Serialization::Configuration::RFConfig *rf() const {
@@ -853,6 +986,10 @@ struct HubConfig FLATBUFFERS_FINAL_CLASS : private ::flatbuffers::Table {
   const OpenShock::Serialization::Configuration::EStopConfig *estop() const {
     return GetPointer<const OpenShock::Serialization::Configuration::EStopConfig *>(VT_ESTOP);
   }
+  /// LAN API configuration
+  const OpenShock::Serialization::Configuration::LanConfig *lan() const {
+    return GetPointer<const OpenShock::Serialization::Configuration::LanConfig *>(VT_LAN);
+  }
   template <bool B = false>
   bool Verify(::flatbuffers::VerifierTemplate<B> &verifier) const {
     return VerifyTableStart(verifier) &&
@@ -870,6 +1007,8 @@ struct HubConfig FLATBUFFERS_FINAL_CLASS : private ::flatbuffers::Table {
            verifier.VerifyTable(ota_update()) &&
            VerifyOffset(verifier, VT_ESTOP) &&
            verifier.VerifyTable(estop()) &&
+           VerifyOffset(verifier, VT_LAN) &&
+           verifier.VerifyTable(lan()) &&
            verifier.EndTable();
   }
 };
@@ -899,6 +1038,9 @@ struct HubConfigBuilder {
   void add_estop(::flatbuffers::Offset<OpenShock::Serialization::Configuration::EStopConfig> estop) {
     fbb_.AddOffset(HubConfig::VT_ESTOP, estop);
   }
+  void add_lan(::flatbuffers::Offset<OpenShock::Serialization::Configuration::LanConfig> lan) {
+    fbb_.AddOffset(HubConfig::VT_LAN, lan);
+  }
   explicit HubConfigBuilder(::flatbuffers::FlatBufferBuilder &_fbb)
         : fbb_(_fbb) {
     start_ = fbb_.StartTable();
@@ -918,8 +1060,10 @@ inline ::flatbuffers::Offset<HubConfig> CreateHubConfig(
     ::flatbuffers::Offset<OpenShock::Serialization::Configuration::BackendConfig> backend = 0,
     ::flatbuffers::Offset<OpenShock::Serialization::Configuration::SerialInputConfig> serial_input = 0,
     ::flatbuffers::Offset<OpenShock::Serialization::Configuration::OtaUpdateConfig> ota_update = 0,
-    ::flatbuffers::Offset<OpenShock::Serialization::Configuration::EStopConfig> estop = 0) {
+    ::flatbuffers::Offset<OpenShock::Serialization::Configuration::EStopConfig> estop = 0,
+    ::flatbuffers::Offset<OpenShock::Serialization::Configuration::LanConfig> lan = 0) {
   HubConfigBuilder builder_(_fbb);
+  builder_.add_lan(lan);
   builder_.add_estop(estop);
   builder_.add_ota_update(ota_update);
   builder_.add_serial_input(serial_input);

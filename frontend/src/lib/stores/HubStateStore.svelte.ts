@@ -46,6 +46,7 @@ class HubStateStore {
     Array.from(this.wifiNetworks.entries()).reduce(ssidMapReducer, new Map())
   );
   accountLinked = $state(false);
+  hasPredefinedPins = $state(false);
   config = $state<Config | null>(null);
   gpioValidInputs = $state<Int8Array>(new Int8Array());
   gpioValidOutputs = $state<Int8Array>(new Int8Array());

@@ -40,20 +40,23 @@ export default defineConfig(
     },
   },
   {
-    ignores: [
-      '.DS_Store',
-      'node_modules',
-      '/build',
-      '/.svelte-kit',
-      '/package',
-      '.env',
-      '.env.*',
-      '!.env.example',
-      'pnpm-lock.yaml',
-      'package-lock.json',
-      'yarn.lock',
-      'src/lib/_fbs',
-      'src/lib/components/ui',
-    ],
+    files: ['**/*.svelte'],
+
+    languageOptions: {
+      parserOptions: {
+        parser: ts.parser,
+        ecmaVersion: 2020,
+      },
+    },
+  },
+  {
+    files: ['**/*.svelte.ts', '**/*.svelte.js'],
+
+    languageOptions: {
+      parser: ts.parser,
+      parserOptions: {
+        ecmaVersion: 2020,
+      },
+    },
   }
 );

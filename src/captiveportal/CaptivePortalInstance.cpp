@@ -4,8 +4,12 @@
 
 const char* const TAG = "CaptivePortalInstance";
 
+#include "captiveportal/Manager.h"
 #include "captiveportal/RFC8908Handler.h"
+#include "Chipset.h"
 #include "CommandHandler.h"
+#include "config/Config.h"
+#include "estop/EStopManager.h"
 #include "GatewayConnectionManager.h"
 #include "Logging.h"
 #include "message_handlers/WebSocket.h"
@@ -14,7 +18,9 @@ const char* const TAG = "CaptivePortalInstance";
 #include "util/HexUtils.h"
 #include "util/PartitionUtils.h"
 #include "util/TaskUtils.h"
+#include "OtaUpdateChannel.h"
 #include "wifi/WiFiManager.h"
+#include "wifi/WiFiScanManager.h"
 
 #include "serialization/_fbs/HubToLocalMessage_generated.h"
 
@@ -104,6 +110,317 @@ CaptivePortal::CaptivePortalInstance::CaptivePortalInstance()
     OS_LOGI(TAG, "Filesystem hash: %s", fsHash);
 
     m_webServer.addHandler(new RFC8908Handler());
+
+    // API endpoints — must be registered before serveStatic so they take priority
+    m_webServer.on("/api/board", HTTP_GET, [](AsyncWebServerRequest* request) {
+      bool hasPredefinedPins = OPENSHOCK_RF_TX_GPIO != OPENSHOCK_GPIO_INVALID;
+      request->send(200, "application/json", hasPredefinedPins ? "{\"has_predefined_pins\":true}" : "{\"has_predefined_pins\":false}");
+    });
+
+    m_webServer.on("/api/portal/close", HTTP_POST, [](AsyncWebServerRequest* request) {
+      request->send(200, "text/plain", "Closing portal");
+      CaptivePortal::ForceClose(0);
+    });
+
+    m_webServer.on("/api/wifi/scan", HTTP_POST, [](AsyncWebServerRequest* request) {
+      bool run = true;
+      if (request->hasParam("run")) {
+        run = request->getParam("run")->value().toInt() != 0;
+      }
+      if (run) {
+        WiFiScanManager::StartScan();
+      } else {
+        WiFiScanManager::AbortScan();
+      }
+      request->send(200, "application/json", "{\"ok\":true}");
+    });
+
+    m_webServer.on("/api/wifi/networks", HTTP_DELETE, [](AsyncWebServerRequest* request) {
+      if (!request->hasParam("ssid")) {
+        request->send(400, "application/json", "{\"ok\":false,\"error\":\"Missing ssid parameter\"}");
+        return;
+      }
+      String ssid = request->getParam("ssid")->value();
+      if (!WiFiManager::Forget(ssid.c_str())) {
+        request->send(500, "application/json", "{\"ok\":false,\"error\":\"InternalError\"}");
+        return;
+      }
+      request->send(200, "application/json", "{\"ok\":true}");
+    });
+
+    m_webServer.on("/api/account/link", HTTP_POST, [](AsyncWebServerRequest* request) {
+      if (!request->hasParam("code")) {
+        request->send(400, "application/json", "{\"ok\":false,\"error\":\"CodeRequired\"}");
+        return;
+      }
+      String code     = request->getParam("code")->value();
+      auto result     = GatewayConnectionManager::Link(std::string_view(code.c_str(), code.length()));
+      using ResultCode = Serialization::Local::AccountLinkResultCode;
+      if (result == ResultCode::Success) {
+        request->send(200, "application/json", "{\"ok\":true}");
+        return;
+      }
+      const char* error;
+      switch (result) {
+        case ResultCode::CodeRequired:
+          error = "CodeRequired";
+          break;
+        case ResultCode::InvalidCodeLength:
+          error = "InvalidCodeLength";
+          break;
+        case ResultCode::NoInternetConnection:
+          error = "NoInternetConnection";
+          break;
+        case ResultCode::InvalidCode:
+          error = "InvalidCode";
+          break;
+        case ResultCode::RateLimited:
+          error = "RateLimited";
+          break;
+        default:
+          error = "InternalError";
+          break;
+      }
+      String resp = String("{\"ok\":false,\"error\":\"") + error + "\"}";
+      request->send(400, "application/json", resp);
+    });
+
+    m_webServer.on("/api/account", HTTP_DELETE, [](AsyncWebServerRequest* request) {
+      GatewayConnectionManager::UnLink();
+      request->send(200, "application/json", "{\"ok\":true}");
+    });
+
+    m_webServer.on("/api/config/rf/pin", HTTP_PUT, [](AsyncWebServerRequest* request) {
+      if (!request->hasParam("pin")) {
+        request->send(400, "application/json", "{\"ok\":false,\"error\":\"InvalidPin\"}");
+        return;
+      }
+      int pin         = request->getParam("pin")->value().toInt();
+      auto result     = CommandHandler::SetRfTxPin(static_cast<gpio_num_t>(pin));
+      using ResultCode = Serialization::Local::SetGPIOResultCode;
+      if (result == ResultCode::Success) {
+        String resp = String("{\"ok\":true,\"pin\":") + pin + "}";
+        request->send(200, "application/json", resp);
+        return;
+      }
+      const char* error = (result == ResultCode::InvalidPin) ? "InvalidPin" : "InternalError";
+      String resp       = String("{\"ok\":false,\"error\":\"") + error + "\"}";
+      request->send(400, "application/json", resp);
+    });
+
+    m_webServer.on("/api/config/estop/pin", HTTP_PUT, [](AsyncWebServerRequest* request) {
+      if (!request->hasParam("pin")) {
+        request->send(400, "application/json", "{\"ok\":false,\"error\":\"InvalidPin\"}");
+        return;
+      }
+      int8_t pin        = static_cast<int8_t>(request->getParam("pin")->value().toInt());
+      const char* error = nullptr;
+      if (IsValidInputPin(pin)) {
+        if (!EStopManager::SetEStopPin(static_cast<gpio_num_t>(pin))) {
+          error = "InternalError";
+        } else if (!Config::SetEStopGpioPin(static_cast<gpio_num_t>(pin))) {
+          error = "InternalError";
+        }
+      } else {
+        error = "InvalidPin";
+      }
+      if (error == nullptr) {
+        String resp = String("{\"ok\":true,\"pin\":") + pin + "}";
+        request->send(200, "application/json", resp);
+      } else {
+        String resp = String("{\"ok\":false,\"error\":\"") + error + "\"}";
+        request->send(400, "application/json", resp);
+      }
+    });
+
+    m_webServer.on("/api/config/estop/enabled", HTTP_PUT, [](AsyncWebServerRequest* request) {
+      if (!request->hasParam("enabled")) {
+        request->send(400, "application/json", "{\"ok\":false,\"error\":\"InternalError\"}");
+        return;
+      }
+      bool enabled = request->getParam("enabled")->value().toInt() != 0;
+      bool success = EStopManager::SetEStopEnabled(enabled) && Config::SetEStopEnabled(enabled);
+      if (success) {
+        request->send(200, "application/json", "{\"ok\":true}");
+      } else {
+        request->send(500, "application/json", "{\"ok\":false,\"error\":\"InternalError\"}");
+      }
+    });
+
+    m_webServer.on("/api/wifi/networks", HTTP_POST, [](AsyncWebServerRequest* request) {
+      if (!request->hasParam("ssid", true)) {
+        request->send(400, "application/json", "{\"ok\":false,\"error\":\"Missing ssid\"}");
+        return;
+      }
+      String ssid = request->getParam("ssid", true)->value();
+      if (ssid.length() == 0 || ssid.length() > 31) {
+        request->send(400, "application/json", "{\"ok\":false,\"error\":\"InvalidSsid\"}");
+        return;
+      }
+      String password;
+      if (request->hasParam("password", true)) {
+        password = request->getParam("password", true)->value();
+        if (password.length() > 0 && password.length() < 8) {
+          request->send(400, "application/json", "{\"ok\":false,\"error\":\"PasswordTooShort\"}");
+          return;
+        }
+        if (password.length() > 63) {
+          request->send(400, "application/json", "{\"ok\":false,\"error\":\"PasswordTooLong\"}");
+          return;
+        }
+      }
+      bool connect = true;
+      if (request->hasParam("connect", true)) {
+        connect = request->getParam("connect", true)->value().toInt() != 0;
+      }
+      if (!WiFiManager::Save(ssid.c_str(), std::string_view(password.c_str(), password.length()), connect)) {
+        request->send(500, "application/json", "{\"ok\":false,\"error\":\"InternalError\"}");
+        return;
+      }
+      request->send(200, "application/json", "{\"ok\":true}");
+    });
+
+    m_webServer.on("/api/wifi/connect", HTTP_POST, [](AsyncWebServerRequest* request) {
+      if (!request->hasParam("ssid", true)) {
+        request->send(400, "application/json", "{\"ok\":false,\"error\":\"Missing ssid\"}");
+        return;
+      }
+      String ssid = request->getParam("ssid", true)->value();
+      if (!WiFiManager::Connect(ssid.c_str())) {
+        request->send(500, "application/json", "{\"ok\":false,\"error\":\"InternalError\"}");
+        return;
+      }
+      request->send(200, "application/json", "{\"ok\":true}");
+    });
+
+    m_webServer.on("/api/wifi/disconnect", HTTP_POST, [](AsyncWebServerRequest* request) {
+      WiFiManager::Disconnect();
+      request->send(200, "application/json", "{\"ok\":true}");
+    });
+
+    m_webServer.on("/api/ota/enabled", HTTP_PUT, [](AsyncWebServerRequest* request) {
+      if (!request->hasParam("enabled")) {
+        request->send(400, "application/json", "{\"ok\":false,\"error\":\"MissingParam\"}");
+        return;
+      }
+      bool enabled = request->getParam("enabled")->value().toInt() != 0;
+      Config::OtaUpdateConfig cfg;
+      if (!Config::GetOtaUpdateConfig(cfg)) {
+        request->send(500, "application/json", "{\"ok\":false,\"error\":\"InternalError\"}");
+        return;
+      }
+      cfg.isEnabled = enabled;
+      if (!Config::SetOtaUpdateConfig(cfg)) {
+        request->send(500, "application/json", "{\"ok\":false,\"error\":\"InternalError\"}");
+        return;
+      }
+      request->send(200, "application/json", "{\"ok\":true}");
+    });
+
+    m_webServer.on("/api/ota/domain", HTTP_PUT, [](AsyncWebServerRequest* request) {
+      if (!request->hasParam("domain")) {
+        request->send(400, "application/json", "{\"ok\":false,\"error\":\"MissingParam\"}");
+        return;
+      }
+      String domain = request->getParam("domain")->value();
+      Config::OtaUpdateConfig cfg;
+      if (!Config::GetOtaUpdateConfig(cfg)) {
+        request->send(500, "application/json", "{\"ok\":false,\"error\":\"InternalError\"}");
+        return;
+      }
+      cfg.cdnDomain = std::string(domain.c_str(), domain.length());
+      if (!Config::SetOtaUpdateConfig(cfg)) {
+        request->send(500, "application/json", "{\"ok\":false,\"error\":\"InternalError\"}");
+        return;
+      }
+      request->send(200, "application/json", "{\"ok\":true}");
+    });
+
+    m_webServer.on("/api/ota/channel", HTTP_PUT, [](AsyncWebServerRequest* request) {
+      if (!request->hasParam("channel")) {
+        request->send(400, "application/json", "{\"ok\":false,\"error\":\"MissingParam\"}");
+        return;
+      }
+      String channelStr = request->getParam("channel")->value();
+      OtaUpdateChannel channel;
+      if (!TryParseOtaUpdateChannel(channel, channelStr.c_str())) {
+        request->send(400, "application/json", "{\"ok\":false,\"error\":\"InvalidChannel\"}");
+        return;
+      }
+      Config::OtaUpdateConfig cfg;
+      if (!Config::GetOtaUpdateConfig(cfg)) {
+        request->send(500, "application/json", "{\"ok\":false,\"error\":\"InternalError\"}");
+        return;
+      }
+      cfg.updateChannel = channel;
+      if (!Config::SetOtaUpdateConfig(cfg)) {
+        request->send(500, "application/json", "{\"ok\":false,\"error\":\"InternalError\"}");
+        return;
+      }
+      request->send(200, "application/json", "{\"ok\":true}");
+    });
+
+    m_webServer.on("/api/ota/check-interval", HTTP_PUT, [](AsyncWebServerRequest* request) {
+      if (!request->hasParam("interval")) {
+        request->send(400, "application/json", "{\"ok\":false,\"error\":\"MissingParam\"}");
+        return;
+      }
+      uint16_t interval = static_cast<uint16_t>(request->getParam("interval")->value().toInt());
+      Config::OtaUpdateConfig cfg;
+      if (!Config::GetOtaUpdateConfig(cfg)) {
+        request->send(500, "application/json", "{\"ok\":false,\"error\":\"InternalError\"}");
+        return;
+      }
+      cfg.checkInterval = interval;
+      if (!Config::SetOtaUpdateConfig(cfg)) {
+        request->send(500, "application/json", "{\"ok\":false,\"error\":\"InternalError\"}");
+        return;
+      }
+      request->send(200, "application/json", "{\"ok\":true}");
+    });
+
+    m_webServer.on("/api/ota/allow-backend-management", HTTP_PUT, [](AsyncWebServerRequest* request) {
+      if (!request->hasParam("allow")) {
+        request->send(400, "application/json", "{\"ok\":false,\"error\":\"MissingParam\"}");
+        return;
+      }
+      bool allow = request->getParam("allow")->value().toInt() != 0;
+      Config::OtaUpdateConfig cfg;
+      if (!Config::GetOtaUpdateConfig(cfg)) {
+        request->send(500, "application/json", "{\"ok\":false,\"error\":\"InternalError\"}");
+        return;
+      }
+      cfg.allowBackendManagement = allow;
+      if (!Config::SetOtaUpdateConfig(cfg)) {
+        request->send(500, "application/json", "{\"ok\":false,\"error\":\"InternalError\"}");
+        return;
+      }
+      request->send(200, "application/json", "{\"ok\":true}");
+    });
+
+    m_webServer.on("/api/ota/require-manual-approval", HTTP_PUT, [](AsyncWebServerRequest* request) {
+      if (!request->hasParam("require")) {
+        request->send(400, "application/json", "{\"ok\":false,\"error\":\"MissingParam\"}");
+        return;
+      }
+      bool require = request->getParam("require")->value().toInt() != 0;
+      Config::OtaUpdateConfig cfg;
+      if (!Config::GetOtaUpdateConfig(cfg)) {
+        request->send(500, "application/json", "{\"ok\":false,\"error\":\"InternalError\"}");
+        return;
+      }
+      cfg.requireManualApproval = require;
+      if (!Config::SetOtaUpdateConfig(cfg)) {
+        request->send(500, "application/json", "{\"ok\":false,\"error\":\"InternalError\"}");
+        return;
+      }
+      request->send(200, "application/json", "{\"ok\":true}");
+    });
+
+    m_webServer.on("/api/ota/check", HTTP_POST, [](AsyncWebServerRequest* request) {
+      // TODO: trigger OTA check - OtaUpdateManager does not yet expose a CheckForUpdates method
+      request->send(200, "application/json", "{\"ok\":true}");
+    });
 
     // Serving the captive portal files from LittleFS
     m_webServer.serveStatic("/", m_fileSystem, "/www/", "max-age=3600").setDefaultFile("index.html").setSharedEtag(fsHash);

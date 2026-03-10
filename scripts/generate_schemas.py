@@ -1,4 +1,5 @@
 import os
+import sys
 import shutil
 import subprocess
 
@@ -12,24 +13,20 @@ def exec_silent(args: list[str]):
 
 
 def get_flatc_path():
-    # Check if there is a flatc.exe in the working directory.
-    path = os.path.join(os.getcwd(), 'flatc.exe')
-    if os.path.exists(path):
-        # Test if the executable is working.
-        if flatc_test(path):
-            return path
-
-    # Check if there is a flatc.exe in the scripts directory.
     script_dir = os.path.dirname(os.path.realpath(__file__))
-    path = os.path.join(script_dir, 'flatc.exe')
-    if os.path.exists(path):
-        # Test if the executable is working.
-        if flatc_test(path):
+
+    # Pick the right binary name for the platform.
+    flatc_name = 'flatc.exe' if sys.platform == 'win32' else 'flatc'
+
+    # Check in the working directory, then the scripts directory.
+    for directory in [os.getcwd(), script_dir]:
+        path = os.path.join(directory, flatc_name)
+        if os.path.exists(path) and flatc_test(path):
             return path
 
-    # Check if flatc is installed globally.
-    if flatc_test('flatc'):
-        return 'flatc'
+    # Fall back to whatever is on PATH.
+    if flatc_test(flatc_name):
+        return flatc_name
 
     return None
 
