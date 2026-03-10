@@ -57,7 +57,7 @@ Confirmed working boards:
 
 ## Flashing
 
-Refer to [OpenShock Wiki - Guides: First time setup](https://wiki.openshock.org/guides/openshock-first-setup/) on how to set up your microcontroller.
+Refer to [OpenShock Wiki - Guides: First time setup](https://wiki.openshock.org/guides/openshock/how-to-flash-your-board) on how to set up your microcontroller.
 
 Other than that, you can just flash via platform io in vscode. More in the contribute section.
 
