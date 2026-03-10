@@ -1,0 +1,6 @@
+github.com/brianvoe/gofakeit/v6 v6.28.0 h1:Xib46XXuQfmlLS2EXRuJpqcw8St6qSZz75OUo0tgAW4=
+github.com/brianvoe/gofakeit/v6 v6.28.0/go.mod h1:Xj58BMSnFqcn/fAQeSK+/PLtC5kSb7FJIq4JyGa8vEs=
+github.com/google/flatbuffers/go v0.0.0-20230110200425-62e4d2e5b215 h1:HA3/6NDG1q6qLD2sCqDFT/ua/1/wctoLo7leuFcFdSE=
+github.com/google/flatbuffers/go v0.0.0-20230110200425-62e4d2e5b215/go.mod h1:qmRCJW6OqZkfBt584Cmq1im0f4367CLrdABrq5lMOWo=
+github.com/gorilla/websocket v1.5.3 h1:saDtZ6Pbx/0u+bgYQ3q96pZgCzfhKXGPqt7kZ72aNNg=
+github.com/gorilla/websocket v1.5.3/go.mod h1:YR8l580nyteQvAITg2hZ9XVh4b55+EU/adAjf1fMHhE=
