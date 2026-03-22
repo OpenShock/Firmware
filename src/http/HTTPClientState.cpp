@@ -192,21 +192,21 @@ esp_err_t HTTP::HTTPClientState::EventHandler(esp_http_client_event_t* evt)
     OS_LOGE(TAG, "Got error event");
     break;
   case HTTP_EVENT_ON_CONNECTED:
-    OS_LOGI(TAG, "Got connected event");
+    OS_LOGD(TAG, "Got connected event");
     break;
   case HTTP_EVENT_HEADERS_SENT:
-    OS_LOGI(TAG, "Got headers_sent event");
+    OS_LOGD(TAG, "Got headers_sent event");
     break;
   case HTTP_EVENT_ON_HEADER:
     return client->EventHeaderHandler(evt->header_key, evt->header_value);
   case HTTP_EVENT_ON_DATA:
-    OS_LOGI(TAG, "Got on_data event");
+    OS_LOGD(TAG, "Got on_data event");
     break;
   case HTTP_EVENT_ON_FINISH:
-    OS_LOGI(TAG, "Got on_finish event");
+    OS_LOGD(TAG, "Got on_finish event");
     break;
   case HTTP_EVENT_DISCONNECTED:
-    OS_LOGI(TAG, "Got disconnected event");
+    OS_LOGD(TAG, "Got disconnected event");
     break;
   default:
     OS_LOGE(TAG, "Got unknown event");
@@ -224,7 +224,7 @@ esp_err_t HTTP::HTTPClientState::EventHeaderHandler(std::string key, std::string
 
   if (key == "retry-after") {
     uint32_t seconds = 0;
-    if (!Convert::ToUint32(value, seconds) || seconds <= 0) {
+    if (!Convert::ToUint32(value, seconds) || seconds == 0) {
       seconds = 15;
     }
 
