@@ -21,6 +21,7 @@
   );
 
   let savedGroups = $derived(strengthSortedGroups.filter(([, g]) => g.saved));
+  let savedOnlySSIDs = $derived(hubState.savedOnlySSIDs);
   let availableGroups = $derived(strengthSortedGroups.filter(([, g]) => !g.saved));
 
   let connectedNetwork = $derived.by(() => {
@@ -78,11 +79,14 @@
   {/if}
 
   <!-- Saved Networks -->
-  {#if savedGroups.length > 0}
+  {#if savedGroups.length > 0 || savedOnlySSIDs.length > 0}
     <div>
       <h4 class="text-muted-foreground mb-2 text-sm font-medium">Saved Networks</h4>
       {#each savedGroups as [netgroupKey, netgroup] (netgroupKey)}
-        <WiFiEntry {netgroup} />
+        <WiFiEntry ssid={netgroup.ssid} {netgroup} />
+      {/each}
+      {#each savedOnlySSIDs as ssid (ssid)}
+        <WiFiEntry ssid={ssid} />
       {/each}
     </div>
   {/if}
@@ -110,7 +114,7 @@
     <ScrollArea class="h-52">
       {#if availableGroups.length > 0}
         {#each availableGroups as [netgroupKey, netgroup] (netgroupKey)}
-          <WiFiEntry {netgroup} />
+          <WiFiEntry ssid={netgroup.ssid} {netgroup} />
         {/each}
       {:else if !isScanning}
         <p class="text-muted-foreground py-4 text-center text-sm">

@@ -45,6 +45,16 @@ class HubStateStore {
   wifiNetworkGroups = $derived.by<Map<string, WiFiNetworkGroup>>(() =>
     Array.from(this.wifiNetworks.entries()).reduce(ssidMapReducer, new Map())
   );
+  // Saved SSIDs from config that aren't visible in scan results
+  savedOnlySSIDs = $derived.by<string[]>(() => {
+    const scannedSavedSSIDs = new Set<string>();
+    for (const [, group] of this.wifiNetworkGroups) {
+      if (group.saved) scannedSavedSSIDs.add(group.ssid);
+    }
+    const creds = this.config?.wifi?.credentials ?? [];
+    return creds.map((c) => c.ssid).filter((ssid) => !scannedSavedSSIDs.has(ssid));
+  });
+
   accountLinked = $state(false);
   hasPredefinedPins = $state(false);
   config = $state<Config | null>(null);

@@ -7,6 +7,7 @@ export { CaptivePortalConfig } from './configuration/captive-portal-config';
 export { EStopConfig } from './configuration/estop-config';
 export { HubConfig } from './configuration/hub-config';
 export { LanConfig } from './configuration/lan-config';
+export { MacAddress } from './configuration/mac-address';
 export { OtaUpdateChannel } from './configuration/ota-update-channel';
 export { OtaUpdateConfig } from './configuration/ota-update-config';
 export { OtaUpdateStep } from './configuration/ota-update-step';

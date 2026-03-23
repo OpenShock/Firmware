@@ -288,7 +288,14 @@ CaptivePortal::CaptivePortalInstance::CaptivePortalInstance()
       if (request->hasParam("connect", true)) {
         connect = request->getParam("connect", true)->value().toInt() != 0;
       }
-      if (!WiFiManager::Save(ssid.c_str(), std::string_view(password.c_str(), password.length()), connect)) {
+      wifi_auth_mode_t authMode = WIFI_AUTH_MAX;
+      if (request->hasParam("security", true)) {
+        int sec = request->getParam("security", true)->value().toInt();
+        if (sec >= 0 && sec <= static_cast<int>(WIFI_AUTH_MAX)) {
+          authMode = static_cast<wifi_auth_mode_t>(sec);
+        }
+      }
+      if (!WiFiManager::Save(ssid.c_str(), std::string_view(password.c_str(), password.length()), connect, authMode)) {
         request->send(500, HTTP::ContentType::JSON, JSON_ERR_INTERNAL);
         return;
       }

@@ -35,38 +35,44 @@
   } from '@lucide/svelte';
 
   interface Props {
-    netgroup: WiFiNetworkGroup;
+    ssid: string;
+    netgroup?: WiFiNetworkGroup;
   }
 
-  let { netgroup }: Props = $props();
+  let { ssid, netgroup }: Props = $props();
+
+  let isPresent = $derived(netgroup != null);
+  let isSaved = $derived(netgroup?.saved ?? true);
 
   let connectedBSSID = $derived(hubState.wifiConnectedBSSID);
-  let isConnected = $derived(netgroup.networks.some((n) => n.bssid === connectedBSSID));
-  let bestRssi = $derived(netgroup.networks[0]?.rssi ?? -100);
+  let isConnected = $derived(
+    netgroup != null && netgroup.networks.some((n) => n.bssid === connectedBSSID)
+  );
+  let bestRssi = $derived(netgroup?.networks[0]?.rssi ?? -100);
 
   let connectDialogOpen = $state(false);
   let editPasswordDialogOpen = $state(false);
   let pendingPassword = $state<string | null>(null);
   let editPassword = $state<string | null>(null);
 
-  function wifiAuthenticate(ssid: string, password: string | null) {
+  function wifiAuthenticate(password: string | null) {
     connectDialogOpen = false;
     saveWifiNetwork(ssid, password, true);
   }
 
-  function wifiConnect(item: WiFiNetworkGroup) {
-    connectWifiNetwork(item.ssid);
+  function wifiConnect() {
+    connectWifiNetwork(ssid);
   }
 
   function wifiDisconnect() {
     disconnectWifiNetwork();
   }
 
-  function wifiForget(ssid: string) {
+  function wifiForget() {
     forgetWifiNetwork(ssid);
   }
 
-  function wifiEditPassword(ssid: string, password: string | null) {
+  function wifiEditPassword(password: string | null) {
     editPasswordDialogOpen = false;
     saveWifiNetwork(ssid, password, false);
   }
@@ -94,6 +100,8 @@
   <div class="flex min-w-0 flex-1 items-center gap-2">
     {#if isConnected}
       <Wifi class="h-4 w-4 shrink-0 text-green-500" />
+    {:else if !isPresent}
+      <WifiOff class="text-muted-foreground h-4 w-4 shrink-0" />
     {:else if bestRssi > -50}
       <SignalHigh class="text-muted-foreground h-4 w-4 shrink-0" />
     {:else if bestRssi > -70}
@@ -105,20 +113,24 @@
     {/if}
 
     <div class="min-w-0 flex-1">
-      {#if netgroup.ssid}
-        <span class="block truncate text-sm font-medium">{netgroup.ssid}</span>
-      {:else}
+      {#if ssid}
+        <span class="block truncate text-sm font-medium">{ssid}</span>
+      {:else if netgroup}
         <span class="block truncate text-sm font-medium">{netgroup.networks[0].bssid}</span>
         <span class="text-muted-foreground text-xs">(Hidden)</span>
       {/if}
       <div class="text-muted-foreground flex items-center gap-2 text-xs">
         {#if isConnected}
           <span class="text-green-600 dark:text-green-400">Connected</span>
-        {:else if netgroup.saved}
+        {:else if !isPresent}
+          <span>Not in range</span>
+        {:else if isSaved}
           <span>Saved</span>
         {/if}
-        <span>{bestRssi} dBm</span>
-        {#if netgroup.security !== WifiAuthMode.Open}
+        {#if isPresent}
+          <span>{bestRssi} dBm</span>
+        {/if}
+        {#if netgroup && netgroup.security !== WifiAuthMode.Open}
           <span class="flex items-center gap-0.5">
             <KeyRound class="h-3 w-3" />
           </span>
@@ -133,27 +145,22 @@
       <Button variant="ghost" size="icon" onclick={wifiDisconnect} title="Disconnect">
         <WifiOff class="h-4 w-4" />
       </Button>
-    {:else if netgroup.saved}
-      <Button variant="ghost" size="icon" onclick={() => wifiConnect(netgroup)} title="Connect">
+    {:else if isSaved}
+      <Button variant="ghost" size="icon" onclick={wifiConnect} title="Connect">
         <ArrowRight class="h-4 w-4 text-green-500" />
       </Button>
-    {:else if netgroup.security === WifiAuthMode.Open}
-      <Button
-        variant="ghost"
-        size="icon"
-        onclick={() => wifiAuthenticate(netgroup.ssid, null)}
-        title="Connect"
-      >
+    {:else if netgroup && netgroup.security === WifiAuthMode.Open}
+      <Button variant="ghost" size="icon" onclick={() => wifiAuthenticate(null)} title="Connect">
         <ArrowRight class="h-4 w-4 text-green-500" />
       </Button>
-    {:else}
+    {:else if netgroup}
       <Dialog bind:open={() => connectDialogOpen, handleConnectDialogOpenChange}>
         <DialogTrigger class={buttonVariants({ variant: 'ghost', size: 'icon' })} title="Connect">
           <Link class="h-4 w-4 text-green-500" />
         </DialogTrigger>
         <DialogContent class="sm:max-w-[425px]">
           <DialogHeader>
-            <DialogTitle>Connect to {netgroup.ssid || 'network'}</DialogTitle>
+            <DialogTitle>Connect to {ssid || 'network'}</DialogTitle>
             <DialogDescription>Enter the WiFi password</DialogDescription>
           </DialogHeader>
           <div class="flex flex-row items-center gap-4 py-4">
@@ -168,7 +175,7 @@
           <DialogFooter>
             <Button
               type="button"
-              onclick={() => wifiAuthenticate(netgroup.ssid, pendingPassword)}
+              onclick={() => wifiAuthenticate(pendingPassword)}
               disabled={!pendingPassword || pendingPassword.length > 63}
             >
               Connect
@@ -178,8 +185,8 @@
       </Dialog>
     {/if}
 
-    <!-- Edit password (saved networks only) -->
-    {#if netgroup.saved && netgroup.security !== WifiAuthMode.Open}
+    <!-- Edit password (saved + present + secured networks only) -->
+    {#if isSaved && netgroup && netgroup.security !== WifiAuthMode.Open}
       <Dialog bind:open={() => editPasswordDialogOpen, handleEditPasswordDialogOpenChange}>
         <DialogTrigger
           class={buttonVariants({ variant: 'ghost', size: 'icon' })}
@@ -189,7 +196,7 @@
         </DialogTrigger>
         <DialogContent class="sm:max-w-[425px]">
           <DialogHeader>
-            <DialogTitle>Edit password for {netgroup.ssid}</DialogTitle>
+            <DialogTitle>Edit password for {ssid}</DialogTitle>
             <DialogDescription>Enter the new WiFi password</DialogDescription>
           </DialogHeader>
           <div class="flex flex-row items-center gap-4 py-4">
@@ -204,7 +211,7 @@
           <DialogFooter>
             <Button
               type="button"
-              onclick={() => wifiEditPassword(netgroup.ssid, editPassword)}
+              onclick={() => wifiEditPassword(editPassword)}
               disabled={!editPassword || editPassword.length > 63}
             >
               Save
@@ -215,18 +222,15 @@
     {/if}
 
     <!-- Forget (saved networks only) -->
-    {#if netgroup.saved}
-      <Button
-        variant="ghost"
-        size="icon"
-        onclick={() => wifiForget(netgroup.ssid)}
-        title="Forget network"
-      >
+    {#if isSaved}
+      <Button variant="ghost" size="icon" onclick={wifiForget} title="Forget network">
         <Trash2 class="text-destructive h-4 w-4" />
       </Button>
     {/if}
 
-    <!-- Details -->
-    <WiFiDetailsDialog group={netgroup} />
+    <!-- Details (present networks only) -->
+    {#if netgroup}
+      <WiFiDetailsDialog group={netgroup} />
+    {/if}
   </div>
 </div>

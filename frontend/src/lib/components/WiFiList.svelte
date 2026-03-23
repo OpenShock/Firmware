@@ -40,7 +40,7 @@
   </div>
   <ScrollArea class="h-64">
     {#each strengthSortedGroups as [netgroupKey, netgroup] (netgroupKey)}
-      <WiFiEntry {netgroup} />
+      <WiFiEntry ssid={netgroup.ssid} {netgroup} />
     {/each}
   </ScrollArea>
 </div>

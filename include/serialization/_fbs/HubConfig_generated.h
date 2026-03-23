@@ -13,6 +13,8 @@ static_assert(FLATBUFFERS_VERSION_MAJOR == 25 &&
               FLATBUFFERS_VERSION_REVISION == 19,
              "Non-compatible flatbuffers version included");
 
+#include "WifiAuthMode_generated.h"
+
 namespace OpenShock {
 namespace Serialization {
 namespace Configuration {
@@ -22,6 +24,8 @@ struct RFConfigBuilder;
 
 struct EStopConfig;
 struct EStopConfigBuilder;
+
+struct MacAddress;
 
 struct WiFiCredentials;
 struct WiFiCredentialsBuilder;
@@ -121,6 +125,32 @@ inline const char *EnumNameOtaUpdateStep(OtaUpdateStep e) {
   const size_t index = static_cast<size_t>(e);
   return EnumNamesOtaUpdateStep()[index];
 }
+
+/// 6-byte MAC address (BSSID)
+FLATBUFFERS_MANUALLY_ALIGNED_STRUCT(1) MacAddress FLATBUFFERS_FINAL_CLASS {
+ private:
+  uint8_t bytes_[6];
+
+ public:
+  struct Traits;
+  static FLATBUFFERS_CONSTEXPR_CPP11 const char *GetFullyQualifiedName() {
+    return "OpenShock.Serialization.Configuration.MacAddress";
+  }
+  MacAddress()
+      : bytes_() {
+  }
+  MacAddress(::flatbuffers::span<const uint8_t, 6> _bytes) {
+    ::flatbuffers::CastToArray(bytes_).CopyFromSpan(_bytes);
+  }
+  const ::flatbuffers::Array<uint8_t, 6> *bytes() const {
+    return &::flatbuffers::CastToArray(bytes_);
+  }
+};
+FLATBUFFERS_STRUCT_END(MacAddress, 6);
+
+struct MacAddress::Traits {
+  using type = MacAddress;
+};
 
 struct RFConfig FLATBUFFERS_FINAL_CLASS : private ::flatbuffers::Table {
   typedef RFConfigBuilder Builder;
@@ -278,7 +308,9 @@ struct WiFiCredentials FLATBUFFERS_FINAL_CLASS : private ::flatbuffers::Table {
   enum FlatBuffersVTableOffset FLATBUFFERS_VTABLE_UNDERLYING_TYPE {
     VT_ID = 4,
     VT_SSID = 6,
-    VT_PASSWORD = 8
+    VT_PASSWORD = 8,
+    VT_AUTH_MODE = 10,
+    VT_BSSID = 12
   };
   /// ID of the WiFi network credentials, used for referencing the credentials with a low memory footprint
   uint8_t id() const {
@@ -292,6 +324,14 @@ struct WiFiCredentials FLATBUFFERS_FINAL_CLASS : private ::flatbuffers::Table {
   const ::flatbuffers::String *password() const {
     return GetPointer<const ::flatbuffers::String *>(VT_PASSWORD);
   }
+  /// Auth mode of the network when credentials were saved. Used to reject evil twins with weaker security.
+  OpenShock::Serialization::Types::WifiAuthMode auth_mode() const {
+    return static_cast<OpenShock::Serialization::Types::WifiAuthMode>(GetField<uint8_t>(VT_AUTH_MODE, 9));
+  }
+  /// Pinned BSSID of the last successfully connected AP. All zeros means no pin.
+  const OpenShock::Serialization::Configuration::MacAddress *bssid() const {
+    return GetStruct<const OpenShock::Serialization::Configuration::MacAddress *>(VT_BSSID);
+  }
   template <bool B = false>
   bool Verify(::flatbuffers::VerifierTemplate<B> &verifier) const {
     return VerifyTableStart(verifier) &&
@@ -300,6 +340,8 @@ struct WiFiCredentials FLATBUFFERS_FINAL_CLASS : private ::flatbuffers::Table {
            verifier.VerifyString(ssid()) &&
            VerifyOffset(verifier, VT_PASSWORD) &&
            verifier.VerifyString(password()) &&
+           VerifyField<uint8_t>(verifier, VT_AUTH_MODE, 1) &&
+           VerifyField<OpenShock::Serialization::Configuration::MacAddress>(verifier, VT_BSSID, 1) &&
            verifier.EndTable();
   }
 };
@@ -317,6 +359,12 @@ struct WiFiCredentialsBuilder {
   void add_password(::flatbuffers::Offset<::flatbuffers::String> password) {
     fbb_.AddOffset(WiFiCredentials::VT_PASSWORD, password);
   }
+  void add_auth_mode(OpenShock::Serialization::Types::WifiAuthMode auth_mode) {
+    fbb_.AddElement<uint8_t>(WiFiCredentials::VT_AUTH_MODE, static_cast<uint8_t>(auth_mode), 9);
+  }
+  void add_bssid(const OpenShock::Serialization::Configuration::MacAddress *bssid) {
+    fbb_.AddStruct(WiFiCredentials::VT_BSSID, bssid);
+  }
   explicit WiFiCredentialsBuilder(::flatbuffers::FlatBufferBuilder &_fbb)
         : fbb_(_fbb) {
     start_ = fbb_.StartTable();
@@ -332,10 +380,14 @@ inline ::flatbuffers::Offset<WiFiCredentials> CreateWiFiCredentials(
     ::flatbuffers::FlatBufferBuilder &_fbb,
     uint8_t id = 0,
     ::flatbuffers::Offset<::flatbuffers::String> ssid = 0,
-    ::flatbuffers::Offset<::flatbuffers::String> password = 0) {
+    ::flatbuffers::Offset<::flatbuffers::String> password = 0,
+    OpenShock::Serialization::Types::WifiAuthMode auth_mode = OpenShock::Serialization::Types::WifiAuthMode::UNKNOWN,
+    const OpenShock::Serialization::Configuration::MacAddress *bssid = nullptr) {
   WiFiCredentialsBuilder builder_(_fbb);
+  builder_.add_bssid(bssid);
   builder_.add_password(password);
   builder_.add_ssid(ssid);
+  builder_.add_auth_mode(auth_mode);
   builder_.add_id(id);
   return builder_.Finish();
 }
@@ -349,14 +401,18 @@ inline ::flatbuffers::Offset<WiFiCredentials> CreateWiFiCredentialsDirect(
     ::flatbuffers::FlatBufferBuilder &_fbb,
     uint8_t id = 0,
     const char *ssid = nullptr,
-    const char *password = nullptr) {
+    const char *password = nullptr,
+    OpenShock::Serialization::Types::WifiAuthMode auth_mode = OpenShock::Serialization::Types::WifiAuthMode::UNKNOWN,
+    const OpenShock::Serialization::Configuration::MacAddress *bssid = nullptr) {
   auto ssid__ = ssid ? _fbb.CreateString(ssid) : 0;
   auto password__ = password ? _fbb.CreateString(password) : 0;
   return OpenShock::Serialization::Configuration::CreateWiFiCredentials(
       _fbb,
       id,
       ssid__,
-      password__);
+      password__,
+      auth_mode,
+      bssid);
 }
 
 struct WiFiConfig FLATBUFFERS_FINAL_CLASS : private ::flatbuffers::Table {

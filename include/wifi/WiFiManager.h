@@ -17,7 +17,7 @@ namespace OpenShock::WiFiManager {
   /// @param password Password of the network
   /// @param connect Whether to connect to the network after saving
   /// @return True if the network was saved successfully
-  bool Save(const char* ssid, std::string_view password, bool connect = true);
+  bool Save(const char* ssid, std::string_view password, bool connect = true, wifi_auth_mode_t authMode = WIFI_AUTH_MAX);
 
   /// @brief Removes a network from the config by it's SSID
   /// @param ssid SSID of the network
@@ -37,11 +37,6 @@ namespace OpenShock::WiFiManager {
   /// @param ssid SSID of the network
   /// @return True if the saved network was found and the connection process was started successfully
   bool Connect(const char* ssid);
-
-  /// @brief Connects to a saved network by it's BSSID
-  /// @param bssid BSSID of the network
-  /// @return True if the saved network was found and the connection process was started successfully
-  bool Connect(const uint8_t (&bssid)[6]);
 
   /// @brief Disconnects from the currently connected network
   void Disconnect();

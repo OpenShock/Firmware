@@ -189,10 +189,12 @@ export async function saveWifiNetwork(
   ssid: string,
   password: string | null,
   connect: boolean,
+  security?: number,
 ): Promise<void> {
   try {
     const params = new URLSearchParams({ ssid, connect: connect ? '1' : '0' });
     if (password) params.set('password', password);
+    if (security !== undefined) params.set('security', String(security));
     await apiFetch('/api/wifi/networks', {
       method: 'POST',
       headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
