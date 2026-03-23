@@ -6,6 +6,7 @@ import { HubToLocalMessagePayload } from '$lib/_fbs/open-shock/serialization/loc
 import { ReadyMessage } from '$lib/_fbs/open-shock/serialization/local/ready-message';
 import { WifiScanStatusMessage } from '$lib/_fbs/open-shock/serialization/local/wifi-scan-status-message';
 import { AccountLinkStatusEvent } from '$lib/_fbs/open-shock/serialization/local/account-link-status-event';
+import { WifiGotIpEvent } from '$lib/_fbs/open-shock/serialization/local/wifi-got-ip-event';
 import { mapConfig } from '$lib/mappers/ConfigMapper';
 import { hubState } from '$lib/stores';
 import { ByteBuffer } from 'flatbuffers';
@@ -65,6 +66,16 @@ PayloadHandlers[HubToLocalMessagePayload.WifiScanStatusMessage] = (cli, msg) => 
 };
 
 PayloadHandlers[HubToLocalMessagePayload.WifiNetworkEvent] = WifiNetworkEventHandler;
+
+PayloadHandlers[HubToLocalMessagePayload.WifiGotIpEvent] = (cli, msg) => {
+  const payload = new WifiGotIpEvent();
+  msg.payload(payload);
+
+  const ip = payload.ip();
+  if (ip) {
+    toast.info('Got IP address: ' + ip);
+  }
+};
 
 PayloadHandlers[HubToLocalMessagePayload.AccountLinkStatusEvent] = (cli, msg) => {
   const payload = new AccountLinkStatusEvent();

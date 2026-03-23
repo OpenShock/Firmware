@@ -245,6 +245,10 @@ void _evWiFiGotIP(arduino_event_t* event)
   memcpy(ip, &info.ip_info.ip.addr, sizeof(ip));
 
   OS_LOGI(TAG, "Got IP address " IPV4ADDR_FMT " from network " BSSID_FMT, IPV4ADDR_ARG(ip), BSSID_ARG(s_connectedBSSID));
+
+  char ipStr[16];
+  snprintf(ipStr, sizeof(ipStr), IPV4ADDR_FMT, IPV4ADDR_ARG(ip));
+  Serialization::Local::SerializeWiFiGotIpEvent(ipStr, CaptivePortal::BroadcastMessageBIN);
 }
 void _evWiFiGotIP6(arduino_event_t* event)
 {

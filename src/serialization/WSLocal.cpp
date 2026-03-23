@@ -142,6 +142,19 @@ bool Local::SerializeWiFiNetworksEvent(Types::WifiNetworkEventType eventType, co
   return callback(builder.GetBufferSpan());
 }
 
+bool Local::SerializeWiFiGotIpEvent(const char* ip, Common::SerializationCallbackFn callback)
+{
+  flatbuffers::FlatBufferBuilder builder(64);
+
+  auto ipOffset    = builder.CreateString(ip);
+  auto eventOffset = Local::CreateWifiGotIpEvent(builder, ipOffset);
+  auto msg         = Local::CreateHubToLocalMessage(builder, Local::HubToLocalMessagePayload::WifiGotIpEvent, eventOffset.Union());
+
+  Local::FinishHubToLocalMessageBuffer(builder, msg);
+
+  return callback(builder.GetBufferSpan());
+}
+
 bool Local::SerializeAccountLinkStatusEvent(bool linked, Common::SerializationCallbackFn callback)
 {
   flatbuffers::FlatBufferBuilder builder(64);
