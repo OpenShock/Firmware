@@ -15,7 +15,7 @@
   import WiFiStep from '$lib/components/steps/WiFiStep.svelte';
   import TestStep from '$lib/components/steps/TestStep.svelte';
   import AccountStep from '$lib/components/steps/AccountStep.svelte';
-  import { hubState } from '$lib/stores';
+  import { hubState, ViewModeStore } from '$lib/stores';
   import { Button } from '$lib/components/ui/button';
 
   interface Props {
@@ -113,7 +113,11 @@
       </div>
 
       <div class="flex justify-between">
-        <StepperPrevious />
+        {#if currentStep === 1}
+          <Button variant="outline" onclick={() => ViewModeStore.set('landing')}>Back</Button>
+        {:else}
+          <StepperPrevious />
+        {/if}
 
         {#if isLastStep}
           <Button onclick={onComplete} disabled={!canFinish}>
