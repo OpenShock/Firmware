@@ -34,11 +34,12 @@ static OpenShock::SimpleMutex s_estopMutex = {};
 static gpio_num_t s_estopPin               = GPIO_NUM_NC;
 static TaskHandle_t s_estopTask            = nullptr;
 
-static EStopState s_lastPublishedState              = EStopState::Idle;
-static std::atomic<bool> s_estopActive              = false;
-static std::atomic<int64_t> s_estopActivatedAt      = 0;
+static EStopState s_lastPublishedState         = EStopState::Idle;
+static std::atomic<bool> s_estopActive         = false;
+static std::atomic<int64_t> s_estopActivatedAt = 0;
 
-static std::atomic<bool> s_externallyTriggered      = false;
+static std::atomic<bool> s_externallyTriggered = false;
+static std::atomic<bool> s_estopStopRequested  = false;
 
 static bool s_estopInitialized = false;
 
@@ -77,6 +78,9 @@ static void estopmgr_checkertask(void* pvParameters)
   bool lastBtnState = false;
 
   for (;;) {
+    // Check if stop was requested
+    if (s_estopStopRequested.load(std::memory_order_relaxed)) break;
+
     // Sleep for the update rate
     vTaskDelay(pdMS_TO_TICKS(k_estopUpdateRate));
 
@@ -90,8 +94,8 @@ static void estopmgr_checkertask(void* pvParameters)
       }
 
       s_estopActive.store(true, std::memory_order_relaxed);
-      state         = EStopState::Active;
-      rearmBlocked  = false;
+      state        = EStopState::Active;
+      rearmBlocked = false;
 
       estopmanager_updateexternals(state);
 
@@ -166,12 +170,15 @@ static void estopmgr_checkertask(void* pvParameters)
 
     estopmanager_updateexternals(state);
   }
+
+  vTaskDelete(nullptr);
 }
 
 static bool estopmgr_setestopenabled(bool enabled)
 {
   if (enabled) {
     if (s_estopTask == nullptr) {
+      s_estopStopRequested.store(false, std::memory_order_relaxed);
       if (TaskUtils::TaskCreateUniversal(estopmgr_checkertask, TAG, 4096, nullptr, 5, &s_estopTask, 1) != pdPASS) {  // TODO: Profile stack size and set priority
         OS_LOGE(TAG, "Failed to create EStop event handler task");
         s_estopTask = nullptr;
@@ -180,7 +187,8 @@ static bool estopmgr_setestopenabled(bool enabled)
     }
   } else {
     if (s_estopTask != nullptr) {
-      vTaskDelete(s_estopTask);
+      s_estopStopRequested.store(true, std::memory_order_relaxed);
+      TaskUtils::StopTask(s_estopTask, TAG, "EStop task");
       s_estopTask = nullptr;
     }
   }

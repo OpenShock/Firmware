@@ -85,8 +85,7 @@ static void commandhandler_keepalivetask(void* arg)
     while (xQueueReceive(s_keepAliveQueue, &cmd, pdMS_TO_TICKS(eepyTime)) == pdTRUE) {
       if (cmd.killTask) {
         OS_LOGI(TAG, "Received kill command, exiting keep-alive task");
-        vTaskDelete(nullptr);
-        break;  // This should never be reached
+        goto exit;  // Break out of nested loop so locals destruct before vTaskDelete
       }
 
       activityMap[cmd.shockerId] = cmd;
@@ -123,6 +122,9 @@ static void commandhandler_keepalivetask(void* arg)
       timeToKeepAlive = std::min(timeToKeepAlive, cmdRef.lastActivityTimestamp + KEEP_ALIVE_INTERVAL);
     }
   }
+
+exit:  // Locals (activityMap) destruct here before task deletion
+  vTaskDelete(nullptr);
 }
 
 bool _internalSetKeepAliveEnabled(bool enabled)
@@ -155,17 +157,14 @@ bool _internalSetKeepAliveEnabled(bool enabled)
   } else {
     OS_LOGV(TAG, "Disabling keep-alive task");
     if (s_keepAliveTaskHandle != nullptr && s_keepAliveQueue != nullptr) {
-      // Wait for the task to stop
+      // Send kill command + wait for task to exit
       KnownShocker cmd;
       memset(&cmd, 0, sizeof(cmd));
       cmd.killTask = true;
+      xQueueSend(s_keepAliveQueue, &cmd, pdMS_TO_TICKS(10));
 
-      while (eTaskGetState(s_keepAliveTaskHandle) != eDeleted) {
-        vTaskDelay(pdMS_TO_TICKS(10));
-
-        // Send nullptr to stop the task gracefully
-        xQueueSend(s_keepAliveQueue, &cmd, pdMS_TO_TICKS(10));
-      }
+      TaskUtils::StopTask(s_keepAliveTaskHandle, TAG, "Keep-alive task");
+      s_keepAliveTaskHandle = nullptr;
       vQueueDelete(s_keepAliveQueue);
       s_keepAliveQueue = nullptr;
     } else {

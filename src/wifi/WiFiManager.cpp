@@ -26,6 +26,58 @@ const char* const TAG = "WiFiManager";
 
 using namespace OpenShock;
 
+/// Returns a user-friendly disconnect reason, or nullptr for obscure/protocol-level errors.
+static const char* _wifiDisconnectReason(uint8_t reason)
+{
+  switch (reason) {
+    // Authentication / password issues
+    case WIFI_REASON_AUTH_EXPIRE:
+    case WIFI_REASON_AUTH_FAIL:
+    case WIFI_REASON_4WAY_HANDSHAKE_TIMEOUT:
+    case WIFI_REASON_HANDSHAKE_TIMEOUT:
+    case WIFI_REASON_802_1X_AUTH_FAILED:
+      return "Authentication failed, check your password";
+
+    // Network not reachable
+    case WIFI_REASON_NO_AP_FOUND:
+      return "Network not found, is it in range?";
+    case WIFI_REASON_BEACON_TIMEOUT:
+      return "Lost connection to the network, out of range?";
+    case WIFI_REASON_CONNECTION_FAIL:
+      return "Could not connect to the network";
+
+    // AP rejected us
+    case WIFI_REASON_ASSOC_TOOMANY:
+      return "Network is full, too many devices connected";
+    case WIFI_REASON_NOT_ENOUGH_BANDWIDTH:
+      return "Network is too busy, try again later";
+    case WIFI_REASON_ASSOC_FAIL:
+      return "Network rejected the connection";
+    case WIFI_REASON_NOT_AUTHORIZED_THIS_LOCATION:
+      return "Network rejected the connection";
+
+    // Normal disconnects
+    case WIFI_REASON_AUTH_LEAVE:
+    case WIFI_REASON_ASSOC_LEAVE:
+    case WIFI_REASON_STA_LEAVING:
+      return "Disconnected from the network";
+    case WIFI_REASON_AP_INITIATED:
+      return "Disconnected by the network";
+    case WIFI_REASON_ROAMING:
+      return "Switching access points";
+
+    // Timeouts
+    case WIFI_REASON_ASSOC_EXPIRE:
+    case WIFI_REASON_TIMEOUT:
+    case WIFI_REASON_MISSING_ACKS:
+      return "Connection timed out";
+
+    // Everything else is too technical for the user
+    default:
+      return nullptr;
+  }
+}
+
 enum class WiFiState : uint8_t {
   Disconnected = 0,
   Connecting   = 1 << 0,
@@ -258,11 +310,12 @@ void _evWiFiDisconnected(arduino_event_t* event)
 
   OS_LOGI(TAG, "Disconnected from network %s (" BSSID_FMT ")", info.ssid, BSSID_ARG(info.bssid));
 
-  if (info.reason == WIFI_REASON_4WAY_HANDSHAKE_TIMEOUT || info.reason == WIFI_REASON_AUTH_EXPIRE || info.reason == WIFI_REASON_AUTH_FAIL) {
-    Serialization::Local::SerializeErrorMessage("WiFi authentication failed", CaptivePortal::BroadcastMessageBIN);
+  const char* friendlyReason = _wifiDisconnectReason(info.reason);
+  if (friendlyReason != nullptr) {
+    Serialization::Local::SerializeErrorMessage(friendlyReason, CaptivePortal::BroadcastMessageBIN);
   } else {
     char reason[64];
-    snprintf(reason, sizeof(reason), "WiFi connection failed (reason %d)", info.reason);
+    snprintf(reason, sizeof(reason), "Unknown WiFi error (code %d), please contact support", info.reason);
     Serialization::Local::SerializeErrorMessage(reason, CaptivePortal::BroadcastMessageBIN);
   }
 }

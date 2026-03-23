@@ -66,6 +66,7 @@ void RGBPatternManager::SetPattern(const RGBState* pattern, std::size_t patternL
   std::copy(pattern, pattern + patternLength, m_pattern.begin());
 
   // Start the task
+  m_stopRequested.store(false, std::memory_order_relaxed);
   BaseType_t result = TaskUtils::TaskCreateExpensive(RunPattern, TAG, 4096, this, 1, &m_taskHandle);  // PROFILED: 1.7KB stack usage
   if (result != pdPASS) {
     OS_LOGE(TAG, "[pin-%hhi] Failed to create task: %d", m_gpioPin, result);
@@ -89,7 +90,8 @@ void RGBPatternManager::ClearPattern()
 void RGBPatternManager::ClearPatternInternal()
 {
   if (m_taskHandle != nullptr) {
-    vTaskDelete(m_taskHandle);
+    m_stopRequested.store(true, std::memory_order_relaxed);
+    TaskUtils::StopTask(m_taskHandle, TAG, "RGBPatternManager task");
     m_taskHandle = nullptr;
   }
 
@@ -112,8 +114,10 @@ void RGBPatternManager::RunPattern(void* arg)
 
   std::array<rmt_data_t, 24> led_data;  // 24 bits per LED (8 bits per color * 3 colors)
 
-  while (true) {
+  while (!thisPtr->m_stopRequested.load(std::memory_order_relaxed)) {
     for (const auto& state : pattern) {
+      if (thisPtr->m_stopRequested.load(std::memory_order_relaxed)) break;
+
       // WS2812B usually takes commands in GRB order
       // https://cdn-shop.adafruit.com/datasheets/WS2812B.pdf - Page 5
       // But some actually expect RGB!
@@ -147,4 +151,6 @@ void RGBPatternManager::RunPattern(void* arg)
       vTaskDelay(pdMS_TO_TICKS(state.duration));
     }
   }
+
+  vTaskDelete(nullptr);
 }

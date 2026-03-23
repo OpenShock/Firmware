@@ -11,6 +11,7 @@
 
 #include <freertos/task.h>
 
+#include <atomic>
 #include <cstdint>
 #include <string_view>
 
@@ -40,5 +41,6 @@ namespace OpenShock::CaptivePortal {
     fs::LittleFSFS m_fileSystem;
     DNSServer m_dnsServer;
     TaskHandle_t m_taskHandle;
+    std::atomic<bool> m_stopRequested {false};
   };
 }  // namespace OpenShock::CaptivePortal

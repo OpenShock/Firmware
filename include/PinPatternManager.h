@@ -7,6 +7,7 @@
 
 #include <freertos/task.h>
 
+#include <atomic>
 #include <cstdint>
 #include <vector>
 
@@ -43,5 +44,6 @@ namespace OpenShock {
     std::vector<State> m_pattern;
     TaskHandle_t m_taskHandle;
     SimpleMutex m_taskMutex;
+    std::atomic<bool> m_stopRequested {false};
   };
 }  // namespace OpenShock
