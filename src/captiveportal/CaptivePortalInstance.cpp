@@ -7,6 +7,7 @@ const char* const TAG = "CaptivePortalInstance";
 #include "captiveportal/RFC8908Handler.h"
 #include "CommandHandler.h"
 #include "GatewayConnectionManager.h"
+#include "http/ContentTypes.h"
 #include "Logging.h"
 #include "message_handlers/WebSocket.h"
 #include "serialization/WSLocal.h"
@@ -116,7 +117,7 @@ CaptivePortal::CaptivePortalInstance::CaptivePortalInstance()
     m_webServer.onNotFound([](AsyncWebServerRequest* request) {
       request->send(
         200,
-        "text/plain",
+        HTTP::ContentType::TextPlain,
         // Raw string literal (1+ to remove the first newline)
         1 + R"(
 You probably forgot to upload the Filesystem with PlatformIO!
