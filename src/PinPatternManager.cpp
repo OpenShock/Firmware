@@ -64,6 +64,7 @@ void PinPatternManager::SetPattern(const State* pattern, std::size_t patternLeng
   snprintf(name, sizeof(name), "PinPatternManager-%hhi", m_gpioPin);
 
   // Start the task
+  m_stopRequested.store(false, std::memory_order_relaxed);
   BaseType_t result = TaskUtils::TaskCreateUniversal(Util::FnProxy<&PinPatternManager::RunPattern>, name, 1024, this, 1, &m_taskHandle, 1);  // PROFILED: 0.5KB stack usage
   if (result != pdPASS) {
     OS_LOGE(TAG, "[pin-%hhi] Failed to create task: %d", m_gpioPin, result);
@@ -87,7 +88,8 @@ void PinPatternManager::ClearPattern()
 void PinPatternManager::ClearPatternInternal()
 {
   if (m_taskHandle != nullptr) {
-    vTaskDelete(m_taskHandle);
+    m_stopRequested.store(true, std::memory_order_relaxed);
+    TaskUtils::StopTask(m_taskHandle, TAG, "PinPatternManager task");
     m_taskHandle = nullptr;
   }
 
@@ -96,10 +98,12 @@ void PinPatternManager::ClearPatternInternal()
 
 void PinPatternManager::RunPattern()
 {
-  while (true) {
+  while (!m_stopRequested.load(std::memory_order_relaxed)) {
     for (const auto& state : m_pattern) {
+      if (m_stopRequested.load(std::memory_order_relaxed)) break;
       gpio_set_level(m_gpioPin, state.level);
       vTaskDelay(pdMS_TO_TICKS(state.duration));
     }
   }
+  vTaskDelete(nullptr);
 }

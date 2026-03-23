@@ -132,6 +132,7 @@ discord.gg/OpenShock
   m_webServer.begin();
 
   if (fsOk) {
+    m_stopRequested.store(false, std::memory_order_relaxed);
     if (TaskUtils::TaskCreateExpensive(Util::FnProxy<&CaptivePortal::CaptivePortalInstance::task>, TAG, 8192, this, 1, &m_taskHandle) != pdPASS) {  // PROFILED: 4-6KB stack usage
       OS_LOGE(TAG, "Failed to create task");
     }
@@ -140,8 +141,9 @@ discord.gg/OpenShock
 
 CaptivePortal::CaptivePortalInstance::~CaptivePortalInstance()
 {
+  m_stopRequested.store(true, std::memory_order_relaxed);
   if (m_taskHandle != nullptr) {
-    vTaskDelete(m_taskHandle);
+    TaskUtils::StopTask(m_taskHandle, TAG, "CaptivePortal task");
     m_taskHandle = nullptr;
   }
   m_webServer.end();
@@ -152,11 +154,12 @@ CaptivePortal::CaptivePortalInstance::~CaptivePortalInstance()
 
 void CaptivePortal::CaptivePortalInstance::task()
 {
-  while (true) {
+  while (!m_stopRequested.load(std::memory_order_relaxed)) {
     m_socketServer.loop();
     m_dnsServer.processNextRequest();
     vTaskDelay(pdMS_TO_TICKS(WEBSOCKET_UPDATE_INTERVAL));
   }
+  vTaskDelete(nullptr);
 }
 
 void CaptivePortal::CaptivePortalInstance::handleWebSocketClientConnected(uint8_t socketId)

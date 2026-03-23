@@ -9,6 +9,7 @@
 
 #include <esp32-hal-rmt.h>
 
+#include <atomic>
 #include <cstdint>
 #include <vector>
 
@@ -50,5 +51,6 @@ namespace OpenShock {
     rmt_obj_t* m_rmtHandle;
     TaskHandle_t m_taskHandle;
     SimpleMutex m_taskMutex;
+    std::atomic<bool> m_stopRequested {false};
   };
 }  // namespace OpenShock
