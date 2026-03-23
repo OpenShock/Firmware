@@ -1,8 +1,8 @@
 import { getApiBaseUrl } from '$lib/utils/localRedirect';
 
 /**
- * Requests the firmware to close the captive portal.
- * The fetch may fail/abort if the portal closes before the response arrives — that's expected.
+ * Signals the firmware that the user has completed setup.
+ * The portal will close gracefully once the device is fully online.
  */
 export async function closePortal(): Promise<void> {
   try {

@@ -26,16 +26,17 @@ using namespace OpenShock;
 
 static std::atomic<bool> s_alwaysEnabled                 = false;
 static std::atomic<bool> s_forceClosed                   = false;
+static std::atomic<bool> s_userDone                      = false;
 static esp_timer_handle_t s_captivePortalUpdateLoopTimer = nullptr;
 static SimpleMutex s_instanceMutex;
 static std::shared_ptr<CaptivePortal::CaptivePortalInstance> s_instance = nullptr;
 
 // Absolute esp_timer timestamps (microseconds). 0 = not armed.
 static std::atomic<int64_t> s_startupGraceExpiry = 0;  // Don't open portal until this time passes
-static std::atomic<int64_t> s_autoCloseExpiry    = 0;  // Auto-close portal when this time passes
+static std::atomic<int64_t> s_autoCloseExpiry    = 0;  // Auto-close AP when no clients connected and device is online
 
-static constexpr int64_t STARTUP_GRACE_PERIOD_US = 30LL * 1'000'000;   // 30 seconds
-static constexpr int64_t AUTO_CLOSE_DELAY_US     = 5LL * 60 * 1'000'000;  // 5 minutes
+static constexpr int64_t STARTUP_GRACE_PERIOD_US = 30LL * 1'000'000;     // 30 seconds
+static constexpr int64_t AUTO_CLOSE_DELAY_US     = 5LL * 60 * 1'000'000; // 5 minutes
 
 static bool isDeviceFullyConfigured()
 {
@@ -109,6 +110,7 @@ static void captiveportal_stop()
   OS_LOGI(TAG, "Stopping captive portal");
 
   DestroyInstance();
+  s_userDone = false;
 
   WiFi.softAPdisconnect(true);
 }
@@ -133,45 +135,52 @@ static void captiveportal_updateloop(void*)
     s_startupGraceExpiry.store(0, std::memory_order_relaxed);
   }
 
-  bool gatewayConnected = GatewayConnectionManager::IsConnected();
-  bool commandHandlerOk = CommandHandler::Ok();
-  bool shouldBeRunning  = (s_alwaysEnabled || !gatewayConnected || !commandHandlerOk) && !s_forceClosed;
-
-  // Auto-close: arm timer when gateway connects (portal still open, not alwaysEnabled)
-  if (gatewayConnected && !s_alwaysEnabled && GetInstance() != nullptr) {
-    if (s_autoCloseExpiry.load(std::memory_order_relaxed) == 0) {
-      s_autoCloseExpiry.store(now + AUTO_CLOSE_DELAY_US, std::memory_order_relaxed);
-    } else if (now >= s_autoCloseExpiry.load(std::memory_order_relaxed)) {
-      OS_LOGI(TAG, "Auto-closing captive portal after gateway connection (5-minute timeout)");
-      s_forceClosed = true;
+  // Force-closed by user (via /api/portal/close)
+  if (s_forceClosed) {
+    if (GetInstance() != nullptr) {
+      OS_LOGD(TAG, "Force-closing captive portal");
       captiveportal_stop();
-      return;
+    }
+    return;
+  }
+
+  // User completed setup — close portal once device is fully online
+  if (s_userDone && GatewayConnectionManager::IsConnected()) {
+    if (GetInstance() != nullptr) {
+      OS_LOGI(TAG, "User completed setup, closing captive portal");
+      captiveportal_stop();
+    }
+    return;
+  }
+
+  // Auto-close: no clients connected, WiFi + gateway are up, 5 minutes elapsed
+  auto instance = GetInstance();
+  if (instance != nullptr && !s_alwaysEnabled && GatewayConnectionManager::IsConnected()) {
+    if (instance->hasClients()) {
+      // Clients still connected — reset timer
+      s_autoCloseExpiry.store(0, std::memory_order_relaxed);
+    } else {
+      int64_t expiry = s_autoCloseExpiry.load(std::memory_order_relaxed);
+      if (expiry == 0) {
+        s_autoCloseExpiry.store(now + AUTO_CLOSE_DELAY_US, std::memory_order_relaxed);
+      } else if (now >= expiry) {
+        OS_LOGI(TAG, "Auto-closing captive portal AP (no clients for 5 minutes)");
+        captiveportal_stop();
+        return;
+      }
     }
   } else {
-    // Gateway disconnected — reset auto-close timer
     s_autoCloseExpiry.store(0, std::memory_order_relaxed);
   }
 
-  if (GetInstance() == nullptr) {
-    if (shouldBeRunning) {
+  // Open portal if not running and device needs setup
+  if (instance == nullptr) {
+    bool commandHandlerOk = CommandHandler::Ok();
+    bool shouldStart      = s_alwaysEnabled || !commandHandlerOk || !isDeviceFullyConfigured();
+    if (shouldStart) {
       OS_LOGD(TAG, "Starting captive portal");
-      OS_LOGD(TAG, "  alwaysEnabled: %s", s_alwaysEnabled ? "true" : "false");
-      OS_LOGD(TAG, "  forceClosed: %s", s_forceClosed ? "true" : "false");
-      OS_LOGD(TAG, "  isConnected: %s", gatewayConnected ? "true" : "false");
-      OS_LOGD(TAG, "  commandHandlerOk: %s", commandHandlerOk ? "true" : "false");
       captiveportal_start();
     }
-    return;
-  }
-
-  if (!shouldBeRunning) {
-    OS_LOGD(TAG, "Stopping captive portal");
-    OS_LOGD(TAG, "  alwaysEnabled: %s", s_alwaysEnabled ? "true" : "false");
-    OS_LOGD(TAG, "  forceClosed: %s", s_forceClosed ? "true" : "false");
-    OS_LOGD(TAG, "  isConnected: %s", gatewayConnected ? "true" : "false");
-    OS_LOGD(TAG, "  commandHandlerOk: %s", commandHandlerOk ? "true" : "false");
-    captiveportal_stop();
-    return;
   }
 }
 
@@ -206,6 +215,11 @@ bool CaptivePortal::Init()
   }
 
   return true;
+}
+
+void CaptivePortal::SetUserDone()
+{
+  s_userDone = true;
 }
 
 void CaptivePortal::SetAlwaysEnabled(bool alwaysEnabled)

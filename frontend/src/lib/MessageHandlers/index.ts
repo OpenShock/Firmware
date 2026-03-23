@@ -5,6 +5,7 @@ import { HubToLocalMessage } from '$lib/_fbs/open-shock/serialization/local/hub-
 import { HubToLocalMessagePayload } from '$lib/_fbs/open-shock/serialization/local/hub-to-local-message-payload';
 import { ReadyMessage } from '$lib/_fbs/open-shock/serialization/local/ready-message';
 import { WifiScanStatusMessage } from '$lib/_fbs/open-shock/serialization/local/wifi-scan-status-message';
+import { AccountLinkStatusEvent } from '$lib/_fbs/open-shock/serialization/local/account-link-status-event';
 import { mapConfig } from '$lib/mappers/ConfigMapper';
 import { hubState } from '$lib/stores';
 import { ByteBuffer } from 'flatbuffers';
@@ -64,6 +65,13 @@ PayloadHandlers[HubToLocalMessagePayload.WifiScanStatusMessage] = (cli, msg) => 
 };
 
 PayloadHandlers[HubToLocalMessagePayload.WifiNetworkEvent] = WifiNetworkEventHandler;
+
+PayloadHandlers[HubToLocalMessagePayload.AccountLinkStatusEvent] = (cli, msg) => {
+  const payload = new AccountLinkStatusEvent();
+  msg.payload(payload);
+
+  hubState.accountLinked = payload.linked();
+};
 
 export function WebSocketMessageBinaryHandler(cli: WebSocketClient, data: ArrayBuffer) {
   const msg = HubToLocalMessage.getRootAsHubToLocalMessage(new ByteBuffer(new Uint8Array(data)));

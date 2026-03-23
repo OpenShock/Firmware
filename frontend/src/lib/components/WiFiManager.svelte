@@ -6,7 +6,7 @@
   import ScrollArea from '$lib/components/ui/scroll-area/scroll-area.svelte';
   import WiFiEntry from '$lib/components/WiFiEntry.svelte';
   import AddHiddenNetworkDialog from '$lib/components/AddHiddenNetworkDialog.svelte';
-  import { LoaderCircle, RotateCcw, Wifi, WifiOff } from '@lucide/svelte';
+  import { LoaderCircle, Radar, Wifi, WifiOff } from '@lucide/svelte';
 
   let scanStatus = $derived(hubState.wifiScanStatus);
   let isScanning = $derived(
@@ -106,7 +106,7 @@
           {#if isScanning}
             <LoaderCircle class="h-4 w-4 animate-spin" />
           {:else}
-            <RotateCcw class="h-4 w-4" />
+            <Radar class="h-4 w-4" />
           {/if}
         </Button>
       </div>

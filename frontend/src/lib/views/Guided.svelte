@@ -15,7 +15,6 @@
   import WiFiStep from '$lib/components/steps/WiFiStep.svelte';
   import AccountStep from '$lib/components/steps/AccountStep.svelte';
   import { hubState } from '$lib/stores';
-  import { closePortal } from '$lib/portalClose';
   import { Button } from '$lib/components/ui/button';
 
   interface Props {
@@ -43,12 +42,8 @@
         : false
   );
 
-  // For prebuilt: auto-complete when WiFi + account are both done
-  $effect(() => {
-    if (!isDIY && wifiConnected && hubState.accountLinked) {
-      onComplete();
-    }
-  });
+  let isLastStep = $derived(currentStep === totalSteps);
+  let canFinish = $derived(wifiConnected && hubState.accountLinked);
 </script>
 
 <div class="flex flex-1 flex-col items-center px-2 py-4">
@@ -109,7 +104,11 @@
       <div class="flex justify-between">
         <StepperPrevious />
 
-        {#if currentStep < totalSteps}
+        {#if isLastStep}
+          <Button onclick={onComplete} disabled={!canFinish}>
+            {canFinish ? 'Done' : 'Link account first'}
+          </Button>
+        {:else}
           <StepperNext disabled={!canAdvance}>
             {#if !canAdvance}
               {isDIY && currentStep === 1 ? 'Configure pins first' : 'Connect WiFi first'}
@@ -117,10 +116,6 @@
               Next
             {/if}
           </StepperNext>
-        {:else if isDIY}
-          <Button onclick={() => closePortal()} disabled={!hubState.accountLinked}>
-            {hubState.accountLinked ? 'Done' : 'Link account first'}
-          </Button>
         {/if}
       </div>
     </Stepper>

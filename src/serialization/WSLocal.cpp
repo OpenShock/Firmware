@@ -141,3 +141,15 @@ bool Local::SerializeWiFiNetworksEvent(Types::WifiNetworkEventType eventType, co
 
   return callback(builder.GetBufferSpan());
 }
+
+bool Local::SerializeAccountLinkStatusEvent(bool linked, Common::SerializationCallbackFn callback)
+{
+  flatbuffers::FlatBufferBuilder builder(64);
+
+  auto eventOffset = Local::CreateAccountLinkStatusEvent(builder, linked);
+  auto msg         = Local::CreateHubToLocalMessage(builder, Local::HubToLocalMessagePayload::AccountLinkStatusEvent, eventOffset.Union());
+
+  Local::FinishHubToLocalMessageBuffer(builder, msg);
+
+  return callback(builder.GetBufferSpan());
+}

@@ -130,8 +130,8 @@ CaptivePortal::CaptivePortalInstance::CaptivePortalInstance()
     });
 
     m_webServer.on("/api/portal/close", HTTP_POST, [](AsyncWebServerRequest* request) {
-      request->send(200, HTTP::ContentType::TextPlain, "Closing portal");
-      CaptivePortal::ForceClose(0);
+      CaptivePortal::SetUserDone();
+      request->send(200);
     });
 
     m_webServer.on("/api/wifi/scan", HTTP_POST, [](AsyncWebServerRequest* request) {

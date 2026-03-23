@@ -40,6 +40,9 @@ struct WifiGotIpEventBuilder;
 struct WifiLostIpEvent;
 struct WifiLostIpEventBuilder;
 
+struct AccountLinkStatusEvent;
+struct AccountLinkStatusEventBuilder;
+
 struct HubToLocalMessage;
 struct HubToLocalMessageBuilder;
 
@@ -51,11 +54,12 @@ enum class HubToLocalMessagePayload : uint8_t {
   WifiNetworkEvent = 4,
   WifiGotIpEvent = 5,
   WifiLostIpEvent = 6,
+  AccountLinkStatusEvent = 7,
   MIN = NONE,
-  MAX = WifiLostIpEvent
+  MAX = AccountLinkStatusEvent
 };
 
-inline const HubToLocalMessagePayload (&EnumValuesHubToLocalMessagePayload())[7] {
+inline const HubToLocalMessagePayload (&EnumValuesHubToLocalMessagePayload())[8] {
   static const HubToLocalMessagePayload values[] = {
     HubToLocalMessagePayload::NONE,
     HubToLocalMessagePayload::ReadyMessage,
@@ -63,13 +67,14 @@ inline const HubToLocalMessagePayload (&EnumValuesHubToLocalMessagePayload())[7]
     HubToLocalMessagePayload::WifiScanStatusMessage,
     HubToLocalMessagePayload::WifiNetworkEvent,
     HubToLocalMessagePayload::WifiGotIpEvent,
-    HubToLocalMessagePayload::WifiLostIpEvent
+    HubToLocalMessagePayload::WifiLostIpEvent,
+    HubToLocalMessagePayload::AccountLinkStatusEvent
   };
   return values;
 }
 
 inline const char * const *EnumNamesHubToLocalMessagePayload() {
-  static const char * const names[8] = {
+  static const char * const names[9] = {
     "NONE",
     "ReadyMessage",
     "ErrorMessage",
@@ -77,13 +82,14 @@ inline const char * const *EnumNamesHubToLocalMessagePayload() {
     "WifiNetworkEvent",
     "WifiGotIpEvent",
     "WifiLostIpEvent",
+    "AccountLinkStatusEvent",
     nullptr
   };
   return names;
 }
 
 inline const char *EnumNameHubToLocalMessagePayload(HubToLocalMessagePayload e) {
-  if (::flatbuffers::IsOutRange(e, HubToLocalMessagePayload::NONE, HubToLocalMessagePayload::WifiLostIpEvent)) return "";
+  if (::flatbuffers::IsOutRange(e, HubToLocalMessagePayload::NONE, HubToLocalMessagePayload::AccountLinkStatusEvent)) return "";
   const size_t index = static_cast<size_t>(e);
   return EnumNamesHubToLocalMessagePayload()[index];
 }
@@ -114,6 +120,10 @@ template<> struct HubToLocalMessagePayloadTraits<OpenShock::Serialization::Local
 
 template<> struct HubToLocalMessagePayloadTraits<OpenShock::Serialization::Local::WifiLostIpEvent> {
   static const HubToLocalMessagePayload enum_value = HubToLocalMessagePayload::WifiLostIpEvent;
+};
+
+template<> struct HubToLocalMessagePayloadTraits<OpenShock::Serialization::Local::AccountLinkStatusEvent> {
+  static const HubToLocalMessagePayload enum_value = HubToLocalMessagePayload::AccountLinkStatusEvent;
 };
 
 template <bool B = false>
@@ -566,6 +576,58 @@ inline ::flatbuffers::Offset<WifiLostIpEvent> CreateWifiLostIpEventDirect(
       ip__);
 }
 
+/// Sent when the auth token status changes (set, cleared, or validated on gateway connect)
+struct AccountLinkStatusEvent FLATBUFFERS_FINAL_CLASS : private ::flatbuffers::Table {
+  typedef AccountLinkStatusEventBuilder Builder;
+  struct Traits;
+  static FLATBUFFERS_CONSTEXPR_CPP11 const char *GetFullyQualifiedName() {
+    return "OpenShock.Serialization.Local.AccountLinkStatusEvent";
+  }
+  enum FlatBuffersVTableOffset FLATBUFFERS_VTABLE_UNDERLYING_TYPE {
+    VT_LINKED = 4
+  };
+  bool linked() const {
+    return GetField<uint8_t>(VT_LINKED, 0) != 0;
+  }
+  template <bool B = false>
+  bool Verify(::flatbuffers::VerifierTemplate<B> &verifier) const {
+    return VerifyTableStart(verifier) &&
+           VerifyField<uint8_t>(verifier, VT_LINKED, 1) &&
+           verifier.EndTable();
+  }
+};
+
+struct AccountLinkStatusEventBuilder {
+  typedef AccountLinkStatusEvent Table;
+  ::flatbuffers::FlatBufferBuilder &fbb_;
+  ::flatbuffers::uoffset_t start_;
+  void add_linked(bool linked) {
+    fbb_.AddElement<uint8_t>(AccountLinkStatusEvent::VT_LINKED, static_cast<uint8_t>(linked), 0);
+  }
+  explicit AccountLinkStatusEventBuilder(::flatbuffers::FlatBufferBuilder &_fbb)
+        : fbb_(_fbb) {
+    start_ = fbb_.StartTable();
+  }
+  ::flatbuffers::Offset<AccountLinkStatusEvent> Finish() {
+    const auto end = fbb_.EndTable(start_);
+    auto o = ::flatbuffers::Offset<AccountLinkStatusEvent>(end);
+    return o;
+  }
+};
+
+inline ::flatbuffers::Offset<AccountLinkStatusEvent> CreateAccountLinkStatusEvent(
+    ::flatbuffers::FlatBufferBuilder &_fbb,
+    bool linked = false) {
+  AccountLinkStatusEventBuilder builder_(_fbb);
+  builder_.add_linked(linked);
+  return builder_.Finish();
+}
+
+struct AccountLinkStatusEvent::Traits {
+  using type = AccountLinkStatusEvent;
+  static auto constexpr Create = CreateAccountLinkStatusEvent;
+};
+
 struct HubToLocalMessage FLATBUFFERS_FINAL_CLASS : private ::flatbuffers::Table {
   typedef HubToLocalMessageBuilder Builder;
   struct Traits;
@@ -601,6 +663,9 @@ struct HubToLocalMessage FLATBUFFERS_FINAL_CLASS : private ::flatbuffers::Table 
   const OpenShock::Serialization::Local::WifiLostIpEvent *payload_as_WifiLostIpEvent() const {
     return payload_type() == OpenShock::Serialization::Local::HubToLocalMessagePayload::WifiLostIpEvent ? static_cast<const OpenShock::Serialization::Local::WifiLostIpEvent *>(payload()) : nullptr;
   }
+  const OpenShock::Serialization::Local::AccountLinkStatusEvent *payload_as_AccountLinkStatusEvent() const {
+    return payload_type() == OpenShock::Serialization::Local::HubToLocalMessagePayload::AccountLinkStatusEvent ? static_cast<const OpenShock::Serialization::Local::AccountLinkStatusEvent *>(payload()) : nullptr;
+  }
   template <bool B = false>
   bool Verify(::flatbuffers::VerifierTemplate<B> &verifier) const {
     return VerifyTableStart(verifier) &&
@@ -633,6 +698,10 @@ template<> inline const OpenShock::Serialization::Local::WifiGotIpEvent *HubToLo
 
 template<> inline const OpenShock::Serialization::Local::WifiLostIpEvent *HubToLocalMessage::payload_as<OpenShock::Serialization::Local::WifiLostIpEvent>() const {
   return payload_as_WifiLostIpEvent();
+}
+
+template<> inline const OpenShock::Serialization::Local::AccountLinkStatusEvent *HubToLocalMessage::payload_as<OpenShock::Serialization::Local::AccountLinkStatusEvent>() const {
+  return payload_as_AccountLinkStatusEvent();
 }
 
 struct HubToLocalMessageBuilder {
@@ -699,6 +768,10 @@ inline bool VerifyHubToLocalMessagePayload(::flatbuffers::VerifierTemplate<B> &v
     }
     case HubToLocalMessagePayload::WifiLostIpEvent: {
       auto ptr = reinterpret_cast<const OpenShock::Serialization::Local::WifiLostIpEvent *>(obj);
+      return verifier.VerifyTable(ptr);
+    }
+    case HubToLocalMessagePayload::AccountLinkStatusEvent: {
+      auto ptr = reinterpret_cast<const OpenShock::Serialization::Local::AccountLinkStatusEvent *>(obj);
       return verifier.VerifyTable(ptr);
     }
     default: return true;

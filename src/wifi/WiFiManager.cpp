@@ -257,24 +257,36 @@ void _evWiFiGotIP6(arduino_event_t* event)
 void _evWiFiDisconnected(arduino_event_t* event)
 {
   s_wifiState.store(WiFiState::Disconnected, std::memory_order_relaxed);
+  s_connectedCredentialsID.store(0, std::memory_order_relaxed);
 
   auto& info = event->event_info.wifi_sta_disconnected;
 
-  Config::WiFiCredentials creds;
-  if (!Config::TryGetWiFiCredentialsBySSID(reinterpret_cast<char*>(info.ssid), creds)) {
-    OS_LOGW(TAG, "Disconnected from unknown network... WTF?");
-    return;
-  }
-
   OS_LOGI(TAG, "Disconnected from network %s (" BSSID_FMT ")", info.ssid, BSSID_ARG(info.bssid));
 
-  const char* friendlyReason = _wifiDisconnectReason(info.reason);
-  if (friendlyReason != nullptr) {
-    Serialization::Local::SerializeErrorMessage(friendlyReason, CaptivePortal::BroadcastMessageBIN);
+  // Notify the frontend
+  ScopedLock lock__(&s_networksMutex);
+  auto it = _findNetworkByBSSID(info.bssid);
+  if (it != s_wifiNetworks.end()) {
+    Serialization::Local::SerializeWiFiNetworkEvent(Serialization::Types::WifiNetworkEventType::Disconnected, *it, CaptivePortal::BroadcastMessageBIN);
   } else {
-    char reason[64];
-    snprintf(reason, sizeof(reason), "Unknown WiFi error (code %d), please contact support", info.reason);
-    Serialization::Local::SerializeErrorMessage(reason, CaptivePortal::BroadcastMessageBIN);
+    // Network not in scan results (forgotten or hidden) — send minimal event
+    WiFiNetwork net;
+    memset(&net, 0, sizeof(net));
+    strncpy(net.ssid, reinterpret_cast<const char*>(info.ssid), sizeof(net.ssid) - 1);
+    memcpy(net.bssid, info.bssid, sizeof(net.bssid));
+    Serialization::Local::SerializeWiFiNetworkEvent(Serialization::Types::WifiNetworkEventType::Disconnected, net, CaptivePortal::BroadcastMessageBIN);
+  }
+
+  // Send error message for unexpected disconnects (not user-initiated)
+  if (info.reason != WIFI_REASON_ASSOC_LEAVE) {
+    const char* friendlyReason = _wifiDisconnectReason(info.reason);
+    if (friendlyReason != nullptr) {
+      Serialization::Local::SerializeErrorMessage(friendlyReason, CaptivePortal::BroadcastMessageBIN);
+    } else {
+      char reason[64];
+      snprintf(reason, sizeof(reason), "Unknown WiFi error (code %d), please contact support", info.reason);
+      Serialization::Local::SerializeErrorMessage(reason, CaptivePortal::BroadcastMessageBIN);
+    }
   }
 }
 void _evWiFiScanStarted()
@@ -499,7 +511,7 @@ bool WiFiManager::Forget(const char* ssid)
     uint8_t credsId = it->credentialsID;
 
     // Check if the network is currently connected
-    if (s_connectedCredentialsID == credsId) {
+    if (credsId != 0 && s_connectedCredentialsID.load(std::memory_order_relaxed) == credsId) {
       WiFiManager::Disconnect();
     }
 
