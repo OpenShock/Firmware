@@ -1,18 +1,7 @@
 import { isArrayBuffer, isString } from '$lib/typeguards';
 import { toast } from 'svelte-sonner';
 import { WebSocketMessageBinaryHandler } from './MessageHandlers';
-
-function getWebSocketHostname() {
-  const hostname = window.location.hostname;
-
-  switch (hostname) {
-    case 'localhost':
-    case '127.0.0.1':
-      return '10.10.10.10';
-    default:
-      return hostname;
-  }
-}
+import { getDeviceHostname } from '$lib/utils/localRedirect';
 
 export enum ConnectionState {
   DISCONNECTED = 0,
@@ -64,7 +53,7 @@ export class WebSocketClient {
     this._autoReconnect = true;
     this.ConnectionState = ConnectionState.CONNECTING;
 
-    const hostname = getWebSocketHostname();
+    const hostname = getDeviceHostname();
     if (!hostname) {
       console.error('[WS] ERROR: Failed to get WebSocket hostname');
       this.ReconnectIfWanted();

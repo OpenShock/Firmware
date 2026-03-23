@@ -52,22 +52,26 @@ class HubStateStore {
   gpioValidOutputs = $state<Int8Array>(new Int8Array());
 
   setWifiNetwork(network: WiFiNetwork) {
-    this.wifiNetworks.set(network.bssid, network);
+    this.wifiNetworks = new Map(this.wifiNetworks).set(network.bssid, network);
   }
 
   updateWifiNetwork(bssid: string, updater: (network: WiFiNetwork) => WiFiNetwork) {
     const network = this.wifiNetworks.get(bssid);
     if (network) {
-      this.wifiNetworks.set(bssid, updater(network));
+      const updated = new Map(this.wifiNetworks);
+      updated.set(bssid, updater(network));
+      this.wifiNetworks = updated;
     }
   }
 
   removeWifiNetwork(bssid: string) {
-    this.wifiNetworks.delete(bssid);
+    const updated = new Map(this.wifiNetworks);
+    updated.delete(bssid);
+    this.wifiNetworks = updated;
   }
 
   clearWifiNetworks() {
-    this.wifiNetworks.clear();
+    this.wifiNetworks = new Map();
   }
 }
 
