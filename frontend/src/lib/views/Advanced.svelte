@@ -1,5 +1,6 @@
 <script lang="ts" module>
-  import { Wifi, Zap, Cpu, User, Download, type Icon } from '@lucide/svelte';
+  import { Wifi, Zap, Cpu, User, Download } from '@lucide/svelte';
+  import type { Component } from 'svelte';
 
   export type AdvancedSection = 'menu' | 'wifi' | 'shocker' | 'hardware' | 'account' | 'ota';
 
@@ -7,7 +8,8 @@
     id: AdvancedSection;
     label: string;
     description: string;
-    icon: Icon;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    icon: Component<any>;
   }
 
   const advancedSections: AdvancedSectionDef[] = [
@@ -78,15 +80,15 @@
         Back
       </Button>
       <div class="flex flex-col gap-1">
-        {#each advancedSections as section}
+        {#each advancedSections as { id, label, description, icon: Icon } (id)}
           <button
             class="hover:bg-muted/50 flex items-center gap-3 rounded-lg p-3 text-left transition-colors"
-            onclick={() => (activeSection = section.id)}
+            onclick={() => (activeSection = id)}
           >
-            <section.icon class="text-muted-foreground h-5 w-5 shrink-0" />
+            <Icon class="text-muted-foreground h-5 w-5 shrink-0" />
             <div class="min-w-0 flex-1">
-              <p class="text-sm font-medium">{section.label}</p>
-              <p class="text-muted-foreground text-xs">{section.description}</p>
+              <p class="text-sm font-medium">{label}</p>
+              <p class="text-muted-foreground text-xs">{description}</p>
             </div>
             <ChevronRight class="text-muted-foreground h-4 w-4 shrink-0" />
           </button>
