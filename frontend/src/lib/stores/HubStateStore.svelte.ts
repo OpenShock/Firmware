@@ -45,28 +45,43 @@ class HubStateStore {
   wifiNetworkGroups = $derived.by<Map<string, WiFiNetworkGroup>>(() =>
     Array.from(this.wifiNetworks.entries()).reduce(ssidMapReducer, new Map())
   );
+  // Saved SSIDs from config that aren't visible in scan results
+  savedOnlySSIDs = $derived.by<string[]>(() => {
+    const scannedSavedSSIDs = new Set<string>();
+    for (const [, group] of this.wifiNetworkGroups) {
+      if (group.saved) scannedSavedSSIDs.add(group.ssid);
+    }
+    const creds = this.config?.wifi?.credentials ?? [];
+    return creds.map((c) => c.ssid).filter((ssid) => !scannedSavedSSIDs.has(ssid));
+  });
+
   accountLinked = $state(false);
+  hasPredefinedPins = $state(false);
   config = $state<Config | null>(null);
   gpioValidInputs = $state<Int8Array>(new Int8Array());
   gpioValidOutputs = $state<Int8Array>(new Int8Array());
 
   setWifiNetwork(network: WiFiNetwork) {
-    this.wifiNetworks.set(network.bssid, network);
+    this.wifiNetworks = new Map(this.wifiNetworks).set(network.bssid, network);
   }
 
   updateWifiNetwork(bssid: string, updater: (network: WiFiNetwork) => WiFiNetwork) {
     const network = this.wifiNetworks.get(bssid);
     if (network) {
-      this.wifiNetworks.set(bssid, updater(network));
+      const updated = new Map(this.wifiNetworks);
+      updated.set(bssid, updater(network));
+      this.wifiNetworks = updated;
     }
   }
 
   removeWifiNetwork(bssid: string) {
-    this.wifiNetworks.delete(bssid);
+    const updated = new Map(this.wifiNetworks);
+    updated.delete(bssid);
+    this.wifiNetworks = updated;
   }
 
   clearWifiNetworks() {
-    this.wifiNetworks.clear();
+    this.wifiNetworks = new Map();
   }
 }
 

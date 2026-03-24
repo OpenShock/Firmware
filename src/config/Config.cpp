@@ -454,7 +454,7 @@ bool Config::AnyWiFiCredentials(std::function<bool(const Config::WiFiCredentials
   return std::any_of(creds.begin(), creds.end(), predicate);
 }
 
-uint8_t Config::AddWiFiCredentials(std::string_view ssid, std::string_view password)
+uint8_t Config::AddWiFiCredentials(std::string_view ssid, std::string_view password, wifi_auth_mode_t authMode)
 {
   CONFIG_LOCK_WRITE(0);
 
@@ -466,6 +466,9 @@ uint8_t Config::AddWiFiCredentials(std::string_view ssid, std::string_view passw
 
     if (std::string_view(creds.ssid) == ssid) {
       creds.password = password;
+      if (authMode != WIFI_AUTH_MAX) {
+        creds.authMode = authMode;
+      }
 
       if (!_trySaveConfig()) {
         OS_LOGE(TAG, "Failed to persist updated WiFi credentials for SSID %.*s", static_cast<int>(ssid.size()), ssid.data());
@@ -498,7 +501,7 @@ uint8_t Config::AddWiFiCredentials(std::string_view ssid, std::string_view passw
     return 0;
   }
 
-  _configData.wifi.credentialsList.emplace_back(id, ssid, password);
+  _configData.wifi.credentialsList.emplace_back(id, ssid, password, authMode);
   _trySaveConfig();
 
   return id;
@@ -543,6 +546,20 @@ uint8_t Config::GetWiFiCredentialsIDbySSID(const char* ssid)
   }
 
   return 0;
+}
+
+bool Config::PinWiFiCredentialsBSSID(uint8_t id, const uint8_t (&bssid)[6])
+{
+  CONFIG_LOCK_WRITE(false);
+
+  for (auto& creds : _configData.wifi.credentialsList) {
+    if (creds.id == id) {
+      memcpy(creds.bssid.data(), bssid, 6);
+      return _trySaveConfig();
+    }
+  }
+
+  return false;
 }
 
 bool Config::RemoveWiFiCredentials(uint8_t id)

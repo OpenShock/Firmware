@@ -91,19 +91,19 @@ WiFiScanStatus _scanningTaskImpl()
   // Start the scan on the highest channel and work our way down
   uint8_t channel = OPENSHOCK_WIFI_SCAN_MAX_CHANNEL;
 
+  _notifyStatusChangedHandlers(WiFiScanStatus::Started);
+
   // Start the scan on the first channel
   int16_t retval = _scanChannel(channel);
   if (_isScanError(retval)) {
     return WiFiScanStatus::Error;
   }
 
-  // Notify the status changed handlers that the scan has started and is in progress
-  _notifyStatusChangedHandlers(WiFiScanStatus::Started);
-  _notifyStatusChangedHandlers(WiFiScanStatus::InProgress);
-
   // Scan each channel until we're done
   while (true) {
     uint32_t notificationFlags = 0;
+
+    _notifyStatusChangedHandlers(WiFiScanStatus::InProgress);
 
     // Wait for the scan to complete, _evScanCompleted will notify us when it's done
     if (xTaskNotifyWait(0, WiFiScanTaskNotificationFlags::CLEAR_FLAGS, &notificationFlags, pdMS_TO_TICKS(OPENSHOCK_WIFI_SCAN_TIMEOUT_MS)) != pdTRUE) {

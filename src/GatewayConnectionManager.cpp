@@ -4,11 +4,13 @@ const char* const TAG = "GatewayConnectionManager";
 
 #include "VisualStateManager.h"
 
+#include "captiveportal/Manager.h"
 #include "config/Config.h"
 #include "Core.h"
 #include "GatewayClient.h"
 #include "http/JsonAPI.h"
 #include "Logging.h"
+#include "serialization/WSLocal.h"
 
 #include "SimpleMutex.h"
 
@@ -315,6 +317,8 @@ void InitializeClient()
 
   s_flags.fetch_or(FLAG_LINKED, std::memory_order_relaxed);
   OS_LOGD(TAG, "Successfully verified auth token");
+
+  Serialization::Local::SerializeAccountLinkStatusEvent(true, CaptivePortal::BroadcastMessageBIN);
 
   CreateClient(authToken);
 }

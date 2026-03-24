@@ -40,6 +40,26 @@ export default defineConfig(
     },
   },
   {
+    files: ['**/*.svelte'],
+
+    languageOptions: {
+      parserOptions: {
+        parser: ts.parser,
+        ecmaVersion: 2020,
+      },
+    },
+  },
+  {
+    files: ['**/*.svelte.ts', '**/*.svelte.js'],
+
+    languageOptions: {
+      parser: ts.parser,
+      parserOptions: {
+        ecmaVersion: 2020,
+      },
+    },
+  },
+  {
     ignores: [
       '.DS_Store',
       'node_modules',

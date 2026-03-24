@@ -31,7 +31,7 @@ static std::array<Handlers::HandlerType, HANDLER_COUNT> s_serverHandlers = []() 
 
   set(PayloadType::Ping, Handlers::HandlePing);
   set(PayloadType::Trigger, Handlers::HandleTrigger);
-  set(PayloadType::ShockerCommandList, Handlers::HandleShockerCommandList);
+  set(PayloadType::Common_ShockerCommandList, Handlers::HandleShockerCommandList);
   set(PayloadType::OtaUpdateRequest, Handlers::HandleOtaUpdateRequest);
 
   return handlers;

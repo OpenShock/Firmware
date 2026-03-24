@@ -28,6 +28,7 @@ namespace OpenShock::CaptivePortal {
     bool sendMessageBIN(uint8_t socketId, tcb::span<const uint8_t> data) { return m_socketServer.sendBIN(socketId, data.data(), data.size()); }
     bool broadcastMessageTXT(std::string_view data) { return m_socketServer.broadcastTXT(data.data(), data.length()); }
     bool broadcastMessageBIN(tcb::span<const uint8_t> data) { return m_socketServer.broadcastBIN(data.data(), data.size()); }
+    bool hasClients() { return m_socketServer.connectedClients() > 0; }
 
   private:
     void task();

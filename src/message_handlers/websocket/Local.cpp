@@ -26,25 +26,7 @@ static std::array<Handlers::HandlerType, HANDLER_COUNT> s_localHandlers = []() {
   std::array<Handlers::HandlerType, HANDLER_COUNT> handlers {};
   handlers.fill(Handlers::HandleInvalidMessage);
 
-  SET_HANDLER(WifiScanCommand);
-  SET_HANDLER(WifiNetworkSaveCommand);
-  SET_HANDLER(WifiNetworkForgetCommand);
-  SET_HANDLER(WifiNetworkConnectCommand);
-  SET_HANDLER(WifiNetworkDisconnectCommand);
-  SET_HANDLER(OtaUpdateSetIsEnabledCommand);
-  SET_HANDLER(OtaUpdateSetDomainCommand);
-  SET_HANDLER(OtaUpdateSetUpdateChannelCommand);
-  SET_HANDLER(OtaUpdateSetCheckIntervalCommand);
-  SET_HANDLER(OtaUpdateSetAllowBackendManagementCommand);
-  SET_HANDLER(OtaUpdateSetRequireManualApprovalCommand);
-  SET_HANDLER(OtaUpdateHandleUpdateRequestCommand);
-  SET_HANDLER(OtaUpdateCheckForUpdatesCommand);
-  SET_HANDLER(OtaUpdateStartUpdateCommand);
-  SET_HANDLER(AccountLinkCommand);
-  SET_HANDLER(AccountUnlinkCommand);
-  SET_HANDLER(SetRfTxPinCommand);
-  SET_HANDLER(SetEstopEnabledCommand);
-  SET_HANDLER(SetEstopPinCommand);
+  SET_HANDLER(Common_ShockerCommandList);
 
   return handlers;
 }();
