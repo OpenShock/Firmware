@@ -13,6 +13,7 @@ const char* const TAG = "CaptivePortalInstance";
 #include "GatewayConnectionManager.h"
 #include "http/ContentTypes.h"
 #include "Logging.h"
+#include "RateLimiter.h"
 #include "message_handlers/WebSocket.h"
 #include "OtaUpdateChannel.h"
 #include "serialization/WSLocal.h"
@@ -45,6 +46,18 @@ static const char* const JSON_ERR_PASSWORD_SHORT  = "{\"error\":\"PasswordTooSho
 static const char* const JSON_ERR_PASSWORD_LONG   = "{\"error\":\"PasswordTooLong\"}";
 static const char* const JSON_ERR_CODE_REQUIRED   = "{\"error\":\"CodeRequired\"}";
 static const char* const JSON_ERR_INVALID_CHANNEL = "{\"error\":\"InvalidChannel\"}";
+static const char* const JSON_ERR_RATE_LIMITED     = "{\"error\":\"RateLimited\"}";
+
+static OpenShock::RateLimiter& getAccountLinkRateLimiter()
+{
+  static OpenShock::RateLimiter* rl = nullptr;
+  if (rl == nullptr) {
+    rl = new OpenShock::RateLimiter();
+    rl->addLimit(60'000, 5);   // 5 attempts per minute
+    rl->addLimit(300'000, 10); // 10 attempts per 5 minutes
+  }
+  return *rl;
+}
 
 using namespace OpenShock;
 
@@ -161,6 +174,10 @@ CaptivePortal::CaptivePortalInstance::CaptivePortalInstance()
     });
 
     m_webServer.on("/api/account/link", HTTP_POST, [](AsyncWebServerRequest* request) {
+      if (!getAccountLinkRateLimiter().tryRequest()) {
+        request->send(429, HTTP::ContentType::JSON, JSON_ERR_RATE_LIMITED);
+        return;
+      }
       if (!request->hasParam("code")) {
         request->send(400, HTTP::ContentType::JSON, JSON_ERR_CODE_REQUIRED);
         return;
