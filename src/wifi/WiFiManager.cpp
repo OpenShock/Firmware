@@ -541,7 +541,10 @@ bool WiFiManager::Forget(const char* ssid)
     WiFiManager::Disconnect();
   }
 
-  Config::RemoveWiFiCredentials(creds.id);
+  if (!Config::RemoveWiFiCredentials(creds.id)) {
+    OS_LOGE(TAG, "Failed to remove credentials for network %s", ssid);
+    return false;
+  }
 
   // Fire Removed event with a minimal WiFiNetwork for the UI
   WiFiNetwork net;

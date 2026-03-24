@@ -195,11 +195,14 @@ export async function saveWifiNetwork(
     const params = new URLSearchParams({ ssid, connect: connect ? '1' : '0' });
     if (password) params.set('password', password);
     if (security !== undefined) params.set('security', String(security));
-    await apiFetch('/api/wifi/networks', {
+    const res = await apiFetch('/api/wifi/networks', {
       method: 'POST',
       headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
       body: params.toString(),
     });
+    if (!res.ok) {
+      toast.error('Failed to save WiFi network: ' + (await getErrorMessage(res)));
+    }
   } catch {
     toast.error('Failed to save WiFi network');
   }
@@ -207,11 +210,14 @@ export async function saveWifiNetwork(
 
 export async function connectWifiNetwork(ssid: string): Promise<void> {
   try {
-    await apiFetch('/api/wifi/connect', {
+    const res = await apiFetch('/api/wifi/connect', {
       method: 'POST',
       headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
       body: new URLSearchParams({ ssid }).toString(),
     });
+    if (!res.ok) {
+      toast.error('Failed to connect to WiFi network: ' + (await getErrorMessage(res)));
+    }
   } catch {
     toast.error('Failed to connect to WiFi network');
   }
@@ -219,7 +225,10 @@ export async function connectWifiNetwork(ssid: string): Promise<void> {
 
 export async function disconnectWifiNetwork(): Promise<void> {
   try {
-    await apiFetch('/api/wifi/disconnect', { method: 'POST' });
+    const res = await apiFetch('/api/wifi/disconnect', { method: 'POST' });
+    if (!res.ok) {
+      toast.error('Failed to disconnect from WiFi network');
+    }
   } catch {
     toast.error('Failed to disconnect from WiFi network');
   }

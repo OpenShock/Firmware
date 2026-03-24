@@ -197,8 +197,12 @@ CaptivePortal::CaptivePortalInstance::CaptivePortalInstance()
       cJSON_AddStringToObject(root, "error", error);
       char* json = cJSON_PrintUnformatted(root);
       cJSON_Delete(root);
-      request->send(400, HTTP::ContentType::JSON, json);
-      cJSON_free(json);
+      if (json == nullptr) {
+        request->send(500, HTTP::ContentType::JSON, JSON_ERR_INTERNAL);
+      } else {
+        request->send(400, HTTP::ContentType::JSON, json);
+        cJSON_free(json);
+      }
     });
 
     m_webServer.on("/api/account", HTTP_DELETE, [](AsyncWebServerRequest* request) {
@@ -222,8 +226,12 @@ CaptivePortal::CaptivePortalInstance::CaptivePortalInstance()
       cJSON_AddNumberToObject(root, "pin", pin);
       char* json = cJSON_PrintUnformatted(root);
       cJSON_Delete(root);
-      request->send(200, HTTP::ContentType::JSON, json);
-      cJSON_free(json);
+      if (json == nullptr) {
+        request->send(500, HTTP::ContentType::JSON, JSON_ERR_INTERNAL);
+      } else {
+        request->send(200, HTTP::ContentType::JSON, json);
+        cJSON_free(json);
+      }
     });
 
     m_webServer.on("/api/config/estop/pin", HTTP_PUT, [](AsyncWebServerRequest* request) {
@@ -244,8 +252,12 @@ CaptivePortal::CaptivePortalInstance::CaptivePortalInstance()
       cJSON_AddNumberToObject(root, "pin", pin);
       char* json = cJSON_PrintUnformatted(root);
       cJSON_Delete(root);
-      request->send(200, HTTP::ContentType::JSON, json);
-      cJSON_free(json);
+      if (json == nullptr) {
+        request->send(500, HTTP::ContentType::JSON, JSON_ERR_INTERNAL);
+      } else {
+        request->send(200, HTTP::ContentType::JSON, json);
+        cJSON_free(json);
+      }
     });
 
     m_webServer.on("/api/config/estop/enabled", HTTP_PUT, [](AsyncWebServerRequest* request) {
