@@ -1,6 +1,7 @@
 import { includeIgnoreFile } from '@eslint/compat';
 import js from '@eslint/js';
 import prettier from 'eslint-config-prettier';
+import compat from 'eslint-plugin-compat';
 import svelte from 'eslint-plugin-svelte';
 import { defineConfig } from 'eslint/config';
 import globals from 'globals';
@@ -17,6 +18,7 @@ export default defineConfig(
   ...svelte.configs.recommended,
   prettier,
   ...svelte.configs.prettier,
+  compat.configs['flat/recommended'],
   {
     languageOptions: { globals: { ...globals.browser, ...globals.node } },
     rules: {
@@ -25,14 +27,16 @@ export default defineConfig(
       'no-undef': 'off',
       'no-useless-assignment': 'warn',
       'svelte/no-unused-svelte-ignore': 'off',
-      '@typescript-eslint/no-unused-vars': 'warn',
+      '@typescript-eslint/no-unused-vars': [
+        'warn',
+        { argsIgnorePattern: '^_', varsIgnorePattern: '^_', caughtErrorsIgnorePattern: '^_' },
+      ],
     },
   },
   {
     files: ['**/*.svelte', '**/*.svelte.ts', '**/*.svelte.js'],
     languageOptions: {
       parserOptions: {
-        projectService: true,
         extraFileExtensions: ['.svelte'],
         parser: ts.parser,
         svelteConfig,

@@ -15,30 +15,30 @@ export type ConnectionStateChangeHandler = (state: ConnectionState) => void;
 export class WebSocketClient {
   public static readonly Instance = new WebSocketClient();
 
-  private _socket: WebSocket | null = null;
+  #socket: WebSocket | null = null;
 
-  private _connectionState: ConnectionState = ConnectionState.DISCONNECTED;
-  private _connectionStateChangeHandlers: ConnectionStateChangeHandler[] = [];
+  #connectionState: ConnectionState = ConnectionState.DISCONNECTED;
+  #connectionStateChangeHandlers: ConnectionStateChangeHandler[] = [];
   private set ConnectionState(value: ConnectionState) {
-    if (this._connectionState !== value) {
-      this._connectionState = value;
-      this._connectionStateChangeHandlers.forEach((handler) => handler(value));
+    if (this.#connectionState !== value) {
+      this.#connectionState = value;
+      this.#connectionStateChangeHandlers.forEach((handler) => handler(value));
     }
   }
   public get ConnectionState(): ConnectionState {
-    return this._connectionState;
+    return this.#connectionState;
   }
   public addConnectionStateChangeHandler(handler: ConnectionStateChangeHandler) {
-    this._connectionStateChangeHandlers.push(handler);
+    this.#connectionStateChangeHandlers.push(handler);
   }
   public removeConnectionStateChangeHandler(handler: ConnectionStateChangeHandler) {
-    const index = this._connectionStateChangeHandlers.indexOf(handler);
+    const index = this.#connectionStateChangeHandlers.indexOf(handler);
     if (index !== -1) {
-      this._connectionStateChangeHandlers.splice(index, 1);
+      this.#connectionStateChangeHandlers.splice(index, 1);
     }
   }
 
-  private _autoReconnect = false;
+  #autoReconnect = false;
   public Connect() {
     const connectionState = this.ConnectionState;
     if (
@@ -50,7 +50,7 @@ export class WebSocketClient {
 
     this.AbortWebSocket();
 
-    this._autoReconnect = true;
+    this.#autoReconnect = true;
     this.ConnectionState = ConnectionState.CONNECTING;
 
     const hostname = getDeviceHostname();
@@ -60,15 +60,15 @@ export class WebSocketClient {
       return;
     }
 
-    this._socket = new WebSocket(`ws://${hostname}:81/ws`);
-    this._socket.binaryType = 'arraybuffer';
-    this._socket.onopen = this.handleOpen.bind(this);
-    this._socket.onclose = this.handleClose.bind(this);
-    this._socket.onerror = this.handleError.bind(this);
-    this._socket.onmessage = this.handleMessage.bind(this);
+    this.#socket = new WebSocket(`ws://${hostname}:81/ws`);
+    this.#socket.binaryType = 'arraybuffer';
+    this.#socket.onopen = this.handleOpen.bind(this);
+    this.#socket.onclose = this.handleClose.bind(this);
+    this.#socket.onerror = this.handleError.bind(this);
+    this.#socket.onmessage = this.handleMessage.bind(this);
   }
   public Disconnect() {
-    this._autoReconnect = false;
+    this.#autoReconnect = false;
     const connectionState = this.ConnectionState;
     if (
       connectionState === ConnectionState.DISCONNECTED ||
@@ -78,9 +78,9 @@ export class WebSocketClient {
     }
     this.ConnectionState = ConnectionState.DISCONNECTING;
 
-    if (this._socket) {
+    if (this.#socket) {
       try {
-        this._socket.close();
+        this.#socket.close();
         setTimeout(this.AbortWebSocket.bind(this), 1000);
       } catch {
         console.warn('[WS] Failed to gracefully close WebSocket connection, forcing close');
@@ -90,21 +90,21 @@ export class WebSocketClient {
   }
   private ReconnectIfWanted() {
     this.AbortWebSocket();
-    if (this._autoReconnect) {
+    if (this.#autoReconnect) {
       setTimeout(this.Connect.bind(this), 200);
     }
   }
 
   public Send(data: string | ArrayBufferLike | Blob | ArrayBufferView) {
-    if (!this._socket || this._socket.readyState !== WebSocket.OPEN) {
+    if (!this.#socket || this.#socket.readyState !== WebSocket.OPEN) {
       return;
     }
 
-    this._socket.send(data);
+    this.#socket.send(data);
   }
 
   private handleOpen() {
-    if (!this._socket) {
+    if (!this.#socket) {
       console.error('[WS] ERROR: Socket not initialized');
       this.ReconnectIfWanted();
       return;
@@ -142,18 +142,18 @@ export class WebSocketClient {
     console.warn('[WS] Received unknown message type: ', msg.data);
   }
   private AbortWebSocket() {
-    if (this._socket) {
+    if (this.#socket) {
       try {
-        this._socket.close();
-        this._socket.onclose = null;
-        this._socket.onerror = null;
-        this._socket.onmessage = null;
-        this._socket.onopen = null;
+        this.#socket.close();
+        this.#socket.onclose = null;
+        this.#socket.onerror = null;
+        this.#socket.onmessage = null;
+        this.#socket.onopen = null;
       } catch (e) {
         console.error(e);
       }
     }
-    this._socket = null;
+    this.#socket = null;
     this.ConnectionState = ConnectionState.DISCONNECTED;
   }
 }

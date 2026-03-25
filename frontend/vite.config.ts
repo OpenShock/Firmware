@@ -35,7 +35,7 @@ export default defineConfig(({ mode }) => {
     publicDir: 'static',
 
     build: {
-      target: 'es2022',
+      target: 'es2024',
       outDir: 'build',
     },
 
