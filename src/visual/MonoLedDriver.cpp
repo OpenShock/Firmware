@@ -11,7 +11,7 @@ const char* const TAG = "MonoLedDriver";
 
 #include <driver/ledc.h>
 
-#define OS_LEDC_TIMER      LEDC_TIMER_0
+#define OS_LEDC_TIMER LEDC_TIMER_0
 #ifdef SOC_LEDC_SUPPORT_HS_MODE
 #define OS_LEDC_SPEED LEDC_HIGH_SPEED_MODE
 #else
