@@ -13,7 +13,7 @@ namespace OpenShock {
     bool Start();
 
   private:
-    void _task();
+    void task();
 
     OpenShock::SemVer m_version;
     TaskHandle_t m_taskHandle;

@@ -3,6 +3,7 @@
 #include "http/FirmwareCDN.h"
 
 #include "Common.h"
+#include "http/ContentTypes.h"
 #include "Logging.h"
 #include "util/HexUtils.h"
 #include "util/StringUtils.h"
@@ -12,6 +13,8 @@ const char* const TAG = "FirmwareCDN";
 using namespace std::string_view_literals;
 
 using namespace OpenShock;
+
+static const uint16_t s_acceptedCodes[] = {200, 304};
 
 HTTP::Response<OpenShock::SemVer> HTTP::FirmwareCDN::GetFirmwareVersion(OtaUpdateChannel channel)
 {
@@ -36,9 +39,9 @@ HTTP::Response<OpenShock::SemVer> HTTP::FirmwareCDN::GetFirmwareVersion(OtaUpdat
   auto response = OpenShock::HTTP::GetString(
     channelIndexUrl,
     {
-      {"Accept", "text/plain"}
+      {"Accept", HTTP::ContentType::TextPlain}
   },
-    {200, 304}
+    s_acceptedCodes
   );
 
   if (response.result != OpenShock::HTTP::RequestResult::Success) {
@@ -58,7 +61,7 @@ HTTP::Response<OpenShock::SemVer> HTTP::FirmwareCDN::GetFirmwareVersion(OtaUpdat
 HTTP::Response<std::vector<std::string>> HTTP::FirmwareCDN::GetFirmwareBoards(const OpenShock::SemVer& version)
 {
   std::string channelIndexUrl;
-  if (!FormatToString(channelIndexUrl, OPENSHOCK_FW_CDN_BOARDS_INDEX_URL_FORMAT, version.toString().c_str())) {  // TODO: This is abusing the SemVer::toString() method causing alot of string copies, fix this
+  if (!FormatToString(channelIndexUrl, OPENSHOCK_FW_CDN_BOARDS_INDEX_URL_FORMAT, version.toString().c_str())) {
     OS_LOGE(TAG, "Failed to format URL");
     return {RequestResult::InternalError, 0, {}};
   }
@@ -68,9 +71,9 @@ HTTP::Response<std::vector<std::string>> HTTP::FirmwareCDN::GetFirmwareBoards(co
   auto response = OpenShock::HTTP::GetString(
     channelIndexUrl,
     {
-      {"Accept", "text/plain"}
+      {"Accept", HTTP::ContentType::TextPlain}
   },
-    {200, 304}
+    s_acceptedCodes
   );
 
   if (response.result != OpenShock::HTTP::RequestResult::Success) {
@@ -78,12 +81,12 @@ HTTP::Response<std::vector<std::string>> HTTP::FirmwareCDN::GetFirmwareBoards(co
     return {RequestResult::InternalError, 0, {}};
   }
 
-  auto lines = OpenShock::StringSplitNewLines(response.data);
+  std::vector<std::string_view> lines = OpenShock::StringSplitNewLines(response.data);
 
   std::vector<std::string> boards;
   boards.reserve(lines.size());
 
-  for (auto line : lines) {
+  for (std::string_view line : lines) {
     line = OpenShock::StringTrim(line);
 
     if (line.empty()) {
@@ -98,34 +101,31 @@ HTTP::Response<std::vector<std::string>> HTTP::FirmwareCDN::GetFirmwareBoards(co
 
 HTTP::Response<std::vector<FirmwareBinaryHash>> HTTP::FirmwareCDN::GetFirmwareBinaryHashes(const OpenShock::SemVer& version)
 {
-  auto versionStr = version.toString();  // TODO: This is abusing the SemVer::toString() method causing alot of string copies, fix this
+  auto versionStr = version.toString();
 
-  // Construct hash URLs.
   std::string sha256HashesUrl;
   if (!FormatToString(sha256HashesUrl, OPENSHOCK_FW_CDN_SHA256_HASHES_URL_FORMAT, versionStr.c_str())) {
     OS_LOGE(TAG, "Failed to format URL");
     return {RequestResult::InternalError, 0, {}};
   }
 
-  // Fetch hashes.
   auto sha256HashesResponse = OpenShock::HTTP::GetString(
     sha256HashesUrl,
     {
-      {"Accept", "text/plain"}
+      {"Accept", HTTP::ContentType::TextPlain}
   },
-    {200, 304}
+    s_acceptedCodes
   );
   if (sha256HashesResponse.result != OpenShock::HTTP::RequestResult::Success) {
     OS_LOGE(TAG, "Failed to fetch hashes: [%u] %s", sha256HashesResponse.code, sha256HashesResponse.data.c_str());
     return {RequestResult::InternalError, 0, {}};
   }
 
-  auto hashesLines = OpenShock::StringSplitNewLines(sha256HashesResponse.data);
+  std::vector<std::string_view> hashesLines = OpenShock::StringSplitNewLines(sha256HashesResponse.data);
 
-  // Parse hashes.
   std::vector<FirmwareBinaryHash> hashes;
   for (std::string_view line : hashesLines) {
-    auto parts = OpenShock::StringSplitWhiteSpace(line);
+    std::vector<std::string_view> parts = OpenShock::StringSplitWhiteSpace(line);
     if (parts.size() != 2) {
       OS_LOGE(TAG, "Invalid hashes entry: %.*s", line.size(), line.data());
       return {RequestResult::InternalError, 0, {}};
@@ -134,9 +134,7 @@ HTTP::Response<std::vector<FirmwareBinaryHash>> HTTP::FirmwareCDN::GetFirmwareBi
     auto hash = OpenShock::StringTrim(parts[0]);
     auto file = OpenShock::StringTrim(parts[1]);
 
-    if (OpenShock::StringStartsWith(file, "./"sv)) {
-      file = file.substr(2);
-    }
+    file = OpenShock::StringRemovePrefix(file, "./"sv);
 
     if (hash.size() != 64) {
       OS_LOGE(TAG, "Invalid hash: %.*s", hash.size(), hash.data());
@@ -160,7 +158,7 @@ HTTP::Response<std::vector<FirmwareBinaryHash>> HTTP::FirmwareCDN::GetFirmwareBi
 
 HTTP::Response<FirmwareReleaseInfo> HTTP::FirmwareCDN::GetFirmwareReleaseInfo(const OpenShock::SemVer& version)
 {
-  auto versionStr = version.toString();  // TODO: This is abusing the SemVer::toString() method causing alot of string copies, fix this
+  auto versionStr = version.toString();
 
   FirmwareReleaseInfo release;
   if (!FormatToString(release.appBinaryUrl, OPENSHOCK_FW_CDN_APP_URL_FORMAT, versionStr.c_str())) {
@@ -173,14 +171,13 @@ HTTP::Response<FirmwareReleaseInfo> HTTP::FirmwareCDN::GetFirmwareReleaseInfo(co
     return {RequestResult::InternalError, 0, {}};
   }
 
-  // Fetch hashes.
   auto response = GetFirmwareBinaryHashes(version);
   if (response.result != HTTP::RequestResult::Success) {
     OS_LOGE(TAG, "Failed to fetch hashes: [%u]", response.code);
     return {response.result, response.code, {}};
   }
 
-  for (auto binaryHash : response.data) {
+  for (const auto& binaryHash : response.data) {
     if (binaryHash.name == "app.bin") {
       static_assert(sizeof(release.appBinaryHash) == sizeof(binaryHash.hash), "Hash size mismatch");
       memcpy(release.appBinaryHash, binaryHash.hash, sizeof(release.appBinaryHash));
