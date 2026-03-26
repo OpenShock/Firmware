@@ -1,11 +1,12 @@
 #include <freertos/FreeRTOS.h>
 
-#include "RGBPatternManager.h"
+#include "visual/RgbLedDriver.h"
 
-const char* const TAG = "RGBPatternManager";
+const char* const TAG = "RGBLedDriver";
 
 #include "Chipset.h"
 #include "Logging.h"
+#include "util/FnProxy.h"
 #include "util/TaskUtils.h"
 
 #include <array>
@@ -16,7 +17,7 @@ using namespace OpenShock;
 // TODO: Support multiple LEDs ?
 // TODO: Support other LED types ?
 
-RGBPatternManager::RGBPatternManager(gpio_num_t gpioPin)
+RgbLedDriver::RgbLedDriver(gpio_num_t gpioPin)
   : m_gpioPin(GPIO_NUM_NC)
   , m_brightness(255)
   , m_pattern()
@@ -43,19 +44,17 @@ RGBPatternManager::RGBPatternManager(gpio_num_t gpioPin)
   float realTick = rmtSetTick(m_rmtHandle, 100.F);
   OS_LOGD(TAG, "RMT tick is %f ns for pin %hhi", realTick, gpioPin);
 
-  SetBrightness(20);
-
   m_gpioPin = gpioPin;
 }
 
-RGBPatternManager::~RGBPatternManager()
+RgbLedDriver::~RgbLedDriver()
 {
   ClearPattern();
 
   rmtDeinit(m_rmtHandle);
 }
 
-void RGBPatternManager::SetPattern(const RGBState* pattern, std::size_t patternLength)
+void RgbLedDriver::SetPattern(const RGBState* pattern, std::size_t patternLength)
 {
   m_taskMutex.lock(portMAX_DELAY);
 
@@ -67,7 +66,7 @@ void RGBPatternManager::SetPattern(const RGBState* pattern, std::size_t patternL
 
   // Start the task
   m_stopRequested.store(false, std::memory_order_relaxed);
-  BaseType_t result = TaskUtils::TaskCreateExpensive(RunPattern, TAG, 4096, this, 1, &m_taskHandle);  // PROFILED: 1.7KB stack usage
+  BaseType_t result = TaskUtils::TaskCreateExpensive(Util::FnProxy<&RgbLedDriver::RunPattern>, TAG, 4096, this, 1, &m_taskHandle);  // PROFILED: 1.7KB stack usage
   if (result != pdPASS) {
     OS_LOGE(TAG, "[pin-%hhi] Failed to create task: %d", m_gpioPin, result);
 
@@ -78,7 +77,7 @@ void RGBPatternManager::SetPattern(const RGBState* pattern, std::size_t patternL
   m_taskMutex.unlock();
 }
 
-void RGBPatternManager::ClearPattern()
+void RgbLedDriver::ClearPattern()
 {
   m_taskMutex.lock(portMAX_DELAY);
 
@@ -87,45 +86,39 @@ void RGBPatternManager::ClearPattern()
   m_taskMutex.unlock();
 }
 
-void RGBPatternManager::ClearPatternInternal()
+// Range: 0-255
+void RgbLedDriver::SetBrightness(uint8_t brightness)
+{
+  m_brightness = brightness;
+}
+
+void RgbLedDriver::ClearPatternInternal()
 {
   if (m_taskHandle != nullptr) {
     m_stopRequested.store(true, std::memory_order_relaxed);
-    TaskUtils::StopTask(m_taskHandle, TAG, "RGBPatternManager task");
+    TaskUtils::StopTask(m_taskHandle, TAG, "RgbLedDriver task");
     m_taskHandle = nullptr;
   }
 
   m_pattern.clear();
 }
 
-// Range: 0-255
-void RGBPatternManager::SetBrightness(uint8_t brightness)
+void RgbLedDriver::RunPattern()
 {
-  m_brightness = brightness;
-}
-
-void RGBPatternManager::RunPattern(void* arg)
-{
-  RGBPatternManager* thisPtr = static_cast<RGBPatternManager*>(arg);
-
-  rmt_obj_t* rmtHandle           = thisPtr->m_rmtHandle;
-  uint8_t brightness             = thisPtr->m_brightness;
-  std::vector<RGBState>& pattern = thisPtr->m_pattern;
-
   std::array<rmt_data_t, 24> led_data;  // 24 bits per LED (8 bits per color * 3 colors)
 
-  while (!thisPtr->m_stopRequested.load(std::memory_order_relaxed)) {
-    for (const auto& state : pattern) {
-      if (thisPtr->m_stopRequested.load(std::memory_order_relaxed)) break;
+  while (!m_stopRequested.load(std::memory_order_relaxed)) {
+    for (const auto& state : m_pattern) {
+      if (m_stopRequested.load(std::memory_order_relaxed)) break;
 
       // WS2812B usually takes commands in GRB order
       // https://cdn-shop.adafruit.com/datasheets/WS2812B.pdf - Page 5
       // But some actually expect RGB!
 
-      uint8_t r = static_cast<uint8_t>(static_cast<uint16_t>(state.red) * brightness / 255);
-      uint8_t g = static_cast<uint8_t>(static_cast<uint16_t>(state.green) * brightness / 255);
-      uint8_t b = static_cast<uint8_t>(static_cast<uint16_t>(state.blue) * brightness / 255);
-#if OPENSHOCK_LED_FLIP_RG_CHANNELS
+      uint8_t r = static_cast<uint8_t>(static_cast<uint16_t>(state.red) * m_brightness / 255);
+      uint8_t g = static_cast<uint8_t>(static_cast<uint16_t>(state.green) * m_brightness / 255);
+      uint8_t b = static_cast<uint8_t>(static_cast<uint16_t>(state.blue) * m_brightness / 255);
+#if OPENSHOCK_LED_SWAP_RG_CHANNELS
       std::swap(r, g);
 #endif
 
@@ -147,8 +140,15 @@ void RGBPatternManager::RunPattern(void* arg)
       }
 
       // Send the data
-      rmtWriteBlocking(rmtHandle, led_data.data(), led_data.size());
-      vTaskDelay(pdMS_TO_TICKS(state.duration));
+      rmtWriteBlocking(m_rmtHandle, led_data.data(), led_data.size());
+
+      // Chunked delay so cooperative shutdown can interrupt long waits
+      uint32_t remaining = state.duration;
+      while (remaining > 0 && !m_stopRequested.load(std::memory_order_relaxed)) {
+        uint32_t chunk = remaining > 50 ? 50 : remaining;
+        vTaskDelay(pdMS_TO_TICKS(chunk));
+        remaining -= chunk;
+      }
     }
   }
 

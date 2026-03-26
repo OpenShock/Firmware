@@ -14,14 +14,14 @@
 #include <vector>
 
 namespace OpenShock {
-  class RGBPatternManager {
-    DISABLE_DEFAULT(RGBPatternManager);
-    DISABLE_COPY(RGBPatternManager);
-    DISABLE_MOVE(RGBPatternManager);
+  class RgbLedDriver {
+    DISABLE_DEFAULT(RgbLedDriver);
+    DISABLE_COPY(RgbLedDriver);
+    DISABLE_MOVE(RgbLedDriver);
 
   public:
-    RGBPatternManager(gpio_num_t gpioPin);
-    ~RGBPatternManager();
+    RgbLedDriver(gpio_num_t gpioPin);
+    ~RgbLedDriver();
 
     bool IsValid() const { return m_gpioPin != GPIO_NUM_NC; }
 
@@ -38,12 +38,13 @@ namespace OpenShock {
     {
       SetPattern(pattern, N);
     }
-    void SetBrightness(uint8_t brightness);
     void ClearPattern();
+
+    void SetBrightness(uint8_t brightness);
 
   private:
     void ClearPatternInternal();
-    static void RunPattern(void* arg);
+    void RunPattern();
 
     gpio_num_t m_gpioPin;
     uint8_t m_brightness;  // 0-255

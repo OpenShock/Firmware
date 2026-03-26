@@ -12,10 +12,10 @@
 #include <vector>
 
 namespace OpenShock {
-  class PinPatternManager {
-    DISABLE_DEFAULT(PinPatternManager);
-    DISABLE_COPY(PinPatternManager);
-    DISABLE_MOVE(PinPatternManager);
+  class MonoLedDriver {
+    DISABLE_DEFAULT(MonoLedDriver);
+    DISABLE_COPY(MonoLedDriver);
+    DISABLE_MOVE(MonoLedDriver);
 
   public:
     struct State {
@@ -23,8 +23,8 @@ namespace OpenShock {
       uint32_t duration;
     };
 
-    PinPatternManager(gpio_num_t gpioPin);
-    ~PinPatternManager();
+    MonoLedDriver(gpio_num_t gpioPin);
+    ~MonoLedDriver();
 
     bool IsValid() const { return m_gpioPin != GPIO_NUM_NC; }
 
@@ -36,11 +36,14 @@ namespace OpenShock {
     }
     void ClearPattern();
 
+    void SetBrightness(uint8_t brightness);
+
   private:
     void ClearPatternInternal();
     void RunPattern();
 
     gpio_num_t m_gpioPin;
+    uint8_t m_brightness;
     std::vector<State> m_pattern;
     TaskHandle_t m_taskHandle;
     SimpleMutex m_taskMutex;

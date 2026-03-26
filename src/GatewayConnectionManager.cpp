@@ -2,7 +2,7 @@
 
 const char* const TAG = "GatewayConnectionManager";
 
-#include "VisualStateManager.h"
+#include "visual/VisualStateManager.h"
 
 #include "captiveportal/Manager.h"
 #include "config/Config.h"
