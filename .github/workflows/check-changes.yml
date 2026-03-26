@@ -1,0 +1,36 @@
+on:
+  pull_request:
+    branches:
+      - develop
+    types: [opened, reopened, synchronize, labeled, unlabeled]
+
+name: check-changes
+
+jobs:
+  require-changefile:
+    runs-on: ubuntu-latest
+    timeout-minutes: 1
+
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      - name: Check for change file
+        run: |
+          # PRs labeled "no-changelog" are exempt (dependency bumps, CI-only, etc.)
+          if echo '${{ toJSON(github.event.pull_request.labels.*.name) }}' | grep -q '"no-changelog"'; then
+            echo "::notice::Skipping changelog check (no-changelog label)"
+            exit 0
+          fi
+
+          # Check if any .changes/*.md files were added (excluding README.md)
+          CHANGES=$(git diff --name-only --diff-filter=A origin/${{ github.base_ref }}...HEAD -- '.changes/*.md' | grep -v README.md || true)
+
+          if [ -z "$CHANGES" ]; then
+            echo "::error::No change file found. Add a .changes/<name>.md file describing your change, or add the 'no-changelog' label to skip this check. See .changes/README.md for the format."
+            exit 1
+          fi
+
+          echo "Found change files:"
+          echo "$CHANGES"
