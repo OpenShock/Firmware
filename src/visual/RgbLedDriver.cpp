@@ -141,7 +141,14 @@ void RgbLedDriver::RunPattern()
 
       // Send the data
       rmtWriteBlocking(m_rmtHandle, led_data.data(), led_data.size());
-      vTaskDelay(pdMS_TO_TICKS(state.duration));
+
+      // Chunked delay so cooperative shutdown can interrupt long waits
+      uint32_t remaining = state.duration;
+      while (remaining > 0 && !m_stopRequested.load(std::memory_order_relaxed)) {
+        uint32_t chunk = remaining > 50 ? 50 : remaining;
+        vTaskDelay(pdMS_TO_TICKS(chunk));
+        remaining -= chunk;
+      }
     }
   }
 

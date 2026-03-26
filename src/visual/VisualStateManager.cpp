@@ -429,3 +429,136 @@ void VisualStateManager::SetScanningStarted()
     _updateVisualState();
   }
 }
+
+void VisualStateManager::RunLedTest()
+{
+  // Save current state
+  uint64_t savedFlags = s_stateFlags.load(std::memory_order_relaxed);
+
+  OS_LOGI(TAG, "=== LED Test Started ===");
+
+  // --- Phase 1: Mono LED brightness sweep (tests LEDC PWM) ---
+  if (s_monoLedDriver != nullptr) {
+    OS_LOGI(TAG, "  [Mono] Brightness sweep up");
+    s_monoLedDriver->ClearPattern();
+
+    static const MonoLedDriver::State solidOn[] = {
+      {true, 100'000}
+    };
+    for (uint16_t b = 0; b <= 255; b += 5) {
+      s_monoLedDriver->SetBrightness(static_cast<uint8_t>(b));
+      s_monoLedDriver->SetPattern(solidOn);
+      vTaskDelay(pdMS_TO_TICKS(20));
+    }
+
+    OS_LOGI(TAG, "  [Mono] Brightness sweep down");
+    for (int16_t b = 255; b >= 0; b -= 5) {
+      s_monoLedDriver->SetBrightness(static_cast<uint8_t>(b));
+      s_monoLedDriver->SetPattern(solidOn);
+      vTaskDelay(pdMS_TO_TICKS(20));
+    }
+
+    // Restore default brightness
+    s_monoLedDriver->SetBrightness(255);
+    s_monoLedDriver->ClearPattern();
+    vTaskDelay(pdMS_TO_TICKS(500));
+  }
+
+  // --- Phase 2: RGB LED color test ---
+  if (s_rgbLedDriver != nullptr) {
+    uint8_t savedBrightness = 20;  // default from Init()
+
+    s_rgbLedDriver->SetBrightness(255);
+
+    OS_LOGI(TAG, "  [RGB] Red");
+    static const RgbLedDriver::RGBState red[] = {
+      {255, 0, 0, 100'000}
+    };
+    s_rgbLedDriver->SetPattern(red);
+    vTaskDelay(pdMS_TO_TICKS(1500));
+
+    OS_LOGI(TAG, "  [RGB] Green");
+    static const RgbLedDriver::RGBState green[] = {
+      {0, 255, 0, 100'000}
+    };
+    s_rgbLedDriver->SetPattern(green);
+    vTaskDelay(pdMS_TO_TICKS(1500));
+
+    OS_LOGI(TAG, "  [RGB] Blue");
+    static const RgbLedDriver::RGBState blue[] = {
+      {0, 0, 255, 100'000}
+    };
+    s_rgbLedDriver->SetPattern(blue);
+    vTaskDelay(pdMS_TO_TICKS(1500));
+
+    OS_LOGI(TAG, "  [RGB] White");
+    static const RgbLedDriver::RGBState white[] = {
+      {255, 255, 255, 100'000}
+    };
+    s_rgbLedDriver->SetPattern(white);
+    vTaskDelay(pdMS_TO_TICKS(1500));
+
+    OS_LOGI(TAG, "  [RGB] Color cycle");
+    static const RgbLedDriver::RGBState cycle[] = {
+      {255,   0,   0, 500},
+      {255, 165,   0, 500},
+      {255, 255,   0, 500},
+      {  0, 255,   0, 500},
+      {  0, 255, 255, 500},
+      {  0,   0, 255, 500},
+      {128,   0, 255, 500},
+      {255,   0, 255, 500},
+    };
+    s_rgbLedDriver->SetPattern(cycle);
+    vTaskDelay(pdMS_TO_TICKS(4000));
+
+    OS_LOGI(TAG, "  [RGB] Brightness sweep");
+    static const RgbLedDriver::RGBState solidWhite[] = {
+      {255, 255, 255, 100'000}
+    };
+    for (uint16_t b = 0; b <= 255; b += 5) {
+      s_rgbLedDriver->SetBrightness(static_cast<uint8_t>(b));
+      s_rgbLedDriver->SetPattern(solidWhite);
+      vTaskDelay(pdMS_TO_TICKS(20));
+    }
+    for (int16_t b = 255; b >= 0; b -= 5) {
+      s_rgbLedDriver->SetBrightness(static_cast<uint8_t>(b));
+      s_rgbLedDriver->SetPattern(solidWhite);
+      vTaskDelay(pdMS_TO_TICKS(20));
+    }
+
+    s_rgbLedDriver->SetBrightness(savedBrightness);
+    s_rgbLedDriver->ClearPattern();
+    vTaskDelay(pdMS_TO_TICKS(500));
+  }
+
+  // --- Phase 3: State pattern test (both LEDs together) ---
+  struct TestStep {
+    const char* name;
+    uint64_t flags;
+    uint32_t durationMs;
+  };
+
+  static const TestStep steps[] = {
+    {      "WiFi Disconnected",                                                                0, 2000},
+    { "WiFi Connected (no WS)",                                                kHasIpAddressFlag, 2000},
+    {    "WebSocket Connected", kWebSocketConnectedFlag | kHasIpAddressFlag | kWiFiConnectedFlag, 2000},
+    {          "E-Stop Active",                                            kEmergencyStoppedFlag, 2000},
+    { "E-Stop Active Clearing",         kEmergencyStoppedFlag | kEmergencyStopActiveClearingFlag, 2000},
+    {"E-Stop Awaiting Release",        kEmergencyStoppedFlag | kEmergencyStopAwaitingReleaseFlag, 2000},
+    {         "Critical Error",                                               kCriticalErrorFlag, 2000},
+  };
+
+  OS_LOGI(TAG, "  State patterns:");
+  for (const auto& step : steps) {
+    OS_LOGI(TAG, "    %s", step.name);
+    s_stateFlags.store(step.flags, std::memory_order_relaxed);
+    _updateVisualState();
+    vTaskDelay(pdMS_TO_TICKS(step.durationMs));
+  }
+
+  // Restore original state
+  OS_LOGI(TAG, "=== LED Test Complete, restoring state ===");
+  s_stateFlags.store(savedFlags, std::memory_order_relaxed);
+  _updateVisualState();
+}

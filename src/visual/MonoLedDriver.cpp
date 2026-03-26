@@ -130,7 +130,14 @@ void MonoLedDriver::RunPattern()
       if (m_stopRequested.load(std::memory_order_relaxed)) break;
       ledc_set_duty(OS_LEDC_SPEED, OS_LEDC_CHANNEL, state.level ? m_brightness : 0);
       ledc_update_duty(OS_LEDC_SPEED, OS_LEDC_CHANNEL);
-      vTaskDelay(pdMS_TO_TICKS(state.duration));
+
+      // Chunked delay so cooperative shutdown can interrupt long waits
+      uint32_t remaining = state.duration;
+      while (remaining > 0 && !m_stopRequested.load(std::memory_order_relaxed)) {
+        uint32_t chunk = remaining > 50 ? 50 : remaining;
+        vTaskDelay(pdMS_TO_TICKS(chunk));
+        remaining -= chunk;
+      }
     }
   }
 
