@@ -1,11 +1,12 @@
 #include "serial/command_handlers/common.h"
 
+#include "Core.h"
 #include "FormatHelpers.h"
-#include "Time.h"
 #include "wifi/WiFiManager.h"
 #include "wifi/WiFiNetwork.h"
 
-void _handleDebugInfoCommand(std::string_view arg, bool isAutomated) {
+void _handleDebugInfoCommand(std::string_view arg, bool isAutomated)
+{
   (void)arg;
 
   SERPR_RESPONSE("RTOSInfo|Free Heap|%u", xPortGetFreeHeapSize());
@@ -35,7 +36,8 @@ void _handleDebugInfoCommand(std::string_view arg, bool isAutomated) {
   }
 }
 
-OpenShock::Serial::CommandGroup OpenShock::Serial::CommandHandlers::SysInfoHandler() {
+OpenShock::Serial::CommandGroup OpenShock::Serial::CommandHandlers::SysInfoHandler()
+{
   auto group = OpenShock::Serial::CommandGroup("sysinfo"sv);
 
   auto& cmd = group.addCommand("Get system information from RTOS, WiFi, etc."sv, _handleDebugInfoCommand);

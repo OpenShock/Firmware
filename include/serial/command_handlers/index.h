@@ -14,7 +14,6 @@ namespace OpenShock::Serial::CommandHandlers {
   OpenShock::Serial::CommandGroup EStopHandler();
   OpenShock::Serial::CommandGroup DomainHandler();
   OpenShock::Serial::CommandGroup AuthTokenHandler();
-  OpenShock::Serial::CommandGroup LcgOverrideHandler();
   OpenShock::Serial::CommandGroup HostnameHandler();
   OpenShock::Serial::CommandGroup NetworksHandler();
   OpenShock::Serial::CommandGroup KeepAliveHandler();
@@ -22,6 +21,7 @@ namespace OpenShock::Serial::CommandHandlers {
   OpenShock::Serial::CommandGroup RawConfigHandler();
   OpenShock::Serial::CommandGroup RfTransmitHandler();
   OpenShock::Serial::CommandGroup FactoryResetHandler();
+  OpenShock::Serial::CommandGroup LedTestHandler();
 
   inline std::vector<OpenShock::Serial::CommandGroup> AllCommandHandlers()
   {
@@ -35,7 +35,6 @@ namespace OpenShock::Serial::CommandHandlers {
       EStopHandler(),
       DomainHandler(),
       AuthTokenHandler(),
-      LcgOverrideHandler(),
       HostnameHandler(),
       NetworksHandler(),
       KeepAliveHandler(),
@@ -43,6 +42,7 @@ namespace OpenShock::Serial::CommandHandlers {
       RawConfigHandler(),
       RfTransmitHandler(),
       FactoryResetHandler(),
+      LedTestHandler(),
     };
   }
 }  // namespace OpenShock::Serial::CommandHandlers

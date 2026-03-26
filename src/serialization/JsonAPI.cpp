@@ -4,7 +4,12 @@ const char* const TAG = "JsonAPI";
 
 #include "Logging.h"
 
-#define ESP_LOGJSONE(err, root) OS_LOGE(TAG, "Invalid JSON response (" err "): %s", cJSON_PrintUnformatted(root))
+#define ESP_LOGJSONE(err, root)                                                    \
+  {                                                                                \
+    char* _jsonStr = cJSON_PrintUnformatted(root);                                 \
+    OS_LOGE(TAG, "Invalid JSON response (" err "): %s", _jsonStr ? _jsonStr : ""); \
+    cJSON_free(_jsonStr);                                                          \
+  }
 
 using namespace OpenShock::Serialization;
 
@@ -222,23 +227,31 @@ bool JsonAPI::ParseAssignLcgJsonResponse(int code, const cJSON* root, JsonAPI::A
     return false;
   }
 
-  const cJSON* data = cJSON_GetObjectItemCaseSensitive(root, "data");
-  if (cJSON_IsObject(data) == 0) {
-    ESP_LOGJSONE("value at 'data' is not an object", root);
+  const cJSON* host    = cJSON_GetObjectItemCaseSensitive(root, "host");
+  const cJSON* port    = cJSON_GetObjectItemCaseSensitive(root, "port");
+  const cJSON* path    = cJSON_GetObjectItemCaseSensitive(root, "path");
+  const cJSON* country = cJSON_GetObjectItemCaseSensitive(root, "country");
+
+  if (cJSON_IsString(host) == 0 || cJSON_IsString(path) == 0 || cJSON_IsString(country) == 0) {
+    ESP_LOGJSONE("value at 'host', 'path' or 'country' is not a string", root);
+    return false;
+  }
+  if (cJSON_IsNumber(port) == 0) {
+    ESP_LOGJSONE("value at 'port' is not a number", root);
     return false;
   }
 
-  const cJSON* fqdn    = cJSON_GetObjectItemCaseSensitive(data, "fqdn");
-  const cJSON* country = cJSON_GetObjectItemCaseSensitive(data, "country");
-
-  if (cJSON_IsString(fqdn) == 0 || cJSON_IsString(country) == 0) {
-    ESP_LOGJSONE("value at 'data.fqdn' or 'data.country' is not a string", root);
+  int portInt = port->valueint;
+  if (portInt < 0 || portInt > UINT16_MAX) {
+    ESP_LOGJSONE("value at 'port' is outside UINT16 bounds", root);
     return false;
   }
 
   out = {};
 
-  out.fqdn    = fqdn->valuestring;
+  out.host    = host->valuestring;
+  out.port    = static_cast<uint16_t>(portInt);
+  out.path    = path->valuestring;
   out.country = country->valuestring;
 
   return true;

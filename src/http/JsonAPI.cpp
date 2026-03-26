@@ -1,6 +1,9 @@
 #include "http/JsonAPI.h"
 
+const char* const TAG = "JsonAPI";
+
 #include "Common.h"
+#include "Logging.h"
 #include "config/Config.h"
 #include "util/StringUtils.h"
 
@@ -14,7 +17,11 @@ HTTP::Response<Serialization::JsonAPI::AccountLinkResponse> HTTP::JsonAPI::LinkA
   }
 
   char uri[OPENSHOCK_URI_BUFFER_SIZE];
-  sprintf(uri, "https://%s/1/device/pair/%.*s", domain.c_str(), accountLinkCode.length(), accountLinkCode.data());
+  int written = snprintf(uri, sizeof(uri), "https://%s/1/device/pair/%.*s", domain.c_str(), static_cast<int>(accountLinkCode.length()), accountLinkCode.data());
+  if (written < 0 || static_cast<size_t>(written) >= sizeof(uri)) {
+    OS_LOGE(TAG, "URI truncated for LinkAccount");
+    return {HTTP::RequestResult::InternalError, 0, {}};
+  }
 
   return HTTP::GetJSON<Serialization::JsonAPI::AccountLinkResponse>(
     uri,
@@ -22,7 +29,7 @@ HTTP::Response<Serialization::JsonAPI::AccountLinkResponse> HTTP::JsonAPI::LinkA
       {"Accept", "application/json"}
   },
     Serialization::JsonAPI::ParseAccountLinkJsonResponse,
-    {200, 404}
+    std::array<uint16_t, 2> {200}
   );
 }
 
@@ -34,7 +41,11 @@ HTTP::Response<Serialization::JsonAPI::HubInfoResponse> HTTP::JsonAPI::GetHubInf
   }
 
   char uri[OPENSHOCK_URI_BUFFER_SIZE];
-  sprintf(uri, "https://%s/1/device/self", domain.c_str());
+  int written = snprintf(uri, sizeof(uri), "https://%s/1/device/self", domain.c_str());
+  if (written < 0 || static_cast<size_t>(written) >= sizeof(uri)) {
+    OS_LOGE(TAG, "URI truncated for GetHubInfo");
+    return {HTTP::RequestResult::InternalError, 0, {}};
+  }
 
   return HTTP::GetJSON<Serialization::JsonAPI::HubInfoResponse>(
     uri,
@@ -43,7 +54,7 @@ HTTP::Response<Serialization::JsonAPI::HubInfoResponse> HTTP::JsonAPI::GetHubInf
       {"DeviceToken", OpenShock::StringToArduinoString(hubToken)}
   },
     Serialization::JsonAPI::ParseHubInfoJsonResponse,
-    {200, 401}
+    std::array<uint16_t, 2> {200}
   );
 }
 
@@ -55,7 +66,11 @@ HTTP::Response<Serialization::JsonAPI::AssignLcgResponse> HTTP::JsonAPI::AssignL
   }
 
   char uri[OPENSHOCK_URI_BUFFER_SIZE];
-  sprintf(uri, "https://%s/1/device/assignLCG", domain.c_str());
+  int written = snprintf(uri, sizeof(uri), "https://%s/2/device/assignLCG?version=2", domain.c_str());
+  if (written < 0 || static_cast<size_t>(written) >= sizeof(uri)) {
+    OS_LOGE(TAG, "URI truncated for AssignLcg");
+    return {HTTP::RequestResult::InternalError, 0, {}};
+  }
 
   return HTTP::GetJSON<Serialization::JsonAPI::AssignLcgResponse>(
     uri,
@@ -64,6 +79,6 @@ HTTP::Response<Serialization::JsonAPI::AssignLcgResponse> HTTP::JsonAPI::AssignL
       {"DeviceToken", OpenShock::StringToArduinoString(hubToken)}
   },
     Serialization::JsonAPI::ParseAssignLcgJsonResponse,
-    {200, 401}
+    std::array<uint16_t, 2> {200}
   );
 }

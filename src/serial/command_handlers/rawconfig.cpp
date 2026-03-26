@@ -1,13 +1,17 @@
 #include "serial/command_handlers/common.h"
 
 #include "config/Config.h"
+#include "TinyVec.h"
 #include "util/Base64Utils.h"
+
+#include <esp_system.h>
 
 #include <vector>
 
-void _handleRawConfigCommand(std::string_view arg, bool isAutomated) {
+void _handleRawConfigCommand(std::string_view arg, bool isAutomated)
+{
   if (arg.empty()) {
-    std::vector<uint8_t> buffer;
+    TinyVec<uint8_t> buffer;
 
     // Get raw config
     if (!OpenShock::Config::GetRaw(buffer)) {
@@ -16,7 +20,7 @@ void _handleRawConfigCommand(std::string_view arg, bool isAutomated) {
     }
 
     std::string base64;
-    if (!OpenShock::Base64Utils::Encode(buffer.data(), buffer.size(), base64)) {
+    if (!OpenShock::Base64Utils::Encode(buffer, base64)) {
       SERPR_ERROR("Failed to encode raw config to base64");
       return;
     }
@@ -25,8 +29,8 @@ void _handleRawConfigCommand(std::string_view arg, bool isAutomated) {
     return;
   }
 
-  std::vector<uint8_t> buffer;
-  if (!OpenShock::Base64Utils::Decode(arg.data(), arg.length(), buffer)) {
+  TinyVec<uint8_t> buffer;
+  if (!OpenShock::Base64Utils::Decode(arg, buffer)) {
     SERPR_ERROR("Failed to decode base64");
     return;
   }
@@ -38,10 +42,11 @@ void _handleRawConfigCommand(std::string_view arg, bool isAutomated) {
 
   SERPR_SUCCESS("Saved config, restarting...");
 
-  ESP.restart();
+  esp_restart();
 }
 
-OpenShock::Serial::CommandGroup OpenShock::Serial::CommandHandlers::RawConfigHandler() {
+OpenShock::Serial::CommandGroup OpenShock::Serial::CommandHandlers::RawConfigHandler()
+{
   auto group = OpenShock::Serial::CommandGroup("rawconfig"sv);
 
   auto& getCommand = group.addCommand("Get the raw binary config"sv, _handleRawConfigCommand);

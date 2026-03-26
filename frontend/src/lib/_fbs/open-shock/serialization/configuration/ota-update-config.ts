@@ -31,7 +31,7 @@ static getSizePrefixedRootAsOtaUpdateConfig(bb:flatbuffers.ByteBuffer, obj?:OtaU
  */
 isEnabled():boolean {
   const offset = this.bb!.__offset(this.bb_pos, 4);
-  return offset ? !!this.bb!.readInt8(this.bb_pos + offset) : false;
+  return offset ? !!this.bb!.readInt8(this.bb_pos + offset) : true;
 }
 
 /**
@@ -81,7 +81,7 @@ checkInterval():number {
  */
 allowBackendManagement():boolean {
   const offset = this.bb!.__offset(this.bb_pos, 16);
-  return offset ? !!this.bb!.readInt8(this.bb_pos + offset) : false;
+  return offset ? !!this.bb!.readInt8(this.bb_pos + offset) : true;
 }
 
 /**
@@ -113,7 +113,7 @@ static startOtaUpdateConfig(builder:flatbuffers.Builder) {
 }
 
 static addIsEnabled(builder:flatbuffers.Builder, isEnabled:boolean) {
-  builder.addFieldInt8(0, +isEnabled, +false);
+  builder.addFieldInt8(0, +isEnabled, +true);
 }
 
 static addCdnDomain(builder:flatbuffers.Builder, cdnDomainOffset:flatbuffers.Offset) {
@@ -137,7 +137,7 @@ static addCheckInterval(builder:flatbuffers.Builder, checkInterval:number) {
 }
 
 static addAllowBackendManagement(builder:flatbuffers.Builder, allowBackendManagement:boolean) {
-  builder.addFieldInt8(6, +allowBackendManagement, +false);
+  builder.addFieldInt8(6, +allowBackendManagement, +true);
 }
 
 static addRequireManualApproval(builder:flatbuffers.Builder, requireManualApproval:boolean) {

@@ -2,6 +2,7 @@
 
 #include "Common.h"
 #include "GatewayClientState.h"
+#include "span.h"
 
 #include <WebSocketsClient.h>
 
@@ -21,11 +22,11 @@ namespace OpenShock {
 
     inline GatewayClientState state() const { return m_state; }
 
-    void connect(const char* lcgFqdn);
+    void connect(const std::string& host, uint16_t port, const std::string& path);
     void disconnect();
 
     bool sendMessageTXT(std::string_view data);
-    bool sendMessageBIN(const uint8_t* data, std::size_t length);
+    bool sendMessageBIN(tcb::span<const uint8_t> data);
 
     bool loop();
 

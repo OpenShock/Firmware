@@ -5,8 +5,24 @@ const char* const TAG = "WSGateway";
 #include <esp_wifi.h>
 
 #include "config/Config.h"
+#include "Core.h"
 #include "Logging.h"
-#include "Time.h"
+
+#ifndef OPENSHOCK_FW_VERSION_MAJOR
+#define OPENSHOCK_FW_VERSION_MAJOR 0
+#endif
+#ifndef OPENSHOCK_FW_VERSION_MINOR
+#define OPENSHOCK_FW_VERSION_MINOR 0
+#endif
+#ifndef OPENSHOCK_FW_VERSION_PATCH
+#define OPENSHOCK_FW_VERSION_PATCH 0
+#endif
+#ifndef OPENSHOCK_FW_VERSION_PRERELEASE
+#define OPENSHOCK_FW_VERSION_PRERELEASE nullptr
+#endif
+#ifndef OPENSHOCK_FW_VERSION_BUILD
+#define OPENSHOCK_FW_VERSION_BUILD nullptr
+#endif
 
 using namespace OpenShock::Serialization;
 
@@ -20,12 +36,12 @@ bool Gateway::SerializePongMessage(Common::SerializationCallbackFn callback)
 
   int rssi;
   esp_err_t err = esp_wifi_sta_get_rssi(&rssi);
-  if (err != ERR_OK) {
+  if (err != ESP_OK) {
     OS_LOGE(TAG, "Failed to get WiFi RSSI: %d", err);
     return false;
   }
 
-  flatbuffers::FlatBufferBuilder builder(256);  // TODO: Profile this and adjust the size accordingly
+  flatbuffers::FlatBufferBuilder builder(64);
 
   auto pong = Gateway::CreatePong(builder, static_cast<uint64_t>(uptime), static_cast<int32_t>(rssi));
 
@@ -33,14 +49,12 @@ bool Gateway::SerializePongMessage(Common::SerializationCallbackFn callback)
 
   Gateway::FinishHubToGatewayMessageBuffer(builder, msg);
 
-  auto span = builder.GetBufferSpan();
-
-  return callback(span.data(), span.size());
+  return callback(builder.GetBufferSpan());
 }
 
 bool Gateway::SerializeBootStatusMessage(int32_t updateId, OpenShock::FirmwareBootType bootType, Common::SerializationCallbackFn callback)
 {
-  flatbuffers::FlatBufferBuilder builder(256);  // TODO: Profile this and adjust the size accordingly
+  flatbuffers::FlatBufferBuilder builder(128);
 
   auto fbsVersion = Types::CreateSemVerDirect(builder, OPENSHOCK_FW_VERSION_MAJOR, OPENSHOCK_FW_VERSION_MINOR, OPENSHOCK_FW_VERSION_PATCH, OPENSHOCK_FW_VERSION_PRERELEASE, OPENSHOCK_FW_VERSION_BUILD);
 
@@ -50,14 +64,12 @@ bool Gateway::SerializeBootStatusMessage(int32_t updateId, OpenShock::FirmwareBo
 
   Gateway::FinishHubToGatewayMessageBuffer(builder, msg);
 
-  auto span = builder.GetBufferSpan();
-
-  return callback(span.data(), span.size());
+  return callback(builder.GetBufferSpan());
 }
 
 bool Gateway::SerializeOtaUpdateStartedMessage(int32_t updateId, const OpenShock::SemVer& version, Common::SerializationCallbackFn callback)
 {
-  flatbuffers::FlatBufferBuilder builder(256);  // TODO: Profile this and adjust the size accordingly
+  flatbuffers::FlatBufferBuilder builder(128);
 
   auto versionOffset = Types::CreateSemVerDirect(builder, version.major, version.minor, version.patch, version.prerelease.data(), version.build.data());
 
@@ -67,14 +79,12 @@ bool Gateway::SerializeOtaUpdateStartedMessage(int32_t updateId, const OpenShock
 
   Gateway::FinishHubToGatewayMessageBuffer(builder, msg);
 
-  auto span = builder.GetBufferSpan();
-
-  return callback(span.data(), span.size());
+  return callback(builder.GetBufferSpan());
 }
 
 bool Gateway::SerializeOtaUpdateProgressMessage(int32_t updateId, Types::OtaUpdateProgressTask task, float progress, Common::SerializationCallbackFn callback)
 {
-  flatbuffers::FlatBufferBuilder builder(64);  // TODO: Profile this and adjust the size accordingly
+  flatbuffers::FlatBufferBuilder builder(64);
 
   auto otaUpdateProgressOffset = Gateway::CreateOtaUpdateProgress(builder, updateId, task, progress);
 
@@ -82,14 +92,12 @@ bool Gateway::SerializeOtaUpdateProgressMessage(int32_t updateId, Types::OtaUpda
 
   Gateway::FinishHubToGatewayMessageBuffer(builder, msg);
 
-  auto span = builder.GetBufferSpan();
-
-  return callback(span.data(), span.size());
+  return callback(builder.GetBufferSpan());
 }
 
 bool Gateway::SerializeOtaUpdateFailedMessage(int32_t updateId, std::string_view message, bool fatal, Common::SerializationCallbackFn callback)
 {
-  flatbuffers::FlatBufferBuilder builder(256);  // TODO: Profile this and adjust the size accordingly
+  flatbuffers::FlatBufferBuilder builder(128 + message.size());
 
   auto messageOffset = builder.CreateString(message.data(), message.size());
 
@@ -99,7 +107,5 @@ bool Gateway::SerializeOtaUpdateFailedMessage(int32_t updateId, std::string_view
 
   Gateway::FinishHubToGatewayMessageBuffer(builder, msg);
 
-  auto span = builder.GetBufferSpan();
-
-  return callback(span.data(), span.size());
+  return callback(builder.GetBufferSpan());
 }

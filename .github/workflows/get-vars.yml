@@ -7,15 +7,6 @@
 
 on:
   workflow_call:
-    inputs:
-      pnpm-version:
-        type: string
-        default: '9'
-        description: 'The pnpm version to use'
-      node-version:
-        type: string
-        default: '20'
-        description: 'The Node.js version to use'
     outputs:
       version:
         description: 'The current version of the project, e.g.  1.0.0-rc.1+build.1'
@@ -68,6 +59,7 @@ name: get-vars
 jobs:
   get-vars:
     runs-on: ubuntu-latest
+    timeout-minutes: 5
     outputs:
       version: ${{ steps.get-vars.outputs.version }}
       changelog: ${{ steps.get-vars.outputs.changelog }}
@@ -86,19 +78,19 @@ jobs:
       release-dev-array: ${{ steps.get-vars.outputs.release-dev-array }}
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
         with:
           fetch-depth: 0
           sparse-checkout: |
             .github
 
-      - uses: pnpm/action-setup@v4
+      - uses: pnpm/action-setup@v5
         name: Install pnpm
         with:
-          version: ${{ inputs.pnpm-version }}
+          package_json_file: ./.github/scripts/package.json
           run_install: false
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v6
         with:
           node-version-file: ./.github/scripts/package.json
           cache: 'pnpm'

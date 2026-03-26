@@ -44,27 +44,23 @@ static ReadWriteMutex _configMutex;
 
 bool _tryDeserializeConfig(const uint8_t* buffer, std::size_t bufferLen, OpenShock::Config::RootConfig& config)
 {
-  if (buffer == nullptr || bufferLen == 0) {
-    OS_LOGE(TAG, "Buffer is null or empty");
+  if (buffer == nullptr || bufferLen < sizeof(flatbuffers::uoffset_t)) {
+    OS_LOGE(TAG, "Buffer is null or too small");
     return false;
   }
 
-  // Deserialize
-  auto fbsConfig = flatbuffers::GetRoot<Serialization::Configuration::HubConfig>(buffer);
-  if (fbsConfig == nullptr) {
-    OS_LOGE(TAG, "Failed to get deserialization root for config file");
-    return false;
-  }
-
-  // Validate buffer
+  // Validate buffer before accessing
   flatbuffers::Verifier::Options verifierOptions {
     .max_size = 4096,  // Should be enough
   };
   flatbuffers::Verifier verifier(buffer, bufferLen, verifierOptions);
-  if (!fbsConfig->Verify(verifier)) {
+  if (!verifier.VerifyBuffer<Serialization::Configuration::HubConfig>()) {
     OS_LOGE(TAG, "Failed to verify config file integrity");
     return false;
   }
+
+  // Deserialize (safe after verification)
+  auto fbsConfig = flatbuffers::GetRoot<Serialization::Configuration::HubConfig>(buffer);
 
   // Read config
   if (!config.FromFlatbuffers(fbsConfig)) {
@@ -74,7 +70,7 @@ bool _tryDeserializeConfig(const uint8_t* buffer, std::size_t bufferLen, OpenSho
 
   return true;
 }
-bool _tryLoadConfig(std::vector<uint8_t>& buffer)
+bool _tryLoadConfig(TinyVec<uint8_t>& buffer)
 {
   File file = _configFS.open("/config", "rb");
   if (!file) {
@@ -100,7 +96,7 @@ bool _tryLoadConfig(std::vector<uint8_t>& buffer)
 }
 bool _tryLoadConfig()
 {
-  std::vector<uint8_t> buffer;
+  TinyVec<uint8_t> buffer;
   if (!_tryLoadConfig(buffer)) {
     return false;
   }
@@ -167,6 +163,10 @@ cJSON* _getAsCJSON(bool withSensitiveData)
 std::string Config::GetAsJSON(bool withSensitiveData)
 {
   cJSON* root = _getAsCJSON(withSensitiveData);
+  if (root == nullptr) {
+    OS_LOGE(TAG, "Failed to get config as JSON");
+    return {};
+  }
 
   char* json = cJSON_PrintUnformatted(root);
 
@@ -219,7 +219,7 @@ bool Config::SaveFromFlatBuffer(const Serialization::Configuration::HubConfig* c
   return _trySaveConfig();
 }
 
-bool Config::GetRaw(std::vector<uint8_t>& buffer)
+bool Config::GetRaw(TinyVec<uint8_t>& buffer)
 {
   CONFIG_LOCK_READ(false);
 
@@ -454,22 +454,27 @@ bool Config::AnyWiFiCredentials(std::function<bool(const Config::WiFiCredentials
   return std::any_of(creds.begin(), creds.end(), predicate);
 }
 
-uint8_t Config::AddWiFiCredentials(std::string_view ssid, std::string_view password)
+uint8_t Config::AddWiFiCredentials(std::string_view ssid, std::string_view password, wifi_auth_mode_t authMode)
 {
   CONFIG_LOCK_WRITE(0);
 
   uint8_t id = 0;
 
   std::bitset<255> bits;
-  for (auto it = _configData.wifi.credentialsList.begin(); it != _configData.wifi.credentialsList.end(); ++it) {
+  for (auto it = _configData.wifi.credentialsList.begin(); it != _configData.wifi.credentialsList.end();) {
     auto& creds = *it;
 
     if (std::string_view(creds.ssid) == ssid) {
       creds.password = password;
+      if (authMode != WIFI_AUTH_MAX) {
+        creds.authMode = authMode;
+      }
 
-      id = creds.id;
-
-      break;
+      if (!_trySaveConfig()) {
+        OS_LOGE(TAG, "Failed to persist updated WiFi credentials for SSID %.*s", static_cast<int>(ssid.size()), ssid.data());
+        return 0;
+      }
+      return creds.id;
     }
 
     if (creds.id == 0) {
@@ -480,6 +485,7 @@ uint8_t Config::AddWiFiCredentials(std::string_view ssid, std::string_view passw
 
     // Mark ID as used
     bits[creds.id - 1] = true;
+    ++it;
   }
 
   // Get first available ID
@@ -495,7 +501,7 @@ uint8_t Config::AddWiFiCredentials(std::string_view ssid, std::string_view passw
     return 0;
   }
 
-  _configData.wifi.credentialsList.emplace_back(id, ssid, password);
+  _configData.wifi.credentialsList.emplace_back(id, ssid, password, authMode);
   _trySaveConfig();
 
   return id;
@@ -542,6 +548,20 @@ uint8_t Config::GetWiFiCredentialsIDbySSID(const char* ssid)
   return 0;
 }
 
+bool Config::PinWiFiCredentialsBSSID(uint8_t id, const uint8_t (&bssid)[6])
+{
+  CONFIG_LOCK_WRITE(false);
+
+  for (auto& creds : _configData.wifi.credentialsList) {
+    if (creds.id == id) {
+      memcpy(creds.bssid.data(), bssid, 6);
+      return _trySaveConfig();
+    }
+  }
+
+  return false;
+}
+
 bool Config::RemoveWiFiCredentials(uint8_t id)
 {
   CONFIG_LOCK_WRITE(false);
@@ -575,11 +595,11 @@ bool Config::GetWiFiHostname(std::string& out)
   return true;
 }
 
-bool Config::SetWiFiHostname(std::string_view hostname)
+bool Config::SetWiFiHostname(std::string hostname)
 {
   CONFIG_LOCK_WRITE(false);
 
-  _configData.wifi.hostname = std::string(hostname);
+  _configData.wifi.hostname = std::move(hostname);
 
   return _trySaveConfig();
 }
@@ -593,11 +613,11 @@ bool Config::GetBackendDomain(std::string& out)
   return true;
 }
 
-bool Config::SetBackendDomain(std::string_view domain)
+bool Config::SetBackendDomain(std::string domain)
 {
   CONFIG_LOCK_WRITE(false);
 
-  _configData.backend.domain = std::string(domain);
+  _configData.backend.domain = std::move(domain);
   return _trySaveConfig();
 }
 
@@ -617,11 +637,11 @@ bool Config::GetBackendAuthToken(std::string& out)
   return true;
 }
 
-bool Config::SetBackendAuthToken(std::string_view token)
+bool Config::SetBackendAuthToken(std::string token)
 {
   CONFIG_LOCK_WRITE(false);
 
-  _configData.backend.authToken = std::string(token);
+  _configData.backend.authToken = std::move(token);
   return _trySaveConfig();
 }
 
@@ -630,38 +650,6 @@ bool Config::ClearBackendAuthToken()
   CONFIG_LOCK_WRITE(false);
 
   _configData.backend.authToken.clear();
-  return _trySaveConfig();
-}
-
-bool Config::HasBackendLCGOverride()
-{
-  CONFIG_LOCK_READ(false);
-
-  return !_configData.backend.lcgOverride.empty();
-}
-
-bool Config::GetBackendLCGOverride(std::string& out)
-{
-  CONFIG_LOCK_READ(false);
-
-  out = _configData.backend.lcgOverride;
-
-  return true;
-}
-
-bool Config::SetBackendLCGOverride(std::string_view lcgOverride)
-{
-  CONFIG_LOCK_WRITE(false);
-
-  _configData.backend.lcgOverride = std::string(lcgOverride);
-  return _trySaveConfig();
-}
-
-bool Config::ClearBackendLCGOverride()
-{
-  CONFIG_LOCK_WRITE(false);
-
-  _configData.backend.lcgOverride.clear();
   return _trySaveConfig();
 }
 
