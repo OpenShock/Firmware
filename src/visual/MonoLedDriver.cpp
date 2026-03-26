@@ -12,14 +12,24 @@ const char* const TAG = "MonoLedDriver";
 #include <driver/ledc.h>
 
 #define OS_LEDC_TIMER      LEDC_TIMER_0
-#define OS_LEDC_SPEED      LEDC_HIGH_SPEED_MODE  // Work is offloaded to hardware ASIC instead of CPU
+#ifdef SOC_LEDC_SUPPORT_HS_MODE
+#define OS_LEDC_SPEED LEDC_HIGH_SPEED_MODE
+#else
+#define OS_LEDC_SPEED LEDC_LOW_SPEED_MODE
+#endif
 #define OS_LEDC_CHANNEL    LEDC_CHANNEL_0
 #define OS_LEDC_RESOLUTION LEDC_TIMER_8_BIT
 #define OS_LEDC_FREQUENCY  4000  // https://en.wikipedia.org/wiki/Flicker_fusion_threshold
 
 using namespace OpenShock;
 
-MonoLedDriver::MonoLedDriver(gpio_num_t gpioPin) : m_gpioPin(GPIO_NUM_NC), m_pattern(), m_taskHandle(nullptr), m_taskMutex(xSemaphoreCreateMutex()) {
+MonoLedDriver::MonoLedDriver(gpio_num_t gpioPin)
+  : m_gpioPin(GPIO_NUM_NC)
+  , m_brightness(255)
+  , m_pattern()
+  , m_taskHandle(nullptr)
+  , m_taskMutex()
+{
   if (gpioPin == GPIO_NUM_NC) {
     OS_LOGE(TAG, "Pin is not set");
     return;
@@ -34,7 +44,7 @@ MonoLedDriver::MonoLedDriver(gpio_num_t gpioPin) : m_gpioPin(GPIO_NUM_NC), m_pat
     .speed_mode      = OS_LEDC_SPEED,
     .duty_resolution = OS_LEDC_RESOLUTION,
     .timer_num       = OS_LEDC_TIMER,
-    .freq_hz         = OS_LEDC_FREQUENCY,  // https://en.wikipedia.org/wiki/Flicker_fusion_threshold
+    .freq_hz         = OS_LEDC_FREQUENCY,
     .clk_cfg         = LEDC_AUTO_CLK,
   };
 
@@ -55,15 +65,17 @@ MonoLedDriver::MonoLedDriver(gpio_num_t gpioPin) : m_gpioPin(GPIO_NUM_NC), m_pat
   m_gpioPin = gpioPin;
 }
 
-MonoLedDriver::~MonoLedDriver() {
+MonoLedDriver::~MonoLedDriver()
+{
   ClearPattern();
-
-  vSemaphoreDelete(m_taskMutex);
 
   ledc_stop(OS_LEDC_SPEED, OS_LEDC_CHANNEL, 0);  // TODO: Error handling
 }
 
-void MonoLedDriver::SetPattern(const State* pattern, std::size_t patternLength) {
+void MonoLedDriver::SetPattern(const State* pattern, std::size_t patternLength)
+{
+  m_taskMutex.lock(portMAX_DELAY);
+
   ClearPatternInternal();
 
   // Set new values
@@ -74,43 +86,53 @@ void MonoLedDriver::SetPattern(const State* pattern, std::size_t patternLength) 
   snprintf(name, sizeof(name), "MonoLedDriver-%d", m_gpioPin);
 
   // Start the task
-  BaseType_t result = TaskUtils::TaskCreateUniversal(&Util::FnProxy<&MonoLedDriver::RunPattern>, name, 1024, this, 1, &m_taskHandle, 1);  // PROFILED: 0.5KB stack usage
+  m_stopRequested.store(false, std::memory_order_relaxed);
+  BaseType_t result = TaskUtils::TaskCreateUniversal(Util::FnProxy<&MonoLedDriver::RunPattern>, name, 1024, this, 1, &m_taskHandle, 1);  // PROFILED: 0.5KB stack usage
   if (result != pdPASS) {
-    OS_LOGE(TAG, "[pin-%u] Failed to create task: %d", m_gpioPin, result);
+    OS_LOGE(TAG, "[pin-%d] Failed to create task: %d", m_gpioPin, result);
 
     m_taskHandle = nullptr;
     m_pattern.clear();
   }
 
-  // Give the semaphore back
-  xSemaphoreGive(m_taskMutex);
+  m_taskMutex.unlock();
 }
 
-void MonoLedDriver::ClearPattern() {
+void MonoLedDriver::ClearPattern()
+{
+  m_taskMutex.lock(portMAX_DELAY);
+
   ClearPatternInternal();
-  xSemaphoreGive(m_taskMutex);
+
+  m_taskMutex.unlock();
 }
 
-void MonoLedDriver::SetBrightness(uint8_t brightness) {
+void MonoLedDriver::SetBrightness(uint8_t brightness)
+{
   m_brightness = brightness;
 }
 
-void MonoLedDriver::ClearPatternInternal() {
-  xSemaphoreTake(m_taskMutex, portMAX_DELAY);
-
+void MonoLedDriver::ClearPatternInternal()
+{
   if (m_taskHandle != nullptr) {
-    vTaskDelete(m_taskHandle);
+    m_stopRequested.store(true, std::memory_order_relaxed);
+    TaskUtils::StopTask(m_taskHandle, TAG, "MonoLedDriver task");
     m_taskHandle = nullptr;
   }
 
   m_pattern.clear();
 }
 
-void MonoLedDriver::RunPattern() {
-  while (true) {
+void MonoLedDriver::RunPattern()
+{
+  while (!m_stopRequested.load(std::memory_order_relaxed)) {
     for (const auto& state : m_pattern) {
-      ledc_set_duty(LEDC_LOW_SPEED_MODE, LEDC_CHANNEL_0, state.level ? m_brightness : 0);
+      if (m_stopRequested.load(std::memory_order_relaxed)) break;
+      ledc_set_duty(OS_LEDC_SPEED, OS_LEDC_CHANNEL, state.level ? m_brightness : 0);
+      ledc_update_duty(OS_LEDC_SPEED, OS_LEDC_CHANNEL);
       vTaskDelay(pdMS_TO_TICKS(state.duration));
     }
   }
+
+  vTaskDelete(nullptr);
 }

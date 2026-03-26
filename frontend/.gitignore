@@ -1,10 +1,35 @@
-.DS_Store
+test-results
+playwright-report
 node_modules
-/build
+
+# Output
+.output
+.vercel
+.netlify
+.wrangler
 /.svelte-kit
-/package
+/build
+/dist
+
+# OS
+.DS_Store
+Thumbs.db
+
+# IDE
+.idea
+.claude
+
+# Env
 .env
 .env.*
 !.env.example
+!.env.test
+
+# Vite
 vite.config.js.timestamp-*
 vite.config.ts.timestamp-*
+
+# Package managers
+pnpm-lock.yaml
+package-lock.json
+yarn.lock

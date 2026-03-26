@@ -1,33 +1,20 @@
 name: cdn-prepare
-description: Prepares the CDN for firmware uploads
+description: Bunny sshpass and knowhosts setup
 inputs:
-  cf-account-id:
-    description: Cloudflare Account ID
-    required: true
-  cf-access-key-id:
-    description: Cloudflare Access Key ID
-    required: true
-  cf-secret-access-key:
-    description: Cloudflare Secret Access Key
+  bunny-ssh-knownhosts:
+    description: Bunny SFTP Hostname
     required: true
 
 runs:
   using: composite
   steps:
-    - name: Install rclone
+    - name: Install sshpass
       shell: bash
-      run: sudo apt-get install -y rclone
+      run: sudo apt-get install -y sshpass
 
-    - name: Configure rclone
+    - name: Configure known hosts
       shell: bash
       run: |
-        mkdir -p ~/.config/rclone/
-        conf=~/.config/rclone/rclone.conf
-        echo "[cdn]" >> $conf
-        echo "type = s3" >> $conf
-        echo "provider = Cloudflare" >> $conf
-        echo "access_key_id = ${{ inputs.cf-access-key-id }}" >> $conf
-        echo "secret_access_key = ${{ inputs.cf-secret-access-key }}" >> $conf
-        echo "endpoint = https://${{ inputs.cf-account-id }}.r2.cloudflarestorage.com" >> $conf
-        echo "acl = public-read" >> $conf
+        mkdir -p ~/.ssh
+        echo "${{ inputs.bunny-ssh-knownhosts }}" >> ~/.ssh/known_hosts
 

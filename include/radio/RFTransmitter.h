@@ -1,9 +1,11 @@
 #pragma once
 
+#include "Common.h"
 #include "ShockerCommandType.h"
 #include "ShockerModelType.h"
 
 #include <esp32-hal-rmt.h>
+#include <hal/gpio_types.h>
 
 #include <freertos/queue.h>
 #include <freertos/task.h>
@@ -12,11 +14,14 @@
 
 namespace OpenShock {
   class RFTransmitter {
+    DISABLE_COPY(RFTransmitter);
+    DISABLE_MOVE(RFTransmitter);
+
   public:
-    RFTransmitter(uint8_t gpioPin);
+    RFTransmitter(gpio_num_t gpioPin);
     ~RFTransmitter();
 
-    inline uint8_t GetTxPin() const { return m_txPin; }
+    inline gpio_num_t GetTxPin() const { return m_txPin; }
 
     inline bool ok() const { return m_rmtHandle != nullptr && m_queueHandle != nullptr && m_taskHandle != nullptr; }
 
@@ -27,7 +32,9 @@ namespace OpenShock {
     void destroy();
     void TransmitTask();
 
-    uint8_t m_txPin;
+    struct Command;
+
+    gpio_num_t m_txPin;
     rmt_obj_t* m_rmtHandle;
     QueueHandle_t m_queueHandle;
     TaskHandle_t m_taskHandle;

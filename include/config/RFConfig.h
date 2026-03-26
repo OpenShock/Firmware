@@ -1,13 +1,15 @@
 #pragma once
 
+#include <hal/gpio_types.h>
+
 #include "config/ConfigBase.h"
 
 namespace OpenShock::Config {
   struct RFConfig : public ConfigBase<Serialization::Configuration::RFConfig> {
     RFConfig();
-    RFConfig(uint8_t txPin, bool keepAliveEnabled);
+    RFConfig(gpio_num_t txPin, bool keepAliveEnabled);
 
-    uint8_t txPin;
+    gpio_num_t txPin;
     bool keepAliveEnabled;
 
     void ToDefault() override;

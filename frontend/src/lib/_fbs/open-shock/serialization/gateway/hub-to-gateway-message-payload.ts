@@ -3,48 +3,68 @@
 /* eslint-disable @typescript-eslint/no-unused-vars, @typescript-eslint/no-explicit-any, @typescript-eslint/no-non-null-assertion */
 
 import { BootStatus } from '../../../open-shock/serialization/gateway/boot-status';
-import { KeepAlive } from '../../../open-shock/serialization/gateway/keep-alive';
-import { OtaInstallFailed } from '../../../open-shock/serialization/gateway/ota-install-failed';
-import { OtaInstallProgress } from '../../../open-shock/serialization/gateway/ota-install-progress';
-import { OtaInstallStarted } from '../../../open-shock/serialization/gateway/ota-install-started';
+import { OtaUpdateFailed } from '../../../open-shock/serialization/gateway/ota-update-failed';
+import { OtaUpdateProgress } from '../../../open-shock/serialization/gateway/ota-update-progress';
+import { OtaUpdateStarted } from '../../../open-shock/serialization/gateway/ota-update-started';
+import { Pong } from '../../../open-shock/serialization/gateway/pong';
 
 
 export enum HubToGatewayMessagePayload {
   NONE = 0,
-  KeepAlive = 1,
+
+  /**
+   * Respond to a ping message
+   */
+  Pong = 1,
+
+  /**
+   * Report the current boot status, used to report firmware version and OTA update results
+   */
   BootStatus = 2,
-  OtaInstallStarted = 3,
-  OtaInstallProgress = 4,
-  OtaInstallFailed = 5
+
+  /**
+   * Report that an OTA update has started
+   */
+  OtaUpdateStarted = 3,
+
+  /**
+   * Report the progress of an OTA update
+   */
+  OtaUpdateProgress = 4,
+
+  /**
+   * Report that an OTA update has failed
+   */
+  OtaUpdateFailed = 5
 }
 
 export function unionToHubToGatewayMessagePayload(
   type: HubToGatewayMessagePayload,
-  accessor: (obj:BootStatus|KeepAlive|OtaInstallFailed|OtaInstallProgress|OtaInstallStarted) => BootStatus|KeepAlive|OtaInstallFailed|OtaInstallProgress|OtaInstallStarted|null
-): BootStatus|KeepAlive|OtaInstallFailed|OtaInstallProgress|OtaInstallStarted|null {
+  accessor: (obj:BootStatus|OtaUpdateFailed|OtaUpdateProgress|OtaUpdateStarted|Pong) => BootStatus|OtaUpdateFailed|OtaUpdateProgress|OtaUpdateStarted|Pong|null
+): BootStatus|OtaUpdateFailed|OtaUpdateProgress|OtaUpdateStarted|Pong|null {
   switch(HubToGatewayMessagePayload[type]) {
     case 'NONE': return null; 
-    case 'KeepAlive': return accessor(new KeepAlive())! as KeepAlive;
+    case 'Pong': return accessor(new Pong())! as Pong;
     case 'BootStatus': return accessor(new BootStatus())! as BootStatus;
-    case 'OtaInstallStarted': return accessor(new OtaInstallStarted())! as OtaInstallStarted;
-    case 'OtaInstallProgress': return accessor(new OtaInstallProgress())! as OtaInstallProgress;
-    case 'OtaInstallFailed': return accessor(new OtaInstallFailed())! as OtaInstallFailed;
+    case 'OtaUpdateStarted': return accessor(new OtaUpdateStarted())! as OtaUpdateStarted;
+    case 'OtaUpdateProgress': return accessor(new OtaUpdateProgress())! as OtaUpdateProgress;
+    case 'OtaUpdateFailed': return accessor(new OtaUpdateFailed())! as OtaUpdateFailed;
     default: return null;
   }
 }
 
 export function unionListToHubToGatewayMessagePayload(
   type: HubToGatewayMessagePayload, 
-  accessor: (index: number, obj:BootStatus|KeepAlive|OtaInstallFailed|OtaInstallProgress|OtaInstallStarted) => BootStatus|KeepAlive|OtaInstallFailed|OtaInstallProgress|OtaInstallStarted|null, 
+  accessor: (index: number, obj:BootStatus|OtaUpdateFailed|OtaUpdateProgress|OtaUpdateStarted|Pong) => BootStatus|OtaUpdateFailed|OtaUpdateProgress|OtaUpdateStarted|Pong|null, 
   index: number
-): BootStatus|KeepAlive|OtaInstallFailed|OtaInstallProgress|OtaInstallStarted|null {
+): BootStatus|OtaUpdateFailed|OtaUpdateProgress|OtaUpdateStarted|Pong|null {
   switch(HubToGatewayMessagePayload[type]) {
     case 'NONE': return null; 
-    case 'KeepAlive': return accessor(index, new KeepAlive())! as KeepAlive;
+    case 'Pong': return accessor(index, new Pong())! as Pong;
     case 'BootStatus': return accessor(index, new BootStatus())! as BootStatus;
-    case 'OtaInstallStarted': return accessor(index, new OtaInstallStarted())! as OtaInstallStarted;
-    case 'OtaInstallProgress': return accessor(index, new OtaInstallProgress())! as OtaInstallProgress;
-    case 'OtaInstallFailed': return accessor(index, new OtaInstallFailed())! as OtaInstallFailed;
+    case 'OtaUpdateStarted': return accessor(index, new OtaUpdateStarted())! as OtaUpdateStarted;
+    case 'OtaUpdateProgress': return accessor(index, new OtaUpdateProgress())! as OtaUpdateProgress;
+    case 'OtaUpdateFailed': return accessor(index, new OtaUpdateFailed())! as OtaUpdateFailed;
     default: return null;
   }
 }

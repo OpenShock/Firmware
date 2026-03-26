@@ -1,18 +1,21 @@
 #pragma once
 
 #include "Common.h"
+#include "SimpleMutex.h"
 
 #include <hal/gpio_types.h>
 
-#include <freertos/semphr.h>
 #include <freertos/task.h>
 
+#include <atomic>
 #include <cstdint>
 #include <vector>
 
 namespace OpenShock {
   class MonoLedDriver {
+    DISABLE_DEFAULT(MonoLedDriver);
     DISABLE_COPY(MonoLedDriver);
+    DISABLE_MOVE(MonoLedDriver);
 
   public:
     struct State {
@@ -20,7 +23,6 @@ namespace OpenShock {
       uint32_t duration;
     };
 
-    MonoLedDriver() = delete;
     MonoLedDriver(gpio_num_t gpioPin);
     ~MonoLedDriver();
 
@@ -28,7 +30,8 @@ namespace OpenShock {
 
     void SetPattern(const State* pattern, std::size_t patternLength);
     template<std::size_t N>
-    inline void SetPattern(const State (&pattern)[N]) {
+    inline void SetPattern(const State (&pattern)[N])
+    {
       SetPattern(pattern, N);
     }
     void ClearPattern();
@@ -43,6 +46,7 @@ namespace OpenShock {
     uint8_t m_brightness;
     std::vector<State> m_pattern;
     TaskHandle_t m_taskHandle;
-    SemaphoreHandle_t m_taskMutex;
+    SimpleMutex m_taskMutex;
+    std::atomic<bool> m_stopRequested {false};
   };
 }  // namespace OpenShock

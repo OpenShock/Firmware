@@ -2,59 +2,60 @@
 
 #include "radio/rmt/internal/Shared.h"
 
+#include "Checksum.h"
+
+#include <algorithm>
+
 const rmt_data_t kRmtPreamble  = {1500, 1, 750, 0};
 const rmt_data_t kRmtOne       = {750, 1, 250, 0};
 const rmt_data_t kRmtZero      = {250, 1, 750, 0};
-const rmt_data_t kRmtPostamble = {1500, 0, 1500, 0}; // Some subvariants expect a quiet period between commands
+const rmt_data_t kRmtPostamble = {250, 1, 3750, 0};  // Some subvariants expect a quiet period between commands, this is a last 1 bit followed by a very long pause
 
 using namespace OpenShock;
 
-std::vector<rmt_data_t> Rmt::Petrainer998DREncoder::GetSequence(uint16_t shockerId, ShockerCommandType type, uint8_t intensity) {
+size_t Rmt::Petrainer998DREncoder::GetBufferSize()
+{
+  return 42;
+}
+
+bool Rmt::Petrainer998DREncoder::FillBuffer(rmt_data_t* sequence, uint16_t shockerId, ShockerCommandType type, uint8_t intensity)
+{
   // Intensity must be between 0 and 100
   intensity = std::min(intensity, static_cast<uint8_t>(100));
 
-  uint8_t typeVal = 0;
-  // typeInvert has the value of typeVal but bits are reversed and inverted
-  uint8_t typeInvert = 0;
+  int typeShift = 0;
   switch (type) {
-  case ShockerCommandType::Shock:
-    typeVal    = 0b0001;
-    typeInvert = 0b0111;
-    break;
-  case ShockerCommandType::Vibrate:
-    typeVal    = 0b0010;
-    typeInvert = 0b1011;
-    break;
-  case ShockerCommandType::Sound:
-    typeVal    = 0b0100;
-    typeInvert = 0b1101;
-    break;
-  // case ShockerCommandType::Light:
-  //   typeVal    = 0b1000;
-  //   typeInvert = 0b1110;
-  //   break;
-  default:
-    return {}; // Invalid type
+    case ShockerCommandType::Shock:
+      typeShift = 0;
+      break;
+    case ShockerCommandType::Vibrate:
+      typeShift = 1;
+      break;
+    case ShockerCommandType::Sound:
+      typeShift = 2;
+      break;
+    case ShockerCommandType::Light:
+      typeShift = 3;
+      break;
+    default:
+      return false;  // Invalid type
   }
 
+  uint8_t typeVal    = 1 << typeShift;
+  uint8_t typeInvert = Checksum::ReverseInverseNibble(typeVal);
+
   // TODO: Channel argument?
-  // Can be [000] or [111], 3 bits wide
-  uint8_t channel = 0b000;
-  uint8_t channelInvert = 0b111;
+  uint8_t channel       = 0b1000;  // Can be [1000] for CH1 or [1111] for CH2, 4 bits wide
+  uint8_t channelInvert = Checksum::ReverseInverseNibble(channel);
 
-  // Payload layout: [channel:3][typeVal:4][shockerID:17][intensity:7][typeInvert:4][channelInvert:3]
-  uint64_t data = (static_cast<uint64_t>(channel & 0b111) << 35 | static_cast<uint64_t>(typeVal & 0b1111) << 31 | static_cast<uint64_t>(shockerId & 0x1FFFF) << 14 | static_cast<uint64_t>(intensity & 0x7F) << 7 | static_cast<uint64_t>(typeInvert & 0b1111) << 3 | static_cast<uint64_t>(channelInvert & 0b111));
-
-  std::vector<rmt_data_t> pulses;
-  pulses.reserve(43);
+  // Payload layout: [channel:4][typeVal:4][shockerID:16][intensity:8][typeInvert:4][channelInvert:4] (40 bits)
+  uint64_t data
+    = (static_cast<uint64_t>(channel & 0xF) << 36 | static_cast<uint64_t>(typeVal & 0xF) << 32 | static_cast<uint64_t>(shockerId & 0xFFFF) << 16 | static_cast<uint64_t>(intensity & 0xFF) << 8 | static_cast<uint64_t>(typeInvert & 0xF) << 4 | static_cast<uint64_t>(channelInvert & 0xF));
 
   // Generate the sequence
-  pulses.push_back(kRmtPreamble);
-  pulses.push_back(kRmtOne);
-  Internal::EncodeBits<38>(pulses, data, kRmtOne, kRmtZero);
-  pulses.push_back(kRmtZero);
-  pulses.push_back(kRmtZero);
-  pulses.push_back(kRmtPostamble);
+  sequence[0] = kRmtPreamble;
+  Rmt::Internal::EncodeBits<40>(sequence + 1, data, kRmtOne, kRmtZero);
+  sequence[41] = kRmtPostamble;
 
-  return pulses;
+  return true;
 }

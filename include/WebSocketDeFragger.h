@@ -1,20 +1,23 @@
 #pragma once
 
 #include "Common.h"
+#include "span.h"
+#include "TinyVec.h"
 #include "WebSocketMessageType.h"
 
 #include <WebSockets.h>
 
-#include <map>
 #include <cstdint>
 #include <functional>
+#include <map>
 
 namespace OpenShock {
   class WebSocketDeFragger {
     DISABLE_COPY(WebSocketDeFragger);
-  public:
+    DISABLE_MOVE(WebSocketDeFragger);
 
-    typedef std::function<void(uint8_t socketId, WebSocketMessageType type, const uint8_t* data, uint32_t length)> EventCallback;
+  public:
+    typedef std::function<void(uint8_t socketId, WebSocketMessageType type, tcb::span<const uint8_t> data)> EventCallback;
 
     WebSocketDeFragger(EventCallback callback);
     ~WebSocketDeFragger();
@@ -23,19 +26,18 @@ namespace OpenShock {
     void onEvent(const EventCallback& callback);
     void clear(uint8_t socketId);
     void clear();
+
   private:
     void start(uint8_t socketId, WebSocketMessageType type, const uint8_t* data, uint32_t length);
     void append(uint8_t socketId, const uint8_t* data, uint32_t length);
     void finish(uint8_t socketId, const uint8_t* data, uint32_t length);
 
     struct Message {
-      uint8_t* data;
-      uint32_t size;
-      uint32_t capacity;
+      TinyVec<uint8_t> data;
       WebSocketMessageType type;
     };
 
     std::map<uint8_t, Message> m_messages;
     EventCallback m_callback;
   };
-}
+}  // namespace OpenShock

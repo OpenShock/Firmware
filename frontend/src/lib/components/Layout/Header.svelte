@@ -1,15 +1,22 @@
 <script lang="ts">
-  import { AppBar, LightSwitch } from '@skeletonlabs/skeleton';
+  import LightSwitch from '$lib/components/LightSwitch.svelte';
+  import { ViewModeStore } from '$lib/stores';
 </script>
 
-<AppBar slot="header">
-  <div slot="lead" class="flex items-center space-x-4">
-    <!-- Logo -->
-    <a href="/" class="overflow-hidden lg:!ml-0 lg:w-auto select-none" data-sveltekit-preload-data="hover">
-      <img class="inline-block h-12 pointer-events-none" src="/logo.svg" alt="OpenShock Logo" />
-    </a>
-  </div>
-  <svelte:fragment slot="trail">
+<header
+  class="border-border/40 bg-background/95 supports-backdrop-filter:bg-background/60 sticky top-0 z-50 flex w-full flex-row border-b backdrop-blur-sm"
+>
+  <div class="flex flex-1 flex-row items-center space-x-2 px-4 py-2">
+    <button onclick={() => ViewModeStore.set('landing')} class="overflow-hidden select-none cursor-pointer" aria-label="OpenShock">
+      <img
+        class="pointer-events-none inline-block h-6 sm:h-10"
+        src="/logo.svg"
+        alt="OpenShock Logo"
+      />
+    </button>
+
+    <div class="flex-1"></div>
+
     <LightSwitch />
-  </svelte:fragment>
-</AppBar>
+  </div>
+</header>

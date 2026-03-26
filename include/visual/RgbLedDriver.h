@@ -1,23 +1,25 @@
 #pragma once
 
 #include "Common.h"
+#include "SimpleMutex.h"
 
 #include <hal/gpio_types.h>
 
-#include <freertos/semphr.h>
 #include <freertos/task.h>
 
 #include <esp32-hal-rmt.h>
 
+#include <atomic>
 #include <cstdint>
 #include <vector>
 
 namespace OpenShock {
   class RgbLedDriver {
+    DISABLE_DEFAULT(RgbLedDriver);
     DISABLE_COPY(RgbLedDriver);
+    DISABLE_MOVE(RgbLedDriver);
 
   public:
-    RgbLedDriver() = delete;
     RgbLedDriver(gpio_num_t gpioPin);
     ~RgbLedDriver();
 
@@ -32,7 +34,8 @@ namespace OpenShock {
 
     void SetPattern(const RGBState* pattern, std::size_t patternLength);
     template<std::size_t N>
-    inline void SetPattern(const RGBState (&pattern)[N]) {
+    inline void SetPattern(const RGBState (&pattern)[N])
+    {
       SetPattern(pattern, N);
     }
     void ClearPattern();
@@ -48,6 +51,7 @@ namespace OpenShock {
     std::vector<RGBState> m_pattern;
     rmt_obj_t* m_rmtHandle;
     TaskHandle_t m_taskHandle;
-    SemaphoreHandle_t m_taskMutex;
+    SimpleMutex m_taskMutex;
+    std::atomic<bool> m_stopRequested {false};
   };
 }  // namespace OpenShock

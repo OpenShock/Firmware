@@ -8,6 +8,7 @@ namespace OpenShock {
   class ReadWriteMutex {
     DISABLE_COPY(ReadWriteMutex);
     DISABLE_MOVE(ReadWriteMutex);
+
   public:
     ReadWriteMutex();
     ~ReadWriteMutex();
@@ -17,6 +18,7 @@ namespace OpenShock {
 
     bool lockWrite(TickType_t xTicksToWait);
     void unlockWrite();
+
   private:
     SemaphoreHandle_t m_mutex;
     SemaphoreHandle_t m_readSem;
@@ -26,8 +28,11 @@ namespace OpenShock {
   class ScopedReadLock {
     DISABLE_COPY(ScopedReadLock);
     DISABLE_MOVE(ScopedReadLock);
+
   public:
-    ScopedReadLock(ReadWriteMutex* mutex, TickType_t xTicksToWait = portMAX_DELAY) : m_mutex(mutex) {
+    ScopedReadLock(ReadWriteMutex* mutex, TickType_t xTicksToWait = portMAX_DELAY)
+      : m_mutex(mutex)
+    {
       bool result = false;
       if (m_mutex != nullptr) {
         result = m_mutex->lockRead(xTicksToWait);
@@ -38,17 +43,17 @@ namespace OpenShock {
       }
     }
 
-    ~ScopedReadLock() {
+    ~ScopedReadLock()
+    {
       if (m_mutex != nullptr) {
         m_mutex->unlockRead();
       }
     }
 
-    bool isLocked() const {
-      return m_mutex != nullptr;
-    }
+    bool isLocked() const { return m_mutex != nullptr; }
 
-    bool unlock() {
+    bool unlock()
+    {
       if (m_mutex != nullptr) {
         m_mutex->unlockRead();
         m_mutex = nullptr;
@@ -58,9 +63,8 @@ namespace OpenShock {
       return false;
     }
 
-    ReadWriteMutex* getMutex() const {
-      return m_mutex;
-    }
+    ReadWriteMutex* getMutex() const { return m_mutex; }
+
   private:
     ReadWriteMutex* m_mutex;
   };
@@ -68,8 +72,11 @@ namespace OpenShock {
   class ScopedWriteLock {
     DISABLE_COPY(ScopedWriteLock);
     DISABLE_MOVE(ScopedWriteLock);
+
   public:
-    ScopedWriteLock(ReadWriteMutex* mutex, TickType_t xTicksToWait = portMAX_DELAY) : m_mutex(mutex) {
+    ScopedWriteLock(ReadWriteMutex* mutex, TickType_t xTicksToWait = portMAX_DELAY)
+      : m_mutex(mutex)
+    {
       bool result = false;
       if (m_mutex != nullptr) {
         result = m_mutex->lockWrite(xTicksToWait);
@@ -80,17 +87,17 @@ namespace OpenShock {
       }
     }
 
-    ~ScopedWriteLock() {
+    ~ScopedWriteLock()
+    {
       if (m_mutex != nullptr) {
         m_mutex->unlockWrite();
       }
     }
 
-    bool isLocked() const {
-      return m_mutex != nullptr;
-    }
+    bool isLocked() const { return m_mutex != nullptr; }
 
-    bool unlock() {
+    bool unlock()
+    {
       if (m_mutex != nullptr) {
         m_mutex->unlockWrite();
         m_mutex = nullptr;
@@ -100,10 +107,9 @@ namespace OpenShock {
       return false;
     }
 
-    ReadWriteMutex* getMutex() const {
-      return m_mutex;
-    }
+    ReadWriteMutex* getMutex() const { return m_mutex; }
+
   private:
     ReadWriteMutex* m_mutex;
   };
-} // namespace OpenShock
+}  // namespace OpenShock

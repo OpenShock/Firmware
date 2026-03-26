@@ -1,7 +1,7 @@
 #pragma once
 
-#include "ShockerModelType.h"
 #include "ShockerCommandType.h"
+#include "ShockerModelType.h"
 
 #include <cJSON.h>
 
@@ -17,4 +17,4 @@ namespace OpenShock::Serialization::JsonSerial {
   };
 
   bool ParseShockerCommand(const cJSON* root, ShockerCommand& out);
-}  // namespace OpenShock::Serialization::JsonAPI
+}  // namespace OpenShock::Serialization::JsonSerial

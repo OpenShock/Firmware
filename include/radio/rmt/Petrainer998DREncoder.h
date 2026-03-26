@@ -5,8 +5,8 @@
 #include <esp32-hal-rmt.h>
 
 #include <cstdint>
-#include <vector>
 
 namespace OpenShock::Rmt::Petrainer998DREncoder {
-  std::vector<rmt_data_t> GetSequence(uint16_t shockerId, OpenShock::ShockerCommandType type, uint8_t intensity);
+  size_t GetBufferSize();
+  bool FillBuffer(rmt_data_t* data, uint16_t shockerId, ShockerCommandType type, uint8_t intensity);
 }

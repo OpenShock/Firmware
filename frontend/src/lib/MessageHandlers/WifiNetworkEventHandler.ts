@@ -1,9 +1,9 @@
 import { WifiNetworkEvent } from '$lib/_fbs/open-shock/serialization/local/wifi-network-event';
 import { WifiNetwork as FbsWifiNetwork } from '$lib/_fbs/open-shock/serialization/types/wifi-network';
 import { WifiNetworkEventType } from '$lib/_fbs/open-shock/serialization/types/wifi-network-event-type';
-import { DeviceStateStore } from '$lib/stores';
-import { toastDelegator } from '$lib/stores/ToastDelegator';
+import { hubState } from '$lib/stores';
 import type { WiFiNetwork } from '$lib/types/WiFiNetwork';
+import { toast } from 'svelte-sonner';
 import type { MessageHandler } from '.';
 
 function handleInvalidEvent() {
@@ -27,7 +27,7 @@ function handleDiscoveredEvent(fbsNetwork: FbsWifiNetwork) {
     saved: fbsNetwork.saved(),
   };
 
-  DeviceStateStore.setWifiNetwork(network);
+  hubState.setWifiNetwork(network);
 }
 function handleUpdatedEvent(fbsNetwork: FbsWifiNetwork) {
   const ssid = fbsNetwork.ssid();
@@ -47,7 +47,7 @@ function handleUpdatedEvent(fbsNetwork: FbsWifiNetwork) {
     saved: fbsNetwork.saved(),
   };
 
-  DeviceStateStore.setWifiNetwork(network);
+  hubState.setWifiNetwork(network);
 }
 function handleLostEvent(fbsNetwork: FbsWifiNetwork) {
   const bssid = fbsNetwork.bssid();
@@ -57,45 +57,63 @@ function handleLostEvent(fbsNetwork: FbsWifiNetwork) {
     return;
   }
 
-  DeviceStateStore.removeWifiNetwork(bssid);
+  hubState.removeWifiNetwork(bssid);
 }
 function handleSavedEvent(fbsNetwork: FbsWifiNetwork) {
   const ssid = fbsNetwork.ssid();
-  const bssid = fbsNetwork.bssid();
-
-  if (!ssid || !bssid) {
+  if (!ssid) {
     console.warn('[WS] Received invalid network saved event');
     return;
   }
 
-  DeviceStateStore.updateWifiNetwork(bssid, (network) => {
-    network.saved = true;
-    return network;
-  });
+  const bssid = fbsNetwork.bssid();
+  if (bssid) {
+    hubState.updateWifiNetwork(bssid, (network) => {
+      network.saved = true;
+      return network;
+    });
+  }
 
-  toastDelegator.trigger({
-    message: 'WiFi network saved: ' + ssid,
-    background: 'bg-green-500',
-  });
+  // Update config credentials so savedOnlySSIDs stays in sync
+  if (hubState.config && !hubState.config.wifi.credentials.some((c) => c.ssid === ssid)) {
+    hubState.config = {
+      ...hubState.config,
+      wifi: {
+        ...hubState.config.wifi,
+        credentials: [...hubState.config.wifi.credentials, { id: 0, ssid, password: null }],
+      },
+    };
+  }
+
+  toast.success('WiFi network saved: ' + ssid);
 }
 function handleRemovedEvent(fbsNetwork: FbsWifiNetwork) {
   const ssid = fbsNetwork.ssid();
-  const bssid = fbsNetwork.bssid();
-
-  if (!ssid || !bssid) {
+  if (!ssid) {
     console.warn('[WS] Received invalid network forgotten event');
     return;
   }
 
-  DeviceStateStore.updateWifiNetwork(bssid, (network) => {
-    network.saved = false;
-    return network;
-  });
+  const bssid = fbsNetwork.bssid();
+  if (bssid) {
+    hubState.updateWifiNetwork(bssid, (network) => {
+      network.saved = false;
+      return network;
+    });
+  }
 
-  toastDelegator.trigger({
-    message: 'WiFi network forgotten: ' + ssid,
-    background: 'bg-green-500',
-  });
+  // Update config credentials so savedOnlySSIDs stays in sync
+  if (hubState.config) {
+    hubState.config = {
+      ...hubState.config,
+      wifi: {
+        ...hubState.config.wifi,
+        credentials: hubState.config.wifi.credentials.filter((c) => c.ssid !== ssid),
+      },
+    };
+  }
+
+  toast.success('WiFi network forgotten: ' + ssid);
 }
 function handleConnectedEvent(fbsNetwork: FbsWifiNetwork) {
   const ssid = fbsNetwork.ssid();
@@ -106,12 +124,9 @@ function handleConnectedEvent(fbsNetwork: FbsWifiNetwork) {
     return;
   }
 
-  DeviceStateStore.setWifiConnectedBSSID(bssid);
+  hubState.wifiConnectedBSSID = bssid;
 
-  toastDelegator.trigger({
-    message: 'WiFi network connected: ' + ssid,
-    background: 'bg-green-500',
-  });
+  toast.info('WiFi network connected: ' + ssid);
 }
 function handleDisconnectedEvent(fbsNetwork: FbsWifiNetwork) {
   const ssid = fbsNetwork.ssid();
@@ -122,18 +137,17 @@ function handleDisconnectedEvent(fbsNetwork: FbsWifiNetwork) {
     return;
   }
 
-  DeviceStateStore.setWifiConnectedBSSID(null);
+  hubState.wifiConnectedBSSID = null;
 
-  toastDelegator.trigger({
-    message: 'WiFi network disconnected: ' + ssid,
-    background: 'bg-green-500',
-  });
+  toast.info('WiFi network disconnected: ' + ssid);
 }
 
 type WifiNetworkEventHandler = (fbsNetwork: FbsWifiNetwork) => void;
 
 const EventTypes = Object.keys(WifiNetworkEventType).length / 2;
-const EventHandlers: WifiNetworkEventHandler[] = new Array<WifiNetworkEventHandler>(EventTypes).fill(handleInvalidEvent);
+const EventHandlers: WifiNetworkEventHandler[] = new Array<WifiNetworkEventHandler>(
+  EventTypes
+).fill(handleInvalidEvent);
 
 EventHandlers[WifiNetworkEventType.Discovered] = handleDiscoveredEvent;
 EventHandlers[WifiNetworkEventType.Updated] = handleUpdatedEvent;

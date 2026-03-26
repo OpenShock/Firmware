@@ -5,8 +5,7 @@
 export { BootStatus } from './gateway/boot-status';
 export { HubToGatewayMessage } from './gateway/hub-to-gateway-message';
 export { HubToGatewayMessagePayload } from './gateway/hub-to-gateway-message-payload';
-export { KeepAlive } from './gateway/keep-alive';
-export { OtaInstallFailed } from './gateway/ota-install-failed';
-export { OtaInstallProgress } from './gateway/ota-install-progress';
-export { OtaInstallProgressTask } from './gateway/ota-install-progress-task';
-export { OtaInstallStarted } from './gateway/ota-install-started';
+export { OtaUpdateFailed } from './gateway/ota-update-failed';
+export { OtaUpdateProgress } from './gateway/ota-update-progress';
+export { OtaUpdateStarted } from './gateway/ota-update-started';
+export { Pong } from './gateway/pong';

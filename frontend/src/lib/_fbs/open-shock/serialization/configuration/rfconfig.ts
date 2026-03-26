@@ -27,7 +27,7 @@ static getSizePrefixedRootAsRFConfig(bb:flatbuffers.ByteBuffer, obj?:RFConfig):R
  */
 txPin():number {
   const offset = this.bb!.__offset(this.bb_pos, 4);
-  return offset ? this.bb!.readUint8(this.bb_pos + offset) : 0;
+  return offset ? this.bb!.readInt8(this.bb_pos + offset) : 0;
 }
 
 /**
@@ -35,7 +35,7 @@ txPin():number {
  */
 keepaliveEnabled():boolean {
   const offset = this.bb!.__offset(this.bb_pos, 6);
-  return offset ? !!this.bb!.readInt8(this.bb_pos + offset) : false;
+  return offset ? !!this.bb!.readInt8(this.bb_pos + offset) : true;
 }
 
 static startRFConfig(builder:flatbuffers.Builder) {
@@ -47,7 +47,7 @@ static addTxPin(builder:flatbuffers.Builder, txPin:number) {
 }
 
 static addKeepaliveEnabled(builder:flatbuffers.Builder, keepaliveEnabled:boolean) {
-  builder.addFieldInt8(1, +keepaliveEnabled, +false);
+  builder.addFieldInt8(1, +keepaliveEnabled, +true);
 }
 
 static endRFConfig(builder:flatbuffers.Builder):flatbuffers.Offset {

@@ -1,13 +1,19 @@
 #pragma once
 
-#include "serialization/_fbs/ShockerCommandType_generated.h"
-
 #include <cstdint>
+#include <cstring>
 
 namespace OpenShock {
-  typedef OpenShock::Serialization::Types::ShockerCommandType ShockerCommandType;
+  enum class ShockerCommandType : uint8_t {
+    Stop,
+    Shock,
+    Vibrate,
+    Sound,
+    Light
+  };
 
-  inline bool ShockerCommandTypeFromString(const char* str, ShockerCommandType& out) {
+  inline bool ShockerCommandTypeFromString(const char* str, ShockerCommandType& out)
+  {
     if (strcasecmp(str, "stop") == 0) {
       out = ShockerCommandType::Stop;
       return true;
@@ -19,6 +25,9 @@ namespace OpenShock {
       return true;
     } else if (strcasecmp(str, "sound") == 0) {
       out = ShockerCommandType::Sound;
+      return true;
+    } else if (strcasecmp(str, "light") == 0) {
+      out = ShockerCommandType::Light;
       return true;
     } else {
       return false;

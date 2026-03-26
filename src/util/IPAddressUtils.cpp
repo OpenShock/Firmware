@@ -5,7 +5,8 @@
 
 const char* const TAG = "Util::IPAddressUtils";
 
-bool OpenShock::IPV4AddressFromStringView(IPAddress& ip, std::string_view sv) {
+bool OpenShock::IPV4AddressFromStringView(IPAddress& ip, std::string_view sv)
+{
   if (sv.empty()) {
     return false;
   }

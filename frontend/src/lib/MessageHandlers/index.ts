@@ -1,22 +1,17 @@
+import { stopWifiScan } from '$lib/api';
 import type { WebSocketClient } from '$lib/WebSocketClient';
+import { ErrorMessage } from '$lib/_fbs/open-shock/serialization/local/error-message';
 import { HubToLocalMessage } from '$lib/_fbs/open-shock/serialization/local/hub-to-local-message';
 import { HubToLocalMessagePayload } from '$lib/_fbs/open-shock/serialization/local/hub-to-local-message-payload';
 import { ReadyMessage } from '$lib/_fbs/open-shock/serialization/local/ready-message';
 import { WifiScanStatusMessage } from '$lib/_fbs/open-shock/serialization/local/wifi-scan-status-message';
-import { ByteBuffer } from 'flatbuffers';
-import { DeviceStateStore } from '$lib/stores';
-import { SerializeWifiScanCommand } from '$lib/Serializers/WifiScanCommand';
-import { toastDelegator } from '$lib/stores/ToastDelegator';
-import { SetRfTxPinCommandResult } from '$lib/_fbs/open-shock/serialization/local/set-rf-tx-pin-command-result';
-import { SetEstopPinCommandResult } from '$lib/_fbs/open-shock/serialization/local/set-estop-pin-command-result';
-import { SetGPIOResultCode } from '$lib/_fbs/open-shock/serialization/local/set-gpioresult-code';
-import { AccountLinkCommandResult } from '$lib/_fbs/open-shock/serialization/local/account-link-command-result';
-import { AccountLinkResultCode } from '$lib/_fbs/open-shock/serialization/local/account-link-result-code';
-import { ErrorMessage } from '$lib/_fbs/open-shock/serialization/local/error-message';
-import { WifiNetworkEventHandler } from './WifiNetworkEventHandler';
+import { AccountLinkStatusEvent } from '$lib/_fbs/open-shock/serialization/local/account-link-status-event';
+import { WifiGotIpEvent } from '$lib/_fbs/open-shock/serialization/local/wifi-got-ip-event';
 import { mapConfig } from '$lib/mappers/ConfigMapper';
-import { SetEstopEnabledCommand } from '$lib/_fbs/open-shock/serialization/local';
-import { SetEstopEnabledCommandResult } from '$lib/_fbs/open-shock/serialization/local/set-estop-enabled-command-result';
+import { hubState } from '$lib/stores';
+import { ByteBuffer } from 'flatbuffers';
+import { toast } from 'svelte-sonner';
+import { WifiNetworkEventHandler } from './WifiNetworkEventHandler';
 
 export type MessageHandler = (wsClient: WebSocketClient, message: HubToLocalMessage) => void;
 
@@ -25,31 +20,33 @@ function handleInvalidMessage() {
 }
 
 const PayloadTypes = Object.keys(HubToLocalMessagePayload).length / 2;
-const PayloadHandlers: MessageHandler[] = new Array<MessageHandler>(PayloadTypes).fill(handleInvalidMessage);
+const PayloadHandlers: MessageHandler[] = new Array<MessageHandler>(PayloadTypes).fill(
+  handleInvalidMessage
+);
 
 PayloadHandlers[HubToLocalMessagePayload.ReadyMessage] = (cli, msg) => {
   const payload = new ReadyMessage();
   msg.payload(payload);
 
-  console.log('[WS] Connected to device, poggies: ', payload.poggies());
+  hubState.wifiConnectedBSSID = payload.connectedWifi()?.bssid() || null;
+  hubState.accountLinked = payload.accountLinked();
+  hubState.config = mapConfig(payload.config());
 
-  DeviceStateStore.update((store) => {
-    store.wifiConnectedBSSID = payload.connectedWifi()?.bssid() || null;
-    store.accountLinked = payload.accountLinked();
-    store.config = mapConfig(payload.config());
+  const gpioValidInputs = payload.gpioValidInputsArray();
+  if (gpioValidInputs) {
+    hubState.gpioValidInputs = gpioValidInputs;
+  }
 
-    console.log('[WS] Updated device state store: ', store);
+  const gpioValidOutputs = payload.gpioValidOutputsArray();
+  if (gpioValidOutputs) {
+    hubState.gpioValidOutputs = gpioValidOutputs;
+  }
 
-    return store;
-  });
+  console.log('[WS] Updated hub state: ', hubState);
 
-  const data = SerializeWifiScanCommand(true);
-  cli.Send(data);
+  stopWifiScan();
 
-  toastDelegator.trigger({
-    message: 'Websocket connection established',
-    background: 'bg-green-500',
-  });
+  toast.success('Websocket connection established');
 };
 
 PayloadHandlers[HubToLocalMessagePayload.ErrorMessage] = (cli, msg) => {
@@ -58,145 +55,33 @@ PayloadHandlers[HubToLocalMessagePayload.ErrorMessage] = (cli, msg) => {
 
   console.error('[WS] Received error message: ', payload.message());
 
-  toastDelegator.trigger({
-    message: 'Error: ' + payload.message(),
-    background: 'bg-red-500',
-  });
+  toast.error(payload.message() ?? 'Unknown error');
 };
 
 PayloadHandlers[HubToLocalMessagePayload.WifiScanStatusMessage] = (cli, msg) => {
   const payload = new WifiScanStatusMessage();
   msg.payload(payload);
 
-  DeviceStateStore.setWifiScanStatus(payload.status());
+  hubState.wifiScanStatus = payload.status();
 };
 
 PayloadHandlers[HubToLocalMessagePayload.WifiNetworkEvent] = WifiNetworkEventHandler;
 
-PayloadHandlers[HubToLocalMessagePayload.AccountLinkCommandResult] = (cli, msg) => {
-  const payload = new AccountLinkCommandResult();
+PayloadHandlers[HubToLocalMessagePayload.WifiGotIpEvent] = (cli, msg) => {
+  const payload = new WifiGotIpEvent();
   msg.payload(payload);
 
-  const result = payload.result();
-
-  if (result == AccountLinkResultCode.Success) {
-    toastDelegator.trigger({
-      message: 'Account linked successfully',
-      background: 'bg-green-500',
-    });
-  } else {
-    let reason: string;
-    switch (result) {
-      case AccountLinkResultCode.CodeRequired:
-        reason = 'Code required';
-        break;
-      case AccountLinkResultCode.InvalidCodeLength:
-        reason = 'Invalid code length';
-        break;
-      case AccountLinkResultCode.NoInternetConnection:
-        reason = 'No internet connection';
-        break;
-      case AccountLinkResultCode.InvalidCode:
-        reason = 'Invalid code';
-        break;
-      case AccountLinkResultCode.InternalError:
-        reason = 'Internal error';
-        break;
-      default:
-        reason = 'Unknown';
-        break;
-    }
-    toastDelegator.trigger({
-      message: 'Failed to link account: ' + reason,
-      background: 'bg-red-500',
-    });
+  const ip = payload.ip();
+  if (ip) {
+    toast.info('Got IP address: ' + ip);
   }
 };
 
-PayloadHandlers[HubToLocalMessagePayload.SetRfTxPinCommandResult] = (cli, msg) => {
-  const payload = new SetRfTxPinCommandResult();
+PayloadHandlers[HubToLocalMessagePayload.AccountLinkStatusEvent] = (cli, msg) => {
+  const payload = new AccountLinkStatusEvent();
   msg.payload(payload);
 
-  const result = payload.result();
-
-  if (result == SetGPIOResultCode.Success) {
-    DeviceStateStore.setRfTxPin(payload.pin());
-    toastDelegator.trigger({
-      message: 'Changed RF TX pin to: ' + payload.pin(),
-      background: 'bg-green-500',
-    });
-  } else {
-    let reason: string;
-    switch (result) {
-      case SetGPIOResultCode.InvalidPin:
-        reason = 'Invalid pin';
-        break;
-      case SetGPIOResultCode.InternalError:
-        reason = 'Internal error';
-        break;
-      default:
-        reason = 'Unknown';
-        break;
-    }
-    toastDelegator.trigger({
-      message: 'Failed to change RF TX pin: ' + reason,
-      background: 'bg-red-500',
-    });
-  }
-};
-
-PayloadHandlers[HubToLocalMessagePayload.SetEstopEnabledCommandResult] = (cli, msg) => {
-  const payload = new SetEstopEnabledCommandResult();
-  msg.payload(payload);
-
-  const enabled = payload.enabled();
-  const success = payload.success();
-
-  if (success) {
-    DeviceStateStore.setEstopEnabled(payload.enabled());
-    toastDelegator.trigger({
-      message: 'Changed EStop enabled to: ' + enabled,
-      background: 'bg-green-500',
-    });
-  } else {
-    toastDelegator.trigger({
-      message: 'Failed to change EStop enabled',
-      background: 'bg-red-500',
-    });
-  }
-};
-
-PayloadHandlers[HubToLocalMessagePayload.SetEstopPinCommandResult] = (cli, msg) => {
-  const payload = new SetEstopPinCommandResult();
-  msg.payload(payload);
-
-  const result = payload.result();
-
-  if (result == SetGPIOResultCode.Success) {
-    const gpioPin = payload.gpioPin();
-    DeviceStateStore.setEstopGpioPin(gpioPin);
-    toastDelegator.trigger({
-      message: 'Changed EStop pin to: ' + gpioPin,
-      background: 'bg-green-500',
-    });
-  } else {
-    let reason: string;
-    switch (result) {
-      case SetGPIOResultCode.InvalidPin:
-        reason = 'Invalid pin';
-        break;
-      case SetGPIOResultCode.InternalError:
-        reason = 'Internal error';
-        break;
-      default:
-        reason = 'Unknown';
-        break;
-    }
-    toastDelegator.trigger({
-      message: 'Failed to change EStop pin: ' + reason,
-      background: 'bg-red-500',
-    });
-  }
+  hubState.accountLinked = payload.linked();
 };
 
 export function WebSocketMessageBinaryHandler(cli: WebSocketClient, data: ArrayBuffer) {

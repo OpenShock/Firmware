@@ -1,26 +1,47 @@
 #pragma once
 
-#include <cstdint>
 #include <utility>
 
 namespace OpenShock::Util {
-  namespace FnProxyImpl {
-    template<typename T>
-    class MemFunTraits;
 
-    template<typename R, typename C, typename... Ts>
-    struct MemFunTraits<R (C::*)(Ts...)> {
-      constexpr static const std::size_t arity = sizeof...(Ts);
-      using ReturnType                         = R;
-      using Class                              = C;
+  namespace detail {
+
+    template<auto MemberFunction>
+    struct FnProxyImpl;
+
+    // Non-const, non-noexcept
+    template<typename R, typename C, typename... Ts, R (C::*MF)(Ts...)>
+    struct FnProxyImpl<MF> {
+      static R Call(void* p, Ts... args) noexcept(noexcept((static_cast<C*>(p)->*MF)(std::move(args)...))) { return (static_cast<C*>(p)->*MF)(std::move(args)...); }
     };
-  }  // namespace FnProxyImpl
 
-  // Proxies a member function pointer to a void(void*) function pointer, allowing it to be passed to C-style APIs that expect a callback.
+    // Const, non-noexcept
+    template<typename R, typename C, typename... Ts, R (C::*MF)(Ts...) const>
+    struct FnProxyImpl<MF> {
+      static R Call(void* p, Ts... args) noexcept(noexcept((static_cast<const C*>(p)->*MF)(std::move(args)...))) { return (static_cast<const C*>(p)->*MF)(std::move(args)...); }
+    };
+
+    // Non-const, noexcept
+    template<typename R, typename C, typename... Ts, R (C::*MF)(Ts...) noexcept>
+    struct FnProxyImpl<MF> {
+      static R Call(void* p, Ts... args) noexcept { return (static_cast<C*>(p)->*MF)(std::move(args)...); }
+    };
+
+    // Const, noexcept
+    template<typename R, typename C, typename... Ts, R (C::*MF)(Ts...) const noexcept>
+    struct FnProxyImpl<MF> {
+      static R Call(void* p, Ts... args) noexcept { return (static_cast<const C*>(p)->*MF)(std::move(args)...); }
+    };
+
+  }  // namespace detail
+
+  /// Variable template: FnProxy<&Class::method> is directly a function pointer.
+  ///
+  /// Usage:
+  ///   auto cb = FnProxy<&Sensor::read>;  // R(*)(void*, Ts...)
+  ///   Sensor s;
+  ///   cb(&s, 1.5f);
   template<auto MemberFunction>
-  inline void FnProxy(void* p) {
-    using T = decltype(MemberFunction);
-    using C = typename FnProxyImpl::MemFunTraits<T>::Class;
-    (reinterpret_cast<C*>(p)->*MemberFunction)();
-  }
+  inline constexpr auto FnProxy = &detail::FnProxyImpl<MemberFunction>::Call;
+
 }  // namespace OpenShock::Util

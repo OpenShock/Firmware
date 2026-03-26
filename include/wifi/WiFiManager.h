@@ -15,8 +15,9 @@ namespace OpenShock::WiFiManager {
   /// @brief Saves a network to the config
   /// @param ssid SSID of the network
   /// @param password Password of the network
+  /// @param connect Whether to connect to the network after saving
   /// @return True if the network was saved successfully
-  bool Save(const char* ssid, std::string_view password);
+  bool Save(const char* ssid, std::string_view password, bool connect = true, wifi_auth_mode_t authMode = WIFI_AUTH_MAX);
 
   /// @brief Removes a network from the config by it's SSID
   /// @param ssid SSID of the network
@@ -37,35 +38,27 @@ namespace OpenShock::WiFiManager {
   /// @return True if the saved network was found and the connection process was started successfully
   bool Connect(const char* ssid);
 
-  /// @brief Connects to a saved network by it's BSSID
-  /// @param bssid BSSID of the network
-  /// @return True if the saved network was found and the connection process was started successfully
-  bool Connect(const uint8_t (&bssid)[6]);
-
   /// @brief Disconnects from the currently connected network
   void Disconnect();
 
-  /// @brief Checks if the device is currently connected to a network
-  /// @return True if the device is connected to a network
+  /// @brief Checks if the hub is currently connected to a network
+  /// @return True if the hub is connected to a network
   bool IsConnected();
 
   /// @brief Gets the currently connected network
   /// @param network Variable to store the network info in
-  /// @return True if the device is connected to a network
+  /// @return True if the hub is connected to a network
   bool GetConnectedNetwork(OpenShock::WiFiNetwork& network);
 
-  /// @brief Gets the devices IP address if it's connected to a network (IPv4)
+  /// @brief Gets the hubs IP address if it's connected to a network (IPv4)
   /// @param ipAddress Variable to store the IP address in
-  /// @return True if the device is connected to a network
+  /// @return True if the hub is connected to a network
   bool GetIPAddress(char* ipAddress);
 
-  /// @brief Gets the devices IP address if it's connected to a network (IPv6)
+  /// @brief Gets the hubs IP address if it's connected to a network (IPv6)
   /// @param ipAddress Variable to store the IP address in
-  /// @return True if the device is connected to a network
+  /// @return True if the hub is connected to a network
   bool GetIPv6Address(char* ipAddress);
-
-  /// @brief Runs the WiFiManager loop
-  void Update();
 
   /// @brief Gets a copy of the vector of discovered WiFi networks
   /// @return Vector of discovered WiFiNetworks

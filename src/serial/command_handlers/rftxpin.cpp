@@ -5,25 +5,26 @@
 #include "Convert.h"
 #include "SetGPIOResultCode.h"
 
-void _handleRfTxPinCommand(std::string_view arg, bool isAutomated) {
+void _handleRfTxPinCommand(std::string_view arg, bool isAutomated)
+{
+  gpio_num_t txPin;
+
   if (arg.empty()) {
-    uint8_t txPin;
     if (!OpenShock::Config::GetRFConfigTxPin(txPin)) {
       SERPR_ERROR("Failed to get RF TX pin from config");
       return;
     }
 
     // Get rmt pin
-    SERPR_RESPONSE("RmtPin|%u", txPin);
+    SERPR_RESPONSE("RmtPin|%hhi", static_cast<int8_t>(txPin));
     return;
   }
 
-  uint8_t pin;
-  if (!OpenShock::Convert::ToUint8(arg, pin)) {
+  if (!OpenShock::Convert::ToGpioNum(arg, txPin)) {
     SERPR_ERROR("Invalid argument (number invalid or out of range)");
   }
 
-  OpenShock::SetGPIOResultCode result = OpenShock::CommandHandler::SetRfTxPin(static_cast<uint8_t>(pin));
+  OpenShock::SetGPIOResultCode result = OpenShock::CommandHandler::SetRfTxPin(txPin);
 
   switch (result) {
     case OpenShock::SetGPIOResultCode::InvalidPin:
@@ -44,7 +45,8 @@ void _handleRfTxPinCommand(std::string_view arg, bool isAutomated) {
   }
 }
 
-OpenShock::Serial::CommandGroup OpenShock::Serial::CommandHandlers::RfTxPinHandler() {
+OpenShock::Serial::CommandGroup OpenShock::Serial::CommandHandlers::RfTxPinHandler()
+{
   auto group = OpenShock::Serial::CommandGroup("rftxpin"sv);
 
   auto& getCommand = group.addCommand("Get the GPIO pin used for the radio transmitter"sv, _handleRfTxPinCommand);

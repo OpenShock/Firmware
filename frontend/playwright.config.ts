@@ -1,12 +1,14 @@
-import type { PlaywrightTestConfig } from '@playwright/test';
+import { defineConfig } from '@playwright/test';
 
-const config: PlaywrightTestConfig = {
-	webServer: {
-		command: 'npm run build && npm run preview',
-		port: 4173
-	},
-	testDir: 'tests',
-	testMatch: /(.+\.)?(test|spec)\.[jt]s/
-};
-
-export default config;
+export default defineConfig({
+  reporter: process.env.CI ? 'github' : 'html',
+  use: {
+    trace: 'on-first-retry',
+  },
+  webServer: {
+    command: 'pnpm run build && pnpm run preview',
+    port: 4173,
+    reuseExistingServer: !process.env.CI,
+  },
+  testDir: 'e2e',
+});

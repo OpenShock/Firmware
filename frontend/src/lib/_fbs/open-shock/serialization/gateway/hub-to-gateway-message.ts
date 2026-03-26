@@ -49,6 +49,7 @@ static addPayload(builder:flatbuffers.Builder, payloadOffset:flatbuffers.Offset)
 
 static endHubToGatewayMessage(builder:flatbuffers.Builder):flatbuffers.Offset {
   const offset = builder.endObject();
+  builder.requiredField(offset, 6) // payload
   return offset;
 }
 

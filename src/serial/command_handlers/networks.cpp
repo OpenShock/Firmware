@@ -9,7 +9,8 @@
 
 const char* const TAG = "Serial::CommandHandlers::Networks";
 
-void _handleNetworksCommand(std::string_view arg, bool isAutomated) {
+void _handleNetworksCommand(std::string_view arg, bool isAutomated)
+{
   cJSON* root;
 
   if (arg.empty()) {
@@ -21,10 +22,12 @@ void _handleNetworksCommand(std::string_view arg, bool isAutomated) {
 
     if (!OpenShock::Config::GetWiFiCredentials(root, true)) {
       SERPR_ERROR("Failed to get WiFi credentials from config");
+      cJSON_Delete(root);
       return;
     }
 
     char* out = cJSON_PrintUnformatted(root);
+    cJSON_Delete(root);
     if (out == nullptr) {
       SERPR_ERROR("Failed to print JSON");
       return;
@@ -44,6 +47,7 @@ void _handleNetworksCommand(std::string_view arg, bool isAutomated) {
 
   if (cJSON_IsArray(root) == 0) {
     SERPR_ERROR("Invalid argument (not an array)");
+    cJSON_Delete(root);
     return;
   }
 
@@ -51,11 +55,13 @@ void _handleNetworksCommand(std::string_view arg, bool isAutomated) {
 
   uint8_t id     = 1;
   cJSON* network = nullptr;
-  cJSON_ArrayForEach(network, root) {
+  cJSON_ArrayForEach(network, root)
+  {
     OpenShock::Config::WiFiCredentials cred;
 
     if (!cred.FromJSON(network)) {
       SERPR_ERROR("Failed to parse network");
+      cJSON_Delete(root);
       return;
     }
 
@@ -65,8 +71,10 @@ void _handleNetworksCommand(std::string_view arg, bool isAutomated) {
 
     OS_LOGI(TAG, "Adding network \"%s\" to config, id=%u", cred.ssid.c_str(), cred.id);
 
-    creds.emplace_back(std::move(cred));
+    creds.push_back(std::move(cred));
   }
+
+  cJSON_Delete(root);
 
   if (!OpenShock::Config::SetWiFiCredentials(creds)) {
     SERPR_ERROR("Failed to save config");
@@ -78,33 +86,23 @@ void _handleNetworksCommand(std::string_view arg, bool isAutomated) {
   OpenShock::WiFiManager::RefreshNetworkCredentials();
 }
 
-OpenShock::Serial::CommandGroup OpenShock::Serial::CommandHandlers::NetworksHandler() {
+OpenShock::Serial::CommandGroup OpenShock::Serial::CommandHandlers::NetworksHandler()
+{
   auto group = OpenShock::Serial::CommandGroup("networks"sv);
 
   auto& getCommand = group.addCommand("Get all saved networks."sv, _handleNetworksCommand);
 
   auto& setCommand = group.addCommand("Set all saved networks."sv, _handleNetworksCommand);
-  setCommand.addArgument("json"sv, "must be a array of objects with the following fields:"sv, "[{\"ssid\":\"myssid\",\"password\":\"mypassword\"}]"sv);
+  setCommand.addArgument(
+    "json"sv,
+    "must be a array of objects with the following fields:"sv,
+    "[{\"ssid\":\"myssid\",\"password\":\"mypassword\"}]"sv,
+    {
+      "ssid     (string)  SSID of the network"sv,
+      "password (string)  Password of the network"sv,
+      "id       (number)  ID of the network (optional)"sv,
+    }
+  );
 
   return group;
 }
-
-/*
-  return OpenShock::Serial::CommandGroup {
-    "networks"sv,
-    R"(networks
-  Get all saved networks.
-
-networks [<json>]
-  Set all saved networks.
-  Arguments:
-    <json> must be a array of objects with the following fields:
-      ssid     (string)  SSID of the network
-      password (string)  Password of the network
-      id       (number)  ID of the network (optional)
-  Example:
-    networks [{\"ssid\":\"myssid\",\"password\":\"mypassword\"}]
-)",
-    _handleNetworksCommand,
-  };
-*/

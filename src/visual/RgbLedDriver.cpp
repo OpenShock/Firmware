@@ -17,36 +17,47 @@ using namespace OpenShock;
 // TODO: Support multiple LEDs ?
 // TODO: Support other LED types ?
 
-RgbLedDriver::RgbLedDriver(gpio_num_t gpioPin) : m_gpioPin(GPIO_NUM_NC), m_brightness(255), m_pattern(), m_rmtHandle(nullptr), m_taskHandle(nullptr), m_taskMutex(xSemaphoreCreateMutex()) {
+RgbLedDriver::RgbLedDriver(gpio_num_t gpioPin)
+  : m_gpioPin(GPIO_NUM_NC)
+  , m_brightness(255)
+  , m_pattern()
+  , m_rmtHandle(nullptr)
+  , m_taskHandle(nullptr)
+  , m_taskMutex()
+{
   if (gpioPin == GPIO_NUM_NC) {
     OS_LOGE(TAG, "Pin is not set");
     return;
   }
 
   if (!OpenShock::IsValidOutputPin(gpioPin)) {
-    OS_LOGE(TAG, "Pin %d is not a valid output pin", gpioPin);
+    OS_LOGE(TAG, "Pin %hhi is not a valid output pin", gpioPin);
     return;
   }
 
   m_rmtHandle = rmtInit(gpioPin, RMT_TX_MODE, RMT_MEM_64);
   if (m_rmtHandle == NULL) {
-    OS_LOGE(TAG, "Failed to initialize RMT for pin %d", gpioPin);
+    OS_LOGE(TAG, "Failed to initialize RMT for pin %hhi", gpioPin);
     return;
   }
 
   float realTick = rmtSetTick(m_rmtHandle, 100.F);
-  OS_LOGD(TAG, "RMT tick is %f ns for pin %d", realTick, gpioPin);
+  OS_LOGD(TAG, "RMT tick is %f ns for pin %hhi", realTick, gpioPin);
 
   m_gpioPin = gpioPin;
 }
 
-RgbLedDriver::~RgbLedDriver() {
+RgbLedDriver::~RgbLedDriver()
+{
   ClearPattern();
 
-  vSemaphoreDelete(m_taskMutex);
+  rmtDeinit(m_rmtHandle);
 }
 
-void RgbLedDriver::SetPattern(const RGBState* pattern, std::size_t patternLength) {
+void RgbLedDriver::SetPattern(const RGBState* pattern, std::size_t patternLength)
+{
+  m_taskMutex.lock(portMAX_DELAY);
+
   ClearPatternInternal();
 
   // Set new values
@@ -54,44 +65,52 @@ void RgbLedDriver::SetPattern(const RGBState* pattern, std::size_t patternLength
   std::copy(pattern, pattern + patternLength, m_pattern.begin());
 
   // Start the task
-  BaseType_t result = TaskUtils::TaskCreateExpensive(&Util::FnProxy<&RgbLedDriver::RunPattern>, TAG, 4096, this, 1, &m_taskHandle);  // PROFILED: 1.7KB stack usage
+  m_stopRequested.store(false, std::memory_order_relaxed);
+  BaseType_t result = TaskUtils::TaskCreateExpensive(Util::FnProxy<&RgbLedDriver::RunPattern>, TAG, 4096, this, 1, &m_taskHandle);  // PROFILED: 1.7KB stack usage
   if (result != pdPASS) {
-    OS_LOGE(TAG, "[pin-%u] Failed to create task: %d", m_gpioPin, result);
+    OS_LOGE(TAG, "[pin-%hhi] Failed to create task: %d", m_gpioPin, result);
 
     m_taskHandle = nullptr;
     m_pattern.clear();
   }
 
-  // Give the semaphore back
-  xSemaphoreGive(m_taskMutex);
+  m_taskMutex.unlock();
 }
 
-void RgbLedDriver::ClearPattern() {
+void RgbLedDriver::ClearPattern()
+{
+  m_taskMutex.lock(portMAX_DELAY);
+
   ClearPatternInternal();
-  xSemaphoreGive(m_taskMutex);
+
+  m_taskMutex.unlock();
 }
 
 // Range: 0-255
-void RgbLedDriver::SetBrightness(uint8_t brightness) {
+void RgbLedDriver::SetBrightness(uint8_t brightness)
+{
   m_brightness = brightness;
 }
 
-void RgbLedDriver::ClearPatternInternal() {
-  xSemaphoreTake(m_taskMutex, portMAX_DELAY);
-
+void RgbLedDriver::ClearPatternInternal()
+{
   if (m_taskHandle != nullptr) {
-    vTaskDelete(m_taskHandle);
+    m_stopRequested.store(true, std::memory_order_relaxed);
+    TaskUtils::StopTask(m_taskHandle, TAG, "RgbLedDriver task");
     m_taskHandle = nullptr;
   }
 
   m_pattern.clear();
 }
 
-void RgbLedDriver::RunPattern() {
+void RgbLedDriver::RunPattern()
+{
   std::array<rmt_data_t, 24> led_data;  // 24 bits per LED (8 bits per color * 3 colors)
 
-  while (true) {
+  while (!m_stopRequested.load(std::memory_order_relaxed)) {
     for (const auto& state : m_pattern) {
+      if (m_stopRequested.load(std::memory_order_relaxed)) break;
+
       // WS2812B usually takes commands in GRB order
       // https://cdn-shop.adafruit.com/datasheets/WS2812B.pdf - Page 5
       // But some actually expect RGB!
@@ -125,4 +144,6 @@ void RgbLedDriver::RunPattern() {
       vTaskDelay(pdMS_TO_TICKS(state.duration));
     }
   }
+
+  vTaskDelete(nullptr);
 }

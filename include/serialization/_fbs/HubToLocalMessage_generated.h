@@ -8,9 +8,9 @@
 
 // Ensure the included flatbuffers.h is the same version as when this file was
 // generated, otherwise it may not be compatible.
-static_assert(FLATBUFFERS_VERSION_MAJOR == 24 &&
-              FLATBUFFERS_VERSION_MINOR == 3 &&
-              FLATBUFFERS_VERSION_REVISION == 25,
+static_assert(FLATBUFFERS_VERSION_MAJOR == 25 &&
+              FLATBUFFERS_VERSION_MINOR == 12 &&
+              FLATBUFFERS_VERSION_REVISION == 19,
              "Non-compatible flatbuffers version included");
 
 #include "HubConfig_generated.h"
@@ -40,95 +40,11 @@ struct WifiGotIpEventBuilder;
 struct WifiLostIpEvent;
 struct WifiLostIpEventBuilder;
 
-struct AccountLinkCommandResult;
-struct AccountLinkCommandResultBuilder;
-
-struct SetRfTxPinCommandResult;
-struct SetRfTxPinCommandResultBuilder;
-
-struct SetEstopEnabledCommandResult;
-struct SetEstopEnabledCommandResultBuilder;
-
-struct SetEstopPinCommandResult;
-struct SetEstopPinCommandResultBuilder;
+struct AccountLinkStatusEvent;
+struct AccountLinkStatusEventBuilder;
 
 struct HubToLocalMessage;
 struct HubToLocalMessageBuilder;
-
-enum class AccountLinkResultCode : uint8_t {
-  Success = 0,
-  CodeRequired = 1,
-  InvalidCodeLength = 2,
-  NoInternetConnection = 3,
-  InvalidCode = 4,
-  InternalError = 5,
-  MIN = Success,
-  MAX = InternalError
-};
-
-inline const AccountLinkResultCode (&EnumValuesAccountLinkResultCode())[6] {
-  static const AccountLinkResultCode values[] = {
-    AccountLinkResultCode::Success,
-    AccountLinkResultCode::CodeRequired,
-    AccountLinkResultCode::InvalidCodeLength,
-    AccountLinkResultCode::NoInternetConnection,
-    AccountLinkResultCode::InvalidCode,
-    AccountLinkResultCode::InternalError
-  };
-  return values;
-}
-
-inline const char * const *EnumNamesAccountLinkResultCode() {
-  static const char * const names[7] = {
-    "Success",
-    "CodeRequired",
-    "InvalidCodeLength",
-    "NoInternetConnection",
-    "InvalidCode",
-    "InternalError",
-    nullptr
-  };
-  return names;
-}
-
-inline const char *EnumNameAccountLinkResultCode(AccountLinkResultCode e) {
-  if (::flatbuffers::IsOutRange(e, AccountLinkResultCode::Success, AccountLinkResultCode::InternalError)) return "";
-  const size_t index = static_cast<size_t>(e);
-  return EnumNamesAccountLinkResultCode()[index];
-}
-
-enum class SetGPIOResultCode : uint8_t {
-  Success = 0,
-  InvalidPin = 1,
-  InternalError = 2,
-  MIN = Success,
-  MAX = InternalError
-};
-
-inline const SetGPIOResultCode (&EnumValuesSetGPIOResultCode())[3] {
-  static const SetGPIOResultCode values[] = {
-    SetGPIOResultCode::Success,
-    SetGPIOResultCode::InvalidPin,
-    SetGPIOResultCode::InternalError
-  };
-  return values;
-}
-
-inline const char * const *EnumNamesSetGPIOResultCode() {
-  static const char * const names[4] = {
-    "Success",
-    "InvalidPin",
-    "InternalError",
-    nullptr
-  };
-  return names;
-}
-
-inline const char *EnumNameSetGPIOResultCode(SetGPIOResultCode e) {
-  if (::flatbuffers::IsOutRange(e, SetGPIOResultCode::Success, SetGPIOResultCode::InternalError)) return "";
-  const size_t index = static_cast<size_t>(e);
-  return EnumNamesSetGPIOResultCode()[index];
-}
 
 enum class HubToLocalMessagePayload : uint8_t {
   NONE = 0,
@@ -138,15 +54,12 @@ enum class HubToLocalMessagePayload : uint8_t {
   WifiNetworkEvent = 4,
   WifiGotIpEvent = 5,
   WifiLostIpEvent = 6,
-  AccountLinkCommandResult = 7,
-  SetRfTxPinCommandResult = 8,
-  SetEstopEnabledCommandResult = 9,
-  SetEstopPinCommandResult = 10,
+  AccountLinkStatusEvent = 7,
   MIN = NONE,
-  MAX = SetEstopPinCommandResult
+  MAX = AccountLinkStatusEvent
 };
 
-inline const HubToLocalMessagePayload (&EnumValuesHubToLocalMessagePayload())[11] {
+inline const HubToLocalMessagePayload (&EnumValuesHubToLocalMessagePayload())[8] {
   static const HubToLocalMessagePayload values[] = {
     HubToLocalMessagePayload::NONE,
     HubToLocalMessagePayload::ReadyMessage,
@@ -155,16 +68,13 @@ inline const HubToLocalMessagePayload (&EnumValuesHubToLocalMessagePayload())[11
     HubToLocalMessagePayload::WifiNetworkEvent,
     HubToLocalMessagePayload::WifiGotIpEvent,
     HubToLocalMessagePayload::WifiLostIpEvent,
-    HubToLocalMessagePayload::AccountLinkCommandResult,
-    HubToLocalMessagePayload::SetRfTxPinCommandResult,
-    HubToLocalMessagePayload::SetEstopEnabledCommandResult,
-    HubToLocalMessagePayload::SetEstopPinCommandResult
+    HubToLocalMessagePayload::AccountLinkStatusEvent
   };
   return values;
 }
 
 inline const char * const *EnumNamesHubToLocalMessagePayload() {
-  static const char * const names[12] = {
+  static const char * const names[9] = {
     "NONE",
     "ReadyMessage",
     "ErrorMessage",
@@ -172,17 +82,14 @@ inline const char * const *EnumNamesHubToLocalMessagePayload() {
     "WifiNetworkEvent",
     "WifiGotIpEvent",
     "WifiLostIpEvent",
-    "AccountLinkCommandResult",
-    "SetRfTxPinCommandResult",
-    "SetEstopEnabledCommandResult",
-    "SetEstopPinCommandResult",
+    "AccountLinkStatusEvent",
     nullptr
   };
   return names;
 }
 
 inline const char *EnumNameHubToLocalMessagePayload(HubToLocalMessagePayload e) {
-  if (::flatbuffers::IsOutRange(e, HubToLocalMessagePayload::NONE, HubToLocalMessagePayload::SetEstopPinCommandResult)) return "";
+  if (::flatbuffers::IsOutRange(e, HubToLocalMessagePayload::NONE, HubToLocalMessagePayload::AccountLinkStatusEvent)) return "";
   const size_t index = static_cast<size_t>(e);
   return EnumNamesHubToLocalMessagePayload()[index];
 }
@@ -215,24 +122,14 @@ template<> struct HubToLocalMessagePayloadTraits<OpenShock::Serialization::Local
   static const HubToLocalMessagePayload enum_value = HubToLocalMessagePayload::WifiLostIpEvent;
 };
 
-template<> struct HubToLocalMessagePayloadTraits<OpenShock::Serialization::Local::AccountLinkCommandResult> {
-  static const HubToLocalMessagePayload enum_value = HubToLocalMessagePayload::AccountLinkCommandResult;
+template<> struct HubToLocalMessagePayloadTraits<OpenShock::Serialization::Local::AccountLinkStatusEvent> {
+  static const HubToLocalMessagePayload enum_value = HubToLocalMessagePayload::AccountLinkStatusEvent;
 };
 
-template<> struct HubToLocalMessagePayloadTraits<OpenShock::Serialization::Local::SetRfTxPinCommandResult> {
-  static const HubToLocalMessagePayload enum_value = HubToLocalMessagePayload::SetRfTxPinCommandResult;
-};
-
-template<> struct HubToLocalMessagePayloadTraits<OpenShock::Serialization::Local::SetEstopEnabledCommandResult> {
-  static const HubToLocalMessagePayload enum_value = HubToLocalMessagePayload::SetEstopEnabledCommandResult;
-};
-
-template<> struct HubToLocalMessagePayloadTraits<OpenShock::Serialization::Local::SetEstopPinCommandResult> {
-  static const HubToLocalMessagePayload enum_value = HubToLocalMessagePayload::SetEstopPinCommandResult;
-};
-
-bool VerifyHubToLocalMessagePayload(::flatbuffers::Verifier &verifier, const void *obj, HubToLocalMessagePayload type);
-bool VerifyHubToLocalMessagePayloadVector(::flatbuffers::Verifier &verifier, const ::flatbuffers::Vector<::flatbuffers::Offset<void>> *values, const ::flatbuffers::Vector<HubToLocalMessagePayload> *types);
+template <bool B = false>
+bool VerifyHubToLocalMessagePayload(::flatbuffers::VerifierTemplate<B> &verifier, const void *obj, HubToLocalMessagePayload type);
+template <bool B = false>
+bool VerifyHubToLocalMessagePayloadVector(::flatbuffers::VerifierTemplate<B> &verifier, const ::flatbuffers::Vector<::flatbuffers::Offset<void>> *values, const ::flatbuffers::Vector<HubToLocalMessagePayload> *types);
 
 struct ReadyMessage FLATBUFFERS_FINAL_CLASS : private ::flatbuffers::Table {
   typedef ReadyMessageBuilder Builder;
@@ -244,7 +141,10 @@ struct ReadyMessage FLATBUFFERS_FINAL_CLASS : private ::flatbuffers::Table {
     VT_POGGIES = 4,
     VT_CONNECTED_WIFI = 6,
     VT_ACCOUNT_LINKED = 8,
-    VT_CONFIG = 10
+    VT_CONFIG = 10,
+    VT_GPIO_VALID_INPUTS = 12,
+    VT_GPIO_VALID_OUTPUTS = 14,
+    VT_HAS_STANDARDIZED_PINS = 16
   };
   bool poggies() const {
     return GetField<uint8_t>(VT_POGGIES, 0) != 0;
@@ -258,7 +158,17 @@ struct ReadyMessage FLATBUFFERS_FINAL_CLASS : private ::flatbuffers::Table {
   const OpenShock::Serialization::Configuration::HubConfig *config() const {
     return GetPointer<const OpenShock::Serialization::Configuration::HubConfig *>(VT_CONFIG);
   }
-  bool Verify(::flatbuffers::Verifier &verifier) const {
+  const ::flatbuffers::Vector<int8_t> *gpio_valid_inputs() const {
+    return GetPointer<const ::flatbuffers::Vector<int8_t> *>(VT_GPIO_VALID_INPUTS);
+  }
+  const ::flatbuffers::Vector<int8_t> *gpio_valid_outputs() const {
+    return GetPointer<const ::flatbuffers::Vector<int8_t> *>(VT_GPIO_VALID_OUTPUTS);
+  }
+  bool has_standardized_pins() const {
+    return GetField<uint8_t>(VT_HAS_STANDARDIZED_PINS, 0) != 0;
+  }
+  template <bool B = false>
+  bool Verify(::flatbuffers::VerifierTemplate<B> &verifier) const {
     return VerifyTableStart(verifier) &&
            VerifyField<uint8_t>(verifier, VT_POGGIES, 1) &&
            VerifyOffset(verifier, VT_CONNECTED_WIFI) &&
@@ -266,6 +176,11 @@ struct ReadyMessage FLATBUFFERS_FINAL_CLASS : private ::flatbuffers::Table {
            VerifyField<uint8_t>(verifier, VT_ACCOUNT_LINKED, 1) &&
            VerifyOffset(verifier, VT_CONFIG) &&
            verifier.VerifyTable(config()) &&
+           VerifyOffset(verifier, VT_GPIO_VALID_INPUTS) &&
+           verifier.VerifyVector(gpio_valid_inputs()) &&
+           VerifyOffset(verifier, VT_GPIO_VALID_OUTPUTS) &&
+           verifier.VerifyVector(gpio_valid_outputs()) &&
+           VerifyField<uint8_t>(verifier, VT_HAS_STANDARDIZED_PINS, 1) &&
            verifier.EndTable();
   }
 };
@@ -286,6 +201,15 @@ struct ReadyMessageBuilder {
   void add_config(::flatbuffers::Offset<OpenShock::Serialization::Configuration::HubConfig> config) {
     fbb_.AddOffset(ReadyMessage::VT_CONFIG, config);
   }
+  void add_gpio_valid_inputs(::flatbuffers::Offset<::flatbuffers::Vector<int8_t>> gpio_valid_inputs) {
+    fbb_.AddOffset(ReadyMessage::VT_GPIO_VALID_INPUTS, gpio_valid_inputs);
+  }
+  void add_gpio_valid_outputs(::flatbuffers::Offset<::flatbuffers::Vector<int8_t>> gpio_valid_outputs) {
+    fbb_.AddOffset(ReadyMessage::VT_GPIO_VALID_OUTPUTS, gpio_valid_outputs);
+  }
+  void add_has_standardized_pins(bool has_standardized_pins) {
+    fbb_.AddElement<uint8_t>(ReadyMessage::VT_HAS_STANDARDIZED_PINS, static_cast<uint8_t>(has_standardized_pins), 0);
+  }
   explicit ReadyMessageBuilder(::flatbuffers::FlatBufferBuilder &_fbb)
         : fbb_(_fbb) {
     start_ = fbb_.StartTable();
@@ -302,10 +226,16 @@ inline ::flatbuffers::Offset<ReadyMessage> CreateReadyMessage(
     bool poggies = false,
     ::flatbuffers::Offset<OpenShock::Serialization::Types::WifiNetwork> connected_wifi = 0,
     bool account_linked = false,
-    ::flatbuffers::Offset<OpenShock::Serialization::Configuration::HubConfig> config = 0) {
+    ::flatbuffers::Offset<OpenShock::Serialization::Configuration::HubConfig> config = 0,
+    ::flatbuffers::Offset<::flatbuffers::Vector<int8_t>> gpio_valid_inputs = 0,
+    ::flatbuffers::Offset<::flatbuffers::Vector<int8_t>> gpio_valid_outputs = 0,
+    bool has_standardized_pins = false) {
   ReadyMessageBuilder builder_(_fbb);
+  builder_.add_gpio_valid_outputs(gpio_valid_outputs);
+  builder_.add_gpio_valid_inputs(gpio_valid_inputs);
   builder_.add_config(config);
   builder_.add_connected_wifi(connected_wifi);
+  builder_.add_has_standardized_pins(has_standardized_pins);
   builder_.add_account_linked(account_linked);
   builder_.add_poggies(poggies);
   return builder_.Finish();
@@ -315,6 +245,28 @@ struct ReadyMessage::Traits {
   using type = ReadyMessage;
   static auto constexpr Create = CreateReadyMessage;
 };
+
+inline ::flatbuffers::Offset<ReadyMessage> CreateReadyMessageDirect(
+    ::flatbuffers::FlatBufferBuilder &_fbb,
+    bool poggies = false,
+    ::flatbuffers::Offset<OpenShock::Serialization::Types::WifiNetwork> connected_wifi = 0,
+    bool account_linked = false,
+    ::flatbuffers::Offset<OpenShock::Serialization::Configuration::HubConfig> config = 0,
+    const std::vector<int8_t> *gpio_valid_inputs = nullptr,
+    const std::vector<int8_t> *gpio_valid_outputs = nullptr,
+    bool has_standardized_pins = false) {
+  auto gpio_valid_inputs__ = gpio_valid_inputs ? _fbb.CreateVector<int8_t>(*gpio_valid_inputs) : 0;
+  auto gpio_valid_outputs__ = gpio_valid_outputs ? _fbb.CreateVector<int8_t>(*gpio_valid_outputs) : 0;
+  return OpenShock::Serialization::Local::CreateReadyMessage(
+      _fbb,
+      poggies,
+      connected_wifi,
+      account_linked,
+      config,
+      gpio_valid_inputs__,
+      gpio_valid_outputs__,
+      has_standardized_pins);
+}
 
 struct ErrorMessage FLATBUFFERS_FINAL_CLASS : private ::flatbuffers::Table {
   typedef ErrorMessageBuilder Builder;
@@ -328,7 +280,8 @@ struct ErrorMessage FLATBUFFERS_FINAL_CLASS : private ::flatbuffers::Table {
   const ::flatbuffers::String *message() const {
     return GetPointer<const ::flatbuffers::String *>(VT_MESSAGE);
   }
-  bool Verify(::flatbuffers::Verifier &verifier) const {
+  template <bool B = false>
+  bool Verify(::flatbuffers::VerifierTemplate<B> &verifier) const {
     return VerifyTableStart(verifier) &&
            VerifyOffset(verifier, VT_MESSAGE) &&
            verifier.VerifyString(message()) &&
@@ -388,7 +341,8 @@ struct WifiScanStatusMessage FLATBUFFERS_FINAL_CLASS : private ::flatbuffers::Ta
   OpenShock::Serialization::Types::WifiScanStatus status() const {
     return static_cast<OpenShock::Serialization::Types::WifiScanStatus>(GetField<uint8_t>(VT_STATUS, 0));
   }
-  bool Verify(::flatbuffers::Verifier &verifier) const {
+  template <bool B = false>
+  bool Verify(::flatbuffers::VerifierTemplate<B> &verifier) const {
     return VerifyTableStart(verifier) &&
            VerifyField<uint8_t>(verifier, VT_STATUS, 1) &&
            verifier.EndTable();
@@ -442,7 +396,8 @@ struct WifiNetworkEvent FLATBUFFERS_FINAL_CLASS : private ::flatbuffers::Table {
   const ::flatbuffers::Vector<::flatbuffers::Offset<OpenShock::Serialization::Types::WifiNetwork>> *networks() const {
     return GetPointer<const ::flatbuffers::Vector<::flatbuffers::Offset<OpenShock::Serialization::Types::WifiNetwork>> *>(VT_NETWORKS);
   }
-  bool Verify(::flatbuffers::Verifier &verifier) const {
+  template <bool B = false>
+  bool Verify(::flatbuffers::VerifierTemplate<B> &verifier) const {
     return VerifyTableStart(verifier) &&
            VerifyField<uint8_t>(verifier, VT_EVENT_TYPE, 1) &&
            VerifyOffset(verifier, VT_NETWORKS) &&
@@ -511,7 +466,8 @@ struct WifiGotIpEvent FLATBUFFERS_FINAL_CLASS : private ::flatbuffers::Table {
   const ::flatbuffers::String *ip() const {
     return GetPointer<const ::flatbuffers::String *>(VT_IP);
   }
-  bool Verify(::flatbuffers::Verifier &verifier) const {
+  template <bool B = false>
+  bool Verify(::flatbuffers::VerifierTemplate<B> &verifier) const {
     return VerifyTableStart(verifier) &&
            VerifyOffset(verifier, VT_IP) &&
            verifier.VerifyString(ip()) &&
@@ -571,7 +527,8 @@ struct WifiLostIpEvent FLATBUFFERS_FINAL_CLASS : private ::flatbuffers::Table {
   const ::flatbuffers::String *ip() const {
     return GetPointer<const ::flatbuffers::String *>(VT_IP);
   }
-  bool Verify(::flatbuffers::Verifier &verifier) const {
+  template <bool B = false>
+  bool Verify(::flatbuffers::VerifierTemplate<B> &verifier) const {
     return VerifyTableStart(verifier) &&
            VerifyOffset(verifier, VT_IP) &&
            verifier.VerifyString(ip()) &&
@@ -619,234 +576,56 @@ inline ::flatbuffers::Offset<WifiLostIpEvent> CreateWifiLostIpEventDirect(
       ip__);
 }
 
-struct AccountLinkCommandResult FLATBUFFERS_FINAL_CLASS : private ::flatbuffers::Table {
-  typedef AccountLinkCommandResultBuilder Builder;
+/// Sent when the auth token status changes (set, cleared, or validated on gateway connect)
+struct AccountLinkStatusEvent FLATBUFFERS_FINAL_CLASS : private ::flatbuffers::Table {
+  typedef AccountLinkStatusEventBuilder Builder;
   struct Traits;
   static FLATBUFFERS_CONSTEXPR_CPP11 const char *GetFullyQualifiedName() {
-    return "OpenShock.Serialization.Local.AccountLinkCommandResult";
+    return "OpenShock.Serialization.Local.AccountLinkStatusEvent";
   }
   enum FlatBuffersVTableOffset FLATBUFFERS_VTABLE_UNDERLYING_TYPE {
-    VT_RESULT = 4
+    VT_LINKED = 4
   };
-  OpenShock::Serialization::Local::AccountLinkResultCode result() const {
-    return static_cast<OpenShock::Serialization::Local::AccountLinkResultCode>(GetField<uint8_t>(VT_RESULT, 0));
+  bool linked() const {
+    return GetField<uint8_t>(VT_LINKED, 0) != 0;
   }
-  bool Verify(::flatbuffers::Verifier &verifier) const {
+  template <bool B = false>
+  bool Verify(::flatbuffers::VerifierTemplate<B> &verifier) const {
     return VerifyTableStart(verifier) &&
-           VerifyField<uint8_t>(verifier, VT_RESULT, 1) &&
+           VerifyField<uint8_t>(verifier, VT_LINKED, 1) &&
            verifier.EndTable();
   }
 };
 
-struct AccountLinkCommandResultBuilder {
-  typedef AccountLinkCommandResult Table;
+struct AccountLinkStatusEventBuilder {
+  typedef AccountLinkStatusEvent Table;
   ::flatbuffers::FlatBufferBuilder &fbb_;
   ::flatbuffers::uoffset_t start_;
-  void add_result(OpenShock::Serialization::Local::AccountLinkResultCode result) {
-    fbb_.AddElement<uint8_t>(AccountLinkCommandResult::VT_RESULT, static_cast<uint8_t>(result), 0);
+  void add_linked(bool linked) {
+    fbb_.AddElement<uint8_t>(AccountLinkStatusEvent::VT_LINKED, static_cast<uint8_t>(linked), 0);
   }
-  explicit AccountLinkCommandResultBuilder(::flatbuffers::FlatBufferBuilder &_fbb)
+  explicit AccountLinkStatusEventBuilder(::flatbuffers::FlatBufferBuilder &_fbb)
         : fbb_(_fbb) {
     start_ = fbb_.StartTable();
   }
-  ::flatbuffers::Offset<AccountLinkCommandResult> Finish() {
+  ::flatbuffers::Offset<AccountLinkStatusEvent> Finish() {
     const auto end = fbb_.EndTable(start_);
-    auto o = ::flatbuffers::Offset<AccountLinkCommandResult>(end);
+    auto o = ::flatbuffers::Offset<AccountLinkStatusEvent>(end);
     return o;
   }
 };
 
-inline ::flatbuffers::Offset<AccountLinkCommandResult> CreateAccountLinkCommandResult(
+inline ::flatbuffers::Offset<AccountLinkStatusEvent> CreateAccountLinkStatusEvent(
     ::flatbuffers::FlatBufferBuilder &_fbb,
-    OpenShock::Serialization::Local::AccountLinkResultCode result = OpenShock::Serialization::Local::AccountLinkResultCode::Success) {
-  AccountLinkCommandResultBuilder builder_(_fbb);
-  builder_.add_result(result);
+    bool linked = false) {
+  AccountLinkStatusEventBuilder builder_(_fbb);
+  builder_.add_linked(linked);
   return builder_.Finish();
 }
 
-struct AccountLinkCommandResult::Traits {
-  using type = AccountLinkCommandResult;
-  static auto constexpr Create = CreateAccountLinkCommandResult;
-};
-
-struct SetRfTxPinCommandResult FLATBUFFERS_FINAL_CLASS : private ::flatbuffers::Table {
-  typedef SetRfTxPinCommandResultBuilder Builder;
-  struct Traits;
-  static FLATBUFFERS_CONSTEXPR_CPP11 const char *GetFullyQualifiedName() {
-    return "OpenShock.Serialization.Local.SetRfTxPinCommandResult";
-  }
-  enum FlatBuffersVTableOffset FLATBUFFERS_VTABLE_UNDERLYING_TYPE {
-    VT_PIN = 4,
-    VT_RESULT = 6
-  };
-  uint8_t pin() const {
-    return GetField<uint8_t>(VT_PIN, 0);
-  }
-  OpenShock::Serialization::Local::SetGPIOResultCode result() const {
-    return static_cast<OpenShock::Serialization::Local::SetGPIOResultCode>(GetField<uint8_t>(VT_RESULT, 0));
-  }
-  bool Verify(::flatbuffers::Verifier &verifier) const {
-    return VerifyTableStart(verifier) &&
-           VerifyField<uint8_t>(verifier, VT_PIN, 1) &&
-           VerifyField<uint8_t>(verifier, VT_RESULT, 1) &&
-           verifier.EndTable();
-  }
-};
-
-struct SetRfTxPinCommandResultBuilder {
-  typedef SetRfTxPinCommandResult Table;
-  ::flatbuffers::FlatBufferBuilder &fbb_;
-  ::flatbuffers::uoffset_t start_;
-  void add_pin(uint8_t pin) {
-    fbb_.AddElement<uint8_t>(SetRfTxPinCommandResult::VT_PIN, pin, 0);
-  }
-  void add_result(OpenShock::Serialization::Local::SetGPIOResultCode result) {
-    fbb_.AddElement<uint8_t>(SetRfTxPinCommandResult::VT_RESULT, static_cast<uint8_t>(result), 0);
-  }
-  explicit SetRfTxPinCommandResultBuilder(::flatbuffers::FlatBufferBuilder &_fbb)
-        : fbb_(_fbb) {
-    start_ = fbb_.StartTable();
-  }
-  ::flatbuffers::Offset<SetRfTxPinCommandResult> Finish() {
-    const auto end = fbb_.EndTable(start_);
-    auto o = ::flatbuffers::Offset<SetRfTxPinCommandResult>(end);
-    return o;
-  }
-};
-
-inline ::flatbuffers::Offset<SetRfTxPinCommandResult> CreateSetRfTxPinCommandResult(
-    ::flatbuffers::FlatBufferBuilder &_fbb,
-    uint8_t pin = 0,
-    OpenShock::Serialization::Local::SetGPIOResultCode result = OpenShock::Serialization::Local::SetGPIOResultCode::Success) {
-  SetRfTxPinCommandResultBuilder builder_(_fbb);
-  builder_.add_result(result);
-  builder_.add_pin(pin);
-  return builder_.Finish();
-}
-
-struct SetRfTxPinCommandResult::Traits {
-  using type = SetRfTxPinCommandResult;
-  static auto constexpr Create = CreateSetRfTxPinCommandResult;
-};
-
-struct SetEstopEnabledCommandResult FLATBUFFERS_FINAL_CLASS : private ::flatbuffers::Table {
-  typedef SetEstopEnabledCommandResultBuilder Builder;
-  struct Traits;
-  static FLATBUFFERS_CONSTEXPR_CPP11 const char *GetFullyQualifiedName() {
-    return "OpenShock.Serialization.Local.SetEstopEnabledCommandResult";
-  }
-  enum FlatBuffersVTableOffset FLATBUFFERS_VTABLE_UNDERLYING_TYPE {
-    VT_ENABLED = 4,
-    VT_SUCCESS = 6
-  };
-  bool enabled() const {
-    return GetField<uint8_t>(VT_ENABLED, 0) != 0;
-  }
-  bool success() const {
-    return GetField<uint8_t>(VT_SUCCESS, 0) != 0;
-  }
-  bool Verify(::flatbuffers::Verifier &verifier) const {
-    return VerifyTableStart(verifier) &&
-           VerifyField<uint8_t>(verifier, VT_ENABLED, 1) &&
-           VerifyField<uint8_t>(verifier, VT_SUCCESS, 1) &&
-           verifier.EndTable();
-  }
-};
-
-struct SetEstopEnabledCommandResultBuilder {
-  typedef SetEstopEnabledCommandResult Table;
-  ::flatbuffers::FlatBufferBuilder &fbb_;
-  ::flatbuffers::uoffset_t start_;
-  void add_enabled(bool enabled) {
-    fbb_.AddElement<uint8_t>(SetEstopEnabledCommandResult::VT_ENABLED, static_cast<uint8_t>(enabled), 0);
-  }
-  void add_success(bool success) {
-    fbb_.AddElement<uint8_t>(SetEstopEnabledCommandResult::VT_SUCCESS, static_cast<uint8_t>(success), 0);
-  }
-  explicit SetEstopEnabledCommandResultBuilder(::flatbuffers::FlatBufferBuilder &_fbb)
-        : fbb_(_fbb) {
-    start_ = fbb_.StartTable();
-  }
-  ::flatbuffers::Offset<SetEstopEnabledCommandResult> Finish() {
-    const auto end = fbb_.EndTable(start_);
-    auto o = ::flatbuffers::Offset<SetEstopEnabledCommandResult>(end);
-    return o;
-  }
-};
-
-inline ::flatbuffers::Offset<SetEstopEnabledCommandResult> CreateSetEstopEnabledCommandResult(
-    ::flatbuffers::FlatBufferBuilder &_fbb,
-    bool enabled = false,
-    bool success = false) {
-  SetEstopEnabledCommandResultBuilder builder_(_fbb);
-  builder_.add_success(success);
-  builder_.add_enabled(enabled);
-  return builder_.Finish();
-}
-
-struct SetEstopEnabledCommandResult::Traits {
-  using type = SetEstopEnabledCommandResult;
-  static auto constexpr Create = CreateSetEstopEnabledCommandResult;
-};
-
-struct SetEstopPinCommandResult FLATBUFFERS_FINAL_CLASS : private ::flatbuffers::Table {
-  typedef SetEstopPinCommandResultBuilder Builder;
-  struct Traits;
-  static FLATBUFFERS_CONSTEXPR_CPP11 const char *GetFullyQualifiedName() {
-    return "OpenShock.Serialization.Local.SetEstopPinCommandResult";
-  }
-  enum FlatBuffersVTableOffset FLATBUFFERS_VTABLE_UNDERLYING_TYPE {
-    VT_GPIO_PIN = 4,
-    VT_RESULT = 6
-  };
-  uint8_t gpio_pin() const {
-    return GetField<uint8_t>(VT_GPIO_PIN, 0);
-  }
-  OpenShock::Serialization::Local::SetGPIOResultCode result() const {
-    return static_cast<OpenShock::Serialization::Local::SetGPIOResultCode>(GetField<uint8_t>(VT_RESULT, 0));
-  }
-  bool Verify(::flatbuffers::Verifier &verifier) const {
-    return VerifyTableStart(verifier) &&
-           VerifyField<uint8_t>(verifier, VT_GPIO_PIN, 1) &&
-           VerifyField<uint8_t>(verifier, VT_RESULT, 1) &&
-           verifier.EndTable();
-  }
-};
-
-struct SetEstopPinCommandResultBuilder {
-  typedef SetEstopPinCommandResult Table;
-  ::flatbuffers::FlatBufferBuilder &fbb_;
-  ::flatbuffers::uoffset_t start_;
-  void add_gpio_pin(uint8_t gpio_pin) {
-    fbb_.AddElement<uint8_t>(SetEstopPinCommandResult::VT_GPIO_PIN, gpio_pin, 0);
-  }
-  void add_result(OpenShock::Serialization::Local::SetGPIOResultCode result) {
-    fbb_.AddElement<uint8_t>(SetEstopPinCommandResult::VT_RESULT, static_cast<uint8_t>(result), 0);
-  }
-  explicit SetEstopPinCommandResultBuilder(::flatbuffers::FlatBufferBuilder &_fbb)
-        : fbb_(_fbb) {
-    start_ = fbb_.StartTable();
-  }
-  ::flatbuffers::Offset<SetEstopPinCommandResult> Finish() {
-    const auto end = fbb_.EndTable(start_);
-    auto o = ::flatbuffers::Offset<SetEstopPinCommandResult>(end);
-    return o;
-  }
-};
-
-inline ::flatbuffers::Offset<SetEstopPinCommandResult> CreateSetEstopPinCommandResult(
-    ::flatbuffers::FlatBufferBuilder &_fbb,
-    uint8_t gpio_pin = 0,
-    OpenShock::Serialization::Local::SetGPIOResultCode result = OpenShock::Serialization::Local::SetGPIOResultCode::Success) {
-  SetEstopPinCommandResultBuilder builder_(_fbb);
-  builder_.add_result(result);
-  builder_.add_gpio_pin(gpio_pin);
-  return builder_.Finish();
-}
-
-struct SetEstopPinCommandResult::Traits {
-  using type = SetEstopPinCommandResult;
-  static auto constexpr Create = CreateSetEstopPinCommandResult;
+struct AccountLinkStatusEvent::Traits {
+  using type = AccountLinkStatusEvent;
+  static auto constexpr Create = CreateAccountLinkStatusEvent;
 };
 
 struct HubToLocalMessage FLATBUFFERS_FINAL_CLASS : private ::flatbuffers::Table {
@@ -884,19 +663,11 @@ struct HubToLocalMessage FLATBUFFERS_FINAL_CLASS : private ::flatbuffers::Table 
   const OpenShock::Serialization::Local::WifiLostIpEvent *payload_as_WifiLostIpEvent() const {
     return payload_type() == OpenShock::Serialization::Local::HubToLocalMessagePayload::WifiLostIpEvent ? static_cast<const OpenShock::Serialization::Local::WifiLostIpEvent *>(payload()) : nullptr;
   }
-  const OpenShock::Serialization::Local::AccountLinkCommandResult *payload_as_AccountLinkCommandResult() const {
-    return payload_type() == OpenShock::Serialization::Local::HubToLocalMessagePayload::AccountLinkCommandResult ? static_cast<const OpenShock::Serialization::Local::AccountLinkCommandResult *>(payload()) : nullptr;
+  const OpenShock::Serialization::Local::AccountLinkStatusEvent *payload_as_AccountLinkStatusEvent() const {
+    return payload_type() == OpenShock::Serialization::Local::HubToLocalMessagePayload::AccountLinkStatusEvent ? static_cast<const OpenShock::Serialization::Local::AccountLinkStatusEvent *>(payload()) : nullptr;
   }
-  const OpenShock::Serialization::Local::SetRfTxPinCommandResult *payload_as_SetRfTxPinCommandResult() const {
-    return payload_type() == OpenShock::Serialization::Local::HubToLocalMessagePayload::SetRfTxPinCommandResult ? static_cast<const OpenShock::Serialization::Local::SetRfTxPinCommandResult *>(payload()) : nullptr;
-  }
-  const OpenShock::Serialization::Local::SetEstopEnabledCommandResult *payload_as_SetEstopEnabledCommandResult() const {
-    return payload_type() == OpenShock::Serialization::Local::HubToLocalMessagePayload::SetEstopEnabledCommandResult ? static_cast<const OpenShock::Serialization::Local::SetEstopEnabledCommandResult *>(payload()) : nullptr;
-  }
-  const OpenShock::Serialization::Local::SetEstopPinCommandResult *payload_as_SetEstopPinCommandResult() const {
-    return payload_type() == OpenShock::Serialization::Local::HubToLocalMessagePayload::SetEstopPinCommandResult ? static_cast<const OpenShock::Serialization::Local::SetEstopPinCommandResult *>(payload()) : nullptr;
-  }
-  bool Verify(::flatbuffers::Verifier &verifier) const {
+  template <bool B = false>
+  bool Verify(::flatbuffers::VerifierTemplate<B> &verifier) const {
     return VerifyTableStart(verifier) &&
            VerifyField<uint8_t>(verifier, VT_PAYLOAD_TYPE, 1) &&
            VerifyOffset(verifier, VT_PAYLOAD) &&
@@ -929,20 +700,8 @@ template<> inline const OpenShock::Serialization::Local::WifiLostIpEvent *HubToL
   return payload_as_WifiLostIpEvent();
 }
 
-template<> inline const OpenShock::Serialization::Local::AccountLinkCommandResult *HubToLocalMessage::payload_as<OpenShock::Serialization::Local::AccountLinkCommandResult>() const {
-  return payload_as_AccountLinkCommandResult();
-}
-
-template<> inline const OpenShock::Serialization::Local::SetRfTxPinCommandResult *HubToLocalMessage::payload_as<OpenShock::Serialization::Local::SetRfTxPinCommandResult>() const {
-  return payload_as_SetRfTxPinCommandResult();
-}
-
-template<> inline const OpenShock::Serialization::Local::SetEstopEnabledCommandResult *HubToLocalMessage::payload_as<OpenShock::Serialization::Local::SetEstopEnabledCommandResult>() const {
-  return payload_as_SetEstopEnabledCommandResult();
-}
-
-template<> inline const OpenShock::Serialization::Local::SetEstopPinCommandResult *HubToLocalMessage::payload_as<OpenShock::Serialization::Local::SetEstopPinCommandResult>() const {
-  return payload_as_SetEstopPinCommandResult();
+template<> inline const OpenShock::Serialization::Local::AccountLinkStatusEvent *HubToLocalMessage::payload_as<OpenShock::Serialization::Local::AccountLinkStatusEvent>() const {
+  return payload_as_AccountLinkStatusEvent();
 }
 
 struct HubToLocalMessageBuilder {
@@ -981,7 +740,8 @@ struct HubToLocalMessage::Traits {
   static auto constexpr Create = CreateHubToLocalMessage;
 };
 
-inline bool VerifyHubToLocalMessagePayload(::flatbuffers::Verifier &verifier, const void *obj, HubToLocalMessagePayload type) {
+template <bool B>
+inline bool VerifyHubToLocalMessagePayload(::flatbuffers::VerifierTemplate<B> &verifier, const void *obj, HubToLocalMessagePayload type) {
   switch (type) {
     case HubToLocalMessagePayload::NONE: {
       return true;
@@ -1010,27 +770,16 @@ inline bool VerifyHubToLocalMessagePayload(::flatbuffers::Verifier &verifier, co
       auto ptr = reinterpret_cast<const OpenShock::Serialization::Local::WifiLostIpEvent *>(obj);
       return verifier.VerifyTable(ptr);
     }
-    case HubToLocalMessagePayload::AccountLinkCommandResult: {
-      auto ptr = reinterpret_cast<const OpenShock::Serialization::Local::AccountLinkCommandResult *>(obj);
-      return verifier.VerifyTable(ptr);
-    }
-    case HubToLocalMessagePayload::SetRfTxPinCommandResult: {
-      auto ptr = reinterpret_cast<const OpenShock::Serialization::Local::SetRfTxPinCommandResult *>(obj);
-      return verifier.VerifyTable(ptr);
-    }
-    case HubToLocalMessagePayload::SetEstopEnabledCommandResult: {
-      auto ptr = reinterpret_cast<const OpenShock::Serialization::Local::SetEstopEnabledCommandResult *>(obj);
-      return verifier.VerifyTable(ptr);
-    }
-    case HubToLocalMessagePayload::SetEstopPinCommandResult: {
-      auto ptr = reinterpret_cast<const OpenShock::Serialization::Local::SetEstopPinCommandResult *>(obj);
+    case HubToLocalMessagePayload::AccountLinkStatusEvent: {
+      auto ptr = reinterpret_cast<const OpenShock::Serialization::Local::AccountLinkStatusEvent *>(obj);
       return verifier.VerifyTable(ptr);
     }
     default: return true;
   }
 }
 
-inline bool VerifyHubToLocalMessagePayloadVector(::flatbuffers::Verifier &verifier, const ::flatbuffers::Vector<::flatbuffers::Offset<void>> *values, const ::flatbuffers::Vector<HubToLocalMessagePayload> *types) {
+template <bool B>
+inline bool VerifyHubToLocalMessagePayloadVector(::flatbuffers::VerifierTemplate<B> &verifier, const ::flatbuffers::Vector<::flatbuffers::Offset<void>> *values, const ::flatbuffers::Vector<HubToLocalMessagePayload> *types) {
   if (!values || !types) return !values && !types;
   if (values->size() != types->size()) return false;
   for (::flatbuffers::uoffset_t i = 0; i < values->size(); ++i) {
@@ -1050,14 +799,16 @@ inline const OpenShock::Serialization::Local::HubToLocalMessage *GetSizePrefixed
   return ::flatbuffers::GetSizePrefixedRoot<OpenShock::Serialization::Local::HubToLocalMessage>(buf);
 }
 
+template <bool B = false>
 inline bool VerifyHubToLocalMessageBuffer(
-    ::flatbuffers::Verifier &verifier) {
-  return verifier.VerifyBuffer<OpenShock::Serialization::Local::HubToLocalMessage>(nullptr);
+    ::flatbuffers::VerifierTemplate<B> &verifier) {
+  return verifier.template VerifyBuffer<OpenShock::Serialization::Local::HubToLocalMessage>(nullptr);
 }
 
+template <bool B = false>
 inline bool VerifySizePrefixedHubToLocalMessageBuffer(
-    ::flatbuffers::Verifier &verifier) {
-  return verifier.VerifySizePrefixedBuffer<OpenShock::Serialization::Local::HubToLocalMessage>(nullptr);
+    ::flatbuffers::VerifierTemplate<B> &verifier) {
+  return verifier.template VerifySizePrefixedBuffer<OpenShock::Serialization::Local::HubToLocalMessage>(nullptr);
 }
 
 inline void FinishHubToLocalMessageBuffer(

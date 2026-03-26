@@ -3,9 +3,9 @@ name: cpp-linter
 on:
   pull_request:
     types: [opened, reopened, synchronize]
-    paths: ['**.c', '**.h', '**.cpp', '**.hpp', '.clang-format']
+    paths: ['**.c', '**.h', '**.cpp', '**.hpp', '.clang-format', '.github/workflows/cpp-linter.yml']
   push:
-    paths: ['**.c', '**.h', '**.cpp', '**.hpp', '.clang-format']
+    paths: ['**.c', '**.h', '**.cpp', '**.hpp', '.clang-format', '.github/workflows/cpp-linter.yml']
   workflow_dispatch: # Manually invoked by user.
 
 jobs:
@@ -15,6 +15,7 @@ jobs:
   cpp-linter:
     name: C/C++ Linter
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     needs: get-vars
 
     permissions:
@@ -23,11 +24,11 @@ jobs:
     
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - uses: ./.github/actions/build-compilationdb
         with:
-          board: OpenShock-Core-V2 # Doesn't matter, just need the compilation database
+          version: 0.0.0-test+build # Doesn't matter, just need the compilation database
           skip-checkout: true
       
       - uses: cpp-linter/cpp-linter-action@v2
@@ -36,10 +37,12 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
           style: file
-          version: 18
-          lines-changed-only: diff
-          thread-comments: true
-          file-annotations: false
+          version: 21
+          ignore: |
+            .github
+            include/serialization/_fbs
+          thread-comments: update
+          no-lgtm: false
 
       - name: Fail fast?!
         if: steps.linter.outputs.checks-failed > 0
