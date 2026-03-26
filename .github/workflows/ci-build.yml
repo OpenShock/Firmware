@@ -18,9 +18,7 @@ on:
 name: ci-build
 
 env:
-  PNPM_VERSION: 10.6.4
-  NODE_VERSION: 22.14.0
-  PYTHON_VERSION: 3.12
+  PYTHON_VERSION: 3.13
 
 jobs:
   getvars:
@@ -31,16 +29,13 @@ jobs:
     timeout-minutes: 5
 
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v6
         with:
           sparse-checkout: |
             .github
             frontend
 
       - uses: ./.github/actions/build-frontend
-        with:
-          pnpm-version: ${{ env.PNPM_VERSION }}
-          node-version: ${{ env.NODE_VERSION }}
 
   build-staticfs:
     runs-on: ubuntu-latest
@@ -48,7 +43,7 @@ jobs:
     timeout-minutes: 5
 
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v6
       - uses: ./.github/actions/build-staticfs
         with:
           version: ${{ needs.getvars.outputs.version }}
@@ -63,7 +58,7 @@ jobs:
       matrix: ${{ fromJSON(needs.getvars.outputs.board-matrix) }}
 
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v6
 
       - uses: ./.github/actions/build-firmware
         with:
@@ -80,7 +75,7 @@ jobs:
       matrix: ${{ fromJSON(needs.getvars.outputs.board-matrix) }}
 
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v6
         with:
           sparse-checkout: |
             .github
@@ -112,7 +107,7 @@ jobs:
       matrix: ${{ fromJson(needs.getvars.outputs.board-matrix) }}
 
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v6
         with:
           sparse-checkout: |
             .github
@@ -139,7 +134,7 @@ jobs:
     environment: cdn-firmware-r2
 
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v6
         with:
           sparse-checkout: |
             .github
@@ -166,7 +161,7 @@ jobs:
     environment: cdn-firmware-r2
 
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v6
         with:
           sparse-checkout: |
             .github
@@ -202,7 +197,7 @@ jobs:
 
     steps:
       - name: Download release artifacts
-        uses: actions/download-artifact@v5
+        uses: actions/download-artifact@v8
 
       - name: Display artifacts
         run: ls -R

@@ -1,5 +1,8 @@
 #pragma once
 
+#include "Common.h"
+#include "Logging.h"
+
 #include <cstdint>
 #include <cstdlib>
 #include <cstring>
@@ -12,6 +15,8 @@
 template<typename T, typename SizeType = uint32_t>
 class TinyVec {
   static_assert(std::is_trivially_copyable_v<T> && std::is_trivially_destructible_v<T>, "TinyVec requires a trivially copyable & destructible type (POD).");
+
+  DISABLE_COPY(TinyVec);
 
 public:
   TinyVec() noexcept = default;
@@ -31,9 +36,6 @@ public:
   }
 
   ~TinyVec() { free(_data); }
-
-  TinyVec(const TinyVec&)            = delete;
-  TinyVec& operator=(const TinyVec&) = delete;
 
   TinyVec(TinyVec&& other) noexcept
   {
@@ -69,10 +71,10 @@ public:
   void reserve(SizeType new_cap)
   {
     if (new_cap <= _cap) return;
-    if (sizeof(T) && new_cap > std::numeric_limits<SizeType>::max() / sizeof(T)) throw std::bad_alloc();
+    if (sizeof(T) && new_cap > std::numeric_limits<SizeType>::max() / sizeof(T)) OS_PANIC_INSTANT("TVEC", "Cannot allocate a buffer of given size!");
 
     void* newbuf = malloc(size_t(new_cap) * sizeof(T));
-    if (!newbuf) throw std::bad_alloc();
+    if (!newbuf) OS_PANIC_INSTANT("TVEC", "Could not allocate a buffer of given size!");
     if (_data) {
       memcpy(newbuf, _data, size_t(_len) * sizeof(T));
       free(_data);

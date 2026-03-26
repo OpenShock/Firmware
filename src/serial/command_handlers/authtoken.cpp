@@ -5,7 +5,8 @@
 
 #include <string>
 
-void _handleAuthtokenCommand(std::string_view arg, bool isAutomated) {
+void _handleAuthtokenCommand(std::string_view arg, bool isAutomated)
+{
   if (arg.empty()) {
     std::string authToken;
     if (!OpenShock::Config::GetBackendAuthToken(authToken)) {
@@ -26,7 +27,7 @@ void _handleAuthtokenCommand(std::string_view arg, bool isAutomated) {
 
   // If we have some other kind of request fault just set it anyway, we probably arent connected to a network
 
-  bool result = OpenShock::Config::SetBackendAuthToken(arg);
+  bool result = OpenShock::Config::SetBackendAuthToken(std::string(arg));
 
   if (result) {
     SERPR_SUCCESS("Saved config");
@@ -35,7 +36,8 @@ void _handleAuthtokenCommand(std::string_view arg, bool isAutomated) {
   }
 }
 
-OpenShock::Serial::CommandGroup OpenShock::Serial::CommandHandlers::AuthTokenHandler() {
+OpenShock::Serial::CommandGroup OpenShock::Serial::CommandHandlers::AuthTokenHandler()
+{
   auto group = OpenShock::Serial::CommandGroup("authtoken"sv);
 
   auto& getCommand = group.addCommand("Get the backend auth token"sv, _handleAuthtokenCommand);

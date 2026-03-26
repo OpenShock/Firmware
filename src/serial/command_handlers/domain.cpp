@@ -10,7 +10,8 @@
 
 const char* const TAG = "Serial::CommandHandlers::Domain";
 
-void _handleDomainCommand(std::string_view arg, bool isAutomated) {
+void _handleDomainCommand(std::string_view arg, bool isAutomated)
+{
   if (arg.empty()) {
     std::string domain;
     if (!OpenShock::Config::GetBackendDomain(domain)) {
@@ -49,7 +50,7 @@ void _handleDomainCommand(std::string_view arg, bool isAutomated) {
 
   OS_LOGI(TAG, "Successfully connected to \"%.*s\", version: %s, commit: %s, current time: %s", arg.length(), arg.data(), resp.data.version.c_str(), resp.data.commit.c_str(), resp.data.currentTime.c_str());
 
-  bool result = OpenShock::Config::SetBackendDomain(arg);
+  bool result = OpenShock::Config::SetBackendDomain(std::string(arg));
 
   if (!result) {
     SERPR_ERROR("Failed to save config");
@@ -62,7 +63,8 @@ void _handleDomainCommand(std::string_view arg, bool isAutomated) {
   esp_restart();
 }
 
-OpenShock::Serial::CommandGroup OpenShock::Serial::CommandHandlers::DomainHandler() {
+OpenShock::Serial::CommandGroup OpenShock::Serial::CommandHandlers::DomainHandler()
+{
   auto group = OpenShock::Serial::CommandGroup("domain"sv);
 
   auto& getCommand = group.addCommand("Get the backend domain."sv, _handleDomainCommand);

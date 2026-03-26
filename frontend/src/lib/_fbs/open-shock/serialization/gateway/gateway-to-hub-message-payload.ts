@@ -2,9 +2,9 @@
 
 /* eslint-disable @typescript-eslint/no-unused-vars, @typescript-eslint/no-explicit-any, @typescript-eslint/no-non-null-assertion */
 
+import { ShockerCommandList } from '../../../open-shock/serialization/common/shocker-command-list';
 import { OtaUpdateRequest } from '../../../open-shock/serialization/gateway/ota-update-request';
 import { Ping } from '../../../open-shock/serialization/gateway/ping';
-import { ShockerCommandList } from '../../../open-shock/serialization/gateway/shocker-command-list';
 import { Trigger } from '../../../open-shock/serialization/gateway/trigger';
 
 
@@ -24,7 +24,7 @@ export enum GatewayToHubMessagePayload {
   /**
    * Send a list of shocker commands to the hub
    */
-  ShockerCommandList = 3,
+  Common_ShockerCommandList = 3,
 
   /**
    * Request an OTA update to be performed
@@ -40,7 +40,7 @@ export function unionToGatewayToHubMessagePayload(
     case 'NONE': return null; 
     case 'Ping': return accessor(new Ping())! as Ping;
     case 'Trigger': return accessor(new Trigger())! as Trigger;
-    case 'ShockerCommandList': return accessor(new ShockerCommandList())! as ShockerCommandList;
+    case 'Common_ShockerCommandList': return accessor(new ShockerCommandList())! as ShockerCommandList;
     case 'OtaUpdateRequest': return accessor(new OtaUpdateRequest())! as OtaUpdateRequest;
     default: return null;
   }
@@ -55,7 +55,7 @@ export function unionListToGatewayToHubMessagePayload(
     case 'NONE': return null; 
     case 'Ping': return accessor(index, new Ping())! as Ping;
     case 'Trigger': return accessor(index, new Trigger())! as Trigger;
-    case 'ShockerCommandList': return accessor(index, new ShockerCommandList())! as ShockerCommandList;
+    case 'Common_ShockerCommandList': return accessor(index, new ShockerCommandList())! as ShockerCommandList;
     case 'OtaUpdateRequest': return accessor(index, new OtaUpdateRequest())! as OtaUpdateRequest;
     default: return null;
   }

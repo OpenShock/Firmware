@@ -2,7 +2,7 @@
 
 const char* const TAG = "main";
 
-#include "CaptivePortal.h"
+#include "captiveportal/Manager.h"
 #include "CommandHandler.h"
 #include "Common.h"
 #include "config/Config.h"
@@ -13,7 +13,7 @@ const char* const TAG = "main";
 #include "OtaUpdateManager.h"
 #include "serial/SerialInputHandler.h"
 #include "util/TaskUtils.h"
-#include "VisualStateManager.h"
+#include "visual/VisualStateManager.h"
 #include "wifi/WiFiManager.h"
 #include "wifi/WiFiScanManager.h"
 
@@ -104,7 +104,11 @@ void appSetup()
 // Arduino setup function
 void setup()
 {
-  ::Serial.begin(115'200);
+  OS_SERIAL.begin(115'200);
+
+#if ARDUINO_USB_MODE
+  OS_SERIAL_USB.begin(115'200);
+#endif
 
   OpenShock::Config::Init();
 
@@ -135,7 +139,10 @@ void main_app(void* arg)
 void loop()
 {
   // Start the main task
-  OpenShock::TaskUtils::TaskCreateExpensive(main_app, "main_app", 8192, nullptr, 1, nullptr);  // PROFILED: 6KB stack usage
+  if (OpenShock::TaskUtils::TaskCreateExpensive(main_app, "main_app", 8192, nullptr, 1, nullptr) != pdPASS) {  // PROFILED: 6KB stack usage
+    OS_PANIC(TAG, "Failed to create main_app task");
+    return;
+  }
 
   // Kill the loop task (Arduino is stinky)
   vTaskDelete(nullptr);

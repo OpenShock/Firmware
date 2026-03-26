@@ -8,7 +8,8 @@
 
 const char* const TAG = "Serial::CommandHandlers::Domain";
 
-void _handleHostnameCommand(std::string_view arg, bool isAutomated) {
+void _handleHostnameCommand(std::string_view arg, bool isAutomated)
+{
   if (arg.empty()) {
     std::string hostname;
     if (!OpenShock::Config::GetWiFiHostname(hostname)) {
@@ -20,7 +21,7 @@ void _handleHostnameCommand(std::string_view arg, bool isAutomated) {
     return;
   }
 
-  bool result = OpenShock::Config::SetWiFiHostname(arg);
+  bool result = OpenShock::Config::SetWiFiHostname(std::string(arg));
   if (result) {
     SERPR_SUCCESS("Saved config, restarting...");
     esp_restart();
@@ -29,7 +30,8 @@ void _handleHostnameCommand(std::string_view arg, bool isAutomated) {
   }
 }
 
-OpenShock::Serial::CommandGroup OpenShock::Serial::CommandHandlers::HostnameHandler() {
+OpenShock::Serial::CommandGroup OpenShock::Serial::CommandHandlers::HostnameHandler()
+{
   auto group = OpenShock::Serial::CommandGroup("hostname"sv);
 
   auto& getCommand = group.addCommand("Get the network hostname."sv, _handleHostnameCommand);

@@ -65,20 +65,21 @@ namespace OpenShock::Config {
 
   bool AnyWiFiCredentials();
   bool AnyWiFiCredentials(std::function<bool(const Config::WiFiCredentials&)> predicate);
-  uint8_t AddWiFiCredentials(std::string_view ssid, std::string_view password);
+  uint8_t AddWiFiCredentials(std::string_view ssid, std::string_view password, wifi_auth_mode_t authMode = WIFI_AUTH_MAX);
   bool TryGetWiFiCredentialsByID(uint8_t id, WiFiCredentials& out);
   bool TryGetWiFiCredentialsBySSID(const char* ssid, WiFiCredentials& out);
   uint8_t GetWiFiCredentialsIDbySSID(const char* ssid);
+  bool PinWiFiCredentialsBSSID(uint8_t id, const uint8_t (&bssid)[6]);
   bool RemoveWiFiCredentials(uint8_t id);
   bool ClearWiFiCredentials();
   bool GetWiFiHostname(std::string& out);
-  bool SetWiFiHostname(std::string_view hostname);
+  bool SetWiFiHostname(std::string hostname);
 
   bool GetBackendDomain(std::string& out);
-  bool SetBackendDomain(std::string_view domain);
+  bool SetBackendDomain(std::string domain);
   bool HasBackendAuthToken();
   bool GetBackendAuthToken(std::string& out);
-  bool SetBackendAuthToken(std::string_view token);
+  bool SetBackendAuthToken(std::string token);
   bool ClearBackendAuthToken();
 
   bool GetSerialInputConfigEchoEnabled(bool& out);
