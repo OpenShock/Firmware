@@ -24,7 +24,6 @@ from pathlib import Path
 
 CHANGES_DIR = '.changes'
 CHANGELOG_FILE = 'CHANGELOG.md'
-RELEASE_JSON_FILE = 'release.json'
 BUMP_ORDER = {'patch': 0, 'minor': 1, 'major': 2}
 NOTICE_LEVELS = {'info', 'warning', 'error'}
 
@@ -329,17 +328,13 @@ def cmd_stable(args):
     if args.dry_run:
         print(f'Would create tag: {tag}')
         print(f'\nChangelog entry:\n{entry}')
-        print(f'\nrelease.json:\n{json.dumps(release_data, indent=2)}')
+        print(f'\nrelease.json (for API):\n{json.dumps(release_data, indent=2)}')
         return
 
     root = get_project_root()
 
-    # Write release.json
-    release_json_path = root / RELEASE_JSON_FILE
-    with open(release_json_path, 'w', encoding='utf-8') as f:
-        json.dump(release_data, f, indent=2)
-        f.write('\n')
-    print(f'Wrote {RELEASE_JSON_FILE}')
+    # Print release JSON to stdout for CI to capture and send to the API
+    print(json.dumps(release_data, indent=2))
 
     # Prepend to CHANGELOG.md
     changelog_path = root / CHANGELOG_FILE
@@ -347,19 +342,19 @@ def cmd_stable(args):
     if changelog_path.exists():
         existing = changelog_path.read_text(encoding='utf-8')
     changelog_path.write_text(entry + '\n' + existing, encoding='utf-8')
-    print(f'Updated {CHANGELOG_FILE}')
+    print(f'Updated {CHANGELOG_FILE}', file=sys.stderr)
 
     # Delete change files
     for c in changes:
         os.remove(root / CHANGES_DIR / c.filename)
-    print(f'Removed {len(changes)} change files')
+    print(f'Removed {len(changes)} change files', file=sys.stderr)
 
     # Commit and tag
-    run_git('add', CHANGELOG_FILE, RELEASE_JSON_FILE, CHANGES_DIR)
+    run_git('add', CHANGELOG_FILE, CHANGES_DIR)
     run_git('commit', '-m', f'chore: release {tag}')
     run_git('tag', tag)
-    print(f'Created tag: {tag}')
-    print(f'Push with: git push origin {tag} && git push')
+    print(f'Created tag: {tag}', file=sys.stderr)
+    print(f'Push with: git push origin {tag} && git push', file=sys.stderr)
 
 
 def main():

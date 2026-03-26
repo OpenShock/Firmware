@@ -1,0 +1,51 @@
+on:
+  push:
+    branches:
+      - master
+      - beta
+
+name: release
+
+env:
+  PYTHON_VERSION: '3.13'
+
+permissions:
+  contents: write
+
+jobs:
+  auto-release:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+          # A PAT is required so the tag push triggers ci-build.
+          # The default GITHUB_TOKEN does not trigger downstream workflows.
+          token: ${{ secrets.RELEASE_TOKEN }}
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - name: Configure git
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+      - name: Create RC tag (beta)
+        if: github.ref == 'refs/heads/beta'
+        run: |
+          python scripts/release.py rc
+          TAG=$(git describe --tags --abbrev=0)
+          git push origin "$TAG"
+          echo "::notice::Created and pushed tag: $TAG"
+
+      - name: Create stable release (master)
+        if: github.ref == 'refs/heads/master'
+        run: |
+          python scripts/release.py stable
+          TAG=$(git describe --tags --abbrev=0)
+          git push origin HEAD "$TAG"
+          echo "::notice::Created and pushed tag: $TAG"
