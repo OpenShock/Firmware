@@ -22,10 +22,12 @@ void _handleNetworksCommand(std::string_view arg, bool isAutomated)
 
     if (!OpenShock::Config::GetWiFiCredentials(root, true)) {
       SERPR_ERROR("Failed to get WiFi credentials from config");
+      cJSON_Delete(root);
       return;
     }
 
     char* out = cJSON_PrintUnformatted(root);
+    cJSON_Delete(root);
     if (out == nullptr) {
       SERPR_ERROR("Failed to print JSON");
       return;
@@ -45,6 +47,7 @@ void _handleNetworksCommand(std::string_view arg, bool isAutomated)
 
   if (cJSON_IsArray(root) == 0) {
     SERPR_ERROR("Invalid argument (not an array)");
+    cJSON_Delete(root);
     return;
   }
 
@@ -58,6 +61,7 @@ void _handleNetworksCommand(std::string_view arg, bool isAutomated)
 
     if (!cred.FromJSON(network)) {
       SERPR_ERROR("Failed to parse network");
+      cJSON_Delete(root);
       return;
     }
 
@@ -69,6 +73,8 @@ void _handleNetworksCommand(std::string_view arg, bool isAutomated)
 
     creds.push_back(std::move(cred));
   }
+
+  cJSON_Delete(root);
 
   if (!OpenShock::Config::SetWiFiCredentials(creds)) {
     SERPR_ERROR("Failed to save config");

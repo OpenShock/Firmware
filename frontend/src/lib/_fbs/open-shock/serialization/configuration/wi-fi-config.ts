@@ -58,8 +58,42 @@ credentialsLength():number {
   return offset ? this.bb!.__vector_len(this.bb_pos + offset) : 0;
 }
 
+/**
+ * Access point password (empty = open network)
+ */
+apPassword():string|null
+apPassword(optionalEncoding:flatbuffers.Encoding):string|Uint8Array|null
+apPassword(optionalEncoding?:any):string|Uint8Array|null {
+  const offset = this.bb!.__offset(this.bb_pos, 10);
+  return offset ? this.bb!.__string(this.bb_pos + offset, optionalEncoding) : null;
+}
+
+/**
+ * Disable WiFi Access Point mode completely
+ */
+apDisabled():boolean {
+  const offset = this.bb!.__offset(this.bb_pos, 12);
+  return offset ? !!this.bb!.readInt8(this.bb_pos + offset) : false;
+}
+
+/**
+ * Disable WiFi Station mode completely
+ */
+staDisabled():boolean {
+  const offset = this.bb!.__offset(this.bb_pos, 14);
+  return offset ? !!this.bb!.readInt8(this.bb_pos + offset) : false;
+}
+
+/**
+ * Don't connect to any cloud services
+ */
+offlineMode():boolean {
+  const offset = this.bb!.__offset(this.bb_pos, 16);
+  return offset ? !!this.bb!.readInt8(this.bb_pos + offset) : false;
+}
+
 static startWiFiConfig(builder:flatbuffers.Builder) {
-  builder.startObject(3);
+  builder.startObject(7);
 }
 
 static addApSsid(builder:flatbuffers.Builder, apSsidOffset:flatbuffers.Offset) {
@@ -86,16 +120,36 @@ static startCredentialsVector(builder:flatbuffers.Builder, numElems:number) {
   builder.startVector(4, numElems, 4);
 }
 
+static addApPassword(builder:flatbuffers.Builder, apPasswordOffset:flatbuffers.Offset) {
+  builder.addFieldOffset(3, apPasswordOffset, 0);
+}
+
+static addApDisabled(builder:flatbuffers.Builder, apDisabled:boolean) {
+  builder.addFieldInt8(4, +apDisabled, +false);
+}
+
+static addStaDisabled(builder:flatbuffers.Builder, staDisabled:boolean) {
+  builder.addFieldInt8(5, +staDisabled, +false);
+}
+
+static addOfflineMode(builder:flatbuffers.Builder, offlineMode:boolean) {
+  builder.addFieldInt8(6, +offlineMode, +false);
+}
+
 static endWiFiConfig(builder:flatbuffers.Builder):flatbuffers.Offset {
   const offset = builder.endObject();
   return offset;
 }
 
-static createWiFiConfig(builder:flatbuffers.Builder, apSsidOffset:flatbuffers.Offset, hostnameOffset:flatbuffers.Offset, credentialsOffset:flatbuffers.Offset):flatbuffers.Offset {
+static createWiFiConfig(builder:flatbuffers.Builder, apSsidOffset:flatbuffers.Offset, hostnameOffset:flatbuffers.Offset, credentialsOffset:flatbuffers.Offset, apPasswordOffset:flatbuffers.Offset, apDisabled:boolean, staDisabled:boolean, offlineMode:boolean):flatbuffers.Offset {
   WiFiConfig.startWiFiConfig(builder);
   WiFiConfig.addApSsid(builder, apSsidOffset);
   WiFiConfig.addHostname(builder, hostnameOffset);
   WiFiConfig.addCredentials(builder, credentialsOffset);
+  WiFiConfig.addApPassword(builder, apPasswordOffset);
+  WiFiConfig.addApDisabled(builder, apDisabled);
+  WiFiConfig.addStaDisabled(builder, staDisabled);
+  WiFiConfig.addOfflineMode(builder, offlineMode);
   return WiFiConfig.endWiFiConfig(builder);
 }
 }

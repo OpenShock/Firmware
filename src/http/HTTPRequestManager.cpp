@@ -11,12 +11,10 @@ const char* const TAG = "HTTPRequestManager";
 #include "util/StringUtils.h"
 
 #include <HTTPClient.h>
-#include <WiFi.h>
 
 #include <algorithm>
 #include <memory>
 #include <numeric>
-#include <string>
 #include <string_view>
 #include <unordered_map>
 
@@ -30,7 +28,7 @@ static std::unordered_map<std::string, std::shared_ptr<OpenShock::RateLimiter>> 
 
 using namespace OpenShock;
 
-std::string_view _getDomain(std::string_view url)
+static std::string_view getDomainFromURL(std::string_view url)
 {
   if (url.empty()) {
     return {};
@@ -67,7 +65,7 @@ std::string_view _getDomain(std::string_view url)
   return url;
 }
 
-std::shared_ptr<OpenShock::RateLimiter> _rateLimiterFactory(std::string_view domain)
+static std::shared_ptr<OpenShock::RateLimiter> createRateLimiterForDomain(std::string_view domain)
 {
   auto rateLimit = std::make_shared<OpenShock::RateLimiter>();
 
@@ -84,29 +82,21 @@ std::shared_ptr<OpenShock::RateLimiter> _rateLimiterFactory(std::string_view dom
   return rateLimit;
 }
 
-std::shared_ptr<OpenShock::RateLimiter> _getRateLimiter(std::string_view url)
+static std::shared_ptr<OpenShock::RateLimiter> createRateLimiterForURL(std::string_view url)
 {
-  auto domain = std::string(_getDomain(url));
+  auto domain = std::string(getDomainFromURL(url));
   if (domain.empty()) {
     return nullptr;
   }
 
-  s_rateLimitsMutex.lock(portMAX_DELAY);
+  OpenShock::ScopedLock lock__(&s_rateLimitsMutex);
 
   auto it = s_rateLimits.find(domain);
   if (it == s_rateLimits.end()) {
-    s_rateLimits.emplace(domain, _rateLimiterFactory(domain));
-    it = s_rateLimits.find(domain);
+    it = s_rateLimits.emplace(domain, createRateLimiterForDomain(domain)).first;
   }
 
-  s_rateLimitsMutex.unlock();
-
   return it->second;
-}
-
-void _setupClient(HTTPClient& client)
-{
-  client.setUserAgent(OpenShock::Constants::FW_USERAGENT);
 }
 
 struct StreamReaderResult {
@@ -114,17 +104,17 @@ struct StreamReaderResult {
   std::size_t nWritten;
 };
 
-constexpr bool _isCRLF(const uint8_t* buffer)
+static bool isCRLF(const uint8_t* buffer)
 {
   return buffer[0] == '\r' && buffer[1] == '\n';
 }
-constexpr bool _tryFindCRLF(std::size_t& pos, const uint8_t* buffer, std::size_t len)
+static bool tryFindCRLF(std::size_t& pos, const uint8_t* buffer, std::size_t len)
 {
   const uint8_t* cur = buffer;
   const uint8_t* end = buffer + len - 1;
 
   while (cur < end) {
-    if (_isCRLF(cur)) {
+    if (isCRLF(cur)) {
       pos = static_cast<std::size_t>(cur - buffer);
       return true;
     }
@@ -135,20 +125,20 @@ constexpr bool _tryFindCRLF(std::size_t& pos, const uint8_t* buffer, std::size_t
   return false;
 }
 
-enum ParserState : uint8_t {
+enum class ParserState : uint8_t {
   Ok,
   NeedMoreData,
   Invalid,
 };
 
-ParserState _parseChunkHeader(const uint8_t* buffer, std::size_t bufferLen, std::size_t& headerLen, std::size_t& payloadLen)
+static ParserState tryParseHttpChunkHeader(const uint8_t* buffer, std::size_t bufferLen, std::size_t& headerLen, std::size_t& payloadLen)
 {
   if (bufferLen < 5) {  // Bare minimum: "0\r\n\r\n"
     return ParserState::NeedMoreData;
   }
 
   // Find the first CRLF
-  if (!_tryFindCRLF(headerLen, buffer, bufferLen)) {
+  if (!tryFindCRLF(headerLen, buffer, bufferLen)) {
     return ParserState::NeedMoreData;
   }
 
@@ -192,10 +182,10 @@ ParserState _parseChunkHeader(const uint8_t* buffer, std::size_t bufferLen, std:
   return ParserState::Ok;
 }
 
-ParserState _parseChunk(const uint8_t* buffer, std::size_t bufferLen, std::size_t& payloadPos, std::size_t& payloadLen)
+static ParserState tryParseHttpChunk(const uint8_t* buffer, std::size_t bufferLen, std::size_t& payloadPos, std::size_t& payloadLen)
 {
   if (payloadPos == 0) {
-    ParserState state = _parseChunkHeader(buffer, bufferLen, payloadPos, payloadLen);
+    ParserState state = tryParseHttpChunkHeader(buffer, bufferLen, payloadPos, payloadLen);
     if (state != ParserState::Ok) {
       return state;
     }
@@ -207,7 +197,7 @@ ParserState _parseChunk(const uint8_t* buffer, std::size_t bufferLen, std::size_
   }
 
   // Check for CRLF
-  if (!_isCRLF(buffer + totalLen - 2)) {
+  if (!isCRLF(buffer + totalLen - 2)) {
     OS_LOGW(TAG, "Invalid chunk payload CRLF");
     return ParserState::Invalid;
   }
@@ -215,7 +205,7 @@ ParserState _parseChunk(const uint8_t* buffer, std::size_t bufferLen, std::size_
   return ParserState::Ok;
 }
 
-void _alignChunk(uint8_t* buffer, std::size_t& bufferCursor, std::size_t payloadPos, std::size_t payloadLen)
+static void alignHttpChunk(uint8_t* buffer, std::size_t& bufferCursor, std::size_t payloadPos, std::size_t payloadLen)
 {
   std::size_t totalLen  = payloadPos + payloadLen + 2;  // +2 for CRLF
   std::size_t remaining = bufferCursor - totalLen;
@@ -227,7 +217,7 @@ void _alignChunk(uint8_t* buffer, std::size_t& bufferCursor, std::size_t payload
   }
 }
 
-StreamReaderResult _readStreamDataChunked(HTTPClient& client, WiFiClient* stream, HTTP::DownloadCallback downloadCallback, int64_t begin, uint32_t timeoutMs)
+static StreamReaderResult readHttpStreamDataChunked(HTTPClient& client, WiFiClient* stream, HTTP::DownloadCallback downloadCallback, int64_t begin, uint32_t timeoutMs)
 {
   std::size_t totalWritten   = 0;
   HTTP::RequestResult result = HTTP::RequestResult::Success;
@@ -264,7 +254,7 @@ StreamReaderResult _readStreamDataChunked(HTTPClient& client, WiFiClient* stream
     bufferCursor += bytesRead;
 
     while (bufferCursor > 0) {
-      state = _parseChunk(buffer, bufferCursor, payloadPos, payloadSize);
+      state = tryParseHttpChunk(buffer, bufferCursor, payloadPos, payloadSize);
       if (state == ParserState::Invalid) {
         OS_LOGE(TAG, "Failed to parse chunk");
         result = HTTP::RequestResult::RequestFailed;
@@ -295,7 +285,7 @@ StreamReaderResult _readStreamDataChunked(HTTPClient& client, WiFiClient* stream
       }
 
       totalWritten += payloadSize;
-      _alignChunk(buffer, bufferCursor, payloadPos, payloadSize);
+      alignHttpChunk(buffer, bufferCursor, payloadPos, payloadSize);
       payloadSize = 0;
       payloadPos  = 0;
     }
@@ -310,12 +300,16 @@ StreamReaderResult _readStreamDataChunked(HTTPClient& client, WiFiClient* stream
   return {result, totalWritten};
 }
 
-StreamReaderResult _readStreamData(HTTPClient& client, WiFiClient* stream, std::size_t contentLength, HTTP::DownloadCallback downloadCallback, int64_t begin, uint32_t timeoutMs)
+static StreamReaderResult readHttpStreamData(HTTPClient& client, WiFiClient* stream, std::size_t contentLength, HTTP::DownloadCallback downloadCallback, int64_t begin, uint32_t timeoutMs)
 {
   std::size_t nWritten       = 0;
   HTTP::RequestResult result = HTTP::RequestResult::Success;
 
   uint8_t* buffer = static_cast<uint8_t*>(malloc(HTTP_BUFFER_SIZE));
+  if (buffer == nullptr) {
+    OS_LOGE(TAG, "Failed to allocate HTTP buffer");
+    return {HTTP::RequestResult::InternalError, 0};
+  }
 
   while (client.connected() && nWritten < contentLength) {
     if (begin + timeoutMs < OpenShock::millis()) {
@@ -355,19 +349,27 @@ StreamReaderResult _readStreamData(HTTPClient& client, WiFiClient* stream, std::
   return {result, nWritten};
 }
 
-HTTP::Response<std::size_t> _doGetStream(
-  HTTPClient& client,
-  std::string_view url,
-  const std::map<String, String>& headers,
-  std::span<const uint16_t> acceptedCodes,
-  std::shared_ptr<OpenShock::RateLimiter> rateLimiter,
-  HTTP::GotContentLengthCallback contentLengthCallback,
-  HTTP::DownloadCallback downloadCallback,
-  uint32_t timeoutMs
-)
+HTTP::Response<std::size_t>
+  HTTP::Download(std::string_view url, const std::map<String, String>& headers, HTTP::GotContentLengthCallback contentLengthCallback, HTTP::DownloadCallback downloadCallback, tcb::span<const uint16_t> acceptedCodes, uint32_t timeoutMs)
 {
+  std::shared_ptr<OpenShock::RateLimiter> rateLimiter = createRateLimiterForURL(url);
+  if (rateLimiter == nullptr) {
+    return {RequestResult::InvalidURL, 0, 0};
+  }
+
+  if (!rateLimiter->tryRequest()) {
+    return {RequestResult::RateLimited, 0, 0};
+  }
+
+  HTTPClient client;
+  client.setUserAgent(OpenShock::Constants::FW_USERAGENT);
+
   int64_t begin = OpenShock::millis();
-  if (!client.begin(OpenShock::StringToArduinoString(url))) {
+
+  // This method is horribly named, if you call the begin() method with one String parameter its HTTP, but the one with (String, const char*) is HTTPS.
+  // We pass null here for CAcert parameter to remove erroneous "unexpected protocol: https, expected http" warning, this is what begin(String) does as a fallback.
+  // This is yet another example of why we need to get rid of Arduino dependency lol
+  if (!client.begin(OpenShock::StringToArduinoString(url), nullptr)) {
     OS_LOGE(TAG, "Failed to begin HTTP request");
     return {HTTP::RequestResult::RequestFailed, 0, 0};
   }
@@ -440,33 +442,15 @@ HTTP::Response<std::size_t> _doGetStream(
 
   StreamReaderResult result;
   if (contentLength > 0) {
-    result = _readStreamData(client, stream, contentLength, downloadCallback, begin, timeoutMs);
+    result = readHttpStreamData(client, stream, contentLength, downloadCallback, begin, timeoutMs);
   } else {
-    result = _readStreamDataChunked(client, stream, downloadCallback, begin, timeoutMs);
+    result = readHttpStreamDataChunked(client, stream, downloadCallback, begin, timeoutMs);
   }
 
   return {result.result, responseCode, result.nWritten};
 }
 
-HTTP::Response<std::size_t>
-  HTTP::Download(std::string_view url, const std::map<String, String>& headers, HTTP::GotContentLengthCallback contentLengthCallback, HTTP::DownloadCallback downloadCallback, std::span<const uint16_t> acceptedCodes, uint32_t timeoutMs)
-{
-  std::shared_ptr<OpenShock::RateLimiter> rateLimiter = _getRateLimiter(url);
-  if (rateLimiter == nullptr) {
-    return {RequestResult::InvalidURL, 0, 0};
-  }
-
-  if (!rateLimiter->tryRequest()) {
-    return {RequestResult::RateLimited, 0, 0};
-  }
-
-  HTTPClient client;
-  _setupClient(client);
-
-  return _doGetStream(client, url, headers, acceptedCodes, rateLimiter, contentLengthCallback, downloadCallback, timeoutMs);
-}
-
-HTTP::Response<std::string> HTTP::GetString(std::string_view url, const std::map<String, String>& headers, std::span<const uint16_t> acceptedCodes, uint32_t timeoutMs)
+HTTP::Response<std::string> HTTP::GetString(std::string_view url, const std::map<String, String>& headers, tcb::span<const uint16_t> acceptedCodes, uint32_t timeoutMs)
 {
   std::string result;
 
@@ -481,8 +465,8 @@ HTTP::Response<std::string> HTTP::GetString(std::string_view url, const std::map
 
   auto response = Download(url, headers, allocator, writer, acceptedCodes, timeoutMs);
   if (response.result != RequestResult::Success) {
-    return Response<std::string> {response.result, response.code, {}};
+    return {response.result, response.code, {}};
   }
 
-  return Response<std::string> {response.result, response.code, result};
+  return {response.result, response.code, result};
 }

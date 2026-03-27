@@ -146,7 +146,7 @@ void _printCommandHelp(SerialCmds::CommandGroup& group)
     size += 2;  // +2 for newline
 
     if (command.description().size() > 0) {
-      size = command.description().size() + 4;  // +2 for indent, +2 for newline
+      size += command.description().size() + 4;  // +2 for indent, +2 for newline
     }
 
     if (command.arguments().size() > 0) {

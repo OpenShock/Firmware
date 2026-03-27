@@ -67,7 +67,7 @@ RFTransmitter::RFTransmitter(gpio_num_t gpioPin)
   char name[32];
   snprintf(name, sizeof(name), "RFTransmitter-%u", m_txPin);
 
-  if (TaskUtils::TaskCreateExpensive(&Util::FnProxy<&RFTransmitter::TransmitTask>, name, kTaskStackSize, this, kTaskPriority, &m_taskHandle) != pdPASS) {
+  if (TaskUtils::TaskCreateExpensive(Util::FnProxy<&RFTransmitter::TransmitTask>, name, kTaskStackSize, this, kTaskPriority, &m_taskHandle) != pdPASS) {
     OS_LOGE(TAG, "[pin-%hhi] Failed to create task", m_txPin);
     destroy();
     return;
@@ -127,17 +127,13 @@ void RFTransmitter::destroy()
   if (m_taskHandle != nullptr) {
     OS_LOGD(TAG, "[pin-%hhi] Stopping task", m_txPin);
 
-    // Wait for the task to stop
+    // Send kill command + wait for task to exit
     Command cmd;
     memset(&cmd, 0, sizeof(cmd));
     cmd.flags = kFlagDeleteTask;
+    xQueueSend(m_queueHandle, &cmd, pdMS_TO_TICKS(10));
 
-    while (eTaskGetState(m_taskHandle) != eDeleted) {
-      vTaskDelay(pdMS_TO_TICKS(10));
-
-      // Send nullptr to stop the task gracefully
-      xQueueSend(m_queueHandle, &cmd, pdMS_TO_TICKS(10));
-    }
+    TaskUtils::StopTask(m_taskHandle, TAG, "RFTransmitter task");
 
     OS_LOGD(TAG, "[pin-%hhi] Task stopped", m_txPin);
 
@@ -217,9 +213,7 @@ void RFTransmitter::TransmitTask()
     while (xQueueReceive(m_queueHandle, &cmd, sequences.empty() ? portMAX_DELAY : 0) == pdTRUE) {
       // Destroy task if we receive destroy command
       if ((cmd.flags & kFlagDeleteTask) != 0) {
-        sequences.clear();
-        vTaskDelete(nullptr);
-        return;
+        goto exit;  // Break out of nested loop so locals destruct before vTaskDelete
       }
 
       if ((cmd.flags & kFlagOverwrite) != 0) {
@@ -249,4 +243,7 @@ void RFTransmitter::TransmitTask()
 
     writeSequences(m_txPin, sequences);
   }
+
+exit:  // Locals (sequences) destruct here before task deletion
+  vTaskDelete(nullptr);
 }

@@ -1,9 +1,15 @@
 #pragma once
 
-#include "serialization/_fbs/HubToLocalMessage_generated.h"
-
 #include <cstdint>
 
 namespace OpenShock {
-  typedef OpenShock::Serialization::Local::AccountLinkResultCode AccountLinkResultCode;
+  enum class AccountLinkResultCode : uint8_t {
+    Success              = 0,
+    CodeRequired         = 1,
+    InvalidCodeLength    = 2,
+    NoInternetConnection = 3,
+    InvalidCode          = 4,
+    RateLimited          = 5,
+    InternalError        = 6,
+  };
 }  // namespace OpenShock

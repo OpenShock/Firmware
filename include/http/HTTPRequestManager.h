@@ -86,6 +86,7 @@ namespace OpenShock::HTTP {
 
     T data;
     if (!jsonParser(response.code, json, data)) {
+      cJSON_Delete(json);
       return {RequestResult::ParseFailed, response.code, {}};
     }
 

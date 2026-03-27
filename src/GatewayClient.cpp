@@ -10,7 +10,7 @@ const char* const TAG = "GatewayClient";
 #include "message_handlers/WebSocket.h"
 #include "OtaUpdateManager.h"
 #include "serialization/WSGateway.h"
-#include "VisualStateManager.h"
+#include "visual/VisualStateManager.h"
 
 using namespace OpenShock;
 
@@ -155,8 +155,6 @@ void GatewayClient::_sendBootStatus()
 
 void GatewayClient::_handleEvent(WStype_t type, uint8_t* payload, std::size_t length)
 {
-  (void)payload;
-
   switch (type) {
     case WStype_DISCONNECTED:
       _setState(GatewayClientState::Disconnected);

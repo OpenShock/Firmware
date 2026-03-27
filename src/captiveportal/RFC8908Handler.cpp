@@ -2,6 +2,7 @@
 
 const char* const TAG = "RFC8908Handler";
 
+#include "http/ContentTypes.h"
 #include "Logging.h"
 
 #include <ESPAsyncWebServer.h>
@@ -85,12 +86,20 @@ void CaptivePortal::RFC8908Handler::handleRequest(AsyncWebServerRequest* request
     cJSON_AddStringToObject(doc, "user-portal-url", portalUrl.c_str());
     cJSON_AddStringToObject(doc, "venue-info-url", "https://openshock.org");
 
-    AsyncWebServerResponse* response = request->beginResponse(200, "application/captive+json", cJSON_Print(doc));
+    char* jsonStr = cJSON_Print(doc);
+    cJSON_Delete(doc);
+
+    if (jsonStr == nullptr) {
+      OS_LOGE(TAG, "Failed to serialize captive portal JSON response");
+      request->send(500, OpenShock::HTTP::ContentType::TextPlain, "Internal Server Error");
+      return;
+    }
+
+    AsyncWebServerResponse* response = request->beginResponse(200, "application/captive+json", jsonStr);
+    cJSON_free(jsonStr);
 
     response->addHeader("Cache-Control", "private");
     request->send(response);
-
-    cJSON_Delete(doc);
     return;
   }
 
