@@ -29,6 +29,8 @@ namespace OpenShock::Checksum {
   template<typename T>
   constexpr uint8_t Sum8(const T& data)
   {
+    static_assert(std::is_trivially_copyable_v<T>, "Sum8 only supports trivially copyable types");
+
     return Sum8(reinterpret_cast<const uint8_t*>(std::addressof(data)), sizeof(T));
   }
 
@@ -39,19 +41,20 @@ namespace OpenShock::Checksum {
   SUM8_INT_FN(int64_t)
   SUM8_INT_FN(uint64_t)
 
-  
   /**
    * Make sure the uint8 only has its high bits (0x0F) set before using this function
    */
-  constexpr uint8_t ReverseNibble(uint8_t b) {
-    return (0xF7B3D591E6A2C480 >> (b * 4)) & 0xF; // Trust me bro
+  constexpr uint8_t ReverseNibble(uint8_t b)
+  {
+    return (0xF7B3D591E6A2C480ull >> (b * 4)) & 0xF;  // Trust me bro
   }
-  
+
   /**
    * Make sure the uint8 only has its high bits (0x0F) set before using this function
    */
-  constexpr uint8_t ReverseInverseNibble(uint8_t b) {
-    return (0x084C2A6E195D3B7F >> (b * 4)) & 0xF; // Trust me bro
+  constexpr uint8_t ReverseInverseNibble(uint8_t b)
+  {
+    return (0x084C2A6E195D3B7Full >> (b * 4)) & 0xF;  // Trust me bro
   }
 }  // namespace OpenShock::Checksum
 

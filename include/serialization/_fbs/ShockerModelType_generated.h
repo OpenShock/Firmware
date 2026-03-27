@@ -9,8 +9,8 @@
 // Ensure the included flatbuffers.h is the same version as when this file was
 // generated, otherwise it may not be compatible.
 static_assert(FLATBUFFERS_VERSION_MAJOR == 25 &&
-              FLATBUFFERS_VERSION_MINOR == 9 &&
-              FLATBUFFERS_VERSION_REVISION == 23,
+              FLATBUFFERS_VERSION_MINOR == 12 &&
+              FLATBUFFERS_VERSION_REVISION == 19,
              "Non-compatible flatbuffers version included");
 
 namespace OpenShock {
@@ -21,31 +21,34 @@ enum class ShockerModelType : uint8_t {
   CaiXianlin = 0,
   Petrainer = 1,
   Petrainer998DR = 2,
+  WellturnT330 = 3,
   MIN = CaiXianlin,
-  MAX = Petrainer998DR
+  MAX = WellturnT330
 };
 
-inline const ShockerModelType (&EnumValuesShockerModelType())[3] {
+inline const ShockerModelType (&EnumValuesShockerModelType())[4] {
   static const ShockerModelType values[] = {
     ShockerModelType::CaiXianlin,
     ShockerModelType::Petrainer,
-    ShockerModelType::Petrainer998DR
+    ShockerModelType::Petrainer998DR,
+    ShockerModelType::WellturnT330
   };
   return values;
 }
 
 inline const char * const *EnumNamesShockerModelType() {
-  static const char * const names[4] = {
+  static const char * const names[5] = {
     "CaiXianlin",
     "Petrainer",
     "Petrainer998DR",
+    "WellturnT330",
     nullptr
   };
   return names;
 }
 
 inline const char *EnumNameShockerModelType(ShockerModelType e) {
-  if (::flatbuffers::IsOutRange(e, ShockerModelType::CaiXianlin, ShockerModelType::Petrainer998DR)) return "";
+  if (::flatbuffers::IsOutRange(e, ShockerModelType::CaiXianlin, ShockerModelType::WellturnT330)) return "";
   const size_t index = static_cast<size_t>(e);
   return EnumNamesShockerModelType()[index];
 }

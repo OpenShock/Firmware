@@ -2,7 +2,7 @@
 
 const char* const TAG = "ServerMessageHandlers";
 
-#include "CaptivePortal.h"
+#include "captiveportal/Manager.h"
 #include "Logging.h"
 #include "OtaUpdateManager.h"
 

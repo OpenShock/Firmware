@@ -8,11 +8,12 @@ namespace OpenShock {
     CaiXianlin,
     Petrainer,
     Petrainer998DR,
-    T330,
+    WellturnT330,
     D80
   };
 
-  inline bool ShockerModelTypeFromString(const char* str, ShockerModelType& out, bool allowTypo = false) {
+  inline bool ShockerModelTypeFromString(const char* str, ShockerModelType& out, bool allowTypo = false)
+  {
     if (strcasecmp(str, "caixianlin") == 0 || strcasecmp(str, "cai-xianlin") == 0) {
       out = ShockerModelType::CaiXianlin;
       return true;
@@ -38,8 +39,8 @@ namespace OpenShock {
       return true;
     }
 
-    if (strcasecmp(str, "t330") == 0) {
-      out = ShockerModelType::T330;
+    if (strcasecmp(str, "wellturnt330") == 0 || strcasecmp(str, "t330") == 0) {
+      out = ShockerModelType::WellturnT330;
       return true;
     }
 

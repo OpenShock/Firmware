@@ -17,6 +17,7 @@ class TinyVec {
   static_assert(std::is_trivially_copyable_v<T> && std::is_trivially_destructible_v<T>, "TinyVec requires a trivially copyable & destructible type (POD).");
 
   DISABLE_COPY(TinyVec);
+
 public:
   TinyVec() noexcept = default;
 

@@ -65,7 +65,8 @@ namespace OpenShock::HTTP {
   Response<std::string> GetString(std::string_view url, const std::map<String, String>& headers, tcb::span<const uint16_t> acceptedCodes, uint32_t timeoutMs = 10'000);
 
   template<typename T>
-  Response<T> GetJSON(std::string_view url, const std::map<String, String>& headers, JsonParser<T> jsonParser, tcb::span<const uint16_t> acceptedCodes, uint32_t timeoutMs = 10'000) {
+  Response<T> GetJSON(std::string_view url, const std::map<String, String>& headers, JsonParser<T> jsonParser, tcb::span<const uint16_t> acceptedCodes, uint32_t timeoutMs = 10'000)
+  {
     auto response = GetString(url, headers, acceptedCodes, timeoutMs);
     if (response.result != RequestResult::Success) {
       return {response.result, response.code, {}};
@@ -78,6 +79,7 @@ namespace OpenShock::HTTP {
 
     T data;
     if (!jsonParser(response.code, json, data)) {
+      cJSON_Delete(json);
       return {RequestResult::ParseFailed, response.code, {}};
     }
 

@@ -1,0 +1,4 @@
+---
+Checks: '*, -bugprone-easily-swappable-parameters, -modernize-use-trailing-return-type'
+
+ExcludePaths: '.pio/build/|include/serialization/_fbs/'

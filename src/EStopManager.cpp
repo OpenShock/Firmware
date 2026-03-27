@@ -17,6 +17,7 @@ const char* const TAG = "EStopManager";
 #include <freertos/task.h>
 #include <freertos/timers.h>
 
+#include <atomic>
 #include <cstdint>
 
 using namespace OpenShock;
@@ -27,24 +28,25 @@ const uint32_t k_estopCheckCount      = 13;  // 65 ms at 200 Hz
 const uint16_t k_estopCheckMask       = 0xFFFF >> ((sizeof(uint16_t) * 8) - k_estopCheckCount);
 
 // Grace period after deactivation (prevents immediate re-trigger on release bounce/EMI)
-const uint32_t k_estopRearmGraceTime  = 250;  // tune as needed
+const uint32_t k_estopRearmGraceTime = 250;  // tune as needed
 
 static OpenShock::SimpleMutex s_estopMutex = {};
 static gpio_num_t s_estopPin               = GPIO_NUM_NC;
 static TaskHandle_t s_estopTask            = nullptr;
 
-static EStopState s_lastPublishedState = EStopState::Idle;
-static bool       s_estopActive        = false;
-static int64_t    s_estopActivatedAt   = 0;
+static EStopState s_lastPublishedState         = EStopState::Idle;
+static std::atomic<bool> s_estopActive         = false;
+static std::atomic<int64_t> s_estopActivatedAt = 0;
 
-static volatile bool s_externallyTriggered = false;
+static std::atomic<bool> s_externallyTriggered = false;
+static std::atomic<bool> s_estopStopRequested  = false;
 
 static bool s_estopInitialized = false;
 
 static void estopmanager_updateexternals(EStopState state)
 {
   if (state == s_lastPublishedState) {
-    return; // No state change -> no event
+    return;  // No state change -> no event
   }
 
   s_lastPublishedState = state;
@@ -60,8 +62,8 @@ static void estopmgr_checkertask(void* pvParameters)
 
   // Ensure known initial state
   s_lastPublishedState = EStopState::Idle;
-  s_estopActive        = false;
-  s_estopActivatedAt   = 0;
+  s_estopActive.store(false, std::memory_order_relaxed);
+  s_estopActivatedAt.store(0, std::memory_order_relaxed);
 
   uint16_t history = 0xFFFF;  // Bit history of samples, 0 is pressed
 
@@ -69,13 +71,16 @@ static void estopmgr_checkertask(void* pvParameters)
   int64_t deactivatesAt = 0;
 
   // Rearm grace state
-  int64_t rearmAt      = 0;
-  bool    rearmBlocked = false;
+  int64_t rearmAt   = 0;
+  bool rearmBlocked = false;
 
   // Debounced button state: true == pressed, false == released
   bool lastBtnState = false;
 
   for (;;) {
+    // Check if stop was requested
+    if (s_estopStopRequested.load(std::memory_order_relaxed)) break;
+
     // Sleep for the update rate
     vTaskDelay(pdMS_TO_TICKS(k_estopUpdateRate));
 
@@ -83,16 +88,14 @@ static void estopmgr_checkertask(void* pvParameters)
     int64_t now = OpenShock::millis();
 
     // Handle external trigger: forcibly set the E-Stop active.
-    if (s_externallyTriggered) {
-      s_externallyTriggered = false;
-
-      if (!s_estopActive) {
-        s_estopActivatedAt = now;
+    if (s_externallyTriggered.exchange(false, std::memory_order_relaxed)) {
+      if (!s_estopActive.load(std::memory_order_relaxed)) {
+        s_estopActivatedAt.store(now, std::memory_order_relaxed);
       }
 
-      s_estopActive = true;
-      state         = EStopState::Active;
-      rearmBlocked  = false;
+      s_estopActive.store(true, std::memory_order_relaxed);
+      state        = EStopState::Active;
+      rearmBlocked = false;
 
       estopmanager_updateexternals(state);
 
@@ -107,9 +110,9 @@ static void estopmgr_checkertask(void* pvParameters)
     // Debounce:
     // If all recent bits are 1 -> fully released.
     // If any bit is 0 -> pressed (or bouncing toward pressed).
-    bool btnState = (history & k_estopCheckMask) != k_estopCheckMask;  // true == pressed
-    bool pressedEdge  = (btnState && !lastBtnState);
-    lastBtnState = btnState;
+    bool btnState    = (history & k_estopCheckMask) != k_estopCheckMask;  // true == pressed
+    bool pressedEdge = (btnState && !lastBtnState);
+    lastBtnState     = btnState;
 
     switch (state) {
       case EStopState::Idle:
@@ -126,9 +129,9 @@ static void estopmgr_checkertask(void* pvParameters)
         }
 
         if (btnState) {
-          state              = EStopState::Active;
-          s_estopActive      = true;
-          s_estopActivatedAt = now;
+          state = EStopState::Active;
+          s_estopActive.store(true, std::memory_order_relaxed);
+          s_estopActivatedAt.store(now, std::memory_order_relaxed);
         }
         break;
 
@@ -151,8 +154,8 @@ static void estopmgr_checkertask(void* pvParameters)
 
       case EStopState::AwaitingRelease:
         if (!btnState) {  // fully released -> clear E-Stop
-          state         = EStopState::Idle;
-          s_estopActive = false;
+          state = EStopState::Idle;
+          s_estopActive.store(false, std::memory_order_relaxed);
 
           // Start grace period to prevent immediate re-trigger.
           rearmBlocked = true;
@@ -167,12 +170,15 @@ static void estopmgr_checkertask(void* pvParameters)
 
     estopmanager_updateexternals(state);
   }
+
+  vTaskDelete(nullptr);
 }
 
 static bool estopmgr_setestopenabled(bool enabled)
 {
   if (enabled) {
     if (s_estopTask == nullptr) {
+      s_estopStopRequested.store(false, std::memory_order_relaxed);
       if (TaskUtils::TaskCreateUniversal(estopmgr_checkertask, TAG, 4096, nullptr, 5, &s_estopTask, 1) != pdPASS) {  // TODO: Profile stack size and set priority
         OS_LOGE(TAG, "Failed to create EStop event handler task");
         s_estopTask = nullptr;
@@ -181,7 +187,8 @@ static bool estopmgr_setestopenabled(bool enabled)
     }
   } else {
     if (s_estopTask != nullptr) {
-      vTaskDelete(s_estopTask);
+      s_estopStopRequested.store(true, std::memory_order_relaxed);
+      TaskUtils::StopTask(s_estopTask, TAG, "EStop task");
       s_estopTask = nullptr;
     }
   }
@@ -305,16 +312,16 @@ bool EStopManager::SetEStopPin(gpio_num_t pin)
 
 bool EStopManager::IsEStopped()
 {
-  return s_estopActive;
+  return s_estopActive.load(std::memory_order_relaxed);
 }
 
 int64_t EStopManager::LastEStopped()
 {
-  return s_estopActivatedAt;
+  return s_estopActivatedAt.load(std::memory_order_relaxed);
 }
 
 void EStopManager::Trigger()
 {
   // This will be picked up by the checker task and lead to an E-Stop activation
-  s_externallyTriggered = true;
+  s_externallyTriggered.store(true, std::memory_order_relaxed);
 }
