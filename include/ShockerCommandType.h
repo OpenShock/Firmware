@@ -12,7 +12,8 @@ namespace OpenShock {
     Light
   };
 
-  inline bool ShockerCommandTypeFromString(const char* str, ShockerCommandType& out) {
+  inline bool ShockerCommandTypeFromString(const char* str, ShockerCommandType& out)
+  {
     if (strcasecmp(str, "stop") == 0) {
       out = ShockerCommandType::Stop;
       return true;

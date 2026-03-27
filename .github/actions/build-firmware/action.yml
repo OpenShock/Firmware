@@ -21,6 +21,7 @@ runs:
     - uses: actions/cache@v4
       with:
         path: |
+          .pio/libdeps
           ~/.platformio/platforms
           ~/.platformio/packages
           ~/.platformio/.cache

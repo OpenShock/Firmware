@@ -8,6 +8,22 @@ const char* const TAG = "WSGateway";
 #include "Core.h"
 #include "Logging.h"
 
+#ifndef OPENSHOCK_FW_VERSION_MAJOR
+#define OPENSHOCK_FW_VERSION_MAJOR 0
+#endif
+#ifndef OPENSHOCK_FW_VERSION_MINOR
+#define OPENSHOCK_FW_VERSION_MINOR 0
+#endif
+#ifndef OPENSHOCK_FW_VERSION_PATCH
+#define OPENSHOCK_FW_VERSION_PATCH 0
+#endif
+#ifndef OPENSHOCK_FW_VERSION_PRERELEASE
+#define OPENSHOCK_FW_VERSION_PRERELEASE nullptr
+#endif
+#ifndef OPENSHOCK_FW_VERSION_BUILD
+#define OPENSHOCK_FW_VERSION_BUILD nullptr
+#endif
+
 using namespace OpenShock::Serialization;
 
 bool Gateway::SerializePongMessage(Common::SerializationCallbackFn callback)
@@ -20,7 +36,7 @@ bool Gateway::SerializePongMessage(Common::SerializationCallbackFn callback)
 
   int rssi;
   esp_err_t err = esp_wifi_sta_get_rssi(&rssi);
-  if (err != ERR_OK) {
+  if (err != ESP_OK) {
     OS_LOGE(TAG, "Failed to get WiFi RSSI: %d", err);
     return false;
   }

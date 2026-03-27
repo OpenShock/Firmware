@@ -21,6 +21,7 @@ namespace OpenShock::Serial::CommandHandlers {
   OpenShock::Serial::CommandGroup RawConfigHandler();
   OpenShock::Serial::CommandGroup RfTransmitHandler();
   OpenShock::Serial::CommandGroup FactoryResetHandler();
+  OpenShock::Serial::CommandGroup LedTestHandler();
 
   inline std::vector<OpenShock::Serial::CommandGroup> AllCommandHandlers()
   {
@@ -41,6 +42,7 @@ namespace OpenShock::Serial::CommandHandlers {
       RawConfigHandler(),
       RfTransmitHandler(),
       FactoryResetHandler(),
+      LedTestHandler(),
     };
   }
 }  // namespace OpenShock::Serial::CommandHandlers

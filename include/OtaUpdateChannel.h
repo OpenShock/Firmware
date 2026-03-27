@@ -2,13 +2,14 @@
 
 #include "serialization/_fbs/HubConfig_generated.h"
 
-#include <cstring>
 #include <cstdint>
+#include <cstring>
 
 namespace OpenShock {
   typedef OpenShock::Serialization::Configuration::OtaUpdateChannel OtaUpdateChannel;
 
-  inline bool TryParseOtaUpdateChannel(OtaUpdateChannel& channel, const char* str) {
+  inline bool TryParseOtaUpdateChannel(OtaUpdateChannel& channel, const char* str)
+  {
     if (strcasecmp(str, "stable") == 0) {
       channel = OtaUpdateChannel::Stable;
       return true;

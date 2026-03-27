@@ -1,5 +1,6 @@
 #include "serial/command_handlers/CommandGroup.h"
 #include "serial/command_handlers/common.h"
+#include "serial/SerialInputHandler.h"
 
 #include "config/Config.h"
 
@@ -9,9 +10,9 @@ static void handleReset(std::string_view arg, bool isAutomated)
 {
   (void)arg;
 
-  ::Serial.println("Resetting to factory defaults...");
+  OS_SERIAL_PRINTLN("Resetting to factory defaults...");
   OpenShock::Config::FactoryReset();
-  ::Serial.println("Restarting...");
+  OS_SERIAL_PRINTLN("Restarting...");
   esp_restart();
 }
 

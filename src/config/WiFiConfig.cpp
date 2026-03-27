@@ -21,13 +21,15 @@ WiFiConfig::WiFiConfig(std::string_view accessPointSSID, std::string_view hostna
 {
 }
 
-void WiFiConfig::ToDefault() {
+void WiFiConfig::ToDefault()
+{
   accessPointSSID = OPENSHOCK_FW_AP_PREFIX;
   hostname        = OPENSHOCK_FW_HOSTNAME;
   credentialsList.clear();
 }
 
-bool WiFiConfig::FromFlatbuffers(const Serialization::Configuration::WiFiConfig* config) {
+bool WiFiConfig::FromFlatbuffers(const Serialization::Configuration::WiFiConfig* config)
+{
   if (config == nullptr) {
     OS_LOGW(TAG, "Config is null, setting to default");
     ToDefault();
@@ -41,7 +43,8 @@ bool WiFiConfig::FromFlatbuffers(const Serialization::Configuration::WiFiConfig*
   return true;
 }
 
-flatbuffers::Offset<OpenShock::Serialization::Configuration::WiFiConfig> WiFiConfig::ToFlatbuffers(flatbuffers::FlatBufferBuilder& builder, bool withSensitiveData) const {
+flatbuffers::Offset<OpenShock::Serialization::Configuration::WiFiConfig> WiFiConfig::ToFlatbuffers(flatbuffers::FlatBufferBuilder& builder, bool withSensitiveData) const
+{
   std::vector<flatbuffers::Offset<OpenShock::Serialization::Configuration::WiFiCredentials>> fbsCredentialsList;
   fbsCredentialsList.reserve(credentialsList.size());
 
@@ -52,7 +55,8 @@ flatbuffers::Offset<OpenShock::Serialization::Configuration::WiFiConfig> WiFiCon
   return Serialization::Configuration::CreateWiFiConfig(builder, builder.CreateString(accessPointSSID), builder.CreateString(hostname), builder.CreateVector(fbsCredentialsList));
 }
 
-bool WiFiConfig::FromJSON(const cJSON* json) {
+bool WiFiConfig::FromJSON(const cJSON* json)
+{
   if (json == nullptr) {
     OS_LOGW(TAG, "Config is null, setting to default");
     ToDefault();
@@ -83,7 +87,8 @@ bool WiFiConfig::FromJSON(const cJSON* json) {
   return true;
 }
 
-cJSON* WiFiConfig::ToJSON(bool withSensitiveData) const {
+cJSON* WiFiConfig::ToJSON(bool withSensitiveData) const
+{
   cJSON* root = cJSON_CreateObject();
 
   cJSON_AddStringToObject(root, "accessPointSSID", accessPointSSID.c_str());

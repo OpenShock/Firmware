@@ -11,7 +11,7 @@
 
 static void handleGet(std::string_view arg, bool isAutomated)
 {
-  std::vector<uint8_t> buffer;
+  TinyVec<uint8_t> buffer;
   if (!OpenShock::Config::GetRaw(buffer)) {
     SERPR_ERROR("Failed to get raw config");
     return;
@@ -28,7 +28,7 @@ static void handleGet(std::string_view arg, bool isAutomated)
 
 static void handleSet(std::string_view arg, bool isAutomated)
 {
-  std::vector<uint8_t> buffer;
+  TinyVec<uint8_t> buffer;
   if (!OpenShock::Base64Utils::Decode(arg, buffer)) {
     SERPR_ERROR("Failed to decode base64");
     return;
