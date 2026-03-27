@@ -3,7 +3,7 @@
 
 #include <esp_system.h>
 
-void _handleRestartCommand(std::string_view arg, bool isAutomated)
+static void handleRestartCommand(std::string_view arg, bool isAutomated)
 {
   (void)arg;
 
@@ -15,7 +15,7 @@ OpenShock::Serial::CommandGroup OpenShock::Serial::CommandHandlers::RestartHandl
 {
   auto group = OpenShock::Serial::CommandGroup("restart"sv);
 
-  auto& cmd = group.addCommand("Restart the board"sv, _handleRestartCommand);
+  auto& cmd = group.addCommand("Restart the board"sv, handleRestartCommand);
 
   return group;
 }

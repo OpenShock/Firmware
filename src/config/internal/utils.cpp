@@ -9,7 +9,7 @@ const char* const TAG = "Config::Internal::Utils";
 using namespace OpenShock;
 
 template<typename T>
-bool _utilFromJsonInt(T& val, const cJSON* json, const char* name, T defaultVal, int minVal, int maxVal)
+static bool utilFromJsonInt(T& val, const cJSON* json, const char* name, T defaultVal, int minVal, int maxVal)
 {
   static_assert(std::is_integral_v<T>, "T must be an integral type");
 
@@ -105,17 +105,17 @@ bool Config::Internal::Utils::FromJsonBool(bool& val, const cJSON* json, const c
 
 bool Config::Internal::Utils::FromJsonU8(uint8_t& val, const cJSON* json, const char* name, uint8_t defaultVal)
 {
-  return _utilFromJsonInt(val, json, name, defaultVal, 0, UINT8_MAX);
+  return utilFromJsonInt(val, json, name, defaultVal, 0, UINT8_MAX);
 }
 
 bool Config::Internal::Utils::FromJsonU16(uint16_t& val, const cJSON* json, const char* name, uint16_t defaultVal)
 {
-  return _utilFromJsonInt(val, json, name, defaultVal, 0, UINT16_MAX);
+  return utilFromJsonInt(val, json, name, defaultVal, 0, UINT16_MAX);
 }
 
 bool Config::Internal::Utils::FromJsonI32(int32_t& val, const cJSON* json, const char* name, int32_t defaultVal)
 {
-  return _utilFromJsonInt(val, json, name, defaultVal, INT32_MIN, INT32_MAX);
+  return utilFromJsonInt(val, json, name, defaultVal, INT32_MIN, INT32_MAX);
 }
 
 bool Config::Internal::Utils::FromJsonStr(std::string& str, const cJSON* json, const char* name)

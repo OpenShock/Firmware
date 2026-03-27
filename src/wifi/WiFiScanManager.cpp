@@ -32,7 +32,7 @@ static std::map<uint64_t, OpenShock::WiFiScanManager::NetworksDiscoveredHandler>
 
 using namespace OpenShock;
 
-bool _notifyTask(WiFiScanTaskNotificationFlags flags)
+static bool notifyTask(WiFiScanTaskNotificationFlags flags)
 {
   ScopedLock lock__(&s_scanTaskMutex);
 
@@ -43,23 +43,23 @@ bool _notifyTask(WiFiScanTaskNotificationFlags flags)
   return xTaskNotify(s_scanTaskHandle, flags, eSetBits) == pdPASS;
 }
 
-void _notifyStatusChangedHandlers(OpenShock::WiFiScanStatus status)
+static void notifyStatusChangedHandlers(OpenShock::WiFiScanStatus status)
 {
   for (auto& it : s_statusChangedHandlers) {
     it.second(status);
   }
 }
 
-bool _isScanError(int16_t retval)
+static bool isScanError(int16_t retval)
 {
   return retval < 0 && retval != WIFI_SCAN_RUNNING;
 }
 
-void _handleScanError(int16_t retval)
+static void handleScanError(int16_t retval)
 {
   if (retval >= 0) return;
 
-  _notifyTask(WiFiScanTaskNotificationFlags::ERROR);
+  notifyTask(WiFiScanTaskNotificationFlags::ERROR);
 
   if (retval == WIFI_SCAN_FAILED) {
     OS_LOGE(TAG, "Failed to start scan on channel %u", s_currentChannel);
@@ -74,28 +74,28 @@ void _handleScanError(int16_t retval)
   OS_LOGE(TAG, "Scan returned an unknown error");
 }
 
-int16_t _scanChannel(uint8_t channel)
+static int16_t scanChannel(uint8_t channel)
 {
   int16_t retval = WiFi.scanNetworks(true, true, false, OPENSHOCK_WIFI_SCAN_MAX_MS_PER_CHANNEL, channel);
-  if (!_isScanError(retval)) {
+  if (!isScanError(retval)) {
     return retval;
   }
 
-  _handleScanError(retval);
+  handleScanError(retval);
 
   return retval;
 }
 
-WiFiScanStatus _scanningTaskImpl()
+static WiFiScanStatus scanningTaskImpl()
 {
   // Start the scan on the highest channel and work our way down
   uint8_t channel = OPENSHOCK_WIFI_SCAN_MAX_CHANNEL;
 
-  _notifyStatusChangedHandlers(WiFiScanStatus::Started);
+  notifyStatusChangedHandlers(WiFiScanStatus::Started);
 
   // Start the scan on the first channel
-  int16_t retval = _scanChannel(channel);
-  if (_isScanError(retval)) {
+  int16_t retval = scanChannel(channel);
+  if (isScanError(retval)) {
     return WiFiScanStatus::Error;
   }
 
@@ -103,9 +103,9 @@ WiFiScanStatus _scanningTaskImpl()
   while (true) {
     uint32_t notificationFlags = 0;
 
-    _notifyStatusChangedHandlers(WiFiScanStatus::InProgress);
+    notifyStatusChangedHandlers(WiFiScanStatus::InProgress);
 
-    // Wait for the scan to complete, _evScanCompleted will notify us when it's done
+    // Wait for the scan to complete, evScanCompleted will notify us when it's done
     if (xTaskNotifyWait(0, WiFiScanTaskNotificationFlags::CLEAR_FLAGS, &notificationFlags, pdMS_TO_TICKS(OPENSHOCK_WIFI_SCAN_TIMEOUT_MS)) != pdTRUE) {
       OS_LOGE(TAG, "Scan timed out");
       return WiFiScanStatus::TimedOut;
@@ -132,8 +132,8 @@ WiFiScanStatus _scanningTaskImpl()
     }
 
     // Start the scan on the next channel
-    retval = _scanChannel(channel);
-    if (_isScanError(retval)) {
+    retval = scanChannel(channel);
+    if (isScanError(retval)) {
       return WiFiScanStatus::Error;
     }
   }
@@ -141,15 +141,15 @@ WiFiScanStatus _scanningTaskImpl()
   return WiFiScanStatus::Completed;
 }
 
-void _scanningTask(void* arg)
+static void scanningTask(void* arg)
 {
   (void)arg;
 
   // Start the scan
-  WiFiScanStatus status = _scanningTaskImpl();
+  WiFiScanStatus status = scanningTaskImpl();
 
   // Notify the status changed handlers of the scan result
-  _notifyStatusChangedHandlers(status);
+  notifyStatusChangedHandlers(status);
 
   s_scanTaskMutex.lock(portMAX_DELAY);
 
@@ -162,14 +162,14 @@ void _scanningTask(void* arg)
   vTaskDelete(nullptr);
 }
 
-void _evScanCompleted(arduino_event_id_t event, arduino_event_info_t info)
+static void evScanCompleted(arduino_event_id_t event, arduino_event_info_t info)
 {
   (void)event;
   (void)info;
 
   int16_t numNetworks = WiFi.scanComplete();
-  if (_isScanError(numNetworks)) {
-    _handleScanError(numNetworks);
+  if (isScanError(numNetworks)) {
+    handleScanError(numNetworks);
     return;
   }
 
@@ -197,14 +197,14 @@ void _evScanCompleted(arduino_event_id_t event, arduino_event_info_t info)
   }
 
   // Notify the scan task that we're done
-  _notifyTask(WiFiScanTaskNotificationFlags::CHANNEL_DONE);
+  notifyTask(WiFiScanTaskNotificationFlags::CHANNEL_DONE);
 }
-void _evSTAStopped(arduino_event_id_t event, arduino_event_info_t info)
+static void evSTAStopped(arduino_event_id_t event, arduino_event_info_t info)
 {
   (void)event;
   (void)info;
 
-  _notifyTask(WiFiScanTaskNotificationFlags::WIFI_DISABLED);
+  notifyTask(WiFiScanTaskNotificationFlags::WIFI_DISABLED);
 }
 
 bool WiFiScanManager::Init()
@@ -214,8 +214,8 @@ bool WiFiScanManager::Init()
     return true;
   }
 
-  WiFi.onEvent(_evScanCompleted, ARDUINO_EVENT_WIFI_SCAN_DONE);
-  WiFi.onEvent(_evSTAStopped, ARDUINO_EVENT_WIFI_STA_STOP);
+  WiFi.onEvent(evScanCompleted, ARDUINO_EVENT_WIFI_SCAN_DONE);
+  WiFi.onEvent(evSTAStopped, ARDUINO_EVENT_WIFI_STA_STOP);
 
   s_initialized = true;
 
@@ -251,7 +251,7 @@ bool WiFiScanManager::StartScan()
   }
 
   // Start the scan task
-  if (TaskUtils::TaskCreateExpensive(_scanningTask, "WiFiScanManager", 4096, nullptr, 1, &s_scanTaskHandle) != pdPASS) {  // PROFILED: 1.8KB stack usage
+  if (TaskUtils::TaskCreateExpensive(scanningTask, "WiFiScanManager", 4096, nullptr, 1, &s_scanTaskHandle) != pdPASS) {  // PROFILED: 1.8KB stack usage
     OS_LOGE(TAG, "Failed to create scan task");
     return false;
   }
