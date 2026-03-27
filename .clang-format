@@ -125,12 +125,9 @@ IndentWrappedFunctionNames: true
 InsertNewlineAtEOF: true
 InsertTrailingCommas: Wrapped
 IntegerLiteralSeparator:
-  Binary: 4
-  BinaryMinDigits: 9
-  Decimal: 3
-  DecimalMinDigits: 5
-  Hex: 2
-  HexMinDigits: 9
+  Binary: 0
+  Decimal: 0
+  Hex: 0
 KeepEmptyLinesAtEOF: false
 KeepEmptyLinesAtTheStartOfBlocks: false
 LambdaBodyIndentation: OuterScope

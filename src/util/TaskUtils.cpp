@@ -2,6 +2,8 @@
 
 #include "util/TaskUtils.h"
 
+#include "Logging.h"
+
 using namespace OpenShock;
 
 /// @brief Create a task on the specified core, or the default core if the specified core is invalid
@@ -23,4 +25,18 @@ BaseType_t TaskUtils::TaskCreateExpensive(TaskFunction_t pvTaskCode, const char*
 #endif
   // Run on core 1 (0 handles WiFi and should be minimally used)
   return TaskCreateUniversal(pvTaskCode, pcName, usStackDepth, pvParameters, uxPriority, pvCreatedTask, 1);
+}
+
+void TaskUtils::StopTask(TaskHandle_t taskHandle, const char* tag, const char* taskName, TickType_t timeout)
+{
+  const TickType_t tickInterval = pdMS_TO_TICKS(10);
+  TickType_t elapsed            = 0;
+  while (eTaskGetState(taskHandle) != eDeleted && elapsed < timeout) {
+    vTaskDelay(tickInterval);
+    elapsed += tickInterval;
+  }
+  if (eTaskGetState(taskHandle) != eDeleted) {
+    OS_LOGW(tag, "%s did not exit gracefully, killing task", taskName);
+    vTaskDelete(taskHandle);
+  }
 }

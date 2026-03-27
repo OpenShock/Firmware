@@ -8,7 +8,7 @@ namespace OpenShock {
     CaiXianlin,
     Petrainer,
     Petrainer998DR,
-    T330,
+    WellturnT330,
     D80
   };
 
@@ -39,8 +39,8 @@ namespace OpenShock {
       return true;
     }
 
-    if (strcasecmp(str, "t330") == 0) {
-      out = ShockerModelType::T330;
+    if (strcasecmp(str, "wellturnt330") == 0 || strcasecmp(str, "t330") == 0) {
+      out = ShockerModelType::WellturnT330;
       return true;
     }
 

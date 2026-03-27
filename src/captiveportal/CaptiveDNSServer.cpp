@@ -299,11 +299,9 @@ void CaptiveDNSServer::stop()
 
   // Wait for the server task to notify us that it's exiting
   if (m_task != nullptr) {
-    ESP_LOGD(TAG, "DELETING...");
+    OS_LOGD(TAG, "Waiting for DNS task to exit");
     ulTaskNotifyTake(pdTRUE, pdMS_TO_TICKS(1000));  // wait up to 1 second
-    ESP_LOGD(TAG, "DELETING!");
     vTaskDelete(m_task);
-    ESP_LOGD(TAG, "DELETED!");
   }
 
   // Now it's safe to close the socket
@@ -338,7 +336,5 @@ void CaptiveDNSServer::serverLoop()
   }
 
   // Notify stop() that the task is exiting
-  ESP_LOGD(TAG, "EXITING...");
   xTaskNotifyGive(m_task);
-  ESP_LOGD(TAG, "EXITING!");
 }

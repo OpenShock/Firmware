@@ -29,6 +29,7 @@ bool OpenShock::ReadWriteMutex::lockRead(TickType_t xTicksToWait)
 
   if (++m_readers == 1) {
     if (xSemaphoreTake(m_mutex, xTicksToWait) == pdFALSE) {
+      --m_readers;
       xSemaphoreGive(m_readSem);
       return false;
     }
