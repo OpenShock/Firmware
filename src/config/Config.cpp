@@ -42,7 +42,7 @@ static ReadWriteMutex _configMutex;
 #define CONFIG_LOCK_READ(retval)  CONFIG_LOCK_READ_ACTION(retval, {})
 #define CONFIG_LOCK_WRITE(retval) CONFIG_LOCK_WRITE_ACTION(retval, {})
 
-bool _tryDeserializeConfig(const uint8_t* buffer, std::size_t bufferLen, OpenShock::Config::RootConfig& config)
+static bool tryDeserializeConfig(const uint8_t* buffer, std::size_t bufferLen, OpenShock::Config::RootConfig& config)
 {
   if (buffer == nullptr || bufferLen < sizeof(flatbuffers::uoffset_t)) {
     OS_LOGE(TAG, "Buffer is null or too small");
@@ -70,7 +70,7 @@ bool _tryDeserializeConfig(const uint8_t* buffer, std::size_t bufferLen, OpenSho
 
   return true;
 }
-bool _tryLoadConfig(TinyVec<uint8_t>& buffer)
+static bool tryLoadConfig(TinyVec<uint8_t>& buffer)
 {
   File file = _configFS.open("/config", "rb");
   if (!file) {
@@ -94,16 +94,16 @@ bool _tryLoadConfig(TinyVec<uint8_t>& buffer)
 
   return true;
 }
-bool _tryLoadConfig()
+static bool tryLoadConfig()
 {
   TinyVec<uint8_t> buffer;
-  if (!_tryLoadConfig(buffer)) {
+  if (!tryLoadConfig(buffer)) {
     return false;
   }
 
-  return _tryDeserializeConfig(buffer.data(), buffer.size(), _configData);
+  return tryDeserializeConfig(buffer.data(), buffer.size(), _configData);
 }
-bool _trySaveConfig(const uint8_t* data, std::size_t dataLen)
+static bool trySaveConfig(const uint8_t* data, std::size_t dataLen)
 {
   File file = _configFS.open("/config", "wb");
   if (!file) {
@@ -121,7 +121,7 @@ bool _trySaveConfig(const uint8_t* data, std::size_t dataLen)
 
   return true;
 }
-bool _trySaveConfig()
+static bool trySaveConfig()
 {
   flatbuffers::FlatBufferBuilder builder;
 
@@ -129,7 +129,7 @@ bool _trySaveConfig()
 
   Serialization::Configuration::FinishHubConfigBuffer(builder, fbsConfig);
 
-  return _trySaveConfig(builder.GetBufferPointer(), builder.GetSize());
+  return trySaveConfig(builder.GetBufferPointer(), builder.GetSize());
 }
 
 void Config::Init()
@@ -140,7 +140,7 @@ void Config::Init()
     OS_PANIC(TAG, "Unable to mount config LittleFS partition!");
   }
 
-  if (_tryLoadConfig()) {
+  if (tryLoadConfig()) {
     return;
   }
 
@@ -148,12 +148,12 @@ void Config::Init()
 
   _configData.ToDefault();
 
-  if (!_trySaveConfig()) {
+  if (!trySaveConfig()) {
     OS_PANIC(TAG, "Failed to save default config. Recommend formatting microcontroller and re-flashing firmware");
   }
 }
 
-cJSON* _getAsCJSON(bool withSensitiveData)
+static cJSON* getAsCJSON(bool withSensitiveData)
 {
   CONFIG_LOCK_READ(nullptr);
 
@@ -162,7 +162,7 @@ cJSON* _getAsCJSON(bool withSensitiveData)
 
 std::string Config::GetAsJSON(bool withSensitiveData)
 {
-  cJSON* root = _getAsCJSON(withSensitiveData);
+  cJSON* root = getAsCJSON(withSensitiveData);
   if (root == nullptr) {
     OS_LOGE(TAG, "Failed to get config as JSON");
     return {};
@@ -197,7 +197,7 @@ bool Config::SaveFromJSON(std::string_view json)
     return false;
   }
 
-  return _trySaveConfig();
+  return trySaveConfig();
 }
 
 flatbuffers::Offset<Serialization::Configuration::HubConfig> Config::GetAsFlatBuffer(flatbuffers::FlatBufferBuilder& builder, bool withSensitiveData)
@@ -216,14 +216,14 @@ bool Config::SaveFromFlatBuffer(const Serialization::Configuration::HubConfig* c
     return false;
   }
 
-  return _trySaveConfig();
+  return trySaveConfig();
 }
 
 bool Config::GetRaw(TinyVec<uint8_t>& buffer)
 {
   CONFIG_LOCK_READ(false);
 
-  return _tryLoadConfig(buffer);
+  return tryLoadConfig(buffer);
 }
 
 bool Config::SetRaw(const uint8_t* buffer, std::size_t size)
@@ -231,12 +231,12 @@ bool Config::SetRaw(const uint8_t* buffer, std::size_t size)
   CONFIG_LOCK_WRITE(false);
 
   OpenShock::Config::RootConfig config;
-  if (!_tryDeserializeConfig(buffer, size, config)) {
+  if (!tryDeserializeConfig(buffer, size, config)) {
     OS_LOGE(TAG, "Failed to deserialize config");
     return false;
   }
 
-  return _trySaveConfig(buffer, size);
+  return trySaveConfig(buffer, size);
 }
 
 void Config::FactoryReset()
@@ -249,7 +249,7 @@ void Config::FactoryReset()
     OS_PANIC(TAG, "Failed to remove existing config file for factory reset. Reccomend formatting microcontroller and re-flashing firmware");
   }
 
-  if (!_trySaveConfig()) {
+  if (!trySaveConfig()) {
     OS_PANIC(TAG, "Failed to save default config. Recommend formatting microcontroller and re-flashing firmware");
   }
 
@@ -324,7 +324,7 @@ bool Config::SetRFConfig(const Config::RFConfig& config)
   CONFIG_LOCK_WRITE(false);
 
   _configData.rf = config;
-  return _trySaveConfig();
+  return trySaveConfig();
 }
 
 bool Config::SetWiFiConfig(const Config::WiFiConfig& config)
@@ -332,7 +332,7 @@ bool Config::SetWiFiConfig(const Config::WiFiConfig& config)
   CONFIG_LOCK_WRITE(false);
 
   _configData.wifi = config;
-  return _trySaveConfig();
+  return trySaveConfig();
 }
 
 bool Config::SetCaptivePortalConfig(const Config::CaptivePortalConfig& config)
@@ -340,7 +340,7 @@ bool Config::SetCaptivePortalConfig(const Config::CaptivePortalConfig& config)
   CONFIG_LOCK_WRITE(false);
 
   _configData.captivePortal = config;
-  return _trySaveConfig();
+  return trySaveConfig();
 }
 
 bool Config::SetBackendConfig(const Config::BackendConfig& config)
@@ -348,7 +348,7 @@ bool Config::SetBackendConfig(const Config::BackendConfig& config)
   CONFIG_LOCK_WRITE(false);
 
   _configData.backend = config;
-  return _trySaveConfig();
+  return trySaveConfig();
 }
 
 bool Config::SetSerialInputConfig(const Config::SerialInputConfig& config)
@@ -356,7 +356,7 @@ bool Config::SetSerialInputConfig(const Config::SerialInputConfig& config)
   CONFIG_LOCK_WRITE(false);
 
   _configData.serialInput = config;
-  return _trySaveConfig();
+  return trySaveConfig();
 }
 
 bool Config::SetOtaUpdateConfig(const Config::OtaUpdateConfig& config)
@@ -364,7 +364,7 @@ bool Config::SetOtaUpdateConfig(const Config::OtaUpdateConfig& config)
   CONFIG_LOCK_WRITE(false);
 
   _configData.otaUpdate = config;
-  return _trySaveConfig();
+  return trySaveConfig();
 }
 
 bool Config::SetEStop(const Config::EStopConfig& config)
@@ -372,7 +372,7 @@ bool Config::SetEStop(const Config::EStopConfig& config)
   CONFIG_LOCK_WRITE(false);
 
   _configData.estop = config;
-  return _trySaveConfig();
+  return trySaveConfig();
 }
 
 bool Config::GetWiFiCredentials(std::vector<Config::WiFiCredentials>& out)
@@ -408,7 +408,7 @@ bool Config::SetWiFiCredentials(const std::vector<Config::WiFiCredentials>& cred
   CONFIG_LOCK_WRITE(false);
 
   _configData.wifi.credentialsList = credentials;
-  return _trySaveConfig();
+  return trySaveConfig();
 }
 
 bool Config::GetRFConfigTxPin(gpio_num_t& out)
@@ -425,7 +425,7 @@ bool Config::SetRFConfigTxPin(gpio_num_t txPin)
   CONFIG_LOCK_WRITE(false);
 
   _configData.rf.txPin = txPin;
-  return _trySaveConfig();
+  return trySaveConfig();
 }
 
 bool Config::GetRFConfigKeepAliveEnabled(bool& out)
@@ -442,7 +442,7 @@ bool Config::SetRFConfigKeepAliveEnabled(bool enabled)
   CONFIG_LOCK_WRITE(false);
 
   _configData.rf.keepAliveEnabled = enabled;
-  return _trySaveConfig();
+  return trySaveConfig();
 }
 
 bool Config::AnyWiFiCredentials(std::function<bool(const Config::WiFiCredentials&)> predicate)
@@ -470,7 +470,7 @@ uint8_t Config::AddWiFiCredentials(std::string_view ssid, std::string_view passw
         creds.authMode = authMode;
       }
 
-      if (!_trySaveConfig()) {
+      if (!trySaveConfig()) {
         OS_LOGE(TAG, "Failed to persist updated WiFi credentials for SSID %.*s", static_cast<int>(ssid.size()), ssid.data());
         return 0;
       }
@@ -502,7 +502,7 @@ uint8_t Config::AddWiFiCredentials(std::string_view ssid, std::string_view passw
   }
 
   _configData.wifi.credentialsList.emplace_back(id, ssid, password, authMode);
-  _trySaveConfig();
+  trySaveConfig();
 
   return id;
 }
@@ -555,7 +555,7 @@ bool Config::PinWiFiCredentialsBSSID(uint8_t id, const uint8_t (&bssid)[6])
   for (auto& creds : _configData.wifi.credentialsList) {
     if (creds.id == id) {
       memcpy(creds.bssid.data(), bssid, 6);
-      return _trySaveConfig();
+      return trySaveConfig();
     }
   }
 
@@ -569,7 +569,7 @@ bool Config::RemoveWiFiCredentials(uint8_t id)
   for (auto it = _configData.wifi.credentialsList.begin(); it != _configData.wifi.credentialsList.end(); ++it) {
     if (it->id == id) {
       _configData.wifi.credentialsList.erase(it);
-      _trySaveConfig();
+      trySaveConfig();
       return true;
     }
   }
@@ -583,7 +583,7 @@ bool Config::ClearWiFiCredentials()
 
   _configData.wifi.credentialsList.clear();
 
-  return _trySaveConfig();
+  return trySaveConfig();
 }
 
 bool Config::GetWiFiHostname(std::string& out)
@@ -601,7 +601,7 @@ bool Config::SetWiFiHostname(std::string hostname)
 
   _configData.wifi.hostname = std::move(hostname);
 
-  return _trySaveConfig();
+  return trySaveConfig();
 }
 
 bool Config::GetBackendDomain(std::string& out)
@@ -618,7 +618,7 @@ bool Config::SetBackendDomain(std::string domain)
   CONFIG_LOCK_WRITE(false);
 
   _configData.backend.domain = std::move(domain);
-  return _trySaveConfig();
+  return trySaveConfig();
 }
 
 bool Config::HasBackendAuthToken()
@@ -642,7 +642,7 @@ bool Config::SetBackendAuthToken(std::string token)
   CONFIG_LOCK_WRITE(false);
 
   _configData.backend.authToken = std::move(token);
-  return _trySaveConfig();
+  return trySaveConfig();
 }
 
 bool Config::ClearBackendAuthToken()
@@ -650,7 +650,7 @@ bool Config::ClearBackendAuthToken()
   CONFIG_LOCK_WRITE(false);
 
   _configData.backend.authToken.clear();
-  return _trySaveConfig();
+  return trySaveConfig();
 }
 
 bool Config::GetSerialInputConfigEchoEnabled(bool& out)
@@ -666,7 +666,7 @@ bool Config::SetSerialInputConfigEchoEnabled(bool enabled)
   CONFIG_LOCK_WRITE(false);
 
   _configData.serialInput.echoEnabled = enabled;
-  return _trySaveConfig();
+  return trySaveConfig();
 }
 
 bool Config::GetOtaUpdateId(int32_t& out)
@@ -687,7 +687,7 @@ bool Config::SetOtaUpdateId(int32_t updateId)
   }
 
   _configData.otaUpdate.updateId = updateId;
-  return _trySaveConfig();
+  return trySaveConfig();
 }
 
 bool Config::GetOtaUpdateStep(OtaUpdateStep& out)
@@ -708,7 +708,7 @@ bool Config::SetOtaUpdateStep(OtaUpdateStep updateStep)
   }
 
   _configData.otaUpdate.updateStep = updateStep;
-  return _trySaveConfig();
+  return trySaveConfig();
 }
 
 bool Config::GetEStopEnabled(bool& out)
@@ -725,7 +725,7 @@ bool Config::SetEStopEnabled(bool enabled)
   CONFIG_LOCK_WRITE(false);
 
   _configData.estop.enabled = enabled;
-  return _trySaveConfig();
+  return trySaveConfig();
 }
 
 bool Config::GetEStopGpioPin(gpio_num_t& out)
@@ -747,5 +747,5 @@ bool Config::SetEStopGpioPin(gpio_num_t gpioPin)
   }
 
   _configData.estop.gpioPin = gpioPin;
-  return _trySaveConfig();
+  return trySaveConfig();
 }
