@@ -11,6 +11,7 @@ const char* const TAG = "HTTPRequestManager";
 #include "util/StringUtils.h"
 
 #include <HTTPClient.h>
+#include <WiFi.h>
 
 #include <algorithm>
 #include <memory>
@@ -350,7 +351,7 @@ static StreamReaderResult readHttpStreamData(HTTPClient& client, WiFiClient* str
 }
 
 HTTP::Response<std::size_t>
-  HTTP::Download(std::string_view url, const std::map<String, String>& headers, HTTP::GotContentLengthCallback contentLengthCallback, HTTP::DownloadCallback downloadCallback, tcb::span<const uint16_t> acceptedCodes, uint32_t timeoutMs)
+  HTTP::Download(std::string_view url, const std::map<String, String>& headers, HTTP::GotContentLengthCallback contentLengthCallback, HTTP::DownloadCallback downloadCallback, std::span<const uint16_t> acceptedCodes, uint32_t timeoutMs)
 {
   std::shared_ptr<OpenShock::RateLimiter> rateLimiter = createRateLimiterForURL(url);
   if (rateLimiter == nullptr) {
@@ -450,7 +451,7 @@ HTTP::Response<std::size_t>
   return {result.result, responseCode, result.nWritten};
 }
 
-HTTP::Response<std::string> HTTP::GetString(std::string_view url, const std::map<String, String>& headers, tcb::span<const uint16_t> acceptedCodes, uint32_t timeoutMs)
+HTTP::Response<std::string> HTTP::GetString(std::string_view url, const std::map<String, String>& headers, std::span<const uint16_t> acceptedCodes, uint32_t timeoutMs)
 {
   std::string result;
 

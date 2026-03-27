@@ -267,7 +267,7 @@ bool CaptivePortal::SendMessageTXT(uint8_t socketId, std::string_view data)
 
   return true;
 }
-bool CaptivePortal::SendMessageBIN(uint8_t socketId, tcb::span<const uint8_t> data)
+bool CaptivePortal::SendMessageBIN(uint8_t socketId, std::span<const uint8_t> data)
 {
   auto instance = GetInstance();
   if (instance == nullptr) return false;
@@ -286,7 +286,7 @@ bool CaptivePortal::BroadcastMessageTXT(std::string_view data)
 
   return true;
 }
-bool CaptivePortal::BroadcastMessageBIN(tcb::span<const uint8_t> data)
+bool CaptivePortal::BroadcastMessageBIN(std::span<const uint8_t> data)
 {
   auto instance = GetInstance();
   if (instance == nullptr) return false;
