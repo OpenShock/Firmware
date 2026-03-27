@@ -15,7 +15,7 @@ namespace OpenShock::Serial {
     inline std::string_view name() const { return m_name; }
     inline std::string_view description() const { return m_description; }
     inline const std::vector<CommandArgument>& arguments() const { return m_arguments; }
-    inline CommandHandler commandHandler() { return m_commandHandler; }
+    inline CommandHandler commandHandler() const { return m_commandHandler; }
 
     CommandArgument& addArgument(std::string_view name, std::string_view constraint, std::string_view exampleValue, std::vector<std::string_view> constraintExtensions = {});
 
