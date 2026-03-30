@@ -379,7 +379,7 @@ CaptivePortal::CaptivePortalInstance::CaptivePortalInstance()
         request->send(500, HTTP::ContentType::JSON, JSON_ERR_INTERNAL);
         return;
       }
-      cfg.cdnDomain = std::string(domain.c_str(), domain.length());
+      cfg.repoDomain = std::string(domain.c_str(), domain.length());
       if (!Config::SetOtaUpdateConfig(cfg)) {
         request->send(500, HTTP::ContentType::JSON, JSON_ERR_INTERNAL);
         return;

@@ -1,0 +1,63 @@
+name: repo-publish-version
+description: Publishes firmware version metadata to the repository server
+inputs:
+  repo-server-url:
+    description: Repository server base URL
+    required: true
+  repo-admin-token:
+    description: Admin authentication token
+    required: true
+  fw-version:
+    description: Firmware semantic version
+    required: true
+  release-channel:
+    description: Release channel (stable, beta, develop)
+    required: true
+  commit-hash:
+    description: Git commit hash
+    required: true
+  release-url:
+    description: GitHub release URL (optional)
+    required: false
+    default: ''
+
+runs:
+  using: composite
+  steps:
+    - name: Publish version metadata to repository server
+      shell: bash
+      run: |
+        set -euo pipefail
+
+        REPO_URL="${{ inputs.repo-server-url }}"
+        VERSION="${{ inputs.fw-version }}"
+        RELEASE_URL="${{ inputs.release-url }}"
+
+        REQUEST_BODY=$(jq -n \
+          --arg channel "${{ inputs.release-channel }}" \
+          --arg commitHash "${{ inputs.commit-hash }}" \
+          --arg releaseUrl "$RELEASE_URL" \
+          '{
+            "channel": $channel,
+            "releaseDate": (now | strftime("%Y-%m-%dT%H:%M:%SZ")),
+            "commitHash": $commitHash,
+            "releaseUrl": (if $releaseUrl == "" then null else $releaseUrl end),
+            "releaseNotes": []
+          }')
+
+        echo "Publishing version $VERSION to repository server..."
+
+        HTTP_CODE=$(curl -s -o /tmp/repo-response.txt -w "%{http_code}" \
+          -X PUT \
+          -H "Content-Type: application/json" \
+          -H "Authorization: ${{ inputs.repo-admin-token }}" \
+          -d "$REQUEST_BODY" \
+          "${REPO_URL}/v2/firmware/admin/versions/${VERSION}")
+
+        if [ "$HTTP_CODE" -ge 200 ] && [ "$HTTP_CODE" -lt 300 ]; then
+          echo "Successfully published version $VERSION (HTTP $HTTP_CODE)"
+        else
+          echo "Failed to publish version $VERSION (HTTP $HTTP_CODE)"
+          cat /tmp/repo-response.txt
+          exit 1
+        fi

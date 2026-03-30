@@ -9,7 +9,7 @@ using namespace OpenShock::Config;
 
 OtaUpdateConfig::OtaUpdateConfig()
   : isEnabled(true)
-  , cdnDomain(OPENSHOCK_FW_CDN_DOMAIN)
+  , repoDomain(OPENSHOCK_REPO_DOMAIN)
   , updateChannel(OtaUpdateChannel::Stable)
   , checkOnStartup(false)
   , checkPeriodically(false)
@@ -22,10 +22,10 @@ OtaUpdateConfig::OtaUpdateConfig()
 }
 
 OtaUpdateConfig::OtaUpdateConfig(
-  bool isEnabled, std::string cdnDomain, OtaUpdateChannel updateChannel, bool checkOnStartup, bool checkPeriodically, uint16_t checkInterval, bool allowBackendManagement, bool requireManualApproval, int32_t updateId, OtaUpdateStep updateStep
+  bool isEnabled, std::string repoDomain, OtaUpdateChannel updateChannel, bool checkOnStartup, bool checkPeriodically, uint16_t checkInterval, bool allowBackendManagement, bool requireManualApproval, int32_t updateId, OtaUpdateStep updateStep
 )
   : isEnabled(isEnabled)
-  , cdnDomain(std::move(cdnDomain))
+  , repoDomain(std::move(repoDomain))
   , updateChannel(updateChannel)
   , checkOnStartup(checkOnStartup)
   , checkPeriodically(checkPeriodically)
@@ -40,7 +40,7 @@ OtaUpdateConfig::OtaUpdateConfig(
 void OtaUpdateConfig::ToDefault()
 {
   isEnabled              = true;
-  cdnDomain              = OPENSHOCK_FW_CDN_DOMAIN;
+  repoDomain              = OPENSHOCK_REPO_DOMAIN;
   updateChannel          = OtaUpdateChannel::Stable;
   checkOnStartup         = false;
   checkPeriodically      = false;
@@ -60,7 +60,7 @@ bool OtaUpdateConfig::FromFlatbuffers(const Serialization::Configuration::OtaUpd
   }
 
   isEnabled = config->is_enabled();
-  Internal::Utils::FromFbsStr(cdnDomain, config->cdn_domain(), OPENSHOCK_FW_CDN_DOMAIN);
+  Internal::Utils::FromFbsStr(repoDomain, config->repo_domain(), OPENSHOCK_REPO_DOMAIN);
   updateChannel          = config->update_channel();
   checkOnStartup         = config->check_on_startup();
   checkPeriodically      = config->check_periodically();
@@ -75,7 +75,7 @@ bool OtaUpdateConfig::FromFlatbuffers(const Serialization::Configuration::OtaUpd
 
 flatbuffers::Offset<OpenShock::Serialization::Configuration::OtaUpdateConfig> OtaUpdateConfig::ToFlatbuffers(flatbuffers::FlatBufferBuilder& builder, bool withSensitiveData) const
 {
-  return Serialization::Configuration::CreateOtaUpdateConfig(builder, isEnabled, builder.CreateString(cdnDomain), updateChannel, checkOnStartup, checkPeriodically, checkInterval, allowBackendManagement, requireManualApproval, updateId, updateStep);
+  return Serialization::Configuration::CreateOtaUpdateConfig(builder, isEnabled, builder.CreateString(repoDomain), updateChannel, checkOnStartup, checkPeriodically, checkInterval, allowBackendManagement, requireManualApproval, updateId, updateStep);
 }
 
 bool OtaUpdateConfig::FromJSON(const cJSON* json)
@@ -92,7 +92,7 @@ bool OtaUpdateConfig::FromJSON(const cJSON* json)
   }
 
   Internal::Utils::FromJsonBool(isEnabled, json, "isEnabled", true);
-  Internal::Utils::FromJsonStr(cdnDomain, json, "cdnDomain", OPENSHOCK_FW_CDN_DOMAIN);
+  Internal::Utils::FromJsonStr(repoDomain, json, "repoDomain", OPENSHOCK_REPO_DOMAIN);
   Internal::Utils::FromJsonStrParsed(updateChannel, json, "updateChannel", OpenShock::TryParseOtaUpdateChannel, OpenShock::OtaUpdateChannel::Stable);
   Internal::Utils::FromJsonBool(checkOnStartup, json, "checkOnStartup", false);
   Internal::Utils::FromJsonBool(checkPeriodically, json, "checkPeriodically", false);
@@ -110,7 +110,7 @@ cJSON* OtaUpdateConfig::ToJSON(bool withSensitiveData) const
   cJSON* root = cJSON_CreateObject();
 
   cJSON_AddBoolToObject(root, "isEnabled", isEnabled);
-  cJSON_AddStringToObject(root, "cdnDomain", cdnDomain.c_str());
+  cJSON_AddStringToObject(root, "repoDomain", repoDomain.c_str());
   cJSON_AddStringToObject(root, "updateChannel", OpenShock::Serialization::Configuration::EnumNameOtaUpdateChannel(updateChannel));
   cJSON_AddBoolToObject(root, "checkOnStartup", checkOnStartup);
   cJSON_AddBoolToObject(root, "checkPeriodically", checkPeriodically);

@@ -1,35 +1,29 @@
 #pragma once
 
 #include "http/HTTPRequestManager.h"
-#include "ota/FirmwareBinaryHash.h"
 #include "ota/FirmwareReleaseInfo.h"
 #include "ota/OtaUpdateChannel.h"
 #include "SemVer.h"
 
-#include <string_view>
+#include <string>
 
 namespace OpenShock::HTTP::FirmwareCDN {
-  /// @brief Fetches the firmware version for the given channel from the firmware CDN.
-  /// Valid response codes: 200, 304
-  /// @param channel The channel to fetch the firmware version for.
-  /// @return The firmware version or an error response.
-  HTTP::Response<OpenShock::SemVer> GetFirmwareVersion(OtaUpdateChannel channel);
+  struct LatestRelease {
+    OpenShock::SemVer version;
+    FirmwareReleaseInfo release;
+  };
 
-  /// @brief Fetches the list of available boards for the given firmware version from the firmware CDN.
-  /// Valid response codes: 200, 304
-  /// @param version The firmware version to fetch the boards for.
-  /// @return The list of available boards or an error response.
-  HTTP::Response<std::vector<std::string>> GetFirmwareBoards(const OpenShock::SemVer& version);
+  /// @brief Fetches the latest firmware release for the given channel and board from the repository server.
+  /// Makes a single request to /v2/firmware/latest/{channel}?board={board} and parses the JSON response.
+  /// @param channel The update channel (stable, beta, develop).
+  /// @param repoDomain The repository server domain.
+  /// @return The latest firmware version and release info, or an error response.
+  HTTP::Response<LatestRelease> GetLatestRelease(OtaUpdateChannel channel, const std::string& repoDomain);
 
-  /// @brief Fetches the binary hashes for the given firmware version from the firmware CDN.
-  /// Valid response codes: 200, 304
-  /// @param version The firmware version to fetch the binary hashes for.
-  /// @return The binary hashes or an error response.
-  HTTP::Response<std::vector<FirmwareBinaryHash>> GetFirmwareBinaryHashes(const OpenShock::SemVer& version);
-
-  /// @brief Fetches the firmware release information for the given firmware version from the firmware CDN.
-  /// Valid response codes: 200, 304
-  /// @param version The firmware version to fetch the release information for.
-  /// @return The firmware release information or an error response.
-  HTTP::Response<FirmwareReleaseInfo> GetFirmwareReleaseInfo(const OpenShock::SemVer& version);
+  /// @brief Fetches a specific firmware version's release info from the repository server.
+  /// Makes a request to /v2/firmware/versions/{version}?board={board} and parses the JSON response.
+  /// @param version The specific firmware version to fetch.
+  /// @param repoDomain The repository server domain.
+  /// @return The firmware release info, or an error response.
+  HTTP::Response<FirmwareReleaseInfo> GetRelease(const OpenShock::SemVer& version, const std::string& repoDomain);
 }  // namespace OpenShock::HTTP::FirmwareCDN

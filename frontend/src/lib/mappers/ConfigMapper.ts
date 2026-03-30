@@ -35,7 +35,7 @@ export interface SerialInputConfig {
 
 export interface OtaUpdateConfig {
   isEnabled: boolean;
-  cdnDomain: string;
+  repoDomain: string;
   updateChannel: OtaUpdateChannel;
   checkOnStartup: boolean;
   checkInterval: number;
@@ -150,18 +150,18 @@ function mapOtaUpdateConfig(hubConfig: HubConfig): OtaUpdateConfig {
   if (!otaUpdate) throw new Error('hubConfig.otaUpdate is null');
 
   const isEnabled = otaUpdate.isEnabled();
-  const cdnDomain = otaUpdate.cdnDomain();
+  const repoDomain = otaUpdate.repoDomain();
   const updateChannel = otaUpdate.updateChannel();
   const checkOnStartup = otaUpdate.checkOnStartup();
   const checkInterval = otaUpdate.checkInterval();
   const allowBackendManagement = otaUpdate.allowBackendManagement();
   const requireManualApproval = otaUpdate.requireManualApproval();
 
-  if (!cdnDomain) throw new Error('otaUpdate.cdnDomain is null');
+  if (!repoDomain) throw new Error('otaUpdate.repoDomain is null');
 
   return {
     isEnabled,
-    cdnDomain,
+    repoDomain,
     updateChannel,
     checkOnStartup,
     checkInterval,

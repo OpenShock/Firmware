@@ -174,6 +174,9 @@ static void otaUpdateTask(void* pvParameters)
     }
 
     OpenShock::SemVer version;
+    FirmwareReleaseInfo release;
+    bool haveRelease = false;
+
     if (updateRequested) {
       updateRequested = false;
 
@@ -181,15 +184,19 @@ static void otaUpdateTask(void* pvParameters)
         OS_LOGE(TAG, "Failed to get requested version");
         continue;
       }
+      // Release info will be fetched by version below.
     } else {
       OS_LOGD(TAG, "Checking for updates");
 
-      auto response = HTTP::FirmwareCDN::GetFirmwareVersion(config.updateChannel);
+      // Fetch latest version + release from the repository server.
+      auto response = HTTP::FirmwareCDN::GetLatestRelease(config.updateChannel, config.repoDomain);
       if (response.result != HTTP::RequestResult::Success) {
-        OS_LOGE(TAG, "Failed to fetch firmware version");
+        OS_LOGE(TAG, "Failed to fetch latest firmware release");
         continue;
       }
-      version = response.data;
+      version = response.data.version;
+      release = response.data.release;
+      haveRelease = true;
     }
 
     std::string versionStr = version.toString();
@@ -201,7 +208,17 @@ static void otaUpdateTask(void* pvParameters)
 
     OS_LOGI(TAG, "Starting update to version: %.*s", versionStr.length(), versionStr.data());
 
-    auto client = std::make_unique<OtaUpdateClient>(version);
+    // If we don't have the release info yet (requested version update), fetch it by version.
+    if (!haveRelease) {
+      auto response = HTTP::FirmwareCDN::GetRelease(version, config.repoDomain);
+      if (response.result != HTTP::RequestResult::Success) {
+        OS_LOGE(TAG, "Failed to fetch firmware release for version %s", versionStr.c_str());
+        continue;
+      }
+      release = response.data;
+    }
+
+    auto client = std::make_unique<OtaUpdateClient>(version, release);
     if (!client->Start()) {
       OS_LOGE(TAG, "Failed to start OTA update client");
       continue;

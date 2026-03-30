@@ -7,7 +7,6 @@ const char* const TAG = "OtaUpdateClient";
 #include "captiveportal/Manager.h"
 #include "config/Config.h"
 #include "GatewayConnectionManager.h"
-#include "http/FirmwareCDN.h"
 #include "Logging.h"
 #include "ota/OtaUpdateStep.h"
 #include "serialization/WSGateway.h"
@@ -139,8 +138,9 @@ static bool flashFilesystemPartition(const esp_partition_t* partition, std::stri
   return true;
 }
 
-OtaUpdateClient::OtaUpdateClient(const OpenShock::SemVer& version)
+OtaUpdateClient::OtaUpdateClient(const OpenShock::SemVer& version, const FirmwareReleaseInfo& release)
   : m_version(version)
+  , m_release(release)
   , m_taskHandle(nullptr)
 {
 }
@@ -192,28 +192,12 @@ void OtaUpdateClient::task()
     return;
   }
 
-  if (!sendProgressMessage(Serialization::Types::OtaUpdateProgressTask::FetchingMetadata, 0.0f)) {
-    vTaskDelete(nullptr);
-    return;
-  }
-
-  // Fetch release info from CDN.
-  auto response = HTTP::FirmwareCDN::GetFirmwareReleaseInfo(m_version);
-  if (response.result != HTTP::RequestResult::Success) {
-    OS_LOGE(TAG, "Failed to fetch firmware release info");
-    sendFailureMessage("Failed to fetch firmware release info"sv);
-    vTaskDelete(nullptr);
-    return;
-  }
-
-  auto& release = response.data;
-
   OS_LOGD(TAG, "Firmware release:");
   OS_LOGD(TAG, "  Version:                %.*s", versionStr.length(), versionStr.data());
-  OS_LOGD(TAG, "  App binary URL:         %.*s", release.appBinaryUrl.length(), release.appBinaryUrl.data());
-  OS_LOGD(TAG, "  App binary hash:        %s", HexUtils::ToHex<32>(release.appBinaryHash).data());
-  OS_LOGD(TAG, "  Filesystem binary URL:  %.*s", release.filesystemBinaryUrl.length(), release.filesystemBinaryUrl.data());
-  OS_LOGD(TAG, "  Filesystem binary hash: %s", HexUtils::ToHex<32>(release.filesystemBinaryHash).data());
+  OS_LOGD(TAG, "  App binary URL:         %.*s", m_release.appBinaryUrl.length(), m_release.appBinaryUrl.data());
+  OS_LOGD(TAG, "  App binary hash:        %s", HexUtils::ToHex<32>(m_release.appBinaryHash).data());
+  OS_LOGD(TAG, "  Filesystem binary URL:  %.*s", m_release.filesystemBinaryUrl.length(), m_release.filesystemBinaryUrl.data());
+  OS_LOGD(TAG, "  Filesystem binary hash: %s", HexUtils::ToHex<32>(m_release.filesystemBinaryHash).data());
 
   // Get available app update partition.
   const esp_partition_t* appPartition = esp_ota_get_next_update_partition(nullptr);
@@ -237,12 +221,12 @@ void OtaUpdateClient::task()
   esp_task_wdt_init(15, true);
 
   // Flash filesystem first, then app.
-  if (!flashFilesystemPartition(filesystemPartition, release.filesystemBinaryUrl, release.filesystemBinaryHash)) {
+  if (!flashFilesystemPartition(filesystemPartition, m_release.filesystemBinaryUrl, m_release.filesystemBinaryHash)) {
     esp_task_wdt_init(5, true);
     vTaskDelete(nullptr);
     return;
   }
-  if (!flashAppPartition(appPartition, release.appBinaryUrl, release.appBinaryHash)) {
+  if (!flashAppPartition(appPartition, m_release.appBinaryUrl, m_release.appBinaryHash)) {
     esp_task_wdt_init(5, true);
     vTaskDelete(nullptr);
     return;
