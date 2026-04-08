@@ -14,14 +14,14 @@
 #ifndef OPENSHOCK_API_DOMAIN
 #error "OPENSHOCK_API_DOMAIN must be defined"
 #endif
-#ifndef OPENSHOCK_FW_CDN_DOMAIN
-#error "OPENSHOCK_FW_CDN_DOMAIN must be defined"
+#ifndef OPENSHOCK_REPO_DOMAIN
+#error "OPENSHOCK_REPO_DOMAIN must be defined"
 #endif
 #ifndef OPENSHOCK_FW_VERSION
 #error "OPENSHOCK_FW_VERSION must be defined"
 #endif
 
-#define OPENSHOCK_FW_CDN_URL(path) "https://" OPENSHOCK_FW_CDN_DOMAIN path
+#define OPENSHOCK_REPO_URL(path) "https://" OPENSHOCK_REPO_DOMAIN path
 
 #define OPENSHOCK_GPIO_INVALID -1
 

@@ -1,0 +1,75 @@
+name: repo-upload-board
+description: Uploads firmware binaries for a single board to the repository server
+inputs:
+  repo-server-url:
+    description: Repository server base URL
+    required: true
+  repo-admin-token:
+    description: Admin authentication token
+    required: true
+  fw-version:
+    description: Firmware semantic version
+    required: true
+  board:
+    description: Board name
+    required: true
+
+runs:
+  using: composite
+  steps:
+    - name: Download static filesystem partition
+      uses: actions/download-artifact@v4
+      with:
+        name: firmware_staticfs
+        path: upload_staging
+
+    - name: Download firmware build
+      uses: actions/download-artifact@v4
+      with:
+        name: firmware_build_${{ inputs.board }}
+        path: upload_staging
+
+    - name: Download merged firmware binary
+      uses: actions/download-artifact@v4
+      with:
+        name: firmware_merged_${{ inputs.board }}
+        path: upload_staging
+
+    - name: Rename merged binary
+      shell: bash
+      run: |
+        cd upload_staging
+        if ls OpenShock_*.bin 1>/dev/null 2>&1; then
+          mv OpenShock_*.bin firmware.bin
+        fi
+
+    - name: Upload artifacts to repository server
+      shell: bash
+      run: |
+        set -euo pipefail
+
+        REPO_URL="${{ inputs.repo-server-url }}"
+        CURL_ARGS=(-s -w "\n%{http_code}" \
+          -X PUT \
+          -H "Authorization: ${{ inputs.repo-admin-token }}" \
+          "${REPO_URL}/v2/firmware/admin/versions/${{ inputs.fw-version }}/boards/${{ inputs.board }}/upload")
+
+        # Add file fields based on what exists
+        [ -f upload_staging/app.bin ] && CURL_ARGS+=(-F "app=@upload_staging/app.bin")
+        [ -f upload_staging/staticfs.bin ] && CURL_ARGS+=(-F "staticfs=@upload_staging/staticfs.bin")
+        [ -f upload_staging/firmware.bin ] && CURL_ARGS+=(-F "merged=@upload_staging/firmware.bin")
+        [ -f upload_staging/bootloader.bin ] && CURL_ARGS+=(-F "bootloader=@upload_staging/bootloader.bin")
+        [ -f upload_staging/partitions.bin ] && CURL_ARGS+=(-F "partitions=@upload_staging/partitions.bin")
+
+        RESPONSE=$(curl "${CURL_ARGS[@]}")
+        HTTP_CODE=$(echo "$RESPONSE" | tail -1)
+        BODY=$(echo "$RESPONSE" | sed '$d')
+
+        if [ "$HTTP_CODE" -ge 200 ] && [ "$HTTP_CODE" -lt 300 ]; then
+          echo "Successfully uploaded artifacts for board ${{ inputs.board }} (HTTP $HTTP_CODE)"
+          echo "$BODY" | jq . 2>/dev/null || echo "$BODY"
+        else
+          echo "Failed to upload artifacts for board ${{ inputs.board }} (HTTP $HTTP_CODE)"
+          echo "$BODY"
+          exit 1
+        fi

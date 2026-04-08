@@ -16,11 +16,11 @@
 
   let otaConfig = $derived(hubState.config?.otaUpdate);
 
-  let cdnDomain = $state('');
+  let repoDomain = $state('');
   let checkInterval = $state(0);
 
   $effect(() => {
-    if (otaConfig?.cdnDomain) cdnDomain = otaConfig.cdnDomain;
+    if (otaConfig?.repoDomain) repoDomain = otaConfig.repoDomain;
     if (otaConfig?.checkInterval) checkInterval = otaConfig.checkInterval;
   });
 
@@ -29,7 +29,7 @@
   }
 
   function saveDomain() {
-    setOtaDomain(cdnDomain);
+    setOtaDomain(repoDomain);
   }
 
   function setChannel(channel: string) {
@@ -90,11 +90,11 @@
       />
     </label>
 
-    <!-- CDN Domain -->
+    <!-- Repository Domain -->
     <div class="flex flex-col gap-2">
-      <Label for="ota-domain">CDN Domain</Label>
+      <Label for="ota-domain">Repository Domain</Label>
       <div class="flex gap-2">
-        <Input id="ota-domain" type="text" bind:value={cdnDomain} placeholder="cdn.openshock.app" />
+        <Input id="ota-domain" type="text" bind:value={repoDomain} placeholder="repo.openshock.org" />
         <Button size="sm" onclick={saveDomain}>Save</Button>
       </div>
     </div>

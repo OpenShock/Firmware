@@ -13,9 +13,9 @@ const char* const TAG = "CaptivePortalInstance";
 #include "GatewayConnectionManager.h"
 #include "http/ContentTypes.h"
 #include "Logging.h"
-#include "RateLimiter.h"
 #include "message_handlers/WebSocket.h"
-#include "OtaUpdateChannel.h"
+#include "ota/OtaUpdateChannel.h"
+#include "RateLimiter.h"
 #include "serialization/WSLocal.h"
 #include "util/FnProxy.h"
 #include "util/HexUtils.h"
@@ -46,15 +46,15 @@ static const char* const JSON_ERR_PASSWORD_SHORT  = "{\"error\":\"PasswordTooSho
 static const char* const JSON_ERR_PASSWORD_LONG   = "{\"error\":\"PasswordTooLong\"}";
 static const char* const JSON_ERR_CODE_REQUIRED   = "{\"error\":\"CodeRequired\"}";
 static const char* const JSON_ERR_INVALID_CHANNEL = "{\"error\":\"InvalidChannel\"}";
-static const char* const JSON_ERR_RATE_LIMITED     = "{\"error\":\"RateLimited\"}";
+static const char* const JSON_ERR_RATE_LIMITED    = "{\"error\":\"RateLimited\"}";
 
 static OpenShock::RateLimiter& getAccountLinkRateLimiter()
 {
   static OpenShock::RateLimiter* rl = nullptr;
   if (rl == nullptr) {
     rl = new OpenShock::RateLimiter();
-    rl->addLimit(60'000, 5);   // 5 attempts per minute
-    rl->addLimit(300'000, 10); // 10 attempts per 5 minutes
+    rl->addLimit(60'000, 5);    // 5 attempts per minute
+    rl->addLimit(300'000, 10);  // 10 attempts per 5 minutes
   }
   return *rl;
 }
@@ -379,7 +379,7 @@ CaptivePortal::CaptivePortalInstance::CaptivePortalInstance()
         request->send(500, HTTP::ContentType::JSON, JSON_ERR_INTERNAL);
         return;
       }
-      cfg.cdnDomain = std::string(domain.c_str(), domain.length());
+      cfg.repoDomain = std::string(domain.c_str(), domain.length());
       if (!Config::SetOtaUpdateConfig(cfg)) {
         request->send(500, HTTP::ContentType::JSON, JSON_ERR_INTERNAL);
         return;

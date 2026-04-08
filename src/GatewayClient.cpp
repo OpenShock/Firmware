@@ -8,7 +8,7 @@ const char* const TAG = "GatewayClient";
 #include "events/Events.h"
 #include "Logging.h"
 #include "message_handlers/WebSocket.h"
-#include "OtaUpdateManager.h"
+#include "ota/OtaUpdateManager.h"
 #include "serialization/WSGateway.h"
 #include "visual/VisualStateManager.h"
 
