@@ -293,6 +293,11 @@ gpio_num_t CommandHandler::GetRfTxPin()
 
 bool CommandHandler::HandleCommand(ShockerModelType model, uint16_t shockerId, ShockerCommandType type, uint8_t intensity, uint16_t durationMs)
 {
+  if (EStopManager::IsEStopped()) {
+    OS_LOGD(TAG, "Ignoring shocker command due to EmergencyStop being activated");
+    return false;
+  }
+
   ScopedReadLock lock__rf(&s_rfTransmitterMutex);
 
   if (s_rfTransmitter == nullptr) {
