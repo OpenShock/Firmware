@@ -1,3 +1,16 @@
+# Version 1.5.1 Release Notes
+
+Hotfix release addressing a safety-critical E-Stop bypass.
+
+### Bug Fixes
+
+- **E-Stop** - Fixed shocker commands being transmitted while E-Stop was active. Commands are now rejected at the entry point (`CommandHandler::HandleCommand`) and discarded in the RF transmit task's receive loop when E-Stop is engaged.
+
+**Full Changelog: [1.5.0 -> 1.5.1](https://github.com/OpenShock/Firmware/compare/1.5.0...1.5.1)**
+
+
+
+
 # Version 1.5.0 Release Notes
 
 This release is a major firmware update bringing a fully reworked RF transmitter pipeline for more reliable shocker communication, a new T330 shocker protocol, an RFC 8908-compliant captive portal, a rebuilt frontend (Svelte 5 + shadcn), and significant improvements to E-Stop handling and rate limiting.
