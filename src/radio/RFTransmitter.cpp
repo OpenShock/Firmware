@@ -221,7 +221,7 @@ void RFTransmitter::TransmitTask()
 
       // Discard any command received while estopped
       if (OpenShock::EStopManager::IsEStopped()) {
-        // Immidiatley break out to stop sequences, we cna empty queue later
+        // Immediately break out to stop sequences; we can empty the queue later
         if (!wasEstopped) {
           break;
         }
