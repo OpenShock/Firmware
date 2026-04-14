@@ -43,12 +43,8 @@ runs:
         DELETE_EXTRA: ${{ inputs.delete-extra }}
       run: |
         set -euo pipefail
-        mirror_flags=(-R --verbose)
+        mirror_flags="-R --verbose"
         if [ "$DELETE_EXTRA" = "true" ]; then
-          mirror_flags+=(--delete)
+          mirror_flags="$mirror_flags --delete"
         fi
-        lftp -u "$SFTP_USER,$SFTP_PASS" "sftp://$SFTP_HOST" -e "
-          set sftp:auto-confirm yes;
-          mirror ${mirror_flags[*]} \"$LOCAL_PATH\" \"$REMOTE_PATH\";
-          bye
-        "
+        lftp -u "$SFTP_USER,$SFTP_PASS" "sftp://$SFTP_HOST" -e "set sftp:auto-confirm yes; mirror $mirror_flags $LOCAL_PATH $REMOTE_PATH; bye"
