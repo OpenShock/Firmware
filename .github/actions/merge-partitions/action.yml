@@ -15,7 +15,7 @@ inputs:
 runs:
   using: composite
   steps:
-    - uses: actions/checkout@v4
+    - uses: actions/checkout@v6
       if: ${{ !inputs.skip-checkout }}
       with:
         sparse-checkout: |
@@ -23,7 +23,7 @@ runs:
           boards
           chips
 
-    - uses: actions/setup-python@v5
+    - uses: actions/setup-python@v6
       with:
         cache: 'pip'
 
@@ -32,12 +32,12 @@ runs:
       run: pip install -r requirements.txt
 
     - name: Download static filesystem partition
-      uses: actions/download-artifact@v4
+      uses: actions/download-artifact@v8
       with:
         name: firmware_staticfs
 
     - name: Download firmware partitions
-      uses: actions/download-artifact@v4
+      uses: actions/download-artifact@v8
       with:
         name: firmware_build_${{ inputs.board }}
 
@@ -48,7 +48,7 @@ runs:
         mv merged.bin OpenShock_${{ inputs.board }}_${{ inputs.version }}.bin
 
     - name: Upload merged firmware binary
-      uses: actions/upload-artifact@v4
+      uses: actions/upload-artifact@v7
       with:
         name: firmware_merged_${{ inputs.board }}
         path: OpenShock_${{ inputs.board }}_*.bin
