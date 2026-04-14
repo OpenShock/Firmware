@@ -84,7 +84,7 @@ jobs:
           sparse-checkout: |
             .github
 
-      - uses: pnpm/action-setup@v6
+      - uses: pnpm/action-setup@v5
         name: Install pnpm
         with:
           package_json_file: ./.github/scripts/package.json

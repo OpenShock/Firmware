@@ -15,7 +15,7 @@ runs:
           frontend
         path: ${{ github.repository }}
 
-    - uses: pnpm/action-setup@v6
+    - uses: pnpm/action-setup@v5
       name: Install pnpm
       with:
         package_json_file: ./frontend/package.json
