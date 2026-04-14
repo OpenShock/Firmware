@@ -83,6 +83,7 @@ jobs:
         with:
           board: ci-build
           skip-checkout: true
+          version: ${{ needs.get-vars.outputs.version }}
 
       - name: Perform CodeQL Analysis
         uses: github/codeql-action/analyze@v4
