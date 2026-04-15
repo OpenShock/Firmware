@@ -18,7 +18,7 @@ jobs:
 
   cpp-linter:
     name: C/C++ Linter
-    runs-on: ubuntu-latest
+    runs-on: blacksmith-4vcpu-ubuntu-2404
     timeout-minutes: 10
     needs: get-vars
 

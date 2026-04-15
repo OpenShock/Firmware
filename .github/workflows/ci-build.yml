@@ -29,7 +29,7 @@ jobs:
     uses: ./.github/workflows/get-vars.yml
 
   build-frontend:
-    runs-on: ubuntu-latest
+    runs-on: blacksmith-4vcpu-ubuntu-2404
     timeout-minutes: 5
 
     steps:
@@ -42,7 +42,7 @@ jobs:
       - uses: ./.github/actions/build-frontend
 
   build-staticfs:
-    runs-on: ubuntu-latest
+    runs-on: blacksmith-4vcpu-ubuntu-2404
     needs: [getvars, build-frontend]
     timeout-minutes: 5
 
@@ -54,7 +54,7 @@ jobs:
           skip-checkout: true
 
   build-firmware:
-    runs-on: ubuntu-latest
+    runs-on: blacksmith-4vcpu-ubuntu-2404
     needs: [getvars]
     timeout-minutes: 10
     strategy:
@@ -71,7 +71,7 @@ jobs:
           skip-checkout: true
 
   merge-partitions:
-    runs-on: ubuntu-latest
+    runs-on: blacksmith-2vcpu-ubuntu-2404
     needs: [getvars, build-staticfs, build-firmware]
     timeout-minutes: 5
     strategy:
@@ -94,14 +94,14 @@ jobs:
           skip-checkout: true
 
   checkpoint-build:
-    runs-on: ubuntu-latest
+    runs-on: blacksmith-2vcpu-ubuntu-2404
     needs: [merge-partitions]
     timeout-minutes: 1
     steps:
       - run: echo "Builds checkpoint reached"
 
   cdn-upload-firmware:
-    runs-on: ubuntu-latest
+    runs-on: blacksmith-2vcpu-ubuntu-2404
     needs: [getvars, checkpoint-build]
     timeout-minutes: 15
     if: ${{ needs.getvars.outputs.should-deploy == 'true' }}
@@ -131,7 +131,7 @@ jobs:
           board: ${{ matrix.board }}
 
   cdn-upload-version-info:
-    runs-on: ubuntu-latest
+    runs-on: blacksmith-2vcpu-ubuntu-2404
     needs: [getvars, checkpoint-build]
     timeout-minutes: 10
     if: ${{ needs.getvars.outputs.should-deploy == 'true' }}
@@ -159,7 +159,7 @@ jobs:
           boards: ${{ needs.getvars.outputs.board-list }}
 
   cdn-bump-version:
-    runs-on: ubuntu-latest
+    runs-on: blacksmith-2vcpu-ubuntu-2404
     needs: [getvars, cdn-upload-firmware] # only after version is complete
     timeout-minutes: 5
     environment: cdn-firmware-r2
@@ -187,14 +187,14 @@ jobs:
           release-channel: ${{ needs.getvars.outputs.release-channel }}
 
   checkpoint-cdn:
-    runs-on: ubuntu-latest
+    runs-on: blacksmith-2vcpu-ubuntu-2404
     needs: [cdn-upload-firmware, cdn-upload-version-info, cdn-bump-version]
     timeout-minutes: 1
     steps:
       - run: echo "CDN checkpoint reached"
 
   release:
-    runs-on: ubuntu-latest
+    runs-on: blacksmith-2vcpu-ubuntu-2404
     needs: [getvars, checkpoint-cdn]
     timeout-minutes: 1
     if: (needs.getvars.outputs.release-channel == 'stable' || needs.getvars.outputs.release-channel == 'beta')

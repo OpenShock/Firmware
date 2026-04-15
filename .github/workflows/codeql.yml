@@ -24,7 +24,7 @@ jobs:
 
   analyze-js-py:
     name: Analyze JS/PY
-    runs-on: 'ubuntu-latest'
+    runs-on: 'blacksmith-4vcpu-ubuntu-2404'
     needs: get-vars
     timeout-minutes: 10
     permissions:
@@ -62,7 +62,7 @@ jobs:
 
   analyze-cpp:
     name: Analyze C/C++
-    runs-on: 'ubuntu-latest'
+    runs-on: 'blacksmith-4vcpu-ubuntu-2404'
     needs: get-vars
     timeout-minutes: 15
     permissions:
