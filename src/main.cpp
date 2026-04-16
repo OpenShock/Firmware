@@ -17,6 +17,10 @@ const char* const TAG = "main";
 #include "wifi/WiFiManager.h"
 #include "wifi/WiFiScanManager.h"
 
+#ifdef OPENSHOCK_ETHERNET_LAN8720
+#include "ethernet/EthernetManager.h"
+#endif
+
 #include <Arduino.h>
 
 #include <memory>
@@ -43,6 +47,12 @@ bool trySetup()
     OS_LOGW(TAG, "Unable to initialize CommandHandler");
     return false;
   }
+
+#ifdef OPENSHOCK_ETHERNET_LAN8720
+  if (!OpenShock::EthernetManager::Init()) {
+    OS_LOGW(TAG, "Ethernet init failed; continuing with WiFi only");
+  }
+#endif
 
   if (!OpenShock::WiFiManager::Init()) {
     OS_LOGE(TAG, "Unable to initialize WiFiManager");

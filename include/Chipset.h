@@ -210,8 +210,27 @@
 #ifdef OPENSHOCK_FW_BOARD_NODEMCU32S
 #define OPENSHOCK_BYPASSED_GPIO(pin) ((pin) == 2)
 #endif
+#ifdef OPENSHOCK_FW_BOARD_ESTPOE32
+#define OPENSHOCK_BYPASSED_GPIO(pin) ((pin) == 2)
+#endif
 #ifndef OPENSHOCK_BYPASSED_GPIO
 #define OPENSHOCK_BYPASSED_GPIO(pin) (false)
+#endif
+
+#pragma endregion
+
+/// Ethernet-peripheral reserved pins. Cannot be bypassed: if physically wired to a PHY, nothing else may use them.
+#pragma region Ethernet Reserved Pins
+
+#ifdef OPENSHOCK_ETHERNET_LAN8720
+// LAN8720 / internal EMAC RMII (ESP32 classic):
+//   GPIO12 PHY_POWER, GPIO18 MDIO, GPIO19 TXD0, GPIO21 TX_EN, GPIO22 TXD1,
+//   GPIO23 MDC, GPIO25 RXD0, GPIO26 RXD1, GPIO27 CRS_DV.
+// GPIO0 / GPIO17 are already covered by the ESP32 CHIP_UNSAFE_GPIO set (strapping / flash).
+#define OPENSHOCK_ETHERNET_UNSAFE_GPIO(pin)                                                                                                                                                                                          \
+  ((pin) == GPIO_NUM_12 || (pin) == GPIO_NUM_18 || (pin) == GPIO_NUM_19 || (pin) == GPIO_NUM_21 || (pin) == GPIO_NUM_22 || (pin) == GPIO_NUM_23 || (pin) == GPIO_NUM_25 || (pin) == GPIO_NUM_26 || (pin) == GPIO_NUM_27)
+#else
+#define OPENSHOCK_ETHERNET_UNSAFE_GPIO(pin) (false)
 #endif
 
 #pragma endregion
@@ -228,6 +247,10 @@ namespace OpenShock {
     }
 
     if (!GPIO_IS_VALID_GPIO(pin)) {
+      return false;
+    }
+
+    if (OPENSHOCK_ETHERNET_UNSAFE_GPIO(pin)) {
       return false;
     }
 
