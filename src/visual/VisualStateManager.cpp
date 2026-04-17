@@ -11,6 +11,8 @@ const char* const TAG = "VisualStateManager";
 #include "visual/MonoLedDriver.h"
 #include "visual/RgbLedDriver.h"
 
+#include <esp_eth.h>
+
 #include <atomic>
 #include <memory>
 
@@ -29,9 +31,17 @@ const uint64_t kWebSocketConnectedFlag           = 1 << 4;
 const uint64_t kHasIpAddressFlag                 = 1 << 5;
 const uint64_t kWiFiConnectedFlag                = 1 << 6;
 const uint64_t kWiFiScanningFlag                 = 1 << 7;
+const uint64_t kEthernetConnectedFlag            = 1 << 8;
 
-// Bitmask of when the system is running normally
-const uint64_t kStatusOKMask = kWebSocketConnectedFlag | kHasIpAddressFlag | kWiFiConnectedFlag;
+// The three "status OK" bit patterns — any one satisfies the green/steady LED state.
+const uint64_t kStatusOKMaskWiFi = kWebSocketConnectedFlag | kHasIpAddressFlag | kWiFiConnectedFlag;
+const uint64_t kStatusOKMaskEth  = kWebSocketConnectedFlag | kHasIpAddressFlag | kEthernetConnectedFlag;
+const uint64_t kStatusOKMaskBoth = kStatusOKMaskWiFi | kEthernetConnectedFlag;
+
+static inline bool isStatusOk(uint64_t flags)
+{
+  return flags == kStatusOKMaskWiFi || flags == kStatusOKMaskEth || flags == kStatusOKMaskBoth;
+}
 
 static std::atomic<uint64_t> s_stateFlags = 0;
 static std::unique_ptr<OpenShock::MonoLedDriver> s_monoLedDriver;
@@ -235,7 +245,7 @@ static void updateVisualState()
   bool rgbActive  = s_rgbLedDriver != nullptr;
 
   if (gpioActive && rgbActive) {
-    if (s_stateFlags == kStatusOKMask) {
+    if (isStatusOk(s_stateFlags.load(std::memory_order_relaxed))) {
       updateVisualStateGPIO(kSolidOnPattern);
     } else {
       updateVisualStateGPIO(kSolidOffPattern);
@@ -275,6 +285,31 @@ static void handleEspWiFiEvent(void* event_handler_arg, esp_event_base_t event_b
       break;
     case WIFI_EVENT_SCAN_DONE:
       setStateFlag(kWiFiScanningFlag, false);
+      break;
+    default:
+      return;
+  }
+
+  if (oldState != s_stateFlags) {
+    updateVisualState();
+  }
+}
+
+static void handleEspEthEvent(void* event_handler_arg, esp_event_base_t event_base, int32_t event_id, void* event_data)
+{
+  (void)event_handler_arg;
+  (void)event_base;
+  (void)event_data;
+
+  uint64_t oldState = s_stateFlags;
+
+  switch (event_id) {
+    case ETHERNET_EVENT_CONNECTED:
+      setStateFlag(kEthernetConnectedFlag, true);
+      break;
+    case ETHERNET_EVENT_DISCONNECTED:
+      setStateFlag(kEthernetConnectedFlag, false);
+      setStateFlag(kHasIpAddressFlag, false);
       break;
     default:
       return;
@@ -393,6 +428,12 @@ bool VisualStateManager::Init()
   err = esp_event_handler_register(IP_EVENT, ESP_EVENT_ANY_ID, handleEspIpEvent, nullptr);
   if (err != ESP_OK) {
     OS_LOGE(TAG, "Failed to register event handler for IP_EVENT: %s", esp_err_to_name(err));
+    return false;
+  }
+
+  err = esp_event_handler_register(ETH_EVENT, ESP_EVENT_ANY_ID, handleEspEthEvent, nullptr);
+  if (err != ESP_OK) {
+    OS_LOGE(TAG, "Failed to register event handler for ETH_EVENT: %s", esp_err_to_name(err));
     return false;
   }
 

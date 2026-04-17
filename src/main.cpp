@@ -6,10 +6,12 @@ const char* const TAG = "main";
 #include "CommandHandler.h"
 #include "Common.h"
 #include "config/Config.h"
+#include "debug/DebugServer.h"
 #include "estop/EStopManager.h"
 #include "events/Events.h"
 #include "GatewayConnectionManager.h"
 #include "Logging.h"
+#include "network/NetworkManager.h"
 #include "OtaUpdateManager.h"
 #include "serial/SerialInputHandler.h"
 #include "util/TaskUtils.h"
@@ -57,6 +59,15 @@ bool trySetup()
   if (!OpenShock::WiFiManager::Init()) {
     OS_LOGE(TAG, "Unable to initialize WiFiManager");
     return false;
+  }
+
+  if (!OpenShock::NetworkManager::Init()) {
+    OS_LOGE(TAG, "Unable to initialize NetworkManager");
+    return false;
+  }
+
+  if (!OpenShock::DebugServer::Init()) {
+    OS_LOGW(TAG, "Debug server failed to start");
   }
 
   if (!OpenShock::GatewayConnectionManager::Init()) {

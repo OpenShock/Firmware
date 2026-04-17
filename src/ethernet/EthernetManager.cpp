@@ -1,5 +1,7 @@
 #include "ethernet/EthernetManager.h"
 
+#ifdef OPENSHOCK_ETHERNET_LAN8720
+
 const char* const TAG = "EthernetManager";
 
 #include "Logging.h"
@@ -123,3 +125,5 @@ bool EthernetManager::GetIPv4(char* out, std::size_t len)
   int n        = std::snprintf(out, len, "%u.%u.%u.%u", ip[0], ip[1], ip[2], ip[3]);
   return n > 0 && static_cast<std::size_t>(n) < len;
 }
+
+#endif  // OPENSHOCK_ETHERNET_LAN8720

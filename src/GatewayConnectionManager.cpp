@@ -7,12 +7,15 @@ const char* const TAG = "GatewayConnectionManager";
 #include "captiveportal/Manager.h"
 #include "config/Config.h"
 #include "Core.h"
+#include "events/Events.h"
 #include "GatewayClient.h"
 #include "http/JsonAPI.h"
 #include "Logging.h"
 #include "serialization/WSLocal.h"
 
 #include "SimpleMutex.h"
+
+#include <esp_event.h>
 
 #include <atomic>
 #include <memory>
@@ -63,18 +66,14 @@ static void DestroyClient()
   s_wsClient = nullptr;
 }
 
-static void evh_gotIP(arduino_event_t* event)
+static void evh_networkUp(void* /*arg*/, esp_event_base_t /*base*/, int32_t /*id*/, void* /*data*/)
 {
-  (void)event;
-
   s_flags.fetch_or(FLAG_HAS_IP, std::memory_order_relaxed);
   OS_LOGD(TAG, "Got IP address");
 }
 
-static void evh_wiFiDisconnected(arduino_event_t* event)
+static void evh_networkDown(void* /*arg*/, esp_event_base_t /*base*/, int32_t /*id*/, void* /*data*/)
 {
-  (void)event;
-
   s_flags.store(FLAG_NONE, std::memory_order_relaxed);
   DestroyClient();
   OS_LOGD(TAG, "Lost IP address");
@@ -94,9 +93,25 @@ namespace JsonAPI = OpenShock::Serialization::JsonAPI;
 
 bool GatewayConnectionManager::Init()
 {
-  WiFi.onEvent(evh_gotIP, ARDUINO_EVENT_WIFI_STA_GOT_IP);
-  WiFi.onEvent(evh_gotIP, ARDUINO_EVENT_WIFI_STA_GOT_IP6);
-  WiFi.onEvent(evh_wiFiDisconnected, ARDUINO_EVENT_WIFI_STA_DISCONNECTED);
+  esp_err_t err;
+
+  err = esp_event_handler_register(OPENSHOCK_EVENTS, OPENSHOCK_EVENT_NETWORK_UP, evh_networkUp, nullptr);
+  if (err != ESP_OK) {
+    OS_LOGE(TAG, "Failed to register NETWORK_UP handler: %s", esp_err_to_name(err));
+    return false;
+  }
+
+  err = esp_event_handler_register(OPENSHOCK_EVENTS, OPENSHOCK_EVENT_NETWORK_GOT_IP, evh_networkUp, nullptr);
+  if (err != ESP_OK) {
+    OS_LOGE(TAG, "Failed to register NETWORK_GOT_IP handler: %s", esp_err_to_name(err));
+    return false;
+  }
+
+  err = esp_event_handler_register(OPENSHOCK_EVENTS, OPENSHOCK_EVENT_NETWORK_DOWN, evh_networkDown, nullptr);
+  if (err != ESP_OK) {
+    OS_LOGE(TAG, "Failed to register NETWORK_DOWN handler: %s", esp_err_to_name(err));
+    return false;
+  }
 
   return true;
 }

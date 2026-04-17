@@ -6,6 +6,7 @@ const char* const TAG = "OtaUpdateManager";
 #include "Common.h"
 #include "config/Config.h"
 #include "Core.h"
+#include "events/Events.h"
 #include "GatewayConnectionManager.h"
 #include "Hashing.h"
 #include "http/HTTPRequestManager.h"
@@ -56,9 +57,9 @@ bool verifyRollbackLater()
 }
 
 enum OtaTaskEventFlag : uint32_t {
-  OTA_TASK_EVENT_UPDATE_REQUESTED  = 1 << 0,
-  OTA_TASK_EVENT_WIFI_DISCONNECTED = 1 << 1,  // If both connected and disconnected are set, disconnected takes priority.
-  OTA_TASK_EVENT_WIFI_CONNECTED    = 1 << 2,
+  OTA_TASK_EVENT_UPDATE_REQUESTED     = 1 << 0,
+  OTA_TASK_EVENT_NETWORK_DISCONNECTED = 1 << 1,  // If both connected and disconnected are set, disconnected takes priority.
+  OTA_TASK_EVENT_NETWORK_CONNECTED    = 1 << 2,
 };
 
 static esp_ota_img_states_t _otaImageState;
@@ -114,33 +115,14 @@ static bool _tryGetRequestedVersion(OpenShock::SemVer& version)
   return true;
 }
 
-static void otaum_evh_wifidisconnected(void* event_handler_arg, esp_event_base_t event_base, int32_t event_id, void* event_data)
+static void otaum_evh_networkUp(void* /*arg*/, esp_event_base_t /*base*/, int32_t /*id*/, void* /*data*/)
 {
-  (void)event_handler_arg;
-  (void)event_base;
-  (void)event_id;
-  (void)event_data;
-
-  otaum_try_notify_task(OTA_TASK_EVENT_WIFI_DISCONNECTED);
+  otaum_try_notify_task(OTA_TASK_EVENT_NETWORK_CONNECTED);
 }
 
-static void otaum_evh_ipevent(void* event_handler_arg, esp_event_base_t event_base, int32_t event_id, void* event_data)
+static void otaum_evh_networkDown(void* /*arg*/, esp_event_base_t /*base*/, int32_t /*id*/, void* /*data*/)
 {
-  (void)event_handler_arg;
-  (void)event_base;
-  (void)event_data;
-
-  switch (event_id) {
-    case IP_EVENT_GOT_IP6:
-    case IP_EVENT_STA_GOT_IP:
-      otaum_try_notify_task(OTA_TASK_EVENT_WIFI_CONNECTED);
-      break;
-    case IP_EVENT_STA_LOST_IP:
-      otaum_try_notify_task(OTA_TASK_EVENT_WIFI_DISCONNECTED);
-      break;
-    default:
-      return;
-  }
+  otaum_try_notify_task(OTA_TASK_EVENT_NETWORK_DISCONNECTED);
 }
 
 static bool otaum_send_progress_msg(Serialization::Types::OtaUpdateProgressTask task, float progress)
@@ -284,14 +266,14 @@ static void otaum_updatetask(void* arg)
 
     updateRequested |= (eventBits & OTA_TASK_EVENT_UPDATE_REQUESTED) != 0;
 
-    if ((eventBits & OTA_TASK_EVENT_WIFI_DISCONNECTED) != 0) {
-      OS_LOGD(TAG, "WiFi disconnected");
+    if ((eventBits & OTA_TASK_EVENT_NETWORK_DISCONNECTED) != 0) {
+      OS_LOGD(TAG, "Network disconnected");
       connected = false;
       continue;  // No further processing needed.
     }
 
-    if ((eventBits & OTA_TASK_EVENT_WIFI_CONNECTED) != 0 && !connected) {
-      OS_LOGD(TAG, "WiFi connected");
+    if ((eventBits & OTA_TASK_EVENT_NETWORK_CONNECTED) != 0 && !connected) {
+      OS_LOGD(TAG, "Network connected");
       connected = true;
     }
 
@@ -544,15 +526,21 @@ bool OtaUpdateManager::Init()
     return false;
   }
 
-  err = esp_event_handler_register(IP_EVENT, ESP_EVENT_ANY_ID, otaum_evh_ipevent, nullptr);
+  err = esp_event_handler_register(OPENSHOCK_EVENTS, OPENSHOCK_EVENT_NETWORK_UP, otaum_evh_networkUp, nullptr);
   if (err != ESP_OK) {
-    OS_LOGE(TAG, "Failed to register event handler for IP_EVENT: %s", esp_err_to_name(err));
+    OS_LOGE(TAG, "Failed to register NETWORK_UP handler: %s", esp_err_to_name(err));
     return false;
   }
 
-  err = esp_event_handler_register(WIFI_EVENT, WIFI_EVENT_STA_DISCONNECTED, otaum_evh_wifidisconnected, nullptr);
+  err = esp_event_handler_register(OPENSHOCK_EVENTS, OPENSHOCK_EVENT_NETWORK_GOT_IP, otaum_evh_networkUp, nullptr);
   if (err != ESP_OK) {
-    OS_LOGE(TAG, "Failed to register event handler for WIFI_EVENT: %s", esp_err_to_name(err));
+    OS_LOGE(TAG, "Failed to register NETWORK_GOT_IP handler: %s", esp_err_to_name(err));
+    return false;
+  }
+
+  err = esp_event_handler_register(OPENSHOCK_EVENTS, OPENSHOCK_EVENT_NETWORK_DOWN, otaum_evh_networkDown, nullptr);
+  if (err != ESP_OK) {
+    OS_LOGE(TAG, "Failed to register NETWORK_DOWN handler: %s", esp_err_to_name(err));
     return false;
   }
 
