@@ -4,6 +4,7 @@
 #include "config/CaptivePortalConfig.h"
 #include "config/ConfigBase.h"
 #include "config/EStopConfig.h"
+#include "config/LanConfig.h"
 #include "config/OtaUpdateConfig.h"
 #include "config/RFConfig.h"
 #include "config/SerialInputConfig.h"
@@ -20,6 +21,7 @@ namespace OpenShock::Config {
     OpenShock::Config::SerialInputConfig serialInput;
     OpenShock::Config::OtaUpdateConfig otaUpdate;
     OpenShock::Config::EStopConfig estop;
+    OpenShock::Config::LanConfig lan;
 
     void ToDefault() override;
 

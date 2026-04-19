@@ -375,6 +375,23 @@ bool Config::SetEStop(const Config::EStopConfig& config)
   return trySaveConfig();
 }
 
+bool Config::GetLanConfig(Config::LanConfig& out)
+{
+  CONFIG_LOCK_READ(false);
+
+  out = _configData.lan;
+
+  return true;
+}
+
+bool Config::SetLanConfig(const Config::LanConfig& config)
+{
+  CONFIG_LOCK_WRITE(false);
+
+  _configData.lan = config;
+  return trySaveConfig();
+}
+
 bool Config::GetWiFiCredentials(std::vector<Config::WiFiCredentials>& out)
 {
   CONFIG_LOCK_READ(false);
