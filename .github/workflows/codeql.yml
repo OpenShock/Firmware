@@ -8,6 +8,10 @@ on:
   schedule:
     - cron: '0 6 * * 1'
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
 env:
   OPENSHOCK_API_DOMAIN: api.openshock.app
   OPENSHOCK_FW_GIT_REF: ${{ github.ref }}
@@ -83,6 +87,7 @@ jobs:
         with:
           board: ci-build
           skip-checkout: true
+          version: ${{ needs.get-vars.outputs.version }}
 
       - name: Perform CodeQL Analysis
         uses: github/codeql-action/analyze@v4

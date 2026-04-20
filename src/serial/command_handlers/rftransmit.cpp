@@ -3,7 +3,7 @@
 #include "CommandHandler.h"
 #include "serialization/JsonSerial.h"
 
-void _handleRFTransmitCommand(std::string_view arg, bool isAutomated)
+static void handleRFTransmitCommand(std::string_view arg, bool isAutomated)
 {
   if (arg.empty()) {
     SERPR_ERROR("No command");
@@ -37,7 +37,7 @@ OpenShock::SerialCmds::CommandGroup OpenShock::SerialCmds::CommandHandlers::RfTr
 {
   auto group = OpenShock::SerialCmds::CommandGroup("rftransmit"sv);
 
-  auto& cmd = group.addCommand("Transmit a RF command"sv, _handleRFTransmitCommand);
+  auto& cmd = group.addCommand("Transmit a RF command"sv, handleRFTransmitCommand);
   cmd.addArgument(
     "json"sv,
     "must be a JSON object with the following fields:"sv,

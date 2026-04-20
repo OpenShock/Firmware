@@ -4,7 +4,7 @@
 
 #include <esp_system.h>
 
-void _handleJsonConfigCommand(std::string_view arg, bool isAutomated)
+static void handleJsonConfigCommand(std::string_view arg, bool isAutomated)
 {
   if (arg.empty()) {
     // Get raw config
@@ -28,9 +28,9 @@ OpenShock::SerialCmds::CommandGroup OpenShock::SerialCmds::CommandHandlers::Json
 {
   auto group = OpenShock::SerialCmds::CommandGroup("jsonconfig"sv);
 
-  auto& getCommand = group.addCommand("Get the configuration as JSON"sv, _handleJsonConfigCommand);
+  auto& getCommand = group.addCommand("Get the configuration as JSON"sv, handleJsonConfigCommand);
 
-  auto& setCommand = group.addCommand("Set the configuration from JSON, and restart"sv, _handleJsonConfigCommand);
+  auto& setCommand = group.addCommand("Set the configuration from JSON, and restart"sv, handleJsonConfigCommand);
   setCommand.addArgument("json"sv, "must be a valid JSON object"sv, "{ ... }"sv);
 
   return group;

@@ -5,7 +5,7 @@
 #include "wifi/WiFiManager.h"
 #include "wifi/WiFiNetwork.h"
 
-void _handleDebugInfoCommand(std::string_view arg, bool isAutomated)
+static void handleDebugInfoCommand(std::string_view arg, bool isAutomated)
 {
   (void)arg;
 
@@ -38,7 +38,7 @@ OpenShock::SerialCmds::CommandGroup OpenShock::SerialCmds::CommandHandlers::SysI
 {
   auto group = OpenShock::SerialCmds::CommandGroup("sysinfo"sv);
 
-  auto& cmd = group.addCommand("Get system information from RTOS, WiFi, etc."sv, _handleDebugInfoCommand);
+  auto& cmd = group.addCommand("Get system information from RTOS, WiFi, etc."sv, handleDebugInfoCommand);
 
   return group;
 }

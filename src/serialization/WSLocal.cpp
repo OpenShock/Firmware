@@ -40,7 +40,7 @@ constexpr WiFiAuthMode GetWiFiAuthModeEnum(wifi_auth_mode_t authMode)
   }
 }
 
-flatbuffers::Offset<OpenShock::Serialization::Types::WifiNetwork> _createWiFiNetwork(flatbuffers::FlatBufferBuilder& builder, const OpenShock::WiFiNetwork& network)
+static flatbuffers::Offset<OpenShock::Serialization::Types::WifiNetwork> createWiFiNetwork(flatbuffers::FlatBufferBuilder& builder, const OpenShock::WiFiNetwork& network)
 {
   auto bssid    = network.GetHexBSSID();
   auto authMode = GetWiFiAuthModeEnum(network.authMode);
@@ -68,7 +68,7 @@ bool Local::SerializeReadyMessage(const WiFiNetwork* connectedNetwork, bool acco
   flatbuffers::Offset<Serialization::Types::WifiNetwork> fbsNetwork = 0;
 
   if (connectedNetwork != nullptr) {
-    fbsNetwork = _createWiFiNetwork(builder, *connectedNetwork);
+    fbsNetwork = createWiFiNetwork(builder, *connectedNetwork);
   } else {
     fbsNetwork = 0;
   }
@@ -111,7 +111,7 @@ bool Local::SerializeWiFiNetworkEvent(Types::WifiNetworkEventType eventType, con
 {
   flatbuffers::FlatBufferBuilder builder(64);
 
-  auto networkOffset = _createWiFiNetwork(builder, network);
+  auto networkOffset = createWiFiNetwork(builder, network);
 
   auto wrapperOffset = Local::CreateWifiNetworkEvent(builder, eventType, builder.CreateVector(&networkOffset, 1));  // Resulting vector will have 1 element
 
@@ -130,7 +130,7 @@ bool Local::SerializeWiFiNetworksEvent(Types::WifiNetworkEventType eventType, co
   fbsNetworks.reserve(networks.size());
 
   for (const auto& network : networks) {
-    fbsNetworks.push_back(_createWiFiNetwork(builder, network));
+    fbsNetworks.push_back(createWiFiNetwork(builder, network));
   }
 
   auto wrapperOffset = Local::CreateWifiNetworkEvent(builder, eventType, builder.CreateVector(fbsNetworks));

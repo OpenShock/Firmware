@@ -10,7 +10,7 @@
 
 const char* const TAG = "SerialCmds::CommandHandlers::Domain";
 
-void _handleDomainCommand(std::string_view arg, bool isAutomated)
+static void handleDomainCommand(std::string_view arg, bool isAutomated)
 {
   if (arg.empty()) {
     std::string domain;
@@ -67,9 +67,9 @@ OpenShock::SerialCmds::CommandGroup OpenShock::SerialCmds::CommandHandlers::Doma
 {
   auto group = OpenShock::SerialCmds::CommandGroup("domain"sv);
 
-  auto& getCommand = group.addCommand("Get the backend domain."sv, _handleDomainCommand);
+  auto& getCommand = group.addCommand("Get the backend domain."sv, handleDomainCommand);
 
-  auto& setCommand = group.addCommand("Set the backend domain."sv, _handleDomainCommand);
+  auto& setCommand = group.addCommand("Set the backend domain."sv, handleDomainCommand);
   setCommand.addArgument("domain"sv, "must be a string"sv, "api.shocklink.net"sv);
 
   return group;

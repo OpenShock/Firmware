@@ -21,19 +21,19 @@ runs:
   using: composite
   steps:
     - name: Download static filesystem partition
-      uses: actions/download-artifact@v4
+      uses: actions/download-artifact@v8
       with:
         name: firmware_staticfs
         path: .
 
     - name: Download firmware partitions
-      uses: actions/download-artifact@v4
+      uses: actions/download-artifact@v8
       with:
         name: firmware_build_${{ inputs.board }}
         path: .
 
     - name: Download merged firmware binary
-      uses: actions/download-artifact@v4
+      uses: actions/download-artifact@v8
       with:
         name: firmware_merged_${{ inputs.board }}
         path: .
@@ -57,12 +57,10 @@ runs:
         mv hashes.*.txt upload/
 
     - name: Upload artifacts to CDN
-      uses: milanmk/actions-file-deployer@master
+      uses: ./.github/actions/sftp-mirror
       with:
-        remote-protocol: "sftp"
-        remote-host: "${{ inputs.bunny-stor-hostname }}"
-        remote-user: "${{ inputs.bunny-stor-username }}"
-        remote-password: "${{ inputs.bunny-stor-password }}"
-        remote-path: "/${{ inputs.fw-version }}/${{ inputs.board }}"
-        local-path: "upload"
-        sync: "full"
+        host: ${{ inputs.bunny-stor-hostname }}
+        username: ${{ inputs.bunny-stor-username }}
+        password: ${{ inputs.bunny-stor-password }}
+        local-path: upload
+        remote-path: /${{ inputs.fw-version }}/${{ inputs.board }}

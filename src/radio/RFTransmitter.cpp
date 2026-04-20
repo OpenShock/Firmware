@@ -216,6 +216,17 @@ void RFTransmitter::TransmitTask()
         goto exit;  // Break out of nested loop so locals destruct before vTaskDelete
       }
 
+      // Discard any command received while estopped
+      if (OpenShock::EStopManager::IsEStopped()) {
+        // Immediately break out to stop sequences; we can empty the queue later
+        if (!wasEstopped) {
+          break;
+        }
+
+        // Discard next item in queue
+        continue;
+      }
+
       if ((cmd.flags & kFlagOverwrite) != 0) {
         // Replace the sequence if it already exists
         if (modifySequence(sequences, cmd.modelType, cmd.shockerId, cmd.type, cmd.intensity, cmd.transmitEnd)) {
@@ -228,6 +239,7 @@ void RFTransmitter::TransmitTask()
       }
     }
 
+    // Terminate all remaining sequences
     bool isEstopped = OpenShock::EStopManager::IsEStopped();
     if (isEstopped != wasEstopped) {
       wasEstopped = isEstopped;

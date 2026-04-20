@@ -8,7 +8,7 @@
 
 const char* const TAG = "SerialCmds::CommandHandlers::Domain";
 
-void _handleHostnameCommand(std::string_view arg, bool isAutomated)
+static void handleHostnameCommand(std::string_view arg, bool isAutomated)
 {
   if (arg.empty()) {
     std::string hostname;
@@ -34,9 +34,9 @@ OpenShock::SerialCmds::CommandGroup OpenShock::SerialCmds::CommandHandlers::Host
 {
   auto group = OpenShock::SerialCmds::CommandGroup("hostname"sv);
 
-  auto& getCommand = group.addCommand("Get the network hostname."sv, _handleHostnameCommand);
+  auto& getCommand = group.addCommand("Get the network hostname."sv, handleHostnameCommand);
 
-  auto& setCommand = group.addCommand("Set the network hostname."sv, _handleHostnameCommand);
+  auto& setCommand = group.addCommand("Set the network hostname."sv, handleHostnameCommand);
   setCommand.addArgument("hostname"sv, "must be a string"sv, "OpenShock"sv);
 
   return group;

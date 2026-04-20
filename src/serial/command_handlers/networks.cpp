@@ -9,7 +9,7 @@
 
 const char* const TAG = "SerialCmds::CommandHandlers::Networks";
 
-void _handleNetworksCommand(std::string_view arg, bool isAutomated)
+static void handleNetworksCommand(std::string_view arg, bool isAutomated)
 {
   cJSON* root;
 
@@ -90,9 +90,9 @@ OpenShock::SerialCmds::CommandGroup OpenShock::SerialCmds::CommandHandlers::Netw
 {
   auto group = OpenShock::SerialCmds::CommandGroup("networks"sv);
 
-  auto& getCommand = group.addCommand("Get all saved networks."sv, _handleNetworksCommand);
+  auto& getCommand = group.addCommand("Get all saved networks."sv, handleNetworksCommand);
 
-  auto& setCommand = group.addCommand("Set all saved networks."sv, _handleNetworksCommand);
+  auto& setCommand = group.addCommand("Set all saved networks."sv, handleNetworksCommand);
   setCommand.addArgument(
     "json"sv,
     "must be a array of objects with the following fields:"sv,

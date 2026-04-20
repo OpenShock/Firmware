@@ -2,7 +2,7 @@
 
 #include "visual/VisualStateManager.h"
 
-void _handleSerialLedTestCommand(std::string_view arg, bool isAutomated)
+static void handleSerialLedTestCommand(std::string_view arg, bool isAutomated)
 {
   (void)arg;
   (void)isAutomated;
@@ -18,7 +18,7 @@ OpenShock::Serial::CommandGroup OpenShock::Serial::CommandHandlers::LedTestHandl
 {
   auto group = OpenShock::Serial::CommandGroup("ledtest"sv);
 
-  group.addCommand("Cycle through all LED patterns for visual verification"sv, _handleSerialLedTestCommand);
+  group.addCommand("Cycle through all LED patterns for visual verification"sv, handleSerialLedTestCommand);
 
   return group;
 }

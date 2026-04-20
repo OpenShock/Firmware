@@ -27,7 +27,7 @@ const char* const TAG = "WiFiManager";
 using namespace OpenShock;
 
 /// Returns a user-friendly disconnect reason, or nullptr for obscure/protocol-level errors.
-static const char* _wifiDisconnectReason(uint8_t reason)
+static const char* wifiDisconnectReason(uint8_t reason)
 {
   switch (reason) {
     // Authentication / password issues
@@ -91,7 +91,7 @@ static std::atomic<uint8_t> s_preferredCredentialsID = 0;
 static OpenShock::SimpleMutex s_networksMutex;
 static std::vector<WiFiNetwork> s_wifiNetworks;
 
-bool _attractivityComparer(const WiFiNetwork& a, const WiFiNetwork& b)
+static bool attractivityComparer(const WiFiNetwork& a, const WiFiNetwork& b)
 {
   // Networks with credentials sort before those without
   if (a.credentialsID != 0 && b.credentialsID == 0) return true;
@@ -103,7 +103,7 @@ bool _attractivityComparer(const WiFiNetwork& a, const WiFiNetwork& b)
   // Higher RSSI is more attractive
   return a.rssi > b.rssi;
 }
-bool _isConnectRateLimited(const WiFiNetwork& net)
+static bool isConnectRateLimited(const WiFiNetwork& net)
 {
   if (net.lastConnectAttempt == 0) {
     return false;
@@ -118,38 +118,38 @@ bool _isConnectRateLimited(const WiFiNetwork& net)
   return false;
 }
 
-bool _isSaved(std::function<bool(const Config::WiFiCredentials&)> predicate)
+static bool isSaved(std::function<bool(const Config::WiFiCredentials&)> predicate)
 {
   return Config::AnyWiFiCredentials(predicate);
 }
-std::vector<WiFiNetwork>::iterator _findNetwork(std::function<bool(WiFiNetwork&)> predicate, bool sortByAttractivity = true)
+static std::vector<WiFiNetwork>::iterator findNetwork(std::function<bool(WiFiNetwork&)> predicate, bool sortByAttractivity = true)
 {
   if (sortByAttractivity) {
-    std::sort(s_wifiNetworks.begin(), s_wifiNetworks.end(), _attractivityComparer);
+    std::sort(s_wifiNetworks.begin(), s_wifiNetworks.end(), attractivityComparer);
   }
   return std::find_if(s_wifiNetworks.begin(), s_wifiNetworks.end(), predicate);
 }
-std::vector<WiFiNetwork>::iterator _findNetworkBySSID(const char* ssid, bool sortByAttractivity = true)
+static std::vector<WiFiNetwork>::iterator findNetworkBySSID(const char* ssid, bool sortByAttractivity = true)
 {
-  return _findNetwork([ssid](const WiFiNetwork& net) noexcept { return strcmp(net.ssid, ssid) == 0; }, sortByAttractivity);
+  return findNetwork([ssid](const WiFiNetwork& net) noexcept { return strcmp(net.ssid, ssid) == 0; }, sortByAttractivity);
 }
-std::vector<WiFiNetwork>::iterator _findNetworkByBSSID(const uint8_t (&bssid)[6])
+static std::vector<WiFiNetwork>::iterator findNetworkByBSSID(const uint8_t (&bssid)[6])
 {
-  return _findNetwork([bssid](const WiFiNetwork& net) noexcept { return memcmp(net.bssid, bssid, sizeof(bssid)) == 0; }, false);
+  return findNetwork([bssid](const WiFiNetwork& net) noexcept { return memcmp(net.bssid, bssid, sizeof(bssid)) == 0; }, false);
 }
-std::vector<WiFiNetwork>::iterator _findNetworkByCredentialsID(uint8_t credentialsID, bool sortByAttractivity = true)
+static std::vector<WiFiNetwork>::iterator findNetworkByCredentialsID(uint8_t credentialsID, bool sortByAttractivity = true)
 {
-  return _findNetwork([credentialsID](const WiFiNetwork& net) noexcept { return net.credentialsID == credentialsID; }, sortByAttractivity);
+  return findNetwork([credentialsID](const WiFiNetwork& net) noexcept { return net.credentialsID == credentialsID; }, sortByAttractivity);
 }
 
-bool _getNextWiFiNetwork(OpenShock::Config::WiFiCredentials& creds)
+static bool getNextWiFiNetwork(OpenShock::Config::WiFiCredentials& creds)
 {
-  return _findNetwork([&creds](const WiFiNetwork& net) {
+  return findNetwork([&creds](const WiFiNetwork& net) {
     if (net.credentialsID == 0) {
       return false;
     }
 
-    if (_isConnectRateLimited(net)) {
+    if (isConnectRateLimited(net)) {
       return false;
     }
 
@@ -161,7 +161,7 @@ bool _getNextWiFiNetwork(OpenShock::Config::WiFiCredentials& creds)
   }) != s_wifiNetworks.end();
 }
 
-bool _connect(const std::string& ssid, const std::string& password, wifi_auth_mode_t expectedAuthMode = WIFI_AUTH_MAX, const uint8_t* pinnedBssid = nullptr)
+static bool connectWiFi(const std::string& ssid, const std::string& password, wifi_auth_mode_t expectedAuthMode = WIFI_AUTH_MAX, const uint8_t* pinnedBssid = nullptr)
 {
   if (ssid.empty()) {
     OS_LOGW(TAG, "Cannot connect to network with empty SSID");
@@ -175,7 +175,7 @@ bool _connect(const std::string& ssid, const std::string& password, wifi_auth_mo
   }
 
   // Mark as attempted and validate auth mode if we know the network from scanning
-  auto it = _findNetworkBySSID(ssid.c_str());
+  auto it = findNetworkBySSID(ssid.c_str());
   if (it != s_wifiNetworks.end()) {
     // Reject if the AP's auth mode is weaker than expected (evil twin protection)
     if (expectedAuthMode != WIFI_AUTH_MAX && it->authMode < expectedAuthMode) {
@@ -195,7 +195,7 @@ bool _connect(const std::string& ssid, const std::string& password, wifi_auth_mo
   return true;
 }
 
-bool _authenticate(const WiFiNetwork& net, std::string_view password)
+static bool authenticate(const WiFiNetwork& net, std::string_view password)
 {
   uint8_t id = Config::AddWiFiCredentials(net.ssid, password, net.authMode);
   if (id == 0) {
@@ -205,10 +205,10 @@ bool _authenticate(const WiFiNetwork& net, std::string_view password)
 
   Serialization::Local::SerializeWiFiNetworkEvent(Serialization::Types::WifiNetworkEventType::Saved, net, CaptivePortal::BroadcastMessageBIN);
 
-  return _connect(net.ssid, std::string(password));
+  return connectWiFi(net.ssid, std::string(password));
 }
 
-void _evWiFiConnected(arduino_event_t* event)
+static void evWiFiConnected(arduino_event_t* event)
 {
   auto& info = event->event_info.wifi_sta_connected;
 
@@ -217,7 +217,7 @@ void _evWiFiConnected(arduino_event_t* event)
 
   ScopedLock lock__(&s_networksMutex);
 
-  auto it = _findNetworkByBSSID(info.bssid);
+  auto it = findNetworkByBSSID(info.bssid);
   if (it == s_wifiNetworks.end()) {
     s_connectedCredentialsID.store(0, std::memory_order_relaxed);
 
@@ -237,7 +237,7 @@ void _evWiFiConnected(arduino_event_t* event)
 
   Serialization::Local::SerializeWiFiNetworkEvent(Serialization::Types::WifiNetworkEventType::Connected, *it, CaptivePortal::BroadcastMessageBIN);
 }
-void _evWiFiGotIP(arduino_event_t* event)
+static void evWiFiGotIP(arduino_event_t* event)
 {
   const auto& info = event->event_info.got_ip;
 
@@ -250,7 +250,7 @@ void _evWiFiGotIP(arduino_event_t* event)
   snprintf(ipStr, sizeof(ipStr), IPV4ADDR_FMT, IPV4ADDR_ARG(ip));
   Serialization::Local::SerializeWiFiGotIpEvent(ipStr, CaptivePortal::BroadcastMessageBIN);
 }
-void _evWiFiGotIP6(arduino_event_t* event)
+static void evWiFiGotIP6(arduino_event_t* event)
 {
   auto& info = event->event_info.got_ip6;
 
@@ -258,7 +258,7 @@ void _evWiFiGotIP6(arduino_event_t* event)
 
   OS_LOGI(TAG, "Got IPv6 address " IPV6ADDR_FMT " from network " BSSID_FMT, IPV6ADDR_ARG(ip6), BSSID_ARG(s_connectedBSSID));
 }
-void _evWiFiDisconnected(arduino_event_t* event)
+static void evWiFiDisconnected(arduino_event_t* event)
 {
   s_wifiState.store(WiFiState::Disconnected, std::memory_order_relaxed);
   s_connectedCredentialsID.store(0, std::memory_order_relaxed);
@@ -269,7 +269,7 @@ void _evWiFiDisconnected(arduino_event_t* event)
 
   // Notify the frontend
   ScopedLock lock__(&s_networksMutex);
-  auto it = _findNetworkByBSSID(info.bssid);
+  auto it = findNetworkByBSSID(info.bssid);
   if (it != s_wifiNetworks.end()) {
     Serialization::Local::SerializeWiFiNetworkEvent(Serialization::Types::WifiNetworkEventType::Disconnected, *it, CaptivePortal::BroadcastMessageBIN);
   } else {
@@ -283,7 +283,7 @@ void _evWiFiDisconnected(arduino_event_t* event)
 
   // Send error message for unexpected disconnects (not user-initiated)
   if (info.reason != WIFI_REASON_ASSOC_LEAVE) {
-    const char* friendlyReason = _wifiDisconnectReason(info.reason);
+    const char* friendlyReason = wifiDisconnectReason(info.reason);
     if (friendlyReason != nullptr) {
       Serialization::Local::SerializeErrorMessage(friendlyReason, CaptivePortal::BroadcastMessageBIN);
     } else {
@@ -293,10 +293,10 @@ void _evWiFiDisconnected(arduino_event_t* event)
     }
   }
 }
-void _evWiFiScanStarted()
+static void evWiFiScanStarted()
 {
 }
-void _evWiFiScanStatusChanged(OpenShock::WiFiScanStatus status)
+static void evWiFiScanStatusChanged(OpenShock::WiFiScanStatus status)
 {
   ScopedLock lock__(&s_networksMutex);
 
@@ -322,7 +322,7 @@ void _evWiFiScanStatusChanged(OpenShock::WiFiScanStatus status)
   // Send the scan status changed event
   Serialization::Local::SerializeWiFiScanStatusChangedEvent(status, CaptivePortal::BroadcastMessageBIN);
 }
-void _evWiFiNetworksDiscovery(const std::vector<const wifi_ap_record_t*>& records)
+static void evWiFiNetworksDiscovery(const std::vector<const wifi_ap_record_t*>& records)
 {
   ScopedLock lock__(&s_networksMutex);
 
@@ -332,7 +332,7 @@ void _evWiFiNetworksDiscovery(const std::vector<const wifi_ap_record_t*>& record
   for (const wifi_ap_record_t* record : records) {
     uint8_t credsId = Config::GetWiFiCredentialsIDbySSID(reinterpret_cast<const char*>(record->ssid));
 
-    auto it = _findNetworkByBSSID(record->bssid);
+    auto it = findNetworkByBSSID(record->bssid);
     if (it != s_wifiNetworks.end()) {
       // Update the network
       memcpy(it->ssid, record->ssid, sizeof(it->ssid));
@@ -367,7 +367,7 @@ void _evWiFiNetworksDiscovery(const std::vector<const wifi_ap_record_t*>& record
 
 esp_err_t set_esp_interface_dns(esp_interface_t interface, IPAddress main_dns, IPAddress backup_dns, IPAddress fallback_dns);
 
-bool _tryConnect()
+static bool tryConnect()
 {
   Config::WiFiCredentials creds;
 
@@ -381,20 +381,20 @@ bool _tryConnect()
         OS_LOGE(TAG, "Failed to find credentials with ID %u", preferredId);
         return false;
       }
-    } else if (!_getNextWiFiNetwork(creds)) {
+    } else if (!getNextWiFiNetwork(creds)) {
       return false;
     }
   }
 
-  return _connect(creds.ssid, creds.password, creds.authMode, creds.HasPinnedBSSID() ? creds.bssid.data() : nullptr);
+  return connectWiFi(creds.ssid, creds.password, creds.authMode, creds.HasPinnedBSSID() ? creds.bssid.data() : nullptr);
 }
 
-void _wifimanagerUpdateTask(void*)
+static void wifimanagerUpdateTask(void*)
 {
   int64_t lastScanRequest = 0;
   while (true) {
     if (s_wifiState.load(std::memory_order_relaxed) == WiFiState::Disconnected && !WiFiScanManager::IsScanning()) {
-      if (!_tryConnect()) {
+      if (!tryConnect()) {
         int64_t now = OpenShock::millis();
         if (lastScanRequest == 0 || now - lastScanRequest > 120'000) {  // Auto-scan at boot and then every 2 mins
           lastScanRequest = now;
@@ -410,12 +410,12 @@ void _wifimanagerUpdateTask(void*)
 
 bool WiFiManager::Init()
 {
-  WiFi.onEvent(_evWiFiConnected, ARDUINO_EVENT_WIFI_STA_CONNECTED);
-  WiFi.onEvent(_evWiFiGotIP, ARDUINO_EVENT_WIFI_STA_GOT_IP);
-  WiFi.onEvent(_evWiFiGotIP6, ARDUINO_EVENT_WIFI_STA_GOT_IP6);
-  WiFi.onEvent(_evWiFiDisconnected, ARDUINO_EVENT_WIFI_STA_DISCONNECTED);
-  WiFiScanManager::RegisterStatusChangedHandler(_evWiFiScanStatusChanged);
-  WiFiScanManager::RegisterNetworksDiscoveredHandler(_evWiFiNetworksDiscovery);
+  WiFi.onEvent(evWiFiConnected, ARDUINO_EVENT_WIFI_STA_CONNECTED);
+  WiFi.onEvent(evWiFiGotIP, ARDUINO_EVENT_WIFI_STA_GOT_IP);
+  WiFi.onEvent(evWiFiGotIP6, ARDUINO_EVENT_WIFI_STA_GOT_IP6);
+  WiFi.onEvent(evWiFiDisconnected, ARDUINO_EVENT_WIFI_STA_DISCONNECTED);
+  WiFiScanManager::RegisterStatusChangedHandler(evWiFiScanStatusChanged);
+  WiFiScanManager::RegisterNetworksDiscoveredHandler(evWiFiNetworksDiscovery);
 
   if (!WiFiScanManager::Init()) {
     OS_LOGE(TAG, "Failed to initialize WiFiScanManager");
@@ -448,7 +448,7 @@ bool WiFiManager::Init()
   //   return false;
   // }
 
-  if (TaskUtils::TaskCreateUniversal(_wifimanagerUpdateTask, TAG, 4096, nullptr, 5, nullptr, 1) != pdPASS) {  // TODO: Re-profile stack usage
+  if (TaskUtils::TaskCreateUniversal(wifimanagerUpdateTask, TAG, 4096, nullptr, 5, nullptr, 1) != pdPASS) {  // TODO: Re-profile stack usage
     OS_LOGE(TAG, "Failed to create WiFiManager update task");
     return false;
   }
@@ -462,7 +462,7 @@ bool WiFiManager::Save(const char* ssid, std::string_view password, bool connect
 
   ScopedLock lock__(&s_networksMutex);
 
-  auto it = _findNetworkBySSID(ssid);
+  auto it = findNetworkBySSID(ssid);
   if (it != s_wifiNetworks.end()) {
     // Network is in scan results — use scanned auth mode (more reliable than user-provided)
     uint8_t id = Config::AddWiFiCredentials(it->ssid, password, it->authMode);
@@ -475,7 +475,7 @@ bool WiFiManager::Save(const char* ssid, std::string_view password, bool connect
     Serialization::Local::SerializeWiFiNetworkEvent(Serialization::Types::WifiNetworkEventType::Saved, *it, CaptivePortal::BroadcastMessageBIN);
 
     if (connect) {
-      return _connect(it->ssid, std::string(password));
+      return connectWiFi(it->ssid, std::string(password));
     }
     return true;
   }
@@ -510,7 +510,7 @@ bool WiFiManager::Forget(const char* ssid)
 
   ScopedLock lock__(&s_networksMutex);
 
-  auto it = _findNetworkBySSID(ssid);
+  auto it = findNetworkBySSID(ssid);
   if (it != s_wifiNetworks.end()) {
     uint8_t credsId = it->credentialsID;
 
@@ -577,7 +577,7 @@ bool WiFiManager::RefreshNetworkCredentials()
 
 bool WiFiManager::IsSaved(const char* ssid)
 {
-  return _isSaved([ssid](const Config::WiFiCredentials& creds) { return creds.ssid == ssid; });
+  return isSaved([ssid](const Config::WiFiCredentials& creds) { return creds.ssid == ssid; });
 }
 
 bool WiFiManager::Connect(const char* ssid)
@@ -596,10 +596,10 @@ bool WiFiManager::Connect(const char* ssid)
 
   if (s_wifiState.load(std::memory_order_relaxed) == WiFiState::Disconnected) {
     s_preferredCredentialsID.store(creds.id, std::memory_order_relaxed);
-    return true;
   }
 
-  return false;
+  // Already connected to this network, or reconnecting — either way, success
+  return true;
 }
 
 void WiFiManager::Disconnect()
@@ -635,7 +635,7 @@ bool WiFiManager::GetConnectedNetwork(OpenShock::WiFiNetwork& network)
 
   ScopedLock lock__(&s_networksMutex);
 
-  auto it = _findNetwork([connectedId](const WiFiNetwork& net) noexcept { return net.credentialsID == connectedId; });
+  auto it = findNetwork([connectedId](const WiFiNetwork& net) noexcept { return net.credentialsID == connectedId; });
   if (it == s_wifiNetworks.end()) {
     return false;
   }

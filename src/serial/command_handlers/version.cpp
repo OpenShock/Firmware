@@ -4,7 +4,7 @@
 
 #include <vector>
 
-void _handleVersionCommand(std::string_view arg, bool isAutomated)
+static void handleVersionCommand(std::string_view arg, bool isAutomated)
 {
   (void)arg;
 
@@ -16,7 +16,7 @@ OpenShock::SerialCmds::CommandGroup OpenShock::SerialCmds::CommandHandlers::Vers
 {
   auto group = OpenShock::SerialCmds::CommandGroup("version"sv);
 
-  auto cmd = group.addCommand("Print version information"sv, _handleVersionCommand);
+  auto cmd = group.addCommand("Print version information"sv, handleVersionCommand);
 
   return group;
 }

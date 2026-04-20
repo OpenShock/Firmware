@@ -141,7 +141,11 @@
 
   <div class="flex shrink-0 items-center gap-1">
     <!-- Primary action: Connect or Disconnect -->
-    {#if isSaved}
+    {#if isConnected}
+      <Button variant="ghost" size="icon" onclick={wifiDisconnect} title="Disconnect">
+        <WifiOff class="h-4 w-4 text-destructive" />
+      </Button>
+    {:else if isSaved}
       <Button variant="ghost" size="icon" onclick={wifiConnect} title="Connect">
         <ArrowRight class="h-4 w-4 text-green-500" />
       </Button>

@@ -4,7 +4,7 @@
 
 #include <string>
 
-void _handleValidGpiosCommand(std::string_view arg, bool isAutomated)
+static void handleValidGpiosCommand(std::string_view arg, bool isAutomated)
 {
   if (!arg.empty()) {
     SERPR_ERROR("Invalid argument (too many arguments)");
@@ -34,7 +34,7 @@ OpenShock::SerialCmds::CommandGroup OpenShock::SerialCmds::CommandHandlers::Vali
 {
   auto group = OpenShock::SerialCmds::CommandGroup("validgpios"sv);
 
-  auto& cmd = group.addCommand("List all valid GPIO pins"sv, _handleValidGpiosCommand);
+  auto& cmd = group.addCommand("List all valid GPIO pins"sv, handleValidGpiosCommand);
 
   return group;
 }

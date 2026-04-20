@@ -1,0 +1,50 @@
+name: sftp-mirror
+description: Mirror a local directory to an SFTP server using lftp. Replaces milanmk/actions-file-deployer.
+inputs:
+  host:
+    description: SFTP hostname
+    required: true
+  username:
+    description: SFTP username
+    required: true
+  password:
+    description: SFTP password. Must not contain a comma (lftp -u splits on comma).
+    required: true
+  local-path:
+    description: Local source directory
+    required: true
+  remote-path:
+    description: Target remote path
+    required: true
+  delete-extra:
+    description: If 'true', remove remote files that are not present locally.
+    required: false
+    default: 'false'
+
+runs:
+  using: composite
+  steps:
+    - name: Install lftp
+      shell: bash
+      run: |
+        if ! command -v lftp >/dev/null 2>&1; then
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq lftp
+        fi
+
+    - name: Mirror to SFTP
+      shell: bash
+      env:
+        SFTP_HOST: ${{ inputs.host }}
+        SFTP_USER: ${{ inputs.username }}
+        SFTP_PASS: ${{ inputs.password }}
+        LOCAL_PATH: ${{ inputs.local-path }}
+        REMOTE_PATH: ${{ inputs.remote-path }}
+        DELETE_EXTRA: ${{ inputs.delete-extra }}
+      run: |
+        set -euo pipefail
+        mirror_flags="-R --verbose"
+        if [ "$DELETE_EXTRA" = "true" ]; then
+          mirror_flags="$mirror_flags --delete"
+        fi
+        lftp -u "$SFTP_USER,$SFTP_PASS" "sftp://$SFTP_HOST" -e "set sftp:auto-confirm yes; mirror $mirror_flags $LOCAL_PATH $REMOTE_PATH; bye"
