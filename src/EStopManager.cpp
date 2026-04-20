@@ -242,10 +242,10 @@ static bool estopmgr_setPinImpl(gpio_num_t pin)
     return false;
   }
 
-  gpio_num_t oldPin = s_estopPin;
+  gpio_num_t oldPin = s_estopPin.load(std::memory_order_acquire);
 
   // Set the new pin
-  s_estopPin = pin;
+  s_estopPin.store(pin, std::memory_order_release);
 
   if (oldPin != GPIO_NUM_NC) {
     // Reset the old pin
