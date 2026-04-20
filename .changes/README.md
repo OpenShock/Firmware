@@ -1,6 +1,6 @@
 # Unreleased Changes
 
-Drop one markdown file per change in this directory. At release time, `scripts/release.py` folds these into `CHANGELOG.md` and exports a `release.json` for the website.
+Drop one markdown file per change in this directory. At release time, `scripts/release.py` folds these into `CHANGELOG.md` and outputs release JSON for the website.
 
 ## File format
 

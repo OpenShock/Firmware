@@ -2,8 +2,8 @@
 """
 Release helper for OpenShock firmware.
 
-Reads .changes/*.md files, determines the semver bump, and manages
-version tagging, CHANGELOG.md generation, and release.json export.
+Reads .changes/*.md files, determines the semver bump, manages version tagging
+and CHANGELOG.md generation, and prints release JSON to stdout for CI capture.
 
 Usage:
   python scripts/release.py status       Show pending changes and next version
@@ -54,7 +54,13 @@ def get_project_root():
 def run_git(*args):
     result = subprocess.run(['git'] + list(args), capture_output=True, text=True, cwd=get_project_root())
     if result.returncode != 0:
-        return None
+        cmd = 'git ' + ' '.join(args)
+        details = [f'Git command failed ({result.returncode}): {cmd}']
+        if result.stderr and result.stderr.strip():
+            details.append(result.stderr.strip())
+        elif result.stdout and result.stdout.strip():
+            details.append(result.stdout.strip())
+        raise SystemExit('\n'.join(details))
     return result.stdout.strip()
 
 
@@ -120,7 +126,7 @@ def parse_change_file(path):
     filename = os.path.basename(path)
 
     # Parse YAML frontmatter
-    m = re.match(r'^---\s*\n(.*?)\n---\s*\n(.*)$', content, re.DOTALL)
+    m = re.match(r'^---\s*\r?\n(.*?)\r?\n---\s*\r?\n(.*)$', content, re.DOTALL)
     if not m:
         print(f'Warning: skipping {filename} (no YAML frontmatter)', file=sys.stderr)
         return None

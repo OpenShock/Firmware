@@ -204,7 +204,7 @@ const versionChangeLog = getVersionChangeLog(fullChangelogLines);
 let missingTags = [];
 for (const tag of gitTagsArray) {
   const parsed = semver.parse(tag);
-  if (parsed && parsed.prerelease.length > 0) continue; // Skip pre-release tags
+  if (!parsed || !isStableRelease(parsed)) continue; // Skip non-stable pre-release tags
   if (!changelogVersions.includes(tag)) {
     missingTags.push(tag);
   }
