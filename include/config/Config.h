@@ -63,6 +63,7 @@ namespace OpenShock::Config {
   bool GetRFConfigKeepAliveEnabled(bool& out);
   bool SetRFConfigKeepAliveEnabled(bool enabled);
 
+  bool AnyWiFiCredentials();
   bool AnyWiFiCredentials(std::function<bool(const Config::WiFiCredentials&)> predicate);
   uint8_t AddWiFiCredentials(std::string_view ssid, std::string_view password, wifi_auth_mode_t authMode = WIFI_AUTH_MAX);
   bool TryGetWiFiCredentialsByID(uint8_t id, WiFiCredentials& out);
