@@ -42,7 +42,7 @@ static std::atomic<bool> s_killEStopManagerRequested = false;
 
 static bool s_estopInitialized = false;
 
-static void estopmgr_PublishState(EStopState state, EStopState& lastState)
+static void estopmgr_publishState(EStopState state, EStopState& lastState)
 {
   if (state == lastState) {
     return;  // No state change -> no event
@@ -59,8 +59,10 @@ static void estopmgr_PublishState(EStopState state, EStopState& lastState)
 }
 
 // Samples the estop at a fixed rate and updates internal state + events
-static void estopmgr_ManagerTask(void* pvParameters)
+static void estopmgr_managerTask(void* pvParameters)
 {
+  (void)pvParameters;
+
   // Ensure known initial state
   s_estopActivatedAt.store(0, std::memory_order_relaxed);
 
@@ -80,9 +82,8 @@ static void estopmgr_ManagerTask(void* pvParameters)
   // Debounced button state: true == pressed, false == released
   bool lastBtnState = false;
 
-  for (;;) {
-    // Check if killing manager was requested
-    if (s_killEStopManagerRequested.load(std::memory_order_relaxed)) break;
+  // Check if killing manager was requested, continue looping otherwise
+  while (!s_killEStopManagerRequested.load(std::memory_order_relaxed)) {
 
     // Sleep for the update rate
     vTaskDelay(pdMS_TO_TICKS(k_estopUpdateRate));
@@ -92,9 +93,7 @@ static void estopmgr_ManagerTask(void* pvParameters)
 
     // Handle external trigger: forcibly set the E-Stop active.
     if (s_externallyTriggered.exchange(false, std::memory_order_acquire)) {
-      if (s_estopActivatedAt.load(std::memory_order_acquire) == 0) {
-        s_estopActivatedAt.store(now, std::memory_order_release);
-      }
+      s_estopActivatedAt.compare_exchange_strong(0, now, std::memory_order_acq_rel);
       
       state        = EStopState::Active;
       rearmBlocked = false;
