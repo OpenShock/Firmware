@@ -93,12 +93,13 @@ static void estopmgr_managerTask(void* pvParameters)
 
     // Handle external trigger: forcibly set the E-Stop active.
     if (s_externallyTriggered.exchange(false, std::memory_order_acquire)) {
-      s_estopActivatedAt.compare_exchange_strong(0, now, std::memory_order_acq_rel);
+      int64_t zero = 0;
+      s_estopActivatedAt.compare_exchange_strong(zero, now, std::memory_order_acq_rel);
       
       state        = EStopState::Active;
       rearmBlocked = false;
 
-      estopmgr_PublishState(state, lastPublishedState);
+      estopmgr_publishState(state, lastPublishedState);
 
       // Do not modify history/lastBtnState here; rely on physical button state
       // on subsequent iterations.
@@ -168,11 +169,11 @@ static void estopmgr_managerTask(void* pvParameters)
         break;
     }
 
-    estopmgr_PublishState(state, lastPublishedState);
+    estopmgr_publishState(state, lastPublishedState);
   }
 
   // Broke out of main loop, set global variables to Idle state.
-  estopmgr_PublishState(EStopState::Idle, lastPublishedState);
+  estopmgr_publishState(EStopState::Idle, lastPublishedState);
   s_estopActivatedAt.store(0, std::memory_order_relaxed);
 
   vTaskDelete(nullptr);
@@ -183,7 +184,7 @@ static bool estopmgr_setEStopEnabled(bool enabled)
   if (enabled) {
     if (s_estopTask == nullptr) {
       s_killEStopManagerRequested.store(false, std::memory_order_acquire);
-      if (TaskUtils::TaskCreateUniversal(estopmgr_ManagerTask, TAG, 4096, nullptr, 5, &s_estopTask, 1) != pdPASS) {  // TODO: Profile stack size and set priority
+      if (TaskUtils::TaskCreateUniversal(estopmgr_managerTask, TAG, 4096, nullptr, 5, &s_estopTask, 1) != pdPASS) {  // TODO: Profile stack size and set priority
         OS_LOGE(TAG, "Failed to create EStop event handler task");
         s_estopTask = nullptr;
         return false;
