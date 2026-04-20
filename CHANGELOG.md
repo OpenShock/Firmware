@@ -1,3 +1,16 @@
+# Version 1.5.2 Release Notes
+
+Feature release restoring missing WellturnT330 support that was intended for 1.5.0.
+
+### Bug Fixes
+
+- Added **WellturnT330 Support** - Added full support for **WellturnT330** devices. This was originally planned for 1.5.0 but was unintentionally left out.
+
+**Full Changelog: [1.5.1 -> 1.5.2](https://github.com/OpenShock/Firmware/compare/1.5.1...1.5.2)**
+
+
+
+
 # Version 1.5.1 Release Notes
 
 Hotfix release addressing a safety-critical E-Stop bypass.
