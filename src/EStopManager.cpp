@@ -183,7 +183,7 @@ static bool estopmgr_setEStopEnabled(bool enabled)
 {
   if (enabled) {
     if (s_estopTask == nullptr) {
-      s_killEStopManagerRequested.store(false, std::memory_order_acquire);
+      s_killEStopManagerRequested.store(false, std::memory_order_release);
       if (TaskUtils::TaskCreateUniversal(estopmgr_managerTask, TAG, 4096, nullptr, 5, &s_estopTask, 1) != pdPASS) {  // TODO: Profile stack size and set priority
         OS_LOGE(TAG, "Failed to create EStop event handler task");
         s_estopTask = nullptr;
@@ -194,7 +194,7 @@ static bool estopmgr_setEStopEnabled(bool enabled)
     }
   } else {
     if (s_estopTask != nullptr) {
-      s_killEStopManagerRequested.store(true, std::memory_order_acquire);
+      s_killEStopManagerRequested.store(true, std::memory_order_release);
       s_estopActivatedAt.store(0, std::memory_order_relaxed);
       
       TaskUtils::StopTask(s_estopTask, TAG, "EStop task");
