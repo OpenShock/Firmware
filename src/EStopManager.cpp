@@ -94,7 +94,7 @@ static void estopmgr_managerTask(void* pvParameters)
     // Handle external trigger: forcibly set the E-Stop active.
     if (s_externallyTriggered.exchange(false, std::memory_order_acquire)) {
       int64_t zero = 0;
-      s_estopActivatedAt.compare_exchange_strong(zero, now, std::memory_order_acq_rel);
+      s_estopActivatedAt.compare_exchange_strong(zero, now, std::memory_order_acquire);
       
       state        = EStopState::Active;
       rearmBlocked = false;
