@@ -23,9 +23,9 @@ const char* const TAG = "EStopManager";
 using namespace OpenShock;
 
 const uint32_t k_estopHoldToClearTime = 5000;
-const uint32_t k_estopUpdateRate      = 5;   // 200 Hz
-const uint32_t k_estopCheckCount      = 13;  // 65 ms at 200 Hz
-const uint16_t k_estopCheckMask       = 0xFFFF >> ((sizeof(uint16_t) * 8) - k_estopCheckCount); // Mask to check only last k_estopCheckCount bits within history
+const uint32_t k_estopUpdateRate      = 5;                                                       // 200 Hz
+const uint32_t k_estopCheckCount      = 13;                                                      // 65 ms at 200 Hz
+const uint16_t k_estopCheckMask       = 0xFFFF >> ((sizeof(uint16_t) * 8) - k_estopCheckCount);  // Mask to check only last k_estopCheckCount bits within history
 
 // Grace period after deactivation (prevents immediate re-trigger on release bounce/EMI)
 const uint32_t k_estopRearmGraceTime = 250;  // tune as needed
@@ -36,8 +36,8 @@ static TaskHandle_t s_estopTask = nullptr;
 static gpio_num_t s_estopPin    = GPIO_NUM_NC;  // Passed to task via pointer argument
 
 // Wrapped in atomics as they're read (or set via public methods) by Tasks potentially running on other cores.
-static std::atomic<int64_t> s_estopActivatedAt = 0; // When == 0, EStop not active. When != 0, EStop is active.
-static std::atomic<bool> s_externallyTriggered = false;
+static std::atomic<int64_t> s_estopActivatedAt       = 0;  // When == 0, EStop not active. When != 0, EStop is active.
+static std::atomic<bool> s_externallyTriggered       = false;
 static std::atomic<bool> s_killEStopManagerRequested = false;
 
 static bool s_estopInitialized = false;
@@ -47,7 +47,7 @@ static void estopmgr_publishState(EStopState state, EStopState& lastState)
   if (state == lastState) {
     return;  // No state change -> no event
   }
-  
+
   // Post the current state as the event payload
   esp_err_t err = esp_event_post(OPENSHOCK_EVENTS, OPENSHOCK_EVENT_ESTOP_STATE_CHANGED, &state, sizeof(state), pdMS_TO_TICKS(750));
 
@@ -73,7 +73,7 @@ static void estopmgr_managerTask(void* pvParameters)
   uint16_t history = 0xFFFF;  // Bit history of samples, 0 is pressed
 
   int64_t deactivatesAt = 0;
-  
+
   // Rearm grace state
   int64_t rearmAt   = 0;
   bool rearmBlocked = false;
@@ -83,7 +83,6 @@ static void estopmgr_managerTask(void* pvParameters)
 
   // Check if killing manager was requested, continue looping otherwise
   while (!s_killEStopManagerRequested.load(std::memory_order_relaxed)) {
-
     // Sleep for the update rate
     vTaskDelay(pdMS_TO_TICKS(k_estopUpdateRate));
 
@@ -94,7 +93,7 @@ static void estopmgr_managerTask(void* pvParameters)
     if (s_externallyTriggered.exchange(false, std::memory_order_relaxed)) {
       int64_t zero = 0;
       s_estopActivatedAt.compare_exchange_strong(zero, now, std::memory_order_relaxed);
-      
+
       state        = EStopState::Active;
       rearmBlocked = false;
 
@@ -241,7 +240,7 @@ static bool estopmgr_taskStart()
       OS_LOGW(TAG, "No valid pin is defined, refusing to start task");
       return false;
     }
-    
+
     if (!estopmgr_setPinImpl(pin)) {
       OS_LOGE(TAG, "Failed to set EStop pin");
       return false;
@@ -252,14 +251,14 @@ static bool estopmgr_taskStart()
 
   // Tiny hack;
   // We are passing pin as a pointer, the pointer memory address being the value of the pin.
-  // 
+  //
   // A pointer after all is just a integer with a special meaning, arg pointer isn't being used for anything so we can use it for this.
-  // 
+  //
   // This also proves to be safer than using atomics for this since we know for sure that the pin we intended the task to run with
   // will not change between creating the task and it freezing its local copy of the value.
-  // 
+  //
   // This enables us to use no allocations or atomic operations
-  static_assert(sizeof(void*) >= sizeof(gpio_num_t), "void* is smaller than gpio_num_t, value embedding trick wont work"); // Just to be safe
+  static_assert(sizeof(void*) >= sizeof(gpio_num_t), "void* is smaller than gpio_num_t, value embedding trick wont work");  // Just to be safe
   void* argPtr = reinterpret_cast<void*>(static_cast<intptr_t>(s_estopPin));
 
   if (TaskUtils::TaskCreateUniversal(estopmgr_managerTask, TAG, 4096, argPtr, 5, &s_estopTask, 1) != pdPASS) {  // TODO: Profile stack size and set priority
@@ -279,7 +278,7 @@ static bool estopmgr_taskStop()
   }
 
   s_killEStopManagerRequested.store(true, std::memory_order_relaxed);
-  
+
   TaskUtils::StopTask(s_estopTask, TAG, "EStop task");
   s_estopTask = nullptr;
 
