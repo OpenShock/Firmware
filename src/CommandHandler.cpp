@@ -5,7 +5,7 @@
 const char* const TAG = "CommandHandler";
 
 #include "Chipset.h"
-#include "Common.h"
+#include "OpenShock.h"
 #include "config/Config.h"
 #include "Core.h"
 #include "estop/EStopManager.h"

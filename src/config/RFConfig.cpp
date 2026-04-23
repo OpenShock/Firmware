@@ -2,7 +2,7 @@
 
 const char* const TAG = "Config::RFConfig";
 
-#include "Common.h"
+#include "OpenShock.h"
 #include "config/internal/utils.h"
 #include "Logging.h"
 

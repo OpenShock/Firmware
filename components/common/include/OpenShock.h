@@ -1,8 +1,5 @@
 #pragma once
 
-#include <cstdint>
-#include <string_view>
-
 #define DISABLE_DEFAULT(TypeName) TypeName() = delete
 #define DISABLE_COPY(TypeName)                   \
   TypeName(const TypeName&)            = delete; \
@@ -37,30 +34,6 @@
 // Check if OPENSHOCK_FW_USERAGENT is overridden trough compiler flags, if not, generate a default useragent.
 #ifndef OPENSHOCK_FW_USERAGENT
 #define OPENSHOCK_FW_USERAGENT OPENSHOCK_FW_HOSTNAME "/" OPENSHOCK_FW_VERSION " (arduino-esp32; " OPENSHOCK_FW_BOARD "; " OPENSHOCK_FW_CHIP "; Espressif)"
-#endif
-
-// Check if Arduino.h exists, if not instruct the developer to remove "arduino-esp32" from the useragent and replace it with "ESP-IDF", after which the developer may remove this warning.
-#if defined(__has_include) && !__has_include("Arduino.h")
-#warning \
-  "Let it be known that Arduino hath finally been cast aside in favor of the noble ESP-IDF! I beseech thee, kind sir or madam, wouldst thou kindly partake in the honors of expunging 'arduino-esp32' from yonder useragent aloft, and in its stead, bestow the illustrious 'ESP-IDF'?"
-#endif
-
-#if __cplusplus >= 202302L
-#warning "C++23 compiler detected"
-#elif __cplusplus >= 202002L
-// C++20 :3
-#elif __cplusplus >= 201703L
-#error "C++17 compiler detected, OpenShock requires a C++20 compliant compiler"
-#elif __cplusplus >= 201402L
-#error "C++14 compiler detected, OpenShock requires a C++20 compliant compiler"
-#elif __cplusplus >= 201103L
-#error "C++11 compiler detected, OpenShock requires a C++20 compliant compiler"
-#elif __cplusplus >= 199711L
-#error "C++98 compiler detected, OpenShock requires a C++20 compliant compiler"
-#elif __cplusplus == 1
-#error "Pre-C++98 compiler detected, OpenShock requires a C++20 compliant compiler"
-#else
-#error "Unknown C++ standard detected, OpenShock requires a C++20 compliant compiler"
 #endif
 
 namespace OpenShock::Constants {

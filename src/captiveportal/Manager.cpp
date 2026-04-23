@@ -225,9 +225,7 @@ void CaptivePortal::SetUserDone()
 void CaptivePortal::SetAlwaysEnabled(bool alwaysEnabled)
 {
   s_alwaysEnabled = alwaysEnabled;
-  Config::SetCaptivePortalConfig({
-    .alwaysEnabled = alwaysEnabled,
-  });
+  Config::SetCaptivePortalConfig(Config::CaptivePortalConfig(alwaysEnabled));
 }
 bool CaptivePortal::IsAlwaysEnabled()
 {

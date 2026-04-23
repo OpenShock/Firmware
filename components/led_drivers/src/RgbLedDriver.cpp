@@ -1,6 +1,6 @@
 #include <freertos/FreeRTOS.h>
 
-#include "visual/RgbLedDriver.h"
+#include "led_drivers/RgbLedDriver.h"
 
 const char* const TAG = "RGBLedDriver";
 
@@ -21,7 +21,6 @@ RgbLedDriver::RgbLedDriver(gpio_num_t gpioPin)
   : m_gpioPin(GPIO_NUM_NC)
   , m_brightness(255)
   , m_pattern()
-  , m_rmtHandle(nullptr)
   , m_taskHandle(nullptr)
   , m_taskMutex()
 {
@@ -35,14 +34,11 @@ RgbLedDriver::RgbLedDriver(gpio_num_t gpioPin)
     return;
   }
 
-  m_rmtHandle = rmtInit(gpioPin, RMT_TX_MODE, RMT_MEM_64);
-  if (m_rmtHandle == NULL) {
+  // Arduino-ESP32 3.x RMT: frequency_Hz replaces rmtSetTick. 10 MHz => 100 ns tick (WS2812B timing).
+  if (!rmtInit(gpioPin, RMT_TX_MODE, RMT_MEM_NUM_BLOCKS_1, 10'000'000)) {
     OS_LOGE(TAG, "Failed to initialize RMT for pin %hhi", gpioPin);
     return;
   }
-
-  float realTick = rmtSetTick(m_rmtHandle, 100.F);
-  OS_LOGD(TAG, "RMT tick is %f ns for pin %hhi", realTick, gpioPin);
 
   m_gpioPin = gpioPin;
 }
@@ -51,7 +47,9 @@ RgbLedDriver::~RgbLedDriver()
 {
   ClearPattern();
 
-  rmtDeinit(m_rmtHandle);
+  if (m_gpioPin != GPIO_NUM_NC) {
+    rmtDeinit(m_gpioPin);
+  }
 }
 
 void RgbLedDriver::SetPattern(const RGBState* pattern, std::size_t patternLength)
@@ -139,8 +137,8 @@ void RgbLedDriver::RunPattern()
         }
       }
 
-      // Send the data
-      rmtWriteBlocking(m_rmtHandle, led_data.data(), led_data.size());
+      // Send the data (blocking, wait up to 10ms per frame)
+      rmtWrite(m_gpioPin, led_data.data(), led_data.size(), 10);
 
       // Chunked delay so cooperative shutdown can interrupt long waits
       uint32_t remaining = state.duration;

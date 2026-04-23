@@ -127,7 +127,7 @@ static void printCompleteHelp()
   OS_SERIAL_PRINT(buffer.data());
 }
 
-static void printCommandHelp(Serial::CommandGroup& group)
+static void printCommandHelp(SerialCmds::CommandGroup& group)
 {
   std::size_t size = 0;
   for (const auto& command : group.commands()) {
@@ -434,7 +434,7 @@ static void skipSerialWhitespaces(SerialBuffer& buffer)
   }
 }
 
-#if ARDUINO_USB_MODE
+#if OS_HAS_USB_SERIAL
 static SerialReadResult tryReadUSBSerialLine(SerialBuffer& buffer)
 {
   // Check if there's any data available
@@ -647,7 +647,7 @@ static void serialRxTask(void*)
         break;
     }
 
-#if ARDUINO_USB_MODE
+#if OS_HAS_USB_SERIAL
     switch (tryReadUSBSerialLine(buffer)) {
       case SerialReadResult::LineEnd:
         processSerialLine(buffer);

@@ -1,6 +1,6 @@
 #pragma once
 
-#include "Common.h"
+#include "OpenShock.h"
 #include "GatewayClientState.h"
 
 #include <WebSocketsClient.h>

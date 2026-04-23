@@ -4,7 +4,7 @@ const char* const TAG = "main";
 
 #include "captiveportal/Manager.h"
 #include "CommandHandler.h"
-#include "Common.h"
+#include "OpenShock.h"
 #include "config/Config.h"
 #include "estop/EStopManager.h"
 #include "events/Events.h"
@@ -94,7 +94,7 @@ void setup()
 {
   OS_SERIAL.begin(115'200);
 
-#if ARDUINO_USB_MODE
+#if OS_HAS_USB_SERIAL
   OS_SERIAL_USB.begin(115'200);
 #endif
 

@@ -1,6 +1,6 @@
 #include <freertos/FreeRTOS.h>
 
-#include "visual/MonoLedDriver.h"
+#include "led_drivers/MonoLedDriver.h"
 
 const char* const TAG = "MonoLedDriver";
 

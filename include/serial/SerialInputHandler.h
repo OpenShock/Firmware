@@ -1,20 +1,23 @@
 #pragma once
 
+#include <Arduino.h>
+
 #include <cstdint>
 
-// Making sense of the ESP32 Arduino core #defines
-#if ARDUINO_USB_MODE && ARDUINO_USB_CDC_ON_BOOT
+// Arduino-ESP32 3.x only declares the USB CDC global (HWCDCSerial or USBSerial) when
+// ARDUINO_USB_CDC_ON_BOOT=1. When CDC is on boot, `Serial` macro-aliases to that global
+// and UART0 remains available as Serial0. When CDC is off boot, `Serial` is UART0 and
+// no USB CDC global is instantiated.
+#if ARDUINO_USB_CDC_ON_BOOT
 #define OS_SERIAL     ::Serial0
-#define OS_SERIAL_USB ::Serial
-#elif ARDUINO_USB_MODE
-#define OS_SERIAL     ::Serial
-#define OS_SERIAL_USB ::USBSerial
+#define OS_SERIAL_USB ::Serial  // expands to HWCDCSerial or USBSerial
+#define OS_HAS_USB_SERIAL 1
 #else
-#define OS_SERIAL ::Serial
-// Variant lacks USB Serial
+#define OS_SERIAL ::Serial  // expands to Serial0
+// No USB serial active on boot
 #endif
 
-#if ARDUINO_USB_MODE
+#if OS_HAS_USB_SERIAL
 #define OS_SERIAL_PRINT(...)          \
   {                                   \
     OS_SERIAL.print(__VA_ARGS__);     \

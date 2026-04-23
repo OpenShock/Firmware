@@ -2,7 +2,7 @@
 
 #include <freertos/semphr.h>
 
-#include "Common.h"
+#include "OpenShock.h"
 
 namespace OpenShock {
   class SimpleMutex {

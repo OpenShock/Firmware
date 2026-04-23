@@ -5,7 +5,7 @@
 const char* const TAG = "Config";
 
 #include "Chipset.h"
-#include "Common.h"
+#include "OpenShock.h"
 #include "config/RootConfig.h"
 #include "Logging.h"
 #include "ReadWriteMutex.h"

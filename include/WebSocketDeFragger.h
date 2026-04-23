@@ -1,6 +1,6 @@
 #pragma once
 
-#include "Common.h"
+#include "OpenShock.h"
 #include "TinyVec.h"
 #include "WebSocketMessageType.h"
 

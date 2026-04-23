@@ -7,7 +7,7 @@
 
 #include <Arduino.h>
 
-#if ARDUINO_USB_MODE
+#if OS_HAS_USB_SERIAL
 #define SERPR_SYS(format, ...)                                   \
   {                                                              \
     OS_SERIAL.printf("$SYS$|" format "\r\n", ##__VA_ARGS__);     \

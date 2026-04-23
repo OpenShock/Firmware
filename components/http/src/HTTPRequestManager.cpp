@@ -2,7 +2,7 @@
 
 const char* const TAG = "HTTPRequestManager";
 
-#include "Common.h"
+#include "OpenShock.h"
 #include "Core.h"
 #include "Logging.h"
 #include "RateLimiter.h"

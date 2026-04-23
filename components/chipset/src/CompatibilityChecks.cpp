@@ -1,5 +1,5 @@
 #include "Chipset.h"
-#include "Common.h"
+#include "OpenShock.h"
 
 const bool kIsValidOrUndefinedRfTxPin = OpenShock::IsValidOutputPin(OPENSHOCK_RF_TX_GPIO) || OPENSHOCK_RF_TX_GPIO == OPENSHOCK_GPIO_INVALID;
 static_assert(kIsValidOrUndefinedRfTxPin, "OPENSHOCK_RF_TX_GPIO is not a valid output GPIO, and is not declared as bypassed by board specific definitions, refusing to compile");
