@@ -1,12 +1,14 @@
 #pragma once
 
-#include "serialization/_fbs/HubConfig_generated.h"
-
 #include <cstdint>
 #include <cstring>
 
 namespace OpenShock {
-  typedef OpenShock::Serialization::Configuration::OtaUpdateChannel OtaUpdateChannel;
+  enum class OtaUpdateChannel : uint8_t {
+    Stable,
+    Beta,
+    Develop
+  };
 
   inline bool TryParseOtaUpdateChannel(OtaUpdateChannel& channel, const char* str)
   {

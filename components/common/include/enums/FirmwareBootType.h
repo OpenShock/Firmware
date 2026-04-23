@@ -1,12 +1,14 @@
 #pragma once
 
-#include "serialization/_fbs/FirmwareBootType_generated.h"
-
 #include <cstdint>
 #include <cstring>
 
 namespace OpenShock {
-  typedef OpenShock::Serialization::Types::FirmwareBootType FirmwareBootType;
+  enum class FirmwareBootType : uint8_t {
+    Normal,
+    NewFirmware,
+    Rollback
+  };
 
   inline bool TryParseFirmwareBootType(FirmwareBootType& bootType, const char* str)
   {
