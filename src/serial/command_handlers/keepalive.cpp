@@ -1,3 +1,4 @@
+#include "serial/command_handlers/CommandGroup.h"
 #include "serial/command_handlers/common.h"
 
 #include "CommandHandler.h"
@@ -5,21 +6,25 @@
 #include "Convert.h"
 #include "util/StringUtils.h"
 
-static void handleKeepAliveCommand(std::string_view arg, bool isAutomated)
+static void handleGet(std::string_view arg, bool isAutomated)
 {
-  bool keepAliveEnabled;
-
-  if (arg.empty()) {
-    // Get keep alive status
-    if (!OpenShock::Config::GetRFConfigKeepAliveEnabled(keepAliveEnabled)) {
-      SERPR_ERROR("Failed to get keep-alive status from config");
-      return;
-    }
-
-    SERPR_RESPONSE("KeepAlive|%s", keepAliveEnabled ? "true" : "false");
+  if (!arg.empty()) {
+    SERPR_ERROR("Get command does not support parameters");
     return;
   }
 
+  bool keepAliveEnabled;
+  if (!OpenShock::Config::GetRFConfigKeepAliveEnabled(keepAliveEnabled)) {
+    SERPR_ERROR("Failed to get keep-alive status from config");
+    return;
+  }
+
+  SERPR_RESPONSE("KeepAlive|%s", keepAliveEnabled ? "true" : "false");
+}
+
+static void handleSet(std::string_view arg, bool isAutomated)
+{
+  bool keepAliveEnabled;
   if (!OpenShock::Convert::ToBool(OpenShock::StringTrim(arg), keepAliveEnabled)) {
     SERPR_ERROR("Invalid argument (not a boolean)");
     return;
@@ -38,9 +43,9 @@ OpenShock::Serial::CommandGroup OpenShock::Serial::CommandHandlers::KeepAliveHan
 {
   auto group = OpenShock::Serial::CommandGroup("keepalive"sv);
 
-  auto& getCommand = group.addCommand("Get the shocker keep-alive status"sv, handleKeepAliveCommand);
+  auto& getCommand = group.addCommand("Get the shocker keep-alive status"sv, handleGet);
 
-  auto& setCommand = group.addCommand("Enable/disable shocker keep-alive"sv, handleKeepAliveCommand);
+  auto& setCommand = group.addCommand("set"sv, "Enable/disable shocker keep-alive"sv, handleSet);
   setCommand.addArgument("enabled"sv, "must be a boolean"sv, "true"sv);
 
   return group;

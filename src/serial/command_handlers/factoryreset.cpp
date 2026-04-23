@@ -1,3 +1,4 @@
+#include "serial/command_handlers/CommandGroup.h"
 #include "serial/command_handlers/common.h"
 #include "serial/SerialInputHandler.h"
 
@@ -5,7 +6,7 @@
 
 #include <esp_system.h>
 
-static void handleFactoryResetCommand(std::string_view arg, bool isAutomated)
+static void handleReset(std::string_view arg, bool isAutomated)
 {
   (void)arg;
 
@@ -19,7 +20,7 @@ OpenShock::Serial::CommandGroup OpenShock::Serial::CommandHandlers::FactoryReset
 {
   auto group = OpenShock::Serial::CommandGroup("factoryreset"sv);
 
-  auto& cmd = group.addCommand("Reset the hub to factory defaults and restart"sv, handleFactoryResetCommand);
+  auto& cmd = group.addCommand("Reset the hub to factory defaults and restart"sv, handleReset);
 
   return group;
 }

@@ -1,3 +1,4 @@
+#include "serial/command_handlers/CommandGroup.h"
 #include "serial/command_handlers/common.h"
 
 #include "Core.h"
@@ -5,7 +6,7 @@
 #include "wifi/WiFiManager.h"
 #include "wifi/WiFiNetwork.h"
 
-static void handleDebugInfoCommand(std::string_view arg, bool isAutomated)
+static void handleDebugInfo(std::string_view arg, bool isAutomated)
 {
   (void)arg;
 
@@ -40,7 +41,7 @@ OpenShock::Serial::CommandGroup OpenShock::Serial::CommandHandlers::SysInfoHandl
 {
   auto group = OpenShock::Serial::CommandGroup("sysinfo"sv);
 
-  auto& cmd = group.addCommand("Get system information from RTOS, WiFi, etc."sv, handleDebugInfoCommand);
+  auto& cmd = group.addCommand("Get system information from RTOS, WiFi, etc."sv, handleDebugInfo);
 
   return group;
 }

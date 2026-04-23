@@ -1,12 +1,16 @@
+#include "serial/command_handlers/CommandGroup.h"
 #include "serial/command_handlers/common.h"
 
 #include "serial/SerialInputHandler.h"
 
 #include <vector>
 
-static void handleVersionCommand(std::string_view arg, bool isAutomated)
+static void handleVersion(std::string_view arg, bool isAutomated)
 {
-  (void)arg;
+  if (!arg.empty()) {
+    SERPR_ERROR("Command does not support parameters");
+    return;
+  }
 
   OS_SERIAL_PRINTLN();
   OpenShock::SerialInputHandler::PrintVersionInfo();
@@ -16,7 +20,7 @@ OpenShock::Serial::CommandGroup OpenShock::Serial::CommandHandlers::VersionHandl
 {
   auto group = OpenShock::Serial::CommandGroup("version"sv);
 
-  auto cmd = group.addCommand("Print version information"sv, handleVersionCommand);
+  auto cmd = group.addCommand("Print version information"sv, handleVersion);
 
   return group;
 }

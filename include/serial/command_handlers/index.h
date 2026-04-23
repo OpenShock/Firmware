@@ -1,6 +1,6 @@
 #pragma once
 
-#include "serial/command_handlers/CommandEntry.h"
+#include "serial/command_handlers/CommandGroup.h"
 
 #include <vector>
 
