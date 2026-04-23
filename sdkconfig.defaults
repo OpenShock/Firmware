@@ -1,0 +1,22 @@
+# Required by Arduino-as-IDF-component
+CONFIG_FREERTOS_HZ=1000
+CONFIG_AUTOSTART_ARDUINO=y
+
+# Keep main task large enough for Arduino setup() / existing init chain
+CONFIG_ESP_MAIN_TASK_STACK_SIZE=8192
+
+# Arduino expects these selected via ENABLE_ARDUINO_DEPENDS, but be explicit
+CONFIG_LWIP_SO_RCVBUF=y
+
+# Let application use exceptions-free C++ (matches build_flags -fno-exceptions)
+CONFIG_COMPILER_CXX_EXCEPTIONS=n
+
+# Arduino NetworkClientSecure (pulled in transitively by WebSockets/WiFiClientSecure)
+# refuses to compile its ssl_client.cpp body unless at least one PSK exchange is
+# enabled — otherwise all ssl_* symbols become unresolved at link time. We don't
+# actually use PSK, but we need MBEDTLS_KEY_EXCHANGE_SOME_PSK_ENABLED to be defined.
+CONFIG_MBEDTLS_PSK_MODES=y
+CONFIG_MBEDTLS_KEY_EXCHANGE_PSK=y
+
+# Partition table — OpenShock uses a custom one; existing partitions stay valid
+# (leave PARTITION_TABLE_* at IDF defaults; per-env sdkconfigs can override)

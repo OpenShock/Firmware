@@ -14,9 +14,9 @@ static void handleSerialLedTestCommand(std::string_view arg, bool isAutomated)
   SERPR_SUCCESS("LedTest|Complete");
 }
 
-OpenShock::Serial::CommandGroup OpenShock::Serial::CommandHandlers::LedTestHandler()
+OpenShock::SerialCmds::CommandGroup OpenShock::SerialCmds::CommandHandlers::LedTestHandler()
 {
-  auto group = OpenShock::Serial::CommandGroup("ledtest"sv);
+  auto group = OpenShock::SerialCmds::CommandGroup("ledtest"sv);
 
   group.addCommand("Cycle through all LED patterns for visual verification"sv, handleSerialLedTestCommand);
 

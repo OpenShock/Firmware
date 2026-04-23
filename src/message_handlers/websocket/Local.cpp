@@ -31,7 +31,7 @@ static std::array<Handlers::HandlerType, HANDLER_COUNT> s_localHandlers = []() {
   return handlers;
 }();
 
-void MessageHandlers::WebSocket::HandleLocalBinary(uint8_t socketId, tcb::span<const uint8_t> data)
+void MessageHandlers::WebSocket::HandleLocalBinary(uint8_t socketId, std::span<const uint8_t> data)
 {
   if (data.size() < sizeof(flatbuffers::uoffset_t)) {
     OS_LOGE(TAG, "Message too small to be a valid FlatBuffer");

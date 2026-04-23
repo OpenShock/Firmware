@@ -1,12 +1,12 @@
 #pragma once
 
-#include "Common.h"
+#include "OpenShock.h"
 #include "GatewayClientState.h"
-#include "span.h"
 
 #include <WebSocketsClient.h>
 
 #include <cstdint>
+#include <span>
 #include <string>
 #include <string_view>
 #include <unordered_map>
@@ -26,7 +26,7 @@ namespace OpenShock {
     void disconnect();
 
     bool sendMessageTXT(std::string_view data);
-    bool sendMessageBIN(tcb::span<const uint8_t> data);
+    bool sendMessageBIN(std::span<const uint8_t> data);
 
     bool loop();
 

@@ -553,7 +553,7 @@ void CaptivePortal::CaptivePortalInstance::handleWebSocketClientDisconnected(uin
   OS_LOGD(TAG, "WebSocket client #%u disconnected", socketId);
 }
 
-void CaptivePortal::CaptivePortalInstance::handleWebSocketEvent(uint8_t socketId, WebSocketMessageType type, tcb::span<const uint8_t> payload)
+void CaptivePortal::CaptivePortalInstance::handleWebSocketEvent(uint8_t socketId, WebSocketMessageType type, std::span<const uint8_t> payload)
 {
   switch (type) {
     case WebSocketMessageType::Connected:

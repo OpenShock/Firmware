@@ -8,8 +8,11 @@ const char* const TAG = "VisualStateManager";
 #include "events/Events.h"
 #include "GatewayClientState.h"
 #include "Logging.h"
-#include "visual/MonoLedDriver.h"
-#include "visual/RgbLedDriver.h"
+#include "led_drivers/MonoLedDriver.h"
+#include "led_drivers/RgbLedDriver.h"
+
+#include <esp_wifi.h>
+#include <esp_netif.h>
 
 #include <atomic>
 #include <memory>

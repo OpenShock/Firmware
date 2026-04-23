@@ -1,7 +1,7 @@
 #include "config/EStopConfig.h"
 
 #include "Chipset.h"
-#include "Common.h"
+#include "OpenShock.h"
 #include "config/internal/utils.h"
 #include "Logging.h"
 

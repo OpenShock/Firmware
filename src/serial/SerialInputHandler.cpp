@@ -63,8 +63,8 @@ const int64_t PASTE_INTERVAL_THRESHOLD_MS    = 20;
 const std::size_t SERIAL_BUFFER_MAX_CAPACITY = 4096;
 
 static bool s_echoEnabled = true;
-static std::vector<OpenShock::Serial::CommandGroup> s_commandGroups;
-static std::unordered_map<std::string_view, OpenShock::Serial::CommandGroup, std::hash_ci, std::equals_ci> s_commandHandlers;
+static std::vector<OpenShock::SerialCmds::CommandGroup> s_commandGroups;
+static std::unordered_map<std::string_view, OpenShock::SerialCmds::CommandGroup, std::hash_ci, std::equals_ci> s_commandHandlers;
 
 static void printCompleteHelp()
 {
@@ -127,7 +127,7 @@ static void printCompleteHelp()
   OS_SERIAL_PRINT(buffer.data());
 }
 
-static void printCommandHelp(Serial::CommandGroup& group)
+static void printCommandHelp(SerialCmds::CommandGroup& group)
 {
   std::size_t size = 0;
   for (const auto& command : group.commands()) {
@@ -278,7 +278,7 @@ static void handleHelpCommand(std::string_view arg, bool isAutomated)
   SERPR_ERROR("Command \"%.*s\" not found", arg.length(), arg.data());
 }
 
-void RegisterCommandHandler(const OpenShock::Serial::CommandGroup& handler)
+void RegisterCommandHandler(const OpenShock::SerialCmds::CommandGroup& handler)
 {
   s_commandHandlers[handler.name()] = handler;
 }
@@ -434,7 +434,7 @@ static void skipSerialWhitespaces(SerialBuffer& buffer)
   }
 }
 
-#if ARDUINO_USB_MODE
+#if OS_HAS_USB_SERIAL
 static SerialReadResult tryReadUSBSerialLine(SerialBuffer& buffer)
 {
   // Check if there's any data available
@@ -575,7 +575,7 @@ static void processSerialLine(std::string_view line)
 
   // If the first argument is not empty, try to find a subcommand that matches
   if (!firstArg.empty()) {
-    for (Serial::CommandEntry& cmd : it->second.commands()) {
+    for (SerialCmds::CommandEntry& cmd : it->second.commands()) {
       // Check subcommand name
       if (cmd.name() != firstArg) {
         continue;
@@ -597,7 +597,7 @@ static void processSerialLine(std::string_view line)
   }
 
   // If no subcommand was found, try to find a default command
-  for (Serial::CommandEntry& cmd : it->second.commands()) {
+  for (SerialCmds::CommandEntry& cmd : it->second.commands()) {
     // Skip subcommands
     if (!cmd.name().empty()) {
       continue;
@@ -647,7 +647,7 @@ static void serialRxTask(void*)
         break;
     }
 
-#if ARDUINO_USB_MODE
+#if OS_HAS_USB_SERIAL
     switch (tryReadUSBSerialLine(buffer)) {
       case SerialReadResult::LineEnd:
         processSerialLine(buffer);
@@ -682,13 +682,13 @@ bool SerialInputHandler::Init()
 {
   static bool s_initialized = false;
   if (s_initialized) {
-    OS_LOGW(TAG, "Serial input handler already initialized");
+    OS_LOGW(TAG, "SerialCmds input handler already initialized");
     return false;
   }
   s_initialized = true;
 
   // Register command handlers
-  s_commandGroups = OpenShock::Serial::CommandHandlers::AllCommandHandlers();
+  s_commandGroups = OpenShock::SerialCmds::CommandHandlers::AllCommandHandlers();
   for (const auto& handler : s_commandGroups) {
     OS_LOGV(TAG, "Registering command handler: %.*s", handler.name().size(), handler.name().data());
     RegisterCommandHandler(handler);

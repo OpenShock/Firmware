@@ -184,7 +184,7 @@ bool GatewayConnectionManager::SendMessageTXT(std::string_view data)
   return client->sendMessageTXT(data);
 }
 
-bool GatewayConnectionManager::SendMessageBIN(tcb::span<const uint8_t> data)
+bool GatewayConnectionManager::SendMessageBIN(std::span<const uint8_t> data)
 {
   auto client = GetClient();
   if (client == nullptr) {

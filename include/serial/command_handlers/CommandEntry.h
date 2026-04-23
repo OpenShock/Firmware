@@ -3,7 +3,7 @@
 #include <string_view>
 #include <vector>
 
-namespace OpenShock::Serial {
+namespace OpenShock::SerialCmds {
   typedef void (*CommandHandler)(std::string_view arg, bool isAutomated);
 
   class CommandArgument {
@@ -53,4 +53,4 @@ namespace OpenShock::Serial {
     std::string_view m_name;
     std::vector<CommandEntry> m_commands;
   };
-}  // namespace OpenShock::Serial
+}  // namespace OpenShock::SerialCmds

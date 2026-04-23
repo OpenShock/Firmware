@@ -3,7 +3,7 @@
 const char* const TAG = "OtaUpdateManager";
 
 #include "captiveportal/Manager.h"
-#include "Common.h"
+#include "OpenShock.h"
 #include "config/Config.h"
 #include "Core.h"
 #include "GatewayConnectionManager.h"
@@ -259,9 +259,19 @@ static bool otaum_flash_fs_partition(const esp_partition_t* parition, std::strin
   return true;
 }
 
+static esp_err_t otaum_set_wdt_timeout(uint32_t timeoutMs)
+{
+  esp_task_wdt_config_t twdt_config = {
+    .timeout_ms     = timeoutMs,
+    .idle_core_mask = (1 << CONFIG_FREERTOS_NUMBER_OF_CORES) - 1,  // Bitmask of all cores
+    .trigger_panic  = true,
+  };
+  return esp_task_wdt_init(&twdt_config);
+}
+
 static void otaum_restore_wdt_timeout()
 {
-  if (esp_task_wdt_init(5, true) != ESP_OK) {
+  if (otaum_set_wdt_timeout(5) != ESP_OK) {
     OS_LOGE(TAG, "Failed to restore task watchdog timeout");
   }
 };
@@ -415,7 +425,7 @@ static void otaum_updatetask(void* arg)
 
     // Increase task watchdog timeout.
     // Prevents panics on some ESP32s when clearing large partitions.
-    if (esp_task_wdt_init(15, true) != ESP_OK) {
+    if (otaum_set_wdt_timeout(15) != ESP_OK) {
       OS_LOGE(TAG, "Failed to increase task watchdog timeout");
       _sendFailureMessage("Failed to increase task watchdog timeout"sv);
       continue;

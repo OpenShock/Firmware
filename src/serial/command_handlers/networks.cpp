@@ -7,7 +7,7 @@
 
 #include <vector>
 
-const char* const TAG = "Serial::CommandHandlers::Networks";
+const char* const TAG = "SerialCmds::CommandHandlers::Networks";
 
 static void handleNetworksCommand(std::string_view arg, bool isAutomated)
 {
@@ -86,9 +86,9 @@ static void handleNetworksCommand(std::string_view arg, bool isAutomated)
   OpenShock::WiFiManager::RefreshNetworkCredentials();
 }
 
-OpenShock::Serial::CommandGroup OpenShock::Serial::CommandHandlers::NetworksHandler()
+OpenShock::SerialCmds::CommandGroup OpenShock::SerialCmds::CommandHandlers::NetworksHandler()
 {
-  auto group = OpenShock::Serial::CommandGroup("networks"sv);
+  auto group = OpenShock::SerialCmds::CommandGroup("networks"sv);
 
   auto& getCommand = group.addCommand("Get all saved networks."sv, handleNetworksCommand);
 

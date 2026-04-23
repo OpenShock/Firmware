@@ -1,10 +1,10 @@
 #pragma once
 
 #include "AccountLinkResultCode.h"
-#include "span.h"
 
 #include <cstdint>
 #include <functional>
+#include <span>
 #include <string_view>
 
 namespace OpenShock::GatewayConnectionManager {
@@ -17,7 +17,7 @@ namespace OpenShock::GatewayConnectionManager {
   void UnLink();
 
   bool SendMessageTXT(std::string_view data);
-  bool SendMessageBIN(tcb::span<const uint8_t> data);
+  bool SendMessageBIN(std::span<const uint8_t> data);
 
   void Update();
 }  // namespace OpenShock::GatewayConnectionManager
