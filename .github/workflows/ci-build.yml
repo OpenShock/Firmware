@@ -33,7 +33,7 @@ jobs:
     timeout-minutes: 5
 
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd  # v6.0.2
         with:
           sparse-checkout: |
             .github
@@ -47,7 +47,7 @@ jobs:
     timeout-minutes: 5
 
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd  # v6.0.2
       - uses: ./.github/actions/build-staticfs
         with:
           version: ${{ needs.getvars.outputs.version }}
@@ -62,7 +62,7 @@ jobs:
       matrix: ${{ fromJSON(needs.getvars.outputs.board-matrix) }}
 
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd  # v6.0.2
 
       - uses: ./.github/actions/build-firmware
         with:
@@ -79,7 +79,7 @@ jobs:
       matrix: ${{ fromJSON(needs.getvars.outputs.board-matrix) }}
 
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd  # v6.0.2
         with:
           sparse-checkout: |
             .github
@@ -111,7 +111,7 @@ jobs:
       matrix: ${{ fromJson(needs.getvars.outputs.board-matrix) }}
 
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd  # v6.0.2
         with:
           sparse-checkout: |
             .github
@@ -138,7 +138,7 @@ jobs:
     environment: cdn-firmware-r2
 
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd  # v6.0.2
         with:
           sparse-checkout: |
             .github
@@ -165,7 +165,7 @@ jobs:
     environment: cdn-firmware-r2
 
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd  # v6.0.2
         with:
           sparse-checkout: |
             .github
@@ -201,13 +201,13 @@ jobs:
 
     steps:
       - name: Download release artifacts
-        uses: actions/download-artifact@v8
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c  # v8.0.1
 
       - name: Display artifacts
         run: ls -R
 
       - name: Release
-        uses: ncipollo/release-action@v1
+        uses: ncipollo/release-action@339a81892b84b4eeb0f6e744e4574d79d0d9b8dd  # v1.21.0
         with:
           artifacts: '**/OpenShock_*.bin'
           tag: ${{ needs.getvars.outputs.version }}
