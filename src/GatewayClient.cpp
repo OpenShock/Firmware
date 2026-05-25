@@ -175,6 +175,7 @@ void GatewayClient::_handleEvent(WStype_t type, uint8_t* payload, std::size_t le
       _setState(GatewayClientState::Disconnected);
       break;
     case WStype_CONNECTED:
+      m_lastPingTimestamp = 0;
       _setState(GatewayClientState::Connected);
       _sendBootStatus();
       break;
