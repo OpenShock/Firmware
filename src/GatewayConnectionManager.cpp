@@ -194,6 +194,16 @@ bool GatewayConnectionManager::SendMessageBIN(tcb::span<const uint8_t> data)
   return client->sendMessageBIN(data);
 }
 
+void GatewayConnectionManager::MarkPingReceived()
+{
+  auto client = GetClient();
+  if (client == nullptr) {
+    return;
+  }
+
+  client->markPingReceived();
+}
+
 bool FetchHubInfo(std::string authToken)
 {
   // TODO: this function is very slow, should be optimized!
