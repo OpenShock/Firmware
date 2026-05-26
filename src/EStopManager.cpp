@@ -42,19 +42,19 @@ static std::atomic<bool> s_killEStopManagerRequested = false;
 
 static bool s_estopInitialized = false;
 
-static void estopmgr_publishState(EStopState state, EStopState& lastState)
+static void estopmgr_publishState(EStopState state, EStopState& lastState, TickType_t timeout = pdMS_TO_TICKS(750))
 {
   if (state == lastState) {
     return;  // No state change -> no event
   }
 
   // Post the current state as the event payload
-  esp_err_t err = esp_event_post(OPENSHOCK_EVENTS, OPENSHOCK_EVENT_ESTOP_STATE_CHANGED, &state, sizeof(state), pdMS_TO_TICKS(750));
+  esp_err_t err = esp_event_post(OPENSHOCK_EVENTS, OPENSHOCK_EVENT_ESTOP_STATE_CHANGED, &state, sizeof(state), timeout);
 
   if (err == ESP_OK) {
     lastState = state;
   } else {
-    OS_LOGE(TAG, "Failed to publish EStop event");
+    OS_LOGE(TAG, "Failed to publish EStop event: %s", esp_err_to_name(err));
   }
 }
 
@@ -62,7 +62,7 @@ static void estopmgr_publishState(EStopState state, EStopState& lastState)
 static void estopmgr_managerTask(void* pvParameters)
 {
   // Pin is being passed as a pointer, cast it back to gpio number type to get pin value
-  gpio_num_t estopPin = static_cast<gpio_num_t>(reinterpret_cast<intptr_t>(pvParameters));
+  gpio_num_t estopPin = static_cast<gpio_num_t>(reinterpret_cast<uintptr_t>(pvParameters));
 
   // Ensure known initial state
   s_estopActivatedAt.store(0, std::memory_order_relaxed);
@@ -171,23 +171,21 @@ static void estopmgr_managerTask(void* pvParameters)
   }
 
   // Broke out of main loop, set global variables to Idle state.
-  estopmgr_publishState(EStopState::Idle, lastPublishedState);
+  // Use a blocking publish so downstream consumers (keep-alive gating, visuals)
+  // are guaranteed to observe the Idle transition even under event-loop pressure.
+  estopmgr_publishState(EStopState::Idle, lastPublishedState, portMAX_DELAY);
   s_estopActivatedAt.store(0, std::memory_order_relaxed);
 
   vTaskDelete(nullptr);
 }
 
-static bool estopmgr_setPinImpl(gpio_num_t pin)
+// Validates and configures `pin` as an EStop input. Does not touch s_estopPin
+// or any other pin — caller owns the s_estopPin assignment and old-pin release.
+static bool estopmgr_configurePin(gpio_num_t pin)
 {
-  esp_err_t err;
-
   if (!OpenShock::IsValidInputPin(pin)) {
     OS_LOGE(TAG, "Invalid EStop pin: %hhi", static_cast<int8_t>(pin));
     return false;
-  }
-
-  if (s_estopPin == pin) {
-    return true;
   }
 
   // Configure the new pin
@@ -199,27 +197,25 @@ static bool estopmgr_setPinImpl(gpio_num_t pin)
     .intr_type    = GPIO_INTR_DISABLE,
   };
 
-  err = gpio_config(&io_conf);
+  esp_err_t err = gpio_config(&io_conf);
   if (err != ESP_OK) {
-    OS_LOGE(TAG, "Failed to configure EStop pin");
+    OS_LOGE(TAG, "Failed to configure EStop pin: %s", esp_err_to_name(err));
     return false;
   }
 
-  gpio_num_t oldPin = s_estopPin;
+  return true;
+}
 
-  // Set the new pin
-  s_estopPin = pin;
-
-  if (oldPin != GPIO_NUM_NC) {
-    // Reset the old pin
-    err = gpio_reset_pin(oldPin);
-    if (err != ESP_OK) {
-      OS_LOGE(TAG, "Failed to reset old EStop pin");
-      return false;
-    }
+static void estopmgr_releasePin(gpio_num_t pin)
+{
+  if (pin == GPIO_NUM_NC) {
+    return;
   }
 
-  return true;
+  esp_err_t err = gpio_reset_pin(pin);
+  if (err != ESP_OK) {
+    OS_LOGE(TAG, "Failed to reset old EStop pin: %s", esp_err_to_name(err));
+  }
 }
 
 static bool estopmgr_taskStart()
@@ -241,10 +237,11 @@ static bool estopmgr_taskStart()
       return false;
     }
 
-    if (!estopmgr_setPinImpl(pin)) {
-      OS_LOGE(TAG, "Failed to set EStop pin");
+    if (!estopmgr_configurePin(pin)) {
       return false;
     }
+
+    s_estopPin = pin;
   }
 
   s_killEStopManagerRequested.store(false, std::memory_order_relaxed);
@@ -258,8 +255,8 @@ static bool estopmgr_taskStart()
   // will not change between creating the task and it freezing its local copy of the value.
   //
   // This enables us to use no allocations or atomic operations
-  static_assert(sizeof(void*) >= sizeof(gpio_num_t), "void* is smaller than gpio_num_t, value embedding trick wont work");  // Just to be safe
-  void* argPtr = reinterpret_cast<void*>(static_cast<intptr_t>(s_estopPin));
+  static_assert(sizeof(void*) >= sizeof(gpio_num_t), "void* is smaller than gpio_num_t, value embedding trick won't work");  // Just to be safe
+  void* argPtr = reinterpret_cast<void*>(static_cast<uintptr_t>(s_estopPin));
 
   if (TaskUtils::TaskCreateUniversal(estopmgr_managerTask, TAG, 4096, argPtr, 5, &s_estopTask, 1) != pdPASS) {  // TODO: Profile stack size and set priority
     OS_LOGE(TAG, "Failed to create EStop event handler task");
@@ -307,10 +304,11 @@ bool EStopManager::Init()
 
   OpenShock::ScopedLock lock__(&s_estopMutex);
 
-  if (!estopmgr_setPinImpl(cfg.gpioPin)) {
-    OS_LOGE(TAG, "Failed to set EStop pin");
+  if (!estopmgr_configurePin(cfg.gpioPin)) {
     return false;
   }
+
+  s_estopPin = cfg.gpioPin;
 
   return estopmgr_taskStart();
 }
@@ -330,28 +328,41 @@ bool EStopManager::SetEStopPin(gpio_num_t pin)
 {
   OpenShock::ScopedLock lock__(&s_estopMutex);
 
-  // Check pin validity before stopping possibly running task
-  if (!OpenShock::IsValidInputPin(pin)) {
-    OS_LOGE(TAG, "Invalid EStop pin: %hhi", static_cast<int8_t>(pin));
-    return false;
-  }
-
   if (s_estopPin == pin) {
     return true;
   }
 
-  bool wasRunning = s_estopTask != nullptr;
+  // 1+2: validate and configure the new pin. On failure, nothing has changed —
+  // old pin is still wired up and the task (if any) keeps sampling it.
+  if (!estopmgr_configurePin(pin)) {
+    return false;
+  }
+
+  gpio_num_t oldPin = s_estopPin;
+  bool wasRunning   = s_estopTask != nullptr;
+
+  // 3: stop the task before swapping s_estopPin, so the global never disagrees
+  // with what the sampling task is actually reading.
   if (wasRunning && !estopmgr_taskStop()) {
+    // Undo step 2: release the just-configured pin; old pin/task untouched.
+    estopmgr_releasePin(pin);
     return false;
   }
 
-  if (!estopmgr_setPinImpl(pin)) {
-    return false;
-  }
+  // 4: swap (safe — task is stopped).
+  s_estopPin = pin;
 
+  // 5: restart on the new pin.
   if (wasRunning && !estopmgr_taskStart()) {
+    // Task is dead and we can't bring it back. The old pin is no longer being
+    // sampled by anyone, so release it. Device is left without an active
+    // EStop manager — unrecoverable.
+    estopmgr_releasePin(oldPin);
     return false;
   }
+
+  // 6: release the old pin now that nothing is sampling it.
+  estopmgr_releasePin(oldPin);
 
   return true;
 }
