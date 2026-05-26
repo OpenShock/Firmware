@@ -28,7 +28,10 @@ const uint32_t k_estopCheckCount      = 13;                                     
 const uint16_t k_estopCheckMask       = 0xFFFF >> ((sizeof(uint16_t) * 8) - k_estopCheckCount);  // Mask to check only last k_estopCheckCount bits within history
 
 // Grace period after deactivation (prevents immediate re-trigger on release bounce/EMI)
-const uint32_t k_estopRearmGraceTime = 250;  // tune as needed
+const uint32_t k_estopRearmGraceTime = 250;    // tune as needed
+
+const uint32_t k_estopTaskStackSize   = 4096;  // TODO: profile and tune
+const UBaseType_t k_estopTaskPriority = 5;
 
 static OpenShock::SimpleMutex s_estopMutex = {};
 // Guarded via Mutex
@@ -180,7 +183,7 @@ static void estopmgr_managerTask(void* pvParameters)
 }
 
 // Validates and configures `pin` as an EStop input. Does not touch s_estopPin
-// or any other pin — caller owns the s_estopPin assignment and old-pin release.
+// or any other pin; caller owns the s_estopPin assignment and old-pin release.
 static bool estopmgr_configurePin(gpio_num_t pin)
 {
   if (!OpenShock::IsValidInputPin(pin)) {
@@ -226,7 +229,7 @@ static bool estopmgr_taskStart()
   }
 
   if (s_estopPin == GPIO_NUM_NC) {
-    gpio_num_t pin;
+    gpio_num_t pin = GPIO_NUM_NC;
     if (!OpenShock::Config::GetEStopGpioPin(pin)) {
       OS_LOGE(TAG, "Failed to get EStop pin from config");
       return false;
@@ -258,7 +261,7 @@ static bool estopmgr_taskStart()
   static_assert(sizeof(void*) >= sizeof(gpio_num_t), "void* is smaller than gpio_num_t, value embedding trick won't work");  // Just to be safe
   void* argPtr = reinterpret_cast<void*>(static_cast<uintptr_t>(s_estopPin));
 
-  if (TaskUtils::TaskCreateUniversal(estopmgr_managerTask, TAG, 4096, argPtr, 5, &s_estopTask, 1) != pdPASS) {  // TODO: Profile stack size and set priority
+  if (TaskUtils::TaskCreateUniversal(estopmgr_managerTask, TAG, k_estopTaskStackSize, argPtr, k_estopTaskPriority, &s_estopTask, 1) != pdPASS) {
     OS_LOGE(TAG, "Failed to create EStop event handler task");
     s_estopTask = nullptr;
     return false;
@@ -319,9 +322,9 @@ bool EStopManager::SetEStopEnabled(bool enabled)
 
   if (enabled) {
     return estopmgr_taskStart();
-  } else {
-    return estopmgr_taskStop();
   }
+
+  return estopmgr_taskStop();
 }
 
 bool EStopManager::SetEStopPin(gpio_num_t pin)
@@ -332,8 +335,8 @@ bool EStopManager::SetEStopPin(gpio_num_t pin)
     return true;
   }
 
-  // 1+2: validate and configure the new pin. On failure, nothing has changed —
-  // old pin is still wired up and the task (if any) keeps sampling it.
+  // Configure the new pin before touching anything else. If this fails the
+  // running task keeps sampling the old pin and the manager stays healthy.
   if (!estopmgr_configurePin(pin)) {
     return false;
   }
@@ -341,27 +344,23 @@ bool EStopManager::SetEStopPin(gpio_num_t pin)
   gpio_num_t oldPin = s_estopPin;
   bool wasRunning   = s_estopTask != nullptr;
 
-  // 3: stop the task before swapping s_estopPin, so the global never disagrees
-  // with what the sampling task is actually reading.
+  // Stop the task before swapping s_estopPin so the global can't disagree
+  // with what the task is actually reading.
   if (wasRunning && !estopmgr_taskStop()) {
-    // Undo step 2: release the just-configured pin; old pin/task untouched.
+    // Roll back the configuration we just did; old pin and task are untouched.
     estopmgr_releasePin(pin);
     return false;
   }
 
-  // 4: swap (safe — task is stopped).
   s_estopPin = pin;
 
-  // 5: restart on the new pin.
   if (wasRunning && !estopmgr_taskStart()) {
-    // Task is dead and we can't bring it back. The old pin is no longer being
-    // sampled by anyone, so release it. Device is left without an active
-    // EStop manager — unrecoverable.
+    // Task is gone and we can't bring it back. The old pin is no longer being
+    // sampled so we release it, but the manager is left inactive.
     estopmgr_releasePin(oldPin);
     return false;
   }
 
-  // 6: release the old pin now that nothing is sampling it.
   estopmgr_releasePin(oldPin);
 
   return true;
