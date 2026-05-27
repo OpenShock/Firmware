@@ -65,10 +65,10 @@ bool Rmt::WellturnT330Encoder::FillBuffer(rmt_data_t* sequence, uint16_t shocker
     state.lastFillTime = now;
 
     int64_t elapsed = now - state.transmitStart;
-    int64_t seconds = elapsed / 1000;
+    int64_t periods = elapsed / 1000;
 
-    bool toggle     = (seconds % 2) != 0;
-    uint8_t counter = (state.baseCounter + static_cast<uint8_t>(seconds / 2)) & 0x7;
+    bool toggle     = (periods % 2) != 0;
+    uint8_t counter = (state.baseCounter + static_cast<uint8_t>(periods / 2)) & 0x7;
 
     intensityByte = (static_cast<uint8_t>(toggle) << 7) | ((counter & 0x7) << 4) | (level & 0xF);
   }
