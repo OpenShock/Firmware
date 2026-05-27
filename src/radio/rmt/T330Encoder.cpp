@@ -1,5 +1,6 @@
 #include "radio/rmt/T330Encoder.h"
 
+#include "Core.h"
 #include "radio/rmt/internal/Shared.h"
 
 #include <algorithm>
@@ -13,8 +14,9 @@ const rmt_data_t kRmtPostamble = {220, 1, 135, 0};
 using namespace OpenShock;
 
 struct ShockRollingState {
-  uint8_t counter = 0;
-  bool toggle     = false;
+  int64_t lastFillTime  = 0;
+  int64_t transmitStart = 0;
+  uint8_t baseCounter   = 0;
 };
 
 static std::unordered_map<uint16_t, ShockRollingState> s_shockState;
@@ -46,16 +48,29 @@ bool Rmt::WellturnT330Encoder::FillBuffer(rmt_data_t* sequence, uint16_t shocker
   }
 
   // Shock intensity byte: [toggle:1][counter:3][level:4]
-  // The collar reads shock intensity from the lower nibble (0-15), not as a raw 0-100 value.
+  // Toggle flips every ~1s, counter increments every ~2s (each toggle cycle).
+  // Computed from wall-clock time so the buffer can be re-filled each send.
   uint8_t intensityByte = intensity;
   if (type == ShockerCommandType::Shock) {
     auto& state   = s_shockState[shockerId];
     uint8_t level = (intensity * 15) / 100;
-    intensityByte = (static_cast<uint8_t>(state.toggle) << 7) | ((state.counter & 0x7) << 4) | (level & 0xF);
-    state.toggle  = !state.toggle;
-    if (!state.toggle) {
-      state.counter = (state.counter + 1) & 0x7;
+
+    int64_t now = OpenShock::millis();
+    if (state.lastFillTime == 0 || (now - state.lastFillTime) > 200) {
+      if (state.lastFillTime != 0) {
+        state.baseCounter = (state.baseCounter + 1) & 0x7;
+      }
+      state.transmitStart = now;
     }
+    state.lastFillTime = now;
+
+    int64_t elapsed = now - state.transmitStart;
+    int64_t seconds = elapsed / 1000;
+
+    bool toggle     = (seconds % 2) != 0;
+    uint8_t counter = (state.baseCounter + static_cast<uint8_t>(seconds / 2)) & 0x7;
+
+    intensityByte = (static_cast<uint8_t>(toggle) << 7) | ((counter & 0x7) << 4) | (level & 0xF);
   }
 
   uint8_t channelId = 0;  // CH1 is 0b0000 and CH2 is 0b1110 on my remote but other values probably work.
