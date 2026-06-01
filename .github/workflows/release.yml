@@ -1,0 +1,118 @@
+on:
+  push:
+    branches:
+      - master
+      - beta
+    paths-ignore:
+      - 'CHANGELOG.md'
+      - '.changes/**'
+
+name: release
+
+env:
+  PYTHON_VERSION: '3.13'
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+  id-token: write
+
+jobs:
+  auto-release:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    # Belt-and-suspenders alongside paths-ignore: never react to our own bot commit.
+    if: github.actor != 'github-actions[bot]'
+
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+          # A PAT is required so the tag push triggers ci-build.
+          # The default GITHUB_TOKEN does not trigger downstream workflows.
+          token: ${{ secrets.RELEASE_TOKEN }}
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - name: Install Python dependencies
+        run: pip install -r scripts/requirements.txt
+
+      - name: Configure git
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+      - name: Rebase on top of latest remote
+        run: git pull --rebase --autostash origin "${GITHUB_REF_NAME}"
+
+      - name: Create RC tag (beta)
+        id: rc
+        if: github.ref == 'refs/heads/beta'
+        run: |
+          python scripts/release.py rc
+          TAG=$(git describe --tags --abbrev=0)
+          echo "tag=$TAG" >> "$GITHUB_OUTPUT"
+          echo "prerelease=true" >> "$GITHUB_OUTPUT"
+
+      - name: Create stable release (master)
+        id: stable
+        if: github.ref == 'refs/heads/master'
+        run: |
+          python scripts/release.py stable
+          TAG=$(git describe --tags --abbrev=0)
+          echo "tag=$TAG" >> "$GITHUB_OUTPUT"
+          echo "prerelease=false" >> "$GITHUB_OUTPUT"
+
+      - name: Resolve release metadata
+        id: meta
+        run: |
+          TAG="${{ steps.rc.outputs.tag || steps.stable.outputs.tag }}"
+          PRERELEASE="${{ steps.rc.outputs.prerelease || steps.stable.outputs.prerelease }}"
+          echo "tag=$TAG" >> "$GITHUB_OUTPUT"
+          echo "prerelease=$PRERELEASE" >> "$GITHUB_OUTPUT"
+          if [ -z "$TAG" ]; then
+            echo "::notice::No tag created (no pending changes). Exiting cleanly."
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "skip=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Push commit and tag
+        if: steps.meta.outputs.skip == 'false'
+        run: git push origin HEAD "${{ steps.meta.outputs.tag }}"
+
+      - name: Publish to OpenShock API
+        if: steps.meta.outputs.skip == 'false' && vars.OPENSHOCK_API_URL != ''
+        env:
+          API_URL: ${{ vars.OPENSHOCK_API_URL }}
+        run: |
+          OIDC_TOKEN=$(curl -sLS \
+            -H "Authorization: bearer $ACTIONS_ID_TOKEN_REQUEST_TOKEN" \
+            "$ACTIONS_ID_TOKEN_REQUEST_URL&audience=openshock-release-ingest" \
+            | jq -r .value)
+          if [ -z "$OIDC_TOKEN" ] || [ "$OIDC_TOKEN" = "null" ]; then
+            echo "::error::Failed to fetch GitHub OIDC token"
+            exit 1
+          fi
+          curl -fsSL --retry 3 --retry-delay 5 -X POST "$API_URL/1/public/releases" \
+            -H "Authorization: Bearer $OIDC_TOKEN" \
+            -H "Content-Type: application/json" \
+            --data-binary @release.json
+
+      - name: Create GitHub Release
+        if: steps.meta.outputs.skip == 'false'
+        env:
+          GH_TOKEN: ${{ secrets.RELEASE_TOKEN }}
+          TAG: ${{ steps.meta.outputs.tag }}
+          PRERELEASE: ${{ steps.meta.outputs.prerelease }}
+        run: |
+          ARGS=("$TAG" "release.json" --title "$TAG" --generate-notes)
+          if [ "$PRERELEASE" = "true" ]; then
+            ARGS+=(--prerelease)
+          fi
+          gh release create "${ARGS[@]}"
