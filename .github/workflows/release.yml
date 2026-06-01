@@ -111,7 +111,7 @@ jobs:
           TAG: ${{ steps.meta.outputs.tag }}
           PRERELEASE: ${{ steps.meta.outputs.prerelease }}
         run: |
-          ARGS=("$TAG" "release.json" --title "$TAG" --generate-notes)
+          ARGS=("$TAG" "release.json" --title "$TAG" --notes-file release-notes.md)
           if [ "$PRERELEASE" = "true" ]; then
             ARGS+=(--prerelease)
           fi

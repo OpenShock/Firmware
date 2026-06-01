@@ -11,6 +11,7 @@ Drop one markdown file per change in this directory. At release time, `scripts/r
 type: minor                          # required: major | minor | patch
 breaking: false                      # optional: bool, defaults true if type==major
 categories: [captive-portal, wifi]   # optional: list, validated against enum
+# pr: 1234                           # MAINTAINER-ONLY; do not set in PRs (CI rejects it)
 ---
 
 Title line for the changelog entry
@@ -47,6 +48,8 @@ Valid categories: `captive-portal`, `wifi`, `rf`, `ota`, `config`, `serial`, `se
 **Summary** (optional): short user-friendly markdown for the website/app UI.
 
 **Notices** (optional): list of `level: message` pairs, one per line, prefixed with `- `. Valid levels: `info`, `warning`, `error`. Unknown levels fail the release. Notices stay attached to their parent change in the JSON output.
+
+**pr** (maintainer-only): positive integer, the PR number this change belongs to. **Do not set this in a PR** — `check-changes` rejects PRs that introduce a `pr:` field, because the workflow auto-derives the PR number from git history at release time. It exists only as an escape hatch for maintainers to patch up files whose history doesn't resolve (migrated entries from the old `.changeset/` system, direct-push commits, etc.) by committing a fix directly to `develop`.
 
 ### Stable ID
 

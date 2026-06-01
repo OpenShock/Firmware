@@ -9,6 +9,10 @@ name: check-changes
 env:
   PYTHON_VERSION: '3.13'
 
+permissions:
+  contents: read
+  pull-requests: write
+
 jobs:
   require-changefile:
     runs-on: ubuntu-latest
@@ -51,8 +55,119 @@ jobs:
 
           echo "Found change files:"
           echo "$CHANGES"
+          echo "changes<<EOF" >> "$GITHUB_OUTPUT"
+          echo "$CHANGES" >> "$GITHUB_OUTPUT"
+          echo "EOF" >> "$GITHUB_OUTPUT"
           echo "skip=false" >> "$GITHUB_OUTPUT"
 
-      - name: Validate change files
+      - name: Reject manual pr override in PR-introduced files
+        id: reject-pr
         if: steps.check.outputs.skip != 'true'
-        run: python scripts/release.py status
+        env:
+          CHANGES: ${{ steps.check.outputs.changes }}
+        run: |
+          # The `pr:` frontmatter field is a maintainer escape hatch for
+          # patching files whose git history doesn't resolve to the right PR
+          # (migrated entries, direct pushes). It must never be authored
+          # inside a PR — the auto-derivation handles the normal case.
+          bad=()
+          while IFS= read -r f; do
+            [ -z "$f" ] && continue
+            # Only inspect the YAML frontmatter block (between the first two `---` lines).
+            if awk '/^---[[:space:]]*$/{c++; next} c==1' "$f" | grep -Eq '^[[:space:]]*pr[[:space:]]*:'; then
+              bad+=("$f")
+            fi
+          done <<< "$CHANGES"
+          if [ ${#bad[@]} -gt 0 ]; then
+            printf '%s\n' "${bad[@]}" > /tmp/bad-pr-files
+            for f in "${bad[@]}"; do
+              echo "::error file=$f::\"pr\" frontmatter is maintainer-only; remove it (the PR number is derived automatically at release time)"
+            done
+            exit 1
+          fi
+
+      - name: Validate change files
+        id: validate
+        if: steps.check.outputs.skip != 'true'
+        run: python scripts/release.py status 2>&1 | tee /tmp/validate.log
+
+      - name: Upsert PR status comment
+        if: always() && github.event.pull_request.number != ''
+        continue-on-error: true
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          PR: ${{ github.event.pull_request.number }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+          SKIP: ${{ steps.check.outputs.skip }}
+          CHANGES: ${{ steps.check.outputs.changes }}
+          CHECK_CONCLUSION: ${{ steps.check.conclusion }}
+          REJECT_CONCLUSION: ${{ steps.reject-pr.conclusion }}
+          VALIDATE_CONCLUSION: ${{ steps.validate.conclusion }}
+        run: |
+          MARKER='<!-- check-changes-status -->'
+
+          if [ "$SKIP" = 'true' ]; then
+            HEAD='**check-changes: skipped**'
+            DETAIL='The `no-changelog` label is set on this PR, so no `.changes/` entry is required.'
+          elif [ "$CHECK_CONCLUSION" = 'failure' ]; then
+            HEAD='**check-changes: missing change file**'
+            DETAIL=$(cat <<EOF
+This PR does not add or modify a file under \`.changes/\`. Either:
+
+- add a \`.changes/<slug>.md\` describing the user-facing change (see [\`.changes/README.md\`](../blob/develop/.changes/README.md)), or
+- apply the \`no-changelog\` label if this PR is CI-only / a dependency bump / docs-only.
+EOF
+)
+          elif [ "$REJECT_CONCLUSION" = 'failure' ]; then
+            BAD=$(cat /tmp/bad-pr-files 2>/dev/null | sed 's/^/- `/; s/$/`/')
+            HEAD='**check-changes: `pr:` frontmatter not allowed**'
+            DETAIL=$(cat <<EOF
+The following file(s) set a \`pr:\` field in their frontmatter:
+
+$BAD
+
+Remove it. The PR number is derived automatically at release time. \`pr:\` is a maintainer-only escape hatch for patching files whose git history doesn't resolve (migrated entries, direct pushes) and is committed directly to \`develop\`.
+EOF
+)
+          elif [ "$VALIDATE_CONCLUSION" = 'failure' ]; then
+            LOG=$(tail -n 40 /tmp/validate.log 2>/dev/null || echo '(no log captured)')
+            HEAD='**check-changes: schema validation failed**'
+            DETAIL=$(cat <<EOF
+\`scripts/release.py status\` rejected one or more change files:
+
+\`\`\`
+$LOG
+\`\`\`
+
+[View full log]($RUN_URL).
+EOF
+)
+          elif [ "$VALIDATE_CONCLUSION" = 'success' ]; then
+            FILES=$(echo "$CHANGES" | sed 's/^/- `/; s/$/`/')
+            HEAD='**check-changes: passed**'
+            DETAIL=$(cat <<EOF
+Change file(s) detected and validated:
+
+$FILES
+EOF
+)
+          else
+            HEAD='**check-changes: incomplete**'
+            DETAIL="The workflow did not finish normally. [View log]($RUN_URL)."
+          fi
+
+          BODY=$(printf '%s\n%s\n\n%s\n' "$MARKER" "$HEAD" "$DETAIL")
+
+          EXISTING=$(gh api "repos/$REPO/issues/$PR/comments" --paginate \
+            --jq "[.[] | select(.body | startswith(\"$MARKER\"))] | first | .id // empty")
+
+          jq -n --arg body "$BODY" '{body: $body}' > /tmp/comment.json
+
+          if [ -n "$EXISTING" ]; then
+            gh api "repos/$REPO/issues/comments/$EXISTING" -X PATCH --input /tmp/comment.json > /dev/null
+            echo "Updated comment $EXISTING"
+          else
+            gh api "repos/$REPO/issues/$PR/comments" -X POST --input /tmp/comment.json > /dev/null
+            echo "Created new comment"
+          fi
