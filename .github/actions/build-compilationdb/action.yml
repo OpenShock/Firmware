@@ -12,10 +12,10 @@ inputs:
 runs:
   using: composite
   steps:
-    - uses: actions/checkout@v6
+    - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd  # v6.0.2
       if: ${{ !inputs.skip-checkout }}
 
-    - uses: actions/cache@v5
+    - uses: actions/cache@27d5ce7f107fe9357f9df03efb73ab90386fccae  # v5.0.5
       with:
         path: |
           ~/.platformio/platforms
@@ -23,7 +23,7 @@ runs:
           ~/.platformio/.cache
         key: pio-${{ runner.os }}-${{ hashFiles('platformio.ini', 'requirements.txt') }}
 
-    - uses: actions/setup-python@v6
+    - uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405  # v6.2.0
       with:
         cache: 'pip'
 

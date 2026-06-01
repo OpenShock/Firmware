@@ -8,10 +8,10 @@
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "dependencies": {
-    "@actions/core": "^3.0.0",
-    "@actions/github": "^9.1.0",
-    "ini": "^6.0.0",
-    "semver": "^7.7.4"
+    "@actions/core": "^3.0.1",
+    "@actions/github": "^9.1.1",
+    "ini": "^7.0.0",
+    "semver": "^7.8.0"
   },
   "engines": {
     "node": "^24.13.1",

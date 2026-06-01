@@ -15,7 +15,11 @@ updates:
     groups:
       ci-cd:
         patterns:
-          - '*' # Group all updates together
+          - '*'
+        update-types:
+          - 'major'
+          - 'minor'
+          - 'patch'
 
   # Daily checks for npm package updates in CI-CD scripts
   - package-ecosystem: 'npm'
@@ -27,7 +31,11 @@ updates:
     groups:
       ci-cd:
         patterns:
-          - '*' # Group all updates together
+          - '*'
+        update-types:
+          - 'major'
+          - 'minor'
+          - 'patch'
 
   # Daily checks for pip package updates in build system scripts
   - package-ecosystem: 'pip'
@@ -39,7 +47,11 @@ updates:
     groups:
       build-system:
         patterns:
-          - '*' # Group all updates together
+          - '*'
+        update-types:
+          - 'major'
+          - 'minor'
+          - 'patch'
 
   # Daily checks for npm package updates in frontend
   - package-ecosystem: 'npm'
@@ -51,4 +63,8 @@ updates:
     groups:
       frontend:
         patterns:
-          - '*' # Group all updates together
+          - '*'
+        update-types:
+          - 'major'
+          - 'minor'
+          - 'patch'
