@@ -154,7 +154,7 @@ def parse_version(version_str: str):
     return int(m.group(1)), int(m.group(2)), int(m.group(3))
 
 
-def bump_version(major: int, minor: int, patch: int, bump: str):
+def bump_version(major: int, minor: int, patch: int, bump: str | None):
     if bump == 'major':
         return major + 1, 0, 0
     if bump == 'minor':
