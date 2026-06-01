@@ -49,7 +49,11 @@ Valid categories: `captive-portal`, `wifi`, `rf`, `ota`, `config`, `serial`, `se
 
 **Notices** (optional): list of `level: message` pairs, one per line, prefixed with `- `. Valid levels: `info`, `warning`, `error`. Unknown levels fail the release. Notices stay attached to their parent change in the JSON output.
 
-**pr** (maintainer-only): positive integer, the PR number this change belongs to. **Do not set this in a PR** — `check-changes` rejects PRs that introduce a `pr:` field, because the workflow auto-derives the PR number from git history at release time. It exists only as an escape hatch for maintainers to patch up files whose history doesn't resolve (migrated entries from the old `.changeset/` system, direct-push commits, etc.) by committing a fix directly to `develop`.
+**pr** (maintainer-only): positive integer (or `null`), the PR number this change belongs to. **Do not set this in a PR** — `check-changes` rejects PRs that introduce a `pr:` field, because the workflow auto-derives the PR number from git history at release time. It exists only as an escape hatch for maintainers to patch up files whose history doesn't resolve (migrated entries from the old `.changeset/` system, direct-push commits, etc.) by committing a fix directly to `develop`. Set `pr: null` to suppress derivation entirely (e.g. for direct-pushed commits with no PR).
+
+### Contributors footer
+
+The rendered CHANGELOG and `release.json` include a release-level `contributors` list, computed at release time from `repos/{owner}/{repo}/compare/<previous_tag>...HEAD` (i.e. every commit author since the previous stable release). Users with `admin` or `maintain` permission on the repo (resolved live via `gh api`) are filtered out, so the "Thanks to …" line only mentions outside contributors.
 
 ### Stable ID
 
@@ -84,6 +88,7 @@ To add a one-paragraph framing at the top of the release ("This release focuses 
   "released_at": "2026-05-26T14:23:00Z",
   "commit": "30663e6...",
   "headline": { "format": "markdown", "text": "..." },   // or null
+  "contributors": ["alice", "bob"],                       // logins since previous_version, may be []
   "changes": [
     {
       "id": "captive-portal-wizard",

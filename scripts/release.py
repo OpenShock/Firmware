@@ -23,6 +23,7 @@ Release JSON contract (schema_version 1):
     "released_at": "2026-05-26T14:23:00Z",
     "commit": "30663e6...",
     "headline": { "format": "markdown", "text": "..." } | null,
+    "contributors": ["alice", "bob"],                     // logins since previous_version
     "changes": [
       {
         "id": "captive-portal-wizard",
@@ -96,7 +97,7 @@ class Change:
     breaking: bool = False
     categories: List[str] = field(default_factory=list)
     pr: Optional[int] = None
-    author: Optional[str] = None
+    pr_explicit_none: bool = False
 
     @property
     def slug(self) -> str:
@@ -253,24 +254,21 @@ def parse_change_file(path: str, errors: List[str]) -> Optional[Change]:
         errors.append(f'{filename}: "breaking" must be a boolean (got {breaking!r})')
         breaking = (bump == 'major')
 
-    # pr / author (optional) — maintainer overrides for cases where git
-    # history doesn't resolve to the right PR (migrated files, direct pushes).
-    # Key absent → auto-derive from git+gh; value → use as-is.
+    # pr (optional) — maintainer override for cases where git history doesn't
+    # resolve to the right PR (migrated files, direct pushes).
+    # Key absent → auto-derive; positive int → use as-is;
+    # explicit null → no PR exists, skip derivation entirely.
+    # Author is always derived from the resolved PR's user.login.
     pr: Optional[int] = None
-    pr_raw = frontmatter.get('pr')
-    if pr_raw is not None:
-        if isinstance(pr_raw, bool) or not isinstance(pr_raw, int) or pr_raw <= 0:
-            errors.append(f'{filename}: "pr" must be a positive integer (got {pr_raw!r})')
+    pr_explicit_none = False
+    if 'pr' in frontmatter:
+        pr_raw = frontmatter['pr']
+        if pr_raw is None:
+            pr_explicit_none = True
+        elif isinstance(pr_raw, bool) or not isinstance(pr_raw, int) or pr_raw <= 0:
+            errors.append(f'{filename}: "pr" must be a positive integer or null (got {pr_raw!r})')
         else:
             pr = pr_raw
-
-    author: Optional[str] = None
-    author_raw = frontmatter.get('author')
-    if author_raw is not None:
-        if not isinstance(author_raw, str) or not author_raw.strip():
-            errors.append(f'{filename}: "author" must be a non-empty string (got {author_raw!r})')
-        else:
-            author = author_raw.strip().lstrip('@')
 
     # categories (optional)
     categories_raw = frontmatter.get('categories', [])
@@ -320,7 +318,7 @@ def parse_change_file(path: str, errors: List[str]) -> Optional[Change]:
         breaking=breaking,
         categories=categories,
         pr=pr,
-        author=author,
+        pr_explicit_none=pr_explicit_none,
     )
 
 
@@ -360,43 +358,107 @@ def get_highest_bump(changes: List[Change]) -> Optional[str]:
     return max((c.bump for c in changes), key=lambda b: BUMP_ORDER.get(b, 0))
 
 
-def derive_pr_info(filename: str) -> tuple[Optional[int], Optional[str]]:
-    """Find the PR that introduced .changes/<filename> via `gh api`.
+_maintainers_cache: Optional[set] = None
 
-    Returns (number, author_login). Either field can be None on failure.
+
+def fetch_maintainers() -> set:
+    """Return lowercase logins of collaborators with admin/maintain access.
+
+    Cached per process. Returns an empty set on failure (no gh, no auth, etc.),
+    in which case nobody is excluded from the Contributors footer.
     """
+    global _maintainers_cache
+    if _maintainers_cache is not None:
+        return _maintainers_cache
+    _maintainers_cache = set()
+    try:
+        result = subprocess.run(
+            ['gh', 'api', 'repos/{owner}/{repo}/collaborators', '--paginate'],
+            capture_output=True, text=True, cwd=get_project_root(),
+        )
+    except FileNotFoundError:
+        return _maintainers_cache
+    if result.returncode != 0:
+        return _maintainers_cache
+    try:
+        collaborators = json.loads(result.stdout)
+    except json.JSONDecodeError:
+        return _maintainers_cache
+    if not isinstance(collaborators, list):
+        return _maintainers_cache
+    for c in collaborators:
+        if not isinstance(c, dict):
+            continue
+        perms = c.get('permissions') or {}
+        if not (perms.get('admin') or perms.get('maintain')):
+            continue
+        login = c.get('login')
+        if isinstance(login, str) and login:
+            _maintainers_cache.add(login.lower())
+    return _maintainers_cache
+
+
+def _gh_api_json(path: str, jq: Optional[str] = None):
+    cmd = ['gh', 'api', path]
+    if jq:
+        cmd += ['--jq', jq]
+    try:
+        result = subprocess.run(
+            cmd, capture_output=True, cwd=get_project_root(),
+        )
+    except FileNotFoundError:
+        return None
+    if result.returncode != 0:
+        return None
+    try:
+        return json.loads(result.stdout.decode('utf-8', errors='replace'))
+    except json.JSONDecodeError:
+        return None
+
+
+def derive_pr_from_filename(filename: str) -> Optional[int]:
+    """Find the PR number that introduced .changes/<filename>."""
     rel = f'{CHANGES_DIR}/{filename}'
     try:
         sha = run_git('log', '--diff-filter=A', '--format=%H', '-n', '1', '--', rel)
     except SystemExit:
-        return None, None
+        return None
     if not sha:
-        return None, None
-    try:
-        result = subprocess.run(
-            ['gh', 'api', f'repos/{{owner}}/{{repo}}/commits/{sha}/pulls'],
-            capture_output=True, text=True, cwd=get_project_root(),
-        )
-    except FileNotFoundError:
-        return None, None
-    if result.returncode != 0:
-        return None, None
-    try:
-        pulls = json.loads(result.stdout)
-    except json.JSONDecodeError:
-        return None, None
+        return None
+    pulls = _gh_api_json(f'repos/{{owner}}/{{repo}}/commits/{sha}/pulls')
     if not isinstance(pulls, list) or not pulls:
-        return None, None
+        return None
     pr = pulls[0]
-    if not isinstance(pr, dict):
-        return None, None
-    num = pr.get('number')
-    user = pr.get('user')
-    login = user.get('login') if isinstance(user, dict) else None
-    return (
-        int(num) if isinstance(num, int) else None,
-        login if isinstance(login, str) and login else None,
+    num = pr.get('number') if isinstance(pr, dict) else None
+    return int(num) if isinstance(num, int) else None
+
+
+def fetch_contributors_since(previous_tag: Optional[str]) -> List[str]:
+    """Distinct GitHub logins of commit authors since `previous_tag`.
+
+    Uses `repos/{owner}/{repo}/compare/<base>...HEAD`. Falls back to an empty
+    list if there's no base, no gh, or no network. Order follows first
+    appearance in the compare result.
+    """
+    if not previous_tag:
+        return []
+    logins = _gh_api_json(
+        f'repos/{{owner}}/{{repo}}/compare/{previous_tag}...HEAD',
+        jq='[.commits[].author.login | select(. != null)]',
     )
+    if not isinstance(logins, list):
+        return []
+    seen = set()
+    out: List[str] = []
+    for login in logins:
+        if not isinstance(login, str) or not login:
+            continue
+        key = login.lower()
+        if key in seen:
+            continue
+        seen.add(key)
+        out.append(login)
+    return out
 
 
 def md(text: str) -> Optional[dict]:
@@ -434,6 +496,7 @@ def build_release_data(
         'released_at': released_at,
         'commit': commit,
         'headline': md(headline) if headline else None,
+        'contributors': fetch_contributors_since(previous) if enrich_pr else [],
         'changes': [],
     }
 
@@ -453,18 +516,10 @@ def build_release_data(
             entry['summary'] = summary_md
 
         pr_value: Optional[int] = c.pr
-        author_value: Optional[str] = c.author
-        if enrich_pr and (pr_value is None or author_value is None):
-            derived_pr, derived_author = derive_pr_info(c.filename)
-            if pr_value is None:
-                pr_value = derived_pr
-            if author_value is None:
-                author_value = derived_author
-
+        if enrich_pr and pr_value is None and not c.pr_explicit_none:
+            pr_value = derive_pr_from_filename(c.filename)
         if pr_value is not None:
             entry['pr'] = pr_value
-        if author_value:
-            entry['author'] = author_value
 
         entry['notices'] = [
             {'level': n.level, 'message': n.message} for n in c.notices
@@ -496,13 +551,8 @@ def render_changelog_markdown(data: dict) -> str:
             if c.get('categories'):
                 badges.append('[' + ', '.join(c['categories']) + ']')
             badge_str = (' ' + ' '.join(badges)) if badges else ''
-            attribution_bits = []
-            if c.get('pr'):
-                attribution_bits.append(f'#{c["pr"]}')
-            if c.get('author'):
-                attribution_bits.append(f'by @{c["author"]}')
-            attribution = (' (' + ', '.join(attribution_bits) + ')') if attribution_bits else ''
-            lines.append(f'- {c["title"]["text"]}{badge_str}{attribution}')
+            pr_str = f' (#{c["pr"]})' if c.get('pr') else ''
+            lines.append(f'- {c["title"]["text"]}{badge_str}{pr_str}')
             body = c.get('body')
             if body:
                 for bline in body['text'].split('\n'):
@@ -516,13 +566,11 @@ def render_changelog_markdown(data: dict) -> str:
             lines.append(f'- **{n["level"].upper()}**: {n["message"]}')
         lines.append('')
 
-    contributors = []
-    seen = set()
-    for c in data['changes']:
-        a = c.get('author')
-        if a and a not in seen:
-            seen.add(a)
-            contributors.append(a)
+    maintainers = fetch_maintainers()
+    contributors = [
+        u for u in data.get('contributors', [])
+        if u.lower() not in maintainers and not u.endswith('[bot]')
+    ]
     if contributors:
         thanks = ', '.join(f'@{u}' for u in contributors)
         lines.append(f'### Contributors\n\nThanks to {thanks} for contributing to this release!\n')

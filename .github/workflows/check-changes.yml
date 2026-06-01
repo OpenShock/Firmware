@@ -66,15 +66,16 @@ jobs:
         env:
           CHANGES: ${{ steps.check.outputs.changes }}
         run: |
-          # The `pr:` frontmatter field is a maintainer escape hatch for
-          # patching files whose git history doesn't resolve to the right PR
-          # (migrated entries, direct pushes). It must never be authored
-          # inside a PR — the auto-derivation handles the normal case.
+          # `pr:` is a maintainer escape hatch for patching files whose git
+          # history doesn't resolve (migrated entries, direct pushes). It must
+          # never be authored inside a PR — auto-derivation handles the normal
+          # case.
           bad=()
           while IFS= read -r f; do
             [ -z "$f" ] && continue
             # Only inspect the YAML frontmatter block (between the first two `---` lines).
-            if awk '/^---[[:space:]]*$/{c++; next} c==1' "$f" | grep -Eq '^[[:space:]]*pr[[:space:]]*:'; then
+            fm=$(awk '/^---[[:space:]]*$/{c++; next} c==1' "$f")
+            if echo "$fm" | grep -Eq '^[[:space:]]*pr[[:space:]]*:'; then
               bad+=("$f")
             fi
           done <<< "$CHANGES"
@@ -127,7 +128,7 @@ The following file(s) set a \`pr:\` field in their frontmatter:
 
 $BAD
 
-Remove it. The PR number is derived automatically at release time. \`pr:\` is a maintainer-only escape hatch for patching files whose git history doesn't resolve (migrated entries, direct pushes) and is committed directly to \`develop\`.
+Remove it. The PR number is derived automatically at release time. \`pr:\` is a maintainer-only escape hatch for patching files whose git history doesn't resolve (migrated entries, direct pushes) and must be committed directly to \`develop\`.
 EOF
 )
           elif [ "$VALIDATE_CONCLUSION" = 'failure' ]; then
