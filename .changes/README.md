@@ -1,8 +1,6 @@
 # Unreleased Changes
 
-Drop one markdown file per change in this directory. At release time, `scripts/release.py` folds these into `CHANGELOG.md` **and** produces a versioned `release.json` document that the OpenShock backend ingests for the website/app release feed.
-
-**The JSON is the contract.** `CHANGELOG.md` is one renderer of it. When in doubt about the shape of a field, look at the schema below and at `scripts/release.py`.
+Drop one markdown file per change in this directory. At release time, `release-tool` folds these into `CHANGELOG.md` and produces a versioned `release.json` document that the OpenShock backend ingests.
 
 ## File format
 
@@ -11,19 +9,19 @@ Drop one markdown file per change in this directory. At release time, `scripts/r
 type: minor                          # required: major | minor | patch
 breaking: false                      # optional: bool, defaults true if type==major
 categories: [captive-portal, wifi]   # optional: list, validated against enum
+pr: 123                              # optional: see below
 ---
 
 Title line for the changelog entry
 
 Optional body with more detail, bullet points, etc.
-All of this goes into CHANGELOG.md and the JSON `body` field.
 
 - Detail one
 - Detail two
 
-## Summary
+## Release Note
 
-Short user-facing markdown for the website UI. Less technical than the body.
+Short user-facing markdown for the website/app UI.
 
 ## Notices
 
@@ -36,21 +34,26 @@ Short user-facing markdown for the website UI. Less technical than the body.
 
 **type** (required): `major`, `minor`, or `patch`. Drives semver bumping.
 
-**breaking** (optional, bool): mark a change as breaking even when it's a `minor`/`patch` bump (e.g. opt-in feature flip, config schema change). Defaults to `true` when `type: major`.
+**breaking** (optional, bool): mark a change as breaking even when it's a `minor`/`patch` bump. Defaults to `true` when `type: major`.
 
-**categories** (optional, list): tags for filtering/grouping on the website. Validated against the enum below — unknown values fail the release. Empty list is fine.
+**categories** (optional, list): tags for filtering/grouping. Validated against the allowlist in `config.json` — unknown values fail validation.
 
 Valid categories: `captive-portal`, `wifi`, `rf`, `ota`, `config`, `serial`, `security`, `frontend`, `gateway`, `gpio`, `estop`, `performance`, `build`.
 
-**Changelog entry** (required): everything between the frontmatter and the first recognized `##` section. First line is the title, rest is the body. Only `## Summary` and `## Notices` are recognized as section breaks — any other `##` header stays as body content.
+**pr** (optional, tri-state):
+- absent: PR number is derived from git history
+- integer (`pr: 123`): used verbatim
+- `pr: null`: suppresses the PR link entirely
 
-**Summary** (optional): short user-friendly markdown for the website/app UI.
+**Changelog entry** (required): everything between the frontmatter and the first `##` section. First line is the title, rest is the body.
 
-**Notices** (optional): list of `level: message` pairs, one per line, prefixed with `- `. Valid levels: `info`, `warning`, `error`. Unknown levels fail the release. Notices stay attached to their parent change in the JSON output.
+**Release Note** (optional): short user-friendly markdown for the website/app UI. Included in `release.json`, not in `CHANGELOG.md`.
+
+**Notices** (optional): list of `level: message` pairs. Valid levels: `info`, `warning`, `error`.
 
 ### Stable ID
 
-The change's stable ID is derived from the filename: `.changes/captive-portal-wizard.md` → `id: "captive-portal-wizard"`. This ID survives title edits, so renaming a file is the only thing that creates a "new" change downstream. Choose a slug you're willing to keep.
+The change's stable ID is derived from the filename: `.changes/captive-portal-wizard.md` → `id: "captive-portal-wizard"`.
 
 ### Minimal example
 
@@ -64,50 +67,15 @@ Fix crash on knockoff boards after network connects
 
 ### Release-level headline
 
-To add a one-paragraph framing at the top of the release ("This release focuses on…"), create `.changes/_headline.md` with plain markdown (no frontmatter). It's consumed and deleted at stable-release time alongside the change files. Optional.
-
-## Release JSON contract
-
-`release.py` writes `release.json` to the repo root and the workflow POSTs it to the OpenShock API and attaches it to the GitHub Release.
-
-```jsonc
-{
-  "schema_version": 1,             // contract version; bumped on breaking changes
-  "component": "firmware",
-  "version": "1.6.0",
-  "tag": "1.6.0",                  // includes "-rc.N" for RCs
-  "prerelease": false,
-  "previous_version": "1.5.0",     // last stable, even for RCs
-  "released_at": "2026-05-26T14:23:00Z",
-  "commit": "30663e6...",
-  "headline": { "format": "markdown", "text": "..." },   // or null
-  "changes": [
-    {
-      "id": "captive-portal-wizard",
-      "type": "minor",
-      "breaking": false,
-      "categories": ["captive-portal", "frontend"],
-      "pr": 1234,                                                  // optional, auto-derived
-      "title":   { "format": "markdown", "text": "..." },
-      "body":    { "format": "markdown", "text": "..." },          // optional
-      "summary": { "format": "markdown", "text": "..." },          // optional
-      "notices": [ { "level": "info", "message": "..." } ]
-    }
-  ]
-}
-```
-
-Every human-readable text field is `{format, text}` so adding `format: "html"` or `format: "plain"` later is non-breaking. `pr` is auto-derived via `gh api` (best-effort; omitted on failure). Notices nest inside their parent change — a consumer can `flatMap` for a banner UI, but the parent link cannot be reconstructed from a flat list.
+Create `.changes/_headline.md` with plain markdown (no frontmatter) to add a framing paragraph at the top of the release. Consumed at stable-release time.
 
 ## Release workflow
 
 ```bash
-python scripts/release.py status        # See pending changes and next version
-python scripts/release.py rc            # Create or bump an RC tag (writes release.json)
-python scripts/release.py stable        # Promote to stable, consume changes (writes release.json)
-python scripts/release.py --dry-run rc  # Preview without making changes (prints JSON to stdout)
+release-tool status                    # see pending changes and next version
+release-tool prerelease                # create/bump a prerelease tag (writes release.json)
+release-tool release                   # promote to stable, consume changes (writes release.json)
+release-tool prerelease --dry-run      # preview without making changes
 ```
 
-Branch model: PRs land in `develop`; merges to `beta` cut RC tags; merges to `master` cut stable releases. The `release.yml` workflow handles both automatically. `check-changes.yml` runs schema validation on every PR so malformed change files fail at PR time, not at release time.
-
-Install script dependencies locally with `pip install -r scripts/requirements.txt`.
+Branch model: PRs land in `develop`; merges to `beta` cut prerelease tags; merges to `master` cut stable releases. `release.yml` handles all of this automatically via the branch config in `config.json`. `check-changes.yml` validates change files on every PR so malformed files fail at PR time, not at release time.

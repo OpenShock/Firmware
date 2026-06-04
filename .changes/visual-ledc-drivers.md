@@ -10,5 +10,5 @@ Replace LED managers with LEDC-driven drivers
 - Add cooperative task shutdown with chunked 50ms delays
 - Add ledtest serial command for visual verification
 
-## Summary
+## Release Note
 LED indicators now use hardware PWM for smooth brightness transitions instead of simple on/off toggling. This applies to both single-color and RGB LEDs across all supported ESP32 chip variants.

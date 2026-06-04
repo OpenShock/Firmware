@@ -1,0 +1,23 @@
+{
+  "tag_prefix": "",
+  "categories": [
+    "captive-portal",
+    "wifi",
+    "rf",
+    "ota",
+    "config",
+    "serial",
+    "security",
+    "frontend",
+    "gateway",
+    "gpio",
+    "estop",
+    "performance",
+    "build"
+  ],
+  "branches": {
+    "develop": { "release": "none", "label": "develop", "sha": true },
+    "beta":    { "release": "prerelease", "label": "beta" },
+    "master":  { "release": "stable" }
+  }
+}

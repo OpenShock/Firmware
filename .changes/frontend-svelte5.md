@@ -8,7 +8,7 @@ Rewrite frontend to Svelte 5 + Vite
 - Migrate to Svelte 5 runes ($state, $derived, $effect)
 - Single-file HTML output via vite-plugin-singlefile for LittleFS
 
-## Summary
+## Release Note
 The captive portal frontend has been completely rewritten using Svelte 5 with its new runes-based reactivity system, replacing the previous SvelteKit setup. The UI is now built as a single HTML file for efficient storage on the device.
 
 ## Notices

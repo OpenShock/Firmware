@@ -8,5 +8,5 @@ Various bug fixes and stability improvements
 - User-friendly WiFi disconnect error messages
 - Remove erroneous "unexpected protocol: https, expected http" warning
 
-## Summary
+## Release Note
 Various bug fixes and stability improvements
