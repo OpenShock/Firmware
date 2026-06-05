@@ -9,7 +9,7 @@ Drop one markdown file per change in this directory. At release time, `release-t
 type: minor                          # required: major | minor | patch
 breaking: false                      # optional: bool, defaults true if type==major
 categories: [captive-portal, wifi]   # optional: list, validated against enum
-pr: 123                              # optional: see below
+# pr: 1234                           # MAINTAINER-ONLY; do not set in PRs (CI rejects it)
 ---
 
 Title line for the changelog entry
@@ -51,6 +51,12 @@ Valid categories: `captive-portal`, `wifi`, `rf`, `ota`, `config`, `serial`, `se
 
 **Notices** (optional): list of `level: message` pairs. Valid levels: `info`, `warning`, `error`.
 
+**pr** (maintainer-only): positive integer (or `null`), the PR number this change belongs to. **Do not set this in a PR** — `check-changes` rejects PRs that introduce a `pr:` field, because the workflow auto-derives the PR number from git history at release time. It exists only as an escape hatch for maintainers to patch up files whose history doesn't resolve (migrated entries from the old `.changeset/` system, direct-push commits, etc.) by committing a fix directly to `develop`. Set `pr: null` to suppress derivation entirely (e.g. for direct-pushed commits with no PR).
+
+### Contributors footer
+
+The rendered CHANGELOG and `release.json` include a release-level `contributors` list, computed at release time from `repos/{owner}/{repo}/compare/<previous_tag>...HEAD` (i.e. every commit author since the previous stable release). Users with `admin` or `maintain` permission on the repo (resolved live via `gh api`) are filtered out, so the "Thanks to …" line only mentions outside contributors.
+
 ### Stable ID
 
 The change's stable ID is derived from the filename: `.changes/captive-portal-wizard.md` → `id: "captive-portal-wizard"`.
@@ -67,7 +73,41 @@ Fix crash on knockoff boards after network connects
 
 ### Release-level headline
 
-Create `.changes/_headline.md` with plain markdown (no frontmatter) to add a framing paragraph at the top of the release. Consumed at stable-release time.
+To add a one-paragraph framing at the top of the release ("This release focuses on…"), create `.changes/_headline.md` with plain markdown (no frontmatter). It's consumed and deleted at stable-release time alongside the change files. Optional.
+
+## Release JSON contract
+
+`release.py` writes `release.json` to the repo root and the workflow POSTs it to the OpenShock API and attaches it to the GitHub Release.
+
+```jsonc
+{
+  "schema_version": 1,             // contract version; bumped on breaking changes
+  "component": "firmware",
+  "version": "1.6.0",
+  "tag": "1.6.0",                  // includes "-rc.N" for RCs
+  "prerelease": false,
+  "previous_version": "1.5.0",     // last stable, even for RCs
+  "released_at": "2026-05-26T14:23:00Z",
+  "commit": "30663e6...",
+  "headline": { "format": "markdown", "text": "..." },   // or null
+  "contributors": ["alice", "bob"],                       // logins since previous_version, may be []
+  "changes": [
+    {
+      "id": "captive-portal-wizard",
+      "type": "minor",
+      "breaking": false,
+      "categories": ["captive-portal", "frontend"],
+      "pr": 1234,                                                  // optional, auto-derived
+      "title":   { "format": "markdown", "text": "..." },
+      "body":    { "format": "markdown", "text": "..." },          // optional
+      "summary": { "format": "markdown", "text": "..." },          // optional
+      "notices": [ { "level": "info", "message": "..." } ]
+    }
+  ]
+}
+```
+
+Every human-readable text field is `{format, text}` so adding `format: "html"` or `format: "plain"` later is non-breaking. `pr` is auto-derived via `gh api` (best-effort; omitted on failure). Notices nest inside their parent change — a consumer can `flatMap` for a banner UI, but the parent link cannot be reconstructed from a flat list.
 
 ## Release workflow
 

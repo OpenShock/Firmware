@@ -23,6 +23,7 @@ Release JSON contract (schema_version 1):
     "released_at": "2026-05-26T14:23:00Z",
     "commit": "30663e6...",
     "headline": { "format": "markdown", "text": "..." } | null,
+    "contributors": ["alice", "bob"],                     // logins since previous_version
     "changes": [
       {
         "id": "captive-portal-wizard",
@@ -96,6 +97,7 @@ class Change:
     breaking: bool = False
     categories: List[str] = field(default_factory=list)
     pr: Optional[int] = None
+    pr_explicit_none: bool = False
 
     @property
     def slug(self) -> str:
@@ -252,6 +254,22 @@ def parse_change_file(path: str, errors: List[str]) -> Optional[Change]:
         errors.append(f'{filename}: "breaking" must be a boolean (got {breaking!r})')
         breaking = (bump == 'major')
 
+    # pr (optional) — maintainer override for cases where git history doesn't
+    # resolve to the right PR (migrated files, direct pushes).
+    # Key absent → auto-derive; positive int → use as-is;
+    # explicit null → no PR exists, skip derivation entirely.
+    # Author is always derived from the resolved PR's user.login.
+    pr: Optional[int] = None
+    pr_explicit_none = False
+    if 'pr' in frontmatter:
+        pr_raw = frontmatter['pr']
+        if pr_raw is None:
+            pr_explicit_none = True
+        elif isinstance(pr_raw, bool) or not isinstance(pr_raw, int) or pr_raw <= 0:
+            errors.append(f'{filename}: "pr" must be a positive integer or null (got {pr_raw!r})')
+        else:
+            pr = pr_raw
+
     # categories (optional)
     categories_raw = frontmatter.get('categories', [])
     if isinstance(categories_raw, str):
@@ -299,6 +317,8 @@ def parse_change_file(path: str, errors: List[str]) -> Optional[Change]:
         filename=filename,
         breaking=breaking,
         categories=categories,
+        pr=pr,
+        pr_explicit_none=pr_explicit_none,
     )
 
 
@@ -338,8 +358,66 @@ def get_highest_bump(changes: List[Change]) -> Optional[str]:
     return max((c.bump for c in changes), key=lambda b: BUMP_ORDER.get(b, 0))
 
 
-def derive_pr_number(filename: str) -> Optional[int]:
-    """Find the PR that introduced .changes/<filename> via `gh api`."""
+_maintainers_cache: Optional[set] = None
+
+
+def fetch_maintainers() -> set:
+    """Return lowercase logins of collaborators with admin/maintain access.
+
+    Cached per process. Returns an empty set on failure (no gh, no auth, etc.),
+    in which case nobody is excluded from the Contributors footer.
+    """
+    global _maintainers_cache
+    if _maintainers_cache is not None:
+        return _maintainers_cache
+    _maintainers_cache = set()
+    try:
+        result = subprocess.run(
+            ['gh', 'api', 'repos/{owner}/{repo}/collaborators', '--paginate'],
+            capture_output=True, text=True, cwd=get_project_root(),
+        )
+    except FileNotFoundError:
+        return _maintainers_cache
+    if result.returncode != 0:
+        return _maintainers_cache
+    try:
+        collaborators = json.loads(result.stdout)
+    except json.JSONDecodeError:
+        return _maintainers_cache
+    if not isinstance(collaborators, list):
+        return _maintainers_cache
+    for c in collaborators:
+        if not isinstance(c, dict):
+            continue
+        perms = c.get('permissions') or {}
+        if not (perms.get('admin') or perms.get('maintain')):
+            continue
+        login = c.get('login')
+        if isinstance(login, str) and login:
+            _maintainers_cache.add(login.lower())
+    return _maintainers_cache
+
+
+def _gh_api_json(path: str, jq: Optional[str] = None):
+    cmd = ['gh', 'api', path]
+    if jq:
+        cmd += ['--jq', jq]
+    try:
+        result = subprocess.run(
+            cmd, capture_output=True, cwd=get_project_root(),
+        )
+    except FileNotFoundError:
+        return None
+    if result.returncode != 0:
+        return None
+    try:
+        return json.loads(result.stdout.decode('utf-8', errors='replace'))
+    except json.JSONDecodeError:
+        return None
+
+
+def derive_pr_from_filename(filename: str) -> Optional[int]:
+    """Find the PR number that introduced .changes/<filename>."""
     rel = f'{CHANGES_DIR}/{filename}'
     try:
         sha = run_git('log', '--diff-filter=A', '--format=%H', '-n', '1', '--', rel)
@@ -347,24 +425,40 @@ def derive_pr_number(filename: str) -> Optional[int]:
         return None
     if not sha:
         return None
-    try:
-        result = subprocess.run(
-            ['gh', 'api', f'repos/{{owner}}/{{repo}}/commits/{sha}/pulls'],
-            capture_output=True, text=True, cwd=get_project_root(),
-        )
-    except FileNotFoundError:
-        return None
-    if result.returncode != 0:
-        return None
-    try:
-        pulls = json.loads(result.stdout)
-    except json.JSONDecodeError:
-        return None
+    pulls = _gh_api_json(f'repos/{{owner}}/{{repo}}/commits/{sha}/pulls')
     if not isinstance(pulls, list) or not pulls:
         return None
     pr = pulls[0]
     num = pr.get('number') if isinstance(pr, dict) else None
     return int(num) if isinstance(num, int) else None
+
+
+def fetch_contributors_since(previous_tag: Optional[str]) -> List[str]:
+    """Distinct GitHub logins of commit authors since `previous_tag`.
+
+    Uses `repos/{owner}/{repo}/compare/<base>...HEAD`. Falls back to an empty
+    list if there's no base, no gh, or no network. Order follows first
+    appearance in the compare result.
+    """
+    if not previous_tag:
+        return []
+    logins = _gh_api_json(
+        f'repos/{{owner}}/{{repo}}/compare/{previous_tag}...HEAD',
+        jq='[.commits[].author.login | select(. != null)]',
+    )
+    if not isinstance(logins, list):
+        return []
+    seen = set()
+    out: List[str] = []
+    for login in logins:
+        if not isinstance(login, str) or not login:
+            continue
+        key = login.lower()
+        if key in seen:
+            continue
+        seen.add(key)
+        out.append(login)
+    return out
 
 
 def md(text: str) -> Optional[dict]:
@@ -402,6 +496,7 @@ def build_release_data(
         'released_at': released_at,
         'commit': commit,
         'headline': md(headline) if headline else None,
+        'contributors': fetch_contributors_since(previous) if enrich_pr else [],
         'changes': [],
     }
 
@@ -420,10 +515,11 @@ def build_release_data(
         if summary_md:
             entry['summary'] = summary_md
 
-        if enrich_pr:
-            pr = c.pr if c.pr is not None else derive_pr_number(c.filename)
-            if pr is not None:
-                entry['pr'] = pr
+        pr_value: Optional[int] = c.pr
+        if enrich_pr and pr_value is None and not c.pr_explicit_none:
+            pr_value = derive_pr_from_filename(c.filename)
+        if pr_value is not None:
+            entry['pr'] = pr_value
 
         entry['notices'] = [
             {'level': n.level, 'message': n.message} for n in c.notices
@@ -469,6 +565,15 @@ def render_changelog_markdown(data: dict) -> str:
         for c, n in all_notices:
             lines.append(f'- **{n["level"].upper()}**: {n["message"]}')
         lines.append('')
+
+    maintainers = fetch_maintainers()
+    contributors = [
+        u for u in data.get('contributors', [])
+        if u.lower() not in maintainers and not u.endswith('[bot]')
+    ]
+    if contributors:
+        thanks = ', '.join(f'@{u}' for u in contributors)
+        lines.append(f'### Contributors\n\nThanks to {thanks} for contributing to this release!\n')
 
     if previous:
         lines.append(
@@ -565,12 +670,17 @@ def cmd_rc(args) -> int:
         enrich_pr=not args.dry_run,
     )
 
+    notes = render_changelog_markdown(data)
+
     if args.dry_run:
         print(f'Would create tag: {tag}', file=sys.stderr)
+        print(f'\nRelease notes:\n{notes}', file=sys.stderr)
         print(json.dumps(data, indent=2))
         return 0
 
     _write_release_json(Path(args.output), data)
+    Path(args.notes_output).write_text(notes, encoding='utf-8')
+    print(f'Wrote {Path(args.notes_output).name}', file=sys.stderr)
     run_git('tag', tag)
     print(f'Created tag: {tag}', file=sys.stderr)
     return 0
@@ -608,6 +718,8 @@ def cmd_stable(args) -> int:
     root = get_project_root()
 
     _write_release_json(Path(args.output), data)
+    Path(args.notes_output).write_text(entry, encoding='utf-8')
+    print(f'Wrote {Path(args.notes_output).name}', file=sys.stderr)
 
     changelog_path = root / CHANGELOG_FILE
     existing = changelog_path.read_text(encoding='utf-8') if changelog_path.exists() else ''
@@ -635,6 +747,7 @@ def main() -> int:
     parser = argparse.ArgumentParser(description='OpenShock firmware release helper')
     parser.add_argument('--dry-run', action='store_true', help='Show what would happen without making changes')
     parser.add_argument('--output', default='release.json', help='Path to write release.json (default: release.json)')
+    parser.add_argument('--notes-output', default='release-notes.md', help='Path to write rendered release notes markdown (default: release-notes.md)')
     sub = parser.add_subparsers(dest='command')
 
     sub.add_parser('status', help='Show pending changes and next version')

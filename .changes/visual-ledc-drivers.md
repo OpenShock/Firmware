@@ -1,5 +1,6 @@
 ---
 type: minor
+pr: 435
 ---
 
 Replace LED managers with LEDC-driven drivers
