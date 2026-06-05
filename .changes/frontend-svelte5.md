@@ -1,5 +1,5 @@
 ---
-type: minor
+kind: changed
 pr: 427
 ---
 

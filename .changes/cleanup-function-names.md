@@ -1,5 +1,5 @@
 ---
-type: patch
+kind: chore
 pr: 437
 ---
 

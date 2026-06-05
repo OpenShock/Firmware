@@ -1,5 +1,5 @@
 ---
-type: minor
+kind: added
 pr: 426
 ---
 

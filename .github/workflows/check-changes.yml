@@ -22,7 +22,7 @@ jobs:
           fetch-depth: 0
 
       - name: Run change file check
-        uses: OpenShock/release-tool@v0.1.0-alpha.7
+        uses: OpenShock/release-tool@83d1560ed28524971f2fc90e45cd7bb61ff8ab47 # v0.1.0-alpha.12
         with:
           mode: check
           base-ref: ${{ github.event.pull_request.base.ref }}

@@ -1,5 +1,5 @@
 ---
-type: patch
+kind: fixed
 pr: 424
 ---
 
