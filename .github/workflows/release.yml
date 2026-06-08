@@ -35,7 +35,7 @@ jobs:
           # The default GITHUB_TOKEN does not trigger downstream workflows.
           token: ${{ secrets.RELEASE_TOKEN }}
 
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@v6
         with:
           python-version: ${{ env.PYTHON_VERSION }}
 
