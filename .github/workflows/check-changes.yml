@@ -17,12 +17,12 @@ jobs:
       !github.event.pull_request.draft &&
       !contains(github.event.pull_request.labels.*.name, 'no-changelog')
     steps:
-      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
+      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10  # v6.0.3
         with:
           fetch-depth: 0
 
       - name: Run change file check
-        uses: OpenShock/release-tool@83d1560ed28524971f2fc90e45cd7bb61ff8ab47 # v0.1.0-alpha.12
+        uses: OpenShock/release-tool@83d1560ed28524971f2fc90e45cd7bb61ff8ab47  # v0.1.0-alpha.12
         with:
           mode: check
           base-ref: ${{ github.event.pull_request.base.ref }}
@@ -31,7 +31,7 @@ jobs:
 
       - name: Upload verdict
         if: always()
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a  # v7.0.1
         with:
           name: release-check
           path: release-check.json
