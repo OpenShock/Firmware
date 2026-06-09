@@ -126,7 +126,11 @@
         {:else}
           <StepperNext disabled={!canAdvance}>
             {#if !canAdvance}
-              {isDIY && currentStep === 1 ? 'Configure pins first' : currentStep === wifiStep ? 'Connect WiFi first' : ''}
+              {isDIY && currentStep === 1
+                ? 'Configure pins first'
+                : currentStep === wifiStep
+                  ? 'Connect WiFi first'
+                  : ''}
             {:else}
               Next
             {/if}

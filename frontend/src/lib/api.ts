@@ -1,6 +1,6 @@
-import { toast } from 'svelte-sonner';
 import { hubState } from '$lib/stores';
 import { getApiBaseUrl } from '$lib/utils/localRedirect';
+import { toast } from 'svelte-sonner';
 
 function apiFetch(path: string, init?: RequestInit): Promise<Response> {
   return fetch(getApiBaseUrl() + path, init);
@@ -144,9 +144,12 @@ export async function setRfTxPin(pin: number): Promise<boolean> {
 
 export async function setEstopPin(pin: number): Promise<boolean> {
   try {
-    const res = await apiFetch('/api/config/estop/pin?' + new URLSearchParams({ pin: String(pin) }), {
-      method: 'PUT',
-    });
+    const res = await apiFetch(
+      '/api/config/estop/pin?' + new URLSearchParams({ pin: String(pin) }),
+      {
+        method: 'PUT',
+      }
+    );
     if (res.ok) {
       const data = await res.json();
       if (hubState.config) hubState.config.estop.gpioPin = data.pin;
@@ -167,7 +170,7 @@ export async function setEstopEnabled(enabled: boolean): Promise<boolean> {
   try {
     const res = await apiFetch(
       '/api/config/estop/enabled?' + new URLSearchParams({ enabled: enabled ? '1' : '0' }),
-      { method: 'PUT' },
+      { method: 'PUT' }
     );
     if (res.ok) {
       if (hubState.config) hubState.config.estop.enabled = enabled;
@@ -189,7 +192,7 @@ export async function saveWifiNetwork(
   ssid: string,
   password: string | null,
   connect: boolean,
-  security?: number,
+  security?: number
 ): Promise<void> {
   try {
     const params = new URLSearchParams({ ssid, connect: connect ? '1' : '0' });
@@ -270,7 +273,9 @@ export async function setOtaCheckInterval(interval: number): Promise<void> {
 
 export async function setOtaAllowBackendManagement(allow: boolean): Promise<void> {
   try {
-    await apiFetch(`/api/ota/allow-backend-management?allow=${allow ? '1' : '0'}`, { method: 'PUT' });
+    await apiFetch(`/api/ota/allow-backend-management?allow=${allow ? '1' : '0'}`, {
+      method: 'PUT',
+    });
   } catch {
     toast.error('Failed to update OTA backend management setting');
   }

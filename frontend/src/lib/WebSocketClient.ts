@@ -1,7 +1,7 @@
 import { isArrayBuffer, isString } from '$lib/typeguards';
+import { getDeviceHostname } from '$lib/utils/localRedirect';
 import { toast } from 'svelte-sonner';
 import { WebSocketMessageBinaryHandler } from './MessageHandlers';
-import { getDeviceHostname } from '$lib/utils/localRedirect';
 
 export enum ConnectionState {
   DISCONNECTED = 0,
@@ -95,7 +95,7 @@ export class WebSocketClient {
     }
   }
 
-  public Send(data: string | ArrayBufferLike | Blob | ArrayBufferView) {
+  public Send(data: string | Blob | BufferSource) {
     if (!this.#socket || this.#socket.readyState !== WebSocket.OPEN) {
       return;
     }

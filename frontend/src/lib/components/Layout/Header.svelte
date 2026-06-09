@@ -7,7 +7,11 @@
   class="border-border/40 bg-background/95 supports-backdrop-filter:bg-background/60 sticky top-0 z-50 flex w-full flex-row border-b backdrop-blur-sm"
 >
   <div class="flex flex-1 flex-row items-center space-x-2 px-4 py-2">
-    <button onclick={() => ViewModeStore.set('landing')} class="overflow-hidden select-none cursor-pointer" aria-label="OpenShock">
+    <button
+      onclick={() => ViewModeStore.set('landing')}
+      class="overflow-hidden select-none cursor-pointer"
+      aria-label="OpenShock"
+    >
       <img
         class="pointer-events-none inline-block h-6 sm:h-10"
         src="/logo.svg"

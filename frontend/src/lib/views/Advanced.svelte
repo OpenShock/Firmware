@@ -69,13 +69,17 @@
   async function toggleEstop() {
     await setEstopEnabled(!(hubState.config?.estop?.enabled ?? false));
   }
-
 </script>
 
 <div class="flex flex-1 flex-col items-center px-2 py-4">
   <div class="flex w-full max-w-md flex-1 flex-col">
     {#if activeSection === 'menu'}
-      <Button variant="ghost" size="sm" class="mb-2 self-start" onclick={() => ViewModeStore.set('landing')}>
+      <Button
+        variant="ghost"
+        size="sm"
+        class="mb-2 self-start"
+        onclick={() => ViewModeStore.set('landing')}
+      >
         <ArrowLeft class="mr-1.5 h-4 w-4" />
         Back
       </Button>
@@ -95,7 +99,12 @@
         {/each}
       </div>
     {:else}
-      <Button variant="ghost" size="sm" class="mb-2 self-start" onclick={() => (activeSection = 'menu')}>
+      <Button
+        variant="ghost"
+        size="sm"
+        class="mb-2 self-start"
+        onclick={() => (activeSection = 'menu')}
+      >
         <ArrowLeft class="mr-1.5 h-4 w-4" />
         Back
       </Button>
@@ -153,14 +162,20 @@
           <div class="flex flex-col gap-4">
             <div>
               <h3 class="text-lg font-semibold">Account</h3>
-              <p class="text-muted-foreground text-sm">Link this device to your OpenShock account.</p>
+              <p class="text-muted-foreground text-sm">
+                Link this device to your OpenShock account.
+              </p>
             </div>
 
             {#if accountLinked}
-              <div class="flex items-center justify-between rounded-lg border border-green-500/30 bg-green-500/10 p-3">
+              <div
+                class="flex items-center justify-between rounded-lg border border-green-500/30 bg-green-500/10 p-3"
+              >
                 <div class="flex items-center gap-2">
                   <CircleCheck class="h-5 w-5 text-green-500" />
-                  <p class="text-sm font-medium text-green-700 dark:text-green-300">Account linked</p>
+                  <p class="text-sm font-medium text-green-700 dark:text-green-300">
+                    Account linked
+                  </p>
                 </div>
                 <Button variant="outline" size="sm" onclick={unlinkAccount}>Unlink</Button>
               </div>

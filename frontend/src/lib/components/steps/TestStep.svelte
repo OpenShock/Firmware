@@ -30,14 +30,21 @@
 
     const fbb = new FlatbufferBuilder(128);
 
-    const cmdOffset = ShockerCommand.createShockerCommand(fbb, model, shockerId, ShockerCommandType.Vibrate, 50, 1000);
+    const cmdOffset = ShockerCommand.createShockerCommand(
+      fbb,
+      model,
+      shockerId,
+      ShockerCommandType.Vibrate,
+      50,
+      1000
+    );
     const cmdsVector = ShockerCommandList.createCommandsVector(fbb, [cmdOffset]);
     const listOffset = ShockerCommandList.createShockerCommandList(fbb, cmdsVector);
 
     const msgOffset = LocalToHubMessage.createLocalToHubMessage(
       fbb,
       LocalToHubMessagePayload.Common_ShockerCommandList,
-      listOffset,
+      listOffset
     );
 
     fbb.finish(msgOffset);
@@ -63,7 +70,7 @@
         class="border-input bg-background ring-offset-background focus-visible:ring-ring flex h-10 w-full flex-1 rounded-md border px-3 py-2 text-sm focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:outline-none"
         bind:value={model}
       >
-        {#each modelOptions as opt}
+        {#each modelOptions as opt (opt.value)}
           <option value={opt.value}>{opt.label}</option>
         {/each}
       </select>
@@ -78,7 +85,9 @@
         max={65535}
         class="flex-1"
         bind:value={shockerId}
-        onblur={() => { shockerId = Math.max(0, Math.min(65535, Math.floor(shockerId))); }}
+        onblur={() => {
+          shockerId = Math.max(0, Math.min(65535, Math.floor(shockerId)));
+        }}
       />
     </div>
   </div>
@@ -90,8 +99,8 @@
 
   <div class="rounded-lg border border-blue-500/30 bg-blue-500/10 p-3">
     <p class="text-xs text-blue-700 dark:text-blue-300">
-      If the shocker doesn't respond, try re-pairing it: hold the power button on the shocker
-      until it beeps, then press Test again.
+      If the shocker doesn't respond, try re-pairing it: hold the power button on the shocker until
+      it beeps, then press Test again.
     </p>
   </div>
 </div>

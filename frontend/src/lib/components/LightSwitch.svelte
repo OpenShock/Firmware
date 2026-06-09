@@ -15,8 +15,14 @@
     <span class="sr-only">Toggle theme</span>
   </DropdownMenu.Trigger>
   <DropdownMenu.Content align="end">
-    <DropdownMenu.Item onclick={() => (colorScheme.Value = ColorScheme.Light)}>Light</DropdownMenu.Item>
-    <DropdownMenu.Item onclick={() => (colorScheme.Value = ColorScheme.Dark)}>Dark</DropdownMenu.Item>
-    <DropdownMenu.Item onclick={() => (colorScheme.Value = ColorScheme.System)}>System</DropdownMenu.Item>
+    <DropdownMenu.Item onclick={() => (colorScheme.Value = ColorScheme.Light)}
+      >Light</DropdownMenu.Item
+    >
+    <DropdownMenu.Item onclick={() => (colorScheme.Value = ColorScheme.Dark)}
+      >Dark</DropdownMenu.Item
+    >
+    <DropdownMenu.Item onclick={() => (colorScheme.Value = ColorScheme.System)}
+      >System</DropdownMenu.Item
+    >
   </DropdownMenu.Content>
 </DropdownMenu.Root>

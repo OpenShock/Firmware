@@ -86,7 +86,7 @@
         <WiFiEntry ssid={netgroup.ssid} {netgroup} />
       {/each}
       {#each savedOnlySSIDs as ssid (ssid)}
-        <WiFiEntry ssid={ssid} />
+        <WiFiEntry {ssid} />
       {/each}
     </div>
   {/if}
