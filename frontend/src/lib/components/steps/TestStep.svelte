@@ -48,7 +48,7 @@
     );
 
     fbb.finish(msgOffset);
-    WebSocketClient.Instance.Send(fbb.asUint8Array());
+    WebSocketClient.Instance.Send(new Uint8Array(fbb.asUint8Array()));
 
     setTimeout(() => (testing = false), 1500);
   }
