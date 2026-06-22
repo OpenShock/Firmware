@@ -1,5 +1,6 @@
 ---
 kind: changed
+pr: 427
 ---
 Rewrite frontend to Svelte 5 + Vite
 

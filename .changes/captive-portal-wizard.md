@@ -1,5 +1,6 @@
 ---
 kind: added
+pr: 426
 ---
 Full setup wizard, REST API migration, and WiFi CRUD overhaul
 
