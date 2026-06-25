@@ -83,6 +83,7 @@ jobs:
           fetch-depth: 0
           sparse-checkout: |
             .github
+            .changes
 
       - uses: pnpm/action-setup@0ebf47130e4866e96fce0953f49152a61190b271  # v6.0.9
         name: Install pnpm
@@ -101,7 +102,20 @@ jobs:
         shell: bash
         run: pnpm install --frozen-lockfile --strict-peer-dependencies
 
+      # Single source of truth for the version bump: release-tool computes the
+      # next version from .changes/. status mode works on every branch (no
+      # branch-config dependency) and creates no tag, so dev/CI builds get
+      # labelled as a pre-release of the upcoming version instead of the last tag.
+      - name: Compute next version
+        id: relmeta
+        uses: OpenShock/release-tool@76d4bee4903b8ee5ed744840ec5a8b79d4f478d7  # v0.2.0
+        with:
+          mode: status
+
       - name: Get variables
         id: get-vars
         shell: bash
+        env:
+          RELEASE_NEXT_VERSION: ${{ steps.relmeta.outputs.next-version }}
+          RELEASE_SKIP: ${{ steps.relmeta.outputs.skip }}
         run: node ./.github/scripts/get-vars.js
