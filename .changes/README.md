@@ -1,113 +1,38 @@
-# Unreleased Changes
+# Change Files
 
-Drop one markdown file per change in this directory. At release time, `scripts/release.py` folds these into `CHANGELOG.md` **and** produces a versioned `release.json` document that the OpenShock backend ingests for the website/app release feed.
+Each `.md` file in this directory describes one pending change that will be
+included in the next release.
 
-**The JSON is the contract.** `CHANGELOG.md` is one renderer of it. When in doubt about the shape of a field, look at the schema below and at `scripts/release.py`.
+## Format
 
-## File format
-
-```yaml
+```
 ---
-type: minor                          # required: major | minor | patch
-breaking: false                      # optional: bool, defaults true if type==major
-categories: [captive-portal, wifi]   # optional: list, validated against enum
+kind: added       # added | changed | deprecated | removed | fixed | security | safety | chore
+breaking: false   # optional; true forces a major semver bump
+mandatory: false  # optional; true means this version must be installed before newer ones
 ---
+Technical title (required, one line — appears in CHANGELOG and GitHub Release)
 
-Title line for the changelog entry
-
-Optional body with more detail, bullet points, etc.
-All of this goes into CHANGELOG.md and the JSON `body` field.
-
-- Detail one
-- Detail two
-
-## Summary
-
-Short user-facing markdown for the website UI. Less technical than the body.
+## Release Note
+User-facing title line (appears in release.json)
+Additional description lines shown in the GitHub Release and release.json.
 
 ## Notices
-
-- warning: Users must re-pair their shockers after updating
-- info: The captive portal now uses REST instead of WebSocket
-- error: Third-party WS tools will break
+- warning: something users must know before upgrading
+- info: optional note or migration step
 ```
 
-### Fields
+## Semver derivation
 
-**type** (required): `major`, `minor`, or `patch`. Drives semver bumping.
+- `breaking: true` -> major bump
+- `kind: fixed|security|safety|chore` -> patch bump
+- everything else -> minor bump
 
-**breaking** (optional, bool): mark a change as breaking even when it's a `minor`/`patch` bump (e.g. opt-in feature flip, config schema change). Defaults to `true` when `type: major`.
+## File naming
 
-**categories** (optional, list): tags for filtering/grouping on the website. Validated against the enum below — unknown values fail the release. Empty list is fine.
+Name the file after the change (e.g. `add-user-auth.md`).
+Run `release-tool new "<title>" --kind added` to generate one automatically.
 
-Valid categories: `captive-portal`, `wifi`, `rf`, `ota`, `config`, `serial`, `security`, `frontend`, `gateway`, `gpio`, `estop`, `performance`, `build`.
+## Special files
 
-**Changelog entry** (required): everything between the frontmatter and the first recognized `##` section. First line is the title, rest is the body. Only `## Summary` and `## Notices` are recognized as section breaks — any other `##` header stays as body content.
-
-**Summary** (optional): short user-friendly markdown for the website/app UI.
-
-**Notices** (optional): list of `level: message` pairs, one per line, prefixed with `- `. Valid levels: `info`, `warning`, `error`. Unknown levels fail the release. Notices stay attached to their parent change in the JSON output.
-
-### Stable ID
-
-The change's stable ID is derived from the filename: `.changes/captive-portal-wizard.md` → `id: "captive-portal-wizard"`. This ID survives title edits, so renaming a file is the only thing that creates a "new" change downstream. Choose a slug you're willing to keep.
-
-### Minimal example
-
-```yaml
----
-type: patch
----
-
-Fix crash on knockoff boards after network connects
-```
-
-### Release-level headline
-
-To add a one-paragraph framing at the top of the release ("This release focuses on…"), create `.changes/_headline.md` with plain markdown (no frontmatter). It's consumed and deleted at stable-release time alongside the change files. Optional.
-
-## Release JSON contract
-
-`release.py` writes `release.json` to the repo root and the workflow POSTs it to the OpenShock API and attaches it to the GitHub Release.
-
-```jsonc
-{
-  "schema_version": 1,             // contract version; bumped on breaking changes
-  "component": "firmware",
-  "version": "1.6.0",
-  "tag": "1.6.0",                  // includes "-rc.N" for RCs
-  "prerelease": false,
-  "previous_version": "1.5.0",     // last stable, even for RCs
-  "released_at": "2026-05-26T14:23:00Z",
-  "commit": "30663e6...",
-  "headline": { "format": "markdown", "text": "..." },   // or null
-  "changes": [
-    {
-      "id": "captive-portal-wizard",
-      "type": "minor",
-      "breaking": false,
-      "categories": ["captive-portal", "frontend"],
-      "pr": 1234,                                                  // optional, auto-derived
-      "title":   { "format": "markdown", "text": "..." },
-      "body":    { "format": "markdown", "text": "..." },          // optional
-      "summary": { "format": "markdown", "text": "..." },          // optional
-      "notices": [ { "level": "info", "message": "..." } ]
-    }
-  ]
-}
-```
-
-Every human-readable text field is `{format, text}` so adding `format: "html"` or `format: "plain"` later is non-breaking. `pr` is auto-derived via `gh api` (best-effort; omitted on failure). Notices nest inside their parent change — a consumer can `flatMap` for a banner UI, but the parent link cannot be reconstructed from a flat list.
-
-## Release workflow
-
-```bash
-python scripts/release.py status        # See pending changes and next version
-python scripts/release.py rc            # Create or bump an RC tag (writes release.json)
-python scripts/release.py stable        # Promote to stable, consume changes (writes release.json)
-python scripts/release.py --dry-run rc  # Preview without making changes (prints JSON to stdout)
-```
-
-Branch model: PRs land in `develop`; merges to `beta` cut RC tags; merges to `master` cut stable releases. The `release.yml` workflow handles both automatically. `check-changes.yml` runs schema validation on every PR so malformed change files fail at PR time, not at release time.
-
-Install script dependencies locally with `pip install -r scripts/requirements.txt`.
+- `_headline.md` - optional release headline shown at the top of the GitHub Release body
