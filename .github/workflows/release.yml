@@ -26,12 +26,21 @@ jobs:
     if: github.actor != 'github-actions[bot]'
 
     steps:
+      # Mint a short-lived, repo-scoped installation token from the release
+      # GitHub App. A non-GITHUB_TOKEN actor is required so the tag push below
+      # triggers ci-build; the default GITHUB_TOKEN does not trigger downstream
+      # workflows. Using an App (instead of a personal PAT) keeps the token
+      # short-lived, least-privilege, and owned by the org rather than a person.
+      - uses: actions/create-github-app-token@fee1f7d63c2ff003460e3d139729b119787bc349  # v2.2.2
+        id: app-token
+        with:
+          app-id: ${{ secrets.RELEASE_APP_ID }}
+          private-key: ${{ secrets.RELEASE_APP_KEY }}
+
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0  # v7.0.0
         with:
           fetch-depth: 0
-          # A PAT is required so the tag push triggers ci-build.
-          # The default GITHUB_TOKEN does not trigger downstream workflows.
-          token: ${{ secrets.RELEASE_TOKEN }}
+          token: ${{ steps.app-token.outputs.token }}
 
       - name: Configure git
         run: |
@@ -52,7 +61,7 @@ jobs:
           output: release.json
           notes-output: release-notes.md
         env:
-          GITHUB_TOKEN: ${{ secrets.RELEASE_TOKEN }}
+          GITHUB_TOKEN: ${{ steps.app-token.outputs.token }}
 
       - name: Push commit and tag
         if: steps.meta.outputs.tag != ''
@@ -79,7 +88,7 @@ jobs:
       - name: Create GitHub Release
         if: steps.meta.outputs.tag != ''
         env:
-          GH_TOKEN: ${{ secrets.RELEASE_TOKEN }}
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
           TAG: ${{ steps.meta.outputs.tag }}
           PRERELEASE: ${{ steps.meta.outputs.prerelease }}
         run: |
