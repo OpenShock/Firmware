@@ -1,0 +1,12 @@
+allowBuilds:
+  '@tailwindcss/oxide': true
+  esbuild: true
+blockExoticSubdeps: true
+minimumReleaseAge: 4320 # 3 days
+
+minimumReleaseAgeExclude:
+  - '@openshock/*'
+
+onlyBuiltDependencies:
+  - '@tailwindcss/oxide'
+  - esbuild
