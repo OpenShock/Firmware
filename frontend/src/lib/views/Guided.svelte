@@ -10,13 +10,13 @@
     StepperDescription,
     StepperNext,
     StepperPrevious,
-  } from '$lib/components/ui/stepper';
+  } from '@openshock/svelte-core/stepper';
   import PinsStep from '$lib/components/steps/HardwareStep.svelte';
   import WiFiStep from '$lib/components/steps/WiFiStep.svelte';
   import TestStep from '$lib/components/steps/TestStep.svelte';
   import AccountStep from '$lib/components/steps/AccountStep.svelte';
   import { hubState, ViewModeStore } from '$lib/stores';
-  import { Button } from '$lib/components/ui/button';
+  import { Button } from '@openshock/svelte-core/ui/button';
 
   interface Props {
     onComplete: () => void;

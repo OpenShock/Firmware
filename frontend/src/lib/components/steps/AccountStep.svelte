@@ -1,9 +1,9 @@
 <script lang="ts">
   import { linkAccount, unlinkAccount } from '$lib/api';
   import { hubState } from '$lib/stores';
-  import { Button } from '$lib/components/ui/button';
-  import { Input } from '$lib/components/ui/input';
-  import { Label } from '$lib/components/ui/label';
+  import { Button } from '@openshock/svelte-core/ui/button';
+  import { Input } from '@openshock/svelte-core/ui/input';
+  import { Label } from '@openshock/svelte-core/ui/label';
   import { CircleCheck, Wifi, WifiOff, Unlink } from '@lucide/svelte';
 
   function isValidLinkCode(str: string) {

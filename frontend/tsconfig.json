@@ -14,7 +14,11 @@
     "strict": true,
     "paths": {
       "$lib": ["./src/lib"],
-      "$lib/*": ["./src/lib/*"]
+      "$lib/*": ["./src/lib/*"],
+      "$core": ["./node_modules/@openshock/svelte-core/dist"],
+      "$core/*": ["./node_modules/@openshock/svelte-core/dist/*"],
+      "$hadcn": ["./node_modules/@openshock/svelte-core/dist/components/ui"],
+      "$hadcn/*": ["./node_modules/@openshock/svelte-core/dist/components/ui/*"]
     }
   },
   "include": ["src/**/*.ts", "src/**/*.d.ts", "src/**/*.svelte", "vite.config.ts"]

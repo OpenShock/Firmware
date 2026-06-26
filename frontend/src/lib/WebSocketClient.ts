@@ -1,5 +1,5 @@
-import { isArrayBuffer, isString } from '$lib/typeguards';
 import { getDeviceHostname } from '$lib/utils/localRedirect';
+import { isArrayBuffer, isString } from '@openshock/svelte-core/typeguards';
 import { toast } from 'svelte-sonner';
 import { WebSocketMessageBinaryHandler } from './MessageHandlers';
 

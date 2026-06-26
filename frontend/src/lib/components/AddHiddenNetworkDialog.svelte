@@ -1,6 +1,6 @@
 <script lang="ts">
   import { saveWifiNetwork } from '$lib/api';
-  import { Button, buttonVariants } from '$lib/components/ui/button';
+  import { Button, buttonVariants } from '@openshock/svelte-core/ui/button';
   import {
     Dialog,
     DialogContent,
@@ -9,9 +9,9 @@
     DialogHeader,
     DialogTitle,
     DialogTrigger,
-  } from '$lib/components/ui/dialog';
-  import { Input } from '$lib/components/ui/input';
-  import { Label } from '$lib/components/ui/label';
+  } from '@openshock/svelte-core/ui/dialog';
+  import { Input } from '@openshock/svelte-core/ui/input';
+  import { Label } from '@openshock/svelte-core/ui/label';
   import { Plus } from '@lucide/svelte';
 
   const securityOptions = [

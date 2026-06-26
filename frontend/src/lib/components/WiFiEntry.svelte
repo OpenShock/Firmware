@@ -9,7 +9,7 @@
   } from '$lib/api';
   import WiFiDetailsDialog from '$lib/components/WiFiDetailsDialog.svelte';
   import type { WiFiNetworkGroup } from '$lib/types';
-  import { Button, buttonVariants } from '$lib/components/ui/button';
+  import { Button, buttonVariants } from '@openshock/svelte-core/ui/button';
   import {
     Dialog,
     DialogContent,
@@ -18,9 +18,9 @@
     DialogHeader,
     DialogTitle,
     DialogTrigger,
-  } from '$lib/components/ui/dialog';
-  import { Input } from '$lib/components/ui/input';
-  import { Label } from '$lib/components/ui/label';
+  } from '@openshock/svelte-core/ui/dialog';
+  import { Input } from '@openshock/svelte-core/ui/input';
+  import { Label } from '@openshock/svelte-core/ui/label';
   import {
     ArrowRight,
     Link,

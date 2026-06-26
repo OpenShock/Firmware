@@ -20,6 +20,7 @@
 		"@eslint/js": "latest",
 		"@internationalized/date": "^3.12.2",
 		"@lucide/svelte": "^1.17.0",
+		"@openshock/svelte-core": "^0.2.2",
 		"@playwright/test": "^1.60.0",
 		"@sveltejs/vite-plugin-svelte": "^7.1.2",
 		"@tailwindcss/vite": "^4.3.0",
@@ -61,11 +62,5 @@
 	"packageManager": "pnpm@11.1.2",
 	"browserslist": [
 		"> 0.5%, last 2 versions, Firefox ESR, not dead, not op_mini all"
-	],
-	"pnpm": {
-		"onlyBuiltDependencies": [
-			"@tailwindcss/oxide",
-			"esbuild"
-		]
-	}
+	]
 }
