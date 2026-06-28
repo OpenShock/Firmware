@@ -1,6 +1,5 @@
 ---
 kind: changed
-pr: 484
 ---
 Report specific account linking failure reasons instead of a generic internal error
 
