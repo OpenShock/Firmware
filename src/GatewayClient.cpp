@@ -14,11 +14,14 @@ const char* const TAG = "GatewayClient";
 
 using namespace OpenShock;
 
+const int64_t GATEWAY_PING_TIMEOUT = 90'000;
+
 static bool s_bootStatusSent = false;
 
 GatewayClient::GatewayClient(const std::string& authToken)
   : m_webSocket()
   , m_state(GatewayClientState::Disconnected)
+  , m_lastPingTimestamp(0)
 {
   OS_LOGD(TAG, "Creating GatewayClient");
 
@@ -90,6 +93,11 @@ bool GatewayClient::sendMessageBIN(tcb::span<const uint8_t> data)
   return m_webSocket.sendBIN(data.data(), data.size());
 }
 
+void GatewayClient::markPingReceived()
+{
+  m_lastPingTimestamp = OpenShock::millis();
+}
+
 bool GatewayClient::loop()
 {
   if (m_state == GatewayClientState::Disconnected) {
@@ -102,6 +110,13 @@ bool GatewayClient::loop()
   if (m_state != GatewayClientState::Connected) {
     // return true to indicate that we are still busy
     return true;
+  }
+
+  if (m_lastPingTimestamp != 0 && (OpenShock::millis() - m_lastPingTimestamp) > GATEWAY_PING_TIMEOUT) {
+    OS_LOGW(TAG, "No ping received from gateway for %lld ms, forcing reconnect", GATEWAY_PING_TIMEOUT);
+    m_webSocket.disconnect();
+    _setState(GatewayClientState::Disconnected);
+    return false;
   }
 
   return true;
@@ -160,6 +175,7 @@ void GatewayClient::_handleEvent(WStype_t type, uint8_t* payload, std::size_t le
       _setState(GatewayClientState::Disconnected);
       break;
     case WStype_CONNECTED:
+      m_lastPingTimestamp = 0;
       _setState(GatewayClientState::Connected);
       _sendBootStatus();
       break;

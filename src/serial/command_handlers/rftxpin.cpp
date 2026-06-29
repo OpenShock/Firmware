@@ -5,7 +5,7 @@
 #include "Convert.h"
 #include "SetGPIOResultCode.h"
 
-void _handleRfTxPinCommand(std::string_view arg, bool isAutomated)
+static void handleRfTxPinCommand(std::string_view arg, bool isAutomated)
 {
   gpio_num_t txPin;
 
@@ -49,9 +49,9 @@ OpenShock::Serial::CommandGroup OpenShock::Serial::CommandHandlers::RfTxPinHandl
 {
   auto group = OpenShock::Serial::CommandGroup("rftxpin"sv);
 
-  auto& getCommand = group.addCommand("Get the GPIO pin used for the radio transmitter"sv, _handleRfTxPinCommand);
+  auto& getCommand = group.addCommand("Get the GPIO pin used for the radio transmitter"sv, handleRfTxPinCommand);
 
-  auto& setCommand = group.addCommand("Set the GPIO pin used for the radio transmitter"sv, _handleRfTxPinCommand);
+  auto& setCommand = group.addCommand("Set the GPIO pin used for the radio transmitter"sv, handleRfTxPinCommand);
   setCommand.addArgument("pin"sv, "must be a number"sv, "15"sv);
 
   return group;

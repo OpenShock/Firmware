@@ -1,0 +1,8 @@
+{
+  "tag_prefix": "",
+  "branches": {
+    "develop": { "release": "none", "label": "develop", "sha": true },
+    "beta":    { "release": "prerelease", "label": "beta" },
+    "master":  { "release": "stable" }
+  }
+}

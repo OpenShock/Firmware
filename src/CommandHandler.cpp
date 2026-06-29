@@ -127,7 +127,7 @@ exit:  // Locals (activityMap) destruct here before task deletion
   vTaskDelete(nullptr);
 }
 
-bool _internalSetKeepAliveEnabled(bool enabled)
+static bool internalSetKeepAliveEnabled(bool enabled)
 {
   bool wasEnabled = s_keepAliveQueue != nullptr && s_keepAliveTaskHandle != nullptr;
 
@@ -183,7 +183,7 @@ static void commandhandler_handleestopstatechange(void* event_handler_arg, esp_e
 
   EStopState state = *static_cast<EStopState*>(event_data);
 
-  _internalSetKeepAliveEnabled(state == EStopState::Idle);
+  internalSetKeepAliveEnabled(state == EStopState::Idle);
 }
 
 bool CommandHandler::Init()
@@ -226,7 +226,7 @@ bool CommandHandler::Init()
   }
 
   if (rfConfig.keepAliveEnabled) {
-    _internalSetKeepAliveEnabled(true);
+    internalSetKeepAliveEnabled(true);
   }
 
   Config::EStopConfig estopConfig;
@@ -275,7 +275,7 @@ SetGPIOResultCode CommandHandler::SetRfTxPin(gpio_num_t txPin)
 
 bool CommandHandler::SetKeepAliveEnabled(bool enabled)
 {
-  if (!_internalSetKeepAliveEnabled(enabled)) {
+  if (!internalSetKeepAliveEnabled(enabled)) {
     return false;
   }
 
@@ -305,6 +305,11 @@ gpio_num_t CommandHandler::GetRfTxPin()
 
 bool CommandHandler::HandleCommand(ShockerModelType model, uint16_t shockerId, ShockerCommandType type, uint8_t intensity, uint16_t durationMs)
 {
+  if (EStopManager::IsEStopped()) {
+    OS_LOGD(TAG, "Ignoring shocker command due to EmergencyStop being activated");
+    return false;
+  }
+
   auto transmitter = GetTransmitter();
   if (transmitter == nullptr) {
     OS_LOGW(TAG, "RF Transmitter is not initialized, ignoring command");

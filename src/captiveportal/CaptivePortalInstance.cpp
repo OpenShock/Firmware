@@ -206,6 +206,21 @@ CaptivePortal::CaptivePortalInstance::CaptivePortalInstance()
         case ResultCode::RateLimited:
           error = "RateLimited";
           break;
+        case ResultCode::RequestFailed:
+          error = "RequestFailed";
+          break;
+        case ResultCode::RequestTimedOut:
+          error = "RequestTimedOut";
+          break;
+        case ResultCode::ServerError:
+          error = "ServerError";
+          break;
+        case ResultCode::InvalidResponse:
+          error = "InvalidResponse";
+          break;
+        case ResultCode::ConfigSaveFailed:
+          error = "ConfigSaveFailed";
+          break;
         default:
           error = "InternalError";
           break;
