@@ -32,7 +32,7 @@ const char* const TAG = "SerialInputHandler";
 
 namespace std {
   struct hash_ci {
-    std::size_t operator()(std::string_view str) const
+    std::size_t operator()(std::string_view str) const noexcept
     {
       std::size_t hash = 7;
 
@@ -58,14 +58,14 @@ using namespace std::string_view_literals;
 
 using namespace OpenShock;
 
-const int64_t PASTE_INTERVAL_THRESHOLD_MS       = 20;
-const std::size_t SERIAL_BUFFER_CLEAR_THRESHOLD = 512;
+const int64_t PASTE_INTERVAL_THRESHOLD_MS    = 20;
+const std::size_t SERIAL_BUFFER_MAX_CAPACITY = 4096;
 
 static bool s_echoEnabled = true;
 static std::vector<OpenShock::Serial::CommandGroup> s_commandGroups;
 static std::unordered_map<std::string_view, OpenShock::Serial::CommandGroup, std::hash_ci, std::equals_ci> s_commandHandlers;
 
-void _printCompleteHelp()
+static void printCompleteHelp()
 {
   std::size_t commandCount    = 0;
   std::size_t longestCommand  = 0;
@@ -122,16 +122,17 @@ void _printCompleteHelp()
   }
 
   SerialInputHandler::PrintWelcomeHeader();
-  ::Serial.print(buffer.data());
+
+  OS_SERIAL_PRINT(buffer.data());
 }
 
-void _printCommandHelp(Serial::CommandGroup& group)
+static void printCommandHelp(Serial::CommandGroup& group)
 {
   std::size_t size = 0;
   for (const auto& command : group.commands()) {
     size += 2;  // +2 for newline
     size += group.name().size();
-    size++;  // +1 for space
+    size++;     // +1 for space
 
     if (command.name().size() > 0) {
       size += command.name().size() + 1;  // +1 for space
@@ -144,7 +145,7 @@ void _printCommandHelp(Serial::CommandGroup& group)
     size += 2;  // +2 for newline
 
     if (command.description().size() > 0) {
-      size = command.description().size() + 4;  // +2 for indent, +2 for newline
+      size += command.description().size() + 4;  // +2 for indent, +2 for newline
     }
 
     if (command.arguments().size() > 0) {
@@ -255,21 +256,21 @@ void _printCommandHelp(Serial::CommandGroup& group)
   buffer.push_back('\r');
   buffer.push_back('\n');
 
-  ::Serial.print(buffer.data());
+  OS_SERIAL_PRINT(buffer.data());
 }
 
-void _handleHelpCommand(std::string_view arg, bool isAutomated)
+static void handleHelpCommand(std::string_view arg, bool isAutomated)
 {
   arg = OpenShock::StringTrim(arg);
   if (arg.empty()) {
-    _printCompleteHelp();
+    printCompleteHelp();
     return;
   }
 
   // Get help for a specific command
   auto it = s_commandHandlers.find(arg);
   if (it != s_commandHandlers.end()) {
-    _printCommandHelp(it->second);
+    printCommandHelp(it->second);
     return;
   }
 
@@ -288,7 +289,7 @@ class SerialBuffer {
   DISABLE_MOVE(SerialBuffer);
 
 public:
-  constexpr SerialBuffer()
+  SerialBuffer()
     : m_data(nullptr)
     , m_size(0)
     , m_capacity(0)
@@ -302,12 +303,12 @@ public:
   }
   inline ~SerialBuffer() { delete[] m_data; }
 
-  constexpr char* data() { return m_data; }
-  constexpr std::size_t size() const { return m_size; }
-  constexpr std::size_t capacity() const { return m_capacity; }
-  constexpr bool empty() const { return m_size == 0; }
+  constexpr const char* data() const noexcept { return m_data == nullptr ? "" : m_data; }
+  constexpr std::size_t size() const noexcept { return m_size; }
+  constexpr std::size_t capacity() const noexcept { return m_capacity; }
+  constexpr bool empty() const noexcept { return m_size == 0; }
 
-  constexpr void clear() { m_size = 0; }
+  constexpr void clear() noexcept { m_size = 0; }
   inline void destroy()
   {
     delete[] m_data;
@@ -320,6 +321,11 @@ public:
   {
     size = (size + 31) & ~31;  // Align to 32 bytes
 
+    if (size > SERIAL_BUFFER_MAX_CAPACITY) {
+      OS_LOGE(TAG, "Refused to reserve %zu bytes, clearing buffer", size);
+      size   = SERIAL_BUFFER_MAX_CAPACITY;
+      m_size = 0;
+    }
     if (size <= m_capacity) {
       return;
     }
@@ -330,27 +336,28 @@ public:
       delete[] m_data;
     }
 
-    m_data     = newData;
-    m_capacity = size;
+    m_data                 = newData;
+    m_capacity             = size;
+    m_data[m_capacity - 1] = 0;
   }
 
   inline void push_back(char c)
   {
     if (m_size >= m_capacity) {
-      reserve(m_capacity + 16);
+      reserve(m_size + 16);
     }
 
     m_data[m_size++] = c;
   }
 
-  constexpr void pop_back()
+  constexpr void pop_back() noexcept
   {
     if (m_size > 0) {
       --m_size;
     }
   }
 
-  constexpr operator std::string_view() const { return std::string_view(m_data, m_size); }
+  constexpr operator std::string_view() const { return std::string_view(data(), m_size); }
 
 private:
   char* m_data;
@@ -365,10 +372,10 @@ enum class SerialReadResult {
   AutoCompleteRequest,
 };
 
-SerialReadResult _tryReadSerialLine(SerialBuffer& buffer)
+static SerialReadResult tryReadSerialLine(SerialBuffer& buffer)
 {
   // Check if there's any data available
-  int available = ::Serial.available();
+  int available = OS_SERIAL.available();
   if (available <= 0) {
     return SerialReadResult::NoData;
   }
@@ -378,7 +385,7 @@ SerialReadResult _tryReadSerialLine(SerialBuffer& buffer)
 
   // Read the data into the buffer
   while (available-- > 0) {
-    char c = ::Serial.read();
+    char c = OS_SERIAL.read();
 
     // Handle backspace
     if (c == '\b') {
@@ -412,12 +419,12 @@ SerialReadResult _tryReadSerialLine(SerialBuffer& buffer)
   return SerialReadResult::Data;
 }
 
-void _skipSerialWhitespaces(SerialBuffer& buffer)
+static void skipSerialWhitespaces(SerialBuffer& buffer)
 {
-  int available = ::Serial.available();
+  int available = OS_SERIAL.available();
 
   while (available-- > 0) {
-    char c = ::Serial.read();
+    char c = OS_SERIAL.read();
 
     if (c != ' ' && c != '\r' && c != '\n') {
       buffer.push_back(c);
@@ -426,12 +433,75 @@ void _skipSerialWhitespaces(SerialBuffer& buffer)
   }
 }
 
-void _echoBuffer(std::string_view buffer)
+#if ARDUINO_USB_MODE
+static SerialReadResult tryReadUSBSerialLine(SerialBuffer& buffer)
 {
-  ::Serial.printf(CLEAR_LINE "> %.*s", buffer.size(), buffer.data());
+  // Check if there's any data available
+  int available = OS_SERIAL_USB.available();
+  if (available <= 0) {
+    return SerialReadResult::NoData;
+  }
+
+  // Reserve space for the new data
+  buffer.reserve(buffer.size() + available);
+
+  // Read the data into the buffer
+  while (available-- > 0) {
+    char c = OS_SERIAL_USB.read();
+
+    // Handle backspace
+    if (c == '\b') {
+      buffer.pop_back();  // Remove the last character from the buffer if it exists
+      continue;
+    }
+
+    // Handle newline
+    if (c == '\r' || c == '\n') {
+      if (!buffer.empty()) {
+        return SerialReadResult::LineEnd;
+      }
+      continue;
+    }
+
+    // Handle leading whitespace
+    if (c == ' ' && buffer.empty()) {
+      continue;
+    }
+
+    if (c == '\t') {
+      return SerialReadResult::AutoCompleteRequest;
+    }
+
+    // If character is printable, add it to the buffer
+    if (c > 31 && c < 127) {
+      buffer.push_back(c);
+    }
+  }
+
+  return SerialReadResult::Data;
 }
 
-void _echoHandleSerialInput(std::string_view buffer, bool hasData)
+static void skipUSBSerialWhitespaces(SerialBuffer& buffer)
+{
+  int available = OS_SERIAL_USB.available();
+
+  while (available-- > 0) {
+    char c = OS_SERIAL_USB.read();
+
+    if (c != ' ' && c != '\r' && c != '\n') {
+      buffer.push_back(c);
+      break;
+    }
+  }
+}
+#endif
+
+static void echoBuffer(std::string_view buffer)
+{
+  OS_SERIAL_PRINTF(CLEAR_LINE "> %.*s", buffer.size(), buffer.data());
+}
+
+static void echoHandleSerialInput(std::string_view buffer, bool hasData)
 {
   static int64_t lastActivity = 0;
   static bool hasChanges      = false;
@@ -454,13 +524,13 @@ void _echoHandleSerialInput(std::string_view buffer, bool hasData)
 
   // If theres has been received data, but no new data for a while, echo the buffer
   if (hasChanges && OpenShock::millis() - lastActivity > PASTE_INTERVAL_THRESHOLD_MS) {
-    _echoBuffer(buffer);
+    echoBuffer(buffer);
     hasChanges   = false;
     lastActivity = OpenShock::millis();
   }
 }
 
-void _processSerialLine(std::string_view line)
+static void processSerialLine(std::string_view line)
 {
   line = OpenShock::StringTrim(line);
   if (line.empty()) {
@@ -474,8 +544,8 @@ void _processSerialLine(std::string_view line)
   if (isAutomated) {
     line = line.substr(1);
   } else if (s_echoEnabled) {
-    _echoBuffer(line);
-    ::Serial.println();
+    echoBuffer(line);
+    OS_SERIAL_PRINTLN();
   }
 
   auto parts                 = OpenShock::StringSplit(line, ' ', 1);
@@ -483,7 +553,7 @@ void _processSerialLine(std::string_view line)
   std::string_view arguments = parts.size() > 1 ? parts[1] : std::string_view();
 
   if (command == "help"sv) {
-    _handleHelpCommand(arguments, isAutomated);
+    handleHelpCommand(arguments, isAutomated);
     return;
   }
 
@@ -512,7 +582,7 @@ void _processSerialLine(std::string_view line)
 
       // Check if the subcommand requires arguments
       if (cmd.arguments().size() > 1 && parts.size() < 2) {
-        _printCommandHelp(it->second);
+        printCommandHelp(it->second);
         return;
       }
 
@@ -534,7 +604,7 @@ void _processSerialLine(std::string_view line)
 
     // Check if the command requires arguments
     if (cmd.arguments().size() > 0 && arguments.empty()) {
-      _printCommandHelp(it->second);
+      printCommandHelp(it->second);
       return;
     }
 
@@ -546,35 +616,62 @@ void _processSerialLine(std::string_view line)
   SERPR_ERROR("Command \"%.*s\" not found", command.size(), command.data());
 }
 
-void _serialRxTask(void*)
+static void serialRxTask(void*)
 {
   SerialBuffer buffer(32);
 
   while (true) {
-    switch (_tryReadSerialLine(buffer)) {
+    switch (tryReadSerialLine(buffer)) {
       case SerialReadResult::LineEnd:
-        _processSerialLine(buffer);
+        processSerialLine(buffer);
 
         // Deallocate memory if the buffer is too large
-        if (buffer.capacity() > SERIAL_BUFFER_CLEAR_THRESHOLD) {
+        if (buffer.capacity() > SERIAL_BUFFER_MAX_CAPACITY) {
           buffer.destroy();
         } else {
           buffer.clear();
         }
 
         // Skip any remaining trailing whitespaces
-        _skipSerialWhitespaces(buffer);
+        skipSerialWhitespaces(buffer);
         break;
       case SerialReadResult::AutoCompleteRequest:
-        ::Serial.printf(CLEAR_LINE "> %.*s [AutoComplete is not implemented]", buffer.size(), buffer.data());
+        OS_SERIAL_PRINTF(CLEAR_LINE "> %.*s [AutoComplete is not implemented]", buffer.size(), buffer.data());
         break;
       case SerialReadResult::Data:
-        _echoHandleSerialInput(buffer, true);
+        echoHandleSerialInput(buffer, true);
         break;
       default:
-        _echoHandleSerialInput(buffer, false);
+        echoHandleSerialInput(buffer, false);
         break;
     }
+
+#if ARDUINO_USB_MODE
+    switch (tryReadUSBSerialLine(buffer)) {
+      case SerialReadResult::LineEnd:
+        processSerialLine(buffer);
+
+        // Deallocate memory if the buffer is too large
+        if (buffer.capacity() > SERIAL_BUFFER_MAX_CAPACITY) {
+          buffer.destroy();
+        } else {
+          buffer.clear();
+        }
+
+        // Skip any remaining trailing whitespaces
+        skipUSBSerialWhitespaces(buffer);
+        break;
+      case SerialReadResult::AutoCompleteRequest:
+        OS_SERIAL_PRINTF(CLEAR_LINE "> %.*s [AutoComplete is not implemented]", buffer.size(), buffer.data());
+        break;
+      case SerialReadResult::Data:
+        echoHandleSerialInput(buffer, true);
+        break;
+      default:
+        echoHandleSerialInput(buffer, false);
+        break;
+    }
+#endif
 
     vTaskDelay(pdMS_TO_TICKS(20));  // 50 Hz update rate
   }
@@ -598,14 +695,14 @@ bool SerialInputHandler::Init()
 
   SerialInputHandler::PrintWelcomeHeader();
   SerialInputHandler::PrintVersionInfo();
-  ::Serial.println();
+  OS_SERIAL_PRINTLN();
 
   if (!Config::GetSerialInputConfigEchoEnabled(s_echoEnabled)) {
     OS_LOGE(TAG, "Failed to get serial echo status from config");
     return false;
   }
 
-  if (TaskUtils::TaskCreateExpensive(_serialRxTask, "SerialRX", 10'000, nullptr, 1, nullptr) != pdPASS) {  // TODO: Profile stack size
+  if (TaskUtils::TaskCreateExpensive(serialRxTask, "SerialRX", 10'000, nullptr, 1, nullptr) != pdPASS) {  // TODO: Profile stack size
     OS_LOGE(TAG, "Failed to create serial RX task");
     return false;
   }
@@ -624,7 +721,7 @@ void SerialInputHandler::SetSerialEchoEnabled(bool enabled)
 
 void SerialInputHandler::PrintWelcomeHeader()
 {
-  ::Serial.println("\
+  OS_SERIAL_PRINTLN("\
 ============== OPENSHOCK ==============\r\n\
   Contribute @ github.com/OpenShock\r\n\
   Discuss    @ discord.gg/OpenShock\r\n\
@@ -635,7 +732,7 @@ void SerialInputHandler::PrintWelcomeHeader()
 
 void SerialInputHandler::PrintVersionInfo()
 {
-  ::Serial.print("\
+  OS_SERIAL_PRINT("\
   Version:  " OPENSHOCK_FW_VERSION "\r\n\
     Build:  " OPENSHOCK_FW_MODE "\r\n\
    Commit:  " OPENSHOCK_FW_GIT_COMMIT "\r\n\

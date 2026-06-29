@@ -4,6 +4,10 @@
 
 import * as flatbuffers from 'flatbuffers';
 
+import { MacAddress } from '../../../open-shock/serialization/configuration/mac-address';
+import { WifiAuthMode } from '../../../open-shock/serialization/types/wifi-auth-mode';
+
+
 export class WiFiCredentials {
   bb: flatbuffers.ByteBuffer|null = null;
   bb_pos = 0;
@@ -50,8 +54,24 @@ password(optionalEncoding?:any):string|Uint8Array|null {
   return offset ? this.bb!.__string(this.bb_pos + offset, optionalEncoding) : null;
 }
 
+/**
+ * Auth mode of the network when credentials were saved. Used to reject evil twins with weaker security.
+ */
+authMode():WifiAuthMode {
+  const offset = this.bb!.__offset(this.bb_pos, 10);
+  return offset ? this.bb!.readUint8(this.bb_pos + offset) : WifiAuthMode.UNKNOWN;
+}
+
+/**
+ * Pinned BSSID of the last successfully connected AP. All zeros means no pin.
+ */
+bssid(obj?:MacAddress):MacAddress|null {
+  const offset = this.bb!.__offset(this.bb_pos, 12);
+  return offset ? (obj || new MacAddress()).__init(this.bb_pos + offset, this.bb!) : null;
+}
+
 static startWiFiCredentials(builder:flatbuffers.Builder) {
-  builder.startObject(3);
+  builder.startObject(5);
 }
 
 static addId(builder:flatbuffers.Builder, id:number) {
@@ -66,16 +86,17 @@ static addPassword(builder:flatbuffers.Builder, passwordOffset:flatbuffers.Offse
   builder.addFieldOffset(2, passwordOffset, 0);
 }
 
+static addAuthMode(builder:flatbuffers.Builder, authMode:WifiAuthMode) {
+  builder.addFieldInt8(3, authMode, WifiAuthMode.UNKNOWN);
+}
+
+static addBssid(builder:flatbuffers.Builder, bssidOffset:flatbuffers.Offset) {
+  builder.addFieldStruct(4, bssidOffset, 0);
+}
+
 static endWiFiCredentials(builder:flatbuffers.Builder):flatbuffers.Offset {
   const offset = builder.endObject();
   return offset;
 }
 
-static createWiFiCredentials(builder:flatbuffers.Builder, id:number, ssidOffset:flatbuffers.Offset, passwordOffset:flatbuffers.Offset):flatbuffers.Offset {
-  WiFiCredentials.startWiFiCredentials(builder);
-  WiFiCredentials.addId(builder, id);
-  WiFiCredentials.addSsid(builder, ssidOffset);
-  WiFiCredentials.addPassword(builder, passwordOffset);
-  return WiFiCredentials.endWiFiCredentials(builder);
-}
 }

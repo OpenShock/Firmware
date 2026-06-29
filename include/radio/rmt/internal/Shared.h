@@ -12,11 +12,18 @@ namespace OpenShock::Rmt::Internal {
   {
     static_assert(std::is_unsigned_v<T>, "T must be an unsigned integer");
     static_assert(N > 0, "N must be greater than 0");
-    static_assert(N < std::numeric_limits<T>::digits, "N must be less or equal to the number of bits in T");
 
-    for (size_t i = 0; i < N; ++i) {
-      size_t bit_pos = N - (i + 1);
-      sequence[i]    = (data >> bit_pos) & 1 ? rmtOne : rmtZero;
+    constexpr std::size_t BitCount = std::numeric_limits<T>::digits;
+    static_assert(N <= BitCount, "N must be less or equal to the number of bits in T");
+
+    // Align MSB to the top bit we care about
+    data <<= (BitCount - N);
+
+    constexpr T MsbMask = T(1) << (BitCount - 1);
+
+    for (std::size_t i = 0; i < N; ++i) {
+      sequence[i] = (data & MsbMask) ? rmtOne : rmtZero;
+      data <<= 1;
     }
   }
 }  // namespace OpenShock::Rmt::Internal

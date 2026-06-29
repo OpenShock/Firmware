@@ -10,25 +10,7 @@
 
 namespace OpenShock::MessageHandlers::Local::_Private {
   typedef HANDLER_SIG((*HandlerType));
-  HANDLER_FN(WifiScanCommand);
-  HANDLER_FN(WifiNetworkSaveCommand);
-  HANDLER_FN(WifiNetworkForgetCommand);
-  HANDLER_FN(WifiNetworkConnectCommand);
-  HANDLER_FN(WifiNetworkDisconnectCommand);
-  HANDLER_FN(OtaUpdateSetIsEnabledCommand);
-  HANDLER_FN(OtaUpdateSetDomainCommand);
-  HANDLER_FN(OtaUpdateSetUpdateChannelCommand);
-  HANDLER_FN(OtaUpdateSetCheckIntervalCommand);
-  HANDLER_FN(OtaUpdateSetAllowBackendManagementCommand);
-  HANDLER_FN(OtaUpdateSetRequireManualApprovalCommand);
-  HANDLER_FN(OtaUpdateHandleUpdateRequestCommand);
-  HANDLER_FN(OtaUpdateCheckForUpdatesCommand);
-  HANDLER_FN(OtaUpdateStartUpdateCommand);
-  HANDLER_FN(AccountLinkCommand);
-  HANDLER_FN(AccountUnlinkCommand);
-  HANDLER_FN(SetRfTxPinCommand);
-  HANDLER_FN(SetEstopEnabledCommand);
-  HANDLER_FN(SetEstopPinCommand);
+  HANDLER_FN(Common_ShockerCommandList);
   HANDLER_FN(InvalidMessage);
 }  // namespace OpenShock::MessageHandlers::Local::_Private
 

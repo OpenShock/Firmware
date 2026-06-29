@@ -1,12 +1,6 @@
 name: build-frontend
 description: Builds the frontend and uploads it as an artifact
 inputs:
-  pnpm-version:
-    description: 'pnpm version to use'
-    required: true
-  node-version:
-    description: 'NodeJS runtime version to use'
-    required: true
   skip-checkout:
     description: 'If true, skips checkout'
     default: false
@@ -14,22 +8,22 @@ inputs:
 runs:
   using: composite
   steps:
-    - uses: actions/checkout@v4
+    - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10  # v6.0.3
       if: ${{ !inputs.skip-checkout }}
       with:
         sparse-checkout: |
           frontend
         path: ${{ github.repository }}
 
-    - uses: pnpm/action-setup@v4
+    - uses: pnpm/action-setup@0e279bb959325dab635dd2c09392533439d90093  # v6.0.8
       name: Install pnpm
       with:
-        version: ${{ inputs.pnpm-version }}
+        package_json_file: ./frontend/package.json
         run_install: false
 
-    - uses: actions/setup-node@v4
+    - uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e  # v6.4.0
       with:
-        node-version-file: ./frontend/.nvmrc
+        node-version-file: ./frontend/package.json
         cache: 'pnpm'
         cache-dependency-path: ./frontend/pnpm-lock.yaml
 
@@ -60,7 +54,7 @@ runs:
       run: pnpm run build
 
     - name: Upload artifacts
-      uses: actions/upload-artifact@v4
+      uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a  # v7.0.1
       with:
         name: frontend
         path: frontend/build/*

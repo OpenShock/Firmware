@@ -2,7 +2,7 @@
 
 const char* const TAG = "ServerMessageHandlers";
 
-#include "CaptivePortal.h"
+#include "captiveportal/Manager.h"
 #include "estop/EStopManager.h"
 #include "Logging.h"
 
@@ -34,7 +34,7 @@ void _Private::HandleTrigger(const OpenShock::Serialization::Gateway::GatewayToH
       esp_restart();
       break;
     case TriggerType::EmergencyStop:
-      EStopManager::Trigger();
+      EStopManager::SoftwareTrigger();
       break;
     case TriggerType::CaptivePortalEnable:
       OpenShock::CaptivePortal::SetAlwaysEnabled(true);

@@ -8,7 +8,8 @@ const char* const TAG = "StringUtils";
 #include <cstdarg>
 #include <cstring>
 
-bool OpenShock::FormatToString(std::string& out, const char* format, ...) {
+bool OpenShock::FormatToString(std::string& out, const char* format, ...)
+{
   const std::size_t STACK_BUFFER_SIZE = 128;
 
   char buffer[STACK_BUFFER_SIZE];
@@ -59,7 +60,8 @@ bool OpenShock::FormatToString(std::string& out, const char* format, ...) {
   return true;
 }
 
-std::vector<std::string_view> OpenShock::StringSplit(std::string_view view, char delimiter, std::size_t maxSplits) {
+std::vector<std::string_view> OpenShock::StringSplit(std::string_view view, char delimiter, std::size_t maxSplits)
+{
   if (view.empty()) {
     return {};
   }
@@ -86,7 +88,8 @@ std::vector<std::string_view> OpenShock::StringSplit(std::string_view view, char
   return result;
 }
 
-std::vector<std::string_view> OpenShock::StringSplit(std::string_view view, bool (*predicate)(char delimiter), std::size_t maxSplits) {
+std::vector<std::string_view> OpenShock::StringSplit(std::string_view view, bool (*predicate)(char delimiter), std::size_t maxSplits)
+{
   if (view.empty()) {
     return {};
   }
@@ -112,16 +115,14 @@ std::vector<std::string_view> OpenShock::StringSplit(std::string_view view, bool
   return result;
 }
 
-std::vector<std::string_view> OpenShock::StringSplitNewLines(std::string_view view, std::size_t maxSplits) {
-  return StringSplit(
-    view, [](char c) { return c == '\r' || c == '\n'; }, maxSplits
-  );
+std::vector<std::string_view> OpenShock::StringSplitNewLines(std::string_view view, std::size_t maxSplits)
+{
+  return StringSplit(view, [](char c) { return c == '\r' || c == '\n'; }, maxSplits);
 }
 
-std::vector<std::string_view> OpenShock::StringSplitWhiteSpace(std::string_view view, std::size_t maxSplits) {
-  return StringSplit(
-    view, [](char c) { return isspace(c) != 0; }, maxSplits
-  );
+std::vector<std::string_view> OpenShock::StringSplitWhiteSpace(std::string_view view, std::size_t maxSplits)
+{
+  return StringSplit(view, [](char c) { return isspace(c) != 0; }, maxSplits);
 }
 
 bool OpenShock::StringIEquals(std::string_view a, std::string_view b)
@@ -142,6 +143,7 @@ bool OpenShock::StringHasPrefixIC(std::string_view view, std::string_view prefix
   return StringIEquals(view.substr(0, prefix.size()), prefix);
 }
 
-String OpenShock::StringToArduinoString(std::string_view view) {
+String OpenShock::StringToArduinoString(std::string_view view)
+{
   return String(view.data(), view.size());
 }

@@ -4,6 +4,7 @@ const char* const TAG = "Sequence";
 
 #include "Logging.h"
 #include "radio/rmt/CaiXianlinEncoder.h"
+#include "radio/rmt/D80Encoder.h"
 #include "radio/rmt/Petrainer998DREncoder.h"
 #include "radio/rmt/PetrainerEncoder.h"
 #include "radio/rmt/T330Encoder.h"
@@ -19,6 +20,10 @@ inline static size_t getSequenceBufferSize(ShockerModelType shockerModelType)
       return Rmt::Petrainer998DREncoder::GetBufferSize();
     case ShockerModelType::Petrainer:
       return Rmt::PetrainerEncoder::GetBufferSize();
+    case ShockerModelType::WellturnT330:
+      return Rmt::WellturnT330Encoder::GetBufferSize();
+    case ShockerModelType::D80:
+      return Rmt::D80Encoder::GetBufferSize();
     default:
       return 0;
   }
@@ -33,6 +38,10 @@ inline static bool fillSequenceImpl(rmt_data_t* data, ShockerModelType modelType
       return Rmt::PetrainerEncoder::FillBuffer(data, shockerId, commandType, intensity);
     case ShockerModelType::Petrainer998DR:
       return Rmt::Petrainer998DREncoder::FillBuffer(data, shockerId, commandType, intensity);
+    case ShockerModelType::WellturnT330:
+      return Rmt::WellturnT330Encoder::FillBuffer(data, shockerId, commandType, intensity);
+    case ShockerModelType::D80:
+      return Rmt::D80Encoder::FillBuffer(data, shockerId, commandType, intensity);
     default:
       OS_LOGE(TAG, "Unknown shocker model: %u", modelType);
       return false;
@@ -48,7 +57,7 @@ Rmt::Sequence::Sequence(ShockerModelType shockerModel, uint16_t shockerId, int64
 {
   if (m_size == 0) return;
 
-  m_data = reinterpret_cast<rmt_data_t*>(malloc(m_size * 2 * sizeof(rmt_data_t)));
+  m_data = static_cast<rmt_data_t*>(malloc(m_size * 2 * sizeof(rmt_data_t)));
   if (m_data == nullptr) {
     m_size = 0;
     return;

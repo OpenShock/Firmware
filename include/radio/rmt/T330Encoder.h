@@ -6,7 +6,7 @@
 
 #include <cstdint>
 
-namespace OpenShock::Rmt::T330Encoder {
+namespace OpenShock::Rmt::WellturnT330Encoder {
   size_t GetBufferSize();
   bool FillBuffer(rmt_data_t* data, uint16_t shockerId, ShockerCommandType type, uint8_t intensity);
 }

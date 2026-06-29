@@ -76,8 +76,13 @@ gpioValidOutputsArray():Int8Array|null {
   return offset ? new Int8Array(this.bb!.bytes().buffer, this.bb!.bytes().byteOffset + this.bb!.__vector(this.bb_pos + offset), this.bb!.__vector_len(this.bb_pos + offset)) : null;
 }
 
+hasStandardizedPins():boolean {
+  const offset = this.bb!.__offset(this.bb_pos, 16);
+  return offset ? !!this.bb!.readInt8(this.bb_pos + offset) : false;
+}
+
 static startReadyMessage(builder:flatbuffers.Builder) {
-  builder.startObject(6);
+  builder.startObject(7);
 }
 
 static addPoggies(builder:flatbuffers.Builder, poggies:boolean) {
@@ -136,6 +141,10 @@ static createGpioValidOutputsVector(builder:flatbuffers.Builder, data:number[]|I
 
 static startGpioValidOutputsVector(builder:flatbuffers.Builder, numElems:number) {
   builder.startVector(1, numElems, 1);
+}
+
+static addHasStandardizedPins(builder:flatbuffers.Builder, hasStandardizedPins:boolean) {
+  builder.addFieldInt8(6, +hasStandardizedPins, +false);
 }
 
 static endReadyMessage(builder:flatbuffers.Builder):flatbuffers.Offset {

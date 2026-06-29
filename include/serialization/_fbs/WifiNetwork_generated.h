@@ -9,8 +9,8 @@
 // Ensure the included flatbuffers.h is the same version as when this file was
 // generated, otherwise it may not be compatible.
 static_assert(FLATBUFFERS_VERSION_MAJOR == 25 &&
-              FLATBUFFERS_VERSION_MINOR == 9 &&
-              FLATBUFFERS_VERSION_REVISION == 23,
+              FLATBUFFERS_VERSION_MINOR == 12 &&
+              FLATBUFFERS_VERSION_REVISION == 19,
              "Non-compatible flatbuffers version included");
 
 #include "WifiAuthMode_generated.h"
@@ -54,7 +54,8 @@ struct WifiNetwork FLATBUFFERS_FINAL_CLASS : private ::flatbuffers::Table {
   bool saved() const {
     return GetField<uint8_t>(VT_SAVED, 0) != 0;
   }
-  bool Verify(::flatbuffers::Verifier &verifier) const {
+  template <bool B = false>
+  bool Verify(::flatbuffers::VerifierTemplate<B> &verifier) const {
     return VerifyTableStart(verifier) &&
            VerifyOffset(verifier, VT_SSID) &&
            verifier.VerifyString(ssid()) &&

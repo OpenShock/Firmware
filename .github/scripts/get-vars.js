@@ -1,13 +1,13 @@
-import fs from 'fs';
+import { setFailed, setOutput } from '@actions/core';
 import ini from 'ini';
+import child_process from 'node:child_process';
+import fs from 'node:fs';
 import semver from 'semver';
-import core from '@actions/core';
-import child_process from 'child_process';
 
 // Get branch name
 const gitRef = process.env.GITHUB_REF;
 if (gitRef === undefined) {
-  core.setFailed('Environment variable "GITHUB_REF" not found');
+  setFailed('Environment variable "GITHUB_REF" not found');
   process.exit();
 }
 
@@ -16,7 +16,7 @@ const isGitBranch = gitRef.startsWith('refs/heads/');
 const isGitPullRequest = gitRef.startsWith('refs/pull/') && gitRef.endsWith('/merge');
 
 if (!isGitTag && !isGitBranch && !isGitPullRequest) {
-  core.setFailed(`Git ref "${gitRef}" is not a valid branch, tag or pull request`);
+  setFailed(`Git ref "${gitRef}" is not a valid branch, tag or pull request`);
   process.exit();
 }
 
@@ -24,26 +24,29 @@ const gitCommitHash = process.env.GITHUB_SHA;
 const gitShortCommitHash = gitCommitHash.substring(0, 8);
 
 if (gitCommitHash === undefined) {
-  core.setFailed('Environment variable "GITHUB_SHA" not found');
+  setFailed('Environment variable "GITHUB_SHA" not found');
   process.exit();
 }
 
 const gitHeadRefName = isGitPullRequest ? process.env.GITHUB_HEAD_REF : gitRef.split('/')[2];
 if (gitHeadRefName === undefined) {
-  core.setFailed('Failed to get git head ref name');
+  setFailed('Failed to get git head ref name');
   process.exit();
 }
 
-const gitTagsList = child_process.execSync('git for-each-ref --sort=-creatordate --format "%(refname:short)" refs/tags').toString().trim();
+const gitTagsList = child_process
+  .execSync('git for-each-ref --sort=-creatordate --format "%(refname:short)" refs/tags')
+  .toString()
+  .trim();
 if (gitTagsList === undefined) {
-  core.setFailed('Failed to get latest git tag');
+  setFailed('Failed to get latest git tag');
   process.exit();
 }
 
 function convertGitTagToSemver(tag) {
   const parsed = semver.parse(tag === '' ? '0.0.0' : tag);
   if (parsed === null || parsed.loose) {
-    core.setFailed(`Git tag "${tag}" is not a valid semver version`);
+    setFailed(`Git tag "${tag}" is not a valid semver version`);
     process.exit();
   }
 
@@ -68,8 +71,21 @@ const stableReleasesArray = releasesArray.filter(isStableRelease);
 const betaReleasesArray = releasesArray.filter(isBetaRelease);
 const devReleasesArray = releasesArray.filter(isDevRelease);
 
-// Build version string
-let currentVersion = `${latestRelease.major}.${latestRelease.minor}.${latestRelease.patch}`;
+// Build version string.
+//
+// The base MAJOR.MINOR.PATCH comes from release-tool (status mode), which is the
+// single source of truth for the version bump: it reads .changes/ and returns
+// the *next* version. For branch/PR builds we label the artifact as a
+// pre-release of that upcoming version (e.g. 1.6.0-develop+sha) rather than the
+// last released tag. We fall back to the latest tag when there are no pending
+// changes (RELEASE_SKIP=true) or the value is absent, and always for tag builds
+// (the tag itself is authoritative there).
+const nextVersion = process.env.RELEASE_NEXT_VERSION;
+const releaseSkip = process.env.RELEASE_SKIP === 'true';
+const latestBase = `${latestRelease.major}.${latestRelease.minor}.${latestRelease.patch}`;
+
+let currentVersion =
+  !isGitTag && nextVersion && !releaseSkip ? nextVersion : latestBase;
 if (!isGitTag) {
   // Get last part of branch name and replace all non-alphanumeric characters with dashes
   let sanitizedGitHeadRefName = gitHeadRefName
@@ -108,11 +124,12 @@ if (gitHeadRefName === 'master' || (isGitTag && isStableRelease(latestRelease)))
 }
 
 function getVersionChangeLog(lines) {
+  const isStableTag = isGitTag && isStableRelease(latestRelease);
   const emptyChangelog = lines.length === 0;
 
-  // Enforce that the changelog is not empty if we are on the master branch
-  if (isGitTag && emptyChangelog) {
-    core.setFailed('File "CHANGELOG.md" is empty, this must be populated in the master branch');
+  // Only stable tags require changelog entries
+  if (isStableTag && emptyChangelog) {
+    setFailed('File "CHANGELOG.md" is empty, this must be populated for stable releases');
     process.exit();
   }
 
@@ -122,36 +139,51 @@ function getVersionChangeLog(lines) {
 
   // Simple validation of the changelog
   if (!lines[0].startsWith('# Version ')) {
-    core.setFailed('File "CHANGELOG.md" must start with "# Version <version>" followed by a changelog entry');
+    setFailed(
+      'File "CHANGELOG.md" must start with "# Version <version>" followed by a changelog entry'
+    );
     process.exit();
   }
 
   // Get the start of the entry
   const changeLogBegin = lines.findIndex((line) => line.startsWith(`# Version ${currentVersion}`));
-  if (isGitTag && changeLogBegin === -1) {
-    core.setFailed(`File "CHANGELOG.md" does not contain a changelog entry for version "${currentVersion}", this must be added in the master branch`);
+  if (isStableTag && changeLogBegin === -1) {
+    setFailed(
+      `File "CHANGELOG.md" does not contain a changelog entry for version "${currentVersion}"`
+    );
     process.exit();
   }
 
-  // Enforce that the changelog entry is at the top of the file if we are on the master branch
-  if (isGitTag && changeLogBegin !== 0) {
-    core.setFailed(`Changelog entry for version "${currentVersion}" is not at the top of the file, you tag is either out of date or you have not updated the changelog`);
+  // RC/beta/dev tags may not have a changelog entry - that's fine
+  if (changeLogBegin === -1) {
+    return '';
+  }
+
+  // Enforce that the changelog entry is at the top of the file for stable releases
+  if (isStableTag && changeLogBegin !== 0) {
+    setFailed(
+      `Changelog entry for version "${currentVersion}" is not at the top of the file`
+    );
     process.exit();
   }
 
   // Get the end of the entry
-  let changeLogEnd = lines.slice(changeLogBegin + 1).findIndex((line) => line.startsWith('# Version '));
+  let changeLogEnd = lines
+    .slice(changeLogBegin + 1)
+    .findIndex((line) => line.startsWith('# Version '));
   if (changeLogEnd === -1) {
     changeLogEnd = lines.length;
   } else {
     changeLogEnd += changeLogBegin + 1;
   }
 
-  const emptyChangelogEntry = lines.slice(changeLogBegin + 1, changeLogEnd).filter((line) => line.trim() !== '').length === 0;
+  const emptyChangelogEntry =
+    lines.slice(changeLogBegin + 1, changeLogEnd).filter((line) => line.trim() !== '').length === 0;
 
-  // Enforce that the changelog entry is not empty if we are on the master branch
-  if (isGitTag && emptyChangelogEntry) {
-    core.setFailed(`Changelog entry for version "${currentVersion}" is empty, this must be populated in the master branch`);
+  if (isStableTag && emptyChangelogEntry) {
+    setFailed(
+      `Changelog entry for version "${currentVersion}" is empty`
+    );
     process.exit();
   }
 
@@ -161,7 +193,7 @@ function getVersionChangeLog(lines) {
 // Make sure we have all the files we need
 for (const file of ['RELEASE.md', 'CHANGELOG.md', 'platformio.ini']) {
   if (!fs.existsSync(file)) {
-    core.setFailed(`File "${file}" not found`);
+    setFailed(`File "${file}" not found`);
     process.exit();
   }
 }
@@ -174,26 +206,31 @@ const platformioIniStr = fs.readFileSync('platformio.ini', 'utf8').trim();
 const fullChangelogLines = fullChangelog.split('\n');
 
 // Get all versions from the changelog
-const changelogVersions = fullChangelogLines.filter((line) => line.startsWith('# Version ')).map((line) => line.substring(10).split(' ')[0].trim());
+const changelogVersions = fullChangelogLines
+  .filter((line) => line.startsWith('# Version '))
+  .map((line) => line.substring(10).split(' ')[0].trim());
 
 // Get the changelog for the current version
 const versionChangeLog = getVersionChangeLog(fullChangelogLines);
 
-// Enforce that all tags exist in the changelog
+// Enforce that all stable tags exist in the changelog (RC/beta/dev tags are excluded)
 let missingTags = [];
 for (const tag of gitTagsArray) {
+  const parsed = semver.parse(tag);
+  if (!parsed || !isStableRelease(parsed)) continue; // Skip non-stable pre-release tags
   if (!changelogVersions.includes(tag)) {
     missingTags.push(tag);
   }
 }
 if (missingTags.length > 0) {
-  core.setFailed(`Changelog is missing the following tags: ${missingTags.join(', ')}`);
+  setFailed(`Changelog is missing the following stable tags: ${missingTags.join(', ')}`);
   process.exit();
 }
 
 // Finish building the release string
 if (versionChangeLog !== '') {
-  releaseNotes = `# OpenShock Firmware ${currentVersion}\n\n${versionChangeLog}\n\n${releaseNotes}`.trim();
+  releaseNotes =
+    `# OpenShock Firmware ${currentVersion}\n\n${versionChangeLog}\n\n${releaseNotes}`.trim();
 } else {
   releaseNotes = `# OpenShock Firmware ${currentVersion}\n\n${releaseNotes}`.trim();
 }
@@ -221,18 +258,18 @@ console.log('Beta:     ' + betaReleasesArray.join(', '));
 console.log('Dev:      ' + devReleasesArray.join(', '));
 
 // Set outputs
-core.setOutput('version', currentVersion);
-core.setOutput('changelog', versionChangeLog);
-core.setOutput('release-notes', releaseNotes);
-core.setOutput('release-channel', currentChannel);
-core.setOutput('full-changelog', fullChangelog);
-core.setOutput('board-list', boards.join('\n'));
-core.setOutput('board-array', JSON.stringify(boards));
-core.setOutput('board-matrix', JSON.stringify({ board: boards }));
-core.setOutput('should-deploy', shouldDeploy);
-core.setOutput('release-stable-list', stableReleasesArray.join('\n'));
-core.setOutput('release-stable-array', JSON.stringify(stableReleasesArray));
-core.setOutput('release-beta-list', betaReleasesArray.join('\n'));
-core.setOutput('release-beta-array', JSON.stringify(betaReleasesArray));
-core.setOutput('release-dev-list', devReleasesArray.join('\n'));
-core.setOutput('release-dev-array', JSON.stringify(devReleasesArray));
+setOutput('version', currentVersion);
+setOutput('changelog', versionChangeLog);
+setOutput('release-notes', releaseNotes);
+setOutput('release-channel', currentChannel);
+setOutput('full-changelog', fullChangelog);
+setOutput('board-list', boards.join('\n'));
+setOutput('board-array', JSON.stringify(boards));
+setOutput('board-matrix', JSON.stringify({ board: boards }));
+setOutput('should-deploy', shouldDeploy);
+setOutput('release-stable-list', stableReleasesArray.join('\n'));
+setOutput('release-stable-array', JSON.stringify(stableReleasesArray));
+setOutput('release-beta-list', betaReleasesArray.join('\n'));
+setOutput('release-beta-array', JSON.stringify(betaReleasesArray));
+setOutput('release-dev-list', devReleasesArray.join('\n'));
+setOutput('release-dev-array', JSON.stringify(devReleasesArray));

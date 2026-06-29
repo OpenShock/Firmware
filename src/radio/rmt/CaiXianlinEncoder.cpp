@@ -39,6 +39,9 @@ bool Rmt::CaiXianlinEncoder::FillBuffer(rmt_data_t* sequence, uint16_t shockerId
       typeVal   = 0x03;
       intensity = 0;  // Sound intensity must be 0 for some shockers, otherwise it wont work, or they soft lock until restarted
       break;
+    case ShockerCommandType::Light:
+      typeVal = 0x04;
+      break;
     default:
       return false;  // Invalid type
   }

@@ -17,11 +17,13 @@ SerialInputConfig::SerialInputConfig(bool echoEnabled)
 {
 }
 
-void SerialInputConfig::ToDefault() {
+void SerialInputConfig::ToDefault()
+{
   echoEnabled = true;
 }
 
-bool SerialInputConfig::FromFlatbuffers(const Serialization::Configuration::SerialInputConfig* config) {
+bool SerialInputConfig::FromFlatbuffers(const Serialization::Configuration::SerialInputConfig* config)
+{
   if (config == nullptr) {
     OS_LOGW(TAG, "Config is null, setting to default");
     ToDefault();
@@ -33,11 +35,13 @@ bool SerialInputConfig::FromFlatbuffers(const Serialization::Configuration::Seri
   return true;
 }
 
-flatbuffers::Offset<OpenShock::Serialization::Configuration::SerialInputConfig> SerialInputConfig::ToFlatbuffers(flatbuffers::FlatBufferBuilder& builder, bool withSensitiveData) const {
+flatbuffers::Offset<OpenShock::Serialization::Configuration::SerialInputConfig> SerialInputConfig::ToFlatbuffers(flatbuffers::FlatBufferBuilder& builder, bool withSensitiveData) const
+{
   return Serialization::Configuration::CreateSerialInputConfig(builder, echoEnabled);
 }
 
-bool SerialInputConfig::FromJSON(const cJSON* json) {
+bool SerialInputConfig::FromJSON(const cJSON* json)
+{
   if (json == nullptr) {
     OS_LOGW(TAG, "Config is null, setting to default");
     ToDefault();
@@ -54,7 +58,8 @@ bool SerialInputConfig::FromJSON(const cJSON* json) {
   return true;
 }
 
-cJSON* SerialInputConfig::ToJSON(bool withSensitiveData) const {
+cJSON* SerialInputConfig::ToJSON(bool withSensitiveData) const
+{
   cJSON* root = cJSON_CreateObject();
 
   cJSON_AddBoolToObject(root, "echoEnabled", echoEnabled);

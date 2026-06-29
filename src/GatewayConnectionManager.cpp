@@ -2,14 +2,20 @@
 
 const char* const TAG = "GatewayConnectionManager";
 
-#include "VisualStateManager.h"
+#include "visual/VisualStateManager.h"
 
+#include "captiveportal/Manager.h"
 #include "config/Config.h"
 #include "Core.h"
 #include "GatewayClient.h"
 #include "http/JsonAPI.h"
 #include "Logging.h"
+#include "serialization/WSLocal.h"
 
+#include "SimpleMutex.h"
+
+#include <atomic>
+#include <memory>
 #include <unordered_map>
 
 //
@@ -34,16 +40,34 @@ const uint8_t FLAG_LINKED = 1 << 1;
 
 const uint8_t LINK_CODE_LENGTH = 6;
 
-static uint8_t s_flags                                      = 0;
-static int64_t s_lastAuthFailure                            = 0;
-static int64_t s_lastConnectionAttempt                      = 0;
-static std::unique_ptr<OpenShock::GatewayClient> s_wsClient = nullptr;
+static std::atomic<uint8_t> s_flags                 = 0;
+static std::atomic<int64_t> s_lastAuthFailure       = 0;
+static std::atomic<int64_t> s_lastConnectionAttempt = 0;
+static std::atomic_flag s_isInitializing            = ATOMIC_FLAG_INIT;
+static OpenShock::SimpleMutex s_clientMutex;
+static std::shared_ptr<OpenShock::GatewayClient> s_wsClient = nullptr;
+
+static std::shared_ptr<OpenShock::GatewayClient> GetClient()
+{
+  OpenShock::ScopedLock lock__(&s_clientMutex);
+  return s_wsClient;
+}
+static void CreateClient(const std::string& authToken)
+{
+  OpenShock::ScopedLock lock__(&s_clientMutex);
+  s_wsClient = std::make_shared<OpenShock::GatewayClient>(authToken);
+}
+static void DestroyClient()
+{
+  OpenShock::ScopedLock lock__(&s_clientMutex);
+  s_wsClient = nullptr;
+}
 
 static void evh_gotIP(arduino_event_t* event)
 {
   (void)event;
 
-  s_flags |= FLAG_HAS_IP;
+  s_flags.fetch_or(FLAG_HAS_IP, std::memory_order_relaxed);
   OS_LOGD(TAG, "Got IP address");
 }
 
@@ -51,8 +75,8 @@ static void evh_wiFiDisconnected(arduino_event_t* event)
 {
   (void)event;
 
-  s_flags    = FLAG_NONE;
-  s_wsClient = nullptr;
+  s_flags.store(FLAG_NONE, std::memory_order_relaxed);
+  DestroyClient();
   OS_LOGD(TAG, "Lost IP address");
 }
 
@@ -79,102 +103,126 @@ bool GatewayConnectionManager::Init()
 
 bool GatewayConnectionManager::IsConnected()
 {
-  if (s_wsClient == nullptr) {
+  auto client = GetClient();
+  if (client == nullptr) {
     return false;
   }
 
-  return s_wsClient->state() == GatewayClientState::Connected;
+  return client->state() == GatewayClientState::Connected;
 }
 
 bool GatewayConnectionManager::IsLinked()
 {
-  return (s_flags & FLAG_LINKED) != 0;
+  return (s_flags.load(std::memory_order_relaxed) & FLAG_LINKED) != 0;
 }
 
 AccountLinkResultCode GatewayConnectionManager::Link(std::string_view linkCode)
 {
-  if ((s_flags & FLAG_HAS_IP) == 0) {
+  if ((s_flags.load(std::memory_order_relaxed) & FLAG_HAS_IP) == 0) {
     return AccountLinkResultCode::NoInternetConnection;
   }
-  s_wsClient = nullptr;
+
+  DestroyClient();
 
   OS_LOGD(TAG, "Attempting to link to account using code %.*s", linkCode.length(), linkCode.data());
 
   if (linkCode.length() != LINK_CODE_LENGTH) {
-    OS_LOGE(TAG, "Invalid link code length");
-    return AccountLinkResultCode::InvalidCode;
+    OS_LOGE(TAG, "Invalid link code length: expected %zu, got %zu", static_cast<size_t>(LINK_CODE_LENGTH), linkCode.length());
+    return AccountLinkResultCode::InvalidCodeLength;
   }
 
   auto response = HTTP::JsonAPI::LinkAccount(linkCode);
+
   if (!response.Ok()) {
+    OS_LOGE(TAG, "Account link request failed: %s (http=%d)", HTTP::HTTPErrorToString(response.Error()), response.StatusCode());
 
-    if (response.Error() == HTTP::HTTPError::RateLimited) {
-      return AccountLinkResultCode::InternalError;  // Just return false, don't spam the console with errors
+    switch (response.Error()) {
+      case HTTP::HTTPError::RateLimited:
+        return AccountLinkResultCode::RateLimited;
+      case HTTP::HTTPError::NetworkError:
+      case HTTP::HTTPError::ConnectionClosed:
+      case HTTP::HTTPError::InvalidUrl:
+        return AccountLinkResultCode::RequestFailed;
+      case HTTP::HTTPError::ParseFailed:
+      case HTTP::HTTPError::SizeLimitExceeded:
+        return AccountLinkResultCode::InvalidResponse;
+      default:  // ClientBusy, InvalidHttpMethod, InternalError, Aborted, ...
+        return AccountLinkResultCode::InternalError;
     }
-
-    OS_LOGE(TAG, "Error while linking account: %s %d", HTTP::HTTPErrorToString(response.Error()), response.StatusCode());
-    return AccountLinkResultCode::InternalError;
   }
 
   if (response.StatusCode() == 404) {
+    OS_LOGW(TAG, "Account link failed: backend rejected the link code as invalid (404)");
     return AccountLinkResultCode::InvalidCode;
   }
 
   if (response.StatusCode() != 200) {
-    OS_LOGE(TAG, "Unexpected response code: %d", response.StatusCode());
-    return AccountLinkResultCode::InternalError;
+    OS_LOGE(TAG, "Account link failed: unexpected response code %d from backend", response.StatusCode());
+    return AccountLinkResultCode::ServerError;
   }
 
   auto content = response.ReadJson();
   if (content.error != HTTP::HTTPError::None) {
-    OS_LOGE(TAG, "Error while reading response: %s %d", HTTP::HTTPErrorToString(response.Error()), response.StatusCode());
-    return AccountLinkResultCode::InternalError;
+    OS_LOGE(TAG, "Account link failed: could not parse backend response: %s", HTTP::HTTPErrorToString(content.error));
+    return AccountLinkResultCode::InvalidResponse;
   }
 
   if (content.data.authToken.empty()) {
-    OS_LOGE(TAG, "Received empty auth token");
-    return AccountLinkResultCode::InternalError;
+    OS_LOGE(TAG, "Account link failed: backend returned an empty auth token");
+    return AccountLinkResultCode::InvalidResponse;
   }
 
   if (!Config::SetBackendAuthToken(std::move(content.data.authToken))) {
-    OS_LOGE(TAG, "Failed to save auth token");
-    return AccountLinkResultCode::InternalError;
+    OS_LOGE(TAG, "Account link failed: could not persist auth token to flash");
+    return AccountLinkResultCode::ConfigSaveFailed;
   }
 
-  s_flags |= FLAG_LINKED;
+  s_flags.fetch_or(FLAG_LINKED, std::memory_order_relaxed);
   OS_LOGD(TAG, "Successfully linked to account");
 
   return AccountLinkResultCode::Success;
 }
 void GatewayConnectionManager::UnLink()
 {
-  s_flags &= FLAG_HAS_IP;
-  s_wsClient = nullptr;
+  s_flags.fetch_and(static_cast<uint8_t>(~FLAG_LINKED), std::memory_order_relaxed);
+  DestroyClient();
   Config::ClearBackendAuthToken();
 }
 
 bool GatewayConnectionManager::SendMessageTXT(std::string_view data)
 {
-  if (s_wsClient == nullptr) {
+  auto client = GetClient();
+  if (client == nullptr) {
     return false;
   }
 
-  return s_wsClient->sendMessageTXT(data);
+  return client->sendMessageTXT(data);
 }
 
 bool GatewayConnectionManager::SendMessageBIN(tcb::span<const uint8_t> data)
 {
-  if (s_wsClient == nullptr) {
+  auto client = GetClient();
+  if (client == nullptr) {
     return false;
   }
 
-  return s_wsClient->sendMessageBIN(data);
+  return client->sendMessageBIN(data);
 }
 
-bool FetchHubInfo(const char* authToken)
+void GatewayConnectionManager::MarkPingReceived()
+{
+  auto client = GetClient();
+  if (client == nullptr) {
+    return;
+  }
+
+  client->markPingReceived();
+}
+
+bool FetchHubInfo(std::string authToken)
 {
   // TODO: this function is very slow, should be optimized!
-  if ((s_flags & FLAG_HAS_IP) == 0) {
+  if ((s_flags.load(std::memory_order_relaxed) & FLAG_HAS_IP) == 0) {
     return false;
   }
 
@@ -182,19 +230,19 @@ bool FetchHubInfo(const char* authToken)
     return false;
   }
 
-  auto response = HTTP::JsonAPI::GetHubInfo(authToken);
+  auto response = HTTP::JsonAPI::GetHubInfo(authToken.c_str());
+
   if (!response.Ok()) {
     if (response.Error() == HTTP::HTTPError::RateLimited) {
       return false;  // Just return false, don't spam the console with errors
     }
-
     OS_LOGE(TAG, "Error while fetching hub info: %s %d", HTTP::HTTPErrorToString(response.Error()), response.StatusCode());
     return false;
   }
 
   if (response.StatusCode() == 401) {
-    OS_LOGD(TAG, "Auth token is invalid, waiting 5 minutes before retrying");
-    s_lastAuthFailure = OpenShock::micros();
+    OS_LOGD(TAG, "Auth token is invalid, waiting 5 minutes before checking again");
+    s_lastAuthFailure = OpenShock::millis();
     return false;
   }
 
@@ -205,7 +253,7 @@ bool FetchHubInfo(const char* authToken)
 
   auto content = response.ReadJson();
   if (content.error != HTTP::HTTPError::None) {
-    OS_LOGE(TAG, "Error while reading response: %s %d", HTTP::HTTPErrorToString(response.Error()), response.StatusCode());
+    OS_LOGE(TAG, "Error while reading hub info response: %s", HTTP::HTTPErrorToString(content.error));
     return false;
   }
 
@@ -216,22 +264,22 @@ bool FetchHubInfo(const char* authToken)
     OS_LOGI(TAG, "  [%s] rf=%u model=%u", shocker.id.c_str(), shocker.rfId, shocker.model);
   }
 
-  s_flags |= FLAG_LINKED;
+  s_flags.fetch_or(FLAG_LINKED, std::memory_order_relaxed);
 
   return true;
 }
 
 bool StartConnectingToLCG()
 {
-  // TODO: this function is very slow, should be optimized!
-  if (s_wsClient == nullptr) {  // If wsClient is already initialized, we are already paired or connected
+  auto client = GetClient();
+  if (client == nullptr) {
     OS_LOGD(TAG, "wsClient is null");
     return false;
   }
 
-  if (s_wsClient->state() != GatewayClientState::Disconnected) {
+  if (client->state() != GatewayClientState::Disconnected) {
     OS_LOGD(TAG, "WebSocketClient is not disconnected, waiting...");
-    s_wsClient->disconnect();
+    client->disconnect();
     return false;
   }
 
@@ -253,18 +301,18 @@ bool StartConnectingToLCG()
   }
 
   auto response = HTTP::JsonAPI::AssignLcg(authToken.c_str());
+
   if (!response.Ok()) {
     if (response.Error() == HTTP::HTTPError::RateLimited) {
       return false;  // Just return false, don't spam the console with errors
     }
-
     OS_LOGE(TAG, "Error while fetching LCG endpoint: %s %d", HTTP::HTTPErrorToString(response.Error()), response.StatusCode());
     return false;
   }
 
   if (response.StatusCode() == 401) {
     OS_LOGD(TAG, "Auth token is invalid, waiting 5 minutes before retrying");
-    s_lastAuthFailure = OpenShock::micros();
+    s_lastAuthFailure = OpenShock::millis();
     return false;
   }
 
@@ -275,44 +323,62 @@ bool StartConnectingToLCG()
 
   auto content = response.ReadJson();
   if (content.error != HTTP::HTTPError::None) {
-    OS_LOGE(TAG, "Error while reading response: %s %d", HTTP::HTTPErrorToString(response.Error()), response.StatusCode());
+    OS_LOGE(TAG, "Error while reading LCG response: %s", HTTP::HTTPErrorToString(content.error));
     return false;
   }
 
-  OS_LOGD(TAG, "Connecting to LCG endpoint { host: '%s', port: %hu, path: '%s' } in country %s", content.data.host.c_str(), content.data.port, content.data.path.c_str(), content.data.country.c_str());
-  s_wsClient->connect(content.data.host, content.data.port, content.data.path);
+  OS_LOGI(TAG, "Connecting to LCG endpoint { host: '%s', port: %hu, path: '%s' } in country %s", content.data.host.c_str(), content.data.port, content.data.path.c_str(), content.data.country.c_str());
+  client->connect(content.data.host, content.data.port, content.data.path);
 
   return true;
 }
 
-void GatewayConnectionManager::Update()
+void InitializeClient()
 {
-  if (s_wsClient == nullptr) {
-    // Can't connect to the API without WiFi or an auth token
-    if ((s_flags & FLAG_HAS_IP) == 0 || !Config::HasBackendAuthToken()) {
-      return;
-    }
+  DestroyClient();
 
-    std::string authToken;
-    if (!Config::GetBackendAuthToken(authToken)) {
-      OS_LOGE(TAG, "Failed to get auth token");
-      return;
-    }
-
-    // Fetch hub info
-    if (!FetchHubInfo(authToken.c_str())) {
-      return;
-    }
-
-    s_flags |= FLAG_LINKED;
-    OS_LOGD(TAG, "Successfully verified auth token");
-
-    s_wsClient = std::make_unique<GatewayClient>(authToken);
-  }
-
-  if (s_wsClient->loop()) {
+  // No client — check prerequisites
+  if ((s_flags.load(std::memory_order_relaxed) & FLAG_HAS_IP) == 0 || !Config::HasBackendAuthToken()) {
     return;
   }
 
-  StartConnectingToLCG();
+  std::string authToken;
+  if (!Config::GetBackendAuthToken(authToken)) {
+    OS_LOGE(TAG, "Failed to get auth token");
+    return;
+  }
+
+  if (!FetchHubInfo(authToken)) {
+    return;
+  }
+
+  s_flags.fetch_or(FLAG_LINKED, std::memory_order_relaxed);
+  OS_LOGD(TAG, "Successfully verified auth token");
+
+  Serialization::Local::SerializeAccountLinkStatusEvent(true, CaptivePortal::BroadcastMessageBIN);
+
+  CreateClient(authToken);
+}
+
+void GatewayConnectionManager::Update()
+{
+  auto client = GetClient();
+  if (client != nullptr) {
+    // Client exists — run its loop and optionally reconnect
+    if (client->loop()) {
+      return;
+    }
+
+    StartConnectingToLCG();
+    return;
+  }
+
+  if (s_isInitializing.test_and_set()) {
+    OS_LOGE(TAG, "Was about to initialize GatewayClient, but encountered race condition, yielding.");
+    return;
+  }
+
+  InitializeClient();
+
+  s_isInitializing.clear();
 }

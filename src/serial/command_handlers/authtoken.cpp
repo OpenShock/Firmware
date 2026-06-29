@@ -6,7 +6,8 @@
 
 #include <string>
 
-void _handleAuthtokenCommand(std::string_view arg, bool isAutomated) {
+static void handleAuthtokenCommand(std::string_view arg, bool isAutomated)
+{
   if (arg.empty()) {
     std::string authToken;
     if (!OpenShock::Config::GetBackendAuthToken(authToken)) {
@@ -38,12 +39,13 @@ void _handleAuthtokenCommand(std::string_view arg, bool isAutomated) {
   }
 }
 
-OpenShock::Serial::CommandGroup OpenShock::Serial::CommandHandlers::AuthTokenHandler() {
+OpenShock::Serial::CommandGroup OpenShock::Serial::CommandHandlers::AuthTokenHandler()
+{
   auto group = OpenShock::Serial::CommandGroup("authtoken"sv);
 
-  auto& getCommand = group.addCommand("Get the backend auth token"sv, _handleAuthtokenCommand);
+  auto& getCommand = group.addCommand("Get the backend auth token"sv, handleAuthtokenCommand);
 
-  auto& setCommand = group.addCommand("Set the auth token"sv, _handleAuthtokenCommand);
+  auto& setCommand = group.addCommand("Set the auth token"sv, handleAuthtokenCommand);
   setCommand.addArgument("token"sv, "must be a string"sv, "mytoken"sv);
 
   return group;

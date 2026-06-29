@@ -91,6 +91,7 @@ void WebSocketDeFragger::start(uint8_t socketId, WebSocketMessageType type, cons
   auto it = m_messages.find(socketId);
   if (it != m_messages.end()) {
     it->second.data.assign(data, length);
+    it->second.type = type;
     return;
   }
 
