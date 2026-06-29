@@ -1,6 +1,6 @@
 <script lang="ts">
   import { WifiAuthMode } from '$lib/_fbs/open-shock/serialization/types/wifi-auth-mode';
-  import { buttonVariants } from '@openshock/svelte-core/components/ui/button';
+  import { buttonVariants } from '@openshock/svelte-core/components/ui/button/index.ts';
   import type { WiFiNetworkGroup } from '$lib/types';
   import {
     Dialog,
@@ -8,7 +8,7 @@
     DialogHeader,
     DialogTitle,
     DialogTrigger,
-  } from '@openshock/svelte-core/components/ui/dialog';
+  } from '@openshock/svelte-core/components/ui/dialog/index.ts';
 
   import { Settings } from '@lucide/svelte';
 

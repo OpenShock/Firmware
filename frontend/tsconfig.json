@@ -1,8 +1,10 @@
 {
   "compilerOptions": {
     "target": "es2025",
+    "lib": ["ESNext", "DOM", "DOM.Iterable"],
     "module": "ESNext",
     "moduleResolution": "bundler",
+    "allowImportingTsExtensions": true,
     "rewriteRelativeImportExtensions": true,
     "allowJs": true,
     "checkJs": true,
@@ -14,11 +16,7 @@
     "strict": true,
     "paths": {
       "$lib": ["./src/lib"],
-      "$lib/*": ["./src/lib/*"],
-      "$core": ["./node_modules/@openshock/svelte-core/dist"],
-      "$core/*": ["./node_modules/@openshock/svelte-core/dist/*"],
-      "$hadcn": ["./node_modules/@openshock/svelte-core/dist/components/ui"],
-      "$hadcn/*": ["./node_modules/@openshock/svelte-core/dist/components/ui/*"]
+      "$lib/*": ["./src/lib/*"]
     }
   },
   "include": ["src/**/*.ts", "src/**/*.d.ts", "src/**/*.svelte", "vite.config.ts"]
