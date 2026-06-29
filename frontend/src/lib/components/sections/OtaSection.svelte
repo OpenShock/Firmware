@@ -10,9 +10,9 @@
     setOtaRequireManualApproval,
     checkOtaUpdates,
   } from '$lib/api';
-  import { Button } from '@openshock/svelte-core/ui/button';
-  import { Input } from '@openshock/svelte-core/ui/input';
-  import { Label } from '@openshock/svelte-core/ui/label';
+  import { Button } from '@openshock/svelte-core/components/ui/button';
+  import { Input } from '@openshock/svelte-core/components/ui/input';
+  import { Label } from '@openshock/svelte-core/components/ui/label';
 
   let otaConfig = $derived(hubState.config?.otaUpdate);
 
