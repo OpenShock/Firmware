@@ -1,4 +1,3 @@
-import { describe, expect, it } from 'vitest';
 import {
   isArrayBuffer,
   isBoolean,
@@ -8,6 +7,7 @@ import {
   isString,
   isStringOrNull,
 } from '$lib/typeguards/basicGuards';
+import { describe, expect, it } from 'vitest';
 
 describe('isString', () => {
   it('returns true for string primitives', () => {

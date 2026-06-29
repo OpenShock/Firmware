@@ -1,10 +1,9 @@
 <script lang="ts">
   import { hubState } from '$lib/stores';
-  import { WebSocketClient } from '$lib/WebSocketClient';
+  import { startWifiScan, stopWifiScan } from '$lib/api';
   import { WifiScanStatus } from '$lib/_fbs/open-shock/serialization/types/wifi-scan-status';
-  import { SerializeWifiScanCommand } from '$lib/Serializers/WifiScanCommand';
   import { Button } from '$lib/components/ui/button';
-  import { LoaderCircle, RotateCcw } from '@lucide/svelte';
+  import { LoaderCircle, Radar } from '@lucide/svelte';
   import ScrollArea from './ui/scroll-area/scroll-area.svelte';
   import WiFiEntry from './WiFiEntry.svelte';
 
@@ -19,9 +18,12 @@
     )
   );
 
-  function wifiScan() {
-    const data = SerializeWifiScanCommand(!isScanning);
-    WebSocketClient.Instance.Send(data);
+  async function wifiScan() {
+    if (isScanning) {
+      await stopWifiScan();
+    } else {
+      await startWifiScan();
+    }
   }
 </script>
 
@@ -32,13 +34,13 @@
       {#if isScanning}
         <LoaderCircle class="animate-spin" />
       {:else}
-        <RotateCcw />
+        <Radar />
       {/if}
     </Button>
   </div>
   <ScrollArea class="h-64">
     {#each strengthSortedGroups as [netgroupKey, netgroup] (netgroupKey)}
-      <WiFiEntry {netgroup} />
+      <WiFiEntry ssid={netgroup.ssid} {netgroup} />
     {/each}
   </ScrollArea>
 </div>

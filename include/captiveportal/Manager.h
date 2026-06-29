@@ -11,6 +11,9 @@ namespace OpenShock::CaptivePortal {
   void SetAlwaysEnabled(bool alwaysEnabled);
   bool IsAlwaysEnabled();
 
+  /// @brief Signal that the user has completed setup. The portal will close once the device is fully online.
+  void SetUserDone();
+
   bool ForceClose(uint32_t timeoutMs);
 
   bool IsRunning();

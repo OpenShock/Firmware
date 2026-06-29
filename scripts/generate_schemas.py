@@ -1,4 +1,5 @@
 import os
+import sys
 import shutil
 import subprocess
 
@@ -14,17 +15,18 @@ def exec_silent(args: list[str]):
 def get_flatc_path():
     script_dir = os.path.dirname(os.path.realpath(__file__))
 
-    # Check CWD and scripts dir for both flatc and flatc.exe.
-    for candidate_name in ('flatc', 'flatc.exe'):
-        for search_dir in (os.getcwd(), script_dir):
-            path = os.path.join(search_dir, candidate_name)
-            if os.path.exists(path):
-                if flatc_test(path):
-                    return path
+    # Pick the right binary name for the platform.
+    flatc_name = 'flatc.exe' if sys.platform == 'win32' else 'flatc'
 
-    # Fall back to a globally installed flatc.
-    if flatc_test('flatc'):
-        return 'flatc'
+    # Check in the working directory, then the scripts directory.
+    for directory in [os.getcwd(), script_dir]:
+        path = os.path.join(directory, flatc_name)
+        if os.path.exists(path) and flatc_test(path):
+            return path
+
+    # Fall back to whatever is on PATH.
+    if flatc_test(flatc_name):
+        return flatc_name
 
     return None
 
@@ -50,8 +52,6 @@ def resolve_path(path):
 schemas_path = resolve_path('../schemas')
 ts_output_path = resolve_path('../frontend/src/lib/_fbs')
 cpp_output_path = resolve_path('../include/serialization/_fbs')
-go_output_path = resolve_path('../tools/mock-portal/fbs')
-go_module_name = 'openshock.dev/mock-portal/fbs'
 
 # Get all the schema files.
 schema_files = []
@@ -87,14 +87,6 @@ flatc_args_cpp = [
     # Output directory.
     '-o ' + cpp_output_path,
 ] + schema_files
-flatc_args_go = [
-    # Compile for Go.
-    '--go',
-    # Prefix local imports with the module name so generated files work within the module.
-    '--go-module-name ' + go_module_name,
-    # Output directory.
-    '-o ' + go_output_path,
-] + schema_files
 
 if os.path.exists(ts_output_path):
     print('Deleting old TypeScript schemas')
@@ -107,9 +99,3 @@ if os.path.exists(cpp_output_path):
     shutil.rmtree(cpp_output_path)
 print('Compiling schemas for C++')
 run_flatc(' '.join(flatc_args_cpp))
-
-if os.path.exists(go_output_path):
-    print('Deleting old Go schemas')
-    shutil.rmtree(go_output_path)
-print('Compiling schemas for Go')
-run_flatc(' '.join(flatc_args_go))

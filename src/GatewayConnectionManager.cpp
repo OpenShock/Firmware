@@ -2,13 +2,15 @@
 
 const char* const TAG = "GatewayConnectionManager";
 
-#include "VisualStateManager.h"
+#include "visual/VisualStateManager.h"
 
+#include "captiveportal/Manager.h"
 #include "config/Config.h"
 #include "Core.h"
 #include "GatewayClient.h"
 #include "http/JsonAPI.h"
 #include "Logging.h"
+#include "serialization/WSLocal.h"
 
 #include "SimpleMutex.h"
 
@@ -125,39 +127,50 @@ AccountLinkResultCode GatewayConnectionManager::Link(std::string_view linkCode)
   OS_LOGD(TAG, "Attempting to link to account using code %.*s", linkCode.length(), linkCode.data());
 
   if (linkCode.length() != LINK_CODE_LENGTH) {
-    OS_LOGE(TAG, "Invalid link code length");
-    return AccountLinkResultCode::InvalidCode;
+    OS_LOGE(TAG, "Invalid link code length: expected %zu, got %zu", static_cast<size_t>(LINK_CODE_LENGTH), linkCode.length());
+    return AccountLinkResultCode::InvalidCodeLength;
   }
 
   auto response = HTTP::JsonAPI::LinkAccount(linkCode);
 
   if (response.code == 404) {
+    OS_LOGW(TAG, "Account link failed: backend rejected the link code as invalid (404)");
     return AccountLinkResultCode::InvalidCode;
   }
 
-  if (response.result == HTTP::RequestResult::RateLimited) {
-    OS_LOGW(TAG, "Account Link request got ratelimited");
-    return AccountLinkResultCode::RateLimited;
-  }
   if (response.result != HTTP::RequestResult::Success) {
-    OS_LOGE(TAG, "Error while getting auth token: %s %d", response.ResultToString(), response.code);
+    OS_LOGE(TAG, "Account link request failed: %s (result=%hhu, http=%d)", response.ResultToString(), static_cast<uint8_t>(response.result), response.code);
 
-    return AccountLinkResultCode::InternalError;
+    switch (response.result) {
+      case HTTP::RequestResult::RateLimited:
+        return AccountLinkResultCode::RateLimited;
+      case HTTP::RequestResult::TimedOut:
+        return AccountLinkResultCode::RequestTimedOut;
+      case HTTP::RequestResult::InvalidURL:
+      case HTTP::RequestResult::RequestFailed:
+        return AccountLinkResultCode::RequestFailed;
+      case HTTP::RequestResult::CodeRejected:
+        return AccountLinkResultCode::ServerError;
+      case HTTP::RequestResult::ParseFailed:
+        return AccountLinkResultCode::InvalidResponse;
+      default:  // InternalError (e.g. no backend domain configured, URI truncated), Cancelled, ...
+        return AccountLinkResultCode::InternalError;
+    }
   }
 
   if (response.code != 200) {
-    OS_LOGE(TAG, "Unexpected response code: %d", response.code);
-    return AccountLinkResultCode::InternalError;
+    OS_LOGE(TAG, "Account link failed: unexpected response code %d from backend", response.code);
+    return AccountLinkResultCode::ServerError;
   }
 
   if (response.data.authToken.empty()) {
-    OS_LOGE(TAG, "Received empty auth token");
-    return AccountLinkResultCode::InternalError;
+    OS_LOGE(TAG, "Account link failed: backend returned an empty auth token");
+    return AccountLinkResultCode::InvalidResponse;
   }
 
   if (!Config::SetBackendAuthToken(std::move(response.data.authToken))) {
-    OS_LOGE(TAG, "Failed to save auth token");
-    return AccountLinkResultCode::InternalError;
+    OS_LOGE(TAG, "Account link failed: could not persist auth token to flash");
+    return AccountLinkResultCode::ConfigSaveFailed;
   }
 
   s_flags.fetch_or(FLAG_LINKED, std::memory_order_relaxed);
@@ -190,6 +203,16 @@ bool GatewayConnectionManager::SendMessageBIN(tcb::span<const uint8_t> data)
   }
 
   return client->sendMessageBIN(data);
+}
+
+void GatewayConnectionManager::MarkPingReceived()
+{
+  auto client = GetClient();
+  if (client == nullptr) {
+    return;
+  }
+
+  client->markPingReceived();
 }
 
 bool FetchHubInfo(std::string authToken)
@@ -315,6 +338,8 @@ void InitializeClient()
 
   s_flags.fetch_or(FLAG_LINKED, std::memory_order_relaxed);
   OS_LOGD(TAG, "Successfully verified auth token");
+
+  Serialization::Local::SerializeAccountLinkStatusEvent(true, CaptivePortal::BroadcastMessageBIN);
 
   CreateClient(authToken);
 }

@@ -1,16 +1,12 @@
-import { SerializeWifiScanCommand } from '$lib/Serializers/WifiScanCommand';
+import { stopWifiScan } from '$lib/api';
 import type { WebSocketClient } from '$lib/WebSocketClient';
-import { AccountLinkCommandResult } from '$lib/_fbs/open-shock/serialization/local/account-link-command-result';
-import { AccountLinkResultCode } from '$lib/_fbs/open-shock/serialization/local/account-link-result-code';
 import { ErrorMessage } from '$lib/_fbs/open-shock/serialization/local/error-message';
 import { HubToLocalMessage } from '$lib/_fbs/open-shock/serialization/local/hub-to-local-message';
 import { HubToLocalMessagePayload } from '$lib/_fbs/open-shock/serialization/local/hub-to-local-message-payload';
 import { ReadyMessage } from '$lib/_fbs/open-shock/serialization/local/ready-message';
-import { SetEstopEnabledCommandResult } from '$lib/_fbs/open-shock/serialization/local/set-estop-enabled-command-result';
-import { SetEstopPinCommandResult } from '$lib/_fbs/open-shock/serialization/local/set-estop-pin-command-result';
-import { SetGPIOResultCode } from '$lib/_fbs/open-shock/serialization/local/set-gpioresult-code';
-import { SetRfTxPinCommandResult } from '$lib/_fbs/open-shock/serialization/local/set-rf-tx-pin-command-result';
 import { WifiScanStatusMessage } from '$lib/_fbs/open-shock/serialization/local/wifi-scan-status-message';
+import { AccountLinkStatusEvent } from '$lib/_fbs/open-shock/serialization/local/account-link-status-event';
+import { WifiGotIpEvent } from '$lib/_fbs/open-shock/serialization/local/wifi-got-ip-event';
 import { mapConfig } from '$lib/mappers/ConfigMapper';
 import { hubState } from '$lib/stores';
 import { ByteBuffer } from 'flatbuffers';
@@ -32,8 +28,6 @@ PayloadHandlers[HubToLocalMessagePayload.ReadyMessage] = (cli, msg) => {
   const payload = new ReadyMessage();
   msg.payload(payload);
 
-  console.log('[WS] Connected to hub, poggies: ', payload.poggies());
-
   hubState.wifiConnectedBSSID = payload.connectedWifi()?.bssid() || null;
   hubState.accountLinked = payload.accountLinked();
   hubState.config = mapConfig(payload.config());
@@ -50,8 +44,7 @@ PayloadHandlers[HubToLocalMessagePayload.ReadyMessage] = (cli, msg) => {
 
   console.log('[WS] Updated hub state: ', hubState);
 
-  const data = SerializeWifiScanCommand(false);
-  cli.Send(data);
+  stopWifiScan();
 
   toast.success('Websocket connection established');
 };
@@ -74,109 +67,21 @@ PayloadHandlers[HubToLocalMessagePayload.WifiScanStatusMessage] = (cli, msg) => 
 
 PayloadHandlers[HubToLocalMessagePayload.WifiNetworkEvent] = WifiNetworkEventHandler;
 
-PayloadHandlers[HubToLocalMessagePayload.AccountLinkCommandResult] = (cli, msg) => {
-  const payload = new AccountLinkCommandResult();
+PayloadHandlers[HubToLocalMessagePayload.WifiGotIpEvent] = (cli, msg) => {
+  const payload = new WifiGotIpEvent();
   msg.payload(payload);
 
-  const result = payload.result();
-
-  if (result == AccountLinkResultCode.Success) {
-    toast.success('Account linked successfully');
-  } else {
-    let reason: string;
-    switch (result) {
-      case AccountLinkResultCode.CodeRequired:
-        reason = 'Code required';
-        break;
-      case AccountLinkResultCode.InvalidCodeLength:
-        reason = 'Invalid code length';
-        break;
-      case AccountLinkResultCode.NoInternetConnection:
-        reason = 'No internet connection';
-        break;
-      case AccountLinkResultCode.InvalidCode:
-        reason = 'Invalid code';
-        break;
-      case AccountLinkResultCode.RateLimited:
-        reason = 'Too many requests';
-        break;
-      case AccountLinkResultCode.InternalError:
-        reason = 'Internal error';
-        break;
-      default:
-        reason = 'Unknown';
-        break;
-    }
-    toast.error('Failed to link account: ' + reason);
+  const ip = payload.ip();
+  if (ip) {
+    toast.info('Got IP address: ' + ip);
   }
 };
 
-PayloadHandlers[HubToLocalMessagePayload.SetRfTxPinCommandResult] = (cli, msg) => {
-  const payload = new SetRfTxPinCommandResult();
+PayloadHandlers[HubToLocalMessagePayload.AccountLinkStatusEvent] = (cli, msg) => {
+  const payload = new AccountLinkStatusEvent();
   msg.payload(payload);
 
-  const result = payload.result();
-
-  if (result == SetGPIOResultCode.Success) {
-    if (hubState.config) hubState.config.rf.txPin = payload.pin();
-    toast.success('Changed RF TX pin to: ' + payload.pin());
-  } else {
-    let reason: string;
-    switch (result) {
-      case SetGPIOResultCode.InvalidPin:
-        reason = 'Invalid pin';
-        break;
-      case SetGPIOResultCode.InternalError:
-        reason = 'Internal error';
-        break;
-      default:
-        reason = 'Unknown';
-        break;
-    }
-    toast.error('Failed to change RF TX pin: ' + reason);
-  }
-};
-
-PayloadHandlers[HubToLocalMessagePayload.SetEstopEnabledCommandResult] = (cli, msg) => {
-  const payload = new SetEstopEnabledCommandResult();
-  msg.payload(payload);
-
-  const enabled = payload.enabled();
-  const success = payload.success();
-
-  if (success) {
-    if (hubState.config) hubState.config.estop.enabled = payload.enabled();
-    toast.success('Changed EStop enabled to: ' + enabled);
-  } else {
-    toast.error('Failed to change EStop enabled');
-  }
-};
-
-PayloadHandlers[HubToLocalMessagePayload.SetEstopPinCommandResult] = (cli, msg) => {
-  const payload = new SetEstopPinCommandResult();
-  msg.payload(payload);
-
-  const result = payload.result();
-
-  if (result == SetGPIOResultCode.Success) {
-    const gpioPin = payload.gpioPin();
-    if (hubState.config) hubState.config.estop.gpioPin = gpioPin;
-    toast.success('Changed EStop pin to: ' + gpioPin);
-  } else {
-    let reason: string;
-    switch (result) {
-      case SetGPIOResultCode.InvalidPin:
-        reason = 'Invalid pin';
-        break;
-      case SetGPIOResultCode.InternalError:
-        reason = 'Internal error';
-        break;
-      default:
-        reason = 'Unknown';
-        break;
-    }
-    toast.error('Failed to change EStop pin: ' + reason);
-  }
+  hubState.accountLinked = payload.linked();
 };
 
 export function WebSocketMessageBinaryHandler(cli: WebSocketClient, data: ArrayBuffer) {

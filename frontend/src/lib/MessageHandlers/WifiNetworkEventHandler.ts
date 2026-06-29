@@ -61,33 +61,57 @@ function handleLostEvent(fbsNetwork: FbsWifiNetwork) {
 }
 function handleSavedEvent(fbsNetwork: FbsWifiNetwork) {
   const ssid = fbsNetwork.ssid();
-  const bssid = fbsNetwork.bssid();
-
-  if (!ssid || !bssid) {
+  if (!ssid) {
     console.warn('[WS] Received invalid network saved event');
     return;
   }
 
-  hubState.updateWifiNetwork(bssid, (network) => {
-    network.saved = true;
-    return network;
-  });
+  const bssid = fbsNetwork.bssid();
+  if (bssid) {
+    hubState.updateWifiNetwork(bssid, (network) => {
+      network.saved = true;
+      return network;
+    });
+  }
+
+  // Update config credentials so savedOnlySSIDs stays in sync
+  if (hubState.config && !hubState.config.wifi.credentials.some((c) => c.ssid === ssid)) {
+    hubState.config = {
+      ...hubState.config,
+      wifi: {
+        ...hubState.config.wifi,
+        credentials: [...hubState.config.wifi.credentials, { id: 0, ssid, password: null }],
+      },
+    };
+  }
 
   toast.success('WiFi network saved: ' + ssid);
 }
 function handleRemovedEvent(fbsNetwork: FbsWifiNetwork) {
   const ssid = fbsNetwork.ssid();
-  const bssid = fbsNetwork.bssid();
-
-  if (!ssid || !bssid) {
+  if (!ssid) {
     console.warn('[WS] Received invalid network forgotten event');
     return;
   }
 
-  hubState.updateWifiNetwork(bssid, (network) => {
-    network.saved = false;
-    return network;
-  });
+  const bssid = fbsNetwork.bssid();
+  if (bssid) {
+    hubState.updateWifiNetwork(bssid, (network) => {
+      network.saved = false;
+      return network;
+    });
+  }
+
+  // Update config credentials so savedOnlySSIDs stays in sync
+  if (hubState.config) {
+    hubState.config = {
+      ...hubState.config,
+      wifi: {
+        ...hubState.config.wifi,
+        credentials: hubState.config.wifi.credentials.filter((c) => c.ssid !== ssid),
+      },
+    };
+  }
 
   toast.success('WiFi network forgotten: ' + ssid);
 }

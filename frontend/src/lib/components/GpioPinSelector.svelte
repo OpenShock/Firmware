@@ -1,16 +1,15 @@
 <script lang="ts">
   import { hubState, usedPins } from '$lib/stores';
-  import { WebSocketClient } from '$lib/WebSocketClient';
   import { Button } from '$lib/components/ui/button';
   import { Input } from '$lib/components/ui/input';
 
   interface Props {
     name: string;
     currentPin: number | null;
-    serializer: (gpio: number) => Uint8Array;
+    setter: (pin: number) => Promise<boolean>;
   }
 
-  let { name, currentPin, serializer }: Props = $props();
+  let { name, currentPin, setter }: Props = $props();
 
   function isPinValid(pin: number | null): pin is number {
     return pin !== null && pin >= 0 && pin <= 255;
@@ -54,10 +53,12 @@
     }
   });
 
-  function setGpioPin() {
+  async function setGpioPin() {
     if (!canSet) return;
-    const data = serializer(pendingPin!);
-    WebSocketClient.Instance.Send(data);
+    const success = await setter(pendingPin!);
+    if (success) {
+      pendingPin = null;
+    }
   }
 </script>
 

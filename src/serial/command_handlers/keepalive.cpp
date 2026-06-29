@@ -5,7 +5,7 @@
 #include "Convert.h"
 #include "util/StringUtils.h"
 
-void _handleKeepAliveCommand(std::string_view arg, bool isAutomated)
+static void handleKeepAliveCommand(std::string_view arg, bool isAutomated)
 {
   bool keepAliveEnabled;
 
@@ -38,9 +38,9 @@ OpenShock::Serial::CommandGroup OpenShock::Serial::CommandHandlers::KeepAliveHan
 {
   auto group = OpenShock::Serial::CommandGroup("keepalive"sv);
 
-  auto& getCommand = group.addCommand("Get the shocker keep-alive status"sv, _handleKeepAliveCommand);
+  auto& getCommand = group.addCommand("Get the shocker keep-alive status"sv, handleKeepAliveCommand);
 
-  auto& setCommand = group.addCommand("Enable/disable shocker keep-alive"sv, _handleKeepAliveCommand);
+  auto& setCommand = group.addCommand("Enable/disable shocker keep-alive"sv, handleKeepAliveCommand);
   setCommand.addArgument("enabled"sv, "must be a boolean"sv, "true"sv);
 
   return group;

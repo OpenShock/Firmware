@@ -499,7 +499,7 @@ bool OtaUpdateManager::Init()
   const esp_partition_t* partition = esp_ota_get_running_partition();
   if (partition == nullptr) {
     OS_PANIC(TAG, "Failed to get currently running partition");
-    return false;  // This will never be reached, but the compiler doesn't know that.
+    return false;  // Unreachable, here to make tooling happy
   }
 
   OS_LOGD(TAG, "Fetching partition state");
@@ -508,7 +508,7 @@ bool OtaUpdateManager::Init()
   err = esp_ota_get_state_partition(partition, &_otaImageState);
   if (err != ESP_OK) {
     OS_PANIC(TAG, "Failed to get partition state: %s", esp_err_to_name(err));
-    return false;  // This will never be reached, but the compiler doesn't know that.
+    return false;  // Unreachable, here to make tooling happy
   }
 
   OS_LOGD(TAG, "Fetching previous update step");

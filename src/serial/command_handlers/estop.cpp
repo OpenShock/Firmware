@@ -4,7 +4,7 @@
 #include "Convert.h"
 #include "estop/EStopManager.h"
 
-void _handleEStopEnabledCommand(std::string_view arg, bool isAutomated)
+static void handleEStopEnabledCommand(std::string_view arg, bool isAutomated)
 {
   bool enabled;
   if (arg.empty()) {
@@ -36,7 +36,7 @@ void _handleEStopEnabledCommand(std::string_view arg, bool isAutomated)
   SERPR_SUCCESS("Saved config");
 }
 
-void _handleEStopPinCommand(std::string_view arg, bool isAutomated)
+static void handleEStopPinCommand(std::string_view arg, bool isAutomated)
 {
   gpio_num_t estopPin;
   if (arg.empty()) {
@@ -72,12 +72,12 @@ OpenShock::Serial::CommandGroup OpenShock::Serial::CommandHandlers::EStopHandler
 {
   auto group = OpenShock::Serial::CommandGroup("estop"sv);
 
-  auto& getEnabledCommand = group.addCommand("enabled"sv, "Get the E-Stop enabled state."sv, _handleEStopEnabledCommand);
-  auto& setEnabledCommand = group.addCommand("enabled"sv, "Set the E-Stop enabled state."sv, _handleEStopEnabledCommand);
+  auto& getEnabledCommand = group.addCommand("enabled"sv, "Get the E-Stop enabled state."sv, handleEStopEnabledCommand);
+  auto& setEnabledCommand = group.addCommand("enabled"sv, "Set the E-Stop enabled state."sv, handleEStopEnabledCommand);
   setEnabledCommand.addArgument("enabled"sv, "must be a boolean"sv, "true"sv);
 
-  auto& getPinCommand = group.addCommand("pin"sv, "Get the GPIO pin used for the E-Stop."sv, _handleEStopPinCommand);
-  auto& setPinCommand = group.addCommand("pin"sv, "Set the GPIO pin used for the E-Stop."sv, _handleEStopPinCommand);
+  auto& getPinCommand = group.addCommand("pin"sv, "Get the GPIO pin used for the E-Stop."sv, handleEStopPinCommand);
+  auto& setPinCommand = group.addCommand("pin"sv, "Set the GPIO pin used for the E-Stop."sv, handleEStopPinCommand);
   setPinCommand.addArgument("pin"sv, "must be a number"sv, "4"sv);
 
   return group;

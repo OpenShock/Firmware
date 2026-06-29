@@ -1,9 +1,11 @@
 #pragma once
 
-#include "serialization/_fbs/HubToLocalMessage_generated.h"
-
 #include <cstdint>
 
 namespace OpenShock {
-  typedef OpenShock::Serialization::Local::SetGPIOResultCode SetGPIOResultCode;
+  enum class SetGPIOResultCode : uint8_t {
+    Success       = 0,
+    InvalidPin    = 1,
+    InternalError = 2,
+  };
 }  // namespace OpenShock

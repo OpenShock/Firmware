@@ -1,0 +1,99 @@
+on:
+  push:
+    branches:
+      - master
+      - beta
+      - develop
+    paths-ignore:
+      - 'CHANGELOG.md'
+      - '.changes/**'
+
+name: release
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+  id-token: write
+
+jobs:
+  auto-release:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    # Belt-and-suspenders alongside paths-ignore: never react to our own bot commit.
+    if: github.actor != 'github-actions[bot]'
+
+    steps:
+      # Mint a short-lived, repo-scoped installation token from the release
+      # GitHub App. A non-GITHUB_TOKEN actor is required so the tag push below
+      # triggers ci-build; the default GITHUB_TOKEN does not trigger downstream
+      # workflows. Using an App (instead of a personal PAT) keeps the token
+      # short-lived, least-privilege, and owned by the org rather than a person.
+      - uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1  # v3.2.0
+        id: app-token
+        with:
+          app-id: ${{ secrets.RELEASE_APP_ID }}
+          private-key: ${{ secrets.RELEASE_APP_KEY }}
+
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0  # v7.0.0
+        with:
+          fetch-depth: 0
+          token: ${{ steps.app-token.outputs.token }}
+
+      - name: Configure git
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+      - name: Rebase on top of latest remote
+        run: git pull --rebase --autostash origin "${GITHUB_REF_NAME}"
+
+      - name: Fetch all tags
+        run: git fetch --tags
+
+      - name: Run release tool
+        id: meta
+        uses: OpenShock/release-tool@8530d21255e619e58bdf7e55c3299a3c8f7bf4ad  # v0.2.2
+        with:
+          mode: release
+          output: release.json
+          notes-output: release-notes.md
+        env:
+          GITHUB_TOKEN: ${{ steps.app-token.outputs.token }}
+
+      - name: Push commit and tag
+        if: steps.meta.outputs.tag != ''
+        run: git push origin HEAD "${{ steps.meta.outputs.tag }}"
+
+      - name: Publish to OpenShock API
+        if: steps.meta.outputs.skip == 'false' && vars.OPENSHOCK_API_URL != ''
+        env:
+          API_URL: ${{ vars.OPENSHOCK_API_URL }}
+        run: |
+          OIDC_TOKEN=$(curl -sLS \
+            -H "Authorization: bearer $ACTIONS_ID_TOKEN_REQUEST_TOKEN" \
+            "$ACTIONS_ID_TOKEN_REQUEST_URL&audience=openshock-release-ingest" \
+            | jq -r .value)
+          if [ -z "$OIDC_TOKEN" ] || [ "$OIDC_TOKEN" = "null" ]; then
+            echo "::error::Failed to fetch GitHub OIDC token"
+            exit 1
+          fi
+          curl -fsSL --retry 3 --retry-delay 5 -X POST "$API_URL/1/public/releases" \
+            -H "Authorization: Bearer $OIDC_TOKEN" \
+            -H "Content-Type: application/json" \
+            --data-binary @release.json
+
+      - name: Create GitHub Release
+        if: steps.meta.outputs.tag != ''
+        env:
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+          TAG: ${{ steps.meta.outputs.tag }}
+          PRERELEASE: ${{ steps.meta.outputs.prerelease }}
+        run: |
+          ARGS=("$TAG" "release.json" --title "$TAG" --notes-file release-notes.md)
+          if [ "$PRERELEASE" = "true" ]; then
+            ARGS+=(--prerelease)
+          fi
+          gh release create "${ARGS[@]}"

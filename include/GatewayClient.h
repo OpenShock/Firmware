@@ -28,6 +28,8 @@ namespace OpenShock {
     bool sendMessageTXT(std::string_view data);
     bool sendMessageBIN(tcb::span<const uint8_t> data);
 
+    void markPingReceived();
+
     bool loop();
 
   private:
@@ -37,5 +39,6 @@ namespace OpenShock {
 
     WebSocketsClient m_webSocket;
     GatewayClientState m_state;
+    int64_t m_lastPingTimestamp;
   };
 }  // namespace OpenShock
