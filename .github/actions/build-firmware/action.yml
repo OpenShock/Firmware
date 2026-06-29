@@ -22,15 +22,23 @@ runs:
       with:
         path: |
           .pio/libdeps
-          ~/.platformio/platforms
-          ~/.platformio/packages
-          ~/.platformio/.cache
-        key: pio-${{ runner.os }}-${{ hashFiles('platformio.ini', 'requirements.txt') }}
+          # pioarduino installs toolchains, esp-idf, the Arduino core and its own
+          # Python venv under ~/.platformio/{tools,penv}, not just platforms/packages.
+          # Caching the whole tree is the only way to avoid a full reinstall per board.
+          # Exclude dist/ and .cache/ — raw download archives + transient install junk
+          # that are redundant once extracted into packages/tools, and just bloat the cache.
+          ~/.platformio
+          !~/.platformio/dist
+          !~/.platformio/.cache
+        # Bump the v2 prefix whenever the cached layout changes — actions/cache
+        # never overwrites an existing key, so a stale/incomplete cache under the
+        # same key would otherwise stick around until platformio.ini changes.
+        key: pio-v2-${{ runner.os }}-${{ hashFiles('platformio.ini', 'requirements.txt') }}
         # Fall back to the latest prior cache when platformio.ini changes so we
         # only download deltas instead of re-fetching the whole pioarduino
         # platform + toolchains on every config edit.
         restore-keys: |
-          pio-${{ runner.os }}-
+          pio-v2-${{ runner.os }}-
 
     - uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405  # v6.2.0
       with:

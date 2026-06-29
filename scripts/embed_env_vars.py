@@ -1,6 +1,5 @@
 from typing import Mapping
 from utils import pioenv, sysenv, dotenv, shorthands
-import git
 import re
 
 # This file is invoked by PlatformIO during build.
@@ -41,6 +40,14 @@ dotenv_type = 'production' if is_release_build else 'development'
 dot = dotenv.DotEnv(project_dir, dotenv_type)
 
 def get_git_repo():
+    # GitPython is only used as a fallback for local builds to derive the version
+    # and commit. In CI both come from OPENSHOCK_FW_* env vars, so the build must
+    # not hard-depend on the 'git' module being importable (the pioarduino build
+    # environment doesn't always have it). Import lazily and degrade gracefully.
+    try:
+        import git
+    except ImportError:
+        return None
     try:
         return git.Repo(search_parent_directories=True)
     except git.exc.InvalidGitRepositoryError:
