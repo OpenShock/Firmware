@@ -26,6 +26,11 @@ runs:
           ~/.platformio/packages
           ~/.platformio/.cache
         key: pio-${{ runner.os }}-${{ hashFiles('platformio.ini', 'requirements.txt') }}
+        # Fall back to the latest prior cache when platformio.ini changes so we
+        # only download deltas instead of re-fetching the whole pioarduino
+        # platform + toolchains on every config edit.
+        restore-keys: |
+          pio-${{ runner.os }}-
 
     - uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405  # v6.2.0
       with:
