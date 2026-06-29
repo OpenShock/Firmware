@@ -60,7 +60,7 @@ bool OtaUpdateConfig::FromFlatbuffers(const Serialization::Configuration::OtaUpd
   }
 
   isEnabled = config->is_enabled();
-  Internal::Utils::FromFbsStr(repoDomain, config->repo_domain(), OPENSHOCK_REPO_DOMAIN);
+  Internal::Utils::FromFbsStr(repoDomain, config->cdn_domain(), OPENSHOCK_REPO_DOMAIN);
   updateChannel          = config->update_channel();
   checkOnStartup         = config->check_on_startup();
   checkPeriodically      = config->check_periodically();
