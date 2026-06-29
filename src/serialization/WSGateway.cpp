@@ -58,7 +58,7 @@ bool Gateway::SerializeBootStatusMessage(int32_t updateId, OpenShock::FirmwareBo
 
   auto fbsVersion = Types::CreateSemVerDirect(builder, OPENSHOCK_FW_VERSION_MAJOR, OPENSHOCK_FW_VERSION_MINOR, OPENSHOCK_FW_VERSION_PATCH, OPENSHOCK_FW_VERSION_PRERELEASE, OPENSHOCK_FW_VERSION_BUILD);
 
-  auto fbsBootStatus = Gateway::CreateBootStatus(builder, bootType, fbsVersion, updateId);
+  auto fbsBootStatus = Gateway::CreateBootStatus(builder, static_cast<Types::FirmwareBootType>(bootType), fbsVersion, updateId);
 
   auto msg = Gateway::CreateHubToGatewayMessage(builder, Gateway::HubToGatewayMessagePayload::BootStatus, fbsBootStatus.Union());
 

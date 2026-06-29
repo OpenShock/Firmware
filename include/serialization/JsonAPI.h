@@ -1,6 +1,6 @@
 #pragma once
 
-#include "ShockerModelType.h"
+#include "enums/ShockerModelType.h"
 
 #include <cJSON.h>
 

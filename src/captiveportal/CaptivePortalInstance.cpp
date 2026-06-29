@@ -15,7 +15,7 @@ const char* const TAG = "CaptivePortalInstance";
 #include "Logging.h"
 #include "RateLimiter.h"
 #include "message_handlers/WebSocket.h"
-#include "OtaUpdateChannel.h"
+#include "enums/OtaUpdateChannel.h"
 #include "serialization/WSLocal.h"
 #include "util/FnProxy.h"
 #include "util/HexUtils.h"

@@ -2,7 +2,7 @@
 
 #include "OpenShock.h"
 #include "TinyVec.h"
-#include "WebSocketMessageType.h"
+#include "enums/WebSocketMessageType.h"
 
 #include <WebSockets.h>
 

@@ -1,6 +1,6 @@
 #pragma once
 
-#include "FirmwareBootType.h"
+#include "enums/FirmwareBootType.h"
 #include "SemVer.h"
 #include "serialization/CallbackFn.h"
 

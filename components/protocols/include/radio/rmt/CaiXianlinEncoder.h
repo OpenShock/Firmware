@@ -1,6 +1,6 @@
 #pragma once
 
-#include "ShockerCommandType.h"
+#include "enums/ShockerCommandType.h"
 
 #include <esp32-hal-rmt.h>
 

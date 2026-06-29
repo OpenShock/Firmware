@@ -3,7 +3,7 @@
 #include "CommandHandler.h"
 #include "config/Config.h"
 #include "Convert.h"
-#include "SetGPIOResultCode.h"
+#include "enums/SetGPIOResultCode.h"
 
 static void handleRfTxPinCommand(std::string_view arg, bool isAutomated)
 {

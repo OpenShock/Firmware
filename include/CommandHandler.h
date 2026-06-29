@@ -1,8 +1,8 @@
 #pragma once
 
-#include "SetGPIOResultCode.h"
-#include "ShockerCommandType.h"
-#include "ShockerModelType.h"
+#include "enums/SetGPIOResultCode.h"
+#include "enums/ShockerCommandType.h"
+#include "enums/ShockerModelType.h"
 
 #include <hal/gpio_types.h>
 

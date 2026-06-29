@@ -1,7 +1,7 @@
 #pragma once
 
-#include "FirmwareBootType.h"
-#include "OtaUpdateChannel.h"
+#include "enums/FirmwareBootType.h"
+#include "enums/OtaUpdateChannel.h"
 #include "SemVer.h"
 
 #include <array>

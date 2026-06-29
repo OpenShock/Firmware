@@ -6,7 +6,7 @@ const char* const TAG = "VisualStateManager";
 
 #include "estop/EStopState.h"
 #include "events/Events.h"
-#include "GatewayClientState.h"
+#include "enums/GatewayClientState.h"
 #include "Logging.h"
 #include "led_drivers/MonoLedDriver.h"
 #include "led_drivers/RgbLedDriver.h"

@@ -61,21 +61,21 @@ bool OtaUpdateConfig::FromFlatbuffers(const Serialization::Configuration::OtaUpd
 
   isEnabled = config->is_enabled();
   Internal::Utils::FromFbsStr(cdnDomain, config->cdn_domain(), OPENSHOCK_FW_CDN_DOMAIN);
-  updateChannel          = config->update_channel();
+  updateChannel          = static_cast<OtaUpdateChannel>(config->update_channel());
   checkOnStartup         = config->check_on_startup();
   checkPeriodically      = config->check_periodically();
   checkInterval          = config->check_interval();
   allowBackendManagement = config->allow_backend_management();
   requireManualApproval  = config->require_manual_approval();
   updateId               = config->update_id();
-  updateStep             = config->update_step();
+  updateStep             = static_cast<OtaUpdateStep>(config->update_step());
 
   return true;
 }
 
 flatbuffers::Offset<OpenShock::Serialization::Configuration::OtaUpdateConfig> OtaUpdateConfig::ToFlatbuffers(flatbuffers::FlatBufferBuilder& builder, bool withSensitiveData) const
 {
-  return Serialization::Configuration::CreateOtaUpdateConfig(builder, isEnabled, builder.CreateString(cdnDomain), updateChannel, checkOnStartup, checkPeriodically, checkInterval, allowBackendManagement, requireManualApproval, updateId, updateStep);
+  return Serialization::Configuration::CreateOtaUpdateConfig(builder, isEnabled, builder.CreateString(cdnDomain), static_cast<Serialization::Configuration::OtaUpdateChannel>(updateChannel), checkOnStartup, checkPeriodically, checkInterval, allowBackendManagement, requireManualApproval, updateId, static_cast<Serialization::Configuration::OtaUpdateStep>(updateStep));
 }
 
 bool OtaUpdateConfig::FromJSON(const cJSON* json)
@@ -111,14 +111,14 @@ cJSON* OtaUpdateConfig::ToJSON(bool withSensitiveData) const
 
   cJSON_AddBoolToObject(root, "isEnabled", isEnabled);
   cJSON_AddStringToObject(root, "cdnDomain", cdnDomain.c_str());
-  cJSON_AddStringToObject(root, "updateChannel", OpenShock::Serialization::Configuration::EnumNameOtaUpdateChannel(updateChannel));
+  cJSON_AddStringToObject(root, "updateChannel", OpenShock::Serialization::Configuration::EnumNameOtaUpdateChannel(static_cast<Serialization::Configuration::OtaUpdateChannel>(updateChannel)));
   cJSON_AddBoolToObject(root, "checkOnStartup", checkOnStartup);
   cJSON_AddBoolToObject(root, "checkPeriodically", checkPeriodically);
   cJSON_AddNumberToObject(root, "checkInterval", checkInterval);
   cJSON_AddBoolToObject(root, "allowBackendManagement", allowBackendManagement);
   cJSON_AddBoolToObject(root, "requireManualApproval", requireManualApproval);
   cJSON_AddNumberToObject(root, "updateId", updateId);
-  cJSON_AddStringToObject(root, "updateStep", OpenShock::Serialization::Configuration::EnumNameOtaUpdateStep(updateStep));
+  cJSON_AddStringToObject(root, "updateStep", OpenShock::Serialization::Configuration::EnumNameOtaUpdateStep(static_cast<Serialization::Configuration::OtaUpdateStep>(updateStep)));
 
   return root;
 }

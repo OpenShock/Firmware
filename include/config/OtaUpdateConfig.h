@@ -1,9 +1,9 @@
 #pragma once
 
 #include "config/ConfigBase.h"
-#include "FirmwareBootType.h"
-#include "OtaUpdateChannel.h"
-#include "OtaUpdateStep.h"
+#include "enums/FirmwareBootType.h"
+#include "enums/OtaUpdateChannel.h"
+#include "enums/OtaUpdateStep.h"
 
 #include <string>
 

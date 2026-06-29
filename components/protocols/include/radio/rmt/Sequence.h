@@ -1,8 +1,8 @@
 #pragma once
 
 #include "OpenShock.h"
-#include "ShockerCommandType.h"
-#include "ShockerModelType.h"
+#include "enums/ShockerCommandType.h"
+#include "enums/ShockerModelType.h"
 
 #include <esp32-hal-rmt.h>
 
