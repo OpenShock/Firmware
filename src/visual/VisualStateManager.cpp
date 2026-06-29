@@ -37,7 +37,7 @@ static std::atomic<uint64_t> s_stateFlags = 0;
 static std::unique_ptr<OpenShock::MonoLedDriver> s_monoLedDriver;
 static std::unique_ptr<OpenShock::RgbLedDriver> s_rgbLedDriver;
 
-inline void _setStateFlag(uint64_t flag, bool state)
+static inline void setStateFlag(uint64_t flag, bool state)
 {
   if (state) {
     s_stateFlags.fetch_or(flag, std::memory_order_relaxed);
@@ -46,7 +46,7 @@ inline void _setStateFlag(uint64_t flag, bool state)
   }
 }
 
-inline bool _isStateFlagSet(uint64_t flag)
+static inline bool isStateFlagSet(uint64_t flag)
 {
   return s_stateFlags.load(std::memory_order_relaxed) & flag;
 }
@@ -191,19 +191,19 @@ const MonoLedDriver::State kSolidOffPattern[] = {
 };
 
 template<std::size_t N>
-inline void _updateVisualStateGPIO(const MonoLedDriver::State (&override)[N])
+static inline void updateVisualStateGPIO(const MonoLedDriver::State (&override)[N])
 {
   s_monoLedDriver->SetPattern(override);
 }
 
 // Check-Set-Return pattern for setting a pattern based on a flag
 #define CSR_PATTERN(manager, flag, pattern) \
-  if (_isStateFlagSet(flag)) {              \
+  if (isStateFlagSet(flag)) {               \
     manager->SetPattern(pattern);           \
     return;                                 \
   }
 
-void _updateVisualStateGPIO()
+static void updateVisualStateGPIO()
 {
   CSR_PATTERN(s_monoLedDriver, kCriticalErrorFlag, kCriticalErrorPattern);
   CSR_PATTERN(s_monoLedDriver, kEmergencyStopAwaitingReleaseFlag, kEmergencyStopAwaitingReleasePattern);
@@ -216,7 +216,7 @@ void _updateVisualStateGPIO()
   s_monoLedDriver->SetPattern(kWiFiDisconnectedPattern);
 }
 
-void _updateVisualStateRGB()
+static void updateVisualStateRGB()
 {
   CSR_PATTERN(s_rgbLedDriver, kCriticalErrorFlag, kCriticalErrorRGBPattern);
   CSR_PATTERN(s_rgbLedDriver, kEmergencyStopAwaitingReleaseFlag, kEmergencyStopAwaitingReleaseRGBPattern);
@@ -229,35 +229,35 @@ void _updateVisualStateRGB()
   s_rgbLedDriver->SetPattern(kWiFiDisconnectedRGBPattern);
 }
 
-void _updateVisualState()
+static void updateVisualState()
 {
   bool gpioActive = s_monoLedDriver != nullptr;
   bool rgbActive  = s_rgbLedDriver != nullptr;
 
   if (gpioActive && rgbActive) {
     if (s_stateFlags == kStatusOKMask) {
-      _updateVisualStateGPIO(kSolidOnPattern);
+      updateVisualStateGPIO(kSolidOnPattern);
     } else {
-      _updateVisualStateGPIO(kSolidOffPattern);
+      updateVisualStateGPIO(kSolidOffPattern);
     }
-    _updateVisualStateRGB();
+    updateVisualStateRGB();
     return;
   }
 
   if (gpioActive) {
-    _updateVisualStateGPIO();
+    updateVisualStateGPIO();
     return;
   }
 
   if (rgbActive) {
-    _updateVisualStateRGB();
+    updateVisualStateRGB();
     return;
   }
 
   OS_LOGW(TAG, "Trying to update visual state, but no LED is active!");
 }
 
-void _handleEspWiFiEvent(void* event_handler_arg, esp_event_base_t event_base, int32_t event_id, void* event_data)
+static void handleEspWiFiEvent(void* event_handler_arg, esp_event_base_t event_base, int32_t event_id, void* event_data)
 {
   (void)event_handler_arg;
   (void)event_base;
@@ -267,25 +267,25 @@ void _handleEspWiFiEvent(void* event_handler_arg, esp_event_base_t event_base, i
 
   switch (event_id) {
     case WIFI_EVENT_STA_CONNECTED:
-      _setStateFlag(kWiFiConnectedFlag, true);
+      setStateFlag(kWiFiConnectedFlag, true);
       break;
     case WIFI_EVENT_STA_DISCONNECTED:
-      _setStateFlag(kWiFiConnectedFlag, false);
-      _setStateFlag(kHasIpAddressFlag, false);
+      setStateFlag(kWiFiConnectedFlag, false);
+      setStateFlag(kHasIpAddressFlag, false);
       break;
     case WIFI_EVENT_SCAN_DONE:
-      _setStateFlag(kWiFiScanningFlag, false);
+      setStateFlag(kWiFiScanningFlag, false);
       break;
     default:
       return;
   }
 
   if (oldState != s_stateFlags) {
-    _updateVisualState();
+    updateVisualState();
   }
 }
 
-void _handleEspIpEvent(void* event_handler_arg, esp_event_base_t event_base, int32_t event_id, void* event_data)
+static void handleEspIpEvent(void* event_handler_arg, esp_event_base_t event_base, int32_t event_id, void* event_data)
 {
   (void)event_handler_arg;
   (void)event_base;
@@ -298,39 +298,39 @@ void _handleEspIpEvent(void* event_handler_arg, esp_event_base_t event_base, int
     case IP_EVENT_STA_GOT_IP:
     case IP_EVENT_ETH_GOT_IP:
     case IP_EVENT_PPP_GOT_IP:
-      _setStateFlag(kHasIpAddressFlag, true);
+      setStateFlag(kHasIpAddressFlag, true);
       break;
     case IP_EVENT_STA_LOST_IP:
     case IP_EVENT_ETH_LOST_IP:
     case IP_EVENT_PPP_LOST_IP:
-      _setStateFlag(kHasIpAddressFlag, false);
+      setStateFlag(kHasIpAddressFlag, false);
       break;
     default:
       return;
   }
 
   if (oldState != s_stateFlags) {
-    _updateVisualState();
+    updateVisualState();
   }
 }
 
-void _handleOpenShockEStopStateChanged(void* event_data)
+static void handleOpenShockEStopStateChanged(void* event_data)
 {
   auto state = *static_cast<EStopState*>(event_data);
 
-  _setStateFlag(kEmergencyStoppedFlag, state != EStopState::Idle);
-  _setStateFlag(kEmergencyStopActiveClearingFlag, state == EStopState::ActiveClearing);
-  _setStateFlag(kEmergencyStopAwaitingReleaseFlag, state == EStopState::AwaitingRelease);
+  setStateFlag(kEmergencyStoppedFlag, state != EStopState::Idle);
+  setStateFlag(kEmergencyStopActiveClearingFlag, state == EStopState::ActiveClearing);
+  setStateFlag(kEmergencyStopAwaitingReleaseFlag, state == EStopState::AwaitingRelease);
 }
 
-void _handleOpenShockGatewayStateChanged(void* event_data)
+static void handleOpenShockGatewayStateChanged(void* event_data)
 {
   auto state = *static_cast<GatewayClientState*>(event_data);
 
-  _setStateFlag(kWebSocketConnectedFlag, state == GatewayClientState::Connected);
+  setStateFlag(kWebSocketConnectedFlag, state == GatewayClientState::Connected);
 }
 
-void _handleOpenShockEvent(void* event_handler_arg, esp_event_base_t event_base, int32_t event_id, void* event_data)
+static void handleOpenShockEvent(void* event_handler_arg, esp_event_base_t event_base, int32_t event_id, void* event_data)
 {
   (void)event_handler_arg;
   (void)event_base;
@@ -339,10 +339,10 @@ void _handleOpenShockEvent(void* event_handler_arg, esp_event_base_t event_base,
 
   switch (event_id) {
     case OPENSHOCK_EVENT_ESTOP_STATE_CHANGED:
-      _handleOpenShockEStopStateChanged(event_data);
+      handleOpenShockEStopStateChanged(event_data);
       break;
     case OPENSHOCK_EVENT_GATEWAY_CLIENT_STATE_CHANGED:
-      _handleOpenShockGatewayStateChanged(event_data);
+      handleOpenShockGatewayStateChanged(event_data);
       break;
     default:
       OS_LOGW(TAG, "Received unknown event ID: %i", event_id);
@@ -350,7 +350,7 @@ void _handleOpenShockEvent(void* event_handler_arg, esp_event_base_t event_base,
   }
 
   if (oldState != s_stateFlags) {
-    _updateVisualState();
+    updateVisualState();
   }
 }
 
@@ -384,26 +384,26 @@ bool VisualStateManager::Init()
 
   esp_err_t err;
 
-  err = esp_event_handler_register(WIFI_EVENT, ESP_EVENT_ANY_ID, _handleEspWiFiEvent, nullptr);
+  err = esp_event_handler_register(WIFI_EVENT, ESP_EVENT_ANY_ID, handleEspWiFiEvent, nullptr);
   if (err != ESP_OK) {
     OS_LOGE(TAG, "Failed to register event handler for WIFI_EVENT: %s", esp_err_to_name(err));
     return false;
   }
 
-  err = esp_event_handler_register(IP_EVENT, ESP_EVENT_ANY_ID, _handleEspIpEvent, nullptr);
+  err = esp_event_handler_register(IP_EVENT, ESP_EVENT_ANY_ID, handleEspIpEvent, nullptr);
   if (err != ESP_OK) {
     OS_LOGE(TAG, "Failed to register event handler for IP_EVENT: %s", esp_err_to_name(err));
     return false;
   }
 
-  err = esp_event_handler_register(OPENSHOCK_EVENTS, ESP_EVENT_ANY_ID, _handleOpenShockEvent, nullptr);
+  err = esp_event_handler_register(OPENSHOCK_EVENTS, ESP_EVENT_ANY_ID, handleOpenShockEvent, nullptr);
   if (err != ESP_OK) {
     OS_LOGE(TAG, "Failed to register event handler for OPENSHOCK_EVENTS: %s", esp_err_to_name(err));
     return false;
   }
 
   // Run the update on init, otherwise no inital pattern is set.
-  _updateVisualState();
+  updateVisualState();
 
   return true;
 }
@@ -412,10 +412,10 @@ void VisualStateManager::SetCriticalError()
 {
   uint64_t oldState = s_stateFlags;
 
-  _setStateFlag(kCriticalErrorFlag, true);
+  setStateFlag(kCriticalErrorFlag, true);
 
   if (oldState != s_stateFlags) {
-    _updateVisualState();
+    updateVisualState();
   }
 }
 
@@ -423,10 +423,10 @@ void VisualStateManager::SetScanningStarted()
 {
   uint64_t oldState = s_stateFlags;
 
-  _setStateFlag(kWiFiScanningFlag, true);
+  setStateFlag(kWiFiScanningFlag, true);
 
   if (oldState != s_stateFlags) {
-    _updateVisualState();
+    updateVisualState();
   }
 }
 
@@ -553,12 +553,12 @@ void VisualStateManager::RunLedTest()
   for (const auto& step : steps) {
     OS_LOGI(TAG, "    %s", step.name);
     s_stateFlags.store(step.flags, std::memory_order_relaxed);
-    _updateVisualState();
+    updateVisualState();
     vTaskDelay(pdMS_TO_TICKS(step.durationMs));
   }
 
   // Restore original state
   OS_LOGI(TAG, "=== LED Test Complete, restoring state ===");
   s_stateFlags.store(savedFlags, std::memory_order_relaxed);
-  _updateVisualState();
+  updateVisualState();
 }

@@ -13,5 +13,5 @@ namespace OpenShock::EStopManager {
   bool IsEStopped();
   int64_t LastEStopped();
 
-  void Trigger();
+  void SoftwareTrigger();
 }  // namespace OpenShock::EStopManager
