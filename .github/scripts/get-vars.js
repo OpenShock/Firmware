@@ -71,8 +71,21 @@ const stableReleasesArray = releasesArray.filter(isStableRelease);
 const betaReleasesArray = releasesArray.filter(isBetaRelease);
 const devReleasesArray = releasesArray.filter(isDevRelease);
 
-// Build version string
-let currentVersion = `${latestRelease.major}.${latestRelease.minor}.${latestRelease.patch}`;
+// Build version string.
+//
+// The base MAJOR.MINOR.PATCH comes from release-tool (status mode), which is the
+// single source of truth for the version bump: it reads .changes/ and returns
+// the *next* version. For branch/PR builds we label the artifact as a
+// pre-release of that upcoming version (e.g. 1.6.0-develop+sha) rather than the
+// last released tag. We fall back to the latest tag when there are no pending
+// changes (RELEASE_SKIP=true) or the value is absent, and always for tag builds
+// (the tag itself is authoritative there).
+const nextVersion = process.env.RELEASE_NEXT_VERSION;
+const releaseSkip = process.env.RELEASE_SKIP === 'true';
+const latestBase = `${latestRelease.major}.${latestRelease.minor}.${latestRelease.patch}`;
+
+let currentVersion =
+  !isGitTag && nextVersion && !releaseSkip ? nextVersion : latestBase;
 if (!isGitTag) {
   // Get last part of branch name and replace all non-alphanumeric characters with dashes
   let sanitizedGitHeadRefName = gitHeadRefName
@@ -111,11 +124,12 @@ if (gitHeadRefName === 'master' || (isGitTag && isStableRelease(latestRelease)))
 }
 
 function getVersionChangeLog(lines) {
+  const isStableTag = isGitTag && isStableRelease(latestRelease);
   const emptyChangelog = lines.length === 0;
 
-  // Enforce that the changelog is not empty if we are on the master branch
-  if (isGitTag && emptyChangelog) {
-    setFailed('File "CHANGELOG.md" is empty, this must be populated in the master branch');
+  // Only stable tags require changelog entries
+  if (isStableTag && emptyChangelog) {
+    setFailed('File "CHANGELOG.md" is empty, this must be populated for stable releases');
     process.exit();
   }
 
@@ -133,17 +147,22 @@ function getVersionChangeLog(lines) {
 
   // Get the start of the entry
   const changeLogBegin = lines.findIndex((line) => line.startsWith(`# Version ${currentVersion}`));
-  if (isGitTag && changeLogBegin === -1) {
+  if (isStableTag && changeLogBegin === -1) {
     setFailed(
-      `File "CHANGELOG.md" does not contain a changelog entry for version "${currentVersion}", this must be added in the master branch`
+      `File "CHANGELOG.md" does not contain a changelog entry for version "${currentVersion}"`
     );
     process.exit();
   }
 
-  // Enforce that the changelog entry is at the top of the file if we are on the master branch
-  if (isGitTag && changeLogBegin !== 0) {
+  // RC/beta/dev tags may not have a changelog entry - that's fine
+  if (changeLogBegin === -1) {
+    return '';
+  }
+
+  // Enforce that the changelog entry is at the top of the file for stable releases
+  if (isStableTag && changeLogBegin !== 0) {
     setFailed(
-      `Changelog entry for version "${currentVersion}" is not at the top of the file, you tag is either out of date or you have not updated the changelog`
+      `Changelog entry for version "${currentVersion}" is not at the top of the file`
     );
     process.exit();
   }
@@ -161,10 +180,9 @@ function getVersionChangeLog(lines) {
   const emptyChangelogEntry =
     lines.slice(changeLogBegin + 1, changeLogEnd).filter((line) => line.trim() !== '').length === 0;
 
-  // Enforce that the changelog entry is not empty if we are on the master branch
-  if (isGitTag && emptyChangelogEntry) {
+  if (isStableTag && emptyChangelogEntry) {
     setFailed(
-      `Changelog entry for version "${currentVersion}" is empty, this must be populated in the master branch`
+      `Changelog entry for version "${currentVersion}" is empty`
     );
     process.exit();
   }
@@ -195,15 +213,17 @@ const changelogVersions = fullChangelogLines
 // Get the changelog for the current version
 const versionChangeLog = getVersionChangeLog(fullChangelogLines);
 
-// Enforce that all tags exist in the changelog
+// Enforce that all stable tags exist in the changelog (RC/beta/dev tags are excluded)
 let missingTags = [];
 for (const tag of gitTagsArray) {
+  const parsed = semver.parse(tag);
+  if (!parsed || !isStableRelease(parsed)) continue; // Skip non-stable pre-release tags
   if (!changelogVersions.includes(tag)) {
     missingTags.push(tag);
   }
 }
 if (missingTags.length > 0) {
-  setFailed(`Changelog is missing the following tags: ${missingTags.join(', ')}`);
+  setFailed(`Changelog is missing the following stable tags: ${missingTags.join(', ')}`);
   process.exit();
 }
 

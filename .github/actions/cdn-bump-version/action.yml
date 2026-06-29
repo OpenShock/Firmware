@@ -33,15 +33,13 @@ runs:
         echo "${{ inputs.version }}" >> upload/version-${{ inputs.release-channel }}.txt
 
     - name: Upload version file
-      uses: milanmk/actions-file-deployer@master
+      uses: ./.github/actions/sftp-mirror
       with:
-        remote-protocol: "sftp"
-        remote-host: "${{ inputs.bunny-stor-hostname }}"
-        remote-user: "${{ inputs.bunny-stor-username }}"
-        remote-password: "${{ inputs.bunny-stor-password }}"
-        remote-path: "/"
-        local-path: "upload"
-        sync: "full"
+        host: ${{ inputs.bunny-stor-hostname }}
+        username: ${{ inputs.bunny-stor-username }}
+        password: ${{ inputs.bunny-stor-password }}
+        local-path: upload
+        remote-path: /
 
     - name: Purge CDN cache
       shell: bash

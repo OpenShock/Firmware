@@ -18,5 +18,6 @@ void _Private::HandlePing(const OpenShock::Serialization::Gateway::GatewayToHubM
     return;
   }
 
+  GatewayConnectionManager::MarkPingReceived();
   Serialization::Gateway::SerializePongMessage(GatewayConnectionManager::SendMessageBIN);
 }

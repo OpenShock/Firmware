@@ -596,10 +596,10 @@ bool WiFiManager::Connect(const char* ssid)
 
   if (s_wifiState.load(std::memory_order_relaxed) == WiFiState::Disconnected) {
     s_preferredCredentialsID.store(creds.id, std::memory_order_relaxed);
-    return true;
   }
 
-  return false;
+  // Already connected to this network, or reconnecting — either way, success
+  return true;
 }
 
 void WiFiManager::Disconnect()
