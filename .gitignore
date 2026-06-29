@@ -19,6 +19,13 @@ packages
 *.sln
 compile_commands.json
 managed_components
+dependencies.lock
+
+# ESP-IDF: per-env sdkconfig.<env> is generated ("DO NOT EDIT") from
+# sdkconfig.defaults[.<target>]. Track only the editable defaults.
+/sdkconfig.*
+!/sdkconfig.defaults
+!/sdkconfig.defaults.*
 
 # Claude Code
 .claude/settings.local.json
