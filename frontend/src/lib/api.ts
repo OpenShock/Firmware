@@ -74,6 +74,11 @@ const _accountLinkErrorMessages: Record<string, string> = {
   NoInternetConnection: 'No internet connection',
   InvalidCode: 'Invalid code',
   RateLimited: 'Too many requests',
+  RequestFailed: 'Could not reach the server (check DNS/TLS/connection)',
+  RequestTimedOut: 'Request to the server timed out',
+  ServerError: 'Server returned an unexpected response',
+  InvalidResponse: 'Server sent an invalid response',
+  ConfigSaveFailed: 'Failed to save the auth token to the device',
   InternalError: 'Internal error',
 };
 

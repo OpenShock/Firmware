@@ -1,58 +1,38 @@
 on:
   pull_request:
-    branches:
-      - develop
-    types: [opened, reopened, synchronize, labeled, unlabeled]
+    branches: [develop, beta, master]
+    types: [opened, reopened, synchronize, ready_for_review, labeled, unlabeled]
 
 name: check-changes
 
-env:
-  PYTHON_VERSION: '3.13'
+permissions:
+  contents: read
+  pull-requests: write
 
 jobs:
-  require-changefile:
+  check:
     runs-on: ubuntu-latest
-    timeout-minutes: 2
-
+    timeout-minutes: 5
+    if: >-
+      !github.event.pull_request.draft &&
+      !contains(github.event.pull_request.labels.*.name, 'no-changelog')
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0  # v7.0.0
         with:
           fetch-depth: 0
 
-      - uses: actions/setup-python@v5
+      - name: Run change file check
+        uses: OpenShock/release-tool@8530d21255e619e58bdf7e55c3299a3c8f7bf4ad  # v0.2.2
         with:
-          python-version: ${{ env.PYTHON_VERSION }}
+          mode: check
+          base-ref: ${{ github.event.pull_request.base.ref }}
+          base-sha: ${{ github.event.pull_request.base.sha }}
+          pr-number: ${{ github.event.pull_request.number }}
 
-      - name: Install Python dependencies
-        run: pip install -r scripts/requirements.txt
-
-      - name: Check for change file
-        id: check
-        env:
-          BASE_SHA: ${{ github.event.pull_request.base.sha }}
-          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
-          LABELS: ${{ toJSON(github.event.pull_request.labels.*.name) }}
-        run: |
-          # PRs labeled "no-changelog" are exempt (dependency bumps, CI-only, etc.)
-          if echo "$LABELS" | jq -e 'any(. == "no-changelog")' > /dev/null; then
-            echo "::notice::Skipping changelog check (no-changelog label)"
-            echo "skip=true" >> "$GITHUB_OUTPUT"
-            exit 0
-          fi
-
-          # Accept both added and modified change files (excluding README and _headline).
-          CHANGES=$(git diff --name-only "$BASE_SHA"..."$HEAD_SHA" -- '.changes/*.md' \
-            | grep -Evi '^\.changes/(README|_headline)\.md$' || true)
-
-          if [ -z "$CHANGES" ]; then
-            echo "::error::No change file found. Add a .changes/<name>.md file describing your change, or add the 'no-changelog' label to skip this check. See .changes/README.md for the format."
-            exit 1
-          fi
-
-          echo "Found change files:"
-          echo "$CHANGES"
-          echo "skip=false" >> "$GITHUB_OUTPUT"
-
-      - name: Validate change files
-        if: steps.check.outputs.skip != 'true'
-        run: python scripts/release.py status
+      - name: Upload verdict
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a  # v7.0.1
+        with:
+          name: release-check
+          path: release-check.json
+          if-no-files-found: warn

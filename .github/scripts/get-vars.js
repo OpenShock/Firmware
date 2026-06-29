@@ -71,8 +71,21 @@ const stableReleasesArray = releasesArray.filter(isStableRelease);
 const betaReleasesArray = releasesArray.filter(isBetaRelease);
 const devReleasesArray = releasesArray.filter(isDevRelease);
 
-// Build version string
-let currentVersion = `${latestRelease.major}.${latestRelease.minor}.${latestRelease.patch}`;
+// Build version string.
+//
+// The base MAJOR.MINOR.PATCH comes from release-tool (status mode), which is the
+// single source of truth for the version bump: it reads .changes/ and returns
+// the *next* version. For branch/PR builds we label the artifact as a
+// pre-release of that upcoming version (e.g. 1.6.0-develop+sha) rather than the
+// last released tag. We fall back to the latest tag when there are no pending
+// changes (RELEASE_SKIP=true) or the value is absent, and always for tag builds
+// (the tag itself is authoritative there).
+const nextVersion = process.env.RELEASE_NEXT_VERSION;
+const releaseSkip = process.env.RELEASE_SKIP === 'true';
+const latestBase = `${latestRelease.major}.${latestRelease.minor}.${latestRelease.patch}`;
+
+let currentVersion =
+  !isGitTag && nextVersion && !releaseSkip ? nextVersion : latestBase;
 if (!isGitTag) {
   // Get last part of branch name and replace all non-alphanumeric characters with dashes
   let sanitizedGitHeadRefName = gitHeadRefName
