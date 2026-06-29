@@ -9,6 +9,7 @@
 #include <span>
 #include <string>
 #include <string_view>
+#include <utility>
 
 namespace OpenShock::HTTP {
   enum class RequestResult : uint8_t {

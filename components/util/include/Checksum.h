@@ -5,6 +5,7 @@
 #include <cstddef>
 #include <cstdint>
 #include <memory>
+#include <type_traits>
 
 namespace OpenShock::Checksum {
 
@@ -26,10 +27,13 @@ namespace OpenShock::Checksum {
   template<std::integral T>
   constexpr uint8_t Sum8(T value)
   {
+    // Shift on the unsigned representation; shifting signed values is implementation-defined for negatives
+    std::make_unsigned_t<T> bits = static_cast<std::make_unsigned_t<T>>(value);
+
     uint8_t result = 0;
 
     for (std::size_t i = 0; i < sizeof(T); ++i) {
-      result += static_cast<uint8_t>((value >> (i * 8)) & 0xFF);
+      result += static_cast<uint8_t>((bits >> (i * 8)) & 0xFF);
     }
 
     return result;

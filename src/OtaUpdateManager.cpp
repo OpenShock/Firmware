@@ -266,7 +266,15 @@ static esp_err_t otaum_set_wdt_timeout(uint32_t timeoutMs)
     .idle_core_mask = (1 << CONFIG_FREERTOS_NUMBER_OF_CORES) - 1,  // Bitmask of all cores
     .trigger_panic  = true,
   };
-  return esp_task_wdt_init(&twdt_config);
+  // The TWDT is already initialized by the Arduino core, so reconfigure it instead of re-initializing.
+  // esp_task_wdt_init() returns ESP_ERR_INVALID_STATE when already initialized and would not apply the new timeout.
+  esp_err_t err = esp_task_wdt_reconfigure(&twdt_config);
+  if (err == ESP_ERR_INVALID_STATE) {
+    // Not yet initialized, fall back to init
+    return esp_task_wdt_init(&twdt_config);
+  }
+
+  return err;
 }
 
 static void otaum_restore_wdt_timeout()
