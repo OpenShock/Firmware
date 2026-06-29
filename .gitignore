@@ -15,7 +15,7 @@ data/www
 
 # ignore generated files
 .vs
-packages
+/packages
 *.sln
 compile_commands.json
 

@@ -2,3 +2,6 @@
 	path = schemas
 	url = https://github.com/OpenShock/flatbuffers-schemas
 	branch = local-comms-revamp
+[submodule "frontend/packages/svelte-core"]
+	path = frontend/packages/svelte-core
+	url = git@github.com:OpenShock/svelte-core.git
