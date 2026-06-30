@@ -1,9 +1,9 @@
 <script lang="ts">
   import { linkAccount, unlinkAccount } from '$lib/api';
   import { hubState } from '$lib/stores';
-  import { Button } from '$lib/components/ui/button';
-  import { Input } from '$lib/components/ui/input';
-  import { Label } from '$lib/components/ui/label';
+  import { Button } from '@openshock/svelte-core/components/ui/button/index.ts';
+  import { Input } from '@openshock/svelte-core/components/ui/input/index.ts';
+  import { Label } from '@openshock/svelte-core/components/ui/label/index.ts';
   import { CircleCheck, Wifi, WifiOff, Unlink } from '@lucide/svelte';
 
   function isValidLinkCode(str: string) {
@@ -47,7 +47,9 @@
       <p class="text-sm text-green-700 dark:text-green-300">WiFi connected</p>
     </div>
   {:else}
-    <div class="flex items-center gap-2 rounded-lg border border-yellow-500/30 bg-yellow-500/10 p-3">
+    <div
+      class="flex items-center gap-2 rounded-lg border border-yellow-500/30 bg-yellow-500/10 p-3"
+    >
       <WifiOff class="h-4 w-4 shrink-0 text-yellow-500" />
       <p class="text-sm text-yellow-700 dark:text-yellow-300">WiFi not connected</p>
     </div>
@@ -55,7 +57,9 @@
 
   <!-- Account status -->
   {#if accountLinked && !showRelink}
-    <div class="flex items-center justify-between rounded-lg border border-green-500/30 bg-green-500/10 p-4">
+    <div
+      class="flex items-center justify-between rounded-lg border border-green-500/30 bg-green-500/10 p-4"
+    >
       <div class="flex items-center gap-2">
         <CircleCheck class="h-5 w-5 text-green-500" />
         <p class="text-sm font-medium text-green-700 dark:text-green-300">Account linked</p>
@@ -81,7 +85,9 @@
           placeholder="Enter link code"
           bind:value={linkCode}
         />
-        <Button onclick={handleLinkAccount} disabled={!linkCodeValid || linkCode.length < 6}>Link</Button>
+        <Button onclick={handleLinkAccount} disabled={!linkCodeValid || linkCode.length < 6}
+          >Link</Button
+        >
       </div>
     </div>
   {/if}

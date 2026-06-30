@@ -3,7 +3,7 @@ import tailwindcss from '@tailwindcss/vite';
 import { fileURLToPath } from 'node:url';
 import license from 'rollup-plugin-license';
 import { visualizer } from 'rollup-plugin-visualizer';
-import type { Plugin } from 'vite';
+import type { ESBuildOptions, Plugin } from 'vite';
 import { viteSingleFile } from 'vite-plugin-singlefile';
 import { defineConfig } from 'vitest/config';
 
@@ -76,7 +76,7 @@ export default defineConfig(({ mode }) => {
       legalComments: 'none',
       drop: isProduction ? ['debugger'] : [],
       pure: isProduction ? ['console.log', 'console.debug', 'console.trace'] : [],
-    },
+    } as ESBuildOptions,
 
     test: {
       include: ['src/**/*.{test,spec}.{js,ts}'],

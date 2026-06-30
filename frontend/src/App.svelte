@@ -5,14 +5,15 @@
   import Guided from '$lib/views/Guided.svelte';
   import Advanced from '$lib/views/Advanced.svelte';
   import Success from '$lib/views/Success.svelte';
-  import { Toaster } from '$lib/components/ui/sonner';
-  import { initializeDarkModeStore, ViewModeStore } from '$lib/stores';
+  import { Toaster } from '@openshock/svelte-core/components/ui/sonner/index.ts';
+  import { initializeColorScheme } from '@openshock/svelte-core/state/color-scheme-state.svelte.ts';
+  import { ViewModeStore } from '$lib/stores';
   import { closePortal } from '$lib/portalClose';
   import { fetchBoardInfo } from '$lib/api';
   import { onMount } from 'svelte';
 
   onMount(() => {
-    initializeDarkModeStore();
+    initializeColorScheme();
     fetchBoardInfo();
     WebSocketClient.Instance.Connect();
   });

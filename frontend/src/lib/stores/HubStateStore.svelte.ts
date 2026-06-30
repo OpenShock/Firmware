@@ -2,6 +2,7 @@ import { WifiAuthMode } from '$lib/_fbs/open-shock/serialization/types/wifi-auth
 import type { WifiScanStatus } from '$lib/_fbs/open-shock/serialization/types/wifi-scan-status';
 import type { Config } from '$lib/mappers/ConfigMapper';
 import type { WiFiNetwork, WiFiNetworkGroup } from '$lib/types';
+import { SvelteMap, SvelteSet } from 'svelte/reactivity';
 
 function insertSorted<T>(array: T[], value: T, compare: (a: T, b: T) => number) {
   let low = 0,
@@ -18,9 +19,9 @@ function insertSorted<T>(array: T[], value: T, compare: (a: T, b: T) => number) 
 }
 
 function ssidMapReducer(
-  groups: Map<string, WiFiNetworkGroup>,
+  groups: SvelteMap<string, WiFiNetworkGroup>,
   [, value]: [string, WiFiNetwork]
-): Map<string, WiFiNetworkGroup> {
+): SvelteMap<string, WiFiNetworkGroup> {
   const key = `${value.ssid || value.bssid}_${WifiAuthMode[value.security]}`;
 
   const group =
@@ -41,13 +42,13 @@ function ssidMapReducer(
 class HubStateStore {
   wifiConnectedBSSID = $state<string | null>(null);
   wifiScanStatus = $state<WifiScanStatus | null>(null);
-  wifiNetworks = $state<Map<string, WiFiNetwork>>(new Map());
-  wifiNetworkGroups = $derived.by<Map<string, WiFiNetworkGroup>>(() =>
-    Array.from(this.wifiNetworks.entries()).reduce(ssidMapReducer, new Map())
+  wifiNetworks = new SvelteMap<string, WiFiNetwork>();
+  wifiNetworkGroups = $derived.by<SvelteMap<string, WiFiNetworkGroup>>(() =>
+    Array.from(this.wifiNetworks.entries()).reduce(ssidMapReducer, new SvelteMap())
   );
   // Saved SSIDs from config that aren't visible in scan results
   savedOnlySSIDs = $derived.by<string[]>(() => {
-    const scannedSavedSSIDs = new Set<string>();
+    const scannedSavedSSIDs = new SvelteSet<string>();
     for (const [, group] of this.wifiNetworkGroups) {
       if (group.saved) scannedSavedSSIDs.add(group.ssid);
     }
@@ -62,26 +63,22 @@ class HubStateStore {
   gpioValidOutputs = $state<Int8Array>(new Int8Array());
 
   setWifiNetwork(network: WiFiNetwork) {
-    this.wifiNetworks = new Map(this.wifiNetworks).set(network.bssid, network);
+    this.wifiNetworks.set(network.bssid, network);
   }
 
   updateWifiNetwork(bssid: string, updater: (network: WiFiNetwork) => WiFiNetwork) {
     const network = this.wifiNetworks.get(bssid);
     if (network) {
-      const updated = new Map(this.wifiNetworks);
-      updated.set(bssid, updater(network));
-      this.wifiNetworks = updated;
+      this.wifiNetworks.set(bssid, updater(network));
     }
   }
 
   removeWifiNetwork(bssid: string) {
-    const updated = new Map(this.wifiNetworks);
-    updated.delete(bssid);
-    this.wifiNetworks = updated;
+    this.wifiNetworks.delete(bssid);
   }
 
   clearWifiNetworks() {
-    this.wifiNetworks = new Map();
+    this.wifiNetworks.clear();
   }
 }
 
