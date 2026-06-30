@@ -13,3 +13,9 @@ minimumReleaseAgeExclude:
 onlyBuiltDependencies:
   - '@tailwindcss/oxide'
   - esbuild
+
+overrides:
+  # Force a single svelte version across the workspace. Without this, svelte-core
+  # can resolve a different patch (e.g. 5.56.3) than the captive-portal root,
+  # producing two unrelated Snippet types and svelte-check errors.
+  svelte@>=5.0.0 <5.56.4: ^5.56.4
