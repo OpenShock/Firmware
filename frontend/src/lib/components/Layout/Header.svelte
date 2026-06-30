@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { LightSwitch } from '@openshock/svelte-core/components/index.ts';
+  import { LightSwitch } from '@openshock/svelte-core/components';
   import { ViewModeStore } from '$lib/stores';
 </script>
 
