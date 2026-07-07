@@ -1,7 +1,7 @@
 <script lang="ts">
   import { hubState, usedPins } from '$lib/stores';
-  import { Button } from '@openshock/svelte-core/components/ui/button/index.ts';
-  import { Input } from '@openshock/svelte-core/components/ui/input/index.ts';
+  import { Button } from '@openshock/svelte-core/components/ui/button';
+  import { Input } from '@openshock/svelte-core/components/ui/input';
 
   interface Props {
     name: string;
