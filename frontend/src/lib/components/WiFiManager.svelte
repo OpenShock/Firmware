@@ -2,8 +2,8 @@
   import { hubState } from '$lib/stores';
   import { WifiScanStatus } from '$lib/_fbs/open-shock/serialization/types/wifi-scan-status';
   import { startWifiScan, stopWifiScan, disconnectWifiNetwork } from '$lib/api';
-  import { Button } from '@openshock/svelte-core/components/ui/button/index.ts';
-  import { ScrollArea } from '@openshock/svelte-core/components/ui/scroll-area/index.ts';
+  import { Button } from '@openshock/svelte-core/components/ui/button';
+  import { ScrollArea } from '@openshock/svelte-core/components/ui/scroll-area';
   import WiFiEntry from '$lib/components/WiFiEntry.svelte';
   import AddHiddenNetworkDialog from '$lib/components/AddHiddenNetworkDialog.svelte';
   import { LoaderCircle, Radar, Wifi, WifiOff } from '@lucide/svelte';
