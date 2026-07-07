@@ -1,7 +1,7 @@
 <script lang="ts">
   import { hubState } from '$lib/stores';
-  import { Input } from '@openshock/svelte-core/ui/input';
-  import { Label } from '@openshock/svelte-core/ui/label';
+  import { Input } from '@openshock/svelte-core/components/ui/input/index.ts';
+  import { Label } from '@openshock/svelte-core/components/ui/label/index.ts';
 
   let domain = $state(hubState.config?.backend?.domain ?? '');
 

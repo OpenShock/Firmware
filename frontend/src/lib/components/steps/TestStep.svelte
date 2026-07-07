@@ -1,8 +1,8 @@
 <script lang="ts">
   import { WebSocketClient } from '$lib/WebSocketClient';
-  import { Button } from '@openshock/svelte-core/ui/button';
-  import { Input } from '@openshock/svelte-core/ui/input';
-  import { Label } from '@openshock/svelte-core/ui/label';
+  import { Button } from '@openshock/svelte-core/components/ui/button/index.ts';
+  import { Input } from '@openshock/svelte-core/components/ui/input/index.ts';
+  import { Label } from '@openshock/svelte-core/components/ui/label/index.ts';
   import { Zap } from '@lucide/svelte';
   import { Builder as FlatbufferBuilder } from 'flatbuffers';
   import { LocalToHubMessage } from '$lib/_fbs/open-shock/serialization/local/local-to-hub-message';
