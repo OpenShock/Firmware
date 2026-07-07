@@ -215,6 +215,7 @@ jobs:
       - name: Upload binaries to staged release
         env:
           GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
           TAG: ${{ needs.getvars.outputs.version }}
         run: |
           shopt -s globstar nullglob
