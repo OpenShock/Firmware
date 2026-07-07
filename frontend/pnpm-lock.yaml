@@ -22,7 +22,7 @@ importers:
         specifier: ^3.12.2
         version: 3.12.2
       '@lucide/svelte':
-        specifier: ^1.21.0
+        specifier: ^1.23.0
         version: 1.23.0(svelte@5.56.4(@typescript-eslint/types@8.62.1))
       '@openshock/svelte-core':
         specifier: workspace:*
@@ -34,7 +34,7 @@ importers:
         specifier: ^7.1.2
         version: 7.1.2(svelte@5.56.4(@typescript-eslint/types@8.62.1))(vite@8.1.3(@types/node@26.1.0)(jiti@2.7.0))
       '@tailwindcss/vite':
-        specifier: ^4.3.1
+        specifier: ^4.3.2
         version: 4.3.2(vite@8.1.3(@types/node@26.1.0)(jiti@2.7.0))
       '@types/node':
         specifier: ^26.1.0
@@ -67,7 +67,7 @@ importers:
         specifier: ^17.7.0
         version: 17.7.0
       prettier:
-        specifier: ^3.8.5
+        specifier: ^3.9.4
         version: 3.9.4
       prettier-plugin-organize-imports:
         specifier: ^4.3.0
@@ -100,7 +100,7 @@ importers:
         specifier: ^3.2.2
         version: 3.2.2(tailwind-merge@3.6.0)(tailwindcss@4.3.2)
       tailwindcss:
-        specifier: ^4.3.1
+        specifier: ^4.3.2
         version: 4.3.2
       tw-animate-css:
         specifier: ^1.4.0
@@ -112,7 +112,7 @@ importers:
         specifier: ^8.62.1
         version: 8.62.1(eslint@10.6.0(jiti@2.7.0))(typescript@6.0.3)
       vite:
-        specifier: ^8.1.0
+        specifier: ^8.1.3
         version: 8.1.3(@types/node@26.1.0)(jiti@2.7.0)
       vite-plugin-singlefile:
         specifier: ^2.3.3
