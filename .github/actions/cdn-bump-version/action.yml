@@ -1,5 +1,8 @@
 name: cdn-bump-version
-description: Uploads version file to CDN
+description: >
+  Advance the channel version pointers on the CDN. A release cascades to every
+  less-stable channel (stable -> beta -> develop), and each pointer is only moved
+  forward when this version is actually newer by semver.
 inputs:
   bunny-stor-hostname:
     description: Bunny SFTP Hostname
@@ -20,30 +23,95 @@ inputs:
     description: 'Version of the release'
     required: true
   release-channel:
-    description: 'Release channel that describes this upload'
+    description: 'Release channel that describes this upload (stable, beta, develop)'
     required: true
 
 runs:
   using: composite
   steps:
-    - name: Prepare Upload Folder
+    - name: Install tools
       shell: bash
       run: |
-        mkdir -p upload
-        echo "${{ inputs.version }}" >> upload/version-${{ inputs.release-channel }}.txt
+        if ! command -v lftp >/dev/null 2>&1; then
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq lftp
+        fi
+        # semver CLI: correct precedence (1.6.0 > 1.6.0-rc.2), which `sort -V`
+        # gets wrong. Installed once so the loop below shells out to it cheaply.
+        npm install -g semver@7 >/dev/null 2>&1
 
-    - name: Upload version file
-      uses: ./.github/actions/sftp-mirror
-      with:
-        host: ${{ inputs.bunny-stor-hostname }}
-        username: ${{ inputs.bunny-stor-username }}
-        password: ${{ inputs.bunny-stor-password }}
-        local-path: upload
-        remote-path: /
-
-    - name: Purge CDN cache
+    - name: Bump channel pointers
+      id: bump
       shell: bash
+      env:
+        SFTP_HOST: ${{ inputs.bunny-stor-hostname }}
+        SFTP_USER: ${{ inputs.bunny-stor-username }}
+        SFTP_PASS: ${{ inputs.bunny-stor-password }}
+        VERSION: ${{ inputs.version }}
+        RELEASE_CHANNEL: ${{ inputs.release-channel }}
       run: |
-        curl -X POST "https://api.bunny.net/purge?url=${{ inputs.bunny-cdn-url }}/version-${{ inputs.release-channel }}.txt" \
-          -H "Content-Type: application/json" \
-          -H "AccessKey: ${{ inputs.bunny-api-key }}"
+        set -euo pipefail
+
+        # Which channel pointers this release may advance. A more-stable release
+        # is acceptable to every less-stable channel, so a stable release moves
+        # beta and develop forward as well. Each pointer is still guarded by the
+        # semver check below, so a stable patch never drags a channel that is
+        # already ahead (e.g. develop on the next minor) backwards.
+        case "$RELEASE_CHANNEL" in
+          stable)  channels="stable beta develop" ;;
+          beta)    channels="beta develop" ;;
+          develop) channels="develop" ;;
+          *)       channels="$RELEASE_CHANNEL" ;;
+        esac
+
+        sftp_run() {
+          lftp -u "$SFTP_USER,$SFTP_PASS" "sftp://$SFTP_HOST" \
+            -e "set sftp:auto-confirm yes; $1; bye"
+        }
+
+        # newer NEW CUR -> succeeds when NEW is a strictly greater semver than
+        # CUR. -p keeps prereleases eligible so e.g. 1.7.0-develop counts as
+        # newer than 1.6.0.
+        newer() {
+          [ -n "$(semver -r ">$2" -p "$1" 2>/dev/null)" ]
+        }
+
+        updated=""
+        for ch in $channels; do
+          file="version-$ch.txt"
+
+          current=""
+          if sftp_run "get /$file -o current.txt" >/dev/null 2>&1 && [ -s current.txt ]; then
+            current="$(tr -d ' \t\r\n' < current.txt)"
+          fi
+          rm -f current.txt
+
+          # A pointer that is missing or holds a non-semver value is always
+          # (re)written; otherwise only advance when VERSION is strictly newer.
+          if [ -n "$current" ] && semver "$current" >/dev/null 2>&1 && ! newer "$VERSION" "$current"; then
+            echo "$file: keeping $current (not older than $VERSION)"
+            continue
+          fi
+
+          printf '%s\n' "$VERSION" > "$file"
+          sftp_run "put $file -o /$file"
+          echo "$file: set to $VERSION (was ${current:-<none>})"
+          updated="$updated $file"
+        done
+
+        echo "updated=${updated# }" >> "$GITHUB_OUTPUT"
+
+    - name: Purge CDN cache for updated pointers
+      if: steps.bump.outputs.updated != ''
+      shell: bash
+      env:
+        BUNNY_API_KEY: ${{ inputs.bunny-api-key }}
+        BUNNY_CDN_URL: ${{ inputs.bunny-cdn-url }}
+        UPDATED: ${{ steps.bump.outputs.updated }}
+      run: |
+        set -euo pipefail
+        for file in $UPDATED; do
+          curl -fsSL -X POST "https://api.bunny.net/purge?url=$BUNNY_CDN_URL/$file&async=false" \
+            -H "Content-Type: application/json" \
+            -H "AccessKey: $BUNNY_API_KEY"
+        done

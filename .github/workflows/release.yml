@@ -85,14 +85,19 @@ jobs:
             -H "Content-Type: application/json" \
             --data-binary @release.json
 
-      - name: Create GitHub Release
+      # Stage the release as a draft. The tag push above triggers ci-build,
+      # which builds the firmware and then attaches the binaries to this draft
+      # and publishes it (see the `release` job in ci-build.yml). Staging as a
+      # draft keeps the release hidden until its artifacts are in place, and
+      # avoids ci-build failing on an "already exists" conflict.
+      - name: Stage GitHub Release (draft)
         if: steps.meta.outputs.tag != ''
         env:
           GH_TOKEN: ${{ steps.app-token.outputs.token }}
           TAG: ${{ steps.meta.outputs.tag }}
           PRERELEASE: ${{ steps.meta.outputs.prerelease }}
         run: |
-          ARGS=("$TAG" "release.json" --title "$TAG" --notes-file release-notes.md)
+          ARGS=("$TAG" "release.json" --title "$TAG" --notes-file release-notes.md --draft)
           if [ "$PRERELEASE" = "true" ]; then
             ARGS+=(--prerelease)
           fi

@@ -197,6 +197,8 @@ jobs:
     needs: [getvars, checkpoint-cdn]
     timeout-minutes: 1
     if: (needs.getvars.outputs.release-channel == 'stable' || needs.getvars.outputs.release-channel == 'beta')
+    permissions:
+      contents: write
 
     steps:
       - name: Download release artifacts
@@ -205,11 +207,20 @@ jobs:
       - name: Display artifacts
         run: ls -R
 
-      - name: Release
-        uses: ncipollo/release-action@339a81892b84b4eeb0f6e744e4574d79d0d9b8dd  # v1.21.0
-        with:
-          artifacts: '**/OpenShock_*.bin'
-          tag: ${{ needs.getvars.outputs.version }}
-          prerelease: ${{ needs.getvars.outputs.release-channel != 'stable' }}
-          artifactErrorsFailBuild: true
-          body: ${{ needs.getvars.outputs.release-notes }}
+      # release.yml (the bot) already staged the draft release for this tag with
+      # the title and notes. All we do here is attach the freshly built binaries
+      # to that existing draft. `gh release upload` only adds assets: it does not
+      # touch the release's draft/prerelease state, so the release stays staged
+      # until a maintainer publishes it manually.
+      - name: Upload binaries to staged release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ needs.getvars.outputs.version }}
+        run: |
+          shopt -s globstar nullglob
+          files=(**/OpenShock_*.bin)
+          if [ ${#files[@]} -eq 0 ]; then
+            echo "::error::No firmware binaries found to upload"
+            exit 1
+          fi
+          gh release upload "$TAG" "${files[@]}" --clobber
