@@ -6,7 +6,6 @@ settings:
 
 overrides:
   cookie@<0.7.0: ^0.7.0
-  ts-deepmerge@<8.0.0: ^8.0.0
 
 importers:
 
