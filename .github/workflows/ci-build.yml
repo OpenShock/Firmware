@@ -1,43 +1,26 @@
 on:
+  # develop does not build on push. It builds nightly (only when there are new
+  # commits since the last run) or on manual dispatch. Release tags still build
+  # immediately so a cut release is published.
   push:
-    branches:
-      - develop
     tags:
       - '[0-9]+.[0-9]+.[0-9]+'
       - '[0-9]+.[0-9]+.[0-9]+-*'
-    # paths-ignore applies to branch pushes only; GitHub does not evaluate it
-    # for tag pushes, so release tags always build. A develop push is skipped
-    # only when EVERY changed file matches one of these (docs, tooling, tests).
-    paths-ignore:
-      - '**/*.md'
-      - 'docs/**'
-      - 'LICENSE'
-      - '**/.gitkeep'
-      - '.claude/**'
-      - '.github/ISSUE_TEMPLATE/**'
-      - '.github/dependabot.yml'
-      # schemas is a dev-only submodule used to regenerate committed code via the
-      # scripts/ tooling below; no CI build checks it out, so a pointer bump alone
-      # changes nothing. Regenerated output is committed elsewhere and still builds.
-      - 'schemas'
-      - 'schemas/**'
-      - 'scripts/fetch_flatc.py'
-      - 'scripts/generate_schemas.py'
-      - 'scripts/flatc'
-      - 'scripts/flatc.exe'
   pull_request:
     branches:
       - master
       - beta
       - develop
     types: [opened, reopened, synchronize]
-  workflow_dispatch: # Manually invoked by user.
+  workflow_dispatch: # Manually invoked, e.g. to force a develop build.
+  schedule:
+    - cron: '0 3 * * *' # Nightly develop build; the gate job skips it if idle.
 
 name: ci-build
 
 # PRs cancel their own superseded runs (per-ref group). Everything that can
-# deploy - develop pushes, release tags, manual dispatch - shares one 'deploy'
-# queue and never cancels, so runs serialize and CDN deploys never race.
+# deploy - nightly/dispatch develop builds and release tags - shares one
+# 'deploy' queue and never cancels, so runs serialize and CDN deploys never race.
 concurrency:
   group: ${{ github.workflow }}-${{ github.event_name == 'pull_request' && github.ref || 'deploy' }}
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
@@ -46,10 +29,49 @@ env:
   PYTHON_VERSION: 3.13
 
 jobs:
+  # Nightly (schedule) runs build only when develop advanced since the last
+  # successful ci-build run. Every other trigger - release tag, PR, manual
+  # dispatch - always builds.
+  gate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    permissions:
+      contents: read
+      actions: read
+    outputs:
+      build: ${{ steps.decide.outputs.build }}
+    steps:
+      - name: Decide whether to build
+        id: decide
+        env:
+          GH_TOKEN: ${{ github.token }}
+          EVENT: ${{ github.event_name }}
+          SHA: ${{ github.sha }}
+          REPO: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+          if [ "$EVENT" != "schedule" ]; then
+            echo "build=true" >> "$GITHUB_OUTPUT"; exit 0
+          fi
+          # Compare develop HEAD to the last successful ci-build run on develop
+          # (covers both nightly and manual dispatch runs).
+          last=$(gh run list --repo "$REPO" --workflow ci-build.yml \
+            --branch develop --status success -L 1 --json headSha --jq '.[0].headSha // ""')
+          if [ "$last" != "$SHA" ]; then
+            echo "build=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "build=false" >> "$GITHUB_OUTPUT"
+            echo "::notice::No new commits on develop since the last successful deploy (${last:-<none>}); skipping nightly build."
+          fi
+
   getvars:
+    needs: [gate]
+    if: ${{ needs.gate.outputs.build == 'true' }}
     uses: ./.github/workflows/get-vars.yml
 
   build-frontend:
+    needs: [gate]
+    if: ${{ needs.gate.outputs.build == 'true' }}
     runs-on: ubuntu-latest
     timeout-minutes: 5
 
@@ -136,12 +158,31 @@ jobs:
     timeout-minutes: 20
     if: ${{ needs.getvars.outputs.should-deploy == 'true' }}
     environment: cdn
+    permissions:
+      contents: read
 
     steps:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0  # v7.0.0
         with:
           sparse-checkout: |
             .github
+
+      # A beta/master deploy must have a draft release staged by release.yml for
+      # this version; otherwise a stray tag push could publish firmware to the
+      # CDN. develop has no releases, so it is exempt.
+      - name: Require a staged draft release (beta/master only)
+        if: ${{ needs.getvars.outputs.release-channel != 'develop' }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          TAG: ${{ needs.getvars.outputs.version }}
+        run: |
+          set -euo pipefail
+          isDraft=$(gh release view "$TAG" --repo "$REPO" --json isDraft --jq '.isDraft' 2>/dev/null || echo "missing")
+          if [ "$isDraft" != "true" ]; then
+            echo "::error::No draft release for $TAG (state: $isDraft). release.yml must stage the draft before the CDN upload runs."
+            exit 1
+          fi
 
       # Upload every board's firmware to the CDN.
       - uses: ./.github/actions/cdn-upload-firmware
