@@ -99,15 +99,20 @@ jobs:
     steps:
       - run: echo "Builds checkpoint reached"
 
-  cdn-upload-firmware:
+  # A single job owns the whole CDN deployment. Every job that declares
+  # `environment:` produces one GitHub deployment record, and matrix legs each
+  # count separately, so the old split (matrix upload + version-info + bump)
+  # created `boards + 2` deployments per run. Collapsing the work into one
+  # non-matrix job yields exactly one deployment per run. The CDN secrets/vars
+  # are environment-scoped, so this job must keep `environment: cdn` to read
+  # them; the environment's only protection rule is a branch policy, so nothing
+  # is gated away by merging the jobs.
+  cdn-deploy:
     runs-on: ubuntu-latest
     needs: [getvars, checkpoint-build]
-    timeout-minutes: 15
+    timeout-minutes: 20
     if: ${{ needs.getvars.outputs.should-deploy == 'true' }}
-    environment: cdn-firmware-r2
-    strategy:
-      fail-fast: true
-      matrix: ${{ fromJson(needs.getvars.outputs.board-matrix) }}
+    environment: cdn
 
     steps:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0  # v7.0.0
@@ -115,39 +120,16 @@ jobs:
           sparse-checkout: |
             .github
 
-      # Set up rclone for CDN uploads.
-      - uses: ./.github/actions/cdn-prepare
-        with:
-          bunny-ssh-knownhosts: ${{ vars.BUNNY_SSH_KNOWNHOSTS }}
-
-      # Upload firmware to CDN.
+      # Upload every board's firmware to the CDN.
       - uses: ./.github/actions/cdn-upload-firmware
         with:
           bunny-stor-hostname: ${{ vars.BUNNY_STOR_HOSTNAME }}
           bunny-stor-username: ${{ secrets.BUNNY_STOR_USERNAME }}
           bunny-stor-password: ${{ secrets.BUNNY_STOR_PASSWORD }}
           fw-version: ${{ needs.getvars.outputs.version }}
-          board: ${{ matrix.board }}
+          boards: ${{ needs.getvars.outputs.board-list }}
 
-  cdn-upload-version-info:
-    runs-on: ubuntu-latest
-    needs: [getvars, checkpoint-build]
-    timeout-minutes: 10
-    if: ${{ needs.getvars.outputs.should-deploy == 'true' }}
-    environment: cdn-firmware-r2
-
-    steps:
-      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0  # v7.0.0
-        with:
-          sparse-checkout: |
-            .github
-
-      # Set up rclone for CDN uploads.
-      - uses: ./.github/actions/cdn-prepare
-        with:
-          bunny-ssh-knownhosts: ${{ vars.BUNNY_SSH_KNOWNHOSTS }}
-
-      # Upload firmware to CDN.
+      # Upload the version manifest (boards.txt) alongside the firmware.
       - uses: ./.github/actions/cdn-upload-version-info
         with:
           bunny-stor-hostname: ${{ vars.BUNNY_STOR_HOSTNAME }}
@@ -157,24 +139,7 @@ jobs:
           release-channel: ${{ needs.getvars.outputs.release-channel }}
           boards: ${{ needs.getvars.outputs.board-list }}
 
-  cdn-bump-version:
-    runs-on: ubuntu-latest
-    needs: [getvars, cdn-upload-firmware] # only after version is complete
-    timeout-minutes: 5
-    environment: cdn-firmware-r2
-
-    steps:
-      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0  # v7.0.0
-        with:
-          sparse-checkout: |
-            .github
-
-      # Set up rclone for CDN uploads.
-      - uses: ./.github/actions/cdn-prepare
-        with:
-          bunny-ssh-knownhosts: ${{ vars.BUNNY_SSH_KNOWNHOSTS }}
-
-      # Upload firmware to CDN.
+      # Advance the channel version pointers now that everything is uploaded.
       - uses: ./.github/actions/cdn-bump-version
         with:
           bunny-stor-hostname: ${{ vars.BUNNY_STOR_HOSTNAME }}
@@ -187,7 +152,7 @@ jobs:
 
   checkpoint-cdn:
     runs-on: ubuntu-latest
-    needs: [cdn-upload-firmware, cdn-upload-version-info, cdn-bump-version]
+    needs: [cdn-deploy]
     timeout-minutes: 1
     steps:
       - run: echo "CDN checkpoint reached"

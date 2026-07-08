@@ -1,5 +1,5 @@
 name: cdn-upload-firmware
-description: Uploads firmware partitions and merged binaries to CDN along with SHA256 checksums
+description: Uploads firmware partitions and merged binaries for every board to CDN along with SHA256 checksums
 inputs:
   bunny-stor-hostname:
     description: Bunny SFTP Hostname
@@ -13,49 +13,49 @@ inputs:
   fw-version:
     description: Firmware version
     required: true
-  board:
-    description: 'Board to upload'
+  boards:
+    description: 'Newline-separated list of boards to upload'
     required: true
 
 runs:
   using: composite
   steps:
-    - name: Download static filesystem partition
+    # Grab every firmware artifact in one shot: the shared static filesystem
+    # partition plus each board's build partitions and merged binary. They land
+    # under artifacts/<artifact-name>/ so the loop below can pick them per board.
+    - name: Download firmware artifacts
       uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c  # v8.0.1
       with:
-        name: firmware_staticfs
-        path: .
+        path: artifacts
+        pattern: firmware_*
 
-    - name: Download firmware partitions
-      uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c  # v8.0.1
-      with:
-        name: firmware_build_${{ inputs.board }}
-        path: .
-
-    - name: Download merged firmware binary
-      uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c  # v8.0.1
-      with:
-        name: firmware_merged_${{ inputs.board }}
-        path: .
-
-    - name: Rename firmware binaries
+    # Assemble the full /<version>/ tree locally, one directory per board, so it
+    # can be pushed in a single mirror. Each board directory keeps the previous
+    # per-board layout: static + build partitions, the merged firmware.bin, and
+    # md5/sha256 checksums over every .bin.
+    - name: Assemble upload tree
       shell: bash
+      env:
+        BOARDS: ${{ inputs.boards }}
       run: |
-        mv OpenShock_*.bin firmware.bin
+        set -euo pipefail
+        rm -rf upload
+        while IFS= read -r board; do
+          [ -z "$board" ] && continue
+          dest="upload/$board"
+          mkdir -p "$dest"
+          cp artifacts/firmware_staticfs/*.bin "$dest"/
+          cp "artifacts/firmware_build_$board"/*.bin "$dest"/
+          cp "artifacts/firmware_merged_$board"/OpenShock_*.bin "$dest"/firmware.bin
+          (
+            cd "$dest"
+            find . -type f -name '*.bin' -exec md5sum {} \; > hashes.md5.txt
+            find . -type f -name '*.bin' -exec sha256sum {} \; > hashes.sha256.txt
+          )
+        done <<< "$BOARDS"
 
-    - name: Generate SHA256 checksums
-      shell: bash
-      run: |
-        find . -type f -name '*.bin' -exec md5sum {} \; > hashes.md5.txt
-        find . -type f -name '*.bin' -exec sha256sum {} \; > hashes.sha256.txt
-
-    - name: Prepare Upload Folder
-      shell: bash
-      run: |
-        mkdir -p upload
-        mv *.bin upload/
-        mv hashes.*.txt upload/
-
+    # A single lftp mirror pushes the whole tree (every board directory) in one
+    # command/connection, replacing the old one-upload-per-board matrix.
     - name: Upload artifacts to CDN
       uses: ./.github/actions/sftp-mirror
       with:
@@ -63,4 +63,4 @@ runs:
         username: ${{ inputs.bunny-stor-username }}
         password: ${{ inputs.bunny-stor-password }}
         local-path: upload
-        remote-path: /${{ inputs.fw-version }}/${{ inputs.board }}
+        remote-path: /${{ inputs.fw-version }}/
