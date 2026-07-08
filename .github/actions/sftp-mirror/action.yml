@@ -20,6 +20,13 @@ inputs:
     description: If 'true', remove remote files that are not present locally.
     required: false
     default: 'false'
+  parallel:
+    description: >
+      Number of files to transfer concurrently (lftp mirror --parallel). Each
+      transfer opens one SFTP connection; Bunny allows ~100 concurrent per zone
+      and 100-200 per IP. 'auto' uses min(nproc, 25).
+    required: false
+    default: 'auto'
 
 runs:
   using: composite
@@ -41,9 +48,17 @@ runs:
         LOCAL_PATH: ${{ inputs.local-path }}
         REMOTE_PATH: ${{ inputs.remote-path }}
         DELETE_EXTRA: ${{ inputs.delete-extra }}
+        PARALLEL: ${{ inputs.parallel }}
       run: |
         set -euo pipefail
-        mirror_flags="-R --verbose"
+        # 'auto' -> min(nproc, 25): scale with the runner, capped at Bunny's
+        # per-IP connection limit.
+        if [ "$PARALLEL" = "auto" ]; then
+          cores=$(nproc)
+          PARALLEL=$(( cores < 25 ? cores : 25 ))
+        fi
+        # --parallel transfers N files at once; lftp mirror is serial otherwise.
+        mirror_flags="-R --verbose --parallel=$PARALLEL"
         if [ "$DELETE_EXTRA" = "true" ]; then
           mirror_flags="$mirror_flags --delete"
         fi

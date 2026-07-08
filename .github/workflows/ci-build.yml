@@ -150,16 +150,9 @@ jobs:
           version: ${{ needs.getvars.outputs.version }}
           release-channel: ${{ needs.getvars.outputs.release-channel }}
 
-  checkpoint-cdn:
-    runs-on: ubuntu-latest
-    needs: [cdn-deploy]
-    timeout-minutes: 1
-    steps:
-      - run: echo "CDN checkpoint reached"
-
   release:
     runs-on: ubuntu-latest
-    needs: [getvars, checkpoint-cdn]
+    needs: [getvars, cdn-deploy]
     timeout-minutes: 1
     if: (needs.getvars.outputs.release-channel == 'stable' || needs.getvars.outputs.release-channel == 'beta')
     permissions:
