@@ -43,7 +43,11 @@ jobs:
           ignore: |
             .github
             include/serialization/_fbs
-          thread-comments: update
+          # Commit comments (push events) need contents:write, which this job
+          # deliberately does not grant; only post thread comments on PRs, where
+          # pull-requests:write applies. Otherwise the action 403s and fails the
+          # job even when the lint is clean.
+          thread-comments: ${{ github.event_name == 'pull_request' && 'update' || 'false' }}
           no-lgtm: false
 
       - name: Fail fast?!
