@@ -5,6 +5,26 @@ on:
     tags:
       - '[0-9]+.[0-9]+.[0-9]+'
       - '[0-9]+.[0-9]+.[0-9]+-*'
+    # paths-ignore applies to branch pushes only; GitHub does not evaluate it
+    # for tag pushes, so release tags always build. A develop push is skipped
+    # only when EVERY changed file matches one of these (docs, tooling, tests).
+    paths-ignore:
+      - '**/*.md'
+      - 'docs/**'
+      - 'LICENSE'
+      - '**/.gitkeep'
+      - '.claude/**'
+      - '.github/ISSUE_TEMPLATE/**'
+      - '.github/dependabot.yml'
+      # schemas is a dev-only submodule used to regenerate committed code via the
+      # scripts/ tooling below; no CI build checks it out, so a pointer bump alone
+      # changes nothing. Regenerated output is committed elsewhere and still builds.
+      - 'schemas'
+      - 'schemas/**'
+      - 'scripts/fetch_flatc.py'
+      - 'scripts/generate_schemas.py'
+      - 'scripts/flatc'
+      - 'scripts/flatc.exe'
   pull_request:
     branches:
       - master
@@ -15,8 +35,11 @@ on:
 
 name: ci-build
 
+# PRs cancel their own superseded runs (per-ref group). Everything that can
+# deploy - develop pushes, release tags, manual dispatch - shares one 'deploy'
+# queue and never cancels, so runs serialize and CDN deploys never race.
 concurrency:
-  group: ${{ github.workflow }}-${{ github.ref }}
+  group: ${{ github.workflow }}-${{ github.event_name == 'pull_request' && github.ref || 'deploy' }}
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 env:

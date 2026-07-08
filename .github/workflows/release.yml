@@ -1,9 +1,11 @@
 on:
   push:
+    # develop is release: "none" in .changes/config.json - it never cuts a
+    # release, so running here would just be a no-op on every dev push. Only
+    # master (stable) and beta (rc) actually produce releases.
     branches:
       - master
       - beta
-      - develop
     paths-ignore:
       - 'CHANGELOG.md'
       - '.changes/**'
