@@ -4,17 +4,10 @@ inputs:
   version:
     required: true
     description: 'Current firmware version'
-  skip-checkout:
-    description: 'If true, skips checkout'
-    required: false
-    default: false
 
 runs:
   using: composite
   steps:
-    - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10  # v6.0.3
-      if: ${{ !inputs.skip-checkout }}
-
     - uses: actions/cache@27d5ce7f107fe9357f9df03efb73ab90386fccae  # v5.0.5
       with:
         path: |
@@ -34,9 +27,10 @@ runs:
     - name: Build firmware
       working-directory: .
       shell: bash
-      run: pio run -e ci-build -t compiledb
+      run: |
+        export OPENSHOCK_FW_BUILD_DATE="$(git show -s --format=%cI HEAD 2>/dev/null || date -u +%Y-%m-%dT%H:%M:%SZ)"
+        pio run -e ci-build -t compiledb
       env:
         OPENSHOCK_FW_VERSION: ${{ inputs.version }}
         OPENSHOCK_FW_GIT_REF: ${{ github.ref }}
         OPENSHOCK_FW_GIT_COMMIT: ${{ github.sha }}
-        OPENSHOCK_FW_BUILD_DATE: ${{ github.event.head_commit.timestamp }}

@@ -12,7 +12,6 @@ concurrency:
 
 permissions:
   contents: write
-  id-token: write
 
 jobs:
   auto-release:
@@ -73,23 +72,9 @@ jobs:
         if: steps.meta.outputs.tag != ''
         run: git push origin HEAD "${{ steps.meta.outputs.tag }}"
 
-      - name: Publish to OpenShock API
-        if: steps.meta.outputs.skip == 'false' && vars.OPENSHOCK_API_URL != ''
-        env:
-          API_URL: ${{ vars.OPENSHOCK_API_URL }}
-        run: |
-          OIDC_TOKEN=$(curl -sLS \
-            -H "Authorization: bearer $ACTIONS_ID_TOKEN_REQUEST_TOKEN" \
-            "$ACTIONS_ID_TOKEN_REQUEST_URL&audience=openshock-release-ingest" \
-            | jq -r .value)
-          if [ -z "$OIDC_TOKEN" ] || [ "$OIDC_TOKEN" = "null" ]; then
-            echo "::error::Failed to fetch GitHub OIDC token"
-            exit 1
-          fi
-          curl -fsSL --retry 3 --retry-delay 5 -X POST "$API_URL/1/public/releases" \
-            -H "Authorization: Bearer $OIDC_TOKEN" \
-            -H "Content-Type: application/json" \
-            --data-binary @release.json
+      # The OpenShock API is announced from ci-build's release job, only after
+      # the firmware is actually built and uploaded - not here, before it exists.
+      # release.json is attached to the draft below so ci-build can read it.
 
       # Stage the release as a draft. The tag push above triggers ci-build,
       # which builds the firmware and then attaches the binaries to this draft

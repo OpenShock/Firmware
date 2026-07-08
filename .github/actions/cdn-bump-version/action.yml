@@ -88,7 +88,15 @@ runs:
 
           # A pointer that is missing or holds a non-semver value is always
           # (re)written; otherwise only advance when VERSION is strictly newer.
-          if [ -n "$current" ] && semver "$current" >/dev/null 2>&1 && ! newer "$VERSION" "$current"; then
+          #
+          # Exception: a develop deploy of its own channel. develop versions are
+          # X.Y.Z-develop+<sha> and consecutive builds differ only in the +<sha>
+          # build metadata, which semver precedence ignores - so `newer` never
+          # holds between them and the guard would freeze version-develop.txt on
+          # the first build of each base version. Always advance in that case;
+          # the guard still protects the stable/beta channels and every cascade.
+          if [ "$RELEASE_CHANNEL" != "develop" ] \
+            && [ -n "$current" ] && semver "$current" >/dev/null 2>&1 && ! newer "$VERSION" "$current"; then
             echo "$file: keeping $current (not older than $VERSION)"
             continue
           fi
