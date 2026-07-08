@@ -62,4 +62,8 @@ runs:
         if [ "$DELETE_EXTRA" = "true" ]; then
           mirror_flags="$mirror_flags --delete"
         fi
-        lftp -u "$SFTP_USER,$SFTP_PASS" "sftp://$SFTP_HOST" -e "set sftp:auto-confirm yes; mirror $mirror_flags $LOCAL_PATH $REMOTE_PATH; bye"
+        # `mirror -R <dir> <target>` appends <dir>'s basename to the target, so
+        # `mirror -R upload /1.2.3/` would upload into /1.2.3/upload/ instead of
+        # /1.2.3/. lcd into the source and mirror `.` so its CONTENTS land
+        # directly under REMOTE_PATH.
+        lftp -u "$SFTP_USER,$SFTP_PASS" "sftp://$SFTP_HOST" -e "set sftp:auto-confirm yes; lcd $LOCAL_PATH; mirror $mirror_flags . $REMOTE_PATH; bye"
