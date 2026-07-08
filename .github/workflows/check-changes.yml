@@ -11,7 +11,7 @@ permissions:
 
 jobs:
   check:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-slim # lightweight: release-tool changelog check
     timeout-minutes: 5
     if: >-
       !github.event.pull_request.draft &&

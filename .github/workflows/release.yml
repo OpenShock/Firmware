@@ -16,7 +16,7 @@ permissions:
 
 jobs:
   auto-release:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-slim # lightweight: release-tool + git/gh, no build
     timeout-minutes: 10
     # Only beta (rc) and master (stable) produce releases; refuse a dispatch
     # from any other branch.

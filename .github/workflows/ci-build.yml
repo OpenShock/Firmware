@@ -33,7 +33,7 @@ jobs:
   # successful ci-build run. Every other trigger - release tag, PR, manual
   # dispatch - always builds.
   gate:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-slim # lightweight: gh API + bash only
     timeout-minutes: 3
     permissions:
       contents: read
@@ -138,7 +138,7 @@ jobs:
           skip-checkout: true
 
   checkpoint-build:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-slim # lightweight: barrier job, just an echo
     needs: [merge-partitions]
     timeout-minutes: 1
     steps:
