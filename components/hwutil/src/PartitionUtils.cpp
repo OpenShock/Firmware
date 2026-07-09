@@ -23,7 +23,7 @@ bool OpenShock::TryGetPartitionHash(const esp_partition_t* partition, char (&has
   return true;
 }
 
-bool OpenShock::FlashPartitionFromUrl(const esp_partition_t* partition, std::string_view remoteUrl, const uint8_t (&remoteHash)[32], std::function<bool(std::size_t, std::size_t, float)> progressCallback)
+bool OpenShock::FlashPartitionFromUrl(HTTP::Client& client, const esp_partition_t* partition, std::string_view remoteUrl, const uint8_t (&remoteHash)[32], std::function<bool(std::size_t, std::size_t, float)> progressCallback)
 {
   OpenShock::SHA256 sha256;
   if (!sha256.begin()) {
@@ -77,7 +77,7 @@ bool OpenShock::FlashPartitionFromUrl(const esp_partition_t* partition, std::str
   };
 
   // Start streaming binary to app partition.
-  auto appBinaryResponse = OpenShock::HTTP::Download(
+  auto appBinaryResponse = client.Download(
     remoteUrl,
     {
       {"Accept", "application/octet-stream"}

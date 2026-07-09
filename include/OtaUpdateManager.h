@@ -9,6 +9,10 @@
 #include <unordered_map>
 #include <vector>
 
+namespace OpenShock::HTTP {
+  class Client;
+}
+
 namespace OpenShock::OtaUpdateManager {
   [[nodiscard]] bool Init();
 
@@ -19,9 +23,9 @@ namespace OpenShock::OtaUpdateManager {
     uint8_t filesystemBinaryHash[32];
   };
 
-  bool TryGetFirmwareVersion(OtaUpdateChannel channel, OpenShock::SemVer& version);
+  bool TryGetFirmwareVersion(HTTP::Client& client, OtaUpdateChannel channel, OpenShock::SemVer& version);
   bool TryGetFirmwareBoards(const OpenShock::SemVer& version, std::vector<std::string>& boards);
-  bool TryGetFirmwareRelease(const OpenShock::SemVer& version, FirmwareRelease& release);
+  bool TryGetFirmwareRelease(HTTP::Client& client, const OpenShock::SemVer& version, FirmwareRelease& release);
 
   bool TryStartFirmwareUpdate(const OpenShock::SemVer& version);
 

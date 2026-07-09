@@ -1,3 +1,5 @@
+#include <freertos/FreeRTOS.h>
+
 #include "http/HTTPRequestManager.h"
 
 const char* const TAG = "HTTPRequestManager";
@@ -7,15 +9,16 @@ const char* const TAG = "HTTPRequestManager";
 #include "RateLimiter.h"
 #include "SimpleMutex.h"
 #include "Temporal.h"
-#include "util/HexUtils.h"
 #include "util/StringUtils.h"
 
-#include <HTTPClient.h>
-#include <WiFi.h>
+#include <esp_err.h>
+#include <esp_http_client.h>
 
 #include <algorithm>
+#include <cctype>
+#include <cstdlib>
 #include <memory>
-#include <numeric>
+#include <string>
 #include <string_view>
 #include <unordered_map>
 
@@ -24,7 +27,7 @@ using namespace std::string_view_literals;
 const std::size_t HTTP_BUFFER_SIZE = 4096LLU;
 const int HTTP_DOWNLOAD_SIZE_LIMIT = 200 * 1024 * 1024;  // 200 MB
 
-static OpenShock::SimpleMutex s_rateLimitsMutex                                              = {};
+static OpenShock::SimpleMutex s_rateLimitsMutex                                               = {};
 static std::unordered_map<std::string, std::shared_ptr<OpenShock::RateLimiter>> s_rateLimits = {};
 
 using namespace OpenShock;
@@ -100,258 +103,52 @@ static std::shared_ptr<OpenShock::RateLimiter> createRateLimiterForURL(std::stri
   return it->second;
 }
 
-struct StreamReaderResult {
-  HTTP::RequestResult result;
-  std::size_t nWritten;
-};
-
-static bool isCRLF(const uint8_t* buffer)
+HTTP::Client::Client() noexcept
+  : m_handle(nullptr)
+  , m_headerKeys()
+  , m_retryAfter()
+  , m_connectionClose(false)
 {
-  return buffer[0] == '\r' && buffer[1] == '\n';
-}
-static bool tryFindCRLF(std::size_t& pos, const uint8_t* buffer, std::size_t len)
-{
-  const uint8_t* cur = buffer;
-  const uint8_t* end = buffer + len - 1;
-
-  while (cur < end) {
-    if (isCRLF(cur)) {
-      pos = static_cast<std::size_t>(cur - buffer);
-      return true;
-    }
-
-    ++cur;
-  }
-
-  return false;
 }
 
-enum class ParserState : uint8_t {
-  Ok,
-  NeedMoreData,
-  Invalid,
-};
-
-static ParserState tryParseHttpChunkHeader(const uint8_t* buffer, std::size_t bufferLen, std::size_t& headerLen, std::size_t& payloadLen)
+HTTP::Client::~Client()
 {
-  if (bufferLen < 5) {  // Bare minimum: "0\r\n\r\n"
-    return ParserState::NeedMoreData;
-  }
-
-  // Find the first CRLF
-  if (!tryFindCRLF(headerLen, buffer, bufferLen)) {
-    return ParserState::NeedMoreData;
-  }
-
-  // Header must have at least one character
-  if (headerLen == 0) {
-    OS_LOGW(TAG, "Invalid chunk header length");
-    return ParserState::Invalid;
-  }
-
-  // Check for end of size field (possibly followed by extensions which is separated by a semicolon)
-  std::size_t sizeFieldEnd = headerLen;
-  for (std::size_t i = 0; i < headerLen; ++i) {
-    if (buffer[i] == ';') {
-      sizeFieldEnd = i;
-      break;
-    }
-  }
-
-  // Bounds check
-  if (sizeFieldEnd == 0 || sizeFieldEnd > 16) {
-    OS_LOGW(TAG, "Invalid chunk size field length");
-    return ParserState::Invalid;
-  }
-
-  std::string_view sizeField(reinterpret_cast<const char*>(buffer), sizeFieldEnd);
-
-  // Parse the chunk size
-  if (!HexUtils::TryParseHexToInt(sizeField.data(), sizeField.length(), payloadLen)) {
-    OS_LOGW(TAG, "Failed to parse chunk size");
-    return ParserState::Invalid;
-  }
-
-  if (payloadLen > HTTP_DOWNLOAD_SIZE_LIMIT) {
-    OS_LOGW(TAG, "Chunk size too large");
-    return ParserState::Invalid;
-  }
-
-  // Set the header length to the end of the CRLF
-  headerLen += 2;
-
-  return ParserState::Ok;
+  drop();
 }
 
-static ParserState tryParseHttpChunk(const uint8_t* buffer, std::size_t bufferLen, std::size_t& payloadPos, std::size_t& payloadLen)
+// esp_http_client only exposes response headers through the event stream, so we
+// capture the ones we care about here. user_data points at the owning Client.
+esp_err_t HTTP::Client::eventHandler(esp_http_client_event_t* evt)
 {
-  if (payloadPos == 0) {
-    ParserState state = tryParseHttpChunkHeader(buffer, bufferLen, payloadPos, payloadLen);
-    if (state != ParserState::Ok) {
-      return state;
-    }
+  if (evt->event_id != HTTP_EVENT_ON_HEADER) {
+    return ESP_OK;
   }
 
-  std::size_t totalLen = payloadPos + payloadLen + 2;  // +2 for CRLF
-  if (bufferLen < totalLen) {
-    return ParserState::NeedMoreData;
+  auto* self = static_cast<Client*>(evt->user_data);
+  if (self == nullptr) {
+    return ESP_OK;
   }
 
-  // Check for CRLF
-  if (!isCRLF(buffer + totalLen - 2)) {
-    OS_LOGW(TAG, "Invalid chunk payload CRLF");
-    return ParserState::Invalid;
+  if (OpenShock::StringIEquals(evt->header_key, "Retry-After")) {
+    self->m_retryAfter.assign(evt->header_value);
+  } else if (OpenShock::StringIEquals(evt->header_key, "Connection")) {
+    self->m_connectionClose = OpenShock::StringIEquals(evt->header_value, "close");
   }
 
-  return ParserState::Ok;
+  return ESP_OK;
 }
 
-static void alignHttpChunk(uint8_t* buffer, std::size_t& bufferCursor, std::size_t payloadPos, std::size_t payloadLen)
+void HTTP::Client::drop()
 {
-  std::size_t totalLen  = payloadPos + payloadLen + 2;  // +2 for CRLF
-  std::size_t remaining = bufferCursor - totalLen;
-  if (remaining > 0) {
-    memmove(buffer, buffer + totalLen, remaining);
-    bufferCursor = remaining;
-  } else {
-    bufferCursor = 0;
+  if (m_handle != nullptr) {
+    esp_http_client_close(m_handle);
+    esp_http_client_cleanup(m_handle);
+    m_handle = nullptr;
   }
+  m_headerKeys.clear();
 }
 
-static StreamReaderResult readHttpStreamDataChunked(HTTPClient& client, WiFiClient* stream, HTTP::DownloadCallback downloadCallback, int64_t begin, uint32_t timeoutMs)
-{
-  std::size_t totalWritten   = 0;
-  HTTP::RequestResult result = HTTP::RequestResult::Success;
-
-  uint8_t* buffer = static_cast<uint8_t*>(malloc(HTTP_BUFFER_SIZE));
-  if (buffer == nullptr) {
-    OS_LOGE(TAG, "Out of memory");
-    return {HTTP::RequestResult::RequestFailed, 0};
-  }
-
-  ParserState state        = ParserState::NeedMoreData;
-  std::size_t bufferCursor = 0, payloadPos = 0, payloadSize = 0;
-
-  while (client.connected() && state != ParserState::Invalid) {
-    if (begin + timeoutMs < OpenShock::millis()) {
-      OS_LOGW(TAG, "Request timed out");
-      result = HTTP::RequestResult::TimedOut;
-      break;
-    }
-
-    std::size_t bytesAvailable = stream->available();
-    if (bytesAvailable == 0) {
-      vTaskDelay(pdMS_TO_TICKS(5));
-      continue;
-    }
-
-    std::size_t bytesRead = stream->readBytes(buffer + bufferCursor, HTTP_BUFFER_SIZE - bufferCursor);
-    if (bytesRead == 0) {
-      OS_LOGW(TAG, "No bytes read");
-      result = HTTP::RequestResult::RequestFailed;
-      break;
-    }
-
-    bufferCursor += bytesRead;
-
-    while (bufferCursor > 0) {
-      state = tryParseHttpChunk(buffer, bufferCursor, payloadPos, payloadSize);
-      if (state == ParserState::Invalid) {
-        OS_LOGE(TAG, "Failed to parse chunk");
-        result = HTTP::RequestResult::RequestFailed;
-        state  = ParserState::Invalid;  // Mark to exit both loops
-        break;
-      }
-      OS_LOGD(TAG, "Chunk parsed: %zu %zu", payloadPos, payloadSize);
-
-      if (state == ParserState::NeedMoreData) {
-        if (bufferCursor == HTTP_BUFFER_SIZE) {
-          OS_LOGE(TAG, "Chunk too large");
-          result = HTTP::RequestResult::RequestFailed;
-          state  = ParserState::Invalid;  // Mark to exit both loops
-        }
-        break;                            // If chunk size good, this only exits one loop
-      }
-
-      // Check for zero chunk size (end of transfer)
-      if (payloadSize == 0) {
-        state = ParserState::Invalid;  // Mark to exit both loops
-        break;
-      }
-
-      if (!downloadCallback(totalWritten, buffer + payloadPos, payloadSize)) {
-        result = HTTP::RequestResult::Cancelled;
-        state  = ParserState::Invalid;  // Mark to exit both loops
-        break;
-      }
-
-      totalWritten += payloadSize;
-      alignHttpChunk(buffer, bufferCursor, payloadPos, payloadSize);
-      payloadSize = 0;
-      payloadPos  = 0;
-    }
-
-    if (state == ParserState::NeedMoreData) {
-      vTaskDelay(pdMS_TO_TICKS(5));
-    }
-  }
-
-  free(buffer);
-
-  return {result, totalWritten};
-}
-
-static StreamReaderResult readHttpStreamData(HTTPClient& client, WiFiClient* stream, std::size_t contentLength, HTTP::DownloadCallback downloadCallback, int64_t begin, uint32_t timeoutMs)
-{
-  std::size_t nWritten       = 0;
-  HTTP::RequestResult result = HTTP::RequestResult::Success;
-
-  uint8_t* buffer = static_cast<uint8_t*>(malloc(HTTP_BUFFER_SIZE));
-  if (buffer == nullptr) {
-    OS_LOGE(TAG, "Failed to allocate HTTP buffer");
-    return {HTTP::RequestResult::InternalError, 0};
-  }
-
-  while (client.connected() && nWritten < contentLength) {
-    if (begin + timeoutMs < OpenShock::millis()) {
-      OS_LOGW(TAG, "Request timed out");
-      result = HTTP::RequestResult::TimedOut;
-      break;
-    }
-
-    std::size_t bytesAvailable = stream->available();
-    if (bytesAvailable == 0) {
-      vTaskDelay(pdMS_TO_TICKS(5));
-      continue;
-    }
-
-    std::size_t bytesToRead = std::min(bytesAvailable, HTTP_BUFFER_SIZE);
-
-    std::size_t bytesRead = stream->readBytes(buffer, bytesToRead);
-    if (bytesRead == 0) {
-      OS_LOGW(TAG, "No bytes read");
-      result = HTTP::RequestResult::RequestFailed;
-      break;
-    }
-
-    if (!downloadCallback(nWritten, buffer, bytesRead)) {
-      OS_LOGW(TAG, "Request cancelled by callback");
-      result = HTTP::RequestResult::Cancelled;
-      break;
-    }
-
-    nWritten += bytesRead;
-
-    vTaskDelay(pdMS_TO_TICKS(10));
-  }
-
-  free(buffer);
-
-  return {result, nWritten};
-}
-
-HTTP::Response<std::size_t>
-  HTTP::Download(std::string_view url, const std::map<String, String>& headers, HTTP::GotContentLengthCallback contentLengthCallback, HTTP::DownloadCallback downloadCallback, std::span<const uint16_t> acceptedCodes, uint32_t timeoutMs)
+HTTP::Response<std::size_t> HTTP::Client::Download(std::string_view url, const std::map<std::string, std::string>& headers, HTTP::GotContentLengthCallback contentLengthCallback, HTTP::DownloadCallback downloadCallback, std::span<const uint16_t> acceptedCodes, uint32_t timeoutMs)
 {
   std::shared_ptr<OpenShock::RateLimiter> rateLimiter = createRateLimiterForURL(url);
   if (rateLimiter == nullptr) {
@@ -362,40 +159,92 @@ HTTP::Response<std::size_t>
     return {RequestResult::RateLimited, 0, 0};
   }
 
-  HTTPClient client;
-  client.setUserAgent(OpenShock::Constants::FW_USERAGENT);
+  std::string urlStr(url);
+  m_retryAfter.clear();
+  m_connectionClose = false;
 
   int64_t begin = OpenShock::millis();
 
-  // This method is horribly named, if you call the begin() method with one String parameter its HTTP, but the one with (String, const char*) is HTTPS.
-  // We pass null here for CAcert parameter to remove erroneous "unexpected protocol: https, expected http" warning, this is what begin(String) does as a fallback.
-  // This is yet another example of why we need to get rid of Arduino dependency lol
-  if (!client.begin(String(url.data(), url.size()), nullptr)) {
-    OS_LOGE(TAG, "Failed to begin HTTP request");
-    return {HTTP::RequestResult::RequestFailed, 0, 0};
+  // Open the connection, reusing the kept-alive handle when possible. If a
+  // reused (kept-alive) socket has been closed by the server, drop it and
+  // reconnect fresh once. HTTPS server certificates are not verified (matches
+  // the previous Arduino behavior). TODO: attach the embedded x509 cert bundle.
+  esp_err_t err = ESP_FAIL;
+  for (int attempt = 0; attempt < 2; ++attempt) {
+    bool reused = m_handle != nullptr;
+
+    if (m_handle == nullptr) {
+      esp_http_client_config_t config = {};
+      config.url                      = urlStr.c_str();
+      config.user_agent               = OpenShock::Constants::FW_USERAGENT;
+      config.method                   = HTTP_METHOD_GET;
+      config.timeout_ms               = static_cast<int>(timeoutMs);
+      config.keep_alive_enable        = true;
+      config.event_handler            = &Client::eventHandler;
+      config.user_data                = this;
+
+      m_handle = esp_http_client_init(&config);
+      if (m_handle == nullptr) {
+        OS_LOGE(TAG, "Failed to initialize HTTP client");
+        return {RequestResult::RequestFailed, 0, 0};
+      }
+    } else {
+      esp_http_client_set_url(m_handle, urlStr.c_str());
+      esp_http_client_set_method(m_handle, HTTP_METHOD_GET);
+      esp_http_client_set_timeout_ms(m_handle, static_cast<int>(timeoutMs));
+    }
+
+    // Clear headers left over from a previous request on this reused handle.
+    for (const auto& key : m_headerKeys) {
+      esp_http_client_delete_header(m_handle, key.c_str());
+    }
+    m_headerKeys.clear();
+
+    for (const auto& header : headers) {
+      esp_http_client_set_header(m_handle, header.first.c_str(), header.second.c_str());
+      m_headerKeys.push_back(header.first);
+    }
+
+    err = esp_http_client_open(m_handle, 0);
+    if (err == ESP_OK) {
+      break;
+    }
+
+    drop();
+    if (!reused) {
+      OS_LOGE(TAG, "Failed to open HTTP connection: %s", esp_err_to_name(err));
+      return {RequestResult::RequestFailed, 0, 0};
+    }
+    OS_LOGD(TAG, "Reused connection failed to open, reconnecting");
+  }
+  if (err != ESP_OK) {
+    return {RequestResult::RequestFailed, 0, 0};
   }
 
-  for (auto& header : headers) {
-    client.addHeader(header.first, header.second);
+  // Tears down the connection when it can't be safely reused.
+  auto fail = [&](HTTP::RequestResult result, int code, std::size_t written) -> HTTP::Response<std::size_t> {
+    drop();
+    return {result, code, written};
+  };
+
+  int64_t contentLength = esp_http_client_fetch_headers(m_handle);
+  if (contentLength < 0) {
+    OS_LOGE(TAG, "Failed to fetch response headers");
+    return fail(RequestResult::RequestFailed, 0, 0);
   }
 
-  int responseCode = client.GET();
+  int responseCode = esp_http_client_get_status_code(m_handle);
 
-  if (responseCode == HTTP_CODE_REQUEST_TIMEOUT || begin + timeoutMs < OpenShock::millis()) {
+  if (begin + timeoutMs < OpenShock::millis()) {
     OS_LOGW(TAG, "Request timed out");
-    return {HTTP::RequestResult::TimedOut, responseCode, 0};
+    return fail(RequestResult::TimedOut, responseCode, 0);
   }
 
-  if (responseCode == HTTP_CODE_TOO_MANY_REQUESTS) {
+  if (responseCode == 429) {  // Too Many Requests
     // https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers/Retry-After
-
-    // Get "Retry-After" header
-    String retryAfterStr = client.header("Retry-After");
-
-    // Try to parse it as an integer (delay-seconds)
     long retryAfter = 0;
-    if (retryAfterStr.length() > 0 && std::all_of(retryAfterStr.begin(), retryAfterStr.end(), isdigit)) {
-      retryAfter = retryAfterStr.toInt();
+    if (!m_retryAfter.empty() && std::all_of(m_retryAfter.begin(), m_retryAfter.end(), [](char c) { return std::isdigit(static_cast<unsigned char>(c)) != 0; })) {
+      retryAfter = strtol(m_retryAfter.c_str(), nullptr, 10);
     }
 
     // If header missing/unparseable, default to 15 seconds
@@ -403,10 +252,9 @@ HTTP::Response<std::size_t>
       retryAfter = 15;
     }
 
-    // Apply the block-for time
     rateLimiter->blockFor(retryAfter * 1000);
 
-    return {HTTP::RequestResult::RateLimited, responseCode, 0};
+    return fail(RequestResult::RateLimited, responseCode, 0);  // body not drained
   }
 
   if (responseCode == 418) {
@@ -415,43 +263,76 @@ HTTP::Response<std::size_t>
 
   if (std::find(acceptedCodes.begin(), acceptedCodes.end(), responseCode) == acceptedCodes.end()) {
     OS_LOGD(TAG, "Received unexpected response code %d", responseCode);
-    return {HTTP::RequestResult::CodeRejected, responseCode, 0};
+    return fail(RequestResult::CodeRejected, responseCode, 0);  // body not drained
   }
 
-  int contentLength = client.getSize();
-  if (contentLength == 0) {
-    return {HTTP::RequestResult::Success, responseCode, 0};
+  bool chunked = esp_http_client_is_chunked_response(m_handle);
+
+  if (contentLength > HTTP_DOWNLOAD_SIZE_LIMIT) {
+    OS_LOGE(TAG, "Content-Length too large");
+    return fail(RequestResult::RequestFailed, responseCode, 0);
   }
 
   if (contentLength > 0) {
-    if (contentLength > HTTP_DOWNLOAD_SIZE_LIMIT) {
-      OS_LOGE(TAG, "Content-Length too large");
-      return {HTTP::RequestResult::RequestFailed, responseCode, 0};
-    }
-
-    if (!contentLengthCallback(contentLength)) {
+    if (!contentLengthCallback(static_cast<int>(contentLength))) {
       OS_LOGW(TAG, "Request cancelled by callback");
-      return {HTTP::RequestResult::Cancelled, responseCode, 0};
+      return fail(RequestResult::Cancelled, responseCode, 0);
     }
+  } else if (!chunked) {
+    // No Content-Length and not chunked => empty body. Nothing to drain.
+    if (m_connectionClose) {
+      drop();
+    }
+    return {RequestResult::Success, responseCode, 0};
   }
 
-  WiFiClient* stream = client.getStreamPtr();
-  if (stream == nullptr) {
-    OS_LOGE(TAG, "Failed to get stream");
-    return {HTTP::RequestResult::RequestFailed, 0, 0};
+  uint8_t* buffer = static_cast<uint8_t*>(malloc(HTTP_BUFFER_SIZE));
+  if (buffer == nullptr) {
+    OS_LOGE(TAG, "Failed to allocate HTTP buffer");
+    return fail(RequestResult::InternalError, responseCode, 0);
   }
 
-  StreamReaderResult result;
-  if (contentLength > 0) {
-    result = readHttpStreamData(client, stream, contentLength, downloadCallback, begin, timeoutMs);
-  } else {
-    result = readHttpStreamDataChunked(client, stream, downloadCallback, begin, timeoutMs);
+  std::size_t totalWritten   = 0;
+  HTTP::RequestResult result = HTTP::RequestResult::Success;
+
+  // esp_http_client_read transparently decodes chunked transfer-encoding.
+  int read;
+  while ((read = esp_http_client_read(m_handle, reinterpret_cast<char*>(buffer), static_cast<int>(HTTP_BUFFER_SIZE))) > 0) {
+    if (begin + timeoutMs < OpenShock::millis()) {
+      OS_LOGW(TAG, "Request timed out");
+      result = HTTP::RequestResult::TimedOut;
+      break;
+    }
+
+    if (!downloadCallback(totalWritten, buffer, static_cast<std::size_t>(read))) {
+      OS_LOGW(TAG, "Request cancelled by callback");
+      result = HTTP::RequestResult::Cancelled;
+      break;
+    }
+
+    totalWritten += static_cast<std::size_t>(read);
   }
 
-  return {result.result, responseCode, result.nWritten};
+  free(buffer);
+
+  if (result == HTTP::RequestResult::Success && (read < 0 || !esp_http_client_is_complete_data_received(m_handle))) {
+    OS_LOGW(TAG, "Response body was not fully received");
+    result = HTTP::RequestResult::RequestFailed;
+  }
+
+  if (result != HTTP::RequestResult::Success) {
+    return fail(result, responseCode, totalWritten);  // connection state uncertain
+  }
+
+  // Success: keep the connection alive for the next request unless the server closed it.
+  if (m_connectionClose) {
+    drop();
+  }
+
+  return {result, responseCode, totalWritten};
 }
 
-HTTP::Response<std::string> HTTP::GetString(std::string_view url, const std::map<String, String>& headers, std::span<const uint16_t> acceptedCodes, uint32_t timeoutMs)
+HTTP::Response<std::string> HTTP::Client::GetString(std::string_view url, const std::map<std::string, std::string>& headers, std::span<const uint16_t> acceptedCodes, uint32_t timeoutMs)
 {
   std::string result;
 

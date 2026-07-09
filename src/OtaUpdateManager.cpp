@@ -175,7 +175,7 @@ static bool _sendFailureMessage(std::string_view message, bool fatal = false)
   return true;
 }
 
-static bool otaum_flash_app_partition(const esp_partition_t* partition, std::string_view remoteUrl, const uint8_t (&remoteHash)[32])
+static bool otaum_flash_app_partition(OpenShock::HTTP::Client& client, const esp_partition_t* partition, std::string_view remoteUrl, const uint8_t (&remoteHash)[32])
 {
   OS_LOGD(TAG, "Flashing app partition");
 
@@ -191,7 +191,7 @@ static bool otaum_flash_app_partition(const esp_partition_t* partition, std::str
     return true;
   };
 
-  if (!OpenShock::FlashPartitionFromUrl(partition, remoteUrl, remoteHash, onProgress)) {
+  if (!OpenShock::FlashPartitionFromUrl(client, partition, remoteUrl, remoteHash, onProgress)) {
     OS_LOGE(TAG, "Failed to flash app partition");
     _sendFailureMessage("Failed to flash app partition"sv);
     return false;
@@ -211,7 +211,7 @@ static bool otaum_flash_app_partition(const esp_partition_t* partition, std::str
   return true;
 }
 
-static bool otaum_flash_fs_partition(const esp_partition_t* parition, std::string_view remoteUrl, const uint8_t (&remoteHash)[32])
+static bool otaum_flash_fs_partition(OpenShock::HTTP::Client& client, const esp_partition_t* parition, std::string_view remoteUrl, const uint8_t (&remoteHash)[32])
 {
   if (!otaum_send_progress_msg(Serialization::Types::OtaUpdateProgressTask::PreparingForUpdate, 0.0f)) {
     return false;
@@ -238,7 +238,7 @@ static bool otaum_flash_fs_partition(const esp_partition_t* parition, std::strin
     return true;
   };
 
-  if (!OpenShock::FlashPartitionFromUrl(parition, remoteUrl, remoteHash, onProgress)) {
+  if (!OpenShock::FlashPartitionFromUrl(client, parition, remoteUrl, remoteHash, onProgress)) {
     OS_LOGE(TAG, "Failed to flash filesystem partition");
     _sendFailureMessage("Failed to flash filesystem partition"sv);
     return false;
@@ -353,6 +353,10 @@ static void otaum_updatetask(void* arg)
       continue;
     }
 
+    // Reuse a single connection for this update's sequential CDN requests
+    // (version -> release -> filesystem binary -> app binary).
+    OpenShock::HTTP::Client client;
+
     OpenShock::SemVer version;
     if (updateRequested) {
       updateRequested = false;
@@ -365,7 +369,7 @@ static void otaum_updatetask(void* arg)
       OS_LOGD(TAG, "Checking for updates");
 
       // Fetch current version.
-      if (!OtaUpdateManager::TryGetFirmwareVersion(config.updateChannel, version)) {
+      if (!OtaUpdateManager::TryGetFirmwareVersion(client, config.updateChannel, version)) {
         OS_LOGE(TAG, "Failed to fetch firmware version");
         continue;
       }
@@ -402,7 +406,7 @@ static void otaum_updatetask(void* arg)
 
     // Fetch current release.
     OtaUpdateManager::FirmwareRelease release;
-    if (!OtaUpdateManager::TryGetFirmwareRelease(version, release)) {
+    if (!OtaUpdateManager::TryGetFirmwareRelease(client, version, release)) {
       OS_LOGE(TAG, "Failed to fetch firmware release");  // TODO: Send error message to server
       _sendFailureMessage("Failed to fetch firmware release"sv);
       continue;
@@ -441,11 +445,11 @@ static void otaum_updatetask(void* arg)
     }
 
     // Flash app and filesystem partitions.
-    if (!otaum_flash_fs_partition(filesystemPartition, release.filesystemBinaryUrl, release.filesystemBinaryHash)) {
+    if (!otaum_flash_fs_partition(client, filesystemPartition, release.filesystemBinaryUrl, release.filesystemBinaryHash)) {
       otaum_restore_wdt_timeout();
       continue;
     }
-    if (!otaum_flash_app_partition(appPartition, release.appBinaryUrl, release.appBinaryHash)) {
+    if (!otaum_flash_app_partition(client, appPartition, release.appBinaryUrl, release.appBinaryHash)) {
       otaum_restore_wdt_timeout();
       continue;
     }
@@ -578,7 +582,7 @@ bool OtaUpdateManager::Init()
   return true;
 }
 
-bool OtaUpdateManager::TryGetFirmwareVersion(OtaUpdateChannel channel, OpenShock::SemVer& version)
+bool OtaUpdateManager::TryGetFirmwareVersion(HTTP::Client& client, OtaUpdateChannel channel, OpenShock::SemVer& version)
 {
   std::string_view channelIndexUrl;
   switch (channel) {
@@ -598,7 +602,7 @@ bool OtaUpdateManager::TryGetFirmwareVersion(OtaUpdateChannel channel, OpenShock
 
   OS_LOGD(TAG, "Fetching firmware version from %s", channelIndexUrl);
 
-  auto response = OpenShock::HTTP::GetString(
+  auto response = client.GetString(
     channelIndexUrl,
     {
       {"Accept", "text/plain"}
@@ -646,7 +650,7 @@ static bool _tryParseIntoHash(std::string_view hash, uint8_t (&hashBytes)[32])
   return true;
 }
 
-bool OtaUpdateManager::TryGetFirmwareRelease(const OpenShock::SemVer& version, FirmwareRelease& release)
+bool OtaUpdateManager::TryGetFirmwareRelease(HTTP::Client& client, const OpenShock::SemVer& version, FirmwareRelease& release)
 {
   auto versionStr = version.toString();  // TODO: This is abusing the SemVer::toString() method causing alot of string copies, fix this
 
@@ -668,7 +672,7 @@ bool OtaUpdateManager::TryGetFirmwareRelease(const OpenShock::SemVer& version, F
   }
 
   // Fetch hashes.
-  auto sha256HashesResponse = OpenShock::HTTP::GetString(
+  auto sha256HashesResponse = client.GetString(
     sha256HashesUrl,
     {
       {"Accept", "text/plain"}

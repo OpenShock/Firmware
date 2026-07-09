@@ -11,11 +11,10 @@ idf_component_register(
   SRCS          "src/HTTPRequestManager.cpp"
   INCLUDE_DIRS  "include"
   REQUIRES      osjson                       # json/Json.h in public header
-                framework-arduinoespressif32 # Arduino.h in public header
   PRIV_REQUIRES common                       # Common.h (internal)
                 temporal                         # Temporal.h (internal)
                 logging                      # Logging.h (internal)
                 concurrency                  # SimpleMutex (internal)
-                util                         # RateLimiter, HexUtils, StringUtils
-                esp_wifi                     # esp_wifi_types.h via WiFiClient (internal)
+                util                         # RateLimiter, StringUtils
+                esp_http_client              # esp_http_client.h (internal)
 )
