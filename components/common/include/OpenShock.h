@@ -22,8 +22,11 @@
 
 #define OPENSHOCK_GPIO_INVALID -1
 
+// Boards without a hardwired RF transmitter leave this undefined; the pin is
+// then configured at runtime (see RFConfig / the `rftxpin` command). Default to
+// INVALID silently, like OPENSHOCK_ESTOP_PIN below - CompatibilityChecks.cpp
+// explicitly treats an INVALID default as a supported configuration.
 #ifndef OPENSHOCK_RF_TX_GPIO
-#warning "OPENSHOCK_RF_TX_GPIO is not defined, setting to OPENSHOCK_GPIO_INVALID"
 #define OPENSHOCK_RF_TX_GPIO OPENSHOCK_GPIO_INVALID
 #endif
 
