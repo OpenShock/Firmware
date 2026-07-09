@@ -16,7 +16,7 @@ using namespace OpenShock;
 // control character U+0000-U+001F; everything else is `unescaped`
 // (%x20-21 / %x23-5B / %x5D-10FFFF) and passes through byte-for-byte.
 //
-//   "  \        -> \" \\
+//   quote (") and backslash -> \" and \\ (two-char escapes)
 //   0x08 0x0C 0x0A 0x0D 0x09 -> \b \f \n \r \t   (the RFC's short forms)
 //   other 0x00-0x1F          -> \u00XX
 //   >= 0x20 (incl. 0x7F/DEL and UTF-8 multibyte) -> passthrough

@@ -70,7 +70,7 @@ static const char* wifiDisconnectReason(uint8_t reason)
       return "Switching access points";
 
     // Timeouts
-    case WIFI_REASON_ASSOC_EXPIRE:
+    case WIFI_REASON_DISASSOC_DUE_TO_INACTIVITY:  // formerly WIFI_REASON_ASSOC_EXPIRE (renamed in ESP-IDF 6)
     case WIFI_REASON_TIMEOUT:
     case WIFI_REASON_MISSING_ACKS:
       return "Connection timed out";

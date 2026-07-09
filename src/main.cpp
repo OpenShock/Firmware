@@ -18,8 +18,6 @@ const char* const TAG = "main";
 #include "wifi/WiFiManager.h"
 #include "wifi/WiFiScanManager.h"
 
-#include <Arduino.h>
-
 #include <memory>
 
 // Internal setup function, returns true if setup succeeded, false otherwise.
@@ -90,8 +88,19 @@ void appSetup()
   }
 }
 
-// Arduino setup function
-void setup()
+void main_app(void* arg)
+{
+  while (true) {
+    OpenShock::GatewayConnectionManager::Update();
+
+    vTaskDelay(5);  // 5 ticks update interval
+  }
+}
+
+// ESP-IDF application entry point. Runs the one-time setup, then spawns the
+// long-lived main task. When app_main returns, its own task is torn down by IDF
+// while the main_app task keeps the firmware running.
+extern "C" void app_main()
 {
   OpenShock::Config::Init();
 
@@ -108,25 +117,9 @@ void setup()
   } else {
     appSetup();
   }
-}
 
-void main_app(void* arg)
-{
-  while (true) {
-    OpenShock::GatewayConnectionManager::Update();
-
-    vTaskDelay(5);  // 5 ticks update interval
-  }
-}
-
-void loop()
-{
   // Start the main task
   if (OpenShock::TaskUtils::TaskCreateExpensive(main_app, "main_app", 8192, nullptr, 1, nullptr) != pdPASS) {  // PROFILED: 6KB stack usage
     OS_PANIC(TAG, "Failed to create main_app task");
-    return;
   }
-
-  // Kill the loop task (Arduino is stinky)
-  vTaskDelete(nullptr);
 }

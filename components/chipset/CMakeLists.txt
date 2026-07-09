@@ -11,6 +11,6 @@
 idf_component_register(
   SRCS         "src/CompatibilityChecks.cpp"
   INCLUDE_DIRS "include"
-  REQUIRES     common      # Common.h
-               driver      # driver/gpio.h
+  REQUIRES     common          # Common.h
+               esp_driver_gpio # driver/gpio.h
 )
