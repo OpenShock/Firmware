@@ -8,7 +8,7 @@ const char* const TAG = "Config::BackendConfig";
 using namespace OpenShock::Config;
 
 BackendConfig::BackendConfig()
-  : domain(OPENSHOCK_API_DOMAIN)
+  : domain(CONFIG_OPENSHOCK_API_DOMAIN)
   , authToken()
 {
 }
@@ -21,7 +21,7 @@ BackendConfig::BackendConfig(std::string_view domain, std::string_view authToken
 
 void BackendConfig::ToDefault()
 {
-  domain = OPENSHOCK_API_DOMAIN;
+  domain = CONFIG_OPENSHOCK_API_DOMAIN;
   authToken.clear();
 }
 
@@ -33,7 +33,7 @@ bool BackendConfig::FromFlatbuffers(const Serialization::Configuration::BackendC
     return true;
   }
 
-  Internal::Utils::FromFbsStr(domain, config->domain(), OPENSHOCK_API_DOMAIN);
+  Internal::Utils::FromFbsStr(domain, config->domain(), CONFIG_OPENSHOCK_API_DOMAIN);
   Internal::Utils::FromFbsStr(authToken, config->auth_token(), "");
 
   return true;
@@ -66,7 +66,7 @@ bool BackendConfig::FromJSON(JSON::JsonView json)
     return false;
   }
 
-  Internal::Utils::FromJsonStr(domain, json, "domain", OPENSHOCK_API_DOMAIN);
+  Internal::Utils::FromJsonStr(domain, json, "domain", CONFIG_OPENSHOCK_API_DOMAIN);
   Internal::Utils::FromJsonStr(authToken, json, "authToken", "");
 
   return true;

@@ -9,7 +9,7 @@ const char* const TAG = "Config::RFConfig";
 using namespace OpenShock::Config;
 
 RFConfig::RFConfig()
-  : txPin(static_cast<gpio_num_t>(OPENSHOCK_RF_TX_GPIO))
+  : txPin(static_cast<gpio_num_t>(CONFIG_OPENSHOCK_RF_TX_GPIO))
   , keepAliveEnabled(true)
 {
 }
@@ -22,7 +22,7 @@ RFConfig::RFConfig(gpio_num_t txPin, bool keepAliveEnabled)
 
 void RFConfig::ToDefault()
 {
-  txPin            = static_cast<gpio_num_t>(OPENSHOCK_RF_TX_GPIO);
+  txPin            = static_cast<gpio_num_t>(CONFIG_OPENSHOCK_RF_TX_GPIO);
   keepAliveEnabled = true;
 }
 
@@ -34,7 +34,7 @@ bool RFConfig::FromFlatbuffers(const Serialization::Configuration::RFConfig* con
     return true;
   }
 
-  Internal::Utils::FromU8GpioNum(txPin, config->tx_pin(), static_cast<gpio_num_t>(OPENSHOCK_RF_TX_GPIO));
+  Internal::Utils::FromU8GpioNum(txPin, config->tx_pin(), static_cast<gpio_num_t>(CONFIG_OPENSHOCK_RF_TX_GPIO));
   keepAliveEnabled = config->keepalive_enabled();
 
   return true;
@@ -58,7 +58,7 @@ bool RFConfig::FromJSON(JSON::JsonView json)
     return false;
   }
 
-  Internal::Utils::FromJsonGpioNum(txPin, json, "txPin", static_cast<gpio_num_t>(OPENSHOCK_RF_TX_GPIO));
+  Internal::Utils::FromJsonGpioNum(txPin, json, "txPin", static_cast<gpio_num_t>(CONFIG_OPENSHOCK_RF_TX_GPIO));
   Internal::Utils::FromJsonBool(keepAliveEnabled, json, "keepAliveEnabled", true);
 
   return true;

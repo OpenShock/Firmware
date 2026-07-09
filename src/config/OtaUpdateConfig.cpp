@@ -10,7 +10,7 @@ using namespace std::string_view_literals;
 
 OtaUpdateConfig::OtaUpdateConfig()
   : isEnabled(true)
-  , cdnDomain(OPENSHOCK_FW_CDN_DOMAIN)
+  , cdnDomain(CONFIG_OPENSHOCK_FW_CDN_DOMAIN)
   , updateChannel(OtaUpdateChannel::Stable)
   , checkOnStartup(false)
   , checkPeriodically(false)
@@ -41,7 +41,7 @@ OtaUpdateConfig::OtaUpdateConfig(
 void OtaUpdateConfig::ToDefault()
 {
   isEnabled              = true;
-  cdnDomain              = OPENSHOCK_FW_CDN_DOMAIN;
+  cdnDomain              = CONFIG_OPENSHOCK_FW_CDN_DOMAIN;
   updateChannel          = OtaUpdateChannel::Stable;
   checkOnStartup         = false;
   checkPeriodically      = false;
@@ -61,7 +61,7 @@ bool OtaUpdateConfig::FromFlatbuffers(const Serialization::Configuration::OtaUpd
   }
 
   isEnabled = config->is_enabled();
-  Internal::Utils::FromFbsStr(cdnDomain, config->cdn_domain(), OPENSHOCK_FW_CDN_DOMAIN);
+  Internal::Utils::FromFbsStr(cdnDomain, config->cdn_domain(), CONFIG_OPENSHOCK_FW_CDN_DOMAIN);
   updateChannel          = static_cast<OtaUpdateChannel>(config->update_channel());
   checkOnStartup         = config->check_on_startup();
   checkPeriodically      = config->check_periodically();
@@ -105,7 +105,7 @@ bool OtaUpdateConfig::FromJSON(JSON::JsonView json)
   }
 
   Internal::Utils::FromJsonBool(isEnabled, json, "isEnabled", true);
-  Internal::Utils::FromJsonStr(cdnDomain, json, "cdnDomain", OPENSHOCK_FW_CDN_DOMAIN);
+  Internal::Utils::FromJsonStr(cdnDomain, json, "cdnDomain", CONFIG_OPENSHOCK_FW_CDN_DOMAIN);
   Internal::Utils::FromJsonStrParsed(updateChannel, json, "updateChannel"sv, OpenShock::TryParseOtaUpdateChannel, OpenShock::OtaUpdateChannel::Stable);
   Internal::Utils::FromJsonBool(checkOnStartup, json, "checkOnStartup", false);
   Internal::Utils::FromJsonBool(checkPeriodically, json, "checkPeriodically", false);

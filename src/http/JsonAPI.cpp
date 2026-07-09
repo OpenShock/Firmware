@@ -16,7 +16,7 @@ HTTP::Response<Serialization::JsonAPI::AccountLinkResponse> HTTP::JsonAPI::LinkA
     return {HTTP::RequestResult::InternalError, 0, {}};
   }
 
-  char uri[OPENSHOCK_URI_BUFFER_SIZE];
+  char uri[CONFIG_OPENSHOCK_URI_BUFFER_SIZE];
   int written = snprintf(uri, sizeof(uri), "https://%s/1/device/pair/%.*s", domain.c_str(), static_cast<int>(accountLinkCode.length()), accountLinkCode.data());
   if (written < 0 || static_cast<size_t>(written) >= sizeof(uri)) {
     OS_LOGE(TAG, "URI truncated for LinkAccount");
@@ -40,7 +40,7 @@ HTTP::Response<Serialization::JsonAPI::HubInfoResponse> HTTP::JsonAPI::GetHubInf
     return {HTTP::RequestResult::InternalError, 0, {}};
   }
 
-  char uri[OPENSHOCK_URI_BUFFER_SIZE];
+  char uri[CONFIG_OPENSHOCK_URI_BUFFER_SIZE];
   int written = snprintf(uri, sizeof(uri), "https://%s/1/device/self", domain.c_str());
   if (written < 0 || static_cast<size_t>(written) >= sizeof(uri)) {
     OS_LOGE(TAG, "URI truncated for GetHubInfo");
@@ -65,7 +65,7 @@ HTTP::Response<Serialization::JsonAPI::AssignLcgResponse> HTTP::JsonAPI::AssignL
     return {HTTP::RequestResult::InternalError, 0, {}};
   }
 
-  char uri[OPENSHOCK_URI_BUFFER_SIZE];
+  char uri[CONFIG_OPENSHOCK_URI_BUFFER_SIZE];
   int written = snprintf(uri, sizeof(uri), "https://%s/2/device/assignLCG?version=2", domain.c_str());
   if (written < 0 || static_cast<size_t>(written) >= sizeof(uri)) {
     OS_LOGE(TAG, "URI truncated for AssignLcg");

@@ -215,7 +215,7 @@ static const char* contentTypeForPath(const std::string& path)
 
 static esp_err_t apiBoard(httpd_req_t* req)
 {
-  bool hasPredefinedPins = OPENSHOCK_RF_TX_GPIO != OPENSHOCK_GPIO_INVALID;
+  bool hasPredefinedPins = CONFIG_OPENSHOCK_RF_TX_GPIO != OPENSHOCK_GPIO_INVALID;
   return sendResp(req, S200, HTTP::ContentType::JSON, hasPredefinedPins ? "{\"has_predefined_pins\":true}" : "{\"has_predefined_pins\":false}");
 }
 

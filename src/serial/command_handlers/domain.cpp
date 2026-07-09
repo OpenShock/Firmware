@@ -26,12 +26,12 @@ static void handleDomainCommand(std::string_view arg, bool isAutomated)
 
   // Check if the domain is too long
   // TODO: Remove magic number
-  if (arg.length() + 40 >= OPENSHOCK_URI_BUFFER_SIZE) {
-    SERPR_ERROR("Domain name too long, please try increasing the \"OPENSHOCK_URI_BUFFER_SIZE\" constant in source code");
+  if (arg.length() + 40 >= CONFIG_OPENSHOCK_URI_BUFFER_SIZE) {
+    SERPR_ERROR("Domain name too long, please try increasing the \"CONFIG_OPENSHOCK_URI_BUFFER_SIZE\" constant in source code");
     return;
   }
 
-  char uri[OPENSHOCK_URI_BUFFER_SIZE];
+  char uri[CONFIG_OPENSHOCK_URI_BUFFER_SIZE];
   sprintf(uri, "https://%.*s/1", static_cast<int>(arg.length()), arg.data());
 
   auto resp = OpenShock::HTTP::GetJSON<OpenShock::Serialization::JsonAPI::BackendVersionResponse>(

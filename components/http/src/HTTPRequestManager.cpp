@@ -79,7 +79,7 @@ static std::shared_ptr<OpenShock::RateLimiter> createRateLimiterForDomain(std::s
   rateLimit->addLimit(10 * 1000, 10);  // 10 per 10 seconds
 
   // per-domain limits
-  if (domain == OPENSHOCK_API_DOMAIN) {
+  if (domain == CONFIG_OPENSHOCK_API_DOMAIN) {
     rateLimit->addLimit(60 * 1000, 12);        // 12 per minute
     rateLimit->addLimit(60 * 60 * 1000, 120);  // 120 per hour
   }

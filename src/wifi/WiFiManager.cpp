@@ -536,7 +536,7 @@ bool WiFiManager::Init()
   std::string hostname;
   if (!Config::GetWiFiHostname(hostname)) {
     OS_LOGE(TAG, "Failed to get WiFi hostname, reverting to default");
-    hostname = OPENSHOCK_FW_HOSTNAME;
+    hostname = CONFIG_OPENSHOCK_FW_HOSTNAME;
   }
 
   err = esp_wifi_set_mode(WIFI_MODE_STA);

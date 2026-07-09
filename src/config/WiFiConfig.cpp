@@ -8,8 +8,8 @@ const char* const TAG = "Config::WiFiConfig";
 using namespace OpenShock::Config;
 
 WiFiConfig::WiFiConfig()
-  : accessPointSSID(OPENSHOCK_FW_AP_PREFIX)
-  , hostname(OPENSHOCK_FW_HOSTNAME)
+  : accessPointSSID(CONFIG_OPENSHOCK_FW_AP_PREFIX)
+  , hostname(CONFIG_OPENSHOCK_FW_HOSTNAME)
   , credentialsList()
 {
 }
@@ -23,8 +23,8 @@ WiFiConfig::WiFiConfig(std::string_view accessPointSSID, std::string_view hostna
 
 void WiFiConfig::ToDefault()
 {
-  accessPointSSID = OPENSHOCK_FW_AP_PREFIX;
-  hostname        = OPENSHOCK_FW_HOSTNAME;
+  accessPointSSID = CONFIG_OPENSHOCK_FW_AP_PREFIX;
+  hostname        = CONFIG_OPENSHOCK_FW_HOSTNAME;
   credentialsList.clear();
 }
 
@@ -36,8 +36,8 @@ bool WiFiConfig::FromFlatbuffers(const Serialization::Configuration::WiFiConfig*
     return true;
   }
 
-  Internal::Utils::FromFbsStr(accessPointSSID, config->ap_ssid(), OPENSHOCK_FW_AP_PREFIX);
-  Internal::Utils::FromFbsStr(hostname, config->hostname(), OPENSHOCK_FW_HOSTNAME);
+  Internal::Utils::FromFbsStr(accessPointSSID, config->ap_ssid(), CONFIG_OPENSHOCK_FW_AP_PREFIX);
+  Internal::Utils::FromFbsStr(hostname, config->hostname(), CONFIG_OPENSHOCK_FW_HOSTNAME);
   Internal::Utils::FromFbsVec(credentialsList, config->credentials());
 
   return true;
@@ -68,8 +68,8 @@ bool WiFiConfig::FromJSON(JSON::JsonView json)
     return false;
   }
 
-  Internal::Utils::FromJsonStr(accessPointSSID, json, "accessPointSSID", OPENSHOCK_FW_AP_PREFIX);
-  Internal::Utils::FromJsonStr(hostname, json, "hostname", OPENSHOCK_FW_HOSTNAME);
+  Internal::Utils::FromJsonStr(accessPointSSID, json, "accessPointSSID", CONFIG_OPENSHOCK_FW_AP_PREFIX);
+  Internal::Utils::FromJsonStr(hostname, json, "hostname", CONFIG_OPENSHOCK_FW_HOSTNAME);
 
   JSON::JsonView credentialsListJson = json["credentials"];
   if (!credentialsListJson.valid()) {

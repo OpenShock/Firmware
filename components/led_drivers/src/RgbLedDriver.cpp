@@ -14,6 +14,11 @@ const char* const TAG = "RGBLedDriver";
 
 #include <array>
 
+// R/G channel swap comes from Kconfig (CONFIG_OPENSHOCK_LED_SWAP_RG_CHANNELS, see
+// src/Kconfig.projbuild). Kconfig defines the symbol as 1 only when the bool is
+// enabled and leaves it undefined otherwise, so the #if below reads it directly.
+#include "sdkconfig.h"
+
 using namespace OpenShock;
 
 // Currently this assumes a single WS2812B LED
@@ -158,7 +163,7 @@ void RgbLedDriver::RunPattern()
       uint8_t r = static_cast<uint8_t>(static_cast<uint16_t>(state.red) * m_brightness / 255);
       uint8_t g = static_cast<uint8_t>(static_cast<uint16_t>(state.green) * m_brightness / 255);
       uint8_t b = static_cast<uint8_t>(static_cast<uint16_t>(state.blue) * m_brightness / 255);
-#if OPENSHOCK_LED_SWAP_RG_CHANNELS
+#if CONFIG_OPENSHOCK_LED_SWAP_RG_CHANNELS
       std::swap(r, g);
 #endif
 

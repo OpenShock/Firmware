@@ -4,7 +4,7 @@
 #   Chipset.h — OpenShock::IsValidInputPin / IsValidOutputPin per IDF_TARGET
 #
 # CompatibilityChecks.cpp contains static_asserts that fail the build if any
-# board config (OPENSHOCK_ESTOP_PIN, OPENSHOCK_RF_TX_GPIO, etc.) resolves to
+# board config (CONFIG_OPENSHOCK_ESTOP_PIN, CONFIG_OPENSHOCK_RF_TX_GPIO, etc.) resolves to
 # an invalid pin for the current chip. It has to be in the link for the
 # asserts to run; no runtime code.
 
