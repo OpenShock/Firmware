@@ -50,7 +50,7 @@ HTTP::Response<Serialization::JsonAPI::HubInfoResponse> HTTP::JsonAPI::GetHubInf
   return HTTP::GetJSON<Serialization::JsonAPI::HubInfoResponse>(
     uri,
     {
-      {"Accept", "application/json"},
+      {     "Accept",    "application/json"},
       {"DeviceToken", std::string(hubToken)}
   },
     Serialization::JsonAPI::ParseHubInfoJsonResponse,
@@ -75,7 +75,7 @@ HTTP::Response<Serialization::JsonAPI::AssignLcgResponse> HTTP::JsonAPI::AssignL
   return HTTP::GetJSON<Serialization::JsonAPI::AssignLcgResponse>(
     uri,
     {
-      {"Accept", "application/json"},
+      {     "Accept",    "application/json"},
       {"DeviceToken", std::string(hubToken)}
   },
     Serialization::JsonAPI::ParseAssignLcgJsonResponse,

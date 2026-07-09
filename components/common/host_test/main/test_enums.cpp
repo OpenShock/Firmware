@@ -46,10 +46,10 @@ TEST_CASE("ShockerModelType: case-insensitive", "[common][enums]")
 TEST_CASE("ShockerModelType: the 'pettrainer' typo only with allowTypo", "[common][enums]")
 {
   ShockerModelType m;
-  TEST_ASSERT_FALSE(ShockerModelTypeFromString("pettrainer", m));         // default: rejected
+  TEST_ASSERT_FALSE(ShockerModelTypeFromString("pettrainer", m));  // default: rejected
   TEST_ASSERT_FALSE(ShockerModelTypeFromString("pettrainer998dr", m));
 
-  TEST_ASSERT_TRUE(ShockerModelTypeFromString("pettrainer", m, true));    // allowTypo: accepted
+  TEST_ASSERT_TRUE(ShockerModelTypeFromString("pettrainer", m, true));  // allowTypo: accepted
   TEST_ASSERT_EQUAL(ShockerModelType::Petrainer, m);
   TEST_ASSERT_TRUE(ShockerModelTypeFromString("pettrainer998dr", m, true));
   TEST_ASSERT_EQUAL(ShockerModelType::Petrainer998DR, m);

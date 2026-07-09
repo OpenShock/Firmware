@@ -67,7 +67,7 @@ void GatewayClient::connect(const std::string& host, uint16_t port, const std::s
   config.transport                     = WEBSOCKET_TRANSPORT_OVER_SSL;
   config.user_agent                    = OpenShock::Constants::FW_USERAGENT;
   config.headers                       = m_headers.c_str();
-  config.disable_auto_reconnect        = true;  // GatewayConnectionManager owns reconnection
+  config.disable_auto_reconnect        = true;                   // GatewayConnectionManager owns reconnection
   config.crt_bundle_attach             = esp_crt_bundle_attach;  // verify server against the compiled-in CA bundle
 
   m_client = esp_websocket_client_init(&config);
@@ -195,7 +195,7 @@ void GatewayClient::_sendBootStatus()
 
 void GatewayClient::_eventHandler(void* arg, esp_event_base_t /*base*/, int32_t eventId, void* eventData)
 {
-  auto* self = static_cast<GatewayClient*>(arg);
+  auto* self       = static_cast<GatewayClient*>(arg);
   const auto* data = static_cast<esp_websocket_event_data_t*>(eventData);
 
   switch (eventId) {

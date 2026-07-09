@@ -28,7 +28,7 @@ using namespace std::string_view_literals;
 const std::size_t HTTP_BUFFER_SIZE = 4096LLU;
 const int HTTP_DOWNLOAD_SIZE_LIMIT = 200 * 1024 * 1024;  // 200 MB
 
-static OpenShock::SimpleMutex s_rateLimitsMutex                                               = {};
+static OpenShock::SimpleMutex s_rateLimitsMutex                                              = {};
 static std::unordered_map<std::string, std::shared_ptr<OpenShock::RateLimiter>> s_rateLimits = {};
 
 using namespace OpenShock;
@@ -149,7 +149,8 @@ void HTTP::Client::drop()
   m_headerKeys.clear();
 }
 
-HTTP::Response<std::size_t> HTTP::Client::Download(std::string_view url, const std::map<std::string, std::string>& headers, HTTP::GotContentLengthCallback contentLengthCallback, HTTP::DownloadCallback downloadCallback, std::span<const uint16_t> acceptedCodes, uint32_t timeoutMs)
+HTTP::Response<std::size_t>
+  HTTP::Client::Download(std::string_view url, const std::map<std::string, std::string>& headers, HTTP::GotContentLengthCallback contentLengthCallback, HTTP::DownloadCallback downloadCallback, std::span<const uint16_t> acceptedCodes, uint32_t timeoutMs)
 {
   std::shared_ptr<OpenShock::RateLimiter> rateLimiter = createRateLimiterForURL(url);
   if (rateLimiter == nullptr) {

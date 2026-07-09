@@ -20,7 +20,7 @@ TEST_CASE("StringIEquals: equal regardless of case", "[common][strhelpers]")
 TEST_CASE("StringIEquals: unequal content or length", "[common][strhelpers]")
 {
   TEST_ASSERT_FALSE(StringIEquals("hello", "world"));
-  TEST_ASSERT_FALSE(StringIEquals("hello", "hell"));    // different length
+  TEST_ASSERT_FALSE(StringIEquals("hello", "hell"));  // different length
   TEST_ASSERT_FALSE(StringIEquals("hell", "hello"));
   TEST_ASSERT_FALSE(StringIEquals("", "x"));
   TEST_ASSERT_FALSE(StringIEquals("x", ""));

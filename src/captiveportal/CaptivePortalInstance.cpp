@@ -6,7 +6,6 @@
 const char* const TAG = "CaptivePortalInstance";
 
 #include "captiveportal/Manager.h"
-#include "rfc8908/RFC8908Handler.h"
 #include "Chipset.h"
 #include "CommandHandler.h"
 #include "config/Config.h"
@@ -18,6 +17,7 @@ const char* const TAG = "CaptivePortalInstance";
 #include "Logging.h"
 #include "message_handlers/WebSocket.h"
 #include "RateLimiter.h"
+#include "rfc8908/RFC8908Handler.h"
 #include "serialization/WSLocal.h"
 #include "wifi/WiFiManager.h"
 #include "wifi/WiFiScanManager.h"
@@ -573,7 +573,8 @@ Go to PlatformIO -> Platform -> Upload Filesystem Image!
 If this happened with a file we provided or you just need help, come to the Discord!
 
 discord.gg/OpenShock
-)");
+)"
+    );
   }
 
   std::string uri(req->uri);
@@ -617,9 +618,7 @@ discord.gg/OpenShock
     httpd_resp_set_hdr(req, "ETag", etag.c_str());
   }
 
-  bool ok = self->m_staticFs.readFile(path.c_str(), [req](std::span<const uint8_t> chunk) {
-    return httpd_resp_send_chunk(req, reinterpret_cast<const char*>(chunk.data()), chunk.size()) == ESP_OK;
-  });
+  bool ok = self->m_staticFs.readFile(path.c_str(), [req](std::span<const uint8_t> chunk) { return httpd_resp_send_chunk(req, reinterpret_cast<const char*>(chunk.data()), chunk.size()) == ESP_OK; });
   if (!ok) {
     // Headers/chunks may already be on the wire — can't cleanly redirect now.
     return ESP_FAIL;
@@ -708,9 +707,9 @@ uint8_t CaptivePortal::CaptivePortalInstance::onWsOpen(int fd)
 
   for (uint8_t i = 0; i < MAX_WS_CLIENTS; ++i) {
     if (!m_clients[i].used) {
-      m_clients[i].used       = true;
-      m_clients[i].fd         = fd;
-      m_clients[i].reasmType  = WebSocketMessageType::Binary;
+      m_clients[i].used      = true;
+      m_clients[i].fd        = fd;
+      m_clients[i].reasmType = WebSocketMessageType::Binary;
       m_clients[i].reasm.clear();
       return i;
     }
@@ -813,7 +812,8 @@ void CaptivePortal::CaptivePortalInstance::onWsFrame(int fd, httpd_ws_type_t opc
 
   switch (opcode) {
     case HTTPD_WS_TYPE_TEXT:
-    case HTTPD_WS_TYPE_BINARY: {
+    case HTTPD_WS_TYPE_BINARY:
+    {
       WebSocketMessageType type = (opcode == HTTPD_WS_TYPE_TEXT) ? WebSocketMessageType::Text : WebSocketMessageType::Binary;
       if (final) {
         dispatchWsMessage(socketId, type, payload);
@@ -824,7 +824,8 @@ void CaptivePortal::CaptivePortalInstance::onWsFrame(int fd, httpd_ws_type_t opc
       }
       break;
     }
-    case HTTPD_WS_TYPE_CONTINUE: {
+    case HTTPD_WS_TYPE_CONTINUE:
+    {
       WebSocketMessageType type;
       std::vector<uint8_t> full;
       {
@@ -999,12 +1000,12 @@ void CaptivePortal::CaptivePortalInstance::registerHandlers()
   RFC8908::RegisterProbeHandlers(m_server, CaptivePortal::ApIPv4String());
 
   // WebSocket.
-  httpd_uri_t ws          = {};
-  ws.uri                  = "/ws";
-  ws.method               = HTTP_GET;
-  ws.handler              = &CaptivePortalInstance::wsHandler;
-  ws.user_ctx             = this;
-  ws.is_websocket         = true;
+  httpd_uri_t ws              = {};
+  ws.uri                      = "/ws";
+  ws.method                   = HTTP_GET;
+  ws.handler                  = &CaptivePortalInstance::wsHandler;
+  ws.user_ctx                 = this;
+  ws.is_websocket             = true;
   ws.handle_ws_control_frames = false;
   ws.supported_subprotocol    = "flatbuffers";
   if (httpd_register_uri_handler(m_server, &ws) != ESP_OK) {

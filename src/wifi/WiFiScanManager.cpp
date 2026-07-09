@@ -18,8 +18,8 @@ const char* const TAG = "WiFiScanManager";
 const uint32_t OPENSHOCK_WIFI_SCAN_MIN_MS_PER_CHANNEL = 100;
 const uint32_t OPENSHOCK_WIFI_SCAN_MAX_MS_PER_CHANNEL = 300;
 
-static bool s_initialized       = false;
-static std::atomic<bool> s_scanning = false;
+static bool s_initialized                     = false;
+static std::atomic<bool> s_scanning           = false;
 static OpenShock::SimpleMutex s_handlersMutex = {};
 static std::map<uint64_t, OpenShock::WiFiScanManager::StatusChangedHandler> s_statusChangedHandlers;
 static std::map<uint64_t, OpenShock::WiFiScanManager::NetworksDiscoveredHandler> s_networksDiscoveredHandlers;
@@ -138,9 +138,9 @@ bool WiFiScanManager::StartScan()
 
   notifyStatusChangedHandlers(WiFiScanStatus::Started);
 
-  wifi_scan_config_t config = {};
-  config.show_hidden        = true;
-  config.scan_type          = WIFI_SCAN_TYPE_ACTIVE;
+  wifi_scan_config_t config   = {};
+  config.show_hidden          = true;
+  config.scan_type            = WIFI_SCAN_TYPE_ACTIVE;
   config.scan_time.active.min = OPENSHOCK_WIFI_SCAN_MIN_MS_PER_CHANNEL;
   config.scan_time.active.max = OPENSHOCK_WIFI_SCAN_MAX_MS_PER_CHANNEL;
 

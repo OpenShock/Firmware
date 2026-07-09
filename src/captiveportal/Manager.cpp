@@ -106,10 +106,10 @@ static bool captiveportal_start()
 
   wifi_config_t apConfig = {};
   snprintf(reinterpret_cast<char*>(apConfig.ap.ssid), sizeof(apConfig.ap.ssid), "%s%02X:%02X:%02X:%02X:%02X:%02X", OPENSHOCK_FW_AP_PREFIX, mac[0], mac[1], mac[2], mac[3], mac[4], mac[5]);
-  apConfig.ap.ssid_len       = strlen(reinterpret_cast<char*>(apConfig.ap.ssid));
-  apConfig.ap.channel        = 1;
-  apConfig.ap.authmode       = WIFI_AUTH_OPEN;
-  apConfig.ap.max_connection = 4;
+  apConfig.ap.ssid_len        = strlen(reinterpret_cast<char*>(apConfig.ap.ssid));
+  apConfig.ap.channel         = 1;
+  apConfig.ap.authmode        = WIFI_AUTH_OPEN;
+  apConfig.ap.max_connection  = 4;
   apConfig.ap.beacon_interval = 100;
 
   esp_err_t err = esp_wifi_set_mode(WIFI_MODE_APSTA);

@@ -87,7 +87,7 @@ enum class WiFiState : uint8_t {
   Connected    = 1 << 1,
 };
 
-static esp_netif_t* s_staNetif                       = nullptr;
+static esp_netif_t* s_staNetif = nullptr;
 static std::atomic<WiFiState> s_wifiState {WiFiState::Disconnected};
 static uint8_t s_connectedBSSID[6]                   = {0};
 static std::atomic<uint8_t> s_connectedCredentialsID = 0;

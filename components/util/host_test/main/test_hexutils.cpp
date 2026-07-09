@@ -25,7 +25,7 @@ TEST_CASE("ToHex single byte, upper and lower", "[util][hex]")
 TEST_CASE("ToHex array -> array", "[util][hex]")
 {
   const uint8_t mac[6] = {0xDE, 0xAD, 0xBE, 0xEF, 0x01, 0x23};
-  auto out = HexUtils::ToHex<6>(mac);
+  auto out             = HexUtils::ToHex<6>(mac);
   TEST_ASSERT_EQUAL_STRING("DEADBEEF0123", out.data());
 }
 
@@ -38,9 +38,9 @@ TEST_CASE("TryParseHex round-trips", "[util][hex]")
   TEST_ASSERT_EQUAL_HEX8(0xEF, out[2]);
 
   // odd length / bad chars / small buffer -> 0
-  TEST_ASSERT_EQUAL_size_t(0, HexUtils::TryParseHex("ABC", 3, out, 3));    // odd
-  TEST_ASSERT_EQUAL_size_t(0, HexUtils::TryParseHex("ABGH", 4, out, 3));   // non-hex
-  TEST_ASSERT_EQUAL_size_t(0, HexUtils::TryParseHex("ABCDEF", 6, out, 2)); // buffer too small
+  TEST_ASSERT_EQUAL_size_t(0, HexUtils::TryParseHex("ABC", 3, out, 3));     // odd
+  TEST_ASSERT_EQUAL_size_t(0, HexUtils::TryParseHex("ABGH", 4, out, 3));    // non-hex
+  TEST_ASSERT_EQUAL_size_t(0, HexUtils::TryParseHex("ABCDEF", 6, out, 2));  // buffer too small
 }
 
 TEST_CASE("TryParseHexPair", "[util][hex]")
@@ -56,7 +56,7 @@ TEST_CASE("TryParseHexPair", "[util][hex]")
 
 TEST_CASE("TryParseHexMac", "[util][hex]")
 {
-  uint8_t out[6] = {0};
+  uint8_t out[6]  = {0};
   const char* mac = "DE:AD:BE:EF:01:23";
   TEST_ASSERT_EQUAL_size_t(6, HexUtils::TryParseHexMac(mac, std::strlen(mac), out, 6));
   TEST_ASSERT_EQUAL_HEX8(0xDE, out[0]);

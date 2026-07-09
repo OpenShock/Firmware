@@ -93,7 +93,8 @@ namespace OpenShock::HTTP {
     Client(Client&&)                 = delete;
     Client& operator=(Client&&)      = delete;
 
-    Response<std::size_t> Download(std::string_view url, const std::map<std::string, std::string>& headers, GotContentLengthCallback contentLengthCallback, DownloadCallback downloadCallback, std::span<const uint16_t> acceptedCodes, uint32_t timeoutMs = 10'000);
+    Response<std::size_t>
+      Download(std::string_view url, const std::map<std::string, std::string>& headers, GotContentLengthCallback contentLengthCallback, DownloadCallback downloadCallback, std::span<const uint16_t> acceptedCodes, uint32_t timeoutMs = 10'000);
     Response<std::string> GetString(std::string_view url, const std::map<std::string, std::string>& headers, std::span<const uint16_t> acceptedCodes, uint32_t timeoutMs = 10'000);
 
     template<typename T>
@@ -131,7 +132,8 @@ namespace OpenShock::HTTP {
 
   // One-shot helpers: perform a single request on a temporary client. Use a
   // Client directly when issuing several requests to the same host.
-  inline Response<std::size_t> Download(std::string_view url, const std::map<std::string, std::string>& headers, GotContentLengthCallback contentLengthCallback, DownloadCallback downloadCallback, std::span<const uint16_t> acceptedCodes, uint32_t timeoutMs = 10'000)
+  inline Response<std::size_t>
+    Download(std::string_view url, const std::map<std::string, std::string>& headers, GotContentLengthCallback contentLengthCallback, DownloadCallback downloadCallback, std::span<const uint16_t> acceptedCodes, uint32_t timeoutMs = 10'000)
   {
     Client client;
     return client.Download(url, headers, std::move(contentLengthCallback), std::move(downloadCallback), acceptedCodes, timeoutMs);

@@ -56,7 +56,7 @@ TEST_CASE("Convert::ToUint16 / ToInt32 boundaries", "[util][convert]")
 TEST_CASE("Convert::ToUint64 large values", "[util][convert]")
 {
   uint64_t v = 0;
-  TEST_ASSERT_TRUE(Convert::ToUint64("18446744073709551615", v));  // UINT64_MAX
+  TEST_ASSERT_TRUE(Convert::ToUint64("18446744073709551615", v));   // UINT64_MAX
   TEST_ASSERT_EQUAL_UINT64(UINT64_MAX, v);
   TEST_ASSERT_FALSE(Convert::ToUint64("18446744073709551616", v));  // overflow
 }

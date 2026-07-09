@@ -52,15 +52,15 @@ MonoLedDriver::MonoLedDriver(gpio_num_t gpioPin)
   ledc_timer_config(&ledc_config);  // TODO: Error handling
 
   ledc_channel_config_t ledc_channel = {
-    .gpio_num   = gpioPin,
-    .speed_mode = OS_LEDC_SPEED,
-    .channel    = OS_LEDC_CHANNEL,
-    .intr_type  = LEDC_INTR_DISABLE,
-    .timer_sel  = OS_LEDC_TIMER,
-    .duty       = 0,
-    .hpoint     = 0,
-    .sleep_mode = LEDC_SLEEP_MODE_NO_ALIVE_NO_PD,  // default: no output during light-sleep
-    .flags      = {},
+    .gpio_num    = gpioPin,
+    .speed_mode  = OS_LEDC_SPEED,
+    .channel     = OS_LEDC_CHANNEL,
+    .intr_type   = LEDC_INTR_DISABLE,
+    .timer_sel   = OS_LEDC_TIMER,
+    .duty        = 0,
+    .hpoint      = 0,
+    .sleep_mode  = LEDC_SLEEP_MODE_NO_ALIVE_NO_PD,  // default: no output during light-sleep
+    .flags       = {},
     .deconfigure = false,
   };
 
