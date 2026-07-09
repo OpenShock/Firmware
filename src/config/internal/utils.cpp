@@ -3,7 +3,6 @@
 const char* const TAG = "Config::Internal::Utils";
 
 #include "Chipset.h"
-#include "hwutil/IPAddressUtils.h"
 #include "Logging.h"
 
 #include <cstdint>
@@ -69,23 +68,6 @@ void Config::Internal::Utils::FromFbsStr(std::string& str, const flatbuffers::St
   }
 }
 
-bool Config::Internal::Utils::FromFbsIPAddress(IPAddress& ip, const flatbuffers::String* fbsIP, const IPAddress& defaultIP)
-{
-  if (fbsIP == nullptr) {
-    ip = defaultIP;
-    return true;
-  }
-
-  std::string_view view(*fbsIP);
-
-  if (!OpenShock::IPV4AddressFromStringView(ip, view)) {
-    OS_LOGE(TAG, "failed to parse IP address");
-    return false;
-  }
-
-  return true;
-}
-
 bool Config::Internal::Utils::FromJsonBool(bool& val, JSON::JsonView json, std::string_view name, bool defaultVal)
 {
   JSON::JsonView jsonVal = json[name];
@@ -140,35 +122,6 @@ void Config::Internal::Utils::FromJsonStr(std::string& str, JSON::JsonView json,
 {
   if (!FromJsonStr(str, json, name)) {
     str = defaultStr;
-  }
-}
-
-bool Config::Internal::Utils::FromJsonIPAddress(IPAddress& ip, JSON::JsonView json, std::string_view name)
-{
-  JSON::JsonView jsonVal = json[name];
-  if (!jsonVal.valid()) {
-    OS_LOGE(TAG, "value at '%.*s' is null", static_cast<int>(name.length()), name.data());
-    return false;
-  }
-
-  std::string_view view;
-  if (!jsonVal.tryGetStr(view)) {
-    OS_LOGE(TAG, "value at '%.*s' is not a string", static_cast<int>(name.length()), name.data());
-    return false;
-  }
-
-  if (!OpenShock::IPV4AddressFromStringView(ip, view)) {
-    OS_LOGE(TAG, "failed to parse IP address at '%.*s'", static_cast<int>(name.length()), name.data());
-    return false;
-  }
-
-  return true;
-}
-
-void Config::Internal::Utils::FromJsonIPAddress(IPAddress& ip, JSON::JsonView json, std::string_view name, const IPAddress& defaultIP)
-{
-  if (!FromJsonIPAddress(ip, json, name)) {
-    ip = defaultIP;
   }
 }
 

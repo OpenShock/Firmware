@@ -5,7 +5,6 @@
 #include "json/Json.h"
 
 #include <hal/gpio_types.h>
-#include <IPAddress.h>
 
 #include <string>
 #include <vector>
@@ -15,7 +14,6 @@ namespace OpenShock::Config::Internal::Utils {
   void FromU8GpioNum(gpio_num_t& val, uint8_t u8Val, gpio_num_t defaultVal);
 
   void FromFbsStr(std::string& str, const flatbuffers::String* fbsStr, const char* defaultStr);
-  bool FromFbsIPAddress(IPAddress& ip, const flatbuffers::String* fbsIP, const IPAddress& defaultIP);
   bool FromJsonBool(bool& val, JSON::JsonView json, std::string_view name, bool defaultVal);
   bool FromJsonU8(uint8_t& val, JSON::JsonView json, std::string_view name, uint8_t defaultVal);
   bool FromJsonU16(uint16_t& val, JSON::JsonView json, std::string_view name, uint16_t defaultVal);
@@ -23,9 +21,6 @@ namespace OpenShock::Config::Internal::Utils {
 
   bool FromJsonStr(std::string& str, JSON::JsonView json, std::string_view name);
   void FromJsonStr(std::string& str, JSON::JsonView json, std::string_view name, const char* defaultStr);
-
-  bool FromJsonIPAddress(IPAddress& ip, JSON::JsonView json, std::string_view name);
-  void FromJsonIPAddress(IPAddress& ip, JSON::JsonView json, std::string_view name, const IPAddress& defaultIP);
 
   bool FromJsonGpioNum(gpio_num_t& val, JSON::JsonView json, std::string_view name);
   void FromJsonGpioNum(gpio_num_t& val, JSON::JsonView json, std::string_view name, gpio_num_t defaultVal);
