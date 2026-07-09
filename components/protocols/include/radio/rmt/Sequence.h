@@ -4,7 +4,7 @@
 #include "enums/ShockerModelType.h"
 #include "OpenShock.h"
 
-#include <esp32-hal-rmt.h>
+#include <driver/rmt_types.h>
 
 #include <cstdint>
 
@@ -41,10 +41,10 @@ namespace OpenShock::Rmt {
     inline int64_t transmitEnd() const noexcept { return m_transmitEnd; }
     inline void setTransmitEnd(int64_t transmitEnd) noexcept { m_transmitEnd = transmitEnd; }
 
-    inline rmt_data_t* payload() noexcept { return m_data; }
-    inline const rmt_data_t* payload() const noexcept { return m_data; }
-    inline rmt_data_t* terminator() noexcept { return m_data + m_size; }
-    inline const rmt_data_t* terminator() const noexcept { return m_data + m_size; }
+    inline rmt_symbol_word_t* payload() noexcept { return m_data; }
+    inline const rmt_symbol_word_t* payload() const noexcept { return m_data; }
+    inline rmt_symbol_word_t* terminator() noexcept { return m_data + m_size; }
+    inline const rmt_symbol_word_t* terminator() const noexcept { return m_data + m_size; }
     inline size_t size() const noexcept { return m_size; }
 
     bool fill(ShockerCommandType commandType, uint8_t intensity);
@@ -76,7 +76,7 @@ namespace OpenShock::Rmt {
       m_shockerModel = static_cast<ShockerModelType>(0);
     }
 
-    rmt_data_t* m_data;
+    rmt_symbol_word_t* m_data;
     size_t m_size;
     int64_t m_transmitEnd;
     uint16_t m_shockerId;

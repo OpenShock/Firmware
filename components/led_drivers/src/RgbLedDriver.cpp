@@ -9,6 +9,9 @@ const char* const TAG = "RGBLedDriver";
 #include "util/FnProxy.h"
 #include "util/TaskUtils.h"
 
+#include <esp_err.h>
+#include <soc/soc_caps.h>
+
 #include <array>
 
 using namespace OpenShock;
@@ -23,6 +26,8 @@ RgbLedDriver::RgbLedDriver(gpio_num_t gpioPin)
   , m_pattern()
   , m_taskHandle(nullptr)
   , m_taskMutex()
+  , m_rmtChannel(nullptr)
+  , m_rmtEncoder(nullptr)
 {
   if (gpioPin == GPIO_NUM_NC) {
     OS_LOGE(TAG, "Pin is not set");
@@ -34,9 +39,38 @@ RgbLedDriver::RgbLedDriver(gpio_num_t gpioPin)
     return;
   }
 
-  // Arduino-ESP32 3.x RMT: frequency_Hz replaces rmtSetTick. 10 MHz => 100 ns tick (WS2812B timing).
-  if (!rmtInit(gpioPin, RMT_TX_MODE, RMT_MEM_NUM_BLOCKS_1, 10'000'000)) {
-    OS_LOGE(TAG, "Failed to initialize RMT for pin %hhi", gpioPin);
+  // 10 MHz resolution => 100 ns tick (WS2812B timing).
+  rmt_tx_channel_config_t channelConfig = {
+    .gpio_num          = gpioPin,
+    .clk_src           = RMT_CLK_SRC_DEFAULT,
+    .resolution_hz     = 10'000'000,
+    .mem_block_symbols = SOC_RMT_MEM_WORDS_PER_CHANNEL,  // exactly 1 memory block
+    .trans_queue_depth = 4,
+  };
+  esp_err_t err = rmt_new_tx_channel(&channelConfig, &m_rmtChannel);
+  if (err != ESP_OK) {
+    OS_LOGE(TAG, "Failed to create RMT TX channel for pin %hhi: %s", gpioPin, esp_err_to_name(err));
+    m_rmtChannel = nullptr;
+    return;
+  }
+
+  rmt_copy_encoder_config_t encoderConfig = {};
+  err                                     = rmt_new_copy_encoder(&encoderConfig, &m_rmtEncoder);
+  if (err != ESP_OK) {
+    OS_LOGE(TAG, "Failed to create RMT copy encoder for pin %hhi: %s", gpioPin, esp_err_to_name(err));
+    rmt_del_channel(m_rmtChannel);
+    m_rmtChannel = nullptr;
+    m_rmtEncoder = nullptr;
+    return;
+  }
+
+  err = rmt_enable(m_rmtChannel);
+  if (err != ESP_OK) {
+    OS_LOGE(TAG, "Failed to enable RMT channel for pin %hhi: %s", gpioPin, esp_err_to_name(err));
+    rmt_del_encoder(m_rmtEncoder);
+    rmt_del_channel(m_rmtChannel);
+    m_rmtChannel = nullptr;
+    m_rmtEncoder = nullptr;
     return;
   }
 
@@ -47,8 +81,14 @@ RgbLedDriver::~RgbLedDriver()
 {
   ClearPattern();
 
-  if (m_gpioPin != GPIO_NUM_NC) {
-    rmtDeinit(m_gpioPin);
+  if (m_rmtChannel != nullptr) {
+    rmt_disable(m_rmtChannel);
+    rmt_del_channel(m_rmtChannel);
+    m_rmtChannel = nullptr;
+  }
+  if (m_rmtEncoder != nullptr) {
+    rmt_del_encoder(m_rmtEncoder);
+    m_rmtEncoder = nullptr;
   }
 }
 
@@ -103,7 +143,7 @@ void RgbLedDriver::ClearPatternInternal()
 
 void RgbLedDriver::RunPattern()
 {
-  std::array<rmt_data_t, 24> led_data;  // 24 bits per LED (8 bits per color * 3 colors)
+  std::array<rmt_symbol_word_t, 24> led_data;  // 24 bits per LED (8 bits per color * 3 colors)
 
   while (!m_stopRequested.load(std::memory_order_relaxed)) {
     for (const auto& state : m_pattern) {
@@ -138,7 +178,10 @@ void RgbLedDriver::RunPattern()
       }
 
       // Send the data (blocking, wait up to 10ms per frame)
-      rmtWrite(m_gpioPin, led_data.data(), led_data.size(), 10);
+      rmt_transmit_config_t txConfig = {};
+      txConfig.flags.eot_level       = 0;
+      rmt_transmit(m_rmtChannel, m_rmtEncoder, led_data.data(), led_data.size() * sizeof(rmt_symbol_word_t), &txConfig);
+      rmt_tx_wait_all_done(m_rmtChannel, 10);
 
       // Chunked delay so cooperative shutdown can interrupt long waits
       uint32_t remaining = state.duration;

@@ -11,9 +11,9 @@
 // It is based on the following documentation:
 // https://wiki.openshock.org/hardware/shockers/caixianlin/#rf-specification
 
-const rmt_data_t kRmtPreamble = {1400, 1, 750, 0};
-const rmt_data_t kRmtOne      = {750, 1, 250, 0};
-const rmt_data_t kRmtZero     = {250, 1, 750, 0};
+const rmt_symbol_word_t kRmtPreamble = {1400, 1, 750, 0};
+const rmt_symbol_word_t kRmtOne      = {750, 1, 250, 0};
+const rmt_symbol_word_t kRmtZero     = {250, 1, 750, 0};
 
 using namespace OpenShock;
 
@@ -22,7 +22,7 @@ size_t Rmt::CaiXianlinEncoder::GetBufferSize()
   return 44;
 }
 
-bool Rmt::CaiXianlinEncoder::FillBuffer(rmt_data_t* sequence, uint16_t shockerId, uint8_t channelId, ShockerCommandType type, uint8_t intensity)
+bool Rmt::CaiXianlinEncoder::FillBuffer(rmt_symbol_word_t* sequence, uint16_t shockerId, uint8_t channelId, ShockerCommandType type, uint8_t intensity)
 {
   // Intensity must be between 0 and 99
   intensity = std::min(intensity, static_cast<uint8_t>(99));

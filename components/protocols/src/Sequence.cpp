@@ -29,7 +29,7 @@ inline static size_t getSequenceBufferSize(ShockerModelType shockerModelType)
   }
 }
 
-inline static bool fillSequenceImpl(rmt_data_t* data, ShockerModelType modelType, uint16_t shockerId, ShockerCommandType commandType, uint8_t intensity)
+inline static bool fillSequenceImpl(rmt_symbol_word_t* data, ShockerModelType modelType, uint16_t shockerId, ShockerCommandType commandType, uint8_t intensity)
 {
   switch (modelType) {
     case ShockerModelType::CaiXianlin:
@@ -57,7 +57,7 @@ Rmt::Sequence::Sequence(ShockerModelType shockerModel, uint16_t shockerId, int64
 {
   if (m_size == 0) return;
 
-  m_data = static_cast<rmt_data_t*>(malloc(m_size * 2 * sizeof(rmt_data_t)));
+  m_data = static_cast<rmt_symbol_word_t*>(malloc(m_size * 2 * sizeof(rmt_symbol_word_t)));
   if (m_data == nullptr) {
     m_size = 0;
     return;

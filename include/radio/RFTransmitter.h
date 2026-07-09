@@ -4,7 +4,8 @@
 #include "enums/ShockerModelType.h"
 #include "OpenShock.h"
 
-#include <esp32-hal-rmt.h>
+#include <driver/rmt_encoder.h>
+#include <driver/rmt_tx.h>
 #include <hal/gpio_types.h>
 
 #include <freertos/queue.h>
@@ -37,5 +38,7 @@ namespace OpenShock {
     gpio_num_t m_txPin;
     QueueHandle_t m_queueHandle;
     TaskHandle_t m_taskHandle;
+    rmt_channel_handle_t m_rmtChannel;
+    rmt_encoder_handle_t m_rmtEncoder;
   };
 }  // namespace OpenShock

@@ -18,7 +18,7 @@ idf_component_register(
   INCLUDE_DIRS  "include"
   PRIV_INCLUDE_DIRS "src"                      # radio/rmt/internal/Shared.h (private)
   REQUIRES      common                       # enums/*, OpenShock.h in public headers
-                framework-arduinoespressif32 # esp32-hal-rmt.h in public headers
+                esp_driver_rmt               # driver/rmt_types.h (rmt_symbol_word_t) in public headers
   PRIV_REQUIRES util                          # Checksum.h (internal)
                 logging                       # OS_LOG* (internal)
 )

@@ -4,10 +4,10 @@
 
 #include <algorithm>
 
-const rmt_data_t kRmtPreamble  = {960, 1, 790, 0};
-const rmt_data_t kRmtOne       = {220, 1, 980, 0};
-const rmt_data_t kRmtZero      = {220, 1, 580, 0};
-const rmt_data_t kRmtPostamble = {220, 1, 135, 0};
+const rmt_symbol_word_t kRmtPreamble  = {960, 1, 790, 0};
+const rmt_symbol_word_t kRmtOne       = {220, 1, 980, 0};
+const rmt_symbol_word_t kRmtZero      = {220, 1, 580, 0};
+const rmt_symbol_word_t kRmtPostamble = {220, 1, 135, 0};
 
 using namespace OpenShock;
 
@@ -16,7 +16,7 @@ size_t Rmt::WellturnT330Encoder::GetBufferSize()
   return 43;
 }
 
-bool Rmt::WellturnT330Encoder::FillBuffer(rmt_data_t* sequence, uint16_t shockerId, ShockerCommandType type, uint8_t intensity)
+bool Rmt::WellturnT330Encoder::FillBuffer(rmt_symbol_word_t* sequence, uint16_t shockerId, ShockerCommandType type, uint8_t intensity)
 {
   // Intensity must be between 0 and 100
   intensity = std::min(intensity, static_cast<uint8_t>(100));

@@ -6,10 +6,10 @@
 
 #include <algorithm>
 
-const rmt_data_t kRmtPreamble  = {1500, 1, 750, 0};
-const rmt_data_t kRmtOne       = {750, 1, 250, 0};
-const rmt_data_t kRmtZero      = {250, 1, 750, 0};
-const rmt_data_t kRmtPostamble = {250, 1, 3750, 0};  // Some subvariants expect a quiet period between commands, this is a last 1 bit followed by a very long pause
+const rmt_symbol_word_t kRmtPreamble  = {1500, 1, 750, 0};
+const rmt_symbol_word_t kRmtOne       = {750, 1, 250, 0};
+const rmt_symbol_word_t kRmtZero      = {250, 1, 750, 0};
+const rmt_symbol_word_t kRmtPostamble = {250, 1, 3750, 0};  // Some subvariants expect a quiet period between commands, this is a last 1 bit followed by a very long pause
 
 using namespace OpenShock;
 
@@ -18,7 +18,7 @@ size_t Rmt::Petrainer998DREncoder::GetBufferSize()
   return 42;
 }
 
-bool Rmt::Petrainer998DREncoder::FillBuffer(rmt_data_t* sequence, uint16_t shockerId, ShockerCommandType type, uint8_t intensity)
+bool Rmt::Petrainer998DREncoder::FillBuffer(rmt_symbol_word_t* sequence, uint16_t shockerId, ShockerCommandType type, uint8_t intensity)
 {
   // Intensity must be between 0 and 100
   intensity = std::min(intensity, static_cast<uint8_t>(100));

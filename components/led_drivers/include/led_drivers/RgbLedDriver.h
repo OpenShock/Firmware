@@ -7,7 +7,8 @@
 
 #include <freertos/task.h>
 
-#include <esp32-hal-rmt.h>
+#include <driver/rmt_encoder.h>
+#include <driver/rmt_tx.h>
 
 #include <atomic>
 #include <cstdint>
@@ -52,5 +53,7 @@ namespace OpenShock {
     TaskHandle_t m_taskHandle;
     SimpleMutex m_taskMutex;
     std::atomic<bool> m_stopRequested {false};
+    rmt_channel_handle_t m_rmtChannel;
+    rmt_encoder_handle_t m_rmtEncoder;
   };
 }  // namespace OpenShock

@@ -4,10 +4,10 @@
 
 #include <algorithm>
 
-const rmt_data_t kRmtPreamble  = {750, 1, 750, 0};
-const rmt_data_t kRmtOne       = {200, 1, 1500, 0};
-const rmt_data_t kRmtZero      = {200, 1, 750, 0};
-const rmt_data_t kRmtPostamble = {200, 1, 7000, 0};
+const rmt_symbol_word_t kRmtPreamble  = {750, 1, 750, 0};
+const rmt_symbol_word_t kRmtOne       = {200, 1, 1500, 0};
+const rmt_symbol_word_t kRmtZero      = {200, 1, 750, 0};
+const rmt_symbol_word_t kRmtPostamble = {200, 1, 7000, 0};
 
 using namespace OpenShock;
 
@@ -16,7 +16,7 @@ size_t Rmt::PetrainerEncoder::GetBufferSize()
   return 42;
 }
 
-bool Rmt::PetrainerEncoder::FillBuffer(rmt_data_t* sequence, uint16_t shockerId, ShockerCommandType type, uint8_t intensity)
+bool Rmt::PetrainerEncoder::FillBuffer(rmt_symbol_word_t* sequence, uint16_t shockerId, ShockerCommandType type, uint8_t intensity)
 {
   // Intensity must be between 0 and 100
   intensity = std::min(intensity, static_cast<uint8_t>(100));

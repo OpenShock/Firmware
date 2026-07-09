@@ -15,7 +15,7 @@ idf_component_register(
   REQUIRES      common                       # Common.h in public headers
                 concurrency                  # SimpleMutex in public headers
                 freertos                     # TaskHandle_t in public headers
-                framework-arduinoespressif32 # esp32-hal-rmt.h in RgbLedDriver.h
+                esp_driver_rmt               # driver/rmt_tx.h, rmt_encoder.h in RgbLedDriver.h
   PRIV_REQUIRES chipset                      # IsValidOutputPin
                 logging                      # OS_LOG*
                 util                         # FnProxy, TaskUtils

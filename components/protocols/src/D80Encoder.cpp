@@ -6,10 +6,10 @@
 
 #include <algorithm>
 
-const rmt_data_t kRmtPreamble  = {1900, 1, 4000, 0};
-const rmt_data_t kRmtOne       = {900, 1, 300, 0};
-const rmt_data_t kRmtZero      = {300, 1, 900, 0};
-const rmt_data_t kRmtPostamble = {200, 1, 2200, 0};
+const rmt_symbol_word_t kRmtPreamble  = {1900, 1, 4000, 0};
+const rmt_symbol_word_t kRmtOne       = {900, 1, 300, 0};
+const rmt_symbol_word_t kRmtZero      = {300, 1, 900, 0};
+const rmt_symbol_word_t kRmtPostamble = {200, 1, 2200, 0};
 
 using namespace OpenShock;
 
@@ -18,7 +18,7 @@ size_t Rmt::D80Encoder::GetBufferSize()
   return 42;
 }
 
-bool Rmt::D80Encoder::FillBuffer(rmt_data_t* sequence, uint16_t shockerId, ShockerCommandType type, uint8_t intensity)
+bool Rmt::D80Encoder::FillBuffer(rmt_symbol_word_t* sequence, uint16_t shockerId, ShockerCommandType type, uint8_t intensity)
 {
   // Intensity must be between 0 and 15, this should mimic the rounding of the original remote which
   // allows you to select from 1-99 when the protocol only has 4 bits for intensity (0-15).

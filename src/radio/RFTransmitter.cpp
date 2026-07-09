@@ -11,6 +11,9 @@ const char* const TAG = "RFTransmitter";
 #include "util/FnProxy.h"
 #include "util/TaskUtils.h"
 
+#include <esp_err.h>
+#include <soc/soc_caps.h>
+
 #include <freertos/queue.h>
 
 #include <vector>
@@ -40,19 +43,37 @@ RFTransmitter::RFTransmitter(gpio_num_t gpioPin)
   : m_txPin(gpioPin)
   , m_queueHandle(nullptr)
   , m_taskHandle(nullptr)
+  , m_rmtChannel(nullptr)
+  , m_rmtEncoder(nullptr)
 {
   OS_LOGD(TAG, "[pin-%hhi] Creating RFTransmitter", m_txPin);
 
-  bool success = rmtInit(gpioPin, RMT_TX_MODE, RMT_MEM_NUM_BLOCKS_1, 1'000'000);  // RMT_MEM_64, 1MHz
-  if (!success) {
-    OS_LOGE(TAG, "[pin-%hhi] Failed to create rmt object", m_txPin);
+  // 1 MHz resolution => 1 us tick (RF protocol timings are in microseconds).
+  rmt_tx_channel_config_t channelConfig = {
+    .gpio_num          = gpioPin,
+    .clk_src           = RMT_CLK_SRC_DEFAULT,
+    .resolution_hz     = 1'000'000,
+    .mem_block_symbols = SOC_RMT_MEM_WORDS_PER_CHANNEL,  // exactly 1 memory block
+    .trans_queue_depth = 4,
+  };
+  esp_err_t err = rmt_new_tx_channel(&channelConfig, &m_rmtChannel);
+  if (err != ESP_OK) {
+    OS_LOGE(TAG, "[pin-%hhi] Failed to create RMT TX channel: %s", m_txPin, esp_err_to_name(err));
     destroy();
     return;
   }
 
-  success = rmtSetEOT(gpioPin, 0);
-  if (!success) {
-    OS_LOGE(TAG, "Failed to set EOT level for pin %hhi", gpioPin);
+  rmt_copy_encoder_config_t encoderConfig = {};
+  err                                     = rmt_new_copy_encoder(&encoderConfig, &m_rmtEncoder);
+  if (err != ESP_OK) {
+    OS_LOGE(TAG, "[pin-%hhi] Failed to create RMT copy encoder: %s", m_txPin, esp_err_to_name(err));
+    destroy();
+    return;
+  }
+
+  err = rmt_enable(m_rmtChannel);
+  if (err != ESP_OK) {
+    OS_LOGE(TAG, "[pin-%hhi] Failed to enable RMT channel: %s", m_txPin, esp_err_to_name(err));
     destroy();
     return;
   }
@@ -146,8 +167,14 @@ void RFTransmitter::destroy()
     vQueueDelete(m_queueHandle);
     m_queueHandle = nullptr;
   }
-  if (m_txPin != GPIO_NUM_NC) {
-    rmtDeinit(m_txPin);
+  if (m_rmtChannel != nullptr) {
+    rmt_disable(m_rmtChannel);
+    rmt_del_channel(m_rmtChannel);
+    m_rmtChannel = nullptr;
+  }
+  if (m_rmtEncoder != nullptr) {
+    rmt_del_encoder(m_rmtEncoder);
+    m_rmtEncoder = nullptr;
   }
 }
 
@@ -176,15 +203,19 @@ static bool modifySequence(std::vector<Rmt::Sequence>& sequences, ShockerModelTy
   return false;
 }
 
-static void writeSequences(gpio_num_t m_txPin, std::vector<Rmt::Sequence>& sequences)
+static void writeSequences(rmt_channel_handle_t channel, rmt_encoder_handle_t encoder, std::vector<Rmt::Sequence>& sequences)
 {
+  rmt_transmit_config_t txConfig = {};
+  txConfig.flags.eot_level       = 0;
+
   // Send queued commands
   for (auto seq = sequences.begin(); seq != sequences.end();) {
     int64_t timeToLive = seq->transmitEnd() - OpenShock::millis();
 
     if (timeToLive > 0) {
       // Send the command
-      rmtWrite(m_txPin, seq->payload(), seq->size(), kRmtTimeoutMs);
+      rmt_transmit(channel, encoder, seq->payload(), seq->size() * sizeof(rmt_symbol_word_t), &txConfig);
+      rmt_tx_wait_all_done(channel, kRmtTimeoutMs);
     } else {
       // Remove command if it has sent out its termination sequence for long enough
       if (timeToLive <= -kTerminatorDurationMs) {
@@ -193,7 +224,8 @@ static void writeSequences(gpio_num_t m_txPin, std::vector<Rmt::Sequence>& seque
       }
 
       // Send the termination sequence to stop the shocker
-      rmtWrite(m_txPin, seq->terminator(), seq->size(), kRmtTimeoutMs);
+      rmt_transmit(channel, encoder, seq->terminator(), seq->size() * sizeof(rmt_symbol_word_t), &txConfig);
+      rmt_tx_wait_all_done(channel, kRmtTimeoutMs);
     }
 
     // Move to the next command
@@ -253,7 +285,7 @@ void RFTransmitter::TransmitTask()
       }
     }
 
-    writeSequences(m_txPin, sequences);
+    writeSequences(m_rmtChannel, m_rmtEncoder, sequences);
   }
 
 exit:  // Locals (sequences) destruct here before task deletion
