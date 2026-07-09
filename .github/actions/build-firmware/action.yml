@@ -31,6 +31,15 @@ runs:
       # schedule/dispatch builds bake in an empty date.
       run: |
         export OPENSHOCK_FW_BUILD_DATE="$(git show -s --format=%cI HEAD 2>/dev/null || date -u +%Y-%m-%dT%H:%M:%SZ)"
+        # Pre-build the bootloader with a single job first. Under parallel SCons
+        # jobs the ESP-IDF bootloader link (bootloader.elf) can start before its
+        # own "Preprocessing linker script" step has written bootloader.ld,
+        # failing intermittently with "cannot open linker script file
+        # bootloader.ld". A serial bootloader-only pass generates that script
+        # deterministically; the full parallel build below then reuses the
+        # now up-to-date bootloader and never hits the race. `|| true` keeps this
+        # a best-effort guard if a future platform renames the target.
+        pio run -e ${{ inputs.board }} -t bootloader -j 1 || true
         pio run -e ${{ inputs.board }}
       env:
         OPENSHOCK_FW_VERSION: ${{ inputs.version }}
