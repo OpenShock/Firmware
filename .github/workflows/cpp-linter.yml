@@ -43,6 +43,8 @@ jobs:
           ignore: |
             .github
             include/serialization/_fbs
+            components/littlefs
+            managed_components
           # Commit comments (push events) need contents:write, which this job
           # deliberately does not grant; only post thread comments on PRs, where
           # pull-requests:write applies. Otherwise the action 403s and fails the
