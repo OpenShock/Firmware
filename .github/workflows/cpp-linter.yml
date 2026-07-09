@@ -5,6 +5,9 @@ on:
     types: [opened, reopened, synchronize]
     paths: ['**.c', '**.h', '**.cpp', '**.hpp', '.clang-format', '.github/workflows/cpp-linter.yml']
   push:
+    # Branch-scoped: path filters are ignored for tag pushes, so without this a
+    # release tag would trigger a full compiledb build + hard-failing lint.
+    branches: [develop, beta, master]
     paths: ['**.c', '**.h', '**.cpp', '**.hpp', '.clang-format', '.github/workflows/cpp-linter.yml']
   workflow_dispatch: # Manually invoked by user.
 
@@ -13,17 +16,13 @@ concurrency:
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
-  get-vars:
-    uses: ./.github/workflows/get-vars.yml
-
   cpp-linter:
     name: C/C++ Linter
     runs-on: ubuntu-latest
     timeout-minutes: 10
-    needs: get-vars
 
     permissions:
-      contents: write
+      contents: read
       pull-requests: write
     
     steps:
@@ -33,7 +32,6 @@ jobs:
       - uses: ./.github/actions/build-compilationdb
         with:
           version: 0.0.0-test+build # Doesn't matter, just need the compilation database
-          skip-checkout: true
       
       - uses: cpp-linter/cpp-linter-action@8e85cd02c8c3fe3ae527c94b5683fe2366b144ed  # v2.20.0
         id: linter
@@ -45,12 +43,15 @@ jobs:
           ignore: |
             .github
             include/serialization/_fbs
-          thread-comments: update
+          # Commit comments (push events) need contents:write, which this job
+          # deliberately does not grant; only post thread comments on PRs, where
+          # pull-requests:write applies. Otherwise the action 403s and fails the
+          # job even when the lint is clean.
+          thread-comments: ${{ github.event_name == 'pull_request' && 'update' || 'false' }}
           no-lgtm: false
 
       - name: Fail fast?!
         if: steps.linter.outputs.checks-failed > 0
         run: |
-          echo "Some files failed the linting checks!"
-        # for actual deployment
-        # run: exit 1
+          echo "::error::Some files failed the linting checks!"
+          exit 1

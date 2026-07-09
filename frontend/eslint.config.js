@@ -25,6 +25,8 @@ export default defineConfig(
       // typescript-eslint strongly recommend that you do not use the no-undef lint rule on TypeScript projects.
       // see: https://typescript-eslint.io/troubleshooting/faqs/eslint/#i-get-errors-from-the-no-undef-rule-about-global-variables-not-being-defined-even-though-there-are-no-typescript-errors
       'no-undef': 'off',
+      'no-control-regex': 'off',
+      'no-misleading-character-class': 'off',
       'no-useless-assignment': 'warn',
       'svelte/no-unused-svelte-ignore': 'off',
       '@typescript-eslint/no-unused-vars': [
@@ -44,26 +46,6 @@ export default defineConfig(
     },
   },
   {
-    files: ['**/*.svelte'],
-
-    languageOptions: {
-      parserOptions: {
-        parser: ts.parser,
-        ecmaVersion: 2020,
-      },
-    },
-  },
-  {
-    files: ['**/*.svelte.ts', '**/*.svelte.js'],
-
-    languageOptions: {
-      parser: ts.parser,
-      parserOptions: {
-        ecmaVersion: 2020,
-      },
-    },
-  },
-  {
     ignores: [
       '.DS_Store',
       'node_modules',
@@ -78,6 +60,8 @@ export default defineConfig(
       'yarn.lock',
       'src/lib/_fbs',
       'src/lib/components/ui',
+      // Workspace packages (e.g. svelte-core submodule) own their own linting
+      'packages/**',
     ],
   }
 );

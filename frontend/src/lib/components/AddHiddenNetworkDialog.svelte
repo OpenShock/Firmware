@@ -1,6 +1,6 @@
 <script lang="ts">
   import { saveWifiNetwork } from '$lib/api';
-  import { Button, buttonVariants } from '$lib/components/ui/button';
+  import { Button, buttonVariants } from '@openshock/svelte-core/components/ui/button';
   import {
     Dialog,
     DialogContent,
@@ -9,9 +9,9 @@
     DialogHeader,
     DialogTitle,
     DialogTrigger,
-  } from '$lib/components/ui/dialog';
-  import { Input } from '$lib/components/ui/input';
-  import { Label } from '$lib/components/ui/label';
+  } from '@openshock/svelte-core/components/ui/dialog';
+  import { Input } from '@openshock/svelte-core/components/ui/input';
+  import { Label } from '@openshock/svelte-core/components/ui/label';
   import { Plus } from '@lucide/svelte';
 
   const securityOptions = [
@@ -59,9 +59,7 @@
   <DialogContent class="sm:max-w-[425px]">
     <DialogHeader>
       <DialogTitle>Add Hidden Network</DialogTitle>
-      <DialogDescription>
-        Enter the details for a hidden WiFi network
-      </DialogDescription>
+      <DialogDescription>Enter the details for a hidden WiFi network</DialogDescription>
     </DialogHeader>
     <div class="flex flex-col gap-4 py-4">
       <div class="flex flex-row items-center gap-4">
@@ -75,7 +73,7 @@
           class="border-input bg-background ring-offset-background placeholder:text-muted-foreground focus-visible:ring-ring flex h-10 w-full flex-1 rounded-md border px-3 py-2 text-sm focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:outline-none"
           bind:value={security}
         >
-          {#each securityOptions as opt}
+          {#each securityOptions as opt (opt.value)}
             <option value={opt.value}>{opt.label}</option>
           {/each}
         </select>

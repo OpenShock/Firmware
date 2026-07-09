@@ -21,12 +21,11 @@ if (!isGitTag && !isGitBranch && !isGitPullRequest) {
 }
 
 const gitCommitHash = process.env.GITHUB_SHA;
-const gitShortCommitHash = gitCommitHash.substring(0, 8);
-
 if (gitCommitHash === undefined) {
   setFailed('Environment variable "GITHUB_SHA" not found');
   process.exit();
 }
+const gitShortCommitHash = gitCommitHash.substring(0, 8);
 
 const gitHeadRefName = isGitPullRequest ? process.env.GITHUB_HEAD_REF : gitRef.split('/')[2];
 if (gitHeadRefName === undefined) {
@@ -38,13 +37,11 @@ const gitTagsList = child_process
   .execSync('git for-each-ref --sort=-creatordate --format "%(refname:short)" refs/tags')
   .toString()
   .trim();
-if (gitTagsList === undefined) {
-  setFailed('Failed to get latest git tag');
-  process.exit();
-}
 
-function convertGitTagToSemver(tag) {
-  const parsed = semver.parse(tag === '' ? '0.0.0' : tag);
+// The current tag on a tag build is authoritative: an unparseable value here is
+// a hard failure, since we cannot derive a version from it.
+function parseCurrentTag(tag) {
+  const parsed = semver.parse(tag);
   if (parsed === null || parsed.loose) {
     setFailed(`Git tag "${tag}" is not a valid semver version`);
     process.exit();
@@ -53,9 +50,23 @@ function convertGitTagToSemver(tag) {
   return parsed;
 }
 
-const gitTagsArray = gitTagsList.split('\n').map((tag) => tag.trim());
-const releasesArray = gitTagsArray.map(convertGitTagToSemver);
-const latestRelease = isGitTag ? convertGitTagToSemver(gitRef.split('/')[2]) : releasesArray[0];
+const gitTagsArray = gitTagsList
+  .split('\n')
+  .map((tag) => tag.trim())
+  .filter((tag) => tag !== '');
+
+// Existing repo tags are best-effort: silently skip any that are not strict
+// semver (legacy or malformed tags) rather than failing the entire build, which
+// convertGitTagToSemver used to do on the first bad tag it mapped over.
+const releasesArray = gitTagsArray
+  .map((tag) => semver.parse(tag))
+  .filter((parsed) => parsed !== null && !parsed.loose);
+
+// Fall back to 0.0.0 when there are no valid tags yet (fresh repo / all tags
+// filtered out).
+const latestRelease = isGitTag
+  ? parseCurrentTag(gitRef.split('/')[2])
+  : (releasesArray[0] ?? semver.parse('0.0.0'));
 
 function isStableRelease(release) {
   return release.prerelease.length === 0 || release.prerelease[0] === 'stable';
@@ -66,10 +77,6 @@ function isBetaRelease(release) {
 function isDevRelease(release) {
   return release.prerelease.length > 0 && ['dev', 'develop'].includes(release.prerelease[0]);
 }
-
-const stableReleasesArray = releasesArray.filter(isStableRelease);
-const betaReleasesArray = releasesArray.filter(isBetaRelease);
-const devReleasesArray = releasesArray.filter(isDevRelease);
 
 // Build version string.
 //
@@ -123,117 +130,17 @@ if (gitHeadRefName === 'master' || (isGitTag && isStableRelease(latestRelease)))
   currentChannel = gitHeadRefName.replace(/[^a-zA-Z0-9-]/g, '-').replace(/^\-+|\-+$/g, '');
 }
 
-function getVersionChangeLog(lines) {
-  const isStableTag = isGitTag && isStableRelease(latestRelease);
-  const emptyChangelog = lines.length === 0;
+// CHANGELOG.md validation lives in release-tool (mode: check, see
+// check-changes.yml); get-vars only derives the version, channel and boards.
 
-  // Only stable tags require changelog entries
-  if (isStableTag && emptyChangelog) {
-    setFailed('File "CHANGELOG.md" is empty, this must be populated for stable releases');
-    process.exit();
-  }
-
-  if (emptyChangelog) {
-    return '';
-  }
-
-  // Simple validation of the changelog
-  if (!lines[0].startsWith('# Version ')) {
-    setFailed(
-      'File "CHANGELOG.md" must start with "# Version <version>" followed by a changelog entry'
-    );
-    process.exit();
-  }
-
-  // Get the start of the entry
-  const changeLogBegin = lines.findIndex((line) => line.startsWith(`# Version ${currentVersion}`));
-  if (isStableTag && changeLogBegin === -1) {
-    setFailed(
-      `File "CHANGELOG.md" does not contain a changelog entry for version "${currentVersion}"`
-    );
-    process.exit();
-  }
-
-  // RC/beta/dev tags may not have a changelog entry - that's fine
-  if (changeLogBegin === -1) {
-    return '';
-  }
-
-  // Enforce that the changelog entry is at the top of the file for stable releases
-  if (isStableTag && changeLogBegin !== 0) {
-    setFailed(
-      `Changelog entry for version "${currentVersion}" is not at the top of the file`
-    );
-    process.exit();
-  }
-
-  // Get the end of the entry
-  let changeLogEnd = lines
-    .slice(changeLogBegin + 1)
-    .findIndex((line) => line.startsWith('# Version '));
-  if (changeLogEnd === -1) {
-    changeLogEnd = lines.length;
-  } else {
-    changeLogEnd += changeLogBegin + 1;
-  }
-
-  const emptyChangelogEntry =
-    lines.slice(changeLogBegin + 1, changeLogEnd).filter((line) => line.trim() !== '').length === 0;
-
-  if (isStableTag && emptyChangelogEntry) {
-    setFailed(
-      `Changelog entry for version "${currentVersion}" is empty`
-    );
-    process.exit();
-  }
-
-  return lines.slice(changeLogBegin + 1, changeLogEnd).join('\n');
-}
-
-// Make sure we have all the files we need
-for (const file of ['RELEASE.md', 'CHANGELOG.md', 'platformio.ini']) {
-  if (!fs.existsSync(file)) {
-    setFailed(`File "${file}" not found`);
-    process.exit();
-  }
-}
-
-// Read files
-let releaseNotes = fs.readFileSync('RELEASE.md', 'utf8');
-const fullChangelog = fs.readFileSync('CHANGELOG.md', 'utf8').trim();
-const platformioIniStr = fs.readFileSync('platformio.ini', 'utf8').trim();
-
-const fullChangelogLines = fullChangelog.split('\n');
-
-// Get all versions from the changelog
-const changelogVersions = fullChangelogLines
-  .filter((line) => line.startsWith('# Version '))
-  .map((line) => line.substring(10).split(' ')[0].trim());
-
-// Get the changelog for the current version
-const versionChangeLog = getVersionChangeLog(fullChangelogLines);
-
-// Enforce that all stable tags exist in the changelog (RC/beta/dev tags are excluded)
-let missingTags = [];
-for (const tag of gitTagsArray) {
-  const parsed = semver.parse(tag);
-  if (!parsed || !isStableRelease(parsed)) continue; // Skip non-stable pre-release tags
-  if (!changelogVersions.includes(tag)) {
-    missingTags.push(tag);
-  }
-}
-if (missingTags.length > 0) {
-  setFailed(`Changelog is missing the following stable tags: ${missingTags.join(', ')}`);
+// Make sure we have the files we need
+if (!fs.existsSync('platformio.ini')) {
+  setFailed('File "platformio.ini" not found');
   process.exit();
 }
 
-// Finish building the release string
-if (versionChangeLog !== '') {
-  releaseNotes =
-    `# OpenShock Firmware ${currentVersion}\n\n${versionChangeLog}\n\n${releaseNotes}`.trim();
-} else {
-  releaseNotes = `# OpenShock Firmware ${currentVersion}\n\n${releaseNotes}`.trim();
-}
+// Read files
+const platformioIniStr = fs.readFileSync('platformio.ini', 'utf8').trim();
 
 // Parse platformio.ini and extract the different boards
 const platformioIni = ini.parse(platformioIniStr);
@@ -246,30 +153,13 @@ const boards = Object.keys(platformioIni)
     return arr;
   }, []);
 
-const shouldDeploy = isGitTag || (isGitBranch && gitHeadRefName === 'develop');
-
 console.log('Version:  ' + currentVersion);
 console.log('Channel:  ' + currentChannel);
 console.log('Boards:   ' + boards.join(', '));
-console.log('Deploy:   ' + shouldDeploy);
 console.log('Tags:     ' + gitTagsArray.join(', '));
-console.log('Stable:   ' + stableReleasesArray.join(', '));
-console.log('Beta:     ' + betaReleasesArray.join(', '));
-console.log('Dev:      ' + devReleasesArray.join(', '));
 
 // Set outputs
 setOutput('version', currentVersion);
-setOutput('changelog', versionChangeLog);
-setOutput('release-notes', releaseNotes);
 setOutput('release-channel', currentChannel);
-setOutput('full-changelog', fullChangelog);
 setOutput('board-list', boards.join('\n'));
-setOutput('board-array', JSON.stringify(boards));
 setOutput('board-matrix', JSON.stringify({ board: boards }));
-setOutput('should-deploy', shouldDeploy);
-setOutput('release-stable-list', stableReleasesArray.join('\n'));
-setOutput('release-stable-array', JSON.stringify(stableReleasesArray));
-setOutput('release-beta-list', betaReleasesArray.join('\n'));
-setOutput('release-beta-array', JSON.stringify(betaReleasesArray));
-setOutput('release-dev-list', devReleasesArray.join('\n'));
-setOutput('release-dev-array', JSON.stringify(devReleasesArray));

@@ -1,38 +1,175 @@
 on:
+  # develop, beta and master all build on every push (paths-ignore skips
+  # docs/meta-only changes). develop also keeps a nightly schedule. Release
+  # tags always build.
   push:
     branches:
       - develop
+      - beta
+      - master
     tags:
       - '[0-9]+.[0-9]+.[0-9]+'
       - '[0-9]+.[0-9]+.[0-9]+-*'
+    # paths-ignore applies to branch pushes only; GitHub does not evaluate it
+    # for tag pushes, so release tags always build. A develop push is skipped
+    # only when EVERY changed file matches one of these (docs, tooling, tests).
+    paths-ignore:
+      - '**/*.md'
+      - 'docs/**'
+      - 'LICENSE'
+      - '**/.gitkeep'
+      - '.claude/**'
+      - '.github/ISSUE_TEMPLATE/**'
+      - '.github/dependabot.yml'
+      # schemas is a dev-only submodule used to regenerate committed code via the
+      # scripts/ tooling below; no CI build checks it out, so a pointer bump alone
+      # changes nothing. Regenerated output is committed elsewhere and still builds.
+      - 'schemas'
+      - 'schemas/**'
+      - 'scripts/fetch_flatc.py'
+      - 'scripts/generate_schemas.py'
+      - 'scripts/flatc'
+      - 'scripts/flatc.exe'
   pull_request:
     branches:
       - master
       - beta
       - develop
     types: [opened, reopened, synchronize]
-  workflow_dispatch: # Manually invoked by user.
+  workflow_dispatch: # Manually invoked, e.g. to force a develop build.
+  schedule:
+    - cron: '0 3 * * *' # Nightly develop build; the gate job skips it if idle.
 
 name: ci-build
 
+# Per-ref: different branches (and tags) build and deploy concurrently. A PR
+# cancels its own superseded runs; branch/tag runs queue per ref. The only thing
+# that must not run concurrently across refs - advancing the shared channel
+# pointer files - is serialized separately in its own global-concurrency job
+# (cdn-bump), so uploads to distinct /<version>/ paths stay parallel.
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+# Least-privilege default for every job. Jobs that need more (actions:read on the
+# gate, contents:write + id-token:write on release/announce) opt up explicitly.
+permissions:
+  contents: read
 
 env:
   PYTHON_VERSION: 3.13
 
 jobs:
+  # Decides what this run does:
+  #   build  - run the build matrix (any branch push, PRs, release tags)
+  #   deploy - run cdn-deploy (release tags; nightly/manual develop deploy)
+  # develop/beta/master pushes build but do not deploy. schedule (develop) and a
+  # manual dispatch on develop rebuild and deploy; the nightly is skipped when
+  # develop has not advanced since the last one. deploy always implies build.
+  gate:
+    runs-on: ubuntu-slim # lightweight: one github-script step, no checkout/install
+    timeout-minutes: 3
+    permissions:
+      contents: read
+      actions: read
+    outputs:
+      build: ${{ steps.decide.outputs.build }}
+      deploy: ${{ steps.decide.outputs.deploy }}
+    steps:
+      # Decide what this run does. Inlined as github-script (which preloads
+      # octokit + core) so the gate needs no checkout, no pnpm install and no
+      # node_modules on the critical path of every push/PR.
+      #   push (branch)     -> build; push (tag) -> build + deploy
+      #   pull_request      -> build
+      #   schedule          -> rebuild + deploy develop, only when it advanced
+      #                        since the last develop deploy
+      #   workflow_dispatch -> build; also deploy when run on develop
+      # deploy always implies build.
+      - name: Decide build vs deploy
+        id: decide
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3  # v9.0.0
+        with:
+          script: |
+            const { eventName, ref, sha } = context;
+            const { owner, repo } = context.repo;
+
+            // HEAD deployed by the most recent develop deploy - a nightly
+            // (schedule) or a manual dispatch of develop - or '' (also on API
+            // error, so a transient hiccup degrades to "treat as changed" and
+            // deploys rather than wrongly skipping). Both event types are
+            // considered so a manual deploy is not invisible to the next nightly.
+            async function lastDeploySha() {
+              const latestRunFor = async (event) => {
+                const { data } = await github.rest.actions.listWorkflowRuns({
+                  owner,
+                  repo,
+                  workflow_id: 'ci-build.yml',
+                  event,
+                  branch: 'develop',
+                  status: 'success',
+                  per_page: 1,
+                });
+                return data.workflow_runs[0];
+              };
+              try {
+                const runs = (
+                  await Promise.all([latestRunFor('schedule'), latestRunFor('workflow_dispatch')])
+                ).filter(Boolean);
+                if (runs.length === 0) return '';
+                runs.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+                return runs[0].head_sha ?? '';
+              } catch (err) {
+                core.warning(`Could not read the last develop deploy: ${err.message}`);
+                return '';
+              }
+            }
+
+            let build = false;
+            let deploy = false;
+
+            switch (eventName) {
+              case 'pull_request':
+                build = true;
+                break;
+              case 'push':
+                build = true;
+                if (ref.startsWith('refs/tags/')) deploy = true;
+                break;
+              case 'schedule':
+                if (sha !== (await lastDeploySha())) {
+                  build = true;
+                  deploy = true;
+                } else {
+                  core.notice(`develop unchanged since last deploy (${sha}); nothing to deploy.`);
+                }
+                break;
+              case 'workflow_dispatch':
+                build = true;
+                if (ref === 'refs/heads/develop') deploy = true;
+                break;
+              default:
+                build = true;
+            }
+
+            core.setOutput('build', build);
+            core.setOutput('deploy', deploy);
+            core.info(`decision: build=${build} deploy=${deploy}`);
+
   getvars:
+    needs: [gate]
+    if: ${{ needs.gate.outputs.build == 'true' || needs.gate.outputs.deploy == 'true' }}
     uses: ./.github/workflows/get-vars.yml
 
   build-frontend:
+    needs: [gate]
+    if: ${{ needs.gate.outputs.build == 'true' }}
     runs-on: ubuntu-latest
     timeout-minutes: 5
 
     steps:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0  # v7.0.0
         with:
+          submodules: recursive
           sparse-checkout: |
             .github
             frontend
@@ -49,11 +186,11 @@ jobs:
       - uses: ./.github/actions/build-staticfs
         with:
           version: ${{ needs.getvars.outputs.version }}
-          skip-checkout: true
 
   build-firmware:
     runs-on: ubuntu-latest
-    needs: [getvars]
+    needs: [gate, getvars]
+    if: ${{ needs.gate.outputs.build == 'true' }}
     timeout-minutes: 10
     strategy:
       fail-fast: false
@@ -66,7 +203,6 @@ jobs:
         with:
           board: ${{ matrix.board }}
           version: ${{ needs.getvars.outputs.version }}
-          skip-checkout: true
 
   merge-partitions:
     runs-on: ubuntu-latest
@@ -89,24 +225,32 @@ jobs:
         with:
           version: ${{ needs.getvars.outputs.version }}
           board: ${{ matrix.board }}
-          skip-checkout: true
 
   checkpoint-build:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-slim # lightweight: barrier job, just an echo
     needs: [merge-partitions]
     timeout-minutes: 1
     steps:
       - run: echo "Builds checkpoint reached"
 
-  cdn-upload-firmware:
+  # A single job owns the whole CDN deployment. Every job that declares
+  # `environment:` produces one GitHub deployment record, and matrix legs each
+  # count separately, so the old split (matrix upload + version-info + bump)
+  # created `boards + 2` deployments per run. Collapsing the work into one
+  # non-matrix job yields exactly one deployment per run. The CDN secrets/vars
+  # are environment-scoped, so this job must keep `environment: cdn` to read
+  # them; the environment's only protection rule is a branch policy, so nothing
+  # is gated away by merging the jobs.
+  cdn-deploy:
     runs-on: ubuntu-latest
-    needs: [getvars, checkpoint-build]
-    timeout-minutes: 15
-    if: ${{ needs.getvars.outputs.should-deploy == 'true' }}
-    environment: cdn-firmware-r2
-    strategy:
-      fail-fast: true
-      matrix: ${{ fromJson(needs.getvars.outputs.board-matrix) }}
+    needs: [gate, getvars, checkpoint-build]
+    timeout-minutes: 20
+    # Deploy on release tags and on nightly/manual develop deploys. deploy always
+    # implies build, so checkpoint-build has run and gates this via needs.
+    if: ${{ needs.gate.outputs.deploy == 'true' }}
+    environment: cdn
+    permissions:
+      contents: read
 
     steps:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0  # v7.0.0
@@ -114,39 +258,42 @@ jobs:
           sparse-checkout: |
             .github
 
-      # Set up rclone for CDN uploads.
-      - uses: ./.github/actions/cdn-prepare
-        with:
-          bunny-ssh-knownhosts: ${{ vars.BUNNY_SSH_KNOWNHOSTS }}
+      # A beta/master deploy must have a draft release staged by release.yml for
+      # this version; otherwise a stray tag push could publish firmware to the
+      # CDN. develop has no releases, so it is exempt.
+      - name: Require a staged draft release (beta/master only)
+        if: ${{ needs.getvars.outputs.release-channel != 'develop' }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          TAG: ${{ needs.getvars.outputs.version }}
+        run: |
+          set -euo pipefail
+          # release.yml pushes the tag (which triggers this run) and only then
+          # stages the draft, so poll for up to ~60s rather than failing on the
+          # brief window before the draft exists.
+          for attempt in $(seq 1 12); do
+            isDraft=$(gh release view "$TAG" --repo "$REPO" --json isDraft --jq '.isDraft' 2>/dev/null || echo "missing")
+            if [ "$isDraft" = "true" ]; then
+              echo "Draft release for $TAG is staged."
+              exit 0
+            fi
+            echo "Draft for $TAG not staged yet (state: $isDraft); retry $attempt/12..."
+            sleep 5
+          done
+          echo "::error::No draft release for $TAG after ~60s. release.yml must stage the draft before the CDN upload runs."
+          exit 1
 
-      # Upload firmware to CDN.
+      # Upload every board's firmware to the CDN.
       - uses: ./.github/actions/cdn-upload-firmware
         with:
           bunny-stor-hostname: ${{ vars.BUNNY_STOR_HOSTNAME }}
           bunny-stor-username: ${{ secrets.BUNNY_STOR_USERNAME }}
           bunny-stor-password: ${{ secrets.BUNNY_STOR_PASSWORD }}
           fw-version: ${{ needs.getvars.outputs.version }}
-          board: ${{ matrix.board }}
+          boards: ${{ needs.getvars.outputs.board-list }}
 
-  cdn-upload-version-info:
-    runs-on: ubuntu-latest
-    needs: [getvars, checkpoint-build]
-    timeout-minutes: 10
-    if: ${{ needs.getvars.outputs.should-deploy == 'true' }}
-    environment: cdn-firmware-r2
-
-    steps:
-      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0  # v7.0.0
-        with:
-          sparse-checkout: |
-            .github
-
-      # Set up rclone for CDN uploads.
-      - uses: ./.github/actions/cdn-prepare
-        with:
-          bunny-ssh-knownhosts: ${{ vars.BUNNY_SSH_KNOWNHOSTS }}
-
-      # Upload firmware to CDN.
+      # Upload the version manifest (boards.txt) alongside the firmware.
       - uses: ./.github/actions/cdn-upload-version-info
         with:
           bunny-stor-hostname: ${{ vars.BUNNY_STOR_HOSTNAME }}
@@ -156,24 +303,39 @@ jobs:
           release-channel: ${{ needs.getvars.outputs.release-channel }}
           boards: ${{ needs.getvars.outputs.board-list }}
 
-  cdn-bump-version:
+  # Advancing the channel pointer files (version-<channel>.txt) is a read-modify-
+  # write on state shared across every branch and channel, so it must never run
+  # concurrently with another deploy. Its own global concurrency group serializes
+  # every bump repo-wide, independent of the per-ref build/deploy above.
+  cdn-bump:
     runs-on: ubuntu-latest
-    needs: [getvars, cdn-upload-firmware] # only after version is complete
+    needs: [getvars, cdn-deploy, release]
     timeout-minutes: 5
-    environment: cdn-firmware-r2
+    # Advance the pointer (the actual rollout to devices) only after the release
+    # is finalized: cdn-deploy uploaded the firmware, and on a tag the release
+    # job attached the binaries and published. release is skipped on develop
+    # deploys, which must still bump - hence the skipped branch.
+    if: >-
+      !cancelled()
+      && needs.cdn-deploy.result == 'success'
+      && (needs.release.result == 'success' || needs.release.result == 'skipped')
+    environment: cdn
+    permissions:
+      contents: read
+    concurrency:
+      group: cdn-version-bump
+      cancel-in-progress: false
 
     steps:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0  # v7.0.0
         with:
+          # Full history so cdn-bump-version can resolve the commit date of the
+          # version currently pinned on the develop channel (X.Y.Z-develop+<sha>)
+          # and only advance the pointer to a strictly newer commit.
+          fetch-depth: 0
           sparse-checkout: |
             .github
 
-      # Set up rclone for CDN uploads.
-      - uses: ./.github/actions/cdn-prepare
-        with:
-          bunny-ssh-knownhosts: ${{ vars.BUNNY_SSH_KNOWNHOSTS }}
-
-      # Upload firmware to CDN.
       - uses: ./.github/actions/cdn-bump-version
         with:
           bunny-stor-hostname: ${{ vars.BUNNY_STOR_HOSTNAME }}
@@ -184,31 +346,95 @@ jobs:
           version: ${{ needs.getvars.outputs.version }}
           release-channel: ${{ needs.getvars.outputs.release-channel }}
 
-  checkpoint-cdn:
-    runs-on: ubuntu-latest
-    needs: [cdn-upload-firmware, cdn-upload-version-info, cdn-bump-version]
-    timeout-minutes: 1
-    steps:
-      - run: echo "CDN checkpoint reached"
-
   release:
     runs-on: ubuntu-latest
-    needs: [getvars, checkpoint-cdn]
-    timeout-minutes: 1
+    needs: [getvars, cdn-deploy]
+    timeout-minutes: 5
     if: (needs.getvars.outputs.release-channel == 'stable' || needs.getvars.outputs.release-channel == 'beta')
+    permissions:
+      contents: write
 
     steps:
+      # Only the merged, flashable binaries are needed here; downloading every
+      # artifact (frontend, per-board partitions, staticfs) just to glob for the
+      # merged images is wasteful.
       - name: Download release artifacts
         uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c  # v8.0.1
+        with:
+          pattern: firmware_merged_*
 
       - name: Display artifacts
         run: ls -R
 
-      - name: Release
-        uses: ncipollo/release-action@339a81892b84b4eeb0f6e744e4574d79d0d9b8dd  # v1.21.0
-        with:
-          artifacts: '**/OpenShock_*.bin'
-          tag: ${{ needs.getvars.outputs.version }}
-          prerelease: ${{ needs.getvars.outputs.release-channel != 'stable' }}
-          artifactErrorsFailBuild: true
-          body: ${{ needs.getvars.outputs.release-notes }}
+      # release.yml staged the draft release for this tag with the title and
+      # notes. Here we attach the freshly built binaries and then publish the
+      # draft - so the GitHub release goes live only once its binaries exist and
+      # the build/deploy succeeded. The API announcement is deliberately deferred
+      # to the `announce` job, which runs only after cdn-bump advances the device
+      # channel pointer, so the API is never told about a release before devices
+      # can actually pull it.
+      - name: Upload binaries to staged release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          TAG: ${{ needs.getvars.outputs.version }}
+        run: |
+          shopt -s globstar nullglob
+          files=(**/OpenShock_*.bin)
+          if [ ${#files[@]} -eq 0 ]; then
+            echo "::error::No firmware binaries found to upload"
+            exit 1
+          fi
+          gh release upload "$TAG" "${files[@]}" --clobber
+
+      # Solidify: binaries are attached and firmware is on the CDN - now publish
+      # the draft. cdn-bump then advances the channel pointer, devices begin
+      # updating, and only then does the announce job notify the API.
+      - name: Publish the release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          TAG: ${{ needs.getvars.outputs.version }}
+        run: gh release edit "$TAG" --draft=false
+
+  # Announce the release to the OpenShock API last of all - only after cdn-bump
+  # has advanced the device-facing channel pointer, so the API never leads the
+  # rollout (a device asked to update by the API could otherwise find the pointer
+  # not yet moved). Only stable/beta produce a release (and thus a release.json);
+  # develop deploys have no release to announce, so this job is scoped out there.
+  announce:
+    runs-on: ubuntu-slim # lightweight: gh + curl only
+    needs: [getvars, cdn-bump]
+    timeout-minutes: 5
+    if: >-
+      !cancelled()
+      && needs.cdn-bump.result == 'success'
+      && vars.OPENSHOCK_API_URL != ''
+      && (needs.getvars.outputs.release-channel == 'stable' || needs.getvars.outputs.release-channel == 'beta')
+    permissions:
+      contents: read
+      id-token: write
+
+    steps:
+      # release.json was staged as a release asset by release.yml.
+      - name: Announce release to OpenShock API
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          API_URL: ${{ vars.OPENSHOCK_API_URL }}
+          TAG: ${{ needs.getvars.outputs.version }}
+        run: |
+          set -euo pipefail
+          gh release download "$TAG" --pattern release.json --dir .
+          OIDC_TOKEN=$(curl -sLS \
+            -H "Authorization: bearer $ACTIONS_ID_TOKEN_REQUEST_TOKEN" \
+            "$ACTIONS_ID_TOKEN_REQUEST_URL&audience=openshock-release-ingest" \
+            | jq -r .value)
+          if [ -z "$OIDC_TOKEN" ] || [ "$OIDC_TOKEN" = "null" ]; then
+            echo "::error::Failed to fetch GitHub OIDC token"
+            exit 1
+          fi
+          curl -fsSL --retry 3 --retry-delay 5 -X POST "$API_URL/1/public/releases" \
+            -H "Authorization: Bearer $OIDC_TOKEN" \
+            -H "Content-Type: application/json" \
+            --data-binary @release.json

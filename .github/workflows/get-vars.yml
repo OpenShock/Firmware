@@ -11,71 +11,27 @@ on:
       version:
         description: 'The current version of the project, e.g.  1.0.0-rc.1+build.1'
         value: ${{ jobs.get-vars.outputs.version }}
-      changelog:
-        description: 'The changelog for the current version'
-        value: ${{ jobs.get-vars.outputs.changelog }}
-      release-notes:
-        description: 'The release notes for the current version (changelog + contents of RELEASE.md)'
-        value: ${{ jobs.get-vars.outputs.release-notes }}
       release-channel:
         description: 'The release channel for the current version (stable, beta, dev)'
         value: ${{ jobs.get-vars.outputs.release-channel }}
-      full-changelog:
-        description: 'The complete changelog for all versions ever released'
-        value: ${{ jobs.get-vars.outputs.full-changelog }}
       board-list:
         description: 'Newline-separated list of boards to build'
         value: ${{ jobs.get-vars.outputs.board-list }}
-      board-array:
-        description: 'JSON array of boards to build'
-        value: ${{ jobs.get-vars.outputs.board-array }}
       board-matrix:
         description: 'JSON matrix of boards to build'
         value: ${{ jobs.get-vars.outputs.board-matrix }}
-      should-deploy:
-        description: 'Whether to deploy the current version'
-        value: ${{ jobs.get-vars.outputs.should-deploy }}
-      release-stable-list:
-        description: 'Newline-separated list of stable releases'
-        value: ${{ jobs.get-vars.outputs.release-stable-list }}
-      release-stable-array:
-        description: 'JSON array of stable releases'
-        value: ${{ jobs.get-vars.outputs.release-stable-array }}
-      release-beta-list:
-        description: 'Newline-separated list of beta releases'
-        value: ${{ jobs.get-vars.outputs.release-beta-list }}
-      release-beta-array:
-        description: 'JSON array of beta releases'
-        value: ${{ jobs.get-vars.outputs.release-beta-array }}
-      release-dev-list:
-        description: 'Newline-separated list of dev releases'
-        value: ${{ jobs.get-vars.outputs.release-dev-list }}
-      release-dev-array:
-        description: 'JSON array of dev releases'
-        value: ${{ jobs.get-vars.outputs.release-dev-array }}
 
 name: get-vars
 
 jobs:
   get-vars:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-slim # pnpm via action-setup, Go via release-tool's setup-go
     timeout-minutes: 5
     outputs:
       version: ${{ steps.get-vars.outputs.version }}
-      changelog: ${{ steps.get-vars.outputs.changelog }}
-      release-notes: ${{ steps.get-vars.outputs.release-notes }}
       release-channel: ${{ steps.get-vars.outputs.release-channel }}
-      full-changelog: ${{ steps.get-vars.outputs.full-changelog }}
       board-list: ${{ steps.get-vars.outputs.board-list }}
-      board-array: ${{ steps.get-vars.outputs.board-array }}
       board-matrix: ${{ steps.get-vars.outputs.board-matrix }}
-      should-deploy: ${{ steps.get-vars.outputs.should-deploy }}
-      release-stable-list: ${{ steps.get-vars.outputs.release-stable-list }}
-      release-stable-array: ${{ steps.get-vars.outputs.release-stable-array }}
-      release-beta-list: ${{ steps.get-vars.outputs.release-beta-list }}
-      release-beta-array: ${{ steps.get-vars.outputs.release-beta-array }}
-      release-dev-list: ${{ steps.get-vars.outputs.release-dev-list }}
-      release-dev-array: ${{ steps.get-vars.outputs.release-dev-array }}
 
     steps:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0  # v7.0.0
@@ -85,22 +41,21 @@ jobs:
             .github
             .changes
 
+      # Pin Node to the range declared in the scripts package (engines.node),
+      # rather than relying on whatever the runner image happens to ship.
+      - uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e  # v6.4.0
+        with:
+          node-version-file: .github/scripts/package.json
+
       - uses: pnpm/action-setup@0ebf47130e4866e96fce0953f49152a61190b271  # v6.0.9
         name: Install pnpm
         with:
-          package_json_file: ./.github/scripts/package.json
-          run_install: false
-
-      - uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e  # v6.4.0
-        with:
-          node-version-file: ./.github/scripts/package.json
-          cache: 'pnpm'
-          cache-dependency-path: ./.github/scripts/pnpm-lock.yaml
-
-      - name: Install dependencies
-        working-directory: ./.github/scripts
-        shell: bash
-        run: pnpm install --frozen-lockfile --strict-peer-dependencies
+          cache: true
+          cache_dependency_path: .github/scripts/pnpm-lock.yaml
+          package_json_file: .github/scripts/package.json
+          run_install: |
+            - cwd: .github/scripts
+              args: [--frozen-lockfile, --strict-peer-dependencies]
 
       # Single source of truth for the version bump: release-tool computes the
       # next version from .changes/. status mode works on every branch (no
@@ -108,7 +63,7 @@ jobs:
       # labelled as a pre-release of the upcoming version instead of the last tag.
       - name: Compute next version
         id: relmeta
-        uses: OpenShock/release-tool@8530d21255e619e58bdf7e55c3299a3c8f7bf4ad  # v0.2.2
+        uses: OpenShock/release-tool@f3e8ebc530022e209e4d6a9a9c8bdb30b643253f  # v0.3.0
         with:
           mode: status
 
@@ -118,4 +73,4 @@ jobs:
         env:
           RELEASE_NEXT_VERSION: ${{ steps.relmeta.outputs.next-version }}
           RELEASE_SKIP: ${{ steps.relmeta.outputs.skip }}
-        run: node ./.github/scripts/get-vars.js
+        run: node .github/scripts/get-vars.js

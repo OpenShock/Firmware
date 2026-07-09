@@ -2,9 +2,9 @@ name: 'CodeQL'
 
 on:
   push:
-    branches: ['master']
+    branches: ['master', 'develop']
   pull_request:
-    branches: ['master']
+    branches: ['master', 'develop']
   schedule:
     - cron: '0 6 * * 1'
 
@@ -19,13 +19,13 @@ env:
   OPENSHOCK_FW_BUILD_DATE: ${{ github.event.head_commit.timestamp }}
 
 jobs:
-  get-vars:
-    uses: ./.github/workflows/get-vars.yml
-
+  # CodeQL only needs to compile the code for analysis; the exact version string
+  # baked into the artifact is irrelevant here, so we use a placeholder instead
+  # of running the heavyweight get-vars job (checkout depth 0 + pnpm + release-
+  # tool) just to stamp it.
   analyze-js-py:
     name: Analyze JS/PY
     runs-on: 'ubuntu-latest'
-    needs: get-vars
     timeout-minutes: 10
     permissions:
       actions: read
@@ -33,7 +33,7 @@ jobs:
       security-events: write
 
     env:
-      OPENSHOCK_FW_VERSION: ${{ needs.get-vars.outputs.version }}
+      OPENSHOCK_FW_VERSION: 0.0.0-codeql+build
 
     strategy:
       fail-fast: false
@@ -43,6 +43,8 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0  # v7.0.0
+        with:
+          submodules: recursive
 
       # Initializes the CodeQL tools for scanning.
       - name: Initialize CodeQL
@@ -63,7 +65,6 @@ jobs:
   analyze-cpp:
     name: Analyze C/C++
     runs-on: 'ubuntu-latest'
-    needs: get-vars
     timeout-minutes: 15
     permissions:
       actions: read
@@ -72,7 +73,7 @@ jobs:
 
     env:
       language: 'c-cpp'
-      OPENSHOCK_FW_VERSION: ${{ needs.get-vars.outputs.version }}
+      OPENSHOCK_FW_VERSION: 0.0.0-codeql+build
 
     steps:
       - name: Checkout repository
@@ -86,8 +87,7 @@ jobs:
       - uses: ./.github/actions/build-firmware
         with:
           board: ci-build
-          skip-checkout: true
-          version: ${{ needs.get-vars.outputs.version }}
+          version: 0.0.0-codeql+build
 
       - name: Perform CodeQL Analysis
         uses: github/codeql-action/analyze@c35d1b164463ee62a100735382aaaa525c5d3496  # codeql-bundle-v2.25.6

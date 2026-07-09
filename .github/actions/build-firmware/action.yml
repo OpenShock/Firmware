@@ -7,38 +7,13 @@ inputs:
   version:
     required: true
     description: 'Current firmware version'
-  skip-checkout:
-    description: 'If true, skips checkout'
-    required: false
-    default: false
 
 runs:
   using: composite
   steps:
-    - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10  # v6.0.3
-      if: ${{ !inputs.skip-checkout }}
-
-    - uses: actions/cache@27d5ce7f107fe9357f9df03efb73ab90386fccae  # v5.0.5
+    - uses: ./.github/actions/pio-cache
       with:
-        path: |
-          .pio/libdeps
-          # pioarduino installs toolchains, esp-idf, the Arduino core and its own
-          # Python venv under ~/.platformio/{tools,penv}, not just platforms/packages.
-          # Caching the whole tree is the only way to avoid a full reinstall per board.
-          # Exclude dist/ and .cache/ — raw download archives + transient install junk
-          # that are redundant once extracted into packages/tools, and just bloat the cache.
-          ~/.platformio
-          !~/.platformio/dist
-          !~/.platformio/.cache
-        # Bump the v2 prefix whenever the cached layout changes — actions/cache
-        # never overwrites an existing key, so a stale/incomplete cache under the
-        # same key would otherwise stick around until platformio.ini changes.
-        key: pio-v2-${{ runner.os }}-${{ hashFiles('platformio.ini', 'requirements.txt') }}
-        # Fall back to the latest prior cache when platformio.ini changes so we
-        # only download deltas instead of re-fetching the whole pioarduino
-        # platform + toolchains on every config edit.
-        restore-keys: |
-          pio-v2-${{ runner.os }}-
+        env: ${{ inputs.board }}
 
     - uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405  # v6.2.0
       with:
@@ -51,12 +26,16 @@ runs:
     - name: Build firmware
       working-directory: .
       shell: bash
-      run: pio run -e ${{ inputs.board }}
+      # head_commit.timestamp only exists on push events, so derive the build
+      # date from the checked-out commit (falling back to now) - otherwise
+      # schedule/dispatch builds bake in an empty date.
+      run: |
+        export OPENSHOCK_FW_BUILD_DATE="$(git show -s --format=%cI HEAD 2>/dev/null || date -u +%Y-%m-%dT%H:%M:%SZ)"
+        pio run -e ${{ inputs.board }}
       env:
         OPENSHOCK_FW_VERSION: ${{ inputs.version }}
         OPENSHOCK_FW_GIT_REF: ${{ github.ref }}
         OPENSHOCK_FW_GIT_COMMIT: ${{ github.sha }}
-        OPENSHOCK_FW_BUILD_DATE: ${{ github.event.head_commit.timestamp }}
 
     - name: Upload build artifacts
       uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a  # v7.0.1

@@ -32,8 +32,10 @@ runs:
 
     - name: Create boards.txt
       shell: bash
+      env:
+        BOARDS: ${{ inputs.boards }}
       run: |
-        echo -e '${{ inputs.boards }}' >> upload/boards.txt
+        printf '%s\n' "$BOARDS" >> upload/boards.txt
 
     - name: Upload artifacts to CDN
       uses: ./.github/actions/sftp-mirror

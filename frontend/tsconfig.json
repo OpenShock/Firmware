@@ -1,8 +1,10 @@
 {
   "compilerOptions": {
-    "target": "es2024",
+    "target": "es2025",
+    "lib": ["ESNext", "DOM", "DOM.Iterable"],
     "module": "ESNext",
     "moduleResolution": "bundler",
+    "allowImportingTsExtensions": true,
     "rewriteRelativeImportExtensions": true,
     "allowJs": true,
     "checkJs": true,

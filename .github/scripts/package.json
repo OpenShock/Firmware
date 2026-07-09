@@ -9,16 +9,12 @@
   },
   "dependencies": {
     "@actions/core": "^3.0.1",
-    "@actions/github": "^9.1.1",
     "ini": "^7.0.0",
-    "semver": "^7.8.0"
+    "semver": "^7.8.5"
   },
   "engines": {
-    "node": "^24.13.1",
-    "pnpm": "^10.29.3"
+    "node": "^24.13.0",
+    "pnpm": "^11.10.0"
   },
-  "volta": {
-    "node": "24.13.1"
-  },
-  "packageManager": "pnpm@10.29.3"
+  "packageManager": "pnpm@11.10.0"
 }

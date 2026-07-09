@@ -15,7 +15,7 @@ data/www
 
 # generated files
 .vs
-packages
+/packages
 *.sln
 compile_commands.json
 managed_components

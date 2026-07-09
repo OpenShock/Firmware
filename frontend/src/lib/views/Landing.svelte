@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { Button } from '$lib/components/ui/button';
+  import { Button } from '@openshock/svelte-core/components/ui/button';
   import { ViewModeStore } from '$lib/stores';
   import { WandSparkles, Settings } from '@lucide/svelte';
 </script>

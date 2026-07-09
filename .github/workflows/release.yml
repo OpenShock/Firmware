@@ -1,12 +1,8 @@
 on:
-  push:
-    branches:
-      - master
-      - beta
-      - develop
-    paths-ignore:
-      - 'CHANGELOG.md'
-      - '.changes/**'
+  # Releases are cut manually, never on push. Run this workflow from the beta
+  # branch to cut an rc, or from master for a stable release. A plain push to
+  # beta/master (e.g. merging CI changes) must not create a release.
+  workflow_dispatch:
 
 name: release
 
@@ -16,14 +12,14 @@ concurrency:
 
 permissions:
   contents: write
-  id-token: write
 
 jobs:
   auto-release:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-slim # lightweight: release-tool + git/gh, no build
     timeout-minutes: 10
-    # Belt-and-suspenders alongside paths-ignore: never react to our own bot commit.
-    if: github.actor != 'github-actions[bot]'
+    # Only beta (rc) and master (stable) produce releases; refuse a dispatch
+    # from any other branch.
+    if: github.ref_name == 'beta' || github.ref_name == 'master'
 
     steps:
       # Mint a short-lived, repo-scoped installation token from the release
@@ -55,7 +51,7 @@ jobs:
 
       - name: Run release tool
         id: meta
-        uses: OpenShock/release-tool@8530d21255e619e58bdf7e55c3299a3c8f7bf4ad  # v0.2.2
+        uses: OpenShock/release-tool@f3e8ebc530022e209e4d6a9a9c8bdb30b643253f  # v0.3.0
         with:
           mode: release
           output: release.json
@@ -63,36 +59,36 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ steps.app-token.outputs.token }}
 
+      # Precondition: there must be change files accumulated since the last tag.
+      # release-tool reports this by leaving the tag output empty; make it a loud
+      # failure rather than a silent no-op, since this workflow is run by hand.
+      - name: Fail if there is nothing to release
+        if: steps.meta.outputs.tag == ''
+        run: |
+          echo "::error::No change files present since the last tag - nothing to release."
+          exit 1
+
       - name: Push commit and tag
         if: steps.meta.outputs.tag != ''
         run: git push origin HEAD "${{ steps.meta.outputs.tag }}"
 
-      - name: Publish to OpenShock API
-        if: steps.meta.outputs.skip == 'false' && vars.OPENSHOCK_API_URL != ''
-        env:
-          API_URL: ${{ vars.OPENSHOCK_API_URL }}
-        run: |
-          OIDC_TOKEN=$(curl -sLS \
-            -H "Authorization: bearer $ACTIONS_ID_TOKEN_REQUEST_TOKEN" \
-            "$ACTIONS_ID_TOKEN_REQUEST_URL&audience=openshock-release-ingest" \
-            | jq -r .value)
-          if [ -z "$OIDC_TOKEN" ] || [ "$OIDC_TOKEN" = "null" ]; then
-            echo "::error::Failed to fetch GitHub OIDC token"
-            exit 1
-          fi
-          curl -fsSL --retry 3 --retry-delay 5 -X POST "$API_URL/1/public/releases" \
-            -H "Authorization: Bearer $OIDC_TOKEN" \
-            -H "Content-Type: application/json" \
-            --data-binary @release.json
+      # The OpenShock API is announced from ci-build's release job, only after
+      # the firmware is actually built and uploaded - not here, before it exists.
+      # release.json is attached to the draft below so ci-build can read it.
 
-      - name: Create GitHub Release
+      # Stage the release as a draft. The tag push above triggers ci-build,
+      # which builds the firmware and then attaches the binaries to this draft
+      # and publishes it (see the `release` job in ci-build.yml). Staging as a
+      # draft keeps the release hidden until its artifacts are in place, and
+      # avoids ci-build failing on an "already exists" conflict.
+      - name: Stage GitHub Release (draft)
         if: steps.meta.outputs.tag != ''
         env:
           GH_TOKEN: ${{ steps.app-token.outputs.token }}
           TAG: ${{ steps.meta.outputs.tag }}
           PRERELEASE: ${{ steps.meta.outputs.prerelease }}
         run: |
-          ARGS=("$TAG" "release.json" --title "$TAG" --notes-file release-notes.md)
+          ARGS=("$TAG" "release.json" --title "$TAG" --notes-file release-notes.md --draft)
           if [ "$PRERELEASE" = "true" ]; then
             ARGS+=(--prerelease)
           fi
