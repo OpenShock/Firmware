@@ -1,7 +1,9 @@
 #pragma once
 
+#include "StringHelpers.h"
+
 #include <cstdint>
-#include <cstring>
+#include <string_view>
 
 namespace OpenShock {
   enum class FirmwareBootType : uint8_t {
@@ -10,19 +12,19 @@ namespace OpenShock {
     Rollback
   };
 
-  inline bool TryParseFirmwareBootType(FirmwareBootType& bootType, const char* str)
+  inline bool TryParseFirmwareBootType(FirmwareBootType& bootType, std::string_view str)
   {
-    if (strcasecmp(str, "normal") == 0) {
+    if (StringIEquals(str, "normal")) {
       bootType = FirmwareBootType::Normal;
       return true;
     }
 
-    if (strcasecmp(str, "newfirmware") == 0 || strcasecmp(str, "new_firmware") == 0) {
+    if (StringIEquals(str, "newfirmware") || StringIEquals(str, "new_firmware")) {
       bootType = FirmwareBootType::NewFirmware;
       return true;
     }
 
-    if (strcasecmp(str, "rollback") == 0) {
+    if (StringIEquals(str, "rollback")) {
       bootType = FirmwareBootType::Rollback;
       return true;
     }

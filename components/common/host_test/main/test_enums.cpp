@@ -16,51 +16,51 @@ using namespace OpenShock;
 TEST_CASE("ShockerModelType: all accepted spellings", "[common][enums]")
 {
   ShockerModelType m;
-  TEST_ASSERT_TRUE(ShockerModelTypeFromString("caixianlin", m));
+  TEST_ASSERT_TRUE(TryParseShockerModelType(m, "caixianlin"));
   TEST_ASSERT_EQUAL(ShockerModelType::CaiXianlin, m);
-  TEST_ASSERT_TRUE(ShockerModelTypeFromString("cai-xianlin", m));
+  TEST_ASSERT_TRUE(TryParseShockerModelType(m, "cai-xianlin"));
   TEST_ASSERT_EQUAL(ShockerModelType::CaiXianlin, m);
-  TEST_ASSERT_TRUE(ShockerModelTypeFromString("petrainer", m));
+  TEST_ASSERT_TRUE(TryParseShockerModelType(m, "petrainer"));
   TEST_ASSERT_EQUAL(ShockerModelType::Petrainer, m);
-  TEST_ASSERT_TRUE(ShockerModelTypeFromString("petrainer998dr", m));
+  TEST_ASSERT_TRUE(TryParseShockerModelType(m, "petrainer998dr"));
   TEST_ASSERT_EQUAL(ShockerModelType::Petrainer998DR, m);
-  TEST_ASSERT_TRUE(ShockerModelTypeFromString("wellturnt330", m));
+  TEST_ASSERT_TRUE(TryParseShockerModelType(m, "wellturnt330"));
   TEST_ASSERT_EQUAL(ShockerModelType::WellturnT330, m);
-  TEST_ASSERT_TRUE(ShockerModelTypeFromString("t330", m));
+  TEST_ASSERT_TRUE(TryParseShockerModelType(m, "t330"));
   TEST_ASSERT_EQUAL(ShockerModelType::WellturnT330, m);
-  TEST_ASSERT_TRUE(ShockerModelTypeFromString("d80", m));
+  TEST_ASSERT_TRUE(TryParseShockerModelType(m, "d80"));
   TEST_ASSERT_EQUAL(ShockerModelType::D80, m);
 }
 
 TEST_CASE("ShockerModelType: case-insensitive", "[common][enums]")
 {
   ShockerModelType m;
-  TEST_ASSERT_TRUE(ShockerModelTypeFromString("CaiXianlin", m));
+  TEST_ASSERT_TRUE(TryParseShockerModelType(m, "CaiXianlin"));
   TEST_ASSERT_EQUAL(ShockerModelType::CaiXianlin, m);
-  TEST_ASSERT_TRUE(ShockerModelTypeFromString("PETRAINER", m));
+  TEST_ASSERT_TRUE(TryParseShockerModelType(m, "PETRAINER"));
   TEST_ASSERT_EQUAL(ShockerModelType::Petrainer, m);
-  TEST_ASSERT_TRUE(ShockerModelTypeFromString("T330", m));
+  TEST_ASSERT_TRUE(TryParseShockerModelType(m, "T330"));
   TEST_ASSERT_EQUAL(ShockerModelType::WellturnT330, m);
 }
 
 TEST_CASE("ShockerModelType: the 'pettrainer' typo only with allowTypo", "[common][enums]")
 {
   ShockerModelType m;
-  TEST_ASSERT_FALSE(ShockerModelTypeFromString("pettrainer", m));  // default: rejected
-  TEST_ASSERT_FALSE(ShockerModelTypeFromString("pettrainer998dr", m));
+  TEST_ASSERT_FALSE(TryParseShockerModelType(m, "pettrainer"));  // default: rejected
+  TEST_ASSERT_FALSE(TryParseShockerModelType(m, "pettrainer998dr"));
 
-  TEST_ASSERT_TRUE(ShockerModelTypeFromString("pettrainer", m, true));  // allowTypo: accepted
+  TEST_ASSERT_TRUE(TryParseShockerModelType(m, "pettrainer", true));  // allowTypo: accepted
   TEST_ASSERT_EQUAL(ShockerModelType::Petrainer, m);
-  TEST_ASSERT_TRUE(ShockerModelTypeFromString("pettrainer998dr", m, true));
+  TEST_ASSERT_TRUE(TryParseShockerModelType(m, "pettrainer998dr", true));
   TEST_ASSERT_EQUAL(ShockerModelType::Petrainer998DR, m);
 }
 
 TEST_CASE("ShockerModelType: rejects unknown and empty", "[common][enums]")
 {
   ShockerModelType m;
-  TEST_ASSERT_FALSE(ShockerModelTypeFromString("", m));
-  TEST_ASSERT_FALSE(ShockerModelTypeFromString("nope", m));
-  TEST_ASSERT_FALSE(ShockerModelTypeFromString("cai", m));  // prefix, not a full match
+  TEST_ASSERT_FALSE(TryParseShockerModelType(m, ""));
+  TEST_ASSERT_FALSE(TryParseShockerModelType(m, "nope"));
+  TEST_ASSERT_FALSE(TryParseShockerModelType(m, "cai"));  // prefix, not a full match
 }
 
 // ---- ShockerCommandType ----------------------------------------------------
@@ -68,23 +68,23 @@ TEST_CASE("ShockerModelType: rejects unknown and empty", "[common][enums]")
 TEST_CASE("ShockerCommandType: all commands + case-insensitive", "[common][enums]")
 {
   ShockerCommandType c;
-  TEST_ASSERT_TRUE(ShockerCommandTypeFromString("stop", c));
+  TEST_ASSERT_TRUE(TryParseShockerCommandType(c, "stop"));
   TEST_ASSERT_EQUAL(ShockerCommandType::Stop, c);
-  TEST_ASSERT_TRUE(ShockerCommandTypeFromString("shock", c));
+  TEST_ASSERT_TRUE(TryParseShockerCommandType(c, "shock"));
   TEST_ASSERT_EQUAL(ShockerCommandType::Shock, c);
-  TEST_ASSERT_TRUE(ShockerCommandTypeFromString("vibrate", c));
+  TEST_ASSERT_TRUE(TryParseShockerCommandType(c, "vibrate"));
   TEST_ASSERT_EQUAL(ShockerCommandType::Vibrate, c);
-  TEST_ASSERT_TRUE(ShockerCommandTypeFromString("sound", c));
+  TEST_ASSERT_TRUE(TryParseShockerCommandType(c, "sound"));
   TEST_ASSERT_EQUAL(ShockerCommandType::Sound, c);
-  TEST_ASSERT_TRUE(ShockerCommandTypeFromString("LIGHT", c));
+  TEST_ASSERT_TRUE(TryParseShockerCommandType(c, "LIGHT"));
   TEST_ASSERT_EQUAL(ShockerCommandType::Light, c);
 }
 
 TEST_CASE("ShockerCommandType: rejects unknown/empty", "[common][enums]")
 {
   ShockerCommandType c;
-  TEST_ASSERT_FALSE(ShockerCommandTypeFromString("", c));
-  TEST_ASSERT_FALSE(ShockerCommandTypeFromString("zap", c));
+  TEST_ASSERT_FALSE(TryParseShockerCommandType(c, ""));
+  TEST_ASSERT_FALSE(TryParseShockerCommandType(c, "zap"));
 }
 
 // ---- OtaUpdateChannel (string_view API) ------------------------------------

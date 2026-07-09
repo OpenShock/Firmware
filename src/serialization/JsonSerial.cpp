@@ -26,7 +26,7 @@ bool JsonSerial::ParseShockerCommand(JSON::JsonView root, JsonSerial::ShockerCom
     return false;
   }
   ShockerModelType modelType = ShockerModelType::CaiXianlin;
-  if (!ShockerModelTypeFromString(std::string(modelStr).c_str(), modelType)) {
+  if (!TryParseShockerModelType(modelType, modelStr)) {
     OS_LOGE(TAG, "value at 'model' is not a valid shocker model (caixianlin, petrainer, petrainer998dr, wellturnt330, d80)");
     return false;
   }
@@ -58,7 +58,7 @@ bool JsonSerial::ParseShockerCommand(JSON::JsonView root, JsonSerial::ShockerCom
     return false;
   }
   ShockerCommandType commandType = ShockerCommandType::Stop;
-  if (!ShockerCommandTypeFromString(std::string(commandStr).c_str(), commandType)) {
+  if (!TryParseShockerCommandType(commandType, commandStr)) {
     OS_LOGE(TAG, "value at 'type' is not a valid shocker command (shock, vibrate, sound, light, stop)");
     return false;
   }

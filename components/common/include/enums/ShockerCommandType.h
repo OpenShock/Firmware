@@ -1,7 +1,9 @@
 #pragma once
 
+#include "StringHelpers.h"
+
 #include <cstdint>
-#include <cstring>
+#include <string_view>
 
 namespace OpenShock {
   enum class ShockerCommandType : uint8_t {
@@ -12,21 +14,21 @@ namespace OpenShock {
     Light
   };
 
-  inline bool ShockerCommandTypeFromString(const char* str, ShockerCommandType& out)
+  inline bool TryParseShockerCommandType(ShockerCommandType& out, std::string_view str)
   {
-    if (strcasecmp(str, "stop") == 0) {
+    if (StringIEquals(str, "stop")) {
       out = ShockerCommandType::Stop;
       return true;
-    } else if (strcasecmp(str, "shock") == 0) {
+    } else if (StringIEquals(str, "shock")) {
       out = ShockerCommandType::Shock;
       return true;
-    } else if (strcasecmp(str, "vibrate") == 0) {
+    } else if (StringIEquals(str, "vibrate")) {
       out = ShockerCommandType::Vibrate;
       return true;
-    } else if (strcasecmp(str, "sound") == 0) {
+    } else if (StringIEquals(str, "sound")) {
       out = ShockerCommandType::Sound;
       return true;
-    } else if (strcasecmp(str, "light") == 0) {
+    } else if (StringIEquals(str, "light")) {
       out = ShockerCommandType::Light;
       return true;
     } else {

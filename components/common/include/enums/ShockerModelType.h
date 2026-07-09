@@ -1,7 +1,9 @@
 #pragma once
 
+#include "StringHelpers.h"
+
 #include <cstdint>
-#include <cstring>
+#include <string_view>
 
 namespace OpenShock {
   enum class ShockerModelType : uint8_t {
@@ -12,39 +14,39 @@ namespace OpenShock {
     D80
   };
 
-  inline bool ShockerModelTypeFromString(const char* str, ShockerModelType& out, bool allowTypo = false)
+  inline bool TryParseShockerModelType(ShockerModelType& out, std::string_view str, bool allowTypo = false)
   {
-    if (strcasecmp(str, "caixianlin") == 0 || strcasecmp(str, "cai-xianlin") == 0) {
+    if (StringIEquals(str, "caixianlin") || StringIEquals(str, "cai-xianlin")) {
       out = ShockerModelType::CaiXianlin;
       return true;
     }
 
-    if (strcasecmp(str, "petrainer") == 0) {
+    if (StringIEquals(str, "petrainer")) {
       out = ShockerModelType::Petrainer;
       return true;
     }
 
-    if (allowTypo && strcasecmp(str, "pettrainer") == 0) {
+    if (allowTypo && StringIEquals(str, "pettrainer")) {
       out = ShockerModelType::Petrainer;
       return true;
     }
 
-    if (strcasecmp(str, "petrainer998dr") == 0) {
+    if (StringIEquals(str, "petrainer998dr")) {
       out = ShockerModelType::Petrainer998DR;
       return true;
     }
 
-    if (allowTypo && strcasecmp(str, "pettrainer998dr") == 0) {
+    if (allowTypo && StringIEquals(str, "pettrainer998dr")) {
       out = ShockerModelType::Petrainer998DR;
       return true;
     }
 
-    if (strcasecmp(str, "wellturnt330") == 0 || strcasecmp(str, "t330") == 0) {
+    if (StringIEquals(str, "wellturnt330") || StringIEquals(str, "t330")) {
       out = ShockerModelType::WellturnT330;
       return true;
     }
 
-    if (strcasecmp(str, "d80") == 0) {
+    if (StringIEquals(str, "d80")) {
       out = ShockerModelType::D80;
       return true;
     }

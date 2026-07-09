@@ -202,10 +202,8 @@ bool JsonAPI::ParseHubInfoJsonResponse(int code, JSON::JsonView root, JsonAPI::H
       return false;
     }
 
-    // ShockerModelTypeFromString takes a NUL-terminated const char*.
-    std::string shockerModelStr(shockerModel);
     OpenShock::ShockerModelType shockerModelType;
-    if (!OpenShock::ShockerModelTypeFromString(shockerModelStr.c_str(), shockerModelType, true)) {  // PetTrainer is a typo in the API, we pass true to allow it
+    if (!OpenShock::TryParseShockerModelType(shockerModelType, shockerModel, true)) {  // PetTrainer is a typo in the API, we pass true to allow it
       ESP_LOGJSONE("value at 'shocker.model' is not a valid shocker model", shocker);
       return false;
     }
