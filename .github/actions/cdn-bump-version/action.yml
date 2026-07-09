@@ -89,13 +89,30 @@ runs:
           # A pointer that is missing or holds a non-semver value is always
           # (re)written; otherwise only advance when VERSION is strictly newer.
           #
-          # Exception: a develop deploy of its own channel. develop versions are
-          # X.Y.Z-develop+<sha> and consecutive builds differ only in the +<sha>
-          # build metadata, which semver precedence ignores - so `newer` never
-          # holds between them and the guard would freeze version-develop.txt on
-          # the first build of each base version. Always advance in that case;
-          # the guard still protects the stable/beta channels and every cascade.
-          if [ "$RELEASE_CHANNEL" != "develop" ] \
+          # develop is special: its versions are X.Y.Z-develop+<sha> and
+          # consecutive builds differ only in the +<sha> build metadata, which
+          # semver precedence ignores - so `newer` can't order them. When a
+          # develop build deploys its OWN channel we order by git commit date
+          # instead, so the pointer only moves forward to a newer commit and
+          # never regresses on a re-run or an out-of-order build. Cascades from
+          # stable/beta into develop still use the semver guard below.
+          if [ "$RELEASE_CHANNEL" = "develop" ] && [ "$ch" = "develop" ]; then
+            case "$current" in
+              *-develop+*)
+                cur_sha="${current##*+}"
+                new_ct="$(git show -s --format=%ct "$GITHUB_SHA" 2>/dev/null || true)"
+                cur_ct="$(git show -s --format=%ct "$cur_sha" 2>/dev/null || true)"
+                # Only hold when we can prove the current commit is newer than
+                # or equal to this one. If either date is unresolvable (e.g. the
+                # commit was garbage-collected or history was rewritten) fall
+                # through and advance rather than freezing the channel.
+                if [ -n "$new_ct" ] && [ -n "$cur_ct" ] && [ "$new_ct" -le "$cur_ct" ]; then
+                  echo "$file: keeping $current (its commit is newer than or equal to $VERSION)"
+                  continue
+                fi
+                ;;
+            esac
+          elif [ "$RELEASE_CHANNEL" != "develop" ] \
             && [ -n "$current" ] && semver "$current" >/dev/null 2>&1 && ! newer "$VERSION" "$current"; then
             echo "$file: keeping $current (not older than $VERSION)"
             continue
