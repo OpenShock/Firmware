@@ -1,14 +1,21 @@
 #!/usr/bin/env python3
 #
-# ESP32 x509 certificate bundle download and conversion script with SHA-256 Verification
+# OpenShock CA trust store manager. Two subcommands:
 #
-# This file is based on Espressif's original certificate bundle
-# generation utility, but has been modified to:
-#  - Automatically download and convert curl's CA certificate bundle
-#  - Perform automatic SHA-256 integrity verification of downloads
-#  - Emit warnings for certificates that trigger cryptography deprecation notices
-#  - Write the output bundle atomically to avoid partial updates
-#  - Optionally include user-provided custom CA certificates from custom_certs/*.pem
+#   generate  (default) — download curl's CA bundle, SHA-256-verify it, and write two files:
+#                         cacert-curl.pem (the verbatim verified base) and cacert-merged.pem
+#                         (base + pinned_certs/*.pem + local custom_certs/*.pem). Does NOT
+#                         emit a packed x509_crt_bundle; the firmware build converts and
+#                         packs cacert-merged.pem into flash via ESP-IDF's certificate-bundle step.
+#   audit               — audit every cert already in cacert-merged.pem (base + pinned + custom):
+#                         flag expiry, and for pinned roots probe the live endpoints to
+#                         decide which are still needed. Reports pins no endpoint chains
+#                         through as removable, and raises an alert on a still-needed cert
+#                         that is expired/expiring. Used by CI.
+#
+# Based on Espressif's original certificate bundle generation utility, extended to
+# add SHA-256 verification, deprecation-warning surfacing, atomic writes, pinned/custom
+# roots, and the audit subcommand.
 #
 # Copyright 2018-2019 Espressif Systems (Shanghai) PTE LTD
 #
@@ -28,10 +35,11 @@
 from __future__ import annotations
 
 import base64
+import datetime
 import hashlib
 import os
 import re
-import struct
+import subprocess
 import sys
 import tempfile
 import urllib.request
@@ -45,7 +53,7 @@ try:
     from cryptography.utils import CryptographyDeprecationWarning
 except ImportError:
     print(
-        'gen_crt_bundle.py: cryptography package not installed ' '(pip install cryptography)',
+        'cert_bundle.py: cryptography package not installed ' '(pip install cryptography)',
         file=sys.stderr,
     )
     raise
@@ -53,12 +61,43 @@ except ImportError:
 URL_PEM = 'https://curl.se/ca/cacert.pem'
 URL_SHA256 = 'https://curl.se/ca/cacert.pem.sha256'
 MANUAL_HASH_PAGE = 'https://curl.se/docs/caextract.html'
-OUTPUT_FILE = 'x509_crt_bundle'
-LOCAL_PEM_FILE = 'cacert.pem'
 
-# Custom certs (self-hosted/internal PKI)
+# The verbatim curl/Mozilla CA extract, saved exactly as downloaded so `sha256sum` of
+# this file matches curl's published checksum (manual verification, see README).
+BASE_PEM_FILE = 'cacert-curl.pem'
+
+# The merged trust store packed into firmware (sdkconfig.defaults:
+# CONFIG_MBEDTLS_CUSTOM_CERTIFICATE_BUNDLE_PATH): the verified curl base followed by every
+# pinned (and any local custom) cert.
+MERGED_PEM_FILE = 'cacert-merged.pem'
+
+# Banner placed at the top of the merged bundle, in place of curl's own header, so it is
+# never mistaken for the verbatim curl extract (its sha256 intentionally differs).
+MERGED_BANNER = (
+    b'##\n'
+    b'## OpenShock firmware TLS trust store -- MERGED / GENERATED, do not edit by hand.\n'
+    b'##\n'
+    b'## Produced by certificates/cert_bundle.py. This is what the firmware packs:\n'
+    b'##   the verbatim curl/Mozilla CA extract (see cacert-curl.pem) + certificates/pinned_certs/.\n'
+    b'## Its sha256 intentionally differs from curl\'s published hash. To change it, edit\n'
+    b'## pinned_certs/ and re-run `cert_bundle.py generate` -- never hand-edit this file.\n'
+    b'##\n'
+)
+
+# Pinned certs (tracked, shipped to every device, expiry-monitored). Roots the
+# Mozilla/curl base has retired but our infrastructure still chains through -- e.g.
+# GlobalSign Root CA R1, which cross-signs GTS Root R4 in the api.openshock.app chain.
+PINNED_CERTS_DIR = 'pinned_certs'
+PINNED_CERTS_GLOB = '*.pem'
+
+# Custom certs (self-hosted/internal PKI). Local-only, git-ignored.
 CUSTOM_CERTS_DIR = 'custom_certs'  # optional; if missing -> ignored
 CUSTOM_CERTS_GLOB = '*.pem'  # required extension
+
+# A pinned cert this close to (or past) expiry is a problem: generation hard-fails on an
+# already-expired pin; the `audit` subcommand / the CI workflow raise an alert once a
+# still-needed pin is within this window. Override with PINNED_CERT_EXPIRY_WARN_DAYS.
+EXPIRY_WARN_DAYS_DEFAULT = 90
 
 PEM_BLOCK_RE = re.compile(
     br'-----BEGIN CERTIFICATE-----\s*[\s\S]+?\s*-----END CERTIFICATE-----\s*',
@@ -71,7 +110,7 @@ class InputError(RuntimeError):
 
 
 def critical(msg: str) -> None:
-    sys.stderr.write('gen_crt_bundle.py: ' + msg + '\n')
+    sys.stderr.write('cert_bundle.py: ' + msg + '\n')
 
 
 def download_bytes(url: str, timeout: int = 30) -> bytes:
@@ -152,9 +191,9 @@ def _load_single_pem_cert_block_from_bytes_strict(data: bytes, *, source: str) -
 
     end_idx += len(end)
 
-    # Disallow any non-whitespace bytes before/after the public certificate
-    if data[:begin_idx].strip(b' \t\r\n'):
-        raise InputError(f'Non-whitespace data before certificate in {source}')
+    # Allow leading label / comment lines before the certificate (curl's bundle prefixes
+    # each cert with a human-readable name), but nothing may follow it. Private-key material
+    # is rejected globally above, and the single-block checks below reject extra certs.
     if data[end_idx:].strip(b' \t\r\n'):
         raise InputError(f'Non-whitespace data after certificate in {source}')
 
@@ -198,40 +237,260 @@ def _load_single_pem_cert_block_from_file(path: Path) -> bytes:
     return _load_single_pem_cert_block_from_bytes_strict(data, source=f'custom cert file: {path}')
 
 
-def load_custom_cert_blocks() -> tuple[list[bytes], list[Path]]:
+def load_dir_cert_blocks(dirname: str, glob: str) -> tuple[list[bytes], list[Path]]:
     """
-    Load user-provided custom CA certificate PEM blocks from custom_certs/*.pem.
+    Load one-cert-per-file PEM blocks from a directory.
 
     Returns: (blocks, paths)
 
     Behavior:
-      - If custom_certs/ does not exist -> return ([], [])
-      - Only *.pem files are considered
-      - If the directory exists but contains no *.pem -> return ([], [])
-      - Non-.pem files are ignored (we do not scan them)
-      - Each .pem must contain exactly one certificate
+      - If the directory does not exist -> return ([], [])
+      - Only files matching `glob` are considered
+      - If the directory exists but contains no matches -> return ([], [])
+      - Each file must contain exactly one certificate
     """
-    d = Path(CUSTOM_CERTS_DIR)
+    d = Path(dirname)
     if not d.exists():
         return ([], [])
 
     if not d.is_dir():
-        raise InputError(f'{CUSTOM_CERTS_DIR} exists but is not a directory')
+        raise InputError(f'{dirname} exists but is not a directory')
 
-    paths = sorted(d.glob(CUSTOM_CERTS_GLOB))
+    paths = sorted(d.glob(glob))
     if not paths:
         return ([], [])
 
-    critical(f'Loading custom certificates from: {CUSTOM_CERTS_DIR}/ ({len(paths)} file(s))')
+    critical(f'Loading certificates from: {dirname}/ ({len(paths)} file(s))')
 
     blocks: list[bytes] = []
     for p in paths:
         if p.suffix.lower() != '.pem':
             # Should not happen due to glob, but keep strict.
-            raise InputError(f'Custom cert file must have .pem extension: {p}')
+            raise InputError(f'Cert file must have .pem extension: {p}')
         blocks.append(_load_single_pem_cert_block_from_file(p))
 
     return (blocks, paths)
+
+
+def load_pinned_cert_blocks() -> tuple[list[bytes], list[Path]]:
+    """Load tracked, shipped pinned CA certs from pinned_certs/*.pem."""
+    return load_dir_cert_blocks(PINNED_CERTS_DIR, PINNED_CERTS_GLOB)
+
+
+def load_custom_cert_blocks() -> tuple[list[bytes], list[Path]]:
+    """Load local-only custom CA certs from custom_certs/*.pem."""
+    return load_dir_cert_blocks(CUSTOM_CERTS_DIR, CUSTOM_CERTS_GLOB)
+
+
+def _cert_not_after_utc(cert: x509.Certificate) -> datetime.datetime:
+    # cryptography >= 42 exposes tz-aware not_valid_after_utc; older exposes naive UTC.
+    try:
+        return cert.not_valid_after_utc
+    except AttributeError:
+        return cert.not_valid_after.replace(tzinfo=datetime.timezone.utc)
+
+
+def check_certs_expiry(
+    certs: list[x509.Certificate],
+    origins: list[str],
+    warn_days: int,
+) -> tuple[list[str], list[str]]:
+    """
+    Classify certs by expiry against `warn_days`.
+
+    Returns (expired, expiring) as human-readable descriptions:
+      - expired:  notAfter is in the past
+      - expiring: notAfter is within `warn_days` from now (but not yet expired)
+    Emits a diagnostic line for each problem cert.
+    """
+    now = datetime.datetime.now(datetime.timezone.utc)
+    expired: list[str] = []
+    expiring: list[str] = []
+
+    for idx, cert in enumerate(certs):
+        origin = origins[idx] if idx < len(origins) else ''
+        not_after = _cert_not_after_utc(cert)
+        days_left = (not_after - now).days
+        desc = f'{cert.subject.rfc4514_string()} (origin: {origin}; notAfter: {not_after:%Y-%m-%d}; {days_left}d left)'
+
+        if days_left < 0:
+            critical(f'EXPIRED certificate: {desc}')
+            expired.append(desc)
+        elif days_left <= warn_days:
+            critical(f'WARNING: certificate expires within {warn_days}d: {desc}')
+            expiring.append(desc)
+
+    return (expired, expiring)
+
+
+def _expiry_warn_days() -> int:
+    raw = os.environ.get('PINNED_CERT_EXPIRY_WARN_DAYS')
+    if not raw:
+        return EXPIRY_WARN_DAYS_DEFAULT
+    try:
+        val = int(raw)
+    except ValueError:
+        raise InputError(f'PINNED_CERT_EXPIRY_WARN_DAYS must be an integer, got {raw!r}')
+    if val < 0:
+        raise InputError('PINNED_CERT_EXPIRY_WARN_DAYS must be >= 0')
+    return val
+
+
+def _reject_non_ca(certs: list[x509.Certificate], origins: list[str], *, kind: str) -> None:
+    non_ca = [(c, o) for (c, o) in zip(certs, origins) if not _is_ca_certificate(c)]
+    if not non_ca:
+        return
+    critical(f'FATAL: One or more {kind} certificates are not CA certificates (BasicConstraints CA=TRUE missing)')
+    for c, origin in non_ca:
+        critical(f'  Origin : {origin}')
+        critical(f'  Subject: {c.subject.rfc4514_string()}')
+        critical(f'  Issuer : {c.issuer.rfc4514_string()}')
+    raise InputError(f'Refusing to include non-CA {kind} certificates')
+
+
+# --------------------------------------------------------------------------------------
+# audit — expiry of every shipped cert + live-endpoint relevance for pinned roots
+# --------------------------------------------------------------------------------------
+
+# Endpoints whose live chains decide whether a pinned root still earns its place. esp_crt_bundle
+# does not do path building: it trusts the chain as the server sends it and looks up the issuer
+# of the topmost presented cert among the trusted roots. So the anchor an endpoint "requires" is
+# precisely the issuer of the last cert in its presented chain.
+MONITORED_DOMAINS = ['api.openshock.app', 'api.openshock.dev']
+PROBE_TIMEOUT_S = 20
+
+
+def _openssl_name(pem_or_der: bytes, field: str) -> str:
+    """Canonical (rfc2253) -subject/-issuer string for a single cert, via openssl."""
+    proc = subprocess.run(
+        ['openssl', 'x509', '-noout', f'-{field}', '-nameopt', 'rfc2253'],
+        input=pem_or_der,
+        capture_output=True,
+    )
+    if proc.returncode != 0:
+        raise InputError(f'openssl x509 -{field} failed: {proc.stderr.decode(errors="replace")}')
+    out = proc.stdout.decode(errors='replace').strip()
+    return out.split('=', 1)[1].strip() if '=' in out else out
+
+
+def _rfc2253_subject(cert: x509.Certificate) -> str:
+    return _openssl_name(cert.public_bytes(serialization.Encoding.PEM), 'subject')
+
+
+def required_anchor_subject(domain: str) -> str | None:
+    """
+    rfc2253 subject of the anchor `domain` requires (issuer of the topmost cert it
+    presents), or None if the endpoint is unreachable.
+    """
+    try:
+        proc = subprocess.run(
+            ['openssl', 's_client', '-connect', f'{domain}:443', '-servername', domain, '-showcerts'],
+            input=b'',
+            capture_output=True,
+            timeout=PROBE_TIMEOUT_S,
+        )
+    except (subprocess.TimeoutExpired, FileNotFoundError) as e:
+        critical(f'  probe error for {domain}: {e}')
+        return None
+
+    chain = re.findall(rb'-----BEGIN CERTIFICATE-----.+?-----END CERTIFICATE-----', proc.stdout, re.S)
+    if not chain:
+        critical(f'  {domain}: no certificates presented (unreachable / handshake failed)')
+        return None
+    return _openssl_name(chain[-1], 'issuer')
+
+
+def _emit_gh_outputs(*, removable: list[str], alert: bool, probe_ok: bool) -> None:
+    gh_out = os.environ.get('GITHUB_OUTPUT')
+    if not gh_out:
+        return
+    with open(gh_out, 'a', encoding='utf-8') as f:
+        f.write(f'removable={" ".join(removable)}\n')
+        f.write(f'alert={"true" if alert else "false"}\n')
+        f.write(f'probe_ok={"true" if probe_ok else "false"}\n')
+
+
+def audit() -> int:
+    """
+    Audit every cert currently in the shipped bundle (cacert-merged.pem = base + pinned + custom):
+      - expiry of all of them;
+      - for pinned roots, probe the live endpoints to decide which are still needed.
+
+    Emits GitHub outputs (removable / alert / probe_ok). Returns exit code 1 on a genuine
+    rotate-now alert (a still-needed cert expired/expiring); removal of unneeded pins is
+    left to the workflow's PR step keyed on the `removable` output. Fail-safe: if any
+    monitored endpoint is unreachable, nothing is proposed for removal.
+    """
+    warn_days = _expiry_warn_days()
+
+    # The bundle as actually shipped.
+    try:
+        bundle_bytes = Path(MERGED_PEM_FILE).read_bytes()
+    except OSError as e:
+        raise InputError(f'Cannot read {MERGED_PEM_FILE}: {e}') from e
+    bundle_blocks = extract_pem_cert_blocks(bundle_bytes, source=MERGED_PEM_FILE)
+    bundle_certs = load_all_certs(bundle_blocks, label='bundle')
+
+    # Pinned roots, keyed by canonical subject, so we can tell them apart from the curl
+    # base within the merged bundle and know which file to retire.
+    pinned_blocks, pinned_paths = load_pinned_cert_blocks()
+    pinned_by_subject: dict[str, str] = {}
+    for blk, path in zip(pinned_blocks, pinned_paths):
+        pinned_by_subject[_openssl_name(blk, 'subject')] = path.as_posix()
+
+    critical(f'Auditing {len(bundle_certs)} certificate(s) in {MERGED_PEM_FILE} '
+             f'({len(pinned_by_subject)} pinned); warn window {warn_days}d')
+
+    # Which anchors do the live endpoints actually require?
+    required: set[str] = set()
+    probe_ok = True
+    for domain in MONITORED_DOMAINS:
+        subj = required_anchor_subject(domain)
+        if subj is None:
+            probe_ok = False
+            critical(f'  {domain}: UNREACHABLE (will not retire any pin this run)')
+            continue
+        required.add(subj)
+        critical(f'  {domain}: requires anchor -> {subj}')
+
+    now = datetime.datetime.now(datetime.timezone.utc)
+    removable: list[str] = []
+    alert = False
+
+    for cert in bundle_certs:
+        subject = _rfc2253_subject(cert)
+        days_left = (_cert_not_after_utc(cert) - now).days
+        pinned_path = pinned_by_subject.get(subject)
+
+        if pinned_path is not None:
+            needed = subject in required
+            if not needed:
+                if probe_ok:
+                    critical(f'REMOVABLE pin (no endpoint chains through it): {pinned_path} [{subject}]')
+                    removable.append(pinned_path)
+                else:
+                    critical(f'unused pin, but a probe failed -> keeping (fail-safe): {pinned_path}')
+                continue
+            # Still needed -> expiry is an operational risk.
+            if days_left < 0:
+                critical(f'ALERT: pinned root EXPIRED and still required: {pinned_path} [{subject}]')
+                alert = True
+            elif days_left <= warn_days:
+                critical(f'ALERT: pinned root expires in {days_left}d and still required: {pinned_path} [{subject}]')
+                alert = True
+        else:
+            # Curl/base (or committed custom) root. We can't retire these individually, but a
+            # shipped root that is already expired is still worth failing on.
+            if days_left < 0:
+                critical(f'ALERT: shipped root EXPIRED: {subject}')
+                alert = True
+            elif days_left <= warn_days:
+                critical(f'note: base root expires in {days_left}d (curl refresh will handle it): {subject}')
+
+    critical('')
+    critical(f'Summary: {len(removable)} removable pin(s), alert={alert}, probe_ok={probe_ok}')
+    _emit_gh_outputs(removable=removable, alert=alert, probe_ok=probe_ok)
+    return 1 if alert else 0
 
 
 def _is_ca_certificate(cert: x509.Certificate) -> bool:
@@ -295,35 +554,21 @@ def load_all_certs(
     return certs
 
 
-def create_bundle(certs: list[x509.Certificate]) -> bytes:
-    def subject_der(c: x509.Certificate) -> bytes:
-        return c.subject.public_bytes(serialization.Encoding.DER)
-
-    certs_sorted = sorted(certs, key=subject_der)
-
-    for i in range(1, len(certs_sorted)):
-        if subject_der(certs_sorted[i - 1]) == subject_der(certs_sorted[i]):
+def validate_unique_subjects(certs: list[x509.Certificate]) -> None:
+    """
+    esp_crt_bundle (the ESP-IDF build step that packs cacert-merged.pem into flash) looks
+    certificates up by their DER-encoded subject name, so two certs sharing a subject
+    would make that lookup ambiguous. Reject duplicates here.
+    """
+    seen: dict[bytes, x509.Certificate] = {}
+    for crt in certs:
+        subject_der = crt.subject.public_bytes(serialization.Encoding.DER)
+        if subject_der in seen:
             raise InputError(
-                'Duplicate certificate subject name detected in bundle; ' 'this can make subject-name lookup ambiguous'
+                'Duplicate certificate subject name detected; this can make '
+                f'esp_crt_bundle subject-name lookup ambiguous: {crt.subject.rfc4514_string()}'
             )
-
-    bundle = struct.pack('>H', len(certs_sorted))
-
-    for crt in certs_sorted:
-        pub_key_der = crt.public_key().public_bytes(
-            serialization.Encoding.DER,
-            serialization.PublicFormat.SubjectPublicKeyInfo,
-        )
-        sub_name_der = subject_der(crt)
-
-        if len(sub_name_der) > 0xFFFF or len(pub_key_der) > 0xFFFF:
-            raise InputError('Subject name or public key too large for bundle format')
-
-        bundle += struct.pack('>HH', len(sub_name_der), len(pub_key_der))
-        bundle += sub_name_der
-        bundle += pub_key_der
-
-    return bundle
+        seen[subject_der] = crt
 
 
 def atomic_write(path: str, data: bytes) -> None:
@@ -350,25 +595,36 @@ def atomic_write(path: str, data: bytes) -> None:
             pass
 
 
-def main() -> int:
-    if len(sys.argv) != 1:
-        raise InputError('This script takes no arguments')
+def _append_pem_blocks(base: bytes, blocks: list[bytes]) -> bytes:
+    out = bytearray(base)
+    for blk in blocks:
+        if out and not out.endswith(b'\n'):
+            out += b'\n'
+        out += b'\n' + blk
+        if not out.endswith(b'\n'):
+            out += b'\n'
+    return bytes(out)
+
+
+def generate() -> int:
+    warn_days = _expiry_warn_days()
 
     critical(f'Downloading CA bundle from: {URL_PEM}')
     pem = download_bytes(URL_PEM)
 
     got_hash = hashlib.sha256(pem).hexdigest().lower()
     critical(f'Downloaded {len(pem)} bytes')
-    critical(f'SHA-256(cacert.pem) = {got_hash}')
+    critical(f'SHA-256(curl download) = {got_hash}')
 
     critical(f'Downloading published hash from: {URL_SHA256}')
     sha_file = download_bytes(URL_SHA256)
-    expected_hash = parse_sha256_file(sha_file, expect_filename=os.path.basename(LOCAL_PEM_FILE))
-    critical(f'Published SHA-256     = {expected_hash}')
+    expected_hash = parse_sha256_file(sha_file, expect_filename='cacert.pem')
+    critical(f'Published SHA-256      = {expected_hash}')
 
     critical('')
     critical('MANUAL VERIFICATION REQUIRED')
-    critical('  Compare the above SHA-256 hash against:')
+    critical('  Compare the "SHA-256(curl download)" hash above (the upstream bytes, computed')
+    critical('  BEFORE pinned/custom certs are appended) against:')
     critical(f'    {MANUAL_HASH_PAGE}')
     critical('')
 
@@ -377,47 +633,97 @@ def main() -> int:
 
     critical('Automatic SHA-256 validation passed')
 
-    # Only write cacert.pem after verification passes
-    critical(f'Saving verified PEM to {LOCAL_PEM_FILE} (atomic)')
-    atomic_write(LOCAL_PEM_FILE, pem)
-
-    blocks = extract_pem_cert_blocks(pem, source='downloaded curl CA bundle (cacert.pem)')
+    # Curl/Mozilla base.
+    blocks = extract_pem_cert_blocks(pem, source='downloaded curl CA bundle')
+    curl_certs = load_all_certs(blocks, label='CA', origins=['curl bundle'] * len(blocks))
     critical(f'Found {len(blocks)} certificate blocks in curl bundle')
 
-    (custom_blocks, custom_paths) = load_custom_cert_blocks()
+    # Pinned roots (tracked, shipped, appended into cacert-merged.pem, expiry-monitored).
+    pinned_blocks, pinned_paths = load_pinned_cert_blocks()
+    pinned_certs: list[x509.Certificate] = []
+    if pinned_blocks:
+        pinned_origins = [f'{PINNED_CERTS_DIR}/{p.name}' for p in pinned_paths]
+        pinned_certs = load_all_certs(pinned_blocks, label='pinned', origins=pinned_origins)
+        _reject_non_ca(pinned_certs, pinned_origins, kind='pinned')
+
+        # Never ship an already-dead anchor.
+        expired, expiring = check_certs_expiry(pinned_certs, pinned_origins, warn_days)
+        if expired:
+            raise InputError(f'Refusing to ship {len(expired)} expired pinned certificate(s)')
+        if expiring:
+            critical(f'NOTE: {len(expiring)} pinned cert(s) expire within {warn_days}d — rotate soon')
+        critical(f'Found {len(pinned_blocks)} pinned certificate(s)')
+    else:
+        critical(f'No pinned certificates found ({PINNED_CERTS_DIR}/*.pem)')
+
+    # Custom roots (local-only, git-ignored self-hosted PKI).
+    custom_blocks, custom_paths = load_custom_cert_blocks()
     custom_certs: list[x509.Certificate] = []
     if custom_blocks:
-        critical(f'Found {len(custom_blocks)} custom certificate(s)')
         custom_origins = [f'custom cert file: {p}' for p in custom_paths]
         custom_certs = load_all_certs(custom_blocks, label='custom', origins=custom_origins)
-
-        # Enforce that custom certs are CA certs (best-effort) and prevent accidental leaf addition.
-        non_ca = [(c, o) for (c, o) in zip(custom_certs, custom_origins) if not _is_ca_certificate(c)]
-        if non_ca:
-            critical(
-                'FATAL: One or more custom certificates are not CA certificates (BasicConstraints CA=TRUE missing)'
-            )
-            for c, origin in non_ca:
-                critical(f'  Origin : {origin}')
-                critical(f'  Subject: {c.subject.rfc4514_string()}')
-                critical(f'  Issuer : {c.issuer.rfc4514_string()}')
-            raise InputError('Refusing to include non-CA custom certificates')
+        _reject_non_ca(custom_certs, custom_origins, kind='custom')
+        critical(f'Found {len(custom_blocks)} custom certificate(s)')
     else:
         critical('No custom certificates found (custom_certs/*.pem)')
 
-    curl_origins = ['curl bundle'] * len(blocks)
-    curl_certs = load_all_certs(blocks, label='CA', origins=curl_origins)
-    certs = curl_certs + custom_certs
+    # Deduplicate: drop any pinned/custom cert whose DER is already present (in the base
+    # or an earlier pin/custom) so the merged output never contains the same cert twice.
+    seen_der = {c.public_bytes(serialization.Encoding.DER) for c in curl_certs}
+    extra_blocks: list[bytes] = []
+    extra_certs: list[x509.Certificate] = []
+    for blk, cert, origin in zip(
+        list(pinned_blocks) + list(custom_blocks),
+        pinned_certs + custom_certs,
+        [f'{PINNED_CERTS_DIR}/{p.name}' for p in pinned_paths] + [f'custom_certs/{p.name}' for p in custom_paths],
+    ):
+        der = cert.public_bytes(serialization.Encoding.DER)
+        if der in seen_der:
+            critical(f'Skipping duplicate certificate (already in bundle): {cert.subject.rfc4514_string()} [{origin}]')
+            continue
+        seen_der.add(der)
+        extra_blocks.append(blk)
+        extra_certs.append(cert)
 
-    critical(f'Parsed {len(certs)} certificates total')
+    # Validate the deduplicated set: unique subject names so esp_crt_bundle's subject-name
+    # lookup stays unambiguous (this also catches two *different* certs sharing a subject).
+    certs = curl_certs + extra_certs
+    critical(f'Bundle: {len(curl_certs)} base + {len(extra_certs)} pinned/custom = {len(certs)} certs')
+    validate_unique_subjects(certs)
 
-    # x509_crt_bundle is no longer written: the firmware build packs cacert.pem into flash
-    # via ESP-IDF's certificate-bundle step. create_bundle() still runs as a validation pass
-    # (it rejects duplicate subject names); its output is intentionally discarded.
-    create_bundle(certs)
+    # Save the verbatim curl base (so `sha256sum {BASE_PEM_FILE}` matches curl's published
+    # hash) and the merged store the firmware actually packs. The firmware build converts
+    # and packs cacert-merged.pem via ESP-IDF's certificate-bundle step; this script does not emit
+    # the packed x509 bundle itself.
+    critical(f'Saving {BASE_PEM_FILE} (verbatim curl base, {len(blocks)} certs, atomic)')
+    atomic_write(BASE_PEM_FILE, pem)
+
+    # Merged file gets our own banner in place of curl's leading header, then all certs.
+    base_no_header = pem[pem.find(b'-----BEGIN CERTIFICATE-----') :]
+    combined = MERGED_BANNER + _append_pem_blocks(base_no_header, extra_blocks)
+    critical(f'Saving {MERGED_PEM_FILE} ({len(certs)} certs, atomic)')
+    atomic_write(MERGED_PEM_FILE, combined)
 
     critical('Done')
     return 0
+
+
+USAGE = 'usage: cert_bundle.py [generate|audit]'
+
+
+def main() -> int:
+    args = sys.argv[1:]
+    if not args or args == ['generate']:
+        return generate()
+    if args == ['audit']:
+        return audit()
+    if args in (['-h'], ['--help']):
+        critical(USAGE)
+        critical('  generate  (default)  download + verify; write cacert-curl.pem (base) + cacert-merged.pem (base+pinned+custom)')
+        critical('  audit                audit expiry of every shipped cert + probe endpoints for pinned')
+        critical('                       relevance; exits 1 on a still-needed expired/expiring cert')
+        return 0
+    raise InputError(USAGE)
 
 
 if __name__ == '__main__':
