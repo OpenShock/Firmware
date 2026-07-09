@@ -1,0 +1,66 @@
+menu "OpenShock Board"
+
+    config OPENSHOCK_RF_TX_GPIO
+        int "RF transmitter GPIO"
+        default -1
+        help
+            GPIO driving the 433 MHz RF transmitter. Leave at -1 to ship without a
+            fixed pin; the firmware then uses the pin configured at runtime.
+
+    config OPENSHOCK_ESTOP_PIN
+        int "E-Stop input GPIO"
+        default -1
+        help
+            GPIO for a physical emergency-stop button. -1 disables the built-in E-Stop.
+
+    config OPENSHOCK_LED_GPIO
+        int "Status LED GPIO (single-colour)"
+        default -1
+        help
+            GPIO for a plain on/off status LED. -1 if the board has none.
+
+    config OPENSHOCK_LED_WS2812B
+        int "Status LED GPIO (WS2812B RGB)"
+        default -1
+        help
+            GPIO for an addressable WS2812B RGB status LED. -1 if the board has none.
+
+    config OPENSHOCK_LED_SWAP_RG_CHANNELS
+        bool "Swap red/green channels on the RGB LED"
+        default n
+        help
+            Some WS2812B-alike parts wire the red and green channels swapped.
+            Enable to correct the colour order.
+
+    config OPENSHOCK_API_DOMAIN
+        string "OpenShock API domain"
+        default "api.openshock.app"
+        help
+            Default backend API domain the hub connects to. Overridable at runtime.
+
+    config OPENSHOCK_FW_CDN_DOMAIN
+        string "Firmware CDN domain"
+        default "firmware.openshock.org"
+        help
+            Default CDN domain used for OTA firmware/version lookups. Overridable at runtime.
+
+    config OPENSHOCK_FW_HOSTNAME
+        string "Default hostname"
+        default "OpenShock"
+        help
+            Default network hostname; also the base of the default user agent.
+
+    config OPENSHOCK_FW_AP_PREFIX
+        string "SoftAP SSID prefix"
+        default "OpenShock-"
+        help
+            Prefix for the captive-portal SoftAP SSID (the device MAC is appended).
+
+    config OPENSHOCK_URI_BUFFER_SIZE
+        int "HTTP URI buffer size (bytes)"
+        default 256
+        help
+            Stack buffer size for composed request URIs. Increase if a configured
+            domain plus path can exceed this.
+
+endmenu

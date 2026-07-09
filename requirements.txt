@@ -1,7 +1,9 @@
-platformio==6.1.19
-esptool==5.3.1
 cryptography==49.0.0
+esptool==5.3.1
 # Used by scripts/embed_env_vars.py (import git). The old espressif32 platform
 # pulled GitPython in transitively; the pioarduino platform does not, so pin it
 # explicitly or the SCons pre-build script fails with ModuleNotFoundError.
 GitPython==3.1.50
+# scripts/gen_staticfs.py packs the captive-portal assets into a littlefs image
+# matching the runtime mount geometry (components/fs/src/LfsPartition.cpp).
+littlefs-python==0.14.0

@@ -1,0 +1,15 @@
+# OpenShock-Core-V1 — auto-ported from platformio.ini. Board-specific deltas only;
+# shared config lives in sdkconfig.defaults.
+
+CONFIG_IDF_TARGET="esp32s3"
+CONFIG_ESPTOOLPY_FLASHSIZE_8MB=y
+
+# OpenShock uses a single 4 MB OTA partition layout (fits every board's flash).
+CONFIG_PARTITION_TABLE_CUSTOM=y
+CONFIG_PARTITION_TABLE_CUSTOM_FILENAME="partitions/ota_4mb.csv"
+
+# Hardware pins (see src/Kconfig.projbuild)
+CONFIG_OPENSHOCK_LED_WS2812B=48
+CONFIG_OPENSHOCK_LED_GPIO=35
+CONFIG_OPENSHOCK_RF_TX_GPIO=15
+CONFIG_OPENSHOCK_ESTOP_PIN=13

@@ -1,0 +1,14 @@
+# DFRobot-Firebeetle2-ESP32E — auto-ported from platformio.ini. Board-specific deltas only;
+# shared config lives in sdkconfig.defaults.
+
+CONFIG_IDF_TARGET="esp32"
+CONFIG_ESPTOOLPY_FLASHSIZE_4MB=y
+
+# OpenShock uses a single 4 MB OTA partition layout (fits every board's flash).
+CONFIG_PARTITION_TABLE_CUSTOM=y
+CONFIG_PARTITION_TABLE_CUSTOM_FILENAME="partitions/ota_4mb.csv"
+
+# Hardware pins (see src/Kconfig.projbuild)
+CONFIG_OPENSHOCK_RF_TX_GPIO=13
+CONFIG_OPENSHOCK_LED_WS2812B=5
+CONFIG_OPENSHOCK_LED_GPIO=2
