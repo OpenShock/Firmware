@@ -58,9 +58,9 @@ TEST_CASE("missing key and type mismatch", "[osjson]")
   bool b = false;
   TEST_ASSERT_FALSE(root["name"].tryGetBool(b));  // string, not bool
   int64_t n = 0;
-  TEST_ASSERT_FALSE(root["name"].tryGetI64(n));  // string, not number
+  TEST_ASSERT_FALSE(root["name"].tryGetI64(n));   // string, not number
   std::string_view s;
-  TEST_ASSERT_FALSE(root["n"].tryGetStr(s));  // number, not string
+  TEST_ASSERT_FALSE(root["n"].tryGetStr(s));      // number, not string
 }
 
 TEST_CASE("nested objects and arrays", "[osjson]")

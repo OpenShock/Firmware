@@ -33,7 +33,7 @@ TEST_CASE("parse: malformed documents are rejected", "[osjson][parse]")
   TEST_ASSERT_FALSE(doc.parse("["));
   TEST_ASSERT_FALSE(doc.parse("[1,2"));
   TEST_ASSERT_FALSE(doc.parse("{\"a\":"));
-  TEST_ASSERT_FALSE(doc.parse("{\"a\""));       // key with no value
+  TEST_ASSERT_FALSE(doc.parse("{\"a\""));          // key with no value
   TEST_ASSERT_FALSE(doc.parse("\"unterminated"));  // unterminated string
   TEST_ASSERT_FALSE(doc.parse("{ not valid json"));
 }

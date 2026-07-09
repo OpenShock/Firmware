@@ -37,7 +37,7 @@ TEST_CASE("operator[]: case-sensitive and prefix-distinct keys", "[osjson][nav]"
   TEST_ASSERT_EQUAL_INT64(1, v);
   TEST_ASSERT_TRUE(root["Name"].tryGetI64(v));  // different case -> different key
   TEST_ASSERT_EQUAL_INT64(2, v);
-  TEST_ASSERT_TRUE(root["n"].tryGetI64(v));      // must not match "name"/"nam"
+  TEST_ASSERT_TRUE(root["n"].tryGetI64(v));     // must not match "name"/"nam"
   TEST_ASSERT_EQUAL_INT64(3, v);
   TEST_ASSERT_TRUE(root["nam"].tryGetI64(v));
   TEST_ASSERT_EQUAL_INT64(4, v);
@@ -65,8 +65,7 @@ TEST_CASE("operator[]: lookup skips over object- and array-valued members", "[os
 {
   // The value before "target" is a nested structure; skip() must jump the whole
   // subtree so the following key is found correctly.
-  static const char json[] =
-    R"({"big":{"x":[1,2,{"y":3}],"z":{"w":4}},"arr":[9,8,7],"target":123})";
+  static const char json[] = R"({"big":{"x":[1,2,{"y":3}],"z":{"w":4}},"arr":[9,8,7],"target":123})";
   JSON::JsonDocument doc;
   TEST_ASSERT_TRUE(doc.parse(json));
   JSON::JsonView root = doc.root();
@@ -88,10 +87,10 @@ TEST_CASE("count(): arrays, objects, primitives, invalid", "[osjson][nav]")
   TEST_ASSERT_TRUE(doc.parse(R"({"a":[1,2,3,4],"o":{"x":1,"y":2},"n":5})"));
   JSON::JsonView root = doc.root();
 
-  TEST_ASSERT_EQUAL_INT(3, root.count());          // object: member count
-  TEST_ASSERT_EQUAL_INT(4, root["a"].count());     // array length
-  TEST_ASSERT_EQUAL_INT(2, root["o"].count());     // nested object members
-  TEST_ASSERT_EQUAL_INT(0, root["n"].count());     // primitive
+  TEST_ASSERT_EQUAL_INT(3, root.count());       // object: member count
+  TEST_ASSERT_EQUAL_INT(4, root["a"].count());  // array length
+  TEST_ASSERT_EQUAL_INT(2, root["o"].count());  // nested object members
+  TEST_ASSERT_EQUAL_INT(0, root["n"].count());  // primitive
   TEST_ASSERT_EQUAL_INT(0, root["missing"].count());
 }
 
@@ -107,8 +106,8 @@ TEST_CASE("at(): valid indices, out of range, and non-arrays", "[osjson][nav]")
   TEST_ASSERT_TRUE(arr.at(2).tryGetI64(v));
   TEST_ASSERT_EQUAL_INT64(30, v);
 
-  TEST_ASSERT_FALSE(arr.at(3).valid());    // past the end
-  TEST_ASSERT_FALSE(arr.at(-1).valid());   // negative
+  TEST_ASSERT_FALSE(arr.at(3).valid());   // past the end
+  TEST_ASSERT_FALSE(arr.at(-1).valid());  // negative
   TEST_ASSERT_FALSE(arr.at(1000).valid());
 
   // at() on an object is invalid (only arrays are indexable)

@@ -14,7 +14,7 @@ TEST_CASE("stress: large flat array forces the token buffer to grow", "[osjson][
 {
   // 1000 elements -> ~1001 tokens, well past the initial capacity of 32, so the
   // grow-and-retry path in parse() runs several times.
-  const int N = 1000;
+  const int N      = 1000;
   std::string json = "[";
   for (int i = 0; i < N; ++i) {
     if (i) json += ',';
@@ -40,7 +40,7 @@ TEST_CASE("stress: large flat array forces the token buffer to grow", "[osjson][
 
 TEST_CASE("stress: object with many members, every key resolvable", "[osjson][stress]")
 {
-  const int N = 300;
+  const int N      = 300;
   std::string json = "{";
   for (int i = 0; i < N; ++i) {
     if (i) json += ',';
@@ -68,7 +68,7 @@ TEST_CASE("stress: document needing > 16384 tokens is rejected by the cap", "[os
 {
   // Array of 20000 numbers => 20001 tokens > cap => parse() bails out to false
   // rather than growing unboundedly.
-  const int N = 20000;
+  const int N      = 20000;
   std::string json = "[";
   for (int i = 0; i < N; ++i) {
     if (i) json += ',';
@@ -85,7 +85,7 @@ TEST_CASE("stress: just under the cap still parses", "[osjson][stress]")
 {
   // 16000 elements -> 16001 tokens, needs capacity 32768? No: capacity doubles
   // 32,64,...,16384. 16001 <= 16384 so it fits without tripping the cap.
-  const int N = 16000;
+  const int N      = 16000;
   std::string json = "[";
   for (int i = 0; i < N; ++i) {
     if (i) json += ',';

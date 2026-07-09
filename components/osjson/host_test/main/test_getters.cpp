@@ -69,9 +69,9 @@ TEST_CASE("tryGetBool: true/false succeed, everything else fails", "[osjson][get
   TEST_ASSERT_TRUE(root["f"].tryGetBool(b));
   TEST_ASSERT_FALSE(b);
 
-  TEST_ASSERT_FALSE(root["n"].tryGetBool(b));   // number
-  TEST_ASSERT_FALSE(root["s"].tryGetBool(b));   // the STRING "true"
-  TEST_ASSERT_FALSE(root["z"].tryGetBool(b));   // null
+  TEST_ASSERT_FALSE(root["n"].tryGetBool(b));  // number
+  TEST_ASSERT_FALSE(root["s"].tryGetBool(b));  // the STRING "true"
+  TEST_ASSERT_FALSE(root["z"].tryGetBool(b));  // null
   TEST_ASSERT_FALSE(root["missing"].tryGetBool(b));
 }
 
@@ -79,9 +79,8 @@ TEST_CASE("tryGetBool: true/false succeed, everything else fails", "[osjson][get
 
 TEST_CASE("tryGetI64: valid integers including boundaries", "[osjson][getters]")
 {
-  static const char json[] =
-    R"({"zero":0,"pos":123,"neg":-123,"i32over":2147483648,)"
-    R"("max":9223372036854775807,"min":-9223372036854775808,"leadzero":007})";
+  static const char json[] = R"({"zero":0,"pos":123,"neg":-123,"i32over":2147483648,)"
+                             R"("max":9223372036854775807,"min":-9223372036854775808,"leadzero":007})";
   JSON::JsonDocument doc;
   TEST_ASSERT_TRUE(doc.parse(json));
   JSON::JsonView root = doc.root();
@@ -105,9 +104,8 @@ TEST_CASE("tryGetI64: valid integers including boundaries", "[osjson][getters]")
 
 TEST_CASE("tryGetI64: rejects non-integers and partial parses", "[osjson][getters]")
 {
-  static const char json[] =
-    R"({"flt":1.5,"exp":"1e3","over":9223372036854775808,)"
-    R"("plus":"+5","hex":"0x1F","word":"abc","s":"42","b":true,"z":null})";
+  static const char json[] = R"({"flt":1.5,"exp":"1e3","over":9223372036854775808,)"
+                             R"("plus":"+5","hex":"0x1F","word":"abc","s":"42","b":true,"z":null})";
   // NOTE: exp/plus/hex/word/s are quoted so they are valid JSON string tokens;
   // tryGetI64 must still reject them because they are not numbers.
   JSON::JsonDocument doc;
@@ -136,8 +134,7 @@ static bool nearly(double a, double b)
 
 TEST_CASE("tryGetDouble: accepts ints, decimals and exponents", "[osjson][getters]")
 {
-  static const char json[] =
-    R"({"i":42,"d":3.14,"neg":-2.5,"e":1e3,"eneg":1.5e-2,"zero":0.0})";
+  static const char json[] = R"({"i":42,"d":3.14,"neg":-2.5,"e":1e3,"eneg":1.5e-2,"zero":0.0})";
   JSON::JsonDocument doc;
   TEST_ASSERT_TRUE(doc.parse(json));
   JSON::JsonView root = doc.root();
