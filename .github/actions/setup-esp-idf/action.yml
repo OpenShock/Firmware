@@ -1,8 +1,8 @@
 name: setup-esp-idf
 description: >-
-  Install a pinned native ESP-IDF toolchain plus the Python deps our build
-  scripts need (gen_env_header.py / gen_staticfs.py). Shared by every job that
-  runs idf.py. Replaces the PlatformIO pio-cache action.
+  Install a pinned native ESP-IDF toolchain, activate its Python virtualenv for
+  every later step, and install the build-time Python deps our scripts need.
+  Shared by every job that runs idf.py. Replaces the PlatformIO pio-cache action.
 inputs:
   idf-version:
     description: 'ESP-IDF version to install (EIM version tag).'
@@ -12,10 +12,10 @@ inputs:
 runs:
   using: composite
   steps:
-    # Best-effort restore of the IDF tool store (compilers, openocd, ...). The
-    # install action below still runs and is authoritative for PATH/IDF_PATH; a
-    # warm ~/.espressif just lets it detect an existing install and skip the
-    # multi-hundred-MB download. Keyed by version so a bump invalidates cleanly.
+    # Cache the ESP-IDF tool store (toolchains, openocd, and the Python venv all
+    # live under IDF_TOOLS_PATH=~/.espressif) so the install below reuses them
+    # instead of re-downloading hundreds of MB. Keyed by version; the venv (with
+    # littlefs-python) is captured at post-job save.
     - name: Cache ESP-IDF tools
       uses: actions/cache@27d5ce7f107fe9357f9df03efb73ab90386fccae  # v5.0.5
       with:
@@ -24,20 +24,27 @@ runs:
         restore-keys: |
           esp-idf-tools-${{ runner.os }}-
 
-    # Installs ESP-IDF and puts idf.py / esptool.py on PATH for later run steps
-    # (no need to source export.sh). v1 is a moving branch (the repo publishes no
-    # release tags), pinned by SHA per this repo's convention.
+    # Installs ESP-IDF and sets IDF_PATH for later steps. v1 is a moving branch
+    # (the repo publishes no release tags), pinned by SHA per this repo's convention.
     - name: Install ESP-IDF
       uses: espressif/install-esp-idf-action@8fc05d1470d5591417e7a3707a1f2bec178db4ae  # v1
       with:
         version: ${{ inputs.idf-version }}
 
-    - uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405  # v6.2.0
-      with:
-        cache: 'pip'
-
-    - name: Install Python dependencies
+    # scripts/build.py runs idf.py through the current Python interpreter, which
+    # MUST be the ESP-IDF venv (idf.py refuses to run otherwise). install-esp-idf
+    # -action only sets IDF_PATH, so activate the venv here and persist it to
+    # GITHUB_ENV so `python` / `idf.py` resolve to the venv in every later step.
+    - name: Activate ESP-IDF environment
       shell: bash
-      # littlefs-python (gen_staticfs.py) + GitPython/cryptography (env + cert
-      # tooling). esptool ships inside ESP-IDF, so it is not reinstalled here.
-      run: pip install -r requirements.txt
+      run: |
+        . "$IDF_PATH/export.sh"
+        # gen_staticfs.py (invoked by CMake under the venv python during a full
+        # build) needs littlefs-python. Install it INTO the venv. esptool is
+        # deliberately not installed - idf.py bundles its own and a pip esptool
+        # would clobber it (the standalone merge job installs esptool separately).
+        python -m pip install --quiet "littlefs-python==0.14.0"
+        {
+          echo "PATH=$PATH"
+          echo "IDF_PYTHON_ENV_PATH=${IDF_PYTHON_ENV_PATH:-}"
+        } >> "$GITHUB_ENV"
