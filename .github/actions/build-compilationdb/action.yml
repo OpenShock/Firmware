@@ -13,25 +13,17 @@ runs:
   steps:
     - uses: ./.github/actions/setup-esp-idf
 
-    # The build always packs a static0 web-assets image, but code analysis does
-    # not need the real frontend. Provide a minimal stub so gen_staticfs.py
-    # succeeds without pulling the (heavy, separately-built) frontend artifact.
-    - name: Stub frontend for staticfs
-      shell: bash
-      run: |
-        mkdir -p frontend/build
-        [ -f frontend/build/index.html ] || printf '<!doctype html><title>ci</title>' > frontend/build/index.html
-
-    # A real compile of the canonical board via the shared build.py entry point,
-    # which writes build/OpenShock-Core-V2/compile_commands.json (for cpp-linter)
-    # and lets CodeQL trace the C/C++ compilation. ccache is left off so CodeQL
-    # sees every compiler invocation.
+    # Build only the `app` target: this configures the project (writing
+    # build/OpenShock-Core-V2/compile_commands.json for cpp-linter) and compiles
+    # the application (so CodeQL traces the C/C++). It skips the static0 image, so
+    # no frontend / littlefs is needed. ccache is left off so CodeQL sees every
+    # compiler invocation.
     - name: Build firmware (OpenShock-Core-V2 / esp32s3)
       shell: bash
       run: |
         set -euo pipefail
         export OPENSHOCK_FW_BUILD_DATE="$(git show -s --format=%cI HEAD 2>/dev/null || date -u +%Y-%m-%dT%H:%M:%SZ)"
-        python scripts/build.py OpenShock-Core-V2 build
+        python3 scripts/build.py OpenShock-Core-V2 app
       env:
         OPENSHOCK_FW_VERSION: ${{ inputs.version }}
         OPENSHOCK_FW_GIT_REF: ${{ github.ref }}

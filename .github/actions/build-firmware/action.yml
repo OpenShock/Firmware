@@ -36,7 +36,7 @@ runs:
         set -euo pipefail
         export OPENSHOCK_FW_BUILD_DATE="$(git show -s --format=%cI HEAD 2>/dev/null || date -u +%Y-%m-%dT%H:%M:%SZ)"
         export IDF_CCACHE_ENABLE=1
-        python scripts/build.py "${{ inputs.board }}" app bootloader partition-table
+        python3 scripts/build.py "${{ inputs.board }}" app bootloader partition-table
       env:
         OPENSHOCK_FW_VERSION: ${{ inputs.version }}
         OPENSHOCK_FW_GIT_REF: ${{ github.ref }}
