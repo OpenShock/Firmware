@@ -18,8 +18,8 @@ namespace OpenShock::Config {
     uint8_t id;
     std::string ssid;
     std::string password;
-    wifi_auth_mode_t authMode;       // Auth mode when saved, WIFI_AUTH_MAX = unknown
-    std::array<uint8_t, 6> bssid;    // Pinned BSSID, all zeros = no pin
+    wifi_auth_mode_t authMode;     // Auth mode when saved, WIFI_AUTH_MAX = unknown
+    std::array<uint8_t, 6> bssid;  // Pinned BSSID, all zeros = no pin
 
     bool HasPinnedBSSID() const;
 

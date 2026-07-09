@@ -2,14 +2,14 @@
 
 const char* const TAG = "GatewayClient";
 
-#include "OpenShock.h"
 #include "config/Config.h"
-#include "Core.h"
 #include "events/Events.h"
 #include "Logging.h"
 #include "message_handlers/WebSocket.h"
+#include "OpenShock.h"
 #include "OtaUpdateManager.h"
 #include "serialization/WSGateway.h"
+#include "Temporal.h"
 #include "visual/VisualStateManager.h"
 
 using namespace OpenShock;

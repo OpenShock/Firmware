@@ -7,9 +7,9 @@ const char* const TAG = "CaptivePortal";
 #include "captiveportal/CaptivePortalInstance.h"
 #include "CommandHandler.h"
 #include "config/Config.h"
-#include "Core.h"
 #include "GatewayConnectionManager.h"
 #include "Logging.h"
+#include "Temporal.h"
 
 #include <ESPAsyncWebServer.h>
 #include <WebSocketsServer.h>
@@ -32,11 +32,11 @@ static SimpleMutex s_instanceMutex;
 static std::shared_ptr<CaptivePortal::CaptivePortalInstance> s_instance = nullptr;
 
 // Absolute esp_timer timestamps (microseconds). 0 = not armed.
-static std::atomic<int64_t> s_startupGraceExpiry = 0;  // Don't open portal until this time passes
-static std::atomic<int64_t> s_autoCloseExpiry    = 0;  // Auto-close AP when no clients connected and device is online
+static std::atomic<int64_t> s_startupGraceExpiry = 0;                     // Don't open portal until this time passes
+static std::atomic<int64_t> s_autoCloseExpiry    = 0;                     // Auto-close AP when no clients connected and device is online
 
-static constexpr int64_t STARTUP_GRACE_PERIOD_US = 30LL * 1'000'000;     // 30 seconds
-static constexpr int64_t AUTO_CLOSE_DELAY_US     = 5LL * 60 * 1'000'000; // 5 minutes
+static constexpr int64_t STARTUP_GRACE_PERIOD_US = 30LL * 1'000'000;      // 30 seconds
+static constexpr int64_t AUTO_CLOSE_DELAY_US     = 5LL * 60 * 1'000'000;  // 5 minutes
 
 static bool isDeviceFullyConfigured()
 {

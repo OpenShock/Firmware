@@ -9,8 +9,8 @@
 // and UART0 remains available as Serial0. When CDC is off boot, `Serial` is UART0 and
 // no USB CDC global is instantiated.
 #if ARDUINO_USB_CDC_ON_BOOT
-#define OS_SERIAL     ::Serial0
-#define OS_SERIAL_USB ::Serial  // expands to HWCDCSerial or USBSerial
+#define OS_SERIAL         ::Serial0
+#define OS_SERIAL_USB     ::Serial  // expands to HWCDCSerial or USBSerial
 #define OS_HAS_USB_SERIAL 1
 #else
 #define OS_SERIAL ::Serial  // expands to Serial0

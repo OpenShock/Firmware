@@ -1,8 +1,8 @@
 #pragma once
 
+#include "enums/WebSocketMessageType.h"
 #include "OpenShock.h"
 #include "TinyVec.h"
-#include "enums/WebSocketMessageType.h"
 
 #include <WebSockets.h>
 

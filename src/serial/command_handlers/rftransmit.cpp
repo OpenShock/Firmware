@@ -1,8 +1,8 @@
 #include "serial/command_handlers/common.h"
 
 #include "CommandHandler.h"
-#include "json/Json.h"
 #include "serialization/JsonSerial.h"
+#include "json/Json.h"
 
 static void handleRFTransmitCommand(std::string_view arg, bool isAutomated)
 {

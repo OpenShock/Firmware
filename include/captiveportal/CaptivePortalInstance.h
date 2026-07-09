@@ -1,8 +1,8 @@
 #pragma once
 
 #include "OpenShock.h"
-#include <span>
 #include "WebSocketDeFragger.h"
+#include <span>
 
 #include <DNSServer.h>
 #include <ESPAsyncWebServer.h>

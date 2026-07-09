@@ -5,8 +5,8 @@ const char* const TAG = "WSGateway";
 #include <esp_wifi.h>
 
 #include "config/Config.h"
-#include "Core.h"
 #include "Logging.h"
+#include "Temporal.h"
 
 #ifndef OPENSHOCK_FW_VERSION_MAJOR
 #define OPENSHOCK_FW_VERSION_MAJOR 0

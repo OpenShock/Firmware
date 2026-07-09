@@ -1,8 +1,8 @@
 #include "serial/command_handlers/common.h"
 
 #include "config/Config.h"
-#include "json/Json.h"
 #include "wifi/WiFiManager.h"
+#include "json/Json.h"
 
 #include <vector>
 

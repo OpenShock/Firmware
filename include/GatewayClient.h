@@ -1,7 +1,7 @@
 #pragma once
 
-#include "OpenShock.h"
 #include "enums/GatewayClientState.h"
+#include "OpenShock.h"
 
 #include <WebSocketsClient.h>
 

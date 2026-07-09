@@ -3,8 +3,8 @@
 const char* const TAG = "ShockerCommandHandler";
 
 #include "CommandHandler.h"
-#include "Logging.h"
 #include "enums/ShockerModelType.h"
+#include "Logging.h"
 
 #include <cstdint>
 

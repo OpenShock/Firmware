@@ -187,8 +187,8 @@ bool JSON::JsonView::tryGetDouble(double& out) const noexcept
   std::memcpy(buf, s.data(), s.size());
   buf[s.size()] = '\0';
 
-  char* end     = nullptr;
-  double value  = std::strtod(buf, &end);
+  char* end    = nullptr;
+  double value = std::strtod(buf, &end);
   if (end != buf + s.size()) {
     return false;
   }

@@ -1,9 +1,9 @@
 #include "config/EStopConfig.h"
 
 #include "Chipset.h"
-#include "OpenShock.h"
 #include "config/internal/utils.h"
 #include "Logging.h"
+#include "OpenShock.h"
 
 const char* const TAG = "Config::EStopConfig";
 
