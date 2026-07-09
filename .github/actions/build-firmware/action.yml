@@ -31,20 +31,7 @@ runs:
       # schedule/dispatch builds bake in an empty date.
       run: |
         export OPENSHOCK_FW_BUILD_DATE="$(git show -s --format=%cI HEAD 2>/dev/null || date -u +%Y-%m-%dT%H:%M:%SZ)"
-        # The ESP-IDF bootloader link (bootloader.elf) intermittently races its
-        # own linker-script generation and fails with "cannot open linker script
-        # file bootloader.ld" - a different board set fails on each run while
-        # siblings with identical flags succeed. Once an attempt has run, the
-        # script is on disk, so an incremental retry re-links only the bootloader
-        # and succeeds. Retry a couple of times before giving up for real.
-        for attempt in 1 2 3; do
-          if pio run -e ${{ inputs.board }}; then
-            exit 0
-          fi
-          echo "::warning::pio run attempt ${attempt} failed for ${{ inputs.board }} (likely the intermittent bootloader.ld link race); retrying"
-        done
-        echo "::error::pio run failed for ${{ inputs.board }} after 3 attempts"
-        exit 1
+        pio run -e ${{ inputs.board }}
       env:
         OPENSHOCK_FW_VERSION: ${{ inputs.version }}
         OPENSHOCK_FW_GIT_REF: ${{ github.ref }}
