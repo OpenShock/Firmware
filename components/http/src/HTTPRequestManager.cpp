@@ -11,6 +11,7 @@ const char* const TAG = "HTTPRequestManager";
 #include "Temporal.h"
 #include "util/StringUtils.h"
 
+#include <esp_crt_bundle.h>
 #include <esp_err.h>
 #include <esp_http_client.h>
 
@@ -167,8 +168,8 @@ HTTP::Response<std::size_t> HTTP::Client::Download(std::string_view url, const s
 
   // Open the connection, reusing the kept-alive handle when possible. If a
   // reused (kept-alive) socket has been closed by the server, drop it and
-  // reconnect fresh once. HTTPS server certificates are not verified yet.
-  // TODO: attach the embedded x509 cert bundle.
+  // reconnect fresh once. HTTPS servers are verified against the compiled-in
+  // CA bundle via config.crt_bundle_attach below.
   esp_err_t err = ESP_FAIL;
   for (int attempt = 0; attempt < 2; ++attempt) {
     bool reused = m_handle != nullptr;
@@ -182,6 +183,7 @@ HTTP::Response<std::size_t> HTTP::Client::Download(std::string_view url, const s
       config.keep_alive_enable        = true;
       config.event_handler            = &Client::eventHandler;
       config.user_data                = this;
+      config.crt_bundle_attach        = esp_crt_bundle_attach;  // verify HTTPS servers against the compiled-in CA bundle
 
       m_handle = esp_http_client_init(&config);
       if (m_handle == nullptr) {

@@ -19,20 +19,6 @@ const char* const TAG = "GatewayConnectionManager";
 #include <memory>
 #include <unordered_map>
 
-//
-//  ######  ########  ######  ##     ## ########  #### ######## ##    ##    ########  ####  ######  ##    ##
-// ##    ## ##       ##    ## ##     ## ##     ##  ##     ##     ##  ##     ##     ##  ##  ##    ## ##   ##
-// ##       ##       ##       ##     ## ##     ##  ##     ##      ####      ##     ##  ##  ##       ##  ##
-//  ######  ######   ##       ##     ## ########   ##     ##       ##       ########   ##   ######  #####
-//       ## ##       ##       ##     ## ##   ##    ##     ##       ##       ##   ##    ##        ## ##  ##
-// ##    ## ##       ##    ## ##     ## ##    ##   ##     ##       ##       ##    ##   ##  ##    ## ##   ##
-//  ######  ########  ######   #######  ##     ## ####    ##       ##       ##     ## ####  ######  ##    ##
-//
-// TODO: Fix loading CA Certificate bundles, currently fails with "[esp_crt_bundle.c:161] esp_crt_bundle_init(): Unable to allocate memory for bundle"
-// This is probably due to the fact that the bundle is too large for the ESP32's heap or the bundle is incorrectly packedy them
-//
-#warning SSL certificate verification is currently not implemented, by RFC definition this is a security risk, and allows for MITM attacks, but the realistic risk is low
-
 const char* const AUTH_TOKEN_FILE = "/authToken";
 
 const uint8_t FLAG_NONE   = 0;

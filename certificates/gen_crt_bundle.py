@@ -411,9 +411,10 @@ def main() -> int:
 
     critical(f'Parsed {len(certs)} certificates total')
 
-    bundle = create_bundle(certs)
-    critical(f'Writing bundle to {OUTPUT_FILE} (atomic)')
-    atomic_write(OUTPUT_FILE, bundle)
+    # x509_crt_bundle is no longer written: the firmware build packs cacert.pem into flash
+    # via ESP-IDF's certificate-bundle step. create_bundle() still runs as a validation pass
+    # (it rejects duplicate subject names); its output is intentionally discarded.
+    create_bundle(certs)
 
     critical('Done')
     return 0

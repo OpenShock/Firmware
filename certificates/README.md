@@ -1,8 +1,10 @@
 # Certificates used for HTTPS
 
-This project uses a curated CA certificate bundle for TLS/SSL verification on the ESP32.
+This project uses a curated CA trust store (`cacert.pem`) for TLS/SSL verification on the ESP32.
 
-The bundle is sourced from **curl’s official CA extract** and can optionally be extended with **user-provided custom CA certificates**.
+It is sourced from **curl’s official CA extract**. The firmware build packs `cacert.pem` into
+the flash image via ESP-IDF's certificate-bundle step, and the ESP32 verifies every TLS server
+(gateway WebSocket, HTTP/OTA) against it.
 
 ## Source of Trust
 
@@ -34,7 +36,8 @@ The script will:
 - Compute its SHA-256 hash
 - Download curl’s published checksum
 - Verify the PEM matches the computed checksum
-- Optionally include custom certificates (see below)
+- Parse and validate every certificate, including any from `custom_certs/` (see below)
+- Write `cacert.pem`
 - Abort on any error or inconsistency
 
 ### 2. **Mandatory Manual Verification**
@@ -64,7 +67,10 @@ If they do not:
 After successful manual verification, commit:
 
 - `cacert.pem`
-- `x509_crt_bundle`
+
+`cacert.pem` is the only artifact. The firmware build packs it into the flash image via
+ESP-IDF's certificate-bundle step (`CONFIG_MBEDTLS_CUSTOM_CERTIFICATE_BUNDLE_PATH` in
+`sdkconfig.defaults`), so the script no longer emits a pre-packed `x509_crt_bundle`.
 
 ❌ **Never commit anything under `custom_certs/`.**
 
@@ -72,7 +78,7 @@ After successful manual verification, commit:
 
 Self-hosted setups may require trusting additional Certificate Authorities (e.g. internal PKI or private reverse proxies).
 
-Custom CA certificates can be added locally and merged into the bundle.
+Custom CA certificates can be dropped in locally; the script loads and validates them.
 
 ### How to add
 
@@ -95,12 +101,17 @@ The script will parse and validate them as CA certificates and reject anything i
 
 If `custom_certs/` does not exist or doesn't contain any .pem certificates, only curl’s CA bundle is used.
 
+> **Note:** custom-cert support is currently **dormant**. The script still validates any
+> `custom_certs/*.pem`, but it no longer writes a bundle and the build packs only
+> `cacert.pem` — so custom certs do not reach the firmware trust store yet. The loader is
+> kept in the script for when that flow is re-enabled.
+
 ## Trust Model Summary
 
 - Automatic verification protects against corruption and mismatched downloads
 - Manual verification anchors trust outside the update mechanism
 - Custom certificates explicitly extend trust and are opt-in only
-- The generated bundle is deterministic for a given input set
+- `cacert.pem` is a verbatim copy of curl’s verified CA extract
 
 ## References
 

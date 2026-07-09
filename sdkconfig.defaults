@@ -29,13 +29,15 @@ CONFIG_MBEDTLS_KEY_EXCHANGE_PSK=y
 # symbols don't exist.
 CONFIG_HTTPD_WS_SUPPORT=y
 
-# TEMPORARY: skip TLS server-cert verification. esp_http_client requests to the
-# API/CDN abort at TLS setup with ESP_ERR_MBEDTLS_SSL_SETUP_FAILED (0x8017)
-# because no CA/cert is supplied. This compiles in the MBEDTLS_SSL_VERIFY_NONE
-# escape hatch (esp_tls_mbedtls.c). TODO: remove and attach the embedded x509
-# cert bundle via config.crt_bundle_attach instead.
-CONFIG_ESP_TLS_INSECURE=y
-CONFIG_ESP_TLS_SKIP_SERVER_CERT_VERIFY=y
+# TLS server-cert verification uses the mbedTLS certificate bundle. We compile in
+# our own curated trust store (certificates/cacert.pem, sourced + checksum-verified
+# by certificates/gen_crt_bundle.py) instead of IDF's built-in Mozilla list, so
+# DEFAULT_NONE + a custom bundle. esp_http_client and esp_websocket_client attach it
+# via config.crt_bundle_attach = esp_crt_bundle_attach.
+CONFIG_MBEDTLS_CERTIFICATE_BUNDLE=y
+CONFIG_MBEDTLS_CERTIFICATE_BUNDLE_DEFAULT_NONE=y
+CONFIG_MBEDTLS_CUSTOM_CERTIFICATE_BUNDLE=y
+CONFIG_MBEDTLS_CUSTOM_CERTIFICATE_BUNDLE_PATH="certificates/cacert.pem"
 
 # Partition table — OpenShock uses a custom one; existing partitions stay valid
 # (leave PARTITION_TABLE_* at IDF defaults; per-env sdkconfigs can override)

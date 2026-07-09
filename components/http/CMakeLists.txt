@@ -17,4 +17,5 @@ idf_component_register(
                 concurrency                  # SimpleMutex (internal)
                 util                         # RateLimiter, StringUtils
                 esp_http_client              # esp_http_client.h (internal)
+                mbedtls                      # esp_crt_bundle.h (internal)
 )

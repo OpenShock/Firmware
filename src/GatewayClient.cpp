@@ -12,6 +12,8 @@ const char* const TAG = "GatewayClient";
 #include "Temporal.h"
 #include "visual/VisualStateManager.h"
 
+#include <esp_crt_bundle.h>
+
 #include <cstring>
 
 using namespace OpenShock;
@@ -58,19 +60,6 @@ void GatewayClient::connect(const std::string& host, uint16_t port, const std::s
 
   _setState(GatewayClientState::Connecting);
 
-//
-//  ######  ########  ######  ##     ## ########  #### ######## ##    ##    ########  ####  ######  ##    ##
-// ##    ## ##       ##    ## ##     ## ##     ##  ##     ##     ##  ##     ##     ##  ##  ##    ## ##   ##
-// ##       ##       ##       ##     ## ##     ##  ##     ##      ####      ##     ##  ##  ##       ##  ##
-//  ######  ######   ##       ##     ## ########   ##     ##       ##       ########   ##   ######  #####
-//       ## ##       ##       ##     ## ##   ##    ##     ##       ##       ##   ##    ##        ## ##  ##
-// ##    ## ##       ##    ## ##     ## ##    ##   ##     ##       ##       ##    ##   ##  ##    ## ##   ##
-//  ######  ########  ######   #######  ##     ## ####    ##       ##       ##     ## ####  ######  ##    ##
-//
-// TODO: Implement certificate verification
-//
-#warning SSL certificate verification is currently not implemented, by RFC definition this is a security risk, and allows for MITM attacks, but the realistic risk is low
-
   esp_websocket_client_config_t config = {};
   config.host                          = host.c_str();
   config.port                          = port;
@@ -79,7 +68,7 @@ void GatewayClient::connect(const std::string& host, uint16_t port, const std::s
   config.user_agent                    = OpenShock::Constants::FW_USERAGENT;
   config.headers                       = m_headers.c_str();
   config.disable_auto_reconnect        = true;  // GatewayConnectionManager owns reconnection
-  // No CA cert supplied: esp-tls skips verification (CONFIG_ESP_TLS_SKIP_SERVER_CERT_VERIFY).
+  config.crt_bundle_attach             = esp_crt_bundle_attach;  // verify server against the compiled-in CA bundle
 
   m_client = esp_websocket_client_init(&config);
   if (m_client == nullptr) {
@@ -98,8 +87,6 @@ void GatewayClient::connect(const std::string& host, uint16_t port, const std::s
     _setState(GatewayClientState::Disconnected);
     return;
   }
-
-  OS_LOGW(TAG, "WEBSOCKET CONNECTION BY RFC DEFINITION IS INSECURE, remote endpoint can not be verified due to lack of CA verification support, theoretically this is a security risk and allows for MITM attacks, but the realistic risk is low");
 }
 
 void GatewayClient::disconnect()
