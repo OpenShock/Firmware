@@ -20,3 +20,24 @@ CONFIG_MBEDTLS_KEY_EXCHANGE_PSK=y
 
 # Partition table — OpenShock uses a custom one; existing partitions stay valid
 # (leave PARTITION_TABLE_* at IDF defaults; per-env sdkconfigs can override)
+
+# Arduino selective compilation — every CONFIG_ARDUINO_SELECTIVE_<lib> defaults
+# to y, so turning on SELECTIVE_COMPILATION and then DISABLING the heavy library
+# wrappers we don't use drops their managed components (esp-sr + esp-dsp,
+# esp_rainmaker + insights + diag + cbor + qrcode, esp-zigbee/zboss, esp_modem,
+# matter, ...) out of the build closure entirely — a large build-time and flash
+# saving. None of these are referenced by OpenShock. Re-enable one (=y / delete
+# its line) if new code ever needs it.
+CONFIG_ARDUINO_SELECTIVE_COMPILATION=y
+CONFIG_ARDUINO_SELECTIVE_BLE=n
+CONFIG_ARDUINO_SELECTIVE_BluetoothSerial=n
+CONFIG_ARDUINO_SELECTIVE_SimpleBLE=n
+CONFIG_ARDUINO_SELECTIVE_RainMaker=n
+CONFIG_ARDUINO_SELECTIVE_Insights=n
+CONFIG_ARDUINO_SELECTIVE_Zigbee=n
+CONFIG_ARDUINO_SELECTIVE_OpenThread=n
+CONFIG_ARDUINO_SELECTIVE_Matter=n
+CONFIG_ARDUINO_SELECTIVE_ESP_SR=n
+CONFIG_ARDUINO_SELECTIVE_PPP=n
+CONFIG_ARDUINO_SELECTIVE_Ethernet=n
+CONFIG_ARDUINO_SELECTIVE_WiFiProv=n

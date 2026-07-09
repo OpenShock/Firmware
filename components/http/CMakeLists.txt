@@ -17,4 +17,5 @@ idf_component_register(
                 logging                      # Logging.h (internal)
                 concurrency                  # SimpleMutex (internal)
                 util                         # RateLimiter, HexUtils, StringUtils
+                esp_wifi                     # esp_wifi_types.h via WiFiClient (internal)
 )
