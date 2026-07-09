@@ -93,12 +93,6 @@ void appSetup()
 // Arduino setup function
 void setup()
 {
-  OS_SERIAL.begin(115'200);
-
-#if OS_HAS_USB_SERIAL
-  OS_SERIAL_USB.begin(115'200);
-#endif
-
   OpenShock::Config::Init();
 
   if (!OpenShock::Events::Init()) {

@@ -1,3 +1,5 @@
+#include <freertos/FreeRTOS.h>
+
 #include "serial/command_handlers/common.h"
 
 #include "FormatHelpers.h"

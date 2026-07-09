@@ -1,43 +1,18 @@
 #pragma once
 
-#include <Arduino.h>
-
 #include <cstdint>
+#include <cstdio>
 
-// Arduino-ESP32 3.x only declares the USB CDC global (HWCDCSerial or USBSerial) when
-// ARDUINO_USB_CDC_ON_BOOT=1. When CDC is on boot, `Serial` macro-aliases to that global
-// and UART0 remains available as Serial0. When CDC is off boot, `Serial` is UART0 and
-// no USB CDC global is instantiated.
-#if ARDUINO_USB_CDC_ON_BOOT
-#define OS_SERIAL         ::Serial0
-#define OS_SERIAL_USB     ::Serial  // expands to HWCDCSerial or USBSerial
-#define OS_HAS_USB_SERIAL 1
-#else
-#define OS_SERIAL ::Serial  // expands to Serial0
-// No USB serial active on boot
-#endif
-
-#if OS_HAS_USB_SERIAL
-#define OS_SERIAL_PRINT(...)          \
-  {                                   \
-    OS_SERIAL.print(__VA_ARGS__);     \
-    OS_SERIAL_USB.print(__VA_ARGS__); \
-  }
-#define OS_SERIAL_PRINTF(...)          \
-  {                                    \
-    OS_SERIAL.printf(__VA_ARGS__);     \
-    OS_SERIAL_USB.printf(__VA_ARGS__); \
-  }
-#define OS_SERIAL_PRINTLN(...)          \
-  {                                     \
-    OS_SERIAL.println(__VA_ARGS__);     \
-    OS_SERIAL_USB.println(__VA_ARGS__); \
-  }
-#else
-#define OS_SERIAL_PRINT(...)   OS_SERIAL.print(__VA_ARGS__)
-#define OS_SERIAL_PRINTF(...)  OS_SERIAL.printf(__VA_ARGS__)
-#define OS_SERIAL_PRINTLN(...) OS_SERIAL.println(__VA_ARGS__)
-#endif
+// Serial console output. TX is written to stdout, which the IDF console driver
+// routes to the primary console (UART0) and any configured secondary channel
+// (USB-Serial-JTAG / USB-CDC). RX is handled separately by SerialConsole.
+//
+// OS_SERIAL_PRINT takes a runtime string (never a format string, so '%' in the
+// data is safe); OS_SERIAL_PRINTF takes a literal format + args; OS_SERIAL_PRINTLN
+// takes an optional string literal (the "" concatenation appends the CRLF).
+#define OS_SERIAL_PRINT(str)   std::fputs(str, stdout)
+#define OS_SERIAL_PRINTF(...)  std::printf(__VA_ARGS__)
+#define OS_SERIAL_PRINTLN(...) std::fputs("" __VA_ARGS__ "\r\n", stdout)
 
 namespace OpenShock::SerialInputHandler {
   [[nodiscard]] bool Init();

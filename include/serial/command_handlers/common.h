@@ -5,17 +5,7 @@
 
 #include "Logging.h"
 
-#include <Arduino.h>
-
-#if OS_HAS_USB_SERIAL
-#define SERPR_SYS(format, ...)                                   \
-  {                                                              \
-    OS_SERIAL.printf("$SYS$|" format "\r\n", ##__VA_ARGS__);     \
-    OS_SERIAL_USB.printf("$SYS$|" format "\r\n", ##__VA_ARGS__); \
-  }
-#else
-#define SERPR_SYS(format, ...) OS_SERIAL.printf("$SYS$|" format "\r\n", ##__VA_ARGS__)
-#endif
+#define SERPR_SYS(format, ...) OS_SERIAL_PRINTF("$SYS$|" format "\r\n", ##__VA_ARGS__)
 
 #define SERPR_RESPONSE(format, ...) SERPR_SYS("Response|" format, ##__VA_ARGS__)
 #define SERPR_SUCCESS(format, ...)  SERPR_SYS("Success|" format, ##__VA_ARGS__)

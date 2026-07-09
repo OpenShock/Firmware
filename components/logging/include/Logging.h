@@ -4,10 +4,12 @@
 
 #include <esp_log.h>
 
-// log_printf is provided by Arduino (esp32-hal-uart) on-device; declared here so
-// logging carries no Arduino/hardware include and stays host-portable (the host
-// test provides its own definition).
-extern "C" int log_printf(const char* fmt, ...);
+// openshock_log_printf forwards to vprintf (the IDF console: UART0 + any secondary
+// USB-Serial-JTAG/CDC output). Defined in Logging.cpp so logging carries no
+// Arduino/hardware include and stays host-portable (the host test no-ops the macros).
+// Named distinctly from Arduino's log_printf so both can coexist while the
+// framework is still `arduino, espidf`.
+extern "C" int openshock_log_printf(const char* fmt, ...);
 
 template<std::size_t N>
 constexpr const char* openshockPathToFileName(const char (&path)[N])
@@ -32,7 +34,7 @@ constexpr const char* openshockPathToFileName(const char (&path)[N])
 #define OPENSHOCK_LOG_FORMAT(letter, format) "[%lli][" #letter "][%s:%u] %s(): " format "\r\n", OpenShock::millis(), openshockPathToFileName(__FILE__), __LINE__, __FUNCTION__
 
 #if OPENSHOCK_LOG_LEVEL >= OPENSHOCK_LOG_LEVEL_VERBOSE
-#define OS_LOGV(TAG, format, ...) log_printf(OPENSHOCK_LOG_FORMAT(V, "[%s] " format), TAG, ##__VA_ARGS__)
+#define OS_LOGV(TAG, format, ...) openshock_log_printf(OPENSHOCK_LOG_FORMAT(V, "[%s] " format), TAG, ##__VA_ARGS__)
 #else
 #define OS_LOGV(TAG, format, ...) \
   do {                            \
@@ -40,7 +42,7 @@ constexpr const char* openshockPathToFileName(const char (&path)[N])
 #endif
 
 #if OPENSHOCK_LOG_LEVEL >= OPENSHOCK_LOG_LEVEL_DEBUG
-#define OS_LOGD(TAG, format, ...) log_printf(OPENSHOCK_LOG_FORMAT(D, "[%s] " format), TAG, ##__VA_ARGS__)
+#define OS_LOGD(TAG, format, ...) openshock_log_printf(OPENSHOCK_LOG_FORMAT(D, "[%s] " format), TAG, ##__VA_ARGS__)
 #else
 #define OS_LOGD(TAG, format, ...) \
   do {                            \
@@ -48,7 +50,7 @@ constexpr const char* openshockPathToFileName(const char (&path)[N])
 #endif
 
 #if OPENSHOCK_LOG_LEVEL >= OPENSHOCK_LOG_LEVEL_INFO
-#define OS_LOGI(TAG, format, ...) log_printf(OPENSHOCK_LOG_FORMAT(I, "[%s] " format), TAG, ##__VA_ARGS__)
+#define OS_LOGI(TAG, format, ...) openshock_log_printf(OPENSHOCK_LOG_FORMAT(I, "[%s] " format), TAG, ##__VA_ARGS__)
 #else
 #define OS_LOGI(TAG, format, ...) \
   do {                            \
@@ -56,7 +58,7 @@ constexpr const char* openshockPathToFileName(const char (&path)[N])
 #endif
 
 #if OPENSHOCK_LOG_LEVEL >= OPENSHOCK_LOG_LEVEL_WARN
-#define OS_LOGW(TAG, format, ...) log_printf(OPENSHOCK_LOG_FORMAT(W, "[%s] " format), TAG, ##__VA_ARGS__)
+#define OS_LOGW(TAG, format, ...) openshock_log_printf(OPENSHOCK_LOG_FORMAT(W, "[%s] " format), TAG, ##__VA_ARGS__)
 #else
 #define OS_LOGW(TAG, format, ...) \
   do {                            \
@@ -64,7 +66,7 @@ constexpr const char* openshockPathToFileName(const char (&path)[N])
 #endif
 
 #if OPENSHOCK_LOG_LEVEL >= OPENSHOCK_LOG_LEVEL_ERROR
-#define OS_LOGE(TAG, format, ...) log_printf(OPENSHOCK_LOG_FORMAT(E, "[%s] " format), TAG, ##__VA_ARGS__)
+#define OS_LOGE(TAG, format, ...) openshock_log_printf(OPENSHOCK_LOG_FORMAT(E, "[%s] " format), TAG, ##__VA_ARGS__)
 #else
 #define OS_LOGE(TAG, format, ...) \
   do {                            \
@@ -72,7 +74,7 @@ constexpr const char* openshockPathToFileName(const char (&path)[N])
 #endif
 
 #if OPENSHOCK_LOG_LEVEL >= OPENSHOCK_LOG_LEVEL_NONE
-#define OS_LOGN(TAG, format, ...) log_printf(OPENSHOCK_LOG_FORMAT(E, "[%s] " format), TAG, ##__VA_ARGS__)
+#define OS_LOGN(TAG, format, ...) openshock_log_printf(OPENSHOCK_LOG_FORMAT(E, "[%s] " format), TAG, ##__VA_ARGS__)
 #else
 #define OS_LOGN(TAG, format, ...) \
   do {                            \

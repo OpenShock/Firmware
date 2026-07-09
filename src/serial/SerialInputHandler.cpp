@@ -14,6 +14,7 @@ const char* const TAG = "SerialInputHandler";
 #include "serial/command_handlers/CommandEntry.h"
 #include "serial/command_handlers/common.h"
 #include "serial/command_handlers/index.h"
+#include "serial/SerialConsole.h"
 #include "serialization/JsonAPI.h"
 #include "serialization/JsonSerial.h"
 #include "Temporal.h"
@@ -21,10 +22,6 @@ const char* const TAG = "SerialInputHandler";
 #include "util/StringUtils.h"
 #include "util/TaskUtils.h"
 #include "wifi/WiFiManager.h"
-
-#include <Arduino.h>
-
-#include <Esp.h>
 
 #include <cstring>
 #include <string_view>
@@ -372,20 +369,35 @@ enum class SerialReadResult {
   AutoCompleteRequest,
 };
 
-static SerialReadResult tryReadSerialLine(SerialBuffer& buffer)
+// Staging buffer: the console is read in chunks (SerialConsole::Read returns the
+// number of bytes read), but the parser consumes one byte at a time. Bytes left
+// over after an early return (line end / autocomplete) are carried across polls.
+static uint8_t s_rxStaging[128];
+static std::size_t s_rxStagingHead = 0;
+static std::size_t s_rxStagingLen  = 0;
+
+static bool nextSerialByte(char& out)
 {
-  // Check if there's any data available
-  int available = OS_SERIAL.available();
-  if (available <= 0) {
-    return SerialReadResult::NoData;
+  if (s_rxStagingHead >= s_rxStagingLen) {
+    int read = SerialConsole::Read(s_rxStaging, sizeof(s_rxStaging));
+    if (read <= 0) {
+      return false;
+    }
+    s_rxStagingHead = 0;
+    s_rxStagingLen  = static_cast<std::size_t>(read);
   }
 
-  // Reserve space for the new data
-  buffer.reserve(buffer.size() + available);
+  out = static_cast<char>(s_rxStaging[s_rxStagingHead++]);
+  return true;
+}
 
-  // Read the data into the buffer
-  while (available-- > 0) {
-    char c = OS_SERIAL.read();
+static SerialReadResult tryReadSerialLine(SerialBuffer& buffer)
+{
+  bool gotData = false;
+
+  char c;
+  while (nextSerialByte(c)) {
+    gotData = true;
 
     // Handle backspace
     if (c == '\b') {
@@ -416,85 +428,19 @@ static SerialReadResult tryReadSerialLine(SerialBuffer& buffer)
     }
   }
 
-  return SerialReadResult::Data;
+  return gotData ? SerialReadResult::Data : SerialReadResult::NoData;
 }
 
 static void skipSerialWhitespaces(SerialBuffer& buffer)
 {
-  int available = OS_SERIAL.available();
-
-  while (available-- > 0) {
-    char c = OS_SERIAL.read();
-
+  char c;
+  while (nextSerialByte(c)) {
     if (c != ' ' && c != '\r' && c != '\n') {
       buffer.push_back(c);
       break;
     }
   }
 }
-
-#if OS_HAS_USB_SERIAL
-static SerialReadResult tryReadUSBSerialLine(SerialBuffer& buffer)
-{
-  // Check if there's any data available
-  int available = OS_SERIAL_USB.available();
-  if (available <= 0) {
-    return SerialReadResult::NoData;
-  }
-
-  // Reserve space for the new data
-  buffer.reserve(buffer.size() + available);
-
-  // Read the data into the buffer
-  while (available-- > 0) {
-    char c = OS_SERIAL_USB.read();
-
-    // Handle backspace
-    if (c == '\b') {
-      buffer.pop_back();  // Remove the last character from the buffer if it exists
-      continue;
-    }
-
-    // Handle newline
-    if (c == '\r' || c == '\n') {
-      if (!buffer.empty()) {
-        return SerialReadResult::LineEnd;
-      }
-      continue;
-    }
-
-    // Handle leading whitespace
-    if (c == ' ' && buffer.empty()) {
-      continue;
-    }
-
-    if (c == '\t') {
-      return SerialReadResult::AutoCompleteRequest;
-    }
-
-    // If character is printable, add it to the buffer
-    if (c > 31 && c < 127) {
-      buffer.push_back(c);
-    }
-  }
-
-  return SerialReadResult::Data;
-}
-
-static void skipUSBSerialWhitespaces(SerialBuffer& buffer)
-{
-  int available = OS_SERIAL_USB.available();
-
-  while (available-- > 0) {
-    char c = OS_SERIAL_USB.read();
-
-    if (c != ' ' && c != '\r' && c != '\n') {
-      buffer.push_back(c);
-      break;
-    }
-  }
-}
-#endif
 
 static void echoBuffer(std::string_view buffer)
 {
@@ -646,33 +592,6 @@ static void serialRxTask(void*)
         break;
     }
 
-#if OS_HAS_USB_SERIAL
-    switch (tryReadUSBSerialLine(buffer)) {
-      case SerialReadResult::LineEnd:
-        processSerialLine(buffer);
-
-        // Deallocate memory if the buffer is too large
-        if (buffer.capacity() > SERIAL_BUFFER_MAX_CAPACITY) {
-          buffer.destroy();
-        } else {
-          buffer.clear();
-        }
-
-        // Skip any remaining trailing whitespaces
-        skipUSBSerialWhitespaces(buffer);
-        break;
-      case SerialReadResult::AutoCompleteRequest:
-        OS_SERIAL_PRINTF(CLEAR_LINE "> %.*s [AutoComplete is not implemented]", static_cast<int>(buffer.size()), buffer.data());
-        break;
-      case SerialReadResult::Data:
-        echoHandleSerialInput(buffer, true);
-        break;
-      default:
-        echoHandleSerialInput(buffer, false);
-        break;
-    }
-#endif
-
     vTaskDelay(pdMS_TO_TICKS(20));  // 50 Hz update rate
   }
 }
@@ -685,6 +604,12 @@ bool SerialInputHandler::Init()
     return false;
   }
   s_initialized = true;
+
+  // Install the console RX driver and make stdout unbuffered.
+  if (!SerialConsole::Init()) {
+    OS_LOGE(TAG, "Failed to initialize serial console");
+    return false;
+  }
 
   // Register command handlers
   s_commandGroups = OpenShock::SerialCmds::CommandHandlers::AllCommandHandlers();
