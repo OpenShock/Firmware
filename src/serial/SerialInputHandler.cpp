@@ -7,7 +7,6 @@ const char* const TAG = "SerialInputHandler";
 #include "config/Config.h"
 #include "config/SerialInputConfig.h"
 #include "Convert.h"
-#include "Core.h"
 #include "estop/EStopManager.h"
 #include "FormatHelpers.h"
 #include "http/HTTPRequestManager.h"
@@ -17,6 +16,7 @@ const char* const TAG = "SerialInputHandler";
 #include "serial/command_handlers/index.h"
 #include "serialization/JsonAPI.h"
 #include "serialization/JsonSerial.h"
+#include "Temporal.h"
 #include "util/Base64Utils.h"
 #include "util/StringUtils.h"
 #include "util/TaskUtils.h"
@@ -274,7 +274,7 @@ static void handleHelpCommand(std::string_view arg, bool isAutomated)
     return;
   }
 
-  SERPR_ERROR("Command \"%.*s\" not found", arg.length(), arg.data());
+  SERPR_ERROR("Command \"%.*s\" not found", static_cast<int>(arg.length()), arg.data());
 }
 
 void RegisterCommandHandler(const OpenShock::SerialCmds::CommandGroup& handler)
@@ -498,7 +498,7 @@ static void skipUSBSerialWhitespaces(SerialBuffer& buffer)
 
 static void echoBuffer(std::string_view buffer)
 {
-  OS_SERIAL_PRINTF(CLEAR_LINE "> %.*s", buffer.size(), buffer.data());
+  OS_SERIAL_PRINTF(CLEAR_LINE "> %.*s", static_cast<int>(buffer.size()), buffer.data());
 }
 
 static void echoHandleSerialInput(std::string_view buffer, bool hasData)
@@ -559,7 +559,7 @@ static void processSerialLine(std::string_view line)
 
   auto it = s_commandHandlers.find(command);
   if (it == s_commandHandlers.end()) {
-    SERPR_ERROR("Command \"%.*s\" not found", command.size(), command.data());
+    SERPR_ERROR("Command \"%.*s\" not found", static_cast<int>(command.size()), command.data());
     return;
   }
 
@@ -613,7 +613,7 @@ static void processSerialLine(std::string_view line)
     return;
   }
 
-  SERPR_ERROR("Command \"%.*s\" not found", command.size(), command.data());
+  SERPR_ERROR("Command \"%.*s\" not found", static_cast<int>(command.size()), command.data());
 }
 
 static void serialRxTask(void*)
@@ -636,7 +636,7 @@ static void serialRxTask(void*)
         skipSerialWhitespaces(buffer);
         break;
       case SerialReadResult::AutoCompleteRequest:
-        OS_SERIAL_PRINTF(CLEAR_LINE "> %.*s [AutoComplete is not implemented]", buffer.size(), buffer.data());
+        OS_SERIAL_PRINTF(CLEAR_LINE "> %.*s [AutoComplete is not implemented]", static_cast<int>(buffer.size()), buffer.data());
         break;
       case SerialReadResult::Data:
         echoHandleSerialInput(buffer, true);
@@ -662,7 +662,7 @@ static void serialRxTask(void*)
         skipUSBSerialWhitespaces(buffer);
         break;
       case SerialReadResult::AutoCompleteRequest:
-        OS_SERIAL_PRINTF(CLEAR_LINE "> %.*s [AutoComplete is not implemented]", buffer.size(), buffer.data());
+        OS_SERIAL_PRINTF(CLEAR_LINE "> %.*s [AutoComplete is not implemented]", static_cast<int>(buffer.size()), buffer.data());
         break;
       case SerialReadResult::Data:
         echoHandleSerialInput(buffer, true);
@@ -689,7 +689,7 @@ bool SerialInputHandler::Init()
   // Register command handlers
   s_commandGroups = OpenShock::SerialCmds::CommandHandlers::AllCommandHandlers();
   for (const auto& handler : s_commandGroups) {
-    OS_LOGV(TAG, "Registering command handler: %.*s", handler.name().size(), handler.name().data());
+    OS_LOGV(TAG, "Registering command handler: %.*s", static_cast<int>(handler.name().size()), handler.name().data());
     RegisterCommandHandler(handler);
   }
 

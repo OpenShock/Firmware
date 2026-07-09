@@ -32,7 +32,7 @@ static void handleDomainCommand(std::string_view arg, bool isAutomated)
   }
 
   char uri[OPENSHOCK_URI_BUFFER_SIZE];
-  sprintf(uri, "https://%.*s/1", arg.length(), arg.data());
+  sprintf(uri, "https://%.*s/1", static_cast<int>(arg.length()), arg.data());
 
   auto resp = OpenShock::HTTP::GetJSON<OpenShock::Serialization::JsonAPI::BackendVersionResponse>(
     uri,
@@ -44,11 +44,11 @@ static void handleDomainCommand(std::string_view arg, bool isAutomated)
   );
 
   if (resp.result != OpenShock::HTTP::RequestResult::Success) {
-    SERPR_ERROR("Tried to connect to \"%.*s\", but failed with status [%d] (%s), refusing to save domain to config", arg.length(), arg.data(), resp.code, resp.ResultToString());
+    SERPR_ERROR("Tried to connect to \"%.*s\", but failed with status [%d] (%s), refusing to save domain to config", static_cast<int>(arg.length()), arg.data(), resp.code, resp.ResultToString());
     return;
   }
 
-  OS_LOGI(TAG, "Successfully connected to \"%.*s\", version: %s, commit: %s, current time: %s", arg.length(), arg.data(), resp.data.version.c_str(), resp.data.commit.c_str(), resp.data.currentTime.c_str());
+  OS_LOGI(TAG, "Successfully connected to \"%.*s\", version: %s, commit: %s, current time: %s", static_cast<int>(arg.length()), arg.data(), resp.data.version.c_str(), resp.data.commit.c_str(), resp.data.currentTime.c_str());
 
   bool result = OpenShock::Config::SetBackendDomain(std::string(arg));
 

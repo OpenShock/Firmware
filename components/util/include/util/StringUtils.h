@@ -2,8 +2,6 @@
 
 #include "StringHelpers.h"  // OpenShock::StringIEquals
 
-#include <WString.h>
-
 #include <cstdint>
 #include <limits>
 #include <string>
@@ -132,23 +130,28 @@ namespace OpenShock {
     return view.substr(pos + delimiter.length());
   }
 
+  // Splits `view` into N parts on `delimiter`. The first N-1 parts are the
+  // delimited fields; the last part is the entire remainder (delimiters and
+  // all), so nothing is silently dropped. Returns false only if there are too
+  // few parts (fewer than N-1 delimiters). Callers that need each part to be a
+  // single field validate the remainder themselves (e.g. Convert::ToUint8).
   template<std::size_t N>
   constexpr bool TryStringSplit(std::string_view view, char delimiter, std::string_view (&out)[N])
   {
+    static_assert(N > 0, "TryStringSplit needs at least one output slot");
+
     std::size_t pos = 0;
-    std::size_t idx = 0;
-    while (pos < view.size() && idx < N) {
+    for (std::size_t idx = 0; idx < N - 1; ++idx) {
       std::size_t nextPos = view.find(delimiter, pos);
       if (nextPos == std::string_view::npos) {
-        nextPos = view.size();
+        return false;  // too few parts
       }
-
       out[idx] = view.substr(pos, nextPos - pos);
       pos      = nextPos + 1;
-      ++idx;
     }
 
-    return idx == N;
+    out[N - 1] = view.substr(pos);  // remainder (may still contain delimiters)
+    return true;
   }
   std::vector<std::string_view> StringSplit(std::string_view view, char delimiter, std::size_t maxSplits = std::numeric_limits<std::size_t>::max());
   std::vector<std::string_view> StringSplit(std::string_view view, bool (*predicate)(char delimiter), std::size_t maxSplits = std::numeric_limits<std::size_t>::max());
@@ -177,6 +180,4 @@ namespace OpenShock {
 
   bool StringIContains(std::string_view haystack, std::string_view needle);
   bool StringHasPrefixIC(std::string_view view, std::string_view prefix);
-
-  String StringToArduinoString(std::string_view view);
 }  // namespace OpenShock

@@ -2,9 +2,9 @@
 
 const char* const TAG = "JsonAPI";
 
-#include "OpenShock.h"
-#include "Logging.h"
 #include "config/Config.h"
+#include "Logging.h"
+#include "OpenShock.h"
 #include "util/StringUtils.h"
 
 using namespace OpenShock;
@@ -50,8 +50,8 @@ HTTP::Response<Serialization::JsonAPI::HubInfoResponse> HTTP::JsonAPI::GetHubInf
   return HTTP::GetJSON<Serialization::JsonAPI::HubInfoResponse>(
     uri,
     {
-      {     "Accept",                         "application/json"},
-      {"DeviceToken", OpenShock::StringToArduinoString(hubToken)}
+      {"Accept", "application/json"},
+      {"DeviceToken", String(hubToken.data(), hubToken.size())}
   },
     Serialization::JsonAPI::ParseHubInfoJsonResponse,
     std::array<uint16_t, 2> {200}
@@ -75,8 +75,8 @@ HTTP::Response<Serialization::JsonAPI::AssignLcgResponse> HTTP::JsonAPI::AssignL
   return HTTP::GetJSON<Serialization::JsonAPI::AssignLcgResponse>(
     uri,
     {
-      {     "Accept",                         "application/json"},
-      {"DeviceToken", OpenShock::StringToArduinoString(hubToken)}
+      {"Accept", "application/json"},
+      {"DeviceToken", String(hubToken.data(), hubToken.size())}
   },
     Serialization::JsonAPI::ParseAssignLcgJsonResponse,
     std::array<uint16_t, 2> {200}

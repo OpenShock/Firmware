@@ -6,11 +6,11 @@ const char* const TAG = "GatewayConnectionManager";
 
 #include "captiveportal/Manager.h"
 #include "config/Config.h"
-#include "Core.h"
 #include "GatewayClient.h"
 #include "http/JsonAPI.h"
 #include "Logging.h"
 #include "serialization/WSLocal.h"
+#include "Temporal.h"
 
 #include "SimpleMutex.h"
 
@@ -124,7 +124,7 @@ AccountLinkResultCode GatewayConnectionManager::Link(std::string_view linkCode)
 
   DestroyClient();
 
-  OS_LOGD(TAG, "Attempting to link to account using code %.*s", linkCode.length(), linkCode.data());
+  OS_LOGD(TAG, "Attempting to link to account using code %.*s", static_cast<int>(linkCode.length()), linkCode.data());
 
   if (linkCode.length() != LINK_CODE_LENGTH) {
     OS_LOGE(TAG, "Invalid link code length: expected %zu, got %zu", static_cast<size_t>(LINK_CODE_LENGTH), linkCode.length());
