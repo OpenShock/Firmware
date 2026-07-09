@@ -31,16 +31,20 @@ runs:
       # schedule/dispatch builds bake in an empty date.
       run: |
         export OPENSHOCK_FW_BUILD_DATE="$(git show -s --format=%cI HEAD 2>/dev/null || date -u +%Y-%m-%dT%H:%M:%SZ)"
-        # Pre-build the bootloader with a single job first. Under parallel SCons
-        # jobs the ESP-IDF bootloader link (bootloader.elf) can start before its
-        # own "Preprocessing linker script" step has written bootloader.ld,
-        # failing intermittently with "cannot open linker script file
-        # bootloader.ld". A serial bootloader-only pass generates that script
-        # deterministically; the full parallel build below then reuses the
-        # now up-to-date bootloader and never hits the race. `|| true` keeps this
-        # a best-effort guard if a future platform renames the target.
-        pio run -e ${{ inputs.board }} -t bootloader -j 1 || true
-        pio run -e ${{ inputs.board }}
+        # The ESP-IDF bootloader link (bootloader.elf) intermittently races its
+        # own linker-script generation and fails with "cannot open linker script
+        # file bootloader.ld" - a different board set fails on each run while
+        # siblings with identical flags succeed. Once an attempt has run, the
+        # script is on disk, so an incremental retry re-links only the bootloader
+        # and succeeds. Retry a couple of times before giving up for real.
+        for attempt in 1 2 3; do
+          if pio run -e ${{ inputs.board }}; then
+            exit 0
+          fi
+          echo "::warning::pio run attempt ${attempt} failed for ${{ inputs.board }} (likely the intermittent bootloader.ld link race); retrying"
+        done
+        echo "::error::pio run failed for ${{ inputs.board }} after 3 attempts"
+        exit 1
       env:
         OPENSHOCK_FW_VERSION: ${{ inputs.version }}
         OPENSHOCK_FW_GIT_REF: ${{ github.ref }}
