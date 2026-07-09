@@ -24,6 +24,14 @@ CONFIG_COMPILER_CXX_EXCEPTIONS=n
 CONFIG_MBEDTLS_PSK_MODES=y
 CONFIG_MBEDTLS_KEY_EXCHANGE_PSK=y
 
+# TEMPORARY: skip TLS server-cert verification. esp_http_client requests to the
+# API/CDN abort at TLS setup with ESP_ERR_MBEDTLS_SSL_SETUP_FAILED (0x8017)
+# because no CA/cert is supplied. This compiles in the MBEDTLS_SSL_VERIFY_NONE
+# escape hatch (esp_tls_mbedtls.c). TODO: remove and attach the embedded x509
+# cert bundle via config.crt_bundle_attach instead.
+CONFIG_ESP_TLS_INSECURE=y
+CONFIG_ESP_TLS_SKIP_SERVER_CERT_VERIFY=y
+
 # Partition table — OpenShock uses a custom one; existing partitions stay valid
 # (leave PARTITION_TABLE_* at IDF defaults; per-env sdkconfigs can override)
 
