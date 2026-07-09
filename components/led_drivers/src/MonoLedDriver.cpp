@@ -46,6 +46,7 @@ MonoLedDriver::MonoLedDriver(gpio_num_t gpioPin)
     .timer_num       = OS_LEDC_TIMER,
     .freq_hz         = OS_LEDC_FREQUENCY,
     .clk_cfg         = LEDC_AUTO_CLK,
+    .deconfigure     = false,
   };
 
   ledc_timer_config(&ledc_config);  // TODO: Error handling
@@ -58,6 +59,9 @@ MonoLedDriver::MonoLedDriver(gpio_num_t gpioPin)
     .timer_sel  = OS_LEDC_TIMER,
     .duty       = 0,
     .hpoint     = 0,
+    .sleep_mode = LEDC_SLEEP_MODE_NO_ALIVE_NO_PD,  // default: no output during light-sleep
+    .flags      = {},
+    .deconfigure = false,
   };
 
   ledc_channel_config(&ledc_channel);  // TODO: Error handling

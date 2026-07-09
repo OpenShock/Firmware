@@ -46,6 +46,8 @@ RgbLedDriver::RgbLedDriver(gpio_num_t gpioPin)
     .resolution_hz     = 10'000'000,
     .mem_block_symbols = SOC_RMT_MEM_WORDS_PER_CHANNEL,  // exactly 1 memory block
     .trans_queue_depth = 4,
+    .intr_priority     = 0,  // 0 => driver picks a low/medium priority
+    .flags             = {},
   };
   esp_err_t err = rmt_new_tx_channel(&channelConfig, &m_rmtChannel);
   if (err != ESP_OK) {
