@@ -31,9 +31,9 @@ runs:
 
     # Assemble the full /<version>/ tree locally, one directory per board, so it
     # can be pushed in a single mirror. Each board directory keeps the per-board
-    # layout the device OTA expects: app.bin + staticfs.bin (+ bootloader /
-    # partition-table) from firmware_build_<board>, the merged firmware.bin, and
-    # md5/sha256 checksums over every .bin.
+    # layout the device OTA expects: the shared staticfs.bin, the board's app.bin
+    # (+ bootloader / partition-table) from firmware_build_<board>, the merged
+    # firmware.bin, and md5/sha256 checksums over every .bin.
     - name: Assemble upload tree
       shell: bash
       env:
@@ -45,6 +45,7 @@ runs:
           [ -z "$board" ] && continue
           dest="upload/$board"
           mkdir -p "$dest"
+          cp artifacts/firmware_staticfs/staticfs.bin "$dest"/
           cp "artifacts/firmware_build_$board"/*.bin "$dest"/
           cp "artifacts/firmware_merged_$board"/OpenShock_*.bin "$dest"/firmware.bin
           (
