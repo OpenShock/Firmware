@@ -20,11 +20,13 @@ const char* const TAG = "OtaUpdateManager";
 #include "util/TaskUtils.h"
 #include "wifi/WiFiManager.h"
 
+#include <esp_event.h>
+#include <esp_netif.h>
 #include <esp_ota_ops.h>
 #include <esp_task_wdt.h>
+#include <esp_wifi.h>
 
 #include <LittleFS.h>
-#include <WiFi.h>
 
 #include <sstream>
 #include <string_view>

@@ -5,6 +5,12 @@ CONFIG_AUTOSTART_ARDUINO=y
 # Keep main task large enough for Arduino setup() / existing init chain
 CONFIG_ESP_MAIN_TASK_STACK_SIZE=8192
 
+# WiFi/IP event handlers (WiFiManager, GatewayConnectionManager) now run directly
+# on the default event loop task instead of Arduino's separate 4096-byte event
+# task. They do flatbuffer serialization + websocket broadcast, so restore that
+# headroom here (default is 2304).
+CONFIG_ESP_SYSTEM_EVENT_TASK_STACK_SIZE=4096
+
 # Arduino expects these selected via ENABLE_ARDUINO_DEPENDS, but be explicit
 CONFIG_LWIP_SO_RCVBUF=y
 

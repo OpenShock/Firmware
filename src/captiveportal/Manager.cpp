@@ -13,13 +13,17 @@ const char* const TAG = "CaptivePortal";
 
 #include <ESPAsyncWebServer.h>
 #include <WebSocketsServer.h>
-#include <WiFi.h>
 
+#include <esp_mac.h>
+#include <esp_netif.h>
 #include <esp_timer.h>
+#include <esp_wifi.h>
+#include <esp_wifi_default.h>
 
 #include "SimpleMutex.h"
 
 #include <atomic>
+#include <cstring>
 #include <memory>
 
 using namespace OpenShock;
@@ -30,6 +34,11 @@ static std::atomic<bool> s_userDone                      = false;
 static esp_timer_handle_t s_captivePortalUpdateLoopTimer = nullptr;
 static SimpleMutex s_instanceMutex;
 static std::shared_ptr<CaptivePortal::CaptivePortalInstance> s_instance = nullptr;
+static esp_netif_t* s_apNetif                                           = nullptr;
+
+// The captive portal AP always serves from this fixed address; the DNS server and
+// RFC8908 handler reference it too (see CaptivePortal::ApIPv4String()).
+static const char* const CAPTIVE_PORTAL_AP_IP = "4.3.2.1";
 
 // Absolute esp_timer timestamps (microseconds). 0 = not armed.
 static std::atomic<int64_t> s_startupGraceExpiry = 0;                     // Don't open portal until this time passes
@@ -72,28 +81,48 @@ static bool captiveportal_start()
 
   OS_LOGI(TAG, "Starting captive portal");
 
-  if (!WiFi.enableAP(true)) {
-    OS_LOGE(TAG, "Failed to enable AP mode");
+  // esp_wifi is already initialized by WiFiManager; create the AP netif once and
+  // pin it to a fixed IP so the DNS/HTTP portal has a stable address.
+  if (s_apNetif == nullptr) {
+    s_apNetif = esp_netif_create_default_wifi_ap();
+    if (s_apNetif == nullptr) {
+      OS_LOGE(TAG, "Failed to create AP netif");
+      return false;
+    }
+
+    esp_netif_ip_info_t ipInfo = {};
+    esp_netif_str_to_ip4(CAPTIVE_PORTAL_AP_IP, &ipInfo.ip);
+    esp_netif_str_to_ip4(CAPTIVE_PORTAL_AP_IP, &ipInfo.gw);
+    esp_netif_str_to_ip4("255.255.255.0", &ipInfo.netmask);
+
+    esp_netif_dhcps_stop(s_apNetif);
+    esp_netif_set_ip_info(s_apNetif, &ipInfo);
+    esp_netif_dhcps_start(s_apNetif);
+  }
+
+  // AP SSID = prefix + this device's STA MAC (matches the old Arduino naming).
+  uint8_t mac[6];
+  esp_read_mac(mac, ESP_MAC_WIFI_STA);
+
+  wifi_config_t apConfig = {};
+  snprintf(reinterpret_cast<char*>(apConfig.ap.ssid), sizeof(apConfig.ap.ssid), "%s%02X:%02X:%02X:%02X:%02X:%02X", OPENSHOCK_FW_AP_PREFIX, mac[0], mac[1], mac[2], mac[3], mac[4], mac[5]);
+  apConfig.ap.ssid_len       = strlen(reinterpret_cast<char*>(apConfig.ap.ssid));
+  apConfig.ap.channel        = 1;
+  apConfig.ap.authmode       = WIFI_AUTH_OPEN;
+  apConfig.ap.max_connection = 4;
+  apConfig.ap.beacon_interval = 100;
+
+  esp_err_t err = esp_wifi_set_mode(WIFI_MODE_APSTA);
+  if (err != ESP_OK) {
+    OS_LOGE(TAG, "Failed to enable AP mode: %s", esp_err_to_name(err));
     return false;
   }
 
-  if (!WiFi.softAP((OPENSHOCK_FW_AP_PREFIX + WiFi.macAddress()).c_str())) {
-    OS_LOGE(TAG, "Failed to start AP");
-    WiFi.enableAP(false);
+  err = esp_wifi_set_config(WIFI_IF_AP, &apConfig);
+  if (err != ESP_OK) {
+    OS_LOGE(TAG, "Failed to configure AP: %s", esp_err_to_name(err));
+    esp_wifi_set_mode(WIFI_MODE_STA);
     return false;
-  }
-
-  IPAddress apIP(4, 3, 2, 1);
-  if (!WiFi.softAPConfig(apIP, apIP, IPAddress(255, 255, 255, 0))) {
-    OS_LOGE(TAG, "Failed to configure AP");
-    WiFi.softAPdisconnect(true);
-    return false;
-  }
-
-  std::string hostname;
-  if (!Config::GetWiFiHostname(hostname)) {
-    OS_LOGE(TAG, "Failed to get WiFi hostname, reverting to default");
-    hostname = OPENSHOCK_FW_HOSTNAME;
   }
 
   CreateInstance();
@@ -112,7 +141,8 @@ static void captiveportal_stop()
   DestroyInstance();
   s_userDone = false;
 
-  WiFi.softAPdisconnect(true);
+  // Drop the AP but keep the STA connection alive.
+  esp_wifi_set_mode(WIFI_MODE_STA);
 }
 
 static void captiveportal_updateloop(void*)
@@ -254,6 +284,11 @@ bool CaptivePortal::ForceClose(uint32_t timeoutMs)
 bool CaptivePortal::IsRunning()
 {
   return GetInstance() != nullptr;
+}
+
+const char* CaptivePortal::ApIPv4String()
+{
+  return CAPTIVE_PORTAL_AP_IP;
 }
 
 bool CaptivePortal::SendMessageTXT(uint8_t socketId, std::string_view data)

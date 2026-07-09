@@ -1,27 +1,30 @@
+#include <freertos/FreeRTOS.h>
+
 #include "wifi/WiFiManager.h"
 
 const char* const TAG = "WiFiManager";
 
 #include "captiveportal/Manager.h"
 #include "config/Config.h"
+#include "events/Events.h"
 #include "FormatHelpers.h"
 #include "Logging.h"
 #include "serialization/WSLocal.h"
 #include "Temporal.h"
 #include "util/TaskUtils.h"
-#include "visual/VisualStateManager.h"
 #include "wifi/WiFiNetwork.h"
 #include "wifi/WiFiScanManager.h"
 
-#include <WiFi.h>
-
+#include <esp_netif.h>
 #include <esp_wifi.h>
-#include <esp_wifi_types.h>
+#include <esp_wifi_default.h>
 
 #include "SimpleMutex.h"
 
+#include <algorithm>
 #include <atomic>
 #include <cstdint>
+#include <cstring>
 #include <vector>
 
 using namespace OpenShock;
@@ -84,12 +87,24 @@ enum class WiFiState : uint8_t {
   Connected    = 1 << 1,
 };
 
+static esp_netif_t* s_staNetif                       = nullptr;
 static std::atomic<WiFiState> s_wifiState {WiFiState::Disconnected};
 static uint8_t s_connectedBSSID[6]                   = {0};
 static std::atomic<uint8_t> s_connectedCredentialsID = 0;
 static std::atomic<uint8_t> s_preferredCredentialsID = 0;
 static OpenShock::SimpleMutex s_networksMutex;
 static std::vector<WiFiNetwork> s_wifiNetworks;
+
+// Broadcast a coarse connectivity change on the OpenShock event bus. Posted with a
+// short timeout because this runs on the default event loop task (posting to the
+// same loop must never block on a full queue).
+static void postWiFiState(OpenShockWiFiState state)
+{
+  esp_err_t err = esp_event_post(OPENSHOCK_EVENTS, OPENSHOCK_EVENT_WIFI_STATE_CHANGED, &state, sizeof(state), pdMS_TO_TICKS(100));
+  if (err != ESP_OK) {
+    OS_LOGE(TAG, "Failed to post WiFi state event: %s", esp_err_to_name(err));
+  }
+}
 
 static bool attractivityComparer(const WiFiNetwork& a, const WiFiNetwork& b)
 {
@@ -186,9 +201,34 @@ static bool connectWiFi(const std::string& ssid, const std::string& password, wi
     it->lastConnectAttempt = OpenShock::millis();
   }
 
+  wifi_config_t config = {};
+  std::strncpy(reinterpret_cast<char*>(config.sta.ssid), ssid.c_str(), sizeof(config.sta.ssid));
+  std::strncpy(reinterpret_cast<char*>(config.sta.password), password.c_str(), sizeof(config.sta.password));
+  // Let esp_wifi pick the strongest matching BSSID and retry a few times before giving up.
+  config.sta.scan_method       = WIFI_ALL_CHANNEL_SCAN;
+  config.sta.sort_method       = WIFI_CONNECT_AP_BY_SIGNAL;
+  config.sta.failure_retry_cnt = 3;
+  if (pinnedBssid != nullptr) {
+    config.sta.bssid_set = true;
+    std::memcpy(config.sta.bssid, pinnedBssid, sizeof(config.sta.bssid));
+  }
+
   s_wifiState.store(WiFiState::Connecting, std::memory_order_relaxed);
-  if (WiFi.begin(ssid.c_str(), password.c_str(), 0, pinnedBssid, true) == WL_CONNECT_FAILED) {
+  postWiFiState(OPENSHOCK_WIFI_STATE_CONNECTING);
+
+  esp_err_t err = esp_wifi_set_config(WIFI_IF_STA, &config);
+  if (err != ESP_OK) {
+    OS_LOGE(TAG, "esp_wifi_set_config failed: %s", esp_err_to_name(err));
     s_wifiState.store(WiFiState::Disconnected, std::memory_order_relaxed);
+    postWiFiState(OPENSHOCK_WIFI_STATE_DISCONNECTED);
+    return false;
+  }
+
+  err = esp_wifi_connect();
+  if (err != ESP_OK) {
+    OS_LOGE(TAG, "esp_wifi_connect failed: %s", esp_err_to_name(err));
+    s_wifiState.store(WiFiState::Disconnected, std::memory_order_relaxed);
+    postWiFiState(OPENSHOCK_WIFI_STATE_DISCONNECTED);
     return false;
   }
 
@@ -208,12 +248,17 @@ static bool authenticate(const WiFiNetwork& net, std::string_view password)
   return connectWiFi(net.ssid, std::string(password));
 }
 
-static void evWiFiConnected(arduino_event_t* event)
+static void evWiFiConnected(const wifi_event_sta_connected_t& info)
 {
-  auto& info = event->event_info.wifi_sta_connected;
-
   s_wifiState.store(WiFiState::Connected, std::memory_order_relaxed);
   memcpy(s_connectedBSSID, info.bssid, sizeof(s_connectedBSSID));
+  postWiFiState(OPENSHOCK_WIFI_STATE_CONNECTED);
+
+  // info.ssid is not guaranteed null-terminated; bound by ssid_len.
+  char ssid[33];
+  size_t ssidLen = std::min(static_cast<size_t>(info.ssid_len), sizeof(ssid) - 1);
+  memcpy(ssid, info.ssid, ssidLen);
+  ssid[ssidLen] = '\0';
 
   ScopedLock lock__(&s_networksMutex);
 
@@ -221,10 +266,10 @@ static void evWiFiConnected(arduino_event_t* event)
   if (it == s_wifiNetworks.end()) {
     s_connectedCredentialsID.store(0, std::memory_order_relaxed);
 
-    OS_LOGW(TAG, "Connected to unscanned network \"%s\", BSSID: " BSSID_FMT, reinterpret_cast<char*>(info.ssid), BSSID_ARG(info.bssid));
+    OS_LOGW(TAG, "Connected to unscanned network \"%s\", BSSID: " BSSID_FMT, ssid, BSSID_ARG(info.bssid));
 
     Config::WiFiCredentials creds;
-    if (Config::TryGetWiFiCredentialsBySSID(reinterpret_cast<const char*>(info.ssid), creds)) {
+    if (Config::TryGetWiFiCredentialsBySSID(ssid, creds)) {
       s_connectedCredentialsID.store(creds.id, std::memory_order_relaxed);
     }
 
@@ -233,39 +278,43 @@ static void evWiFiConnected(arduino_event_t* event)
 
   s_connectedCredentialsID.store(it->credentialsID, std::memory_order_relaxed);
 
-  OS_LOGI(TAG, "Connected to network %s (" BSSID_FMT ")", reinterpret_cast<const char*>(info.ssid), BSSID_ARG(info.bssid));
+  OS_LOGI(TAG, "Connected to network %s (" BSSID_FMT ")", ssid, BSSID_ARG(info.bssid));
 
   Serialization::Local::SerializeWiFiNetworkEvent(Serialization::Types::WifiNetworkEventType::Connected, *it, CaptivePortal::BroadcastMessageBIN);
 }
-static void evWiFiGotIP(arduino_event_t* event)
+static void evWiFiGotIP(const ip_event_got_ip_t& info)
 {
-  const auto& info = event->event_info.got_ip;
-
   uint8_t ip[4];
   memcpy(ip, &info.ip_info.ip.addr, sizeof(ip));
 
   OS_LOGI(TAG, "Got IP address " IPV4ADDR_FMT " from network " BSSID_FMT, IPV4ADDR_ARG(ip), BSSID_ARG(s_connectedBSSID));
 
+  postWiFiState(OPENSHOCK_WIFI_STATE_GOT_IP);
+
   char ipStr[16];
   snprintf(ipStr, sizeof(ipStr), IPV4ADDR_FMT, IPV4ADDR_ARG(ip));
   Serialization::Local::SerializeWiFiGotIpEvent(ipStr, CaptivePortal::BroadcastMessageBIN);
 }
-static void evWiFiGotIP6(arduino_event_t* event)
+static void evWiFiGotIP6(const ip_event_got_ip6_t& info)
 {
-  auto& info = event->event_info.got_ip6;
-
-  uint8_t* ip6 = reinterpret_cast<uint8_t*>(&info.ip6_info.ip.addr);
+  const uint8_t* ip6 = reinterpret_cast<const uint8_t*>(&info.ip6_info.ip.addr);
 
   OS_LOGI(TAG, "Got IPv6 address " IPV6ADDR_FMT " from network " BSSID_FMT, IPV6ADDR_ARG(ip6), BSSID_ARG(s_connectedBSSID));
+
+  postWiFiState(OPENSHOCK_WIFI_STATE_GOT_IP);
 }
-static void evWiFiDisconnected(arduino_event_t* event)
+static void evWiFiDisconnected(const wifi_event_sta_disconnected_t& info)
 {
   s_wifiState.store(WiFiState::Disconnected, std::memory_order_relaxed);
   s_connectedCredentialsID.store(0, std::memory_order_relaxed);
+  postWiFiState(OPENSHOCK_WIFI_STATE_DISCONNECTED);
 
-  auto& info = event->event_info.wifi_sta_disconnected;
+  char ssid[33];
+  size_t ssidLen = std::min(static_cast<size_t>(info.ssid_len), sizeof(ssid) - 1);
+  memcpy(ssid, info.ssid, ssidLen);
+  ssid[ssidLen] = '\0';
 
-  OS_LOGI(TAG, "Disconnected from network %s (" BSSID_FMT ")", info.ssid, BSSID_ARG(info.bssid));
+  OS_LOGI(TAG, "Disconnected from network %s (" BSSID_FMT ")", ssid, BSSID_ARG(info.bssid));
 
   // Notify the frontend
   ScopedLock lock__(&s_networksMutex);
@@ -276,7 +325,7 @@ static void evWiFiDisconnected(arduino_event_t* event)
     // Network not in scan results (forgotten or hidden) — send minimal event
     WiFiNetwork net;
     memset(&net, 0, sizeof(net));
-    strncpy(net.ssid, reinterpret_cast<const char*>(info.ssid), sizeof(net.ssid) - 1);
+    strncpy(net.ssid, ssid, sizeof(net.ssid) - 1);
     memcpy(net.bssid, info.bssid, sizeof(net.bssid));
     Serialization::Local::SerializeWiFiNetworkEvent(Serialization::Types::WifiNetworkEventType::Disconnected, net, CaptivePortal::BroadcastMessageBIN);
   }
@@ -293,9 +342,40 @@ static void evWiFiDisconnected(arduino_event_t* event)
     }
   }
 }
-static void evWiFiScanStarted()
+
+static void wifiEventHandler(void* arg, esp_event_base_t base, int32_t id, void* data)
 {
+  (void)arg;
+  (void)base;
+
+  switch (id) {
+    case WIFI_EVENT_STA_CONNECTED:
+      evWiFiConnected(*static_cast<const wifi_event_sta_connected_t*>(data));
+      break;
+    case WIFI_EVENT_STA_DISCONNECTED:
+      evWiFiDisconnected(*static_cast<const wifi_event_sta_disconnected_t*>(data));
+      break;
+    default:
+      break;
+  }
 }
+static void ipEventHandler(void* arg, esp_event_base_t base, int32_t id, void* data)
+{
+  (void)arg;
+  (void)base;
+
+  switch (id) {
+    case IP_EVENT_STA_GOT_IP:
+      evWiFiGotIP(*static_cast<const ip_event_got_ip_t*>(data));
+      break;
+    case IP_EVENT_GOT_IP6:
+      evWiFiGotIP6(*static_cast<const ip_event_got_ip6_t*>(data));
+      break;
+    default:
+      break;
+  }
+}
+
 static void evWiFiScanStatusChanged(OpenShock::WiFiScanStatus status)
 {
   ScopedLock lock__(&s_networksMutex);
@@ -365,8 +445,6 @@ static void evWiFiNetworksDiscovery(const std::vector<const wifi_ap_record_t*>& 
   }
 }
 
-esp_err_t set_esp_interface_dns(esp_interface_t interface, IPAddress main_dns, IPAddress backup_dns, IPAddress fallback_dns);
-
 static bool tryConnect()
 {
   Config::WiFiCredentials creds;
@@ -410,10 +488,43 @@ static void wifimanagerUpdateTask(void*)
 
 bool WiFiManager::Init()
 {
-  WiFi.onEvent(evWiFiConnected, ARDUINO_EVENT_WIFI_STA_CONNECTED);
-  WiFi.onEvent(evWiFiGotIP, ARDUINO_EVENT_WIFI_STA_GOT_IP);
-  WiFi.onEvent(evWiFiGotIP6, ARDUINO_EVENT_WIFI_STA_GOT_IP6);
-  WiFi.onEvent(evWiFiDisconnected, ARDUINO_EVENT_WIFI_STA_DISCONNECTED);
+  esp_err_t err;
+
+  // Bring up the network stack that Arduino's WiFi class used to init implicitly.
+  // The default event loop already exists (Events::Init runs earlier in main).
+  err = esp_netif_init();
+  if (err != ESP_OK) {
+    OS_LOGE(TAG, "esp_netif_init failed: %s", esp_err_to_name(err));
+    return false;
+  }
+
+  s_staNetif = esp_netif_create_default_wifi_sta();
+  if (s_staNetif == nullptr) {
+    OS_LOGE(TAG, "Failed to create default STA netif");
+    return false;
+  }
+
+  wifi_init_config_t initConfig = WIFI_INIT_CONFIG_DEFAULT();
+  err                           = esp_wifi_init(&initConfig);
+  if (err != ESP_OK) {
+    OS_LOGE(TAG, "esp_wifi_init failed: %s", esp_err_to_name(err));
+    return false;
+  }
+
+  // Config owns our credentials; don't let esp_wifi persist/auto-connect from NVS.
+  esp_wifi_set_storage(WIFI_STORAGE_RAM);
+
+  err = esp_event_handler_register(WIFI_EVENT, ESP_EVENT_ANY_ID, wifiEventHandler, nullptr);
+  if (err != ESP_OK) {
+    OS_LOGE(TAG, "Failed to register WIFI_EVENT handler: %s", esp_err_to_name(err));
+    return false;
+  }
+  err = esp_event_handler_register(IP_EVENT, ESP_EVENT_ANY_ID, ipEventHandler, nullptr);
+  if (err != ESP_OK) {
+    OS_LOGE(TAG, "Failed to register IP_EVENT handler: %s", esp_err_to_name(err));
+    return false;
+  }
+
   WiFiScanManager::RegisterStatusChangedHandler(evWiFiScanStatusChanged);
   WiFiScanManager::RegisterNetworksDiscoveredHandler(evWiFiNetworksDiscovery);
 
@@ -428,19 +539,19 @@ bool WiFiManager::Init()
     hostname = OPENSHOCK_FW_HOSTNAME;
   }
 
-  WiFi.setAutoReconnect(false);
-  WiFi.enableSTA(true);
-  WiFi.setHostname(hostname.c_str());
-
-  // If we recognize the network in the ESP's WiFi cache, try to connect to it
-  wifi_config_t current_conf;
-  if (esp_wifi_get_config(static_cast<wifi_interface_t>(ESP_IF_WIFI_STA), &current_conf) == ESP_OK) {
-    if (current_conf.sta.ssid[0] != '\0') {
-      if (Config::GetWiFiCredentialsIDbySSID(reinterpret_cast<const char*>(current_conf.sta.ssid)) != 0) {
-        WiFi.begin();
-      }
-    }
+  err = esp_wifi_set_mode(WIFI_MODE_STA);
+  if (err != ESP_OK) {
+    OS_LOGE(TAG, "esp_wifi_set_mode failed: %s", esp_err_to_name(err));
+    return false;
   }
+
+  err = esp_wifi_start();
+  if (err != ESP_OK) {
+    OS_LOGE(TAG, "esp_wifi_start failed: %s", esp_err_to_name(err));
+    return false;
+  }
+
+  esp_netif_set_hostname(s_staNetif, hostname.c_str());
 
   if (TaskUtils::TaskCreateUniversal(wifimanagerUpdateTask, TAG, 4096, nullptr, 5, nullptr, 1) != pdPASS) {  // TODO: Re-profile stack usage
     OS_LOGE(TAG, "Failed to create WiFiManager update task");
@@ -598,7 +709,7 @@ bool WiFiManager::Connect(const char* ssid)
 
 void WiFiManager::Disconnect()
 {
-  WiFi.disconnect(false);
+  esp_wifi_disconnect();
 }
 
 bool WiFiManager::IsConnected()
@@ -612,16 +723,18 @@ bool WiFiManager::GetConnectedNetwork(OpenShock::WiFiNetwork& network)
   if (connectedId == 0) {
     if (IsConnected()) {
       // We connected without a scan, so populate the network with the current connection info manually
-      network.credentialsID = 0;
-      {
-        auto ssid  = WiFi.SSID();
-        size_t len = std::min(static_cast<size_t>(ssid.length()), sizeof(network.ssid) - 1);
-        memcpy(network.ssid, ssid.c_str(), len);
-        network.ssid[len] = '\0';
+      wifi_ap_record_t apInfo;
+      if (esp_wifi_sta_get_ap_info(&apInfo) != ESP_OK) {
+        return false;
       }
-      memcpy(network.bssid, WiFi.BSSID(), sizeof(network.bssid));
-      network.channel = WiFi.channel();
-      network.rssi    = WiFi.RSSI();
+
+      network.credentialsID = 0;
+      size_t len            = std::min(strlen(reinterpret_cast<const char*>(apInfo.ssid)), sizeof(network.ssid) - 1);
+      memcpy(network.ssid, apInfo.ssid, len);
+      network.ssid[len] = '\0';
+      memcpy(network.bssid, apInfo.bssid, sizeof(network.bssid));
+      network.channel = apInfo.primary;
+      network.rssi    = apInfo.rssi;
       return true;
     }
     return false;
@@ -645,8 +758,14 @@ bool WiFiManager::GetIPAddress(char* ipAddress)
     return false;
   }
 
-  IPAddress ip = WiFi.localIP();
-  snprintf(ipAddress, IP4ADDR_STRLEN_MAX, "%s", ip.toString().c_str());
+  esp_netif_ip_info_t ipInfo;
+  if (s_staNetif == nullptr || esp_netif_get_ip_info(s_staNetif, &ipInfo) != ESP_OK) {
+    return false;
+  }
+
+  uint8_t ip[4];
+  memcpy(ip, &ipInfo.ip.addr, sizeof(ip));
+  snprintf(ipAddress, 16, IPV4ADDR_FMT, IPV4ADDR_ARG(ip));  // "255.255.255.255" + NUL
 
   return true;
 }

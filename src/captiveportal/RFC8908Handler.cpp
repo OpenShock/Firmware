@@ -2,12 +2,11 @@
 
 const char* const TAG = "RFC8908Handler";
 
+#include "captiveportal/Manager.h"
 #include "http/ContentTypes.h"
 #include "Logging.h"
 
 #include <ESPAsyncWebServer.h>
-
-#include <WiFi.h>
 
 #include "json/Json.h"
 
@@ -19,7 +18,7 @@ static const char* const probeRequestrefixes[] = {"/gen_204", "/generate_204", "
 
 static String GetCaptivePortalUrl()
 {
-  return String("http://") + WiFi.softAPIP().toString() + "/";
+  return String("http://") + CaptivePortal::ApIPv4String() + "/";
 }
 
 // Catch-all handler for OS connectivity probes.

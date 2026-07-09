@@ -6,6 +6,7 @@ const char* const TAG = "GatewayConnectionManager";
 
 #include "captiveportal/Manager.h"
 #include "config/Config.h"
+#include "events/Events.h"
 #include "GatewayClient.h"
 #include "http/JsonAPI.h"
 #include "Logging.h"
@@ -63,21 +64,25 @@ static void DestroyClient()
   s_wsClient = nullptr;
 }
 
-static void evh_gotIP(arduino_event_t* event)
+static void handleWiFiStateChanged(void* arg, esp_event_base_t base, int32_t id, void* data)
 {
-  (void)event;
+  (void)arg;
+  (void)base;
+  (void)id;
 
-  s_flags.fetch_or(FLAG_HAS_IP, std::memory_order_relaxed);
-  OS_LOGD(TAG, "Got IP address");
-}
-
-static void evh_wiFiDisconnected(arduino_event_t* event)
-{
-  (void)event;
-
-  s_flags.store(FLAG_NONE, std::memory_order_relaxed);
-  DestroyClient();
-  OS_LOGD(TAG, "Lost IP address");
+  switch (*static_cast<OpenShockWiFiState*>(data)) {
+    case OPENSHOCK_WIFI_STATE_GOT_IP:
+      s_flags.fetch_or(FLAG_HAS_IP, std::memory_order_relaxed);
+      OS_LOGD(TAG, "Got IP address");
+      break;
+    case OPENSHOCK_WIFI_STATE_DISCONNECTED:
+      s_flags.store(FLAG_NONE, std::memory_order_relaxed);
+      DestroyClient();
+      OS_LOGD(TAG, "Lost IP address");
+      break;
+    default:
+      break;
+  }
 }
 
 static bool checkIsDeAuthRateLimited(int64_t millis)
@@ -94,9 +99,11 @@ namespace JsonAPI = OpenShock::Serialization::JsonAPI;
 
 bool GatewayConnectionManager::Init()
 {
-  WiFi.onEvent(evh_gotIP, ARDUINO_EVENT_WIFI_STA_GOT_IP);
-  WiFi.onEvent(evh_gotIP, ARDUINO_EVENT_WIFI_STA_GOT_IP6);
-  WiFi.onEvent(evh_wiFiDisconnected, ARDUINO_EVENT_WIFI_STA_DISCONNECTED);
+  esp_err_t err = esp_event_handler_register(OPENSHOCK_EVENTS, OPENSHOCK_EVENT_WIFI_STATE_CHANGED, handleWiFiStateChanged, nullptr);
+  if (err != ESP_OK) {
+    OS_LOGE(TAG, "Failed to register WiFi state event handler: %s", esp_err_to_name(err));
+    return false;
+  }
 
   return true;
 }

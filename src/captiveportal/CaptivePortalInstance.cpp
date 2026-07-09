@@ -28,8 +28,6 @@ const char* const TAG = "CaptivePortalInstance";
 
 #include "json/Json.h"
 
-#include <WiFi.h>
-
 const uint16_t HTTP_PORT                 = 80;
 const uint16_t WEBSOCKET_PORT            = 81;
 const uint16_t DNS_PORT                  = 53;
@@ -106,7 +104,7 @@ CaptivePortal::CaptivePortalInstance::CaptivePortalInstance()
   m_socketServer.enableHeartbeat(WEBSOCKET_PING_INTERVAL, WEBSOCKET_PING_TIMEOUT, WEBSOCKET_PING_RETRIES);
 
   OS_LOGI(TAG, "Setting up DNS server");
-  bool dnsStarted = m_dnsServer.start(DNS_PORT, "*", WiFi.softAPIP());
+  bool dnsStarted = m_dnsServer.start(DNS_PORT, "*", IPAddress(4, 3, 2, 1));  // CaptivePortal::ApIPv4String()
 
   if (!dnsStarted) {
     OS_LOGE(TAG, "Failed to start DNS server!");

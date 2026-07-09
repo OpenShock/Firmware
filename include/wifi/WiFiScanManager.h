@@ -6,6 +6,7 @@
 
 #include <cstdint>
 #include <functional>
+#include <vector>
 
 namespace OpenShock::WiFiScanManager {
   [[nodiscard]] bool Init();

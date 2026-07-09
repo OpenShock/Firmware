@@ -3,7 +3,7 @@
 #include "config/ConfigBase.h"
 
 #include <hal/gpio_types.h>
-#include <WiFiType.h>
+#include <esp_wifi_types.h>
 
 #include <array>
 #include <cstdint>
