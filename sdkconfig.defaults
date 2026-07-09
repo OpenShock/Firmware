@@ -24,6 +24,11 @@ CONFIG_COMPILER_CXX_EXCEPTIONS=n
 CONFIG_MBEDTLS_PSK_MODES=y
 CONFIG_MBEDTLS_KEY_EXCHANGE_PSK=y
 
+# Captive portal serves HTTP + WebSocket from a single esp_http_server. WebSocket
+# support is compiled out of esp_http_server by default; enable it or the httpd_ws_*
+# symbols don't exist.
+CONFIG_HTTPD_WS_SUPPORT=y
+
 # TEMPORARY: skip TLS server-cert verification. esp_http_client requests to the
 # API/CDN abort at TLS setup with ESP_ERR_MBEDTLS_SSL_SETUP_FAILED (0x8017)
 # because no CA/cert is supplied. This compiles in the MBEDTLS_SSL_VERIFY_NONE
