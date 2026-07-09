@@ -13,7 +13,7 @@ idf_component_register(
   REQUIRES      osjson                       # json/Json.h in public header
                 framework-arduinoespressif32 # Arduino.h in public header
   PRIV_REQUIRES common                       # Common.h (internal)
-                time                         # Core.h (internal)
+                temporal                         # Temporal.h (internal)
                 logging                      # Logging.h (internal)
                 concurrency                  # SimpleMutex (internal)
                 util                         # RateLimiter, HexUtils, StringUtils

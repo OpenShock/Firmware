@@ -1,13 +1,12 @@
 #pragma once
 
-#include "Core.h"
-
-#include <esp32-hal-uart.h>
+#include "Temporal.h"
 
 #include <esp_log.h>
-#include <esp_ota_ops.h>
-#include <esp_system.h>
 
+// log_printf is provided by Arduino (esp32-hal-uart) on-device; declared here so
+// logging carries no Arduino/hardware include and stays host-portable (the host
+// test provides its own definition).
 extern "C" int log_printf(const char* fmt, ...);
 
 template<std::size_t N>
@@ -80,25 +79,5 @@ constexpr const char* openshockPathToFileName(const char (&path)[N])
   } while (0)
 #endif
 
-#define OS_PANIC_PRINT(TAG, format, ...) OS_LOGE(TAG, "PANIC: " format, ##__VA_ARGS__)
-
-#define OS_PANIC(TAG, format, ...)                                             \
-  {                                                                            \
-    OS_PANIC_PRINT(TAG, format ", restarting in 5 seconds...", ##__VA_ARGS__); \
-    vTaskDelay(pdMS_TO_TICKS(5000));                                           \
-    esp_restart();                                                             \
-  }
-
-#define OS_PANIC_OTA(TAG, format, ...)                                                                           \
-  {                                                                                                              \
-    OS_PANIC_PRINT(TAG, format ", invalidating update partition and restarting in 5 seconds...", ##__VA_ARGS__); \
-    vTaskDelay(pdMS_TO_TICKS(5000));                                                                             \
-    esp_ota_mark_app_invalid_rollback_and_reboot();                                                              \
-    esp_restart();                                                                                               \
-  }
-
-#define OS_PANIC_INSTANT(TAG, format, ...)      \
-  {                                             \
-    OS_PANIC_PRINT(TAG, format, ##__VA_ARGS__); \
-    esp_restart();                              \
-  }
+// OS_PANIC / OS_PANIC_OTA / OS_PANIC_INSTANT live in the separate `panic`
+// component (Panic.h) - they pull in esp_ota_ops / esp_system / freertos.

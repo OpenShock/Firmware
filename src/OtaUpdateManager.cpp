@@ -3,18 +3,19 @@
 const char* const TAG = "OtaUpdateManager";
 
 #include "captiveportal/Manager.h"
-#include "OpenShock.h"
 #include "config/Config.h"
-#include "Core.h"
 #include "GatewayConnectionManager.h"
 #include "Hashing.h"
 #include "http/HTTPRequestManager.h"
+#include "hwutil/PartitionUtils.h"
 #include "Logging.h"
+#include "OpenShock.h"
+#include "Panic.h"
 #include "SemVer.h"
 #include "serialization/WSGateway.h"
 #include "SimpleMutex.h"
+#include "Temporal.h"
 #include "util/HexUtils.h"
-#include "util/PartitionUtils.h"
 #include "util/StringUtils.h"
 #include "util/TaskUtils.h"
 #include "wifi/WiFiManager.h"
@@ -377,7 +378,7 @@ static void otaum_updatetask(void* arg)
       continue;
     }
 
-    OS_LOGD(TAG, "Updating to version: %.*s", versionStr.length(), versionStr.data());
+    OS_LOGD(TAG, "Updating to version: %.*s", static_cast<int>(versionStr.length()), versionStr.data());
 
     // Generate random int32_t for this update.
     int32_t updateId = static_cast<int32_t>(esp_random());
@@ -409,10 +410,10 @@ static void otaum_updatetask(void* arg)
 
     // Print release.
     OS_LOGD(TAG, "Firmware release:");
-    OS_LOGD(TAG, "  Version:                %.*s", versionStr.length(), versionStr.data());
-    OS_LOGD(TAG, "  App binary URL:         %.*s", release.appBinaryUrl.length(), release.appBinaryUrl.data());
+    OS_LOGD(TAG, "  Version:                %.*s", static_cast<int>(versionStr.length()), versionStr.data());
+    OS_LOGD(TAG, "  App binary URL:         %.*s", static_cast<int>(release.appBinaryUrl.length()), release.appBinaryUrl.data());
     OS_LOGD(TAG, "  App binary hash:        %s", HexUtils::ToHex<32>(release.appBinaryHash).data());
-    OS_LOGD(TAG, "  Filesystem binary URL:  %.*s", release.filesystemBinaryUrl.length(), release.filesystemBinaryUrl.data());
+    OS_LOGD(TAG, "  Filesystem binary URL:  %.*s", static_cast<int>(release.filesystemBinaryUrl.length()), release.filesystemBinaryUrl.data());
     OS_LOGD(TAG, "  Filesystem binary hash: %s", HexUtils::ToHex<32>(release.filesystemBinaryHash).data());
 
     // Get available app update partition.
@@ -610,7 +611,7 @@ bool OtaUpdateManager::TryGetFirmwareVersion(OtaUpdateChannel channel, OpenShock
   }
 
   if (!OpenShock::TryParseSemVer(response.data, version)) {
-    OS_LOGE(TAG, "Failed to parse firmware version: %.*s", response.data.size(), response.data.data());
+    OS_LOGE(TAG, "Failed to parse firmware version: %.*s", static_cast<int>(response.data.size()), response.data.data());
     return false;
   }
 
@@ -638,7 +639,7 @@ bool OtaUpdateManager::TryGetFirmwareBoards(const OpenShock::SemVer& version, st
 static bool _tryParseIntoHash(std::string_view hash, uint8_t (&hashBytes)[32])
 {
   if (HexUtils::TryParseHex(hash.data(), hash.size(), hashBytes, 32) != 32) {
-    OS_LOGE(TAG, "Failed to parse hash: %.*s", hash.size(), hash.data());
+    OS_LOGE(TAG, "Failed to parse hash: %.*s", static_cast<int>(hash.size()), hash.data());
     return false;
   }
 
@@ -686,7 +687,7 @@ bool OtaUpdateManager::TryGetFirmwareRelease(const OpenShock::SemVer& version, F
   for (std::string_view line : hashesLines) {
     auto parts = OpenShock::StringSplitWhiteSpace(line);
     if (parts.size() != 2) {
-      OS_LOGE(TAG, "Invalid hashes entry: %.*s", line.size(), line.data());
+      OS_LOGE(TAG, "Invalid hashes entry: %.*s", static_cast<int>(line.size()), line.data());
       return false;
     }
 
@@ -696,7 +697,7 @@ bool OtaUpdateManager::TryGetFirmwareRelease(const OpenShock::SemVer& version, F
     file = OpenShock::StringRemovePrefix(file, "./"sv);
 
     if (hash.size() != 64) {
-      OS_LOGE(TAG, "Invalid hash: %.*s", hash.size(), hash.data());
+      OS_LOGE(TAG, "Invalid hash: %.*s", static_cast<int>(hash.size()), hash.data());
       return false;
     }
 

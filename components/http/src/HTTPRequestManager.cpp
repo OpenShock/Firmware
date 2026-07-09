@@ -2,11 +2,11 @@
 
 const char* const TAG = "HTTPRequestManager";
 
-#include "OpenShock.h"
-#include "Core.h"
 #include "Logging.h"
+#include "OpenShock.h"
 #include "RateLimiter.h"
 #include "SimpleMutex.h"
+#include "Temporal.h"
 #include "util/HexUtils.h"
 #include "util/StringUtils.h"
 
@@ -370,7 +370,7 @@ HTTP::Response<std::size_t>
   // This method is horribly named, if you call the begin() method with one String parameter its HTTP, but the one with (String, const char*) is HTTPS.
   // We pass null here for CAcert parameter to remove erroneous "unexpected protocol: https, expected http" warning, this is what begin(String) does as a fallback.
   // This is yet another example of why we need to get rid of Arduino dependency lol
-  if (!client.begin(OpenShock::StringToArduinoString(url), nullptr)) {
+  if (!client.begin(String(url.data(), url.size()), nullptr)) {
     OS_LOGE(TAG, "Failed to begin HTTP request");
     return {HTTP::RequestResult::RequestFailed, 0, 0};
   }

@@ -9,17 +9,17 @@ const char* const TAG = "CaptivePortalInstance";
 #include "Chipset.h"
 #include "CommandHandler.h"
 #include "config/Config.h"
+#include "enums/OtaUpdateChannel.h"
 #include "estop/EStopManager.h"
 #include "GatewayConnectionManager.h"
 #include "http/ContentTypes.h"
+#include "hwutil/PartitionUtils.h"
 #include "Logging.h"
-#include "RateLimiter.h"
 #include "message_handlers/WebSocket.h"
-#include "enums/OtaUpdateChannel.h"
+#include "RateLimiter.h"
 #include "serialization/WSLocal.h"
 #include "util/FnProxy.h"
 #include "util/HexUtils.h"
-#include "util/PartitionUtils.h"
 #include "util/TaskUtils.h"
 #include "wifi/WiFiManager.h"
 #include "wifi/WiFiScanManager.h"
@@ -47,15 +47,15 @@ static const char* const JSON_ERR_PASSWORD_SHORT  = "{\"error\":\"PasswordTooSho
 static const char* const JSON_ERR_PASSWORD_LONG   = "{\"error\":\"PasswordTooLong\"}";
 static const char* const JSON_ERR_CODE_REQUIRED   = "{\"error\":\"CodeRequired\"}";
 static const char* const JSON_ERR_INVALID_CHANNEL = "{\"error\":\"InvalidChannel\"}";
-static const char* const JSON_ERR_RATE_LIMITED     = "{\"error\":\"RateLimited\"}";
+static const char* const JSON_ERR_RATE_LIMITED    = "{\"error\":\"RateLimited\"}";
 
 static OpenShock::RateLimiter& getAccountLinkRateLimiter()
 {
   static OpenShock::RateLimiter* rl = nullptr;
   if (rl == nullptr) {
     rl = new OpenShock::RateLimiter();
-    rl->addLimit(60'000, 5);   // 5 attempts per minute
-    rl->addLimit(300'000, 10); // 10 attempts per 5 minutes
+    rl->addLimit(60'000, 5);    // 5 attempts per minute
+    rl->addLimit(300'000, 10);  // 10 attempts per 5 minutes
   }
   return *rl;
 }

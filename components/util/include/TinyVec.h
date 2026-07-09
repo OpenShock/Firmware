@@ -1,7 +1,8 @@
 #pragma once
 
-#include "OpenShock.h"
 #include "Logging.h"
+#include "OpenShock.h"
+#include "Panic.h"
 
 #include <cstdint>
 #include <cstdlib>

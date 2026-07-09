@@ -3,8 +3,8 @@
 const char* const TAG = "Config::Internal::Utils";
 
 #include "Chipset.h"
+#include "hwutil/IPAddressUtils.h"
 #include "Logging.h"
-#include "util/IPAddressUtils.h"
 
 #include <cstdint>
 
@@ -22,17 +22,17 @@ static bool utilFromJsonInt(T& val, JSON::JsonView json, std::string_view name, 
 
   int64_t intVal;
   if (!jsonVal.tryGetI64(intVal)) {
-    OS_LOGE(TAG, "value at '%.*s' is not a number", name.length(), name.data());
+    OS_LOGE(TAG, "value at '%.*s' is not a number", static_cast<int>(name.length()), name.data());
     return false;
   }
 
   if (intVal < minVal) {
-    OS_LOGE(TAG, "value at '%.*s' is less than %d", name.length(), name.data(), minVal);
+    OS_LOGE(TAG, "value at '%.*s' is less than %d", static_cast<int>(name.length()), name.data(), minVal);
     return false;
   }
 
   if (intVal > maxVal) {
-    OS_LOGE(TAG, "value at '%.*s' is greater than %d", name.length(), name.data(), maxVal);
+    OS_LOGE(TAG, "value at '%.*s' is greater than %d", static_cast<int>(name.length()), name.data(), maxVal);
     return false;
   }
 
@@ -95,7 +95,7 @@ bool Config::Internal::Utils::FromJsonBool(bool& val, JSON::JsonView json, std::
   }
 
   if (!jsonVal.tryGetBool(val)) {
-    OS_LOGE(TAG, "value at '%.*s' is not a bool", name.length(), name.data());
+    OS_LOGE(TAG, "value at '%.*s' is not a bool", static_cast<int>(name.length()), name.data());
     return false;
   }
 
@@ -121,13 +121,13 @@ bool Config::Internal::Utils::FromJsonStr(std::string& str, JSON::JsonView json,
 {
   JSON::JsonView jsonVal = json[name];
   if (!jsonVal.valid()) {
-    OS_LOGE(TAG, "value at '%.*s' is null", name.length(), name.data());
+    OS_LOGE(TAG, "value at '%.*s' is null", static_cast<int>(name.length()), name.data());
     return false;
   }
 
   std::string_view view;
   if (!jsonVal.tryGetStr(view)) {
-    OS_LOGE(TAG, "value at '%.*s' is not a string", name.length(), name.data());
+    OS_LOGE(TAG, "value at '%.*s' is not a string", static_cast<int>(name.length()), name.data());
     return false;
   }
 
@@ -147,18 +147,18 @@ bool Config::Internal::Utils::FromJsonIPAddress(IPAddress& ip, JSON::JsonView js
 {
   JSON::JsonView jsonVal = json[name];
   if (!jsonVal.valid()) {
-    OS_LOGE(TAG, "value at '%.*s' is null", name.length(), name.data());
+    OS_LOGE(TAG, "value at '%.*s' is null", static_cast<int>(name.length()), name.data());
     return false;
   }
 
   std::string_view view;
   if (!jsonVal.tryGetStr(view)) {
-    OS_LOGE(TAG, "value at '%.*s' is not a string", name.length(), name.data());
+    OS_LOGE(TAG, "value at '%.*s' is not a string", static_cast<int>(name.length()), name.data());
     return false;
   }
 
   if (!OpenShock::IPV4AddressFromStringView(ip, view)) {
-    OS_LOGE(TAG, "failed to parse IP address at '%.*s'", name.length(), name.data());
+    OS_LOGE(TAG, "failed to parse IP address at '%.*s'", static_cast<int>(name.length()), name.data());
     return false;
   }
 

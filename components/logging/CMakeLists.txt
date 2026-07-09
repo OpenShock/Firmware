@@ -8,10 +8,6 @@
 
 idf_component_register(
   INCLUDE_DIRS "include"
-  REQUIRES     time                         # Core.h -> OpenShock::millis()
+  REQUIRES     temporal                         # Temporal.h -> OpenShock::millis()
                log                          # esp_log.h (IDF's own logging)
-               app_update                   # esp_ota_ops.h (panic-ota macro)
-               esp_system                   # esp_restart
-               freertos                     # OS_PANIC -> vTaskDelay
-               framework-arduinoespressif32 # esp32-hal-uart.h (log_printf)
 )
