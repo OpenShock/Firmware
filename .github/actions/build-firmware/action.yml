@@ -1,9 +1,12 @@
 name: build-firmware
-description: Builds the firmware partitions and uploads them as an artifact
+description: >-
+  Build one board with native ESP-IDF. Uploads the individual OTA partition
+  images (app.bin, staticfs.bin, bootloader, partition-table) and a single
+  full-flash binary merged via `idf.py merge-bin`.
 inputs:
   board:
     required: true
-    description: 'Board name to build'
+    description: 'Board name to build (matches boards/<board>.defaults)'
   version:
     required: true
     description: 'Current firmware version'
@@ -11,36 +14,79 @@ inputs:
 runs:
   using: composite
   steps:
-    - uses: ./.github/actions/pio-cache
+    - uses: ./.github/actions/setup-esp-idf
+
+    # gen_staticfs.py (invoked by the root CMakeLists during the build) reuses a
+    # prebuilt frontend/build when CI is set, so pull the frontend artifact into
+    # place instead of rebuilding it per board.
+    - name: Download frontend
+      uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c  # v8.0.1
       with:
-        env: ${{ inputs.board }}
+        name: frontend
+        path: frontend/build
 
-    - uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405  # v6.2.0
+    # ccache keyed per board's chip (compiler/framework artifacts track the chip);
+    # the board name is a fine key here since one target maps to the same store.
+    - name: Cache ccache
+      uses: actions/cache@27d5ce7f107fe9357f9df03efb73ab90386fccae  # v5.0.5
       with:
-        cache: 'pip'
+        path: ~/.cache/ccache
+        key: ccache-${{ runner.os }}-${{ inputs.board }}-${{ github.sha }}
+        restore-keys: |
+          ccache-${{ runner.os }}-${{ inputs.board }}-
 
-    - name: Install python dependencies
-      shell: bash
-      run: pip install -r requirements.txt
-
+    # scripts/build.py is the shared native entry point (resolves the target from
+    # boards/<board>.defaults, sets OPENSHOCK_BOARD, layers sdkconfig.defaults +
+    # the board fragment, builds into build/<board>/). The env vars flow through
+    # it to gen_env_header.py.
     - name: Build firmware
-      working-directory: .
       shell: bash
-      # head_commit.timestamp only exists on push events, so derive the build
-      # date from the checked-out commit (falling back to now) - otherwise
-      # schedule/dispatch builds bake in an empty date.
       run: |
+        set -euo pipefail
         export OPENSHOCK_FW_BUILD_DATE="$(git show -s --format=%cI HEAD 2>/dev/null || date -u +%Y-%m-%dT%H:%M:%SZ)"
-        pio run -e ${{ inputs.board }}
+        export IDF_CCACHE_ENABLE=1
+        python scripts/build.py "${{ inputs.board }}" build
       env:
         OPENSHOCK_FW_VERSION: ${{ inputs.version }}
         OPENSHOCK_FW_GIT_REF: ${{ github.ref }}
         OPENSHOCK_FW_GIT_COMMIT: ${{ github.sha }}
 
-    - name: Upload build artifacts
+    # Individual partition images for OTA. The device pulls /<ver>/<board>/app.bin
+    # and /staticfs.bin (OtaUpdateManager.cpp) and flashes them separately, so
+    # they must be named exactly that. bootloader/partition-table ride along for
+    # full-flash tooling. `project(firmware)` names the app image firmware.bin.
+    - name: Stage partition images
+      shell: bash
+      env:
+        B: build/${{ inputs.board }}
+      run: |
+        set -euo pipefail
+        mkdir -p dist
+        cp "$B/firmware.bin"                        dist/app.bin
+        cp "$B/staticfs.bin"                        dist/staticfs.bin
+        cp "$B/bootloader/bootloader.bin"           dist/bootloader.bin
+        cp "$B/partition_table/partition-table.bin" dist/partition-table.bin
+
+    - name: Upload partition images
       uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a  # v7.0.1
       with:
         name: firmware_build_${{ inputs.board }}
-        path: .pio/build/${{ inputs.board }}/*.bin
-        retention-days: 1
+        path: dist/*.bin
+        retention-days: 7
+        if-no-files-found: error
+
+    # merge-bin folds bootloader + partition table + app + the registered static0
+    # image into one binary flashable at offset 0 (web flasher / GitHub release).
+    - name: Merge partitions
+      shell: bash
+      run: |
+        set -euo pipefail
+        python scripts/build.py "${{ inputs.board }}" merge-bin -o "$PWD/OpenShock_${{ inputs.board }}_${{ inputs.version }}.bin"
+
+    - name: Upload merged firmware binary
+      uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a  # v7.0.1
+      with:
+        name: firmware_merged_${{ inputs.board }}
+        path: OpenShock_${{ inputs.board }}_*.bin
+        retention-days: 7
         if-no-files-found: error

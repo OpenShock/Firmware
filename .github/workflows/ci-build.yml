@@ -176,59 +176,34 @@ jobs:
 
       - uses: ./.github/actions/build-frontend
 
-  build-staticfs:
-    runs-on: ubuntu-latest
-    needs: [getvars, build-frontend]
-    timeout-minutes: 5
-
-    steps:
-      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0  # v7.0.0
-      - uses: ./.github/actions/build-staticfs
-        with:
-          version: ${{ needs.getvars.outputs.version }}
-
+  # Native ESP-IDF build. Each leg builds one board and, in the same step,
+  # merges bootloader + partition table + app + the static0 web-assets image into
+  # a single flashable binary (idf.py merge-bin) - so this one job replaces the
+  # old build-staticfs + build-firmware + merge-partitions trio. Depends on
+  # build-frontend for the prebuilt frontend artifact the static0 image packs.
   build-firmware:
     runs-on: ubuntu-latest
-    needs: [gate, getvars]
+    needs: [gate, getvars, build-frontend]
     if: ${{ needs.gate.outputs.build == 'true' }}
-    timeout-minutes: 10
+    timeout-minutes: 30
     strategy:
       fail-fast: false
       matrix: ${{ fromJSON(needs.getvars.outputs.board-matrix) }}
 
     steps:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0  # v7.0.0
+        with:
+          # flatbuffers runtime lives in a submodule (components/flatbuffers).
+          submodules: recursive
 
       - uses: ./.github/actions/build-firmware
         with:
           board: ${{ matrix.board }}
           version: ${{ needs.getvars.outputs.version }}
 
-  merge-partitions:
-    runs-on: ubuntu-latest
-    needs: [getvars, build-staticfs, build-firmware]
-    timeout-minutes: 5
-    strategy:
-      fail-fast: false
-      matrix: ${{ fromJSON(needs.getvars.outputs.board-matrix) }}
-
-    steps:
-      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0  # v7.0.0
-        with:
-          sparse-checkout: |
-            .github
-            scripts
-            boards
-            chips
-
-      - uses: ./.github/actions/merge-partitions
-        with:
-          version: ${{ needs.getvars.outputs.version }}
-          board: ${{ matrix.board }}
-
   checkpoint-build:
     runs-on: ubuntu-slim # lightweight: barrier job, just an echo
-    needs: [merge-partitions]
+    needs: [build-firmware]
     timeout-minutes: 1
     steps:
       - run: echo "Builds checkpoint reached"

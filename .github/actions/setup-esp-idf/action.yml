@@ -1,0 +1,43 @@
+name: setup-esp-idf
+description: >-
+  Install a pinned native ESP-IDF toolchain plus the Python deps our build
+  scripts need (gen_env_header.py / gen_staticfs.py). Shared by every job that
+  runs idf.py. Replaces the PlatformIO pio-cache action.
+inputs:
+  idf-version:
+    description: 'ESP-IDF version to install (EIM version tag).'
+    required: false
+    default: 'v6.0.2'
+
+runs:
+  using: composite
+  steps:
+    # Best-effort restore of the IDF tool store (compilers, openocd, ...). The
+    # install action below still runs and is authoritative for PATH/IDF_PATH; a
+    # warm ~/.espressif just lets it detect an existing install and skip the
+    # multi-hundred-MB download. Keyed by version so a bump invalidates cleanly.
+    - name: Cache ESP-IDF tools
+      uses: actions/cache@27d5ce7f107fe9357f9df03efb73ab90386fccae  # v5.0.5
+      with:
+        path: ~/.espressif
+        key: esp-idf-tools-${{ runner.os }}-${{ inputs.idf-version }}
+        restore-keys: |
+          esp-idf-tools-${{ runner.os }}-
+
+    # Installs ESP-IDF and puts idf.py / esptool.py on PATH for later run steps
+    # (no need to source export.sh). v1 is a moving branch (the repo publishes no
+    # release tags), pinned by SHA per this repo's convention.
+    - name: Install ESP-IDF
+      uses: espressif/install-esp-idf-action@8fc05d1470d5591417e7a3707a1f2bec178db4ae  # v1
+      with:
+        version: ${{ inputs.idf-version }}
+
+    - uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405  # v6.2.0
+      with:
+        cache: 'pip'
+
+    - name: Install Python dependencies
+      shell: bash
+      # littlefs-python (gen_staticfs.py) + GitPython/cryptography (env + cert
+      # tooling). esptool ships inside ESP-IDF, so it is not reinstalled here.
+      run: pip install -r requirements.txt

@@ -78,15 +78,17 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0  # v7.0.0
+        with:
+          # flatbuffers runtime lives in a submodule (components/flatbuffers).
+          submodules: recursive
 
       - name: Initialize CodeQL
         uses: github/codeql-action/init@c35d1b164463ee62a100735382aaaa525c5d3496  # codeql-bundle-v2.25.6
         with:
           languages: ${{ env.language }}
 
-      - uses: ./.github/actions/build-firmware
+      - uses: ./.github/actions/build-compilationdb
         with:
-          board: ci-build
           version: 0.0.0-codeql+build
 
       - name: Perform CodeQL Analysis

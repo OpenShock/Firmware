@@ -1,5 +1,8 @@
 name: build-compilationdb
-description: Builds the compilation database for the firmware for code analysis
+description: >-
+  Build a representative board with native ESP-IDF to emit
+  build/compile_commands.json (for cpp-linter) and a real compile pass (for
+  CodeQL C/C++). Uses OpenShock-Core-V2 / esp32s3 as the canonical config.
 inputs:
   version:
     required: true
@@ -8,24 +11,27 @@ inputs:
 runs:
   using: composite
   steps:
-    - uses: ./.github/actions/pio-cache
-      with:
-        env: ci-build
+    - uses: ./.github/actions/setup-esp-idf
 
-    - uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405  # v6.2.0
-      with:
-        cache: 'pip'
-
-    - name: Install python dependencies
-      shell: bash
-      run: pip install -r requirements.txt
-
-    - name: Build firmware
-      working-directory: .
+    # The build always packs a static0 web-assets image, but code analysis does
+    # not need the real frontend. Provide a minimal stub so gen_staticfs.py
+    # succeeds without pulling the (heavy, separately-built) frontend artifact.
+    - name: Stub frontend for staticfs
       shell: bash
       run: |
+        mkdir -p frontend/build
+        [ -f frontend/build/index.html ] || printf '<!doctype html><title>ci</title>' > frontend/build/index.html
+
+    # A real compile of the canonical board via the shared build.py entry point,
+    # which writes build/OpenShock-Core-V2/compile_commands.json (for cpp-linter)
+    # and lets CodeQL trace the C/C++ compilation. ccache is left off so CodeQL
+    # sees every compiler invocation.
+    - name: Build firmware (OpenShock-Core-V2 / esp32s3)
+      shell: bash
+      run: |
+        set -euo pipefail
         export OPENSHOCK_FW_BUILD_DATE="$(git show -s --format=%cI HEAD 2>/dev/null || date -u +%Y-%m-%dT%H:%M:%SZ)"
-        pio run -e ci-build -t compiledb
+        python scripts/build.py OpenShock-Core-V2 build
       env:
         OPENSHOCK_FW_VERSION: ${{ inputs.version }}
         OPENSHOCK_FW_GIT_REF: ${{ github.ref }}

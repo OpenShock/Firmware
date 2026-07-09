@@ -40,22 +40,10 @@ jobs:
           sparse-checkout: |
             .github
             .changes
+            boards
 
-      # Pin Node to the range declared in the scripts package (engines.node),
-      # rather than relying on whatever the runner image happens to ship.
-      - uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e  # v6.4.0
-        with:
-          node-version-file: .github/scripts/package.json
-
-      - uses: pnpm/action-setup@0ebf47130e4866e96fce0953f49152a61190b271  # v6.0.9
-        name: Install pnpm
-        with:
-          cache: true
-          cache_dependency_path: .github/scripts/pnpm-lock.yaml
-          package_json_file: .github/scripts/package.json
-          run_install: |
-            - cwd: .github/scripts
-              args: [--frozen-lockfile, --strict-peer-dependencies]
+      # No setup-python: the runner ships Python 3.12.3, which get-vars.py needs
+      # (it self-checks the floor via MIN_PYTHON and fails clearly otherwise).
 
       # Single source of truth for the version bump: release-tool computes the
       # next version from .changes/. status mode works on every branch (no
@@ -73,4 +61,4 @@ jobs:
         env:
           RELEASE_NEXT_VERSION: ${{ steps.relmeta.outputs.next-version }}
           RELEASE_SKIP: ${{ steps.relmeta.outputs.skip }}
-        run: node .github/scripts/get-vars.js
+        run: python3 .github/scripts/get-vars.py
