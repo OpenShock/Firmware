@@ -3,7 +3,7 @@ CONFIG_FREERTOS_HZ=1000
 CONFIG_AUTOSTART_ARDUINO=y
 
 # Keep main task large enough for Arduino setup() / existing init chain
-CONFIG_ESP_MAIN_TASK_STACK_SIZE=8192
+CONFIG_ESP_MAIN_TASK_STACK_SIZE=16384
 
 # WiFi/IP event handlers (WiFiManager, GatewayConnectionManager) now run directly
 # on the default event loop task instead of Arduino's separate 4096-byte event
