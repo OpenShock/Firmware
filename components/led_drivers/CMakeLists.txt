@@ -1,5 +1,5 @@
-# OpenShock LED drivers — both mono (PWM via LEDC) and RGB (WS2812B via
-# Arduino-ESP32's RMT HAL).
+# OpenShock LED drivers — both mono (PWM via LEDC) and RGB (WS2812B via the
+# ESP-IDF RMT driver, esp_driver_rmt).
 #
 # Public surface:
 #   led_drivers/MonoLedDriver.h

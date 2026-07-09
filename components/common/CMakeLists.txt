@@ -1,6 +1,7 @@
 # OpenShock foundation headers — pure language-level utilities.
 #
-# Header-only. No SRCS. Arduino-free. Consumers pick these up by `REQUIRES common`.
+# Headers plus a single compile-time language-version guard. Consumers pick these
+# up by `REQUIRES common`.
 #
 # Public surface:
 #   Common.h         — basic defines, DISABLE_DEFAULT/COPY/MOVE macros
@@ -9,6 +10,5 @@
 
 idf_component_register(
   SRCS         "src/LanguageVersionCheck.cpp"
-               "src/ArduinoExistanceCheck.cpp"
   INCLUDE_DIRS "include"
 )

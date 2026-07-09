@@ -167,8 +167,8 @@ HTTP::Response<std::size_t> HTTP::Client::Download(std::string_view url, const s
 
   // Open the connection, reusing the kept-alive handle when possible. If a
   // reused (kept-alive) socket has been closed by the server, drop it and
-  // reconnect fresh once. HTTPS server certificates are not verified (matches
-  // the previous Arduino behavior). TODO: attach the embedded x509 cert bundle.
+  // reconnect fresh once. HTTPS server certificates are not verified yet.
+  // TODO: attach the embedded x509 cert bundle.
   esp_err_t err = ESP_FAIL;
   for (int attempt = 0; attempt < 2; ++attempt) {
     bool reused = m_handle != nullptr;

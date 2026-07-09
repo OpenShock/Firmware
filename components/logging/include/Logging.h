@@ -5,10 +5,9 @@
 #include <esp_log.h>
 
 // openshock_log_printf forwards to vprintf (the IDF console: UART0 + any secondary
-// USB-Serial-JTAG/CDC output). Defined in Logging.cpp so logging carries no
-// Arduino/hardware include and stays host-portable (the host test no-ops the macros).
-// Named distinctly from Arduino's log_printf so both can coexist while the
-// framework is still `arduino, espidf`.
+// USB-Serial-JTAG/CDC output). Defined in Logging.cpp so this header carries no
+// hardware include and stays host-portable (the host test no-ops the macros).
+// Named distinctly from the framework's own log_printf to avoid a symbol clash.
 extern "C" int openshock_log_printf(const char* fmt, ...);
 
 template<std::size_t N>

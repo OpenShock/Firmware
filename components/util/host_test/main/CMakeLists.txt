@@ -1,6 +1,7 @@
 # Compile util's PURE sources directly (not via the util component) so we avoid
-# util's firmware-only transitive deps (logging -> app_update / Arduino). A stub
-# Logging.h (stubs/) satisfies the OS_LOG* macros the sources use.
+# util's firmware-only transitive deps (logging pulls in IDF components that are
+# unavailable on the host). A stub Logging.h (stubs/) satisfies the OS_LOG*
+# macros the sources use.
 idf_component_register(
   SRCS         "test_main.cpp"
                "test_convert.cpp"
