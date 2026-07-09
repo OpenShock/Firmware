@@ -1,6 +1,7 @@
 #include "serial/command_handlers/common.h"
 
 #include "CommandHandler.h"
+#include "json/Json.h"
 #include "serialization/JsonSerial.h"
 
 static void handleRFTransmitCommand(std::string_view arg, bool isAutomated)
@@ -9,16 +10,14 @@ static void handleRFTransmitCommand(std::string_view arg, bool isAutomated)
     SERPR_ERROR("No command");
     return;
   }
-  cJSON* root = cJSON_ParseWithLength(arg.data(), arg.length());
-  if (root == nullptr) {
-    SERPR_ERROR("Failed to parse JSON: %s", cJSON_GetErrorPtr());
+  OpenShock::JSON::JsonDocument doc;
+  if (!doc.parse(arg)) {
+    SERPR_ERROR("Failed to parse JSON");
     return;
   }
 
   OpenShock::Serialization::JsonSerial::ShockerCommand cmd;
-  bool parsed = OpenShock::Serialization::JsonSerial::ParseShockerCommand(root, cmd);
-
-  cJSON_Delete(root);
+  bool parsed = OpenShock::Serialization::JsonSerial::ParseShockerCommand(doc.root(), cmd);
 
   if (!parsed) {
     SERPR_ERROR("Failed to parse shocker command");

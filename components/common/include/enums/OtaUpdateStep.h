@@ -1,7 +1,9 @@
 #pragma once
 
+#include "StringHelpers.h"
+
 #include <cstdint>
-#include <cstring>
+#include <string_view>
 
 namespace OpenShock {
   enum class OtaUpdateStep : uint8_t {
@@ -13,34 +15,34 @@ namespace OpenShock {
     RollingBack
   };
 
-  inline bool TryParseOtaUpdateStep(OtaUpdateStep& channel, const char* str)
+  inline bool TryParseOtaUpdateStep(OtaUpdateStep& channel, std::string_view str)
   {
-    if (strcasecmp(str, "none") == 0) {
+    if (StringIEquals(str, "none")) {
       channel = OtaUpdateStep::None;
       return true;
     }
 
-    if (strcasecmp(str, "updating") == 0) {
+    if (StringIEquals(str, "updating")) {
       channel = OtaUpdateStep::Updating;
       return true;
     }
 
-    if (strcasecmp(str, "updated") == 0) {
+    if (StringIEquals(str, "updated")) {
       channel = OtaUpdateStep::Updated;
       return true;
     }
 
-    if (strcasecmp(str, "validating") == 0) {
+    if (StringIEquals(str, "validating")) {
       channel = OtaUpdateStep::Validating;
       return true;
     }
 
-    if (strcasecmp(str, "validated") == 0) {
+    if (StringIEquals(str, "validated")) {
       channel = OtaUpdateStep::Validated;
       return true;
     }
 
-    if (strcasecmp(str, "rollingback") == 0) {
+    if (StringIEquals(str, "rollingback")) {
       channel = OtaUpdateStep::RollingBack;
       return true;
     }

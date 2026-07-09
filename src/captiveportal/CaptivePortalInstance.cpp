@@ -26,7 +26,8 @@ const char* const TAG = "CaptivePortalInstance";
 
 #include "serialization/_fbs/HubToLocalMessage_generated.h"
 
-#include <cJSON.h>
+#include "json/Json.h"
+
 #include <WiFi.h>
 
 const uint16_t HTTP_PORT                 = 80;
@@ -225,16 +226,13 @@ CaptivePortal::CaptivePortalInstance::CaptivePortalInstance()
           error = "InternalError";
           break;
       }
-      cJSON* root = cJSON_CreateObject();
-      cJSON_AddStringToObject(root, "error", error);
-      char* json = cJSON_PrintUnformatted(root);
-      cJSON_Delete(root);
-      if (json == nullptr) {
-        request->send(500, HTTP::ContentType::JSON, JSON_ERR_INTERNAL);
-      } else {
-        request->send(400, HTTP::ContentType::JSON, json);
-        cJSON_free(json);
-      }
+      OpenShock::JSON::StringWriter writer;
+      json_gen_str_t* gen = writer.gen();
+      json_gen_start_object(gen);
+      OpenShock::JSON::objSetString(gen, "error", error);
+      json_gen_end_object(gen);
+      std::string json = writer.finish();
+      request->send(400, HTTP::ContentType::JSON, json.c_str());
     });
 
     m_webServer.on("/api/account", HTTP_DELETE, [](AsyncWebServerRequest* request) {
@@ -254,16 +252,13 @@ CaptivePortal::CaptivePortalInstance::CaptivePortalInstance()
         request->send(400, HTTP::ContentType::JSON, (result == ResultCode::InvalidPin) ? JSON_ERR_INVALID_PIN : JSON_ERR_INTERNAL);
         return;
       }
-      cJSON* root = cJSON_CreateObject();
-      cJSON_AddNumberToObject(root, "pin", pin);
-      char* json = cJSON_PrintUnformatted(root);
-      cJSON_Delete(root);
-      if (json == nullptr) {
-        request->send(500, HTTP::ContentType::JSON, JSON_ERR_INTERNAL);
-      } else {
-        request->send(200, HTTP::ContentType::JSON, json);
-        cJSON_free(json);
-      }
+      OpenShock::JSON::StringWriter writer;
+      json_gen_str_t* gen = writer.gen();
+      json_gen_start_object(gen);
+      json_gen_obj_set_int(gen, "pin", pin);
+      json_gen_end_object(gen);
+      std::string json = writer.finish();
+      request->send(200, HTTP::ContentType::JSON, json.c_str());
     });
 
     m_webServer.on("/api/config/estop/pin", HTTP_PUT, [](AsyncWebServerRequest* request) {
@@ -280,16 +275,13 @@ CaptivePortal::CaptivePortalInstance::CaptivePortalInstance()
         request->send(500, HTTP::ContentType::JSON, JSON_ERR_INTERNAL);
         return;
       }
-      cJSON* root = cJSON_CreateObject();
-      cJSON_AddNumberToObject(root, "pin", pin);
-      char* json = cJSON_PrintUnformatted(root);
-      cJSON_Delete(root);
-      if (json == nullptr) {
-        request->send(500, HTTP::ContentType::JSON, JSON_ERR_INTERNAL);
-      } else {
-        request->send(200, HTTP::ContentType::JSON, json);
-        cJSON_free(json);
-      }
+      OpenShock::JSON::StringWriter writer;
+      json_gen_str_t* gen = writer.gen();
+      json_gen_start_object(gen);
+      json_gen_obj_set_int(gen, "pin", pin);
+      json_gen_end_object(gen);
+      std::string json = writer.finish();
+      request->send(200, HTTP::ContentType::JSON, json.c_str());
     });
 
     m_webServer.on("/api/config/estop/enabled", HTTP_PUT, [](AsyncWebServerRequest* request) {

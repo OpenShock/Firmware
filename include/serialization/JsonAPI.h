@@ -1,8 +1,7 @@
 #pragma once
 
 #include "enums/ShockerModelType.h"
-
-#include <cJSON.h>
+#include "json/Json.h"
 
 #include <cstdint>
 #include <string>
@@ -41,9 +40,9 @@ namespace OpenShock::Serialization::JsonAPI {
     std::string country;
   };
 
-  bool ParseLcgInstanceDetailsJsonResponse(int code, const cJSON* root, LcgInstanceDetailsResponse& out);
-  bool ParseBackendVersionJsonResponse(int code, const cJSON* root, BackendVersionResponse& out);
-  bool ParseAccountLinkJsonResponse(int code, const cJSON* root, AccountLinkResponse& out);
-  bool ParseHubInfoJsonResponse(int code, const cJSON* root, HubInfoResponse& out);
-  bool ParseAssignLcgJsonResponse(int code, const cJSON* root, AssignLcgResponse& out);
+  bool ParseLcgInstanceDetailsJsonResponse(int code, JSON::JsonView root, LcgInstanceDetailsResponse& out);
+  bool ParseBackendVersionJsonResponse(int code, JSON::JsonView root, BackendVersionResponse& out);
+  bool ParseAccountLinkJsonResponse(int code, JSON::JsonView root, AccountLinkResponse& out);
+  bool ParseHubInfoJsonResponse(int code, JSON::JsonView root, HubInfoResponse& out);
+  bool ParseAssignLcgJsonResponse(int code, JSON::JsonView root, AssignLcgResponse& out);
 }  // namespace OpenShock::Serialization::JsonAPI

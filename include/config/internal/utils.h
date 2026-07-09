@@ -2,7 +2,8 @@
 
 #include "config/ConfigBase.h"
 
-#include <cJSON.h>
+#include "json/Json.h"
+
 #include <hal/gpio_types.h>
 #include <IPAddress.h>
 
@@ -15,19 +16,19 @@ namespace OpenShock::Config::Internal::Utils {
 
   void FromFbsStr(std::string& str, const flatbuffers::String* fbsStr, const char* defaultStr);
   bool FromFbsIPAddress(IPAddress& ip, const flatbuffers::String* fbsIP, const IPAddress& defaultIP);
-  bool FromJsonBool(bool& val, const cJSON* json, const char* name, bool defaultVal);
-  bool FromJsonU8(uint8_t& val, const cJSON* json, const char* name, uint8_t defaultVal);
-  bool FromJsonU16(uint16_t& val, const cJSON* json, const char* name, uint16_t defaultVal);
-  bool FromJsonI32(int32_t& val, const cJSON* json, const char* name, int32_t defaultVal);
+  bool FromJsonBool(bool& val, JSON::JsonView json, std::string_view name, bool defaultVal);
+  bool FromJsonU8(uint8_t& val, JSON::JsonView json, std::string_view name, uint8_t defaultVal);
+  bool FromJsonU16(uint16_t& val, JSON::JsonView json, std::string_view name, uint16_t defaultVal);
+  bool FromJsonI32(int32_t& val, JSON::JsonView json, std::string_view name, int32_t defaultVal);
 
-  bool FromJsonStr(std::string& str, const cJSON* json, const char* name);
-  void FromJsonStr(std::string& str, const cJSON* json, const char* name, const char* defaultStr);
+  bool FromJsonStr(std::string& str, JSON::JsonView json, std::string_view name);
+  void FromJsonStr(std::string& str, JSON::JsonView json, std::string_view name, const char* defaultStr);
 
-  bool FromJsonIPAddress(IPAddress& ip, const cJSON* json, const char* name);
-  void FromJsonIPAddress(IPAddress& ip, const cJSON* json, const char* name, const IPAddress& defaultIP);
+  bool FromJsonIPAddress(IPAddress& ip, JSON::JsonView json, std::string_view name);
+  void FromJsonIPAddress(IPAddress& ip, JSON::JsonView json, std::string_view name, const IPAddress& defaultIP);
 
-  bool FromJsonGpioNum(gpio_num_t& val, const cJSON* json, const char* name);
-  void FromJsonGpioNum(gpio_num_t& val, const cJSON* json, const char* name, gpio_num_t defaultVal);
+  bool FromJsonGpioNum(gpio_num_t& val, JSON::JsonView json, std::string_view name);
+  void FromJsonGpioNum(gpio_num_t& val, JSON::JsonView json, std::string_view name, gpio_num_t defaultVal);
 
   template<typename T, typename U>  // T inherits from ConfigBase<U>
   void FromFbsVec(std::vector<T>& vec, const flatbuffers::Vector<flatbuffers::Offset<U>>* fbsVec)
@@ -46,37 +47,37 @@ namespace OpenShock::Config::Internal::Utils {
     }
   }
   template<typename T>  // T inherits from ConfigBase<T>
-  bool FromJsonStrParsed(T& val, const cJSON* json, const char* name, bool (*StringParser)(T&, const char*), T defaultVal)
+  bool FromJsonStrParsed(T& val, JSON::JsonView json, std::string_view name, bool (*StringParser)(T&, std::string_view), T defaultVal)
   {
-    const cJSON* jsonVal = cJSON_GetObjectItemCaseSensitive(json, name);
-    if (jsonVal == nullptr) {
+    JSON::JsonView jsonVal = json[name];
+    if (!jsonVal.valid()) {
       val = defaultVal;
       return true;
     }
 
-    if (cJSON_IsString(jsonVal) == 0) {
+    std::string_view view;
+    if (!jsonVal.tryGetStr(view)) {
       return false;
     }
 
-    if (!StringParser(val, jsonVal->valuestring)) {
+    if (!StringParser(val, view)) {
       return false;
     }
 
     return true;
   }
   template<typename T>  // T inherits from ConfigBase<T>
-  bool FromJsonArray(std::vector<T>& vec, const cJSON* jsonArray)
+  bool FromJsonArray(std::vector<T>& vec, JSON::JsonView jsonArray)
   {
     vec.clear();
-    if (jsonArray == nullptr) {
+    if (!jsonArray.isArray()) {
       return true;
     }
 
-    const cJSON* jsonItem = nullptr;
-    cJSON_ArrayForEach(jsonItem, jsonArray)
-    {
+    const int count = jsonArray.count();
+    for (int i = 0; i < count; ++i) {
       T item;
-      if (item.FromJSON(jsonItem)) {
+      if (item.FromJSON(jsonArray.at(i))) {
         vec.push_back(std::move(item));
       }
     }

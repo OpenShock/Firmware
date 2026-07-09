@@ -87,50 +87,50 @@ flatbuffers::Offset<OpenShock::Serialization::Configuration::HubConfig> RootConf
   return Serialization::Configuration::CreateHubConfig(builder, rfOffset, wifiOffset, captivePortalOffset, backendOffset, serialInputOffset, otaUpdateOffset, estopOffset);
 }
 
-bool RootConfig::FromJSON(const cJSON* json)
+bool RootConfig::FromJSON(JSON::JsonView json)
 {
-  if (json == nullptr) {
+  if (!json.valid()) {
     OS_LOGW(TAG, "Config is null, setting to default");
     ToDefault();
     return true;
   }
 
-  if (cJSON_IsObject(json) == 0) {
+  if (!json.isObject()) {
     OS_LOGE(TAG, "json is not an object");
     return false;
   }
 
-  if (!rf.FromJSON(cJSON_GetObjectItemCaseSensitive(json, "rf"))) {
+  if (!rf.FromJSON(json["rf"])) {
     OS_LOGE(TAG, "Unable to load rf config");
     return false;
   }
 
-  if (!wifi.FromJSON(cJSON_GetObjectItemCaseSensitive(json, "wifi"))) {
+  if (!wifi.FromJSON(json["wifi"])) {
     OS_LOGE(TAG, "Unable to load wifi config");
     return false;
   }
 
-  if (!captivePortal.FromJSON(cJSON_GetObjectItemCaseSensitive(json, "captivePortal"))) {
+  if (!captivePortal.FromJSON(json["captivePortal"])) {
     OS_LOGE(TAG, "Unable to load captive portal config");
     return false;
   }
 
-  if (!backend.FromJSON(cJSON_GetObjectItemCaseSensitive(json, "backend"))) {
+  if (!backend.FromJSON(json["backend"])) {
     OS_LOGE(TAG, "Unable to load backend config");
     return false;
   }
 
-  if (!serialInput.FromJSON(cJSON_GetObjectItemCaseSensitive(json, "serialInput"))) {
+  if (!serialInput.FromJSON(json["serialInput"])) {
     OS_LOGE(TAG, "Unable to load serial input config");
     return false;
   }
 
-  if (!otaUpdate.FromJSON(cJSON_GetObjectItemCaseSensitive(json, "otaUpdate"))) {
+  if (!otaUpdate.FromJSON(json["otaUpdate"])) {
     OS_LOGE(TAG, "Unable to load ota update config");
     return false;
   }
 
-  if (!estop.FromJSON(cJSON_GetObjectItemCaseSensitive(json, "estop"))) {
+  if (!estop.FromJSON(json["estop"])) {
     OS_LOGE(TAG, "Unable to load estop config");
     return false;
   }
@@ -138,17 +138,33 @@ bool RootConfig::FromJSON(const cJSON* json)
   return true;
 }
 
-cJSON* RootConfig::ToJSON(bool withSensitiveData) const
+void RootConfig::ToJSON(json_gen_str_t* gen, bool withSensitiveData) const
 {
-  cJSON* root = cJSON_CreateObject();
+  json_gen_push_object(gen, "rf");
+  rf.ToJSON(gen, withSensitiveData);
+  json_gen_pop_object(gen);
 
-  cJSON_AddItemToObject(root, "rf", rf.ToJSON(withSensitiveData));
-  cJSON_AddItemToObject(root, "wifi", wifi.ToJSON(withSensitiveData));
-  cJSON_AddItemToObject(root, "captivePortal", captivePortal.ToJSON(withSensitiveData));
-  cJSON_AddItemToObject(root, "backend", backend.ToJSON(withSensitiveData));
-  cJSON_AddItemToObject(root, "serialInput", serialInput.ToJSON(withSensitiveData));
-  cJSON_AddItemToObject(root, "otaUpdate", otaUpdate.ToJSON(withSensitiveData));
-  cJSON_AddItemToObject(root, "estop", estop.ToJSON(withSensitiveData));
+  json_gen_push_object(gen, "wifi");
+  wifi.ToJSON(gen, withSensitiveData);
+  json_gen_pop_object(gen);
 
-  return root;
+  json_gen_push_object(gen, "captivePortal");
+  captivePortal.ToJSON(gen, withSensitiveData);
+  json_gen_pop_object(gen);
+
+  json_gen_push_object(gen, "backend");
+  backend.ToJSON(gen, withSensitiveData);
+  json_gen_pop_object(gen);
+
+  json_gen_push_object(gen, "serialInput");
+  serialInput.ToJSON(gen, withSensitiveData);
+  json_gen_pop_object(gen);
+
+  json_gen_push_object(gen, "otaUpdate");
+  otaUpdate.ToJSON(gen, withSensitiveData);
+  json_gen_pop_object(gen);
+
+  json_gen_push_object(gen, "estop");
+  estop.ToJSON(gen, withSensitiveData);
+  json_gen_pop_object(gen);
 }

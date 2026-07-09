@@ -53,15 +53,15 @@ flatbuffers::Offset<OpenShock::Serialization::Configuration::BackendConfig> Back
   return Serialization::Configuration::CreateBackendConfig(builder, domainOffset, authTokenOffset);
 }
 
-bool BackendConfig::FromJSON(const cJSON* json)
+bool BackendConfig::FromJSON(JSON::JsonView json)
 {
-  if (json == nullptr) {
+  if (!json.valid()) {
     OS_LOGW(TAG, "Config is null, setting to default");
     ToDefault();
     return true;
   }
 
-  if (cJSON_IsObject(json) == 0) {
+  if (!json.isObject()) {
     OS_LOGE(TAG, "json is not an object");
     return false;
   }
@@ -72,15 +72,11 @@ bool BackendConfig::FromJSON(const cJSON* json)
   return true;
 }
 
-cJSON* BackendConfig::ToJSON(bool withSensitiveData) const
+void BackendConfig::ToJSON(json_gen_str_t* gen, bool withSensitiveData) const
 {
-  cJSON* root = cJSON_CreateObject();
-
-  cJSON_AddStringToObject(root, "domain", domain.c_str());
+  JSON::objSetString(gen, "domain", domain);
 
   if (withSensitiveData) {
-    cJSON_AddStringToObject(root, "authToken", authToken.c_str());
+    JSON::objSetString(gen, "authToken", authToken);
   }
-
-  return root;
 }

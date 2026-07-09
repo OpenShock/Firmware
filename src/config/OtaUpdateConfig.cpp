@@ -6,6 +6,7 @@ const char* const TAG = "Config::OtaUpdateConfig";
 #include "Logging.h"
 
 using namespace OpenShock::Config;
+using namespace std::string_view_literals;
 
 OtaUpdateConfig::OtaUpdateConfig()
   : isEnabled(true)
@@ -78,47 +79,43 @@ flatbuffers::Offset<OpenShock::Serialization::Configuration::OtaUpdateConfig> Ot
   return Serialization::Configuration::CreateOtaUpdateConfig(builder, isEnabled, builder.CreateString(cdnDomain), static_cast<Serialization::Configuration::OtaUpdateChannel>(updateChannel), checkOnStartup, checkPeriodically, checkInterval, allowBackendManagement, requireManualApproval, updateId, static_cast<Serialization::Configuration::OtaUpdateStep>(updateStep));
 }
 
-bool OtaUpdateConfig::FromJSON(const cJSON* json)
+bool OtaUpdateConfig::FromJSON(JSON::JsonView json)
 {
-  if (json == nullptr) {
+  if (!json.valid()) {
     OS_LOGW(TAG, "Config is null, setting to default");
     ToDefault();
     return true;
   }
 
-  if (!cJSON_IsObject(json)) {
+  if (!json.isObject()) {
     OS_LOGE(TAG, "json is not an object");
     return false;
   }
 
   Internal::Utils::FromJsonBool(isEnabled, json, "isEnabled", true);
   Internal::Utils::FromJsonStr(cdnDomain, json, "cdnDomain", OPENSHOCK_FW_CDN_DOMAIN);
-  Internal::Utils::FromJsonStrParsed(updateChannel, json, "updateChannel", OpenShock::TryParseOtaUpdateChannel, OpenShock::OtaUpdateChannel::Stable);
+  Internal::Utils::FromJsonStrParsed(updateChannel, json, "updateChannel"sv, OpenShock::TryParseOtaUpdateChannel, OpenShock::OtaUpdateChannel::Stable);
   Internal::Utils::FromJsonBool(checkOnStartup, json, "checkOnStartup", false);
   Internal::Utils::FromJsonBool(checkPeriodically, json, "checkPeriodically", false);
   Internal::Utils::FromJsonU16(checkInterval, json, "checkInterval", 30);
   Internal::Utils::FromJsonBool(allowBackendManagement, json, "allowBackendManagement", true);
   Internal::Utils::FromJsonBool(requireManualApproval, json, "requireManualApproval", false);
   Internal::Utils::FromJsonI32(updateId, json, "updateId", 0);
-  Internal::Utils::FromJsonStrParsed(updateStep, json, "updateStep", OpenShock::TryParseOtaUpdateStep, OpenShock::OtaUpdateStep::None);
+  Internal::Utils::FromJsonStrParsed(updateStep, json, "updateStep"sv, OpenShock::TryParseOtaUpdateStep, OpenShock::OtaUpdateStep::None);
 
   return true;
 }
 
-cJSON* OtaUpdateConfig::ToJSON(bool withSensitiveData) const
+void OtaUpdateConfig::ToJSON(json_gen_str_t* gen, bool withSensitiveData) const
 {
-  cJSON* root = cJSON_CreateObject();
-
-  cJSON_AddBoolToObject(root, "isEnabled", isEnabled);
-  cJSON_AddStringToObject(root, "cdnDomain", cdnDomain.c_str());
-  cJSON_AddStringToObject(root, "updateChannel", OpenShock::Serialization::Configuration::EnumNameOtaUpdateChannel(static_cast<Serialization::Configuration::OtaUpdateChannel>(updateChannel)));
-  cJSON_AddBoolToObject(root, "checkOnStartup", checkOnStartup);
-  cJSON_AddBoolToObject(root, "checkPeriodically", checkPeriodically);
-  cJSON_AddNumberToObject(root, "checkInterval", checkInterval);
-  cJSON_AddBoolToObject(root, "allowBackendManagement", allowBackendManagement);
-  cJSON_AddBoolToObject(root, "requireManualApproval", requireManualApproval);
-  cJSON_AddNumberToObject(root, "updateId", updateId);
-  cJSON_AddStringToObject(root, "updateStep", OpenShock::Serialization::Configuration::EnumNameOtaUpdateStep(static_cast<Serialization::Configuration::OtaUpdateStep>(updateStep)));
-
-  return root;
+  json_gen_obj_set_bool(gen, "isEnabled", isEnabled);
+  JSON::objSetString(gen, "cdnDomain", cdnDomain);
+  JSON::objSetString(gen, "updateChannel", OpenShock::Serialization::Configuration::EnumNameOtaUpdateChannel(static_cast<Serialization::Configuration::OtaUpdateChannel>(updateChannel)));
+  json_gen_obj_set_bool(gen, "checkOnStartup", checkOnStartup);
+  json_gen_obj_set_bool(gen, "checkPeriodically", checkPeriodically);
+  json_gen_obj_set_int(gen, "checkInterval", checkInterval);
+  json_gen_obj_set_bool(gen, "allowBackendManagement", allowBackendManagement);
+  json_gen_obj_set_bool(gen, "requireManualApproval", requireManualApproval);
+  json_gen_obj_set_int(gen, "updateId", updateId);
+  JSON::objSetString(gen, "updateStep", OpenShock::Serialization::Configuration::EnumNameOtaUpdateStep(static_cast<Serialization::Configuration::OtaUpdateStep>(updateStep)));
 }

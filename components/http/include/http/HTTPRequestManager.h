@@ -2,7 +2,7 @@
 
 #include <Arduino.h>
 
-#include <cJSON.h>
+#include "json/Json.h"
 
 #include <functional>
 #include <map>
@@ -65,7 +65,7 @@ namespace OpenShock::HTTP {
   };
 
   template<typename T>
-  using JsonParser               = std::function<bool(int code, const cJSON* json, T& data)>;
+  using JsonParser               = std::function<bool(int code, JSON::JsonView json, T& data)>;
   using GotContentLengthCallback = std::function<bool(int contentLength)>;
   using DownloadCallback         = std::function<bool(std::size_t offset, const uint8_t* data, std::size_t len)>;
 
@@ -80,18 +80,17 @@ namespace OpenShock::HTTP {
       return {response.result, response.code, {}};
     }
 
-    cJSON* json = cJSON_ParseWithLength(response.data.c_str(), response.data.length());
-    if (json == nullptr) {
+    // The parsed views point into response.data, which outlives this call; the
+    // parser copies out everything it needs before we return.
+    JSON::JsonDocument doc;
+    if (!doc.parse(response.data)) {
       return {RequestResult::ParseFailed, response.code, {}};
     }
 
     T data;
-    if (!jsonParser(response.code, json, data)) {
-      cJSON_Delete(json);
+    if (!jsonParser(response.code, doc.root(), data)) {
       return {RequestResult::ParseFailed, response.code, {}};
     }
-
-    cJSON_Delete(json);
 
     return {response.result, response.code, std::move(data)};
   }

@@ -40,15 +40,15 @@ flatbuffers::Offset<OpenShock::Serialization::Configuration::SerialInputConfig> 
   return Serialization::Configuration::CreateSerialInputConfig(builder, echoEnabled);
 }
 
-bool SerialInputConfig::FromJSON(const cJSON* json)
+bool SerialInputConfig::FromJSON(JSON::JsonView json)
 {
-  if (json == nullptr) {
+  if (!json.valid()) {
     OS_LOGW(TAG, "Config is null, setting to default");
     ToDefault();
     return true;
   }
 
-  if (cJSON_IsObject(json) == 0) {
+  if (!json.isObject()) {
     OS_LOGE(TAG, "json is not an object");
     return false;
   }
@@ -58,11 +58,7 @@ bool SerialInputConfig::FromJSON(const cJSON* json)
   return true;
 }
 
-cJSON* SerialInputConfig::ToJSON(bool withSensitiveData) const
+void SerialInputConfig::ToJSON(json_gen_str_t* gen, bool withSensitiveData) const
 {
-  cJSON* root = cJSON_CreateObject();
-
-  cJSON_AddBoolToObject(root, "echoEnabled", echoEnabled);
-
-  return root;
+  json_gen_obj_set_bool(gen, "echoEnabled", echoEnabled);
 }

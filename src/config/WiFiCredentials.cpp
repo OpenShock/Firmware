@@ -145,15 +145,15 @@ flatbuffers::Offset<OpenShock::Serialization::Configuration::WiFiCredentials> Wi
   return Serialization::Configuration::CreateWiFiCredentials(builder, id, ssidOffset, passwordOffset, toFbsAuthMode(authMode), bssidPtr);
 }
 
-bool WiFiCredentials::FromJSON(const cJSON* json)
+bool WiFiCredentials::FromJSON(JSON::JsonView json)
 {
-  if (json == nullptr) {
+  if (!json.valid()) {
     OS_LOGW(TAG, "Config is null, setting to default");
     ToDefault();
     return true;
   }
 
-  if (cJSON_IsObject(json) == 0) {
+  if (!json.isObject()) {
     OS_LOGE(TAG, "json is not an object");
     return false;
   }
@@ -167,9 +167,9 @@ bool WiFiCredentials::FromJSON(const cJSON* json)
   authMode = fromFbsAuthMode(static_cast<FbsAuthMode>(authModeVal));
 
   bssid.fill(0);
-  const cJSON* bssidJson = cJSON_GetObjectItemCaseSensitive(json, "bssid");
-  if (cJSON_IsString(bssidJson) && bssidJson->valuestring != nullptr && strlen(bssidJson->valuestring) == 12) {
-    HexUtils::TryParseHex(bssidJson->valuestring, 12, bssid.data(), bssid.size());
+  std::string_view bssidStr;
+  if (json["bssid"].tryGetStr(bssidStr) && bssidStr.size() == 12) {
+    HexUtils::TryParseHex(bssidStr.data(), bssidStr.size(), bssid.data(), bssid.size());
   }
 
   if (ssid.empty()) {
@@ -180,24 +180,20 @@ bool WiFiCredentials::FromJSON(const cJSON* json)
   return true;
 }
 
-cJSON* WiFiCredentials::ToJSON(bool withSensitiveData) const
+void WiFiCredentials::ToJSON(json_gen_str_t* gen, bool withSensitiveData) const
 {
-  cJSON* root = cJSON_CreateObject();
-
-  cJSON_AddNumberToObject(root, "id", id);  //-V2564
-  cJSON_AddStringToObject(root, "ssid", ssid.c_str());
+  json_gen_obj_set_int(gen, "id", id);
+  JSON::objSetString(gen, "ssid", ssid);
   if (withSensitiveData) {
-    cJSON_AddStringToObject(root, "password", password.c_str());
+    JSON::objSetString(gen, "password", password);
   }
-  cJSON_AddNumberToObject(root, "authMode", static_cast<uint8_t>(toFbsAuthMode(authMode)));
+  json_gen_obj_set_int(gen, "authMode", static_cast<uint8_t>(toFbsAuthMode(authMode)));
   if (HasPinnedBSSID()) {
     char hex[13];
     for (std::size_t i = 0; i < bssid.size(); ++i) {
       HexUtils::ToHex(bssid[i], &hex[i * 2]);
     }
     hex[12] = '\0';
-    cJSON_AddStringToObject(root, "bssid", hex);
+    JSON::objSetString(gen, "bssid", hex);
   }
-
-  return root;
 }

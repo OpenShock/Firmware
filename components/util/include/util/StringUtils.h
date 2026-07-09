@@ -1,5 +1,7 @@
 #pragma once
 
+#include "StringHelpers.h"  // OpenShock::StringIEquals
+
 #include <WString.h>
 
 #include <cstdint>
@@ -173,7 +175,6 @@ namespace OpenShock {
     return std::make_pair(view.substr(0, pos), pos == std::string_view::npos ? std::string_view() : view.substr(pos + delimiter.length()));
   }
 
-  bool StringIEquals(std::string_view a, std::string_view b);
   bool StringIContains(std::string_view haystack, std::string_view needle);
   bool StringHasPrefixIC(std::string_view view, std::string_view prefix);
 

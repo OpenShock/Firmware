@@ -55,7 +55,9 @@ namespace OpenShock::Config {
   bool SetEStop(const EStopConfig& config);
 
   bool GetWiFiCredentials(std::vector<WiFiCredentials>& out);
-  bool GetWiFiCredentials(cJSON* array, bool withSensitiveData);
+  // Emits each stored credential as an object into an already-open JSON array
+  // (the caller opens/closes it with json_gen_{start,end}_array).
+  bool GetWiFiCredentials(json_gen_str_t* gen, bool withSensitiveData);
   bool SetWiFiCredentials(const std::vector<WiFiCredentials>& credentials);
 
   bool GetRFConfigTxPin(gpio_num_t& out);

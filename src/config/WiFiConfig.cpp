@@ -55,15 +55,15 @@ flatbuffers::Offset<OpenShock::Serialization::Configuration::WiFiConfig> WiFiCon
   return Serialization::Configuration::CreateWiFiConfig(builder, builder.CreateString(accessPointSSID), builder.CreateString(hostname), builder.CreateVector(fbsCredentialsList));
 }
 
-bool WiFiConfig::FromJSON(const cJSON* json)
+bool WiFiConfig::FromJSON(JSON::JsonView json)
 {
-  if (json == nullptr) {
+  if (!json.valid()) {
     OS_LOGW(TAG, "Config is null, setting to default");
     ToDefault();
     return true;
   }
 
-  if (cJSON_IsObject(json) == 0) {
+  if (!json.isObject()) {
     OS_LOGE(TAG, "json is not an object");
     return false;
   }
@@ -71,13 +71,13 @@ bool WiFiConfig::FromJSON(const cJSON* json)
   Internal::Utils::FromJsonStr(accessPointSSID, json, "accessPointSSID", OPENSHOCK_FW_AP_PREFIX);
   Internal::Utils::FromJsonStr(hostname, json, "hostname", OPENSHOCK_FW_HOSTNAME);
 
-  const cJSON* credentialsListJson = cJSON_GetObjectItemCaseSensitive(json, "credentials");
-  if (credentialsListJson == nullptr) {
+  JSON::JsonView credentialsListJson = json["credentials"];
+  if (!credentialsListJson.valid()) {
     OS_LOGE(TAG, "credentials is null");
     return false;
   }
 
-  if (cJSON_IsArray(credentialsListJson) == 0) {
+  if (!credentialsListJson.isArray()) {
     OS_LOGE(TAG, "credentials is not an array");
     return false;
   }
@@ -87,20 +87,16 @@ bool WiFiConfig::FromJSON(const cJSON* json)
   return true;
 }
 
-cJSON* WiFiConfig::ToJSON(bool withSensitiveData) const
+void WiFiConfig::ToJSON(json_gen_str_t* gen, bool withSensitiveData) const
 {
-  cJSON* root = cJSON_CreateObject();
+  JSON::objSetString(gen, "accessPointSSID", accessPointSSID);
+  JSON::objSetString(gen, "hostname", hostname);
 
-  cJSON_AddStringToObject(root, "accessPointSSID", accessPointSSID.c_str());
-  cJSON_AddStringToObject(root, "hostname", hostname.c_str());
-
-  cJSON* credentialsListJson = cJSON_CreateArray();
-
+  json_gen_push_array(gen, "credentials");
   for (auto& credentials : credentialsList) {
-    cJSON_AddItemToArray(credentialsListJson, credentials.ToJSON(withSensitiveData));
+    json_gen_start_object(gen);
+    credentials.ToJSON(gen, withSensitiveData);
+    json_gen_end_object(gen);
   }
-
-  cJSON_AddItemToObject(root, "credentials", credentialsListJson);
-
-  return root;
+  json_gen_pop_array(gen);
 }

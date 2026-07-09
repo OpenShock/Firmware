@@ -45,15 +45,15 @@ flatbuffers::Offset<OpenShock::Serialization::Configuration::RFConfig> RFConfig:
   return Serialization::Configuration::CreateRFConfig(builder, txPin, keepAliveEnabled);
 }
 
-bool RFConfig::FromJSON(const cJSON* json)
+bool RFConfig::FromJSON(JSON::JsonView json)
 {
-  if (json == nullptr) {
+  if (!json.valid()) {
     OS_LOGW(TAG, "Config is null, setting to default");
     ToDefault();
     return true;
   }
 
-  if (cJSON_IsObject(json) == 0) {
+  if (!json.isObject()) {
     OS_LOGE(TAG, "json is not an object");
     return false;
   }
@@ -64,12 +64,8 @@ bool RFConfig::FromJSON(const cJSON* json)
   return true;
 }
 
-cJSON* RFConfig::ToJSON(bool withSensitiveData) const
+void RFConfig::ToJSON(json_gen_str_t* gen, bool withSensitiveData) const
 {
-  cJSON* root = cJSON_CreateObject();
-
-  cJSON_AddNumberToObject(root, "txPin", static_cast<int>(txPin));  //-V2564
-  cJSON_AddBoolToObject(root, "keepAliveEnabled", keepAliveEnabled);
-
-  return root;
+  json_gen_obj_set_int(gen, "txPin", static_cast<int>(txPin));
+  json_gen_obj_set_bool(gen, "keepAliveEnabled", keepAliveEnabled);
 }

@@ -1,9 +1,8 @@
 #include "serial/command_handlers/common.h"
 
 #include "config/Config.h"
+#include "json/Json.h"
 #include "wifi/WiFiManager.h"
-
-#include <cJSON.h>
 
 #include <vector>
 
@@ -11,57 +10,44 @@ const char* const TAG = "SerialCmds::CommandHandlers::Networks";
 
 static void handleNetworksCommand(std::string_view arg, bool isAutomated)
 {
-  cJSON* root;
-
   if (arg.empty()) {
-    root = cJSON_CreateArray();
-    if (root == nullptr) {
-      SERPR_ERROR("Failed to create JSON array");
-      return;
-    }
+    OpenShock::JSON::StringWriter writer;
+    json_gen_str_t* gen = writer.gen();
 
-    if (!OpenShock::Config::GetWiFiCredentials(root, true)) {
+    json_gen_start_array(gen);
+    if (!OpenShock::Config::GetWiFiCredentials(gen, true)) {
       SERPR_ERROR("Failed to get WiFi credentials from config");
-      cJSON_Delete(root);
       return;
     }
+    json_gen_end_array(gen);
 
-    char* out = cJSON_PrintUnformatted(root);
-    cJSON_Delete(root);
-    if (out == nullptr) {
-      SERPR_ERROR("Failed to print JSON");
-      return;
-    }
+    std::string out = writer.finish();
 
-    SERPR_RESPONSE("Networks|%s", out);
-
-    cJSON_free(out);
+    SERPR_RESPONSE("Networks|%s", out.c_str());
     return;
   }
 
-  root = cJSON_ParseWithLength(arg.data(), arg.length());
-  if (root == nullptr) {
-    SERPR_ERROR("Failed to parse JSON: %s", cJSON_GetErrorPtr());
+  OpenShock::JSON::JsonDocument doc;
+  if (!doc.parse(arg)) {
+    SERPR_ERROR("Failed to parse JSON");
     return;
   }
 
-  if (cJSON_IsArray(root) == 0) {
+  OpenShock::JSON::JsonView root = doc.root();
+  if (!root.isArray()) {
     SERPR_ERROR("Invalid argument (not an array)");
-    cJSON_Delete(root);
     return;
   }
 
   std::vector<OpenShock::Config::WiFiCredentials> creds;
 
-  uint8_t id     = 1;
-  cJSON* network = nullptr;
-  cJSON_ArrayForEach(network, root)
-  {
+  uint8_t id      = 1;
+  const int count = root.count();
+  for (int i = 0; i < count; ++i) {
     OpenShock::Config::WiFiCredentials cred;
 
-    if (!cred.FromJSON(network)) {
+    if (!cred.FromJSON(root.at(i))) {
       SERPR_ERROR("Failed to parse network");
-      cJSON_Delete(root);
       return;
     }
 
@@ -73,8 +59,6 @@ static void handleNetworksCommand(std::string_view arg, bool isAutomated)
 
     creds.push_back(std::move(cred));
   }
-
-  cJSON_Delete(root);
 
   if (!OpenShock::Config::SetWiFiCredentials(creds)) {
     SERPR_ERROR("Failed to save config");

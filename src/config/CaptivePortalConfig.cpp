@@ -40,15 +40,15 @@ flatbuffers::Offset<OpenShock::Serialization::Configuration::CaptivePortalConfig
   return Serialization::Configuration::CreateCaptivePortalConfig(builder, alwaysEnabled);
 }
 
-bool CaptivePortalConfig::FromJSON(const cJSON* json)
+bool CaptivePortalConfig::FromJSON(JSON::JsonView json)
 {
-  if (json == nullptr) {
+  if (!json.valid()) {
     OS_LOGW(TAG, "Config is null, setting to default");
     ToDefault();
     return true;
   }
 
-  if (cJSON_IsObject(json) == 0) {
+  if (!json.isObject()) {
     OS_LOGE(TAG, "json is not an object");
     return false;
   }
@@ -58,11 +58,7 @@ bool CaptivePortalConfig::FromJSON(const cJSON* json)
   return true;
 }
 
-cJSON* CaptivePortalConfig::ToJSON(bool withSensitiveData) const
+void CaptivePortalConfig::ToJSON(json_gen_str_t* gen, bool withSensitiveData) const
 {
-  cJSON* root = cJSON_CreateObject();
-
-  cJSON_AddBoolToObject(root, "alwaysEnabled", alwaysEnabled);
-
-  return root;
+  json_gen_obj_set_bool(gen, "alwaysEnabled", alwaysEnabled);
 }

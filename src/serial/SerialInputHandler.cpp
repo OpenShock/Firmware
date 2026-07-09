@@ -24,7 +24,6 @@ const char* const TAG = "SerialInputHandler";
 
 #include <Arduino.h>
 
-#include <cJSON.h>
 #include <Esp.h>
 
 #include <cstring>

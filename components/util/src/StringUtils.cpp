@@ -125,11 +125,6 @@ std::vector<std::string_view> OpenShock::StringSplitWhiteSpace(std::string_view 
   return StringSplit(view, [](char c) { return isspace(c) != 0; }, maxSplits);
 }
 
-bool OpenShock::StringIEquals(std::string_view a, std::string_view b)
-{
-  if (a.size() != b.size()) return false;
-  return strncasecmp(a.data(), b.data(), a.size()) == 0;
-}
 bool OpenShock::StringIContains(std::string_view haystack, std::string_view needle)
 {
   if (haystack.size() < needle.size()) return false;

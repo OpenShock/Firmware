@@ -10,10 +10,10 @@ const char* const TAG = "Config";
 #include "Logging.h"
 #include "ReadWriteMutex.h"
 
+#include "json/Json.h"
+
 #include <FS.h>
 #include <LittleFS.h>
-
-#include <cJSON.h>
 
 #include <bitset>
 
@@ -153,46 +153,30 @@ void Config::Init()
   }
 }
 
-static cJSON* getAsCJSON(bool withSensitiveData)
-{
-  CONFIG_LOCK_READ(nullptr);
-
-  return _configData.ToJSON(withSensitiveData);
-}
-
 std::string Config::GetAsJSON(bool withSensitiveData)
 {
-  cJSON* root = getAsCJSON(withSensitiveData);
-  if (root == nullptr) {
-    OS_LOGE(TAG, "Failed to get config as JSON");
-    return {};
-  }
+  CONFIG_LOCK_READ({});
 
-  char* json = cJSON_PrintUnformatted(root);
+  JSON::StringWriter writer;
+  json_gen_str_t* gen = writer.gen();
 
-  std::string result(json);
+  json_gen_start_object(gen);
+  _configData.ToJSON(gen, withSensitiveData);
+  json_gen_end_object(gen);
 
-  free(json);
-
-  cJSON_Delete(root);
-
-  return result;
+  return writer.finish();
 }
 bool Config::SaveFromJSON(std::string_view json)
 {
-  cJSON* root = cJSON_ParseWithLength(json.data(), json.size());
-  if (root == nullptr) {
-    OS_LOGE(TAG, "Failed to parse JSON: %s", cJSON_GetErrorPtr());
+  JSON::JsonDocument doc;
+  if (!doc.parse(json)) {
+    OS_LOGE(TAG, "Failed to parse JSON");
     return false;
   }
 
-  CONFIG_LOCK_WRITE_ACTION(false, cJSON_Delete(root));
+  CONFIG_LOCK_WRITE(false);
 
-  bool result = _configData.FromJSON(root);
-
-  cJSON_Delete(root);
-
-  if (!result) {
+  if (!_configData.FromJSON(doc.root())) {
     OS_LOGE(TAG, "Failed to read JSON");
     return false;
   }
@@ -384,14 +368,14 @@ bool Config::GetWiFiCredentials(std::vector<Config::WiFiCredentials>& out)
   return true;
 }
 
-bool Config::GetWiFiCredentials(cJSON* array, bool withSensitiveData)
+bool Config::GetWiFiCredentials(json_gen_str_t* gen, bool withSensitiveData)
 {
   CONFIG_LOCK_READ(false);
 
   for (auto& creds : _configData.wifi.credentialsList) {
-    cJSON* jsonCreds = creds.ToJSON(withSensitiveData);
-
-    cJSON_AddItemToArray(array, jsonCreds);
+    json_gen_start_object(gen);
+    creds.ToJSON(gen, withSensitiveData);
+    json_gen_end_object(gen);
   }
 
   return true;

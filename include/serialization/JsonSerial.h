@@ -2,8 +2,7 @@
 
 #include "enums/ShockerCommandType.h"
 #include "enums/ShockerModelType.h"
-
-#include <cJSON.h>
+#include "json/Json.h"
 
 #include <cstdint>
 
@@ -16,5 +15,5 @@ namespace OpenShock::Serialization::JsonSerial {
     uint16_t durationMs;
   };
 
-  bool ParseShockerCommand(const cJSON* root, ShockerCommand& out);
+  bool ParseShockerCommand(JSON::JsonView root, ShockerCommand& out);
 }  // namespace OpenShock::Serialization::JsonSerial

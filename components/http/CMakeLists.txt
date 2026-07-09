@@ -10,7 +10,7 @@
 idf_component_register(
   SRCS          "src/HTTPRequestManager.cpp"
   INCLUDE_DIRS  "include"
-  REQUIRES      json                         # cJSON.h in public header
+  REQUIRES      osjson                       # json/Json.h in public header
                 framework-arduinoespressif32 # Arduino.h in public header
   PRIV_REQUIRES common                       # Common.h (internal)
                 time                         # Core.h (internal)

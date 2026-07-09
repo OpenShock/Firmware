@@ -4,91 +4,96 @@ const char* const TAG = "JsonSerial";
 
 #include "Logging.h"
 
+#include <string>
+
 using namespace OpenShock::Serialization;
 
-bool JsonSerial::ParseShockerCommand(const cJSON* root, JsonSerial::ShockerCommand& out)
+bool JsonSerial::ParseShockerCommand(JSON::JsonView root, JsonSerial::ShockerCommand& out)
 {
-  if (cJSON_IsObject(root) == 0) {
+  if (!root.isObject()) {
     OS_LOGE(TAG, "not an object");
     return false;
   }
 
-  const cJSON* model = cJSON_GetObjectItemCaseSensitive(root, "model");
-  if (model == nullptr) {
+  JSON::JsonView model = root["model"];
+  if (!model.valid()) {
     OS_LOGE(TAG, "missing 'model' field");
     return false;
   }
-  if (cJSON_IsString(model) == 0) {
+  std::string_view modelStr;
+  if (!model.tryGetStr(modelStr)) {
     OS_LOGE(TAG, "value at 'model' is not a string");
     return false;
   }
   ShockerModelType modelType = ShockerModelType::CaiXianlin;
-  if (!ShockerModelTypeFromString(model->valuestring, modelType)) {
+  if (!ShockerModelTypeFromString(std::string(modelStr).c_str(), modelType)) {
     OS_LOGE(TAG, "value at 'model' is not a valid shocker model (caixianlin, petrainer, petrainer998dr, wellturnt330, d80)");
     return false;
   }
 
-  const cJSON* id = cJSON_GetObjectItemCaseSensitive(root, "id");
-  if (id == nullptr) {
+  JSON::JsonView id = root["id"];
+  if (!id.valid()) {
     OS_LOGE(TAG, "missing 'id' field");
     return false;
   }
-  if (cJSON_IsNumber(id) == 0) {
+  int64_t idInt;
+  if (!id.tryGetI64(idInt)) {
     OS_LOGE(TAG, "value at 'id' is not a number");
     return false;
   }
-  int idInt = id->valueint;
   if (idInt < 0 || idInt > UINT16_MAX) {
     OS_LOGE(TAG, "value at 'id' is out of range (0-65535)");
     return false;
   }
   uint16_t idU16 = static_cast<uint16_t>(idInt);
 
-  const cJSON* command = cJSON_GetObjectItemCaseSensitive(root, "type");
-  if (command == nullptr) {
+  JSON::JsonView command = root["type"];
+  if (!command.valid()) {
     OS_LOGE(TAG, "missing 'type' field");
     return false;
   }
-  if (cJSON_IsString(command) == 0) {
+  std::string_view commandStr;
+  if (!command.tryGetStr(commandStr)) {
     OS_LOGE(TAG, "value at 'type' is not a string");
     return false;
   }
   ShockerCommandType commandType = ShockerCommandType::Stop;
-  if (!ShockerCommandTypeFromString(command->valuestring, commandType)) {
+  if (!ShockerCommandTypeFromString(std::string(commandStr).c_str(), commandType)) {
     OS_LOGE(TAG, "value at 'type' is not a valid shocker command (shock, vibrate, sound, light, stop)");
     return false;
   }
 
-  const cJSON* intensity = cJSON_GetObjectItemCaseSensitive(root, "intensity");
-  if (intensity == nullptr) {
+  JSON::JsonView intensity = root["intensity"];
+  if (!intensity.valid()) {
     OS_LOGE(TAG, "missing 'intensity' field");
     return false;
   }
-  if (cJSON_IsNumber(intensity) == 0) {
+  int64_t intensityInt;
+  if (!intensity.tryGetI64(intensityInt)) {
     OS_LOGE(TAG, "value at 'intensity' is not a number");
     return false;
   }
-  int intensityInt = intensity->valueint;
   if (intensityInt < 0 || intensityInt > UINT8_MAX) {
     OS_LOGE(TAG, "value at 'intensity' is out of range (0-255)");
     return false;
   }
   uint8_t intensityU8 = static_cast<uint8_t>(intensityInt);
 
-  const cJSON* durationMs = cJSON_GetObjectItemCaseSensitive(root, "durationMs");
-  if (durationMs == nullptr) {
+  JSON::JsonView durationMs = root["durationMs"];
+  if (!durationMs.valid()) {
     OS_LOGE(TAG, "missing 'durationMs' field");
     return false;
   }
-  if (cJSON_IsNumber(durationMs) == 0) {
+  int64_t durationMsInt;
+  if (!durationMs.tryGetI64(durationMsInt)) {
     OS_LOGE(TAG, "value at 'durationMs' is not a number");
     return false;
   }
-  if (durationMs->valueint < 0 || durationMs->valueint > UINT16_MAX) {
+  if (durationMsInt < 0 || durationMsInt > UINT16_MAX) {
     OS_LOGE(TAG, "value at 'durationMs' is out of range (0-65535)");
     return false;
   }
-  uint16_t durationMsU16 = static_cast<uint16_t>(durationMs->valueint);
+  uint16_t durationMsU16 = static_cast<uint16_t>(durationMsInt);
 
   out = {
     .model      = modelType,

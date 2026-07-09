@@ -50,14 +50,14 @@ flatbuffers::Offset<OpenShock::Serialization::Configuration::EStopConfig> EStopC
   return Serialization::Configuration::CreateEStopConfig(builder, enabled, gpioPin);
 }
 
-bool EStopConfig::FromJSON(const cJSON* json)
+bool EStopConfig::FromJSON(JSON::JsonView json)
 {
-  if (json == nullptr) {
+  if (!json.valid()) {
     ToDefault();  // Set to default if config is null
     return true;
   }
 
-  if (cJSON_IsObject(json) == 0) {
+  if (!json.isObject()) {
     OS_LOGE(TAG, "json is not an object");
     return false;
   }
@@ -72,12 +72,8 @@ bool EStopConfig::FromJSON(const cJSON* json)
   return true;
 }
 
-cJSON* EStopConfig::ToJSON(bool withSensitiveData) const
+void EStopConfig::ToJSON(json_gen_str_t* gen, bool withSensitiveData) const
 {
-  cJSON* root = cJSON_CreateObject();
-
-  cJSON_AddBoolToObject(root, "enabled", enabled);
-  cJSON_AddNumberToObject(root, "gpioPin", gpioPin);
-
-  return root;
+  json_gen_obj_set_bool(gen, "enabled", enabled);
+  json_gen_obj_set_int(gen, "gpioPin", gpioPin);
 }

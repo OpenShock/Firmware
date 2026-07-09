@@ -18,7 +18,7 @@ namespace OpenShock::Config {
     bool FromFlatbuffers(const Serialization::Configuration::BackendConfig* config) override;
     [[nodiscard]] flatbuffers::Offset<Serialization::Configuration::BackendConfig> ToFlatbuffers(flatbuffers::FlatBufferBuilder& builder, bool withSensitiveData) const override;
 
-    bool FromJSON(const cJSON* json) override;
-    [[nodiscard]] cJSON* ToJSON(bool withSensitiveData) const override;
+    bool FromJSON(JSON::JsonView json) override;
+    void ToJSON(json_gen_str_t* gen, bool withSensitiveData) const override;
   };
 }  // namespace OpenShock::Config

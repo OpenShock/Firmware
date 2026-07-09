@@ -9,7 +9,7 @@ const char* const TAG = "RFC8908Handler";
 
 #include <WiFi.h>
 
-#include <cJSON.h>
+#include "json/Json.h"
 
 using namespace OpenShock;
 
@@ -81,22 +81,16 @@ void CaptivePortal::RFC8908Handler::handleRequest(AsyncWebServerRequest* request
 
     auto portalUrl = GetCaptivePortalUrl();
 
-    cJSON* doc = cJSON_CreateObject();
-    cJSON_AddBoolToObject(doc, "captive", true);
-    cJSON_AddStringToObject(doc, "user-portal-url", portalUrl.c_str());
-    cJSON_AddStringToObject(doc, "venue-info-url", "https://openshock.org");
+    OpenShock::JSON::StringWriter writer;
+    json_gen_str_t* gen = writer.gen();
+    json_gen_start_object(gen);
+    json_gen_obj_set_bool(gen, "captive", true);
+    JSON::objSetString(gen, "user-portal-url", portalUrl.c_str());
+    JSON::objSetString(gen, "venue-info-url", "https://openshock.org");
+    json_gen_end_object(gen);
+    std::string jsonStr = writer.finish();
 
-    char* jsonStr = cJSON_Print(doc);
-    cJSON_Delete(doc);
-
-    if (jsonStr == nullptr) {
-      OS_LOGE(TAG, "Failed to serialize captive portal JSON response");
-      request->send(500, OpenShock::HTTP::ContentType::TextPlain, "Internal Server Error");
-      return;
-    }
-
-    AsyncWebServerResponse* response = request->beginResponse(200, "application/captive+json", jsonStr);
-    cJSON_free(jsonStr);
+    AsyncWebServerResponse* response = request->beginResponse(200, "application/captive+json", jsonStr.c_str());
 
     response->addHeader("Cache-Control", "private");
     request->send(response);
