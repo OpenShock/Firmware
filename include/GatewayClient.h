@@ -3,13 +3,14 @@
 #include "enums/GatewayClientState.h"
 #include "OpenShock.h"
 
-#include <WebSocketsClient.h>
+#include <esp_event.h>
+#include <esp_websocket_client.h>
 
 #include <cstdint>
 #include <span>
 #include <string>
 #include <string_view>
-#include <unordered_map>
+#include <vector>
 
 namespace OpenShock {
   class GatewayClient {
@@ -35,10 +36,14 @@ namespace OpenShock {
   private:
     void _setState(GatewayClientState state);
     void _sendBootStatus();
-    void _handleEvent(WStype_t type, uint8_t* payload, std::size_t length);
 
-    WebSocketsClient m_webSocket;
+    static void _eventHandler(void* arg, esp_event_base_t base, int32_t eventId, void* eventData);
+    void _handleData(const esp_websocket_event_data_t* data);
+
+    std::string m_headers;
+    esp_websocket_client_handle_t m_client;
     GatewayClientState m_state;
     int64_t m_lastPingTimestamp;
+    std::vector<uint8_t> m_binReasm;  // reassembly buffer for fragmented binary frames
   };
 }  // namespace OpenShock

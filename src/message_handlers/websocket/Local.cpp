@@ -7,8 +7,6 @@ const char* const TAG = "LocalMessageHandlers";
 
 #include "serialization/_fbs/LocalToHubMessage_generated.h"
 
-#include <WebSockets.h>
-
 #include <array>
 #include <cstdint>
 

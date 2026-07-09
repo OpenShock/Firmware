@@ -4,6 +4,7 @@ const char* const TAG = "OtaUpdateManager";
 
 #include "captiveportal/Manager.h"
 #include "config/Config.h"
+#include "fs/FsCheck.h"
 #include "GatewayConnectionManager.h"
 #include "Hashing.h"
 #include "http/HTTPRequestManager.h"
@@ -23,10 +24,9 @@ const char* const TAG = "OtaUpdateManager";
 #include <esp_event.h>
 #include <esp_netif.h>
 #include <esp_ota_ops.h>
+#include <esp_random.h>
 #include <esp_task_wdt.h>
 #include <esp_wifi.h>
-
-#include <LittleFS.h>
 
 #include <sstream>
 #include <string_view>
@@ -47,16 +47,6 @@ using namespace std::string_view_literals;
 #define OPENSHOCK_FW_CDN_APP_URL_FORMAT           OPENSHOCK_FW_CDN_VERSION_BASE_URL_FORMAT "/app.bin"
 #define OPENSHOCK_FW_CDN_FILESYSTEM_URL_FORMAT    OPENSHOCK_FW_CDN_VERSION_BASE_URL_FORMAT "/staticfs.bin"
 #define OPENSHOCK_FW_CDN_SHA256_HASHES_URL_FORMAT OPENSHOCK_FW_CDN_VERSION_BASE_URL_FORMAT "/hashes.sha256.txt"
-
-/// @brief Stops initArduino() from handling OTA rollbacks
-/// @todo Get rid of Arduino entirely. >:(
-///
-/// @see .platformio/packages/framework-arduinoespressif32/cores/esp32/esp32-hal-misc.c
-/// @return true
-bool verifyRollbackLater()
-{
-  return true;
-}
 
 enum OtaTaskEventFlag : uint32_t {
   OTA_TASK_EVENT_UPDATE_REQUESTED  = 1 << 0,
@@ -250,14 +240,12 @@ static bool otaum_flash_fs_partition(OpenShock::HTTP::Client& client, const esp_
     return false;
   }
 
-  // Attempt to mount filesystem.
-  fs::LittleFSFS test;
-  if (!test.begin(false, "/static", 10, "static0")) {
+  // Verify the freshly flashed image mounts cleanly.
+  if (!OpenShock::TestFilesystem(parition)) {
     OS_LOGE(TAG, "Failed to mount filesystem");
     _sendFailureMessage("Failed to mount filesystem"sv);
     return false;
   }
-  test.end();
 
   return true;
 }
@@ -269,8 +257,9 @@ static esp_err_t otaum_set_wdt_timeout(uint32_t timeoutMs)
     .idle_core_mask = (1 << CONFIG_FREERTOS_NUMBER_OF_CORES) - 1,  // Bitmask of all cores
     .trigger_panic  = true,
   };
-  // The TWDT is already initialized by the Arduino core, so reconfigure it instead of re-initializing.
-  // esp_task_wdt_init() returns ESP_ERR_INVALID_STATE when already initialized and would not apply the new timeout.
+  // ESP-IDF initializes the TWDT at startup (CONFIG_ESP_TASK_WDT_INIT, default y), so
+  // reconfigure it instead of re-initializing. esp_task_wdt_reconfigure() returns
+  // ESP_ERR_INVALID_STATE if the TWDT isn't initialized yet, in which case we fall back to init.
   esp_err_t err = esp_task_wdt_reconfigure(&twdt_config);
   if (err == ESP_ERR_INVALID_STATE) {
     // Not yet initialized, fall back to init

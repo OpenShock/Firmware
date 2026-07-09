@@ -12,33 +12,42 @@ const char* const TAG = "GatewayClient";
 #include "Temporal.h"
 #include "visual/VisualStateManager.h"
 
+#include <cstring>
+
 using namespace OpenShock;
 
 const int64_t GATEWAY_PING_TIMEOUT = 90'000;
 
+// WebSocket opcodes (RFC 6455) as delivered by esp_websocket_client event data.
+static constexpr int WS_OP_TEXT   = 0x01;
+static constexpr int WS_OP_BINARY = 0x02;
+
 static bool s_bootStatusSent = false;
 
 GatewayClient::GatewayClient(const std::string& authToken)
-  : m_webSocket()
+  : m_headers()
+  , m_client(nullptr)
   , m_state(GatewayClientState::Disconnected)
   , m_lastPingTimestamp(0)
+  , m_binReasm()
 {
   OS_LOGD(TAG, "Creating GatewayClient");
 
-  std::string headers = "Firmware-Version: " OPENSHOCK_FW_VERSION "\r\n"
-                        "Device-Token: "
-                      + authToken;
-
-  m_webSocket.setUserAgent(OpenShock::Constants::FW_USERAGENT);
-  m_webSocket.setExtraHeaders(headers.c_str());
-  m_webSocket.onEvent(std::bind(&GatewayClient::_handleEvent, this, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3));
+  m_headers = "Firmware-Version: " OPENSHOCK_FW_VERSION "\r\n"
+              "Device-Token: "
+            + authToken + "\r\n";
 }
 GatewayClient::~GatewayClient()
 {
+  OS_LOGD(TAG, "Destroying GatewayClient");
+
   _setState(GatewayClientState::Disconnected);
 
-  OS_LOGD(TAG, "Destroying GatewayClient");
-  m_webSocket.disconnect();
+  if (m_client != nullptr) {
+    esp_websocket_client_close(m_client, pdMS_TO_TICKS(1000));
+    esp_websocket_client_destroy(m_client);
+    m_client = nullptr;
+  }
 }
 
 void GatewayClient::connect(const std::string& host, uint16_t port, const std::string& path)
@@ -62,7 +71,34 @@ void GatewayClient::connect(const std::string& host, uint16_t port, const std::s
 //
 #warning SSL certificate verification is currently not implemented, by RFC definition this is a security risk, and allows for MITM attacks, but the realistic risk is low
 
-  m_webSocket.beginSSL(host.c_str(), port, path.c_str());
+  esp_websocket_client_config_t config = {};
+  config.host                          = host.c_str();
+  config.port                          = port;
+  config.path                          = path.c_str();
+  config.transport                     = WEBSOCKET_TRANSPORT_OVER_SSL;
+  config.user_agent                    = OpenShock::Constants::FW_USERAGENT;
+  config.headers                       = m_headers.c_str();
+  config.disable_auto_reconnect        = true;  // GatewayConnectionManager owns reconnection
+  // No CA cert supplied: esp-tls skips verification (CONFIG_ESP_TLS_SKIP_SERVER_CERT_VERIFY).
+
+  m_client = esp_websocket_client_init(&config);
+  if (m_client == nullptr) {
+    OS_LOGE(TAG, "Failed to initialize WebSocket client");
+    _setState(GatewayClientState::Disconnected);
+    return;
+  }
+
+  esp_websocket_register_events(m_client, WEBSOCKET_EVENT_ANY, &GatewayClient::_eventHandler, this);
+
+  esp_err_t err = esp_websocket_client_start(m_client);
+  if (err != ESP_OK) {
+    OS_LOGE(TAG, "Failed to start WebSocket client: %s", esp_err_to_name(err));
+    esp_websocket_client_destroy(m_client);
+    m_client = nullptr;
+    _setState(GatewayClientState::Disconnected);
+    return;
+  }
+
   OS_LOGW(TAG, "WEBSOCKET CONNECTION BY RFC DEFINITION IS INSECURE, remote endpoint can not be verified due to lack of CA verification support, theoretically this is a security risk and allows for MITM attacks, but the realistic risk is low");
 }
 
@@ -72,25 +108,27 @@ void GatewayClient::disconnect()
     return;
   }
   _setState(GatewayClientState::Disconnecting);
-  m_webSocket.disconnect();
+  if (m_client != nullptr) {
+    esp_websocket_client_close(m_client, pdMS_TO_TICKS(1000));
+  }
 }
 
 bool GatewayClient::sendMessageTXT(std::string_view data)
 {
-  if (m_state != GatewayClientState::Connected) {
+  if (m_state != GatewayClientState::Connected || m_client == nullptr) {
     return false;
   }
 
-  return m_webSocket.sendTXT(data.data(), data.length());
+  return esp_websocket_client_send_text(m_client, data.data(), data.length(), pdMS_TO_TICKS(10'000)) >= 0;
 }
 
 bool GatewayClient::sendMessageBIN(std::span<const uint8_t> data)
 {
-  if (m_state != GatewayClientState::Connected) {
+  if (m_state != GatewayClientState::Connected || m_client == nullptr) {
     return false;
   }
 
-  return m_webSocket.sendBIN(data.data(), data.size());
+  return esp_websocket_client_send_bin(m_client, reinterpret_cast<const char*>(data.data()), data.size(), pdMS_TO_TICKS(10'000)) >= 0;
 }
 
 void GatewayClient::markPingReceived()
@@ -104,17 +142,17 @@ bool GatewayClient::loop()
     return false;
   }
 
-  m_webSocket.loop();
-
-  // We are still in the process of connecting or disconnecting
+  // esp_websocket_client runs its own task; we only enforce the app-level ping timeout.
   if (m_state != GatewayClientState::Connected) {
-    // return true to indicate that we are still busy
+    // Still connecting or disconnecting
     return true;
   }
 
   if (m_lastPingTimestamp != 0 && (OpenShock::millis() - m_lastPingTimestamp) > GATEWAY_PING_TIMEOUT) {
     OS_LOGW(TAG, "No ping received from gateway for %lld ms, forcing reconnect", GATEWAY_PING_TIMEOUT);
-    m_webSocket.disconnect();
+    if (m_client != nullptr) {
+      esp_websocket_client_close(m_client, pdMS_TO_TICKS(1000));
+    }
     _setState(GatewayClientState::Disconnected);
     return false;
   }
@@ -159,7 +197,7 @@ void GatewayClient::_sendBootStatus()
     return;
   }
 
-  s_bootStatusSent = Serialization::Gateway::SerializeBootStatusMessage(updateId, OtaUpdateManager::GetFirmwareBootType(), [this](std::span<const uint8_t> data) { return m_webSocket.sendBIN(data.data(), data.size()); });
+  s_bootStatusSent = Serialization::Gateway::SerializeBootStatusMessage(updateId, OtaUpdateManager::GetFirmwareBootType(), [this](std::span<const uint8_t> data) { return sendMessageBIN(data); });
 
   if (s_bootStatusSent && updateStep != OpenShock::OtaUpdateStep::None) {
     if (!Config::SetOtaUpdateStep(OpenShock::OtaUpdateStep::None)) {
@@ -168,43 +206,63 @@ void GatewayClient::_sendBootStatus()
   }
 }
 
-void GatewayClient::_handleEvent(WStype_t type, uint8_t* payload, std::size_t length)
+void GatewayClient::_eventHandler(void* arg, esp_event_base_t /*base*/, int32_t eventId, void* eventData)
 {
-  switch (type) {
-    case WStype_DISCONNECTED:
-      _setState(GatewayClientState::Disconnected);
+  auto* self = static_cast<GatewayClient*>(arg);
+  const auto* data = static_cast<esp_websocket_event_data_t*>(eventData);
+
+  switch (eventId) {
+    case WEBSOCKET_EVENT_CONNECTED:
+      self->m_lastPingTimestamp = 0;
+      self->_setState(GatewayClientState::Connected);
+      self->_sendBootStatus();
       break;
-    case WStype_CONNECTED:
-      m_lastPingTimestamp = 0;
-      _setState(GatewayClientState::Connected);
-      _sendBootStatus();
+    case WEBSOCKET_EVENT_DISCONNECTED:
+    case WEBSOCKET_EVENT_CLOSED:
+      self->_setState(GatewayClientState::Disconnected);
       break;
-    case WStype_TEXT:
-      OS_LOGW(TAG, "Received text from API, JSON parsing is not supported anymore :D");
-      break;
-    case WStype_ERROR:
+    case WEBSOCKET_EVENT_ERROR:
       OS_LOGE(TAG, "Received error from API");
       break;
-    case WStype_FRAGMENT_TEXT_START:
-      OS_LOGD(TAG, "Received fragment text start from API");
-      break;
-    case WStype_FRAGMENT:
-      OS_LOGD(TAG, "Received fragment from API");
-      break;
-    case WStype_FRAGMENT_FIN:
-      OS_LOGD(TAG, "Received fragment fin from API");
-      break;
-    case WStype_BIN:
-      MessageHandlers::WebSocket::HandleGatewayBinary(std::span<const uint8_t>(payload, length));
-      break;
-    case WStype_FRAGMENT_BIN_START:
-      OS_LOGE(TAG, "Received binary fragment start from API, this is not supported!");
-      break;
-    case WStype_PING:
-    case WStype_PONG:
+    case WEBSOCKET_EVENT_DATA:
+      self->_handleData(data);
       break;
     default:
-      OS_LOGE(TAG, "Received unknown event from API");
       break;
+  }
+}
+
+void GatewayClient::_handleData(const esp_websocket_event_data_t* data)
+{
+  if (data == nullptr) {
+    return;
+  }
+
+  // Control frames (ping/pong/close) and empty frames carry no application payload.
+  if (data->op_code == WS_OP_TEXT) {
+    OS_LOGW(TAG, "Received text from API, JSON parsing is not supported anymore :D");
+    return;
+  }
+  if (data->op_code != WS_OP_BINARY && data->op_code != 0x00 /* continuation */) {
+    return;
+  }
+
+  // esp_websocket_client may deliver a message in chunks (payload_offset/payload_len).
+  // Fast path: a complete single-frame message.
+  if (data->payload_offset == 0 && data->data_len == data->payload_len) {
+    MessageHandlers::WebSocket::HandleGatewayBinary(std::span<const uint8_t>(reinterpret_cast<const uint8_t*>(data->data_ptr), data->data_len));
+    return;
+  }
+
+  // Fragmented / chunked message: accumulate until complete.
+  if (data->payload_offset == 0) {
+    m_binReasm.clear();
+    m_binReasm.reserve(data->payload_len);
+  }
+  m_binReasm.insert(m_binReasm.end(), reinterpret_cast<const uint8_t*>(data->data_ptr), reinterpret_cast<const uint8_t*>(data->data_ptr) + data->data_len);
+
+  if (m_binReasm.size() >= static_cast<size_t>(data->payload_len)) {
+    MessageHandlers::WebSocket::HandleGatewayBinary(std::span<const uint8_t>(m_binReasm.data(), m_binReasm.size()));
+    m_binReasm.clear();
   }
 }

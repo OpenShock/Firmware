@@ -1,4 +1,5 @@
 #include <freertos/FreeRTOS.h>
+#include <freertos/task.h>
 
 #include "captiveportal/Manager.h"
 
@@ -11,9 +12,6 @@ const char* const TAG = "CaptivePortal";
 #include "Logging.h"
 #include "Temporal.h"
 
-#include <ESPAsyncWebServer.h>
-#include <WebSocketsServer.h>
-
 #include <esp_mac.h>
 #include <esp_netif.h>
 #include <esp_timer.h>
@@ -21,6 +19,7 @@ const char* const TAG = "CaptivePortal";
 #include <esp_wifi_default.h>
 
 #include "SimpleMutex.h"
+#include "util/TaskUtils.h"
 
 #include <atomic>
 #include <cstring>
@@ -32,6 +31,7 @@ static std::atomic<bool> s_alwaysEnabled                 = false;
 static std::atomic<bool> s_forceClosed                   = false;
 static std::atomic<bool> s_userDone                      = false;
 static esp_timer_handle_t s_captivePortalUpdateLoopTimer = nullptr;
+static TaskHandle_t s_managerTask                        = nullptr;
 static SimpleMutex s_instanceMutex;
 static std::shared_ptr<CaptivePortal::CaptivePortalInstance> s_instance = nullptr;
 static esp_netif_t* s_apNetif                                           = nullptr;
@@ -145,7 +145,11 @@ static void captiveportal_stop()
   esp_wifi_set_mode(WIFI_MODE_STA);
 }
 
-static void captiveportal_updateloop(void*)
+// Runs the captive-portal state machine once. This does heavy work (starting the
+// portal constructs CaptivePortalInstance, which mounts LittleFS and spins up the
+// HTTP/WS/DNS servers), so it MUST run on the dedicated manager task below — never
+// on the esp_timer task, whose 3.5KB stack would overflow.
+static void captiveportal_tick()
 {
   int64_t now = esp_timer_get_time();
 
@@ -214,6 +218,25 @@ static void captiveportal_updateloop(void*)
   }
 }
 
+// Dedicated worker task. The 500ms timer only notifies us; all the heavy tick work
+// (portal start/stop, instance construction) runs here on a generous stack.
+static void captiveportal_managertask(void*)
+{
+  for (;;) {
+    ulTaskNotifyTake(pdTRUE, portMAX_DELAY);
+    captiveportal_tick();
+  }
+}
+
+// esp_timer callback (runs on the esp_timer task, 3.5KB stack). Must stay trivial —
+// it only kicks the manager task, which does the real work on its own stack.
+static void captiveportal_timernotify(void*)
+{
+  if (s_managerTask != nullptr) {
+    xTaskNotifyGive(s_managerTask);
+  }
+}
+
 bool CaptivePortal::Init()
 {
   // If device is already fully configured, set a startup grace period before opening portal
@@ -222,8 +245,13 @@ bool CaptivePortal::Init()
     OS_LOGI(TAG, "Device fully configured, startup grace period of 30s before opening portal");
   }
 
+  if (TaskUtils::TaskCreateExpensive(captiveportal_managertask, "CaptivePortalManager", 6144, nullptr, 1, &s_managerTask) != pdPASS) {
+    OS_LOGE(TAG, "Failed to create captive portal manager task");
+    return false;
+  }
+
   esp_timer_create_args_t args = {
-    .callback              = captiveportal_updateloop,
+    .callback              = captiveportal_timernotify,
     .arg                   = nullptr,
     .dispatch_method       = ESP_TIMER_TASK,
     .name                  = "captive_portal_update",

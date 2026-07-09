@@ -13,14 +13,23 @@ const char* const TAG = "Config";
 
 #include "json/Json.h"
 
-#include <FS.h>
-#include <LittleFS.h>
+#include "fs/ConfigFs.h"
 
 #include <bitset>
+#include <cstring>
+#include <span>
+#include <vector>
 
 using namespace OpenShock;
 
-static fs::LittleFSFS _configFS;
+// littlefs partition holding the persisted config blob. The Arduino LittleFSFS
+// stored it as the file "config" at the root of the partition labelled "config"
+// (VFS "/config/config" resolved to lfs path "/config"); the raw-lfs ConfigFs opens
+// that same path so existing devices keep loading their config after the migration.
+static constexpr const char* CONFIG_PARTITION_LABEL = "config";
+static constexpr const char* CONFIG_FILE_PATH       = "/config";
+
+static OpenShock::ConfigFs _configFs;
 static Config::RootConfig _configData;
 static ReadWriteMutex _configMutex;
 
@@ -73,25 +82,16 @@ static bool tryDeserializeConfig(const uint8_t* buffer, std::size_t bufferLen, O
 }
 static bool tryLoadConfig(TinyVec<uint8_t>& buffer)
 {
-  File file = _configFS.open("/config", "rb");
-  if (!file) {
-    OS_LOGE(TAG, "Failed to open config file for reading");
+  std::vector<uint8_t> data;
+  if (!_configFs.read(CONFIG_FILE_PATH, data)) {
+    OS_LOGE(TAG, "Failed to read config file");
     return false;
   }
 
-  // Get file size
-  std::size_t size = file.size();
-
-  // Resize buffer
-  buffer.resize(size);
-
-  // Read file
-  if (file.read(buffer.data(), buffer.size()) != buffer.size()) {
-    OS_LOGE(TAG, "Failed to read config file, size mismatch");
-    return false;
+  buffer.resize(data.size());
+  if (!data.empty()) {
+    memcpy(buffer.data(), data.data(), data.size());
   }
-
-  file.close();
 
   return true;
 }
@@ -106,19 +106,10 @@ static bool tryLoadConfig()
 }
 static bool trySaveConfig(const uint8_t* data, std::size_t dataLen)
 {
-  File file = _configFS.open("/config", "wb");
-  if (!file) {
-    OS_LOGE(TAG, "Failed to open config file for writing");
-    return false;
-  }
-
-  // Write file
-  if (file.write(data, dataLen) != dataLen) {
+  if (!_configFs.write(CONFIG_FILE_PATH, std::span<const uint8_t>(data, dataLen))) {
     OS_LOGE(TAG, "Failed to write config file");
     return false;
   }
-
-  file.close();
 
   return true;
 }
@@ -137,7 +128,12 @@ void Config::Init()
 {
   CONFIG_LOCK_WRITE();
 
-  if (!_configFS.begin(true, "/config", 3, "config")) {
+  const esp_partition_t* partition = esp_partition_find_first(ESP_PARTITION_TYPE_DATA, ESP_PARTITION_SUBTYPE_DATA_SPIFFS, CONFIG_PARTITION_LABEL);
+  if (partition == nullptr) {
+    OS_PANIC(TAG, "Unable to find config partition!");
+  }
+
+  if (!_configFs.mount(partition)) {
     OS_PANIC(TAG, "Unable to mount config LittleFS partition!");
   }
 
@@ -230,7 +226,7 @@ void Config::FactoryReset()
 
   _configData.ToDefault();
 
-  if (!_configFS.remove("/config") && _configFS.exists("/config")) {
+  if (!_configFs.remove(CONFIG_FILE_PATH) && _configFs.exists(CONFIG_FILE_PATH)) {
     OS_PANIC(TAG, "Failed to remove existing config file for factory reset. Reccomend formatting microcontroller and re-flashing firmware");
   }
 

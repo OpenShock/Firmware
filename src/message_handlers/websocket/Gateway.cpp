@@ -8,8 +8,6 @@ const char* const TAG = "ServerMessageHandlers";
 
 #include "serialization/_fbs/GatewayToHubMessage_generated.h"
 
-#include <WebSockets.h>
-
 #include <array>
 #include <cstdint>
 
