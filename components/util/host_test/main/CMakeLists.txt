@@ -10,6 +10,9 @@ idf_component_register(
                "test_digitcounter.cpp"
                "test_semver.cpp"
                "test_base64.cpp"
+               "test_checksum.cpp"
+               "test_tinyvec.cpp"
+               "test_fnproxy.cpp"
                "../../src/StringUtils.cpp"
                "../../src/Convert.cpp"
                "../../src/DigitCounter.cpp"
@@ -21,7 +24,7 @@ idf_component_register(
                "../../../common/include"  # StringHelpers.h, Common.h
   REQUIRES     unity
                mbedtls            # Base64Utils.cpp -> mbedtls/base64.h
-               hal                # Convert.h -> hal/gpio_types.h
+               esp_hal_gpio       # Convert.h -> hal/gpio_types.h (moved out of `hal` in IDF 6.0)
   WHOLE_ARCHIVE
 )
 

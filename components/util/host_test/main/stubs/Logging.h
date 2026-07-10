@@ -10,5 +10,5 @@
 #define OS_LOGW(tag, ...)      ((void)0)
 #define OS_LOGE(tag, ...)      ((void)0)
 #define OS_LOGWTF(tag, ...)    ((void)0)
-#define OS_PANIC(tag, ...)     ((void)0)
-#define OS_PANIC_OTA(tag, ...) ((void)0)
+// OS_PANIC* are intentionally NOT defined here — they live in Panic.h (stubbed
+// separately). Defining them here too would double-define when a source pulls both.
