@@ -1,6 +1,6 @@
 #include <freertos/FreeRTOS.h>
 
-#include "serial/command_handlers/common.h"
+#include "serial_console/command_handlers/common.h"
 
 #include "FormatHelpers.h"
 #include "Temporal.h"

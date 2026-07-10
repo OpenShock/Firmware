@@ -1,4 +1,4 @@
-#include "serial/command_handlers/common.h"
+#include "serial_console/command_handlers/common.h"
 
 #include "Chipset.h"
 

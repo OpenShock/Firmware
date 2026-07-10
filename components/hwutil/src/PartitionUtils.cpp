@@ -5,6 +5,8 @@ const char* const TAG = "PartitionUtils";
 #include "Hashing.h"
 #include "http/HTTPRequestManager.h"
 #include "Logging.h"
+
+#include <cstring>
 #include "Temporal.h"
 #include "util/HexUtils.h"
 

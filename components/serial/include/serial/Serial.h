@@ -3,11 +3,15 @@
 #include <cstddef>
 #include <cstdint>
 
-namespace OpenShock::SerialConsole {
+// Low-level serial transport for the device console (UART0 or USB-Serial-JTAG,
+// selected by the ESP-IDF console sdkconfig). This is a foundation-layer
+// component: it owns the raw byte I/O to the port and depends on nothing above
+// the IDF drivers, so `logging` can write through it without a dependency cycle.
+namespace OpenShock::Serial {
   /**
-   * @brief Installs the console RX driver (UART0 / USB-Serial-JTAG depending on the
-   *        configured console) and switches stdout to unbuffered so interactive
-   *        prompts flush immediately. Idempotent.
+   * @brief Installs the console driver (UART0 / USB-Serial-JTAG) and routes stdout
+   *        through it, unbuffered so interactive prompts flush immediately.
+   *        Idempotent.
    *
    * @return true on success, false if the driver could not be installed.
    */
@@ -21,4 +25,14 @@ namespace OpenShock::SerialConsole {
    * @return Number of bytes read (0 if none available).
    */
   int Read(uint8_t* buffer, std::size_t len);
-}  // namespace OpenShock::SerialConsole
+
+  /**
+   * @brief Writes @p len raw bytes to the console. Before Init() the bytes go
+   *        straight to the ROM serial output (early-boot logging), never C stdio.
+   *
+   * @param data Source buffer.
+   * @param len  Number of bytes to write.
+   * @return Number of bytes written.
+   */
+  int Write(const uint8_t* data, std::size_t len);
+}  // namespace OpenShock::Serial

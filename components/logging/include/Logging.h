@@ -2,8 +2,6 @@
 
 #include "Temporal.h"
 
-#include <esp_log.h>
-
 // openshock_log_printf forwards to vprintf (the IDF console: UART0 + any secondary
 // USB-Serial-JTAG/CDC output). Defined in Logging.cpp so this header carries no
 // hardware include and stays host-portable (the host test no-ops the macros).

@@ -5,6 +5,8 @@
 const char* const TAG = "HTTPRequestManager";
 
 #include "Logging.h"
+
+#include <cstring>
 #include "OpenShock.h"
 #include "RateLimiter.h"
 #include "SimpleMutex.h"

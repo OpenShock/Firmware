@@ -1,4 +1,4 @@
-#include "serial/SerialInputHandler.h"
+#include "serial_console/SerialInputHandler.h"
 
 const char* const TAG = "SerialInputHandler";
 
@@ -11,10 +11,10 @@ const char* const TAG = "SerialInputHandler";
 #include "FormatHelpers.h"
 #include "http/HTTPRequestManager.h"
 #include "Logging.h"
-#include "serial/command_handlers/CommandEntry.h"
-#include "serial/command_handlers/common.h"
-#include "serial/command_handlers/index.h"
-#include "serial/SerialConsole.h"
+#include "serial_console/command_handlers/CommandEntry.h"
+#include "serial_console/command_handlers/common.h"
+#include "serial_console/command_handlers/index.h"
+#include "serial/Serial.h"
 #include "serialization/JsonAPI.h"
 #include "serialization/JsonSerial.h"
 #include "Temporal.h"
@@ -369,7 +369,7 @@ enum class SerialReadResult {
   AutoCompleteRequest,
 };
 
-// Staging buffer: the console is read in chunks (SerialConsole::Read returns the
+// Staging buffer: the console is read in chunks (Serial::Read returns the
 // number of bytes read), but the parser consumes one byte at a time. Bytes left
 // over after an early return (line end / autocomplete) are carried across polls.
 static uint8_t s_rxStaging[128];
@@ -379,7 +379,7 @@ static std::size_t s_rxStagingLen  = 0;
 static bool nextSerialByte(char& out)
 {
   if (s_rxStagingHead >= s_rxStagingLen) {
-    int read = SerialConsole::Read(s_rxStaging, sizeof(s_rxStaging));
+    int read = Serial::Read(s_rxStaging, sizeof(s_rxStaging));
     if (read <= 0) {
       return false;
     }
@@ -606,7 +606,7 @@ bool SerialInputHandler::Init()
   s_initialized = true;
 
   // Install the console RX driver and make stdout unbuffered.
-  if (!SerialConsole::Init()) {
+  if (!Serial::Init()) {
     OS_LOGE(TAG, "Failed to initialize serial console");
     return false;
   }

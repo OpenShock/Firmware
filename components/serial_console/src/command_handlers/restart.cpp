@@ -1,5 +1,5 @@
-#include "serial/command_handlers/common.h"
-#include "serial/SerialInputHandler.h"
+#include "serial_console/command_handlers/common.h"
+#include "serial_console/SerialInputHandler.h"
 
 #include <esp_system.h>
 

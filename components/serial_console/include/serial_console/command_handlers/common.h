@@ -1,7 +1,7 @@
 #pragma once
 
-#include "serial/command_handlers/index.h"
-#include "serial/SerialInputHandler.h"
+#include "serial_console/command_handlers/index.h"
+#include "serial_console/SerialInputHandler.h"
 
 #include "Logging.h"
 

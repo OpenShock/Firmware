@@ -12,7 +12,7 @@ const char* const TAG = "main";
 #include "OpenShock.h"
 #include "OtaUpdateManager.h"
 #include "Panic.h"
-#include "serial/SerialInputHandler.h"
+#include "serial_console/SerialInputHandler.h"
 #include "visual/VisualStateManager.h"
 #include "wifi/WiFiManager.h"
 #include "wifi/WiFiScanManager.h"

@@ -10,6 +10,8 @@ const char* const TAG = "CommandHandler";
 #include "estop/EStopState.h"
 #include "events/Events.h"
 #include "Logging.h"
+
+#include <cstring>
 #include "OpenShock.h"
 #include "radio/RFTransmitter.h"
 #include "SimpleMutex.h"

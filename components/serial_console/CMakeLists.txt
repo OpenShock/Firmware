@@ -1,15 +1,16 @@
-# OpenShock serial console + command handlers.
+# OpenShock interactive console — SerialInputHandler + command handlers.
 #
-# Separable from `core`: it consumes core's config/wifi/etc. surface, but nothing
-# in core depends on it (only the top-level app entry does), so it stands alone as
-# a component that REQUIRES core.
-FILE(GLOB_RECURSE serial_sources
+# The app-level command console: reads lines from the low-level `serial` transport
+# and dispatches them against `core` (config, wifi, RF, OTA, ...). Entry-layer;
+# nothing in core depends on it (only the top-level app entry does). Its public
+# surface is just SerialInputHandler.h, so all deps are private.
+FILE(GLOB_RECURSE console_sources
   ${CMAKE_CURRENT_SOURCE_DIR}/src/*.cpp)
 
 idf_component_register(
-  SRCS ${serial_sources}
-  INCLUDE_DIRS "include"
-  REQUIRES core esp_driver_uart esp_driver_usb_serial_jtag
+  SRCS          ${console_sources}
+  INCLUDE_DIRS  "include"
+  PRIV_REQUIRES core serial          # core: config/wifi/etc. · serial: Serial::Init/Read
 )
 
 target_compile_options(${COMPONENT_LIB} PRIVATE -Wno-error)
