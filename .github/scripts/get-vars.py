@@ -13,6 +13,7 @@ import re
 import subprocess
 import sys
 from pathlib import Path
+from typing import NoReturn
 
 MIN_PYTHON = (3, 12, 3)
 if sys.version_info < MIN_PYTHON:
@@ -27,7 +28,7 @@ SEMVER_RE = re.compile(
 )
 
 
-def set_failed(msg: str):
+def set_failed(msg: str) -> NoReturn:
     print(f'::error::{msg}')
     sys.exit(1)
 
@@ -75,7 +76,7 @@ class SemVer:
 
 
 def sanitize(name: str) -> str:
-    return re.sub(r'^-+|-+$', '', re.sub(r'[^a-zA-Z0-9-]', '-', name))
+    return re.sub(r'^-+|-+$', '', re.sub(r'-+', '-', re.sub(r'[^a-zA-Z0-9-]', '-', name)))
 
 
 def main() -> int:
@@ -94,15 +95,18 @@ def main() -> int:
         set_failed('Environment variable "GITHUB_SHA" not found')
     short_sha = git_sha[:8]
 
-    head_ref = os.environ.get('GITHUB_HEAD_REF') if is_git_pr else git_ref.split('/')[2]
+    head_ref = os.environ.get('GITHUB_HEAD_REF') if is_git_pr else git_ref.split('/', 2)[2]
     if not head_ref:
         set_failed('Failed to get git head ref name')
 
-    tags_raw = subprocess.check_output(
-        ['git', 'for-each-ref', '--sort=-creatordate',
-         '--format=%(refname:short)', 'refs/tags'],
-        text=True,
-    ).strip()
+    try:
+        tags_raw = subprocess.check_output(
+            ['git', 'for-each-ref', '--sort=-creatordate',
+             '--format=%(refname:short)', 'refs/tags'],
+            text=True,
+        ).strip()
+    except (subprocess.CalledProcessError, FileNotFoundError) as e:
+        set_failed(f'Failed to read git tags: {e}')
     tags = [t.strip() for t in tags_raw.split('\n') if t.strip()]
 
     # Existing repo tags are best-effort: skip any that aren't strict semver.
@@ -144,6 +148,8 @@ def main() -> int:
         channel = 'beta'
     elif head_ref == 'develop' or (is_git_tag and latest.is_dev()):
         channel = 'develop'
+    elif is_git_tag:
+        set_failed(f'Tag "{head_ref}" has an unrecognized prerelease channel')
     else:
         channel = sanitize(head_ref)
 
