@@ -1,6 +1,5 @@
 #pragma once
 
-#include "estop/EStopManager.h"
 #include <cstdint>
 
 namespace OpenShock::VisualStateManager {

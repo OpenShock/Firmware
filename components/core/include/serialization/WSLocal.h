@@ -5,8 +5,6 @@
 
 #include "serialization/_fbs/WifiNetworkEventType_generated.h"
 
-#include <esp_wifi_types.h>
-
 #include <string_view>
 
 namespace OpenShock {

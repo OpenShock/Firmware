@@ -4,5 +4,6 @@
 idf_component_register(
   SRCS "src/RFC8908Handler.cpp"
   INCLUDE_DIRS "include"
-  REQUIRES common logging esp_http_server osjson
+  REQUIRES esp_http_server          # esp_http_server.h in public header
+  PRIV_REQUIRES logging osjson      # .cpp-only (common was unused)
 )

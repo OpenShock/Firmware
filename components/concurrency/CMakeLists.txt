@@ -8,7 +8,7 @@ idf_component_register(
   SRCS         "src/SimpleMutex.cpp"
                "src/ReadWriteMutex.cpp"
   INCLUDE_DIRS "include"
-  REQUIRES     freertos
-               common     # Common.h
-               logging    # Logging.h (ReadWriteMutex uses OS_LOG*)
+  REQUIRES      freertos                        # semphr.h in public headers
+                common                          # OpenShock.h in public headers
+  PRIV_REQUIRES logging                         # Logging.h (ReadWriteMutex.cpp only)
 )

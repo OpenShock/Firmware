@@ -4,7 +4,6 @@ const char* const TAG = "WSGateway";
 
 #include <esp_wifi.h>
 
-#include "config/Config.h"
 #include "Logging.h"
 #include "Temporal.h"
 
