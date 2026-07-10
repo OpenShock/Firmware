@@ -138,6 +138,7 @@ void DNSServer::task()
 
     size_t respLen = questionEnd;
     if (qtype == 1) {  // only answer A queries
+      // clang-format off
       const uint8_t answer[] = {
         0xC0, 0x0C,                          // name pointer → offset 12 (the question)
         0x00, 0x01,                          // TYPE  A
@@ -146,6 +147,7 @@ void DNSServer::task()
         0x00, 0x04,                          // RDLENGTH 4
         m_ip[0], m_ip[1], m_ip[2], m_ip[3],  // RDATA — the fixed response IP
       };
+      // clang-format on
       memcpy(resp + respLen, answer, sizeof(answer));
       respLen += sizeof(answer);
     }
