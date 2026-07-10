@@ -5,6 +5,8 @@
 
 #include "util/FnProxy.h"
 
+#include <type_traits>
+
 using OpenShock::Util::FnProxy;
 
 namespace {
@@ -14,6 +16,12 @@ namespace {
     int get() const noexcept { return value; }
   };
 }  // namespace
+
+// noexcept propagates onto the function-pointer type; plain methods stay plain.
+static_assert(std::is_same_v<std::remove_const_t<decltype(FnProxy<&Counter::add>)>,
+                             int (*)(void*, int)>);
+static_assert(std::is_same_v<std::remove_const_t<decltype(FnProxy<&Counter::get>)>,
+                             int (*)(void*) noexcept>);
 
 TEST_CASE("FnProxy forwards to a non-const member", "[util][fnproxy]")
 {
