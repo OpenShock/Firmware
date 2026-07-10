@@ -12,8 +12,11 @@ FILE(GLOB_RECURSE core_sources
 
 idf_component_register(
   SRCS ${core_sources}
-  INCLUDE_DIRS "include"
-  REQUIRES common temporal logging panic concurrency util hwutil http chipset led_drivers protocols osjson events esp_driver_rmt esp_driver_gpio esp_http_server esp_netif esp_event esp_wifi esp_timer app_update nvs_flash fs dns_server rfc8908 mbedtls espressif__esp_websocket_client flatbuffers
+  INCLUDE_DIRS      "include"
+  PRIV_INCLUDE_DIRS "src"          # internal headers (CaptivePortalInstance.h, GatewayClient.h, message_handlers/impl/*, ...)
+  REQUIRES common temporal logging panic concurrency util hwutil http chipset led_drivers protocols osjson events esp_driver_rmt esp_driver_gpio esp_netif esp_event esp_wifi esp_timer app_update nvs_flash mbedtls flatbuffers
+  # Internal-only now that CaptivePortalInstance.h + GatewayClient.h are private:
+  PRIV_REQUIRES esp_http_server fs dns_server rfc8908 espressif__esp_websocket_client
 )
 
 # IDF compiles application components with -Werror. The legacy PlatformIO build
