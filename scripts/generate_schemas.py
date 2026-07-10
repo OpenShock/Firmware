@@ -51,7 +51,7 @@ def resolve_path(path):
 # resolve paths
 schemas_path = resolve_path('../schemas')
 ts_output_path = resolve_path('../frontend/src/lib/_fbs')
-cpp_output_path = resolve_path('../components/core/include/serialization/_fbs')
+cpp_output_path = resolve_path('../components/serialization/include/serialization/_fbs')
 
 # Get all the schema files.
 schema_files = []
