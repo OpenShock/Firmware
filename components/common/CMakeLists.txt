@@ -9,6 +9,5 @@
 #   enums/*.h        — shared enums (consumers include with the enums/ prefix)
 
 idf_component_register(
-  SRCS         "src/LanguageVersionCheck.cpp"
   INCLUDE_DIRS "include"
 )
