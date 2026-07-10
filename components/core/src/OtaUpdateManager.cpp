@@ -533,18 +533,7 @@ bool OtaUpdateManager::Init()
   }
 
   // Infer boot type from update step.
-  switch (updateStep) {
-    case OtaUpdateStep::Updated:
-      _bootType = FirmwareBootType::NewFirmware;
-      break;
-    case OtaUpdateStep::Validating:  // If the update step is validating, we have failed in the middle of validating the new firmware, meaning this is a rollback.
-    case OtaUpdateStep::RollingBack:
-      _bootType = FirmwareBootType::Rollback;
-      break;
-    default:
-      _bootType = FirmwareBootType::Normal;
-      break;
-  }
+  _bootType = OpenShock::InferFirmwareBootType(updateStep);
 
   if (updateStep == OtaUpdateStep::Updated) {
     if (!Config::SetOtaUpdateStep(OtaUpdateStep::Validating)) {

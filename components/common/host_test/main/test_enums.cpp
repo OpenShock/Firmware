@@ -145,3 +145,19 @@ TEST_CASE("FirmwareBootType: normal/newfirmware/new_firmware/rollback", "[common
   TEST_ASSERT_FALSE(TryParseFirmwareBootType(b, ""));
   TEST_ASSERT_FALSE(TryParseFirmwareBootType(b, "reboot"));
 }
+
+TEST_CASE("InferFirmwareBootType: maps every OTA step to a boot type", "[common][enums]")
+{
+  // Only 'Updated' means we just flashed new firmware this boot.
+  TEST_ASSERT_EQUAL(FirmwareBootType::NewFirmware, InferFirmwareBootType(OtaUpdateStep::Updated));
+
+  // A crash while validating, or an explicit rolling-back step, means this boot is
+  // the previous image after a rollback.
+  TEST_ASSERT_EQUAL(FirmwareBootType::Rollback, InferFirmwareBootType(OtaUpdateStep::Validating));
+  TEST_ASSERT_EQUAL(FirmwareBootType::Rollback, InferFirmwareBootType(OtaUpdateStep::RollingBack));
+
+  // Everything else is a normal boot.
+  TEST_ASSERT_EQUAL(FirmwareBootType::Normal, InferFirmwareBootType(OtaUpdateStep::None));
+  TEST_ASSERT_EQUAL(FirmwareBootType::Normal, InferFirmwareBootType(OtaUpdateStep::Updating));
+  TEST_ASSERT_EQUAL(FirmwareBootType::Normal, InferFirmwareBootType(OtaUpdateStep::Validated));
+}

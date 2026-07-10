@@ -1,6 +1,7 @@
 #pragma once
 
 #include "StringHelpers.h"
+#include "enums/OtaUpdateStep.h"
 
 #include <cstdint>
 #include <string_view>
@@ -30,5 +31,22 @@ namespace OpenShock {
     }
 
     return false;
+  }
+
+  // Maps the OTA update step persisted in config (read once at boot) to the boot
+  // type this startup represents.
+  constexpr FirmwareBootType InferFirmwareBootType(OtaUpdateStep step)
+  {
+    switch (step) {
+      case OtaUpdateStep::Updated:
+        return FirmwareBootType::NewFirmware;
+      // Validating means we crashed mid-validation of the new firmware, so this
+      // boot is the rollback to the previous image.
+      case OtaUpdateStep::Validating:
+      case OtaUpdateStep::RollingBack:
+        return FirmwareBootType::Rollback;
+      default:
+        return FirmwareBootType::Normal;
+    }
   }
 }  // namespace OpenShock
