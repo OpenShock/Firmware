@@ -5,43 +5,37 @@
 namespace OpenShock::Util {
 
   namespace detail {
-
-    template<auto MemberFunction>
-    struct FnProxyImpl;
-
-    // Non-const, non-noexcept
-    template<typename R, typename C, typename... Ts, R (C::*MF)(Ts...)>
-    struct FnProxyImpl<MF> {
-      static R Call(void* p, Ts... args) noexcept(noexcept((static_cast<C*>(p)->*MF)(std::move(args)...))) { return (static_cast<C*>(p)->*MF)(std::move(args)...); }
+    template<auto MF, class R, class C, class... A>
+    struct Body {
+      static R call(void* self, A... args)
+      { return (static_cast<C*>(self)->*MF)(std::forward<A>(args)...); }
     };
-
-    // Const, non-noexcept
-    template<typename R, typename C, typename... Ts, R (C::*MF)(Ts...) const>
-    struct FnProxyImpl<MF> {
-      static R Call(void* p, Ts... args) noexcept(noexcept((static_cast<const C*>(p)->*MF)(std::move(args)...))) { return (static_cast<const C*>(p)->*MF)(std::move(args)...); }
-    };
-
-    // Non-const, noexcept
-    template<typename R, typename C, typename... Ts, R (C::*MF)(Ts...) noexcept>
-    struct FnProxyImpl<MF> {
-      static R Call(void* p, Ts... args) noexcept { return (static_cast<C*>(p)->*MF)(std::move(args)...); }
-    };
-
-    // Const, noexcept
-    template<typename R, typename C, typename... Ts, R (C::*MF)(Ts...) const noexcept>
-    struct FnProxyImpl<MF> {
-      static R Call(void* p, Ts... args) noexcept { return (static_cast<const C*>(p)->*MF)(std::move(args)...); }
-    };
-
+    template<auto MF> struct Deduce;
+    template<class R, class C, class... A, R (C::*MF)(A...)>
+    struct Deduce<MF> : Body<MF, R, C, A...> {};
+    template<class R, class C, class... A, R (C::*MF)(A...) const>
+    struct Deduce<MF> : Body<MF, R, C, A...> {};
+    template<class R, class C, class... A, R (C::*MF)(A...) noexcept>
+    struct Deduce<MF> : Body<MF, R, C, A...> {};
+    template<class R, class C, class... A, R (C::*MF)(A...) const noexcept>
+    struct Deduce<MF> : Body<MF, R, C, A...> {};
+    // (ref-qualified &/&& members omitted, meaningless for a void* callback.)
   }  // namespace detail
 
-  /// Variable template: FnProxy<&Class::method> is directly a function pointer.
+  /// Variable template: FnProxy<&Class::method> is a plain function pointer,
+  /// R(*)(void*, Args...), that casts the void* back to Class* and calls the
+  /// method. It exists to hand C++ member functions to C callback APIs that pass
+  /// context as a void* (FreeRTOS tasks, esp_event handlers).
   ///
   /// Usage:
-  ///   auto cb = FnProxy<&Sensor::read>;  // R(*)(void*, Ts...)
+  ///   auto cb = FnProxy<&Sensor::read>;  // R(*)(void*, float)
   ///   Sensor s;
   ///   cb(&s, 1.5f);
-  template<auto MemberFunction>
-  inline constexpr auto FnProxy = &detail::FnProxyImpl<MemberFunction>::Call;
-
+  ///
+  /// Works for any non-ref-qualified member function. The four Deduce
+  /// specializations cover the const/noexcept combinations, each forwarding the
+  /// deduced signature to the single Body::call trampoline whose address becomes
+  /// the resulting function pointer.
+  template<auto MF>
+  constexpr auto FnProxy = &detail::Deduce<MF>::call;
 }  // namespace OpenShock::Util
