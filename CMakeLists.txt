@@ -14,10 +14,6 @@ if(NOT DEFINED OPENSHOCK_BOARD AND DEFINED ENV{OPENSHOCK_BOARD})
 endif()
 
 if(DEFINED OPENSHOCK_BOARD)
-  # PlatformIO treats src/ as the application (main) component. Native ESP-IDF
-  # only auto-discovers main/ and components/, so register src/ explicitly.
-  set(EXTRA_COMPONENT_DIRS "${CMAKE_CURRENT_LIST_DIR}/src")
-
   # Map the IDF target to an OpenShock chip label for OPENSHOCK_FW_CHIP.
   if(DEFINED IDF_TARGET)
     set(_os_target ${IDF_TARGET})
