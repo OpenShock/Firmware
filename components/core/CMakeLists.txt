@@ -17,6 +17,7 @@ idf_component_register(
   REQUIRES common temporal logging panic concurrency util hwutil http chipset led_drivers protocols osjson events esp_driver_rmt esp_driver_gpio esp_netif esp_event esp_wifi esp_timer app_update nvs_flash mbedtls flatbuffers serialization config
   # Internal-only now that CaptivePortalInstance.h + GatewayClient.h are private:
   PRIV_REQUIRES esp_http_server fs dns_server rfc8908 espressif__esp_websocket_client
+                device_control   # estop/CommandHandler/visual used only in core .cpp
 )
 
 # IDF compiles application components with -Werror. The legacy PlatformIO build

@@ -10,7 +10,7 @@ FILE(GLOB_RECURSE console_sources
 idf_component_register(
   SRCS          ${console_sources}
   INCLUDE_DIRS  "include"
-  PRIV_REQUIRES core serial          # core: config/wifi/etc. · serial: Serial::Init/Read
+  PRIV_REQUIRES core serial device_control   # core: config/wifi/etc. · serial: Serial::Init/Read · device_control: estop/CommandHandler/visual/radio
 )
 
 target_compile_options(${COMPONENT_LIB} PRIVATE -Wno-error)
