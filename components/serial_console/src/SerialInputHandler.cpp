@@ -347,6 +347,26 @@ public:
     m_data[m_size++] = c;
   }
 
+  inline void append(const char* data, std::size_t len)
+  {
+    if (len == 0) {
+      return;
+    }
+
+    if (m_size + len > m_capacity) {
+      reserve(m_size + len);
+    }
+
+    // reserve() clamps to SERIAL_BUFFER_MAX_CAPACITY and may have reset m_size;
+    // never write past the allocation.
+    if (len > m_capacity - m_size) {
+      len = m_capacity - m_size;
+    }
+
+    std::memcpy(m_data + m_size, data, len);
+    m_size += len;
+  }
+
   constexpr void pop_back() noexcept
   {
     if (m_size > 0) {
@@ -370,24 +390,28 @@ enum class SerialReadResult {
 };
 
 // Staging buffer: the console is read in chunks (Serial::Read returns the
-// number of bytes read), but the parser consumes one byte at a time. Bytes left
-// over after an early return (line end / autocomplete) are carried across polls.
+// number of bytes read) into this buffer, and the parser scans the chunk in
+// place. Bytes left over after an early return (line end / autocomplete) are
+// carried across polls via s_rxStagingHead.
 static uint8_t s_rxStaging[128];
 static std::size_t s_rxStagingHead = 0;
 static std::size_t s_rxStagingLen  = 0;
 
-static bool nextSerialByte(char& out)
+// Ensures the staging buffer holds unconsumed bytes, refilling from the console
+// when it has been drained. Returns false if no bytes are available.
+static bool fillRxStaging()
 {
-  if (s_rxStagingHead >= s_rxStagingLen) {
-    int read = Serial::Read(s_rxStaging, sizeof(s_rxStaging));
-    if (read <= 0) {
-      return false;
-    }
-    s_rxStagingHead = 0;
-    s_rxStagingLen  = static_cast<std::size_t>(read);
+  if (s_rxStagingHead < s_rxStagingLen) {
+    return true;
   }
 
-  out = static_cast<char>(s_rxStaging[s_rxStagingHead++]);
+  int read = Serial::Read(s_rxStaging, sizeof(s_rxStaging));
+  if (read <= 0) {
+    return false;
+  }
+
+  s_rxStagingHead = 0;
+  s_rxStagingLen  = static_cast<std::size_t>(read);
   return true;
 }
 
@@ -395,37 +419,65 @@ static SerialReadResult tryReadSerialLine(SerialBuffer& buffer)
 {
   bool gotData = false;
 
-  char c;
-  while (nextSerialByte(c)) {
+  while (fillRxStaging()) {
     gotData = true;
 
-    // Handle backspace
-    if (c == '\b') {
-      buffer.pop_back();  // Remove the last character from the buffer if it exists
-      continue;
-    }
+    const char* chunk     = reinterpret_cast<const char*>(s_rxStaging);
+    const std::size_t end = s_rxStagingLen;
+    std::size_t i         = s_rxStagingHead;
 
-    // Handle newline
-    if (c == '\r' || c == '\n') {
-      if (!buffer.empty()) {
-        return SerialReadResult::LineEnd;
+    while (i < end) {
+      char c = chunk[i];
+
+      // Backspace: erase the last buffered character.
+      if (c == '\b') {
+        buffer.pop_back();
+        ++i;
+        continue;
       }
-      continue;
+
+      // Line end: dispatch the line, or swallow blank lines.
+      if (c == '\r' || c == '\n') {
+        ++i;
+        if (!buffer.empty()) {
+          s_rxStagingHead = i;
+          return SerialReadResult::LineEnd;
+        }
+        continue;
+      }
+
+      // Tab: autocomplete request.
+      if (c == '\t') {
+        ++i;
+        s_rxStagingHead = i;
+        return SerialReadResult::AutoCompleteRequest;
+      }
+
+      // Strip leading whitespace.
+      if (c == ' ' && buffer.empty()) {
+        ++i;
+        continue;
+      }
+
+      // Bulk-append the maximal run of printable characters. Bytes we don't
+      // handle above (control codes, >= 0x7F) are dropped one at a time.
+      std::size_t runStart = i;
+      while (i < end) {
+        char d = chunk[i];
+        if (d <= 31 || d >= 127) {
+          break;
+        }
+        ++i;
+      }
+
+      if (i > runStart) {
+        buffer.append(chunk + runStart, i - runStart);
+      } else {
+        ++i;  // drop the unhandled byte
+      }
     }
 
-    // Handle leading whitespace
-    if (c == ' ' && buffer.empty()) {
-      continue;
-    }
-
-    if (c == '\t') {
-      return SerialReadResult::AutoCompleteRequest;
-    }
-
-    // If character is printable, add it to the buffer
-    if (c > 31 && c < 127) {
-      buffer.push_back(c);
-    }
+    s_rxStagingHead = i;  // chunk fully consumed
   }
 
   return gotData ? SerialReadResult::Data : SerialReadResult::NoData;
@@ -433,12 +485,21 @@ static SerialReadResult tryReadSerialLine(SerialBuffer& buffer)
 
 static void skipSerialWhitespaces(SerialBuffer& buffer)
 {
-  char c;
-  while (nextSerialByte(c)) {
-    if (c != ' ' && c != '\r' && c != '\n') {
-      buffer.push_back(c);
-      break;
+  while (fillRxStaging()) {
+    const char* chunk     = reinterpret_cast<const char*>(s_rxStaging);
+    const std::size_t end = s_rxStagingLen;
+    std::size_t i         = s_rxStagingHead;
+
+    while (i < end) {
+      char c = chunk[i++];
+      if (c != ' ' && c != '\r' && c != '\n') {
+        buffer.push_back(c);
+        s_rxStagingHead = i;
+        return;
+      }
     }
+
+    s_rxStagingHead = i;  // drained; loop refills
   }
 }
 
