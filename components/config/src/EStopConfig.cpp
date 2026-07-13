@@ -62,11 +62,17 @@ bool EStopConfig::FromJSON(JSON::JsonView json)
     return false;
   }
 
-  Internal::Utils::FromJsonGpioNum(gpioPin, json, "gpioPin", static_cast<gpio_num_t>(CONFIG_OPENSHOCK_ESTOP_PIN));
+  if (!Internal::Utils::FromJsonGpioNum(gpioPin, json, "gpioPin")) {
+    gpioPin = static_cast<gpio_num_t>(CONFIG_OPENSHOCK_ESTOP_PIN);
+  }
 
-  if (!Internal::Utils::FromJsonBool(enabled, json, "enabled", OpenShock::IsValidInputPin(gpioPin))) {
-    OS_LOGE(TAG, "Failed to parse enabled");
-    return false;
+  if (JSON::JsonView enabledJson = json["enabled"]; enabledJson.valid()) {
+    if (!enabledJson.tryGetBool(enabled)) {
+      OS_LOGE(TAG, "Failed to parse enabled");
+      return false;
+    }
+  } else {
+    enabled = OpenShock::IsValidInputPin(gpioPin);
   }
 
   return true;

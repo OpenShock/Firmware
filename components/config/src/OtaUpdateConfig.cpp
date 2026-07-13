@@ -104,15 +104,23 @@ bool OtaUpdateConfig::FromJSON(JSON::JsonView json)
     return false;
   }
 
-  Internal::Utils::FromJsonBool(isEnabled, json, "isEnabled", true);
-  Internal::Utils::FromJsonStr(cdnDomain, json, "cdnDomain", CONFIG_OPENSHOCK_FW_CDN_DOMAIN);
+  if (!json["isEnabled"].tryGetBool(isEnabled)) isEnabled = true;
+
+  if (std::string_view sv; json["cdnDomain"].tryGetStr(sv)) {
+    cdnDomain = sv;
+  } else {
+    cdnDomain = CONFIG_OPENSHOCK_FW_CDN_DOMAIN;
+  }
+
   Internal::Utils::FromJsonStrParsed(updateChannel, json, "updateChannel"sv, OpenShock::TryParseOtaUpdateChannel, OpenShock::OtaUpdateChannel::Stable);
-  Internal::Utils::FromJsonBool(checkOnStartup, json, "checkOnStartup", false);
-  Internal::Utils::FromJsonBool(checkPeriodically, json, "checkPeriodically", false);
-  Internal::Utils::FromJsonU16(checkInterval, json, "checkInterval", 30);
-  Internal::Utils::FromJsonBool(allowBackendManagement, json, "allowBackendManagement", true);
-  Internal::Utils::FromJsonBool(requireManualApproval, json, "requireManualApproval", false);
-  Internal::Utils::FromJsonI32(updateId, json, "updateId", 0);
+
+  if (!json["checkOnStartup"].tryGetBool(checkOnStartup)) checkOnStartup = false;
+  if (!json["checkPeriodically"].tryGetBool(checkPeriodically)) checkPeriodically = false;
+  if (!json["checkInterval"].tryGetU16(checkInterval)) checkInterval = 30;
+  if (!json["allowBackendManagement"].tryGetBool(allowBackendManagement)) allowBackendManagement = true;
+  if (!json["requireManualApproval"].tryGetBool(requireManualApproval)) requireManualApproval = false;
+  if (!json["updateId"].tryGetI32(updateId)) updateId = 0;
+
   Internal::Utils::FromJsonStrParsed(updateStep, json, "updateStep"sv, OpenShock::TryParseOtaUpdateStep, OpenShock::OtaUpdateStep::None);
 
   return true;

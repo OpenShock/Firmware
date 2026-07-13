@@ -1,7 +1,7 @@
 #include "Convert.h"
 
 #include "util/DigitCounter.h"
-#include "util/StringUtils.h"
+#include "StringHelpers.h"
 
 #include <cstdint>
 #include <cstring>

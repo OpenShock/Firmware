@@ -4,7 +4,7 @@
 
 #include "config/Config.h"
 #include "Convert.h"
-#include "util/StringUtils.h"
+#include "StringHelpers.h"
 
 static void handleSerialEchoCommand(std::string_view arg, bool isAutomated)
 {

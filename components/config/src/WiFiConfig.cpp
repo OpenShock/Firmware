@@ -68,8 +68,17 @@ bool WiFiConfig::FromJSON(JSON::JsonView json)
     return false;
   }
 
-  Internal::Utils::FromJsonStr(accessPointSSID, json, "accessPointSSID", CONFIG_OPENSHOCK_FW_AP_PREFIX);
-  Internal::Utils::FromJsonStr(hostname, json, "hostname", CONFIG_OPENSHOCK_FW_HOSTNAME);
+  if (std::string_view sv; json["accessPointSSID"].tryGetStr(sv)) {
+    accessPointSSID = sv;
+  } else {
+    accessPointSSID = CONFIG_OPENSHOCK_FW_AP_PREFIX;
+  }
+
+  if (std::string_view sv; json["hostname"].tryGetStr(sv)) {
+    hostname = sv;
+  } else {
+    hostname = CONFIG_OPENSHOCK_FW_HOSTNAME;
+  }
 
   JSON::JsonView credentialsListJson = json["credentials"];
   if (!credentialsListJson.valid()) {

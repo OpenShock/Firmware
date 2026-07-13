@@ -98,8 +98,7 @@ TEST_CASE("tryGetI64: valid integers including boundaries", "[osjson][getters]")
   TEST_ASSERT_EQUAL_INT64(INT64_MAX, v);
   TEST_ASSERT_TRUE(root["min"].tryGetI64(v));
   TEST_ASSERT_EQUAL_INT64(INT64_MIN, v);
-  TEST_ASSERT_TRUE(root["leadzero"].tryGetI64(v));  // "007" -> 7 (from_chars consumes all digits)
-  TEST_ASSERT_EQUAL_INT64(7, v);
+  TEST_ASSERT_FALSE(root["leadzero"].tryGetI64(v));  // "007" -> rejected (Convert disallows leading zeros)
 }
 
 TEST_CASE("tryGetI64: rejects non-integers and partial parses", "[osjson][getters]")
@@ -113,7 +112,7 @@ TEST_CASE("tryGetI64: rejects non-integers and partial parses", "[osjson][getter
   JSON::JsonView root = doc.root();
 
   int64_t v = 0;
-  TEST_ASSERT_FALSE(root["flt"].tryGetI64(v));   // 1.5 -> from_chars stops at '.'
+  TEST_ASSERT_FALSE(root["flt"].tryGetI64(v));   // 1.5 -> '.' is not a digit
   TEST_ASSERT_FALSE(root["over"].tryGetI64(v));  // overflows int64
   TEST_ASSERT_FALSE(root["exp"].tryGetI64(v));   // string, not a number
   TEST_ASSERT_FALSE(root["plus"].tryGetI64(v));

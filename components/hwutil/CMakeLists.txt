@@ -9,7 +9,8 @@ idf_component_register(
   SRCS          "src/PartitionUtils.cpp"
   INCLUDE_DIRS  "include"
   REQUIRES      esp_partition                # esp_partition_t in public header
-  PRIV_REQUIRES util                         # Convert, StringUtils, Hashing, HexUtils
+  PRIV_REQUIRES common                       # Convert, StringHelpers, HexUtils
+                crypto                       # Hashing
                 temporal                         # Temporal.h
                 http                         # HTTPRequestManager (URL flashing)
                 logging                      # Logging.h

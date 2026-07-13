@@ -46,6 +46,9 @@ namespace OpenShock::JSON {
     // Typed getters. Return false if this node is not of the requested kind.
     [[nodiscard]] bool tryGetStr(std::string_view& out) const noexcept;
     [[nodiscard]] bool tryGetBool(bool& out) const noexcept;
+    [[nodiscard]] bool tryGetU8(uint8_t& out) const noexcept;
+    [[nodiscard]] bool tryGetU16(uint16_t& out) const noexcept;
+    [[nodiscard]] bool tryGetI32(int32_t& out) const noexcept;
     [[nodiscard]] bool tryGetI64(int64_t& out) const noexcept;
     [[nodiscard]] bool tryGetDouble(double& out) const noexcept;
 

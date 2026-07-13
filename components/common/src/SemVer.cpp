@@ -5,7 +5,7 @@ const char* const TAG = "SemVer";
 #include "Convert.h"
 #include "Logging.h"
 #include "util/DigitCounter.h"
-#include "util/StringUtils.h"
+#include "StringHelpers.h"
 
 using namespace OpenShock;
 

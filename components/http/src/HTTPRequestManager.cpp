@@ -11,7 +11,7 @@ const char* const TAG = "HTTPRequestManager";
 #include "RateLimiter.h"
 #include "SimpleMutex.h"
 #include "Temporal.h"
-#include "util/StringUtils.h"
+#include "StringHelpers.h"
 
 #include <esp_crt_bundle.h>
 #include <esp_err.h>

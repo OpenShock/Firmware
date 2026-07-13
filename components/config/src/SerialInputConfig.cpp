@@ -53,7 +53,7 @@ bool SerialInputConfig::FromJSON(JSON::JsonView json)
     return false;
   }
 
-  Internal::Utils::FromJsonBool(echoEnabled, json, "echoEnabled", true);
+  if (!json["echoEnabled"].tryGetBool(echoEnabled)) echoEnabled = true;
 
   return true;
 }

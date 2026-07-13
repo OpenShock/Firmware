@@ -1,8 +1,4 @@
-#include "util/StringUtils.h"
-
-const char* const TAG = "StringUtils";
-
-#include "Logging.h"
+#include "StringHelpers.h"
 
 #include <algorithm>
 #include <cstdarg>
@@ -24,7 +20,6 @@ bool OpenShock::FormatToString(std::string& out, const char* format, ...)
 
   // If result is negative, something went wrong.
   if (result < 0) {
-    OS_LOGE(TAG, "Failed to format string");
     return false;
   }
 
@@ -44,7 +39,6 @@ bool OpenShock::FormatToString(std::string& out, const char* format, ...)
     // Free heap buffer and return false.
     if (result < 0) {
       delete[] bufferPtr;
-      OS_LOGE(TAG, "Failed to format string");
       return false;
     }
   }
@@ -125,15 +119,23 @@ std::vector<std::string_view> OpenShock::StringSplitWhiteSpace(std::string_view 
   return StringSplit(view, [](char c) { return isspace(c) != 0; }, maxSplits);
 }
 
-bool OpenShock::StringIContains(std::string_view haystack, std::string_view needle)
+static bool lowercaseEqual(char a, char b) {
+  return tolower(a) == tolower(b);
+}
+
+bool OpenShock::StringIEquals(std::string_view a, std::string_view b) noexcept
+{
+  return std::ranges::equal(a, b, lowercaseEqual);
+}
+bool OpenShock::StringIContains(std::string_view haystack, std::string_view needle) noexcept
 {
   if (haystack.size() < needle.size()) return false;
-  if (haystack.size() == needle.size()) return StringIEquals(haystack, needle);
+  if (haystack.size() == needle.size()) return std::ranges::equal(haystack, needle, lowercaseEqual);
 
-  return std::search(haystack.begin(), haystack.end(), needle.begin(), needle.end(), [](char hc, char nc) { return tolower(hc) == tolower(nc); }) != haystack.end();
+  return std::search(haystack.begin(), haystack.end(), needle.begin(), needle.end(), lowercaseEqual) != haystack.end();
 }
-bool OpenShock::StringHasPrefixIC(std::string_view view, std::string_view prefix)
+bool OpenShock::StringHasPrefixIC(std::string_view view, std::string_view prefix) noexcept
 {
   if (view.size() < prefix.size()) return false;
-  return StringIEquals(view.substr(0, prefix.size()), prefix);
+  return std::ranges::equal(view.substr(0, prefix.size()), prefix, lowercaseEqual);
 }

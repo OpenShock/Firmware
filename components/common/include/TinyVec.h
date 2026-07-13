@@ -2,7 +2,6 @@
 
 #include "Logging.h"
 #include "OpenShock.h"
-#include "Panic.h"
 
 #include <cstdint>
 #include <cstdlib>

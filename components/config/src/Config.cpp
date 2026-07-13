@@ -8,7 +8,6 @@ const char* const TAG = "Config";
 #include "config/RootConfig.h"
 #include "Logging.h"
 #include "OpenShock.h"
-#include "Panic.h"
 #include "ReadWriteMutex.h"
 
 #include "json/Json.h"

@@ -160,12 +160,22 @@ bool WiFiCredentials::FromJSON(JSON::JsonView json)
     return false;
   }
 
-  Internal::Utils::FromJsonU8(id, json, "id", 0);
-  Internal::Utils::FromJsonStr(ssid, json, "ssid", "");
-  Internal::Utils::FromJsonStr(password, json, "password", "");
+  if (!json["id"].tryGetU8(id)) id = 0;
+
+  if (std::string_view sv; json["ssid"].tryGetStr(sv)) {
+    ssid = sv;
+  } else {
+    ssid.clear();
+  }
+
+  if (std::string_view sv; json["password"].tryGetStr(sv)) {
+    password = sv;
+  } else {
+    password.clear();
+  }
 
   uint8_t authModeVal = static_cast<uint8_t>(FbsAuthMode::UNKNOWN);
-  Internal::Utils::FromJsonU8(authModeVal, json, "authMode", static_cast<uint8_t>(FbsAuthMode::UNKNOWN));
+  if (!json["authMode"].tryGetU8(authModeVal)) authModeVal = static_cast<uint8_t>(FbsAuthMode::UNKNOWN);
   authMode = fromFbsAuthMode(static_cast<FbsAuthMode>(authModeVal));
 
   bssid.fill(0);

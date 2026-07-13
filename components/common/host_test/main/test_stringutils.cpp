@@ -1,14 +1,14 @@
-// StringUtils: trimming, prefix/suffix, splitting. All std::string_view based.
+// StringHelpers: trimming, prefix/suffix, splitting. All std::string_view based.
 #include "unity.h"
 
-#include "util/StringUtils.h"
+#include "StringHelpers.h"
 
 #include <string_view>
 #include <vector>
 
 using namespace OpenShock;
 
-TEST_CASE("StringTrim variants", "[util][string]")
+TEST_CASE("StringTrim variants", "[common][strhelpers]")
 {
   TEST_ASSERT_TRUE(StringTrim("  hi  ") == "hi");
   TEST_ASSERT_TRUE(StringTrimLeft("  hi  ") == "hi  ");
@@ -19,7 +19,7 @@ TEST_CASE("StringTrim variants", "[util][string]")
   TEST_ASSERT_TRUE(StringTrim("\t\n x \r\n") == "x");
 }
 
-TEST_CASE("StringHasPrefix / HasSuffix", "[util][string]")
+TEST_CASE("StringHasPrefix / HasSuffix", "[common][strhelpers]")
 {
   TEST_ASSERT_TRUE(StringHasPrefix("hello", 'h'));
   TEST_ASSERT_FALSE(StringHasPrefix("hello", 'x'));
@@ -28,7 +28,7 @@ TEST_CASE("StringHasPrefix / HasSuffix", "[util][string]")
   TEST_ASSERT_FALSE(StringHasPrefix("hi", std::string_view("hello")));  // longer than view
 }
 
-TEST_CASE("StringSplitByFirst / ByLast", "[util][string]")
+TEST_CASE("StringSplitByFirst / ByLast", "[common][strhelpers]")
 {
   auto [a, b] = StringSplitByFirst("key=value=extra", '=');
   TEST_ASSERT_TRUE(a == "key");
@@ -43,7 +43,7 @@ TEST_CASE("StringSplitByFirst / ByLast", "[util][string]")
   TEST_ASSERT_TRUE(e == "nodelim");
 }
 
-TEST_CASE("TryStringSplit into a fixed array", "[util][string]")
+TEST_CASE("TryStringSplit into a fixed array", "[common][strhelpers]")
 {
   std::string_view parts[4];
   TEST_ASSERT_TRUE(TryStringSplit("192.168.0.1", '.', parts));
@@ -62,7 +62,7 @@ TEST_CASE("TryStringSplit into a fixed array", "[util][string]")
   TEST_ASSERT_TRUE(five[3] == "4.5");
 }
 
-TEST_CASE("StringSplit into a vector", "[util][string]")
+TEST_CASE("StringSplit into a vector", "[common][strhelpers]")
 {
   auto v = StringSplit("a,b,,c", ',');
   TEST_ASSERT_EQUAL_size_t(4, v.size());
@@ -71,7 +71,7 @@ TEST_CASE("StringSplit into a vector", "[util][string]")
   TEST_ASSERT_TRUE(v[3] == "c");
 }
 
-TEST_CASE("StringIContains / StringHasPrefixIC", "[util][string]")
+TEST_CASE("StringIContains / StringHasPrefixIC", "[common][strhelpers]")
 {
   TEST_ASSERT_TRUE(StringIContains("Hello World", "LO WO"));
   TEST_ASSERT_FALSE(StringIContains("Hello", "xyz"));

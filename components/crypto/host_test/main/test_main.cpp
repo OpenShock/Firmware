@@ -1,4 +1,4 @@
-// Host-only (linux target) test binary for util's pure logic. FreeRTOS is
+// Host-only (linux target) test binary for the crypto component. FreeRTOS is
 // mocked, so there is no ESP startup - drive Unity directly.
 #include "unity.h"
 

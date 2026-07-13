@@ -11,7 +11,6 @@ const char* const TAG = "main";
 #include "Logging.h"
 #include "OpenShock.h"
 #include "OtaUpdateManager.h"
-#include "Panic.h"
 #include "serial_console/SerialInputHandler.h"
 #include "visual/VisualStateManager.h"
 #include "wifi/WiFiManager.h"

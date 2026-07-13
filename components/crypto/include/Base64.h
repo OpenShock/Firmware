@@ -8,7 +8,7 @@
 
 #include "TinyVec.h"
 
-namespace OpenShock::Base64Utils {
+namespace OpenShock::Base64 {
   /// @brief Encodes a byte array to base64.
   /// @param data The data to encode.
   /// @param dataLen The size of the data to encode.
@@ -22,4 +22,4 @@ namespace OpenShock::Base64Utils {
   /// @param output The output buffer to write to.
   /// @return The amount of bytes written to the output buffer.
   bool Decode(std::string_view data, TinyVec<uint8_t>& output) noexcept;
-}  // namespace OpenShock::Base64Utils
+}  // namespace OpenShock::Base64

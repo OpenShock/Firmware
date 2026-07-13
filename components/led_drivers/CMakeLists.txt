@@ -12,12 +12,10 @@ idf_component_register(
   SRCS          "src/MonoLedDriver.cpp"
                 "src/RgbLedDriver.cpp"
   INCLUDE_DIRS  "include"
-  REQUIRES      common                       # Common.h in public headers
-                concurrency                  # SimpleMutex in public headers
+  REQUIRES      common                       # Common.h, SimpleMutex in public headers
                 freertos                     # TaskHandle_t in public headers
                 esp_driver_rmt               # driver/rmt_tx.h, rmt_encoder.h in RgbLedDriver.h
   PRIV_REQUIRES chipset                      # IsValidOutputPin
                 logging                      # OS_LOG*
-                util                         # FnProxy, TaskUtils
-                esp_driver_ledc              # driver/ledc.h (mono PWM)
+                esp_driver_ledc              # driver/ledc.h (mono PWM)   # FnProxy/TaskUtils via common
 )

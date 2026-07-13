@@ -4,7 +4,8 @@
 
 #include "json/Json.h"
 
-#include <charconv>
+#include "Convert.h"
+
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
@@ -174,19 +175,36 @@ bool JSON::JsonView::tryGetBool(bool& out) const noexcept
   return false;
 }
 
+bool JSON::JsonView::tryGetU8(uint8_t& out) const noexcept
+{
+  if (!isNumber()) {
+    return false;
+  }
+  return Convert::ToUint8(raw(), out);
+}
+
+bool JSON::JsonView::tryGetU16(uint16_t& out) const noexcept
+{
+  if (!isNumber()) {
+    return false;
+  }
+  return Convert::ToUint16(raw(), out);
+}
+
+bool JSON::JsonView::tryGetI32(int32_t& out) const noexcept
+{
+  if (!isNumber()) {
+    return false;
+  }
+  return Convert::ToInt32(raw(), out);
+}
+
 bool JSON::JsonView::tryGetI64(int64_t& out) const noexcept
 {
   if (!isNumber()) {
     return false;
   }
-  std::string_view s = raw();
-  int64_t value      = 0;
-  auto [ptr, ec]     = std::from_chars(s.data(), s.data() + s.size(), value);
-  if (ec != std::errc() || ptr != s.data() + s.size()) {
-    return false;
-  }
-  out = value;
-  return true;
+  return Convert::ToInt64(raw(), out);
 }
 
 bool JSON::JsonView::tryGetDouble(double& out) const noexcept

@@ -2,9 +2,17 @@
 
 #include "Temporal.h"
 
+#include <esp_ota_ops.h>
+#include <esp_system.h>
+
+#include <freertos/FreeRTOS.h>
+#include <freertos/task.h>
+
 // openshock_log_printf forwards to vprintf (the IDF console: UART0 + any secondary
-// USB-Serial-JTAG/CDC output). Defined in Logging.cpp so this header carries no
-// hardware include and stays host-portable (the host test no-ops the macros).
+// USB-Serial-JTAG/CDC output). Defined in Logging.cpp so the logging path carries
+// no hardware include of its own. The OS_PANIC* macros below, however, pull in
+// esp_ota_ops / esp_system / freertos, so this header is firmware-only (host tests
+// shadow it with a no-op stub).
 // Named distinctly from the framework's own log_printf to avoid a symbol clash.
 extern "C" int openshock_log_printf(const char* fmt, ...);
 
@@ -78,5 +86,28 @@ constexpr const char* openshockPathToFileName(const char (&path)[N])
   } while (0)
 #endif
 
-// OS_PANIC / OS_PANIC_OTA / OS_PANIC_INSTANT live in the separate `panic`
-// component (Panic.h) - they pull in esp_ota_ops / esp_system / freertos.
+// Panic/abort macros. These log at error level, then restart the device; they
+// pull in esp_ota_ops / esp_system / freertos (included above), so anything that
+// includes Logging.h is firmware-only.
+#define OS_PANIC_PRINT(TAG, format, ...) OS_LOGE(TAG, "PANIC: " format, ##__VA_ARGS__)
+
+#define OS_PANIC(TAG, format, ...)                                             \
+  {                                                                            \
+    OS_PANIC_PRINT(TAG, format ", restarting in 5 seconds...", ##__VA_ARGS__); \
+    vTaskDelay(pdMS_TO_TICKS(5000));                                           \
+    esp_restart();                                                             \
+  }
+
+#define OS_PANIC_OTA(TAG, format, ...)                                                                           \
+  {                                                                                                              \
+    OS_PANIC_PRINT(TAG, format ", invalidating update partition and restarting in 5 seconds...", ##__VA_ARGS__); \
+    vTaskDelay(pdMS_TO_TICKS(5000));                                                                             \
+    esp_ota_mark_app_invalid_rollback_and_reboot();                                                              \
+    esp_restart();                                                                                               \
+  }
+
+#define OS_PANIC_INSTANT(TAG, format, ...)      \
+  {                                             \
+    OS_PANIC_PRINT(TAG, format, ##__VA_ARGS__); \
+    esp_restart();                              \
+  }

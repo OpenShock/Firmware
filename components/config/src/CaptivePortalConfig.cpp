@@ -53,7 +53,7 @@ bool CaptivePortalConfig::FromJSON(JSON::JsonView json)
     return false;
   }
 
-  Internal::Utils::FromJsonBool(alwaysEnabled, json, "alwaysEnabled", false);
+  if (!json["alwaysEnabled"].tryGetBool(alwaysEnabled)) alwaysEnabled = false;
 
   return true;
 }

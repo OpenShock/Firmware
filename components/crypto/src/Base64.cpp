@@ -1,6 +1,6 @@
-#include "util/Base64Utils.h"
+#include "Base64.h"
 
-const char* const TAG = "Base64Utils";
+const char* const TAG = "Base64";
 
 #include "Logging.h"
 
@@ -18,7 +18,7 @@ constexpr std::size_t CalculateDecodedSize(std::size_t size) noexcept
   return ((size / 4) * 3) + 3;  // +3 guards against missing padding variants
 }
 
-bool Base64Utils::Encode(std::span<const uint8_t> data, std::string& output)
+bool Base64::Encode(std::span<const uint8_t> data, std::string& output)
 {
   std::size_t requiredLen = CalculateEncodedSize(data.size());
 
@@ -42,7 +42,7 @@ bool Base64Utils::Encode(std::span<const uint8_t> data, std::string& output)
   return true;
 }
 
-bool Base64Utils::Decode(std::string_view data, TinyVec<uint8_t>& output) noexcept
+bool Base64::Decode(std::string_view data, TinyVec<uint8_t>& output) noexcept
 {
   std::size_t requiredLen = CalculateDecodedSize(data.size());
 

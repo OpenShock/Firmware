@@ -34,7 +34,9 @@ bool RFConfig::FromFlatbuffers(const Serialization::Configuration::RFConfig* con
     return true;
   }
 
-  Internal::Utils::FromU8GpioNum(txPin, config->tx_pin(), static_cast<gpio_num_t>(CONFIG_OPENSHOCK_RF_TX_GPIO));
+  if (!Internal::Utils::FromU8GpioNum(txPin, config->tx_pin())) {
+    txPin = static_cast<gpio_num_t>(CONFIG_OPENSHOCK_RF_TX_GPIO);
+  }
   keepAliveEnabled = config->keepalive_enabled();
 
   return true;
@@ -58,8 +60,10 @@ bool RFConfig::FromJSON(JSON::JsonView json)
     return false;
   }
 
-  Internal::Utils::FromJsonGpioNum(txPin, json, "txPin", static_cast<gpio_num_t>(CONFIG_OPENSHOCK_RF_TX_GPIO));
-  Internal::Utils::FromJsonBool(keepAliveEnabled, json, "keepAliveEnabled", true);
+  if (!Internal::Utils::FromJsonGpioNum(txPin, json, "txPin")) {
+    txPin = static_cast<gpio_num_t>(CONFIG_OPENSHOCK_RF_TX_GPIO);
+  }
+  if (!json["keepAliveEnabled"].tryGetBool(keepAliveEnabled)) keepAliveEnabled = true;
 
   return true;
 }

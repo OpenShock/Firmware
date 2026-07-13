@@ -11,19 +11,10 @@
 
 namespace OpenShock::Config::Internal::Utils {
   bool FromU8GpioNum(gpio_num_t& val, uint8_t u8Val);
-  void FromU8GpioNum(gpio_num_t& val, uint8_t u8Val, gpio_num_t defaultVal);
 
   void FromFbsStr(std::string& str, const flatbuffers::String* fbsStr, const char* defaultStr);
-  bool FromJsonBool(bool& val, JSON::JsonView json, std::string_view name, bool defaultVal);
-  bool FromJsonU8(uint8_t& val, JSON::JsonView json, std::string_view name, uint8_t defaultVal);
-  bool FromJsonU16(uint16_t& val, JSON::JsonView json, std::string_view name, uint16_t defaultVal);
-  bool FromJsonI32(int32_t& val, JSON::JsonView json, std::string_view name, int32_t defaultVal);
-
-  bool FromJsonStr(std::string& str, JSON::JsonView json, std::string_view name);
-  void FromJsonStr(std::string& str, JSON::JsonView json, std::string_view name, const char* defaultStr);
 
   bool FromJsonGpioNum(gpio_num_t& val, JSON::JsonView json, std::string_view name);
-  void FromJsonGpioNum(gpio_num_t& val, JSON::JsonView json, std::string_view name, gpio_num_t defaultVal);
 
   template<typename T, typename U>  // T inherits from ConfigBase<U>
   void FromFbsVec(std::vector<T>& vec, const flatbuffers::Vector<flatbuffers::Offset<U>>* fbsVec)

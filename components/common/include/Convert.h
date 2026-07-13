@@ -6,7 +6,7 @@
 #include <string>
 #include <string_view>
 
-namespace OpenShock::Convert {  // TODO: C++23 make this use std::from_chars instead
+namespace OpenShock::Convert {
   void FromInt8(int8_t val, std::string& str);
   void FromUint8(uint8_t val, std::string& str);
   void FromInt16(int16_t val, std::string& str);

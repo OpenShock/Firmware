@@ -13,4 +13,5 @@ idf_component_register(
   INCLUDE_DIRS "include"
   REQUIRES     espressif__jsmn            # jsmn.h types in public header
                espressif__json_generator  # json_generator.h in public header
+  PRIV_REQUIRES common                     # OpenShock::Convert strict string->int (Json.cpp)
 )

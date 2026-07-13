@@ -11,11 +11,9 @@ idf_component_register(
   SRCS          "src/HTTPRequestManager.cpp"
   INCLUDE_DIRS  "include"
   REQUIRES      osjson                       # json/Json.h in public header
-  PRIV_REQUIRES common                       # Common.h (internal)
+  PRIV_REQUIRES common                       # Common.h, RateLimiter, StringHelpers, SimpleMutex (internal)
                 temporal                         # Temporal.h (internal)
                 logging                      # Logging.h (internal)
-                concurrency                  # SimpleMutex (internal)
-                util                         # RateLimiter, StringUtils
                 esp_http_client              # esp_http_client.h (internal)
                 mbedtls                      # esp_crt_bundle.h (internal)
 )

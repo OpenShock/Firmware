@@ -3,7 +3,7 @@
 #include "CommandHandler.h"
 #include "config/Config.h"
 #include "Convert.h"
-#include "util/StringUtils.h"
+#include "StringHelpers.h"
 
 static void handleKeepAliveCommand(std::string_view arg, bool isAutomated)
 {
