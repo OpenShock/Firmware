@@ -3,8 +3,9 @@
 # directly via an esp_partition-backed block device (see the captive portal's
 # StaticFs helper). Sources copied from github.com/littlefs-project/littlefs.
 idf_component_register(
-  SRCS "lfs.c" "lfs_util.c"
-  INCLUDE_DIRS "."
+  SRCS "src/lfs.c"
+       "src/lfs_util.c"
+  INCLUDE_DIRS "include"
 )
 
 # Quiet the library: it otherwise emits printf-based trace/debug/warn/error output.
