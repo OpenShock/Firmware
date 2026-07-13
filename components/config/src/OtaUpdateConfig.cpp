@@ -118,8 +118,9 @@ bool OtaUpdateConfig::FromJSON(JSON::JsonView json)
   return true;
 }
 
-void OtaUpdateConfig::ToJSON(json_gen_str_t* gen, bool withSensitiveData) const
+void OtaUpdateConfig::ToJSON(json_gen_str_t* gen, const char* name, bool withSensitiveData) const
 {
+  JSON::objBegin(gen, name);
   json_gen_obj_set_bool(gen, "isEnabled", isEnabled);
   JSON::objSetString(gen, "cdnDomain", cdnDomain);
   JSON::objSetString(gen, "updateChannel", OpenShock::Serialization::Configuration::EnumNameOtaUpdateChannel(static_cast<Serialization::Configuration::OtaUpdateChannel>(updateChannel)));
@@ -130,4 +131,5 @@ void OtaUpdateConfig::ToJSON(json_gen_str_t* gen, bool withSensitiveData) const
   json_gen_obj_set_bool(gen, "requireManualApproval", requireManualApproval);
   json_gen_obj_set_int(gen, "updateId", updateId);
   JSON::objSetString(gen, "updateStep", OpenShock::Serialization::Configuration::EnumNameOtaUpdateStep(static_cast<Serialization::Configuration::OtaUpdateStep>(updateStep)));
+  JSON::objEnd(gen, name);
 }

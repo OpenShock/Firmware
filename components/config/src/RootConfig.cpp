@@ -138,33 +138,15 @@ bool RootConfig::FromJSON(JSON::JsonView json)
   return true;
 }
 
-void RootConfig::ToJSON(json_gen_str_t* gen, bool withSensitiveData) const
+void RootConfig::ToJSON(json_gen_str_t* gen, const char* name, bool withSensitiveData) const
 {
-  json_gen_push_object(gen, "rf");
-  rf.ToJSON(gen, withSensitiveData);
-  json_gen_pop_object(gen);
-
-  json_gen_push_object(gen, "wifi");
-  wifi.ToJSON(gen, withSensitiveData);
-  json_gen_pop_object(gen);
-
-  json_gen_push_object(gen, "captivePortal");
-  captivePortal.ToJSON(gen, withSensitiveData);
-  json_gen_pop_object(gen);
-
-  json_gen_push_object(gen, "backend");
-  backend.ToJSON(gen, withSensitiveData);
-  json_gen_pop_object(gen);
-
-  json_gen_push_object(gen, "serialInput");
-  serialInput.ToJSON(gen, withSensitiveData);
-  json_gen_pop_object(gen);
-
-  json_gen_push_object(gen, "otaUpdate");
-  otaUpdate.ToJSON(gen, withSensitiveData);
-  json_gen_pop_object(gen);
-
-  json_gen_push_object(gen, "estop");
-  estop.ToJSON(gen, withSensitiveData);
-  json_gen_pop_object(gen);
+  JSON::objBegin(gen, name);
+  rf.ToJSON(gen, "rf", withSensitiveData);
+  wifi.ToJSON(gen, "wifi", withSensitiveData);
+  captivePortal.ToJSON(gen, "captivePortal", withSensitiveData);
+  backend.ToJSON(gen, "backend", withSensitiveData);
+  serialInput.ToJSON(gen, "serialInput", withSensitiveData);
+  otaUpdate.ToJSON(gen, "otaUpdate", withSensitiveData);
+  estop.ToJSON(gen, "estop", withSensitiveData);
+  JSON::objEnd(gen, name);
 }

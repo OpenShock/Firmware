@@ -157,9 +157,7 @@ std::string Config::GetAsJSON(bool withSensitiveData)
   JSON::StringWriter writer;
   json_gen_str_t* gen = writer.gen();
 
-  json_gen_start_object(gen);
-  _configData.ToJSON(gen, withSensitiveData);
-  json_gen_end_object(gen);
+  _configData.ToJSON(gen, nullptr, withSensitiveData);
 
   return writer.finish();
 }
@@ -370,9 +368,7 @@ bool Config::GetWiFiCredentials(json_gen_str_t* gen, bool withSensitiveData)
   CONFIG_LOCK_READ(false);
 
   for (auto& creds : _configData.wifi.credentialsList) {
-    json_gen_start_object(gen);
-    creds.ToJSON(gen, withSensitiveData);
-    json_gen_end_object(gen);
+    creds.ToJSON(gen, nullptr, withSensitiveData);
   }
 
   return true;

@@ -182,8 +182,9 @@ bool WiFiCredentials::FromJSON(JSON::JsonView json)
   return true;
 }
 
-void WiFiCredentials::ToJSON(json_gen_str_t* gen, bool withSensitiveData) const
+void WiFiCredentials::ToJSON(json_gen_str_t* gen, const char* name, bool withSensitiveData) const
 {
+  JSON::objBegin(gen, name);
   json_gen_obj_set_int(gen, "id", id);
   JSON::objSetString(gen, "ssid", ssid);
   if (withSensitiveData) {
@@ -198,4 +199,5 @@ void WiFiCredentials::ToJSON(json_gen_str_t* gen, bool withSensitiveData) const
     hex[12] = '\0';
     JSON::objSetString(gen, "bssid", hex);
   }
+  JSON::objEnd(gen, name);
 }

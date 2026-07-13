@@ -72,8 +72,10 @@ bool EStopConfig::FromJSON(JSON::JsonView json)
   return true;
 }
 
-void EStopConfig::ToJSON(json_gen_str_t* gen, bool withSensitiveData) const
+void EStopConfig::ToJSON(json_gen_str_t* gen, const char* name, bool withSensitiveData) const
 {
+  JSON::objBegin(gen, name);
   json_gen_obj_set_bool(gen, "enabled", enabled);
   json_gen_obj_set_int(gen, "gpioPin", gpioPin);
+  JSON::objEnd(gen, name);
 }

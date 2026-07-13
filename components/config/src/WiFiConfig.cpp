@@ -87,16 +87,16 @@ bool WiFiConfig::FromJSON(JSON::JsonView json)
   return true;
 }
 
-void WiFiConfig::ToJSON(json_gen_str_t* gen, bool withSensitiveData) const
+void WiFiConfig::ToJSON(json_gen_str_t* gen, const char* name, bool withSensitiveData) const
 {
+  JSON::objBegin(gen, name);
   JSON::objSetString(gen, "accessPointSSID", accessPointSSID);
   JSON::objSetString(gen, "hostname", hostname);
 
   json_gen_push_array(gen, "credentials");
   for (auto& credentials : credentialsList) {
-    json_gen_start_object(gen);
-    credentials.ToJSON(gen, withSensitiveData);
-    json_gen_end_object(gen);
+    credentials.ToJSON(gen, nullptr, withSensitiveData);
   }
   json_gen_pop_array(gen);
+  JSON::objEnd(gen, name);
 }

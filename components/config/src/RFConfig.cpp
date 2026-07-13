@@ -64,8 +64,10 @@ bool RFConfig::FromJSON(JSON::JsonView json)
   return true;
 }
 
-void RFConfig::ToJSON(json_gen_str_t* gen, bool withSensitiveData) const
+void RFConfig::ToJSON(json_gen_str_t* gen, const char* name, bool withSensitiveData) const
 {
+  JSON::objBegin(gen, name);
   json_gen_obj_set_int(gen, "txPin", static_cast<int>(txPin));
   json_gen_obj_set_bool(gen, "keepAliveEnabled", keepAliveEnabled);
+  JSON::objEnd(gen, name);
 }

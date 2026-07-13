@@ -15,9 +15,10 @@ namespace OpenShock::Config {
     [[nodiscard]] virtual flatbuffers::Offset<T> ToFlatbuffers(flatbuffers::FlatBufferBuilder& builder, bool withSensitiveData) const = 0;
 
     virtual bool FromJSON(JSON::JsonView json) = 0;
-    // Emits this config's members into the already-open current JSON object; the
-    // caller is responsible for opening/closing it (json_gen_{start,push}_object).
-    virtual void ToJSON(json_gen_str_t* gen, bool withSensitiveData) const = 0;
+    // Emits this config as its own JSON object. When `name` is non-null the object
+    // is added as a named member of the enclosing object; when null it is anonymous
+    // (document root or array element). See JSON::objBegin/objEnd.
+    virtual void ToJSON(json_gen_str_t* gen, const char* name, bool withSensitiveData) const = 0;
   };
 
 }  // namespace OpenShock::Config

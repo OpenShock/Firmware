@@ -72,11 +72,13 @@ bool BackendConfig::FromJSON(JSON::JsonView json)
   return true;
 }
 
-void BackendConfig::ToJSON(json_gen_str_t* gen, bool withSensitiveData) const
+void BackendConfig::ToJSON(json_gen_str_t* gen, const char* name, bool withSensitiveData) const
 {
+  JSON::objBegin(gen, name);
   JSON::objSetString(gen, "domain", domain);
 
   if (withSensitiveData) {
     JSON::objSetString(gen, "authToken", authToken);
   }
+  JSON::objEnd(gen, name);
 }

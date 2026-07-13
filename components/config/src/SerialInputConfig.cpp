@@ -58,7 +58,9 @@ bool SerialInputConfig::FromJSON(JSON::JsonView json)
   return true;
 }
 
-void SerialInputConfig::ToJSON(json_gen_str_t* gen, bool withSensitiveData) const
+void SerialInputConfig::ToJSON(json_gen_str_t* gen, const char* name, bool withSensitiveData) const
 {
+  JSON::objBegin(gen, name);
   json_gen_obj_set_bool(gen, "echoEnabled", echoEnabled);
+  JSON::objEnd(gen, name);
 }

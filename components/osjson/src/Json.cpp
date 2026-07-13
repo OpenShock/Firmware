@@ -80,6 +80,24 @@ int JSON::arrSetString(json_gen_str_t* gen, std::string_view value)
   return json_gen_arr_set_string(gen, escaped.c_str());
 }
 
+void JSON::objBegin(json_gen_str_t* gen, const char* name)
+{
+  if (name != nullptr) {
+    json_gen_push_object(gen, name);
+  } else {
+    json_gen_start_object(gen);
+  }
+}
+
+void JSON::objEnd(json_gen_str_t* gen, const char* name)
+{
+  if (name != nullptr) {
+    json_gen_pop_object(gen);
+  } else {
+    json_gen_end_object(gen);
+  }
+}
+
 int JSON::JsonView::skip(int index) const noexcept
 {
   const jsmntok_t& tok = m_tokens[index];

@@ -110,4 +110,12 @@ namespace OpenShock::JSON {
   // json_gen_* call.
   int objSetString(json_gen_str_t* gen, const char* name, std::string_view value);
   int arrSetString(json_gen_str_t* gen, std::string_view value);
+
+  // Opens/closes an object on the generator. When `name` is non-null the object
+  // is added as a named member of the enclosing object (push/pop); when it is
+  // null the object is anonymous (start/end), e.g. the document root or an array
+  // element. Config ToJSON() implementations wrap their members in these so each
+  // config owns its own object, mirroring the source firmware's cJSON approach.
+  void objBegin(json_gen_str_t* gen, const char* name);
+  void objEnd(json_gen_str_t* gen, const char* name);
 }  // namespace OpenShock::JSON
