@@ -167,7 +167,7 @@ jobs:
     timeout-minutes: 5
 
     steps:
-      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0  # v7.0.0
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
         with:
           submodules: recursive
           sparse-checkout: |
@@ -182,7 +182,7 @@ jobs:
     timeout-minutes: 5
 
     steps:
-      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0  # v7.0.0
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
       - uses: ./.github/actions/build-staticfs
         with:
           version: ${{ needs.getvars.outputs.version }}
@@ -197,7 +197,7 @@ jobs:
       matrix: ${{ fromJSON(needs.getvars.outputs.board-matrix) }}
 
     steps:
-      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0  # v7.0.0
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
 
       - uses: ./.github/actions/build-firmware
         with:
@@ -213,7 +213,7 @@ jobs:
       matrix: ${{ fromJSON(needs.getvars.outputs.board-matrix) }}
 
     steps:
-      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0  # v7.0.0
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
         with:
           sparse-checkout: |
             .github
@@ -253,7 +253,7 @@ jobs:
       contents: read
 
     steps:
-      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0  # v7.0.0
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
         with:
           sparse-checkout: |
             .github
@@ -327,7 +327,7 @@ jobs:
       cancel-in-progress: false
 
     steps:
-      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0  # v7.0.0
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
         with:
           # Full history so cdn-bump-version can resolve the commit date of the
           # version currently pinned on the develop channel (X.Y.Z-develop+<sha>)
