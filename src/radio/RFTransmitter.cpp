@@ -232,7 +232,7 @@ void RFTransmitter::TransmitTask()
       }
 
       if (!addSequence(sequences, cmd.modelType, cmd.shockerId, cmd.type, cmd.intensity, cmd.transmitEnd)) {
-        OS_LOGD(TAG, "[pin-%hhi] Failed to add sequence");
+        OS_LOGD(TAG, "[pin-%hhi] Failed to add sequence", m_txPin);
       }
     }
 
