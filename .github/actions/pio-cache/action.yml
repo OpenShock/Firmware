@@ -36,7 +36,7 @@ runs:
     # entry instead of each storing its own copy. ~/.platformio/.cache (the
     # downloaded archives) is deliberately NOT cached: the extracted packages
     # cache already avoids re-downloads, and caching it roughly doubled the size.
-    - uses: actions/cache@27d5ce7f107fe9357f9df03efb73ab90386fccae  # v5.0.5
+    - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
       with:
         path: |
           ~/.platformio/platforms
@@ -48,7 +48,7 @@ runs:
     # Library sources live in per-env directories. lib_deps is global so the
     # contents are identical across boards, but PlatformIO stores them under
     # .pio/libdeps/<env>, so key them per-env. This slice is small.
-    - uses: actions/cache@27d5ce7f107fe9357f9df03efb73ab90386fccae  # v5.0.5
+    - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
       with:
         path: .pio/libdeps
         key: pio-libdeps-${{ runner.os }}-${{ inputs.env }}-${{ hashFiles('platformio.ini') }}
