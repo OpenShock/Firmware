@@ -34,7 +34,7 @@ jobs:
       board-matrix: ${{ steps.get-vars.outputs.board-matrix }}
 
     steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           fetch-depth: 0
           sparse-checkout: |
@@ -43,11 +43,11 @@ jobs:
 
       # Pin Node to the range declared in the scripts package (engines.node),
       # rather than relying on whatever the runner image happens to ship.
-      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020  # v7.0.0
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
           node-version-file: .github/scripts/package.json
 
-      - uses: pnpm/action-setup@0ebf47130e4866e96fce0953f49152a61190b271  # v6.0.9
+      - uses: pnpm/action-setup@0ebf47130e4866e96fce0953f49152a61190b271 # v6.0.9
         name: Install pnpm
         with:
           cache: true
@@ -63,7 +63,7 @@ jobs:
       # labelled as a pre-release of the upcoming version instead of the last tag.
       - name: Compute next version
         id: relmeta
-        uses: OpenShock/release-tool@f3e8ebc530022e209e4d6a9a9c8bdb30b643253f  # v0.3.0
+        uses: OpenShock/release-tool@f3e8ebc530022e209e4d6a9a9c8bdb30b643253f # v0.3.0
         with:
           mode: status
 

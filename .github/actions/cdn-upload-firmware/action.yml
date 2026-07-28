@@ -24,7 +24,7 @@ runs:
     # partition plus each board's build partitions and merged binary. They land
     # under artifacts/<artifact-name>/ so the loop below can pick them per board.
     - name: Download firmware artifacts
-      uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c  # v8.0.1
+      uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
       with:
         path: artifacts
         pattern: firmware_*
