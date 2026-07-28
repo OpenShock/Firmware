@@ -69,7 +69,7 @@ jobs:
           exit 1
 
       - name: Push commit and tag
-        uses: OpenShock/actions/publish-tag@7e9cf5cd05af3d97a363d80adad50cfe50a273d0 # v1.0.0
+        uses: OpenShock/actions/publish-tag@21ca2d511bca92cf24fb502fa302f82700822584 # v1.1.1
         with:
           tag: ${{ steps.meta.outputs.tag }}
 
