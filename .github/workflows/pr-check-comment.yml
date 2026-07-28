@@ -13,51 +13,5 @@ jobs:
     runs-on: ubuntu-slim # lightweight: jq + gh api sticky comment
     if: github.event.workflow_run.event == 'pull_request'
     steps:
-      - name: Download verdict
-        id: download
-        continue-on-error: true
-        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
-        with:
-          name: release-check
-          run-id: ${{ github.event.workflow_run.id }}
-          github-token: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Post, update, or remove sticky comment
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          GH_REPO: ${{ github.repository }}
-          DOWNLOAD_OK: ${{ steps.download.outcome == 'success' }}
-          FALLBACK_PR: ${{ github.event.workflow_run.pull_requests[0].number }}
-        run: |
-          # Determine PR number and verdict state
-          if [ "$DOWNLOAD_OK" = "true" ]; then
-            STATE=$(jq -r '.state' release-check.json)
-            PR=$(jq -r '.pr' release-check.json)
-            BODY=$(jq -r '.body' release-check.json)
-          else
-            STATE="skip"
-            PR="$FALLBACK_PR"
-            BODY=""
-          fi
-
-          if [ -z "$PR" ] || [ "$PR" = "0" ] || [ "$PR" = "null" ]; then
-            echo "No PR number, nothing to do"
-            exit 0
-          fi
-
-          EXISTING=$(gh api "repos/$GH_REPO/issues/$PR/comments" \
-            --jq '[.[] | select(.body | contains("<!-- release-tool-check -->"))] | first | .id // empty')
-
-          if [ "$STATE" = "skip" ]; then
-            # Base branch not a release branch (or check was skipped via label) — remove stale comment
-            if [ -n "$EXISTING" ]; then
-              gh api --method DELETE "repos/$GH_REPO/issues/comments/$EXISTING"
-              echo "Deleted stale comment $EXISTING on PR #$PR"
-            fi
-          elif [ -n "$EXISTING" ]; then
-            gh api --method PATCH "repos/$GH_REPO/issues/comments/$EXISTING" \
-              --raw-field body="$BODY"
-          else
-            gh api --method POST "repos/$GH_REPO/issues/$PR/comments" \
-              --raw-field body="$BODY"
-          fi
+      - name: Check PR comment
+        uses: OpenShock/actions/pr-check-comment@d8af907a3bbfcb1d4eb1dc6272501524d7c465d6 # v1.0.0
