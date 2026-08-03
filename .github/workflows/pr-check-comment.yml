@@ -14,4 +14,4 @@ jobs:
     if: github.event.workflow_run.event == 'pull_request'
     steps:
       - name: Check PR comment
-        uses: OpenShock/actions/pr-check-comment@d8af907a3bbfcb1d4eb1dc6272501524d7c465d6 # v1.0.0
+        uses: OpenShock/actions/pr-check-comment@21ca2d511bca92cf24fb502fa302f82700822584 # v1.0.0
