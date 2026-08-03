@@ -63,7 +63,7 @@ jobs:
       # labelled as a pre-release of the upcoming version instead of the last tag.
       - name: Compute next version
         id: relmeta
-        uses: OpenShock/release-tool@aea812a62e3e06228bbc4ad0a9597b4f22968893 # v0.5.1
+        uses: OpenShock/release-tool@ea651e8c10372a10b6f452dcb34c38e60a72dc1f # v0.5.1
         with:
           mode: status
 
