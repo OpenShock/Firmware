@@ -34,7 +34,7 @@ const char* const TAG = "OtaUpdateManager";
 using namespace std::string_view_literals;
 
 /// Repository server firmware API root. Paths per firmware-api-spec.md §4.
-#define OPENSHOCK_FW_REPO_API_PREFIX "/v2/firmware"
+#define OPENSHOCK_FW_REPO_API_PREFIX "/2/firmware"
 
 /// @brief Latest release for this board on a channel, with the hub's current version attached so the
 /// server can answer 204 when there is nothing to do. See spec §4.2.

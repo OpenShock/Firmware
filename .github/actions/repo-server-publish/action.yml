@@ -10,7 +10,7 @@ inputs:
     required: true
   audience:
     description: >-
-      OIDC audience the repository server validates. Must match its Firmware:CiCd:Audience setting.
+      OIDC audience the repository server validates. Must match its CiCd:Audience setting.
     required: false
     default: openshock-repository-server
   fw-version:
@@ -56,7 +56,7 @@ runs:
         # ---- OIDC -------------------------------------------------------------------------------
         # The token proves a workflow in this repository is calling. The server additionally requires
         # the repository to be registered in its allowlist; an unregistered repo is rejected, so a
-        # 401 here usually means onboarding has not been done (admin PUT /v2/firmware/admin/repositories).
+        # 401 here usually means onboarding has not been done (admin PUT /2/firmware/admin/repositories).
         OIDC_TOKEN=$(curl -sSL --fail-with-body \
           -H "Authorization: bearer $ACTIONS_ID_TOKEN_REQUEST_TOKEN" \
           "$ACTIONS_ID_TOKEN_REQUEST_URL&audience=$AUDIENCE" | jq -r .value)
@@ -81,7 +81,7 @@ runs:
           '{version: $version, channel: $channel, releaseDate: $date, boards: $boards, changelog: $changelog}')
 
         echo "==> Initialising release $FW_VERSION on $RELEASE_CHANNEL"
-        init_response=$(curl -sS --fail-with-body -X POST "$BASE/v2/firmware/releases" \
+        init_response=$(curl -sS --fail-with-body -X POST "$BASE/2/firmware/releases" \
           "${auth[@]}" -H "Content-Type: application/json" --data-binary "$init_body")
 
         RELEASE_ID=$(printf '%s' "$init_response" | jq -r .id)
@@ -98,7 +98,7 @@ runs:
         cleanup() {
           if [ "${PUBLISHED:-0}" != "1" ]; then
             echo "::warning::Aborting staged release $RELEASE_ID"
-            curl -sS -X DELETE "$BASE/v2/firmware/releases/$RELEASE_ID" "${auth[@]}" >/dev/null || true
+            curl -sS -X DELETE "$BASE/2/firmware/releases/$RELEASE_ID" "${auth[@]}" >/dev/null || true
           fi
         }
         trap cleanup EXIT
@@ -133,7 +133,7 @@ runs:
           fi
 
           echo "==> Uploading $board"
-          curl -sS --fail-with-body -X PUT "$BASE/v2/firmware/releases/$RELEASE_ID/boards/$board" \
+          curl -sS --fail-with-body -X PUT "$BASE/2/firmware/releases/$RELEASE_ID/boards/$board" \
             "${auth[@]}" "${form[@]}" -F "sha256=$manifest" >/dev/null
 
           rm -rf "$workdir"
@@ -142,7 +142,7 @@ runs:
         # ---- Publish ----------------------------------------------------------------------------
         # Promotes every staged artifact to its published key and makes the version visible to hubs.
         echo "==> Publishing $FW_VERSION"
-        curl -sS --fail-with-body -X POST "$BASE/v2/firmware/releases/$RELEASE_ID/publish" \
+        curl -sS --fail-with-body -X POST "$BASE/2/firmware/releases/$RELEASE_ID/publish" \
           "${auth[@]}" >/dev/null
 
         PUBLISHED=1
