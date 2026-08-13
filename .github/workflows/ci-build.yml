@@ -388,8 +388,9 @@ jobs:
           gh release upload "$TAG" "${files[@]}" --clobber
 
       # Solidify: binaries are attached and firmware is on the CDN - now publish
-      # the draft. cdn-bump then advances the channel pointer, devices begin
-      # updating, and only then does the announce job notify the API.
+      # the draft. cdn-bump then advances the legacy channel pointer, and only
+      # then does repo-server-publish ingest the release into the repository
+      # server, so the two rollout paths never disagree about what is current.
       - name: Publish the release
         env:
           GH_TOKEN: ${{ github.token }}
@@ -397,44 +398,70 @@ jobs:
           TAG: ${{ needs.getvars.outputs.version }}
         run: gh release edit "$TAG" --draft=false
 
-  # Announce the release to the OpenShock API last of all - only after cdn-bump
-  # has advanced the device-facing channel pointer, so the API never leads the
-  # rollout (a device asked to update by the API could otherwise find the pointer
-  # not yet moved). Only stable/beta produce a release (and thus a release.json);
-  # develop deploys have no release to announce, so this job is scoped out there.
-  announce:
-    runs-on: ubuntu-slim # lightweight: gh + curl only
+  # Publish the release to the repository server, which is the authoritative
+  # ingestion path: it hashes and stores every binary itself and owns the
+  # device-facing view of what is current.
+  #
+  # This replaces the old `announce` job, which POSTed release.json to
+  # $OPENSHOCK_API_URL/1/public/releases with audience `openshock-release-ingest`
+  # - an endpoint that does not exist on either side, so the payload went nowhere.
+  #
+  # The legacy cdn-deploy/cdn-bump jobs above deliberately still run. Hubs in the
+  # field predate the JSON API client and can only update via the flat files
+  # (version-<channel>.txt, boards.txt, hashes.sha256.txt). Retiring those jobs
+  # before the fleet has moved would strand every un-migrated hub with no path to
+  # any future firmware - including the firmware that would migrate it. Remove
+  # them only once telemetry shows the old client is gone.
+  repo-server-publish:
+    runs-on: ubuntu-latest
     needs: [getvars, cdn-bump]
-    timeout-minutes: 5
+    timeout-minutes: 20
     if: >-
       !cancelled()
       && needs.cdn-bump.result == 'success'
-      && vars.OPENSHOCK_API_URL != ''
-      && (needs.getvars.outputs.release-channel == 'stable' || needs.getvars.outputs.release-channel == 'beta')
+      && vars.OPENSHOCK_REPO_SERVER_URL != ''
     permissions:
       contents: read
       id-token: write
 
     steps:
-      # release.json was staged as a release asset by release.yml.
-      - name: Announce release to OpenShock API
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          sparse-checkout: |
+            .github
+
+      # The release body is the changelog the server parses into structured notes. develop builds
+      # have no GitHub release, so they carry a synthetic one - the server rejects a changelog it
+      # cannot parse rather than publishing a release with empty notes.
+      - name: Resolve changelog
+        id: changelog
         env:
           GH_TOKEN: ${{ github.token }}
           GH_REPO: ${{ github.repository }}
-          API_URL: ${{ vars.OPENSHOCK_API_URL }}
           TAG: ${{ needs.getvars.outputs.version }}
+          CHANNEL: ${{ needs.getvars.outputs.release-channel }}
+          SHA: ${{ github.sha }}
         run: |
           set -euo pipefail
-          gh release download "$TAG" --pattern release.json --dir .
-          OIDC_TOKEN=$(curl -sLS \
-            -H "Authorization: bearer $ACTIONS_ID_TOKEN_REQUEST_TOKEN" \
-            "$ACTIONS_ID_TOKEN_REQUEST_URL&audience=openshock-release-ingest" \
-            | jq -r .value)
-          if [ -z "$OIDC_TOKEN" ] || [ "$OIDC_TOKEN" = "null" ]; then
-            echo "::error::Failed to fetch GitHub OIDC token"
-            exit 1
+          if [ "$CHANNEL" = "develop" ]; then
+            body="### Info"$'\n'"- Development build from ${SHA}"
+          else
+            body=$(gh release view "$TAG" --json body --jq '.body')
+            if [ -z "$body" ]; then
+              echo "::error::Release $TAG has an empty body; the repository server needs a changelog."
+              exit 1
+            fi
           fi
-          curl -fsSL --retry 3 --retry-delay 5 -X POST "$API_URL/1/public/releases" \
-            -H "Authorization: Bearer $OIDC_TOKEN" \
-            -H "Content-Type: application/json" \
-            --data-binary @release.json
+          {
+            echo "body<<CHANGELOG_EOF"
+            echo "$body"
+            echo "CHANGELOG_EOF"
+          } >> "$GITHUB_OUTPUT"
+
+      - uses: ./.github/actions/repo-server-publish
+        with:
+          repo-server-url: ${{ vars.OPENSHOCK_REPO_SERVER_URL }}
+          fw-version: ${{ needs.getvars.outputs.version }}
+          release-channel: ${{ needs.getvars.outputs.release-channel }}
+          boards: ${{ needs.getvars.outputs.board-list }}
+          changelog: ${{ steps.changelog.outputs.body }}
