@@ -19,8 +19,12 @@ namespace OpenShock::OtaUpdateManager {
     uint8_t filesystemBinaryHash[32];
   };
 
+  /// @brief Asks the repository server for the head of a channel for this board.
+  /// @param version Receives the version to install. When the hub is already current the server answers
+  ///                204 and this is set to the running version, so an equality check skips the update.
   bool TryGetFirmwareVersion(OtaUpdateChannel channel, OpenShock::SemVer& version);
-  bool TryGetFirmwareBoards(const OpenShock::SemVer& version, std::vector<std::string>& boards);
+
+  /// @brief Fetches the app and staticfs artifacts for a specific version of this board.
   bool TryGetFirmwareRelease(const OpenShock::SemVer& version, FirmwareRelease& release);
 
   bool TryStartFirmwareUpdate(const OpenShock::SemVer& version);
