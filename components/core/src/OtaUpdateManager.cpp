@@ -14,11 +14,12 @@ const char* const TAG = "OtaUpdateManager";
 #include "SemVer.h"
 #include "serialization/WSGateway.h"
 #include "SimpleMutex.h"
+#include "StringHelpers.h"
 #include "Temporal.h"
 #include "util/HexUtils.h"
-#include "StringHelpers.h"
 #include "util/TaskUtils.h"
 #include "wifi/WiFiManager.h"
+#include "json/Json.h"
 
 #include <esp_event.h>
 #include <esp_netif.h>
@@ -27,25 +28,23 @@ const char* const TAG = "OtaUpdateManager";
 #include <esp_task_wdt.h>
 #include <esp_wifi.h>
 
+#include <array>
+#include <span>
 #include <sstream>
+#include <string>
 #include <string_view>
 
 using namespace std::string_view_literals;
 
-#define OPENSHOCK_FW_CDN_CHANNEL_URL(ch) OPENSHOCK_FW_CDN_URL("/version-" ch ".txt")
+/// Repository server firmware API root. Paths per firmware-api-spec.md §4.
+#define OPENSHOCK_FW_REPO_API_PREFIX "/2/firmware"
 
-#define OPENSHOCK_FW_CDN_STABLE_URL  OPENSHOCK_FW_CDN_CHANNEL_URL("stable")
-#define OPENSHOCK_FW_CDN_BETA_URL    OPENSHOCK_FW_CDN_CHANNEL_URL("beta")
-#define OPENSHOCK_FW_CDN_DEVELOP_URL OPENSHOCK_FW_CDN_CHANNEL_URL("develop")
+/// @brief Latest release for this board on a channel, with the hub's current version attached so the
+/// server can answer 204 when there is nothing to do. See spec §4.2.
+#define OPENSHOCK_FW_REPO_LATEST_URL_FORMAT "https://%s" OPENSHOCK_FW_REPO_API_PREFIX "/latest/%s/" OPENSHOCK_FW_BOARD "?version=" OPENSHOCK_FW_VERSION
 
-#define OPENSHOCK_FW_CDN_BOARDS_BASE_URL_FORMAT  OPENSHOCK_FW_CDN_URL("/%s")
-#define OPENSHOCK_FW_CDN_BOARDS_INDEX_URL_FORMAT OPENSHOCK_FW_CDN_BOARDS_BASE_URL_FORMAT "/boards.txt"
-
-#define OPENSHOCK_FW_CDN_VERSION_BASE_URL_FORMAT OPENSHOCK_FW_CDN_BOARDS_BASE_URL_FORMAT "/" OPENSHOCK_FW_BOARD
-
-#define OPENSHOCK_FW_CDN_APP_URL_FORMAT           OPENSHOCK_FW_CDN_VERSION_BASE_URL_FORMAT "/app.bin"
-#define OPENSHOCK_FW_CDN_FILESYSTEM_URL_FORMAT    OPENSHOCK_FW_CDN_VERSION_BASE_URL_FORMAT "/staticfs.bin"
-#define OPENSHOCK_FW_CDN_SHA256_HASHES_URL_FORMAT OPENSHOCK_FW_CDN_VERSION_BASE_URL_FORMAT "/hashes.sha256.txt"
+/// @brief Artifacts for one specific version of this board — the directed-update path. See spec §4.4.
+#define OPENSHOCK_FW_REPO_VERSION_URL_FORMAT "https://%s" OPENSHOCK_FW_REPO_API_PREFIX "/versions/%s/" OPENSHOCK_FW_BOARD
 
 enum OtaTaskEventFlag : uint32_t {
   OTA_TASK_EVENT_UPDATE_REQUESTED  = 1 << 0,
@@ -468,35 +467,72 @@ static void otaum_updatetask(void* arg)
   esp_restart();
 }
 
-static bool _tryGetStringList(std::string_view url, std::vector<std::string>& list)
+static const char* otaum_channel_name(OpenShock::OtaUpdateChannel channel)
 {
-  auto response = OpenShock::HTTP::GetString(
-    url,
-    {
-      {"Accept", "text/plain"}
-  },
-    std::array<uint16_t, 2> {200, 304}
-  );
-  if (response.result != OpenShock::HTTP::RequestResult::Success) {
-    OS_LOGE(TAG, "Failed to fetch list: %s [%u] %s", response.ResultToString(), response.code, response.data.c_str());
+  switch (channel) {
+    case OtaUpdateChannel::Stable:
+      return "stable";
+    case OtaUpdateChannel::Beta:
+      return "beta";
+    case OtaUpdateChannel::Develop:
+      return "develop";
+    default:
+      return nullptr;
+  }
+}
+
+/// @brief Fetches the repository server domain from runtime config.
+///
+/// Historically named cdnDomain, from when OTA metadata was flat files served straight off the CDN.
+/// It now addresses the repository server's JSON API; artifact URLs come back absolute in the response,
+/// so the CDN host no longer has to be known by the hub.
+static bool otaum_try_get_repo_domain(std::string& domain)
+{
+  Config::OtaUpdateConfig config;
+  if (!Config::GetOtaUpdateConfig(config)) {
+    OS_LOGE(TAG, "Failed to get OTA update config");
     return false;
   }
 
-  list.clear();
+  if (config.cdnDomain.empty()) {
+    OS_LOGE(TAG, "OTA repository domain is not configured");
+    return false;
+  }
 
-  std::string_view data = response.data;
+  domain = std::move(config.cdnDomain);
 
-  auto lines = OpenShock::StringSplitNewLines(data);
-  list.reserve(lines.size());
+  return true;
+}
 
-  for (auto line : lines) {
-    line = OpenShock::StringTrim(line);
+/// @brief Issues a GET against the repository API and parses the body as JSON.
+/// @param body Receives the response body. JsonView is zero-copy, so this must outlive `doc`.
+/// @param acceptedCodes Response codes to treat as success. 204 is handled by the caller and must not
+///                      reach the parser — an empty body is not valid JSON.
+static bool otaum_try_get_json(HTTP::Client& client, std::string_view url, std::span<const uint16_t> acceptedCodes, std::string& body, JSON::JsonDocument& doc, int& code)
+{
+  auto response = client.GetString(
+    url,
+    {
+      {"Accept", "application/json"}
+  },
+    acceptedCodes
+  );
+  if (response.result != OpenShock::HTTP::RequestResult::Success) {
+    OS_LOGE(TAG, "Request failed: %s [%u] %s", response.ResultToString(), response.code, response.data.c_str());
+    return false;
+  }
 
-    if (line.empty()) {
-      continue;
-    }
+  code = response.code;
+  body = std::move(response.data);
 
-    list.emplace_back(line);
+  // 204 carries no body; the caller decides what that means for the endpoint it called.
+  if (code == 204) {
+    return true;
+  }
+
+  if (!doc.parse(body)) {
+    OS_LOGE(TAG, "Failed to parse response JSON");
+    return false;
   }
 
   return true;
@@ -563,56 +599,47 @@ bool OtaUpdateManager::Init()
 
 bool OtaUpdateManager::TryGetFirmwareVersion(HTTP::Client& client, OtaUpdateChannel channel, OpenShock::SemVer& version)
 {
-  std::string_view channelIndexUrl;
-  switch (channel) {
-    case OtaUpdateChannel::Stable:
-      channelIndexUrl = OPENSHOCK_FW_CDN_STABLE_URL ""sv;
-      break;
-    case OtaUpdateChannel::Beta:
-      channelIndexUrl = OPENSHOCK_FW_CDN_BETA_URL ""sv;
-      break;
-    case OtaUpdateChannel::Develop:
-      channelIndexUrl = OPENSHOCK_FW_CDN_DEVELOP_URL ""sv;
-      break;
-    default:
-      OS_LOGE(TAG, "Unknown channel: %u", channel);
-      return false;
-  }
-
-  OS_LOGD(TAG, "Fetching firmware version from %s", channelIndexUrl);
-
-  auto response = client.GetString(
-    channelIndexUrl,
-    {
-      {"Accept", "text/plain"}
-  },
-    std::array<uint16_t, 2> {200, 304}
-  );
-  if (response.result != OpenShock::HTTP::RequestResult::Success) {
-    OS_LOGE(TAG, "Failed to fetch firmware version: %s [%u] %s", response.ResultToString(), response.code, response.data.c_str());
+  const char* channelName = otaum_channel_name(channel);
+  if (channelName == nullptr) {
+    OS_LOGE(TAG, "Unknown channel: %u", channel);
     return false;
   }
 
-  if (!OpenShock::TryParseSemVer(response.data, version)) {
-    OS_LOGE(TAG, "Failed to parse firmware version: %.*s", static_cast<int>(response.data.size()), response.data.data());
+  std::string domain;
+  if (!otaum_try_get_repo_domain(domain)) {
     return false;
   }
 
-  return true;
-}
-
-bool OtaUpdateManager::TryGetFirmwareBoards(const OpenShock::SemVer& version, std::vector<std::string>& boards)
-{
-  std::string channelIndexUrl;
-  if (!FormatToString(channelIndexUrl, OPENSHOCK_FW_CDN_BOARDS_INDEX_URL_FORMAT, version.toString().c_str())) {  // TODO: This is abusing the SemVer::toString() method causing alot of string copies, fix this
+  std::string uri;
+  if (!FormatToString(uri, OPENSHOCK_FW_REPO_LATEST_URL_FORMAT, domain.c_str(), channelName)) {
     OS_LOGE(TAG, "Failed to format URL");
     return false;
   }
 
-  OS_LOGD(TAG, "Fetching firmware boards from %s", channelIndexUrl.c_str());
+  OS_LOGD(TAG, "Fetching latest firmware version from %s", uri.c_str());
 
-  if (!_tryGetStringList(channelIndexUrl, boards)) {
-    OS_LOGE(TAG, "Failed to fetch firmware boards");
+  std::string body;
+  JSON::JsonDocument doc;
+  int code = 0;
+  if (!otaum_try_get_json(client, uri, std::array<uint16_t, 3> {200, 204, 304}, body, doc, code)) {
+    return false;
+  }
+
+  // 204 means the server compared our version against the channel head and found no work to do.
+  // Report the running version back so the caller's "already installed" check short-circuits.
+  if (code == 204) {
+    OS_LOGD(TAG, "Already on the latest version for this channel");
+    return OpenShock::TryParseSemVer(OPENSHOCK_FW_VERSION ""sv, version);
+  }
+
+  std::string_view versionStr;
+  if (!doc.root()["version"].tryGetStr(versionStr)) {
+    OS_LOGE(TAG, "Response is missing a 'version' string");
+    return false;
+  }
+
+  if (!OpenShock::TryParseSemVer(versionStr, version)) {
+    OS_LOGE(TAG, "Failed to parse firmware version: %.*s", static_cast<int>(versionStr.size()), versionStr.data());
     return false;
   }
 
@@ -621,8 +648,74 @@ bool OtaUpdateManager::TryGetFirmwareBoards(const OpenShock::SemVer& version, st
 
 static bool _tryParseIntoHash(std::string_view hash, uint8_t (&hashBytes)[32])
 {
+  if (hash.size() != 64) {
+    OS_LOGE(TAG, "Invalid hash length %u, expected 64", static_cast<unsigned>(hash.size()));
+    return false;
+  }
+
   if (HexUtils::TryParseHex(hash.data(), hash.size(), hashBytes, 32) != 32) {
     OS_LOGE(TAG, "Failed to parse hash: %.*s", static_cast<int>(hash.size()), hash.data());
+    return false;
+  }
+
+  return true;
+}
+
+/// @brief Pulls the app and staticfs artifacts out of a board release response.
+///
+/// OTA is per-partition, so the hub wants exactly these two. The 'merged' artifact is deliberately
+/// ignored: it is a full-flash esptool image (bootloader at 0x1000, partition table at 0x8000, app at
+/// 0x10000, filesystem at its offset) meant for USB flashing a blank device. Writing it into an OTA app
+/// slot would put a bootloader image where the app belongs. See firmware-api-spec.md §9.2.
+static bool otaum_parse_board_artifacts(JSON::JsonView root, OtaUpdateManager::FirmwareRelease& release)
+{
+  auto artifacts = root["artifacts"];
+  if (!artifacts.isArray()) {
+    OS_LOGE(TAG, "Response is missing an 'artifacts' array");
+    return false;
+  }
+
+  bool foundApp = false, foundFilesystem = false;
+
+  int count = artifacts.count();
+  for (int i = 0; i < count; i++) {
+    auto artifact = artifacts.at(i);
+
+    std::string_view typeStr, urlStr, hashStr;
+    if (!artifact["type"].tryGetStr(typeStr) || !artifact["url"].tryGetStr(urlStr) || !artifact["sha256Hash"].tryGetStr(hashStr)) {
+      continue;
+    }
+
+    if (typeStr == "app"sv) {
+      if (foundApp) {
+        OS_LOGE(TAG, "Duplicate 'app' artifact");
+        return false;
+      }
+      if (!_tryParseIntoHash(hashStr, release.appBinaryHash)) {
+        return false;
+      }
+      release.appBinaryUrl.assign(urlStr.data(), urlStr.size());
+      foundApp = true;
+    } else if (typeStr == "staticfs"sv) {
+      if (foundFilesystem) {
+        OS_LOGE(TAG, "Duplicate 'staticfs' artifact");
+        return false;
+      }
+      if (!_tryParseIntoHash(hashStr, release.filesystemBinaryHash)) {
+        return false;
+      }
+      release.filesystemBinaryUrl.assign(urlStr.data(), urlStr.size());
+      foundFilesystem = true;
+    }
+  }
+
+  if (!foundApp) {
+    OS_LOGE(TAG, "Release is missing an 'app' artifact");
+    return false;
+  }
+
+  if (!foundFilesystem) {
+    OS_LOGE(TAG, "Release is missing a 'staticfs' artifact");
     return false;
   }
 
@@ -633,93 +726,27 @@ bool OtaUpdateManager::TryGetFirmwareRelease(HTTP::Client& client, const OpenSho
 {
   auto versionStr = version.toString();  // TODO: This is abusing the SemVer::toString() method causing alot of string copies, fix this
 
-  if (!FormatToString(release.appBinaryUrl, OPENSHOCK_FW_CDN_APP_URL_FORMAT, versionStr.c_str())) {
+  std::string domain;
+  if (!otaum_try_get_repo_domain(domain)) {
+    return false;
+  }
+
+  std::string uri;
+  if (!FormatToString(uri, OPENSHOCK_FW_REPO_VERSION_URL_FORMAT, domain.c_str(), versionStr.c_str())) {
     OS_LOGE(TAG, "Failed to format URL");
     return false;
   }
 
-  if (!FormatToString(release.filesystemBinaryUrl, OPENSHOCK_FW_CDN_FILESYSTEM_URL_FORMAT, versionStr.c_str())) {
-    OS_LOGE(TAG, "Failed to format URL");
+  OS_LOGD(TAG, "Fetching firmware release from %s", uri.c_str());
+
+  std::string body;
+  JSON::JsonDocument doc;
+  int code = 0;
+  if (!otaum_try_get_json(client, uri, std::array<uint16_t, 2> {200, 304}, body, doc, code)) {
     return false;
   }
 
-  // Construct hash URLs.
-  std::string sha256HashesUrl;
-  if (!FormatToString(sha256HashesUrl, OPENSHOCK_FW_CDN_SHA256_HASHES_URL_FORMAT, versionStr.c_str())) {
-    OS_LOGE(TAG, "Failed to format URL");
-    return false;
-  }
-
-  // Fetch hashes.
-  auto sha256HashesResponse = client.GetString(
-    sha256HashesUrl,
-    {
-      {"Accept", "text/plain"}
-  },
-    std::array<uint16_t, 2> {200, 304}
-  );
-  if (sha256HashesResponse.result != OpenShock::HTTP::RequestResult::Success) {
-    OS_LOGE(TAG, "Failed to fetch hashes: %s [%u] %s", sha256HashesResponse.ResultToString(), sha256HashesResponse.code, sha256HashesResponse.data.c_str());
-    return false;
-  }
-
-  auto hashesLines = OpenShock::StringSplitNewLines(sha256HashesResponse.data);
-
-  // Parse hashes.
-  bool foundAppHash = false, foundFilesystemHash = false;
-  for (std::string_view line : hashesLines) {
-    auto parts = OpenShock::StringSplitWhiteSpace(line);
-    if (parts.size() != 2) {
-      OS_LOGE(TAG, "Invalid hashes entry: %.*s", static_cast<int>(line.size()), line.data());
-      return false;
-    }
-
-    auto hash = OpenShock::StringTrim(parts[0]);
-    auto file = OpenShock::StringTrim(parts[1]);
-
-    file = OpenShock::StringRemovePrefix(file, "./"sv);
-
-    if (hash.size() != 64) {
-      OS_LOGE(TAG, "Invalid hash: %.*s", static_cast<int>(hash.size()), hash.data());
-      return false;
-    }
-
-    if (file == "app.bin") {
-      if (foundAppHash) {
-        OS_LOGE(TAG, "Duplicate hash for app.bin");
-        return false;
-      }
-
-      if (!_tryParseIntoHash(hash, release.appBinaryHash)) {
-        return false;
-      }
-
-      foundAppHash = true;
-    } else if (file == "staticfs.bin") {
-      if (foundFilesystemHash) {
-        OS_LOGE(TAG, "Duplicate hash for staticfs.bin");
-        return false;
-      }
-
-      if (!_tryParseIntoHash(hash, release.filesystemBinaryHash)) {
-        return false;
-      }
-
-      foundFilesystemHash = true;
-    }
-  }
-
-  if (!foundAppHash) {
-    OS_LOGE(TAG, "Missing hash for app.bin");
-    return false;
-  }
-
-  if (!foundFilesystemHash) {
-    OS_LOGE(TAG, "Missing hash for staticfs.bin");
-    return false;
-  }
-
-  return true;
+  return otaum_parse_board_artifacts(doc.root(), release);
 }
 
 bool OtaUpdateManager::TryStartFirmwareUpdate(const OpenShock::SemVer& version)
