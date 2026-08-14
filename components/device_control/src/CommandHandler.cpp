@@ -11,12 +11,12 @@ const char* const TAG = "CommandHandler";
 #include "events/Events.h"
 #include "Logging.h"
 
-#include <cstring>
 #include "OpenShock.h"
 #include "radio/RFTransmitter.h"
 #include "SimpleMutex.h"
 #include "Temporal.h"
 #include "util/TaskUtils.h"
+#include <cstring>
 
 #include <freertos/queue.h>
 
@@ -64,9 +64,10 @@ static void DestroyTransmitter()
   s_rfTransmitter = nullptr;
 }
 
-static OpenShock::SimpleMutex s_keepAliveMutex = {};
-static QueueHandle_t s_keepAliveQueue          = nullptr;
-static TaskHandle_t s_keepAliveTaskHandle      = nullptr;
+static OpenShock::SimpleMutex s_keepAliveMutex                  = {};
+static QueueHandle_t s_keepAliveQueue                           = nullptr;
+static TaskHandle_t s_keepAliveTaskHandle                       = nullptr;
+static OpenShock::TaskUtils::TaskExitFlag s_keepAliveTaskExited = false;
 
 using namespace OpenShock;
 
@@ -126,7 +127,7 @@ static void commandhandler_keepalivetask(void* arg)
   }
 
 exit:  // Locals (activityMap) destruct here before task deletion
-  vTaskDelete(nullptr);
+  TaskUtils::TaskExiting(s_keepAliveTaskExited);
 }
 
 static bool internalSetKeepAliveEnabled(bool enabled)
@@ -148,6 +149,7 @@ static bool internalSetKeepAliveEnabled(bool enabled)
       return false;
     }
 
+    s_keepAliveTaskExited.store(false, std::memory_order_relaxed);
     if (TaskUtils::TaskCreateExpensive(commandhandler_keepalivetask, "KeepAliveTask", 4096, nullptr, 1, &s_keepAliveTaskHandle) != pdPASS) {  // PROFILED: 1.5KB stack usage
       OS_LOGE(TAG, "Failed to create keep-alive task");
 
@@ -165,7 +167,7 @@ static bool internalSetKeepAliveEnabled(bool enabled)
       cmd.killTask = true;
       xQueueSend(s_keepAliveQueue, &cmd, pdMS_TO_TICKS(10));
 
-      TaskUtils::StopTask(s_keepAliveTaskHandle, TAG, "Keep-alive task");
+      TaskUtils::StopTask(s_keepAliveTaskHandle, s_keepAliveTaskExited, TAG, "Keep-alive task");
       s_keepAliveTaskHandle = nullptr;
       vQueueDelete(s_keepAliveQueue);
       s_keepAliveQueue = nullptr;

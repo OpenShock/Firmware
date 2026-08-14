@@ -27,15 +27,27 @@ BaseType_t TaskUtils::TaskCreateExpensive(TaskFunction_t pvTaskCode, const char*
   return TaskCreateUniversal(pvTaskCode, pcName, usStackDepth, pvParameters, uxPriority, pvCreatedTask, 1);
 }
 
-void TaskUtils::StopTask(TaskHandle_t taskHandle, const char* tag, const char* taskName, TickType_t timeout)
+void TaskUtils::TaskExiting(TaskExitFlag& exited)
+{
+  // Publish before deleting. Once vTaskDelete() runs, the idle task is free to
+  // reclaim this task's TCB, so the handle StopTask() holds may already point at
+  // freed memory — the flag is the only thing it can safely read.
+  exited.store(true, std::memory_order_release);
+  vTaskDelete(nullptr);
+}
+
+void TaskUtils::StopTask(TaskHandle_t taskHandle, TaskExitFlag& exited, const char* tag, const char* taskName, TickType_t timeout)
 {
   const TickType_t tickInterval = pdMS_TO_TICKS(10);
   TickType_t elapsed            = 0;
-  while (eTaskGetState(taskHandle) != eDeleted && elapsed < timeout) {
+  while (!exited.load(std::memory_order_acquire) && elapsed < timeout) {
     vTaskDelay(tickInterval);
     elapsed += tickInterval;
   }
-  if (eTaskGetState(taskHandle) != eDeleted) {
+
+  if (!exited.load(std::memory_order_acquire)) {
+    // The task never reached TaskExiting(), so it has not deleted itself and the
+    // handle is still valid to kill.
     OS_LOGW(tag, "%s did not exit gracefully, killing task", taskName);
     vTaskDelete(taskHandle);
   }

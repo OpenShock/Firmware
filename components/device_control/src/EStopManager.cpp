@@ -35,8 +35,9 @@ const UBaseType_t k_estopTaskPriority = 5;
 
 static OpenShock::SimpleMutex s_estopMutex = {};
 // Guarded via Mutex
-static TaskHandle_t s_estopTask = nullptr;
-static gpio_num_t s_estopPin    = GPIO_NUM_NC;  // Passed to task via pointer argument
+static TaskHandle_t s_estopTask                  = nullptr;
+static TaskUtils::TaskExitFlag s_estopTaskExited = false;
+static gpio_num_t s_estopPin                     = GPIO_NUM_NC;  // Passed to task via pointer argument
 
 // Wrapped in atomics as they're read (or set via public methods) by Tasks potentially running on other cores.
 static std::atomic<int64_t> s_estopActivatedAt       = 0;  // When == 0, EStop not active. When != 0, EStop is active.
@@ -179,7 +180,7 @@ static void estopmgr_managerTask(void* pvParameters)
   estopmgr_publishState(EStopState::Idle, lastPublishedState, portMAX_DELAY);
   s_estopActivatedAt.store(0, std::memory_order_relaxed);
 
-  vTaskDelete(nullptr);
+  TaskUtils::TaskExiting(s_estopTaskExited);
 }
 
 // Validates and configures `pin` as an EStop input. Does not touch s_estopPin
@@ -261,6 +262,7 @@ static bool estopmgr_taskStart()
   static_assert(sizeof(void*) >= sizeof(gpio_num_t), "void* is smaller than gpio_num_t, value embedding trick won't work");  // Just to be safe
   void* argPtr = reinterpret_cast<void*>(static_cast<uintptr_t>(s_estopPin));
 
+  s_estopTaskExited.store(false, std::memory_order_relaxed);
   if (TaskUtils::TaskCreateUniversal(estopmgr_managerTask, TAG, k_estopTaskStackSize, argPtr, k_estopTaskPriority, &s_estopTask, 1) != pdPASS) {
     OS_LOGE(TAG, "Failed to create EStop event handler task");
     s_estopTask = nullptr;
@@ -279,7 +281,7 @@ static bool estopmgr_taskStop()
 
   s_killEStopManagerRequested.store(true, std::memory_order_relaxed);
 
-  TaskUtils::StopTask(s_estopTask, TAG, "EStop task");
+  TaskUtils::StopTask(s_estopTask, s_estopTaskExited, TAG, "EStop task");
   s_estopTask = nullptr;
 
   // Disable E-Stop after task has stopped to ensure that the task didn't get it stuck in enabled state

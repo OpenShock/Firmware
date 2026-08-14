@@ -51,6 +51,7 @@ namespace OpenShock {
     uint8_t m_brightness;  // 0-255
     std::vector<RGBState> m_pattern;
     TaskHandle_t m_taskHandle;
+    std::atomic<bool> m_taskExited;  // TaskUtils::TaskExitFlag; set by the task just before it deletes itself
     SimpleMutex m_taskMutex;
     std::atomic<bool> m_stopRequested {false};
     rmt_channel_handle_t m_rmtChannel;

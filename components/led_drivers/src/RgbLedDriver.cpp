@@ -30,6 +30,7 @@ RgbLedDriver::RgbLedDriver(gpio_num_t gpioPin)
   , m_brightness(255)
   , m_pattern()
   , m_taskHandle(nullptr)
+  , m_taskExited(false)
   , m_taskMutex()
   , m_rmtChannel(nullptr)
   , m_rmtEncoder(nullptr)
@@ -111,6 +112,7 @@ void RgbLedDriver::SetPattern(const RGBState* pattern, std::size_t patternLength
 
   // Start the task
   m_stopRequested.store(false, std::memory_order_relaxed);
+  m_taskExited.store(false, std::memory_order_relaxed);
   BaseType_t result = TaskUtils::TaskCreateExpensive(Util::FnProxy<&RgbLedDriver::RunPattern>, TAG, 4096, this, 1, &m_taskHandle);  // PROFILED: 1.7KB stack usage
   if (result != pdPASS) {
     OS_LOGE(TAG, "[pin-%hhi] Failed to create task: %d", m_gpioPin, result);
@@ -141,7 +143,7 @@ void RgbLedDriver::ClearPatternInternal()
 {
   if (m_taskHandle != nullptr) {
     m_stopRequested.store(true, std::memory_order_relaxed);
-    TaskUtils::StopTask(m_taskHandle, TAG, "RgbLedDriver task");
+    TaskUtils::StopTask(m_taskHandle, m_taskExited, TAG, "RgbLedDriver task");
     m_taskHandle = nullptr;
   }
 
@@ -200,5 +202,5 @@ void RgbLedDriver::RunPattern()
     }
   }
 
-  vTaskDelete(nullptr);
+  TaskUtils::TaskExiting(m_taskExited);
 }

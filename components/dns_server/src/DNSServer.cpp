@@ -78,6 +78,7 @@ DNSServer::DNSServer()
   : m_socket(-1)
   , m_taskHandle(nullptr)
   , m_stop(false)
+  , m_taskExited(false)
   , m_ip {}
 {
 }
@@ -136,6 +137,7 @@ bool DNSServer::start(const char* responseIpv4, uint16_t port)
   }
 
   m_stop.store(false, std::memory_order_relaxed);
+  m_taskExited.store(false, std::memory_order_relaxed);
   if (TaskUtils::TaskCreateExpensive(Util::FnProxy<&DNSServer::task>, "DNSServer", 3072, this, 1, &m_taskHandle) != pdPASS) {
     OS_LOGE(TAG, "Failed to create DNS task");
     close(m_socket);
@@ -160,7 +162,7 @@ void DNSServer::stop()
 
   // The task checks m_stop every time the receive times out, so give it margin
   // over that 250 ms timeout before resorting to a force-kill.
-  TaskUtils::StopTask(m_taskHandle, TAG, "DNSServer task", pdMS_TO_TICKS(2000));
+  TaskUtils::StopTask(m_taskHandle, m_taskExited, TAG, "DNSServer task", pdMS_TO_TICKS(2000));
   m_taskHandle = nullptr;
 
   // Only now is nobody using the fd. Closing it earlier would let lwIP hand
@@ -295,5 +297,5 @@ void DNSServer::task()
     }
   }
 
-  vTaskDelete(nullptr);
+  TaskUtils::TaskExiting(m_taskExited);
 }

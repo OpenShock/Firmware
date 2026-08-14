@@ -11,6 +11,7 @@
 #include <freertos/queue.h>
 #include <freertos/task.h>
 
+#include <atomic>
 #include <cstdint>
 
 namespace OpenShock {
@@ -38,6 +39,7 @@ namespace OpenShock {
     gpio_num_t m_txPin;
     QueueHandle_t m_queueHandle;
     TaskHandle_t m_taskHandle;
+    std::atomic<bool> m_taskExited;  // TaskUtils::TaskExitFlag; set by the task just before it deletes itself
     rmt_channel_handle_t m_rmtChannel;
     rmt_encoder_handle_t m_rmtEncoder;
   };

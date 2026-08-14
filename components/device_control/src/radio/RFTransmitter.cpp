@@ -7,11 +7,11 @@ const char* const TAG = "RFTransmitter";
 #include "estop/EStopManager.h"
 #include "Logging.h"
 
-#include <cstring>
 #include "radio/rmt/Sequence.h"
 #include "Temporal.h"
 #include "util/FnProxy.h"
 #include "util/TaskUtils.h"
+#include <cstring>
 
 #include <esp_err.h>
 #include <soc/soc_caps.h>
@@ -45,6 +45,7 @@ RFTransmitter::RFTransmitter(gpio_num_t gpioPin)
   : m_txPin(gpioPin)
   , m_queueHandle(nullptr)
   , m_taskHandle(nullptr)
+  , m_taskExited(false)
   , m_rmtChannel(nullptr)
   , m_rmtEncoder(nullptr)
 {
@@ -90,6 +91,7 @@ RFTransmitter::RFTransmitter(gpio_num_t gpioPin)
   char name[32];
   snprintf(name, sizeof(name), "RFTransmitter-%u", m_txPin);
 
+  m_taskExited.store(false, std::memory_order_relaxed);
   if (TaskUtils::TaskCreateExpensive(Util::FnProxy<&RFTransmitter::TransmitTask>, name, kTaskStackSize, this, kTaskPriority, &m_taskHandle) != pdPASS) {
     OS_LOGE(TAG, "[pin-%hhi] Failed to create task", m_txPin);
     destroy();
@@ -156,7 +158,7 @@ void RFTransmitter::destroy()
     cmd.flags = kFlagDeleteTask;
     xQueueSend(m_queueHandle, &cmd, pdMS_TO_TICKS(10));
 
-    TaskUtils::StopTask(m_taskHandle, TAG, "RFTransmitter task");
+    TaskUtils::StopTask(m_taskHandle, m_taskExited, TAG, "RFTransmitter task");
 
     OS_LOGD(TAG, "[pin-%hhi] Task stopped", m_txPin);
 
@@ -291,5 +293,5 @@ void RFTransmitter::TransmitTask()
   }
 
 exit:  // Locals (sequences) destruct here before task deletion
-  vTaskDelete(nullptr);
+  TaskUtils::TaskExiting(m_taskExited);
 }

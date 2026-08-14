@@ -28,6 +28,7 @@ MonoLedDriver::MonoLedDriver(gpio_num_t gpioPin)
   , m_brightness(255)
   , m_pattern()
   , m_taskHandle(nullptr)
+  , m_taskExited(false)
   , m_taskMutex()
 {
   if (gpioPin == GPIO_NUM_NC) {
@@ -91,6 +92,7 @@ void MonoLedDriver::SetPattern(const State* pattern, std::size_t patternLength)
 
   // Start the task
   m_stopRequested.store(false, std::memory_order_relaxed);
+  m_taskExited.store(false, std::memory_order_relaxed);
   BaseType_t result = TaskUtils::TaskCreateUniversal(Util::FnProxy<&MonoLedDriver::RunPattern>, name, 1024, this, 1, &m_taskHandle, 1);  // PROFILED: 0.5KB stack usage
   if (result != pdPASS) {
     OS_LOGE(TAG, "[pin-%d] Failed to create task: %d", m_gpioPin, result);
@@ -120,7 +122,7 @@ void MonoLedDriver::ClearPatternInternal()
 {
   if (m_taskHandle != nullptr) {
     m_stopRequested.store(true, std::memory_order_relaxed);
-    TaskUtils::StopTask(m_taskHandle, TAG, "MonoLedDriver task");
+    TaskUtils::StopTask(m_taskHandle, m_taskExited, TAG, "MonoLedDriver task");
     m_taskHandle = nullptr;
   }
 
@@ -145,5 +147,5 @@ void MonoLedDriver::RunPattern()
     }
   }
 
-  vTaskDelete(nullptr);
+  TaskUtils::TaskExiting(m_taskExited);
 }

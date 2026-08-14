@@ -39,7 +39,8 @@ namespace OpenShock {
 
     int m_socket;
     TaskHandle_t m_taskHandle;
-    std::atomic<bool> m_stop;
+    std::atomic<bool> m_stop;        // set by stop(), observed by the task
+    std::atomic<bool> m_taskExited;  // set by the task just before it self-deletes
     uint8_t m_ip[4];
   };
 }  // namespace OpenShock
