@@ -1,0 +1,51 @@
+name: repo-server-token
+description: >-
+  Mints a GitHub Actions OIDC token for the repository server. Every call into the
+  server goes through a token from here, so there is one definition of the audience
+  and one place where a malformed mint is caught.
+
+inputs:
+  audience:
+    description: 'OIDC audience, must match OPENSHOCK__CICD__AUDIENCE on the server'
+    required: false
+    default: 'openshock-repository-server'
+
+outputs:
+  token:
+    description: 'The OIDC bearer token. Masked in logs, but still a credential.'
+    value: ${{ steps.mint.outputs.token }}
+
+runs:
+  using: composite
+  steps:
+    - id: mint
+      shell: bash
+      env:
+        AUDIENCE: ${{ inputs.audience }}
+      run: |
+        set -euo pipefail
+
+        # id-token: write is granted per job, not per action, so a caller that forgets it
+        # gets an unset request URL rather than a failed request. Say which it was.
+        if [ -z "${ACTIONS_ID_TOKEN_REQUEST_URL:-}" ]; then
+          echo "::error::No OIDC request URL. The calling job needs permissions: id-token: write."
+          exit 1
+        fi
+
+        token=$(curl -sSLf \
+          -H "Authorization: bearer $ACTIONS_ID_TOKEN_REQUEST_TOKEN" \
+          "$ACTIONS_ID_TOKEN_REQUEST_URL&audience=$AUDIENCE" | jq -r .value)
+        if [ -z "$token" ] || [ "$token" = "null" ]; then
+          echo "::error::GitHub returned no OIDC token for audience '$AUDIENCE'."
+          exit 1
+        fi
+
+        echo "::add-mask::$token"
+        echo "token=$token" >> "$GITHUB_OUTPUT"
+
+        # The claims the server keys off. Printed so a later rejection can be read against
+        # what was actually sent, rather than what the workflow assumes it sent. The token
+        # is masked above; these five claims are not secret.
+        payload=$(echo "$token" | cut -d. -f2 | tr '_-' '/+')
+        case $(( ${#payload} % 4 )) in 2) payload="$payload==";; 3) payload="$payload=";; esac
+        echo "$payload" | base64 -d 2>/dev/null | jq '{aud, repository, repository_owner, ref, run_id}'

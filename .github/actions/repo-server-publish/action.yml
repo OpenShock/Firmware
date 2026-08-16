@@ -1,0 +1,249 @@
+name: repo-server-publish
+description: >-
+  Stages a firmware release on the repository server: init, upload every board's
+  artifacts, then either promote it or throw it away. `mode` picks which ending, and
+  nothing before that ending differs between the two - a dry run parses the same
+  changelog, uploads the same bytes and passes the same server-side hash verification
+  as a real publish. That is what makes it worth running on ordinary builds: the
+  publish path is exercised continuously instead of first thing on release day.
+
+inputs:
+  server-url:
+    description: 'Base URL of the repository server'
+    required: true
+  token:
+    description: 'OIDC token from the repo-server-token action'
+    required: true
+  version:
+    description: 'Firmware version, strict semver'
+    required: true
+  channel:
+    description: 'Release channel: stable, beta or develop'
+    required: true
+  boards:
+    description: 'Newline-separated boards to publish'
+    required: true
+  mode:
+    description: >-
+      `publish` promotes the release and it goes live. `dry-run` aborts it instead,
+      which deletes the staged artifacts and leaves nothing behind.
+    required: false
+    default: 'dry-run'
+  changelog-file:
+    description: 'Markdown file to take the newest release-notes section from'
+    required: false
+    default: 'CHANGELOG.md'
+  nofail:
+    description: >-
+      Pass ?nofail to init, so an unparseable changelog parks the release in `editing`
+      for a maintainer instead of failing the build. Off by default: on a dry run the
+      changelog failing to parse is a finding, not an inconvenience.
+    required: false
+    default: 'false'
+
+runs:
+  using: composite
+  steps:
+
+    - name: Validate inputs
+      shell: bash
+      env:
+        MODE: ${{ inputs.mode }}
+        CHANNEL: ${{ inputs.channel }}
+      run: |
+        set -euo pipefail
+        case "$MODE" in publish|dry-run) ;; *) echo "::error::mode must be 'publish' or 'dry-run', got '$MODE'"; exit 1 ;; esac
+        # The server parses this into an enum; anything else is a 400 several steps later,
+        # after artifacts have been downloaded. Branch builds derive a channel from the
+        # branch name, so this catches a feature branch being published by accident.
+        case "$CHANNEL" in stable|beta|develop) ;; *) echo "::error::channel must be stable, beta or develop, got '$CHANNEL'"; exit 1 ;; esac
+
+    - name: Download firmware artifacts
+      uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c  # v8.0.1
+      with:
+        path: artifacts
+        pattern: firmware_*
+
+    # The newest `# Version ...` section, which is the release being built on a tag and the
+    # previous release on a branch. Either way it is a real changelog going through the real
+    # parser, so a grammar the server rejects surfaces on an ordinary build.
+    - name: Extract changelog
+      shell: bash
+      env:
+        CHANGELOG_FILE: ${{ inputs.changelog-file }}
+      run: |
+        set -euo pipefail
+        if [ ! -f "$CHANGELOG_FILE" ]; then
+          echo "::error::Changelog file '$CHANGELOG_FILE' not found."
+          exit 1
+        fi
+        awk '/^# /{ if (seen) exit; seen=1 } seen' "$CHANGELOG_FILE" > /tmp/changelog.md
+        if [ ! -s /tmp/changelog.md ]; then
+          echo "::error::No '# ' heading found in '$CHANGELOG_FILE'; init would reject an empty changelog."
+          exit 1
+        fi
+        echo "Changelog section: $(head -1 /tmp/changelog.md) ($(wc -l < /tmp/changelog.md) lines)"
+
+    - name: Init release
+      shell: bash
+      env:
+        SERVER_URL: ${{ inputs.server-url }}
+        TOKEN: ${{ inputs.token }}
+        VERSION: ${{ inputs.version }}
+        CHANNEL: ${{ inputs.channel }}
+        BOARDS: ${{ inputs.boards }}
+        NOFAIL: ${{ inputs.nofail }}
+      run: |
+        set -euo pipefail
+        query=''
+        [ "$NOFAIL" = 'true' ] && query='?nofail'
+
+        jq -n \
+          --arg version "$VERSION" \
+          --arg channel "$CHANNEL" \
+          --arg date "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
+          --arg changelog "$(cat /tmp/changelog.md)" \
+          --arg boards "$BOARDS" \
+          '{version: $version, channel: $channel, releaseDate: $date,
+            boards: ($boards | split("\n") | map(select(length > 0))),
+            changelog: $changelog}' > /tmp/init.json
+
+        code=$(curl -sS -o /tmp/init-response.json -w '%{http_code}' --max-time 60 -X POST \
+          "$SERVER_URL/2/firmware/releases$query" \
+          -H "Authorization: Bearer $TOKEN" \
+          -H 'Content-Type: application/json' \
+          --data-binary @/tmp/init.json)
+
+        if [ "$code" != "201" ]; then
+          echo "::error::Init failed (HTTP $code)"
+          cat /tmp/init-response.json
+          exit 1
+        fi
+
+        release_id=$(jq -r .id /tmp/init-response.json)
+        status=$(jq -r .status /tmp/init-response.json)
+        echo "Release $release_id staged as $status for $VERSION on $CHANNEL"
+        # Recorded before any upload so the cleanup step can find it however this ends.
+        echo "REPO_SERVER_RELEASE_ID=$release_id" >> "$GITHUB_ENV"
+
+    # One request per board, each carrying that board's artifacts and a sha256 manifest the
+    # server re-computes before writing anything. The manifest keys and the file field names
+    # have to match exactly, so both are built from the same table below.
+    - name: Upload board artifacts
+      shell: bash
+      env:
+        SERVER_URL: ${{ inputs.server-url }}
+        TOKEN: ${{ inputs.token }}
+        BOARDS: ${{ inputs.boards }}
+      run: |
+        set -euo pipefail
+
+        upload_board() {
+          local board="$1"
+          local build="artifacts/firmware_build_$board"
+          local merged
+          merged=$(find "artifacts/firmware_merged_$board" -name 'OpenShock_*.bin' 2>/dev/null | head -1 || true)
+
+          # server field name -> local file. app and staticfs are what an OTA update needs;
+          # the rest are for the flashtool, which writes a whole chip rather than updating one.
+          local -a pairs=(
+            "app:$build/app.bin"
+            "bootloader:$build/bootloader.bin"
+            "partitions:$build/partition-table.bin"
+            "staticfs:artifacts/firmware_staticfs/staticfs.bin"
+            "merged:$merged"
+          )
+
+          local -a args=()
+          local -a hashes=()
+          local field file sum
+          for pair in "${pairs[@]}"; do
+            field="${pair%%:*}"
+            file="${pair#*:}"
+            if [ -z "$file" ] || [ ! -f "$file" ]; then
+              echo "::error::$board is missing its $field artifact (expected $file)"
+              return 1
+            fi
+            sum=$(sha256sum "$file" | cut -d' ' -f1)
+            args+=(-F "$field=@$file")
+            hashes+=("$(jq -nc --arg k "$field" --arg v "$sum" '{($k): $v}')")
+          done
+
+          printf '%s\n' "${hashes[@]}" | jq -sc 'add' > /tmp/sha256.json
+
+          local code
+          code=$(curl -sS -o /tmp/upload-response.json -w '%{http_code}' --max-time 300 -X PUT \
+            "$SERVER_URL/2/firmware/releases/$REPO_SERVER_RELEASE_ID/boards/$board" \
+            -H "Authorization: Bearer $TOKEN" \
+            "${args[@]}" \
+            -F "sha256=</tmp/sha256.json")
+
+          if [ "$code" != "200" ]; then
+            echo "::error::Upload failed for $board (HTTP $code)"
+            cat /tmp/upload-response.json
+            return 1
+          fi
+          echo "  $board: $(jq -r 'length' /tmp/upload-response.json) artifacts accepted"
+        }
+
+        while IFS= read -r board; do
+          [ -z "$board" ] && continue
+          upload_board "$board"
+        done <<< "$BOARDS"
+
+    - name: Promote release
+      if: ${{ inputs.mode == 'publish' }}
+      shell: bash
+      env:
+        SERVER_URL: ${{ inputs.server-url }}
+        TOKEN: ${{ inputs.token }}
+      run: |
+        set -euo pipefail
+        code=$(curl -sS -o /tmp/publish-response.json -w '%{http_code}' --max-time 120 -X POST \
+          "$SERVER_URL/2/firmware/releases/$REPO_SERVER_RELEASE_ID/publish" \
+          -H "Authorization: Bearer $TOKEN" \
+          -H 'Content-Type: application/json' --data '{}')
+        if [ "$code" != "201" ]; then
+          echo "::error::Publish failed (HTTP $code)"
+          cat /tmp/publish-response.json
+          exit 1
+        fi
+        echo "Published $REPO_SERVER_RELEASE_ID"
+        # Cleared so the cleanup step below leaves the now-live release alone.
+        echo "REPO_SERVER_RELEASE_ID=" >> "$GITHUB_ENV"
+
+    # Runs on the dry-run path and on any failure of the steps above. A staged release that
+    # is never aborted holds its version against a later attempt (init returns
+    # ReleaseAlreadyStaging) until the server's TTL job reaps it, so a failed run that left
+    # one behind would block the retry that was meant to fix it.
+    - name: Discard staged release
+      if: ${{ always() }}
+      shell: bash
+      env:
+        SERVER_URL: ${{ inputs.server-url }}
+        TOKEN: ${{ inputs.token }}
+        MODE: ${{ inputs.mode }}
+      run: |
+        set -euo pipefail
+        # Emptiness is checked here rather than in `if:` so cleanup does not depend on the
+        # env context reflecting a GITHUB_ENV write from an earlier step of the same action.
+        # Unset means init never succeeded; empty means promote cleared it.
+        if [ -z "${REPO_SERVER_RELEASE_ID:-}" ]; then
+          echo "No staged release to discard."
+          exit 0
+        fi
+        code=$(curl -sS -o /tmp/abort-response.json -w '%{http_code}' --max-time 60 -X DELETE \
+          "$SERVER_URL/2/firmware/releases/$REPO_SERVER_RELEASE_ID" \
+          -H "Authorization: Bearer $TOKEN")
+        if [ "$code" = "204" ]; then
+          if [ "$MODE" = 'dry-run' ]; then
+            echo "Dry run complete: release staged, verified and discarded. Nothing was published."
+          else
+            echo "Publish failed; the staged release was discarded so a retry can reuse this version."
+          fi
+          exit 0
+        fi
+        # Not fatal on its own - the TTL job reaps abandoned releases - but it means the next
+        # attempt at this version will be refused until that happens, so say so loudly.
+        echo "::warning::Could not discard release $REPO_SERVER_RELEASE_ID (HTTP $code). It will be reaped by the server's TTL job."
+        cat /tmp/abort-response.json 2>/dev/null || true
