@@ -26,5 +26,9 @@ dependencies.lock
 !/sdkconfig.defaults
 !/sdkconfig.defaults.*
 
+# Python bytecode, from the build/CI scripts under scripts/ and .github/scripts/
+__pycache__/
+*.py[cod]
+
 # Claude Code
 .claude/settings.local.json

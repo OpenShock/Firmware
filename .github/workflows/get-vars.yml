@@ -42,8 +42,18 @@ jobs:
             .changes
             boards
 
-      # No setup-python: the runner ships Python 3.12.3, which get-vars.py needs
-      # (it self-checks the floor via MIN_PYTHON and fails clearly otherwise).
+      # get-vars.py parses tags with the semver package rather than a local regex, so
+      # it needs the pinned dependency set. gha.py still self-checks the interpreter
+      # floor and fails clearly if the image ever ships something older.
+      - uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405  # v6.2.0
+        with:
+          python-version-file: .github/scripts/.python-version
+          cache: 'pip'
+          cache-dependency-path: .github/scripts/requirements.txt
+
+      - name: Install script dependencies
+        shell: bash
+        run: pip install --require-hashes -r .github/scripts/requirements.txt
 
       # Single source of truth for the version bump: release-tool computes the
       # next version from .changes/. status mode works on every branch (no
@@ -61,4 +71,4 @@ jobs:
         env:
           RELEASE_NEXT_VERSION: ${{ steps.relmeta.outputs.next-version }}
           RELEASE_SKIP: ${{ steps.relmeta.outputs.skip }}
-        run: python3 .github/scripts/get-vars.py
+        run: python .github/scripts/get-vars.py

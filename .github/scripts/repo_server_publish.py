@@ -1,0 +1,284 @@
+#!/usr/bin/env python3
+"""Stage a firmware release on the repository server, then promote or discard it.
+
+Init, upload every board's artifacts, and either publish or abort - failing on the
+first non-success response. That is CI's whole contract with the server: submit each
+blob with the hash it computed, and believe the server about everything else.
+
+`MODE` picks the ending. `publish` promotes the release and it goes live; `dry-run`
+aborts it instead, which deletes the staged artifacts and leaves nothing behind.
+Nothing before that ending differs between the two - a dry run parses the same
+changelog, uploads the same bytes and passes the same server-side hash verification
+as a real publish, which is what makes it worth running on ordinary builds.
+
+HTTP and multipart are `requests`; see .github/scripts/requirements.txt for the pins.
+"""
+
+import hashlib
+import json
+import time
+from contextlib import ExitStack
+from datetime import datetime, timezone
+from pathlib import Path
+
+import requests
+
+from gha import env, fail, require_env, warn
+
+VALID_MODES = ('publish', 'dry-run')
+# The server parses this into an enum; anything else is a 400 several steps later, after
+# artifacts have been downloaded. Branch builds derive a channel from the branch name, so
+# this catches a feature branch being published by accident.
+VALID_CHANNELS = ('stable', 'beta', 'develop')
+
+# Server field name -> the artifact it carries. app and staticfs are what an OTA update
+# needs; the rest are for the flashtool, which writes a whole chip rather than updating
+# one. The manifest keys and the file field names come from this one table, so they
+# cannot drift apart.
+BUILD_ARTIFACTS = {
+    'app': 'app.bin',
+    'bootloader': 'bootloader.bin',
+    'partitions': 'partition-table.bin',
+}
+STATICFS_FIELD = 'staticfs'
+MERGED_FIELD = 'merged'
+MERGED_GLOB = 'OpenShock_*.bin'
+
+UPLOAD_RETRIES = 3
+UPLOAD_BACKOFF_SECONDS = 5
+CHUNK = 1 << 20
+
+
+def session_for(token: str) -> requests.Session:
+    """One session for the whole run, so the bearer token is attached in a single place
+    and the connection to the server is reused across every board."""
+    s = requests.Session()
+    s.headers.update({'Authorization': f'Bearer {token}', 'Accept': 'application/json'})
+    return s
+
+
+def show_response(resp: requests.Response) -> None:
+    """Print the server's problem details. It names its own causes better than any
+    guess made from the status code alone, so the body is worth the log lines."""
+    text = (resp.text or '').strip()
+    if text:
+        print(text, flush=True)
+
+
+def extract_changelog(path: Path) -> str:
+    """The newest `# ` section, which is the release being built on a tag and the
+    previous release on a branch. Either way it is a real changelog going through the
+    real parser, so a grammar the server rejects surfaces on an ordinary build."""
+    if not path.is_file():
+        fail(f"Changelog file '{path}' not found.")
+    lines = path.read_text(encoding='utf-8').splitlines()
+    section: list[str] = []
+    for line in lines:
+        if line.startswith('# '):
+            if section:
+                break
+            section.append(line)
+        elif section:
+            section.append(line)
+    text = '\n'.join(section).strip()
+    if not text:
+        fail(f"No '# ' heading found in '{path}'; init would reject an empty changelog.")
+    print(f'Changelog section: {section[0]} ({len(section)} lines)', flush=True)
+    return text
+
+
+def sha256_of(path: Path) -> str:
+    digest = hashlib.sha256()
+    with path.open('rb') as fh:
+        while chunk := fh.read(CHUNK):
+            digest.update(chunk)
+    return digest.hexdigest()
+
+
+def resolve_artifacts(artifacts: Path, board: str) -> dict[str, Path]:
+    """Every artifact the server wants for one board, or a hard failure naming the
+    first one that is missing."""
+    build = artifacts / f'firmware_build_{board}'
+    found: dict[str, Path] = {}
+
+    for field, filename in BUILD_ARTIFACTS.items():
+        found[field] = build / filename
+    found[STATICFS_FIELD] = artifacts / 'firmware_staticfs' / 'staticfs.bin'
+
+    merged = sorted((artifacts / f'firmware_merged_{board}').glob(MERGED_GLOB))
+    if merged:
+        found[MERGED_FIELD] = merged[0]
+
+    for field in (*BUILD_ARTIFACTS, STATICFS_FIELD, MERGED_FIELD):
+        path = found.get(field)
+        if path is None or not path.is_file():
+            expected = path if path else f'{artifacts}/firmware_merged_{board}/{MERGED_GLOB}'
+            fail(f'{board} is missing its {field} artifact (expected {expected})')
+    return found
+
+
+def upload_board(session: requests.Session, server: str, release_id: str, board: str, artifacts: Path) -> None:
+    """One request per board, carrying that board's artifacts and a sha256 manifest the
+    server re-computes before writing anything.
+
+    Retried on transport errors and 5xx: the request is a whole-board PUT, so a repeat
+    replaces the same artifacts rather than appending anything. init and publish below
+    are deliberately not retried - they are POSTs whose effect a timeout leaves unknown.
+    The file handles are reopened per attempt, since a retry has to send the body from
+    the start and the previous attempt consumed the streams.
+    """
+    paths = resolve_artifacts(artifacts, board)
+    manifest = {field: sha256_of(path) for field, path in paths.items()}
+
+    url = f'{server}/2/firmware/releases/{release_id}/boards/{board}'
+    for attempt in range(1, UPLOAD_RETRIES + 1):
+        try:
+            with ExitStack() as stack:
+                files = {
+                    field: (path.name, stack.enter_context(path.open('rb')), 'application/octet-stream')
+                    for field, path in paths.items()
+                }
+                resp = session.put(
+                    url,
+                    files=files,
+                    data={'sha256': json.dumps(manifest)},
+                    timeout=(30, 300),
+                )
+        except requests.RequestException as err:
+            if attempt == UPLOAD_RETRIES:
+                fail(f'Upload failed for {board} after {attempt} attempts: {err}')
+            warn(f'Upload for {board} failed ({err}); retrying {attempt}/{UPLOAD_RETRIES - 1}...')
+            time.sleep(UPLOAD_BACKOFF_SECONDS)
+            continue
+
+        if resp.status_code == 200:
+            print(f'  {board}: {len(resp.json())} artifacts accepted', flush=True)
+            return
+
+        if resp.status_code >= 500 and attempt < UPLOAD_RETRIES:
+            warn(f'Upload for {board} returned HTTP {resp.status_code}; retrying {attempt}/{UPLOAD_RETRIES - 1}...')
+            show_response(resp)
+            time.sleep(UPLOAD_BACKOFF_SECONDS)
+            continue
+
+        print(f'::error::Upload failed for {board} (HTTP {resp.status_code})', flush=True)
+        show_response(resp)
+        raise SystemExit(1)
+
+
+def init_release(session: requests.Session, server: str, *, version: str, channel: str, boards: list[str], changelog: str, nofail: bool) -> str:
+    """Stage the release. There is no preflight: an unregistered repository, a missing
+    scope and an unknown board are all non-success responses from here, before a single
+    artifact is uploaded, and each names its own cause."""
+    resp = session.post(
+        f'{server}/2/firmware/releases' + ('?nofail' if nofail else ''),
+        json={
+            'version': version,
+            'channel': channel,
+            'releaseDate': datetime.now(timezone.utc).strftime('%Y-%m-%dT%H:%M:%SZ'),
+            'boards': boards,
+            'changelog': changelog,
+        },
+        timeout=(30, 60),
+    )
+    if resp.status_code != 201:
+        print(f'::error::Init failed (HTTP {resp.status_code})', flush=True)
+        show_response(resp)
+        raise SystemExit(1)
+
+    data = resp.json()
+    release_id = data['id']
+    print(f"Release {release_id} staged as {data.get('status')} for {version} on {channel}", flush=True)
+    return release_id
+
+
+def promote(session: requests.Session, server: str, release_id: str) -> None:
+    resp = session.post(
+        f'{server}/2/firmware/releases/{release_id}/publish',
+        json={},
+        timeout=(30, 120),
+    )
+    if resp.status_code != 201:
+        print(f'::error::Publish failed (HTTP {resp.status_code})', flush=True)
+        show_response(resp)
+        raise SystemExit(1)
+    print(f'Published {release_id}', flush=True)
+
+
+def discard(session: requests.Session, server: str, release_id: str, mode: str) -> None:
+    """A staged release that is never aborted holds its version against a later attempt
+    (init returns ReleaseAlreadyStaging) until the server's TTL job reaps it, so a failed
+    run that left one behind would block the retry that was meant to fix it.
+
+    Never raises: this runs from a finally, where the failure being cleaned up after is
+    the one worth reporting.
+    """
+    try:
+        resp = session.delete(f'{server}/2/firmware/releases/{release_id}', timeout=(30, 60))
+    except requests.RequestException as err:
+        warn(f'Could not reach the server to discard release {release_id} ({err}). It will be reaped by the server TTL job.')
+        return
+
+    if resp.status_code == 204:
+        if mode == 'dry-run':
+            print('Dry run complete: release staged, verified and discarded. Nothing was published.', flush=True)
+        else:
+            print('The run failed; the staged release was discarded so a retry can reuse this version.', flush=True)
+        return
+    # Not fatal on its own - the TTL job reaps abandoned releases - but it means the next
+    # attempt at this version will be refused until that happens, so say so loudly.
+    warn(f'Could not discard release {release_id} (HTTP {resp.status_code}). It will be reaped by the server TTL job.')
+    show_response(resp)
+
+
+def main() -> int:
+    server = env('SERVER_URL').rstrip('/')
+    token = env('TOKEN')
+    version = env('VERSION')
+    channel = env('CHANNEL')
+    mode = env('MODE', 'dry-run')
+    nofail = env('NOFAIL').lower() == 'true'
+    artifacts = Path(env('ARTIFACTS_DIR', 'artifacts'))
+    changelog_file = Path(env('CHANGELOG_FILE', 'CHANGELOG.md'))
+    boards = [b.strip() for b in env('BOARDS').splitlines() if b.strip()]
+
+    require_env('SERVER_URL', 'TOKEN', 'VERSION')
+    if mode not in VALID_MODES:
+        fail(f"MODE must be one of {'/'.join(VALID_MODES)}, got '{mode}'")
+    if channel not in VALID_CHANNELS:
+        fail(f"CHANNEL must be one of {'/'.join(VALID_CHANNELS)}, got '{channel}'")
+    if not boards:
+        fail('BOARDS is empty; there is nothing to upload.')
+
+    changelog = extract_changelog(changelog_file)
+    session = session_for(token)
+
+    release_id = init_release(
+        session,
+        server,
+        version=version,
+        channel=channel,
+        boards=boards,
+        changelog=changelog,
+        nofail=nofail,
+    )
+
+    # From here the release exists on the server, so every exit path has to decide what
+    # to do with it. That is the whole reason this is one script: the staged release is
+    # a resource with a lifetime, and try/finally is how a lifetime is expressed.
+    published = False
+    try:
+        for board in boards:
+            upload_board(session, server, release_id, board, artifacts)
+        if mode == 'publish':
+            promote(session, server, release_id)
+            published = True
+    finally:
+        if not published:
+            discard(session, server, release_id, mode)
+
+    return 0
+
+
+if __name__ == '__main__':
+    raise SystemExit(main())
