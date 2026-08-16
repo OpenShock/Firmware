@@ -1,0 +1,161 @@
+name: repo-server-verify
+description: >-
+  Proves a published release is actually reachable, by reading it back through the
+  same public endpoints a hub and the flashtool use and comparing what the CDN serves
+  against the artifacts this run built.
+
+  This is the half a dry run cannot reach. A dry run proves init, upload and
+  server-side hash verification; it stops before the promote, so it says nothing about
+  whether publishing makes a version visible, whether the CDN serves the bytes, or
+  whether a hub would be offered the update. That is what this checks.
+
+inputs:
+  server-url:
+    description: 'Base URL of the repository server'
+    required: true
+  version:
+    description: 'Version that was just published'
+    required: true
+  channel:
+    description: 'Channel it was published to'
+    required: true
+  boards:
+    description: 'Newline-separated boards the release declared'
+    required: true
+
+runs:
+  using: composite
+  steps:
+
+    # Nothing here is authenticated. Reading it back as an anonymous caller is the point:
+    # a published release that only the publisher can see is not published.
+    - name: Version is listed
+      shell: bash
+      env:
+        SERVER_URL: ${{ inputs.server-url }}
+        VERSION: ${{ inputs.version }}
+      run: |
+        set -euo pipefail
+        code=$(curl -sS -o /tmp/version.json -w '%{http_code}' --max-time 30 \
+          "$SERVER_URL/2/firmware/versions/$VERSION")
+        echo "GET /2/firmware/versions/$VERSION -> $code"
+        if [ "$code" != "200" ]; then
+          echo "::error::Published version is not readable back (HTTP $code)."
+          cat /tmp/version.json 2>/dev/null || true
+          exit 1
+        fi
+
+    # The end-to-end check. For every board: resolve the release through the channel the
+    # way a hub does, download each artifact from the URL the server hands out, and hash it.
+    # A match means the bytes a device would flash are the bytes this run compiled - which no
+    # amount of checking the upload response can establish, because that only proves the
+    # server received them, not that the CDN is serving them from the published key.
+    - name: Served artifacts match what was built
+      shell: bash
+      env:
+        SERVER_URL: ${{ inputs.server-url }}
+        VERSION: ${{ inputs.version }}
+        CHANNEL: ${{ inputs.channel }}
+        BOARDS: ${{ inputs.boards }}
+      run: |
+        set -euo pipefail
+
+        # Local hashes of everything this run built, keyed the way the server names them.
+        declare -A local_hash
+        while IFS= read -r board; do
+          [ -z "$board" ] && continue
+          build="artifacts/firmware_build_$board"
+          merged=$(find "artifacts/firmware_merged_$board" -name 'OpenShock_*.bin' 2>/dev/null | head -1 || true)
+          for pair in \
+            "app:$build/app.bin" \
+            "bootloader:$build/bootloader.bin" \
+            "partitions:$build/partition-table.bin" \
+            "staticfs:artifacts/firmware_staticfs/staticfs.bin" \
+            "merged:$merged"
+          do
+            field="${pair%%:*}"; file="${pair#*:}"
+            [ -n "$file" ] && [ -f "$file" ] || continue
+            local_hash["$board/$field"]=$(sha256sum "$file" | cut -d' ' -f1)
+          done
+        done <<< "$BOARDS"
+
+        failures=0
+        checked=0
+
+        while IFS= read -r board; do
+          [ -z "$board" ] && continue
+
+          code=$(curl -sS -o /tmp/board.json -w '%{http_code}' --max-time 30 \
+            "$SERVER_URL/2/firmware/latest/$CHANNEL/$board")
+          if [ "$code" != "200" ]; then
+            echo "::error::$board: channel $CHANNEL does not resolve a release (HTTP $code)"
+            failures=$((failures + 1))
+            continue
+          fi
+
+          served_version=$(jq -r '.version' /tmp/board.json)
+          if [ "$served_version" != "$VERSION" ]; then
+            echo "::error::$board: channel $CHANNEL serves '$served_version', expected '$VERSION'"
+            failures=$((failures + 1))
+            continue
+          fi
+
+          # Artifact types are whatever the release actually published for this board, read off
+          # the response rather than assumed, so a board with a different required set still
+          # verifies every artifact it does have.
+          while IFS=$'\t' read -r type url declared; do
+            [ -z "$type" ] && continue
+            expected="${local_hash["$board/$type"]:-}"
+            if [ -z "$expected" ]; then
+              echo "::warning::$board/$type: served but not built by this run, skipping"
+              continue
+            fi
+
+            # Follows redirects: the URL is a CDN address and may well be one.
+            if ! curl -sSL --max-time 300 -o /tmp/artifact.bin "$url"; then
+              echo "::error::$board/$type: could not download $url"
+              failures=$((failures + 1))
+              continue
+            fi
+
+            actual=$(sha256sum /tmp/artifact.bin | cut -d' ' -f1)
+            checked=$((checked + 1))
+
+            if [ "$actual" != "$expected" ]; then
+              echo "::error::$board/$type: served bytes differ from built bytes"
+              echo "  built:  $expected"
+              echo "  served: $actual"
+              echo "  url:    $url"
+              failures=$((failures + 1))
+            elif [ "${declared,,}" != "${expected,,}" ]; then
+              # The hash the API advertises is what a hub checks its download against, so a
+              # correct file behind a wrong declared hash still fails every OTA update.
+              echo "::error::$board/$type: API advertises $declared but the file hashes to $actual"
+              failures=$((failures + 1))
+            fi
+          done < <(jq -r '.artifacts[] | [.type, .url, .sha256Hash] | @tsv' /tmp/board.json)
+        done <<< "$BOARDS"
+
+        echo "Verified $checked artifact(s), $failures failure(s)."
+        [ "$failures" -eq 0 ]
+
+    # The contract a hub relies on to stop asking: told its current version, the server must
+    # answer 204 rather than offering the same build again. Getting this wrong costs every hub
+    # a full download per check.
+    - name: Up-to-date hubs are told there is nothing to do
+      shell: bash
+      env:
+        SERVER_URL: ${{ inputs.server-url }}
+        VERSION: ${{ inputs.version }}
+        CHANNEL: ${{ inputs.channel }}
+        BOARDS: ${{ inputs.boards }}
+      run: |
+        set -euo pipefail
+        board=$(echo "$BOARDS" | sed '/^[[:space:]]*$/d' | head -1)
+        code=$(curl -sS -o /dev/null -w '%{http_code}' --max-time 30 \
+          "$SERVER_URL/2/firmware/latest/$CHANNEL/$board?version=$VERSION")
+        echo "GET /2/firmware/latest/$CHANNEL/$board?version=$VERSION -> $code"
+        if [ "$code" != "204" ]; then
+          echo "::error::Expected 204 for a hub already on $VERSION, got $code."
+          exit 1
+        fi

@@ -9,26 +9,34 @@ on:
         description: 'OIDC audience, must match OPENSHOCK__CICD__AUDIENCE on the server'
         required: false
         default: 'openshock-repository-server'
-  # Also runs when the repository-server plumbing itself changes, on any branch.
-  # workflow_dispatch only offers a workflow that already exists on the default branch,
-  # so without this the check could not be run from the branch developing it.
+  # Any branch, whenever the repository-server plumbing changes. workflow_dispatch only
+  # offers a workflow that already exists on the default branch, so without this the check
+  # could not be run from the branch developing it.
   push:
     branches:
       - '**'
     paths:
-      - '.github/workflows/repo-server-smoke.yml'
+      - '.github/workflows/repo-server-preflight.yml'
       - '.github/actions/repo-server-*/**'
 
-name: repo-server-smoke
+name: repo-server-preflight
 
-# Standalone check that this repository can publish firmware, without publishing
-# anything. It is the same preflight ci-build runs before a deploy, callable on its own
-# so the server can be checked after an admin change (a board added, a scope granted)
-# without waiting for a build.
+# The cheap half of repository-server testing, and the only half that runs on any branch.
 #
-# It deliberately does not upload: preflight is reads only. What exercises the actual
-# publish path is the dry run in ci-build, which stages a real release from real
-# artifacts and then discards it.
+# Answers two questions, in seconds, without building anything: can this repository publish
+# firmware at all, and does the server know every board it would publish. Both are server-side
+# state an admin can change underneath CI - a scope revoked, a board not yet added - so being
+# able to re-check them without waiting on a 30-minute build is the point.
+#
+# It reads only. Everything that writes lives in ci-build's repo-server job, because that is
+# where the built artifacts are:
+#
+#   preflight (here)        server reachable, repo authorised, catalog complete
+#   ci-build, dry run       + init, upload every board, server-side hash verification
+#   ci-build, publish       + promote, then read the release back and compare served bytes
+#
+# Each row is the row above plus more, so this workflow passing is necessary and not
+# sufficient. ci-build runs the same preflight action before it uploads anything.
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
@@ -39,7 +47,7 @@ permissions:
 
 jobs:
 
-  smoke:
+  preflight:
     name: Repository server preflight
     runs-on: ubuntu-slim # lightweight: curl + jq, checkout only for the board list
     timeout-minutes: 5

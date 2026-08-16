@@ -248,12 +248,26 @@ jobs:
   # exercised on every build rather than first thing on release day - which is the whole
   # reason it runs here and not only on the deploy path.
   #
-  # The real publish is gated on OPENSHOCK_REPO_SERVER_PUBLISH, not on the deploy gate,
-  # because the CDN path above is still the one serving devices. Flipping that variable is
-  # what cuts firmware distribution over to the repository server; until then this job
-  # proves the cutover will work without performing it.
+  # Where the repository server is actually exercised. Two modes, one switch:
+  #
+  #   OPENSHOCK_REPO_SERVER_PUBLISH unset  dry run - init, upload every board, let the server
+  #                                        verify every hash, then discard the release
+  #   OPENSHOCK_REPO_SERVER_PUBLISH=true   publish for real, then read it back and verify
+  #
+  # One variable rather than a dispatch input, because a dispatch input is only offered for
+  # the copy of this workflow on the default branch, and the end-to-end run has to be
+  # available from whatever branch is developing it. Set the variable, dispatch this workflow
+  # on any ref, unset it afterwards; leaving it set is the cutover.
+  #
+  # It is deliberately not tied to the deploy gate. The CDN path below still serves devices,
+  # so a repository-server publish is not yet something a release should imply — and tying it
+  # to deploy would make the full test unreachable from a feature branch, where dispatch
+  # yields build=true, deploy=false.
+  #
+  # A published version goes live on that branch's channel and CI cannot take it back; only a
+  # maintainer can, at /admin/firmware/releases.
   repo-server:
-    name: Repository server (${{ (vars.OPENSHOCK_REPO_SERVER_PUBLISH == 'true' && needs.gate.outputs.deploy == 'true') && 'publish' || 'dry run' }})
+    name: Repository server (${{ vars.OPENSHOCK_REPO_SERVER_PUBLISH == 'true' && 'publish + verify' || 'dry run' }})
     runs-on: ubuntu-latest
     needs: [gate, getvars, checkpoint-build]
     timeout-minutes: 20
@@ -277,6 +291,23 @@ jobs:
       - uses: ./.github/actions/repo-server-token
         id: token
 
+      # get-vars derives the channel from the branch name, so a feature branch yields something
+      # the server's enum does not know. Only the three real channels pass through; anything
+      # else is treated as develop. Computed once - both the publish and the verify need it,
+      # and they must agree on which channel the release went to.
+      - name: Resolve channel
+        id: channel
+        env:
+          CHANNEL: ${{ needs.getvars.outputs.release-channel }}
+        run: |
+          set -euo pipefail
+          case "$CHANNEL" in
+            stable|beta|develop) name="$CHANNEL" ;;
+            *) name='develop' ;;
+          esac
+          echo "Channel: $CHANNEL -> $name"
+          echo "name=$name" >> "$GITHUB_OUTPUT"
+
       # Fails the job before any artifact is downloaded if the server is unreachable, this
       # repository is not authorised, or a board is missing from the catalog.
       - uses: ./.github/actions/repo-server-preflight
@@ -290,12 +321,19 @@ jobs:
           server-url: ${{ vars.OPENSHOCK_REPO_SERVER_URL }}
           token: ${{ steps.token.outputs.token }}
           version: ${{ needs.getvars.outputs.version }}
-          # get-vars derives the channel from the branch name, so a feature branch yields
-          # something the server's enum does not know. Only the three real channels are
-          # passed through; anything else dry-runs as develop.
-          channel: ${{ contains(fromJSON('["stable","beta","develop"]'), needs.getvars.outputs.release-channel) && needs.getvars.outputs.release-channel || 'develop' }}
+          channel: ${{ steps.channel.outputs.name }}
           boards: ${{ needs.getvars.outputs.board-list }}
-          mode: ${{ (vars.OPENSHOCK_REPO_SERVER_PUBLISH == 'true' && needs.gate.outputs.deploy == 'true') && 'publish' || 'dry-run' }}
+          mode: ${{ vars.OPENSHOCK_REPO_SERVER_PUBLISH == 'true' && 'publish' || 'dry-run' }}
+
+      # Only meaningful after a real publish - there is nothing to read back from a dry run,
+      # which discards the release it staged.
+      - uses: ./.github/actions/repo-server-verify
+        if: ${{ vars.OPENSHOCK_REPO_SERVER_PUBLISH == 'true' }}
+        with:
+          server-url: ${{ vars.OPENSHOCK_REPO_SERVER_URL }}
+          version: ${{ needs.getvars.outputs.version }}
+          channel: ${{ steps.channel.outputs.name }}
+          boards: ${{ needs.getvars.outputs.board-list }}
 
   # A single job owns the whole CDN deployment. Every job that declares
   # `environment:` produces one GitHub deployment record, and matrix legs each
