@@ -1,0 +1,182 @@
+on:
+  workflow_dispatch:
+    inputs:
+      server_url:
+        description: 'Base URL of the repository server to probe'
+        required: false
+        default: 'https://repo.openshock.dev'
+      audience:
+        description: 'OIDC audience, must match OPENSHOCK__CICD__AUDIENCE on the server'
+        required: false
+        default: 'openshock-repository-server'
+  # Also runs when this file itself changes, on any branch. workflow_dispatch only
+  # offers a workflow that already exists on the default branch, so without this
+  # the smoke test could not be run from the branch developing it.
+  push:
+    branches:
+      - '**'
+    paths:
+      - '.github/workflows/repo-server-smoke.yml'
+
+name: repo-server-smoke
+
+# Checks that this repository can publish firmware to the repository server, without
+# publishing anything. Every request either reads a public endpoint or names an object
+# that cannot exist, so a run writes nothing and leaves nothing to clean up.
+#
+# It exists because the publishing path cannot be exercised anywhere else: uploads are
+# authenticated by a GitHub Actions OIDC token, and ACTIONS_ID_TOKEN_REQUEST_URL is only
+# present inside a real Actions run. Registration is per (owner, repo), so a token minted
+# by any other repository proves nothing about this one.
+#
+# Two prerequisites on the server, both admin actions:
+#   1. OpenShock/Firmware registered at /admin/repositories with the publish_firmware scope
+#   2. every board below present at /admin/firmware/boards
+# Release init rejects a board it does not know, so a missing board fails the first real
+# publish rather than this check.
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+
+  smoke:
+    name: Repository server smoke test
+    runs-on: ubuntu-slim # lightweight: curl + jq, checkout only for the board list
+    timeout-minutes: 5
+    permissions:
+      contents: read
+      id-token: write
+
+    env:
+      SERVER_URL: ${{ inputs.server_url || 'https://repo.openshock.dev' }}
+      AUDIENCE: ${{ inputs.audience || 'openshock-repository-server' }}
+
+    steps:
+
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+
+      # Separates "the server is down" from "the token was refused". Without it, a failed
+      # probe below is ambiguous: an unreachable host and a rejected token look the same.
+      - name: Server is reachable
+        run: |
+          set -euo pipefail
+          code=$(curl -sS -o /dev/null -w '%{http_code}' --max-time 20 "$SERVER_URL/2/firmware/manifest")
+          echo "GET /2/firmware/manifest -> $code"
+          if [ "$code" != "200" ]; then
+            echo "::error::Server is not serving the public manifest (HTTP $code). Nothing below will be meaningful."
+            exit 1
+          fi
+
+      # The board catalog is seeded by hand and the names have to match what a hub reports
+      # as its own board, which is the boards/*.defaults basename. A board this repository
+      # builds but the server does not know is invisible until a release init rejects it, so
+      # it is worth catching before the first publish rather than during it.
+      - name: Boards are in the server catalog
+        run: |
+          set -euo pipefail
+          curl -sSf --max-time 20 "$SERVER_URL/2/firmware/boards" -o /tmp/boards.json
+          jq -r '.[] | (.name // .Name)' /tmp/boards.json | tr '[:upper:]' '[:lower:]' | sort > /tmp/known.txt
+          for f in boards/*.defaults; do basename "$f" .defaults; done \
+            | tr '[:upper:]' '[:lower:]' | sort > /tmp/built.txt
+
+          missing=$(comm -23 /tmp/built.txt /tmp/known.txt)
+          echo "built: $(wc -l < /tmp/built.txt), known to server: $(wc -l < /tmp/known.txt)"
+          if [ -n "$missing" ]; then
+            echo "Missing from the server catalog:"
+            echo "$missing" | sed 's/^/  /'
+            {
+              echo "boards_missing<<EOF"
+              echo "$missing"
+              echo "EOF"
+            } >> "$GITHUB_ENV"
+          else
+            echo "Every built board is registered."
+          fi
+
+      - name: Mint an OIDC token
+        run: |
+          set -euo pipefail
+          token=$(curl -sSLf \
+            -H "Authorization: bearer $ACTIONS_ID_TOKEN_REQUEST_TOKEN" \
+            "$ACTIONS_ID_TOKEN_REQUEST_URL&audience=$AUDIENCE" | jq -r .value)
+          if [ -z "$token" ] || [ "$token" = "null" ]; then
+            echo "::error::GitHub returned no OIDC token. Check that the job has id-token: write."
+            exit 1
+          fi
+          echo "::add-mask::$token"
+          echo "OIDC_TOKEN=$token" >> "$GITHUB_ENV"
+
+          # The claims the server keys off. Printed so a rejection can be read against what was
+          # actually sent, rather than what the workflow assumes it sent. The token itself is
+          # masked above; these five claims are not secret.
+          payload=$(echo "$token" | cut -d. -f2 | tr '_-' '/+')
+          case $(( ${#payload} % 4 )) in 2) payload="$payload==";; 3) payload="$payload=";; esac
+          echo "$payload" | base64 -d 2>/dev/null \
+            | jq '{aud, repository, repository_owner, ref, run_id}'
+
+      # Aborting a release id that does not exist is the cheapest authenticated call there is:
+      # the lookup misses, so nothing is ever marked aborted or removed from storage. Reaching
+      # that miss at all means the signature, issuer, audience, registration and publish_firmware
+      # scope have all been accepted, which is the whole question.
+      - name: Probe publish_firmware scope
+        run: |
+          set -euo pipefail
+          release_id=$(cat /proc/sys/kernel/random/uuid)
+          code=$(curl -sS -o /tmp/firmware.json -w '%{http_code}' --max-time 20 -X DELETE \
+            "$SERVER_URL/2/firmware/releases/$release_id" \
+            -H "Authorization: Bearer $OIDC_TOKEN")
+          echo "DELETE /2/firmware/releases/$release_id -> $code"
+          cat /tmp/firmware.json 2>/dev/null || true
+          echo
+          echo "firmware_code=$code" >> "$GITHUB_ENV"
+
+      - name: Report
+        if: always()
+        run: |
+          set -uo pipefail
+          firmware_code="${firmware_code:-none}"
+          boards_missing="${boards_missing:-}"
+
+          # 401 covers two distinct causes and the server will not say which, deliberately: an
+          # unregistered repository is refused with the same response as a bad token, so an
+          # outsider cannot probe the allowlist. Both causes are listed here for the operator.
+          case "$firmware_code" in
+            404) auth='PASS - authenticated, publish_firmware granted, release simply absent' ;;
+            401) auth='FAIL - token rejected: OpenShock/Firmware not registered at /admin/repositories, or audience does not match OPENSHOCK__CICD__AUDIENCE' ;;
+            403) auth='FAIL - authenticated, but publish_firmware is not granted to this repository' ;;
+            000) auth='FAIL - no response (timeout or TLS failure)' ;;
+            none) auth='FAIL - probe did not run' ;;
+            *)   auth="UNEXPECTED - HTTP $firmware_code, see the step log for the problem details body" ;;
+          esac
+
+          if [ -z "$boards_missing" ]; then
+            boards='PASS - every built board is in the catalog'
+          else
+            boards="FAIL - not in the catalog: $(echo "$boards_missing" | tr '\n' ' ')"
+          fi
+
+          {
+            echo "## Repository server smoke test"
+            echo
+            echo "Server \`$SERVER_URL\`, audience \`$AUDIENCE\`"
+            echo
+            echo "| Check | Result |"
+            echo "|---|---|"
+            echo "| OIDC / publish_firmware ($firmware_code) | $auth |"
+            echo "| Board catalog | $boards |"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+          echo "auth:   $auth"
+          echo "boards: $boards"
+
+          if [ "$firmware_code" = "404" ] && [ -z "$boards_missing" ]; then
+            echo "This repository is ready to publish firmware."
+            exit 0
+          fi
+          echo "::error::Smoke test failed, see the table in the job summary."
+          exit 1
