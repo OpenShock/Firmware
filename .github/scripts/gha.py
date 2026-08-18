@@ -1,27 +1,16 @@
-#!/usr/bin/env python3
-"""Shared GitHub Actions plumbing for the scripts in this directory.
+# !/usr/bin/env python3
+"""Shared GitHub Actions plumbing: workflow commands, step outputs, version check.
 
-Workflow commands, step outputs, and the interpreter floor - the parts every script
-here needs and none of them should be restating. Importing it applies the version
-check, so a script gets that by importing rather than by copying six lines.
-
-Deliberately stdlib only and deliberately conservative in syntax: this module has to
-be importable on an interpreter too old to run its callers, or the version check it
-exists to perform would itself be the thing that fails, with a SyntaxError instead of
-the sentence explaining what to install.
-
-Scripts are invoked as `python3 .github/scripts/<name>.py` from the workspace root;
-Python puts the script's own directory on sys.path, so `import gha` resolves with no
-PYTHONPATH juggling.
+Importing applies the version check.
+Stdlib only, and conservative in syntax: this has to import on an interpreter too old to run its callers, or the check fails as a SyntaxError instead of the sentence explaining what to install.
 """
 
 import os
 import sys
 from typing import NoReturn
 
-# ESP-IDF's own tooling wants 3.9+; this floor is higher because these scripts use
-# 3.12 typing syntax. The runners ship well past it - the check is here for the
-# person running a script locally, not for CI.
+# ESP-IDF's own tooling wants 3.9+; this floor is higher because these scripts use 3.12 typing syntax.
+# The runners ship well past it - the check is here for the person running a script locally, not for CI.
 MIN_PYTHON = (3, 12, 3)
 
 if sys.version_info < MIN_PYTHON:
@@ -60,10 +49,8 @@ def mask(value: str) -> None:
 def set_output(name: str, value: str, *, secret: bool = False) -> None:
     """Write a step output, using the heredoc form when the value spans lines.
 
-    Falls back to printing when GITHUB_OUTPUT is unset, so a script run locally says
-    what it would have produced instead of failing on a missing environment. Pass
-    secret=True for a credential: the local fallback then reports the name only, since
-    there is no runner to apply the mask outside CI.
+    Falls back to printing when GITHUB_OUTPUT is unset, so a script run locally says what it would have produced instead of failing on a missing environment.
+    Pass secret=True for a credential: the local fallback then reports the name only, since there is no runner to apply the mask outside CI.
     """
     gh_output = os.environ.get('GITHUB_OUTPUT')
     if not gh_output:
@@ -78,9 +65,9 @@ def set_output(name: str, value: str, *, secret: bool = False) -> None:
 
 
 def env(name: str, default: str = '') -> str:
-    """An environment variable, stripped. Actions inputs arrive with stray whitespace
-    often enough - a YAML folded scalar leaves a trailing newline - that reading them
-    raw is a bug waiting for the one input somebody wrote across two lines."""
+    """An environment variable, stripped.
+    Actions inputs arrive with stray whitespace often enough - a YAML folded scalar leaves a trailing newline - that reading them raw is a bug waiting for the one input somebody wrote across two lines.
+    """
     return os.environ.get(name, default).strip()
 
 

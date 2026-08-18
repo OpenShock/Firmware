@@ -1,17 +1,10 @@
-#!/usr/bin/env python3
+# !/usr/bin/env python3
 """Stage a firmware release on the repository server, then promote or discard it.
 
-Init, upload every board's artifacts, and either publish or abort - failing on the
-first non-success response. That is CI's whole contract with the server: submit each
-blob with the hash it computed, and believe the server about everything else.
+Init, upload every board's artifacts, publish or abort, failing on the first non-success.
+That is CI's whole contract: submit each blob with the hash it computed and believe the server about everything else.
 
-`MODE` picks the ending. `publish` promotes the release and it goes live; `dry-run`
-aborts it instead, which deletes the staged artifacts and leaves nothing behind.
-Nothing before that ending differs between the two - a dry run parses the same
-changelog, uploads the same bytes and passes the same server-side hash verification
-as a real publish, which is what makes it worth running on ordinary builds.
-
-HTTP and multipart are `requests`; see .github/scripts/requirements.txt for the pins.
+`MODE` picks the ending; nothing before it differs, so `dry-run` exercises the same path a real publish takes.
 """
 
 import hashlib
@@ -26,15 +19,13 @@ import requests
 from gha import env, fail, require_env, warn
 
 VALID_MODES = ('publish', 'dry-run')
-# The server parses this into an enum; anything else is a 400 several steps later, after
-# artifacts have been downloaded. Branch builds derive a channel from the branch name, so
-# this catches a feature branch being published by accident.
+# The server parses this into an enum; anything else is a 400 several steps later, after artifacts have been downloaded.
+# Branch builds derive a channel from the branch name, so this catches a feature branch being published by accident.
 VALID_CHANNELS = ('stable', 'beta', 'develop')
 
-# Server field name -> the artifact it carries. app and staticfs are what an OTA update
-# needs; the rest are for the flashtool, which writes a whole chip rather than updating
-# one. The manifest keys and the file field names come from this one table, so they
-# cannot drift apart.
+# Server field name -> the artifact it carries.
+# app and staticfs are what an OTA update needs; the rest are for the flashtool, which writes a whole chip rather than updating one.
+# The manifest keys and the file field names come from this one table, so they cannot drift apart.
 BUILD_ARTIFACTS = {
     'app': 'app.bin',
     'bootloader': 'bootloader.bin',
@@ -50,25 +41,26 @@ CHUNK = 1 << 20
 
 
 def session_for(token: str) -> requests.Session:
-    """One session for the whole run, so the bearer token is attached in a single place
-    and the connection to the server is reused across every board."""
+    """One session for the whole run, so the bearer token is attached in a single place and the connection to the server is reused across every board.
+    """
     s = requests.Session()
     s.headers.update({'Authorization': f'Bearer {token}', 'Accept': 'application/json'})
     return s
 
 
 def show_response(resp: requests.Response) -> None:
-    """Print the server's problem details. It names its own causes better than any
-    guess made from the status code alone, so the body is worth the log lines."""
+    """Print the server's problem details.
+    It names its own causes better than any guess made from the status code alone, so the body is worth the log lines.
+    """
     text = (resp.text or '').strip()
     if text:
         print(text, flush=True)
 
 
 def extract_changelog(path: Path) -> str:
-    """The newest `# ` section, which is the release being built on a tag and the
-    previous release on a branch. Either way it is a real changelog going through the
-    real parser, so a grammar the server rejects surfaces on an ordinary build."""
+    """The newest `# ` section, which is the release being built on a tag and the previous release on a branch.
+    Either way it is a real changelog going through the real parser, so a grammar the server rejects surfaces on an ordinary build.
+    """
     if not path.is_file():
         fail(f"Changelog file '{path}' not found.")
     lines = path.read_text(encoding='utf-8').splitlines()
@@ -96,8 +88,8 @@ def sha256_of(path: Path) -> str:
 
 
 def resolve_artifacts(artifacts: Path, board: str) -> dict[str, Path]:
-    """Every artifact the server wants for one board, or a hard failure naming the
-    first one that is missing."""
+    """Every artifact the server wants for one board, or a hard failure naming the first one that is missing.
+    """
     build = artifacts / f'firmware_build_{board}'
     found: dict[str, Path] = {}
 
@@ -118,14 +110,11 @@ def resolve_artifacts(artifacts: Path, board: str) -> dict[str, Path]:
 
 
 def upload_board(session: requests.Session, server: str, release_id: str, board: str, artifacts: Path) -> None:
-    """One request per board, carrying that board's artifacts and a sha256 manifest the
-    server re-computes before writing anything.
+    """One request per board, carrying that board's artifacts and a sha256 manifest the server re-computes before writing anything.
 
-    Retried on transport errors and 5xx: the request is a whole-board PUT, so a repeat
-    replaces the same artifacts rather than appending anything. init and publish below
-    are deliberately not retried - they are POSTs whose effect a timeout leaves unknown.
-    The file handles are reopened per attempt, since a retry has to send the body from
-    the start and the previous attempt consumed the streams.
+    Retried on transport errors and 5xx: the request is a whole-board PUT, so a repeat replaces the same artifacts rather than appending anything.
+    init and publish below are deliberately not retried - they are POSTs whose effect a timeout leaves unknown.
+    The file handles are reopened per attempt, since a retry has to send the body from the start and the previous attempt consumed the streams.
     """
     paths = resolve_artifacts(artifacts, board)
     manifest = {field: sha256_of(path) for field, path in paths.items()}
@@ -167,9 +156,9 @@ def upload_board(session: requests.Session, server: str, release_id: str, board:
 
 
 def init_release(session: requests.Session, server: str, *, version: str, channel: str, boards: list[str], changelog: str, nofail: bool) -> str:
-    """Stage the release. There is no preflight: an unregistered repository, a missing
-    scope and an unknown board are all non-success responses from here, before a single
-    artifact is uploaded, and each names its own cause."""
+    """Stage the release.
+    There is no preflight: an unregistered repository, a missing scope and an unknown board are all non-success responses from here, before a single artifact is uploaded, and each names its own cause.
+    """
     resp = session.post(
         f'{server}/2/firmware/releases' + ('?nofail' if nofail else ''),
         json={
@@ -206,12 +195,9 @@ def promote(session: requests.Session, server: str, release_id: str) -> None:
 
 
 def discard(session: requests.Session, server: str, release_id: str, mode: str) -> None:
-    """A staged release that is never aborted holds its version against a later attempt
-    (init returns ReleaseAlreadyStaging) until the server's TTL job reaps it, so a failed
-    run that left one behind would block the retry that was meant to fix it.
+    """A staged release that is never aborted holds its version against a later attempt (init returns ReleaseAlreadyStaging) until the server's TTL job reaps it, so a failed run that left one behind would block the retry that was meant to fix it.
 
-    Never raises: this runs from a finally, where the failure being cleaned up after is
-    the one worth reporting.
+    Never raises: this runs from a finally, where the failure being cleaned up after is the one worth reporting.
     """
     try:
         resp = session.delete(f'{server}/2/firmware/releases/{release_id}', timeout=(30, 60))
@@ -225,8 +211,7 @@ def discard(session: requests.Session, server: str, release_id: str, mode: str) 
         else:
             print('The run failed; the staged release was discarded so a retry can reuse this version.', flush=True)
         return
-    # Not fatal on its own - the TTL job reaps abandoned releases - but it means the next
-    # attempt at this version will be refused until that happens, so say so loudly.
+    # Not fatal on its own - the TTL job reaps abandoned releases - but it means the next attempt at this version will be refused until that happens, so say so loudly.
     warn(f'Could not discard release {release_id} (HTTP {resp.status_code}). It will be reaped by the server TTL job.')
     show_response(resp)
 
@@ -263,9 +248,8 @@ def main() -> int:
         nofail=nofail,
     )
 
-    # From here the release exists on the server, so every exit path has to decide what
-    # to do with it. That is the whole reason this is one script: the staged release is
-    # a resource with a lifetime, and try/finally is how a lifetime is expressed.
+    # From here the release exists on the server, so every exit path has to decide what to do with it.
+    # That is the whole reason this is one script: the staged release is a resource with a lifetime, and try/finally is how a lifetime is expressed.
     published = False
     try:
         for board in boards:

@@ -1,10 +1,8 @@
-#!/usr/bin/env python3
+# !/usr/bin/env python3
 """Derive the CI build variables: firmware version, release channel, board matrix.
 
 Python port of the former get-vars.js (stdlib only, no node/pnpm toolchain).
-Reads the git ref/sha from the GITHUB_* env, the pending version from
-release-tool (RELEASE_NEXT_VERSION / RELEASE_SKIP), the repo tags via git, and
-the buildable boards from boards/*.defaults, then writes GitHub Action outputs.
+Reads the git ref/sha from the GITHUB_* env, the pending version from release-tool (RELEASE_NEXT_VERSION / RELEASE_SKIP), the repo tags via git, and the buildable boards from boards/*.defaults, then writes GitHub Action outputs.
 """
 
 import json
@@ -19,9 +17,9 @@ import semver
 from gha import fail, set_output
 
 def parse_version(tag: str) -> semver.Version | None:
-    """Strict semver, except for the historical `v` prefix - the repo still carries a
-    `v0.8.1` tag that the spec (and therefore the parser) rejects. Returns None rather
-    than raising, since scanning the tag list is best-effort."""
+    """Strict semver, except for the historical `v` prefix - the repo still carries a `v0.8.1` tag that the spec (and therefore the parser) rejects.
+    Returns None rather than raising, since scanning the tag list is best-effort.
+    """
     try:
         return semver.Version.parse(tag.strip().removeprefix('v'))
     except ValueError:
@@ -29,8 +27,9 @@ def parse_version(tag: str) -> semver.Version | None:
 
 
 def prerelease_id(version: semver.Version) -> str:
-    """First dot-separated prerelease identifier: `rc` out of `1.5.0-rc.2`, '' when the
-    version is final. This is what names the channel."""
+    """First dot-separated prerelease identifier: `rc` out of `1.5.0-rc.2`, '' when the version is final.
+    This is what names the channel.
+    """
     return (version.prerelease or '').split('.')[0]
 
 
@@ -91,8 +90,7 @@ def main() -> int:
     else:
         latest = releases[0] if releases else semver.Version(0, 0, 0)
 
-    # Version: release-tool's next version for branch/PR builds (labelled as a
-    # pre-release of the upcoming version), else the latest tag base.
+    # Version: release-tool's next version for branch/PR builds (labelled as a pre-release of the upcoming version), else the latest tag base.
     next_version = os.environ.get('RELEASE_NEXT_VERSION')
     release_skip = os.environ.get('RELEASE_SKIP') == 'true'
 

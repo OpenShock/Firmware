@@ -1,7 +1,5 @@
-# This is a bit of a silly workflow, but Github Workflow definitions
-# do not let us easily reuse the strategy matrix used to trigger jobs
-# per-board. This is a workaround to define everything in one file, and
-# use the output in the multiple places we need it.
+# This is a bit of a silly workflow, but Github Workflow definitions do not let us easily reuse the strategy matrix used to trigger jobs per-board.
+# This is a workaround to define everything in one file, and use the output in the multiple places we need it.
 #
 # Source: https://github.com/orgs/community/discussions/26284#discussioncomment-6701976
 
@@ -42,9 +40,8 @@ jobs:
             .changes
             boards
 
-      # get-vars.py parses tags with the semver package rather than a local regex, so
-      # it needs the pinned dependency set. gha.py still self-checks the interpreter
-      # floor and fails clearly if the image ever ships something older.
+      # get-vars.py parses tags with the semver package rather than a local regex, so it needs the pinned dependency set.
+      # gha.py still self-checks the interpreter floor and fails clearly if the image ever ships something older.
       - uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405  # v6.2.0
         with:
           python-version-file: .github/scripts/.python-version
@@ -55,10 +52,7 @@ jobs:
         shell: bash
         run: pip install --require-hashes -r .github/scripts/requirements.txt
 
-      # Single source of truth for the version bump: release-tool computes the
-      # next version from .changes/. status mode works on every branch (no
-      # branch-config dependency) and creates no tag, so dev/CI builds get
-      # labelled as a pre-release of the upcoming version instead of the last tag.
+      # Single source of truth for the version bump: release-tool computes the next version from .changes/. status mode works on every branch (no branch-config dependency) and creates no tag, so dev/CI builds get labelled as a pre-release of the upcoming version instead of the last tag.
       - name: Compute next version
         id: relmeta
         uses: OpenShock/release-tool@f3e8ebc530022e209e4d6a9a9c8bdb30b643253f  # v0.3.0

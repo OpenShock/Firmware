@@ -1,8 +1,6 @@
 name: repo-server-token
 description: >-
-  Mints a GitHub Actions OIDC token for the repository server. Every call into the
-  server goes through a token from here, so there is one definition of the audience
-  and one place where a malformed mint is caught.
+  Mints a GitHub Actions OIDC token for the repository server, so the audience has one definition.
 
 inputs:
   audience:

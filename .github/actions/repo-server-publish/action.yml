@@ -1,11 +1,7 @@
 name: repo-server-publish
 description: >-
-  Stages a firmware release on the repository server: init, upload every board's
-  artifacts, then either promote it or throw it away. `mode` picks which ending, and
-  nothing before that ending differs between the two - a dry run parses the same
-  changelog, uploads the same bytes and passes the same server-side hash verification
-  as a real publish. That is what makes it worth running on ordinary builds: the
-  publish path is exercised continuously instead of first thing on release day.
+  Stages a firmware release on the repository server: init, upload every board's artifacts, then promote or discard.
+  `mode` picks the ending; nothing before it differs, so a dry run exercises the whole publish path.
 
 inputs:
   server-url:
@@ -24,9 +20,7 @@ inputs:
     description: 'Newline-separated boards to publish'
     required: true
   mode:
-    description: >-
-      `publish` promotes the release and it goes live. `dry-run` aborts it instead,
-      which deletes the staged artifacts and leaves nothing behind.
+    description: '`publish` promotes the release; `dry-run` aborts it, leaving nothing staged.'
     required: false
     default: 'dry-run'
   changelog-file:
@@ -35,9 +29,7 @@ inputs:
     default: 'CHANGELOG.md'
   nofail:
     description: >-
-      Pass ?nofail to init, so an unparseable changelog parks the release in `editing`
-      for a maintainer instead of failing the build. Off by default: on a dry run the
-      changelog failing to parse is a finding, not an inconvenience.
+      Pass ?nofail to init, so an unparseable changelog parks the release in `editing` instead of failing the build.
     required: false
     default: 'false'
 
@@ -57,8 +49,7 @@ runs:
         cache: 'pip'
         cache-dependency-path: .github/scripts/requirements.txt
 
-    # --require-hashes: this job holds the publish credential, so what pip installs
-    # next to it is pinned by digest rather than by whatever the index serves today.
+    # This job holds the publish credential, so pip installs are pinned by digest.
     - name: Install script dependencies
       shell: bash
       run: pip install --require-hashes -r .github/scripts/requirements.txt
