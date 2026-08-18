@@ -36,7 +36,6 @@ BUILD_ARTIFACTS = {
 }
 STATICFS_FIELD = 'staticfs'
 MERGED_FIELD = 'merged'
-MERGED_GLOB = 'OpenShock_*.bin'
 
 UPLOAD_RETRIES = 3
 UPLOAD_BACKOFF_SECONDS = 5
@@ -100,14 +99,16 @@ def resolve_artifacts(artifacts: Path, board: str) -> dict[str, Path]:
         found[field] = build / filename
     found[STATICFS_FIELD] = artifacts / 'firmware_staticfs' / 'staticfs.bin'
 
-    merged = sorted((artifacts / f'firmware_merged_{board}').glob(MERGED_GLOB))
+    # merge-partitions is one job for every board, so the merged binaries share a directory and are told apart by the board in their filename.
+    merged_glob = f'OpenShock_{board}_*.bin'
+    merged = sorted((artifacts / 'firmware_merged').glob(merged_glob))
     if merged:
         found[MERGED_FIELD] = merged[0]
 
     for field in (*BUILD_ARTIFACTS, STATICFS_FIELD, MERGED_FIELD):
         path = found.get(field)
         if path is None or not path.is_file():
-            expected = path if path else f'{artifacts}/firmware_merged_{board}/{MERGED_GLOB}'
+            expected = path if path else f'{artifacts}/firmware_merged/{merged_glob}'
             fail(f'{board} is missing its {field} artifact (expected {expected})')
     return found
 
