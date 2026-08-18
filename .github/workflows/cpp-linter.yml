@@ -35,8 +35,8 @@ jobs:
       - uses: ./.github/actions/build-compilationdb
         with:
           version: 0.0.0-test+build # Doesn't matter, just need the compilation database
-
-      - uses: cpp-linter/cpp-linter-action@8e85cd02c8c3fe3ae527c94b5683fe2366b144ed  # v2.20.0
+      
+      - uses: cpp-linter/cpp-linter-action@cab1143a2c149bc41e85b070a9de81716974c18f # v2.21.0
         id: linter
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
