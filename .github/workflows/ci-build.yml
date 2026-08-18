@@ -1,7 +1,4 @@
 on:
-  # develop, beta and master all build on every push (paths-ignore skips
-  # docs/meta-only changes). develop also keeps a nightly schedule. Release
-  # tags always build.
   push:
     branches:
       - develop
@@ -10,9 +7,8 @@ on:
     tags:
       - '[0-9]+.[0-9]+.[0-9]+'
       - '[0-9]+.[0-9]+.[0-9]+-*'
-    # paths-ignore applies to branch pushes only; GitHub does not evaluate it
-    # for tag pushes, so release tags always build. A develop push is skipped
-    # only when EVERY changed file matches one of these (docs, tooling, tests).
+    # Branch pushes only; GitHub does not evaluate paths-ignore for tags.
+    # A push is skipped only when every changed file matches.
     paths-ignore:
       - '**/*.md'
       - 'docs/**'
@@ -21,9 +17,7 @@ on:
       - '.claude/**'
       - '.github/ISSUE_TEMPLATE/**'
       - '.github/dependabot.yml'
-      # schemas is a dev-only submodule used to regenerate committed code via the
-      # scripts/ tooling below; no CI build checks it out, so a pointer bump alone
-      # changes nothing. Regenerated output is committed elsewhere and still builds.
+      # Dev-only submodule; no CI build checks it out, so a pointer bump alone changes nothing.
       - 'schemas'
       - 'schemas/**'
       - 'scripts/fetch_flatc.py'
@@ -42,20 +36,14 @@ on:
 
 name: ci-build
 
-# Per-ref: different branches (and tags) build and deploy concurrently. A PR
-# cancels its own superseded runs; branch/tag runs queue per ref. Nothing here
-# needs a group shared across refs: the only state two runs could contend for is
-# a release on the repository server, and the server owns that - a version can be
-# staged once, and a second attempt at it is refused with ReleaseAlreadyStaging
-# rather than interleaved.
+# Per-ref.
+# No cross-ref group is needed: the only state two runs could contend for is a release on the server, which refuses a second staging of a version.
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
-# Least-privilege default for every job. Jobs that need more (actions:read on the
-# gate, id-token:write on repo-server/announce, contents:write on release) opt up
-# explicitly. Note what is absent: no job holds a storage or CDN credential,
-# because no job writes to storage or a CDN.
+# Least-privilege default; jobs needing more opt up explicitly.
+# No job holds a storage or CDN credential, because no job writes to either.
 permissions:
   contents: read
 
@@ -63,15 +51,10 @@ env:
   PYTHON_VERSION: 3.13
 
 jobs:
-  # Decides what this run does:
-  #   build  - run the build matrix (any branch push, PRs, release tags)
-  #   deploy - publish to the repository server for real, instead of the dry run
-  #            every other build does (release tags; nightly/manual develop deploy)
-  # develop/beta/master pushes build but do not deploy. schedule (develop) and a
-  # manual dispatch on develop rebuild and deploy; the nightly is skipped when
-  # develop has not advanced since the last one. deploy always implies build.
+  # build governs the build matrix, and every build publishes to the repository server.
+  # deploy additionally cuts a GitHub release, and implies build.
   gate:
-    runs-on: ubuntu-slim # lightweight: one github-script step, no checkout/install
+    runs-on: ubuntu-slim
     timeout-minutes: 3
     permissions:
       contents: read
@@ -80,15 +63,7 @@ jobs:
       build: ${{ steps.decide.outputs.build }}
       deploy: ${{ steps.decide.outputs.deploy }}
     steps:
-      # Decide what this run does. Inlined as github-script (which preloads
-      # octokit + core) so the gate needs no checkout, no pnpm install and no
-      # node_modules on the critical path of every push/PR.
-      #   push (branch)     -> build; push (tag) -> build + deploy
-      #   pull_request      -> build
-      #   schedule          -> rebuild + deploy develop, only when it advanced
-      #                        since the last develop deploy
-      #   workflow_dispatch -> build; also deploy when run on develop
-      # deploy always implies build.
+      # github-script so the gate needs no checkout or install.
       - name: Decide build vs deploy
         id: decide
         uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3  # v9.0.0
@@ -97,11 +72,8 @@ jobs:
             const { eventName, ref, sha } = context;
             const { owner, repo } = context.repo;
 
-            // HEAD deployed by the most recent develop deploy - a nightly
-            // (schedule) or a manual dispatch of develop - or '' (also on API
-            // error, so a transient hiccup degrades to "treat as changed" and
-            // deploys rather than wrongly skipping). Both event types are
-            // considered so a manual deploy is not invisible to the next nightly.
+            // HEAD of the last develop deploy, nightly or manual.
+            // Returns '' on error so a hiccup redeploys rather than wrongly skipping.
             async function lastDeploySha() {
               const latestRunFor = async (event) => {
                 const { data } = await github.rest.actions.listWorkflowRuns({
@@ -194,8 +166,8 @@ jobs:
         with:
           version: ${{ needs.getvars.outputs.version }}
 
-  # Compile each board's C++ firmware. Builds only the code partitions (no static0
-  # image, no frontend), so it runs in parallel with build-staticfs.
+  # Compile each board's C++ firmware.
+  # Builds only the code partitions (no static0 image, no frontend), so it runs in parallel with build-staticfs.
   build-firmware:
     runs-on: ubuntu-latest
     needs: [gate, getvars]
@@ -216,8 +188,8 @@ jobs:
           board: ${{ matrix.board }}
           version: ${{ needs.getvars.outputs.version }}
 
-  # Link each board's C++ partitions with the shared static0 image into one
-  # flashable binary. Waits on both parallel build legs.
+  # Link each board's C++ partitions with the shared static0 image into one flashable binary.
+  # Waits on both parallel build legs.
   merge-partitions:
     runs-on: ubuntu-latest
     needs: [getvars, build-staticfs, build-firmware]
@@ -240,101 +212,60 @@ jobs:
           board: ${{ matrix.board }}
 
   checkpoint-build:
-    runs-on: ubuntu-slim # lightweight: barrier job, just an echo
+    runs-on: ubuntu-slim
     needs: [merge-partitions]
     timeout-minutes: 1
     steps:
       - run: echo "Builds checkpoint reached"
 
-  # The deployment, in full. CI starts a release on the repository server, uploads every
-  # board's artifacts to it, and tells it to publish - failing on the first of those that
-  # does not succeed. There is nothing else, and deliberately so: where the artifacts are
-  # stored, which hostname serves them and the moment a channel starts offering them are the
-  # server's decisions, taken behind one API call. CI holds no storage or CDN credential, so
-  # a mistake here cannot leave objects, pointer files and the release index disagreeing
-  # about what is live.
+  # Stage a release on the repository server, upload every board's artifacts with the hash CI computed for each, publish.
+  # Fail on the first non-success; that is the whole contract.
+  # Where artifacts are stored and which hostname serves them are the server's decisions, and CI holds no storage credential to second-guess them with.
   #
-  # `mode` follows the deploy gate:
-  #
-  #   deploy == false  dry run - init, upload every board, then discard
-  #   deploy == true   publish for real
-  #
-  # A dry run parses the same changelog, uploads the same bytes and passes the same
-  # server-side hash verification as a real publish, so every ordinary build exercises the
-  # publish path rather than it being first walked on release day. Either ending leaves
-  # nothing staged: the action aborts the release on the dry-run path and on any failure, so
-  # the next attempt can reuse the version instead of colliding with an abandoned one.
-  #
-  # CI submits blobs and the hash it computed for each, and fails on any non-success from the
-  # server. That is the whole contract. The server hashes what it received and rejects a
-  # mismatch; that the stored objects are retrievable at the URLs it advertises is its own
-  # invariant, checked at publish. CI is not in a position to assert either - it does not know
-  # where the server chose to write, or which hostname fronts it.
-  #
-  # There is no preflight for the same reason. An unregistered repository, a missing scope and
-  # an unknown board are all non-success responses from init, before a single artifact is
-  # uploaded, and each names its own cause. Asking the same questions beforehand only moved the
-  # answer earlier by a second and gave it a second place to be wrong.
-  #
-  # A published version goes live on that branch's channel and CI cannot take it back; only a
-  # maintainer can, at /admin/firmware/releases.
+  # Every build publishes, against the development instance.
+  # Publishing consumes a version and only a maintainer can undo it, at /admin/firmware/releases.
+  # Branch builds carry +<short-sha> so pushes do not collide; re-running a build on a published commit does.
+  # A staged release is aborted on failure, so the retry can reuse the version.
   repo-server:
-    name: Repository server (${{ needs.gate.outputs.deploy == 'true' && 'publish' || 'dry run' }})
+    name: Repository server (publish)
     runs-on: ubuntu-latest
     needs: [gate, getvars, checkpoint-build]
     timeout-minutes: 20
-    # A fork PR cannot mint an OIDC token for this repository, so it would fail on something
-    # the contributor cannot fix. An unset server URL is handled inside the job instead of
-    # here: skipping a job is how a deploy silently ships nothing, and this job is the deploy.
+    # A fork PR cannot mint an OIDC token here, so it would fail on something the contributor cannot fix.
     if: ${{ github.event.pull_request.head.repo.fork != true }}
     permissions:
       contents: read
       id-token: write
 
     steps:
-      # Not configured is only tolerable when nothing was going to be published anyway.
       - name: Resolve server configuration
-        id: config
         env:
           SERVER_URL: ${{ vars.OPENSHOCK_REPO_SERVER_URL }}
-          DEPLOY: ${{ needs.gate.outputs.deploy }}
         run: |
           set -euo pipefail
-          if [ -n "$SERVER_URL" ]; then
-            echo "configured=true" >> "$GITHUB_OUTPUT"
-            exit 0
-          fi
-          if [ "$DEPLOY" = 'true' ]; then
-            echo "::error::OPENSHOCK_REPO_SERVER_URL is unset, so this deploy has nowhere to publish to."
+          if [ -z "$SERVER_URL" ]; then
+            echo "::error::OPENSHOCK_REPO_SERVER_URL is unset, so this build has nowhere to publish to."
             exit 1
           fi
-          echo "::notice::OPENSHOCK_REPO_SERVER_URL is unset; skipping the dry run."
-          echo "configured=false" >> "$GITHUB_OUTPUT"
 
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
-        if: ${{ steps.config.outputs.configured == 'true' }}
         with:
           sparse-checkout: |
             .github
             CHANGELOG.md
 
-      # A beta/master publish must have a draft release staged by release.yml for this
-      # version; otherwise a stray tag push could put firmware on a channel devices follow.
-      # develop has no releases, so it is exempt, and a dry run publishes nothing either way.
-      - name: Require a staged draft release (beta/master publish only)
+      # get-vars maps a push to `master` or `beta` onto a channel devices follow, tag or no tag.
+      # release.yml's draft is what stops a stray push from shipping there.
+      - name: Require a staged draft release (beta/stable publish only)
         if: >-
-          steps.config.outputs.configured == 'true'
-          && needs.gate.outputs.deploy == 'true'
-          && needs.getvars.outputs.release-channel != 'develop'
+          needs.getvars.outputs.release-channel != 'develop'
         env:
           GH_TOKEN: ${{ github.token }}
           REPO: ${{ github.repository }}
           TAG: ${{ needs.getvars.outputs.version }}
         run: |
           set -euo pipefail
-          # release.yml pushes the tag (which triggers this run) and only then
-          # stages the draft, so poll for up to ~60s rather than failing on the
-          # brief window before the draft exists.
+          # release.yml pushes the tag (which triggers this run) and only then stages the draft, so poll for up to ~60s rather than failing on the brief window before the draft exists.
           for attempt in $(seq 1 12); do
             isDraft=$(gh release view "$TAG" --repo "$REPO" --json isDraft --jq '.isDraft' 2>/dev/null || echo "missing")
             if [ "$isDraft" = "true" ]; then
@@ -349,14 +280,10 @@ jobs:
 
       - uses: ./.github/actions/repo-server-token
         id: token
-        if: ${{ steps.config.outputs.configured == 'true' }}
 
-      # get-vars derives the channel from the branch name, so a feature branch yields something
-      # the server's enum does not know. Only the three real channels pass through; anything
-      # else is treated as develop.
+      # A feature branch yields a channel the server's enum does not know; treat it as develop.
       - name: Resolve channel
         id: channel
-        if: ${{ steps.config.outputs.configured == 'true' }}
         env:
           CHANNEL: ${{ needs.getvars.outputs.release-channel }}
         run: |
@@ -369,23 +296,17 @@ jobs:
           echo "name=$name" >> "$GITHUB_OUTPUT"
 
       - uses: ./.github/actions/repo-server-publish
-        if: ${{ steps.config.outputs.configured == 'true' }}
         with:
           server-url: ${{ vars.OPENSHOCK_REPO_SERVER_URL }}
           token: ${{ steps.token.outputs.token }}
           version: ${{ needs.getvars.outputs.version }}
           channel: ${{ steps.channel.outputs.name }}
           boards: ${{ needs.getvars.outputs.board-list }}
-          mode: ${{ needs.gate.outputs.deploy == 'true' && 'publish' || 'dry-run' }}
+          mode: publish
 
-  # Mirrors the binaries onto the GitHub release, for people rather than for devices - a hub
-  # updates from the repository server and never looks here. It runs after the publish
-  # because the version is live at that point, so a published GitHub release cannot advertise
-  # something no device can fetch. `needs: repo-server` without an always() guard is what
-  # makes that ordering strict: a failed or discarded publish skips this job.
-  #
-  # Only a real deploy of a stable/beta tag has a draft staged by release.yml; a develop
-  # deploy has no release, and an ordinary build only did a dry run.
+  # Mirrors the binaries onto the GitHub release, for people rather than devices.
+  # Runs after the publish, with no always() guard, so a release never advertises what no device can fetch.
+  # Stays on the deploy gate: every build publishes, not every build cuts a release.
   release:
     runs-on: ubuntu-latest
     needs: [gate, getvars, repo-server]
@@ -397,9 +318,7 @@ jobs:
       contents: write
 
     steps:
-      # Only the merged, flashable binaries are needed here; downloading every
-      # artifact (frontend, per-board partitions, staticfs) just to glob for the
-      # merged images is wasteful.
+      # Only the merged, flashable binaries are needed here; downloading every artifact (frontend, per-board partitions, staticfs) just to glob for the merged images is wasteful.
       - name: Download release artifacts
         uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c  # v8.0.1
         with:
@@ -408,10 +327,8 @@ jobs:
       - name: Display artifacts
         run: ls -R
 
-      # release.yml staged the draft release for this tag with the title and
-      # notes. Here we attach the freshly built binaries and then publish the
-      # draft - so the GitHub release goes live only once its binaries exist and
-      # the repository server is already serving the version.
+      # release.yml staged the draft release for this tag with the title and notes.
+      # Here we attach the freshly built binaries and then publish the draft - so the GitHub release goes live only once its binaries exist and the repository server is already serving the version.
       - name: Upload binaries to staged release
         env:
           GH_TOKEN: ${{ github.token }}
@@ -426,8 +343,7 @@ jobs:
           fi
           gh release upload "$TAG" "${files[@]}" --clobber
 
-      # Solidify: the version is live on the repository server and the binaries
-      # are attached - now publish the draft, and only then announce.
+      # Solidify: the version is live on the repository server and the binaries are attached - now publish the draft, and only then announce.
       - name: Publish the release
         env:
           GH_TOKEN: ${{ github.token }}
@@ -435,11 +351,8 @@ jobs:
           TAG: ${{ needs.getvars.outputs.version }}
         run: gh release edit "$TAG" --draft=false
 
-  # Announce the release to the OpenShock API last of all - after the repository server has
-  # published it, so the API never leads the rollout (a device asked to update by the API
-  # could otherwise be pointed at a version the server is not yet serving). Chaining on
-  # `release` inherits its conditions: only a stable/beta deploy gets this far, which is also
-  # the only case that produced a release.json to send.
+  # Announce the release to the OpenShock API last of all - after the repository server has published it, so the API never leads the rollout (a device asked to update by the API could otherwise be pointed at a version the server is not yet serving).
+  # Chaining on `release` inherits its conditions: only a stable/beta deploy gets this far, which is also the only case that produced a release.json to send.
   announce:
     runs-on: ubuntu-slim # lightweight: gh + curl only
     needs: [getvars, release]
