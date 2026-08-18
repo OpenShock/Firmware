@@ -1,4 +1,4 @@
-cryptography==49.0.0
+cryptography==50.0.0
 esptool==5.3.1
 # Used by scripts/embed_env_vars.py (import git). The old espressif32 platform
 # pulled GitPython in transitively; the pioarduino platform does not, so pin it

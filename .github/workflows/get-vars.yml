@@ -42,7 +42,7 @@ jobs:
 
       # get-vars.py parses tags with the semver package rather than a local regex, so it needs the pinned dependency set.
       # gha.py still self-checks the interpreter floor and fails clearly if the image ever ships something older.
-      - uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405  # v6.2.0
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97  # v7.0.0
         with:
           python-version-file: .github/scripts/.python-version
           cache: 'pip'
@@ -55,7 +55,7 @@ jobs:
       # Single source of truth for the version bump: release-tool computes the next version from .changes/. status mode works on every branch (no branch-config dependency) and creates no tag, so dev/CI builds get labelled as a pre-release of the upcoming version instead of the last tag.
       - name: Compute next version
         id: relmeta
-        uses: OpenShock/release-tool@f3e8ebc530022e209e4d6a9a9c8bdb30b643253f  # v0.3.0
+        uses: OpenShock/release-tool@ea651e8c10372a10b6f452dcb34c38e60a72dc1f  # v0.5.1
         with:
           mode: status
 

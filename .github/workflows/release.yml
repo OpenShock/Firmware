@@ -51,7 +51,7 @@ jobs:
 
       - name: Run release tool
         id: meta
-        uses: OpenShock/release-tool@f3e8ebc530022e209e4d6a9a9c8bdb30b643253f  # v0.3.0
+        uses: OpenShock/release-tool@ea651e8c10372a10b6f452dcb34c38e60a72dc1f  # v0.5.1
         with:
           mode: release
           output: release.json
@@ -69,8 +69,9 @@ jobs:
           exit 1
 
       - name: Push commit and tag
-        if: steps.meta.outputs.tag != ''
-        run: git push origin HEAD "${{ steps.meta.outputs.tag }}"
+        uses: OpenShock/actions/publish-tag@21ca2d511bca92cf24fb502fa302f82700822584  # v1.1.1
+        with:
+          tag: ${{ steps.meta.outputs.tag }}
 
       # The OpenShock API is announced from ci-build's release job, only after
       # the firmware is actually built and uploaded - not here, before it exists.
