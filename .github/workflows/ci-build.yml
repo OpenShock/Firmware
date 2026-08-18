@@ -30,7 +30,24 @@ on:
       - beta
       - develop
     types: [opened, reopened, synchronize]
-  workflow_dispatch: # Manually invoked, e.g. to force a develop build.
+  workflow_dispatch:
+    inputs:
+      server:
+        description: 'Repository server to publish to (prod is honoured only when running against a tag)'
+        required: false
+        type: choice
+        default: dev
+        options: [dev, prod]
+      channel:
+        description: 'Channel to publish onto'
+        required: false
+        type: choice
+        default: develop
+        options: [develop, beta, stable]
+      tag:
+        description: 'Version to publish as, e.g. 1.2.3. Defaults to the version get-vars derives from the ref.'
+        required: false
+        type: string
   schedule:
     - cron: '0 3 * * *' # Nightly develop build; the gate job skips it if idle.
 
@@ -51,8 +68,10 @@ env:
   PYTHON_VERSION: 3.13
 
 jobs:
-  # build governs the build matrix, and every build publishes to the repository server.
+  # build governs the build matrix.
   # deploy additionally cuts a GitHub release, and implies build.
+  # publish governs whether the build reaches a repository server at all, and server names which one.
+  # Building is not publishing: a branch push and a pull request compile and go no further.
   gate:
     runs-on: ubuntu-slim
     timeout-minutes: 3
@@ -62,9 +81,11 @@ jobs:
     outputs:
       build: ${{ steps.decide.outputs.build }}
       deploy: ${{ steps.decide.outputs.deploy }}
+      publish: ${{ steps.decide.outputs.publish }}
+      server: ${{ steps.decide.outputs.server }}
     steps:
       # github-script so the gate needs no checkout or install.
-      - name: Decide build vs deploy
+      - name: Decide build, deploy and publish
         id: decide
         uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3  # v9.0.0
         with:
@@ -127,9 +148,33 @@ jobs:
                 build = true;
             }
 
+            // Publishing is never a side effect of a build.
+            // A branch push and a pull request compile and stop, so merging changes nothing on any server until someone says to.
+            // The develop nightly and a release tag publish to prod, because both are already the deliberate act.
+            // Everything else reaches a server only by being dispatched, which is where the channel and the ref are chosen by hand.
+            const isTag = ref.startsWith('refs/tags/');
+
+            let publish = false;
+            let server = 'dev';
+
+            if (eventName === 'workflow_dispatch') {
+              publish = true;
+              server = context.payload.inputs?.server === 'prod' ? 'prod' : 'dev';
+              // The ref picker offers tags as well as branches, so reaching prod by hand still means running against the tag being released.
+              if (server === 'prod' && !isTag) {
+                core.warning(`prod was requested on ${ref}; only a tag may dispatch to prod, publishing to dev instead.`);
+                server = 'dev';
+              }
+            } else if (eventName === 'schedule' || (eventName === 'push' && isTag)) {
+              publish = true;
+              server = 'prod';
+            }
+
             core.setOutput('build', build);
             core.setOutput('deploy', deploy);
-            core.info(`decision: build=${build} deploy=${deploy}`);
+            core.setOutput('publish', publish);
+            core.setOutput('server', server);
+            core.info(`decision: build=${build} deploy=${deploy} publish=${publish} server=${server}`);
 
   getvars:
     needs: [gate]
@@ -227,12 +272,15 @@ jobs:
   # Branch builds carry +<short-sha> so pushes do not collide; re-running a build on a published commit does.
   # A staged release is aborted on failure, so the retry can reuse the version.
   repo-server:
-    name: Repository server (publish)
+    name: Repository server (publish to ${{ needs.gate.outputs.server }})
     runs-on: ubuntu-latest
     needs: [gate, getvars, checkpoint-build]
     timeout-minutes: 20
     # A fork PR cannot mint an OIDC token here, so it would fail on something the contributor cannot fix.
-    if: ${{ github.event.pull_request.head.repo.fork != true }}
+    if: ${{ needs.gate.outputs.publish == 'true' && github.event.pull_request.head.repo.fork != true }}
+    # The environment carries OPENSHOCK_REPO_SERVER_URL, so which instance is published to is settings rather than workflow logic.
+    # It is also where a required reviewer on repo-server-prod takes effect, which makes a production publish a protected action instead of an if condition.
+    environment: repo-server-${{ needs.gate.outputs.server }}
     permissions:
       contents: read
       id-token: write
@@ -241,12 +289,14 @@ jobs:
       - name: Resolve server configuration
         env:
           SERVER_URL: ${{ vars.OPENSHOCK_REPO_SERVER_URL }}
+          TARGET: ${{ needs.gate.outputs.server }}
         run: |
           set -euo pipefail
           if [ -z "$SERVER_URL" ]; then
-            echo "::error::OPENSHOCK_REPO_SERVER_URL is unset, so this build has nowhere to publish to."
+            echo "::error::OPENSHOCK_REPO_SERVER_URL is unset on environment repo-server-$TARGET, so this build has nowhere to publish to."
             exit 1
           fi
+          echo "Publishing to the $TARGET repository server."
 
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
         with:
@@ -254,53 +304,41 @@ jobs:
             .github
             CHANGELOG.md
 
-      # get-vars maps a push to `master` or `beta` onto a channel devices follow, tag or no tag.
-      # release.yml's draft is what stops a stray push from shipping there.
-      - name: Require a staged draft release (beta/stable publish only)
-        if: >-
-          needs.getvars.outputs.release-channel != 'develop'
+      # Same pinned set the repo-server actions install, so this runs before a credential is minted rather than after.
+      - uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405  # v6.2.0
+        with:
+          python-version-file: .github/scripts/.python-version
+          cache: 'pip'
+          cache-dependency-path: .github/scripts/requirements.txt
+
+      - name: Install script dependencies
+        shell: bash
+        run: pip install --require-hashes -r .github/scripts/requirements.txt
+
+      # Resolves the channel and version this run publishes under, and refuses the run if this repository's rules say it may not.
+      # The rules are all about prod, and all about things the server cannot know: that a stable release descends from master, that a maintainer staged a draft for it.
+      - name: Apply repository publishing policy
+        id: policy
         env:
-          GH_TOKEN: ${{ github.token }}
+          GITHUB_TOKEN: ${{ github.token }}
           REPO: ${{ github.repository }}
-          TAG: ${{ needs.getvars.outputs.version }}
-        run: |
-          set -euo pipefail
-          # release.yml pushes the tag (which triggers this run) and only then stages the draft, so poll for up to ~60s rather than failing on the brief window before the draft exists.
-          for attempt in $(seq 1 12); do
-            isDraft=$(gh release view "$TAG" --repo "$REPO" --json isDraft --jq '.isDraft' 2>/dev/null || echo "missing")
-            if [ "$isDraft" = "true" ]; then
-              echo "Draft release for $TAG is staged."
-              exit 0
-            fi
-            echo "Draft for $TAG not staged yet (state: $isDraft); retry $attempt/12..."
-            sleep 5
-          done
-          echo "::error::No draft release for $TAG after ~60s. release.yml must stage the draft before the publish runs."
-          exit 1
+          SHA: ${{ github.sha }}
+          SERVER: ${{ needs.gate.outputs.server }}
+          CHANNEL_INPUT: ${{ inputs.channel }}
+          DERIVED_CHANNEL: ${{ needs.getvars.outputs.release-channel }}
+          TAG_INPUT: ${{ inputs.tag }}
+          DERIVED_VERSION: ${{ needs.getvars.outputs.version }}
+        run: python .github/scripts/repo_server_policy.py
 
       - uses: ./.github/actions/repo-server-token
         id: token
-
-      # A feature branch yields a channel the server's enum does not know; treat it as develop.
-      - name: Resolve channel
-        id: channel
-        env:
-          CHANNEL: ${{ needs.getvars.outputs.release-channel }}
-        run: |
-          set -euo pipefail
-          case "$CHANNEL" in
-            stable|beta|develop) name="$CHANNEL" ;;
-            *) name='develop' ;;
-          esac
-          echo "Channel: $CHANNEL -> $name"
-          echo "name=$name" >> "$GITHUB_OUTPUT"
 
       - uses: ./.github/actions/repo-server-publish
         with:
           server-url: ${{ vars.OPENSHOCK_REPO_SERVER_URL }}
           token: ${{ steps.token.outputs.token }}
-          version: ${{ needs.getvars.outputs.version }}
-          channel: ${{ steps.channel.outputs.name }}
+          version: ${{ steps.policy.outputs.version }}
+          channel: ${{ steps.policy.outputs.channel }}
           boards: ${{ needs.getvars.outputs.board-list }}
           mode: publish
 
