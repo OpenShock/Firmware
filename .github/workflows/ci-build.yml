@@ -44,10 +44,6 @@ on:
         type: choice
         default: develop
         options: [develop, beta, stable]
-      tag:
-        description: 'Version to publish as, e.g. 1.2.3. Defaults to the version get-vars derives from the ref.'
-        required: false
-        type: string
   schedule:
     - cron: '0 3 * * *' # Nightly develop build; the gate job skips it if idle.
 
@@ -180,10 +176,97 @@ jobs:
     needs: [gate]
     if: ${{ needs.gate.outputs.build == 'true' || needs.gate.outputs.deploy == 'true' }}
     uses: ./.github/workflows/get-vars.yml
+    # Empty on every event but a dispatch, which is when get-vars derives the channel from the ref instead.
+    with:
+      channel: ${{ inputs.channel }}
+
+  # Opens the release the moment get-vars has settled what this run is, before anything is built.
+  # Everything the server checks at init - semver, the channel enum, a version already published, another run holding the same one, an unknown board - answers here in a minute rather than after the matrix.
+  # It also reserves the version: a second run for it is refused now, instead of after both have spent half an hour building.
+  stage:
+    name: Stage release on ${{ needs.gate.outputs.server }}
+    runs-on: ubuntu-latest
+    needs: [gate, getvars]
+    timeout-minutes: 10
+    # A fork PR cannot mint an OIDC token here, so it would fail on something the contributor cannot fix.
+    if: ${{ needs.gate.outputs.publish == 'true' && github.event.pull_request.head.repo.fork != true }}
+    # The environment carries OPENSHOCK_REPO_SERVER_URL, so which instance is published to is settings rather than workflow logic.
+    # The required reviewer on repo-server-prod also takes effect here rather than at the publish, so a production release is approved before it spends the build rather than after.
+    environment: repo-server-${{ needs.gate.outputs.server }}
+    permissions:
+      contents: read
+      id-token: write
+    outputs:
+      release-id: ${{ steps.stage.outputs.release-id }}
+      # The publish and abort jobs run outside the environment, so they cannot read its vars themselves.
+      # This is a hostname, not a credential.
+      server-url: ${{ steps.resolve.outputs.server-url }}
+
+    steps:
+      - name: Resolve server configuration
+        id: resolve
+        env:
+          SERVER_URL: ${{ vars.OPENSHOCK_REPO_SERVER_URL }}
+          TARGET: ${{ needs.gate.outputs.server }}
+        run: |
+          set -euo pipefail
+          if [ -z "$SERVER_URL" ]; then
+            echo "::error::OPENSHOCK_REPO_SERVER_URL is unset on environment repo-server-$TARGET, so this build has nowhere to publish to."
+            exit 1
+          fi
+          echo "server-url=$SERVER_URL" >> "$GITHUB_OUTPUT"
+          echo "Publishing to the $TARGET repository server."
+
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+        with:
+          sparse-checkout: |
+            .github
+            CHANGELOG.md
+
+      # Same pinned set the repo-server actions install, so this runs before a credential is minted rather than after.
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97  # v7.0.0
+        with:
+          python-version-file: .github/scripts/.python-version
+          cache: 'pip'
+          cache-dependency-path: .github/scripts/requirements.txt
+
+      - name: Install script dependencies
+        shell: bash
+        run: pip install --require-hashes -r .github/scripts/requirements.txt
+
+      # Refuses the run if this repository's rules say it may not publish what get-vars resolved.
+      # The rules are all about prod, and all about things the server cannot know: that a stable release descends from master, that a maintainer staged a draft for it.
+      - name: Apply repository publishing policy
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          SHA: ${{ github.sha }}
+          SERVER: ${{ needs.gate.outputs.server }}
+          CHANNEL: ${{ needs.getvars.outputs.release-channel }}
+          VERSION: ${{ needs.getvars.outputs.version }}
+        run: python .github/scripts/repo_server_policy.py
+
+      - uses: ./.github/actions/repo-server-token
+        id: token
+
+      - uses: ./.github/actions/repo-server-publish
+        id: stage
+        with:
+          server-url: ${{ steps.resolve.outputs.server-url }}
+          token: ${{ steps.token.outputs.token }}
+          version: ${{ needs.getvars.outputs.version }}
+          channel: ${{ needs.getvars.outputs.release-channel }}
+          boards: ${{ needs.getvars.outputs.board-list }}
+          mode: init
 
   build-frontend:
-    needs: [gate]
-    if: ${{ needs.gate.outputs.build == 'true' }}
+    # Waits on stage so the reviewer on a prod release approves before the compute is spent rather than while it burns.
+    # stage is skipped on anything that does not publish, and a skip is not a failure, so a PR still builds.
+    needs: [gate, stage]
+    if: >-
+      ${{ !cancelled()
+      && needs.gate.outputs.build == 'true'
+      && needs.stage.result != 'failure' }}
     runs-on: ubuntu-latest
     timeout-minutes: 5
 
@@ -215,8 +298,13 @@ jobs:
   # Builds only the code partitions (no static0 image, no frontend), so it runs in parallel with build-staticfs.
   build-firmware:
     runs-on: ubuntu-latest
-    needs: [gate, getvars]
-    if: ${{ needs.gate.outputs.build == 'true' }}
+    needs: [gate, getvars, stage]
+    # getvars is named explicitly: without it, !cancelled() would let the matrix start on an empty board-matrix when get-vars failed.
+    if: >-
+      ${{ !cancelled()
+      && needs.gate.outputs.build == 'true'
+      && needs.getvars.result == 'success'
+      && needs.stage.result != 'failure' }}
     timeout-minutes: 30
     strategy:
       fail-fast: false
@@ -263,41 +351,25 @@ jobs:
     steps:
       - run: echo "Builds checkpoint reached"
 
-  # Stage a release on the repository server, upload every board's artifacts with the hash CI computed for each, publish.
+  # Upload every board's artifacts with the hash CI computed for each, into the release stage opened, then publish.
   # Fail on the first non-success; that is the whole contract.
   # Where artifacts are stored and which hostname serves them are the server's decisions, and CI holds no storage credential to second-guess them with.
   #
   # Every build publishes, against the development instance.
   # Publishing consumes a version and only a maintainer can undo it, at /admin/firmware/releases.
   # Branch builds carry +<short-sha> so pushes do not collide; re-running a build on a published commit does.
-  # A staged release is aborted on failure, so the retry can reuse the version.
+  # No environment here: the reviewer already approved this release at stage, and nothing can be promoted that was not staged there.
   repo-server:
     name: Repository server (publish to ${{ needs.gate.outputs.server }})
     runs-on: ubuntu-latest
-    needs: [gate, getvars, checkpoint-build]
+    needs: [gate, getvars, stage, checkpoint-build]
     timeout-minutes: 20
-    # A fork PR cannot mint an OIDC token here, so it would fail on something the contributor cannot fix.
     if: ${{ needs.gate.outputs.publish == 'true' && github.event.pull_request.head.repo.fork != true }}
-    # The environment carries OPENSHOCK_REPO_SERVER_URL, so which instance is published to is settings rather than workflow logic.
-    # It is also where a required reviewer on repo-server-prod takes effect, which makes a production publish a protected action instead of an if condition.
-    environment: repo-server-${{ needs.gate.outputs.server }}
     permissions:
       contents: read
       id-token: write
 
     steps:
-      - name: Resolve server configuration
-        env:
-          SERVER_URL: ${{ vars.OPENSHOCK_REPO_SERVER_URL }}
-          TARGET: ${{ needs.gate.outputs.server }}
-        run: |
-          set -euo pipefail
-          if [ -z "$SERVER_URL" ]; then
-            echo "::error::OPENSHOCK_REPO_SERVER_URL is unset on environment repo-server-$TARGET, so this build has nowhere to publish to."
-            exit 1
-          fi
-          echo "Publishing to the $TARGET repository server."
-
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
         with:
           sparse-checkout: |
@@ -315,32 +387,54 @@ jobs:
         shell: bash
         run: pip install --require-hashes -r .github/scripts/requirements.txt
 
-      # Resolves the channel and version this run publishes under, and refuses the run if this repository's rules say it may not.
-      # The rules are all about prod, and all about things the server cannot know: that a stable release descends from master, that a maintainer staged a draft for it.
-      - name: Apply repository publishing policy
-        id: policy
-        env:
-          GITHUB_TOKEN: ${{ github.token }}
-          REPO: ${{ github.repository }}
-          SHA: ${{ github.sha }}
-          SERVER: ${{ needs.gate.outputs.server }}
-          CHANNEL_INPUT: ${{ inputs.channel }}
-          DERIVED_CHANNEL: ${{ needs.getvars.outputs.release-channel }}
-          TAG_INPUT: ${{ inputs.tag }}
-          DERIVED_VERSION: ${{ needs.getvars.outputs.version }}
-        run: python .github/scripts/repo_server_policy.py
+      - uses: ./.github/actions/repo-server-token
+        id: token
+
+      - uses: ./.github/actions/repo-server-publish
+        with:
+          server-url: ${{ needs.stage.outputs.server-url }}
+          token: ${{ steps.token.outputs.token }}
+          release-id: ${{ needs.stage.outputs.release-id }}
+          boards: ${{ needs.getvars.outputs.board-list }}
+          mode: publish
+
+  # The finally for the release stage opened.
+  # That lifetime now spans jobs, so nothing inside a single script can close it: if the build fails, is cancelled, or never reaches the publish, this is what hands the version back.
+  # The server's TTL sweeper is the backstop rather than the mechanism - waiting for it would hold the version against the very retry meant to fix the failure.
+  abort:
+    name: Abort staged release
+    runs-on: ubuntu-latest
+    needs: [gate, stage, repo-server]
+    timeout-minutes: 10
+    if: ${{ always() && needs.stage.outputs.release-id != '' && needs.repo-server.result != 'success' }}
+    permissions:
+      contents: read
+      id-token: write
+
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+        with:
+          sparse-checkout: .github
+
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97  # v7.0.0
+        with:
+          python-version-file: .github/scripts/.python-version
+          cache: 'pip'
+          cache-dependency-path: .github/scripts/requirements.txt
+
+      - name: Install script dependencies
+        shell: bash
+        run: pip install --require-hashes -r .github/scripts/requirements.txt
 
       - uses: ./.github/actions/repo-server-token
         id: token
 
       - uses: ./.github/actions/repo-server-publish
         with:
-          server-url: ${{ vars.OPENSHOCK_REPO_SERVER_URL }}
+          server-url: ${{ needs.stage.outputs.server-url }}
           token: ${{ steps.token.outputs.token }}
-          version: ${{ steps.policy.outputs.version }}
-          channel: ${{ steps.policy.outputs.channel }}
-          boards: ${{ needs.getvars.outputs.board-list }}
-          mode: publish
+          release-id: ${{ needs.stage.outputs.release-id }}
+          mode: abort
 
   # Mirrors the binaries onto the GitHub release, for people rather than devices.
   # Runs after the publish, with no always() guard, so a release never advertises what no device can fetch.
@@ -349,9 +443,11 @@ jobs:
     runs-on: ubuntu-latest
     needs: [gate, getvars, repo-server]
     timeout-minutes: 5
+    # A GitHub release exists only for a tag, and only because release.yml staged the draft.
+    # Testing the ref rather than the channel, since a dispatch may now name a channel the ref has no release for.
     if: >-
       needs.gate.outputs.deploy == 'true'
-      && (needs.getvars.outputs.release-channel == 'stable' || needs.getvars.outputs.release-channel == 'beta')
+      && startsWith(github.ref, 'refs/tags/')
     permissions:
       contents: write
 

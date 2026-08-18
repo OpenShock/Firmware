@@ -14,7 +14,11 @@ from pathlib import Path
 
 import semver
 
-from gha import fail, set_output
+from gha import fail, notice, set_output
+
+# The channels the repository server's enum knows.
+# A feature branch derives its own name, which is not one of them.
+KNOWN_CHANNELS = ('stable', 'beta', 'develop')
 
 def parse_version(tag: str) -> semver.Version | None:
     """Strict semver, except for the historical `v` prefix - the repo still carries a `v0.8.1` tag that the spec (and therefore the parser) rejects.
@@ -121,6 +125,19 @@ def main() -> int:
         fail(f'Tag "{head_ref}" has an unrecognized prerelease channel')
     else:
         channel = sanitize(head_ref)
+
+    # A dispatch may name the channel; otherwise the ref decides.
+    # Resolving it here rather than at publish time keeps one answer for the whole run, so what a build reports about itself is what it is published as.
+    channel_input = os.environ.get('CHANNEL_INPUT', '').strip()
+    if channel_input:
+        if channel_input not in KNOWN_CHANNELS:
+            fail(f'Channel "{channel_input}" is not one of: {", ".join(KNOWN_CHANNELS)}')
+        if channel_input != channel:
+            notice(f'Channel overridden by dispatch: {channel} -> {channel_input}')
+        channel = channel_input
+    elif channel not in KNOWN_CHANNELS:
+        notice(f'Channel "{channel}" is not one the server knows; using develop.')
+        channel = 'develop'
 
     # Board matrix: one entry per boards/<Board>.defaults fragment.
     boards_dir = Path('boards')

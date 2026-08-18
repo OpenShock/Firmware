@@ -1,7 +1,13 @@
 name: repo-server-publish
 description: >-
-  Stages a firmware release on the repository server: init, upload every board's artifacts, then promote or discard.
-  `mode` picks the ending; nothing before it differs, so a dry run exercises the whole publish path.
+  Drives one phase of a firmware release on the repository server.
+  `init` opens the release and returns its id; `publish` and `dry-run` upload every board's artifacts and then promote or discard; `abort` closes a release whose build never got that far.
+  Nothing before the ending differs between `publish` and `dry-run`, so a dry run exercises the whole publish path.
+
+outputs:
+  release-id:
+    description: 'The staged release id, set by `init` and passed to a later `publish`, `dry-run` or `abort`.'
+    value: ${{ steps.run.outputs.release-id }}
 
 inputs:
   server-url:
@@ -11,16 +17,19 @@ inputs:
     description: 'OIDC token from the repo-server-token action'
     required: true
   version:
-    description: 'Firmware version, strict semver'
-    required: true
+    description: 'Firmware version, strict semver. Required by `init`.'
+    required: false
   channel:
-    description: 'Release channel: stable, beta or develop'
-    required: true
+    description: 'Release channel: stable, beta or develop. Required by `init`.'
+    required: false
   boards:
-    description: 'Newline-separated boards to publish'
-    required: true
+    description: 'Newline-separated boards to publish. Required by `init`, `publish` and `dry-run`.'
+    required: false
+  release-id:
+    description: 'Release opened by an earlier `init`. Required by `publish`, `dry-run` and `abort`.'
+    required: false
   mode:
-    description: '`publish` promotes the release; `dry-run` aborts it, leaving nothing staged.'
+    description: '`init` opens the release; `publish` promotes it; `dry-run` aborts it, leaving nothing staged; `abort` closes one the build never reached.'
     required: false
     default: 'dry-run'
   changelog-file:
@@ -38,6 +47,7 @@ runs:
   steps:
 
     - name: Download firmware artifacts
+      if: ${{ inputs.mode == 'publish' || inputs.mode == 'dry-run' }}
       uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c  # v8.0.1
       with:
         path: artifacts
@@ -54,7 +64,8 @@ runs:
       shell: bash
       run: pip install --require-hashes -r .github/scripts/requirements.txt
 
-    - name: Stage and ${{ inputs.mode == 'publish' && 'publish' || 'discard' }} release
+    - name: Run the ${{ inputs.mode }} phase
+      id: run
       shell: bash
       env:
         SERVER_URL: ${{ inputs.server-url }}
@@ -62,6 +73,7 @@ runs:
         VERSION: ${{ inputs.version }}
         CHANNEL: ${{ inputs.channel }}
         BOARDS: ${{ inputs.boards }}
+        RELEASE_ID: ${{ inputs.release-id }}
         MODE: ${{ inputs.mode }}
         CHANGELOG_FILE: ${{ inputs.changelog-file }}
         NOFAIL: ${{ inputs.nofail }}

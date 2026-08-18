@@ -5,6 +5,12 @@
 
 on:
   workflow_call:
+    inputs:
+      channel:
+        description: 'Channel to publish onto, overriding the one the ref implies. Empty means derive it.'
+        required: false
+        type: string
+        default: ''
     outputs:
       version:
         description: 'The current version of the project, e.g.  1.0.0-rc.1+build.1'
@@ -65,4 +71,5 @@ jobs:
         env:
           RELEASE_NEXT_VERSION: ${{ steps.relmeta.outputs.next-version }}
           RELEASE_SKIP: ${{ steps.relmeta.outputs.skip }}
+          CHANNEL_INPUT: ${{ inputs.channel }}
         run: python .github/scripts/get-vars.py

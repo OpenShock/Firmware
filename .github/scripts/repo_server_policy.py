@@ -1,25 +1,24 @@
 # !/usr/bin/env python3
-"""Decide the channel and version a run publishes under, and refuse the run if it may not.
+"""Refuse a run that may not publish the version and channel get-vars resolved.
+
+get-vars settles what this run is before anything builds, so nothing here overrides it - a build that reports one version must not be published as another.
 
 These are the repository's rules, not the server's. The server rejects an unregistered repo, a bad hash or an unknown board on its own, and checking those here would only give them a second place to be wrong. What it cannot know is that a stable release descends from master, or that a maintainer staged a draft for it, because those are facts about this repository.
 
 Everything here applies to prod only. A dev publish reaches no device, so constraining it buys nothing and costs the ability to test.
 """
 
-import os
 import time
 
 import requests
 
-from gha import env, fail, notice, require_env, set_output
+from gha import env, fail, notice, require_env
 
 API = 'https://api.github.com'
 
 # Pinned rather than left to the default, so a new default cannot change what these checks see.
 # GitHub names its supported versions in the 400 it returns for an unknown one, which is how to find the next.
 API_VERSION = '2026-03-10'
-KNOWN_CHANNELS = ('stable', 'beta', 'develop')
-
 # The branch each channel is cut from.
 # develop is absent because the nightly is already the only thing publishing it, and a tag is not required to descend from it.
 CHANNEL_BRANCH = {'stable': 'master', 'beta': 'beta'}
@@ -48,31 +47,6 @@ def get(path: str, *, allow_404: bool = False) -> dict | None:
     if resp.status_code != 200:
         fail(f'GitHub returned HTTP {resp.status_code} for {path}: {(resp.text or "").strip()[:300]}')
     return resp.json()
-
-
-def resolve_channel(requested: str, derived: str) -> str:
-    """A dispatch names its channel; otherwise get-vars derived one from the ref.
-
-    A feature branch yields something the server's enum does not know, so anything unrecognised is develop.
-    """
-    channel = requested or derived
-    if channel not in KNOWN_CHANNELS:
-        notice(f'Channel {channel!r} is not one the server knows; publishing to develop.')
-        return 'develop'
-    return channel
-
-
-def require_tag_matches_commit(repo: str, tag: str, sha: str) -> None:
-    """The tag names the version; the artifacts come from whatever ref the run started on.
-
-    If those are different commits then a build of one ref ships under another ref's version, and afterwards the two are indistinguishable.
-    """
-    commit = get(f'/repos/{repo}/commits/{tag}', allow_404=True)
-    if commit is None:
-        fail(f'Tag {tag} does not exist in {repo}.')
-    if commit['sha'] != sha:
-        fail(f'Tag {tag} points at {commit["sha"]} but this run built {sha}. Dispatch the run against {tag} instead.')
-    print(f'Tag {tag} matches the built commit.')
 
 
 def require_branch_contains(repo: str, channel: str, sha: str) -> None:
@@ -109,28 +83,19 @@ def require_staged_draft(repo: str, version: str) -> None:
 
 
 def main() -> int:
-    require_env('SERVER', 'REPO', 'SHA', 'GITHUB_TOKEN')
+    require_env('SERVER', 'REPO', 'SHA', 'VERSION', 'CHANNEL', 'GITHUB_TOKEN')
 
     server = env('SERVER')
     repo = env('REPO')
     sha = env('SHA')
-    tag_input = env('TAG_INPUT')
+    version = env('VERSION')
+    channel = env('CHANNEL')
 
-    channel = resolve_channel(env('CHANNEL_INPUT'), env('DERIVED_CHANNEL'))
-    version = tag_input or env('DERIVED_VERSION')
-    if not version:
-        fail('No version to publish: neither the tag input nor the version get-vars derived is set.')
-
-    set_output('channel', channel)
-    set_output('version', version)
     print(f'Publishing {version} to the {channel} channel on {server}.')
 
     if server != 'prod':
         notice('Publishing to dev, so none of the production rules apply.')
         return 0
-
-    if tag_input:
-        require_tag_matches_commit(repo, tag_input, sha)
 
     if channel in CHANNEL_BRANCH:
         require_branch_contains(repo, channel, sha)

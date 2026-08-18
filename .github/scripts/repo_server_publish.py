@@ -1,10 +1,13 @@
 # !/usr/bin/env python3
-"""Stage a firmware release on the repository server, then promote or discard it.
+"""Drive one phase of a firmware release on the repository server.
 
-Init, upload every board's artifacts, publish or abort, failing on the first non-success.
-That is CI's whole contract: submit each blob with the hash it computed and believe the server about everything else.
+CI's whole contract: submit each blob with the hash it computed and believe the server about everything else.
 
-`MODE` picks the ending; nothing before it differs, so `dry-run` exercises the same path a real publish takes.
+`MODE` picks the phase, because the phases run in different jobs.
+`init` opens the release before anything is built, so the server learns a release is coming while the build is still starting and refuses it now rather than half an hour from now.
+`publish` and `dry-run` upload every board and then promote or discard; `abort` discards a release the build never got to.
+
+The staged release is a resource whose lifetime now outlives this process: init hands the id to the workflow, and ci-build's abort job is the `finally` that closes it.
 """
 
 import hashlib
@@ -16,9 +19,9 @@ from pathlib import Path
 
 import requests
 
-from gha import env, fail, require_env, warn
+from gha import env, fail, require_env, set_output, warn
 
-VALID_MODES = ('publish', 'dry-run')
+VALID_MODES = ('init', 'publish', 'dry-run', 'abort')
 # The server parses this into an enum; anything else is a 400 several steps later, after artifacts have been downloaded.
 # Branch builds derive a channel from the branch name, so this catches a feature branch being published by accident.
 VALID_CHANNELS = ('stable', 'beta', 'develop')
@@ -211,32 +214,35 @@ def discard(session: requests.Session, server: str, release_id: str, mode: str) 
         else:
             print('The run failed; the staged release was discarded so a retry can reuse this version.', flush=True)
         return
+
+    # The workflow's abort job is a backstop for a publish that never ran, so it also fires after one that ran and cleaned up after itself.
+    # Finding the release already gone is that job succeeding, not failing.
+    if mode == 'abort' and resp.status_code in (404, 409):
+        print(f'Release {release_id} was already closed; nothing to abort.', flush=True)
+        return
     # Not fatal on its own - the TTL job reaps abandoned releases - but it means the next attempt at this version will be refused until that happens, so say so loudly.
     warn(f'Could not discard release {release_id} (HTTP {resp.status_code}). It will be reaped by the server TTL job.')
     show_response(resp)
 
 
-def main() -> int:
-    server = env('SERVER_URL').rstrip('/')
-    token = env('TOKEN')
+def read_boards() -> list[str]:
+    return [b.strip() for b in env('BOARDS').splitlines() if b.strip()]
+
+
+def do_init(session: requests.Session, server: str) -> int:
+    """Open the release and hand its id back, leaving it staged on purpose.
+
+    Nothing is uploaded here, so every check the server makes at init - semver, channel, a version already published, a concurrent release holding the same one, an unknown board - lands before the build burns its half hour.
+    """
+    require_env('VERSION', 'CHANNEL')
     version = env('VERSION')
     channel = env('CHANNEL')
-    mode = env('MODE', 'dry-run')
-    nofail = env('NOFAIL').lower() == 'true'
-    artifacts = Path(env('ARTIFACTS_DIR', 'artifacts'))
-    changelog_file = Path(env('CHANGELOG_FILE', 'CHANGELOG.md'))
-    boards = [b.strip() for b in env('BOARDS').splitlines() if b.strip()]
+    boards = read_boards()
 
-    require_env('SERVER_URL', 'TOKEN', 'VERSION')
-    if mode not in VALID_MODES:
-        fail(f"MODE must be one of {'/'.join(VALID_MODES)}, got '{mode}'")
     if channel not in VALID_CHANNELS:
         fail(f"CHANNEL must be one of {'/'.join(VALID_CHANNELS)}, got '{channel}'")
     if not boards:
-        fail('BOARDS is empty; there is nothing to upload.')
-
-    changelog = extract_changelog(changelog_file)
-    session = session_for(token)
+        fail('BOARDS is empty; there is nothing to declare.')
 
     release_id = init_release(
         session,
@@ -244,12 +250,23 @@ def main() -> int:
         version=version,
         channel=channel,
         boards=boards,
-        changelog=changelog,
-        nofail=nofail,
+        changelog=extract_changelog(Path(env('CHANGELOG_FILE', 'CHANGELOG.md'))),
+        nofail=env('NOFAIL').lower() == 'true',
     )
+    set_output('release-id', release_id)
+    return 0
 
-    # From here the release exists on the server, so every exit path has to decide what to do with it.
-    # That is the whole reason this is one script: the staged release is a resource with a lifetime, and try/finally is how a lifetime is expressed.
+
+def do_upload(session: requests.Session, server: str, mode: str) -> int:
+    """Upload every board into the release init opened, then promote or discard it."""
+    require_env('RELEASE_ID')
+    release_id = env('RELEASE_ID')
+    boards = read_boards()
+    artifacts = Path(env('ARTIFACTS_DIR', 'artifacts'))
+
+    if not boards:
+        fail('BOARDS is empty; there is nothing to upload.')
+
     published = False
     try:
         for board in boards:
@@ -262,6 +279,37 @@ def main() -> int:
             discard(session, server, release_id, mode)
 
     return 0
+
+
+def do_abort(session: requests.Session, server: str) -> int:
+    """Close a release whose build never reached the upload.
+
+    Runs from the workflow's always() job, so it reports rather than fails: the build failure it is cleaning up after is the one worth surfacing.
+    """
+    release_id = env('RELEASE_ID')
+    if not release_id:
+        print('No release was staged, so there is nothing to abort.', flush=True)
+        return 0
+
+    discard(session, server, release_id, 'abort')
+    return 0
+
+
+def main() -> int:
+    require_env('SERVER_URL', 'TOKEN')
+    server = env('SERVER_URL').rstrip('/')
+    mode = env('MODE', 'dry-run')
+
+    if mode not in VALID_MODES:
+        fail(f"MODE must be one of {'/'.join(VALID_MODES)}, got '{mode}'")
+
+    session = session_for(env('TOKEN'))
+
+    if mode == 'init':
+        return do_init(session, server)
+    if mode == 'abort':
+        return do_abort(session, server)
+    return do_upload(session, server, mode)
 
 
 if __name__ == '__main__':
