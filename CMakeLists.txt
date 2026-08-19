@@ -1,14 +1,21 @@
 cmake_minimum_required(VERSION 3.16.0)
 
-# --- OpenShock native ESP-IDF environment header -----------------------------
-# When a board is selected via OPENSHOCK_BOARD (set by the idf.py build driver /
-# CI), generate the OpenShock environment header (firmware version, API/CDN
-# domains, board/chip identity, log level) and force-include it into every
-# translation unit. This replaces the PlatformIO embed_env_vars.py extra_script.
+# --- OpenShock generated build headers ---------------------------------------
+# Two headers are generated into ${CMAKE_BINARY_DIR}/config, the directory ESP-IDF
+# already writes sdkconfig.h into and puts on the global include path:
 #
-# The legacy PlatformIO build leaves OPENSHOCK_BOARD unset and supplies the same
-# macros via -D, so everything below is skipped there and the two builds don't
-# fight over the definitions.
+#   openshock_board.h    board/chip identity, build mode, log level, GPIO assignments
+#   openshock_version.h  firmware version and git commit
+#
+# Neither is force-included. openshock_board.h is included by OpenShock.h, so only
+# OpenShock's own components see it; openshock_version.h is included by the few
+# translation units that actually report a version.
+#
+# They used to be one header, force-included into every translation unit in the project
+# through idf_build_set_property(COMPILE_OPTIONS "-include..."). Because it carried the
+# git commit and a version string ending in +<short-sha>, every commit changed the
+# preprocessed text of every source file in the build - all of ESP-IDF included - and
+# ccache could never reuse a single object between CI runs.
 if(NOT DEFINED OPENSHOCK_BOARD AND DEFINED ENV{OPENSHOCK_BOARD})
   set(OPENSHOCK_BOARD $ENV{OPENSHOCK_BOARD})
 endif()
@@ -32,15 +39,17 @@ if(DEFINED OPENSHOCK_BOARD)
     set(_os_chip "ESP32")
   endif()
 
-  set(OPENSHOCK_ENV_HEADER ${CMAKE_BINARY_DIR}/config/openshock_env.h)
-  execute_process(
-    COMMAND ${CMAKE_COMMAND} -E env
-            python ${CMAKE_CURRENT_LIST_DIR}/scripts/gen_env_header.py
-            --output ${OPENSHOCK_ENV_HEADER}
-            --board ${OPENSHOCK_BOARD}
-            --chip ${_os_chip}
-    RESULT_VARIABLE _os_env_rc
-  )
+  set(OPENSHOCK_CONFIG_DIR ${CMAKE_BINARY_DIR}/config)
+  set(OPENSHOCK_VERSION_HEADER ${OPENSHOCK_CONFIG_DIR}/openshock_version.h)
+  set(_os_gen_command
+      ${CMAKE_COMMAND} -E env
+      python ${CMAKE_CURRENT_LIST_DIR}/scripts/gen_env_header.py
+      --out-dir ${OPENSHOCK_CONFIG_DIR}
+      --board ${OPENSHOCK_BOARD}
+      --chip ${_os_chip}
+      --fragment ${CMAKE_CURRENT_LIST_DIR}/boards/${OPENSHOCK_BOARD}.defaults)
+
+  execute_process(COMMAND ${_os_gen_command} --emit both RESULT_VARIABLE _os_env_rc)
   if(NOT _os_env_rc EQUAL 0)
     message(FATAL_ERROR "gen_env_header.py failed (rc=${_os_env_rc})")
   endif()
@@ -49,11 +58,31 @@ endif()
 
 include($ENV{IDF_PATH}/tools/cmake/project.cmake)
 
-if(OPENSHOCK_NATIVE_ENV)
-  idf_build_set_property(COMPILE_OPTIONS "-include${OPENSHOCK_ENV_HEADER}" APPEND)
-endif()
-
 project(firmware)
+
+if(OPENSHOCK_NATIVE_ENV)
+  # The version and commit come from git and the environment, which CMake has no
+  # dependency on, so refresh the version header on every build rather than only on a
+  # reconfigure. Generating it at configure time alone left an incremental build
+  # reporting whatever version the build directory was first configured with.
+  #
+  # The generator writes only when the contents differ, so an unchanged version leaves
+  # the file - and its mtime - alone, and nothing downstream is rebuilt.
+  add_custom_target(openshock_version_header ALL
+    BYPRODUCTS ${OPENSHOCK_VERSION_HEADER}
+    COMMAND ${_os_gen_command} --emit version
+    COMMENT "Refreshing openshock_version.h"
+    VERBATIM)
+
+  # Order the refresh ahead of the components that include the header. Without this the
+  # ALL target is unordered against them and a build could compile the previous version.
+  foreach(_os_consumer common core serial_console)
+    idf_component_get_property(_os_lib ${_os_consumer} COMPONENT_LIB)
+    if(_os_lib)
+      add_dependencies(${_os_lib} openshock_version_header)
+    endif()
+  endforeach()
+endif()
 
 # --- Static filesystem image (captive-portal web assets) ---------------------
 # Build the SvelteKit frontend, gzip it, and pack it into a littlefs image whose

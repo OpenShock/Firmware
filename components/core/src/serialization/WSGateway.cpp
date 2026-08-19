@@ -7,6 +7,10 @@ const char* const TAG = "WSGateway";
 #include "Logging.h"
 #include "Temporal.h"
 
+// Firmware version / commit. Regenerated every build, so this file is one of the
+// few that recompile on a new commit.
+#include "openshock_version.h"
+
 #ifndef OPENSHOCK_FW_VERSION_MAJOR
 #define OPENSHOCK_FW_VERSION_MAJOR 0
 #endif

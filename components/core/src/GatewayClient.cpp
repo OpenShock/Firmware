@@ -16,6 +16,10 @@ const char* const TAG = "GatewayClient";
 
 #include <cstring>
 
+// Firmware version / commit. Regenerated every build, so this file is one of the
+// few that recompile on a new commit.
+#include "openshock_version.h"
+
 using namespace OpenShock;
 
 const int64_t GATEWAY_PING_TIMEOUT = 90'000;

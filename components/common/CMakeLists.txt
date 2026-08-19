@@ -18,6 +18,9 @@ idf_component_register(
                 "src/SimpleMutex.cpp"
                 "src/StringHelpers.cpp"
                 "src/TaskUtils.cpp"
+                # The only TU that sees openshock_version.h, so a new commit rebuilds
+                # this file rather than the whole project.
+                "src/Version.cpp"
   INCLUDE_DIRS  "include"
   REQUIRES      logging      # Logging.h / OS_PANIC* (TinyVec.h) in public headers
                 temporal     # Temporal.h (RateLimiter.h) in public header

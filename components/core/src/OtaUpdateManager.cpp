@@ -34,6 +34,10 @@ const char* const TAG = "OtaUpdateManager";
 #include <string>
 #include <string_view>
 
+// Firmware version / commit. Regenerated every build, so this file is one of the
+// few that recompile on a new commit.
+#include "openshock_version.h"
+
 using namespace std::string_view_literals;
 
 /// Repository server firmware API root. Paths per firmware-api-spec.md §4.

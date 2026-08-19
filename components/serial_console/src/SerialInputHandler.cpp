@@ -27,6 +27,10 @@ const char* const TAG = "SerialInputHandler";
 #include <string_view>
 #include <unordered_map>
 
+// Firmware version / commit. Regenerated every build, so this file is one of the
+// few that recompile on a new commit.
+#include "openshock_version.h"
+
 namespace std {
   struct hash_ci {
     std::size_t operator()(std::string_view str) const noexcept
