@@ -1,0 +1,43 @@
+#include "serial_console/command_handlers/common.h"
+
+#include "serial_console/SerialInputHandler.h"
+
+#include "config/Config.h"
+#include "Convert.h"
+#include "StringHelpers.h"
+
+static void handleSerialEchoCommand(std::string_view arg, bool isAutomated)
+{
+  if (arg.empty()) {
+    // Get current serial echo status
+    SERPR_RESPONSE("SerialEcho|%s", OpenShock::SerialInputHandler::SerialEchoEnabled() ? "true" : "false");
+    return;
+  }
+
+  bool enabled;
+  if (!OpenShock::Convert::ToBool(OpenShock::StringTrim(arg), enabled)) {
+    SERPR_ERROR("Invalid argument (not a boolean)");
+    return;
+  }
+
+  bool result = OpenShock::Config::SetSerialInputConfigEchoEnabled(enabled);
+  OpenShock::SerialInputHandler::SetSerialEchoEnabled(enabled);
+
+  if (result) {
+    SERPR_SUCCESS("Saved config");
+  } else {
+    SERPR_ERROR("Failed to save config");
+  }
+}
+
+OpenShock::SerialCmds::CommandGroup OpenShock::SerialCmds::CommandHandlers::EchoHandler()
+{
+  auto group = OpenShock::SerialCmds::CommandGroup("echo"sv);
+
+  auto& getCommand = group.addCommand("Get the serial echo status"sv, handleSerialEchoCommand);
+
+  auto& setCommand = group.addCommand("Enable/disable serial echo"sv, handleSerialEchoCommand);
+  setCommand.addArgument("enabled"sv, "must be a boolean"sv, "true"sv);
+
+  return group;
+}

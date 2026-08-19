@@ -1,46 +1,117 @@
 name: build-firmware
-description: Builds the firmware partitions and uploads them as an artifact
+description: >-
+  Compile one board's C++ firmware with native ESP-IDF and upload its discrete
+  partition images (app, bootloader, partition-table). Builds only the code
+  targets - not the static0 web-assets image - so it runs in parallel with
+  build-staticfs; the merge-partitions job links them together.
 inputs:
   board:
     required: true
-    description: 'Board name to build'
+    description: 'Board name to build (matches boards/<board>.defaults)'
   version:
     required: true
     description: 'Current firmware version'
+  cache-group:
+    required: true
+    description: >-
+      Identifier of the ccache store this board shares, computed by get-vars.py as the
+      chip plus a digest of the resolved sdkconfig. Boards with identical sdkconfig
+      compile identical ESP-IDF objects, so they share one store.
+  idf-cache-writer:
+    required: false
+    default: 'false'
+    description: >-
+      Whether this job writes the shared ESP-IDF cache. get-vars nominates one board;
+      every other job restores it read-only.
 
 runs:
   using: composite
   steps:
-    - uses: ./.github/actions/pio-cache
+    - uses: ./.github/actions/setup-esp-idf
       with:
-        env: ${{ inputs.board }}
+        save-cache: ${{ inputs.idf-cache-writer }}
 
-    - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+    # ccache is keyed on the sdkconfig identity, not the board: 13 boards resolve to 6
+    # stores, so same-chip/same-flash boards reuse each other's ESP-IDF objects.
+    #
+    # The key deliberately does NOT contain the commit SHA. Cache entries are immutable,
+    # so a key that always misses always writes a full new copy - 13 fresh entries per
+    # push was what pushed this repository over the 10 GB cap. The SHA is only a save
+    # discriminator here; restore-keys does the real work by taking the newest store for
+    # the group.
+    - name: Restore ccache
+      uses: actions/cache/restore@27d5ce7f107fe9357f9df03efb73ab90386fccae  # v5.0.5
       with:
-        cache: 'pip'
+        path: ~/.cache/ccache
+        key: ccache-${{ runner.os }}-${{ inputs.cache-group }}-${{ github.sha }}
+        restore-keys: |
+          ccache-${{ runner.os }}-${{ inputs.cache-group }}-
 
-    - name: Install python dependencies
-      shell: bash
-      run: pip install -r requirements.txt
-
+    # Build only the code targets (app + bootloader + partition-table). This
+    # skips the static0 image (built separately by build-staticfs), so no
+    # frontend is needed here. scripts/build.py resolves the target from
+    # boards/<board>.defaults, sets OPENSHOCK_BOARD, and layers the sdkconfig.
     - name: Build firmware
-      working-directory: .
       shell: bash
-      # head_commit.timestamp only exists on push events, so derive the build
-      # date from the checked-out commit (falling back to now) - otherwise
-      # schedule/dispatch builds bake in an empty date.
       run: |
-        export OPENSHOCK_FW_BUILD_DATE="$(git show -s --format=%cI HEAD 2>/dev/null || date -u +%Y-%m-%dT%H:%M:%SZ)"
-        pio run -e ${{ inputs.board }}
+        set -euo pipefail
+        export IDF_CCACHE_ENABLE=1
+        ccache --zero-stats >/dev/null 2>&1 || true
+        python3 scripts/build.py "${{ inputs.board }}" app bootloader partition-table
       env:
         OPENSHOCK_FW_VERSION: ${{ inputs.version }}
+        # One board per job, so a fixed build directory is safe here - and necessary.
+        # The directory path appears on every compile command line, so building each
+        # board under build/<board> gave every board a different command line and no two
+        # boards in a cache group could share an object.
+        OPENSHOCK_BUILD_DIR: build/firmware
         OPENSHOCK_FW_GIT_REF: ${{ github.ref }}
         OPENSHOCK_FW_GIT_COMMIT: ${{ github.sha }}
+        # content, not the default mtime: the toolchain is restored from a cache with
+        # fresh timestamps every run, which would otherwise invalidate the whole store.
+        CCACHE_COMPILERCHECK: content
+        # ccache defaults to 5 GB. One store holds a single sdkconfig's objects, so this
+        # is generous - it exists to stop a store growing without bound between evictions.
+        CCACHE_MAXSIZE: 500M
 
-    - name: Upload build artifacts
-      uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+    # The hit rate is the thing to watch after a change to the generated headers: a
+    # near-zero rate on an unchanged tree means something is being force-included that
+    # varies per commit again.
+    - name: ccache statistics
+      shell: bash
+      run: ccache --show-stats --verbose || ccache -s
+
+    # Saved on pull requests too, deliberately. ci-build only runs `push` for develop,
+    # beta and master, so a feature branch only ever builds as a PR - skipping the save
+    # there meant the store was never written and every PR push started from nothing.
+    #
+    # The entry count this costs is bounded now in a way it was not before: 6 stores per
+    # push rather than 13, each measured at roughly 30 MB for one board and capped by
+    # CCACHE_MAXSIZE, and PR-scoped entries age out with the branch.
+    - name: Save ccache
+      uses: actions/cache/save@27d5ce7f107fe9357f9df03efb73ab90386fccae  # v5.0.5
+      with:
+        path: ~/.cache/ccache
+        key: ccache-${{ runner.os }}-${{ inputs.cache-group }}-${{ github.sha }}
+
+    # Flat, canonically-named images. app.bin/staticfs.bin are the names the
+    # device OTA pulls (OtaUpdateManager.cpp); merge_image.py and the CDN upload
+    # consume these too. `project(firmware)` names the app image firmware.bin.
+    - name: Stage partition images
+      shell: bash
+      env:
+        B: build/firmware
+      run: |
+        set -euo pipefail
+        mkdir -p dist
+        cp "$B/firmware.bin"                        dist/app.bin
+        cp "$B/bootloader/bootloader.bin"           dist/bootloader.bin
+        cp "$B/partition_table/partition-table.bin" dist/partition-table.bin
+
+    - name: Upload partition images
+      uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a  # v7.0.1
       with:
         name: firmware_build_${{ inputs.board }}
-        path: .pio/build/${{ inputs.board }}/*.bin
-        retention-days: 1
+        path: dist/*.bin
+        retention-days: 7
         if-no-files-found: error

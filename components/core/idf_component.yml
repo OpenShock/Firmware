@@ -1,0 +1,8 @@
+# esp_websocket_client backs the gateway (LCG) WebSocket client (src/GatewayClient.cpp)
+# now that we no longer use the Arduino BadWebSockets library. In IDF 5.x it is a
+# managed component rather than a bundled one, so declare it here.
+#
+# The captive portal's static assets are read from a littlefs partition via the raw
+# vendored littlefs core (components/littlefs) — no VFS, no joltwallet.
+dependencies:
+  espressif/esp_websocket_client: "^1.4.0"

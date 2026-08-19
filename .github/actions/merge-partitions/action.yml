@@ -1,44 +1,60 @@
 name: merge-partitions
-description: Merges multiple partitions into a single flashable binary
+description: >-
+  Link every board's C++ partition images (from build-firmware) with the shared
+  static0 image (from build-staticfs) into one flashable binary per board via
+  scripts/merge_image.py. Needs esptool only - no full ESP-IDF install.
 inputs:
   version:
-    description: 'Version of the firmware'
+    description: 'Firmware version'
     required: true
-  board:
-    description: 'Board name to merge partitions for'
+  boards:
+    description: 'Newline-separated board names to merge'
     required: true
 
 runs:
   using: composite
   steps:
-    - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+    - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97  # v7.0.0
       with:
         cache: 'pip'
 
-    - name: Install dependencies
+    - name: Install Python dependencies
       shell: bash
       run: pip install -r requirements.txt
 
-    - name: Download static filesystem partition
-      uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+    # Every board at once, each into its own directory.
+    # merge-multiple would flatten them, and the partition images share filenames across boards, so they would overwrite each other.
+    - name: Download C++ partition images
+      uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c  # v8.0.1
+      with:
+        pattern: firmware_build_*
+        path: partitions
+
+    - name: Download static filesystem image
+      uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c  # v8.0.1
       with:
         name: firmware_staticfs
+        path: staticfs
 
-    - name: Download firmware partitions
-      uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
-      with:
-        name: firmware_build_${{ inputs.board }}
-
+    # One invocation for every board, merged in parallel across the runner's CPUs.
+    # merge_image.py expands {board} into --bindir and --output itself and reports every board that failed, so there is no loop to write here.
     - name: Merge partitions
       shell: bash
+      env:
+        BOARDS: ${{ inputs.boards }}
+        VERSION: ${{ inputs.version }}
       run: |
-        python scripts/merge_image.py ${{ inputs.board }}
-        mv merged.bin OpenShock_${{ inputs.board }}_${{ inputs.version }}.bin
+        set -euo pipefail
+        python scripts/merge_image.py \
+          --board "$BOARDS" \
+          --bindir 'partitions/firmware_build_{board}' \
+          --staticfs staticfs/staticfs.bin \
+          --output "merged/OpenShock_{board}_${VERSION}.bin"
 
-    - name: Upload merged firmware binary
-      uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+    - name: Upload merged firmware binaries
+      uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a  # v7.0.1
       with:
-        name: firmware_merged_${{ inputs.board }}
-        path: OpenShock_${{ inputs.board }}_*.bin
+        name: firmware_merged
+        path: merged/OpenShock_*.bin
         retention-days: 7
         if-no-files-found: error

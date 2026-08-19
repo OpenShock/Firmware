@@ -1,149 +1,81 @@
 name: repo-server-publish
 description: >-
-  Publishes a firmware release to the OpenShock repository server: initialises the release, uploads
-  every board's artifacts, and publishes it. The server hashes and stores the binaries itself, so this
-  is the authoritative ingestion path — the CDN is written by the server, not by CI.
+  Drives one phase of a firmware release on the repository server.
+  `init` opens the release and returns its id; `publish` and `dry-run` upload every board's artifacts and then promote or discard; `abort` closes a release whose build never got that far.
+  Nothing before the ending differs between `publish` and `dry-run`, so a dry run exercises the whole publish path.
+
+outputs:
+  release-id:
+    description: 'The staged release id, set by `init` and passed to a later `publish`, `dry-run` or `abort`.'
+    value: ${{ steps.run.outputs.release-id }}
 
 inputs:
-  repo-server-url:
-    description: Base URL of the repository server, e.g. https://repo.openshock.org
+  server-url:
+    description: 'Base URL of the repository server'
     required: true
-  audience:
-    description: >-
-      OIDC audience the repository server validates. Must match its CiCd:Audience setting.
+  token:
+    description: 'OIDC token from the repo-server-token action'
+    required: true
+  version:
+    description: 'Firmware version, strict semver. Required by `init`.'
     required: false
-    default: openshock-repository-server
-  fw-version:
-    description: Firmware version (exact semver, must match OPENSHOCK_FW_VERSION in the binaries)
-    required: true
-  release-channel:
-    description: stable, beta or develop
-    required: true
+  channel:
+    description: 'Release channel: stable, beta or develop. Required by `init`.'
+    required: false
   boards:
-    description: Newline-separated list of board names (PlatformIO env names)
-    required: true
-  changelog:
+    description: 'Newline-separated boards to publish. Required by `init`, `publish` and `dry-run`.'
+    required: false
+  release-id:
+    description: 'Release opened by an earlier `init`. Required by `publish`, `dry-run` and `abort`.'
+    required: false
+  mode:
+    description: '`init` opens the release; `publish` promotes it; `dry-run` aborts it, leaving nothing staged; `abort` closes one the build never reached.'
+    required: false
+    default: 'dry-run'
+  changelog-file:
+    description: 'Markdown file to take the newest release-notes section from'
+    required: false
+    default: 'CHANGELOG.md'
+  nofail:
     description: >-
-      Markdown changelog, parsed server-side per firmware-api-spec.md §5.3. An unparseable changelog
-      fails the release rather than publishing one with empty notes.
-    required: true
+      Pass ?nofail to init, so an unparseable changelog parks the release in `editing` instead of failing the build.
+    required: false
+    default: 'false'
 
 runs:
   using: composite
   steps:
-    # Same artifact set the CDN upload used: the shared static filesystem partition, each board's
-    # build partitions, and each board's merged image.
+
     - name: Download firmware artifacts
-      uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+      if: ${{ inputs.mode == 'publish' || inputs.mode == 'dry-run' }}
+      uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c  # v8.0.1
       with:
         path: artifacts
         pattern: firmware_*
 
-    - name: Publish release to the repository server
+    - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97  # v7.0.0
+      with:
+        python-version-file: .github/scripts/.python-version
+        cache: 'pip'
+        cache-dependency-path: .github/scripts/requirements.txt
+
+    # This job holds the publish credential, so pip installs are pinned by digest.
+    - name: Install script dependencies
+      shell: bash
+      run: pip install --require-hashes -r .github/scripts/requirements.txt
+
+    - name: Run the ${{ inputs.mode }} phase
+      id: run
       shell: bash
       env:
-        REPO_SERVER_URL: ${{ inputs.repo-server-url }}
-        AUDIENCE: ${{ inputs.audience }}
-        FW_VERSION: ${{ inputs.fw-version }}
-        RELEASE_CHANNEL: ${{ inputs.release-channel }}
+        SERVER_URL: ${{ inputs.server-url }}
+        TOKEN: ${{ inputs.token }}
+        VERSION: ${{ inputs.version }}
+        CHANNEL: ${{ inputs.channel }}
         BOARDS: ${{ inputs.boards }}
-        CHANGELOG: ${{ inputs.changelog }}
-      run: |
-        set -euo pipefail
-
-        BASE="${REPO_SERVER_URL%/}"
-
-        # ---- OIDC -------------------------------------------------------------------------------
-        # The token proves a workflow in this repository is calling. The server additionally requires
-        # the repository to be registered in its allowlist; an unregistered repo is rejected, so a
-        # 401 here usually means onboarding has not been done (admin PUT /2/firmware/admin/repositories).
-        OIDC_TOKEN=$(curl -sSL --fail-with-body \
-          -H "Authorization: bearer $ACTIONS_ID_TOKEN_REQUEST_TOKEN" \
-          "$ACTIONS_ID_TOKEN_REQUEST_URL&audience=$AUDIENCE" | jq -r .value)
-        if [ -z "$OIDC_TOKEN" ] || [ "$OIDC_TOKEN" = "null" ]; then
-          echo "::error::Failed to fetch a GitHub OIDC token for audience '$AUDIENCE'"
-          exit 1
-        fi
-
-        auth=(-H "Authorization: Bearer $OIDC_TOKEN")
-
-        # ---- Init -------------------------------------------------------------------------------
-        # Board names are sent as-is: they are the PlatformIO env names, which is exactly what the
-        # server knows boards by and what a hub compiles in as OPENSHOCK_FW_BOARD.
-        boards_json=$(printf '%s\n' "$BOARDS" | jq -R . | jq -sc 'map(select(length > 0))')
-
-        init_body=$(jq -nc \
-          --arg version "$FW_VERSION" \
-          --arg channel "$RELEASE_CHANNEL" \
-          --arg date "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
-          --argjson boards "$boards_json" \
-          --arg changelog "$CHANGELOG" \
-          '{version: $version, channel: $channel, releaseDate: $date, boards: $boards, changelog: $changelog}')
-
-        echo "==> Initialising release $FW_VERSION on $RELEASE_CHANNEL"
-        init_response=$(curl -sS --fail-with-body -X POST "$BASE/2/firmware/releases" \
-          "${auth[@]}" -H "Content-Type: application/json" --data-binary "$init_body")
-
-        RELEASE_ID=$(printf '%s' "$init_response" | jq -r .id)
-        STATUS=$(printf '%s' "$init_response" | jq -r .status)
-        if [ -z "$RELEASE_ID" ] || [ "$RELEASE_ID" = "null" ]; then
-          echo "::error::Release init did not return an id: $init_response"
-          exit 1
-        fi
-        echo "    release $RELEASE_ID (status: $STATUS)"
-
-        # From here on, any failure leaves a staged release behind. Abort it so the version is not
-        # blocked until its TTL expires — the server keys staged bytes under the release id, so an
-        # abort cannot touch anything already published.
-        cleanup() {
-          if [ "${PUBLISHED:-0}" != "1" ]; then
-            echo "::warning::Aborting staged release $RELEASE_ID"
-            curl -sS -X DELETE "$BASE/2/firmware/releases/$RELEASE_ID" "${auth[@]}" >/dev/null || true
-          fi
-        }
-        trap cleanup EXIT
-
-        # ---- Upload -----------------------------------------------------------------------------
-        # Field names are the server's artifact types. The sha256 manifest must name exactly the
-        # files uploaded — the server rejects a mismatch in either direction — so both are built
-        # from the same scan.
-        while IFS= read -r board; do
-          [ -z "$board" ] && continue
-
-          workdir=$(mktemp -d)
-          cp artifacts/firmware_staticfs/*.bin "$workdir"/
-          cp "artifacts/firmware_build_$board"/*.bin "$workdir"/
-          cp "artifacts/firmware_merged_$board"/OpenShock_*.bin "$workdir/firmware.bin"
-
-          form=()
-          manifest='{}'
-          for pair in "app:app.bin" "staticfs:staticfs.bin" "merged:firmware.bin" \
-                      "bootloader:bootloader.bin" "partitions:partitions.bin"; do
-            field="${pair%%:*}"
-            file="${pair##*:}"
-            [ -f "$workdir/$file" ] || continue
-            form+=(-F "$field=@$workdir/$file")
-            hash=$(sha256sum "$workdir/$file" | cut -d' ' -f1)
-            manifest=$(printf '%s' "$manifest" | jq -c --arg k "$field" --arg v "$hash" '. + {($k): $v}')
-          done
-
-          if [ ${#form[@]} -eq 0 ]; then
-            echo "::error::No artifacts found for board $board"
-            exit 1
-          fi
-
-          echo "==> Uploading $board"
-          curl -sS --fail-with-body -X PUT "$BASE/2/firmware/releases/$RELEASE_ID/boards/$board" \
-            "${auth[@]}" "${form[@]}" -F "sha256=$manifest" >/dev/null
-
-          rm -rf "$workdir"
-        done <<< "$BOARDS"
-
-        # ---- Publish ----------------------------------------------------------------------------
-        # Promotes every staged artifact to its published key and makes the version visible to hubs.
-        echo "==> Publishing $FW_VERSION"
-        curl -sS --fail-with-body -X POST "$BASE/2/firmware/releases/$RELEASE_ID/publish" \
-          "${auth[@]}" >/dev/null
-
-        PUBLISHED=1
-        echo "==> Published $FW_VERSION to $RELEASE_CHANNEL"
+        RELEASE_ID: ${{ inputs.release-id }}
+        MODE: ${{ inputs.mode }}
+        CHANGELOG_FILE: ${{ inputs.changelog-file }}
+        NOFAIL: ${{ inputs.nofail }}
+        ARTIFACTS_DIR: artifacts
+      run: python .github/scripts/repo_server_publish.py

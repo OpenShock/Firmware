@@ -1,51 +1,52 @@
 name: build-staticfs
-description: Builds the static filesystem partition and uploads it as an artifact
+description: >-
+  Pack the captive-portal web assets into the static0 littlefs image once
+  (board-independent) via scripts/gen_staticfs.py. Runs in parallel with the
+  per-board C++ build; the merge job combines the two.
 inputs:
   version:
-    required: true
-    description: 'Current firmware version'
+    description: 'Current firmware version (unused in the image, kept for parity)'
+    required: false
+    default: ''
 
 runs:
   using: composite
   steps:
-    - uses: ./.github/actions/pio-cache
-      with:
-        env: fs
-
-    - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+    - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97  # v7.0.0
       with:
         cache: 'pip'
 
-    - name: Install dependencies
+    - name: Install Python dependencies
       shell: bash
       run: pip install -r requirements.txt
 
-    - name: Download built frontend
-      uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+    # The frontend is built once in build-frontend and downloaded here so
+    # gen_staticfs.py packs the prebuilt assets rather than rebuilding them.
+    - name: Download frontend
+      uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c  # v8.0.1
       with:
         name: frontend
-        path: frontend/build/
+        path: frontend/build
 
-    - name: Build filesystem partition
+    # static0 is 0x09D000 bytes in the 4MB OTA table (partitions/ota_4mb.csv);
+    # the image is board-independent, so one build serves every board. Geometry
+    # (4 KiB blocks, 128-byte read/prog) matches the runtime mount in
+    # components/fs/src/LfsPartition.cpp and the CMake build.
+    - name: Build static filesystem image
       shell: bash
-      # head_commit.timestamp only exists on push events; derive from the commit
-      # (falling back to now) so schedule/dispatch builds don't get an empty date.
       run: |
-        export OPENSHOCK_FW_BUILD_DATE="$(git show -s --format=%cI HEAD 2>/dev/null || date -u +%Y-%m-%dT%H:%M:%SZ)"
-        pio run --target buildfs -e fs
-      env:
-        OPENSHOCK_FW_VERSION: ${{ inputs.version }}
-        OPENSHOCK_FW_GIT_REF: ${{ github.ref }}
-        OPENSHOCK_FW_GIT_COMMIT: ${{ github.sha }}
+        python scripts/gen_staticfs.py \
+          --frontend-dir frontend \
+          --staging-dir staticfs \
+          --output staticfs.bin \
+          --partition-size 0x09D000 \
+          --block-size 4096 --read-size 128 --prog-size 128 \
+          --skip-frontend-build
 
-    - name: Rename partition binary
-      shell: bash
-      run: mv .pio/build/fs/littlefs.bin staticfs.bin
-
-    - name: Upload internal filesystem artifact
-      uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+    - name: Upload static filesystem artifact
+      uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a  # v7.0.1
       with:
         name: firmware_staticfs
         path: staticfs.bin
-        retention-days: 1
+        retention-days: 7
         if-no-files-found: error

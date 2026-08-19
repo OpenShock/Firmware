@@ -1,31 +1,50 @@
 name: build-compilationdb
-description: Builds the compilation database for the firmware for code analysis
+description: >-
+  Emit build/OpenShock-Core-V2/compile_commands.json with native ESP-IDF, using
+  OpenShock-Core-V2 / esp32s3 as the canonical config. `mode: configure` stops at the
+  CMake configure that writes the database; `mode: build` also compiles, which is what
+  CodeQL needs in order to trace the C/C++.
 inputs:
   version:
     required: true
     description: 'Current firmware version'
+  mode:
+    required: false
+    default: configure
+    description: >-
+      configure - run CMake only, which is all compile_commands.json requires.
+      build - configure and compile, for consumers that must observe real compiler
+      invocations.
 
 runs:
   using: composite
   steps:
-    - uses: ./.github/actions/pio-cache
-      with:
-        env: ci-build
+    - uses: ./.github/actions/setup-esp-idf
 
-    - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
-      with:
-        cache: 'pip'
-
-    - name: Install python dependencies
-      shell: bash
-      run: pip install -r requirements.txt
-
-    - name: Build firmware
-      working-directory: .
+    - name: Validate mode
       shell: bash
       run: |
-        export OPENSHOCK_FW_BUILD_DATE="$(git show -s --format=%cI HEAD 2>/dev/null || date -u +%Y-%m-%dT%H:%M:%SZ)"
-        pio run -e ci-build -t compiledb
+        set -euo pipefail
+        case "${{ inputs.mode }}" in
+          configure|build) ;;
+          *) echo "::error::mode must be 'configure' or 'build', got '${{ inputs.mode }}'"; exit 1 ;;
+        esac
+
+    # compile_commands.json is written by CMake at configure time, before a single object
+    # is compiled, so a consumer that only reads the database never needs the compile.
+    # `build` remains available for CodeQL, whose tracer has to see the compiler run.
+    # ccache stays off in both modes: it would hide invocations from that tracer.
+    - name: Generate compilation database (OpenShock-Core-V2 / esp32s3)
+      shell: bash
+      run: |
+        set -euo pipefail
+        if [ "${{ inputs.mode }}" = "build" ]; then
+          python3 scripts/build.py OpenShock-Core-V2 app
+        else
+          python3 scripts/build.py OpenShock-Core-V2 reconfigure
+        fi
+        test -f build/OpenShock-Core-V2/compile_commands.json \
+          || { echo "::error::compile_commands.json was not generated"; exit 1; }
       env:
         OPENSHOCK_FW_VERSION: ${{ inputs.version }}
         OPENSHOCK_FW_GIT_REF: ${{ github.ref }}

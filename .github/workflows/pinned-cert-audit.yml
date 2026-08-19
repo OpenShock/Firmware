@@ -1,0 +1,80 @@
+name: pinned-cert-audit
+
+# Audits certificates/pinned_certs/*.pem against reality (certificates/cert_bundle.py audit):
+#   - probes api.openshock.app / api.openshock.dev and retires any pinned root no live
+#     endpoint chains through anymore (opens a PR that deletes it + regenerates cacert-merged.pem);
+#   - fails the job (→ notifies) when a still-needed pinned root is expired or nearing expiry.
+on:
+  schedule:
+    - cron: '17 6 * * 1' # Weekly, Monday 06:17 UTC
+  workflow_dispatch: # Manually invoked.
+  push:
+    branches: [develop, beta, master]
+    paths: ['certificates/pinned_certs/**', 'certificates/cert_bundle.py', '.github/workflows/pinned-cert-audit.yml']
+
+concurrency:
+  group: ${{ github.workflow }}
+  cancel-in-progress: false
+
+permissions:
+  contents: write # push the retire-pin branch
+  pull-requests: write # open the retire-pin PR
+
+jobs:
+  audit:
+    name: Audit pinned certs
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+
+      - name: Install cryptography
+        run: python3 -m pip install --user cryptography
+
+      # Probes the live endpoints + checks expiry. Never fails the step itself (so the
+      # follow-up steps always see its outputs); the expiry alert is raised at the end.
+      - name: Audit
+        id: audit
+        continue-on-error: true
+        working-directory: certificates
+        run: python3 cert_bundle.py audit
+
+      # A pinned root that no monitored endpoint chains through anymore: delete it,
+      # regenerate cacert-merged.pem, and open a PR. Runs only when the audit positively found
+      # removable pins (empty when any probe failed — fail-safe).
+      - name: Open PR to retire unneeded pinned root(s)
+        if: steps.audit.outputs.removable != ''
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          branch="chore/retire-pinned-certs-${{ github.run_id }}"
+          git config user.name  "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git checkout -b "$branch"
+          for f in ${{ steps.audit.outputs.removable }}; do
+            echo "Retiring certificates/$f"
+            git rm "certificates/$f"
+          done
+          # Regenerate the base + packed bundle (verified curl base + remaining pinned certs).
+          ( cd certificates && python3 cert_bundle.py generate )
+          git add certificates/cacert-curl.pem certificates/cacert-merged.pem
+          git commit -m "chore(certs): retire pinned root(s) no longer needed by live endpoints"
+          git push origin "$branch"
+          gh pr create \
+            --base "${{ github.ref_name }}" \
+            --head "$branch" \
+            --title "chore(certs): retire unneeded pinned root(s)" \
+            --body "Automated by \`pinned-cert-audit\`: \`cert_bundle.py audit\` found pinned root(s) that no monitored endpoint (api.openshock.app / api.openshock.dev) chains through anymore. Deleted them from \`certificates/pinned_certs/\` and regenerated \`certificates/cacert-merged.pem\`.
+
+          Merge only after confirming the endpoints still verify against the base trust store (i.e. the server chain was intentionally trimmed)."
+
+      # Fail last so the retire-PR step above still runs. A still-needed pinned root that
+      # is expired / nearing expiry means we must rotate it.
+      - name: Fail on expiry alert
+        if: steps.audit.outputs.alert == 'true'
+        run: |
+          echo "::error::A still-needed pinned certificate is expired or nearing expiry — rotate it in certificates/pinned_certs/ and regenerate cacert-merged.pem."
+          exit 1

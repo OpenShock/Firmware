@@ -1,12 +1,16 @@
-# This is a bit of a silly workflow, but Github Workflow definitions
-# do not let us easily reuse the strategy matrix used to trigger jobs
-# per-board. This is a workaround to define everything in one file, and
-# use the output in the multiple places we need it.
+# This is a bit of a silly workflow, but Github Workflow definitions do not let us easily reuse the strategy matrix used to trigger jobs per-board.
+# This is a workaround to define everything in one file, and use the output in the multiple places we need it.
 #
 # Source: https://github.com/orgs/community/discussions/26284#discussioncomment-6701976
 
 on:
   workflow_call:
+    inputs:
+      channel:
+        description: 'Channel to publish onto, overriding the one the ref implies. Empty means derive it.'
+        required: false
+        type: string
+        default: ''
     outputs:
       version:
         description: 'The current version of the project, e.g.  1.0.0-rc.1+build.1'
@@ -34,36 +38,30 @@ jobs:
       board-matrix: ${{ steps.get-vars.outputs.board-matrix }}
 
     steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
         with:
           fetch-depth: 0
           sparse-checkout: |
             .github
             .changes
+            boards
 
-      # Pin Node to the range declared in the scripts package (engines.node),
-      # rather than relying on whatever the runner image happens to ship.
-      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+      # get-vars.py parses tags with the semver package rather than a local regex, so it needs the pinned dependency set.
+      # gha.py still self-checks the interpreter floor and fails clearly if the image ever ships something older.
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97  # v7.0.0
         with:
-          node-version-file: .github/scripts/package.json
+          python-version-file: .github/scripts/.python-version
+          cache: 'pip'
+          cache-dependency-path: .github/scripts/requirements.txt
 
-      - uses: pnpm/action-setup@0977fd99725f1db4007ccb2928dbb4e90d06cc86 # v6.0.10
-        name: Install pnpm
-        with:
-          cache: true
-          cache_dependency_path: .github/scripts/pnpm-lock.yaml
-          package_json_file: .github/scripts/package.json
-          run_install: |
-            - cwd: .github/scripts
-              args: [--frozen-lockfile, --strict-peer-dependencies]
+      - name: Install script dependencies
+        shell: bash
+        run: pip install --require-hashes -r .github/scripts/requirements.txt
 
-      # Single source of truth for the version bump: release-tool computes the
-      # next version from .changes/. status mode works on every branch (no
-      # branch-config dependency) and creates no tag, so dev/CI builds get
-      # labelled as a pre-release of the upcoming version instead of the last tag.
+      # Single source of truth for the version bump: release-tool computes the next version from .changes/. status mode works on every branch (no branch-config dependency) and creates no tag, so dev/CI builds get labelled as a pre-release of the upcoming version instead of the last tag.
       - name: Compute next version
         id: relmeta
-        uses: OpenShock/release-tool@ea651e8c10372a10b6f452dcb34c38e60a72dc1f # v0.5.1
+        uses: OpenShock/release-tool@ea651e8c10372a10b6f452dcb34c38e60a72dc1f  # v0.5.1
         with:
           mode: status
 
@@ -73,4 +71,5 @@ jobs:
         env:
           RELEASE_NEXT_VERSION: ${{ steps.relmeta.outputs.next-version }}
           RELEASE_SKIP: ${{ steps.relmeta.outputs.skip }}
-        run: node .github/scripts/get-vars.js
+          CHANNEL_INPUT: ${{ inputs.channel }}
+        run: python .github/scripts/get-vars.py

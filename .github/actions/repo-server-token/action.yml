@@ -1,0 +1,34 @@
+name: repo-server-token
+description: >-
+  Mints a GitHub Actions OIDC token for the repository server, so the audience has one definition.
+
+inputs:
+  audience:
+    description: 'OIDC audience, must match OPENSHOCK__CICD__AUDIENCE on the server'
+    required: false
+    default: 'openshock-repository-server'
+
+outputs:
+  token:
+    description: 'The OIDC bearer token. Masked in logs, but still a credential.'
+    value: ${{ steps.mint.outputs.token }}
+
+runs:
+  using: composite
+  steps:
+    - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97  # v7.0.0
+      with:
+        python-version-file: .github/scripts/.python-version
+        cache: 'pip'
+        cache-dependency-path: .github/scripts/requirements.txt
+
+    # Same pinned set as repo-server-publish; pip no-ops when the job already has them.
+    - name: Install script dependencies
+      shell: bash
+      run: pip install --require-hashes -r .github/scripts/requirements.txt
+
+    - id: mint
+      shell: bash
+      env:
+        AUDIENCE: ${{ inputs.audience }}
+      run: python .github/scripts/repo_server_token.py
