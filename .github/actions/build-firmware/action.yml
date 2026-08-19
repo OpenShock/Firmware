@@ -17,11 +17,19 @@ inputs:
       Identifier of the ccache store this board shares, computed by get-vars.py as the
       chip plus a digest of the resolved sdkconfig. Boards with identical sdkconfig
       compile identical ESP-IDF objects, so they share one store.
+  idf-cache-writer:
+    required: false
+    default: 'false'
+    description: >-
+      Whether this job writes the shared ESP-IDF cache. get-vars nominates one board;
+      every other job restores it read-only.
 
 runs:
   using: composite
   steps:
     - uses: ./.github/actions/setup-esp-idf
+      with:
+        save-cache: ${{ inputs.idf-cache-writer }}
 
     # ccache is keyed on the sdkconfig identity, not the board: 13 boards resolve to 6
     # stores, so same-chip/same-flash boards reuse each other's ESP-IDF objects.
@@ -73,11 +81,14 @@ runs:
       shell: bash
       run: ccache --show-stats --verbose || ccache -s
 
-    # Saving is skipped on pull requests. A PR restores the base branch's store and
-    # benefits from it in full, but writing from every PR push is what multiplies entries
-    # fastest, and a PR's own store is thrown away when it merges.
+    # Saved on pull requests too, deliberately. ci-build only runs `push` for develop,
+    # beta and master, so a feature branch only ever builds as a PR - skipping the save
+    # there meant the store was never written and every PR push started from nothing.
+    #
+    # The entry count this costs is bounded now in a way it was not before: 6 stores per
+    # push rather than 13, each measured at roughly 30 MB for one board and capped by
+    # CCACHE_MAXSIZE, and PR-scoped entries age out with the branch.
     - name: Save ccache
-      if: ${{ github.event_name != 'pull_request' }}
       uses: actions/cache/save@27d5ce7f107fe9357f9df03efb73ab90386fccae  # v5.0.5
       with:
         path: ~/.cache/ccache

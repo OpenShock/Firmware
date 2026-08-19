@@ -198,8 +198,11 @@ def main() -> int:
     # Each entry carries the ccache store the board belongs to, so build-firmware can key
     # its cache on the sdkconfig identity rather than on the board name.
     # `include` alone is the whole matrix - there are no other axes to combine it with.
+    # The ESP-IDF install is identical for every board, so exactly one job is nominated to
+    # write its cache. Without this, a changed key has all 13 jobs tar and upload ~3.5 GB
+    # at once; one wins the reservation and the rest waste the effort and log a warning.
     entries = []
-    for board in boards:
+    for index, board in enumerate(boards):
         fragment = boards_dir / f'{board}.defaults'
         target = idf_target(fragment)
         entries.append(
@@ -207,6 +210,7 @@ def main() -> int:
                 'board': board,
                 'chip': target,
                 'cache-group': cache_group(fragment, target, shared),
+                'idf-cache-writer': index == 0,
             }
         )
 

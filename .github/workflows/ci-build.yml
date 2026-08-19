@@ -324,6 +324,7 @@ jobs:
           board: ${{ matrix.board }}
           version: ${{ needs.getvars.outputs.version }}
           cache-group: ${{ matrix.cache-group }}
+          idf-cache-writer: ${{ matrix.idf-cache-writer }}
 
   # Link every board's C++ partitions with the shared static0 image into one flashable binary each.
   # Waits on both parallel build legs.
