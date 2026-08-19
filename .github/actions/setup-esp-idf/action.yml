@@ -8,6 +8,14 @@ inputs:
     description: 'ESP-IDF version to install (EIM version tag).'
     required: false
     default: 'v6.0.2'
+  lookup-only:
+    description: >-
+      Probe mode. The restore only checks whether the cache entry exists instead of
+      downloading it, so a job that just wants to guarantee the cache is populated costs
+      seconds when it already is. On a miss the install, prune and save run as normal.
+      Nothing is activated in this mode, so the caller cannot build afterwards.
+    required: false
+    default: 'false'
   save-cache:
     description: >-
       Whether this job may write the ESP-IDF cache. The install is identical for every
@@ -36,21 +44,108 @@ runs:
           /tmp/esp
           /opt/esp
           ~/.espressif
-        key: esp-idf-${{ runner.os }}-${{ inputs.idf-version }}-4
+        # The one definition of this key; the warm-esp-idf job reaches it through
+        # lookup-only rather than repeating it. Bump the trailing number to invalidate.
+        key: esp-idf-${{ runner.os }}-${{ inputs.idf-version }}-5
         restore-keys: |
           esp-idf-${{ runner.os }}-${{ inputs.idf-version }}-
+        lookup-only: ${{ inputs.lookup-only }}
 
-    # Installs ESP-IDF, sets IDF_PATH, and puts the `idf.py` wrapper on PATH for
-    # later steps. v1 is a moving branch (no release tags), pinned by SHA.
+    # Only on a cache miss. The action re-runs `apt-get install` (git, cmake,
+    # ninja-build, ccache, ...) and re-prepares the IDF clone on every invocation, even
+    # when the restored tree is already complete. Measured with 13 matrix jobs running at
+    # once, that took 867 s in a job whose actual firmware build took 128 s - about 700 s
+    # of it apt fetching cmake at roughly 35 KB/s while every other job did the same. The
+    # cached tree is self-contained, so a warm run activates it directly below instead.
+    #
+    # v1 is a moving branch (no release tags), pinned by SHA.
     - uses: espressif/install-esp-idf-action@8fc05d1470d5591417e7a3707a1f2bec178db4ae  # v1
+      if: ${{ steps.idf-cache.outputs.cache-hit != 'true' }}
       with:
         version: ${{ inputs.idf-version }}
+
+    # The warm path. EIM writes an activate_idf_<version>.sh next to the install with
+    # absolute paths baked in, and the whole tree is cached, so those paths are still
+    # valid on restore. Sourcing it yields a working idf.py without the action.
+    # PATH entries it adds for pruned tools (esp-clang, the GDBs, OpenOCD, the ULP
+    # toolchain) simply do not resolve, which is harmless.
+    - name: Activate cached ESP-IDF
+      if: ${{ steps.idf-cache.outputs.cache-hit == 'true' && inputs.lookup-only != 'true' }}
+      shell: bash
+      run: |
+        set -euo pipefail
+        # A candidate directory with no match leaves the glob unexpanded, so guard with
+        # -f and keep the test out of an && chain, which would trip `set -e`.
+        act=""
+        for c in /tmp/esp /opt/esp "$HOME/.espressif" "$HOME/.espressif/tools"; do
+          for f in "$c"/activate_idf_*.sh; do
+            if [ -f "$f" ]; then
+              act="$f"
+              break 2
+            fi
+          done
+        done
+        if [ -z "$act" ]; then
+          echo "::error::ESP-IDF cache was restored but no activate_idf_*.sh was found in it."
+          exit 1
+        fi
+        echo "activating $act"
+
+        # `-e` is the script's own non-interactive mode: it prints KEY=VALUE lines instead
+        # of mutating the shell. Sourcing it is not an option here - it refuses to run
+        # unless $0 is a shell name, which it is not inside a GitHub step - and it also
+        # reads $ZSH_VERSION without a default, which trips `set -u`.
+        env_dump="$(sh "$act" -e)"
+        if [ -z "$env_dump" ]; then
+          echo "::error::$act produced no environment."
+          exit 1
+        fi
+
+        # Its PATH= line carries only the tool directories to prepend; SYSTEM_PATH is the
+        # caller's own PATH and must not be echoed back.
+        printf '%s\n' "$env_dump" | while IFS= read -r line; do
+          case "$line" in
+            PATH=*)
+              printf '%s\n' "${line#PATH=}" | tr ':' '\n' | grep -v '^$' >> "$GITHUB_PATH"
+              ;;
+            SYSTEM_PATH=*|'') ;;
+            *=*)
+              echo "$line" >> "$GITHUB_ENV"
+              ;;
+          esac
+        done
+
+        idf_path="$(printf '%s\n' "$env_dump" | sed -n 's/^IDF_PATH=//p' | head -1)"
+        if [ -z "$idf_path" ]; then
+          echo "::error::$act did not report IDF_PATH."
+          exit 1
+        fi
+        # idf.py lives in $IDF_PATH/tools and is not on the tool PATH the script emits.
+        # scripts/build.py prefers the wrapper when it can find it there.
+        echo "$idf_path/tools" >> "$GITHUB_PATH"
+        echo "activated ESP-IDF at $idf_path"
+
+    # ccache is the one build prerequisite the IDF tree does not carry - cmake, ninja and
+    # python all come from it. Installed only when absent, so the warm path normally
+    # touches apt not at all, and at worst fetches 592 KB rather than the action's ~15 MB.
+    - name: Ensure ccache is present
+      if: ${{ inputs.lookup-only != 'true' }}
+      shell: bash
+      run: |
+        set -euo pipefail
+        if command -v ccache >/dev/null 2>&1; then
+          echo "ccache present: $(ccache --version | head -1)"
+        else
+          sudo apt-get update -qq
+          sudo apt-get install -y --no-install-recommends ccache
+        fi
 
     # Report what the install actually weighs, per directory. This is the ground truth
     # for the prune list below: if a warm run shows the install step taking minutes
     # again, the installer is re-fetching something pruned here and that entry should be
     # taken off the list.
     - name: Measure ESP-IDF install
+      if: ${{ steps.idf-cache.outputs.cache-hit != 'true' }}
       shell: bash
       run: |
         set -uo pipefail
@@ -128,4 +223,4 @@ runs:
           /tmp/esp
           /opt/esp
           ~/.espressif
-        key: esp-idf-${{ runner.os }}-${{ inputs.idf-version }}-4
+        key: esp-idf-${{ runner.os }}-${{ inputs.idf-version }}-5
