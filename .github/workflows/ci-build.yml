@@ -297,6 +297,9 @@ jobs:
   # Compile each board's C++ firmware.
   # Builds only the code partitions (no static0 image, no frontend), so it runs in parallel with build-staticfs.
   build-firmware:
+    # The matrix carries chip and cache-group alongside the board, which would otherwise
+    # all end up in the generated job name.
+    name: build-firmware (${{ matrix.board }})
     runs-on: ubuntu-latest
     needs: [gate, getvars, stage]
     # getvars is named explicitly: without it, !cancelled() would let the matrix start on an empty board-matrix when get-vars failed.
@@ -320,6 +323,7 @@ jobs:
         with:
           board: ${{ matrix.board }}
           version: ${{ needs.getvars.outputs.version }}
+          cache-group: ${{ matrix.cache-group }}
 
   # Link every board's C++ partitions with the shared static0 image into one flashable binary each.
   # Waits on both parallel build legs.

@@ -11,20 +11,33 @@ inputs:
   version:
     required: true
     description: 'Current firmware version'
+  cache-group:
+    required: true
+    description: >-
+      Identifier of the ccache store this board shares, computed by get-vars.py as the
+      chip plus a digest of the resolved sdkconfig. Boards with identical sdkconfig
+      compile identical ESP-IDF objects, so they share one store.
 
 runs:
   using: composite
   steps:
     - uses: ./.github/actions/setup-esp-idf
 
-    # ccache keyed per board's chip (compiler/framework artifacts track the chip).
-    - name: Cache ccache
-      uses: actions/cache@27d5ce7f107fe9357f9df03efb73ab90386fccae  # v5.0.5
+    # ccache is keyed on the sdkconfig identity, not the board: 13 boards resolve to 6
+    # stores, so same-chip/same-flash boards reuse each other's ESP-IDF objects.
+    #
+    # The key deliberately does NOT contain the commit SHA. Cache entries are immutable,
+    # so a key that always misses always writes a full new copy - 13 fresh entries per
+    # push was what pushed this repository over the 10 GB cap. The SHA is only a save
+    # discriminator here; restore-keys does the real work by taking the newest store for
+    # the group.
+    - name: Restore ccache
+      uses: actions/cache/restore@27d5ce7f107fe9357f9df03efb73ab90386fccae  # v5.0.5
       with:
         path: ~/.cache/ccache
-        key: ccache-${{ runner.os }}-${{ inputs.board }}-${{ github.sha }}
+        key: ccache-${{ runner.os }}-${{ inputs.cache-group }}-${{ github.sha }}
         restore-keys: |
-          ccache-${{ runner.os }}-${{ inputs.board }}-
+          ccache-${{ runner.os }}-${{ inputs.cache-group }}-
 
     # Build only the code targets (app + bootloader + partition-table). This
     # skips the static0 image (built separately by build-staticfs), so no
@@ -34,13 +47,41 @@ runs:
       shell: bash
       run: |
         set -euo pipefail
-        export OPENSHOCK_FW_BUILD_DATE="$(git show -s --format=%cI HEAD 2>/dev/null || date -u +%Y-%m-%dT%H:%M:%SZ)"
         export IDF_CCACHE_ENABLE=1
+        ccache --zero-stats >/dev/null 2>&1 || true
         python3 scripts/build.py "${{ inputs.board }}" app bootloader partition-table
       env:
         OPENSHOCK_FW_VERSION: ${{ inputs.version }}
+        # One board per job, so a fixed build directory is safe here - and necessary.
+        # The directory path appears on every compile command line, so building each
+        # board under build/<board> gave every board a different command line and no two
+        # boards in a cache group could share an object.
+        OPENSHOCK_BUILD_DIR: build/firmware
         OPENSHOCK_FW_GIT_REF: ${{ github.ref }}
         OPENSHOCK_FW_GIT_COMMIT: ${{ github.sha }}
+        # content, not the default mtime: the toolchain is restored from a cache with
+        # fresh timestamps every run, which would otherwise invalidate the whole store.
+        CCACHE_COMPILERCHECK: content
+        # ccache defaults to 5 GB. One store holds a single sdkconfig's objects, so this
+        # is generous - it exists to stop a store growing without bound between evictions.
+        CCACHE_MAXSIZE: 500M
+
+    # The hit rate is the thing to watch after a change to the generated headers: a
+    # near-zero rate on an unchanged tree means something is being force-included that
+    # varies per commit again.
+    - name: ccache statistics
+      shell: bash
+      run: ccache --show-stats --verbose || ccache -s
+
+    # Saving is skipped on pull requests. A PR restores the base branch's store and
+    # benefits from it in full, but writing from every PR push is what multiplies entries
+    # fastest, and a PR's own store is thrown away when it merges.
+    - name: Save ccache
+      if: ${{ github.event_name != 'pull_request' }}
+      uses: actions/cache/save@27d5ce7f107fe9357f9df03efb73ab90386fccae  # v5.0.5
+      with:
+        path: ~/.cache/ccache
+        key: ccache-${{ runner.os }}-${{ inputs.cache-group }}-${{ github.sha }}
 
     # Flat, canonically-named images. app.bin/staticfs.bin are the names the
     # device OTA pulls (OtaUpdateManager.cpp); merge_image.py and the CDN upload
@@ -48,7 +89,7 @@ runs:
     - name: Stage partition images
       shell: bash
       env:
-        B: build/${{ inputs.board }}
+        B: build/firmware
       run: |
         set -euo pipefail
         mkdir -p dist

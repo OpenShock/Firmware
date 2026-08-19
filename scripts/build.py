@@ -40,6 +40,58 @@ def resolve_target(fragment: Path) -> str:
     raise SystemExit(f'error: {fragment} does not set CONFIG_IDF_TARGET')
 
 
+def resolve_build_dir(board: str) -> Path:
+    """Where to build. ``build/<board>`` locally, overridable with OPENSHOCK_BUILD_DIR.
+
+    The build directory path ends up on the compiler command line (``-I<dir>/config``
+    and the ``@<dir>/toolchain/cflags`` response file), so two boards built in
+    differently-named directories produce different command lines and share nothing in
+    ccache - even when their sdkconfig, and therefore every object, is identical.
+
+    Locally the per-board directory is what you want, so several boards can coexist. Each
+    CI job builds exactly one board, so it sets OPENSHOCK_BUILD_DIR to a fixed path and
+    every board in a cache group then compiles byte-identical objects.
+    """
+    override = os.environ.get('OPENSHOCK_BUILD_DIR')
+    if override:
+        path = Path(override)
+        return path if path.is_absolute() else ROOT / path
+    return ROOT / 'build' / board
+
+
+def write_sdkconfig_fragment(fragment: Path, build_dir: Path) -> Path:
+    """Strip the board's GPIO assignments out of the fragment before idf.py sees it.
+
+    boards/<board>.defaults holds two kinds of line: CONFIG_* settings, which are real
+    Kconfig and belong in sdkconfig, and bare OPENSHOCK_* GPIO assignments, which are
+    not. The latter are read by scripts/gen_env_header.py into openshock_board.h.
+
+    Keeping the pins out of Kconfig is what lets boards sharing a chip and flash size
+    produce byte-identical ESP-IDF objects: as Kconfig they landed in sdkconfig.h, which
+    most of the framework includes, so a different LED pin invalidated everything.
+
+    Kconfig would reject the bare lines outright, so the filtered copy is what idf.py is
+    pointed at.
+    """
+    out = build_dir / 'board.defaults'
+    kept = [
+        line
+        for line in fragment.read_text(encoding='utf-8').splitlines()
+        if not re.match(r'\s*OPENSHOCK_[A-Z0-9_]+\s*=', line)
+    ]
+    body = (
+        f'# Generated from {fragment.as_posix()} by scripts/build.py - do not edit.\n'
+        '# The board GPIO assignments are stripped here; they are not Kconfig.\n'
+        + '\n'.join(kept)
+        + '\n'
+    )
+    out.parent.mkdir(parents=True, exist_ok=True)
+    # Write only on change, so touching it does not force a CMake reconfigure.
+    if not out.is_file() or out.read_text(encoding='utf-8') != body:
+        out.write_text(body, encoding='utf-8')
+    return out
+
+
 def main(argv: list[str]) -> int:
     if not argv:
         raise SystemExit(__doc__)
@@ -49,8 +101,8 @@ def main(argv: list[str]) -> int:
 
     fragment = board_fragment(board)
     target = resolve_target(fragment)
-    build_dir = ROOT / 'build' / board
-    frag_rel = fragment.relative_to(ROOT).as_posix()
+    build_dir = resolve_build_dir(board)
+    frag_rel = write_sdkconfig_fragment(fragment, build_dir).relative_to(ROOT).as_posix()
 
     idf_args = [
         '-C', str(ROOT),

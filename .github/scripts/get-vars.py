@@ -5,6 +5,7 @@ Python port of the former get-vars.js (stdlib only, no node/pnpm toolchain).
 Reads the git ref/sha from the GITHUB_* env, the pending version from release-tool (RELEASE_NEXT_VERSION / RELEASE_SKIP), the repo tags via git, and the buildable boards from boards/*.defaults, then writes GitHub Action outputs.
 """
 
+import hashlib
 import json
 import os
 import re
@@ -51,6 +52,49 @@ def is_dev(version: semver.Version) -> bool:
 
 def sanitize(name: str) -> str:
     return re.sub(r'^-+|-+$', '', re.sub(r'-+', '-', re.sub(r'[^a-zA-Z0-9-]', '-', name)))
+
+
+def sdkconfig_lines(path: Path) -> list[str]:
+    """The CONFIG_* assignments of an sdkconfig fragment, normalized and sorted.
+
+    Comments, blank lines and the bare OPENSHOCK_* board-pin assignments are dropped:
+    the first two carry no build meaning, and the pins are deliberately not Kconfig
+    (see scripts/build.py), so they must not influence the digest below.
+    """
+    lines = []
+    for raw in path.read_text(encoding='utf-8').splitlines():
+        line = raw.strip()
+        if line.startswith('CONFIG_'):
+            lines.append(line)
+    return sorted(lines)
+
+
+def cache_group(fragment: Path, target: str, shared: Path) -> str:
+    """Name the ccache store this board shares with its peers.
+
+    Two boards compile byte-identical ESP-IDF objects exactly when their resolved
+    sdkconfig is identical, so the store is keyed on precisely that: the chip, plus a
+    digest of every sdkconfig input. Board pins live outside Kconfig, so the five
+    ESP32/4 MB boards - which differ only in pins - collapse into a single group.
+
+    The digest is derived rather than hardcoded as chip+flash-size on purpose: a board
+    that later changes any other sdkconfig setting (PSRAM, a different partition table)
+    splits into its own group by itself, instead of silently sharing a store it can
+    never hit. dependencies.lock is deliberately excluded - a component bump should
+    invalidate the affected objects inside the store, not abandon the whole store.
+    """
+    digest = hashlib.sha256()
+    for line in sdkconfig_lines(shared) + sdkconfig_lines(fragment):
+        digest.update(line.encode('utf-8'))
+        digest.update(b'\n')
+    return f'{target}-{digest.hexdigest()[:10]}'
+
+
+def idf_target(fragment: Path) -> str:
+    m = re.search(r'^\s*CONFIG_IDF_TARGET\s*=\s*"([^"]+)"', fragment.read_text(encoding='utf-8'), re.M)
+    if m is None:
+        fail(f'{fragment} does not set CONFIG_IDF_TARGET')
+    return m.group(1)
 
 
 def main() -> int:
@@ -147,15 +191,41 @@ def main() -> int:
     if not boards:
         fail('No boards/*.defaults files found in "boards"')
 
+    shared = Path('sdkconfig.defaults')
+    if not shared.is_file():
+        fail('sdkconfig.defaults not found')
+
+    # Each entry carries the ccache store the board belongs to, so build-firmware can key
+    # its cache on the sdkconfig identity rather than on the board name.
+    # `include` alone is the whole matrix - there are no other axes to combine it with.
+    entries = []
+    for board in boards:
+        fragment = boards_dir / f'{board}.defaults'
+        target = idf_target(fragment)
+        entries.append(
+            {
+                'board': board,
+                'chip': target,
+                'cache-group': cache_group(fragment, target, shared),
+            }
+        )
+
+    groups: dict[str, list[str]] = {}
+    for entry in entries:
+        groups.setdefault(entry['cache-group'], []).append(entry['board'])
+
     print('Version:  ' + version)
     print('Channel:  ' + channel)
     print('Boards:   ' + ', '.join(boards))
     print('Tags:     ' + ', '.join(tags))
+    print(f'ccache stores: {len(groups)} for {len(boards)} boards')
+    for group, members in sorted(groups.items()):
+        print(f'  {group}  {", ".join(members)}')
 
     set_output('version', version)
     set_output('release-channel', channel)
     set_output('board-list', '\n'.join(boards))
-    set_output('board-matrix', json.dumps({'board': boards}))
+    set_output('board-matrix', json.dumps({'include': entries}))
     return 0
 
 
