@@ -31,6 +31,9 @@ const char* const TAG = "CaptivePortalInstance";
 #include <functional>
 #include <string>
 
+// Board GPIO assignments (no longer Kconfig; see scripts/gen_env_header.py).
+#include "openshock_board.h"
+
 const uint16_t HTTP_PORT = 80;
 
 // Largest inbound WebSocket message we'll accept (local FlatBuffer commands are tiny).
@@ -215,7 +218,7 @@ static const char* contentTypeForPath(const std::string& path)
 
 static esp_err_t apiBoard(httpd_req_t* req)
 {
-  bool hasPredefinedPins = CONFIG_OPENSHOCK_RF_TX_GPIO != OPENSHOCK_GPIO_INVALID;
+  bool hasPredefinedPins = OPENSHOCK_RF_TX_GPIO != OPENSHOCK_GPIO_INVALID;
   return sendResp(req, S200, HTTP::ContentType::JSON, hasPredefinedPins ? "{\"has_predefined_pins\":true}" : "{\"has_predefined_pins\":false}");
 }
 

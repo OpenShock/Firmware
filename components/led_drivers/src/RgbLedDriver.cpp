@@ -14,9 +14,11 @@ const char* const TAG = "RGBLedDriver";
 
 #include <array>
 
-// R/G channel swap comes from Kconfig (CONFIG_OPENSHOCK_LED_SWAP_RG_CHANNELS, see
-// src/Kconfig.projbuild). Kconfig defines the symbol as 1 only when the bool is
-// enabled and leaves it undefined otherwise, so the #if below reads it directly.
+// R/G channel swap is a board setting, generated into openshock_board.h by
+// scripts/gen_env_header.py rather than coming from Kconfig - keeping it out of
+// sdkconfig.h is what lets boards sharing a chip reuse ESP-IDF objects. It is always
+// defined, as 0 or 1, so the #if below reads it directly.
+#include "openshock_board.h"
 #include "sdkconfig.h"
 
 using namespace OpenShock;
@@ -165,7 +167,7 @@ void RgbLedDriver::RunPattern()
       uint8_t r = static_cast<uint8_t>(static_cast<uint16_t>(state.red) * m_brightness / 255);
       uint8_t g = static_cast<uint8_t>(static_cast<uint16_t>(state.green) * m_brightness / 255);
       uint8_t b = static_cast<uint8_t>(static_cast<uint16_t>(state.blue) * m_brightness / 255);
-#if CONFIG_OPENSHOCK_LED_SWAP_RG_CHANNELS
+#if OPENSHOCK_LED_SWAP_RG_CHANNELS
       std::swap(r, g);
 #endif
 

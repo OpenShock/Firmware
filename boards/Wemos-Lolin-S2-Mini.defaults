@@ -8,5 +8,7 @@ CONFIG_ESPTOOLPY_FLASHSIZE_4MB=y
 CONFIG_PARTITION_TABLE_CUSTOM=y
 CONFIG_PARTITION_TABLE_CUSTOM_FILENAME="partitions/ota_4mb.csv"
 
-# Hardware pins (see src/Kconfig.projbuild)
-CONFIG_OPENSHOCK_LED_GPIO=15
+# Hardware pins. Not Kconfig: bare OPENSHOCK_* lines, read by scripts/gen_env_header.py
+# into openshock_board.h and stripped from the sdkconfig fragment by scripts/build.py,
+# so boards sharing a chip and flash size compile identical ESP-IDF objects.
+OPENSHOCK_LED_GPIO=15
