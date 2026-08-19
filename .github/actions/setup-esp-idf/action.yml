@@ -2,7 +2,7 @@ name: setup-esp-idf
 description: >-
   Install a pinned native ESP-IDF toolchain and put its `idf.py` wrapper on PATH.
   scripts/build.py invokes that wrapper, which activates the tool + venv
-  environment itself. Shared by every job that runs idf.py; replaces pio-cache.
+  environment itself. Shared by every job that runs idf.py.
 inputs:
   idf-version:
     description: 'ESP-IDF version to install (EIM version tag).'
@@ -12,26 +12,101 @@ inputs:
 runs:
   using: composite
   steps:
-    # Cache the whole ESP-IDF install so a warm run skips the multi-minute IDF
-    # source clone + submodule fetch + toolchain download. On Linux this action
-    # installs the source (and its submodules) under /tmp/esp/idf and the tools /
-    # Python venv under /tmp/esp (older layouts used /opt/esp or ~/.espressif, so
-    # cache all three - missing paths are skipped). Keyed by version. Bump the
-    # trailing number to invalidate a stale cache (keys are immutable once saved).
-    - name: Cache ESP-IDF install
-      uses: actions/cache@27d5ce7f107fe9357f9df03efb73ab90386fccae  # v5.0.5
+    # Cache the whole ESP-IDF install so a warm run skips the multi-minute IDF source
+    # clone + submodule fetch + toolchain download. On Linux this action installs the
+    # source (and its submodules) under /tmp/esp/idf and the tools / Python venv under
+    # /tmp/esp (older layouts used /opt/esp or ~/.espressif, so cache all three - missing
+    # paths are skipped). Keyed by version; bump the trailing number to invalidate.
+    #
+    # Split into restore + save so the prune below lands between them, and the cache
+    # stores the trimmed install rather than the full one.
+    - name: Restore ESP-IDF install
+      id: idf-cache
+      uses: actions/cache/restore@27d5ce7f107fe9357f9df03efb73ab90386fccae  # v5.0.5
       with:
         path: |
           /tmp/esp
           /opt/esp
           ~/.espressif
-        key: esp-idf-${{ runner.os }}-${{ inputs.idf-version }}-2
+        key: esp-idf-${{ runner.os }}-${{ inputs.idf-version }}-3
         restore-keys: |
           esp-idf-${{ runner.os }}-${{ inputs.idf-version }}-
 
     # Installs ESP-IDF, sets IDF_PATH, and puts the `idf.py` wrapper on PATH for
     # later steps. v1 is a moving branch (no release tags), pinned by SHA.
-    - name: Install ESP-IDF
-      uses: espressif/install-esp-idf-action@8fc05d1470d5591417e7a3707a1f2bec178db4ae  # v1
+    - uses: espressif/install-esp-idf-action@8fc05d1470d5591417e7a3707a1f2bec178db4ae  # v1
       with:
         version: ${{ inputs.idf-version }}
+
+    # Report what the install actually weighs, per directory. This is the ground truth
+    # for the prune list below: if a warm run shows the install step taking minutes
+    # again, the installer is re-fetching something pruned here and that entry should be
+    # taken off the list.
+    - name: Measure ESP-IDF install
+      shell: bash
+      run: |
+        set -uo pipefail
+        for root in /tmp/esp /opt/esp "$HOME/.espressif"; do
+          [ -d "$root" ] || continue
+          echo "::group::$root"
+          du -sh "$root" 2>/dev/null || true
+          du -sh "$root"/* 2>/dev/null | sort -rh | head -20 || true
+          if [ -d "$root/tools" ]; then
+            echo "-- tools --"
+            du -sh "$root"/tools/* 2>/dev/null | sort -rh | head -20 || true
+          fi
+          echo "::endgroup::"
+        done
+
+    # Trim the install before it is cached. Only reached on a cache miss, which is also
+    # the only run that saves.
+    #
+    #   dist/          the downloaded archives, already extracted into tools/. idf_tools
+    #                  ships --remove-archives for exactly this, and decides whether a
+    #                  tool needs installing from tools/<name>/<version>, not from dist/.
+    #   *-gdb          debuggers; nothing debugs on a runner.
+    #   openocd-esp32  on-target flashing/debugging; CI never touches hardware.
+    #   esp32ulp-elf   ULP coprocessor toolchain. No board enables the ULP - if one ever
+    #                  does, drop this line or its build will fail to find the assembler.
+    #   esp-clang*     only used by clang-tidy / `idf.py clang-check`. cpp-linter runs
+    #                  with tidy-checks '-*' and the firmware is built with gcc, so
+    #                  nothing invokes it. Frequently absent anyway (it belongs to the
+    #                  optional esp-clang feature, not core), hence the existence guard.
+    #
+    # The xtensa/riscv gcc toolchains are NOT pruned: xtensa-esp-elf builds 12 of the 13
+    # boards and riscv32-esp-elf builds the ESP32-C3.
+    - name: Prune unused toolchains before caching
+      if: ${{ steps.idf-cache.outputs.cache-hit != 'true' }}
+      shell: bash
+      run: |
+        set -uo pipefail
+        total=0
+        drop() {
+          [ -e "$1" ] || return 0
+          local kb
+          kb=$(du -sk "$1" 2>/dev/null | cut -f1) || kb=0
+          rm -rf "$1"
+          total=$((total + kb))
+          echo "  removed $(printf '%6s' "$((kb / 1024))MB")  $1"
+        }
+        for root in /tmp/esp /opt/esp "$HOME/.espressif"; do
+          [ -d "$root" ] || continue
+          echo "pruning $root"
+          drop "$root/dist"
+          for t in "$root"/tools/*-gdb "$root"/tools/openocd-esp32 \
+                   "$root"/tools/esp32ulp-elf "$root"/tools/esp-clang \
+                   "$root"/tools/esp-clang-libs; do
+            drop "$t"
+          done
+        done
+        echo "pruned $((total / 1024)) MB in total"
+
+    - name: Save ESP-IDF install
+      if: ${{ steps.idf-cache.outputs.cache-hit != 'true' }}
+      uses: actions/cache/save@27d5ce7f107fe9357f9df03efb73ab90386fccae  # v5.0.5
+      with:
+        path: |
+          /tmp/esp
+          /opt/esp
+          ~/.espressif
+        key: esp-idf-${{ runner.os }}-${{ inputs.idf-version }}-3

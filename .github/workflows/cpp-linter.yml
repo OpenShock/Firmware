@@ -32,9 +32,13 @@ jobs:
           # flatbuffers runtime lives in a submodule (components/flatbuffers).
           submodules: recursive
 
+      # configure only: the linter reads compile_commands.json, which CMake writes before
+      # anything is compiled. Building the firmware here was a full uncached board build
+      # on every PR touching C/C++, for a file that already existed by then.
       - uses: ./.github/actions/build-compilationdb
         with:
           version: 0.0.0-test+build # Doesn't matter, just need the compilation database
+          mode: configure
       
       - uses: cpp-linter/cpp-linter-action@cab1143a2c149bc41e85b070a9de81716974c18f # v2.21.0
         id: linter

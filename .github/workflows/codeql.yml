@@ -16,7 +16,6 @@ env:
   OPENSHOCK_API_DOMAIN: api.openshock.app
   OPENSHOCK_FW_GIT_REF: ${{ github.ref }}
   OPENSHOCK_FW_GIT_COMMIT: ${{ github.sha }}
-  OPENSHOCK_FW_BUILD_DATE: ${{ github.event.head_commit.timestamp }}
 
 jobs:
   # CodeQL only needs to compile the code for analysis; the exact version string
@@ -87,9 +86,11 @@ jobs:
         with:
           languages: ${{ env.language }}
 
+      # build, not configure: CodeQL's tracer only sees the C/C++ if the compiler actually runs.
       - uses: ./.github/actions/build-compilationdb
         with:
           version: 0.0.0-codeql+build
+          mode: build
 
       - name: Perform CodeQL Analysis
         uses: github/codeql-action/analyze@e58424170fb0262c8d7ed60a2e84b9bffe205c67  # codeql-bundle-v2.26.1
