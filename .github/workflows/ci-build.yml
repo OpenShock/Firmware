@@ -285,6 +285,16 @@ jobs:
   build-staticfs:
     runs-on: ubuntu-latest
     needs: [getvars, build-frontend]
+    # `stage` is skipped on every run that does not publish, and GitHub propagates that
+    # skip down the needs graph to any job that does not override it. build-frontend and
+    # build-firmware each carry their own condition, so they run; this job did not, so it
+    # skipped on pull requests - taking merge-partitions and checkpoint-build with it, and
+    # leaving a PR with no flashable images. It builds on dispatch, which is why it went
+    # unnoticed.
+    if: >-
+      ${{ !cancelled()
+      && needs.getvars.result == 'success'
+      && needs.build-frontend.result == 'success' }}
     timeout-minutes: 5
 
     steps:
@@ -332,6 +342,13 @@ jobs:
   merge-partitions:
     runs-on: ubuntu-latest
     needs: [getvars, build-staticfs, build-firmware]
+    # Explicit for the same reason as build-staticfs above: this job sits downstream of
+    # the same chain, so it must not inherit a skip from it.
+    if: >-
+      ${{ !cancelled()
+      && needs.getvars.result == 'success'
+      && needs.build-staticfs.result == 'success'
+      && needs.build-firmware.result == 'success' }}
     timeout-minutes: 10
 
     steps:
