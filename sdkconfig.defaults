@@ -1,8 +1,8 @@
-# Required by Arduino-as-IDF-component
+# Tick rate. Originally raised for Arduino-as-IDF-component; kept because the existing
+# timing code assumes a 1 ms tick.
 CONFIG_FREERTOS_HZ=1000
-CONFIG_AUTOSTART_ARDUINO=y
 
-# Keep main task large enough for Arduino setup() / existing init chain
+# Keep the main task large enough for the init chain.
 CONFIG_ESP_MAIN_TASK_STACK_SIZE=16384
 
 # WiFi/IP event handlers (WiFiManager, GatewayConnectionManager) now run directly
@@ -48,23 +48,13 @@ CONFIG_MBEDTLS_CUSTOM_CERTIFICATE_BUNDLE_PATH="certificates/cacert-merged.pem"
 # Partition table — OpenShock uses a custom one; existing partitions stay valid
 # (leave PARTITION_TABLE_* at IDF defaults; per-env sdkconfigs can override)
 
-# Arduino selective compilation — every CONFIG_ARDUINO_SELECTIVE_<lib> defaults
-# to y, so turning on SELECTIVE_COMPILATION and then DISABLING the heavy library
-# wrappers we don't use drops their managed components (esp-sr + esp-dsp,
-# esp_rainmaker + insights + diag + cbor + qrcode, esp-zigbee/zboss, esp_modem,
-# matter, ...) out of the build closure entirely — a large build-time and flash
-# saving. None of these are referenced by OpenShock. Re-enable one (=y / delete
-# its line) if new code ever needs it.
-CONFIG_ARDUINO_SELECTIVE_COMPILATION=y
-CONFIG_ARDUINO_SELECTIVE_BLE=n
-CONFIG_ARDUINO_SELECTIVE_BluetoothSerial=n
-CONFIG_ARDUINO_SELECTIVE_SimpleBLE=n
-CONFIG_ARDUINO_SELECTIVE_RainMaker=n
-CONFIG_ARDUINO_SELECTIVE_Insights=n
-CONFIG_ARDUINO_SELECTIVE_Zigbee=n
-CONFIG_ARDUINO_SELECTIVE_OpenThread=n
-CONFIG_ARDUINO_SELECTIVE_Matter=n
-CONFIG_ARDUINO_SELECTIVE_ESP_SR=n
-CONFIG_ARDUINO_SELECTIVE_PPP=n
-CONFIG_ARDUINO_SELECTIVE_Ethernet=n
-CONFIG_ARDUINO_SELECTIVE_WiFiProv=n
+# The CONFIG_ARDUINO_SELECTIVE_* block that used to live here is gone. Arduino is no
+# longer a component of this project - it is in neither dependencies.lock nor any
+# idf_component.yml - so kconfgen reported every one of those symbols as unknown and
+# discarded it. They were fourteen lines that did nothing.
+#
+# Still to review as part of finishing the de-Arduino migration: CONFIG_MBEDTLS_PSK_MODES
+# and CONFIG_MBEDTLS_KEY_EXCHANGE_PSK above were only needed to make Arduino's
+# NetworkClientSecure link, and CONFIG_LWIP_SO_RCVBUF was an Arduino dependency. All
+# three are real settings that still take effect, so they are left alone here rather
+# than changed as a side effect of a build-caching pass.
