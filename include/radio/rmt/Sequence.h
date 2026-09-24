@@ -19,6 +19,8 @@ namespace OpenShock::Rmt {
       , m_transmitEnd(0)
       , m_shockerId(0)
       , m_shockerModel()
+      , m_commandType()
+      , m_intensity(0)
     {
     }
     Sequence(ShockerModelType shockerModel, uint16_t shockerId, int64_t transmitEnd);
@@ -28,6 +30,8 @@ namespace OpenShock::Rmt {
       , m_transmitEnd(other.m_transmitEnd)
       , m_shockerId(other.m_shockerId)
       , m_shockerModel(other.m_shockerModel)
+      , m_commandType(other.m_commandType)
+      , m_intensity(other.m_intensity)
     {
       other.reset();
     }
@@ -48,6 +52,7 @@ namespace OpenShock::Rmt {
     inline size_t size() const noexcept { return m_size; }
 
     bool fill(ShockerCommandType commandType, uint8_t intensity);
+    bool refill();
 
     Sequence& operator=(Sequence&& other)
     {
@@ -60,6 +65,8 @@ namespace OpenShock::Rmt {
       m_transmitEnd  = other.m_transmitEnd;
       m_shockerId    = other.m_shockerId;
       m_shockerModel = other.m_shockerModel;
+      m_commandType  = other.m_commandType;
+      m_intensity    = other.m_intensity;
 
       other.reset();
 
@@ -74,6 +81,8 @@ namespace OpenShock::Rmt {
       m_transmitEnd  = 0;
       m_shockerId    = 0;
       m_shockerModel = static_cast<ShockerModelType>(0);
+      m_commandType  = static_cast<ShockerCommandType>(0);
+      m_intensity    = 0;
     }
 
     rmt_data_t* m_data;
@@ -81,5 +90,7 @@ namespace OpenShock::Rmt {
     int64_t m_transmitEnd;
     uint16_t m_shockerId;
     ShockerModelType m_shockerModel;
+    ShockerCommandType m_commandType;
+    uint8_t m_intensity;
   };
 }  // namespace OpenShock::Rmt

@@ -73,5 +73,22 @@ Rmt::Sequence::Sequence(ShockerModelType shockerModel, uint16_t shockerId, int64
 
 bool Rmt::Sequence::fill(ShockerCommandType commandType, uint8_t intensity)
 {
+  m_commandType = commandType;
+  m_intensity   = intensity;
   return fillSequenceImpl(payload(), m_shockerModel, m_shockerId, commandType, intensity);
+}
+
+static bool refillSequenceImpl(rmt_data_t* data, ShockerModelType modelType, uint16_t shockerId, ShockerCommandType commandType, uint8_t intensity)
+{
+  switch (modelType) {
+    case ShockerModelType::WellturnT330:
+      return Rmt::WellturnT330Encoder::FillBuffer(data, shockerId, commandType, intensity);
+    default:
+      return true;
+  }
+}
+
+bool Rmt::Sequence::refill()
+{
+  return refillSequenceImpl(payload(), m_shockerModel, m_shockerId, m_commandType, m_intensity);
 }

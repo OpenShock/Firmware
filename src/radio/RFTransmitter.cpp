@@ -180,7 +180,7 @@ static void writeSequences(rmt_obj_t* rmt_handle, std::vector<Rmt::Sequence>& se
     int64_t timeToLive = seq->transmitEnd() - OpenShock::millis();
 
     if (timeToLive > 0) {
-      // Send the command
+      seq->refill();
       rmtWriteBlocking(rmt_handle, seq->payload(), seq->size());
     } else {
       // Remove command if it has sent out its termination sequence for long enough
