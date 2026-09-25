@@ -1,6 +1,5 @@
 ---
 kind: fixed
-pr: 515
 ---
 Report the connected WiFi network when it isn't in the scan results
 
