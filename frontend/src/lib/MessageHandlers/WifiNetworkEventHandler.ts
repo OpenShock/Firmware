@@ -21,18 +21,6 @@ export function mapWifiNetwork(
   };
 }
 
-// The connected network may not be part of the scan results (e.g. connected without a scan),
-// make sure it is always listed so the UI can display it as connected
-export function ensureConnectedWifiNetwork(
-  fbsNetwork: FbsWifiNetwork,
-  ssid: string,
-  bssid: string
-) {
-  if (!hubState.wifiNetworks.has(bssid)) {
-    hubState.setWifiNetwork(mapWifiNetwork(fbsNetwork, ssid, bssid));
-  }
-}
-
 function handleInvalidEvent() {
   console.warn('[WS] Received invalid event type');
 }
@@ -103,13 +91,8 @@ function handleRemovedEvent(fbsNetwork: FbsWifiNetwork) {
     return;
   }
 
-  const bssid = fbsNetwork.bssid();
-  if (bssid) {
-    hubState.updateWifiNetwork(bssid, (network) => {
-      network.saved = false;
-      return network;
-    });
-  }
+  // Credentials are per SSID, and the event may carry a zeroed BSSID if the network wasn't scanned
+  hubState.markWifiNetworksUnsaved(ssid);
 
   // Update config credentials so savedOnlySSIDs stays in sync
   if (hubState.config) {
@@ -133,8 +116,7 @@ function handleConnectedEvent(fbsNetwork: FbsWifiNetwork) {
     return;
   }
 
-  ensureConnectedWifiNetwork(fbsNetwork, ssid, bssid);
-  hubState.wifiConnectedBSSID = bssid;
+  hubState.setConnectedWifiNetwork(mapWifiNetwork(fbsNetwork, ssid, bssid));
 
   toast.info('WiFi network connected: ' + ssid);
 }
@@ -147,7 +129,7 @@ function handleDisconnectedEvent(fbsNetwork: FbsWifiNetwork) {
     return;
   }
 
-  hubState.wifiConnectedBSSID = null;
+  hubState.setConnectedWifiNetwork(null);
 
   toast.info('WiFi network disconnected: ' + ssid);
 }
