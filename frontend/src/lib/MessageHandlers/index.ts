@@ -11,7 +11,7 @@ import { hubState } from '$lib/stores';
 import type { WebSocketClient } from '$lib/WebSocketClient';
 import { ByteBuffer } from 'flatbuffers';
 import { toast } from 'svelte-sonner';
-import { WifiNetworkEventHandler } from './WifiNetworkEventHandler';
+import { ensureConnectedWifiNetwork, WifiNetworkEventHandler } from './WifiNetworkEventHandler';
 
 export type MessageHandler = (wsClient: WebSocketClient, message: HubToLocalMessage) => void;
 
@@ -28,7 +28,13 @@ PayloadHandlers[HubToLocalMessagePayload.ReadyMessage] = (cli, msg) => {
   const payload = new ReadyMessage();
   msg.payload(payload);
 
-  hubState.wifiConnectedBSSID = payload.connectedWifi()?.bssid() || null;
+  const connectedWifi = payload.connectedWifi();
+  const connectedSSID = connectedWifi?.ssid();
+  const connectedBSSID = connectedWifi?.bssid();
+  if (connectedWifi && connectedSSID && connectedBSSID) {
+    ensureConnectedWifiNetwork(connectedWifi, connectedSSID, connectedBSSID);
+  }
+  hubState.wifiConnectedBSSID = connectedBSSID || null;
   hubState.accountLinked = payload.accountLinked();
   hubState.config = mapConfig(payload.config());
 

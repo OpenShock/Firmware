@@ -6,6 +6,33 @@ import type { WiFiNetwork } from '$lib/types/WiFiNetwork';
 import { toast } from 'svelte-sonner';
 import type { MessageHandler } from '.';
 
+export function mapWifiNetwork(
+  fbsNetwork: FbsWifiNetwork,
+  ssid: string,
+  bssid: string
+): WiFiNetwork {
+  return {
+    ssid: ssid,
+    bssid: bssid,
+    rssi: fbsNetwork.rssi(),
+    channel: fbsNetwork.channel(),
+    security: fbsNetwork.authMode(),
+    saved: fbsNetwork.saved(),
+  };
+}
+
+// The connected network may not be part of the scan results (e.g. connected without a scan),
+// make sure it is always listed so the UI can display it as connected
+export function ensureConnectedWifiNetwork(
+  fbsNetwork: FbsWifiNetwork,
+  ssid: string,
+  bssid: string
+) {
+  if (!hubState.wifiNetworks.has(bssid)) {
+    hubState.setWifiNetwork(mapWifiNetwork(fbsNetwork, ssid, bssid));
+  }
+}
+
 function handleInvalidEvent() {
   console.warn('[WS] Received invalid event type');
 }
@@ -18,16 +45,7 @@ function handleDiscoveredEvent(fbsNetwork: FbsWifiNetwork) {
     return;
   }
 
-  const network: WiFiNetwork = {
-    ssid: ssid,
-    bssid: bssid,
-    rssi: fbsNetwork.rssi(),
-    channel: fbsNetwork.channel(),
-    security: fbsNetwork.authMode(),
-    saved: fbsNetwork.saved(),
-  };
-
-  hubState.setWifiNetwork(network);
+  hubState.setWifiNetwork(mapWifiNetwork(fbsNetwork, ssid, bssid));
 }
 function handleUpdatedEvent(fbsNetwork: FbsWifiNetwork) {
   const ssid = fbsNetwork.ssid();
@@ -38,16 +56,7 @@ function handleUpdatedEvent(fbsNetwork: FbsWifiNetwork) {
     return;
   }
 
-  const network: WiFiNetwork = {
-    ssid: ssid,
-    bssid: bssid,
-    rssi: fbsNetwork.rssi(),
-    channel: fbsNetwork.channel(),
-    security: fbsNetwork.authMode(),
-    saved: fbsNetwork.saved(),
-  };
-
-  hubState.setWifiNetwork(network);
+  hubState.setWifiNetwork(mapWifiNetwork(fbsNetwork, ssid, bssid));
 }
 function handleLostEvent(fbsNetwork: FbsWifiNetwork) {
   const bssid = fbsNetwork.bssid();
@@ -124,6 +133,7 @@ function handleConnectedEvent(fbsNetwork: FbsWifiNetwork) {
     return;
   }
 
+  ensureConnectedWifiNetwork(fbsNetwork, ssid, bssid);
   hubState.wifiConnectedBSSID = bssid;
 
   toast.info('WiFi network connected: ' + ssid);
