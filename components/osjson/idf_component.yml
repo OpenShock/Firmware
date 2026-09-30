@@ -2,5 +2,5 @@
 # Declared here explicitly rather than relying on them being pulled in as
 # transitive private dependencies of other components.
 dependencies:
-  espressif/jsmn: "^1.1.0"
-  espressif/json_generator: "^1.1.2"
+  espressif/jsmn: "^1.2.0"
+  espressif/json_generator: "^1.3.0"

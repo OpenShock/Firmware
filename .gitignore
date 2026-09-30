@@ -17,7 +17,6 @@
 *.sln
 compile_commands.json
 managed_components
-dependencies.lock
 
 # ESP-IDF: sdkconfig and sdkconfig.old are generated ("DO NOT EDIT") from
 # sdkconfig.defaults[.<target>]. Track only the editable defaults.

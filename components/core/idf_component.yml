@@ -5,4 +5,4 @@
 # The captive portal's static assets are read from a littlefs partition via the raw
 # vendored littlefs core (components/littlefs) — no VFS, no joltwallet.
 dependencies:
-  espressif/esp_websocket_client: "^1.4.0"
+  espressif/esp_websocket_client: "^1.8.0"
