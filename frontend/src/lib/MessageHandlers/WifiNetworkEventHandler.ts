@@ -6,6 +6,21 @@ import type { WiFiNetwork } from '$lib/types/WiFiNetwork';
 import { toast } from 'svelte-sonner';
 import type { MessageHandler } from '.';
 
+export function mapWifiNetwork(
+  fbsNetwork: FbsWifiNetwork,
+  ssid: string,
+  bssid: string
+): WiFiNetwork {
+  return {
+    ssid: ssid,
+    bssid: bssid,
+    rssi: fbsNetwork.rssi(),
+    channel: fbsNetwork.channel(),
+    security: fbsNetwork.authMode(),
+    saved: fbsNetwork.saved(),
+  };
+}
+
 function handleInvalidEvent() {
   console.warn('[WS] Received invalid event type');
 }
@@ -18,16 +33,7 @@ function handleDiscoveredEvent(fbsNetwork: FbsWifiNetwork) {
     return;
   }
 
-  const network: WiFiNetwork = {
-    ssid: ssid,
-    bssid: bssid,
-    rssi: fbsNetwork.rssi(),
-    channel: fbsNetwork.channel(),
-    security: fbsNetwork.authMode(),
-    saved: fbsNetwork.saved(),
-  };
-
-  hubState.setWifiNetwork(network);
+  hubState.setWifiNetwork(mapWifiNetwork(fbsNetwork, ssid, bssid));
 }
 function handleUpdatedEvent(fbsNetwork: FbsWifiNetwork) {
   const ssid = fbsNetwork.ssid();
@@ -38,16 +44,7 @@ function handleUpdatedEvent(fbsNetwork: FbsWifiNetwork) {
     return;
   }
 
-  const network: WiFiNetwork = {
-    ssid: ssid,
-    bssid: bssid,
-    rssi: fbsNetwork.rssi(),
-    channel: fbsNetwork.channel(),
-    security: fbsNetwork.authMode(),
-    saved: fbsNetwork.saved(),
-  };
-
-  hubState.setWifiNetwork(network);
+  hubState.setWifiNetwork(mapWifiNetwork(fbsNetwork, ssid, bssid));
 }
 function handleLostEvent(fbsNetwork: FbsWifiNetwork) {
   const bssid = fbsNetwork.bssid();
@@ -94,13 +91,8 @@ function handleRemovedEvent(fbsNetwork: FbsWifiNetwork) {
     return;
   }
 
-  const bssid = fbsNetwork.bssid();
-  if (bssid) {
-    hubState.updateWifiNetwork(bssid, (network) => {
-      network.saved = false;
-      return network;
-    });
-  }
+  // Credentials are per SSID, and the event may carry a zeroed BSSID if the network wasn't scanned
+  hubState.markWifiNetworksUnsaved(ssid);
 
   // Update config credentials so savedOnlySSIDs stays in sync
   if (hubState.config) {
@@ -124,7 +116,7 @@ function handleConnectedEvent(fbsNetwork: FbsWifiNetwork) {
     return;
   }
 
-  hubState.wifiConnectedBSSID = bssid;
+  hubState.setConnectedWifiNetwork(mapWifiNetwork(fbsNetwork, ssid, bssid));
 
   toast.info('WiFi network connected: ' + ssid);
 }
@@ -137,7 +129,7 @@ function handleDisconnectedEvent(fbsNetwork: FbsWifiNetwork) {
     return;
   }
 
-  hubState.wifiConnectedBSSID = null;
+  hubState.setConnectedWifiNetwork(null);
 
   toast.info('WiFi network disconnected: ' + ssid);
 }
