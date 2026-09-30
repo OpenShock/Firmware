@@ -1,0 +1,18 @@
+# OpenShock Core V2 — ESP32-S3, 8 MB flash, no PSRAM.
+# Loaded on top of the shared sdkconfig.defaults; only board-specific deltas here.
+
+CONFIG_IDF_TARGET="esp32s3"
+CONFIG_ESPTOOLPY_FLASHSIZE_8MB=y
+
+# OpenShock custom OTA partition layout. There is no dedicated 8 MB table yet, so
+# reuse the 4 MB OTA layout — it fits within 8 MB (upper flash currently unused).
+CONFIG_PARTITION_TABLE_CUSTOM=y
+CONFIG_PARTITION_TABLE_CUSTOM_FILENAME="partitions/ota_4mb.csv"
+
+# Hardware pins. Not Kconfig: bare OPENSHOCK_* lines, read by scripts/gen_env_header.py
+# into openshock_board.h and stripped from the sdkconfig fragment by scripts/build.py,
+# so boards sharing a chip and flash size compile identical ESP-IDF objects.
+OPENSHOCK_LED_WS2812B=14
+OPENSHOCK_LED_GPIO=13
+OPENSHOCK_RF_TX_GPIO=1
+OPENSHOCK_ESTOP_PIN=38

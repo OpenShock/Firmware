@@ -10,3 +10,7 @@ custom_certs/
 *.pem.key
 *.p12
 *.pfx
+
+# Python bytecode cache from cert_bundle.py
+__pycache__/
+*.pyc

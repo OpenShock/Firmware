@@ -1,0 +1,14 @@
+#pragma once
+
+#include "serial_console/command_handlers/index.h"
+#include "serial_console/SerialInputHandler.h"
+
+#include "Logging.h"
+
+#define SERPR_SYS(format, ...) OS_SERIAL_PRINTF("$SYS$|" format "\r\n", ##__VA_ARGS__)
+
+#define SERPR_RESPONSE(format, ...) SERPR_SYS("Response|" format, ##__VA_ARGS__)
+#define SERPR_SUCCESS(format, ...)  SERPR_SYS("Success|" format, ##__VA_ARGS__)
+#define SERPR_ERROR(format, ...)    SERPR_SYS("Error|" format, ##__VA_ARGS__)
+
+using namespace std::string_view_literals;
