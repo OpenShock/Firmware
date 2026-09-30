@@ -61,13 +61,7 @@ jobs:
           # into a paginated fallback that crashes on files GitHub omits a patch for.
           # Scanning the tree sidesteps the diff-size limit entirely.
           files-changed-only: false
-          ignore: |
-            .github
-            build
-            include/serialization/_fbs
-            components/littlefs
-            managed_components
-            components/*/host_test
+          ignore: '.github|build|managed_components|components/littlefs|components/flatbuffers|components/serialization/include/serialization/_fbs'
           # Commit comments (push events) need contents:write, which this job
           # deliberately does not grant; only post thread comments on PRs, where
           # pull-requests:write applies. Otherwise the action 403s and fails the
