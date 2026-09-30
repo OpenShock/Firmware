@@ -18,10 +18,8 @@ namespace {
 }  // namespace
 
 // noexcept propagates onto the function-pointer type; plain methods stay plain.
-static_assert(std::is_same_v<std::remove_const_t<decltype(FnProxy<&Counter::add>)>,
-                             int (*)(void*, int)>);
-static_assert(std::is_same_v<std::remove_const_t<decltype(FnProxy<&Counter::get>)>,
-                             int (*)(void*) noexcept>);
+static_assert(std::is_same_v<std::remove_const_t<decltype(FnProxy<&Counter::add>)>, int (*)(void*, int)>);
+static_assert(std::is_same_v<std::remove_const_t<decltype(FnProxy<&Counter::get>)>, int (*)(void*) noexcept>);
 
 TEST_CASE("FnProxy forwards to a non-const member", "[util][fnproxy]")
 {

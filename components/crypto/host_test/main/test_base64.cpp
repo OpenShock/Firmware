@@ -1,8 +1,8 @@
 // Base64 encode/decode (mbedtls-backed) - used for auth tokens etc.
 #include "unity.h"
 
-#include "TinyVec.h"
 #include "Base64.h"
+#include "TinyVec.h"
 
 #include <cstdint>
 #include <span>

@@ -10,18 +10,18 @@ namespace OpenShock::Util {
     // as `const C` so the cast matches the method's constness.
     template<auto MF, bool NX, class R, class C, class... A>
     struct Body {
-      static R call(void* self, A... args) noexcept(NX)
-      { return (static_cast<C*>(self)->*MF)(std::forward<A>(args)...); }
+      static R call(void* self, A... args) noexcept(NX) { return (static_cast<C*>(self)->*MF)(std::forward<A>(args)...); }
     };
-    template<auto MF> struct Deduce;
+    template<auto MF>
+    struct Deduce;
     template<class R, class C, class... A, R (C::*MF)(A...)>
-    struct Deduce<MF> : Body<MF, false, R, C, A...> {};
+    struct Deduce<MF> : Body<MF, false, R, C, A...> { };
     template<class R, class C, class... A, R (C::*MF)(A...) const>
-    struct Deduce<MF> : Body<MF, false, R, const C, A...> {};
+    struct Deduce<MF> : Body<MF, false, R, const C, A...> { };
     template<class R, class C, class... A, R (C::*MF)(A...) noexcept>
-    struct Deduce<MF> : Body<MF, true, R, C, A...> {};
+    struct Deduce<MF> : Body<MF, true, R, C, A...> { };
     template<class R, class C, class... A, R (C::*MF)(A...) const noexcept>
-    struct Deduce<MF> : Body<MF, true, R, const C, A...> {};
+    struct Deduce<MF> : Body<MF, true, R, const C, A...> { };
     // (ref-qualified &/&& members omitted, meaningless for a void* callback.)
   }  // namespace detail
 

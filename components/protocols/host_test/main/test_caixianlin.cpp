@@ -4,8 +4,8 @@
 // clamping, and the Sound-mutes-intensity quirk.
 #include "unity.h"
 
-#include "radio/rmt/CaiXianlinEncoder.h"
 #include "Checksum.h"
+#include "radio/rmt/CaiXianlinEncoder.h"
 
 #include <cstdint>
 
@@ -40,9 +40,9 @@ TEST_CASE("CaiXianlin rejects unsupported command types", "[protocols][caixianli
 
 TEST_CASE("CaiXianlin encodes id/channel/type/intensity + checksum", "[protocols][caixianlin]")
 {
-  const uint16_t id        = 0x1234;
-  const uint8_t channel    = 5;
-  const uint8_t intensity  = 42;
+  const uint16_t id       = 0x1234;
+  const uint8_t channel   = 5;
+  const uint8_t intensity = 42;
 
   rmt_symbol_word_t seq[44];
   TEST_ASSERT_TRUE(Rmt::CaiXianlinEncoder::FillBuffer(seq, id, channel, ShockerCommandType::Shock, intensity));
@@ -56,9 +56,9 @@ TEST_CASE("CaiXianlin encodes id/channel/type/intensity + checksum", "[protocols
   const uint64_t tx = decode(seq + 1, 43);
   TEST_ASSERT_EQUAL_UINT32(0, tx & 0x7);  // 3-bit zero postamble
 
-  const uint64_t frame    = tx >> 3;             // payload<<8 | checksum
-  const uint8_t  checksum = frame & 0xFF;
-  const uint32_t payload  = static_cast<uint32_t>(frame >> 8);
+  const uint64_t frame   = tx >> 3;       // payload<<8 | checksum
+  const uint8_t checksum = frame & 0xFF;
+  const uint32_t payload = static_cast<uint32_t>(frame >> 8);
 
   TEST_ASSERT_EQUAL_UINT16(id, (payload >> 16) & 0xFFFF);
   TEST_ASSERT_EQUAL_UINT8(channel, (payload >> 12) & 0xF);

@@ -6,12 +6,11 @@ const char* const TAG = "HTTPRequestManager";
 
 #include "Logging.h"
 
-#include <cstring>
 #include "OpenShock.h"
 #include "RateLimiter.h"
 #include "SimpleMutex.h"
-#include "Temporal.h"
 #include "StringHelpers.h"
+#include "Temporal.h"
 
 #include <esp_crt_bundle.h>
 #include <esp_err.h>
@@ -20,6 +19,7 @@ const char* const TAG = "HTTPRequestManager";
 #include <algorithm>
 #include <cctype>
 #include <cstdlib>
+#include <cstring>
 #include <memory>
 #include <string>
 #include <string_view>

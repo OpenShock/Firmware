@@ -1,7 +1,7 @@
 #pragma once
 
-#include "StringHelpers.h"
 #include "enums/OtaUpdateStep.h"
+#include "StringHelpers.h"
 
 #include <cstdint>
 #include <string_view>

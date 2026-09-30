@@ -31,7 +31,7 @@ TEST_CASE("Sum8 over a trivially copyable struct", "[util][checksum]")
 {
   struct Packed {
     uint8_t a, b, c, d;
-  } p{10, 20, 30, 40};
+  } p {10, 20, 30, 40};
   TEST_ASSERT_EQUAL_UINT8(100, Checksum::Sum8(p));
 }
 

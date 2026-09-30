@@ -119,7 +119,8 @@ std::vector<std::string_view> OpenShock::StringSplitWhiteSpace(std::string_view 
   return StringSplit(view, [](char c) { return isspace(c) != 0; }, maxSplits);
 }
 
-static bool lowercaseEqual(char a, char b) {
+static bool lowercaseEqual(char a, char b)
+{
   return tolower(a) == tolower(b);
 }
 

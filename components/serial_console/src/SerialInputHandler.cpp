@@ -2,6 +2,7 @@
 
 const char* const TAG = "SerialInputHandler";
 
+#include "Base64.h"
 #include "Chipset.h"
 #include "CommandHandler.h"
 #include "config/Config.h"
@@ -11,15 +12,14 @@ const char* const TAG = "SerialInputHandler";
 #include "FormatHelpers.h"
 #include "http/HTTPRequestManager.h"
 #include "Logging.h"
+#include "serial/Serial.h"
 #include "serial_console/command_handlers/CommandEntry.h"
 #include "serial_console/command_handlers/common.h"
 #include "serial_console/command_handlers/index.h"
-#include "serial/Serial.h"
 #include "serialization/JsonAPI.h"
 #include "serialization/JsonSerial.h"
-#include "Temporal.h"
-#include "Base64.h"
 #include "StringHelpers.h"
+#include "Temporal.h"
 #include "util/TaskUtils.h"
 #include "wifi/WiFiManager.h"
 

@@ -20,7 +20,8 @@ namespace OpenShock::Util {
 
     if constexpr (std::is_signed_v<T>) {
       if (val < 0) {
-        ++count;  // the leading '-'
+        // the leading '-'
+        ++count;
         mag = std::make_unsigned_t<T>(0) - static_cast<std::make_unsigned_t<T>>(val);  // magnitude via modular negation
       } else {
         mag = static_cast<std::make_unsigned_t<T>>(val);

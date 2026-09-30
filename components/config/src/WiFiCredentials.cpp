@@ -5,8 +5,9 @@ const char* const TAG = "Config::WiFiCredentials";
 #include "config/internal/utils.h"
 #include "Logging.h"
 
-#include <cstring>
 #include "util/HexUtils.h"
+
+#include <cstring>
 
 using namespace OpenShock::Config;
 using FbsAuthMode = OpenShock::Serialization::Types::WifiAuthMode;
