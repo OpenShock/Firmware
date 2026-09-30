@@ -40,7 +40,7 @@ jobs:
           version: 0.0.0-test+build # Doesn't matter, just need the compilation database
           mode: configure
       
-      - uses: cpp-linter/cpp-linter-action@cab1143a2c149bc41e85b070a9de81716974c18f # v2.21.0
+      - uses: cpp-linter/cpp-linter-action@8120e05c7fbd25fa09fa93424ec49f55f7b304ab # v2.23.1
         id: linter
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
