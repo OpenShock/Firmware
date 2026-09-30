@@ -143,7 +143,7 @@
     <!-- Primary action: Connect or Disconnect -->
     {#if isConnected}
       <Button variant="ghost" size="icon" onclick={wifiDisconnect} title="Disconnect">
-        <WifiOff class="h-4 w-4 text-destructive" />
+        <WifiOff class="text-destructive h-4 w-4" />
       </Button>
     {:else if isSaved}
       <Button variant="ghost" size="icon" onclick={wifiConnect} title="Connect">
