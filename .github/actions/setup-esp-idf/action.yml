@@ -7,7 +7,7 @@ inputs:
   idf-version:
     description: 'ESP-IDF version to install (EIM version tag).'
     required: false
-    default: 'v6.0.3'
+    default: 'v6.1'
   lookup-only:
     description: >-
       Probe mode. The restore only checks whether the cache entry exists instead of
