@@ -47,17 +47,17 @@ jobs:
 
       # Initializes the CodeQL tools for scanning.
       - name: Initialize CodeQL
-        uses: github/codeql-action/init@e58424170fb0262c8d7ed60a2e84b9bffe205c67  # codeql-bundle-v2.26.1
+        uses: github/codeql-action/init@416ff0dea110f80f0f56f0046500dbf7420e4bb0  # codeql-bundle-v2.27.1
         with:
           languages: ${{ matrix.language }}
 
       - name: Autobuild
-        uses: github/codeql-action/autobuild@e58424170fb0262c8d7ed60a2e84b9bffe205c67  # codeql-bundle-v2.26.1
+        uses: github/codeql-action/autobuild@416ff0dea110f80f0f56f0046500dbf7420e4bb0  # codeql-bundle-v2.27.1
 
       # Build stuff here
 
       - name: Perform CodeQL Analysis
-        uses: github/codeql-action/analyze@e58424170fb0262c8d7ed60a2e84b9bffe205c67  # codeql-bundle-v2.26.1
+        uses: github/codeql-action/analyze@416ff0dea110f80f0f56f0046500dbf7420e4bb0  # codeql-bundle-v2.27.1
         with:
           category: '/language:${{matrix.language}}'
 
@@ -82,7 +82,7 @@ jobs:
           submodules: recursive
 
       - name: Initialize CodeQL
-        uses: github/codeql-action/init@e58424170fb0262c8d7ed60a2e84b9bffe205c67  # codeql-bundle-v2.26.1
+        uses: github/codeql-action/init@416ff0dea110f80f0f56f0046500dbf7420e4bb0  # codeql-bundle-v2.27.1
         with:
           languages: ${{ env.language }}
 
@@ -93,6 +93,6 @@ jobs:
           mode: build
 
       - name: Perform CodeQL Analysis
-        uses: github/codeql-action/analyze@e58424170fb0262c8d7ed60a2e84b9bffe205c67  # codeql-bundle-v2.26.1
+        uses: github/codeql-action/analyze@416ff0dea110f80f0f56f0046500dbf7420e4bb0  # codeql-bundle-v2.27.1
         with:
           category: '/language:${{ env.language }}'

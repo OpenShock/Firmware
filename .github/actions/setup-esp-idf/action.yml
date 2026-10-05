@@ -7,7 +7,7 @@ inputs:
   idf-version:
     description: 'ESP-IDF version to install (EIM version tag).'
     required: false
-    default: 'v6.0.2'
+    default: 'v6.0.3'
   lookup-only:
     description: >-
       Probe mode. The restore only checks whether the cache entry exists instead of
@@ -38,7 +38,7 @@ runs:
     # stores the trimmed install rather than the full one.
     - name: Restore ESP-IDF install
       id: idf-cache
-      uses: actions/cache/restore@27d5ce7f107fe9357f9df03efb73ab90386fccae  # v5.0.5
+      uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9  # v6.1.0
       with:
         path: |
           /tmp/esp
@@ -217,7 +217,7 @@ runs:
 
     - name: Save ESP-IDF install
       if: ${{ steps.idf-cache.outputs.cache-hit != 'true' && inputs.save-cache == 'true' }}
-      uses: actions/cache/save@27d5ce7f107fe9357f9df03efb73ab90386fccae  # v5.0.5
+      uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9  # v6.1.0
       with:
         path: |
           /tmp/esp

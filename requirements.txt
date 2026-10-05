@@ -1,4 +1,4 @@
-cryptography==50.0.1
+cryptography==50.0.2
 esptool==5.4.0
 # scripts/gen_staticfs.py packs the captive-portal assets into a littlefs image
 # matching the runtime mount geometry (components/fs/src/LfsPartition.cpp).

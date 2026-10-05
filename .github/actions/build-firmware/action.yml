@@ -40,7 +40,7 @@ runs:
     # discriminator here; restore-keys does the real work by taking the newest store for
     # the group.
     - name: Restore ccache
-      uses: actions/cache/restore@27d5ce7f107fe9357f9df03efb73ab90386fccae  # v5.0.5
+      uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9  # v6.1.0
       with:
         path: ~/.cache/ccache
         key: ccache-${{ runner.os }}-${{ inputs.cache-group }}-${{ github.sha }}
@@ -89,7 +89,7 @@ runs:
     # push rather than 13, each measured at roughly 30 MB for one board and capped by
     # CCACHE_MAXSIZE, and PR-scoped entries age out with the branch.
     - name: Save ccache
-      uses: actions/cache/save@27d5ce7f107fe9357f9df03efb73ab90386fccae  # v5.0.5
+      uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9  # v6.1.0
       with:
         path: ~/.cache/ccache
         key: ccache-${{ runner.os }}-${{ inputs.cache-group }}-${{ github.sha }}
