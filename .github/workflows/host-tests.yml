@@ -70,6 +70,13 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
+          # The IDF environment puts each toolchain's inner <triple>/bin on PATH, which holds
+          # unprefixed cross binutils (as, ld, ...). The linux target builds with the host gcc,
+          # which looks up `as` on PATH and would get esp32ulp-elf's or riscv32's instead
+          # ("as: unrecognized option '--64'"). The firmware only calls the prefixed tools.
+          PATH="$(printf '%s' "$PATH" | tr ':' '\n' | grep -vE -- '-elf/[^/]*-elf/bin/?$' | paste -sd: -)"
+          export PATH
+          echo "as: $(command -v as)"
           failed=()
           for dir in components/*/host_test; do
             name="$(basename "$(dirname "$dir")")"
