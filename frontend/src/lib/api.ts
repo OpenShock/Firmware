@@ -247,62 +247,69 @@ export async function disconnectWifiNetwork(): Promise<void> {
 
 // OTA
 
-export async function setOtaEnabled(enabled: boolean): Promise<void> {
+async function otaRequest(path: string, method: 'PUT' | 'POST', failure: string): Promise<void> {
   try {
-    await apiFetch(`/api/ota/enabled?enabled=${enabled ? '1' : '0'}`, { method: 'PUT' });
+    const res = await apiFetch('/api/ota/' + path, { method });
+    if (!res.ok) {
+      toast.error(failure + ': ' + (await getErrorMessage(res)));
+    }
   } catch {
-    toast.error('Failed to update OTA setting');
+    toast.error(failure);
   }
 }
 
-export async function setOtaDomain(domain: string): Promise<void> {
-  try {
-    await apiFetch(`/api/ota/domain?` + new URLSearchParams({ domain }), { method: 'PUT' });
-  } catch {
-    toast.error('Failed to update OTA domain');
-  }
+export function setOtaEnabled(enabled: boolean): Promise<void> {
+  return otaRequest(
+    `enabled?enabled=${enabled ? '1' : '0'}`,
+    'PUT',
+    'Failed to update OTA setting'
+  );
 }
 
-export async function setOtaChannel(channel: string): Promise<void> {
-  try {
-    await apiFetch(`/api/ota/channel?` + new URLSearchParams({ channel }), { method: 'PUT' });
-  } catch {
-    toast.error('Failed to update OTA channel');
-  }
+export function setOtaDomain(domain: string): Promise<void> {
+  return otaRequest(
+    'domain?' + new URLSearchParams({ domain }),
+    'PUT',
+    'Failed to update OTA domain'
+  );
 }
 
-export async function setOtaCheckInterval(interval: number): Promise<void> {
-  try {
-    await apiFetch(`/api/ota/check-interval?interval=${interval}`, { method: 'PUT' });
-  } catch {
-    toast.error('Failed to update OTA check interval');
-  }
+export function setOtaChannel(channel: string): Promise<void> {
+  return otaRequest(
+    'channel?' + new URLSearchParams({ channel }),
+    'PUT',
+    'Failed to update OTA channel'
+  );
 }
 
-export async function setOtaAllowBackendManagement(allow: boolean): Promise<void> {
-  try {
-    await apiFetch(`/api/ota/allow-backend-management?allow=${allow ? '1' : '0'}`, {
-      method: 'PUT',
-    });
-  } catch {
-    toast.error('Failed to update OTA backend management setting');
-  }
+export function setOtaCheckInterval(interval: number): Promise<void> {
+  return otaRequest(
+    `check-interval?interval=${interval}`,
+    'PUT',
+    'Failed to update OTA check interval'
+  );
 }
 
-export async function setOtaRequireManualApproval(require: boolean): Promise<void> {
-  try {
-    await apiFetch(`/api/ota/require-manual-approval?require=${require ? '1' : '0'}`, {
-      method: 'PUT',
-    });
-  } catch {
-    toast.error('Failed to update OTA manual approval setting');
-  }
+export function setOtaAllowBackendManagement(allow: boolean): Promise<void> {
+  return otaRequest(
+    `allow-backend-management?allow=${allow ? '1' : '0'}`,
+    'PUT',
+    'Failed to update OTA backend management setting'
+  );
 }
 
-export async function checkOtaUpdates(channel: string): Promise<void> {
-  try {
-    await apiFetch(`/api/ota/check?` + new URLSearchParams({ channel }), { method: 'POST' });
-  } catch {
-    toast.error('Failed to check for OTA updates');
-  }
+export function setOtaRequireManualApproval(require: boolean): Promise<void> {
+  return otaRequest(
+    `require-manual-approval?require=${require ? '1' : '0'}`,
+    'PUT',
+    'Failed to update OTA manual approval setting'
+  );
+}
+
+export function checkOtaUpdates(channel: string): Promise<void> {
+  return otaRequest(
+    'check?' + new URLSearchParams({ channel }),
+    'POST',
+    'Failed to check for OTA updates'
+  );
 }

@@ -5,6 +5,7 @@
   import { Input } from '@openshock/svelte-core/components/ui/input';
   import { Label } from '@openshock/svelte-core/components/ui/label';
   import { Zap } from '@lucide/svelte';
+  import { toast } from 'svelte-sonner';
   import { Builder as FlatbufferBuilder } from 'flatbuffers';
   import { LocalToHubMessage } from '#lib/_fbs/open-shock/serialization/local/local-to-hub-message.js';
   import { LocalToHubMessagePayload } from '#lib/_fbs/open-shock/serialization/local/local-to-hub-message-payload.js';
@@ -27,7 +28,6 @@
 
   function sendTestVibrate() {
     if (!validId) return;
-    testing = true;
 
     const fbb = new FlatbufferBuilder(128);
 
@@ -49,8 +49,12 @@
     );
 
     fbb.finish(msgOffset);
-    WebSocketClient.Instance.Send(new Uint8Array(fbb.asUint8Array()));
+    if (!WebSocketClient.Instance.Send(new Uint8Array(fbb.asUint8Array()))) {
+      toast.error('Not connected to the hub, test command was not sent');
+      return;
+    }
 
+    testing = true;
     setTimeout(() => (testing = false), 1500);
   }
 </script>
