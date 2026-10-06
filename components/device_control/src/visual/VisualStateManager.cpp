@@ -347,6 +347,9 @@ static void handleOpenShockEvent(void* event_handler_arg, esp_event_base_t event
     case OPENSHOCK_EVENT_GATEWAY_CLIENT_STATE_CHANGED:
       handleOpenShockGatewayStateChanged(event_data);
       break;
+    case OPENSHOCK_EVENT_WIFI_STATE_CHANGED:
+      // WiFi state is tracked from the IDF WIFI_EVENT/IP_EVENT handlers above.
+      return;
     default:
       OS_LOGW(TAG, "Received unknown event ID: %i", event_id);
       return;

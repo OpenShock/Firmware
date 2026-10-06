@@ -546,7 +546,7 @@ bool OtaUpdateManager::Init()
 {
   esp_err_t err;
 
-  OS_LOGN(TAG, "Fetching current partition");
+  OS_LOGD(TAG, "Fetching current partition");
 
   // Fetch current partition info.
   const esp_partition_t* partition = esp_ota_get_running_partition();

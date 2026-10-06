@@ -79,7 +79,7 @@ constexpr const char* openshockPathToFileName(const char (&path)[N])
 #endif
 
 #if OPENSHOCK_LOG_LEVEL >= OPENSHOCK_LOG_LEVEL_NONE
-#define OS_LOGN(TAG, format, ...) openshock_log_printf(OPENSHOCK_LOG_FORMAT(E, "[%s] " format), TAG, ##__VA_ARGS__)
+#define OS_LOGN(TAG, format, ...) openshock_log_printf(OPENSHOCK_LOG_FORMAT(N, "[%s] " format), TAG, ##__VA_ARGS__)
 #else
 #define OS_LOGN(TAG, format, ...) \
   do {                            \
