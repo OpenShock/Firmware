@@ -16,11 +16,12 @@
 #include <vector>
 
 namespace OpenShock::JSON {
-  // Zero-copy, read-only view over a single node of a parsed jsmn token tree.
+  // Read-only view over a single node of a parsed jsmn token tree.
   //
-  // Strings and numbers are exposed as std::string_view directly into the
-  // source buffer (no NUL-termination, no strlen). The source buffer must
-  // outlive every JsonView derived from it.
+  // Navigation and number parsing are zero-copy (raw() is a std::string_view
+  // straight into the source buffer, not NUL-terminated). String values are
+  // decoded (JSON escapes resolved) into an owned std::string by tryGetStr. The
+  // source buffer must outlive every JsonView derived from it.
   class JsonView {
   public:
     JsonView() noexcept = default;
@@ -40,11 +41,14 @@ namespace OpenShock::JSON {
     [[nodiscard]] bool isNull() const noexcept;
     [[nodiscard]] bool isNumber() const noexcept;  // primitive that is not true/false/null
 
-    // Raw token text, zero-copy into the source buffer.
+    // Raw token text, zero-copy into the source buffer. For a string this is the
+    // body between the quotes with its escapes still in place.
     [[nodiscard]] std::string_view raw() const noexcept;
 
     // Typed getters. Return false if this node is not of the requested kind.
-    [[nodiscard]] bool tryGetStr(std::string_view& out) const noexcept;
+    // tryGetStr decodes the string's escapes (\uXXXX and surrogate pairs to UTF-8)
+    // and returns false for a malformed escape; `out` is left unchanged on failure.
+    [[nodiscard]] bool tryGetStr(std::string& out) const;
     [[nodiscard]] bool tryGetBool(bool& out) const noexcept;
     [[nodiscard]] bool tryGetU8(uint8_t& out) const noexcept;
     [[nodiscard]] bool tryGetU16(uint16_t& out) const noexcept;
@@ -52,8 +56,9 @@ namespace OpenShock::JSON {
     [[nodiscard]] bool tryGetI64(int64_t& out) const noexcept;
     [[nodiscard]] bool tryGetDouble(double& out) const noexcept;
 
-    // Object member lookup. Returns an invalid view if not found or not an object.
-    [[nodiscard]] JsonView operator[](std::string_view key) const noexcept;
+    // Object member lookup (keys compare after decoding escapes). Returns an
+    // invalid view if not found or not an object.
+    [[nodiscard]] JsonView operator[](std::string_view key) const;
 
     // Array access (also reports object member count).
     [[nodiscard]] int count() const noexcept;
@@ -103,14 +108,12 @@ namespace OpenShock::JSON {
     json_gen_str_t m_gen;
   };
 
-  // json_generator writes string VALUES verbatim between quotes - it does NOT
-  // JSON-escape them, so a value containing '"', '\\' or a control character
-  // would emit invalid JSON. These wrappers escape the value first, then hand it
-  // to json_gen_{obj,arr}_set_string (which only adds the surrounding quotes).
+  // Add a string value with an explicit length (embedded NULs and non-terminated
+  // views are fine). json_generator 2.x escapes the value per RFC 8259 and fails
+  // the document on malformed UTF-8, so pass the plain, unescaped text.
   //
-  // Keys/names are NOT escaped here (all our keys are safe literals); pass a
-  // pre-escaped name if that ever changes. Return value matches the underlying
-  // json_gen_* call.
+  // Keys/names are NUL-terminated C strings (json_generator escapes them too).
+  // Return value matches the underlying json_gen_* call.
   int objSetString(json_gen_str_t* gen, const char* name, std::string_view value);
   int arrSetString(json_gen_str_t* gen, std::string_view value);
 

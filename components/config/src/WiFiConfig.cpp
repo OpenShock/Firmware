@@ -68,13 +68,13 @@ bool WiFiConfig::FromJSON(JSON::JsonView json)
     return false;
   }
 
-  if (std::string_view sv; json["accessPointSSID"].tryGetStr(sv)) {
+  if (std::string sv; json["accessPointSSID"].tryGetStr(sv)) {
     accessPointSSID = sv;
   } else {
     accessPointSSID = CONFIG_OPENSHOCK_FW_AP_PREFIX;
   }
 
-  if (std::string_view sv; json["hostname"].tryGetStr(sv)) {
+  if (std::string sv; json["hostname"].tryGetStr(sv)) {
     hostname = sv;
   } else {
     hostname = CONFIG_OPENSHOCK_FW_HOSTNAME;

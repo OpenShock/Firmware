@@ -41,12 +41,12 @@ namespace OpenShock::Config::Internal::Utils {
       return true;
     }
 
-    std::string_view view;
-    if (!jsonVal.tryGetStr(view)) {
+    std::string str;
+    if (!jsonVal.tryGetStr(str)) {
       return false;
     }
 
-    if (!StringParser(val, view)) {
+    if (!StringParser(val, str)) {
       return false;
     }
 

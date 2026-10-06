@@ -23,31 +23,31 @@ bool JsonAPI::ParseLcgInstanceDetailsJsonResponse(int code, JSON::JsonView root,
 
   out = {};
 
-  std::string_view name;
+  std::string name;
   if (!root["name"].tryGetStr(name)) {
     ESP_LOGJSONE("value at 'data.name' is not a string", root);
     return false;
   }
 
-  std::string_view version;
+  std::string version;
   if (!root["version"].tryGetStr(version)) {
     ESP_LOGJSONE("value at 'data.version' is not a string", root);
     return false;
   }
 
-  std::string_view currentTime;
+  std::string currentTime;
   if (!root["currentTime"].tryGetStr(currentTime)) {
     ESP_LOGJSONE("value at 'data.currentTime' is not a string", root);
     return false;
   }
 
-  std::string_view countryCode;
+  std::string countryCode;
   if (!root["countryCode"].tryGetStr(countryCode)) {
     ESP_LOGJSONE("value at 'data.countryCode' is not a string", root);
     return false;
   }
 
-  std::string_view fqdn;
+  std::string fqdn;
   if (!root["fqdn"].tryGetStr(fqdn)) {
     ESP_LOGJSONE("value at 'data.fqdn' is not a string", root);
     return false;
@@ -78,19 +78,19 @@ bool JsonAPI::ParseBackendVersionJsonResponse(int code, JSON::JsonView root, Jso
 
   out = {};
 
-  std::string_view version;
+  std::string version;
   if (!data["version"].tryGetStr(version)) {
     ESP_LOGJSONE("value at 'data.version' is not a string", root);
     return false;
   }
 
-  std::string_view commit;
+  std::string commit;
   if (!data["commit"].tryGetStr(commit)) {
     ESP_LOGJSONE("value at 'data.commit' is not a string", root);
     return false;
   }
 
-  std::string_view currentTime;
+  std::string currentTime;
   if (!data["currentTime"].tryGetStr(currentTime)) {
     ESP_LOGJSONE("value at 'data.currentTime' is not a string", root);
     return false;
@@ -112,7 +112,7 @@ bool JsonAPI::ParseAccountLinkJsonResponse(int code, JSON::JsonView root, JsonAP
     return false;
   }
 
-  std::string_view data;
+  std::string data;
   if (!root["data"].tryGetStr(data)) {
     ESP_LOGJSONE("value at 'data' is not a string", root);
     return false;
@@ -139,13 +139,13 @@ bool JsonAPI::ParseHubInfoJsonResponse(int code, JSON::JsonView root, JsonAPI::H
     return false;
   }
 
-  std::string_view hubId;
+  std::string hubId;
   if (!data["id"].tryGetStr(hubId)) {
     ESP_LOGJSONE("value at 'data.id' is not a string", root);
     return false;
   }
 
-  std::string_view hubName;
+  std::string hubName;
   if (!data["name"].tryGetStr(hubName)) {
     ESP_LOGJSONE("value at 'data.name' is not a string", root);
     return false;
@@ -171,7 +171,7 @@ bool JsonAPI::ParseHubInfoJsonResponse(int code, JSON::JsonView root, JsonAPI::H
   for (int i = 0; i < shockerCount; ++i) {
     JSON::JsonView shocker = hubShockers.at(i);
 
-    std::string_view shockerId;
+    std::string shockerId;
     if (!shocker["id"].tryGetStr(shockerId)) {
       ESP_LOGJSONE("value at 'shocker.id' is not a string", shocker);
       return false;
@@ -192,7 +192,7 @@ bool JsonAPI::ParseHubInfoJsonResponse(int code, JSON::JsonView root, JsonAPI::H
     }
     uint16_t shockerRfIdU16 = static_cast<uint16_t>(shockerRfId);
 
-    std::string_view shockerModel;
+    std::string shockerModel;
     if (!shocker["model"].tryGetStr(shockerModel)) {
       ESP_LOGJSONE("value at 'shocker.model' is not a string", shocker);
       return false;
@@ -222,9 +222,9 @@ bool JsonAPI::ParseAssignLcgJsonResponse(int code, JSON::JsonView root, JsonAPI:
     return false;
   }
 
-  std::string_view host;
-  std::string_view path;
-  std::string_view country;
+  std::string host;
+  std::string path;
+  std::string country;
   if (!root["host"].tryGetStr(host) || !root["path"].tryGetStr(path) || !root["country"].tryGetStr(country)) {
     ESP_LOGJSONE("value at 'host', 'path' or 'country' is not a string", root);
     return false;

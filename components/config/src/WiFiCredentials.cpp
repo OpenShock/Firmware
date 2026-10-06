@@ -163,13 +163,13 @@ bool WiFiCredentials::FromJSON(JSON::JsonView json)
 
   if (!json["id"].tryGetU8(id)) id = 0;
 
-  if (std::string_view sv; json["ssid"].tryGetStr(sv)) {
+  if (std::string sv; json["ssid"].tryGetStr(sv)) {
     ssid = sv;
   } else {
     ssid.clear();
   }
 
-  if (std::string_view sv; json["password"].tryGetStr(sv)) {
+  if (std::string sv; json["password"].tryGetStr(sv)) {
     password = sv;
   } else {
     password.clear();
@@ -180,7 +180,7 @@ bool WiFiCredentials::FromJSON(JSON::JsonView json)
   authMode = fromFbsAuthMode(static_cast<FbsAuthMode>(authModeVal));
 
   bssid.fill(0);
-  std::string_view bssidStr;
+  std::string bssidStr;
   if (json["bssid"].tryGetStr(bssidStr) && bssidStr.size() == 12) {
     HexUtils::TryParseHex(bssidStr.data(), bssidStr.size(), bssid.data(), bssid.size());
   }

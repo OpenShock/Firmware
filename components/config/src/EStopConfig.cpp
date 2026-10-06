@@ -34,9 +34,19 @@ bool EStopConfig::FromFlatbuffers(const Serialization::Configuration::EStopConfi
     return true;
   }
 
-  gpioPin = static_cast<gpio_num_t>(config->gpio_pin());
+  // gpio_pin is a raw int8 from flash or rawconfig: only values gpio_num_t can hold
+  // (GPIO_NUM_NC .. GPIO_NUM_MAX - 1) may be cast to it. Anything else means a
+  // corrupt section, so fall back to the default.
+  const int8_t pin = config->gpio_pin();
+  if (pin < GPIO_NUM_NC || pin >= GPIO_NUM_MAX) {
+    OS_LOGW(TAG, "Invalid E-Stop GPIO pin %d, using default", pin);
+    ToDefault();
+    return true;
+  }
 
-  if (OpenShock::IsValidInputPin(static_cast<int8_t>(gpioPin))) {
+  gpioPin = static_cast<gpio_num_t>(pin);
+
+  if (OpenShock::IsValidInputPin(pin)) {
     enabled = config->enabled();
   } else {
     enabled = false;

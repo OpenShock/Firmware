@@ -17,6 +17,7 @@ const char* const TAG = "Config";
 #include <bitset>
 #include <cstring>
 #include <span>
+#include <utility>
 #include <vector>
 
 using namespace OpenShock;
@@ -58,9 +59,16 @@ static bool tryDeserializeConfig(const uint8_t* buffer, std::size_t bufferLen, O
     return false;
   }
 
+  // Must be checked before constructing the Verifier: its constructor asserts
+  // size < max_size (an abort, not a verification failure).
+  if (bufferLen > Config::MaxConfigSize) {
+    OS_LOGE(TAG, "Config is too large (%zu bytes, max %zu)", bufferLen, Config::MaxConfigSize);
+    return false;
+  }
+
   // Validate buffer before accessing
   flatbuffers::Verifier::Options verifierOptions {
-    .max_size = 4096,  // Should be enough
+    .max_size = Config::MaxConfigSize + 1,  // Verifier requires size < max_size
   };
   flatbuffers::Verifier verifier(buffer, bufferLen, verifierOptions);
   if (!verifier.VerifyBuffer<Serialization::Configuration::HubConfig>()) {
@@ -105,6 +113,11 @@ static bool tryLoadConfig()
 }
 static bool trySaveConfig(const uint8_t* data, std::size_t dataLen)
 {
+  if (dataLen > Config::MaxConfigSize) {
+    OS_LOGE(TAG, "Config is too large to store (%zu bytes, max %zu)", dataLen, Config::MaxConfigSize);
+    return false;
+  }
+
   if (!_configFs.write(CONFIG_FILE_PATH, std::span<const uint8_t>(data, dataLen))) {
     OS_LOGE(TAG, "Failed to write config file");
     return false;
@@ -112,15 +125,19 @@ static bool trySaveConfig(const uint8_t* data, std::size_t dataLen)
 
   return true;
 }
-static bool trySaveConfig()
+static bool trySaveConfig(const OpenShock::Config::RootConfig& config)
 {
   flatbuffers::FlatBufferBuilder builder;
 
-  auto fbsConfig = _configData.ToFlatbuffers(builder, true);
+  auto fbsConfig = config.ToFlatbuffers(builder, true);
 
   Serialization::Configuration::FinishHubConfigBuffer(builder, fbsConfig);
 
   return trySaveConfig(builder.GetBufferPointer(), builder.GetSize());
+}
+static bool trySaveConfig()
+{
+  return trySaveConfig(_configData);
 }
 
 void Config::Init()
@@ -170,12 +187,21 @@ bool Config::SaveFromJSON(std::string_view json)
 
   CONFIG_LOCK_WRITE(false);
 
-  if (!_configData.FromJSON(doc.root())) {
+  // Parse into a copy and commit only once every section parsed and the result is
+  // stored: RootConfig::FromJSON fills in section by section, so a failure part way
+  // through would otherwise leave the earlier sections applied.
+  OpenShock::Config::RootConfig config = _configData;
+  if (!config.FromJSON(doc.root())) {
     OS_LOGE(TAG, "Failed to read JSON");
     return false;
   }
 
-  return trySaveConfig();
+  if (!trySaveConfig(config)) {
+    return false;
+  }
+
+  _configData = std::move(config);
+  return true;
 }
 
 flatbuffers::Offset<Serialization::Configuration::HubConfig> Config::GetAsFlatBuffer(flatbuffers::FlatBufferBuilder& builder, bool withSensitiveData)
@@ -189,12 +215,19 @@ bool Config::SaveFromFlatBuffer(const Serialization::Configuration::HubConfig* c
 {
   CONFIG_LOCK_WRITE(false);
 
-  if (!_configData.FromFlatbuffers(config)) {
+  // Same all-or-nothing handling as SaveFromJSON.
+  OpenShock::Config::RootConfig parsed = _configData;
+  if (!parsed.FromFlatbuffers(config)) {
     OS_LOGE(TAG, "Failed to read config file");
     return false;
   }
 
-  return trySaveConfig();
+  if (!trySaveConfig(parsed)) {
+    return false;
+  }
+
+  _configData = std::move(parsed);
+  return true;
 }
 
 bool Config::GetRaw(TinyVec<uint8_t>& buffer)
@@ -441,6 +474,8 @@ uint8_t Config::AddWiFiCredentials(std::string_view ssid, std::string_view passw
     auto& creds = *it;
 
     if (std::string_view(creds.ssid) == ssid) {
+      const Config::WiFiCredentials previous = creds;
+
       creds.password = password;
       if (authMode != WIFI_AUTH_MAX) {
         creds.authMode = authMode;
@@ -448,6 +483,7 @@ uint8_t Config::AddWiFiCredentials(std::string_view ssid, std::string_view passw
 
       if (!trySaveConfig()) {
         OS_LOGE(TAG, "Failed to persist updated WiFi credentials for SSID %.*s", static_cast<int>(ssid.size()), ssid.data());
+        creds = previous;
         return 0;
       }
       return creds.id;
@@ -478,7 +514,14 @@ uint8_t Config::AddWiFiCredentials(std::string_view ssid, std::string_view passw
   }
 
   _configData.wifi.credentialsList.emplace_back(id, ssid, password, authMode);
-  trySaveConfig();
+
+  // Only keep credentials that made it to flash. This is also what caps the list:
+  // once the config would outgrow MaxConfigSize, trySaveConfig refuses it.
+  if (!trySaveConfig()) {
+    OS_LOGE(TAG, "Failed to persist new WiFi credentials for SSID %.*s", static_cast<int>(ssid.size()), ssid.data());
+    _configData.wifi.credentialsList.pop_back();
+    return 0;
+  }
 
   return id;
 }

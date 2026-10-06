@@ -14,6 +14,8 @@ namespace Schemas  = OpenShock::Serialization::Local;
 namespace Handlers = OpenShock::MessageHandlers::Local::_Private;
 typedef Schemas::LocalToHubMessagePayload PayloadType;
 
+static constexpr std::size_t MAX_MESSAGE_SIZE = 4096;  // TODO: Profile this
+
 using namespace OpenShock;
 
 const std::size_t HANDLER_COUNT = static_cast<std::size_t>(PayloadType::MAX) + 1;
@@ -36,9 +38,16 @@ void MessageHandlers::WebSocket::HandleLocalBinary(uint8_t socketId, std::span<c
     return;
   }
 
+  // Checked before constructing the Verifier: its constructor asserts
+  // size < max_size, so an oversized message would abort instead of being rejected.
+  if (data.size() > MAX_MESSAGE_SIZE) {
+    OS_LOGE(TAG, "Message too large (%zu bytes, max %zu)", data.size(), MAX_MESSAGE_SIZE);
+    return;
+  }
+
   // Validate buffer
   flatbuffers::Verifier::Options verifierOptions {
-    .max_size = 4096,  // TODO: Profile this
+    .max_size = MAX_MESSAGE_SIZE + 1,  // Verifier requires size < max_size
   };
   flatbuffers::Verifier verifier(data.data(), data.size(), verifierOptions);
   if (!verifier.VerifyBuffer<Schemas::LocalToHubMessage>()) {

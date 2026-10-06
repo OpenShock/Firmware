@@ -44,7 +44,15 @@ bool RFConfig::FromFlatbuffers(const Serialization::Configuration::RFConfig* con
 
 flatbuffers::Offset<OpenShock::Serialization::Configuration::RFConfig> RFConfig::ToFlatbuffers(flatbuffers::FlatBufferBuilder& builder, bool withSensitiveData) const
 {
-  return Serialization::Configuration::CreateRFConfig(builder, txPin, keepAliveEnabled);
+  namespace Fbs = Serialization::Configuration;
+
+  // keepalive_enabled is stored even when it equals the schema default, so the value
+  // reads back the same under every schema version (up to 1.5.x it defaulted to
+  // false) and RootConfig::FromFlatbuffers never has to infer it.
+  Fbs::RFConfigBuilder rfBuilder(builder);
+  rfBuilder.add_tx_pin(txPin);
+  builder.AddElement<uint8_t>(Fbs::RFConfig::VT_KEEPALIVE_ENABLED, static_cast<uint8_t>(keepAliveEnabled));
+  return rfBuilder.Finish();
 }
 
 bool RFConfig::FromJSON(JSON::JsonView json)

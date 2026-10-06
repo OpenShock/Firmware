@@ -76,19 +76,26 @@ bool OtaUpdateConfig::FromFlatbuffers(const Serialization::Configuration::OtaUpd
 
 flatbuffers::Offset<OpenShock::Serialization::Configuration::OtaUpdateConfig> OtaUpdateConfig::ToFlatbuffers(flatbuffers::FlatBufferBuilder& builder, bool withSensitiveData) const
 {
-  return Serialization::Configuration::CreateOtaUpdateConfig(
-    builder,
-    isEnabled,
-    builder.CreateString(cdnDomain),
-    static_cast<Serialization::Configuration::OtaUpdateChannel>(updateChannel),
-    checkOnStartup,
-    checkPeriodically,
-    checkInterval,
-    allowBackendManagement,
-    requireManualApproval,
-    updateId,
-    static_cast<Serialization::Configuration::OtaUpdateStep>(updateStep)
-  );
+  namespace Fbs = Serialization::Configuration;
+
+  auto cdnDomainOffset = builder.CreateString(cdnDomain);
+
+  // Same field order as CreateOtaUpdateConfig, except that is_enabled and
+  // allow_backend_management are stored even when they equal the schema default, so
+  // they read back the same under every schema version (up to 1.5.x both defaulted
+  // to false) and RootConfig::FromFlatbuffers never has to infer them.
+  Fbs::OtaUpdateConfigBuilder otaBuilder(builder);
+  otaBuilder.add_update_id(updateId);
+  otaBuilder.add_cdn_domain(cdnDomainOffset);
+  otaBuilder.add_check_interval(checkInterval);
+  otaBuilder.add_update_step(static_cast<Fbs::OtaUpdateStep>(updateStep));
+  otaBuilder.add_require_manual_approval(requireManualApproval);
+  builder.AddElement<uint8_t>(Fbs::OtaUpdateConfig::VT_ALLOW_BACKEND_MANAGEMENT, static_cast<uint8_t>(allowBackendManagement));
+  otaBuilder.add_check_periodically(checkPeriodically);
+  otaBuilder.add_check_on_startup(checkOnStartup);
+  otaBuilder.add_update_channel(static_cast<Fbs::OtaUpdateChannel>(updateChannel));
+  builder.AddElement<uint8_t>(Fbs::OtaUpdateConfig::VT_IS_ENABLED, static_cast<uint8_t>(isEnabled));
+  return otaBuilder.Finish();
 }
 
 bool OtaUpdateConfig::FromJSON(JSON::JsonView json)
@@ -106,7 +113,7 @@ bool OtaUpdateConfig::FromJSON(JSON::JsonView json)
 
   if (!json["isEnabled"].tryGetBool(isEnabled)) isEnabled = true;
 
-  if (std::string_view sv; json["cdnDomain"].tryGetStr(sv)) {
+  if (std::string sv; json["cdnDomain"].tryGetStr(sv)) {
     cdnDomain = sv;
   } else {
     cdnDomain = CONFIG_OPENSHOCK_FW_CDN_DOMAIN;

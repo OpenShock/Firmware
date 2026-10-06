@@ -15,6 +15,8 @@ namespace Schemas  = OpenShock::Serialization::Gateway;
 namespace Handlers = OpenShock::MessageHandlers::Server::_Private;
 typedef Schemas::GatewayToHubMessagePayload PayloadType;
 
+static constexpr std::size_t MAX_MESSAGE_SIZE = 4096;  // TODO: Profile this
+
 using namespace OpenShock;
 
 const std::size_t HANDLER_COUNT = static_cast<std::size_t>(PayloadType::MAX) + 1;
@@ -42,9 +44,16 @@ void MessageHandlers::WebSocket::HandleGatewayBinary(std::span<const uint8_t> da
     return;
   }
 
+  // Checked before constructing the Verifier: its constructor asserts
+  // size < max_size, so an oversized message would abort instead of being rejected.
+  if (data.size() > MAX_MESSAGE_SIZE) {
+    OS_LOGE(TAG, "Message too large (%zu bytes, max %zu)", data.size(), MAX_MESSAGE_SIZE);
+    return;
+  }
+
   // Validate buffer
   flatbuffers::Verifier::Options verifierOptions {
-    .max_size = 4096,  // TODO: Profile this
+    .max_size = MAX_MESSAGE_SIZE + 1,  // Verifier requires size < max_size
   };
   flatbuffers::Verifier verifier(data.data(), data.size(), verifierOptions);
   if (!verifier.VerifyBuffer<Schemas::GatewayToHubMessage>()) {

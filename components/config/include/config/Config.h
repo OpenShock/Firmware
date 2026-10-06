@@ -12,11 +12,17 @@
 
 #include <hal/gpio_types.h>
 
+#include <cstddef>
 #include <functional>
 #include <string_view>
 #include <vector>
 
 namespace OpenShock::Config {
+  /* Largest config file that can be stored and loaded back. The "config" partition (partitions/ota_4mb.csv) is 12 KiB of littlefs with
+   * 4 KiB blocks; two blocks hold the metadata pair, leaving a single block for file data. Saves of a larger config are refused, and a
+   * larger file or rawconfig buffer is rejected without being loaded. */
+  inline constexpr std::size_t MaxConfigSize = 4096;
+
   void Init();
 
   /* GetAsJSON and SaveFromJSON are used for Reading/Writing the config file in its human-readable form. */

@@ -6,79 +6,150 @@
 
 #include "Convert.h"
 
-#include <cstdio>
 #include <cstdlib>
 #include <cstring>
+#include <utility>
 
 using namespace OpenShock;
 
-// JSON-escape a string per RFC 8259 section 7. The grammar requires escaping
-// exactly the quotation mark (U+0022), reverse solidus (U+005C) and every
-// control character U+0000-U+001F; everything else is `unescaped`
-// (%x20-21 / %x23-5B / %x5D-10FFFF) and passes through byte-for-byte.
-//
-//   quote (") and backslash -> \" and \\ (two-char escapes)
-//   0x08 0x0C 0x0A 0x0D 0x09 -> \b \f \n \r \t   (the RFC's short forms)
-//   other 0x00-0x1F          -> \u00XX
-//   >= 0x20 (incl. 0x7F/DEL and UTF-8 multibyte) -> passthrough
-//
-// The solidus '/' is NOT escaped (the RFC lists \/ as permitted, not required).
-// Non-ASCII is emitted as raw UTF-8, so no \u surrogate pairs are ever produced.
-// Output validity therefore assumes valid UTF-8 input - the escaper escapes, it
-// does not transcode (same contract cJSON had).
-static std::string jsonEscape(std::string_view in)
-{
-  std::string out;
-  out.reserve(in.size() + 8);
-
-  for (unsigned char c : in) {
-    switch (c) {
-      case '"':
-        out += "\\\"";
-        break;
-      case '\\':
-        out += "\\\\";
-        break;
-      case '\b':
-        out += "\\b";
-        break;
-      case '\f':
-        out += "\\f";
-        break;
-      case '\n':
-        out += "\\n";
-        break;
-      case '\r':
-        out += "\\r";
-        break;
-      case '\t':
-        out += "\\t";
-        break;
-      default:
-        if (c < 0x20) {
-          char buf[7];
-          std::snprintf(buf, sizeof(buf), "\\u%04x", c);
-          out += buf;
-        } else {
-          out += static_cast<char>(c);
-        }
-        break;
-    }
-  }
-
-  return out;
-}
-
+// json_generator 2.x escapes string values itself (RFC 8259 section 7: quote,
+// backslash and U+0000-U+001F) and rejects malformed UTF-8, so these only hand the
+// value over with an explicit length. Escaping here as well would escape twice.
+// The length also lets an embedded NUL through (emitted as \u0000).
 int JSON::objSetString(json_gen_str_t* gen, const char* name, std::string_view value)
 {
-  std::string escaped = jsonEscape(value);
-  return json_gen_obj_set_string(gen, name, escaped.c_str());
+  return json_gen_obj_set_string_len(gen, name, value.data(), value.size());
 }
 
 int JSON::arrSetString(json_gen_str_t* gen, std::string_view value)
 {
-  std::string escaped = jsonEscape(value);
-  return json_gen_arr_set_string(gen, escaped.c_str());
+  return json_gen_arr_set_string_len(gen, value.data(), value.size());
+}
+
+// Parses the 4 hex digits of a \uXXXX escape starting at in[pos].
+static bool readHex4(std::string_view in, std::size_t pos, uint32_t& out)
+{
+  if (pos > in.size() || in.size() - pos < 4) {
+    return false;
+  }
+
+  uint32_t value = 0;
+  for (std::size_t i = pos; i < pos + 4; ++i) {
+    const char c = in[i];
+    value <<= 4;
+    if (c >= '0' && c <= '9') {
+      value |= static_cast<uint32_t>(c - '0');
+    } else if (c >= 'a' && c <= 'f') {
+      value |= static_cast<uint32_t>(c - 'a' + 10);
+    } else if (c >= 'A' && c <= 'F') {
+      value |= static_cast<uint32_t>(c - 'A' + 10);
+    } else {
+      return false;
+    }
+  }
+
+  out = value;
+  return true;
+}
+
+static void appendUtf8(std::string& out, uint32_t cp)
+{
+  if (cp < 0x80) {
+    out += static_cast<char>(cp);
+  } else if (cp < 0x800) {
+    out += static_cast<char>(0xC0 | (cp >> 6));
+    out += static_cast<char>(0x80 | (cp & 0x3F));
+  } else if (cp < 0x10000) {
+    out += static_cast<char>(0xE0 | (cp >> 12));
+    out += static_cast<char>(0x80 | ((cp >> 6) & 0x3F));
+    out += static_cast<char>(0x80 | (cp & 0x3F));
+  } else {
+    out += static_cast<char>(0xF0 | (cp >> 18));
+    out += static_cast<char>(0x80 | ((cp >> 12) & 0x3F));
+    out += static_cast<char>(0x80 | ((cp >> 6) & 0x3F));
+    out += static_cast<char>(0x80 | (cp & 0x3F));
+  }
+}
+
+// Decodes the body of a JSON string token (RFC 8259 section 7) to UTF-8:
+//
+//   \" \\ \/ \b \f \n \r \t -> the character they stand for
+//   \uXXXX                  -> that code point, UTF-8 encoded (\u0000 gives a NUL byte)
+//   \uD8xx\uDCxx            -> one supplementary code point (surrogate pair)
+//   unpaired surrogate      -> U+FFFD (a lone surrogate has no UTF-8 encoding)
+//
+// All other bytes are copied unchanged. Returns false on a malformed escape (unknown
+// escape character, truncated or non-hex \u), which jsmn's default (non-strict)
+// mode does not reject.
+static bool jsonUnescape(std::string_view in, std::string& out)
+{
+  out.clear();
+  out.reserve(in.size());
+
+  std::size_t i = 0;
+  while (i < in.size()) {
+    char c = in[i++];
+    if (c != '\\') {
+      out += c;
+      continue;
+    }
+
+    if (i >= in.size()) {
+      return false;
+    }
+
+    c = in[i++];
+    switch (c) {
+      case '"':
+      case '\\':
+      case '/':
+        out += c;
+        break;
+      case 'b':
+        out += '\b';
+        break;
+      case 'f':
+        out += '\f';
+        break;
+      case 'n':
+        out += '\n';
+        break;
+      case 'r':
+        out += '\r';
+        break;
+      case 't':
+        out += '\t';
+        break;
+      case 'u':
+      {
+        uint32_t cp;
+        if (!readHex4(in, i, cp)) {
+          return false;
+        }
+        i += 4;
+
+        if (cp >= 0xD800 && cp <= 0xDBFF) {
+          // High surrogate: forms a code point only together with a following \uDC00-\uDFFF.
+          uint32_t low;
+          if (in.size() - i >= 6 && in[i] == '\\' && in[i + 1] == 'u' && readHex4(in, i + 2, low) && low >= 0xDC00 && low <= 0xDFFF) {
+            i += 6;
+            cp = 0x10000 + ((cp - 0xD800) << 10) + (low - 0xDC00);
+          } else {
+            cp = 0xFFFD;
+          }
+        } else if (cp >= 0xDC00 && cp <= 0xDFFF) {
+          cp = 0xFFFD;
+        }
+
+        appendUtf8(out, cp);
+        break;
+      }
+      default:
+        return false;
+    }
+  }
+
+  return true;
 }
 
 void JSON::objBegin(json_gen_str_t* gen, const char* name)
@@ -99,28 +170,24 @@ void JSON::objEnd(json_gen_str_t* gen, const char* name)
   }
 }
 
+// Iterative rather than recursive: input can nest thousands of levels deep (parse
+// accepts up to 16384 tokens), which would overflow a task stack one frame per level.
 int JSON::JsonView::skip(int index) const noexcept
 {
-  const jsmntok_t& tok = m_tokens[index];
-
-  if (tok.type == JSMN_OBJECT) {
-    int j = index + 1;
-    for (int m = 0; m < tok.size; ++m) {
-      j = skip(j);  // key
-      j = skip(j);  // value
+  // Tokens still to consume in this subtree: an object owes a key and a value per
+  // member, an array one value per element, a leaf nothing.
+  long pending = 1;
+  int j        = index;
+  while (pending > 0 && j < m_count) {
+    const jsmntok_t& tok = m_tokens[j++];
+    --pending;
+    if (tok.type == JSMN_OBJECT) {
+      pending += 2L * tok.size;
+    } else if (tok.type == JSMN_ARRAY) {
+      pending += tok.size;
     }
-    return j;
   }
-
-  if (tok.type == JSMN_ARRAY) {
-    int j = index + 1;
-    for (int e = 0; e < tok.size; ++e) {
-      j = skip(j);
-    }
-    return j;
-  }
-
-  return index + 1;  // string / primitive leaf
+  return j;
 }
 
 std::string_view JSON::JsonView::raw() const noexcept
@@ -149,12 +216,23 @@ bool JSON::JsonView::isNumber() const noexcept
   return s != "true" && s != "false" && s != "null";
 }
 
-bool JSON::JsonView::tryGetStr(std::string_view& out) const noexcept
+bool JSON::JsonView::tryGetStr(std::string& out) const
 {
   if (!isString()) {
     return false;
   }
-  out = raw();
+
+  std::string_view s = raw();
+  if (s.find('\\') == std::string_view::npos) {
+    out.assign(s);  // nothing to decode
+    return true;
+  }
+
+  std::string decoded;
+  if (!jsonUnescape(s, decoded)) {
+    return false;
+  }
+  out = std::move(decoded);
   return true;
 }
 
@@ -232,7 +310,7 @@ bool JSON::JsonView::tryGetDouble(double& out) const noexcept
   return true;
 }
 
-JSON::JsonView JSON::JsonView::operator[](std::string_view key) const noexcept
+JSON::JsonView JSON::JsonView::operator[](std::string_view key) const
 {
   if (!isObject()) {
     return {};
@@ -248,6 +326,12 @@ JSON::JsonView JSON::JsonView::operator[](std::string_view key) const noexcept
     if (k.type == JSMN_STRING) {
       std::string_view keyView(m_json + k.start, static_cast<size_t>(k.end - k.start));
       if (keyView == key) {
+        return JsonView(m_json, m_tokens, m_count, valIdx);
+      }
+
+      // A key written with escapes ("id" for "id") is still the same key.
+      std::string decodedKey;
+      if (keyView.find('\\') != std::string_view::npos && jsonUnescape(keyView, decodedKey) && decodedKey == key) {
         return JsonView(m_json, m_tokens, m_count, valIdx);
       }
     }
