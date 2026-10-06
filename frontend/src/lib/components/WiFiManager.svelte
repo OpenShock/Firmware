@@ -57,7 +57,7 @@
         <Wifi class="text-success h-5 w-5" />
         <div>
           <p class="text-sm font-medium">
-            Connected to {connectedNetwork.ssid || 'Hidden Network'}
+            Connected to {connectedNetwork.ssid || 'hidden network'}
           </p>
           <p class="text-muted-foreground text-xs">
             {connectedNetwork.networks[0]?.rssi ?? '?'} dBm

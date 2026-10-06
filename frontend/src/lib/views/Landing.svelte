@@ -8,7 +8,7 @@
   <img class="pointer-events-none h-12 select-none" src="/logo.svg" alt="OpenShock Logo" />
   <h1 class="text-2xl font-bold">Welcome to OpenShock</h1>
   <p class="text-muted-foreground max-w-sm text-center text-sm">
-    Choose how you'd like to set up your device.
+    Choose how you'd like to set up your hub.
   </p>
   <div class="flex w-full max-w-xs flex-col gap-3">
     <Button size="lg" onclick={() => ViewModeStore.set('wizard')}>

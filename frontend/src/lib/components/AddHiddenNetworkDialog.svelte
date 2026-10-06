@@ -63,8 +63,8 @@
   </DialogTrigger>
   <DialogContent class="sm:max-w-[425px]">
     <DialogHeader>
-      <DialogTitle>Add Hidden Network</DialogTitle>
-      <DialogDescription>Enter the details for a hidden WiFi network</DialogDescription>
+      <DialogTitle>Add hidden network</DialogTitle>
+      <DialogDescription>Enter the details for a hidden WiFi network.</DialogDescription>
     </DialogHeader>
     <form class="contents" onsubmit={handleSave}>
       <div class="flex flex-col gap-4 py-4">

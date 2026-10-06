@@ -94,7 +94,7 @@
             <StepperIndicator />
             <div class="hidden sm:block">
               <StepperTitle>Account</StepperTitle>
-              <StepperDescription>Link device</StepperDescription>
+              <StepperDescription>Link hub</StepperDescription>
             </div>
           </StepperTrigger>
         </StepperItem>

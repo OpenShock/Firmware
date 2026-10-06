@@ -183,7 +183,7 @@
         <DialogContent class="sm:max-w-[425px]">
           <DialogHeader>
             <DialogTitle>Connect to {ssid || 'network'}</DialogTitle>
-            <DialogDescription>Enter the WiFi password</DialogDescription>
+            <DialogDescription>Enter the WiFi password.</DialogDescription>
           </DialogHeader>
           <form class="contents" onsubmit={wifiAuthenticate}>
             <div class="flex flex-row items-center gap-4 py-4">
@@ -223,7 +223,7 @@
         <DialogContent class="sm:max-w-[425px]">
           <DialogHeader>
             <DialogTitle>Edit password for {ssid}</DialogTitle>
-            <DialogDescription>Enter the new WiFi password</DialogDescription>
+            <DialogDescription>Enter the new WiFi password.</DialogDescription>
           </DialogHeader>
           <form class="contents" onsubmit={wifiEditPassword}>
             <div class="flex flex-row items-center gap-4 py-4">

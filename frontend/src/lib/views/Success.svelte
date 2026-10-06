@@ -18,7 +18,7 @@
     <CircleCheck class="text-success h-20 w-20" />
     <h1 class="text-2xl font-bold">Setup Complete!</h1>
     <p class="text-muted-foreground text-sm">
-      Your OpenShock device is configured and connected to your account.
+      Your OpenShock hub is configured and connected to your account.
     </p>
     <p class="text-muted-foreground text-sm">This portal will close shortly.</p>
   </div>

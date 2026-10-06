@@ -57,7 +57,7 @@
   </DialogTrigger>
   <DialogContent class="sm:max-w-[425px]">
     <DialogHeader>
-      <DialogTitle>Network Info</DialogTitle>
+      <DialogTitle>Network info</DialogTitle>
     </DialogHeader>
     <div>
       {#each rows as row (row.key)}

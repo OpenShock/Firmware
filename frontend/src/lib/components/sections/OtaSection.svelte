@@ -79,7 +79,7 @@
       <div>
         <p class="text-sm font-medium">OTA Updates Enabled</p>
         <p class="text-muted-foreground text-xs">
-          Allow the device to check for and install firmware updates.
+          Allow the hub to check for and install firmware updates.
         </p>
       </div>
       <input
@@ -95,7 +95,7 @@
       <Label for="ota-domain">CDN Domain</Label>
       <form class="flex gap-2" onsubmit={saveDomain}>
         <Input id="ota-domain" type="text" bind:value={cdnDomain} placeholder="cdn.openshock.app" />
-        <Button size="sm" type="submit">Save</Button>
+        <Button size="sm" variant="outline" type="submit">Save</Button>
       </form>
     </div>
 
@@ -132,7 +132,7 @@
       <Label for="ota-interval">Check Interval (minutes)</Label>
       <form class="flex gap-2" onsubmit={saveCheckInterval}>
         <Input id="ota-interval" type="number" min={0} max={65535} bind:value={checkInterval} />
-        <Button size="sm" type="submit">Save</Button>
+        <Button size="sm" variant="outline" type="submit">Save</Button>
       </form>
     </div>
 

@@ -23,7 +23,7 @@
     <div class="border-warning/30 bg-warning/10 flex items-center gap-2 rounded-lg border p-3">
       <TriangleAlert class="text-warning h-5 w-5 shrink-0" />
       <p class="text-xs">
-        The captive portal will close automatically when the device connects to the gateway. Enable
+        The captive portal will close automatically when the hub connects to the gateway. Enable
         "Always Enabled" via serial commands to keep it running.
       </p>
     </div>

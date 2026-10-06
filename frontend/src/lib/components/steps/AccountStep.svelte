@@ -34,7 +34,7 @@
   async function handleUnlink() {
     const result = await dialog.confirm({
       title: 'Unlink account?',
-      desc: 'The hub goes offline from OpenShock and cannot be controlled remotely until you link it again with a new link code.',
+      desc: 'The hub goes offline from OpenShock and cannot be controlled remotely until you link it again with a new pair code.',
       confirmButtonText: 'Unlink',
     });
     if (!result.confirmed) return;
@@ -45,7 +45,7 @@
 <div class="flex flex-col gap-4">
   <SectionHeader
     title="Account Linking"
-    description="Link this device to your OpenShock account to control it remotely."
+    description="Link this hub to your OpenShock account to control it remotely."
   />
 
   <!-- WiFi status -->
@@ -77,9 +77,9 @@
     </div>
   {:else}
     <div class="flex flex-col gap-2">
-      <Label for="account-link-code">Link Code</Label>
+      <Label for="account-link-code">Pair Code</Label>
       <p class="text-muted-foreground text-xs">
-        Find your link code on the OpenShock website under device settings.
+        On the OpenShock website, open Hubs and choose Pair from this hub's menu.
       </p>
       <form class="flex gap-2" onsubmit={handleLinkAccount}>
         <Input
@@ -88,7 +88,7 @@
           id="account-link-code"
           inputmode="numeric"
           pattern="[0-9]*"
-          placeholder="Enter link code"
+          placeholder="Enter pair code"
           bind:value={linkCode}
         />
         <Button type="submit" disabled={!canLink}>Link</Button>

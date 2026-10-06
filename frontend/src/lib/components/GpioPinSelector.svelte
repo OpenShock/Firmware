@@ -74,6 +74,6 @@
   </div>
   <form class="flex gap-2" onsubmit={setGpioPin}>
     <Input type="number" placeholder="GPIO Pin" bind:value={pendingPin} />
-    <Button type="submit" disabled={!canSet || saving}>Set</Button>
+    <Button variant="outline" type="submit" disabled={!canSet || saving}>Set</Button>
   </form>
 </div>
