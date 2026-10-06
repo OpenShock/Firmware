@@ -238,6 +238,12 @@ static BaseType_t fakeQueueReceive(QueueHandle_t handle, void* const buffer, Tic
   return pdTRUE;
 }
 
+static BaseType_t fakeQueueGenericReset(QueueHandle_t handle, BaseType_t, int)
+{
+  AsQueue(handle)->items.clear();
+  return pdPASS;
+}
+
 static void fakeQueueDelete(QueueHandle_t handle, int)
 {
   FakeQueue* queue = AsQueue(handle);
@@ -340,6 +346,7 @@ __attribute__((constructor(101))) static void installMockCallbacks()
   xQueueGenericSend_Stub(fakeQueueGenericSend);
   xQueueSemaphoreTake_Stub(fakeQueueSemaphoreTake);
   xQueueReceive_Stub(fakeQueueReceive);
+  xQueueGenericReset_Stub(fakeQueueGenericReset);
   vQueueDelete_Stub(fakeQueueDelete);
   vTaskDelay_Stub(fakeTaskDelay);
 

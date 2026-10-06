@@ -139,6 +139,7 @@ TEST_CASE("parse: structurally invalid JSON is rejected (CONFIG_JSMN_STRICT)", "
     R"([1 2])",              // missing comma
     R"({"a":1} trailing)",   // garbage after the value
     R"({"x":{"a"},"b":1})",  // key without a value (lenient mode misread "b" as the value of "a")
+    R"({"a":007})",          // number with a leading zero
   };
 
   for (const char* input : inputs) {

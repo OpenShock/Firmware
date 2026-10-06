@@ -207,7 +207,7 @@ TEST_CASE("tryGetBool: true/false succeed, everything else fails", "[osjson][get
 TEST_CASE("tryGetI64: valid integers including boundaries", "[osjson][getters]")
 {
   static const char json[] = R"({"zero":0,"pos":123,"neg":-123,"i32over":2147483648,)"
-                             R"("max":9223372036854775807,"min":-9223372036854775808,"leadzero":007})";
+                             R"("max":9223372036854775807,"min":-9223372036854775808})";
   JSON::JsonDocument doc;
   TEST_ASSERT_TRUE(doc.parse(json));
   JSON::JsonView root = doc.root();
@@ -225,7 +225,6 @@ TEST_CASE("tryGetI64: valid integers including boundaries", "[osjson][getters]")
   TEST_ASSERT_EQUAL_INT64(INT64_MAX, v);
   TEST_ASSERT_TRUE(root["min"].tryGetI64(v));
   TEST_ASSERT_EQUAL_INT64(INT64_MIN, v);
-  TEST_ASSERT_FALSE(root["leadzero"].tryGetI64(v));  // "007" -> rejected (Convert disallows leading zeros)
 }
 
 TEST_CASE("tryGetI64: rejects non-integers and partial parses", "[osjson][getters]")
