@@ -58,3 +58,9 @@ CONFIG_MBEDTLS_CUSTOM_CERTIFICATE_BUNDLE_PATH="certificates/cacert-merged.pem"
 # NetworkClientSecure link, and CONFIG_LWIP_SO_RCVBUF was an Arduino dependency. All
 # three are real settings that still take effect, so they are left alone here rather
 # than changed as a side effect of a build-caching pass.
+
+# Boot a freshly flashed OTA image as PENDING_VERIFY so otaSetup() validates it and a
+# broken image rolls back to the previous slot instead of boot-looping. Needs the
+# bootloader built with this option; devices that only receive OTA app updates keep
+# their old bootloader and boot new images without the verify step.
+CONFIG_BOOTLOADER_APP_ROLLBACK_ENABLE=y

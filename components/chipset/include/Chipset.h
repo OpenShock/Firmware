@@ -73,13 +73,14 @@
 // GPIO1, GPIO3 is used for UART0 RXD/TXD.
 // GPIO0, GPIO2 is used to control the boot mode of the chip.
 // GPIO5, GPIO15 is used for SDIO slave timing selection.
-// GPIO6, GPIO7, GPIO8, GPIO9, GPIO11, GPIO16, GPIO17 is used for SPI flash connection. (DO NOT TOUCH)
+// GPIO12 (MTDI) selects the flash voltage at boot; an external pull-up selects 1.8 V and the board won't boot.
+// GPIO6, GPIO7, GPIO8, GPIO9, GPIO10, GPIO11, GPIO16, GPIO17 is used for SPI flash connection (GPIO10 as SD_DATA3 in QIO mode). (DO NOT TOUCH)
 //
 // See: ESP32 Series Datasheet Version 4.3 Section 2.2 Pin Overview
 // See: ESP32 Series Datasheet Version 4.3 Section 2.4 Strapping Pins
-#define CHIP_UNSAFE_GPIO(pin)                                                                                                                                                                                                                                  \
-  ((pin) == GPIO_NUM_1 || (pin) == GPIO_NUM_3 || (pin) == GPIO_NUM_0 || (pin) == GPIO_NUM_2 || (pin) == GPIO_NUM_5 || (pin) == GPIO_NUM_15 || (pin) == GPIO_NUM_6 || (pin) == GPIO_NUM_7 || (pin) == GPIO_NUM_8 || (pin) == GPIO_NUM_9 || (pin) == GPIO_NUM_11 \
-   || (pin) == GPIO_NUM_16 || (pin) == GPIO_NUM_17)
+#define CHIP_UNSAFE_GPIO(pin) \
+  ((pin) == GPIO_NUM_1 || (pin) == GPIO_NUM_3 || (pin) == GPIO_NUM_0 || (pin) == GPIO_NUM_2 || (pin) == GPIO_NUM_5 || (pin) == GPIO_NUM_15 || (pin) == GPIO_NUM_12 || (pin) == GPIO_NUM_6 \
+   || (pin) == GPIO_NUM_7 || (pin) == GPIO_NUM_8 || (pin) == GPIO_NUM_9 || (pin) == GPIO_NUM_10 || (pin) == GPIO_NUM_11 || (pin) == GPIO_NUM_16 || (pin) == GPIO_NUM_17)
 #endif
 
 // ESP32-PICO-D4
