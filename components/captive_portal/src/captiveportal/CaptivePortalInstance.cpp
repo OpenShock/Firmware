@@ -21,6 +21,7 @@ const char* const TAG = "CaptivePortalInstance";
 #include "RateLimiter.h"
 #include "rfc8908/RFC8908Handler.h"
 #include "serialization/WSLocal.h"
+#include "util/TaskUtils.h"
 #include "wifi/WiFiManager.h"
 #include "wifi/WiFiScanManager.h"
 
@@ -28,6 +29,7 @@ const char* const TAG = "CaptivePortalInstance";
 
 #include "json/Json.h"
 
+#include <atomic>
 #include <cctype>
 #include <cstring>
 #include <functional>
@@ -99,12 +101,15 @@ static const char* getPartitionHash()
     return nullptr;
   }
 
+  // Hashing the whole partition takes a noticeable time and its content only changes through OTA, which restarts the
+  // device, so compute it once per boot. Only called from the portal manager task.
   static char hash[65];
-  if (!OpenShock::TryGetPartitionHash(partition, hash)) {
-    return nullptr;
+  static bool hashValid = false;
+  if (!hashValid) {
+    hashValid = OpenShock::TryGetPartitionHash(partition, hash);
   }
 
-  return hash;
+  return hashValid ? hash : nullptr;
 }
 
 // ---------------------------------------------------------------------------
@@ -304,16 +309,8 @@ static esp_err_t apiWifiNetworksDelete(httpd_req_t* req)
   return sendResp(req, S200, nullptr, {});
 }
 
-static esp_err_t apiAccountLink(httpd_req_t* req)
+static esp_err_t sendAccountLinkResult(httpd_req_t* req, OpenShock::AccountLinkResultCode result)
 {
-  if (!getAccountLinkRateLimiter().tryRequest()) {
-    return sendResp(req, S429, HTTP::ContentType::JSON, JSON_ERR_RATE_LIMITED);
-  }
-  std::string code;
-  if (!getQueryParam(req, "code", code)) {
-    return sendResp(req, S400, HTTP::ContentType::JSON, JSON_ERR_CODE_REQUIRED);
-  }
-  auto result      = GatewayConnectionManager::Link(std::string_view(code));
   using ResultCode = OpenShock::AccountLinkResultCode;
   if (result == ResultCode::Success) {
     return sendResp(req, S200, nullptr, {});
@@ -361,6 +358,64 @@ static esp_err_t apiAccountLink(httpd_req_t* req)
   json_gen_end_object(gen);
   std::string json = writer.finish();
   return sendResp(req, S400, HTTP::ContentType::JSON, json);
+}
+
+namespace {
+  struct AccountLinkJob {
+    httpd_req_t* req;  // async copy, owned until httpd_req_async_handler_complete
+    std::string code;
+  };
+
+  std::atomic<bool> s_accountLinkInProgress = false;
+
+  // Linking does DNS + TLS + an HTTPS round trip (seconds); running it here keeps the single httpd task free to
+  // serve the page, assets and WebSocket meanwhile.
+  void accountLinkTask(void* arg)
+  {
+    auto* job   = static_cast<AccountLinkJob*>(arg);
+    auto result = GatewayConnectionManager::Link(std::string_view(job->code));
+
+    sendAccountLinkResult(job->req, result);
+    httpd_req_async_handler_complete(job->req);
+
+    delete job;
+    s_accountLinkInProgress.store(false);
+    vTaskDelete(nullptr);
+  }
+}  // namespace
+
+static esp_err_t apiAccountLink(httpd_req_t* req)
+{
+  if (!getAccountLinkRateLimiter().tryRequest()) {
+    return sendResp(req, S429, HTTP::ContentType::JSON, JSON_ERR_RATE_LIMITED);
+  }
+  std::string code;
+  if (!getQueryParam(req, "code", code)) {
+    return sendResp(req, S400, HTTP::ContentType::JSON, JSON_ERR_CODE_REQUIRED);
+  }
+
+  if (s_accountLinkInProgress.exchange(true)) {
+    return sendResp(req, S429, HTTP::ContentType::JSON, JSON_ERR_RATE_LIMITED);
+  }
+
+  httpd_req_t* asyncReq = nullptr;
+  if (httpd_req_async_handler_begin(req, &asyncReq) != ESP_OK) {
+    s_accountLinkInProgress.store(false);
+    return sendResp(req, S500, HTTP::ContentType::JSON, JSON_ERR_INTERNAL);
+  }
+
+  auto* job = new AccountLinkJob {asyncReq, std::move(code)};
+  // TLS needs a large stack
+  if (TaskUtils::TaskCreateExpensive(accountLinkTask, "AccountLink", 8192, job, 1, nullptr) != pdPASS) {
+    OS_LOGE(TAG, "Failed to create account link task");
+    delete job;
+    esp_err_t err = sendResp(asyncReq, S500, HTTP::ContentType::JSON, JSON_ERR_INTERNAL);
+    httpd_req_async_handler_complete(asyncReq);
+    s_accountLinkInProgress.store(false);
+    return err;
+  }
+
+  return ESP_OK;
 }
 
 static esp_err_t apiAccountDelete(httpd_req_t* req)
@@ -700,6 +755,19 @@ namespace {
     std::vector<uint8_t> data;
   };
 
+  void sendToWsClient(httpd_handle_t hd, int fd, httpd_ws_frame_t& frame)
+  {
+    if (httpd_ws_send_frame_async(hd, fd, &frame) != ESP_OK) {
+      // A client that can't take data (gone, asleep, buffers full) would otherwise stall every later send for the
+      // full send timeout; drop it, the web UI reconnects.
+      httpd_sess_trigger_close(hd, fd);
+      return;
+    }
+
+    // httpd only counts inbound requests as activity, so a push-only WebSocket would look idle to the LRU purge.
+    httpd_sess_update_lru_counter(hd, fd);
+  }
+
   void wsSendWork(void* arg)
   {
     auto* job = static_cast<WsSendJob*>(arg);
@@ -716,12 +784,12 @@ namespace {
       if (httpd_get_client_list(job->hd, &count, fds) == ESP_OK) {
         for (size_t i = 0; i < count; ++i) {
           if (httpd_ws_get_fd_info(job->hd, fds[i]) == HTTPD_WS_CLIENT_WEBSOCKET) {
-            httpd_ws_send_frame_async(job->hd, fds[i], &frame);
+            sendToWsClient(job->hd, fds[i], frame);
           }
         }
       }
     } else {
-      httpd_ws_send_frame_async(job->hd, job->fd, &frame);
+      sendToWsClient(job->hd, job->fd, frame);
     }
 
     delete job;
@@ -965,6 +1033,11 @@ void CaptivePortal::CaptivePortalInstance::handleWebSocketClientConnected(httpd_
   // Send all previously scanned wifi networks
   auto networks = OpenShock::WiFiManager::GetDiscoveredWiFiNetworks();
   Serialization::Local::SerializeWiFiNetworksEvent(Serialization::Types::WifiNetworkEventType::Discovered, networks, sendBin);
+
+  // Nothing scanned yet (e.g. connected at boot, so no auto-scan ran): start one so the list isn't empty
+  if (networks.empty() && !WiFiScanManager::IsScanning()) {
+    WiFiScanManager::StartScan();
+  }
 }
 
 void CaptivePortal::CaptivePortalInstance::handleWebSocketClientDisconnected(uint8_t socketId)
@@ -1101,11 +1174,14 @@ bool CaptivePortal::CaptivePortalInstance::startHttpServer()
   httpd_config_t config    = HTTPD_DEFAULT_CONFIG();
   config.server_port       = HTTP_PORT;
   config.max_uri_handlers  = 40;
-  config.max_open_sockets  = 4;
+  // Browsers open several connections per page load; with only 4 slots the LRU purge evicted the (server-push,
+  // therefore "idle" looking) WebSocket. Needs CONFIG_LWIP_MAX_SOCKETS >= max_open_sockets + 3 (+ DNS/HTTP client).
+  config.max_open_sockets  = 8;
   config.lru_purge_enable  = true;
   config.stack_size        = 8192;
-  config.recv_wait_timeout = 10;
-  config.send_wait_timeout = 10;
+  // Shorter than the default 10 s: one stalled or sleeping client blocks the single httpd task for this long.
+  config.recv_wait_timeout = 5;
+  config.send_wait_timeout = 5;
   config.uri_match_fn      = httpd_uri_match_wildcard;
 
   esp_err_t err = httpd_start(&m_server, &config);
@@ -1159,6 +1235,12 @@ CaptivePortal::CaptivePortalInstance::CaptivePortalInstance()
 CaptivePortal::CaptivePortalInstance::~CaptivePortalInstance()
 {
   m_dnsServer.stop();
+
+  // An in-flight account link still owns an async request on this server; let it answer first (bounded by the HTTP
+  // client timeout) so it never sends on a stopped server.
+  for (int i = 0; i < 150 && s_accountLinkInProgress.load(); ++i) {
+    vTaskDelay(pdMS_TO_TICKS(100));
+  }
 
   // Stop the server (closes all WS sockets, firing the session free callbacks).
   if (m_server != nullptr) {

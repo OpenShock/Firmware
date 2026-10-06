@@ -124,13 +124,14 @@ static bool isConnectRateLimited(const WiFiNetwork& net)
     return false;
   }
 
-  int64_t now  = OpenShock::millis();
-  int64_t diff = now - net.lastConnectAttempt;
-  if ((net.connectAttempts > 5 && diff < 5000) || (net.connectAttempts > 10 && diff < 10'000) || (net.connectAttempts > 15 && diff < 30'000) || (net.connectAttempts > 20 && diff < 60'000)) {
-    return true;
-  }
+  // Back off from the first failure: 2 s, 4 s, 8 s, ... capped at 60 s. Every attempt is an all-channel scan that
+  // takes the radio off the captive portal AP's channel, so retrying every second starves portal clients.
+  int64_t now     = OpenShock::millis();
+  int64_t diff    = now - net.lastConnectAttempt;
+  uint16_t shift  = std::min<uint16_t>(net.connectAttempts, 5);
+  int64_t backoff = std::min<int64_t>(1000LL << shift, 60'000);
 
-  return false;
+  return diff < backoff;
 }
 
 static bool isSaved(std::function<bool(const Config::WiFiCredentials&)> predicate)
@@ -170,8 +171,11 @@ static bool getNextWiFiNetwork(OpenShock::Config::WiFiCredentials& creds)
 }
 
 // Requires s_networksMutex. Records the attempt and rejects the network if its scanned auth mode is weaker than expected.
-static bool prepareConnectAttempt(const std::string& ssid, wifi_auth_mode_t expectedAuthMode)
+// `channel` receives the scanned channel of the strongest BSSID (0 if not scanned).
+static bool prepareConnectAttempt(const std::string& ssid, wifi_auth_mode_t expectedAuthMode, uint8_t& channel)
 {
+  channel = 0;
+
   auto it = findNetworkBySSID(ssid.c_str());
   if (it == s_wifiNetworks.end()) {
     return true;  // Not scanned (hidden or out of range); nothing to validate against
@@ -185,6 +189,7 @@ static bool prepareConnectAttempt(const std::string& ssid, wifi_auth_mode_t expe
 
   it->connectAttempts++;
   it->lastConnectAttempt = OpenShock::millis();
+  channel                = it->channel;
 
   return true;
 }
@@ -201,8 +206,9 @@ static bool getConnectedAPNetwork(WiFiNetwork& network, uint8_t credentialsId)
   return true;
 }
 
-// Must be called without s_networksMutex held, after prepareConnectAttempt().
-static bool connectWiFi(const std::string& ssid, const std::string& password, const uint8_t* pinnedBssid = nullptr)
+// Must be called without s_networksMutex held, after prepareConnectAttempt(). A known `channel` (from a scan) lets
+// esp_wifi probe just that channel instead of sweeping all of them.
+static bool connectWiFi(const std::string& ssid, const std::string& password, const uint8_t* pinnedBssid = nullptr, uint8_t channel = 0)
 {
   if (ssid.empty()) {
     OS_LOGW(TAG, "Cannot connect to network with empty SSID");
@@ -219,7 +225,8 @@ static bool connectWiFi(const std::string& ssid, const std::string& password, co
   std::strncpy(reinterpret_cast<char*>(config.sta.ssid), ssid.c_str(), sizeof(config.sta.ssid));
   std::strncpy(reinterpret_cast<char*>(config.sta.password), password.c_str(), sizeof(config.sta.password));
   // Let esp_wifi pick the strongest matching BSSID and retry a few times before giving up.
-  config.sta.scan_method       = WIFI_ALL_CHANNEL_SCAN;
+  config.sta.scan_method       = channel != 0 ? WIFI_FAST_SCAN : WIFI_ALL_CHANNEL_SCAN;
+  config.sta.channel           = channel;
   config.sta.sort_method       = WIFI_CONNECT_AP_BY_SIGNAL;
   config.sta.failure_retry_cnt = 3;
   if (pinnedBssid != nullptr) {
@@ -464,6 +471,7 @@ static void evWiFiNetworksDiscovery(const std::vector<const wifi_ap_record_t*>& 
 static bool tryConnect()
 {
   Config::WiFiCredentials creds;
+  uint8_t channel = 0;
 
   // Select the target network, validate it and mark it as attempted under lock, then release before connecting
   {
@@ -479,12 +487,12 @@ static bool tryConnect()
       return false;
     }
 
-    if (!prepareConnectAttempt(creds.ssid, creds.authMode)) {
+    if (!prepareConnectAttempt(creds.ssid, creds.authMode, channel)) {
       return false;
     }
   }
 
-  return connectWiFi(creds.ssid, creds.password, creds.HasPinnedBSSID() ? creds.bssid.data() : nullptr);
+  return connectWiFi(creds.ssid, creds.password, creds.HasPinnedBSSID() ? creds.bssid.data() : nullptr, channel);
 }
 
 static void wifimanagerUpdateTask(void*)

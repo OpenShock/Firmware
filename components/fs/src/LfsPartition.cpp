@@ -7,6 +7,8 @@ const char* const TAG = "LfsPartition";
 #include "lfs.h"
 
 #include <cstring>
+#include <memory>
+#include <new>
 #include <string>
 
 using namespace OpenShock;
@@ -153,10 +155,18 @@ bool LfsPartition::readStream(const char* path, const std::function<bool(std::sp
     return false;
   }
 
-  uint8_t buf[1024];
+  // Larger chunks mean far fewer downstream writes (an httpd chunk costs several socket sends and an event post);
+  // heap-allocated so callers on small task stacks are not affected.
+  constexpr std::size_t kChunkSize = 4096;
+  std::unique_ptr<uint8_t[]> buf(new (std::nothrow) uint8_t[kChunkSize]);
+  if (buf == nullptr) {
+    lfs_file_close(&m_state->lfs, &file);
+    return false;
+  }
+
   bool ok = true;
   for (;;) {
-    lfs_ssize_t r = lfs_file_read(&m_state->lfs, &file, buf, sizeof(buf));
+    lfs_ssize_t r = lfs_file_read(&m_state->lfs, &file, buf.get(), kChunkSize);
     if (r < 0) {
       ok = false;
       break;
@@ -164,7 +174,7 @@ bool LfsPartition::readStream(const char* path, const std::function<bool(std::sp
     if (r == 0) {
       break;  // EOF
     }
-    if (!sink(std::span<const uint8_t>(buf, static_cast<size_t>(r)))) {
+    if (!sink(std::span<const uint8_t>(buf.get(), static_cast<size_t>(r)))) {
       ok = false;
       break;
     }

@@ -5,7 +5,6 @@ import { HubToLocalMessage } from '#lib/_fbs/open-shock/serialization/local/hub-
 import { ReadyMessage } from '#lib/_fbs/open-shock/serialization/local/ready-message.js';
 import { WifiGotIpEvent } from '#lib/_fbs/open-shock/serialization/local/wifi-got-ip-event.js';
 import { WifiScanStatusMessage } from '#lib/_fbs/open-shock/serialization/local/wifi-scan-status-message.js';
-import { stopWifiScan } from '#lib/api.js';
 import { mapConfig } from '#lib/mappers/ConfigMapper.js';
 import { hubState } from '#lib/stores/index.js';
 import type { WebSocketClient } from '#lib/WebSocketClient.js';
@@ -55,8 +54,6 @@ PayloadHandlers[HubToLocalMessagePayload.ReadyMessage] = (cli, msg) => {
   }
 
   console.log('[WS] Updated hub state: ', hubState);
-
-  stopWifiScan();
 
   toast.success('Websocket connection established');
 };

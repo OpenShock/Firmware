@@ -13,10 +13,11 @@ const char* const TAG = "WiFiScanManager";
 #include <map>
 #include <vector>
 
-// Per-channel active-scan dwell time. esp_wifi walks every channel itself, so
-// this is the only knob that affects scan duration / result quality.
-const uint32_t OPENSHOCK_WIFI_SCAN_MIN_MS_PER_CHANNEL = 100;
-const uint32_t OPENSHOCK_WIFI_SCAN_MAX_MS_PER_CHANNEL = 300;
+// Per-channel active-scan dwell time. esp_wifi walks every channel itself, so this is the main knob for scan
+// duration. While scanning, the radio is off the AP's channel, so captive-portal clients lose frames for each dwell:
+// keep it close to the IDF default (120 ms) rather than 300 ms.
+const uint32_t OPENSHOCK_WIFI_SCAN_MIN_MS_PER_CHANNEL = 60;
+const uint32_t OPENSHOCK_WIFI_SCAN_MAX_MS_PER_CHANNEL = 120;
 
 static bool s_initialized                     = false;
 static std::atomic<bool> s_scanning           = false;
@@ -143,6 +144,7 @@ bool WiFiScanManager::StartScan()
   config.scan_type            = WIFI_SCAN_TYPE_ACTIVE;
   config.scan_time.active.min = OPENSHOCK_WIFI_SCAN_MIN_MS_PER_CHANNEL;
   config.scan_time.active.max = OPENSHOCK_WIFI_SCAN_MAX_MS_PER_CHANNEL;
+  config.home_chan_dwell_time = WIFI_SCAN_HOME_CHANNEL_DWELL_DEFAULT_TIME;  // 0 (zero-init) is not the default
 
   esp_err_t err = esp_wifi_scan_start(&config, false);  // async: WIFI_EVENT_SCAN_DONE fans out results
   if (err != ESP_OK) {

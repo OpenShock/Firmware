@@ -127,6 +127,17 @@ static bool captiveportal_start()
 
     esp_netif_dhcps_stop(s_apNetif);
     esp_netif_set_ip_info(s_apNetif, &ipInfo);
+
+    // DHCP option 114 (RFC 8910): points clients straight at the RFC 8908 captive-portal API, so modern Android/iOS
+    // can open the portal without waiting for their connectivity probes to be redirected. esp_netif keeps the
+    // pointer, so the string must outlive the netif.
+    static char captivePortalUri[64];
+    snprintf(captivePortalUri, sizeof(captivePortalUri), "http://%s/captive-portal/api", CAPTIVE_PORTAL_AP_IP);  // RFC8908Handler's API path
+    esp_err_t uriErr = esp_netif_dhcps_option(s_apNetif, ESP_NETIF_OP_SET, ESP_NETIF_CAPTIVEPORTAL_URI, captivePortalUri, strlen(captivePortalUri));
+    if (uriErr != ESP_OK) {
+      OS_LOGW(TAG, "Failed to set DHCP captive portal URI: %s", esp_err_to_name(uriErr));
+    }
+
     esp_netif_dhcps_start(s_apNetif);
   }
 
