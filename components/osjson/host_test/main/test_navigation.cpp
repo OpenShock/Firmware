@@ -132,7 +132,7 @@ TEST_CASE("arrays: nested and mixed-type elements", "[osjson][nav]")
   TEST_ASSERT_TRUE(root.at(1).at(0).tryGetI64(v));
   TEST_ASSERT_EQUAL_INT64(3, v);
 
-  std::string_view sv;
+  std::string sv;
   TEST_ASSERT_TRUE(root.at(2).tryGetStr(sv));
   TEST_ASSERT_TRUE(sv == "five");
 

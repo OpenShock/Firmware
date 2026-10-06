@@ -25,12 +25,13 @@ TEST_CASE("parse scalar object", "[osjson]")
   JSON::JsonView root = doc.root();
   TEST_ASSERT_TRUE(root.isObject());
 
-  std::string_view s;
+  std::string s;
   TEST_ASSERT_TRUE(root["name"].tryGetStr(s));
   TEST_ASSERT_EQUAL_size_t(5, s.size());
   TEST_ASSERT_TRUE(s == "hello");
-  // Zero-copy: the view must point straight into the source buffer.
-  TEST_ASSERT_TRUE(s.data() >= json && s.data() < json + sizeof(json));
+  // Zero-copy: raw() must point straight into the source buffer.
+  std::string_view raw = root["name"].raw();
+  TEST_ASSERT_TRUE(raw.data() >= json && raw.data() < json + sizeof(json));
 
   int64_t n = 0;
   TEST_ASSERT_TRUE(root["n"].tryGetI64(n));
@@ -59,7 +60,7 @@ TEST_CASE("missing key and type mismatch", "[osjson]")
   TEST_ASSERT_FALSE(root["name"].tryGetBool(b));  // string, not bool
   int64_t n = 0;
   TEST_ASSERT_FALSE(root["name"].tryGetI64(n));   // string, not number
-  std::string_view s;
+  std::string s;
   TEST_ASSERT_FALSE(root["n"].tryGetStr(s));      // number, not string
 }
 
@@ -111,7 +112,7 @@ TEST_CASE("generate then parse round-trip", "[osjson]")
   TEST_ASSERT_TRUE(doc.parse(out));
   JSON::JsonView root = doc.root();
 
-  std::string_view ssid;
+  std::string ssid;
   TEST_ASSERT_TRUE(root["ssid"].tryGetStr(ssid));
   TEST_ASSERT_TRUE(ssid == "net");
 

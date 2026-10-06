@@ -2,13 +2,13 @@ cmake_minimum_required(VERSION 3.16)
 
 include($ENV{IDF_PATH}/tools/cmake/project.cmake)
 
-# Only build 'main' and its dependency closure (osjson + jsmn + json_generator).
+# Only build 'main'; it compiles osjson's Json.cpp directly (see main/CMakeLists.txt).
 set(COMPONENTS main)
 
-# Make the OpenShock components (osjson) discoverable, and use the linux-target
-# freertos mock so app_main is provided on the host.
+# linux-target freertos mock, so unity's IDF integration has its dependencies, and
+# the shared host-test stand-ins (Logging.h, openshock_board.h, CONFIG_OPENSHOCK_*).
 list(APPEND EXTRA_COMPONENT_DIRS
-     "${CMAKE_CURRENT_LIST_DIR}/../.."          # firmware/components (contains osjson)
-     "$ENV{IDF_PATH}/tools/mocks/freertos/")
+     "$ENV{IDF_PATH}/tools/mocks/freertos/"
+     "${CMAKE_CURRENT_LIST_DIR}/../../../test/host_support")
 
 project(osjson_host_test)

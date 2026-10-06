@@ -1,0 +1,19 @@
+CONFIG_IDF_TARGET="linux"
+CONFIG_IDF_TARGET_LINUX=y
+CONFIG_COMPILER_CXX_EXCEPTIONS=y
+CONFIG_UNITY_ENABLE_IDF_TEST_RUNNER=y
+
+# Same tick rate as the firmware (sdkconfig.defaults at the repo root).
+CONFIG_FREERTOS_HZ=1000
+
+# The firmware's own partition table (every board uses it), so Config::Init's
+# esp_partition_find_first() looks up the real "config" partition. ESP-IDF's linux
+# esp_partition emulates the flash in a file.
+CONFIG_ESPTOOLPY_FLASHSIZE_4MB=y
+CONFIG_PARTITION_TABLE_CUSTOM=y
+CONFIG_PARTITION_TABLE_CUSTOM_FILENAME="../../../partitions/ota_4mb.csv"
+
+# app_main runs the whole suite on the main task. The 3584-byte default is sized for
+# the target; x86-64 frames (flatbuffers builders, std::string, Unity) need more.
+# Keep it modest so unbounded recursion still overflows here rather than hiding.
+CONFIG_ESP_MAIN_TASK_STACK_SIZE=32768

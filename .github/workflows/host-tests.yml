@@ -6,9 +6,12 @@ on:
     paths:
       - 'components/**'
       - 'main/**'
+      - 'test/**'
+      - 'partitions/**'
       - 'CMakeLists.txt'
       - 'sdkconfig.defaults'
       - 'dependencies.lock'
+      - '.gitmodules'
       - '.github/actions/setup-esp-idf/**'
       - '.github/workflows/host-tests.yml'
   # A same-repo PR branch is already covered by its push run; pull_request is for forks, whose
@@ -17,9 +20,12 @@ on:
     paths:
       - 'components/**'
       - 'main/**'
+      - 'test/**'
+      - 'partitions/**'
       - 'CMakeLists.txt'
       - 'sdkconfig.defaults'
       - 'dependencies.lock'
+      - '.gitmodules'
       - '.github/actions/setup-esp-idf/**'
       - '.github/workflows/host-tests.yml'
   workflow_dispatch:
@@ -41,15 +47,25 @@ jobs:
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
 
-      # The linux target links libbsd.
+      # The config suite includes the flatbuffers runtime, which lives in a submodule.
+      # Fetch only that one; the others (schemas, frontend) are not needed here.
+      - name: Fetch flatbuffers submodule
+        run: git submodule update --init --depth 1 components/flatbuffers/flatbuffers
+
+      # The linux target links libbsd. ESP-IDF generates the CMock mocks the suites use
+      # (tools/mocks/*) with Ruby; ubuntu-latest ships it, listed so that stays true.
       - name: Install host build dependencies
-        run: sudo apt-get update && sudo apt-get install -y --no-install-recommends libbsd-dev
+        run: sudo apt-get update && sudo apt-get install -y --no-install-recommends libbsd-dev ruby
 
       # Restore-only: ci-build's single nominated writer owns the cache entry.
       - uses: ./.github/actions/setup-esp-idf
         with:
           save-cache: 'false'
 
+      # Each components/<name>/host_test is its own linux-target ESP-IDF project. They
+      # share test/host_support (stand-ins for Logging.h, openshock_board.h, ...) and
+      # use ESP-IDF's tools/mocks and linux ports; the config suite also reads the
+      # firmware's partitions/ota_4mb.csv. The ELF's exit code is the Unity failure count.
       - name: Build and run host test suites
         shell: bash
         run: |

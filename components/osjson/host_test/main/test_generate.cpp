@@ -70,12 +70,10 @@ TEST_CASE("generate: array of objects", "[osjson][gen]")
   TEST_ASSERT_TRUE(w.finish() == R"([{"id":1},{"id":2},{"id":3}])");
 }
 
-// The RAW library call json_gen_obj_set_string writes VALUES verbatim between
-// quotes - no escaping - so a value with '"', '\' or a control char yields
-// INVALID JSON. The two tests below pin that unsafe behaviour so it stays
-// visible; production code must use JSON::objSetString / JSON::arrSetString
-// instead (see the "escapes ..." tests further down).
-TEST_CASE("generate: raw json_gen_obj_set_string does NOT escape quotes/backslashes", "[osjson][gen][raw-unsafe]")
+// json_generator 2.x escapes string values itself (RFC 8259 section 7), which is
+// why JSON::objSetString / arrSetString must hand it the plain text: escaping
+// there as well would escape twice. The two tests below pin the library side.
+TEST_CASE("generate: raw json_gen_obj_set_string escapes quotes/backslashes", "[osjson][gen][raw]")
 {
   JSON::StringWriter w;
   json_gen_str_t* g = w.gen();
@@ -83,11 +81,10 @@ TEST_CASE("generate: raw json_gen_obj_set_string does NOT escape quotes/backslas
   json_gen_obj_set_string(g, "k", R"(a"b\c)");  // value bytes: a " b \ c
   json_gen_end_object(g);
 
-  // Verbatim passthrough -> the inner quote breaks the string. Invalid JSON.
-  TEST_ASSERT_TRUE(w.finish() == R"({"k":"a"b\c"})");
+  TEST_ASSERT_TRUE(w.finish() == R"({"k":"a\"b\\c"})");
 }
 
-TEST_CASE("generate: raw json_gen_obj_set_string does NOT escape control chars", "[osjson][gen][raw-unsafe]")
+TEST_CASE("generate: raw json_gen_obj_set_string escapes control chars", "[osjson][gen][raw]")
 {
   JSON::StringWriter w;
   json_gen_str_t* g = w.gen();
@@ -95,11 +92,10 @@ TEST_CASE("generate: raw json_gen_obj_set_string does NOT escape control chars",
   json_gen_obj_set_string(g, "k", "line1\nline2\ttab");
   json_gen_end_object(g);
 
-  // Raw newline/tab bytes end up in the output (not \n / \t escapes).
-  TEST_ASSERT_TRUE(w.finish() == "{\"k\":\"line1\nline2\ttab\"}");
+  TEST_ASSERT_TRUE(w.finish() == R"({"k":"line1\nline2\ttab"})");
 }
 
-// ---- JSON::objSetString / arrSetString: the escaping wrappers ----
+// ---- JSON::objSetString / arrSetString: escaped exactly once ----
 
 TEST_CASE("escape: objSetString escapes quotes and backslashes", "[osjson][gen][escape]")
 {
@@ -112,10 +108,13 @@ TEST_CASE("escape: objSetString escapes quotes and backslashes", "[osjson][gen][
   std::string out = w.finish();
   TEST_ASSERT_TRUE(out == R"({"k":"a\"b\\c"})");
 
-  // and unlike the raw path, the escaped output is now valid JSON
+  // escaped exactly once: valid JSON that decodes back to the original bytes
   JSON::JsonDocument doc;
   TEST_ASSERT_TRUE(doc.parse(out));
   TEST_ASSERT_TRUE(doc.root().isObject());
+  std::string back;
+  TEST_ASSERT_TRUE(doc.root()["k"].tryGetStr(back));
+  TEST_ASSERT_TRUE(back == R"(a"b\c)");
 }
 
 TEST_CASE("escape: objSetString escapes the short-form control chars", "[osjson][gen][escape]")
@@ -235,13 +234,13 @@ TEST_CASE("escape: a WiFi password with a quote serializes to valid JSON", "[osj
   TEST_ASSERT_TRUE(doc.parse(out));  // would be malformed via the raw call
   JSON::JsonView root = doc.root();
 
-  std::string_view ssid;
+  std::string ssid;
   TEST_ASSERT_TRUE(root["ssid"].tryGetStr(ssid));
   TEST_ASSERT_TRUE(ssid == "Home");
-  // password round-trips as its escaped form (osjson parse does not unescape)
-  std::string_view pw;
+  // the password decodes back to exactly what was written
+  std::string pw;
   TEST_ASSERT_TRUE(root["password"].tryGetStr(pw));
-  TEST_ASSERT_TRUE(pw == R"(p@ss\"word\\)");
+  TEST_ASSERT_TRUE(pw == R"(p@ss"word\)");
 }
 
 TEST_CASE("generate: value larger than the 256-byte flush buffer", "[osjson][gen]")
@@ -284,7 +283,7 @@ TEST_CASE("generate -> parse round-trip preserves scalar values", "[osjson][gen]
   TEST_ASSERT_TRUE(doc.parse(out));
   JSON::JsonView root = doc.root();
 
-  std::string_view ssid;
+  std::string ssid;
   TEST_ASSERT_TRUE(root["ssid"].tryGetStr(ssid));
   TEST_ASSERT_TRUE(ssid == "net");
 

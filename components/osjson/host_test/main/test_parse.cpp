@@ -89,7 +89,7 @@ TEST_CASE("parse: scalar document at the root", "[osjson][parse]")
   JSON::JsonDocument str;
   TEST_ASSERT_TRUE(str.parse("\"hello\""));
   TEST_ASSERT_TRUE(str.root().isString());
-  std::string_view sv;
+  std::string sv;
   TEST_ASSERT_TRUE(str.root().tryGetStr(sv));
   TEST_ASSERT_TRUE(sv == "hello");
 
@@ -126,9 +126,8 @@ TEST_CASE("parse: source buffer must outlive the document (zero-copy contract)",
   JSON::JsonDocument doc;
   TEST_ASSERT_TRUE(doc.parse(src));
 
-  std::string_view sv;
-  TEST_ASSERT_TRUE(doc.root()["name"].tryGetStr(sv));
-  // The view must point straight into src, not into a copy.
+  // raw() must point straight into src, not into a copy.
+  std::string_view sv = doc.root()["name"].raw();
   TEST_ASSERT_TRUE(sv.data() >= src.data() && sv.data() < src.data() + src.size());
   TEST_ASSERT_TRUE(sv == "value");
 }

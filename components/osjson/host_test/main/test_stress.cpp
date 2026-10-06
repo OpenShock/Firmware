@@ -123,6 +123,25 @@ TEST_CASE("stress: moderately deep nesting navigates correctly", "[osjson][stres
   TEST_ASSERT_EQUAL_INT64(depth, leaf);
 }
 
+TEST_CASE("stress: skipping a very deep subtree does not recurse", "[osjson][stress]")
+{
+  // {"deep":[[[...1...]]],"after":7}: finding "after" must step over the whole deep
+  // subtree. Recursing once per level would overflow the default main-task stack.
+  const int depth  = 5000;
+  std::string json = "{\"deep\":";
+  for (int i = 0; i < depth; ++i) json += "[";
+  json += "1";
+  for (int i = 0; i < depth; ++i) json += "]";
+  json += ",\"after\":7}";
+
+  JSON::JsonDocument doc;
+  TEST_ASSERT_TRUE(doc.parse(json));
+
+  int64_t v = 0;
+  TEST_ASSERT_TRUE(doc.root()["after"].tryGetI64(v));
+  TEST_ASSERT_EQUAL_INT64(7, v);
+}
+
 TEST_CASE("stress: large generate -> parse round-trip", "[osjson][stress]")
 {
   const int N = 2000;

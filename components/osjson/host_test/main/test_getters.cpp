@@ -19,7 +19,7 @@ TEST_CASE("tryGetStr: strings succeed, non-strings fail", "[osjson][getters]")
   TEST_ASSERT_TRUE(doc.parse(json));
   JSON::JsonView root = doc.root();
 
-  std::string_view sv;
+  std::string sv;
   TEST_ASSERT_TRUE(root["s"].tryGetStr(sv));
   TEST_ASSERT_TRUE(sv == "hi");
 
@@ -35,23 +35,150 @@ TEST_CASE("tryGetStr: empty string value", "[osjson][getters]")
 {
   JSON::JsonDocument doc;
   TEST_ASSERT_TRUE(doc.parse(R"({"s":""})"));
-  std::string_view sv;
+  std::string sv = "stale";
   TEST_ASSERT_TRUE(doc.root()["s"].tryGetStr(sv));
   TEST_ASSERT_EQUAL_size_t(0, sv.size());
   TEST_ASSERT_TRUE(sv.empty());
 }
 
-TEST_CASE("tryGetStr: escape sequences are returned RAW (jsmn does not unescape)", "[osjson][getters]")
+TEST_CASE("tryGetStr: escape sequences are decoded, raw() keeps them", "[osjson][getters][unescape]")
 {
-  // Documents current behaviour: the view is the raw bytes between the quotes,
-  // escapes are NOT processed. Consumers that need real bytes must unescape.
   static const char json[] = R"({"s":"a\nb\"c"})";
   JSON::JsonDocument doc;
   TEST_ASSERT_TRUE(doc.parse(json));
-  std::string_view sv;
-  TEST_ASSERT_TRUE(doc.root()["s"].tryGetStr(sv));
-  TEST_ASSERT_TRUE(sv == R"(a\nb\"c)");  // backslash-n and backslash-quote, literally
-  TEST_ASSERT_EQUAL_size_t(7, sv.size());
+  std::string s;
+  TEST_ASSERT_TRUE(doc.root()["s"].tryGetStr(s));
+  TEST_ASSERT_TRUE(s == "a\nb\"c");                         // a real newline and quote
+  TEST_ASSERT_EQUAL_size_t(5, s.size());
+  TEST_ASSERT_TRUE(doc.root()["s"].raw() == R"(a\nb\"c)");  // the token text, untouched
+}
+
+TEST_CASE("tryGetStr: every two-character escape", "[osjson][getters][unescape]")
+{
+  JSON::JsonDocument doc;
+  TEST_ASSERT_TRUE(doc.parse(R"({"s":"\"\\\/\b\f\n\r\t"})"));
+  std::string s;
+  TEST_ASSERT_TRUE(doc.root()["s"].tryGetStr(s));
+  TEST_ASSERT_TRUE(s == "\"\\/\b\f\n\r\t");
+}
+
+TEST_CASE("tryGetStr: \\u escapes decode to UTF-8", "[osjson][getters][unescape]")
+{
+  struct Case {
+    const char* json;
+    std::string expected;
+  };
+  // clang-format off
+  const Case cases[] = {
+    {"{\"s\":\"\\u0041\"}",              "A"},                        // 1 byte
+    {"{\"s\":\"\\u00e9\"}",              "\xc3\xa9"},                 // 2 bytes, lowercase hex
+    {"{\"s\":\"\\u00E9\"}",              "\xc3\xa9"},                 // uppercase hex
+    {"{\"s\":\"\\u20AC\"}",              "\xe2\x82\xac"},             // 3 bytes (euro sign)
+    {"{\"s\":\"\\uFFFF\"}",              "\xef\xbf\xbf"},             // top of the BMP
+    {"{\"s\":\"\\u001f\"}",              "\x1f"},                     // control character
+    {"{\"s\":\"x\\u0022y\"}",            "x\"y"},                     // quote spelled as \u
+    {"{\"s\":\"\\ud83d\\ude00\"}",       "\xf0\x9f\x98\x80"},         // surrogate pair, U+1F600
+    {"{\"s\":\"\\uDBFF\\uDFFF\"}",       "\xf4\x8f\xbf\xbf"},         // highest pair, U+10FFFF
+    {"{\"s\":\"caf\\u00e9 \\u20ac5\"}",  "caf\xc3\xa9 \xe2\x82\xac\x35"},
+  };
+  // clang-format on
+
+  for (const Case& c : cases) {
+    JSON::JsonDocument doc;
+    TEST_ASSERT_TRUE_MESSAGE(doc.parse(c.json), c.json);
+    std::string s;
+    TEST_ASSERT_TRUE_MESSAGE(doc.root()["s"].tryGetStr(s), c.json);
+    TEST_ASSERT_TRUE_MESSAGE(s == c.expected, c.json);
+  }
+}
+
+TEST_CASE("tryGetStr: \\u0000 decodes to an embedded NUL", "[osjson][getters][unescape]")
+{
+  JSON::JsonDocument doc;
+  TEST_ASSERT_TRUE(doc.parse(R"({"s":"a\u0000b"})"));
+  std::string s;
+  TEST_ASSERT_TRUE(doc.root()["s"].tryGetStr(s));
+  TEST_ASSERT_EQUAL_size_t(3, s.size());
+  TEST_ASSERT_TRUE(s == std::string("a\0b", 3));
+}
+
+TEST_CASE("tryGetStr: unpaired surrogates decode to U+FFFD", "[osjson][getters][unescape]")
+{
+  struct Case {
+    const char* json;
+    std::string expected;
+  };
+  // clang-format off
+  const Case cases[] = {
+    {"{\"s\":\"\\ud83d\"}",          "\xef\xbf\xbd"},              // high surrogate at the end
+    {"{\"s\":\"\\ud83dx\"}",         "\xef\xbf\xbd\x78"},          // followed by a plain character ('x')
+    {"{\"s\":\"\\ud83d\\u0041\"}",   "\xef\xbf\xbd\x41"},          // followed by a non-surrogate escape ('A')
+    {"{\"s\":\"\\ude00\"}",          "\xef\xbf\xbd"},              // low surrogate on its own
+    {"{\"s\":\"\\ud83d\\ud83d\"}",   "\xef\xbf\xbd\xef\xbf\xbd"},  // two high surrogates
+  };
+  // clang-format on
+
+  for (const Case& c : cases) {
+    JSON::JsonDocument doc;
+    TEST_ASSERT_TRUE_MESSAGE(doc.parse(c.json), c.json);
+    std::string s;
+    TEST_ASSERT_TRUE_MESSAGE(doc.root()["s"].tryGetStr(s), c.json);
+    TEST_ASSERT_TRUE_MESSAGE(s == c.expected, c.json);
+  }
+}
+
+TEST_CASE("tryGetStr: malformed escapes fail and leave the output untouched", "[osjson][getters][unescape]")
+{
+  // jsmn's default (non-strict) mode may tokenize these; the decoder must reject them.
+  const char* inputs[] = {
+    R"({"s":"\x41"})",
+    R"({"s":"\u12G4"})",
+    R"({"s":"\u12"})",
+  };
+
+  for (const char* input : inputs) {
+    JSON::JsonDocument doc;
+    if (!doc.parse(input)) {
+      continue;  // already rejected by the tokenizer, which is fine too
+    }
+    std::string s = "unchanged";
+    TEST_ASSERT_FALSE_MESSAGE(doc.root()["s"].tryGetStr(s), input);
+    TEST_ASSERT_TRUE_MESSAGE(s == "unchanged", input);
+  }
+}
+
+TEST_CASE("operator[]: keys written with escapes still match", "[osjson][getters][unescape]")
+{
+  JSON::JsonDocument doc;
+  TEST_ASSERT_TRUE(doc.parse(R"({"\u0069d":7,"a\"b":"q"})"));
+  int64_t id = 0;
+  TEST_ASSERT_TRUE(doc.root()["id"].tryGetI64(id));
+  TEST_ASSERT_EQUAL_INT64(7, id);
+  std::string s;
+  TEST_ASSERT_TRUE(doc.root()["a\"b"].tryGetStr(s));
+  TEST_ASSERT_TRUE(s == "q");
+}
+
+TEST_CASE("generate -> parse round trip restores every byte value", "[osjson][getters][unescape]")
+{
+  // All of ASCII (control characters, quote, backslash, DEL) plus multi-byte UTF-8.
+  std::string value;
+  for (int c = 0; c < 0x80; ++c) value += static_cast<char>(c);
+  value += "caf\xc3\xa9 \xe2\x82\xac \xf0\x9f\x98\x80";
+
+  JSON::StringWriter w;
+  json_gen_str_t* g = w.gen();
+  json_gen_start_object(g);
+  JSON::objSetString(g, "k", value);
+  json_gen_end_object(g);
+  const std::string out = w.finish();
+
+  JSON::JsonDocument doc;
+  TEST_ASSERT_TRUE(doc.parse(out));
+  std::string back;
+  TEST_ASSERT_TRUE(doc.root()["k"].tryGetStr(back));
+  TEST_ASSERT_EQUAL_size_t(value.size(), back.size());
+  TEST_ASSERT_TRUE(back == value);
 }
 
 // ---- tryGetBool ------------------------------------------------------------
@@ -229,7 +356,7 @@ TEST_CASE("predicates: an invalid/default view answers false everywhere", "[osjs
   TEST_ASSERT_FALSE(v["k"].valid());
   TEST_ASSERT_TRUE(v.raw().empty());
 
-  std::string_view sv;
+  std::string sv;
   int64_t i;
   double d;
   bool b;
