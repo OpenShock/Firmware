@@ -83,7 +83,11 @@ bool DNSServer::start(const char* responseIpv4, uint16_t port)
 
   m_stop.store(false, std::memory_order_relaxed);
   m_taskExited.store(false, std::memory_order_relaxed);
-  if (TaskUtils::TaskCreateExpensive(Util::FnProxy<&DNSServer::task>, "DNSServer", 3072, this, 1, &m_taskHandle) != pdPASS) {
+  // Above the other application tasks (priority 1): a phone joining the AP sends a burst of DNS queries, and the
+  // small UDP receive mailbox drops them if this task is starved, which delays captive-portal detection by seconds.
+  // Still below httpd and the E-Stop task (5).
+  constexpr UBaseType_t kTaskPriority = 4;
+  if (TaskUtils::TaskCreateExpensive(Util::FnProxy<&DNSServer::task>, "DNSServer", 3072, this, kTaskPriority, &m_taskHandle) != pdPASS) {
     OS_LOGE(TAG, "Failed to create DNS task");
     close(m_socket);
     m_socket = -1;

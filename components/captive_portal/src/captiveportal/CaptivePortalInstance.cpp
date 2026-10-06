@@ -502,95 +502,65 @@ static esp_err_t apiWifiDisconnect(httpd_req_t* req)
   return sendResp(req, S200, nullptr, {});
 }
 
-static esp_err_t apiOtaEnabled(httpd_req_t* req)
+// PUT /api/ota/settings?enabled=&channel=&interval=&allow=&require=
+// Any subset of the OTA settings in one request, applied together in a single config write (and none at all when
+// nothing changed), instead of one handler and one flash write per setting.
+static esp_err_t apiOtaSettings(httpd_req_t* req)
 {
-  bool enabled;
-  if (auto result = getBoolQueryParam(req, "enabled", enabled); result != ParamResult::Ok) {
-    return sendParamError(req, result);
-  }
   Config::OtaUpdateConfig cfg;
   if (!Config::GetOtaUpdateConfig(cfg)) {
     return sendResp(req, S500, HTTP::ContentType::JSON, JSON_ERR_INTERNAL);
   }
-  cfg.isEnabled = enabled;
-  if (!Config::SetOtaUpdateConfig(cfg)) {
-    return sendResp(req, S500, HTTP::ContentType::JSON, JSON_ERR_INTERNAL);
-  }
-  return sendResp(req, S200, nullptr, {});
-}
 
-static esp_err_t apiOtaChannel(httpd_req_t* req)
-{
-  std::string channelStr;
-  if (!getQueryParam(req, "channel", channelStr)) {
+  bool present = false;
+  bool changed = false;
+
+  // Applies one optional boolean parameter; returns false (after responding) on an invalid value.
+  auto applyBool = [&](const char* key, bool& field, esp_err_t& response) {
+    bool value;
+    ParamResult result = getBoolQueryParam(req, key, value);
+    if (result == ParamResult::Missing) return true;
+    if (result == ParamResult::Invalid) {
+      response = sendParamError(req, result);
+      return false;
+    }
+    present = true;
+    changed |= field != value;
+    field = value;
+    return true;
+  };
+
+  esp_err_t response = ESP_OK;
+  if (!applyBool("enabled", cfg.isEnabled, response) || !applyBool("allow", cfg.allowBackendManagement, response) || !applyBool("require", cfg.requireManualApproval, response)) {
+    return response;
+  }
+
+  if (std::string channelStr; getQueryParam(req, "channel", channelStr)) {
+    OtaUpdateChannel channel;
+    if (!TryParseOtaUpdateChannel(channel, channelStr.c_str())) {
+      return sendResp(req, S400, HTTP::ContentType::JSON, JSON_ERR_INVALID_CHANNEL);
+    }
+    present = true;
+    changed |= cfg.updateChannel != channel;
+    cfg.updateChannel = channel;
+  }
+
+  if (std::string intervalStr; getQueryParam(req, "interval", intervalStr)) {
+    // Minutes; 0 would make periodic checks fire on every OTA task wake-up
+    uint16_t interval;
+    if (!Convert::ToUint16(intervalStr, interval) || interval == 0) {
+      return sendResp(req, S400, HTTP::ContentType::JSON, JSON_ERR_INVALID_PARAM);
+    }
+    present = true;
+    changed |= cfg.checkInterval != interval;
+    cfg.checkInterval = interval;
+  }
+
+  if (!present) {
     return sendResp(req, S400, HTTP::ContentType::JSON, JSON_ERR_MISSING_PARAM);
   }
-  OtaUpdateChannel channel;
-  if (!TryParseOtaUpdateChannel(channel, channelStr.c_str())) {
-    return sendResp(req, S400, HTTP::ContentType::JSON, JSON_ERR_INVALID_CHANNEL);
-  }
-  Config::OtaUpdateConfig cfg;
-  if (!Config::GetOtaUpdateConfig(cfg)) {
-    return sendResp(req, S500, HTTP::ContentType::JSON, JSON_ERR_INTERNAL);
-  }
-  cfg.updateChannel = channel;
-  if (!Config::SetOtaUpdateConfig(cfg)) {
-    return sendResp(req, S500, HTTP::ContentType::JSON, JSON_ERR_INTERNAL);
-  }
-  return sendResp(req, S200, nullptr, {});
-}
 
-static esp_err_t apiOtaCheckInterval(httpd_req_t* req)
-{
-  std::string intervalStr;
-  if (!getQueryParam(req, "interval", intervalStr)) {
-    return sendResp(req, S400, HTTP::ContentType::JSON, JSON_ERR_MISSING_PARAM);
-  }
-  // Minutes; 0 would make periodic checks fire on every OTA task wake-up
-  uint16_t interval;
-  if (!Convert::ToUint16(intervalStr, interval) || interval == 0) {
-    return sendResp(req, S400, HTTP::ContentType::JSON, JSON_ERR_INVALID_PARAM);
-  }
-  Config::OtaUpdateConfig cfg;
-  if (!Config::GetOtaUpdateConfig(cfg)) {
-    return sendResp(req, S500, HTTP::ContentType::JSON, JSON_ERR_INTERNAL);
-  }
-  cfg.checkInterval = interval;
-  if (!Config::SetOtaUpdateConfig(cfg)) {
-    return sendResp(req, S500, HTTP::ContentType::JSON, JSON_ERR_INTERNAL);
-  }
-  return sendResp(req, S200, nullptr, {});
-}
-
-static esp_err_t apiOtaAllowBackendManagement(httpd_req_t* req)
-{
-  bool allow;
-  if (auto result = getBoolQueryParam(req, "allow", allow); result != ParamResult::Ok) {
-    return sendParamError(req, result);
-  }
-  Config::OtaUpdateConfig cfg;
-  if (!Config::GetOtaUpdateConfig(cfg)) {
-    return sendResp(req, S500, HTTP::ContentType::JSON, JSON_ERR_INTERNAL);
-  }
-  cfg.allowBackendManagement = allow;
-  if (!Config::SetOtaUpdateConfig(cfg)) {
-    return sendResp(req, S500, HTTP::ContentType::JSON, JSON_ERR_INTERNAL);
-  }
-  return sendResp(req, S200, nullptr, {});
-}
-
-static esp_err_t apiOtaRequireManualApproval(httpd_req_t* req)
-{
-  bool require;
-  if (auto result = getBoolQueryParam(req, "require", require); result != ParamResult::Ok) {
-    return sendParamError(req, result);
-  }
-  Config::OtaUpdateConfig cfg;
-  if (!Config::GetOtaUpdateConfig(cfg)) {
-    return sendResp(req, S500, HTTP::ContentType::JSON, JSON_ERR_INTERNAL);
-  }
-  cfg.requireManualApproval = require;
-  if (!Config::SetOtaUpdateConfig(cfg)) {
+  if (changed && !Config::SetOtaUpdateConfig(cfg)) {
     return sendResp(req, S500, HTTP::ContentType::JSON, JSON_ERR_INTERNAL);
   }
   return sendResp(req, S200, nullptr, {});
@@ -1083,13 +1053,9 @@ void CaptivePortal::CaptivePortalInstance::registerHandlers()
   reg("/api/config/rf/pin", HTTP_PUT, apiConfigRfPin);
   reg("/api/config/estop/pin", HTTP_PUT, apiConfigEstopPin);
   reg("/api/config/estop/enabled", HTTP_PUT, apiConfigEstopEnabled);
-  reg("/api/ota/enabled", HTTP_PUT, apiOtaEnabled);
   // No /api/ota/domain: the portal is an open, unauthenticated AP, and OTA trusts the hashes served by that domain, so
   // changing it would let anyone in range install firmware. It can only be changed over serial (jsonconfig).
-  reg("/api/ota/channel", HTTP_PUT, apiOtaChannel);
-  reg("/api/ota/check-interval", HTTP_PUT, apiOtaCheckInterval);
-  reg("/api/ota/allow-backend-management", HTTP_PUT, apiOtaAllowBackendManagement);
-  reg("/api/ota/require-manual-approval", HTTP_PUT, apiOtaRequireManualApproval);
+  reg("/api/ota/settings", HTTP_PUT, apiOtaSettings);
   reg("/api/ota/check", HTTP_POST, apiOtaCheck);
 
   // OS captive-detection probes + RFC 8908 endpoint + 404 redirect (rfc8908 component).

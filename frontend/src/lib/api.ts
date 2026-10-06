@@ -285,49 +285,33 @@ async function otaRequest(
   }
 }
 
+// All OTA settings go through PUT /api/ota/settings, which applies any subset in one config write.
+function setOtaSettings(params: Record<string, string>, failure: string, patch: Partial<OtaUpdateConfig>): Promise<boolean> {
+  return otaRequest('settings?' + new URLSearchParams(params), 'PUT', failure, patch);
+}
+
 export function setOtaEnabled(isEnabled: boolean): Promise<boolean> {
-  return otaRequest(
-    `enabled?enabled=${isEnabled ? '1' : '0'}`,
-    'PUT',
-    'Failed to update OTA setting',
-    { isEnabled }
-  );
+  return setOtaSettings({ enabled: isEnabled ? '1' : '0' }, 'Failed to update OTA setting', { isEnabled });
 }
 
 export function setOtaChannel(updateChannel: OtaUpdateChannel): Promise<boolean> {
-  return otaRequest(
-    'channel?' + new URLSearchParams({ channel: _otaChannelNames[updateChannel] }),
-    'PUT',
-    'Failed to update OTA channel',
-    { updateChannel }
-  );
+  return setOtaSettings({ channel: _otaChannelNames[updateChannel] }, 'Failed to update OTA channel', { updateChannel });
 }
 
 export function setOtaCheckInterval(checkInterval: number): Promise<boolean> {
-  return otaRequest(
-    `check-interval?interval=${checkInterval}`,
-    'PUT',
-    'Failed to update OTA check interval',
-    { checkInterval }
-  );
+  return setOtaSettings({ interval: String(checkInterval) }, 'Failed to update OTA check interval', { checkInterval });
 }
 
 export function setOtaAllowBackendManagement(allowBackendManagement: boolean): Promise<boolean> {
-  return otaRequest(
-    `allow-backend-management?allow=${allowBackendManagement ? '1' : '0'}`,
-    'PUT',
-    'Failed to update OTA backend management setting',
-    { allowBackendManagement }
-  );
+  return setOtaSettings({ allow: allowBackendManagement ? '1' : '0' }, 'Failed to update OTA backend management setting', {
+    allowBackendManagement,
+  });
 }
 
 export function setOtaRequireManualApproval(requireManualApproval: boolean): Promise<boolean> {
-  return otaRequest(
-    `require-manual-approval?require=${requireManualApproval ? '1' : '0'}`,
-    'PUT',
-    'Failed to update OTA manual approval setting',
-    { requireManualApproval }
-  );
+  return setOtaSettings({ require: requireManualApproval ? '1' : '0' }, 'Failed to update OTA manual approval setting', {
+    requireManualApproval,
+  });
 }
 
 export function checkOtaUpdates(channel: OtaUpdateChannel): Promise<boolean> {

@@ -75,3 +75,9 @@ CONFIG_ESP_COREDUMP_ENABLE_TO_FLASH=y
 # Captive portal httpd uses max_open_sockets (8) + 3 internal sockets, plus DNS server, HTTP client and gateway
 # websocket sockets; the default of 10 would make httpd_start fail.
 CONFIG_LWIP_MAX_SOCKETS=16
+
+# The gateway websocket and the kept-alive HTTP client each hold a TLS session. With static
+# buffers every session keeps a 16 KB input + 4 KB output record buffer for its whole life;
+# dynamic buffers allocate them per record and shrink while idle, lowering the heap peak
+# (e.g. while the captive portal links an account). Verify heap and throughput on a device.
+CONFIG_MBEDTLS_DYNAMIC_BUFFER=y

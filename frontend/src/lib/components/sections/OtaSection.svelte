@@ -33,7 +33,7 @@
   let intervalValid = $derived(
     checkInterval !== null &&
       Number.isInteger(checkInterval) &&
-      checkInterval >= 0 &&
+      checkInterval >= 1 && // minutes; the hub rejects 0
       checkInterval <= 65535
   );
   let canSaveInterval = $derived(
