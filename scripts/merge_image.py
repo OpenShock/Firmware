@@ -11,7 +11,9 @@ so a whole build merges in one invocation, in parallel, rather than one process
 per board driven from the outside.
 
 Offsets mirror partitions/ota_4mb.csv (partition table 0x8000, app 0x10000,
-static0 0x353000); the bootloader offset is the only chip-specific value.
+static0 0x353000); the bootloader offset is the only chip-specific value. The
+flash size written into the image header comes from the board's sdkconfig, so an
+8 MB board's merged image does not tell its bootloader it has 4 MB.
 Replaces the old chips/<chip>/merge-image.py scripts.
 """
 
@@ -43,15 +45,47 @@ APP_OFFSET = '0x10000'
 STATICFS_OFFSET = '0x353000'
 
 
-def resolve_target(board: str) -> str:
+# ESP-IDF's own default when no sdkconfig input picks a CONFIG_ESPTOOLPY_FLASHSIZE_* choice.
+DEFAULT_FLASH_SIZE = '4MB'
+
+
+def board_fragment(board: str) -> Path:
     fragment = ROOT / 'boards' / f'{board}.defaults'
     if not fragment.is_file():
         raise SystemExit(f'error: unknown board {board!r} ({fragment} missing)')
+    return fragment
+
+
+def resolve_target(board: str) -> str:
+    fragment = board_fragment(board)
     for line in fragment.read_text(encoding='utf-8').splitlines():
         m = re.match(r'\s*CONFIG_IDF_TARGET\s*=\s*"([^"]+)"', line)
         if m:
             return m.group(1)
     raise SystemExit(f'error: {fragment} does not set CONFIG_IDF_TARGET')
+
+
+def parse_flash_size(text: str) -> str | None:
+    """The flash size an sdkconfig fragment selects, e.g. '8MB', or None when it picks none.
+
+    It is a Kconfig choice, so the selected option reads CONFIG_ESPTOOLPY_FLASHSIZE_<size>=y.
+    The last selection wins, as it would when sdkconfig layers the fragment.
+    """
+    size = None
+    for line in text.splitlines():
+        m = re.match(r'\s*CONFIG_ESPTOOLPY_FLASHSIZE_(\d+MB)\s*=\s*y\s*$', line)
+        if m:
+            size = m.group(1)
+    return size
+
+
+def resolve_flash_size(board: str) -> str:
+    """The board's flash size, layered the way scripts/build.py layers sdkconfig: shared defaults, then the board."""
+    size = None
+    for path in (ROOT / 'sdkconfig.defaults', board_fragment(board)):
+        if path.is_file():
+            size = parse_flash_size(path.read_text(encoding='utf-8')) or size
+    return size or DEFAULT_FLASH_SIZE
 
 
 def merge_one(board: str, bindir: str, staticfs: str, output: str) -> tuple[str, bool, str]:
@@ -66,6 +100,7 @@ def merge_one(board: str, bindir: str, staticfs: str, output: str) -> tuple[str,
     try:
         with redirect_stdout(buf), redirect_stderr(buf):
             chip = resolve_target(board)
+            flash_size = resolve_flash_size(board)
             boot_offset = BOOTLOADER_OFFSET.get(chip)
             if boot_offset is None:
                 raise SystemExit(f'error: no bootloader offset known for chip {chip!r} - add it to merge_image.py')
@@ -75,7 +110,7 @@ def merge_one(board: str, bindir: str, staticfs: str, output: str) -> tuple[str,
                 '--chip', chip,
                 'merge-bin',
                 '--output', output,
-                '--flash-size', '4MB',
+                '--flash-size', flash_size,
                 boot_offset, str(binpath / 'bootloader.bin'),
                 PARTITION_TABLE_OFFSET, str(binpath / 'partition-table.bin'),
                 APP_OFFSET, str(binpath / 'app.bin'),
