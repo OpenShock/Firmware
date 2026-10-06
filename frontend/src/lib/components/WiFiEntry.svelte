@@ -19,6 +19,7 @@
     DialogTitle,
     DialogTrigger,
   } from '@openshock/svelte-core/components/ui/dialog';
+  import { dialog } from '@openshock/svelte-core/components/dialog-manager';
   import { Input } from '@openshock/svelte-core/components/ui/input';
   import { Label } from '@openshock/svelte-core/components/ui/label';
   import {
@@ -54,10 +55,19 @@
   let editPasswordDialogOpen = $state(false);
   let pendingPassword = $state<string | null>(null);
   let editPassword = $state<string | null>(null);
+  let saving = $state(false);
 
-  function wifiAuthenticate(password: string | null) {
-    connectDialogOpen = false;
-    saveWifiNetwork(ssid, password, true);
+  function wifiConnectOpen() {
+    saveWifiNetwork(ssid, null, true);
+  }
+
+  async function wifiAuthenticate(e: SubmitEvent) {
+    e.preventDefault();
+    if (!pendingPassword || pendingPassword.length > 63 || saving) return;
+    saving = true;
+    const saved = await saveWifiNetwork(ssid, pendingPassword, true);
+    saving = false;
+    if (saved) handleConnectDialogOpenChange(false);
   }
 
   function wifiConnect() {
@@ -68,13 +78,25 @@
     disconnectWifiNetwork();
   }
 
-  function wifiForget() {
-    forgetWifiNetwork(ssid);
+  async function wifiForget() {
+    const result = await dialog.confirm({
+      title: `Forget ${ssid || 'this network'}?`,
+      desc: isConnected
+        ? 'The hub disconnects and deletes the saved password. You will need to enter it again to reconnect.'
+        : 'The hub deletes the saved password. You will need to enter it again to reconnect.',
+      confirmButtonText: 'Forget',
+    });
+    if (!result.confirmed) return;
+    await forgetWifiNetwork(ssid);
   }
 
-  function wifiEditPassword(password: string | null) {
-    editPasswordDialogOpen = false;
-    saveWifiNetwork(ssid, password, false);
+  async function wifiEditPassword(e: SubmitEvent) {
+    e.preventDefault();
+    if (!editPassword || editPassword.length > 63 || saving) return;
+    saving = true;
+    const saved = await saveWifiNetwork(ssid, editPassword, false);
+    saving = false;
+    if (saved) handleEditPasswordDialogOpenChange(false);
   }
 
   function handleConnectDialogOpenChange(open: boolean) {
@@ -94,12 +116,12 @@
 
 <div
   class="mb-1 flex items-center justify-between rounded-md p-2 transition-colors {isConnected
-    ? 'border border-green-500/30 bg-green-500/10'
+    ? 'border-success/30 bg-success/10 border'
     : 'hover:bg-muted/50'}"
 >
   <div class="flex min-w-0 flex-1 items-center gap-2">
     {#if isConnected}
-      <Wifi class="h-4 w-4 shrink-0 text-green-500" />
+      <Wifi class="text-success h-4 w-4 shrink-0" />
     {:else if !isPresent}
       <WifiOff class="text-muted-foreground h-4 w-4 shrink-0" />
     {:else if bestRssi > -50}
@@ -121,7 +143,7 @@
       {/if}
       <div class="text-muted-foreground flex items-center gap-2 text-xs">
         {#if isConnected}
-          <span class="text-green-600 dark:text-green-400">Connected</span>
+          <span class="text-foreground">Connected</span>
         {:else if !isPresent}
           <span>Not in range</span>
         {:else if isSaved}
@@ -147,40 +169,44 @@
       </Button>
     {:else if isSaved}
       <Button variant="ghost" size="icon" onclick={wifiConnect} title="Connect">
-        <ArrowRight class="h-4 w-4 text-green-500" />
+        <ArrowRight class="text-success h-4 w-4" />
       </Button>
     {:else if netgroup && netgroup.security === WifiAuthMode.Open}
-      <Button variant="ghost" size="icon" onclick={() => wifiAuthenticate(null)} title="Connect">
-        <ArrowRight class="h-4 w-4 text-green-500" />
+      <Button variant="ghost" size="icon" onclick={wifiConnectOpen} title="Connect">
+        <ArrowRight class="text-success h-4 w-4" />
       </Button>
     {:else if netgroup}
       <Dialog bind:open={() => connectDialogOpen, handleConnectDialogOpenChange}>
         <DialogTrigger class={buttonVariants({ variant: 'ghost', size: 'icon' })} title="Connect">
-          <Link class="h-4 w-4 text-green-500" />
+          <Link class="text-success h-4 w-4" />
         </DialogTrigger>
         <DialogContent class="sm:max-w-[425px]">
           <DialogHeader>
             <DialogTitle>Connect to {ssid || 'network'}</DialogTitle>
-            <DialogDescription>Enter the WiFi password</DialogDescription>
+            <DialogDescription>Enter the WiFi password.</DialogDescription>
           </DialogHeader>
-          <div class="flex flex-row items-center gap-4 py-4">
-            <Label for="wifi-password" class="text-right">Password</Label>
-            <Input
-              id="wifi-password"
-              type="password"
-              class="col-span-3"
-              bind:value={pendingPassword}
-            />
-          </div>
-          <DialogFooter>
-            <Button
-              type="button"
-              onclick={() => wifiAuthenticate(pendingPassword)}
-              disabled={!pendingPassword || pendingPassword.length > 63}
-            >
-              Connect
-            </Button>
-          </DialogFooter>
+          <form class="contents" onsubmit={wifiAuthenticate}>
+            <div class="flex flex-row items-center gap-4 py-4">
+              <Label for="wifi-password" class="text-right">Password</Label>
+              <Input
+                id="wifi-password"
+                type="password"
+                class="flex-1"
+                bind:value={pendingPassword}
+              />
+            </div>
+            <DialogFooter>
+              <Button variant="outline" onclick={() => handleConnectDialogOpenChange(false)}
+                >Cancel</Button
+              >
+              <Button
+                type="submit"
+                disabled={!pendingPassword || pendingPassword.length > 63 || saving}
+              >
+                Connect
+              </Button>
+            </DialogFooter>
+          </form>
         </DialogContent>
       </Dialog>
     {/if}
@@ -197,26 +223,22 @@
         <DialogContent class="sm:max-w-[425px]">
           <DialogHeader>
             <DialogTitle>Edit password for {ssid}</DialogTitle>
-            <DialogDescription>Enter the new WiFi password</DialogDescription>
+            <DialogDescription>Enter the new WiFi password.</DialogDescription>
           </DialogHeader>
-          <div class="flex flex-row items-center gap-4 py-4">
-            <Label for="edit-password" class="text-right">Password</Label>
-            <Input
-              id="edit-password"
-              type="password"
-              class="col-span-3"
-              bind:value={editPassword}
-            />
-          </div>
-          <DialogFooter>
-            <Button
-              type="button"
-              onclick={() => wifiEditPassword(editPassword)}
-              disabled={!editPassword || editPassword.length > 63}
-            >
-              Save
-            </Button>
-          </DialogFooter>
+          <form class="contents" onsubmit={wifiEditPassword}>
+            <div class="flex flex-row items-center gap-4 py-4">
+              <Label for="edit-password" class="text-right">Password</Label>
+              <Input id="edit-password" type="password" class="flex-1" bind:value={editPassword} />
+            </div>
+            <DialogFooter>
+              <Button variant="outline" onclick={() => handleEditPasswordDialogOpenChange(false)}
+                >Cancel</Button
+              >
+              <Button type="submit" disabled={!editPassword || editPassword.length > 63 || saving}>
+                Save
+              </Button>
+            </DialogFooter>
+          </form>
         </DialogContent>
       </Dialog>
     {/if}

@@ -1,4 +1,6 @@
 <script lang="ts">
+  import SectionHeader from '#lib/components/SectionHeader.svelte';
+  import SettingSwitch from '#lib/components/SettingSwitch.svelte';
   import { hubState } from '#lib/stores/index.js';
   import { TriangleAlert } from '@lucide/svelte';
 
@@ -6,28 +8,21 @@
 </script>
 
 <div class="flex flex-col gap-4">
-  <div>
-    <h3 class="text-lg font-semibold">Captive Portal</h3>
-    <p class="text-muted-foreground text-sm">Web configuration portal settings.</p>
-  </div>
+  <SectionHeader title="Captive Portal" description="Web configuration portal settings." />
 
-  <label class="flex cursor-pointer items-center justify-between rounded-lg border p-3">
-    <div>
-      <p class="text-sm font-medium">Always Enabled</p>
-      <p class="text-muted-foreground text-xs">
-        Keep the portal running even after connecting to the gateway.
-      </p>
-    </div>
-    <input type="checkbox" checked={alwaysEnabled} disabled class="h-4 w-4" />
-  </label>
+  <SettingSwitch
+    id="captive-portal-always-enabled"
+    class="rounded-lg border p-3"
+    label="Always Enabled"
+    description="Keep the portal running even after connecting to the gateway."
+    checked={alwaysEnabled}
+  />
 
   {#if !alwaysEnabled}
-    <div
-      class="flex items-center gap-2 rounded-lg border border-yellow-500/30 bg-yellow-500/10 p-3"
-    >
-      <TriangleAlert class="h-5 w-5 shrink-0 text-yellow-500" />
-      <p class="text-xs text-yellow-700 dark:text-yellow-300">
-        The captive portal will close automatically when the device connects to the gateway. Enable
+    <div class="border-warning/30 bg-warning/10 flex items-center gap-2 rounded-lg border p-3">
+      <TriangleAlert class="text-warning h-5 w-5 shrink-0" />
+      <p class="text-xs">
+        The captive portal will close automatically when the hub connects to the gateway. Enable
         "Always Enabled" via serial commands to keep it running.
       </p>
     </div>

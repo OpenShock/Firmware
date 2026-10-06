@@ -1,4 +1,5 @@
 <script lang="ts">
+  import SectionHeader from '#lib/components/SectionHeader.svelte';
   import WiFiManager from '#lib/components/WiFiManager.svelte';
   import { hubState } from '#lib/stores/index.js';
   import { CircleCheck } from '@lucide/svelte';
@@ -7,15 +8,11 @@
 </script>
 
 <div class="flex flex-col gap-4">
-  <div class="flex items-center justify-between">
-    <div>
-      <h3 class="text-lg font-semibold">WiFi Setup</h3>
-      <p class="text-muted-foreground text-sm">Connect to your WiFi network to continue</p>
-    </div>
+  <SectionHeader title="WiFi Setup" description="Connect the hub to your WiFi network.">
     {#if isConnected}
-      <CircleCheck class="h-6 w-6 text-green-500" />
+      <CircleCheck class="text-success h-6 w-6 shrink-0" />
     {/if}
-  </div>
+  </SectionHeader>
 
   <WiFiManager />
 </div>

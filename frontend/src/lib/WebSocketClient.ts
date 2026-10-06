@@ -95,12 +95,13 @@ export class WebSocketClient {
     }
   }
 
-  public Send(data: string | Blob | BufferSource) {
+  public Send(data: string | Blob | BufferSource): boolean {
     if (!this.#socket || this.#socket.readyState !== WebSocket.OPEN) {
-      return;
+      return false;
     }
 
     this.#socket.send(data);
+    return true;
   }
 
   private handleOpen() {

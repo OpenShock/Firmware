@@ -22,22 +22,15 @@
 </script>
 
 <script lang="ts">
-  import WiFiManager from '#lib/components/WiFiManager.svelte';
+  import AccountStep from '#lib/components/steps/AccountStep.svelte';
+  import HardwareStep from '#lib/components/steps/HardwareStep.svelte';
   import TestStep from '#lib/components/steps/TestStep.svelte';
-  import GpioPinSelector from '#lib/components/GpioPinSelector.svelte';
-  import {
-    linkAccount as apiLinkAccount,
-    unlinkAccount as apiUnlinkAccount,
-    setEstopEnabled,
-    setRfTxPin,
-    setEstopPin,
-  } from '#lib/api.js';
-  import { hubState, ViewModeStore } from '#lib/stores/index.js';
-  import { Button } from '@openshock/svelte-core/components/ui/button';
-  import { Input } from '@openshock/svelte-core/components/ui/input';
-  import { Label } from '@openshock/svelte-core/components/ui/label';
+  import WiFiStep from '#lib/components/steps/WiFiStep.svelte';
   import OtaSection from '#lib/components/sections/OtaSection.svelte';
-  import { CircleCheck, ChevronRight, ArrowLeft } from '@lucide/svelte';
+  import SectionHeader from '#lib/components/SectionHeader.svelte';
+  import { ViewModeStore } from '#lib/stores/index.js';
+  import { Button } from '@openshock/svelte-core/components/ui/button';
+  import { ChevronRight, ArrowLeft } from '@lucide/svelte';
 
   interface Props {
     activeSection?: AdvancedSection;
@@ -45,35 +38,23 @@
 
   let { activeSection = $bindable<AdvancedSection>('menu') }: Props = $props();
 
-  function isValidLinkCode(str: string) {
-    if (typeof str != 'string') return false;
-    for (let i = 0; i < str.length; i++) {
-      if (str[i] < '0' || str[i] > '9') return false;
-    }
-    return true;
-  }
-
-  let linkCode: string = $state('');
-  let linkCodeValid = $derived(isValidLinkCode(linkCode));
-  let accountLinked = $derived(hubState.accountLinked);
-
-  async function linkAccount() {
-    if (!linkCodeValid) return;
-    await apiLinkAccount(linkCode!);
-  }
-
-  async function unlinkAccount() {
-    await apiUnlinkAccount();
-  }
-
-  async function toggleEstop() {
-    await setEstopEnabled(!(hubState.config?.estop?.enabled ?? false));
-  }
+  // On a phone 'menu' hides the content panel, so this only shows from md up.
+  let shownSection = $derived(activeSection === 'menu' ? advancedSections[0].id : activeSection);
 </script>
 
-<div class="flex flex-1 flex-col items-center px-2 py-4">
-  <div class="flex w-full max-w-md flex-1 flex-col">
-    {#if activeSection === 'menu'}
+<!-- Phones drill down from the menu into one section. From md up the menu is a sidebar and a
+     section is always shown, defaulting to the first. -->
+<div class="flex flex-1 flex-col items-center px-2 py-4 md:px-6 md:py-8">
+  <div
+    class="flex w-full max-w-md flex-1 flex-col md:max-w-5xl md:flex-row md:items-start md:gap-6"
+  >
+    <nav
+      aria-label="Advanced settings"
+      class={[
+        'flex-col md:sticky md:top-20 md:flex md:w-64 md:shrink-0',
+        activeSection === 'menu' ? 'flex' : 'hidden',
+      ]}
+    >
       <Button
         variant="ghost"
         size="sm"
@@ -83,10 +64,15 @@
         <ArrowLeft class="mr-1.5 h-4 w-4" />
         Back
       </Button>
-      <div class="flex flex-col gap-1">
+      <SectionHeader
+        title="Advanced Setup"
+        description="Configure each part of the hub on its own."
+      />
+      <div class="mt-4 flex flex-col gap-1">
         {#each advancedSections as { id, label, description, icon: Icon } (id)}
           <button
-            class="hover:bg-muted/50 flex items-center gap-3 rounded-lg p-3 text-left transition-colors"
+            class="hover:bg-muted/50 focus-visible:ring-ring/50 md:aria-[current=page]:bg-muted flex cursor-pointer items-center gap-3 rounded-lg p-3 text-left transition-colors outline-none focus-visible:ring-3"
+            aria-current={id === shownSection ? 'page' : undefined}
             onclick={() => (activeSection = id)}
           >
             <Icon class="text-muted-foreground h-5 w-5 shrink-0" />
@@ -94,118 +80,36 @@
               <p class="text-sm font-medium">{label}</p>
               <p class="text-muted-foreground text-xs">{description}</p>
             </div>
-            <ChevronRight class="text-muted-foreground h-4 w-4 shrink-0" />
+            <ChevronRight class="text-muted-foreground h-4 w-4 shrink-0 md:hidden" />
           </button>
         {/each}
       </div>
-    {:else}
+    </nav>
+
+    <div class={['min-w-0 flex-1 flex-col', activeSection === 'menu' ? 'hidden md:flex' : 'flex']}>
       <Button
         variant="ghost"
         size="sm"
-        class="mb-2 self-start"
+        class="mb-2 self-start md:hidden"
         onclick={() => (activeSection = 'menu')}
       >
         <ArrowLeft class="mr-1.5 h-4 w-4" />
         Back
       </Button>
 
-      <div class="flex-1 rounded-lg border p-4">
-        {#if activeSection === 'wifi'}
-          <div class="flex flex-col gap-4">
-            <div>
-              <h3 class="text-lg font-semibold">WiFi</h3>
-              <p class="text-muted-foreground text-sm">Manage wireless networks.</p>
-            </div>
-            <WiFiManager />
-          </div>
-        {:else if activeSection === 'shocker'}
+      <div class="flex-1 rounded-lg border p-4 md:flex-none md:p-6">
+        {#if shownSection === 'wifi'}
+          <WiFiStep />
+        {:else if shownSection === 'shocker'}
           <TestStep />
-        {:else if activeSection === 'hardware'}
-          <div class="flex flex-col gap-4">
-            <div>
-              <h3 class="text-lg font-semibold">Hardware</h3>
-              <p class="text-muted-foreground text-sm">GPIO pin configuration.</p>
-            </div>
-
-            <div class="rounded-lg border p-3">
-              <p class="text-muted-foreground mb-3 text-xs">
-                The RF transmitter pin controls the 433 MHz radio used to communicate with shockers.
-              </p>
-              <GpioPinSelector
-                name="RF TX Pin"
-                currentPin={hubState.config?.rf?.txPin ?? null}
-                setter={setRfTxPin}
-              />
-            </div>
-
-            <div class="rounded-lg border p-3">
-              <p class="text-muted-foreground mb-3 text-xs">
-                The emergency stop pin provides a hardware kill switch for all shocker output.
-              </p>
-              <label class="mb-3 flex cursor-pointer items-center justify-between">
-                <p class="text-sm font-medium">EStop Enabled</p>
-                <input
-                  type="checkbox"
-                  checked={hubState.config?.estop?.enabled ?? false}
-                  onchange={toggleEstop}
-                  class="h-4 w-4"
-                />
-              </label>
-              <GpioPinSelector
-                name="EStop Pin"
-                currentPin={hubState.config?.estop?.gpioPin ?? null}
-                setter={setEstopPin}
-              />
-            </div>
-          </div>
-        {:else if activeSection === 'account'}
-          <div class="flex flex-col gap-4">
-            <div>
-              <h3 class="text-lg font-semibold">Account</h3>
-              <p class="text-muted-foreground text-sm">
-                Link this device to your OpenShock account.
-              </p>
-            </div>
-
-            {#if accountLinked}
-              <div
-                class="flex items-center justify-between rounded-lg border border-green-500/30 bg-green-500/10 p-3"
-              >
-                <div class="flex items-center gap-2">
-                  <CircleCheck class="h-5 w-5 text-green-500" />
-                  <p class="text-sm font-medium text-green-700 dark:text-green-300">
-                    Account linked
-                  </p>
-                </div>
-                <Button variant="outline" size="sm" onclick={unlinkAccount}>Unlink</Button>
-              </div>
-            {:else}
-              <div class="flex flex-col gap-2">
-                <Label for="adv-link-code">Link Code</Label>
-                <p class="text-muted-foreground text-xs">
-                  Find your link code on the OpenShock website under device settings.
-                </p>
-                <div class="flex gap-2">
-                  <Input
-                    class={linkCodeValid ? '' : 'input-error'}
-                    type="text"
-                    id="adv-link-code"
-                    inputmode="numeric"
-                    pattern="[0-9]*"
-                    placeholder="Enter link code"
-                    bind:value={linkCode}
-                  />
-                  <Button onclick={linkAccount} disabled={!linkCodeValid || linkCode.length < 6}>
-                    Link
-                  </Button>
-                </div>
-              </div>
-            {/if}
-          </div>
-        {:else if activeSection === 'ota'}
+        {:else if shownSection === 'hardware'}
+          <HardwareStep />
+        {:else if shownSection === 'account'}
+          <AccountStep />
+        {:else if shownSection === 'ota'}
           <OtaSection />
         {/if}
       </div>
-    {/if}
+    </div>
   </div>
 </div>
