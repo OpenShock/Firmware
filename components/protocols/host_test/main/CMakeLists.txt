@@ -6,6 +6,7 @@ idf_component_register(
   SRCS         "test_main.cpp"
                "test_encodebits.cpp"
                "test_caixianlin.cpp"
+               "test_encoders.cpp"
                "test_sequence.cpp"
                "../../src/CaiXianlinEncoder.cpp"
                "../../src/D80Encoder.cpp"

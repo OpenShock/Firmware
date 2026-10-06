@@ -56,3 +56,26 @@ TEST_CASE("Base64 round-trip", "[util][base64]")
     TEST_ASSERT_EQUAL_UINT8(data[i], decoded[i]);
   }
 }
+
+TEST_CASE("Base64 decode sizes the output exactly, including padded input", "[util][base64]")
+{
+  TinyVec<uint8_t> out;
+
+  TEST_ASSERT_TRUE(Base64::Decode("TQ==", out));
+  TEST_ASSERT_EQUAL_size_t(1, out.size());
+  TEST_ASSERT_EQUAL_UINT8('M', out[0]);
+
+  TEST_ASSERT_TRUE(Base64::Decode("TWE=", out));
+  TEST_ASSERT_EQUAL_size_t(2, out.size());
+
+  TEST_ASSERT_TRUE(Base64::Decode("", out));
+  TEST_ASSERT_EQUAL_size_t(0, out.size());
+}
+
+TEST_CASE("Base64 failed decode leaves the output empty", "[util][base64]")
+{
+  TinyVec<uint8_t> out;
+  TEST_ASSERT_TRUE(Base64::Decode("TWFu", out));
+  TEST_ASSERT_FALSE(Base64::Decode("TW!u", out));
+  TEST_ASSERT_EQUAL_size_t(0, out.size());
+}

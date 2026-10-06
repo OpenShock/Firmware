@@ -53,6 +53,7 @@ Rmt::Sequence::Sequence(ShockerModelType shockerModel, uint16_t shockerId, int64
   , m_transmitEnd(transmitEnd)
   , m_shockerId(shockerId)
   , m_shockerModel(shockerModel)
+  , m_terminatorSent(false)
 {
   const EncoderInfo* encoder = findEncoder(shockerModel);
   if (encoder == nullptr) return;
@@ -76,6 +77,8 @@ Rmt::Sequence::Sequence(ShockerModelType shockerModel, uint16_t shockerId, int64
 
 bool Rmt::Sequence::fill(ShockerCommandType commandType, uint8_t intensity)
 {
+  m_terminatorSent = false;  // A new payload needs its own terminator again
+
   const EncoderInfo* encoder = findEncoder(m_shockerModel);
   return encoder != nullptr && m_data != nullptr && encoder->fill(payload(), m_shockerId, commandType, intensity);
 }

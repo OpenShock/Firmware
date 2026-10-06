@@ -117,6 +117,58 @@ TEST_CASE("RFTransmitter cuts live commands to terminators when the e-stop trips
   TEST_ASSERT_TRUE(HostFake::Transmissions.back().at < start + 1000);
 }
 
+TEST_CASE("RFTransmitter stops payloads within the round in which the e-stop trips", "[device_control][rf][estop]")
+{
+  HostFake::Reset();
+  RFTransmitter tx(kPin);
+
+  auto first  = TestFrames::Payload(kModel, kShockerId, ShockerCommandType::Shock, 70);
+  auto second = TestFrames::Payload(kModel, kShockerId + 1, ShockerCommandType::Shock, 70);
+  auto third  = TestFrames::Payload(kModel, kShockerId + 2, ShockerCommandType::Shock, 70);
+
+  TEST_ASSERT_TRUE(tx.SendCommand(kModel, kShockerId, ShockerCommandType::Shock, 70, 10'000));
+  TEST_ASSERT_TRUE(tx.SendCommand(kModel, kShockerId + 1, ShockerCommandType::Shock, 70, 10'000));
+  TEST_ASSERT_TRUE(tx.SendCommand(kModel, kShockerId + 2, ShockerCommandType::Shock, 70, 10'000));
+
+  // Trip after the first frame of a round (3 sequences per round), not at a round boundary.
+  size_t trippedAfter  = 0;
+  HostFake::OnTransmit = [&] {
+    if (!HostFake::EStopped && HostFake::Transmissions.size() == 7) {
+      HostFake::EStopped = true;
+      trippedAfter       = HostFake::Transmissions.size();
+    }
+  };
+
+  TEST_ASSERT_FALSE(HostFake::RunTask(transmitTask(), kBudget));
+  TEST_ASSERT_EQUAL(7, trippedAfter);
+
+  // The rest of that round already sends terminators instead of the remaining payloads.
+  for (size_t i = trippedAfter; i < HostFake::Transmissions.size(); i++) {
+    const auto& symbols = HostFake::Transmissions[i].symbols;
+    TEST_ASSERT_FALSE(symbols == first);
+    TEST_ASSERT_FALSE(symbols == second);
+    TEST_ASSERT_FALSE(symbols == third);
+  }
+}
+
+TEST_CASE("RFTransmitter sends every shocker a terminator even when rounds outlast the terminator window", "[device_control][rf]")
+{
+  HostFake::Reset();
+  // 4 sequences x 120 ms per frame = 480 ms per round, longer than the 300 ms terminator window.
+  HostFake::RmtFrameMs = 120;
+  RFTransmitter tx(kPin);
+
+  for (uint16_t i = 0; i < 4; i++) {
+    TEST_ASSERT_TRUE(tx.SendCommand(kModel, kShockerId + i, ShockerCommandType::Vibrate, 10, 100));
+  }
+
+  TEST_ASSERT_FALSE(HostFake::RunTask(transmitTask(), kBudget));
+
+  for (uint16_t i = 0; i < 4; i++) {
+    TEST_ASSERT_TRUE_MESSAGE(TestFrames::Count(TestFrames::Terminator(kModel, kShockerId + i)) > 0, "a shocker never got a terminator");
+  }
+}
+
 TEST_CASE("RFTransmitter resumes once the e-stop clears", "[device_control][rf][estop]")
 {
   HostFake::Reset();

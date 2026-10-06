@@ -19,6 +19,7 @@ namespace OpenShock::Rmt {
       , m_transmitEnd(0)
       , m_shockerId(0)
       , m_shockerModel()
+      , m_terminatorSent(false)
     {
     }
     Sequence(ShockerModelType shockerModel, uint16_t shockerId, int64_t transmitEnd);
@@ -28,6 +29,7 @@ namespace OpenShock::Rmt {
       , m_transmitEnd(other.m_transmitEnd)
       , m_shockerId(other.m_shockerId)
       , m_shockerModel(other.m_shockerModel)
+      , m_terminatorSent(other.m_terminatorSent)
     {
       other.reset();
     }
@@ -40,6 +42,10 @@ namespace OpenShock::Rmt {
 
     inline int64_t transmitEnd() const noexcept { return m_transmitEnd; }
     inline void setTransmitEnd(int64_t transmitEnd) noexcept { m_transmitEnd = transmitEnd; }
+
+    // Whether at least one terminator frame went out; a sequence must not be dropped before that.
+    inline bool terminatorSent() const noexcept { return m_terminatorSent; }
+    inline void markTerminatorSent() noexcept { m_terminatorSent = true; }
 
     inline rmt_symbol_word_t* payload() noexcept { return m_data; }
     inline const rmt_symbol_word_t* payload() const noexcept { return m_data; }
@@ -59,7 +65,8 @@ namespace OpenShock::Rmt {
       m_size         = other.m_size;
       m_transmitEnd  = other.m_transmitEnd;
       m_shockerId    = other.m_shockerId;
-      m_shockerModel = other.m_shockerModel;
+      m_shockerModel   = other.m_shockerModel;
+      m_terminatorSent = other.m_terminatorSent;
 
       other.reset();
 
@@ -73,7 +80,8 @@ namespace OpenShock::Rmt {
       m_size         = 0;
       m_transmitEnd  = 0;
       m_shockerId    = 0;
-      m_shockerModel = static_cast<ShockerModelType>(0);
+      m_shockerModel   = static_cast<ShockerModelType>(0);
+      m_terminatorSent = false;
     }
 
     rmt_symbol_word_t* m_data;
@@ -81,5 +89,6 @@ namespace OpenShock::Rmt {
     int64_t m_transmitEnd;
     uint16_t m_shockerId;
     ShockerModelType m_shockerModel;
+    bool m_terminatorSent;
   };
 }  // namespace OpenShock::Rmt

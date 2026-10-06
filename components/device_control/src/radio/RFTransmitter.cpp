@@ -246,16 +246,17 @@ static void writeSequences(rmt_channel_handle_t channel, rmt_encoder_handle_t en
       continue;
     }
 
-    // Send the termination sequence to stop the shocker.
-    // Always sent at least once before removal, even if a slow round skipped past the whole terminator window.
-    transmitSymbols(channel, encoder, seq->terminator(), seq->size());
-
-    // Remove command if it has sent out its termination sequence for long enough
-    if (timeToLive <= -kTerminatorDurationMs) {
+    // Remove command once it has sent out its termination sequence for long enough. A sequence that never got a
+    // terminator out (a slow round skipped past the whole window, or a failed fill zeroed its end) sends one first.
+    if (timeToLive <= -kTerminatorDurationMs && seq->terminatorSent()) {
       seq = sequences.erase(seq);
-    } else {
-      ++seq;
+      continue;
     }
+
+    // Send the termination sequence to stop the shocker
+    transmitSymbols(channel, encoder, seq->terminator(), seq->size());
+    seq->markTerminatorSent();
+    ++seq;
   }
 }
 
