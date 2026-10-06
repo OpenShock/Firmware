@@ -50,27 +50,25 @@
 
   <!-- WiFi status -->
   {#if wifiConnected}
-    <div class="flex items-center gap-2 rounded-lg border border-green-500/30 bg-green-500/10 p-3">
-      <Wifi class="h-4 w-4 shrink-0 text-green-500" />
-      <p class="text-sm text-green-700 dark:text-green-300">WiFi connected</p>
+    <div class="border-success/30 bg-success/10 flex items-center gap-2 rounded-lg border p-3">
+      <Wifi class="text-success h-4 w-4 shrink-0" />
+      <p class="text-sm">WiFi connected</p>
     </div>
   {:else}
-    <div
-      class="flex items-center gap-2 rounded-lg border border-yellow-500/30 bg-yellow-500/10 p-3"
-    >
-      <WifiOff class="h-4 w-4 shrink-0 text-yellow-500" />
-      <p class="text-sm text-yellow-700 dark:text-yellow-300">WiFi not connected</p>
+    <div class="border-warning/30 bg-warning/10 flex items-center gap-2 rounded-lg border p-3">
+      <WifiOff class="text-warning h-4 w-4 shrink-0" />
+      <p class="text-sm">WiFi not connected</p>
     </div>
   {/if}
 
   <!-- Account status -->
   {#if accountLinked}
     <div
-      class="flex items-center justify-between rounded-lg border border-green-500/30 bg-green-500/10 p-4"
+      class="border-success/30 bg-success/10 flex items-center justify-between rounded-lg border p-4"
     >
       <div class="flex items-center gap-2">
-        <CircleCheck class="h-5 w-5 text-green-500" />
-        <p class="text-sm font-medium text-green-700 dark:text-green-300">Account linked</p>
+        <CircleCheck class="text-success h-5 w-5" />
+        <p class="text-sm font-medium">Account linked</p>
       </div>
       <Button variant="outline" size="sm" onclick={handleUnlink}>
         <Unlink class="mr-1.5 h-4 w-4" />

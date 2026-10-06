@@ -10,7 +10,7 @@
 <div class="flex flex-col gap-4">
   <SectionHeader title="WiFi Setup" description="Connect the hub to your WiFi network.">
     {#if isConnected}
-      <CircleCheck class="h-6 w-6 shrink-0 text-green-500" />
+      <CircleCheck class="text-success h-6 w-6 shrink-0" />
     {/if}
   </SectionHeader>
 

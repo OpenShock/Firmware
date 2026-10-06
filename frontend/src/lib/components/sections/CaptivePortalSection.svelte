@@ -20,11 +20,9 @@
   </label>
 
   {#if !alwaysEnabled}
-    <div
-      class="flex items-center gap-2 rounded-lg border border-yellow-500/30 bg-yellow-500/10 p-3"
-    >
-      <TriangleAlert class="h-5 w-5 shrink-0 text-yellow-500" />
-      <p class="text-xs text-yellow-700 dark:text-yellow-300">
+    <div class="border-warning/30 bg-warning/10 flex items-center gap-2 rounded-lg border p-3">
+      <TriangleAlert class="text-warning h-5 w-5 shrink-0" />
+      <p class="text-xs">
         The captive portal will close automatically when the device connects to the gateway. Enable
         "Always Enabled" via serial commands to keep it running.
       </p>

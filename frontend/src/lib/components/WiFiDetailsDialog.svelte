@@ -62,7 +62,7 @@
     <div>
       {#each rows as row (row.key)}
         <span class="flex justify-between"
-          ><span class="font-bold">{row.key}:</span><span class="text-gray-700 dark:text-gray-300"
+          ><span class="font-bold">{row.key}:</span><span class="text-muted-foreground"
             >{row.value}</span
           ></span
         >
@@ -76,8 +76,8 @@
         {#each group.networks as network (network.bssid)}
           <div class="flex items-center justify-between rounded-md border p-2">
             <span class="font-bold">{network.bssid}</span>
-            <span class="text-gray-700 dark:text-gray-300">{network.rssi} dBm</span>
-            <span class="text-gray-700 dark:text-gray-300">Channel {network.channel}</span>
+            <span class="text-muted-foreground">{network.rssi} dBm</span>
+            <span class="text-muted-foreground">Channel {network.channel}</span>
           </div>
         {/each}
       </div>

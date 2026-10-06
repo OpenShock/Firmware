@@ -100,8 +100,8 @@
     {testing ? 'Testing...' : 'Test Vibrate (50%)'}
   </Button>
 
-  <div class="rounded-lg border border-blue-500/30 bg-blue-500/10 p-3">
-    <p class="text-xs text-blue-700 dark:text-blue-300">
+  <div class="border-info/30 bg-info/10 rounded-lg border p-3">
+    <p class="text-xs">
       If the shocker doesn't respond, try re-pairing it: hold the power button on the shocker until
       it beeps, then press Test again.
     </p>

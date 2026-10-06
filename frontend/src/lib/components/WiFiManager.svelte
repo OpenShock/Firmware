@@ -51,10 +51,10 @@
   <!-- Connection Status -->
   {#if connectedNetwork}
     <div
-      class="flex items-center justify-between rounded-lg border border-green-500/30 bg-green-500/10 p-3"
+      class="border-success/30 bg-success/10 flex items-center justify-between rounded-lg border p-3"
     >
       <div class="flex items-center gap-2">
-        <Wifi class="h-5 w-5 text-green-500" />
+        <Wifi class="text-success h-5 w-5" />
         <div>
           <p class="text-sm font-medium">
             Connected to {connectedNetwork.ssid || 'Hidden Network'}
@@ -70,11 +70,9 @@
       </Button>
     </div>
   {:else}
-    <div
-      class="flex items-center gap-2 rounded-lg border border-yellow-500/30 bg-yellow-500/10 p-3"
-    >
-      <WifiOff class="h-5 w-5 text-yellow-500" />
-      <p class="text-sm text-yellow-700 dark:text-yellow-300">Not connected to any network</p>
+    <div class="border-warning/30 bg-warning/10 flex items-center gap-2 rounded-lg border p-3">
+      <WifiOff class="text-warning h-5 w-5" />
+      <p class="text-sm">Not connected to any network</p>
     </div>
   {/if}
 

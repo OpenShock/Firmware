@@ -116,12 +116,12 @@
 
 <div
   class="mb-1 flex items-center justify-between rounded-md p-2 transition-colors {isConnected
-    ? 'border border-green-500/30 bg-green-500/10'
+    ? 'border-success/30 bg-success/10 border'
     : 'hover:bg-muted/50'}"
 >
   <div class="flex min-w-0 flex-1 items-center gap-2">
     {#if isConnected}
-      <Wifi class="h-4 w-4 shrink-0 text-green-500" />
+      <Wifi class="text-success h-4 w-4 shrink-0" />
     {:else if !isPresent}
       <WifiOff class="text-muted-foreground h-4 w-4 shrink-0" />
     {:else if bestRssi > -50}
@@ -143,7 +143,7 @@
       {/if}
       <div class="text-muted-foreground flex items-center gap-2 text-xs">
         {#if isConnected}
-          <span class="text-green-600 dark:text-green-400">Connected</span>
+          <span class="text-foreground">Connected</span>
         {:else if !isPresent}
           <span>Not in range</span>
         {:else if isSaved}
@@ -169,16 +169,16 @@
       </Button>
     {:else if isSaved}
       <Button variant="ghost" size="icon" onclick={wifiConnect} title="Connect">
-        <ArrowRight class="h-4 w-4 text-green-500" />
+        <ArrowRight class="text-success h-4 w-4" />
       </Button>
     {:else if netgroup && netgroup.security === WifiAuthMode.Open}
       <Button variant="ghost" size="icon" onclick={wifiConnectOpen} title="Connect">
-        <ArrowRight class="h-4 w-4 text-green-500" />
+        <ArrowRight class="text-success h-4 w-4" />
       </Button>
     {:else if netgroup}
       <Dialog bind:open={() => connectDialogOpen, handleConnectDialogOpenChange}>
         <DialogTrigger class={buttonVariants({ variant: 'ghost', size: 'icon' })} title="Connect">
-          <Link class="h-4 w-4 text-green-500" />
+          <Link class="text-success h-4 w-4" />
         </DialogTrigger>
         <DialogContent class="sm:max-w-[425px]">
           <DialogHeader>
