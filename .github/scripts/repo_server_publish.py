@@ -1,4 +1,4 @@
-# !/usr/bin/env python3
+#!/usr/bin/env python3
 """Drive one phase of a firmware release on the repository server.
 
 CI's whole contract: submit each blob with the hash it computed and believe the server about everything else.
@@ -185,12 +185,20 @@ def init_release(session: requests.Session, server: str, *, version: str, channe
     return release_id
 
 
+class PublishOutcomeUnknown(Exception):
+    """The publish request was sent but no answer came back, so the release may or may not be live."""
+
+
 def promote(session: requests.Session, server: str, release_id: str) -> None:
-    resp = session.post(
-        f'{server}/2/firmware/releases/{release_id}/publish',
-        json={},
-        timeout=(30, 120),
-    )
+    try:
+        resp = session.post(
+            f'{server}/2/firmware/releases/{release_id}/publish',
+            json={},
+            timeout=(30, 120),
+        )
+    except requests.RequestException as e:
+        print(f'::error::Publish request for {release_id} got no response ({e}); the release may already be live', flush=True)
+        raise PublishOutcomeUnknown(release_id) from e
     if resp.status_code != 201:
         print(f'::error::Publish failed (HTTP {resp.status_code})', flush=True)
         show_response(resp)
@@ -269,14 +277,20 @@ def do_upload(session: requests.Session, server: str, mode: str) -> int:
         fail('BOARDS is empty; there is nothing to upload.')
 
     published = False
+    outcome_unknown = False
     try:
         for board in boards:
             upload_board(session, server, release_id, board, artifacts)
         if mode == 'publish':
             promote(session, server, release_id)
             published = True
+    except PublishOutcomeUnknown:
+        # Discarding now could delete a release that did go live; leave it for a human to check.
+        outcome_unknown = True
+        print(f'::error::Not discarding {release_id}: verify on the repository server whether it was published.', flush=True)
+        raise SystemExit(1)
     finally:
-        if not published:
+        if not published and not outcome_unknown:
             discard(session, server, release_id, mode)
 
     return 0

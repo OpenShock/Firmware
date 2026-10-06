@@ -4,5 +4,5 @@ idf_component_register(
   SRCS "src/DNSServer.cpp" "src/DNSPacket.cpp"
   INCLUDE_DIRS "include"
   REQUIRES common freertos          # OpenShock.h + freertos/* in public header
-  PRIV_REQUIRES common logging lwip   # all .cpp-only (common: Convert/StringHelpers)
+  PRIV_REQUIRES logging lwip          # .cpp-only (common is already a public requirement)
 )

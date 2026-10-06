@@ -216,8 +216,13 @@ def main() -> int:
         or shorthands.is_github_pr_into('beta')
         or shorthands.is_github_tag()
     )
+    # A release-candidate tag (e.g. 1.5.0-rc.7) is a beta-channel build too, so it gets beta's log level.
+    ref_name = shorthands.get_github_ref_name() or ''
+    tag_prerelease = ref_name.split('-', 1)[1].lower() if shorthands.is_github_tag() and '-' in ref_name else ''
     is_beta = is_ci and (
-        shorthands.get_github_ref_name() == 'beta' or shorthands.is_github_pr_into('beta')
+        ref_name == 'beta'
+        or shorthands.is_github_pr_into('beta')
+        or tag_prerelease.startswith(('rc', 'beta'))
     )
     mode = 'release' if is_release else 'debug'
 

@@ -16,8 +16,17 @@ cmake_minimum_required(VERSION 3.16.0)
 # git commit and a version string ending in +<short-sha>, every commit changed the
 # preprocessed text of every source file in the build - all of ESP-IDF included - and
 # ccache could never reuse a single object between CI runs.
+# Cached so an automatic reconfigure (e.g. from a plain `ninja` run without the env var) keeps generating the
+# headers for the same board instead of silently dropping them.
 if(NOT DEFINED OPENSHOCK_BOARD AND DEFINED ENV{OPENSHOCK_BOARD})
-  set(OPENSHOCK_BOARD $ENV{OPENSHOCK_BOARD})
+  set(OPENSHOCK_BOARD $ENV{OPENSHOCK_BOARD} CACHE STRING "OpenShock board (boards/<name>.defaults)")
+endif()
+
+# idf.py passes the interpreter of the IDF Python environment as PYTHON; fall back to the one on PATH.
+if(DEFINED PYTHON)
+  set(_os_python ${PYTHON})
+else()
+  set(_os_python python)
 endif()
 
 if(DEFINED OPENSHOCK_BOARD)
@@ -42,8 +51,7 @@ if(DEFINED OPENSHOCK_BOARD)
   set(OPENSHOCK_CONFIG_DIR ${CMAKE_BINARY_DIR}/config)
   set(OPENSHOCK_VERSION_HEADER ${OPENSHOCK_CONFIG_DIR}/openshock_version.h)
   set(_os_gen_command
-      ${CMAKE_COMMAND} -E env
-      python ${CMAKE_CURRENT_LIST_DIR}/scripts/gen_env_header.py
+      ${_os_python} ${CMAKE_CURRENT_LIST_DIR}/scripts/gen_env_header.py
       --out-dir ${OPENSHOCK_CONFIG_DIR}
       --board ${OPENSHOCK_BOARD}
       --chip ${_os_chip}
@@ -53,6 +61,10 @@ if(DEFINED OPENSHOCK_BOARD)
   if(NOT _os_env_rc EQUAL 0)
     message(FATAL_ERROR "gen_env_header.py failed (rc=${_os_env_rc})")
   endif()
+
+  # openshock_board.h (GPIO pins etc.) is generated at configure time from the board fragment, so editing the
+  # fragment must trigger a reconfigure.
+  set_property(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS ${CMAKE_CURRENT_LIST_DIR}/boards/${OPENSHOCK_BOARD}.defaults)
   set(OPENSHOCK_NATIVE_ENV TRUE)
 endif()
 
@@ -102,15 +114,16 @@ if(_staticfs_offset STREQUAL "" OR _staticfs_size STREQUAL "")
 else()
   set(_staticfs_image ${CMAKE_BINARY_DIR}/staticfs.bin)
 
-  # ALL target so a normal `idf.py build` regenerates the image. The generator
-  # skips the pnpm rebuild when frontend/build already exists (or in CI, where the
-  # frontend is downloaded as an artifact), so this stays cheap on incremental builds.
+  # ALL target so a normal `idf.py build` regenerates the image. The generator only
+  # runs pnpm when frontend/build is older than the frontend sources (never in CI,
+  # where the frontend is downloaded as an artifact), so this stays cheap on
+  # incremental builds. Staging lives in the build directory so concurrent board
+  # builds don't share (and wipe) one directory.
   add_custom_target(staticfs ALL
     BYPRODUCTS ${_staticfs_image}
-    COMMAND ${CMAKE_COMMAND} -E env
-            python ${CMAKE_CURRENT_LIST_DIR}/scripts/gen_staticfs.py
+    COMMAND ${_os_python} ${CMAKE_CURRENT_LIST_DIR}/scripts/gen_staticfs.py
             --frontend-dir   ${CMAKE_CURRENT_LIST_DIR}/frontend
-            --staging-dir    ${CMAKE_CURRENT_LIST_DIR}/staticfs
+            --staging-dir    ${CMAKE_BINARY_DIR}/staticfs
             --output         ${_staticfs_image}
             --partition-size ${_staticfs_size}
             --block-size 4096 --read-size 128 --prog-size 128

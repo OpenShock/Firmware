@@ -6,7 +6,7 @@
 # foundation utilities — nothing in core. This is what lets device_control (estop/
 # radio/visual/CommandHandler, which read Config::) leave core in a later step
 # without a config <-> core cycle.
-FILE(GLOB_RECURSE config_sources
+FILE(GLOB_RECURSE config_sources CONFIGURE_DEPENDS
   ${CMAKE_CURRENT_SOURCE_DIR}/src/*.cpp)
 
 idf_component_register(

@@ -10,8 +10,8 @@ Takes one board or many. --bindir and --output are templates expanded per board,
 so a whole build merges in one invocation, in parallel, rather than one process
 per board driven from the outside.
 
-Offsets mirror partitions/ota_4mb.csv (partition table 0x8000, app 0x10000,
-static0 0x353000); the bootloader offset is the only chip-specific value. The
+The partition table, app and static0 offsets are read from the partition CSV the
+board's sdkconfig selects; the bootloader offset is the only chip-specific value. The
 flash size written into the image header comes from the board's sdkconfig, so an
 8 MB board's merged image does not tell its bootloader it has 4 MB.
 Replaces the old chips/<chip>/merge-image.py scripts.
@@ -28,6 +28,9 @@ from pathlib import Path
 
 import esptool
 
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from utils import partitions as partition_table  # noqa: E402
+
 ROOT = Path(__file__).resolve().parent.parent
 
 # The 2nd-stage bootloader flashes at 0x0 on chips whose ROM loader expects it
@@ -38,11 +41,6 @@ BOOTLOADER_OFFSET = {
     'esp32s3': '0x0',
     'esp32c3': '0x0',
 }
-
-# Fixed by partitions/ota_4mb.csv + the ESP-IDF default partition-table offset.
-PARTITION_TABLE_OFFSET = '0x8000'
-APP_OFFSET = '0x10000'
-STATICFS_OFFSET = '0x353000'
 
 
 # ESP-IDF's own default when no sdkconfig input picks a CONFIG_ESPTOOLPY_FLASHSIZE_* choice.
@@ -105,6 +103,13 @@ def merge_one(board: str, bindir: str, staticfs: str, output: str) -> tuple[str,
             if boot_offset is None:
                 raise SystemExit(f'error: no bootloader offset known for chip {chip!r} - add it to merge_image.py')
 
+            table = partition_table.read_partitions(partition_table.partition_csv_for(board))
+            if 'static0' not in table:
+                raise SystemExit(f'error: the partition table for {board} has no static0 partition')
+            table_offset    = hex(partition_table.partition_table_offset(board))
+            app_offset      = hex(partition_table.first_app_partition(table)['offset'])
+            staticfs_offset = hex(table['static0']['offset'])
+
             binpath = Path(bindir)
             argv = [
                 '--chip', chip,
@@ -112,9 +117,9 @@ def merge_one(board: str, bindir: str, staticfs: str, output: str) -> tuple[str,
                 '--output', output,
                 '--flash-size', flash_size,
                 boot_offset, str(binpath / 'bootloader.bin'),
-                PARTITION_TABLE_OFFSET, str(binpath / 'partition-table.bin'),
-                APP_OFFSET, str(binpath / 'app.bin'),
-                STATICFS_OFFSET, staticfs,
+                table_offset, str(binpath / 'partition-table.bin'),
+                app_offset, str(binpath / 'app.bin'),
+                staticfs_offset, staticfs,
             ]
             print(f'+ esptool {" ".join(argv)}', flush=True)
             esptool.main(argv)

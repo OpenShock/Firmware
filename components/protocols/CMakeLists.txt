@@ -17,8 +17,7 @@ idf_component_register(
                 "src/T330Encoder.cpp"
   INCLUDE_DIRS  "include"
   PRIV_INCLUDE_DIRS "src"                    # radio/rmt/internal/Shared.h (private)
-  REQUIRES      common                       # enums/*, OpenShock.h in public headers
+  REQUIRES      common                       # enums/*, OpenShock.h in public headers; also Checksum.h internally
                 esp_driver_rmt               # driver/rmt_types.h (rmt_symbol_word_t) in public headers
-  PRIV_REQUIRES common                       # Checksum.h (internal)
-                logging                      # OS_LOG* (internal)
+  PRIV_REQUIRES logging                      # OS_LOG* (internal)
 )

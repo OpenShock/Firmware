@@ -1,4 +1,4 @@
-# !/usr/bin/env python3
+#!/usr/bin/env python3
 """Decide what a ci-build run does: build, deploy, publish, which server, which boards.
 
 build governs the build matrix.

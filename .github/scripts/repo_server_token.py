@@ -1,4 +1,4 @@
-# !/usr/bin/env python3
+#!/usr/bin/env python3
 """Mint a GitHub Actions OIDC token for the repository server.
 
 Every call into the server goes through a token from here, so there is one definition of the audience and one place where a malformed mint is caught.

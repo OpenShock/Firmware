@@ -1,4 +1,4 @@
-# !/usr/bin/env python3
+#!/usr/bin/env python3
 """Shared GitHub Actions plumbing: workflow commands, step outputs, version check.
 
 Importing applies the version check.

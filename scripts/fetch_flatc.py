@@ -1,73 +1,81 @@
-import os
-import requests
-import zipfile
+"""Download the flatc compiler binaries (Linux + Windows) used by generate_schemas.py.
+
+The release is pinned: generated code static_asserts the exact flatbuffers version it was produced with
+(components/serialization/include/serialization/_fbs/*_generated.h), so flatc must match the vendored runtime.
+Each download is checked against the SHA-256 digest GitHub publishes for the release asset.
+"""
+
+import argparse
+import hashlib
+import sys
 import tempfile
+import zipfile
 from pathlib import Path
 
+import requests
 
-def fetch_latest_flatbuffers_release(output_dir):
-    # API URL for the latest release
-    api_url = "https://api.github.com/repos/google/flatbuffers/releases/latest"
-
-    try:
-        # Fetch the latest release data
-        response = requests.get(api_url)
-        response.raise_for_status()
-        release_data = response.json()
-
-        # Extract assets matching the desired filenames
-        assets = release_data.get("assets", [])
-        linux_asset = next((asset for asset in assets if "Linux.flatc.binary.clang" in asset["name"]), None)
-        windows_asset = next((asset for asset in assets if "Windows.flatc.binary" in asset["name"]), None)
-
-        if not linux_asset or not windows_asset:
-            raise ValueError("Required assets not found in the latest release.")
-
-        # Create a temporary directory for downloads
-        with tempfile.TemporaryDirectory() as temp_dir:
-            temp_dir_path = Path(temp_dir)
-
-            # Download and extract Linux asset
-            linux_zip_path = temp_dir_path / linux_asset["name"]
-            download_file(linux_asset["browser_download_url"], linux_zip_path)
-            extract_zip(linux_zip_path, output_dir)
-
-            # Download and extract Windows asset
-            windows_zip_path = temp_dir_path / windows_asset["name"]
-            download_file(windows_asset["browser_download_url"], windows_zip_path)
-            extract_zip(windows_zip_path, output_dir)
-
-            print(f"Files have been successfully downloaded, extracted to {output_dir}, and temporary files deleted.")
-
-    except requests.RequestException as e:
-        print(f"Error fetching release data: {e}")
-    except Exception as e:
-        print(f"An error occurred: {e}")
+# Keep in sync with the flatbuffers runtime in components/flatbuffers.
+FLATBUFFERS_VERSION = 'v25.12.19'
+RELEASE_API_URL = f'https://api.github.com/repos/google/flatbuffers/releases/tags/{FLATBUFFERS_VERSION}'
+ASSET_MARKERS = ('Linux.flatc.binary.clang', 'Windows.flatc.binary')
+TIMEOUT = 60
 
 
-def download_file(url, dest_path):
-    """Download a file from a URL to the specified destination."""
-    response = requests.get(url, stream=True)
+def find_asset(assets, marker):
+    asset = next((a for a in assets if marker in a['name']), None)
+    if asset is None:
+        raise SystemExit(f'error: no asset matching {marker!r} in flatbuffers {FLATBUFFERS_VERSION}')
+    return asset
+
+
+def download_verified(asset, dest_path: Path):
+    response = requests.get(asset['browser_download_url'], stream=True, timeout=TIMEOUT)
     response.raise_for_status()
 
-    with open(dest_path, "wb") as f:
+    sha256 = hashlib.sha256()
+    with open(dest_path, 'wb') as f:
         for chunk in response.iter_content(chunk_size=8192):
             f.write(chunk)
-    print(f"Downloaded: {dest_path}")
+            sha256.update(chunk)
+
+    expected = (asset.get('digest') or '').removeprefix('sha256:')
+    if not expected:
+        raise SystemExit(f'error: GitHub published no digest for {asset["name"]}; refusing to use it unverified')
+    if sha256.hexdigest() != expected:
+        raise SystemExit(f'error: SHA-256 mismatch for {asset["name"]} (got {sha256.hexdigest()}, expected {expected})')
+
+    print(f'Downloaded and verified: {asset["name"]}')
 
 
-def extract_zip(zip_path, extract_to):
-    """Extract a ZIP file to the specified directory."""
-    with zipfile.ZipFile(zip_path, "r") as zip_ref:
-        zip_ref.extractall(extract_to)
-    print(f"Extracted: {zip_path} to {extract_to}")
+def fetch_flatc(output_dir: Path):
+    response = requests.get(RELEASE_API_URL, timeout=TIMEOUT)
+    response.raise_for_status()
+    assets = response.json().get('assets', [])
+
+    with tempfile.TemporaryDirectory() as temp_dir:
+        for marker in ASSET_MARKERS:
+            asset = find_asset(assets, marker)
+            zip_path = Path(temp_dir) / asset['name']
+            download_verified(asset, zip_path)
+            with zipfile.ZipFile(zip_path, 'r') as zip_ref:
+                zip_ref.extractall(output_dir)
+            print(f'Extracted {asset["name"]} to {output_dir}')
 
 
-if __name__ == "__main__":
-    # Specify the output directory for the extracted files
-    output_directory = Path(input("Enter the directory to extract the files to: ")).resolve()
+def main():
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument('output_dir', nargs='?', default=str(Path(__file__).resolve().parent),
+                        help='directory to extract flatc into (default: scripts/)')
+    args = parser.parse_args()
 
-    if not output_directory.exists():
-        output_directory.mkdir(parents=True)
+    output_dir = Path(args.output_dir).resolve()
+    output_dir.mkdir(parents=True, exist_ok=True)
 
-    fetch_latest_flatbuffers_release(output_directory)
+    try:
+        fetch_flatc(output_dir)
+    except requests.RequestException as e:
+        sys.exit(f'error: download failed: {e}')
+
+
+if __name__ == '__main__':
+    main()

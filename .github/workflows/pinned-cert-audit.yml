@@ -31,7 +31,8 @@ jobs:
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
 
       - name: Install cryptography
-        run: python3 -m pip install --user cryptography
+        # Same pin as requirements.txt: this job holds write permissions, so don't pull whatever is latest
+        run: python3 -m pip install --user cryptography==50.0.2
 
       # Probes the live endpoints + checks expiry. Never fails the step itself (so the
       # follow-up steps always see its outputs); the expiry alert is raised at the end.

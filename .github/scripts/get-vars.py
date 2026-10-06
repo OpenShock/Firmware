@@ -1,4 +1,4 @@
-# !/usr/bin/env python3
+#!/usr/bin/env python3
 """Derive the CI build variables: firmware version, release channel, board matrix.
 
 Python port of the former get-vars.js (stdlib only, no node/pnpm toolchain).
@@ -59,12 +59,14 @@ def sdkconfig_lines(path: Path) -> list[str]:
 
     Comments, blank lines and the bare OPENSHOCK_* board-pin assignments are dropped:
     the first two carry no build meaning, and the pins are deliberately not Kconfig
-    (see scripts/build.py), so they must not influence the digest below.
+    (see scripts/build.py), so they must not influence the digest below. The one
+    comment form that does mean something, `# CONFIG_X is not set` (it disables a
+    bool), is kept.
     """
     lines = []
     for raw in path.read_text(encoding='utf-8').splitlines():
         line = raw.strip()
-        if line.startswith('CONFIG_'):
+        if line.startswith('CONFIG_') or (line.startswith('# CONFIG_') and line.endswith(' is not set')):
             lines.append(line)
     return sorted(lines)
 

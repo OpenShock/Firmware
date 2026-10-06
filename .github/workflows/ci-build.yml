@@ -58,9 +58,6 @@ concurrency:
 permissions:
   contents: read
 
-env:
-  PYTHON_VERSION: 3.13
-
 jobs:
   # Decides build, deploy, publish, the server and the boards; .github/scripts/ci_build_gate.py says how.
   gate:

@@ -1,4 +1,4 @@
-# !/usr/bin/env python3
+#!/usr/bin/env python3
 """Refuse a run that may not publish the version and channel get-vars resolved.
 
 get-vars settles what this run is before anything builds, so nothing here overrides it - a build that reports one version must not be published as another.

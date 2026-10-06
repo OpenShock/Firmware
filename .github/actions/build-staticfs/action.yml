@@ -28,7 +28,7 @@ runs:
         name: frontend
         path: frontend/build
 
-    # static0 is 0x09D000 bytes in the 4MB OTA table (partitions/ota_4mb.csv);
+    # The static0 size comes from partitions/ota_4mb.csv (the table every board uses);
     # the image is board-independent, so one build serves every board. Geometry
     # (4 KiB blocks, 128-byte read/prog) matches the runtime mount in
     # components/fs/src/LfsPartition.cpp and the CMake build.
@@ -39,7 +39,7 @@ runs:
           --frontend-dir frontend \
           --staging-dir staticfs \
           --output staticfs.bin \
-          --partition-size 0x09D000 \
+          --partition-csv partitions/ota_4mb.csv \
           --block-size 4096 --read-size 128 --prog-size 128 \
           --skip-frontend-build
 
