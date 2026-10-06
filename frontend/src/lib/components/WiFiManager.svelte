@@ -109,14 +109,14 @@
         </Button>
       </div>
     </div>
-    <ScrollArea class="h-52">
+    <ScrollArea class="h-52 md:h-80">
       {#if availableGroups.length > 0}
         {#each availableGroups as [netgroupKey, netgroup] (netgroupKey)}
           <WiFiEntry ssid={netgroup.ssid} {netgroup} />
         {/each}
       {:else if !isScanning}
         <p class="text-muted-foreground py-4 text-center text-sm">
-          No networks found. Tap scan to search.
+          No networks found. Scan to search for networks.
         </p>
       {:else}
         <p class="text-muted-foreground py-4 text-center text-sm">Scanning...</p>

@@ -50,8 +50,8 @@
   let canFinish = $derived(wifiConnected && hubState.accountLinked);
 </script>
 
-<div class="flex flex-1 flex-col items-center px-2 py-4">
-  <div class="flex w-full max-w-md flex-1 flex-col">
+<div class="flex flex-1 flex-col items-center px-2 py-4 md:px-6 md:py-8">
+  <div class="flex w-full max-w-md flex-1 flex-col md:max-w-2xl">
     <Stepper bind:value={currentStep} linear class="flex-1">
       <StepperNav>
         {#if isDIY}
@@ -100,7 +100,7 @@
         </StepperItem>
       </StepperNav>
 
-      <div class="flex-1 rounded-lg border p-4">
+      <div class="flex-1 rounded-lg border p-4 md:flex-none md:p-6">
         {#if isDIY && currentStep === 1}
           <PinsStep />
         {:else if currentStep === testStep}

@@ -37,11 +37,24 @@
   }
 
   let { activeSection = $bindable<AdvancedSection>('menu') }: Props = $props();
+
+  // On a phone 'menu' hides the content panel, so this only shows from md up.
+  let shownSection = $derived(activeSection === 'menu' ? advancedSections[0].id : activeSection);
 </script>
 
-<div class="flex flex-1 flex-col items-center px-2 py-4">
-  <div class="flex w-full max-w-md flex-1 flex-col">
-    {#if activeSection === 'menu'}
+<!-- Phones drill down from the menu into one section. From md up the menu is a sidebar and a
+     section is always shown, defaulting to the first. -->
+<div class="flex flex-1 flex-col items-center px-2 py-4 md:px-6 md:py-8">
+  <div
+    class="flex w-full max-w-md flex-1 flex-col md:max-w-5xl md:flex-row md:items-start md:gap-6"
+  >
+    <nav
+      aria-label="Advanced settings"
+      class={[
+        'flex-col md:sticky md:top-20 md:flex md:w-64 md:shrink-0',
+        activeSection === 'menu' ? 'flex' : 'hidden',
+      ]}
+    >
       <Button
         variant="ghost"
         size="sm"
@@ -58,7 +71,8 @@
       <div class="mt-4 flex flex-col gap-1">
         {#each advancedSections as { id, label, description, icon: Icon } (id)}
           <button
-            class="hover:bg-muted/50 flex items-center gap-3 rounded-lg p-3 text-left transition-colors"
+            class="hover:bg-muted/50 focus-visible:ring-ring/50 md:aria-[current=page]:bg-muted flex cursor-pointer items-center gap-3 rounded-lg p-3 text-left transition-colors outline-none focus-visible:ring-3"
+            aria-current={id === shownSection ? 'page' : undefined}
             onclick={() => (activeSection = id)}
           >
             <Icon class="text-muted-foreground h-5 w-5 shrink-0" />
@@ -66,34 +80,36 @@
               <p class="text-sm font-medium">{label}</p>
               <p class="text-muted-foreground text-xs">{description}</p>
             </div>
-            <ChevronRight class="text-muted-foreground h-4 w-4 shrink-0" />
+            <ChevronRight class="text-muted-foreground h-4 w-4 shrink-0 md:hidden" />
           </button>
         {/each}
       </div>
-    {:else}
+    </nav>
+
+    <div class={['min-w-0 flex-1 flex-col', activeSection === 'menu' ? 'hidden md:flex' : 'flex']}>
       <Button
         variant="ghost"
         size="sm"
-        class="mb-2 self-start"
+        class="mb-2 self-start md:hidden"
         onclick={() => (activeSection = 'menu')}
       >
         <ArrowLeft class="mr-1.5 h-4 w-4" />
         Back
       </Button>
 
-      <div class="flex-1 rounded-lg border p-4">
-        {#if activeSection === 'wifi'}
+      <div class="flex-1 rounded-lg border p-4 md:flex-none md:p-6">
+        {#if shownSection === 'wifi'}
           <WiFiStep />
-        {:else if activeSection === 'shocker'}
+        {:else if shownSection === 'shocker'}
           <TestStep />
-        {:else if activeSection === 'hardware'}
+        {:else if shownSection === 'hardware'}
           <HardwareStep />
-        {:else if activeSection === 'account'}
+        {:else if shownSection === 'account'}
           <AccountStep />
-        {:else if activeSection === 'ota'}
+        {:else if shownSection === 'ota'}
           <OtaSection />
         {/if}
       </div>
-    {/if}
+    </div>
   </div>
 </div>
