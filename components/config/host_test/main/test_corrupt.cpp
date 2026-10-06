@@ -208,6 +208,54 @@ TEST_CASE("Adding WiFi credentials that cannot be stored changes nothing", "[con
   AssertConfigEqual(sample, Snapshot());
 }
 
+TEST_CASE("Setters that cannot be stored leave the running config unchanged", "[config][corrupt]")
+{
+  const Config::RootConfig sample = MakeSampleConfig();
+  TEST_ASSERT_TRUE(InitFrom(Serialize(sample)));
+  TEST_ASSERT_FALSE(sample.wifi.credentialsList.empty());
+
+  HostConfigFs::failWrites = true;
+  TEST_ASSERT_FALSE(Config::SetBackendAuthToken("replaced-token"));
+  TEST_ASSERT_FALSE(Config::ClearBackendAuthToken());
+  TEST_ASSERT_FALSE(Config::SetWiFiHostname("other-host"));
+  TEST_ASSERT_FALSE(Config::SetRFConfigKeepAliveEnabled(!sample.rf.keepAliveEnabled));
+  TEST_ASSERT_FALSE(Config::SetEStopEnabled(!sample.estop.enabled));
+  TEST_ASSERT_FALSE(Config::ClearWiFiCredentials());
+  TEST_ASSERT_FALSE(Config::RemoveWiFiCredentials(sample.wifi.credentialsList.front().id));
+  HostConfigFs::failWrites = false;
+
+  AssertConfigEqual(sample, Snapshot());
+}
+
+TEST_CASE("A malformed JSON bssid does not pin a partial address", "[config][corrupt][json]")
+{
+  InitDefault();
+  TEST_ASSERT_TRUE(Config::SaveFromJSON(R"({"wifi":{"credentials":[{"id":1,"ssid":"net","bssid":"123456789aZZ"}]}})"));
+
+  const Config::RootConfig loaded = Snapshot();
+  TEST_ASSERT_EQUAL_size_t(1, loaded.wifi.credentialsList.size());
+  TEST_ASSERT_FALSE(loaded.wifi.credentialsList[0].HasPinnedBSSID());
+}
+
+TEST_CASE("An unknown OTA channel in JSON falls back to the default, not the running value", "[config][corrupt][json]")
+{
+  Config::RootConfig sample      = MakeSampleConfig();
+  sample.otaUpdate.updateChannel = OtaUpdateChannel::Develop;
+  TEST_ASSERT_TRUE(InitFrom(Serialize(sample)));
+
+  TEST_ASSERT_TRUE(Config::SaveFromJSON(R"({"otaUpdate":{"updateChannel":"nightly","updateStep":42}})"));
+
+  const Config::RootConfig loaded = Snapshot();
+  TEST_ASSERT_EQUAL_UINT8(static_cast<uint8_t>(OtaUpdateChannel::Stable), static_cast<uint8_t>(loaded.otaUpdate.updateChannel));
+  TEST_ASSERT_EQUAL_UINT8(static_cast<uint8_t>(OtaUpdateStep::None), static_cast<uint8_t>(loaded.otaUpdate.updateStep));
+}
+
+TEST_CASE("RemoveWiFiCredentials reports unknown IDs", "[config]")
+{
+  InitDefault();
+  TEST_ASSERT_FALSE(Config::RemoveWiFiCredentials(42));
+}
+
 TEST_CASE("Out-of-range E-Stop GPIO in a stored config falls back to the default", "[config][corrupt]")
 {
   // gpio_pin is an int8 on flash; values outside gpio_num_t must not be cast to it

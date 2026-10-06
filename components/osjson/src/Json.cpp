@@ -373,32 +373,29 @@ bool JSON::JsonDocument::parse(std::string_view json)
   m_json = json;
   m_ok   = false;
 
-  // jsmn needs a token buffer sized up-front; grow-and-retry on NOMEM rather
-  // than relying on a separate counting pass.
-  size_t capacity = 32;
-  for (;;) {
-    m_tokens.resize(capacity);
+  // Count tokens first (jsmn does this without a buffer), then allocate exactly once. Growing by doubling briefly
+  // held both the old and the new buffer, which for a large untrusted body meant ~384 KiB with exceptions disabled.
+  static constexpr int kMaxTokens = 16384;
 
-    jsmn_parser parser;
-    jsmn_init(&parser);
-
-    int result = jsmn_parse(&parser, json.data(), json.size(), m_tokens.data(), static_cast<unsigned int>(capacity));
-    if (result >= 0) {
-      m_tokens.resize(static_cast<size_t>(result));
-      m_ok = result > 0;
-      return m_ok;
-    }
-
-    if (result == JSMN_ERROR_NOMEM) {
-      capacity *= 2;
-      if (capacity > 16384) {
-        return false;  // unreasonably large / malformed
-      }
-      continue;
-    }
-
-    return false;  // JSMN_ERROR_INVAL / JSMN_ERROR_PART
+  jsmn_parser parser;
+  jsmn_init(&parser);
+  int count = jsmn_parse(&parser, json.data(), json.size(), nullptr, 0);
+  if (count <= 0 || count > kMaxTokens) {
+    m_tokens.clear();
+    return false;  // malformed, empty, or unreasonably large
   }
+
+  m_tokens.resize(static_cast<size_t>(count));
+
+  jsmn_init(&parser);
+  int result = jsmn_parse(&parser, json.data(), json.size(), m_tokens.data(), static_cast<unsigned int>(count));
+  if (result != count) {
+    m_tokens.clear();
+    return false;
+  }
+
+  m_ok = true;
+  return true;
 }
 
 JSON::JsonView JSON::JsonDocument::root() const noexcept
@@ -421,6 +418,14 @@ JSON::StringWriter::StringWriter()
 
 std::string JSON::StringWriter::finish()
 {
-  json_gen_str_end(&m_gen);
+  // On error (e.g. malformed UTF-8 in a value) json_generator stops generating, but chunks flushed before the error
+  // are already in m_out; never hand out that truncated, invalid document.
+  int result = json_gen_str_end(&m_gen);
+  if (result < 0) {
+    m_failed = true;
+    m_out.clear();
+    return {};
+  }
+
   return std::move(m_out);
 }

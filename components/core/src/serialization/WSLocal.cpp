@@ -69,8 +69,6 @@ bool Local::SerializeReadyMessage(const WiFiNetwork* connectedNetwork, bool acco
 
   if (connectedNetwork != nullptr) {
     fbsNetwork = createWiFiNetwork(builder, *connectedNetwork);
-  } else {
-    fbsNetwork = 0;
   }
 
   auto configOffset = OpenShock::Config::GetAsFlatBuffer(builder, false);

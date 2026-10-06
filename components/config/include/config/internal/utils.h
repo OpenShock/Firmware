@@ -10,7 +10,8 @@
 #include <vector>
 
 namespace OpenShock::Config::Internal::Utils {
-  bool FromU8GpioNum(gpio_num_t& val, uint8_t u8Val);
+  // Accepts GPIO_NUM_NC (-1, "no pin") or any GPIO number valid on this chip; used for every stored/imported pin.
+  bool FromIntGpioNum(gpio_num_t& val, int32_t intVal);
 
   void FromFbsStr(std::string& str, const flatbuffers::String* fbsStr, const char* defaultStr);
 
@@ -41,12 +42,11 @@ namespace OpenShock::Config::Internal::Utils {
       return true;
     }
 
+    // Wrong type or unknown value: fall back to the default like every other field, rather than keeping
+    // whatever value `val` held before (the current running config when importing JSON).
     std::string str;
-    if (!jsonVal.tryGetStr(str)) {
-      return false;
-    }
-
-    if (!StringParser(val, str)) {
+    if (!jsonVal.tryGetStr(str) || !StringParser(val, str)) {
+      val = defaultVal;
       return false;
     }
 

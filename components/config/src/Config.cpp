@@ -14,6 +14,7 @@ const char* const TAG = "Config";
 
 #include "fs/ConfigFs.h"
 
+#include <algorithm>
 #include <bitset>
 #include <cstring>
 #include <span>
@@ -87,7 +88,7 @@ static bool tryDeserializeConfig(const uint8_t* buffer, std::size_t bufferLen, O
 
   return true;
 }
-static bool tryLoadConfig(TinyVec<uint8_t>& buffer)
+static bool tryLoadConfig()
 {
   std::vector<uint8_t> data;
   if (!_configFs.read(CONFIG_FILE_PATH, data)) {
@@ -95,21 +96,7 @@ static bool tryLoadConfig(TinyVec<uint8_t>& buffer)
     return false;
   }
 
-  buffer.resize(data.size());
-  if (!data.empty()) {
-    memcpy(buffer.data(), data.data(), data.size());
-  }
-
-  return true;
-}
-static bool tryLoadConfig()
-{
-  TinyVec<uint8_t> buffer;
-  if (!tryLoadConfig(buffer)) {
-    return false;
-  }
-
-  return tryDeserializeConfig(buffer.data(), buffer.size(), _configData);
+  return tryDeserializeConfig(data.data(), data.size(), _configData);
 }
 static bool trySaveConfig(const uint8_t* data, std::size_t dataLen)
 {
@@ -138,6 +125,24 @@ static bool trySaveConfig(const OpenShock::Config::RootConfig& config)
 static bool trySaveConfig()
 {
   return trySaveConfig(_configData);
+}
+
+// Requires the write lock. Applies `mutate` to a copy, persists the copy and only then commits it, so a failed
+// write leaves the running config identical to what is on flash. `mutate` returns false to abort without saving.
+template<typename Fn>
+static bool mutateAndSave(Fn&& mutate)
+{
+  OpenShock::Config::RootConfig updated = _configData;
+  if (!mutate(updated)) {
+    return false;
+  }
+
+  if (!trySaveConfig(updated)) {
+    return false;
+  }
+
+  _configData = std::move(updated);
+  return true;
 }
 
 void Config::Init()
@@ -234,7 +239,16 @@ bool Config::GetRaw(TinyVec<uint8_t>& buffer)
 {
   CONFIG_LOCK_READ(false);
 
-  return tryLoadConfig(buffer);
+  // Serialize the live config rather than reading flash: no filesystem access under the shared read lock, and it is
+  // what the device is actually running with.
+  flatbuffers::FlatBufferBuilder builder;
+  auto fbsConfig = _configData.ToFlatbuffers(builder, true);
+  Serialization::Configuration::FinishHubConfigBuffer(builder, fbsConfig);
+
+  buffer.resize(builder.GetSize());
+  memcpy(buffer.data(), builder.GetBufferPointer(), builder.GetSize());
+
+  return true;
 }
 
 bool Config::SetRaw(const uint8_t* buffer, std::size_t size)
@@ -247,7 +261,13 @@ bool Config::SetRaw(const uint8_t* buffer, std::size_t size)
     return false;
   }
 
-  return trySaveConfig(buffer, size);
+  if (!trySaveConfig(buffer, size)) {
+    return false;
+  }
+
+  // Keep memory in sync with flash, or the next setter would write the old config back over the import.
+  _configData = std::move(config);
+  return true;
 }
 
 void Config::FactoryReset()
@@ -334,56 +354,71 @@ bool Config::SetRFConfig(const Config::RFConfig& config)
 {
   CONFIG_LOCK_WRITE(false);
 
-  _configData.rf = config;
-  return trySaveConfig();
+  return mutateAndSave([&](Config::RootConfig& root) {
+    root.rf = config;
+    return true;
+  });
 }
 
 bool Config::SetWiFiConfig(const Config::WiFiConfig& config)
 {
   CONFIG_LOCK_WRITE(false);
 
-  _configData.wifi = config;
-  return trySaveConfig();
+  return mutateAndSave([&](Config::RootConfig& root) {
+    root.wifi = config;
+    return true;
+  });
 }
 
 bool Config::SetCaptivePortalConfig(const Config::CaptivePortalConfig& config)
 {
   CONFIG_LOCK_WRITE(false);
 
-  _configData.captivePortal = config;
-  return trySaveConfig();
+  return mutateAndSave([&](Config::RootConfig& root) {
+    root.captivePortal = config;
+    return true;
+  });
 }
 
 bool Config::SetBackendConfig(const Config::BackendConfig& config)
 {
   CONFIG_LOCK_WRITE(false);
 
-  _configData.backend = config;
-  return trySaveConfig();
+  return mutateAndSave([&](Config::RootConfig& root) {
+    root.backend = config;
+    return true;
+  });
 }
 
 bool Config::SetSerialInputConfig(const Config::SerialInputConfig& config)
 {
   CONFIG_LOCK_WRITE(false);
 
-  _configData.serialInput = config;
-  return trySaveConfig();
+  return mutateAndSave([&](Config::RootConfig& root) {
+    root.serialInput = config;
+    return true;
+  });
 }
 
 bool Config::SetOtaUpdateConfig(const Config::OtaUpdateConfig& config)
 {
   CONFIG_LOCK_WRITE(false);
 
-  _configData.otaUpdate = config;
-  return trySaveConfig();
+  return mutateAndSave([&](Config::RootConfig& root) {
+    root.otaUpdate = config;
+    return true;
+  });
 }
 
 bool Config::SetEStop(const Config::EStopConfig& config)
 {
   CONFIG_LOCK_WRITE(false);
 
-  _configData.estop = config;
-  return trySaveConfig();
+  return mutateAndSave([&](Config::RootConfig& root) {
+    root.estop = config;
+    root.estop.Normalize();
+    return true;
+  });
 }
 
 bool Config::GetWiFiCredentials(std::vector<Config::WiFiCredentials>& out)
@@ -406,18 +441,45 @@ bool Config::GetWiFiCredentials(json_gen_str_t* gen, bool withSensitiveData)
   return true;
 }
 
+// 802.11 SSIDs are 1-32 bytes; WPA passphrases are up to 63 characters, or 64 for a raw hex PSK.
+static bool isValidWiFiCredentials(std::string_view ssid, std::string_view password)
+{
+  if (ssid.empty() || ssid.size() > 32) {
+    OS_LOGE(TAG, "Invalid SSID length %zu", ssid.size());
+    return false;
+  }
+  if (password.size() > 64) {
+    OS_LOGE(TAG, "Invalid password length %zu", password.size());
+    return false;
+  }
+  return true;
+}
+
 bool Config::SetWiFiCredentials(const std::vector<Config::WiFiCredentials>& credentials)
 {
-  bool foundZeroId = std::any_of(credentials.begin(), credentials.end(), [](const Config::WiFiCredentials& creds) { return creds.id == 0; });
-  if (foundZeroId) {
-    OS_LOGE(TAG, "Cannot set WiFi credentials: credential ID cannot be 0");
-    return false;
+  std::bitset<256> seenIds;
+  for (const auto& creds : credentials) {
+    if (creds.id == 0) {
+      OS_LOGE(TAG, "Cannot set WiFi credentials: credential ID cannot be 0");
+      return false;
+    }
+    if (seenIds[creds.id]) {
+      OS_LOGE(TAG, "Cannot set WiFi credentials: duplicate credential ID %u", creds.id);
+      return false;
+    }
+    seenIds[creds.id] = true;
+
+    if (!isValidWiFiCredentials(creds.ssid, creds.password)) {
+      return false;
+    }
   }
 
   CONFIG_LOCK_WRITE(false);
 
-  _configData.wifi.credentialsList = credentials;
-  return trySaveConfig();
+  return mutateAndSave([&](Config::RootConfig& root) {
+    root.wifi.credentialsList = credentials;
+    return true;
+  });
 }
 
 bool Config::GetRFConfigTxPin(gpio_num_t& out)
@@ -433,8 +495,10 @@ bool Config::SetRFConfigTxPin(gpio_num_t txPin)
 {
   CONFIG_LOCK_WRITE(false);
 
-  _configData.rf.txPin = txPin;
-  return trySaveConfig();
+  return mutateAndSave([&](Config::RootConfig& root) {
+    root.rf.txPin = txPin;
+    return true;
+  });
 }
 
 bool Config::GetRFConfigKeepAliveEnabled(bool& out)
@@ -450,8 +514,10 @@ bool Config::SetRFConfigKeepAliveEnabled(bool enabled)
 {
   CONFIG_LOCK_WRITE(false);
 
-  _configData.rf.keepAliveEnabled = enabled;
-  return trySaveConfig();
+  return mutateAndSave([&](Config::RootConfig& root) {
+    root.rf.keepAliveEnabled = enabled;
+    return true;
+  });
 }
 
 bool Config::AnyWiFiCredentials(std::function<bool(const Config::WiFiCredentials&)> predicate)
@@ -465,6 +531,10 @@ bool Config::AnyWiFiCredentials(std::function<bool(const Config::WiFiCredentials
 
 uint8_t Config::AddWiFiCredentials(std::string_view ssid, std::string_view password, wifi_auth_mode_t authMode)
 {
+  if (!isValidWiFiCredentials(ssid, password)) {
+    return 0;
+  }
+
   CONFIG_LOCK_WRITE(0);
 
   uint8_t id = 0;
@@ -571,38 +641,40 @@ bool Config::PinWiFiCredentialsBSSID(uint8_t id, const uint8_t (&bssid)[6])
 {
   CONFIG_LOCK_WRITE(false);
 
-  for (auto& creds : _configData.wifi.credentialsList) {
-    if (creds.id == id) {
-      memcpy(creds.bssid.data(), bssid, 6);
-      return trySaveConfig();
+  return mutateAndSave([&](Config::RootConfig& root) {
+    for (auto& creds : root.wifi.credentialsList) {
+      if (creds.id == id) {
+        memcpy(creds.bssid.data(), bssid, 6);
+        return true;
+      }
     }
-  }
-
-  return false;
+    return false;
+  });
 }
 
 bool Config::RemoveWiFiCredentials(uint8_t id)
 {
   CONFIG_LOCK_WRITE(false);
 
-  for (auto it = _configData.wifi.credentialsList.begin(); it != _configData.wifi.credentialsList.end(); ++it) {
-    if (it->id == id) {
-      _configData.wifi.credentialsList.erase(it);
-      trySaveConfig();
-      return true;
+  return mutateAndSave([id](Config::RootConfig& root) {
+    auto& list = root.wifi.credentialsList;
+    auto it    = std::find_if(list.begin(), list.end(), [id](const Config::WiFiCredentials& creds) { return creds.id == id; });
+    if (it == list.end()) {
+      return false;
     }
-  }
-
-  return false;
+    list.erase(it);
+    return true;
+  });
 }
 
 bool Config::ClearWiFiCredentials()
 {
   CONFIG_LOCK_WRITE(false);
 
-  _configData.wifi.credentialsList.clear();
-
-  return trySaveConfig();
+  return mutateAndSave([](Config::RootConfig& root) {
+    root.wifi.credentialsList.clear();
+    return true;
+  });
 }
 
 bool Config::GetWiFiHostname(std::string& out)
@@ -618,9 +690,10 @@ bool Config::SetWiFiHostname(std::string hostname)
 {
   CONFIG_LOCK_WRITE(false);
 
-  _configData.wifi.hostname = std::move(hostname);
-
-  return trySaveConfig();
+  return mutateAndSave([&](Config::RootConfig& root) {
+    root.wifi.hostname = std::move(hostname);
+    return true;
+  });
 }
 
 bool Config::GetBackendDomain(std::string& out)
@@ -636,8 +709,10 @@ bool Config::SetBackendDomain(std::string domain)
 {
   CONFIG_LOCK_WRITE(false);
 
-  _configData.backend.domain = std::move(domain);
-  return trySaveConfig();
+  return mutateAndSave([&](Config::RootConfig& root) {
+    root.backend.domain = std::move(domain);
+    return true;
+  });
 }
 
 bool Config::HasBackendAuthToken()
@@ -660,16 +735,20 @@ bool Config::SetBackendAuthToken(std::string token)
 {
   CONFIG_LOCK_WRITE(false);
 
-  _configData.backend.authToken = std::move(token);
-  return trySaveConfig();
+  return mutateAndSave([&](Config::RootConfig& root) {
+    root.backend.authToken = std::move(token);
+    return true;
+  });
 }
 
 bool Config::ClearBackendAuthToken()
 {
   CONFIG_LOCK_WRITE(false);
 
-  _configData.backend.authToken.clear();
-  return trySaveConfig();
+  return mutateAndSave([](Config::RootConfig& root) {
+    root.backend.authToken.clear();
+    return true;
+  });
 }
 
 bool Config::GetSerialInputConfigEchoEnabled(bool& out)
@@ -684,8 +763,10 @@ bool Config::SetSerialInputConfigEchoEnabled(bool enabled)
 {
   CONFIG_LOCK_WRITE(false);
 
-  _configData.serialInput.echoEnabled = enabled;
-  return trySaveConfig();
+  return mutateAndSave([&](Config::RootConfig& root) {
+    root.serialInput.echoEnabled = enabled;
+    return true;
+  });
 }
 
 bool Config::GetOtaUpdateId(int32_t& out)
@@ -705,8 +786,10 @@ bool Config::SetOtaUpdateId(int32_t updateId)
     return true;
   }
 
-  _configData.otaUpdate.updateId = updateId;
-  return trySaveConfig();
+  return mutateAndSave([&](Config::RootConfig& root) {
+    root.otaUpdate.updateId = updateId;
+    return true;
+  });
 }
 
 bool Config::GetOtaUpdateStep(OtaUpdateStep& out)
@@ -726,8 +809,10 @@ bool Config::SetOtaUpdateStep(OtaUpdateStep updateStep)
     return true;
   }
 
-  _configData.otaUpdate.updateStep = updateStep;
-  return trySaveConfig();
+  return mutateAndSave([&](Config::RootConfig& root) {
+    root.otaUpdate.updateStep = updateStep;
+    return true;
+  });
 }
 
 bool Config::GetEStopEnabled(bool& out)
@@ -743,8 +828,10 @@ bool Config::SetEStopEnabled(bool enabled)
 {
   CONFIG_LOCK_WRITE(false);
 
-  _configData.estop.enabled = enabled;
-  return trySaveConfig();
+  return mutateAndSave([&](Config::RootConfig& root) {
+    root.estop.enabled = enabled;
+    return true;
+  });
 }
 
 bool Config::GetEStopGpioPin(gpio_num_t& out)
@@ -765,6 +852,8 @@ bool Config::SetEStopGpioPin(gpio_num_t gpioPin)
     return false;
   }
 
-  _configData.estop.gpioPin = gpioPin;
-  return trySaveConfig();
+  return mutateAndSave([&](Config::RootConfig& root) {
+    root.estop.gpioPin = gpioPin;
+    return true;
+  });
 }

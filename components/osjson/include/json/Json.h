@@ -98,7 +98,9 @@ namespace OpenShock::JSON {
     [[nodiscard]] json_gen_str_t* gen() noexcept { return &m_gen; }
 
     // Finalizes the JSON and returns the accumulated string. Call once.
+    // Returns an empty string (and failed() becomes true) if generation failed, e.g. on malformed UTF-8.
     [[nodiscard]] std::string finish();
+    [[nodiscard]] bool failed() const noexcept { return m_failed; }
 
   private:
     static void flushCb(char* buf, void* priv);
@@ -106,6 +108,7 @@ namespace OpenShock::JSON {
     std::string m_out;
     char m_buf[256];
     json_gen_str_t m_gen;
+    bool m_failed = false;
   };
 
   // Add a string value with an explicit length (embedded NULs and non-terminated

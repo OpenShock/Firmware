@@ -4,6 +4,7 @@
 #include "wifi/WiFiManager.h"
 #include "json/Json.h"
 
+#include <bitset>
 #include <vector>
 
 const char* const TAG = "SerialCmds::CommandHandlers::Networks";
@@ -41,8 +42,8 @@ static void handleNetworksCommand(std::string_view arg, bool isAutomated)
 
   std::vector<OpenShock::Config::WiFiCredentials> creds;
 
-  uint8_t id      = 1;
   const int count = root.count();
+  std::bitset<256> usedIds;
   for (int i = 0; i < count; ++i) {
     OpenShock::Config::WiFiCredentials cred;
 
@@ -51,13 +52,24 @@ static void handleNetworksCommand(std::string_view arg, bool isAutomated)
       return;
     }
 
+    usedIds[cred.id] = true;
+    creds.push_back(std::move(cred));
+  }
+
+  // Give networks without an ID the lowest IDs not already taken by the ones that have one
+  uint16_t nextId = 1;
+  for (auto& cred : creds) {
     if (cred.id == 0) {
-      cred.id = id++;
+      while (nextId < 256 && usedIds[nextId]) ++nextId;
+      if (nextId >= 256) {
+        SERPR_ERROR("Too many networks");
+        return;
+      }
+      cred.id          = static_cast<uint8_t>(nextId);
+      usedIds[nextId] = true;
     }
 
     OS_LOGI(TAG, "Adding network \"%s\" to config, id=%u", cred.ssid.c_str(), cred.id);
-
-    creds.push_back(std::move(cred));
   }
 
   if (!OpenShock::Config::SetWiFiCredentials(creds)) {

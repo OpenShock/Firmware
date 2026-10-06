@@ -5,18 +5,24 @@ const char* const TAG = "Config::Internal::Utils";
 #include "Chipset.h"
 #include "Logging.h"
 
+#include <cinttypes>
 #include <cstdint>
 
 using namespace OpenShock;
 
-bool Config::Internal::Utils::FromU8GpioNum(gpio_num_t& val, uint8_t u8Val)
+bool Config::Internal::Utils::FromIntGpioNum(gpio_num_t& val, int32_t intVal)
 {
-  if (u8Val >= GPIO_NUM_MAX || !GPIO_IS_VALID_GPIO(u8Val)) {
-    OS_LOGE(TAG, "invalid GPIO number");
+  if (intVal == GPIO_NUM_NC) {
+    val = GPIO_NUM_NC;
+    return true;
+  }
+
+  if (intVal < 0 || intVal >= GPIO_NUM_MAX || !GPIO_IS_VALID_GPIO(intVal)) {
+    OS_LOGE(TAG, "invalid GPIO number %" PRId32, intVal);
     return false;
   }
 
-  val = static_cast<gpio_num_t>(u8Val);
+  val = static_cast<gpio_num_t>(intVal);
 
   return true;
 }
@@ -32,10 +38,10 @@ void Config::Internal::Utils::FromFbsStr(std::string& str, const flatbuffers::St
 
 bool Config::Internal::Utils::FromJsonGpioNum(gpio_num_t& val, JSON::JsonView json, std::string_view name)
 {
-  uint8_t u8Val;
-  if (!json[name].tryGetU8(u8Val)) {
+  int32_t intVal;
+  if (!json[name].tryGetI32(intVal)) {
     return false;
   }
 
-  return FromU8GpioNum(val, u8Val);
+  return FromIntGpioNum(val, intVal);
 }

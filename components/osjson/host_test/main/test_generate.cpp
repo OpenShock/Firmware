@@ -303,3 +303,17 @@ TEST_CASE("generate -> parse round-trip preserves scalar values", "[osjson][gen]
   }
   TEST_ASSERT_EQUAL_INT64(6, sum);
 }
+
+TEST_CASE("finish: malformed UTF-8 yields an empty string, never a truncated document", "[osjson][gen]")
+{
+  JSON::StringWriter w;
+  json_gen_str_t* gen = w.gen();
+  json_gen_start_object(gen);
+  // Long enough that earlier chunks are flushed before the bad byte is reached.
+  JSON::objSetString(gen, "pad", std::string(600, 'x'));
+  JSON::objSetString(gen, "ssid", std::string_view("Caf\xE9", 4));  // Latin-1, not UTF-8
+  json_gen_end_object(gen);
+
+  TEST_ASSERT_TRUE(w.finish().empty());
+  TEST_ASSERT_TRUE(w.failed());
+}

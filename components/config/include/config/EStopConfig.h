@@ -14,6 +14,9 @@ namespace OpenShock::Config {
 
     void ToDefault() override;
 
+    /// @brief Disables the E-Stop when its pin can't be used as an input, so every input path stores the same thing.
+    void Normalize();
+
     bool FromFlatbuffers(const Serialization::Configuration::EStopConfig* config) override;
     flatbuffers::Offset<Serialization::Configuration::EStopConfig> ToFlatbuffers(flatbuffers::FlatBufferBuilder& builder, bool withSensitiveData) const override;
 

@@ -34,23 +34,16 @@ bool EStopConfig::FromFlatbuffers(const Serialization::Configuration::EStopConfi
     return true;
   }
 
-  // gpio_pin is a raw int8 from flash or rawconfig: only values gpio_num_t can hold
-  // (GPIO_NUM_NC .. GPIO_NUM_MAX - 1) may be cast to it. Anything else means a
+  // gpio_pin is a raw int8 from flash or rawconfig; anything that isn't "no pin" or a real GPIO means a
   // corrupt section, so fall back to the default.
-  const int8_t pin = config->gpio_pin();
-  if (pin < GPIO_NUM_NC || pin >= GPIO_NUM_MAX) {
-    OS_LOGW(TAG, "Invalid E-Stop GPIO pin %d, using default", pin);
+  if (!Internal::Utils::FromIntGpioNum(gpioPin, config->gpio_pin())) {
+    OS_LOGW(TAG, "Invalid E-Stop GPIO pin %d, using default", config->gpio_pin());
     ToDefault();
     return true;
   }
 
-  gpioPin = static_cast<gpio_num_t>(pin);
-
-  if (OpenShock::IsValidInputPin(pin)) {
-    enabled = config->enabled();
-  } else {
-    enabled = false;
-  }
+  enabled = config->enabled();
+  Normalize();
 
   return true;
 }
@@ -84,8 +77,18 @@ bool EStopConfig::FromJSON(JSON::JsonView json)
   } else {
     enabled = OpenShock::IsValidInputPin(gpioPin);
   }
+  Normalize();
 
   return true;
+}
+
+void EStopConfig::Normalize()
+{
+  // An E-Stop on a pin that can't be read as an input would never trigger; store it as disabled on every path.
+  if (enabled && !OpenShock::IsValidInputPin(gpioPin)) {
+    OS_LOGW(TAG, "E-Stop pin %d is not a valid input pin, disabling E-Stop", gpioPin);
+    enabled = false;
+  }
 }
 
 void EStopConfig::ToJSON(json_gen_str_t* gen, const char* name, bool withSensitiveData) const

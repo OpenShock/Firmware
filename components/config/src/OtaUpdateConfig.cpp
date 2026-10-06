@@ -62,14 +62,17 @@ bool OtaUpdateConfig::FromFlatbuffers(const Serialization::Configuration::OtaUpd
 
   isEnabled = config->is_enabled();
   Internal::Utils::FromFbsStr(cdnDomain, config->cdn_domain(), CONFIG_OPENSHOCK_FW_CDN_DOMAIN);
-  updateChannel          = static_cast<OtaUpdateChannel>(config->update_channel());
+  // Out-of-range enum values (bit flips, configs from newer firmware) fall back to the defaults
+  auto fbsChannel        = static_cast<uint8_t>(config->update_channel());
+  updateChannel          = fbsChannel <= static_cast<uint8_t>(OtaUpdateChannel::Develop) ? static_cast<OtaUpdateChannel>(fbsChannel) : OtaUpdateChannel::Stable;
   checkOnStartup         = config->check_on_startup();
   checkPeriodically      = config->check_periodically();
   checkInterval          = config->check_interval();
   allowBackendManagement = config->allow_backend_management();
   requireManualApproval  = config->require_manual_approval();
   updateId               = config->update_id();
-  updateStep             = static_cast<OtaUpdateStep>(config->update_step());
+  auto fbsStep           = static_cast<uint8_t>(config->update_step());
+  updateStep             = fbsStep <= static_cast<uint8_t>(OtaUpdateStep::RollingBack) ? static_cast<OtaUpdateStep>(fbsStep) : OtaUpdateStep::None;
 
   return true;
 }

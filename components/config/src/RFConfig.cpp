@@ -34,7 +34,8 @@ bool RFConfig::FromFlatbuffers(const Serialization::Configuration::RFConfig* con
     return true;
   }
 
-  if (!Internal::Utils::FromU8GpioNum(txPin, config->tx_pin())) {
+  // "No pin" (-1) is not a usable TX pin either; both fall back to the board default.
+  if (!Internal::Utils::FromIntGpioNum(txPin, config->tx_pin()) || txPin == GPIO_NUM_NC) {
     txPin = static_cast<gpio_num_t>(OPENSHOCK_RF_TX_GPIO);
   }
   keepAliveEnabled = config->keepalive_enabled();
@@ -68,7 +69,7 @@ bool RFConfig::FromJSON(JSON::JsonView json)
     return false;
   }
 
-  if (!Internal::Utils::FromJsonGpioNum(txPin, json, "txPin")) {
+  if (!Internal::Utils::FromJsonGpioNum(txPin, json, "txPin") || txPin == GPIO_NUM_NC) {
     txPin = static_cast<gpio_num_t>(OPENSHOCK_RF_TX_GPIO);
   }
   if (!json["keepAliveEnabled"].tryGetBool(keepAliveEnabled)) keepAliveEnabled = true;

@@ -182,7 +182,12 @@ bool WiFiCredentials::FromJSON(JSON::JsonView json)
   bssid.fill(0);
   std::string bssidStr;
   if (json["bssid"].tryGetStr(bssidStr) && bssidStr.size() == 12) {
-    HexUtils::TryParseHex(bssidStr.data(), bssidStr.size(), bssid.data(), bssid.size());
+    // Parse into a temporary: TryParseHex writes byte by byte and stops at the first bad pair, and a partial
+    // BSSID would pin the network to an AP that doesn't exist.
+    std::array<uint8_t, 6> parsed {};
+    if (HexUtils::TryParseHex(bssidStr.data(), bssidStr.size(), parsed.data(), parsed.size()) == parsed.size()) {
+      bssid = parsed;
+    }
   }
 
   if (ssid.empty()) {

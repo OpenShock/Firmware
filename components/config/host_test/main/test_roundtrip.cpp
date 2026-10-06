@@ -124,9 +124,24 @@ TEST_CASE("SetRaw stores a valid buffer verbatim and GetRaw returns it", "[confi
   TEST_ASSERT_EQUAL_size_t(bytes.size(), raw.size());
   TEST_ASSERT_EQUAL_UINT8_ARRAY(bytes.data(), raw.data(), bytes.size());
 
-  // SetRaw only takes effect after a restart.
+  // SetRaw takes effect immediately and survives a restart.
+  AssertConfigEqual(MakeSampleConfig(), Snapshot());
   TEST_ASSERT_TRUE(InitFrom(StoredFile()));
   AssertConfigEqual(MakeSampleConfig(), Snapshot());
+}
+
+TEST_CASE("A setter after SetRaw keeps the imported config", "[config][roundtrip]")
+{
+  const std::vector<uint8_t> bytes = Serialize(MakeSampleConfig());
+  InitDefault();
+
+  TEST_ASSERT_TRUE(Config::SetRaw(bytes.data(), bytes.size()));
+  TEST_ASSERT_TRUE(Config::SetSerialInputConfigEchoEnabled(!MakeSampleConfig().serialInput.echoEnabled));
+
+  Config::RootConfig expected        = MakeSampleConfig();
+  expected.serialInput.echoEnabled   = !expected.serialInput.echoEnabled;
+  TEST_ASSERT_TRUE(InitFrom(StoredFile()));
+  AssertConfigEqual(expected, Snapshot());
 }
 
 TEST_CASE("Many max-length WiFi credentials survive a reload", "[config][roundtrip]")
