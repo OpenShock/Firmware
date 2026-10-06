@@ -8,6 +8,10 @@ CONFIG_ESPTOOLPY_FLASHSIZE_4MB=y
 CONFIG_PARTITION_TABLE_CUSTOM=y
 CONFIG_PARTITION_TABLE_CUSTOM_FILENAME="partitions/ota_4mb.csv"
 
+# Native USB only (no USB-UART bridge): console on the built-in USB-Serial-JTAG, so the
+# serial console reads commands from the port the host actually sees.
+CONFIG_ESP_CONSOLE_USB_SERIAL_JTAG=y
+
 # Hardware pins. Not Kconfig: bare OPENSHOCK_* lines, read by scripts/gen_env_header.py
 # into openshock_board.h and stripped from the sdkconfig fragment by scripts/build.py,
 # so boards sharing a chip and flash size compile identical ESP-IDF objects.

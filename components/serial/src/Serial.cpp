@@ -9,12 +9,17 @@
 
 #include <cstdio>
 
-// Select the console backend from the configured primary console. USB-CDC console
-// (native TinyUSB) is not handled here yet; I/O falls back to the ROM output.
+// Select the console backend from the configured primary console.
 #if defined(CONFIG_ESP_CONSOLE_USB_SERIAL_JTAG)
 #define OS_CONSOLE_USJ 1
 #include <driver/usb_serial_jtag.h>
 #include <driver/usb_serial_jtag_vfs.h>
+#elif defined(CONFIG_ESP_CONSOLE_USB_CDC)
+// ROM USB-OTG CDC console (ESP32-S2, which has no USB-Serial-JTAG). Driven through
+// the low-level console API rather than the cdcacm VFS, which would rewrite the
+// "\r\n" our log lines already carry into "\r\r\n"; UART and USJ write raw too.
+#define OS_CONSOLE_CDC 1
+#include <esp_private/usb_console.h>
 #elif defined(CONFIG_ESP_CONSOLE_UART) || defined(CONFIG_ESP_CONSOLE_UART_DEFAULT) || defined(CONFIG_ESP_CONSOLE_UART_CUSTOM)
 #define OS_CONSOLE_UART 1
 #include <driver/uart.h>
@@ -60,6 +65,7 @@ bool Serial::Init()
   }
   uart_vfs_dev_use_driver(CONFIG_ESP_CONSOLE_UART_NUM);
 #endif
+  // OS_CONSOLE_CDC: the startup code already brought the ROM CDC console up.
 
   // The command handler echoes prompts without trailing newlines, so make stdout
   // unbuffered to flush them immediately.
@@ -79,6 +85,8 @@ int Serial::Read(uint8_t* buffer, std::size_t len)
   int read = usb_serial_jtag_read_bytes(buffer, static_cast<uint32_t>(len), 0);
 #elif defined(OS_CONSOLE_UART)
   int read = uart_read_bytes(static_cast<uart_port_t>(CONFIG_ESP_CONSOLE_UART_NUM), buffer, static_cast<uint32_t>(len), 0);
+#elif defined(OS_CONSOLE_CDC)
+  int read = static_cast<int>(esp_usb_console_read_buf(reinterpret_cast<char*>(buffer), len));
 #else
   int read = 0;
 #endif
@@ -101,6 +109,28 @@ int Serial::Write(const uint8_t* data, std::size_t len)
   int written = usb_serial_jtag_write_bytes(data, len, pdMS_TO_TICKS(50));
 #elif defined(OS_CONSOLE_UART)
   int written = uart_write_bytes(static_cast<uart_port_t>(CONFIG_ESP_CONSOLE_UART_NUM), data, len);
+#elif defined(OS_CONSOLE_CDC)
+  // write_buf never blocks: it takes what fits in its TX buffer and returns 0 while the
+  // host isn't draining it. Retry for up to 50 ms (as the USJ path waits), then flush so
+  // prompts without a trailing newline go out too.
+  std::size_t sent    = 0;
+  TickType_t deadline = xTaskGetTickCount() + pdMS_TO_TICKS(50);
+  while (sent < len) {
+    ssize_t n = esp_usb_console_write_buf(reinterpret_cast<const char*>(data + sent), len - sent);
+    if (n < 0) {
+      break;
+    }
+    if (n == 0) {
+      if (xTaskGetTickCount() >= deadline) {
+        break;
+      }
+      vTaskDelay(1);
+      continue;
+    }
+    sent += static_cast<std::size_t>(n);
+  }
+  esp_usb_console_flush();
+  int written = static_cast<int>(sent);
 #else
   romWrite(data, len);
   int written = static_cast<int>(len);

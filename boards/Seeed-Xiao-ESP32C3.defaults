@@ -7,3 +7,7 @@ CONFIG_ESPTOOLPY_FLASHSIZE_4MB=y
 # OpenShock uses a single 4 MB OTA partition layout (fits every board's flash).
 CONFIG_PARTITION_TABLE_CUSTOM=y
 CONFIG_PARTITION_TABLE_CUSTOM_FILENAME="partitions/ota_4mb.csv"
+
+# Native USB only (no USB-UART bridge): console on the built-in USB-Serial-JTAG, so the
+# serial console reads commands from the port the host actually sees.
+CONFIG_ESP_CONSOLE_USB_SERIAL_JTAG=y
