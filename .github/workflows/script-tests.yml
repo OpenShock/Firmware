@@ -1,0 +1,50 @@
+# Unit tests for the CI/release scripts (.github/scripts) and the build helpers in scripts/.
+on:
+  push:
+    branches: ['**']
+    paths:
+      - '.github/scripts/**'
+      - 'scripts/**'
+      - 'partitions/**'
+      - 'boards/**'
+      - 'sdkconfig.defaults'
+      - '.github/workflows/script-tests.yml'
+  # Same-repo PR branches are covered by their push run; pull_request is for forks.
+  pull_request:
+    paths:
+      - '.github/scripts/**'
+      - 'scripts/**'
+      - 'partitions/**'
+      - 'boards/**'
+      - 'sdkconfig.defaults'
+      - '.github/workflows/script-tests.yml'
+  workflow_dispatch:
+
+name: script-tests
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  pytest:
+    if: ${{ github.event_name != 'pull_request' || github.event.pull_request.head.repo.fork }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97  # v7.0.0
+        with:
+          python-version-file: .github/scripts/.python-version
+          cache: 'pip'
+          cache-dependency-path: .github/scripts/requirements-dev.txt
+
+      - name: Install test dependencies
+        run: pip install --require-hashes -r .github/scripts/requirements-dev.txt
+
+      - name: Run tests
+        run: python -m pytest .github/scripts/tests
