@@ -33,6 +33,9 @@ TEST_CASE("Sum8 over a trivially copyable struct", "[util][checksum]")
     uint8_t a, b, c, d;
   } p {10, 20, 30, 40};
   TEST_ASSERT_EQUAL_UINT8(100, Checksum::Sum8(p));
+
+  // Usable in constant expressions
+  static_assert(Checksum::Sum8(Packed {1, 2, 3, 4}) == 10);
 }
 
 TEST_CASE("ReverseNibble reverses the low nibble bit order", "[util][checksum]")

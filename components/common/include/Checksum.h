@@ -1,10 +1,10 @@
 #pragma once
 
+#include <array>
 #include <bit>
 #include <concepts>
 #include <cstddef>
 #include <cstdint>
-#include <memory>
 #include <type_traits>
 
 namespace OpenShock::Checksum {
@@ -42,14 +42,14 @@ namespace OpenShock::Checksum {
   // ------------------------------------------------------------
   // Generic trivially copyable object overload
   // ------------------------------------------------------------
-  // Not constexpr: it reads the object representation through reinterpret_cast.
+  // std::bit_cast keeps this usable in constant expressions (reinterpret_cast is not). Constant evaluation still
+  // rejects types containing pointers, unions or padding, which have no fixed byte representation.
   template<typename T>
     requires(!std::integral<T> && std::is_trivially_copyable_v<T>)
-  inline uint8_t Sum8(const T& data)
+  constexpr uint8_t Sum8(const T& data)
   {
-    static_assert(std::is_trivially_copyable_v<T>, "Sum8 only supports trivially copyable types");
-
-    return Sum8(reinterpret_cast<const uint8_t*>(std::addressof(data)), sizeof(T));
+    const auto bytes = std::bit_cast<std::array<uint8_t, sizeof(T)>>(data);
+    return Sum8(bytes.data(), bytes.size());
   }
 
   /// @brief Reverses the bit order of the low nibble of `b` (lookup table packed into a 64-bit constant).
