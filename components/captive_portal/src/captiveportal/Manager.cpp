@@ -34,6 +34,8 @@ static std::atomic<bool> s_userDone                      = false;
 static esp_timer_handle_t s_captivePortalUpdateLoopTimer = nullptr;
 static TaskHandle_t s_managerTask                        = nullptr;
 static SimpleMutex s_instanceMutex;
+// Serializes portal start/stop between the manager task and ForceClose (called from the OTA task).
+static SimpleMutex s_lifecycleMutex;
 static std::shared_ptr<CaptivePortal::CaptivePortalInstance> s_instance = nullptr;
 static esp_netif_t* s_apNetif                                           = nullptr;
 
@@ -62,15 +64,42 @@ static std::shared_ptr<CaptivePortal::CaptivePortalInstance> GetInstance()
   ScopedLock lock__(&s_instanceMutex);
   return s_instance;
 }
-static void CreateInstance()
+static bool CreateInstance()
 {
+  auto instance = std::make_shared<CaptivePortal::CaptivePortalInstance>();
+  if (!instance->ok()) {
+    OS_LOGE(TAG, "Captive portal servers failed to start");
+    return false;  // `instance` is destroyed here, nothing was published
+  }
+
   ScopedLock lock__(&s_instanceMutex);
-  s_instance = std::make_shared<CaptivePortal::CaptivePortalInstance>();
+  s_instance = std::move(instance);
+  return true;
 }
+// Tears the instance down on the calling task and only returns once it is fully destroyed (servers stopped,
+// filesystem unmounted). Other tasks may briefly hold a copy while sending; wait for those to drop first so the
+// destructor never runs on an event-loop or httpd task.
 static void DestroyInstance()
 {
-  ScopedLock lock__(&s_instanceMutex);
-  s_instance = nullptr;
+  std::shared_ptr<CaptivePortal::CaptivePortalInstance> instance;
+  {
+    ScopedLock lock__(&s_instanceMutex);
+    instance = std::move(s_instance);
+    s_instance = nullptr;
+  }
+
+  if (instance == nullptr) {
+    return;
+  }
+
+  for (int i = 0; i < 200 && instance.use_count() > 1; ++i) {  // up to ~2 s
+    vTaskDelay(pdMS_TO_TICKS(10));
+  }
+  if (instance.use_count() > 1) {
+    OS_LOGW(TAG, "Captive portal instance still referenced elsewhere, it will be destroyed by the last holder");
+  }
+
+  instance.reset();
 }
 
 static bool captiveportal_start()
@@ -126,7 +155,10 @@ static bool captiveportal_start()
     return false;
   }
 
-  CreateInstance();
+  if (!CreateInstance()) {
+    esp_wifi_set_mode(WIFI_MODE_STA);
+    return false;
+  }
 
   return true;
 }
@@ -170,7 +202,7 @@ static void captiveportal_tick()
     s_startupGraceExpiry.store(0, std::memory_order_relaxed);
   }
 
-  // Force-closed by user (via /api/portal/close)
+  // Force-closed (OTA flashing the static filesystem); cleared again by ReleaseForceClose()
   if (s_forceClosed) {
     if (GetInstance() != nullptr) {
       OS_LOGD(TAG, "Force-closing captive portal");
@@ -225,6 +257,8 @@ static void captiveportal_managertask(void*)
 {
   for (;;) {
     ulTaskNotifyTake(pdTRUE, portMAX_DELAY);
+
+    ScopedLock lock__(&s_lifecycleMutex);
     captiveportal_tick();
   }
 }
@@ -305,19 +339,22 @@ bool CaptivePortal::ForceClose(uint32_t timeoutMs)
 {
   s_forceClosed = true;
 
-  if (GetInstance() == nullptr) return true;
-
-  while (timeoutMs > 0) {
-    uint32_t delay = std::min(timeoutMs, static_cast<uint32_t>(10U));
-
-    vTaskDelay(pdMS_TO_TICKS(delay));
-
-    timeoutMs -= delay;
-
-    if (GetInstance() == nullptr) return true;
+  // Waiting for the lifecycle lock means no start is half-way through (which could still mount the static
+  // filesystem after we return); once held, stop the portal here and return only when it is fully torn down.
+  if (!s_lifecycleMutex.lock(pdMS_TO_TICKS(timeoutMs))) {
+    return false;
   }
 
-  return false;
+  captiveportal_stop();
+
+  s_lifecycleMutex.unlock();
+
+  return true;
+}
+
+void CaptivePortal::ReleaseForceClose()
+{
+  s_forceClosed = false;
 }
 
 bool CaptivePortal::IsRunning()

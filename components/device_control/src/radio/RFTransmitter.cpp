@@ -23,12 +23,10 @@ const char* const TAG = "RFTransmitter";
 const UBaseType_t kQueueSize        = 64;
 const BaseType_t kTaskPriority      = 1;
 const uint32_t kTaskStackSize       = 4096;  // PROFILED: 1.4KB stack usage
-const float kTickrateNs             = 1000;
 const int64_t kTerminatorDurationMs = 300;
 const int32_t kRmtTimeoutMs         = 100;
 const uint8_t kFlagOverwrite        = 1 << 0;
 const uint8_t kFlagDeleteTask       = 1 << 1;
-const TickType_t kTaskIdleDelay     = pdMS_TO_TICKS(5);
 
 using namespace OpenShock;
 
@@ -152,11 +150,15 @@ void RFTransmitter::destroy()
   if (m_taskHandle != nullptr) {
     OS_LOGD(TAG, "[pin-%hhi] Stopping task", m_txPin);
 
-    // Send kill command + wait for task to exit
+    // Drop pending commands first so the kill command always fits, then wait for the task to exit
+    ClearPendingCommands();
+
     Command cmd;
     memset(&cmd, 0, sizeof(cmd));
     cmd.flags = kFlagDeleteTask;
-    xQueueSend(m_queueHandle, &cmd, pdMS_TO_TICKS(10));
+    if (xQueueSendToFront(m_queueHandle, &cmd, pdMS_TO_TICKS(100)) != pdTRUE) {
+      OS_LOGE(TAG, "[pin-%hhi] Failed to queue task kill command", m_txPin);
+    }
 
     TaskUtils::StopTask(m_taskHandle, m_taskExited, TAG, "RFTransmitter task");
 
@@ -207,33 +209,53 @@ static bool modifySequence(std::vector<Rmt::Sequence>& sequences, ShockerModelTy
   return false;
 }
 
-static void writeSequences(rmt_channel_handle_t channel, rmt_encoder_handle_t encoder, std::vector<Rmt::Sequence>& sequences)
+static void transmitSymbols(rmt_channel_handle_t channel, rmt_encoder_handle_t encoder, const rmt_symbol_word_t* symbols, size_t count)
 {
   rmt_transmit_config_t txConfig = {};
   txConfig.flags.eot_level       = 0;
 
+  esp_err_t err = rmt_transmit(channel, encoder, symbols, count * sizeof(rmt_symbol_word_t), &txConfig);
+  if (err != ESP_OK) {
+    OS_LOGE(TAG, "rmt_transmit failed: %s", esp_err_to_name(err));
+    return;
+  }
+
+  err = rmt_tx_wait_all_done(channel, kRmtTimeoutMs);
+  if (err != ESP_OK) {
+    OS_LOGE(TAG, "rmt_tx_wait_all_done failed: %s", esp_err_to_name(err));
+  }
+}
+
+static void writeSequences(rmt_channel_handle_t channel, rmt_encoder_handle_t encoder, std::vector<Rmt::Sequence>& sequences)
+{
   // Send queued commands
   for (auto seq = sequences.begin(); seq != sequences.end();) {
-    int64_t timeToLive = seq->transmitEnd() - OpenShock::millis();
+    int64_t now = OpenShock::millis();
+
+    // A round can take several frames; re-check EStop per sequence so no payload goes out after activation.
+    if (seq->transmitEnd() > now && OpenShock::EStopManager::IsEStopped()) {
+      seq->setTransmitEnd(now);
+    }
+
+    int64_t timeToLive = seq->transmitEnd() - now;
 
     if (timeToLive > 0) {
       // Send the command
-      rmt_transmit(channel, encoder, seq->payload(), seq->size() * sizeof(rmt_symbol_word_t), &txConfig);
-      rmt_tx_wait_all_done(channel, kRmtTimeoutMs);
-    } else {
-      // Remove command if it has sent out its termination sequence for long enough
-      if (timeToLive <= -kTerminatorDurationMs) {
-        seq = sequences.erase(seq);
-        continue;
-      }
-
-      // Send the termination sequence to stop the shocker
-      rmt_transmit(channel, encoder, seq->terminator(), seq->size() * sizeof(rmt_symbol_word_t), &txConfig);
-      rmt_tx_wait_all_done(channel, kRmtTimeoutMs);
+      transmitSymbols(channel, encoder, seq->payload(), seq->size());
+      ++seq;
+      continue;
     }
 
-    // Move to the next command
-    ++seq;
+    // Send the termination sequence to stop the shocker.
+    // Always sent at least once before removal, even if a slow round skipped past the whole terminator window.
+    transmitSymbols(channel, encoder, seq->terminator(), seq->size());
+
+    // Remove command if it has sent out its termination sequence for long enough
+    if (timeToLive <= -kTerminatorDurationMs) {
+      seq = sequences.erase(seq);
+    } else {
+      ++seq;
+    }
   }
 }
 
@@ -262,6 +284,9 @@ void RFTransmitter::TransmitTask()
         // Discard next item in queue
         continue;
       }
+
+      // EStop is clear when accepting a command; keep wasEstopped in sync so a re-trip is seen as a new edge.
+      wasEstopped = false;
 
       if ((cmd.flags & kFlagOverwrite) != 0) {
         // Replace the sequence if it already exists

@@ -34,29 +34,25 @@ const char* const TAG = "SerialInputHandler";
 // few that recompile on a new commit.
 #include "openshock_version.h"
 
-namespace std {
+namespace {
+  // Case-insensitive hash/equality for the command lookup table.
   struct hash_ci {
     std::size_t operator()(std::string_view str) const noexcept
     {
       std::size_t hash = 7;
 
-      for (int i = 0; i < str.size(); ++i) {
-        hash = hash * 31 + tolower(str[i]);
+      for (char c : str) {
+        hash = hash * 31 + tolower(static_cast<unsigned char>(c));
       }
 
       return hash;
     }
   };
 
-  template<>
-  struct less<std::string_view> {
-    bool operator()(std::string_view a, std::string_view b) const { return a < b; }
-  };
-
   struct equals_ci {
     bool operator()(std::string_view a, std::string_view b) const { return OpenShock::StringIEquals(a, b); }
   };
-}  // namespace std
+}  // namespace
 
 using namespace std::string_view_literals;
 
@@ -67,7 +63,7 @@ const std::size_t SERIAL_BUFFER_MAX_CAPACITY = 4096;
 
 static bool s_echoEnabled = true;
 static std::vector<OpenShock::SerialCmds::CommandGroup> s_commandGroups;
-static std::unordered_map<std::string_view, OpenShock::SerialCmds::CommandGroup, std::hash_ci, std::equals_ci> s_commandHandlers;
+static std::unordered_map<std::string_view, OpenShock::SerialCmds::CommandGroup, hash_ci, equals_ci> s_commandHandlers;
 
 static void printCompleteHelp()
 {
@@ -312,13 +308,13 @@ public:
   constexpr std::size_t capacity() const noexcept { return m_capacity; }
   constexpr bool empty() const noexcept { return m_size == 0; }
 
-  constexpr void clear() noexcept { m_size = 0; }
-  inline void destroy()
+  // Set when a line outgrew SERIAL_BUFFER_MAX_CAPACITY; the rest of that line is discarded and it is never executed.
+  constexpr bool overflowed() const noexcept { return m_overflowed; }
+
+  constexpr void clear() noexcept
   {
-    delete[] m_data;
-    m_data     = nullptr;
-    m_size     = 0;
-    m_capacity = 0;
+    m_size       = 0;
+    m_overflowed = false;
   }
 
   inline void reserve(std::size_t size)
@@ -326,9 +322,10 @@ public:
     size = (size + 31) & ~31;  // Align to 32 bytes
 
     if (size > SERIAL_BUFFER_MAX_CAPACITY) {
-      OS_LOGE(TAG, "Refused to reserve %zu bytes, clearing buffer", size);
-      size   = SERIAL_BUFFER_MAX_CAPACITY;
-      m_size = 0;
+      OS_LOGE(TAG, "Line exceeds %zu bytes, discarding it", SERIAL_BUFFER_MAX_CAPACITY);
+      m_size       = 0;
+      m_overflowed = true;
+      return;
     }
     if (size <= m_capacity) {
       return;
@@ -345,29 +342,17 @@ public:
     m_data[m_capacity - 1] = 0;
   }
 
-  inline void push_back(char c)
-  {
-    if (m_size >= m_capacity) {
-      reserve(m_size + 16);
-    }
-
-    m_data[m_size++] = c;
-  }
-
   inline void append(const char* data, std::size_t len)
   {
-    if (len == 0) {
+    if (len == 0 || m_overflowed) {
       return;
     }
 
     if (m_size + len > m_capacity) {
       reserve(m_size + len);
-    }
-
-    // reserve() clamps to SERIAL_BUFFER_MAX_CAPACITY and may have reset m_size;
-    // never write past the allocation.
-    if (len > m_capacity - m_size) {
-      len = m_capacity - m_size;
+      if (m_overflowed) {
+        return;
+      }
     }
 
     std::memcpy(m_data + m_size, data, len);
@@ -387,6 +372,7 @@ private:
   char* m_data;
   std::size_t m_size;
   std::size_t m_capacity;
+  bool m_overflowed = false;
 };
 
 enum class SerialReadResult {
@@ -436,8 +422,8 @@ static SerialReadResult tryReadSerialLine(SerialBuffer& buffer)
     while (i < end) {
       char c = chunk[i];
 
-      // Backspace: erase the last buffered character.
-      if (c == '\b') {
+      // Backspace (BS, or DEL as most terminals send it): erase the last buffered character.
+      if (c == '\b' || c == '\x7F') {
         buffer.pop_back();
         ++i;
         continue;
@@ -446,7 +432,7 @@ static SerialReadResult tryReadSerialLine(SerialBuffer& buffer)
       // Line end: dispatch the line, or swallow blank lines.
       if (c == '\r' || c == '\n') {
         ++i;
-        if (!buffer.empty()) {
+        if (!buffer.empty() || buffer.overflowed()) {
           s_rxStagingHead = i;
           return SerialReadResult::LineEnd;
         }
@@ -490,7 +476,8 @@ static SerialReadResult tryReadSerialLine(SerialBuffer& buffer)
   return gotData ? SerialReadResult::Data : SerialReadResult::NoData;
 }
 
-static void skipSerialWhitespaces(SerialBuffer& buffer)
+// Skips whitespace between lines; the first other byte is left in staging for tryReadSerialLine to filter.
+static void skipSerialWhitespaces()
 {
   while (fillRxStaging()) {
     const char* chunk     = reinterpret_cast<const char*>(s_rxStaging);
@@ -498,12 +485,12 @@ static void skipSerialWhitespaces(SerialBuffer& buffer)
     std::size_t i         = s_rxStagingHead;
 
     while (i < end) {
-      char c = chunk[i++];
+      char c = chunk[i];
       if (c != ' ' && c != '\r' && c != '\n') {
-        buffer.push_back(c);
         s_rxStagingHead = i;
         return;
       }
+      ++i;
     }
 
     s_rxStagingHead = i;  // drained; loop refills
@@ -562,9 +549,15 @@ static void processSerialLine(std::string_view line)
     OS_SERIAL_PRINTLN();
   }
 
+  // Line may be just "$" (or "$" plus whitespace)
+  line = OpenShock::StringTrim(line);
+  if (line.empty()) {
+    return;
+  }
+
   auto parts                 = OpenShock::StringSplit(line, ' ', 1);
   std::string_view command   = OpenShock::StringTrim(parts[0]);
-  std::string_view arguments = parts.size() > 1 ? parts[1] : std::string_view();
+  std::string_view arguments = parts.size() > 1 ? OpenShock::StringTrim(parts[1]) : std::string_view();
 
   if (command == "help"sv) {
     handleHelpCommand(arguments, isAutomated);
@@ -577,34 +570,37 @@ static void processSerialLine(std::string_view line)
     return;
   }
 
-  // Get potential subcommand
+  // Get potential subcommand (arguments are trimmed, so the first token is never empty)
   std::string_view firstArg;
-  parts = OpenShock::StringSplit(arguments, ' ');
-  if (parts.size() > 1) {
-    firstArg = OpenShock::StringTrim(parts[0]);
-  } else {
-    firstArg = arguments;
+  std::string_view subArguments;
+  if (!arguments.empty()) {
+    parts        = OpenShock::StringSplit(arguments, ' ', 1);
+    firstArg     = parts[0];
+    subArguments = parts.size() > 1 ? OpenShock::StringTrim(parts[1]) : std::string_view();
   }
 
   // If the first argument is not empty, try to find a subcommand that matches
   if (!firstArg.empty()) {
+    bool nameMatched = false;
     for (SerialCmds::CommandEntry& cmd : it->second.commands()) {
       // Check subcommand name
       if (cmd.name() != firstArg) {
         continue;
       }
+      nameMatched = true;
 
-      // Check if the subcommand requires arguments
-      if (cmd.arguments().size() > 1 && parts.size() < 2) {
-        printCommandHelp(it->second);
-        return;
+      // A getter and a setter can share a name; skip variants that need arguments when none were given
+      if (cmd.arguments().size() > 0 && subArguments.empty()) {
+        continue;
       }
 
-      // Command found, remove the subcommand from the arguments
-      arguments = OpenShock::StringTrim(arguments.substr(firstArg.size()));
-
       // Execute the subcommand
-      cmd.commandHandler()(arguments, isAutomated);
+      cmd.commandHandler()(subArguments, isAutomated);
+      return;
+    }
+
+    if (nameMatched) {
+      printCommandHelp(it->second);
       return;
     }
   }
@@ -637,17 +633,16 @@ static void serialRxTask(void*)
   while (true) {
     switch (tryReadSerialLine(buffer)) {
       case SerialReadResult::LineEnd:
-        processSerialLine(buffer);
-
-        // Deallocate memory if the buffer is too large
-        if (buffer.capacity() > SERIAL_BUFFER_MAX_CAPACITY) {
-          buffer.destroy();
+        if (buffer.overflowed()) {
+          SERPR_ERROR("Line too long (max %zu bytes), ignored", SERIAL_BUFFER_MAX_CAPACITY);
         } else {
-          buffer.clear();
+          processSerialLine(buffer);
         }
 
+        buffer.clear();
+
         // Skip any remaining trailing whitespaces
-        skipSerialWhitespaces(buffer);
+        skipSerialWhitespaces();
         break;
       case SerialReadResult::AutoCompleteRequest:
         OS_SERIAL_PRINTF(CLEAR_LINE "> %.*s [AutoComplete is not implemented]", static_cast<int>(buffer.size()), buffer.data());

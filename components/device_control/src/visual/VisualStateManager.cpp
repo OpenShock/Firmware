@@ -37,6 +37,7 @@ const uint64_t kWiFiScanningFlag                 = 1 << 7;
 const uint64_t kStatusOKMask = kWebSocketConnectedFlag | kHasIpAddressFlag | kWiFiConnectedFlag;
 
 static std::atomic<uint64_t> s_stateFlags = 0;
+static std::atomic<bool> s_ledTestActive   = false;  // While set, the LED test owns the LEDs; flags keep tracking live state
 static std::unique_ptr<OpenShock::MonoLedDriver> s_monoLedDriver;
 static std::unique_ptr<OpenShock::RgbLedDriver> s_rgbLedDriver;
 
@@ -47,11 +48,6 @@ static inline void setStateFlag(uint64_t flag, bool state)
   } else {
     s_stateFlags.fetch_and(~flag, std::memory_order_relaxed);
   }
-}
-
-static inline bool isStateFlagSet(uint64_t flag)
-{
-  return s_stateFlags.load(std::memory_order_relaxed) & flag;
 }
 
 using namespace OpenShock;
@@ -201,12 +197,12 @@ static inline void updateVisualStateGPIO(const MonoLedDriver::State (&override)[
 
 // Check-Set-Return pattern for setting a pattern based on a flag
 #define CSR_PATTERN(manager, flag, pattern) \
-  if (isStateFlagSet(flag)) {               \
+  if ((flags & (flag)) != 0) {              \
     manager->SetPattern(pattern);           \
     return;                                 \
   }
 
-static void updateVisualStateGPIO()
+static void updateVisualStateGPIO(uint64_t flags)
 {
   CSR_PATTERN(s_monoLedDriver, kCriticalErrorFlag, kCriticalErrorPattern);
   CSR_PATTERN(s_monoLedDriver, kEmergencyStopAwaitingReleaseFlag, kEmergencyStopAwaitingReleasePattern);
@@ -219,7 +215,7 @@ static void updateVisualStateGPIO()
   s_monoLedDriver->SetPattern(kWiFiDisconnectedPattern);
 }
 
-static void updateVisualStateRGB()
+static void updateVisualStateRGB(uint64_t flags)
 {
   CSR_PATTERN(s_rgbLedDriver, kCriticalErrorFlag, kCriticalErrorRGBPattern);
   CSR_PATTERN(s_rgbLedDriver, kEmergencyStopAwaitingReleaseFlag, kEmergencyStopAwaitingReleaseRGBPattern);
@@ -232,32 +228,41 @@ static void updateVisualStateRGB()
   s_rgbLedDriver->SetPattern(kWiFiDisconnectedRGBPattern);
 }
 
-static void updateVisualState()
+static void applyVisualState(uint64_t flags)
 {
   bool gpioActive = s_monoLedDriver != nullptr;
   bool rgbActive  = s_rgbLedDriver != nullptr;
 
   if (gpioActive && rgbActive) {
-    if (s_stateFlags == kStatusOKMask) {
+    if (flags == kStatusOKMask) {
       updateVisualStateGPIO(kSolidOnPattern);
     } else {
       updateVisualStateGPIO(kSolidOffPattern);
     }
-    updateVisualStateRGB();
+    updateVisualStateRGB(flags);
     return;
   }
 
   if (gpioActive) {
-    updateVisualStateGPIO();
+    updateVisualStateGPIO(flags);
     return;
   }
 
   if (rgbActive) {
-    updateVisualStateRGB();
+    updateVisualStateRGB(flags);
     return;
   }
 
   OS_LOGW(TAG, "Trying to update visual state, but no LED is active!");
+}
+
+static void updateVisualState()
+{
+  if (s_ledTestActive.load(std::memory_order_relaxed)) {
+    return;  // Re-applied from the live flags when the test finishes
+  }
+
+  applyVisualState(s_stateFlags.load(std::memory_order_relaxed));
 }
 
 static void handleEspWiFiEvent(void* event_handler_arg, esp_event_base_t event_base, int32_t event_id, void* event_data)
@@ -438,8 +443,11 @@ void VisualStateManager::SetScanningStarted()
 
 void VisualStateManager::RunLedTest()
 {
-  // Save current state
-  uint64_t savedFlags = s_stateFlags.load(std::memory_order_relaxed);
+  // Take over the LEDs; state events keep updating s_stateFlags but don't touch the LEDs until the test ends
+  if (s_ledTestActive.exchange(true, std::memory_order_relaxed)) {
+    OS_LOGW(TAG, "LED test already running");
+    return;
+  }
 
   OS_LOGI(TAG, "=== LED Test Started ===");
 
@@ -558,13 +566,12 @@ void VisualStateManager::RunLedTest()
   OS_LOGI(TAG, "  State patterns:");
   for (const auto& step : steps) {
     OS_LOGI(TAG, "    %s", step.name);
-    s_stateFlags.store(step.flags, std::memory_order_relaxed);
-    updateVisualState();
+    applyVisualState(step.flags);
     vTaskDelay(pdMS_TO_TICKS(step.durationMs));
   }
 
-  // Restore original state
+  // Show the live state again (including anything that changed during the test, e.g. an E-Stop)
   OS_LOGI(TAG, "=== LED Test Complete, restoring state ===");
-  s_stateFlags.store(savedFlags, std::memory_order_relaxed);
+  s_ledTestActive.store(false, std::memory_order_relaxed);
   updateVisualState();
 }

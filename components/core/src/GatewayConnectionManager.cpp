@@ -15,9 +15,11 @@ const char* const TAG = "GatewayConnectionManager";
 
 #include "SimpleMutex.h"
 
+#include <algorithm>
 #include <atomic>
 #include <memory>
 #include <unordered_map>
+#include <vector>
 
 const char* const AUTH_TOKEN_FILE = "/authToken";
 
@@ -30,9 +32,14 @@ const uint8_t LINK_CODE_LENGTH = 6;
 static std::atomic<uint8_t> s_flags                 = 0;
 static std::atomic<int64_t> s_lastAuthFailure       = 0;
 static std::atomic<int64_t> s_lastConnectionAttempt = 0;
-static std::atomic_flag s_isInitializing            = ATOMIC_FLAG_INIT;
+static std::atomic<int64_t> s_nextHubInfoAttempt    = 0;
+static std::atomic<int64_t> s_hubInfoBackoffMs      = 0;
 static OpenShock::SimpleMutex s_clientMutex;
 static std::shared_ptr<OpenShock::GatewayClient> s_wsClient = nullptr;
+// Clients taken out of service but not yet destroyed. Destruction blocks (websocket close + task stop), so it is
+// deferred to the main task in reapRetiredClients() instead of running under s_clientMutex, on the event loop, or
+// on the websocket task (where stopping the client from inside its own task is not allowed).
+static std::vector<std::shared_ptr<OpenShock::GatewayClient>> s_retiredClients;
 
 static std::shared_ptr<OpenShock::GatewayClient> GetClient()
 {
@@ -47,7 +54,29 @@ static void CreateClient(const std::string& authToken)
 static void DestroyClient()
 {
   OpenShock::ScopedLock lock__(&s_clientMutex);
-  s_wsClient = nullptr;
+  if (s_wsClient != nullptr) {
+    s_wsClient->retire();
+    s_retiredClients.push_back(std::move(s_wsClient));
+    s_wsClient = nullptr;
+  }
+}
+// Main task only. Destroys retired clients that no other task still holds a reference to.
+static void reapRetiredClients()
+{
+  std::vector<std::shared_ptr<OpenShock::GatewayClient>> reapable;
+  {
+    OpenShock::ScopedLock lock__(&s_clientMutex);
+    for (auto it = s_retiredClients.begin(); it != s_retiredClients.end();) {
+      // No new references can be taken once retired, so a use_count of 1 means we are the sole owner.
+      if (it->use_count() == 1) {
+        reapable.push_back(std::move(*it));
+        it = s_retiredClients.erase(it);
+      } else {
+        ++it;
+      }
+    }
+  }
+  // `reapable` goes out of scope here, outside the lock, running the destructors on this task.
 }
 
 static void handleWiFiStateChanged(void* arg, esp_event_base_t base, int32_t id, void* data)
@@ -115,8 +144,6 @@ AccountLinkResultCode GatewayConnectionManager::Link(std::string_view linkCode)
     return AccountLinkResultCode::NoInternetConnection;
   }
 
-  DestroyClient();
-
   OS_LOGD(TAG, "Attempting to link to account using code %.*s", static_cast<int>(linkCode.length()), linkCode.data());
 
   if (linkCode.length() != LINK_CODE_LENGTH) {
@@ -166,6 +193,9 @@ AccountLinkResultCode GatewayConnectionManager::Link(std::string_view linkCode)
     return AccountLinkResultCode::ConfigSaveFailed;
   }
 
+  // Only drop the existing connection once the new token is in place; a failed link keeps the current session.
+  DestroyClient();
+
   s_flags.fetch_or(FLAG_LINKED, std::memory_order_relaxed);
   OS_LOGD(TAG, "Successfully linked to account");
 
@@ -176,6 +206,21 @@ void GatewayConnectionManager::UnLink()
   s_flags.fetch_and(static_cast<uint8_t>(~FLAG_LINKED), std::memory_order_relaxed);
   DestroyClient();
   Config::ClearBackendAuthToken();
+}
+bool GatewayConnectionManager::SetAuthToken(std::string authToken)
+{
+  if (!Config::SetBackendAuthToken(std::move(authToken))) {
+    return false;
+  }
+
+  // Drop the session using the old token; the main task verifies the new one and reconnects (and broadcasts the link status).
+  s_flags.fetch_and(static_cast<uint8_t>(~FLAG_LINKED), std::memory_order_relaxed);
+  s_lastAuthFailure    = 0;
+  s_hubInfoBackoffMs   = 0;
+  s_nextHubInfoAttempt = 0;
+  DestroyClient();
+
+  return true;
 }
 
 bool GatewayConnectionManager::SendMessageTXT(std::string_view data)
@@ -208,7 +253,7 @@ void GatewayConnectionManager::MarkPingReceived()
   client->markPingReceived();
 }
 
-bool FetchHubInfo(std::string authToken)
+static bool FetchHubInfo(std::string authToken)
 {
   // TODO: this function is very slow, should be optimized!
   if ((s_flags.load(std::memory_order_relaxed) & FLAG_HAS_IP) == 0) {
@@ -247,12 +292,10 @@ bool FetchHubInfo(std::string authToken)
     OS_LOGI(TAG, "  [%s] rf=%u model=%u", shocker.id.c_str(), shocker.rfId, shocker.model);
   }
 
-  s_flags.fetch_or(FLAG_LINKED, std::memory_order_relaxed);
-
   return true;
 }
 
-bool StartConnectingToLCG()
+static bool StartConnectingToLCG()
 {
   auto client = GetClient();
   if (client == nullptr) {
@@ -261,8 +304,6 @@ bool StartConnectingToLCG()
   }
 
   if (client->state() != GatewayClientState::Disconnected) {
-    OS_LOGD(TAG, "WebSocketClient is not disconnected, waiting...");
-    client->disconnect();
     return false;
   }
 
@@ -310,12 +351,17 @@ bool StartConnectingToLCG()
   return true;
 }
 
-void InitializeClient()
+static void InitializeClient()
 {
   DestroyClient();
 
   // No client — check prerequisites
   if ((s_flags.load(std::memory_order_relaxed) & FLAG_HAS_IP) == 0 || !Config::HasBackendAuthToken()) {
+    return;
+  }
+
+  int64_t now = OpenShock::millis();
+  if (now < s_nextHubInfoAttempt) {
     return;
   }
 
@@ -326,6 +372,18 @@ void InitializeClient()
   }
 
   if (!FetchHubInfo(authToken)) {
+    // Back off on failure so an unreachable backend isn't polled on every update tick (5 s doubling up to 5 min).
+    s_hubInfoBackoffMs   = s_hubInfoBackoffMs == 0 ? 5'000 : std::min<int64_t>(s_hubInfoBackoffMs * 2, 300'000);
+    s_nextHubInfoAttempt = OpenShock::millis() + s_hubInfoBackoffMs;
+    return;
+  }
+  s_hubInfoBackoffMs   = 0;
+  s_nextHubInfoAttempt = 0;
+
+  // The token may have been cleared or replaced (UnLink / Link) while the request was in flight.
+  std::string currentToken;
+  if (!Config::GetBackendAuthToken(currentToken) || currentToken != authToken) {
+    OS_LOGD(TAG, "Auth token changed while verifying it, discarding result");
     return;
   }
 
@@ -339,6 +397,8 @@ void InitializeClient()
 
 void GatewayConnectionManager::Update()
 {
+  reapRetiredClients();
+
   auto client = GetClient();
   if (client != nullptr) {
     // Client exists — run its loop and optionally reconnect
@@ -350,12 +410,6 @@ void GatewayConnectionManager::Update()
     return;
   }
 
-  if (s_isInitializing.test_and_set()) {
-    OS_LOGE(TAG, "Was about to initialize GatewayClient, but encountered race condition, yielding.");
-    return;
-  }
-
+  // Only ever called from the main task, so initialization can't race with itself.
   InitializeClient();
-
-  s_isInitializing.clear();
 }

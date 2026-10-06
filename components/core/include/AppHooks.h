@@ -14,13 +14,15 @@ namespace OpenShock::AppHooks {
   typedef void (*SetAlwaysEnabledFn)(bool alwaysEnabled);
   typedef FirmwareBootType (*GetFirmwareBootTypeFn)();
   typedef bool (*TryStartFirmwareUpdateFn)(const OpenShock::SemVer& version);
+  typedef bool (*RequestUpdateCheckFn)();
 
   void RegisterCaptivePortal(BroadcastMessageBINFn broadcastMessageBIN, SetAlwaysEnabledFn setAlwaysEnabled);
-  void RegisterOtaUpdateManager(GetFirmwareBootTypeFn getFirmwareBootType, TryStartFirmwareUpdateFn tryStartFirmwareUpdate);
+  void RegisterOtaUpdateManager(GetFirmwareBootTypeFn getFirmwareBootType, TryStartFirmwareUpdateFn tryStartFirmwareUpdate, RequestUpdateCheckFn requestUpdateCheck);
 
   bool CaptivePortalBroadcastMessageBIN(std::span<const uint8_t> data);
   void CaptivePortalSetAlwaysEnabled(bool alwaysEnabled);
 
   FirmwareBootType OtaGetFirmwareBootType();
   bool OtaTryStartFirmwareUpdate(const OpenShock::SemVer& version);
+  bool OtaRequestUpdateCheck();
 }  // namespace OpenShock::AppHooks

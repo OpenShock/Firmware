@@ -37,11 +37,12 @@ bool Gateway::SerializePongMessage(Common::SerializationCallbackFn callback)
     return false;
   }
 
-  int rssi;
+  // A missing RSSI must not suppress the Pong, or the gateway would treat the hub as unresponsive.
+  int rssi      = 0;
   esp_err_t err = esp_wifi_sta_get_rssi(&rssi);
   if (err != ESP_OK) {
-    OS_LOGE(TAG, "Failed to get WiFi RSSI: %d", err);
-    return false;
+    OS_LOGW(TAG, "Failed to get WiFi RSSI: %s", esp_err_to_name(err));
+    rssi = 0;
   }
 
   flatbuffers::FlatBufferBuilder builder(64);

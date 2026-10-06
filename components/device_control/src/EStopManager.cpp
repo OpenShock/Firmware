@@ -57,17 +57,23 @@ static void estopmgr_publishState(EStopState state, EStopState& lastState, TickT
   }
 }
 
+static void estopmgr_latchWithoutTask();
+
 // Samples the estop at a fixed rate and updates internal state + events
 static void estopmgr_managerTask(void* pvParameters)
 {
   // Pin is being passed as a pointer, cast it back to gpio number type to get pin value
   gpio_num_t estopPin = static_cast<gpio_num_t>(reinterpret_cast<uintptr_t>(pvParameters));
 
-  // Ensure known initial state
-  s_estopActivatedAt.store(0, std::memory_order_relaxed);
-
   EStopStateMachine machine;
   EStopState lastPublishedState = EStopState::Idle;
+
+  // Carry over an E-Stop latched while no task was running (software trigger); it must be cleared with the button.
+  int64_t latchedAt = s_estopActivatedAt.load(std::memory_order_relaxed);
+  if (latchedAt != 0) {
+    machine.Trigger(latchedAt);
+    lastPublishedState = EStopState::Active;  // Already published when it was latched
+  }
 
   // Check if killing manager was requested, continue looping otherwise
   while (!s_killEStopManagerRequested.load(std::memory_order_relaxed)) {
@@ -203,6 +209,11 @@ static bool estopmgr_taskStop()
   // Disable E-Stop after task has stopped to ensure that the task didn't get it stuck in enabled state
   s_estopActivatedAt.store(0, std::memory_order_relaxed);
 
+  // A software trigger that arrived while the task was shutting down was never consumed; don't lose it.
+  if (s_externallyTriggered.exchange(false, std::memory_order_relaxed)) {
+    estopmgr_latchWithoutTask();
+  }
+
   return true;
 }
 
@@ -242,6 +253,12 @@ bool EStopManager::SetEStopEnabled(bool enabled)
     return estopmgr_taskStart();
   }
 
+  // Stopping the task resets the activation, which would release an active EStop without the hold-to-clear.
+  if (EStopManager::IsEStopped()) {
+    OS_LOGW(TAG, "Refusing to disable EStop while it is active");
+    return false;
+  }
+
   return estopmgr_taskStop();
 }
 
@@ -251,6 +268,12 @@ bool EStopManager::SetEStopPin(gpio_num_t pin)
 
   if (s_estopPin == pin) {
     return true;
+  }
+
+  // Restarting the task resets the activation, which would release an active EStop without the hold-to-clear.
+  if (EStopManager::IsEStopped()) {
+    OS_LOGW(TAG, "Refusing to change EStop pin while EStop is active");
+    return false;
   }
 
   // Configure the new pin before touching anything else. If this fails the
@@ -294,8 +317,30 @@ int64_t EStopManager::LastEStopped()
   return s_estopActivatedAt.load(std::memory_order_relaxed);
 }
 
+// Requires s_estopMutex. Activates the E-Stop directly when no manager task is running to pick up the trigger.
+// Without a task there is no button to clear it, so it stays active until reboot or until a task (with a pin)
+// takes it over and the button is held to clear it.
+static void estopmgr_latchWithoutTask()
+{
+  int64_t expected = 0;
+  if (!s_estopActivatedAt.compare_exchange_strong(expected, OpenShock::millis(), std::memory_order_relaxed)) {
+    return;  // Already active
+  }
+
+  EStopState lastState = EStopState::Idle;
+  estopmgr_publishState(EStopState::Active, lastState, portMAX_DELAY);
+}
+
 void EStopManager::SoftwareTrigger()
 {
-  // This will be picked up by the checker task and lead to an E-Stop activation
-  s_externallyTriggered.store(true, std::memory_order_relaxed);
+  OpenShock::ScopedLock lock__(&s_estopMutex);
+
+  if (s_estopTask != nullptr) {
+    // Picked up by the manager task on its next tick
+    s_externallyTriggered.store(true, std::memory_order_relaxed);
+    return;
+  }
+
+  OS_LOGW(TAG, "Software EStop triggered without an EStop input configured, latching until reboot");
+  estopmgr_latchWithoutTask();
 }

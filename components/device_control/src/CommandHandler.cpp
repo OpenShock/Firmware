@@ -78,8 +78,8 @@ static void commandhandler_keepalivetask(void* arg)
 
   int64_t timeToKeepAlive = KEEP_ALIVE_INTERVAL;
 
-  // Map of shocker IDs to time of next keep-alive
-  std::unordered_map<uint16_t, KnownShocker> activityMap;
+  // Map of (model, shocker ID) to its last activity; IDs are only unique per model
+  std::unordered_map<uint32_t, KnownShocker> activityMap;
 
   while (true) {
     // Calculate eepyTime based on the timeToKeepAlive
@@ -92,7 +92,7 @@ static void commandhandler_keepalivetask(void* arg)
         goto exit;  // Break out of nested loop so locals destruct before vTaskDelete
       }
 
-      activityMap[cmd.shockerId] = cmd;
+      activityMap[(static_cast<uint32_t>(cmd.model) << 16) | cmd.shockerId] = cmd;
 
       eepyTime = calculateEepyTime(std::min(timeToKeepAlive, cmd.lastActivityTimestamp + KEEP_ALIVE_INTERVAL));
     }
@@ -133,13 +133,14 @@ exit:  // Locals (activityMap) destruct here before task deletion
 
 static bool internalSetKeepAliveEnabled(bool enabled)
 {
+  // Called from the event loop (EStop changes) and from serial/portal tasks; the check must be under the lock.
+  ScopedLock lock__(&s_keepAliveMutex);
+
   bool wasEnabled = s_keepAliveQueue != nullptr && s_keepAliveTaskHandle != nullptr;
 
   if (enabled == wasEnabled) {
     return true;
   }
-
-  ScopedLock lock__(&s_keepAliveMutex);
 
   if (enabled) {
     OS_LOGV(TAG, "Enabling keep-alive task");
@@ -162,11 +163,15 @@ static bool internalSetKeepAliveEnabled(bool enabled)
   } else {
     OS_LOGV(TAG, "Disabling keep-alive task");
     if (s_keepAliveTaskHandle != nullptr && s_keepAliveQueue != nullptr) {
-      // Send kill command + wait for task to exit
+      // Drop pending activity so the kill command always fits, then wait for the task to exit
+      xQueueReset(s_keepAliveQueue);
+
       KnownShocker cmd;
       memset(&cmd, 0, sizeof(cmd));
       cmd.killTask = true;
-      xQueueSend(s_keepAliveQueue, &cmd, pdMS_TO_TICKS(10));
+      if (xQueueSend(s_keepAliveQueue, &cmd, pdMS_TO_TICKS(100)) != pdTRUE) {
+        OS_LOGE(TAG, "Failed to queue keep-alive kill command");
+      }
 
       TaskUtils::StopTask(s_keepAliveTaskHandle, s_keepAliveTaskExited, TAG, "Keep-alive task");
       s_keepAliveTaskHandle = nullptr;
@@ -212,12 +217,24 @@ bool CommandHandler::Init()
     OS_LOGW(TAG, "RF Transmitter and EStopManager are already initialized?");
     return true;
   }
+
+  // Register first so EStop changes gate the keep-alive task even if the transmitter can't be created yet
+  // (it can still be brought up later through SetRfTxPin).
+  err = esp_event_handler_register(OPENSHOCK_EVENTS, OPENSHOCK_EVENT_ESTOP_STATE_CHANGED, commandhandler_handleestopstatechange, nullptr);
+  if (err != ESP_OK) {
+    OS_LOGE(TAG, "Failed to register event handler for OPENSHOCK_EVENTS: %s", esp_err_to_name(err));
+    return false;
+  }
   initialized = true;
 
   Config::RFConfig rfConfig;
   if (!Config::GetRFConfig(rfConfig)) {
     OS_LOGE(TAG, "Failed to get RF config");
     return false;
+  }
+
+  if (rfConfig.keepAliveEnabled && !EStopManager::IsEStopped()) {
+    internalSetKeepAliveEnabled(true);
   }
 
   gpio_num_t txPin = rfConfig.txPin;
@@ -242,24 +259,6 @@ bool CommandHandler::Init()
     return false;
   }
 
-  if (rfConfig.keepAliveEnabled) {
-    internalSetKeepAliveEnabled(true);
-  }
-
-  Config::EStopConfig estopConfig;
-  if (!Config::GetEStop(estopConfig)) {
-    OS_LOGE(TAG, "Failed to get EStop config");
-    return false;
-  }
-
-  err = esp_event_handler_register(OPENSHOCK_EVENTS, OPENSHOCK_EVENT_ESTOP_STATE_CHANGED, commandhandler_handleestopstatechange, nullptr);
-  if (err != ESP_OK) {
-    OS_LOGE(TAG, "Failed to register event handler for OPENSHOCK_EVENTS: %s", esp_err_to_name(err));
-    return false;
-  }
-
-  // TODO: Implement EStopManager pin change logic
-
   return true;
 }
 
@@ -274,12 +273,26 @@ SetGPIOResultCode CommandHandler::SetRfTxPin(gpio_num_t txPin)
     return SetGPIOResultCode::InvalidPin;
   }
 
-  DestroyTransmitter();
+  gpio_num_t oldPin = static_cast<gpio_num_t>(OPENSHOCK_GPIO_INVALID);
+  if (auto current = GetTransmitter(); current != nullptr) {
+    oldPin = current->GetTxPin();
+  }
 
-  OS_LOGV(TAG, "Creating new RF transmitter");
-  if (!TryCreateTransmitter(txPin)) {
-    OS_LOGE(TAG, "Failed to initialize RF transmitter");
-    return SetGPIOResultCode::InternalError;
+  if (oldPin != txPin) {
+    // Free the old RMT channel first: two live channels can exhaust TX channels on smaller chips.
+    DestroyTransmitter();
+
+    OS_LOGV(TAG, "Creating new RF transmitter");
+    if (!TryCreateTransmitter(txPin)) {
+      OS_LOGE(TAG, "Failed to initialize RF transmitter");
+
+      // Keep RF working on the previous pin rather than leaving it down
+      if (OpenShock::IsValidOutputPin(oldPin) && !TryCreateTransmitter(oldPin)) {
+        OS_LOGE(TAG, "Failed to restore RF transmitter on previous pin %hhi", oldPin);
+      }
+
+      return SetGPIOResultCode::InternalError;
+    }
   }
 
   if (!Config::SetRFConfigTxPin(txPin)) {

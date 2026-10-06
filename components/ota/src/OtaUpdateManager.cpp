@@ -53,8 +53,9 @@ using namespace std::string_view_literals;
 
 enum OtaTaskEventFlag : uint32_t {
   OTA_TASK_EVENT_UPDATE_REQUESTED  = 1 << 0,
-  OTA_TASK_EVENT_WIFI_DISCONNECTED = 1 << 1,  // If both connected and disconnected are set, disconnected takes priority.
+  OTA_TASK_EVENT_WIFI_DISCONNECTED = 1 << 1,  // If both connected and disconnected are set, the current link state decides.
   OTA_TASK_EVENT_WIFI_CONNECTED    = 1 << 2,
+  OTA_TASK_EVENT_CHECK_REQUESTED   = 1 << 3,
 };
 
 static esp_ota_img_states_t _otaImageState;
@@ -253,12 +254,25 @@ static bool otaum_flash_fs_partition(OpenShock::HTTP::Client& client, const esp_
   return true;
 }
 
-static esp_err_t otaum_set_wdt_timeout(uint32_t timeoutMs)
+// Only the timeout is changed; idle-core mask and panic behaviour stay as configured in sdkconfig.
+static esp_err_t otaum_set_wdt_timeout(uint32_t timeoutSeconds)
 {
+  uint32_t idleCoreMask = 0;
+#if CONFIG_ESP_TASK_WDT_CHECK_IDLE_TASK_CPU0
+  idleCoreMask |= 1U << 0;
+#endif
+#if CONFIG_ESP_TASK_WDT_CHECK_IDLE_TASK_CPU1
+  idleCoreMask |= 1U << 1;
+#endif
+
   esp_task_wdt_config_t twdt_config = {
-    .timeout_ms     = timeoutMs,
-    .idle_core_mask = (1 << CONFIG_FREERTOS_NUMBER_OF_CORES) - 1,  // Bitmask of all cores
-    .trigger_panic  = true,
+    .timeout_ms     = timeoutSeconds * 1000U,
+    .idle_core_mask = idleCoreMask,
+#if CONFIG_ESP_TASK_WDT_PANIC
+    .trigger_panic = true,
+#else
+    .trigger_panic = false,
+#endif
   };
   // ESP-IDF initializes the TWDT at startup (CONFIG_ESP_TASK_WDT_INIT, default y), so
   // reconfigure it instead of re-initializing. esp_task_wdt_reconfigure() returns
@@ -274,7 +288,7 @@ static esp_err_t otaum_set_wdt_timeout(uint32_t timeoutMs)
 
 static void otaum_restore_wdt_timeout()
 {
-  if (otaum_set_wdt_timeout(5) != ESP_OK) {
+  if (otaum_set_wdt_timeout(CONFIG_ESP_TASK_WDT_TIMEOUT_S) != ESP_OK) {
     OS_LOGE(TAG, "Failed to restore task watchdog timeout");
   }
 };
@@ -287,6 +301,7 @@ static void otaum_updatetask(void* arg)
 
   bool connected          = false;
   bool updateRequested    = false;
+  bool checkRequested     = false;
   int64_t lastUpdateCheck = 0;
 
   // Update task loop.
@@ -296,14 +311,19 @@ static void otaum_updatetask(void* arg)
     xTaskNotifyWait(0, UINT32_MAX, &eventBits, pdMS_TO_TICKS(5000));  // TODO: wait for rest time
 
     updateRequested |= (eventBits & OTA_TASK_EVENT_UPDATE_REQUESTED) != 0;
+    checkRequested |= (eventBits & OTA_TASK_EVENT_CHECK_REQUESTED) != 0;
 
-    if ((eventBits & OTA_TASK_EVENT_WIFI_DISCONNECTED) != 0) {
+    bool gotConnected    = (eventBits & OTA_TASK_EVENT_WIFI_CONNECTED) != 0;
+    bool gotDisconnected = (eventBits & OTA_TASK_EVENT_WIFI_DISCONNECTED) != 0;
+
+    if (gotConnected && gotDisconnected) {
+      // Both edges were coalesced into one wait, so their order is unknown; ask for the current link state.
+      connected = WiFiManager::IsConnected();
+      OS_LOGD(TAG, "WiFi connection changed, now %s", connected ? "connected" : "disconnected");
+    } else if (gotDisconnected) {
       OS_LOGD(TAG, "WiFi disconnected");
       connected = false;
-      continue;  // No further processing needed.
-    }
-
-    if ((eventBits & OTA_TASK_EVENT_WIFI_CONNECTED) != 0 && !connected) {
+    } else if (gotConnected && !connected) {
       OS_LOGD(TAG, "WiFi connected");
       connected = true;
     }
@@ -326,6 +346,11 @@ static void otaum_updatetask(void* arg)
       continue;
     }
 
+    if (updateRequested && !config.allowBackendManagement) {
+      OS_LOGW(TAG, "Ignoring backend update request, backend management is disabled");
+      updateRequested = false;
+    }
+
     bool firstCheck  = lastUpdateCheck == 0;
     int64_t diff     = now - lastUpdateCheck;
     int64_t diffMins = diff / 60'000LL;
@@ -334,12 +359,14 @@ static void otaum_updatetask(void* arg)
     check |= config.checkOnStartup && firstCheck;                           // On startup
     check |= config.checkPeriodically && diffMins >= config.checkInterval;  // Periodically
     check |= updateRequested && (firstCheck || diffMins >= 1);              // Update requested
+    check |= checkRequested;                                                // Check requested by the user
 
     if (!check) {
       continue;
     }
 
     lastUpdateCheck = now;
+    checkRequested  = false;
 
     if (config.requireManualApproval) {
       OS_LOGD(TAG, "Manual approval required, skipping update check");
@@ -438,6 +465,16 @@ static void otaum_updatetask(void* arg)
       continue;
     }
 
+    // Flashing the filesystem force-closes the captive portal; on any failure (`continue`) it must be allowed to
+    // open again. On success the portal stays closed until the restart below.
+    struct ReopenPortalOnFailure {
+      bool succeeded = false;
+      ~ReopenPortalOnFailure()
+      {
+        if (!succeeded) CaptivePortal::ReleaseForceClose();
+      }
+    } reopenPortalOnFailure;
+
     // Flash app and filesystem partitions.
     if (!otaum_flash_fs_partition(client, filesystemPartition, release.filesystemBinaryUrl, release.filesystemBinaryHash)) {
       otaum_restore_wdt_timeout();
@@ -464,6 +501,7 @@ static void otaum_updatetask(void* arg)
 
     // Reboot into new firmware.
     OS_LOGI(TAG, "Restarting into new firmware...");
+    reopenPortalOnFailure.succeeded = true;
     vTaskDelay(pdMS_TO_TICKS(200));
     break;
   }
@@ -545,7 +583,7 @@ static bool otaum_try_get_json(HTTP::Client& client, std::string_view url, std::
 
 bool OtaUpdateManager::Init()
 {
-  AppHooks::RegisterOtaUpdateManager(OtaUpdateManager::GetFirmwareBootType, OtaUpdateManager::TryStartFirmwareUpdate);
+  AppHooks::RegisterOtaUpdateManager(OtaUpdateManager::GetFirmwareBootType, OtaUpdateManager::TryStartFirmwareUpdate, OtaUpdateManager::RequestUpdateCheck);
 
   esp_err_t err;
 
@@ -608,7 +646,7 @@ bool OtaUpdateManager::TryGetFirmwareVersion(HTTP::Client& client, OtaUpdateChan
 {
   const char* channelName = otaum_channel_name(channel);
   if (channelName == nullptr) {
-    OS_LOGE(TAG, "Unknown channel: %u", channel);
+    OS_LOGE(TAG, "Unknown channel: %u", static_cast<unsigned>(channel));
     return false;
   }
 
@@ -628,7 +666,7 @@ bool OtaUpdateManager::TryGetFirmwareVersion(HTTP::Client& client, OtaUpdateChan
   std::string body;
   JSON::JsonDocument doc;
   int code = 0;
-  if (!otaum_try_get_json(client, uri, std::array<uint16_t, 3> {200, 204, 304}, body, doc, code)) {
+  if (!otaum_try_get_json(client, uri, std::array<uint16_t, 2> {200, 204}, body, doc, code)) {
     return false;
   }
 
@@ -749,7 +787,7 @@ bool OtaUpdateManager::TryGetFirmwareRelease(HTTP::Client& client, const OpenSho
   std::string body;
   JSON::JsonDocument doc;
   int code = 0;
-  if (!otaum_try_get_json(client, uri, std::array<uint16_t, 2> {200, 304}, body, doc, code)) {
+  if (!otaum_try_get_json(client, uri, std::array<uint16_t, 1> {200}, body, doc, code)) {
     return false;
   }
 
@@ -761,6 +799,11 @@ bool OtaUpdateManager::TryStartFirmwareUpdate(const OpenShock::SemVer& version)
   OS_LOGD(TAG, "Requesting firmware version %s", version.toString().c_str());  // TODO: This is abusing the SemVer::toString() method causing alot of string copies, fix this
 
   return otaum_try_queue_update_request(version);
+}
+
+bool OtaUpdateManager::RequestUpdateCheck()
+{
+  return otaum_try_notify_task(OTA_TASK_EVENT_CHECK_REQUESTED);
 }
 
 FirmwareBootType OtaUpdateManager::GetFirmwareBootType()

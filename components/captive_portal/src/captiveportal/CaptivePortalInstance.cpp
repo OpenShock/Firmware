@@ -5,10 +5,12 @@
 
 const char* const TAG = "CaptivePortalInstance";
 
+#include "AppHooks.h"
 #include "captiveportal/Manager.h"
 #include "Chipset.h"
 #include "CommandHandler.h"
 #include "config/Config.h"
+#include "Convert.h"
 #include "enums/OtaUpdateChannel.h"
 #include "estop/EStopManager.h"
 #include "GatewayConnectionManager.h"
@@ -46,9 +48,11 @@ static constexpr const char* S304 = "304 Not Modified";
 static constexpr const char* S400 = "400 Bad Request";
 static constexpr const char* S429 = "429 Too Many Requests";
 static constexpr const char* S500 = "500 Internal Server Error";
+static constexpr const char* S503 = "503 Service Unavailable";
 
 static const char* const JSON_ERR_INTERNAL        = "{\"error\":\"InternalError\"}";
 static const char* const JSON_ERR_MISSING_PARAM   = "{\"error\":\"MissingParam\"}";
+static const char* const JSON_ERR_INVALID_PARAM   = "{\"error\":\"InvalidParam\"}";
 static const char* const JSON_ERR_INVALID_PIN     = "{\"error\":\"InvalidPin\"}";
 static const char* const JSON_ERR_MISSING_SSID    = "{\"error\":\"MissingSsid\"}";
 static const char* const JSON_ERR_INVALID_SSID    = "{\"error\":\"InvalidSsid\"}";
@@ -114,7 +118,8 @@ static esp_err_t sendResp(httpd_req_t* req, const char* status, const char* type
   return httpd_resp_send(req, body.data(), body.size());
 }
 
-static std::string urlDecode(const char* s)
+// Returns false for an encoded NUL ("%00"), which would silently truncate the value at every c_str() use.
+static bool urlDecode(const char* s, std::string& out)
 {
   auto hexVal = [](char h) -> int {
     if (h >= '0' && h <= '9') return h - '0';
@@ -122,19 +127,23 @@ static std::string urlDecode(const char* s)
     return h - 'a' + 10;
   };
 
-  std::string out;
+  out.clear();
   for (size_t i = 0; s[i] != '\0'; ++i) {
     char c = s[i];
     if (c == '+') {
       out += ' ';
     } else if (c == '%' && isxdigit(static_cast<unsigned char>(s[i + 1])) && isxdigit(static_cast<unsigned char>(s[i + 2]))) {
-      out += static_cast<char>((hexVal(s[i + 1]) << 4) | hexVal(s[i + 2]));
+      char decoded = static_cast<char>((hexVal(s[i + 1]) << 4) | hexVal(s[i + 2]));
+      if (decoded == '\0') {
+        return false;
+      }
+      out += decoded;
       i += 2;
     } else {
       out += c;
     }
   }
-  return out;
+  return true;
 }
 
 // Read and URL-decode a query-string parameter. httpd does not decode for us.
@@ -156,8 +165,41 @@ static bool getQueryParam(httpd_req_t* req, const char* key, std::string& out)
     return false;
   }
 
-  out = urlDecode(val);
-  return true;
+  return urlDecode(val, out);
+}
+
+enum class ParamResult {
+  Ok,
+  Missing,
+  Invalid,
+};
+
+// The web UI sends booleans as "1"/"0"; "true"/"false" are accepted too.
+static bool parseBool(std::string_view str, bool& out)
+{
+  if (str == "1") {
+    out = true;
+    return true;
+  }
+  if (str == "0") {
+    out = false;
+    return true;
+  }
+  return Convert::ToBool(str, out);
+}
+
+static ParamResult getBoolQueryParam(httpd_req_t* req, const char* key, bool& out)
+{
+  std::string str;
+  if (!getQueryParam(req, key, str)) {
+    return ParamResult::Missing;
+  }
+  return parseBool(str, out) ? ParamResult::Ok : ParamResult::Invalid;
+}
+
+static esp_err_t sendParamError(httpd_req_t* req, ParamResult result)
+{
+  return sendResp(req, S400, HTTP::ContentType::JSON, result == ParamResult::Missing ? JSON_ERR_MISSING_PARAM : JSON_ERR_INVALID_PARAM);
 }
 
 // Read a urlencoded request body (application/x-www-form-urlencoded).
@@ -168,11 +210,18 @@ static bool recvBody(httpd_req_t* req, std::string& out)
     return false;
   }
 
+  // A client that announces a body and then stalls must not hold the (single) httpd task forever.
+  static constexpr int kMaxRecvTimeouts = 3;
+
   out.resize(total);
-  int off = 0;
+  int off      = 0;
+  int timeouts = 0;
   while (off < total) {
     int r = httpd_req_recv(req, out.data() + off, total - off);
     if (r == HTTPD_SOCK_ERR_TIMEOUT) {
+      if (++timeouts >= kMaxRecvTimeouts) {
+        return false;
+      }
       continue;
     }
     if (r <= 0) {
@@ -189,8 +238,7 @@ static bool getFormParam(const std::string& body, const char* key, std::string& 
   if (httpd_query_key_value(body.c_str(), key, val, sizeof(val)) != ESP_OK) {
     return false;
   }
-  out = urlDecode(val);
-  return true;
+  return urlDecode(val, out);
 }
 
 static const char* contentTypeForPath(const std::string& path)
@@ -231,9 +279,8 @@ static esp_err_t apiPortalClose(httpd_req_t* req)
 static esp_err_t apiWifiScan(httpd_req_t* req)
 {
   bool run = true;
-  std::string runStr;
-  if (getQueryParam(req, "run", runStr)) {
-    run = atoi(runStr.c_str()) != 0;
+  if (auto result = getBoolQueryParam(req, "run", run); result == ParamResult::Invalid) {
+    return sendParamError(req, result);
   }
   if (run) {
     WiFiScanManager::StartScan();
@@ -326,8 +373,11 @@ static esp_err_t apiConfigRfPin(httpd_req_t* req)
   if (!getQueryParam(req, "pin", pinStr)) {
     return sendResp(req, S400, HTTP::ContentType::JSON, JSON_ERR_INVALID_PIN);
   }
-  int pin          = atoi(pinStr.c_str());
-  auto result      = CommandHandler::SetRfTxPin(static_cast<gpio_num_t>(pin));
+  gpio_num_t pin;
+  if (!Convert::ToGpioNum(pinStr, pin)) {
+    return sendResp(req, S400, HTTP::ContentType::JSON, JSON_ERR_INVALID_PIN);
+  }
+  auto result      = CommandHandler::SetRfTxPin(pin);
   using ResultCode = OpenShock::SetGPIOResultCode;
   if (result != ResultCode::Success) {
     return sendResp(req, S400, HTTP::ContentType::JSON, (result == ResultCode::InvalidPin) ? JSON_ERR_INVALID_PIN : JSON_ERR_INTERNAL);
@@ -347,11 +397,11 @@ static esp_err_t apiConfigEstopPin(httpd_req_t* req)
   if (!getQueryParam(req, "pin", pinStr)) {
     return sendResp(req, S400, HTTP::ContentType::JSON, JSON_ERR_INVALID_PIN);
   }
-  int8_t pin = static_cast<int8_t>(atoi(pinStr.c_str()));
-  if (!IsValidInputPin(pin)) {
+  gpio_num_t pin;
+  if (!Convert::ToGpioNum(pinStr, pin) || !IsValidInputPin(pin)) {
     return sendResp(req, S400, HTTP::ContentType::JSON, JSON_ERR_INVALID_PIN);
   }
-  if (!EStopManager::SetEStopPin(static_cast<gpio_num_t>(pin)) || !Config::SetEStopGpioPin(static_cast<gpio_num_t>(pin))) {
+  if (!EStopManager::SetEStopPin(pin) || !Config::SetEStopGpioPin(pin)) {
     return sendResp(req, S500, HTTP::ContentType::JSON, JSON_ERR_INTERNAL);
   }
   OpenShock::JSON::StringWriter writer;
@@ -365,11 +415,10 @@ static esp_err_t apiConfigEstopPin(httpd_req_t* req)
 
 static esp_err_t apiConfigEstopEnabled(httpd_req_t* req)
 {
-  std::string enabledStr;
-  if (!getQueryParam(req, "enabled", enabledStr)) {
-    return sendResp(req, S400, HTTP::ContentType::JSON, JSON_ERR_INTERNAL);
+  bool enabled;
+  if (auto result = getBoolQueryParam(req, "enabled", enabled); result != ParamResult::Ok) {
+    return sendParamError(req, result);
   }
-  bool enabled = atoi(enabledStr.c_str()) != 0;
   bool success = EStopManager::SetEStopEnabled(enabled) && Config::SetEStopEnabled(enabled);
   if (success) {
     return sendResp(req, S200, nullptr, {});
@@ -385,7 +434,7 @@ static esp_err_t apiWifiNetworksAdd(httpd_req_t* req)
   }
 
   std::string ssid;
-  if (!getFormParam(body, "ssid", ssid) || ssid.empty() || ssid.length() > 31) {
+  if (!getFormParam(body, "ssid", ssid) || ssid.empty() || ssid.length() > 32) {
     return sendResp(req, S400, HTTP::ContentType::JSON, ssid.empty() ? JSON_ERR_MISSING_SSID : JSON_ERR_INVALID_SSID);
   }
 
@@ -401,17 +450,18 @@ static esp_err_t apiWifiNetworksAdd(httpd_req_t* req)
 
   bool connect = true;
   std::string connectStr;
-  if (getFormParam(body, "connect", connectStr)) {
-    connect = atoi(connectStr.c_str()) != 0;
+  if (getFormParam(body, "connect", connectStr) && !parseBool(connectStr, connect)) {
+    return sendResp(req, S400, HTTP::ContentType::JSON, JSON_ERR_INVALID_PARAM);
   }
 
   wifi_auth_mode_t authMode = WIFI_AUTH_MAX;
   std::string securityStr;
   if (getFormParam(body, "security", securityStr)) {
-    int sec = atoi(securityStr.c_str());
-    if (sec >= 0 && sec <= static_cast<int>(WIFI_AUTH_MAX)) {
-      authMode = static_cast<wifi_auth_mode_t>(sec);
+    uint8_t sec;
+    if (!Convert::ToUint8(securityStr, sec) || sec > static_cast<uint8_t>(WIFI_AUTH_MAX)) {
+      return sendResp(req, S400, HTTP::ContentType::JSON, JSON_ERR_INVALID_PARAM);
     }
+    authMode = static_cast<wifi_auth_mode_t>(sec);
   }
 
   if (!WiFiManager::Save(ssid.c_str(), std::string_view(password), connect, authMode)) {
@@ -441,11 +491,10 @@ static esp_err_t apiWifiDisconnect(httpd_req_t* req)
 
 static esp_err_t apiOtaEnabled(httpd_req_t* req)
 {
-  std::string enabledStr;
-  if (!getQueryParam(req, "enabled", enabledStr)) {
-    return sendResp(req, S400, HTTP::ContentType::JSON, JSON_ERR_MISSING_PARAM);
+  bool enabled;
+  if (auto result = getBoolQueryParam(req, "enabled", enabled); result != ParamResult::Ok) {
+    return sendParamError(req, result);
   }
-  bool enabled = atoi(enabledStr.c_str()) != 0;
   Config::OtaUpdateConfig cfg;
   if (!Config::GetOtaUpdateConfig(cfg)) {
     return sendResp(req, S500, HTTP::ContentType::JSON, JSON_ERR_INTERNAL);
@@ -501,7 +550,11 @@ static esp_err_t apiOtaCheckInterval(httpd_req_t* req)
   if (!getQueryParam(req, "interval", intervalStr)) {
     return sendResp(req, S400, HTTP::ContentType::JSON, JSON_ERR_MISSING_PARAM);
   }
-  uint16_t interval = static_cast<uint16_t>(atoi(intervalStr.c_str()));
+  // Minutes; 0 would make periodic checks fire on every OTA task wake-up
+  uint16_t interval;
+  if (!Convert::ToUint16(intervalStr, interval) || interval == 0) {
+    return sendResp(req, S400, HTTP::ContentType::JSON, JSON_ERR_INVALID_PARAM);
+  }
   Config::OtaUpdateConfig cfg;
   if (!Config::GetOtaUpdateConfig(cfg)) {
     return sendResp(req, S500, HTTP::ContentType::JSON, JSON_ERR_INTERNAL);
@@ -515,11 +568,10 @@ static esp_err_t apiOtaCheckInterval(httpd_req_t* req)
 
 static esp_err_t apiOtaAllowBackendManagement(httpd_req_t* req)
 {
-  std::string allowStr;
-  if (!getQueryParam(req, "allow", allowStr)) {
-    return sendResp(req, S400, HTTP::ContentType::JSON, JSON_ERR_MISSING_PARAM);
+  bool allow;
+  if (auto result = getBoolQueryParam(req, "allow", allow); result != ParamResult::Ok) {
+    return sendParamError(req, result);
   }
-  bool allow = atoi(allowStr.c_str()) != 0;
   Config::OtaUpdateConfig cfg;
   if (!Config::GetOtaUpdateConfig(cfg)) {
     return sendResp(req, S500, HTTP::ContentType::JSON, JSON_ERR_INTERNAL);
@@ -533,11 +585,10 @@ static esp_err_t apiOtaAllowBackendManagement(httpd_req_t* req)
 
 static esp_err_t apiOtaRequireManualApproval(httpd_req_t* req)
 {
-  std::string requireStr;
-  if (!getQueryParam(req, "require", requireStr)) {
-    return sendResp(req, S400, HTTP::ContentType::JSON, JSON_ERR_MISSING_PARAM);
+  bool require;
+  if (auto result = getBoolQueryParam(req, "require", require); result != ParamResult::Ok) {
+    return sendParamError(req, result);
   }
-  bool require = atoi(requireStr.c_str()) != 0;
   Config::OtaUpdateConfig cfg;
   if (!Config::GetOtaUpdateConfig(cfg)) {
     return sendResp(req, S500, HTTP::ContentType::JSON, JSON_ERR_INTERNAL);
@@ -551,7 +602,10 @@ static esp_err_t apiOtaRequireManualApproval(httpd_req_t* req)
 
 static esp_err_t apiOtaCheck(httpd_req_t* req)
 {
-  // TODO: trigger OTA check - OtaUpdateManager does not yet expose a CheckForUpdates method
+  // Checks the configured channel; the update task reports progress over the gateway as usual.
+  if (!AppHooks::OtaRequestUpdateCheck()) {
+    return sendResp(req, S503, HTTP::ContentType::JSON, JSON_ERR_INTERNAL);
+  }
   return sendResp(req, S200, nullptr, {});
 }
 
@@ -711,8 +765,9 @@ uint8_t CaptivePortal::CaptivePortalInstance::onWsOpen(int fd)
   for (uint8_t i = 0; i < MAX_WS_CLIENTS; ++i) {
     if (!m_clients[i].used) {
       m_clients[i].used      = true;
-      m_clients[i].fd        = fd;
-      m_clients[i].reasmType = WebSocketMessageType::Binary;
+      m_clients[i].fd          = fd;
+      m_clients[i].reasmActive = false;
+      m_clients[i].reasmType   = WebSocketMessageType::Binary;
       m_clients[i].reasm.clear();
       return i;
     }
@@ -728,7 +783,8 @@ void CaptivePortal::CaptivePortalInstance::onWsClose(int fd)
     ScopedLock lock__(&m_clientsMutex);
     for (uint8_t i = 0; i < MAX_WS_CLIENTS; ++i) {
       if (m_clients[i].used && m_clients[i].fd == fd) {
-        m_clients[i].used = false;
+        m_clients[i].used        = false;
+        m_clients[i].reasmActive = false;
         m_clients[i].reasm.clear();
         id = i;
         break;
@@ -818,13 +874,22 @@ void CaptivePortal::CaptivePortalInstance::onWsFrame(int fd, httpd_ws_type_t opc
     case HTTPD_WS_TYPE_BINARY:
     {
       WebSocketMessageType type = (opcode == HTTPD_WS_TYPE_TEXT) ? WebSocketMessageType::Text : WebSocketMessageType::Binary;
-      if (final) {
-        dispatchWsMessage(socketId, type, payload);
-      } else {
+      {
         ScopedLock lock__(&m_clientsMutex);
-        m_clients[idx].reasmType = type;
-        m_clients[idx].reasm.assign(payload.begin(), payload.end());
+        if (m_clients[idx].reasmActive) {
+          // A new message started before the previous fragmented one finished; drop the stale fragments
+          OS_LOGW(TAG, "WebSocket client %u started a new message mid-fragment, dropping the old one", socketId);
+          m_clients[idx].reasmActive = false;
+          m_clients[idx].reasm.clear();
+        }
+        if (!final) {
+          m_clients[idx].reasmActive = true;
+          m_clients[idx].reasmType   = type;
+          m_clients[idx].reasm.assign(payload.begin(), payload.end());
+          break;
+        }
       }
+      dispatchWsMessage(socketId, type, payload);
       break;
     }
     case HTTPD_WS_TYPE_CONTINUE:
@@ -833,12 +898,26 @@ void CaptivePortal::CaptivePortalInstance::onWsFrame(int fd, httpd_ws_type_t opc
       std::vector<uint8_t> full;
       {
         ScopedLock lock__(&m_clientsMutex);
+        if (!m_clients[idx].reasmActive) {
+          OS_LOGW(TAG, "WebSocket client %u sent a continuation frame without a message start, dropping it", socketId);
+          break;
+        }
+        // MAX_WS_MSG only bounds single frames; also bound the reassembled message
+        if (m_clients[idx].reasm.size() + payload.size() > MAX_WS_MSG) {
+          OS_LOGE(TAG, "WebSocket client %u fragmented message exceeds %u bytes, closing", socketId, static_cast<unsigned>(MAX_WS_MSG));
+          m_clients[idx].reasmActive = false;
+          m_clients[idx].reasm.clear();
+          m_clients[idx].reasm.shrink_to_fit();
+          httpd_sess_trigger_close(m_server, fd);
+          break;
+        }
         m_clients[idx].reasm.insert(m_clients[idx].reasm.end(), payload.begin(), payload.end());
         if (!final) {
           break;
         }
-        type = m_clients[idx].reasmType;
-        full = std::move(m_clients[idx].reasm);
+        type                       = m_clients[idx].reasmType;
+        full                       = std::move(m_clients[idx].reasm);
+        m_clients[idx].reasmActive = false;
         m_clients[idx].reasm.clear();
       }
       dispatchWsMessage(socketId, type, full);
@@ -1073,7 +1152,10 @@ CaptivePortal::CaptivePortalInstance::CaptivePortalInstance()
   }
 
   // Start the wildcard DNS responder (all A queries → the portal AP IP).
-  m_dnsServer.start(CaptivePortal::ApIPv4String());
+  m_dnsStarted = m_dnsServer.start(CaptivePortal::ApIPv4String());
+  if (!m_dnsStarted) {
+    OS_LOGE(TAG, "Failed to start DNS server");
+  }
 }
 
 CaptivePortal::CaptivePortalInstance::~CaptivePortalInstance()

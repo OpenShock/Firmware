@@ -33,6 +33,9 @@ namespace OpenShock::OtaUpdateManager {
 
   bool TryStartFirmwareUpdate(const OpenShock::SemVer& version);
 
+  /// @brief Asks the update task to check the configured channel for a new version as soon as it can.
+  bool RequestUpdateCheck();
+
   FirmwareBootType GetFirmwareBootType();
   bool IsValidatingApp();
 

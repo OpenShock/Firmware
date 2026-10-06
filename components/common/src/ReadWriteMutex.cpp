@@ -7,10 +7,13 @@ const char* const TAG = "ReadWriteMutex";
 #include "Logging.h"
 
 OpenShock::ReadWriteMutex::ReadWriteMutex()
-  : m_mutex(xSemaphoreCreateMutex())
+  // Binary semaphore, not a mutex: the first reader takes it but the last reader (possibly another task) gives it back,
+  // which an owned FreeRTOS mutex does not allow.
+  : m_mutex(xSemaphoreCreateBinary())
   , m_readSem(xSemaphoreCreateBinary())
   , m_readers(0)
 {
+  xSemaphoreGive(m_mutex);
   xSemaphoreGive(m_readSem);
 }
 

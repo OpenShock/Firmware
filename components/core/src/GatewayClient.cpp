@@ -24,6 +24,12 @@ using namespace OpenShock;
 
 const int64_t GATEWAY_PING_TIMEOUT = 90'000;
 
+// Message handlers (config reads, flash writes, FlatBuffers verification) run on the websocket task.
+const int GATEWAY_TASK_STACK_SIZE = 6 * 1024;
+
+// Upper bound for a reassembled message; matches the gateway message handler limit.
+const std::size_t GATEWAY_MAX_MESSAGE_SIZE = 4096;
+
 // WebSocket opcodes (RFC 6455) as delivered by esp_websocket_client event data.
 static constexpr int WS_OP_TEXT   = 0x01;
 static constexpr int WS_OP_BINARY = 0x02;
@@ -35,7 +41,10 @@ GatewayClient::GatewayClient(const std::string& authToken)
   , m_client(nullptr)
   , m_state(GatewayClientState::Disconnected)
   , m_lastPingTimestamp(0)
+  , m_retired(false)
   , m_binReasm()
+  , m_binReasmActive(false)
+  , m_binReasmDiscard(false)
 {
   OS_LOGD(TAG, "Creating GatewayClient");
 
@@ -51,9 +60,19 @@ GatewayClient::~GatewayClient()
 
   if (m_client != nullptr) {
     esp_websocket_client_close(m_client, pdMS_TO_TICKS(1000));
-    esp_websocket_client_destroy(m_client);
-    m_client = nullptr;
   }
+  _destroyHandle();
+}
+
+void GatewayClient::_destroyHandle()
+{
+  if (m_client == nullptr) {
+    return;
+  }
+
+  // Stops the client task if still running and frees the handle; no further events reach `this` afterwards.
+  esp_websocket_client_destroy(m_client);
+  m_client = nullptr;
 }
 
 void GatewayClient::connect(const std::string& host, uint16_t port, const std::string& path)
@@ -61,6 +80,9 @@ void GatewayClient::connect(const std::string& host, uint16_t port, const std::s
   if (m_state != GatewayClientState::Disconnected) {
     return;
   }
+
+  // A previous connection's task exits on disconnect but its handle stays allocated; free it before reconnecting.
+  _destroyHandle();
 
   _setState(GatewayClientState::Connecting);
 
@@ -73,6 +95,7 @@ void GatewayClient::connect(const std::string& host, uint16_t port, const std::s
   config.headers                       = m_headers.c_str();
   config.disable_auto_reconnect        = true;                   // GatewayConnectionManager owns reconnection
   config.crt_bundle_attach             = esp_crt_bundle_attach;  // verify server against the compiled-in CA bundle
+  config.task_stack                    = GATEWAY_TASK_STACK_SIZE;
 
   m_client = esp_websocket_client_init(&config);
   if (m_client == nullptr) {
@@ -86,21 +109,9 @@ void GatewayClient::connect(const std::string& host, uint16_t port, const std::s
   esp_err_t err = esp_websocket_client_start(m_client);
   if (err != ESP_OK) {
     OS_LOGE(TAG, "Failed to start WebSocket client: %s", esp_err_to_name(err));
-    esp_websocket_client_destroy(m_client);
-    m_client = nullptr;
+    _destroyHandle();
     _setState(GatewayClientState::Disconnected);
     return;
-  }
-}
-
-void GatewayClient::disconnect()
-{
-  if (m_state != GatewayClientState::Connected) {
-    return;
-  }
-  _setState(GatewayClientState::Disconnecting);
-  if (m_client != nullptr) {
-    esp_websocket_client_close(m_client, pdMS_TO_TICKS(1000));
   }
 }
 
@@ -139,11 +150,11 @@ bool GatewayClient::loop()
     return true;
   }
 
-  if (m_lastPingTimestamp != 0 && (OpenShock::millis() - m_lastPingTimestamp) > GATEWAY_PING_TIMEOUT) {
+  // Timestamp is seeded on connect, so a connection that never sees a ping also times out.
+  if ((OpenShock::millis() - m_lastPingTimestamp.load()) > GATEWAY_PING_TIMEOUT) {
     OS_LOGW(TAG, "No ping received from gateway for %lld ms, forcing reconnect", GATEWAY_PING_TIMEOUT);
-    if (m_client != nullptr) {
-      esp_websocket_client_close(m_client, pdMS_TO_TICKS(1000));
-    }
+    // The link is presumed dead, so skip the close handshake; destroy stops the client task and frees the handle.
+    _destroyHandle();
     _setState(GatewayClientState::Disconnected);
     return false;
   }
@@ -153,13 +164,15 @@ bool GatewayClient::loop()
 
 void GatewayClient::_setState(GatewayClientState state)
 {
-  if (m_state == state) {
+  if (m_state.exchange(state) == state) {
     return;
   }
 
-  m_state = state;
-
-  ESP_ERROR_CHECK(esp_event_post(OPENSHOCK_EVENTS, OPENSHOCK_EVENT_GATEWAY_CLIENT_STATE_CHANGED, &m_state, sizeof(m_state), portMAX_DELAY));
+  // Bounded wait: never block the websocket task or the owning task indefinitely on a full event queue.
+  esp_err_t err = esp_event_post(OPENSHOCK_EVENTS, OPENSHOCK_EVENT_GATEWAY_CLIENT_STATE_CHANGED, &state, sizeof(state), pdMS_TO_TICKS(100));
+  if (err != ESP_OK) {
+    OS_LOGE(TAG, "Failed to post gateway client state change: %s", esp_err_to_name(err));
+  }
 }
 
 void GatewayClient::_sendBootStatus()
@@ -180,14 +193,6 @@ void GatewayClient::_sendBootStatus()
     return;
   }
 
-  using namespace std::string_view_literals;
-
-  OpenShock::SemVer version;
-  if (!OpenShock::TryParseSemVer(OPENSHOCK_FW_VERSION ""sv, version)) {
-    OS_LOGE(TAG, "Failed to parse firmware version");
-    return;
-  }
-
   s_bootStatusSent = Serialization::Gateway::SerializeBootStatusMessage(updateId, AppHooks::OtaGetFirmwareBootType(), [this](std::span<const uint8_t> data) { return sendMessageBIN(data); });
 
   if (s_bootStatusSent && updateStep != OpenShock::OtaUpdateStep::None) {
@@ -204,7 +209,7 @@ void GatewayClient::_eventHandler(void* arg, esp_event_base_t /*base*/, int32_t 
 
   switch (eventId) {
     case WEBSOCKET_EVENT_CONNECTED:
-      self->m_lastPingTimestamp = 0;
+      self->m_lastPingTimestamp = OpenShock::millis();
       self->_setState(GatewayClientState::Connected);
       self->_sendBootStatus();
       break;
@@ -216,7 +221,9 @@ void GatewayClient::_eventHandler(void* arg, esp_event_base_t /*base*/, int32_t 
       OS_LOGE(TAG, "Received error from API");
       break;
     case WEBSOCKET_EVENT_DATA:
-      self->_handleData(data);
+      if (!self->m_retired.load()) {
+        self->_handleData(data);
+      }
       break;
     default:
       break;
@@ -238,22 +245,46 @@ void GatewayClient::_handleData(const esp_websocket_event_data_t* data)
     return;
   }
 
-  // esp_websocket_client may deliver a message in chunks (payload_offset/payload_len).
+  // esp_websocket_client delivers each frame in chunks (payload_offset/data_len of payload_len),
+  // and a message may span several frames (continuation opcode, fin on the last one).
+  bool frameComplete = static_cast<std::size_t>(data->payload_offset) + data->data_len >= static_cast<std::size_t>(data->payload_len);
+  bool messageEnd    = frameComplete && data->fin;
+
   // Fast path: a complete single-frame message.
-  if (data->payload_offset == 0 && data->data_len == data->payload_len) {
+  if (data->op_code == WS_OP_BINARY && data->payload_offset == 0 && messageEnd) {
+    m_binReasmActive  = false;
+    m_binReasmDiscard = false;
     MessageHandlers::WebSocket::HandleGatewayBinary(std::span<const uint8_t>(reinterpret_cast<const uint8_t*>(data->data_ptr), data->data_len));
     return;
   }
 
-  // Fragmented / chunked message: accumulate until complete.
-  if (data->payload_offset == 0) {
+  if (data->op_code == WS_OP_BINARY && data->payload_offset == 0) {
+    // Start of a new message
     m_binReasm.clear();
-    m_binReasm.reserve(data->payload_len);
+    m_binReasmActive  = true;
+    m_binReasmDiscard = false;
+  } else if (!m_binReasmActive) {
+    OS_LOGW(TAG, "Dropping continuation data without a message start");
+    return;
   }
-  m_binReasm.insert(m_binReasm.end(), reinterpret_cast<const uint8_t*>(data->data_ptr), reinterpret_cast<const uint8_t*>(data->data_ptr) + data->data_len);
 
-  if (m_binReasm.size() >= static_cast<size_t>(data->payload_len)) {
-    MessageHandlers::WebSocket::HandleGatewayBinary(std::span<const uint8_t>(m_binReasm.data(), m_binReasm.size()));
+  if (!m_binReasmDiscard) {
+    if (m_binReasm.size() + data->data_len > GATEWAY_MAX_MESSAGE_SIZE) {
+      OS_LOGE(TAG, "Fragmented message exceeds %zu bytes, dropping it", GATEWAY_MAX_MESSAGE_SIZE);
+      m_binReasm.clear();
+      m_binReasm.shrink_to_fit();
+      m_binReasmDiscard = true;
+    } else {
+      m_binReasm.insert(m_binReasm.end(), reinterpret_cast<const uint8_t*>(data->data_ptr), reinterpret_cast<const uint8_t*>(data->data_ptr) + data->data_len);
+    }
+  }
+
+  if (messageEnd) {
+    if (!m_binReasmDiscard) {
+      MessageHandlers::WebSocket::HandleGatewayBinary(std::span<const uint8_t>(m_binReasm.data(), m_binReasm.size()));
+    }
     m_binReasm.clear();
+    m_binReasmActive  = false;
+    m_binReasmDiscard = false;
   }
 }

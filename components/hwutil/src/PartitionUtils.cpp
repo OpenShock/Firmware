@@ -53,7 +53,7 @@ bool OpenShock::FlashPartitionFromUrl(HTTP::Client& client, const esp_partition_
     contentLength = size;
 
     lastProgress = OpenShock::millis();
-    progressCallback(0, contentLength, 0.0f);
+    if (progressCallback) progressCallback(0, contentLength, 0.0f);
 
     return true;
   };
@@ -73,7 +73,7 @@ bool OpenShock::FlashPartitionFromUrl(HTTP::Client& client, const esp_partition_
     int64_t now = OpenShock::millis();
     if (now - lastProgress >= 500) {  // Send progress every 500ms
       lastProgress = now;
-      progressCallback(contentWritten, contentLength, static_cast<float>(contentWritten) / static_cast<float>(contentLength));
+      if (progressCallback) progressCallback(contentWritten, contentLength, static_cast<float>(contentWritten) / static_cast<float>(contentLength));
     }
 
     return true;
@@ -87,7 +87,7 @@ bool OpenShock::FlashPartitionFromUrl(HTTP::Client& client, const esp_partition_
   },
     sizeValidator,
     dataWriter,
-    std::array<uint16_t, 2> {200, 304},
+    std::array<uint16_t, 1> {200},
     180'000
   );  // 3 minutes
   if (appBinaryResponse.result != OpenShock::HTTP::RequestResult::Success) {
@@ -95,7 +95,7 @@ bool OpenShock::FlashPartitionFromUrl(HTTP::Client& client, const esp_partition_
     return false;
   }
 
-  progressCallback(contentLength, contentLength, 1.0f);
+  if (progressCallback) progressCallback(contentLength, contentLength, 1.0f);
   OS_LOGD(TAG, "Wrote %u bytes to partition", appBinaryResponse.data);
 
   std::array<uint8_t, 32> localHash;

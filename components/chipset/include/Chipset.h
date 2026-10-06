@@ -90,11 +90,12 @@
 #ifdef OPENSHOCK_FW_CHIP_ESP32PICOD4
 #define OPENSHOCK_FW_CHIP_DEFINED
 // GPIO3, GPIO1 is used for UART0 RXD/TXD.
-// GPIO25, GPIO27, GPIO29, GPIO30, GPIO31, GPIO32, GPIO33 is used for SPI flash connection. (DO NOT TOUCH)
+// GPIO6, GPIO7, GPIO8, GPIO9, GPIO10, GPIO11, GPIO16, GPIO17 are used for the embedded SPI flash connection. (DO NOT TOUCH)
+// (The datasheet lists these by package pin number, 25/27/29-33, not GPIO number.)
 // GPIO12, GPIO0, GPIO2, GPIO15, and GPIO5 are used for boot mode and SDIO slave timing selection.
-#define CHIP_UNSAFE_GPIO(pin)                                                                                                                                                                                                                 \
-  ((pin) == GPIO_NUM_3 || (pin) == GPIO_NUM_1 || (pin) == GPIO_NUM_25 || (pin) == GPIO_NUM_27 || (pin) == GPIO_NUM_29 || (pin) == GPIO_NUM_30 || (pin) == GPIO_NUM_31 || (pin) == GPIO_NUM_32 || (pin) == GPIO_NUM_33 || (pin) == GPIO_NUM_12 \
-   || (pin) == GPIO_NUM_0 || (pin) == GPIO_NUM_2 || (pin) == GPIO_NUM_15 || (pin) == GPIO_NUM_5)
+#define CHIP_UNSAFE_GPIO(pin) \
+  ((pin) == GPIO_NUM_3 || (pin) == GPIO_NUM_1 || (pin) == GPIO_NUM_6 || (pin) == GPIO_NUM_7 || (pin) == GPIO_NUM_8 || (pin) == GPIO_NUM_9 || (pin) == GPIO_NUM_10 || (pin) == GPIO_NUM_11 \
+   || (pin) == GPIO_NUM_16 || (pin) == GPIO_NUM_17 || (pin) == GPIO_NUM_12 || (pin) == GPIO_NUM_0 || (pin) == GPIO_NUM_2 || (pin) == GPIO_NUM_15 || (pin) == GPIO_NUM_5)
 #endif
 
 // ESP32-PICO-V3

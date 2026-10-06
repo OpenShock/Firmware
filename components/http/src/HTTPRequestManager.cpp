@@ -35,7 +35,8 @@ static std::unordered_map<std::string, std::shared_ptr<OpenShock::RateLimiter>> 
 
 using namespace OpenShock;
 
-static std::string_view getDomainFromURL(std::string_view url)
+// Rate limits are kept per host, so the API host gets its own limits independent of CDN/firmware hosts.
+static std::string_view getHostFromURL(std::string_view url)
 {
   if (url.empty()) {
     return {};
@@ -57,16 +58,6 @@ static std::string_view getDomainFromURL(std::string_view url)
   seperator = url.rfind(':');
   if (seperator != std::string_view::npos) {
     url = url.substr(0, seperator);
-  }
-
-  // Remove all subdomains eg. "api.example.com" -> "example.com"
-  seperator = url.rfind('.');
-  if (seperator == std::string_view::npos) {
-    return url;  // E.g. "localhost"
-  }
-  seperator = url.rfind('.', seperator - 1);
-  if (seperator != std::string_view::npos) {
-    url = url.substr(seperator + 1);
   }
 
   return url;
@@ -91,7 +82,7 @@ static std::shared_ptr<OpenShock::RateLimiter> createRateLimiterForDomain(std::s
 
 static std::shared_ptr<OpenShock::RateLimiter> createRateLimiterForURL(std::string_view url)
 {
-  auto domain = std::string(getDomainFromURL(url));
+  auto domain = std::string(getHostFromURL(url));
   if (domain.empty()) {
     return nullptr;
   }
@@ -173,7 +164,8 @@ HTTP::Response<std::size_t>
   // reused (kept-alive) socket has been closed by the server, drop it and
   // reconnect fresh once. HTTPS servers are verified against the compiled-in
   // CA bundle via config.crt_bundle_attach below.
-  esp_err_t err = ESP_FAIL;
+  esp_err_t err         = ESP_FAIL;
+  int64_t contentLength = -1;
   for (int attempt = 0; attempt < 2; ++attempt) {
     bool reused = m_handle != nullptr;
 
@@ -212,15 +204,20 @@ HTTP::Response<std::size_t>
 
     err = esp_http_client_open(m_handle, 0);
     if (err == ESP_OK) {
-      break;
+      // A server-closed keep-alive socket usually accepts the request write and only fails here.
+      contentLength = esp_http_client_fetch_headers(m_handle);
+      if (contentLength >= 0) {
+        break;
+      }
+      err = ESP_FAIL;
     }
 
     drop();
     if (!reused) {
-      OS_LOGE(TAG, "Failed to open HTTP connection: %s", esp_err_to_name(err));
+      OS_LOGE(TAG, "Failed to send HTTP request: %s", esp_err_to_name(err));
       return {RequestResult::RequestFailed, 0, 0};
     }
-    OS_LOGD(TAG, "Reused connection failed to open, reconnecting");
+    OS_LOGD(TAG, "Reused connection failed, reconnecting");
   }
   if (err != ESP_OK) {
     return {RequestResult::RequestFailed, 0, 0};
@@ -231,12 +228,6 @@ HTTP::Response<std::size_t>
     drop();
     return {result, code, written};
   };
-
-  int64_t contentLength = esp_http_client_fetch_headers(m_handle);
-  if (contentLength < 0) {
-    OS_LOGE(TAG, "Failed to fetch response headers");
-    return fail(RequestResult::RequestFailed, 0, 0);
-  }
 
   int responseCode = esp_http_client_get_status_code(m_handle);
 
@@ -252,12 +243,14 @@ HTTP::Response<std::size_t>
       retryAfter = strtol(m_retryAfter.c_str(), nullptr, 10);
     }
 
-    // If header missing/unparseable, default to 15 seconds
+    // If header missing/unparseable, default to 15 seconds; cap at an hour (also keeps the ms conversion in range)
     if (retryAfter <= 0) {
       retryAfter = 15;
+    } else if (retryAfter > 3600) {
+      retryAfter = 3600;
     }
 
-    rateLimiter->blockFor(retryAfter * 1000);
+    rateLimiter->blockFor(static_cast<int64_t>(retryAfter) * 1000);
 
     return fail(RequestResult::RateLimited, responseCode, 0);  // body not drained
   }
@@ -339,13 +332,24 @@ HTTP::Response<std::size_t>
 
 HTTP::Response<std::string> HTTP::Client::GetString(std::string_view url, const std::map<std::string, std::string>& headers, std::span<const uint16_t> acceptedCodes, uint32_t timeoutMs)
 {
+  // String responses are small JSON documents; refuse anything that would only exhaust the heap.
+  static constexpr std::size_t kMaxStringResponseSize = 64 * 1024;
+
   std::string result;
 
   auto allocator = [&result](std::size_t contentLength) {
+    if (contentLength > kMaxStringResponseSize) {
+      OS_LOGE(TAG, "Response too large (%zu bytes)", contentLength);
+      return false;
+    }
     result.reserve(contentLength);
     return true;
   };
   auto writer = [&result](std::size_t offset, const uint8_t* data, std::size_t len) {
+    if (result.size() + len > kMaxStringResponseSize) {
+      OS_LOGE(TAG, "Response exceeds %zu bytes", kMaxStringResponseSize);
+      return false;
+    }
     result.append(reinterpret_cast<const char*>(data), len);
     return true;
   };
@@ -355,5 +359,5 @@ HTTP::Response<std::string> HTTP::Client::GetString(std::string_view url, const 
     return {response.result, response.code, {}};
   }
 
-  return {response.result, response.code, result};
+  return {response.result, response.code, std::move(result)};
 }

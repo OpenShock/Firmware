@@ -13,7 +13,9 @@ namespace OpenShock::CaptivePortal {
   /// @brief Signal that the user has completed setup. The portal will close once the device is fully online.
   void SetUserDone();
 
+  /// @brief Stops the portal and keeps it closed until ReleaseForceClose(). Returns once fully torn down.
   bool ForceClose(uint32_t timeoutMs);
+  void ReleaseForceClose();
 
   bool IsRunning();
 
