@@ -4,7 +4,7 @@
 # and dispatches them against `core` (config, wifi, RF, OTA, ...). Entry-layer;
 # nothing in core depends on it (only the top-level app entry does). Its public
 # surface is just SerialInputHandler.h, so all deps are private.
-FILE(GLOB_RECURSE console_sources CONFIGURE_DEPENDS
+FILE(GLOB_RECURSE console_sources
   ${CMAKE_CURRENT_SOURCE_DIR}/src/*.cpp)
 
 idf_component_register(

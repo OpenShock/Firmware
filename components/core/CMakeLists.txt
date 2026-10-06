@@ -7,7 +7,7 @@
 #
 # The captive portal and the OTA update manager were split out into captive_portal and
 # ota, which sit above core. core calls back into them only through AppHooks.h.
-FILE(GLOB_RECURSE core_sources CONFIGURE_DEPENDS
+FILE(GLOB_RECURSE core_sources
   ${CMAKE_CURRENT_SOURCE_DIR}/src/*.c
   ${CMAKE_CURRENT_SOURCE_DIR}/src/*.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/src/*.S)

@@ -5,7 +5,7 @@
 # Extracted out of `core`: its only upstream-core dependency was config, which is
 # now its own low-layer component, so device_control depends only on config + the
 # foundation/driver layer and nothing else in core. core PRIV_REQUIRES it one-way.
-FILE(GLOB_RECURSE device_control_sources CONFIGURE_DEPENDS
+FILE(GLOB_RECURSE device_control_sources
   ${CMAKE_CURRENT_SOURCE_DIR}/src/*.cpp)
 
 idf_component_register(
