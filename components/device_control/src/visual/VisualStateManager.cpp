@@ -37,7 +37,7 @@ const uint64_t kWiFiScanningFlag                 = 1 << 7;
 const uint64_t kStatusOKMask = kWebSocketConnectedFlag | kHasIpAddressFlag | kWiFiConnectedFlag;
 
 static std::atomic<uint64_t> s_stateFlags = 0;
-static std::atomic<bool> s_ledTestActive   = false;  // While set, the LED test owns the LEDs; flags keep tracking live state
+static std::atomic<bool> s_ledTestActive  = false;  // While set, the LED test owns the LEDs; flags keep tracking live state
 static std::unique_ptr<OpenShock::MonoLedDriver> s_monoLedDriver;
 static std::unique_ptr<OpenShock::RgbLedDriver> s_rgbLedDriver;
 

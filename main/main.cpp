@@ -18,7 +18,6 @@ const char* const TAG = "main";
 #include <esp_err.h>
 #include <nvs_flash.h>
 
-
 // Internal setup function, returns true if setup succeeded, false otherwise.
 static bool trySetup()
 {

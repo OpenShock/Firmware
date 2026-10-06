@@ -61,10 +61,10 @@ namespace OpenShock::Rmt {
 
       free(m_data);
 
-      m_data         = other.m_data;
-      m_size         = other.m_size;
-      m_transmitEnd  = other.m_transmitEnd;
-      m_shockerId    = other.m_shockerId;
+      m_data           = other.m_data;
+      m_size           = other.m_size;
+      m_transmitEnd    = other.m_transmitEnd;
+      m_shockerId      = other.m_shockerId;
       m_shockerModel   = other.m_shockerModel;
       m_terminatorSent = other.m_terminatorSent;
 
@@ -76,10 +76,10 @@ namespace OpenShock::Rmt {
   private:
     void reset()
     {
-      m_data         = nullptr;
-      m_size         = 0;
-      m_transmitEnd  = 0;
-      m_shockerId    = 0;
+      m_data           = nullptr;
+      m_size           = 0;
+      m_transmitEnd    = 0;
+      m_shockerId      = 0;
       m_shockerModel   = static_cast<ShockerModelType>(0);
       m_terminatorSent = false;
     }

@@ -732,9 +732,11 @@ void SerialInputHandler::PrintWelcomeHeader()
 void SerialInputHandler::PrintVersionInfo()
 {
   OS_SERIAL_PRINTF(
-    "  Version:  %s" "\r\n"
+    "  Version:  %s"
+    "\r\n"
     "    Build:  " OPENSHOCK_FW_MODE "\r\n"
-    "   Commit:  %s" "\r\n"
+    "   Commit:  %s"
+    "\r\n"
     "    Board:  " OPENSHOCK_FW_BOARD "\r\n"
     "     Chip:  " OPENSHOCK_FW_CHIP "\r\n",
     OpenShock::Constants::FW_VERSION,

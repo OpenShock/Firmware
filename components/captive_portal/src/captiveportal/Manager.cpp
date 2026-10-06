@@ -85,7 +85,7 @@ static void DestroyInstance()
   std::shared_ptr<CaptivePortal::CaptivePortalInstance> instance;
   {
     ScopedLock lock__(&s_instanceMutex);
-    instance = std::move(s_instance);
+    instance   = std::move(s_instance);
     s_instance = nullptr;
   }
 

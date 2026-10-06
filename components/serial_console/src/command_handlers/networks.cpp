@@ -65,7 +65,7 @@ static void handleNetworksCommand(std::string_view arg, bool isAutomated)
         SERPR_ERROR("Too many networks");
         return;
       }
-      cred.id          = static_cast<uint8_t>(nextId);
+      cred.id         = static_cast<uint8_t>(nextId);
       usedIds[nextId] = true;
     }
 

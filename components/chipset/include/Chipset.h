@@ -78,9 +78,9 @@
 //
 // See: ESP32 Series Datasheet Version 4.3 Section 2.2 Pin Overview
 // See: ESP32 Series Datasheet Version 4.3 Section 2.4 Strapping Pins
-#define CHIP_UNSAFE_GPIO(pin) \
-  ((pin) == GPIO_NUM_1 || (pin) == GPIO_NUM_3 || (pin) == GPIO_NUM_0 || (pin) == GPIO_NUM_2 || (pin) == GPIO_NUM_5 || (pin) == GPIO_NUM_15 || (pin) == GPIO_NUM_12 || (pin) == GPIO_NUM_6 \
-   || (pin) == GPIO_NUM_7 || (pin) == GPIO_NUM_8 || (pin) == GPIO_NUM_9 || (pin) == GPIO_NUM_10 || (pin) == GPIO_NUM_11 || (pin) == GPIO_NUM_16 || (pin) == GPIO_NUM_17)
+#define CHIP_UNSAFE_GPIO(pin)                                                                                                                                                                                                                                  \
+  ((pin) == GPIO_NUM_1 || (pin) == GPIO_NUM_3 || (pin) == GPIO_NUM_0 || (pin) == GPIO_NUM_2 || (pin) == GPIO_NUM_5 || (pin) == GPIO_NUM_15 || (pin) == GPIO_NUM_12 || (pin) == GPIO_NUM_6 || (pin) == GPIO_NUM_7 || (pin) == GPIO_NUM_8 || (pin) == GPIO_NUM_9 \
+   || (pin) == GPIO_NUM_10 || (pin) == GPIO_NUM_11 || (pin) == GPIO_NUM_16 || (pin) == GPIO_NUM_17)
 #endif
 
 // ESP32-PICO-D4
@@ -94,9 +94,9 @@
 // GPIO6, GPIO7, GPIO8, GPIO9, GPIO10, GPIO11, GPIO16, GPIO17 are used for the embedded SPI flash connection. (DO NOT TOUCH)
 // (The datasheet lists these by package pin number, 25/27/29-33, not GPIO number.)
 // GPIO12, GPIO0, GPIO2, GPIO15, and GPIO5 are used for boot mode and SDIO slave timing selection.
-#define CHIP_UNSAFE_GPIO(pin) \
-  ((pin) == GPIO_NUM_3 || (pin) == GPIO_NUM_1 || (pin) == GPIO_NUM_6 || (pin) == GPIO_NUM_7 || (pin) == GPIO_NUM_8 || (pin) == GPIO_NUM_9 || (pin) == GPIO_NUM_10 || (pin) == GPIO_NUM_11 \
-   || (pin) == GPIO_NUM_16 || (pin) == GPIO_NUM_17 || (pin) == GPIO_NUM_12 || (pin) == GPIO_NUM_0 || (pin) == GPIO_NUM_2 || (pin) == GPIO_NUM_15 || (pin) == GPIO_NUM_5)
+#define CHIP_UNSAFE_GPIO(pin)                                                                                                                                                                                                             \
+  ((pin) == GPIO_NUM_3 || (pin) == GPIO_NUM_1 || (pin) == GPIO_NUM_6 || (pin) == GPIO_NUM_7 || (pin) == GPIO_NUM_8 || (pin) == GPIO_NUM_9 || (pin) == GPIO_NUM_10 || (pin) == GPIO_NUM_11 || (pin) == GPIO_NUM_16 || (pin) == GPIO_NUM_17 \
+   || (pin) == GPIO_NUM_12 || (pin) == GPIO_NUM_0 || (pin) == GPIO_NUM_2 || (pin) == GPIO_NUM_15 || (pin) == GPIO_NUM_5)
 #endif
 
 // ESP32-PICO-V3

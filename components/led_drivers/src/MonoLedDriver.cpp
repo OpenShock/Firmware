@@ -74,7 +74,7 @@ MonoLedDriver::MonoLedDriver(gpio_num_t gpioPin)
 
 MonoLedDriver::~MonoLedDriver()
 {
-  stopTask();  // before the LEDC channel goes away
+  stopTask();                                    // before the LEDC channel goes away
 
   ledc_stop(OS_LEDC_SPEED, OS_LEDC_CHANNEL, 0);  // TODO: Error handling
 }

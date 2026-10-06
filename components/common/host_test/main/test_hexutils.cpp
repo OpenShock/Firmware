@@ -70,19 +70,19 @@ TEST_CASE("TryParseHexMac edge cases", "[util][hex]")
 {
   uint8_t out[6] = {0};
 
-  TEST_ASSERT_EQUAL_size_t(0, HexUtils::TryParseHexMac("", 0, out, 6));                 // empty
-  TEST_ASSERT_EQUAL_size_t(1, HexUtils::TryParseHexMac("AB", 2, out, 6));               // a single pair
+  TEST_ASSERT_EQUAL_size_t(0, HexUtils::TryParseHexMac("", 0, out, 6));          // empty
+  TEST_ASSERT_EQUAL_size_t(1, HexUtils::TryParseHexMac("AB", 2, out, 6));        // a single pair
   TEST_ASSERT_EQUAL_HEX8(0xAB, out[0]);
-  TEST_ASSERT_EQUAL_size_t(0, HexUtils::TryParseHexMac("DE:AD:BE", 8, out, 2));         // output too small
-  TEST_ASSERT_EQUAL_size_t(0, HexUtils::TryParseHexMac("DE:AD:", 6, out, 6));           // trailing separator
-  TEST_ASSERT_EQUAL_size_t(0, HexUtils::TryParseHexMac("DE:XY:BE", 8, out, 6));         // bad hex digit
+  TEST_ASSERT_EQUAL_size_t(0, HexUtils::TryParseHexMac("DE:AD:BE", 8, out, 2));  // output too small
+  TEST_ASSERT_EQUAL_size_t(0, HexUtils::TryParseHexMac("DE:AD:", 6, out, 6));    // trailing separator
+  TEST_ASSERT_EQUAL_size_t(0, HexUtils::TryParseHexMac("DE:XY:BE", 8, out, 6));  // bad hex digit
 }
 
 TEST_CASE("TryParseHex rejects odd lengths, small buffers and bad digits", "[util][hex]")
 {
   uint8_t out[4] = {0};
 
-  TEST_ASSERT_EQUAL_size_t(0, HexUtils::TryParseHex("ABC", 3, out, 4));         // odd length
+  TEST_ASSERT_EQUAL_size_t(0, HexUtils::TryParseHex("ABC", 3, out, 4));          // odd length
   TEST_ASSERT_EQUAL_size_t(0, HexUtils::TryParseHex("AABBCCDDEE", 10, out, 4));  // output too small
   TEST_ASSERT_EQUAL_size_t(0, HexUtils::TryParseHex("AAZZ", 4, out, 4));         // bad digit
   TEST_ASSERT_EQUAL_size_t(2, HexUtils::TryParseHex("aaBB", 4, out, 4));         // mixed case

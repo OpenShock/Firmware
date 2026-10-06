@@ -72,7 +72,7 @@ bool Serial::Init()
   // line at 115200 baud, so logging no longer stalls the caller (event loop, httpd, ...). OS_PANIC waits 5 s before
   // restarting, which lets the buffer drain; only OS_PANIC_INSTANT can lose its last line.
   static constexpr int k_uartTxBufferSize = 2048;
-  esp_err_t err                            = uart_driver_install(static_cast<uart_port_t>(CONFIG_ESP_CONSOLE_UART_NUM), k_consoleBufferSize, k_uartTxBufferSize, 0, nullptr, 0);
+  esp_err_t err                           = uart_driver_install(static_cast<uart_port_t>(CONFIG_ESP_CONSOLE_UART_NUM), k_consoleBufferSize, k_uartTxBufferSize, 0, nullptr, 0);
   if (err != ESP_OK && err != ESP_ERR_INVALID_STATE) {
     return false;
   }

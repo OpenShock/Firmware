@@ -46,7 +46,7 @@ namespace OpenShock {
     void _destroyHandle();
 
     std::string m_headers;
-    esp_websocket_client_handle_t m_client;  // Only touched from the owning (main) task
+    esp_websocket_client_handle_t m_client;   // Only touched from the owning (main) task
     std::atomic<GatewayClientState> m_state;  // Written from both the owning task and the websocket task
     std::atomic<int64_t> m_lastPingTimestamp;
     std::atomic<bool> m_retired;

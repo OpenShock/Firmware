@@ -138,8 +138,8 @@ TEST_CASE("A setter after SetRaw keeps the imported config", "[config][roundtrip
   TEST_ASSERT_TRUE(Config::SetRaw(bytes.data(), bytes.size()));
   TEST_ASSERT_TRUE(Config::SetSerialInputConfigEchoEnabled(!MakeSampleConfig().serialInput.echoEnabled));
 
-  Config::RootConfig expected        = MakeSampleConfig();
-  expected.serialInput.echoEnabled   = !expected.serialInput.echoEnabled;
+  Config::RootConfig expected      = MakeSampleConfig();
+  expected.serialInput.echoEnabled = !expected.serialInput.echoEnabled;
   TEST_ASSERT_TRUE(InitFrom(StoredFile()));
   AssertConfigEqual(expected, Snapshot());
 }

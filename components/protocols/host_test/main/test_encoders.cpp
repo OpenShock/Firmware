@@ -40,7 +40,7 @@ TEST_CASE("Petrainer frame layout", "[protocols][petrainer]")
   rmt_symbol_word_t seq[42];
   TEST_ASSERT_TRUE(Rmt::PetrainerEncoder::FillBuffer(seq, 0x1234, ShockerCommandType::Shock, 42));
 
-  TEST_ASSERT_EQUAL_UINT16(750, seq[0].duration0);   // preamble
+  TEST_ASSERT_EQUAL_UINT16(750, seq[0].duration0);    // preamble
   TEST_ASSERT_EQUAL_UINT16(7000, seq[41].duration1);  // postamble
 
   const uint64_t data = decode(seq + 1, 40, petrainerOne);
@@ -141,7 +141,7 @@ TEST_CASE("Wellturn T330 frame layout", "[protocols][t330]")
   TEST_ASSERT_EQUAL_UINT16(135, seq[42].duration1);  // postamble
 
   const uint64_t bits = decode(seq + 1, 41, t330One);
-  TEST_ASSERT_EQUAL_UINT8(0, bits & 1);  // trailing zero bit
+  TEST_ASSERT_EQUAL_UINT8(0, bits & 1);              // trailing zero bit
   const uint64_t data = bits >> 1;
   TEST_ASSERT_EQUAL_UINT8(0, (data >> 36) & 0xF);    // channel
   TEST_ASSERT_EQUAL_UINT8(0x7, (data >> 32) & 0xF);  // vibrate 0b0111'0010, high nibble
@@ -165,7 +165,7 @@ TEST_CASE("Wellturn T330 shock/sound codes, clamping and unsupported types", "[p
   data = decode(seq + 1, 41, t330One) >> 1;
   TEST_ASSERT_EQUAL_UINT8(0x8, (data >> 32) & 0xF);  // 0b1000'0100
   TEST_ASSERT_EQUAL_UINT8(0x4, (data >> 4) & 0xF);
-  TEST_ASSERT_EQUAL_UINT8(0, (data >> 8) & 0xFF);  // sound always sends 0
+  TEST_ASSERT_EQUAL_UINT8(0, (data >> 8) & 0xFF);    // sound always sends 0
 
   TEST_ASSERT_FALSE(Rmt::WellturnT330Encoder::FillBuffer(seq, 1, ShockerCommandType::Light, 10));
 }

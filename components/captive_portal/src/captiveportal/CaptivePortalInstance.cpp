@@ -743,7 +743,7 @@ uint8_t CaptivePortal::CaptivePortalInstance::onWsOpen(int fd)
 
   for (uint8_t i = 0; i < MAX_WS_CLIENTS; ++i) {
     if (!m_clients[i].used) {
-      m_clients[i].used      = true;
+      m_clients[i].used        = true;
       m_clients[i].fd          = fd;
       m_clients[i].reasmActive = false;
       m_clients[i].reasmType   = WebSocketMessageType::Binary;
@@ -1081,14 +1081,14 @@ void CaptivePortal::CaptivePortalInstance::registerHandlers()
 
 bool CaptivePortal::CaptivePortalInstance::startHttpServer()
 {
-  httpd_config_t config    = HTTPD_DEFAULT_CONFIG();
-  config.server_port       = HTTP_PORT;
-  config.max_uri_handlers  = 40;
+  httpd_config_t config   = HTTPD_DEFAULT_CONFIG();
+  config.server_port      = HTTP_PORT;
+  config.max_uri_handlers = 40;
   // Browsers open several connections per page load; with only 4 slots the LRU purge evicted the (server-push,
   // therefore "idle" looking) WebSocket. Needs CONFIG_LWIP_MAX_SOCKETS >= max_open_sockets + 3 (+ DNS/HTTP client).
-  config.max_open_sockets  = 8;
-  config.lru_purge_enable  = true;
-  config.stack_size        = 8192;
+  config.max_open_sockets = 8;
+  config.lru_purge_enable = true;
+  config.stack_size       = 8192;
   // Shorter than the default 10 s: one stalled or sleeping client blocks the single httpd task for this long.
   config.recv_wait_timeout = 5;
   config.send_wait_timeout = 5;
