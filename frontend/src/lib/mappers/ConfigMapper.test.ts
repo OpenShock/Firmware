@@ -79,7 +79,12 @@ describe('mapConfig', () => {
 
   it('maps every section', () => {
     const config = mapConfig(
-      buildHubConfig({ apSsid: 'OpenShock-', hostname: 'hub', domain: 'api.example.org', cdnDomain: 'fw.example.org' })
+      buildHubConfig({
+        apSsid: 'OpenShock-',
+        hostname: 'hub',
+        domain: 'api.example.org',
+        cdnDomain: 'fw.example.org',
+      })
     );
 
     expect(config?.rf).toEqual({ txPin: 15, keepaliveEnabled: true });
@@ -92,7 +97,9 @@ describe('mapConfig', () => {
   });
 
   it('accepts empty strings the hub can legitimately store', () => {
-    const config = mapConfig(buildHubConfig({ apSsid: '', hostname: '', domain: '', cdnDomain: '' }));
+    const config = mapConfig(
+      buildHubConfig({ apSsid: '', hostname: '', domain: '', cdnDomain: '' })
+    );
 
     expect(config?.wifi.apSsid).toBe('');
     expect(config?.backend.domain).toBe('');

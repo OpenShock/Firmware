@@ -45,10 +45,12 @@ export class HubStateStore {
   wifiNetworks = new SvelteMap<string, WiFiNetwork>();
   // Rebuilt from scratch on every change, so plain (non-reactive) collections are enough here
   wifiNetworkGroups = $derived.by<Map<string, WiFiNetworkGroup>>(() =>
+    // eslint-disable-next-line svelte/prefer-svelte-reactivity -- rebuilt on every change, never mutated afterwards
     Array.from(this.wifiNetworks.entries()).reduce(ssidMapReducer, new Map())
   );
   // Saved SSIDs from config that aren't visible in scan results
   savedOnlySSIDs = $derived.by<string[]>(() => {
+    // eslint-disable-next-line svelte/prefer-svelte-reactivity -- local to this derivation
     const scannedSavedSSIDs = new Set<string>();
     for (const [, group] of this.wifiNetworkGroups) {
       if (group.saved) scannedSavedSSIDs.add(group.ssid);
@@ -64,6 +66,7 @@ export class HubStateStore {
   gpioValidOutputs = $state<Int8Array>(new Int8Array());
 
   // BSSIDs only listed because the hub is connected to them, not because a scan found them
+  // eslint-disable-next-line svelte/prefer-svelte-reactivity -- private bookkeeping, never read by the UI
   #connectionOnlyBSSIDs = new Set<string>();
 
   setWifiNetwork(network: WiFiNetwork) {

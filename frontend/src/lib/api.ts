@@ -22,7 +22,8 @@ const _errorMessages: Record<string, string> = {
   ConfigSaveFailed: 'Failed to save the auth token to the device',
   // GPIO
   InvalidPin: 'Invalid pin',
-  EStopProtected: 'Disabling the E-Stop or changing its pin is only possible over the serial console',
+  EStopProtected:
+    'Disabling the E-Stop or changing its pin is only possible over the serial console',
   // WiFi
   MissingSsid: 'Network name is required',
   InvalidSsid: 'Network name must be 1-32 bytes',
@@ -286,32 +287,54 @@ async function otaRequest(
 }
 
 // All OTA settings go through PUT /api/ota/settings, which applies any subset in one config write.
-function setOtaSettings(params: Record<string, string>, failure: string, patch: Partial<OtaUpdateConfig>): Promise<boolean> {
+function setOtaSettings(
+  params: Record<string, string>,
+  failure: string,
+  patch: Partial<OtaUpdateConfig>
+): Promise<boolean> {
   return otaRequest('settings?' + new URLSearchParams(params), 'PUT', failure, patch);
 }
 
 export function setOtaEnabled(isEnabled: boolean): Promise<boolean> {
-  return setOtaSettings({ enabled: isEnabled ? '1' : '0' }, 'Failed to update OTA setting', { isEnabled });
+  return setOtaSettings({ enabled: isEnabled ? '1' : '0' }, 'Failed to update OTA setting', {
+    isEnabled,
+  });
 }
 
 export function setOtaChannel(updateChannel: OtaUpdateChannel): Promise<boolean> {
-  return setOtaSettings({ channel: _otaChannelNames[updateChannel] }, 'Failed to update OTA channel', { updateChannel });
+  return setOtaSettings(
+    { channel: _otaChannelNames[updateChannel] },
+    'Failed to update OTA channel',
+    { updateChannel }
+  );
 }
 
 export function setOtaCheckInterval(checkInterval: number): Promise<boolean> {
-  return setOtaSettings({ interval: String(checkInterval) }, 'Failed to update OTA check interval', { checkInterval });
+  return setOtaSettings(
+    { interval: String(checkInterval) },
+    'Failed to update OTA check interval',
+    { checkInterval }
+  );
 }
 
 export function setOtaAllowBackendManagement(allowBackendManagement: boolean): Promise<boolean> {
-  return setOtaSettings({ allow: allowBackendManagement ? '1' : '0' }, 'Failed to update OTA backend management setting', {
-    allowBackendManagement,
-  });
+  return setOtaSettings(
+    { allow: allowBackendManagement ? '1' : '0' },
+    'Failed to update OTA backend management setting',
+    {
+      allowBackendManagement,
+    }
+  );
 }
 
 export function setOtaRequireManualApproval(requireManualApproval: boolean): Promise<boolean> {
-  return setOtaSettings({ require: requireManualApproval ? '1' : '0' }, 'Failed to update OTA manual approval setting', {
-    requireManualApproval,
-  });
+  return setOtaSettings(
+    { require: requireManualApproval ? '1' : '0' },
+    'Failed to update OTA manual approval setting',
+    {
+      requireManualApproval,
+    }
+  );
 }
 
 export function checkOtaUpdates(channel: OtaUpdateChannel): Promise<boolean> {
