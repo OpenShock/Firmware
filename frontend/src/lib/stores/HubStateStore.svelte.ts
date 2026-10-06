@@ -39,7 +39,7 @@ function ssidMapReducer(
   return groups;
 }
 
-class HubStateStore {
+export class HubStateStore {
   wifiConnectedBSSID = $state<string | null>(null);
   wifiScanStatus = $state<WifiScanStatus | null>(null);
   wifiNetworks = new SvelteMap<string, WiFiNetwork>();
