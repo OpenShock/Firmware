@@ -9,6 +9,7 @@
   } from '#lib/api.js';
   import WiFiDetailsDialog from '#lib/components/WiFiDetailsDialog.svelte';
   import type { WiFiNetworkGroup } from '#lib/types/index.js';
+  import { isValidWifiPassword } from '#lib/utils/wifiValidation.js';
   import { Button, buttonVariants } from '@openshock/svelte-core/components/ui/button';
   import {
     Dialog,
@@ -63,7 +64,7 @@
 
   async function wifiAuthenticate(e: SubmitEvent) {
     e.preventDefault();
-    if (!pendingPassword || pendingPassword.length > 63 || saving) return;
+    if (!pendingPassword || !isValidWifiPassword(pendingPassword) || saving) return;
     saving = true;
     const saved = await saveWifiNetwork(ssid, pendingPassword, true);
     saving = false;
@@ -92,7 +93,7 @@
 
   async function wifiEditPassword(e: SubmitEvent) {
     e.preventDefault();
-    if (!editPassword || editPassword.length > 63 || saving) return;
+    if (!editPassword || !isValidWifiPassword(editPassword) || saving) return;
     saving = true;
     const saved = await saveWifiNetwork(ssid, editPassword, false);
     saving = false;
@@ -135,12 +136,7 @@
     {/if}
 
     <div class="min-w-0 flex-1">
-      {#if ssid}
-        <span class="block truncate text-sm font-medium">{ssid}</span>
-      {:else if netgroup}
-        <span class="block truncate text-sm font-medium">{netgroup.networks[0].bssid}</span>
-        <span class="text-muted-foreground text-xs">(Hidden)</span>
-      {/if}
+      <span class="block truncate text-sm font-medium">{ssid}</span>
       <div class="text-muted-foreground flex items-center gap-2 text-xs">
         {#if isConnected}
           <span class="text-foreground">Connected</span>

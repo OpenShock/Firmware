@@ -1,5 +1,7 @@
 <script lang="ts">
+  import { WifiAuthMode } from '#lib/_fbs/open-shock/serialization/types/wifi-auth-mode.js';
   import { saveWifiNetwork } from '#lib/api.js';
+  import { isValidWifiPassword, isValidWifiSsid } from '#lib/utils/wifiValidation.js';
   import { Button, buttonVariants } from '@openshock/svelte-core/components/ui/button';
   import {
     Dialog,
@@ -15,27 +17,23 @@
   import { Plus } from '@lucide/svelte';
 
   const securityOptions = [
-    { value: 0, label: 'Open (no password)' },
-    { value: 2, label: 'WPA' },
-    { value: 3, label: 'WPA2' },
-    { value: 4, label: 'WPA/WPA2' },
-    { value: 6, label: 'WPA3' },
-    { value: 7, label: 'WPA2/WPA3' },
+    { value: WifiAuthMode.Open, label: 'Open (no password)' },
+    { value: WifiAuthMode.WPA_PSK, label: 'WPA' },
+    { value: WifiAuthMode.WPA2_PSK, label: 'WPA2' },
+    { value: WifiAuthMode.WPA_WPA2_PSK, label: 'WPA/WPA2' },
+    { value: WifiAuthMode.WPA3_PSK, label: 'WPA3' },
+    { value: WifiAuthMode.WPA2_WPA3_PSK, label: 'WPA2/WPA3' },
   ];
 
   let dialogOpen = $state(false);
   let saving = $state(false);
   let ssid = $state('');
   let password = $state('');
-  let security = $state(3); // WPA2 default
+  let security = $state<WifiAuthMode>(WifiAuthMode.WPA2_PSK);
 
-  let isOpen = $derived(security === 0);
+  let isOpen = $derived(security === WifiAuthMode.Open);
   let needsPassword = $derived(!isOpen);
-  let canSave = $derived(
-    ssid.length > 0 &&
-      ssid.length <= 31 &&
-      (isOpen || (password.length >= 8 && password.length <= 63))
-  );
+  let canSave = $derived(isValidWifiSsid(ssid) && (isOpen || isValidWifiPassword(password)));
 
   async function handleSave(e: SubmitEvent) {
     e.preventDefault();
@@ -51,7 +49,7 @@
     if (!open) {
       ssid = '';
       password = '';
-      security = 3;
+      security = WifiAuthMode.WPA2_PSK;
     }
   }
 </script>

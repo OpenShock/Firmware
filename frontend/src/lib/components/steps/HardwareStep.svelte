@@ -20,6 +20,7 @@
       <GpioPinSelector
         name="RF TX Pin"
         currentPin={hubState.config?.rf?.txPin ?? null}
+        validPins={hubState.gpioValidOutputs}
         setter={setRfTxPin}
       />
     </div>
@@ -38,6 +39,7 @@
       <GpioPinSelector
         name="EStop Pin"
         currentPin={hubState.config?.estop?.gpioPin ?? null}
+        validPins={hubState.gpioValidInputs}
         setter={setEstopPin}
       />
     </div>

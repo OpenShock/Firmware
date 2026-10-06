@@ -21,6 +21,8 @@ export function mapWifiNetwork(
   };
 }
 
+// Hidden networks are reported with an empty SSID. They are not listed (connecting needs the SSID, which the hidden
+// network dialog asks for), so the `!ssid` checks below intentionally skip them.
 function handleInvalidEvent() {
   console.warn('[WS] Received invalid event type');
 }
@@ -63,13 +65,8 @@ function handleSavedEvent(fbsNetwork: FbsWifiNetwork) {
     return;
   }
 
-  const bssid = fbsNetwork.bssid();
-  if (bssid) {
-    hubState.updateWifiNetwork(bssid, (network) => {
-      network.saved = true;
-      return network;
-    });
-  }
+  // Credentials are per SSID, so every scanned BSSID of it is now saved
+  hubState.markWifiNetworksSaved(ssid);
 
   // Update config credentials so savedOnlySSIDs stays in sync
   if (hubState.config && !hubState.config.wifi.credentials.some((c) => c.ssid === ssid)) {

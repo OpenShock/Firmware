@@ -8,10 +8,40 @@ function apiFetch(path: string, init?: RequestInit): Promise<Response> {
   return fetch(getApiBaseUrl() + path, init);
 }
 
+// Error codes returned by the hub's HTTP API, mapped to user-facing text. Unknown codes are shown as-is.
+const _errorMessages: Record<string, string> = {
+  // Account linking
+  CodeRequired: 'Code required',
+  InvalidCodeLength: 'Invalid code length',
+  NoInternetConnection: 'No internet connection',
+  InvalidCode: 'Invalid code',
+  RequestFailed: 'Could not reach the server (check DNS/TLS/connection)',
+  RequestTimedOut: 'Request to the server timed out',
+  ServerError: 'Server returned an unexpected response',
+  InvalidResponse: 'Server sent an invalid response',
+  ConfigSaveFailed: 'Failed to save the auth token to the device',
+  // GPIO
+  InvalidPin: 'Invalid pin',
+  // WiFi
+  MissingSsid: 'Network name is required',
+  InvalidSsid: 'Network name must be 1-32 bytes',
+  PasswordTooShort: 'Password must be at least 8 characters',
+  PasswordTooLong: 'Password must be at most 63 characters',
+  // OTA
+  InvalidChannel: 'Invalid update channel',
+  // Generic
+  MissingParam: 'Missing parameter',
+  InvalidParam: 'Invalid value',
+  RateLimited: 'Too many requests',
+  InternalError: 'Internal error',
+};
+
 async function getErrorMessage(res: Response): Promise<string> {
   try {
     const data = await res.json();
-    return data.error ?? 'Unknown error';
+    const code: unknown = data?.error;
+    if (typeof code !== 'string') return 'Unknown error';
+    return _errorMessages[code] ?? code;
   } catch {
     return 'Unknown error';
   }
@@ -22,6 +52,7 @@ async function getErrorMessage(res: Response): Promise<string> {
 export async function fetchBoardInfo(): Promise<void> {
   try {
     const res = await apiFetch('/api/board');
+    if (!res.ok) return; // Non-fatal, see below
     const data = await res.json();
     hubState.hasPredefinedPins = data.has_predefined_pins ?? false;
   } catch {
@@ -58,9 +89,8 @@ export async function forgetWifiNetwork(ssid: string): Promise<void> {
     const res = await apiFetch('/api/wifi/networks?' + new URLSearchParams({ ssid }), {
       method: 'DELETE',
     });
-    if (res.ok) {
-      toast.success('Forgot network: ' + ssid);
-    } else {
+    // Success is announced by the hub's "Removed" WiFi event
+    if (!res.ok) {
       toast.error('Failed to forget network: ' + (await getErrorMessage(res)));
     }
   } catch {
@@ -69,20 +99,6 @@ export async function forgetWifiNetwork(ssid: string): Promise<void> {
 }
 
 // Account
-
-const _accountLinkErrorMessages: Record<string, string> = {
-  CodeRequired: 'Code required',
-  InvalidCodeLength: 'Invalid code length',
-  NoInternetConnection: 'No internet connection',
-  InvalidCode: 'Invalid code',
-  RateLimited: 'Too many requests',
-  RequestFailed: 'Could not reach the server (check DNS/TLS/connection)',
-  RequestTimedOut: 'Request to the server timed out',
-  ServerError: 'Server returned an unexpected response',
-  InvalidResponse: 'Server sent an invalid response',
-  ConfigSaveFailed: 'Failed to save the auth token to the device',
-  InternalError: 'Internal error',
-};
 
 export async function linkAccount(code: string): Promise<boolean> {
   try {
@@ -94,9 +110,7 @@ export async function linkAccount(code: string): Promise<boolean> {
       toast.success('Account linked successfully');
       return true;
     } else {
-      const error = await getErrorMessage(res);
-      const reason = _accountLinkErrorMessages[error] ?? 'Unknown error';
-      toast.error('Failed to link account: ' + reason);
+      toast.error('Failed to link account: ' + (await getErrorMessage(res)));
       return false;
     }
   } catch {
@@ -121,11 +135,6 @@ export async function unlinkAccount(): Promise<void> {
 
 // Config - RF
 
-const _gpioErrorMessages: Record<string, string> = {
-  InvalidPin: 'Invalid pin',
-  InternalError: 'Internal error',
-};
-
 export async function setRfTxPin(pin: number): Promise<boolean> {
   try {
     const res = await apiFetch('/api/config/rf/pin?' + new URLSearchParams({ pin: String(pin) }), {
@@ -137,8 +146,7 @@ export async function setRfTxPin(pin: number): Promise<boolean> {
       toast.success('Changed RF TX pin to: ' + data.pin);
       return true;
     } else {
-      const error = await getErrorMessage(res);
-      toast.error('Failed to change RF TX pin: ' + (_gpioErrorMessages[error] ?? 'Unknown error'));
+      toast.error('Failed to change RF TX pin: ' + (await getErrorMessage(res)));
       return false;
     }
   } catch {
@@ -163,8 +171,7 @@ export async function setEstopPin(pin: number): Promise<boolean> {
       toast.success('Changed EStop pin to: ' + data.pin);
       return true;
     } else {
-      const error = await getErrorMessage(res);
-      toast.error('Failed to change EStop pin: ' + (_gpioErrorMessages[error] ?? 'Unknown error'));
+      toast.error('Failed to change EStop pin: ' + (await getErrorMessage(res)));
       return false;
     }
   } catch {

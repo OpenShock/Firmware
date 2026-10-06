@@ -28,7 +28,11 @@
 
   let isDIY = $derived(!hubState.hasPredefinedPins);
   let wifiConnected = $derived(hubState.wifiConnectedBSSID !== null);
-  let pinConfigured = $derived(hubState.config?.rf?.txPin != null);
+  // An unset pin arrives as -1, so check it is a real output pin rather than just present
+  let pinConfigured = $derived.by(() => {
+    const txPin = hubState.config?.rf?.txPin;
+    return txPin != null && txPin >= 0 && hubState.gpioValidOutputs.includes(txPin);
+  });
 
   // Steps: DIY = Pins, Test, WiFi, Account (4)  |  Prebuilt = Test, WiFi, Account (3)
   let totalSteps = $derived(isDIY ? 4 : 3);
@@ -37,6 +41,11 @@
   let testStep = $derived(isDIY ? 2 : 1);
   let wifiStep = $derived(isDIY ? 3 : 2);
   let accountStep = $derived(isDIY ? 4 : 3);
+
+  // Board info loads asynchronously and can drop the Pins step after the wizard opened; keep the step in range
+  $effect(() => {
+    if (currentStep > totalSteps) currentStep = totalSteps;
+  });
 
   let canAdvance = $derived.by(() => {
     if (isDIY && currentStep === 1) return pinConfigured;

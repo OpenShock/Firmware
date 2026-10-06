@@ -21,7 +21,8 @@
   let accountLinked = $derived(hubState.accountLinked);
   let wifiConnected = $derived(hubState.wifiConnectedBSSID !== null);
   let linking = $state(false);
-  let canLink = $derived(linkCodeValid && linkCode.length >= 6 && !linking);
+  // Pair codes are exactly 6 digits; the hub rejects any other length
+  let canLink = $derived(linkCodeValid && linkCode.length === 6 && !linking);
 
   async function handleLinkAccount(e: SubmitEvent) {
     e.preventDefault();
@@ -88,6 +89,7 @@
           id="account-link-code"
           inputmode="numeric"
           pattern="[0-9]*"
+          maxlength={6}
           placeholder="Enter pair code"
           bind:value={linkCode}
         />

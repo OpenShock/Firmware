@@ -28,6 +28,11 @@ PayloadHandlers[HubToLocalMessagePayload.ReadyMessage] = (cli, msg) => {
   const payload = new ReadyMessage();
   msg.payload(payload);
 
+  // A (re)connect starts from a clean slate: the hub re-sends its full network list after Ready, and anything
+  // that changed while the socket was down would otherwise linger.
+  hubState.clearWifiNetworks();
+  hubState.wifiScanStatus = null;
+
   const connectedWifi = payload.connectedWifi();
   const connectedSSID = connectedWifi?.ssid();
   const connectedBSSID = connectedWifi?.bssid();
@@ -100,5 +105,11 @@ export function WebSocketMessageBinaryHandler(cli: WebSocketClient, data: ArrayB
     return;
   }
 
-  PayloadHandlers[payloadType](cli, msg);
+  try {
+    PayloadHandlers[payloadType](cli, msg);
+  } catch (e) {
+    // A malformed message must not take the whole UI down (e.g. leave the config unset forever)
+    console.error('[WS] ERROR: Failed to handle message: ', e);
+    toast.error('Received an invalid message from the hub');
+  }
 }
