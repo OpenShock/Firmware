@@ -3,6 +3,7 @@
 const char* const TAG = "Config::WiFiCredentials";
 
 #include "config/internal/utils.h"
+#include "config/WiFiAuthMode.h"
 #include "Logging.h"
 
 #include "util/HexUtils.h"
@@ -11,58 +12,6 @@ const char* const TAG = "Config::WiFiCredentials";
 
 using namespace OpenShock::Config;
 using FbsAuthMode = OpenShock::Serialization::Types::WifiAuthMode;
-
-static FbsAuthMode toFbsAuthMode(wifi_auth_mode_t mode)
-{
-  switch (mode) {
-    case WIFI_AUTH_OPEN:
-      return FbsAuthMode::Open;
-    case WIFI_AUTH_WEP:
-      return FbsAuthMode::WEP;
-    case WIFI_AUTH_WPA_PSK:
-      return FbsAuthMode::WPA_PSK;
-    case WIFI_AUTH_WPA2_PSK:
-      return FbsAuthMode::WPA2_PSK;
-    case WIFI_AUTH_WPA_WPA2_PSK:
-      return FbsAuthMode::WPA_WPA2_PSK;
-    case WIFI_AUTH_WPA2_ENTERPRISE:
-      return FbsAuthMode::WPA2_ENTERPRISE;
-    case WIFI_AUTH_WPA3_PSK:
-      return FbsAuthMode::WPA3_PSK;
-    case WIFI_AUTH_WPA2_WPA3_PSK:
-      return FbsAuthMode::WPA2_WPA3_PSK;
-    case WIFI_AUTH_WAPI_PSK:
-      return FbsAuthMode::WAPI_PSK;
-    default:
-      return FbsAuthMode::UNKNOWN;
-  }
-}
-
-static wifi_auth_mode_t fromFbsAuthMode(FbsAuthMode mode)
-{
-  switch (mode) {
-    case FbsAuthMode::Open:
-      return WIFI_AUTH_OPEN;
-    case FbsAuthMode::WEP:
-      return WIFI_AUTH_WEP;
-    case FbsAuthMode::WPA_PSK:
-      return WIFI_AUTH_WPA_PSK;
-    case FbsAuthMode::WPA2_PSK:
-      return WIFI_AUTH_WPA2_PSK;
-    case FbsAuthMode::WPA_WPA2_PSK:
-      return WIFI_AUTH_WPA_WPA2_PSK;
-    case FbsAuthMode::WPA2_ENTERPRISE:
-      return WIFI_AUTH_WPA2_ENTERPRISE;
-    case FbsAuthMode::WPA3_PSK:
-      return WIFI_AUTH_WPA3_PSK;
-    case FbsAuthMode::WPA2_WPA3_PSK:
-      return WIFI_AUTH_WPA2_WPA3_PSK;
-    case FbsAuthMode::WAPI_PSK:
-      return WIFI_AUTH_WAPI_PSK;
-    default:
-      return WIFI_AUTH_MAX;
-  }
-}
 
 WiFiCredentials::WiFiCredentials()
   : id(0)
@@ -110,7 +59,7 @@ bool WiFiCredentials::FromFlatbuffers(const Serialization::Configuration::WiFiCr
   id = config->id();
   Internal::Utils::FromFbsStr(ssid, config->ssid(), "");
   Internal::Utils::FromFbsStr(password, config->password(), "");
-  authMode = fromFbsAuthMode(config->auth_mode());
+  authMode = FromFbsAuthMode(config->auth_mode());
 
   auto fbsBssid = config->bssid();
   if (fbsBssid != nullptr) {
@@ -145,7 +94,7 @@ flatbuffers::Offset<OpenShock::Serialization::Configuration::WiFiCredentials> Wi
     bssidPtr    = &bssidStruct;
   }
 
-  return Serialization::Configuration::CreateWiFiCredentials(builder, id, ssidOffset, passwordOffset, toFbsAuthMode(authMode), bssidPtr);
+  return Serialization::Configuration::CreateWiFiCredentials(builder, id, ssidOffset, passwordOffset, ToFbsAuthMode(authMode), bssidPtr);
 }
 
 bool WiFiCredentials::FromJSON(JSON::JsonView json)
@@ -177,7 +126,7 @@ bool WiFiCredentials::FromJSON(JSON::JsonView json)
 
   uint8_t authModeVal = static_cast<uint8_t>(FbsAuthMode::UNKNOWN);
   if (!json["authMode"].tryGetU8(authModeVal)) authModeVal = static_cast<uint8_t>(FbsAuthMode::UNKNOWN);
-  authMode = fromFbsAuthMode(static_cast<FbsAuthMode>(authModeVal));
+  authMode = FromFbsAuthMode(static_cast<FbsAuthMode>(authModeVal));
 
   bssid.fill(0);
   std::string bssidStr;
@@ -206,7 +155,7 @@ void WiFiCredentials::ToJSON(json_gen_str_t* gen, const char* name, bool withSen
   if (withSensitiveData) {
     JSON::objSetString(gen, "password", password);
   }
-  json_gen_obj_set_int(gen, "authMode", static_cast<uint8_t>(toFbsAuthMode(authMode)));
+  json_gen_obj_set_int(gen, "authMode", static_cast<uint8_t>(ToFbsAuthMode(authMode)));
   if (HasPinnedBSSID()) {
     char hex[13];
     for (std::size_t i = 0; i < bssid.size(); ++i) {

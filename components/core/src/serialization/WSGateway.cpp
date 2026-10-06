@@ -9,23 +9,7 @@ const char* const TAG = "WSGateway";
 
 // Firmware version / commit. Regenerated every build, so this file is one of the
 // few that recompile on a new commit.
-#include "openshock_version.h"
-
-#ifndef OPENSHOCK_FW_VERSION_MAJOR
-#define OPENSHOCK_FW_VERSION_MAJOR 0
-#endif
-#ifndef OPENSHOCK_FW_VERSION_MINOR
-#define OPENSHOCK_FW_VERSION_MINOR 0
-#endif
-#ifndef OPENSHOCK_FW_VERSION_PATCH
-#define OPENSHOCK_FW_VERSION_PATCH 0
-#endif
-#ifndef OPENSHOCK_FW_VERSION_PRERELEASE
-#define OPENSHOCK_FW_VERSION_PRERELEASE nullptr
-#endif
-#ifndef OPENSHOCK_FW_VERSION_BUILD
-#define OPENSHOCK_FW_VERSION_BUILD nullptr
-#endif
+#include "SemVer.h"
 
 using namespace OpenShock::Serialization;
 
@@ -60,7 +44,8 @@ bool Gateway::SerializeBootStatusMessage(int32_t updateId, OpenShock::FirmwareBo
 {
   flatbuffers::FlatBufferBuilder builder(128);
 
-  auto fbsVersion = Types::CreateSemVerDirect(builder, OPENSHOCK_FW_VERSION_MAJOR, OPENSHOCK_FW_VERSION_MINOR, OPENSHOCK_FW_VERSION_PATCH, OPENSHOCK_FW_VERSION_PRERELEASE, OPENSHOCK_FW_VERSION_BUILD);
+  const OpenShock::SemVer& version = OpenShock::Constants::FirmwareVersion();
+  auto fbsVersion                  = Types::CreateSemVerDirect(builder, version.major, version.minor, version.patch, version.prerelease.empty() ? nullptr : version.prerelease.c_str(), version.build.empty() ? nullptr : version.build.c_str());
 
   auto fbsBootStatus = Gateway::CreateBootStatus(builder, static_cast<Types::FirmwareBootType>(bootType), fbsVersion, updateId);
 

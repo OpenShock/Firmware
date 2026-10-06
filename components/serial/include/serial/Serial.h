@@ -1,5 +1,6 @@
 #pragma once
 
+#include <cstdarg>
 #include <cstddef>
 #include <cstdint>
 
@@ -37,4 +38,12 @@ namespace OpenShock::Serial {
    * @return Number of bytes written.
    */
   int Write(const uint8_t* data, std::size_t len);
+
+  /**
+   * @brief printf-style Write(). Formats into a stack buffer, and only for long output (e.g. a config dump) into a
+   *        heap buffer; if that allocation fails the output is truncated rather than dropped.
+   *
+   * @return Number of bytes written, or a negative value if formatting failed.
+   */
+  int VWritef(const char* format, va_list args) __attribute__((format(printf, 1, 0)));
 }  // namespace OpenShock::Serial

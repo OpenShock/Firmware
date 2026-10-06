@@ -6,6 +6,7 @@ const char* const TAG = "LocalMessageHandlers";
 #include "message_handlers/impl/WSLocal.h"
 
 #include "serialization/_fbs/LocalToHubMessage_generated.h"
+#include "serialization/VerifiedRoot.h"
 
 #include <array>
 #include <cstdint>
@@ -13,8 +14,6 @@ const char* const TAG = "LocalMessageHandlers";
 namespace Schemas  = OpenShock::Serialization::Local;
 namespace Handlers = OpenShock::MessageHandlers::Local::_Private;
 typedef Schemas::LocalToHubMessagePayload PayloadType;
-
-static constexpr std::size_t MAX_MESSAGE_SIZE = 4096;  // TODO: Profile this
 
 using namespace OpenShock;
 
@@ -33,30 +32,11 @@ static std::array<Handlers::HandlerType, HANDLER_COUNT> s_localHandlers = []() {
 
 void MessageHandlers::WebSocket::HandleLocalBinary(uint8_t socketId, std::span<const uint8_t> data)
 {
-  if (data.size() < sizeof(flatbuffers::uoffset_t)) {
-    OS_LOGE(TAG, "Message too small to be a valid FlatBuffer");
+  auto msg = Serialization::GetVerifiedRoot<Schemas::LocalToHubMessage>(data, MaxLocalMessageSize);
+  if (msg == nullptr) {
+    OS_LOGE(TAG, "Invalid message (%zu bytes, max %zu)", data.size(), MaxLocalMessageSize);
     return;
   }
-
-  // Checked before constructing the Verifier: its constructor asserts
-  // size < max_size, so an oversized message would abort instead of being rejected.
-  if (data.size() > MAX_MESSAGE_SIZE) {
-    OS_LOGE(TAG, "Message too large (%zu bytes, max %zu)", data.size(), MAX_MESSAGE_SIZE);
-    return;
-  }
-
-  // Validate buffer
-  flatbuffers::Verifier::Options verifierOptions {
-    .max_size = MAX_MESSAGE_SIZE + 1,  // Verifier requires size < max_size
-  };
-  flatbuffers::Verifier verifier(data.data(), data.size(), verifierOptions);
-  if (!verifier.VerifyBuffer<Schemas::LocalToHubMessage>()) {
-    OS_LOGE(TAG, "Failed to verify message");
-    return;
-  }
-
-  // Deserialize (safe after verification)
-  auto msg = flatbuffers::GetRoot<Schemas::LocalToHubMessage>(data.data());
 
   if (msg->payload_type() < PayloadType::MIN || msg->payload_type() > PayloadType::MAX) {
     Handlers::HandleInvalidMessage(socketId, msg);

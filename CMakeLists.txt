@@ -88,7 +88,7 @@ if(OPENSHOCK_NATIVE_ENV)
 
   # Order the refresh ahead of the components that include the header. Without this the
   # ALL target is unordered against them and a build could compile the previous version.
-  foreach(_os_consumer common core ota serial_console)
+  foreach(_os_consumer common)  # Version.cpp is the only translation unit including it
     idf_component_get_property(_os_lib ${_os_consumer} COMPONENT_LIB)
     if(_os_lib)
       add_dependencies(${_os_lib} openshock_version_header)

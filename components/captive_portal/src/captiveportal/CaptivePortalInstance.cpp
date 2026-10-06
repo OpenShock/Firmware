@@ -41,7 +41,8 @@ const char* const TAG = "CaptivePortalInstance";
 const uint16_t HTTP_PORT = 80;
 
 // Largest inbound WebSocket message we'll accept (local FlatBuffer commands are tiny).
-static constexpr size_t MAX_WS_MSG = 8 * 1024;
+// Nothing larger is accepted by the local message handler, so don't buffer more than that.
+static constexpr size_t MAX_WS_MSG = OpenShock::MessageHandlers::WebSocket::MaxLocalMessageSize;
 
 // HTTP status lines (esp_http_server needs the full "code reason" string, and stores
 // the pointer rather than copying — so these must have static storage duration).
@@ -466,7 +467,7 @@ static esp_err_t apiConfigEstopPin(httpd_req_t* req)
   if (estopEnabled) {
     return sendResp(req, S403, HTTP::ContentType::JSON, JSON_ERR_ESTOP_PROTECTED);
   }
-  if (!EStopManager::SetEStopPin(pin) || !Config::SetEStopGpioPin(pin)) {
+  if (!EStopManager::SetEStopPin(pin)) {
     return sendResp(req, S500, HTTP::ContentType::JSON, JSON_ERR_INTERNAL);
   }
   OpenShock::JSON::StringWriter writer;
@@ -488,8 +489,7 @@ static esp_err_t apiConfigEstopEnabled(httpd_req_t* req)
   if (!enabled) {
     return sendResp(req, S403, HTTP::ContentType::JSON, JSON_ERR_ESTOP_PROTECTED);
   }
-  bool success = EStopManager::SetEStopEnabled(enabled) && Config::SetEStopEnabled(enabled);
-  if (success) {
+  if (EStopManager::SetEStopEnabled(enabled)) {
     return sendResp(req, S200, nullptr, {});
   }
   return sendResp(req, S500, HTTP::ContentType::JSON, JSON_ERR_INTERNAL);

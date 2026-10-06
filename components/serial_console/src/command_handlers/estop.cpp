@@ -24,12 +24,7 @@ static void handleEStopEnabledCommand(std::string_view arg, bool isAutomated)
   }
 
   if (!OpenShock::EStopManager::SetEStopEnabled(enabled)) {
-    SERPR_ERROR("Failed to set EStop enabled");
-    return;
-  }
-
-  if (!OpenShock::Config::SetEStopEnabled(enabled)) {
-    SERPR_ERROR("Failed to save config");
+    SERPR_ERROR("Failed to set EStop enabled (refused while the EStop is active)");
     return;
   }
 
@@ -56,12 +51,7 @@ static void handleEStopPinCommand(std::string_view arg, bool isAutomated)
   }
 
   if (!OpenShock::EStopManager::SetEStopPin(estopPin)) {
-    SERPR_ERROR("Failed to set EStop pin");
-    return;
-  }
-
-  if (!OpenShock::Config::SetEStopGpioPin(estopPin)) {
-    SERPR_ERROR("Failed to save config");
+    SERPR_ERROR("Failed to set EStop pin (invalid pin, or refused while the EStop is active)");
     return;
   }
 

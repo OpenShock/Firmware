@@ -9,6 +9,7 @@ const char* const TAG = "Config";
 #include "Logging.h"
 #include "OpenShock.h"
 #include "ReadWriteMutex.h"
+#include "serialization/VerifiedRoot.h"
 
 #include "json/Json.h"
 
@@ -55,30 +56,16 @@ static ReadWriteMutex _configMutex;
 
 static bool tryDeserializeConfig(const uint8_t* buffer, std::size_t bufferLen, OpenShock::Config::RootConfig& config)
 {
-  if (buffer == nullptr || bufferLen < sizeof(flatbuffers::uoffset_t)) {
-    OS_LOGE(TAG, "Buffer is null or too small");
+  if (buffer == nullptr) {
+    OS_LOGE(TAG, "Buffer is null");
     return false;
   }
 
-  // Must be checked before constructing the Verifier: its constructor asserts
-  // size < max_size (an abort, not a verification failure).
-  if (bufferLen > Config::MaxConfigSize) {
-    OS_LOGE(TAG, "Config is too large (%zu bytes, max %zu)", bufferLen, Config::MaxConfigSize);
+  auto fbsConfig = Serialization::GetVerifiedRoot<Serialization::Configuration::HubConfig>(std::span<const uint8_t>(buffer, bufferLen), Config::MaxConfigSize);
+  if (fbsConfig == nullptr) {
+    OS_LOGE(TAG, "Config failed verification (%zu bytes, max %zu)", bufferLen, Config::MaxConfigSize);
     return false;
   }
-
-  // Validate buffer before accessing
-  flatbuffers::Verifier::Options verifierOptions {
-    .max_size = Config::MaxConfigSize + 1,  // Verifier requires size < max_size
-  };
-  flatbuffers::Verifier verifier(buffer, bufferLen, verifierOptions);
-  if (!verifier.VerifyBuffer<Serialization::Configuration::HubConfig>()) {
-    OS_LOGE(TAG, "Failed to verify config file integrity");
-    return false;
-  }
-
-  // Deserialize (safe after verification)
-  auto fbsConfig = flatbuffers::GetRoot<Serialization::Configuration::HubConfig>(buffer);
 
   // Read config
   if (!config.FromFlatbuffers(fbsConfig)) {

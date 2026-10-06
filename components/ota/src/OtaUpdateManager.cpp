@@ -37,7 +37,6 @@ const char* const TAG = "OtaUpdateManager";
 
 // Firmware version / commit. Regenerated every build, so this file is one of the
 // few that recompile on a new commit.
-#include "openshock_version.h"
 
 using namespace std::string_view_literals;
 
@@ -46,7 +45,7 @@ using namespace std::string_view_literals;
 
 /// @brief Latest release for this board on a channel, with the hub's current version attached so the
 /// server can answer 204 when there is nothing to do. See spec §4.2.
-#define OPENSHOCK_FW_REPO_LATEST_URL_FORMAT "https://%s" OPENSHOCK_FW_REPO_API_PREFIX "/latest/%s/" OPENSHOCK_FW_BOARD "?version=" OPENSHOCK_FW_VERSION
+#define OPENSHOCK_FW_REPO_LATEST_URL_FORMAT "https://%s" OPENSHOCK_FW_REPO_API_PREFIX "/latest/%s/" OPENSHOCK_FW_BOARD "?version=%s"
 
 /// @brief Artifacts for one specific version of this board — the directed-update path. See spec §4.4.
 #define OPENSHOCK_FW_REPO_VERSION_URL_FORMAT "https://%s" OPENSHOCK_FW_REPO_API_PREFIX "/versions/%s/" OPENSHOCK_FW_BOARD
@@ -398,7 +397,7 @@ static void otaum_updatetask(void* arg)
 
     std::string versionStr = version.toString();  // TODO: This is abusing the SemVer::toString() method causing alot of string copies, fix this
 
-    if (versionStr == OPENSHOCK_FW_VERSION ""sv) {
+    if (versionStr == OpenShock::Constants::FW_VERSION) {
       OS_LOGI(TAG, "Requested version is already installed");
       continue;
     }
@@ -656,7 +655,7 @@ bool OtaUpdateManager::TryGetFirmwareVersion(HTTP::Client& client, OtaUpdateChan
   }
 
   std::string uri;
-  if (!FormatToString(uri, OPENSHOCK_FW_REPO_LATEST_URL_FORMAT, domain.c_str(), channelName)) {
+  if (!FormatToString(uri, OPENSHOCK_FW_REPO_LATEST_URL_FORMAT, domain.c_str(), channelName, OpenShock::Constants::FW_VERSION)) {
     OS_LOGE(TAG, "Failed to format URL");
     return false;
   }
@@ -674,7 +673,8 @@ bool OtaUpdateManager::TryGetFirmwareVersion(HTTP::Client& client, OtaUpdateChan
   // Report the running version back so the caller's "already installed" check short-circuits.
   if (code == 204) {
     OS_LOGD(TAG, "Already on the latest version for this channel");
-    return OpenShock::TryParseSemVer(OPENSHOCK_FW_VERSION ""sv, version);
+    version = OpenShock::Constants::FirmwareVersion();
+    return true;
   }
 
   std::string versionStr;

@@ -6,52 +6,24 @@
 
 bool OpenShock::FormatToString(std::string& out, const char* format, ...)
 {
-  const std::size_t STACK_BUFFER_SIZE = 128;
-
-  char buffer[STACK_BUFFER_SIZE];
-  char* bufferPtr = buffer;
-
   va_list args;
 
-  // Try format with stack buffer.
+  // Measure, then format straight into the string (C++11 guarantees the trailing NUL slot).
   va_start(args, format);
-  int result = vsnprintf(buffer, STACK_BUFFER_SIZE, format, args);
+  int length = vsnprintf(nullptr, 0, format, args);
   va_end(args);
 
-  // If result is negative, something went wrong.
-  if (result < 0) {
+  if (length < 0) {
     return false;
   }
 
-  if (result >= STACK_BUFFER_SIZE) {
-    // Account for null terminator.
-    result += 1;
+  out.resize(static_cast<std::size_t>(length));
 
-    // Allocate heap buffer.
-    bufferPtr = new char[result];
+  va_start(args, format);
+  int written = vsnprintf(out.data(), out.size() + 1, format, args);
+  va_end(args);
 
-    // Try format with heap buffer.
-    va_start(args, format);
-    result = vsnprintf(bufferPtr, result, format, args);
-    va_end(args);
-
-    // If we still fail, something is wrong.
-    // Free heap buffer and return false.
-    if (result < 0) {
-      delete[] bufferPtr;
-      return false;
-    }
-  }
-
-  // Set output string.
-  out = std::string(bufferPtr, result);
-
-  // Free heap buffer if we used it.
-  if (bufferPtr != buffer) {
-    delete[] bufferPtr;
-  }
-
-  return true;
+  return written == length;
 }
 
 std::vector<std::string_view> OpenShock::StringSplit(std::string_view view, char delimiter, std::size_t maxSplits)

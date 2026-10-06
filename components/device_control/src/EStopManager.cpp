@@ -250,16 +250,27 @@ bool EStopManager::SetEStopEnabled(bool enabled)
   OpenShock::ScopedLock lock__(&s_estopMutex);
 
   if (enabled) {
-    return estopmgr_taskStart();
+    if (!estopmgr_taskStart()) {
+      return false;
+    }
+  } else {
+    // Stopping the task resets the activation, which would release an active EStop without the hold-to-clear.
+    if (EStopManager::IsEStopped()) {
+      OS_LOGW(TAG, "Refusing to disable EStop while it is active");
+      return false;
+    }
+
+    if (!estopmgr_taskStop()) {
+      return false;
+    }
   }
 
-  // Stopping the task resets the activation, which would release an active EStop without the hold-to-clear.
-  if (EStopManager::IsEStopped()) {
-    OS_LOGW(TAG, "Refusing to disable EStop while it is active");
+  if (!Config::SetEStopEnabled(enabled)) {
+    OS_LOGE(TAG, "Failed to save EStop enabled state to config");
     return false;
   }
 
-  return estopmgr_taskStop();
+  return true;
 }
 
 bool EStopManager::SetEStopPin(gpio_num_t pin)
@@ -303,6 +314,11 @@ bool EStopManager::SetEStopPin(gpio_num_t pin)
   }
 
   estopmgr_releasePin(oldPin);
+
+  if (!Config::SetEStopGpioPin(pin)) {
+    OS_LOGE(TAG, "Failed to save EStop pin to config");
+    return false;
+  }
 
   return true;
 }

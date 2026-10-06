@@ -16,10 +16,6 @@ const char* const TAG = "GatewayClient";
 
 #include <cstring>
 
-// Firmware version / commit. Regenerated every build, so this file is one of the
-// few that recompile on a new commit.
-#include "openshock_version.h"
-
 using namespace OpenShock;
 
 const int64_t GATEWAY_PING_TIMEOUT = 90'000;
@@ -27,8 +23,8 @@ const int64_t GATEWAY_PING_TIMEOUT = 90'000;
 // Message handlers (config reads, flash writes, FlatBuffers verification) run on the websocket task.
 const int GATEWAY_TASK_STACK_SIZE = 6 * 1024;
 
-// Upper bound for a reassembled message; matches the gateway message handler limit.
-const std::size_t GATEWAY_MAX_MESSAGE_SIZE = 4096;
+// Upper bound for a reassembled message: the gateway message handler limit.
+const std::size_t GATEWAY_MAX_MESSAGE_SIZE = OpenShock::MessageHandlers::WebSocket::MaxGatewayMessageSize;
 
 // WebSocket opcodes (RFC 6455) as delivered by esp_websocket_client event data.
 static constexpr int WS_OP_TEXT   = 0x01;
@@ -48,9 +44,8 @@ GatewayClient::GatewayClient(const std::string& authToken)
 {
   OS_LOGD(TAG, "Creating GatewayClient");
 
-  m_headers = "Firmware-Version: " OPENSHOCK_FW_VERSION "\r\n"
-              "Device-Token: "
-            + authToken + "\r\n";
+  m_headers = std::string("Firmware-Version: ") + OpenShock::Constants::FW_VERSION + "\r\n"
+            + "Device-Token: " + authToken + "\r\n";
 }
 GatewayClient::~GatewayClient()
 {

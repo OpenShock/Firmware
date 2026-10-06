@@ -11,6 +11,7 @@
 #include <algorithm>
 #include <atomic>
 #include <cstdio>
+#include <cstdlib>
 
 // Select the console backend from the configured primary console.
 #if defined(CONFIG_ESP_CONSOLE_USB_SERIAL_JTAG)
@@ -153,6 +154,34 @@ static int driverWrite(const uint8_t* data, std::size_t len)
   romWrite(data, len);
   return static_cast<int>(len);
 #endif
+}
+
+int Serial::VWritef(const char* format, va_list args)
+{
+  char stackBuf[256];
+
+  // vsnprintf consumes the va_list, and a long line needs a second pass
+  va_list retryArgs;
+  va_copy(retryArgs, args);
+
+  int len = vsnprintf(stackBuf, sizeof(stackBuf), format, args);
+  if (len <= 0 || static_cast<std::size_t>(len) < sizeof(stackBuf)) {
+    va_end(retryArgs);
+    return len <= 0 ? len : Write(reinterpret_cast<const uint8_t*>(stackBuf), static_cast<std::size_t>(len));
+  }
+
+  char* heapBuf = static_cast<char*>(malloc(static_cast<std::size_t>(len) + 1));
+  if (heapBuf == nullptr) {
+    va_end(retryArgs);
+    return Write(reinterpret_cast<const uint8_t*>(stackBuf), sizeof(stackBuf) - 1);
+  }
+
+  vsnprintf(heapBuf, static_cast<std::size_t>(len) + 1, format, retryArgs);
+  va_end(retryArgs);
+
+  int written = Write(reinterpret_cast<const uint8_t*>(heapBuf), static_cast<std::size_t>(len));
+  free(heapBuf);
+  return written;
 }
 
 int Serial::Write(const uint8_t* data, std::size_t len)

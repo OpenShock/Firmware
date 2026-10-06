@@ -4,6 +4,7 @@ const char* const TAG = "WSLocal";
 
 #include "Chipset.h"
 #include "config/Config.h"
+#include "config/WiFiAuthMode.h"
 #include "Logging.h"
 #include "util/HexUtils.h"
 #include "wifi/WiFiNetwork.h"
@@ -12,38 +13,10 @@ const char* const TAG = "WSLocal";
 
 using namespace OpenShock::Serialization;
 
-typedef OpenShock::Serialization::Types::WifiAuthMode WiFiAuthMode;
-
-constexpr WiFiAuthMode GetWiFiAuthModeEnum(wifi_auth_mode_t authMode)
-{
-  switch (authMode) {
-    case wifi_auth_mode_t::WIFI_AUTH_OPEN:
-      return WiFiAuthMode::Open;
-    case wifi_auth_mode_t::WIFI_AUTH_WEP:
-      return WiFiAuthMode::WEP;
-    case wifi_auth_mode_t::WIFI_AUTH_WPA_PSK:
-      return WiFiAuthMode::WPA_PSK;
-    case wifi_auth_mode_t::WIFI_AUTH_WPA2_PSK:
-      return WiFiAuthMode::WPA2_PSK;
-    case wifi_auth_mode_t::WIFI_AUTH_WPA_WPA2_PSK:
-      return WiFiAuthMode::WPA_WPA2_PSK;
-    case wifi_auth_mode_t::WIFI_AUTH_WPA2_ENTERPRISE:
-      return WiFiAuthMode::WPA2_ENTERPRISE;
-    case wifi_auth_mode_t::WIFI_AUTH_WPA3_PSK:
-      return WiFiAuthMode::WPA3_PSK;
-    case wifi_auth_mode_t::WIFI_AUTH_WPA2_WPA3_PSK:
-      return WiFiAuthMode::WPA2_WPA3_PSK;
-    case wifi_auth_mode_t::WIFI_AUTH_WAPI_PSK:
-      return WiFiAuthMode::WAPI_PSK;
-    default:
-      return WiFiAuthMode::UNKNOWN;
-  }
-}
-
 static flatbuffers::Offset<OpenShock::Serialization::Types::WifiNetwork> createWiFiNetwork(flatbuffers::FlatBufferBuilder& builder, const OpenShock::WiFiNetwork& network)
 {
   auto bssid    = network.GetHexBSSID();
-  auto authMode = GetWiFiAuthModeEnum(network.authMode);
+  auto authMode = OpenShock::Config::ToFbsAuthMode(network.authMode);
 
   return Types::CreateWifiNetworkDirect(builder, network.ssid, bssid.data(), network.channel, network.rssi, authMode, network.IsSaved());
 }

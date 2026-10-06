@@ -7,6 +7,7 @@ const char* const TAG = "ServerMessageHandlers";
 #include "Logging.h"
 
 #include "serialization/_fbs/GatewayToHubMessage_generated.h"
+#include "serialization/VerifiedRoot.h"
 
 #include <array>
 #include <cstdint>
@@ -14,8 +15,6 @@ const char* const TAG = "ServerMessageHandlers";
 namespace Schemas  = OpenShock::Serialization::Gateway;
 namespace Handlers = OpenShock::MessageHandlers::Server::_Private;
 typedef Schemas::GatewayToHubMessagePayload PayloadType;
-
-static constexpr std::size_t MAX_MESSAGE_SIZE = 4096;  // TODO: Profile this
 
 using namespace OpenShock;
 
@@ -39,30 +38,11 @@ static std::array<Handlers::HandlerType, HANDLER_COUNT> s_serverHandlers = []() 
 
 void MessageHandlers::WebSocket::HandleGatewayBinary(std::span<const uint8_t> data)
 {
-  if (data.size() < sizeof(flatbuffers::uoffset_t)) {
-    OS_LOGE(TAG, "Message too small to be a valid FlatBuffer");
+  auto msg = Serialization::GetVerifiedRoot<Schemas::GatewayToHubMessage>(data, MaxGatewayMessageSize);
+  if (msg == nullptr) {
+    OS_LOGE(TAG, "Invalid message (%zu bytes, max %zu)", data.size(), MaxGatewayMessageSize);
     return;
   }
-
-  // Checked before constructing the Verifier: its constructor asserts
-  // size < max_size, so an oversized message would abort instead of being rejected.
-  if (data.size() > MAX_MESSAGE_SIZE) {
-    OS_LOGE(TAG, "Message too large (%zu bytes, max %zu)", data.size(), MAX_MESSAGE_SIZE);
-    return;
-  }
-
-  // Validate buffer
-  flatbuffers::Verifier::Options verifierOptions {
-    .max_size = MAX_MESSAGE_SIZE + 1,  // Verifier requires size < max_size
-  };
-  flatbuffers::Verifier verifier(data.data(), data.size(), verifierOptions);
-  if (!verifier.VerifyBuffer<Schemas::GatewayToHubMessage>()) {
-    OS_LOGE(TAG, "Failed to verify message");
-    return;
-  }
-
-  // Deserialize (safe after verification)
-  auto msg = flatbuffers::GetRoot<Schemas::GatewayToHubMessage>(data.data());
 
   if (msg->payload_type() < PayloadType::MIN || msg->payload_type() > PayloadType::MAX) {
     Handlers::HandleInvalidMessage(msg);

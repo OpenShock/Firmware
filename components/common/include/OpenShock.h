@@ -29,10 +29,19 @@
 
 #define OPENSHOCK_GPIO_INVALID -1
 
+namespace OpenShock {
+  struct SemVer;
+}  // namespace OpenShock
+
 namespace OpenShock::Constants {
   // Defined in Version.cpp, which is the only translation unit that includes
-  // openshock_version.h. Building the string here would have put the firmware version -
+  // openshock_version.h. Building these here would have put the firmware version -
   // and so the commit SHA - into every file that includes this header, rebuilding all of
-  // them on every commit for a string almost none of them use.
+  // them on every commit for strings almost none of them use.
   extern const char* const FW_USERAGENT;
+  extern const char* const FW_VERSION;     // e.g. "1.5.0-rc.7+abc1234"
+  extern const char* const FW_GIT_COMMIT;  // full SHA
+
+  /// @brief The running firmware version, parsed once.
+  const OpenShock::SemVer& FirmwareVersion();
 }  // namespace OpenShock::Constants

@@ -30,10 +30,6 @@ const char* const TAG = "SerialInputHandler";
 #include <string_view>
 #include <unordered_map>
 
-// Firmware version / commit. Regenerated every build, so this file is one of the
-// few that recompile on a new commit.
-#include "openshock_version.h"
-
 namespace {
   // Case-insensitive hash/equality for the command lookup table.
   struct hash_ci {
@@ -716,37 +712,10 @@ void SerialInputHandler::Print(std::string_view str)
 // the logger does), so it is not interleaved with log output mid-line.
 void SerialInputHandler::Printf(const char* format, ...)
 {
-  char stackBuf[256];
-
   va_list args;
   va_start(args, format);
-  int len = vsnprintf(stackBuf, sizeof(stackBuf), format, args);
+  Serial::VWritef(format, args);
   va_end(args);
-
-  if (len <= 0) {
-    return;
-  }
-
-  if (static_cast<std::size_t>(len) < sizeof(stackBuf)) {
-    Serial::Write(reinterpret_cast<const uint8_t*>(stackBuf), static_cast<std::size_t>(len));
-    return;
-  }
-
-  // Longer than the stack buffer (e.g. a config dump): format again into a heap
-  // buffer so the response isn't truncated. Fall back to the truncated stack
-  // buffer if the allocation fails.
-  char* heapBuf = static_cast<char*>(malloc(static_cast<std::size_t>(len) + 1));
-  if (heapBuf == nullptr) {
-    Serial::Write(reinterpret_cast<const uint8_t*>(stackBuf), sizeof(stackBuf) - 1);
-    return;
-  }
-
-  va_start(args, format);
-  vsnprintf(heapBuf, static_cast<std::size_t>(len) + 1, format, args);
-  va_end(args);
-
-  Serial::Write(reinterpret_cast<const uint8_t*>(heapBuf), static_cast<std::size_t>(len));
-  free(heapBuf);
 }
 
 void SerialInputHandler::PrintWelcomeHeader()
@@ -762,11 +731,13 @@ void SerialInputHandler::PrintWelcomeHeader()
 
 void SerialInputHandler::PrintVersionInfo()
 {
-  OS_SERIAL_PRINT("\
-  Version:  " OPENSHOCK_FW_VERSION "\r\n\
-    Build:  " OPENSHOCK_FW_MODE "\r\n\
-   Commit:  " OPENSHOCK_FW_GIT_COMMIT "\r\n\
-    Board:  " OPENSHOCK_FW_BOARD "\r\n\
-     Chip:  " OPENSHOCK_FW_CHIP "\r\n\
-");
+  OS_SERIAL_PRINTF(
+    "  Version:  %s" "\r\n"
+    "    Build:  " OPENSHOCK_FW_MODE "\r\n"
+    "   Commit:  %s" "\r\n"
+    "    Board:  " OPENSHOCK_FW_BOARD "\r\n"
+    "     Chip:  " OPENSHOCK_FW_CHIP "\r\n",
+    OpenShock::Constants::FW_VERSION,
+    OpenShock::Constants::FW_GIT_COMMIT
+  );
 }
