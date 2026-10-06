@@ -2,6 +2,7 @@
 
 const char* const TAG = "OtaUpdateManager";
 
+#include "AppHooks.h"
 #include "captiveportal/Manager.h"
 #include "config/Config.h"
 #include "fs/FsCheck.h"
@@ -544,6 +545,8 @@ static bool otaum_try_get_json(HTTP::Client& client, std::string_view url, std::
 
 bool OtaUpdateManager::Init()
 {
+  AppHooks::RegisterOtaUpdateManager(OtaUpdateManager::GetFirmwareBootType, OtaUpdateManager::TryStartFirmwareUpdate);
+
   esp_err_t err;
 
   OS_LOGD(TAG, "Fetching current partition");
@@ -636,7 +639,7 @@ bool OtaUpdateManager::TryGetFirmwareVersion(HTTP::Client& client, OtaUpdateChan
     return OpenShock::TryParseSemVer(OPENSHOCK_FW_VERSION ""sv, version);
   }
 
-  std::string_view versionStr;
+  std::string versionStr;
   if (!doc.root()["version"].tryGetStr(versionStr)) {
     OS_LOGE(TAG, "Response is missing a 'version' string");
     return false;
@@ -685,7 +688,7 @@ static bool otaum_parse_board_artifacts(JSON::JsonView root, OtaUpdateManager::F
   for (int i = 0; i < count; i++) {
     auto artifact = artifacts.at(i);
 
-    std::string_view typeStr, urlStr, hashStr;
+    std::string typeStr, urlStr, hashStr;
     if (!artifact["type"].tryGetStr(typeStr) || !artifact["url"].tryGetStr(urlStr) || !artifact["sha256Hash"].tryGetStr(hashStr)) {
       continue;
     }
@@ -698,8 +701,8 @@ static bool otaum_parse_board_artifacts(JSON::JsonView root, OtaUpdateManager::F
       if (!_tryParseIntoHash(hashStr, release.appBinaryHash)) {
         return false;
       }
-      release.appBinaryUrl.assign(urlStr.data(), urlStr.size());
-      foundApp = true;
+      release.appBinaryUrl = std::move(urlStr);
+      foundApp             = true;
     } else if (typeStr == "staticfs"sv) {
       if (foundFilesystem) {
         OS_LOGE(TAG, "Duplicate 'staticfs' artifact");
@@ -708,8 +711,8 @@ static bool otaum_parse_board_artifacts(JSON::JsonView root, OtaUpdateManager::F
       if (!_tryParseIntoHash(hashStr, release.filesystemBinaryHash)) {
         return false;
       }
-      release.filesystemBinaryUrl.assign(urlStr.data(), urlStr.size());
-      foundFilesystem = true;
+      release.filesystemBinaryUrl = std::move(urlStr);
+      foundFilesystem             = true;
     }
   }
 

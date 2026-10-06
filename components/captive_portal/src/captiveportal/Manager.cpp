@@ -5,6 +5,7 @@
 
 const char* const TAG = "CaptivePortal";
 
+#include "AppHooks.h"
 #include "captiveportal/CaptivePortalInstance.h"
 #include "CommandHandler.h"
 #include "config/Config.h"
@@ -239,6 +240,16 @@ static void captiveportal_timernotify(void*)
 
 bool CaptivePortal::Init()
 {
+  // Restore the persisted always-enabled setting before the hook can change it, so it survives a reboot.
+  Config::CaptivePortalConfig config;
+  if (Config::GetCaptivePortalConfig(config)) {
+    s_alwaysEnabled = config.alwaysEnabled;
+  } else {
+    OS_LOGE(TAG, "Failed to get captive portal config");
+  }
+
+  AppHooks::RegisterCaptivePortal(CaptivePortal::BroadcastMessageBIN, CaptivePortal::SetAlwaysEnabled);
+
   // If device is already fully configured, set a startup grace period before opening portal
   if (isDeviceFullyConfigured()) {
     s_startupGraceExpiry.store(esp_timer_get_time() + STARTUP_GRACE_PERIOD_US, std::memory_order_relaxed);

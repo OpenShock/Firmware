@@ -2,9 +2,8 @@
 
 const char* const TAG = "ServerMessageHandlers";
 
-#include "captiveportal/Manager.h"
+#include "AppHooks.h"
 #include "Logging.h"
-#include "OtaUpdateManager.h"
 
 #include <cstdint>
 
@@ -36,7 +35,7 @@ void _Private::HandleOtaUpdateRequest(const OpenShock::Serialization::Gateway::G
 
   OS_LOGI(TAG, "OTA update requested for version %s", version.toString().c_str());  // TODO: This is abusing the SemVer::toString() method causing alot of string copies, fix this
 
-  if (!OpenShock::OtaUpdateManager::TryStartFirmwareUpdate(version)) {
+  if (!OpenShock::AppHooks::OtaTryStartFirmwareUpdate(version)) {
     OS_LOGE(TAG, "Failed to update firmware");  // TODO: Send error message to server
     return;
   }

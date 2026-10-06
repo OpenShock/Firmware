@@ -2,12 +2,12 @@
 
 const char* const TAG = "GatewayClient";
 
+#include "AppHooks.h"
 #include "config/Config.h"
 #include "events/Events.h"
 #include "Logging.h"
 #include "message_handlers/WebSocket.h"
 #include "OpenShock.h"
-#include "OtaUpdateManager.h"
 #include "serialization/WSGateway.h"
 #include "Temporal.h"
 #include "visual/VisualStateManager.h"
@@ -188,7 +188,7 @@ void GatewayClient::_sendBootStatus()
     return;
   }
 
-  s_bootStatusSent = Serialization::Gateway::SerializeBootStatusMessage(updateId, OtaUpdateManager::GetFirmwareBootType(), [this](std::span<const uint8_t> data) { return sendMessageBIN(data); });
+  s_bootStatusSent = Serialization::Gateway::SerializeBootStatusMessage(updateId, AppHooks::OtaGetFirmwareBootType(), [this](std::span<const uint8_t> data) { return sendMessageBIN(data); });
 
   if (s_bootStatusSent && updateStep != OpenShock::OtaUpdateStep::None) {
     if (!Config::SetOtaUpdateStep(OpenShock::OtaUpdateStep::None)) {

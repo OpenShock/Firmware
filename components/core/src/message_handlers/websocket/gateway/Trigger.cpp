@@ -2,7 +2,7 @@
 
 const char* const TAG = "ServerMessageHandlers";
 
-#include "captiveportal/Manager.h"
+#include "AppHooks.h"
 #include "estop/EStopManager.h"
 #include "Logging.h"
 
@@ -37,10 +37,10 @@ void _Private::HandleTrigger(const OpenShock::Serialization::Gateway::GatewayToH
       EStopManager::SoftwareTrigger();
       break;
     case TriggerType::CaptivePortalEnable:
-      OpenShock::CaptivePortal::SetAlwaysEnabled(true);
+      OpenShock::AppHooks::CaptivePortalSetAlwaysEnabled(true);
       break;
     case TriggerType::CaptivePortalDisable:
-      OpenShock::CaptivePortal::SetAlwaysEnabled(false);
+      OpenShock::AppHooks::CaptivePortalSetAlwaysEnabled(false);
       break;
     default:
       OS_LOGW(TAG, "Got unknown trigger type: %hhu", static_cast<uint8_t>(triggerType));
