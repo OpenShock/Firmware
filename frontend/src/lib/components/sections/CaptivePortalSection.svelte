@@ -1,4 +1,5 @@
 <script lang="ts">
+  import SectionHeader from '#lib/components/SectionHeader.svelte';
   import { hubState } from '#lib/stores/index.js';
   import { TriangleAlert } from '@lucide/svelte';
 
@@ -6,10 +7,7 @@
 </script>
 
 <div class="flex flex-col gap-4">
-  <div>
-    <h3 class="text-lg font-semibold">Captive Portal</h3>
-    <p class="text-muted-foreground text-sm">Web configuration portal settings.</p>
-  </div>
+  <SectionHeader title="Captive Portal" description="Web configuration portal settings." />
 
   <label class="flex cursor-pointer items-center justify-between rounded-lg border p-3">
     <div>

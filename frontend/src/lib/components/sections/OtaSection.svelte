@@ -1,4 +1,5 @@
 <script lang="ts">
+  import SectionHeader from '#lib/components/SectionHeader.svelte';
   import { hubState } from '#lib/stores/index.js';
   import { OtaUpdateChannel } from '#lib/_fbs/open-shock/serialization/configuration/ota-update-channel.js';
   import {
@@ -68,10 +69,7 @@
 </script>
 
 <div class="flex flex-col gap-4">
-  <div>
-    <h3 class="text-lg font-semibold">OTA Updates</h3>
-    <p class="text-muted-foreground text-sm">Over-the-air firmware update settings.</p>
-  </div>
+  <SectionHeader title="OTA Updates" description="Over-the-air firmware update settings." />
 
   <div class="flex flex-col gap-4">
     <!-- Enabled toggle -->

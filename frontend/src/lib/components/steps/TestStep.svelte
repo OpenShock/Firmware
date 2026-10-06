@@ -1,5 +1,6 @@
 <script lang="ts">
   import { WebSocketClient } from '#lib/WebSocketClient.js';
+  import SectionHeader from '#lib/components/SectionHeader.svelte';
   import { Button } from '@openshock/svelte-core/components/ui/button';
   import { Input } from '@openshock/svelte-core/components/ui/input';
   import { Label } from '@openshock/svelte-core/components/ui/label';
@@ -55,12 +56,10 @@
 </script>
 
 <div class="flex flex-col gap-4">
-  <div>
-    <h3 class="text-lg font-semibold">Test Shocker</h3>
-    <p class="text-muted-foreground text-sm">
-      Verify your shocker is working by sending a test vibration.
-    </p>
-  </div>
+  <SectionHeader
+    title="Test Shocker"
+    description="Verify your shocker is working by sending a test vibration."
+  />
 
   <div class="flex flex-col gap-3">
     <div class="flex flex-row items-center gap-4">

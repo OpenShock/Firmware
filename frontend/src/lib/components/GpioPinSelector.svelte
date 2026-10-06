@@ -64,7 +64,7 @@
 
 <div class="flex flex-col gap-2">
   <div class="flex flex-row items-center gap-2">
-    <h4 class="text-xl font-semibold tracking-tight">{name}</h4>
+    <h2 class="text-sm font-medium">{name}</h2>
     <p class="text-muted-foreground text-sm">{statusText}</p>
   </div>
   <div class="flex gap-2">

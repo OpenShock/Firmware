@@ -1,5 +1,6 @@
 <script lang="ts">
   import { linkAccount, unlinkAccount } from '#lib/api.js';
+  import SectionHeader from '#lib/components/SectionHeader.svelte';
   import { hubState } from '#lib/stores/index.js';
   import { Button } from '@openshock/svelte-core/components/ui/button';
   import { Input } from '@openshock/svelte-core/components/ui/input';
@@ -18,27 +19,22 @@
   let linkCodeValid = $derived(isValidLinkCode(linkCode));
   let accountLinked = $derived(hubState.accountLinked);
   let wifiConnected = $derived(hubState.wifiConnectedBSSID !== null);
-  let showRelink = $state(false);
 
   async function handleLinkAccount() {
     if (!linkCodeValid) return;
-    const success = await linkAccount(linkCode!);
-    if (success) showRelink = false;
+    await linkAccount(linkCode);
   }
 
   async function handleUnlink() {
     await unlinkAccount();
-    showRelink = true;
   }
 </script>
 
 <div class="flex flex-col gap-4">
-  <div>
-    <h3 class="text-lg font-semibold">Account Linking</h3>
-    <p class="text-muted-foreground text-sm">
-      Link this device to your OpenShock account to control it remotely.
-    </p>
-  </div>
+  <SectionHeader
+    title="Account Linking"
+    description="Link this device to your OpenShock account to control it remotely."
+  />
 
   <!-- WiFi status -->
   {#if wifiConnected}
@@ -56,7 +52,7 @@
   {/if}
 
   <!-- Account status -->
-  {#if accountLinked && !showRelink}
+  {#if accountLinked}
     <div
       class="flex items-center justify-between rounded-lg border border-green-500/30 bg-green-500/10 p-4"
     >
@@ -64,9 +60,9 @@
         <CircleCheck class="h-5 w-5 text-green-500" />
         <p class="text-sm font-medium text-green-700 dark:text-green-300">Account linked</p>
       </div>
-      <Button variant="ghost" size="sm" onclick={handleUnlink} title="Unlink and re-link">
+      <Button variant="outline" size="sm" onclick={handleUnlink}>
         <Unlink class="mr-1.5 h-4 w-4" />
-        Re-link
+        Unlink
       </Button>
     </div>
   {:else}
