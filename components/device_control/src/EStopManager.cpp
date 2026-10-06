@@ -6,6 +6,7 @@ const char* const TAG = "EStopManager";
 
 #include "Chipset.h"
 #include "config/Config.h"
+#include "estop/EStopStateMachine.h"
 #include "events/Events.h"
 #include "Logging.h"
 #include "SimpleMutex.h"
@@ -22,13 +23,7 @@ const char* const TAG = "EStopManager";
 
 using namespace OpenShock;
 
-const uint32_t k_estopHoldToClearTime = 5000;
-const uint32_t k_estopUpdateRate      = 5;                                                       // 200 Hz
-const uint32_t k_estopCheckCount      = 13;                                                      // 65 ms at 200 Hz
-const uint16_t k_estopCheckMask       = 0xFFFF >> ((sizeof(uint16_t) * 8) - k_estopCheckCount);  // Mask to check only last k_estopCheckCount bits within history
-
-// Grace period after deactivation (prevents immediate re-trigger on release bounce/EMI)
-const uint32_t k_estopRearmGraceTime = 250;    // tune as needed
+const uint32_t k_estopUpdateRate = 5;          // 200 Hz (debounce/hold timings live in EStopStateMachine)
 
 const uint32_t k_estopTaskStackSize   = 4096;  // TODO: profile and tune
 const UBaseType_t k_estopTaskPriority = 5;
@@ -71,19 +66,8 @@ static void estopmgr_managerTask(void* pvParameters)
   // Ensure known initial state
   s_estopActivatedAt.store(0, std::memory_order_relaxed);
 
-  EStopState state              = EStopState::Idle;
+  EStopStateMachine machine;
   EStopState lastPublishedState = EStopState::Idle;
-
-  uint16_t history = 0xFFFF;  // Bit history of samples, 0 is pressed
-
-  int64_t deactivatesAt = 0;
-
-  // Rearm grace state
-  int64_t rearmAt   = 0;
-  bool rearmBlocked = false;
-
-  // Debounced button state: true == pressed, false == released
-  bool lastBtnState = false;
 
   // Check if killing manager was requested, continue looping otherwise
   while (!s_killEStopManagerRequested.load(std::memory_order_relaxed)) {
@@ -93,85 +77,17 @@ static void estopmgr_managerTask(void* pvParameters)
     // Get current time
     int64_t now = OpenShock::millis();
 
-    // Handle external trigger: forcibly set the E-Stop active.
+    // Handle external trigger: forcibly set the E-Stop active, otherwise sample the EStop input.
     if (s_externallyTriggered.exchange(false, std::memory_order_relaxed)) {
-      int64_t zero = 0;
-      s_estopActivatedAt.compare_exchange_strong(zero, now, std::memory_order_relaxed);
-
-      state        = EStopState::Active;
-      rearmBlocked = false;
-
-      estopmgr_publishState(state, lastPublishedState);
-
-      // Do not modify history/lastBtnState here; rely on physical button state
-      // on subsequent iterations.
-      continue;
+      machine.Trigger(now);
+    } else {
+      machine.Sample(gpio_get_level(estopPin), now);
     }
 
-    // Sample the EStop input
-    history = static_cast<uint16_t>((history << 1) | gpio_get_level(estopPin));
+    // This task is the only writer while it runs; mirror before publishing so consumers see the new state.
+    s_estopActivatedAt.store(machine.activatedAt(), std::memory_order_relaxed);
 
-    // Debounce:
-    // If all recent bits are 1 -> fully released.
-    // If any bit is 0 -> pressed (or bouncing toward pressed).
-    bool btnState    = (history & k_estopCheckMask) != k_estopCheckMask;  // true == pressed
-    bool pressedEdge = (btnState && !lastBtnState);
-    lastBtnState     = btnState;
-
-    switch (state) {
-      case EStopState::Idle:
-        // Rearm grace: after clearing, ignore presses for a short window.
-        // After the window ends, require a released state before re-arming.
-        if (rearmBlocked) {
-          if (now < rearmAt) {
-            // Still in grace window: ignore any press. Track input to avoid phantom edges later.
-            break;
-          }
-
-          // Grace window ended: only re-arm once we see released.
-          rearmBlocked = false;
-        }
-
-        if (btnState) {
-          state = EStopState::Active;
-          s_estopActivatedAt.store(now, std::memory_order_relaxed);
-        }
-        break;
-
-      case EStopState::Active:
-        // Once active, if the input gets pressed, start hold-to-clear timing.
-        if (pressedEdge) {
-          state         = EStopState::ActiveClearing;
-          deactivatesAt = now + k_estopHoldToClearTime;
-        }
-        break;
-
-      case EStopState::ActiveClearing:
-        if (!btnState) {  // released before hold time -> go back to Active
-          state = EStopState::Active;
-        } else if (now >= deactivatesAt) {
-          // Hold complete -> now wait for release edge to fully clear
-          state = EStopState::AwaitingRelease;
-        }
-        break;
-
-      case EStopState::AwaitingRelease:
-        if (!btnState) {  // fully released -> clear E-Stop
-          state = EStopState::Idle;
-          s_estopActivatedAt.store(0, std::memory_order_relaxed);
-
-          // Start grace period to prevent immediate re-trigger.
-          rearmBlocked = true;
-          rearmAt      = now + k_estopRearmGraceTime;
-        }
-        break;
-
-      default:
-        // Should never happen
-        break;
-    }
-
-    estopmgr_publishState(state, lastPublishedState);
+    estopmgr_publishState(machine.state(), lastPublishedState);
   }
 
   // Broke out of main loop, set global variables to Idle state.

@@ -20,6 +20,7 @@ const char* const TAG = "CommandHandler";
 
 #include <freertos/queue.h>
 
+#include <algorithm>
 #include <memory>
 #include <unordered_map>
 
@@ -29,7 +30,7 @@ const uint16_t KEEP_ALIVE_DURATION = 300;
 static uint32_t calculateEepyTime(int64_t timeToKeepAlive)
 {
   int64_t now = OpenShock::millis();
-  return static_cast<uint32_t>(std::clamp(timeToKeepAlive - now, 0LL, KEEP_ALIVE_INTERVAL));
+  return static_cast<uint32_t>(std::clamp<int64_t>(timeToKeepAlive - now, 0, KEEP_ALIVE_INTERVAL));
 }
 
 struct KnownShocker {
@@ -187,7 +188,19 @@ static void commandhandler_handleestopstatechange(void* event_handler_arg, esp_e
 
   EStopState state = *static_cast<EStopState*>(event_data);
 
-  internalSetKeepAliveEnabled(state == EStopState::Idle);
+  if (state != EStopState::Idle) {
+    internalSetKeepAliveEnabled(false);
+    return;
+  }
+
+  // E-Stop cleared: restore the configured keep-alive setting instead of forcing it on.
+  bool keepAliveEnabled;
+  if (!Config::GetRFConfigKeepAliveEnabled(keepAliveEnabled)) {
+    OS_LOGE(TAG, "Failed to get keep-alive enabled from config");
+    return;
+  }
+
+  internalSetKeepAliveEnabled(keepAliveEnabled);
 }
 
 bool CommandHandler::Init()
@@ -279,7 +292,8 @@ SetGPIOResultCode CommandHandler::SetRfTxPin(gpio_num_t txPin)
 
 bool CommandHandler::SetKeepAliveEnabled(bool enabled)
 {
-  if (!internalSetKeepAliveEnabled(enabled)) {
+  // While e-stopped the task stays off; clearing the e-stop starts it from the saved setting.
+  if (!internalSetKeepAliveEnabled(enabled && !EStopManager::IsEStopped())) {
     return false;
   }
 
