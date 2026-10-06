@@ -9,17 +9,25 @@ const char* const TAG = "JsonAPI";
 
 using namespace OpenShock;
 
-HTTP::Response<Serialization::JsonAPI::AccountLinkResponse> HTTP::JsonAPI::LinkAccount(std::string_view accountLinkCode)
+// "https://<configured backend domain><path>"
+static bool tryGetBackendUri(std::string& uri, std::string_view path)
 {
   std::string domain;
   if (!Config::GetBackendDomain(domain)) {
-    return {HTTP::RequestResult::InternalError, 0, {}};
+    return false;
   }
 
-  char uri[CONFIG_OPENSHOCK_URI_BUFFER_SIZE];
-  int written = snprintf(uri, sizeof(uri), "https://%s/1/device/pair/%.*s", domain.c_str(), static_cast<int>(accountLinkCode.length()), accountLinkCode.data());
-  if (written < 0 || static_cast<size_t>(written) >= sizeof(uri)) {
-    OS_LOGE(TAG, "URI truncated for LinkAccount");
+  uri.reserve(8 + domain.size() + path.size());
+  uri = "https://";
+  uri += domain;
+  uri += path;
+  return true;
+}
+
+HTTP::Response<Serialization::JsonAPI::AccountLinkResponse> HTTP::JsonAPI::LinkAccount(std::string_view accountLinkCode)
+{
+  std::string uri;
+  if (!tryGetBackendUri(uri, std::string("/1/device/pair/") + std::string(accountLinkCode))) {
     return {HTTP::RequestResult::InternalError, 0, {}};
   }
 
@@ -35,15 +43,8 @@ HTTP::Response<Serialization::JsonAPI::AccountLinkResponse> HTTP::JsonAPI::LinkA
 
 HTTP::Response<Serialization::JsonAPI::HubInfoResponse> HTTP::JsonAPI::GetHubInfo(std::string_view hubToken)
 {
-  std::string domain;
-  if (!Config::GetBackendDomain(domain)) {
-    return {HTTP::RequestResult::InternalError, 0, {}};
-  }
-
-  char uri[CONFIG_OPENSHOCK_URI_BUFFER_SIZE];
-  int written = snprintf(uri, sizeof(uri), "https://%s/1/device/self", domain.c_str());
-  if (written < 0 || static_cast<size_t>(written) >= sizeof(uri)) {
-    OS_LOGE(TAG, "URI truncated for GetHubInfo");
+  std::string uri;
+  if (!tryGetBackendUri(uri, "/1/device/self")) {
     return {HTTP::RequestResult::InternalError, 0, {}};
   }
 
@@ -60,15 +61,8 @@ HTTP::Response<Serialization::JsonAPI::HubInfoResponse> HTTP::JsonAPI::GetHubInf
 
 HTTP::Response<Serialization::JsonAPI::AssignLcgResponse> HTTP::JsonAPI::AssignLcg(std::string_view hubToken)
 {
-  std::string domain;
-  if (!Config::GetBackendDomain(domain)) {
-    return {HTTP::RequestResult::InternalError, 0, {}};
-  }
-
-  char uri[CONFIG_OPENSHOCK_URI_BUFFER_SIZE];
-  int written = snprintf(uri, sizeof(uri), "https://%s/2/device/assignLCG?version=2", domain.c_str());
-  if (written < 0 || static_cast<size_t>(written) >= sizeof(uri)) {
-    OS_LOGE(TAG, "URI truncated for AssignLcg");
+  std::string uri;
+  if (!tryGetBackendUri(uri, "/2/device/assignLCG?version=2")) {
     return {HTTP::RequestResult::InternalError, 0, {}};
   }
 

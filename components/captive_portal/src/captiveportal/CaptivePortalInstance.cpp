@@ -21,6 +21,7 @@ const char* const TAG = "CaptivePortalInstance";
 #include "RateLimiter.h"
 #include "rfc8908/RFC8908Handler.h"
 #include "serialization/WSLocal.h"
+#include "util/HexUtils.h"
 #include "util/TaskUtils.h"
 #include "wifi/WiFiManager.h"
 #include "wifi/WiFiScanManager.h"
@@ -80,24 +81,9 @@ static OpenShock::RateLimiter& getAccountLinkRateLimiter()
   return *rl;
 }
 
-static const esp_partition_t* getStaticPartition()
-{
-  const esp_partition_t* partition = esp_partition_find_first(ESP_PARTITION_TYPE_DATA, ESP_PARTITION_SUBTYPE_DATA_SPIFFS, "static0");
-  if (partition != nullptr) {
-    return partition;
-  }
-
-  partition = esp_partition_find_first(ESP_PARTITION_TYPE_DATA, ESP_PARTITION_SUBTYPE_DATA_SPIFFS, "static1");
-  if (partition != nullptr) {
-    return partition;
-  }
-
-  return nullptr;
-}
-
 static const char* getPartitionHash()
 {
-  const esp_partition_t* partition = getStaticPartition();
+  const esp_partition_t* partition = FindStaticPartition();
   if (partition == nullptr) {
     return nullptr;
   }
@@ -129,23 +115,17 @@ static esp_err_t sendResp(httpd_req_t* req, const char* status, const char* type
 // Returns false for an encoded NUL ("%00"), which would silently truncate the value at every c_str() use.
 static bool urlDecode(const char* s, std::string& out)
 {
-  auto hexVal = [](char h) -> int {
-    if (h >= '0' && h <= '9') return h - '0';
-    h = static_cast<char>(h | 0x20);
-    return h - 'a' + 10;
-  };
-
   out.clear();
   for (size_t i = 0; s[i] != '\0'; ++i) {
     char c = s[i];
+    uint8_t decoded;
     if (c == '+') {
       out += ' ';
-    } else if (c == '%' && isxdigit(static_cast<unsigned char>(s[i + 1])) && isxdigit(static_cast<unsigned char>(s[i + 2]))) {
-      char decoded = static_cast<char>((hexVal(s[i + 1]) << 4) | hexVal(s[i + 2]));
-      if (decoded == '\0') {
+    } else if (c == '%' && s[i + 1] != '\0' && HexUtils::TryParseHexPair(s[i + 1], s[i + 2], decoded)) {
+      if (decoded == 0) {
         return false;
       }
-      out += decoded;
+      out += static_cast<char>(decoded);
       i += 2;
     } else {
       out += c;
@@ -257,15 +237,15 @@ static const char* contentTypeForPath(const std::string& path)
   };
 
   if (endsWith(".html")) return HTTP::ContentType::TextHTML;
-  if (endsWith(".js")) return "text/javascript";
-  if (endsWith(".css")) return "text/css";
-  if (endsWith(".svg")) return "image/svg+xml";
-  if (endsWith(".png")) return "image/png";
-  if (endsWith(".ico")) return "image/x-icon";
+  if (endsWith(".js")) return HTTP::ContentType::JavaScript;
+  if (endsWith(".css")) return HTTP::ContentType::CSS;
+  if (endsWith(".svg")) return HTTP::ContentType::SVG;
+  if (endsWith(".png")) return HTTP::ContentType::PNG;
+  if (endsWith(".ico")) return HTTP::ContentType::Icon;
   if (endsWith(".json")) return HTTP::ContentType::JSON;
-  if (endsWith(".woff2")) return "font/woff2";
+  if (endsWith(".woff2")) return HTTP::ContentType::WOFF2;
   if (endsWith(".txt")) return HTTP::ContentType::TextPlain;
-  return "application/octet-stream";
+  return HTTP::ContentType::OctetStream;
 }
 
 // ---------------------------------------------------------------------------
@@ -312,46 +292,10 @@ static esp_err_t apiWifiNetworksDelete(httpd_req_t* req)
 
 static esp_err_t sendAccountLinkResult(httpd_req_t* req, OpenShock::AccountLinkResultCode result)
 {
-  using ResultCode = OpenShock::AccountLinkResultCode;
-  if (result == ResultCode::Success) {
+  if (result == OpenShock::AccountLinkResultCode::Success) {
     return sendResp(req, S200, nullptr, {});
   }
-  const char* error;
-  switch (result) {
-    case ResultCode::CodeRequired:
-      error = "CodeRequired";
-      break;
-    case ResultCode::InvalidCodeLength:
-      error = "InvalidCodeLength";
-      break;
-    case ResultCode::NoInternetConnection:
-      error = "NoInternetConnection";
-      break;
-    case ResultCode::InvalidCode:
-      error = "InvalidCode";
-      break;
-    case ResultCode::RateLimited:
-      error = "RateLimited";
-      break;
-    case ResultCode::RequestFailed:
-      error = "RequestFailed";
-      break;
-    case ResultCode::RequestTimedOut:
-      error = "RequestTimedOut";
-      break;
-    case ResultCode::ServerError:
-      error = "ServerError";
-      break;
-    case ResultCode::InvalidResponse:
-      error = "InvalidResponse";
-      break;
-    case ResultCode::ConfigSaveFailed:
-      error = "ConfigSaveFailed";
-      break;
-    default:
-      error = "InternalError";
-      break;
-  }
+  const char* error = OpenShock::AccountLinkResultCodeToString(result);
   OpenShock::JSON::StringWriter writer;
   json_gen_str_t* gen = writer.gen();
   json_gen_start_object(gen);
@@ -1208,7 +1152,7 @@ CaptivePortal::CaptivePortalInstance::CaptivePortalInstance()
   , m_clientsMutex()
 {
   // Mount the static filesystem (gzipped portal assets) read-only via raw littlefs.
-  const esp_partition_t* partition = getStaticPartition();
+  const esp_partition_t* partition = FindStaticPartition();
   if (partition == nullptr) {
     OS_LOGE(TAG, "Failed to find static filesystem partition");
   } else if (!m_staticFs.mount(partition)) {

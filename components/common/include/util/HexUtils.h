@@ -174,30 +174,4 @@ namespace OpenShock::HexUtils {
   {
     return TryParseHex(str, strlen(str), out, outLen);
   }
-
-  template<typename T>
-  constexpr bool TryParseHexToInt(const char* str, std::size_t strLen, T& out)
-  {
-    if (strLen == 0 || strLen > sizeof(T) * 2) {
-      return false;
-    }
-
-    out = 0;
-
-    const char* end = str + strLen;
-    while (str < end) {
-      char c = *str++;
-      if (c >= '0' && c <= '9') {
-        out = (out << 4) | (c - '0');
-      } else if (c >= 'a' && c <= 'f') {
-        out = (out << 4) | (c - 'a' + 10);
-      } else if (c >= 'A' && c <= 'F') {
-        out = (out << 4) | (c - 'A' + 10);
-      } else {
-        return false;
-      }
-    }
-
-    return true;
-  }
 }  // namespace OpenShock::HexUtils

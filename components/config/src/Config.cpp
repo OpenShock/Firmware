@@ -328,7 +328,7 @@ bool Config::GetOtaUpdateConfig(Config::OtaUpdateConfig& out)
   return true;
 }
 
-bool Config::GetEStop(Config::EStopConfig& out)
+bool Config::GetEStopConfig(Config::EStopConfig& out)
 {
   CONFIG_LOCK_READ(false);
 
@@ -397,7 +397,7 @@ bool Config::SetOtaUpdateConfig(const Config::OtaUpdateConfig& config)
   });
 }
 
-bool Config::SetEStop(const Config::EStopConfig& config)
+bool Config::SetEStopConfig(const Config::EStopConfig& config)
 {
   CONFIG_LOCK_WRITE(false);
 

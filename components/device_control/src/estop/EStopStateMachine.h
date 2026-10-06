@@ -49,14 +49,14 @@ namespace OpenShock {
       switch (m_state) {
         case EStopState::Idle:
           // Rearm grace: after clearing, ignore presses for a short window.
-          // After the window ends, require a released state before re-arming.
+          // After the window ends, any press activates again (fail-safe: no released state is required first).
           if (m_rearmBlocked) {
             if (now < m_rearmAt) {
               // Still in grace window: ignore any press. Track input to avoid phantom edges later.
               break;
             }
 
-            // Grace window ended: only re-arm once we see released.
+            // Grace window ended: re-armed.
             m_rearmBlocked = false;
           }
 

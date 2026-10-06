@@ -126,7 +126,7 @@ const RgbLedDriver::RGBState kWiFiConnectedWithoutWSRGBPattern[] = {
   {  0,   0, 0, 700}
 };
 
-const MonoLedDriver::State kPingNoResponsePattern[] = {
+const MonoLedDriver::State kWiFiScanningPattern[] = {
   { true, 100},
   {false, 100},
   { true, 100},
@@ -136,7 +136,7 @@ const MonoLedDriver::State kPingNoResponsePattern[] = {
   { true, 100},
   {false, 700}
 };
-const RgbLedDriver::RGBState kPingNoResponseRGBPattern[] = {
+const RgbLedDriver::RGBState kWiFiScanningRGBPattern[] = {
   {0, 50, 255, 100},
   {0,  0,   0, 100},
   {0, 50, 255, 100},
@@ -210,7 +210,7 @@ static void updateVisualStateGPIO(uint64_t flags)
   CSR_PATTERN(s_monoLedDriver, kEmergencyStoppedFlag, kEmergencyStoppedPattern);
   CSR_PATTERN(s_monoLedDriver, kWebSocketConnectedFlag, kWebSocketConnectedPattern);
   CSR_PATTERN(s_monoLedDriver, kHasIpAddressFlag, kWiFiConnectedWithoutWSPattern);
-  CSR_PATTERN(s_monoLedDriver, kWiFiScanningFlag, kPingNoResponsePattern);
+  CSR_PATTERN(s_monoLedDriver, kWiFiScanningFlag, kWiFiScanningPattern);
 
   s_monoLedDriver->SetPattern(kWiFiDisconnectedPattern);
 }
@@ -223,7 +223,7 @@ static void updateVisualStateRGB(uint64_t flags)
   CSR_PATTERN(s_rgbLedDriver, kEmergencyStoppedFlag, kEmergencyStoppedRGBPattern);
   CSR_PATTERN(s_rgbLedDriver, kWebSocketConnectedFlag, kWebSocketConnectedRGBPattern);
   CSR_PATTERN(s_rgbLedDriver, kHasIpAddressFlag, kWiFiConnectedWithoutWSRGBPattern);
-  CSR_PATTERN(s_rgbLedDriver, kWiFiScanningFlag, kPingNoResponseRGBPattern);
+  CSR_PATTERN(s_rgbLedDriver, kWiFiScanningFlag, kWiFiScanningRGBPattern);
 
   s_rgbLedDriver->SetPattern(kWiFiDisconnectedRGBPattern);
 }

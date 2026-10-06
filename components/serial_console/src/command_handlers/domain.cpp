@@ -25,15 +25,13 @@ static void handleDomainCommand(std::string_view arg, bool isAutomated)
     return;
   }
 
-  // Check if the domain is too long
-  // TODO: Remove magic number
-  if (arg.length() + 40 >= CONFIG_OPENSHOCK_URI_BUFFER_SIZE) {
-    SERPR_ERROR("Domain name too long, please try increasing the \"CONFIG_OPENSHOCK_URI_BUFFER_SIZE\" constant in source code");
+  // 253 characters is the DNS limit for a full domain name
+  if (arg.length() > 253) {
+    SERPR_ERROR("Domain name too long (max 253 characters)");
     return;
   }
 
-  char uri[CONFIG_OPENSHOCK_URI_BUFFER_SIZE];
-  sprintf(uri, "https://%.*s/1", static_cast<int>(arg.length()), arg.data());
+  std::string uri = "https://" + std::string(arg) + "/1";
 
   auto resp = OpenShock::HTTP::GetJSON<OpenShock::Serialization::JsonAPI::BackendVersionResponse>(
     uri,

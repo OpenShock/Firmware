@@ -83,7 +83,7 @@ namespace ConfigTest {
     TEST_ASSERT_TRUE(Config::GetBackendConfig(config.backend));
     TEST_ASSERT_TRUE(Config::GetSerialInputConfig(config.serialInput));
     TEST_ASSERT_TRUE(Config::GetOtaUpdateConfig(config.otaUpdate));
-    TEST_ASSERT_TRUE(Config::GetEStop(config.estop));
+    TEST_ASSERT_TRUE(Config::GetEStopConfig(config.estop));
     return config;
   }
 

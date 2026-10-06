@@ -449,7 +449,7 @@ static void otaum_updatetask(void* arg)
     }
 
     // Get filesystem partition.
-    const esp_partition_t* filesystemPartition = esp_partition_find_first(ESP_PARTITION_TYPE_DATA, ESP_PARTITION_SUBTYPE_DATA_SPIFFS, "static0");
+    const esp_partition_t* filesystemPartition = FindStaticPartition();
     if (filesystemPartition == nullptr) {
       OS_LOGE(TAG, "Failed to find filesystem partition");
       _sendFailureMessage("Failed to find filesystem partition"sv);

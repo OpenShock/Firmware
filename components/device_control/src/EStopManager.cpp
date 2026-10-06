@@ -225,7 +225,7 @@ bool EStopManager::Init()
   s_estopInitialized = true;
 
   Config::EStopConfig cfg;
-  if (!OpenShock::Config::GetEStop(cfg)) {
+  if (!OpenShock::Config::GetEStopConfig(cfg)) {
     OS_LOGE(TAG, "Failed to get EStop pin from config");
     return false;
   }

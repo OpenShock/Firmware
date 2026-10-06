@@ -4,8 +4,8 @@
 #   include/http/HTTPRequestManager.h — rate-limited HTTP/HTTPS client
 #   include/http/ContentTypes.h        — MIME type constants
 #
-# JsonAPI.{h,cpp} intentionally stays in main because it depends on
-# serialization/ + config/ (flatbuffers-heavy) which haven't been extracted.
+# The backend endpoint wrappers (http/JsonAPI.h) live in core, not here, because they
+# depend on config/ and the core serialization codecs.
 
 idf_component_register(
   SRCS          "src/HTTPRequestManager.cpp"

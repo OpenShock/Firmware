@@ -297,26 +297,6 @@ namespace OpenShock {
     }
     return pins;
   }
-  constexpr GPIOPinSet GetValidInputPins()
-  {
-    GPIOPinSet pins;
-    for (uint8_t i = 0; i < GPIO_NUM_MAX; i++) {
-      if (IsValidInputPin(i)) {
-        pins.set(i);
-      }
-    }
-    return pins;
-  }
-  constexpr GPIOPinSet GetValidOutputPins()
-  {
-    GPIOPinSet pins;
-    for (uint8_t i = 0; i < GPIO_NUM_MAX; i++) {
-      if (IsValidOutputPin(i)) {
-        pins.set(i);
-      }
-    }
-    return pins;
-  }
   inline std::vector<int8_t> GetValidInputPinsVector()
   {
     std::vector<int8_t> pins;

@@ -50,7 +50,7 @@ namespace OpenShock::Config {
   bool GetBackendConfig(BackendConfig& out);
   bool GetSerialInputConfig(SerialInputConfig& out);
   bool GetOtaUpdateConfig(OtaUpdateConfig& out);
-  bool GetEStop(EStopConfig& out);
+  bool GetEStopConfig(EStopConfig& out);
 
   bool SetRFConfig(const RFConfig& config);
   bool SetWiFiConfig(const WiFiConfig& config);
@@ -58,7 +58,7 @@ namespace OpenShock::Config {
   bool SetBackendConfig(const BackendConfig& config);
   bool SetSerialInputConfig(const SerialInputConfig& config);
   bool SetOtaUpdateConfig(const OtaUpdateConfig& config);
-  bool SetEStop(const EStopConfig& config);
+  bool SetEStopConfig(const EStopConfig& config);
 
   bool GetWiFiCredentials(std::vector<WiFiCredentials>& out);
   // Emits each stored credential as an object into an already-open JSON array

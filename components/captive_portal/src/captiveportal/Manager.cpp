@@ -9,6 +9,7 @@ const char* const TAG = "CaptivePortal";
 #include "captiveportal/CaptivePortalInstance.h"
 #include "CommandHandler.h"
 #include "config/Config.h"
+#include "FormatHelpers.h"
 #include "GatewayConnectionManager.h"
 #include "Logging.h"
 #include "Temporal.h"
@@ -146,7 +147,7 @@ static bool captiveportal_start()
   esp_read_mac(mac, ESP_MAC_WIFI_STA);
 
   wifi_config_t apConfig = {};
-  snprintf(reinterpret_cast<char*>(apConfig.ap.ssid), sizeof(apConfig.ap.ssid), "%s%02X:%02X:%02X:%02X:%02X:%02X", CONFIG_OPENSHOCK_FW_AP_PREFIX, mac[0], mac[1], mac[2], mac[3], mac[4], mac[5]);
+  snprintf(reinterpret_cast<char*>(apConfig.ap.ssid), sizeof(apConfig.ap.ssid), "%s" BSSID_FMT, CONFIG_OPENSHOCK_FW_AP_PREFIX, BSSID_ARG(mac));
   apConfig.ap.ssid_len        = strlen(reinterpret_cast<char*>(apConfig.ap.ssid));
   apConfig.ap.channel         = 1;
   apConfig.ap.authmode        = WIFI_AUTH_OPEN;

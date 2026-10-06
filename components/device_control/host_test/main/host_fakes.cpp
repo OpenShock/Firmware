@@ -418,7 +418,7 @@ bool OpenShock::Config::SetRFConfigKeepAliveEnabled(bool enabled)
   return true;
 }
 
-bool OpenShock::Config::GetEStop(EStopConfig& out)
+bool OpenShock::Config::GetEStopConfig(EStopConfig& out)
 {
   out = EStopCfg;
   return true;

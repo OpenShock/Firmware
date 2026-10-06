@@ -11,6 +11,11 @@ const char* const TAG = "PartitionUtils";
 
 #include <cstring>
 
+const esp_partition_t* OpenShock::FindStaticPartition()
+{
+  return esp_partition_find_first(ESP_PARTITION_TYPE_DATA, ESP_PARTITION_SUBTYPE_DATA_SPIFFS, "static0");
+}
+
 bool OpenShock::TryGetPartitionHash(const esp_partition_t* partition, char (&hash)[65])
 {
   uint8_t buffer[32];

@@ -86,7 +86,7 @@ TEST_CASE("Whole-section setters round trip through the store", "[config][roundt
   TEST_ASSERT_TRUE(Config::SetBackendConfig(sample.backend));
   TEST_ASSERT_TRUE(Config::SetSerialInputConfig(sample.serialInput));
   TEST_ASSERT_TRUE(Config::SetOtaUpdateConfig(sample.otaUpdate));
-  TEST_ASSERT_TRUE(Config::SetEStop(sample.estop));
+  TEST_ASSERT_TRUE(Config::SetEStopConfig(sample.estop));
   AssertConfigEqual(sample, Snapshot());
 
   TEST_ASSERT_TRUE(InitFrom(StoredFile()));

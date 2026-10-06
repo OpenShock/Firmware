@@ -1,7 +1,7 @@
 #include "Chipset.h"
 #include "OpenShock.h"
 
-// Board pins are Kconfig options (CONFIG_OPENSHOCK_*) and always have a value
+// Board pins come from openshock_board.h (OPENSHOCK_*, generated from boards/<board>.defaults) and always have a value
 // (-1 == OPENSHOCK_GPIO_INVALID when the board has no such pin). A pin is valid
 // if it's a usable GPIO or explicitly bypassed with INVALID; anything else is a
 // misconfiguration and fails the build.

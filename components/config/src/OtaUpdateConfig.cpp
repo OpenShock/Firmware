@@ -116,11 +116,7 @@ bool OtaUpdateConfig::FromJSON(JSON::JsonView json)
 
   if (!json["isEnabled"].tryGetBool(isEnabled)) isEnabled = true;
 
-  if (std::string sv; json["cdnDomain"].tryGetStr(sv)) {
-    cdnDomain = sv;
-  } else {
-    cdnDomain = CONFIG_OPENSHOCK_FW_CDN_DOMAIN;
-  }
+  if (!json["cdnDomain"].tryGetStr(cdnDomain)) cdnDomain = CONFIG_OPENSHOCK_FW_CDN_DOMAIN;
 
   Internal::Utils::FromJsonStrParsed(updateChannel, json, "updateChannel"sv, OpenShock::TryParseOtaUpdateChannel, OpenShock::OtaUpdateChannel::Stable);
 

@@ -14,15 +14,13 @@ const char* const TAG = "main";
 #include "serial_console/SerialInputHandler.h"
 #include "visual/VisualStateManager.h"
 #include "wifi/WiFiManager.h"
-#include "wifi/WiFiScanManager.h"
 
 #include <esp_err.h>
 #include <nvs_flash.h>
 
-#include <memory>
 
 // Internal setup function, returns true if setup succeeded, false otherwise.
-bool trySetup()
+static bool trySetup()
 {
   if (!OpenShock::VisualStateManager::Init()) {
     OS_LOGE(TAG, "Unable to initialize VisualStateManager");
@@ -40,7 +38,7 @@ bool trySetup()
   }
 
   if (!OpenShock::CommandHandler::Init()) {
-    OS_LOGW(TAG, "Unable to initialize CommandHandler");
+    OS_LOGE(TAG, "Unable to initialize CommandHandler");
     return false;
   }
 
@@ -63,7 +61,7 @@ bool trySetup()
 }
 
 // OTA setup is the same as normal setup, but we invalidate the currently running app, and roll back if it fails.
-void otaSetup()
+static void otaSetup()
 {
   OS_LOGI(TAG, "Validating OTA app");
 
@@ -80,7 +78,7 @@ void otaSetup()
 }
 
 // App setup is the same as normal setup, but we restart if it fails.
-void appSetup()
+static void appSetup()
 {
   if (!trySetup()) {
     OS_LOGI(TAG, "Restarting in 5 seconds...");
@@ -89,9 +87,8 @@ void appSetup()
   }
 }
 
-// ESP-IDF application entry point. Runs the one-time setup, then spawns the
-// long-lived main task. When app_main returns, its own task is torn down by IDF
-// while the main_app task keeps the firmware running.
+// ESP-IDF application entry point. Runs the one-time setup, then stays in the
+// update loop below for the lifetime of the firmware (it never returns).
 extern "C" void app_main()
 {
   // WiFi persists calibration/config in the default NVS partition, so NVS must be

@@ -13,6 +13,15 @@ const char* const TAG = "WSGateway";
 
 using namespace OpenShock::Serialization;
 
+// Wraps a payload in a HubToGatewayMessage, finishes the buffer and hands it to the callback.
+template<typename T>
+static bool finishMessage(flatbuffers::FlatBufferBuilder& builder, Gateway::HubToGatewayMessagePayload type, flatbuffers::Offset<T> payload, Common::SerializationCallbackFn callback)
+{
+  auto msg = Gateway::CreateHubToGatewayMessage(builder, type, payload.Union());
+  Gateway::FinishHubToGatewayMessageBuffer(builder, msg);
+  return callback(builder.GetBufferSpan());
+}
+
 bool Gateway::SerializePongMessage(Common::SerializationCallbackFn callback)
 {
   int64_t uptime = OpenShock::millis();
@@ -33,11 +42,7 @@ bool Gateway::SerializePongMessage(Common::SerializationCallbackFn callback)
 
   auto pong = Gateway::CreatePong(builder, static_cast<uint64_t>(uptime), static_cast<int32_t>(rssi));
 
-  auto msg = Gateway::CreateHubToGatewayMessage(builder, Gateway::HubToGatewayMessagePayload::Pong, pong.Union());
-
-  Gateway::FinishHubToGatewayMessageBuffer(builder, msg);
-
-  return callback(builder.GetBufferSpan());
+  return finishMessage(builder, Gateway::HubToGatewayMessagePayload::Pong, pong, callback);
 }
 
 bool Gateway::SerializeBootStatusMessage(int32_t updateId, OpenShock::FirmwareBootType bootType, Common::SerializationCallbackFn callback)
@@ -49,11 +54,7 @@ bool Gateway::SerializeBootStatusMessage(int32_t updateId, OpenShock::FirmwareBo
 
   auto fbsBootStatus = Gateway::CreateBootStatus(builder, static_cast<Types::FirmwareBootType>(bootType), fbsVersion, updateId);
 
-  auto msg = Gateway::CreateHubToGatewayMessage(builder, Gateway::HubToGatewayMessagePayload::BootStatus, fbsBootStatus.Union());
-
-  Gateway::FinishHubToGatewayMessageBuffer(builder, msg);
-
-  return callback(builder.GetBufferSpan());
+  return finishMessage(builder, Gateway::HubToGatewayMessagePayload::BootStatus, fbsBootStatus, callback);
 }
 
 bool Gateway::SerializeOtaUpdateStartedMessage(int32_t updateId, const OpenShock::SemVer& version, Common::SerializationCallbackFn callback)
@@ -64,11 +65,7 @@ bool Gateway::SerializeOtaUpdateStartedMessage(int32_t updateId, const OpenShock
 
   auto otaUpdateStartedOffset = Gateway::CreateOtaUpdateStarted(builder, updateId, versionOffset);
 
-  auto msg = Gateway::CreateHubToGatewayMessage(builder, Gateway::HubToGatewayMessagePayload::OtaUpdateStarted, otaUpdateStartedOffset.Union());
-
-  Gateway::FinishHubToGatewayMessageBuffer(builder, msg);
-
-  return callback(builder.GetBufferSpan());
+  return finishMessage(builder, Gateway::HubToGatewayMessagePayload::OtaUpdateStarted, otaUpdateStartedOffset, callback);
 }
 
 bool Gateway::SerializeOtaUpdateProgressMessage(int32_t updateId, Types::OtaUpdateProgressTask task, float progress, Common::SerializationCallbackFn callback)
@@ -77,11 +74,7 @@ bool Gateway::SerializeOtaUpdateProgressMessage(int32_t updateId, Types::OtaUpda
 
   auto otaUpdateProgressOffset = Gateway::CreateOtaUpdateProgress(builder, updateId, task, progress);
 
-  auto msg = Gateway::CreateHubToGatewayMessage(builder, Gateway::HubToGatewayMessagePayload::OtaUpdateProgress, otaUpdateProgressOffset.Union());
-
-  Gateway::FinishHubToGatewayMessageBuffer(builder, msg);
-
-  return callback(builder.GetBufferSpan());
+  return finishMessage(builder, Gateway::HubToGatewayMessagePayload::OtaUpdateProgress, otaUpdateProgressOffset, callback);
 }
 
 bool Gateway::SerializeOtaUpdateFailedMessage(int32_t updateId, std::string_view message, bool fatal, Common::SerializationCallbackFn callback)
@@ -92,9 +85,5 @@ bool Gateway::SerializeOtaUpdateFailedMessage(int32_t updateId, std::string_view
 
   auto otaUpdateFailedOffset = Gateway::CreateOtaUpdateFailed(builder, updateId, messageOffset, fatal);
 
-  auto msg = Gateway::CreateHubToGatewayMessage(builder, Gateway::HubToGatewayMessagePayload::OtaUpdateFailed, otaUpdateFailedOffset.Union());
-
-  Gateway::FinishHubToGatewayMessageBuffer(builder, msg);
-
-  return callback(builder.GetBufferSpan());
+  return finishMessage(builder, Gateway::HubToGatewayMessagePayload::OtaUpdateFailed, otaUpdateFailedOffset, callback);
 }

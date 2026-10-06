@@ -12,55 +12,6 @@ const char* const TAG = "JsonAPI";
 
 using namespace OpenShock::Serialization;
 
-bool JsonAPI::ParseLcgInstanceDetailsJsonResponse(int code, JSON::JsonView root, JsonAPI::LcgInstanceDetailsResponse& out)
-{
-  (void)code;
-
-  if (!root.isObject()) {
-    ESP_LOGJSONE("not an object", root);
-    return false;
-  }
-
-  out = {};
-
-  std::string name;
-  if (!root["name"].tryGetStr(name)) {
-    ESP_LOGJSONE("value at 'data.name' is not a string", root);
-    return false;
-  }
-
-  std::string version;
-  if (!root["version"].tryGetStr(version)) {
-    ESP_LOGJSONE("value at 'data.version' is not a string", root);
-    return false;
-  }
-
-  std::string currentTime;
-  if (!root["currentTime"].tryGetStr(currentTime)) {
-    ESP_LOGJSONE("value at 'data.currentTime' is not a string", root);
-    return false;
-  }
-
-  std::string countryCode;
-  if (!root["countryCode"].tryGetStr(countryCode)) {
-    ESP_LOGJSONE("value at 'data.countryCode' is not a string", root);
-    return false;
-  }
-
-  std::string fqdn;
-  if (!root["fqdn"].tryGetStr(fqdn)) {
-    ESP_LOGJSONE("value at 'data.fqdn' is not a string", root);
-    return false;
-  }
-
-  out.name.assign(name);
-  out.version.assign(version);
-  out.currentTime.assign(currentTime);
-  out.countryCode.assign(countryCode);
-  out.fqdn.assign(fqdn);
-
-  return true;
-}
 bool JsonAPI::ParseBackendVersionJsonResponse(int code, JSON::JsonView root, JsonAPI::BackendVersionResponse& out)
 {
   (void)code;

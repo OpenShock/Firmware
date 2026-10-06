@@ -18,4 +18,36 @@ namespace OpenShock {
     InvalidResponse  = 10,  // The backend response could not be parsed or was missing the auth token
     ConfigSaveFailed = 11,  // Failed to persist the auth token to flash
   };
+
+  /// @brief The code's name, as used for the captive portal's JSON error codes.
+  constexpr const char* AccountLinkResultCodeToString(AccountLinkResultCode code)
+  {
+    switch (code) {
+      case AccountLinkResultCode::Success:
+        return "Success";
+      case AccountLinkResultCode::CodeRequired:
+        return "CodeRequired";
+      case AccountLinkResultCode::InvalidCodeLength:
+        return "InvalidCodeLength";
+      case AccountLinkResultCode::NoInternetConnection:
+        return "NoInternetConnection";
+      case AccountLinkResultCode::InvalidCode:
+        return "InvalidCode";
+      case AccountLinkResultCode::RateLimited:
+        return "RateLimited";
+      case AccountLinkResultCode::RequestFailed:
+        return "RequestFailed";
+      case AccountLinkResultCode::RequestTimedOut:
+        return "RequestTimedOut";
+      case AccountLinkResultCode::ServerError:
+        return "ServerError";
+      case AccountLinkResultCode::InvalidResponse:
+        return "InvalidResponse";
+      case AccountLinkResultCode::ConfigSaveFailed:
+        return "ConfigSaveFailed";
+      case AccountLinkResultCode::InternalError:
+      default:
+        return "InternalError";
+    }
+  }
 }  // namespace OpenShock

@@ -13,6 +13,15 @@ const char* const TAG = "WSLocal";
 
 using namespace OpenShock::Serialization;
 
+// Wraps a payload in a HubToLocalMessage, finishes the buffer and hands it to the callback.
+template<typename T>
+static bool finishMessage(flatbuffers::FlatBufferBuilder& builder, Local::HubToLocalMessagePayload type, flatbuffers::Offset<T> payload, Common::SerializationCallbackFn callback)
+{
+  auto msg = Local::CreateHubToLocalMessage(builder, type, payload.Union());
+  Local::FinishHubToLocalMessageBuffer(builder, msg);
+  return callback(builder.GetBufferSpan());
+}
+
 static flatbuffers::Offset<OpenShock::Serialization::Types::WifiNetwork> createWiFiNetwork(flatbuffers::FlatBufferBuilder& builder, const OpenShock::WiFiNetwork& network)
 {
   auto bssid    = network.GetHexBSSID();
@@ -27,11 +36,7 @@ bool Local::SerializeErrorMessage(std::string_view message, Common::Serializatio
 
   auto wrapperOffset = Local::CreateErrorMessage(builder, builder.CreateString(message.data(), message.length()));
 
-  auto msg = Local::CreateHubToLocalMessage(builder, Local::HubToLocalMessagePayload::ErrorMessage, wrapperOffset.Union());
-
-  Serialization::Local::FinishHubToLocalMessageBuffer(builder, msg);
-
-  return callback(builder.GetBufferSpan());
+  return finishMessage(builder, Local::HubToLocalMessagePayload::ErrorMessage, wrapperOffset, callback);
 }
 
 bool Local::SerializeReadyMessage(const WiFiNetwork* connectedNetwork, bool accountLinked, Common::SerializationCallbackFn callback)
@@ -58,11 +63,7 @@ bool Local::SerializeReadyMessage(const WiFiNetwork* connectedNetwork, bool acco
 
   auto readyMessageOffset = Serialization::Local::CreateReadyMessage(builder, true, fbsNetwork, accountLinked, configOffset, inputPinsOffset, outputPinsOffset);
 
-  auto msg = Serialization::Local::CreateHubToLocalMessage(builder, Serialization::Local::HubToLocalMessagePayload::ReadyMessage, readyMessageOffset.Union());
-
-  Serialization::Local::FinishHubToLocalMessageBuffer(builder, msg);
-
-  return callback(builder.GetBufferSpan());
+  return finishMessage(builder, Local::HubToLocalMessagePayload::ReadyMessage, readyMessageOffset, callback);
 }
 
 bool Local::SerializeWiFiScanStatusChangedEvent(OpenShock::WiFiScanStatus status, Common::SerializationCallbackFn callback)
@@ -71,11 +72,7 @@ bool Local::SerializeWiFiScanStatusChangedEvent(OpenShock::WiFiScanStatus status
 
   auto scanStatusOffset = Serialization::Local::CreateWifiScanStatusMessage(builder, status);
 
-  auto msg = Serialization::Local::CreateHubToLocalMessage(builder, Serialization::Local::HubToLocalMessagePayload::WifiScanStatusMessage, scanStatusOffset.Union());
-
-  Serialization::Local::FinishHubToLocalMessageBuffer(builder, msg);
-
-  return callback(builder.GetBufferSpan());
+  return finishMessage(builder, Local::HubToLocalMessagePayload::WifiScanStatusMessage, scanStatusOffset, callback);
 }
 
 bool Local::SerializeWiFiNetworkEvent(Types::WifiNetworkEventType eventType, const WiFiNetwork& network, Common::SerializationCallbackFn callback)
@@ -86,11 +83,7 @@ bool Local::SerializeWiFiNetworkEvent(Types::WifiNetworkEventType eventType, con
 
   auto wrapperOffset = Local::CreateWifiNetworkEvent(builder, eventType, builder.CreateVector(&networkOffset, 1));  // Resulting vector will have 1 element
 
-  auto msg = Local::CreateHubToLocalMessage(builder, Local::HubToLocalMessagePayload::WifiNetworkEvent, wrapperOffset.Union());
-
-  Serialization::Local::FinishHubToLocalMessageBuffer(builder, msg);
-
-  return callback(builder.GetBufferSpan());
+  return finishMessage(builder, Local::HubToLocalMessagePayload::WifiNetworkEvent, wrapperOffset, callback);
 }
 
 bool Local::SerializeWiFiNetworksEvent(Types::WifiNetworkEventType eventType, const std::vector<WiFiNetwork>& networks, Common::SerializationCallbackFn callback)
@@ -106,11 +99,7 @@ bool Local::SerializeWiFiNetworksEvent(Types::WifiNetworkEventType eventType, co
 
   auto wrapperOffset = Local::CreateWifiNetworkEvent(builder, eventType, builder.CreateVector(fbsNetworks));
 
-  auto msg = Local::CreateHubToLocalMessage(builder, Local::HubToLocalMessagePayload::WifiNetworkEvent, wrapperOffset.Union());
-
-  Serialization::Local::FinishHubToLocalMessageBuffer(builder, msg);
-
-  return callback(builder.GetBufferSpan());
+  return finishMessage(builder, Local::HubToLocalMessagePayload::WifiNetworkEvent, wrapperOffset, callback);
 }
 
 bool Local::SerializeWiFiGotIpEvent(const char* ip, Common::SerializationCallbackFn callback)
@@ -119,11 +108,7 @@ bool Local::SerializeWiFiGotIpEvent(const char* ip, Common::SerializationCallbac
 
   auto ipOffset    = builder.CreateString(ip);
   auto eventOffset = Local::CreateWifiGotIpEvent(builder, ipOffset);
-  auto msg         = Local::CreateHubToLocalMessage(builder, Local::HubToLocalMessagePayload::WifiGotIpEvent, eventOffset.Union());
-
-  Local::FinishHubToLocalMessageBuffer(builder, msg);
-
-  return callback(builder.GetBufferSpan());
+  return finishMessage(builder, Local::HubToLocalMessagePayload::WifiGotIpEvent, eventOffset, callback);
 }
 
 bool Local::SerializeAccountLinkStatusEvent(bool linked, Common::SerializationCallbackFn callback)
@@ -131,9 +116,5 @@ bool Local::SerializeAccountLinkStatusEvent(bool linked, Common::SerializationCa
   flatbuffers::FlatBufferBuilder builder(64);
 
   auto eventOffset = Local::CreateAccountLinkStatusEvent(builder, linked);
-  auto msg         = Local::CreateHubToLocalMessage(builder, Local::HubToLocalMessagePayload::AccountLinkStatusEvent, eventOffset.Union());
-
-  Local::FinishHubToLocalMessageBuffer(builder, msg);
-
-  return callback(builder.GetBufferSpan());
+  return finishMessage(builder, Local::HubToLocalMessagePayload::AccountLinkStatusEvent, eventOffset, callback);
 }

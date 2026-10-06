@@ -21,6 +21,6 @@ namespace OpenShock::Config {
   bool GetRFConfigKeepAliveEnabled(bool& out);
   bool SetRFConfigKeepAliveEnabled(bool enabled);
 
-  bool GetEStop(EStopConfig& out);
+  bool GetEStopConfig(EStopConfig& out);
   bool GetEStopGpioPin(gpio_num_t& out);
 }  // namespace OpenShock::Config

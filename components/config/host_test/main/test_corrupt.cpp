@@ -291,7 +291,7 @@ TEST_CASE("Out-of-range E-Stop GPIO in a stored config falls back to the default
     TEST_ASSERT_TRUE_MESSAGE(InitFrom(builder.GetBufferPointer(), builder.GetSize()), msg);
 
     Config::EStopConfig estopConfig;
-    TEST_ASSERT_TRUE(Config::GetEStop(estopConfig));
+    TEST_ASSERT_TRUE(Config::GetEStopConfig(estopConfig));
     TEST_ASSERT_EQUAL_INT_MESSAGE(Config::EStopConfig().gpioPin, estopConfig.gpioPin, msg);
     TEST_ASSERT_EQUAL_MESSAGE(Config::EStopConfig().enabled, estopConfig.enabled, msg);
   }
