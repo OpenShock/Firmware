@@ -1,0 +1,73 @@
+# Per-commit firmware check: build and run the host (linux target) Unity suites.
+# Cheap next to compiling the firmware, which happens nightly, on release tags and as a PR canary (ci-build.yml).
+on:
+  push:
+    branches: ['**']
+    paths:
+      - 'components/**'
+      - 'main/**'
+      - 'CMakeLists.txt'
+      - 'sdkconfig.defaults'
+      - 'dependencies.lock'
+      - '.github/actions/setup-esp-idf/**'
+      - '.github/workflows/host-tests.yml'
+  # A same-repo PR branch is already covered by its push run; pull_request is for forks, whose
+  # pushes do not run here. Fork runs need a maintainer's approval (repository setting).
+  pull_request:
+    paths:
+      - 'components/**'
+      - 'main/**'
+      - 'CMakeLists.txt'
+      - 'sdkconfig.defaults'
+      - 'dependencies.lock'
+      - '.github/actions/setup-esp-idf/**'
+      - '.github/workflows/host-tests.yml'
+  workflow_dispatch:
+
+name: host-tests
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  host-tests:
+    if: ${{ github.event_name != 'pull_request' || github.event.pull_request.head.repo.fork }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+
+      # The linux target links libbsd.
+      - name: Install host build dependencies
+        run: sudo apt-get update && sudo apt-get install -y --no-install-recommends libbsd-dev
+
+      # Restore-only: ci-build's single nominated writer owns the cache entry.
+      - uses: ./.github/actions/setup-esp-idf
+        with:
+          save-cache: 'false'
+
+      - name: Build and run host test suites
+        shell: bash
+        run: |
+          set -euo pipefail
+          failed=()
+          for dir in components/*/host_test; do
+            name="$(basename "$(dirname "$dir")")"
+            echo "::group::$name"
+            if idf.py -C "$dir" --preview set-target linux build \
+              && "$dir"/build/*_host_test.elf; then
+              echo "::endgroup::"
+            else
+              echo "::endgroup::"
+              echo "::error::$name host tests failed"
+              failed+=("$name")
+            fi
+          done
+          if [ "${#failed[@]}" -gt 0 ]; then
+            echo "Failed: ${failed[*]}"
+            exit 1
+          fi

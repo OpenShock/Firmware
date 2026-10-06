@@ -191,6 +191,14 @@ def main() -> int:
     if not boards:
         fail('No boards/*.defaults files found in "boards"')
 
+    # A caller may narrow the matrix (the pull request canary builds one board); empty means all.
+    boards_input = [b.strip() for b in os.environ.get('BOARDS_INPUT', '').replace(',', '\n').split('\n') if b.strip()]
+    if boards_input:
+        unknown = sorted(set(boards_input) - set(boards))
+        if unknown:
+            fail(f'Unknown board(s) requested: {", ".join(unknown)}')
+        boards = [b for b in boards if b in boards_input]
+
     shared = Path('sdkconfig.defaults')
     if not shared.is_file():
         fail('sdkconfig.defaults not found')

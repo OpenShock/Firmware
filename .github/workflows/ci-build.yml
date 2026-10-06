@@ -1,35 +1,25 @@
+# When the firmware is compiled. A full 13-board build is too heavy to run per commit, so:
+#   - release tags (beta rc / stable) build every board and publish to prod;
+#   - develop, beta and master build every board nightly (nightly.yml dispatches one run per branch,
+#     which keeps each branch's status badge current), only when firmware sources changed since
+#     that branch's last nightly; develop's nightly also publishes to prod, beta and master only build;
+#   - a pull request builds one canary board, or every board once it carries the ci:full-build label;
+#   - a dispatch builds every board on demand.
+# Branch pushes do not build at all; the cheap per-commit checks live in checks.yml.
+# Fork pull requests run only after a maintainer approves them: the repository requires approval
+# for every workflow run from an external contributor.
 on:
   push:
-    branches:
-      - develop
-      - beta
-      - master
     tags:
       - '[0-9]+.[0-9]+.[0-9]+'
       - '[0-9]+.[0-9]+.[0-9]+-*'
-    # Branch pushes only; GitHub does not evaluate paths-ignore for tags.
-    # A push is skipped only when every changed file matches.
-    paths-ignore:
-      - '**/*.md'
-      - 'docs/**'
-      - 'LICENSE'
-      - '**/.gitkeep'
-      - '.claude/**'
-      - '.github/ISSUE_TEMPLATE/**'
-      - '.github/dependabot.yml'
-      # Dev-only submodule; no CI build checks it out, so a pointer bump alone changes nothing.
-      - 'schemas'
-      - 'schemas/**'
-      - 'scripts/fetch_flatc.py'
-      - 'scripts/generate_schemas.py'
-      - 'scripts/flatc'
-      - 'scripts/flatc.exe'
   pull_request:
     branches:
       - master
       - beta
       - develop
-    types: [opened, reopened, synchronize]
+    # labeled so that adding ci:full-build upgrades the PR's build; the gate ignores every other label.
+    types: [opened, reopened, synchronize, labeled]
   workflow_dispatch:
     inputs:
       server:
@@ -44,15 +34,23 @@ on:
         type: choice
         default: develop
         options: [develop, beta, stable]
-  schedule:
-    - cron: '0 3 * * *' # Nightly develop build; the gate job skips it if idle.
+      nightly:
+        description: 'Run as the nightly build of this branch (set by nightly.yml): skip when no firmware sources changed; server and channel are ignored'
+        required: false
+        type: boolean
+        default: false
 
 name: ci-build
 
 # Per-ref.
 # No cross-ref group is needed: the only state two runs could contend for is a release on the server, which refuses a second staging of a version.
+# Labelling a PR with anything but ci:full-build gets its own group, so the no-op run it triggers
+# does not cancel the build already running for that PR.
 concurrency:
-  group: ${{ github.workflow }}-${{ github.ref }}
+  group: >-
+    ${{ github.workflow }}-${{ github.ref }}${{
+    github.event.action == 'labeled' && github.event.label.name != 'ci:full-build'
+    && format('-label-{0}', github.event.label.name) || '' }}
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 # Least-privilege default; jobs needing more opt up explicitly.
@@ -79,6 +77,7 @@ jobs:
       deploy: ${{ steps.decide.outputs.deploy }}
       publish: ${{ steps.decide.outputs.publish }}
       server: ${{ steps.decide.outputs.server }}
+      boards: ${{ steps.decide.outputs.boards }}
     steps:
       # github-script so the gate needs no checkout or install.
       - name: Decide build, deploy and publish
@@ -89,16 +88,20 @@ jobs:
             const { eventName, ref, sha } = context;
             const { owner, repo } = context.repo;
 
-            // HEAD of the last develop deploy, nightly or manual.
-            // Returns '' on error so a hiccup redeploys rather than wrongly skipping.
-            async function lastDeploySha() {
+            const branch = ref.startsWith('refs/heads/') ? ref.slice('refs/heads/'.length) : '';
+            const nightly = eventName === 'workflow_dispatch' && String(context.payload.inputs?.nightly) === 'true';
+
+            // HEAD of this branch's last successful nightly or manual run.
+            // 'schedule' covers the develop nightlies from before nightly.yml dispatched them.
+            // Returns '' on error so a hiccup rebuilds rather than wrongly skipping.
+            async function lastBuildSha() {
               const latestRunFor = async (event) => {
                 const { data } = await github.rest.actions.listWorkflowRuns({
                   owner,
                   repo,
                   workflow_id: 'ci-build.yml',
                   event,
-                  branch: 'develop',
+                  branch,
                   status: 'success',
                   per_page: 1,
                 });
@@ -112,31 +115,99 @@ jobs:
                 runs.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
                 return runs[0].head_sha ?? '';
               } catch (err) {
-                core.warning(`Could not read the last develop deploy: ${err.message}`);
+                core.warning(`Could not read the last ${branch} build: ${err.message}`);
                 return '';
               }
             }
 
+            // Paths that cannot change a firmware image or its build. The nightly skips when nothing else changed.
+            // .changes/ and .github/ count as source: change files set the version, and a CI change should
+            // meet a nightly before it meets a release tag.
+            const NON_SOURCE = [
+              /^(?!\.changes\/).*\.md$/,
+              /^docs\//,
+              /^LICENSE$/,
+              /(^|\/)\.gitkeep$/,
+              /^\.claude\//,
+              /^\.github\/ISSUE_TEMPLATE\//,
+              /^\.github\/dependabot\.yml$/,
+              // Dev-only schema submodule and its codegen helpers; builds use the generated sources.
+              /^schemas(\/|$)/,
+              /^scripts\/(fetch_flatc\.py|generate_schemas\.py|flatc|flatc\.exe)$/,
+            ];
+
+            // Whether anything between base and sha can change the firmware.
+            // Errs towards true: an unreadable or truncated comparison builds rather than skips.
+            async function sourceChangedSince(base) {
+              try {
+                const { data } = await github.rest.repos.compareCommitsWithBasehead({
+                  owner,
+                  repo,
+                  basehead: `${base}...${sha}`,
+                  per_page: 300,
+                });
+                const files = data.files ?? [];
+                if (files.length >= 300) return true;
+                const source = files
+                  .flatMap((f) => [f.filename, f.previous_filename].filter(Boolean))
+                  .filter((name) => !NON_SOURCE.some((re) => re.test(name)));
+                if (source.length > 0) core.info(`Firmware sources changed: ${source.slice(0, 20).join(', ')}`);
+                return source.length > 0;
+              } catch (err) {
+                core.warning(`Could not compare ${base}...${sha}: ${err.message}`);
+                return true;
+              }
+            }
+
+            const FULL_BUILD_LABEL = 'ci:full-build';
+            const CANARY_BOARD = 'OpenShock-Core-V2';
+
             let build = false;
             let deploy = false;
+            // Empty builds every board.
+            let boards = '';
 
             switch (eventName) {
-              case 'pull_request':
+              case 'pull_request': {
+                const pr = context.payload.pull_request;
+                const action = context.payload.action;
+                if (action === 'labeled' && context.payload.label?.name !== FULL_BUILD_LABEL) {
+                  core.notice(`Label "${context.payload.label?.name}" does not affect the build.`);
+                  break;
+                }
                 build = true;
-                break;
-              case 'push':
-                build = true;
-                if (ref.startsWith('refs/tags/')) deploy = true;
-                break;
-              case 'schedule':
-                if (sha !== (await lastDeploySha())) {
-                  build = true;
-                  deploy = true;
-                } else {
-                  core.notice(`develop unchanged since last deploy (${sha}); nothing to deploy.`);
+                const full = (pr.labels ?? []).some((l) => l.name === FULL_BUILD_LABEL);
+                if (!full) {
+                  boards = CANARY_BOARD;
+                  core.notice(`Canary build of ${CANARY_BOARD} only; add the ${FULL_BUILD_LABEL} label to build every board.`);
                 }
                 break;
+              }
+              case 'push':
+                // Only release tags trigger a push run.
+                build = true;
+                deploy = true;
+                break;
               case 'workflow_dispatch':
+                if (nightly) {
+                  if (!['develop', 'beta', 'master'].includes(branch)) {
+                    core.warning(`Nightly requested on ${ref}; only develop, beta and master have nightlies.`);
+                    break;
+                  }
+                  const base = await lastBuildSha();
+                  if (base === sha) {
+                    core.notice(`${branch} unchanged since its last build (${sha}); nothing to build.`);
+                    break;
+                  }
+                  if (base !== '' && !(await sourceChangedSince(base))) {
+                    core.notice(`No firmware sources changed on ${branch} since its last build (${base}); nothing to build.`);
+                    break;
+                  }
+                  build = true;
+                  // Only develop's nightly is a release; beta and master publish from tags.
+                  deploy = branch === 'develop';
+                  break;
+                }
                 build = true;
                 if (ref === 'refs/heads/develop') deploy = true;
                 break;
@@ -147,13 +218,17 @@ jobs:
             // Publishing is never a side effect of a build.
             // A branch push and a pull request compile and stop, so merging changes nothing on any server until someone says to.
             // The develop nightly and a release tag publish to prod, because both are already the deliberate act.
+            // The beta and master nightlies only build: those channels are published from tags.
             // Everything else reaches a server only by being dispatched, which is where the channel and the ref are chosen by hand.
             const isTag = ref.startsWith('refs/tags/');
 
             let publish = false;
             let server = 'dev';
 
-            if (eventName === 'workflow_dispatch') {
+            if (nightly) {
+              publish = build && branch === 'develop';
+              server = 'prod';
+            } else if (eventName === 'workflow_dispatch') {
               publish = true;
               server = context.payload.inputs?.server === 'prod' ? 'prod' : 'dev';
               // The ref picker offers tags as well as branches, so reaching prod by hand still means running against the tag being released.
@@ -161,7 +236,7 @@ jobs:
                 core.warning(`prod was requested on ${ref}; only a tag may dispatch to prod, publishing to dev instead.`);
                 server = 'dev';
               }
-            } else if (eventName === 'schedule' || (eventName === 'push' && isTag)) {
+            } else if (eventName === 'push' && isTag) {
               publish = true;
               server = 'prod';
             }
@@ -170,15 +245,17 @@ jobs:
             core.setOutput('deploy', deploy);
             core.setOutput('publish', publish);
             core.setOutput('server', server);
-            core.info(`decision: build=${build} deploy=${deploy} publish=${publish} server=${server}`);
+            core.setOutput('boards', boards);
+            core.info(`decision: build=${build} deploy=${deploy} publish=${publish} server=${server} boards=${boards || 'all'}`);
 
   getvars:
     needs: [gate]
     if: ${{ needs.gate.outputs.build == 'true' || needs.gate.outputs.deploy == 'true' }}
     uses: ./.github/workflows/get-vars.yml
-    # Empty on every event but a dispatch, which is when get-vars derives the channel from the ref instead.
+    # Set only on a manual dispatch; empty otherwise, nightlies included, so get-vars derives the channel from the ref.
     with:
-      channel: ${{ inputs.channel }}
+      channel: ${{ !inputs.nightly && inputs.channel || '' }}
+      boards: ${{ needs.gate.outputs.boards }}
 
   # Opens the release the moment get-vars has settled what this run is, before anything is built.
   # Everything the server checks at init - semver, the channel enum, a version already published, another run holding the same one, an unknown board - answers here in a minute rather than after the matrix.
