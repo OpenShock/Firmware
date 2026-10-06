@@ -29,7 +29,8 @@
     setOtaEnabled(!otaConfig?.isEnabled);
   }
 
-  function saveDomain() {
+  function saveDomain(e: SubmitEvent) {
+    e.preventDefault();
     setOtaDomain(cdnDomain);
   }
 
@@ -37,7 +38,8 @@
     setOtaChannel(channel);
   }
 
-  function saveCheckInterval() {
+  function saveCheckInterval(e: SubmitEvent) {
+    e.preventDefault();
     setOtaCheckInterval(checkInterval);
   }
 
@@ -91,10 +93,10 @@
     <!-- CDN Domain -->
     <div class="flex flex-col gap-2">
       <Label for="ota-domain">CDN Domain</Label>
-      <div class="flex gap-2">
+      <form class="flex gap-2" onsubmit={saveDomain}>
         <Input id="ota-domain" type="text" bind:value={cdnDomain} placeholder="cdn.openshock.app" />
-        <Button size="sm" onclick={saveDomain}>Save</Button>
-      </div>
+        <Button size="sm" type="submit">Save</Button>
+      </form>
     </div>
 
     <!-- Update Channel -->
@@ -128,10 +130,10 @@
     <!-- Check Interval -->
     <div class="flex flex-col gap-2">
       <Label for="ota-interval">Check Interval (minutes)</Label>
-      <div class="flex gap-2">
+      <form class="flex gap-2" onsubmit={saveCheckInterval}>
         <Input id="ota-interval" type="number" min={0} max={65535} bind:value={checkInterval} />
-        <Button size="sm" onclick={saveCheckInterval}>Save</Button>
-      </div>
+        <Button size="sm" type="submit">Save</Button>
+      </form>
     </div>
 
     <!-- Backend Management toggle -->

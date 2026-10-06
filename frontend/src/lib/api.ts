@@ -198,7 +198,7 @@ export async function saveWifiNetwork(
   password: string | null,
   connect: boolean,
   security?: number
-): Promise<void> {
+): Promise<boolean> {
   try {
     const params = new URLSearchParams({ ssid, connect: connect ? '1' : '0' });
     if (password) params.set('password', password);
@@ -210,9 +210,12 @@ export async function saveWifiNetwork(
     });
     if (!res.ok) {
       toast.error('Failed to save WiFi network: ' + (await getErrorMessage(res)));
+      return false;
     }
+    return true;
   } catch {
     toast.error('Failed to save WiFi network');
+    return false;
   }
 }
 

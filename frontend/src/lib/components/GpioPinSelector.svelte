@@ -53,9 +53,14 @@
     }
   });
 
-  async function setGpioPin() {
-    if (!canSet) return;
+  let saving = $state(false);
+
+  async function setGpioPin(e: SubmitEvent) {
+    e.preventDefault();
+    if (!canSet || saving) return;
+    saving = true;
     const success = await setter(pendingPin!);
+    saving = false;
     if (success) {
       pendingPin = null;
     }
@@ -67,8 +72,8 @@
     <h2 class="text-sm font-medium">{name}</h2>
     <p class="text-muted-foreground text-sm">{statusText}</p>
   </div>
-  <div class="flex gap-2">
+  <form class="flex gap-2" onsubmit={setGpioPin}>
     <Input type="number" placeholder="GPIO Pin" bind:value={pendingPin} />
-    <Button onclick={setGpioPin} disabled={!canSet}>Set</Button>
-  </div>
+    <Button type="submit" disabled={!canSet || saving}>Set</Button>
+  </form>
 </div>

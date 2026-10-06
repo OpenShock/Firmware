@@ -19,10 +19,15 @@
   let linkCodeValid = $derived(isValidLinkCode(linkCode));
   let accountLinked = $derived(hubState.accountLinked);
   let wifiConnected = $derived(hubState.wifiConnectedBSSID !== null);
+  let linking = $state(false);
+  let canLink = $derived(linkCodeValid && linkCode.length >= 6 && !linking);
 
-  async function handleLinkAccount() {
-    if (!linkCodeValid) return;
+  async function handleLinkAccount(e: SubmitEvent) {
+    e.preventDefault();
+    if (!canLink) return;
+    linking = true;
     await linkAccount(linkCode);
+    linking = false;
   }
 
   async function handleUnlink() {
@@ -71,7 +76,7 @@
       <p class="text-muted-foreground text-xs">
         Find your link code on the OpenShock website under device settings.
       </p>
-      <div class="flex gap-2">
+      <form class="flex gap-2" onsubmit={handleLinkAccount}>
         <Input
           aria-invalid={!linkCodeValid}
           type="text"
@@ -81,10 +86,8 @@
           placeholder="Enter link code"
           bind:value={linkCode}
         />
-        <Button onclick={handleLinkAccount} disabled={!linkCodeValid || linkCode.length < 6}
-          >Link</Button
-        >
-      </div>
+        <Button type="submit" disabled={!canLink}>Link</Button>
+      </form>
     </div>
   {/if}
 </div>

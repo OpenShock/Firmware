@@ -54,10 +54,19 @@
   let editPasswordDialogOpen = $state(false);
   let pendingPassword = $state<string | null>(null);
   let editPassword = $state<string | null>(null);
+  let saving = $state(false);
 
-  function wifiAuthenticate(password: string | null) {
-    connectDialogOpen = false;
-    saveWifiNetwork(ssid, password, true);
+  function wifiConnectOpen() {
+    saveWifiNetwork(ssid, null, true);
+  }
+
+  async function wifiAuthenticate(e: SubmitEvent) {
+    e.preventDefault();
+    if (!pendingPassword || pendingPassword.length > 63 || saving) return;
+    saving = true;
+    const saved = await saveWifiNetwork(ssid, pendingPassword, true);
+    saving = false;
+    if (saved) handleConnectDialogOpenChange(false);
   }
 
   function wifiConnect() {
@@ -72,9 +81,13 @@
     forgetWifiNetwork(ssid);
   }
 
-  function wifiEditPassword(password: string | null) {
-    editPasswordDialogOpen = false;
-    saveWifiNetwork(ssid, password, false);
+  async function wifiEditPassword(e: SubmitEvent) {
+    e.preventDefault();
+    if (!editPassword || editPassword.length > 63 || saving) return;
+    saving = true;
+    const saved = await saveWifiNetwork(ssid, editPassword, false);
+    saving = false;
+    if (saved) handleEditPasswordDialogOpenChange(false);
   }
 
   function handleConnectDialogOpenChange(open: boolean) {
@@ -150,7 +163,7 @@
         <ArrowRight class="h-4 w-4 text-green-500" />
       </Button>
     {:else if netgroup && netgroup.security === WifiAuthMode.Open}
-      <Button variant="ghost" size="icon" onclick={() => wifiAuthenticate(null)} title="Connect">
+      <Button variant="ghost" size="icon" onclick={wifiConnectOpen} title="Connect">
         <ArrowRight class="h-4 w-4 text-green-500" />
       </Button>
     {:else if netgroup}
@@ -163,19 +176,28 @@
             <DialogTitle>Connect to {ssid || 'network'}</DialogTitle>
             <DialogDescription>Enter the WiFi password</DialogDescription>
           </DialogHeader>
-          <div class="flex flex-row items-center gap-4 py-4">
-            <Label for="wifi-password" class="text-right">Password</Label>
-            <Input id="wifi-password" type="password" class="flex-1" bind:value={pendingPassword} />
-          </div>
-          <DialogFooter>
-            <Button
-              type="button"
-              onclick={() => wifiAuthenticate(pendingPassword)}
-              disabled={!pendingPassword || pendingPassword.length > 63}
-            >
-              Connect
-            </Button>
-          </DialogFooter>
+          <form class="contents" onsubmit={wifiAuthenticate}>
+            <div class="flex flex-row items-center gap-4 py-4">
+              <Label for="wifi-password" class="text-right">Password</Label>
+              <Input
+                id="wifi-password"
+                type="password"
+                class="flex-1"
+                bind:value={pendingPassword}
+              />
+            </div>
+            <DialogFooter>
+              <Button variant="outline" onclick={() => handleConnectDialogOpenChange(false)}
+                >Cancel</Button
+              >
+              <Button
+                type="submit"
+                disabled={!pendingPassword || pendingPassword.length > 63 || saving}
+              >
+                Connect
+              </Button>
+            </DialogFooter>
+          </form>
         </DialogContent>
       </Dialog>
     {/if}
@@ -194,19 +216,20 @@
             <DialogTitle>Edit password for {ssid}</DialogTitle>
             <DialogDescription>Enter the new WiFi password</DialogDescription>
           </DialogHeader>
-          <div class="flex flex-row items-center gap-4 py-4">
-            <Label for="edit-password" class="text-right">Password</Label>
-            <Input id="edit-password" type="password" class="flex-1" bind:value={editPassword} />
-          </div>
-          <DialogFooter>
-            <Button
-              type="button"
-              onclick={() => wifiEditPassword(editPassword)}
-              disabled={!editPassword || editPassword.length > 63}
-            >
-              Save
-            </Button>
-          </DialogFooter>
+          <form class="contents" onsubmit={wifiEditPassword}>
+            <div class="flex flex-row items-center gap-4 py-4">
+              <Label for="edit-password" class="text-right">Password</Label>
+              <Input id="edit-password" type="password" class="flex-1" bind:value={editPassword} />
+            </div>
+            <DialogFooter>
+              <Button variant="outline" onclick={() => handleEditPasswordDialogOpenChange(false)}
+                >Cancel</Button
+              >
+              <Button type="submit" disabled={!editPassword || editPassword.length > 63 || saving}>
+                Save
+              </Button>
+            </DialogFooter>
+          </form>
         </DialogContent>
       </Dialog>
     {/if}
