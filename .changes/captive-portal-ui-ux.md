@@ -1,6 +1,5 @@
 ---
 kind: changed
-pr: 522
 ---
 Captive portal UI/UX pass: Enter-to-submit, confirmations, synced settings and a desktop layout
 
