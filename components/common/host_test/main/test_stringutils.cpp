@@ -78,3 +78,42 @@ TEST_CASE("StringIContains / StringHasPrefixIC", "[common][strhelpers]")
   TEST_ASSERT_TRUE(StringHasPrefixIC("HELLO", "hel"));
   TEST_ASSERT_FALSE(StringHasPrefixIC("hello", "world"));
 }
+
+TEST_CASE("StringTrimRight on all-whitespace input", "[util][string]")
+{
+  TEST_ASSERT_TRUE(StringTrimRight("   ").empty());
+  TEST_ASSERT_TRUE(StringTrimLeft("   ").empty());
+  TEST_ASSERT_TRUE(StringTrim(" \t\r\n ").empty());
+}
+
+TEST_CASE("StringRemoveSuffix removes the suffix", "[util][string]")
+{
+  TEST_ASSERT_TRUE(StringRemoveSuffix("file.bin", std::string_view(".bin")) == "file");
+  TEST_ASSERT_TRUE(StringRemoveSuffix("file.bin", std::string_view(".txt")) == "file.bin");
+}
+
+TEST_CASE("Last-delimiter helpers treat a string delimiter as a substring", "[util][string]")
+{
+  TEST_ASSERT_TRUE(StringAfterLast("a=>b>c", std::string_view("=>")) == "b>c");
+  TEST_ASSERT_TRUE(StringBeforeLast("a=>b>c", std::string_view("=>")) == "a");
+  auto [head, tail] = StringSplitByLast("a=>b>c", std::string_view("=>"));
+  TEST_ASSERT_TRUE(head == "a");
+  TEST_ASSERT_TRUE(tail == "b>c");
+}
+
+TEST_CASE("StringSplit edge cases", "[util][string]")
+{
+  TEST_ASSERT_TRUE(StringSplit("", ',').empty());
+
+  auto parts = StringSplitWhiteSpace("a  b c d", 2);
+  TEST_ASSERT_EQUAL_size_t(3, parts.size());
+  TEST_ASSERT_TRUE(parts[0] == "a");
+  TEST_ASSERT_TRUE(parts[1] == "b");
+  TEST_ASSERT_TRUE(parts[2] == "c d");
+}
+
+TEST_CASE("Case-insensitive helpers are safe on non-ASCII bytes", "[util][string]")
+{
+  TEST_ASSERT_TRUE(StringIEquals("Caf\xC3\xA9", "CAF\xC3\xA9"));
+  TEST_ASSERT_FALSE(StringIEquals("\xC3\xA9", "\xC3\x89"));  // only ASCII letters fold
+}

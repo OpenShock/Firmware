@@ -42,30 +42,26 @@ namespace OpenShock::Checksum {
   // ------------------------------------------------------------
   // Generic trivially copyable object overload
   // ------------------------------------------------------------
+  // Not constexpr: it reads the object representation through reinterpret_cast.
   template<typename T>
     requires(!std::integral<T> && std::is_trivially_copyable_v<T>)
-  constexpr uint8_t Sum8(const T& data)
+  inline uint8_t Sum8(const T& data)
   {
     static_assert(std::is_trivially_copyable_v<T>, "Sum8 only supports trivially copyable types");
 
     return Sum8(reinterpret_cast<const uint8_t*>(std::addressof(data)), sizeof(T));
   }
 
-  /**
-   * Make sure the uint8 only has its high bits (0x0F) set before using this function
-   */
+  /// @brief Reverses the bit order of the low nibble of `b` (lookup table packed into a 64-bit constant).
+  ///        Only the low nibble is used, so the shift can never reach 64 bits.
   constexpr uint8_t ReverseNibble(uint8_t b)
   {
-    return (0xF7B3D591E6A2C480ull >> (b * 4)) & 0xF;  // Trust me bro
+    return (0xF7B3D591E6A2C480ull >> ((b & 0xF) * 4)) & 0xF;
   }
 
-  /**
-   * Make sure the uint8 only has its high bits (0x0F) set before using this function
-   */
+  /// @brief Reverses and inverts the bits of the low nibble of `b`. Only the low nibble is used.
   constexpr uint8_t ReverseInverseNibble(uint8_t b)
   {
-    return (0x084C2A6E195D3B7Full >> (b * 4)) & 0xF;  // Trust me bro
+    return (0x084C2A6E195D3B7Full >> ((b & 0xF) * 4)) & 0xF;
   }
 }  // namespace OpenShock::Checksum
-
-#undef SUM8_INT_FN

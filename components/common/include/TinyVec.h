@@ -21,10 +21,12 @@ class TinyVec {
 public:
   TinyVec() noexcept = default;
 
+  // Zero-initialized, like resize()
   TinyVec(SizeType count)
   {
     if (count == 0) return;
     reserve(count);
+    memset(_data, 0, size_t(count) * sizeof(T));
     _len = count;
   }
   TinyVec(const T* src, SizeType count)
@@ -106,6 +108,7 @@ public:
   void append(const T* src, SizeType count)
   {
     if (!src || count == 0) return;
+    if (count > std::numeric_limits<SizeType>::max() - _len) OS_PANIC_INSTANT("TVEC", "Length overflow!");
     SizeType new_len = _len + count;
     if (new_len > _cap) reserve(next_cap(new_len));
     memcpy(_data + _len, src, size_t(count) * sizeof(T));
@@ -128,7 +131,9 @@ public:
 private:
   SizeType next_cap(SizeType min_needed) const noexcept
   {
-    SizeType newcap = _cap ? (_cap + _cap / 2 + 1) : 4;
+    // Grow by 1.5x, saturating instead of wrapping around near the SizeType limit
+    constexpr SizeType kMax = std::numeric_limits<SizeType>::max();
+    SizeType newcap         = _cap == 0 ? 4 : (_cap > (kMax - 1) / 3 * 2 ? kMax : SizeType(_cap + _cap / 2 + 1));
     if (newcap < min_needed) newcap = min_needed;
     return newcap;
   }

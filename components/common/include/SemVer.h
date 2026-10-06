@@ -37,19 +37,22 @@ namespace OpenShock {
     {
     }
 
+    // == / != compare every field, build metadata included. The ordering operators compare precedence (semver 11),
+    // which ignores build metadata, and are all derived from operator< so they stay consistent with each other.
     bool operator==(const SemVer& other) const;
     inline bool operator!=(const SemVer& other) const { return !(*this == other); }
     bool operator<(const SemVer& other) const;
-    inline bool operator<=(const SemVer& other) const { return *this < other || *this == other; }
-    inline bool operator>(const SemVer& other) const { return !(*this <= other); }
+    inline bool operator<=(const SemVer& other) const { return !(other < *this); }
+    inline bool operator>(const SemVer& other) const { return other < *this; }
     inline bool operator>=(const SemVer& other) const { return !(*this < other); }
 
+    // String comparisons parse `other` first; if it is not a valid semver every comparison except != is false.
     bool operator==(std::string_view other) const;
     inline bool operator!=(std::string_view other) const { return !(*this == other); }
     bool operator<(std::string_view other) const;
-    inline bool operator<=(std::string_view other) const { return *this < other || *this == other; }
-    inline bool operator>(std::string_view other) const { return !(*this <= other); }
-    inline bool operator>=(std::string_view other) const { return !(*this < other); }
+    bool operator<=(std::string_view other) const;
+    bool operator>(std::string_view other) const;
+    bool operator>=(std::string_view other) const;
 
     bool isValid() const;
 

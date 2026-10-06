@@ -50,18 +50,15 @@ bool OpenShock::RateLimiter::tryRequest()
   if (m_limits.empty()) {
     return true;
   }
-  if (m_requests.empty()) {
-    m_requests.push_back(now);
-    return true;
-  }
 
   // Cleanup based on longest limit
   if (m_nextCleanup <= now) {
     int64_t longestLimit = m_limits.back().durationMs;
     int64_t expiresAt    = now - longestLimit;
 
-    // erase everything that’s expired
-    auto firstAlive = std::upper_bound(m_requests.begin(), m_requests.end(), expiresAt);
+    // Erase everything that left the longest window. A request exactly at the window start still counts (see the
+    // `*it < windowStart` check below), so only strictly older ones are dropped.
+    auto firstAlive = std::lower_bound(m_requests.begin(), m_requests.end(), expiresAt);
     m_requests.erase(m_requests.begin(), firstAlive);
 
     if (!m_requests.empty()) {

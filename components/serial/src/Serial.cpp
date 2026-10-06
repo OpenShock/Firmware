@@ -9,6 +9,7 @@
 #include <esp_rom_serial_output.h>
 
 #include <algorithm>
+#include <atomic>
 #include <cstdio>
 
 // Select the console backend from the configured primary console.
@@ -32,7 +33,9 @@ using namespace OpenShock;
 
 static constexpr int k_consoleBufferSize = 256;
 
-static bool s_initialized = false;
+// Published with release ordering after s_writeMutex is created, so a writer on another core that sees it set also
+// sees the mutex.
+static std::atomic<bool> s_initialized = false;
 
 // Serializes writers (the logger and the console) so one Write() never
 // interleaves with another, even when it is split into several driver calls.
@@ -80,7 +83,7 @@ bool Serial::Init()
   // still printing through C stdio (e.g. ESP-IDF's logs) isn't held back either.
   std::setvbuf(stdout, nullptr, _IONBF, 0);
 
-  s_initialized = true;
+  s_initialized.store(true, std::memory_order_release);
   return true;
 }
 
@@ -125,15 +128,16 @@ static int driverWrite(const uint8_t* data, std::size_t len)
   // write_buf never blocks: it takes what fits in its TX buffer and returns 0 while the
   // host isn't draining it. Retry for up to 50 ms (as the USJ path waits), then flush so
   // prompts without a trailing newline go out too.
-  std::size_t sent    = 0;
-  TickType_t deadline = xTaskGetTickCount() + pdMS_TO_TICKS(50);
+  // Elapsed-time check: comparing against an absolute deadline breaks when the tick counter wraps.
+  std::size_t sent   = 0;
+  TickType_t started = xTaskGetTickCount();
   while (sent < len) {
     ssize_t n = esp_usb_console_write_buf(reinterpret_cast<const char*>(data + sent), len - sent);
     if (n < 0) {
       break;
     }
     if (n == 0) {
-      if (xTaskGetTickCount() >= deadline) {
+      if (xTaskGetTickCount() - started >= pdMS_TO_TICKS(50)) {
         break;
       }
       vTaskDelay(1);
@@ -155,7 +159,7 @@ int Serial::Write(const uint8_t* data, std::size_t len)
     return 0;
   }
 
-  if (!s_initialized) {
+  if (!s_initialized.load(std::memory_order_acquire)) {
     romWrite(data, len);
     return static_cast<int>(len);
   }

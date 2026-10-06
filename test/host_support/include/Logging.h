@@ -47,19 +47,19 @@ inline void openshock_host_log_discard(const char*, const char*, ...)
 #define OS_PANIC_PRINT(TAG, format, ...) std::fprintf(stderr, "[%s] PANIC: " format "\n", TAG, ##__VA_ARGS__)
 
 #define OS_PANIC(TAG, format, ...)              \
-  {                                             \
+  do {                                          \
     OS_PANIC_PRINT(TAG, format, ##__VA_ARGS__); \
     std::abort();                               \
-  }
+  } while (0)
 
 #define OS_PANIC_OTA(TAG, format, ...)          \
-  {                                             \
+  do {                                          \
     OS_PANIC_PRINT(TAG, format, ##__VA_ARGS__); \
     std::abort();                               \
-  }
+  } while (0)
 
 #define OS_PANIC_INSTANT(TAG, format, ...)      \
-  {                                             \
+  do {                                          \
     OS_PANIC_PRINT(TAG, format, ##__VA_ARGS__); \
     std::abort();                               \
-  }
+  } while (0)

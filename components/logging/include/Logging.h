@@ -78,13 +78,8 @@ constexpr const char* openshockPathToFileName(const char (&path)[N])
   } while (0)
 #endif
 
-#if OPENSHOCK_LOG_LEVEL >= OPENSHOCK_LOG_LEVEL_NONE
+// Always compiled in: NONE is the lowest level, so no OPENSHOCK_LOG_LEVEL disables it.
 #define OS_LOGN(TAG, format, ...) openshock_log_printf(OPENSHOCK_LOG_FORMAT(N, "[%s] " format), TAG, ##__VA_ARGS__)
-#else
-#define OS_LOGN(TAG, format, ...) \
-  do {                            \
-  } while (0)
-#endif
 
 // Panic/abort macros. These log at error level, then restart the device; they
 // pull in esp_ota_ops / esp_system / freertos (included above), so anything that
@@ -92,22 +87,22 @@ constexpr const char* openshockPathToFileName(const char (&path)[N])
 #define OS_PANIC_PRINT(TAG, format, ...) OS_LOGE(TAG, "PANIC: " format, ##__VA_ARGS__)
 
 #define OS_PANIC(TAG, format, ...)                                             \
-  {                                                                            \
+  do {                                                                         \
     OS_PANIC_PRINT(TAG, format ", restarting in 5 seconds...", ##__VA_ARGS__); \
     vTaskDelay(pdMS_TO_TICKS(5000));                                           \
     esp_restart();                                                             \
-  }
+  } while (0)
 
 #define OS_PANIC_OTA(TAG, format, ...)                                                                           \
-  {                                                                                                              \
+  do {                                                                                                           \
     OS_PANIC_PRINT(TAG, format ", invalidating update partition and restarting in 5 seconds...", ##__VA_ARGS__); \
     vTaskDelay(pdMS_TO_TICKS(5000));                                                                             \
     esp_ota_mark_app_invalid_rollback_and_reboot();                                                              \
     esp_restart();                                                                                               \
-  }
+  } while (0)
 
 #define OS_PANIC_INSTANT(TAG, format, ...)      \
-  {                                             \
+  do {                                          \
     OS_PANIC_PRINT(TAG, format, ##__VA_ARGS__); \
     esp_restart();                              \
-  }
+  } while (0)

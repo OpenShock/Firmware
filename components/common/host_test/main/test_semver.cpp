@@ -102,3 +102,42 @@ TEST_CASE("SemVer toString round-trips with dots", "[util][semver]")
   TEST_ASSERT_TRUE(TryParseSemVer("3.1.4-beta.2+build.9", v));
   TEST_ASSERT_TRUE(v.toString() == "3.1.4-beta.2+build.9");
 }
+
+TEST_CASE("SemVer isValid accepts dotted prerelease and build", "[util][semver]")
+{
+  TEST_ASSERT_TRUE(SemVer(1, 5, 0, "rc.7", "build.9").isValid());
+  TEST_ASSERT_FALSE(SemVer(1, 5, 0, "rc..7", "").isValid());
+}
+
+TEST_CASE("TryParseSemVer rejects an empty prerelease or build and leaves the output untouched", "[util][semver]")
+{
+  SemVer v(9, 9, 9);
+  TEST_ASSERT_FALSE(TryParseSemVer("1.0.0-", v));
+  TEST_ASSERT_FALSE(TryParseSemVer("1.0.0+", v));
+  TEST_ASSERT_FALSE(TryParseSemVer("1.0.0-+", v));
+  TEST_ASSERT_FALSE(TryParseSemVer("1.2.x", v));
+  TEST_ASSERT_TRUE(v == SemVer(9, 9, 9));
+}
+
+TEST_CASE("SemVer ordering operators agree when only build metadata differs", "[util][semver]")
+{
+  SemVer a, b;
+  TEST_ASSERT_TRUE(TryParseSemVer("1.0.0+x", a));
+  TEST_ASSERT_TRUE(TryParseSemVer("1.0.0+y", b));
+  TEST_ASSERT_FALSE(a > b);
+  TEST_ASSERT_FALSE(b > a);
+  TEST_ASSERT_TRUE(a <= b);
+  TEST_ASSERT_TRUE(a >= b);
+  TEST_ASSERT_TRUE(a != b);  // equality still includes build metadata
+}
+
+TEST_CASE("SemVer string comparisons fail closed on garbage", "[util][semver]")
+{
+  SemVer v(1, 0, 0);
+  TEST_ASSERT_FALSE(v < "garbage");
+  TEST_ASSERT_FALSE(v <= "garbage");
+  TEST_ASSERT_FALSE(v > "garbage");
+  TEST_ASSERT_FALSE(v >= "garbage");
+  TEST_ASSERT_FALSE(v == "garbage");
+  TEST_ASSERT_TRUE(v > "0.9.0");
+}

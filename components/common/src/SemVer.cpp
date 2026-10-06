@@ -156,75 +156,19 @@ static constexpr bool semverIsDotSeperatedPreleaseIdentifiers(std::string_view s
 }
 
 // For readability
-#define semverIsPatch      semverIsNumericIdentifier
-#define semverIsMinor      semverIsNumericIdentifier
-#define semverIsMajor      semverIsNumericIdentifier
 #define semverIsPrerelease semverIsDotSeperatedPreleaseIdentifiers
 #define semverIsBuild      semverIsDotSeperatedBuildIdentifiers
 
-static constexpr bool semverIsVersionCore(std::string_view str)
-{
-  if (str.empty()) {
-    return false;
-  }
-
-  std::string_view parts[3];
-  if (!OpenShock::TryStringSplit(str, '.', parts)) {
-    return false;
-  }
-
-  return semverIsMajor(parts[0]) && semverIsMinor(parts[1]) && semverIsPatch(parts[2]);
-}
-static constexpr bool semverIsSemver(std::string_view str)
-{
-  if (str.empty()) {
-    return false;
-  }
-
-  auto dashPos = str.find('-');
-  auto plusPos = str.find('+');
-
-  if (dashPos == std::string_view::npos && plusPos == std::string_view::npos) {
-    return semverIsVersionCore(str);
-  }
-
-  if (dashPos != std::string_view::npos && plusPos != std::string_view::npos) {
-    if (dashPos > plusPos) {
-      return false;
-    }
-
-    auto core       = str.substr(0, dashPos);
-    auto prerelease = str.substr(dashPos + 1, plusPos - dashPos - 1);
-    auto build      = str.substr(plusPos + 1);
-
-    return semverIsVersionCore(core) && semverIsPrerelease(prerelease) && semverIsBuild(build);
-  }
-
-  if (dashPos != std::string_view::npos) {
-    auto core       = str.substr(0, dashPos);
-    auto prerelease = str.substr(dashPos + 1);
-
-    return semverIsVersionCore(core) && semverIsPrerelease(prerelease);
-  }
-
-  if (plusPos != std::string_view::npos) {
-    auto core  = str.substr(0, plusPos);
-    auto build = str.substr(plusPos + 1);
-
-    return semverIsVersionCore(core) && semverIsBuild(build);
-  }
-
-  return false;
-}
 #pragma endregion
 
 bool SemVer::isValid() const
 {
-  if (!this->prerelease.empty() && !semverIsPrereleaseIdentifier(this->prerelease)) {
+  // Same dot-separated grammar TryParseSemVer accepts (e.g. "rc.7")
+  if (!this->prerelease.empty() && !semverIsPrerelease(this->prerelease)) {
     return false;
   }
 
-  if (!this->build.empty() && !semverIsBuildIdentifier(this->build)) {
+  if (!this->build.empty() && !semverIsBuild(this->build)) {
     return false;
   }
 
@@ -348,25 +292,47 @@ bool SemVer::operator==(std::string_view other) const
 bool SemVer::operator<(std::string_view other) const
 {
   SemVer otherSemVer;
-  if (!OpenShock::TryParseSemVer(other, otherSemVer)) {
-    return false;
-  }
-
-  return *this < otherSemVer;
+  return OpenShock::TryParseSemVer(other, otherSemVer) && *this < otherSemVer;
 }
 
-bool OpenShock::TryParseSemVer(std::string_view semverStr, SemVer& semver)
+bool SemVer::operator<=(std::string_view other) const
 {
+  SemVer otherSemVer;
+  return OpenShock::TryParseSemVer(other, otherSemVer) && *this <= otherSemVer;
+}
+
+bool SemVer::operator>(std::string_view other) const
+{
+  SemVer otherSemVer;
+  return OpenShock::TryParseSemVer(other, otherSemVer) && *this > otherSemVer;
+}
+
+bool SemVer::operator>=(std::string_view other) const
+{
+  SemVer otherSemVer;
+  return OpenShock::TryParseSemVer(other, otherSemVer) && *this >= otherSemVer;
+}
+
+bool OpenShock::TryParseSemVer(std::string_view semverStr, SemVer& out)
+{
+  // Parse into a local and assign on success only, so a failed parse leaves `out` untouched.
+  SemVer semver;
+
   // Peel off build (after the first '+') then prerelease (after the first '-'),
   // leaving the bare major.minor.patch core. Splitting the whole string by '.'
   // up front would corrupt a dotted prerelease/build such as "-rc.7".
   std::string_view rest = semverStr;
 
+  // A separator must be followed by at least one identifier ("1.0.0-" and "1.0.0+" are invalid).
   std::string_view build;
   size_t plusIdx = rest.find('+');
   if (plusIdx != std::string_view::npos) {
     build = rest.substr(plusIdx + 1);
     rest  = rest.substr(0, plusIdx);
+    if (build.empty()) {
+      OS_LOGE(TAG, "Empty build metadata");
+      return false;
+    }
   }
 
   std::string_view prerelease;
@@ -374,6 +340,10 @@ bool OpenShock::TryParseSemVer(std::string_view semverStr, SemVer& semver)
   if (dashIdx != std::string_view::npos) {
     prerelease = rest.substr(dashIdx + 1);
     rest       = rest.substr(0, dashIdx);
+    if (prerelease.empty()) {
+      OS_LOGE(TAG, "Empty prerelease");
+      return false;
+    }
   }
 
   std::string_view parts[3];
@@ -399,5 +369,6 @@ bool OpenShock::TryParseSemVer(std::string_view semverStr, SemVer& semver)
   semver.prerelease.assign(prerelease);
   semver.build.assign(build);
 
+  out = std::move(semver);
   return true;
 }

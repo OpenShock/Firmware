@@ -99,6 +99,9 @@ std::vector<std::string_view> OpenShock::StringSplit(std::string_view view, bool
       }
     } else if (start == nullptr) {
       start = ptr;
+      if (result.size() >= maxSplits) {
+        break;  // Remainder becomes the final part below
+      }
     }
   }
 
@@ -116,12 +119,12 @@ std::vector<std::string_view> OpenShock::StringSplitNewLines(std::string_view vi
 
 std::vector<std::string_view> OpenShock::StringSplitWhiteSpace(std::string_view view, std::size_t maxSplits)
 {
-  return StringSplit(view, [](char c) { return isspace(c) != 0; }, maxSplits);
+  return StringSplit(view, [](char c) { return CharIsSpace(c); }, maxSplits);
 }
 
 static bool lowercaseEqual(char a, char b)
 {
-  return tolower(a) == tolower(b);
+  return OpenShock::CharToLower(a) == OpenShock::CharToLower(b);
 }
 
 bool OpenShock::StringIEquals(std::string_view a, std::string_view b) noexcept
