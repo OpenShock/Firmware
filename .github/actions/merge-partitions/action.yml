@@ -30,6 +30,23 @@ runs:
         pattern: firmware_build_*
         path: partitions
 
+    # download-artifact only makes per-artifact directories when the pattern matches more than
+    # one artifact; a single match (the pull request canary) lands straight in partitions/.
+    # Put it where --bindir expects it.
+    - name: Normalize a single-board download
+      shell: bash
+      env:
+        BOARDS: ${{ inputs.boards }}
+      run: |
+        set -euo pipefail
+        mapfile -t boards < <(printf '%s\n' "$BOARDS" | sed '/^[[:space:]]*$/d')
+        if [ "${#boards[@]}" -eq 1 ] && [ ! -d "partitions/firmware_build_${boards[0]}" ]; then
+          dir="partitions/firmware_build_${boards[0]}"
+          mkdir -p "$dir"
+          find partitions -maxdepth 1 -type f -exec mv -t "$dir" {} +
+          echo "Moved the single downloaded artifact into $dir"
+        fi
+
     - name: Download static filesystem image
       uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c  # v8.0.1
       with:
