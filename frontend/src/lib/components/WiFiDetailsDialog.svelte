@@ -10,7 +10,7 @@
     DialogTrigger,
   } from '@openshock/svelte-core/components/ui/dialog';
 
-  import { Settings } from '@lucide/svelte';
+  import { Info } from '@lucide/svelte';
 
   type Props = {
     group: WiFiNetworkGroup;
@@ -52,8 +52,12 @@
 </script>
 
 <Dialog>
-  <DialogTrigger class={buttonVariants({ variant: 'outline' })}>
-    <Settings />
+  <DialogTrigger
+    class={buttonVariants({ variant: 'ghost', size: 'icon' })}
+    title="Network info"
+    aria-label="Network info"
+  >
+    <Info class="h-4 w-4" />
   </DialogTrigger>
   <DialogContent class="sm:max-w-[425px]">
     <DialogHeader>

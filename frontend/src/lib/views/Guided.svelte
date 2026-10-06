@@ -121,7 +121,7 @@
 
         {#if isLastStep}
           <Button onclick={onComplete} disabled={!canFinish}>
-            {canFinish ? 'Done' : 'Link account first'}
+            {canFinish ? 'Done' : !wifiConnected ? 'Connect WiFi first' : 'Link account first'}
           </Button>
         {:else}
           <StepperNext disabled={!canAdvance}>

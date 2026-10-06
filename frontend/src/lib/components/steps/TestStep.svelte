@@ -21,13 +21,16 @@
     { value: ShockerModelType.WellturnT330, label: 'Wellturn T330' },
   ];
 
-  let shockerId = $state(12345);
+  // A cleared number input binds null.
+  let shockerId = $state<number | null>(12345);
   let model = $state(ShockerModelType.CaiXianlin);
   let testing = $state(false);
-  let validId = $derived(shockerId >= 0 && shockerId <= 65535);
+  let validId = $derived(
+    shockerId !== null && Number.isInteger(shockerId) && shockerId >= 0 && shockerId <= 65535
+  );
 
   function sendTestVibrate() {
-    if (!validId) return;
+    if (!validId || shockerId === null) return;
 
     const fbb = new FlatbufferBuilder(128);
 
@@ -87,9 +90,10 @@
         min={0}
         max={65535}
         class="flex-1"
+        aria-invalid={!validId}
         bind:value={shockerId}
         onblur={() => {
-          shockerId = Math.max(0, Math.min(65535, Math.floor(shockerId)));
+          if (shockerId !== null) shockerId = Math.max(0, Math.min(65535, Math.floor(shockerId)));
         }}
       />
     </div>
