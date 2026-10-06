@@ -74,7 +74,7 @@ OpenShock::SerialCmds::CommandGroup OpenShock::SerialCmds::CommandHandlers::Netw
 {
   auto group = OpenShock::SerialCmds::CommandGroup("networks"sv);
 
-  auto& getCommand = group.addCommand("Get all saved networks."sv, handleNetworksCommand);
+  group.addCommand("Get all saved networks."sv, handleNetworksCommand);
 
   auto& setCommand = group.addCommand("Set all saved networks."sv, handleNetworksCommand);
   setCommand.addArgument(

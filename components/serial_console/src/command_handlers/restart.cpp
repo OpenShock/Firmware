@@ -15,7 +15,7 @@ OpenShock::SerialCmds::CommandGroup OpenShock::SerialCmds::CommandHandlers::Rest
 {
   auto group = OpenShock::SerialCmds::CommandGroup("restart"sv);
 
-  auto& cmd = group.addCommand("Restart the board"sv, handleRestartCommand);
+  group.addCommand("Restart the board"sv, handleRestartCommand);
 
   return group;
 }

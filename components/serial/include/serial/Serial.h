@@ -10,7 +10,7 @@
 namespace OpenShock::Serial {
   /**
    * @brief Installs the console driver (UART0 / USB-Serial-JTAG) and routes stdout
-   *        through it, unbuffered so interactive prompts flush immediately.
+   *        through it, unbuffered.
    *        Idempotent.
    *
    * @return true on success, false if the driver could not be installed.
@@ -29,6 +29,8 @@ namespace OpenShock::Serial {
   /**
    * @brief Writes @p len raw bytes to the console. Before Init() the bytes go
    *        straight to the ROM serial output (early-boot logging), never C stdio.
+   *        After Init() concurrent calls are serialized, so each call's bytes go
+   *        out contiguously. Not callable from an ISR.
    *
    * @param data Source buffer.
    * @param len  Number of bytes to write.

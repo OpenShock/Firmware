@@ -16,7 +16,7 @@ OpenShock::SerialCmds::CommandGroup OpenShock::SerialCmds::CommandHandlers::Vers
 {
   auto group = OpenShock::SerialCmds::CommandGroup("version"sv);
 
-  auto cmd = group.addCommand("Print version information"sv, handleVersionCommand);
+  group.addCommand("Print version information"sv, handleVersionCommand);
 
   return group;
 }

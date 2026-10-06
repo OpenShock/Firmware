@@ -34,7 +34,7 @@ OpenShock::SerialCmds::CommandGroup OpenShock::SerialCmds::CommandHandlers::Host
 {
   auto group = OpenShock::SerialCmds::CommandGroup("hostname"sv);
 
-  auto& getCommand = group.addCommand("Get the network hostname."sv, handleHostnameCommand);
+  group.addCommand("Get the network hostname."sv, handleHostnameCommand);
 
   auto& setCommand = group.addCommand("Set the network hostname."sv, handleHostnameCommand);
   setCommand.addArgument("hostname"sv, "must be a string"sv, "OpenShock"sv);

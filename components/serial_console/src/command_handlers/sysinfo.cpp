@@ -40,7 +40,7 @@ OpenShock::SerialCmds::CommandGroup OpenShock::SerialCmds::CommandHandlers::SysI
 {
   auto group = OpenShock::SerialCmds::CommandGroup("sysinfo"sv);
 
-  auto& cmd = group.addCommand("Get system information from RTOS, WiFi, etc."sv, handleDebugInfoCommand);
+  group.addCommand("Get system information from RTOS, WiFi, etc."sv, handleDebugInfoCommand);
 
   return group;
 }

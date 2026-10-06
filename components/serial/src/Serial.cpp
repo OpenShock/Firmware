@@ -1,4 +1,5 @@
 #include <freertos/FreeRTOS.h>
+#include <freertos/semphr.h>
 
 #include "serial/Serial.h"
 
@@ -7,6 +8,7 @@
 #include <esp_err.h>
 #include <esp_rom_serial_output.h>
 
+#include <algorithm>
 #include <cstdio>
 
 // Select the console backend from the configured primary console.
@@ -31,6 +33,11 @@ using namespace OpenShock;
 static constexpr int k_consoleBufferSize = 256;
 
 static bool s_initialized = false;
+
+// Serializes writers (the logger and the console) so one Write() never
+// interleaves with another, even when it is split into several driver calls.
+static StaticSemaphore_t s_writeMutexStorage;
+static SemaphoreHandle_t s_writeMutex = nullptr;
 
 // Byte-for-byte write to the ROM serial output. Used before the driver is
 // installed (early-boot logging) or when no console driver is configured. This
@@ -67,8 +74,10 @@ bool Serial::Init()
 #endif
   // OS_CONSOLE_CDC: the startup code already brought the ROM CDC console up.
 
-  // The command handler echoes prompts without trailing newlines, so make stdout
-  // unbuffered to flush them immediately.
+  s_writeMutex = xSemaphoreCreateMutexStatic(&s_writeMutexStorage);
+
+  // OpenShock's own output goes through Write(); keep stdout unbuffered so anything
+  // still printing through C stdio (e.g. ESP-IDF's logs) isn't held back either.
   std::setvbuf(stdout, nullptr, _IONBF, 0);
 
   s_initialized = true;
@@ -94,21 +103,24 @@ int Serial::Read(uint8_t* buffer, std::size_t len)
   return read < 0 ? 0 : read;
 }
 
-int Serial::Write(const uint8_t* data, std::size_t len)
+// Writes to the installed console driver. Called with s_writeMutex held.
+static int driverWrite(const uint8_t* data, std::size_t len)
 {
-  if (data == nullptr || len == 0) {
-    return 0;
-  }
-
-  if (!s_initialized) {
-    romWrite(data, len);
-    return static_cast<int>(len);
-  }
-
 #if defined(OS_CONSOLE_USJ)
-  int written = usb_serial_jtag_write_bytes(data, len, pdMS_TO_TICKS(50));
+  // The driver queues each call into its TX ring buffer as a single item and rejects
+  // anything larger than the buffer outright, so feed it buffer-sized chunks.
+  std::size_t sent = 0;
+  while (sent < len) {
+    std::size_t chunk = std::min(len - sent, static_cast<std::size_t>(k_consoleBufferSize));
+    int n             = usb_serial_jtag_write_bytes(data + sent, chunk, pdMS_TO_TICKS(50));
+    if (n <= 0) {
+      break;
+    }
+    sent += static_cast<std::size_t>(n);
+  }
+  return static_cast<int>(sent);
 #elif defined(OS_CONSOLE_UART)
-  int written = uart_write_bytes(static_cast<uart_port_t>(CONFIG_ESP_CONSOLE_UART_NUM), data, len);
+  return uart_write_bytes(static_cast<uart_port_t>(CONFIG_ESP_CONSOLE_UART_NUM), data, len);
 #elif defined(OS_CONSOLE_CDC)
   // write_buf never blocks: it takes what fits in its TX buffer and returns 0 while the
   // host isn't draining it. Retry for up to 50 ms (as the USJ path waits), then flush so
@@ -130,11 +142,27 @@ int Serial::Write(const uint8_t* data, std::size_t len)
     sent += static_cast<std::size_t>(n);
   }
   esp_usb_console_flush();
-  int written = static_cast<int>(sent);
+  return static_cast<int>(sent);
 #else
   romWrite(data, len);
-  int written = static_cast<int>(len);
+  return static_cast<int>(len);
 #endif
+}
+
+int Serial::Write(const uint8_t* data, std::size_t len)
+{
+  if (data == nullptr || len == 0) {
+    return 0;
+  }
+
+  if (!s_initialized) {
+    romWrite(data, len);
+    return static_cast<int>(len);
+  }
+
+  xSemaphoreTake(s_writeMutex, portMAX_DELAY);
+  int written = driverWrite(data, len);
+  xSemaphoreGive(s_writeMutex);
 
   return written < 0 ? 0 : written;
 }

@@ -40,7 +40,7 @@ OpenShock::SerialCmds::CommandGroup OpenShock::SerialCmds::CommandHandlers::Auth
 {
   auto group = OpenShock::SerialCmds::CommandGroup("authtoken"sv);
 
-  auto& getCommand = group.addCommand("Get the backend auth token"sv, handleAuthtokenCommand);
+  group.addCommand("Get the backend auth token"sv, handleAuthtokenCommand);
 
   auto& setCommand = group.addCommand("Set the auth token"sv, handleAuthtokenCommand);
   setCommand.addArgument("token"sv, "must be a string"sv, "mytoken"sv);

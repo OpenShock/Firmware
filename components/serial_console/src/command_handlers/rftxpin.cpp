@@ -22,6 +22,7 @@ static void handleRfTxPinCommand(std::string_view arg, bool isAutomated)
 
   if (!OpenShock::Convert::ToGpioNum(arg, txPin)) {
     SERPR_ERROR("Invalid argument (number invalid or out of range)");
+    return;
   }
 
   OpenShock::SetGPIOResultCode result = OpenShock::CommandHandler::SetRfTxPin(txPin);
@@ -49,7 +50,7 @@ OpenShock::SerialCmds::CommandGroup OpenShock::SerialCmds::CommandHandlers::RfTx
 {
   auto group = OpenShock::SerialCmds::CommandGroup("rftxpin"sv);
 
-  auto& getCommand = group.addCommand("Get the GPIO pin used for the radio transmitter"sv, handleRfTxPinCommand);
+  group.addCommand("Get the GPIO pin used for the radio transmitter"sv, handleRfTxPinCommand);
 
   auto& setCommand = group.addCommand("Set the GPIO pin used for the radio transmitter"sv, handleRfTxPinCommand);
   setCommand.addArgument("pin"sv, "must be a number"sv, "15"sv);

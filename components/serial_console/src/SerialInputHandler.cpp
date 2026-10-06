@@ -23,6 +23,9 @@ const char* const TAG = "SerialInputHandler";
 #include "util/TaskUtils.h"
 #include "wifi/WiFiManager.h"
 
+#include <cstdarg>
+#include <cstdio>
+#include <cstdlib>
 #include <cstring>
 #include <string_view>
 #include <unordered_map>
@@ -124,7 +127,7 @@ static void printCompleteHelp()
 
   SerialInputHandler::PrintWelcomeHeader();
 
-  OS_SERIAL_PRINT(buffer.data());
+  OS_SERIAL_PRINT(buffer);
 }
 
 static void printCommandHelp(SerialCmds::CommandGroup& group)
@@ -257,7 +260,7 @@ static void printCommandHelp(SerialCmds::CommandGroup& group)
   buffer.push_back('\r');
   buffer.push_back('\n');
 
-  OS_SERIAL_PRINT(buffer.data());
+  OS_SERIAL_PRINT(buffer);
 }
 
 static void handleHelpCommand(std::string_view arg, bool isAutomated)
@@ -670,7 +673,7 @@ bool SerialInputHandler::Init()
   }
   s_initialized = true;
 
-  // Install the console RX driver and make stdout unbuffered.
+  // Install the console driver (RX here, and the raw TX path used by OS_SERIAL_*).
   if (!Serial::Init()) {
     OS_LOGE(TAG, "Failed to initialize serial console");
     return false;
@@ -707,6 +710,48 @@ bool SerialInputHandler::SerialEchoEnabled()
 void SerialInputHandler::SetSerialEchoEnabled(bool enabled)
 {
   s_echoEnabled = enabled;
+}
+
+void SerialInputHandler::Print(std::string_view str)
+{
+  Serial::Write(reinterpret_cast<const uint8_t*>(str.data()), str.size());
+}
+
+// Formats the whole message first and hands it to Serial::Write in one call (as
+// the logger does), so it is not interleaved with log output mid-line.
+void SerialInputHandler::Printf(const char* format, ...)
+{
+  char stackBuf[256];
+
+  va_list args;
+  va_start(args, format);
+  int len = vsnprintf(stackBuf, sizeof(stackBuf), format, args);
+  va_end(args);
+
+  if (len <= 0) {
+    return;
+  }
+
+  if (static_cast<std::size_t>(len) < sizeof(stackBuf)) {
+    Serial::Write(reinterpret_cast<const uint8_t*>(stackBuf), static_cast<std::size_t>(len));
+    return;
+  }
+
+  // Longer than the stack buffer (e.g. a config dump): format again into a heap
+  // buffer so the response isn't truncated. Fall back to the truncated stack
+  // buffer if the allocation fails.
+  char* heapBuf = static_cast<char*>(malloc(static_cast<std::size_t>(len) + 1));
+  if (heapBuf == nullptr) {
+    Serial::Write(reinterpret_cast<const uint8_t*>(stackBuf), sizeof(stackBuf) - 1);
+    return;
+  }
+
+  va_start(args, format);
+  vsnprintf(heapBuf, static_cast<std::size_t>(len) + 1, format, args);
+  va_end(args);
+
+  Serial::Write(reinterpret_cast<const uint8_t*>(heapBuf), static_cast<std::size_t>(len));
+  free(heapBuf);
 }
 
 void SerialInputHandler::PrintWelcomeHeader()

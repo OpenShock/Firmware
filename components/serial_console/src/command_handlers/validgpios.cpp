@@ -34,7 +34,7 @@ OpenShock::SerialCmds::CommandGroup OpenShock::SerialCmds::CommandHandlers::Vali
 {
   auto group = OpenShock::SerialCmds::CommandGroup("validgpios"sv);
 
-  auto& cmd = group.addCommand("List all valid GPIO pins"sv, handleValidGpiosCommand);
+  group.addCommand("List all valid GPIO pins"sv, handleValidGpiosCommand);
 
   return group;
 }

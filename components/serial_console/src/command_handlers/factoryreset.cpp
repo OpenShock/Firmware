@@ -19,7 +19,7 @@ OpenShock::SerialCmds::CommandGroup OpenShock::SerialCmds::CommandHandlers::Fact
 {
   auto group = OpenShock::SerialCmds::CommandGroup("factoryreset"sv);
 
-  auto& cmd = group.addCommand("Reset the hub to factory defaults and restart"sv, handleFactoryResetCommand);
+  group.addCommand("Reset the hub to factory defaults and restart"sv, handleFactoryResetCommand);
 
   return group;
 }

@@ -6,6 +6,7 @@
 
 #include <esp_system.h>
 
+#include <cstdio>
 #include <string>
 
 const char* const TAG = "SerialCmds::CommandHandlers::Domain";
@@ -67,7 +68,7 @@ OpenShock::SerialCmds::CommandGroup OpenShock::SerialCmds::CommandHandlers::Doma
 {
   auto group = OpenShock::SerialCmds::CommandGroup("domain"sv);
 
-  auto& getCommand = group.addCommand("Get the backend domain."sv, handleDomainCommand);
+  group.addCommand("Get the backend domain."sv, handleDomainCommand);
 
   auto& setCommand = group.addCommand("Set the backend domain."sv, handleDomainCommand);
   setCommand.addArgument("domain"sv, "must be a string"sv, "api.shocklink.net"sv);

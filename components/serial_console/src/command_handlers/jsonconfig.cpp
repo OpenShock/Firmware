@@ -28,7 +28,7 @@ OpenShock::SerialCmds::CommandGroup OpenShock::SerialCmds::CommandHandlers::Json
 {
   auto group = OpenShock::SerialCmds::CommandGroup("jsonconfig"sv);
 
-  auto& getCommand = group.addCommand("Get the configuration as JSON"sv, handleJsonConfigCommand);
+  group.addCommand("Get the configuration as JSON"sv, handleJsonConfigCommand);
 
   auto& setCommand = group.addCommand("Set the configuration from JSON, and restart"sv, handleJsonConfigCommand);
   setCommand.addArgument("json"sv, "must be a valid JSON object"sv, "{ ... }"sv);
