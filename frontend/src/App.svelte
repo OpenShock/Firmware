@@ -26,7 +26,7 @@
 {#if showSuccess}
   <Success onClose={closePortal} />
 {:else}
-  <div class="flex min-h-screen flex-col">
+  <div class="flex min-h-svh flex-col">
     {#if $ViewModeStore === 'landing'}
       <Landing />
     {:else}
