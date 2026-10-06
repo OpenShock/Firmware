@@ -1,5 +1,5 @@
-import { hubState } from '$lib/stores';
-import { getApiBaseUrl } from '$lib/utils/localRedirect';
+import { hubState } from '#lib/stores/index.js';
+import { getApiBaseUrl } from '#lib/utils/localRedirect.js';
 import { toast } from 'svelte-sonner';
 
 function apiFetch(path: string, init?: RequestInit): Promise<Response> {

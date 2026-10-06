@@ -1,6 +1,6 @@
 <script lang="ts">
   import { Button } from '@openshock/svelte-core/components/ui/button';
-  import { ViewModeStore } from '$lib/stores';
+  import { ViewModeStore } from '#lib/stores/index.js';
   import { WandSparkles, Settings } from '@lucide/svelte';
 </script>
 

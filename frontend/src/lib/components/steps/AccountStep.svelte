@@ -1,6 +1,6 @@
 <script lang="ts">
-  import { linkAccount, unlinkAccount } from '$lib/api';
-  import { hubState } from '$lib/stores';
+  import { linkAccount, unlinkAccount } from '#lib/api.js';
+  import { hubState } from '#lib/stores/index.js';
   import { Button } from '@openshock/svelte-core/components/ui/button';
   import { Input } from '@openshock/svelte-core/components/ui/input';
   import { Label } from '@openshock/svelte-core/components/ui/label';

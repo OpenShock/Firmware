@@ -1,6 +1,6 @@
 <script lang="ts">
-  import WiFiManager from '$lib/components/WiFiManager.svelte';
-  import { hubState } from '$lib/stores';
+  import WiFiManager from '#lib/components/WiFiManager.svelte';
+  import { hubState } from '#lib/stores/index.js';
   import { CircleCheck } from '@lucide/svelte';
 
   let isConnected = $derived(hubState.wifiConnectedBSSID !== null);

@@ -1,7 +1,7 @@
 <script lang="ts">
-  import { hubState } from '$lib/stores';
-  import { startWifiScan, stopWifiScan } from '$lib/api';
-  import { WifiScanStatus } from '$lib/_fbs/open-shock/serialization/types/wifi-scan-status';
+  import { hubState } from '#lib/stores/index.js';
+  import { startWifiScan, stopWifiScan } from '#lib/api.js';
+  import { WifiScanStatus } from '#lib/_fbs/open-shock/serialization/types/wifi-scan-status.js';
   import { Button } from '@openshock/svelte-core/components/ui/button';
   import { LoaderCircle, Radar } from '@lucide/svelte';
   import { ScrollArea } from '@openshock/svelte-core/components/ui/scroll-area';

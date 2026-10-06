@@ -1,14 +1,14 @@
 <script lang="ts">
-  import { hubState } from '$lib/stores';
-  import { WifiAuthMode } from '$lib/_fbs/open-shock/serialization/types/wifi-auth-mode';
+  import { hubState } from '#lib/stores/index.js';
+  import { WifiAuthMode } from '#lib/_fbs/open-shock/serialization/types/wifi-auth-mode.js';
   import {
     forgetWifiNetwork,
     saveWifiNetwork,
     connectWifiNetwork,
     disconnectWifiNetwork,
-  } from '$lib/api';
-  import WiFiDetailsDialog from '$lib/components/WiFiDetailsDialog.svelte';
-  import type { WiFiNetworkGroup } from '$lib/types';
+  } from '#lib/api.js';
+  import WiFiDetailsDialog from '#lib/components/WiFiDetailsDialog.svelte';
+  import type { WiFiNetworkGroup } from '#lib/types/index.js';
   import { Button, buttonVariants } from '@openshock/svelte-core/components/ui/button';
   import {
     Dialog,
@@ -143,7 +143,7 @@
     <!-- Primary action: Connect or Disconnect -->
     {#if isConnected}
       <Button variant="ghost" size="icon" onclick={wifiDisconnect} title="Disconnect">
-        <WifiOff class="h-4 w-4 text-destructive" />
+        <WifiOff class="text-destructive h-4 w-4" />
       </Button>
     {:else if isSaved}
       <Button variant="ghost" size="icon" onclick={wifiConnect} title="Connect">

@@ -22,21 +22,21 @@
 </script>
 
 <script lang="ts">
-  import WiFiManager from '$lib/components/WiFiManager.svelte';
-  import TestStep from '$lib/components/steps/TestStep.svelte';
-  import GpioPinSelector from '$lib/components/GpioPinSelector.svelte';
+  import WiFiManager from '#lib/components/WiFiManager.svelte';
+  import TestStep from '#lib/components/steps/TestStep.svelte';
+  import GpioPinSelector from '#lib/components/GpioPinSelector.svelte';
   import {
     linkAccount as apiLinkAccount,
     unlinkAccount as apiUnlinkAccount,
     setEstopEnabled,
     setRfTxPin,
     setEstopPin,
-  } from '$lib/api';
-  import { hubState, ViewModeStore } from '$lib/stores';
+  } from '#lib/api.js';
+  import { hubState, ViewModeStore } from '#lib/stores/index.js';
   import { Button } from '@openshock/svelte-core/components/ui/button';
   import { Input } from '@openshock/svelte-core/components/ui/input';
   import { Label } from '@openshock/svelte-core/components/ui/label';
-  import OtaSection from '$lib/components/sections/OtaSection.svelte';
+  import OtaSection from '#lib/components/sections/OtaSection.svelte';
   import { CircleCheck, ChevronRight, ArrowLeft } from '@lucide/svelte';
 
   interface Props {

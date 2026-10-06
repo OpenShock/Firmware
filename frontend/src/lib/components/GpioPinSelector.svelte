@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { hubState, usedPins } from '$lib/stores';
+  import { hubState, usedPins } from '#lib/stores/index.js';
   import { Button } from '@openshock/svelte-core/components/ui/button';
   import { Input } from '@openshock/svelte-core/components/ui/input';
 

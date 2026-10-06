@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { saveWifiNetwork } from '$lib/api';
+  import { saveWifiNetwork } from '#lib/api.js';
   import { Button, buttonVariants } from '@openshock/svelte-core/components/ui/button';
   import {
     Dialog,

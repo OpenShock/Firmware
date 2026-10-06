@@ -1,16 +1,16 @@
 <script lang="ts">
-  import { WebSocketClient } from '$lib/WebSocketClient';
+  import { WebSocketClient } from '#lib/WebSocketClient.js';
   import { Button } from '@openshock/svelte-core/components/ui/button';
   import { Input } from '@openshock/svelte-core/components/ui/input';
   import { Label } from '@openshock/svelte-core/components/ui/label';
   import { Zap } from '@lucide/svelte';
   import { Builder as FlatbufferBuilder } from 'flatbuffers';
-  import { LocalToHubMessage } from '$lib/_fbs/open-shock/serialization/local/local-to-hub-message';
-  import { LocalToHubMessagePayload } from '$lib/_fbs/open-shock/serialization/local/local-to-hub-message-payload';
-  import { ShockerCommandList } from '$lib/_fbs/open-shock/serialization/common/shocker-command-list';
-  import { ShockerCommand } from '$lib/_fbs/open-shock/serialization/common/shocker-command';
-  import { ShockerModelType } from '$lib/_fbs/open-shock/serialization/types/shocker-model-type';
-  import { ShockerCommandType } from '$lib/_fbs/open-shock/serialization/types/shocker-command-type';
+  import { LocalToHubMessage } from '#lib/_fbs/open-shock/serialization/local/local-to-hub-message.js';
+  import { LocalToHubMessagePayload } from '#lib/_fbs/open-shock/serialization/local/local-to-hub-message-payload.js';
+  import { ShockerCommandList } from '#lib/_fbs/open-shock/serialization/common/shocker-command-list.js';
+  import { ShockerCommand } from '#lib/_fbs/open-shock/serialization/common/shocker-command.js';
+  import { ShockerModelType } from '#lib/_fbs/open-shock/serialization/types/shocker-model-type.js';
+  import { ShockerCommandType } from '#lib/_fbs/open-shock/serialization/types/shocker-command-type.js';
 
   const modelOptions = [
     { value: ShockerModelType.CaiXianlin, label: 'CaiXianlin' },

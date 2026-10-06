@@ -1,5 +1,5 @@
-import { WifiAuthMode } from '$lib/_fbs/open-shock/serialization/types/wifi-auth-mode';
-import type { WiFiNetwork } from '$lib/types';
+import { WifiAuthMode } from '#lib/_fbs/open-shock/serialization/types/wifi-auth-mode.js';
+import type { WiFiNetwork } from '#lib/types/index.js';
 import { describe, expect, it } from 'vitest';
 
 // Import the store freshly for each test to avoid shared state

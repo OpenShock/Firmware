@@ -1,6 +1,6 @@
 <script lang="ts">
-  import { hubState } from '$lib/stores';
-  import { OtaUpdateChannel } from '$lib/_fbs/open-shock/serialization/configuration/ota-update-channel';
+  import { hubState } from '#lib/stores/index.js';
+  import { OtaUpdateChannel } from '#lib/_fbs/open-shock/serialization/configuration/ota-update-channel.js';
   import {
     setOtaEnabled,
     setOtaDomain,
@@ -9,7 +9,7 @@
     setOtaAllowBackendManagement,
     setOtaRequireManualApproval,
     checkOtaUpdates,
-  } from '$lib/api';
+  } from '#lib/api.js';
   import { Button } from '@openshock/svelte-core/components/ui/button';
   import { Input } from '@openshock/svelte-core/components/ui/input';
   import { Label } from '@openshock/svelte-core/components/ui/label';
