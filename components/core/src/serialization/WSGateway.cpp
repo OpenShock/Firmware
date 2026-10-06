@@ -5,11 +5,9 @@ const char* const TAG = "WSGateway";
 #include <esp_wifi.h>
 
 #include "Logging.h"
-#include "Temporal.h"
-
-// Firmware version / commit. Regenerated every build, so this file is one of the
-// few that recompile on a new commit.
+#include "OpenShock.h"
 #include "SemVer.h"
+#include "Temporal.h"
 
 using namespace OpenShock::Serialization;
 

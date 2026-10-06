@@ -12,6 +12,7 @@ const char* const TAG = "SerialInputHandler";
 #include "FormatHelpers.h"
 #include "http/HTTPRequestManager.h"
 #include "Logging.h"
+#include "OpenShock.h"
 #include "serial/Serial.h"
 #include "serial_console/command_handlers/CommandEntry.h"
 #include "serial_console/command_handlers/common.h"
