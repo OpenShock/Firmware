@@ -44,7 +44,7 @@ GatewayClient::GatewayClient(const std::string& authToken)
 {
   OS_LOGD(TAG, "Creating GatewayClient");
 
-  m_headers = std::string("Firmware-Version: ") + OpenShock::Constants::FW_VERSION + "\r\n" + "Device-Token: " + authToken + "\r\n";
+  m_headers = std::string("Firmware-Version: ") + OpenShock::Constants::FW_VERSION + "\r\nDevice-Token: " + authToken + "\r\n";
 }
 GatewayClient::~GatewayClient()
 {

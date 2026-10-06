@@ -146,7 +146,8 @@ bool WiFiScanManager::StartScan()
   config.scan_time.active.max = OPENSHOCK_WIFI_SCAN_MAX_MS_PER_CHANNEL;
   config.home_chan_dwell_time = WIFI_SCAN_HOME_CHANNEL_DWELL_DEFAULT_TIME;  // 0 (zero-init) is not the default
 
-  esp_err_t err = esp_wifi_scan_start(&config, false);                      // async: WIFI_EVENT_SCAN_DONE fans out results
+  // async: WIFI_EVENT_SCAN_DONE fans out results
+  esp_err_t err = esp_wifi_scan_start(&config, false);
   if (err != ESP_OK) {
     OS_LOGE(TAG, "esp_wifi_scan_start failed: %s", esp_err_to_name(err));
     s_scanning.store(false, std::memory_order_relaxed);
