@@ -62,18 +62,13 @@
   }
 </script>
 
-<div class="flex flex-col space-y-2">
-  <div class="flex flex-row items-center space-x-2">
-    <h4 class="scroll-m-20 text-xl font-semibold tracking-tight">{name}</h4>
+<div class="flex flex-col gap-2">
+  <div class="flex flex-row items-center gap-2">
+    <h4 class="text-xl font-semibold tracking-tight">{name}</h4>
     <p class="text-muted-foreground text-sm">{statusText}</p>
   </div>
-  <div class="flex space-x-2">
-    <Input
-      class="input variant-form-material"
-      type="number"
-      placeholder="GPIO Pin"
-      bind:value={pendingPin}
-    />
+  <div class="flex gap-2">
+    <Input type="number" placeholder="GPIO Pin" bind:value={pendingPin} />
     <Button onclick={setGpioPin} disabled={!canSet}>Set</Button>
   </div>
 </div>

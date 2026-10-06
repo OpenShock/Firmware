@@ -77,7 +77,7 @@
       </p>
       <div class="flex gap-2">
         <Input
-          class={linkCodeValid ? '' : 'input-error'}
+          aria-invalid={!linkCodeValid}
           type="text"
           id="account-link-code"
           inputmode="numeric"

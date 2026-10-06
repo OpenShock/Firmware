@@ -165,12 +165,7 @@
           </DialogHeader>
           <div class="flex flex-row items-center gap-4 py-4">
             <Label for="wifi-password" class="text-right">Password</Label>
-            <Input
-              id="wifi-password"
-              type="password"
-              class="col-span-3"
-              bind:value={pendingPassword}
-            />
+            <Input id="wifi-password" type="password" class="flex-1" bind:value={pendingPassword} />
           </div>
           <DialogFooter>
             <Button
@@ -201,12 +196,7 @@
           </DialogHeader>
           <div class="flex flex-row items-center gap-4 py-4">
             <Label for="edit-password" class="text-right">Password</Label>
-            <Input
-              id="edit-password"
-              type="password"
-              class="col-span-3"
-              bind:value={editPassword}
-            />
+            <Input id="edit-password" type="password" class="flex-1" bind:value={editPassword} />
           </div>
           <DialogFooter>
             <Button

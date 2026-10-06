@@ -67,7 +67,7 @@
       <Label for="shocker-model" class="w-20 text-right">Model</Label>
       <select
         id="shocker-model"
-        class="border-input bg-background ring-offset-background focus-visible:ring-ring flex h-10 w-full flex-1 rounded-md border px-3 py-2 text-sm focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:outline-none"
+        class="border-input focus-visible:border-ring focus-visible:ring-ring/50 dark:bg-input/30 h-8 w-full flex-1 rounded-lg border bg-transparent px-2.5 text-sm outline-none focus-visible:ring-3"
         bind:value={model}
       >
         {#each modelOptions as opt (opt.value)}
