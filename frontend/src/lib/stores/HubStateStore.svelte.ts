@@ -1,7 +1,7 @@
-import { WifiAuthMode } from '$lib/_fbs/open-shock/serialization/types/wifi-auth-mode';
-import type { WifiScanStatus } from '$lib/_fbs/open-shock/serialization/types/wifi-scan-status';
-import type { Config } from '$lib/mappers/ConfigMapper';
-import type { WiFiNetwork, WiFiNetworkGroup } from '$lib/types';
+import { WifiAuthMode } from '#lib/_fbs/open-shock/serialization/types/wifi-auth-mode.js';
+import type { WifiScanStatus } from '#lib/_fbs/open-shock/serialization/types/wifi-scan-status.js';
+import type { Config } from '#lib/mappers/ConfigMapper.js';
+import type { WiFiNetwork, WiFiNetworkGroup } from '#lib/types/index.js';
 import { SvelteMap, SvelteSet } from 'svelte/reactivity';
 
 function insertSorted<T>(array: T[], value: T, compare: (a: T, b: T) => number) {

@@ -11,11 +11,11 @@
     StepperNext,
     StepperPrevious,
   } from '@openshock/svelte-core/components/stepper';
-  import PinsStep from '$lib/components/steps/HardwareStep.svelte';
-  import WiFiStep from '$lib/components/steps/WiFiStep.svelte';
-  import TestStep from '$lib/components/steps/TestStep.svelte';
-  import AccountStep from '$lib/components/steps/AccountStep.svelte';
-  import { hubState, ViewModeStore } from '$lib/stores';
+  import PinsStep from '#lib/components/steps/HardwareStep.svelte';
+  import WiFiStep from '#lib/components/steps/WiFiStep.svelte';
+  import TestStep from '#lib/components/steps/TestStep.svelte';
+  import AccountStep from '#lib/components/steps/AccountStep.svelte';
+  import { hubState, ViewModeStore } from '#lib/stores/index.js';
   import { Button } from '@openshock/svelte-core/components/ui/button';
 
   interface Props {

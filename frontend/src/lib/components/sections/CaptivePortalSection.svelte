@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { hubState } from '$lib/stores';
+  import { hubState } from '#lib/stores/index.js';
   import { TriangleAlert } from '@lucide/svelte';
 
   let alwaysEnabled = $derived(hubState.config?.captivePortal?.alwaysEnabled ?? false);

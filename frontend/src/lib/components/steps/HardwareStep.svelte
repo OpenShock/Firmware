@@ -1,7 +1,7 @@
 <script lang="ts">
-  import { setRfTxPin, setEstopPin } from '$lib/api';
-  import GpioPinSelector from '$lib/components/GpioPinSelector.svelte';
-  import { hubState } from '$lib/stores';
+  import { setRfTxPin, setEstopPin } from '#lib/api.js';
+  import GpioPinSelector from '#lib/components/GpioPinSelector.svelte';
+  import { hubState } from '#lib/stores/index.js';
 </script>
 
 <div class="flex flex-col gap-6">

@@ -1,6 +1,6 @@
 <script lang="ts">
   import { LightSwitch } from '@openshock/svelte-core/components';
-  import { ViewModeStore } from '$lib/stores';
+  import { ViewModeStore } from '#lib/stores/index.js';
 </script>
 
 <header
@@ -9,7 +9,7 @@
   <div class="flex flex-1 flex-row items-center space-x-2 px-4 py-2">
     <button
       onclick={() => ViewModeStore.set('landing')}
-      class="overflow-hidden select-none cursor-pointer"
+      class="cursor-pointer overflow-hidden select-none"
       aria-label="OpenShock"
     >
       <img

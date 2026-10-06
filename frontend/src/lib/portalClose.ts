@@ -1,4 +1,4 @@
-import { getApiBaseUrl } from '$lib/utils/localRedirect';
+import { getApiBaseUrl } from '#lib/utils/localRedirect.js';
 
 /**
  * Signals the firmware that the user has completed setup.

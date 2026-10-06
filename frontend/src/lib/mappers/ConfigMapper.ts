@@ -1,5 +1,5 @@
-import type { OtaUpdateChannel } from '$lib/_fbs/open-shock/serialization/configuration';
-import { HubConfig } from '$lib/_fbs/open-shock/serialization/configuration/hub-config';
+import type { OtaUpdateChannel } from '#lib/_fbs/open-shock/serialization/configuration.js';
+import { HubConfig } from '#lib/_fbs/open-shock/serialization/configuration/hub-config.js';
 
 // TODO: Update these configs and ensure that typescript enforces them to be up to date
 

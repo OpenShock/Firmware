@@ -1,8 +1,8 @@
-import { WifiNetworkEvent } from '$lib/_fbs/open-shock/serialization/local/wifi-network-event';
-import { WifiNetwork as FbsWifiNetwork } from '$lib/_fbs/open-shock/serialization/types/wifi-network';
-import { WifiNetworkEventType } from '$lib/_fbs/open-shock/serialization/types/wifi-network-event-type';
-import { hubState } from '$lib/stores';
-import type { WiFiNetwork } from '$lib/types/WiFiNetwork';
+import { WifiNetworkEvent } from '#lib/_fbs/open-shock/serialization/local/wifi-network-event.js';
+import { WifiNetworkEventType } from '#lib/_fbs/open-shock/serialization/types/wifi-network-event-type.js';
+import { WifiNetwork as FbsWifiNetwork } from '#lib/_fbs/open-shock/serialization/types/wifi-network.js';
+import { hubState } from '#lib/stores/index.js';
+import type { WiFiNetwork } from '#lib/types/WiFiNetwork.js';
 import { toast } from 'svelte-sonner';
 import type { MessageHandler } from '.';
 

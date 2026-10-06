@@ -1,6 +1,5 @@
-import { svelte } from '@sveltejs/vite-plugin-svelte';
+import { svelte, vitePreprocess } from '@sveltejs/vite-plugin-svelte';
 import tailwindcss from '@tailwindcss/vite';
-import { fileURLToPath } from 'node:url';
 import license from 'rollup-plugin-license';
 import { visualizer } from 'rollup-plugin-visualizer';
 import type { ESBuildOptions, Plugin } from 'vite';
@@ -27,9 +26,19 @@ export default defineConfig(({ mode }) => {
 
   return {
     resolve: {
-      alias: {
-        $lib: fileURLToPath(new URL('./src/lib', import.meta.url)),
-      },
+      // svelte-core is a workspace package with its own node_modules, so without this its
+      // components bundle whatever versions its devDependencies resolve to. Resolve its
+      // runtime peers from this app so the versions pinned in package.json are what ships
+      // (e.g. tailwind-variants >=3.3 vendors tailwind-merge and adds ~80 kB).
+      dedupe: [
+        'bits-ui',
+        'svelte-sonner',
+        '@lucide/svelte',
+        '@internationalized/date',
+        'tailwind-merge',
+        'tailwind-variants',
+        'clsx',
+      ],
     },
 
     publicDir: 'static',
@@ -40,7 +49,14 @@ export default defineConfig(({ mode }) => {
     },
 
     plugins: [
-      svelte(),
+      svelte({
+        // Inline instead of svelte.config.js, matching the cloud frontend's SvelteKit 3 setup.
+        preprocess: vitePreprocess(),
+        compilerOptions: {
+          runes: true,
+          modernAst: true,
+        },
+      }),
       tailwindcss(),
       jsBannerPlugin('/*! For license information, see LICENSES.txt */'),
       viteSingleFile(),
@@ -79,6 +95,8 @@ export default defineConfig(({ mode }) => {
     } as ESBuildOptions,
 
     test: {
+      // A test that runs no assertions fails instead of silently passing.
+      expect: { requireAssertions: true },
       include: ['src/**/*.{test,spec}.{js,ts}'],
     },
   };

@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { hubState } from '$lib/stores';
+  import { hubState } from '#lib/stores/index.js';
   import { Input } from '@openshock/svelte-core/components/ui/input';
   import { Label } from '@openshock/svelte-core/components/ui/label';
 
