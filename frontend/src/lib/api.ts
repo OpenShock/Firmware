@@ -1,3 +1,5 @@
+import { OtaUpdateChannel } from '#lib/_fbs/open-shock/serialization/configuration/ota-update-channel.js';
+import type { OtaUpdateConfig } from '#lib/mappers/ConfigMapper.js';
 import { hubState } from '#lib/stores/index.js';
 import { getApiBaseUrl } from '#lib/utils/localRedirect.js';
 import { toast } from 'svelte-sonner';
@@ -247,68 +249,91 @@ export async function disconnectWifiNetwork(): Promise<void> {
 
 // OTA
 
-async function otaRequest(path: string, method: 'PUT' | 'POST', failure: string): Promise<void> {
+const _otaChannelNames: Record<OtaUpdateChannel, string> = {
+  [OtaUpdateChannel.Stable]: 'stable',
+  [OtaUpdateChannel.Beta]: 'beta',
+  [OtaUpdateChannel.Develop]: 'develop',
+};
+
+// On success the change is mirrored into hubState.config, which is otherwise only sent once on
+// connect, so the controls reflect what the hub stored.
+async function otaRequest(
+  path: string,
+  method: 'PUT' | 'POST',
+  failure: string,
+  patch?: Partial<OtaUpdateConfig>
+): Promise<boolean> {
   try {
     const res = await apiFetch('/api/ota/' + path, { method });
     if (!res.ok) {
       toast.error(failure + ': ' + (await getErrorMessage(res)));
+      return false;
     }
+    if (patch && hubState.config) Object.assign(hubState.config.otaUpdate, patch);
+    return true;
   } catch {
     toast.error(failure);
+    return false;
   }
 }
 
-export function setOtaEnabled(enabled: boolean): Promise<void> {
+export function setOtaEnabled(isEnabled: boolean): Promise<boolean> {
   return otaRequest(
-    `enabled?enabled=${enabled ? '1' : '0'}`,
+    `enabled?enabled=${isEnabled ? '1' : '0'}`,
     'PUT',
-    'Failed to update OTA setting'
+    'Failed to update OTA setting',
+    { isEnabled }
   );
 }
 
-export function setOtaDomain(domain: string): Promise<void> {
+export function setOtaDomain(cdnDomain: string): Promise<boolean> {
   return otaRequest(
-    'domain?' + new URLSearchParams({ domain }),
+    'domain?' + new URLSearchParams({ domain: cdnDomain }),
     'PUT',
-    'Failed to update OTA domain'
+    'Failed to update OTA domain',
+    { cdnDomain }
   );
 }
 
-export function setOtaChannel(channel: string): Promise<void> {
+export function setOtaChannel(updateChannel: OtaUpdateChannel): Promise<boolean> {
   return otaRequest(
-    'channel?' + new URLSearchParams({ channel }),
+    'channel?' + new URLSearchParams({ channel: _otaChannelNames[updateChannel] }),
     'PUT',
-    'Failed to update OTA channel'
+    'Failed to update OTA channel',
+    { updateChannel }
   );
 }
 
-export function setOtaCheckInterval(interval: number): Promise<void> {
+export function setOtaCheckInterval(checkInterval: number): Promise<boolean> {
   return otaRequest(
-    `check-interval?interval=${interval}`,
+    `check-interval?interval=${checkInterval}`,
     'PUT',
-    'Failed to update OTA check interval'
+    'Failed to update OTA check interval',
+    { checkInterval }
   );
 }
 
-export function setOtaAllowBackendManagement(allow: boolean): Promise<void> {
+export function setOtaAllowBackendManagement(allowBackendManagement: boolean): Promise<boolean> {
   return otaRequest(
-    `allow-backend-management?allow=${allow ? '1' : '0'}`,
+    `allow-backend-management?allow=${allowBackendManagement ? '1' : '0'}`,
     'PUT',
-    'Failed to update OTA backend management setting'
+    'Failed to update OTA backend management setting',
+    { allowBackendManagement }
   );
 }
 
-export function setOtaRequireManualApproval(require: boolean): Promise<void> {
+export function setOtaRequireManualApproval(requireManualApproval: boolean): Promise<boolean> {
   return otaRequest(
-    `require-manual-approval?require=${require ? '1' : '0'}`,
+    `require-manual-approval?require=${requireManualApproval ? '1' : '0'}`,
     'PUT',
-    'Failed to update OTA manual approval setting'
+    'Failed to update OTA manual approval setting',
+    { requireManualApproval }
   );
 }
 
-export function checkOtaUpdates(channel: string): Promise<void> {
+export function checkOtaUpdates(channel: OtaUpdateChannel): Promise<boolean> {
   return otaRequest(
-    'check?' + new URLSearchParams({ channel }),
+    'check?' + new URLSearchParams({ channel: _otaChannelNames[channel] }),
     'POST',
     'Failed to check for OTA updates'
   );

@@ -1,5 +1,6 @@
 <script lang="ts">
   import SectionHeader from '#lib/components/SectionHeader.svelte';
+  import SettingSwitch from '#lib/components/SettingSwitch.svelte';
   import { hubState } from '#lib/stores/index.js';
   import { OtaUpdateChannel } from '#lib/_fbs/open-shock/serialization/configuration/ota-update-channel.js';
   import {
@@ -15,156 +16,153 @@
   import { Input } from '@openshock/svelte-core/components/ui/input';
   import { Label } from '@openshock/svelte-core/components/ui/label';
 
+  const channels = [
+    { value: OtaUpdateChannel.Stable, label: 'Stable' },
+    { value: OtaUpdateChannel.Beta, label: 'Beta' },
+    { value: OtaUpdateChannel.Develop, label: 'Develop' },
+  ];
+
   let otaConfig = $derived(hubState.config?.otaUpdate);
 
-  let cdnDomain = $state('');
-  let checkInterval = $state(0);
+  // Unsaved edits; undefined shows the hub's stored value. A cleared number input binds null.
+  let cdnDomainEdit = $state<string | undefined>();
+  let checkIntervalEdit = $state<number | null | undefined>();
 
-  $effect(() => {
-    if (otaConfig?.cdnDomain) cdnDomain = otaConfig.cdnDomain;
-    if (otaConfig?.checkInterval) checkInterval = otaConfig.checkInterval;
-  });
+  let cdnDomain = $derived(
+    cdnDomainEdit !== undefined ? cdnDomainEdit : (otaConfig?.cdnDomain ?? '')
+  );
+  let checkInterval = $derived(
+    checkIntervalEdit !== undefined ? checkIntervalEdit : (otaConfig?.checkInterval ?? 0)
+  );
 
-  function toggleEnabled() {
-    setOtaEnabled(!otaConfig?.isEnabled);
-  }
+  let canSaveDomain = $derived(
+    cdnDomainEdit !== undefined &&
+      cdnDomain.trim().length > 0 &&
+      cdnDomain.trim() !== otaConfig?.cdnDomain
+  );
+  let intervalValid = $derived(
+    checkInterval !== null &&
+      Number.isInteger(checkInterval) &&
+      checkInterval >= 0 &&
+      checkInterval <= 65535
+  );
+  let canSaveInterval = $derived(
+    checkIntervalEdit !== undefined && intervalValid && checkInterval !== otaConfig?.checkInterval
+  );
 
-  function saveDomain(e: SubmitEvent) {
+  let saving = $state(false);
+
+  async function saveDomain(e: SubmitEvent) {
     e.preventDefault();
-    setOtaDomain(cdnDomain);
+    if (!canSaveDomain || saving) return;
+    saving = true;
+    if (await setOtaDomain(cdnDomain.trim())) cdnDomainEdit = undefined;
+    saving = false;
   }
 
-  function setChannel(channel: string) {
-    setOtaChannel(channel);
-  }
-
-  function saveCheckInterval(e: SubmitEvent) {
+  async function saveCheckInterval(e: SubmitEvent) {
     e.preventDefault();
-    setOtaCheckInterval(checkInterval);
+    if (!canSaveInterval || saving) return;
+    saving = true;
+    if (await setOtaCheckInterval(checkInterval!)) checkIntervalEdit = undefined;
+    saving = false;
   }
 
-  function toggleBackendManagement() {
-    setOtaAllowBackendManagement(!otaConfig?.allowBackendManagement);
+  async function setChannel(channel: OtaUpdateChannel) {
+    if (saving || channel === otaConfig?.updateChannel) return;
+    saving = true;
+    await setOtaChannel(channel);
+    saving = false;
   }
 
-  function toggleManualApproval() {
-    setOtaRequireManualApproval(!otaConfig?.requireManualApproval);
-  }
-
-  function checkForUpdates() {
-    const channelName = channelToString(otaConfig?.updateChannel ?? OtaUpdateChannel.Stable);
-    checkOtaUpdates(channelName);
-  }
-
-  function channelToString(ch: OtaUpdateChannel): string {
-    switch (ch) {
-      case OtaUpdateChannel.Stable:
-        return 'stable';
-      case OtaUpdateChannel.Beta:
-        return 'beta';
-      case OtaUpdateChannel.Develop:
-        return 'develop';
-      default:
-        return 'stable';
-    }
+  async function checkForUpdates() {
+    if (saving) return;
+    saving = true;
+    await checkOtaUpdates(otaConfig?.updateChannel ?? OtaUpdateChannel.Stable);
+    saving = false;
   }
 </script>
 
 <div class="flex flex-col gap-4">
   <SectionHeader title="OTA Updates" description="Over-the-air firmware update settings." />
 
-  <div class="flex flex-col gap-4">
-    <!-- Enabled toggle -->
-    <label class="flex cursor-pointer items-center justify-between rounded-lg border p-3">
-      <div>
-        <p class="text-sm font-medium">OTA Updates Enabled</p>
-        <p class="text-muted-foreground text-xs">
-          Allow the hub to check for and install firmware updates.
-        </p>
-      </div>
-      <input
-        type="checkbox"
-        checked={otaConfig?.isEnabled ?? false}
-        onchange={toggleEnabled}
-        class="h-4 w-4"
+  <SettingSwitch
+    id="ota-enabled"
+    class="rounded-lg border p-3"
+    label="OTA Updates Enabled"
+    description="Allow the hub to check for and install firmware updates."
+    checked={otaConfig?.isEnabled ?? false}
+    onchange={otaConfig ? setOtaEnabled : undefined}
+  />
+
+  <div class="flex flex-col gap-2">
+    <Label for="ota-domain">CDN Domain</Label>
+    <form class="flex gap-2" onsubmit={saveDomain}>
+      <Input
+        id="ota-domain"
+        type="text"
+        bind:value={() => cdnDomain, (v) => (cdnDomainEdit = v)}
+        placeholder="cdn.openshock.app"
       />
-    </label>
-
-    <!-- CDN Domain -->
-    <div class="flex flex-col gap-2">
-      <Label for="ota-domain">CDN Domain</Label>
-      <form class="flex gap-2" onsubmit={saveDomain}>
-        <Input id="ota-domain" type="text" bind:value={cdnDomain} placeholder="cdn.openshock.app" />
-        <Button size="sm" variant="outline" type="submit">Save</Button>
-      </form>
-    </div>
-
-    <!-- Update Channel -->
-    <div class="flex flex-col gap-2">
-      <Label for="ota-channel">Update Channel</Label>
-      <div class="flex gap-2">
-        <Button
-          size="sm"
-          variant={otaConfig?.updateChannel === OtaUpdateChannel.Stable ? 'default' : 'outline'}
-          onclick={() => setChannel('stable')}
-        >
-          Stable
-        </Button>
-        <Button
-          size="sm"
-          variant={otaConfig?.updateChannel === OtaUpdateChannel.Beta ? 'default' : 'outline'}
-          onclick={() => setChannel('beta')}
-        >
-          Beta
-        </Button>
-        <Button
-          size="sm"
-          variant={otaConfig?.updateChannel === OtaUpdateChannel.Develop ? 'default' : 'outline'}
-          onclick={() => setChannel('develop')}
-        >
-          Develop
-        </Button>
-      </div>
-    </div>
-
-    <!-- Check Interval -->
-    <div class="flex flex-col gap-2">
-      <Label for="ota-interval">Check Interval (minutes)</Label>
-      <form class="flex gap-2" onsubmit={saveCheckInterval}>
-        <Input id="ota-interval" type="number" min={0} max={65535} bind:value={checkInterval} />
-        <Button size="sm" variant="outline" type="submit">Save</Button>
-      </form>
-    </div>
-
-    <!-- Backend Management toggle -->
-    <label class="flex cursor-pointer items-center justify-between rounded-lg border p-3">
-      <div>
-        <p class="text-sm font-medium">Allow Backend Management</p>
-        <p class="text-muted-foreground text-xs">Let the gateway server trigger updates.</p>
-      </div>
-      <input
-        type="checkbox"
-        checked={otaConfig?.allowBackendManagement ?? false}
-        onchange={toggleBackendManagement}
-        class="h-4 w-4"
-      />
-    </label>
-
-    <!-- Manual Approval toggle -->
-    <label class="flex cursor-pointer items-center justify-between rounded-lg border p-3">
-      <div>
-        <p class="text-sm font-medium">Require Manual Approval</p>
-        <p class="text-muted-foreground text-xs">Prompt before installing updates.</p>
-      </div>
-      <input
-        type="checkbox"
-        checked={otaConfig?.requireManualApproval ?? false}
-        onchange={toggleManualApproval}
-        class="h-4 w-4"
-      />
-    </label>
-
-    <!-- Check for Updates button -->
-    <Button onclick={checkForUpdates}>Check for Updates</Button>
+      <Button size="sm" variant="outline" type="submit" disabled={!canSaveDomain || saving}>
+        Save
+      </Button>
+    </form>
   </div>
+
+  <div class="flex flex-col gap-2">
+    <Label>Update Channel</Label>
+    <div class="flex gap-2" role="group" aria-label="Update channel">
+      {#each channels as channel (channel.value)}
+        {@const active = otaConfig?.updateChannel === channel.value}
+        <Button
+          size="sm"
+          variant={active ? 'default' : 'outline'}
+          aria-pressed={active}
+          disabled={!otaConfig || saving}
+          onclick={() => setChannel(channel.value)}
+        >
+          {channel.label}
+        </Button>
+      {/each}
+    </div>
+  </div>
+
+  <div class="flex flex-col gap-2">
+    <Label for="ota-interval">Check Interval (minutes)</Label>
+    <form class="flex gap-2" onsubmit={saveCheckInterval}>
+      <Input
+        id="ota-interval"
+        type="number"
+        min={0}
+        max={65535}
+        step={1}
+        aria-invalid={!intervalValid}
+        bind:value={() => checkInterval, (v) => (checkIntervalEdit = v)}
+      />
+      <Button size="sm" variant="outline" type="submit" disabled={!canSaveInterval || saving}>
+        Save
+      </Button>
+    </form>
+  </div>
+
+  <SettingSwitch
+    id="ota-backend-management"
+    class="rounded-lg border p-3"
+    label="Allow Backend Management"
+    description="Let the gateway server trigger updates."
+    checked={otaConfig?.allowBackendManagement ?? false}
+    onchange={otaConfig ? setOtaAllowBackendManagement : undefined}
+  />
+
+  <SettingSwitch
+    id="ota-manual-approval"
+    class="rounded-lg border p-3"
+    label="Require Manual Approval"
+    description="Prompt before installing updates."
+    checked={otaConfig?.requireManualApproval ?? false}
+    onchange={otaConfig ? setOtaRequireManualApproval : undefined}
+  />
+
+  <Button onclick={checkForUpdates} disabled={!otaConfig || saving}>Check for Updates</Button>
 </div>

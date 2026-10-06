@@ -2,11 +2,8 @@
   import { setRfTxPin, setEstopPin, setEstopEnabled } from '#lib/api.js';
   import GpioPinSelector from '#lib/components/GpioPinSelector.svelte';
   import SectionHeader from '#lib/components/SectionHeader.svelte';
+  import SettingSwitch from '#lib/components/SettingSwitch.svelte';
   import { hubState } from '#lib/stores/index.js';
-
-  async function toggleEstop() {
-    await setEstopEnabled(!(hubState.config?.estop?.enabled ?? false));
-  }
 </script>
 
 <div class="flex flex-col gap-4">
@@ -30,15 +27,13 @@
     <p class="text-muted-foreground mb-3 text-xs">
       The emergency stop pin provides a hardware kill switch for all shocker output.
     </p>
-    <label class="mb-3 flex cursor-pointer items-center justify-between">
-      <span class="text-sm font-medium">EStop Enabled</span>
-      <input
-        type="checkbox"
-        checked={hubState.config?.estop?.enabled ?? false}
-        onchange={toggleEstop}
-        class="h-4 w-4"
-      />
-    </label>
+    <SettingSwitch
+      id="estop-enabled"
+      class="mb-3"
+      label="EStop Enabled"
+      checked={hubState.config?.estop?.enabled ?? false}
+      onchange={hubState.config ? setEstopEnabled : undefined}
+    />
     <GpioPinSelector
       name="EStop Pin"
       currentPin={hubState.config?.estop?.gpioPin ?? null}
