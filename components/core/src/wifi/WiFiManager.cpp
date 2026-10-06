@@ -176,6 +176,18 @@ static bool getNextWiFiNetwork(OpenShock::Config::WiFiCredentials& creds)
   }) != s_wifiNetworks.end();
 }
 
+static bool getConnectedAPNetwork(WiFiNetwork& network, uint8_t credentialsId)
+{
+  wifi_ap_record_t apRecord;
+  if (esp_wifi_sta_get_ap_info(&apRecord) != ESP_OK) {
+    return false;
+  }
+
+  network = WiFiNetwork(&apRecord, credentialsId);
+
+  return true;
+}
+
 static bool connectWiFi(const std::string& ssid, const std::string& password, wifi_auth_mode_t expectedAuthMode = WIFI_AUTH_MAX, const uint8_t* pinnedBssid = nullptr)
 {
   if (ssid.empty()) {
@@ -268,9 +280,16 @@ static void evWiFiConnected(const wifi_event_sta_connected_t& info)
 
     OS_LOGW(TAG, "Connected to unscanned network \"%s\", BSSID: " BSSID_FMT, ssid, BSSID_ARG(info.bssid));
 
+    uint8_t credentialsId = 0;
     Config::WiFiCredentials creds;
     if (Config::TryGetWiFiCredentialsBySSID(ssid, creds)) {
-      s_connectedCredentialsID.store(creds.id, std::memory_order_relaxed);
+      credentialsId = creds.id;
+      s_connectedCredentialsID.store(credentialsId, std::memory_order_relaxed);
+    }
+
+    WiFiNetwork network;
+    if (getConnectedAPNetwork(network, credentialsId)) {
+      Serialization::Local::SerializeWiFiNetworkEvent(Serialization::Types::WifiNetworkEventType::Connected, network, CaptivePortal::BroadcastMessageBIN);
     }
 
     return;
@@ -720,36 +739,22 @@ bool WiFiManager::GetConnectedNetwork(OpenShock::WiFiNetwork& network)
 {
   uint8_t connectedId = s_connectedCredentialsID.load(std::memory_order_relaxed);
 
-  if (connectedId == 0) {
-    if (IsConnected()) {
-      // We connected without a scan, so populate the network with the current connection info manually
-      wifi_ap_record_t apInfo;
-      if (esp_wifi_sta_get_ap_info(&apInfo) != ESP_OK) {
-        return false;
-      }
+  if (connectedId != 0) {
+    ScopedLock lock__(&s_networksMutex);
 
-      network.credentialsID = 0;
-      size_t len            = std::min(strlen(reinterpret_cast<const char*>(apInfo.ssid)), sizeof(network.ssid) - 1);
-      memcpy(network.ssid, apInfo.ssid, len);
-      network.ssid[len] = '\0';
-      memcpy(network.bssid, apInfo.bssid, sizeof(network.bssid));
-      network.channel = apInfo.primary;
-      network.rssi    = apInfo.rssi;
+    auto it = findNetwork([connectedId](const WiFiNetwork& net) noexcept { return net.credentialsID == connectedId; });
+    if (it != s_wifiNetworks.end()) {
+      network = *it;
       return true;
     }
+  }
+
+  if (!IsConnected()) {
     return false;
   }
 
-  ScopedLock lock__(&s_networksMutex);
-
-  auto it = findNetwork([connectedId](const WiFiNetwork& net) noexcept { return net.credentialsID == connectedId; });
-  if (it == s_wifiNetworks.end()) {
-    return false;
-  }
-
-  network = *it;
-
-  return true;
+  // The connected network is not in the scan results (e.g. connected on boot before any scan), so query the AP directly
+  return getConnectedAPNetwork(network, connectedId);
 }
 
 bool WiFiManager::GetIPAddress(char* ipAddress)

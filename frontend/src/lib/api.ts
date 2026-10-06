@@ -1,5 +1,7 @@
-import { hubState } from '$lib/stores';
-import { getApiBaseUrl } from '$lib/utils/localRedirect';
+import { OtaUpdateChannel } from '#lib/_fbs/open-shock/serialization/configuration/ota-update-channel.js';
+import type { OtaUpdateConfig } from '#lib/mappers/ConfigMapper.js';
+import { hubState } from '#lib/stores/index.js';
+import { getApiBaseUrl } from '#lib/utils/localRedirect.js';
 import { toast } from 'svelte-sonner';
 
 function apiFetch(path: string, init?: RequestInit): Promise<Response> {
@@ -198,7 +200,7 @@ export async function saveWifiNetwork(
   password: string | null,
   connect: boolean,
   security?: number
-): Promise<void> {
+): Promise<boolean> {
   try {
     const params = new URLSearchParams({ ssid, connect: connect ? '1' : '0' });
     if (password) params.set('password', password);
@@ -210,9 +212,12 @@ export async function saveWifiNetwork(
     });
     if (!res.ok) {
       toast.error('Failed to save WiFi network: ' + (await getErrorMessage(res)));
+      return false;
     }
+    return true;
   } catch {
     toast.error('Failed to save WiFi network');
+    return false;
   }
 }
 
@@ -244,62 +249,92 @@ export async function disconnectWifiNetwork(): Promise<void> {
 
 // OTA
 
-export async function setOtaEnabled(enabled: boolean): Promise<void> {
+const _otaChannelNames: Record<OtaUpdateChannel, string> = {
+  [OtaUpdateChannel.Stable]: 'stable',
+  [OtaUpdateChannel.Beta]: 'beta',
+  [OtaUpdateChannel.Develop]: 'develop',
+};
+
+// On success the change is mirrored into hubState.config, which is otherwise only sent once on
+// connect, so the controls reflect what the hub stored.
+async function otaRequest(
+  path: string,
+  method: 'PUT' | 'POST',
+  failure: string,
+  patch?: Partial<OtaUpdateConfig>
+): Promise<boolean> {
   try {
-    await apiFetch(`/api/ota/enabled?enabled=${enabled ? '1' : '0'}`, { method: 'PUT' });
+    const res = await apiFetch('/api/ota/' + path, { method });
+    if (!res.ok) {
+      toast.error(failure + ': ' + (await getErrorMessage(res)));
+      return false;
+    }
+    if (patch && hubState.config) Object.assign(hubState.config.otaUpdate, patch);
+    return true;
   } catch {
-    toast.error('Failed to update OTA setting');
+    toast.error(failure);
+    return false;
   }
 }
 
-export async function setOtaDomain(domain: string): Promise<void> {
-  try {
-    await apiFetch(`/api/ota/domain?` + new URLSearchParams({ domain }), { method: 'PUT' });
-  } catch {
-    toast.error('Failed to update OTA domain');
-  }
+export function setOtaEnabled(isEnabled: boolean): Promise<boolean> {
+  return otaRequest(
+    `enabled?enabled=${isEnabled ? '1' : '0'}`,
+    'PUT',
+    'Failed to update OTA setting',
+    { isEnabled }
+  );
 }
 
-export async function setOtaChannel(channel: string): Promise<void> {
-  try {
-    await apiFetch(`/api/ota/channel?` + new URLSearchParams({ channel }), { method: 'PUT' });
-  } catch {
-    toast.error('Failed to update OTA channel');
-  }
+export function setOtaDomain(cdnDomain: string): Promise<boolean> {
+  return otaRequest(
+    'domain?' + new URLSearchParams({ domain: cdnDomain }),
+    'PUT',
+    'Failed to update OTA domain',
+    { cdnDomain }
+  );
 }
 
-export async function setOtaCheckInterval(interval: number): Promise<void> {
-  try {
-    await apiFetch(`/api/ota/check-interval?interval=${interval}`, { method: 'PUT' });
-  } catch {
-    toast.error('Failed to update OTA check interval');
-  }
+export function setOtaChannel(updateChannel: OtaUpdateChannel): Promise<boolean> {
+  return otaRequest(
+    'channel?' + new URLSearchParams({ channel: _otaChannelNames[updateChannel] }),
+    'PUT',
+    'Failed to update OTA channel',
+    { updateChannel }
+  );
 }
 
-export async function setOtaAllowBackendManagement(allow: boolean): Promise<void> {
-  try {
-    await apiFetch(`/api/ota/allow-backend-management?allow=${allow ? '1' : '0'}`, {
-      method: 'PUT',
-    });
-  } catch {
-    toast.error('Failed to update OTA backend management setting');
-  }
+export function setOtaCheckInterval(checkInterval: number): Promise<boolean> {
+  return otaRequest(
+    `check-interval?interval=${checkInterval}`,
+    'PUT',
+    'Failed to update OTA check interval',
+    { checkInterval }
+  );
 }
 
-export async function setOtaRequireManualApproval(require: boolean): Promise<void> {
-  try {
-    await apiFetch(`/api/ota/require-manual-approval?require=${require ? '1' : '0'}`, {
-      method: 'PUT',
-    });
-  } catch {
-    toast.error('Failed to update OTA manual approval setting');
-  }
+export function setOtaAllowBackendManagement(allowBackendManagement: boolean): Promise<boolean> {
+  return otaRequest(
+    `allow-backend-management?allow=${allowBackendManagement ? '1' : '0'}`,
+    'PUT',
+    'Failed to update OTA backend management setting',
+    { allowBackendManagement }
+  );
 }
 
-export async function checkOtaUpdates(channel: string): Promise<void> {
-  try {
-    await apiFetch(`/api/ota/check?` + new URLSearchParams({ channel }), { method: 'POST' });
-  } catch {
-    toast.error('Failed to check for OTA updates');
-  }
+export function setOtaRequireManualApproval(requireManualApproval: boolean): Promise<boolean> {
+  return otaRequest(
+    `require-manual-approval?require=${requireManualApproval ? '1' : '0'}`,
+    'PUT',
+    'Failed to update OTA manual approval setting',
+    { requireManualApproval }
+  );
+}
+
+export function checkOtaUpdates(channel: OtaUpdateChannel): Promise<boolean> {
+  return otaRequest(
+    'check?' + new URLSearchParams({ channel: _otaChannelNames[channel] }),
+    'POST',
+    'Failed to check for OTA updates'
+  );
 }

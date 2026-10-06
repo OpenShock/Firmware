@@ -7,9 +7,9 @@ allowBuilds:
 blockExoticSubdeps: true
 minimumReleaseAge: 4320 # 3 days
 
+minimumReleaseAgeExcludePrune: true
 minimumReleaseAgeExclude:
   - '@openshock/*'
-  - cookie@0.7.0
 
 onlyBuiltDependencies:
   - '@tailwindcss/oxide'

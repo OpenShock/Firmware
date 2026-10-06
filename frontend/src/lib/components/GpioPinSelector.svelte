@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { hubState, usedPins } from '$lib/stores';
+  import { hubState, usedPins } from '#lib/stores/index.js';
   import { Button } from '@openshock/svelte-core/components/ui/button';
   import { Input } from '@openshock/svelte-core/components/ui/input';
 
@@ -53,27 +53,27 @@
     }
   });
 
-  async function setGpioPin() {
-    if (!canSet) return;
+  let saving = $state(false);
+
+  async function setGpioPin(e: SubmitEvent) {
+    e.preventDefault();
+    if (!canSet || saving) return;
+    saving = true;
     const success = await setter(pendingPin!);
+    saving = false;
     if (success) {
       pendingPin = null;
     }
   }
 </script>
 
-<div class="flex flex-col space-y-2">
-  <div class="flex flex-row items-center space-x-2">
-    <h4 class="scroll-m-20 text-xl font-semibold tracking-tight">{name}</h4>
+<div class="flex flex-col gap-2">
+  <div class="flex flex-row items-center gap-2">
+    <h2 class="text-sm font-medium">{name}</h2>
     <p class="text-muted-foreground text-sm">{statusText}</p>
   </div>
-  <div class="flex space-x-2">
-    <Input
-      class="input variant-form-material"
-      type="number"
-      placeholder="GPIO Pin"
-      bind:value={pendingPin}
-    />
-    <Button onclick={setGpioPin} disabled={!canSet}>Set</Button>
-  </div>
+  <form class="flex gap-2" onsubmit={setGpioPin}>
+    <Input type="number" placeholder="GPIO Pin" bind:value={pendingPin} />
+    <Button variant="outline" type="submit" disabled={!canSet || saving}>Set</Button>
+  </form>
 </div>

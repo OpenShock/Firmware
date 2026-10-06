@@ -1,16 +1,18 @@
 <script lang="ts">
-  import { WebSocketClient } from '$lib/WebSocketClient';
+  import { WebSocketClient } from '#lib/WebSocketClient.js';
+  import SectionHeader from '#lib/components/SectionHeader.svelte';
   import { Button } from '@openshock/svelte-core/components/ui/button';
   import { Input } from '@openshock/svelte-core/components/ui/input';
   import { Label } from '@openshock/svelte-core/components/ui/label';
   import { Zap } from '@lucide/svelte';
+  import { toast } from 'svelte-sonner';
   import { Builder as FlatbufferBuilder } from 'flatbuffers';
-  import { LocalToHubMessage } from '$lib/_fbs/open-shock/serialization/local/local-to-hub-message';
-  import { LocalToHubMessagePayload } from '$lib/_fbs/open-shock/serialization/local/local-to-hub-message-payload';
-  import { ShockerCommandList } from '$lib/_fbs/open-shock/serialization/common/shocker-command-list';
-  import { ShockerCommand } from '$lib/_fbs/open-shock/serialization/common/shocker-command';
-  import { ShockerModelType } from '$lib/_fbs/open-shock/serialization/types/shocker-model-type';
-  import { ShockerCommandType } from '$lib/_fbs/open-shock/serialization/types/shocker-command-type';
+  import { LocalToHubMessage } from '#lib/_fbs/open-shock/serialization/local/local-to-hub-message.js';
+  import { LocalToHubMessagePayload } from '#lib/_fbs/open-shock/serialization/local/local-to-hub-message-payload.js';
+  import { ShockerCommandList } from '#lib/_fbs/open-shock/serialization/common/shocker-command-list.js';
+  import { ShockerCommand } from '#lib/_fbs/open-shock/serialization/common/shocker-command.js';
+  import { ShockerModelType } from '#lib/_fbs/open-shock/serialization/types/shocker-model-type.js';
+  import { ShockerCommandType } from '#lib/_fbs/open-shock/serialization/types/shocker-command-type.js';
 
   const modelOptions = [
     { value: ShockerModelType.CaiXianlin, label: 'CaiXianlin' },
@@ -19,14 +21,16 @@
     { value: ShockerModelType.WellturnT330, label: 'Wellturn T330' },
   ];
 
-  let shockerId = $state(12345);
+  // A cleared number input binds null.
+  let shockerId = $state<number | null>(12345);
   let model = $state(ShockerModelType.CaiXianlin);
   let testing = $state(false);
-  let validId = $derived(shockerId >= 0 && shockerId <= 65535);
+  let validId = $derived(
+    shockerId !== null && Number.isInteger(shockerId) && shockerId >= 0 && shockerId <= 65535
+  );
 
   function sendTestVibrate() {
-    if (!validId) return;
-    testing = true;
+    if (!validId || shockerId === null) return;
 
     const fbb = new FlatbufferBuilder(128);
 
@@ -48,26 +52,28 @@
     );
 
     fbb.finish(msgOffset);
-    WebSocketClient.Instance.Send(new Uint8Array(fbb.asUint8Array()));
+    if (!WebSocketClient.Instance.Send(new Uint8Array(fbb.asUint8Array()))) {
+      toast.error('Not connected to the hub, test command was not sent');
+      return;
+    }
 
+    testing = true;
     setTimeout(() => (testing = false), 1500);
   }
 </script>
 
 <div class="flex flex-col gap-4">
-  <div>
-    <h3 class="text-lg font-semibold">Test Shocker</h3>
-    <p class="text-muted-foreground text-sm">
-      Verify your shocker is working by sending a test vibration.
-    </p>
-  </div>
+  <SectionHeader
+    title="Test Shocker"
+    description="Verify your shocker is working by sending a test vibration."
+  />
 
   <div class="flex flex-col gap-3">
     <div class="flex flex-row items-center gap-4">
       <Label for="shocker-model" class="w-20 text-right">Model</Label>
       <select
         id="shocker-model"
-        class="border-input bg-background ring-offset-background focus-visible:ring-ring flex h-10 w-full flex-1 rounded-md border px-3 py-2 text-sm focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:outline-none"
+        class="border-input focus-visible:border-ring focus-visible:ring-ring/50 dark:bg-input/30 h-8 w-full flex-1 rounded-lg border bg-transparent px-2.5 text-sm outline-none focus-visible:ring-3"
         bind:value={model}
       >
         {#each modelOptions as opt (opt.value)}
@@ -84,9 +90,10 @@
         min={0}
         max={65535}
         class="flex-1"
+        aria-invalid={!validId}
         bind:value={shockerId}
         onblur={() => {
-          shockerId = Math.max(0, Math.min(65535, Math.floor(shockerId)));
+          if (shockerId !== null) shockerId = Math.max(0, Math.min(65535, Math.floor(shockerId)));
         }}
       />
     </div>
@@ -97,8 +104,8 @@
     {testing ? 'Testing...' : 'Test Vibrate (50%)'}
   </Button>
 
-  <div class="rounded-lg border border-blue-500/30 bg-blue-500/10 p-3">
-    <p class="text-xs text-blue-700 dark:text-blue-300">
+  <div class="border-info/30 bg-info/10 rounded-lg border p-3">
+    <p class="text-xs">
       If the shocker doesn't respond, try re-pairing it: hold the power button on the shocker until
       it beeps, then press Test again.
     </p>

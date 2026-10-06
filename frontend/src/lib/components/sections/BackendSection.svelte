@@ -1,5 +1,6 @@
 <script lang="ts">
-  import { hubState } from '$lib/stores';
+  import SectionHeader from '#lib/components/SectionHeader.svelte';
+  import { hubState } from '#lib/stores/index.js';
   import { Input } from '@openshock/svelte-core/components/ui/input';
   import { Label } from '@openshock/svelte-core/components/ui/label';
 
@@ -12,10 +13,7 @@
 </script>
 
 <div class="flex flex-col gap-4">
-  <div>
-    <h3 class="text-lg font-semibold">Backend</h3>
-    <p class="text-muted-foreground text-sm">Gateway server configuration.</p>
-  </div>
+  <SectionHeader title="Backend" description="Gateway server configuration." />
 
   <div class="flex flex-col gap-2">
     <Label for="backend-domain">Domain</Label>
