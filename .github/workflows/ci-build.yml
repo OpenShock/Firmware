@@ -29,11 +29,11 @@ on:
         default: dev
         options: [dev, prod]
       channel:
-        description: 'Channel to publish onto'
+        description: 'Channel to publish onto (derive = the channel the ref maps to)'
         required: false
         type: choice
-        default: develop
-        options: [develop, beta, stable]
+        default: derive
+        options: [derive, develop, beta, stable]
       nightly:
         description: 'Run as the nightly build of this branch (set by nightly.yml): skip when no firmware sources changed; server and channel are ignored'
         required: false
@@ -103,7 +103,7 @@ jobs:
     uses: ./.github/workflows/get-vars.yml
     # Set only on a manual dispatch; empty otherwise, nightlies included, so get-vars derives the channel from the ref.
     with:
-      channel: ${{ !inputs.nightly && inputs.channel || '' }}
+      channel: ${{ !inputs.nightly && inputs.channel != 'derive' && inputs.channel || '' }}
       boards: ${{ needs.gate.outputs.boards }}
 
   # Opens the release the moment get-vars has settled what this run is, before anything is built.

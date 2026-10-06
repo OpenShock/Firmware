@@ -64,3 +64,10 @@ CONFIG_MBEDTLS_CUSTOM_CERTIFICATE_BUNDLE_PATH="certificates/cacert-merged.pem"
 # bootloader built with this option; devices that only receive OTA app updates keep
 # their old bootloader and boot new images without the verify step.
 CONFIG_BOOTLOADER_APP_ROLLBACK_ENABLE=y
+
+# Parse JSON as RFC 8259 only. In lenient mode jsmn accepts input like {a:1} or {"x":{"a"},"b":1} and the
+# navigation code can then return the wrong value for a key.
+CONFIG_JSMN_STRICT=y
+
+# Keep crash dumps in the (otherwise unused) coredump partition so field crashes can be read back over serial.
+CONFIG_ESP_COREDUMP_ENABLE_TO_FLASH=y

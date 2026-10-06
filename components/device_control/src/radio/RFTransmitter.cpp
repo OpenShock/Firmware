@@ -118,7 +118,7 @@ bool RFTransmitter::SendCommand(ShockerModelType model, uint16_t shockerId, Shoc
     durationMs        = 300;
     overwriteExisting = true;
   } else {
-    OS_LOGD(TAG, "Command received: %u %u %u %u", model, shockerId, type, intensity);
+    OS_LOGD(TAG, "Command received: %u %u %u %u", static_cast<unsigned>(model), shockerId, static_cast<unsigned>(type), intensity);
   }
 
   Command cmd = Command {.transmitEnd = OpenShock::millis() + durationMs, .modelType = model, .type = type, .shockerId = shockerId, .intensity = intensity, .flags = overwriteExisting ? kFlagOverwrite : (uint8_t)0};

@@ -46,6 +46,7 @@ static constexpr size_t MAX_WS_MSG = 8 * 1024;
 static constexpr const char* S200 = "200 OK";
 static constexpr const char* S304 = "304 Not Modified";
 static constexpr const char* S400 = "400 Bad Request";
+static constexpr const char* S403 = "403 Forbidden";
 static constexpr const char* S429 = "429 Too Many Requests";
 static constexpr const char* S500 = "500 Internal Server Error";
 static constexpr const char* S503 = "503 Service Unavailable";
@@ -61,6 +62,7 @@ static const char* const JSON_ERR_PASSWORD_LONG   = "{\"error\":\"PasswordTooLon
 static const char* const JSON_ERR_CODE_REQUIRED   = "{\"error\":\"CodeRequired\"}";
 static const char* const JSON_ERR_INVALID_CHANNEL = "{\"error\":\"InvalidChannel\"}";
 static const char* const JSON_ERR_RATE_LIMITED    = "{\"error\":\"RateLimited\"}";
+static const char* const JSON_ERR_ESTOP_PROTECTED = "{\"error\":\"EStopProtected\"}";
 
 using namespace OpenShock;
 
@@ -401,6 +403,14 @@ static esp_err_t apiConfigEstopPin(httpd_req_t* req)
   if (!Convert::ToGpioNum(pinStr, pin) || !IsValidInputPin(pin)) {
     return sendResp(req, S400, HTTP::ContentType::JSON, JSON_ERR_INVALID_PIN);
   }
+  // The portal is unauthenticated: while the E-Stop is enabled, only the serial console may move it to another pin.
+  bool estopEnabled = false;
+  if (!Config::GetEStopEnabled(estopEnabled)) {
+    return sendResp(req, S500, HTTP::ContentType::JSON, JSON_ERR_INTERNAL);
+  }
+  if (estopEnabled) {
+    return sendResp(req, S403, HTTP::ContentType::JSON, JSON_ERR_ESTOP_PROTECTED);
+  }
   if (!EStopManager::SetEStopPin(pin) || !Config::SetEStopGpioPin(pin)) {
     return sendResp(req, S500, HTTP::ContentType::JSON, JSON_ERR_INTERNAL);
   }
@@ -418,6 +428,10 @@ static esp_err_t apiConfigEstopEnabled(httpd_req_t* req)
   bool enabled;
   if (auto result = getBoolQueryParam(req, "enabled", enabled); result != ParamResult::Ok) {
     return sendParamError(req, result);
+  }
+  // The portal is unauthenticated: it may turn the E-Stop on, but only the serial console may turn it off.
+  if (!enabled) {
+    return sendResp(req, S403, HTTP::ContentType::JSON, JSON_ERR_ESTOP_PROTECTED);
   }
   bool success = EStopManager::SetEStopEnabled(enabled) && Config::SetEStopEnabled(enabled);
   if (success) {
@@ -500,23 +514,6 @@ static esp_err_t apiOtaEnabled(httpd_req_t* req)
     return sendResp(req, S500, HTTP::ContentType::JSON, JSON_ERR_INTERNAL);
   }
   cfg.isEnabled = enabled;
-  if (!Config::SetOtaUpdateConfig(cfg)) {
-    return sendResp(req, S500, HTTP::ContentType::JSON, JSON_ERR_INTERNAL);
-  }
-  return sendResp(req, S200, nullptr, {});
-}
-
-static esp_err_t apiOtaDomain(httpd_req_t* req)
-{
-  std::string domain;
-  if (!getQueryParam(req, "domain", domain)) {
-    return sendResp(req, S400, HTTP::ContentType::JSON, JSON_ERR_MISSING_PARAM);
-  }
-  Config::OtaUpdateConfig cfg;
-  if (!Config::GetOtaUpdateConfig(cfg)) {
-    return sendResp(req, S500, HTTP::ContentType::JSON, JSON_ERR_INTERNAL);
-  }
-  cfg.cdnDomain = domain;
   if (!Config::SetOtaUpdateConfig(cfg)) {
     return sendResp(req, S500, HTTP::ContentType::JSON, JSON_ERR_INTERNAL);
   }
@@ -1070,7 +1067,8 @@ void CaptivePortal::CaptivePortalInstance::registerHandlers()
   reg("/api/config/estop/pin", HTTP_PUT, apiConfigEstopPin);
   reg("/api/config/estop/enabled", HTTP_PUT, apiConfigEstopEnabled);
   reg("/api/ota/enabled", HTTP_PUT, apiOtaEnabled);
-  reg("/api/ota/domain", HTTP_PUT, apiOtaDomain);
+  // No /api/ota/domain: the portal is an open, unauthenticated AP, and OTA trusts the hashes served by that domain, so
+  // changing it would let anyone in range install firmware. It can only be changed over serial (jsonconfig).
   reg("/api/ota/channel", HTTP_PUT, apiOtaChannel);
   reg("/api/ota/check-interval", HTTP_PUT, apiOtaCheckInterval);
   reg("/api/ota/allow-backend-management", HTTP_PUT, apiOtaAllowBackendManagement);

@@ -250,6 +250,25 @@ TEST_CASE("An unknown OTA channel in JSON falls back to the default, not the run
   TEST_ASSERT_EQUAL_UINT8(static_cast<uint8_t>(OtaUpdateStep::None), static_cast<uint8_t>(loaded.otaUpdate.updateStep));
 }
 
+TEST_CASE("Schema fields the firmware does not model are dropped on save", "[config][corrupt]")
+{
+  // estop.active / estop.latching (and wifi AP/LAN fields) exist in the schema but nothing in the firmware reads
+  // them, so they are intentionally not round-tripped. This pins that behaviour.
+  namespace Fbs = Serialization::Configuration;
+  flatbuffers::FlatBufferBuilder builder;
+  auto estop = Fbs::CreateEStopConfig(builder, false, -1, /*active=*/true, /*latching=*/true);
+  Fbs::FinishHubConfigBuffer(builder, Fbs::CreateHubConfig(builder, 0, 0, 0, 0, 0, 0, estop));
+  TEST_ASSERT_TRUE(InitFrom(builder.GetBufferPointer(), builder.GetSize()));
+
+  TEST_ASSERT_TRUE(Config::SetSerialInputConfigEchoEnabled(false));  // any save rewrites the file
+
+  const std::vector<uint8_t> stored = StoredFile();
+  const auto* root                  = Fbs::GetHubConfig(stored.data());
+  TEST_ASSERT_NOT_NULL(root->estop());
+  TEST_ASSERT_FALSE(root->estop()->active());
+  TEST_ASSERT_FALSE(root->estop()->latching());
+}
+
 TEST_CASE("RemoveWiFiCredentials reports unknown IDs", "[config]")
 {
   InitDefault();

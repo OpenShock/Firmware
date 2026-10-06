@@ -5,6 +5,7 @@
 #include <hal/gpio_types.h>
 
 namespace OpenShock::Config {
+  // The schema's `active` and `latching` fields are not modelled: nothing reads them, so they are dropped on save.
   struct EStopConfig : public ConfigBase<Serialization::Configuration::EStopConfig> {
     EStopConfig();
     EStopConfig(bool enabled, gpio_num_t gpioPin);

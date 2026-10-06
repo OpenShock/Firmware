@@ -14,7 +14,7 @@
 // esp_ota_ops / esp_system / freertos, so this header is firmware-only (host tests
 // shadow it with a no-op stub).
 // Named distinctly from the framework's own log_printf to avoid a symbol clash.
-extern "C" int openshock_log_printf(const char* fmt, ...);
+extern "C" int openshock_log_printf(const char* fmt, ...) __attribute__((format(printf, 1, 2)));
 
 template<std::size_t N>
 constexpr const char* openshockPathToFileName(const char (&path)[N])
@@ -36,7 +36,7 @@ constexpr const char* openshockPathToFileName(const char (&path)[N])
 #define OPENSHOCK_LOG_LEVEL_DEBUG   (4)
 #define OPENSHOCK_LOG_LEVEL_VERBOSE (5)
 
-#define OPENSHOCK_LOG_FORMAT(letter, format) "[%lli][" #letter "][%s:%u] %s(): " format "\r\n", OpenShock::millis(), openshockPathToFileName(__FILE__), __LINE__, __FUNCTION__
+#define OPENSHOCK_LOG_FORMAT(letter, format) "[%lli][" #letter "][%s:%d] %s(): " format "\r\n", OpenShock::millis(), openshockPathToFileName(__FILE__), __LINE__, __FUNCTION__
 
 #if OPENSHOCK_LOG_LEVEL >= OPENSHOCK_LOG_LEVEL_VERBOSE
 #define OS_LOGV(TAG, format, ...) openshock_log_printf(OPENSHOCK_LOG_FORMAT(V, "[%s] " format), TAG, ##__VA_ARGS__)

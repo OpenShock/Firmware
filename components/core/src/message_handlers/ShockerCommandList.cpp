@@ -19,7 +19,7 @@ void OpenShock::MessageHandlers::HandleShockerCommandList(const OpenShock::Seria
     return;
   }
 
-  OS_LOGV(TAG, "Received command list (%u commands)", commands->size());
+  OS_LOGV(TAG, "Received command list (%u commands)", static_cast<unsigned>(commands->size()));
 
   for (auto command : *commands) {
     uint16_t id                   = command->id();

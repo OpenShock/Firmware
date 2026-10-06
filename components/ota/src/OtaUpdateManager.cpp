@@ -74,7 +74,7 @@ static bool otaum_try_notify_task(uint32_t eventFlag)
   }
 
   if (xTaskNotify(_taskHandle, eventFlag, eSetBits) != pdPASS) {
-    OS_LOGE(TAG, "Failed to notify OTA task (event: 0x%08x)", eventFlag);
+    OS_LOGE(TAG, "Failed to notify OTA task (event: 0x%08x)", static_cast<unsigned>(eventFlag));
     return false;
   }
 

@@ -4,6 +4,10 @@
   import SectionHeader from '#lib/components/SectionHeader.svelte';
   import SettingSwitch from '#lib/components/SettingSwitch.svelte';
   import { hubState } from '#lib/stores/index.js';
+
+  // The portal can turn the E-Stop on, but turning it off or moving it is serial-only (the portal is unauthenticated)
+  let estopEnabled = $derived(hubState.config?.estop?.enabled ?? false);
+  const estopLockedReason = 'Use the serial console to disable the E-Stop or change its pin.';
 </script>
 
 <div class="flex flex-col gap-4">
@@ -33,14 +37,16 @@
         id="estop-enabled"
         class="mb-3"
         label="EStop Enabled"
-        checked={hubState.config?.estop?.enabled ?? false}
-        onchange={hubState.config ? setEstopEnabled : undefined}
+        description={estopEnabled ? estopLockedReason : undefined}
+        checked={estopEnabled}
+        onchange={hubState.config && !estopEnabled ? setEstopEnabled : undefined}
       />
       <GpioPinSelector
         name="EStop Pin"
         currentPin={hubState.config?.estop?.gpioPin ?? null}
         validPins={hubState.gpioValidInputs}
         setter={setEstopPin}
+        lockedReason={estopEnabled ? estopLockedReason : undefined}
       />
     </div>
   </div>

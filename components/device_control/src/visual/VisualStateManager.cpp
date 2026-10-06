@@ -356,7 +356,7 @@ static void handleOpenShockEvent(void* event_handler_arg, esp_event_base_t event
       // WiFi state is tracked from the IDF WIFI_EVENT/IP_EVENT handlers above.
       return;
     default:
-      OS_LOGW(TAG, "Received unknown event ID: %i", event_id);
+      OS_LOGW(TAG, "Received unknown event ID: %d", static_cast<int>(event_id));
       return;
   }
 

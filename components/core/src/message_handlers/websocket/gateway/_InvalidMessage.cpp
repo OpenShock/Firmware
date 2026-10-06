@@ -13,5 +13,5 @@ void _Private::HandleInvalidMessage(const OpenShock::Serialization::Gateway::Gat
     return;
   }
 
-  OS_LOGE(TAG, "Invalid message type: %u", root->payload_type());
+  OS_LOGE(TAG, "Invalid message type: %u", static_cast<unsigned>(root->payload_type()));
 }

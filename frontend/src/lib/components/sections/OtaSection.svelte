@@ -5,7 +5,6 @@
   import { OtaUpdateChannel } from '#lib/_fbs/open-shock/serialization/configuration/ota-update-channel.js';
   import {
     setOtaEnabled,
-    setOtaDomain,
     setOtaChannel,
     setOtaCheckInterval,
     setOtaAllowBackendManagement,
@@ -25,21 +24,12 @@
   let otaConfig = $derived(hubState.config?.otaUpdate);
 
   // Unsaved edits; undefined shows the hub's stored value. A cleared number input binds null.
-  let cdnDomainEdit = $state<string | undefined>();
   let checkIntervalEdit = $state<number | null | undefined>();
 
-  let cdnDomain = $derived(
-    cdnDomainEdit !== undefined ? cdnDomainEdit : (otaConfig?.cdnDomain ?? '')
-  );
   let checkInterval = $derived(
     checkIntervalEdit !== undefined ? checkIntervalEdit : (otaConfig?.checkInterval ?? 0)
   );
 
-  let canSaveDomain = $derived(
-    cdnDomainEdit !== undefined &&
-      cdnDomain.trim().length > 0 &&
-      cdnDomain.trim() !== otaConfig?.cdnDomain
-  );
   let intervalValid = $derived(
     checkInterval !== null &&
       Number.isInteger(checkInterval) &&
@@ -51,14 +41,6 @@
   );
 
   let saving = $state(false);
-
-  async function saveDomain(e: SubmitEvent) {
-    e.preventDefault();
-    if (!canSaveDomain || saving) return;
-    saving = true;
-    if (await setOtaDomain(cdnDomain.trim())) cdnDomainEdit = undefined;
-    saving = false;
-  }
 
   async function saveCheckInterval(e: SubmitEvent) {
     e.preventDefault();
@@ -97,17 +79,10 @@
 
   <div class="flex flex-col gap-2">
     <Label for="ota-domain">CDN Domain</Label>
-    <form class="flex gap-2" onsubmit={saveDomain}>
-      <Input
-        id="ota-domain"
-        type="text"
-        bind:value={() => cdnDomain, (v) => (cdnDomainEdit = v)}
-        placeholder="cdn.openshock.app"
-      />
-      <Button size="sm" variant="outline" type="submit" disabled={!canSaveDomain || saving}>
-        Save
-      </Button>
-    </form>
+    <Input id="ota-domain" type="text" value={otaConfig?.cdnDomain ?? ''} readonly />
+    <p class="text-muted-foreground text-xs">
+      Firmware is downloaded from this domain, so it can only be changed over the serial console.
+    </p>
   </div>
 
   <div class="flex flex-col gap-2">

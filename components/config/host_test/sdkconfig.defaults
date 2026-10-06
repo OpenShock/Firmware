@@ -17,3 +17,6 @@ CONFIG_PARTITION_TABLE_CUSTOM_FILENAME="../../../partitions/ota_4mb.csv"
 # the target; x86-64 frames (flatbuffers builders, std::string, Unity) need more.
 # Keep it modest so unbounded recursion still overflows here rather than hiding.
 CONFIG_ESP_MAIN_TASK_STACK_SIZE=32768
+
+# Match the firmware's sdkconfig.defaults
+CONFIG_JSMN_STRICT=y

@@ -43,7 +43,7 @@ inline static bool fillSequenceImpl(rmt_symbol_word_t* data, ShockerModelType mo
     case ShockerModelType::D80:
       return Rmt::D80Encoder::FillBuffer(data, shockerId, commandType, intensity);
     default:
-      OS_LOGE(TAG, "Unknown shocker model: %u", modelType);
+      OS_LOGE(TAG, "Unknown shocker model: %u", static_cast<unsigned>(modelType));
       return false;
   }
 }

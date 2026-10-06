@@ -21,7 +21,10 @@ API = 'https://api.github.com'
 API_VERSION = '2026-03-10'
 # The branch each channel is cut from.
 # develop is absent because the nightly is already the only thing publishing it, and a tag is not required to descend from it.
-CHANNEL_BRANCH = {'stable': 'master', 'beta': 'beta'}
+# Branch a commit must be contained in to publish to the channel on prod.
+CHANNEL_BRANCH = {'stable': 'master', 'beta': 'beta', 'develop': 'develop'}
+# Channels whose prod publishes also need a staged draft release (develop builds have no release).
+DRAFT_CHANNELS = ('stable', 'beta')
 
 DRAFT_ATTEMPTS = 12
 DRAFT_INTERVAL = 5
@@ -97,8 +100,11 @@ def main() -> int:
         notice('Publishing to dev, so none of the production rules apply.')
         return 0
 
-    if channel in CHANNEL_BRANCH:
-        require_branch_contains(repo, channel, sha)
+    if channel not in CHANNEL_BRANCH:
+        fail(f'Channel "{channel}" has no publishing rules for prod.')
+
+    require_branch_contains(repo, channel, sha)
+    if channel in DRAFT_CHANNELS:
         require_staged_draft(repo, version)
 
     return 0

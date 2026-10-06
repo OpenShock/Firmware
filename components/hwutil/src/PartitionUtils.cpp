@@ -96,7 +96,7 @@ bool OpenShock::FlashPartitionFromUrl(HTTP::Client& client, const esp_partition_
   }
 
   if (progressCallback) progressCallback(contentLength, contentLength, 1.0f);
-  OS_LOGD(TAG, "Wrote %u bytes to partition", appBinaryResponse.data);
+  OS_LOGD(TAG, "Wrote %zu bytes to partition", appBinaryResponse.data);
 
   std::array<uint8_t, 32> localHash;
   if (!sha256.finish(localHash)) {

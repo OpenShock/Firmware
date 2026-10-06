@@ -289,7 +289,7 @@ static bool FetchHubInfo(std::string authToken)
   OS_LOGI(TAG, "Hub Name: %s", response.data.hubName.c_str());
   OS_LOGI(TAG, "Shockers:");
   for (auto& shocker : response.data.shockers) {
-    OS_LOGI(TAG, "  [%s] rf=%u model=%u", shocker.id.c_str(), shocker.rfId, shocker.model);
+    OS_LOGI(TAG, "  [%s] rf=%u model=%u", shocker.id.c_str(), shocker.rfId, static_cast<unsigned>(shocker.model));
   }
 
   return true;

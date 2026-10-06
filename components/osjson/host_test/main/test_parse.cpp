@@ -131,3 +131,18 @@ TEST_CASE("parse: source buffer must outlive the document (zero-copy contract)",
   TEST_ASSERT_TRUE(sv.data() >= src.data() && sv.data() < src.data() + src.size());
   TEST_ASSERT_TRUE(sv == "value");
 }
+
+TEST_CASE("parse: structurally invalid JSON is rejected (CONFIG_JSMN_STRICT)", "[osjson][parse]")
+{
+  const char* inputs[] = {
+    R"({a:1})",              // unquoted key
+    R"([1 2])",              // missing comma
+    R"({"a":1} trailing)",   // garbage after the value
+    R"({"x":{"a"},"b":1})",  // key without a value (lenient mode misread "b" as the value of "a")
+  };
+
+  for (const char* input : inputs) {
+    JSON::JsonDocument doc;
+    TEST_ASSERT_FALSE_MESSAGE(doc.parse(input), input);
+  }
+}

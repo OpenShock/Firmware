@@ -22,6 +22,7 @@ const _errorMessages: Record<string, string> = {
   ConfigSaveFailed: 'Failed to save the auth token to the device',
   // GPIO
   InvalidPin: 'Invalid pin',
+  EStopProtected: 'Disabling the E-Stop or changing its pin is only possible over the serial console',
   // WiFi
   MissingSsid: 'Network name is required',
   InvalidSsid: 'Network name must be 1-32 bytes',
@@ -191,7 +192,7 @@ export async function setEstopEnabled(enabled: boolean): Promise<boolean> {
       toast.success('Changed EStop enabled to: ' + enabled);
       return true;
     } else {
-      toast.error('Failed to change EStop enabled');
+      toast.error('Failed to change EStop enabled: ' + (await getErrorMessage(res)));
       return false;
     }
   } catch {
@@ -290,15 +291,6 @@ export function setOtaEnabled(isEnabled: boolean): Promise<boolean> {
     'PUT',
     'Failed to update OTA setting',
     { isEnabled }
-  );
-}
-
-export function setOtaDomain(cdnDomain: string): Promise<boolean> {
-  return otaRequest(
-    'domain?' + new URLSearchParams({ domain: cdnDomain }),
-    'PUT',
-    'Failed to update OTA domain',
-    { cdnDomain }
   );
 }
 
