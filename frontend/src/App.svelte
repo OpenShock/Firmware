@@ -5,6 +5,7 @@
   import Guided from '#lib/views/Guided.svelte';
   import Advanced from '#lib/views/Advanced.svelte';
   import Success from '#lib/views/Success.svelte';
+  import { DialogManager } from '@openshock/svelte-core/components/dialog-manager';
   import { Toaster } from '@openshock/svelte-core/components/ui/sonner';
   import { initializeColorScheme } from '@openshock/svelte-core/state/color-scheme-state.svelte.js';
   import { ViewModeStore } from '#lib/stores/index.js';
@@ -22,6 +23,7 @@
 </script>
 
 <Toaster position="top-center" />
+<DialogManager />
 
 {#if showSuccess}
   <Success onClose={closePortal} />

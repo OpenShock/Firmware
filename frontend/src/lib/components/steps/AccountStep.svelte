@@ -2,6 +2,7 @@
   import { linkAccount, unlinkAccount } from '#lib/api.js';
   import SectionHeader from '#lib/components/SectionHeader.svelte';
   import { hubState } from '#lib/stores/index.js';
+  import { dialog } from '@openshock/svelte-core/components/dialog-manager';
   import { Button } from '@openshock/svelte-core/components/ui/button';
   import { Input } from '@openshock/svelte-core/components/ui/input';
   import { Label } from '@openshock/svelte-core/components/ui/label';
@@ -31,6 +32,12 @@
   }
 
   async function handleUnlink() {
+    const result = await dialog.confirm({
+      title: 'Unlink account?',
+      desc: 'The hub goes offline from OpenShock and cannot be controlled remotely until you link it again with a new link code.',
+      confirmButtonText: 'Unlink',
+    });
+    if (!result.confirmed) return;
     await unlinkAccount();
   }
 </script>

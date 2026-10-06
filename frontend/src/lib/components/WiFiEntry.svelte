@@ -19,6 +19,7 @@
     DialogTitle,
     DialogTrigger,
   } from '@openshock/svelte-core/components/ui/dialog';
+  import { dialog } from '@openshock/svelte-core/components/dialog-manager';
   import { Input } from '@openshock/svelte-core/components/ui/input';
   import { Label } from '@openshock/svelte-core/components/ui/label';
   import {
@@ -77,8 +78,16 @@
     disconnectWifiNetwork();
   }
 
-  function wifiForget() {
-    forgetWifiNetwork(ssid);
+  async function wifiForget() {
+    const result = await dialog.confirm({
+      title: `Forget ${ssid || 'this network'}?`,
+      desc: isConnected
+        ? 'The hub disconnects and deletes the saved password. You will need to enter it again to reconnect.'
+        : 'The hub deletes the saved password. You will need to enter it again to reconnect.',
+      confirmButtonText: 'Forget',
+    });
+    if (!result.confirmed) return;
+    await forgetWifiNetwork(ssid);
   }
 
   async function wifiEditPassword(e: SubmitEvent) {
