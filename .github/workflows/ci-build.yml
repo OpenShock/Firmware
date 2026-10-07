@@ -314,6 +314,7 @@ jobs:
             .github
             scripts
             boards
+            partitions
 
       - uses: ./.github/actions/merge-partitions
         with:
