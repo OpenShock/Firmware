@@ -78,8 +78,8 @@ function mapWifiConfig(hubConfig: HubConfig): WifiConfig {
   const apSsid = wifi.apSsid();
   const hostname = wifi.hostname();
 
-  if (!apSsid) throw new Error('wifi.apSsid is null');
-  if (!hostname) throw new Error('wifi.hostname is null');
+  if (apSsid === null) throw new Error('wifi.apSsid is null');
+  if (hostname === null) throw new Error('wifi.hostname is null');
 
   const credentials: WifiCredentials[] = [];
   const credentialsLength = wifi.credentialsLength();
@@ -92,7 +92,7 @@ function mapWifiConfig(hubConfig: HubConfig): WifiConfig {
     const password = cred.password();
 
     if (!id) throw new Error('cred.id is null');
-    if (!ssid) throw new Error('cred.ssid is null');
+    if (ssid === null) throw new Error('cred.ssid is null');
 
     credentials.push({
       id,
@@ -126,7 +126,7 @@ function mapBackendConfig(hubConfig: HubConfig): BackendConfig {
   const domain = backend.domain();
   const authToken = backend.authToken();
 
-  if (!domain) throw new Error('backend.domain is null');
+  if (domain === null) throw new Error('backend.domain is null');
 
   return {
     domain,
@@ -157,7 +157,7 @@ function mapOtaUpdateConfig(hubConfig: HubConfig): OtaUpdateConfig {
   const allowBackendManagement = otaUpdate.allowBackendManagement();
   const requireManualApproval = otaUpdate.requireManualApproval();
 
-  if (!cdnDomain) throw new Error('otaUpdate.cdnDomain is null');
+  if (cdnDomain === null) throw new Error('otaUpdate.cdnDomain is null');
 
   return {
     isEnabled,

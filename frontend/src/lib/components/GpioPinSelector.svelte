@@ -1,28 +1,26 @@
 <script lang="ts">
-  import { hubState, usedPins } from '#lib/stores/index.js';
+  import { usedPins } from '#lib/stores/index.js';
   import { Button } from '@openshock/svelte-core/components/ui/button';
   import { Input } from '@openshock/svelte-core/components/ui/input';
 
   interface Props {
     name: string;
     currentPin: number | null;
+    // Pins the hub accepts for this role (e.g. outputs for RF TX)
+    validPins: Int8Array;
     setter: (pin: number) => Promise<boolean>;
   }
 
-  let { name, currentPin, setter }: Props = $props();
+  let { name, currentPin, validPins, setter }: Props = $props();
 
   function isPinValid(pin: number | null): pin is number {
     return pin !== null && pin >= 0 && pin <= 255;
   }
 
-  let currentPinValid = $derived(
-    isPinValid(currentPin) && hubState.gpioValidOutputs.includes(currentPin)
-  );
+  let currentPinValid = $derived(isPinValid(currentPin) && validPins.includes(currentPin));
 
   let pendingPin = $state<number | null>(null);
-  let pendingPinValid = $derived(
-    isPinValid(pendingPin) && hubState.gpioValidOutputs.includes(pendingPin)
-  );
+  let pendingPinValid = $derived(isPinValid(pendingPin) && validPins.includes(pendingPin));
 
   let statusText = $derived.by<string>(() => {
     if (pendingPin !== null) {

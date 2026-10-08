@@ -1,0 +1,23 @@
+#pragma once
+
+#include "enums/SetGPIOResultCode.h"
+#include "enums/ShockerCommandType.h"
+#include "enums/ShockerModelType.h"
+
+#include <hal/gpio_types.h>
+
+#include <cstdint>
+
+// TODO: This is horrible architecture. Fix it.
+
+namespace OpenShock::CommandHandler {
+  [[nodiscard]] bool Init();
+  bool Ok();
+
+  gpio_num_t GetRfTxPin();
+  SetGPIOResultCode SetRfTxPin(gpio_num_t txPin);
+
+  bool SetKeepAliveEnabled(bool enabled);
+
+  bool HandleCommand(ShockerModelType shockerModel, uint16_t shockerId, ShockerCommandType type, uint8_t intensity, uint16_t durationMs);
+}  // namespace OpenShock::CommandHandler

@@ -1,5 +1,8 @@
-class UsedPinsStore {
-  #pins = $state<Map<number, string>>(new Map());
+import { SvelteMap } from 'svelte/reactivity';
+
+export class UsedPinsStore {
+  // $state does not proxy a Map; SvelteMap makes has() reactive for the pin selectors
+  #pins = new SvelteMap<number, string>();
 
   has(pin: number) {
     return this.#pins.has(pin);

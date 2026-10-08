@@ -1,0 +1,49 @@
+menu "OpenShock Board"
+
+    # The board's GPIO assignments deliberately do NOT live here.
+    #
+    # A Kconfig symbol ends up in sdkconfig.h, which most of ESP-IDF includes, so two
+    # boards that differed only by an LED pin produced a different sdkconfig.h and
+    # therefore shared no compiled framework objects at all. The pins are plain
+    # generated macros in openshock_board.h instead:
+    #
+    #   OPENSHOCK_RF_TX_GPIO  OPENSHOCK_ESTOP_PIN  OPENSHOCK_LED_GPIO
+    #   OPENSHOCK_LED_WS2812B  OPENSHOCK_LED_SWAP_RG_CHANNELS
+    #
+    # They are set per board as bare `OPENSHOCK_*=` lines in boards/<board>.defaults,
+    # read by scripts/gen_env_header.py, and stripped from the sdkconfig fragment by
+    # scripts/build.py. Only the settings below - identical across every board - remain
+    # Kconfig, because they cost nothing in shared objects.
+
+    config OPENSHOCK_API_DOMAIN
+        string "OpenShock API domain"
+        default "api.openshock.app"
+        help
+            Default backend API domain the hub connects to. Overridable at runtime.
+
+    config OPENSHOCK_FW_CDN_DOMAIN
+        string "Firmware CDN domain"
+        default "firmware.openshock.org"
+        help
+            Default CDN domain used for OTA firmware/version lookups. Overridable at runtime.
+
+    config OPENSHOCK_FW_HOSTNAME
+        string "Default hostname"
+        default "OpenShock"
+        help
+            Default network hostname; also the base of the default user agent.
+
+    config OPENSHOCK_FW_AP_PREFIX
+        string "SoftAP SSID prefix"
+        default "OpenShock-"
+        help
+            Prefix for the captive-portal SoftAP SSID (the device MAC is appended).
+
+    config OPENSHOCK_URI_BUFFER_SIZE
+        int "HTTP URI buffer size (bytes)"
+        default 256
+        help
+            Stack buffer size for composed request URIs. Increase if a configured
+            domain plus path can exceed this.
+
+endmenu

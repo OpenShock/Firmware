@@ -1,0 +1,15 @@
+# Wemos-D1-Mini-ESP32 — auto-ported from platformio.ini. Board-specific deltas only;
+# shared config lives in sdkconfig.defaults.
+
+CONFIG_IDF_TARGET="esp32"
+CONFIG_ESPTOOLPY_FLASHSIZE_4MB=y
+
+# OpenShock uses a single 4 MB OTA partition layout (fits every board's flash).
+CONFIG_PARTITION_TABLE_CUSTOM=y
+CONFIG_PARTITION_TABLE_CUSTOM_FILENAME="partitions/ota_4mb.csv"
+
+# Hardware pins. Not Kconfig: bare OPENSHOCK_* lines, read by scripts/gen_env_header.py
+# into openshock_board.h and stripped from the sdkconfig fragment by scripts/build.py,
+# so boards sharing a chip and flash size compile identical ESP-IDF objects.
+OPENSHOCK_LED_GPIO=2
+OPENSHOCK_RF_TX_GPIO=15

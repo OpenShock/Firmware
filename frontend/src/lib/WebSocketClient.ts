@@ -12,6 +12,9 @@ export enum ConnectionState {
 
 export type ConnectionStateChangeHandler = (state: ConnectionState) => void;
 
+const RECONNECT_DELAY_MIN_MS = 200;
+const RECONNECT_DELAY_MAX_MS = 5000;
+
 export class WebSocketClient {
   public static readonly Instance = new WebSocketClient();
 
@@ -39,6 +42,11 @@ export class WebSocketClient {
   }
 
   #autoReconnect = false;
+  #reconnectDelayMs = RECONNECT_DELAY_MIN_MS;
+  #reconnectTimer: ReturnType<typeof setTimeout> | null = null;
+  #abortTimer: ReturnType<typeof setTimeout> | null = null;
+  #outageReported = false;
+
   public Connect() {
     const connectionState = this.ConnectionState;
     if (
@@ -48,6 +56,7 @@ export class WebSocketClient {
       return;
     }
 
+    this.clearTimers();
     this.AbortWebSocket();
 
     this.#autoReconnect = true;
@@ -60,7 +69,8 @@ export class WebSocketClient {
       return;
     }
 
-    this.#socket = new WebSocket(`ws://${hostname}:81/ws`);
+    // The firmware serves /ws from the same HTTP server as the page (port 80).
+    this.#socket = new WebSocket(`ws://${hostname}/ws`, 'flatbuffers');
     this.#socket.binaryType = 'arraybuffer';
     this.#socket.onopen = this.handleOpen.bind(this);
     this.#socket.onclose = this.handleClose.bind(this);
@@ -69,6 +79,8 @@ export class WebSocketClient {
   }
   public Disconnect() {
     this.#autoReconnect = false;
+    this.clearTimers();
+
     const connectionState = this.ConnectionState;
     if (
       connectionState === ConnectionState.DISCONNECTED ||
@@ -81,18 +93,38 @@ export class WebSocketClient {
     if (this.#socket) {
       try {
         this.#socket.close();
-        setTimeout(this.AbortWebSocket.bind(this), 1000);
+        this.#abortTimer = setTimeout(() => {
+          this.#abortTimer = null;
+          this.AbortWebSocket();
+        }, 1000);
       } catch {
         console.warn('[WS] Failed to gracefully close WebSocket connection, forcing close');
         this.AbortWebSocket();
       }
     }
   }
+  private clearTimers() {
+    if (this.#reconnectTimer !== null) {
+      clearTimeout(this.#reconnectTimer);
+      this.#reconnectTimer = null;
+    }
+    if (this.#abortTimer !== null) {
+      clearTimeout(this.#abortTimer);
+      this.#abortTimer = null;
+    }
+  }
   private ReconnectIfWanted() {
     this.AbortWebSocket();
-    if (this.#autoReconnect) {
-      setTimeout(this.Connect.bind(this), 200);
+    if (!this.#autoReconnect || this.#reconnectTimer !== null) {
+      return;
     }
+
+    const delay = this.#reconnectDelayMs;
+    this.#reconnectDelayMs = Math.min(this.#reconnectDelayMs * 2, RECONNECT_DELAY_MAX_MS);
+    this.#reconnectTimer = setTimeout(() => {
+      this.#reconnectTimer = null;
+      this.Connect();
+    }, delay);
   }
 
   public Send(data: string | Blob | BufferSource): boolean {
@@ -110,11 +142,19 @@ export class WebSocketClient {
       this.ReconnectIfWanted();
       return;
     }
+
+    this.#reconnectDelayMs = RECONNECT_DELAY_MIN_MS;
+    this.#outageReported = false;
+    this.ConnectionState = ConnectionState.CONNECTED;
   }
   private handleClose(ev: CloseEvent) {
     if (!ev.wasClean) {
       console.error('[WS] ERROR: Connection closed unexpectedly');
-      toast.error('Websocket connection closed unexpectedly');
+      // Report each outage once, not every failed reconnect attempt.
+      if (!this.#outageReported) {
+        this.#outageReported = true;
+        toast.error('Websocket connection closed unexpectedly');
+      }
     } else {
       console.log('[WS] Received disconnect: ', ev.reason);
     }
@@ -145,11 +185,11 @@ export class WebSocketClient {
   private AbortWebSocket() {
     if (this.#socket) {
       try {
-        this.#socket.close();
         this.#socket.onclose = null;
         this.#socket.onerror = null;
         this.#socket.onmessage = null;
         this.#socket.onopen = null;
+        this.#socket.close();
       } catch (e) {
         console.error(e);
       }

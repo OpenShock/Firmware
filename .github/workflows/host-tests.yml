@@ -1,0 +1,96 @@
+# Per-commit firmware check: build and run the host (linux target) Unity suites.
+# Cheap next to compiling the firmware, which happens nightly, on release tags and as a PR canary (ci-build.yml).
+on:
+  push:
+    branches: ['**']
+    paths:
+      - 'components/**'
+      - 'main/**'
+      - 'test/**'
+      - 'partitions/**'
+      - 'CMakeLists.txt'
+      - 'sdkconfig.defaults'
+      - 'dependencies.lock'
+      - '.gitmodules'
+      - '.github/actions/setup-esp-idf/**'
+      - '.github/workflows/host-tests.yml'
+  # A same-repo PR branch is already covered by its push run; pull_request is for forks, whose
+  # pushes do not run here. Fork runs need a maintainer's approval (repository setting).
+  pull_request:
+    paths:
+      - 'components/**'
+      - 'main/**'
+      - 'test/**'
+      - 'partitions/**'
+      - 'CMakeLists.txt'
+      - 'sdkconfig.defaults'
+      - 'dependencies.lock'
+      - '.gitmodules'
+      - '.github/actions/setup-esp-idf/**'
+      - '.github/workflows/host-tests.yml'
+  workflow_dispatch:
+
+name: host-tests
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  host-tests:
+    if: ${{ github.event_name != 'pull_request' || github.event.pull_request.head.repo.fork }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+
+      # The config suite includes the flatbuffers runtime, which lives in a submodule.
+      # Fetch only that one; the others (schemas, frontend) are not needed here.
+      - name: Fetch flatbuffers submodule
+        run: git submodule update --init --depth 1 components/flatbuffers/flatbuffers
+
+      # The linux target links libbsd. ESP-IDF generates the CMock mocks the suites use
+      # (tools/mocks/*) with Ruby; ubuntu-latest ships it, listed so that stays true.
+      - name: Install host build dependencies
+        run: sudo apt-get update && sudo apt-get install -y --no-install-recommends libbsd-dev ruby
+
+      # Restore-only: ci-build's single nominated writer owns the cache entry.
+      - uses: ./.github/actions/setup-esp-idf
+        with:
+          save-cache: 'false'
+
+      # Each components/<name>/host_test is its own linux-target ESP-IDF project. They
+      # share test/host_support (stand-ins for Logging.h, openshock_board.h, ...) and
+      # use ESP-IDF's tools/mocks and linux ports; the config suite also reads the
+      # firmware's partitions/ota_4mb.csv. The ELF's exit code is the Unity failure count.
+      - name: Build and run host test suites
+        shell: bash
+        run: |
+          set -euo pipefail
+          # The IDF environment puts each toolchain's inner <triple>/bin on PATH, which holds
+          # unprefixed cross binutils (as, ld, ...). The linux target builds with the host gcc,
+          # which looks up `as` on PATH and would get esp32ulp-elf's or riscv32's instead
+          # ("as: unrecognized option '--64'"). The firmware only calls the prefixed tools.
+          PATH="$(printf '%s' "$PATH" | tr ':' '\n' | grep -vE -- '-elf/[^/]*-elf/bin/?$' | paste -sd: -)"
+          export PATH
+          echo "as: $(command -v as)"
+          failed=()
+          for dir in components/*/host_test; do
+            name="$(basename "$(dirname "$dir")")"
+            echo "::group::$name"
+            if idf.py -C "$dir" --preview set-target linux build \
+              && "$dir"/build/*_host_test.elf; then
+              echo "::endgroup::"
+            else
+              echo "::endgroup::"
+              echo "::error::$name host tests failed"
+              failed+=("$name")
+            fi
+          done
+          if [ "${#failed[@]}" -gt 0 ]; then
+            echo "Failed: ${failed[*]}"
+            exit 1
+          fi

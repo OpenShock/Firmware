@@ -1,8 +1,9 @@
 import { WifiAuthMode } from '#lib/_fbs/open-shock/serialization/types/wifi-auth-mode.js';
 import type { WiFiNetwork } from '#lib/types/index.js';
 import { describe, expect, it } from 'vitest';
+import { HubStateStore } from './HubStateStore.svelte';
+import { UsedPinsStore } from './UsedPinsStore.svelte';
 
-// Import the store freshly for each test to avoid shared state
 function makeNetwork(overrides: Partial<WiFiNetwork> = {}): WiFiNetwork {
   return {
     ssid: 'TestNet',
@@ -15,28 +16,9 @@ function makeNetwork(overrides: Partial<WiFiNetwork> = {}): WiFiNetwork {
   };
 }
 
-// UsedPinsStore is a class, so we can instantiate fresh copies for tests
-class UsedPinsStore {
-  #pins = new Map<number, string>();
-
-  has(pin: number) {
-    return this.#pins.has(pin);
-  }
-
-  markPinUsed(pin: number, name: string) {
-    for (const [key, value] of this.#pins) {
-      if (key === pin || value === name) {
-        this.#pins.delete(key);
-      }
-    }
-    this.#pins.set(pin, name);
-  }
-}
-
 describe('UsedPinsStore', () => {
   it('reports a pin as not used initially', () => {
-    const store = new UsedPinsStore();
-    expect(store.has(4)).toBe(false);
+    expect(new UsedPinsStore().has(4)).toBe(false);
   });
 
   it('marks a pin as used', () => {
@@ -45,17 +27,10 @@ describe('UsedPinsStore', () => {
     expect(store.has(4)).toBe(true);
   });
 
-  it('replaces the name when the same pin is re-registered', () => {
+  it('removes the old pin when the same name moves to another pin', () => {
     const store = new UsedPinsStore();
     store.markPinUsed(4, 'RF TX');
-    store.markPinUsed(4, 'EStop'); // same pin, new name — old entry evicted, new one added
-    expect(store.has(4)).toBe(true);
-  });
-
-  it('removes the old pin when the same name is reused', () => {
-    const store = new UsedPinsStore();
-    store.markPinUsed(4, 'RF TX');
-    store.markPinUsed(5, 'RF TX'); // same name, different pin — should evict pin 4
+    store.markPinUsed(5, 'RF TX');
     expect(store.has(4)).toBe(false);
     expect(store.has(5)).toBe(true);
   });
@@ -70,28 +45,53 @@ describe('UsedPinsStore', () => {
   });
 });
 
-describe('WiFiNetwork helpers', () => {
-  it('makeNetwork produces a valid network with defaults', () => {
-    const n = makeNetwork();
-    expect(n.ssid).toBe('TestNet');
-    expect(n.security).toBe(WifiAuthMode.WPA2_PSK);
-    expect(n.saved).toBe(false);
+describe('HubStateStore WiFi grouping', () => {
+  it('groups BSSIDs of one SSID and security, strongest first', () => {
+    const store = new HubStateStore();
+    store.setWifiNetwork(makeNetwork({ bssid: '01:00:00:00:00:00', rssi: -80 }));
+    store.setWifiNetwork(makeNetwork({ bssid: '02:00:00:00:00:00', rssi: -40 }));
+    store.setWifiNetwork(makeNetwork({ bssid: '03:00:00:00:00:00', ssid: 'Other' }));
+
+    const groups = Array.from(store.wifiNetworkGroups.values());
+    expect(groups).toHaveLength(2);
+
+    const testNet = groups.find((g) => g.ssid === 'TestNet');
+    expect(testNet?.networks.map((n) => n.rssi)).toEqual([-40, -80]);
   });
 
-  it('makeNetwork applies overrides', () => {
-    const n = makeNetwork({ ssid: 'Hidden', saved: true, rssi: -80 });
-    expect(n.ssid).toBe('Hidden');
-    expect(n.saved).toBe(true);
-    expect(n.rssi).toBe(-80);
+  it('marks every BSSID of an SSID as saved, replacing the stored objects', () => {
+    const store = new HubStateStore();
+    const original = makeNetwork({ bssid: '01:00:00:00:00:00' });
+    store.setWifiNetwork(original);
+    store.setWifiNetwork(makeNetwork({ bssid: '02:00:00:00:00:00' }));
+
+    store.markWifiNetworksSaved('TestNet');
+
+    expect(store.wifiNetworks.get('01:00:00:00:00:00')?.saved).toBe(true);
+    expect(store.wifiNetworks.get('02:00:00:00:00:00')?.saved).toBe(true);
+    // A new object, so the reactive map notifies (mutating in place did not)
+    expect(store.wifiNetworks.get('01:00:00:00:00:00')).not.toBe(original);
+    expect(original.saved).toBe(false);
+
+    store.markWifiNetworksUnsaved('TestNet');
+    expect(store.wifiNetworks.get('01:00:00:00:00:00')?.saved).toBe(false);
   });
 
-  it('networks sort by RSSI descending (stronger signal first)', () => {
-    const nets = [
-      makeNetwork({ bssid: 'AA:AA:AA:AA:AA:AA', rssi: -80 }),
-      makeNetwork({ bssid: 'BB:BB:BB:BB:BB:BB', rssi: -40 }),
-      makeNetwork({ bssid: 'CC:CC:CC:CC:CC:CC', rssi: -60 }),
-    ];
-    nets.sort((a, b) => b.rssi - a.rssi);
-    expect(nets.map((n) => n.rssi)).toEqual([-40, -60, -80]);
+  it('lists the connected network even when it was not scanned, until it disconnects', () => {
+    const store = new HubStateStore();
+    const connected = makeNetwork({ bssid: '09:00:00:00:00:00' });
+
+    store.setConnectedWifiNetwork(connected);
+    expect(store.wifiNetworks.has('09:00:00:00:00:00')).toBe(true);
+
+    store.setConnectedWifiNetwork(null);
+    expect(store.wifiNetworks.has('09:00:00:00:00:00')).toBe(false);
+  });
+
+  it('clearWifiNetworks removes everything', () => {
+    const store = new HubStateStore();
+    store.setWifiNetwork(makeNetwork());
+    store.clearWifiNetworks();
+    expect(store.wifiNetworks.size).toBe(0);
   });
 });
