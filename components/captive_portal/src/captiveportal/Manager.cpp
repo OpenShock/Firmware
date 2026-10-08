@@ -32,6 +32,7 @@ using namespace OpenShock;
 static std::atomic<bool> s_alwaysEnabled                 = false;
 static std::atomic<bool> s_forceClosed                   = false;
 static std::atomic<bool> s_userDone                      = false;
+static std::atomic<bool> s_closeRequested                = false;  // Backend disabled the portal; close once online
 static esp_timer_handle_t s_captivePortalUpdateLoopTimer = nullptr;
 static TaskHandle_t s_managerTask                        = nullptr;
 static SimpleMutex s_instanceMutex;
@@ -223,20 +224,27 @@ static void captiveportal_tick()
     return;
   }
 
-  // User completed setup — close portal once device is fully online
-  if (s_userDone && GatewayConnectionManager::IsConnected()) {
+  // User completed setup, or the backend disabled the portal: close it once the device is fully online
+  if ((s_userDone || s_closeRequested) && GatewayConnectionManager::IsConnected()) {
+    s_closeRequested = false;
     if (GetInstance() != nullptr) {
-      OS_LOGI(TAG, "User completed setup, closing captive portal");
+      OS_LOGI(TAG, "Setup completed or portal disabled, closing captive portal");
       captiveportal_stop();
     }
     return;
   }
 
   // Auto-close: no clients connected, WiFi + gateway are up, 5 minutes elapsed
-  auto instance = GetInstance();
-  if (instance != nullptr && !s_alwaysEnabled && GatewayConnectionManager::IsConnected()) {
-    if (instance->hasClients()) {
-      // Clients still connected — reset timer
+  bool running    = false;
+  bool hasClients = false;
+  if (auto instance = GetInstance(); instance != nullptr) {
+    // Only sample it: holding the reference across captiveportal_stop() would stall DestroyInstance()
+    running    = true;
+    hasClients = instance->hasClients();
+  }
+  if (running && !s_alwaysEnabled && GatewayConnectionManager::IsConnected()) {
+    if (hasClients) {
+      // Clients still connected, reset timer
       s_autoCloseExpiry.store(0, std::memory_order_relaxed);
     } else {
       int64_t expiry = s_autoCloseExpiry.load(std::memory_order_relaxed);
@@ -253,7 +261,7 @@ static void captiveportal_tick()
   }
 
   // Open portal if not running and device needs setup
-  if (instance == nullptr) {
+  if (!running) {
     bool commandHandlerOk = CommandHandler::Ok();
     bool shouldStart      = s_alwaysEnabled || !commandHandlerOk || !isDeviceFullyConfigured();
     if (shouldStart) {
@@ -339,7 +347,8 @@ void CaptivePortal::SetUserDone()
 
 void CaptivePortal::SetAlwaysEnabled(bool alwaysEnabled)
 {
-  s_alwaysEnabled = alwaysEnabled;
+  s_alwaysEnabled  = alwaysEnabled;
+  s_closeRequested = !alwaysEnabled;
   Config::SetCaptivePortalConfig(Config::CaptivePortalConfig(alwaysEnabled));
 }
 bool CaptivePortal::IsAlwaysEnabled()
