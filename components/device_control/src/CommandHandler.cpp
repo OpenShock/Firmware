@@ -273,6 +273,16 @@ SetGPIOResultCode CommandHandler::SetRfTxPin(gpio_num_t txPin)
     return SetGPIOResultCode::InvalidPin;
   }
 
+  // Driving the E-Stop input as the RF output would defeat the kill switch. Checked against the configured pin even
+  // while the E-Stop is disabled, so enabling it later can't collide either.
+  gpio_num_t estopPin = GPIO_NUM_NC;
+  if (!Config::GetEStopGpioPin(estopPin)) {
+    return SetGPIOResultCode::InternalError;
+  }
+  if (estopPin != GPIO_NUM_NC && txPin == estopPin) {
+    return SetGPIOResultCode::PinInUse;
+  }
+
   gpio_num_t oldPin = static_cast<gpio_num_t>(OPENSHOCK_GPIO_INVALID);
   if (auto current = GetTransmitter(); current != nullptr) {
     oldPin = current->GetTxPin();

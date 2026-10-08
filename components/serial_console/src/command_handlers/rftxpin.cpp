@@ -36,6 +36,10 @@ static void handleRfTxPinCommand(std::string_view arg, bool isAutomated)
       SERPR_ERROR("Internal error while setting RF TX pin");
       break;
 
+    case OpenShock::SetGPIOResultCode::PinInUse:
+      SERPR_ERROR("Pin is in use by the E-Stop");
+      break;
+
     case OpenShock::SetGPIOResultCode::Success:
       SERPR_SUCCESS("Saved config");
       break;

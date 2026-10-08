@@ -140,6 +140,20 @@ TEST_CASE("CommandHandler invalid TX pin keeps the current transmitter", "[devic
   TEST_ASSERT_TRUE(CommandHandler::HandleCommand(kModel, kShockerId, ShockerCommandType::Vibrate, 10, 100));
 }
 
+TEST_CASE("CommandHandler refuses the E-Stop pin as TX pin and keeps the current transmitter", "[device_control][command][estop]")
+{
+  resetCommandHandler();
+
+  // Configured but disabled still counts: enabling the E-Stop later must not find its pin driven by RF.
+  const gpio_num_t estopPin = static_cast<gpio_num_t>(13);
+  HostFake::EStopCfg        = {.enabled = false, .gpioPin = estopPin};
+
+  TEST_ASSERT_EQUAL(SetGPIOResultCode::PinInUse, CommandHandler::SetRfTxPin(estopPin));
+
+  TEST_ASSERT_TRUE(CommandHandler::Ok());
+  TEST_ASSERT_EQUAL(kTxPin, CommandHandler::GetRfTxPin());
+}
+
 TEST_CASE("CommandHandler keep-alive enable/disable starts and stops its task", "[device_control][command][keepalive]")
 {
   resetCommandHandler();

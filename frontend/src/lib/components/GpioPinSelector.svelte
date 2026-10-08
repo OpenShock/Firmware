@@ -6,14 +6,12 @@
   interface Props {
     name: string;
     currentPin: number | null;
-    // Pins the hub accepts for this role (outputs for RF TX, inputs for the E-Stop)
+    // Pins the hub accepts for this role (e.g. outputs for RF TX)
     validPins: Int8Array;
     setter: (pin: number) => Promise<boolean>;
-    // When set, the pin is shown but can't be changed here; the text explains why
-    lockedReason?: string;
   }
 
-  let { name, currentPin, validPins, setter, lockedReason }: Props = $props();
+  let { name, currentPin, validPins, setter }: Props = $props();
 
   function isPinValid(pin: number | null): pin is number {
     return pin !== null && pin >= 0 && pin <= 255;
@@ -35,9 +33,7 @@
     return 'Currently ' + currentPin;
   });
 
-  let canSet = $derived(
-    !lockedReason && pendingPin !== currentPin && pendingPinValid && !usedPins.has(pendingPin!)
-  );
+  let canSet = $derived(pendingPin !== currentPin && pendingPinValid && !usedPins.has(pendingPin!));
 
   $effect(() => {
     if (pendingPin !== null) {
@@ -74,12 +70,8 @@
     <h2 class="text-sm font-medium">{name}</h2>
     <p class="text-muted-foreground text-sm">{statusText}</p>
   </div>
-  {#if lockedReason}
-    <p class="text-muted-foreground text-xs">{lockedReason}</p>
-  {:else}
-    <form class="flex gap-2" onsubmit={setGpioPin}>
-      <Input type="number" placeholder="GPIO Pin" bind:value={pendingPin} />
-      <Button variant="outline" type="submit" disabled={!canSet || saving}>Set</Button>
-    </form>
-  {/if}
+  <form class="flex gap-2" onsubmit={setGpioPin}>
+    <Input type="number" placeholder="GPIO Pin" bind:value={pendingPin} />
+    <Button variant="outline" type="submit" disabled={!canSet || saving}>Set</Button>
+  </form>
 </div>

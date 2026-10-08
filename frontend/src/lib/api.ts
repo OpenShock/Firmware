@@ -22,8 +22,7 @@ const _errorMessages: Record<string, string> = {
   ConfigSaveFailed: 'Failed to save the auth token to the device',
   // GPIO
   InvalidPin: 'Invalid pin',
-  EStopProtected:
-    'Disabling the E-Stop or changing its pin is only possible over the serial console',
+  PinInUse: 'Pin is used by the E-Stop',
   // WiFi
   MissingSsid: 'Network name is required',
   InvalidSsid: 'Network name must be 1-32 bytes',
@@ -153,51 +152,6 @@ export async function setRfTxPin(pin: number): Promise<boolean> {
     }
   } catch {
     toast.error('Failed to change RF TX pin');
-    return false;
-  }
-}
-
-// Config - EStop
-
-export async function setEstopPin(pin: number): Promise<boolean> {
-  try {
-    const res = await apiFetch(
-      '/api/config/estop/pin?' + new URLSearchParams({ pin: String(pin) }),
-      {
-        method: 'PUT',
-      }
-    );
-    if (res.ok) {
-      const data = await res.json();
-      if (hubState.config) hubState.config.estop.gpioPin = data.pin;
-      toast.success('Changed EStop pin to: ' + data.pin);
-      return true;
-    } else {
-      toast.error('Failed to change EStop pin: ' + (await getErrorMessage(res)));
-      return false;
-    }
-  } catch {
-    toast.error('Failed to change EStop pin');
-    return false;
-  }
-}
-
-export async function setEstopEnabled(enabled: boolean): Promise<boolean> {
-  try {
-    const res = await apiFetch(
-      '/api/config/estop/enabled?' + new URLSearchParams({ enabled: enabled ? '1' : '0' }),
-      { method: 'PUT' }
-    );
-    if (res.ok) {
-      if (hubState.config) hubState.config.estop.enabled = enabled;
-      toast.success('Changed EStop enabled to: ' + enabled);
-      return true;
-    } else {
-      toast.error('Failed to change EStop enabled: ' + (await getErrorMessage(res)));
-      return false;
-    }
-  } catch {
-    toast.error('Failed to change EStop enabled');
     return false;
   }
 }

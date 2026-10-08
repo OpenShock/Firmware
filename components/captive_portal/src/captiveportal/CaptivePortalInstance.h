@@ -51,6 +51,7 @@ namespace OpenShock::CaptivePortal {
     bool m_dnsStarted = false;
 
     // --- HTTP handlers that need instance state (recovered via req->user_ctx) ---
+    static esp_err_t wsPostHandshake(httpd_req_t* req);
     static esp_err_t wsHandler(httpd_req_t* req);
     static esp_err_t staticFileHandler(httpd_req_t* req);
 

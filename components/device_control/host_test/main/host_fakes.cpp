@@ -86,6 +86,7 @@ namespace HostFake {
   void Reset()
   {
     EStopped       = false;
+    EStopCfg       = {.enabled = false, .gpioPin = GPIO_NUM_NC};
     RmtFrameMs     = 10;
     FailRmtChannel = false;
     Transmissions.clear();

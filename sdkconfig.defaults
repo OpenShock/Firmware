@@ -28,6 +28,9 @@ CONFIG_MBEDTLS_KEY_EXCHANGE_PSK=y
 # support is compiled out of esp_http_server by default; enable it or the httpd_ws_*
 # symbols don't exist.
 CONFIG_HTTPD_WS_SUPPORT=y
+# The URI handler is not called for the handshake itself, so greeting a new client (the Ready message with the config
+# and valid GPIO pins) needs the post-handshake callback.
+CONFIG_HTTPD_WS_POST_HANDSHAKE_CB_SUPPORT=y
 
 # TLS server-cert verification uses the mbedTLS certificate bundle. We compile in
 # our own curated trust store (certificates/cacert-merged.pem) instead of IDF's built-in

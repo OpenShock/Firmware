@@ -12,7 +12,6 @@ const char* const TAG = "CaptivePortalInstance";
 #include "config/Config.h"
 #include "Convert.h"
 #include "enums/OtaUpdateChannel.h"
-#include "estop/EStopManager.h"
 #include "GatewayConnectionManager.h"
 #include "http/ContentTypes.h"
 #include "hwutil/PartitionUtils.h"
@@ -50,7 +49,6 @@ static constexpr size_t MAX_WS_MSG = OpenShock::MessageHandlers::WebSocket::MaxL
 static constexpr const char* S200 = "200 OK";
 static constexpr const char* S304 = "304 Not Modified";
 static constexpr const char* S400 = "400 Bad Request";
-static constexpr const char* S403 = "403 Forbidden";
 static constexpr const char* S429 = "429 Too Many Requests";
 static constexpr const char* S500 = "500 Internal Server Error";
 static constexpr const char* S503 = "503 Service Unavailable";
@@ -59,6 +57,7 @@ static const char* const JSON_ERR_INTERNAL        = "{\"error\":\"InternalError\
 static const char* const JSON_ERR_MISSING_PARAM   = "{\"error\":\"MissingParam\"}";
 static const char* const JSON_ERR_INVALID_PARAM   = "{\"error\":\"InvalidParam\"}";
 static const char* const JSON_ERR_INVALID_PIN     = "{\"error\":\"InvalidPin\"}";
+static const char* const JSON_ERR_PIN_IN_USE      = "{\"error\":\"PinInUse\"}";
 static const char* const JSON_ERR_MISSING_SSID    = "{\"error\":\"MissingSsid\"}";
 static const char* const JSON_ERR_INVALID_SSID    = "{\"error\":\"InvalidSsid\"}";
 static const char* const JSON_ERR_PASSWORD_SHORT  = "{\"error\":\"PasswordTooShort\"}";
@@ -66,7 +65,6 @@ static const char* const JSON_ERR_PASSWORD_LONG   = "{\"error\":\"PasswordTooLon
 static const char* const JSON_ERR_CODE_REQUIRED   = "{\"error\":\"CodeRequired\"}";
 static const char* const JSON_ERR_INVALID_CHANNEL = "{\"error\":\"InvalidChannel\"}";
 static const char* const JSON_ERR_RATE_LIMITED    = "{\"error\":\"RateLimited\"}";
-static const char* const JSON_ERR_ESTOP_PROTECTED = "{\"error\":\"EStopProtected\"}";
 
 using namespace OpenShock;
 
@@ -382,7 +380,8 @@ static esp_err_t apiConfigRfPin(httpd_req_t* req)
   auto result      = CommandHandler::SetRfTxPin(pin);
   using ResultCode = OpenShock::SetGPIOResultCode;
   if (result != ResultCode::Success) {
-    return sendResp(req, S400, HTTP::ContentType::JSON, (result == ResultCode::InvalidPin) ? JSON_ERR_INVALID_PIN : JSON_ERR_INTERNAL);
+    const char* error = result == ResultCode::InvalidPin ? JSON_ERR_INVALID_PIN : result == ResultCode::PinInUse ? JSON_ERR_PIN_IN_USE : JSON_ERR_INTERNAL;
+    return sendResp(req, S400, HTTP::ContentType::JSON, error);
   }
   OpenShock::JSON::StringWriter writer;
   json_gen_str_t* gen = writer.gen();
@@ -391,52 +390,6 @@ static esp_err_t apiConfigRfPin(httpd_req_t* req)
   json_gen_end_object(gen);
   std::string json = writer.finish();
   return sendResp(req, S200, HTTP::ContentType::JSON, json);
-}
-
-static esp_err_t apiConfigEstopPin(httpd_req_t* req)
-{
-  std::string pinStr;
-  if (!getQueryParam(req, "pin", pinStr)) {
-    return sendResp(req, S400, HTTP::ContentType::JSON, JSON_ERR_INVALID_PIN);
-  }
-  gpio_num_t pin;
-  if (!Convert::ToGpioNum(pinStr, pin) || !IsValidInputPin(pin)) {
-    return sendResp(req, S400, HTTP::ContentType::JSON, JSON_ERR_INVALID_PIN);
-  }
-  // The portal is unauthenticated: while the E-Stop is enabled, only the serial console may move it to another pin.
-  bool estopEnabled = false;
-  if (!Config::GetEStopEnabled(estopEnabled)) {
-    return sendResp(req, S500, HTTP::ContentType::JSON, JSON_ERR_INTERNAL);
-  }
-  if (estopEnabled) {
-    return sendResp(req, S403, HTTP::ContentType::JSON, JSON_ERR_ESTOP_PROTECTED);
-  }
-  if (!EStopManager::SetEStopPin(pin)) {
-    return sendResp(req, S500, HTTP::ContentType::JSON, JSON_ERR_INTERNAL);
-  }
-  OpenShock::JSON::StringWriter writer;
-  json_gen_str_t* gen = writer.gen();
-  json_gen_start_object(gen);
-  json_gen_obj_set_int(gen, "pin", pin);
-  json_gen_end_object(gen);
-  std::string json = writer.finish();
-  return sendResp(req, S200, HTTP::ContentType::JSON, json);
-}
-
-static esp_err_t apiConfigEstopEnabled(httpd_req_t* req)
-{
-  bool enabled;
-  if (auto result = getBoolQueryParam(req, "enabled", enabled); result != ParamResult::Ok) {
-    return sendParamError(req, result);
-  }
-  // The portal is unauthenticated: it may turn the E-Stop on, but only the serial console may turn it off.
-  if (!enabled) {
-    return sendResp(req, S403, HTTP::ContentType::JSON, JSON_ERR_ESTOP_PROTECTED);
-  }
-  if (EStopManager::SetEStopEnabled(enabled)) {
-    return sendResp(req, S200, nullptr, {});
-  }
-  return sendResp(req, S500, HTTP::ContentType::JSON, JSON_ERR_INTERNAL);
 }
 
 static esp_err_t apiWifiNetworksAdd(httpd_req_t* req)
@@ -786,26 +739,31 @@ void CaptivePortal::CaptivePortalInstance::wsSessCtxFree(void* ctx)
   delete c;
 }
 
-esp_err_t CaptivePortal::CaptivePortalInstance::wsHandler(httpd_req_t* req)
+// httpd does not call the URI handler for the handshake (esp_http_server's httpd_uri.c), only this callback, right
+// after it has switched the socket to WebSocket: allocate an id, arm the disconnect hook and greet the client.
+esp_err_t CaptivePortal::CaptivePortalInstance::wsPostHandshake(httpd_req_t* req)
 {
   auto* self = static_cast<CaptivePortalInstance*>(req->user_ctx);
   int fd     = httpd_req_to_sockfd(req);
 
-  // Initial GET = handshake just completed → allocate id, arm disconnect hook, greet.
-  if (req->method == HTTP_GET) {
-    uint8_t id = self->onWsOpen(fd);
-    if (id == 0xFF) {
-      OS_LOGW(TAG, "WebSocket client table full, rejecting fd %d", fd);
-      httpd_sess_trigger_close(self->m_server, fd);
-      return ESP_OK;
-    }
-
-    auto* sessCtx = new WsSessCtx {self, fd};
-    httpd_sess_set_ctx(self->m_server, fd, sessCtx, &CaptivePortalInstance::wsSessCtxFree);
-
-    self->handleWebSocketClientConnected(req, id);
+  uint8_t id = self->onWsOpen(fd);
+  if (id == 0xFF) {
+    OS_LOGW(TAG, "WebSocket client table full, rejecting fd %d", fd);
+    httpd_sess_trigger_close(self->m_server, fd);
     return ESP_OK;
   }
+
+  auto* sessCtx = new WsSessCtx {self, fd};
+  httpd_sess_set_ctx(self->m_server, fd, sessCtx, &CaptivePortalInstance::wsSessCtxFree);
+
+  self->handleWebSocketClientConnected(req, id);
+  return ESP_OK;
+}
+
+esp_err_t CaptivePortal::CaptivePortalInstance::wsHandler(httpd_req_t* req)
+{
+  auto* self = static_cast<CaptivePortalInstance*>(req->user_ctx);
+  int fd     = httpd_req_to_sockfd(req);
 
   // Data frame: two-call recv (length first, then payload).
   httpd_ws_frame_t frame = {};
@@ -839,7 +797,7 @@ void CaptivePortal::CaptivePortalInstance::onWsFrame(int fd, httpd_ws_type_t opc
 {
   int idx = idForFd(fd);
   if (idx < 0) {
-    // Lazy fallback in case the handshake GET call didn't fire on this IDF build.
+    // Defensive: wsPostHandshake() registers every client, so a frame from an unknown fd should not happen.
     uint8_t id = onWsOpen(fd);
     if (id == 0xFF) {
       return;
@@ -1051,8 +1009,7 @@ void CaptivePortal::CaptivePortalInstance::registerHandlers()
   reg("/api/account/link", HTTP_POST, apiAccountLink);
   reg("/api/account", HTTP_DELETE, apiAccountDelete);
   reg("/api/config/rf/pin", HTTP_PUT, apiConfigRfPin);
-  reg("/api/config/estop/pin", HTTP_PUT, apiConfigEstopPin);
-  reg("/api/config/estop/enabled", HTTP_PUT, apiConfigEstopEnabled);
+  // No /api/config/estop/*: the portal is an open, unauthenticated AP, so the E-Stop is configured over serial only.
   // No /api/ota/domain: the portal is an open, unauthenticated AP, and OTA trusts the hashes served by that domain, so
   // changing it would let anyone in range install firmware. It can only be changed over serial (jsonconfig).
   reg("/api/ota/settings", HTTP_PUT, apiOtaSettings);
@@ -1071,6 +1028,7 @@ void CaptivePortal::CaptivePortalInstance::registerHandlers()
   ws.is_websocket             = true;
   ws.handle_ws_control_frames = false;
   ws.supported_subprotocol    = "flatbuffers";
+  ws.ws_post_handshake_cb     = &CaptivePortalInstance::wsPostHandshake;
   if (httpd_register_uri_handler(m_server, &ws) != ESP_OK) {
     OS_LOGE(TAG, "Failed to register WebSocket handler");
   }
