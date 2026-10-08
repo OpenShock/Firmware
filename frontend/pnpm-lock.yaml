@@ -1898,8 +1898,8 @@ packages:
     resolution: {integrity: sha512-vpLQEs+VLCr1nU0BXS07maYoFwlDAH0gngQuuttxIwutDFEMHq2blX+8vpgxDdK3J1PwjCJiep77OitTZ4Ll1A==}
     engines: {node: 18 || 20 || >=22}
 
-  moment@2.30.1:
-    resolution: {integrity: sha512-uEmtNhbDOrWPFS+hdjFCBfy9f2YoyzRpwcl+DqpC6taX21FzsTLQVbMV/W7PzNSX6x/bhC1zA3c2UQ5NzH6how==}
+  moment@2.31.0:
+    resolution: {integrity: sha512-0acOTfMiWOheYS4eoWb80yYMb/JLvVv9SHbs2PehaDzfUG0Bw855SKyk0IKTnPGa5+U2bmi3W68l1+sGLX/pvw==}
 
   mri@1.2.0:
     resolution: {integrity: sha512-tzzskb3bG8LvYGFF/mDTpq3jpI6Q9wc3LEmBaghu+DdCssd1FakN7Bc0hVNmEyGq1bq3RgfkCb3cmQLpNPOroA==}
@@ -3873,7 +3873,7 @@ snapshots:
     dependencies:
       brace-expansion: 5.0.12
 
-  moment@2.30.1: {}
+  moment@2.31.0: {}
 
   mri@1.2.0: {}
 
@@ -4036,7 +4036,7 @@ snapshots:
       fdir: 6.5.0(picomatch@4.0.7)
       lodash: 4.18.1
       magic-string: 0.30.21
-      moment: 2.30.1
+      moment: 2.31.0
       package-name-regex: 2.0.6
       rollup: 4.62.2
       spdx-expression-validate: 2.0.0
