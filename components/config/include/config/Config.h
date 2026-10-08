@@ -3,6 +3,7 @@
 #include "config/BackendConfig.h"
 #include "config/CaptivePortalConfig.h"
 #include "config/EStopConfig.h"
+#include "config/LanConfig.h"
 #include "config/OtaUpdateConfig.h"
 #include "config/RFConfig.h"
 #include "config/SerialInputConfig.h"
@@ -51,6 +52,7 @@ namespace OpenShock::Config {
   bool GetSerialInputConfig(SerialInputConfig& out);
   bool GetOtaUpdateConfig(OtaUpdateConfig& out);
   bool GetEStopConfig(EStopConfig& out);
+  bool GetLanConfig(LanConfig& out);
 
   bool SetRFConfig(const RFConfig& config);
   bool SetWiFiConfig(const WiFiConfig& config);
@@ -59,6 +61,7 @@ namespace OpenShock::Config {
   bool SetSerialInputConfig(const SerialInputConfig& config);
   bool SetOtaUpdateConfig(const OtaUpdateConfig& config);
   bool SetEStopConfig(const EStopConfig& config);
+  bool SetLanConfig(const LanConfig& config);
 
   bool GetWiFiCredentials(std::vector<WiFiCredentials>& out);
   // Emits each stored credential as an object into an already-open JSON array

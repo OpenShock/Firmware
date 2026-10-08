@@ -61,6 +61,7 @@ RootConfig::RootConfig()
   , serialInput()
   , otaUpdate()
   , estop()
+  , lan()
 {
 }
 
@@ -73,6 +74,7 @@ void RootConfig::ToDefault()
   serialInput.ToDefault();
   otaUpdate.ToDefault();
   estop.ToDefault();
+  lan.ToDefault();
 }
 
 bool RootConfig::FromFlatbuffers(const Serialization::Configuration::HubConfig* config)
@@ -118,6 +120,11 @@ bool RootConfig::FromFlatbuffers(const Serialization::Configuration::HubConfig* 
     return false;
   }
 
+  if (!lan.FromFlatbuffers(config->lan())) {
+    OS_LOGE(TAG, "Unable to load lan config");
+    return false;
+  }
+
   applyLegacyBoolDefaults(config, rf, otaUpdate);
 
   return true;
@@ -132,8 +139,9 @@ flatbuffers::Offset<OpenShock::Serialization::Configuration::HubConfig> RootConf
   auto serialInputOffset   = serialInput.ToFlatbuffers(builder, withSensitiveData);
   auto otaUpdateOffset     = otaUpdate.ToFlatbuffers(builder, withSensitiveData);
   auto estopOffset         = estop.ToFlatbuffers(builder, withSensitiveData);
+  auto lanOffset           = lan.ToFlatbuffers(builder, withSensitiveData);
 
-  return Serialization::Configuration::CreateHubConfig(builder, rfOffset, wifiOffset, captivePortalOffset, backendOffset, serialInputOffset, otaUpdateOffset, estopOffset);
+  return Serialization::Configuration::CreateHubConfig(builder, rfOffset, wifiOffset, captivePortalOffset, backendOffset, serialInputOffset, otaUpdateOffset, estopOffset, lanOffset);
 }
 
 bool RootConfig::FromJSON(JSON::JsonView json)
@@ -184,6 +192,11 @@ bool RootConfig::FromJSON(JSON::JsonView json)
     return false;
   }
 
+  if (!lan.FromJSON(json["lan"])) {
+    OS_LOGE(TAG, "Unable to load lan config");
+    return false;
+  }
+
   return true;
 }
 
@@ -197,5 +210,6 @@ void RootConfig::ToJSON(json_gen_str_t* gen, const char* name, bool withSensitiv
   serialInput.ToJSON(gen, "serialInput", withSensitiveData);
   otaUpdate.ToJSON(gen, "otaUpdate", withSensitiveData);
   estop.ToJSON(gen, "estop", withSensitiveData);
+  lan.ToJSON(gen, "lan", withSensitiveData);
   JSON::objEnd(gen, name);
 }
