@@ -20,4 +20,5 @@ idf_component_register(
   REQUIRES      common                       # enums/*, OpenShock.h in public headers; also Checksum.h internally
                 esp_driver_rmt               # driver/rmt_types.h (rmt_symbol_word_t) in public headers
   PRIV_REQUIRES logging                      # OS_LOG* (internal)
+                temporal                     # OpenShock::millis() for T330 rolling state
 )

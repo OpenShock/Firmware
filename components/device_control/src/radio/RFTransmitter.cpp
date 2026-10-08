@@ -234,7 +234,7 @@ static void writeSequences(rmt_channel_handle_t channel, rmt_encoder_handle_t en
     int64_t timeToLive = seq->transmitEnd() - now;
 
     if (timeToLive > 0) {
-      // Send the command
+      seq->refill();
       transmitSymbols(channel, encoder, seq->payload(), seq->size());
       ++seq;
       continue;

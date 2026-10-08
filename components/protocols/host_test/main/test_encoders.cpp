@@ -8,6 +8,7 @@
 #include "radio/rmt/Petrainer998DREncoder.h"
 #include "radio/rmt/PetrainerEncoder.h"
 #include "radio/rmt/T330Encoder.h"
+#include "test_clock.h"
 
 #include <cstdint>
 
@@ -159,7 +160,7 @@ TEST_CASE("Wellturn T330 shock/sound codes, clamping and unsupported types", "[p
   uint64_t data = decode(seq + 1, 41, t330One) >> 1;
   TEST_ASSERT_EQUAL_UINT8(0x6, (data >> 32) & 0xF);  // 0b0110'0001
   TEST_ASSERT_EQUAL_UINT8(0x1, (data >> 4) & 0xF);
-  TEST_ASSERT_EQUAL_UINT8(100, (data >> 8) & 0xFF);  // clamped
+  TEST_ASSERT_EQUAL_UINT8(15, (data >> 8) & 0xF);    // clamped to 100, scaled to the 4-bit level
 
   TEST_ASSERT_TRUE(Rmt::WellturnT330Encoder::FillBuffer(seq, 1, ShockerCommandType::Sound, 50));
   data = decode(seq + 1, 41, t330One) >> 1;
@@ -168,6 +169,40 @@ TEST_CASE("Wellturn T330 shock/sound codes, clamping and unsupported types", "[p
   TEST_ASSERT_EQUAL_UINT8(0, (data >> 8) & 0xFF);    // sound always sends 0
 
   TEST_ASSERT_FALSE(Rmt::WellturnT330Encoder::FillBuffer(seq, 1, ShockerCommandType::Light, 10));
+}
+
+TEST_CASE("Wellturn T330 shock rolling toggle and counter", "[protocols][t330]")
+{
+  rmt_symbol_word_t seq[43];
+  const uint16_t id = 0x1234;  // own rolling state, independent of the other T330 tests
+
+  auto shockByte = [&](uint8_t intensity) {
+    TEST_ASSERT_TRUE(Rmt::WellturnT330Encoder::FillBuffer(seq, id, ShockerCommandType::Shock, intensity));
+    return static_cast<uint8_t>(((decode(seq + 1, 41, t330One) >> 1) >> 8) & 0xFF);
+  };
+
+  // Refill every 100ms like RFTransmitter does while a command is live.
+  auto runUntil = [&](int64_t from, int64_t to) {
+    for (TestClock::NowMs = from; TestClock::NowMs < to; TestClock::NowMs += 100) shockByte(50);
+    TestClock::NowMs = to;
+  };
+
+  // [toggle:1][counter:3][level:4]
+  TestClock::NowMs = 10000;
+  TEST_ASSERT_EQUAL_HEX8(0x07, shockByte(50));  // 50% -> level 7, fresh state
+
+  runUntil(10100, 11000);
+  TEST_ASSERT_EQUAL_HEX8(0x87, shockByte(50));  // 1s in: toggle set
+
+  runUntil(11100, 12000);
+  TEST_ASSERT_EQUAL_HEX8(0x17, shockByte(50));  // 2s in: toggle clear, counter 1
+
+  TestClock::NowMs = 20000;                     // gap > 200ms starts a new transmission: base counter advances
+  TEST_ASSERT_EQUAL_HEX8(0x1F, shockByte(100));
+
+  // Vibrate is not affected
+  TEST_ASSERT_TRUE(Rmt::WellturnT330Encoder::FillBuffer(seq, id, ShockerCommandType::Vibrate, 42));
+  TEST_ASSERT_EQUAL_UINT8(42, ((decode(seq + 1, 41, t330One) >> 1) >> 8) & 0xFF);
 }
 
 // ---------------------------------------------------------------------------
