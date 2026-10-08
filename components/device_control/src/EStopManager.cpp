@@ -11,7 +11,7 @@ const char* const TAG = "EStopManager";
 #include "Logging.h"
 #include "SimpleMutex.h"
 #include "Temporal.h"
-#include "util/TaskUtils.h"
+#include "util/ManagedTask.h"
 
 #include <driver/gpio.h>
 #include <freertos/queue.h>
@@ -30,14 +30,12 @@ const UBaseType_t k_estopTaskPriority = 5;
 
 static OpenShock::SimpleMutex s_estopMutex = {};
 // Guarded via Mutex
-static TaskHandle_t s_estopTask                  = nullptr;
-static TaskUtils::TaskExitFlag s_estopTaskExited = false;
-static gpio_num_t s_estopPin                     = GPIO_NUM_NC;  // Passed to task via pointer argument
+static ManagedTask s_estopTask(TAG, "EStop task");
+static gpio_num_t s_estopPin = GPIO_NUM_NC;  // Captured by value when the task starts
 
 // Wrapped in atomics as they're read (or set via public methods) by Tasks potentially running on other cores.
-static std::atomic<int64_t> s_estopActivatedAt       = 0;  // When == 0, EStop not active. When != 0, EStop is active.
-static std::atomic<bool> s_externallyTriggered       = false;
-static std::atomic<bool> s_killEStopManagerRequested = false;
+static std::atomic<int64_t> s_estopActivatedAt = 0;  // When == 0, EStop not active. When != 0, EStop is active.
+static std::atomic<bool> s_externallyTriggered = false;
 
 static bool s_estopInitialized = false;
 
@@ -60,11 +58,8 @@ static void estopmgr_publishState(EStopState state, EStopState& lastState, TickT
 static void estopmgr_latchWithoutTask();
 
 // Samples the estop at a fixed rate and updates internal state + events
-static void estopmgr_managerTask(void* pvParameters)
+static void estopmgr_managerTask(gpio_num_t estopPin)
 {
-  // Pin is being passed as a pointer, cast it back to gpio number type to get pin value
-  gpio_num_t estopPin = static_cast<gpio_num_t>(reinterpret_cast<uintptr_t>(pvParameters));
-
   EStopStateMachine machine;
   EStopState lastPublishedState = EStopState::Idle;
 
@@ -76,7 +71,7 @@ static void estopmgr_managerTask(void* pvParameters)
   }
 
   // Check if killing manager was requested, continue looping otherwise
-  while (!s_killEStopManagerRequested.load(std::memory_order_relaxed)) {
+  while (!s_estopTask.stopRequested()) {
     // Sleep for the update rate
     vTaskDelay(pdMS_TO_TICKS(k_estopUpdateRate));
 
@@ -101,8 +96,6 @@ static void estopmgr_managerTask(void* pvParameters)
   // are guaranteed to observe the Idle transition even under event-loop pressure.
   estopmgr_publishState(EStopState::Idle, lastPublishedState, portMAX_DELAY);
   s_estopActivatedAt.store(0, std::memory_order_relaxed);
-
-  TaskUtils::TaskExiting(s_estopTaskExited);
 }
 
 // Validates and configures `pin` as an EStop input. Does not touch s_estopPin
@@ -146,7 +139,7 @@ static void estopmgr_releasePin(gpio_num_t pin)
 
 static bool estopmgr_taskStart()
 {
-  if (s_estopTask != nullptr) {
+  if (s_estopTask.running()) {
     OS_LOGW(TAG, "Tried to enable EStop manager, but was already running");
     return true;
   }
@@ -170,24 +163,10 @@ static bool estopmgr_taskStart()
     s_estopPin = pin;
   }
 
-  s_killEStopManagerRequested.store(false, std::memory_order_relaxed);
-
-  // Tiny hack;
-  // We are passing pin as a pointer, the pointer memory address being the value of the pin.
-  //
-  // A pointer after all is just a integer with a special meaning, arg pointer isn't being used for anything so we can use it for this.
-  //
-  // This also proves to be safer than using atomics for this since we know for sure that the pin we intended the task to run with
-  // will not change between creating the task and it freezing its local copy of the value.
-  //
-  // This enables us to use no allocations or atomic operations
-  static_assert(sizeof(void*) >= sizeof(gpio_num_t), "void* is smaller than gpio_num_t, value embedding trick won't work");  // Just to be safe
-  void* argPtr = reinterpret_cast<void*>(static_cast<uintptr_t>(s_estopPin));
-
-  s_estopTaskExited.store(false, std::memory_order_relaxed);
-  if (TaskUtils::TaskCreateUniversal(estopmgr_managerTask, TAG, k_estopTaskStackSize, argPtr, k_estopTaskPriority, &s_estopTask, 1) != pdPASS) {
+  // The pin is captured by value, so the task keeps sampling the pin it was started with even if s_estopPin changes.
+  gpio_num_t pin = s_estopPin;
+  if (!s_estopTask.start(TAG, k_estopTaskStackSize, k_estopTaskPriority, 1, [pin] { estopmgr_managerTask(pin); })) {
     OS_LOGE(TAG, "Failed to create EStop event handler task");
-    s_estopTask = nullptr;
     return false;
   }
 
@@ -196,15 +175,12 @@ static bool estopmgr_taskStart()
 
 static bool estopmgr_taskStop()
 {
-  if (s_estopTask == nullptr) {
+  if (!s_estopTask.running()) {
     OS_LOGW(TAG, "Tried to kill EStop manager, but was not running");
     return true;
   }
 
-  s_killEStopManagerRequested.store(true, std::memory_order_relaxed);
-
-  TaskUtils::StopTask(s_estopTask, s_estopTaskExited, TAG, "EStop task");
-  s_estopTask = nullptr;
+  s_estopTask.stop();
 
   // Disable E-Stop after task has stopped to ensure that the task didn't get it stuck in enabled state
   s_estopActivatedAt.store(0, std::memory_order_relaxed);
@@ -294,7 +270,7 @@ bool EStopManager::SetEStopPin(gpio_num_t pin)
   }
 
   gpio_num_t oldPin = s_estopPin;
-  bool wasRunning   = s_estopTask != nullptr;
+  bool wasRunning   = s_estopTask.running();
 
   // Stop the task before swapping s_estopPin so the global can't disagree
   // with what the task is actually reading.
@@ -351,7 +327,7 @@ void EStopManager::SoftwareTrigger()
 {
   OpenShock::ScopedLock lock__(&s_estopMutex);
 
-  if (s_estopTask != nullptr) {
+  if (s_estopTask.running()) {
     // Picked up by the manager task on its next tick
     s_externallyTriggered.store(true, std::memory_order_relaxed);
     return;

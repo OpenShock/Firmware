@@ -2,12 +2,11 @@
 
 #include "OpenShock.h"
 #include "SimpleMutex.h"
-#include "util/TaskUtils.h"
+#include "util/ManagedTask.h"
 
 #include <freertos/FreeRTOS.h>
 #include <freertos/task.h>
 
-#include <atomic>
 #include <cstdint>
 #include <vector>
 
@@ -50,42 +49,20 @@ namespace OpenShock {
 
     bool startTask(const char* name, uint32_t stackSize)
     {
-      m_stopRequested.store(false);
-      m_taskExited.store(false);
-      if (TaskUtils::TaskCreateExpensive(&PatternPlayer::taskEntry, name, stackSize, this, 1, &m_taskHandle) != pdPASS) {
-        m_taskHandle = nullptr;
-        return false;
-      }
-      return true;
+      return m_task.startExpensive(name, stackSize, 1, [this] { run(); });
     }
 
-    void stopTask()
-    {
-      if (m_taskHandle == nullptr) {
-        return;
-      }
-      m_stopRequested.store(true);
-      wake();
-      TaskUtils::StopTask(m_taskHandle, m_taskExited, "PatternPlayer", "LED pattern task");
-      m_taskHandle = nullptr;
-    }
+    void stopTask() { m_task.stop(); }
 
   private:
-    void wake()
-    {
-      if (m_taskHandle != nullptr) {
-        xTaskNotifyGive(m_taskHandle);
-      }
-    }
-
-    static void taskEntry(void* arg) { static_cast<PatternPlayer*>(arg)->run(); }
+    void wake() { m_task.notify(); }
 
     void run()
     {
       std::vector<State> pattern;
       uint32_t generation = 0;
 
-      while (!m_stopRequested.load()) {
+      while (!m_task.stopRequested()) {
         {
           ScopedLock lock__(&m_patternMutex);
           if (generation != m_generation) {
@@ -108,16 +85,12 @@ namespace OpenShock {
           }
         }
       }
-
-      TaskUtils::TaskExiting(m_taskExited);
     }
 
     SimpleMutex m_patternMutex;
     std::vector<State> m_pattern;  // Guarded by m_patternMutex
     uint32_t m_generation = 0;     // Guarded by m_patternMutex; bumped on every SetPattern
 
-    TaskHandle_t m_taskHandle = nullptr;
-    TaskUtils::TaskExitFlag m_taskExited {false};
-    std::atomic<bool> m_stopRequested {false};
+    ManagedTask m_task {"PatternPlayer", "LED pattern task"};
   };
 }  // namespace OpenShock

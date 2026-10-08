@@ -4,8 +4,8 @@
 #include <freertos/task.h>
 
 #include "OpenShock.h"
+#include "util/ManagedTask.h"
 
-#include <atomic>
 #include <cstdint>
 
 namespace OpenShock {
@@ -32,15 +32,13 @@ namespace OpenShock {
     bool start(const char* responseIpv4, uint16_t port = 53);
     void stop();
 
-    bool isRunning() const { return m_taskHandle != nullptr; }
+    bool isRunning() const { return m_task.running(); }
 
   private:
     void task();
 
     int m_socket;
-    TaskHandle_t m_taskHandle;
-    std::atomic<bool> m_stop;        // set by stop(), observed by the task
-    std::atomic<bool> m_taskExited;  // set by the task just before it self-deletes
     uint8_t m_ip[4];
+    ManagedTask m_task;
   };
 }  // namespace OpenShock

@@ -7,8 +7,6 @@
 const char* const TAG = "DNSServer";
 
 #include "Logging.h"
-#include "util/FnProxy.h"
-#include "util/TaskUtils.h"
 
 #include <lwip/inet.h>
 #include <lwip/sockets.h>
@@ -21,10 +19,8 @@ using namespace OpenShock;
 
 DNSServer::DNSServer()
   : m_socket(-1)
-  , m_taskHandle(nullptr)
-  , m_stop(false)
-  , m_taskExited(false)
   , m_ip {}
+  , m_task(TAG, "DNSServer task")
 {
 }
 
@@ -35,7 +31,7 @@ DNSServer::~DNSServer()
 
 bool DNSServer::start(const char* responseIpv4, uint16_t port)
 {
-  if (m_taskHandle != nullptr) {
+  if (m_task.running()) {
     return true;  // already running
   }
 
@@ -56,7 +52,7 @@ bool DNSServer::start(const char* responseIpv4, uint16_t port)
     return false;
   }
 
-  // A receive timeout is the *only* way the task ever gets to look at m_stop:
+  // A receive timeout is the *only* way the task ever gets to check for a stop request:
   // lwIP's shutdown() rejects non-TCP sockets with EOPNOTSUPP, and close()
   // under a blocked recvfrom is undefined without LWIP_NETCONN_FULLDUPLEX.
   // Without this the task would block forever, so a failure here is fatal.
@@ -81,13 +77,11 @@ bool DNSServer::start(const char* responseIpv4, uint16_t port)
     return false;
   }
 
-  m_stop.store(false, std::memory_order_relaxed);
-  m_taskExited.store(false, std::memory_order_relaxed);
   // Above the other application tasks (priority 1): a phone joining the AP sends a burst of DNS queries, and the
   // small UDP receive mailbox drops them if this task is starved, which delays captive-portal detection by seconds.
   // Still below httpd and the E-Stop task (5).
   constexpr UBaseType_t kTaskPriority = 4;
-  if (TaskUtils::TaskCreateExpensive(Util::FnProxy<&DNSServer::task>, "DNSServer", 3072, this, kTaskPriority, &m_taskHandle) != pdPASS) {
+  if (!m_task.startExpensive("DNSServer", 3072, kTaskPriority, [this] { task(); })) {
     OS_LOGE(TAG, "Failed to create DNS task");
     close(m_socket);
     m_socket = -1;
@@ -99,20 +93,9 @@ bool DNSServer::start(const char* responseIpv4, uint16_t port)
 
 void DNSServer::stop()
 {
-  if (m_taskHandle == nullptr) {
-    if (m_socket >= 0) {
-      close(m_socket);
-      m_socket = -1;
-    }
-    return;
-  }
-
-  m_stop.store(true, std::memory_order_relaxed);
-
-  // The task checks m_stop every time the receive times out, so give it margin
+  // The task checks for a stop every time the receive times out, so give it margin
   // over that 250 ms timeout before resorting to a force-kill.
-  TaskUtils::StopTask(m_taskHandle, m_taskExited, TAG, "DNSServer task", pdMS_TO_TICKS(2000));
-  m_taskHandle = nullptr;
+  m_task.stop(pdMS_TO_TICKS(2000));
 
   // Only now is nobody using the fd. Closing it earlier would let lwIP hand
   // the number to another socket while the task was still between calls.
@@ -128,20 +111,20 @@ void DNSServer::task()
   // buffer serves both directions.
   uint8_t packet[DNSPacket::MAX_PACKET];
 
-  while (!m_stop.load(std::memory_order_relaxed)) {
+  while (!m_task.stopRequested()) {
     struct sockaddr_in from = {};
     socklen_t fromLen       = sizeof(from);
 
     ssize_t n = recvfrom(m_socket, packet, sizeof(packet), 0, reinterpret_cast<struct sockaddr*>(&from), &fromLen);
 
     // Don't answer anything once shutdown has begun.
-    if (m_stop.load(std::memory_order_relaxed)) {
+    if (m_task.stopRequested()) {
       break;
     }
 
     if (n < 0) {
       if (errno == EAGAIN || errno == EWOULDBLOCK) {
-        continue;  // receive timeout, which is how we get here to check m_stop
+        continue;  // receive timeout, which is how we get here to check for a stop
       }
       // A socket can enter a persistent error state when the AP interface goes
       // down. Back off so that can't spin the core at full tilt.
@@ -159,6 +142,4 @@ void DNSServer::task()
       OS_LOGW(TAG, "DNS sendto failed: errno=%d", errno);  // e.g. ENOMEM when TX buffers are exhausted
     }
   }
-
-  TaskUtils::TaskExiting(m_taskExited);
 }

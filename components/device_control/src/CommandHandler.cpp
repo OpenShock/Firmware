@@ -15,7 +15,7 @@ const char* const TAG = "CommandHandler";
 #include "radio/RFTransmitter.h"
 #include "SimpleMutex.h"
 #include "Temporal.h"
-#include "util/TaskUtils.h"
+#include "util/ManagedTask.h"
 #include <cstring>
 
 #include <freertos/queue.h>
@@ -65,17 +65,14 @@ static void DestroyTransmitter()
   s_rfTransmitter = nullptr;
 }
 
-static OpenShock::SimpleMutex s_keepAliveMutex                  = {};
-static QueueHandle_t s_keepAliveQueue                           = nullptr;
-static TaskHandle_t s_keepAliveTaskHandle                       = nullptr;
-static OpenShock::TaskUtils::TaskExitFlag s_keepAliveTaskExited = false;
+static OpenShock::SimpleMutex s_keepAliveMutex = {};
+static QueueHandle_t s_keepAliveQueue          = nullptr;
+static OpenShock::ManagedTask s_keepAliveTask(TAG, "Keep-alive task");
 
 using namespace OpenShock;
 
-static void commandhandler_keepalivetask(void* arg)
+static void commandhandler_keepalivetask()
 {
-  (void)arg;
-
   int64_t timeToKeepAlive = KEEP_ALIVE_INTERVAL;
 
   // Map of (model, shocker ID) to its last activity; IDs are only unique per model
@@ -89,7 +86,7 @@ static void commandhandler_keepalivetask(void* arg)
     while (xQueueReceive(s_keepAliveQueue, &cmd, pdMS_TO_TICKS(eepyTime)) == pdTRUE) {
       if (cmd.killTask) {
         OS_LOGI(TAG, "Received kill command, exiting keep-alive task");
-        goto exit;  // Break out of nested loop so locals destruct before vTaskDelete
+        return;
       }
 
       activityMap[(static_cast<uint32_t>(cmd.model) << 16) | cmd.shockerId] = cmd;
@@ -126,9 +123,6 @@ static void commandhandler_keepalivetask(void* arg)
       timeToKeepAlive = std::min(timeToKeepAlive, cmdRef.lastActivityTimestamp + KEEP_ALIVE_INTERVAL);
     }
   }
-
-exit:  // Locals (activityMap) destruct here before task deletion
-  TaskUtils::TaskExiting(s_keepAliveTaskExited);
 }
 
 static bool internalSetKeepAliveEnabled(bool enabled)
@@ -136,7 +130,7 @@ static bool internalSetKeepAliveEnabled(bool enabled)
   // Called from the event loop (EStop changes) and from serial/portal tasks; the check must be under the lock.
   ScopedLock lock__(&s_keepAliveMutex);
 
-  bool wasEnabled = s_keepAliveQueue != nullptr && s_keepAliveTaskHandle != nullptr;
+  bool wasEnabled = s_keepAliveQueue != nullptr && s_keepAliveTask.running();
 
   if (enabled == wasEnabled) {
     return true;
@@ -151,8 +145,7 @@ static bool internalSetKeepAliveEnabled(bool enabled)
       return false;
     }
 
-    s_keepAliveTaskExited.store(false, std::memory_order_relaxed);
-    if (TaskUtils::TaskCreateExpensive(commandhandler_keepalivetask, "KeepAliveTask", 4096, nullptr, 1, &s_keepAliveTaskHandle) != pdPASS) {  // PROFILED: 1.5KB stack usage
+    if (!s_keepAliveTask.startExpensive("KeepAliveTask", 4096, 1, commandhandler_keepalivetask)) {  // PROFILED: 1.5KB stack usage
       OS_LOGE(TAG, "Failed to create keep-alive task");
 
       vQueueDelete(s_keepAliveQueue);
@@ -162,19 +155,18 @@ static bool internalSetKeepAliveEnabled(bool enabled)
     }
   } else {
     OS_LOGV(TAG, "Disabling keep-alive task");
-    if (s_keepAliveTaskHandle != nullptr && s_keepAliveQueue != nullptr) {
-      // Drop pending activity so the kill command always fits, then wait for the task to exit
-      xQueueReset(s_keepAliveQueue);
+    if (s_keepAliveTask.running() && s_keepAliveQueue != nullptr) {
+      // The task blocks on its queue, so wake it with a kill command. Drop pending activity first so it always fits.
+      s_keepAliveTask.stop([] {
+        xQueueReset(s_keepAliveQueue);
 
-      KnownShocker cmd;
-      memset(&cmd, 0, sizeof(cmd));
-      cmd.killTask = true;
-      if (xQueueSend(s_keepAliveQueue, &cmd, pdMS_TO_TICKS(100)) != pdTRUE) {
-        OS_LOGE(TAG, "Failed to queue keep-alive kill command");
-      }
-
-      TaskUtils::StopTask(s_keepAliveTaskHandle, s_keepAliveTaskExited, TAG, "Keep-alive task");
-      s_keepAliveTaskHandle = nullptr;
+        KnownShocker cmd;
+        memset(&cmd, 0, sizeof(cmd));
+        cmd.killTask = true;
+        if (xQueueSend(s_keepAliveQueue, &cmd, pdMS_TO_TICKS(100)) != pdTRUE) {
+          OS_LOGE(TAG, "Failed to queue keep-alive kill command");
+        }
+      });
       vQueueDelete(s_keepAliveQueue);
       s_keepAliveQueue = nullptr;
     } else {

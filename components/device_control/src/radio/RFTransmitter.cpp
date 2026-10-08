@@ -9,8 +9,6 @@ const char* const TAG = "RFTransmitter";
 
 #include "radio/rmt/Sequence.h"
 #include "Temporal.h"
-#include "util/FnProxy.h"
-#include "util/TaskUtils.h"
 #include <cstring>
 
 #include <esp_err.h>
@@ -42,10 +40,9 @@ struct RFTransmitter::Command {
 RFTransmitter::RFTransmitter(gpio_num_t gpioPin)
   : m_txPin(gpioPin)
   , m_queueHandle(nullptr)
-  , m_taskHandle(nullptr)
-  , m_taskExited(false)
   , m_rmtChannel(nullptr)
   , m_rmtEncoder(nullptr)
+  , m_task(TAG, "RFTransmitter task")
 {
   OS_LOGD(TAG, "[pin-%hhi] Creating RFTransmitter", m_txPin);
 
@@ -89,8 +86,7 @@ RFTransmitter::RFTransmitter(gpio_num_t gpioPin)
   char name[32];
   snprintf(name, sizeof(name), "RFTransmitter-%u", m_txPin);
 
-  m_taskExited.store(false, std::memory_order_relaxed);
-  if (TaskUtils::TaskCreateExpensive(Util::FnProxy<&RFTransmitter::TransmitTask>, name, kTaskStackSize, this, kTaskPriority, &m_taskHandle) != pdPASS) {
+  if (!m_task.startExpensive(name, kTaskStackSize, kTaskPriority, [this] { TransmitTask(); })) {
     OS_LOGE(TAG, "[pin-%hhi] Failed to create task", m_txPin);
     destroy();
     return;
@@ -147,27 +143,25 @@ void RFTransmitter::ClearPendingCommands()
 
 void RFTransmitter::destroy()
 {
-  if (m_taskHandle != nullptr) {
+  if (m_task.running()) {
     OS_LOGD(TAG, "[pin-%hhi] Stopping task", m_txPin);
 
-    // Drop pending commands first so the kill command always fits, then wait for the task to exit
-    ClearPendingCommands();
+    // The task blocks on its queue, so wake it with a kill command. Drop pending commands first so it always fits.
+    m_task.stop([this] {
+      ClearPendingCommands();
 
-    Command cmd;
-    memset(&cmd, 0, sizeof(cmd));
-    cmd.flags = kFlagDeleteTask;
-    if (xQueueSendToFront(m_queueHandle, &cmd, pdMS_TO_TICKS(100)) != pdTRUE) {
-      OS_LOGE(TAG, "[pin-%hhi] Failed to queue task kill command", m_txPin);
-    }
-
-    TaskUtils::StopTask(m_taskHandle, m_taskExited, TAG, "RFTransmitter task");
+      Command cmd;
+      memset(&cmd, 0, sizeof(cmd));
+      cmd.flags = kFlagDeleteTask;
+      if (xQueueSendToFront(m_queueHandle, &cmd, pdMS_TO_TICKS(100)) != pdTRUE) {
+        OS_LOGE(TAG, "[pin-%hhi] Failed to queue task kill command", m_txPin);
+      }
+    });
 
     OS_LOGD(TAG, "[pin-%hhi] Task stopped", m_txPin);
 
     // Clear the queue
     ClearPendingCommands();
-
-    m_taskHandle = nullptr;
   }
   if (m_queueHandle != nullptr) {
     vQueueDelete(m_queueHandle);
@@ -272,7 +266,7 @@ void RFTransmitter::TransmitTask()
     while (xQueueReceive(m_queueHandle, &cmd, sequences.empty() ? portMAX_DELAY : 0) == pdTRUE) {
       // Destroy task if we receive destroy command
       if ((cmd.flags & kFlagDeleteTask) != 0) {
-        goto exit;  // Break out of nested loop so locals destruct before vTaskDelete
+        return;
       }
 
       // Discard any command received while estopped
@@ -317,7 +311,4 @@ void RFTransmitter::TransmitTask()
 
     writeSequences(m_rmtChannel, m_rmtEncoder, sequences);
   }
-
-exit:  // Locals (sequences) destruct here before task deletion
-  TaskUtils::TaskExiting(m_taskExited);
 }

@@ -41,13 +41,12 @@ static std::atomic<bool> s_ledTestActive  = false;  // While set, the LED test o
 static std::unique_ptr<OpenShock::MonoLedDriver> s_monoLedDriver;
 static std::unique_ptr<OpenShock::RgbLedDriver> s_rgbLedDriver;
 
-static inline void setStateFlag(uint64_t flag, bool state)
+// Sets or clears `flag` and returns whether that changed it. Atomic per flag, so concurrent setters (the event loop,
+// SetCriticalError, SetScanningStarted) each see their own change and none is missed.
+static inline bool setStateFlag(uint64_t flag, bool state)
 {
-  if (state) {
-    s_stateFlags.fetch_or(flag, std::memory_order_relaxed);
-  } else {
-    s_stateFlags.fetch_and(~flag, std::memory_order_relaxed);
-  }
+  uint64_t previous = state ? s_stateFlags.fetch_or(flag, std::memory_order_relaxed) : s_stateFlags.fetch_and(~flag, std::memory_order_relaxed);
+  return ((previous & flag) != 0) != state;
 }
 
 using namespace OpenShock;
@@ -271,24 +270,24 @@ static void handleEspWiFiEvent(void* event_handler_arg, esp_event_base_t event_b
   (void)event_base;
   (void)event_data;
 
-  uint64_t oldState = s_stateFlags;
+  bool changed = false;
 
   switch (event_id) {
     case WIFI_EVENT_STA_CONNECTED:
-      setStateFlag(kWiFiConnectedFlag, true);
+      changed = setStateFlag(kWiFiConnectedFlag, true);
       break;
     case WIFI_EVENT_STA_DISCONNECTED:
-      setStateFlag(kWiFiConnectedFlag, false);
-      setStateFlag(kHasIpAddressFlag, false);
+      changed = setStateFlag(kWiFiConnectedFlag, false);
+      changed |= setStateFlag(kHasIpAddressFlag, false);
       break;
     case WIFI_EVENT_SCAN_DONE:
-      setStateFlag(kWiFiScanningFlag, false);
+      changed = setStateFlag(kWiFiScanningFlag, false);
       break;
     default:
       return;
   }
 
-  if (oldState != s_stateFlags) {
+  if (changed) {
     updateVisualState();
   }
 }
@@ -299,43 +298,44 @@ static void handleEspIpEvent(void* event_handler_arg, esp_event_base_t event_bas
   (void)event_base;
   (void)event_data;
 
-  uint64_t oldState = s_stateFlags;
+  bool changed = false;
 
   switch (event_id) {
     case IP_EVENT_GOT_IP6:
     case IP_EVENT_STA_GOT_IP:
     case IP_EVENT_ETH_GOT_IP:
     case IP_EVENT_PPP_GOT_IP:
-      setStateFlag(kHasIpAddressFlag, true);
+      changed = setStateFlag(kHasIpAddressFlag, true);
       break;
     case IP_EVENT_STA_LOST_IP:
     case IP_EVENT_ETH_LOST_IP:
     case IP_EVENT_PPP_LOST_IP:
-      setStateFlag(kHasIpAddressFlag, false);
+      changed = setStateFlag(kHasIpAddressFlag, false);
       break;
     default:
       return;
   }
 
-  if (oldState != s_stateFlags) {
+  if (changed) {
     updateVisualState();
   }
 }
 
-static void handleOpenShockEStopStateChanged(void* event_data)
+static bool handleOpenShockEStopStateChanged(void* event_data)
 {
   auto state = *static_cast<EStopState*>(event_data);
 
-  setStateFlag(kEmergencyStoppedFlag, state != EStopState::Idle);
-  setStateFlag(kEmergencyStopActiveClearingFlag, state == EStopState::ActiveClearing);
-  setStateFlag(kEmergencyStopAwaitingReleaseFlag, state == EStopState::AwaitingRelease);
+  bool changed = setStateFlag(kEmergencyStoppedFlag, state != EStopState::Idle);
+  changed |= setStateFlag(kEmergencyStopActiveClearingFlag, state == EStopState::ActiveClearing);
+  changed |= setStateFlag(kEmergencyStopAwaitingReleaseFlag, state == EStopState::AwaitingRelease);
+  return changed;
 }
 
-static void handleOpenShockGatewayStateChanged(void* event_data)
+static bool handleOpenShockGatewayStateChanged(void* event_data)
 {
   auto state = *static_cast<GatewayClientState*>(event_data);
 
-  setStateFlag(kWebSocketConnectedFlag, state == GatewayClientState::Connected);
+  return setStateFlag(kWebSocketConnectedFlag, state == GatewayClientState::Connected);
 }
 
 static void handleOpenShockEvent(void* event_handler_arg, esp_event_base_t event_base, int32_t event_id, void* event_data)
@@ -343,14 +343,14 @@ static void handleOpenShockEvent(void* event_handler_arg, esp_event_base_t event
   (void)event_handler_arg;
   (void)event_base;
 
-  uint64_t oldState = s_stateFlags;
+  bool changed = false;
 
   switch (event_id) {
     case OPENSHOCK_EVENT_ESTOP_STATE_CHANGED:
-      handleOpenShockEStopStateChanged(event_data);
+      changed = handleOpenShockEStopStateChanged(event_data);
       break;
     case OPENSHOCK_EVENT_GATEWAY_CLIENT_STATE_CHANGED:
-      handleOpenShockGatewayStateChanged(event_data);
+      changed = handleOpenShockGatewayStateChanged(event_data);
       break;
     case OPENSHOCK_EVENT_WIFI_STATE_CHANGED:
       // WiFi state is tracked from the IDF WIFI_EVENT/IP_EVENT handlers above.
@@ -360,7 +360,7 @@ static void handleOpenShockEvent(void* event_handler_arg, esp_event_base_t event
       return;
   }
 
-  if (oldState != s_stateFlags) {
+  if (changed) {
     updateVisualState();
   }
 }
@@ -421,22 +421,14 @@ bool VisualStateManager::Init()
 
 void VisualStateManager::SetCriticalError()
 {
-  uint64_t oldState = s_stateFlags;
-
-  setStateFlag(kCriticalErrorFlag, true);
-
-  if (oldState != s_stateFlags) {
+  if (setStateFlag(kCriticalErrorFlag, true)) {
     updateVisualState();
   }
 }
 
 void VisualStateManager::SetScanningStarted()
 {
-  uint64_t oldState = s_stateFlags;
-
-  setStateFlag(kWiFiScanningFlag, true);
-
-  if (oldState != s_stateFlags) {
+  if (setStateFlag(kWiFiScanningFlag, true)) {
     updateVisualState();
   }
 }

@@ -259,6 +259,12 @@ static void fakeTaskDelay(const TickType_t ticks, int)
   Now += TicksToMs(ticks);
 }
 
+// ManagedTask wakes a task it stops with a notification; fake tasks only run inside RunTask(), so there is nothing to wake.
+static BaseType_t fakeTaskGenericNotify(TaskHandle_t, UBaseType_t, uint32_t, eNotifyAction, uint32_t*, int)
+{
+  return pdPASS;
+}
+
 // --- esp_timer (tools/mocks/esp_timer), behind Temporal.h's micros()/millis() ---
 
 static int64_t fakeTimerGetTime(int)
@@ -350,6 +356,7 @@ __attribute__((constructor(101))) static void installMockCallbacks()
   xQueueGenericReset_Stub(fakeQueueGenericReset);
   vQueueDelete_Stub(fakeQueueDelete);
   vTaskDelay_Stub(fakeTaskDelay);
+  xTaskGenericNotify_Stub(fakeTaskGenericNotify);
 
   esp_timer_get_time_Stub(fakeTimerGetTime);
 

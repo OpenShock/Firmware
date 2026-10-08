@@ -14,6 +14,8 @@ const char* const TAG = "GatewayConnectionManager";
 #include "Temporal.h"
 
 #include "SimpleMutex.h"
+#include "util/Backoff.h"
+#include "util/RetiredList.h"
 
 #include <algorithm>
 #include <atomic>
@@ -29,17 +31,19 @@ const uint8_t FLAG_LINKED = 1 << 1;
 
 const uint8_t LINK_CODE_LENGTH = 6;
 
-static std::atomic<uint8_t> s_flags                 = 0;
-static std::atomic<int64_t> s_lastAuthFailure       = 0;
-static std::atomic<int64_t> s_lastConnectionAttempt = 0;
-static std::atomic<int64_t> s_nextHubInfoAttempt    = 0;
-static std::atomic<int64_t> s_hubInfoBackoffMs      = 0;
+static std::atomic<uint8_t> s_flags = 0;
+
+// Retry timing, owned by the main task (Update()). Other tasks ask for a reset through s_retryResetRequested.
+static OpenShock::Backoff s_authBackoff(300'000, 300'000);   // After the backend rejects the token: 5 minutes
+static OpenShock::Backoff s_connectBackoff(20'000, 20'000);  // Between LCG connection attempts: 20 seconds
+static OpenShock::Backoff s_hubInfoBackoff(5'000, 300'000);  // After a failed hub info fetch: 5 s doubling up to 5 min
+static std::atomic<bool> s_retryResetRequested = false;
 static OpenShock::SimpleMutex s_clientMutex;
 static std::shared_ptr<OpenShock::GatewayClient> s_wsClient = nullptr;
 // Clients taken out of service but not yet destroyed. Destruction blocks (websocket close + task stop), so it is
-// deferred to the main task in reapRetiredClients() instead of running under s_clientMutex, on the event loop, or
-// on the websocket task (where stopping the client from inside its own task is not allowed).
-static std::vector<std::shared_ptr<OpenShock::GatewayClient>> s_retiredClients;
+// deferred to the main task (Update()) instead of running under s_clientMutex, on the event loop, or on the websocket
+// task (where stopping the client from inside its own task is not allowed).
+static OpenShock::RetiredList<OpenShock::GatewayClient> s_retiredClients;
 
 static std::shared_ptr<OpenShock::GatewayClient> GetClient()
 {
@@ -56,27 +60,8 @@ static void DestroyClient()
   OpenShock::ScopedLock lock__(&s_clientMutex);
   if (s_wsClient != nullptr) {
     s_wsClient->retire();
-    s_retiredClients.push_back(std::move(s_wsClient));
-    s_wsClient = nullptr;
+    s_retiredClients.retire(std::move(s_wsClient));  // Leaves s_wsClient null
   }
-}
-// Main task only. Destroys retired clients that no other task still holds a reference to.
-static void reapRetiredClients()
-{
-  std::vector<std::shared_ptr<OpenShock::GatewayClient>> reapable;
-  {
-    OpenShock::ScopedLock lock__(&s_clientMutex);
-    for (auto it = s_retiredClients.begin(); it != s_retiredClients.end();) {
-      // No new references can be taken once retired, so a use_count of 1 means we are the sole owner.
-      if (it->use_count() == 1) {
-        reapable.push_back(std::move(*it));
-        it = s_retiredClients.erase(it);
-      } else {
-        ++it;
-      }
-    }
-  }
-  // `reapable` goes out of scope here, outside the lock, running the destructors on this task.
 }
 
 static void handleWiFiStateChanged(void* arg, esp_event_base_t base, int32_t id, void* data)
@@ -98,15 +83,6 @@ static void handleWiFiStateChanged(void* arg, esp_event_base_t base, int32_t id,
     default:
       break;
   }
-}
-
-static bool checkIsDeAuthRateLimited(int64_t millis)
-{
-  return s_lastAuthFailure != 0 && (millis - s_lastAuthFailure) < 300'000;  // 5 Minutes
-}
-static bool checkIsConnectionRateLimited(int64_t millis)
-{
-  return s_lastConnectionAttempt != 0 && (millis - s_lastConnectionAttempt) < 20'000;  // 20 seconds
 }
 
 using namespace OpenShock;
@@ -194,6 +170,7 @@ AccountLinkResultCode GatewayConnectionManager::Link(std::string_view linkCode)
   }
 
   // Only drop the existing connection once the new token is in place; a failed link keeps the current session.
+  s_retryResetRequested = true;  // A new token deserves an immediate check, whatever the old one's backoff
   DestroyClient();
 
   s_flags.fetch_or(FLAG_LINKED, std::memory_order_relaxed);
@@ -215,9 +192,7 @@ bool GatewayConnectionManager::SetAuthToken(std::string authToken)
 
   // Drop the session using the old token; the main task verifies the new one and reconnects (and broadcasts the link status).
   s_flags.fetch_and(static_cast<uint8_t>(~FLAG_LINKED), std::memory_order_relaxed);
-  s_lastAuthFailure    = 0;
-  s_hubInfoBackoffMs   = 0;
-  s_nextHubInfoAttempt = 0;
+  s_retryResetRequested = true;  // A new token deserves an immediate check
   DestroyClient();
 
   return true;
@@ -260,7 +235,7 @@ static bool FetchHubInfo(std::string authToken)
     return false;
   }
 
-  if (checkIsDeAuthRateLimited(OpenShock::millis())) {
+  if (!s_authBackoff.ready(OpenShock::millis())) {
     return false;
   }
 
@@ -268,7 +243,7 @@ static bool FetchHubInfo(std::string authToken)
 
   if (response.code == 401) {
     OS_LOGD(TAG, "Auth token is invalid, waiting 5 minutes before checking again");
-    s_lastAuthFailure = OpenShock::millis();
+    s_authBackoff.backOff(OpenShock::millis());
     return false;
   }
 
@@ -308,10 +283,10 @@ static bool StartConnectingToLCG()
   }
 
   int64_t msNow = OpenShock::millis();
-  if (checkIsDeAuthRateLimited(msNow) || checkIsConnectionRateLimited(msNow)) {
+  if (!s_authBackoff.ready(msNow) || !s_connectBackoff.ready(msNow)) {
     return false;
   }
-  s_lastConnectionAttempt = msNow;
+  s_connectBackoff.backOff(msNow);
 
   if (!Config::HasBackendAuthToken()) {
     OS_LOGD(TAG, "No auth token, can't connect to LCG");
@@ -328,7 +303,7 @@ static bool StartConnectingToLCG()
 
   if (response.code == 401) {
     OS_LOGD(TAG, "Auth token is invalid, waiting 5 minutes before retrying");
-    s_lastAuthFailure = OpenShock::millis();
+    s_authBackoff.backOff(OpenShock::millis());
     return false;
   }
 
@@ -361,8 +336,8 @@ static void InitializeClient()
   }
 
   int64_t now = OpenShock::millis();
-  if (now < s_nextHubInfoAttempt) {
-    return;
+  if (!s_authBackoff.ready(now) || !s_hubInfoBackoff.ready(now)) {
+    return;  // Checked here so an auth hold-off doesn't also count as a hub info failure and stack the two backoffs
   }
 
   std::string authToken;
@@ -372,13 +347,11 @@ static void InitializeClient()
   }
 
   if (!FetchHubInfo(authToken)) {
-    // Back off on failure so an unreachable backend isn't polled on every update tick (5 s doubling up to 5 min).
-    s_hubInfoBackoffMs   = s_hubInfoBackoffMs == 0 ? 5'000 : std::min<int64_t>(s_hubInfoBackoffMs * 2, 300'000);
-    s_nextHubInfoAttempt = OpenShock::millis() + s_hubInfoBackoffMs;
+    // Back off on failure so an unreachable backend isn't polled on every update tick.
+    s_hubInfoBackoff.backOff(OpenShock::millis());
     return;
   }
-  s_hubInfoBackoffMs   = 0;
-  s_nextHubInfoAttempt = 0;
+  s_hubInfoBackoff.reset();
 
   // The token may have been cleared or replaced (UnLink / Link) while the request was in flight.
   std::string currentToken;
@@ -397,7 +370,12 @@ static void InitializeClient()
 
 void GatewayConnectionManager::Update()
 {
-  reapRetiredClients();
+  s_retiredClients.reap();
+
+  if (s_retryResetRequested.exchange(false)) {
+    s_authBackoff.reset();
+    s_hubInfoBackoff.reset();
+  }
 
   auto client = GetClient();
   if (client != nullptr) {

@@ -5,6 +5,7 @@
 #include <atomic>
 #include <cstdint>
 
+// For a task that is started and stopped, prefer util/ManagedTask.h, which wraps TaskExiting() and StopTask().
 namespace OpenShock::TaskUtils {
   /// @brief A task's exit signal, owned by whoever owns the task.
   ///        The task publishes it through TaskExiting() immediately before deleting
