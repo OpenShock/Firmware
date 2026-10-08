@@ -62,6 +62,12 @@ BOARD_PINS: dict[str, tuple[str, int]] = {
     'OPENSHOCK_LED_GPIO': ('int', -1),
     'OPENSHOCK_LED_WS2812B': ('int', -1),
     'OPENSHOCK_LED_SWAP_RG_CHANNELS': ('bool', 0),
+    # LAN8720 on the ESP32's internal EMAC (RMII). PHY_ADDR -1 auto-detects the address.
+    'OPENSHOCK_ETHERNET_LAN8720': ('bool', 0),
+    'OPENSHOCK_ETH_PHY_ADDR': ('int', -1),
+    'OPENSHOCK_ETH_PHY_POWER_GPIO': ('int', -1),
+    'OPENSHOCK_ETH_MDC_GPIO': ('int', -1),
+    'OPENSHOCK_ETH_MDIO_GPIO': ('int', -1),
 }
 
 

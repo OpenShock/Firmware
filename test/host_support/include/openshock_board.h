@@ -5,6 +5,11 @@
 #pragma once
 
 #define OPENSHOCK_ESTOP_PIN            -1
+#define OPENSHOCK_ETH_MDC_GPIO         -1
+#define OPENSHOCK_ETH_MDIO_GPIO        -1
+#define OPENSHOCK_ETH_PHY_ADDR         -1
+#define OPENSHOCK_ETH_PHY_POWER_GPIO   -1
+#define OPENSHOCK_ETHERNET_LAN8720     0
 #define OPENSHOCK_FW_BOARD             "HostTest"
 #define OPENSHOCK_FW_BOARD_HOSTTEST    1
 #define OPENSHOCK_FW_CHIP              "ESP32"

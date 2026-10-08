@@ -19,6 +19,7 @@ idf_component_register(
   REQUIRES common temporal logging http chipset led_drivers protocols osjson events esp_driver_rmt esp_driver_gpio esp_netif esp_event esp_wifi esp_timer nvs_flash mbedtls flatbuffers serialization config
   # Internal-only now that GatewayClient.h is private:
   PRIV_REQUIRES espressif__esp_websocket_client
+                esp_eth          # network/NetworkManager + ethernet/EthernetManager (ETH_EVENT, EMAC driver)
                 device_control   # estop/CommandHandler/visual used only in core .cpp
 )
 

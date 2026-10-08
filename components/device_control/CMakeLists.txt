@@ -13,6 +13,7 @@ idf_component_register(
   INCLUDE_DIRS  "include"
   REQUIRES      common esp_hal_gpio esp_driver_rmt freertos   # public headers (enums, gpio_types, rmt_tx/encoder, TaskHandle/QueueHandle)
   PRIV_REQUIRES config chipset events led_drivers logging temporal protocols   # concurrency/util folded into common (public REQUIRE)
+                esp_eth                                                      # ETH_EVENT link state for the status LED
                 esp_driver_gpio esp_wifi esp_event esp_netif soc
 )
 

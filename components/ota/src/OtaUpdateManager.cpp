@@ -10,7 +10,9 @@ const char* const TAG = "OtaUpdateManager";
 #include "Hashing.h"
 #include "http/HTTPRequestManager.h"
 #include "hwutil/PartitionUtils.h"
+#include "events/Events.h"
 #include "Logging.h"
+#include "network/NetworkManager.h"
 #include "OpenShock.h"
 #include "SemVer.h"
 #include "serialization/WSGateway.h"
@@ -19,7 +21,6 @@ const char* const TAG = "OtaUpdateManager";
 #include "Temporal.h"
 #include "util/HexUtils.h"
 #include "util/TaskUtils.h"
-#include "wifi/WiFiManager.h"
 #include "json/Json.h"
 
 #include <esp_event.h>
@@ -51,10 +52,10 @@ using namespace std::string_view_literals;
 #define OPENSHOCK_FW_REPO_VERSION_URL_FORMAT "https://%s" OPENSHOCK_FW_REPO_API_PREFIX "/versions/%s/" OPENSHOCK_FW_BOARD
 
 enum OtaTaskEventFlag : uint32_t {
-  OTA_TASK_EVENT_UPDATE_REQUESTED  = 1 << 0,
-  OTA_TASK_EVENT_WIFI_DISCONNECTED = 1 << 1,  // If both connected and disconnected are set, the current link state decides.
-  OTA_TASK_EVENT_WIFI_CONNECTED    = 1 << 2,
-  OTA_TASK_EVENT_CHECK_REQUESTED   = 1 << 3,
+  OTA_TASK_EVENT_UPDATE_REQUESTED     = 1 << 0,
+  OTA_TASK_EVENT_NETWORK_DISCONNECTED = 1 << 1,  // If both connected and disconnected are set, the current link state decides.
+  OTA_TASK_EVENT_NETWORK_CONNECTED    = 1 << 2,
+  OTA_TASK_EVENT_CHECK_REQUESTED      = 1 << 3,
 };
 
 static esp_ota_img_states_t _otaImageState;
@@ -110,29 +111,20 @@ static bool _tryGetRequestedVersion(OpenShock::SemVer& version)
   return true;
 }
 
-static void otaum_evh_wifidisconnected(void* event_handler_arg, esp_event_base_t event_base, int32_t event_id, void* event_data)
-{
-  (void)event_handler_arg;
-  (void)event_base;
-  (void)event_id;
-  (void)event_data;
-
-  otaum_try_notify_task(OTA_TASK_EVENT_WIFI_DISCONNECTED);
-}
-
-static void otaum_evh_ipevent(void* event_handler_arg, esp_event_base_t event_base, int32_t event_id, void* event_data)
+// Network events cover WiFi and Ethernet: DOWN only fires once no interface has an IP left.
+static void otaum_evh_network(void* event_handler_arg, esp_event_base_t event_base, int32_t event_id, void* event_data)
 {
   (void)event_handler_arg;
   (void)event_base;
   (void)event_data;
 
   switch (event_id) {
-    case IP_EVENT_GOT_IP6:
-    case IP_EVENT_STA_GOT_IP:
-      otaum_try_notify_task(OTA_TASK_EVENT_WIFI_CONNECTED);
+    case OPENSHOCK_EVENT_NETWORK_UP:
+    case OPENSHOCK_EVENT_NETWORK_GOT_IP:
+      otaum_try_notify_task(OTA_TASK_EVENT_NETWORK_CONNECTED);
       break;
-    case IP_EVENT_STA_LOST_IP:
-      otaum_try_notify_task(OTA_TASK_EVENT_WIFI_DISCONNECTED);
+    case OPENSHOCK_EVENT_NETWORK_DOWN:
+      otaum_try_notify_task(OTA_TASK_EVENT_NETWORK_DISCONNECTED);
       break;
     default:
       return;
@@ -312,18 +304,18 @@ static void otaum_updatetask(void* arg)
     updateRequested |= (eventBits & OTA_TASK_EVENT_UPDATE_REQUESTED) != 0;
     checkRequested |= (eventBits & OTA_TASK_EVENT_CHECK_REQUESTED) != 0;
 
-    bool gotConnected    = (eventBits & OTA_TASK_EVENT_WIFI_CONNECTED) != 0;
-    bool gotDisconnected = (eventBits & OTA_TASK_EVENT_WIFI_DISCONNECTED) != 0;
+    bool gotConnected    = (eventBits & OTA_TASK_EVENT_NETWORK_CONNECTED) != 0;
+    bool gotDisconnected = (eventBits & OTA_TASK_EVENT_NETWORK_DISCONNECTED) != 0;
 
     if (gotConnected && gotDisconnected) {
       // Both edges were coalesced into one wait, so their order is unknown; ask for the current link state.
-      connected = WiFiManager::IsConnected();
-      OS_LOGD(TAG, "WiFi connection changed, now %s", connected ? "connected" : "disconnected");
+      connected = NetworkManager::HasIP();
+      OS_LOGD(TAG, "Network connection changed, now %s", connected ? "connected" : "disconnected");
     } else if (gotDisconnected) {
-      OS_LOGD(TAG, "WiFi disconnected");
+      OS_LOGD(TAG, "Network disconnected");
       connected = false;
     } else if (gotConnected && !connected) {
-      OS_LOGD(TAG, "WiFi connected");
+      OS_LOGD(TAG, "Network connected");
       connected = true;
     }
 
@@ -626,16 +618,12 @@ bool OtaUpdateManager::Init()
     return false;
   }
 
-  err = esp_event_handler_register(IP_EVENT, ESP_EVENT_ANY_ID, otaum_evh_ipevent, nullptr);
-  if (err != ESP_OK) {
-    OS_LOGE(TAG, "Failed to register event handler for IP_EVENT: %s", esp_err_to_name(err));
-    return false;
-  }
-
-  err = esp_event_handler_register(WIFI_EVENT, WIFI_EVENT_STA_DISCONNECTED, otaum_evh_wifidisconnected, nullptr);
-  if (err != ESP_OK) {
-    OS_LOGE(TAG, "Failed to register event handler for WIFI_EVENT: %s", esp_err_to_name(err));
-    return false;
+  for (int32_t eventId : {OPENSHOCK_EVENT_NETWORK_UP, OPENSHOCK_EVENT_NETWORK_GOT_IP, OPENSHOCK_EVENT_NETWORK_DOWN}) {
+    err = esp_event_handler_register(OPENSHOCK_EVENTS, eventId, otaum_evh_network, nullptr);
+    if (err != ESP_OK) {
+      OS_LOGE(TAG, "Failed to register network event handler: %s", esp_err_to_name(err));
+      return false;
+    }
   }
 
   return true;

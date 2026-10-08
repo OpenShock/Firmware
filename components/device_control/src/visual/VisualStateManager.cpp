@@ -11,6 +11,7 @@ const char* const TAG = "VisualStateManager";
 #include "led_drivers/RgbLedDriver.h"
 #include "Logging.h"
 
+#include <esp_eth.h>
 #include <esp_netif.h>
 #include <esp_wifi.h>
 
@@ -32,9 +33,18 @@ const uint64_t kWebSocketConnectedFlag           = 1 << 4;
 const uint64_t kHasIpAddressFlag                 = 1 << 5;
 const uint64_t kWiFiConnectedFlag                = 1 << 6;
 const uint64_t kWiFiScanningFlag                 = 1 << 7;
+const uint64_t kEthernetConnectedFlag            = 1 << 8;
 
 // Bitmask of when the system is running normally
 const uint64_t kStatusOKMask = kWebSocketConnectedFlag | kHasIpAddressFlag | kWiFiConnectedFlag;
+// The same over Ethernet, with or without WiFi also connected.
+const uint64_t kStatusOKMaskEthernet  = kWebSocketConnectedFlag | kHasIpAddressFlag | kEthernetConnectedFlag;
+const uint64_t kStatusOKMaskDualHomed = kStatusOKMask | kEthernetConnectedFlag;
+
+static inline bool isStatusOk(uint64_t flags)
+{
+  return flags == kStatusOKMask || flags == kStatusOKMaskEthernet || flags == kStatusOKMaskDualHomed;
+}
 
 static std::atomic<uint64_t> s_stateFlags = 0;
 static std::atomic<bool> s_ledTestActive  = false;  // While set, the LED test owns the LEDs; flags keep tracking live state
@@ -233,7 +243,7 @@ static void applyVisualState(uint64_t flags)
   bool rgbActive  = s_rgbLedDriver != nullptr;
 
   if (gpioActive && rgbActive) {
-    if (flags == kStatusOKMask) {
+    if (isStatusOk(flags)) {
       updateVisualStateGPIO(kSolidOnPattern);
     } else {
       updateVisualStateGPIO(kSolidOffPattern);
@@ -277,8 +287,8 @@ static void handleEspWiFiEvent(void* event_handler_arg, esp_event_base_t event_b
       changed = setStateFlag(kWiFiConnectedFlag, true);
       break;
     case WIFI_EVENT_STA_DISCONNECTED:
+      // kHasIpAddressFlag follows OPENSHOCK_EVENT_NETWORK_*, since Ethernet may still have an IP.
       changed = setStateFlag(kWiFiConnectedFlag, false);
-      changed |= setStateFlag(kHasIpAddressFlag, false);
       break;
     case WIFI_EVENT_SCAN_DONE:
       changed = setStateFlag(kWiFiScanningFlag, false);
@@ -292,7 +302,7 @@ static void handleEspWiFiEvent(void* event_handler_arg, esp_event_base_t event_b
   }
 }
 
-static void handleEspIpEvent(void* event_handler_arg, esp_event_base_t event_base, int32_t event_id, void* event_data)
+static void handleEspEthEvent(void* event_handler_arg, esp_event_base_t event_base, int32_t event_id, void* event_data)
 {
   (void)event_handler_arg;
   (void)event_base;
@@ -301,16 +311,12 @@ static void handleEspIpEvent(void* event_handler_arg, esp_event_base_t event_bas
   bool changed = false;
 
   switch (event_id) {
-    case IP_EVENT_GOT_IP6:
-    case IP_EVENT_STA_GOT_IP:
-    case IP_EVENT_ETH_GOT_IP:
-    case IP_EVENT_PPP_GOT_IP:
-      changed = setStateFlag(kHasIpAddressFlag, true);
+    case ETHERNET_EVENT_CONNECTED:
+      changed = setStateFlag(kEthernetConnectedFlag, true);
       break;
-    case IP_EVENT_STA_LOST_IP:
-    case IP_EVENT_ETH_LOST_IP:
-    case IP_EVENT_PPP_LOST_IP:
-      changed = setStateFlag(kHasIpAddressFlag, false);
+    case ETHERNET_EVENT_DISCONNECTED:
+    case ETHERNET_EVENT_STOP:
+      changed = setStateFlag(kEthernetConnectedFlag, false);
       break;
     default:
       return;
@@ -353,8 +359,15 @@ static void handleOpenShockEvent(void* event_handler_arg, esp_event_base_t event
       changed = handleOpenShockGatewayStateChanged(event_data);
       break;
     case OPENSHOCK_EVENT_WIFI_STATE_CHANGED:
-      // WiFi state is tracked from the IDF WIFI_EVENT/IP_EVENT handlers above.
+      // WiFi link state is tracked from the IDF WIFI_EVENT handler above.
       return;
+    case OPENSHOCK_EVENT_NETWORK_UP:
+    case OPENSHOCK_EVENT_NETWORK_GOT_IP:
+      changed = setStateFlag(kHasIpAddressFlag, true);
+      break;
+    case OPENSHOCK_EVENT_NETWORK_DOWN:
+      changed = setStateFlag(kHasIpAddressFlag, false);
+      break;
     default:
       OS_LOGW(TAG, "Received unknown event ID: %d", static_cast<int>(event_id));
       return;
@@ -401,9 +414,9 @@ bool VisualStateManager::Init()
     return false;
   }
 
-  err = esp_event_handler_register(IP_EVENT, ESP_EVENT_ANY_ID, handleEspIpEvent, nullptr);
+  err = esp_event_handler_register(ETH_EVENT, ESP_EVENT_ANY_ID, handleEspEthEvent, nullptr);
   if (err != ESP_OK) {
-    OS_LOGE(TAG, "Failed to register event handler for IP_EVENT: %s", esp_err_to_name(err));
+    OS_LOGE(TAG, "Failed to register event handler for ETH_EVENT: %s", esp_err_to_name(err));
     return false;
   }
 

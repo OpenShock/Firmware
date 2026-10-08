@@ -64,18 +64,20 @@ static void DestroyClient()
   }
 }
 
-static void handleWiFiStateChanged(void* arg, esp_event_base_t base, int32_t id, void* data)
+// Network events cover WiFi and Ethernet: DOWN only fires once no interface has an IP left.
+static void handleNetworkEvent(void* arg, esp_event_base_t base, int32_t id, void* data)
 {
   (void)arg;
   (void)base;
-  (void)id;
+  (void)data;
 
-  switch (*static_cast<OpenShockWiFiState*>(data)) {
-    case OPENSHOCK_WIFI_STATE_GOT_IP:
+  switch (id) {
+    case OPENSHOCK_EVENT_NETWORK_UP:
+    case OPENSHOCK_EVENT_NETWORK_GOT_IP:
       s_flags.fetch_or(FLAG_HAS_IP, std::memory_order_relaxed);
       OS_LOGD(TAG, "Got IP address");
       break;
-    case OPENSHOCK_WIFI_STATE_DISCONNECTED:
+    case OPENSHOCK_EVENT_NETWORK_DOWN:
       s_flags.store(FLAG_NONE, std::memory_order_relaxed);
       DestroyClient();
       OS_LOGD(TAG, "Lost IP address");
@@ -90,10 +92,12 @@ namespace JsonAPI = OpenShock::Serialization::JsonAPI;
 
 bool GatewayConnectionManager::Init()
 {
-  esp_err_t err = esp_event_handler_register(OPENSHOCK_EVENTS, OPENSHOCK_EVENT_WIFI_STATE_CHANGED, handleWiFiStateChanged, nullptr);
-  if (err != ESP_OK) {
-    OS_LOGE(TAG, "Failed to register WiFi state event handler: %s", esp_err_to_name(err));
-    return false;
+  for (int32_t eventId : {OPENSHOCK_EVENT_NETWORK_UP, OPENSHOCK_EVENT_NETWORK_GOT_IP, OPENSHOCK_EVENT_NETWORK_DOWN}) {
+    esp_err_t err = esp_event_handler_register(OPENSHOCK_EVENTS, eventId, handleNetworkEvent, nullptr);
+    if (err != ESP_OK) {
+      OS_LOGE(TAG, "Failed to register network event handler: %s", esp_err_to_name(err));
+      return false;
+    }
   }
 
   return true;

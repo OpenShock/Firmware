@@ -6,9 +6,11 @@ const char* const TAG = "main";
 #include "CommandHandler.h"
 #include "config/Config.h"
 #include "estop/EStopManager.h"
+#include "ethernet/EthernetManager.h"
 #include "events/Events.h"
 #include "GatewayConnectionManager.h"
 #include "Logging.h"
+#include "network/NetworkManager.h"
 #include "OpenShock.h"
 #include "OtaUpdateManager.h"
 #include "serial_console/SerialInputHandler.h"
@@ -41,9 +43,20 @@ static bool trySetup()
     return false;
   }
 
+  // Before WiFi and Ethernet come up, so their first IP is seen.
+  if (!OpenShock::NetworkManager::Init()) {
+    OS_LOGE(TAG, "Unable to initialize NetworkManager");
+    return false;
+  }
+
   if (!OpenShock::WiFiManager::Init()) {
     OS_LOGE(TAG, "Unable to initialize WiFiManager");
     return false;
+  }
+
+  // After WiFiManager, which initializes esp_netif. A no-op on boards without Ethernet.
+  if (!OpenShock::EthernetManager::Init()) {
+    OS_LOGW(TAG, "Ethernet init failed; continuing with WiFi only");
   }
 
   if (!OpenShock::GatewayConnectionManager::Init()) {
