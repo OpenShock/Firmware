@@ -11,13 +11,13 @@
 
 namespace OpenShock {
   namespace detail {
-    struct LfsState;  // defined in LfsPartition.cpp — keeps lfs.h out of public headers
+    struct LfsState;  // defined in LfsPartition.cpp; keeps lfs.h out of public headers
   }
 
   // Mounts a littlefs filesystem directly over a raw esp_partition using the vendored
-  // littlefs core — no VFS registration. This is the shared kernel behind StaticFs
+  // littlefs core, no VFS registration. This is the shared kernel behind StaticFs
   // (read-only) and ConfigFs (read/write); most callers should use one of those
-  // façades rather than this class directly.
+  // facades rather than this class directly.
   //
   // Not thread-safe: callers that share a partition across tasks must serialize access
   // themselves.

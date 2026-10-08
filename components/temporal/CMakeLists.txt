@@ -1,4 +1,4 @@
-# OpenShock time helpers — OpenShock::millis(), OpenShock::micros().
+# OpenShock time helpers: OpenShock::millis(), OpenShock::micros().
 #
 # Thin header-only wrapper over esp_timer. Split from common so that logging
 # and other components can depend on it without pulling everything else in.

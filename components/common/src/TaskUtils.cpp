@@ -31,7 +31,7 @@ void TaskUtils::TaskExiting(TaskExitFlag& exited)
 {
   // Publish before deleting. Once vTaskDelete() runs, the idle task is free to
   // reclaim this task's TCB, so the handle StopTask() holds may already point at
-  // freed memory — the flag is the only thing it can safely read.
+  // freed memory; the flag is the only thing it can safely read.
   exited.store(true, std::memory_order_release);
   vTaskDelete(nullptr);
 }

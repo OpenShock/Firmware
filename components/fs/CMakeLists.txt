@@ -1,5 +1,5 @@
 # littlefs-over-esp_partition filesystem layer (no VFS), built on the vendored littlefs
-# core. Provides the shared LfsPartition mount kernel plus two façades:
+# core. Provides the shared LfsPartition mount kernel plus two facades:
 #   - StaticFs: read-only, streams pre-built image assets (e.g. the captive portal UI)
 #   - ConfigFs: read/write blob store for configuration (atomic writes, wear leveling)
 # and FsCheck: non-destructive helpers to validate a partition holds a mountable image.

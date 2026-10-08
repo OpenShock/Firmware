@@ -3,7 +3,7 @@
 # OTA) types that do not exist on the linux host target.
 #
 # Public surface:
-#   include/hwutil/PartitionUtils.h — hash / flash an esp_partition from a URL
+#   include/hwutil/PartitionUtils.h: hash / flash an esp_partition from a URL
 
 idf_component_register(
   SRCS          "src/PartitionUtils.cpp"

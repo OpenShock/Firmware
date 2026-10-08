@@ -346,7 +346,7 @@ static void evWiFiDisconnected(const wifi_event_sta_disconnected_t& info)
   if (it != s_wifiNetworks.end()) {
     Serialization::Local::SerializeWiFiNetworkEvent(Serialization::Types::WifiNetworkEventType::Disconnected, *it, AppHooks::CaptivePortalBroadcastMessageBIN);
   } else {
-    // Network not in scan results (forgotten or hidden) — send minimal event
+    // Network not in scan results (forgotten or hidden); send minimal event
     WiFiNetwork net;
     strncpy(net.ssid, ssid, sizeof(net.ssid) - 1);
     memcpy(net.bssid, info.bssid, sizeof(net.bssid));
@@ -606,7 +606,7 @@ bool WiFiManager::Save(const char* ssid, std::string_view password, bool connect
 
   auto it = findNetworkBySSID(ssid);
   if (it != s_wifiNetworks.end()) {
-    // Network is in scan results — use scanned auth mode (more reliable than user-provided)
+    // Network is in scan results; use scanned auth mode (more reliable than user-provided)
     uint8_t id = Config::AddWiFiCredentials(it->ssid, password, it->authMode);
     if (id == 0) {
       Serialization::Local::SerializeErrorMessage("too_many_credentials", AppHooks::CaptivePortalBroadcastMessageBIN);
@@ -622,7 +622,7 @@ bool WiFiManager::Save(const char* ssid, std::string_view password, bool connect
     return true;
   }
 
-  // Network not in scan results (hidden or out of range) — save credentials directly
+  // Network not in scan results (hidden or out of range); save credentials directly
   OS_LOGI(TAG, "Network %s not in scan results, saving credentials directly", ssid);
 
   uint8_t id = Config::AddWiFiCredentials(ssid, password, authMode);
@@ -669,7 +669,7 @@ bool WiFiManager::Forget(const char* ssid)
     return true;
   }
 
-  // Network not in scan results — look up credentials directly
+  // Network not in scan results; look up credentials directly
   Config::WiFiCredentials creds;
   if (!Config::TryGetWiFiCredentialsBySSID(ssid, creds)) {
     OS_LOGE(TAG, "Failed to find credentials for network %s", ssid);
@@ -738,7 +738,7 @@ bool WiFiManager::Connect(const char* ssid)
     s_preferredCredentialsID.store(creds.id, std::memory_order_relaxed);
   }
 
-  // Already connected to this network, or reconnecting — either way, success
+  // Already connected to this network, or reconnecting; either way, success
   return true;
 }
 

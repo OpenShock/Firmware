@@ -11,7 +11,7 @@
 #include <span>
 
 namespace OpenShock {
-  // Read-only view of a littlefs partition — for pre-built images (e.g. the captive
+  // Read-only view of a littlefs partition, for pre-built images (e.g. the captive
   // portal's gzipped web assets) that are flashed once and only read at runtime.
   // Streams files out to a caller-provided sink; never writes.
   class StaticFs {

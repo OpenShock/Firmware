@@ -1,4 +1,4 @@
-# Pishock-2023 — auto-ported from platformio.ini. Board-specific deltas only;
+# Pishock-2023: auto-ported from platformio.ini. Board-specific deltas only;
 # shared config lives in sdkconfig.defaults.
 
 CONFIG_IDF_TARGET="esp32"

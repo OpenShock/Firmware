@@ -15,7 +15,7 @@ namespace OpenShock {
   // small blobs, atomic replace (temp file + rename), wear leveling enabled, formats a
   // fresh partition on first mount.
   //
-  // Deals only in raw bytes — it has no knowledge of the config serialization format
+  // Deals only in raw bytes; it has no knowledge of the config serialization format
   // (flatbuffers). Serialization and any cross-task locking belong to the caller.
   class ConfigFs {
     DISABLE_COPY(ConfigFs);

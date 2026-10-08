@@ -47,7 +47,7 @@ using namespace std::string_view_literals;
 /// server can answer 204 when there is nothing to do. See spec §4.2.
 #define OPENSHOCK_FW_REPO_LATEST_URL_FORMAT "https://%s" OPENSHOCK_FW_REPO_API_PREFIX "/latest/%s/" OPENSHOCK_FW_BOARD "?version=%s"
 
-/// @brief Artifacts for one specific version of this board — the directed-update path. See spec §4.4.
+/// @brief Artifacts for one specific version of this board: the directed-update path. See spec §4.4.
 #define OPENSHOCK_FW_REPO_VERSION_URL_FORMAT "https://%s" OPENSHOCK_FW_REPO_API_PREFIX "/versions/%s/" OPENSHOCK_FW_BOARD
 
 enum OtaTaskEventFlag : uint32_t {
@@ -549,7 +549,7 @@ static bool otaum_try_get_repo_domain(std::string& domain)
 /// @brief Issues a GET against the repository API and parses the body as JSON.
 /// @param body Receives the response body. JsonView is zero-copy, so this must outlive `doc`.
 /// @param acceptedCodes Response codes to treat as success. 204 is handled by the caller and must not
-///                      reach the parser — an empty body is not valid JSON.
+///                      reach the parser; an empty body is not valid JSON.
 static bool otaum_try_get_json(HTTP::Client& client, std::string_view url, std::span<const uint16_t> acceptedCodes, std::string& body, JSON::JsonDocument& doc, int& code)
 {
   auto response = client.GetString(

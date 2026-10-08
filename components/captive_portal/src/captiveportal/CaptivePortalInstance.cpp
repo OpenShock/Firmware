@@ -45,7 +45,7 @@ const uint16_t HTTP_PORT = 80;
 static constexpr size_t MAX_WS_MSG = OpenShock::MessageHandlers::WebSocket::MaxLocalMessageSize;
 
 // HTTP status lines (esp_http_server needs the full "code reason" string, and stores
-// the pointer rather than copying — so these must have static storage duration).
+// the pointer rather than copying, so these must have static storage duration).
 static constexpr const char* S200 = "200 OK";
 static constexpr const char* S304 = "304 Not Modified";
 static constexpr const char* S400 = "400 Bad Request";
@@ -537,7 +537,7 @@ esp_err_t CaptivePortal::CaptivePortalInstance::staticFileHandler(httpd_req_t* r
   auto* self = static_cast<CaptivePortalInstance*>(req->user_ctx);
 
   if (!self->m_staticFs.isMounted()) {
-    // Filesystem image was never uploaded — serve the help page for any request.
+    // Filesystem image was never uploaded; serve the help page for any request.
     return sendResp(
       req,
       S200,
@@ -572,7 +572,7 @@ discord.gg/OpenShock
   std::string path = "/www" + uri + ".gz";
 
   if (!self->m_staticFs.exists(path.c_str())) {
-    // Unknown path → captive redirect (matches serveStatic default-file fallthrough).
+    // Unknown path -> captive redirect (matches serveStatic default-file fallthrough).
     return RFC8908::EmitRedirect(req);
   }
 
@@ -596,7 +596,7 @@ discord.gg/OpenShock
 
   bool ok = self->m_staticFs.readFile(path.c_str(), [req](std::span<const uint8_t> chunk) { return httpd_resp_send_chunk(req, reinterpret_cast<const char*>(chunk.data()), chunk.size()) == ESP_OK; });
   if (!ok) {
-    // Headers/chunks may already be on the wire — can't cleanly redirect now.
+    // Headers/chunks may already be on the wire; can't cleanly redirect now.
     return ESP_FAIL;
   }
   return httpd_resp_send_chunk(req, nullptr, 0);
@@ -884,7 +884,7 @@ void CaptivePortal::CaptivePortalInstance::handleWebSocketClientConnected(httpd_
 {
   OS_LOGD(TAG, "WebSocket client #%u connected (fd %d)", socketId, httpd_req_to_sockfd(req));
 
-  // We're on the httpd task with a live req — send directly, no copy/queue needed.
+  // We're on the httpd task with a live req; send directly, no copy/queue needed.
   auto sendBin = [req](std::span<const uint8_t> data) -> bool {
     httpd_ws_frame_t frame = {};
     frame.final            = true;
@@ -918,7 +918,7 @@ void CaptivePortal::CaptivePortalInstance::handleWebSocketClientDisconnected(uin
 }
 
 // ---------------------------------------------------------------------------
-// Public WS send API (called from arbitrary tasks → must copy + queue)
+// Public WS send API (called from arbitrary tasks -> must copy + queue)
 // ---------------------------------------------------------------------------
 
 bool CaptivePortal::CaptivePortalInstance::queueSend(int fd, bool broadcast, bool binary, std::span<const uint8_t> data)
@@ -1033,7 +1033,7 @@ void CaptivePortal::CaptivePortalInstance::registerHandlers()
     OS_LOGE(TAG, "Failed to register WebSocket handler");
   }
 
-  // Static files — catch-all, registered LAST so specific routes win.
+  // Static files: catch-all, registered LAST so specific routes win.
   reg("/*", HTTP_GET, &CaptivePortalInstance::staticFileHandler);
 }
 
@@ -1082,7 +1082,7 @@ CaptivePortal::CaptivePortalInstance::CaptivePortalInstance()
   } else if (!m_staticFs.mount(partition)) {
     OS_LOGE(TAG, "Failed to mount static filesystem");
   } else if (!m_staticFs.exists("/www/index.html.gz")) {
-    OS_LOGE(TAG, "/www/index.html.gz not found — serving error page");
+    OS_LOGE(TAG, "/www/index.html.gz not found, serving error page");
   } else {
     m_fsHash = getPartitionHash();
     OS_LOGI(TAG, "Serving files from littlefs (hash: %s)", m_fsHash != nullptr ? m_fsHash : "?");
@@ -1093,7 +1093,7 @@ CaptivePortal::CaptivePortalInstance::CaptivePortalInstance()
     return;
   }
 
-  // Start the wildcard DNS responder (all A queries → the portal AP IP).
+  // Start the wildcard DNS responder (all A queries -> the portal AP IP).
   m_dnsStarted = m_dnsServer.start(CaptivePortal::ApIPv4String());
   if (!m_dnsStarted) {
     OS_LOGE(TAG, "Failed to start DNS server");

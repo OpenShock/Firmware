@@ -8,6 +8,6 @@ export async function closePortal(): Promise<void> {
   try {
     await fetch(getApiBaseUrl() + '/api/portal/close', { method: 'POST' });
   } catch {
-    // Portal may close before response arrives — ignore network errors
+    // Portal may close before response arrives; ignore network errors
   }
 }

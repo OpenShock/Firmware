@@ -2,12 +2,12 @@
 #
 # OpenShock CA trust store manager. Two subcommands:
 #
-#   generate  (default) — download curl's CA bundle, SHA-256-verify it, and write two files:
+#   generate  (default): download curl's CA bundle, SHA-256-verify it, and write two files:
 #                         cacert-curl.pem (the verbatim verified base) and cacert-merged.pem
 #                         (base + pinned_certs/*.pem + local custom_certs/*.pem). Does NOT
 #                         emit a packed x509_crt_bundle; the firmware build converts and
 #                         packs cacert-merged.pem into flash via ESP-IDF's certificate-bundle step.
-#   audit               — audit every cert already in cacert-merged.pem (base + pinned + custom):
+#   audit:               audit every cert already in cacert-merged.pem (base + pinned + custom):
 #                         flag expiry, and for pinned roots probe the live endpoints to
 #                         decide which are still needed. Reports pins no endpoint chains
 #                         through as removable, and raises an alert on a still-needed cert
@@ -349,7 +349,7 @@ def _reject_non_ca(certs: list[x509.Certificate], origins: list[str], *, kind: s
 
 
 # --------------------------------------------------------------------------------------
-# audit — expiry of every shipped cert + live-endpoint relevance for pinned roots
+# audit: expiry of every shipped cert + live-endpoint relevance for pinned roots
 # --------------------------------------------------------------------------------------
 
 # Endpoints whose live chains decide whether a pinned root still earns its place. esp_crt_bundle
@@ -629,7 +629,7 @@ def generate() -> int:
     critical('')
 
     if got_hash != expected_hash:
-        raise InputError('SHA-256 mismatch against cacert.pem.sha256 — refusing to proceed')
+        raise InputError('SHA-256 mismatch against cacert.pem.sha256; refusing to proceed')
 
     critical('Automatic SHA-256 validation passed')
 
@@ -651,7 +651,7 @@ def generate() -> int:
         if expired:
             raise InputError(f'Refusing to ship {len(expired)} expired pinned certificate(s)')
         if expiring:
-            critical(f'NOTE: {len(expiring)} pinned cert(s) expire within {warn_days}d — rotate soon')
+            critical(f'NOTE: {len(expiring)} pinned cert(s) expire within {warn_days}d; rotate soon')
         critical(f'Found {len(pinned_blocks)} pinned certificate(s)')
     else:
         critical(f'No pinned certificates found ({PINNED_CERTS_DIR}/*.pem)')

@@ -1,8 +1,8 @@
 # OpenShock HTTP client manager + content type helpers.
 #
 # Public surface:
-#   include/http/HTTPRequestManager.h — rate-limited HTTP/HTTPS client
-#   include/http/ContentTypes.h        — MIME type constants
+#   include/http/HTTPRequestManager.h: rate-limited HTTP/HTTPS client
+#   include/http/ContentTypes.h:        MIME type constants
 #
 # The backend endpoint wrappers (http/JsonAPI.h) live in core, not here, because they
 # depend on config/ and the core serialization codecs.

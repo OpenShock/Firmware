@@ -1,9 +1,9 @@
 # OpenShock RF shocker protocol encoders (RMT-based).
 #
 # Public surface:
-#   radio/rmt/Sequence.h            — RMT sequence builder
-#   radio/rmt/CaiXianlinEncoder.h   — CaiXianlin protocol
-#   radio/rmt/PetrainerEncoder.h    — Petrainer protocol
+#   radio/rmt/Sequence.h:            RMT sequence builder
+#   radio/rmt/CaiXianlinEncoder.h:   CaiXianlin protocol
+#   radio/rmt/PetrainerEncoder.h:    Petrainer protocol
 #   radio/rmt/Petrainer998DREncoder.h
 #   radio/rmt/D80Encoder.h
 #   radio/rmt/T330Encoder.h

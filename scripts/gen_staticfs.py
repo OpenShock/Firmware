@@ -67,7 +67,7 @@ def build_frontend(frontend_dir):
     if os.environ.get('CI'):
         if not os.path.isdir(build_dir):
             raise SystemExit(f'CI build: expected prebuilt frontend at {build_dir}')
-        log('CI detected — using prebuilt frontend/build')
+        log('CI detected, using prebuilt frontend/build')
         return build_dir
 
     if frontend_build_is_current(frontend_dir, build_dir):
@@ -109,7 +109,7 @@ def stage_assets(build_dir, staging_dir):
 
     log(f'Staged {count} gzipped assets into {www_dir}')
     if not os.path.exists(os.path.join(www_dir, 'index.html.gz')):
-        raise SystemExit(f'{www_dir}/index.html.gz missing — frontend build produced no index.html')
+        raise SystemExit(f'{www_dir}/index.html.gz missing: frontend build produced no index.html')
     return www_dir
 
 

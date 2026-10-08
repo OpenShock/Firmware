@@ -11,7 +11,7 @@ kind: added       # added | changed | deprecated | removed | fixed | security | 
 breaking: false   # optional; true forces a major semver bump
 mandatory: false  # optional; true means this version must be installed before newer ones
 ---
-Technical title (required, one line — appears in CHANGELOG and GitHub Release)
+Technical title (required, one line; appears in CHANGELOG and GitHub Release)
 
 ## Release Note
 User-facing title line (appears in release.json)

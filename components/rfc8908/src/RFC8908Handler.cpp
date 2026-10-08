@@ -36,7 +36,7 @@ static esp_err_t probeHandler(httpd_req_t* req)
   return RFC8908::EmitRedirect(req);
 }
 
-// RFC 8908 Captive Portal API endpoint — machine-readable captive state. Complements
+// RFC 8908 Captive Portal API endpoint: machine-readable captive state. Complements
 // the classic redirect-based detection used by Android, iOS/macOS, and Windows.
 static esp_err_t captiveApiHandler(httpd_req_t* req)
 {

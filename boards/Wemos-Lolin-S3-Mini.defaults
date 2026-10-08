@@ -1,4 +1,4 @@
-# Wemos-Lolin-S3-Mini — auto-ported from platformio.ini. Board-specific deltas only;
+# Wemos-Lolin-S3-Mini: auto-ported from platformio.ini. Board-specific deltas only;
 # shared config lives in sdkconfig.defaults.
 
 CONFIG_IDF_TARGET="esp32s3"

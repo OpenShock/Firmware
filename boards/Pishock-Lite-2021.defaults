@@ -1,4 +1,4 @@
-# Pishock-Lite-2021 — auto-ported from platformio.ini. Board-specific deltas only;
+# Pishock-Lite-2021: auto-ported from platformio.ini. Board-specific deltas only;
 # shared config lives in sdkconfig.defaults.
 
 CONFIG_IDF_TARGET="esp32"

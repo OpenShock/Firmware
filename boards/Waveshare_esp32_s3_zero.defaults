@@ -1,4 +1,4 @@
-# Waveshare_esp32_s3_zero — auto-ported from platformio.ini. Board-specific deltas only;
+# Waveshare_esp32_s3_zero: auto-ported from platformio.ini. Board-specific deltas only;
 # shared config lives in sdkconfig.defaults.
 
 CONFIG_IDF_TARGET="esp32s3"

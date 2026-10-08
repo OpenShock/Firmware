@@ -1,4 +1,4 @@
-# OpenShock logging + panic macros — OS_LOG*, OS_PANIC*.
+# OpenShock logging + panic macros: OS_LOG*, OS_PANIC*.
 #
 # openshock_log_printf (Logging.cpp) writes OS_LOG* output to the low-level `serial`
 # transport (raw bytes to the console port), not C stdio. The OS_PANIC* macros

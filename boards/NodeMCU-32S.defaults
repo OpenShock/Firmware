@@ -1,4 +1,4 @@
-# NodeMCU-32S — auto-ported from platformio.ini. Board-specific deltas only;
+# NodeMCU-32S: auto-ported from platformio.ini. Board-specific deltas only;
 # shared config lives in sdkconfig.defaults.
 
 CONFIG_IDF_TARGET="esp32"

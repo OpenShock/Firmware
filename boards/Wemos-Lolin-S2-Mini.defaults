@@ -1,4 +1,4 @@
-# Wemos-Lolin-S2-Mini — auto-ported from platformio.ini. Board-specific deltas only;
+# Wemos-Lolin-S2-Mini: auto-ported from platformio.ini. Board-specific deltas only;
 # shared config lives in sdkconfig.defaults.
 
 CONFIG_IDF_TARGET="esp32s2"

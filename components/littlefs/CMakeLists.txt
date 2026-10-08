@@ -1,5 +1,5 @@
 # Vendored littlefs core (upstream ARM littlefs, BSD-3-Clause). This is the plain
-# filesystem library only — no VFS layer. OpenShock mounts partitions against it
+# filesystem library only, no VFS layer. OpenShock mounts partitions against it
 # directly via an esp_partition-backed block device (see the captive portal's
 # StaticFs helper). Sources copied from github.com/littlefs-project/littlefs.
 idf_component_register(

@@ -1,4 +1,4 @@
-# OpenShock LED drivers — both mono (PWM via LEDC) and RGB (WS2812B via the
+# OpenShock LED drivers: both mono (PWM via LEDC) and RGB (WS2812B via the
 # ESP-IDF RMT driver, esp_driver_rmt).
 #
 # Public surface:

@@ -1,7 +1,7 @@
-# OpenShock chipset utilities — GPIO validation, compile-time pin assertions.
+# OpenShock chipset utilities: GPIO validation, compile-time pin assertions.
 #
 # Public surface:
-#   Chipset.h — OpenShock::IsValidInputPin / IsValidOutputPin per IDF_TARGET
+#   Chipset.h: OpenShock::IsValidInputPin / IsValidOutputPin per IDF_TARGET
 #
 # CompatibilityChecks.cpp contains static_asserts that fail the build if any
 # board pin (OPENSHOCK_ESTOP_PIN, OPENSHOCK_RF_TX_GPIO, ... from openshock_board.h) resolves to

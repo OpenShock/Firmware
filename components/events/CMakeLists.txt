@@ -4,7 +4,7 @@
 # emitters/consumers.
 #
 # Public surface:
-#   include/events/Events.h — OPENSHOCK_EVENTS base, event ids, payload structs, Init()
+#   include/events/Events.h: OPENSHOCK_EVENTS base, event ids, payload structs, Init()
 
 idf_component_register(
   SRCS          "src/Events.cpp"

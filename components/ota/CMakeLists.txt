@@ -9,7 +9,7 @@ idf_component_register(
   SRCS          "src/OtaUpdateManager.cpp"
   INCLUDE_DIRS  "include"
   REQUIRES      common                                          # enums/FirmwareBootType.h, enums/OtaUpdateChannel.h, SemVer.h in public header
-  PRIV_REQUIRES core captive_portal config                      # gateway/wifi/WSGateway/AppHooks · CaptivePortal::ForceClose · Config::
+  PRIV_REQUIRES core captive_portal config                      # gateway/wifi/WSGateway/AppHooks; CaptivePortal::ForceClose; Config::
                 crypto fs http hwutil logging osjson temporal   # Hashing, FsCheck, HTTPRequestManager, PartitionUtils, json
                 app_update esp_event esp_netif esp_wifi         # esp_ota_ops.h, WiFi/IP event handlers
 )

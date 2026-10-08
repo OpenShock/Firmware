@@ -1,4 +1,4 @@
-# OpenShock device control — the hardware-facing actuators and inputs: estop
+# OpenShock device control, the hardware-facing actuators and inputs: estop
 # (EStopManager), radio (RFTransmitter), visual status LEDs (VisualStateManager)
 # and the shocker CommandHandler that drives the radio.
 #

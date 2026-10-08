@@ -57,7 +57,7 @@ export async function fetchBoardInfo(): Promise<void> {
     const data = await res.json();
     hubState.hasPredefinedPins = data.has_predefined_pins ?? false;
   } catch {
-    // Non-fatal — hasPredefinedPins stays false (DIY flow shown)
+    // Non-fatal: hasPredefinedPins stays false (DIY flow shown)
   }
 }
 

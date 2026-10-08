@@ -19,7 +19,7 @@ CONFIG_COMPILER_CXX_EXCEPTIONS=n
 
 # Arduino NetworkClientSecure (pulled in transitively by WebSockets/WiFiClientSecure)
 # refuses to compile its ssl_client.cpp body unless at least one PSK exchange is
-# enabled — otherwise all ssl_* symbols become unresolved at link time. We don't
+# enabled, otherwise all ssl_* symbols become unresolved at link time. We don't
 # actually use PSK, but we need MBEDTLS_KEY_EXCHANGE_SOME_PSK_ENABLED to be defined.
 CONFIG_MBEDTLS_PSK_MODES=y
 CONFIG_MBEDTLS_KEY_EXCHANGE_PSK=y
@@ -48,7 +48,7 @@ CONFIG_MBEDTLS_CERTIFICATE_BUNDLE_DEFAULT_NONE=y
 CONFIG_MBEDTLS_CUSTOM_CERTIFICATE_BUNDLE=y
 CONFIG_MBEDTLS_CUSTOM_CERTIFICATE_BUNDLE_PATH="certificates/cacert-merged.pem"
 
-# Partition table — OpenShock uses a custom one; existing partitions stay valid
+# Partition table: OpenShock uses a custom one; existing partitions stay valid
 # (leave PARTITION_TABLE_* at IDF defaults; per-env sdkconfigs can override)
 
 # The CONFIG_ARDUINO_SELECTIVE_* block that used to live here is gone. Arduino is no

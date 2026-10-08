@@ -3,7 +3,7 @@ name: pinned-cert-audit
 # Audits certificates/pinned_certs/*.pem against reality (certificates/cert_bundle.py audit):
 #   - probes api.openshock.app / api.openshock.dev and retires any pinned root no live
 #     endpoint chains through anymore (opens a PR that deletes it + regenerates cacert-merged.pem);
-#   - fails the job (→ notifies) when a still-needed pinned root is expired or nearing expiry.
+#   - fails the job (-> notifies) when a still-needed pinned root is expired or nearing expiry.
 on:
   schedule:
     - cron: '17 6 * * 1' # Weekly, Monday 06:17 UTC
@@ -44,7 +44,7 @@ jobs:
 
       # A pinned root that no monitored endpoint chains through anymore: delete it,
       # regenerate cacert-merged.pem, and open a PR. Runs only when the audit positively found
-      # removable pins (empty when any probe failed — fail-safe).
+      # removable pins (empty when any probe failed; fail-safe).
       - name: Open PR to retire unneeded pinned root(s)
         if: steps.audit.outputs.removable != ''
         env:
@@ -77,5 +77,5 @@ jobs:
       - name: Fail on expiry alert
         if: steps.audit.outputs.alert == 'true'
         run: |
-          echo "::error::A still-needed pinned certificate is expired or nearing expiry — rotate it in certificates/pinned_certs/ and regenerate cacert-merged.pem."
+          echo "::error::A still-needed pinned certificate is expired or nearing expiry; rotate it in certificates/pinned_certs/ and regenerate cacert-merged.pem."
           exit 1

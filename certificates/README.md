@@ -16,7 +16,7 @@ python3 cert_bundle.py audit      # audit expiry + live-endpoint relevance (used
 
 | File | What it is | Packed into firmware? |
 |---|---|---|
-| `cacert-curl.pem` | **Verbatim** curl/Mozilla CA extract, exactly as downloaded. Its `sha256sum` matches curl's published hash. | No — reference/base only |
+| `cacert-curl.pem` | **Verbatim** curl/Mozilla CA extract, exactly as downloaded. Its `sha256sum` matches curl's published hash. | No (reference/base only) |
 | `cacert-merged.pem` | Generated: the base **plus** `pinned_certs/*.pem` (plus any local `custom_certs/*.pem`), de-duplicated, with an OpenShock header banner instead of curl's. | **Yes** |
 
 Both are tracked and committed. `cacert-merged.pem` is what actually ships; `cacert-curl.pem`
@@ -27,13 +27,13 @@ exists so the base can be independently checksum-verified against curl.
 esp_crt_bundle does **not** do certificate-path building. It trusts the chain exactly as a
 server presents it and looks up the **issuer of the topmost presented cert** among the trusted
 roots. If a server sends a legacy cross-signed root at the top of its chain, the anchor it
-"requires" is that cross-signer — which a modern (Mozilla-derived) store may no longer include.
+"requires" is that cross-signer, which a modern (Mozilla-derived) store may no longer include.
 
-Concretely: `api.openshock.app` presents `leaf → GTS WE1 → GTS Root R4`, where R4 is the
+Concretely: `api.openshock.app` presents `leaf -> GTS WE1 -> GTS Root R4`, where R4 is the
 **cross-signed** copy issued by `GlobalSign Root CA` (R1). Mozilla/curl retired R1, so without
 it esp_crt_bundle reports *"No matching trusted root certificate found"*. `pinned_certs/` carries
 R1 so that chain verifies. (The cleaner long-term fix is trimming the server chain so it
-validates against `GTS Root R4`, which every store already ships — see **Auditing** below.)
+validates against `GTS Root R4`, which every store already ships; see **Auditing** below.)
 
 ## Source of Trust
 
@@ -92,7 +92,7 @@ After successful manual verification, commit:
 - any change under `pinned_certs/`
 
 `cacert-merged.pem` is the packed artifact. The script does **not** emit a packed
-`x509_crt_bundle` — the firmware build converts and packs `cacert-merged.pem` into flash itself
+`x509_crt_bundle`: the firmware build converts and packs `cacert-merged.pem` into flash itself
 via ESP-IDF's certificate-bundle step (`CONFIG_MBEDTLS_CUSTOM_CERTIFICATE_BUNDLE_PATH` in
 `sdkconfig.defaults`).
 
@@ -114,10 +114,10 @@ source (e.g. the CA's own repository plus Cloudflare's `cfssl_trust`), then drop
 
 `cert_bundle.py audit` (run weekly by the `pinned-cert-audit` CI workflow):
 
-- **Expiry** — checks every cert in `cacert-merged.pem`. A still-needed pinned root that is
+- **Expiry**: checks every cert in `cacert-merged.pem`. A still-needed pinned root that is
   expired or within the warn window (`PINNED_CERT_EXPIRY_WARN_DAYS`, default 90) fails the job
   so we rotate it in time.
-- **Relevance** — probes `api.openshock.app` / `api.openshock.dev` and works out which anchor
+- **Relevance**: probes `api.openshock.app` / `api.openshock.dev` and works out which anchor
   each requires. A pinned root that **no** reachable endpoint chains through anymore is dead
   weight; the workflow opens a PR that deletes it and regenerates the bundle. (Fail-safe: if a
   probe is unreachable, nothing is retired.)
@@ -128,7 +128,7 @@ root, the corresponding pin is automatically proposed for removal.
 ## Custom Certificates (Optional)
 
 Self-hosted setups may need to trust additional CAs (internal PKI, private reverse proxies).
-Drop them in `custom_certs/` locally — this directory is **git-ignored** and never committed.
+Drop them in `custom_certs/` locally; this directory is **git-ignored** and never committed.
 
 - Only `*.pem` files are considered; each must contain exactly one CA certificate (an optional
   leading label/comment line is allowed, but no trailing data or private keys).
@@ -137,7 +137,7 @@ Drop them in `custom_certs/` locally — this directory is **git-ignored** and n
 > ⚠️ Adding custom CAs expands the ESP32's trust boundary. Only add certificates you fully
 > trust and control.
 
-> **Note:** custom-cert support is currently **dormant** in shipped builds — the committed
+> **Note:** custom-cert support is currently **dormant** in shipped builds; the committed
 > `cacert-merged.pem` is generated without any `custom_certs/`, so custom certs only reach the
 > trust store in a local rebuild.
 

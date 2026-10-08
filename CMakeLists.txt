@@ -109,7 +109,7 @@ partition_table_get_partition_info(_staticfs_offset "--partition-name static0" "
 partition_table_get_partition_info(_staticfs_size   "--partition-name static0" "size")
 
 if(_staticfs_offset STREQUAL "" OR _staticfs_size STREQUAL "")
-  message(WARNING "No `static0` partition in the active partition table — "
+  message(WARNING "No `static0` partition in the active partition table; "
                   "skipping static filesystem image generation.")
 else()
   set(_staticfs_image ${CMAKE_BINARY_DIR}/staticfs.bin)

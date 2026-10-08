@@ -330,7 +330,7 @@ static void InitializeClient()
 {
   DestroyClient();
 
-  // No client — check prerequisites
+  // No client; check prerequisites
   if ((s_flags.load(std::memory_order_relaxed) & FLAG_HAS_IP) == 0 || !Config::HasBackendAuthToken()) {
     return;
   }
@@ -379,7 +379,7 @@ void GatewayConnectionManager::Update()
 
   auto client = GetClient();
   if (client != nullptr) {
-    // Client exists — run its loop and optionally reconnect
+    // Client exists; run its loop and optionally reconnect
     if (client->loop()) {
       return;
     }
