@@ -59,6 +59,7 @@ FORCE_STRING_KEYS = {
 BOARD_PINS: dict[str, tuple[str, int]] = {
     'OPENSHOCK_RF_TX_GPIO': ('int', -1),
     'OPENSHOCK_ESTOP_PIN': ('int', -1),
+    'OPENSHOCK_ESTOP_LATCHING': ('bool', 0),
     'OPENSHOCK_LED_GPIO': ('int', -1),
     'OPENSHOCK_LED_WS2812B': ('int', -1),
     'OPENSHOCK_LED_SWAP_RG_CHANNELS': ('bool', 0),

@@ -93,7 +93,7 @@ describe('mapConfig', () => {
     expect(config?.backend.domain).toBe('api.example.org');
     expect(config?.otaUpdate.cdnDomain).toBe('fw.example.org');
     expect(config?.otaUpdate.updateChannel).toBe(OtaUpdateChannel.Beta);
-    expect(config?.estop).toEqual({ enabled: true, gpioPin: 13 });
+    expect(config?.estop).toEqual({ enabled: true, gpioPin: 13, latching: false, active: false });
   });
 
   it('accepts empty strings the hub can legitimately store', () => {

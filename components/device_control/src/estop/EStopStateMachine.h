@@ -8,6 +8,13 @@ namespace OpenShock {
   /// @brief The EStop debounce + hold-to-clear state machine, free of FreeRTOS/GPIO so it can be host tested.
   ///        EStopManager's task feeds it one GPIO sample per tick (or a software trigger) and mirrors activatedAt() into
   ///        the atomic that IsEStopped() reads. activatedAt() is non-zero in every state except Idle.
+  ///
+  ///        Momentary mode (latching == false), for a momentary push button:
+  ///          Idle -> press -> Active -> press and hold for kHoldToClearTime -> AwaitingRelease -> release -> Idle
+  ///
+  ///        Latching mode (latching == true), for a switch that mechanically stays engaged (e.g. twist-to-release mushroom button):
+  ///          Idle -> engage -> Active -> disengage -> Idle
+  ///          A software triggered (or restored) E-Stop is cleared by cycling the switch: engage, then disengage.
   class EStopStateMachine {
   public:
     static constexpr int64_t kHoldToClearTime = 5000;
@@ -17,6 +24,12 @@ namespace OpenShock {
     // Grace period after deactivation (prevents immediate re-trigger on release bounce/EMI)
     static constexpr int64_t kRearmGraceTime = 250;  // tune as needed
 
+    explicit EStopStateMachine(bool latching = false) noexcept
+      : m_latching(latching)
+    {
+    }
+
+    bool latching() const noexcept { return m_latching; }
     EStopState state() const noexcept { return m_state; }
     int64_t activatedAt() const noexcept { return m_activatedAt; }
 
@@ -27,8 +40,9 @@ namespace OpenShock {
         m_activatedAt = now;
       }
 
-      m_state        = EStopState::Active;
-      m_rearmBlocked = false;
+      m_state         = EStopState::Active;
+      m_rearmBlocked  = false;
+      m_switchEngaged = false;
 
       // Do not modify history/lastBtnState here; rely on physical button state
       // on subsequent samples.
@@ -61,12 +75,22 @@ namespace OpenShock {
           }
 
           if (btnState) {
-            m_state       = EStopState::Active;
-            m_activatedAt = now;
+            m_state         = EStopState::Active;
+            m_activatedAt   = now;
+            m_switchEngaged = true;
           }
           break;
 
         case EStopState::Active:
+          if (m_latching) {
+            if (btnState) {
+              m_switchEngaged = true;
+            } else if (m_switchEngaged) {  // switch disengaged -> clear E-Stop
+              clear(now);
+            }
+            break;
+          }
+
           // Once active, if the input gets pressed, start hold-to-clear timing.
           if (pressedEdge) {
             m_state         = EStopState::ActiveClearing;
@@ -85,12 +109,7 @@ namespace OpenShock {
 
         case EStopState::AwaitingRelease:
           if (!btnState) {  // fully released -> clear E-Stop
-            m_state       = EStopState::Idle;
-            m_activatedAt = 0;
-
-            // Start grace period to prevent immediate re-trigger.
-            m_rearmBlocked = true;
-            m_rearmAt      = now + kRearmGraceTime;
+            clear(now);
           }
           break;
 
@@ -101,6 +120,18 @@ namespace OpenShock {
     }
 
   private:
+    void clear(int64_t now) noexcept
+    {
+      m_state       = EStopState::Idle;
+      m_activatedAt = 0;
+
+      // Start grace period to prevent immediate re-trigger.
+      m_rearmBlocked = true;
+      m_rearmAt      = now + kRearmGraceTime;
+    }
+
+    bool m_latching;
+
     EStopState m_state    = EStopState::Idle;
     int64_t m_activatedAt = 0;    // When == 0, EStop not active. When != 0, EStop is active.
 
@@ -114,5 +145,8 @@ namespace OpenShock {
 
     // Debounced button state: true == pressed, false == released
     bool m_lastBtnState = false;
+
+    // Latching mode: whether the switch has been seen engaged since the E-Stop became active
+    bool m_switchEngaged = false;
   };
 }  // namespace OpenShock

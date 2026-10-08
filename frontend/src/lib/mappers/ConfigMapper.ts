@@ -46,6 +46,8 @@ export interface OtaUpdateConfig {
 export interface EStopConfig {
   enabled: boolean;
   gpioPin: number;
+  latching: boolean;
+  active: boolean;
 }
 
 export interface Config {
@@ -176,10 +178,14 @@ function mapEstopConfig(hubConfig: HubConfig): EStopConfig {
 
   const enabled = estop.enabled();
   const gpioPin = estop.gpioPin();
+  const latching = estop.latching();
+  const active = estop.active();
 
   return {
     enabled,
     gpioPin,
+    latching,
+    active,
   };
 }
 

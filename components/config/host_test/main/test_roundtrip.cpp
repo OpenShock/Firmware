@@ -250,6 +250,8 @@ TEST_CASE("jsonconfig get/set round trip keeps every section", "[config][roundtr
   Config::RootConfig sample = MakeSampleConfig();
   // Strings that need JSON escaping are covered separately below.
   sample.wifi.credentialsList[2] = Config::WiFiCredentials(7, "Office", "s3cret!", WIFI_AUTH_WPA3_PSK);
+  // estop.active is exported but never imported (see "jsonconfig never changes estop.active").
+  sample.estop.active = false;
   TEST_ASSERT_TRUE(InitFrom(Serialize(sample)));
   const std::string json = Config::GetAsJSON(true);
   TEST_ASSERT_FALSE(json.empty());
@@ -264,6 +266,31 @@ TEST_CASE("jsonconfig get/set round trip keeps every section", "[config][roundtr
 
   // And exporting again yields identical JSON.
   TEST_ASSERT_EQUAL_STRING(json.c_str(), Config::GetAsJSON(true).c_str());
+}
+
+TEST_CASE("jsonconfig never changes estop.active", "[config][roundtrip][json]")
+{
+  // An active E-Stop is restored on boot; importing a config must not be a way to release it.
+  Config::RootConfig sample = MakeSampleConfig();
+  TEST_ASSERT_TRUE(sample.estop.active);
+  TEST_ASSERT_TRUE(InitFrom(Serialize(sample)));
+
+  TEST_ASSERT_TRUE(Config::SaveFromJSON(R"({"estop":{"enabled":true,"gpioPin":13,"latching":false,"active":false}})"));
+  bool active = false;
+  TEST_ASSERT_TRUE(Config::GetEStopActive(active));
+  TEST_ASSERT_TRUE(active);
+  TEST_ASSERT_TRUE(InitFrom(StoredFile()));
+  TEST_ASSERT_TRUE(Config::GetEStopActive(active));
+  TEST_ASSERT_TRUE(active);
+
+  TEST_ASSERT_TRUE(Config::SaveFromJSON(R"({"rf":{"txPin":13}})"));  // estop section missing
+  TEST_ASSERT_TRUE(Config::GetEStopActive(active));
+  TEST_ASSERT_TRUE(active);
+
+  InitDefault();
+  TEST_ASSERT_TRUE(Config::SaveFromJSON(R"({"estop":{"active":true}})"));
+  TEST_ASSERT_TRUE(Config::GetEStopActive(active));
+  TEST_ASSERT_FALSE(active);
 }
 
 TEST_CASE("jsonconfig round trip keeps strings that need escaping", "[config][roundtrip][json]")

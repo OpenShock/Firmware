@@ -171,10 +171,14 @@ TEST_CASE("jsonconfig set with an empty object resets to defaults", "[config][de
 {
   TEST_ASSERT_TRUE(InitFrom(Serialize(MakeSampleConfig())));
   TEST_ASSERT_TRUE(Config::SaveFromJSON("{}"));
-  AssertConfigEqual(Config::RootConfig(), Snapshot());
+
+  // Except estop.active: an active E-Stop is never released by a JSON import (the sample's is active).
+  Config::RootConfig expected;
+  expected.estop.active = true;
+  AssertConfigEqual(expected, Snapshot());
 
   TEST_ASSERT_TRUE(InitFrom(StoredFile()));
-  AssertConfigEqual(Config::RootConfig(), Snapshot());
+  AssertConfigEqual(expected, Snapshot());
 }
 
 TEST_CASE("jsonconfig set with partial sections fills in defaults", "[config][defaults][json]")

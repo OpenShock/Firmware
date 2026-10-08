@@ -101,4 +101,8 @@ namespace OpenShock::Config {
   bool SetEStopEnabled(bool enabled);
   bool GetEStopGpioPin(gpio_num_t& out);
   bool SetEStopGpioPin(gpio_num_t gpioPin);
+  bool GetEStopLatching(bool& out);
+  bool SetEStopLatching(bool latching);
+  bool GetEStopActive(bool& out);
+  bool SetEStopActive(bool active);
 }  // namespace OpenShock::Config

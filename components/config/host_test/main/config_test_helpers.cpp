@@ -24,7 +24,7 @@ namespace ConfigTest {
     config.backend       = Config::BackendConfig("api.example.org", "tok_0123456789abcdef");
     config.serialInput   = Config::SerialInputConfig(false);
     config.otaUpdate     = Config::OtaUpdateConfig(false, "fw.example.org", OtaUpdateChannel::Develop, true, true, 120, false, true, 4242, OtaUpdateStep::Validating);
-    config.estop         = Config::EStopConfig(true, GPIO_NUM_13);
+    config.estop         = Config::EStopConfig(true, GPIO_NUM_13, true, true);
 
     return config;
   }
@@ -130,5 +130,7 @@ namespace ConfigTest {
 
     TEST_ASSERT_EQUAL_MESSAGE(expected.estop.enabled, actual.estop.enabled, "estop.enabled");
     TEST_ASSERT_EQUAL_INT_MESSAGE(expected.estop.gpioPin, actual.estop.gpioPin, "estop.gpioPin");
+    TEST_ASSERT_EQUAL_MESSAGE(expected.estop.latching, actual.estop.latching, "estop.latching");
+    TEST_ASSERT_EQUAL_MESSAGE(expected.estop.active, actual.estop.active, "estop.active");
   }
 }  // namespace ConfigTest

@@ -16,6 +16,11 @@ namespace {
   const int64_t kSampleMs = 5;  // EStopManager samples at 200 Hz
 
   struct Rig {
+    explicit Rig(bool latching = false)
+      : machine(latching)
+    {
+    }
+
     EStopStateMachine machine;
     int64_t now = 1'000'000;
 
@@ -334,4 +339,88 @@ TEST_CASE("EStop is e-stopped in every state except Idle", "[device_control][est
   TEST_ASSERT_TRUE(sawState[static_cast<uint8_t>(EStopState::Idle)]);
   TEST_ASSERT_TRUE(sawState[static_cast<uint8_t>(EStopState::Active)]);
   TEST_ASSERT_TRUE(sawState[static_cast<uint8_t>(EStopState::ActiveClearing)]);
+}
+
+// ---------------------------------------------------------------------------
+// Latching mode: the switch stays engaged mechanically, so disengaging it clears the E-Stop.
+// ---------------------------------------------------------------------------
+
+TEST_CASE("EStop latching: engaging activates, staying engaged never clears", "[device_control][estop][latching]")
+{
+  Rig rig(true);
+  TEST_ASSERT_TRUE(rig.machine.latching());
+
+  rig.sample(kPressed);
+  assertState(EStopState::Active, rig);
+
+  rig.hold(kPressed, EStopStateMachine::kHoldToClearTime * 2);  // no hold-to-clear in latching mode
+  assertState(EStopState::Active, rig);
+}
+
+TEST_CASE("EStop latching: disengaging clears after the debounce", "[device_control][estop][latching]")
+{
+  Rig rig(true);
+  rig.sample(kPressed);
+
+  rig.feed(kReleased, EStopStateMachine::kCheckCount - 1);
+  assertState(EStopState::Active, rig);
+
+  rig.sample(kReleased);
+  assertState(EStopState::Idle, rig);
+}
+
+TEST_CASE("EStop latching: rearm grace applies after clearing", "[device_control][estop][latching]")
+{
+  Rig rig(true);
+  rig.sample(kPressed);
+  rig.feed(kReleased, EStopStateMachine::kCheckCount);
+  assertState(EStopState::Idle, rig);
+
+  rig.sample(kPressed);
+  assertState(EStopState::Idle, rig);  // inside the grace window
+
+  rig.hold(kPressed, EStopStateMachine::kRearmGraceTime);
+  assertState(EStopState::Active, rig);
+}
+
+TEST_CASE("EStop latching: a software trigger needs the switch cycled to clear", "[device_control][estop][latching]")
+{
+  Rig rig(true);
+  rig.hold(kReleased, 100);
+
+  rig.machine.Trigger(rig.now);
+  assertState(EStopState::Active, rig);
+
+  // Switch already disengaged: staying disengaged must not clear it.
+  rig.hold(kReleased, 10'000);
+  assertState(EStopState::Active, rig);
+
+  // Engage, then disengage.
+  rig.sample(kPressed);
+  assertState(EStopState::Active, rig);
+  rig.feed(kReleased, EStopStateMachine::kCheckCount);
+  assertState(EStopState::Idle, rig);
+}
+
+TEST_CASE("EStop latching: a software trigger while engaged clears on disengage", "[device_control][estop][latching]")
+{
+  Rig rig(true);
+  rig.sample(kPressed);  // engaged
+
+  rig.machine.Trigger(rig.now);
+  rig.hold(kPressed, 100);  // still engaged: seen engaged again, not yet disengaged
+  assertState(EStopState::Active, rig);
+
+  rig.feed(kReleased, EStopStateMachine::kCheckCount);
+  assertState(EStopState::Idle, rig);
+}
+
+TEST_CASE("EStop momentary is the default mode", "[device_control][estop]")
+{
+  Rig rig;
+  TEST_ASSERT_FALSE(rig.machine.latching());
+
+  rig.sample(kPressed);
+  rig.feed(kReleased, EStopStateMachine::kCheckCount * 4);
+  assertState(EStopState::Active, rig);  // releasing alone never clears a momentary E-Stop
 }
