@@ -13,9 +13,9 @@ const char* const TAG = "CaptivePortalInstance";
 #include "GatewayConnectionManager.h"
 #include "http/ContentTypes.h"
 #include "Logging.h"
-#include "RateLimiter.h"
 #include "message_handlers/WebSocket.h"
 #include "OtaUpdateChannel.h"
+#include "RateLimiter.h"
 #include "serialization/WSLocal.h"
 #include "util/FnProxy.h"
 #include "util/HexUtils.h"
@@ -46,15 +46,16 @@ static const char* const JSON_ERR_PASSWORD_SHORT  = "{\"error\":\"PasswordTooSho
 static const char* const JSON_ERR_PASSWORD_LONG   = "{\"error\":\"PasswordTooLong\"}";
 static const char* const JSON_ERR_CODE_REQUIRED   = "{\"error\":\"CodeRequired\"}";
 static const char* const JSON_ERR_INVALID_CHANNEL = "{\"error\":\"InvalidChannel\"}";
-static const char* const JSON_ERR_RATE_LIMITED     = "{\"error\":\"RateLimited\"}";
+static const char* const JSON_ERR_RATE_LIMITED    = "{\"error\":\"RateLimited\"}";
+static const char* const JSON_ERR_ESTOP_ACTIVE    = "{\"error\":\"EStopActive\"}";
 
 static OpenShock::RateLimiter& getAccountLinkRateLimiter()
 {
   static OpenShock::RateLimiter* rl = nullptr;
   if (rl == nullptr) {
     rl = new OpenShock::RateLimiter();
-    rl->addLimit(60'000, 5);   // 5 attempts per minute
-    rl->addLimit(300'000, 10); // 10 attempts per 5 minutes
+    rl->addLimit(60'000, 5);    // 5 attempts per minute
+    rl->addLimit(300'000, 10);  // 10 attempts per 5 minutes
   }
   return *rl;
 }
@@ -276,6 +277,10 @@ CaptivePortal::CaptivePortalInstance::CaptivePortalInstance()
         request->send(400, HTTP::ContentType::JSON, JSON_ERR_INVALID_PIN);
         return;
       }
+      if (EStopManager::IsEStopped()) {
+        request->send(409, HTTP::ContentType::JSON, JSON_ERR_ESTOP_ACTIVE);
+        return;
+      }
       if (!EStopManager::SetEStopPin(static_cast<gpio_num_t>(pin)) || !Config::SetEStopGpioPin(static_cast<gpio_num_t>(pin))) {
         request->send(500, HTTP::ContentType::JSON, JSON_ERR_INTERNAL);
         return;
@@ -298,6 +303,10 @@ CaptivePortal::CaptivePortalInstance::CaptivePortalInstance()
         return;
       }
       bool enabled = request->getParam("enabled")->value().toInt() != 0;
+      if (!enabled && EStopManager::IsEStopped()) {
+        request->send(409, HTTP::ContentType::JSON, JSON_ERR_ESTOP_ACTIVE);
+        return;
+      }
       bool success = EStopManager::SetEStopEnabled(enabled) && Config::SetEStopEnabled(enabled);
       if (success) {
         request->send(200);

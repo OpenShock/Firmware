@@ -324,6 +324,12 @@ bool EStopManager::SetEStopEnabled(bool enabled)
     return estopmgr_taskStart();
   }
 
+  // Disabling resets the active state, which would clear an E-Stop without it being released
+  if (EStopManager::IsEStopped()) {
+    OS_LOGW(TAG, "Refusing to disable E-Stop while it is active");
+    return false;
+  }
+
   return estopmgr_taskStop();
 }
 
@@ -333,6 +339,12 @@ bool EStopManager::SetEStopPin(gpio_num_t pin)
 
   if (s_estopPin == pin) {
     return true;
+  }
+
+  // Re-pinning restarts the task, which would clear an E-Stop without it being released
+  if (EStopManager::IsEStopped()) {
+    OS_LOGW(TAG, "Refusing to change E-Stop pin while it is active");
+    return false;
   }
 
   // Configure the new pin before touching anything else. If this fails the

@@ -122,6 +122,7 @@ export async function unlinkAccount(): Promise<void> {
 const _gpioErrorMessages: Record<string, string> = {
   InvalidPin: 'Invalid pin',
   InternalError: 'Internal error',
+  EStopActive: 'E-Stop is active, release it first',
 };
 
 export async function setRfTxPin(pin: number): Promise<boolean> {
@@ -182,7 +183,10 @@ export async function setEstopEnabled(enabled: boolean): Promise<boolean> {
       toast.success('Changed EStop enabled to: ' + enabled);
       return true;
     } else {
-      toast.error('Failed to change EStop enabled');
+      const error = await getErrorMessage(res);
+      toast.error(
+        'Failed to change EStop enabled: ' + (_gpioErrorMessages[error] ?? 'Unknown error')
+      );
       return false;
     }
   } catch {
