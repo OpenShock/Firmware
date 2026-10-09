@@ -38,9 +38,16 @@ void MessageHandlers::WebSocket::HandleLocalBinary(uint8_t socketId, tcb::span<c
     return;
   }
 
+  // The Verifier asserts size < max_size, so oversize input must be rejected before constructing one
+  constexpr std::size_t MaxMessageSize = 4096;
+  if (data.size() >= MaxMessageSize) {
+    OS_LOGE(TAG, "Message too large to be valid (%zu bytes)", data.size());
+    return;
+  }
+
   // Validate buffer
   flatbuffers::Verifier::Options verifierOptions {
-    .max_size = 4096,  // TODO: Profile this
+    .max_size = MaxMessageSize,
   };
   flatbuffers::Verifier verifier(data.data(), data.size(), verifierOptions);
   if (!verifier.VerifyBuffer<Schemas::LocalToHubMessage>()) {

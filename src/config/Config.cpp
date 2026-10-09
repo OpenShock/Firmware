@@ -42,6 +42,9 @@ static ReadWriteMutex _configMutex;
 #define CONFIG_LOCK_READ(retval)  CONFIG_LOCK_READ_ACTION(retval, {})
 #define CONFIG_LOCK_WRITE(retval) CONFIG_LOCK_WRITE_ACTION(retval, {})
 
+// Upper bound for the serialized config, enforced on both load and save so a saved config always loads again
+static constexpr std::size_t MaxConfigSize = 4096;
+
 static bool tryDeserializeConfig(const uint8_t* buffer, std::size_t bufferLen, OpenShock::Config::RootConfig& config)
 {
   if (buffer == nullptr || bufferLen < sizeof(flatbuffers::uoffset_t)) {
@@ -49,9 +52,15 @@ static bool tryDeserializeConfig(const uint8_t* buffer, std::size_t bufferLen, O
     return false;
   }
 
+  // The Verifier asserts size < max_size, so an oversize file must be rejected before constructing one
+  if (bufferLen >= MaxConfigSize) {
+    OS_LOGE(TAG, "Config file too large to be valid (%zu bytes)", bufferLen);
+    return false;
+  }
+
   // Validate buffer before accessing
   flatbuffers::Verifier::Options verifierOptions {
-    .max_size = 4096,  // Should be enough
+    .max_size = MaxConfigSize,
   };
   flatbuffers::Verifier verifier(buffer, bufferLen, verifierOptions);
   if (!verifier.VerifyBuffer<Serialization::Configuration::HubConfig>()) {
@@ -105,6 +114,11 @@ static bool tryLoadConfig()
 }
 static bool trySaveConfig(const uint8_t* data, std::size_t dataLen)
 {
+  if (dataLen >= MaxConfigSize) {
+    OS_LOGE(TAG, "Refusing to save config, too large (%zu bytes)", dataLen);
+    return false;
+  }
+
   File file = _configFS.open("/config", "wb");
   if (!file) {
     OS_LOGE(TAG, "Failed to open config file for writing");
