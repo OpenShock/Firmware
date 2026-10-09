@@ -256,14 +256,6 @@ export async function setOtaEnabled(enabled: boolean): Promise<void> {
   }
 }
 
-export async function setOtaDomain(domain: string): Promise<void> {
-  try {
-    await apiFetch(`/api/ota/domain?` + new URLSearchParams({ domain }), { method: 'PUT' });
-  } catch {
-    toast.error('Failed to update OTA domain');
-  }
-}
-
 export async function setOtaChannel(channel: string): Promise<void> {
   try {
     await apiFetch(`/api/ota/channel?` + new URLSearchParams({ channel }), { method: 'PUT' });

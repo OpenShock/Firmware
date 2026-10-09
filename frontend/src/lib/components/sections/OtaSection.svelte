@@ -3,7 +3,6 @@
   import { OtaUpdateChannel } from '$lib/_fbs/open-shock/serialization/configuration/ota-update-channel';
   import {
     setOtaEnabled,
-    setOtaDomain,
     setOtaChannel,
     setOtaCheckInterval,
     setOtaAllowBackendManagement,
@@ -26,10 +25,6 @@
 
   function toggleEnabled() {
     setOtaEnabled(!otaConfig?.isEnabled);
-  }
-
-  function saveDomain() {
-    setOtaDomain(cdnDomain);
   }
 
   function setChannel(channel: string) {
@@ -93,10 +88,16 @@
     <!-- CDN Domain -->
     <div class="flex flex-col gap-2">
       <Label for="ota-domain">CDN Domain</Label>
-      <div class="flex gap-2">
-        <Input id="ota-domain" type="text" bind:value={cdnDomain} placeholder="cdn.openshock.app" />
-        <Button size="sm" onclick={saveDomain}>Save</Button>
-      </div>
+      <Input
+        id="ota-domain"
+        type="text"
+        bind:value={cdnDomain}
+        disabled
+        placeholder="cdn.openshock.app"
+      />
+      <p class="text-muted-foreground text-xs">
+        The CDN domain is read-only here. Use serial commands to change it.
+      </p>
     </div>
 
     <!-- Update Channel -->

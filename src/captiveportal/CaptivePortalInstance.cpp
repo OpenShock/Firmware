@@ -392,25 +392,6 @@ CaptivePortal::CaptivePortalInstance::CaptivePortalInstance()
       request->send(200);
     });
 
-    m_webServer.on("/api/ota/domain", HTTP_PUT, [](AsyncWebServerRequest* request) {
-      if (!request->hasParam("domain")) {
-        request->send(400, HTTP::ContentType::JSON, JSON_ERR_MISSING_PARAM);
-        return;
-      }
-      String domain = request->getParam("domain")->value();
-      Config::OtaUpdateConfig cfg;
-      if (!Config::GetOtaUpdateConfig(cfg)) {
-        request->send(500, HTTP::ContentType::JSON, JSON_ERR_INTERNAL);
-        return;
-      }
-      cfg.cdnDomain = std::string(domain.c_str(), domain.length());
-      if (!Config::SetOtaUpdateConfig(cfg)) {
-        request->send(500, HTTP::ContentType::JSON, JSON_ERR_INTERNAL);
-        return;
-      }
-      request->send(200);
-    });
-
     m_webServer.on("/api/ota/channel", HTTP_PUT, [](AsyncWebServerRequest* request) {
       if (!request->hasParam("channel")) {
         request->send(400, HTTP::ContentType::JSON, JSON_ERR_MISSING_PARAM);
