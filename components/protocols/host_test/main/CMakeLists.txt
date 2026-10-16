@@ -18,8 +18,10 @@ idf_component_register(
                "../../include"              # radio/rmt/*Encoder.h, Sequence.h
                "../../src"                  # radio/rmt/internal/Shared.h (EncodeBits)
                "../../../common/include"    # enums/*, OpenShock.h, Checksum.h
+               "../../../temporal/include"  # Temporal.h (esp_timer_get_time)
   REQUIRES     unity
                host_support                 # Logging.h, openshock_board.h (test/host_support)
                driver                       # <driver/rmt_types.h> (tools/mocks/driver on linux)
+               esp_timer                    # tools/mocks/esp_timer
   WHOLE_ARCHIVE  # keep the auto-registered TEST_CASEs from being stripped
 )
