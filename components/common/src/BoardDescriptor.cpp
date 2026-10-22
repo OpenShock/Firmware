@@ -14,11 +14,15 @@ using namespace OpenShock;
 // directly and have the compiler fold the placeholder values into its code.
 extern "C" const BoardDescriptor openshock_board_desc;
 
-// Constant-initialized to the no-pin fallback, so a read before Init() is safe rather than garbage.
-constinit BoardDescriptor Board::Detail::active = Board::Defaults("UNSTAMPED", OPENSHOCK_FW_CHIP);
-constinit bool Board::Detail::stamped           = false;
-constinit std::string_view Board::Detail::name  = "UNSTAMPED";
-constinit std::string_view Board::Detail::chip  = OPENSHOCK_FW_CHIP;
+// The one writable copy of the board state. Constant-initialized to the no-pin fallback, so a read before Init()
+// is safe rather than garbage; the header hands out only a const reference to it.
+static constinit Board::Detail::State s_state {
+  .desc    = Board::Defaults("UNSTAMPED", OPENSHOCK_FW_CHIP),
+  .stamped = false,
+  .name    = "UNSTAMPED",
+  .chip    = OPENSHOCK_FW_CHIP,
+};
+const Board::Detail::State& Board::Detail::state = s_state;
 
 bool Board::Init()
 {
@@ -33,8 +37,8 @@ bool Board::Init()
   BoardDescriptor desc;
   switch (Parse(bytes, desc)) {
     case ParseResult::Valid:
-      Detail::active  = desc;
-      Detail::stamped = true;
+      s_state.desc    = desc;
+      s_state.stamped = true;
       break;
     case ParseResult::Unstamped:
       OS_LOGE(TAG, "The firmware image was never stamped with a board; running as UNSTAMPED with no pins. Stamp it with scripts/stamp_board.py.");
@@ -45,10 +49,10 @@ bool Board::Init()
   }
 
   // Parse() / Defaults() guarantee the terminators.
-  Detail::name = Detail::active.board;
-  Detail::chip = Detail::active.chip;
+  s_state.name = s_state.desc.board;
+  s_state.chip = s_state.desc.chip;
 
-  return Detail::stamped;
+  return s_state.stamped;
 }
 
 Board::ParseResult Board::Parse(const uint8_t (&bytes)[OPENSHOCK_BOARD_DESCRIPTOR_SIZE], BoardDescriptor& out)

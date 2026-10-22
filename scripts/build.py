@@ -15,14 +15,13 @@ Examples:
 """
 
 import os
-import re
 import shutil
 import subprocess
 import sys
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from utils.boards import board_fragment, read_target  # noqa: E402
+from utils.boards import board_fragment, is_board_line, read_target  # noqa: E402
 
 ROOT = Path(__file__).resolve().parent.parent
 
@@ -51,7 +50,8 @@ def write_sdkconfig_fragment(fragment: Path, build_dir: Path) -> Path:
 
     boards/<board>.defaults holds two kinds of line: CONFIG_* settings, which are real
     Kconfig and belong in sdkconfig, and bare OPENSHOCK_* GPIO assignments, which are
-    not. The latter are read by scripts/gen_env_header.py into openshock_board.h.
+    not. The latter describe the board descriptor scripts/stamp_board.py writes into the
+    app image after linking (scripts/utils/boards.py parses them).
 
     Keeping the pins out of Kconfig is what lets boards sharing a chip and flash size
     produce byte-identical ESP-IDF objects: as Kconfig they landed in sdkconfig.h, which
@@ -61,11 +61,7 @@ def write_sdkconfig_fragment(fragment: Path, build_dir: Path) -> Path:
     pointed at.
     """
     out = build_dir / 'board.defaults'
-    kept = [
-        line
-        for line in fragment.read_text(encoding='utf-8').splitlines()
-        if not re.match(r'\s*OPENSHOCK_[A-Z0-9_]+\s*=', line)
-    ]
+    kept = [line for line in fragment.read_text(encoding='utf-8').splitlines() if not is_board_line(line)]
     body = (
         f'# Generated from {fragment.as_posix()} by scripts/build.py - do not edit.\n'
         '# The board GPIO assignments are stripped here; they are not Kconfig.\n' + '\n'.join(kept) + '\n'

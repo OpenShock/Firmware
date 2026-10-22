@@ -32,6 +32,7 @@ const char* const TAG = "OtaUpdateManager";
 #include <esp_wifi.h>
 
 #include <array>
+#include <cstring>
 #include <span>
 #include <sstream>
 #include <string>

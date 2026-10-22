@@ -29,7 +29,8 @@ the image instead, so every board on a chip compiles byte-identical objects.
 
 Values come from (highest priority first):
   1. ``OPENSHOCK_*`` process environment variables (CI provides the version etc.)
-  2. computed defaults (local dev version fallback, chip macros)
+  2. the board fragment (``boards/<board>.defaults``), for the chip label
+  3. computed defaults (local dev version fallback)
 """
 
 import argparse
@@ -142,7 +143,7 @@ def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__)
     ap.add_argument('--out-dir', required=True, help='directory to write the headers into')
     ap.add_argument('--board', required=True, help='board name, e.g. OpenShock-Core-V2')
-    ap.add_argument('--chip', required=True, help='chip, e.g. ESP32-S3')
+    ap.add_argument('--target', help='IDF target the build is configured for (IDF_TARGET); must match the fragment')
     ap.add_argument('--fragment', required=True, help='path to boards/<board>.defaults')
     ap.add_argument(
         '--emit',
@@ -173,10 +174,21 @@ def main() -> int:
     mode = 'release' if is_release else 'debug'
 
     # --- openshock_board.h ---------------------------------------------------
+    # The board itself - name, pins, flags, bypasses - is not compiled in. It is stamped into
+    # the image after linking (scripts/stamp_board.py, run by the root CMakeLists.txt for the
+    # configured board), so one compile serves every board on the chip and an unstamped
+    # image has no pins. The fragment is parsed here for two things: the chip label, so
+    # OPENSHOCK_FW_CHIP and the stamped descriptor's chip field come from the one map in
+    # scripts/utils/boards.py, and an early failure on a typo, at configure time rather than
+    # at the stamp.
+    spec = boards.read_board_fragment(Path(args.fragment), args.board)
+    if args.target and args.target != spec.target:
+        raise SystemExit(f'error: {args.fragment} targets {spec.target}, but the build is configured for {args.target}')
+
     board: dict[str, object] = {}
 
-    board['OPENSHOCK_FW_CHIP'] = args.chip.upper()
-    board['OPENSHOCK_FW_CHIP_' + macroify(args.chip)] = 1
+    board['OPENSHOCK_FW_CHIP'] = spec.chip
+    board['OPENSHOCK_FW_CHIP_' + macroify(spec.chip)] = 1
     board['OPENSHOCK_FW_MODE'] = mode
 
     # Log level by build mode (formerly .env.development / .env.production):
@@ -188,15 +200,6 @@ def main() -> int:
     else:
         log_level = 5
     board['OPENSHOCK_LOG_LEVEL'] = log_level
-
-    # The board itself - name, pins, flags, bypasses - is not compiled in. It is stamped into
-    # the image after linking (scripts/stamp_board.py, run by the root CMakeLists.txt for the
-    # configured board), so one compile serves every board on the chip and an unstamped
-    # image has no pins. The fragment is still parsed here so a typo fails at configure
-    # time rather than at the stamp.
-    spec = boards.read_board_fragment(Path(args.fragment), args.board)
-    if spec.chip != board['OPENSHOCK_FW_CHIP']:
-        raise SystemExit(f'error: {args.fragment} targets {spec.chip}, but the build is configured for {args.chip}')
 
     # --- openshock_version.h -------------------------------------------------
     version_defines: dict[str, object] = {}

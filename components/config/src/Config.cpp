@@ -32,6 +32,10 @@ static constexpr const char* CONFIG_PARTITION_LABEL = "config";
 static constexpr const char* CONFIG_FILE_PATH       = "/config";
 
 static OpenShock::ConfigFs _configFs;
+// Constructed at static-init time, before app_main has run Board::Init(), so the RF and E-Stop constructors see
+// the no-pin fallback descriptor here. That is harmless only because Init() always re-seeds it: a stored config
+// goes through FromFlatbuffers, which falls back to the board default per field, and a missing or corrupt one
+// through ToDefault(). Nothing may read _configData before Config::Init().
 static Config::RootConfig _configData;
 static ReadWriteMutex _configMutex;
 

@@ -11,8 +11,9 @@
 #                               (chip, build mode, log level), plus the test board's pins.
 #   src/TestBoardDescriptor.cpp - the board descriptor built from those pins. Firmware gets
 #                               its descriptor stamped into the image; a host build does
-#                               not, so suites whose code reads Board::Get() compile this
-#                               in next to common/src/BoardDescriptor.cpp.
+#                               not, so this component compiles it, together with
+#                               common/src/BoardDescriptor.cpp, and every suite has
+#                               Board::Get() (after calling Board::Init() in its main).
 #   Kconfig.projbuild         - sources core's Kconfig.projbuild, so the suites see the
 #                               real CONFIG_OPENSHOCK_* defaults through sdkconfig.h.
 #
@@ -20,7 +21,12 @@
 # linux-target components, or the CMock mocks in $IDF_PATH/tools/mocks. Fakes that
 # isolate one suite from a dependency (device_control's config/Config.h, config's
 # in-memory fs/ConfigFs.h) stay in that suite's main/stubs.
-idf_component_register(INCLUDE_DIRS "include")
+idf_component_register(
+  SRCS              "src/TestBoardDescriptor.cpp"                      # the test board's descriptor
+                    "../../components/common/src/BoardDescriptor.cpp"  # Board::Init() / Get() / Parse() over it
+  INCLUDE_DIRS      "include"
+  PRIV_INCLUDE_DIRS "../../components/common/include"                  # BoardDescriptor.h, Checksum.h, OpenShock.h
+)
 
 # The linux target's soc_caps.h / clk_tree_defs.h describe no GPIO matrix and no RMT
 # peripheral (ESP-IDF's driver mocks only need the types). openshock_board.h declares

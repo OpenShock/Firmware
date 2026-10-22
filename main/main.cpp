@@ -119,7 +119,8 @@ extern "C" void app_main()
     OpenShock::Board::Init();
     const OpenShock::BoardDescriptor& board = OpenShock::Board::Get();
     OS_LOGI(TAG, "Board: %s (%s)%s", board.board, board.chip, OpenShock::Board::IsStamped() ? "" : " - no valid descriptor in image, running with no pins");
-    if (!OpenShock::ValidateBoardDescriptor()) {
+    // An unstamped image already said so in Init(); this line is for a stamped descriptor with bad pins.
+    if (!OpenShock::ValidateBoardDescriptor() && OpenShock::Board::IsStamped()) {
       OS_LOGE(TAG, "Board descriptor has problems (see above); affected features will stay disabled");
     }
   }

@@ -73,7 +73,7 @@ def cmd_stamp(args) -> int:
     output = Path(args.output or args.image)
     output.parent.mkdir(parents=True, exist_ok=True)
     output.write_bytes(stamped.data)
-    print(f'stamped {output} as {spec.name} ({spec.chip}); was {current.board}')
+    print(f'stamped {output} as {spec.name} ({spec.chip}); was {current.board or "(unstamped)"}')
     return 0
 
 

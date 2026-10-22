@@ -109,12 +109,16 @@ namespace OpenShock {
     /// @return Whether the image carries a stamped descriptor (the same as IsStamped()).
     bool Init();
 
-    // Written by Init() only. Not for direct use: read through the accessors below.
+    // Written by Init() only, through the one writable object in BoardDescriptor.cpp. This is a read-only view of
+    // it: the accessors below still inline to a plain load, and nothing outside Init() can change the board.
     namespace Detail {
-      extern BoardDescriptor active;
-      extern bool stamped;
-      extern std::string_view name;
-      extern std::string_view chip;
+      struct State {
+        BoardDescriptor desc;
+        bool stamped;
+        std::string_view name;  // desc.board, measured once
+        std::string_view chip;  // desc.chip, measured once
+      };
+      extern const State& state;
     }  // namespace Detail
 
     /// @brief The descriptor of the running image.
@@ -125,25 +129,25 @@ namespace OpenShock {
     /// wrong instead of driving pins it was never told about.
     inline const BoardDescriptor& Get()
     {
-      return Detail::active;
+      return Detail::state.desc;
     }
 
     /// @brief Whether Get() is the image's own descriptor rather than the fallback.
     inline bool IsStamped()
     {
-      return Detail::stamped;
+      return Detail::state.stamped;
     }
 
     /// @brief Get().board as a view, measured once. Points into the descriptor, so it stays valid and NUL-terminated.
     inline std::string_view Name()
     {
-      return Detail::name;
+      return Detail::state.name;
     }
 
     /// @brief Get().chip as a view, measured once. Points into the descriptor, so it stays valid and NUL-terminated.
     inline std::string_view Chip()
     {
-      return Detail::chip;
+      return Detail::state.chip;
     }
 
     enum class ParseResult : uint8_t {
@@ -160,7 +164,7 @@ namespace OpenShock {
     /// @brief Whether the board declares this chip-unsafe pin usable anyway. A mask test; safe in hot paths.
     inline bool IsBypassedGPIO(int8_t pin)
     {
-      return pin >= 0 && pin < 64 && ((Detail::active.gpioBypassMask >> pin) & 1u) != 0;
+      return pin >= 0 && pin < 64 && ((Detail::state.desc.gpioBypassMask >> pin) & 1u) != 0;
     }
   }  // namespace Board
 }  // namespace OpenShock

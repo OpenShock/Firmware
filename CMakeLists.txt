@@ -30,22 +30,16 @@ else()
 endif()
 
 if(DEFINED OPENSHOCK_BOARD)
-  # Map the IDF target to an OpenShock chip label for OPENSHOCK_FW_CHIP.
+  # The chip label (OPENSHOCK_FW_CHIP) is derived from the fragment's CONFIG_IDF_TARGET by
+  # gen_env_header.py through the one target-to-chip map in scripts/utils/boards.py, the same
+  # map the stamped descriptor's chip field uses. The build's IDF_TARGET is passed along only
+  # so a fragment configured for another target fails here.
   if(DEFINED IDF_TARGET)
     set(_os_target ${IDF_TARGET})
   elseif(DEFINED ENV{IDF_TARGET})
     set(_os_target $ENV{IDF_TARGET})
   else()
     set(_os_target "esp32")
-  endif()
-  if(_os_target STREQUAL "esp32s3")
-    set(_os_chip "ESP32-S3")
-  elseif(_os_target STREQUAL "esp32s2")
-    set(_os_chip "ESP32-S2")
-  elseif(_os_target STREQUAL "esp32c3")
-    set(_os_chip "ESP32-C3")
-  else()
-    set(_os_chip "ESP32")
   endif()
 
   set(OPENSHOCK_CONFIG_DIR ${CMAKE_BINARY_DIR}/config)
@@ -54,7 +48,7 @@ if(DEFINED OPENSHOCK_BOARD)
       ${_os_python} ${CMAKE_CURRENT_LIST_DIR}/scripts/gen_env_header.py
       --out-dir ${OPENSHOCK_CONFIG_DIR}
       --board ${OPENSHOCK_BOARD}
-      --chip ${_os_chip}
+      --target ${_os_target}
       --fragment ${CMAKE_CURRENT_LIST_DIR}/boards/${OPENSHOCK_BOARD}.defaults)
 
   execute_process(COMMAND ${_os_gen_command} --emit both RESULT_VARIABLE _os_env_rc)
@@ -62,8 +56,8 @@ if(DEFINED OPENSHOCK_BOARD)
     message(FATAL_ERROR "gen_env_header.py failed (rc=${_os_env_rc})")
   endif()
 
-  # openshock_board.h (GPIO pins etc.) is generated at configure time from the board fragment, so editing the
-  # fragment must trigger a reconfigure.
+  # openshock_board.h (chip label, build mode, log level) is generated at configure time from the board
+  # fragment, so editing the fragment must trigger a reconfigure.
   set_property(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS ${CMAKE_CURRENT_LIST_DIR}/boards/${OPENSHOCK_BOARD}.defaults)
   set(OPENSHOCK_NATIVE_ENV TRUE)
 endif()
@@ -101,7 +95,11 @@ if(OPENSHOCK_NATIVE_ENV)
   # into firmware.bin right after esptool produces it, so `idf.py flash` and the CI
   # artifacts carry the board, and a build that somehow skipped this boots with no pins
   # rather than with pins it assumed. gen_project_binary is the IDF target that writes
-  # the .bin; it re-runs (and so does this) whenever the ELF changes.
+  # the .bin. A POST_BUILD step on a custom target runs on every build, not only when the
+  # ELF changed; that is fine because the stamp is idempotent (CI checks that re-stamping
+  # is byte-identical). If app signing (secure boot) is ever enabled, this has to move
+  # before the signing step, and scripts/utils/espimage.py has to learn the signature
+  # block: today it rejects an image with anything after the SHA-256.
   idf_build_get_property(_os_build_dir BUILD_DIR)
   add_custom_command(TARGET gen_project_binary POST_BUILD
     COMMAND ${_os_python} ${CMAKE_CURRENT_LIST_DIR}/scripts/stamp_board.py stamp

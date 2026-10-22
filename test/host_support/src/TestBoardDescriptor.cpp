@@ -2,8 +2,8 @@
 // placeholder in components/common/src/BoardDescriptorImage.cpp that the stamper
 // overwrites; the host build is never stamped, so it is built here from the fixed test
 // board in include/openshock_board.h (classic ESP32, RF TX on GPIO4, nothing else) and
-// Board::Get() serves it like a stamped one. Suites list this file in their SRCS next to
-// common/src/BoardDescriptor.cpp.
+// Board::Get() serves it like a stamped one. host_support compiles it, together with
+// common/src/BoardDescriptor.cpp, for every suite.
 #include "BoardDescriptor.h"
 #include "openshock_board.h"
 

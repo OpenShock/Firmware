@@ -21,7 +21,7 @@ so anything that changes a byte of a segment must recompute both. `patch()` does
 import hashlib
 import struct
 import zlib
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from functools import reduce
 from operator import xor
 
@@ -208,11 +208,10 @@ class Image:
             raise ImageError(f'patch at 0x{offset:X}+{len(replacement)} does not lie inside a single segment')
         data = bytearray(self.data)
         data[offset:end] = replacement
-        patched = parse(bytes(data))
-        data[patched.checksum_offset] = patched.checksum()
-        patched = parse(bytes(data))
-        if patched.hash_appended:
-            data[patched.digest_offset :] = patched.digest()
+        # Only segment bytes changed, so the layout - and with it the checksum and digest offsets - is ours.
+        data[self.checksum_offset] = replace(self, data=bytes(data)).checksum()
+        if self.hash_appended:
+            data[self.digest_offset :] = replace(self, data=bytes(data)).digest()
         patched = parse(bytes(data))
         patched.verify()
         return patched

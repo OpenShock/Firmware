@@ -4,8 +4,10 @@ A fragment holds two kinds of line. ``CONFIG_*`` lines are real Kconfig, layered
 sdkconfig.defaults by scripts/build.py. Bare ``OPENSHOCK_*`` lines are the board's
 hardware description - pins, LED flags, the chip-unsafe pins the board is allowed to use
 anyway - and are deliberately not Kconfig (see scripts/build.py). This module is the one
-parser for those lines, shared by gen_env_header.py (the compiled-in defaults),
-stamp_board.py (the descriptor written into the app image) and merge_image.py.
+parser for those lines, shared by stamp_board.py (the descriptor written into the app
+image), gen_env_header.py (the chip label, and an early typo check at configure time),
+build.py (which strips them before idf.py sees the fragment), merge_image.py and the CI
+matrix script (.github/scripts/get-vars.py).
 """
 
 import re
@@ -74,6 +76,11 @@ def board_fragment(board: str) -> Path:
         avail = ', '.join(sorted(p.stem for p in (ROOT / 'boards').glob('*.defaults')))
         raise SystemExit(f'error: unknown board {board!r}\n  available: {avail}')
     return fragment
+
+
+def is_board_line(line: str) -> bool:
+    """Whether a fragment line is one of the bare board assignments rather than Kconfig."""
+    return re.match(r'\s*OPENSHOCK_[A-Z0-9_]+\s*=', line) is not None
 
 
 def read_target(fragment: Path) -> str:
