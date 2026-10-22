@@ -1,0 +1,19 @@
+packages:
+  - 'packages/*'
+
+allowBuilds:
+  '@tailwindcss/oxide': true
+  esbuild: true
+blockExoticSubdeps: true
+minimumReleaseAge: 4320 # 3 days
+
+minimumReleaseAgeExcludePrune: true
+minimumReleaseAgeExclude:
+  - '@openshock/*'
+
+onlyBuiltDependencies:
+  - '@tailwindcss/oxide'
+  - esbuild
+
+overrides:
+  cookie@<0.7.0: ^0.7.0

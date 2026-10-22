@@ -1,0 +1,27 @@
+#pragma once
+
+#include "config/ConfigBase.h"
+
+#include <hal/gpio_types.h>
+
+namespace OpenShock::Config {
+  // The schema's `active` and `latching` fields are not modelled: nothing reads them, so they are dropped on save.
+  struct EStopConfig : public ConfigBase<Serialization::Configuration::EStopConfig> {
+    EStopConfig();
+    EStopConfig(bool enabled, gpio_num_t gpioPin);
+
+    bool enabled;
+    gpio_num_t gpioPin;
+
+    void ToDefault() override;
+
+    /// @brief Disables the E-Stop when its pin can't be used as an input, so every input path stores the same thing.
+    void Normalize();
+
+    bool FromFlatbuffers(const Serialization::Configuration::EStopConfig* config) override;
+    flatbuffers::Offset<Serialization::Configuration::EStopConfig> ToFlatbuffers(flatbuffers::FlatBufferBuilder& builder, bool withSensitiveData) const override;
+
+    bool FromJSON(JSON::JsonView json) override;
+    void ToJSON(json_gen_str_t* gen, const char* name, bool withSensitiveData) const override;
+  };
+}  // namespace OpenShock::Config

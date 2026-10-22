@@ -1,15 +1,48 @@
+import { OtaUpdateChannel } from '#lib/_fbs/open-shock/serialization/configuration/ota-update-channel.js';
+import type { OtaUpdateConfig } from '#lib/mappers/ConfigMapper.js';
+import { hubState } from '#lib/stores/index.js';
+import { getApiBaseUrl } from '#lib/utils/localRedirect.js';
 import { toast } from 'svelte-sonner';
-import { hubState } from '$lib/stores';
-import { getApiBaseUrl } from '$lib/utils/localRedirect';
 
 function apiFetch(path: string, init?: RequestInit): Promise<Response> {
   return fetch(getApiBaseUrl() + path, init);
 }
 
+// Error codes returned by the hub's HTTP API, mapped to user-facing text. Unknown codes are shown as-is.
+const _errorMessages: Record<string, string> = {
+  // Account linking
+  CodeRequired: 'Code required',
+  InvalidCodeLength: 'Invalid code length',
+  NoInternetConnection: 'No internet connection',
+  InvalidCode: 'Invalid code',
+  RequestFailed: 'Could not reach the server (check DNS/TLS/connection)',
+  RequestTimedOut: 'Request to the server timed out',
+  ServerError: 'Server returned an unexpected response',
+  InvalidResponse: 'Server sent an invalid response',
+  ConfigSaveFailed: 'Failed to save the auth token to the device',
+  // GPIO
+  InvalidPin: 'Invalid pin',
+  PinInUse: 'Pin is used by the E-Stop',
+  // WiFi
+  MissingSsid: 'Network name is required',
+  InvalidSsid: 'Network name must be 1-32 bytes',
+  PasswordTooShort: 'Password must be at least 8 characters',
+  PasswordTooLong: 'Password must be at most 63 characters',
+  // OTA
+  InvalidChannel: 'Invalid update channel',
+  // Generic
+  MissingParam: 'Missing parameter',
+  InvalidParam: 'Invalid value',
+  RateLimited: 'Too many requests',
+  InternalError: 'Internal error',
+};
+
 async function getErrorMessage(res: Response): Promise<string> {
   try {
     const data = await res.json();
-    return data.error ?? 'Unknown error';
+    const code: unknown = data?.error;
+    if (typeof code !== 'string') return 'Unknown error';
+    return _errorMessages[code] ?? code;
   } catch {
     return 'Unknown error';
   }
@@ -20,10 +53,11 @@ async function getErrorMessage(res: Response): Promise<string> {
 export async function fetchBoardInfo(): Promise<void> {
   try {
     const res = await apiFetch('/api/board');
+    if (!res.ok) return; // Non-fatal, see below
     const data = await res.json();
     hubState.hasPredefinedPins = data.has_predefined_pins ?? false;
   } catch {
-    // Non-fatal — hasPredefinedPins stays false (DIY flow shown)
+    // Non-fatal: hasPredefinedPins stays false (DIY flow shown)
   }
 }
 
@@ -56,9 +90,8 @@ export async function forgetWifiNetwork(ssid: string): Promise<void> {
     const res = await apiFetch('/api/wifi/networks?' + new URLSearchParams({ ssid }), {
       method: 'DELETE',
     });
-    if (res.ok) {
-      toast.success('Forgot network: ' + ssid);
-    } else {
+    // Success is announced by the hub's "Removed" WiFi event
+    if (!res.ok) {
       toast.error('Failed to forget network: ' + (await getErrorMessage(res)));
     }
   } catch {
@@ -67,15 +100,6 @@ export async function forgetWifiNetwork(ssid: string): Promise<void> {
 }
 
 // Account
-
-const _accountLinkErrorMessages: Record<string, string> = {
-  CodeRequired: 'Code required',
-  InvalidCodeLength: 'Invalid code length',
-  NoInternetConnection: 'No internet connection',
-  InvalidCode: 'Invalid code',
-  RateLimited: 'Too many requests',
-  InternalError: 'Internal error',
-};
 
 export async function linkAccount(code: string): Promise<boolean> {
   try {
@@ -87,9 +111,7 @@ export async function linkAccount(code: string): Promise<boolean> {
       toast.success('Account linked successfully');
       return true;
     } else {
-      const error = await getErrorMessage(res);
-      const reason = _accountLinkErrorMessages[error] ?? 'Unknown error';
-      toast.error('Failed to link account: ' + reason);
+      toast.error('Failed to link account: ' + (await getErrorMessage(res)));
       return false;
     }
   } catch {
@@ -114,11 +136,6 @@ export async function unlinkAccount(): Promise<void> {
 
 // Config - RF
 
-const _gpioErrorMessages: Record<string, string> = {
-  InvalidPin: 'Invalid pin',
-  InternalError: 'Internal error',
-};
-
 export async function setRfTxPin(pin: number): Promise<boolean> {
   try {
     const res = await apiFetch('/api/config/rf/pin?' + new URLSearchParams({ pin: String(pin) }), {
@@ -130,55 +147,11 @@ export async function setRfTxPin(pin: number): Promise<boolean> {
       toast.success('Changed RF TX pin to: ' + data.pin);
       return true;
     } else {
-      const error = await getErrorMessage(res);
-      toast.error('Failed to change RF TX pin: ' + (_gpioErrorMessages[error] ?? 'Unknown error'));
+      toast.error('Failed to change RF TX pin: ' + (await getErrorMessage(res)));
       return false;
     }
   } catch {
     toast.error('Failed to change RF TX pin');
-    return false;
-  }
-}
-
-// Config - EStop
-
-export async function setEstopPin(pin: number): Promise<boolean> {
-  try {
-    const res = await apiFetch('/api/config/estop/pin?' + new URLSearchParams({ pin: String(pin) }), {
-      method: 'PUT',
-    });
-    if (res.ok) {
-      const data = await res.json();
-      if (hubState.config) hubState.config.estop.gpioPin = data.pin;
-      toast.success('Changed EStop pin to: ' + data.pin);
-      return true;
-    } else {
-      const error = await getErrorMessage(res);
-      toast.error('Failed to change EStop pin: ' + (_gpioErrorMessages[error] ?? 'Unknown error'));
-      return false;
-    }
-  } catch {
-    toast.error('Failed to change EStop pin');
-    return false;
-  }
-}
-
-export async function setEstopEnabled(enabled: boolean): Promise<boolean> {
-  try {
-    const res = await apiFetch(
-      '/api/config/estop/enabled?' + new URLSearchParams({ enabled: enabled ? '1' : '0' }),
-      { method: 'PUT' },
-    );
-    if (res.ok) {
-      if (hubState.config) hubState.config.estop.enabled = enabled;
-      toast.success('Changed EStop enabled to: ' + enabled);
-      return true;
-    } else {
-      toast.error('Failed to change EStop enabled');
-      return false;
-    }
-  } catch {
-    toast.error('Failed to change EStop enabled');
     return false;
   }
 }
@@ -189,8 +162,8 @@ export async function saveWifiNetwork(
   ssid: string,
   password: string | null,
   connect: boolean,
-  security?: number,
-): Promise<void> {
+  security?: number
+): Promise<boolean> {
   try {
     const params = new URLSearchParams({ ssid, connect: connect ? '1' : '0' });
     if (password) params.set('password', password);
@@ -202,9 +175,12 @@ export async function saveWifiNetwork(
     });
     if (!res.ok) {
       toast.error('Failed to save WiFi network: ' + (await getErrorMessage(res)));
+      return false;
     }
+    return true;
   } catch {
     toast.error('Failed to save WiFi network');
+    return false;
   }
 }
 
@@ -236,60 +212,89 @@ export async function disconnectWifiNetwork(): Promise<void> {
 
 // OTA
 
-export async function setOtaEnabled(enabled: boolean): Promise<void> {
+const _otaChannelNames: Record<OtaUpdateChannel, string> = {
+  [OtaUpdateChannel.Stable]: 'stable',
+  [OtaUpdateChannel.Beta]: 'beta',
+  [OtaUpdateChannel.Develop]: 'develop',
+};
+
+// On success the change is mirrored into hubState.config, which is otherwise only sent once on
+// connect, so the controls reflect what the hub stored.
+async function otaRequest(
+  path: string,
+  method: 'PUT' | 'POST',
+  failure: string,
+  patch?: Partial<OtaUpdateConfig>
+): Promise<boolean> {
   try {
-    await apiFetch(`/api/ota/enabled?enabled=${enabled ? '1' : '0'}`, { method: 'PUT' });
+    const res = await apiFetch('/api/ota/' + path, { method });
+    if (!res.ok) {
+      toast.error(failure + ': ' + (await getErrorMessage(res)));
+      return false;
+    }
+    if (patch && hubState.config) Object.assign(hubState.config.otaUpdate, patch);
+    return true;
   } catch {
-    toast.error('Failed to update OTA setting');
+    toast.error(failure);
+    return false;
   }
 }
 
-export async function setOtaDomain(domain: string): Promise<void> {
-  try {
-    await apiFetch(`/api/ota/domain?` + new URLSearchParams({ domain }), { method: 'PUT' });
-  } catch {
-    toast.error('Failed to update OTA domain');
-  }
+// All OTA settings go through PUT /api/ota/settings, which applies any subset in one config write.
+function setOtaSettings(
+  params: Record<string, string>,
+  failure: string,
+  patch: Partial<OtaUpdateConfig>
+): Promise<boolean> {
+  return otaRequest('settings?' + new URLSearchParams(params), 'PUT', failure, patch);
 }
 
-export async function setOtaChannel(channel: string): Promise<void> {
-  try {
-    await apiFetch(`/api/ota/channel?` + new URLSearchParams({ channel }), { method: 'PUT' });
-  } catch {
-    toast.error('Failed to update OTA channel');
-  }
+export function setOtaEnabled(isEnabled: boolean): Promise<boolean> {
+  return setOtaSettings({ enabled: isEnabled ? '1' : '0' }, 'Failed to update OTA setting', {
+    isEnabled,
+  });
 }
 
-export async function setOtaCheckInterval(interval: number): Promise<void> {
-  try {
-    await apiFetch(`/api/ota/check-interval?interval=${interval}`, { method: 'PUT' });
-  } catch {
-    toast.error('Failed to update OTA check interval');
-  }
+export function setOtaChannel(updateChannel: OtaUpdateChannel): Promise<boolean> {
+  return setOtaSettings(
+    { channel: _otaChannelNames[updateChannel] },
+    'Failed to update OTA channel',
+    { updateChannel }
+  );
 }
 
-export async function setOtaAllowBackendManagement(allow: boolean): Promise<void> {
-  try {
-    await apiFetch(`/api/ota/allow-backend-management?allow=${allow ? '1' : '0'}`, { method: 'PUT' });
-  } catch {
-    toast.error('Failed to update OTA backend management setting');
-  }
+export function setOtaCheckInterval(checkInterval: number): Promise<boolean> {
+  return setOtaSettings(
+    { interval: String(checkInterval) },
+    'Failed to update OTA check interval',
+    { checkInterval }
+  );
 }
 
-export async function setOtaRequireManualApproval(require: boolean): Promise<void> {
-  try {
-    await apiFetch(`/api/ota/require-manual-approval?require=${require ? '1' : '0'}`, {
-      method: 'PUT',
-    });
-  } catch {
-    toast.error('Failed to update OTA manual approval setting');
-  }
+export function setOtaAllowBackendManagement(allowBackendManagement: boolean): Promise<boolean> {
+  return setOtaSettings(
+    { allow: allowBackendManagement ? '1' : '0' },
+    'Failed to update OTA backend management setting',
+    {
+      allowBackendManagement,
+    }
+  );
 }
 
-export async function checkOtaUpdates(channel: string): Promise<void> {
-  try {
-    await apiFetch(`/api/ota/check?` + new URLSearchParams({ channel }), { method: 'POST' });
-  } catch {
-    toast.error('Failed to check for OTA updates');
-  }
+export function setOtaRequireManualApproval(requireManualApproval: boolean): Promise<boolean> {
+  return setOtaSettings(
+    { require: requireManualApproval ? '1' : '0' },
+    'Failed to update OTA manual approval setting',
+    {
+      requireManualApproval,
+    }
+  );
+}
+
+export function checkOtaUpdates(channel: OtaUpdateChannel): Promise<boolean> {
+  return otaRequest(
+    'check?' + new URLSearchParams({ channel: _otaChannelNames[channel] }),
+    'POST',
+    'Failed to check for OTA updates'
+  );
 }

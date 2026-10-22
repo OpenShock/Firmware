@@ -1,7 +1,15 @@
+# When the firmware is compiled. A full 13-board build is too heavy to run per commit, so:
+#   - release tags (beta rc / stable) build every board and publish to prod;
+#   - develop, beta and master build every board nightly (nightly.yml dispatches one run per branch,
+#     which keeps each branch's status badge current), only when firmware sources changed since
+#     that branch's last nightly; develop's nightly also publishes to prod, beta and master only build;
+#   - a pull request builds one canary board, or every board once it carries the ci:full-build label;
+#   - a dispatch builds every board on demand.
+# Branch pushes do not build at all; the cheap per-commit checks live in checks.yml.
+# Fork pull requests run only after a maintainer approves them: the repository requires approval
+# for every workflow run from an external contributor.
 on:
   push:
-    branches:
-      - develop
     tags:
       - '[0-9]+.[0-9]+.[0-9]+'
       - '[0-9]+.[0-9]+.[0-9]+-*'
@@ -10,205 +18,481 @@ on:
       - master
       - beta
       - develop
-    types: [opened, reopened, synchronize]
-  workflow_dispatch: # Manually invoked by user.
+    # labeled so that adding ci:full-build upgrades the PR's build; the gate ignores every other label.
+    types: [opened, reopened, synchronize, labeled]
+  workflow_dispatch:
+    inputs:
+      server:
+        description: 'Repository server to publish to (prod is honoured only when running against a tag)'
+        required: false
+        type: choice
+        default: dev
+        options: [dev, prod]
+      channel:
+        description: 'Channel to publish onto (derive = the channel the ref maps to)'
+        required: false
+        type: choice
+        default: derive
+        options: [derive, develop, beta, stable]
+      nightly:
+        description: 'Run as the nightly build of this branch (set by nightly.yml): skip when no firmware sources changed; server and channel are ignored'
+        required: false
+        type: boolean
+        default: false
 
 name: ci-build
 
+# Per-ref.
+# No cross-ref group is needed: the only state two runs could contend for is a release on the server, which refuses a second staging of a version.
+# Labelling a PR with anything but ci:full-build gets its own group, so the no-op run it triggers
+# does not cancel the build already running for that PR.
 concurrency:
-  group: ${{ github.workflow }}-${{ github.ref }}
+  group: >-
+    ${{ github.workflow }}-${{ github.ref }}${{
+    github.event.action == 'labeled' && github.event.label.name != 'ci:full-build'
+    && format('-label-{0}', github.event.label.name) || '' }}
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
-env:
-  PYTHON_VERSION: 3.13
+# Least-privilege default; jobs needing more opt up explicitly.
+# No job holds a storage or CDN credential, because no job writes to either.
+permissions:
+  contents: read
 
 jobs:
+  # Decides build, deploy, publish, the server and the boards; .github/scripts/ci_build_gate.py says how.
+  gate:
+    runs-on: ubuntu-slim
+    timeout-minutes: 3
+    permissions:
+      contents: read
+      actions: read
+    outputs:
+      build: ${{ steps.decide.outputs.build }}
+      deploy: ${{ steps.decide.outputs.deploy }}
+      publish: ${{ steps.decide.outputs.publish }}
+      server: ${{ steps.decide.outputs.server }}
+      boards: ${{ steps.decide.outputs.boards }}
+      warm-idf: ${{ steps.decide.outputs.warm-idf }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+        with:
+          sparse-checkout: .github
+
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97  # v7.0.0
+        with:
+          python-version-file: .github/scripts/.python-version
+          cache: 'pip'
+          cache-dependency-path: .github/scripts/requirements.txt
+
+      - name: Install script dependencies
+        shell: bash
+        run: pip install --require-hashes -r .github/scripts/requirements.txt
+
+      - name: Decide build, deploy and publish
+        id: decide
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: python .github/scripts/ci_build_gate.py
+
   getvars:
+    needs: [gate]
+    if: ${{ needs.gate.outputs.build == 'true' || needs.gate.outputs.deploy == 'true' }}
     uses: ./.github/workflows/get-vars.yml
+    # Set only on a manual dispatch; empty otherwise, nightlies included, so get-vars derives the channel from the ref.
+    with:
+      channel: ${{ !inputs.nightly && inputs.channel != 'derive' && inputs.channel || '' }}
+      boards: ${{ needs.gate.outputs.boards }}
+
+  # Opens the release the moment get-vars has settled what this run is, before anything is built.
+  # Everything the server checks at init - semver, the channel enum, a version already published, another run holding the same one, an unknown board - answers here in a minute rather than after the matrix.
+  # It also reserves the version: a second run for it is refused now, instead of after both have spent half an hour building.
+  stage:
+    name: Stage release on ${{ needs.gate.outputs.server }}
+    runs-on: ubuntu-latest
+    needs: [gate, getvars]
+    timeout-minutes: 10
+    # A fork PR cannot mint an OIDC token here, so it would fail on something the contributor cannot fix.
+    if: ${{ needs.gate.outputs.publish == 'true' && github.event.pull_request.head.repo.fork != true }}
+    # The environment carries OPENSHOCK_REPO_SERVER_URL, so which instance is published to is settings rather than workflow logic.
+    # The required reviewer on repo-server-prod also takes effect here rather than at the publish, so a production release is approved before it spends the build rather than after.
+    environment: repo-server-${{ needs.gate.outputs.server }}
+    permissions:
+      contents: read
+      id-token: write
+    outputs:
+      release-id: ${{ steps.stage.outputs.release-id }}
+      # The publish and abort jobs run outside the environment, so they cannot read its vars themselves.
+      # This is a hostname, not a credential.
+      server-url: ${{ steps.resolve.outputs.server-url }}
+
+    steps:
+      - name: Resolve server configuration
+        id: resolve
+        env:
+          SERVER_URL: ${{ vars.OPENSHOCK_REPO_SERVER_URL }}
+          TARGET: ${{ needs.gate.outputs.server }}
+        run: |
+          set -euo pipefail
+          if [ -z "$SERVER_URL" ]; then
+            echo "::error::OPENSHOCK_REPO_SERVER_URL is unset on environment repo-server-$TARGET, so this build has nowhere to publish to."
+            exit 1
+          fi
+          echo "server-url=$SERVER_URL" >> "$GITHUB_OUTPUT"
+          echo "Publishing to the $TARGET repository server."
+
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+        with:
+          sparse-checkout: |
+            .github
+            CHANGELOG.md
+
+      # Same pinned set the repo-server actions install, so this runs before a credential is minted rather than after.
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97  # v7.0.0
+        with:
+          python-version-file: .github/scripts/.python-version
+          cache: 'pip'
+          cache-dependency-path: .github/scripts/requirements.txt
+
+      - name: Install script dependencies
+        shell: bash
+        run: pip install --require-hashes -r .github/scripts/requirements.txt
+
+      # Refuses the run if this repository's rules say it may not publish what get-vars resolved.
+      # The rules are all about prod, and all about things the server cannot know: that a stable release descends from master, that a maintainer staged a draft for it.
+      - name: Apply repository publishing policy
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          SHA: ${{ github.sha }}
+          SERVER: ${{ needs.gate.outputs.server }}
+          CHANNEL: ${{ needs.getvars.outputs.release-channel }}
+          VERSION: ${{ needs.getvars.outputs.version }}
+        run: python .github/scripts/repo_server_policy.py
+
+      - uses: ./.github/actions/repo-server-token
+        id: token
+
+      - uses: ./.github/actions/repo-server-publish
+        id: stage
+        with:
+          server-url: ${{ steps.resolve.outputs.server-url }}
+          token: ${{ steps.token.outputs.token }}
+          version: ${{ needs.getvars.outputs.version }}
+          channel: ${{ needs.getvars.outputs.release-channel }}
+          boards: ${{ needs.getvars.outputs.board-list }}
+          mode: init
 
   build-frontend:
+    # Waits on stage so the reviewer on a prod release approves before the compute is spent rather than while it burns.
+    # stage is skipped on anything that does not publish, and a skip is not a failure, so a PR still builds.
+    needs: [gate, stage]
+    if: >-
+      ${{ !cancelled()
+      && needs.gate.outputs.build == 'true'
+      && needs.stage.result != 'failure' }}
     runs-on: ubuntu-latest
     timeout-minutes: 5
 
     steps:
-      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd  # v6.0.2
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
         with:
+          submodules: recursive
           sparse-checkout: |
             .github
             frontend
 
       - uses: ./.github/actions/build-frontend
 
+  # Pack the captive-portal assets into the static0 image once (board-independent).
+  # Runs in parallel with the per-board C++ build below; merge-partitions links them.
   build-staticfs:
     runs-on: ubuntu-latest
     needs: [getvars, build-frontend]
+    # `stage` is skipped on every run that does not publish, and GitHub propagates that
+    # skip down the needs graph to any job that does not override it. build-frontend and
+    # build-firmware each carry their own condition, so they run; this job did not, so it
+    # skipped on pull requests - taking merge-partitions and checkpoint-build with it, and
+    # leaving a PR with no flashable images. It builds on dispatch, which is why it went
+    # unnoticed.
+    if: >-
+      ${{ !cancelled()
+      && needs.getvars.result == 'success'
+      && needs.build-frontend.result == 'success' }}
     timeout-minutes: 5
 
     steps:
-      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd  # v6.0.2
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+
       - uses: ./.github/actions/build-staticfs
         with:
           version: ${{ needs.getvars.outputs.version }}
-          skip-checkout: true
 
-  build-firmware:
+  # Populate the ESP-IDF cache once, before the matrix fans out.
+  #
+  # setup-esp-idf only runs the installer when the cache misses, so on a warm key every
+  # board skips it. The problem is the cold key: without this job all 13 boards miss at
+  # the same moment and all 13 run the installer concurrently, which measured 867s per job
+  # - some 700s of it apt fetching cmake at ~35 KB/s while twelve siblings did the same.
+  # One job paying that once, and thirteen then hitting a warm cache, is strictly cheaper.
+  #
+  # A lookup-only probe first, so the usual case - the cache already exists - costs a few
+  # seconds and does not download the entry just to prove it is there.
+  #
+  # Skipped when a single board builds (the pull request canary): that board's job is the
+  # nominated writer, so it warms the cache itself and a separate job would only delay it.
+  warm-esp-idf:
+    name: Warm the ESP-IDF cache
     runs-on: ubuntu-latest
-    needs: [getvars]
-    timeout-minutes: 10
+    needs: [gate]
+    if: ${{ !cancelled() && needs.gate.outputs.warm-idf == 'true' }}
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+        with:
+          sparse-checkout: .github
+
+      # lookup-only so the cache key lives in exactly one place, inside the action. The
+      # probe checks for the entry without downloading it, so the usual case - already
+      # populated - costs seconds; on a miss the action installs, prunes and saves.
+      - uses: ./.github/actions/setup-esp-idf
+        with:
+          lookup-only: 'true'
+
+  # Compile each board's C++ firmware.
+  # Builds only the code partitions (no static0 image, no frontend), so it runs in parallel with build-staticfs.
+  build-firmware:
+    # The matrix carries chip and cache-group alongside the board, which would otherwise
+    # all end up in the generated job name.
+    name: build-firmware (${{ matrix.board }})
+    runs-on: ubuntu-latest
+    needs: [gate, getvars, stage, warm-esp-idf]
+    # getvars is named explicitly: without it, !cancelled() would let the matrix start on an empty board-matrix when get-vars failed.
+    # warm-esp-idf is skipped on a single-board build, and !cancelled() keeps that skip from propagating here, so only its failure stops the matrix.
+    if: >-
+      ${{ !cancelled()
+      && needs.gate.outputs.build == 'true'
+      && needs.getvars.result == 'success'
+      && needs.stage.result != 'failure'
+      && (needs.warm-esp-idf.result == 'success' || needs.warm-esp-idf.result == 'skipped') }}
+    timeout-minutes: 30
     strategy:
       fail-fast: false
       matrix: ${{ fromJSON(needs.getvars.outputs.board-matrix) }}
 
     steps:
-      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd  # v6.0.2
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+        with:
+          # flatbuffers runtime lives in a submodule (components/flatbuffers).
+          submodules: recursive
 
       - uses: ./.github/actions/build-firmware
         with:
           board: ${{ matrix.board }}
           version: ${{ needs.getvars.outputs.version }}
-          skip-checkout: true
+          cache-group: ${{ matrix.cache-group }}
+          idf-cache-writer: ${{ matrix.idf-cache-writer }}
 
+  # Link every board's C++ partitions with the shared static0 image into one flashable binary each.
+  # Waits on both parallel build legs.
+  # One job rather than a matrix: the merge is seconds of esptool per board, so thirteen runners spent more on checkout, pip and artifact downloads than on the work.
   merge-partitions:
     runs-on: ubuntu-latest
     needs: [getvars, build-staticfs, build-firmware]
-    timeout-minutes: 5
-    strategy:
-      fail-fast: false
-      matrix: ${{ fromJSON(needs.getvars.outputs.board-matrix) }}
+    # Explicit for the same reason as build-staticfs above: this job sits downstream of
+    # the same chain, so it must not inherit a skip from it.
+    if: >-
+      ${{ !cancelled()
+      && needs.getvars.result == 'success'
+      && needs.build-staticfs.result == 'success'
+      && needs.build-firmware.result == 'success' }}
+    timeout-minutes: 10
 
     steps:
-      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd  # v6.0.2
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
         with:
           sparse-checkout: |
             .github
             scripts
             boards
-            chips
+            partitions
 
       - uses: ./.github/actions/merge-partitions
         with:
           version: ${{ needs.getvars.outputs.version }}
-          board: ${{ matrix.board }}
-          skip-checkout: true
+          boards: ${{ needs.getvars.outputs.board-list }}
 
   checkpoint-build:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-slim
     needs: [merge-partitions]
     timeout-minutes: 1
     steps:
       - run: echo "Builds checkpoint reached"
 
-  cdn-upload-firmware:
+  # Upload every board's artifacts with the hash CI computed for each, into the release stage opened, then publish.
+  # Fail on the first non-success; that is the whole contract.
+  # Where artifacts are stored and which hostname serves them are the server's decisions, and CI holds no storage credential to second-guess them with.
+  #
+  # Every build publishes, against the development instance.
+  # Publishing consumes a version and only a maintainer can undo it, at /admin/firmware/releases.
+  # Branch builds carry +<short-sha> so pushes do not collide; re-running a build on a published commit does.
+  # No environment here: the reviewer already approved this release at stage, and nothing can be promoted that was not staged there.
+  repo-server:
+    name: Repository server (publish to ${{ needs.gate.outputs.server }})
     runs-on: ubuntu-latest
-    needs: [getvars, checkpoint-build]
-    timeout-minutes: 15
-    if: ${{ needs.getvars.outputs.should-deploy == 'true' }}
-    environment: cdn-firmware-r2
-    strategy:
-      fail-fast: true
-      matrix: ${{ fromJson(needs.getvars.outputs.board-matrix) }}
+    needs: [gate, getvars, stage, checkpoint-build]
+    timeout-minutes: 20
+    if: ${{ needs.gate.outputs.publish == 'true' && github.event.pull_request.head.repo.fork != true }}
+    permissions:
+      contents: read
+      id-token: write
 
     steps:
-      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd  # v6.0.2
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
         with:
           sparse-checkout: |
             .github
+            CHANGELOG.md
 
-      # Set up rclone for CDN uploads.
-      - uses: ./.github/actions/cdn-prepare
+      # Same pinned set the repo-server actions install, so this runs before a credential is minted rather than after.
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97  # v7.0.0
         with:
-          bunny-ssh-knownhosts: ${{ vars.BUNNY_SSH_KNOWNHOSTS }}
+          python-version-file: .github/scripts/.python-version
+          cache: 'pip'
+          cache-dependency-path: .github/scripts/requirements.txt
 
-      # Upload firmware to CDN.
-      - uses: ./.github/actions/cdn-upload-firmware
+      - name: Install script dependencies
+        shell: bash
+        run: pip install --require-hashes -r .github/scripts/requirements.txt
+
+      - uses: ./.github/actions/repo-server-token
+        id: token
+
+      - uses: ./.github/actions/repo-server-publish
         with:
-          bunny-stor-hostname: ${{ vars.BUNNY_STOR_HOSTNAME }}
-          bunny-stor-username: ${{ secrets.BUNNY_STOR_USERNAME }}
-          bunny-stor-password: ${{ secrets.BUNNY_STOR_PASSWORD }}
-          fw-version: ${{ needs.getvars.outputs.version }}
-          board: ${{ matrix.board }}
-
-  cdn-upload-version-info:
-    runs-on: ubuntu-latest
-    needs: [getvars, checkpoint-build]
-    timeout-minutes: 10
-    if: ${{ needs.getvars.outputs.should-deploy == 'true' }}
-    environment: cdn-firmware-r2
-
-    steps:
-      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd  # v6.0.2
-        with:
-          sparse-checkout: |
-            .github
-
-      # Set up rclone for CDN uploads.
-      - uses: ./.github/actions/cdn-prepare
-        with:
-          bunny-ssh-knownhosts: ${{ vars.BUNNY_SSH_KNOWNHOSTS }}
-
-      # Upload firmware to CDN.
-      - uses: ./.github/actions/cdn-upload-version-info
-        with:
-          bunny-stor-hostname: ${{ vars.BUNNY_STOR_HOSTNAME }}
-          bunny-stor-username: ${{ secrets.BUNNY_STOR_USERNAME }}
-          bunny-stor-password: ${{ secrets.BUNNY_STOR_PASSWORD }}
-          fw-version: ${{ needs.getvars.outputs.version }}
-          release-channel: ${{ needs.getvars.outputs.release-channel }}
+          server-url: ${{ needs.stage.outputs.server-url }}
+          token: ${{ steps.token.outputs.token }}
+          release-id: ${{ needs.stage.outputs.release-id }}
           boards: ${{ needs.getvars.outputs.board-list }}
+          mode: publish
 
-  cdn-bump-version:
+  # The finally for the release stage opened.
+  # That lifetime now spans jobs, so nothing inside a single script can close it: if the build fails, is cancelled, or never reaches the publish, this is what hands the version back.
+  # The server's TTL sweeper is the backstop rather than the mechanism - waiting for it would hold the version against the very retry meant to fix the failure.
+  abort:
+    name: Abort staged release
     runs-on: ubuntu-latest
-    needs: [getvars, cdn-upload-firmware] # only after version is complete
-    timeout-minutes: 5
-    environment: cdn-firmware-r2
+    needs: [gate, stage, repo-server]
+    timeout-minutes: 10
+    if: ${{ always() && needs.stage.outputs.release-id != '' && needs.repo-server.result != 'success' }}
+    permissions:
+      contents: read
+      id-token: write
 
     steps:
-      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd  # v6.0.2
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
         with:
-          sparse-checkout: |
-            .github
+          sparse-checkout: .github
 
-      # Set up rclone for CDN uploads.
-      - uses: ./.github/actions/cdn-prepare
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97  # v7.0.0
         with:
-          bunny-ssh-knownhosts: ${{ vars.BUNNY_SSH_KNOWNHOSTS }}
+          python-version-file: .github/scripts/.python-version
+          cache: 'pip'
+          cache-dependency-path: .github/scripts/requirements.txt
 
-      # Upload firmware to CDN.
-      - uses: ./.github/actions/cdn-bump-version
+      - name: Install script dependencies
+        shell: bash
+        run: pip install --require-hashes -r .github/scripts/requirements.txt
+
+      - uses: ./.github/actions/repo-server-token
+        id: token
+
+      - uses: ./.github/actions/repo-server-publish
         with:
-          bunny-stor-hostname: ${{ vars.BUNNY_STOR_HOSTNAME }}
-          bunny-stor-username: ${{ secrets.BUNNY_STOR_USERNAME }}
-          bunny-stor-password: ${{ secrets.BUNNY_STOR_PASSWORD }}
-          bunny-api-key: ${{ secrets.BUNNY_APIKEY }}
-          bunny-cdn-url: ${{ vars.BUNNY_CDN_URL }}
-          version: ${{ needs.getvars.outputs.version }}
-          release-channel: ${{ needs.getvars.outputs.release-channel }}
+          server-url: ${{ needs.stage.outputs.server-url }}
+          token: ${{ steps.token.outputs.token }}
+          release-id: ${{ needs.stage.outputs.release-id }}
+          mode: abort
 
-  checkpoint-cdn:
-    runs-on: ubuntu-latest
-    needs: [cdn-upload-firmware, cdn-upload-version-info, cdn-bump-version]
-    timeout-minutes: 1
-    steps:
-      - run: echo "CDN checkpoint reached"
-
+  # Mirrors the binaries onto the GitHub release, for people rather than devices.
+  # Runs after the publish, with no always() guard, so a release never advertises what no device can fetch.
+  # Stays on the deploy gate: every build publishes, not every build cuts a release.
   release:
     runs-on: ubuntu-latest
-    needs: [getvars, checkpoint-cdn]
-    timeout-minutes: 1
-    if: (needs.getvars.outputs.release-channel == 'stable' || needs.getvars.outputs.release-channel == 'beta')
+    needs: [gate, getvars, repo-server]
+    timeout-minutes: 5
+    # A GitHub release exists only for a tag, and only because release.yml staged the draft.
+    # Testing the ref rather than the channel, since a dispatch may now name a channel the ref has no release for.
+    if: >-
+      needs.gate.outputs.deploy == 'true'
+      && startsWith(github.ref, 'refs/tags/')
+    permissions:
+      contents: write
 
     steps:
+      # Only the merged, flashable binaries are needed here; downloading every artifact (frontend, per-board partitions, staticfs) just to glob for the merged images is wasteful.
       - name: Download release artifacts
-        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c  # v8.0.1
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333  # v8.0.2
+        with:
+          name: firmware_merged
 
       - name: Display artifacts
         run: ls -R
 
-      - name: Release
-        uses: ncipollo/release-action@339a81892b84b4eeb0f6e744e4574d79d0d9b8dd  # v1.21.0
-        with:
-          artifacts: '**/OpenShock_*.bin'
-          tag: ${{ needs.getvars.outputs.version }}
-          prerelease: ${{ needs.getvars.outputs.release-channel != 'stable' }}
-          artifactErrorsFailBuild: true
-          body: ${{ needs.getvars.outputs.release-notes }}
+      # release.yml staged the draft release for this tag with the title and notes.
+      # Here we attach the freshly built binaries and then publish the draft - so the GitHub release goes live only once its binaries exist and the repository server is already serving the version.
+      - name: Upload binaries to staged release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          TAG: ${{ needs.getvars.outputs.version }}
+        run: |
+          shopt -s globstar nullglob
+          files=(**/OpenShock_*.bin)
+          if [ ${#files[@]} -eq 0 ]; then
+            echo "::error::No firmware binaries found to upload"
+            exit 1
+          fi
+          gh release upload "$TAG" "${files[@]}" --clobber
+
+      # Solidify: the version is live on the repository server and the binaries are attached - now publish the draft, and only then announce.
+      - name: Publish the release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          TAG: ${{ needs.getvars.outputs.version }}
+        run: gh release edit "$TAG" --draft=false
+
+  # Announce the release to the OpenShock API last of all - after the repository server has published it, so the API never leads the rollout (a device asked to update by the API could otherwise be pointed at a version the server is not yet serving).
+  # Chaining on `release` inherits its conditions: only a stable/beta deploy gets this far, which is also the only case that produced a release.json to send.
+  announce:
+    runs-on: ubuntu-slim # lightweight: gh + curl only
+    needs: [getvars, release]
+    timeout-minutes: 5
+    if: ${{ vars.OPENSHOCK_API_URL != '' }}
+    permissions:
+      contents: read
+      id-token: write
+
+    steps:
+      # release.json was staged as a release asset by release.yml.
+      - name: Announce release to OpenShock API
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          API_URL: ${{ vars.OPENSHOCK_API_URL }}
+          TAG: ${{ needs.getvars.outputs.version }}
+        run: |
+          set -euo pipefail
+          gh release download "$TAG" --pattern release.json --dir .
+          OIDC_TOKEN=$(curl -sLS \
+            -H "Authorization: bearer $ACTIONS_ID_TOKEN_REQUEST_TOKEN" \
+            "$ACTIONS_ID_TOKEN_REQUEST_URL&audience=openshock-release-ingest" \
+            | jq -r .value)
+          if [ -z "$OIDC_TOKEN" ] || [ "$OIDC_TOKEN" = "null" ]; then
+            echo "::error::Failed to fetch GitHub OIDC token"
+            exit 1
+          fi
+          curl -fsSL --retry 3 --retry-delay 5 -X POST "$API_URL/1/public/releases" \
+            -H "Authorization: Bearer $OIDC_TOKEN" \
+            -H "Content-Type: application/json" \
+            --data-binary @release.json

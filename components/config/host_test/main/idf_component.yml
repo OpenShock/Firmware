@@ -1,0 +1,5 @@
+# osjson's Json.cpp is compiled into main (see CMakeLists.txt), so main needs the
+# same espressif components osjson declares.
+dependencies:
+  espressif/jsmn: "^1.2.0"
+  espressif/json_generator: "^2.0.0"

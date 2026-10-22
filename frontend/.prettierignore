@@ -14,6 +14,8 @@ package-lock.json
 yarn.lock
 
 # Generated or imported files
-/components.json
 /src/lib/_fbs
 /src/lib/components/ui
+
+# Workspace packages (e.g. svelte-core submodule) own their own formatting
+/packages

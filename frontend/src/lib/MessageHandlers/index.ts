@@ -1,17 +1,16 @@
-import { stopWifiScan } from '$lib/api';
-import type { WebSocketClient } from '$lib/WebSocketClient';
-import { ErrorMessage } from '$lib/_fbs/open-shock/serialization/local/error-message';
-import { HubToLocalMessage } from '$lib/_fbs/open-shock/serialization/local/hub-to-local-message';
-import { HubToLocalMessagePayload } from '$lib/_fbs/open-shock/serialization/local/hub-to-local-message-payload';
-import { ReadyMessage } from '$lib/_fbs/open-shock/serialization/local/ready-message';
-import { WifiScanStatusMessage } from '$lib/_fbs/open-shock/serialization/local/wifi-scan-status-message';
-import { AccountLinkStatusEvent } from '$lib/_fbs/open-shock/serialization/local/account-link-status-event';
-import { WifiGotIpEvent } from '$lib/_fbs/open-shock/serialization/local/wifi-got-ip-event';
-import { mapConfig } from '$lib/mappers/ConfigMapper';
-import { hubState } from '$lib/stores';
+import { AccountLinkStatusEvent } from '#lib/_fbs/open-shock/serialization/local/account-link-status-event.js';
+import { ErrorMessage } from '#lib/_fbs/open-shock/serialization/local/error-message.js';
+import { HubToLocalMessagePayload } from '#lib/_fbs/open-shock/serialization/local/hub-to-local-message-payload.js';
+import { HubToLocalMessage } from '#lib/_fbs/open-shock/serialization/local/hub-to-local-message.js';
+import { ReadyMessage } from '#lib/_fbs/open-shock/serialization/local/ready-message.js';
+import { WifiGotIpEvent } from '#lib/_fbs/open-shock/serialization/local/wifi-got-ip-event.js';
+import { WifiScanStatusMessage } from '#lib/_fbs/open-shock/serialization/local/wifi-scan-status-message.js';
+import { mapConfig } from '#lib/mappers/ConfigMapper.js';
+import { hubState } from '#lib/stores/index.js';
+import type { WebSocketClient } from '#lib/WebSocketClient.js';
 import { ByteBuffer } from 'flatbuffers';
 import { toast } from 'svelte-sonner';
-import { WifiNetworkEventHandler } from './WifiNetworkEventHandler';
+import { mapWifiNetwork, WifiNetworkEventHandler } from './WifiNetworkEventHandler';
 
 export type MessageHandler = (wsClient: WebSocketClient, message: HubToLocalMessage) => void;
 
@@ -28,7 +27,19 @@ PayloadHandlers[HubToLocalMessagePayload.ReadyMessage] = (cli, msg) => {
   const payload = new ReadyMessage();
   msg.payload(payload);
 
-  hubState.wifiConnectedBSSID = payload.connectedWifi()?.bssid() || null;
+  // A (re)connect starts from a clean slate: the hub re-sends its full network list after Ready, and anything
+  // that changed while the socket was down would otherwise linger.
+  hubState.clearWifiNetworks();
+  hubState.wifiScanStatus = null;
+
+  const connectedWifi = payload.connectedWifi();
+  const connectedSSID = connectedWifi?.ssid();
+  const connectedBSSID = connectedWifi?.bssid();
+  hubState.setConnectedWifiNetwork(
+    connectedWifi && connectedSSID && connectedBSSID
+      ? mapWifiNetwork(connectedWifi, connectedSSID, connectedBSSID)
+      : null
+  );
   hubState.accountLinked = payload.accountLinked();
   hubState.config = mapConfig(payload.config());
 
@@ -43,8 +54,6 @@ PayloadHandlers[HubToLocalMessagePayload.ReadyMessage] = (cli, msg) => {
   }
 
   console.log('[WS] Updated hub state: ', hubState);
-
-  stopWifiScan();
 
   toast.success('Websocket connection established');
 };
@@ -93,5 +102,11 @@ export function WebSocketMessageBinaryHandler(cli: WebSocketClient, data: ArrayB
     return;
   }
 
-  PayloadHandlers[payloadType](cli, msg);
+  try {
+    PayloadHandlers[payloadType](cli, msg);
+  } catch (e) {
+    // A malformed message must not take the whole UI down (e.g. leave the config unset forever)
+    console.error('[WS] ERROR: Failed to handle message: ', e);
+    toast.error('Received an invalid message from the hub');
+  }
 }

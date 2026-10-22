@@ -1,42 +1,51 @@
 name: build-compilationdb
-description: Builds the compilation database for the firmware for code analysis
+description: >-
+  Emit build/OpenShock-Core-V2/compile_commands.json with native ESP-IDF, using
+  OpenShock-Core-V2 / esp32s3 as the canonical config. `mode: configure` stops at the
+  CMake configure that writes the database; `mode: build` also compiles, which is what
+  CodeQL needs in order to trace the C/C++.
 inputs:
   version:
     required: true
     description: 'Current firmware version'
-  skip-checkout:
-    description: 'If true, skips checkout'
+  mode:
     required: false
-    default: false
+    default: configure
+    description: >-
+      configure - run CMake only, which is all compile_commands.json requires.
+      build - configure and compile, for consumers that must observe real compiler
+      invocations.
 
 runs:
   using: composite
   steps:
-    - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd  # v6.0.2
-      if: ${{ !inputs.skip-checkout }}
+    - uses: ./.github/actions/setup-esp-idf
 
-    - uses: actions/cache@27d5ce7f107fe9357f9df03efb73ab90386fccae  # v5.0.5
-      with:
-        path: |
-          ~/.platformio/platforms
-          ~/.platformio/packages
-          ~/.platformio/.cache
-        key: pio-${{ runner.os }}-${{ hashFiles('platformio.ini', 'requirements.txt') }}
-
-    - uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405  # v6.2.0
-      with:
-        cache: 'pip'
-
-    - name: Install python dependencies
+    - name: Validate mode
       shell: bash
-      run: pip install -r requirements.txt
+      run: |
+        set -euo pipefail
+        case "${{ inputs.mode }}" in
+          configure|build) ;;
+          *) echo "::error::mode must be 'configure' or 'build', got '${{ inputs.mode }}'"; exit 1 ;;
+        esac
 
-    - name: Build firmware
-      working-directory: .
+    # compile_commands.json is written by CMake at configure time, before a single object
+    # is compiled, so a consumer that only reads the database never needs the compile.
+    # `build` remains available for CodeQL, whose tracer has to see the compiler run.
+    # ccache stays off in both modes: it would hide invocations from that tracer.
+    - name: Generate compilation database (OpenShock-Core-V2 / esp32s3)
       shell: bash
-      run: pio run -e ci-build -t compiledb
+      run: |
+        set -euo pipefail
+        if [ "${{ inputs.mode }}" = "build" ]; then
+          python3 scripts/build.py OpenShock-Core-V2 app
+        else
+          python3 scripts/build.py OpenShock-Core-V2 reconfigure
+        fi
+        test -f build/OpenShock-Core-V2/compile_commands.json \
+          || { echo "::error::compile_commands.json was not generated"; exit 1; }
       env:
         OPENSHOCK_FW_VERSION: ${{ inputs.version }}
         OPENSHOCK_FW_GIT_REF: ${{ github.ref }}
         OPENSHOCK_FW_GIT_COMMIT: ${{ github.sha }}
-        OPENSHOCK_FW_BUILD_DATE: ${{ github.event.head_commit.timestamp }}

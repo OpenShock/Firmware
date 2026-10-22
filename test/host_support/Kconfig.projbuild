@@ -1,0 +1,4 @@
+# The CONFIG_OPENSHOCK_* settings (domains, hostname, AP prefix, buffer sizes) the
+# firmware reads through sdkconfig.h. Sourced from core rather than copied, so the
+# host tests always build against the same defaults as the firmware.
+rsource "../../components/core/Kconfig.projbuild"

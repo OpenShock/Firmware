@@ -1,0 +1,40 @@
+# Per-commit captive-portal check: svelte-check, unit tests and a production build.
+on:
+  push:
+    branches: ['**']
+    paths:
+      - 'frontend/**'
+      - '.github/actions/build-frontend/**'
+      - '.github/workflows/frontend-checks.yml'
+  # A same-repo PR branch is already covered by its push run; pull_request is for forks, whose
+  # pushes do not run here. Fork runs need a maintainer's approval (repository setting).
+  pull_request:
+    paths:
+      - 'frontend/**'
+      - '.github/actions/build-frontend/**'
+      - '.github/workflows/frontend-checks.yml'
+  workflow_dispatch:
+
+name: frontend-checks
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  frontend:
+    if: ${{ github.event_name != 'pull_request' || github.event.pull_request.head.repo.fork }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+        with:
+          submodules: recursive
+          sparse-checkout: |
+            .github
+            frontend
+
+      - uses: ./.github/actions/build-frontend

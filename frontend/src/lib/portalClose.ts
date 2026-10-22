@@ -1,4 +1,4 @@
-import { getApiBaseUrl } from '$lib/utils/localRedirect';
+import { getApiBaseUrl } from '#lib/utils/localRedirect.js';
 
 /**
  * Signals the firmware that the user has completed setup.
@@ -8,6 +8,6 @@ export async function closePortal(): Promise<void> {
   try {
     await fetch(getApiBaseUrl() + '/api/portal/close', { method: 'POST' });
   } catch {
-    // Portal may close before response arrives — ignore network errors
+    // Portal may close before response arrives; ignore network errors
   }
 }

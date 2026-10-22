@@ -10,13 +10,13 @@
     StepperDescription,
     StepperNext,
     StepperPrevious,
-  } from '$lib/components/ui/stepper';
-  import PinsStep from '$lib/components/steps/HardwareStep.svelte';
-  import WiFiStep from '$lib/components/steps/WiFiStep.svelte';
-  import TestStep from '$lib/components/steps/TestStep.svelte';
-  import AccountStep from '$lib/components/steps/AccountStep.svelte';
-  import { hubState, ViewModeStore } from '$lib/stores';
-  import { Button } from '$lib/components/ui/button';
+  } from '@openshock/svelte-core/components/stepper';
+  import PinsStep from '#lib/components/steps/HardwareStep.svelte';
+  import WiFiStep from '#lib/components/steps/WiFiStep.svelte';
+  import TestStep from '#lib/components/steps/TestStep.svelte';
+  import AccountStep from '#lib/components/steps/AccountStep.svelte';
+  import { hubState, ViewModeStore } from '#lib/stores/index.js';
+  import { Button } from '@openshock/svelte-core/components/ui/button';
 
   interface Props {
     onComplete: () => void;
@@ -28,7 +28,11 @@
 
   let isDIY = $derived(!hubState.hasPredefinedPins);
   let wifiConnected = $derived(hubState.wifiConnectedBSSID !== null);
-  let pinConfigured = $derived(hubState.config?.rf?.txPin != null);
+  // An unset pin arrives as -1, so check it is a real output pin rather than just present
+  let pinConfigured = $derived.by(() => {
+    const txPin = hubState.config?.rf?.txPin;
+    return txPin != null && txPin >= 0 && hubState.gpioValidOutputs.includes(txPin);
+  });
 
   // Steps: DIY = Pins, Test, WiFi, Account (4)  |  Prebuilt = Test, WiFi, Account (3)
   let totalSteps = $derived(isDIY ? 4 : 3);
@@ -37,6 +41,11 @@
   let testStep = $derived(isDIY ? 2 : 1);
   let wifiStep = $derived(isDIY ? 3 : 2);
   let accountStep = $derived(isDIY ? 4 : 3);
+
+  // Board info loads asynchronously and can drop the Pins step after the wizard opened; keep the step in range
+  $effect(() => {
+    if (currentStep > totalSteps) currentStep = totalSteps;
+  });
 
   let canAdvance = $derived.by(() => {
     if (isDIY && currentStep === 1) return pinConfigured;
@@ -50,8 +59,8 @@
   let canFinish = $derived(wifiConnected && hubState.accountLinked);
 </script>
 
-<div class="flex flex-1 flex-col items-center px-2 py-4">
-  <div class="flex w-full max-w-md flex-1 flex-col">
+<div class="flex flex-1 flex-col items-center px-2 py-4 md:px-6 md:py-8">
+  <div class="flex w-full max-w-md flex-1 flex-col md:max-w-2xl">
     <Stepper bind:value={currentStep} linear class="flex-1">
       <StepperNav>
         {#if isDIY}
@@ -94,13 +103,13 @@
             <StepperIndicator />
             <div class="hidden sm:block">
               <StepperTitle>Account</StepperTitle>
-              <StepperDescription>Link device</StepperDescription>
+              <StepperDescription>Link hub</StepperDescription>
             </div>
           </StepperTrigger>
         </StepperItem>
       </StepperNav>
 
-      <div class="flex-1 rounded-lg border p-4">
+      <div class="flex-1 rounded-lg border p-4 md:flex-none md:p-6">
         {#if isDIY && currentStep === 1}
           <PinsStep />
         {:else if currentStep === testStep}
@@ -121,12 +130,16 @@
 
         {#if isLastStep}
           <Button onclick={onComplete} disabled={!canFinish}>
-            {canFinish ? 'Done' : 'Link account first'}
+            {canFinish ? 'Done' : !wifiConnected ? 'Connect WiFi first' : 'Link account first'}
           </Button>
         {:else}
           <StepperNext disabled={!canAdvance}>
             {#if !canAdvance}
-              {isDIY && currentStep === 1 ? 'Configure pins first' : currentStep === wifiStep ? 'Connect WiFi first' : ''}
+              {isDIY && currentStep === 1
+                ? 'Configure pins first'
+                : currentStep === wifiStep
+                  ? 'Connect WiFi first'
+                  : ''}
             {:else}
               Next
             {/if}
