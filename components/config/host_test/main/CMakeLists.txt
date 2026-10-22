@@ -25,6 +25,7 @@ idf_component_register(
                "../../src/WiFiCredentials.cpp"
                "../../src/internal/utils.cpp"
                "../../../osjson/src/Json.cpp"
+               "../../../common/src/BoardDescriptor.cpp" # Board::Get() for the RF/E-Stop defaults
                "../../../common/src/Convert.cpp"        # Json.cpp strict string->int
                "../../../common/src/DigitCounter.cpp"
                "../../../common/src/ReadWriteMutex.cpp" # Config.cpp's store lock

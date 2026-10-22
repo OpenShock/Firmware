@@ -3,6 +3,7 @@
 const char* const TAG = "OtaUpdateManager";
 
 #include "AppHooks.h"
+#include "BoardDescriptor.h"
 #include "captiveportal/Manager.h"
 #include "config/Config.h"
 #include "fs/FsCheck.h"
@@ -25,6 +26,7 @@ const char* const TAG = "OtaUpdateManager";
 #include <esp_event.h>
 #include <esp_netif.h>
 #include <esp_ota_ops.h>
+#include <esp_partition.h>
 #include <esp_random.h>
 #include <esp_task_wdt.h>
 #include <esp_wifi.h>
@@ -43,12 +45,16 @@ using namespace std::string_view_literals;
 /// Repository server firmware API root. Paths per firmware-api-spec.md §4.
 #define OPENSHOCK_FW_REPO_API_PREFIX "/2/firmware"
 
+// The board in these URLs is the name from the descriptor stamped into the image (Board::Get().board), so the
+// repository server's per-board releases keep working unchanged now that the firmware is compiled per chip.
+
 /// @brief Latest release for this board on a channel, with the hub's current version attached so the
-/// server can answer 204 when there is nothing to do. See spec §4.2.
-#define OPENSHOCK_FW_REPO_LATEST_URL_FORMAT "https://%s" OPENSHOCK_FW_REPO_API_PREFIX "/latest/%s/" OPENSHOCK_FW_BOARD "?version=%s"
+/// server can answer 204 when there is nothing to do. See spec §4.2. Arguments: domain, channel, board, version.
+#define OPENSHOCK_FW_REPO_LATEST_URL_FORMAT "https://%s" OPENSHOCK_FW_REPO_API_PREFIX "/latest/%s/%s?version=%s"
 
 /// @brief Artifacts for one specific version of this board: the directed-update path. See spec §4.4.
-#define OPENSHOCK_FW_REPO_VERSION_URL_FORMAT "https://%s" OPENSHOCK_FW_REPO_API_PREFIX "/versions/%s/" OPENSHOCK_FW_BOARD
+/// Arguments: domain, version, board.
+#define OPENSHOCK_FW_REPO_VERSION_URL_FORMAT "https://%s" OPENSHOCK_FW_REPO_API_PREFIX "/versions/%s/%s"
 
 enum OtaTaskEventFlag : uint32_t {
   OTA_TASK_EVENT_UPDATE_REQUESTED  = 1 << 0,
@@ -170,6 +176,54 @@ static bool _sendFailureMessage(std::string_view message, bool fatal = false)
   return true;
 }
 
+/// @brief Reads the board descriptor out of an app slot.
+/// @return 1 when the slot holds a valid descriptor, 0 when it holds none (empty, or a build from before the
+/// descriptor existed), -1 when the flash could not be read.
+static int otaum_read_slot_descriptor(const esp_partition_t* slot, BoardDescriptor& out)
+{
+  uint8_t bytes[OPENSHOCK_BOARD_DESCRIPTOR_SIZE];
+  esp_err_t err = esp_partition_read(slot, OPENSHOCK_BOARD_DESCRIPTOR_IMAGE_OFFSET, bytes, sizeof(bytes));
+  if (err != ESP_OK) {
+    OS_LOGE(TAG, "Failed to read board descriptor from %s: %s", slot->label, esp_err_to_name(err));
+    return -1;
+  }
+
+  return Board::Parse(bytes, out) ? 1 : 0;
+}
+
+/// @brief Whether the descriptor in `slot` names the board this hub is, logging the verdict.
+///
+/// A slot with no descriptor passes: the repository server keyed pre-descriptor builds by board, and refusing
+/// them would block every downgrade to one. Running unstamped also passes, since there is nothing to compare to.
+/// @param strict Whether an unreadable slot counts as a mismatch. True for an image about to be made bootable;
+///               false for the first-boot check, where "could not read the old slot" must not roll back a good image.
+static bool otaum_slot_matches_this_board(const esp_partition_t* slot, const char* what, bool strict)
+{
+  BoardDescriptor other;
+  int read = otaum_read_slot_descriptor(slot, other);
+  if (read < 0) {
+    return !strict;
+  }
+  if (read == 0) {
+    OS_LOGW(TAG, "%s carries no board descriptor, cannot check it against this board", what);
+    return true;
+  }
+
+  if (!Board::IsStamped()) {
+    OS_LOGW(TAG, "This image carries no valid board descriptor; accepting %s for %s unchecked", what, other.board);
+    return true;
+  }
+
+  const BoardDescriptor& self = Board::Get();
+  if (std::strcmp(other.board, self.board) != 0 || std::strcmp(other.chip, self.chip) != 0) {
+    OS_LOGE(TAG, "%s is for %s (%s), but this hub is %s (%s)", what, other.board, other.chip, self.board, self.chip);
+    return false;
+  }
+
+  OS_LOGD(TAG, "%s is for %s, matching this hub", what, other.board);
+  return true;
+}
+
 static bool otaum_flash_app_partition(OpenShock::HTTP::Client& client, const esp_partition_t* partition, std::string_view remoteUrl, const uint8_t (&remoteHash)[32])
 {
   OS_LOGD(TAG, "Flashing app partition");
@@ -189,6 +243,13 @@ static bool otaum_flash_app_partition(OpenShock::HTTP::Client& client, const esp
   if (!OpenShock::FlashPartitionFromUrl(client, partition, remoteUrl, remoteHash, onProgress)) {
     OS_LOGE(TAG, "Failed to flash app partition");
     _sendFailureMessage("Failed to flash app partition"sv);
+    return false;
+  }
+
+  // The hash proved the download is what the server published; this proves the server published it for this
+  // board. Checked before the slot is made bootable, so a mislabelled release never gets a chance to boot.
+  if (!otaum_slot_matches_this_board(partition, "Downloaded firmware", true)) {
+    _sendFailureMessage("Downloaded firmware is for a different board"sv);
     return false;
   }
 
@@ -655,7 +716,7 @@ bool OtaUpdateManager::TryGetFirmwareVersion(HTTP::Client& client, OtaUpdateChan
   }
 
   std::string uri;
-  if (!FormatToString(uri, OPENSHOCK_FW_REPO_LATEST_URL_FORMAT, domain.c_str(), channelName, OpenShock::Constants::FW_VERSION)) {
+  if (!FormatToString(uri, OPENSHOCK_FW_REPO_LATEST_URL_FORMAT, domain.c_str(), channelName, Board::Get().board, OpenShock::Constants::FW_VERSION)) {
     OS_LOGE(TAG, "Failed to format URL");
     return false;
   }
@@ -777,7 +838,7 @@ bool OtaUpdateManager::TryGetFirmwareRelease(HTTP::Client& client, const OpenSho
   }
 
   std::string uri;
-  if (!FormatToString(uri, OPENSHOCK_FW_REPO_VERSION_URL_FORMAT, domain.c_str(), versionStr.c_str())) {
+  if (!FormatToString(uri, OPENSHOCK_FW_REPO_VERSION_URL_FORMAT, domain.c_str(), versionStr.c_str(), Board::Get().board)) {
     OS_LOGE(TAG, "Failed to format URL");
     return false;
   }
@@ -814,6 +875,18 @@ FirmwareBootType OtaUpdateManager::GetFirmwareBootType()
 bool OtaUpdateManager::IsValidatingApp()
 {
   return _otaImageState == ESP_OTA_IMG_PENDING_VERIFY;
+}
+
+bool OtaUpdateManager::IsPendingImageForThisBoard()
+{
+  // The slot we were installed from is the other OTA slot, which is also the next update target.
+  const esp_partition_t* previous = esp_ota_get_next_update_partition(nullptr);
+  if (previous == nullptr) {
+    OS_LOGW(TAG, "No previous app slot to check the board against");
+    return true;
+  }
+
+  return otaum_slot_matches_this_board(previous, "The previous firmware", false);
 }
 
 void OtaUpdateManager::InvalidateAndRollback()

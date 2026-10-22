@@ -4,7 +4,7 @@
 # in app_main.
 idf_component_register(
   SRCS "main.cpp"
-  REQUIRES core captive_portal ota serial_console device_control events logging common nvs_flash config
+  REQUIRES core captive_portal ota serial_console device_control events logging common chipset nvs_flash config
 )
 
 target_compile_options(${COMPONENT_LIB} PRIVATE -Wno-error)

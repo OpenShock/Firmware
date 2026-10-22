@@ -15,3 +15,6 @@ OPENSHOCK_LED_WS2812B=48
 OPENSHOCK_LED_GPIO=35
 OPENSHOCK_RF_TX_GPIO=15
 OPENSHOCK_ESTOP_PIN=13
+# Chip-unsafe pins (strapping / flash / UART, see Chipset.h) this board wires up anyway. Still unsafe;
+# listed so the firmware accepts them for this board only.
+OPENSHOCK_GPIO_BYPASS=15,35

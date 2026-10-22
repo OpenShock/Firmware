@@ -94,6 +94,21 @@ runs:
         path: ~/.cache/ccache
         key: ccache-${{ runner.os }}-${{ inputs.cache-group }}-${{ github.sha }}
 
+    # The image carries the board descriptor the device reads its pins and OTA identity
+    # from (BoardDescriptor.h). Check it says this board, then prove the stamper
+    # reproduces the compiler's bytes exactly: re-stamping the image as the same board
+    # must be a no-op, checksum and SHA-256 included. That is the path a per-chip build
+    # takes for every board, so it is exercised here while builds are still per board.
+    - name: Verify board descriptor
+      shell: bash
+      env:
+        BOARD: ${{ inputs.board }}
+      run: |
+        set -euo pipefail
+        python3 scripts/stamp_board.py verify --image build/firmware/firmware.bin --board "$BOARD"
+        python3 scripts/stamp_board.py stamp  --image build/firmware/firmware.bin --board "$BOARD" --output build/restamped.bin
+        cmp build/firmware/firmware.bin build/restamped.bin
+
     # Flat, canonically-named images. app.bin/staticfs.bin are the names the
     # device OTA pulls (OtaUpdateManager.cpp); merge_image.py and the CDN upload
     # consume these too. `project(firmware)` names the app image firmware.bin.

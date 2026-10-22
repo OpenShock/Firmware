@@ -10,8 +10,13 @@
 
 // Config comes from two places: Kconfig (CONFIG_OPENSHOCK_*, via sdkconfig.h -
 // domains, hostname, AP prefix, buffer sizes; see components/core/Kconfig.projbuild)
-// and the generated board header (OPENSHOCK_FW_BOARD, OPENSHOCK_FW_CHIP, the GPIO
-// assignments, ...; see scripts/gen_env_header.py).
+// and the generated board header (OPENSHOCK_FW_CHIP, build mode, log level, and the
+// board the build was configured for; see scripts/gen_env_header.py).
+//
+// The board itself - its name and pins - is read at runtime from the descriptor stamped
+// into the app image (BoardDescriptor.h, OpenShock::Board::Get()). The OPENSHOCK_FW_BOARD
+// and pin macros below only seed the descriptor compiled into the image; firmware code
+// must not read them directly, or a stamped image would ignore its stamp.
 #include "sdkconfig.h"
 
 // Board identity and GPIO assignments. Deliberately included here rather than
@@ -38,9 +43,12 @@ namespace OpenShock::Constants {
   // openshock_version.h. Building these here would have put the firmware version -
   // and so the commit SHA - into every file that includes this header, rebuilding all of
   // them on every commit for strings almost none of them use.
-  extern const char* const FW_USERAGENT;
   extern const char* const FW_VERSION;     // e.g. "1.5.0-rc.7+abc1234"
   extern const char* const FW_GIT_COMMIT;  // full SHA
+
+  /// @brief The HTTP user agent: hostname, version, board and chip. Built once on first use, since the board
+  /// name comes from the descriptor stamped into the image (BoardDescriptor.h) rather than a compile-time string.
+  const char* UserAgent();
 
   /// @brief The running firmware version, parsed once.
   const OpenShock::SemVer& FirmwareVersion();

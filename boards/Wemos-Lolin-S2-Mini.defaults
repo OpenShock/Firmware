@@ -16,3 +16,6 @@ CONFIG_ESP_CONSOLE_USB_CDC=y
 # into openshock_board.h and stripped from the sdkconfig fragment by scripts/build.py,
 # so boards sharing a chip and flash size compile identical ESP-IDF objects.
 OPENSHOCK_LED_GPIO=15
+# Chip-unsafe pins (strapping / flash / UART, see Chipset.h) this board wires up anyway. Still unsafe;
+# listed so the firmware accepts them for this board only.
+OPENSHOCK_GPIO_BYPASS=15

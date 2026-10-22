@@ -30,6 +30,7 @@ import esptool
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from utils import partitions as partition_table  # noqa: E402
+from utils.boards import board_fragment, read_target  # noqa: E402
 
 ROOT = Path(__file__).resolve().parent.parent
 
@@ -45,22 +46,6 @@ BOOTLOADER_OFFSET = {
 
 # ESP-IDF's own default when no sdkconfig input picks a CONFIG_ESPTOOLPY_FLASHSIZE_* choice.
 DEFAULT_FLASH_SIZE = '4MB'
-
-
-def board_fragment(board: str) -> Path:
-    fragment = ROOT / 'boards' / f'{board}.defaults'
-    if not fragment.is_file():
-        raise SystemExit(f'error: unknown board {board!r} ({fragment} missing)')
-    return fragment
-
-
-def resolve_target(board: str) -> str:
-    fragment = board_fragment(board)
-    for line in fragment.read_text(encoding='utf-8').splitlines():
-        m = re.match(r'\s*CONFIG_IDF_TARGET\s*=\s*"([^"]+)"', line)
-        if m:
-            return m.group(1)
-    raise SystemExit(f'error: {fragment} does not set CONFIG_IDF_TARGET')
 
 
 def parse_flash_size(text: str) -> str | None:
@@ -97,7 +82,7 @@ def merge_one(board: str, bindir: str, staticfs: str, output: str) -> tuple[str,
     buf = io.StringIO()
     try:
         with redirect_stdout(buf), redirect_stderr(buf):
-            chip = resolve_target(board)
+            chip = read_target(board_fragment(board))
             flash_size = resolve_flash_size(board)
             boot_offset = BOOTLOADER_OFFSET.get(chip)
             if boot_offset is None:
@@ -106,20 +91,27 @@ def merge_one(board: str, bindir: str, staticfs: str, output: str) -> tuple[str,
             table = partition_table.read_partitions(partition_table.partition_csv_for(board))
             if 'static0' not in table:
                 raise SystemExit(f'error: the partition table for {board} has no static0 partition')
-            table_offset    = hex(partition_table.partition_table_offset(board))
-            app_offset      = hex(partition_table.first_app_partition(table)['offset'])
+            table_offset = hex(partition_table.partition_table_offset(board))
+            app_offset = hex(partition_table.first_app_partition(table)['offset'])
             staticfs_offset = hex(table['static0']['offset'])
 
             binpath = Path(bindir)
             argv = [
-                '--chip', chip,
+                '--chip',
+                chip,
                 'merge-bin',
-                '--output', output,
-                '--flash-size', flash_size,
-                boot_offset, str(binpath / 'bootloader.bin'),
-                table_offset, str(binpath / 'partition-table.bin'),
-                app_offset, str(binpath / 'app.bin'),
-                staticfs_offset, staticfs,
+                '--output',
+                output,
+                '--flash-size',
+                flash_size,
+                boot_offset,
+                str(binpath / 'bootloader.bin'),
+                table_offset,
+                str(binpath / 'partition-table.bin'),
+                app_offset,
+                str(binpath / 'app.bin'),
+                staticfs_offset,
+                staticfs,
             ]
             print(f'+ esptool {" ".join(argv)}', flush=True)
             esptool.main(argv)
@@ -137,15 +129,23 @@ def merge_one(board: str, bindir: str, staticfs: str, output: str) -> tuple[str,
 
 def main() -> None:
     ap = argparse.ArgumentParser(description=__doc__)
-    ap.add_argument('--board', required=True, action='append',
-                    help='board name matching boards/<board>.defaults. Repeatable, and a single '
-                         'value may hold several names separated by whitespace or newlines.')
-    ap.add_argument('--bindir', required=True,
-                    help='dir with app.bin, bootloader.bin, partition-table.bin. {board} is expanded per board.')
+    ap.add_argument(
+        '--board',
+        required=True,
+        action='append',
+        help='board name matching boards/<board>.defaults. Repeatable, and a single '
+        'value may hold several names separated by whitespace or newlines.',
+    )
+    ap.add_argument(
+        '--bindir',
+        required=True,
+        help='dir with app.bin, bootloader.bin, partition-table.bin. {board} is expanded per board.',
+    )
     ap.add_argument('--staticfs', required=True, help='path to the static0 image (staticfs.bin)')
     ap.add_argument('--output', required=True, help='merged output binary. {board} is expanded per board.')
-    ap.add_argument('-j', '--jobs', type=int, default=0,
-                    help='boards to merge at once. 0 (the default) uses one per CPU.')
+    ap.add_argument(
+        '-j', '--jobs', type=int, default=0, help='boards to merge at once. 0 (the default) uses one per CPU.'
+    )
     args = ap.parse_args()
 
     boards = [b for value in args.board for b in value.split()]

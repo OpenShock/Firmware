@@ -19,7 +19,7 @@ nothing could ever be reused. Neither header is force-included now:
 components see it), and ``openshock_version.h`` by the handful of translation
 units that actually report a version.
 
-The GPIO assignments live here rather than in Kconfig for the same reason. As
+The GPIO assignments (parsed by scripts/utils/boards.py) live here rather than in Kconfig for the same reason. As
 Kconfig symbols they landed in ``sdkconfig.h``, which most of ESP-IDF includes,
 so two boards that differed only by an LED pin shared no compiled objects at
 all. Keeping them out of ``sdkconfig.h`` lets every board with the same chip and
@@ -39,7 +39,7 @@ import sys
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from utils import shorthands  # noqa: E402
+from utils import boards, shorthands  # noqa: E402
 
 # Keys whose value must always be emitted as a C string, even when it happens to
 # be all-numeric (a bare numeric macro breaks string concatenation / #if usage).
@@ -51,18 +51,8 @@ FORCE_STRING_KEYS = {
     'OPENSHOCK_FW_VERSION_PRERELEASE',
 }
 
-# The board's GPIO assignments, with the defaults a board fragment may override.
-# `int` entries are emitted verbatim; `bool` entries as 0/1, since RgbLedDriver.cpp
-# tests one with `#if`. Every key is always emitted: CompatibilityChecks.cpp puts the
-# pins through static_assert, so an undefined macro is a compile error rather than a
-# silently disabled feature.
-BOARD_PINS: dict[str, tuple[str, int]] = {
-    'OPENSHOCK_RF_TX_GPIO': ('int', -1),
-    'OPENSHOCK_ESTOP_PIN': ('int', -1),
-    'OPENSHOCK_LED_GPIO': ('int', -1),
-    'OPENSHOCK_LED_WS2812B': ('int', -1),
-    'OPENSHOCK_LED_SWAP_RG_CHANNELS': ('bool', 0),
-}
+# Keys emitted verbatim (not through serialize()): C integer literals with a suffix.
+RAW_KEYS = {'OPENSHOCK_GPIO_BYPASS_MASK'}
 
 
 def macroify(s: str) -> str:
@@ -93,6 +83,8 @@ def c_string(value: str) -> str:
 
 def serialize(key: str, value) -> str:
     """Render a macro value: raw int when numeric, else a C string."""
+    if key in RAW_KEYS:
+        return str(value)
     if key in FORCE_STRING_KEYS:
         return c_string(str(value))
     s = str(value)
@@ -107,9 +99,7 @@ def git_commit() -> str | None:
     if commit:
         return commit
     try:
-        return subprocess.check_output(
-            ['git', 'rev-parse', 'HEAD'], text=True, stderr=subprocess.DEVNULL
-        ).strip()
+        return subprocess.check_output(['git', 'rev-parse', 'HEAD'], text=True, stderr=subprocess.DEVNULL).strip()
     except Exception:
         return None
 
@@ -125,42 +115,19 @@ def resolve_version() -> str:
     return '0.0.0-local' + (f'+{commit[:7]}' if commit else '')
 
 
-def read_board_pins(fragment: Path) -> dict[str, int]:
-    """Read the bare ``OPENSHOCK_*=`` assignments out of a board fragment.
+def board_defines(spec: boards.BoardSpec) -> dict[str, object]:
+    """The board's hardware description as macros.
 
-    These sit alongside the ``CONFIG_*`` lines but are deliberately not Kconfig, so
-    scripts/build.py strips them before handing the fragment to idf.py. Anything
-    unrecognised is an error rather than a silent no-op - a typo in a pin name would
-    otherwise leave the board on the default and be very hard to spot.
+    Every key is always emitted, with -1 / 0 for what the board lacks, so a consumer can
+    rely on the macro existing. These are the values compiled into the firmware's board
+    descriptor (BoardDescriptor.cpp); scripts/stamp_board.py writes the same fields into
+    the app image after the build, which is what a per-chip build relies on.
     """
-    values = {key: default for key, (_, default) in BOARD_PINS.items()}
-    if not fragment.is_file():
-        raise SystemExit(f'error: board fragment {fragment} not found')
-
-    for lineno, raw in enumerate(fragment.read_text(encoding='utf-8').splitlines(), 1):
-        line = raw.strip()
-        if not line or line.startswith('#') or line.startswith('CONFIG_'):
-            continue
-        if '=' not in line:
-            raise SystemExit(f'error: {fragment}:{lineno}: expected KEY=VALUE, got {line!r}')
-        key, _, value = line.partition('=')
-        key, value = key.strip(), value.strip()
-        if key not in BOARD_PINS:
-            known = ', '.join(sorted(BOARD_PINS))
-            raise SystemExit(f'error: {fragment}:{lineno}: unknown board setting {key!r}\n  known: {known}')
-
-        kind, _ = BOARD_PINS[key]
-        if kind == 'bool':
-            if value not in ('y', 'n'):
-                raise SystemExit(f'error: {fragment}:{lineno}: {key} is a boolean, expected y or n, got {value!r}')
-            values[key] = 1 if value == 'y' else 0
-        else:
-            try:
-                values[key] = int(value)
-            except ValueError:
-                raise SystemExit(f'error: {fragment}:{lineno}: {key} expects an integer GPIO, got {value!r}')
-
-    return values
+    defines: dict[str, object] = dict(spec.pins)
+    defines['OPENSHOCK_LED_SWAP_RG_CHANNELS'] = 1 if spec.led_swap_rg else 0
+    # The chip-unsafe pins this board is allowed to use anyway, as a bit mask (Chipset.h).
+    defines['OPENSHOCK_GPIO_BYPASS_MASK'] = f'0x{spec.gpio_bypass_mask:X}ULL'
+    return defines
 
 
 def render(title: str, defines: dict[str, object]) -> str:
@@ -220,9 +187,7 @@ def main() -> int:
     ref_name = shorthands.get_github_ref_name() or ''
     tag_prerelease = ref_name.split('-', 1)[1].lower() if shorthands.is_github_tag() and '-' in ref_name else ''
     is_beta = is_ci and (
-        ref_name == 'beta'
-        or shorthands.is_github_pr_into('beta')
-        or tag_prerelease.startswith(('rc', 'beta'))
+        ref_name == 'beta' or shorthands.is_github_pr_into('beta') or tag_prerelease.startswith(('rc', 'beta'))
     )
     mode = 'release' if is_release else 'debug'
 
@@ -245,7 +210,7 @@ def main() -> int:
         log_level = 5
     board['OPENSHOCK_LOG_LEVEL'] = log_level
 
-    board.update(read_board_pins(Path(args.fragment)))
+    board.update(board_defines(boards.read_board_fragment(Path(args.fragment), args.board)))
 
     # --- openshock_version.h -------------------------------------------------
     version_defines: dict[str, object] = {}

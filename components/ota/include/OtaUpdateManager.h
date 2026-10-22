@@ -39,6 +39,15 @@ namespace OpenShock::OtaUpdateManager {
   FirmwareBootType GetFirmwareBootType();
   bool IsValidatingApp();
 
+  /// @brief On the first boot of a freshly installed image, whether it was meant for this board.
+  ///
+  /// Compares the running image's board descriptor with the one in the slot it was installed from. The update
+  /// path already refuses a foreign image before it is made bootable; this is the second line, for an image that
+  /// got into the slot some other way. A slot without a descriptor (a pre-descriptor build, or empty) cannot be
+  /// compared and passes.
+  /// @return false when the previous slot names a different board, in which case the caller should roll back.
+  bool IsPendingImageForThisBoard();
+
   void InvalidateAndRollback();
   void ValidateApp();
 }  // namespace OpenShock::OtaUpdateManager

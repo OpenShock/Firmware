@@ -4,6 +4,7 @@
 
 const char* const TAG = "VisualStateManager";
 
+#include "BoardDescriptor.h"
 #include "enums/GatewayClientState.h"
 #include "estop/EStopState.h"
 #include "events/Events.h"
@@ -17,12 +18,8 @@ const char* const TAG = "VisualStateManager";
 #include <atomic>
 #include <memory>
 
-// Status LED pins are Kconfig options (CONFIG_OPENSHOCK_*, see
-// openshock_board.h); -1 (== GPIO_NUM_NC) means the board has no such LED.
-#include "sdkconfig.h"
-
-// Board GPIO assignments (no longer Kconfig; see scripts/gen_env_header.py).
-#include "openshock_board.h"
+// Status LED pins come from the board descriptor stamped into the image (BoardDescriptor.h);
+// -1 (== GPIO_NUM_NC) means the board has no such LED.
 
 const uint64_t kCriticalErrorFlag                = 1 << 0;
 const uint64_t kEmergencyStoppedFlag             = 1 << 1;
@@ -369,8 +366,10 @@ bool VisualStateManager::Init()
 {
   bool ledActive = false;
 
-  if (OPENSHOCK_LED_GPIO != GPIO_NUM_NC) {
-    s_monoLedDriver = std::make_unique<MonoLedDriver>(static_cast<gpio_num_t>(OPENSHOCK_LED_GPIO));
+  const BoardDescriptor& board = Board::Get();
+
+  if (board.ledGpio != GPIO_NUM_NC) {
+    s_monoLedDriver = std::make_unique<MonoLedDriver>(static_cast<gpio_num_t>(board.ledGpio));
     if (!s_monoLedDriver->IsValid()) {
       OS_LOGE(TAG, "Failed to initialize built-in LED manager");
       return false;
@@ -378,8 +377,8 @@ bool VisualStateManager::Init()
     ledActive = true;
   }
 
-  if (OPENSHOCK_LED_WS2812B != GPIO_NUM_NC) {
-    s_rgbLedDriver = std::make_unique<RgbLedDriver>(static_cast<gpio_num_t>(OPENSHOCK_LED_WS2812B));
+  if (board.ws2812bGpio != GPIO_NUM_NC) {
+    s_rgbLedDriver = std::make_unique<RgbLedDriver>(static_cast<gpio_num_t>(board.ws2812bGpio));
     if (!s_rgbLedDriver->IsValid()) {
       OS_LOGE(TAG, "Failed to initialize RGB LED manager");
       return false;

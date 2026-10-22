@@ -13,6 +13,7 @@ idf_component_register(
                "test_command_handler.cpp"
                "../../src/CommandHandler.cpp"
                "../../src/radio/RFTransmitter.cpp"
+               "../../../common/src/BoardDescriptor.cpp"  # Board::Get() (CommandHandler's default pin, Chipset.h bypasses)
                "../../../common/src/SimpleMutex.cpp"
                "../../../events/src/Events.cpp"
                "../../../protocols/src/Sequence.cpp"

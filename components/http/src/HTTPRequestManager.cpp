@@ -172,7 +172,7 @@ HTTP::Response<std::size_t>
     if (m_handle == nullptr) {
       esp_http_client_config_t config = {};
       config.url                      = urlStr.c_str();
-      config.user_agent               = OpenShock::Constants::FW_USERAGENT;
+      config.user_agent               = OpenShock::Constants::UserAgent();
       config.method                   = HTTP_METHOD_GET;
       config.timeout_ms               = static_cast<int>(timeoutMs);
       config.keep_alive_enable        = true;

@@ -13,3 +13,6 @@ CONFIG_PARTITION_TABLE_CUSTOM_FILENAME="partitions/ota_4mb.csv"
 # so boards sharing a chip and flash size compile identical ESP-IDF objects.
 OPENSHOCK_LED_GPIO=2
 OPENSHOCK_RF_TX_GPIO=15
+# Chip-unsafe pins (strapping / flash / UART, see Chipset.h) this board wires up anyway. Still unsafe;
+# listed so the firmware accepts them for this board only.
+OPENSHOCK_GPIO_BYPASS=15,2

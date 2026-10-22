@@ -1,6 +1,9 @@
 #include "OpenShock.h"
 
+#include "BoardDescriptor.h"
 #include "SemVer.h"
+
+#include <string>
 
 // The one translation unit that sees the firmware version and git commit.
 //
@@ -20,16 +23,28 @@
 #define OPENSHOCK_FW_VERSION_BUILD ""
 #endif
 
-// Allow the user agent to be overridden through compiler flags; otherwise build it from
-// the hostname, version, board and chip.
-#ifndef OPENSHOCK_FW_USERAGENT
-#define OPENSHOCK_FW_USERAGENT CONFIG_OPENSHOCK_FW_HOSTNAME "/" OPENSHOCK_FW_VERSION " (ESP-IDF; " OPENSHOCK_FW_BOARD "; " OPENSHOCK_FW_CHIP "; Espressif)"
-#endif
-
 namespace OpenShock::Constants {
-  const char* const FW_USERAGENT  = OPENSHOCK_FW_USERAGENT;
   const char* const FW_VERSION    = OPENSHOCK_FW_VERSION;
   const char* const FW_GIT_COMMIT = OPENSHOCK_FW_GIT_COMMIT;
+
+  const char* UserAgent()
+  {
+    // A compiler flag may still pin the whole string; otherwise hostname, version, board and chip.
+#ifdef OPENSHOCK_FW_USERAGENT
+    return OPENSHOCK_FW_USERAGENT;
+#else
+    static const std::string userAgent = [] {
+      const BoardDescriptor& board = Board::Get();
+      std::string ua               = CONFIG_OPENSHOCK_FW_HOSTNAME "/" OPENSHOCK_FW_VERSION " (ESP-IDF; ";
+      ua += board.board;
+      ua += "; ";
+      ua += board.chip;
+      ua += "; Espressif)";
+      return ua;
+    }();
+    return userAgent.c_str();
+#endif
+  }
 
   const OpenShock::SemVer& FirmwareVersion()
   {

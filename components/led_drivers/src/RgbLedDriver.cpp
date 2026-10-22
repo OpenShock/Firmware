@@ -4,6 +4,7 @@
 
 const char* const TAG = "RGBLedDriver";
 
+#include "BoardDescriptor.h"
 #include "Chipset.h"
 #include "Logging.h"
 
@@ -11,13 +12,6 @@ const char* const TAG = "RGBLedDriver";
 #include <soc/soc_caps.h>
 
 #include <array>
-
-// R/G channel swap is a board setting, generated into openshock_board.h by
-// scripts/gen_env_header.py rather than coming from Kconfig - keeping it out of
-// sdkconfig.h is what lets boards sharing a chip reuse ESP-IDF objects. It is always
-// defined, as 0 or 1, so the #if below reads it directly.
-#include "openshock_board.h"
-#include "sdkconfig.h"
 
 using namespace OpenShock;
 
@@ -118,9 +112,11 @@ void RgbLedDriver::apply(const RGBState& state)
   uint8_t r = static_cast<uint8_t>(static_cast<uint16_t>(state.red) * brightness / 255);
   uint8_t g = static_cast<uint8_t>(static_cast<uint16_t>(state.green) * brightness / 255);
   uint8_t b = static_cast<uint8_t>(static_cast<uint16_t>(state.blue) * brightness / 255);
-#if OPENSHOCK_LED_SWAP_RG_CHANNELS
-  std::swap(r, g);
-#endif
+  // Whether this board's LED wants RGB rather than GRB is a board setting, so it comes from the descriptor
+  // stamped into the image rather than a compile-time flag: one image serves every board on the chip.
+  if ((Board::Get().flags & OPENSHOCK_BOARD_FLAG_LED_SWAP_RG) != 0) {
+    std::swap(r, g);
+  }
 
   const uint32_t colors = (static_cast<uint32_t>(g) << 16) | (static_cast<uint32_t>(r) << 8) | static_cast<uint32_t>(b);
 

@@ -85,7 +85,7 @@ void GatewayClient::connect(const std::string& host, uint16_t port, const std::s
   config.port                          = port;
   config.path                          = path.c_str();
   config.transport                     = WEBSOCKET_TRANSPORT_OVER_SSL;
-  config.user_agent                    = OpenShock::Constants::FW_USERAGENT;
+  config.user_agent                    = OpenShock::Constants::UserAgent();
   config.headers                       = m_headers.c_str();
   config.disable_auto_reconnect        = true;                   // GatewayConnectionManager owns reconnection
   config.crt_bundle_attach             = esp_crt_bundle_attach;  // verify server against the compiled-in CA bundle

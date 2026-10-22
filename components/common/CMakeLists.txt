@@ -5,12 +5,14 @@
 #
 # Public surface (include/):
 #   Common.h / FormatHelpers.h / OpenShock.h: basic defines and macros
+#   BoardDescriptor.h: the board descriptor stamped into the app image, Board::Get()
 #   enums/*.h:        shared enums (consumers include with the enums/ prefix)
 #   Convert.h, SemVer.h, Checksum.h, RateLimiter.h, TinyVec.h,
 #   StringHelpers.h, SimpleMutex.h, ReadWriteMutex.h, util/*.h
 
 idf_component_register(
-  SRCS          "src/Convert.cpp"
+  SRCS          "src/BoardDescriptor.cpp"  # the board descriptor in .rodata_custom_desc + Board::Get()
+                "src/Convert.cpp"
                 "src/DigitCounter.cpp"
                 "src/RateLimiter.cpp"
                 "src/ReadWriteMutex.cpp"

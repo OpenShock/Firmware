@@ -1,7 +1,9 @@
 // Host-test stand-in for the board header scripts/gen_env_header.py generates in
 // firmware builds (same keys and value formats). A classic ESP32 board in debug mode,
-// with the RF transmitter on GPIO4 and no E-Stop or LED. The ESP32 GPIO capabilities
-// the real Chipset.h checks pins against come from this component's CMakeLists.txt.
+// with the RF transmitter on GPIO4 and no E-Stop or LED. These seed the descriptor
+// BoardDescriptor.cpp compiles in, which Board::Get() then serves to the code under
+// test. The ESP32 GPIO capabilities the real Chipset.h checks pins against come from
+// this component's CMakeLists.txt.
 #pragma once
 
 #define OPENSHOCK_ESTOP_PIN            -1
@@ -10,6 +12,7 @@
 #define OPENSHOCK_FW_CHIP              "ESP32"
 #define OPENSHOCK_FW_CHIP_ESP32        1
 #define OPENSHOCK_FW_MODE              "debug"
+#define OPENSHOCK_GPIO_BYPASS_MASK     0x0ULL
 #define OPENSHOCK_LED_GPIO             -1
 #define OPENSHOCK_LED_SWAP_RG_CHANNELS 0
 #define OPENSHOCK_LED_WS2812B          -1

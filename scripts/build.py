@@ -21,23 +21,10 @@ import subprocess
 import sys
 from pathlib import Path
 
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from utils.boards import board_fragment, read_target  # noqa: E402
+
 ROOT = Path(__file__).resolve().parent.parent
-
-
-def board_fragment(board: str) -> Path:
-    fragment = ROOT / 'boards' / f'{board}.defaults'
-    if not fragment.is_file():
-        avail = ', '.join(sorted(p.stem for p in (ROOT / 'boards').glob('*.defaults')))
-        raise SystemExit(f'error: unknown board {board!r}\n  available: {avail}')
-    return fragment
-
-
-def resolve_target(fragment: Path) -> str:
-    for line in fragment.read_text(encoding='utf-8').splitlines():
-        m = re.match(r'\s*CONFIG_IDF_TARGET\s*=\s*"([^"]+)"', line)
-        if m:
-            return m.group(1)
-    raise SystemExit(f'error: {fragment} does not set CONFIG_IDF_TARGET')
 
 
 def resolve_build_dir(board: str) -> Path:
@@ -81,9 +68,7 @@ def write_sdkconfig_fragment(fragment: Path, build_dir: Path) -> Path:
     ]
     body = (
         f'# Generated from {fragment.as_posix()} by scripts/build.py - do not edit.\n'
-        '# The board GPIO assignments are stripped here; they are not Kconfig.\n'
-        + '\n'.join(kept)
-        + '\n'
+        '# The board GPIO assignments are stripped here; they are not Kconfig.\n' + '\n'.join(kept) + '\n'
     )
     out.parent.mkdir(parents=True, exist_ok=True)
     # Write only on change, so touching it does not force a CMake reconfigure.
@@ -100,13 +85,15 @@ def main(argv: list[str]) -> int:
     targets = argv[1:] or ['build']
 
     fragment = board_fragment(board)
-    target = resolve_target(fragment)
+    target = read_target(fragment)
     build_dir = resolve_build_dir(board)
     frag_rel = write_sdkconfig_fragment(fragment, build_dir).relative_to(ROOT).as_posix()
 
     idf_args = [
-        '-C', str(ROOT),
-        '-B', str(build_dir),
+        '-C',
+        str(ROOT),
+        '-B',
+        str(build_dir),
         f'-DIDF_TARGET={target}',
         f'-DSDKCONFIG_DEFAULTS=sdkconfig.defaults;{frag_rel}',
         f'-DSDKCONFIG={build_dir / "sdkconfig"}',
