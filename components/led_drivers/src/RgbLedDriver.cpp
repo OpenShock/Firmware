@@ -21,6 +21,7 @@ using namespace OpenShock;
 
 RgbLedDriver::RgbLedDriver(gpio_num_t gpioPin)
   : m_gpioPin(GPIO_NUM_NC)
+  , m_swapRg((Board::Get().flags & OPENSHOCK_BOARD_FLAG_LED_SWAP_RG) != 0)
   , m_brightness(255)
   , m_rmtChannel(nullptr)
   , m_rmtEncoder(nullptr)
@@ -112,9 +113,8 @@ void RgbLedDriver::apply(const RGBState& state)
   uint8_t r = static_cast<uint8_t>(static_cast<uint16_t>(state.red) * brightness / 255);
   uint8_t g = static_cast<uint8_t>(static_cast<uint16_t>(state.green) * brightness / 255);
   uint8_t b = static_cast<uint8_t>(static_cast<uint16_t>(state.blue) * brightness / 255);
-  // Whether this board's LED wants RGB rather than GRB is a board setting, so it comes from the descriptor
-  // stamped into the image rather than a compile-time flag: one image serves every board on the chip.
-  if ((Board::Get().flags & OPENSHOCK_BOARD_FLAG_LED_SWAP_RG) != 0) {
+  // Board setting (descriptor flag), decided once in the constructor so this path stays a single branch.
+  if (m_swapRg) {
     std::swap(r, g);
   }
 

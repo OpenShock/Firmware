@@ -113,8 +113,10 @@ extern "C" void app_main()
   }
 
   // Who we are. The descriptor is stamped into the image per board (BoardDescriptor.h); everything that needs a
-  // pin or the board name reads it from there, so it is validated once here, before Config::Init seeds defaults.
+  // pin or the board name reads it from there, so it is read and validated once here, before any other task
+  // exists and before Config::Init seeds defaults. Every later access is a plain load.
   {
+    OpenShock::Board::Init();
     const OpenShock::BoardDescriptor& board = OpenShock::Board::Get();
     OS_LOGI(TAG, "Board: %s (%s)%s", board.board, board.chip, OpenShock::Board::IsStamped() ? "" : " - no valid descriptor in image, running with no pins");
     if (!OpenShock::ValidateBoardDescriptor()) {

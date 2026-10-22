@@ -100,22 +100,51 @@ namespace OpenShock {
       return Seal(desc);
     }
 
-    /// @brief The descriptor of the running image, validated once on first use.
+    /// @brief Reads and validates the descriptor stamped into the image, once. app_main calls this before anything
+    ///        else; a host test calls it at the top of its main.
+    ///
+    /// Everything below is a plain load afterwards: the state is constant-initialized to the no-pin fallback, so
+    /// code that somehow runs before Init() sees "UNSTAMPED" with no pins, never garbage. Init() is the only writer
+    /// and runs before any other task exists, so the accessors need no guard and inline to a load.
+    /// @return Whether the image carries a stamped descriptor (the same as IsStamped()).
+    bool Init();
+
+    // Written by Init() only. Not for direct use: read through the accessors below.
+    namespace Detail {
+      extern BoardDescriptor active;
+      extern bool stamped;
+      extern std::string_view name;
+      extern std::string_view chip;
+    }  // namespace Detail
+
+    /// @brief The descriptor of the running image.
     ///
     /// The image is compiled with a placeholder (Defaults() with no name) that scripts/stamp_board.py replaces
     /// per board. When the image carries no stamped descriptor - never stamped, or magic, length or CRC wrong -
     /// this is Defaults() named "UNSTAMPED": no pins, so the hub boots into the captive portal and says what is
     /// wrong instead of driving pins it was never told about.
-    const BoardDescriptor& Get();
+    inline const BoardDescriptor& Get()
+    {
+      return Detail::active;
+    }
 
     /// @brief Whether Get() is the image's own descriptor rather than the fallback.
-    bool IsStamped();
+    inline bool IsStamped()
+    {
+      return Detail::stamped;
+    }
 
     /// @brief Get().board as a view, measured once. Points into the descriptor, so it stays valid and NUL-terminated.
-    std::string_view Name();
+    inline std::string_view Name()
+    {
+      return Detail::name;
+    }
 
     /// @brief Get().chip as a view, measured once. Points into the descriptor, so it stays valid and NUL-terminated.
-    std::string_view Chip();
+    inline std::string_view Chip()
+    {
+      return Detail::chip;
+    }
 
     enum class ParseResult : uint8_t {
       Absent,     ///< Not a descriptor at all (no magic): an empty slot, or a build from before descriptors existed.
@@ -128,9 +157,10 @@ namespace OpenShock {
     /// @return What the bytes are. `out` is only meaningful for Valid (and holds the placeholder for Unstamped).
     ParseResult Parse(const uint8_t (&bytes)[OPENSHOCK_BOARD_DESCRIPTOR_SIZE], BoardDescriptor& out);
 
+    /// @brief Whether the board declares this chip-unsafe pin usable anyway. A mask test; safe in hot paths.
     inline bool IsBypassedGPIO(int8_t pin)
     {
-      return pin >= 0 && pin < 64 && (Get().gpioBypassMask & (1ULL << pin)) != 0;
+      return pin >= 0 && pin < 64 && ((Detail::active.gpioBypassMask >> pin) & 1u) != 0;
     }
   }  // namespace Board
 }  // namespace OpenShock

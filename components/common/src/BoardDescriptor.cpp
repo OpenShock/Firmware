@@ -14,66 +14,41 @@ using namespace OpenShock;
 // directly and have the compiler fold the placeholder values into its code.
 extern "C" const BoardDescriptor openshock_board_desc;
 
-namespace {
-  struct Loaded {
-    BoardDescriptor desc;
-    bool stamped;
-    std::string_view name;  // Into desc.board, measured once
-    std::string_view chip;  // Into desc.chip, measured once
-  };
+// Constant-initialized to the no-pin fallback, so a read before Init() is safe rather than garbage.
+constinit BoardDescriptor Board::Detail::active = Board::Defaults("UNSTAMPED", OPENSHOCK_FW_CHIP);
+constinit bool Board::Detail::stamped           = false;
+constinit std::string_view Board::Detail::name  = "UNSTAMPED";
+constinit std::string_view Board::Detail::chip  = OPENSHOCK_FW_CHIP;
 
-  const Loaded& load()
-  {
-    static const Loaded loaded = [] {
-      // Read through a volatile pointer: the bytes in flash are what the stamper wrote,
-      // not what the placeholder initializer says, and at -O2 GCC would otherwise fold
-      // the compile-time values straight into the code (ESP-IDF does the same for the
-      // ELF SHA-256 that esptool patches into esp_app_desc_t).
-      const volatile uint8_t* src = reinterpret_cast<const volatile uint8_t*>(&openshock_board_desc);
-      uint8_t bytes[OPENSHOCK_BOARD_DESCRIPTOR_SIZE];
-      for (std::size_t i = 0; i < sizeof(bytes); i++) bytes[i] = src[i];
+bool Board::Init()
+{
+  // Read through a volatile pointer: the bytes in flash are what the stamper wrote, not
+  // what the placeholder initializer says, and at -O2 GCC would otherwise fold the
+  // compile-time values straight into the code (ESP-IDF does the same for the ELF
+  // SHA-256 that esptool patches into esp_app_desc_t).
+  const volatile uint8_t* src = reinterpret_cast<const volatile uint8_t*>(&openshock_board_desc);
+  uint8_t bytes[OPENSHOCK_BOARD_DESCRIPTOR_SIZE];
+  for (std::size_t i = 0; i < sizeof(bytes); i++) bytes[i] = src[i];
 
-      Loaded result {};
-      switch (Board::Parse(bytes, result.desc)) {
-        case Board::ParseResult::Valid:
-          result.stamped = true;
-          break;
-        case Board::ParseResult::Unstamped:
-          OS_LOGE(TAG, "The firmware image was never stamped with a board; running as UNSTAMPED with no pins. Stamp it with scripts/stamp_board.py.");
-          break;
-        default:
-          OS_LOGE(TAG, "The firmware image's board descriptor is missing or corrupt; running as UNSTAMPED with no pins.");
-          break;
-      }
-      if (!result.stamped) {
-        result.desc = Board::Defaults("UNSTAMPED", OPENSHOCK_FW_CHIP);
-      }
-      result.name = result.desc.board;  // Parse() / Defaults() guarantee the terminator
-      result.chip = result.desc.chip;
-      return result;
-    }();
-    return loaded;
+  BoardDescriptor desc;
+  switch (Parse(bytes, desc)) {
+    case ParseResult::Valid:
+      Detail::active  = desc;
+      Detail::stamped = true;
+      break;
+    case ParseResult::Unstamped:
+      OS_LOGE(TAG, "The firmware image was never stamped with a board; running as UNSTAMPED with no pins. Stamp it with scripts/stamp_board.py.");
+      break;
+    default:
+      OS_LOGE(TAG, "The firmware image's board descriptor is missing or corrupt; running as UNSTAMPED with no pins.");
+      break;
   }
-}  // namespace
 
-const BoardDescriptor& Board::Get()
-{
-  return load().desc;
-}
+  // Parse() / Defaults() guarantee the terminators.
+  Detail::name = Detail::active.board;
+  Detail::chip = Detail::active.chip;
 
-bool Board::IsStamped()
-{
-  return load().stamped;
-}
-
-std::string_view Board::Name()
-{
-  return load().name;
-}
-
-std::string_view Board::Chip()
-{
-  return load().chip;
+  return Detail::stamped;
 }
 
 Board::ParseResult Board::Parse(const uint8_t (&bytes)[OPENSHOCK_BOARD_DESCRIPTOR_SIZE], BoardDescriptor& out)

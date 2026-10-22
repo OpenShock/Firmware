@@ -40,6 +40,7 @@ namespace OpenShock {
 
   private:
     gpio_num_t m_gpioPin;
+    bool m_swapRg;  // Board wants RGB rather than GRB wire order; decided once, apply() runs on the pattern task
     std::atomic<uint8_t> m_brightness;
     rmt_channel_handle_t m_rmtChannel;
     rmt_encoder_handle_t m_rmtEncoder;
