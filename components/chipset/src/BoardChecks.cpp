@@ -7,6 +7,7 @@ const char* const TAG = "Board";
 #include "OpenShock.h"
 
 #include <cstring>
+#include <iterator>
 
 using namespace OpenShock;
 
@@ -30,10 +31,32 @@ bool OpenShock::ValidateBoardDescriptor()
     ok = false;
   }
 
-  ok &= checkPin("RF TX pin", desc.rfTxGpio, IsValidOutputPin);
-  ok &= checkPin("E-Stop pin", desc.estopGpio, IsValidInputPin);
-  ok &= checkPin("LED pin", desc.ledGpio, IsValidOutputPin);
-  ok &= checkPin("WS2812B pin", desc.ws2812bGpio, IsValidOutputPin);
+  const struct {
+    const char* name;
+    int8_t pin;
+    bool (*isValid)(int8_t);
+  } pins[] = {
+    {  "RF TX pin",    desc.rfTxGpio, IsValidOutputPin},
+    { "E-Stop pin",   desc.estopGpio,  IsValidInputPin},
+    {    "LED pin",     desc.ledGpio, IsValidOutputPin},
+    {"WS2812B pin", desc.ws2812bGpio, IsValidOutputPin},
+  };
+
+  for (const auto& p : pins) {
+    ok &= checkPin(p.name, p.pin, p.isValid);
+  }
+
+  // Each assigned pin must be its own GPIO. Two features on one pin - the RF output driving the E-Stop input, say -
+  // is a wiring error the stamp should never encode, and nothing downstream checks it at boot.
+  for (std::size_t i = 0; i < std::size(pins); i++) {
+    if (pins[i].pin == OPENSHOCK_GPIO_INVALID) continue;
+    for (std::size_t j = i + 1; j < std::size(pins); j++) {
+      if (pins[j].pin == pins[i].pin) {
+        OS_LOGE(TAG, "%s and %s are both GPIO %hhi", pins[i].name, pins[j].name, pins[i].pin);
+        ok = false;
+      }
+    }
+  }
 
   return ok;
 }

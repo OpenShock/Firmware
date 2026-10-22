@@ -26,6 +26,7 @@ idf_component_register(
                "../../src/internal/utils.cpp"
                "../../../osjson/src/Json.cpp"
                "../../../common/src/BoardDescriptor.cpp" # Board::Get() for the RF/E-Stop defaults
+               "../../../../test/host_support/src/TestBoardDescriptor.cpp"  # the test board's descriptor
                "../../../common/src/Convert.cpp"        # Json.cpp strict string->int
                "../../../common/src/DigitCounter.cpp"
                "../../../common/src/ReadWriteMutex.cpp" # Config.cpp's store lock

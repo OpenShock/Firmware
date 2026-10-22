@@ -49,12 +49,13 @@ using namespace std::string_view_literals;
 // repository server's per-board releases keep working unchanged now that the firmware is compiled per chip.
 
 /// @brief Latest release for this board on a channel, with the hub's current version attached so the
-/// server can answer 204 when there is nothing to do. See spec §4.2. Arguments: domain, channel, board, version.
-#define OPENSHOCK_FW_REPO_LATEST_URL_FORMAT "https://%s" OPENSHOCK_FW_REPO_API_PREFIX "/latest/%s/%s?version=%s"
+/// server can answer 204 when there is nothing to do. See spec §4.2.
+/// Arguments: domain, channel, board (as %.*s: length, data), version.
+#define OPENSHOCK_FW_REPO_LATEST_URL_FORMAT "https://%s" OPENSHOCK_FW_REPO_API_PREFIX "/latest/%s/%.*s?version=%s"
 
 /// @brief Artifacts for one specific version of this board: the directed-update path. See spec §4.4.
-/// Arguments: domain, version, board.
-#define OPENSHOCK_FW_REPO_VERSION_URL_FORMAT "https://%s" OPENSHOCK_FW_REPO_API_PREFIX "/versions/%s/%s"
+/// Arguments: domain, version, board (as %.*s: length, data).
+#define OPENSHOCK_FW_REPO_VERSION_URL_FORMAT "https://%s" OPENSHOCK_FW_REPO_API_PREFIX "/versions/%s/%.*s"
 
 enum OtaTaskEventFlag : uint32_t {
   OTA_TASK_EVENT_UPDATE_REQUESTED  = 1 << 0,
@@ -176,37 +177,37 @@ static bool _sendFailureMessage(std::string_view message, bool fatal = false)
   return true;
 }
 
-/// @brief Reads the board descriptor out of an app slot.
-/// @return 1 when the slot holds a valid descriptor, 0 when it holds none (empty, or a build from before the
-/// descriptor existed), -1 when the flash could not be read.
-static int otaum_read_slot_descriptor(const esp_partition_t* slot, BoardDescriptor& out)
+/// @brief Whether the descriptor in `slot` names the board this hub is, logging the verdict.
+///
+/// A slot with no descriptor at all passes: the repository server keyed pre-descriptor builds by board, and
+/// refusing them would block every downgrade to one. A descriptor that is present but corrupt, or a placeholder
+/// from an image nobody stamped, is not that case: such an image would run with no pins, so it is refused when
+/// strict. Running unstamped ourselves passes, since there is nothing to compare to.
+/// @param strict True for an image about to be made bootable: an unreadable, corrupt or unstamped descriptor is a
+///               refusal. False for the first-boot check against the slot we came from, where a problem reading
+///               the old slot must not roll back a good image.
+static bool otaum_slot_matches_this_board(const esp_partition_t* slot, const char* what, bool strict)
 {
   uint8_t bytes[OPENSHOCK_BOARD_DESCRIPTOR_SIZE];
   esp_err_t err = esp_partition_read(slot, OPENSHOCK_BOARD_DESCRIPTOR_IMAGE_OFFSET, bytes, sizeof(bytes));
   if (err != ESP_OK) {
-    OS_LOGE(TAG, "Failed to read board descriptor from %s: %s", slot->label, esp_err_to_name(err));
-    return -1;
-  }
-
-  return Board::Parse(bytes, out) ? 1 : 0;
-}
-
-/// @brief Whether the descriptor in `slot` names the board this hub is, logging the verdict.
-///
-/// A slot with no descriptor passes: the repository server keyed pre-descriptor builds by board, and refusing
-/// them would block every downgrade to one. Running unstamped also passes, since there is nothing to compare to.
-/// @param strict Whether an unreadable slot counts as a mismatch. True for an image about to be made bootable;
-///               false for the first-boot check, where "could not read the old slot" must not roll back a good image.
-static bool otaum_slot_matches_this_board(const esp_partition_t* slot, const char* what, bool strict)
-{
-  BoardDescriptor other;
-  int read = otaum_read_slot_descriptor(slot, other);
-  if (read < 0) {
+    OS_LOGE(TAG, "Failed to read the board descriptor of %s from %s: %s", what, slot->label, esp_err_to_name(err));
     return !strict;
   }
-  if (read == 0) {
-    OS_LOGW(TAG, "%s carries no board descriptor, cannot check it against this board", what);
-    return true;
+
+  BoardDescriptor other;
+  switch (Board::Parse(bytes, other)) {
+    case Board::ParseResult::Absent:
+      OS_LOGW(TAG, "%s carries no board descriptor (built before descriptors existed), cannot check it against this board", what);
+      return true;
+    case Board::ParseResult::Invalid:
+      OS_LOGE(TAG, "%s carries a corrupt board descriptor", what);
+      return !strict;
+    case Board::ParseResult::Unstamped:
+      OS_LOGE(TAG, "%s was never stamped with a board and would run with no pins", what);
+      return !strict;
+    case Board::ParseResult::Valid:
+      break;
   }
 
   if (!Board::IsStamped()) {
@@ -716,7 +717,8 @@ bool OtaUpdateManager::TryGetFirmwareVersion(HTTP::Client& client, OtaUpdateChan
   }
 
   std::string uri;
-  if (!FormatToString(uri, OPENSHOCK_FW_REPO_LATEST_URL_FORMAT, domain.c_str(), channelName, Board::Get().board, OpenShock::Constants::FW_VERSION)) {
+  const auto board = Board::Name();
+  if (!FormatToString(uri, OPENSHOCK_FW_REPO_LATEST_URL_FORMAT, domain.c_str(), channelName, static_cast<int>(board.size()), board.data(), OpenShock::Constants::FW_VERSION)) {
     OS_LOGE(TAG, "Failed to format URL");
     return false;
   }
@@ -838,7 +840,8 @@ bool OtaUpdateManager::TryGetFirmwareRelease(HTTP::Client& client, const OpenSho
   }
 
   std::string uri;
-  if (!FormatToString(uri, OPENSHOCK_FW_REPO_VERSION_URL_FORMAT, domain.c_str(), versionStr.c_str(), Board::Get().board)) {
+  const auto board = Board::Name();
+  if (!FormatToString(uri, OPENSHOCK_FW_REPO_VERSION_URL_FORMAT, domain.c_str(), versionStr.c_str(), static_cast<int>(board.size()), board.data())) {
     OS_LOGE(TAG, "Failed to format URL");
     return false;
   }

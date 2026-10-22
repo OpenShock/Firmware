@@ -4,6 +4,7 @@
 #include "SemVer.h"
 
 #include <string>
+#include <string_view>
 
 // The one translation unit that sees the firmware version and git commit.
 //
@@ -34,12 +35,16 @@ namespace OpenShock::Constants {
     return OPENSHOCK_FW_USERAGENT;
 #else
     static const std::string userAgent = [] {
-      const BoardDescriptor& board = Board::Get();
-      std::string ua               = CONFIG_OPENSHOCK_FW_HOSTNAME "/" OPENSHOCK_FW_VERSION " (ESP-IDF; ";
-      ua += board.board;
-      ua += "; ";
-      ua += board.chip;
-      ua += "; Espressif)";
+      using namespace std::string_view_literals;
+      constexpr auto prefix    = CONFIG_OPENSHOCK_FW_HOSTNAME "/" OPENSHOCK_FW_VERSION " (ESP-IDF; "sv;
+      constexpr auto separator = "; "sv;
+      constexpr auto suffix    = "; Espressif)"sv;
+      const auto board         = Board::Name();
+      const auto chip          = Board::Chip();
+
+      std::string ua;
+      ua.reserve(prefix.size() + board.size() + separator.size() + chip.size() + suffix.size());
+      ua.append(prefix).append(board).append(separator).append(chip).append(suffix);
       return ua;
     }();
     return userAgent.c_str();

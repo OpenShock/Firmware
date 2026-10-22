@@ -5,8 +5,9 @@ Native ESP-IDF replacement for the PlatformIO ``embed_env_vars.py`` extra_script
 Two headers are written, split by how often their contents change:
 
 ``openshock_board.h``
-    Board and chip identity, build mode, log level, and the board's GPIO
-    assignments. Changes when the board changes, not when the tree does.
+    Chip identity, build mode and log level. Identical for every board on a chip:
+    the board itself (name, pins, flags) is stamped into the image after linking
+    by scripts/stamp_board.py, never compiled in.
 
 ``openshock_version.h``
     Firmware version and git commit. Changes on *every* commit.
@@ -19,16 +20,16 @@ nothing could ever be reused. Neither header is force-included now:
 components see it), and ``openshock_version.h`` by the handful of translation
 units that actually report a version.
 
-The GPIO assignments (parsed by scripts/utils/boards.py) live here rather than in Kconfig for the same reason. As
-Kconfig symbols they landed in ``sdkconfig.h``, which most of ESP-IDF includes,
-so two boards that differed only by an LED pin shared no compiled objects at
-all. Keeping them out of ``sdkconfig.h`` lets every board with the same chip and
-flash size compile byte-identical framework objects.
+The GPIO assignments (parsed by scripts/utils/boards.py) are not in this header at
+all, and not in Kconfig either. As Kconfig symbols they landed in ``sdkconfig.h``,
+which most of ESP-IDF includes, so two boards that differed only by an LED pin
+shared no compiled objects at all; as macros in this header they still rebuilt
+every OpenShock object per board. They live in the board descriptor stamped into
+the image instead, so every board on a chip compiles byte-identical objects.
 
 Values come from (highest priority first):
   1. ``OPENSHOCK_*`` process environment variables (CI provides the version etc.)
-  2. the board fragment (``boards/<board>.defaults``), for the GPIO assignments
-  3. computed defaults (local dev version fallback, board/chip macros)
+  2. computed defaults (local dev version fallback, chip macros)
 """
 
 import argparse
@@ -50,9 +51,6 @@ FORCE_STRING_KEYS = {
     # a string so it isn't emitted as a bare int macro.
     'OPENSHOCK_FW_VERSION_PRERELEASE',
 }
-
-# Keys emitted verbatim (not through serialize()): C integer literals with a suffix.
-RAW_KEYS = {'OPENSHOCK_GPIO_BYPASS_MASK'}
 
 
 def macroify(s: str) -> str:
@@ -83,8 +81,6 @@ def c_string(value: str) -> str:
 
 def serialize(key: str, value) -> str:
     """Render a macro value: raw int when numeric, else a C string."""
-    if key in RAW_KEYS:
-        return str(value)
     if key in FORCE_STRING_KEYS:
         return c_string(str(value))
     s = str(value)
@@ -113,21 +109,6 @@ def resolve_version() -> str:
     # Local dev fallback - a valid semver so split_semver() is happy.
     commit = git_commit()
     return '0.0.0-local' + (f'+{commit[:7]}' if commit else '')
-
-
-def board_defines(spec: boards.BoardSpec) -> dict[str, object]:
-    """The board's hardware description as macros.
-
-    Every key is always emitted, with -1 / 0 for what the board lacks, so a consumer can
-    rely on the macro existing. These are the values compiled into the firmware's board
-    descriptor (BoardDescriptor.cpp); scripts/stamp_board.py writes the same fields into
-    the app image after the build, which is what a per-chip build relies on.
-    """
-    defines: dict[str, object] = dict(spec.pins)
-    defines['OPENSHOCK_LED_SWAP_RG_CHANNELS'] = 1 if spec.led_swap_rg else 0
-    # The chip-unsafe pins this board is allowed to use anyway, as a bit mask (Chipset.h).
-    defines['OPENSHOCK_GPIO_BYPASS_MASK'] = f'0x{spec.gpio_bypass_mask:X}ULL'
-    return defines
 
 
 def render(title: str, defines: dict[str, object]) -> str:
@@ -194,8 +175,6 @@ def main() -> int:
     # --- openshock_board.h ---------------------------------------------------
     board: dict[str, object] = {}
 
-    board['OPENSHOCK_FW_BOARD'] = args.board
-    board['OPENSHOCK_FW_BOARD_' + macroify(args.board)] = 1
     board['OPENSHOCK_FW_CHIP'] = args.chip.upper()
     board['OPENSHOCK_FW_CHIP_' + macroify(args.chip)] = 1
     board['OPENSHOCK_FW_MODE'] = mode
@@ -210,7 +189,14 @@ def main() -> int:
         log_level = 5
     board['OPENSHOCK_LOG_LEVEL'] = log_level
 
-    board.update(board_defines(boards.read_board_fragment(Path(args.fragment), args.board)))
+    # The board itself - name, pins, flags, bypasses - is not compiled in. It is stamped into
+    # the image after linking (scripts/stamp_board.py, run by the root CMakeLists.txt for the
+    # configured board), so one compile serves every board on the chip and an unstamped
+    # image has no pins. The fragment is still parsed here so a typo fails at configure
+    # time rather than at the stamp.
+    spec = boards.read_board_fragment(Path(args.fragment), args.board)
+    if spec.chip != board['OPENSHOCK_FW_CHIP']:
+        raise SystemExit(f'error: {args.fragment} targets {spec.chip}, but the build is configured for {args.chip}')
 
     # --- openshock_version.h -------------------------------------------------
     version_defines: dict[str, object] = {}

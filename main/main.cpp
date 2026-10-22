@@ -11,7 +11,6 @@ const char* const TAG = "main";
 #include "events/Events.h"
 #include "GatewayConnectionManager.h"
 #include "Logging.h"
-#include "OpenShock.h"
 #include "OtaUpdateManager.h"
 #include "serial_console/SerialInputHandler.h"
 #include "visual/VisualStateManager.h"

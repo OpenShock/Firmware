@@ -51,3 +51,20 @@ TEST_CASE("ReverseInverseNibble reverses the inverted nibble", "[util][checksum]
     TEST_ASSERT_EQUAL_UINT8(rev4((~b) & 0xF), Checksum::ReverseInverseNibble(b));
   }
 }
+
+TEST_CASE("Crc32 matches the IEEE check value and zlib", "[util][checksum]")
+{
+  // The standard CRC-32 check value: crc32("123456789") == 0xCBF43926 (also what zlib.crc32 gives).
+  const uint8_t check[] = {'1', '2', '3', '4', '5', '6', '7', '8', '9'};
+  TEST_ASSERT_EQUAL_HEX32(0xCBF43926, Checksum::Crc32(check, sizeof(check)));
+  TEST_ASSERT_EQUAL_HEX32(0x00000000, Checksum::Crc32(check, 0));
+
+  // Chained calls give the same result as one call over the whole span.
+  uint32_t partial = Checksum::Crc32(check, 4);
+  TEST_ASSERT_EQUAL_HEX32(0xCBF43926, Checksum::Crc32(check + 4, sizeof(check) - 4, partial));
+
+  // Usable in constant expressions, and the object overload hashes the object's bytes.
+  constexpr uint8_t ones[4] = {0xFF, 0xFF, 0xFF, 0xFF};
+  static_assert(Checksum::Crc32(ones, sizeof(ones)) == 0xFFFFFFFF);
+  TEST_ASSERT_EQUAL_HEX32(Checksum::Crc32(ones, sizeof(ones)), Checksum::Crc32(static_cast<uint32_t>(0xFFFFFFFF)));
+}

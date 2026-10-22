@@ -78,8 +78,9 @@ class Descriptor:
     def pack(self) -> bytes:
         board = self.board.encode('ascii')
         chip = self.chip.encode('ascii')
-        if not board or len(board) >= DESC_BOARD_LEN:
-            raise ValueError(f'board name must be 1-{DESC_BOARD_LEN - 1} ASCII characters: {self.board!r}')
+        # An empty name is the unstamped placeholder a fresh build carries; a stamp always names a board.
+        if len(board) >= DESC_BOARD_LEN:
+            raise ValueError(f'board name must be at most {DESC_BOARD_LEN - 1} ASCII characters: {self.board!r}')
         if not chip or len(chip) >= DESC_CHIP_LEN:
             raise ValueError(f'chip label must be 1-{DESC_CHIP_LEN - 1} ASCII characters: {self.chip!r}')
         body = struct.pack(

@@ -94,6 +94,21 @@ if(OPENSHOCK_NATIVE_ENV)
       add_dependencies(${_os_lib} openshock_version_header)
     endif()
   endforeach()
+
+  # --- Board descriptor stamp -------------------------------------------------
+  # The compiled image describes no board: its descriptor (BoardDescriptor.h, at image
+  # offset 0x120) is a placeholder with no name and no pins. Stamp the configured board
+  # into firmware.bin right after esptool produces it, so `idf.py flash` and the CI
+  # artifacts carry the board, and a build that somehow skipped this boots with no pins
+  # rather than with pins it assumed. gen_project_binary is the IDF target that writes
+  # the .bin; it re-runs (and so does this) whenever the ELF changes.
+  idf_build_get_property(_os_build_dir BUILD_DIR)
+  add_custom_command(TARGET gen_project_binary POST_BUILD
+    COMMAND ${_os_python} ${CMAKE_CURRENT_LIST_DIR}/scripts/stamp_board.py stamp
+            --image ${_os_build_dir}/${CMAKE_PROJECT_NAME}.bin
+            --board ${OPENSHOCK_BOARD}
+    COMMENT "Stamping board descriptor for ${OPENSHOCK_BOARD} into ${CMAKE_PROJECT_NAME}.bin"
+    VERBATIM)
 endif()
 
 # --- Static filesystem image (captive-portal web assets) ---------------------

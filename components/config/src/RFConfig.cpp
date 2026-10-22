@@ -5,7 +5,6 @@ const char* const TAG = "Config::RFConfig";
 #include "BoardDescriptor.h"
 #include "config/internal/utils.h"
 #include "Logging.h"
-#include "OpenShock.h"
 
 using namespace OpenShock::Config;
 

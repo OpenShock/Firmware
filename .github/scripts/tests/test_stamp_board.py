@@ -125,6 +125,13 @@ def test_descriptor_crc_covers_every_field():
 def test_descriptor_rejects_overlong_names():
     with pytest.raises(ValueError):
         espimage.Descriptor('x' * 48, 'ESP32', -1, -1, -1, -1, 0, 0).pack()
+    with pytest.raises(ValueError):
+        espimage.Descriptor('A', '', -1, -1, -1, -1, 0, 0).pack()
+
+
+def test_placeholder_has_no_name_but_a_valid_crc():
+    packed = espimage.Descriptor('', 'ESP32-S3', -1, -1, -1, -1, 0, 0).pack()
+    assert espimage.unpack_descriptor(packed).board == ''
 
 
 def test_image_parse_and_verify_round_trip():
@@ -188,7 +195,17 @@ def test_stamp_verify_and_read(tmp_path, capsys):
     )
     assert stamp_board.main(['verify', '--image', str(out), '--board', 'Test-S3', '--fragment', str(fragment)]) == 0
     assert stamp_board.main(['read', '--image', str(out)]) == 0
-    assert '"board": "Test-S3"' in capsys.readouterr().out
+    printed = capsys.readouterr().out
+    assert '"board": "Test-S3"' in printed
+    assert '"stamped": true' in printed
+
+    # A fresh build's placeholder (no board name) reads back as unstamped.
+    placeholder = tmp_path / 'placeholder.bin'
+    placeholder.write_bytes(make_image(espimage.Descriptor('', 'ESP32-S3', -1, -1, -1, -1, 0, 0).pack()))
+    assert stamp_board.main(['read', '--image', str(placeholder)]) == 0
+    assert '"stamped": false' in capsys.readouterr().out
+    with pytest.raises(SystemExit):
+        stamp_board.main(['verify', '--image', str(placeholder), '--board', 'Test-S3', '--fragment', str(fragment)])
 
     # The unstamped image does not verify as that board, and stamping is idempotent.
     with pytest.raises(SystemExit):

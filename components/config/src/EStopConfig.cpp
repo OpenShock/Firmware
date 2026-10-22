@@ -4,7 +4,6 @@
 #include "Chipset.h"
 #include "config/internal/utils.h"
 #include "Logging.h"
-#include "OpenShock.h"
 
 const char* const TAG = "Config::EStopConfig";
 

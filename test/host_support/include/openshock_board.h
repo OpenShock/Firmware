@@ -1,9 +1,10 @@
 // Host-test stand-in for the board header scripts/gen_env_header.py generates in
-// firmware builds (same keys and value formats). A classic ESP32 board in debug mode,
-// with the RF transmitter on GPIO4 and no E-Stop or LED. These seed the descriptor
-// BoardDescriptor.cpp compiles in, which Board::Get() then serves to the code under
-// test. The ESP32 GPIO capabilities the real Chipset.h checks pins against come from
-// this component's CMakeLists.txt.
+// firmware builds (chip, build mode, log level), plus the pins of the fixed test board:
+// a classic ESP32 with the RF transmitter on GPIO4 and no E-Stop or LED. Firmware has no
+// pin macros any more (pins come from the descriptor stamped into the image); here they
+// seed src/TestBoardDescriptor.cpp, which Board::Get() serves to the code under test.
+// The ESP32 GPIO capabilities the real Chipset.h checks pins against come from this
+// component's CMakeLists.txt.
 #pragma once
 
 #define OPENSHOCK_ESTOP_PIN            -1

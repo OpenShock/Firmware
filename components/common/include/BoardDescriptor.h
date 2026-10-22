@@ -14,13 +14,22 @@
 // in whichever OTA slot the app does; formatting the config, NVS or static partitions
 // cannot touch it, and a rollback restores the old app together with its descriptor.
 //
+// The compiled-in copy (BoardDescriptorImage.cpp) is a placeholder with no board name and
+// no pins. Pins only ever come from a stamp, so an image that was never stamped, or whose
+// descriptor fails validation, boots with no pins rather than with pins it assumed.
+//
 // The layout is shared with scripts/utils/espimage.py (DESC_FORMAT); change both together
 // and bump OPENSHOCK_BOARD_DESCRIPTOR_SCHEMA_VERSION. Never read the global directly:
-// the compiler would fold the compiled-in placeholder values into the code and the
-// stamped bytes would never be seen. Go through OpenShock::Board::Get().
+// the compiler would fold the placeholder values into the code and the stamped bytes
+// would never be seen. Go through OpenShock::Board::Get().
 
+#include "Checksum.h"
+
+#include <array>
+#include <bit>
 #include <cstddef>
 #include <cstdint>
+#include <string_view>
 
 #define OPENSHOCK_BOARD_DESCRIPTOR_MAGIC          0x4442534Fu  // "OSBD" as little-endian bytes
 #define OPENSHOCK_BOARD_DESCRIPTOR_SCHEMA_VERSION 1u
@@ -57,19 +66,67 @@ namespace OpenShock {
   static_assert(offsetof(BoardDescriptor, crc32) == 252);
 
   namespace Board {
+    /// @brief The number of leading bytes the crc32 field covers: everything before itself.
+    constexpr std::size_t kCrcCoverage = offsetof(BoardDescriptor, crc32);
+
+    /// @brief The descriptor with its crc32 filled in (Checksum::Crc32, what scripts/utils/espimage.py checks against).
+    constexpr BoardDescriptor Seal(BoardDescriptor desc)
+    {
+      desc.crc32 = 0;
+      auto bytes = std::bit_cast<std::array<uint8_t, OPENSHOCK_BOARD_DESCRIPTOR_SIZE>>(desc);
+      desc.crc32 = Checksum::Crc32(bytes.data(), kCrcCoverage);
+      return desc;
+    }
+
+    /// @brief A sealed descriptor that describes no board: `name` (empty for the placeholder compiled into the
+    /// image, "UNSTAMPED" for the runtime fallback), the given chip, no pins, no flags, no bypasses.
+    ///
+    /// These are the safe defaults: with no pins the hub drives nothing it was never told about, and still boots
+    /// into the captive portal.
+    constexpr BoardDescriptor Defaults(const char* name, const char* chip)
+    {
+      BoardDescriptor desc {};
+      desc.magic         = OPENSHOCK_BOARD_DESCRIPTOR_MAGIC;
+      desc.schemaVersion = OPENSHOCK_BOARD_DESCRIPTOR_SCHEMA_VERSION;
+      desc.length        = OPENSHOCK_BOARD_DESCRIPTOR_SIZE;
+      for (std::size_t i = 0; i + 1 < sizeof(desc.board) && name[i] != '\0'; i++) desc.board[i] = name[i];
+      for (std::size_t i = 0; i + 1 < sizeof(desc.chip) && chip[i] != '\0'; i++) desc.chip[i] = chip[i];
+      desc.rfTxGpio       = -1;
+      desc.estopGpio      = -1;
+      desc.ledGpio        = -1;
+      desc.ws2812bGpio    = -1;
+      desc.flags          = 0;
+      desc.gpioBypassMask = 0;
+      return Seal(desc);
+    }
+
     /// @brief The descriptor of the running image, validated once on first use.
     ///
-    /// When the image carries no valid descriptor (magic, length or CRC wrong) this is a
-    /// fallback named "UNSTAMPED" with no pins, so the hub still boots into the captive
-    /// portal and says what is wrong instead of driving pins it was never told about.
+    /// The image is compiled with a placeholder (Defaults() with no name) that scripts/stamp_board.py replaces
+    /// per board. When the image carries no stamped descriptor - never stamped, or magic, length or CRC wrong -
+    /// this is Defaults() named "UNSTAMPED": no pins, so the hub boots into the captive portal and says what is
+    /// wrong instead of driving pins it was never told about.
     const BoardDescriptor& Get();
 
     /// @brief Whether Get() is the image's own descriptor rather than the fallback.
     bool IsStamped();
 
+    /// @brief Get().board as a view, measured once. Points into the descriptor, so it stays valid and NUL-terminated.
+    std::string_view Name();
+
+    /// @brief Get().chip as a view, measured once. Points into the descriptor, so it stays valid and NUL-terminated.
+    std::string_view Chip();
+
+    enum class ParseResult : uint8_t {
+      Absent,     ///< Not a descriptor at all (no magic): an empty slot, or a build from before descriptors existed.
+      Invalid,    ///< Has the magic but fails validation (length, schema, CRC, bounds): corrupt or mis-stamped.
+      Unstamped,  ///< A valid placeholder with no board name: an image that was built but never stamped.
+      Valid,      ///< A stamped descriptor; `out` is usable.
+    };
+
     /// @brief Decodes and validates descriptor bytes read from elsewhere (another OTA slot).
-    /// @return false when they are not a descriptor this firmware understands. `out` is then unspecified.
-    bool Parse(const uint8_t (&bytes)[OPENSHOCK_BOARD_DESCRIPTOR_SIZE], BoardDescriptor& out);
+    /// @return What the bytes are. `out` is only meaningful for Valid (and holds the placeholder for Unstamped).
+    ParseResult Parse(const uint8_t (&bytes)[OPENSHOCK_BOARD_DESCRIPTOR_SIZE], BoardDescriptor& out);
 
     inline bool IsBypassedGPIO(int8_t pin)
     {

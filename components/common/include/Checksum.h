@@ -52,6 +52,31 @@ namespace OpenShock::Checksum {
     return Sum8(bytes.data(), bytes.size());
   }
 
+  // ------------------------------------------------------------
+  // CRC-32 (IEEE 802.3): reflected, polynomial 0xEDB88320, init and final xor 0xFFFFFFFF.
+  // The same CRC zlib.crc32() and esp_rom_crc32_le(0, ...) compute; kept bitwise and constexpr so it works in
+  // constant expressions (the board descriptor placeholder is sealed at compile time) and has no table to carry.
+  // ------------------------------------------------------------
+  constexpr uint32_t Crc32(const uint8_t* data, std::size_t size, uint32_t crc = 0)
+  {
+    crc = ~crc;
+    for (std::size_t i = 0; i < size; ++i) {
+      crc ^= data[i];
+      for (int bit = 0; bit < 8; ++bit) {
+        crc = (crc >> 1) ^ (0xEDB88320u & (0u - (crc & 1u)));
+      }
+    }
+    return ~crc;
+  }
+
+  template<typename T>
+    requires(!std::integral<T> && std::is_trivially_copyable_v<T>)
+  constexpr uint32_t Crc32(const T& data)
+  {
+    const auto bytes = std::bit_cast<std::array<uint8_t, sizeof(T)>>(data);
+    return Crc32(bytes.data(), bytes.size());
+  }
+
   /// @brief Reverses the bit order of the low nibble of `b` (lookup table packed into a 64-bit constant).
   ///        Only the low nibble is used, so the shift can never reach 64 bits.
   constexpr uint8_t ReverseNibble(uint8_t b)

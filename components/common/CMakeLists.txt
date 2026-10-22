@@ -11,7 +11,8 @@
 #   StringHelpers.h, SimpleMutex.h, ReadWriteMutex.h, util/*.h
 
 idf_component_register(
-  SRCS          "src/BoardDescriptor.cpp"  # the board descriptor in .rodata_custom_desc + Board::Get()
+  SRCS          "src/BoardDescriptor.cpp"       # Board::Get() / Parse()
+                "src/BoardDescriptorImage.cpp"  # the placeholder descriptor in .rodata_custom_desc (not in host tests)
                 "src/Convert.cpp"
                 "src/DigitCounter.cpp"
                 "src/RateLimiter.cpp"
@@ -28,3 +29,9 @@ idf_component_register(
                 temporal     # Temporal.h (RateLimiter.h) in public header
                 freertos     # semphr.h in SimpleMutex.h / ReadWriteMutex.h public headers
 )
+
+# Keep the board descriptor in the link even when nothing references it. The ESP-IDF app
+# image format documentation prescribes this for a custom structure in .rodata_custom_desc:
+# the component is a static archive, so an unreferenced object would otherwise be dropped
+# and the image would carry no descriptor at offset 0x120 for scripts/stamp_board.py.
+target_link_libraries(${COMPONENT_LIB} INTERFACE "-u openshock_board_desc")

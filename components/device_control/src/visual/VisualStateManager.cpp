@@ -5,6 +5,7 @@
 const char* const TAG = "VisualStateManager";
 
 #include "BoardDescriptor.h"
+#include "Chipset.h"
 #include "enums/GatewayClientState.h"
 #include "estop/EStopState.h"
 #include "events/Events.h"
@@ -368,23 +369,34 @@ bool VisualStateManager::Init()
 
   const BoardDescriptor& board = Board::Get();
 
+  // The pins come from the stamped descriptor, so they are data, not something the build checked. A pin this
+  // chip cannot drive leaves that LED off rather than failing Init: that would restart-loop a normal boot and
+  // roll back an OTA boot over an indicator. ValidateBoardDescriptor() has already logged the specifics.
   if (board.ledGpio != GPIO_NUM_NC) {
-    s_monoLedDriver = std::make_unique<MonoLedDriver>(static_cast<gpio_num_t>(board.ledGpio));
-    if (!s_monoLedDriver->IsValid()) {
-      OS_LOGE(TAG, "Failed to initialize built-in LED manager");
-      return false;
+    if (!OpenShock::IsValidOutputPin(board.ledGpio)) {
+      OS_LOGW(TAG, "Built-in LED pin %hhi is not usable on this board, leaving the LED disabled", board.ledGpio);
+    } else {
+      s_monoLedDriver = std::make_unique<MonoLedDriver>(static_cast<gpio_num_t>(board.ledGpio));
+      if (!s_monoLedDriver->IsValid()) {
+        OS_LOGE(TAG, "Failed to initialize built-in LED manager");
+        return false;
+      }
+      ledActive = true;
     }
-    ledActive = true;
   }
 
   if (board.ws2812bGpio != GPIO_NUM_NC) {
-    s_rgbLedDriver = std::make_unique<RgbLedDriver>(static_cast<gpio_num_t>(board.ws2812bGpio));
-    if (!s_rgbLedDriver->IsValid()) {
-      OS_LOGE(TAG, "Failed to initialize RGB LED manager");
-      return false;
+    if (!OpenShock::IsValidOutputPin(board.ws2812bGpio)) {
+      OS_LOGW(TAG, "RGB LED pin %hhi is not usable on this board, leaving the LED disabled", board.ws2812bGpio);
+    } else {
+      s_rgbLedDriver = std::make_unique<RgbLedDriver>(static_cast<gpio_num_t>(board.ws2812bGpio));
+      if (!s_rgbLedDriver->IsValid()) {
+        OS_LOGE(TAG, "Failed to initialize RGB LED manager");
+        return false;
+      }
+      s_rgbLedDriver->SetBrightness(20);
+      ledActive = true;
     }
-    s_rgbLedDriver->SetBrightness(20);
-    ledActive = true;
   }
 
   if (!ledActive) {

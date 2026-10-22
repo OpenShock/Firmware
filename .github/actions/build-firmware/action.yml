@@ -95,10 +95,10 @@ runs:
         key: ccache-${{ runner.os }}-${{ inputs.cache-group }}-${{ github.sha }}
 
     # The image carries the board descriptor the device reads its pins and OTA identity
-    # from (BoardDescriptor.h). Check it says this board, then prove the stamper
-    # reproduces the compiler's bytes exactly: re-stamping the image as the same board
-    # must be a no-op, checksum and SHA-256 included. That is the path a per-chip build
-    # takes for every board, so it is exercised here while builds are still per board.
+    # from (BoardDescriptor.h); the compiled placeholder has no pins, and the root
+    # CMakeLists.txt stamps the configured board in after linking. Check the stamp is
+    # there and says this board, then that re-stamping it is a byte-identical no-op,
+    # checksum and SHA-256 included.
     - name: Verify board descriptor
       shell: bash
       env:

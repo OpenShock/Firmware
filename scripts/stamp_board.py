@@ -84,7 +84,7 @@ def cmd_read(args) -> int:
         desc = espimage.unpack_descriptor(image.descriptor_bytes())
     except espimage.DescriptorError as err:
         raise SystemExit(f'error: {args.image} carries no valid board descriptor ({err})')
-    print(json.dumps({**desc.as_dict(), 'chip_id': image.chip_id}, indent=2))
+    print(json.dumps({**desc.as_dict(), 'chip_id': image.chip_id, 'stamped': bool(desc.board)}, indent=2))
     return 0
 
 
