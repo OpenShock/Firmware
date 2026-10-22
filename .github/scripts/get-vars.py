@@ -17,6 +17,11 @@ import semver
 
 from gha import fail, notice, set_output
 
+# The one parser for boards/<board>.defaults lives with the build helpers. get-vars.yml checks out a sparse
+# tree, so scripts/utils is listed there explicitly.
+sys.path.insert(0, str(Path(__file__).resolve().parents[2] / 'scripts'))
+from utils.boards import read_target  # noqa: E402
+
 # The channels the repository server's enum knows.
 # A feature branch derives its own name, which is not one of them.
 KNOWN_CHANNELS = ('stable', 'beta', 'develop')
@@ -90,13 +95,6 @@ def cache_group(fragment: Path, target: str, shared: Path) -> str:
         digest.update(line.encode('utf-8'))
         digest.update(b'\n')
     return f'{target}-{digest.hexdigest()[:10]}'
-
-
-def idf_target(fragment: Path) -> str:
-    m = re.search(r'^\s*CONFIG_IDF_TARGET\s*=\s*"([^"]+)"', fragment.read_text(encoding='utf-8'), re.M)
-    if m is None:
-        fail(f'{fragment} does not set CONFIG_IDF_TARGET')
-    return m.group(1)
 
 
 def main() -> int:
@@ -214,7 +212,7 @@ def main() -> int:
     entries = []
     for index, board in enumerate(boards):
         fragment = boards_dir / f'{board}.defaults'
-        target = idf_target(fragment)
+        target = read_target(fragment)
         entries.append(
             {
                 'board': board,

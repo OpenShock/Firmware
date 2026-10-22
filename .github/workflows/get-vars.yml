@@ -43,6 +43,7 @@ jobs:
       board-matrix: ${{ steps.get-vars.outputs.board-matrix }}
 
     steps:
+      # scripts/utils holds the one parser for boards/*.defaults (scripts/utils/boards.py), which get-vars.py imports.
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
         with:
           fetch-depth: 0
@@ -50,6 +51,7 @@ jobs:
             .github
             .changes
             boards
+            scripts/utils
 
       # get-vars.py parses tags with the semver package rather than a local regex, so it needs the pinned dependency set.
       # gha.py still self-checks the interpreter floor and fails clearly if the image ever ships something older.

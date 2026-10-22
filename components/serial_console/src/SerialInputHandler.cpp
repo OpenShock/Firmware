@@ -736,9 +736,14 @@ void SerialInputHandler::PrintVersionInfo()
     "  Version:  %s\r\n"
     "    Build:  " OPENSHOCK_FW_MODE "\r\n"
     "   Commit:  %s\r\n"
-    "    Board:  " OPENSHOCK_FW_BOARD "\r\n"
-    "     Chip:  " OPENSHOCK_FW_CHIP "\r\n",
+    "    Board:  %.*s%s\r\n"
+    "     Chip:  %.*s\r\n",
     OpenShock::Constants::FW_VERSION,
-    OpenShock::Constants::FW_GIT_COMMIT
+    OpenShock::Constants::FW_GIT_COMMIT,
+    static_cast<int>(OpenShock::Board::Name().size()),
+    OpenShock::Board::Name().data(),
+    OpenShock::Board::IsStamped() ? "" : " (no valid board descriptor in image)",
+    static_cast<int>(OpenShock::Board::Chip().size()),
+    OpenShock::Board::Chip().data()
   );
 }

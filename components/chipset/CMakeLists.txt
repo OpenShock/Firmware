@@ -1,16 +1,18 @@
-# OpenShock chipset utilities: GPIO validation, compile-time pin assertions.
+# OpenShock chipset utilities: GPIO validation against the chip's reserved pins and the
+# board's bypass list.
 #
 # Public surface:
-#   Chipset.h: OpenShock::IsValidInputPin / IsValidOutputPin per IDF_TARGET
+#   Chipset.h: OpenShock::IsValidInputPin / IsValidOutputPin per IDF_TARGET, plus the
+#              board's bypasses from the descriptor (BoardDescriptor.h in common).
 #
-# CompatibilityChecks.cpp contains static_asserts that fail the build if any
-# board pin (OPENSHOCK_ESTOP_PIN, OPENSHOCK_RF_TX_GPIO, ... from openshock_board.h) resolves to
-# an invalid pin for the current chip. It has to be in the link for the
-# asserts to run; no runtime code.
+# BoardChecks.cpp validates the running board descriptor at boot (ValidateBoardDescriptor).
+# It replaces the compile-time pin asserts the per-board builds had: the pins are no
+# longer known at compile time, since one image serves every board on a chip.
 
 idf_component_register(
-  SRCS         "src/CompatibilityChecks.cpp"
-  INCLUDE_DIRS "include"
-  REQUIRES     common          # Common.h
-               esp_driver_gpio # driver/gpio.h
+  SRCS          "src/BoardChecks.cpp"
+  INCLUDE_DIRS  "include"
+  REQUIRES      common          # Common.h, BoardDescriptor.h
+                esp_driver_gpio # driver/gpio.h
+  PRIV_REQUIRES logging         # OS_LOG* in BoardChecks.cpp
 )

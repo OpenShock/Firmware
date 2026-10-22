@@ -2,14 +2,15 @@
 
 const char* const TAG = "main";
 
+#include "BoardDescriptor.h"
 #include "captiveportal/Manager.h"
+#include "Chipset.h"
 #include "CommandHandler.h"
 #include "config/Config.h"
 #include "estop/EStopManager.h"
 #include "events/Events.h"
 #include "GatewayConnectionManager.h"
 #include "Logging.h"
-#include "OpenShock.h"
 #include "OtaUpdateManager.h"
 #include "serial_console/SerialInputHandler.h"
 #include "visual/VisualStateManager.h"
@@ -64,6 +65,11 @@ static void otaSetup()
 {
   OS_LOGI(TAG, "Validating OTA app");
 
+  if (!OpenShock::OtaUpdateManager::IsPendingImageForThisBoard()) {
+    OS_LOGE(TAG, "This image was not built for this board, rolling back");
+    OpenShock::OtaUpdateManager::InvalidateAndRollback();
+  }
+
   if (!trySetup()) {
     OS_LOGE(TAG, "Unable to validate OTA app, rolling back");
     OpenShock::OtaUpdateManager::InvalidateAndRollback();
@@ -104,6 +110,19 @@ extern "C" void app_main()
   }
   if (nvsResult != ESP_OK) {
     OS_PANIC(TAG, "Failed to initialize NVS: %s", esp_err_to_name(nvsResult));
+  }
+
+  // Who we are. The descriptor is stamped into the image per board (BoardDescriptor.h); everything that needs a
+  // pin or the board name reads it from there, so it is read and validated once here, before any other task
+  // exists and before Config::Init seeds defaults. Every later access is a plain load.
+  {
+    OpenShock::Board::Init();
+    const OpenShock::BoardDescriptor& board = OpenShock::Board::Get();
+    OS_LOGI(TAG, "Board: %s (%s)%s", board.board, board.chip, OpenShock::Board::IsStamped() ? "" : " - no valid descriptor in image, running with no pins");
+    // An unstamped image already said so in Init(); this line is for a stamped descriptor with bad pins.
+    if (!OpenShock::ValidateBoardDescriptor() && OpenShock::Board::IsStamped()) {
+      OS_LOGE(TAG, "Board descriptor has problems (see above); affected features will stay disabled");
+    }
   }
 
   OpenShock::Config::Init();

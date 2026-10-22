@@ -5,10 +5,14 @@
 // the real one. The exit code is the Unity failure count.
 #include "unity.h"
 
+#include "BoardDescriptor.h"
+
 #include <cstdlib>
 
 extern "C" void app_main(void)
 {
+  OpenShock::Board::Init();  // The test board (test/host_support), as app_main does on the device
+
   UNITY_BEGIN();
   unity_run_all_tests();
   std::exit(UNITY_END());

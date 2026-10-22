@@ -2,14 +2,14 @@
 
 const char* const TAG = "Config::RFConfig";
 
+#include "BoardDescriptor.h"
 #include "config/internal/utils.h"
 #include "Logging.h"
-#include "OpenShock.h"
 
 using namespace OpenShock::Config;
 
 RFConfig::RFConfig()
-  : txPin(static_cast<gpio_num_t>(OPENSHOCK_RF_TX_GPIO))
+  : txPin(static_cast<gpio_num_t>(Board::Get().rfTxGpio))
   , keepAliveEnabled(true)
 {
 }
@@ -22,7 +22,7 @@ RFConfig::RFConfig(gpio_num_t txPin, bool keepAliveEnabled)
 
 void RFConfig::ToDefault()
 {
-  txPin            = static_cast<gpio_num_t>(OPENSHOCK_RF_TX_GPIO);
+  txPin            = static_cast<gpio_num_t>(Board::Get().rfTxGpio);
   keepAliveEnabled = true;
 }
 
@@ -36,7 +36,7 @@ bool RFConfig::FromFlatbuffers(const Serialization::Configuration::RFConfig* con
 
   // "No pin" (-1) is not a usable TX pin either; both fall back to the board default.
   if (!Internal::Utils::FromIntGpioNum(txPin, config->tx_pin()) || txPin == GPIO_NUM_NC) {
-    txPin = static_cast<gpio_num_t>(OPENSHOCK_RF_TX_GPIO);
+    txPin = static_cast<gpio_num_t>(Board::Get().rfTxGpio);
   }
   keepAliveEnabled = config->keepalive_enabled();
 
@@ -70,7 +70,7 @@ bool RFConfig::FromJSON(JSON::JsonView json)
   }
 
   if (!Internal::Utils::FromJsonGpioNum(txPin, json, "txPin") || txPin == GPIO_NUM_NC) {
-    txPin = static_cast<gpio_num_t>(OPENSHOCK_RF_TX_GPIO);
+    txPin = static_cast<gpio_num_t>(Board::Get().rfTxGpio);
   }
   if (!json["keepAliveEnabled"].tryGetBool(keepAliveEnabled)) keepAliveEnabled = true;
 

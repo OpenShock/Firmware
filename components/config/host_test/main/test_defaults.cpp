@@ -4,6 +4,8 @@
 
 #include "config_test_helpers.h"
 
+#include "BoardDescriptor.h"
+
 #include <string>
 
 using namespace OpenShock;
@@ -18,8 +20,13 @@ namespace {
   }
 }  // namespace
 
-TEST_CASE("Default values come from Kconfig and the board header", "[config][defaults]")
+TEST_CASE("Default values come from Kconfig and the board descriptor", "[config][defaults]")
 {
+  // The host-test descriptor is compiled from openshock_board.h, so the macros are what Board::Get() serves.
+  TEST_ASSERT_TRUE(OpenShock::Board::IsStamped());
+  TEST_ASSERT_EQUAL_STRING(OPENSHOCK_FW_BOARD, OpenShock::Board::Get().board);
+  TEST_ASSERT_EQUAL_INT(OPENSHOCK_RF_TX_GPIO, OpenShock::Board::Get().rfTxGpio);
+
   const Config::RootConfig config;
 
   TEST_ASSERT_EQUAL_INT(OPENSHOCK_RF_TX_GPIO, config.rf.txPin);
