@@ -17,7 +17,8 @@ import semver
 
 from gha import fail, notice, set_output
 
-# The one parser for boards/<board>.defaults lives with the build helpers.
+# The one parser for boards/<board>.defaults lives with the build helpers. get-vars.yml checks out a sparse
+# tree, so scripts/utils is listed there explicitly.
 sys.path.insert(0, str(Path(__file__).resolve().parents[2] / 'scripts'))
 from utils.boards import read_target  # noqa: E402
 
