@@ -1,9 +1,15 @@
 ---
 kind: changed
 ---
-Read the board's pins and OTA identity from a descriptor stamped into the app image instead of compile-time macros
+Stamp a board descriptor into the firmware image instead of compiling each board in
 
 ## Release Note
-Board identity now lives in the firmware image itself
+Firmware images now carry a small board descriptor: which board they are for, which chip, and the pins and LED settings that board uses. The firmware reads it at startup instead of having those values baked in at compile time, so one build per chip can serve every board on that chip, and adding a board no longer means adding a build. Nothing changes for you when updating: the hub asks for updates by the same board name as before, and the descriptor travels inside the app image, so it survives resetting the configuration and follows a rollback.
 
-Each firmware image carries a 256-byte board descriptor (board name, chip, pins, LED flags, pin bypasses) at a fixed offset, written by `scripts/stamp_board.py` after linking (the build does this for the configured board). The compiled image itself describes no board and has no pins, so an image that was never stamped boots into the captive portal instead of driving pins it assumed. The firmware reads its pins and the board name it asks the repository server for from that descriptor, so one compile per chip can serve every board on it. The descriptor travels with the app through OTA, so it survives formatting the config, NVS and static partitions, and a rollback restores the matching one. The OTA updater now refuses a downloaded image whose descriptor names a different board before making it bootable, and an image that nonetheless boots on the wrong board rolls back on its first boot. Board fragments gain an `OPENSHOCK_GPIO_BYPASS` line, replacing the per-board bypass lists that were compiled into `Chipset.h`.
+- Add a 256-byte board descriptor at a fixed offset of the app image, written by `scripts/stamp_board.py` after linking and validated on the device with a CRC
+- Read pins, LED flags, pin bypasses and the OTA board name from the descriptor at startup; the compiled image describes no board and has no pins until it is stamped
+- Refuse an OTA download whose descriptor names a different board before it is made bootable, and roll back on first boot if the previous slot disagrees
+- Boot into the captive portal with no pins, and say so on the serial console, when an image was never stamped or its descriptor is corrupt
+- Validate the descriptor at boot: chip matches the build, every pin is usable on the chip, no two features share a pin; an unusable LED pin disables that LED instead of failing startup
+- Move per-board pin bypass lists out of `Chipset.h` into an `OPENSHOCK_GPIO_BYPASS` line in each board fragment
+- Stamp the configured board automatically in local builds, and verify in CI that every built image carries the right descriptor and that re-stamping it is byte-identical

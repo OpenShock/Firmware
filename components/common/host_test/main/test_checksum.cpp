@@ -63,8 +63,13 @@ TEST_CASE("Crc32 matches the IEEE check value and zlib", "[util][checksum]")
   uint32_t partial = Checksum::Crc32(check, 4);
   TEST_ASSERT_EQUAL_HEX32(0xCBF43926, Checksum::Crc32(check + 4, sizeof(check) - 4, partial));
 
-  // Usable in constant expressions, and the object overload hashes the object's bytes.
+  // Usable in constant expressions, and the object overload hashes a trivially copyable object's bytes.
   constexpr uint8_t ones[4] = {0xFF, 0xFF, 0xFF, 0xFF};
   static_assert(Checksum::Crc32(ones, sizeof(ones)) == 0xFFFFFFFF);
-  TEST_ASSERT_EQUAL_HEX32(Checksum::Crc32(ones, sizeof(ones)), Checksum::Crc32(static_cast<uint32_t>(0xFFFFFFFF)));
+  struct FourBytes {
+    uint8_t a, b, c, d;
+  };
+  constexpr FourBytes allOnes {0xFF, 0xFF, 0xFF, 0xFF};
+  static_assert(Checksum::Crc32(allOnes) == 0xFFFFFFFF);
+  TEST_ASSERT_EQUAL_HEX32(Checksum::Crc32(ones, sizeof(ones)), Checksum::Crc32(allOnes));
 }
