@@ -38,7 +38,7 @@ def run(head_sha, created_at='2026-10-01T03:00:00Z'):
 
 
 def outcome(d):
-    return (d.build, d.deploy, d.publish, d.server, d.boards)
+    return (d.build, d.publish, d.server, d.boards)
 
 
 def pr(action='synchronize', labels=(), label=None):
@@ -59,27 +59,24 @@ def nightly(branch, api, inputs=None):
 @pytest.mark.parametrize('action', ['opened', 'reopened', 'synchronize'])
 def test_pr_without_label_builds_the_canary(action):
     d = decide('pull_request', 'refs/pull/7/merge', SHA, pr(action), FakeApi())
-    assert outcome(d) == (True, False, False, 'dev', CANARY_BOARD)
-    assert not d.warm_idf
+    assert outcome(d) == (True, False, 'dev', CANARY_BOARD)
 
 
 def test_pr_with_full_build_label_builds_every_board():
     d = decide('pull_request', 'refs/pull/7/merge', SHA, pr(labels=['bug', FULL_BUILD_LABEL]), FakeApi())
-    assert outcome(d) == (True, False, False, 'dev', '')
-    assert d.warm_idf
+    assert outcome(d) == (True, False, 'dev', '')
 
 
 def test_pr_labelled_full_build_builds_every_board():
     payload = pr('labeled', labels=[FULL_BUILD_LABEL], label=FULL_BUILD_LABEL)
     d = decide('pull_request', 'refs/pull/7/merge', SHA, payload, FakeApi())
-    assert outcome(d) == (True, False, False, 'dev', '')
+    assert outcome(d) == (True, False, 'dev', '')
 
 
 def test_pr_labelled_with_another_label_does_nothing(capsys):
     payload = pr('labeled', labels=['enhancement'], label='enhancement')
     d = decide('pull_request', 'refs/pull/7/merge', SHA, payload, FakeApi())
-    assert outcome(d) == (False, False, False, 'dev', '')
-    assert not d.warm_idf
+    assert outcome(d) == (False, False, 'dev', '')
     assert 'Label "enhancement" does not affect the build.' in capsys.readouterr().out
 
 
@@ -87,18 +84,17 @@ def test_pr_labelled_with_another_label_while_carrying_full_build_still_does_not
     # The full build was already started by the labeled event for ci:full-build itself.
     payload = pr('labeled', labels=[FULL_BUILD_LABEL, 'bug'], label='bug')
     d = decide('pull_request', 'refs/pull/7/merge', SHA, payload, FakeApi())
-    assert outcome(d) == (False, False, False, 'dev', '')
+    assert outcome(d) == (False, False, 'dev', '')
 
 
 # --- release tags ---
 
 
 @pytest.mark.parametrize('tag', ['1.5.0', '1.5.0-rc.1', '1.5.0-develop.3'])
-def test_tag_push_builds_deploys_and_publishes_to_prod(tag):
+def test_tag_push_builds_and_publishes_to_prod(tag):
     api = FakeApi()
     d = decide('push', f'refs/tags/{tag}', SHA, {}, api)
-    assert outcome(d) == (True, True, True, 'prod', '')
-    assert d.warm_idf
+    assert outcome(d) == (True, True, 'prod', '')
     assert api.run_queries == [] and api.compares == []
 
 
@@ -106,14 +102,13 @@ def test_tag_push_builds_deploys_and_publishes_to_prod(tag):
 
 
 @pytest.mark.parametrize(
-    'branch, deploy, publish',
-    [('develop', True, True), ('beta', False, False), ('master', False, False)],
+    'branch, publish',
+    [('develop', True), ('beta', False), ('master', False)],
 )
-def test_nightly_with_source_changes_builds(branch, deploy, publish):
+def test_nightly_with_source_changes_builds(branch, publish):
     api = FakeApi(runs={'workflow_dispatch': run(BASE)}, files=['README.md', 'components/rf/src/Foo.cpp'])
     d = nightly(branch, api)
-    assert outcome(d) == (True, deploy, publish, 'prod', '')
-    assert d.warm_idf
+    assert outcome(d) == (True, publish, 'prod', '')
     assert api.run_queries == [('schedule', branch), ('workflow_dispatch', branch)]
     assert api.compares == [(BASE, SHA)]
 
@@ -122,8 +117,7 @@ def test_nightly_with_source_changes_builds(branch, deploy, publish):
 def test_nightly_with_unchanged_sha_skips(branch):
     api = FakeApi(runs={'workflow_dispatch': run(SHA)})
     d = nightly(branch, api)
-    assert outcome(d) == (False, False, False, 'prod', '')
-    assert not d.warm_idf
+    assert outcome(d) == (False, False, 'prod', '')
     assert api.compares == []
 
 
@@ -150,7 +144,7 @@ NON_SOURCE_CHANGES = [
 def test_nightly_with_only_non_source_changes_skips(branch):
     api = FakeApi(runs={'schedule': run(BASE)}, files=NON_SOURCE_CHANGES)
     d = nightly(branch, api)
-    assert outcome(d) == (False, False, False, 'prod', '')
+    assert outcome(d) == (False, False, 'prod', '')
 
 
 @pytest.mark.parametrize('name', NON_SOURCE_CHANGES)
@@ -183,7 +177,7 @@ def test_source_paths(name):
 @pytest.mark.parametrize('changed', [['.changes/feat-rf.md'], ['.github/workflows/ci-build.yml']])
 def test_nightly_counts_changes_and_workflows_as_source(changed):
     api = FakeApi(runs={'workflow_dispatch': run(BASE)}, files=changed)
-    assert outcome(nightly('develop', api)) == (True, True, True, 'prod', '')
+    assert outcome(nightly('develop', api)) == (True, True, 'prod', '')
 
 
 def test_nightly_counts_a_rename_from_source_as_source():
@@ -197,7 +191,7 @@ def test_nightly_counts_a_rename_from_source_as_source():
 def test_first_ever_nightly_builds_without_comparing():
     api = FakeApi()
     d = nightly('develop', api)
-    assert outcome(d) == (True, True, True, 'prod', '')
+    assert outcome(d) == (True, True, 'prod', '')
     assert api.compares == []
 
 
@@ -222,7 +216,7 @@ def test_nightly_compares_against_the_newer_of_schedule_and_dispatch():
 def test_nightly_run_listing_failure_builds(capsys):
     api = FakeApi(runs_error=RuntimeError('HTTP 502'), files=['README.md'])
     d = nightly('develop', api)
-    assert outcome(d) == (True, True, True, 'prod', '')
+    assert outcome(d) == (True, True, 'prod', '')
     assert api.compares == []
     assert '::warning::Could not read the last develop build: HTTP 502' in capsys.readouterr().out
 
@@ -230,7 +224,7 @@ def test_nightly_run_listing_failure_builds(capsys):
 def test_nightly_compare_failure_builds(capsys):
     api = FakeApi(runs={'workflow_dispatch': run(BASE)}, compare_error=RuntimeError('HTTP 404'))
     d = nightly('beta', api)
-    assert outcome(d) == (True, False, False, 'prod', '')
+    assert outcome(d) == (True, False, 'prod', '')
     assert f'::warning::Could not compare {BASE}...{SHA}: HTTP 404' in capsys.readouterr().out
 
 
@@ -248,7 +242,7 @@ def test_nightly_with_299_non_source_files_skips():
 def test_nightly_on_a_feature_branch_is_refused(capsys):
     api = FakeApi()
     d = nightly('feat/arduino-3.0', api)
-    assert outcome(d) == (False, False, False, 'prod', '')
+    assert outcome(d) == (False, False, 'prod', '')
     assert api.run_queries == []
     assert 'Nightly requested on refs/heads/feat/arduino-3.0' in capsys.readouterr().out
 
@@ -256,14 +250,14 @@ def test_nightly_on_a_feature_branch_is_refused(capsys):
 def test_nightly_on_a_tag_is_refused():
     api = FakeApi()
     d = decide('workflow_dispatch', 'refs/tags/1.5.0', SHA, {'inputs': {'nightly': 'true'}}, api)
-    assert outcome(d) == (False, False, False, 'prod', '')
+    assert outcome(d) == (False, False, 'prod', '')
     assert api.run_queries == []
 
 
 def test_nightly_ignores_server_and_channel():
     api = FakeApi(runs={'workflow_dispatch': run(BASE)}, files=['main/main.cpp'])
     d = nightly('beta', api, {'server': 'dev', 'channel': 'stable'})
-    assert outcome(d) == (True, False, False, 'prod', '')
+    assert outcome(d) == (True, False, 'prod', '')
 
 
 def test_boolean_nightly_input_counts():
@@ -282,32 +276,32 @@ def test_dispatch_on_develop_publishes_to_dev(nightly_input):
         inputs['nightly'] = nightly_input
     api = FakeApi()
     d = decide('workflow_dispatch', 'refs/heads/develop', SHA, {'inputs': inputs}, api)
-    assert outcome(d) == (True, True, True, 'dev', '')
+    assert outcome(d) == (True, True, 'dev', '')
     assert api.run_queries == []
 
 
 def test_dispatch_on_master_with_prod_is_downgraded_to_dev(capsys):
     payload = {'inputs': {'server': 'prod', 'channel': 'stable', 'nightly': 'false'}}
     d = decide('workflow_dispatch', 'refs/heads/master', SHA, payload, FakeApi())
-    assert outcome(d) == (True, False, True, 'dev', '')
+    assert outcome(d) == (True, True, 'dev', '')
     assert 'prod was requested on refs/heads/master' in capsys.readouterr().out
 
 
 def test_dispatch_on_develop_with_prod_is_downgraded_to_dev():
     payload = {'inputs': {'server': 'prod', 'nightly': 'false'}}
     d = decide('workflow_dispatch', 'refs/heads/develop', SHA, payload, FakeApi())
-    assert outcome(d) == (True, True, True, 'dev', '')
+    assert outcome(d) == (True, True, 'dev', '')
 
 
 def test_dispatch_on_a_tag_may_publish_to_prod():
     payload = {'inputs': {'server': 'prod', 'channel': 'beta', 'nightly': 'false'}}
     d = decide('workflow_dispatch', 'refs/tags/1.5.0-rc.1', SHA, payload, FakeApi())
-    assert outcome(d) == (True, False, True, 'prod', '')
+    assert outcome(d) == (True, True, 'prod', '')
 
 
 def test_dispatch_without_inputs_publishes_to_dev():
     d = decide('workflow_dispatch', 'refs/heads/feat/x', SHA, {}, FakeApi())
-    assert outcome(d) == (True, False, True, 'dev', '')
+    assert outcome(d) == (True, True, 'dev', '')
 
 
 # --- main ---
@@ -326,9 +320,7 @@ def test_main_writes_every_output(tmp_path, monkeypatch):
     assert ci_build_gate.main() == 0
     assert out.read_text(encoding='utf-8').splitlines() == [
         'build=true',
-        'deploy=false',
         'publish=false',
         'server=dev',
         f'boards={CANARY_BOARD}',
-        'warm-idf=false',
     ]

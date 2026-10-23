@@ -19,9 +19,10 @@ API = 'https://api.github.com'
 # Pinned rather than left to the default, so a new default cannot change what these checks see.
 # GitHub names its supported versions in the 400 it returns for an unknown one, which is how to find the next.
 API_VERSION = '2026-03-10'
-# The branch each channel is cut from.
-# develop is absent because the nightly is already the only thing publishing it, and a tag is not required to descend from it.
-# Branch a commit must be contained in to publish to the channel on prod.
+# The channels the repository server's enum knows. A feature branch derives its own name, which is not one of them.
+CHANNELS = ('stable', 'beta', 'develop')
+# The branch a commit must be contained in to publish to the channel on prod: the one each channel is cut from.
+# develop's entry is met by construction, since the nightly on develop is the only thing publishing that channel.
 CHANNEL_BRANCH = {'stable': 'master', 'beta': 'beta', 'develop': 'develop'}
 # Channels whose prod publishes also need a staged draft release (develop builds have no release).
 DRAFT_CHANNELS = ('stable', 'beta')

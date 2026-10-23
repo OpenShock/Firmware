@@ -9,13 +9,7 @@ Pipeline:
 The output is reproducible: gzip headers carry no timestamp and files are packed in sorted order, so an unchanged
 frontend gives a byte-identical staticfs.bin (and the same hash, so devices don't re-flash it).
 
-The littlefs geometry MUST match how the firmware mounts the partition at
-runtime (components/fs/src/LfsPartition.cpp): 4 KiB erase blocks, 128-byte
-read/prog. Only block_size and block_count are fixed on-disk and validated
-against the superblock at mount; the rest are runtime buffer sizes.
-
-Invoked by CMake (see the root CMakeLists.txt). This replaces the old
-PlatformIO SCons extra_script scripts/build_frontend.py.
+Invoked by CMake (see the root CMakeLists.txt), and by CI with --skip-frontend-build.
 """
 
 import argparse
@@ -24,6 +18,15 @@ import os
 import shutil
 import subprocess
 import sys
+from pathlib import Path
+
+from utils import partitions
+
+# The littlefs geometry the firmware mounts static0 with (components/fs/src/LfsPartition.cpp). Only the
+# block size is on disk and checked at mount; read/prog/cache are runtime buffer sizes that must agree.
+BLOCK_SIZE = 4096
+READ_SIZE = PROG_SIZE = 128
+CACHE_SIZE = 512
 
 
 def log(msg):
@@ -57,19 +60,8 @@ def frontend_build_is_current(frontend_dir, build_dir):
 
 
 def build_frontend(frontend_dir):
-    """Run the SvelteKit production build when frontend/build is missing or older than its sources.
-
-    In CI the frontend is built once in a separate job and downloaded as an
-    artifact into frontend/build, so we must not rebuild it here.
-    """
+    """Run the SvelteKit production build when frontend/build is missing or older than its sources."""
     build_dir = os.path.join(frontend_dir, 'build')
-
-    if os.environ.get('CI'):
-        if not os.path.isdir(build_dir):
-            raise SystemExit(f'CI build: expected prebuilt frontend at {build_dir}')
-        log('CI detected, using prebuilt frontend/build')
-        return build_dir
-
     if frontend_build_is_current(frontend_dir, build_dir):
         log('frontend/build is up to date, skipping pnpm')
         return build_dir
@@ -113,25 +105,22 @@ def stage_assets(build_dir, staging_dir):
     return www_dir
 
 
-def pack_image(staging_dir, output, partition_size, block_size, read_size, prog_size):
+def pack_image(staging_dir, output, partition_size):
     """Pack <staging_dir>/www into a littlefs image of exactly partition_size bytes (as /www/...)."""
     try:
         from littlefs import LittleFS
     except ImportError:
         raise SystemExit("littlefs-python is required (pip install -r requirements.txt)")
 
-    if partition_size % block_size != 0:
-        raise SystemExit(f'partition size {partition_size} is not a multiple of block size {block_size}')
-    block_count = partition_size // block_size
-
-    # cache_size must be a multiple of read/prog and divide block_size; 512 matches
-    # the runtime mount (LfsPartition.cpp). lookahead just needs to be a multiple of 8.
+    if partition_size % BLOCK_SIZE != 0:
+        raise SystemExit(f'partition size {partition_size} is not a multiple of block size {BLOCK_SIZE}')
+    block_count = partition_size // BLOCK_SIZE
     fs = LittleFS(
-        block_size=block_size,
+        block_size=BLOCK_SIZE,
         block_count=block_count,
-        read_size=read_size,
-        prog_size=prog_size,
-        cache_size=512,
+        read_size=READ_SIZE,
+        prog_size=PROG_SIZE,
+        cache_size=CACHE_SIZE,
         lookahead_size=128,
     )
 
@@ -153,7 +142,7 @@ def pack_image(staging_dir, output, partition_size, block_size, read_size, prog_
         f.write(bytes(fs.context.buffer))
 
     log(f'Packed {file_count} files into {output} '
-        f'({partition_size} bytes, {block_count} x {block_size}-byte blocks)')
+        f'({partition_size} bytes, {block_count} x {BLOCK_SIZE}-byte blocks)')
 
 
 def main():
@@ -164,9 +153,6 @@ def main():
     size = p.add_mutually_exclusive_group(required=True)
     size.add_argument('--partition-size', type=lambda v: int(v, 0), help='static0 partition size')
     size.add_argument('--partition-csv', help='partition table CSV to read the static0 size from')
-    p.add_argument('--block-size', type=int, default=4096)
-    p.add_argument('--read-size', type=int, default=128)
-    p.add_argument('--prog-size', type=int, default=128)
     p.add_argument('--skip-frontend-build', action='store_true',
                    help='Reuse existing frontend/build without invoking pnpm')
     args = p.parse_args()
@@ -180,18 +166,13 @@ def main():
 
     partition_size = args.partition_size
     if partition_size is None:
-        sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-        from utils import partitions  # noqa: E402
-        from pathlib import Path
-
         table = partitions.read_partitions(Path(args.partition_csv))
         if 'static0' not in table:
             raise SystemExit(f'{args.partition_csv} has no static0 partition')
         partition_size = table['static0']['size']
 
     stage_assets(build_dir, args.staging_dir)
-    pack_image(args.staging_dir, args.output, partition_size,
-               args.block_size, args.read_size, args.prog_size)
+    pack_image(args.staging_dir, args.output, partition_size)
 
 
 if __name__ == '__main__':

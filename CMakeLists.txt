@@ -1,26 +1,13 @@
 cmake_minimum_required(VERSION 3.16.0)
 
 # --- OpenShock generated build headers ---------------------------------------
-# Two headers are generated into ${CMAKE_BINARY_DIR}/config, the directory ESP-IDF
-# already writes sdkconfig.h into and puts on the global include path:
+# gen_env_header.py writes openshock_board.h (chip, build mode, log level) and openshock_version.h
+# (version, commit) into ${CMAKE_BINARY_DIR}/config. Neither is force-included: a header carrying the
+# commit in every translation unit would defeat ccache on every commit.
 #
-#   openshock_board.h    board/chip identity, build mode, log level, GPIO assignments
-#   openshock_version.h  firmware version and git commit
-#
-# Neither is force-included. openshock_board.h is included by OpenShock.h, so only
-# OpenShock's own components see it; openshock_version.h is included by the few
-# translation units that actually report a version.
-#
-# They used to be one header, force-included into every translation unit in the project
-# through idf_build_set_property(COMPILE_OPTIONS "-include..."). Because it carried the
-# git commit and a version string ending in +<short-sha>, every commit changed the
-# preprocessed text of every source file in the build - all of ESP-IDF included - and
-# ccache could never reuse a single object between CI runs.
-# Cached so an automatic reconfigure (e.g. from a plain `ninja` run without the env var) keeps generating the
-# headers for the same board instead of silently dropping them.
-if(NOT DEFINED OPENSHOCK_BOARD AND DEFINED ENV{OPENSHOCK_BOARD})
-  set(OPENSHOCK_BOARD $ENV{OPENSHOCK_BOARD} CACHE STRING "OpenShock board (boards/<name>.defaults)")
-endif()
+# OPENSHOCK_BOARD (-D, from scripts/build.py) names the board to stamp into the image after linking.
+# Empty for a variant build, whose image stays unstamped until scripts/package_boards.py stamps each board.
+set(OPENSHOCK_BOARD "" CACHE STRING "OpenShock board to stamp (boards/<name>.defaults); empty for a variant build")
 
 # idf.py passes the interpreter of the IDF Python environment as PYTHON; fall back to the one on PATH.
 if(DEFINED PYTHON)
@@ -29,77 +16,49 @@ else()
   set(_os_python python)
 endif()
 
-if(DEFINED OPENSHOCK_BOARD)
-  # The chip label (OPENSHOCK_FW_CHIP) is derived from the fragment's CONFIG_IDF_TARGET by
-  # gen_env_header.py through the one target-to-chip map in scripts/utils/boards.py, the same
-  # map the stamped descriptor's chip field uses. The build's IDF_TARGET is passed along only
-  # so a fragment configured for another target fails here.
-  if(DEFINED IDF_TARGET)
-    set(_os_target ${IDF_TARGET})
-  elseif(DEFINED ENV{IDF_TARGET})
-    set(_os_target $ENV{IDF_TARGET})
-  else()
-    set(_os_target "esp32")
-  endif()
+# scripts/build.py passes -DIDF_TARGET; with idf.py it comes from `idf.py set-target <chip>` or the
+# environment. Guessing instead (ESP-IDF's own fallback is esp32) could contradict the sdkconfig this
+# build layers, and the chip label in the generated header would then disagree with the image.
+if(DEFINED IDF_TARGET)
+  set(_os_target ${IDF_TARGET})
+elseif(DEFINED ENV{IDF_TARGET})
+  set(_os_target $ENV{IDF_TARGET})
+else()
+  message(FATAL_ERROR "IDF_TARGET is not set: pass -DIDF_TARGET=<chip>, export IDF_TARGET, or build through scripts/build.py")
+endif()
 
-  set(OPENSHOCK_CONFIG_DIR ${CMAKE_BINARY_DIR}/config)
-  set(OPENSHOCK_VERSION_HEADER ${OPENSHOCK_CONFIG_DIR}/openshock_version.h)
-  set(_os_gen_command
-      ${_os_python} ${CMAKE_CURRENT_LIST_DIR}/scripts/gen_env_header.py
-      --out-dir ${OPENSHOCK_CONFIG_DIR}
-      --board ${OPENSHOCK_BOARD}
-      --target ${_os_target}
-      --fragment ${CMAKE_CURRENT_LIST_DIR}/boards/${OPENSHOCK_BOARD}.defaults)
+set(OPENSHOCK_CONFIG_DIR ${CMAKE_BINARY_DIR}/config)
+set(OPENSHOCK_VERSION_HEADER ${OPENSHOCK_CONFIG_DIR}/openshock_version.h)
+set(_os_gen_command
+    ${_os_python} ${CMAKE_CURRENT_LIST_DIR}/scripts/gen_env_header.py
+    --out-dir ${OPENSHOCK_CONFIG_DIR}
+    --target ${_os_target})
 
-  execute_process(COMMAND ${_os_gen_command} --emit both RESULT_VARIABLE _os_env_rc)
-  if(NOT _os_env_rc EQUAL 0)
-    message(FATAL_ERROR "gen_env_header.py failed (rc=${_os_env_rc})")
-  endif()
-
-  # openshock_board.h (chip label, build mode, log level) is generated at configure time from the board
-  # fragment, so editing the fragment must trigger a reconfigure.
-  set_property(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS ${CMAKE_CURRENT_LIST_DIR}/boards/${OPENSHOCK_BOARD}.defaults)
-  set(OPENSHOCK_NATIVE_ENV TRUE)
+execute_process(COMMAND ${_os_gen_command} RESULT_VARIABLE _os_env_rc)
+if(NOT _os_env_rc EQUAL 0)
+  message(FATAL_ERROR "gen_env_header.py failed (rc=${_os_env_rc})")
 endif()
 
 include($ENV{IDF_PATH}/tools/cmake/project.cmake)
 
 project(firmware)
 
-if(OPENSHOCK_NATIVE_ENV)
-  # The version and commit come from git and the environment, which CMake has no
-  # dependency on, so refresh the version header on every build rather than only on a
-  # reconfigure. Generating it at configure time alone left an incremental build
-  # reporting whatever version the build directory was first configured with.
-  #
-  # The generator writes only when the contents differ, so an unchanged version leaves
-  # the file - and its mtime - alone, and nothing downstream is rebuilt.
-  add_custom_target(openshock_version_header ALL
-    BYPRODUCTS ${OPENSHOCK_VERSION_HEADER}
-    COMMAND ${_os_gen_command} --emit version
-    COMMENT "Refreshing openshock_version.h"
-    VERBATIM)
+# The version comes from git and the environment, which CMake cannot track, so refresh the header on
+# every build. It is written only when it changes, so an unchanged version rebuilds nothing.
+add_custom_target(openshock_version_header ALL
+  BYPRODUCTS ${OPENSHOCK_VERSION_HEADER}
+  COMMAND ${_os_gen_command} --version-only
+  COMMENT "Refreshing openshock_version.h"
+  VERBATIM)
+# Order the refresh ahead of Version.cpp, the only translation unit that includes it.
+idf_component_get_property(_os_common_lib common COMPONENT_LIB)
+add_dependencies(${_os_common_lib} openshock_version_header)
 
-  # Order the refresh ahead of the components that include the header. Without this the
-  # ALL target is unordered against them and a build could compile the previous version.
-  foreach(_os_consumer common)  # Version.cpp is the only translation unit including it
-    idf_component_get_property(_os_lib ${_os_consumer} COMPONENT_LIB)
-    if(_os_lib)
-      add_dependencies(${_os_lib} openshock_version_header)
-    endif()
-  endforeach()
-
-  # --- Board descriptor stamp -------------------------------------------------
-  # The compiled image describes no board: its descriptor (BoardDescriptor.h, at image
-  # offset 0x120) is a placeholder with no name and no pins. Stamp the configured board
-  # into firmware.bin right after esptool produces it, so `idf.py flash` and the CI
-  # artifacts carry the board, and a build that somehow skipped this boots with no pins
-  # rather than with pins it assumed. gen_project_binary is the IDF target that writes
-  # the .bin. A POST_BUILD step on a custom target runs on every build, not only when the
-  # ELF changed; that is fine because the stamp is idempotent (CI checks that re-stamping
-  # is byte-identical). If app signing (secure boot) is ever enabled, this has to move
-  # before the signing step, and scripts/utils/espimage.py has to learn the signature
-  # block: today it rejects an image with anything after the SHA-256.
+# --- Board descriptor stamp -------------------------------------------------
+# Stamp the board into the .bin as soon as gen_project_binary writes it, so `idf.py flash` carries the
+# board. It runs on every build, which is fine because stamping is idempotent. With secure boot this
+# would have to move before signing, and scripts/utils/espimage.py learn the signature block.
+if(OPENSHOCK_BOARD)
   idf_build_get_property(_os_build_dir BUILD_DIR)
   add_custom_command(TARGET gen_project_binary POST_BUILD
     COMMAND ${_os_python} ${CMAKE_CURRENT_LIST_DIR}/scripts/stamp_board.py stamp
@@ -113,7 +72,7 @@ endif()
 # Build the SvelteKit frontend, gzip it, and pack it into a littlefs image whose
 # geometry matches the runtime mount in components/fs/src/LfsPartition.cpp (4 KiB
 # blocks, 128-byte read/prog). `idf.py flash` writes it to the `static0`
-# partition. Replaces PlatformIO's build_frontend.py post-action + mklittlefs.
+# partition.
 #
 # The partition only exists in the OpenShock custom partition CSV; if the active
 # partition table has no `static0` (e.g. a bare default-table build), skip the
@@ -128,10 +87,11 @@ else()
   set(_staticfs_image ${CMAKE_BINARY_DIR}/staticfs.bin)
 
   # ALL target so a normal `idf.py build` regenerates the image. The generator only
-  # runs pnpm when frontend/build is older than the frontend sources (never in CI,
-  # where the frontend is downloaded as an artifact), so this stays cheap on
-  # incremental builds. Staging lives in the build directory so concurrent board
-  # builds don't share (and wipe) one directory.
+  # runs pnpm when frontend/build is older than the frontend sources, so this stays
+  # cheap on incremental builds. CI never builds this target: its staticfs job builds
+  # the frontend itself and runs gen_staticfs.py --skip-frontend-build, and the image
+  # is packaged beside every variant. Staging lives in the build directory so
+  # concurrent board builds don't share (and wipe) one directory.
   add_custom_target(staticfs ALL
     BYPRODUCTS ${_staticfs_image}
     COMMAND ${_os_python} ${CMAKE_CURRENT_LIST_DIR}/scripts/gen_staticfs.py
@@ -139,7 +99,6 @@ else()
             --staging-dir    ${CMAKE_BINARY_DIR}/staticfs
             --output         ${_staticfs_image}
             --partition-size ${_staticfs_size}
-            --block-size 4096 --read-size 128 --prog-size 128
     COMMENT "Building static filesystem image (staticfs.bin) for static0"
     VERBATIM USES_TERMINAL)
 

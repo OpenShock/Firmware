@@ -1,5 +1,4 @@
 # Per-commit firmware check: build and run the host (linux target) Unity suites.
-# Cheap next to compiling the firmware, which happens nightly, on release tags and as a PR canary (ci-build.yml).
 on:
   push:
     branches: ['**']
@@ -14,8 +13,7 @@ on:
       - '.gitmodules'
       - '.github/actions/setup-esp-idf/**'
       - '.github/workflows/host-tests.yml'
-  # A same-repo PR branch is already covered by its push run; pull_request is for forks, whose
-  # pushes do not run here. Fork runs need a maintainer's approval (repository setting).
+  # For forks only: a same-repo PR branch is already covered by its push run.
   pull_request:
     paths:
       - 'components/**'
@@ -47,33 +45,24 @@ jobs:
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
 
-      # The config suite includes the flatbuffers runtime, which lives in a submodule.
-      # Fetch only that one; the others (schemas, frontend) are not needed here.
+      # The config suite needs the flatbuffers runtime submodule, and only that one.
       - name: Fetch flatbuffers submodule
         run: git submodule update --init --depth 1 components/flatbuffers/flatbuffers
 
-      # The linux target links libbsd. ESP-IDF generates the CMock mocks the suites use
-      # (tools/mocks/*) with Ruby; ubuntu-latest ships it, listed so that stays true.
+      # The linux target links libbsd; ESP-IDF generates the CMock mocks with Ruby.
       - name: Install host build dependencies
         run: sudo apt-get update && sudo apt-get install -y --no-install-recommends libbsd-dev ruby
 
-      # Restore-only: ci-build's single nominated writer owns the cache entry.
+      # On develop this also refills the ESP-IDF cache after a key change (it runs on setup-esp-idf edits).
       - uses: ./.github/actions/setup-esp-idf
-        with:
-          save-cache: 'false'
 
-      # Each components/<name>/host_test is its own linux-target ESP-IDF project. They
-      # share test/host_support (stand-ins for Logging.h, openshock_board.h, ...) and
-      # use ESP-IDF's tools/mocks and linux ports; the config suite also reads the
-      # firmware's partitions/ota_4mb.csv. The ELF's exit code is the Unity failure count.
+      # Each components/<name>/host_test is its own linux-target project; the ELF exits with the Unity failure count.
       - name: Build and run host test suites
         shell: bash
         run: |
           set -euo pipefail
-          # The IDF environment puts each toolchain's inner <triple>/bin on PATH, which holds
-          # unprefixed cross binutils (as, ld, ...). The linux target builds with the host gcc,
-          # which looks up `as` on PATH and would get esp32ulp-elf's or riscv32's instead
-          # ("as: unrecognized option '--64'"). The firmware only calls the prefixed tools.
+          # Drop the toolchains' inner <triple>/bin dirs: their unprefixed `as` would shadow the host's
+          # for the linux target ("as: unrecognized option '--64'").
           PATH="$(printf '%s' "$PATH" | tr ':' '\n' | grep -vE -- '-elf/[^/]*-elf/bin/?$' | paste -sd: -)"
           export PATH
           echo "as: $(command -v as)"

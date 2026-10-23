@@ -20,11 +20,11 @@ from pathlib import Path
 import requests
 
 from gha import env, fail, require_env, set_output, warn
+from repo_server_policy import CHANNELS
 
 VALID_MODES = ('init', 'publish', 'dry-run', 'abort')
 # The server parses this into an enum; anything else is a 400 several steps later, after artifacts have been downloaded.
 # Branch builds derive a channel from the branch name, so this catches a feature branch being published by accident.
-VALID_CHANNELS = ('stable', 'beta', 'develop')
 
 # Server field name -> the artifact it carries.
 # app and staticfs are what an OTA update needs; the rest are for the flashtool, which writes a whole chip rather than updating one.
@@ -91,15 +91,18 @@ def sha256_of(path: Path) -> str:
 
 def resolve_artifacts(artifacts: Path, board: str) -> dict[str, Path]:
     """Every artifact the server wants for one board, or a hard failure naming the first one that is missing.
+
+    ci-build's package job writes every board's images into the one firmware_boards artifact, a directory per board.
+    The app is that board's stamped image; the device's OTA refuses one whose descriptor names another board.
     """
-    build = artifacts / f'firmware_build_{board}'
+    build = artifacts / 'firmware_boards' / board
     found: dict[str, Path] = {}
 
     for field, filename in BUILD_ARTIFACTS.items():
         found[field] = build / filename
     found[STATICFS_FIELD] = artifacts / 'firmware_staticfs' / 'staticfs.bin'
 
-    # merge-partitions is one job for every board, so the merged binaries share a directory and are told apart by the board in their filename.
+    # The package job merges every board at once, so the merged binaries share a directory and are told apart by the board in their filename.
     merged_glob = f'OpenShock_{board}_*.bin'
     merged = sorted((artifacts / 'firmware_merged').glob(merged_glob))
     if merged:
@@ -248,8 +251,8 @@ def do_init(session: requests.Session, server: str) -> int:
     channel = env('CHANNEL')
     boards = read_boards()
 
-    if channel not in VALID_CHANNELS:
-        fail(f"CHANNEL must be one of {'/'.join(VALID_CHANNELS)}, got '{channel}'")
+    if channel not in CHANNELS:
+        fail(f"CHANNEL must be one of {'/'.join(CHANNELS)}, got '{channel}'")
     if not boards:
         fail('BOARDS is empty; there is nothing to declare.')
 

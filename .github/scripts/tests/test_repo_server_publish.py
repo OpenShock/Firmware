@@ -63,3 +63,37 @@ def test_dry_run_always_discards():
     session = FakeSession(publish=201)
     assert repo_server_publish.do_upload(session, 'https://repo', 'dry-run') == 0
     assert len(session.deleted) == 1
+
+
+# --- artifact layout ---
+
+
+def write_board_artifacts(artifacts, board, version='1.5.0'):
+    build = artifacts / 'firmware_boards' / board
+    build.mkdir(parents=True)
+    for filename in repo_server_publish.BUILD_ARTIFACTS.values():
+        (build / filename).write_bytes(filename.encode())
+    (artifacts / 'firmware_staticfs').mkdir(exist_ok=True)
+    (artifacts / 'firmware_staticfs' / 'staticfs.bin').write_bytes(b'fs')
+    (artifacts / 'firmware_merged').mkdir(exist_ok=True)
+    (artifacts / 'firmware_merged' / f'OpenShock_{board}_{version}.bin').write_bytes(b'merged')
+
+
+def test_resolve_artifacts_reads_the_package_layout(tmp_path):
+    write_board_artifacts(tmp_path, 'BoardA')
+    write_board_artifacts(tmp_path, 'BoardA-Mini')
+
+    found = repo_server_publish.resolve_artifacts(tmp_path, 'BoardA')
+
+    for field, filename in repo_server_publish.BUILD_ARTIFACTS.items():
+        assert found[field] == tmp_path / 'firmware_boards' / 'BoardA' / filename
+    assert found[repo_server_publish.STATICFS_FIELD] == tmp_path / 'firmware_staticfs' / 'staticfs.bin'
+    # A board whose name extends another's does not pick up the other's merged image.
+    assert found[repo_server_publish.MERGED_FIELD] == tmp_path / 'firmware_merged' / 'OpenShock_BoardA_1.5.0.bin'
+
+
+def test_resolve_artifacts_fails_on_a_missing_image(tmp_path):
+    write_board_artifacts(tmp_path, 'BoardA')
+    (tmp_path / 'firmware_boards' / 'BoardA' / 'bootloader.bin').unlink()
+    with pytest.raises(SystemExit):
+        repo_server_publish.resolve_artifacts(tmp_path, 'BoardA')

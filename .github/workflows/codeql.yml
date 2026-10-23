@@ -13,16 +13,7 @@ concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
-env:
-  OPENSHOCK_API_DOMAIN: api.openshock.app
-  OPENSHOCK_FW_GIT_REF: ${{ github.ref }}
-  OPENSHOCK_FW_GIT_COMMIT: ${{ github.sha }}
-
 jobs:
-  # CodeQL only needs to compile the code for analysis; the exact version string
-  # baked into the artifact is irrelevant here, so we use a placeholder instead
-  # of running the heavyweight get-vars job (checkout depth 0 + pnpm + release-
-  # tool) just to stamp it.
   analyze-js-py:
     name: Analyze JS/PY
     runs-on: 'ubuntu-latest'
@@ -31,9 +22,6 @@ jobs:
       actions: read
       contents: read
       security-events: write
-
-    env:
-      OPENSHOCK_FW_VERSION: 0.0.0-codeql+build
 
     strategy:
       fail-fast: false
@@ -52,18 +40,13 @@ jobs:
         with:
           languages: ${{ matrix.language }}
 
-      - name: Autobuild
-        uses: github/codeql-action/autobuild@416ff0dea110f80f0f56f0046500dbf7420e4bb0  # codeql-bundle-v2.27.1
-
-      # Build stuff here
-
+      # No build step: JavaScript/TypeScript and Python are extracted from source.
       - name: Perform CodeQL Analysis
         uses: github/codeql-action/analyze@416ff0dea110f80f0f56f0046500dbf7420e4bb0  # codeql-bundle-v2.27.1
         with:
           category: '/language:${{matrix.language}}'
 
-  # Weekly (or on demand) only: the C/C++ analysis has to compile the firmware, which is too
-  # heavy for every push and pull request. JS/Python above need no compile and stay per-change.
+  # Weekly or on demand only: the C/C++ analysis has to compile the firmware.
   analyze-cpp:
     name: Analyze C/C++
     if: ${{ github.event_name == 'schedule' || github.event_name == 'workflow_dispatch' }}
@@ -76,21 +59,21 @@ jobs:
 
     env:
       language: 'c-cpp'
-      OPENSHOCK_FW_VERSION: 0.0.0-codeql+build
 
     steps:
       - name: Checkout repository
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
-        with:
-          # flatbuffers runtime lives in a submodule (components/flatbuffers).
-          submodules: recursive
+
+      # The firmware needs only the flatbuffers runtime submodule.
+      - name: Fetch flatbuffers submodule
+        run: git submodule update --init --depth 1 components/flatbuffers/flatbuffers
 
       - name: Initialize CodeQL
         uses: github/codeql-action/init@416ff0dea110f80f0f56f0046500dbf7420e4bb0  # codeql-bundle-v2.27.1
         with:
           languages: ${{ env.language }}
 
-      # build, not configure: CodeQL's tracer only sees the C/C++ if the compiler actually runs.
+      # build, not configure: the tracer must see the compiler run. The version is a placeholder.
       - uses: ./.github/actions/build-compilationdb
         with:
           version: 0.0.0-codeql+build

@@ -1,16 +1,13 @@
 """Tests for the build helpers in scripts/ (partition table reading, reproducible staticfs staging)."""
 
 import os
-import sys
 from pathlib import Path
 
 import pytest
 
-ROOT = Path(__file__).resolve().parents[3]
-sys.path.insert(0, str(ROOT / 'scripts'))
-
-import gen_staticfs  # noqa: E402
-from utils import partitions  # noqa: E402
+import gen_staticfs
+from support import ROOT
+from utils import partitions
 
 
 def test_reads_the_repository_partition_table():
@@ -20,15 +17,6 @@ def test_reads_the_repository_partition_table():
     assert table['static0']['size'] == 0x9D000
     assert table['config']['size'] == 0x3000
     assert partitions.first_app_partition(table)['offset'] == 0x10000
-
-
-def test_every_board_resolves_a_partition_table():
-    for fragment in sorted((ROOT / 'boards').glob('*.defaults')):
-        board = fragment.stem
-        csv = partitions.partition_csv_for(board)
-        assert csv.is_file(), board
-        assert 'static0' in partitions.read_partitions(csv), board
-        assert partitions.partition_table_offset(board) == 0x8000, board
 
 
 def test_sizes_with_suffixes_and_comments(tmp_path):

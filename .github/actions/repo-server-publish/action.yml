@@ -32,15 +32,6 @@ inputs:
     description: '`init` opens the release; `publish` promotes it; `dry-run` aborts it, leaving nothing staged; `abort` closes one the build never reached.'
     required: false
     default: 'dry-run'
-  changelog-file:
-    description: 'Markdown file to take the newest release-notes section from'
-    required: false
-    default: 'CHANGELOG.md'
-  nofail:
-    description: >-
-      Pass ?nofail to init, so an unparseable changelog parks the release in `editing` instead of failing the build.
-    required: false
-    default: 'false'
 
 runs:
   using: composite
@@ -48,22 +39,12 @@ runs:
 
     - name: Download firmware artifacts
       if: ${{ inputs.mode == 'publish' || inputs.mode == 'dry-run' }}
-      uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c  # v8.0.1
+      uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333  # v8.0.2
       with:
         path: artifacts
         pattern: firmware_*
 
-    - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97  # v7.0.0
-      with:
-        python-version-file: .github/scripts/.python-version
-        cache: 'pip'
-        cache-dependency-path: .github/scripts/requirements.txt
-
-    # This job holds the publish credential, so pip installs are pinned by digest.
-    - name: Install script dependencies
-      shell: bash
-      run: pip install --require-hashes -r .github/scripts/requirements.txt
-
+    # No Python setup: callers run repo-server-token first, which installs the pinned dependencies.
     - name: Run the ${{ inputs.mode }} phase
       id: run
       shell: bash
@@ -75,7 +56,5 @@ runs:
         BOARDS: ${{ inputs.boards }}
         RELEASE_ID: ${{ inputs.release-id }}
         MODE: ${{ inputs.mode }}
-        CHANGELOG_FILE: ${{ inputs.changelog-file }}
-        NOFAIL: ${{ inputs.nofail }}
         ARTIFACTS_DIR: artifacts
       run: python .github/scripts/repo_server_publish.py

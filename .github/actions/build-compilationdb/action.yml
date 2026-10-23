@@ -1,9 +1,7 @@
 name: build-compilationdb
 description: >-
-  Emit build/OpenShock-Core-V2/compile_commands.json with native ESP-IDF, using
-  OpenShock-Core-V2 / esp32s3 as the canonical config. `mode: configure` stops at the
-  CMake configure that writes the database; `mode: build` also compiles, which is what
-  CodeQL needs in order to trace the C/C++.
+  Emit build/OpenShock-Core-V2/compile_commands.json with native ESP-IDF for the
+  canonical OpenShock-Core-V2 config, configuring only or also compiling.
 inputs:
   version:
     required: true
@@ -12,9 +10,8 @@ inputs:
     required: false
     default: configure
     description: >-
-      configure - run CMake only, which is all compile_commands.json requires.
-      build - configure and compile, for consumers that must observe real compiler
-      invocations.
+      configure - CMake only, which writes compile_commands.json.
+      build - also compile, for tools that trace the compiler (CodeQL).
 
 runs:
   using: composite
@@ -30,10 +27,7 @@ runs:
           *) echo "::error::mode must be 'configure' or 'build', got '${{ inputs.mode }}'"; exit 1 ;;
         esac
 
-    # compile_commands.json is written by CMake at configure time, before a single object
-    # is compiled, so a consumer that only reads the database never needs the compile.
-    # `build` remains available for CodeQL, whose tracer has to see the compiler run.
-    # ccache stays off in both modes: it would hide invocations from that tracer.
+    # ccache stays off: it would hide compiler invocations from CodeQL's tracer.
     - name: Generate compilation database (OpenShock-Core-V2 / esp32s3)
       shell: bash
       run: |
@@ -47,5 +41,4 @@ runs:
           || { echo "::error::compile_commands.json was not generated"; exit 1; }
       env:
         OPENSHOCK_FW_VERSION: ${{ inputs.version }}
-        OPENSHOCK_FW_GIT_REF: ${{ github.ref }}
         OPENSHOCK_FW_GIT_COMMIT: ${{ github.sha }}
