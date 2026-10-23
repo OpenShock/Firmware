@@ -159,6 +159,9 @@ ESPPORT=COM4 cmake --build --preset OpenShock-Core-V2 --target monitor
 The presets build into `build/<board>/`, the same directories `scripts/build.py` uses, so the
 two can be mixed. Flash and monitor read the port from `ESPPORT`; `menuconfig` is a target too.
 A preset build stamps the board like the script does, since the stamp is a CMake post-build step.
+The file also has a `default` preset with no board. It exists for `idf.py`, which configures with
+the preset of that name once a `CMakePresets.json` is present, and it is what `scripts/build.py`
+runs under; the script's own `-B` and `-D` arguments take precedence, so it changes nothing.
 Differences from the script: ccache is off (idf.py turns it on), and the bootloader's nested
 configure prints a warning about `ESP_ROM_ELF_DIR` when the shell is not exported; it is harmless.
 
