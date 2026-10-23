@@ -8,7 +8,7 @@ CI now compiles the firmware once per build variant instead of once per board, a
 
 - Group boards into variants in `scripts/utils/boards.py`, and add `scripts/build.py --variant <id>` to build one; board builds are unchanged
 - Add `scripts/package_boards.py`, which stamps, verifies and lays out each board's images from its variant's build, replacing the `merge-partitions` action with `package-firmware`
-- Restructure `ci-build.yml` into gate, plan, stage, staticfs and ESP-IDF warm-up, one build job per variant, then package and publish; `get-vars.yml` is inlined into the plan job and `checkpoint-build` keeps the name the develop ruleset requires
+- Restructure `ci-build.yml` into gate, plan, stage and staticfs, one build job per variant, then package and publish; `get-vars.yml` is inlined into the plan job and `checkpoint-build` keeps the name the develop ruleset requires
 - Cache ESP-IDF with ccache bundled into the install and ccache per variant, both saved only from develop, which keeps the run inside the repository's cache limit
 - Merge images with esptool's bootloader offsets and `--flash-size keep`, so a merged image holds exactly the images published beside it
 - Consolidate the build and CI script helpers and their tests, and drop helpers nothing calls

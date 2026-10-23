@@ -41,8 +41,8 @@ def package(board_names: list[str], variants: Path, out: Path) -> list[str]:
     for board in board_names:
         try:
             print(package_board(board, variants, out), flush=True)
-        except (SystemExit, espimage.ImageError) as err:
-            message = err.code if isinstance(err, SystemExit) else f'error: {variants}: {err}'
+        except (SystemExit, OSError, espimage.ImageError) as err:
+            message = err.code if isinstance(err, SystemExit) else f'error: {type(err).__name__}: {err}'
             print(f'{board}: {message}', file=sys.stderr, flush=True)
             failed.append(board)
     return failed

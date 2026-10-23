@@ -40,3 +40,13 @@ def test_a_missing_variant_fails_only_its_boards(tmp_path, capsys):
     assert failed == ['OpenShock-Core-V1']
     assert 'no build of variant' in capsys.readouterr().err
     assert (out / 'OpenShock-Core-V2' / 'app.bin').is_file()
+
+
+def test_a_variant_missing_an_image_fails_only_its_boards(tmp_path, capsys):
+    variants, out = tmp_path / 'variants', tmp_path / 'out'
+    (variants / write_variant(variants, 'OpenShock-Core-V2') / 'bootloader.bin').unlink()
+    write_variant(variants, 'OpenShock-Core-V1')
+    failed = package_boards.package(['OpenShock-Core-V2', 'OpenShock-Core-V1'], variants, out)
+    assert failed == ['OpenShock-Core-V2']
+    assert 'FileNotFoundError' in capsys.readouterr().err
+    assert (out / 'OpenShock-Core-V1' / 'app.bin').is_file()
