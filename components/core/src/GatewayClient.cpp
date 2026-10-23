@@ -1,4 +1,5 @@
 #include <freertos/FreeRTOS.h>
+#include <freertos/task.h>
 
 #include "GatewayClient.h"
 
@@ -137,6 +138,7 @@ void GatewayClient::connect(const std::string& host, uint16_t port, const std::s
 
 bool GatewayClient::sendMessageTXT(std::string_view data)
 {
+  const TickType_t started = xTaskGetTickCount();
   ScopedLock lock__(&m_handleMutex, GATEWAY_SEND_TIMEOUT);  // Held across the send so the handle can't be destroyed under it
   if (!lock__.isLocked()) {
     OS_LOGW(TAG, "Timed out waiting for the websocket handle, dropping text message");
@@ -146,11 +148,17 @@ bool GatewayClient::sendMessageTXT(std::string_view data)
     return false;
   }
 
-  return esp_websocket_client_send_text(m_client, data.data(), data.length(), GATEWAY_SEND_TIMEOUT) >= 0;
+  const TickType_t elapsed = xTaskGetTickCount() - started;
+  if (elapsed >= GATEWAY_SEND_TIMEOUT) {
+    return false;
+  }
+
+  return esp_websocket_client_send_text(m_client, data.data(), data.length(), GATEWAY_SEND_TIMEOUT - elapsed) >= 0;
 }
 
 bool GatewayClient::sendMessageBIN(std::span<const uint8_t> data)
 {
+  const TickType_t started = xTaskGetTickCount();
   ScopedLock lock__(&m_handleMutex, GATEWAY_SEND_TIMEOUT);  // Held across the send so the handle can't be destroyed under it
   if (!lock__.isLocked()) {
     OS_LOGW(TAG, "Timed out waiting for the websocket handle, dropping binary message");
@@ -160,7 +168,12 @@ bool GatewayClient::sendMessageBIN(std::span<const uint8_t> data)
     return false;
   }
 
-  return esp_websocket_client_send_bin(m_client, reinterpret_cast<const char*>(data.data()), data.size(), GATEWAY_SEND_TIMEOUT) >= 0;
+  const TickType_t elapsed = xTaskGetTickCount() - started;
+  if (elapsed >= GATEWAY_SEND_TIMEOUT) {
+    return false;
+  }
+
+  return esp_websocket_client_send_bin(m_client, reinterpret_cast<const char*>(data.data()), data.size(), GATEWAY_SEND_TIMEOUT - elapsed) >= 0;
 }
 
 void GatewayClient::markPingReceived()
