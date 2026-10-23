@@ -118,6 +118,14 @@ endif()
 
 project(firmware)
 
+# --- ccache by absolute path ---------------------------------------------------
+# idf.py configures with CCACHE_ENABLE, and ESP-IDF then launches compiles through a bare `ccache`,
+# which only resolves inside an exported shell. CLion or a plain `cmake --build` on the same tree
+# fails every compile with "CreateProcess failed". ESP-IDF already found the program; use that path.
+if(CCACHE_ENABLE AND CCACHE_FOUND)
+  set_property(GLOBAL PROPERTY RULE_LAUNCH_COMPILE "${CCACHE_FOUND}")
+endif()
+
 # The version comes from git and the environment, which CMake cannot track, so refresh the header on
 # every build. It is written only when it changes, so an unchanged version rebuilds nothing.
 add_custom_target(openshock_version_header ALL
