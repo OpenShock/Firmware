@@ -23,6 +23,10 @@ using namespace OpenShock;
 
 const int64_t GATEWAY_PING_TIMEOUT = 90'000;
 
+// One bound for a send: waiting for the handle lock behind another sender and the IDF send itself. Without the bound on
+// the lock, a sender queued behind a full-length send could wait longer than the timeout it was promised.
+const TickType_t GATEWAY_SEND_TIMEOUT = pdMS_TO_TICKS(10'000);
+
 // Message handlers (config reads, flash writes, FlatBuffers verification) run on the websocket task.
 const int GATEWAY_TASK_STACK_SIZE = 6 * 1024;
 
@@ -133,22 +137,30 @@ void GatewayClient::connect(const std::string& host, uint16_t port, const std::s
 
 bool GatewayClient::sendMessageTXT(std::string_view data)
 {
-  ScopedLock lock__(&m_handleMutex);  // Held across the send so the handle can't be destroyed under it
+  ScopedLock lock__(&m_handleMutex, GATEWAY_SEND_TIMEOUT);  // Held across the send so the handle can't be destroyed under it
+  if (!lock__.isLocked()) {
+    OS_LOGW(TAG, "Timed out waiting for the websocket handle, dropping text message");
+    return false;
+  }
   if (m_state != GatewayClientState::Connected || m_client == nullptr) {
     return false;
   }
 
-  return esp_websocket_client_send_text(m_client, data.data(), data.length(), pdMS_TO_TICKS(10'000)) >= 0;
+  return esp_websocket_client_send_text(m_client, data.data(), data.length(), GATEWAY_SEND_TIMEOUT) >= 0;
 }
 
 bool GatewayClient::sendMessageBIN(std::span<const uint8_t> data)
 {
-  ScopedLock lock__(&m_handleMutex);  // Held across the send so the handle can't be destroyed under it
+  ScopedLock lock__(&m_handleMutex, GATEWAY_SEND_TIMEOUT);  // Held across the send so the handle can't be destroyed under it
+  if (!lock__.isLocked()) {
+    OS_LOGW(TAG, "Timed out waiting for the websocket handle, dropping binary message");
+    return false;
+  }
   if (m_state != GatewayClientState::Connected || m_client == nullptr) {
     return false;
   }
 
-  return esp_websocket_client_send_bin(m_client, reinterpret_cast<const char*>(data.data()), data.size(), pdMS_TO_TICKS(10'000)) >= 0;
+  return esp_websocket_client_send_bin(m_client, reinterpret_cast<const char*>(data.data()), data.size(), GATEWAY_SEND_TIMEOUT) >= 0;
 }
 
 void GatewayClient::markPingReceived()
