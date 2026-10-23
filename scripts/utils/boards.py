@@ -10,6 +10,9 @@ import re
 from collections.abc import Iterable
 from dataclasses import dataclass
 from pathlib import Path
+from typing import Any
+
+from .espimage import DESC_BOARD_LEN
 
 ROOT = Path(__file__).resolve().parent.parent.parent
 
@@ -29,9 +32,11 @@ LIST_KEYS = ('OPENSHOCK_GPIO_BYPASS',)
 KNOWN_KEYS = PIN_KEYS + BOOL_KEYS + LIST_KEYS
 
 NO_PIN = -1
+MAX_GPIO = 127
+MAX_BYPASS_GPIO = 63
 
-# The longest board name the image descriptor holds: espimage.DESC_BOARD_LEN less its NUL terminator.
-NAME_MAX_LEN = 47
+# The longest board name the image descriptor holds, less its NUL terminator.
+NAME_MAX_LEN = DESC_BOARD_LEN - 1
 
 # Descriptor flag bits (BoardDescriptor.h: OPENSHOCK_BOARD_FLAG_*).
 FLAG_LED_SWAP_RG = 1 << 0
@@ -61,7 +66,7 @@ class BoardSpec:
 def board_fragment(board: str) -> Path:
     fragment = ROOT / 'boards' / f'{board}.defaults'
     if not fragment.is_file():
-        avail = ', '.join(sorted(p.stem for p in (ROOT / 'boards').glob('*.defaults')))
+        avail = ', '.join(all_boards())
         raise SystemExit(f'error: unknown board {board!r}\n  available: {avail}')
     return fragment
 
@@ -99,15 +104,44 @@ def _parse_pin(fragment: Path, lineno: int, key: str, value: str) -> int:
     try:
         pin = int(value)
     except ValueError:
-        raise SystemExit(f'error: {fragment}:{lineno}: {key} expects an integer GPIO, got {value!r}')
-    if pin < NO_PIN or pin > 127:
+        raise SystemExit(f'error: {fragment}:{lineno}: {key} expects an integer GPIO, got {value!r}') from None
+    if pin < NO_PIN or pin > MAX_GPIO:
         raise SystemExit(f'error: {fragment}:{lineno}: {key} must be -1 (no pin) or a GPIO number, got {pin}')
     return pin
 
 
+def _parse_bool(fragment: Path, lineno: int, key: str, value: str) -> bool:
+    if value not in ('y', 'n'):
+        raise SystemExit(f'error: {fragment}:{lineno}: {key} is a boolean, expected y or n, got {value!r}')
+    return value == 'y'
+
+
+def _parse_pin_list(fragment: Path, lineno: int, key: str, value: str) -> tuple[int, ...]:
+    pins = []
+    for item in filter(None, (s.strip() for s in value.split(','))):
+        pin = _parse_pin(fragment, lineno, key, item)
+        if pin == NO_PIN or pin > MAX_BYPASS_GPIO:
+            raise SystemExit(
+                f'error: {fragment}:{lineno}: {key} entries must be GPIO numbers 0-{MAX_BYPASS_GPIO}, got {pin}'
+            )
+        pins.append(pin)
+    if len(set(pins)) != len(pins):
+        raise SystemExit(f'error: {fragment}:{lineno}: {key} lists a pin twice')
+    return tuple(sorted(pins))
+
+
+def _check_name(fragment: Path) -> str:
+    name = fragment.stem
+    if not name.isascii() or len(name) > NAME_MAX_LEN:
+        raise SystemExit(
+            f'error: {fragment}: a board name must be at most {NAME_MAX_LEN} ASCII characters to fit the descriptor, got {name!r}'
+        )
+    return name
+
+
 def read_board_fragment(fragment: Path) -> BoardSpec:
     """Parse a fragment's ``OPENSHOCK_*=`` assignments and IDF target. Anything unrecognised is an error, so a typo cannot pass silently."""
-    values: dict[str, object] = {key: NO_PIN for key in PIN_KEYS}
+    values: dict[str, Any] = {key: NO_PIN for key in PIN_KEYS}
     values.update({key: False for key in BOOL_KEYS})
     values.update({key: () for key in LIST_KEYS})
 
@@ -125,28 +159,13 @@ def read_board_fragment(fragment: Path) -> BoardSpec:
             )
 
         if key in BOOL_KEYS:
-            if value not in ('y', 'n'):
-                raise SystemExit(f'error: {fragment}:{lineno}: {key} is a boolean, expected y or n, got {value!r}')
-            values[key] = value == 'y'
+            values[key] = _parse_bool(fragment, lineno, key, value)
         elif key in LIST_KEYS:
-            pins = []
-            for item in filter(None, (s.strip() for s in value.split(','))):
-                pin = _parse_pin(fragment, lineno, key, item)
-                if pin == NO_PIN or pin > 63:
-                    raise SystemExit(f'error: {fragment}:{lineno}: {key} entries must be GPIO numbers 0-63, got {pin}')
-                pins.append(pin)
-            if len(set(pins)) != len(pins):
-                raise SystemExit(f'error: {fragment}:{lineno}: {key} lists a pin twice')
-            values[key] = tuple(sorted(pins))
+            values[key] = _parse_pin_list(fragment, lineno, key, value)
         else:
             values[key] = _parse_pin(fragment, lineno, key, value)
 
-    name = fragment.stem
-    if not name.isascii() or len(name) > NAME_MAX_LEN:
-        raise SystemExit(
-            f'error: {fragment}: a board name must be at most {NAME_MAX_LEN} ASCII characters to fit the descriptor, got {name!r}'
-        )
-
+    name = _check_name(fragment)
     target = read_target(fragment)
     return BoardSpec(
         name=name,
@@ -168,8 +187,6 @@ def read_board(board: str) -> BoardSpec:
 def all_boards() -> list[str]:
     return sorted(p.stem for p in (ROOT / 'boards').glob('*.defaults'))
 
-
-# --- Flash size --------------------------------------------------------------------------
 
 # ESP-IDF's own default when no sdkconfig input picks a CONFIG_ESPTOOLPY_FLASHSIZE_* choice.
 DEFAULT_FLASH_SIZE = '2MB'
@@ -219,27 +236,8 @@ def flash_size_bytes(size: str) -> int:
     return int(size.removesuffix('MB')) * 1024 * 1024
 
 
-# --- Build variants -------------------------------------------------------------------
-# A variant is one compile, and every board whose fragment differs from it only in what
-# is settled after linking. That is two things:
-#
-#   - the OPENSHOCK_* lines, stamped into the app image by utils/stamping.py;
-#   - the flash size. It feeds the partition table's fit check and the image headers'
-#     flash-size field, and nothing else: no board's partition table, and no firmware
-#     code, uses flash past VARIANT_FLASH_SIZE, the size partitions/ota_4mb.csv is laid
-#     out for. So a variant compiles at that size and every board ships its images as
-#     they are; a bigger board's bootloader logs that the chip is larger than its header
-#     says and uses the header's size. A board that wants its extra flash needs a bigger
-#     partition table, which is Kconfig and so a variant of its own - and the fit check
-#     fails that variant's build until it compiles at the board's size.
-#
-# Every other Kconfig line is compiled in and splits the variant: the S3 boards on the
-# USB-Serial-JTAG console and the ones on the UART cannot share an image, because the
-# serial driver and the bootloader's console are both chosen at compile time.
-#
-# Variants are derived from whichever boards a build asks for, never declared, so a board
-# that changes a Kconfig setting moves into its own variant by itself.
-
+# A variant is one compile shared by boards that differ only in the OPENSHOCK_* lines and flash size.
+# It compiles at the flash size partitions/ota_4mb.csv is laid out for; a board needing more fails the fit check.
 VARIANT_FLASH_SIZE = '4MB'
 
 

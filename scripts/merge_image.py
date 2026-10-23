@@ -36,7 +36,7 @@ def merge_one(board: str, bindir: Path, staticfs: str, output: str) -> None:
     esptool.main(argv)
 
 
-def main(argv=None) -> None:
+def main(argv=None) -> int:
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument('--board', required=True, action='append', help='board name(s); repeatable, whitespace-separated')
     ap.add_argument('--bindir', required=True, help='dir with app.bin, bootloader.bin, partition-table.bin; {board} is expanded')
@@ -50,7 +50,7 @@ def main(argv=None) -> None:
         for template in (args.bindir, args.output):
             template.format(board=names[0])
     except (KeyError, IndexError, ValueError) as e:
-        raise SystemExit(f'error: cannot expand --bindir or --output ({type(e).__name__}: {e}); only {{board}} is expanded')
+        raise SystemExit(f'error: cannot expand --bindir or --output ({type(e).__name__}: {e}); only {{board}} is expanded') from e
     if len(names) > 1 and len({args.output.format(board=b) for b in names}) < len(names):
         raise SystemExit('error: --output expands to the same path for different boards; include {board}')
 
@@ -71,7 +71,8 @@ def main(argv=None) -> None:
 
     if failed:
         raise SystemExit(f'error: failed to merge: {", ".join(failed)}')
+    return 0
 
 
 if __name__ == '__main__':
-    main()
+    raise SystemExit(main())

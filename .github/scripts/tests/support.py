@@ -9,6 +9,11 @@ from utils import espimage
 ROOT = Path(__file__).resolve().parents[3]
 
 
+def blank(chip: str = 'ESP32-S3') -> bytes:
+    """A packed board descriptor with no board stamped in."""
+    return espimage.Descriptor('', chip, -1, -1, -1, -1, 0, 0).pack()
+
+
 def make_image(
     descriptor: bytes | None, chip_id: int = 0x0009, hash_appended: bool = True, extra_segments: int = 1
 ) -> bytes:

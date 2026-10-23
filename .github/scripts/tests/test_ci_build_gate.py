@@ -1,8 +1,7 @@
 import json
 
-import pytest
-
 import ci_build_gate
+import pytest
 from ci_build_gate import CANARY_BOARD, FULL_BUILD_LABEL, decide
 
 SHA = 'c' * 40
@@ -109,7 +108,7 @@ def test_nightly_with_source_changes_builds(branch, publish):
     api = FakeApi(runs={'workflow_dispatch': run(BASE)}, files=['README.md', 'components/rf/src/Foo.cpp'])
     d = nightly(branch, api)
     assert outcome(d) == (True, publish, 'prod', '')
-    assert api.run_queries == [('schedule', branch), ('workflow_dispatch', branch)]
+    assert api.run_queries == [('workflow_dispatch', branch)]
     assert api.compares == [(BASE, SHA)]
 
 
@@ -142,7 +141,7 @@ NON_SOURCE_CHANGES = [
 
 @pytest.mark.parametrize('branch', ['develop', 'beta', 'master'])
 def test_nightly_with_only_non_source_changes_skips(branch):
-    api = FakeApi(runs={'schedule': run(BASE)}, files=NON_SOURCE_CHANGES)
+    api = FakeApi(runs={'workflow_dispatch': run(BASE)}, files=NON_SOURCE_CHANGES)
     d = nightly(branch, api)
     assert outcome(d) == (False, False, 'prod', '')
 
@@ -157,7 +156,7 @@ def test_non_source_paths(name):
     [
         '.changes/feat-rf.md',
         '.github/workflows/ci-build.yml',
-        '.github/scripts/get-vars.py',
+        '.github/scripts/get_vars.py',
         '.github/ISSUE_TEMPLATE',
         'components/rf/src/Foo.cpp',
         'docs',
@@ -193,24 +192,6 @@ def test_first_ever_nightly_builds_without_comparing():
     d = nightly('develop', api)
     assert outcome(d) == (True, True, 'prod', '')
     assert api.compares == []
-
-
-def test_nightly_compares_against_the_newer_of_schedule_and_dispatch():
-    older, newer = 'a' * 40, 'd' * 40
-    api = FakeApi(
-        runs={
-            'schedule': run(older, '2026-09-01T03:00:00Z'),
-            'workflow_dispatch': run(newer, '2026-10-01T03:00:00Z'),
-        },
-        files=['README.md'],
-    )
-    nightly('develop', api)
-    assert api.compares == [(newer, SHA)]
-
-    api.runs = {'schedule': run(newer, '2026-10-02T03:00:00Z'), 'workflow_dispatch': run(older, '2026-10-01T03:00:00Z')}
-    api.compares = []
-    nightly('develop', api)
-    assert api.compares == [(newer, SHA)]
 
 
 def test_nightly_run_listing_failure_builds(capsys):
@@ -317,7 +298,9 @@ def test_main_writes_every_output(tmp_path, monkeypatch):
     monkeypatch.setenv('GITHUB_REPOSITORY', 'OpenShock/Firmware')
     monkeypatch.setenv('GITHUB_EVENT_PATH', str(event))
     monkeypatch.setenv('GITHUB_OUTPUT', str(out))
+    monkeypatch.setenv('GITHUB_STEP_SUMMARY', str(tmp_path / 'summary'))
     assert ci_build_gate.main() == 0
+    assert f'boards={CANARY_BOARD}' in (tmp_path / 'summary').read_text(encoding='utf-8')
     assert out.read_text(encoding='utf-8').splitlines() == [
         'build=true',
         'publish=false',

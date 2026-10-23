@@ -1,19 +1,13 @@
 #!/usr/bin/env python3
-"""Mint a GitHub Actions OIDC token for the repository server.
-
-Every call into the server goes through a token from here, so there is one definition of the audience and one place where a malformed mint is caught.
-"""
+"""Mint a GitHub Actions OIDC token for the repository server."""
 
 import base64
 import json
 
 import requests
-
 from gha import env, fail, mask, require_env, set_output
 
-# The claims the server keys off.
-# Printed so a later rejection can be read against what was actually sent, rather than what the workflow assumes it sent.
-# The token itself is masked; these five claims are not secret.
+# Printed so a later rejection can be read against what was sent; the token itself is masked, these claims are not secret.
 ECHOED_CLAIMS = ('aud', 'repository', 'repository_owner', 'ref', 'run_id')
 
 
@@ -31,15 +25,15 @@ def main() -> int:
     require_env('AUDIENCE')
     audience = env('AUDIENCE')
 
-    # id-token: write is granted per job, not per action, so a caller that forgets it gets an unset request URL rather than a failed request.
-    # Say which it was.
+    # id-token: write is granted per job, so a caller that forgets it gets an unset URL rather than a failed request.
     request_url = env('ACTIONS_ID_TOKEN_REQUEST_URL')
     if not request_url:
         fail('No OIDC request URL. The calling job needs permissions: id-token: write.')
 
     try:
         resp = requests.get(
-            f'{request_url}&audience={audience}',
+            request_url,
+            params={'audience': audience},
             headers={
                 'Authorization': f"bearer {env('ACTIONS_ID_TOKEN_REQUEST_TOKEN')}",
                 'Accept': 'application/json',

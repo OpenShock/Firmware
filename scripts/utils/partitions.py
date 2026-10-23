@@ -2,11 +2,19 @@
 
 import re
 from pathlib import Path
+from typing import TypedDict
 
 from .boards import ROOT, sdkconfig_value
 
 # ESP-IDF's default CONFIG_PARTITION_TABLE_OFFSET.
 DEFAULT_PARTITION_TABLE_OFFSET = 0x8000
+
+
+class Partition(TypedDict):
+    type: str
+    subtype: str
+    offset: int
+    size: int
 
 
 def partition_csv_for(board: str) -> Path:
@@ -21,9 +29,9 @@ def partition_table_offset(board: str) -> int:
     return int(value, 0) if value else DEFAULT_PARTITION_TABLE_OFFSET
 
 
-def read_partitions(csv_path: Path) -> dict[str, dict]:
-    """Partitions by name: {'type', 'subtype', 'offset', 'size'}. Every entry must give an explicit offset."""
-    partitions = {}
+def read_partitions(csv_path: Path) -> dict[str, Partition]:
+    """Partitions by name. Every entry must give an explicit offset."""
+    partitions: dict[str, Partition] = {}
     for raw in csv_path.read_text(encoding='utf-8').splitlines():
         line = raw.split('#', 1)[0].strip()
         if not line:
@@ -46,7 +54,7 @@ def _parse_size(size: str) -> int:
     return value * {'': 1, 'K': 1024, 'M': 1024 * 1024}[m.group(2)]
 
 
-def first_app_partition(partitions: dict[str, dict]) -> dict:
+def first_app_partition(partitions: dict[str, Partition]) -> Partition:
     apps = [p for p in partitions.values() if p['type'] == 'app']
     if not apps:
         raise SystemExit('error: partition table has no app partition')

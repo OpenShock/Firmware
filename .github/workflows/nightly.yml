@@ -3,12 +3,12 @@
 # on that branch, so this dispatches ci-build once per branch instead of building here. ci-build's
 # gate skips a branch whose firmware sources have not changed since its last build, and decides
 # what each nightly publishes (develop to prod; beta and master build only).
+name: nightly
+
 on:
   schedule:
     - cron: '0 3 * * *'
   workflow_dispatch:
-
-name: nightly
 
 permissions:
   contents: read

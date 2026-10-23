@@ -1,8 +1,7 @@
 """Tests for the command line of scripts/merge_image.py; esptool itself is never run."""
 
-import pytest
-
 import merge_image
+import pytest
 
 ARGS = ['--board', 'OpenShock-Core-V2', '--staticfs', 'staticfs.bin']
 

@@ -1,10 +1,10 @@
+name: release
+
 on:
   # Releases are cut manually, never on push. Run this workflow from the beta
   # branch to cut an rc, or from master for a stable release. A plain push to
   # beta/master (e.g. merging CI changes) must not create a release.
   workflow_dispatch:
-
-name: release
 
 concurrency:
   group: release-${{ github.ref }}
@@ -13,20 +13,19 @@ concurrency:
 permissions:
   contents: write
 
+defaults:
+  run:
+    shell: bash
+
 jobs:
   auto-release:
     runs-on: ubuntu-slim # lightweight: release-tool + git/gh, no build
     timeout-minutes: 10
-    # Only beta (rc) and master (stable) produce releases; refuse a dispatch
-    # from any other branch.
+    # Only beta (rc) and master (stable) produce releases.
     if: github.ref_name == 'beta' || github.ref_name == 'master'
 
     steps:
-      # Mint a short-lived, repo-scoped installation token from the release
-      # GitHub App. A non-GITHUB_TOKEN actor is required so the tag push below
-      # triggers ci-build; the default GITHUB_TOKEN does not trigger downstream
-      # workflows. Using an App (instead of a personal PAT) keeps the token
-      # short-lived, least-privilege, and owned by the org rather than a person.
+      # An App token, not GITHUB_TOKEN, so the tag push below triggers ci-build.
       - uses: actions/create-github-app-token@64ab729a6294000f5aa4a4bc0b73d1f32bc45510  # v3.3.0
         id: app-token
         with:
@@ -41,7 +40,7 @@ jobs:
       - name: Configure git
         run: |
           git config user.name "github-actions[bot]"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
 
       - name: Rebase on top of latest remote
         run: git pull --rebase --autostash origin "${GITHUB_REF_NAME}"
@@ -73,15 +72,7 @@ jobs:
         with:
           tag: ${{ steps.meta.outputs.tag }}
 
-      # The OpenShock API is announced from ci-build's release job, only after
-      # the firmware is actually built and uploaded - not here, before it exists.
-      # release.json is attached to the draft below so ci-build can read it.
-
-      # Stage the release as a draft. The tag push above triggers ci-build,
-      # which builds the firmware and then attaches the binaries to this draft
-      # and publishes it (see the `release` job in ci-build.yml). Staging as a
-      # draft keeps the release hidden until its artifacts are in place, and
-      # avoids ci-build failing on an "already exists" conflict.
+      # A draft: the tag push triggers ci-build, whose `release` job attaches the binaries and publishes it.
       - name: Stage GitHub Release (draft)
         if: steps.meta.outputs.tag != ''
         env:

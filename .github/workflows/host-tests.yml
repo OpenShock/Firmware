@@ -1,4 +1,6 @@
 # Per-commit firmware check: build and run the host (linux target) Unity suites.
+name: host-tests
+
 on:
   push:
     branches: ['**']
@@ -28,14 +30,16 @@ on:
       - '.github/workflows/host-tests.yml'
   workflow_dispatch:
 
-name: host-tests
-
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
 permissions:
   contents: read
+
+defaults:
+  run:
+    shell: bash
 
 jobs:
   host-tests:
@@ -56,15 +60,17 @@ jobs:
       # On develop this also refills the ESP-IDF cache after a key change (it runs on setup-esp-idf edits).
       - uses: ./.github/actions/setup-esp-idf
 
-      # Each components/<name>/host_test is its own linux-target project; the ELF exits with the Unity failure count.
-      - name: Build and run host test suites
-        shell: bash
+      # The toolchains' inner <triple>/bin dirs hold an unprefixed `as` that would shadow the host's one.
+      - name: Drop toolchain assemblers from PATH
         run: |
           set -euo pipefail
-          # Drop the toolchains' inner <triple>/bin dirs: their unprefixed `as` would shadow the host's
-          # for the linux target ("as: unrecognized option '--64'").
-          PATH="$(printf '%s' "$PATH" | tr ':' '\n' | grep -vE -- '-elf/[^/]*-elf/bin/?$' | paste -sd: -)"
-          export PATH
+          path="$(printf '%s' "$PATH" | tr ':' '\n' | grep -vE -- '-elf/[^/]*-elf/bin/?$' | paste -sd: -)"
+          echo "PATH=$path" >> "$GITHUB_ENV"
+
+      # Each components/<name>/host_test is its own linux-target project; the ELF exits with the Unity failure count.
+      - name: Build and run host test suites
+        run: |
+          set -euo pipefail
           echo "as: $(command -v as)"
           failed=()
           for dir in components/*/host_test; do

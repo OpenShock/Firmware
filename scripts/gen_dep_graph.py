@@ -19,11 +19,12 @@ Paste the output into any Mermaid renderer (GitHub, mermaid.live, VS Code).
 """
 
 import argparse
+import heapq
 import re
 import sys
 from pathlib import Path
 
-ROOT = Path(__file__).resolve().parent.parent
+from utils.boards import ROOT
 
 # idf_component_register() argument keywords. A token equal to one of these ends
 # the current value list and (for REQUIRES/PRIV_REQUIRES) starts a new one.
@@ -91,53 +92,43 @@ def parse_requires(cmake_text: str, include_priv: bool) -> list[str]:
     tokens = block.split()
 
     deps: list[str] = []
-    active = None  # None | 'collect'
+    active = False
     for tok in tokens:
         if tok in CMAKE_KEYWORDS:
-            if tok == 'REQUIRES' or (tok == 'PRIV_REQUIRES' and include_priv):
-                active = 'collect'
-            else:
-                active = None
+            active = tok == 'REQUIRES' or (tok == 'PRIV_REQUIRES' and include_priv)
             continue
-        if active == 'collect':
+        if active:
             deps.append(tok)
 
-    # de-dupe while preserving order
-    seen = set()
-    ordered = []
-    for d in deps:
-        if d not in seen:
-            seen.add(d)
-            ordered.append(d)
-    return ordered
+    return list(dict.fromkeys(deps))
 
 
 def topo_order(nodes: set[str], edges: set[tuple[str, str]]) -> list[str]:
     """Dependencies first. Edge (dep, dependent). Alphabetical tie-break; any
     nodes left in a cycle are appended in sorted order so output stays total."""
     indeg = {n: 0 for n in nodes}
-    adj = {n: [] for n in nodes}
+    adj: dict[str, list[str]] = {n: [] for n in nodes}
     for dep, dependent in edges:
         adj[dep].append(dependent)
         indeg[dependent] += 1
 
-    ready = sorted(n for n in nodes if indeg[n] == 0)
+    ready = [n for n in nodes if indeg[n] == 0]
+    heapq.heapify(ready)
     order = []
     while ready:
-        n = ready.pop(0)
+        n = heapq.heappop(ready)
         order.append(n)
         for m in sorted(adj[n]):
             indeg[m] -= 1
             if indeg[m] == 0:
-                ready.append(m)
-        ready.sort()
+                heapq.heappush(ready, m)
 
     if len(order) < len(nodes):
         order.extend(sorted(nodes - set(order)))
     return order
 
 
-def main(argv: list[str]) -> int:
+def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__,
                                      formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument('--components-dir', default=str(ROOT / 'components'),
@@ -166,8 +157,7 @@ def main(argv: list[str]) -> int:
     nodes: set[str] = set(local)
     for name, deps in local.items():
         for dep in deps:
-            is_local = dep in local
-            if not is_local and not args.external:
+            if dep not in local and not args.external:
                 continue
             edges.add((dep, name))  # dependency -> dependent
             nodes.add(dep)
@@ -194,4 +184,4 @@ def main(argv: list[str]) -> int:
 
 
 if __name__ == '__main__':
-    raise SystemExit(main(sys.argv[1:]))
+    raise SystemExit(main())

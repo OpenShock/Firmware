@@ -2,10 +2,10 @@
 
 import importlib.util
 
-import pytest
-
 import gen_env_header
+import pytest
 from support import ROOT
+
 from utils import boards, github
 
 # Loaded from its path: a plain `import build` could resolve to PyPA's `build` package instead.

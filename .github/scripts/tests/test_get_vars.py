@@ -1,13 +1,7 @@
-import importlib.util
 import json
-from pathlib import Path
 
+import get_vars
 import pytest
-
-# get-vars.py has a hyphen in its name, so it can't be imported with a plain import statement.
-_spec = importlib.util.spec_from_file_location('get_vars', Path(__file__).resolve().parent.parent / 'get-vars.py')
-get_vars = importlib.util.module_from_spec(_spec)
-_spec.loader.exec_module(get_vars)
 
 
 @pytest.mark.parametrize(
@@ -28,21 +22,19 @@ def test_parse_version_rejects(tag):
 
 
 @pytest.mark.parametrize(
-    'tag, stable, beta, dev',
+    'tag, channel',
     [
-        ('1.5.0', True, False, False),
-        ('1.5.0-rc.1', False, True, False),
-        ('1.5.0-beta.3', False, True, False),
-        ('1.5.0-develop.4', False, False, True),
-        ('1.5.0-dev.4', False, False, True),
-        ('1.5.0-feature.1', False, False, False),
+        ('1.5.0', 'stable'),
+        ('1.5.0-rc.1', 'beta'),
+        ('1.5.0-beta.3', 'beta'),
+        ('1.5.0-develop.4', 'develop'),
+        ('1.5.0-dev.4', 'develop'),
+        ('1.5.0-feature.1', None),
     ],
 )
-def test_channel_of_version(tag, stable, beta, dev):
+def test_channel_of_version(tag, channel):
     version = get_vars.parse_version(tag)
-    assert get_vars.is_stable(version) is stable
-    assert get_vars.is_beta(version) is beta
-    assert get_vars.is_dev(version) is dev
+    assert get_vars.CHANNEL_BY_PRERELEASE.get(get_vars.prerelease_id(version)) == channel
 
 
 @pytest.mark.parametrize(
@@ -61,7 +53,7 @@ def test_sanitize(name, expected):
 def run_main(monkeypatch):
     """Runs get-vars main() for a ref and board selection, git's tag list stubbed out; returns its outputs."""
     monkeypatch.setattr(get_vars.subprocess, 'check_output', lambda *a, **kw: '1.4.0\n1.3.0\n')
-    for name in ('GITHUB_HEAD_REF', 'RELEASE_NEXT_VERSION', 'RELEASE_SKIP', 'CHANNEL_INPUT'):
+    for name in ('GITHUB_HEAD_REF', 'RELEASE_NEXT_VERSION', 'RELEASE_SKIP', 'CHANNEL_INPUT', 'NIGHTLY_INPUT'):
         monkeypatch.delenv(name, raising=False)
 
     def run(ref, boards_input=''):
@@ -103,3 +95,14 @@ def test_main_on_a_tag_releases_the_tag(run_main, tag, channel):
 def test_main_on_a_feature_branch_publishes_to_develop(run_main):
     outputs, _ = run_main('refs/heads/feature/thing')
     assert outputs['release-channel'] == 'develop'
+
+
+@pytest.mark.parametrize(
+    'channel, nightly, expected',
+    [('beta', 'false', 'beta'), ('derive', 'false', 'develop'), ('', '', 'develop'), ('beta', 'true', 'develop')],
+)
+def test_main_channel_input(run_main, monkeypatch, channel, nightly, expected):
+    monkeypatch.setenv('CHANNEL_INPUT', channel)
+    monkeypatch.setenv('NIGHTLY_INPUT', nightly)
+    outputs, _ = run_main('refs/heads/develop')
+    assert outputs['release-channel'] == expected

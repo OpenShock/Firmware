@@ -3,10 +3,10 @@
 import os
 from pathlib import Path
 
-import pytest
-
 import gen_staticfs
+import pytest
 from support import ROOT
+
 from utils import partitions
 
 
@@ -47,7 +47,7 @@ def test_staged_assets_are_byte_identical_across_runs(tmp_path):
 
     def stage(name):
         staging = tmp_path / name
-        gen_staticfs.stage_assets(str(build), str(staging))
+        gen_staticfs.stage_assets(build, staging)
         return {p.relative_to(staging): p.read_bytes() for p in staging.rglob('*') if p.is_file()}
 
     first = stage('a')
@@ -73,7 +73,7 @@ def test_frontend_build_is_current_tracks_source_changes(tmp_path):
 
     os.utime(source, (1000, 1000))
     os.utime(index, (2000, 2000))
-    assert gen_staticfs.frontend_build_is_current(str(frontend), str(frontend / 'build'))
+    assert gen_staticfs.frontend_build_is_current(frontend, frontend / 'build')
 
     os.utime(source, (3000, 3000))
-    assert not gen_staticfs.frontend_build_is_current(str(frontend), str(frontend / 'build'))
+    assert not gen_staticfs.frontend_build_is_current(frontend, frontend / 'build')

@@ -1,12 +1,9 @@
 cmake_minimum_required(VERSION 3.16.0)
 
 # --- OpenShock generated build headers ---------------------------------------
-# gen_env_header.py writes openshock_board.h (chip, build mode, log level) and openshock_version.h
-# (version, commit) into ${CMAKE_BINARY_DIR}/config. Neither is force-included: a header carrying the
-# commit in every translation unit would defeat ccache on every commit.
-#
-# OPENSHOCK_BOARD (-D, from scripts/build.py) names the board to stamp into the image after linking.
-# Empty for a variant build, whose image stays unstamped until scripts/package_boards.py stamps each board.
+# gen_env_header.py writes openshock_board.h and openshock_version.h into ${CMAKE_BINARY_DIR}/config.
+# Neither is force-included: the commit in every translation unit would defeat ccache.
+# OPENSHOCK_BOARD (-D, from scripts/build.py) is empty for a variant build, which package_boards.py stamps later.
 set(OPENSHOCK_BOARD "" CACHE STRING "OpenShock board to stamp (boards/<name>.defaults); empty for a variant build")
 
 # idf.py passes the interpreter of the IDF Python environment as PYTHON; fall back to the one on PATH.
@@ -55,9 +52,7 @@ idf_component_get_property(_os_common_lib common COMPONENT_LIB)
 add_dependencies(${_os_common_lib} openshock_version_header)
 
 # --- Board descriptor stamp -------------------------------------------------
-# Stamp the board into the .bin as soon as gen_project_binary writes it, so `idf.py flash` carries the
-# board. It runs on every build, which is fine because stamping is idempotent. With secure boot this
-# would have to move before signing, and scripts/utils/espimage.py learn the signature block.
+# stamp_board.py stamps the board into the .bin as soon as it is written, so `idf.py flash` carries it.
 if(OPENSHOCK_BOARD)
   idf_build_get_property(_os_build_dir BUILD_DIR)
   add_custom_command(TARGET gen_project_binary POST_BUILD
@@ -69,14 +64,7 @@ if(OPENSHOCK_BOARD)
 endif()
 
 # --- Static filesystem image (captive-portal web assets) ---------------------
-# Build the SvelteKit frontend, gzip it, and pack it into a littlefs image whose
-# geometry matches the runtime mount in components/fs/src/LfsPartition.cpp (4 KiB
-# blocks, 128-byte read/prog). `idf.py flash` writes it to the `static0`
-# partition.
-#
-# The partition only exists in the OpenShock custom partition CSV; if the active
-# partition table has no `static0` (e.g. a bare default-table build), skip the
-# image instead of failing the whole build.
+# gen_staticfs.py packs the frontend into the `static0` partition image; skipped when the partition table has none.
 partition_table_get_partition_info(_staticfs_offset "--partition-name static0" "offset")
 partition_table_get_partition_info(_staticfs_size   "--partition-name static0" "size")
 
@@ -86,12 +74,7 @@ if(_staticfs_offset STREQUAL "" OR _staticfs_size STREQUAL "")
 else()
   set(_staticfs_image ${CMAKE_BINARY_DIR}/staticfs.bin)
 
-  # ALL target so a normal `idf.py build` regenerates the image. The generator only
-  # runs pnpm when frontend/build is older than the frontend sources, so this stays
-  # cheap on incremental builds. CI never builds this target: its staticfs job builds
-  # the frontend itself and runs gen_staticfs.py --skip-frontend-build, and the image
-  # is packaged beside every variant. Staging lives in the build directory so
-  # concurrent board builds don't share (and wipe) one directory.
+  # CI never builds this target: its staticfs job runs gen_staticfs.py --skip-frontend-build once for every variant.
   add_custom_target(staticfs ALL
     BYPRODUCTS ${_staticfs_image}
     COMMAND ${_os_python} ${CMAKE_CURRENT_LIST_DIR}/scripts/gen_staticfs.py

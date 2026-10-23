@@ -1,4 +1,6 @@
 # Per-commit captive-portal check: svelte-check, unit tests and a production build.
+name: frontend-checks
+
 on:
   push:
     branches: ['**']
@@ -14,8 +16,6 @@ on:
       - '.github/actions/build-frontend/**'
       - '.github/workflows/frontend-checks.yml'
   workflow_dispatch:
-
-name: frontend-checks
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}

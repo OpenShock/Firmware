@@ -9,9 +9,6 @@ import dataclasses
 
 from . import boards, espimage
 
-# boards.py checks names where fragments are read, so it must agree with the descriptor's field.
-assert boards.NAME_MAX_LEN == espimage.DESC_BOARD_LEN - 1
-
 
 def descriptor_for(spec: boards.BoardSpec) -> espimage.Descriptor:
     return espimage.Descriptor(
@@ -44,7 +41,7 @@ def read_descriptor(image: espimage.Image, path) -> espimage.Descriptor:
     except espimage.DescriptorError as err:
         raise SystemExit(
             f'error: {path} carries no board descriptor at 0x{espimage.DESC_OFFSET:X} ({err}); was it built with BoardDescriptor.cpp?'
-        )
+        ) from err
 
 
 def stamp_image(image: espimage.Image, spec: boards.BoardSpec, path) -> espimage.Image:

@@ -27,6 +27,9 @@ from operator import xor
 
 IMAGE_MAGIC = 0xE9
 HEADER_LEN = 24
+MAX_SEGMENTS = 16
+CHIP_ID_OFFSET = 0x0C
+HASH_FLAG_OFFSET = 0x17
 SEGMENT_HEADER_LEN = 8
 CHECKSUM_INIT = 0xEF
 DIGEST_LEN = 32
@@ -46,7 +49,6 @@ CHIP_IDS = {
     'esp32h2': 0x0010,
 }
 
-# --- Board descriptor ----------------------------------------------------------------
 # Mirrors OpenShock::BoardDescriptor (components/common/include/BoardDescriptor.h):
 #   u32 magic, u16 schema_version, u16 length, char board[48], char chip[16],
 #   i8 rf_tx_gpio, i8 estop_gpio, i8 led_gpio, i8 ws2812b_gpio,
@@ -60,7 +62,13 @@ DESC_CRC_LEN = DESC_LEN - 4
 DESC_BOARD_LEN = 48
 DESC_CHIP_LEN = 16
 
-assert struct.calcsize(DESC_FORMAT) == DESC_LEN
+
+class DescriptorError(ValueError):
+    pass
+
+
+class ImageError(ValueError):
+    pass
 
 
 @dataclass(frozen=True)
@@ -103,11 +111,6 @@ class Descriptor:
         return body[:DESC_CRC_LEN] + struct.pack('<I', crc)
 
 
-
-class DescriptorError(ValueError):
-    pass
-
-
 def unpack_descriptor(data: bytes) -> Descriptor:
     """Decode and validate 256 descriptor bytes. Raises DescriptorError when they are not a descriptor."""
     if len(data) < DESC_LEN:
@@ -135,13 +138,6 @@ def unpack_descriptor(data: bytes) -> Descriptor:
         gpio_bypass_mask=bypass,
         schema_version=schema,
     )
-
-
-# --- Image -------------------------------------------------------------------------
-
-
-class ImageError(ValueError):
-    pass
 
 
 @dataclass(frozen=True)
@@ -178,9 +174,8 @@ class Image:
         stored = self.data[self.checksum_offset]
         if stored != self.checksum():
             raise ImageError(f'checksum mismatch: stored 0x{stored:02X}, computed 0x{self.checksum():02X}')
-        if self.hash_appended:
-            if self.data[self.digest_offset :] != self.digest():
-                raise ImageError('sha256 digest mismatch')
+        if self.hash_appended and self.data[self.digest_offset :] != self.digest():
+            raise ImageError('sha256 digest mismatch')
 
     def descriptor_bytes(self) -> bytes:
         return self.data[DESC_OFFSET : DESC_OFFSET + DESC_LEN]
@@ -212,10 +207,10 @@ def parse(data: bytes) -> Image:
     if data[0] != IMAGE_MAGIC:
         raise ImageError(f'bad image magic 0x{data[0]:02X}')
     segment_count = data[1]
-    if segment_count == 0 or segment_count > 16:
+    if segment_count == 0 or segment_count > MAX_SEGMENTS:
         raise ImageError(f'unreasonable segment count {segment_count}')
-    chip_id = struct.unpack_from('<H', data, 0x0C)[0]
-    hash_appended = data[0x17] == 1
+    chip_id = struct.unpack_from('<H', data, CHIP_ID_OFFSET)[0]
+    hash_appended = data[HASH_FLAG_OFFSET] == 1
 
     segments = []
     cursor = HEADER_LEN
@@ -230,7 +225,7 @@ def parse(data: bytes) -> Image:
         cursor += length
 
     # The checksum byte is the last byte of the 16-byte-aligned block the segments end in.
-    checksum_offset = ((cursor + 1 + 15) // 16) * 16 - 1
+    checksum_offset = cursor + (-(cursor + 1) % 16)
     expected_len = checksum_offset + 1 + (DIGEST_LEN if hash_appended else 0)
     if len(data) != expected_len:
         raise ImageError(f'image is {len(data)} bytes, expected {expected_len} from its segment table')

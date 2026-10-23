@@ -1,9 +1,9 @@
+name: check-changes
+
 on:
   pull_request:
     branches: [develop, beta, master]
     types: [opened, reopened, synchronize, ready_for_review, labeled, unlabeled]
-
-name: check-changes
 
 permissions:
   contents: read

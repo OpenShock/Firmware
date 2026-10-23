@@ -1,7 +1,6 @@
 import pytest
-import requests
-
 import repo_server_publish
+import requests
 
 
 class FakeResponse:
@@ -40,29 +39,26 @@ def upload_env(monkeypatch):
 
 def test_successful_publish_does_not_discard():
     session = FakeSession(publish=201)
-    assert repo_server_publish.do_upload(session, 'https://repo', 'publish') == 0
+    assert repo_server_publish.do_upload(session, 'https://repo') == 0
     assert session.deleted == []
 
 
 def test_rejected_publish_discards_the_release():
     session = FakeSession(publish=500)
     with pytest.raises(SystemExit):
-        repo_server_publish.do_upload(session, 'https://repo', 'publish')
+        repo_server_publish.do_upload(session, 'https://repo')
     assert len(session.deleted) == 1
 
 
-def test_publish_without_a_response_is_not_discarded():
+def test_publish_without_a_response_is_not_discarded(tmp_path, monkeypatch):
     # The release may already be live, so deleting it would be worse than leaving it for a human to check.
+    output = tmp_path / 'output'
+    monkeypatch.setenv('GITHUB_OUTPUT', str(output))
     session = FakeSession(publish=requests.ConnectionError('timed out'))
     with pytest.raises(SystemExit):
-        repo_server_publish.do_upload(session, 'https://repo', 'publish')
+        repo_server_publish.do_upload(session, 'https://repo')
     assert session.deleted == []
-
-
-def test_dry_run_always_discards():
-    session = FakeSession(publish=201)
-    assert repo_server_publish.do_upload(session, 'https://repo', 'dry-run') == 0
-    assert len(session.deleted) == 1
+    assert 'outcome-unknown=true' in output.read_text()
 
 
 # --- artifact layout ---
@@ -81,7 +77,7 @@ def write_board_artifacts(artifacts, board, version='1.5.0'):
 
 def test_resolve_artifacts_reads_the_package_layout(tmp_path):
     write_board_artifacts(tmp_path, 'BoardA')
-    write_board_artifacts(tmp_path, 'BoardA-Mini')
+    write_board_artifacts(tmp_path, 'BoardA_Mini')
 
     found = repo_server_publish.resolve_artifacts(tmp_path, 'BoardA')
 
@@ -97,3 +93,19 @@ def test_resolve_artifacts_fails_on_a_missing_image(tmp_path):
     (tmp_path / 'firmware_boards' / 'BoardA' / 'bootloader.bin').unlink()
     with pytest.raises(SystemExit):
         repo_server_publish.resolve_artifacts(tmp_path, 'BoardA')
+
+
+@pytest.mark.parametrize('status, expected', [(204, 'discarded'), (404, 'already_closed'), (409, 'already_closed'), (500, 'failed')])
+def test_discard_reports_what_happened(status, expected):
+    session = FakeSession(publish=201)
+    session.delete = lambda url, **kwargs: FakeResponse(status)
+    assert repo_server_publish.discard(session, 'https://repo', 'rel-1') == expected
+
+
+def test_discard_without_a_response_fails_quietly():
+    def unreachable(url, **kwargs):
+        raise requests.ConnectionError('down')
+
+    session = FakeSession(publish=201)
+    session.delete = unreachable
+    assert repo_server_publish.discard(session, 'https://repo', 'rel-1') == 'failed'
