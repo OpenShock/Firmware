@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Turn per-variant builds into per-board images: stamp each board into a copy of its variant's app.
+"""Turn per-variant builds into per-board images: stamp and verify each board in a copy of its variant's app.
 
     package_boards.py --variants images --board "OpenShock-Core-V2 Seeed-Xiao-ESP32S3" --out boards
 
@@ -29,7 +29,14 @@ def package_board(board: str, variants: Path, out: Path) -> str:
 
     dst = out / board
     dst.mkdir(parents=True, exist_ok=True)
-    (dst / 'app.bin').write_bytes(stamped.data)
+    app_out = dst / 'app.bin'
+    app_out.write_bytes(stamped.data)
+    # Check the file that ships, not the bytes in memory: it must be intact, for the board's chip and carry
+    # exactly its descriptor, and stamping it again must change nothing, which proves the stamp idempotent.
+    written = espimage.load(app_out)
+    stamping.verify_image(written, spec, app_out)
+    if stamping.stamp_image(written, spec, app_out).data != stamped.data:
+        raise SystemExit(f'error: stamping {app_out} a second time changed it')
     for name in ('bootloader.bin', 'partition-table.bin'):
         shutil.copyfile(src / name, dst / name)
     return f'{board}: stamped from {vid}'
@@ -41,7 +48,8 @@ def package(board_names: list[str], variants: Path, out: Path) -> list[str]:
     for board in board_names:
         try:
             print(package_board(board, variants, out), flush=True)
-        except (SystemExit, OSError, espimage.ImageError) as err:
+        # ValueError covers espimage's ImageError and DescriptorError, and Descriptor.pack refusing a field.
+        except (SystemExit, OSError, ValueError) as err:
             message = err.code if isinstance(err, SystemExit) else f'error: {type(err).__name__}: {err}'
             print(f'{board}: {message}', file=sys.stderr, flush=True)
             failed.append(board)

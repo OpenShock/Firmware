@@ -158,6 +158,9 @@ runs:
 
     # Only develop saves: a cache saved on another ref is restorable by that ref alone, and each one
     # would be another ~1.8 GB of the repository's 10 GB. Concurrent misses race; the losers only warn.
+    # The cost, accepted for that limit: after an eviction (7 days unused) or a key bump, every tag
+    # and PR build installs cold and saves nothing until a develop push next runs this action.
+    # The alternative, if that bites, is to let one nominated job save on a miss from any ref.
     - name: Save ESP-IDF install
       if: >-
         ${{ steps.idf-cache.outputs.cache-hit != 'true'

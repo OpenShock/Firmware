@@ -35,16 +35,24 @@ def merge_one(board: str, bindir: Path, staticfs: str, output: str) -> None:
     esptool.main(argv)
 
 
-def main() -> None:
+def main(argv=None) -> None:
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument('--board', required=True, action='append', help='board name(s); repeatable, whitespace-separated')
     ap.add_argument('--bindir', required=True, help='dir with app.bin, bootloader.bin, partition-table.bin; {board} is expanded')
     ap.add_argument('--staticfs', required=True, help='path to the static0 image (staticfs.bin)')
     ap.add_argument('--output', required=True, help='merged output binary; {board} is expanded')
-    args = ap.parse_args()
+    args = ap.parse_args(argv)
+
+    names = board_names(args.board)
+    # Expand both templates once up front, so an unknown placeholder fails before any work starts.
+    try:
+        for template in (args.bindir, args.output):
+            template.format(board=names[0])
+    except (KeyError, IndexError, ValueError) as e:
+        raise SystemExit(f'error: cannot expand --bindir or --output ({type(e).__name__}: {e}); only {{board}} is expanded')
 
     failed = []
-    for board in board_names(args.board):
+    for board in names:
         output = Path(args.output.format(board=board))
         output.parent.mkdir(parents=True, exist_ok=True)
         try:

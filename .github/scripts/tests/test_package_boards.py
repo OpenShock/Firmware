@@ -1,5 +1,7 @@
 """Tests for scripts/package_boards.py: per-variant images in, stamped per-board images out."""
 
+import shutil
+
 import package_boards
 from support import make_image
 from utils import boards, espimage, stamping
@@ -50,3 +52,52 @@ def test_a_variant_missing_an_image_fails_only_its_boards(tmp_path, capsys):
     assert failed == ['OpenShock-Core-V2']
     assert 'FileNotFoundError' in capsys.readouterr().err
     assert (out / 'OpenShock-Core-V1' / 'app.bin').is_file()
+
+
+def test_a_corrupt_stamp_is_caught_before_it_ships(tmp_path, capsys, monkeypatch):
+    """The written image is verified, so a patch that broke the image fails its board instead of shipping."""
+    variants, out = tmp_path / 'variants', tmp_path / 'out'
+    write_variant(variants, 'OpenShock-Core-V2')
+    real = stamping.stamp_image
+
+    def corrupt_core_v2(image, spec, path):
+        stamped = real(image, spec, path)
+        if spec.name != 'OpenShock-Core-V2':
+            return stamped
+        data = bytearray(stamped.data)
+        data[espimage.DESC_OFFSET + 8] ^= 0xFF  # inside the descriptor; the checksum no longer matches
+        return espimage.parse(bytes(data))
+
+    monkeypatch.setattr(package_boards.stamping, 'stamp_image', corrupt_core_v2)
+    failed = package_boards.package(['OpenShock-Core-V2', 'Wemos-Lolin-S3-Mini'], variants, out)
+    assert failed == ['OpenShock-Core-V2']
+    assert 'checksum mismatch' in capsys.readouterr().err
+    assert (out / 'Wemos-Lolin-S3-Mini' / 'app.bin').is_file()
+
+
+def test_a_wrong_stamp_is_caught_before_it_ships(tmp_path, capsys, monkeypatch):
+    """An image that carries another board's descriptor after stamping fails its board."""
+    variants, out = tmp_path / 'variants', tmp_path / 'out'
+    write_variant(variants, 'OpenShock-Core-V2')
+    other = boards.read_board('Wemos-Lolin-S3-Mini')
+    real = stamping.stamp_image
+    monkeypatch.setattr(package_boards.stamping, 'stamp_image', lambda image, spec, path: real(image, other, path))
+    failed = package_boards.package(['OpenShock-Core-V2', 'Wemos-Lolin-S3-Mini'], variants, out)
+    assert failed == ['OpenShock-Core-V2']
+    assert 'does not match OpenShock-Core-V2' in capsys.readouterr().err
+    assert (out / 'Wemos-Lolin-S3-Mini' / 'app.bin').is_file()
+
+
+def test_a_board_name_too_long_for_the_descriptor_fails_only_that_board(tmp_path, capsys, monkeypatch):
+    root = tmp_path / 'repo'
+    shutil.copytree(boards.ROOT / 'boards', root / 'boards')
+    long_name = 'L' * (boards.NAME_MAX_LEN + 1)
+    shutil.copyfile(root / 'boards' / 'OpenShock-Core-V2.defaults', root / 'boards' / f'{long_name}.defaults')
+    monkeypatch.setattr(boards, 'ROOT', root)
+    variants, out = tmp_path / 'variants', tmp_path / 'out'
+    write_variant(variants, 'OpenShock-Core-V2')
+
+    failed = package_boards.package([long_name, 'OpenShock-Core-V2'], variants, out)
+    assert failed == [long_name]
+    assert f'at most {boards.NAME_MAX_LEN} ASCII characters' in capsys.readouterr().err
+    assert (out / 'OpenShock-Core-V2' / 'app.bin').is_file()

@@ -30,6 +30,9 @@ KNOWN_KEYS = PIN_KEYS + BOOL_KEYS + LIST_KEYS
 
 NO_PIN = -1
 
+# The longest board name the image descriptor holds: espimage.DESC_BOARD_LEN less its NUL terminator.
+NAME_MAX_LEN = 47
+
 # Descriptor flag bits (BoardDescriptor.h: OPENSHOCK_BOARD_FLAG_*).
 FLAG_LED_SWAP_RG = 1 << 0
 
@@ -138,9 +141,15 @@ def read_board_fragment(fragment: Path) -> BoardSpec:
         else:
             values[key] = _parse_pin(fragment, lineno, key, value)
 
+    name = fragment.stem
+    if not name.isascii() or len(name) > NAME_MAX_LEN:
+        raise SystemExit(
+            f'error: {fragment}: a board name must be at most {NAME_MAX_LEN} ASCII characters to fit the descriptor, got {name!r}'
+        )
+
     target = read_target(fragment)
     return BoardSpec(
-        name=fragment.stem,
+        name=name,
         target=target,
         chip=chip_for_target(target),
         rf_tx_gpio=values['OPENSHOCK_RF_TX_GPIO'],
@@ -163,7 +172,7 @@ def all_boards() -> list[str]:
 # --- Flash size --------------------------------------------------------------------------
 
 # ESP-IDF's own default when no sdkconfig input picks a CONFIG_ESPTOOLPY_FLASHSIZE_* choice.
-DEFAULT_FLASH_SIZE = '4MB'
+DEFAULT_FLASH_SIZE = '2MB'
 
 
 def parse_flash_size(text: str) -> str | None:

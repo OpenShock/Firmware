@@ -54,11 +54,14 @@ def test_board_mode_strips_the_pins(idf, tmp_path):
     assert not any(line.startswith('OPENSHOCK_') for line in text.splitlines())
 
 
-def test_a_build_dir_in_the_repository_is_passed_relative(idf, monkeypatch):
+def test_a_build_dir_in_the_repository_is_passed_relative(idf, monkeypatch, tmp_path):
+    # A relative build dir resolves against the repository root, so stand one in: pytest must not write into the checkout.
+    monkeypatch.setattr(build, 'ROOT', tmp_path)
     monkeypatch.setenv('OPENSHOCK_BUILD_DIR', 'build/OpenShock-Core-V2')
     build.main(['OpenShock-Core-V2'])
     (cmd,) = idf
     assert defaults_arg(cmd) == '-DSDKCONFIG_DEFAULTS=sdkconfig.defaults;build/OpenShock-Core-V2/board.defaults'
+    assert (tmp_path / 'build' / 'OpenShock-Core-V2' / 'board.defaults').is_file()
 
 
 def test_unknown_variant_is_refused(idf):

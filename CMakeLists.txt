@@ -16,10 +16,15 @@ else()
   set(_os_python python)
 endif()
 
+# scripts/build.py passes -DIDF_TARGET; with idf.py it comes from `idf.py set-target <chip>` or the
+# environment. Guessing instead (ESP-IDF's own fallback is esp32) could contradict the sdkconfig this
+# build layers, and the chip label in the generated header would then disagree with the image.
 if(DEFINED IDF_TARGET)
   set(_os_target ${IDF_TARGET})
-else()
+elseif(DEFINED ENV{IDF_TARGET})
   set(_os_target $ENV{IDF_TARGET})
+else()
+  message(FATAL_ERROR "IDF_TARGET is not set: pass -DIDF_TARGET=<chip>, export IDF_TARGET, or build through scripts/build.py")
 endif()
 
 set(OPENSHOCK_CONFIG_DIR ${CMAKE_BINARY_DIR}/config)
@@ -82,10 +87,11 @@ else()
   set(_staticfs_image ${CMAKE_BINARY_DIR}/staticfs.bin)
 
   # ALL target so a normal `idf.py build` regenerates the image. The generator only
-  # runs pnpm when frontend/build is older than the frontend sources (never in CI,
-  # where the frontend is downloaded as an artifact), so this stays cheap on
-  # incremental builds. Staging lives in the build directory so concurrent board
-  # builds don't share (and wipe) one directory.
+  # runs pnpm when frontend/build is older than the frontend sources, so this stays
+  # cheap on incremental builds. CI never builds this target: its staticfs job builds
+  # the frontend itself and runs gen_staticfs.py --skip-frontend-build, and the image
+  # is packaged beside every variant. Staging lives in the build directory so
+  # concurrent board builds don't share (and wipe) one directory.
   add_custom_target(staticfs ALL
     BYPRODUCTS ${_staticfs_image}
     COMMAND ${_os_python} ${CMAKE_CURRENT_LIST_DIR}/scripts/gen_staticfs.py

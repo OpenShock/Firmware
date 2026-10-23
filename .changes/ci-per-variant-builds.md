@@ -4,7 +4,7 @@ kind: chore
 Compile once per build variant in CI and stamp each board from it
 
 ## Release Note
-CI now compiles the firmware once per build variant instead of once per board, and stamps each board's descriptor into a copy of its variant's image. A variant is every board one compile can serve: the same chip and the same compiled-in Kconfig, with pins and flash size left out because they are settled after linking. The variants are derived from the boards a build asks for, never declared, so today's 12 boards are 5 compiles, and a board that changes a Kconfig setting moves into a variant of its own.
+CI now compiles the firmware once per build variant instead of once per board, and stamps each board's descriptor into a copy of its variant's image. A variant is every board one compile can serve: the same chip and the same compiled-in Kconfig, with pins and flash size left out because they are settled after linking. The variants are derived from the boards a build asks for, never declared, so today's 13 boards are 5 compiles, and a board that changes a Kconfig setting moves into a variant of its own.
 
 - Group boards into variants in `scripts/utils/boards.py`, and add `scripts/build.py --variant <id>` to build one; board builds are unchanged
 - Add `scripts/package_boards.py`, which stamps, verifies and lays out each board's images from its variant's build, replacing the `merge-partitions` action with `package-firmware`

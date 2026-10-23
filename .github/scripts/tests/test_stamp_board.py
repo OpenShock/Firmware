@@ -56,6 +56,12 @@ def test_fragment_rejects_bad_lines(tmp_path, line):
         boards.read_board_fragment(write_fragment(tmp_path, 'Bad', f'CONFIG_IDF_TARGET="esp32"\n{line}\n'))
 
 
+@pytest.mark.parametrize('name', ['L' * (boards.NAME_MAX_LEN + 1), 'Bo\u00e4rd'])
+def test_fragment_rejects_a_name_the_descriptor_cannot_hold(tmp_path, name):
+    with pytest.raises(SystemExit, match=f'at most {boards.NAME_MAX_LEN} ASCII characters'):
+        boards.read_board_fragment(write_fragment(tmp_path, name, 'CONFIG_IDF_TARGET="esp32"\n'))
+
+
 def test_descriptor_round_trips():
     desc = espimage.Descriptor('OpenShock-Core-V2', 'ESP32-S3', 1, 38, 13, 14, boards.FLAG_LED_SWAP_RG, 0x8004)
     packed = desc.pack()
