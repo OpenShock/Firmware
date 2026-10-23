@@ -67,12 +67,35 @@ if(OPENSHOCK_BOARD AND NOT DEFINED SDKCONFIG_DEFAULTS)
   endif()
 endif()
 
-# idf.py passes the interpreter of the IDF Python environment as PYTHON; fall back to the one on PATH.
-if(DEFINED PYTHON)
+# --- Interpreter for the project's scripts --------------------------------------------------------
+# gen_env_header.py, stamp_board.py and gen_staticfs.py need requirements.txt, which must not go into
+# ESP-IDF's venv (its constraints conflict). scripts/build.py passes its own interpreter as
+# OPENSHOCK_PYTHON; a preset build (CLion, plain cmake) takes .venv/ in the repository. Without either,
+# the interpreter idf.py passes as PYTHON (ESP-IDF's venv) or the one on PATH is tried and checked.
+set(OPENSHOCK_PYTHON "" CACHE FILEPATH "Interpreter with requirements.txt installed, for the project's scripts")
+if(OPENSHOCK_PYTHON)
+  set(_os_python ${OPENSHOCK_PYTHON})
+elseif(EXISTS ${CMAKE_CURRENT_LIST_DIR}/.venv/Scripts/python.exe)
+  set(_os_python ${CMAKE_CURRENT_LIST_DIR}/.venv/Scripts/python.exe)
+elseif(EXISTS ${CMAKE_CURRENT_LIST_DIR}/.venv/bin/python)
+  set(_os_python ${CMAKE_CURRENT_LIST_DIR}/.venv/bin/python)
+elseif(DEFINED PYTHON)
   set(_os_python ${PYTHON})
 else()
   set(_os_python python)
 endif()
+
+# Every pin of requirements.txt, checked against that interpreter now: a missing package fails the
+# configure with the list instead of the build halfway through. Nothing is installed here.
+execute_process(
+  COMMAND ${_os_python} ${CMAKE_CURRENT_LIST_DIR}/scripts/utils/pyreqs.py
+          --check ${CMAKE_CURRENT_LIST_DIR}/requirements.txt
+  RESULT_VARIABLE _os_req_rc ERROR_VARIABLE _os_req_err OUTPUT_QUIET)
+if(NOT _os_req_rc EQUAL 0)
+  string(STRIP "${_os_req_err}" _os_req_err)
+  message(FATAL_ERROR "${_os_req_err}")
+endif()
+message(STATUS "Project scripts run with ${_os_python}")
 
 # scripts/build.py passes -DIDF_TARGET; with idf.py it comes from `idf.py set-target <chip>` or the
 # environment. Guessing instead (ESP-IDF's own fallback is esp32) could contradict the sdkconfig this

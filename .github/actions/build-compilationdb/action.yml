@@ -18,6 +18,16 @@ runs:
   steps:
     - uses: ./.github/actions/setup-esp-idf
 
+    - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97  # v7.0.0
+      with:
+        python-version-file: .python-version
+        cache: 'pip'
+
+    # scripts/build.py and the scripts CMake runs need requirements.txt; see docs/DEVELOPING.md.
+    - name: Install Python dependencies
+      shell: bash
+      run: pip install --require-hashes -r requirements.txt
+
     # ccache stays off: it would hide compiler invocations from CodeQL's tracer.
     - name: Generate compilation database (OpenShock-Core-V2)
       shell: bash

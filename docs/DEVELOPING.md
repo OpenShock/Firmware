@@ -64,9 +64,10 @@ user:
 
 ### Python dependencies
 
-The scripts need a few packages beyond what ESP-IDF's venv ships. Install them into a venv of
-your own, not into ESP-IDF's: `requirements.txt` pins a newer `cryptography` than ESP-IDF's
-constraints allow, and installing it there breaks the ESP-IDF activation.
+The project's scripts, both the ones you run and the ones the build runs (`gen_staticfs.py`,
+`stamp_board.py`), need `requirements.txt`. Install it into a venv of your own, not into ESP-IDF's:
+`requirements.txt` pins a newer `cryptography` than ESP-IDF's constraints allow, and installing it
+there breaks the ESP-IDF activation.
 
 ```sh
 python -m venv .venv
@@ -74,9 +75,12 @@ python -m venv .venv
 pip install --require-hashes -r requirements.txt
 ```
 
-The one exception is the `staticfs` build target, which ESP-IDF's own interpreter runs: it needs
-`littlefs-python` in the ESP-IDF venv. Install just that one there, at the version pinned in
-`requirements.in`.
+Run `scripts/build.py` from that venv: it checks that its own interpreter has every pin of
+`requirements.txt` before `idf.py` starts, then hands the interpreter to CMake as `OPENSHOCK_PYTHON`
+for the scripts the build runs. A bare `cmake --preset <board>` (CLion, the command line) uses
+`.venv/` in the repository when it exists, or the interpreter you set `OPENSHOCK_PYTHON` to, and
+runs the same check at configure time. Nothing installs packages for you: a missing pin fails fast
+with the list.
 
 ## Building
 

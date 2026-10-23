@@ -21,6 +21,7 @@ def idf(monkeypatch, tmp_path):
     calls = []
     monkeypatch.setattr(build.subprocess, 'call', lambda cmd, env=None: calls.append(cmd) or 0)
     monkeypatch.setattr(build.shutil, 'which', lambda name: None)
+    monkeypatch.setattr(build.pyreqs, 'check', lambda path=None: [])
     monkeypatch.setenv('IDF_PATH', str(tmp_path / 'idf'))
     monkeypatch.setenv('OPENSHOCK_BUILD_DIR', str(tmp_path / 'build'))
     return calls
@@ -65,6 +66,19 @@ def test_without_idf_path_or_an_install_the_error_names_the_export_script(monkey
 
     with pytest.raises(SystemExit, match='export script'):
         build.run_idf(['build'])
+
+
+def test_the_build_hands_its_own_interpreter_to_cmake(idf):
+    assert build.main(['OpenShock-Core-V2']) == 0
+    assert f'-DOPENSHOCK_PYTHON={build.sys.executable}' in idf[0]
+
+
+def test_missing_requirements_stop_the_build_before_idf_runs(idf, monkeypatch):
+    monkeypatch.setattr(build.pyreqs, 'check', lambda path=None: [build.pyreqs.Pin('littlefs-python', '0.19.0')])
+
+    with pytest.raises(SystemExit, match=r'lacks 1 of the pins in requirements.txt: littlefs-python==0.19.0'):
+        build.main(['OpenShock-Core-V2'])
+    assert idf == []
 
 
 def test_a_successful_build_publishes_its_compile_database(idf, monkeypatch, tmp_path):

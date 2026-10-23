@@ -16,6 +16,16 @@ runs:
     - uses: ./.github/actions/setup-esp-idf
       id: idf
 
+    - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97  # v7.0.0
+      with:
+        python-version-file: .python-version
+        cache: 'pip'
+
+    # scripts/build.py and the scripts CMake runs need requirements.txt; see docs/DEVELOPING.md.
+    - name: Install Python dependencies
+      shell: bash
+      run: pip install --require-hashes -r requirements.txt
+
     # One store per variant and IDF version. Entries are immutable, so the key ends in the run and
     # restore-keys picks the newest store; only develop saves, so every other ref restores develop's.
     - name: Compute ccache key

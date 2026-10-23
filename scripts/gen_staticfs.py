@@ -17,6 +17,7 @@ import gzip
 import os
 import shutil
 import subprocess
+import sys
 from pathlib import Path
 
 from utils import partitions
@@ -105,7 +106,10 @@ def pack_image(staging_dir, output, partition_size):
     try:
         from littlefs import LittleFS
     except ImportError:
-        raise SystemExit('littlefs-python is required (pip install --require-hashes -r requirements.txt)') from None
+        raise SystemExit(
+            f'littlefs-python is not installed for {sys.executable}: the build scripts need an interpreter with '
+            'requirements.txt installed (docs/DEVELOPING.md, Python dependencies)'
+        ) from None
 
     if partition_size % BLOCK_SIZE != 0:
         raise SystemExit(f'partition size {partition_size} is not a multiple of block size {BLOCK_SIZE}')

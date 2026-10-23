@@ -20,9 +20,10 @@ import argparse
 import os
 import shutil
 import subprocess
+import sys
 from pathlib import Path
 
-from utils import idfenv
+from utils import idfenv, pyreqs
 from utils.boards import ROOT, board_fragment, find_variant, kconfig_lines, read_board_fragment
 from utils.files import write_if_changed
 
@@ -112,12 +113,20 @@ def main(argv: list[str] | None = None) -> int:
     # Relative to the project where it can be; ESP-IDF takes an absolute entry too, for a build dir outside the repo.
     frag_rel = (frag.relative_to(ROOT) if frag.is_relative_to(ROOT) else frag).as_posix()
 
+    # The project's scripts run under this interpreter, which therefore needs requirements.txt. Check
+    # before idf.py starts rather than minutes into the build; nothing is installed on the developer's
+    # behalf, and never into the ESP-IDF venv.
+    missing = pyreqs.check()
+    if missing:
+        raise SystemExit(pyreqs.report(missing, pyreqs.REQUIREMENTS))
+
     rc = run_idf(
         [
             '-C',
             str(ROOT),
             '-B',
             str(build_dir),
+            f'-DOPENSHOCK_PYTHON={sys.executable}',
             f'-DIDF_TARGET={target}',
             f'-DSDKCONFIG_DEFAULTS=sdkconfig.defaults;{frag_rel}',
             f'-DSDKCONFIG={build_dir / "sdkconfig"}',
