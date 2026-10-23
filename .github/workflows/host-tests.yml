@@ -77,7 +77,8 @@ jobs:
             name="$(basename "$(dirname "$dir")")"
             echo "::group::$name"
             if idf.py -C "$dir" --preview set-target linux build \
-              && "$dir"/build/*_host_test.elf; then
+              && elfs=("$dir"/build/*_host_test.elf) \
+              && "${elfs[0]}"; then
               echo "::endgroup::"
             else
               echo "::endgroup::"
