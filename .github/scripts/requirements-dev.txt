@@ -5,6 +5,7 @@
 # requirements.txt is; refresh the same way.
 #
 #   python -m venv .venv
+#   .venv/bin/pip install --require-hashes -r requirements.txt   # root build lock; scripts/tests need it
 #   .venv/bin/pip install --require-hashes -r .github/scripts/requirements-dev.txt
 #   .venv/bin/python -m pytest
 

@@ -90,7 +90,8 @@ def stage_assets(build_dir, staging_dir):
                 shutil.copyfile(src, dst_root / name)
             else:
                 # mtime=0: the gzip bytes depend only on the content
-                (dst_root / (name + '.gz')).write_bytes(gzip.compress(src.read_bytes(), mtime=0))
+                with open(dst_root / (name + '.gz'), 'wb') as raw, gzip.GzipFile(filename='', mode='wb', fileobj=raw, mtime=0) as gz:
+                    gz.write(src.read_bytes())
             count += 1
 
     log(f'Staged {count} gzipped assets into {www_dir}')

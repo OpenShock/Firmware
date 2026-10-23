@@ -53,7 +53,7 @@ def test_sanitize(name, expected):
 def run_main(monkeypatch):
     """Runs get-vars main() for a ref and board selection, git's tag list stubbed out; returns its outputs."""
     monkeypatch.setattr(get_vars.subprocess, 'check_output', lambda *a, **kw: '1.4.0\n1.3.0\n')
-    for name in ('GITHUB_HEAD_REF', 'RELEASE_NEXT_VERSION', 'RELEASE_SKIP', 'CHANNEL_INPUT', 'NIGHTLY_INPUT'):
+    for name in ('GITHUB_HEAD_REF', 'RELEASE_NEXT_VERSION', 'RELEASE_SKIP', 'CHANNEL_INPUT', 'NIGHTLY_INPUT', 'GITHUB_STEP_SUMMARY'):
         monkeypatch.delenv(name, raising=False)
 
     def run(ref, boards_input=''):

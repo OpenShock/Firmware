@@ -1,5 +1,5 @@
 # Hashed for --require-hashes (this job holds the publish credential). Direct deps: requests, semver; the rest is transitive.
-# Refresh with: pip-compile --generate-hashes --output-file requirements.txt <(printf 'requests\nsemver\n')
+# Refresh from the repository root with: pip-compile --generate-hashes --output-file .github/scripts/requirements.txt <(printf 'requests\nsemver\n')
 
 # --- direct ---
 
