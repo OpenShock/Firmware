@@ -1,0 +1,25 @@
+# clangd configuration. The compile database is build/compile_commands.json, which
+# scripts/build.py refreshes from the last board or variant it built.
+#
+# Use Espressif's clangd build (esp-clangd), which knows the Xtensa targets; stock clangd
+# rejects the esp32/s2/s3 compile commands. Point `clangd.path` at it in your user settings.
+CompileFlags:
+  CompilationDatabase: build
+  # GCC-only flags clang does not understand.
+  Remove:
+    - -fno-shrink-wrap
+    - -fno-tree-switch-conversion
+    - -fstrict-volatile-bitfields
+    - -fno-malloc-dce
+    - -fzero-init-padding-bits=*
+    - -fno-inline-functions-called-once
+    - -fno-inline-small-functions
+    - -mlongcalls
+    - -mdisable-hardware-atomics
+    - -fmacro-prefix-map=*
+
+Diagnostics:
+  UnusedIncludes: Strict
+  Suppress:
+    # Only the ESP-IDF build knows the generated sdkconfig for every target.
+    - pp_file_not_found

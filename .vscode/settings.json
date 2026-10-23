@@ -1,0 +1,36 @@
+{
+  // C/C++: clangd against build/compile_commands.json (see .clangd). Install Espressif's
+  "clangd.arguments": [
+    "--background-index",
+    "--query-driver=**",
+    "--compile-commands-dir=e:\\src\\openshock\\firmware\\build"
+  ],
+  "C_Cpp.intelliSenseEngine": "disabled",
+  "[c]": { "editor.defaultFormatter": "llvm-vs-code-extensions.vscode-clangd" },
+  "[cpp]": { "editor.defaultFormatter": "llvm-vs-code-extensions.vscode-clangd" },
+
+  // Python tooling, as CI runs it (pyproject.toml).
+  "python.testing.pytestEnabled": true,
+  "python.testing.pytestArgs": [],
+  "[python]": {
+    "editor.defaultFormatter": "charliermarsh.ruff",
+    "editor.formatOnSave": true
+  },
+
+  "files.associations": {
+    "*.defaults": "properties",
+    "sdkconfig": "properties",
+    "sdkconfig.*": "properties",
+    "*.fbs": "flatbuffers"
+  },
+  "files.exclude": {
+    "**/__pycache__": true,
+    "managed_components": true
+  },
+  "search.exclude": {
+    "build": true,
+    "managed_components": true,
+    "frontend/node_modules": true,
+    "components/flatbuffers/flatbuffers": true
+  }
+}
