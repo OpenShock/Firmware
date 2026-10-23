@@ -106,3 +106,42 @@ def test_main_channel_input(run_main, monkeypatch, channel, nightly, expected):
     monkeypatch.setenv('NIGHTLY_INPUT', nightly)
     outputs, _ = run_main('refs/heads/develop')
     assert outputs['release-channel'] == expected
+
+
+def test_main_on_a_pull_request_names_the_version_after_the_head_branch(run_main, monkeypatch):
+    monkeypatch.setenv('GITHUB_HEAD_REF', 'feature/rf-fix')
+    outputs, _ = run_main('refs/pull/12/merge')
+    assert outputs['version'] == '1.4.0-rf-fix+01234567'
+    assert outputs['release-channel'] == 'develop'
+
+
+@pytest.mark.parametrize('ref', ['refs/pull/12/head', 'refs/remotes/origin/x', 'develop'])
+def test_main_refuses_a_ref_that_is_not_a_branch_tag_or_merge_ref(run_main, ref):
+    with pytest.raises(SystemExit):
+        run_main(ref)
+
+
+@pytest.mark.parametrize(
+    'ref, skip, expected',
+    [
+        ('refs/heads/develop', '', '1.5.0-develop+01234567'),
+        ('refs/heads/develop', 'true', '1.4.0-develop+01234567'),
+        ('refs/tags/1.4.1', '', '1.4.1'),
+    ],
+)
+def test_main_next_version_applies_to_branch_builds_only(run_main, monkeypatch, ref, skip, expected):
+    monkeypatch.setenv('RELEASE_NEXT_VERSION', '1.5.0')
+    monkeypatch.setenv('RELEASE_SKIP', skip)
+    outputs, _ = run_main(ref)
+    assert outputs['version'] == expected
+
+
+def test_main_refuses_a_channel_the_server_does_not_know(run_main, monkeypatch):
+    monkeypatch.setenv('CHANNEL_INPUT', 'nightly')
+    with pytest.raises(SystemExit):
+        run_main('refs/heads/develop')
+
+
+def test_main_refuses_an_unknown_board(run_main):
+    with pytest.raises(SystemExit):
+        run_main('refs/heads/develop', 'OpenShock-Core-V2, No-Such-Board')

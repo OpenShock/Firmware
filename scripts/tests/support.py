@@ -6,7 +6,7 @@ from pathlib import Path
 
 from utils import espimage
 
-ROOT = Path(__file__).resolve().parents[3]
+ROOT = Path(__file__).resolve().parents[2]
 
 
 def blank(chip: str = 'ESP32-S3') -> bytes:

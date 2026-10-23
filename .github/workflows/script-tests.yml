@@ -1,4 +1,4 @@
-# Unit tests for the CI/release scripts (.github/scripts) and the build helpers in scripts/.
+# Unit tests for the CI/release scripts (.github/scripts/tests) and the build helpers (scripts/tests).
 name: script-tests
 
 on:

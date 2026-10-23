@@ -6,7 +6,7 @@
 #
 #   python -m venv .venv
 #   .venv/bin/pip install --require-hashes -r .github/scripts/requirements-dev.txt
-#   .venv/bin/python -m pytest .github/scripts/tests
+#   .venv/bin/python -m pytest
 
 -r requirements.txt
 

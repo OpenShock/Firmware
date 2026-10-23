@@ -4,8 +4,8 @@ version = '0.0.0'
 requires-python = '>=3.10'
 
 [tool.pytest.ini_options]
-pythonpath = ['.github/scripts', 'scripts', '.github/scripts/tests']
-testpaths = ['.github/scripts/tests']
+pythonpath = ['.github/scripts', 'scripts', 'certificates']
+testpaths = ['.github/scripts/tests', 'scripts/tests']
 
 [tool.ruff]
 target-version = 'py310'

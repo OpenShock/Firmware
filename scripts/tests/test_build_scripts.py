@@ -1,5 +1,6 @@
 """Tests for the build helpers in scripts/ (partition table reading, reproducible staticfs staging)."""
 
+import gzip
 import os
 from pathlib import Path
 
@@ -77,3 +78,50 @@ def test_frontend_build_is_current_tracks_source_changes(tmp_path):
 
     os.utime(source, (3000, 3000))
     assert not gen_staticfs.frontend_build_is_current(frontend, frontend / 'build')
+
+
+def test_staged_assets_gzip_everything_but_prebuilt_gz(tmp_path):
+    build = tmp_path / 'build'
+    build.mkdir()
+    (build / 'index.html').write_text('<title>x</title>', encoding='utf-8')
+    (build / 'font.woff2.gz').write_bytes(b'already')
+
+    www = gen_staticfs.stage_assets(build, tmp_path / 'staging')
+
+    assert sorted(p.name for p in www.iterdir()) == ['font.woff2.gz', 'index.html.gz']
+    assert (www / 'font.woff2.gz').read_bytes() == b'already'
+    assert gzip.decompress((www / 'index.html.gz').read_bytes()) == b'<title>x</title>'
+
+
+def test_staging_a_build_without_index_html_fails(tmp_path):
+    build = tmp_path / 'build'
+    build.mkdir()
+    (build / 'app.js').write_text('1', encoding='utf-8')
+    with pytest.raises(SystemExit, match='index.html.gz missing'):
+        gen_staticfs.stage_assets(build, tmp_path / 'staging')
+
+
+def test_packed_image_is_partition_sized_and_holds_only_www(tmp_path):
+    from littlefs import LittleFS
+
+    staging = tmp_path / 'staging'
+    (staging / 'www').mkdir(parents=True)
+    (staging / 'www' / 'index.html.gz').write_bytes(b'page')
+    (staging / 'stray.txt').write_text('x', encoding='utf-8')
+    output = tmp_path / 'out' / 'staticfs.bin'
+
+    gen_staticfs.pack_image(staging, output, 64 * 1024)
+
+    image = output.read_bytes()
+    assert len(image) == 64 * 1024
+    fs = LittleFS(block_size=gen_staticfs.BLOCK_SIZE, block_count=16, disk_version=0)
+    fs.context.buffer[:] = image
+    fs.mount()
+    assert fs.listdir('/') == ['www']
+    with fs.open('www/index.html.gz', 'rb') as f:
+        assert f.read() == b'page'
+
+
+def test_packing_refuses_a_size_that_is_not_a_block_multiple(tmp_path):
+    with pytest.raises(SystemExit, match='not a multiple of block size'):
+        gen_staticfs.pack_image(tmp_path, tmp_path / 'out.bin', 5000)
