@@ -6,7 +6,6 @@ version the submodule's base.h declares.
 
   fetch_flatc.py                 fetch flatc matching the submodule
   fetch_flatc.py --upgrade       move the submodule to the latest flatbuffers release, then fetch its flatc
-                                 (aliases: --update, --latest)
 
 Each download is checked against the SHA-256 digest GitHub publishes for the release asset.
 """
@@ -22,7 +21,8 @@ from pathlib import Path
 
 import requests
 
-ROOT = Path(__file__).resolve().parent.parent
+from utils.boards import ROOT
+
 SUBMODULE = ROOT / 'components' / 'flatbuffers' / 'flatbuffers'
 BASE_H = SUBMODULE / 'include' / 'flatbuffers' / 'base.h'
 
@@ -112,13 +112,13 @@ def fetch_binaries(release: dict, output_dir: Path) -> None:
             print(f'Extracted {asset["name"]} to {output_dir}')
 
 
-def main():
+def main(argv=None) -> int:
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument('output_dir', nargs='?', default=str(Path(__file__).resolve().parent),
                         help='directory to extract flatc into (default: scripts/)')
-    parser.add_argument('--upgrade', '--update', '--latest', dest='upgrade', action='store_true',
+    parser.add_argument('--upgrade', dest='upgrade', action='store_true',
                         help='move the flatbuffers submodule to the latest release and fetch its flatc')
-    args = parser.parse_args()
+    args = parser.parse_args(argv)
 
     output_dir = Path(args.output_dir).resolve()
     output_dir.mkdir(parents=True, exist_ok=True)
@@ -141,7 +141,8 @@ def main():
     if args.upgrade:
         print(f'\nflatbuffers is now at {release["tag_name"]}. Next: run scripts/generate_schemas.py so the generated code '
               'matches, then commit the submodule bump together with the regenerated sources.')
+    return 0
 
 
 if __name__ == '__main__':
-    main()
+    raise SystemExit(main())

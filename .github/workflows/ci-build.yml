@@ -4,6 +4,8 @@
 #   - pull requests: one canary board, or every board with the ci:full-build label;
 #   - dispatch: every board, on demand.
 # Per-commit checks are host-tests.yml, script-tests.yml, frontend-checks.yml and cpp-linter.yml.
+name: ci-build
+
 on:
   push:
     tags:
@@ -36,8 +38,6 @@ on:
         type: boolean
         default: false
 
-name: ci-build
-
 # Per ref. A label other than ci:full-build gets its own group, so its no-op run does not cancel the PR's build.
 concurrency:
   group: >-
@@ -49,11 +49,14 @@ concurrency:
 permissions:
   contents: read
 
-# Python jobs use ubuntu-latest, which ships the pinned interpreter; ubuntu-slim downloads it every time.
+defaults:
+  run:
+    shell: bash
+
 jobs:
   # Decides build, publish, the server and the boards (.github/scripts/ci_build_gate.py).
   gate:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-latest # ships the pinned Python; ubuntu-slim would download it every run
     timeout-minutes: 3
     permissions:
       contents: read
@@ -68,15 +71,7 @@ jobs:
         with:
           sparse-checkout: .github
 
-      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97  # v7.0.0
-        with:
-          python-version-file: .github/scripts/.python-version
-          cache: 'pip'
-          cache-dependency-path: .github/scripts/requirements.txt
-
-      - name: Install script dependencies
-        shell: bash
-        run: pip install --require-hashes -r .github/scripts/requirements.txt
+      - uses: ./.github/actions/setup-ci-scripts
 
       - name: Decide build and publish
         id: decide
@@ -84,7 +79,7 @@ jobs:
           GITHUB_TOKEN: ${{ github.token }}
         run: python .github/scripts/ci_build_gate.py
 
-  # Version, channel, boards, and the build variants they need (.github/scripts/get-vars.py).
+  # Version, channel, boards, and the build variants they need (.github/scripts/get_vars.py).
   plan:
     needs: [gate]
     if: ${{ needs.gate.outputs.build == 'true' }}
@@ -106,15 +101,7 @@ jobs:
             boards
             scripts/utils
 
-      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97  # v7.0.0
-        with:
-          python-version-file: .github/scripts/.python-version
-          cache: 'pip'
-          cache-dependency-path: .github/scripts/requirements.txt
-
-      - name: Install script dependencies
-        shell: bash
-        run: pip install --require-hashes -r .github/scripts/requirements.txt
+      - uses: ./.github/actions/setup-ci-scripts
 
       # The next version from .changes/; status mode works on every branch and creates no tag.
       - name: Compute next version
@@ -125,14 +112,13 @@ jobs:
 
       - name: Get variables
         id: get-vars
-        shell: bash
         env:
           RELEASE_NEXT_VERSION: ${{ steps.relmeta.outputs.next-version }}
           RELEASE_SKIP: ${{ steps.relmeta.outputs.skip }}
-          # Manual dispatch only; otherwise get-vars derives the channel from the ref.
-          CHANNEL_INPUT: ${{ !inputs.nightly && inputs.channel != 'derive' && inputs.channel || '' }}
+          CHANNEL_INPUT: ${{ inputs.channel }}
+          NIGHTLY_INPUT: ${{ inputs.nightly }}
           BOARDS_INPUT: ${{ needs.gate.outputs.boards }}
-        run: python .github/scripts/get-vars.py
+        run: python .github/scripts/get_vars.py
 
   # Opens and reserves the release before anything is built, so the server's checks fail in a minute, not after the matrix.
   stage:
@@ -173,16 +159,7 @@ jobs:
             .github
             CHANGELOG.md
 
-      # The policy runs before repo-server-token, which would otherwise install these.
-      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97  # v7.0.0
-        with:
-          python-version-file: .github/scripts/.python-version
-          cache: 'pip'
-          cache-dependency-path: .github/scripts/requirements.txt
-
-      - name: Install script dependencies
-        shell: bash
-        run: pip install --require-hashes -r .github/scripts/requirements.txt
+      - uses: ./.github/actions/setup-ci-scripts
 
       # This repository's prod rules, which the server cannot know (stable descends from master, a draft is staged).
       - name: Apply repository publishing policy
@@ -209,13 +186,14 @@ jobs:
           mode: init
 
   # The frontend packed into the static0 image, once for every board (its checks are frontend-checks.yml's).
-  # Waits on stage so a prod release is approved before compute is spent; a skipped stage still lets it run.
+  # The jobs below wait on stage so a prod release is approved before compute is spent: a skipped stage
+  # (nothing to publish) lets them run, a failed one stops them.
   staticfs:
     needs: [gate, stage]
     if: >-
       ${{ !cancelled()
-      && needs.gate.outputs.build == 'true'
-      && needs.stage.result != 'failure' }}
+      && needs.stage.result != 'failure'
+      && needs.gate.outputs.build == 'true' }}
     runs-on: ubuntu-latest
     timeout-minutes: 10
 
@@ -240,11 +218,10 @@ jobs:
     name: 'build (${{ matrix.chip }}: ${{ matrix.boards }})'
     runs-on: ubuntu-latest
     needs: [plan, stage]
-    # !cancelled() so a skipped stage does not skip the build; plan named so a failed get-vars does.
     if: >-
       ${{ !cancelled()
-      && needs.plan.result == 'success'
-      && needs.stage.result != 'failure' }}
+      && needs.stage.result != 'failure'
+      && needs.plan.result == 'success' }}
     timeout-minutes: 30
     strategy:
       fail-fast: false
@@ -265,13 +242,18 @@ jobs:
   # Stamp every board from its variant and merge it with static0. One job: it is seconds of work per board.
   package:
     runs-on: ubuntu-latest
-    needs: [plan, staticfs, build]
-    # !cancelled() so a skipped stage upstream does not skip this; a successful build implies plan.
+    needs: [plan, stage, staticfs, build]
     if: >-
       ${{ !cancelled()
+      && needs.stage.result != 'failure'
       && needs.staticfs.result == 'success'
       && needs.build.result == 'success' }}
     timeout-minutes: 10
+    permissions:
+      contents: read
+      id-token: write
+      attestations: write
+      artifact-metadata: write
 
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
@@ -287,6 +269,12 @@ jobs:
           version: ${{ needs.plan.outputs.version }}
           boards: ${{ needs.plan.outputs.board-list }}
 
+      - name: Attest build provenance
+        if: ${{ startsWith(github.ref, 'refs/tags/') }}
+        uses: actions/attest@1e69f48acb82d1966a394da916b4c1698aa569d6  # v4.2.2
+        with:
+          subject-path: merged/OpenShock_*.bin
+
   # Upload every board into the staged release and publish it; fail on the first non-success.
   # Publishing consumes the version (only a maintainer can undo it). No environment: stage was the approval.
   # A plain if is safe: on a publish run nothing upstream is skipped, and a failure upstream must skip this.
@@ -299,6 +287,8 @@ jobs:
     permissions:
       contents: read
       id-token: write
+    outputs:
+      outcome-unknown: ${{ steps.publish.outputs.outcome-unknown }}
 
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
@@ -309,6 +299,7 @@ jobs:
         id: token
 
       - uses: ./.github/actions/repo-server-publish
+        id: publish
         with:
           server-url: ${{ needs.stage.outputs.server-url }}
           token: ${{ steps.token.outputs.token }}
@@ -322,7 +313,7 @@ jobs:
     runs-on: ubuntu-latest
     needs: [stage, repo-server]
     timeout-minutes: 10
-    if: ${{ always() && needs.stage.outputs.release-id != '' && needs.repo-server.result != 'success' }}
+    if: ${{ always() && needs.stage.outputs.release-id != '' && needs.repo-server.result != 'success' && needs.repo-server.outputs.outcome-unknown != 'true' }}
     permissions:
       contents: read
       id-token: write
@@ -354,6 +345,10 @@ jobs:
       && startsWith(github.ref, 'refs/tags/')
     permissions:
       contents: write
+    env:
+      GH_TOKEN: ${{ github.token }}
+      GH_REPO: ${{ github.repository }}
+      TAG: ${{ needs.plan.outputs.version }}
 
     steps:
       - name: Download release artifacts
@@ -361,14 +356,7 @@ jobs:
         with:
           name: firmware_merged
 
-      - name: Display artifacts
-        run: ls -R
-
       - name: Upload binaries to staged release
-        env:
-          GH_TOKEN: ${{ github.token }}
-          GH_REPO: ${{ github.repository }}
-          TAG: ${{ needs.plan.outputs.version }}
         run: |
           shopt -s globstar nullglob
           files=(**/OpenShock_*.bin)
@@ -379,10 +367,6 @@ jobs:
           gh release upload "$TAG" "${files[@]}" --clobber
 
       - name: Publish the release
-        env:
-          GH_TOKEN: ${{ github.token }}
-          GH_REPO: ${{ github.repository }}
-          TAG: ${{ needs.plan.outputs.version }}
         run: gh release edit "$TAG" --draft=false
 
   # Announce to the OpenShock API last, so it never points a device at a version the server is not yet serving.
@@ -396,9 +380,19 @@ jobs:
       id-token: write
 
     steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+        with:
+          sparse-checkout: .github
+
+      - uses: ./.github/actions/repo-server-token
+        id: token
+        with:
+          audience: openshock-release-ingest
+
       # release.json is the release asset release.yml staged.
       - name: Announce release to OpenShock API
         env:
+          OIDC_TOKEN: ${{ steps.token.outputs.token }}
           GH_TOKEN: ${{ github.token }}
           GH_REPO: ${{ github.repository }}
           API_URL: ${{ vars.OPENSHOCK_API_URL }}
@@ -406,14 +400,6 @@ jobs:
         run: |
           set -euo pipefail
           gh release download "$TAG" --pattern release.json --dir .
-          OIDC_TOKEN=$(curl -sLS \
-            -H "Authorization: bearer $ACTIONS_ID_TOKEN_REQUEST_TOKEN" \
-            "$ACTIONS_ID_TOKEN_REQUEST_URL&audience=openshock-release-ingest" \
-            | jq -r .value)
-          if [ -z "$OIDC_TOKEN" ] || [ "$OIDC_TOKEN" = "null" ]; then
-            echo "::error::Failed to fetch GitHub OIDC token"
-            exit 1
-          fi
           curl -fsSL --retry 3 --retry-delay 5 -X POST "$API_URL/1/public/releases" \
             -H "Authorization: Bearer $OIDC_TOKEN" \
             -H "Content-Type: application/json" \
@@ -427,13 +413,8 @@ jobs:
     if: ${{ always() }}
     timeout-minutes: 1
     steps:
-      - name: Check every job's result
-        env:
-          FAILED: ${{ contains(needs.*.result, 'failure') || contains(needs.*.result, 'cancelled') }}
-          RESULTS: ${{ toJSON(needs.*.result) }}
+      - name: Fail when a job failed or was cancelled
+        if: ${{ contains(needs.*.result, 'failure') || contains(needs.*.result, 'cancelled') }}
         run: |
-          echo "job results: $RESULTS"
-          if [ "$FAILED" = "true" ]; then
-            echo "::error::A ci-build job failed or was cancelled."
-            exit 1
-          fi
+          echo "::error::A ci-build job failed or was cancelled."
+          exit 1

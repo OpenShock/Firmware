@@ -1,24 +1,17 @@
 #!/usr/bin/env python3
 """Decide what a ci-build run does: build, publish, which server, which boards.
 
-build governs the build matrix.
-publish governs whether the build reaches a repository server at all, and server names which one.
 Building is not publishing: a pull request compiles and goes no further.
-
-Reads the event from the GITHUB_* environment and the event payload, and asks the GitHub API only for a nightly: when this branch last built, and whether anything since then can change the firmware.
-Those two calls sit behind the Api protocol so the tests can answer them without a network.
+The GitHub API is queried only for a nightly (when this branch last built, and what changed since); those calls sit behind the Api protocol so tests need no network.
 """
 
 import json
 import re
 from dataclasses import dataclass
-from datetime import datetime
 from typing import Protocol
 
-import requests
-
-from gha import env, notice, require_env, set_output, warn
-from repo_server_policy import API, API_VERSION
+from gha import env, notice, require_env, set_output, summary, warn
+from github_api import github_get
 
 FULL_BUILD_LABEL = 'ci:full-build'
 CANARY_BOARD = 'OpenShock-Core-V2'
@@ -59,20 +52,10 @@ class Api(Protocol):
 class GitHubApi:
     def __init__(self, repo: str, token: str) -> None:
         self.repo = repo
-        self.session = requests.Session()
-        self.session.headers.update(
-            {
-                'Authorization': f'Bearer {token}',
-                'Accept': 'application/vnd.github+json',
-                'X-GitHub-Api-Version': API_VERSION,
-            }
-        )
+        self.token = token
 
     def _get(self, path: str, params: dict) -> dict:
-        resp = self.session.get(f'{API}/repos/{self.repo}{path}', params=params, timeout=(10, 30))
-        if resp.status_code != 200:
-            raise RuntimeError(f'HTTP {resp.status_code}: {(resp.text or "").strip()[:300]}')
-        return resp.json()
+        return github_get(f'/repos/{self.repo}{path}', self.token, params)
 
     def latest_successful_run(self, event: str, branch: str) -> dict | None:
         data = self._get(
@@ -91,26 +74,17 @@ class Decision:
     build: bool = False
     publish: bool = False
     server: str = 'dev'
-    # Empty builds every board. The build variants these need are get-vars.py's to work out.
     boards: str = ''
 
 
-def _created_at(run: dict) -> datetime:
-    return datetime.fromisoformat(run['created_at'])
-
-
 def last_build_sha(api: Api, branch: str) -> str:
-    """HEAD of this branch's last successful nightly or manual run.
+    """HEAD of this branch's last successful manual or nightly dispatch.
 
-    'schedule' covers the develop nightlies from before nightly.yml dispatched them.
     Returns '' on error so a hiccup rebuilds rather than wrongly skipping.
     """
     try:
-        runs = [r for r in (api.latest_successful_run(e, branch) for e in ('schedule', 'workflow_dispatch')) if r]
-        if not runs:
-            return ''
-        runs.sort(key=_created_at, reverse=True)
-        return runs[0].get('head_sha') or ''
+        run = api.latest_successful_run('workflow_dispatch', branch)
+        return (run or {}).get('head_sha') or ''
     except Exception as err:
         warn(f'Could not read the last {branch} build: {err}')
         return ''
@@ -139,65 +113,68 @@ def source_changed_since(api: Api, base: str, sha: str) -> bool:
         return True
 
 
-def decide(event_name: str, ref: str, sha: str, payload: dict, api: Api) -> Decision:
-    d = Decision()
+def _decide_pull_request(payload: dict) -> Decision:
+    # A pull request compiles and stops: merging changes nothing on any server.
+    label = (payload.get('label') or {}).get('name')
+    if payload.get('action') == 'labeled' and label != FULL_BUILD_LABEL:
+        notice(f'Label "{label}" does not affect the build.')
+        return Decision()
+    d = Decision(build=True)
+    labels = (payload.get('pull_request') or {}).get('labels') or []
+    if not any(lbl.get('name') == FULL_BUILD_LABEL for lbl in labels):
+        d.boards = CANARY_BOARD
+        notice(f'Canary build of {CANARY_BOARD} only; add the {FULL_BUILD_LABEL} label to build every board.')
+    return d
+
+
+def _decide_nightly(ref: str, sha: str, api: Api) -> Decision:
+    # Only the develop nightly publishes (to prod); beta and master are published from tags.
     branch = ref.removeprefix('refs/heads/') if ref.startswith('refs/heads/') else ''
+    d = Decision(server='prod')
+    if branch not in NIGHTLY_BRANCHES:
+        warn(f'Nightly requested on {ref}; only develop, beta and master have nightlies.')
+        return d
+    base = last_build_sha(api, branch)
+    if base == sha:
+        notice(f'{branch} unchanged since its last build ({sha}); nothing to build.')
+    elif base != '' and not source_changed_since(api, base, sha):
+        notice(f'No firmware sources changed on {branch} since its last build ({base}); nothing to build.')
+    else:
+        d.build = True
+    d.publish = d.build and branch == 'develop'
+    return d
+
+
+def _decide_dispatch(ref: str, inputs: dict) -> Decision:
+    # A manual dispatch always publishes; the channel and the ref are chosen by hand.
+    d = Decision(build=True, publish=True, server='prod' if inputs.get('server') == 'prod' else 'dev')
+    # The ref picker offers tags as well as branches, so prod still means running against the tag being released.
+    if d.server == 'prod' and not ref.startswith('refs/tags/'):
+        warn(f'prod was requested on {ref}; only a tag may dispatch to prod, publishing to dev instead.')
+        d.server = 'dev'
+    return d
+
+
+def _decide_push(ref: str) -> Decision:
+    # The workflow only triggers on release tags, which publish to prod.
+    is_tag = ref.startswith('refs/tags/')
+    return Decision(build=True, publish=is_tag, server='prod' if is_tag else 'dev')
+
+
+def decide(event_name: str, ref: str, sha: str, payload: dict, api: Api) -> Decision:
     inputs = payload.get('inputs') or {}
     # The payload carries a boolean input as either true or 'true', depending on who dispatched it.
     nightly = event_name == 'workflow_dispatch' and inputs.get('nightly') in (True, 'true')
 
     if event_name == 'pull_request':
-        label = (payload.get('label') or {}).get('name')
-        if payload.get('action') == 'labeled' and label != FULL_BUILD_LABEL:
-            notice(f'Label "{label}" does not affect the build.')
-        else:
-            d.build = True
-            labels = (payload.get('pull_request') or {}).get('labels') or []
-            if not any(lbl.get('name') == FULL_BUILD_LABEL for lbl in labels):
-                d.boards = CANARY_BOARD
-                notice(f'Canary build of {CANARY_BOARD} only; add the {FULL_BUILD_LABEL} label to build every board.')
-    elif event_name == 'push':
-        # Only release tags trigger a push run.
-        d.build = True
-    elif event_name == 'workflow_dispatch':
-        if nightly:
-            if branch not in NIGHTLY_BRANCHES:
-                warn(f'Nightly requested on {ref}; only develop, beta and master have nightlies.')
-            else:
-                base = last_build_sha(api, branch)
-                if base == sha:
-                    notice(f'{branch} unchanged since its last build ({sha}); nothing to build.')
-                elif base != '' and not source_changed_since(api, base, sha):
-                    notice(f'No firmware sources changed on {branch} since its last build ({base}); nothing to build.')
-                else:
-                    d.build = True
-        else:
-            d.build = True
-    else:
-        d.build = True
-
-    # Publishing is never a side effect of a build.
-    # A pull request compiles and stops, so merging changes nothing on any server until someone says to.
-    # The develop nightly and a release tag publish to prod, because both are already the deliberate act.
-    # The beta and master nightlies only build: those channels are published from tags.
-    # Everything else reaches a server only by being dispatched, which is where the channel and the ref are chosen by hand.
-    is_tag = ref.startswith('refs/tags/')
-
+        return _decide_pull_request(payload)
     if nightly:
-        d.publish = d.build and branch == 'develop'
-        d.server = 'prod'
-    elif event_name == 'workflow_dispatch':
-        d.publish = True
-        d.server = 'prod' if inputs.get('server') == 'prod' else 'dev'
-        # The ref picker offers tags as well as branches, so reaching prod by hand still means running against the tag being released.
-        if d.server == 'prod' and not is_tag:
-            warn(f'prod was requested on {ref}; only a tag may dispatch to prod, publishing to dev instead.')
-            d.server = 'dev'
-    elif event_name == 'push' and is_tag:
-        d.publish = True
-        d.server = 'prod'
-
-    return d
+        return _decide_nightly(ref, sha, api)
+    if event_name == 'workflow_dispatch':
+        return _decide_dispatch(ref, inputs)
+    if event_name == 'push':
+        return _decide_push(ref)
+    raise SystemExit(f'error: unsupported event {event_name!r}')
 
 
 def main() -> int:
@@ -209,17 +186,13 @@ def main() -> int:
     api = GitHubApi(env('GITHUB_REPOSITORY'), env('GITHUB_TOKEN'))
     d = decide(env('GITHUB_EVENT_NAME'), env('GITHUB_REF'), env('GITHUB_SHA'), payload, api)
 
-    def flag(value: bool) -> str:
-        return 'true' if value else 'false'
-
-    set_output('build', flag(d.build))
-    set_output('publish', flag(d.publish))
+    set_output('build', str(d.build).lower())
+    set_output('publish', str(d.publish).lower())
     set_output('server', d.server)
     set_output('boards', d.boards)
-    print(
-        f'decision: build={flag(d.build)} publish={flag(d.publish)} '
-        f'server={d.server} boards={d.boards or "all"}'
-    )
+    decision = f'build={str(d.build).lower()} publish={str(d.publish).lower()} server={d.server} boards={d.boards or "all"}'
+    print(f'decision: {decision}')
+    summary(f'### Gate\n\n`{decision}`')
     return 0
 
 

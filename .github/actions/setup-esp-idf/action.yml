@@ -18,6 +18,14 @@ runs:
   steps:
     # Restore and save are split so the prune below lands between them. Missing paths are skipped.
     # No restore-keys: a partial match would run the installer over a stale tree and save the layering.
+    # Bump the trailing number to invalidate.
+    - name: Compute cache key
+      id: key
+      shell: bash
+      env:
+        IDF_VERSION: ${{ inputs.idf-version }}
+      run: echo "key=esp-idf-$RUNNER_OS-$IDF_VERSION-6" >> "$GITHUB_OUTPUT"
+
     - name: Restore ESP-IDF install
       id: idf-cache
       uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9  # v6.1.0
@@ -26,8 +34,7 @@ runs:
           /tmp/esp
           /opt/esp
           ~/.espressif
-        # Bump the trailing number to invalidate; the save step below repeats this key.
-        key: esp-idf-${{ runner.os }}-${{ inputs.idf-version }}-6
+        key: ${{ steps.key.outputs.key }}
 
     # Cache miss only: the action re-runs apt and re-prepares the clone even over a complete tree.
     # v1 is a moving branch (no release tags), pinned by SHA.
@@ -41,77 +48,10 @@ runs:
     - name: Activate cached ESP-IDF
       if: ${{ steps.idf-cache.outputs.cache-hit == 'true' }}
       shell: bash
-      run: |
-        set -euo pipefail
-        # Guard with -f: an unmatched glob stays unexpanded.
-        act=""
-        for c in /tmp/esp /opt/esp "$HOME/.espressif" "$HOME/.espressif/tools"; do
-          for f in "$c"/activate_idf_*.sh; do
-            if [ -f "$f" ]; then
-              act="$f"
-              break 2
-            fi
-          done
-        done
-        if [ -z "$act" ]; then
-          echo "::error::ESP-IDF cache was restored but no activate_idf_*.sh was found in it."
-          exit 1
-        fi
-        echo "activating $act"
+      run: "$GITHUB_ACTION_PATH/../../scripts/activate_idf.sh"
 
-        # -e prints KEY=VALUE lines instead of mutating the shell; sourcing it refuses to run
-        # inside a step ($0 is not a shell name) and trips set -u on $ZSH_VERSION.
-        env_dump="$(sh "$act" -e)"
-        if [ -z "$env_dump" ]; then
-          echo "::error::$act produced no environment."
-          exit 1
-        fi
-
-        # PATH= holds only the directories to prepend; SYSTEM_PATH is the caller's own PATH.
-        printf '%s\n' "$env_dump" | while IFS= read -r line; do
-          case "$line" in
-            PATH=*)
-              printf '%s\n' "${line#PATH=}" | tr ':' '\n' | grep -v '^$' >> "$GITHUB_PATH"
-              ;;
-            SYSTEM_PATH=*|'') ;;
-            *=*)
-              echo "$line" >> "$GITHUB_ENV"
-              ;;
-          esac
-        done
-
-        idf_path="$(printf '%s\n' "$env_dump" | sed -n 's/^IDF_PATH=//p' | head -1)"
-        if [ -z "$idf_path" ]; then
-          echo "::error::$act did not report IDF_PATH."
-          exit 1
-        fi
-        # idf.py is in $IDF_PATH/tools, which the script does not emit; scripts/build.py prefers it.
-        echo "$idf_path/tools" >> "$GITHUB_PATH"
-        echo "activated ESP-IDF at $idf_path"
-
-    # What the fresh install weighs per directory, to check the prune list against.
-    - name: Measure ESP-IDF install
-      if: ${{ steps.idf-cache.outputs.cache-hit != 'true' }}
-      shell: bash
-      run: |
-        set -uo pipefail
-        for root in /tmp/esp /opt/esp "$HOME/.espressif"; do
-          [ -d "$root" ] || continue
-          echo "::group::$root"
-          du -sh "$root" 2>/dev/null || true
-          du -sh "$root"/* 2>/dev/null | sort -rh | head -20 || true
-          if [ -d "$root/tools" ]; then
-            echo "-- tools --"
-            du -sh "$root"/tools/* 2>/dev/null | sort -rh | head -20 || true
-          fi
-          echo "::endgroup::"
-        done
-
-    # Trim what no CI build uses before caching: download archives (already extracted), esp-clang
-    # (the firmware builds with gcc), the GDBs and OpenOCD (no hardware), and the ULP toolchain.
-    # No board enables the ULP; one that does must take esp32ulp-elf off this list.
-    # Never prune the gcc toolchains (xtensa-esp-elf, riscv32-esp-elf). Removal is by exact name so
-    # xtensa-esp-elf-gdb cannot take xtensa-esp-elf with it; runners use <root>/<tool>, EIM <root>/tools/<tool>.
+    # Drops what no CI build uses (archives, clang, GDBs, OpenOCD, ULP) by exact name, never the gcc toolchains.
+    # A board that enables the ULP must take esp32ulp-elf off this list.
     - name: Prune unused toolchains before caching
       if: ${{ steps.idf-cache.outputs.cache-hit != 'true' }}
       shell: bash
@@ -138,8 +78,7 @@ runs:
         done
         echo "pruned $((total / 1024)) MB in total"
 
-    # ccache is the one build prerequisite the IDF tree lacks, so a pinned static build is cached with it
-    # and a warm run never touches apt.
+    # A pinned static ccache, cached with the install so a warm run never touches apt.
     - name: Bundle ccache into the install
       if: ${{ steps.idf-cache.outputs.cache-hit != 'true' }}
       shell: bash
@@ -156,11 +95,7 @@ runs:
         tar -xJf "$RUNNER_TEMP/ccache.tar.xz" -C /tmp/esp/ccache --strip-components=1 "${name}/ccache"
         /tmp/esp/ccache/ccache --version | head -1
 
-    # Only develop saves: a cache saved on another ref is restorable by that ref alone, and each one
-    # would be another ~1.8 GB of the repository's 10 GB. Concurrent misses race; the losers only warn.
-    # The cost, accepted for that limit: after an eviction (7 days unused) or a key bump, every tag
-    # and PR build installs cold and saves nothing until a develop push next runs this action.
-    # The alternative, if that bites, is to let one nominated job save on a miss from any ref.
+    # Only develop saves: a cache saved on another ref is restorable by that ref alone, and costs ~1.8 GB of the 10 GB.
     - name: Save ESP-IDF install
       if: >-
         ${{ steps.idf-cache.outputs.cache-hit != 'true'
@@ -171,7 +106,7 @@ runs:
           /tmp/esp
           /opt/esp
           ~/.espressif
-        key: esp-idf-${{ runner.os }}-${{ inputs.idf-version }}-6
+        key: ${{ steps.key.outputs.key }}
 
     - name: Put ccache on PATH
       shell: bash

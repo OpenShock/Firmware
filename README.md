@@ -73,7 +73,7 @@ You will need:
 
 ```bash
 # Install dependencies
-pip install -r requirements.txt
+pip install --require-hashes -r requirements.txt
 ```
 
 ## Support

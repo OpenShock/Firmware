@@ -1,8 +1,8 @@
 """Tests for the build-variant grouping in scripts/utils/boards.py: which boards one compile can serve."""
 
 import pytest
-
 from support import write_fragment
+
 from utils import boards
 
 BASE = 'CONFIG_IDF_TARGET="esp32s3"\nCONFIG_PARTITION_TABLE_CUSTOM=y\n'

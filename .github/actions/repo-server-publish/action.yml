@@ -1,13 +1,15 @@
 name: repo-server-publish
 description: >-
   Drives one phase of a firmware release on the repository server.
-  `init` opens the release and returns its id; `publish` and `dry-run` upload every board's artifacts and then promote or discard; `abort` closes a release whose build never got that far.
-  Nothing before the ending differs between `publish` and `dry-run`, so a dry run exercises the whole publish path.
+  `init` opens the release and returns its id; `publish` uploads every board's artifacts and promotes it; `abort` closes a release whose build never got that far.
 
 outputs:
   release-id:
-    description: 'The staged release id, set by `init` and passed to a later `publish`, `dry-run` or `abort`.'
+    description: 'The staged release id, set by `init` and passed to a later `publish` or `abort`.'
     value: ${{ steps.run.outputs.release-id }}
+  outcome-unknown:
+    description: "'true' when `publish` got no response, so the release may be live and must not be aborted."
+    value: ${{ steps.run.outputs.outcome-unknown }}
 
 inputs:
   server-url:
@@ -23,22 +25,21 @@ inputs:
     description: 'Release channel: stable, beta or develop. Required by `init`.'
     required: false
   boards:
-    description: 'Newline-separated boards to publish. Required by `init`, `publish` and `dry-run`.'
+    description: 'Newline-separated boards to publish. Required by `init` and `publish`.'
     required: false
   release-id:
-    description: 'Release opened by an earlier `init`. Required by `publish`, `dry-run` and `abort`.'
+    description: 'Release opened by an earlier `init`. Required by `publish` and `abort`.'
     required: false
   mode:
-    description: '`init` opens the release; `publish` promotes it; `dry-run` aborts it, leaving nothing staged; `abort` closes one the build never reached.'
-    required: false
-    default: 'dry-run'
+    description: '`init` opens the release; `publish` uploads and promotes it; `abort` closes one the build never reached.'
+    required: true
 
 runs:
   using: composite
   steps:
 
     - name: Download firmware artifacts
-      if: ${{ inputs.mode == 'publish' || inputs.mode == 'dry-run' }}
+      if: ${{ inputs.mode == 'publish' }}
       uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333  # v8.0.2
       with:
         path: artifacts
@@ -56,5 +57,4 @@ runs:
         BOARDS: ${{ inputs.boards }}
         RELEASE_ID: ${{ inputs.release-id }}
         MODE: ${{ inputs.mode }}
-        ARTIFACTS_DIR: artifacts
       run: python .github/scripts/repo_server_publish.py

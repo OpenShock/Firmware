@@ -1,11 +1,12 @@
 """Tests for scripts/stamp_board.py and the board/image helpers under scripts/utils."""
 
+import struct
+
 import pytest
-
 import stamp_board
-from support import make_image, write_fragment
-from utils import boards, espimage
+from support import blank, make_image, write_fragment
 
+from utils import boards, espimage
 
 S3_FRAGMENT = (
     'CONFIG_IDF_TARGET="esp32s3"\n'
@@ -143,10 +144,6 @@ def cli(*argv):
     return stamp_board.main([str(a) for a in argv])
 
 
-def blank(chip='ESP32-S3'):
-    return espimage.Descriptor('', chip, -1, -1, -1, -1, 0, 0).pack()
-
-
 def test_stamp_verify_and_read(tmp_path, capsys, test_board):
     image = tmp_path / 'firmware.bin'
     image.write_bytes(make_image(blank()))
@@ -181,3 +178,7 @@ def test_stamp_refuses_the_wrong_chip(tmp_path, test_board):
     image.write_bytes(make_image(blank('ESP32'), chip_id=0x0000))
     with pytest.raises(SystemExit, match='chip id'):
         cli('stamp', '--image', image, '--board', test_board)
+
+
+def test_descriptor_format_fills_the_descriptor():
+    assert struct.calcsize(espimage.DESC_FORMAT) == espimage.DESC_LEN

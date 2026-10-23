@@ -53,18 +53,46 @@ def git_commit() -> str | None:
         return commit
     try:
         return subprocess.check_output(['git', 'rev-parse', 'HEAD'], text=True, stderr=subprocess.DEVNULL).strip()
-    except Exception:
+    except (OSError, subprocess.CalledProcessError):
         return None
 
 
-def resolve_version() -> str:
+def resolve_version(commit: str | None) -> str:
     version = os.environ.get('OPENSHOCK_FW_VERSION')
     if version:
         return version
     if github.is_ci():
         raise SystemExit('error: OPENSHOCK_FW_VERSION must be set for CI builds')
-    commit = git_commit()
     return '0.0.0-local' + (f'+{commit[:7]}' if commit else '')
+
+
+def board_defines(chip: str) -> dict[str, int | str]:
+    mode, log_level = github.build_mode()
+    chip_macro = chip.upper().replace('-', '').replace('_', '')  # ESP32-S3 -> ESP32S3
+    return {
+        'OPENSHOCK_FW_CHIP': chip,
+        f'OPENSHOCK_FW_CHIP_{chip_macro}': 1,
+        'OPENSHOCK_FW_MODE': mode,
+        'OPENSHOCK_LOG_LEVEL': log_level,
+    }
+
+
+def version_defines(commit: str | None) -> dict[str, int | str]:
+    version = resolve_version(commit)
+    major, minor, patch, prerelease, build = split_semver(version)
+    defines: dict[str, int | str] = {
+        'OPENSHOCK_FW_VERSION': version,
+        'OPENSHOCK_FW_VERSION_MAJOR': major,
+        'OPENSHOCK_FW_VERSION_MINOR': minor,
+        'OPENSHOCK_FW_VERSION_PATCH': patch,
+    }
+    if prerelease is not None:
+        defines['OPENSHOCK_FW_VERSION_PRERELEASE'] = prerelease
+    if build is not None:
+        defines['OPENSHOCK_FW_VERSION_BUILD'] = build
+    if commit is not None:
+        defines['OPENSHOCK_FW_GIT_COMMIT'] = commit
+    return defines
 
 
 def render(title: str, defines: dict[str, int | str]) -> str:
@@ -85,33 +113,10 @@ def main(argv=None) -> int:
     args = ap.parse_args(argv)
 
     chip = boards.chip_for_target(args.target)
-    mode, log_level = github.build_mode()
-    board = {
-        'OPENSHOCK_FW_CHIP': chip,
-        'OPENSHOCK_FW_CHIP_' + chip.upper().replace('-', '').replace('_', ''): 1,
-        'OPENSHOCK_FW_MODE': mode,
-        'OPENSHOCK_LOG_LEVEL': log_level,
-    }
-
-    version = resolve_version()
-    major, minor, patch, prerelease, build = split_semver(version)
-    version_defines: dict[str, int | str] = {
-        'OPENSHOCK_FW_VERSION': version,
-        'OPENSHOCK_FW_VERSION_MAJOR': major,
-        'OPENSHOCK_FW_VERSION_MINOR': minor,
-        'OPENSHOCK_FW_VERSION_PATCH': patch,
-    }
-    if prerelease is not None:
-        version_defines['OPENSHOCK_FW_VERSION_PRERELEASE'] = prerelease
-    if build is not None:
-        version_defines['OPENSHOCK_FW_VERSION_BUILD'] = build
-    commit = git_commit()
-    if commit is not None:
-        version_defines['OPENSHOCK_FW_GIT_COMMIT'] = commit
-
-    headers = [('openshock_version.h', 'Firmware version and git commit. Changes every commit.', version_defines)]
+    headers = []
     if not args.version_only:
-        headers.insert(0, ('openshock_board.h', 'Chip identity, build mode and log level.', board))
+        headers.append(('openshock_board.h', 'Chip identity, build mode and log level.', board_defines(chip)))
+    headers.append(('openshock_version.h', 'Firmware version and git commit. Changes every commit.', version_defines(git_commit())))
 
     out_dir = Path(args.out_dir)
     written = [name for name, title, defines in headers if write_if_changed(out_dir / name, render(title, defines))]

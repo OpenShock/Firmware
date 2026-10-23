@@ -1,44 +1,32 @@
 name: build-compilationdb
 description: >-
   Emit build/OpenShock-Core-V2/compile_commands.json with native ESP-IDF for the
-  canonical OpenShock-Core-V2 config, configuring only or also compiling.
+  canonical OpenShock-Core-V2 config.
 inputs:
   version:
     required: true
     description: 'Current firmware version'
-  mode:
+  target:
     required: false
-    default: configure
+    default: reconfigure
     description: >-
-      configure - CMake only, which writes compile_commands.json.
-      build - also compile, for tools that trace the compiler (CodeQL).
+      The idf.py target: reconfigure runs CMake only, which writes compile_commands.json;
+      app also compiles, for tools that trace the compiler (CodeQL).
 
 runs:
   using: composite
   steps:
     - uses: ./.github/actions/setup-esp-idf
 
-    - name: Validate mode
-      shell: bash
-      run: |
-        set -euo pipefail
-        case "${{ inputs.mode }}" in
-          configure|build) ;;
-          *) echo "::error::mode must be 'configure' or 'build', got '${{ inputs.mode }}'"; exit 1 ;;
-        esac
-
     # ccache stays off: it would hide compiler invocations from CodeQL's tracer.
-    - name: Generate compilation database (OpenShock-Core-V2 / esp32s3)
+    - name: Generate compilation database (OpenShock-Core-V2)
       shell: bash
       run: |
         set -euo pipefail
-        if [ "${{ inputs.mode }}" = "build" ]; then
-          python3 scripts/build.py OpenShock-Core-V2 app
-        else
-          python3 scripts/build.py OpenShock-Core-V2 reconfigure
-        fi
+        python scripts/build.py OpenShock-Core-V2 "$TARGET"
         test -f build/OpenShock-Core-V2/compile_commands.json \
           || { echo "::error::compile_commands.json was not generated"; exit 1; }
       env:
+        TARGET: ${{ inputs.target }}
         OPENSHOCK_FW_VERSION: ${{ inputs.version }}
         OPENSHOCK_FW_GIT_COMMIT: ${{ github.sha }}

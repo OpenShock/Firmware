@@ -5,7 +5,7 @@ description: >-
 inputs:
   variant:
     required: true
-    description: 'Build variant id, as get-vars.py emits it (e.g. esp32s3-6832dbd5)'
+    description: 'Build variant id, as get_vars.py emits it (e.g. esp32s3-6832dbd5)'
   version:
     required: true
     description: 'Current firmware version'
@@ -18,13 +18,21 @@ runs:
 
     # One store per variant and IDF version. Entries are immutable, so the key ends in the run and
     # restore-keys picks the newest store; only develop saves, so every other ref restores develop's.
+    - name: Compute ccache key
+      id: ccache-key
+      shell: bash
+      env:
+        IDF_VERSION: ${{ steps.idf.outputs.version }}
+        VARIANT: ${{ inputs.variant }}
+      run: echo "key=ccache-v2-$RUNNER_OS-$IDF_VERSION-$VARIANT-" >> "$GITHUB_OUTPUT"
+
     - name: Restore ccache
       uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9  # v6.1.0
       with:
         path: ~/.cache/ccache
-        key: ccache-v2-${{ runner.os }}-${{ steps.idf.outputs.version }}-${{ inputs.variant }}-${{ github.run_id }}-${{ github.run_attempt }}
+        key: ${{ steps.ccache-key.outputs.key }}${{ github.run_id }}-${{ github.run_attempt }}
         restore-keys: |
-          ccache-v2-${{ runner.os }}-${{ steps.idf.outputs.version }}-${{ inputs.variant }}-
+          ${{ steps.ccache-key.outputs.key }}
 
     # Code targets only: the static0 image is the staticfs job's.
     - name: Build firmware
@@ -33,8 +41,9 @@ runs:
         set -euo pipefail
         export IDF_CCACHE_ENABLE=1
         ccache --zero-stats >/dev/null 2>&1 || true
-        python3 scripts/build.py --variant "${{ inputs.variant }}" app bootloader partition-table
+        python scripts/build.py --variant "$VARIANT" app bootloader partition-table
       env:
+        VARIANT: ${{ inputs.variant }}
         OPENSHOCK_FW_VERSION: ${{ inputs.version }}
         # Fixed: the build directory is on every compile command line, so it is part of each ccache hash.
         OPENSHOCK_BUILD_DIR: build/firmware
@@ -47,7 +56,16 @@ runs:
     # A near-zero hit rate on an unchanged tree means something per-commit is being force-included.
     - name: ccache statistics
       shell: bash
-      run: ccache --show-stats --verbose || ccache -s
+      env:
+        VARIANT: ${{ inputs.variant }}
+      run: |
+        ccache --show-stats --verbose || ccache -s
+        {
+          echo "### ccache ($VARIANT)"
+          echo '```'
+          ccache --show-stats || true
+          echo '```'
+        } >> "$GITHUB_STEP_SUMMARY"
 
     # develop only: another ref's entry is restorable by that ref alone and would only spend the 10 GB.
     - name: Save ccache
@@ -55,20 +73,20 @@ runs:
       uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9  # v6.1.0
       with:
         path: ~/.cache/ccache
-        key: ccache-v2-${{ runner.os }}-${{ steps.idf.outputs.version }}-${{ inputs.variant }}-${{ github.run_id }}-${{ github.run_attempt }}
+        key: ${{ steps.ccache-key.outputs.key }}${{ github.run_id }}-${{ github.run_attempt }}
 
     # dist/<variant>/ so the package job can merge every variant into one tree; app.bin is the OTA name.
     - name: Stage partition images
       shell: bash
       env:
-        B: build/firmware
-        OUT: dist/${{ inputs.variant }}
+        BUILD_DIR: build/firmware
+        OUT_DIR: dist/${{ inputs.variant }}
       run: |
         set -euo pipefail
-        mkdir -p "$OUT"
-        cp "$B/firmware.bin"                        "$OUT/app.bin"
-        cp "$B/bootloader/bootloader.bin"           "$OUT/bootloader.bin"
-        cp "$B/partition_table/partition-table.bin" "$OUT/partition-table.bin"
+        mkdir -p "$OUT_DIR"
+        cp "$BUILD_DIR/firmware.bin"                        "$OUT_DIR/app.bin"
+        cp "$BUILD_DIR/bootloader/bootloader.bin"           "$OUT_DIR/bootloader.bin"
+        cp "$BUILD_DIR/partition_table/partition-table.bin" "$OUT_DIR/partition-table.bin"
 
     # variant_*, not firmware_*: repo-server-publish downloads firmware_* and must not get unstamped images.
     - name: Upload partition images

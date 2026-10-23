@@ -1,16 +1,5 @@
-# Dependencies for the CI scripts in this directory.
-#
-# Installed with --require-hashes, so every distribution pip may choose has to be
-# listed here by hash. That is why the transitive dependencies appear too, and why
-# each entry carries several hashes: the pure-python wheel, the sdist, and for
-# charset-normalizer the compiled wheels for the interpreters the runners ship.
-# An unpinned install would be arbitrary third-party code running in the same job
-# as the repository-server publish credential.
-#
-# Refreshing after a version bump:
-#   pip install pip-tools
-#   pip-compile --generate-hashes --output-file requirements.txt requirements.in
-# or re-query the PyPI JSON API for the new release's digests.
+# Hashed for --require-hashes (this job holds the publish credential). Direct deps: requests, semver; the rest is transitive.
+# Refresh from the repository root with: pip-compile --generate-hashes --output-file .github/scripts/requirements.txt <(printf 'requests\nsemver\n')
 
 # --- direct ---
 

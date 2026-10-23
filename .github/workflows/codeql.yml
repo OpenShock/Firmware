@@ -13,9 +13,13 @@ concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
+defaults:
+  run:
+    shell: bash
+
 jobs:
-  analyze-js-py:
-    name: Analyze JS/PY
+  analyze:
+    name: Analyze ${{ matrix.language }}
     runs-on: 'ubuntu-latest'
     timeout-minutes: 10
     permissions:
@@ -26,7 +30,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        language: ['javascript-typescript', 'python']
+        language: ['javascript-typescript', 'python', 'actions']
 
     steps:
       - name: Checkout repository
@@ -36,15 +40,15 @@ jobs:
 
       # Initializes the CodeQL tools for scanning.
       - name: Initialize CodeQL
-        uses: github/codeql-action/init@416ff0dea110f80f0f56f0046500dbf7420e4bb0  # codeql-bundle-v2.27.1
+        uses: github/codeql-action/init@9b3254085494b55a0f7c4c2b3d2d52cc712ce370  # v4.39.1
         with:
           languages: ${{ matrix.language }}
 
-      # No build step: JavaScript/TypeScript and Python are extracted from source.
+      # No build step: JavaScript/TypeScript, Python and workflow YAML are extracted from source.
       - name: Perform CodeQL Analysis
-        uses: github/codeql-action/analyze@416ff0dea110f80f0f56f0046500dbf7420e4bb0  # codeql-bundle-v2.27.1
+        uses: github/codeql-action/analyze@9b3254085494b55a0f7c4c2b3d2d52cc712ce370  # v4.39.1
         with:
-          category: '/language:${{matrix.language}}'
+          category: '/language:${{ matrix.language }}'
 
   # Weekly or on demand only: the C/C++ analysis has to compile the firmware.
   analyze-cpp:
@@ -57,9 +61,6 @@ jobs:
       contents: read
       security-events: write
 
-    env:
-      language: 'c-cpp'
-
     steps:
       - name: Checkout repository
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
@@ -69,17 +70,17 @@ jobs:
         run: git submodule update --init --depth 1 components/flatbuffers/flatbuffers
 
       - name: Initialize CodeQL
-        uses: github/codeql-action/init@416ff0dea110f80f0f56f0046500dbf7420e4bb0  # codeql-bundle-v2.27.1
+        uses: github/codeql-action/init@9b3254085494b55a0f7c4c2b3d2d52cc712ce370  # v4.39.1
         with:
-          languages: ${{ env.language }}
+          languages: c-cpp
 
       # build, not configure: the tracer must see the compiler run. The version is a placeholder.
       - uses: ./.github/actions/build-compilationdb
         with:
           version: 0.0.0-codeql+build
-          mode: build
+          target: app
 
       - name: Perform CodeQL Analysis
-        uses: github/codeql-action/analyze@416ff0dea110f80f0f56f0046500dbf7420e4bb0  # codeql-bundle-v2.27.1
+        uses: github/codeql-action/analyze@9b3254085494b55a0f7c4c2b3d2d52cc712ce370  # v4.39.1
         with:
-          category: '/language:${{ env.language }}'
+          category: '/language:c-cpp'
