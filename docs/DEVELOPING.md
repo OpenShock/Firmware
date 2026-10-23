@@ -64,12 +64,18 @@ user:
 
 ### Python dependencies
 
-The scripts need a few packages beyond what ESP-IDF's venv ships. Install them into the active
-ESP-IDF venv (or any venv you use for the scripts):
+The scripts need a few packages beyond what ESP-IDF's venv ships. Install them into a venv of
+your own, not into ESP-IDF's: `requirements.txt` pins a newer `cryptography` than ESP-IDF's
+constraints allow, and installing it there breaks the ESP-IDF activation.
 
 ```sh
+python -m venv .venv && . .venv/bin/activate      # Windows: .venv\Scripts\activate
 pip install --require-hashes -r requirements.txt
 ```
+
+The one exception is the `staticfs` build target, which ESP-IDF's own interpreter runs: it needs
+`littlefs-python` in the ESP-IDF venv. Install just that one there, at the version pinned in
+`requirements.in`.
 
 ## Building
 
