@@ -71,14 +71,24 @@ def main() -> int:
     if not schema_files:
         sys.exit(f'No .fbs schemas found in {schemas_path}')
 
-    ts_args = ['--ts', '--ts-no-import-ext']
+    ts_args = [
+        # Compile for TypeScript.
+        '--ts',
+        # Don't add .ts extension to imports.
+        '--ts-no-import-ext',
+    ]
     cpp_args = [
+        # Compile for C++.
         '--cpp',
+        # Don't prefix enum values in generated C++ by their enum type.
         '--no-prefix',
+        # Use C++11 style scoped and strongly typed enums in generated C++. This also implies --no-prefix.
         '--scoped-enums',
+        # Generate type name functions for C++.
         '--gen-name-strings',
-        # (char* + length) string construction instead of std::string, for efficient custom string types.
+        # Don't construct custom string types by passing std::string from Flatbuffers, but (char* + length). This allows efficient construction of custom string types, including zero-copy construction.
         '--cpp-str-flex-ctor',
+        # use C++17 features in generated code (experimental).
         '--cpp-std',
         'c++17',
     ]
