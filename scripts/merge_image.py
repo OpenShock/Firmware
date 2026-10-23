@@ -12,14 +12,15 @@ import argparse
 import sys
 from pathlib import Path
 
-import esptool
-from esptool.targets import CHIP_DEFS
-
 from utils import partitions
 from utils.boards import board_fragment, board_names, read_target
 
 
 def merge_one(board: str, bindir: Path, staticfs: str, output: str) -> None:
+    # Imported here so the argument checks (and their tests) need no esptool.
+    import esptool
+    from esptool.targets import CHIP_DEFS
+
     chip = read_target(board_fragment(board))
     table = partitions.read_partitions(partitions.partition_csv_for(board))
     if 'static0' not in table:
@@ -50,12 +51,14 @@ def main(argv=None) -> None:
             template.format(board=names[0])
     except (KeyError, IndexError, ValueError) as e:
         raise SystemExit(f'error: cannot expand --bindir or --output ({type(e).__name__}: {e}); only {{board}} is expanded')
+    if len(names) > 1 and len({args.output.format(board=b) for b in names}) < len(names):
+        raise SystemExit('error: --output expands to the same path for different boards; include {board}')
 
     failed = []
     for board in names:
         output = Path(args.output.format(board=board))
-        output.parent.mkdir(parents=True, exist_ok=True)
         try:
+            output.parent.mkdir(parents=True, exist_ok=True)
             merge_one(board, Path(args.bindir.format(board=board)), args.staticfs, str(output))
         # esptool exits rather than raising, and a zero code is still a success.
         except SystemExit as e:
