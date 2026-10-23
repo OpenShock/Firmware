@@ -4,11 +4,10 @@ const char* const TAG = "ServerMessageHandlers";
 
 #include "AppHooks.h"
 #include "estop/EStopManager.h"
+#include "GatewayConnectionManager.h"
 #include "Logging.h"
 
 #include <cstdint>
-
-#include <esp_system.h>
 
 using namespace OpenShock::MessageHandlers::Server;
 
@@ -31,7 +30,8 @@ void _Private::HandleTrigger(const OpenShock::Serialization::Gateway::GatewayToH
 
   switch (triggerType) {
     case TriggerType::Restart:
-      esp_restart();
+      // Handled on the websocket task: the actual restart runs from the main task so the client can close cleanly.
+      GatewayConnectionManager::RequestRestart();
       break;
     case TriggerType::EmergencyStop:
       EStopManager::SoftwareTrigger();

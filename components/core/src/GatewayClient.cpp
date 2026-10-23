@@ -50,12 +50,18 @@ GatewayClient::~GatewayClient()
 {
   OS_LOGD(TAG, "Destroying GatewayClient");
 
-  _setState(GatewayClientState::Disconnected);
-
-  if (m_client != nullptr) {
-    esp_websocket_client_close(m_client, pdMS_TO_TICKS(1000));
-  }
+  close();  // No-op once disconnected, e.g. after the shutdown handler or a lost link already closed it
   _destroyHandle();
+}
+
+void GatewayClient::close()
+{
+  if (m_client == nullptr || m_state == GatewayClientState::Disconnected) {
+    return;
+  }
+
+  _setState(GatewayClientState::Disconnected);
+  esp_websocket_client_close(m_client, pdMS_TO_TICKS(1000));
 }
 
 void GatewayClient::_destroyHandle()

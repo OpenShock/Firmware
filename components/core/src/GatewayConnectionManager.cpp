@@ -17,6 +17,8 @@ const char* const TAG = "GatewayConnectionManager";
 #include "util/Backoff.h"
 #include "util/RetiredList.h"
 
+#include <esp_system.h>
+
 #include <algorithm>
 #include <atomic>
 #include <memory>
@@ -38,6 +40,7 @@ static OpenShock::Backoff s_authBackoff(300'000, 300'000);   // After the backen
 static OpenShock::Backoff s_connectBackoff(20'000, 20'000);  // Between LCG connection attempts: 20 seconds
 static OpenShock::Backoff s_hubInfoBackoff(5'000, 300'000);  // After a failed hub info fetch: 5 s doubling up to 5 min
 static std::atomic<bool> s_retryResetRequested = false;
+static std::atomic<bool> s_restartRequested    = false;
 static OpenShock::SimpleMutex s_clientMutex;
 static std::shared_ptr<OpenShock::GatewayClient> s_wsClient = nullptr;
 // Clients taken out of service but not yet destroyed. Destruction blocks (websocket close + task stop), so it is
@@ -85,6 +88,18 @@ static void handleWiFiStateChanged(void* arg, esp_event_base_t base, int32_t id,
   }
 }
 
+// Runs inside esp_restart(), on the task that called it (main, serial console, OTA; never the websocket task, see
+// RequestRestart). Shutdown handlers run newest first, and WiFiManager::Init() ran esp_wifi_init() before this
+// registered, so this closes the gateway websocket before esp_wifi_stop() pulls the link out from under it.
+static void handleShutdown()
+{
+  OpenShock::ScopedLock lock__(&s_clientMutex);
+  if (s_wsClient != nullptr) {
+    s_wsClient->retire();
+    s_wsClient->close();
+  }
+}
+
 using namespace OpenShock;
 namespace JsonAPI = OpenShock::Serialization::JsonAPI;
 
@@ -93,6 +108,12 @@ bool GatewayConnectionManager::Init()
   esp_err_t err = esp_event_handler_register(OPENSHOCK_EVENTS, OPENSHOCK_EVENT_WIFI_STATE_CHANGED, handleWiFiStateChanged, nullptr);
   if (err != ESP_OK) {
     OS_LOGE(TAG, "Failed to register WiFi state event handler: %s", esp_err_to_name(err));
+    return false;
+  }
+
+  err = esp_register_shutdown_handler(handleShutdown);
+  if (err != ESP_OK) {
+    OS_LOGE(TAG, "Failed to register shutdown handler: %s", esp_err_to_name(err));
     return false;
   }
 
@@ -368,8 +389,19 @@ static void InitializeClient()
   CreateClient(authToken);
 }
 
+void GatewayConnectionManager::RequestRestart()
+{
+  OS_LOGI(TAG, "Restart requested by gateway");
+  s_restartRequested.store(true);
+}
+
 void GatewayConnectionManager::Update()
 {
+  if (s_restartRequested.load()) {
+    OS_LOGI(TAG, "Restarting");
+    esp_restart();
+  }
+
   s_retiredClients.reap();
 
   if (s_retryResetRequested.exchange(false)) {

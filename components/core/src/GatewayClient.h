@@ -34,6 +34,10 @@ namespace OpenShock {
     // Stops dispatching received messages; used when the client is taken out of service ahead of destruction.
     inline void retire() { m_retired.store(true); }
 
+    // Close handshake with the gateway, blocking up to a second. Used by the shutdown handler so the gateway sees a
+    // clean close before esp_restart() stops WiFi. Not callable from the websocket task (the handshake stops it).
+    void close();
+
     bool loop();
 
   private:
