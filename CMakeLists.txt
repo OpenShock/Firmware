@@ -141,6 +141,19 @@ if(OPENSHOCK_BOARD)
     VERBATIM)
 endif()
 
+# --- Compile database for clangd --------------------------------------------
+# .clangd reads build/compile_commands.json. scripts/build.py copies it there after its builds; a
+# `cmake --build --preset <board>` has no script, so publish it from the build itself.
+set(_os_compile_db_dir ${CMAKE_CURRENT_LIST_DIR}/build)
+if(NOT CMAKE_BINARY_DIR STREQUAL _os_compile_db_dir)
+  add_custom_command(TARGET gen_project_binary POST_BUILD
+    COMMAND ${CMAKE_COMMAND} -E make_directory ${_os_compile_db_dir}
+    COMMAND ${CMAKE_COMMAND} -E copy_if_different
+            ${CMAKE_BINARY_DIR}/compile_commands.json ${_os_compile_db_dir}/compile_commands.json
+    COMMENT "Publishing compile_commands.json for clangd"
+    VERBATIM)
+endif()
+
 # --- Static filesystem image (captive-portal web assets) ---------------------
 # gen_staticfs.py packs the frontend into the `static0` partition image; skipped when the partition table has none.
 partition_table_get_partition_info(_staticfs_offset "--partition-name static0" "offset")

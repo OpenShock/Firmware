@@ -1,10 +1,6 @@
 {
   // C/C++: clangd against build/compile_commands.json (see .clangd). Install Espressif's
-  "clangd.arguments": [
-    "--background-index",
-    "--query-driver=**",
-    "--compile-commands-dir=e:\\src\\openshock\\firmware\\build"
-  ],
+  "clangd.arguments": ["--background-index", "--query-driver=**"],
   "C_Cpp.intelliSenseEngine": "disabled",
   "[c]": { "editor.defaultFormatter": "llvm-vs-code-extensions.vscode-clangd" },
   "[cpp]": { "editor.defaultFormatter": "llvm-vs-code-extensions.vscode-clangd" },

@@ -59,7 +59,7 @@ Confirmed working boards:
 
 Refer to [OpenShock Wiki - Guides: First time setup](https://wiki.openshock.org/guides/openshock/first-setup) on how to set up your microcontroller.
 
-Other than that, you can just flash via platform io in vscode. More in the contribute section.
+To flash a build of your own, see [docs/DEVELOPING.md](docs/DEVELOPING.md): `python scripts/build.py <board> flash`, or the "Firmware: flash" task in VS Code.
 
 ## Contribute
 

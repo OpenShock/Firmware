@@ -1,5 +1,6 @@
-# clangd configuration. The compile database is build/compile_commands.json, which
-# scripts/build.py refreshes from the last board or variant it built.
+# clangd configuration. The compile database is build/compile_commands.json, which every build
+# (scripts/build.py, and a `cmake --build --preset <board>` via CMakeLists.txt) refreshes from the
+# board or variant built last.
 #
 # Use Espressif's clangd build (esp-clangd), which knows the Xtensa targets; stock clangd
 # rejects the esp32/s2/s3 compile commands. Point `clangd.path` at it in your user settings.

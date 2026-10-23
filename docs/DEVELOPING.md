@@ -69,7 +69,8 @@ your own, not into ESP-IDF's: `requirements.txt` pins a newer `cryptography` tha
 constraints allow, and installing it there breaks the ESP-IDF activation.
 
 ```sh
-python -m venv .venv && . .venv/bin/activate      # Windows: .venv\Scripts\activate
+python -m venv .venv
+. .venv/bin/activate              # PowerShell or cmd: .venv\Scripts\activate
 pip install --require-hashes -r requirements.txt
 ```
 
@@ -155,6 +156,9 @@ cmake --build --preset OpenShock-Core-V2 --target app
 ESPPORT=COM4 cmake --build --preset OpenShock-Core-V2 --target flash
 ESPPORT=COM4 cmake --build --preset OpenShock-Core-V2 --target monitor
 ```
+
+The inline `ESPPORT=COM4` form is POSIX shell syntax. In PowerShell set it first with
+`$env:ESPPORT = "COM4"`, in cmd with `set ESPPORT=COM4`, and then run the command without it.
 
 The presets build into `build/<board>/`, the same directories `scripts/build.py` uses, so the
 two can be mixed. Flash and monitor read the port from `ESPPORT`; `menuconfig` is a target too.

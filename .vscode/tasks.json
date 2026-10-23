@@ -85,9 +85,29 @@
       "problemMatcher": []
     },
     {
-      "label": "Scripts: ruff + mypy + pytest",
+      "label": "Scripts: ruff",
       "type": "shell",
-      "command": "ruff check . && mypy && python -m pytest",
+      "command": "ruff",
+      "args": ["check", "."],
+      "problemMatcher": []
+    },
+    {
+      "label": "Scripts: mypy",
+      "type": "shell",
+      "command": "mypy",
+      "problemMatcher": []
+    },
+    {
+      "label": "Scripts: pytest",
+      "type": "shell",
+      "command": "python",
+      "args": ["-m", "pytest"],
+      "problemMatcher": []
+    },
+    {
+      "label": "Scripts: ruff + mypy + pytest",
+      "dependsOrder": "sequence",
+      "dependsOn": ["Scripts: ruff", "Scripts: mypy", "Scripts: pytest"],
       "group": "test",
       "problemMatcher": []
     },
@@ -100,10 +120,25 @@
       "problemMatcher": []
     },
     {
-      "label": "Frontend: check + lint",
+      "label": "Frontend: check",
       "type": "shell",
-      "command": "pnpm run check && pnpm run lint",
+      "command": "pnpm",
+      "args": ["run", "check"],
       "options": { "cwd": "${workspaceFolder}/frontend" },
+      "problemMatcher": []
+    },
+    {
+      "label": "Frontend: lint",
+      "type": "shell",
+      "command": "pnpm",
+      "args": ["run", "lint"],
+      "options": { "cwd": "${workspaceFolder}/frontend" },
+      "problemMatcher": []
+    },
+    {
+      "label": "Frontend: check + lint",
+      "dependsOrder": "sequence",
+      "dependsOn": ["Frontend: check", "Frontend: lint"],
       "group": "test",
       "problemMatcher": []
     }
