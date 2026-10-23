@@ -1,4 +1,5 @@
 import importlib.util
+import json
 from pathlib import Path
 
 import pytest
@@ -56,30 +57,49 @@ def test_sanitize(name, expected):
     assert get_vars.sanitize(name) == expected
 
 
-def test_sdkconfig_lines_keeps_settings_and_disabled_bools_only(tmp_path):
-    fragment = tmp_path / 'board.defaults'
-    fragment.write_text(
-        '# A comment\n'
-        '\n'
-        'CONFIG_IDF_TARGET="esp32"\n'
-        'OPENSHOCK_RF_TX_GPIO=15\n'
-        '# CONFIG_FOO is not set\n'
-        'CONFIG_BAR=y\n',
-        encoding='utf-8',
-    )
-    assert get_vars.sdkconfig_lines(fragment) == sorted(['CONFIG_IDF_TARGET="esp32"', '# CONFIG_FOO is not set', 'CONFIG_BAR=y'])
+@pytest.fixture
+def run_main(monkeypatch):
+    """Runs get-vars main() for a ref and board selection, git's tag list stubbed out; returns its outputs."""
+    monkeypatch.setattr(get_vars.subprocess, 'check_output', lambda *a, **kw: '1.4.0\n1.3.0\n')
+    for name in ('GITHUB_HEAD_REF', 'RELEASE_NEXT_VERSION', 'RELEASE_SKIP', 'CHANNEL_INPUT'):
+        monkeypatch.delenv(name, raising=False)
+
+    def run(ref, boards_input=''):
+        outputs = {}
+        monkeypatch.setattr(get_vars, 'set_output', lambda name, value: outputs.__setitem__(name, value))
+        monkeypatch.setenv('GITHUB_REF', ref)
+        monkeypatch.setenv('GITHUB_SHA', '0123456789abcdef')
+        monkeypatch.setenv('BOARDS_INPUT', boards_input)
+        assert get_vars.main() == 0
+        return outputs, json.loads(outputs['variant-matrix'])['include']
+
+    return run
 
 
-def test_cache_group_ignores_pins_but_not_disabled_bools(tmp_path):
-    shared = tmp_path / 'sdkconfig.defaults'
-    shared.write_text('CONFIG_X=y\n', encoding='utf-8')
+def test_main_on_develop_builds_every_variant(run_main):
+    outputs, entries = run_main('refs/heads/develop')
+    assert outputs['release-channel'] == 'develop'
+    assert outputs['version'] == '1.4.0-develop+01234567'
+    assert len(entries) > 1
+    assert sorted(b for e in entries for b in e['boards'].split()) == outputs['board-list'].split('\n')
+    assert all(set(e) == {'variant', 'chip', 'boards'} for e in entries)
 
-    def group(content):
-        fragment = tmp_path / 'board.defaults'
-        fragment.write_text(content, encoding='utf-8')
-        return get_vars.cache_group(fragment, 'esp32', shared)
 
-    base = group('CONFIG_IDF_TARGET="esp32"\n')
-    assert group('CONFIG_IDF_TARGET="esp32"\nOPENSHOCK_LED_GPIO=2\n') == base
-    assert group('CONFIG_IDF_TARGET="esp32"\n# CONFIG_X is not set\n') != base
-    assert base.startswith('esp32-')
+def test_main_narrowed_to_one_board_builds_its_variant_only(run_main):
+    outputs, entries = run_main('refs/heads/develop', 'OpenShock-Core-V2')
+    assert outputs['board-list'] == 'OpenShock-Core-V2'
+    assert [(e['chip'], e['boards']) for e in entries] == [('esp32s3', 'OpenShock-Core-V2')]
+
+
+@pytest.mark.parametrize(
+    'tag, channel',
+    [('1.5.0', 'stable'), ('1.5.0-rc.1', 'beta'), ('1.5.0-beta.2', 'beta'), ('1.5.0-dev.4', 'develop')],
+)
+def test_main_on_a_tag_releases_the_tag(run_main, tag, channel):
+    outputs, _ = run_main(f'refs/tags/{tag}')
+    assert (outputs['version'], outputs['release-channel']) == (tag, channel)
+
+
+def test_main_on_a_feature_branch_publishes_to_develop(run_main):
+    outputs, _ = run_main('refs/heads/feature/thing')
+    assert outputs['release-channel'] == 'develop'

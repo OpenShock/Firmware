@@ -1,11 +1,11 @@
 #!/usr/bin/env python3
-"""Derive the CI build variables: firmware version, release channel, board matrix.
+"""Derive the CI build variables: firmware version, release channel, build-variant matrix.
 
-Python port of the former get-vars.js (stdlib only, no node/pnpm toolchain).
+Python port of the former get-vars.js (no node/pnpm toolchain; semver is its one dependency).
 Reads the git ref/sha from the GITHUB_* env, the pending version from release-tool (RELEASE_NEXT_VERSION / RELEASE_SKIP), the repo tags via git, and the buildable boards from boards/*.defaults, then writes GitHub Action outputs.
+The boards are grouped into build variants (scripts/utils/boards.py): ci-build compiles once per variant and stamps each board into a copy.
 """
 
-import hashlib
 import json
 import os
 import re
@@ -16,15 +16,12 @@ from pathlib import Path
 import semver
 
 from gha import fail, notice, set_output
+from repo_server_policy import CHANNELS
 
-# The one parser for boards/<board>.defaults lives with the build helpers. get-vars.yml checks out a sparse
-# tree, so scripts/utils is listed there explicitly.
+# The one parser for boards/<board>.defaults lives with the build helpers. ci-build's plan job checks out a
+# sparse tree, so scripts/utils is listed there explicitly.
 sys.path.insert(0, str(Path(__file__).resolve().parents[2] / 'scripts'))
-from utils.boards import read_target  # noqa: E402
-
-# The channels the repository server's enum knows.
-# A feature branch derives its own name, which is not one of them.
-KNOWN_CHANNELS = ('stable', 'beta', 'develop')
+from utils.boards import all_boards, group_variants  # noqa: E402
 
 def parse_version(tag: str) -> semver.Version | None:
     """Strict semver, except for the historical `v` prefix - the repo still carries a `v0.8.1` tag that the spec (and therefore the parser) rejects.
@@ -57,44 +54,6 @@ def is_dev(version: semver.Version) -> bool:
 
 def sanitize(name: str) -> str:
     return re.sub(r'^-+|-+$', '', re.sub(r'-+', '-', re.sub(r'[^a-zA-Z0-9-]', '-', name)))
-
-
-def sdkconfig_lines(path: Path) -> list[str]:
-    """The CONFIG_* assignments of an sdkconfig fragment, normalized and sorted.
-
-    Comments, blank lines and the bare OPENSHOCK_* board-pin assignments are dropped:
-    the first two carry no build meaning, and the pins are deliberately not Kconfig
-    (see scripts/build.py), so they must not influence the digest below. The one
-    comment form that does mean something, `# CONFIG_X is not set` (it disables a
-    bool), is kept.
-    """
-    lines = []
-    for raw in path.read_text(encoding='utf-8').splitlines():
-        line = raw.strip()
-        if line.startswith('CONFIG_') or (line.startswith('# CONFIG_') and line.endswith(' is not set')):
-            lines.append(line)
-    return sorted(lines)
-
-
-def cache_group(fragment: Path, target: str, shared: Path) -> str:
-    """Name the ccache store this board shares with its peers.
-
-    Two boards compile byte-identical ESP-IDF objects exactly when their resolved
-    sdkconfig is identical, so the store is keyed on precisely that: the chip, plus a
-    digest of every sdkconfig input. Board pins live outside Kconfig, so the five
-    ESP32/4 MB boards - which differ only in pins - collapse into a single group.
-
-    The digest is derived rather than hardcoded as chip+flash-size on purpose: a board
-    that later changes any other sdkconfig setting (PSRAM, a different partition table)
-    splits into its own group by itself, instead of silently sharing a store it can
-    never hit. dependencies.lock is deliberately excluded - a component bump should
-    invalidate the affected objects inside the store, not abandon the whole store.
-    """
-    digest = hashlib.sha256()
-    for line in sdkconfig_lines(shared) + sdkconfig_lines(fragment):
-        digest.update(line.encode('utf-8'))
-        digest.update(b'\n')
-    return f'{target}-{digest.hexdigest()[:10]}'
 
 
 def main() -> int:
@@ -174,20 +133,18 @@ def main() -> int:
     # Resolving it here rather than at publish time keeps one answer for the whole run, so what a build reports about itself is what it is published as.
     channel_input = os.environ.get('CHANNEL_INPUT', '').strip()
     if channel_input:
-        if channel_input not in KNOWN_CHANNELS:
-            fail(f'Channel "{channel_input}" is not one of: {", ".join(KNOWN_CHANNELS)}')
+        if channel_input not in CHANNELS:
+            fail(f'Channel "{channel_input}" is not one of: {", ".join(CHANNELS)}')
         if channel_input != channel:
             notice(f'Channel overridden by dispatch: {channel} -> {channel_input}')
         channel = channel_input
-    elif channel not in KNOWN_CHANNELS:
+    elif channel not in CHANNELS:
         notice(f'Channel "{channel}" is not one the server knows; using develop.')
         channel = 'develop'
 
-    # Board matrix: one entry per boards/<Board>.defaults fragment.
-    boards_dir = Path('boards')
-    if not boards_dir.is_dir():
-        fail('Directory "boards" not found')
-    boards = sorted(p.stem for p in boards_dir.glob('*.defaults'))
+    # Boards: one per boards/<Board>.defaults fragment. A feature branch's own channel name is not one the
+    # server knows, which is why it fell back to develop above.
+    boards = all_boards()
     if not boards:
         fail('No boards/*.defaults files found in "boards"')
 
@@ -199,45 +156,28 @@ def main() -> int:
             fail(f'Unknown board(s) requested: {", ".join(unknown)}')
         boards = [b for b in boards if b in boards_input]
 
-    shared = Path('sdkconfig.defaults')
-    if not shared.is_file():
-        fail('sdkconfig.defaults not found')
-
-    # Each entry carries the ccache store the board belongs to, so build-firmware can key
-    # its cache on the sdkconfig identity rather than on the board name.
+    # One matrix entry per build variant those boards need, so the variants follow from the boards asked for:
+    # the pull request canary compiles its own variant only, and a full build every variant there is.
     # `include` alone is the whole matrix - there are no other axes to combine it with.
-    # The ESP-IDF install is identical for every board, so exactly one job is nominated to
-    # write its cache. Without this, a changed key has all 13 jobs tar and upload ~3.5 GB
-    # at once; one wins the reservation and the rest waste the effort and log a warning.
-    entries = []
-    for index, board in enumerate(boards):
-        fragment = boards_dir / f'{board}.defaults'
-        target = read_target(fragment)
-        entries.append(
-            {
-                'board': board,
-                'chip': target,
-                'cache-group': cache_group(fragment, target, shared),
-                'idf-cache-writer': index == 0,
-            }
-        )
-
-    groups: dict[str, list[str]] = {}
-    for entry in entries:
-        groups.setdefault(entry['cache-group'], []).append(entry['board'])
+    # The board helpers report a bad fragment by raising SystemExit; route it through fail() for the annotation.
+    try:
+        variants = group_variants(boards)
+    except SystemExit as err:
+        fail(str(err.code))
+    entries = [{'variant': v.id, 'chip': v.target, 'boards': ' '.join(v.boards)} for v in variants]
 
     print('Version:  ' + version)
     print('Channel:  ' + channel)
     print('Boards:   ' + ', '.join(boards))
     print('Tags:     ' + ', '.join(tags))
-    print(f'ccache stores: {len(groups)} for {len(boards)} boards')
-    for group, members in sorted(groups.items()):
-        print(f'  {group}  {", ".join(members)}')
+    print(f'Variants: {len(variants)} for {len(boards)} boards')
+    for variant in variants:
+        print(f'  {variant.id}  {", ".join(variant.boards)}')
 
     set_output('version', version)
     set_output('release-channel', channel)
     set_output('board-list', '\n'.join(boards))
-    set_output('board-matrix', json.dumps({'include': entries}))
+    set_output('variant-matrix', json.dumps({'include': entries}))
     return 0
 
 

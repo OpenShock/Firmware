@@ -1,0 +1,108 @@
+"""Tests for the command lines of the build scripts: build.py, gen_env_header.py and the --board option."""
+
+import importlib.util
+
+import pytest
+
+import gen_env_header
+from support import ROOT
+from utils import boards, github
+
+# Loaded from its path: a plain `import build` could resolve to PyPA's `build` package instead.
+_spec = importlib.util.spec_from_file_location('openshock_build', ROOT / 'scripts' / 'build.py')
+build = importlib.util.module_from_spec(_spec)
+_spec.loader.exec_module(build)
+
+
+@pytest.fixture
+def idf(monkeypatch, tmp_path):
+    """Runs build.main without ESP-IDF: records the idf.py command instead of running it."""
+    calls = []
+    monkeypatch.setattr(build.subprocess, 'call', lambda cmd: calls.append(cmd) or 0)
+    monkeypatch.setattr(build.shutil, 'which', lambda name: None)
+    monkeypatch.setenv('IDF_PATH', str(tmp_path / 'idf'))
+    monkeypatch.setenv('OPENSHOCK_BUILD_DIR', str(tmp_path / 'build'))
+    return calls
+
+
+def defaults_arg(cmd):
+    return next(a for a in cmd if a.startswith('-DSDKCONFIG_DEFAULTS='))
+
+
+def test_variant_mode_builds_the_variant_without_a_board(idf, tmp_path):
+    variant = boards.group_variants(['OpenShock-Core-V2'])[0]
+
+    assert build.main(['--variant', variant.id]) == 0
+
+    (cmd,) = idf
+    assert f'-DIDF_TARGET={variant.target}' in cmd and cmd[-1] == 'build'
+    # Passed empty, so a board an earlier configure cached in the build directory is not stamped.
+    assert '-DOPENSHOCK_BOARD=' in cmd
+    fragment = tmp_path / 'build' / 'variant.defaults'
+    # Outside the repository, the fragment is passed by its absolute path.
+    assert defaults_arg(cmd) == f'-DSDKCONFIG_DEFAULTS=sdkconfig.defaults;{fragment.as_posix()}'
+    assert variant.sdkconfig_fragment() in fragment.read_text(encoding='utf-8')
+
+
+def test_board_mode_strips_the_pins(idf, tmp_path):
+    assert build.main(['OpenShock-Core-V2', 'app']) == 0
+
+    (cmd,) = idf
+    assert '-DIDF_TARGET=esp32s3' in cmd and '-DOPENSHOCK_BOARD=OpenShock-Core-V2' in cmd and cmd[-1] == 'app'
+    text = (tmp_path / 'build' / 'board.defaults').read_text(encoding='utf-8')
+    assert 'CONFIG_IDF_TARGET="esp32s3"' in text
+    assert not any(line.startswith('OPENSHOCK_') for line in text.splitlines())
+
+
+def test_a_build_dir_in_the_repository_is_passed_relative(idf, monkeypatch):
+    monkeypatch.setenv('OPENSHOCK_BUILD_DIR', 'build/OpenShock-Core-V2')
+    build.main(['OpenShock-Core-V2'])
+    (cmd,) = idf
+    assert defaults_arg(cmd) == '-DSDKCONFIG_DEFAULTS=sdkconfig.defaults;build/OpenShock-Core-V2/board.defaults'
+
+
+def test_unknown_variant_is_refused(idf):
+    with pytest.raises(SystemExit, match='OpenShock-Core-V2'):
+        build.main(['--variant', 'esp32s3-00000000'])
+    assert idf == []
+
+
+@pytest.mark.parametrize(
+    'env, expected',
+    [
+        ({}, ('debug', 5)),
+        ({'GITHUB_REF_NAME': 'develop'}, ('debug', 5)),
+        ({'GITHUB_REF_NAME': 'master'}, ('release', 3)),
+        ({'GITHUB_REF_NAME': 'beta'}, ('release', 4)),
+        ({'GITHUB_EVENT_NAME': 'pull_request', 'GITHUB_BASE_REF': 'master'}, ('release', 3)),
+        ({'GITHUB_EVENT_NAME': 'pull_request', 'GITHUB_BASE_REF': 'beta'}, ('release', 4)),
+        ({'GITHUB_REF_NAME': '1.5.0', 'GITHUB_REF_TYPE': 'tag'}, ('release', 3)),
+        ({'GITHUB_REF_NAME': '1.5.0-rc.1', 'GITHUB_REF_TYPE': 'tag'}, ('release', 4)),
+        ({'GITHUB_REF_NAME': '1.5.0-dev.1', 'GITHUB_REF_TYPE': 'tag'}, ('release', 3)),
+    ],
+)
+def test_build_mode_follows_the_ref(monkeypatch, env, expected):
+    for name in ('GITHUB_REF_NAME', 'GITHUB_REF_TYPE', 'GITHUB_EVENT_NAME', 'GITHUB_BASE_REF'):
+        monkeypatch.delenv(name, raising=False)
+    monkeypatch.setenv('CI', 'true')
+    monkeypatch.setenv('GITHUB_ACTIONS', 'true')
+    for name, value in env.items():
+        monkeypatch.setenv(name, value)
+    assert github.build_mode() == expected
+
+
+def test_gen_env_header_writes_both_headers_and_keeps_numeric_prereleases_strings(tmp_path, monkeypatch):
+    monkeypatch.setenv('OPENSHOCK_FW_VERSION', '1.2.3-1+abc')
+    gen_env_header.main(['--out-dir', str(tmp_path), '--target', 'esp32s3'])
+    assert '#define OPENSHOCK_FW_CHIP_ESP32S3 1' in (tmp_path / 'openshock_board.h').read_text(encoding='utf-8')
+    version = (tmp_path / 'openshock_version.h').read_text(encoding='utf-8')
+    assert '#define OPENSHOCK_FW_VERSION_PRERELEASE "1"' in version
+    assert '#define OPENSHOCK_FW_VERSION_MAJOR 1' in version
+
+
+def test_board_names_splits_and_refuses_repeats():
+    assert boards.board_names(['A B', 'C']) == ['A', 'B', 'C']
+    with pytest.raises(SystemExit, match='no board names'):
+        boards.board_names([' '])
+    with pytest.raises(SystemExit, match='repeated board.*A'):
+        boards.board_names(['A', 'B A'])

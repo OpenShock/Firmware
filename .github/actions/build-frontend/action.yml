@@ -1,5 +1,12 @@
 name: build-frontend
-description: Builds the frontend and uploads it as an artifact
+description: >-
+  Build the captive-portal frontend into frontend/build, optionally running its type
+  check and unit tests first.
+inputs:
+  checks:
+    description: 'Run svelte-check and the unit tests before building.'
+    required: false
+    default: 'true'
 
 runs:
   using: composite
@@ -20,6 +27,7 @@ runs:
               args: [--frozen-lockfile, --strict-peer-dependencies]
 
     - name: Check
+      if: ${{ inputs.checks == 'true' }}
       working-directory: ./frontend
       shell: bash
       run: pnpm run check
@@ -31,6 +39,7 @@ runs:
     #      run: pnpx playwright install --with-deps
 
     - name: Test
+      if: ${{ inputs.checks == 'true' }}
       working-directory: ./frontend
       shell: bash
       run: pnpm test:unit # TODO: Change back to pnpm test when playwright is working
@@ -39,11 +48,3 @@ runs:
       working-directory: ./frontend
       shell: bash
       run: pnpm run build
-
-    - name: Upload artifacts
-      uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a  # v7.0.1
-      with:
-        name: frontend
-        path: frontend/build/*
-        retention-days: 1
-        if-no-files-found: error

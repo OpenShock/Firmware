@@ -3,15 +3,17 @@
 
 Usage:
     python scripts/build.py <board> [idf.py targets/args ...]
+    python scripts/build.py --variant <variant-id> [idf.py targets/args ...]
 
-Resolves the IDF target from boards/<board>.defaults, sets OPENSHOCK_BOARD (so the
-root CMakeLists generates the env header), layers sdkconfig.defaults + the board
-fragment, and runs idf.py into build/<board>/. Replaces the PlatformIO per-env
-build so CI and local builds share one entry point.
+Board mode builds boards/<board>.defaults into build/<board>/ and stamps the board into the image.
+Variant mode is what CI builds: one unstamped compile for every board of a build variant
+(scripts/utils/boards.py) into build/<variant-id>/; scripts/package_boards.py stamps each board.
+An unknown variant id lists the variants and their boards.
 
 Examples:
     python scripts/build.py OpenShock-Core-V2                 # full build
     python scripts/build.py OpenShock-Core-V2 app bootloader partition-table
+    python scripts/build.py --variant esp32s3-6832dbd5 app bootloader partition-table
 """
 
 import os
@@ -20,70 +22,45 @@ import subprocess
 import sys
 from pathlib import Path
 
-sys.path.insert(0, str(Path(__file__).resolve().parent))
-from utils.boards import board_fragment, is_board_line, read_target  # noqa: E402
+from utils.boards import board_fragment, find_variant, kconfig_lines, read_board_fragment
+from utils.files import write_if_changed
 
 ROOT = Path(__file__).resolve().parent.parent
 
 
-def resolve_build_dir(board: str) -> Path:
-    """Where to build. ``build/<board>`` locally, overridable with OPENSHOCK_BUILD_DIR.
-
-    The build directory path ends up on the compiler command line (``-I<dir>/config``
-    and the ``@<dir>/toolchain/cflags`` response file), so two boards built in
-    differently-named directories produce different command lines and share nothing in
-    ccache - even when their sdkconfig, and therefore every object, is identical.
-
-    Locally the per-board directory is what you want, so several boards can coexist. Each
-    CI job builds exactly one board, so it sets OPENSHOCK_BUILD_DIR to a fixed path and
-    every board in a cache group then compiles byte-identical objects.
-    """
+def resolve_build_dir(name: str) -> Path:
+    """``build/<name>``, or OPENSHOCK_BUILD_DIR. CI fixes the path: it is on the compiler command line, so it is in ccache's hash."""
     override = os.environ.get('OPENSHOCK_BUILD_DIR')
     if override:
         path = Path(override)
         return path if path.is_absolute() else ROOT / path
-    return ROOT / 'build' / board
-
-
-def write_sdkconfig_fragment(fragment: Path, build_dir: Path) -> Path:
-    """Strip the board's GPIO assignments out of the fragment before idf.py sees it.
-
-    boards/<board>.defaults holds two kinds of line: CONFIG_* settings, which are real
-    Kconfig and belong in sdkconfig, and bare OPENSHOCK_* GPIO assignments, which are
-    not. The latter describe the board descriptor scripts/stamp_board.py writes into the
-    app image after linking (scripts/utils/boards.py parses them).
-
-    Keeping the pins out of Kconfig is what lets boards sharing a chip and flash size
-    produce byte-identical ESP-IDF objects: as Kconfig they landed in sdkconfig.h, which
-    most of the framework includes, so a different LED pin invalidated everything.
-
-    Kconfig would reject the bare lines outright, so the filtered copy is what idf.py is
-    pointed at.
-    """
-    out = build_dir / 'board.defaults'
-    kept = [line for line in fragment.read_text(encoding='utf-8').splitlines() if not is_board_line(line)]
-    body = (
-        f'# Generated from {fragment.as_posix()} by scripts/build.py - do not edit.\n'
-        '# The board GPIO assignments are stripped here; they are not Kconfig.\n' + '\n'.join(kept) + '\n'
-    )
-    out.parent.mkdir(parents=True, exist_ok=True)
-    # Write only on change, so touching it does not force a CMake reconfigure.
-    if not out.is_file() or out.read_text(encoding='utf-8') != body:
-        out.write_text(body, encoding='utf-8')
-    return out
+    return ROOT / 'build' / name
 
 
 def main(argv: list[str]) -> int:
-    if not argv:
+    if not argv or argv[0] == '--variant' and len(argv) < 2:
         raise SystemExit(__doc__)
 
-    board = argv[0]
-    targets = argv[1:] or ['build']
-
-    fragment = board_fragment(board)
-    target = read_target(fragment)
-    build_dir = resolve_build_dir(board)
-    frag_rel = write_sdkconfig_fragment(fragment, build_dir).relative_to(ROOT).as_posix()
+    if argv[0] == '--variant':
+        variant = find_variant(argv[1])
+        targets = argv[2:] or ['build']
+        target, board = variant.target, ''
+        build_dir = resolve_build_dir(variant.id)
+        frag = build_dir / 'variant.defaults'
+        body = f'# Build variant {variant.id} ({", ".join(variant.boards)})\n' + variant.sdkconfig_fragment()
+    else:
+        board = argv[0]
+        targets = argv[1:] or ['build']
+        fragment = board_fragment(board)
+        target = read_board_fragment(fragment).target  # parsed whole, so a typo fails now rather than at the stamp
+        build_dir = resolve_build_dir(board)
+        frag = build_dir / 'board.defaults'
+        # Only the Kconfig lines: the OPENSHOCK_* pins are stamped, and Kconfig would reject them.
+        body = f'# Board {board}, without its pins\n' + '\n'.join(kconfig_lines(fragment)) + '\n'
+    # Generated, and written only on change so an unchanged fragment does not force a reconfigure.
+    write_if_changed(frag, '# Generated by scripts/build.py - do not edit.\n' + body)
+    # Relative to the project where it can be; ESP-IDF takes an absolute entry too, for a build dir outside the repo.
+    frag_rel = (frag.relative_to(ROOT) if frag.is_relative_to(ROOT) else frag).as_posix()
 
     idf_args = [
         '-C',
@@ -93,28 +70,24 @@ def main(argv: list[str]) -> int:
         f'-DIDF_TARGET={target}',
         f'-DSDKCONFIG_DEFAULTS=sdkconfig.defaults;{frag_rel}',
         f'-DSDKCONFIG={build_dir / "sdkconfig"}',
+        # Empty for a variant, which also clears a board an earlier configure cached.
+        f'-DOPENSHOCK_BOARD={board}',
         *targets,
     ]
 
-    # Prefer an executable `idf.py` wrapper on PATH. install-esp-idf-action (and
-    # an activated ESP-IDF shell) provide one that sets up the tool + venv
-    # environment itself - the EIM install is not visible to a plain
-    # `python tools/idf.py`. Restricted to POSIX: on Windows a bare idf.py isn't
-    # directly executable, so fall through to the interpreter form there.
+    # An idf.py wrapper on PATH (install-esp-idf-action, an activated ESP-IDF shell) sets up its own
+    # environment. On Windows a bare idf.py is not executable, so run tools/idf.py with this interpreter.
     idf_wrapper = shutil.which('idf.py') if os.name == 'posix' else None
     if idf_wrapper:
         cmd = [idf_wrapper, *idf_args]
     else:
-        # Fall back to running tools/idf.py with the current interpreter, which
-        # requires the ESP-IDF venv to already be active (IDF_PATH set).
         idf_path = os.environ.get('IDF_PATH')
         if not idf_path:
             raise SystemExit('error: IDF_PATH is not set - run the ESP-IDF export script first')
         cmd = [sys.executable, str(Path(idf_path) / 'tools' / 'idf.py'), *idf_args]
 
-    env = dict(os.environ, OPENSHOCK_BOARD=board)
-    print(f'+ OPENSHOCK_BOARD={board} {" ".join(cmd)}', flush=True)
-    return subprocess.call(cmd, env=env)
+    print(f'+ {" ".join(cmd)}', flush=True)
+    return subprocess.call(cmd)
 
 
 if __name__ == '__main__':

@@ -1,16 +1,13 @@
-"""Read a board fragment (boards/<name>.defaults) into a BoardSpec.
+"""Board fragments (boards/<name>.defaults) and the build variants they group into.
 
-A fragment holds two kinds of line. ``CONFIG_*`` lines are real Kconfig, layered onto
-sdkconfig.defaults by scripts/build.py. Bare ``OPENSHOCK_*`` lines are the board's
-hardware description - pins, LED flags, the chip-unsafe pins the board is allowed to use
-anyway - and are deliberately not Kconfig (see scripts/build.py). This module is the one
-parser for those lines, shared by stamp_board.py (the descriptor written into the app
-image), gen_env_header.py (the chip label, and an early typo check at configure time),
-build.py (which strips them before idf.py sees the fragment), merge_image.py and the CI
-matrix script (.github/scripts/get-vars.py).
+A fragment's ``CONFIG_*`` lines are Kconfig. Its bare ``OPENSHOCK_*`` lines are the board's pins and
+LED flags, which are stamped into the image after linking rather than compiled in, so boards that
+differ only in them can share one compile.
 """
 
+import hashlib
 import re
+from collections.abc import Iterable
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -55,19 +52,7 @@ class BoardSpec:
 
     @property
     def gpio_bypass_mask(self) -> int:
-        mask = 0
-        for pin in self.gpio_bypass:
-            mask |= 1 << pin
-        return mask
-
-    @property
-    def pins(self) -> dict[str, int]:
-        return {
-            'OPENSHOCK_RF_TX_GPIO': self.rf_tx_gpio,
-            'OPENSHOCK_ESTOP_PIN': self.estop_gpio,
-            'OPENSHOCK_LED_GPIO': self.led_gpio,
-            'OPENSHOCK_LED_WS2812B': self.ws2812b_gpio,
-        }
+        return sum(1 << pin for pin in self.gpio_bypass)
 
 
 def board_fragment(board: str) -> Path:
@@ -78,9 +63,18 @@ def board_fragment(board: str) -> Path:
     return fragment
 
 
-def is_board_line(line: str) -> bool:
-    """Whether a fragment line is one of the bare board assignments rather than Kconfig."""
-    return re.match(r'\s*OPENSHOCK_[A-Z0-9_]+\s*=', line) is not None
+def board_names(values: list[str]) -> list[str]:
+    """The board names a repeatable --board option holds, each value split on whitespace.
+
+    Refuses an empty list and a board named twice, so a CLI never packages or merges one twice.
+    """
+    names = [name for value in values for name in value.split()]
+    if not names:
+        raise SystemExit('error: --board matched no board names')
+    repeated = sorted({name for name in names if names.count(name) > 1})
+    if repeated:
+        raise SystemExit(f'error: repeated board(s): {", ".join(repeated)}')
+    return names
 
 
 def read_target(fragment: Path) -> str:
@@ -108,15 +102,8 @@ def _parse_pin(fragment: Path, lineno: int, key: str, value: str) -> int:
     return pin
 
 
-def read_board_fragment(fragment: Path, name: str | None = None) -> BoardSpec:
-    """Parse the bare ``OPENSHOCK_*=`` assignments and the IDF target out of a fragment.
-
-    Anything unrecognised is an error rather than a silent no-op: a typo in a pin name
-    would otherwise leave the board on the default and be very hard to spot.
-    """
-    if not fragment.is_file():
-        raise SystemExit(f'error: board fragment {fragment} not found')
-
+def read_board_fragment(fragment: Path) -> BoardSpec:
+    """Parse a fragment's ``OPENSHOCK_*=`` assignments and IDF target. Anything unrecognised is an error, so a typo cannot pass silently."""
     values: dict[str, object] = {key: NO_PIN for key in PIN_KEYS}
     values.update({key: False for key in BOOL_KEYS})
     values.update({key: () for key in LIST_KEYS})
@@ -153,7 +140,7 @@ def read_board_fragment(fragment: Path, name: str | None = None) -> BoardSpec:
 
     target = read_target(fragment)
     return BoardSpec(
-        name=name or fragment.stem,
+        name=fragment.stem,
         target=target,
         chip=chip_for_target(target),
         rf_tx_gpio=values['OPENSHOCK_RF_TX_GPIO'],
@@ -166,4 +153,164 @@ def read_board_fragment(fragment: Path, name: str | None = None) -> BoardSpec:
 
 
 def read_board(board: str) -> BoardSpec:
-    return read_board_fragment(board_fragment(board), board)
+    return read_board_fragment(board_fragment(board))
+
+
+def all_boards() -> list[str]:
+    return sorted(p.stem for p in (ROOT / 'boards').glob('*.defaults'))
+
+
+# --- Flash size --------------------------------------------------------------------------
+
+# ESP-IDF's own default when no sdkconfig input picks a CONFIG_ESPTOOLPY_FLASHSIZE_* choice.
+DEFAULT_FLASH_SIZE = '4MB'
+
+
+def parse_flash_size(text: str) -> str | None:
+    """The flash size an sdkconfig fragment selects, e.g. '8MB', or None when it picks none.
+
+    It is a Kconfig choice, so the selected option reads CONFIG_ESPTOOLPY_FLASHSIZE_<size>=y.
+    The last selection wins, as it would when sdkconfig layers the fragment.
+    """
+    size = None
+    for line in text.splitlines():
+        m = re.match(r'\s*CONFIG_ESPTOOLPY_FLASHSIZE_(\d+MB)\s*=\s*y\s*$', line)
+        if m:
+            size = m.group(1)
+    return size
+
+
+def layered_sdkconfig(board: str) -> list[str]:
+    """The text of every sdkconfig input a board build layers, in order: shared defaults, then the board."""
+    shared = ROOT / 'sdkconfig.defaults'
+    paths = [shared] if shared.is_file() else []
+    return [path.read_text(encoding='utf-8') for path in (*paths, board_fragment(board))]
+
+
+def sdkconfig_value(board: str, key: str) -> str | None:
+    """The value of `key` the board build ends up with, quotes stripped; None when nothing sets it."""
+    value = None
+    for text in layered_sdkconfig(board):
+        for line in text.splitlines():
+            m = re.match(rf'\s*{re.escape(key)}\s*=\s*"?([^"]*)"?\s*$', line)
+            if m:
+                value = m.group(1)
+    return value
+
+
+def flash_size(board: str) -> str:
+    """The board's flash size, layered the way scripts/build.py layers sdkconfig."""
+    size = None
+    for text in layered_sdkconfig(board):
+        size = parse_flash_size(text) or size
+    return size or DEFAULT_FLASH_SIZE
+
+
+def flash_size_bytes(size: str) -> int:
+    return int(size.removesuffix('MB')) * 1024 * 1024
+
+
+# --- Build variants -------------------------------------------------------------------
+# A variant is one compile, and every board whose fragment differs from it only in what
+# is settled after linking. That is two things:
+#
+#   - the OPENSHOCK_* lines, stamped into the app image by utils/stamping.py;
+#   - the flash size. It feeds the partition table's fit check and the image headers'
+#     flash-size field, and nothing else: no board's partition table, and no firmware
+#     code, uses flash past VARIANT_FLASH_SIZE, the size partitions/ota_4mb.csv is laid
+#     out for. So a variant compiles at that size and every board ships its images as
+#     they are; a bigger board's bootloader logs that the chip is larger than its header
+#     says and uses the header's size. A board that wants its extra flash needs a bigger
+#     partition table, which is Kconfig and so a variant of its own - and the fit check
+#     fails that variant's build until it compiles at the board's size.
+#
+# Every other Kconfig line is compiled in and splits the variant: the S3 boards on the
+# USB-Serial-JTAG console and the ones on the UART cannot share an image, because the
+# serial driver and the bootloader's console are both chosen at compile time.
+#
+# Variants are derived from whichever boards a build asks for, never declared, so a board
+# that changes a Kconfig setting moves into its own variant by itself.
+
+VARIANT_FLASH_SIZE = '4MB'
+
+
+def _is_kconfig_line(line: str) -> bool:
+    # `# CONFIG_X is not set` is the one comment form that means something: it disables a bool.
+    return line.startswith('CONFIG_') or (line.startswith('# CONFIG_') and line.endswith(' is not set'))
+
+
+def _is_flash_size_line(line: str) -> bool:
+    return re.match(r'(#\s*)?CONFIG_ESPTOOLPY_FLASHSIZE_', line) is not None
+
+
+def kconfig_lines(fragment: Path) -> list[str]:
+    """The Kconfig lines of an sdkconfig fragment, stripped, in file order.
+
+    Comments, blank lines and the bare OPENSHOCK_* board assignments are dropped.
+    """
+    lines = []
+    for raw in fragment.read_text(encoding='utf-8').splitlines():
+        line = raw.strip()
+        if _is_kconfig_line(line):
+            lines.append(line)
+    return lines
+
+
+def variant_kconfig(fragment: Path) -> list[str]:
+    """The Kconfig lines that decide what a board compiles to: all of them but the flash size."""
+    return [line for line in kconfig_lines(fragment) if not _is_flash_size_line(line)]
+
+
+def variant_id(fragment: Path) -> str:
+    """Name the compile a board needs: its IDF target plus a digest of its compiled-in Kconfig.
+
+    The order-independent digest makes two fragments listing the same settings in another
+    order the same variant. sdkconfig.defaults is not part of it: every board shares it,
+    so it cannot tell two variants apart, and leaving it out keeps the id - which also
+    names the ccache store - stable across edits to the shared defaults.
+    """
+    digest = hashlib.sha256('\n'.join(sorted(variant_kconfig(fragment))).encode('utf-8')).hexdigest()
+    return f'{read_target(fragment)}-{digest[:8]}'
+
+
+@dataclass(frozen=True)
+class Variant:
+    id: str
+    target: str
+    # The compiled-in Kconfig, in the file order of the first board's fragment.
+    kconfig: tuple[str, ...]
+    boards: tuple[str, ...]
+
+    def sdkconfig_fragment(self) -> str:
+        """The fragment scripts/build.py layers onto sdkconfig.defaults for this variant."""
+        return '\n'.join([*self.kconfig, f'CONFIG_ESPTOOLPY_FLASHSIZE_{VARIANT_FLASH_SIZE}=y']) + '\n'
+
+
+def group_variants(names: Iterable[str]) -> list[Variant]:
+    """The variants that build these boards, sorted by id; each lists its boards sorted."""
+    members: dict[str, list[str]] = {}
+    for name in sorted(set(names)):
+        members.setdefault(variant_id(board_fragment(name)), []).append(name)
+
+    variants = []
+    for vid, names_in in sorted(members.items()):
+        fragment = board_fragment(names_in[0])
+        variants.append(
+            Variant(
+                id=vid,
+                target=read_target(fragment),
+                kconfig=tuple(variant_kconfig(fragment)),
+                boards=tuple(names_in),
+            )
+        )
+    return variants
+
+
+def find_variant(vid: str) -> Variant:
+    """The variant with this id among every board in the repository."""
+    variants = group_variants(all_boards())
+    for variant in variants:
+        if variant.id == vid:
+            return variant
+    avail = '\n'.join(f'  {v.id}  {", ".join(v.boards)}' for v in variants)
+    raise SystemExit(f'error: unknown build variant {vid!r}\n  available:\n{avail}')

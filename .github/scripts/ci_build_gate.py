@@ -1,8 +1,7 @@
 #!/usr/bin/env python3
-"""Decide what a ci-build run does: build, deploy, publish, which server, which boards.
+"""Decide what a ci-build run does: build, publish, which server, which boards.
 
 build governs the build matrix.
-deploy additionally cuts a GitHub release, and implies build.
 publish governs whether the build reaches a repository server at all, and server names which one.
 Building is not publishing: a pull request compiles and goes no further.
 
@@ -90,19 +89,10 @@ class GitHubApi:
 @dataclass
 class Decision:
     build: bool = False
-    deploy: bool = False
     publish: bool = False
     server: str = 'dev'
-    # Empty builds every board.
+    # Empty builds every board. The build variants these need are get-vars.py's to work out.
     boards: str = ''
-
-    @property
-    def warm_idf(self) -> bool:
-        """Whether to warm the ESP-IDF cache before the matrix.
-
-        Only worth it when several boards would otherwise miss the cache at once; a single board's job writes the cache itself as the nominated writer.
-        """
-        return self.build and len(self.boards.split()) != 1
 
 
 def _created_at(run: dict) -> datetime:
@@ -169,7 +159,6 @@ def decide(event_name: str, ref: str, sha: str, payload: dict, api: Api) -> Deci
     elif event_name == 'push':
         # Only release tags trigger a push run.
         d.build = True
-        d.deploy = True
     elif event_name == 'workflow_dispatch':
         if nightly:
             if branch not in NIGHTLY_BRANCHES:
@@ -182,11 +171,8 @@ def decide(event_name: str, ref: str, sha: str, payload: dict, api: Api) -> Deci
                     notice(f'No firmware sources changed on {branch} since its last build ({base}); nothing to build.')
                 else:
                     d.build = True
-                    # Only develop's nightly is a release; beta and master publish from tags.
-                    d.deploy = branch == 'develop'
         else:
             d.build = True
-            d.deploy = ref == 'refs/heads/develop'
     else:
         d.build = True
 
@@ -227,14 +213,12 @@ def main() -> int:
         return 'true' if value else 'false'
 
     set_output('build', flag(d.build))
-    set_output('deploy', flag(d.deploy))
     set_output('publish', flag(d.publish))
     set_output('server', d.server)
     set_output('boards', d.boards)
-    set_output('warm-idf', flag(d.warm_idf))
     print(
-        f'decision: build={flag(d.build)} deploy={flag(d.deploy)} publish={flag(d.publish)} '
-        f'server={d.server} boards={d.boards or "all"} warm-idf={flag(d.warm_idf)}'
+        f'decision: build={flag(d.build)} publish={flag(d.publish)} '
+        f'server={d.server} boards={d.boards or "all"}'
     )
     return 0
 

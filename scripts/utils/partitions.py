@@ -3,38 +3,21 @@
 import re
 from pathlib import Path
 
-ROOT = Path(__file__).resolve().parent.parent.parent
+from .boards import ROOT, sdkconfig_value
 
 # ESP-IDF's default CONFIG_PARTITION_TABLE_OFFSET.
 DEFAULT_PARTITION_TABLE_OFFSET = 0x8000
 
 
-def _sdkconfig_value(board: str | None, key: str) -> str | None:
-    """Last value of `key` in sdkconfig.defaults, then the board fragment (the order scripts/build.py layers them)."""
-    paths = [ROOT / 'sdkconfig.defaults']
-    if board is not None:
-        paths.append(ROOT / 'boards' / f'{board}.defaults')
-
-    value = None
-    for path in paths:
-        if not path.is_file():
-            continue
-        for line in path.read_text(encoding='utf-8').splitlines():
-            m = re.match(rf'\s*{re.escape(key)}\s*=\s*"?([^"]*)"?\s*$', line)
-            if m:
-                value = m.group(1)
-    return value
-
-
-def partition_csv_for(board: str | None) -> Path:
-    name = _sdkconfig_value(board, 'CONFIG_PARTITION_TABLE_CUSTOM_FILENAME')
+def partition_csv_for(board: str) -> Path:
+    name = sdkconfig_value(board, 'CONFIG_PARTITION_TABLE_CUSTOM_FILENAME')
     if not name:
         raise SystemExit(f'error: no CONFIG_PARTITION_TABLE_CUSTOM_FILENAME for board {board!r}')
     return ROOT / name
 
 
-def partition_table_offset(board: str | None) -> int:
-    value = _sdkconfig_value(board, 'CONFIG_PARTITION_TABLE_OFFSET')
+def partition_table_offset(board: str) -> int:
+    value = sdkconfig_value(board, 'CONFIG_PARTITION_TABLE_OFFSET')
     return int(value, 0) if value else DEFAULT_PARTITION_TABLE_OFFSET
 
 

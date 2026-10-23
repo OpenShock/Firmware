@@ -22,6 +22,9 @@ API_VERSION = '2026-03-10'
 # The branch each channel is cut from.
 # develop is absent because the nightly is already the only thing publishing it, and a tag is not required to descend from it.
 # Branch a commit must be contained in to publish to the channel on prod.
+# The channels the repository server's enum knows. A feature branch derives its own name, which is not one of them.
+CHANNELS = ('stable', 'beta', 'develop')
+
 CHANNEL_BRANCH = {'stable': 'master', 'beta': 'beta', 'develop': 'develop'}
 # Channels whose prod publishes also need a staged draft release (develop builds have no release).
 DRAFT_CHANNELS = ('stable', 'beta')

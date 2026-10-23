@@ -102,18 +102,6 @@ class Descriptor:
         crc = zlib.crc32(body[:DESC_CRC_LEN]) & 0xFFFFFFFF
         return body[:DESC_CRC_LEN] + struct.pack('<I', crc)
 
-    def as_dict(self) -> dict:
-        return {
-            'board': self.board,
-            'chip': self.chip,
-            'rf_tx_gpio': self.rf_tx_gpio,
-            'estop_gpio': self.estop_gpio,
-            'led_gpio': self.led_gpio,
-            'ws2812b_gpio': self.ws2812b_gpio,
-            'flags': self.flags,
-            'gpio_bypass_mask': self.gpio_bypass_mask,
-            'schema_version': self.schema_version,
-        }
 
 
 class DescriptorError(ValueError):
