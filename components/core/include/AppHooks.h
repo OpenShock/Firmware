@@ -12,15 +12,19 @@
 namespace OpenShock::AppHooks {
   typedef bool (*BroadcastMessageBINFn)(std::span<const uint8_t> data);
   typedef void (*SetAlwaysEnabledFn)(bool alwaysEnabled);
+  typedef bool (*IsRunningFn)();
   typedef FirmwareBootType (*GetFirmwareBootTypeFn)();
   typedef bool (*TryStartFirmwareUpdateFn)(const OpenShock::SemVer& version);
   typedef bool (*RequestUpdateCheckFn)();
 
-  void RegisterCaptivePortal(BroadcastMessageBINFn broadcastMessageBIN, SetAlwaysEnabledFn setAlwaysEnabled);
+  void RegisterCaptivePortal(BroadcastMessageBINFn broadcastMessageBIN, SetAlwaysEnabledFn setAlwaysEnabled, IsRunningFn isRunning);
   void RegisterOtaUpdateManager(GetFirmwareBootTypeFn getFirmwareBootType, TryStartFirmwareUpdateFn tryStartFirmwareUpdate, RequestUpdateCheckFn requestUpdateCheck);
 
   bool CaptivePortalBroadcastMessageBIN(std::span<const uint8_t> data);
   void CaptivePortalSetAlwaysEnabled(bool alwaysEnabled);
+  /// @brief Cheap, lock-free check whether a portal instance exists. Use it to skip building a local message when nobody
+  ///        can receive it; a broadcast still checks again under the portal's own lock.
+  bool CaptivePortalIsRunning();
 
   FirmwareBootType OtaGetFirmwareBootType();
   bool OtaTryStartFirmwareUpdate(const OpenShock::SemVer& version);

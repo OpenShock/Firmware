@@ -22,28 +22,35 @@ const char* const TAG = "VisualStateManager";
 // Status LED pins come from the board descriptor stamped into the image (BoardDescriptor.h);
 // -1 (== GPIO_NUM_NC) means the board has no such LED.
 
-const uint64_t kCriticalErrorFlag                = 1 << 0;
-const uint64_t kEmergencyStoppedFlag             = 1 << 1;
-const uint64_t kEmergencyStopActiveClearingFlag  = 1 << 2;
-const uint64_t kEmergencyStopAwaitingReleaseFlag = 1 << 3;
-const uint64_t kWebSocketConnectedFlag           = 1 << 4;
-const uint64_t kHasIpAddressFlag                 = 1 << 5;
-const uint64_t kWiFiConnectedFlag                = 1 << 6;
-const uint64_t kWiFiScanningFlag                 = 1 << 7;
+const uint32_t kCriticalErrorFlag                = 1 << 0;
+const uint32_t kEmergencyStoppedFlag             = 1 << 1;
+const uint32_t kEmergencyStopActiveClearingFlag  = 1 << 2;
+const uint32_t kEmergencyStopAwaitingReleaseFlag = 1 << 3;
+const uint32_t kWebSocketConnectedFlag           = 1 << 4;
+const uint32_t kHasIpAddressFlag                 = 1 << 5;
+const uint32_t kWiFiConnectedFlag                = 1 << 6;
+const uint32_t kWiFiScanningFlag                 = 1 << 7;
 
 // Bitmask of when the system is running normally
-const uint64_t kStatusOKMask = kWebSocketConnectedFlag | kHasIpAddressFlag | kWiFiConnectedFlag;
+const uint32_t kStatusOKMask = kWebSocketConnectedFlag | kHasIpAddressFlag | kWiFiConnectedFlag;
 
-static std::atomic<uint64_t> s_stateFlags = 0;
+// 32-bit on purpose: 64-bit atomics are not lock-free on any supported chip (ESP-IDF emulates them with a critical
+// section), and eight flags fit easily.
+//
+// Both use the default sequentially consistent ordering, and need it. updateVisualState() modifies s_stateFlags and
+// then loads s_ledTestActive; RunLedTest() stores s_ledTestActive and then loads s_stateFlags. With relaxed ordering
+// each side could miss the other's write (a store-buffer reordering), so a state change made during the LED test
+// would be lost until the next event. Sequential consistency guarantees at least one side sees the other.
+static std::atomic<uint32_t> s_stateFlags = 0;
 static std::atomic<bool> s_ledTestActive  = false;  // While set, the LED test owns the LEDs; flags keep tracking live state
 static std::unique_ptr<OpenShock::MonoLedDriver> s_monoLedDriver;
 static std::unique_ptr<OpenShock::RgbLedDriver> s_rgbLedDriver;
 
 // Sets or clears `flag` and returns whether that changed it. Atomic per flag, so concurrent setters (the event loop,
 // SetCriticalError, SetScanningStarted) each see their own change and none is missed.
-static inline bool setStateFlag(uint64_t flag, bool state)
+static inline bool setStateFlag(uint32_t flag, bool state)
 {
-  uint64_t previous = state ? s_stateFlags.fetch_or(flag, std::memory_order_relaxed) : s_stateFlags.fetch_and(~flag, std::memory_order_relaxed);
+  uint32_t previous = state ? s_stateFlags.fetch_or(flag) : s_stateFlags.fetch_and(~flag);
   return ((previous & flag) != 0) != state;
 }
 
@@ -199,7 +206,7 @@ static inline void updateVisualStateGPIO(const MonoLedDriver::State (&override)[
     return;                                 \
   }
 
-static void updateVisualStateGPIO(uint64_t flags)
+static void updateVisualStateGPIO(uint32_t flags)
 {
   CSR_PATTERN(s_monoLedDriver, kCriticalErrorFlag, kCriticalErrorPattern);
   CSR_PATTERN(s_monoLedDriver, kEmergencyStopAwaitingReleaseFlag, kEmergencyStopAwaitingReleasePattern);
@@ -212,7 +219,7 @@ static void updateVisualStateGPIO(uint64_t flags)
   s_monoLedDriver->SetPattern(kWiFiDisconnectedPattern);
 }
 
-static void updateVisualStateRGB(uint64_t flags)
+static void updateVisualStateRGB(uint32_t flags)
 {
   CSR_PATTERN(s_rgbLedDriver, kCriticalErrorFlag, kCriticalErrorRGBPattern);
   CSR_PATTERN(s_rgbLedDriver, kEmergencyStopAwaitingReleaseFlag, kEmergencyStopAwaitingReleaseRGBPattern);
@@ -225,7 +232,7 @@ static void updateVisualStateRGB(uint64_t flags)
   s_rgbLedDriver->SetPattern(kWiFiDisconnectedRGBPattern);
 }
 
-static void applyVisualState(uint64_t flags)
+static void applyVisualState(uint32_t flags)
 {
   bool gpioActive = s_monoLedDriver != nullptr;
   bool rgbActive  = s_rgbLedDriver != nullptr;
@@ -255,11 +262,11 @@ static void applyVisualState(uint64_t flags)
 
 static void updateVisualState()
 {
-  if (s_ledTestActive.load(std::memory_order_relaxed)) {
+  if (s_ledTestActive.load()) {
     return;  // Re-applied from the live flags when the test finishes
   }
 
-  applyVisualState(s_stateFlags.load(std::memory_order_relaxed));
+  applyVisualState(s_stateFlags.load());
 }
 
 static void handleEspWiFiEvent(void* event_handler_arg, esp_event_base_t event_base, int32_t event_id, void* event_data)
@@ -447,7 +454,7 @@ void VisualStateManager::SetScanningStarted()
 void VisualStateManager::RunLedTest()
 {
   // Take over the LEDs; state events keep updating s_stateFlags but don't touch the LEDs until the test ends
-  if (s_ledTestActive.exchange(true, std::memory_order_relaxed)) {
+  if (s_ledTestActive.exchange(true)) {
     OS_LOGW(TAG, "LED test already running");
     return;
   }
@@ -552,7 +559,7 @@ void VisualStateManager::RunLedTest()
   // --- Phase 3: State pattern test (both LEDs together) ---
   struct TestStep {
     const char* name;
-    uint64_t flags;
+    uint32_t flags;
     uint32_t durationMs;
   };
 
@@ -575,6 +582,6 @@ void VisualStateManager::RunLedTest()
 
   // Show the live state again (including anything that changed during the test, e.g. an E-Stop)
   OS_LOGI(TAG, "=== LED Test Complete, restoring state ===");
-  s_ledTestActive.store(false, std::memory_order_relaxed);
+  s_ledTestActive.store(false);
   updateVisualState();
 }

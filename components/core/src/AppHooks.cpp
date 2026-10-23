@@ -8,6 +8,7 @@ namespace {
   struct CaptivePortalHooks {
     AppHooks::BroadcastMessageBINFn broadcastMessageBIN;
     AppHooks::SetAlwaysEnabledFn setAlwaysEnabled;
+    AppHooks::IsRunningFn isRunning;
   };
   struct OtaUpdateManagerHooks {
     AppHooks::GetFirmwareBootTypeFn getFirmwareBootType;
@@ -23,9 +24,9 @@ static OtaUpdateManagerHooks s_otaUpdateManagerHooks;
 static std::atomic<const CaptivePortalHooks*> s_captivePortal       = nullptr;
 static std::atomic<const OtaUpdateManagerHooks*> s_otaUpdateManager = nullptr;
 
-void AppHooks::RegisterCaptivePortal(BroadcastMessageBINFn broadcastMessageBIN, SetAlwaysEnabledFn setAlwaysEnabled)
+void AppHooks::RegisterCaptivePortal(BroadcastMessageBINFn broadcastMessageBIN, SetAlwaysEnabledFn setAlwaysEnabled, IsRunningFn isRunning)
 {
-  s_captivePortalHooks = {broadcastMessageBIN, setAlwaysEnabled};
+  s_captivePortalHooks = {broadcastMessageBIN, setAlwaysEnabled, isRunning};
   s_captivePortal.store(&s_captivePortalHooks, std::memory_order_release);
 }
 
@@ -45,6 +46,12 @@ void AppHooks::CaptivePortalSetAlwaysEnabled(bool alwaysEnabled)
 {
   auto hooks = s_captivePortal.load(std::memory_order_acquire);
   if (hooks != nullptr && hooks->setAlwaysEnabled != nullptr) hooks->setAlwaysEnabled(alwaysEnabled);
+}
+
+bool AppHooks::CaptivePortalIsRunning()
+{
+  auto hooks = s_captivePortal.load(std::memory_order_acquire);
+  return hooks != nullptr && hooks->isRunning != nullptr && hooks->isRunning();
 }
 
 FirmwareBootType AppHooks::OtaGetFirmwareBootType()

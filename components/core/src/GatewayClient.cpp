@@ -1,3 +1,5 @@
+#include <freertos/FreeRTOS.h>
+
 #include "GatewayClient.h"
 
 const char* const TAG = "GatewayClient";
@@ -15,6 +17,7 @@ const char* const TAG = "GatewayClient";
 #include <esp_crt_bundle.h>
 
 #include <cstring>
+#include <utility>
 
 using namespace OpenShock;
 
@@ -30,10 +33,12 @@ const std::size_t GATEWAY_MAX_MESSAGE_SIZE = OpenShock::MessageHandlers::WebSock
 static constexpr int WS_OP_TEXT   = 0x01;
 static constexpr int WS_OP_BINARY = 0x02;
 
-static bool s_bootStatusSent = false;
+// Set from the websocket task; a retired client's task can still be running when the new client's connects.
+static std::atomic<bool> s_bootStatusSent = false;
 
 GatewayClient::GatewayClient(const std::string& authToken)
   : m_headers()
+  , m_handleMutex()
   , m_client(nullptr)
   , m_state(GatewayClientState::Disconnected)
   , m_lastPingTimestamp(0)
@@ -52,21 +57,32 @@ GatewayClient::~GatewayClient()
 
   _setState(GatewayClientState::Disconnected);
 
-  if (m_client != nullptr) {
-    esp_websocket_client_close(m_client, pdMS_TO_TICKS(1000));
+  // Taken out under the lock so no sender can pick it up again; closed and destroyed outside it (see _destroyHandle).
+  esp_websocket_client_handle_t handle = _takeHandle();
+  if (handle != nullptr) {
+    esp_websocket_client_close(handle, pdMS_TO_TICKS(1000));
+    esp_websocket_client_destroy(handle);
   }
-  _destroyHandle();
+}
+
+esp_websocket_client_handle_t GatewayClient::_takeHandle()
+{
+  // Waits for an in-flight send to finish (bounded by its timeout), then unpublishes the handle so later senders bail.
+  ScopedLock lock__(&m_handleMutex);
+  return std::exchange(m_client, nullptr);
 }
 
 void GatewayClient::_destroyHandle()
 {
-  if (m_client == nullptr) {
+  esp_websocket_client_handle_t handle = _takeHandle();
+  if (handle == nullptr) {
     return;
   }
 
-  // Stops the client task if still running and frees the handle; no further events reach `this` afterwards.
-  esp_websocket_client_destroy(m_client);
-  m_client = nullptr;
+  // Stops the client task if still running and frees the handle; no further events reach `this` afterwards. Must run
+  // without m_handleMutex held: the websocket task may itself be waiting for that mutex in a send (pong, boot status),
+  // and destroy waits for that task to exit.
+  esp_websocket_client_destroy(handle);
 }
 
 void GatewayClient::connect(const std::string& host, uint16_t port, const std::string& path)
@@ -91,16 +107,22 @@ void GatewayClient::connect(const std::string& host, uint16_t port, const std::s
   config.crt_bundle_attach             = esp_crt_bundle_attach;  // verify server against the compiled-in CA bundle
   config.task_stack                    = GATEWAY_TASK_STACK_SIZE;
 
-  m_client = esp_websocket_client_init(&config);
-  if (m_client == nullptr) {
+  esp_websocket_client_handle_t handle = esp_websocket_client_init(&config);
+  if (handle == nullptr) {
     OS_LOGE(TAG, "Failed to initialize WebSocket client");
     _setState(GatewayClientState::Disconnected);
     return;
   }
 
-  esp_websocket_register_events(m_client, WEBSOCKET_EVENT_ANY, &GatewayClient::_eventHandler, this);
+  esp_websocket_register_events(handle, WEBSOCKET_EVENT_ANY, &GatewayClient::_eventHandler, this);
 
-  esp_err_t err = esp_websocket_client_start(m_client);
+  // Published before start() so the CONNECTED event's boot status message finds it; senders bail on m_state until then.
+  {
+    ScopedLock lock__(&m_handleMutex);
+    m_client = handle;
+  }
+
+  esp_err_t err = esp_websocket_client_start(handle);
   if (err != ESP_OK) {
     OS_LOGE(TAG, "Failed to start WebSocket client: %s", esp_err_to_name(err));
     _destroyHandle();
@@ -111,6 +133,7 @@ void GatewayClient::connect(const std::string& host, uint16_t port, const std::s
 
 bool GatewayClient::sendMessageTXT(std::string_view data)
 {
+  ScopedLock lock__(&m_handleMutex);  // Held across the send so the handle can't be destroyed under it
   if (m_state != GatewayClientState::Connected || m_client == nullptr) {
     return false;
   }
@@ -120,6 +143,7 @@ bool GatewayClient::sendMessageTXT(std::string_view data)
 
 bool GatewayClient::sendMessageBIN(std::span<const uint8_t> data)
 {
+  ScopedLock lock__(&m_handleMutex);  // Held across the send so the handle can't be destroyed under it
   if (m_state != GatewayClientState::Connected || m_client == nullptr) {
     return false;
   }

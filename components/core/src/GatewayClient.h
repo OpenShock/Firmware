@@ -2,6 +2,7 @@
 
 #include "enums/GatewayClientState.h"
 #include "OpenShock.h"
+#include "SimpleMutex.h"
 
 #include <esp_event.h>
 #include <esp_websocket_client.h>
@@ -43,10 +44,17 @@ namespace OpenShock {
     static void _eventHandler(void* arg, esp_event_base_t base, int32_t eventId, void* eventData);
     void _handleData(const esp_websocket_event_data_t* data);
 
+    esp_websocket_client_handle_t _takeHandle();
     void _destroyHandle();
 
     std::string m_headers;
-    esp_websocket_client_handle_t m_client;   // Only touched from the owning (main) task
+    // The handle is created and destroyed by the owning (main) task but used by every task that sends through
+    // GatewayConnectionManager (OTA progress, the websocket task's own pong). m_state alone cannot protect it: a sender
+    // that passed the state check may still be inside esp_websocket_client_send_*() when the owner tears the handle
+    // down, and destroy frees the handle's locks without taking them. The mutex is held for the whole send and for
+    // taking the handle out, never across the (blocking) destroy itself; see _destroyHandle().
+    SimpleMutex m_handleMutex;
+    esp_websocket_client_handle_t m_client;   // Guarded by m_handleMutex
     std::atomic<GatewayClientState> m_state;  // Written from both the owning task and the websocket task
     std::atomic<int64_t> m_lastPingTimestamp;
     std::atomic<bool> m_retired;
