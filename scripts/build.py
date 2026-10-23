@@ -20,9 +20,9 @@ import argparse
 import os
 import shutil
 import subprocess
-import sys
 from pathlib import Path
 
+from utils import idfenv
 from utils.boards import ROOT, board_fragment, find_variant, kconfig_lines, read_board_fragment
 from utils.files import write_if_changed
 
@@ -55,18 +55,42 @@ def board_inputs(board: str) -> tuple[str, str, Path, Path, str]:
 
 def run_idf(idf_args: list[str]) -> int:
     # An idf.py wrapper on PATH (install-esp-idf-action, an activated ESP-IDF shell) sets up its own
-    # environment. On Windows a bare idf.py is not executable, so run tools/idf.py with this interpreter.
+    # environment. On Windows a bare idf.py is not executable, so run tools/idf.py with an interpreter:
+    # the ESP-IDF venv's when known (an installer-registered install activates here if the shell did not).
     idf_wrapper = shutil.which('idf.py') if os.name == 'posix' else None
     if idf_wrapper:
         cmd = [idf_wrapper, *idf_args]
     else:
+        python = idfenv.activate()
         idf_path = os.environ.get('IDF_PATH')
-        if not idf_path:
-            raise SystemExit('error: IDF_PATH is not set - run the ESP-IDF export script first')
-        cmd = [sys.executable, str(Path(idf_path) / 'tools' / 'idf.py'), *idf_args]
+        if not python or not idf_path:
+            raise SystemExit(
+                'error: IDF_PATH is not set and no ESP-IDF install was found - run the ESP-IDF export script first'
+            )
+        cmd = [python, str(Path(idf_path) / 'tools' / 'idf.py'), *idf_args]
+
+    # idf.py prints non-ASCII progress glyphs; without UTF-8 mode, Python on Windows encodes stdout
+    # with the legacy console code page and crashes on them (UnicodeEncodeError).
+    env = {**os.environ}
+    env.setdefault('PYTHONUTF8', '1')
 
     print(f'+ {" ".join(cmd)}', flush=True)
-    return subprocess.call(cmd)
+    return subprocess.call(cmd, env=env)
+
+
+def publish_compile_commands(build_dir: Path) -> None:
+    """Copy the build's compile database to build/compile_commands.json, where .clangd looks for it.
+
+    One shared location, so clangd follows whichever board or variant was built last.
+    """
+    src = build_dir / 'compile_commands.json'
+    if not src.is_file():
+        return
+    dst = ROOT / 'build' / 'compile_commands.json'
+    if dst.resolve() == src.resolve():
+        return
+    dst.parent.mkdir(parents=True, exist_ok=True)
+    shutil.copyfile(src, dst)
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -88,7 +112,7 @@ def main(argv: list[str] | None = None) -> int:
     # Relative to the project where it can be; ESP-IDF takes an absolute entry too, for a build dir outside the repo.
     frag_rel = (frag.relative_to(ROOT) if frag.is_relative_to(ROOT) else frag).as_posix()
 
-    return run_idf(
+    rc = run_idf(
         [
             '-C',
             str(ROOT),
@@ -101,6 +125,9 @@ def main(argv: list[str] | None = None) -> int:
             *targets,
         ]
     )
+    if rc == 0:
+        publish_compile_commands(build_dir)
+    return rc
 
 
 if __name__ == '__main__':

@@ -1,6 +1,7 @@
 """Tests for the command lines of the build scripts: build.py, gen_env_header.py and the --board option."""
 
 import importlib.util
+import os
 
 import gen_env_header
 import pytest
@@ -18,7 +19,7 @@ _spec.loader.exec_module(build)
 def idf(monkeypatch, tmp_path):
     """Runs build.main without ESP-IDF: records the idf.py command instead of running it."""
     calls = []
-    monkeypatch.setattr(build.subprocess, 'call', lambda cmd: calls.append(cmd) or 0)
+    monkeypatch.setattr(build.subprocess, 'call', lambda cmd, env=None: calls.append(cmd) or 0)
     monkeypatch.setattr(build.shutil, 'which', lambda name: None)
     monkeypatch.setenv('IDF_PATH', str(tmp_path / 'idf'))
     monkeypatch.setenv('OPENSHOCK_BUILD_DIR', str(tmp_path / 'build'))
@@ -27,6 +28,54 @@ def idf(monkeypatch, tmp_path):
 
 def defaults_arg(cmd):
     return next(a for a in cmd if a.startswith('-DSDKCONFIG_DEFAULTS='))
+
+
+def test_idf_runs_in_utf8_mode(monkeypatch, tmp_path):
+    seen = {}
+    monkeypatch.setattr(build.subprocess, 'call', lambda cmd, env=None: seen.update(env) or 0)
+    monkeypatch.setattr(build.shutil, 'which', lambda name: None)
+    monkeypatch.setenv('IDF_PATH', str(tmp_path / 'idf'))
+    monkeypatch.delenv('PYTHONUTF8', raising=False)
+
+    assert build.run_idf(['build']) == 0
+    assert seen['PYTHONUTF8'] == '1'
+
+
+def test_without_idf_path_an_installer_registered_idf_is_activated(monkeypatch, tmp_path):
+    calls = []
+    monkeypatch.setattr(build.subprocess, 'call', lambda cmd, env=None: calls.append(cmd) or 0)
+    monkeypatch.setattr(build.shutil, 'which', lambda name: None)
+    monkeypatch.delenv('IDF_PATH', raising=False)
+    idf = tmp_path / 'idf'
+
+    def fake_activate(environ=None):
+        os.environ['IDF_PATH'] = str(idf)
+        return 'venv-python'
+
+    monkeypatch.setattr(build.idfenv, 'activate', fake_activate)
+
+    assert build.run_idf(['build']) == 0
+    assert calls[0][:2] == ['venv-python', str(idf / 'tools' / 'idf.py')]
+
+
+def test_without_idf_path_or_an_install_the_error_names_the_export_script(monkeypatch):
+    monkeypatch.setattr(build.shutil, 'which', lambda name: None)
+    monkeypatch.delenv('IDF_PATH', raising=False)
+    monkeypatch.setattr(build.idfenv, 'activate', lambda environ=None: None)
+
+    with pytest.raises(SystemExit, match='export script'):
+        build.run_idf(['build'])
+
+
+def test_a_successful_build_publishes_its_compile_database(idf, monkeypatch, tmp_path):
+    monkeypatch.setattr(build, 'ROOT', tmp_path)
+    build_dir = tmp_path / 'build' / 'OpenShock-Core-V2'
+    monkeypatch.setenv('OPENSHOCK_BUILD_DIR', str(build_dir))
+    build_dir.mkdir(parents=True)
+    (build_dir / 'compile_commands.json').write_text('[]')
+
+    assert build.main(['OpenShock-Core-V2']) == 0
+    assert (tmp_path / 'build' / 'compile_commands.json').read_text() == '[]'
 
 
 def test_variant_mode_builds_the_variant_without_a_board(idf, tmp_path):
