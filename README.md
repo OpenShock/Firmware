@@ -59,22 +59,13 @@ Confirmed working boards:
 
 Refer to [OpenShock Wiki - Guides: First time setup](https://wiki.openshock.org/guides/openshock/first-setup) on how to set up your microcontroller.
 
-Other than that, you can just flash via platform io in vscode. More in the contribute section.
+To flash a build of your own, see [docs/DEVELOPING.md](docs/DEVELOPING.md): `python scripts/build.py <board> flash`, or the "Firmware: flash" task in VS Code.
 
 ## Contribute
 
-You will need:
-
-- VSCode
-- Knowledge about Arduino library and C++
-- Compatible ESP-32 board with 433 MHz antenna
-
-### Setting up
-
-```bash
-# Install dependencies
-pip install --require-hashes -r requirements.txt
-```
+Building, flashing, testing and updating dependencies are covered in
+[docs/DEVELOPING.md](docs/DEVELOPING.md). You will need ESP-IDF v6.1, Python, Node with pnpm,
+and a compatible ESP32 board with a 433 MHz transmitter.
 
 ## Support
 

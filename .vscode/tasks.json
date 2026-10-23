@@ -1,0 +1,146 @@
+{
+  // Build, flash and test through scripts/build.py. The script finds the ESP-IDF install
+  // itself (scripts/utils/idfenv.py), so the terminal does not need the export script.
+  "version": "2.0.0",
+  "inputs": [
+    {
+      "id": "board",
+      "type": "pickString",
+      "description": "Board (boards/<name>.defaults)",
+      "default": "OpenShock-Core-V2",
+      "options": [
+        "DFRobot-Firebeetle2-ESP32E",
+        "NodeMCU-32S",
+        "OpenShock-Core-V1",
+        "OpenShock-Core-V2",
+        "Pishock-2023",
+        "Pishock-Lite-2021",
+        "Seeed-Xiao-ESP32C3",
+        "Seeed-Xiao-ESP32S3",
+        "Waveshare_esp32_s3_zero",
+        "Wemos-D1-Mini-ESP32",
+        "Wemos-Lolin-S2-Mini",
+        "Wemos-Lolin-S3-Mini",
+        "Wemos-Lolin-S3"
+      ]
+    },
+    {
+      "id": "port",
+      "type": "promptString",
+      "description": "Serial port (COM4, /dev/ttyACM0, ...)",
+      "default": "COM4"
+    }
+  ],
+  "tasks": [
+    {
+      "label": "Firmware: build",
+      "type": "shell",
+      "command": "python",
+      "args": ["scripts/build.py", "${input:board}"],
+      "group": { "kind": "build", "isDefault": true },
+      "problemMatcher": ["$gcc"]
+    },
+    {
+      "label": "Firmware: build app only",
+      "type": "shell",
+      "command": "python",
+      "args": ["scripts/build.py", "${input:board}", "app"],
+      "group": "build",
+      "problemMatcher": ["$gcc"]
+    },
+    {
+      "label": "Firmware: flash",
+      "type": "shell",
+      "command": "python",
+      "args": ["scripts/build.py", "${input:board}", "flash", "-p", "${input:port}"],
+      "problemMatcher": ["$gcc"]
+    },
+    {
+      "label": "Firmware: monitor",
+      "type": "shell",
+      "command": "python",
+      "args": ["scripts/build.py", "${input:board}", "monitor", "-p", "${input:port}"],
+      "isBackground": true,
+      "problemMatcher": []
+    },
+    {
+      "label": "Firmware: menuconfig",
+      "type": "shell",
+      "command": "python",
+      "args": ["scripts/build.py", "${input:board}", "menuconfig"],
+      "problemMatcher": []
+    },
+    {
+      "label": "Firmware: full clean",
+      "type": "shell",
+      "command": "python",
+      "args": ["scripts/build.py", "${input:board}", "fullclean"],
+      "problemMatcher": []
+    },
+    {
+      "label": "Firmware: update managed components",
+      "type": "shell",
+      "command": "python",
+      "args": ["scripts/build.py", "${input:board}", "update-dependencies"],
+      "problemMatcher": []
+    },
+    {
+      "label": "Scripts: ruff",
+      "type": "shell",
+      "command": "ruff",
+      "args": ["check", "."],
+      "problemMatcher": []
+    },
+    {
+      "label": "Scripts: mypy",
+      "type": "shell",
+      "command": "mypy",
+      "problemMatcher": []
+    },
+    {
+      "label": "Scripts: pytest",
+      "type": "shell",
+      "command": "python",
+      "args": ["-m", "pytest"],
+      "problemMatcher": []
+    },
+    {
+      "label": "Scripts: ruff + mypy + pytest",
+      "dependsOrder": "sequence",
+      "dependsOn": ["Scripts: ruff", "Scripts: mypy", "Scripts: pytest"],
+      "group": "test",
+      "problemMatcher": []
+    },
+    {
+      "label": "Frontend: dev server",
+      "type": "shell",
+      "command": "pnpm run dev",
+      "options": { "cwd": "${workspaceFolder}/frontend" },
+      "isBackground": true,
+      "problemMatcher": []
+    },
+    {
+      "label": "Frontend: check",
+      "type": "shell",
+      "command": "pnpm",
+      "args": ["run", "check"],
+      "options": { "cwd": "${workspaceFolder}/frontend" },
+      "problemMatcher": []
+    },
+    {
+      "label": "Frontend: lint",
+      "type": "shell",
+      "command": "pnpm",
+      "args": ["run", "lint"],
+      "options": { "cwd": "${workspaceFolder}/frontend" },
+      "problemMatcher": []
+    },
+    {
+      "label": "Frontend: check + lint",
+      "dependsOrder": "sequence",
+      "dependsOn": ["Frontend: check", "Frontend: lint"],
+      "group": "test",
+      "problemMatcher": []
+    }
+  ]
+}

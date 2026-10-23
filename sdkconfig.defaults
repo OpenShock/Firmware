@@ -48,8 +48,13 @@ CONFIG_MBEDTLS_CERTIFICATE_BUNDLE_DEFAULT_NONE=y
 CONFIG_MBEDTLS_CUSTOM_CERTIFICATE_BUNDLE=y
 CONFIG_MBEDTLS_CUSTOM_CERTIFICATE_BUNDLE_PATH="certificates/cacert-merged.pem"
 
-# Partition table: OpenShock uses a custom one; existing partitions stay valid
-# (leave PARTITION_TABLE_* at IDF defaults; per-env sdkconfigs can override)
+# Partition table: every board uses the same 4 MB OTA layout (app0/app1 1.6 MB each plus
+# config/static0/coredump). Set it here so a build without a board fragment (e.g. the
+# VS Code ESP-IDF extension) does not fall back to IDF's 1 MB single-app table, which
+# the app overflows and which has no static0 partition for the captive-portal assets.
+CONFIG_ESPTOOLPY_FLASHSIZE_4MB=y
+CONFIG_PARTITION_TABLE_CUSTOM=y
+CONFIG_PARTITION_TABLE_CUSTOM_FILENAME="partitions/ota_4mb.csv"
 
 # The CONFIG_ARDUINO_SELECTIVE_* block that used to live here is gone. Arduino is no
 # longer a component of this project - it is in neither dependencies.lock nor any
