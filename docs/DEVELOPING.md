@@ -135,8 +135,8 @@ recommended extensions when prompted, and:
   monitor, menuconfig, full clean and update managed components, each asking for a board and,
   where relevant, a serial port. They call `scripts/build.py`, which activates ESP-IDF itself.
 - **IntelliSense** comes from clangd via `.clangd`, which reads `build/compile_commands.json`.
-  The build script refreshes that file from whichever board or variant it built last, so build a
-  board once and clangd follows. Stock clangd does not know the Xtensa targets; install
+  Every build, through the script or a CMake preset, refreshes that file from whichever board or
+  variant it built last, so build a board once and clangd follows. Stock clangd does not know the Xtensa targets; install
   Espressif's esp-clangd (the installer puts it under the tools directory, e.g.
   `C:\Espressif\tools\esp-clangd\<version>\esp-clangd\bin\clangd.exe`) and point `clangd.path`
   at it in your **user** settings, since the path is machine specific.
@@ -166,8 +166,10 @@ A preset build stamps the board like the script does, since the stamp is a CMake
 The file also has a `default` preset with no board. It exists for `idf.py`, which configures with
 the preset of that name once a `CMakePresets.json` is present, and it is what `scripts/build.py`
 runs under; the script's own `-B` and `-D` arguments take precedence, so it changes nothing.
-Differences from the script: ccache is off (idf.py turns it on), and the bootloader's nested
-configure prints a warning about `ESP_ROM_ELF_DIR` when the shell is not exported; it is harmless.
+Differences from the script: a tree configured by a preset has ccache off (idf.py turns it on),
+and the bootloader's nested configure prints a warning about `ESP_ROM_ELF_DIR` when the shell is
+not exported; it is harmless. A tree the script configured keeps ccache when CLion or a bare
+shell builds it: the compile rules carry ccache's absolute path, so nothing needs to be on PATH.
 
 #### First-time setup in CLion
 
@@ -341,6 +343,7 @@ checksum check against curl's site. Follow `certificates/README.md` exactly.
 ## Useful extras
 
 - Component dependency graph: `python scripts/gen_dep_graph.py` emits Mermaid.
-- `build/compile_commands.json` is the compile database of the last build; `.clangd` points at it.
+- `build/compile_commands.json` is the compile database of the last build, by script or preset;
+  `.clangd` points at it.
 - CHANGELOG.md and RELEASE.md hold release notes and the flashing instructions shipped with a
   release.
