@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Shared GitHub Actions plumbing: workflow commands, step outputs, version check.
+"""GitHub Actions plumbing for the CI scripts in scripts/: workflow commands, step outputs, version check.
 
 Stdlib only and old-syntax safe, so the version check can run before a too-old interpreter hits a SyntaxError.
 """

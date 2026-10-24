@@ -5,7 +5,8 @@ import base64
 import json
 
 import requests
-from gha import env, fail, mask, require_env, set_output
+
+from utils.gha import env, fail, mask, require_env, set_output
 
 # Printed so a later rejection can be read against what was sent; the token itself is masked, these claims are not secret.
 ECHOED_CLAIMS = ('aud', 'repository', 'repository_owner', 'ref', 'run_id')

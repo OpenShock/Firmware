@@ -47,9 +47,8 @@ def pr(action='synchronize', labels=(), label=None):
     return payload
 
 
-def nightly(branch, api, inputs=None):
-    payload = {'inputs': {'nightly': 'true', **(inputs or {})}}
-    return decide('workflow_dispatch', f'refs/heads/{branch}', SHA, payload, api)
+def nightly(branch, api):
+    return decide('schedule', f'refs/heads/{branch}', SHA, {}, api)
 
 
 # --- pull requests ---
@@ -100,22 +99,17 @@ def test_tag_push_builds_and_publishes_to_prod(tag):
 # --- nightlies ---
 
 
-@pytest.mark.parametrize(
-    'branch, publish',
-    [('develop', True), ('beta', False), ('master', False)],
-)
-def test_nightly_with_source_changes_builds(branch, publish):
-    api = FakeApi(runs={'workflow_dispatch': run(BASE)}, files=['README.md', 'components/rf/src/Foo.cpp'])
-    d = nightly(branch, api)
-    assert outcome(d) == (True, publish, 'prod', '')
-    assert api.run_queries == [('workflow_dispatch', branch)]
+def test_nightly_with_source_changes_builds_and_publishes():
+    api = FakeApi(runs={'schedule': run(BASE)}, files=['README.md', 'components/rf/src/Foo.cpp'])
+    d = nightly('develop', api)
+    assert outcome(d) == (True, True, 'prod', '')
+    assert api.run_queries == [('schedule', 'develop')]
     assert api.compares == [(BASE, SHA)]
 
 
-@pytest.mark.parametrize('branch', ['develop', 'beta', 'master'])
-def test_nightly_with_unchanged_sha_skips(branch):
-    api = FakeApi(runs={'workflow_dispatch': run(SHA)})
-    d = nightly(branch, api)
+def test_nightly_with_unchanged_sha_skips():
+    api = FakeApi(runs={'schedule': run(SHA)})
+    d = nightly('develop', api)
     assert outcome(d) == (False, False, 'prod', '')
     assert api.compares == []
 
@@ -139,10 +133,9 @@ NON_SOURCE_CHANGES = [
 ]
 
 
-@pytest.mark.parametrize('branch', ['develop', 'beta', 'master'])
-def test_nightly_with_only_non_source_changes_skips(branch):
-    api = FakeApi(runs={'workflow_dispatch': run(BASE)}, files=NON_SOURCE_CHANGES)
-    d = nightly(branch, api)
+def test_nightly_with_only_non_source_changes_skips():
+    api = FakeApi(runs={'schedule': run(BASE)}, files=NON_SOURCE_CHANGES)
+    d = nightly('develop', api)
     assert outcome(d) == (False, False, 'prod', '')
 
 
@@ -156,7 +149,7 @@ def test_non_source_paths(name):
     [
         '.changes/feat-rf.md',
         '.github/workflows/ci-build.yml',
-        '.github/scripts/get_vars.py',
+        'scripts/get_vars.py',
         '.github/ISSUE_TEMPLATE',
         'components/rf/src/Foo.cpp',
         'docs',
@@ -175,13 +168,13 @@ def test_source_paths(name):
 
 @pytest.mark.parametrize('changed', [['.changes/feat-rf.md'], ['.github/workflows/ci-build.yml']])
 def test_nightly_counts_changes_and_workflows_as_source(changed):
-    api = FakeApi(runs={'workflow_dispatch': run(BASE)}, files=changed)
+    api = FakeApi(runs={'schedule': run(BASE)}, files=changed)
     assert outcome(nightly('develop', api)) == (True, True, 'prod', '')
 
 
 def test_nightly_counts_a_rename_from_source_as_source():
     api = FakeApi(
-        runs={'workflow_dispatch': run(BASE)},
+        runs={'schedule': run(BASE)},
         files=[{'filename': 'docs/old-notes.txt', 'previous_filename': 'components/rf/notes.txt'}],
     )
     assert nightly('develop', api).build
@@ -203,48 +196,42 @@ def test_nightly_run_listing_failure_builds(capsys):
 
 
 def test_nightly_compare_failure_builds(capsys):
-    api = FakeApi(runs={'workflow_dispatch': run(BASE)}, compare_error=RuntimeError('HTTP 404'))
-    d = nightly('beta', api)
-    assert outcome(d) == (True, False, 'prod', '')
+    api = FakeApi(runs={'schedule': run(BASE)}, compare_error=RuntimeError('HTTP 404'))
+    d = nightly('develop', api)
+    assert outcome(d) == (True, True, 'prod', '')
     assert f'::warning::Could not compare {BASE}...{SHA}: HTTP 404' in capsys.readouterr().out
 
 
 @pytest.mark.parametrize('count', [300, 301])
 def test_nightly_with_a_truncated_comparison_builds(count):
-    api = FakeApi(runs={'workflow_dispatch': run(BASE)}, files=[f'docs/{i}.md' for i in range(count)])
-    assert nightly('master', api).build
+    api = FakeApi(runs={'schedule': run(BASE)}, files=[f'docs/{i}.md' for i in range(count)])
+    assert nightly('develop', api).build
 
 
 def test_nightly_with_299_non_source_files_skips():
-    api = FakeApi(runs={'workflow_dispatch': run(BASE)}, files=[f'docs/{i}.md' for i in range(299)])
-    assert not nightly('master', api).build
+    api = FakeApi(runs={'schedule': run(BASE)}, files=[f'docs/{i}.md' for i in range(299)])
+    assert not nightly('develop', api).build
 
 
-def test_nightly_on_a_feature_branch_is_refused(capsys):
+@pytest.mark.parametrize('branch', ['beta', 'master', 'feat/arduino-3.0'])
+def test_nightly_on_another_branch_is_refused(branch, capsys):
     api = FakeApi()
-    d = nightly('feat/arduino-3.0', api)
+    d = nightly(branch, api)
     assert outcome(d) == (False, False, 'prod', '')
     assert api.run_queries == []
-    assert 'Nightly requested on refs/heads/feat/arduino-3.0' in capsys.readouterr().out
+    assert f'Nightly requested on refs/heads/{branch}; only develop has a nightly.' in capsys.readouterr().out
 
 
 def test_nightly_on_a_tag_is_refused():
     api = FakeApi()
-    d = decide('workflow_dispatch', 'refs/tags/1.5.0', SHA, {'inputs': {'nightly': 'true'}}, api)
+    d = decide('schedule', 'refs/tags/1.5.0', SHA, {}, api)
     assert outcome(d) == (False, False, 'prod', '')
     assert api.run_queries == []
 
 
-def test_nightly_ignores_server_and_channel():
-    api = FakeApi(runs={'workflow_dispatch': run(BASE)}, files=['main/main.cpp'])
-    d = nightly('beta', api, {'server': 'dev', 'channel': 'stable'})
-    assert outcome(d) == (True, False, 'prod', '')
-
-
-def test_boolean_nightly_input_counts():
-    api = FakeApi()
-    d = decide('workflow_dispatch', 'refs/heads/develop', SHA, {'inputs': {'nightly': True}}, api)
-    assert d.server == 'prod' and api.run_queries
+def test_nightly_ignores_a_manual_develop_build():
+    api = FakeApi(runs={'workflow_dispatch': run(SHA), 'schedule': run(BASE)}, files=['main/main.cpp'])
+    assert outcome(nightly('develop', api)) == (True, True, 'prod', '')
 
 
 # --- manual dispatch ---

@@ -4,8 +4,8 @@ version = '0.0.0'
 requires-python = '>=3.10'
 
 [tool.pytest.ini_options]
-pythonpath = ['.github/scripts', 'scripts', 'certificates']
-testpaths = ['.github/scripts/tests', 'scripts/tests']
+pythonpath = ['scripts', 'certificates']
+testpaths = ['scripts/tests']
 
 [tool.ruff]
 target-version = 'py310'
@@ -24,7 +24,7 @@ known-first-party = ['utils']
 
 [tool.mypy]
 python_version = '3.10'
-files = ['scripts', '.github/scripts']
+files = ['scripts']
 exclude = ['/tests/']
 
 [[tool.mypy.overrides]]

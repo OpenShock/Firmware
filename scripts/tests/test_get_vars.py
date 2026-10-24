@@ -53,7 +53,7 @@ def test_sanitize(name, expected):
 def run_main(monkeypatch):
     """Runs get-vars main() for a ref and board selection, git's tag list stubbed out; returns its outputs."""
     monkeypatch.setattr(get_vars.subprocess, 'check_output', lambda *a, **kw: '1.4.0\n1.3.0\n')
-    for name in ('GITHUB_HEAD_REF', 'RELEASE_NEXT_VERSION', 'RELEASE_SKIP', 'CHANNEL_INPUT', 'NIGHTLY_INPUT', 'GITHUB_STEP_SUMMARY'):
+    for name in ('GITHUB_HEAD_REF', 'RELEASE_NEXT_VERSION', 'RELEASE_SKIP', 'CHANNEL_INPUT', 'GITHUB_STEP_SUMMARY'):
         monkeypatch.delenv(name, raising=False)
 
     def run(ref, boards_input=''):
@@ -97,13 +97,9 @@ def test_main_on_a_feature_branch_publishes_to_develop(run_main):
     assert outputs['release-channel'] == 'develop'
 
 
-@pytest.mark.parametrize(
-    'channel, nightly, expected',
-    [('beta', 'false', 'beta'), ('derive', 'false', 'develop'), ('', '', 'develop'), ('beta', 'true', 'develop')],
-)
-def test_main_channel_input(run_main, monkeypatch, channel, nightly, expected):
+@pytest.mark.parametrize('channel, expected', [('beta', 'beta'), ('derive', 'develop'), ('', 'develop')])
+def test_main_channel_input(run_main, monkeypatch, channel, expected):
     monkeypatch.setenv('CHANNEL_INPUT', channel)
-    monkeypatch.setenv('NIGHTLY_INPUT', nightly)
     outputs, _ = run_main('refs/heads/develop')
     assert outputs['release-channel'] == expected
 

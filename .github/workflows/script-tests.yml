@@ -1,33 +1,22 @@
-# Unit tests for the CI/release scripts (.github/scripts/tests) and the build helpers (scripts/tests).
+# Unit tests for the build and CI scripts in scripts/ (scripts/tests).
 name: script-tests
 
 on:
   push:
     branches: ['**']
-    paths:
-      - '.github/scripts/**'
+    paths: &paths
       - 'scripts/**'
       - 'partitions/**'
       - 'boards/**'
       - 'sdkconfig.defaults'
       - 'certificates/cert_bundle.py'
       - 'pyproject.toml'
-      - 'requirements.txt'
+      - 'requirements*.txt'
       - '.python-version'
       - '.github/workflows/script-tests.yml'
-  # Same-repo PR branches are covered by their push run; pull_request is for forks.
+  # Same-repo PR branches are covered by their push run, pull_request is for forks
   pull_request:
-    paths:
-      - '.github/scripts/**'
-      - 'scripts/**'
-      - 'partitions/**'
-      - 'boards/**'
-      - 'sdkconfig.defaults'
-      - 'certificates/cert_bundle.py'
-      - 'pyproject.toml'
-      - 'requirements.txt'
-      - '.python-version'
-      - '.github/workflows/script-tests.yml'
+    paths: *paths
   workflow_dispatch:
 
 concurrency:
@@ -53,12 +42,10 @@ jobs:
         with:
           python-version-file: .python-version
           cache: 'pip'
-          cache-dependency-path: |
-            requirements.txt
-            .github/scripts/requirements-dev.txt
+          cache-dependency-path: requirements*.txt
 
       - name: Install dependencies
-        run: pip install --require-hashes -r requirements.txt -r .github/scripts/requirements-dev.txt
+        run: pip install --require-hashes -r requirements.txt -r requirements-dev.txt
 
       - name: Lint
         run: ruff check .

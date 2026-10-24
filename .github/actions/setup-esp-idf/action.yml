@@ -1,31 +1,24 @@
 name: setup-esp-idf
-description: >-
-  Install a pinned native ESP-IDF toolchain, cached, and put its idf.py wrapper and a
-  bundled ccache on PATH. Shared by every job that runs idf.py.
+description: Install a pinned ESP-IDF with ccache from cache, and fetch the flatbuffers submodule the firmware needs
 inputs:
   idf-version:
-    description: 'ESP-IDF version to install (EIM version tag).'
     required: false
     default: 'v6.1'
+    description: 'ESP-IDF version to install (EIM version tag)'
 
 outputs:
   version:
-    description: 'The ESP-IDF version installed, for keying caches of what it builds.'
+    description: 'The ESP-IDF version installed, for keying caches of what it builds'
     value: ${{ inputs.idf-version }}
 
 runs:
   using: composite
   steps:
-    # Restore and save are split so the prune below lands between them. Missing paths are skipped.
-    # No restore-keys: a partial match would run the installer over a stale tree and save the layering.
-    # Bump the trailing number to invalidate.
-    - name: Compute cache key
-      id: key
+    - name: Fetch flatbuffers submodule
       shell: bash
-      env:
-        IDF_VERSION: ${{ inputs.idf-version }}
-      run: echo "key=esp-idf-$RUNNER_OS-$IDF_VERSION-6" >> "$GITHUB_OUTPUT"
+      run: git submodule update --init --depth 1 components/flatbuffers/flatbuffers
 
+    # No restore-keys, a partial match would layer the installer over a stale tree. Bump the trailing number to invalidate.
     - name: Restore ESP-IDF install
       id: idf-cache
       uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9  # v6.1.0
@@ -34,24 +27,19 @@ runs:
           /tmp/esp
           /opt/esp
           ~/.espressif
-        key: ${{ steps.key.outputs.key }}
+        key: esp-idf-${{ runner.os }}-${{ inputs.idf-version }}-6
 
-    # Cache miss only: the action re-runs apt and re-prepares the clone even over a complete tree.
-    # v1 is a moving branch (no release tags), pinned by SHA.
     - uses: espressif/install-esp-idf-action@8fc05d1470d5591417e7a3707a1f2bec178db4ae  # v1
       if: ${{ steps.idf-cache.outputs.cache-hit != 'true' }}
       with:
         version: ${{ inputs.idf-version }}
 
-    # The cached tree carries EIM's activate_idf_<version>.sh with absolute paths that are still
-    # valid on restore. PATH entries for pruned tools do not resolve, which is harmless.
     - name: Activate cached ESP-IDF
       if: ${{ steps.idf-cache.outputs.cache-hit == 'true' }}
       shell: bash
       run: "$GITHUB_ACTION_PATH/../../scripts/activate_idf.sh"
 
-    # Drops what no CI build uses (archives, clang, GDBs, OpenOCD, ULP) by exact name, never the gcc toolchains.
-    # A board that enables the ULP must take esp32ulp-elf off this list.
+    # Drop what no CI build uses (archives, clang, GDBs, OpenOCD, ULP), never the gcc toolchains
     - name: Prune unused toolchains before caching
       if: ${{ steps.idf-cache.outputs.cache-hit != 'true' }}
       shell: bash
@@ -78,7 +66,7 @@ runs:
         done
         echo "pruned $((total / 1024)) MB in total"
 
-    # A pinned static ccache, cached with the install so a warm run never touches apt.
+    # A pinned static ccache, cached with the install so a warm run never touches apt
     - name: Bundle ccache into the install
       if: ${{ steps.idf-cache.outputs.cache-hit != 'true' }}
       shell: bash
@@ -95,18 +83,15 @@ runs:
         tar -xJf "$RUNNER_TEMP/ccache.tar.xz" -C /tmp/esp/ccache --strip-components=1 "${name}/ccache"
         /tmp/esp/ccache/ccache --version | head -1
 
-    # Only develop saves: a cache saved on another ref is restorable by that ref alone, and costs ~1.8 GB of the 10 GB.
     - name: Save ESP-IDF install
-      if: >-
-        ${{ steps.idf-cache.outputs.cache-hit != 'true'
-        && github.ref == 'refs/heads/develop' }}
+      if: ${{ steps.idf-cache.outputs.cache-hit != 'true' && !github.event.pull_request.head.repo.fork }} # Never save cache from external prs
       uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9  # v6.1.0
       with:
         path: |
           /tmp/esp
           /opt/esp
           ~/.espressif
-        key: ${{ steps.key.outputs.key }}
+        key: esp-idf-${{ runner.os }}-${{ inputs.idf-version }}-6
 
     - name: Put ccache on PATH
       shell: bash

@@ -13,8 +13,9 @@ from pathlib import Path
 from typing import NoReturn
 
 import requests
-from gha import env, error, fail, require_env, set_output, warn
 from repo_server_policy import CHANNELS
+
+from utils.gha import env, error, fail, require_env, set_output, warn
 
 VALID_MODES = ('init', 'publish', 'abort')
 

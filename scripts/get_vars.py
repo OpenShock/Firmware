@@ -9,15 +9,13 @@ import json
 import re
 import subprocess
 import sys
-from pathlib import Path
 
 import semver
-from gha import env, fail, notice, require_env, set_output, summary
 from repo_server_policy import CHANNELS
 
-# ci-build's plan job checks out a sparse tree, so scripts/utils is listed there explicitly.
-sys.path.insert(0, str(Path(__file__).resolve().parents[2] / 'scripts'))
-from utils.boards import all_boards, group_variants  # noqa: E402
+from utils.boards import all_boards, group_variants
+from utils.gha import env, fail, notice, require_env, set_output, summary
+from utils.github import parse_ref
 
 CHANNEL_BY_PRERELEASE = {'': 'stable', 'stable': 'stable', 'rc': 'beta', 'beta': 'beta', 'dev': 'develop', 'develop': 'develop'}
 CHANNEL_BY_BRANCH = {'master': 'stable', 'beta': 'beta', 'develop': 'develop'}
@@ -73,9 +71,9 @@ def resolve_channel(is_git_tag: bool, head_ref: str, latest: semver.Version) -> 
     else:
         channel = CHANNEL_BY_BRANCH.get(head_ref) or sanitize(head_ref)
 
-    # A manual dispatch may name the channel; derive and a nightly keep the one the ref maps to.
+    # A manual dispatch may name the channel; derive keeps the one the ref maps to.
     channel_input = env('CHANNEL_INPUT')
-    if channel_input not in ('', 'derive') and env('NIGHTLY_INPUT') != 'true':
+    if channel_input not in ('', 'derive'):
         if channel_input not in CHANNELS:
             fail(f'Channel "{channel_input}" is not one of: {", ".join(CHANNELS)}')
         if channel_input != channel:
@@ -107,15 +105,14 @@ def main() -> int:
     require_env('GITHUB_REF', 'GITHUB_SHA')
     git_ref = env('GITHUB_REF')
 
-    is_git_tag = git_ref.startswith('refs/tags/')
-    is_git_branch = git_ref.startswith('refs/heads/')
-    is_git_pr = git_ref.startswith('refs/pull/') and git_ref.endswith('/merge')
-    if not (is_git_tag or is_git_branch or is_git_pr):
+    kind, ref_name = parse_ref(git_ref)
+    if not kind:
         fail(f'Git ref "{git_ref}" is not a valid branch, tag or pull request')
+    is_git_tag = kind == 'tag'
 
     short_sha = env('GITHUB_SHA')[:8]
 
-    head_ref = env('GITHUB_HEAD_REF') if is_git_pr else git_ref.split('/', 2)[2]
+    head_ref = env('GITHUB_HEAD_REF') if kind == 'pull' else ref_name
     if not head_ref:
         fail('Failed to get git head ref name')
 
@@ -134,9 +131,9 @@ def main() -> int:
 
     if is_git_tag:
         # A tag build's own tag is authoritative; an unparseable value is fatal.
-        latest = parse_version(git_ref.split('/')[2])
+        latest = parse_version(ref_name)
         if latest is None:
-            fail(f'Git tag "{git_ref.split("/")[2]}" is not a valid semver version')
+            fail(f'Git tag "{ref_name}" is not a valid semver version')
     else:
         latest = releases[0] if releases else semver.Version(0, 0, 0)
 

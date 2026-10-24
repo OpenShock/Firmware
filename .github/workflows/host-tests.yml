@@ -4,7 +4,7 @@ name: host-tests
 on:
   push:
     branches: ['**']
-    paths:
+    paths: &paths
       - 'components/**'
       - 'main/**'
       - 'test/**'
@@ -15,19 +15,9 @@ on:
       - '.gitmodules'
       - '.github/actions/setup-esp-idf/**'
       - '.github/workflows/host-tests.yml'
-  # For forks only: a same-repo PR branch is already covered by its push run.
+  # Same-repo PR branches are covered by their push run, pull_request is for forks
   pull_request:
-    paths:
-      - 'components/**'
-      - 'main/**'
-      - 'test/**'
-      - 'partitions/**'
-      - 'CMakeLists.txt'
-      - 'sdkconfig.defaults'
-      - 'dependencies.lock'
-      - '.gitmodules'
-      - '.github/actions/setup-esp-idf/**'
-      - '.github/workflows/host-tests.yml'
+    paths: *paths
   workflow_dispatch:
 
 concurrency:
@@ -49,25 +39,20 @@ jobs:
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
 
-      # The config suite needs the flatbuffers runtime submodule, and only that one.
-      - name: Fetch flatbuffers submodule
-        run: git submodule update --init --depth 1 components/flatbuffers/flatbuffers
-
-      # The linux target links libbsd; ESP-IDF generates the CMock mocks with Ruby.
+      # The linux target links libbsd, ESP-IDF generates the CMock mocks with Ruby
       - name: Install host build dependencies
         run: sudo apt-get update && sudo apt-get install -y --no-install-recommends libbsd-dev ruby
 
-      # On develop this also refills the ESP-IDF cache after a key change (it runs on setup-esp-idf edits).
       - uses: ./.github/actions/setup-esp-idf
 
-      # The toolchains' inner <triple>/bin dirs hold an unprefixed `as` that would shadow the host's one.
+      # The toolchains' inner <triple>/bin dirs hold an unprefixed `as` that would shadow the host's one
       - name: Drop toolchain assemblers from PATH
         run: |
           set -euo pipefail
           path="$(printf '%s' "$PATH" | tr ':' '\n' | grep -vE -- '-elf/[^/]*-elf/bin/?$' | paste -sd: -)"
           echo "PATH=$path" >> "$GITHUB_ENV"
 
-      # Each components/<name>/host_test is its own linux-target project; the ELF exits with the Unity failure count.
+      # Each components/<name>/host_test is its own linux-target project, the ELF exits with the Unity failure count
       - name: Build and run host test suites
         run: |
           set -euo pipefail

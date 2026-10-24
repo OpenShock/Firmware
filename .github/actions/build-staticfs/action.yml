@@ -1,21 +1,12 @@
 name: build-staticfs
-description: >-
-  Pack the frontend build (from build-frontend, same job) into the board-independent
-  static0 littlefs image with scripts/gen_staticfs.py.
+description: Pack the frontend build into the board-independent static0 littlefs image
 
 runs:
   using: composite
   steps:
-    - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97  # v7.0.0
-      with:
-        python-version-file: .python-version
-        cache: 'pip'
+    - uses: ./.github/actions/install-python-deps
 
-    - name: Install Python dependencies
-      shell: bash
-      run: pip install --require-hashes -r requirements.txt
-
-    # Sized from partitions/ota_4mb.csv, the table every board uses.
+    # Sized from partitions/ota_4mb.csv, the table every board uses
     - name: Build static filesystem image
       shell: bash
       run: |

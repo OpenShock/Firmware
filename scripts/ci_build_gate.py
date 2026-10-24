@@ -2,7 +2,7 @@
 """Decide what a ci-build run does: build, publish, which server, which boards.
 
 Building is not publishing: a pull request compiles and goes no further.
-The GitHub API is queried only for a nightly (when this branch last built, and what changed since); those calls sit behind the Api protocol so tests need no network.
+The GitHub API is queried only for the nightly (when develop last built, and what changed since); those calls sit behind the Api protocol so tests need no network.
 """
 
 import json
@@ -10,12 +10,12 @@ import re
 from dataclasses import dataclass
 from typing import Protocol
 
-from gha import env, notice, require_env, set_output, summary, warn
-from github_api import github_get
+from utils.gha import env, notice, require_env, set_output, summary, warn
+from utils.github import parse_ref
+from utils.github_api import github_get
 
 FULL_BUILD_LABEL = 'ci:full-build'
 CANARY_BOARD = 'OpenShock-Core-V2'
-NIGHTLY_BRANCHES = ('develop', 'beta', 'master')
 
 # A comparison reports at most this many files; a full page may be truncated, so it counts as a change.
 COMPARE_LIMIT = 300
@@ -78,12 +78,12 @@ class Decision:
 
 
 def last_build_sha(api: Api, branch: str) -> str:
-    """HEAD of this branch's last successful manual or nightly dispatch.
+    """HEAD of this branch's last successful nightly.
 
     Returns '' on error so a hiccup rebuilds rather than wrongly skipping.
     """
     try:
-        run = api.latest_successful_run('workflow_dispatch', branch)
+        run = api.latest_successful_run('schedule', branch)
         return (run or {}).get('head_sha') or ''
     except Exception as err:
         warn(f'Could not read the last {branch} build: {err}')
@@ -106,7 +106,7 @@ def source_changed_since(api: Api, base: str, sha: str) -> bool:
         names = [n for f in files for n in (f.get('filename'), f.get('previous_filename')) if n]
         source = [n for n in names if is_source(n)]
         if source:
-            print(f"Firmware sources changed: {', '.join(source[:20])}")
+            print(f'Firmware sources changed: {", ".join(source[:20])}')
         return bool(source)
     except Exception as err:
         warn(f'Could not compare {base}...{sha}: {err}')
@@ -128,11 +128,11 @@ def _decide_pull_request(payload: dict) -> Decision:
 
 
 def _decide_nightly(ref: str, sha: str, api: Api) -> Decision:
-    # Only the develop nightly publishes (to prod); beta and master are published from tags.
-    branch = ref.removeprefix('refs/heads/') if ref.startswith('refs/heads/') else ''
+    # Only develop has a nightly; beta and master are built and published from tags.
+    kind, branch = parse_ref(ref)
     d = Decision(server='prod')
-    if branch not in NIGHTLY_BRANCHES:
-        warn(f'Nightly requested on {ref}; only develop, beta and master have nightlies.')
+    if kind != 'branch' or branch != 'develop':
+        warn(f'Nightly requested on {ref}; only develop has a nightly.')
         return d
     base = last_build_sha(api, branch)
     if base == sha:
@@ -141,7 +141,7 @@ def _decide_nightly(ref: str, sha: str, api: Api) -> Decision:
         notice(f'No firmware sources changed on {branch} since its last build ({base}); nothing to build.')
     else:
         d.build = True
-    d.publish = d.build and branch == 'develop'
+    d.publish = d.build
     return d
 
 
@@ -149,7 +149,7 @@ def _decide_dispatch(ref: str, inputs: dict) -> Decision:
     # A manual dispatch always publishes; the channel and the ref are chosen by hand.
     d = Decision(build=True, publish=True, server='prod' if inputs.get('server') == 'prod' else 'dev')
     # The ref picker offers tags as well as branches, so prod still means running against the tag being released.
-    if d.server == 'prod' and not ref.startswith('refs/tags/'):
+    if d.server == 'prod' and parse_ref(ref)[0] != 'tag':
         warn(f'prod was requested on {ref}; only a tag may dispatch to prod, publishing to dev instead.')
         d.server = 'dev'
     return d
@@ -157,21 +157,17 @@ def _decide_dispatch(ref: str, inputs: dict) -> Decision:
 
 def _decide_push(ref: str) -> Decision:
     # The workflow only triggers on release tags, which publish to prod.
-    is_tag = ref.startswith('refs/tags/')
+    is_tag = parse_ref(ref)[0] == 'tag'
     return Decision(build=True, publish=is_tag, server='prod' if is_tag else 'dev')
 
 
 def decide(event_name: str, ref: str, sha: str, payload: dict, api: Api) -> Decision:
-    inputs = payload.get('inputs') or {}
-    # The payload carries a boolean input as either true or 'true', depending on who dispatched it.
-    nightly = event_name == 'workflow_dispatch' and inputs.get('nightly') in (True, 'true')
-
     if event_name == 'pull_request':
         return _decide_pull_request(payload)
-    if nightly:
+    if event_name == 'schedule':
         return _decide_nightly(ref, sha, api)
     if event_name == 'workflow_dispatch':
-        return _decide_dispatch(ref, inputs)
+        return _decide_dispatch(ref, payload.get('inputs') or {})
     if event_name == 'push':
         return _decide_push(ref)
     raise SystemExit(f'error: unsupported event {event_name!r}')
@@ -190,7 +186,9 @@ def main() -> int:
     set_output('publish', str(d.publish).lower())
     set_output('server', d.server)
     set_output('boards', d.boards)
-    decision = f'build={str(d.build).lower()} publish={str(d.publish).lower()} server={d.server} boards={d.boards or "all"}'
+    decision = (
+        f'build={str(d.build).lower()} publish={str(d.publish).lower()} server={d.server} boards={d.boards or "all"}'
+    )
     print(f'decision: {decision}')
     summary(f'### Gate\n\n`{decision}`')
     return 0

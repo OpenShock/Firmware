@@ -2,6 +2,16 @@
 
 import os
 
+REF_KINDS = (('refs/tags/', 'tag'), ('refs/heads/', 'branch'), ('refs/pull/', 'pull'))
+
+
+def parse_ref(ref: str) -> tuple[str, str]:
+    """(kind, name) of a GITHUB_REF: ('tag', '1.5.0'), ('branch', 'develop'), ('pull', '12') or ('', ref) for anything else."""
+    for prefix, kind in REF_KINDS:
+        if ref.startswith(prefix):
+            return kind, ref.removeprefix(prefix).removesuffix('/merge')
+    return '', ref
+
 
 def is_ci() -> bool:
     return os.environ.get('CI') == 'true' and os.environ.get('GITHUB_ACTIONS') == 'true'

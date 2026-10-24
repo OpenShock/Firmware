@@ -9,8 +9,9 @@ import time
 from typing import Any
 
 import requests
-from gha import env, fail, notice, require_env
-from github_api import GitHubError, github_get
+
+from utils.gha import env, fail, notice, require_env
+from utils.github_api import GitHubError, github_get
 
 # The channels the repository server's enum knows. A feature branch derives its own name, which is not one of them.
 CHANNELS = ('stable', 'beta', 'develop')
