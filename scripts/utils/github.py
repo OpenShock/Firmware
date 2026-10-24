@@ -1,16 +1,26 @@
 """What the GitHub Actions environment says about the build: whether it is CI, and for which ref."""
 
 import os
+from typing import NamedTuple
+
+from . import channels
 
 REF_KINDS = (('refs/tags/', 'tag'), ('refs/heads/', 'branch'), ('refs/pull/', 'pull'))
 
 
-def parse_ref(ref: str) -> tuple[str, str]:
-    """(kind, name) of a GITHUB_REF: ('tag', '1.5.0'), ('branch', 'develop'), ('pull', '12') or ('', ref) for anything else."""
+class Ref(NamedTuple):
+    """A parsed GITHUB_REF. kind is 'tag', 'branch', 'pull', or '' for anything else (then name is the whole ref)."""
+
+    kind: str
+    name: str
+
+
+def parse_ref(ref: str) -> Ref:
+    """Ref('tag', '1.5.0'), Ref('branch', 'develop'), Ref('pull', '12') or Ref('', ref) for anything else."""
     for prefix, kind in REF_KINDS:
         if ref.startswith(prefix):
-            return kind, ref.removeprefix(prefix).removesuffix('/merge')
-    return '', ref
+            return Ref(kind, ref.removeprefix(prefix).removesuffix('/merge'))
+    return Ref('', ref)
 
 
 def is_ci() -> bool:
@@ -31,15 +41,21 @@ def pr_base() -> str:
     return os.environ.get('GITHUB_BASE_REF', '') if os.environ.get('GITHUB_EVENT_NAME') == 'pull_request' else ''
 
 
+def build_channel() -> str | None:
+    """The channel this run builds for: a tag's prerelease, else the branch (or the branch a pull request targets)."""
+    ref = ref_name()
+    if is_tag():
+        return channels.prerelease_channel(ref.partition('-')[2])
+    return channels.branch_channel(ref) or channels.branch_channel(pr_base())
+
+
 def build_mode() -> tuple[str, int]:
     """(mode, log level) for the firmware: release for CI builds of master/beta and tags, beta's log level for beta and rc tags."""
     if not is_ci():
         return 'debug', 5
-    ref, base = ref_name(), pr_base()
-    prerelease = ref.split('-', 1)[1].lower() if is_tag() and '-' in ref else ''
-
-    if ref == 'beta' or base == 'beta' or prerelease.startswith(('rc', 'beta')):
+    channel = build_channel()
+    if channel == 'beta':
         return 'release', 4
-    if ref == 'master' or base == 'master' or is_tag():
+    if channel == 'stable' or is_tag():
         return 'release', 3
     return 'debug', 5

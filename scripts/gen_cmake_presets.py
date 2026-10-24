@@ -20,7 +20,8 @@ import argparse
 import json
 from pathlib import Path
 
-from utils.boards import ROOT, all_boards
+from utils.boards import all_boards
+from utils.paths import ROOT
 
 PRESETS_PATH = ROOT / 'CMakePresets.json'
 # idf.py selects a configure preset of this name when none is given; keep it visible (not hidden).

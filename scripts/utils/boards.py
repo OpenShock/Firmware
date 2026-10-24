@@ -12,18 +12,9 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
+from . import targets
 from .espimage import DESC_BOARD_LEN
-
-ROOT = Path(__file__).resolve().parent.parent.parent
-
-# IDF target -> the chip label the firmware reports (OPENSHOCK_FW_CHIP, the descriptor's chip field).
-TARGET_TO_CHIP = {
-    'esp32': 'ESP32',
-    'esp32s2': 'ESP32-S2',
-    'esp32s3': 'ESP32-S3',
-    'esp32c3': 'ESP32-C3',
-    'esp32c6': 'ESP32-C6',
-}
+from .paths import ROOT
 
 # The pin keys, in the order they sit in the descriptor.
 PIN_KEYS = ('OPENSHOCK_RF_TX_GPIO', 'OPENSHOCK_ESTOP_PIN', 'OPENSHOCK_LED_GPIO', 'OPENSHOCK_LED_WS2812B')
@@ -71,12 +62,21 @@ def board_fragment(board: str) -> Path:
     return fragment
 
 
+def parse_board_list(text: str) -> list[str]:
+    """The board names in a list separated by whitespace, newlines or commas, in order.
+
+    The one parser for every hop a board list takes: the dispatch input, get_vars' board-list
+    output, the publish job's BOARDS, and the --board options of the packaging scripts.
+    """
+    return text.replace(',', ' ').split()
+
+
 def board_names(values: list[str]) -> list[str]:
-    """The board names a repeatable --board option holds, each value split on whitespace.
+    """The board names a repeatable --board option holds, each value a board list (see parse_board_list).
 
     Refuses an empty list and a board named twice, so a CLI never packages or merges one twice.
     """
-    names = [name for value in values for name in value.split()]
+    names = [name for value in values for name in parse_board_list(value)]
     if not names:
         raise SystemExit('error: --board matched no board names')
     repeated = sorted({name for name in names if names.count(name) > 1})
@@ -94,10 +94,7 @@ def read_target(fragment: Path) -> str:
 
 
 def chip_for_target(target: str) -> str:
-    chip = TARGET_TO_CHIP.get(target)
-    if chip is None:
-        raise SystemExit(f'error: no chip label known for IDF target {target!r} - add it to scripts/utils/boards.py')
-    return chip
+    return targets.target(target).chip
 
 
 def _parse_pin(fragment: Path, lineno: int, key: str, value: str) -> int:

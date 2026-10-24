@@ -45,7 +45,7 @@ def set_output(name: str, value: str, *, secret: bool = False) -> None:
     """Write a step output (heredoc form for multi-line values); prints instead when GITHUB_OUTPUT is unset."""
     gh_output = os.environ.get('GITHUB_OUTPUT')
     if not gh_output:
-        print(f"[output] {name}={'<redacted>' if secret else value}")
+        print(f'[output] {name}={"<redacted>" if secret else value}')
         return
     with open(gh_output, 'a', encoding='utf-8') as f:
         if '\n' in value:
@@ -72,4 +72,4 @@ def require_env(*names: str) -> None:
     """Fail naming every missing variable at once, rather than one per re-run."""
     missing = [n for n in names if not env(n)]
     if missing:
-        fail(f"Missing required environment variable(s): {', '.join(missing)}")
+        fail(f'Missing required environment variable(s): {", ".join(missing)}')

@@ -19,11 +19,14 @@ so anything that changes a byte of a segment must recompute both. `patch()` does
 """
 
 import hashlib
+import os
 import struct
 import zlib
+from collections.abc import Iterator
 from dataclasses import dataclass, replace
 from functools import reduce
 from operator import xor
+from pathlib import Path
 
 IMAGE_MAGIC = 0xE9
 HEADER_LEN = 24
@@ -37,17 +40,6 @@ DIGEST_LEN = 32
 APP_DESC_OFFSET = 0x20
 APP_DESC_MAGIC = 0xABCD5432
 APP_DESC_LEN = 256
-
-# esp_chip_id_t.
-CHIP_IDS = {
-    'esp32': 0x0000,
-    'esp32s2': 0x0002,
-    'esp32c3': 0x0005,
-    'esp32s3': 0x0009,
-    'esp32c2': 0x000C,
-    'esp32c6': 0x000D,
-    'esp32h2': 0x0010,
-}
 
 # Mirrors OpenShock::BoardDescriptor (components/common/include/BoardDescriptor.h):
 #   u32 magic, u16 schema_version, u16 length, char board[48], char chip[16],
@@ -159,7 +151,7 @@ class Image:
     def digest_offset(self) -> int | None:
         return self.checksum_offset + 1 if self.hash_appended else None
 
-    def segment_bytes(self):
+    def segment_bytes(self) -> Iterator[bytes]:
         for seg in self.segments:
             yield self.data[seg.offset : seg.offset + seg.length]
 
@@ -239,6 +231,5 @@ def parse(data: bytes) -> Image:
     )
 
 
-def load(path) -> Image:
-    with open(path, 'rb') as f:
-        return parse(f.read())
+def load(path: str | os.PathLike[str]) -> Image:
+    return parse(Path(path).read_bytes())

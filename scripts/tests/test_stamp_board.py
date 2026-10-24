@@ -53,8 +53,13 @@ def test_fragment_defaults_to_no_pins(tmp_path):
     ],
 )
 def test_fragment_rejects_bad_lines(tmp_path, line):
-    with pytest.raises(SystemExit):
+    with pytest.raises(SystemExit, match=r'Bad\.defaults:2: '):
         boards.read_board_fragment(write_fragment(tmp_path, 'Bad', f'CONFIG_IDF_TARGET="esp32"\n{line}\n'))
+
+
+def test_fragment_rejects_an_unknown_target(tmp_path):
+    with pytest.raises(SystemExit, match="unknown IDF target 'esp32p4'"):
+        boards.read_board_fragment(write_fragment(tmp_path, 'P4', 'CONFIG_IDF_TARGET="esp32p4"\n'))
 
 
 @pytest.mark.parametrize('name', ['L' * (boards.NAME_MAX_LEN + 1), 'Bo\u00e4rd'])
@@ -128,8 +133,64 @@ def test_patch_without_appended_hash():
 
 def test_patch_refuses_to_cross_a_segment_boundary():
     image = espimage.parse(make_image(None))
-    with pytest.raises(espimage.ImageError):
+    with pytest.raises(espimage.ImageError, match='does not lie inside a single segment'):
         image.patch(image.segments[0].offset + image.segments[0].length - 4, b'12345678')
+
+
+def _set(raw: bytes, offset: int, value: int) -> bytes:
+    data = bytearray(raw)
+    data[offset] = value
+    return bytes(data)
+
+
+def _first_segment_end(raw: bytes) -> int:
+    (length,) = struct.unpack_from('<I', raw, espimage.HEADER_LEN + 4)
+    return espimage.HEADER_LEN + espimage.SEGMENT_HEADER_LEN + length
+
+
+@pytest.mark.parametrize(
+    'mutate, error',
+    [
+        (lambda raw: raw[:20], 'image too small'),
+        (lambda raw: _set(raw, 0, 0xE8), 'bad image magic 0xE8'),
+        (lambda raw: _set(raw, 1, 0), 'unreasonable segment count 0'),
+        (lambda raw: _set(raw, 1, espimage.MAX_SEGMENTS + 1), 'unreasonable segment count 17'),
+        # Cut right after the first segment's data, so the second segment's header is missing.
+        (lambda raw: raw[: _first_segment_end(raw)], 'segment 1: header runs past the end'),
+        (lambda raw: raw + b'\0', 'expected .* from its segment table'),
+        (lambda raw: raw[:-1], 'expected .* from its segment table'),
+    ],
+)
+def test_parse_rejects_a_malformed_image(mutate, error):
+    with pytest.raises(espimage.ImageError, match=error):
+        espimage.parse(mutate(make_image(blank())))
+
+
+def test_parse_rejects_a_segment_running_past_the_end():
+    raw = bytearray(make_image(blank()))
+    struct.pack_into('<I', raw, espimage.HEADER_LEN + 4, len(raw))  # first segment's length
+    with pytest.raises(espimage.ImageError, match='segment 0: data runs past the end'):
+        espimage.parse(bytes(raw))
+
+
+@pytest.mark.parametrize(
+    'offset, value, error',
+    [
+        (0, 0x00, 'bad magic'),
+        (7, 0x00, 'bad length 0'),  # the u16 length is 0x0100, little-endian
+        (4, 0x02, 'unsupported schema version 2'),
+    ],
+)
+def test_unpack_descriptor_rejects_a_foreign_block(offset, value, error):
+    data = bytearray(blank())
+    data[offset] = value
+    with pytest.raises(espimage.DescriptorError, match=error):
+        espimage.unpack_descriptor(bytes(data))
+
+
+def test_unpack_descriptor_needs_a_whole_descriptor():
+    with pytest.raises(espimage.DescriptorError, match='need 256 bytes, got 10'):
+        espimage.unpack_descriptor(b'\0' * 10)
 
 
 @pytest.fixture
@@ -151,7 +212,7 @@ def test_stamp_verify_and_read(tmp_path, capsys, test_board):
     # A fresh build's placeholder reads back as unstamped, and does not verify as the board.
     assert cli('read', '--image', image) == 0
     assert '"stamped": false' in capsys.readouterr().out
-    with pytest.raises(SystemExit):
+    with pytest.raises(SystemExit, match='does not match Test-S3'):
         cli('verify', '--image', image, '--board', test_board)
 
     assert cli('stamp', '--image', image, '--board', test_board) == 0
@@ -161,9 +222,19 @@ def test_stamp_verify_and_read(tmp_path, capsys, test_board):
     assert cli('read', '--image', image) == 0
     assert '"board": "Test-S3"' in capsys.readouterr().out
 
-    # Stamping again is a byte-identical no-op.
+    # Stamping again is a byte-identical no-op, and leaves no temporary file behind.
     assert cli('stamp', '--image', image, '--board', test_board) == 0
     assert image.read_bytes() == stamped
+    assert sorted(p.name for p in tmp_path.iterdir()) == sorted(['firmware.bin', 'Test-S3.defaults'])
+
+
+def test_a_refused_stamp_leaves_the_image_untouched(tmp_path, test_board):
+    image = tmp_path / 'esp32.bin'
+    original = make_image(blank('ESP32'), chip_id=0x0000)
+    image.write_bytes(original)
+    with pytest.raises(SystemExit):
+        cli('stamp', '--image', image, '--board', test_board)
+    assert image.read_bytes() == original
 
 
 def test_stamp_refuses_an_image_without_a_descriptor(tmp_path, test_board):

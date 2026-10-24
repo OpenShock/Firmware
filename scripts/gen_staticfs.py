@@ -18,6 +18,7 @@ import os
 import shutil
 import subprocess
 import sys
+from collections.abc import Iterable
 from pathlib import Path
 
 from utils import partitions
@@ -29,16 +30,27 @@ READ_SIZE = PROG_SIZE = 128
 CACHE_SIZE = 512
 LOOKAHEAD_SIZE = 128
 
+STATIC_PARTITION = 'static0'
+
 # Inputs of the frontend build; a change to any of them makes frontend/build stale.
-FRONTEND_INPUTS = ('src', 'static', 'packages', 'index.html', 'package.json', 'pnpm-lock.yaml', 'vite.config.ts', 'tsconfig.json')
+FRONTEND_INPUTS = (
+    'src',
+    'static',
+    'packages',
+    'index.html',
+    'package.json',
+    'pnpm-lock.yaml',
+    'vite.config.ts',
+    'tsconfig.json',
+)
 FRONTEND_IGNORED_DIRS = {'node_modules', 'build', 'dist', '.svelte-kit'}
 
 
-def log(msg):
+def log(msg: str) -> None:
     print(f'[gen_staticfs] {msg}', flush=True)
 
 
-def newest_mtime(paths):
+def newest_mtime(paths: Iterable[Path]) -> float:
     newest = 0.0
     for path in paths:
         if path.is_file():
@@ -51,7 +63,7 @@ def newest_mtime(paths):
     return newest
 
 
-def frontend_build_is_current(frontend_dir, build_dir):
+def frontend_build_is_current(frontend_dir: Path, build_dir: Path) -> bool:
     index = build_dir / 'index.html'
     if not index.is_file():
         return False
@@ -59,21 +71,33 @@ def frontend_build_is_current(frontend_dir, build_dir):
     return newest_mtime(inputs) <= index.stat().st_mtime
 
 
-def build_frontend(frontend_dir):
+def run_pnpm(pnpm: str, args: list[str], frontend_dir: Path) -> None:
+    try:
+        subprocess.run([pnpm, *args], cwd=frontend_dir, check=True)
+    except subprocess.CalledProcessError as err:
+        raise SystemExit(f'error: `pnpm {" ".join(args)}` failed in {frontend_dir} (exit {err.returncode})') from None
+
+
+def build_frontend(frontend_dir: Path) -> Path:
     """Run the SvelteKit production build when frontend/build is missing or older than its sources."""
     build_dir = frontend_dir / 'build'
     if frontend_build_is_current(frontend_dir, build_dir):
         log('frontend/build is up to date, skipping pnpm')
         return build_dir
 
+    # Resolved here rather than through a shell: on Windows pnpm is a pnpm.cmd shim, which which() finds.
+    pnpm = shutil.which('pnpm')
+    if pnpm is None:
+        raise SystemExit('error: pnpm not found on PATH; install Node.js and pnpm, or pass --skip-frontend-build')
+
     log('Building frontend (pnpm i && pnpm run build)...')
-    subprocess.run(['pnpm', 'i'], cwd=frontend_dir, check=True, shell=os.name == 'nt')
-    subprocess.run(['pnpm', 'run', 'build'], cwd=frontend_dir, check=True, shell=os.name == 'nt')
+    run_pnpm(pnpm, ['i'], frontend_dir)
+    run_pnpm(pnpm, ['run', 'build'], frontend_dir)
     log('Frontend build complete')
     return build_dir
 
 
-def stage_assets(build_dir, staging_dir):
+def stage_assets(build_dir: Path, staging_dir: Path) -> Path:
     """Mirror build_dir into <staging>/www, gzipping everything that isn't already .gz."""
     www_dir = staging_dir / 'www'
     if www_dir.exists():
@@ -91,28 +115,31 @@ def stage_assets(build_dir, staging_dir):
                 shutil.copyfile(src, dst_root / name)
             else:
                 # mtime=0: the gzip bytes depend only on the content
-                with open(dst_root / (name + '.gz'), 'wb') as raw, gzip.GzipFile(filename='', mode='wb', fileobj=raw, mtime=0) as gz:
+                with (
+                    (dst_root / f'{name}.gz').open('wb') as raw,
+                    gzip.GzipFile(filename='', mode='wb', fileobj=raw, mtime=0) as gz,
+                ):
                     gz.write(src.read_bytes())
             count += 1
 
     log(f'Staged {count} gzipped assets into {www_dir}')
     if not (www_dir / 'index.html.gz').exists():
-        raise SystemExit(f'{www_dir}/index.html.gz missing: frontend build produced no index.html')
+        raise SystemExit(f'error: {www_dir}/index.html.gz missing: the frontend build produced no index.html')
     return www_dir
 
 
-def pack_image(staging_dir, output, partition_size):
+def pack_image(staging_dir: Path, output: Path, partition_size: int) -> None:
     """Pack <staging_dir>/www into a littlefs image of exactly partition_size bytes (as /www/...)."""
     try:
         from littlefs import LittleFS
     except ImportError:
         raise SystemExit(
-            f'littlefs-python is not installed for {sys.executable}: the build scripts need an interpreter with '
-            'requirements.txt installed (docs/DEVELOPING.md, Python dependencies)'
+            f'error: littlefs-python is not installed for {sys.executable}: the build scripts need an interpreter '
+            'with requirements.txt installed (docs/DEVELOPING.md, Python dependencies)'
         ) from None
 
     if partition_size % BLOCK_SIZE != 0:
-        raise SystemExit(f'partition size {partition_size} is not a multiple of block size {BLOCK_SIZE}')
+        raise SystemExit(f'error: partition size {partition_size} is not a multiple of block size {BLOCK_SIZE}')
     block_count = partition_size // BLOCK_SIZE
     fs = LittleFS(
         block_size=BLOCK_SIZE,
@@ -137,39 +164,44 @@ def pack_image(staging_dir, output, partition_size):
     output.resolve().parent.mkdir(parents=True, exist_ok=True)
     output.write_bytes(bytes(fs.context.buffer))
 
-    log(f'Packed {file_count} files into {output} '
-        f'({partition_size} bytes, {block_count} x {BLOCK_SIZE}-byte blocks)')
+    log(f'Packed {file_count} files into {output} ({partition_size} bytes, {block_count} x {BLOCK_SIZE}-byte blocks)')
 
 
-def main(argv=None) -> int:
+def static_partition_size(csv_path: Path) -> int:
+    table = partitions.read_partitions(csv_path)
+    if STATIC_PARTITION not in table:
+        raise SystemExit(f'error: {csv_path} has no {STATIC_PARTITION} partition')
+    return table[STATIC_PARTITION]['size']
+
+
+def main(argv: list[str] | None = None) -> int:
     p = argparse.ArgumentParser(description='Build the OpenShock static filesystem image')
-    p.add_argument('--frontend-dir', required=True, help='Path to the frontend/ project')
-    p.add_argument('--staging-dir', required=True, help='Where to stage gzipped assets (contains www/)')
-    p.add_argument('--output', required=True, help='Output littlefs image path')
+    p.add_argument('--frontend-dir', type=Path, required=True, help='Path to the frontend/ project')
+    p.add_argument('--staging-dir', type=Path, required=True, help='Where to stage gzipped assets (contains www/)')
+    p.add_argument('--output', type=Path, required=True, help='Output littlefs image path')
     size = p.add_mutually_exclusive_group(required=True)
-    size.add_argument('--partition-size', type=lambda v: int(v, 0), help='static0 partition size')
-    size.add_argument('--partition-csv', help='partition table CSV to read the static0 size from')
-    p.add_argument('--skip-frontend-build', action='store_true',
-                   help='Reuse existing frontend/build without invoking pnpm')
+    size.add_argument('--partition-size', type=lambda v: int(v, 0), help=f'{STATIC_PARTITION} partition size')
+    size.add_argument(
+        '--partition-csv', type=Path, help=f'partition table CSV to read the {STATIC_PARTITION} size from'
+    )
+    p.add_argument(
+        '--skip-frontend-build', action='store_true', help='Reuse existing frontend/build without invoking pnpm'
+    )
     args = p.parse_args(argv)
 
-    frontend_dir, staging_dir, output = Path(args.frontend_dir), Path(args.staging_dir), Path(args.output)
     if args.skip_frontend_build:
-        build_dir = frontend_dir / 'build'
+        build_dir = args.frontend_dir / 'build'
         if not build_dir.is_dir():
-            raise SystemExit(f'--skip-frontend-build set but {build_dir} does not exist')
+            raise SystemExit(f'error: --skip-frontend-build set but {build_dir} does not exist')
     else:
-        build_dir = build_frontend(frontend_dir)
+        build_dir = build_frontend(args.frontend_dir)
 
     partition_size = args.partition_size
     if partition_size is None:
-        table = partitions.read_partitions(Path(args.partition_csv))
-        if 'static0' not in table:
-            raise SystemExit(f'{args.partition_csv} has no static0 partition')
-        partition_size = table['static0']['size']
+        partition_size = static_partition_size(args.partition_csv)
 
-    stage_assets(build_dir, staging_dir)
-    pack_image(staging_dir, output, partition_size)
+    stage_assets(build_dir, args.staging_dir)
+    pack_image(args.staging_dir, args.output, partition_size)
     return 0
 
 

@@ -14,6 +14,7 @@ import sys
 from pathlib import Path
 
 from utils import boards, espimage, stamping
+from utils.files import atomic_write_bytes
 
 
 def package_board(board: str, variants: Path, out: Path) -> str:
@@ -30,7 +31,7 @@ def package_board(board: str, variants: Path, out: Path) -> str:
     dst = out / board
     dst.mkdir(parents=True, exist_ok=True)
     app_out = dst / 'app.bin'
-    app_out.write_bytes(stamped.data)
+    atomic_write_bytes(app_out, stamped.data)
     # Check the file that ships, not the bytes in memory: it must be intact, for the board's chip and carry
     # exactly its descriptor, and stamping it again must change nothing, which proves the stamp idempotent.
     written = espimage.load(app_out)
@@ -56,7 +57,7 @@ def package(board_names: list[str], variants: Path, out: Path) -> list[str]:
     return failed
 
 
-def main(argv=None) -> int:
+def main(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument('--variants', required=True, type=Path, help='directory holding one <variant-id>/ per build')
     ap.add_argument(

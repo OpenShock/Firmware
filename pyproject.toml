@@ -4,7 +4,7 @@ version = '0.0.0'
 requires-python = '>=3.10'
 
 [tool.pytest.ini_options]
-pythonpath = ['scripts', 'certificates']
+pythonpath = ['scripts', 'scripts/tests', 'certificates']
 testpaths = ['scripts/tests']
 
 [tool.ruff]
@@ -25,6 +25,8 @@ known-first-party = ['utils']
 [tool.mypy]
 python_version = '3.10'
 files = ['scripts']
+# Unannotated functions are checked too, so a missing annotation cannot hide a body from the check.
+check_untyped_defs = true
 exclude = ['/tests/']
 
 [[tool.mypy.overrides]]

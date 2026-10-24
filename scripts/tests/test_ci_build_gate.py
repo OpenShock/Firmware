@@ -1,8 +1,11 @@
+"""Tests for scripts/ci_build_gate.py: what each event builds and publishes, with the GitHub API faked."""
+
 import json
 
 import ci_build_gate
 import pytest
 from ci_build_gate import CANARY_BOARD, FULL_BUILD_LABEL, decide
+from support import fails_with
 
 SHA = 'c' * 40
 BASE = 'b' * 40
@@ -94,6 +97,16 @@ def test_tag_push_builds_and_publishes_to_prod(tag):
     d = decide('push', f'refs/tags/{tag}', SHA, {}, api)
     assert outcome(d) == (True, True, 'prod', '')
     assert api.run_queries == [] and api.compares == []
+
+
+def test_branch_push_builds_without_publishing():
+    d = decide('push', 'refs/heads/develop', SHA, {}, FakeApi())
+    assert outcome(d) == (True, False, 'dev', '')
+
+
+def test_an_unsupported_event_is_refused(capsys):
+    with fails_with(capsys, "Unsupported event 'release'"):
+        decide('release', 'refs/tags/1.5.0', SHA, {}, FakeApi())
 
 
 # --- nightlies ---
@@ -270,6 +283,45 @@ def test_dispatch_on_a_tag_may_publish_to_prod():
 def test_dispatch_without_inputs_publishes_to_dev():
     d = decide('workflow_dispatch', 'refs/heads/feat/x', SHA, {}, FakeApi())
     assert outcome(d) == (True, True, 'dev', '')
+
+
+# --- the real API wrapper, over a faked github_get ---
+
+
+@pytest.fixture
+def github_get(monkeypatch):
+    """Answers ci_build_gate.github_get with a canned document; records (path, token, params)."""
+    calls = []
+    answer = {}
+
+    def fake(path, token, params=None):
+        calls.append((path, token, params))
+        return answer
+
+    monkeypatch.setattr(ci_build_gate, 'github_get', fake)
+    return answer, calls
+
+
+def test_latest_successful_run_asks_for_one_successful_run(github_get):
+    answer, calls = github_get
+    api = ci_build_gate.GitHubApi('OpenShock/Firmware', 'tok')
+    assert api.latest_successful_run('schedule', 'develop') is None
+    answer['workflow_runs'] = [run(BASE)]
+    assert api.latest_successful_run('schedule', 'develop') == run(BASE)
+    path, token, params = calls[0]
+    assert path == '/repos/OpenShock/Firmware/actions/workflows/ci-build.yml/runs'
+    assert token == 'tok'
+    assert params == {'event': 'schedule', 'branch': 'develop', 'status': 'success', 'per_page': 1}
+
+
+def test_compare_files_tolerates_a_comparison_without_files(github_get):
+    answer, calls = github_get
+    api = ci_build_gate.GitHubApi('OpenShock/Firmware', 'tok')
+    assert api.compare_files(BASE, SHA) == []
+    answer['files'] = [{'filename': 'a.cpp'}]
+    assert api.compare_files(BASE, SHA) == [{'filename': 'a.cpp'}]
+    assert calls[0][0] == f'/repos/OpenShock/Firmware/compare/{BASE}...{SHA}'
+    assert calls[0][2] == {'per_page': ci_build_gate.COMPARE_LIMIT}
 
 
 # --- main ---

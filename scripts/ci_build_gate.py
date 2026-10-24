@@ -8,9 +8,9 @@ The GitHub API is queried only for the nightly (when develop last built, and wha
 import json
 import re
 from dataclasses import dataclass
-from typing import Protocol
+from typing import Any, Protocol
 
-from utils.gha import env, notice, require_env, set_output, summary, warn
+from utils.gha import env, fail, notice, require_env, set_output, summary, warn
 from utils.github import parse_ref
 from utils.github_api import github_get
 
@@ -54,7 +54,7 @@ class GitHubApi:
         self.repo = repo
         self.token = token
 
-    def _get(self, path: str, params: dict) -> dict:
+    def _get(self, path: str, params: dict[str, Any]) -> Any:
         return github_get(f'/repos/{self.repo}{path}', self.token, params)
 
     def latest_successful_run(self, event: str, branch: str) -> dict | None:
@@ -131,7 +131,7 @@ def _decide_nightly(ref: str, sha: str, api: Api) -> Decision:
     # Only develop has a nightly; beta and master are built and published from tags.
     kind, branch = parse_ref(ref)
     d = Decision(server='prod')
-    if kind != 'branch' or branch != 'develop':
+    if (kind, branch) != ('branch', 'develop'):
         warn(f'Nightly requested on {ref}; only develop has a nightly.')
         return d
     base = last_build_sha(api, branch)
@@ -149,15 +149,15 @@ def _decide_dispatch(ref: str, inputs: dict) -> Decision:
     # A manual dispatch always publishes; the channel and the ref are chosen by hand.
     d = Decision(build=True, publish=True, server='prod' if inputs.get('server') == 'prod' else 'dev')
     # The ref picker offers tags as well as branches, so prod still means running against the tag being released.
-    if d.server == 'prod' and parse_ref(ref)[0] != 'tag':
+    if d.server == 'prod' and parse_ref(ref).kind != 'tag':
         warn(f'prod was requested on {ref}; only a tag may dispatch to prod, publishing to dev instead.')
         d.server = 'dev'
     return d
 
 
 def _decide_push(ref: str) -> Decision:
-    # The workflow only triggers on release tags, which publish to prod.
-    is_tag = parse_ref(ref)[0] == 'tag'
+    # The workflow only triggers on release tags, which publish to prod; a branch push builds without publishing.
+    is_tag = parse_ref(ref).kind == 'tag'
     return Decision(build=True, publish=is_tag, server='prod' if is_tag else 'dev')
 
 
@@ -170,7 +170,7 @@ def decide(event_name: str, ref: str, sha: str, payload: dict, api: Api) -> Deci
         return _decide_dispatch(ref, payload.get('inputs') or {})
     if event_name == 'push':
         return _decide_push(ref)
-    raise SystemExit(f'error: unsupported event {event_name!r}')
+    fail(f'Unsupported event {event_name!r}')
 
 
 def main() -> int:

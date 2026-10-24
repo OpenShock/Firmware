@@ -36,7 +36,7 @@ def main() -> int:
             request_url,
             params={'audience': audience},
             headers={
-                'Authorization': f"bearer {env('ACTIONS_ID_TOKEN_REQUEST_TOKEN')}",
+                'Authorization': f'bearer {env("ACTIONS_ID_TOKEN_REQUEST_TOKEN")}',
                 'Accept': 'application/json',
             },
             timeout=(10, 30),

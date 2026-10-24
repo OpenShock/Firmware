@@ -13,8 +13,9 @@ from pathlib import Path
 from typing import NoReturn
 
 import requests
-from repo_server_policy import CHANNELS
 
+from utils.boards import parse_board_list
+from utils.channels import CHANNELS
 from utils.gha import env, error, fail, require_env, set_output, warn
 
 VALID_MODES = ('init', 'publish', 'abort')
@@ -143,7 +144,9 @@ def upload_board(session: requests.Session, server: str, release_id: str, board:
         die(f'Upload failed for {board} (HTTP {resp.status_code})', resp)
 
 
-def init_release(session: requests.Session, server: str, *, version: str, channel: str, boards: list[str], changelog: str) -> str:
+def init_release(
+    session: requests.Session, server: str, *, version: str, channel: str, boards: list[str], changelog: str
+) -> str:
     """Stage the release; the server rejects a bad repository, scope or board here, before any upload."""
     resp = session.post(
         f'{server}/2/firmware/releases',
@@ -161,7 +164,7 @@ def init_release(session: requests.Session, server: str, *, version: str, channe
 
     data = resp.json()
     release_id = data['id']
-    print(f"Release {release_id} staged as {data.get('status')} for {version} on {channel}", flush=True)
+    print(f'Release {release_id} staged as {data.get("status")} for {version} on {channel}', flush=True)
     return release_id
 
 
@@ -192,7 +195,9 @@ def discard(session: requests.Session, server: str, release_id: str) -> str:
     try:
         resp = session.delete(f'{server}/2/firmware/releases/{release_id}', timeout=(30, 60))
     except requests.RequestException as err:
-        warn(f'Could not reach the server to discard release {release_id} ({err}). It will be reaped by the server TTL job.')
+        warn(
+            f'Could not reach the server to discard release {release_id} ({err}). It will be reaped by the server TTL job.'
+        )
         return 'failed'
 
     if resp.status_code == 204:
@@ -213,7 +218,7 @@ def report_discard(status: str, release_id: str) -> None:
 
 
 def read_boards() -> list[str]:
-    return [b.strip() for b in env('BOARDS').splitlines() if b.strip()]
+    return parse_board_list(env('BOARDS'))
 
 
 def do_init(session: requests.Session, server: str) -> int:
@@ -240,7 +245,7 @@ def do_init(session: requests.Session, server: str) -> int:
     return 0
 
 
-def do_upload(session: requests.Session, server: str) -> int:
+def do_publish(session: requests.Session, server: str) -> int:
     """Upload every board into the release init opened, then promote it; discard it on any failure."""
     require_env('RELEASE_ID')
     release_id = env('RELEASE_ID')
@@ -290,7 +295,7 @@ def main() -> int:
         return do_init(session, server)
     if mode == 'abort':
         return do_abort(session, server)
-    return do_upload(session, server)
+    return do_publish(session, server)
 
 
 if __name__ == '__main__':
