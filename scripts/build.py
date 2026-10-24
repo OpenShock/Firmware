@@ -10,6 +10,9 @@ Variant mode is what CI builds: one unstamped compile for every board of a build
 (scripts/utils/boards.py) into build/<variant-id>/; scripts/package_boards.py stamps each board.
 An unknown variant id lists the variants and their boards.
 
+CI builds of the stable channel compile with -Os, everything else with -Og (utils/github.py:build_optimization).
+OPENSHOCK_FW_OPTIMIZATION=size|debug overrides it; a local size build goes to build/<board>-size/.
+
 Examples:
     python scripts/build.py OpenShock-Core-V2                 # full build
     python scripts/build.py OpenShock-Core-V2 app bootloader partition-table
@@ -24,10 +27,25 @@ import sys
 from pathlib import Path
 from typing import NamedTuple
 
-from utils import idfenv, pyreqs
+from utils import github, idfenv, pyreqs
 from utils.boards import board_fragment, find_variant, kconfig_lines, read_board_fragment
 from utils.files import write_if_changed
 from utils.paths import ROOT
+
+# The compiler optimization each level selects (OPENSHOCK_FW_OPTIMIZATION, else github.build_optimization()).
+OPTIMIZATION_KCONFIG = {
+    'debug': 'CONFIG_COMPILER_OPTIMIZATION_DEBUG=y',
+    'size': 'CONFIG_COMPILER_OPTIMIZATION_SIZE=y',
+}
+
+
+def resolve_optimization() -> str:
+    level = os.environ.get('OPENSHOCK_FW_OPTIMIZATION') or github.build_optimization()
+    if level not in OPTIMIZATION_KCONFIG:
+        raise SystemExit(
+            f'error: OPENSHOCK_FW_OPTIMIZATION must be one of {", ".join(OPTIMIZATION_KCONFIG)}, not {level!r}'
+        )
+    return level
 
 
 class BuildInputs(NamedTuple):
@@ -40,28 +58,46 @@ class BuildInputs(NamedTuple):
     fragment_body: str
 
 
-def resolve_build_dir(name: str) -> Path:
-    """``build/<name>``, or OPENSHOCK_BUILD_DIR. CI fixes the path: it is on the compiler command line, so it is in ccache's hash."""
+def resolve_build_dir(name: str, optimization: str = 'debug') -> Path:
+    """``build/<name>``, or OPENSHOCK_BUILD_DIR. CI fixes the path: it is on the compiler command line, so it is in ccache's hash.
+
+    A non-debug build gets ``build/<name>-<level>``: an existing sdkconfig wins over SDKCONFIG_DEFAULTS, so switching the
+    level inside one build directory would silently keep the old one.
+    """
     override = os.environ.get('OPENSHOCK_BUILD_DIR')
     if override:
         path = Path(override)
         return path if path.is_absolute() else ROOT / path
-    return ROOT / 'build' / name
+    return ROOT / 'build' / (name if optimization == 'debug' else f'{name}-{optimization}')
 
 
-def variant_inputs(variant_id: str) -> BuildInputs:
+def optimization_kconfig(optimization: str) -> str:
+    # Last in the fragment, after the board's lines. Not part of the variant id: every variant compiles at either level.
+    return f'# Optimization: {optimization}\n{OPTIMIZATION_KCONFIG[optimization]}\n'
+
+
+def variant_inputs(variant_id: str, optimization: str = 'debug') -> BuildInputs:
     variant = find_variant(variant_id)
-    build_dir = resolve_build_dir(variant.id)
-    body = f'# Build variant {variant.id} ({", ".join(variant.boards)})\n' + variant.sdkconfig_fragment()
+    build_dir = resolve_build_dir(variant.id, optimization)
+    body = (
+        f'# Build variant {variant.id} ({", ".join(variant.boards)})\n'
+        + variant.sdkconfig_fragment()
+        + optimization_kconfig(optimization)
+    )
     return BuildInputs(variant.target, None, build_dir, build_dir / 'variant.defaults', body)
 
 
-def board_inputs(board: str) -> BuildInputs:
+def board_inputs(board: str, optimization: str = 'debug') -> BuildInputs:
     fragment = board_fragment(board)
     target = read_board_fragment(fragment).target  # parsed whole, so a typo fails now rather than at the stamp
-    build_dir = resolve_build_dir(board)
+    build_dir = resolve_build_dir(board, optimization)
     # Only the Kconfig lines: the OPENSHOCK_* pins are stamped, and Kconfig would reject them.
-    body = f'# Board {board}, without its pins\n' + '\n'.join(kconfig_lines(fragment)) + '\n'
+    body = (
+        f'# Board {board}, without its pins\n'
+        + '\n'.join(kconfig_lines(fragment))
+        + '\n'
+        + optimization_kconfig(optimization)
+    )
     return BuildInputs(target, board, build_dir, build_dir / 'board.defaults', body)
 
 
@@ -111,14 +147,15 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument('args', nargs=argparse.REMAINDER, help='<board> (unless --variant), then idf.py targets/args')
     args = ap.parse_args(argv)
 
+    optimization = resolve_optimization()
     if args.variant:
         targets = args.args or ['build']
-        inputs = variant_inputs(args.variant)
+        inputs = variant_inputs(args.variant, optimization)
     else:
         if not args.args:
             ap.error('a board or --variant is required')
         targets = args.args[1:] or ['build']
-        inputs = board_inputs(args.args[0])
+        inputs = board_inputs(args.args[0], optimization)
     frag, build_dir = inputs.fragment, inputs.build_dir
     # Generated, and written only on change so an unchanged fragment does not force a reconfigure.
     write_if_changed(frag, '# Generated by scripts/build.py - do not edit.\n' + inputs.fragment_body)

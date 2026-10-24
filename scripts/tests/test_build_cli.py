@@ -163,6 +163,68 @@ def test_build_mode_outside_ci_is_debug(monkeypatch):
 
 
 @pytest.mark.parametrize(
+    'env, expected',
+    [
+        ({}, 'debug'),
+        ({'GITHUB_REF_NAME': 'develop'}, 'debug'),
+        ({'GITHUB_REF_NAME': 'beta'}, 'debug'),
+        ({'GITHUB_REF_NAME': 'master'}, 'size'),
+        ({'GITHUB_EVENT_NAME': 'pull_request', 'GITHUB_BASE_REF': 'master'}, 'size'),
+        ({'GITHUB_EVENT_NAME': 'pull_request', 'GITHUB_BASE_REF': 'develop'}, 'debug'),
+        ({'GITHUB_REF_NAME': '1.5.0', 'GITHUB_REF_TYPE': 'tag'}, 'size'),
+        ({'GITHUB_REF_NAME': '1.5.0-rc.1', 'GITHUB_REF_TYPE': 'tag'}, 'debug'),
+        ({'GITHUB_REF_NAME': '1.5.0-dev.1', 'GITHUB_REF_TYPE': 'tag'}, 'debug'),
+    ],
+)
+def test_only_stable_builds_optimized(monkeypatch, env, expected):
+    monkeypatch.setenv('CI', 'true')
+    monkeypatch.setenv('GITHUB_ACTIONS', 'true')
+    for name, value in env.items():
+        monkeypatch.setenv(name, value)
+    assert github.build_optimization() == expected
+
+
+def test_optimization_outside_ci_is_debug(monkeypatch):
+    monkeypatch.setenv('GITHUB_REF_NAME', 'master')
+    assert github.build_optimization() == 'debug'
+
+
+def test_board_fragment_selects_the_optimization(idf, tmp_path):
+    assert build.main(['OpenShock-Core-V2', 'app']) == 0
+    text = (tmp_path / 'build' / 'board.defaults').read_text(encoding='utf-8')
+    assert text.splitlines()[-1] == 'CONFIG_COMPILER_OPTIMIZATION_DEBUG=y'
+
+
+def test_stable_variant_compiles_for_size(idf, monkeypatch, tmp_path):
+    monkeypatch.setenv('OPENSHOCK_FW_OPTIMIZATION', 'size')
+    variant = boards.group_variants(['OpenShock-Core-V2'])[0]
+    assert build.main(['--variant', variant.id]) == 0
+    text = (tmp_path / 'build' / 'variant.defaults').read_text(encoding='utf-8')
+    assert text.splitlines()[-1] == 'CONFIG_COMPILER_OPTIMIZATION_SIZE=y'
+    assert 'CONFIG_COMPILER_OPTIMIZATION_DEBUG=y' not in text
+
+
+def test_optimization_is_not_part_of_the_variant_id(monkeypatch):
+    variant = boards.group_variants(['OpenShock-Core-V2'])[0]
+    monkeypatch.setenv('OPENSHOCK_FW_OPTIMIZATION', 'size')
+    assert boards.group_variants(['OpenShock-Core-V2'])[0].id == variant.id
+
+
+def test_a_local_size_build_gets_its_own_directory(monkeypatch):
+    # An existing sdkconfig wins over the defaults, so sharing build/<board> would keep whichever level ran first.
+    monkeypatch.delenv('OPENSHOCK_BUILD_DIR', raising=False)
+    assert build.resolve_build_dir('OpenShock-Core-V2') == ROOT / 'build' / 'OpenShock-Core-V2'
+    assert build.resolve_build_dir('OpenShock-Core-V2', 'size') == ROOT / 'build' / 'OpenShock-Core-V2-size'
+
+
+def test_unknown_optimization_is_refused(idf, monkeypatch):
+    monkeypatch.setenv('OPENSHOCK_FW_OPTIMIZATION', 'O3')
+    with pytest.raises(SystemExit, match='debug, size'):
+        build.main(['OpenShock-Core-V2'])
+    assert idf == []
+
+
+@pytest.mark.parametrize(
     'ref, expected',
     [
         ('refs/tags/1.5.0', ('tag', '1.5.0')),
