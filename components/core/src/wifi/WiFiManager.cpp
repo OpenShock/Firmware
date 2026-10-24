@@ -95,6 +95,24 @@ static std::atomic<uint8_t> s_preferredCredentialsID = 0;
 static OpenShock::SimpleMutex s_networksMutex;
 static std::vector<WiFiNetwork> s_wifiNetworks;
 
+// Local events only reach captive-portal clients, and building the FlatBuffer is most of their cost. The portal
+// answers "is anyone there" with one lock-free flag, so the common case, portal closed, does no work at all.
+static void portalBroadcastNetworkEvent(Serialization::Types::WifiNetworkEventType eventType, const WiFiNetwork& network)
+{
+  if (!AppHooks::CaptivePortalIsRunning()) return;
+  Serialization::Local::SerializeWiFiNetworkEvent(eventType, network, AppHooks::CaptivePortalBroadcastMessageBIN);
+}
+static void portalBroadcastNetworksEvent(Serialization::Types::WifiNetworkEventType eventType, const std::vector<WiFiNetwork>& networks)
+{
+  if (!AppHooks::CaptivePortalIsRunning()) return;
+  Serialization::Local::SerializeWiFiNetworksEvent(eventType, networks, AppHooks::CaptivePortalBroadcastMessageBIN);
+}
+static void portalBroadcastError(std::string_view message)
+{
+  if (!AppHooks::CaptivePortalIsRunning()) return;
+  Serialization::Local::SerializeErrorMessage(message, AppHooks::CaptivePortalBroadcastMessageBIN);
+}
+
 // Broadcast a coarse connectivity change on the OpenShock event bus. Posted with a
 // short timeout because this runs on the default event loop task (posting to the
 // same loop must never block on a full queue).
@@ -294,7 +312,7 @@ static void evWiFiConnected(const wifi_event_sta_connected_t& info)
 
     WiFiNetwork network;
     if (getConnectedAPNetwork(network, credentialsId)) {
-      Serialization::Local::SerializeWiFiNetworkEvent(Serialization::Types::WifiNetworkEventType::Connected, network, AppHooks::CaptivePortalBroadcastMessageBIN);
+      portalBroadcastNetworkEvent(Serialization::Types::WifiNetworkEventType::Connected, network);
     }
 
     return;
@@ -304,7 +322,7 @@ static void evWiFiConnected(const wifi_event_sta_connected_t& info)
 
   OS_LOGI(TAG, "Connected to network %s (" BSSID_FMT ")", ssid, BSSID_ARG(info.bssid));
 
-  Serialization::Local::SerializeWiFiNetworkEvent(Serialization::Types::WifiNetworkEventType::Connected, *it, AppHooks::CaptivePortalBroadcastMessageBIN);
+  portalBroadcastNetworkEvent(Serialization::Types::WifiNetworkEventType::Connected, *it);
 }
 static void evWiFiGotIP(const ip_event_got_ip_t& info)
 {
@@ -317,7 +335,9 @@ static void evWiFiGotIP(const ip_event_got_ip_t& info)
 
   char ipStr[16];
   snprintf(ipStr, sizeof(ipStr), IPV4ADDR_FMT, IPV4ADDR_ARG(ip));
-  Serialization::Local::SerializeWiFiGotIpEvent(ipStr, AppHooks::CaptivePortalBroadcastMessageBIN);
+  if (AppHooks::CaptivePortalIsRunning()) {
+    Serialization::Local::SerializeWiFiGotIpEvent(ipStr, AppHooks::CaptivePortalBroadcastMessageBIN);
+  }
 }
 static void evWiFiGotIP6(const ip_event_got_ip6_t& info)
 {
@@ -344,24 +364,24 @@ static void evWiFiDisconnected(const wifi_event_sta_disconnected_t& info)
   ScopedLock lock__(&s_networksMutex);
   auto it = findNetworkByBSSID(info.bssid);
   if (it != s_wifiNetworks.end()) {
-    Serialization::Local::SerializeWiFiNetworkEvent(Serialization::Types::WifiNetworkEventType::Disconnected, *it, AppHooks::CaptivePortalBroadcastMessageBIN);
+    portalBroadcastNetworkEvent(Serialization::Types::WifiNetworkEventType::Disconnected, *it);
   } else {
     // Network not in scan results (forgotten or hidden); send minimal event
     WiFiNetwork net;
     strncpy(net.ssid, ssid, sizeof(net.ssid) - 1);
     memcpy(net.bssid, info.bssid, sizeof(net.bssid));
-    Serialization::Local::SerializeWiFiNetworkEvent(Serialization::Types::WifiNetworkEventType::Disconnected, net, AppHooks::CaptivePortalBroadcastMessageBIN);
+    portalBroadcastNetworkEvent(Serialization::Types::WifiNetworkEventType::Disconnected, net);
   }
 
   // Send error message for unexpected disconnects (not user-initiated)
   if (info.reason != WIFI_REASON_ASSOC_LEAVE) {
     const char* friendlyReason = wifiDisconnectReason(info.reason);
     if (friendlyReason != nullptr) {
-      Serialization::Local::SerializeErrorMessage(friendlyReason, AppHooks::CaptivePortalBroadcastMessageBIN);
+      portalBroadcastError(friendlyReason);
     } else {
       char reason[64];
       snprintf(reason, sizeof(reason), "Unknown WiFi error (code %d), please contact support", info.reason);
-      Serialization::Local::SerializeErrorMessage(reason, AppHooks::CaptivePortalBroadcastMessageBIN);
+      portalBroadcastError(reason);
     }
   }
 }
@@ -408,7 +428,7 @@ static void evWiFiScanStatusChanged(OpenShock::WiFiScanStatus status)
     for (auto it = s_wifiNetworks.begin(); it != s_wifiNetworks.end();) {
       if (++it->scansMissed > 3) {
         OS_LOGV(TAG, "Network %s (" BSSID_FMT ") has not been seen in 3 scans, removing from list", it->ssid, BSSID_ARG(it->bssid));
-        Serialization::Local::SerializeWiFiNetworkEvent(Serialization::Types::WifiNetworkEventType::Lost, *it, AppHooks::CaptivePortalBroadcastMessageBIN);
+        portalBroadcastNetworkEvent(Serialization::Types::WifiNetworkEventType::Lost, *it);
         it = s_wifiNetworks.erase(it);
       } else {
         ++it;
@@ -423,7 +443,9 @@ static void evWiFiScanStatusChanged(OpenShock::WiFiScanStatus status)
   }
 
   // Send the scan status changed event
-  Serialization::Local::SerializeWiFiScanStatusChangedEvent(status, AppHooks::CaptivePortalBroadcastMessageBIN);
+  if (AppHooks::CaptivePortalIsRunning()) {
+    Serialization::Local::SerializeWiFiScanStatusChangedEvent(status, AppHooks::CaptivePortalBroadcastMessageBIN);
+  }
 }
 static void evWiFiNetworksDiscovery(const std::vector<const wifi_ap_record_t*>& records)
 {
@@ -461,10 +483,10 @@ static void evWiFiNetworksDiscovery(const std::vector<const wifi_ap_record_t*>& 
   }
 
   if (!updatedNetworks.empty()) {
-    Serialization::Local::SerializeWiFiNetworksEvent(Serialization::Types::WifiNetworkEventType::Updated, updatedNetworks, AppHooks::CaptivePortalBroadcastMessageBIN);
+    portalBroadcastNetworksEvent(Serialization::Types::WifiNetworkEventType::Updated, updatedNetworks);
   }
   if (!discoveredNetworks.empty()) {
-    Serialization::Local::SerializeWiFiNetworksEvent(Serialization::Types::WifiNetworkEventType::Discovered, discoveredNetworks, AppHooks::CaptivePortalBroadcastMessageBIN);
+    portalBroadcastNetworksEvent(Serialization::Types::WifiNetworkEventType::Discovered, discoveredNetworks);
   }
 }
 
@@ -609,12 +631,12 @@ bool WiFiManager::Save(const char* ssid, std::string_view password, bool connect
     // Network is in scan results; use scanned auth mode (more reliable than user-provided)
     uint8_t id = Config::AddWiFiCredentials(it->ssid, password, it->authMode);
     if (id == 0) {
-      Serialization::Local::SerializeErrorMessage("too_many_credentials", AppHooks::CaptivePortalBroadcastMessageBIN);
+      portalBroadcastError("too_many_credentials");
       return false;
     }
 
     it->credentialsID = id;
-    Serialization::Local::SerializeWiFiNetworkEvent(Serialization::Types::WifiNetworkEventType::Saved, *it, AppHooks::CaptivePortalBroadcastMessageBIN);
+    portalBroadcastNetworkEvent(Serialization::Types::WifiNetworkEventType::Saved, *it);
 
     if (connect) {
       requestConnect(id);
@@ -627,7 +649,7 @@ bool WiFiManager::Save(const char* ssid, std::string_view password, bool connect
 
   uint8_t id = Config::AddWiFiCredentials(ssid, password, authMode);
   if (id == 0) {
-    Serialization::Local::SerializeErrorMessage("too_many_credentials", AppHooks::CaptivePortalBroadcastMessageBIN);
+    portalBroadcastError("too_many_credentials");
     return false;
   }
 
@@ -636,7 +658,7 @@ bool WiFiManager::Save(const char* ssid, std::string_view password, bool connect
   strncpy(net.ssid, ssid, sizeof(net.ssid) - 1);
   net.authMode      = authMode != WIFI_AUTH_MAX ? authMode : WIFI_AUTH_OPEN;
   net.credentialsID = id;
-  Serialization::Local::SerializeWiFiNetworkEvent(Serialization::Types::WifiNetworkEventType::Saved, net, AppHooks::CaptivePortalBroadcastMessageBIN);
+  portalBroadcastNetworkEvent(Serialization::Types::WifiNetworkEventType::Saved, net);
 
   if (connect) {
     requestConnect(id);
@@ -663,7 +685,7 @@ bool WiFiManager::Forget(const char* ssid)
     // Remove the credentials from the config
     if (Config::RemoveWiFiCredentials(credsId)) {
       it->credentialsID = 0;
-      Serialization::Local::SerializeWiFiNetworkEvent(Serialization::Types::WifiNetworkEventType::Removed, *it, AppHooks::CaptivePortalBroadcastMessageBIN);
+      portalBroadcastNetworkEvent(Serialization::Types::WifiNetworkEventType::Removed, *it);
     }
 
     return true;
@@ -690,7 +712,7 @@ bool WiFiManager::Forget(const char* ssid)
   // Fire Removed event with a minimal WiFiNetwork for the UI
   WiFiNetwork net;
   strncpy(net.ssid, ssid, sizeof(net.ssid) - 1);
-  Serialization::Local::SerializeWiFiNetworkEvent(Serialization::Types::WifiNetworkEventType::Removed, net, AppHooks::CaptivePortalBroadcastMessageBIN);
+  portalBroadcastNetworkEvent(Serialization::Types::WifiNetworkEventType::Removed, net);
 
   return true;
 }

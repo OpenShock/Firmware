@@ -32,6 +32,7 @@ const char* const TAG = "OtaUpdateManager";
 #include <esp_wifi.h>
 
 #include <array>
+#include <atomic>
 #include <cstring>
 #include <span>
 #include <sstream>
@@ -65,7 +66,8 @@ enum OtaTaskEventFlag : uint32_t {
   OTA_TASK_EVENT_CHECK_REQUESTED   = 1 << 3,
 };
 
-static esp_ota_img_states_t _otaImageState;
+// Written by Init() and again when the OTA task validates the image; read by IsValidatingApp() from other tasks.
+static std::atomic<esp_ota_img_states_t> _otaImageState;
 static OpenShock::FirmwareBootType _bootType;
 static TaskHandle_t _taskHandle = nullptr;
 static OpenShock::SemVer _requestedVersion;
@@ -661,11 +663,13 @@ bool OtaUpdateManager::Init()
   OS_LOGD(TAG, "Fetching partition state");
 
   // Get OTA state for said partition.
-  err = esp_ota_get_state_partition(partition, &_otaImageState);
+  esp_ota_img_states_t imageState;
+  err = esp_ota_get_state_partition(partition, &imageState);
   if (err != ESP_OK) {
     OS_PANIC(TAG, "Failed to get partition state: %s", esp_err_to_name(err));
     return false;  // Unreachable, here to make tooling happy
   }
+  _otaImageState = imageState;
 
   OS_LOGD(TAG, "Fetching previous update step");
   OtaUpdateStep updateStep;

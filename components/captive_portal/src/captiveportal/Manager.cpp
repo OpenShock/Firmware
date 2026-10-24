@@ -66,6 +66,12 @@ static SemaphoreHandle_t s_forceCloseDone                = nullptr;  // Given by
 // The running instance, read by any task that sends through it; only the manager task creates or retires it.
 static SimpleMutex s_instanceMutex;
 static std::shared_ptr<CaptivePortalInstance> s_instance = nullptr;
+// Mirrors `s_instance != nullptr`; written under s_instanceMutex. Double-checked locking: GetInstance() reads this flag
+// first and only takes the mutex when it says there is something to get, so the common case, portal closed with WiFi
+// events and the 500 ms tick still asking, costs one atomic load. The flag is advisory; the pointer read under the
+// mutex is authoritative (hence relaxed: a stale answer only costs a mutex round trip or drops a broadcast that would
+// have raced with the instance's creation anyway).
+static std::atomic<bool> s_instanceLive = false;
 // Instances taken down whose destruction waits for other tasks to drop their references; destroyed by the manager task.
 static RetiredList<CaptivePortalInstance> s_retiredInstances;
 static esp_netif_t* s_apNetif = nullptr;
@@ -92,6 +98,10 @@ static bool isDeviceFullyConfigured()
 
 static std::shared_ptr<CaptivePortalInstance> GetInstance()
 {
+  if (!s_instanceLive.load(std::memory_order_relaxed)) {
+    return nullptr;
+  }
+
   ScopedLock lock__(&s_instanceMutex);
   return s_instance;
 }
@@ -105,6 +115,7 @@ static bool CreateInstance()
 
   ScopedLock lock__(&s_instanceMutex);
   s_instance = std::move(instance);
+  s_instanceLive.store(true, std::memory_order_relaxed);
   return true;
 }
 // Unpublishes the instance and destroys it on this task. Other tasks may hold a copy for a moment while sending, so
@@ -114,6 +125,7 @@ static bool DestroyInstance()
 {
   {
     ScopedLock lock__(&s_instanceMutex);
+    s_instanceLive.store(false, std::memory_order_relaxed);
     s_retiredInstances.retire(std::move(s_instance));  // Leaves s_instance null
   }
 
@@ -365,7 +377,7 @@ bool CaptivePortal::Init()
     return false;
   }
 
-  AppHooks::RegisterCaptivePortal(CaptivePortal::BroadcastMessageBIN, CaptivePortal::SetAlwaysEnabled);
+  AppHooks::RegisterCaptivePortal(CaptivePortal::BroadcastMessageBIN, CaptivePortal::SetAlwaysEnabled, CaptivePortal::IsRunning);
 
   esp_timer_create_args_t args = {
     .callback              = captiveportal_timernotify,
@@ -429,7 +441,7 @@ void CaptivePortal::ReleaseForceClose()
 
 bool CaptivePortal::IsRunning()
 {
-  return GetInstance() != nullptr;
+  return s_instanceLive.load(std::memory_order_relaxed);
 }
 
 const char* CaptivePortal::ApIPv4String()
