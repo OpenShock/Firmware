@@ -8,7 +8,7 @@
 #define HANDLER_FN(NAME)  HANDLER_SIG(Handle##NAME)
 
 namespace OpenShock::MessageHandlers::Server::_Private {
-  typedef HANDLER_SIG((*HandlerType));
+  using HandlerType = HANDLER_SIG((*));
   HANDLER_FN(Ping);
   HANDLER_FN(Trigger);
   HANDLER_FN(ShockerCommandList);

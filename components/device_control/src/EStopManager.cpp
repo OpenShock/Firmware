@@ -145,12 +145,13 @@ static bool estopmgr_taskStart()
   }
 
   if (s_estopPin == GPIO_NUM_NC) {
-    gpio_num_t pin = GPIO_NUM_NC;
-    if (!OpenShock::Config::GetEStopGpioPin(pin)) {
+    auto configPin = OpenShock::Config::GetEStopGpioPin();
+    if (!configPin) {
       OS_LOGE(TAG, "Failed to get EStop pin from config");
       return false;
     }
 
+    gpio_num_t pin = *configPin;
     if (pin == GPIO_NUM_NC) {
       OS_LOGW(TAG, "No valid pin is defined, refusing to start task");
       return false;
@@ -200,23 +201,23 @@ bool EStopManager::Init()
   }
   s_estopInitialized = true;
 
-  Config::EStopConfig cfg;
-  if (!OpenShock::Config::GetEStopConfig(cfg)) {
+  auto cfg = OpenShock::Config::GetEStopConfig();
+  if (!cfg) {
     OS_LOGE(TAG, "Failed to get EStop pin from config");
     return false;
   }
 
-  if (!cfg.enabled) {
+  if (!cfg->enabled) {
     return true;
   }
 
   OpenShock::ScopedLock lock__(&s_estopMutex);
 
-  if (!estopmgr_configurePin(cfg.gpioPin)) {
+  if (!estopmgr_configurePin(cfg->gpioPin)) {
     return false;
   }
 
-  s_estopPin = cfg.gpioPin;
+  s_estopPin = cfg->gpioPin;
 
   return estopmgr_taskStart();
 }

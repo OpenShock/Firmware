@@ -11,6 +11,7 @@ const char* const TAG = "WiFiManager";
 #include "Logging.h"
 #include "serialization/WSLocal.h"
 #include "Temporal.h"
+#include "util/FunctionRef.h"
 #include "util/TaskUtils.h"
 #include "wifi/WiFiNetwork.h"
 #include "wifi/WiFiScanManager.h"
@@ -25,6 +26,7 @@ const char* const TAG = "WiFiManager";
 #include <atomic>
 #include <cstdint>
 #include <cstring>
+#include <optional>
 #include <vector>
 
 using namespace OpenShock;
@@ -134,13 +136,13 @@ static bool isConnectRateLimited(const WiFiNetwork& net)
   return diff < backoff;
 }
 
-static bool isSaved(std::function<bool(const Config::WiFiCredentials&)> predicate)
+static bool isSaved(Util::FunctionRef<bool(const Config::WiFiCredentials&)> predicate)
 {
   return Config::AnyWiFiCredentials(predicate);
 }
 // All s_wifiNetworks helpers require s_networksMutex. The list is kept ordered by RSSI (strongest first), so lookups
 // return the strongest matching BSSID; nothing else may reorder it.
-static std::vector<WiFiNetwork>::iterator findNetwork(std::function<bool(WiFiNetwork&)> predicate)
+static std::vector<WiFiNetwork>::iterator findNetwork(Util::FunctionRef<bool(WiFiNetwork&)> predicate)
 {
   return std::find_if(s_wifiNetworks.begin(), s_wifiNetworks.end(), predicate);
 }
@@ -154,7 +156,7 @@ static std::vector<WiFiNetwork>::iterator findNetworkByBSSID(const uint8_t (&bss
 }
 
 // Picks the most attractive saved, non-rate-limited network without reordering the list.
-static bool getNextWiFiNetwork(OpenShock::Config::WiFiCredentials& creds)
+[[nodiscard]] static std::optional<OpenShock::Config::WiFiCredentials> getNextWiFiNetwork()
 {
   const WiFiNetwork* best = nullptr;
   for (const WiFiNetwork& net : s_wifiNetworks) {
@@ -167,43 +169,42 @@ static bool getNextWiFiNetwork(OpenShock::Config::WiFiCredentials& creds)
     }
   }
 
-  return best != nullptr && Config::TryGetWiFiCredentialsByID(best->credentialsID, creds);
+  if (best == nullptr) {
+    return std::nullopt;
+  }
+
+  return Config::TryGetWiFiCredentialsByID(best->credentialsID);
 }
 
 // Requires s_networksMutex. Records the attempt and rejects the network if its scanned auth mode is weaker than expected.
-// `channel` receives the scanned channel of the strongest BSSID (0 if not scanned).
-static bool prepareConnectAttempt(const std::string& ssid, wifi_auth_mode_t expectedAuthMode, uint8_t& channel)
+// Returns the scanned channel of the strongest BSSID (0 if not scanned), or nullopt if the network is rejected.
+[[nodiscard]] static std::optional<uint8_t> prepareConnectAttempt(const std::string& ssid, wifi_auth_mode_t expectedAuthMode)
 {
-  channel = 0;
-
   auto it = findNetworkBySSID(ssid.c_str());
   if (it == s_wifiNetworks.end()) {
-    return true;  // Not scanned (hidden or out of range); nothing to validate against
+    return uint8_t {0};  // Not scanned (hidden or out of range); nothing to validate against
   }
 
   // Reject if the AP's auth mode is weaker than expected (evil twin protection)
   if (expectedAuthMode != WIFI_AUTH_MAX && it->authMode < expectedAuthMode) {
     OS_LOGW(TAG, "Rejecting network %s: auth mode %d is weaker than expected %d", ssid.c_str(), it->authMode, expectedAuthMode);
-    return false;
+    return std::nullopt;
   }
 
   it->connectAttempts++;
   it->lastConnectAttempt = OpenShock::millis();
-  channel                = it->channel;
 
-  return true;
+  return it->channel;
 }
 
-static bool getConnectedAPNetwork(WiFiNetwork& network, uint8_t credentialsId)
+[[nodiscard]] static std::optional<WiFiNetwork> getConnectedAPNetwork(uint8_t credentialsId)
 {
   wifi_ap_record_t apRecord;
   if (esp_wifi_sta_get_ap_info(&apRecord) != ESP_OK) {
-    return false;
+    return std::nullopt;
   }
 
-  network = WiFiNetwork(&apRecord, credentialsId);
-
-  return true;
+  return WiFiNetwork(&apRecord, credentialsId);
 }
 
 // Must be called without s_networksMutex held, after prepareConnectAttempt(). A known `channel` (from a scan) lets
@@ -286,15 +287,13 @@ static void evWiFiConnected(const wifi_event_sta_connected_t& info)
     OS_LOGW(TAG, "Connected to unscanned network \"%s\", BSSID: " BSSID_FMT, ssid, BSSID_ARG(info.bssid));
 
     uint8_t credentialsId = 0;
-    Config::WiFiCredentials creds;
-    if (Config::TryGetWiFiCredentialsBySSID(ssid, creds)) {
-      credentialsId = creds.id;
+    if (auto creds = Config::TryGetWiFiCredentialsBySSID(ssid)) {
+      credentialsId = creds->id;
       s_connectedCredentialsID.store(credentialsId, std::memory_order_relaxed);
     }
 
-    WiFiNetwork network;
-    if (getConnectedAPNetwork(network, credentialsId)) {
-      Serialization::Local::SerializeWiFiNetworkEvent(Serialization::Types::WifiNetworkEventType::Connected, network, AppHooks::CaptivePortalBroadcastMessageBIN);
+    if (auto network = getConnectedAPNetwork(credentialsId)) {
+      Serialization::Local::SerializeWiFiNetworkEvent(Serialization::Types::WifiNetworkEventType::Connected, *network, AppHooks::CaptivePortalBroadcastMessageBIN);
     }
 
     return;
@@ -470,7 +469,7 @@ static void evWiFiNetworksDiscovery(const std::vector<const wifi_ap_record_t*>& 
 
 static bool tryConnect()
 {
-  Config::WiFiCredentials creds;
+  std::optional<Config::WiFiCredentials> creds;
   uint8_t channel = 0;
 
   // Select the target network, validate it and mark it as attempted under lock, then release before connecting
@@ -479,20 +478,26 @@ static bool tryConnect()
 
     uint8_t preferredId = s_preferredCredentialsID.exchange(0, std::memory_order_relaxed);
     if (preferredId != 0) {
-      if (!Config::TryGetWiFiCredentialsByID(preferredId, creds)) {
+      creds = Config::TryGetWiFiCredentialsByID(preferredId);
+      if (!creds) {
         OS_LOGE(TAG, "Failed to find credentials with ID %u", preferredId);
         return false;
       }
-    } else if (!getNextWiFiNetwork(creds)) {
-      return false;
+    } else {
+      creds = getNextWiFiNetwork();
+      if (!creds) {
+        return false;
+      }
     }
 
-    if (!prepareConnectAttempt(creds.ssid, creds.authMode, channel)) {
+    auto scannedChannel = prepareConnectAttempt(creds->ssid, creds->authMode);
+    if (!scannedChannel) {
       return false;
     }
+    channel = *scannedChannel;
   }
 
-  return connectWiFi(creds.ssid, creds.password, creds.HasPinnedBSSID() ? creds.bssid.data() : nullptr, channel);
+  return connectWiFi(creds->ssid, creds->password, creds->HasPinnedBSSID() ? creds->bssid.data() : nullptr, channel);
 }
 
 static void wifimanagerUpdateTask(void*)
@@ -561,8 +566,8 @@ bool WiFiManager::Init()
     return false;
   }
 
-  std::string hostname;
-  if (!Config::GetWiFiHostname(hostname)) {
+  auto hostname = Config::GetWiFiHostname();
+  if (!hostname) {
     OS_LOGE(TAG, "Failed to get WiFi hostname, reverting to default");
     hostname = CONFIG_OPENSHOCK_FW_HOSTNAME;
   }
@@ -579,7 +584,7 @@ bool WiFiManager::Init()
     return false;
   }
 
-  esp_netif_set_hostname(s_staNetif, hostname.c_str());
+  esp_netif_set_hostname(s_staNetif, hostname->c_str());
 
   if (TaskUtils::TaskCreateUniversal(wifimanagerUpdateTask, TAG, 4096, nullptr, 5, nullptr, 1) != pdPASS) {  // TODO: Re-profile stack usage
     OS_LOGE(TAG, "Failed to create WiFiManager update task");
@@ -670,19 +675,19 @@ bool WiFiManager::Forget(const char* ssid)
   }
 
   // Network not in scan results; look up credentials directly
-  Config::WiFiCredentials creds;
-  if (!Config::TryGetWiFiCredentialsBySSID(ssid, creds)) {
+  auto creds = Config::TryGetWiFiCredentialsBySSID(ssid);
+  if (!creds) {
     OS_LOGE(TAG, "Failed to find credentials for network %s", ssid);
     return false;
   }
 
   // Check if the network is currently connected
-  if (s_connectedCredentialsID.load(std::memory_order_relaxed) == creds.id) {
+  if (s_connectedCredentialsID.load(std::memory_order_relaxed) == creds->id) {
     // Disconnect from the network
     WiFiManager::Disconnect();
   }
 
-  if (!Config::RemoveWiFiCredentials(creds.id)) {
+  if (!Config::RemoveWiFiCredentials(creds->id)) {
     OS_LOGE(TAG, "Failed to remove credentials for network %s", ssid);
     return false;
   }
@@ -702,10 +707,9 @@ bool WiFiManager::RefreshNetworkCredentials()
   ScopedLock lock__(&s_networksMutex);
 
   for (auto& net : s_wifiNetworks) {
-    Config::WiFiCredentials creds;
-    if (Config::TryGetWiFiCredentialsBySSID(net.ssid, creds)) {
+    if (auto creds = Config::TryGetWiFiCredentialsBySSID(net.ssid)) {
       OS_LOGV(TAG, "Found credentials for network %s (" BSSID_FMT ")", net.ssid, BSSID_ARG(net.bssid));
-      net.credentialsID = creds.id;
+      net.credentialsID = creds->id;
     } else {
       OS_LOGV(TAG, "Failed to find credentials for network %s (" BSSID_FMT ")", net.ssid, BSSID_ARG(net.bssid));
       net.credentialsID = 0;
@@ -722,20 +726,20 @@ bool WiFiManager::IsSaved(const char* ssid)
 
 bool WiFiManager::Connect(const char* ssid)
 {
-  Config::WiFiCredentials creds;
-  if (!Config::TryGetWiFiCredentialsBySSID(ssid, creds)) {
+  auto creds = Config::TryGetWiFiCredentialsBySSID(ssid);
+  if (!creds) {
     OS_LOGE(TAG, "Failed to find credentials for network %s", ssid);
     return false;
   }
 
-  if (s_connectedCredentialsID.load(std::memory_order_relaxed) != creds.id) {
+  if (s_connectedCredentialsID.load(std::memory_order_relaxed) != creds->id) {
     Disconnect();
-    s_preferredCredentialsID.store(creds.id, std::memory_order_relaxed);
+    s_preferredCredentialsID.store(creds->id, std::memory_order_relaxed);
     return true;
   }
 
   if (s_wifiState.load(std::memory_order_relaxed) == WiFiState::Disconnected) {
-    s_preferredCredentialsID.store(creds.id, std::memory_order_relaxed);
+    s_preferredCredentialsID.store(creds->id, std::memory_order_relaxed);
   }
 
   // Already connected to this network, or reconnecting; either way, success
@@ -771,7 +775,13 @@ bool WiFiManager::GetConnectedNetwork(OpenShock::WiFiNetwork& network)
   }
 
   // The connected network is not in the scan results (e.g. connected on boot before any scan), so query the AP directly
-  return getConnectedAPNetwork(network, connectedId);
+  auto apNetwork = getConnectedAPNetwork(connectedId);
+  if (!apNetwork) {
+    return false;
+  }
+
+  network = std::move(*apNetwork);
+  return true;
 }
 
 bool WiFiManager::GetIPAddress(char* ipAddress)

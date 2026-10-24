@@ -216,79 +216,75 @@ bool JSON::JsonView::isNumber() const noexcept
   return s != "true" && s != "false" && s != "null";
 }
 
-bool JSON::JsonView::tryGetStr(std::string& out) const
+std::optional<std::string> JSON::JsonView::tryGetStr() const
 {
   if (!isString()) {
-    return false;
+    return std::nullopt;
   }
 
   std::string_view s = raw();
   if (s.find('\\') == std::string_view::npos) {
-    out.assign(s);  // nothing to decode
-    return true;
+    return std::string(s);  // nothing to decode
   }
 
   std::string decoded;
   if (!jsonUnescape(s, decoded)) {
-    return false;
+    return std::nullopt;
   }
-  out = std::move(decoded);
-  return true;
+  return decoded;
 }
 
-bool JSON::JsonView::tryGetBool(bool& out) const noexcept
+std::optional<bool> JSON::JsonView::tryGetBool() const noexcept
 {
   if (!isPrimitive()) {
-    return false;
+    return std::nullopt;
   }
   std::string_view s = raw();
   if (s == "true") {
-    out = true;
     return true;
   }
   if (s == "false") {
-    out = false;
-    return true;
-  }
-  return false;
-}
-
-bool JSON::JsonView::tryGetU8(uint8_t& out) const noexcept
-{
-  if (!isNumber()) {
     return false;
   }
-  return Convert::ToUint8(raw(), out);
+  return std::nullopt;
 }
 
-bool JSON::JsonView::tryGetU16(uint16_t& out) const noexcept
+std::optional<uint8_t> JSON::JsonView::tryGetU8() const noexcept
 {
   if (!isNumber()) {
-    return false;
+    return std::nullopt;
   }
-  return Convert::ToUint16(raw(), out);
+  return Convert::ToUint8(raw());
 }
 
-bool JSON::JsonView::tryGetI32(int32_t& out) const noexcept
+std::optional<uint16_t> JSON::JsonView::tryGetU16() const noexcept
 {
   if (!isNumber()) {
-    return false;
+    return std::nullopt;
   }
-  return Convert::ToInt32(raw(), out);
+  return Convert::ToUint16(raw());
 }
 
-bool JSON::JsonView::tryGetI64(int64_t& out) const noexcept
+std::optional<int32_t> JSON::JsonView::tryGetI32() const noexcept
 {
   if (!isNumber()) {
-    return false;
+    return std::nullopt;
   }
-  return Convert::ToInt64(raw(), out);
+  return Convert::ToInt32(raw());
 }
 
-bool JSON::JsonView::tryGetDouble(double& out) const noexcept
+std::optional<int64_t> JSON::JsonView::tryGetI64() const noexcept
 {
   if (!isNumber()) {
-    return false;
+    return std::nullopt;
+  }
+  return Convert::ToInt64(raw());
+}
+
+std::optional<double> JSON::JsonView::tryGetDouble() const noexcept
+{
+  if (!isNumber()) {
+    return std::nullopt;
   }
   std::string_view s = raw();
 
@@ -296,7 +292,7 @@ bool JSON::JsonView::tryGetDouble(double& out) const noexcept
   // stack copy is fine and avoids touching the (non-terminated) source buffer.
   char buf[64];
   if (s.size() >= sizeof(buf)) {
-    return false;
+    return std::nullopt;
   }
   std::memcpy(buf, s.data(), s.size());
   buf[s.size()] = '\0';
@@ -304,10 +300,9 @@ bool JSON::JsonView::tryGetDouble(double& out) const noexcept
   char* end    = nullptr;
   double value = std::strtod(buf, &end);
   if (end != buf + s.size()) {
-    return false;
+    return std::nullopt;
   }
-  out = value;
-  return true;
+  return value;
 }
 
 JSON::JsonView JSON::JsonView::operator[](std::string_view key) const

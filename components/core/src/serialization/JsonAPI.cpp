@@ -4,7 +4,9 @@ const char* const TAG = "JsonAPI";
 
 #include "Logging.h"
 
+#include <optional>
 #include <string>
+#include <utility>
 
 // Log an invalid-response error together with the offending JSON, zero-copy
 // straight out of the parse buffer (jsmn views are not NUL-terminated).
@@ -12,191 +14,183 @@ const char* const TAG = "JsonAPI";
 
 using namespace OpenShock::Serialization;
 
-bool JsonAPI::ParseBackendVersionJsonResponse(int code, JSON::JsonView root, JsonAPI::BackendVersionResponse& out)
+std::optional<JsonAPI::BackendVersionResponse> JsonAPI::ParseBackendVersionJsonResponse(int code, JSON::JsonView root)
 {
   (void)code;
 
   if (!root.isObject()) {
     ESP_LOGJSONE("not an object", root);
-    return false;
+    return std::nullopt;
   }
 
   JSON::JsonView data = root["data"];
   if (!data.isObject()) {
     ESP_LOGJSONE("value at 'data' is not an object", root);
-    return false;
+    return std::nullopt;
   }
 
-  out = {};
-
-  std::string version;
-  if (!data["version"].tryGetStr(version)) {
+  auto version = data["version"].tryGetStr();
+  if (!version) {
     ESP_LOGJSONE("value at 'data.version' is not a string", root);
-    return false;
+    return std::nullopt;
   }
 
-  std::string commit;
-  if (!data["commit"].tryGetStr(commit)) {
+  auto commit = data["commit"].tryGetStr();
+  if (!commit) {
     ESP_LOGJSONE("value at 'data.commit' is not a string", root);
-    return false;
+    return std::nullopt;
   }
 
-  std::string currentTime;
-  if (!data["currentTime"].tryGetStr(currentTime)) {
+  auto currentTime = data["currentTime"].tryGetStr();
+  if (!currentTime) {
     ESP_LOGJSONE("value at 'data.currentTime' is not a string", root);
-    return false;
+    return std::nullopt;
   }
 
-  out.version.assign(version);
-  out.commit.assign(commit);
-  out.currentTime.assign(currentTime);
-
-  return true;
+  return BackendVersionResponse {
+    .version     = std::move(*version),
+    .commit      = std::move(*commit),
+    .currentTime = std::move(*currentTime),
+  };
 }
 
-bool JsonAPI::ParseAccountLinkJsonResponse(int code, JSON::JsonView root, JsonAPI::AccountLinkResponse& out)
+std::optional<JsonAPI::AccountLinkResponse> JsonAPI::ParseAccountLinkJsonResponse(int code, JSON::JsonView root)
 {
   (void)code;
 
   if (!root.isObject()) {
     ESP_LOGJSONE("not an object", root);
-    return false;
+    return std::nullopt;
   }
 
-  std::string data;
-  if (!root["data"].tryGetStr(data)) {
+  auto data = root["data"].tryGetStr();
+  if (!data) {
     ESP_LOGJSONE("value at 'data' is not a string", root);
-    return false;
+    return std::nullopt;
   }
 
-  out = {};
-
-  out.authToken.assign(data);
-
-  return true;
+  return AccountLinkResponse {.authToken = std::move(*data)};
 }
-bool JsonAPI::ParseHubInfoJsonResponse(int code, JSON::JsonView root, JsonAPI::HubInfoResponse& out)
+std::optional<JsonAPI::HubInfoResponse> JsonAPI::ParseHubInfoJsonResponse(int code, JSON::JsonView root)
 {
   (void)code;
 
   if (!root.isObject()) {
     ESP_LOGJSONE("not an object", root);
-    return false;
+    return std::nullopt;
   }
 
   JSON::JsonView data = root["data"];
   if (!data.isObject()) {
     ESP_LOGJSONE("value at 'data' is not an object", root);
-    return false;
+    return std::nullopt;
   }
 
-  std::string hubId;
-  if (!data["id"].tryGetStr(hubId)) {
+  auto hubId = data["id"].tryGetStr();
+  if (!hubId) {
     ESP_LOGJSONE("value at 'data.id' is not a string", root);
-    return false;
+    return std::nullopt;
   }
 
-  std::string hubName;
-  if (!data["name"].tryGetStr(hubName)) {
+  auto hubName = data["name"].tryGetStr();
+  if (!hubName) {
     ESP_LOGJSONE("value at 'data.name' is not a string", root);
-    return false;
+    return std::nullopt;
   }
 
   JSON::JsonView hubShockers = data["shockers"];
   if (!hubShockers.isArray()) {
     ESP_LOGJSONE("value at 'data.shockers' is not an array", root);
-    return false;
+    return std::nullopt;
   }
 
-  out = {};
-
-  out.hubId.assign(hubId);
-  out.hubName.assign(hubName);
-
-  if (out.hubId.empty() || out.hubName.empty()) {
+  if (hubId->empty() || hubName->empty()) {
     ESP_LOGJSONE("value at 'data.id' or 'data.name' is empty", root);
-    return false;
+    return std::nullopt;
   }
+
+  HubInfoResponse out {};
+
+  out.hubId   = std::move(*hubId);
+  out.hubName = std::move(*hubName);
 
   const int shockerCount = hubShockers.count();
   for (int i = 0; i < shockerCount; ++i) {
     JSON::JsonView shocker = hubShockers.at(i);
 
-    std::string shockerId;
-    if (!shocker["id"].tryGetStr(shockerId)) {
+    auto shockerId = shocker["id"].tryGetStr();
+    if (!shockerId) {
       ESP_LOGJSONE("value at 'shocker.id' is not a string", shocker);
-      return false;
+      return std::nullopt;
     }
-    if (shockerId.empty()) {
+    if (shockerId->empty()) {
       ESP_LOGJSONE("value at 'shocker.id' is empty", shocker);
-      return false;
+      return std::nullopt;
     }
 
-    int64_t shockerRfId;
-    if (!shocker["rfId"].tryGetI64(shockerRfId)) {
+    auto shockerRfId = shocker["rfId"].tryGetI64();
+    if (!shockerRfId) {
       ESP_LOGJSONE("value at 'shocker.rfId' is not a number", shocker);
-      return false;
+      return std::nullopt;
     }
-    if (shockerRfId < 0 || shockerRfId > UINT16_MAX) {
+    if (*shockerRfId < 0 || *shockerRfId > UINT16_MAX) {
       ESP_LOGJSONE("value at 'shocker.rfId' is not a valid uint16_t", shocker);
-      return false;
+      return std::nullopt;
     }
-    uint16_t shockerRfIdU16 = static_cast<uint16_t>(shockerRfId);
+    uint16_t shockerRfIdU16 = static_cast<uint16_t>(*shockerRfId);
 
-    std::string shockerModel;
-    if (!shocker["model"].tryGetStr(shockerModel)) {
+    auto shockerModel = shocker["model"].tryGetStr();
+    if (!shockerModel) {
       ESP_LOGJSONE("value at 'shocker.model' is not a string", shocker);
-      return false;
+      return std::nullopt;
     }
-    if (shockerModel.empty()) {
+    if (shockerModel->empty()) {
       ESP_LOGJSONE("value at 'shocker.model' is empty", shocker);
-      return false;
+      return std::nullopt;
     }
 
-    OpenShock::ShockerModelType shockerModelType;
-    if (!OpenShock::TryParseShockerModelType(shockerModelType, shockerModel, true)) {  // PetTrainer is a typo in the API, we pass true to allow it
+    auto shockerModelType = OpenShock::TryParseShockerModelType(*shockerModel, true);  // PetTrainer is a typo in the API, we pass true to allow it
+    if (!shockerModelType) {
       ESP_LOGJSONE("value at 'shocker.model' is not a valid shocker model", shocker);
-      return false;
+      return std::nullopt;
     }
 
-    out.shockers.push_back({.id = std::string(shockerId), .rfId = shockerRfIdU16, .model = shockerModelType});
+    out.shockers.push_back({.id = std::move(*shockerId), .rfId = shockerRfIdU16, .model = *shockerModelType});
   }
 
-  return true;
+  return out;
 }
-bool JsonAPI::ParseAssignLcgJsonResponse(int code, JSON::JsonView root, JsonAPI::AssignLcgResponse& out)
+std::optional<JsonAPI::AssignLcgResponse> JsonAPI::ParseAssignLcgJsonResponse(int code, JSON::JsonView root)
 {
   (void)code;
 
   if (!root.isObject()) {
     ESP_LOGJSONE("not an object", root);
-    return false;
+    return std::nullopt;
   }
 
-  std::string host;
-  std::string path;
-  std::string country;
-  if (!root["host"].tryGetStr(host) || !root["path"].tryGetStr(path) || !root["country"].tryGetStr(country)) {
+  auto host    = root["host"].tryGetStr();
+  auto path    = root["path"].tryGetStr();
+  auto country = root["country"].tryGetStr();
+  if (!host || !path || !country) {
     ESP_LOGJSONE("value at 'host', 'path' or 'country' is not a string", root);
-    return false;
+    return std::nullopt;
   }
 
-  int64_t port;
-  if (!root["port"].tryGetI64(port)) {
+  auto port = root["port"].tryGetI64();
+  if (!port) {
     ESP_LOGJSONE("value at 'port' is not a number", root);
-    return false;
+    return std::nullopt;
   }
-  if (port < 0 || port > UINT16_MAX) {
+  if (*port < 0 || *port > UINT16_MAX) {
     ESP_LOGJSONE("value at 'port' is outside UINT16 bounds", root);
-    return false;
+    return std::nullopt;
   }
 
-  out = {};
-
-  out.host.assign(host);
-  out.port = static_cast<uint16_t>(port);
-  out.path.assign(path);
-  out.country.assign(country);
-
-  return true;
+  return AssignLcgResponse {
+    .host    = std::move(*host),
+    .port    = static_cast<uint16_t>(*port),
+    .path    = std::move(*path),
+    .country = std::move(*country),
+  };
 }

@@ -10,11 +10,11 @@
 // They register these callbacks from their Init(); until then each call behaves as if the
 // subsystem were not running (broadcasts fail, requests are dropped).
 namespace OpenShock::AppHooks {
-  typedef bool (*BroadcastMessageBINFn)(std::span<const uint8_t> data);
-  typedef void (*SetAlwaysEnabledFn)(bool alwaysEnabled);
-  typedef FirmwareBootType (*GetFirmwareBootTypeFn)();
-  typedef bool (*TryStartFirmwareUpdateFn)(const OpenShock::SemVer& version);
-  typedef bool (*RequestUpdateCheckFn)();
+  using BroadcastMessageBINFn    = bool (*)(std::span<const uint8_t> data);
+  using SetAlwaysEnabledFn       = void (*)(bool alwaysEnabled);
+  using GetFirmwareBootTypeFn    = FirmwareBootType (*)();
+  using TryStartFirmwareUpdateFn = bool (*)(const OpenShock::SemVer& version);
+  using RequestUpdateCheckFn     = bool (*)();
 
   void RegisterCaptivePortal(BroadcastMessageBINFn broadcastMessageBIN, SetAlwaysEnabledFn setAlwaysEnabled);
   void RegisterOtaUpdateManager(GetFirmwareBootTypeFn getFirmwareBootType, TryStartFirmwareUpdateFn tryStartFirmwareUpdate, RequestUpdateCheckFn requestUpdateCheck);

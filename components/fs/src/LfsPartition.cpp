@@ -144,7 +144,7 @@ bool LfsPartition::exists(const char* path)
   return lfs_stat(&m_state->lfs, path, &info) >= 0;
 }
 
-bool LfsPartition::readStream(const char* path, const std::function<bool(std::span<const uint8_t>)>& sink)
+bool LfsPartition::readStream(const char* path, Util::FunctionRef<bool(std::span<const uint8_t>)> sink)
 {
   if (!m_mounted) {
     return false;

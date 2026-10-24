@@ -4,6 +4,7 @@
 #include "json/Json.h"
 
 #include <cstdint>
+#include <optional>
 #include <string>
 #include <string_view>
 
@@ -32,33 +33,39 @@ TEST_CASE("operator[]: case-sensitive and prefix-distinct keys", "[osjson][nav]"
   TEST_ASSERT_TRUE(doc.parse(json));
   JSON::JsonView root = doc.root();
 
-  int64_t v = 0;
-  TEST_ASSERT_TRUE(root["name"].tryGetI64(v));
-  TEST_ASSERT_EQUAL_INT64(1, v);
-  TEST_ASSERT_TRUE(root["Name"].tryGetI64(v));  // different case -> different key
-  TEST_ASSERT_EQUAL_INT64(2, v);
-  TEST_ASSERT_TRUE(root["n"].tryGetI64(v));     // must not match "name"/"nam"
-  TEST_ASSERT_EQUAL_INT64(3, v);
-  TEST_ASSERT_TRUE(root["nam"].tryGetI64(v));
-  TEST_ASSERT_EQUAL_INT64(4, v);
+  std::optional<int64_t> v;
+  v = root["name"].tryGetI64();
+  TEST_ASSERT_TRUE(v.has_value());
+  TEST_ASSERT_EQUAL_INT64(1, *v);
+  v = root["Name"].tryGetI64();  // different case -> different key
+  TEST_ASSERT_TRUE(v.has_value());
+  TEST_ASSERT_EQUAL_INT64(2, *v);
+  v = root["n"].tryGetI64();     // must not match "name"/"nam"
+  TEST_ASSERT_TRUE(v.has_value());
+  TEST_ASSERT_EQUAL_INT64(3, *v);
+  v = root["nam"].tryGetI64();
+  TEST_ASSERT_TRUE(v.has_value());
+  TEST_ASSERT_EQUAL_INT64(4, *v);
 }
 
 TEST_CASE("operator[]: empty-string key can be looked up", "[osjson][nav]")
 {
   JSON::JsonDocument doc;
   TEST_ASSERT_TRUE(doc.parse(R"({"":42})"));
-  int64_t v = 0;
-  TEST_ASSERT_TRUE(doc.root()[""].tryGetI64(v));
-  TEST_ASSERT_EQUAL_INT64(42, v);
+  std::optional<int64_t> v;
+  v = doc.root()[""].tryGetI64();
+  TEST_ASSERT_TRUE(v.has_value());
+  TEST_ASSERT_EQUAL_INT64(42, *v);
 }
 
 TEST_CASE("operator[]: duplicate keys resolve to the first occurrence", "[osjson][nav]")
 {
   JSON::JsonDocument doc;
   TEST_ASSERT_TRUE(doc.parse(R"({"k":1,"k":2})"));
-  int64_t v = 0;
-  TEST_ASSERT_TRUE(doc.root()["k"].tryGetI64(v));
-  TEST_ASSERT_EQUAL_INT64(1, v);
+  std::optional<int64_t> v;
+  v = doc.root()["k"].tryGetI64();
+  TEST_ASSERT_TRUE(v.has_value());
+  TEST_ASSERT_EQUAL_INT64(1, *v);
 }
 
 TEST_CASE("operator[]: lookup skips over object- and array-valued members", "[osjson][nav]")
@@ -70,15 +77,18 @@ TEST_CASE("operator[]: lookup skips over object- and array-valued members", "[os
   TEST_ASSERT_TRUE(doc.parse(json));
   JSON::JsonView root = doc.root();
 
-  int64_t v = 0;
-  TEST_ASSERT_TRUE(root["target"].tryGetI64(v));
-  TEST_ASSERT_EQUAL_INT64(123, v);
+  std::optional<int64_t> v;
+  v = root["target"].tryGetI64();
+  TEST_ASSERT_TRUE(v.has_value());
+  TEST_ASSERT_EQUAL_INT64(123, *v);
 
   // and the nested paths themselves resolve
-  TEST_ASSERT_TRUE(root["big"]["z"]["w"].tryGetI64(v));
-  TEST_ASSERT_EQUAL_INT64(4, v);
-  TEST_ASSERT_TRUE(root["big"]["x"].at(2)["y"].tryGetI64(v));
-  TEST_ASSERT_EQUAL_INT64(3, v);
+  v = root["big"]["z"]["w"].tryGetI64();
+  TEST_ASSERT_TRUE(v.has_value());
+  TEST_ASSERT_EQUAL_INT64(4, *v);
+  v = root["big"]["x"].at(2)["y"].tryGetI64();
+  TEST_ASSERT_TRUE(v.has_value());
+  TEST_ASSERT_EQUAL_INT64(3, *v);
 }
 
 TEST_CASE("count(): arrays, objects, primitives, invalid", "[osjson][nav]")
@@ -100,11 +110,13 @@ TEST_CASE("at(): valid indices, out of range, and non-arrays", "[osjson][nav]")
   TEST_ASSERT_TRUE(doc.parse(R"([10,20,30])"));
   JSON::JsonView arr = doc.root();
 
-  int64_t v = 0;
-  TEST_ASSERT_TRUE(arr.at(0).tryGetI64(v));
-  TEST_ASSERT_EQUAL_INT64(10, v);
-  TEST_ASSERT_TRUE(arr.at(2).tryGetI64(v));
-  TEST_ASSERT_EQUAL_INT64(30, v);
+  std::optional<int64_t> v;
+  v = arr.at(0).tryGetI64();
+  TEST_ASSERT_TRUE(v.has_value());
+  TEST_ASSERT_EQUAL_INT64(10, *v);
+  v = arr.at(2).tryGetI64();
+  TEST_ASSERT_TRUE(v.has_value());
+  TEST_ASSERT_EQUAL_INT64(30, *v);
 
   TEST_ASSERT_FALSE(arr.at(3).valid());   // past the end
   TEST_ASSERT_FALSE(arr.at(-1).valid());  // negative
@@ -125,26 +137,31 @@ TEST_CASE("arrays: nested and mixed-type elements", "[osjson][nav]")
 
   TEST_ASSERT_EQUAL_INT(7, root.count());
 
-  int64_t v = 0;
+  std::optional<int64_t> v;
   TEST_ASSERT_TRUE(root.at(0).isArray());
-  TEST_ASSERT_TRUE(root.at(0).at(1).tryGetI64(v));
-  TEST_ASSERT_EQUAL_INT64(2, v);
-  TEST_ASSERT_TRUE(root.at(1).at(0).tryGetI64(v));
-  TEST_ASSERT_EQUAL_INT64(3, v);
+  v = root.at(0).at(1).tryGetI64();
+  TEST_ASSERT_TRUE(v.has_value());
+  TEST_ASSERT_EQUAL_INT64(2, *v);
+  v = root.at(1).at(0).tryGetI64();
+  TEST_ASSERT_TRUE(v.has_value());
+  TEST_ASSERT_EQUAL_INT64(3, *v);
 
-  std::string sv;
-  TEST_ASSERT_TRUE(root.at(2).tryGetStr(sv));
-  TEST_ASSERT_TRUE(sv == "five");
+  std::optional<std::string> sv;
+  sv = root.at(2).tryGetStr();
+  TEST_ASSERT_TRUE(sv.has_value());
+  TEST_ASSERT_TRUE(*sv == "five");
 
-  bool b = false;
-  TEST_ASSERT_TRUE(root.at(3).tryGetBool(b));
-  TEST_ASSERT_TRUE(b);
+  std::optional<bool> b;
+  b = root.at(3).tryGetBool();
+  TEST_ASSERT_TRUE(b.has_value());
+  TEST_ASSERT_TRUE(*b);
 
   TEST_ASSERT_TRUE(root.at(4).isNull());
 
   TEST_ASSERT_TRUE(root.at(5).isObject());
-  TEST_ASSERT_TRUE(root.at(5)["k"].tryGetI64(v));
-  TEST_ASSERT_EQUAL_INT64(6, v);
+  v = root.at(5)["k"].tryGetI64();
+  TEST_ASSERT_TRUE(v.has_value());
+  TEST_ASSERT_EQUAL_INT64(6, *v);
 
   TEST_ASSERT_TRUE(root.at(6).isArray());
   TEST_ASSERT_EQUAL_INT(0, root.at(6).count());
@@ -180,6 +197,5 @@ TEST_CASE("chaining on invalid views never dereferences", "[osjson][nav]")
 
   // deep chain through missing keys and bad indices stays invalid, no crash
   TEST_ASSERT_FALSE(root["nope"]["deeper"].at(3)["evenmore"].valid());
-  int64_t v = 0;
-  TEST_ASSERT_FALSE(root["nope"].at(0)["x"].tryGetI64(v));
+  TEST_ASSERT_FALSE(root["nope"].at(0)["x"].tryGetI64().has_value());
 }

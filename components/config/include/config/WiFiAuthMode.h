@@ -56,8 +56,11 @@ namespace OpenShock::Config {
         return WIFI_AUTH_WPA2_WPA3_PSK;
       case FbsAuthMode::WAPI_PSK:
         return WIFI_AUTH_WAPI_PSK;
-      default:
+      case FbsAuthMode::UNKNOWN:
         return WIFI_AUTH_MAX;
     }
+
+    // Not unreachable: the value comes from stored config / the local protocol and can hold any byte
+    return WIFI_AUTH_MAX;
   }
 }  // namespace OpenShock::Config

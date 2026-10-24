@@ -7,6 +7,7 @@ const char* const TAG = "ServerMessageHandlers";
 #include "Logging.h"
 
 #include <cstdint>
+#include <utility>
 
 #include <esp_system.h>
 
@@ -29,21 +30,21 @@ void _Private::HandleTrigger(const OpenShock::Serialization::Gateway::GatewayToH
 
   auto triggerType = msg->type();
 
+  // No default: -Wswitch flags new trigger types. The value comes from the network, so fall through to the log below.
   switch (triggerType) {
     case TriggerType::Restart:
       esp_restart();
-      break;
+      return;
     case TriggerType::EmergencyStop:
       EStopManager::SoftwareTrigger();
-      break;
+      return;
     case TriggerType::CaptivePortalEnable:
       OpenShock::AppHooks::CaptivePortalSetAlwaysEnabled(true);
-      break;
+      return;
     case TriggerType::CaptivePortalDisable:
       OpenShock::AppHooks::CaptivePortalSetAlwaysEnabled(false);
-      break;
-    default:
-      OS_LOGW(TAG, "Got unknown trigger type: %hhu", static_cast<uint8_t>(triggerType));
-      break;
+      return;
   }
+
+  OS_LOGW(TAG, "Got unknown trigger type: %hhu", std::to_underlying(triggerType));
 }

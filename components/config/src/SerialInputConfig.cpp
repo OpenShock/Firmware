@@ -53,7 +53,7 @@ bool SerialInputConfig::FromJSON(JSON::JsonView json)
     return false;
   }
 
-  if (!json["echoEnabled"].tryGetBool(echoEnabled)) echoEnabled = true;
+  echoEnabled = json["echoEnabled"].tryGetBool().value_or(true);
 
   return true;
 }

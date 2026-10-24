@@ -10,6 +10,7 @@
 #include "json/Json.h"
 
 #include <cstring>
+#include <optional>
 #include <string>
 #include <string_view>
 
@@ -25,25 +26,29 @@ TEST_CASE("parse scalar object", "[osjson]")
   JSON::JsonView root = doc.root();
   TEST_ASSERT_TRUE(root.isObject());
 
-  std::string s;
-  TEST_ASSERT_TRUE(root["name"].tryGetStr(s));
-  TEST_ASSERT_EQUAL_size_t(5, s.size());
-  TEST_ASSERT_TRUE(s == "hello");
+  std::optional<std::string> s;
+  s = root["name"].tryGetStr();
+  TEST_ASSERT_TRUE(s.has_value());
+  TEST_ASSERT_EQUAL_size_t(5, s->size());
+  TEST_ASSERT_TRUE(*s == "hello");
   // Zero-copy: raw() must point straight into the source buffer.
   std::string_view raw = root["name"].raw();
   TEST_ASSERT_TRUE(raw.data() >= json && raw.data() < json + sizeof(json));
 
-  int64_t n = 0;
-  TEST_ASSERT_TRUE(root["n"].tryGetI64(n));
-  TEST_ASSERT_EQUAL_INT64(42, n);
+  std::optional<int64_t> n;
+  n = root["n"].tryGetI64();
+  TEST_ASSERT_TRUE(n.has_value());
+  TEST_ASSERT_EQUAL_INT64(42, *n);
 
-  int64_t neg = 0;
-  TEST_ASSERT_TRUE(root["neg"].tryGetI64(neg));
-  TEST_ASSERT_EQUAL_INT64(-7, neg);
+  std::optional<int64_t> neg;
+  neg = root["neg"].tryGetI64();
+  TEST_ASSERT_TRUE(neg.has_value());
+  TEST_ASSERT_EQUAL_INT64(-7, *neg);
 
-  bool flag = false;
-  TEST_ASSERT_TRUE(root["flag"].tryGetBool(flag));
-  TEST_ASSERT_TRUE(flag);
+  std::optional<bool> flag;
+  flag = root["flag"].tryGetBool();
+  TEST_ASSERT_TRUE(flag.has_value());
+  TEST_ASSERT_TRUE(*flag);
 }
 
 TEST_CASE("missing key and type mismatch", "[osjson]")
@@ -56,12 +61,9 @@ TEST_CASE("missing key and type mismatch", "[osjson]")
 
   TEST_ASSERT_FALSE(root["missing"].valid());
 
-  bool b = false;
-  TEST_ASSERT_FALSE(root["name"].tryGetBool(b));  // string, not bool
-  int64_t n = 0;
-  TEST_ASSERT_FALSE(root["name"].tryGetI64(n));   // string, not number
-  std::string s;
-  TEST_ASSERT_FALSE(root["n"].tryGetStr(s));      // number, not string
+  TEST_ASSERT_FALSE(root["name"].tryGetBool().has_value());  // string, not bool
+  TEST_ASSERT_FALSE(root["name"].tryGetI64().has_value());   // string, not number
+  TEST_ASSERT_FALSE(root["n"].tryGetStr().has_value());      // number, not string
 }
 
 TEST_CASE("nested objects and arrays", "[osjson]")
@@ -72,17 +74,19 @@ TEST_CASE("nested objects and arrays", "[osjson]")
   TEST_ASSERT_TRUE(doc.parse(json));
   JSON::JsonView root = doc.root();
 
-  int64_t y = 0;
-  TEST_ASSERT_TRUE(root["obj"]["y"].tryGetI64(y));
-  TEST_ASSERT_EQUAL_INT64(2, y);
+  std::optional<int64_t> y;
+  y = root["obj"]["y"].tryGetI64();
+  TEST_ASSERT_TRUE(y.has_value());
+  TEST_ASSERT_EQUAL_INT64(2, *y);
 
   JSON::JsonView arr = root["arr"];
   TEST_ASSERT_TRUE(arr.isArray());
   TEST_ASSERT_EQUAL_INT(3, arr.count());
 
-  int64_t v = 0;
-  TEST_ASSERT_TRUE(arr.at(1).tryGetI64(v));
-  TEST_ASSERT_EQUAL_INT64(20, v);
+  std::optional<int64_t> v;
+  v = arr.at(1).tryGetI64();
+  TEST_ASSERT_TRUE(v.has_value());
+  TEST_ASSERT_EQUAL_INT64(20, *v);
   TEST_ASSERT_FALSE(arr.at(3).valid());  // out of range
 }
 
@@ -112,17 +116,20 @@ TEST_CASE("generate then parse round-trip", "[osjson]")
   TEST_ASSERT_TRUE(doc.parse(out));
   JSON::JsonView root = doc.root();
 
-  std::string ssid;
-  TEST_ASSERT_TRUE(root["ssid"].tryGetStr(ssid));
-  TEST_ASSERT_TRUE(ssid == "net");
+  std::optional<std::string> ssid;
+  ssid = root["ssid"].tryGetStr();
+  TEST_ASSERT_TRUE(ssid.has_value());
+  TEST_ASSERT_TRUE(*ssid == "net");
 
-  int64_t id = 0;
-  TEST_ASSERT_TRUE(root["id"].tryGetI64(id));
-  TEST_ASSERT_EQUAL_INT64(7, id);
+  std::optional<int64_t> id;
+  id = root["id"].tryGetI64();
+  TEST_ASSERT_TRUE(id.has_value());
+  TEST_ASSERT_EQUAL_INT64(7, *id);
 
-  bool on = false;
-  TEST_ASSERT_TRUE(root["on"].tryGetBool(on));
-  TEST_ASSERT_TRUE(on);
+  std::optional<bool> on;
+  on = root["on"].tryGetBool();
+  TEST_ASSERT_TRUE(on.has_value());
+  TEST_ASSERT_TRUE(*on);
 }
 
 // Host-only (linux target) test binary. FreeRTOS is mocked, so there is no ESP

@@ -11,6 +11,7 @@ const char* const TAG = "WiFiScanManager";
 
 #include <atomic>
 #include <map>
+#include <utility>
 #include <vector>
 
 // Per-channel active-scan dwell time. esp_wifi walks every channel itself, so this is the main knob for scan
@@ -175,12 +176,12 @@ bool WiFiScanManager::AbortScan()
   return true;
 }
 
-uint64_t WiFiScanManager::RegisterStatusChangedHandler(const WiFiScanManager::StatusChangedHandler& handler)
+uint64_t WiFiScanManager::RegisterStatusChangedHandler(WiFiScanManager::StatusChangedHandler handler)
 {
   static uint64_t nextHandle = 0;
   ScopedLock lock__(&s_handlersMutex);
   uint64_t handle                 = nextHandle++;
-  s_statusChangedHandlers[handle] = handler;
+  s_statusChangedHandlers[handle] = std::move(handler);
   return handle;
 }
 void WiFiScanManager::UnregisterStatusChangedHandler(uint64_t handle)
@@ -189,12 +190,12 @@ void WiFiScanManager::UnregisterStatusChangedHandler(uint64_t handle)
   s_statusChangedHandlers.erase(handle);
 }
 
-uint64_t WiFiScanManager::RegisterNetworksDiscoveredHandler(const WiFiScanManager::NetworksDiscoveredHandler& handler)
+uint64_t WiFiScanManager::RegisterNetworksDiscoveredHandler(WiFiScanManager::NetworksDiscoveredHandler handler)
 {
   static uint64_t nextHandle = 0;
   ScopedLock lock__(&s_handlersMutex);
   uint64_t handle                      = nextHandle++;
-  s_networksDiscoveredHandlers[handle] = handler;
+  s_networksDiscoveredHandlers[handle] = std::move(handler);
   return handle;
 }
 void WiFiScanManager::UnregisterNetworksDiscoveredHandler(uint64_t handle)

@@ -17,7 +17,8 @@ const char* const TAG = "HTTPRequestManager";
 #include <esp_http_client.h>
 
 #include <algorithm>
-#include <cctype>
+#include <charconv>
+#include <cstdint>
 #include <cstdlib>
 #include <cstring>
 #include <memory>
@@ -238,13 +239,23 @@ HTTP::Response<std::size_t>
 
   if (responseCode == 429) {  // Too Many Requests
     // https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers/Retry-After
-    long retryAfter = 0;
-    if (!m_retryAfter.empty() && std::all_of(m_retryAfter.begin(), m_retryAfter.end(), [](char c) { return std::isdigit(static_cast<unsigned char>(c)) != 0; })) {
-      retryAfter = strtol(m_retryAfter.c_str(), nullptr, 10);
+    // Only a plain run of digits is accepted (from_chars on an unsigned type takes no sign or whitespace);
+    // an overlong number saturates and is capped below.
+    uint32_t retryAfter = 0;
+    if (!m_retryAfter.empty()) {
+      const char* first = m_retryAfter.data();
+      const char* last  = first + m_retryAfter.size();
+
+      auto [ptr, ec] = std::from_chars(first, last, retryAfter);
+      if (ptr != last || ec == std::errc::invalid_argument) {
+        retryAfter = 0;
+      } else if (ec == std::errc::result_out_of_range) {
+        retryAfter = UINT32_MAX;
+      }
     }
 
     // If header missing/unparseable, default to 15 seconds; cap at an hour (also keeps the ms conversion in range)
-    if (retryAfter <= 0) {
+    if (retryAfter == 0) {
       retryAfter = 15;
     } else if (retryAfter > 3600) {
       retryAfter = 3600;

@@ -6,24 +6,25 @@
 
 static void handleEStopEnabledCommand(std::string_view arg, bool isAutomated)
 {
-  bool enabled;
   if (arg.empty()) {
-    if (!OpenShock::Config::GetEStopEnabled(enabled)) {
+    auto configEnabled = OpenShock::Config::GetEStopEnabled();
+    if (!configEnabled) {
       SERPR_ERROR("Failed to get EStop enabled from config");
       return;
     }
 
     // Get EStop enabled
-    SERPR_RESPONSE("EStopEnabled|%s", enabled ? "true" : "false");
+    SERPR_RESPONSE("EStopEnabled|%s", *configEnabled ? "true" : "false");
     return;
   }
 
-  if (!OpenShock::Convert::ToBool(arg, enabled)) {
+  auto enabled = OpenShock::Convert::ToBool(arg);
+  if (!enabled) {
     SERPR_ERROR("Invalid argument (must be a boolean)");
     return;
   }
 
-  if (!OpenShock::EStopManager::SetEStopEnabled(enabled)) {
+  if (!OpenShock::EStopManager::SetEStopEnabled(*enabled)) {
     SERPR_ERROR("Failed to set EStop enabled (refused while the EStop is active)");
     return;
   }
@@ -33,24 +34,25 @@ static void handleEStopEnabledCommand(std::string_view arg, bool isAutomated)
 
 static void handleEStopPinCommand(std::string_view arg, bool isAutomated)
 {
-  gpio_num_t estopPin;
   if (arg.empty()) {
-    if (!OpenShock::Config::GetEStopGpioPin(estopPin)) {
+    auto configPin = OpenShock::Config::GetEStopGpioPin();
+    if (!configPin) {
       SERPR_ERROR("Failed to get EStop pin from config");
       return;
     }
 
     // Get EStop pin
-    SERPR_RESPONSE("EStopPin|%hhi", static_cast<int8_t>(estopPin));
+    SERPR_RESPONSE("EStopPin|%hhi", static_cast<int8_t>(*configPin));
     return;
   }
 
-  if (!OpenShock::Convert::ToGpioNum(arg, estopPin)) {
+  auto estopPin = OpenShock::Convert::ToGpioNum(arg);
+  if (!estopPin) {
     SERPR_ERROR("Invalid argument (number invalid or out of range)");
     return;
   }
 
-  if (!OpenShock::EStopManager::SetEStopPin(estopPin)) {
+  if (!OpenShock::EStopManager::SetEStopPin(*estopPin)) {
     SERPR_ERROR("Failed to set EStop pin (invalid pin, or refused while the EStop is active)");
     return;
   }

@@ -64,14 +64,14 @@ TEST_CASE("Values set through the Config API survive a reload", "[config][roundt
   TEST_ASSERT_TRUE(InitFrom(StoredFile()));
   AssertConfigEqual(before, Snapshot());
 
-  std::string token;
   TEST_ASSERT_TRUE(Config::HasBackendAuthToken());
-  TEST_ASSERT_TRUE(Config::GetBackendAuthToken(token));
-  TEST_ASSERT_EQUAL_STRING("tok_0123456789abcdef", token.c_str());
+  auto token = Config::GetBackendAuthToken();
+  TEST_ASSERT_TRUE(token.has_value());
+  TEST_ASSERT_EQUAL_STRING("tok_0123456789abcdef", token->c_str());
 
-  Config::WiFiCredentials creds;
-  TEST_ASSERT_TRUE(Config::TryGetWiFiCredentialsBySSID("Guest", creds));
-  TEST_ASSERT_EQUAL_UINT8(2, creds.id);
+  auto creds = Config::TryGetWiFiCredentialsBySSID("Guest");
+  TEST_ASSERT_TRUE(creds.has_value());
+  TEST_ASSERT_EQUAL_UINT8(2, creds->id);
   TEST_ASSERT_EQUAL_UINT8(2, Config::GetWiFiCredentialsIDbySSID("Guest"));
 }
 
@@ -279,10 +279,10 @@ TEST_CASE("jsonconfig round trip keeps strings that need escaping", "[config][ro
   TEST_ASSERT_NOT_EQUAL(std::string::npos, json.find(R"("Office \"5G\"")"));
   TEST_ASSERT_NOT_EQUAL(std::string::npos, json.find(R"("p@ss w0rd/\\")"));
 
-  Config::WiFiCredentials office;
-  TEST_ASSERT_TRUE(Config::TryGetWiFiCredentialsByID(7, office));
-  TEST_ASSERT_EQUAL_STRING("Office \"5G\"", office.ssid.c_str());
-  TEST_ASSERT_EQUAL_STRING("p@ss w0rd/\\", office.password.c_str());
+  auto office = Config::TryGetWiFiCredentialsByID(7);
+  TEST_ASSERT_TRUE(office.has_value());
+  TEST_ASSERT_EQUAL_STRING("Office \"5G\"", office->ssid.c_str());
+  TEST_ASSERT_EQUAL_STRING("p@ss w0rd/\\", office->password.c_str());
 
   // Repeated get/set cycles are stable.
   TEST_ASSERT_TRUE(Config::SaveFromJSON(Config::GetAsJSON(true)));
@@ -294,12 +294,12 @@ TEST_CASE("jsonconfig set decodes \\u escapes", "[config][roundtrip][json]")
   InitDefault();
   TEST_ASSERT_TRUE(Config::SaveFromJSON(R"({"wifi":{"hostname":"hub\u002d1","credentials":[{"id":1,"ssid":"Caf\u00e9 \ud83d\ude00","password":"a\tb"}]}})"));
 
-  Config::WiFiConfig wifi;
-  TEST_ASSERT_TRUE(Config::GetWiFiConfig(wifi));
-  TEST_ASSERT_EQUAL_STRING("hub-1", wifi.hostname.c_str());
-  TEST_ASSERT_EQUAL_size_t(1, wifi.credentialsList.size());
-  TEST_ASSERT_EQUAL_STRING("Caf\xc3\xa9 \xf0\x9f\x98\x80", wifi.credentialsList[0].ssid.c_str());
-  TEST_ASSERT_EQUAL_STRING("a\tb", wifi.credentialsList[0].password.c_str());
+  auto wifi = Config::GetWiFiConfig();
+  TEST_ASSERT_TRUE(wifi.has_value());
+  TEST_ASSERT_EQUAL_STRING("hub-1", wifi->hostname.c_str());
+  TEST_ASSERT_EQUAL_size_t(1, wifi->credentialsList.size());
+  TEST_ASSERT_EQUAL_STRING("Caf\xc3\xa9 \xf0\x9f\x98\x80", wifi->credentialsList[0].ssid.c_str());
+  TEST_ASSERT_EQUAL_STRING("a\tb", wifi->credentialsList[0].password.c_str());
 }
 
 TEST_CASE("GetAsJSON without sensitive data omits secrets", "[config][roundtrip][json]")

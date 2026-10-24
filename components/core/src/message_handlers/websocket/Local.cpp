@@ -10,16 +10,17 @@ const char* const TAG = "LocalMessageHandlers";
 
 #include <array>
 #include <cstdint>
+#include <utility>
 
 namespace Schemas  = OpenShock::Serialization::Local;
 namespace Handlers = OpenShock::MessageHandlers::Local::_Private;
-typedef Schemas::LocalToHubMessagePayload PayloadType;
+using PayloadType = Schemas::LocalToHubMessagePayload;
 
 using namespace OpenShock;
 
-const std::size_t HANDLER_COUNT = static_cast<std::size_t>(PayloadType::MAX) + 1;
+const std::size_t HANDLER_COUNT = std::to_underlying(PayloadType::MAX) + 1;
 
-#define SET_HANDLER(payload) handlers[static_cast<std::size_t>(PayloadType::payload)] = Handlers::Handle##payload
+#define SET_HANDLER(payload) handlers[std::to_underlying(PayloadType::payload)] = Handlers::Handle##payload
 
 static std::array<Handlers::HandlerType, HANDLER_COUNT> s_localHandlers = []() {
   std::array<Handlers::HandlerType, HANDLER_COUNT> handlers {};
@@ -43,5 +44,5 @@ void MessageHandlers::WebSocket::HandleLocalBinary(uint8_t socketId, std::span<c
     return;
   }
 
-  s_localHandlers[static_cast<std::size_t>(msg->payload_type())](socketId, msg);
+  s_localHandlers[std::to_underlying(msg->payload_type())](socketId, msg);
 }

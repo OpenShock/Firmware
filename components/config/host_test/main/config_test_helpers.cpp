@@ -4,6 +4,7 @@
 
 #include <cstring>
 #include <string>
+#include <utility>
 
 using namespace OpenShock;
 
@@ -76,14 +77,20 @@ namespace ConfigTest {
 
   Config::RootConfig Snapshot()
   {
+    // Every getter must succeed; unwraps the returned optional.
+    auto get = [](auto section) {
+      TEST_ASSERT_TRUE(section.has_value());
+      return *std::move(section);
+    };
+
     Config::RootConfig config;
-    TEST_ASSERT_TRUE(Config::GetRFConfig(config.rf));
-    TEST_ASSERT_TRUE(Config::GetWiFiConfig(config.wifi));
-    TEST_ASSERT_TRUE(Config::GetCaptivePortalConfig(config.captivePortal));
-    TEST_ASSERT_TRUE(Config::GetBackendConfig(config.backend));
-    TEST_ASSERT_TRUE(Config::GetSerialInputConfig(config.serialInput));
-    TEST_ASSERT_TRUE(Config::GetOtaUpdateConfig(config.otaUpdate));
-    TEST_ASSERT_TRUE(Config::GetEStopConfig(config.estop));
+    config.rf            = get(Config::GetRFConfig());
+    config.wifi          = get(Config::GetWiFiConfig());
+    config.captivePortal = get(Config::GetCaptivePortalConfig());
+    config.backend       = get(Config::GetBackendConfig());
+    config.serialInput   = get(Config::GetSerialInputConfig());
+    config.otaUpdate     = get(Config::GetOtaUpdateConfig());
+    config.estop         = get(Config::GetEStopConfig());
     return config;
   }
 
@@ -119,14 +126,14 @@ namespace ConfigTest {
     const auto& ao = actual.otaUpdate;
     TEST_ASSERT_EQUAL_MESSAGE(eo.isEnabled, ao.isEnabled, "otaUpdate.isEnabled");
     TEST_ASSERT_EQUAL_STRING_MESSAGE(eo.cdnDomain.c_str(), ao.cdnDomain.c_str(), "otaUpdate.cdnDomain");
-    TEST_ASSERT_EQUAL_UINT8_MESSAGE(static_cast<uint8_t>(eo.updateChannel), static_cast<uint8_t>(ao.updateChannel), "otaUpdate.updateChannel");
+    TEST_ASSERT_EQUAL_UINT8_MESSAGE(std::to_underlying(eo.updateChannel), std::to_underlying(ao.updateChannel), "otaUpdate.updateChannel");
     TEST_ASSERT_EQUAL_MESSAGE(eo.checkOnStartup, ao.checkOnStartup, "otaUpdate.checkOnStartup");
     TEST_ASSERT_EQUAL_MESSAGE(eo.checkPeriodically, ao.checkPeriodically, "otaUpdate.checkPeriodically");
     TEST_ASSERT_EQUAL_UINT16_MESSAGE(eo.checkInterval, ao.checkInterval, "otaUpdate.checkInterval");
     TEST_ASSERT_EQUAL_MESSAGE(eo.allowBackendManagement, ao.allowBackendManagement, "otaUpdate.allowBackendManagement");
     TEST_ASSERT_EQUAL_MESSAGE(eo.requireManualApproval, ao.requireManualApproval, "otaUpdate.requireManualApproval");
     TEST_ASSERT_EQUAL_INT32_MESSAGE(eo.updateId, ao.updateId, "otaUpdate.updateId");
-    TEST_ASSERT_EQUAL_UINT8_MESSAGE(static_cast<uint8_t>(eo.updateStep), static_cast<uint8_t>(ao.updateStep), "otaUpdate.updateStep");
+    TEST_ASSERT_EQUAL_UINT8_MESSAGE(std::to_underlying(eo.updateStep), std::to_underlying(ao.updateStep), "otaUpdate.updateStep");
 
     TEST_ASSERT_EQUAL_MESSAGE(expected.estop.enabled, actual.estop.enabled, "estop.enabled");
     TEST_ASSERT_EQUAL_INT_MESSAGE(expected.estop.gpioPin, actual.estop.gpioPin, "estop.gpioPin");

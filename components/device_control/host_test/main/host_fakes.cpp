@@ -403,16 +403,14 @@ void OpenShock::TaskUtils::StopTask(TaskHandle_t taskHandle, TaskExitFlag& exite
 
 // --- Config ---
 
-bool OpenShock::Config::GetRFConfig(RFConfig& out)
+std::optional<OpenShock::Config::RFConfig> OpenShock::Config::GetRFConfig()
 {
-  out = RfConfig;
-  return true;
+  return RfConfig;
 }
 
-bool OpenShock::Config::GetRFConfigTxPin(gpio_num_t& out)
+std::optional<gpio_num_t> OpenShock::Config::GetRFConfigTxPin()
 {
-  out = RfConfig.txPin;
-  return true;
+  return RfConfig.txPin;
 }
 
 bool OpenShock::Config::SetRFConfigTxPin(gpio_num_t txPin)
@@ -421,10 +419,9 @@ bool OpenShock::Config::SetRFConfigTxPin(gpio_num_t txPin)
   return true;
 }
 
-bool OpenShock::Config::GetRFConfigKeepAliveEnabled(bool& out)
+std::optional<bool> OpenShock::Config::GetRFConfigKeepAliveEnabled()
 {
-  out = RfConfig.keepAliveEnabled;
-  return true;
+  return RfConfig.keepAliveEnabled;
 }
 
 bool OpenShock::Config::SetRFConfigKeepAliveEnabled(bool enabled)
@@ -433,16 +430,14 @@ bool OpenShock::Config::SetRFConfigKeepAliveEnabled(bool enabled)
   return true;
 }
 
-bool OpenShock::Config::GetEStopConfig(EStopConfig& out)
+std::optional<OpenShock::Config::EStopConfig> OpenShock::Config::GetEStopConfig()
 {
-  out = EStopCfg;
-  return true;
+  return EStopCfg;
 }
 
-bool OpenShock::Config::GetEStopGpioPin(gpio_num_t& out)
+std::optional<gpio_num_t> OpenShock::Config::GetEStopGpioPin()
 {
-  out = EStopCfg.gpioPin;
-  return true;
+  return EStopCfg.gpioPin;
 }
 
 // --- EStopManager (the real one samples GPIO from its own task; see EStopStateMachine for its logic) ---
