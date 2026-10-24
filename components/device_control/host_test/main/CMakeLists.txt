@@ -20,6 +20,7 @@ idf_component_register(
                "../../../protocols/src/D80Encoder.cpp"
                "../../../protocols/src/Petrainer998DREncoder.cpp"
                "../../../protocols/src/PetrainerEncoder.cpp"
+               "../../../protocols/src/T330Alt1Encoder.cpp"
                "../../../protocols/src/T330Encoder.cpp"
   INCLUDE_DIRS "."
                "stubs"                      # config/Config.h (fake RF/E-Stop settings)

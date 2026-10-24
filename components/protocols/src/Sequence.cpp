@@ -7,6 +7,7 @@ const char* const TAG = "Sequence";
 #include "radio/rmt/D80Encoder.h"
 #include "radio/rmt/Petrainer998DREncoder.h"
 #include "radio/rmt/PetrainerEncoder.h"
+#include "radio/rmt/T330Alt1Encoder.h"
 #include "radio/rmt/T330Encoder.h"
 
 using namespace OpenShock;
@@ -16,6 +17,8 @@ namespace {
   struct EncoderInfo {
     size_t (*bufferSize)();
     bool (*fill)(rmt_symbol_word_t* data, uint16_t shockerId, ShockerCommandType commandType, uint8_t intensity);
+    // Only set for models with rolling state; re-encodes the payload right before each frame goes out.
+    bool (*refill)(rmt_symbol_word_t* data, uint16_t shockerId, ShockerCommandType commandType, uint8_t intensity, int64_t nowMs);
   };
 
   const EncoderInfo* findEncoder(ShockerModelType modelType)
@@ -28,6 +31,7 @@ namespace {
     static constexpr EncoderInfo kPetrainer998DR {Rmt::Petrainer998DREncoder::GetBufferSize, Rmt::Petrainer998DREncoder::FillBuffer};
     static constexpr EncoderInfo kWellturnT330 {Rmt::WellturnT330Encoder::GetBufferSize, Rmt::WellturnT330Encoder::FillBuffer};
     static constexpr EncoderInfo kD80 {Rmt::D80Encoder::GetBufferSize, Rmt::D80Encoder::FillBuffer};
+    static constexpr EncoderInfo kWellturnT330Alt1 {Rmt::WellturnT330Alt1Encoder::GetBufferSize, Rmt::WellturnT330Alt1Encoder::FillBuffer, Rmt::WellturnT330Alt1Encoder::RefillBuffer};
 
     switch (modelType) {
       case ShockerModelType::CaiXianlin:
@@ -40,6 +44,8 @@ namespace {
         return &kWellturnT330;
       case ShockerModelType::D80:
         return &kD80;
+      case ShockerModelType::WellturnT330Alt1:
+        return &kWellturnT330Alt1;
       default:
         OS_LOGE(TAG, "Unknown shocker model: %u", static_cast<unsigned>(modelType));
         return nullptr;
@@ -78,7 +84,18 @@ Rmt::Sequence::Sequence(ShockerModelType shockerModel, uint16_t shockerId, int64
 bool Rmt::Sequence::fill(ShockerCommandType commandType, uint8_t intensity)
 {
   m_terminatorSent = false;  // A new payload needs its own terminator again
+  m_commandType    = commandType;
+  m_intensity      = intensity;
 
   const EncoderInfo* encoder = findEncoder(m_shockerModel);
   return encoder != nullptr && m_data != nullptr && encoder->fill(payload(), m_shockerId, commandType, intensity);
+}
+
+bool Rmt::Sequence::refill(int64_t nowMs)
+{
+  const EncoderInfo* encoder = findEncoder(m_shockerModel);
+  if (encoder == nullptr || m_data == nullptr) return false;
+  if (encoder->refill == nullptr) return true;
+
+  return encoder->refill(payload(), m_shockerId, m_commandType, m_intensity, nowMs);
 }

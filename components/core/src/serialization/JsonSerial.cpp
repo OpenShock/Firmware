@@ -27,7 +27,7 @@ bool JsonSerial::ParseShockerCommand(JSON::JsonView root, JsonSerial::ShockerCom
   }
   ShockerModelType modelType = ShockerModelType::CaiXianlin;
   if (!TryParseShockerModelType(modelType, modelStr)) {
-    OS_LOGE(TAG, "value at 'model' is not a valid shocker model (caixianlin, petrainer, petrainer998dr, wellturnt330, d80)");
+    OS_LOGE(TAG, "value at 'model' is not a valid shocker model (caixianlin, petrainer, petrainer998dr, wellturnt330, d80, wellturnt330alt1)");
     return false;
   }
 

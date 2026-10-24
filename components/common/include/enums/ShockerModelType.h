@@ -11,7 +11,8 @@ namespace OpenShock {
     Petrainer,
     Petrainer998DR,
     WellturnT330,
-    D80
+    D80,
+    WellturnT330Alt1
   };
 
   inline bool TryParseShockerModelType(ShockerModelType& out, std::string_view str, bool allowTypo = false)
@@ -48,6 +49,11 @@ namespace OpenShock {
 
     if (StringIEquals(str, "d80")) {
       out = ShockerModelType::D80;
+      return true;
+    }
+
+    if (StringIEquals(str, "wellturnt330alt1") || StringIEquals(str, "t330alt1")) {
+      out = ShockerModelType::WellturnT330Alt1;
       return true;
     }
 
