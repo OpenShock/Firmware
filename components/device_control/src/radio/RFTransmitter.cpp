@@ -233,9 +233,15 @@ static void writeSequences(rmt_channel_handle_t channel, rmt_encoder_handle_t en
 
     int64_t timeToLive = seq->transmitEnd() - now;
 
+    // Models with rolling state re-encode every frame; if that fails, terminate rather than resend a stale frame.
+    if (timeToLive > 0 && !seq->refill(now)) {
+      OS_LOGE(TAG, "Failed to re-encode frame for shocker %hu, terminating it", seq->shockerId());
+      seq->setTransmitEnd(now);
+      timeToLive = 0;
+    }
+
     if (timeToLive > 0) {
       // Send the command
-      seq->refill(now);
       transmitSymbols(channel, encoder, seq->payload(), seq->size());
       ++seq;
       continue;

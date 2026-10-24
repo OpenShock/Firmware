@@ -11,4 +11,4 @@ namespace OpenShock::Rmt::WellturnT330Alt1Encoder {
   bool FillBuffer(rmt_symbol_word_t* data, uint16_t shockerId, ShockerCommandType type, uint8_t intensity);
   // Re-encodes the frame with the shock rolling state (toggle + counter) for nowMs; call before every frame sent.
   bool RefillBuffer(rmt_symbol_word_t* data, uint16_t shockerId, ShockerCommandType type, uint8_t intensity, int64_t nowMs);
-}
+}  // namespace OpenShock::Rmt::WellturnT330Alt1Encoder

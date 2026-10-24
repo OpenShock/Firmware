@@ -44,6 +44,12 @@ namespace {
     return (static_cast<uint8_t>(toggle) << 7) | (counter << 4);
   }
 
+  // Shock reads a 0-15 level from the low nibble; like D80, a non-zero intensity never rounds down to level 0.
+  uint8_t shockLevel(uint8_t intensity)
+  {
+    return intensity > 0 ? std::max((intensity * 15) / 100, 1) : 0;
+  }
+
   bool fillImpl(rmt_symbol_word_t* sequence, uint16_t shockerId, ShockerCommandType type, uint8_t intensity, uint8_t rollingBits)
   {
     // Intensity must be between 0 and 100
@@ -53,7 +59,7 @@ namespace {
     switch (type) {
       case ShockerCommandType::Shock:
         typeVal   = 0b01100001;
-        intensity = rollingBits | (((intensity * 15) / 100) & 0xF);  // Shock reads a 0-15 level from the low nibble
+        intensity = rollingBits | shockLevel(intensity);
         break;
       case ShockerCommandType::Vibrate:
         typeVal = 0b01110010;

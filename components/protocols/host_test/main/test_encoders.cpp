@@ -195,7 +195,7 @@ TEST_CASE("Wellturn T330 Alt1 frame layout matches T330 for vibrate and sound", 
   TEST_ASSERT_FALSE(Rmt::WellturnT330Alt1Encoder::FillBuffer(alt1, 1, ShockerCommandType::Light, 10));
 }
 
-TEST_CASE("Wellturn T330 Alt1 shock maps 0-100 to a 0-15 level", "[protocols][t330alt1]")
+TEST_CASE("Wellturn T330 Alt1 shock maps 0-100 to a 0-15 level, non-zero never rounds to 0", "[protocols][t330alt1]")
 {
   rmt_symbol_word_t seq[43];
   const struct {
@@ -203,6 +203,9 @@ TEST_CASE("Wellturn T330 Alt1 shock maps 0-100 to a 0-15 level", "[protocols][t3
     uint8_t level;
   } cases[] = {
     {  0,  0},
+    {  1,  1},
+    {  6,  1},
+    { 14,  2},
     { 50,  7},
     {100, 15},
     {150, 15}, // clamped
