@@ -17,6 +17,7 @@ from pathlib import Path
 
 from utils import boards, github
 from utils.files import write_if_changed
+from utils.paths import ROOT
 from utils.versions import parse_version
 
 
@@ -35,7 +36,10 @@ def git_commit() -> str | None:
     if commit:
         return commit
     try:
-        return subprocess.check_output(['git', 'rev-parse', 'HEAD'], text=True, stderr=subprocess.DEVNULL).strip()
+        # In the repository, not the working directory: CMake runs this from the build directory, which may be outside it.
+        return subprocess.check_output(
+            ['git', 'rev-parse', 'HEAD'], cwd=ROOT, text=True, stderr=subprocess.DEVNULL
+        ).strip()
     except (OSError, subprocess.CalledProcessError):
         return None
 
