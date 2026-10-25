@@ -17,6 +17,9 @@ namespace OpenShock {
     void unlock();
 
   private:
+    // Statically allocated: creating it can't fail, which matters because most SimpleMutexes are constructed during
+    // static initialization, where a failed allocation would go unnoticed and leave a null handle.
+    StaticSemaphore_t m_storage;
     SemaphoreHandle_t m_mutex;
   };
 

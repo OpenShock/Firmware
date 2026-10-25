@@ -165,6 +165,12 @@ static QueueHandle_t fakeQueueCreateMutex(const uint8_t, int)
   return AsHandle(new FakeQueue {.isMutex = true, .length = 1, .itemSize = 0, .items = {}, .held = false});
 }
 
+// SimpleMutex uses the static variant; the fake ignores the storage, and vQueueDelete frees the fake as usual.
+static QueueHandle_t fakeQueueCreateMutexStatic(const uint8_t type, StaticQueue_t*, int numCalls)
+{
+  return fakeQueueCreateMutex(type, numCalls);
+}
+
 // xQueueSend, and xSemaphoreGive on a mutex.
 static BaseType_t fakeQueueGenericSend(QueueHandle_t handle, const void* const item, TickType_t, const BaseType_t position, int)
 {
@@ -358,11 +364,12 @@ static esp_err_t fakeEventHandlerRegister(esp_event_base_t, int32_t event_id, es
 }
 
 // Installed before any C++ static constructor runs: CommandHandler.cpp's static
-// SimpleMutexes call xSemaphoreCreateMutex during static initialization.
+// SimpleMutexes call xSemaphoreCreateMutexStatic during static initialization.
 __attribute__((constructor(101))) static void installMockCallbacks()
 {
   xQueueGenericCreate_Stub(fakeQueueGenericCreate);
   xQueueCreateMutex_Stub(fakeQueueCreateMutex);
+  xQueueCreateMutexStatic_Stub(fakeQueueCreateMutexStatic);
   xQueueGenericSend_Stub(fakeQueueGenericSend);
   xQueueSemaphoreTake_Stub(fakeQueueSemaphoreTake);
   xQueueReceive_Stub(fakeQueueReceive);
