@@ -35,6 +35,10 @@ const char* const TAG = "CaptivePortalInstance";
 #include <string_view>
 
 const uint16_t HTTP_PORT = 80;
+// Browsers open several connections per page load; with only 4 slots the LRU purge evicted the (server-push, therefore
+// "idle" looking) WebSocket. Needs CONFIG_LWIP_MAX_SOCKETS >= this + 3 (+ DNS/HTTP client). Also sizes the broadcast
+// fd list, which must hold every open socket.
+const size_t HTTP_MAX_OPEN_SOCKETS = 8;
 
 // Largest inbound WebSocket message we'll accept (local FlatBuffer commands are tiny).
 // Nothing larger is accepted by the local message handler, so don't buffer more than that.
@@ -972,12 +976,15 @@ void CaptivePortal::CaptivePortalInstance::drainSends()
       frame.len              = send.data.size();
 
       if (send.fd >= 0) {
-        sendToWsClient(m_server, send.fd, frame);
+        // The fd may have closed and been reused by a plain HTTP request since the send was queued
+        if (httpd_ws_get_fd_info(m_server, send.fd) == HTTPD_WS_CLIENT_WEBSOCKET) {
+          sendToWsClient(m_server, send.fd, frame);
+        }
         continue;
       }
 
-      size_t count = 8;
-      int fds[8];
+      size_t count = HTTP_MAX_OPEN_SOCKETS;
+      int fds[HTTP_MAX_OPEN_SOCKETS];
       if (httpd_get_client_list(m_server, &count, fds) == ESP_OK) {
         for (size_t i = 0; i < count; ++i) {
           if (httpd_ws_get_fd_info(m_server, fds[i]) == HTTPD_WS_CLIENT_WEBSOCKET) {
@@ -1102,9 +1109,7 @@ bool CaptivePortal::CaptivePortalInstance::startHttpServer()
   httpd_config_t config   = HTTPD_DEFAULT_CONFIG();
   config.server_port      = HTTP_PORT;
   config.max_uri_handlers = 40;
-  // Browsers open several connections per page load; with only 4 slots the LRU purge evicted the (server-push,
-  // therefore "idle" looking) WebSocket. Needs CONFIG_LWIP_MAX_SOCKETS >= max_open_sockets + 3 (+ DNS/HTTP client).
-  config.max_open_sockets = 8;
+  config.max_open_sockets = HTTP_MAX_OPEN_SOCKETS;
   config.lru_purge_enable = true;
   config.stack_size       = 8192;
   // Shorter than the default 10 s: one stalled or sleeping client blocks the single httpd task for this long.
