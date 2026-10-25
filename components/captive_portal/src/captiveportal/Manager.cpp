@@ -79,7 +79,7 @@ static const char* const CAPTIVE_PORTAL_AP_IP = "4.3.2.1";
 static void sendCommand(uint32_t command)
 {
   if (s_managerTask != nullptr) {
-    xTaskNotify(s_managerTask, command, eSetBits);
+    xTaskNotifyIndexed(s_managerTask, TaskUtils::kNotifyIndex, command, eSetBits);
   }
 }
 
@@ -338,7 +338,7 @@ static void captiveportal_managertask(void* arg)
 
   for (;;) {
     uint32_t commands = 0;
-    xTaskNotifyWait(0, UINT32_MAX, &commands, portMAX_DELAY);
+    xTaskNotifyWaitIndexed(TaskUtils::kNotifyIndex, 0, UINT32_MAX, &commands, portMAX_DELAY);
 
     applyCommands(state, commands);
     captiveportal_tick(state);

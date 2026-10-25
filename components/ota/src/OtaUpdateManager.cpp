@@ -82,7 +82,7 @@ static bool otaum_try_notify_task(uint32_t eventFlag)
     return false;
   }
 
-  if (xTaskNotify(_taskHandle, eventFlag, eSetBits) != pdPASS) {
+  if (xTaskNotifyIndexed(_taskHandle, TaskUtils::kNotifyIndex, eventFlag, eSetBits) != pdPASS) {
     OS_LOGE(TAG, "Failed to notify OTA task (event: 0x%08x)", static_cast<unsigned>(eventFlag));
     return false;
   }
@@ -333,7 +333,7 @@ static void otaum_updatetask(void* arg)
   while (true) {
     // Wait for event.
     uint32_t eventBits = 0;
-    xTaskNotifyWait(0, UINT32_MAX, &eventBits, pdMS_TO_TICKS(5000));  // TODO: wait for rest time
+    xTaskNotifyWaitIndexed(TaskUtils::kNotifyIndex, 0, UINT32_MAX, &eventBits, pdMS_TO_TICKS(5000));  // TODO: wait for rest time
 
     updateRequested |= (eventBits & OTA_TASK_EVENT_UPDATE_REQUESTED) != 0;
     checkRequested |= (eventBits & OTA_TASK_EVENT_CHECK_REQUESTED) != 0;
