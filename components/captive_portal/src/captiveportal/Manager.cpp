@@ -449,18 +449,14 @@ bool CaptivePortal::SendMessageTXT(uint8_t socketId, std::string_view data)
   auto instance = GetInstance();
   if (instance == nullptr) return false;
 
-  instance->sendMessageTXT(socketId, data);
-
-  return true;
+  return instance->sendMessageTXT(socketId, data);
 }
 bool CaptivePortal::SendMessageBIN(uint8_t socketId, std::span<const uint8_t> data)
 {
   auto instance = GetInstance();
   if (instance == nullptr) return false;
 
-  instance->sendMessageBIN(socketId, data);
-
-  return true;
+  return instance->sendMessageBIN(socketId, data);
 }
 
 bool CaptivePortal::BroadcastMessageTXT(std::string_view data)
@@ -468,16 +464,12 @@ bool CaptivePortal::BroadcastMessageTXT(std::string_view data)
   auto instance = GetInstance();
   if (instance == nullptr) return false;
 
-  instance->broadcastMessageTXT(data);
-
-  return true;
+  return instance->broadcastMessageTXT(data);
 }
 bool CaptivePortal::BroadcastMessageBIN(std::span<const uint8_t> data)
 {
   auto instance = GetInstance();
   if (instance == nullptr) return false;
 
-  instance->broadcastMessageBIN(data);
-
-  return true;
+  return instance->broadcastMessageBIN(data);
 }

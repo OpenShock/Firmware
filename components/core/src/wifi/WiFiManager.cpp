@@ -438,14 +438,19 @@ static void evWiFiScanStatusChanged(OpenShock::WiFiScanStatus status)
 
   // If the scan started, remove any networks that have not been seen in the last 3 scans
   if (status == OpenShock::WiFiScanStatus::Started) {
+    std::vector<WiFiNetwork> lostNetworks;
     for (auto it = s_wifiNetworks.begin(); it != s_wifiNetworks.end();) {
       if (++it->scansMissed > 3) {
         OS_LOGV(TAG, "Network %s (" BSSID_FMT ") has not been seen in 3 scans, removing from list", it->ssid, BSSID_ARG(it->bssid));
-        portalBroadcastNetworkEvent(Serialization::Types::WifiNetworkEventType::Lost, *it);
+        lostNetworks.push_back(std::move(*it));
         it = s_wifiNetworks.erase(it);
       } else {
         ++it;
       }
+    }
+    // One message for all of them rather than one per network
+    if (!lostNetworks.empty()) {
+      portalBroadcastNetworksEvent(Serialization::Types::WifiNetworkEventType::Lost, lostNetworks);
     }
   }
 

@@ -638,14 +638,13 @@ namespace {
     int fd;
   };
 
-  // Deferred WS send marshalled onto the httpd task via httpd_queue_work.
-  struct WsSendJob {
-    httpd_handle_t hd;
-    int fd;
-    bool broadcast;
-    bool binary;
-    std::vector<uint8_t> data;
-  };
+#if defined(CONFIG_HTTPD_QUEUE_WORK_BLOCKING)
+  // httpd_queue_work is called from the httpd task itself (drainSends); a blocking mailbox would deadlock it
+#error "CONFIG_HTTPD_QUEUE_WORK_BLOCKING must be disabled"
+#endif
+
+  // Bounds the memory a burst of broadcasts can hold while no client drains them
+  constexpr size_t kMaxQueuedSends = 32;
 
   void sendToWsClient(httpd_handle_t hd, int fd, httpd_ws_frame_t& frame)
   {
@@ -660,32 +659,6 @@ namespace {
     httpd_sess_update_lru_counter(hd, fd);
   }
 
-  void wsSendWork(void* arg)
-  {
-    auto* job = static_cast<WsSendJob*>(arg);
-
-    httpd_ws_frame_t frame = {};
-    frame.final            = true;
-    frame.type             = job->binary ? HTTPD_WS_TYPE_BINARY : HTTPD_WS_TYPE_TEXT;
-    frame.payload          = job->data.data();
-    frame.len              = job->data.size();
-
-    if (job->broadcast) {
-      size_t count = 8;
-      int fds[8];
-      if (httpd_get_client_list(job->hd, &count, fds) == ESP_OK) {
-        for (size_t i = 0; i < count; ++i) {
-          if (httpd_ws_get_fd_info(job->hd, fds[i]) == HTTPD_WS_CLIENT_WEBSOCKET) {
-            sendToWsClient(job->hd, fds[i], frame);
-          }
-        }
-      }
-    } else {
-      sendToWsClient(job->hd, job->fd, frame);
-    }
-
-    delete job;
-  }
 }  // namespace
 
 int CaptivePortal::CaptivePortalInstance::idForFd(int fd)
@@ -952,18 +925,77 @@ bool CaptivePortal::CaptivePortalInstance::queueSend(int fd, bool broadcast, boo
     return false;
   }
 
-  auto* job      = new WsSendJob;
-  job->hd        = m_server;
-  job->fd        = fd;
-  job->broadcast = broadcast;
-  job->binary    = binary;
-  job->data.assign(data.begin(), data.end());
+  {
+    ScopedLock lock__(&m_sendMutex);
+    if (m_sendQueue.size() >= kMaxQueuedSends) {
+      OS_LOGW(TAG, "WebSocket send queue full, dropping message");
+      return false;
+    }
+    m_sendQueue.push_back(WsSend {.fd = broadcast ? -1 : fd, .binary = binary, .data = std::vector<uint8_t>(data.begin(), data.end())});
+  }
 
-  if (httpd_queue_work(m_server, wsSendWork, job) != ESP_OK) {
-    delete job;
-    return false;
+  // Ring the doorbell unless a drain is already pending; that drain will pick this message up too
+  if (!m_drainQueued.exchange(true)) {
+    if (httpd_queue_work(m_server, &CaptivePortalInstance::wsDrainWork, this) != ESP_OK) {
+      m_drainQueued.store(false);
+      // The message stays queued and goes out with the next send that gets a drain scheduled
+      OS_LOGW(TAG, "httpd work queue full, WebSocket send delayed");
+    }
   }
   return true;
+}
+
+// Runs on the httpd task. httpd_stop (in the destructor) joins that task before any member is destroyed, and a drain
+// still in httpd's mailbox then never runs, so `this` is valid here.
+void CaptivePortal::CaptivePortalInstance::wsDrainWork(void* arg)
+{
+  static_cast<CaptivePortalInstance*>(arg)->drainSends();
+}
+
+void CaptivePortal::CaptivePortalInstance::drainSends()
+{
+  while (true) {
+    std::deque<WsSend> batch;
+    {
+      ScopedLock lock__(&m_sendMutex);
+      batch.swap(m_sendQueue);
+    }
+
+    for (auto& send : batch) {
+      httpd_ws_frame_t frame = {};
+      frame.final            = true;
+      frame.type             = send.binary ? HTTPD_WS_TYPE_BINARY : HTTPD_WS_TYPE_TEXT;
+      frame.payload          = send.data.data();
+      frame.len              = send.data.size();
+
+      if (send.fd >= 0) {
+        sendToWsClient(m_server, send.fd, frame);
+        continue;
+      }
+
+      size_t count = 8;
+      int fds[8];
+      if (httpd_get_client_list(m_server, &count, fds) == ESP_OK) {
+        for (size_t i = 0; i < count; ++i) {
+          if (httpd_ws_get_fd_info(m_server, fds[i]) == HTTPD_WS_CLIENT_WEBSOCKET) {
+            sendToWsClient(m_server, fds[i], frame);
+          }
+        }
+      }
+    }
+
+    // Clear the doorbell, then look again: a producer that saw it set before the clear didn't schedule a drain
+    m_drainQueued.store(false);
+    {
+      ScopedLock lock__(&m_sendMutex);
+      if (m_sendQueue.empty()) {
+        return;
+      }
+    }
+    if (m_drainQueued.exchange(true)) {
+      return;  // A producer scheduled a new drain meanwhile
+    }
+  }
 }
 
 bool CaptivePortal::CaptivePortalInstance::sendMessageTXT(uint8_t socketId, std::string_view data)
