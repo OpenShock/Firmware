@@ -184,7 +184,7 @@ bool GatewayClient::_send(ws_transport_opcodes_t opcode, const uint8_t* data, st
   }
 
   const TickType_t started = xTaskGetTickCount();
-  ScopedLock lock__(&m_handleMutex, GATEWAY_SEND_TIMEOUT);
+  ScopedTryLock lock__(&m_handleMutex, GATEWAY_SEND_TIMEOUT);
   if (!lock__.isLocked()) {
     OS_LOGW(TAG, "Timed out waiting for the websocket handle, dropping message");
     return false;

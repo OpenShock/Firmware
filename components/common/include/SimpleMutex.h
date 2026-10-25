@@ -23,45 +23,53 @@ namespace OpenShock {
     SemaphoreHandle_t m_mutex;
   };
 
+  /// @brief Holds `mutex` from construction until destruction or unlock(). Waits as long as it takes, so it always
+  ///        holds the lock; use ScopedTryLock to give up after a timeout.
   class ScopedLock {
     DISABLE_COPY(ScopedLock);
     DISABLE_MOVE(ScopedLock);
 
   public:
-    ScopedLock(SimpleMutex* mutex, TickType_t xTicksToWait = portMAX_DELAY)
+    explicit ScopedLock(SimpleMutex* mutex)
       : m_mutex(mutex)
     {
-      bool result = false;
-      if (m_mutex != nullptr) {
-        result = m_mutex->lock(xTicksToWait);
-      }
+      m_mutex->lock(portMAX_DELAY);
+    }
 
-      if (!result) {
+    ~ScopedLock() { unlock(); }
+
+    /// @brief Releases the lock early; the destructor then does nothing.
+    void unlock()
+    {
+      if (m_mutex != nullptr) {
+        m_mutex->unlock();
         m_mutex = nullptr;
       }
     }
 
-    ~ScopedLock()
+  private:
+    SimpleMutex* m_mutex;
+  };
+
+  /// @brief Like ScopedLock, but gives up after `timeout`. Check isLocked() before touching what the mutex guards.
+  class ScopedTryLock {
+    DISABLE_COPY(ScopedTryLock);
+    DISABLE_MOVE(ScopedTryLock);
+
+  public:
+    ScopedTryLock(SimpleMutex* mutex, TickType_t timeout)
+      : m_mutex(mutex->lock(timeout) ? mutex : nullptr)
+    {
+    }
+
+    ~ScopedTryLock()
     {
       if (m_mutex != nullptr) {
         m_mutex->unlock();
       }
     }
 
-    bool isLocked() const { return m_mutex != nullptr; }
-
-    bool unlock()
-    {
-      if (m_mutex != nullptr) {
-        m_mutex->unlock();
-        m_mutex = nullptr;
-        return true;
-      }
-
-      return false;
-    }
-
-    SimpleMutex* getMutex() const { return m_mutex; }
+    [[nodiscard]] bool isLocked() const { return m_mutex != nullptr; }
 
   private:
     SimpleMutex* m_mutex;

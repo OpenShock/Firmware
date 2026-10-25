@@ -47,19 +47,9 @@ static Config::RootConfig _configData;
 static SimpleMutex _configDataMutex;
 static SimpleMutex _configWriteMutex;
 
-#define CONFIG_LOCK_READ(retval)                 \
-  ScopedLock lock__(&_configDataMutex);          \
-  if (!lock__.isLocked()) {                      \
-    OS_LOGE(TAG, "Failed to acquire read lock"); \
-    return retval;                               \
-  }
-
-#define CONFIG_LOCK_WRITE(retval)                 \
-  ScopedLock lock__(&_configWriteMutex);          \
-  if (!lock__.isLocked()) {                       \
-    OS_LOGE(TAG, "Failed to acquire write lock"); \
-    return retval;                                \
-  }
+// Both wait as long as it takes, so they can't fail; `retval` is kept so the call sites read the same.
+#define CONFIG_LOCK_READ(retval)  ScopedLock lock__(&_configDataMutex)
+#define CONFIG_LOCK_WRITE(retval) ScopedLock lock__(&_configWriteMutex)
 
 // Requires the write lock. Publishes `config` as the running config.
 static void commitConfig(Config::RootConfig&& config)
