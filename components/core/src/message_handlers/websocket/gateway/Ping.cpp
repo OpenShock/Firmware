@@ -1,3 +1,5 @@
+#include <freertos/FreeRTOS.h>
+
 #include "message_handlers/impl/WSGateway.h"
 
 const char* const TAG = "ServerMessageHandlers";
