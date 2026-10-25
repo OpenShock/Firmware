@@ -16,13 +16,11 @@ namespace OpenShock::WiFiScanManager {
   bool StartScan();
   bool AbortScan();
 
-  // Stored in the registry until unregistered; moved in, never copied.
+  // Moved in, never copied. Handlers can only be registered before Init(): the lists are then fixed, so they are
+  // called without a lock and may call back into this manager or take their own locks.
   using StatusChangedHandler      = std::move_only_function<void(OpenShock::WiFiScanStatus)>;
   using NetworksDiscoveredHandler = std::move_only_function<void(const std::vector<const wifi_ap_record_t*>& networkRecords)>;
 
-  uint64_t RegisterStatusChangedHandler(StatusChangedHandler handler);
-  void UnregisterStatusChangedHandler(uint64_t id);
-
-  uint64_t RegisterNetworksDiscoveredHandler(NetworksDiscoveredHandler handler);
-  void UnregisterNetworksDiscoveredHandler(uint64_t id);
+  bool RegisterStatusChangedHandler(StatusChangedHandler handler);
+  bool RegisterNetworksDiscoveredHandler(NetworksDiscoveredHandler handler);
 }  // namespace OpenShock::WiFiScanManager

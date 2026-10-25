@@ -309,6 +309,14 @@ static void evWiFiConnected(const wifi_event_sta_connected_t& info)
       s_connectedCredentialsID.store(credentialsId, std::memory_order_relaxed);
     }
 
+    // Every connect starts from saved credentials, so none means they were forgotten while connecting
+    if (credentialsId == 0) {
+      OS_LOGW(TAG, "Credentials for \"%s\" were removed while connecting, disconnecting", ssid);
+      lock__.unlock();  // Not across a driver call
+      esp_wifi_disconnect();
+      return;
+    }
+
     if (auto network = getConnectedAPNetwork(credentialsId)) {
       portalBroadcastNetworkEvent(Serialization::Types::WifiNetworkEventType::Connected, *network);
     }
@@ -317,6 +325,13 @@ static void evWiFiConnected(const wifi_event_sta_connected_t& info)
   }
 
   s_connectedCredentialsID.store(it->credentialsID, std::memory_order_relaxed);
+
+  if (it->credentialsID == 0) {
+    OS_LOGW(TAG, "Credentials for %s were removed while connecting, disconnecting", ssid);
+    lock__.unlock();  // Not across a driver call
+    esp_wifi_disconnect();
+    return;
+  }
 
   OS_LOGI(TAG, "Connected to network %s (" BSSID_FMT ")", ssid, BSSID_ARG(info.bssid));
 
@@ -624,45 +639,56 @@ static void requestConnect(uint8_t credentialsId)
   }
 }
 
+// Save() and Forget() hold s_networksMutex only to read or update s_wifiNetworks, never across the config flash write
+// or esp_wifi calls: the event-loop handlers take it too.
+
 bool WiFiManager::Save(const char* ssid, std::string_view password, bool connect, wifi_auth_mode_t authMode)
 {
   OS_LOGV(TAG, "Saving network %s (connect=%s)", ssid, connect ? "true" : "false");
 
-  ScopedLock lock__(&s_networksMutex);
-
-  auto it = findNetworkBySSID(ssid);
-  if (it != s_wifiNetworks.end()) {
-    // Network is in scan results; use scanned auth mode (more reliable than user-provided)
-    uint8_t id = Config::AddWiFiCredentials(it->ssid, password, it->authMode);
-    if (id == 0) {
-      portalBroadcastError("too_many_credentials");
-      return false;
+  // Prefer the scanned auth mode (more reliable than user-provided)
+  std::optional<wifi_auth_mode_t> scannedAuthMode;
+  {
+    ScopedLock lock__(&s_networksMutex);
+    auto it = findNetworkBySSID(ssid);
+    if (it != s_wifiNetworks.end()) {
+      scannedAuthMode = it->authMode;
     }
-
-    it->credentialsID = id;
-    portalBroadcastNetworkEvent(Serialization::Types::WifiNetworkEventType::Saved, *it);
-
-    if (connect) {
-      requestConnect(id);
-    }
-    return true;
   }
 
-  // Network not in scan results (hidden or out of range); save credentials directly
-  OS_LOGI(TAG, "Network %s not in scan results, saving credentials directly", ssid);
+  if (!scannedAuthMode) {
+    // Network not in scan results (hidden or out of range); save credentials directly
+    OS_LOGI(TAG, "Network %s not in scan results, saving credentials directly", ssid);
+  }
 
-  uint8_t id = Config::AddWiFiCredentials(ssid, password, authMode);
+  uint8_t id = Config::AddWiFiCredentials(ssid, password, scannedAuthMode.value_or(authMode));
   if (id == 0) {
     portalBroadcastError("too_many_credentials");
     return false;
   }
 
-  // Fire Saved event with a minimal WiFiNetwork for the UI
-  WiFiNetwork net;
-  strncpy(net.ssid, ssid, sizeof(net.ssid) - 1);
-  net.authMode      = authMode != WIFI_AUTH_MAX ? authMode : WIFI_AUTH_OPEN;
-  net.credentialsID = id;
-  portalBroadcastNetworkEvent(Serialization::Types::WifiNetworkEventType::Saved, net);
+  // Tag every scanned entry (one per BSSID) and report one of them; the network may have dropped out meanwhile
+  std::optional<WiFiNetwork> saved;
+  {
+    ScopedLock lock__(&s_networksMutex);
+    for (auto& net : s_wifiNetworks) {
+      if (strcmp(net.ssid, ssid) == 0) {
+        net.credentialsID = id;
+        if (!saved) {
+          saved = net;
+        }
+      }
+    }
+  }
+
+  if (!saved) {
+    // Minimal WiFiNetwork for the UI
+    saved.emplace();
+    strncpy(saved->ssid, ssid, sizeof(saved->ssid) - 1);
+    saved->authMode      = authMode != WIFI_AUTH_MAX ? authMode : WIFI_AUTH_OPEN;
+    saved->credentialsID = id;
+  }
+  portalBroadcastNetworkEvent(Serialization::Types::WifiNetworkEventType::Saved, *saved);
 
   if (connect) {
     requestConnect(id);
@@ -675,48 +701,45 @@ bool WiFiManager::Forget(const char* ssid)
 {
   OS_LOGV(TAG, "Forgetting network %s", ssid);
 
-  ScopedLock lock__(&s_networksMutex);
-
-  auto it = findNetworkBySSID(ssid);
-  if (it != s_wifiNetworks.end()) {
-    uint8_t credsId = it->credentialsID;
-
-    // Check if the network is currently connected
-    if (credsId != 0 && s_connectedCredentialsID.load(std::memory_order_relaxed) == credsId) {
-      WiFiManager::Disconnect();
-    }
-
-    // Remove the credentials from the config
-    if (Config::RemoveWiFiCredentials(credsId)) {
-      it->credentialsID = 0;
-      portalBroadcastNetworkEvent(Serialization::Types::WifiNetworkEventType::Removed, *it);
-    }
-
-    return true;
-  }
-
-  // Network not in scan results; look up credentials directly
   auto creds = Config::TryGetWiFiCredentialsBySSID(ssid);
   if (!creds) {
     OS_LOGE(TAG, "Failed to find credentials for network %s", ssid);
     return false;
   }
 
-  // Check if the network is currently connected
-  if (s_connectedCredentialsID.load(std::memory_order_relaxed) == creds->id) {
-    // Disconnect from the network
-    WiFiManager::Disconnect();
-  }
-
+  // Remove first: a connect already under way then finds no credentials when it lands and drops the link itself
+  // (see evWiFiConnected), so there is no window to connect to the forgotten network.
   if (!Config::RemoveWiFiCredentials(creds->id)) {
     OS_LOGE(TAG, "Failed to remove credentials for network %s", ssid);
     return false;
   }
 
-  // Fire Removed event with a minimal WiFiNetwork for the UI
-  WiFiNetwork net;
-  strncpy(net.ssid, ssid, sizeof(net.ssid) - 1);
-  portalBroadcastNetworkEvent(Serialization::Types::WifiNetworkEventType::Removed, net);
+  std::optional<WiFiNetwork> removed;
+  bool connected;
+  {
+    // evWiFiConnected sets s_connectedCredentialsID under this lock, so this sees either its id or its disconnect
+    ScopedLock lock__(&s_networksMutex);
+    for (auto& net : s_wifiNetworks) {
+      if (net.credentialsID == creds->id) {
+        net.credentialsID = 0;
+        if (!removed) {
+          removed = net;
+        }
+      }
+    }
+    connected = s_connectedCredentialsID.load(std::memory_order_relaxed) == creds->id;
+  }
+
+  if (connected) {
+    WiFiManager::Disconnect();
+  }
+
+  if (!removed) {
+    // Minimal WiFiNetwork for the UI
+    removed.emplace();
+    strncpy(removed->ssid, ssid, sizeof(removed->ssid) - 1);
+  }
+  portalBroadcastNetworkEvent(Serialization::Types::WifiNetworkEventType::Removed, *removed);
 
   return true;
 }
@@ -754,8 +777,9 @@ bool WiFiManager::Connect(const char* ssid)
   }
 
   if (s_connectedCredentialsID.load(std::memory_order_relaxed) != creds->id) {
-    Disconnect();
+    // Preference first: the update task may reconnect as soon as the DISCONNECTED event lands
     s_preferredCredentialsID.store(creds->id, std::memory_order_relaxed);
+    Disconnect();
     return true;
   }
 

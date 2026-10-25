@@ -5,12 +5,10 @@
 const char* const TAG = "WiFiScanManager";
 
 #include "Logging.h"
-#include "SimpleMutex.h"
 
 #include <esp_wifi.h>
 
 #include <atomic>
-#include <map>
 #include <utility>
 #include <vector>
 
@@ -20,27 +18,25 @@ const char* const TAG = "WiFiScanManager";
 const uint32_t OPENSHOCK_WIFI_SCAN_MIN_MS_PER_CHANNEL = 60;
 const uint32_t OPENSHOCK_WIFI_SCAN_MAX_MS_PER_CHANNEL = 120;
 
-static bool s_initialized                     = false;
-static std::atomic<bool> s_scanning           = false;
-static OpenShock::SimpleMutex s_handlersMutex = {};
-static std::map<uint64_t, OpenShock::WiFiScanManager::StatusChangedHandler> s_statusChangedHandlers;
-static std::map<uint64_t, OpenShock::WiFiScanManager::NetworksDiscoveredHandler> s_networksDiscoveredHandlers;
+static bool s_initialized           = false;
+static std::atomic<bool> s_scanning = false;
+// Only written before Init() (by the task that runs it), read-only afterwards
+static std::vector<OpenShock::WiFiScanManager::StatusChangedHandler> s_statusChangedHandlers;
+static std::vector<OpenShock::WiFiScanManager::NetworksDiscoveredHandler> s_networksDiscoveredHandlers;
 
 using namespace OpenShock;
 
 static void notifyStatusChangedHandlers(WiFiScanStatus status)
 {
-  ScopedLock lock__(&s_handlersMutex);
-  for (auto& it : s_statusChangedHandlers) {
-    it.second(status);
+  for (auto& handler : s_statusChangedHandlers) {
+    handler(status);
   }
 }
 
 static void notifyNetworksDiscoveredHandlers(const std::vector<const wifi_ap_record_t*>& records)
 {
-  ScopedLock lock__(&s_handlersMutex);
-  for (auto& it : s_networksDiscoveredHandlers) {
-    it.second(records);
+  for (auto& handler : s_networksDiscoveredHandlers) {
+    handler(records);
   }
 }
 
@@ -176,30 +172,24 @@ bool WiFiScanManager::AbortScan()
   return true;
 }
 
-uint64_t WiFiScanManager::RegisterStatusChangedHandler(WiFiScanManager::StatusChangedHandler handler)
+bool WiFiScanManager::RegisterStatusChangedHandler(WiFiScanManager::StatusChangedHandler handler)
 {
-  static uint64_t nextHandle = 0;
-  ScopedLock lock__(&s_handlersMutex);
-  uint64_t handle                 = nextHandle++;
-  s_statusChangedHandlers[handle] = std::move(handler);
-  return handle;
-}
-void WiFiScanManager::UnregisterStatusChangedHandler(uint64_t handle)
-{
-  ScopedLock lock__(&s_handlersMutex);
-  s_statusChangedHandlers.erase(handle);
+  if (s_initialized) {
+    OS_LOGE(TAG, "Scan handlers must be registered before Init()");
+    return false;
+  }
+
+  s_statusChangedHandlers.push_back(std::move(handler));
+  return true;
 }
 
-uint64_t WiFiScanManager::RegisterNetworksDiscoveredHandler(WiFiScanManager::NetworksDiscoveredHandler handler)
+bool WiFiScanManager::RegisterNetworksDiscoveredHandler(WiFiScanManager::NetworksDiscoveredHandler handler)
 {
-  static uint64_t nextHandle = 0;
-  ScopedLock lock__(&s_handlersMutex);
-  uint64_t handle                      = nextHandle++;
-  s_networksDiscoveredHandlers[handle] = std::move(handler);
-  return handle;
-}
-void WiFiScanManager::UnregisterNetworksDiscoveredHandler(uint64_t handle)
-{
-  ScopedLock lock__(&s_handlersMutex);
-  s_networksDiscoveredHandlers.erase(handle);
+  if (s_initialized) {
+    OS_LOGE(TAG, "Scan handlers must be registered before Init()");
+    return false;
+  }
+
+  s_networksDiscoveredHandlers.push_back(std::move(handler));
+  return true;
 }
