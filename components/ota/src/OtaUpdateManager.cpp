@@ -28,7 +28,6 @@ const char* const TAG = "OtaUpdateManager";
 #include <esp_ota_ops.h>
 #include <esp_partition.h>
 #include <esp_random.h>
-#include <esp_task_wdt.h>
 #include <esp_wifi.h>
 
 #include <array>
@@ -319,45 +318,6 @@ static bool otaum_flash_fs_partition(OpenShock::HTTP::Client& client, const esp_
   return true;
 }
 
-// Only the timeout is changed; idle-core mask and panic behaviour stay as configured in sdkconfig.
-static esp_err_t otaum_set_wdt_timeout(uint32_t timeoutSeconds)
-{
-  uint32_t idleCoreMask = 0;
-#if CONFIG_ESP_TASK_WDT_CHECK_IDLE_TASK_CPU0
-  idleCoreMask |= 1U << 0;
-#endif
-#if CONFIG_ESP_TASK_WDT_CHECK_IDLE_TASK_CPU1
-  idleCoreMask |= 1U << 1;
-#endif
-
-  esp_task_wdt_config_t twdt_config = {
-    .timeout_ms     = timeoutSeconds * 1000U,
-    .idle_core_mask = idleCoreMask,
-#if CONFIG_ESP_TASK_WDT_PANIC
-    .trigger_panic = true,
-#else
-    .trigger_panic = false,
-#endif
-  };
-  // ESP-IDF initializes the TWDT at startup (CONFIG_ESP_TASK_WDT_INIT, default y), so
-  // reconfigure it instead of re-initializing. esp_task_wdt_reconfigure() returns
-  // ESP_ERR_INVALID_STATE if the TWDT isn't initialized yet, in which case we fall back to init.
-  esp_err_t err = esp_task_wdt_reconfigure(&twdt_config);
-  if (err == ESP_ERR_INVALID_STATE) {
-    // Not yet initialized, fall back to init
-    return esp_task_wdt_init(&twdt_config);
-  }
-
-  return err;
-}
-
-static void otaum_restore_wdt_timeout()
-{
-  if (otaum_set_wdt_timeout(CONFIG_ESP_TASK_WDT_TIMEOUT_S) != ESP_OK) {
-    OS_LOGE(TAG, "Failed to restore task watchdog timeout");
-  }
-};
-
 static void otaum_updatetask(void* arg)
 {
   (void)arg;
@@ -528,14 +488,6 @@ static void otaum_updatetask(void* arg)
       continue;
     }
 
-    // Increase task watchdog timeout.
-    // Prevents panics on some ESP32s when clearing large partitions.
-    if (otaum_set_wdt_timeout(15) != ESP_OK) {
-      OS_LOGE(TAG, "Failed to increase task watchdog timeout");
-      _sendFailureMessage("Failed to increase task watchdog timeout"sv);
-      continue;
-    }
-
     // Flashing the filesystem force-closes the captive portal; on any failure (`continue`) it must be allowed to
     // open again. On success the portal stays closed until the restart below.
     struct ReopenPortalOnFailure {
@@ -548,11 +500,9 @@ static void otaum_updatetask(void* arg)
 
     // Flash app and filesystem partitions.
     if (!otaum_flash_fs_partition(client, filesystemPartition, release.filesystemBinaryUrl, release.filesystemBinaryHash)) {
-      otaum_restore_wdt_timeout();
       continue;
     }
     if (!otaum_flash_app_partition(client, appPartition, release.appBinaryUrl, release.appBinaryHash)) {
-      otaum_restore_wdt_timeout();
       continue;
     }
 
@@ -560,12 +510,8 @@ static void otaum_updatetask(void* arg)
     if (!Config::SetOtaUpdateStep(OpenShock::OtaUpdateStep::Updated)) {
       OS_LOGE(TAG, "Failed to set OTA update step");
       _sendFailureMessage("Failed to set OTA update step"sv);
-      otaum_restore_wdt_timeout();
       continue;
     }
-
-    // Set task watchdog timeout back to default.
-    otaum_restore_wdt_timeout();
 
     // Send reboot message.
     otaum_send_progress_msg(Serialization::Types::OtaUpdateProgressTask::Rebooting, 0.0f);

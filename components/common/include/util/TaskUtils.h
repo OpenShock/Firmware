@@ -32,4 +32,13 @@ namespace OpenShock::TaskUtils {
   ///        `exited` must be the same flag the task passes to TaskExiting(), and must be
   ///        cleared before the task is created.
   void StopTask(TaskHandle_t taskHandle, TaskExitFlag& exited, const char* tag, const char* taskName, TickType_t timeout = pdMS_TO_TICKS(1000));
+
+  /// @brief Puts the calling task on the task watchdog. From then on it must call WatchdogFeed() more often than
+  ///        CONFIG_ESP_TASK_WDT_TIMEOUT_S, or the watchdog reports it as stuck. Only for loops that never wait longer
+  ///        than that; call WatchdogUnsubscribe() before blocking indefinitely and before exiting.
+  void WatchdogSubscribe();
+  /// @brief Tells the task watchdog the calling task is alive. A no-op for a task that isn't subscribed.
+  void WatchdogFeed();
+  /// @brief Takes the calling task off the task watchdog. A no-op for a task that isn't subscribed.
+  void WatchdogUnsubscribe();
 }  // namespace OpenShock::TaskUtils

@@ -4,7 +4,27 @@
 
 #include "Logging.h"
 
+#include <esp_task_wdt.h>
+
 using namespace OpenShock;
+
+void TaskUtils::WatchdogSubscribe()
+{
+  esp_err_t err = esp_task_wdt_add(nullptr);
+  if (err != ESP_OK && err != ESP_ERR_INVALID_ARG) {  // INVALID_ARG: already subscribed
+    OS_LOGE("TaskUtils", "Failed to subscribe %s to the task watchdog: %s", pcTaskGetName(nullptr), esp_err_to_name(err));
+  }
+}
+
+void TaskUtils::WatchdogFeed()
+{
+  esp_task_wdt_reset();  // ESP_ERR_NOT_FOUND when not subscribed, which is fine
+}
+
+void TaskUtils::WatchdogUnsubscribe()
+{
+  esp_task_wdt_delete(nullptr);  // ESP_ERR_NOT_FOUND when not subscribed, which is fine
+}
 
 /// @brief Create a task on the specified core, or the default core if the specified core is invalid
 BaseType_t TaskUtils::TaskCreateUniversal(TaskFunction_t pvTaskCode, const char* const pcName, const uint32_t usStackDepth, void* const pvParameters, UBaseType_t uxPriority, TaskHandle_t* const pvCreatedTask, const BaseType_t xCoreID)

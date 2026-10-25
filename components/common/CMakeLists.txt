@@ -26,6 +26,7 @@ idf_component_register(
   REQUIRES      logging      # Logging.h / OS_PANIC* (TinyVec.h) in public headers
                 temporal     # Temporal.h (RateLimiter.h) in public header
                 freertos     # semphr.h in SimpleMutex.h public header
+  PRIV_REQUIRES esp_system   # esp_task_wdt.h (TaskUtils watchdog helpers)
 )
 
 # Keep the board descriptor in the link even when nothing references it. The ESP-IDF app

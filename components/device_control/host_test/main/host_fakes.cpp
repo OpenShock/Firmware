@@ -401,6 +401,17 @@ BaseType_t OpenShock::TaskUtils::TaskCreateExpensive(TaskFunction_t pvTaskCode, 
   return TaskCreateUniversal(pvTaskCode, pcName, usStackDepth, pvParameters, uxPriority, pvCreatedTask, 1);
 }
 
+// No task watchdog on the host
+void OpenShock::TaskUtils::WatchdogSubscribe()
+{
+}
+void OpenShock::TaskUtils::WatchdogFeed()
+{
+}
+void OpenShock::TaskUtils::WatchdogUnsubscribe()
+{
+}
+
 void OpenShock::TaskUtils::TaskExiting(TaskExitFlag& exited)
 {
   exited.store(true, std::memory_order_relaxed);
