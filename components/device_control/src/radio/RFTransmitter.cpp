@@ -16,6 +16,8 @@ const char* const TAG = "RFTransmitter";
 
 #include <freertos/queue.h>
 
+#include <algorithm>
+#include <atomic>
 #include <utility>
 #include <vector>
 
@@ -26,17 +28,29 @@ const int64_t kTerminatorDurationMs = 300;
 const int32_t kRmtTimeoutMs         = 100;
 const uint8_t kFlagOverwrite        = 1 << 0;
 const uint8_t kFlagDeleteTask       = 1 << 1;
+const uint8_t kFlagStop             = 1 << 2;
+// A Stop waits longer for a slot than other commands: the queue only stays full while the task is mid-round
+const TickType_t kStopQueueWait = pdMS_TO_TICKS(100);
 
 using namespace OpenShock;
 
+// Orders commands across producers, so a Stop sent to the front of the queue can tell which queued commands are older
+static std::atomic<uint32_t> s_nextCommandSeq = 0;
+
 struct RFTransmitter::Command {
   int64_t transmitEnd;
+  uint32_t seq;
   ShockerModelType modelType;
   ShockerCommandType type;
   uint16_t shockerId;
   uint8_t intensity;
   uint8_t flags;
 };
+
+static uint32_t shockerKey(ShockerModelType model, uint16_t shockerId)
+{
+  return (static_cast<uint32_t>(model) << 16) | shockerId;
+}
 
 RFTransmitter::RFTransmitter(gpio_num_t gpioPin)
   : m_txPin(gpioPin)
@@ -106,22 +120,35 @@ bool RFTransmitter::SendCommand(ShockerModelType model, uint16_t shockerId, Shoc
     return false;
   }
 
+  uint8_t flags = overwriteExisting ? kFlagOverwrite : 0;
+
   // Stop logic
-  if (type == ShockerCommandType::Stop) {
+  bool isStop = type == ShockerCommandType::Stop;
+  if (isStop) {
     OS_LOGV(TAG, "Stop command received");
 
-    type              = ShockerCommandType::Vibrate;
-    intensity         = 0;
-    durationMs        = 300;
-    overwriteExisting = true;
+    type       = ShockerCommandType::Vibrate;
+    intensity  = 0;
+    durationMs = 300;
+    flags      = kFlagOverwrite | kFlagStop;
   } else {
     OS_LOGD(TAG, "Command received: %u %u %u %u", std::to_underlying(model), shockerId, std::to_underlying(type), intensity);
   }
 
-  Command cmd = Command {.transmitEnd = OpenShock::millis() + durationMs, .modelType = model, .type = type, .shockerId = shockerId, .intensity = intensity, .flags = overwriteExisting ? kFlagOverwrite : (uint8_t)0};
+  Command cmd = Command {
+    .transmitEnd = OpenShock::millis() + durationMs,
+    .seq         = s_nextCommandSeq.fetch_add(1, std::memory_order_relaxed),
+    .modelType   = model,
+    .type        = type,
+    .shockerId   = shockerId,
+    .intensity   = intensity,
+    .flags       = flags,
+  };
 
-  // Add the command to the queue, wait max 10 ms (Adjust this)
-  if (xQueueSend(m_queueHandle, &cmd, pdMS_TO_TICKS(10)) != pdTRUE) {
+  // A Stop jumps the queue instead of waiting behind (or being dropped after) a backlog; the task then discards the
+  // older commands for that shocker still queued behind it.
+  BaseType_t queued = isStop ? xQueueSendToFront(m_queueHandle, &cmd, kStopQueueWait) : xQueueSend(m_queueHandle, &cmd, pdMS_TO_TICKS(10));
+  if (queued != pdTRUE) {
     OS_LOGE(TAG, "[pin-%hhi] Failed to send command to queue", m_txPin);
     return false;
   }
@@ -266,19 +293,36 @@ void RFTransmitter::TransmitTask()
 
   bool wasEstopped = false;
   std::vector<Rmt::Sequence> sequences;
+  // (shocker key, seq) of Stops taken from the front of the queue while older commands may still be behind them.
+  // Cleared once the queue drains, so it stays as small as the number of distinct shockers stopped in one backlog.
+  std::vector<std::pair<uint32_t, uint32_t>> stops;
   while (true) {
     // Receive commands
     Command cmd;
+    bool drained = true;
     while (xQueueReceive(m_queueHandle, &cmd, sequences.empty() ? portMAX_DELAY : 0) == pdTRUE) {
       // Destroy task if we receive destroy command
       if ((cmd.flags & kFlagDeleteTask) != 0) {
         return;
       }
 
+      uint32_t key = shockerKey(cmd.modelType, cmd.shockerId);
+      auto stop    = std::find_if(stops.begin(), stops.end(), [key](const auto& entry) { return entry.first == key; });
+      if ((cmd.flags & kFlagStop) != 0) {
+        if (stop == stops.end()) {
+          stops.emplace_back(key, cmd.seq);
+        } else if (static_cast<int32_t>(cmd.seq - stop->second) > 0) {
+          stop->second = cmd.seq;
+        }
+      } else if (stop != stops.end() && static_cast<int32_t>(cmd.seq - stop->second) < 0) {
+        continue;  // Sent before a Stop that overtook it
+      }
+
       // Discard any command received while estopped
       if (OpenShock::EStopManager::IsEStopped()) {
         // Immediately break out to stop sequences; we can empty the queue later
         if (!wasEstopped) {
+          drained = false;
           break;
         }
 
@@ -299,6 +343,10 @@ void RFTransmitter::TransmitTask()
       if (!addSequence(sequences, cmd.modelType, cmd.shockerId, cmd.type, cmd.intensity, cmd.transmitEnd)) {
         OS_LOGD(TAG, "[pin-%hhi] Failed to add sequence", m_txPin);
       }
+    }
+
+    if (drained) {
+      stops.clear();
     }
 
     // Terminate all remaining sequences

@@ -162,7 +162,7 @@ static QueueHandle_t fakeQueueCreateMutex(const uint8_t, int)
 }
 
 // xQueueSend, and xSemaphoreGive on a mutex.
-static BaseType_t fakeQueueGenericSend(QueueHandle_t handle, const void* const item, TickType_t, const BaseType_t, int)
+static BaseType_t fakeQueueGenericSend(QueueHandle_t handle, const void* const item, TickType_t, const BaseType_t position, int)
 {
   FakeQueue* queue = AsQueue(handle);
   if (queue->isMutex) {
@@ -178,7 +178,11 @@ static BaseType_t fakeQueueGenericSend(QueueHandle_t handle, const void* const i
   }
 
   const auto* bytes = static_cast<const uint8_t*>(item);
-  queue->items.emplace_back(bytes, bytes + queue->itemSize);
+  if (position == queueSEND_TO_FRONT) {
+    queue->items.emplace(queue->items.begin(), bytes, bytes + queue->itemSize);
+  } else {
+    queue->items.emplace_back(bytes, bytes + queue->itemSize);
+  }
   return pdTRUE;
 }
 
