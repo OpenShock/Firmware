@@ -71,7 +71,9 @@ namespace OpenShock {
       stop([this] { TaskUtils::Notify(m_handle); }, timeout);
     }
 
-    /// @brief Requests a stop, wakes the task with `wake` and waits for it to exit.
+    /// @brief Requests a stop, wakes the task with `wake` and waits for it to exit. `wake` runs under the handle lock,
+    ///        which keeps the task from deleting itself under it, so it must not block for long (bound any queue send)
+    ///        and must not call back into this ManagedTask.
     template<typename Wake>
     void stop(Wake&& wake, TickType_t timeout = pdMS_TO_TICKS(1000))
     {
