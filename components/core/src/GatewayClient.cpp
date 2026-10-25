@@ -40,7 +40,8 @@ static constexpr int WS_OP_BINARY = 0x02;
 static std::atomic<bool> s_bootStatusSent = false;
 // Set on the websocket task once the boot status went out; the OTA step is then cleared from loop() on the main task,
 // so the flash write doesn't run on the websocket task (which holds the client lock every other sender waits on).
-static std::atomic<bool> s_otaStepResetPending = false;
+static std::atomic<bool> s_otaStepResetPending                 = false;
+static std::atomic<OpenShock::OtaUpdateStep> s_reportedOtaStep = OpenShock::OtaUpdateStep::None;  // The step it reported
 
 GatewayClient::GatewayClient(const std::string& authToken)
   : m_headers()
@@ -191,8 +192,10 @@ void GatewayClient::markPingReceived()
 bool GatewayClient::loop()
 {
   if (s_otaStepResetPending.exchange(false)) {
-    if (!Config::SetOtaUpdateStep(OpenShock::OtaUpdateStep::None)) {
-      OS_LOGE(TAG, "Failed to reset firmware boot type to normal");
+    // Only the step that was reported: an OTA update started since then owns the step now
+    auto reported = s_reportedOtaStep.load();
+    if (!Config::CompareExchangeOtaUpdateStep(reported, OpenShock::OtaUpdateStep::None)) {
+      OS_LOGW(TAG, "OTA step not reset: it changed since the boot status was sent, or saving failed");
     }
   }
 
@@ -252,6 +255,7 @@ void GatewayClient::_sendBootStatus()
   s_bootStatusSent = Serialization::Gateway::SerializeBootStatusMessage(*updateId, AppHooks::OtaGetFirmwareBootType(), [this](std::span<const uint8_t> data) { return sendMessageBIN(data); });
 
   if (s_bootStatusSent && *updateStep != OpenShock::OtaUpdateStep::None) {
+    s_reportedOtaStep     = *updateStep;
     s_otaStepResetPending = true;
   }
 }

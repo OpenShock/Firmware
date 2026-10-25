@@ -783,6 +783,24 @@ std::optional<OtaUpdateStep> Config::GetOtaUpdateStep()
   return _configData.otaUpdate.updateStep;
 }
 
+bool Config::CompareExchangeOtaUpdateStep(OtaUpdateStep expected, OtaUpdateStep desired)
+{
+  CONFIG_LOCK_WRITE(false);
+
+  // Writers are serialized by the write lock, so the step can't change between this check and the save
+  if (_configData.otaUpdate.updateStep != expected) {
+    return false;
+  }
+  if (expected == desired) {
+    return true;
+  }
+
+  return mutateAndSave([&](Config::RootConfig& root) {
+    root.otaUpdate.updateStep = desired;
+    return true;
+  });
+}
+
 bool Config::SetOtaUpdateStep(OtaUpdateStep updateStep)
 {
   CONFIG_LOCK_WRITE(false);

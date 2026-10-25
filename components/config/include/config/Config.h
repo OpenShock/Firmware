@@ -98,6 +98,9 @@ namespace OpenShock::Config {
   bool SetOtaUpdateId(int32_t updateId);
   [[nodiscard]] std::optional<OtaUpdateStep> GetOtaUpdateStep();
   bool SetOtaUpdateStep(OtaUpdateStep updateStep);
+  /// @brief Sets the step only if it is still `expected`, so a stale writer can't clobber an update started meanwhile.
+  /// @return True if the step was `expected` and is now `desired`
+  bool CompareExchangeOtaUpdateStep(OtaUpdateStep expected, OtaUpdateStep desired);
 
   [[nodiscard]] std::optional<bool> GetEStopEnabled();
   bool SetEStopEnabled(bool enabled);
