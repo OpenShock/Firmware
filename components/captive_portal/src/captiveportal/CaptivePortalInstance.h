@@ -12,12 +12,14 @@
 #include <esp_http_server.h>
 
 #include <cstdint>
+#include <memory>
 #include <span>
 #include <string_view>
 #include <vector>
 
 namespace OpenShock::CaptivePortal {
-  class CaptivePortalInstance {
+  // Shared so a detached job (account link) can keep the instance, and with it the server, alive until it answers.
+  class CaptivePortalInstance : public std::enable_shared_from_this<CaptivePortalInstance> {
     DISABLE_COPY(CaptivePortalInstance);
     DISABLE_MOVE(CaptivePortalInstance);
 

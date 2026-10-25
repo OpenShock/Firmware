@@ -161,6 +161,12 @@ HTTP::Response<std::size_t>
 
   int64_t begin = OpenShock::millis();
 
+  // timeoutMs bounds the whole request. The client applies its timeout per socket operation, so each phase gets
+  // what is left of the budget rather than a fresh timeoutMs (DNS resolution can't be bounded from here).
+  auto remainingMs = [&]() -> int64_t {
+    return begin + timeoutMs - OpenShock::millis();
+  };
+
   // Open the connection, reusing the kept-alive handle when possible. If a
   // reused (kept-alive) socket has been closed by the server, drop it and
   // reconnect fresh once. HTTPS servers are verified against the compiled-in
@@ -175,7 +181,7 @@ HTTP::Response<std::size_t>
       config.url                      = urlStr.c_str();
       config.user_agent               = OpenShock::Constants::UserAgent();
       config.method                   = HTTP_METHOD_GET;
-      config.timeout_ms               = static_cast<int>(timeoutMs);
+      config.timeout_ms               = static_cast<int>(std::max<int64_t>(remainingMs(), 1));
       config.keep_alive_enable        = true;
       config.event_handler            = &Client::eventHandler;
       config.user_data                = this;
@@ -189,7 +195,7 @@ HTTP::Response<std::size_t>
     } else {
       esp_http_client_set_url(m_handle, urlStr.c_str());
       esp_http_client_set_method(m_handle, HTTP_METHOD_GET);
-      esp_http_client_set_timeout_ms(m_handle, static_cast<int>(timeoutMs));
+      esp_http_client_set_timeout_ms(m_handle, static_cast<int>(std::max<int64_t>(remainingMs(), 1)));
     }
 
     // Clear headers left over from a previous request on this reused handle.
@@ -204,8 +210,14 @@ HTTP::Response<std::size_t>
     }
 
     err = esp_http_client_open(m_handle, 0);
+    if (err == ESP_OK && remainingMs() <= 0) {
+      OS_LOGW(TAG, "Request timed out");
+      drop();
+      return {RequestResult::TimedOut, 0, 0};
+    }
     if (err == ESP_OK) {
       // A server-closed keep-alive socket usually accepts the request write and only fails here.
+      esp_http_client_set_timeout_ms(m_handle, static_cast<int>(remainingMs()));
       contentLength = esp_http_client_fetch_headers(m_handle);
       if (contentLength >= 0) {
         break;
@@ -232,7 +244,7 @@ HTTP::Response<std::size_t>
 
   int responseCode = esp_http_client_get_status_code(m_handle);
 
-  if (begin + timeoutMs < OpenShock::millis()) {
+  if (remainingMs() <= 0) {
     OS_LOGW(TAG, "Request timed out");
     return fail(RequestResult::TimedOut, responseCode, 0);
   }
@@ -291,11 +303,18 @@ HTTP::Response<std::size_t>
   HTTP::RequestResult result = HTTP::RequestResult::Success;
 
   // esp_http_client_read transparently decodes chunked transfer-encoding.
-  int read;
-  while ((read = esp_http_client_read(m_handle, reinterpret_cast<char*>(buffer), static_cast<int>(HTTP_BUFFER_SIZE))) > 0) {
-    if (begin + timeoutMs < OpenShock::millis()) {
+  int read = 0;
+  while (true) {
+    int64_t remaining = remainingMs();
+    if (remaining <= 0) {
       OS_LOGW(TAG, "Request timed out");
       result = HTTP::RequestResult::TimedOut;
+      break;
+    }
+    esp_http_client_set_timeout_ms(m_handle, static_cast<int>(remaining));
+
+    read = esp_http_client_read(m_handle, reinterpret_cast<char*>(buffer), static_cast<int>(HTTP_BUFFER_SIZE));
+    if (read <= 0) {
       break;
     }
 

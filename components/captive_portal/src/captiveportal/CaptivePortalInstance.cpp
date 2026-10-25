@@ -309,6 +309,9 @@ static esp_err_t sendAccountLinkResult(httpd_req_t* req, OpenShock::AccountLinkR
 
 namespace {
   struct AccountLinkJob {
+    // Keeps the instance alive, so its server can't be stopped under the async request; the manager's RetiredList
+    // destroys it only after this is dropped.
+    std::shared_ptr<CaptivePortal::CaptivePortalInstance> instance;
     httpd_req_t* req;  // async copy, owned until httpd_req_async_handler_complete
     std::string code;
   };
@@ -341,6 +344,12 @@ static esp_err_t apiAccountLink(httpd_req_t* req)
     return sendResp(req, S400, HTTP::ContentType::JSON, JSON_ERR_CODE_REQUIRED);
   }
 
+  // Empty while the instance is still being constructed
+  auto instance = static_cast<CaptivePortal::CaptivePortalInstance*>(req->user_ctx)->weak_from_this().lock();
+  if (instance == nullptr) {
+    return sendResp(req, S503, HTTP::ContentType::JSON, JSON_ERR_INTERNAL);
+  }
+
   if (s_accountLinkInProgress.exchange(true)) {
     return sendResp(req, S429, HTTP::ContentType::JSON, JSON_ERR_RATE_LIMITED);
   }
@@ -351,7 +360,7 @@ static esp_err_t apiAccountLink(httpd_req_t* req)
     return sendResp(req, S500, HTTP::ContentType::JSON, JSON_ERR_INTERNAL);
   }
 
-  auto* job = new AccountLinkJob {asyncReq, std::move(*code)};
+  auto* job = new AccountLinkJob {std::move(instance), asyncReq, std::move(*code)};
   // TLS needs a large stack
   if (TaskUtils::TaskCreateExpensive(accountLinkTask, "AccountLink", 8192, job, 1, nullptr) != pdPASS) {
     OS_LOGE(TAG, "Failed to create account link task");
@@ -1120,11 +1129,7 @@ CaptivePortal::CaptivePortalInstance::~CaptivePortalInstance()
 {
   m_dnsServer.stop();
 
-  // An in-flight account link still owns an async request on this server; let it answer first (bounded by the HTTP
-  // client timeout) so it never sends on a stopped server.
-  for (int i = 0; i < 150 && s_accountLinkInProgress.load(); ++i) {
-    vTaskDelay(pdMS_TO_TICKS(100));
-  }
+  // No account link can still be answering on this server: its job holds a reference, so this only runs after it.
 
   // Stop the server (closes all WS sockets, firing the session free callbacks).
   if (m_server != nullptr) {
