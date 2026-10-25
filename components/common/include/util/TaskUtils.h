@@ -1,5 +1,6 @@
 #pragma once
 
+#include <freertos/FreeRTOS.h>
 #include <freertos/task.h>
 
 #include <atomic>
@@ -7,6 +8,26 @@
 
 // For a task that is started and stopped, prefer util/ManagedTask.h, which wraps TaskExiting() and StopTask().
 namespace OpenShock::TaskUtils {
+  /// @brief The task-notification index OpenShock's own wakes use (ManagedTask, the WiFiManager task). Index 0 is the
+  ///        one ESP-IDF drivers and the plain xTaskNotify* calls use, so a wake there could end a driver's wait early,
+  ///        or a driver could consume ours. Falls back to 0 if the config has only one entry.
+#if configTASK_NOTIFICATION_ARRAY_ENTRIES > 1
+  inline constexpr UBaseType_t kNotifyIndex = 1;
+#else
+  inline constexpr UBaseType_t kNotifyIndex = 0;
+#endif
+
+  /// @brief Waits for a wake on kNotifyIndex (clearing it). Returns nonzero if woken, 0 on timeout.
+  inline uint32_t WaitForNotify(TickType_t timeout)
+  {
+    return ulTaskNotifyTakeIndexed(kNotifyIndex, pdTRUE, timeout);
+  }
+  /// @brief Wakes `task` on kNotifyIndex.
+  inline void Notify(TaskHandle_t task)
+  {
+    xTaskNotifyGiveIndexed(task, kNotifyIndex);
+  }
+
   /// @brief A task's exit signal, owned by whoever owns the task.
   ///        The task publishes it through TaskExiting() immediately before deleting
   ///        itself, and StopTask() waits on it. It exists because a self-deleted

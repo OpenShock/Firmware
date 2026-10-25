@@ -547,7 +547,7 @@ static std::atomic<TaskHandle_t> s_updateTask = nullptr;
 static void wakeUpdateTask()
 {
   if (TaskHandle_t task = s_updateTask.load(std::memory_order_acquire); task != nullptr) {
-    xTaskNotifyGive(task);
+    TaskUtils::Notify(task);
   }
 }
 
@@ -568,7 +568,7 @@ static void wifimanagerUpdateTask(void*)
         }
       }
     }
-    ulTaskNotifyTake(pdTRUE, pdMS_TO_TICKS(1000));
+    TaskUtils::WaitForNotify(pdMS_TO_TICKS(1000));
   }
 }
 

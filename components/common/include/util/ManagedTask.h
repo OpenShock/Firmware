@@ -20,7 +20,7 @@ namespace OpenShock {
   /// vTaskDelete() and never touches the exit flag. A long-running body polls stopRequested() at its wait points.
   ///
   /// stop() requests the stop, wakes the task and waits for it to exit (see TaskUtils::StopTask() for overruns). The
-  /// default wake is a task notification, which ends a ulTaskNotifyTake() wait; a task that blocks on something else
+  /// default wake is a task notification, which ends a TaskUtils::WaitForNotify() wait; a task that blocks on something else
   /// (a queue) passes its own wake, e.g. one that posts a sentinel.
   ///
   /// start() and stop() must be serialized by the owner; notify(), running() and stopRequested() may be called from
@@ -68,7 +68,7 @@ namespace OpenShock {
     ///        an overrun starts being logged, not a limit.
     void stop(TickType_t timeout = pdMS_TO_TICKS(1000))
     {
-      stop([this] { xTaskNotifyGive(m_handle); }, timeout);
+      stop([this] { TaskUtils::Notify(m_handle); }, timeout);
     }
 
     /// @brief Requests a stop, wakes the task with `wake` and waits for it to exit.
@@ -99,12 +99,12 @@ namespace OpenShock {
       m_body   = nullptr;
     }
 
-    /// @brief Wakes a task blocked in ulTaskNotifyTake() without stopping it. Safe from any task.
+    /// @brief Wakes a task blocked in TaskUtils::WaitForNotify() without stopping it. Safe from any task.
     void notify()
     {
       ScopedLock lock__(&m_handleMutex);
       if (m_handle != nullptr && !m_stopRequested.load(std::memory_order_relaxed)) {
-        xTaskNotifyGive(m_handle);
+        TaskUtils::Notify(m_handle);
       }
     }
 

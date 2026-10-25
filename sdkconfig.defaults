@@ -1,6 +1,8 @@
 # Tick rate. Originally raised for Arduino-as-IDF-component; kept because the existing
 # timing code assumes a 1 ms tick.
 CONFIG_FREERTOS_HZ=1000
+# Index 1 is OpenShock's own (TaskUtils::kNotifyIndex), so its wakes and ESP-IDF's index-0 waits can't interfere
+CONFIG_FREERTOS_TASK_NOTIFICATION_ARRAY_ENTRIES=2
 
 # Keep the main task large enough for the init chain.
 CONFIG_ESP_MAIN_TASK_STACK_SIZE=16384
