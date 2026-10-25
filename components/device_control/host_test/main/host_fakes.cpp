@@ -409,8 +409,9 @@ BaseType_t OpenShock::TaskUtils::TaskCreateExpensive(TaskFunction_t pvTaskCode, 
 }
 
 // No task watchdog on the host
-void OpenShock::TaskUtils::WatchdogSubscribe()
+bool OpenShock::TaskUtils::WatchdogSubscribe()
 {
+  return true;
 }
 void OpenShock::TaskUtils::WatchdogFeed()
 {

@@ -54,7 +54,8 @@ namespace OpenShock::TaskUtils {
   void StopTask(TaskHandle_t taskHandle, TaskExitFlag& exited, const char* tag, const char* taskName, TickType_t timeout = pdMS_TO_TICKS(1000));
 
   // Raw task watchdog calls on the calling task; use TaskWatchdog, which can't leave a task subscribed.
-  void WatchdogSubscribe();
+  /// @brief Returns whether this call added the subscription (false if the task already was subscribed, or on error).
+  bool WatchdogSubscribe();
   void WatchdogFeed();
   void WatchdogUnsubscribe();
 
@@ -79,8 +80,7 @@ namespace OpenShock::TaskUtils {
     void subscribe()
     {
       if (!m_subscribed) {
-        WatchdogSubscribe();
-        m_subscribed = true;
+        m_subscribed = WatchdogSubscribe();  // Not ours to remove if something else on this task already added it
       }
     }
     void unsubscribe()

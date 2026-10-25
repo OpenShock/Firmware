@@ -8,12 +8,13 @@
 
 using namespace OpenShock;
 
-void TaskUtils::WatchdogSubscribe()
+bool TaskUtils::WatchdogSubscribe()
 {
   esp_err_t err = esp_task_wdt_add(nullptr);
   if (err != ESP_OK && err != ESP_ERR_INVALID_ARG) {  // INVALID_ARG: already subscribed
     OS_LOGE("TaskUtils", "Failed to subscribe %s to the task watchdog: %s", pcTaskGetName(nullptr), esp_err_to_name(err));
   }
+  return err == ESP_OK;
 }
 
 void TaskUtils::WatchdogFeed()
