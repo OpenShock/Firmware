@@ -175,21 +175,21 @@ void GatewayClient::_sendBootStatus()
 
   OS_LOGV(TAG, "Sending Gateway boot status message");
 
-  int32_t updateId;
-  if (!Config::GetOtaUpdateId(updateId)) {
+  auto updateId = Config::GetOtaUpdateId();
+  if (!updateId) {
     OS_LOGE(TAG, "Failed to get OTA update ID");
     return;
   }
 
-  OpenShock::OtaUpdateStep updateStep;
-  if (!Config::GetOtaUpdateStep(updateStep)) {
+  auto updateStep = Config::GetOtaUpdateStep();
+  if (!updateStep) {
     OS_LOGE(TAG, "Failed to get OTA firmware boot type");
     return;
   }
 
-  s_bootStatusSent = Serialization::Gateway::SerializeBootStatusMessage(updateId, AppHooks::OtaGetFirmwareBootType(), [this](std::span<const uint8_t> data) { return sendMessageBIN(data); });
+  s_bootStatusSent = Serialization::Gateway::SerializeBootStatusMessage(*updateId, AppHooks::OtaGetFirmwareBootType(), [this](std::span<const uint8_t> data) { return sendMessageBIN(data); });
 
-  if (s_bootStatusSent && updateStep != OpenShock::OtaUpdateStep::None) {
+  if (s_bootStatusSent && *updateStep != OpenShock::OtaUpdateStep::None) {
     if (!Config::SetOtaUpdateStep(OpenShock::OtaUpdateStep::None)) {
       OS_LOGE(TAG, "Failed to reset firmware boot type to normal");
     }

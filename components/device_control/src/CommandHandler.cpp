@@ -192,13 +192,13 @@ static void commandhandler_handleestopstatechange(void* event_handler_arg, esp_e
   }
 
   // E-Stop cleared: restore the configured keep-alive setting instead of forcing it on.
-  bool keepAliveEnabled;
-  if (!Config::GetRFConfigKeepAliveEnabled(keepAliveEnabled)) {
+  auto keepAliveEnabled = Config::GetRFConfigKeepAliveEnabled();
+  if (!keepAliveEnabled) {
     OS_LOGE(TAG, "Failed to get keep-alive enabled from config");
     return;
   }
 
-  internalSetKeepAliveEnabled(keepAliveEnabled);
+  internalSetKeepAliveEnabled(*keepAliveEnabled);
 }
 
 bool CommandHandler::Init()
@@ -220,17 +220,17 @@ bool CommandHandler::Init()
   }
   initialized = true;
 
-  Config::RFConfig rfConfig;
-  if (!Config::GetRFConfig(rfConfig)) {
+  auto rfConfig = Config::GetRFConfig();
+  if (!rfConfig) {
     OS_LOGE(TAG, "Failed to get RF config");
     return false;
   }
 
-  if (rfConfig.keepAliveEnabled && !EStopManager::IsEStopped()) {
+  if (rfConfig->keepAliveEnabled && !EStopManager::IsEStopped()) {
     internalSetKeepAliveEnabled(true);
   }
 
-  gpio_num_t txPin = rfConfig.txPin;
+  gpio_num_t txPin = rfConfig->txPin;
   if (!OpenShock::IsValidOutputPin(txPin)) {
     const int8_t boardTxPin = Board::Get().rfTxGpio;
     if (!OpenShock::IsValidOutputPin(boardTxPin)) {
@@ -269,11 +269,11 @@ SetGPIOResultCode CommandHandler::SetRfTxPin(gpio_num_t txPin)
 
   // Driving the E-Stop input as the RF output would defeat the kill switch. Checked against the configured pin even
   // while the E-Stop is disabled, so enabling it later can't collide either.
-  gpio_num_t estopPin = GPIO_NUM_NC;
-  if (!Config::GetEStopGpioPin(estopPin)) {
+  auto estopPin = Config::GetEStopGpioPin();
+  if (!estopPin) {
     return SetGPIOResultCode::InternalError;
   }
-  if (estopPin != GPIO_NUM_NC && txPin == estopPin) {
+  if (*estopPin != GPIO_NUM_NC && txPin == *estopPin) {
     return SetGPIOResultCode::PinInUse;
   }
 
@@ -329,13 +329,13 @@ gpio_num_t CommandHandler::GetRfTxPin()
     return transmitter->GetTxPin();
   }
 
-  gpio_num_t txPin;
-  if (!Config::GetRFConfigTxPin(txPin)) {
+  auto txPin = Config::GetRFConfigTxPin();
+  if (!txPin) {
     OS_LOGE(TAG, "Failed to get RF TX pin from config");
-    txPin = static_cast<gpio_num_t>(OPENSHOCK_GPIO_INVALID);
+    return static_cast<gpio_num_t>(OPENSHOCK_GPIO_INVALID);
   }
 
-  return txPin;
+  return *txPin;
 }
 
 bool CommandHandler::HandleCommand(ShockerModelType model, uint16_t shockerId, ShockerCommandType type, uint8_t intensity, uint16_t durationMs)

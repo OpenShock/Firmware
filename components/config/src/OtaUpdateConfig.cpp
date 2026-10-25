@@ -5,6 +5,8 @@ const char* const TAG = "Config::OtaUpdateConfig";
 #include "config/internal/utils.h"
 #include "Logging.h"
 
+#include <utility>
+
 using namespace OpenShock::Config;
 using namespace std::string_view_literals;
 
@@ -63,16 +65,16 @@ bool OtaUpdateConfig::FromFlatbuffers(const Serialization::Configuration::OtaUpd
   isEnabled = config->is_enabled();
   Internal::Utils::FromFbsStr(cdnDomain, config->cdn_domain(), CONFIG_OPENSHOCK_FW_CDN_DOMAIN);
   // Out-of-range enum values (bit flips, configs from newer firmware) fall back to the defaults
-  auto fbsChannel        = static_cast<uint8_t>(config->update_channel());
-  updateChannel          = fbsChannel <= static_cast<uint8_t>(OtaUpdateChannel::Develop) ? static_cast<OtaUpdateChannel>(fbsChannel) : OtaUpdateChannel::Stable;
+  auto fbsChannel        = std::to_underlying(config->update_channel());
+  updateChannel          = fbsChannel <= std::to_underlying(OtaUpdateChannel::Develop) ? static_cast<OtaUpdateChannel>(fbsChannel) : OtaUpdateChannel::Stable;
   checkOnStartup         = config->check_on_startup();
   checkPeriodically      = config->check_periodically();
   checkInterval          = config->check_interval();
   allowBackendManagement = config->allow_backend_management();
   requireManualApproval  = config->require_manual_approval();
   updateId               = config->update_id();
-  auto fbsStep           = static_cast<uint8_t>(config->update_step());
-  updateStep             = fbsStep <= static_cast<uint8_t>(OtaUpdateStep::RollingBack) ? static_cast<OtaUpdateStep>(fbsStep) : OtaUpdateStep::None;
+  auto fbsStep           = std::to_underlying(config->update_step());
+  updateStep             = fbsStep <= std::to_underlying(OtaUpdateStep::RollingBack) ? static_cast<OtaUpdateStep>(fbsStep) : OtaUpdateStep::None;
 
   return true;
 }
@@ -114,18 +116,18 @@ bool OtaUpdateConfig::FromJSON(JSON::JsonView json)
     return false;
   }
 
-  if (!json["isEnabled"].tryGetBool(isEnabled)) isEnabled = true;
+  isEnabled = json["isEnabled"].tryGetBool().value_or(true);
 
-  if (!json["cdnDomain"].tryGetStr(cdnDomain)) cdnDomain = CONFIG_OPENSHOCK_FW_CDN_DOMAIN;
+  cdnDomain = json["cdnDomain"].tryGetStr().value_or(CONFIG_OPENSHOCK_FW_CDN_DOMAIN);
 
   Internal::Utils::FromJsonStrParsed(updateChannel, json, "updateChannel"sv, OpenShock::TryParseOtaUpdateChannel, OpenShock::OtaUpdateChannel::Stable);
 
-  if (!json["checkOnStartup"].tryGetBool(checkOnStartup)) checkOnStartup = false;
-  if (!json["checkPeriodically"].tryGetBool(checkPeriodically)) checkPeriodically = false;
-  if (!json["checkInterval"].tryGetU16(checkInterval)) checkInterval = 30;
-  if (!json["allowBackendManagement"].tryGetBool(allowBackendManagement)) allowBackendManagement = true;
-  if (!json["requireManualApproval"].tryGetBool(requireManualApproval)) requireManualApproval = false;
-  if (!json["updateId"].tryGetI32(updateId)) updateId = 0;
+  checkOnStartup         = json["checkOnStartup"].tryGetBool().value_or(false);
+  checkPeriodically      = json["checkPeriodically"].tryGetBool().value_or(false);
+  checkInterval          = json["checkInterval"].tryGetU16().value_or(30);
+  allowBackendManagement = json["allowBackendManagement"].tryGetBool().value_or(true);
+  requireManualApproval  = json["requireManualApproval"].tryGetBool().value_or(false);
+  updateId               = json["updateId"].tryGetI32().value_or(0);
 
   Internal::Utils::FromJsonStrParsed(updateStep, json, "updateStep"sv, OpenShock::TryParseOtaUpdateStep, OpenShock::OtaUpdateStep::None);
 

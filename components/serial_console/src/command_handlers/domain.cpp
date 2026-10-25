@@ -14,14 +14,14 @@ const char* const TAG = "SerialCmds::CommandHandlers::Domain";
 static void handleDomainCommand(std::string_view arg, bool isAutomated)
 {
   if (arg.empty()) {
-    std::string domain;
-    if (!OpenShock::Config::GetBackendDomain(domain)) {
+    auto domain = OpenShock::Config::GetBackendDomain();
+    if (!domain) {
       SERPR_ERROR("Failed to get domain from config");
       return;
     }
 
     // Get domain
-    SERPR_RESPONSE("Domain|%s", domain.c_str());
+    SERPR_RESPONSE("Domain|%s", domain->c_str());
     return;
   }
 

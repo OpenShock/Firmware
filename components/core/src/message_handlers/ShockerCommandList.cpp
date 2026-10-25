@@ -7,9 +7,44 @@ const char* const TAG = "ShockerCommandHandler";
 #include "Logging.h"
 
 #include <cstdint>
+#include <optional>
 
 using FbsModelType   = OpenShock::Serialization::Types::ShockerModelType;
 using FbsCommandType = OpenShock::Serialization::Types::ShockerCommandType;
+
+// No default in these switches: -Wswitch flags new schema enumerators. The values come from the network and may be
+// out of range, so they fall through to std::nullopt.
+static std::optional<OpenShock::ShockerModelType> toShockerModelType(FbsModelType fbsModel)
+{
+  switch (fbsModel) {
+    case FbsModelType::CaiXianlin:
+      return OpenShock::ShockerModelType::CaiXianlin;
+    case FbsModelType::Petrainer:
+      return OpenShock::ShockerModelType::Petrainer;
+    case FbsModelType::Petrainer998DR:
+      return OpenShock::ShockerModelType::Petrainer998DR;
+    case FbsModelType::WellturnT330:
+      return OpenShock::ShockerModelType::WellturnT330;
+  }
+
+  return std::nullopt;
+}
+
+static std::optional<OpenShock::ShockerCommandType> toShockerCommandType(FbsCommandType fbsCommandType)
+{
+  switch (fbsCommandType) {
+    case FbsCommandType::Stop:
+      return OpenShock::ShockerCommandType::Stop;
+    case FbsCommandType::Shock:
+      return OpenShock::ShockerCommandType::Shock;
+    case FbsCommandType::Vibrate:
+      return OpenShock::ShockerCommandType::Vibrate;
+    case FbsCommandType::Sound:
+      return OpenShock::ShockerCommandType::Sound;
+  }
+
+  return std::nullopt;
+}
 
 void OpenShock::MessageHandlers::HandleShockerCommandList(const OpenShock::Serialization::Common::ShockerCommandList* cmdList)
 {
@@ -28,45 +63,19 @@ void OpenShock::MessageHandlers::HandleShockerCommandList(const OpenShock::Seria
     FbsModelType fbsModel         = command->model();
     FbsCommandType fbsCommandType = command->type();
 
-    ShockerModelType model;
-    switch (fbsModel) {
-      case FbsModelType::CaiXianlin:
-        model = ShockerModelType::CaiXianlin;
-        break;
-      case FbsModelType::Petrainer:
-        model = ShockerModelType::Petrainer;
-        break;
-      case FbsModelType::Petrainer998DR:
-        model = ShockerModelType::Petrainer998DR;
-        break;
-      case FbsModelType::WellturnT330:
-        model = ShockerModelType::WellturnT330;
-        break;
-      default:
-        OS_LOGE(TAG, "Unsupported shocker model: %s", OpenShock::Serialization::Types::EnumNameShockerModelType(fbsModel));
-        continue;
+    auto model = toShockerModelType(fbsModel);
+    if (!model) {
+      OS_LOGE(TAG, "Unsupported shocker model: %s", OpenShock::Serialization::Types::EnumNameShockerModelType(fbsModel));
+      continue;
     }
 
-    ShockerCommandType commandType;
-    switch (fbsCommandType) {
-      case FbsCommandType::Stop:
-        commandType = ShockerCommandType::Stop;
-        break;
-      case FbsCommandType::Shock:
-        commandType = ShockerCommandType::Shock;
-        break;
-      case FbsCommandType::Vibrate:
-        commandType = ShockerCommandType::Vibrate;
-        break;
-      case FbsCommandType::Sound:
-        commandType = ShockerCommandType::Sound;
-        break;
-      default:
-        OS_LOGE(TAG, "Unsupported command type: %s", OpenShock::Serialization::Types::EnumNameShockerCommandType(fbsCommandType));
-        continue;
+    auto commandType = toShockerCommandType(fbsCommandType);
+    if (!commandType) {
+      OS_LOGE(TAG, "Unsupported command type: %s", OpenShock::Serialization::Types::EnumNameShockerCommandType(fbsCommandType));
+      continue;
     }
 
-    if (!CommandHandler::HandleCommand(model, id, commandType, intensity, durationMs)) {
+    if (!CommandHandler::HandleCommand(*model, id, *commandType, intensity, durationMs)) {
       OS_LOGE(TAG, "Command failed/rejected!");
     }
   }

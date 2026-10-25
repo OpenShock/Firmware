@@ -46,8 +46,10 @@ namespace OpenShock {
       case AccountLinkResultCode::ConfigSaveFailed:
         return "ConfigSaveFailed";
       case AccountLinkResultCode::InternalError:
-      default:
         return "InternalError";
     }
+
+    // Only reachable for an out-of-range value; the switch lists every enumerator, so a new one warns via -Wswitch.
+    return "InternalError";
   }
 }  // namespace OpenShock

@@ -9,6 +9,7 @@ const char* const TAG = "Config::WiFiCredentials";
 #include "util/HexUtils.h"
 
 #include <cstring>
+#include <utility>
 
 using namespace OpenShock::Config;
 using FbsAuthMode = OpenShock::Serialization::Types::WifiAuthMode;
@@ -110,23 +111,21 @@ bool WiFiCredentials::FromJSON(JSON::JsonView json)
     return false;
   }
 
-  if (!json["id"].tryGetU8(id)) id = 0;
+  id = json["id"].tryGetU8().value_or(0);
 
-  if (!json["ssid"].tryGetStr(ssid)) ssid.clear();
+  ssid = json["ssid"].tryGetStr().value_or(std::string());
 
-  if (!json["password"].tryGetStr(password)) password.clear();
+  password = json["password"].tryGetStr().value_or(std::string());
 
-  uint8_t authModeVal = static_cast<uint8_t>(FbsAuthMode::UNKNOWN);
-  if (!json["authMode"].tryGetU8(authModeVal)) authModeVal = static_cast<uint8_t>(FbsAuthMode::UNKNOWN);
-  authMode = FromFbsAuthMode(static_cast<FbsAuthMode>(authModeVal));
+  uint8_t authModeVal = json["authMode"].tryGetU8().value_or(std::to_underlying(FbsAuthMode::UNKNOWN));
+  authMode            = FromFbsAuthMode(static_cast<FbsAuthMode>(authModeVal));
 
   bssid.fill(0);
-  std::string bssidStr;
-  if (json["bssid"].tryGetStr(bssidStr) && bssidStr.size() == 12) {
+  if (auto bssidStr = json["bssid"].tryGetStr(); bssidStr && bssidStr->size() == 12) {
     // Parse into a temporary: TryParseHex writes byte by byte and stops at the first bad pair, and a partial
     // BSSID would pin the network to an AP that doesn't exist.
     std::array<uint8_t, 6> parsed {};
-    if (HexUtils::TryParseHex(bssidStr.data(), bssidStr.size(), parsed.data(), parsed.size()) == parsed.size()) {
+    if (HexUtils::TryParseHex(*bssidStr, parsed) == parsed.size()) {
       bssid = parsed;
     }
   }
@@ -147,7 +146,7 @@ void WiFiCredentials::ToJSON(json_gen_str_t* gen, const char* name, bool withSen
   if (withSensitiveData) {
     JSON::objSetString(gen, "password", password);
   }
-  json_gen_obj_set_int(gen, "authMode", static_cast<uint8_t>(ToFbsAuthMode(authMode)));
+  json_gen_obj_set_int(gen, "authMode", std::to_underlying(ToFbsAuthMode(authMode)));
   if (HasPinnedBSSID()) {
     char hex[13];
     for (std::size_t i = 0; i < bssid.size(); ++i) {

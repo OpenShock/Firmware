@@ -31,7 +31,7 @@ bool OpenShock::TryGetPartitionHash(const esp_partition_t* partition, char (&has
   return true;
 }
 
-bool OpenShock::FlashPartitionFromUrl(HTTP::Client& client, const esp_partition_t* partition, std::string_view remoteUrl, const uint8_t (&remoteHash)[32], std::function<bool(std::size_t, std::size_t, float)> progressCallback)
+bool OpenShock::FlashPartitionFromUrl(HTTP::Client& client, const esp_partition_t* partition, std::string_view remoteUrl, const uint8_t (&remoteHash)[32], Util::FunctionRef<bool(std::size_t, std::size_t, float)> progressCallback)
 {
   OpenShock::SHA256 sha256;
   if (!sha256.begin()) {
@@ -58,7 +58,7 @@ bool OpenShock::FlashPartitionFromUrl(HTTP::Client& client, const esp_partition_
     contentLength = size;
 
     lastProgress = OpenShock::millis();
-    if (progressCallback) progressCallback(0, contentLength, 0.0f);
+    progressCallback(0, contentLength, 0.0f);
 
     return true;
   };
@@ -78,7 +78,7 @@ bool OpenShock::FlashPartitionFromUrl(HTTP::Client& client, const esp_partition_
     int64_t now = OpenShock::millis();
     if (now - lastProgress >= 500) {  // Send progress every 500ms
       lastProgress = now;
-      if (progressCallback) progressCallback(contentWritten, contentLength, static_cast<float>(contentWritten) / static_cast<float>(contentLength));
+      progressCallback(contentWritten, contentLength, static_cast<float>(contentWritten) / static_cast<float>(contentLength));
     }
 
     return true;
@@ -100,7 +100,7 @@ bool OpenShock::FlashPartitionFromUrl(HTTP::Client& client, const esp_partition_
     return false;
   }
 
-  if (progressCallback) progressCallback(contentLength, contentLength, 1.0f);
+  progressCallback(contentLength, contentLength, 1.0f);
   OS_LOGD(TAG, "Wrote %zu bytes to partition", appBinaryResponse.data);
 
   std::array<uint8_t, 32> localHash;

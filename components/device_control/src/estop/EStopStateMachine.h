@@ -93,10 +93,6 @@ namespace OpenShock {
             m_rearmAt      = now + kRearmGraceTime;
           }
           break;
-
-        default:
-          // Should never happen
-          break;
       }
     }
 

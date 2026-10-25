@@ -1,6 +1,7 @@
 """Tests for the command lines of the build scripts: build.py, gen_env_header.py and the --board option."""
 
 import importlib.util
+import os
 
 import gen_env_header
 import pytest
@@ -53,6 +54,19 @@ def test_without_idf_path_an_installer_registered_idf_is_activated(monkeypatch, 
         return 'venv-python'
 
     monkeypatch.setattr(build.idfenv, 'activate', fake_activate)
+
+    assert build.run_idf(['build']) == 0
+    assert calls[0][:2] == ['venv-python', str(idf / 'tools' / 'idf.py')]
+
+
+@pytest.mark.skipif(os.name != 'posix', reason='Windows never looks up an idf.py wrapper')
+def test_idf_py_from_idf_path_on_path_runs_under_the_venv_interpreter(monkeypatch, tmp_path):
+    calls = []
+    idf = tmp_path / 'idf'
+    monkeypatch.setattr(build.subprocess, 'call', lambda cmd, env=None: calls.append(cmd) or 0)
+    monkeypatch.setattr(build.shutil, 'which', lambda name: str(idf / 'tools' / 'idf.py'))
+    monkeypatch.setenv('IDF_PATH', str(idf))
+    monkeypatch.setattr(build.idfenv, 'activate', lambda environ=None: 'venv-python')
 
     assert build.run_idf(['build']) == 0
     assert calls[0][:2] == ['venv-python', str(idf / 'tools' / 'idf.py')]
@@ -160,6 +174,75 @@ def test_build_mode_follows_the_ref(monkeypatch, env, expected):
 def test_build_mode_outside_ci_is_debug(monkeypatch):
     monkeypatch.setenv('GITHUB_REF_NAME', 'master')
     assert github.build_mode() == ('debug', 5)
+
+
+@pytest.mark.parametrize(
+    'env, expected',
+    [
+        ({}, 'debug'),
+        ({'GITHUB_REF_NAME': 'develop'}, 'debug'),
+        ({'GITHUB_REF_NAME': 'beta'}, 'debug'),
+        ({'GITHUB_REF_NAME': 'master'}, 'size'),
+        ({'GITHUB_EVENT_NAME': 'pull_request', 'GITHUB_BASE_REF': 'master'}, 'size'),
+        ({'GITHUB_EVENT_NAME': 'pull_request', 'GITHUB_BASE_REF': 'develop'}, 'debug'),
+        ({'GITHUB_REF_NAME': '1.5.0', 'GITHUB_REF_TYPE': 'tag'}, 'size'),
+        ({'GITHUB_REF_NAME': '1.5.0-rc.1', 'GITHUB_REF_TYPE': 'tag'}, 'debug'),
+        ({'GITHUB_REF_NAME': '1.5.0-dev.1', 'GITHUB_REF_TYPE': 'tag'}, 'debug'),
+    ],
+)
+def test_only_stable_builds_optimized(monkeypatch, env, expected):
+    monkeypatch.setenv('CI', 'true')
+    monkeypatch.setenv('GITHUB_ACTIONS', 'true')
+    for name, value in env.items():
+        monkeypatch.setenv(name, value)
+    assert github.build_optimization() == expected
+
+
+def test_optimization_outside_ci_is_debug(monkeypatch):
+    monkeypatch.setenv('GITHUB_REF_NAME', 'master')
+    assert github.build_optimization() == 'debug'
+
+
+def test_board_fragment_selects_the_optimization(idf, tmp_path):
+    assert build.main(['OpenShock-Core-V2', 'app']) == 0
+    text = (tmp_path / 'build' / 'board.defaults').read_text(encoding='utf-8')
+    assert text.splitlines()[-2:] == [
+        'CONFIG_COMPILER_OPTIMIZATION_DEBUG=y',
+        'CONFIG_COMPILER_OPTIMIZATION_ASSERTIONS_ENABLE=y',
+    ]
+
+
+def test_stable_variant_compiles_for_size(idf, monkeypatch, tmp_path):
+    monkeypatch.setenv('OPENSHOCK_FW_OPTIMIZATION', 'size')
+    variant = boards.group_variants(['OpenShock-Core-V2'])[0]
+    assert build.main(['--variant', variant.id]) == 0
+    text = (tmp_path / 'build' / 'variant.defaults').read_text(encoding='utf-8')
+    # Stable drops the assert text; the release's ELF decodes the backtrace instead.
+    assert text.splitlines()[-2:] == [
+        'CONFIG_COMPILER_OPTIMIZATION_SIZE=y',
+        'CONFIG_COMPILER_OPTIMIZATION_ASSERTIONS_SILENT=y',
+    ]
+    assert 'CONFIG_COMPILER_OPTIMIZATION_DEBUG=y' not in text
+
+
+def test_optimization_is_not_part_of_the_variant_id(monkeypatch):
+    variant = boards.group_variants(['OpenShock-Core-V2'])[0]
+    monkeypatch.setenv('OPENSHOCK_FW_OPTIMIZATION', 'size')
+    assert boards.group_variants(['OpenShock-Core-V2'])[0].id == variant.id
+
+
+def test_a_local_size_build_gets_its_own_directory(monkeypatch):
+    # An existing sdkconfig wins over the defaults, so sharing build/<board> would keep whichever level ran first.
+    monkeypatch.delenv('OPENSHOCK_BUILD_DIR', raising=False)
+    assert build.resolve_build_dir('OpenShock-Core-V2') == ROOT / 'build' / 'OpenShock-Core-V2'
+    assert build.resolve_build_dir('OpenShock-Core-V2', 'size') == ROOT / 'build' / 'OpenShock-Core-V2-size'
+
+
+def test_unknown_optimization_is_refused(idf, monkeypatch):
+    monkeypatch.setenv('OPENSHOCK_FW_OPTIMIZATION', 'O3')
+    with pytest.raises(SystemExit, match='debug, size'):
+        build.main(['OpenShock-Core-V2'])
+    assert idf == []
 
 
 @pytest.mark.parametrize(

@@ -1,10 +1,11 @@
 #pragma once
 
+#include "util/FunctionRef.h"
 #include "json/Json.h"
 
 #include <cstdint>
-#include <functional>
 #include <map>
+#include <optional>
 #include <span>
 #include <string>
 #include <string_view>
@@ -65,16 +66,17 @@ namespace OpenShock::HTTP {
           return "Request was cancelled";
         case RequestResult::Success:
           return "Success";
-        default:
-          return "Unknown reason";
       }
+
+      return "Unknown reason";
     }
   };
 
+  // Callbacks are only invoked during the request call they are passed to, never stored.
   template<typename T>
-  using JsonParser               = std::function<bool(int code, JSON::JsonView json, T& data)>;
-  using GotContentLengthCallback = std::function<bool(int contentLength)>;
-  using DownloadCallback         = std::function<bool(std::size_t offset, const uint8_t* data, std::size_t len)>;
+  using JsonParser               = Util::FunctionRef<std::optional<T>(int code, JSON::JsonView json)>;
+  using GotContentLengthCallback = Util::FunctionRef<bool(int contentLength)>;
+  using DownloadCallback         = Util::FunctionRef<bool(std::size_t offset, const uint8_t* data, std::size_t len)>;
 
   // A reusable HTTP client. Sequential requests on the same instance reuse the
   // underlying TCP/TLS connection (HTTP keep-alive) when they target the same
@@ -112,12 +114,12 @@ namespace OpenShock::HTTP {
         return {RequestResult::ParseFailed, response.code, {}};
       }
 
-      T data;
-      if (!jsonParser(response.code, doc.root(), data)) {
+      auto data = jsonParser(response.code, doc.root());
+      if (!data) {
         return {RequestResult::ParseFailed, response.code, {}};
       }
 
-      return {response.result, response.code, std::move(data)};
+      return {response.result, response.code, std::move(*data)};
     }
 
   private:
@@ -136,7 +138,7 @@ namespace OpenShock::HTTP {
     Download(std::string_view url, const std::map<std::string, std::string>& headers, GotContentLengthCallback contentLengthCallback, DownloadCallback downloadCallback, std::span<const uint16_t> acceptedCodes, uint32_t timeoutMs = 10'000)
   {
     Client client;
-    return client.Download(url, headers, std::move(contentLengthCallback), std::move(downloadCallback), acceptedCodes, timeoutMs);
+    return client.Download(url, headers, contentLengthCallback, downloadCallback, acceptedCodes, timeoutMs);
   }
 
   inline Response<std::string> GetString(std::string_view url, const std::map<std::string, std::string>& headers, std::span<const uint16_t> acceptedCodes, uint32_t timeoutMs = 10'000)
@@ -149,6 +151,6 @@ namespace OpenShock::HTTP {
   Response<T> GetJSON(std::string_view url, const std::map<std::string, std::string>& headers, JsonParser<T> jsonParser, std::span<const uint16_t> acceptedCodes, uint32_t timeoutMs = 10'000)
   {
     Client client;
-    return client.GetJSON<T>(url, headers, std::move(jsonParser), acceptedCodes, timeoutMs);
+    return client.GetJSON<T>(url, headers, jsonParser, acceptedCodes, timeoutMs);
   }
 }  // namespace OpenShock::HTTP

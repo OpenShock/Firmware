@@ -245,7 +245,7 @@ namespace OpenShock {
   static_assert(GPIO_NUM_MAX < std::numeric_limits<int8_t>::max(), "GPIO_NUM_MAX is too large for int8_t.");
   static_assert(GPIO_NUM_MAX <= 64, "BoardDescriptor::gpioBypassMask holds 64 pins.");
 
-  typedef std::bitset<GPIO_NUM_MAX> GPIOPinSet;
+  using GPIOPinSet = std::bitset<GPIO_NUM_MAX>;
 
   inline GPIOPinSet GetValidGPIOPins()
   {

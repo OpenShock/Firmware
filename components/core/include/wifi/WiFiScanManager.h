@@ -16,12 +16,13 @@ namespace OpenShock::WiFiScanManager {
   bool StartScan();
   bool AbortScan();
 
-  typedef std::function<void(OpenShock::WiFiScanStatus)> StatusChangedHandler;
-  typedef std::function<void(const std::vector<const wifi_ap_record_t*>& networkRecords)> NetworksDiscoveredHandler;
+  // Stored in the registry until unregistered; moved in, never copied.
+  using StatusChangedHandler      = std::move_only_function<void(OpenShock::WiFiScanStatus)>;
+  using NetworksDiscoveredHandler = std::move_only_function<void(const std::vector<const wifi_ap_record_t*>& networkRecords)>;
 
-  uint64_t RegisterStatusChangedHandler(const StatusChangedHandler& handler);
+  uint64_t RegisterStatusChangedHandler(StatusChangedHandler handler);
   void UnregisterStatusChangedHandler(uint64_t id);
 
-  uint64_t RegisterNetworksDiscoveredHandler(const NetworksDiscoveredHandler& handler);
+  uint64_t RegisterNetworksDiscoveredHandler(NetworksDiscoveredHandler handler);
   void UnregisterNetworksDiscoveredHandler(uint64_t id);
 }  // namespace OpenShock::WiFiScanManager

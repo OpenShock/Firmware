@@ -6,6 +6,7 @@ const char* const TAG = "Board";
 #include "OpenShock.h"
 
 #include <cstring>
+#include <span>
 
 using namespace OpenShock;
 
@@ -62,7 +63,7 @@ Board::ParseResult Board::Parse(const uint8_t (&bytes)[OPENSHOCK_BOARD_DESCRIPTO
   if (out.magic != OPENSHOCK_BOARD_DESCRIPTOR_MAGIC) return ParseResult::Absent;
   if (out.length != OPENSHOCK_BOARD_DESCRIPTOR_SIZE) return ParseResult::Invalid;
   if (out.schemaVersion != OPENSHOCK_BOARD_DESCRIPTOR_SCHEMA_VERSION) return ParseResult::Invalid;
-  if (out.crc32 != Checksum::Crc32(bytes, kCrcCoverage)) return ParseResult::Invalid;
+  if (out.crc32 != Checksum::Crc32(std::span<const uint8_t>(bytes).first(kCrcCoverage))) return ParseResult::Invalid;
 
   // Whatever the stamper wrote, the strings are bounded here. A stamped descriptor always
   // names a board and a chip; an empty board name is the placeholder of an unstamped image.

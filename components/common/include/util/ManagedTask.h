@@ -39,7 +39,7 @@ namespace OpenShock {
     ~ManagedTask() { stop(); }
 
     /// @brief Creates the task on `core` (-1 for any core). Returns true if it is already running.
-    bool start(const char* name, uint32_t stackSize, UBaseType_t priority, BaseType_t core, std::function<void()> body)
+    bool start(const char* name, uint32_t stackSize, UBaseType_t priority, BaseType_t core, std::move_only_function<void()> body)
     {
       ScopedLock lock__(&m_handleMutex);
 
@@ -62,7 +62,7 @@ namespace OpenShock {
     }
 
     /// @brief Same as start(), on the core that does expensive work (see TaskUtils::TaskCreateExpensive).
-    bool startExpensive(const char* name, uint32_t stackSize, UBaseType_t priority, std::function<void()> body) { return start(name, stackSize, priority, 1, std::move(body)); }
+    bool startExpensive(const char* name, uint32_t stackSize, UBaseType_t priority, std::move_only_function<void()> body) { return start(name, stackSize, priority, 1, std::move(body)); }
 
     /// @brief Requests a stop, wakes the task with a task notification and waits for it to exit.
     void stop(TickType_t timeout = pdMS_TO_TICKS(1000))
@@ -134,8 +134,8 @@ namespace OpenShock {
 
     const char* m_tag;
     const char* m_description;
-    std::function<void()> m_body;
-    mutable SimpleMutex m_handleMutex;  // Guards m_handle against notify()/running() on other tasks during start()/stop()
+    std::move_only_function<void()> m_body;  // Moved in by start(), never copied
+    mutable SimpleMutex m_handleMutex;       // Guards m_handle against notify()/running() on other tasks during start()/stop()
     TaskHandle_t m_handle = nullptr;
     TaskUtils::TaskExitFlag m_exited {false};
     std::atomic<bool> m_stopRequested {false};

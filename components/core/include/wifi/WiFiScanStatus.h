@@ -5,5 +5,5 @@
 #include <cstdint>
 
 namespace OpenShock {
-  typedef OpenShock::Serialization::Types::WifiScanStatus WiFiScanStatus;
+  using WiFiScanStatus = OpenShock::Serialization::Types::WifiScanStatus;
 }  // namespace OpenShock

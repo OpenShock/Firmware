@@ -84,3 +84,23 @@ runs:
         path: dist
         retention-days: 1
         if-no-files-found: error
+
+    # The symbols for decoding a crash backtrace: stable builds print no assert text (ASSERTIONS_SILENT). Stamping
+    # does not move code, so one ELF covers every board of the variant. ci-build.yml attaches it to the release.
+    - name: Stage ELF
+      shell: bash
+      env:
+        BUILD_DIR: build/firmware
+        OUT: elf/OpenShock_${{ inputs.variant }}_${{ inputs.version }}.elf
+      run: |
+        set -euo pipefail
+        mkdir -p elf
+        cp "$BUILD_DIR/firmware.elf" "$OUT"
+
+    - name: Upload ELF
+      uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9  # v7.0.2
+      with:
+        name: elf_${{ inputs.variant }}
+        path: elf
+        retention-days: 7
+        if-no-files-found: error

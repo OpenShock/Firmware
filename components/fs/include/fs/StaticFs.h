@@ -3,11 +3,11 @@
 #include "fs/LfsPartition.h"
 
 #include "OpenShock.h"
+#include "util/FunctionRef.h"
 
 #include <esp_partition.h>
 
 #include <cstdint>
-#include <functional>
 #include <span>
 
 namespace OpenShock {
@@ -26,7 +26,7 @@ namespace OpenShock {
     bool isMounted() const { return m_fs.isMounted(); }
 
     bool exists(const char* path) { return m_fs.exists(path); }
-    bool readFile(const char* path, const std::function<bool(std::span<const uint8_t>)>& sink) { return m_fs.readStream(path, sink); }
+    bool readFile(const char* path, Util::FunctionRef<bool(std::span<const uint8_t>)> sink) { return m_fs.readStream(path, sink); }
 
   private:
     LfsPartition m_fs;

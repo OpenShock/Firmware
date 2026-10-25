@@ -14,7 +14,6 @@ idf_component_register(
   SRCS          "src/BoardDescriptor.cpp"       # Board::Get() / Parse()
                 "src/BoardDescriptorImage.cpp"  # the placeholder descriptor in .rodata_custom_desc (not in host tests)
                 "src/Convert.cpp"
-                "src/DigitCounter.cpp"
                 "src/RateLimiter.cpp"
                 "src/ReadWriteMutex.cpp"
                 "src/SemVer.cpp"

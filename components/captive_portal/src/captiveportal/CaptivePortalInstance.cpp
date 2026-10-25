@@ -8,7 +8,6 @@ const char* const TAG = "CaptivePortalInstance";
 #include "AppHooks.h"
 #include "BoardDescriptor.h"
 #include "captiveportal/Manager.h"
-#include "Chipset.h"
 #include "CommandHandler.h"
 #include "config/Config.h"
 #include "Convert.h"
@@ -26,15 +25,14 @@ const char* const TAG = "CaptivePortalInstance";
 #include "wifi/WiFiManager.h"
 #include "wifi/WiFiScanManager.h"
 
-#include "serialization/_fbs/HubToLocalMessage_generated.h"
-
 #include "json/Json.h"
 
 #include <atomic>
-#include <cctype>
 #include <cstring>
-#include <functional>
+#include <expected>
+#include <optional>
 #include <string>
+#include <string_view>
 
 const uint16_t HTTP_PORT = 80;
 
@@ -108,95 +106,102 @@ static esp_err_t sendResp(httpd_req_t* req, const char* status, const char* type
   return httpd_resp_send(req, body.data(), body.size());
 }
 
-// Returns false for an encoded NUL ("%00"), which would silently truncate the value at every c_str() use.
-static bool urlDecode(const char* s, std::string& out)
+enum class ParamError {
+  Missing,
+  Invalid,  // present, but not decodable (an encoded NUL) or not a valid value
+};
+
+// Fails with ParamError::Invalid for an encoded NUL ("%00"), which would silently truncate the value at every c_str() use.
+[[nodiscard]] static std::expected<std::string, ParamError> urlDecode(std::string_view s)
 {
-  out.clear();
-  for (size_t i = 0; s[i] != '\0'; ++i) {
+  std::string out;
+  out.reserve(s.size());
+  for (std::size_t i = 0; i < s.size(); ++i) {
     char c = s[i];
-    uint8_t decoded;
     if (c == '+') {
       out += ' ';
-    } else if (c == '%' && s[i + 1] != '\0' && HexUtils::TryParseHexPair(s[i + 1], s[i + 2], decoded)) {
-      if (decoded == 0) {
-        return false;
-      }
-      out += static_cast<char>(decoded);
-      i += 2;
-    } else {
-      out += c;
+      continue;
     }
+    // A '%' without two characters after it is kept as-is.
+    if (c == '%' && i + 2 < s.size()) {
+      if (auto decoded = HexUtils::TryParseHexPair(s[i + 1], s[i + 2])) {
+        if (*decoded == 0) {
+          return std::unexpected(ParamError::Invalid);
+        }
+        out += static_cast<char>(*decoded);
+        i += 2;
+        continue;
+      }
+    }
+    out += c;
   }
-  return true;
+  return out;
 }
 
 // Read and URL-decode a query-string parameter. httpd does not decode for us.
-static bool getQueryParam(httpd_req_t* req, const char* key, std::string& out)
+[[nodiscard]] static std::expected<std::string, ParamError> getQueryParam(httpd_req_t* req, const char* key)
 {
   size_t qlen = httpd_req_get_url_query_len(req);
   if (qlen == 0) {
-    return false;
+    return std::unexpected(ParamError::Missing);
   }
 
   std::string query;
   query.resize(qlen + 1);
   if (httpd_req_get_url_query_str(req, query.data(), query.size()) != ESP_OK) {
-    return false;
+    return std::unexpected(ParamError::Missing);
   }
 
   char val[256];
   if (httpd_query_key_value(query.c_str(), key, val, sizeof(val)) != ESP_OK) {
-    return false;
+    return std::unexpected(ParamError::Missing);
   }
 
-  return urlDecode(val, out);
+  return urlDecode(val);
 }
 
-enum class ParamResult {
-  Ok,
-  Missing,
-  Invalid,
-};
-
 // The web UI sends booleans as "1"/"0"; "true"/"false" are accepted too.
-static bool parseBool(std::string_view str, bool& out)
+[[nodiscard]] static std::optional<bool> parseBool(std::string_view str)
 {
   if (str == "1") {
-    out = true;
     return true;
   }
   if (str == "0") {
-    out = false;
-    return true;
+    return false;
   }
-  return Convert::ToBool(str, out);
+  return Convert::ToBool(str);
 }
 
-static ParamResult getBoolQueryParam(httpd_req_t* req, const char* key, bool& out)
+[[nodiscard]] static std::expected<bool, ParamError> getBoolQueryParam(httpd_req_t* req, const char* key)
 {
-  std::string str;
-  if (!getQueryParam(req, key, str)) {
-    return ParamResult::Missing;
+  auto str = getQueryParam(req, key);
+  if (!str) {
+    return std::unexpected(str.error());
   }
-  return parseBool(str, out) ? ParamResult::Ok : ParamResult::Invalid;
+  auto value = parseBool(*str);
+  if (!value) {
+    return std::unexpected(ParamError::Invalid);
+  }
+  return *value;
 }
 
-static esp_err_t sendParamError(httpd_req_t* req, ParamResult result)
+static esp_err_t sendParamError(httpd_req_t* req, ParamError error)
 {
-  return sendResp(req, S400, HTTP::ContentType::JSON, result == ParamResult::Missing ? JSON_ERR_MISSING_PARAM : JSON_ERR_INVALID_PARAM);
+  return sendResp(req, S400, HTTP::ContentType::JSON, error == ParamError::Missing ? JSON_ERR_MISSING_PARAM : JSON_ERR_INVALID_PARAM);
 }
 
 // Read a urlencoded request body (application/x-www-form-urlencoded).
-static bool recvBody(httpd_req_t* req, std::string& out)
+[[nodiscard]] static std::optional<std::string> recvBody(httpd_req_t* req)
 {
   int total = req->content_len;
   if (total <= 0 || total > 4096) {
-    return false;
+    return std::nullopt;
   }
 
   // A client that announces a body and then stalls must not hold the (single) httpd task forever.
   static constexpr int kMaxRecvTimeouts = 3;
 
+  std::string out;
   out.resize(total);
   int off      = 0;
   int timeouts = 0;
@@ -204,25 +209,25 @@ static bool recvBody(httpd_req_t* req, std::string& out)
     int r = httpd_req_recv(req, out.data() + off, total - off);
     if (r == HTTPD_SOCK_ERR_TIMEOUT) {
       if (++timeouts >= kMaxRecvTimeouts) {
-        return false;
+        return std::nullopt;
       }
       continue;
     }
     if (r <= 0) {
-      return false;
+      return std::nullopt;
     }
     off += r;
   }
-  return true;
+  return out;
 }
 
-static bool getFormParam(const std::string& body, const char* key, std::string& out)
+[[nodiscard]] static std::expected<std::string, ParamError> getFormParam(const std::string& body, const char* key)
 {
   char val[256];
   if (httpd_query_key_value(body.c_str(), key, val, sizeof(val)) != ESP_OK) {
-    return false;
+    return std::unexpected(ParamError::Missing);
   }
-  return urlDecode(val, out);
+  return urlDecode(val);
 }
 
 static const char* contentTypeForPath(const std::string& path)
@@ -262,11 +267,11 @@ static esp_err_t apiPortalClose(httpd_req_t* req)
 
 static esp_err_t apiWifiScan(httpd_req_t* req)
 {
-  bool run = true;
-  if (auto result = getBoolQueryParam(req, "run", run); result == ParamResult::Invalid) {
-    return sendParamError(req, result);
+  auto run = getBoolQueryParam(req, "run");
+  if (!run && run.error() == ParamError::Invalid) {
+    return sendParamError(req, run.error());
   }
-  if (run) {
+  if (run.value_or(true)) {
     WiFiScanManager::StartScan();
   } else {
     WiFiScanManager::AbortScan();
@@ -276,11 +281,11 @@ static esp_err_t apiWifiScan(httpd_req_t* req)
 
 static esp_err_t apiWifiNetworksDelete(httpd_req_t* req)
 {
-  std::string ssid;
-  if (!getQueryParam(req, "ssid", ssid)) {
+  auto ssid = getQueryParam(req, "ssid");
+  if (!ssid) {
     return sendResp(req, S400, HTTP::ContentType::JSON, JSON_ERR_MISSING_SSID);
   }
-  if (!WiFiManager::Forget(ssid.c_str())) {
+  if (!WiFiManager::Forget(ssid->c_str())) {
     return sendResp(req, S500, HTTP::ContentType::JSON, JSON_ERR_INTERNAL);
   }
   return sendResp(req, S200, nullptr, {});
@@ -330,8 +335,8 @@ static esp_err_t apiAccountLink(httpd_req_t* req)
   if (!getAccountLinkRateLimiter().tryRequest()) {
     return sendResp(req, S429, HTTP::ContentType::JSON, JSON_ERR_RATE_LIMITED);
   }
-  std::string code;
-  if (!getQueryParam(req, "code", code)) {
+  auto code = getQueryParam(req, "code");
+  if (!code) {
     return sendResp(req, S400, HTTP::ContentType::JSON, JSON_ERR_CODE_REQUIRED);
   }
 
@@ -345,7 +350,7 @@ static esp_err_t apiAccountLink(httpd_req_t* req)
     return sendResp(req, S500, HTTP::ContentType::JSON, JSON_ERR_INTERNAL);
   }
 
-  auto* job = new AccountLinkJob {asyncReq, std::move(code)};
+  auto* job = new AccountLinkJob {asyncReq, std::move(*code)};
   // TLS needs a large stack
   if (TaskUtils::TaskCreateExpensive(accountLinkTask, "AccountLink", 8192, job, 1, nullptr) != pdPASS) {
     OS_LOGE(TAG, "Failed to create account link task");
@@ -367,14 +372,15 @@ static esp_err_t apiAccountDelete(httpd_req_t* req)
 
 static esp_err_t apiConfigRfPin(httpd_req_t* req)
 {
-  std::string pinStr;
-  if (!getQueryParam(req, "pin", pinStr)) {
+  auto pinStr = getQueryParam(req, "pin");
+  if (!pinStr) {
     return sendResp(req, S400, HTTP::ContentType::JSON, JSON_ERR_INVALID_PIN);
   }
-  gpio_num_t pin;
-  if (!Convert::ToGpioNum(pinStr, pin)) {
+  auto parsedPin = Convert::ToGpioNum(*pinStr);
+  if (!parsedPin) {
     return sendResp(req, S400, HTTP::ContentType::JSON, JSON_ERR_INVALID_PIN);
   }
+  gpio_num_t pin   = *parsedPin;
   auto result      = CommandHandler::SetRfTxPin(pin);
   using ResultCode = OpenShock::SetGPIOResultCode;
   if (result != ResultCode::Success) {
@@ -392,18 +398,26 @@ static esp_err_t apiConfigRfPin(httpd_req_t* req)
 
 static esp_err_t apiWifiNetworksAdd(httpd_req_t* req)
 {
-  std::string body;
-  if (!recvBody(req, body)) {
+  auto body = recvBody(req);
+  if (!body) {
     return sendResp(req, S400, HTTP::ContentType::JSON, JSON_ERR_MISSING_SSID);
   }
 
-  std::string ssid;
-  if (!getFormParam(body, "ssid", ssid) || ssid.empty() || ssid.length() > 32) {
-    return sendResp(req, S400, HTTP::ContentType::JSON, ssid.empty() ? JSON_ERR_MISSING_SSID : JSON_ERR_INVALID_SSID);
+  auto ssid = getFormParam(*body, "ssid");
+  if (!ssid && ssid.error() == ParamError::Invalid) {
+    return sendResp(req, S400, HTTP::ContentType::JSON, JSON_ERR_INVALID_SSID);
+  }
+  if (!ssid || ssid->empty() || ssid->length() > 32) {
+    return sendResp(req, S400, HTTP::ContentType::JSON, !ssid || ssid->empty() ? JSON_ERR_MISSING_SSID : JSON_ERR_INVALID_SSID);
   }
 
-  std::string password;
-  if (getFormParam(body, "password", password) && !password.empty()) {
+  // Missing means an open network; an undecodable one is rejected rather than saved as a different password.
+  auto passwordParam = getFormParam(*body, "password");
+  if (!passwordParam && passwordParam.error() == ParamError::Invalid) {
+    return sendResp(req, S400, HTTP::ContentType::JSON, JSON_ERR_INVALID_PARAM);
+  }
+  std::string password = std::move(passwordParam).value_or(std::string());
+  if (!password.empty()) {
     if (password.length() < 8) {
       return sendResp(req, S400, HTTP::ContentType::JSON, JSON_ERR_PASSWORD_SHORT);
     }
@@ -413,22 +427,24 @@ static esp_err_t apiWifiNetworksAdd(httpd_req_t* req)
   }
 
   bool connect = true;
-  std::string connectStr;
-  if (getFormParam(body, "connect", connectStr) && !parseBool(connectStr, connect)) {
-    return sendResp(req, S400, HTTP::ContentType::JSON, JSON_ERR_INVALID_PARAM);
+  if (auto connectStr = getFormParam(*body, "connect")) {
+    auto parsed = parseBool(*connectStr);
+    if (!parsed) {
+      return sendResp(req, S400, HTTP::ContentType::JSON, JSON_ERR_INVALID_PARAM);
+    }
+    connect = *parsed;
   }
 
   wifi_auth_mode_t authMode = WIFI_AUTH_MAX;
-  std::string securityStr;
-  if (getFormParam(body, "security", securityStr)) {
-    uint8_t sec;
-    if (!Convert::ToUint8(securityStr, sec) || sec > static_cast<uint8_t>(WIFI_AUTH_MAX)) {
+  if (auto securityStr = getFormParam(*body, "security")) {
+    auto sec = Convert::ToUint8(*securityStr);
+    if (!sec || *sec > static_cast<uint8_t>(WIFI_AUTH_MAX)) {
       return sendResp(req, S400, HTTP::ContentType::JSON, JSON_ERR_INVALID_PARAM);
     }
-    authMode = static_cast<wifi_auth_mode_t>(sec);
+    authMode = static_cast<wifi_auth_mode_t>(*sec);
   }
 
-  if (!WiFiManager::Save(ssid.c_str(), std::string_view(password), connect, authMode)) {
+  if (!WiFiManager::Save(ssid->c_str(), std::string_view(password), connect, authMode)) {
     return sendResp(req, S500, HTTP::ContentType::JSON, JSON_ERR_INTERNAL);
   }
   return sendResp(req, S200, nullptr, {});
@@ -436,12 +452,15 @@ static esp_err_t apiWifiNetworksAdd(httpd_req_t* req)
 
 static esp_err_t apiWifiConnect(httpd_req_t* req)
 {
-  std::string body;
-  std::string ssid;
-  if (!recvBody(req, body) || !getFormParam(body, "ssid", ssid)) {
+  auto body = recvBody(req);
+  if (!body) {
     return sendResp(req, S400, HTTP::ContentType::JSON, JSON_ERR_MISSING_SSID);
   }
-  if (!WiFiManager::Connect(ssid.c_str())) {
+  auto ssid = getFormParam(*body, "ssid");
+  if (!ssid) {
+    return sendResp(req, S400, HTTP::ContentType::JSON, JSON_ERR_MISSING_SSID);
+  }
+  if (!WiFiManager::Connect(ssid->c_str())) {
     return sendResp(req, S500, HTTP::ContentType::JSON, JSON_ERR_INTERNAL);
   }
   return sendResp(req, S200, nullptr, {});
@@ -458,26 +477,26 @@ static esp_err_t apiWifiDisconnect(httpd_req_t* req)
 // nothing changed), instead of one handler and one flash write per setting.
 static esp_err_t apiOtaSettings(httpd_req_t* req)
 {
-  Config::OtaUpdateConfig cfg;
-  if (!Config::GetOtaUpdateConfig(cfg)) {
+  auto otaConfig = Config::GetOtaUpdateConfig();
+  if (!otaConfig) {
     return sendResp(req, S500, HTTP::ContentType::JSON, JSON_ERR_INTERNAL);
   }
+  Config::OtaUpdateConfig& cfg = *otaConfig;
 
   bool present = false;
   bool changed = false;
 
   // Applies one optional boolean parameter; returns false (after responding) on an invalid value.
   auto applyBool = [&](const char* key, bool& field, esp_err_t& response) {
-    bool value;
-    ParamResult result = getBoolQueryParam(req, key, value);
-    if (result == ParamResult::Missing) return true;
-    if (result == ParamResult::Invalid) {
-      response = sendParamError(req, result);
+    auto value = getBoolQueryParam(req, key);
+    if (!value) {
+      if (value.error() == ParamError::Missing) return true;
+      response = sendParamError(req, value.error());
       return false;
     }
     present = true;
-    changed |= field != value;
-    field = value;
+    changed |= field != *value;
+    field = *value;
     return true;
   };
 
@@ -486,25 +505,25 @@ static esp_err_t apiOtaSettings(httpd_req_t* req)
     return response;
   }
 
-  if (std::string channelStr; getQueryParam(req, "channel", channelStr)) {
-    OtaUpdateChannel channel;
-    if (!TryParseOtaUpdateChannel(channel, channelStr.c_str())) {
+  if (auto channelStr = getQueryParam(req, "channel")) {
+    auto channel = TryParseOtaUpdateChannel(*channelStr);
+    if (!channel) {
       return sendResp(req, S400, HTTP::ContentType::JSON, JSON_ERR_INVALID_CHANNEL);
     }
     present = true;
-    changed |= cfg.updateChannel != channel;
-    cfg.updateChannel = channel;
+    changed |= cfg.updateChannel != *channel;
+    cfg.updateChannel = *channel;
   }
 
-  if (std::string intervalStr; getQueryParam(req, "interval", intervalStr)) {
+  if (auto intervalStr = getQueryParam(req, "interval")) {
     // Minutes; 0 would make periodic checks fire on every OTA task wake-up
-    uint16_t interval;
-    if (!Convert::ToUint16(intervalStr, interval) || interval == 0) {
+    auto interval = Convert::ToUint16(*intervalStr);
+    if (!interval || *interval == 0) {
       return sendResp(req, S400, HTTP::ContentType::JSON, JSON_ERR_INVALID_PARAM);
     }
     present = true;
-    changed |= cfg.checkInterval != interval;
-    cfg.checkInterval = interval;
+    changed |= cfg.checkInterval != *interval;
+    cfg.checkInterval = *interval;
   }
 
   if (!present) {
@@ -540,9 +559,7 @@ esp_err_t CaptivePortal::CaptivePortalInstance::staticFileHandler(httpd_req_t* r
       req,
       S200,
       HTTP::ContentType::TextPlain,
-      // Raw string literal (1+ to remove the first newline)
-      1 + R"(
-You probably forgot to upload the Filesystem with PlatformIO!
+      R"(You probably forgot to upload the Filesystem with PlatformIO!
 Go to PlatformIO -> Platform -> Upload Filesystem Image!
 If this happened with a file we provided or you just need help, come to the Discord!
 

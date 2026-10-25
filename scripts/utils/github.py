@@ -59,3 +59,12 @@ def build_mode() -> tuple[str, int]:
     if channel == 'stable' or is_tag():
         return 'release', 3
     return 'debug', 5
+
+
+def build_optimization() -> str:
+    """'size' (-Os) for CI builds of the stable channel, else 'debug' (-Og, ESP-IDF's default).
+
+    Develop and beta stay at -Og so their backtraces and JTAG sessions keep every variable and line. A pull
+    request into master builds as stable, so the optimized compile is checked before it is released.
+    """
+    return 'size' if is_ci() and build_channel() == 'stable' else 'debug'

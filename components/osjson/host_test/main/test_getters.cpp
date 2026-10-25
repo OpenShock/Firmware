@@ -5,6 +5,7 @@
 
 #include <cmath>
 #include <cstdint>
+#include <optional>
 #include <string>
 #include <string_view>
 
@@ -19,26 +20,26 @@ TEST_CASE("tryGetStr: strings succeed, non-strings fail", "[osjson][getters]")
   TEST_ASSERT_TRUE(doc.parse(json));
   JSON::JsonView root = doc.root();
 
-  std::string sv;
-  TEST_ASSERT_TRUE(root["s"].tryGetStr(sv));
-  TEST_ASSERT_TRUE(sv == "hi");
+  auto sv = root["s"].tryGetStr();
+  TEST_ASSERT_TRUE(sv.has_value());
+  TEST_ASSERT_TRUE(*sv == "hi");
 
-  TEST_ASSERT_FALSE(root["n"].tryGetStr(sv));
-  TEST_ASSERT_FALSE(root["b"].tryGetStr(sv));
-  TEST_ASSERT_FALSE(root["z"].tryGetStr(sv));
-  TEST_ASSERT_FALSE(root["o"].tryGetStr(sv));
-  TEST_ASSERT_FALSE(root["a"].tryGetStr(sv));
-  TEST_ASSERT_FALSE(root["missing"].tryGetStr(sv));
+  TEST_ASSERT_FALSE(root["n"].tryGetStr().has_value());
+  TEST_ASSERT_FALSE(root["b"].tryGetStr().has_value());
+  TEST_ASSERT_FALSE(root["z"].tryGetStr().has_value());
+  TEST_ASSERT_FALSE(root["o"].tryGetStr().has_value());
+  TEST_ASSERT_FALSE(root["a"].tryGetStr().has_value());
+  TEST_ASSERT_FALSE(root["missing"].tryGetStr().has_value());
 }
 
 TEST_CASE("tryGetStr: empty string value", "[osjson][getters]")
 {
   JSON::JsonDocument doc;
   TEST_ASSERT_TRUE(doc.parse(R"({"s":""})"));
-  std::string sv = "stale";
-  TEST_ASSERT_TRUE(doc.root()["s"].tryGetStr(sv));
-  TEST_ASSERT_EQUAL_size_t(0, sv.size());
-  TEST_ASSERT_TRUE(sv.empty());
+  auto sv = doc.root()["s"].tryGetStr();
+  TEST_ASSERT_TRUE(sv.has_value());
+  TEST_ASSERT_EQUAL_size_t(0, sv->size());
+  TEST_ASSERT_TRUE(sv->empty());
 }
 
 TEST_CASE("tryGetStr: escape sequences are decoded, raw() keeps them", "[osjson][getters][unescape]")
@@ -46,10 +47,10 @@ TEST_CASE("tryGetStr: escape sequences are decoded, raw() keeps them", "[osjson]
   static const char json[] = R"({"s":"a\nb\"c"})";
   JSON::JsonDocument doc;
   TEST_ASSERT_TRUE(doc.parse(json));
-  std::string s;
-  TEST_ASSERT_TRUE(doc.root()["s"].tryGetStr(s));
-  TEST_ASSERT_TRUE(s == "a\nb\"c");                         // a real newline and quote
-  TEST_ASSERT_EQUAL_size_t(5, s.size());
+  auto s = doc.root()["s"].tryGetStr();
+  TEST_ASSERT_TRUE(s.has_value());
+  TEST_ASSERT_TRUE(*s == "a\nb\"c");                        // a real newline and quote
+  TEST_ASSERT_EQUAL_size_t(5, s->size());
   TEST_ASSERT_TRUE(doc.root()["s"].raw() == R"(a\nb\"c)");  // the token text, untouched
 }
 
@@ -57,9 +58,9 @@ TEST_CASE("tryGetStr: every two-character escape", "[osjson][getters][unescape]"
 {
   JSON::JsonDocument doc;
   TEST_ASSERT_TRUE(doc.parse(R"({"s":"\"\\\/\b\f\n\r\t"})"));
-  std::string s;
-  TEST_ASSERT_TRUE(doc.root()["s"].tryGetStr(s));
-  TEST_ASSERT_TRUE(s == "\"\\/\b\f\n\r\t");
+  auto s = doc.root()["s"].tryGetStr();
+  TEST_ASSERT_TRUE(s.has_value());
+  TEST_ASSERT_TRUE(*s == "\"\\/\b\f\n\r\t");
 }
 
 TEST_CASE("tryGetStr: \\u escapes decode to UTF-8", "[osjson][getters][unescape]")
@@ -86,9 +87,9 @@ TEST_CASE("tryGetStr: \\u escapes decode to UTF-8", "[osjson][getters][unescape]
   for (const Case& c : cases) {
     JSON::JsonDocument doc;
     TEST_ASSERT_TRUE_MESSAGE(doc.parse(c.json), c.json);
-    std::string s;
-    TEST_ASSERT_TRUE_MESSAGE(doc.root()["s"].tryGetStr(s), c.json);
-    TEST_ASSERT_TRUE_MESSAGE(s == c.expected, c.json);
+    auto s = doc.root()["s"].tryGetStr();
+    TEST_ASSERT_TRUE_MESSAGE(s.has_value(), c.json);
+    TEST_ASSERT_TRUE_MESSAGE(*s == c.expected, c.json);
   }
 }
 
@@ -96,10 +97,10 @@ TEST_CASE("tryGetStr: \\u0000 decodes to an embedded NUL", "[osjson][getters][un
 {
   JSON::JsonDocument doc;
   TEST_ASSERT_TRUE(doc.parse(R"({"s":"a\u0000b"})"));
-  std::string s;
-  TEST_ASSERT_TRUE(doc.root()["s"].tryGetStr(s));
-  TEST_ASSERT_EQUAL_size_t(3, s.size());
-  TEST_ASSERT_TRUE(s == std::string("a\0b", 3));
+  auto s = doc.root()["s"].tryGetStr();
+  TEST_ASSERT_TRUE(s.has_value());
+  TEST_ASSERT_EQUAL_size_t(3, s->size());
+  TEST_ASSERT_TRUE(*s == std::string("a\0b", 3));
 }
 
 TEST_CASE("tryGetStr: unpaired surrogates decode to U+FFFD", "[osjson][getters][unescape]")
@@ -121,13 +122,13 @@ TEST_CASE("tryGetStr: unpaired surrogates decode to U+FFFD", "[osjson][getters][
   for (const Case& c : cases) {
     JSON::JsonDocument doc;
     TEST_ASSERT_TRUE_MESSAGE(doc.parse(c.json), c.json);
-    std::string s;
-    TEST_ASSERT_TRUE_MESSAGE(doc.root()["s"].tryGetStr(s), c.json);
-    TEST_ASSERT_TRUE_MESSAGE(s == c.expected, c.json);
+    auto s = doc.root()["s"].tryGetStr();
+    TEST_ASSERT_TRUE_MESSAGE(s.has_value(), c.json);
+    TEST_ASSERT_TRUE_MESSAGE(*s == c.expected, c.json);
   }
 }
 
-TEST_CASE("tryGetStr: malformed escapes fail and leave the output untouched", "[osjson][getters][unescape]")
+TEST_CASE("tryGetStr: malformed escapes fail", "[osjson][getters][unescape]")
 {
   // jsmn's default (non-strict) mode may tokenize these; the decoder must reject them.
   const char* inputs[] = {
@@ -141,9 +142,7 @@ TEST_CASE("tryGetStr: malformed escapes fail and leave the output untouched", "[
     if (!doc.parse(input)) {
       continue;  // already rejected by the tokenizer, which is fine too
     }
-    std::string s = "unchanged";
-    TEST_ASSERT_FALSE_MESSAGE(doc.root()["s"].tryGetStr(s), input);
-    TEST_ASSERT_TRUE_MESSAGE(s == "unchanged", input);
+    TEST_ASSERT_FALSE_MESSAGE(doc.root()["s"].tryGetStr().has_value(), input);
   }
 }
 
@@ -151,12 +150,12 @@ TEST_CASE("operator[]: keys written with escapes still match", "[osjson][getters
 {
   JSON::JsonDocument doc;
   TEST_ASSERT_TRUE(doc.parse(R"({"\u0069d":7,"a\"b":"q"})"));
-  int64_t id = 0;
-  TEST_ASSERT_TRUE(doc.root()["id"].tryGetI64(id));
-  TEST_ASSERT_EQUAL_INT64(7, id);
-  std::string s;
-  TEST_ASSERT_TRUE(doc.root()["a\"b"].tryGetStr(s));
-  TEST_ASSERT_TRUE(s == "q");
+  auto id = doc.root()["id"].tryGetI64();
+  TEST_ASSERT_TRUE(id.has_value());
+  TEST_ASSERT_EQUAL_INT64(7, *id);
+  auto s = doc.root()["a\"b"].tryGetStr();
+  TEST_ASSERT_TRUE(s.has_value());
+  TEST_ASSERT_TRUE(*s == "q");
 }
 
 TEST_CASE("generate -> parse round trip restores every byte value", "[osjson][getters][unescape]")
@@ -175,10 +174,10 @@ TEST_CASE("generate -> parse round trip restores every byte value", "[osjson][ge
 
   JSON::JsonDocument doc;
   TEST_ASSERT_TRUE(doc.parse(out));
-  std::string back;
-  TEST_ASSERT_TRUE(doc.root()["k"].tryGetStr(back));
-  TEST_ASSERT_EQUAL_size_t(value.size(), back.size());
-  TEST_ASSERT_TRUE(back == value);
+  auto back = doc.root()["k"].tryGetStr();
+  TEST_ASSERT_TRUE(back.has_value());
+  TEST_ASSERT_EQUAL_size_t(value.size(), back->size());
+  TEST_ASSERT_TRUE(*back == value);
 }
 
 // ---- tryGetBool ------------------------------------------------------------
@@ -190,16 +189,17 @@ TEST_CASE("tryGetBool: true/false succeed, everything else fails", "[osjson][get
   TEST_ASSERT_TRUE(doc.parse(json));
   JSON::JsonView root = doc.root();
 
-  bool b = false;
-  TEST_ASSERT_TRUE(root["t"].tryGetBool(b));
-  TEST_ASSERT_TRUE(b);
-  TEST_ASSERT_TRUE(root["f"].tryGetBool(b));
-  TEST_ASSERT_FALSE(b);
+  auto b = root["t"].tryGetBool();
+  TEST_ASSERT_TRUE(b.has_value());
+  TEST_ASSERT_TRUE(*b);
+  b = root["f"].tryGetBool();
+  TEST_ASSERT_TRUE(b.has_value());
+  TEST_ASSERT_FALSE(*b);
 
-  TEST_ASSERT_FALSE(root["n"].tryGetBool(b));  // number
-  TEST_ASSERT_FALSE(root["s"].tryGetBool(b));  // the STRING "true"
-  TEST_ASSERT_FALSE(root["z"].tryGetBool(b));  // null
-  TEST_ASSERT_FALSE(root["missing"].tryGetBool(b));
+  TEST_ASSERT_FALSE(root["n"].tryGetBool().has_value());  // number
+  TEST_ASSERT_FALSE(root["s"].tryGetBool().has_value());  // the STRING "true"
+  TEST_ASSERT_FALSE(root["z"].tryGetBool().has_value());  // null
+  TEST_ASSERT_FALSE(root["missing"].tryGetBool().has_value());
 }
 
 // ---- tryGetI64 -------------------------------------------------------------
@@ -212,19 +212,24 @@ TEST_CASE("tryGetI64: valid integers including boundaries", "[osjson][getters]")
   TEST_ASSERT_TRUE(doc.parse(json));
   JSON::JsonView root = doc.root();
 
-  int64_t v = 0;
-  TEST_ASSERT_TRUE(root["zero"].tryGetI64(v));
-  TEST_ASSERT_EQUAL_INT64(0, v);
-  TEST_ASSERT_TRUE(root["pos"].tryGetI64(v));
-  TEST_ASSERT_EQUAL_INT64(123, v);
-  TEST_ASSERT_TRUE(root["neg"].tryGetI64(v));
-  TEST_ASSERT_EQUAL_INT64(-123, v);
-  TEST_ASSERT_TRUE(root["i32over"].tryGetI64(v));
-  TEST_ASSERT_EQUAL_INT64(2147483648LL, v);
-  TEST_ASSERT_TRUE(root["max"].tryGetI64(v));
-  TEST_ASSERT_EQUAL_INT64(INT64_MAX, v);
-  TEST_ASSERT_TRUE(root["min"].tryGetI64(v));
-  TEST_ASSERT_EQUAL_INT64(INT64_MIN, v);
+  std::optional<int64_t> v = root["zero"].tryGetI64();
+  TEST_ASSERT_TRUE(v.has_value());
+  TEST_ASSERT_EQUAL_INT64(0, *v);
+  v = root["pos"].tryGetI64();
+  TEST_ASSERT_TRUE(v.has_value());
+  TEST_ASSERT_EQUAL_INT64(123, *v);
+  v = root["neg"].tryGetI64();
+  TEST_ASSERT_TRUE(v.has_value());
+  TEST_ASSERT_EQUAL_INT64(-123, *v);
+  v = root["i32over"].tryGetI64();
+  TEST_ASSERT_TRUE(v.has_value());
+  TEST_ASSERT_EQUAL_INT64(2147483648LL, *v);
+  v = root["max"].tryGetI64();
+  TEST_ASSERT_TRUE(v.has_value());
+  TEST_ASSERT_EQUAL_INT64(INT64_MAX, *v);
+  v = root["min"].tryGetI64();
+  TEST_ASSERT_TRUE(v.has_value());
+  TEST_ASSERT_EQUAL_INT64(INT64_MIN, *v);
 }
 
 TEST_CASE("tryGetI64: rejects non-integers and partial parses", "[osjson][getters]")
@@ -237,17 +242,16 @@ TEST_CASE("tryGetI64: rejects non-integers and partial parses", "[osjson][getter
   TEST_ASSERT_TRUE(doc.parse(json));
   JSON::JsonView root = doc.root();
 
-  int64_t v = 0;
-  TEST_ASSERT_FALSE(root["flt"].tryGetI64(v));   // 1.5 -> '.' is not a digit
-  TEST_ASSERT_FALSE(root["over"].tryGetI64(v));  // overflows int64
-  TEST_ASSERT_FALSE(root["exp"].tryGetI64(v));   // string, not a number
-  TEST_ASSERT_FALSE(root["plus"].tryGetI64(v));
-  TEST_ASSERT_FALSE(root["hex"].tryGetI64(v));
-  TEST_ASSERT_FALSE(root["word"].tryGetI64(v));
-  TEST_ASSERT_FALSE(root["s"].tryGetI64(v));
-  TEST_ASSERT_FALSE(root["b"].tryGetI64(v));
-  TEST_ASSERT_FALSE(root["z"].tryGetI64(v));
-  TEST_ASSERT_FALSE(root["missing"].tryGetI64(v));
+  TEST_ASSERT_FALSE(root["flt"].tryGetI64().has_value());   // 1.5 -> '.' is not a digit
+  TEST_ASSERT_FALSE(root["over"].tryGetI64().has_value());  // overflows int64
+  TEST_ASSERT_FALSE(root["exp"].tryGetI64().has_value());   // string, not a number
+  TEST_ASSERT_FALSE(root["plus"].tryGetI64().has_value());
+  TEST_ASSERT_FALSE(root["hex"].tryGetI64().has_value());
+  TEST_ASSERT_FALSE(root["word"].tryGetI64().has_value());
+  TEST_ASSERT_FALSE(root["s"].tryGetI64().has_value());
+  TEST_ASSERT_FALSE(root["b"].tryGetI64().has_value());
+  TEST_ASSERT_FALSE(root["z"].tryGetI64().has_value());
+  TEST_ASSERT_FALSE(root["missing"].tryGetI64().has_value());
 }
 
 // ---- tryGetDouble ----------------------------------------------------------
@@ -264,19 +268,24 @@ TEST_CASE("tryGetDouble: accepts ints, decimals and exponents", "[osjson][getter
   TEST_ASSERT_TRUE(doc.parse(json));
   JSON::JsonView root = doc.root();
 
-  double d = 0;
-  TEST_ASSERT_TRUE(root["i"].tryGetDouble(d));
-  TEST_ASSERT_TRUE(nearly(42.0, d));
-  TEST_ASSERT_TRUE(root["d"].tryGetDouble(d));
-  TEST_ASSERT_TRUE(nearly(3.14, d));
-  TEST_ASSERT_TRUE(root["neg"].tryGetDouble(d));
-  TEST_ASSERT_TRUE(nearly(-2.5, d));
-  TEST_ASSERT_TRUE(root["e"].tryGetDouble(d));
-  TEST_ASSERT_TRUE(nearly(1000.0, d));
-  TEST_ASSERT_TRUE(root["eneg"].tryGetDouble(d));
-  TEST_ASSERT_TRUE(nearly(0.015, d));
-  TEST_ASSERT_TRUE(root["zero"].tryGetDouble(d));
-  TEST_ASSERT_TRUE(nearly(0.0, d));
+  std::optional<double> d = root["i"].tryGetDouble();
+  TEST_ASSERT_TRUE(d.has_value());
+  TEST_ASSERT_TRUE(nearly(42.0, *d));
+  d = root["d"].tryGetDouble();
+  TEST_ASSERT_TRUE(d.has_value());
+  TEST_ASSERT_TRUE(nearly(3.14, *d));
+  d = root["neg"].tryGetDouble();
+  TEST_ASSERT_TRUE(d.has_value());
+  TEST_ASSERT_TRUE(nearly(-2.5, *d));
+  d = root["e"].tryGetDouble();
+  TEST_ASSERT_TRUE(d.has_value());
+  TEST_ASSERT_TRUE(nearly(1000.0, *d));
+  d = root["eneg"].tryGetDouble();
+  TEST_ASSERT_TRUE(d.has_value());
+  TEST_ASSERT_TRUE(nearly(0.015, *d));
+  d = root["zero"].tryGetDouble();
+  TEST_ASSERT_TRUE(d.has_value());
+  TEST_ASSERT_TRUE(nearly(0.0, *d));
 }
 
 TEST_CASE("tryGetDouble: rejects non-numbers", "[osjson][getters]")
@@ -286,13 +295,12 @@ TEST_CASE("tryGetDouble: rejects non-numbers", "[osjson][getters]")
   TEST_ASSERT_TRUE(doc.parse(json));
   JSON::JsonView root = doc.root();
 
-  double d = 0;
-  TEST_ASSERT_FALSE(root["s"].tryGetDouble(d));
-  TEST_ASSERT_FALSE(root["b"].tryGetDouble(d));
-  TEST_ASSERT_FALSE(root["z"].tryGetDouble(d));
-  TEST_ASSERT_FALSE(root["o"].tryGetDouble(d));
-  TEST_ASSERT_FALSE(root["a"].tryGetDouble(d));
-  TEST_ASSERT_FALSE(root["missing"].tryGetDouble(d));
+  TEST_ASSERT_FALSE(root["s"].tryGetDouble().has_value());
+  TEST_ASSERT_FALSE(root["b"].tryGetDouble().has_value());
+  TEST_ASSERT_FALSE(root["z"].tryGetDouble().has_value());
+  TEST_ASSERT_FALSE(root["o"].tryGetDouble().has_value());
+  TEST_ASSERT_FALSE(root["a"].tryGetDouble().has_value());
+  TEST_ASSERT_FALSE(root["missing"].tryGetDouble().has_value());
 }
 
 TEST_CASE("tryGetDouble: number at/over the 64-byte stack-copy limit", "[osjson][getters]")
@@ -306,9 +314,8 @@ TEST_CASE("tryGetDouble: number at/over the 64-byte stack-copy limit", "[osjson]
   TEST_ASSERT_TRUE(doc.parse(json));
   JSON::JsonView root = doc.root();
 
-  double d = 0;
-  TEST_ASSERT_TRUE(root["a"].tryGetDouble(d));   // fits
-  TEST_ASSERT_FALSE(root["b"].tryGetDouble(d));  // too long -> rejected, not truncated
+  TEST_ASSERT_TRUE(root["a"].tryGetDouble().has_value());   // fits
+  TEST_ASSERT_FALSE(root["b"].tryGetDouble().has_value());  // too long -> rejected, not truncated
 }
 
 // ---- type predicates -------------------------------------------------------
@@ -355,12 +362,8 @@ TEST_CASE("predicates: an invalid/default view answers false everywhere", "[osjs
   TEST_ASSERT_FALSE(v["k"].valid());
   TEST_ASSERT_TRUE(v.raw().empty());
 
-  std::string sv;
-  int64_t i;
-  double d;
-  bool b;
-  TEST_ASSERT_FALSE(v.tryGetStr(sv));
-  TEST_ASSERT_FALSE(v.tryGetI64(i));
-  TEST_ASSERT_FALSE(v.tryGetDouble(d));
-  TEST_ASSERT_FALSE(v.tryGetBool(b));
+  TEST_ASSERT_FALSE(v.tryGetStr().has_value());
+  TEST_ASSERT_FALSE(v.tryGetI64().has_value());
+  TEST_ASSERT_FALSE(v.tryGetDouble().has_value());
+  TEST_ASSERT_FALSE(v.tryGetBool().has_value());
 }

@@ -21,6 +21,7 @@ const char* const TAG = "GatewayConnectionManager";
 #include <atomic>
 #include <memory>
 #include <unordered_map>
+#include <utility>
 #include <vector>
 
 const char* const AUTH_TOKEN_FILE = "/authToken";
@@ -135,7 +136,7 @@ AccountLinkResultCode GatewayConnectionManager::Link(std::string_view linkCode)
   }
 
   if (response.result != HTTP::RequestResult::Success) {
-    OS_LOGE(TAG, "Account link request failed: %s (result=%hhu, http=%d)", response.ResultToString(), static_cast<uint8_t>(response.result), response.code);
+    OS_LOGE(TAG, "Account link request failed: %s (result=%hhu, http=%d)", response.ResultToString(), std::to_underlying(response.result), response.code);
 
     switch (response.result) {
       case HTTP::RequestResult::RateLimited:
@@ -264,7 +265,7 @@ static bool FetchHubInfo(std::string authToken)
   OS_LOGI(TAG, "Hub Name: %s", response.data.hubName.c_str());
   OS_LOGI(TAG, "Shockers:");
   for (auto& shocker : response.data.shockers) {
-    OS_LOGI(TAG, "  [%s] rf=%u model=%u", shocker.id.c_str(), shocker.rfId, static_cast<unsigned>(shocker.model));
+    OS_LOGI(TAG, "  [%s] rf=%u model=%u", shocker.id.c_str(), shocker.rfId, std::to_underlying(shocker.model));
   }
 
   return true;
@@ -293,13 +294,13 @@ static bool StartConnectingToLCG()
     return false;
   }
 
-  std::string authToken;
-  if (!Config::GetBackendAuthToken(authToken)) {
+  auto authToken = Config::GetBackendAuthToken();
+  if (!authToken) {
     OS_LOGE(TAG, "Failed to get auth token");
     return false;
   }
 
-  auto response = HTTP::JsonAPI::AssignLcg(std::move(authToken));
+  auto response = HTTP::JsonAPI::AssignLcg(*authToken);
 
   if (response.code == 401) {
     OS_LOGD(TAG, "Auth token is invalid, waiting 5 minutes before retrying");
@@ -340,13 +341,13 @@ static void InitializeClient()
     return;  // Checked here so an auth hold-off doesn't also count as a hub info failure and stack the two backoffs
   }
 
-  std::string authToken;
-  if (!Config::GetBackendAuthToken(authToken)) {
+  auto authToken = Config::GetBackendAuthToken();
+  if (!authToken) {
     OS_LOGE(TAG, "Failed to get auth token");
     return;
   }
 
-  if (!FetchHubInfo(authToken)) {
+  if (!FetchHubInfo(*authToken)) {
     // Back off on failure so an unreachable backend isn't polled on every update tick.
     s_hubInfoBackoff.backOff(OpenShock::millis());
     return;
@@ -354,8 +355,8 @@ static void InitializeClient()
   s_hubInfoBackoff.reset();
 
   // The token may have been cleared or replaced (UnLink / Link) while the request was in flight.
-  std::string currentToken;
-  if (!Config::GetBackendAuthToken(currentToken) || currentToken != authToken) {
+  auto currentToken = Config::GetBackendAuthToken();
+  if (!currentToken || *currentToken != *authToken) {
     OS_LOGD(TAG, "Auth token changed while verifying it, discarding result");
     return;
   }
@@ -365,7 +366,7 @@ static void InitializeClient()
 
   Serialization::Local::SerializeAccountLinkStatusEvent(true, AppHooks::CaptivePortalBroadcastMessageBIN);
 
-  CreateClient(authToken);
+  CreateClient(*authToken);
 }
 
 void GatewayConnectionManager::Update()

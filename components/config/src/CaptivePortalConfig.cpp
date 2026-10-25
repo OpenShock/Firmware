@@ -53,7 +53,7 @@ bool CaptivePortalConfig::FromJSON(JSON::JsonView json)
     return false;
   }
 
-  if (!json["alwaysEnabled"].tryGetBool(alwaysEnabled)) alwaysEnabled = false;
+  alwaysEnabled = json["alwaysEnabled"].tryGetBool().value_or(false);
 
   return true;
 }
