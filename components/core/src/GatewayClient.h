@@ -48,7 +48,7 @@ namespace OpenShock {
     void _destroyHandle();
 
     std::string m_headers;
-    SimpleMutex m_handleMutex;  // Held across sends so the handle can't be destroyed mid-send
+    SimpleMutex m_handleMutex;                // Held across sends so the handle can't be destroyed mid-send
     esp_websocket_client_handle_t m_client;   // Guarded by m_handleMutex
     std::atomic<GatewayClientState> m_state;  // Written from both the owning task and the websocket task
     std::atomic<int64_t> m_lastPingTimestamp;
