@@ -48,19 +48,24 @@ static std::shared_ptr<OpenShock::GatewayClient> s_wsClient = nullptr;
 // task (where stopping the client from inside its own task is not allowed).
 static OpenShock::RetiredList<OpenShock::GatewayClient> s_retiredClients;
 
+// Bumped under s_clientMutex whenever the client is torn down (token change, unlink, WiFi loss). A token verification
+// that started under an older generation is stale and must not create a client or mark the hub linked.
+static uint32_t s_clientGeneration = 0;
+
 static std::shared_ptr<OpenShock::GatewayClient> GetClient()
 {
   OpenShock::ScopedLock lock__(&s_clientMutex);
   return s_wsClient;
 }
-static void CreateClient(const std::string& authToken)
+static uint32_t GetClientGeneration()
 {
   OpenShock::ScopedLock lock__(&s_clientMutex);
-  s_wsClient = std::make_shared<OpenShock::GatewayClient>(authToken);
+  return s_clientGeneration;
 }
 static void DestroyClient()
 {
   OpenShock::ScopedLock lock__(&s_clientMutex);
+  ++s_clientGeneration;
   if (s_wsClient != nullptr) {
     s_wsClient->retire();
     s_retiredClients.retire(std::move(s_wsClient));  // Leaves s_wsClient null
@@ -184,9 +189,10 @@ AccountLinkResultCode GatewayConnectionManager::Link(std::string_view linkCode)
 }
 void GatewayConnectionManager::UnLink()
 {
+  // Token first: a verification still in flight then either sees it gone or is invalidated by DestroyClient
+  Config::ClearBackendAuthToken();
   s_flags.fetch_and(static_cast<uint8_t>(~FLAG_LINKED), std::memory_order_relaxed);
   DestroyClient();
-  Config::ClearBackendAuthToken();
 }
 bool GatewayConnectionManager::SetAuthToken(std::string authToken)
 {
@@ -333,6 +339,7 @@ static bool StartConnectingToLCG()
 static void InitializeClient()
 {
   DestroyClient();
+  uint32_t generation = GetClientGeneration();
 
   // No client; check prerequisites
   if ((s_flags.load(std::memory_order_relaxed) & FLAG_HAS_IP) == 0 || !Config::HasBackendAuthToken()) {
@@ -357,19 +364,22 @@ static void InitializeClient()
   }
   s_hubInfoBackoff.reset();
 
-  // The token may have been cleared or replaced (UnLink / Link) while the request was in flight.
-  auto currentToken = Config::GetBackendAuthToken();
-  if (!currentToken || *currentToken != *authToken) {
-    OS_LOGD(TAG, "Auth token changed while verifying it, discarding result");
-    return;
-  }
+  {
+    // The token may have been cleared or replaced (UnLink / Link / SetAuthToken) while the request was in flight.
+    // Those tear the client down, bumping the generation, so checking it under the same lock as creating the client
+    // leaves no window for them.
+    ScopedLock lock__(&s_clientMutex);
+    if (s_clientGeneration != generation) {
+      OS_LOGD(TAG, "Auth token changed while verifying it, discarding result");
+      return;
+    }
 
-  s_flags.fetch_or(FLAG_LINKED, std::memory_order_relaxed);
+    s_flags.fetch_or(FLAG_LINKED, std::memory_order_relaxed);
+    s_wsClient = std::make_shared<OpenShock::GatewayClient>(*authToken);
+  }
   OS_LOGD(TAG, "Successfully verified auth token");
 
   Serialization::Local::SerializeAccountLinkStatusEvent(true, AppHooks::CaptivePortalBroadcastMessageBIN);
-
-  CreateClient(*authToken);
 }
 
 // The WiFi state events are edges posted to the default loop with a short timeout, so one can be dropped when its
