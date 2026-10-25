@@ -193,10 +193,11 @@ AccountLinkResultCode GatewayConnectionManager::Link(std::string_view linkCode)
 }
 void GatewayConnectionManager::UnLink()
 {
-  // Token first: a verification still in flight then either sees it gone or is invalidated by DestroyClient
+  // Token first: a verification still in flight then either sees it gone or is invalidated by DestroyClient. The flag
+  // last: a verification that passed its generation check before DestroyClient may already have set it.
   Config::ClearBackendAuthToken();
-  s_flags.fetch_and(static_cast<uint8_t>(~FLAG_LINKED), std::memory_order_relaxed);
   DestroyClient();
+  s_flags.fetch_and(static_cast<uint8_t>(~FLAG_LINKED), std::memory_order_relaxed);
 }
 bool GatewayConnectionManager::SetAuthToken(std::string authToken)
 {

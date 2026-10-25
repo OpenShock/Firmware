@@ -314,6 +314,11 @@ HTTP::Response<std::size_t>
     esp_http_client_set_timeout_ms(m_handle, static_cast<int>(remaining));
 
     read = esp_http_client_read(m_handle, reinterpret_cast<char*>(buffer), static_cast<int>(HTTP_BUFFER_SIZE));
+    if (read == -ESP_ERR_HTTP_EAGAIN) {
+      OS_LOGW(TAG, "Request timed out");  // The remaining budget ran out inside the read
+      result = HTTP::RequestResult::TimedOut;
+      break;
+    }
     if (read <= 0) {
       break;
     }

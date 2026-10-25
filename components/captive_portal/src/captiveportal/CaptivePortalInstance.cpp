@@ -39,6 +39,7 @@ const uint16_t HTTP_PORT = 80;
 // "idle" looking) WebSocket. Needs CONFIG_LWIP_MAX_SOCKETS >= this + 3 (+ DNS/HTTP client). Also sizes the broadcast
 // fd list, which must hold every open socket.
 const size_t HTTP_MAX_OPEN_SOCKETS = 8;
+static_assert(CONFIG_LWIP_MAX_SOCKETS >= HTTP_MAX_OPEN_SOCKETS + 3, "httpd needs 3 lwIP sockets besides its client sockets");
 
 // Largest inbound WebSocket message we'll accept (local FlatBuffer commands are tiny).
 // Nothing larger is accepted by the local message handler, so don't buffer more than that.

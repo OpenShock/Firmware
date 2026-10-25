@@ -135,12 +135,15 @@ static int driverWrite(const uint8_t* data, std::size_t len)
   }
 
   // The driver queues each call into its TX ring buffer as a single item and rejects
-  // anything larger than the buffer outright, so feed it buffer-sized chunks.
+  // anything larger than the buffer outright, so feed it buffer-sized chunks. The timeout covers the whole write, not
+  // each chunk, so a slowly drained long message can't hold s_writeMutex for longer than that.
   TickType_t timeout = s_usbHostStalled.load(std::memory_order_relaxed) ? 0 : k_usbWriteTimeout;
+  TickType_t started = xTaskGetTickCount();
   std::size_t sent   = 0;
   while (sent < len) {
-    std::size_t chunk = std::min(len - sent, static_cast<std::size_t>(k_usjTxBufferSize));
-    int n             = usb_serial_jtag_write_bytes(data + sent, chunk, timeout);
+    TickType_t elapsed = xTaskGetTickCount() - started;  // Unsigned: wrap-safe
+    std::size_t chunk  = std::min(len - sent, static_cast<std::size_t>(k_usjTxBufferSize));
+    int n              = usb_serial_jtag_write_bytes(data + sent, chunk, elapsed < timeout ? timeout - elapsed : 0);
     if (n <= 0) {
       s_usbHostStalled.store(true, std::memory_order_relaxed);
       break;

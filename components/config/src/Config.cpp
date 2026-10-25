@@ -273,7 +273,6 @@ void Config::FactoryReset()
 
   OpenShock::Config::RootConfig defaults;
   defaults.ToDefault();
-  commitConfig(OpenShock::Config::RootConfig(defaults));
 
   if (!_configFs.remove(CONFIG_FILE_PATH) && _configFs.exists(CONFIG_FILE_PATH)) {
     OS_PANIC(TAG, "Failed to remove existing config file for factory reset. Reccomend formatting microcontroller and re-flashing firmware");
@@ -282,6 +281,9 @@ void Config::FactoryReset()
   if (!trySaveConfig(defaults)) {
     OS_PANIC(TAG, "Failed to save default config. Recommend formatting microcontroller and re-flashing firmware");
   }
+
+  // Published only once persisted, like every other write
+  commitConfig(std::move(defaults));
 
   OS_LOGI(TAG, "Factory reset complete");
 }

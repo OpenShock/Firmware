@@ -310,9 +310,11 @@ static void writeSequences(rmt_channel_handle_t channel, rmt_encoder_handle_t en
       continue;
     }
 
-    // Send the termination sequence to stop the shocker
-    transmitSymbols(channel, encoder, seq->terminator(), seq->size(), failures);
-    seq->markTerminatorSent();
+    // Send the termination sequence to stop the shocker. Only a terminator that went out counts: after a failure it is
+    // retried next round, and kMaxConsecutiveFailures bounds the retries.
+    if (transmitSymbols(channel, encoder, seq->terminator(), seq->size(), failures)) {
+      seq->markTerminatorSent();
+    }
     ++seq;
   }
 }
