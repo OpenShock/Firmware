@@ -1,4 +1,5 @@
 #include <freertos/FreeRTOS.h>
+#include <freertos/task.h>
 
 #include "wifi/WiFiScanManager.h"
 
@@ -18,8 +19,20 @@ const char* const TAG = "WiFiScanManager";
 const uint32_t OPENSHOCK_WIFI_SCAN_MIN_MS_PER_CHANNEL = 60;
 const uint32_t OPENSHOCK_WIFI_SCAN_MAX_MS_PER_CHANNEL = 120;
 
-static bool s_initialized           = false;
-static std::atomic<bool> s_scanning = false;
+// Idle -> Scanning (StartScan) -> Idle (results handled, failure, STA stop).
+// Scanning -> Stopping (AbortScan) -> Idle (the stopped scan's SCAN_DONE, or kStopTimeout without one).
+// Stopping keeps a new scan from starting until the stopped one's SCAN_DONE is out of the way, so that event can't be
+// taken for the new scan's results. esp_wifi doesn't document whether esp_wifi_scan_stop posts one, hence the timeout.
+enum class ScanState : uint8_t {
+  Idle,
+  Scanning,
+  Stopping,
+};
+static constexpr TickType_t kStopTimeout = pdMS_TO_TICKS(2000);
+
+static bool s_initialized                   = false;
+static std::atomic<ScanState> s_state       = ScanState::Idle;
+static std::atomic<TickType_t> s_stoppingAt = 0;
 // Set on the event loop, consumed by ProcessEvents() on the worker task
 static std::atomic<bool> s_scanDonePending           = false;
 static std::atomic<bool> s_scanAbortedPending        = false;
@@ -44,6 +57,24 @@ static void notifyNetworksDiscoveredHandlers(const std::vector<const wifi_ap_rec
   }
 }
 
+static bool stopTimedOut()
+{
+  return xTaskGetTickCount() - s_stoppingAt.load() >= kStopTimeout;
+}
+
+// Ends the scan this task was handling. False if AbortScan got there first, which has already reported it.
+static bool finishScan()
+{
+  ScanState expected = ScanState::Scanning;
+  if (s_state.compare_exchange_strong(expected, ScanState::Idle)) {
+    return true;
+  }
+  if (expected == ScanState::Stopping) {
+    s_state.store(ScanState::Idle);  // Its SCAN_DONE was the one just handled; none will follow
+  }
+  return false;
+}
+
 // Fetch the scan results esp_wifi buffered for us and fan them out. Runs on the worker task.
 static void handleScanDone()
 {
@@ -51,8 +82,10 @@ static void handleScanDone()
   esp_err_t err    = esp_wifi_scan_get_ap_num(&apCount);
   if (err != ESP_OK) {
     OS_LOGE(TAG, "esp_wifi_scan_get_ap_num failed: %s", esp_err_to_name(err));
-    s_scanning.store(false, std::memory_order_relaxed);
-    notifyStatusChangedHandlers(WiFiScanStatus::Error);
+    esp_wifi_clear_ap_list();
+    if (finishScan()) {
+      notifyStatusChangedHandlers(WiFiScanStatus::Error);
+    }
     return;
   }
 
@@ -61,8 +94,10 @@ static void handleScanDone()
     err = esp_wifi_scan_get_ap_records(&apCount, records.data());
     if (err != ESP_OK) {
       OS_LOGE(TAG, "esp_wifi_scan_get_ap_records failed: %s", esp_err_to_name(err));
-      s_scanning.store(false, std::memory_order_relaxed);
-      notifyStatusChangedHandlers(WiFiScanStatus::Error);
+      esp_wifi_clear_ap_list();
+      if (finishScan()) {
+        notifyStatusChangedHandlers(WiFiScanStatus::Error);
+      }
       return;
     }
     records.resize(apCount);
@@ -77,8 +112,9 @@ static void handleScanDone()
 
   notifyNetworksDiscoveredHandlers(recordPtrs);
 
-  s_scanning.store(false, std::memory_order_relaxed);
-  notifyStatusChangedHandlers(WiFiScanStatus::Completed);
+  if (finishScan()) {
+    notifyStatusChangedHandlers(WiFiScanStatus::Completed);
+  }
 }
 
 static void wifiEventHandler(void* arg, esp_event_base_t base, int32_t id, void* data)
@@ -91,11 +127,20 @@ static void wifiEventHandler(void* arg, esp_event_base_t base, int32_t id, void*
   // portal broadcasts would otherwise delay every WiFi and IP event behind them.
   switch (id) {
     case WIFI_EVENT_SCAN_DONE:
+    {
+      // A stopped scan's results, or a scan we didn't start: free them here (cheap) and keep them from being taken
+      // for a later scan's
+      ScanState expected = ScanState::Stopping;
+      if (s_state.compare_exchange_strong(expected, ScanState::Idle) || expected == ScanState::Idle) {
+        esp_wifi_clear_ap_list();
+        break;
+      }
       s_scanDonePending.store(true, std::memory_order_relaxed);
       s_wake();
       break;
+    }
     case WIFI_EVENT_STA_STOP:
-      if (s_scanning.exchange(false, std::memory_order_relaxed)) {
+      if (s_state.exchange(ScanState::Idle) == ScanState::Scanning) {
         OS_LOGW(TAG, "STA stopped mid-scan, aborting");
         s_scanAbortedPending.store(true, std::memory_order_relaxed);
         s_wake();
@@ -113,10 +158,10 @@ void WiFiScanManager::ProcessEvents()
   }
 
   if (s_scanDonePending.exchange(false, std::memory_order_relaxed)) {
-    if (s_scanning.load(std::memory_order_relaxed)) {
+    if (s_state.load() != ScanState::Idle) {
       handleScanDone();
     } else {
-      // Not ours, or aborted meanwhile: free the records esp_wifi kept for us
+      // The STA stopped meanwhile: free the records esp_wifi kept for us
       esp_wifi_clear_ap_list();
     }
   }
@@ -144,16 +189,19 @@ bool WiFiScanManager::Init(WakeWorker wakeWorker)
 
 bool WiFiScanManager::IsScanning()
 {
-  return s_scanning.load(std::memory_order_relaxed);
+  ScanState state = s_state.load();
+  return state == ScanState::Scanning || (state == ScanState::Stopping && !stopTimedOut());
 }
 
 bool WiFiScanManager::StartScan()
 {
-  // Claim the scan slot; bail if one is already running.
-  bool expected = false;
-  if (!s_scanning.compare_exchange_strong(expected, true, std::memory_order_relaxed)) {
-    OS_LOGW(TAG, "Cannot start scan: a scan is already running");
-    return false;
+  // Claim the scan slot; bail if one is already running or still stopping.
+  ScanState expected = ScanState::Idle;
+  if (!s_state.compare_exchange_strong(expected, ScanState::Scanning)) {
+    if (expected != ScanState::Stopping || !stopTimedOut() || !s_state.compare_exchange_strong(expected, ScanState::Scanning)) {
+      OS_LOGW(TAG, "Cannot start scan: a scan is already running");
+      return false;
+    }
   }
 
   notifyStatusChangedHandlers(WiFiScanStatus::Started);
@@ -169,7 +217,7 @@ bool WiFiScanManager::StartScan()
   esp_err_t err = esp_wifi_scan_start(&config, false);
   if (err != ESP_OK) {
     OS_LOGE(TAG, "esp_wifi_scan_start failed: %s", esp_err_to_name(err));
-    s_scanning.store(false, std::memory_order_relaxed);
+    finishScan();
     notifyStatusChangedHandlers(WiFiScanStatus::Error);
     return false;
   }
@@ -179,7 +227,9 @@ bool WiFiScanManager::StartScan()
 
 bool WiFiScanManager::AbortScan()
 {
-  if (!s_scanning.exchange(false, std::memory_order_relaxed)) {
+  s_stoppingAt.store(xTaskGetTickCount());  // Before the state, so whoever sees Stopping sees its start time
+  ScanState expected = ScanState::Scanning;
+  if (!s_state.compare_exchange_strong(expected, ScanState::Stopping)) {
     OS_LOGW(TAG, "Cannot abort scan: no scan is in progress");
     return false;
   }
