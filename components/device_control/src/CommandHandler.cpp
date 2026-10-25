@@ -20,6 +20,7 @@ const char* const TAG = "CommandHandler";
 #include <cstring>
 
 #include <freertos/queue.h>
+#include <freertos/task.h>
 
 #include <algorithm>
 #include <memory>
@@ -41,6 +42,10 @@ struct KnownShocker {
   int64_t lastActivityTimestamp;
 };
 
+// Serializes creating and replacing the transmitter (Init, SetRfTxPin from httpd or serial). Never taken by the
+// command path. Lock order: s_rfLifecycleMutex before s_rfTransmitterMutex.
+static OpenShock::SimpleMutex s_rfLifecycleMutex = {};
+// Guards only the pointer; held for a copy or a swap, never across the transmitter's destructor.
 static OpenShock::SimpleMutex s_rfTransmitterMutex               = {};
 static std::shared_ptr<OpenShock::RFTransmitter> s_rfTransmitter = nullptr;
 
@@ -60,10 +65,27 @@ static bool TryCreateTransmitter(gpio_num_t txPin)
   s_rfTransmitter = std::move(transmitter);
   return true;
 }
+// Requires s_rfLifecycleMutex. Unpublishes the transmitter and destroys it on the calling task, so its RMT channel is
+// free before a new one is created and its destructor (a task join and RMT teardown) never runs under
+// s_rfTransmitterMutex or on a command sender that happened to hold the last copy.
 static void DestroyTransmitter()
 {
-  OpenShock::ScopedLock lock__(&s_rfTransmitterMutex);
-  s_rfTransmitter = nullptr;
+  std::shared_ptr<OpenShock::RFTransmitter> old;
+  {
+    OpenShock::ScopedLock lock__(&s_rfTransmitterMutex);
+    old = std::move(s_rfTransmitter);
+  }
+  if (old == nullptr) {
+    return;
+  }
+
+  // Command senders hold a copy only across SendCommand (bounded by its 10 ms queue wait)
+  for (int i = 0; i < 50 && old.use_count() > 1; ++i) {
+    vTaskDelay(pdMS_TO_TICKS(10));
+  }
+  if (old.use_count() > 1) {
+    OS_LOGW(TAG, "RF transmitter still in use, it will be destroyed by its last user");
+  }
 }
 
 static OpenShock::SimpleMutex s_keepAliveMutex = {};
@@ -248,6 +270,7 @@ bool CommandHandler::Init()
     }
   }
 
+  ScopedLock lifecycleLock(&s_rfLifecycleMutex);
   if (!TryCreateTransmitter(txPin)) {
     OS_LOGE(TAG, "Failed to initialize RF Transmitter");
     return false;
@@ -276,6 +299,9 @@ SetGPIOResultCode CommandHandler::SetRfTxPin(gpio_num_t txPin)
   if (*estopPin != GPIO_NUM_NC && txPin == *estopPin) {
     return SetGPIOResultCode::PinInUse;
   }
+
+  // Held throughout so concurrent changes can't leave config and the live pin disagreeing
+  ScopedLock lifecycleLock(&s_rfLifecycleMutex);
 
   gpio_num_t oldPin = static_cast<gpio_num_t>(OPENSHOCK_GPIO_INVALID);
   if (auto current = GetTransmitter(); current != nullptr) {
