@@ -41,6 +41,10 @@ namespace OpenShock {
     // Held from taking a command's sequence number until it is queued, so queue order matches sequence order: an
     // older command can't be queued after a newer Stop was processed (and its stop record cleared on an empty queue).
     SimpleMutex m_sendMutex;
+    // Next command's sequence number, guarded by m_sendMutex. Lets the task tell which queued commands are older than
+    // a Stop that jumped the queue. Wraps freely: it is only compared wrap-safely ((int32_t)(a - b)), between a Stop
+    // and commands queued with it, which are at most the queue depth apart.
+    uint32_t m_nextSeq;
     rmt_channel_handle_t m_rmtChannel;
     rmt_encoder_handle_t m_rmtEncoder;
     ManagedTask m_task;

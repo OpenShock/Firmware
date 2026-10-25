@@ -17,7 +17,6 @@ const char* const TAG = "RFTransmitter";
 #include <freertos/queue.h>
 
 #include <algorithm>
-#include <atomic>
 #include <utility>
 #include <vector>
 
@@ -39,9 +38,6 @@ const TickType_t kStopQueueWait = pdMS_TO_TICKS(100);
 
 using namespace OpenShock;
 
-// Orders commands across producers, so a Stop sent to the front of the queue can tell which queued commands are older
-static std::atomic<uint32_t> s_nextCommandSeq = 0;
-
 struct RFTransmitter::Command {
   int64_t transmitEnd;
   uint32_t seq;
@@ -60,6 +56,7 @@ static uint32_t shockerKey(ShockerModelType model, uint16_t shockerId)
 RFTransmitter::RFTransmitter(gpio_num_t gpioPin)
   : m_txPin(gpioPin)
   , m_queueHandle(nullptr)
+  , m_nextSeq(0)
   , m_rmtChannel(nullptr)
   , m_rmtEncoder(nullptr)
   , m_task(TAG, "RFTransmitter task")
@@ -144,7 +141,7 @@ bool RFTransmitter::SendCommand(ShockerModelType model, uint16_t shockerId, Shoc
 
   Command cmd = Command {
     .transmitEnd = OpenShock::millis() + durationMs,
-    .seq         = s_nextCommandSeq.fetch_add(1, std::memory_order_relaxed),
+    .seq         = m_nextSeq++,
     .modelType   = model,
     .type        = type,
     .shockerId   = shockerId,
