@@ -20,6 +20,10 @@ const uint32_t OPENSHOCK_WIFI_SCAN_MAX_MS_PER_CHANNEL = 120;
 
 static bool s_initialized           = false;
 static std::atomic<bool> s_scanning = false;
+// Set on the event loop, consumed by ProcessEvents() on the worker task
+static std::atomic<bool> s_scanDonePending           = false;
+static std::atomic<bool> s_scanAbortedPending        = false;
+static OpenShock::WiFiScanManager::WakeWorker s_wake = nullptr;
 // Only written before Init() (by the task that runs it), read-only afterwards
 static std::vector<OpenShock::WiFiScanManager::StatusChangedHandler> s_statusChangedHandlers;
 static std::vector<OpenShock::WiFiScanManager::NetworksDiscoveredHandler> s_networksDiscoveredHandlers;
@@ -40,8 +44,7 @@ static void notifyNetworksDiscoveredHandlers(const std::vector<const wifi_ap_rec
   }
 }
 
-// Fetch the scan results esp_wifi buffered for us and fan them out. Runs in the
-// esp_event loop task (WIFI_EVENT_SCAN_DONE).
+// Fetch the scan results esp_wifi buffered for us and fan them out. Runs on the worker task.
 static void handleScanDone()
 {
   uint16_t apCount = 0;
@@ -84,17 +87,18 @@ static void wifiEventHandler(void* arg, esp_event_base_t base, int32_t id, void*
   (void)base;
   (void)data;
 
+  // Default event loop: only flag the work and wake the worker. Fetching records, the handlers' config lookups and
+  // portal broadcasts would otherwise delay every WiFi and IP event behind them.
   switch (id) {
     case WIFI_EVENT_SCAN_DONE:
-      // Ignore spurious scan-done events that we didn't initiate (or already handled).
-      if (s_scanning.load(std::memory_order_relaxed)) {
-        handleScanDone();
-      }
+      s_scanDonePending.store(true, std::memory_order_relaxed);
+      s_wake();
       break;
     case WIFI_EVENT_STA_STOP:
       if (s_scanning.exchange(false, std::memory_order_relaxed)) {
         OS_LOGW(TAG, "STA stopped mid-scan, aborting");
-        notifyStatusChangedHandlers(WiFiScanStatus::Aborted);
+        s_scanAbortedPending.store(true, std::memory_order_relaxed);
+        s_wake();
       }
       break;
     default:
@@ -102,12 +106,30 @@ static void wifiEventHandler(void* arg, esp_event_base_t base, int32_t id, void*
   }
 }
 
-bool WiFiScanManager::Init()
+void WiFiScanManager::ProcessEvents()
+{
+  if (s_scanAbortedPending.exchange(false, std::memory_order_relaxed)) {
+    notifyStatusChangedHandlers(WiFiScanStatus::Aborted);
+  }
+
+  if (s_scanDonePending.exchange(false, std::memory_order_relaxed)) {
+    if (s_scanning.load(std::memory_order_relaxed)) {
+      handleScanDone();
+    } else {
+      // Not ours, or aborted meanwhile: free the records esp_wifi kept for us
+      esp_wifi_clear_ap_list();
+    }
+  }
+}
+
+bool WiFiScanManager::Init(WakeWorker wakeWorker)
 {
   if (s_initialized) {
     OS_LOGW(TAG, "WiFiScanManager is already initialized");
     return true;
   }
+
+  s_wake = wakeWorker;
 
   esp_err_t err = esp_event_handler_register(WIFI_EVENT, ESP_EVENT_ANY_ID, wifiEventHandler, nullptr);
   if (err != ESP_OK) {

@@ -536,10 +536,22 @@ static bool tryConnect()
   return connectWiFi(creds->ssid, creds->password, creds->HasPinnedBSSID() ? creds->bssid.data() : nullptr, channel);
 }
 
+// Published once the update task exists; wakes before that are no-ops and its 1 s poll picks the work up
+static std::atomic<TaskHandle_t> s_updateTask = nullptr;
+
+static void wakeUpdateTask()
+{
+  if (TaskHandle_t task = s_updateTask.load(std::memory_order_acquire); task != nullptr) {
+    xTaskNotifyGive(task);
+  }
+}
+
 static void wifimanagerUpdateTask(void*)
 {
   int64_t lastScanRequest = 0;
   while (true) {
+    WiFiScanManager::ProcessEvents();
+
     if (s_wifiState.load(std::memory_order_relaxed) == WiFiState::Disconnected && !WiFiScanManager::IsScanning()) {
       if (!tryConnect()) {
         int64_t now = OpenShock::millis();
@@ -551,7 +563,7 @@ static void wifimanagerUpdateTask(void*)
         }
       }
     }
-    vTaskDelay(pdMS_TO_TICKS(1000));
+    ulTaskNotifyTake(pdTRUE, pdMS_TO_TICKS(1000));
   }
 }
 
@@ -597,7 +609,7 @@ bool WiFiManager::Init()
   WiFiScanManager::RegisterStatusChangedHandler(evWiFiScanStatusChanged);
   WiFiScanManager::RegisterNetworksDiscoveredHandler(evWiFiNetworksDiscovery);
 
-  if (!WiFiScanManager::Init()) {
+  if (!WiFiScanManager::Init(wakeUpdateTask)) {
     OS_LOGE(TAG, "Failed to initialize WiFiScanManager");
     return false;
   }
@@ -622,10 +634,12 @@ bool WiFiManager::Init()
 
   esp_netif_set_hostname(s_staNetif, hostname->c_str());
 
-  if (TaskUtils::TaskCreateUniversal(wifimanagerUpdateTask, TAG, 4096, nullptr, 5, nullptr, 1) != pdPASS) {  // TODO: Re-profile stack usage
+  TaskHandle_t updateTask = nullptr;
+  if (TaskUtils::TaskCreateUniversal(wifimanagerUpdateTask, TAG, 4096, nullptr, 5, &updateTask, 1) != pdPASS) {  // TODO: Re-profile stack usage
     OS_LOGE(TAG, "Failed to create WiFiManager update task");
     return false;
   }
+  s_updateTask.store(updateTask, std::memory_order_release);
 
   return true;
 }

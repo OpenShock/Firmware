@@ -9,7 +9,15 @@
 #include <vector>
 
 namespace OpenShock::WiFiScanManager {
-  [[nodiscard]] bool Init();
+  // Called on the event loop when scan work is pending; must only wake the worker (e.g. a task notification)
+  using WakeWorker = void (*)();
+
+  /// @brief Scan events only mark work as pending and call wakeWorker; the worker task then calls ProcessEvents(),
+  /// which fetches the results and runs the handlers there instead of on the system event task.
+  [[nodiscard]] bool Init(WakeWorker wakeWorker);
+
+  /// @brief Runs the handlers for scan events since the last call. Call from a single worker task.
+  void ProcessEvents();
 
   bool IsScanning();
 
