@@ -64,11 +64,15 @@ static uint32_t GetClientGeneration()
 }
 static void DestroyClient()
 {
-  OpenShock::ScopedLock lock__(&s_clientMutex);
-  ++s_clientGeneration;
-  if (s_wsClient != nullptr) {
-    s_wsClient->retire();
-    s_retiredClients.retire(std::move(s_wsClient));  // Leaves s_wsClient null
+  std::shared_ptr<OpenShock::GatewayClient> client;
+  {
+    OpenShock::ScopedLock lock__(&s_clientMutex);
+    ++s_clientGeneration;
+    client = std::move(s_wsClient);  // Leaves s_wsClient null
+  }
+  if (client != nullptr) {
+    client->retire();  // Outside s_clientMutex: it posts an event
+    s_retiredClients.retire(std::move(client));
   }
 }
 

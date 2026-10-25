@@ -32,8 +32,10 @@ namespace OpenShock {
 
     void markPingReceived();
 
-    // Stops dispatching received messages; used when the client is taken out of service ahead of destruction.
-    inline void retire() { m_retired.store(true); }
+    // Takes the client out of service ahead of destruction: reports it disconnected once, then stops dispatching
+    // received messages, posting state changes, sending the boot status and (re)connecting. Don't call it under a lock
+    // other tasks wait on: it posts an event.
+    void retire();
 
     bool loop();
 

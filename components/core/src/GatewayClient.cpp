@@ -76,6 +76,23 @@ GatewayClient::~GatewayClient()
   }
 }
 
+void GatewayClient::retire()
+{
+  if (m_retired.exchange(true)) {
+    return;
+  }
+
+  // The last state anyone hears from this client. Posted directly: _setState stays quiet once retired, so a retired
+  // client's websocket task or destructor can't report a state that belongs to its successor.
+  GatewayClientState state = GatewayClientState::Disconnected;
+  if (m_state.exchange(state) != state) {
+    esp_err_t err = esp_event_post(OPENSHOCK_EVENTS, OPENSHOCK_EVENT_GATEWAY_CLIENT_STATE_CHANGED, &state, sizeof(state), pdMS_TO_TICKS(100));
+    if (err != ESP_OK) {
+      OS_LOGE(TAG, "Failed to post gateway client state change: %s", esp_err_to_name(err));
+    }
+  }
+}
+
 esp_websocket_client_handle_t GatewayClient::_takeHandle()
 {
   ScopedLock lock__(&m_handleMutex);
@@ -95,7 +112,8 @@ void GatewayClient::_destroyHandle()
 
 void GatewayClient::connect(const std::string& host, uint16_t port, const std::string& path)
 {
-  if (m_state != GatewayClientState::Disconnected) {
+  // A retired client may still be connected by a caller that fetched it before it was retired (the LCG lookup is slow)
+  if (m_state != GatewayClientState::Disconnected || m_retired.load()) {
     return;
   }
 
@@ -223,7 +241,7 @@ bool GatewayClient::loop()
 
 void GatewayClient::_setState(GatewayClientState state)
 {
-  if (m_state.exchange(state) == state) {
+  if (m_state.exchange(state) == state || m_retired.load()) {
     return;
   }
 
@@ -236,7 +254,8 @@ void GatewayClient::_setState(GatewayClientState state)
 
 void GatewayClient::_sendBootStatus()
 {
-  if (s_bootStatusSent) return;
+  // A retired client's connection is about to go away; leave the boot status for its successor
+  if (s_bootStatusSent || m_retired.load()) return;
 
   OS_LOGV(TAG, "Sending Gateway boot status message");
 
