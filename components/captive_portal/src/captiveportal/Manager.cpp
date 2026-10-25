@@ -301,6 +301,7 @@ static void captiveportal_tick(ManagerState& state)
     // Only sample it: holding the reference across captiveportal_stop() would stall DestroyInstance()
     running    = true;
     hasClients = instance->hasClients();
+    instance->retryDrain();
   }
 
   if (state.closeWhenOnline && connected) {

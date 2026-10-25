@@ -942,15 +942,34 @@ bool CaptivePortal::CaptivePortalInstance::queueSend(int fd, bool broadcast, boo
     m_sendQueue.push_back(WsSend {.fd = broadcast ? -1 : fd, .binary = binary, .data = std::vector<uint8_t>(data.begin(), data.end())});
   }
 
-  // Ring the doorbell unless a drain is already pending; that drain will pick this message up too
+  scheduleDrain();
+  return true;
+}
+
+// Rings the doorbell unless a drain is already pending; that drain picks up everything queued so far
+void CaptivePortal::CaptivePortalInstance::scheduleDrain()
+{
   if (!m_drainQueued.exchange(true)) {
     if (httpd_queue_work(m_server, &CaptivePortalInstance::wsDrainWork, this) != ESP_OK) {
       m_drainQueued.store(false);
-      // The message stays queued and goes out with the next send that gets a drain scheduled
+      // The messages stay queued: the next send, or retryDrain() on the manager's next tick, tries again
       OS_LOGW(TAG, "httpd work queue full, WebSocket send delayed");
     }
   }
-  return true;
+}
+
+void CaptivePortal::CaptivePortalInstance::retryDrain()
+{
+  if (m_server == nullptr || m_drainQueued.load()) {
+    return;
+  }
+  {
+    ScopedLock lock__(&m_sendMutex);
+    if (m_sendQueue.empty()) {
+      return;
+    }
+  }
+  scheduleDrain();
 }
 
 // Runs on the httpd task. httpd_stop (in the destructor) joins that task before any member is destroyed, and a drain

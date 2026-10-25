@@ -31,6 +31,10 @@ namespace OpenShock::CaptivePortal {
     CaptivePortalInstance();
     ~CaptivePortalInstance();
 
+    /// @brief Schedules a drain if sends are waiting and none is pending: retries a doorbell httpd's work mailbox
+    ///        refused. Called from the manager's tick.
+    void retryDrain();
+
     // WS sends invoked from arbitrary tasks (WiFiManager, GatewayConnectionManager,
     // the captive-portal manager task). httpd frames may only be written from the
     // httpd task, so these copy the payload into a bounded queue that the httpd task
@@ -78,6 +82,7 @@ namespace OpenShock::CaptivePortal {
 
     bool queueSend(int fd, bool broadcast, bool binary, std::span<const uint8_t> data);
     static void wsDrainWork(void* arg);
+    void scheduleDrain();
     void drainSends();
 
     // Per-session free callback fired by httpd on socket close/LRU/timeout.
