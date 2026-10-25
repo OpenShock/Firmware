@@ -269,11 +269,11 @@ static bool transmitSymbols(rmt_channel_handle_t channel, rmt_encoder_handle_t e
   return false;
 }
 
-static void writeSequences(rmt_channel_handle_t channel, rmt_encoder_handle_t encoder, std::vector<Rmt::Sequence>& sequences, const ManagedTask& task, uint32_t& failures)
+static void writeSequences(rmt_channel_handle_t channel, rmt_encoder_handle_t encoder, std::vector<Rmt::Sequence>& sequences, const ManagedTask& task, uint32_t& failures, const TaskUtils::TaskWatchdog& watchdog)
 {
   // Send queued commands
   for (auto seq = sequences.begin(); seq != sequences.end();) {
-    TaskUtils::WatchdogFeed();  // Per frame: a round over many shockers can outlast the watchdog timeout
+    watchdog.feed();  // Per frame: a round over many shockers can outlast the watchdog timeout
     if (failures >= kMaxConsecutiveFailures) {
       // Nothing is getting out; dropping them beats retrying forever. New commands get a fresh run.
       OS_LOGE(TAG, "RMT keeps failing, dropping %zu pending sequences", sequences.size());
@@ -328,12 +328,10 @@ void RFTransmitter::TransmitTask()
   // Cleared once the queue drains, so it stays as small as the number of distinct shockers stopped in one backlog.
   std::vector<std::pair<uint32_t, uint32_t>> stops;
   // On the task watchdog only while it has frames to send: idle, it blocks on its queue indefinitely
-  struct Unsubscribe {
-    ~Unsubscribe() { TaskUtils::WatchdogUnsubscribe(); }
-  } unsubscribe;
+  TaskUtils::TaskWatchdog watchdog(false);
   while (true) {
     if (sequences.empty()) {
-      TaskUtils::WatchdogUnsubscribe();
+      watchdog.unsubscribe();
     }
 
     // Receive commands
@@ -403,8 +401,8 @@ void RFTransmitter::TransmitTask()
     }
 
     if (!sequences.empty()) {
-      TaskUtils::WatchdogSubscribe();
+      watchdog.subscribe();
     }
-    writeSequences(m_rmtChannel, m_rmtEncoder, sequences, m_task, rmtFailures);
+    writeSequences(m_rmtChannel, m_rmtEncoder, sequences, m_task, rmtFailures, watchdog);
   }
 }

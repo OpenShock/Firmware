@@ -80,15 +80,12 @@ static void estopmgr_managerTask(gpio_num_t estopPin)
 
   // On the task watchdog for as long as it samples: a wedged sampler means the kill switch silently stops working.
   // Fed every 5 ms sample, so only a real hang (not a slow post or log) can trip it.
-  TaskUtils::WatchdogSubscribe();
-  struct Unsubscribe {
-    ~Unsubscribe() { TaskUtils::WatchdogUnsubscribe(); }
-  } unsubscribe;
+  TaskUtils::TaskWatchdog watchdog;
 
   // Check if killing manager was requested, continue looping otherwise
   TickType_t lastWake = xTaskGetTickCount();
   while (!s_estopTask.stopRequested()) {
-    TaskUtils::WatchdogFeed();
+    watchdog.feed();
     // Fixed rate: the debounce and hold timings assume samples k_estopUpdateRate apart, whatever the loop body costs
     xTaskDelayUntil(&lastWake, pdMS_TO_TICKS(k_estopUpdateRate));
 

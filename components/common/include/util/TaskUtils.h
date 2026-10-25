@@ -53,12 +53,52 @@ namespace OpenShock::TaskUtils {
   ///        cleared before the task is created.
   void StopTask(TaskHandle_t taskHandle, TaskExitFlag& exited, const char* tag, const char* taskName, TickType_t timeout = pdMS_TO_TICKS(1000));
 
-  /// @brief Puts the calling task on the task watchdog. From then on it must call WatchdogFeed() more often than
-  ///        CONFIG_ESP_TASK_WDT_TIMEOUT_S, or the watchdog reports it as stuck. Only for loops that never wait longer
-  ///        than that; call WatchdogUnsubscribe() before blocking indefinitely and before exiting.
+  // Raw task watchdog calls on the calling task; use TaskWatchdog, which can't leave a task subscribed.
   void WatchdogSubscribe();
-  /// @brief Tells the task watchdog the calling task is alive. A no-op for a task that isn't subscribed.
   void WatchdogFeed();
-  /// @brief Takes the calling task off the task watchdog. A no-op for a task that isn't subscribed.
   void WatchdogUnsubscribe();
+
+  /// @brief Keeps the calling task on the task watchdog while subscribed, and takes it off when destroyed, so no exit
+  ///        path leaves it subscribed. While subscribed the task must call feed() more often than
+  ///        CONFIG_ESP_TASK_WDT_TIMEOUT_S, or the watchdog reports it as stuck: unsubscribe() before blocking for
+  ///        longer than that. Belongs to the task that created it; never share it with another task.
+  class TaskWatchdog {
+  public:
+    /// @param subscribed Whether to subscribe right away.
+    explicit TaskWatchdog(bool subscribed = true)
+    {
+      if (subscribed) {
+        subscribe();
+      }
+    }
+    ~TaskWatchdog() { unsubscribe(); }
+
+    TaskWatchdog(const TaskWatchdog&)            = delete;
+    TaskWatchdog& operator=(const TaskWatchdog&) = delete;
+
+    void subscribe()
+    {
+      if (!m_subscribed) {
+        WatchdogSubscribe();
+        m_subscribed = true;
+      }
+    }
+    void unsubscribe()
+    {
+      if (m_subscribed) {
+        WatchdogUnsubscribe();
+        m_subscribed = false;
+      }
+    }
+    /// @brief Tells the watchdog this task is alive. Does nothing while unsubscribed.
+    void feed() const
+    {
+      if (m_subscribed) {
+        WatchdogFeed();
+      }
+    }
+
+  private:
+    bool m_subscribed = false;
+  };
 }  // namespace OpenShock::TaskUtils
