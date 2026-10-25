@@ -369,6 +369,9 @@ static void otaum_updatetask(void* arg)
 
     if (!config.isEnabled) {
       OS_LOGD(TAG, "OTA updates are disabled, skipping update check");
+      // Dropped rather than kept for later: re-enabling updates shouldn't act on a request made while disabled
+      updateRequested = false;
+      checkRequested  = false;
       continue;
     }
 
@@ -396,6 +399,7 @@ static void otaum_updatetask(void* arg)
 
     if (config.requireManualApproval) {
       OS_LOGD(TAG, "Manual approval required, skipping update check");
+      updateRequested = false;  // Otherwise it re-triggers this branch every minute
       // TODO: IMPLEMENT
       continue;
     }
@@ -445,6 +449,16 @@ static void otaum_updatetask(void* arg)
       OS_LOGE(TAG, "Failed to set OTA update step");
       continue;
     }
+
+    // Every `continue` from here on abandons the update; don't leave the step at Updating for the next boot to report.
+    // Only resets Updating, so a step another task moved on (or our own Updated below) is left alone.
+    struct ResetStepOnFailure {
+      bool succeeded = false;
+      ~ResetStepOnFailure()
+      {
+        if (!succeeded) Config::CompareExchangeOtaUpdateStep(OpenShock::OtaUpdateStep::Updating, OpenShock::OtaUpdateStep::None);
+      }
+    } resetStepOnFailure;
 
     if (!Serialization::Gateway::SerializeOtaUpdateStartedMessage(updateId, version, GatewayConnectionManager::SendMessageBIN)) {
       OS_LOGE(TAG, "Failed to serialize OTA update started message");
@@ -512,6 +526,7 @@ static void otaum_updatetask(void* arg)
       _sendFailureMessage("Failed to set OTA update step"sv);
       continue;
     }
+    resetStepOnFailure.succeeded = true;
 
     // Send reboot message.
     otaum_send_progress_msg(Serialization::Types::OtaUpdateProgressTask::Rebooting, 0.0f);
