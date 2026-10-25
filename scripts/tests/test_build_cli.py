@@ -1,6 +1,7 @@
 """Tests for the command lines of the build scripts: build.py, gen_env_header.py and the --board option."""
 
 import importlib.util
+import os
 
 import gen_env_header
 import pytest
@@ -53,6 +54,19 @@ def test_without_idf_path_an_installer_registered_idf_is_activated(monkeypatch, 
         return 'venv-python'
 
     monkeypatch.setattr(build.idfenv, 'activate', fake_activate)
+
+    assert build.run_idf(['build']) == 0
+    assert calls[0][:2] == ['venv-python', str(idf / 'tools' / 'idf.py')]
+
+
+@pytest.mark.skipif(os.name != 'posix', reason='Windows never looks up an idf.py wrapper')
+def test_idf_py_from_idf_path_on_path_runs_under_the_venv_interpreter(monkeypatch, tmp_path):
+    calls = []
+    idf = tmp_path / 'idf'
+    monkeypatch.setattr(build.subprocess, 'call', lambda cmd, env=None: calls.append(cmd) or 0)
+    monkeypatch.setattr(build.shutil, 'which', lambda name: str(idf / 'tools' / 'idf.py'))
+    monkeypatch.setenv('IDF_PATH', str(idf))
+    monkeypatch.setattr(build.idfenv, 'activate', lambda environ=None: 'venv-python')
 
     assert build.run_idf(['build']) == 0
     assert calls[0][:2] == ['venv-python', str(idf / 'tools' / 'idf.py')]

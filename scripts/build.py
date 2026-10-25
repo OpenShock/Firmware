@@ -108,6 +108,11 @@ def run_idf(idf_args: list[str]) -> int:
     # environment. On Windows a bare idf.py is not executable, so run tools/idf.py with an interpreter:
     # the ESP-IDF venv's when known (an installer-registered install activates here if the shell did not).
     idf_wrapper = shutil.which('idf.py') if os.name == 'posix' else None
+    # $IDF_PATH/tools on PATH (a restored CI install) is no wrapper: its `env python` shebang takes
+    # whichever interpreter leads PATH, which need not be the ESP-IDF venv.
+    idf_path = os.environ.get('IDF_PATH')
+    if idf_wrapper and idf_path and Path(idf_wrapper).resolve() == (Path(idf_path) / 'tools' / 'idf.py').resolve():
+        idf_wrapper = None
     if idf_wrapper:
         cmd = [idf_wrapper, *idf_args]
     else:
