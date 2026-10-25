@@ -12,6 +12,7 @@ const char* const TAG = "VisualStateManager";
 #include "led_drivers/MonoLedDriver.h"
 #include "led_drivers/RgbLedDriver.h"
 #include "Logging.h"
+#include "SimpleMutex.h"
 
 #include <esp_netif.h>
 #include <esp_wifi.h>
@@ -37,6 +38,7 @@ const uint32_t kStatusOKMask = kWebSocketConnectedFlag | kHasIpAddressFlag | kWi
 // 32-bit so the atomic is lock-free. Both need seq_cst so a state change during the LED test isn't lost.
 static std::atomic<uint32_t> s_stateFlags = 0;
 static std::atomic<bool> s_ledTestActive  = false;  // While set, the LED test owns the LEDs; flags keep tracking live state
+static OpenShock::SimpleMutex s_applyMutex;         // Serializes reading the flags with applying them, so an older snapshot can't land last
 static std::unique_ptr<OpenShock::MonoLedDriver> s_monoLedDriver;
 static std::unique_ptr<OpenShock::RgbLedDriver> s_rgbLedDriver;
 
@@ -256,6 +258,8 @@ static void applyVisualState(uint32_t flags)
 
 static void updateVisualState()
 {
+  OpenShock::ScopedLock lock__(&s_applyMutex);
+
   if (s_ledTestActive.load()) {
     return;  // Re-applied from the live flags when the test finishes
   }
@@ -447,10 +451,14 @@ void VisualStateManager::SetScanningStarted()
 
 void VisualStateManager::RunLedTest()
 {
-  // Take over the LEDs; state events keep updating s_stateFlags but don't touch the LEDs until the test ends
-  if (s_ledTestActive.exchange(true)) {
-    OS_LOGW(TAG, "LED test already running");
-    return;
+  // Take over the LEDs; state events keep updating s_stateFlags but don't touch the LEDs until the test ends.
+  // Under s_applyMutex so an update already in flight finishes before the test starts.
+  {
+    ScopedLock lock__(&s_applyMutex);
+    if (s_ledTestActive.exchange(true)) {
+      OS_LOGW(TAG, "LED test already running");
+      return;
+    }
   }
 
   OS_LOGI(TAG, "=== LED Test Started ===");
