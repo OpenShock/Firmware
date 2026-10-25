@@ -140,6 +140,8 @@ bool RFTransmitter::SendCommand(ShockerModelType model, uint16_t shockerId, Shoc
     OS_LOGD(TAG, "Command received: %u %u %u %u", std::to_underlying(model), shockerId, std::to_underlying(type), intensity);
   }
 
+  ScopedLock lock__(&m_sendMutex);  // Bounded: both queue sends below time out
+
   Command cmd = Command {
     .transmitEnd = OpenShock::millis() + durationMs,
     .seq         = s_nextCommandSeq.fetch_add(1, std::memory_order_relaxed),

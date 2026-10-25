@@ -38,6 +38,9 @@ namespace OpenShock {
 
     gpio_num_t m_txPin;
     QueueHandle_t m_queueHandle;
+    // Held from taking a command's sequence number until it is queued, so queue order matches sequence order: an
+    // older command can't be queued after a newer Stop was processed (and its stop record cleared on an empty queue).
+    SimpleMutex m_sendMutex;
     rmt_channel_handle_t m_rmtChannel;
     rmt_encoder_handle_t m_rmtEncoder;
     ManagedTask m_task;
