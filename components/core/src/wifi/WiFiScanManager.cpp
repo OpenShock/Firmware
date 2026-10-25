@@ -6,6 +6,7 @@
 const char* const TAG = "WiFiScanManager";
 
 #include "Logging.h"
+#include "visual/VisualStateManager.h"
 
 #include <esp_wifi.h>
 
@@ -221,6 +222,8 @@ bool WiFiScanManager::StartScan()
     notifyStatusChangedHandlers(WiFiScanStatus::Error);
     return false;
   }
+
+  VisualStateManager::SetScanningStarted();  // Cleared by the WIFI_EVENT_SCAN_DONE that ends this scan
 
   return true;
 }

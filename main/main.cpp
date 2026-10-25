@@ -73,6 +73,7 @@ static void otaSetup()
 
   if (!trySetup()) {
     OS_LOGE(TAG, "Unable to validate OTA app, rolling back");
+    OpenShock::VisualStateManager::SetCriticalError();
     OpenShock::OtaUpdateManager::InvalidateAndRollback();
   }
 
@@ -87,6 +88,7 @@ static void otaSetup()
 static void appSetup()
 {
   if (!trySetup()) {
+    OpenShock::VisualStateManager::SetCriticalError();  // Shown for the 5 s until the restart
     OS_LOGI(TAG, "Restarting in 5 seconds...");
     vTaskDelay(pdMS_TO_TICKS(5000));
     esp_restart();
