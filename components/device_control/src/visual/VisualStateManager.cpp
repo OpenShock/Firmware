@@ -34,13 +34,7 @@ const uint32_t kWiFiScanningFlag                 = 1 << 7;
 // Bitmask of when the system is running normally
 const uint32_t kStatusOKMask = kWebSocketConnectedFlag | kHasIpAddressFlag | kWiFiConnectedFlag;
 
-// 32-bit on purpose: 64-bit atomics are not lock-free on any supported chip (ESP-IDF emulates them with a critical
-// section), and eight flags fit easily.
-//
-// Both use the default sequentially consistent ordering, and need it. updateVisualState() modifies s_stateFlags and
-// then loads s_ledTestActive; RunLedTest() stores s_ledTestActive and then loads s_stateFlags. With relaxed ordering
-// each side could miss the other's write (a store-buffer reordering), so a state change made during the LED test
-// would be lost until the next event. Sequential consistency guarantees at least one side sees the other.
+// 32-bit so the atomic is lock-free. Both need seq_cst so a state change during the LED test isn't lost.
 static std::atomic<uint32_t> s_stateFlags = 0;
 static std::atomic<bool> s_ledTestActive  = false;  // While set, the LED test owns the LEDs; flags keep tracking live state
 static std::unique_ptr<OpenShock::MonoLedDriver> s_monoLedDriver;

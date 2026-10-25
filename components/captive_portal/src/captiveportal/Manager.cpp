@@ -66,11 +66,7 @@ static SemaphoreHandle_t s_forceCloseDone                = nullptr;  // Given by
 // The running instance, read by any task that sends through it; only the manager task creates or retires it.
 static SimpleMutex s_instanceMutex;
 static std::shared_ptr<CaptivePortalInstance> s_instance = nullptr;
-// Mirrors `s_instance != nullptr`; written under s_instanceMutex. Double-checked locking: GetInstance() reads this flag
-// first and only takes the mutex when it says there is something to get, so the common case, portal closed with WiFi
-// events and the 500 ms tick still asking, costs one atomic load. The flag is advisory; the pointer read under the
-// mutex is authoritative (hence relaxed: a stale answer only costs a mutex round trip or drops a broadcast that would
-// have raced with the instance's creation anyway).
+// Lock-free mirror of `s_instance != nullptr`, written under s_instanceMutex
 static std::atomic<bool> s_instanceLive = false;
 // Instances taken down whose destruction waits for other tasks to drop their references; destroyed by the manager task.
 static RetiredList<CaptivePortalInstance> s_retiredInstances;

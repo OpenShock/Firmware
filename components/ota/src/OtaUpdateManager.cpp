@@ -66,7 +66,6 @@ enum OtaTaskEventFlag : uint32_t {
   OTA_TASK_EVENT_CHECK_REQUESTED   = 1 << 3,
 };
 
-// Written by Init() and again when the OTA task validates the image; read by IsValidatingApp() from other tasks.
 static std::atomic<esp_ota_img_states_t> _otaImageState;
 static OpenShock::FirmwareBootType _bootType;
 static TaskHandle_t _taskHandle = nullptr;

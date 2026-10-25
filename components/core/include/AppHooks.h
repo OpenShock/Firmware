@@ -22,8 +22,6 @@ namespace OpenShock::AppHooks {
 
   bool CaptivePortalBroadcastMessageBIN(std::span<const uint8_t> data);
   void CaptivePortalSetAlwaysEnabled(bool alwaysEnabled);
-  /// @brief Cheap, lock-free check whether a portal instance exists. Use it to skip building a local message when nobody
-  ///        can receive it; a broadcast still checks again under the portal's own lock.
   bool CaptivePortalIsRunning();
 
   FirmwareBootType OtaGetFirmwareBootType();

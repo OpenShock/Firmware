@@ -24,8 +24,7 @@ using namespace OpenShock;
 
 const int64_t GATEWAY_PING_TIMEOUT = 90'000;
 
-// One bound for a send: waiting for the handle lock behind another sender and the IDF send itself. Without the bound on
-// the lock, a sender queued behind a full-length send could wait longer than the timeout it was promised.
+// Covers both the handle lock wait and the send itself
 const TickType_t GATEWAY_SEND_TIMEOUT = pdMS_TO_TICKS(10'000);
 
 // Message handlers (config reads, flash writes, FlatBuffers verification) run on the websocket task.
@@ -38,7 +37,7 @@ const std::size_t GATEWAY_MAX_MESSAGE_SIZE = OpenShock::MessageHandlers::WebSock
 static constexpr int WS_OP_TEXT   = 0x01;
 static constexpr int WS_OP_BINARY = 0x02;
 
-// Set from the websocket task; a retired client's task can still be running when the new client's connects.
+// A retired client's websocket task may still be running
 static std::atomic<bool> s_bootStatusSent = false;
 
 GatewayClient::GatewayClient(const std::string& authToken)
@@ -62,7 +61,6 @@ GatewayClient::~GatewayClient()
 
   _setState(GatewayClientState::Disconnected);
 
-  // Taken out under the lock so no sender can pick it up again; closed and destroyed outside it (see _destroyHandle).
   esp_websocket_client_handle_t handle = _takeHandle();
   if (handle != nullptr) {
     esp_websocket_client_close(handle, pdMS_TO_TICKS(1000));
@@ -72,7 +70,6 @@ GatewayClient::~GatewayClient()
 
 esp_websocket_client_handle_t GatewayClient::_takeHandle()
 {
-  // Waits for an in-flight send to finish (bounded by its timeout), then unpublishes the handle so later senders bail.
   ScopedLock lock__(&m_handleMutex);
   return std::exchange(m_client, nullptr);
 }
@@ -84,9 +81,7 @@ void GatewayClient::_destroyHandle()
     return;
   }
 
-  // Stops the client task if still running and frees the handle; no further events reach `this` afterwards. Must run
-  // without m_handleMutex held: the websocket task may itself be waiting for that mutex in a send (pong, boot status),
-  // and destroy waits for that task to exit.
+  // Not under m_handleMutex: destroy joins the websocket task, which may be waiting on it to send
   esp_websocket_client_destroy(handle);
 }
 
@@ -121,7 +116,7 @@ void GatewayClient::connect(const std::string& host, uint16_t port, const std::s
 
   esp_websocket_register_events(handle, WEBSOCKET_EVENT_ANY, &GatewayClient::_eventHandler, this);
 
-  // Published before start() so the CONNECTED event's boot status message finds it; senders bail on m_state until then.
+  // Published before start() so the CONNECTED handler can send
   {
     ScopedLock lock__(&m_handleMutex);
     m_client = handle;
@@ -139,7 +134,7 @@ void GatewayClient::connect(const std::string& host, uint16_t port, const std::s
 bool GatewayClient::sendMessageTXT(std::string_view data)
 {
   const TickType_t started = xTaskGetTickCount();
-  ScopedLock lock__(&m_handleMutex, GATEWAY_SEND_TIMEOUT);  // Held across the send so the handle can't be destroyed under it
+  ScopedLock lock__(&m_handleMutex, GATEWAY_SEND_TIMEOUT);
   if (!lock__.isLocked()) {
     OS_LOGW(TAG, "Timed out waiting for the websocket handle, dropping text message");
     return false;
@@ -159,7 +154,7 @@ bool GatewayClient::sendMessageTXT(std::string_view data)
 bool GatewayClient::sendMessageBIN(std::span<const uint8_t> data)
 {
   const TickType_t started = xTaskGetTickCount();
-  ScopedLock lock__(&m_handleMutex, GATEWAY_SEND_TIMEOUT);  // Held across the send so the handle can't be destroyed under it
+  ScopedLock lock__(&m_handleMutex, GATEWAY_SEND_TIMEOUT);
   if (!lock__.isLocked()) {
     OS_LOGW(TAG, "Timed out waiting for the websocket handle, dropping binary message");
     return false;

@@ -68,16 +68,13 @@ using namespace OpenShock;
 
 static OpenShock::RateLimiter& getAccountLinkRateLimiter()
 {
-  // Function-local static: initialized exactly once on first use and thread-safe per [stmt.dcl]; ESP-IDF supplies
-  // the __cxa_guard_* functions behind it. A pointer so nothing is registered with atexit; never destroyed on purpose.
-  // ESP32-C3 note: GCC emits no inline "already initialized" fast path there, so every call goes through
-  // __cxa_guard_acquire and its global mutex. Fine for a per-request handler like this, not for a hot loop.
-  static OpenShock::RateLimiter* const rl = [] {
-    auto* limiter = new OpenShock::RateLimiter();
-    limiter->addLimit(60'000, 5);    // 5 attempts per minute
-    limiter->addLimit(300'000, 10);  // 10 attempts per 5 minutes
-    return limiter;
-  }();
+  // Only called from the httpd task
+  static OpenShock::RateLimiter* rl = nullptr;
+  if (rl == nullptr) {
+    rl = new OpenShock::RateLimiter();
+    rl->addLimit(60'000, 5);    // 5 attempts per minute
+    rl->addLimit(300'000, 10);  // 10 attempts per 5 minutes
+  }
   return *rl;
 }
 

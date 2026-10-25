@@ -95,8 +95,7 @@ static std::atomic<uint8_t> s_preferredCredentialsID = 0;
 static OpenShock::SimpleMutex s_networksMutex;
 static std::vector<WiFiNetwork> s_wifiNetworks;
 
-// Local events only reach captive-portal clients, and building the FlatBuffer is most of their cost. The portal
-// answers "is anyone there" with one lock-free flag, so the common case, portal closed, does no work at all.
+// Skip serializing when no portal is running
 static void portalBroadcastNetworkEvent(Serialization::Types::WifiNetworkEventType eventType, const WiFiNetwork& network)
 {
   if (!AppHooks::CaptivePortalIsRunning()) return;
