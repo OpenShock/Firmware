@@ -251,6 +251,33 @@ TEST_CASE("CommandHandler keep-alive pings a shocker after a minute of inactivit
   TEST_ASSERT_TRUE(CommandHandler::SetKeepAliveEnabled(false));
 }
 
+TEST_CASE("CommandHandler keep-alive tracks at most 16 shockers, dropping the least recently used", "[device_control][command][keepalive]")
+{
+  resetCommandHandler();
+  QueueHandle_t rfQueue = HostFake::NewestQueue();
+  TEST_ASSERT_TRUE(CommandHandler::SetKeepAliveEnabled(true));
+  TaskHandle_t keepAlive = HostFake::FindTask("KeepAliveTask");
+
+  // Shockers 1..17, each a little later than the one before, so shocker 1 is the least recently used
+  for (uint16_t id = 1; id <= 17; id++) {
+    TEST_ASSERT_TRUE(CommandHandler::HandleCommand(kModel, id, ShockerCommandType::Vibrate, 10, 100));
+    HostFake::RunTask(transmitTask(), kBudget);
+    HostFake::Now += 10;
+  }
+  TEST_ASSERT_EQUAL(0, HostFake::QueueLength(rfQueue));
+  HostFake::Transmissions.clear();
+
+  TEST_ASSERT_TRUE(runKeepAliveUntil(keepAlive, rfQueue, HostFake::Now + 2 * kKeepAliveMs));
+  TEST_ASSERT_EQUAL(16, HostFake::QueueLength(rfQueue));
+
+  HostFake::RunTask(transmitTask(), kBudget);
+  TEST_ASSERT_EQUAL(0, TestFrames::Count(TestFrames::Payload(kModel, 1, ShockerCommandType::Vibrate, 0)));
+  TEST_ASSERT_TRUE(TestFrames::Count(TestFrames::Payload(kModel, 2, ShockerCommandType::Vibrate, 0)) > 0);
+  TEST_ASSERT_TRUE(TestFrames::Count(TestFrames::Payload(kModel, 17, ShockerCommandType::Vibrate, 0)) > 0);
+
+  TEST_ASSERT_TRUE(CommandHandler::SetKeepAliveEnabled(false));
+}
+
 TEST_CASE("CommandHandler keep-alive stays up but sends nothing while e-stopped", "[device_control][command][keepalive][estop]")
 {
   resetCommandHandler();

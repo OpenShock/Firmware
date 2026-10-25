@@ -26,6 +26,8 @@ const char* const TAG = "CommandHandler";
 
 const int64_t KEEP_ALIVE_INTERVAL  = 60'000;
 const uint16_t KEEP_ALIVE_DURATION = 300;
+// Shocker IDs come from the network, so the set is capped; past it the least recently used shocker is dropped
+const size_t KEEP_ALIVE_MAX_SHOCKERS = 16;
 
 static uint32_t calculateEepyTime(int64_t timeToKeepAlive)
 {
@@ -110,7 +112,13 @@ static void commandhandler_keepalivetask()
         return;
       }
 
-      activityMap[(static_cast<uint32_t>(cmd.model) << 16) | cmd.shockerId] = cmd;
+      uint32_t key = (static_cast<uint32_t>(cmd.model) << 16) | cmd.shockerId;
+      if (activityMap.size() >= KEEP_ALIVE_MAX_SHOCKERS && !activityMap.contains(key)) {
+        auto oldest = std::min_element(activityMap.begin(), activityMap.end(), [](const auto& a, const auto& b) { return a.second.lastActivityTimestamp < b.second.lastActivityTimestamp; });
+        OS_LOGW(TAG, "Keeping more than %zu shockers alive, dropping shocker %u", KEEP_ALIVE_MAX_SHOCKERS, oldest->second.shockerId);
+        activityMap.erase(oldest);
+      }
+      activityMap[key] = cmd;
 
       eepyTime = calculateEepyTime(std::min(timeToKeepAlive, cmd.lastActivityTimestamp + KEEP_ALIVE_INTERVAL));
     }
