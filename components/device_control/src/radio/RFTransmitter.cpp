@@ -254,6 +254,10 @@ static bool transmitSymbols(rmt_channel_handle_t channel, rmt_encoder_handle_t e
     if (failures++ == 0) {
       OS_LOGE(TAG, "rmt_tx_wait_all_done failed: %s", esp_err_to_name(err));
     }
+    // The frame may still be in flight, reading `symbols`, which the caller is free to rewrite or free once this
+    // returns. Disabling the channel aborts it; enable it again for the next frame.
+    rmt_disable(channel);
+    rmt_enable(channel);
     return false;
   }
 

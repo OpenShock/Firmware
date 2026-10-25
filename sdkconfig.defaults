@@ -35,6 +35,11 @@ CONFIG_HTTPD_WS_POST_HANDSHAKE_CB_SUPPORT=y
 # which the WiFi, IP and OpenShock events depend on.
 CONFIG_HTTPD_ENABLE_EVENTS=n
 
+# Keep the RMT TX ISR running while the flash cache is off (OTA erase, config writes). Otherwise it is masked for the
+# whole flash operation and a frame longer than the channel's 64-symbol memory block runs dry mid-transmission: a
+# corrupted RF frame or LED colour. Costs some IRAM; frame buffers must be in internal RAM (they are: heap and stack).
+CONFIG_RMT_TX_ISR_CACHE_SAFE=y
+
 # TLS server-cert verification uses the mbedTLS certificate bundle. We compile in
 # our own curated trust store (certificates/cacert-merged.pem) instead of IDF's built-in
 # Mozilla list, so DEFAULT_NONE + a custom bundle. esp_http_client and
