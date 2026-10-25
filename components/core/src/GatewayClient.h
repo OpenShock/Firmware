@@ -40,6 +40,7 @@ namespace OpenShock {
   private:
     void _setState(GatewayClientState state);
     void _sendBootStatus();
+    bool _send(ws_transport_opcodes_t opcode, const uint8_t* data, std::size_t len);
 
     static void _eventHandler(void* arg, esp_event_base_t base, int32_t eventId, void* eventData);
     void _handleData(const esp_websocket_event_data_t* data);
@@ -48,9 +49,10 @@ namespace OpenShock {
     void _destroyHandle();
 
     std::string m_headers;
-    SimpleMutex m_handleMutex;                // Held across sends so the handle can't be destroyed mid-send
-    esp_websocket_client_handle_t m_client;   // Guarded by m_handleMutex
-    std::atomic<GatewayClientState> m_state;  // Written from both the owning task and the websocket task
+    SimpleMutex m_handleMutex;                            // Held across sends from other tasks so the handle can't be destroyed mid-send
+    std::atomic<esp_websocket_client_handle_t> m_client;  // Written under m_handleMutex
+    std::atomic<TaskHandle_t> m_wsTask;                   // The websocket task, recorded from its event callbacks
+    std::atomic<GatewayClientState> m_state;              // Written from both the owning task and the websocket task
     std::atomic<int64_t> m_lastPingTimestamp;
     std::atomic<bool> m_retired;
 

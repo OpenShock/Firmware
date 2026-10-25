@@ -18,7 +18,6 @@ const char* const TAG = "GatewayClient";
 #include <esp_crt_bundle.h>
 
 #include <cstring>
-#include <utility>
 
 using namespace OpenShock;
 
@@ -44,6 +43,7 @@ GatewayClient::GatewayClient(const std::string& authToken)
   : m_headers()
   , m_handleMutex()
   , m_client(nullptr)
+  , m_wsTask(nullptr)
   , m_state(GatewayClientState::Disconnected)
   , m_lastPingTimestamp(0)
   , m_retired(false)
@@ -71,7 +71,7 @@ GatewayClient::~GatewayClient()
 esp_websocket_client_handle_t GatewayClient::_takeHandle()
 {
   ScopedLock lock__(&m_handleMutex);
-  return std::exchange(m_client, nullptr);
+  return m_client.exchange(nullptr);
 }
 
 void GatewayClient::_destroyHandle()
@@ -133,33 +133,35 @@ void GatewayClient::connect(const std::string& host, uint16_t port, const std::s
 
 bool GatewayClient::sendMessageTXT(std::string_view data)
 {
-  const TickType_t started = xTaskGetTickCount();
-  ScopedLock lock__(&m_handleMutex, GATEWAY_SEND_TIMEOUT);
-  if (!lock__.isLocked()) {
-    OS_LOGW(TAG, "Timed out waiting for the websocket handle, dropping text message");
-    return false;
-  }
-  if (m_state != GatewayClientState::Connected || m_client == nullptr) {
-    return false;
-  }
-
-  const TickType_t elapsed = xTaskGetTickCount() - started;
-  if (elapsed >= GATEWAY_SEND_TIMEOUT) {
-    return false;
-  }
-
-  return esp_websocket_client_send_text(m_client, data.data(), data.length(), GATEWAY_SEND_TIMEOUT - elapsed) >= 0;
+  return _send(WS_TRANSPORT_OPCODES_TEXT, reinterpret_cast<const uint8_t*>(data.data()), data.length());
 }
 
 bool GatewayClient::sendMessageBIN(std::span<const uint8_t> data)
 {
+  return _send(WS_TRANSPORT_OPCODES_BINARY, data.data(), data.size());
+}
+
+bool GatewayClient::_send(ws_transport_opcodes_t opcode, const uint8_t* data, std::size_t len)
+{
+  // The websocket task runs our callbacks while holding the client's internal lock, so taking m_handleMutex there
+  // would invert the lock order against other senders. It needs no lock: destroy joins that task, so the handle
+  // outlives the callback.
+  if (xTaskGetCurrentTaskHandle() == m_wsTask.load()) {
+    esp_websocket_client_handle_t client = m_client.load();
+    if (m_state != GatewayClientState::Connected || client == nullptr) {
+      return false;
+    }
+    return esp_websocket_client_send_with_opcode(client, opcode, data, len, GATEWAY_SEND_TIMEOUT) >= 0;
+  }
+
   const TickType_t started = xTaskGetTickCount();
   ScopedLock lock__(&m_handleMutex, GATEWAY_SEND_TIMEOUT);
   if (!lock__.isLocked()) {
-    OS_LOGW(TAG, "Timed out waiting for the websocket handle, dropping binary message");
+    OS_LOGW(TAG, "Timed out waiting for the websocket handle, dropping message");
     return false;
   }
-  if (m_state != GatewayClientState::Connected || m_client == nullptr) {
+  esp_websocket_client_handle_t client = m_client.load();
+  if (m_state != GatewayClientState::Connected || client == nullptr) {
     return false;
   }
 
@@ -168,7 +170,7 @@ bool GatewayClient::sendMessageBIN(std::span<const uint8_t> data)
     return false;
   }
 
-  return esp_websocket_client_send_bin(m_client, reinterpret_cast<const char*>(data.data()), data.size(), GATEWAY_SEND_TIMEOUT - elapsed) >= 0;
+  return esp_websocket_client_send_with_opcode(client, opcode, data, len, GATEWAY_SEND_TIMEOUT - elapsed) >= 0;
 }
 
 void GatewayClient::markPingReceived()
@@ -244,6 +246,14 @@ void GatewayClient::_eventHandler(void* arg, esp_event_base_t /*base*/, int32_t 
 {
   auto* self       = static_cast<GatewayClient*>(arg);
   const auto* data = static_cast<esp_websocket_event_data_t*>(eventData);
+
+  // Only BEGIN and FINISH are guaranteed to run on the websocket task (a failing send dispatches ERROR/DISCONNECTED
+  // on the sender). Forget the task on FINISH, its last event, so a task reusing the handle isn't trusted.
+  if (eventId == WEBSOCKET_EVENT_BEGIN) {
+    self->m_wsTask = xTaskGetCurrentTaskHandle();
+  } else if (eventId == WEBSOCKET_EVENT_FINISH) {
+    self->m_wsTask = nullptr;
+  }
 
   switch (eventId) {
     case WEBSOCKET_EVENT_CONNECTED:
