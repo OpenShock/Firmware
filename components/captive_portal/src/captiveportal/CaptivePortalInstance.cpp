@@ -1108,6 +1108,8 @@ bool CaptivePortal::CaptivePortalInstance::startHttpServer()
   config.recv_wait_timeout = 5;
   config.send_wait_timeout = 5;
   config.uri_match_fn      = httpd_uri_match_wildcard;
+  // Same core as the WiFi/lwIP tasks, away from the E-Stop and RF tasks on core 1
+  config.core_id = 0;
 
   esp_err_t err = httpd_start(&m_server, &config);
   if (err != ESP_OK) {

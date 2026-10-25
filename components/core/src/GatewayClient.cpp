@@ -113,6 +113,9 @@ void GatewayClient::connect(const std::string& host, uint16_t port, const std::s
   config.disable_auto_reconnect        = true;                   // GatewayConnectionManager owns reconnection
   config.crt_bundle_attach             = esp_crt_bundle_attach;  // verify server against the compiled-in CA bundle
   config.task_stack                    = GATEWAY_TASK_STACK_SIZE;
+  // TLS work stays on core 0 with the WiFi/lwIP tasks, away from the E-Stop and RF tasks on core 1
+  config.task_core_id_set = true;
+  config.task_core_id     = 0;
 
   esp_websocket_client_handle_t handle = esp_websocket_client_init(&config);
   if (handle == nullptr) {

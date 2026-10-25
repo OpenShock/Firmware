@@ -23,10 +23,12 @@ const char* const TAG = "EStopManager";
 
 using namespace OpenShock;
 
-const uint32_t k_estopUpdateRate = 5;          // 200 Hz (debounce/hold timings live in EStopStateMachine)
+const uint32_t k_estopUpdateRate = 5;        // 200 Hz (debounce/hold timings live in EStopStateMachine)
 
-const uint32_t k_estopTaskStackSize   = 4096;  // TODO: profile and tune
-const UBaseType_t k_estopTaskPriority = 5;
+const uint32_t k_estopTaskStackSize = 4096;  // TODO: profile and tune
+// Above the network tasks (5) and the RF task: it is blocked almost all the time, and a sample that waits behind TLS
+// work delays the E-Stop by that long.
+const UBaseType_t k_estopTaskPriority = 10;
 
 static OpenShock::SimpleMutex s_estopMutex = {};
 // Guarded via Mutex
@@ -73,9 +75,10 @@ static void estopmgr_managerTask(gpio_num_t estopPin)
   }
 
   // Check if killing manager was requested, continue looping otherwise
+  TickType_t lastWake = xTaskGetTickCount();
   while (!s_estopTask.stopRequested()) {
-    // Sleep for the update rate
-    vTaskDelay(pdMS_TO_TICKS(k_estopUpdateRate));
+    // Fixed rate: the debounce and hold timings assume samples k_estopUpdateRate apart, whatever the loop body costs
+    xTaskDelayUntil(&lastWake, pdMS_TO_TICKS(k_estopUpdateRate));
 
     // Get current time
     int64_t now = OpenShock::millis();
