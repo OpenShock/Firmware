@@ -147,7 +147,7 @@ static bool isConnectRateLimited(const WiFiNetwork& net)
   // takes the radio off the captive portal AP's channel, so retrying every second starves portal clients.
   int64_t now     = OpenShock::millis();
   int64_t diff    = now - net.lastConnectAttempt;
-  uint16_t shift  = std::min<uint16_t>(net.connectAttempts, 5);
+  uint16_t shift  = std::min<uint16_t>(net.connectAttempts, 20);  // 1000 << 20 is past the largest cap
   int64_t backoff = std::min<int64_t>(1000LL << shift, CONFIG_OPENSHOCK_WIFI_CONNECT_BACKOFF_MAX_MS);
 
   return diff < backoff;

@@ -315,14 +315,15 @@ public:
 
   inline void reserve(std::size_t size)
   {
-    size = (size + 31) & ~31;  // Align to 32 bytes
-
     if (size > CONFIG_OPENSHOCK_SERIAL_LINE_MAX_SIZE) {
       OS_LOGE(TAG, "Line exceeds %d bytes, discarding it", CONFIG_OPENSHOCK_SERIAL_LINE_MAX_SIZE);
       m_size       = 0;
       m_overflowed = true;
       return;
     }
+
+    size = (size + 31) & ~31;  // Align to 32 bytes
+
     if (size <= m_capacity) {
       return;
     }

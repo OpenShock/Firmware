@@ -11,13 +11,13 @@ menu "Radio"
 
     config OPENSHOCK_RF_TASK_PRIORITY
         int "RF transmitter task priority"
-        range 1 24
+        range 2 24
         default 9
         help
             Above the network tasks (5): it blocks on its queue or on RMT almost all the time,
             and frames (and the terminators after an E-Stop) shouldn't wait behind TLS work.
-            Must stay below the E-Stop task's priority, so a press preempts a transmission
-            (checked at compile time).
+            Must stay above the WiFi manager and DNS server tasks, and below the E-Stop task's
+            priority so a press preempts a transmission (checked at compile time).
 
     config OPENSHOCK_RF_QUEUE_SIZE
         int "RF command queue length"
@@ -96,11 +96,11 @@ menu "Emergency stop"
 
     config OPENSHOCK_ESTOP_TASK_PRIORITY
         int "E-Stop task priority"
-        range 2 24
+        range 3 24
         default 10
         help
             Above the network tasks (5) and the RF task: it is blocked almost all the time,
             and a sample that waits behind TLS work delays the E-Stop by that long. Must stay
-            above the RF transmitter task's priority (checked at compile time).
+            above the RF transmitter and DNS server tasks' priorities (checked at compile time).
 
 endmenu

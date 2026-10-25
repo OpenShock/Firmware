@@ -368,7 +368,7 @@ bool CaptivePortal::Init()
   // If device is already fully configured, set a startup grace period before opening portal
   if (isDeviceFullyConfigured()) {
     initialState->startupGraceEnd = esp_timer_get_time() + STARTUP_GRACE_PERIOD_US;
-    OS_LOGI(TAG, "Device fully configured, startup grace period of 30s before opening portal");
+    OS_LOGI(TAG, "Device fully configured, startup grace period of %ds before opening portal", CONFIG_OPENSHOCK_PORTAL_STARTUP_GRACE_S);
   }
 
   s_forceCloseDone = xSemaphoreCreateBinary();

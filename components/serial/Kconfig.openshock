@@ -4,8 +4,10 @@ menu "Serial driver"
 
     config OPENSHOCK_SERIAL_RX_BUFFER_SIZE
         int "Console driver receive buffer (bytes)"
-        range 128 4096
+        range 256 4096
         default 256
+        help
+            The UART driver needs more than its 128-byte hardware FIFO.
 
     config OPENSHOCK_SERIAL_UART_TX_BUFFER_SIZE
         int "UART console transmit buffer (bytes)"

@@ -320,6 +320,13 @@ HTTP::Response<std::size_t>
       break;
     }
 
+    // Content-Length was checked against the limit up front, a chunked body is only bounded here
+    if (static_cast<int64_t>(totalWritten) + read > HTTP_DOWNLOAD_SIZE_LIMIT) {
+      OS_LOGE(TAG, "Response body exceeds %d MB", CONFIG_OPENSHOCK_HTTP_DOWNLOAD_SIZE_LIMIT_MB);
+      result = HTTP::RequestResult::RequestFailed;
+      break;
+    }
+
     if (!downloadCallback(totalWritten, buffer, static_cast<std::size_t>(read))) {
       OS_LOGW(TAG, "Request cancelled by callback");
       result = HTTP::RequestResult::Cancelled;

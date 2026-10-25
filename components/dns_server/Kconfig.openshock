@@ -15,6 +15,6 @@ menu "Captive portal DNS server"
             Above the other application tasks (1): a phone joining the AP sends a burst of
             DNS queries, and the small UDP receive mailbox drops them if this task is starved,
             which delays captive-portal detection by seconds. Keep it below httpd (5) and the
-            E-Stop task.
+            E-Stop task (checked at compile time).
 
 endmenu

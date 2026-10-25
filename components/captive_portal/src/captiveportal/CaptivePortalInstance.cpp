@@ -35,7 +35,8 @@ const char* const TAG = "CaptivePortalInstance";
 #include <string_view>
 
 const uint16_t HTTP_PORT = 80;
-static_assert(CONFIG_LWIP_MAX_SOCKETS >= CONFIG_OPENSHOCK_PORTAL_HTTPD_MAX_SOCKETS + 3, "httpd needs 3 lwIP sockets besides its client sockets");
+// httpd needs 3 lwIP sockets besides its client sockets; the DNS server, the gateway connection and an outbound HTTP request need one each
+static_assert(CONFIG_LWIP_MAX_SOCKETS >= CONFIG_OPENSHOCK_PORTAL_HTTPD_MAX_SOCKETS + 3 + 3, "httpd client sockets would leave no lwIP sockets for the DNS server and outbound connections");
 static_assert(CONFIG_OPENSHOCK_PORTAL_HTTPD_MAX_SOCKETS > CONFIG_OPENSHOCK_PORTAL_MAX_CLIENTS, "every websocket client needs a socket, plus one for plain requests");
 
 // HTTP status lines (esp_http_server needs the full "code reason" string, and stores

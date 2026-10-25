@@ -12,12 +12,13 @@ menu "Captive portal"
 
     config OPENSHOCK_PORTAL_HTTPD_MAX_SOCKETS
         int "HTTP server sockets"
-        range 2 13
+        range 2 10
         default 8
         help
             Browsers open several connections per page load; with only 4 the LRU purge
             evicted the websocket (server push, so it looks idle). Also sizes the broadcast
-            fd list. httpd needs 3 lwIP sockets besides these (checked against
+            fd list. httpd needs 3 lwIP sockets besides these, and the DNS server, the
+            gateway connection and an outbound HTTP request need one each (checked against
             LWIP_MAX_SOCKETS).
 
     config OPENSHOCK_PORTAL_HTTPD_STACK_SIZE
@@ -48,7 +49,8 @@ menu "Captive portal"
         range 0 600
         default 30
         help
-            The portal stays up this long after boot, whatever the connection state.
+            On a fully configured hub, how long after boot the portal waits for the gateway
+            connection before it opens. It stays closed if the hub connects in time.
 
     config OPENSHOCK_PORTAL_AUTO_CLOSE_S
         int "Auto-close delay (s)"
