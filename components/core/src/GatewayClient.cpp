@@ -63,7 +63,11 @@ GatewayClient::~GatewayClient()
 
   esp_websocket_client_handle_t handle = _takeHandle();
   if (handle != nullptr) {
-    esp_websocket_client_close(handle, pdMS_TO_TICKS(1000));
+    // Not esp_websocket_client_close(): it sends the close frame with portMAX_DELAY, so a stalled TLS write would hang
+    // this task. Best-effort close frame with a bounded wait, then destroy stops and joins the websocket task.
+    if (esp_websocket_client_is_connected(handle)) {
+      esp_websocket_client_send_with_opcode(handle, WS_TRANSPORT_OPCODES_CLOSE, nullptr, 0, pdMS_TO_TICKS(1000));
+    }
     esp_websocket_client_destroy(handle);
   }
 }
