@@ -38,6 +38,9 @@ static constexpr int WS_OP_BINARY = 0x02;
 
 // A retired client's websocket task may still be running
 static std::atomic<bool> s_bootStatusSent = false;
+// Set on the websocket task once the boot status went out; the OTA step is then cleared from loop() on the main task,
+// so the flash write doesn't run on the websocket task (which holds the client lock every other sender waits on).
+static std::atomic<bool> s_otaStepResetPending = false;
 
 GatewayClient::GatewayClient(const std::string& authToken)
   : m_headers()
@@ -184,6 +187,12 @@ void GatewayClient::markPingReceived()
 
 bool GatewayClient::loop()
 {
+  if (s_otaStepResetPending.exchange(false)) {
+    if (!Config::SetOtaUpdateStep(OpenShock::OtaUpdateStep::None)) {
+      OS_LOGE(TAG, "Failed to reset firmware boot type to normal");
+    }
+  }
+
   if (m_state == GatewayClientState::Disconnected) {
     return false;
   }
@@ -240,9 +249,7 @@ void GatewayClient::_sendBootStatus()
   s_bootStatusSent = Serialization::Gateway::SerializeBootStatusMessage(*updateId, AppHooks::OtaGetFirmwareBootType(), [this](std::span<const uint8_t> data) { return sendMessageBIN(data); });
 
   if (s_bootStatusSent && *updateStep != OpenShock::OtaUpdateStep::None) {
-    if (!Config::SetOtaUpdateStep(OpenShock::OtaUpdateStep::None)) {
-      OS_LOGE(TAG, "Failed to reset firmware boot type to normal");
-    }
+    s_otaStepResetPending = true;
   }
 }
 

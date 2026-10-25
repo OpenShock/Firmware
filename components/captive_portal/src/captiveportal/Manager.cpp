@@ -229,6 +229,11 @@ static void applyCommands(ManagerState& state, uint32_t commands)
 {
   if ((commands & kCmdAlwaysEnabledSet) != 0) {
     state.alwaysEnabled = s_alwaysEnabled.load(std::memory_order_relaxed);
+    // Persisted here rather than by the caller, which may be the websocket task; back-to-back changes coalesce into
+    // one write of the latest value.
+    if (!Config::SetCaptivePortalConfig(Config::CaptivePortalConfig(state.alwaysEnabled))) {
+      OS_LOGE(TAG, "Failed to save captive portal config");
+    }
     // Disabled from the backend: close once online rather than after the idle timeout
     state.closeWhenOnline = !state.alwaysEnabled;
   }
@@ -407,8 +412,12 @@ void CaptivePortal::SetUserDone()
 void CaptivePortal::SetAlwaysEnabled(bool alwaysEnabled)
 {
   s_alwaysEnabled = alwaysEnabled;
-  Config::SetCaptivePortalConfig(Config::CaptivePortalConfig(alwaysEnabled));
-  sendCommand(kCmdAlwaysEnabledSet);
+  if (s_managerTask == nullptr) {
+    // No manager task to hand the write to yet
+    Config::SetCaptivePortalConfig(Config::CaptivePortalConfig(alwaysEnabled));
+    return;
+  }
+  sendCommand(kCmdAlwaysEnabledSet);  // The manager task saves it
 }
 bool CaptivePortal::IsAlwaysEnabled()
 {
