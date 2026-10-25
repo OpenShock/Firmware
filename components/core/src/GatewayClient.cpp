@@ -339,7 +339,7 @@ void GatewayClient::_handleData(const esp_websocket_event_data_t* data)
   if (data->op_code == WS_OP_BINARY && data->payload_offset == 0 && messageEnd) {
     m_binReasmActive  = false;
     m_binReasmDiscard = false;
-    MessageHandlers::WebSocket::HandleGatewayBinary(std::span<const uint8_t>(reinterpret_cast<const uint8_t*>(data->data_ptr), data->data_len));
+    MessageHandlers::WebSocket::HandleGatewayBinary(*this, std::span<const uint8_t>(reinterpret_cast<const uint8_t*>(data->data_ptr), data->data_len));
     return;
   }
 
@@ -366,7 +366,7 @@ void GatewayClient::_handleData(const esp_websocket_event_data_t* data)
 
   if (messageEnd) {
     if (!m_binReasmDiscard) {
-      MessageHandlers::WebSocket::HandleGatewayBinary(std::span<const uint8_t>(m_binReasm.data(), m_binReasm.size()));
+      MessageHandlers::WebSocket::HandleGatewayBinary(*this, std::span<const uint8_t>(m_binReasm.data(), m_binReasm.size()));
     }
     m_binReasm.clear();
     m_binReasmActive  = false;

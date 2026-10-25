@@ -37,7 +37,7 @@ static std::array<Handlers::HandlerType, HANDLER_COUNT> s_serverHandlers = []() 
   return handlers;
 }();
 
-void MessageHandlers::WebSocket::HandleGatewayBinary(std::span<const uint8_t> data)
+void MessageHandlers::WebSocket::HandleGatewayBinary(GatewayClient& client, std::span<const uint8_t> data)
 {
   auto msg = Serialization::GetVerifiedRoot<Schemas::GatewayToHubMessage>(data, MaxGatewayMessageSize);
   if (msg == nullptr) {
@@ -46,9 +46,9 @@ void MessageHandlers::WebSocket::HandleGatewayBinary(std::span<const uint8_t> da
   }
 
   if (msg->payload_type() < PayloadType::MIN || msg->payload_type() > PayloadType::MAX) {
-    Handlers::HandleInvalidMessage(msg);
+    Handlers::HandleInvalidMessage(client, msg);
     return;
   }
 
-  s_serverHandlers[std::to_underlying(msg->payload_type())](msg);
+  s_serverHandlers[std::to_underlying(msg->payload_type())](client, msg);
 }

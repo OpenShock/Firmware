@@ -21,7 +21,5 @@ namespace OpenShock::GatewayConnectionManager {
   bool SendMessageTXT(std::string_view data);
   bool SendMessageBIN(std::span<const uint8_t> data);
 
-  void MarkPingReceived();
-
   void Update();
 }  // namespace OpenShock::GatewayConnectionManager
