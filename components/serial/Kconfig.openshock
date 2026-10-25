@@ -1,0 +1,20 @@
+# Sourced into the OpenShock menu by main/Kconfig.projbuild
+
+menu "Serial driver"
+
+    config OPENSHOCK_SERIAL_RX_BUFFER_SIZE
+        int "Console driver receive buffer (bytes)"
+        range 128 4096
+        default 256
+
+    config OPENSHOCK_SERIAL_UART_TX_BUFFER_SIZE
+        int "UART console transmit buffer (bytes)"
+        range 256 16384
+        default 2048
+
+    config OPENSHOCK_SERIAL_USJ_TX_BUFFER_SIZE
+        int "USB-Serial-JTAG console transmit buffer (bytes)"
+        range 256 16384
+        default 1024
+
+endmenu

@@ -1,0 +1,12 @@
+# Sourced into the OpenShock menu by main/Kconfig.projbuild
+
+menu "OTA updates"
+
+    config OPENSHOCK_OTA_TASK_STACK_SIZE
+        int "OTA task stack (bytes)"
+        range 8192 32768
+        default 16384
+        help
+            Profiled at about 6.2 KB.
+
+endmenu

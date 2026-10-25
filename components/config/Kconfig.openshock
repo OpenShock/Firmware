@@ -1,0 +1,29 @@
+# Sourced into the OpenShock menu by main/Kconfig.projbuild
+
+menu "Defaults"
+
+    config OPENSHOCK_API_DOMAIN
+        string "OpenShock API domain"
+        default "api.openshock.app"
+        help
+            Default backend API domain the hub connects to. Overridable at runtime.
+
+    config OPENSHOCK_FW_CDN_DOMAIN
+        string "Firmware CDN domain"
+        default "firmware.openshock.org"
+        help
+            Default CDN domain used for OTA firmware/version lookups. Overridable at runtime.
+
+    config OPENSHOCK_FW_HOSTNAME
+        string "Default hostname"
+        default "OpenShock"
+        help
+            Default network hostname; also the base of the default user agent.
+
+    config OPENSHOCK_FW_AP_PREFIX
+        string "SoftAP SSID prefix"
+        default "OpenShock-"
+        help
+            Prefix for the captive-portal SoftAP SSID (the device MAC is appended).
+
+endmenu

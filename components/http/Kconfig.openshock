@@ -1,0 +1,37 @@
+# Sourced into the OpenShock menu by main/Kconfig.projbuild
+
+menu "HTTP client"
+
+    config OPENSHOCK_HTTP_BUFFER_SIZE
+        int "Download buffer (bytes)"
+        range 512 32768
+        default 4096
+
+    config OPENSHOCK_HTTP_MAX_STRING_RESPONSE_SIZE
+        int "Largest response read into memory (bytes)"
+        range 4096 262144
+        default 65536
+        help
+            JSON and text responses are read whole; larger ones are rejected.
+
+    config OPENSHOCK_HTTP_DOWNLOAD_SIZE_LIMIT_MB
+        int "Largest streamed download (MB)"
+        range 1 2000
+        default 200
+
+    config OPENSHOCK_HTTP_RETRY_AFTER_MIN_S
+        int "Shortest Retry-After honoured (s)"
+        range 1 600
+        default 2
+        help
+            Also used when the header is missing or unparseable. Above zero, so a "0" can't
+            turn into a tight retry loop.
+
+    config OPENSHOCK_HTTP_RETRY_AFTER_MAX_S
+        int "Longest Retry-After honoured (s)"
+        range 1 86400
+        default 600
+        help
+            So one bad header can't keep the hub offline for long.
+
+endmenu

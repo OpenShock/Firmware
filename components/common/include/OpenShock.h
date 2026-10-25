@@ -9,7 +9,8 @@
   TypeName& operator=(TypeName&&) = delete
 
 // Config comes from two places: Kconfig (CONFIG_OPENSHOCK_*, via sdkconfig.h -
-// domains, hostname, AP prefix, buffer sizes; see components/core/Kconfig.projbuild)
+// domains, hostname, task stacks and priorities, timeouts, queue and buffer sizes;
+// see main/Kconfig.projbuild and components/*/Kconfig.openshock)
 // and the generated board header (OPENSHOCK_FW_CHIP, build mode, log level, and the
 // board the build was configured for; see scripts/gen_env_header.py).
 //

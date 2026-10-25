@@ -1,4 +1,4 @@
-# The CONFIG_OPENSHOCK_* settings (domains, hostname, AP prefix, buffer sizes) the
-# firmware reads through sdkconfig.h. Sourced from core rather than copied, so the
-# host tests always build against the same defaults as the firmware.
-rsource "../../components/core/Kconfig.projbuild"
+# The CONFIG_OPENSHOCK_* settings the firmware reads through sdkconfig.h. Sourced from
+# the firmware's own menu (which pulls in every component's Kconfig.openshock) rather
+# than copied, so the host tests always build against the same defaults as the firmware.
+rsource "../../main/Kconfig.projbuild"

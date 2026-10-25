@@ -53,8 +53,8 @@ struct ManagerState {
   int64_t autoCloseAt     = 0;      // esp_timer time at which an idle portal closes; 0 = not armed
 };
 
-static constexpr int64_t STARTUP_GRACE_PERIOD_US = 30LL * 1'000'000;      // 30 seconds
-static constexpr int64_t AUTO_CLOSE_DELAY_US     = 5LL * 60 * 1'000'000;  // 5 minutes
+static constexpr int64_t STARTUP_GRACE_PERIOD_US = CONFIG_OPENSHOCK_PORTAL_STARTUP_GRACE_S * 1'000'000LL;
+static constexpr int64_t AUTO_CLOSE_DELAY_US     = CONFIG_OPENSHOCK_PORTAL_AUTO_CLOSE_S * 1'000'000LL;
 
 // The requested always-enabled setting, and what IsAlwaysEnabled() reports. Written by SetAlwaysEnabled().
 static std::atomic<bool> s_alwaysEnabled = false;
@@ -190,7 +190,7 @@ static bool captiveportal_start()
   apConfig.ap.ssid_len        = strlen(reinterpret_cast<char*>(apConfig.ap.ssid));
   apConfig.ap.channel         = 1;
   apConfig.ap.authmode        = WIFI_AUTH_OPEN;
-  apConfig.ap.max_connection  = 4;
+  apConfig.ap.max_connection  = CONFIG_OPENSHOCK_PORTAL_MAX_CLIENTS;
   apConfig.ap.beacon_interval = 100;
 
   esp_err_t err = esp_wifi_set_mode(WIFI_MODE_APSTA);
@@ -312,12 +312,12 @@ static void captiveportal_tick(ManagerState& state)
     return;
   }
 
-  // Auto-close: no clients connected, WiFi + gateway are up, 5 minutes elapsed
+  // Auto-close: no clients connected, WiFi + gateway are up, AUTO_CLOSE_DELAY_US elapsed
   if (running && !state.alwaysEnabled && connected && !hasClients) {
     if (state.autoCloseAt == 0) {
       state.autoCloseAt = now + AUTO_CLOSE_DELAY_US;
     } else if (now >= state.autoCloseAt) {
-      OS_LOGI(TAG, "Auto-closing captive portal AP (no clients for 5 minutes)");
+      OS_LOGI(TAG, "Auto-closing captive portal AP (no clients for %d s)", CONFIG_OPENSHOCK_PORTAL_AUTO_CLOSE_S);
       captiveportal_stop(state);
       return;
     }
@@ -378,7 +378,7 @@ bool CaptivePortal::Init()
     return false;
   }
 
-  if (TaskUtils::TaskCreateExpensive(captiveportal_managertask, "CaptivePortalManager", 6144, initialState, 1, &s_managerTask) != pdPASS) {
+  if (TaskUtils::TaskCreateExpensive(captiveportal_managertask, "CaptivePortalManager", CONFIG_OPENSHOCK_PORTAL_MANAGER_TASK_STACK_SIZE, initialState, 1, &s_managerTask) != pdPASS) {
     OS_LOGE(TAG, "Failed to create captive portal manager task");
     delete initialState;
     return false;

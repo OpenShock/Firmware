@@ -1,0 +1,24 @@
+menu "OpenShock"
+
+# The board's GPIO assignments deliberately do NOT live here.
+#
+# A Kconfig symbol ends up in sdkconfig.h, which most of ESP-IDF includes, so two
+# boards that differed only by an LED pin produced a different sdkconfig.h and
+# therefore shared no compiled framework objects at all. The pins are stamped into
+# the image per board instead (BoardDescriptor.h): bare `OPENSHOCK_*=` lines in
+# boards/<board>.defaults, stripped from the sdkconfig fragment by scripts/build.py.
+#
+# Everything in it is identical across every board and build channel, so it costs
+# nothing in shared objects. Keep it that way: a setting that has to differ per
+# board or per channel doesn't belong here (see OPENSHOCK_LOG_LEVEL_CHOICE).
+#
+# Fixed in code on purpose: the RF protocol timings, the E-Stop debounce, hold and
+# rearm times (safety behaviour), task core affinity, and on-flash formats.
+#
+# Each component keeps its own settings in components/<name>/Kconfig.openshock. They are
+# all sourced here, also for components a build leaves out, so every CONFIG_OPENSHOCK_*
+# symbol exists in every build (the host tests build only their own sources).
+
+orsource "../components/*/Kconfig.openshock"
+
+endmenu

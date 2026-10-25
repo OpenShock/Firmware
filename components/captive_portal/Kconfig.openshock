@@ -1,0 +1,72 @@
+# Sourced into the OpenShock menu by main/Kconfig.projbuild
+
+menu "Captive portal"
+
+    config OPENSHOCK_PORTAL_MAX_CLIENTS
+        int "Clients (SoftAP stations and websockets)"
+        range 1 8
+        default 4
+        help
+            The SoftAP's station limit and the number of websocket clients the portal
+            serves. Must stay below the HTTP server's socket count.
+
+    config OPENSHOCK_PORTAL_HTTPD_MAX_SOCKETS
+        int "HTTP server sockets"
+        range 2 13
+        default 8
+        help
+            Browsers open several connections per page load; with only 4 the LRU purge
+            evicted the websocket (server push, so it looks idle). Also sizes the broadcast
+            fd list. httpd needs 3 lwIP sockets besides these (checked against
+            LWIP_MAX_SOCKETS).
+
+    config OPENSHOCK_PORTAL_HTTPD_STACK_SIZE
+        int "HTTP server task stack (bytes)"
+        range 4096 32768
+        default 8192
+
+    config OPENSHOCK_PORTAL_HTTPD_TIMEOUT_S
+        int "HTTP socket send/receive timeout (s)"
+        range 1 60
+        default 5
+
+    config OPENSHOCK_PORTAL_MAX_MESSAGE_SIZE
+        int "Largest local websocket message (bytes)"
+        range 1024 32768
+        default 4096
+
+    config OPENSHOCK_PORTAL_WS_MAX_QUEUED_SENDS
+        int "Queued websocket sends"
+        range 4 256
+        default 32
+        help
+            Outgoing websocket messages waiting for httpd. Bounds the memory a burst of
+            broadcasts can hold while no client drains them; past it, new ones are dropped.
+
+    config OPENSHOCK_PORTAL_STARTUP_GRACE_S
+        int "Startup grace period (s)"
+        range 0 600
+        default 30
+        help
+            The portal stays up this long after boot, whatever the connection state.
+
+    config OPENSHOCK_PORTAL_AUTO_CLOSE_S
+        int "Auto-close delay (s)"
+        range 10 3600
+        default 300
+        help
+            Once the hub is online and no client is connected, the portal closes after this long.
+
+    config OPENSHOCK_PORTAL_MANAGER_TASK_STACK_SIZE
+        int "Portal manager task stack (bytes)"
+        range 4096 16384
+        default 6144
+
+    config OPENSHOCK_PORTAL_ACCOUNT_LINK_TASK_STACK_SIZE
+        int "Account link task stack (bytes)"
+        range 4096 16384
+        default 8192
+        help
+            Runs the HTTPS request that exchanges a link code for a token.
+
+endmenu
