@@ -218,6 +218,7 @@ bool LfsPartition::readAll(const char* path, std::vector<uint8_t>& out)
 bool LfsPartition::writeAll(const char* path, std::span<const uint8_t> data)
 {
   if (!m_mounted || !m_state->writable) {
+    OS_LOGE(TAG, "Can't write %s: partition %s", path, !m_mounted ? "not mounted" : "read-only");
     return false;
   }
 
@@ -225,7 +226,9 @@ bool LfsPartition::writeAll(const char* path, std::span<const uint8_t> data)
   std::string tmp = std::string(path) + ".tmp";
 
   lfs_file_t file;
-  if (lfs_file_open(&m_state->lfs, &file, tmp.c_str(), LFS_O_WRONLY | LFS_O_CREAT | LFS_O_TRUNC) < 0) {
+  int err = lfs_file_open(&m_state->lfs, &file, tmp.c_str(), LFS_O_WRONLY | LFS_O_CREAT | LFS_O_TRUNC);
+  if (err < 0) {
+    OS_LOGE(TAG, "Failed to open %s for writing (lfs error %d)", tmp.c_str(), err);
     return false;
   }
 
@@ -233,10 +236,13 @@ bool LfsPartition::writeAll(const char* path, std::span<const uint8_t> data)
   if (!data.empty()) {
     lfs_ssize_t w = lfs_file_write(&m_state->lfs, &file, data.data(), data.size());
     if (w < 0 || static_cast<size_t>(w) != data.size()) {
+      OS_LOGE(TAG, "Failed to write %zu bytes to %s (lfs result %ld)", data.size(), tmp.c_str(), static_cast<long>(w));
       ok = false;
     }
   }
-  if (lfs_file_close(&m_state->lfs, &file) < 0) {
+  err = lfs_file_close(&m_state->lfs, &file);
+  if (err < 0) {
+    OS_LOGE(TAG, "Failed to close %s (lfs error %d)", tmp.c_str(), err);
     ok = false;
   }
 
@@ -245,7 +251,9 @@ bool LfsPartition::writeAll(const char* path, std::span<const uint8_t> data)
     return false;
   }
 
-  if (lfs_rename(&m_state->lfs, tmp.c_str(), path) < 0) {
+  err = lfs_rename(&m_state->lfs, tmp.c_str(), path);
+  if (err < 0) {
+    OS_LOGE(TAG, "Failed to rename %s to %s (lfs error %d)", tmp.c_str(), path, err);
     lfs_remove(&m_state->lfs, tmp.c_str());
     return false;
   }

@@ -104,7 +104,7 @@ static bool trySaveConfig(const uint8_t* data, std::size_t dataLen)
   }
 
   if (!_configFs.write(CONFIG_FILE_PATH, std::span<const uint8_t>(data, dataLen))) {
-    OS_LOGE(TAG, "Failed to write config file");
+    OS_LOGE(TAG, "Failed to write config file (%zu bytes)", dataLen);
     return false;
   }
 
