@@ -192,7 +192,10 @@ def test_optimization_outside_ci_is_debug(monkeypatch):
 def test_board_fragment_selects_the_optimization(idf, tmp_path):
     assert build.main(['OpenShock-Core-V2', 'app']) == 0
     text = (tmp_path / 'build' / 'board.defaults').read_text(encoding='utf-8')
-    assert text.splitlines()[-1] == 'CONFIG_COMPILER_OPTIMIZATION_DEBUG=y'
+    assert text.splitlines()[-2:] == [
+        'CONFIG_COMPILER_OPTIMIZATION_DEBUG=y',
+        'CONFIG_COMPILER_OPTIMIZATION_ASSERTIONS_ENABLE=y',
+    ]
 
 
 def test_stable_variant_compiles_for_size(idf, monkeypatch, tmp_path):
@@ -200,7 +203,11 @@ def test_stable_variant_compiles_for_size(idf, monkeypatch, tmp_path):
     variant = boards.group_variants(['OpenShock-Core-V2'])[0]
     assert build.main(['--variant', variant.id]) == 0
     text = (tmp_path / 'build' / 'variant.defaults').read_text(encoding='utf-8')
-    assert text.splitlines()[-1] == 'CONFIG_COMPILER_OPTIMIZATION_SIZE=y'
+    # Stable drops the assert text; the release's ELF decodes the backtrace instead.
+    assert text.splitlines()[-2:] == [
+        'CONFIG_COMPILER_OPTIMIZATION_SIZE=y',
+        'CONFIG_COMPILER_OPTIMIZATION_ASSERTIONS_SILENT=y',
+    ]
     assert 'CONFIG_COMPILER_OPTIMIZATION_DEBUG=y' not in text
 
 

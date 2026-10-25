@@ -32,10 +32,12 @@ from utils.boards import board_fragment, find_variant, kconfig_lines, read_board
 from utils.files import write_if_changed
 from utils.paths import ROOT
 
-# The compiler optimization each level selects (OPENSHOCK_FW_OPTIMIZATION, else github.build_optimization()).
+# The Kconfig each level selects (OPENSHOCK_FW_OPTIMIZATION, else github.build_optimization()). Size also drops the
+# assert text (file, line, expression), about 54 KB: a failed assert still aborts with a backtrace, which the
+# release's ELF decodes.
 OPTIMIZATION_KCONFIG = {
-    'debug': 'CONFIG_COMPILER_OPTIMIZATION_DEBUG=y',
-    'size': 'CONFIG_COMPILER_OPTIMIZATION_SIZE=y',
+    'debug': ('CONFIG_COMPILER_OPTIMIZATION_DEBUG=y', 'CONFIG_COMPILER_OPTIMIZATION_ASSERTIONS_ENABLE=y'),
+    'size': ('CONFIG_COMPILER_OPTIMIZATION_SIZE=y', 'CONFIG_COMPILER_OPTIMIZATION_ASSERTIONS_SILENT=y'),
 }
 
 
@@ -73,7 +75,7 @@ def resolve_build_dir(name: str, optimization: str = 'debug') -> Path:
 
 def optimization_kconfig(optimization: str) -> str:
     # Last in the fragment, after the board's lines. Not part of the variant id: every variant compiles at either level.
-    return f'# Optimization: {optimization}\n{OPTIMIZATION_KCONFIG[optimization]}\n'
+    return f'# Optimization: {optimization}\n' + ''.join(f'{line}\n' for line in OPTIMIZATION_KCONFIG[optimization])
 
 
 def variant_inputs(variant_id: str, optimization: str = 'debug') -> BuildInputs:

@@ -348,6 +348,13 @@ jobs:
         with:
           name: firmware_merged
 
+      # One per build variant, for decoding crash backtraces (build-firmware's Stage ELF)
+      - name: Download ELF files
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333  # v8.0.2
+        with:
+          pattern: elf_*
+          merge-multiple: true
+
       - name: Upload binaries to staged release
         run: |
           shopt -s globstar nullglob
@@ -356,7 +363,12 @@ jobs:
             echo "::error::No firmware binaries found to upload"
             exit 1
           fi
-          gh release upload "$TAG" "${files[@]}" --clobber
+          elfs=(**/OpenShock_*.elf)
+          if [ ${#elfs[@]} -eq 0 ]; then
+            echo "::error::No ELF files found to upload"
+            exit 1
+          fi
+          gh release upload "$TAG" "${files[@]}" "${elfs[@]}" --clobber
 
       - name: Publish the release
         run: gh release edit "$TAG" --draft=false
