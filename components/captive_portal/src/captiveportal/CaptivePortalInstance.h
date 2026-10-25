@@ -21,7 +21,9 @@
 
 namespace OpenShock::CaptivePortal {
   // Shared so a detached job (account link) can keep the instance, and with it the server, alive until it answers.
-  class CaptivePortalInstance : public std::enable_shared_from_this<CaptivePortalInstance> {
+  // New references only come from the manager (GetLiveInstance), never from the instance itself: a retired instance
+  // is destroyed once the manager's RetiredList holds the only one, which a weak_ptr could otherwise undo.
+  class CaptivePortalInstance {
     DISABLE_COPY(CaptivePortalInstance);
     DISABLE_MOVE(CaptivePortalInstance);
 
@@ -101,4 +103,8 @@ namespace OpenShock::CaptivePortal {
     std::deque<WsSend> m_sendQueue;
     std::atomic<bool> m_drainQueued = false;
   };
+
+  /// @brief A reference to `instance` if it is the one the manager has published, or null (being constructed, or
+  ///        retired). Defined in Manager.cpp.
+  std::shared_ptr<CaptivePortalInstance> GetLiveInstance(const CaptivePortalInstance* instance);
 }  // namespace OpenShock::CaptivePortal

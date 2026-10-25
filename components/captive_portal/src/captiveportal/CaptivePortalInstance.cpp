@@ -344,8 +344,8 @@ static esp_err_t apiAccountLink(httpd_req_t* req)
     return sendResp(req, S400, HTTP::ContentType::JSON, JSON_ERR_CODE_REQUIRED);
   }
 
-  // Empty while the instance is still being constructed
-  auto instance = static_cast<CaptivePortal::CaptivePortalInstance*>(req->user_ctx)->weak_from_this().lock();
+  // Null while the instance is still being constructed or once it is retired
+  auto instance = CaptivePortal::GetLiveInstance(static_cast<CaptivePortal::CaptivePortalInstance*>(req->user_ctx));
   if (instance == nullptr) {
     return sendResp(req, S503, HTTP::ContentType::JSON, JSON_ERR_INTERNAL);
   }

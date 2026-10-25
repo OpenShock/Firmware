@@ -101,6 +101,12 @@ static std::shared_ptr<CaptivePortalInstance> GetInstance()
   ScopedLock lock__(&s_instanceMutex);
   return s_instance;
 }
+std::shared_ptr<CaptivePortalInstance> CaptivePortal::GetLiveInstance(const CaptivePortalInstance* instance)
+{
+  auto live = GetInstance();
+  return live.get() == instance ? live : nullptr;
+}
+
 static bool CreateInstance()
 {
   auto instance = std::make_shared<CaptivePortalInstance>();

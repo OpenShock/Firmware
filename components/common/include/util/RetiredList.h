@@ -3,6 +3,7 @@
 #include "OpenShock.h"
 #include "SimpleMutex.h"
 
+#include <atomic>
 #include <memory>
 #include <vector>
 
@@ -13,6 +14,8 @@ namespace OpenShock {
   /// would otherwise run the destructor on whichever task happened to hold it last, and destructors that stop servers
   /// or tasks must not run on an event-loop, httpd or websocket task. Retired objects stay referenced here until the
   /// owner calls reap(), which destroys, on the calling task, every one that nobody else holds any more.
+  ///
+  /// Don't hand out std::weak_ptr to retired types: a weak_ptr can be locked again after reap() saw a use_count of 1.
   template<typename T>
   class RetiredList {
     DISABLE_COPY(RetiredList);
@@ -48,6 +51,11 @@ namespace OpenShock {
           }
         }
         empty = m_objects.empty();
+      }
+      // use_count() is a relaxed load. Pair it with the release decrement of the task that dropped its copy, so
+      // everything that task did through the object happens before the destructor runs here.
+      if (!reapable.empty()) {
+        std::atomic_thread_fence(std::memory_order_acquire);
       }
       // `reapable` goes out of scope here, outside the lock, running the destructors on this task.
       return empty;
