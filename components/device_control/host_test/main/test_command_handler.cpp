@@ -267,7 +267,16 @@ TEST_CASE("CommandHandler keep-alive tracks at most 16 shockers, dropping the le
   TEST_ASSERT_EQUAL(0, HostFake::QueueLength(rfQueue));
   HostFake::Transmissions.clear();
 
-  TEST_ASSERT_TRUE(runKeepAliveUntil(keepAlive, rfQueue, HostFake::Now + 2 * kKeepAliveMs));
+  // The shockers fall due 10 ms apart, so run past the last deadline (but not into the next interval) rather than
+  // stopping at the first ping
+  int64_t until    = HostFake::Now + kKeepAliveMs + 1000;
+  HostFake::OnIdle = [&] {
+    if (HostFake::Now > until) {
+      throw HostFake::TaskBlocked {};
+    }
+  };
+  HostFake::RunTask(keepAlive, kBudget);
+  HostFake::OnIdle = nullptr;
   TEST_ASSERT_EQUAL(16, HostFake::QueueLength(rfQueue));
 
   HostFake::RunTask(transmitTask(), kBudget);
