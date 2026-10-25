@@ -16,9 +16,11 @@ const char* const TAG = "GatewayConnectionManager";
 #include "SimpleMutex.h"
 #include "util/Backoff.h"
 #include "util/RetiredList.h"
+#include "wifi/WiFiManager.h"
 
 #include <algorithm>
 #include <atomic>
+#include <cstring>
 #include <memory>
 #include <unordered_map>
 #include <utility>
@@ -77,7 +79,8 @@ static void handleWiFiStateChanged(void* arg, esp_event_base_t base, int32_t id,
       OS_LOGD(TAG, "Got IP address");
       break;
     case OPENSHOCK_WIFI_STATE_DISCONNECTED:
-      s_flags.store(FLAG_NONE, std::memory_order_relaxed);
+      // Linked is about the token, not the connection; keep it so the UI doesn't show the hub unlinked on WiFi loss
+      s_flags.fetch_and(static_cast<uint8_t>(~FLAG_HAS_IP), std::memory_order_relaxed);
       DestroyClient();
       OS_LOGD(TAG, "Lost IP address");
       break;
@@ -369,9 +372,28 @@ static void InitializeClient()
   CreateClient(*authToken);
 }
 
+// The WiFi state events are edges posted to the default loop with a short timeout, so one can be dropped when its
+// queue is full. Reconcile with the actual WiFi state every tick so a lost edge can't strand the connection.
+static void reconcileConnectivity()
+{
+  bool hasIp = (s_flags.load(std::memory_order_relaxed) & FLAG_HAS_IP) != 0;
+  if (hasIp && !WiFiManager::IsConnected()) {
+    OS_LOGW(TAG, "Missed a WiFi disconnect, dropping the gateway connection");
+    s_flags.fetch_and(static_cast<uint8_t>(~FLAG_HAS_IP), std::memory_order_relaxed);
+    DestroyClient();
+  } else if (!hasIp) {
+    char ip[16];
+    if (WiFiManager::GetIPAddress(ip) && strcmp(ip, "0.0.0.0") != 0) {
+      OS_LOGW(TAG, "Missed a got-IP event, recovering");
+      s_flags.fetch_or(FLAG_HAS_IP, std::memory_order_relaxed);
+    }
+  }
+}
+
 void GatewayConnectionManager::Update()
 {
   s_retiredClients.reap();
+  reconcileConnectivity();
 
   if (s_retryResetRequested.exchange(false)) {
     s_authBackoff.reset();

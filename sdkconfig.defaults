@@ -31,6 +31,9 @@ CONFIG_HTTPD_WS_SUPPORT=y
 # The URI handler is not called for the handshake itself, so greeting a new client (the Ready message with the config
 # and valid GPIO pins) needs the post-handshake callback.
 CONFIG_HTTPD_WS_POST_HANDSHAKE_CB_SUPPORT=y
+# Nothing subscribes to ESP_HTTP_SERVER_EVENT; posting them only adds traffic to the default event loop's queue,
+# which the WiFi, IP and OpenShock events depend on.
+CONFIG_HTTPD_ENABLE_EVENTS=n
 
 # TLS server-cert verification uses the mbedTLS certificate bundle. We compile in
 # our own curated trust store (certificates/cacert-merged.pem) instead of IDF's built-in

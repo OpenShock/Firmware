@@ -42,13 +42,14 @@ static bool trySetup()
     return false;
   }
 
-  if (!OpenShock::WiFiManager::Init()) {
-    OS_LOGE(TAG, "Unable to initialize WiFiManager");
+  // Subscribes to WiFi state events, so it goes before WiFiManager starts producing them
+  if (!OpenShock::GatewayConnectionManager::Init()) {
+    OS_LOGE(TAG, "Unable to initialize GatewayConnectionManager");
     return false;
   }
 
-  if (!OpenShock::GatewayConnectionManager::Init()) {
-    OS_LOGE(TAG, "Unable to initialize GatewayConnectionManager");
+  if (!OpenShock::WiFiManager::Init()) {
+    OS_LOGE(TAG, "Unable to initialize WiFiManager");
     return false;
   }
 
