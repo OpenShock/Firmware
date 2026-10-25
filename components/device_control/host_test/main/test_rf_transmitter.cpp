@@ -226,6 +226,59 @@ TEST_CASE("RFTransmitter Stop replaces a live command with a short zero-intensit
   TEST_ASSERT_TRUE(HostFake::Transmissions.back().at < start + 1000);
 }
 
+TEST_CASE("RFTransmitter Stop overtakes a backlog and drops that shocker's older commands", "[device_control][rf]")
+{
+  HostFake::Reset();
+  RFTransmitter tx(kPin);
+
+  const uint16_t kOtherShockerId = kShockerId + 1;
+  auto shock                     = TestFrames::Payload(kModel, kShockerId, ShockerCommandType::Shock, 80);
+  auto stop                      = TestFrames::Payload(kModel, kShockerId, ShockerCommandType::Vibrate, 0);
+  auto other                     = TestFrames::Payload(kModel, kOtherShockerId, ShockerCommandType::Vibrate, 30);
+
+  // Queued before the task gets to run, so the Stop lands in front of both.
+  TEST_ASSERT_TRUE(tx.SendCommand(kModel, kShockerId, ShockerCommandType::Shock, 80, 10'000));
+  TEST_ASSERT_TRUE(tx.SendCommand(kModel, kOtherShockerId, ShockerCommandType::Vibrate, 30, 500));
+  TEST_ASSERT_TRUE(tx.SendCommand(kModel, kShockerId, ShockerCommandType::Stop, 0, 0));
+
+  TEST_ASSERT_FALSE(HostFake::RunTask(transmitTask(), kBudget));
+
+  TEST_ASSERT_EQUAL(0, TestFrames::Count(shock));
+  TEST_ASSERT_TRUE(TestFrames::Count(stop) > 0);
+  TEST_ASSERT_TRUE(TestFrames::Count(other) > 0);  // Other shockers are unaffected
+
+  // Once the backlog is gone, new commands for the stopped shocker are accepted again.
+  HostFake::Transmissions.clear();
+  TEST_ASSERT_TRUE(tx.SendCommand(kModel, kShockerId, ShockerCommandType::Shock, 80, 300));
+  TEST_ASSERT_FALSE(HostFake::RunTask(transmitTask(), kBudget));
+  TEST_ASSERT_TRUE(TestFrames::Count(shock) > 0);
+}
+
+TEST_CASE("RFTransmitter backs off on failing transmits and gives up on its sequences", "[device_control][rf]")
+{
+  HostFake::Reset();
+  RFTransmitter tx(kPin);
+
+  HostFake::FailRmtTransmit = true;
+  TEST_ASSERT_TRUE(tx.SendCommand(kModel, kShockerId, ShockerCommandType::Vibrate, 40, 60'000));
+
+  // Without a back-off the loop would spin on the failing call without ever blocking. With it, the task sleeps after
+  // each failure, then drops the sequence and goes back to waiting on its queue (RunTask returns false) well before
+  // the command would have ended.
+  int64_t start = HostFake::Now;
+  TEST_ASSERT_FALSE(HostFake::RunTask(transmitTask(), kBudget));
+  TEST_ASSERT_TRUE(HostFake::TaskDelays >= 20);
+  TEST_ASSERT_TRUE(HostFake::Now - start < 10'000);
+  TEST_ASSERT_TRUE(HostFake::Transmissions.empty());
+
+  // Once RMT works again, new commands go out.
+  HostFake::FailRmtTransmit = false;
+  auto vibrate              = TestFrames::Payload(kModel, kShockerId, ShockerCommandType::Vibrate, 40);
+  TEST_ASSERT_TRUE(tx.SendCommand(kModel, kShockerId, ShockerCommandType::Vibrate, 40, 300));
+  TEST_ASSERT_FALSE(HostFake::RunTask(transmitTask(), kBudget));
+  TEST_ASSERT_TRUE(TestFrames::Count(vibrate) > 0);
+}
+
 TEST_CASE("RFTransmitter drops commands for an unknown shocker model", "[device_control][rf]")
 {
   HostFake::Reset();

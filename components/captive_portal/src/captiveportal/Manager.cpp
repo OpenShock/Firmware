@@ -66,6 +66,8 @@ static SemaphoreHandle_t s_forceCloseDone                = nullptr;  // Given by
 // The running instance, read by any task that sends through it; only the manager task creates or retires it.
 static SimpleMutex s_instanceMutex;
 static std::shared_ptr<CaptivePortalInstance> s_instance = nullptr;
+// Lock-free mirror of `s_instance != nullptr`, written under s_instanceMutex
+static std::atomic<bool> s_instanceLive = false;
 // Instances taken down whose destruction waits for other tasks to drop their references; destroyed by the manager task.
 static RetiredList<CaptivePortalInstance> s_retiredInstances;
 static esp_netif_t* s_apNetif = nullptr;
@@ -77,7 +79,7 @@ static const char* const CAPTIVE_PORTAL_AP_IP = "4.3.2.1";
 static void sendCommand(uint32_t command)
 {
   if (s_managerTask != nullptr) {
-    xTaskNotify(s_managerTask, command, eSetBits);
+    xTaskNotifyIndexed(s_managerTask, TaskUtils::kNotifyIndex, command, eSetBits);
   }
 }
 
@@ -92,9 +94,19 @@ static bool isDeviceFullyConfigured()
 
 static std::shared_ptr<CaptivePortalInstance> GetInstance()
 {
+  if (!s_instanceLive.load(std::memory_order_relaxed)) {
+    return nullptr;
+  }
+
   ScopedLock lock__(&s_instanceMutex);
   return s_instance;
 }
+std::shared_ptr<CaptivePortalInstance> CaptivePortal::GetLiveInstance(const CaptivePortalInstance* instance)
+{
+  auto live = GetInstance();
+  return live.get() == instance ? live : nullptr;
+}
+
 static bool CreateInstance()
 {
   auto instance = std::make_shared<CaptivePortalInstance>();
@@ -105,6 +117,7 @@ static bool CreateInstance()
 
   ScopedLock lock__(&s_instanceMutex);
   s_instance = std::move(instance);
+  s_instanceLive.store(true, std::memory_order_relaxed);
   return true;
 }
 // Unpublishes the instance and destroys it on this task. Other tasks may hold a copy for a moment while sending, so
@@ -114,6 +127,7 @@ static bool DestroyInstance()
 {
   {
     ScopedLock lock__(&s_instanceMutex);
+    s_instanceLive.store(false, std::memory_order_relaxed);
     s_retiredInstances.retire(std::move(s_instance));  // Leaves s_instance null
   }
 
@@ -221,6 +235,11 @@ static void applyCommands(ManagerState& state, uint32_t commands)
 {
   if ((commands & kCmdAlwaysEnabledSet) != 0) {
     state.alwaysEnabled = s_alwaysEnabled.load(std::memory_order_relaxed);
+    // Persisted here rather than by the caller, which may be the websocket task; back-to-back changes coalesce into
+    // one write of the latest value.
+    if (!Config::SetCaptivePortalConfig(Config::CaptivePortalConfig(state.alwaysEnabled))) {
+      OS_LOGE(TAG, "Failed to save captive portal config");
+    }
     // Disabled from the backend: close once online rather than after the idle timeout
     state.closeWhenOnline = !state.alwaysEnabled;
   }
@@ -282,6 +301,7 @@ static void captiveportal_tick(ManagerState& state)
     // Only sample it: holding the reference across captiveportal_stop() would stall DestroyInstance()
     running    = true;
     hasClients = instance->hasClients();
+    instance->retryDrain();
   }
 
   if (state.closeWhenOnline && connected) {
@@ -319,7 +339,7 @@ static void captiveportal_managertask(void* arg)
 
   for (;;) {
     uint32_t commands = 0;
-    xTaskNotifyWait(0, UINT32_MAX, &commands, portMAX_DELAY);
+    xTaskNotifyWaitIndexed(TaskUtils::kNotifyIndex, 0, UINT32_MAX, &commands, portMAX_DELAY);
 
     applyCommands(state, commands);
     captiveportal_tick(state);
@@ -364,7 +384,7 @@ bool CaptivePortal::Init()
     return false;
   }
 
-  AppHooks::RegisterCaptivePortal(CaptivePortal::BroadcastMessageBIN, CaptivePortal::SetAlwaysEnabled);
+  AppHooks::RegisterCaptivePortal(CaptivePortal::BroadcastMessageBIN, CaptivePortal::SetAlwaysEnabled, CaptivePortal::IsRunning);
 
   esp_timer_create_args_t args = {
     .callback              = captiveportal_timernotify,
@@ -399,8 +419,12 @@ void CaptivePortal::SetUserDone()
 void CaptivePortal::SetAlwaysEnabled(bool alwaysEnabled)
 {
   s_alwaysEnabled = alwaysEnabled;
-  Config::SetCaptivePortalConfig(Config::CaptivePortalConfig(alwaysEnabled));
-  sendCommand(kCmdAlwaysEnabledSet);
+  if (s_managerTask == nullptr) {
+    // No manager task to hand the write to yet
+    Config::SetCaptivePortalConfig(Config::CaptivePortalConfig(alwaysEnabled));
+    return;
+  }
+  sendCommand(kCmdAlwaysEnabledSet);  // The manager task saves it
 }
 bool CaptivePortal::IsAlwaysEnabled()
 {
@@ -428,7 +452,7 @@ void CaptivePortal::ReleaseForceClose()
 
 bool CaptivePortal::IsRunning()
 {
-  return GetInstance() != nullptr;
+  return s_instanceLive.load(std::memory_order_relaxed);
 }
 
 const char* CaptivePortal::ApIPv4String()
@@ -441,18 +465,14 @@ bool CaptivePortal::SendMessageTXT(uint8_t socketId, std::string_view data)
   auto instance = GetInstance();
   if (instance == nullptr) return false;
 
-  instance->sendMessageTXT(socketId, data);
-
-  return true;
+  return instance->sendMessageTXT(socketId, data);
 }
 bool CaptivePortal::SendMessageBIN(uint8_t socketId, std::span<const uint8_t> data)
 {
   auto instance = GetInstance();
   if (instance == nullptr) return false;
 
-  instance->sendMessageBIN(socketId, data);
-
-  return true;
+  return instance->sendMessageBIN(socketId, data);
 }
 
 bool CaptivePortal::BroadcastMessageTXT(std::string_view data)
@@ -460,16 +480,12 @@ bool CaptivePortal::BroadcastMessageTXT(std::string_view data)
   auto instance = GetInstance();
   if (instance == nullptr) return false;
 
-  instance->broadcastMessageTXT(data);
-
-  return true;
+  return instance->broadcastMessageTXT(data);
 }
 bool CaptivePortal::BroadcastMessageBIN(std::span<const uint8_t> data)
 {
   auto instance = GetInstance();
   if (instance == nullptr) return false;
 
-  instance->broadcastMessageBIN(data);
-
-  return true;
+  return instance->broadcastMessageBIN(data);
 }

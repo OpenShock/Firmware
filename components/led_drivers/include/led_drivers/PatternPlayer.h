@@ -72,7 +72,7 @@ namespace OpenShock {
         }
 
         if (pattern.empty()) {
-          ulTaskNotifyTake(pdTRUE, portMAX_DELAY);  // Nothing to play until the next SetPattern / stop
+          TaskUtils::WaitForNotify(portMAX_DELAY);  // Nothing to play until the next SetPattern / stop
           continue;
         }
 
@@ -80,7 +80,7 @@ namespace OpenShock {
           apply(state);
 
           // Sleep for the state's duration, but wake immediately on a new pattern or a stop request
-          if (ulTaskNotifyTake(pdTRUE, pdMS_TO_TICKS(state.duration)) != 0) {
+          if (TaskUtils::WaitForNotify(pdMS_TO_TICKS(state.duration)) != 0) {
             break;
           }
         }

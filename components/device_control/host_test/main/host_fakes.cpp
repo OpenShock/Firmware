@@ -67,10 +67,12 @@ namespace {
 }  // namespace
 
 namespace HostFake {
-  int64_t Now         = 1'000'000;
-  bool EStopped       = false;
-  int64_t RmtFrameMs  = 10;
-  bool FailRmtChannel = false;
+  int64_t Now          = 1'000'000;
+  bool EStopped        = false;
+  int64_t RmtFrameMs   = 10;
+  bool FailRmtChannel  = false;
+  bool FailRmtTransmit = false;
+  int TaskDelays       = 0;
   std::vector<Transmission> Transmissions;
   std::function<void()> OnIdle;
   std::function<void()> OnTransmit;
@@ -85,10 +87,12 @@ namespace HostFake {
 
   void Reset()
   {
-    EStopped       = false;
-    EStopCfg       = {.enabled = false, .gpioPin = GPIO_NUM_NC};
-    RmtFrameMs     = 10;
-    FailRmtChannel = false;
+    EStopped        = false;
+    EStopCfg        = {.enabled = false, .gpioPin = GPIO_NUM_NC};
+    RmtFrameMs      = 10;
+    FailRmtChannel  = false;
+    FailRmtTransmit = false;
+    TaskDelays      = 0;
     Transmissions.clear();
     OnIdle     = nullptr;
     OnTransmit = nullptr;
@@ -161,8 +165,14 @@ static QueueHandle_t fakeQueueCreateMutex(const uint8_t, int)
   return AsHandle(new FakeQueue {.isMutex = true, .length = 1, .itemSize = 0, .items = {}, .held = false});
 }
 
+// SimpleMutex uses the static variant; the fake ignores the storage, and vQueueDelete frees the fake as usual.
+static QueueHandle_t fakeQueueCreateMutexStatic(const uint8_t type, StaticQueue_t*, int numCalls)
+{
+  return fakeQueueCreateMutex(type, numCalls);
+}
+
 // xQueueSend, and xSemaphoreGive on a mutex.
-static BaseType_t fakeQueueGenericSend(QueueHandle_t handle, const void* const item, TickType_t, const BaseType_t, int)
+static BaseType_t fakeQueueGenericSend(QueueHandle_t handle, const void* const item, TickType_t, const BaseType_t position, int)
 {
   FakeQueue* queue = AsQueue(handle);
   if (queue->isMutex) {
@@ -178,7 +188,11 @@ static BaseType_t fakeQueueGenericSend(QueueHandle_t handle, const void* const i
   }
 
   const auto* bytes = static_cast<const uint8_t*>(item);
-  queue->items.emplace_back(bytes, bytes + queue->itemSize);
+  if (position == queueSEND_TO_FRONT) {
+    queue->items.emplace(queue->items.begin(), bytes, bytes + queue->itemSize);
+  } else {
+    queue->items.emplace_back(bytes, bytes + queue->itemSize);
+  }
   return pdTRUE;
 }
 
@@ -256,6 +270,7 @@ static void fakeQueueDelete(QueueHandle_t handle, int)
 
 static void fakeTaskDelay(const TickType_t ticks, int)
 {
+  ++TaskDelays;
   Now += TicksToMs(ticks);
 }
 
@@ -313,6 +328,10 @@ static esp_err_t fakeRmtDelEncoder(rmt_encoder_handle_t encoder, int)
 
 static esp_err_t fakeRmtTransmit(rmt_channel_handle_t, rmt_encoder_handle_t, const void* payload, size_t payload_bytes, const rmt_transmit_config_t*, int)
 {
+  if (FailRmtTransmit) {
+    return ESP_ERR_INVALID_STATE;
+  }
+
   const auto* symbols = static_cast<const rmt_symbol_word_t*>(payload);
 
   Transmission tx {.at = Now, .symbols = {}};
@@ -345,11 +364,12 @@ static esp_err_t fakeEventHandlerRegister(esp_event_base_t, int32_t event_id, es
 }
 
 // Installed before any C++ static constructor runs: CommandHandler.cpp's static
-// SimpleMutexes call xSemaphoreCreateMutex during static initialization.
+// SimpleMutexes call xSemaphoreCreateMutexStatic during static initialization.
 __attribute__((constructor(101))) static void installMockCallbacks()
 {
   xQueueGenericCreate_Stub(fakeQueueGenericCreate);
   xQueueCreateMutex_Stub(fakeQueueCreateMutex);
+  xQueueCreateMutexStatic_Stub(fakeQueueCreateMutexStatic);
   xQueueGenericSend_Stub(fakeQueueGenericSend);
   xQueueSemaphoreTake_Stub(fakeQueueSemaphoreTake);
   xQueueReceive_Stub(fakeQueueReceive);
@@ -386,6 +406,18 @@ BaseType_t OpenShock::TaskUtils::TaskCreateUniversal(TaskFunction_t pvTaskCode, 
 BaseType_t OpenShock::TaskUtils::TaskCreateExpensive(TaskFunction_t pvTaskCode, const char* const pcName, const uint32_t usStackDepth, void* const pvParameters, UBaseType_t uxPriority, TaskHandle_t* const pvCreatedTask)
 {
   return TaskCreateUniversal(pvTaskCode, pcName, usStackDepth, pvParameters, uxPriority, pvCreatedTask, 1);
+}
+
+// No task watchdog on the host
+bool OpenShock::TaskUtils::WatchdogSubscribe()
+{
+  return true;
+}
+void OpenShock::TaskUtils::WatchdogFeed()
+{
+}
+void OpenShock::TaskUtils::WatchdogUnsubscribe()
+{
 }
 
 void OpenShock::TaskUtils::TaskExiting(TaskExitFlag& exited)

@@ -60,6 +60,10 @@ namespace OpenShock::Config {
   bool SetBackendConfig(const BackendConfig& config);
   bool SetSerialInputConfig(const SerialInputConfig& config);
   bool SetOtaUpdateConfig(const OtaUpdateConfig& config);
+  /// @brief Read-modify-write that no other writer can interleave with. `update` edits the current config in place and
+  ///        returns whether it changed anything (nothing is saved otherwise). It runs under the config write lock: keep
+  ///        it to plain field updates.
+  bool UpdateOtaUpdateConfig(Util::FunctionRef<bool(OtaUpdateConfig&)> update);
   bool SetEStopConfig(const EStopConfig& config);
 
   [[nodiscard]] std::optional<std::vector<WiFiCredentials>> GetWiFiCredentials();
@@ -98,6 +102,9 @@ namespace OpenShock::Config {
   bool SetOtaUpdateId(int32_t updateId);
   [[nodiscard]] std::optional<OtaUpdateStep> GetOtaUpdateStep();
   bool SetOtaUpdateStep(OtaUpdateStep updateStep);
+  /// @brief Sets the step only if it is still `expected`, so a stale writer can't clobber an update started meanwhile.
+  /// @return True if the step was `expected` and is now `desired`
+  bool CompareExchangeOtaUpdateStep(OtaUpdateStep expected, OtaUpdateStep desired);
 
   [[nodiscard]] std::optional<bool> GetEStopEnabled();
   bool SetEStopEnabled(bool enabled);

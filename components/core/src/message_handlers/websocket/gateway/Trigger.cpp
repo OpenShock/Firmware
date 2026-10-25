@@ -15,7 +15,7 @@ using namespace OpenShock::MessageHandlers::Server;
 
 using TriggerType = OpenShock::Serialization::Gateway::TriggerType;
 
-void _Private::HandleTrigger(const OpenShock::Serialization::Gateway::GatewayToHubMessage* root)
+void _Private::HandleTrigger(OpenShock::GatewayClient&, const OpenShock::Serialization::Gateway::GatewayToHubMessage* root)
 {
   auto msg = root->payload_as_Trigger();
   if (msg == nullptr) {

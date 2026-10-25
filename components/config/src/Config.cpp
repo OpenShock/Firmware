@@ -8,8 +8,8 @@ const char* const TAG = "Config";
 #include "config/RootConfig.h"
 #include "Logging.h"
 #include "OpenShock.h"
-#include "ReadWriteMutex.h"
 #include "serialization/VerifiedRoot.h"
+#include "SimpleMutex.h"
 
 #include "json/Json.h"
 
@@ -38,26 +38,25 @@ static OpenShock::ConfigFs _configFs;
 // goes through FromFlatbuffers, which falls back to the board default per field, and a missing or corrupt one
 // through ToDefault(). Nothing may read _configData before Config::Init().
 static Config::RootConfig _configData;
-static ReadWriteMutex _configMutex;
 
-#define CONFIG_LOCK_READ_ACTION(retval, action)  \
-  ScopedReadLock lock__(&_configMutex);          \
-  if (!lock__.isLocked()) {                      \
-    OS_LOGE(TAG, "Failed to acquire read lock"); \
-    action;                                      \
-    return retval;                               \
-  }
+// Two priority-inheriting mutexes, so no reader ever waits on flash:
+// - _configDataMutex guards _configData and is held only to copy it out (readers) or to commit a new one (writers).
+// - _configWriteMutex serializes writers across copy, mutate, save and commit. Writers are the only ones that modify
+//   _configData, so while holding it they may read _configData without _configDataMutex.
+// Lock order: _configWriteMutex before _configDataMutex.
+static SimpleMutex _configDataMutex;
+static SimpleMutex _configWriteMutex;
 
-#define CONFIG_LOCK_WRITE_ACTION(retval, action)  \
-  ScopedWriteLock lock__(&_configMutex);          \
-  if (!lock__.isLocked()) {                       \
-    OS_LOGE(TAG, "Failed to acquire write lock"); \
-    action;                                       \
-    return retval;                                \
-  }
+// Both wait as long as it takes, so they can't fail; `retval` is kept so the call sites read the same.
+#define CONFIG_LOCK_READ(retval)  ScopedLock lock__(&_configDataMutex)
+#define CONFIG_LOCK_WRITE(retval) ScopedLock lock__(&_configWriteMutex)
 
-#define CONFIG_LOCK_READ(retval)  CONFIG_LOCK_READ_ACTION(retval, {})
-#define CONFIG_LOCK_WRITE(retval) CONFIG_LOCK_WRITE_ACTION(retval, {})
+// Requires the write lock. Publishes `config` as the running config.
+static void commitConfig(Config::RootConfig&& config)
+{
+  ScopedLock lock__(&_configDataMutex);
+  _configData = std::move(config);
+}
 
 static bool tryDeserializeConfig(const uint8_t* buffer, std::size_t bufferLen, OpenShock::Config::RootConfig& config)
 {
@@ -80,6 +79,7 @@ static bool tryDeserializeConfig(const uint8_t* buffer, std::size_t bufferLen, O
 
   return true;
 }
+// Requires the write lock.
 static bool tryLoadConfig()
 {
   std::vector<uint8_t> data;
@@ -88,7 +88,13 @@ static bool tryLoadConfig()
     return false;
   }
 
-  return tryDeserializeConfig(data.data(), data.size(), _configData);
+  OpenShock::Config::RootConfig loaded;
+  if (!tryDeserializeConfig(data.data(), data.size(), loaded)) {
+    return false;
+  }
+
+  commitConfig(std::move(loaded));
+  return true;
 }
 static bool trySaveConfig(const uint8_t* data, std::size_t dataLen)
 {
@@ -98,7 +104,7 @@ static bool trySaveConfig(const uint8_t* data, std::size_t dataLen)
   }
 
   if (!_configFs.write(CONFIG_FILE_PATH, std::span<const uint8_t>(data, dataLen))) {
-    OS_LOGE(TAG, "Failed to write config file");
+    OS_LOGE(TAG, "Failed to write config file (%zu bytes)", dataLen);
     return false;
   }
 
@@ -114,13 +120,9 @@ static bool trySaveConfig(const OpenShock::Config::RootConfig& config)
 
   return trySaveConfig(builder.GetBufferPointer(), builder.GetSize());
 }
-static bool trySaveConfig()
-{
-  return trySaveConfig(_configData);
-}
-
 // Requires the write lock. Applies `mutate` to a copy, persists the copy and only then commits it, so a failed
 // write leaves the running config identical to what is on flash. `mutate` returns false to abort without saving.
+// Readers keep reading the old config during the flash write.
 template<typename Fn>
 static bool mutateAndSave(Fn&& mutate)
 {
@@ -133,7 +135,7 @@ static bool mutateAndSave(Fn&& mutate)
     return false;
   }
 
-  _configData = std::move(updated);
+  commitConfig(std::move(updated));
   return true;
 }
 
@@ -156,11 +158,14 @@ void Config::Init()
 
   OS_LOGW(TAG, "Failed to load config, writing default config");
 
-  _configData.ToDefault();
+  OpenShock::Config::RootConfig defaults;
+  defaults.ToDefault();
 
-  if (!trySaveConfig()) {
+  if (!trySaveConfig(defaults)) {
     OS_PANIC(TAG, "Failed to save default config. Recommend formatting microcontroller and re-flashing firmware");
   }
+
+  commitConfig(std::move(defaults));
 }
 
 std::string Config::GetAsJSON(bool withSensitiveData)
@@ -197,7 +202,7 @@ bool Config::SaveFromJSON(std::string_view json)
     return false;
   }
 
-  _configData = std::move(config);
+  commitConfig(std::move(config));
   return true;
 }
 
@@ -223,7 +228,7 @@ bool Config::SaveFromFlatBuffer(const Serialization::Configuration::HubConfig* c
     return false;
   }
 
-  _configData = std::move(parsed);
+  commitConfig(std::move(parsed));
   return true;
 }
 
@@ -231,7 +236,7 @@ bool Config::GetRaw(TinyVec<uint8_t>& buffer)
 {
   CONFIG_LOCK_READ(false);
 
-  // Serialize the live config rather than reading flash: no filesystem access under the shared read lock, and it is
+  // Serialize the live config rather than reading flash: no filesystem access under the read lock, and it is
   // what the device is actually running with.
   flatbuffers::FlatBufferBuilder builder;
   auto fbsConfig = _configData.ToFlatbuffers(builder, true);
@@ -258,7 +263,7 @@ bool Config::SetRaw(const uint8_t* buffer, std::size_t size)
   }
 
   // Keep memory in sync with flash, or the next setter would write the old config back over the import.
-  _configData = std::move(config);
+  commitConfig(std::move(config));
   return true;
 }
 
@@ -266,15 +271,19 @@ void Config::FactoryReset()
 {
   CONFIG_LOCK_WRITE();
 
-  _configData.ToDefault();
+  OpenShock::Config::RootConfig defaults;
+  defaults.ToDefault();
 
   if (!_configFs.remove(CONFIG_FILE_PATH) && _configFs.exists(CONFIG_FILE_PATH)) {
     OS_PANIC(TAG, "Failed to remove existing config file for factory reset. Reccomend formatting microcontroller and re-flashing firmware");
   }
 
-  if (!trySaveConfig()) {
+  if (!trySaveConfig(defaults)) {
     OS_PANIC(TAG, "Failed to save default config. Recommend formatting microcontroller and re-flashing firmware");
   }
+
+  // Published only once persisted, like every other write
+  commitConfig(std::move(defaults));
 
   OS_LOGI(TAG, "Factory reset complete");
 }
@@ -388,6 +397,21 @@ bool Config::SetOtaUpdateConfig(const Config::OtaUpdateConfig& config)
   });
 }
 
+bool Config::UpdateOtaUpdateConfig(Util::FunctionRef<bool(Config::OtaUpdateConfig&)> update)
+{
+  CONFIG_LOCK_WRITE(false);
+
+  Config::OtaUpdateConfig config = _configData.otaUpdate;
+  if (!update(config)) {
+    return true;  // Unchanged
+  }
+
+  return mutateAndSave([&](Config::RootConfig& root) {
+    root.otaUpdate = std::move(config);
+    return true;
+  });
+}
+
 bool Config::SetEStopConfig(const Config::EStopConfig& config)
 {
   CONFIG_LOCK_WRITE(false);
@@ -494,11 +518,13 @@ bool Config::SetRFConfigKeepAliveEnabled(bool enabled)
 
 bool Config::AnyWiFiCredentials(Util::FunctionRef<bool(const Config::WiFiCredentials&)> predicate)
 {
-  CONFIG_LOCK_READ(false);
+  // The predicate is caller code, so run it on a copy outside the lock
+  auto creds = GetWiFiCredentials();
+  if (!creds) {
+    return false;
+  }
 
-  auto& creds = _configData.wifi.credentialsList;
-
-  return std::any_of(creds.begin(), creds.end(), predicate);
+  return std::any_of(creds->begin(), creds->end(), predicate);
 }
 
 uint8_t Config::AddWiFiCredentials(std::string_view ssid, std::string_view password, wifi_auth_mode_t authMode)
@@ -509,31 +535,35 @@ uint8_t Config::AddWiFiCredentials(std::string_view ssid, std::string_view passw
 
   CONFIG_LOCK_WRITE(0);
 
+  // Built on a copy and committed only once on flash, like mutateAndSave
+  OpenShock::Config::RootConfig updated = _configData;
+  auto& list                            = updated.wifi.credentialsList;
+
   uint8_t id = 0;
 
   std::bitset<255> bits;
-  for (auto it = _configData.wifi.credentialsList.begin(); it != _configData.wifi.credentialsList.end();) {
+  for (auto it = list.begin(); it != list.end();) {
     auto& creds = *it;
 
     if (std::string_view(creds.ssid) == ssid) {
-      const Config::WiFiCredentials previous = creds;
-
       creds.password = password;
       if (authMode != WIFI_AUTH_MAX) {
         creds.authMode = authMode;
       }
 
-      if (!trySaveConfig()) {
+      if (!trySaveConfig(updated)) {
         OS_LOGE(TAG, "Failed to persist updated WiFi credentials for SSID %.*s", static_cast<int>(ssid.size()), ssid.data());
-        creds = previous;
         return 0;
       }
-      return creds.id;
+
+      id = creds.id;
+      commitConfig(std::move(updated));
+      return id;
     }
 
     if (creds.id == 0) {
       OS_LOGW(TAG, "Found WiFi credentials with ID 0, removing");
-      it = _configData.wifi.credentialsList.erase(it);
+      it = list.erase(it);
       continue;
     }
 
@@ -555,16 +585,16 @@ uint8_t Config::AddWiFiCredentials(std::string_view ssid, std::string_view passw
     return 0;
   }
 
-  _configData.wifi.credentialsList.emplace_back(id, ssid, password, authMode);
+  list.emplace_back(id, ssid, password, authMode);
 
   // Only keep credentials that made it to flash. This is also what caps the list:
   // once the config would outgrow MaxConfigSize, trySaveConfig refuses it.
-  if (!trySaveConfig()) {
+  if (!trySaveConfig(updated)) {
     OS_LOGE(TAG, "Failed to persist new WiFi credentials for SSID %.*s", static_cast<int>(ssid.size()), ssid.data());
-    _configData.wifi.credentialsList.pop_back();
     return 0;
   }
 
+  commitConfig(std::move(updated));
   return id;
 }
 
@@ -758,6 +788,24 @@ std::optional<OtaUpdateStep> Config::GetOtaUpdateStep()
   CONFIG_LOCK_READ(std::nullopt);
 
   return _configData.otaUpdate.updateStep;
+}
+
+bool Config::CompareExchangeOtaUpdateStep(OtaUpdateStep expected, OtaUpdateStep desired)
+{
+  CONFIG_LOCK_WRITE(false);
+
+  // Writers are serialized by the write lock, so the step can't change between this check and the save
+  if (_configData.otaUpdate.updateStep != expected) {
+    return false;
+  }
+  if (expected == desired) {
+    return true;
+  }
+
+  return mutateAndSave([&](Config::RootConfig& root) {
+    root.otaUpdate.updateStep = desired;
+    return true;
+  });
 }
 
 bool Config::SetOtaUpdateStep(OtaUpdateStep updateStep)

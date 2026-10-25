@@ -8,7 +8,7 @@ const char* const TAG = "ServerMessageHandlers";
 
 using namespace OpenShock::MessageHandlers::Server;
 
-void _Private::HandleInvalidMessage(const OpenShock::Serialization::Gateway::GatewayToHubMessage* root)
+void _Private::HandleInvalidMessage(OpenShock::GatewayClient&, const OpenShock::Serialization::Gateway::GatewayToHubMessage* root)
 {
   if (root == nullptr) {
     OS_LOGE(TAG, "Message cannot be parsed");

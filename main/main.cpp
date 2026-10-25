@@ -12,6 +12,7 @@ const char* const TAG = "main";
 #include "GatewayConnectionManager.h"
 #include "Logging.h"
 #include "OtaUpdateManager.h"
+#include "serial/Serial.h"
 #include "serial_console/SerialInputHandler.h"
 #include "visual/VisualStateManager.h"
 #include "wifi/WiFiManager.h"
@@ -42,13 +43,14 @@ static bool trySetup()
     return false;
   }
 
-  if (!OpenShock::WiFiManager::Init()) {
-    OS_LOGE(TAG, "Unable to initialize WiFiManager");
+  // Subscribes to WiFi state events, so it goes before WiFiManager starts producing them
+  if (!OpenShock::GatewayConnectionManager::Init()) {
+    OS_LOGE(TAG, "Unable to initialize GatewayConnectionManager");
     return false;
   }
 
-  if (!OpenShock::GatewayConnectionManager::Init()) {
-    OS_LOGE(TAG, "Unable to initialize GatewayConnectionManager");
+  if (!OpenShock::WiFiManager::Init()) {
+    OS_LOGE(TAG, "Unable to initialize WiFiManager");
     return false;
   }
 
@@ -72,6 +74,7 @@ static void otaSetup()
 
   if (!trySetup()) {
     OS_LOGE(TAG, "Unable to validate OTA app, rolling back");
+    OpenShock::VisualStateManager::SetCriticalError();
     OpenShock::OtaUpdateManager::InvalidateAndRollback();
   }
 
@@ -86,6 +89,7 @@ static void otaSetup()
 static void appSetup()
 {
   if (!trySetup()) {
+    OpenShock::VisualStateManager::SetCriticalError();  // Shown for the 5 s until the restart
     OS_LOGI(TAG, "Restarting in 5 seconds...");
     vTaskDelay(pdMS_TO_TICKS(5000));
     esp_restart();
@@ -96,6 +100,13 @@ static void appSetup()
 // update loop below for the lifetime of the firmware (it never returns).
 extern "C" void app_main()
 {
+  // First, while this is the only OpenShock task: installing the console driver switches stdout's VFS over to it,
+  // which isn't safe while another task is printing. SerialInputHandler::Init calls it again (a no-op) and fails
+  // setup if it still isn't up; until then output takes the pre-driver path.
+  if (!OpenShock::Serial::Init()) {
+    OS_LOGE(TAG, "Failed to initialize the serial console driver");
+  }
+
   // WiFi persists calibration/config in the default NVS partition, so NVS must be
   // initialized before esp_wifi_init() (or any other NVS user) runs. Arduino used
   // to do this implicitly during startup; under the IDF entry point we do it

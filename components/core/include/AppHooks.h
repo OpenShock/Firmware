@@ -12,15 +12,17 @@
 namespace OpenShock::AppHooks {
   using BroadcastMessageBINFn    = bool (*)(std::span<const uint8_t> data);
   using SetAlwaysEnabledFn       = void (*)(bool alwaysEnabled);
+  using IsRunningFn              = bool (*)();
   using GetFirmwareBootTypeFn    = FirmwareBootType (*)();
   using TryStartFirmwareUpdateFn = bool (*)(const OpenShock::SemVer& version);
   using RequestUpdateCheckFn     = bool (*)();
 
-  void RegisterCaptivePortal(BroadcastMessageBINFn broadcastMessageBIN, SetAlwaysEnabledFn setAlwaysEnabled);
+  void RegisterCaptivePortal(BroadcastMessageBINFn broadcastMessageBIN, SetAlwaysEnabledFn setAlwaysEnabled, IsRunningFn isRunning);
   void RegisterOtaUpdateManager(GetFirmwareBootTypeFn getFirmwareBootType, TryStartFirmwareUpdateFn tryStartFirmwareUpdate, RequestUpdateCheckFn requestUpdateCheck);
 
   bool CaptivePortalBroadcastMessageBIN(std::span<const uint8_t> data);
   void CaptivePortalSetAlwaysEnabled(bool alwaysEnabled);
+  bool CaptivePortalIsRunning();
 
   FirmwareBootType OtaGetFirmwareBootType();
   bool OtaTryStartFirmwareUpdate(const OpenShock::SemVer& version);

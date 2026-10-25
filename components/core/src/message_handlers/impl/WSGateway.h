@@ -4,7 +4,12 @@
 
 #include <cstdint>
 
-#define HANDLER_SIG(NAME) void NAME(const OpenShock::Serialization::Gateway::GatewayToHubMessage* msg)
+namespace OpenShock {
+  class GatewayClient;
+}
+
+// `client` is the connection the message arrived on, which is not necessarily the manager's current one
+#define HANDLER_SIG(NAME) void NAME(OpenShock::GatewayClient& client, const OpenShock::Serialization::Gateway::GatewayToHubMessage* msg)
 #define HANDLER_FN(NAME)  HANDLER_SIG(Handle##NAME)
 
 namespace OpenShock::MessageHandlers::Server::_Private {

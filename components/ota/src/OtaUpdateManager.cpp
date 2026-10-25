@@ -28,10 +28,10 @@ const char* const TAG = "OtaUpdateManager";
 #include <esp_ota_ops.h>
 #include <esp_partition.h>
 #include <esp_random.h>
-#include <esp_task_wdt.h>
 #include <esp_wifi.h>
 
 #include <array>
+#include <atomic>
 #include <cstring>
 #include <optional>
 #include <span>
@@ -67,7 +67,7 @@ enum OtaTaskEventFlag : uint32_t {
   OTA_TASK_EVENT_CHECK_REQUESTED   = 1 << 3,
 };
 
-static esp_ota_img_states_t _otaImageState;
+static std::atomic<esp_ota_img_states_t> _otaImageState;
 static OpenShock::FirmwareBootType _bootType;
 static TaskHandle_t _taskHandle = nullptr;
 static OpenShock::SemVer _requestedVersion;
@@ -82,7 +82,7 @@ static bool otaum_try_notify_task(uint32_t eventFlag)
     return false;
   }
 
-  if (xTaskNotify(_taskHandle, eventFlag, eSetBits) != pdPASS) {
+  if (xTaskNotifyIndexed(_taskHandle, TaskUtils::kNotifyIndex, eventFlag, eSetBits) != pdPASS) {
     OS_LOGE(TAG, "Failed to notify OTA task (event: 0x%08x)", static_cast<unsigned>(eventFlag));
     return false;
   }
@@ -318,45 +318,6 @@ static bool otaum_flash_fs_partition(OpenShock::HTTP::Client& client, const esp_
   return true;
 }
 
-// Only the timeout is changed; idle-core mask and panic behaviour stay as configured in sdkconfig.
-static esp_err_t otaum_set_wdt_timeout(uint32_t timeoutSeconds)
-{
-  uint32_t idleCoreMask = 0;
-#if CONFIG_ESP_TASK_WDT_CHECK_IDLE_TASK_CPU0
-  idleCoreMask |= 1U << 0;
-#endif
-#if CONFIG_ESP_TASK_WDT_CHECK_IDLE_TASK_CPU1
-  idleCoreMask |= 1U << 1;
-#endif
-
-  esp_task_wdt_config_t twdt_config = {
-    .timeout_ms     = timeoutSeconds * 1000U,
-    .idle_core_mask = idleCoreMask,
-#if CONFIG_ESP_TASK_WDT_PANIC
-    .trigger_panic = true,
-#else
-    .trigger_panic = false,
-#endif
-  };
-  // ESP-IDF initializes the TWDT at startup (CONFIG_ESP_TASK_WDT_INIT, default y), so
-  // reconfigure it instead of re-initializing. esp_task_wdt_reconfigure() returns
-  // ESP_ERR_INVALID_STATE if the TWDT isn't initialized yet, in which case we fall back to init.
-  esp_err_t err = esp_task_wdt_reconfigure(&twdt_config);
-  if (err == ESP_ERR_INVALID_STATE) {
-    // Not yet initialized, fall back to init
-    return esp_task_wdt_init(&twdt_config);
-  }
-
-  return err;
-}
-
-static void otaum_restore_wdt_timeout()
-{
-  if (otaum_set_wdt_timeout(CONFIG_ESP_TASK_WDT_TIMEOUT_S) != ESP_OK) {
-    OS_LOGE(TAG, "Failed to restore task watchdog timeout");
-  }
-};
-
 static void otaum_updatetask(void* arg)
 {
   (void)arg;
@@ -372,7 +333,7 @@ static void otaum_updatetask(void* arg)
   while (true) {
     // Wait for event.
     uint32_t eventBits = 0;
-    xTaskNotifyWait(0, UINT32_MAX, &eventBits, pdMS_TO_TICKS(5000));  // TODO: wait for rest time
+    xTaskNotifyWaitIndexed(TaskUtils::kNotifyIndex, 0, UINT32_MAX, &eventBits, pdMS_TO_TICKS(5000));  // TODO: wait for rest time
 
     updateRequested |= (eventBits & OTA_TASK_EVENT_UPDATE_REQUESTED) != 0;
     checkRequested |= (eventBits & OTA_TASK_EVENT_CHECK_REQUESTED) != 0;
@@ -408,6 +369,9 @@ static void otaum_updatetask(void* arg)
 
     if (!config.isEnabled) {
       OS_LOGD(TAG, "OTA updates are disabled, skipping update check");
+      // Dropped rather than kept for later: re-enabling updates shouldn't act on a request made while disabled
+      updateRequested = false;
+      checkRequested  = false;
       continue;
     }
 
@@ -435,6 +399,7 @@ static void otaum_updatetask(void* arg)
 
     if (config.requireManualApproval) {
       OS_LOGD(TAG, "Manual approval required, skipping update check");
+      updateRequested = false;  // Otherwise it re-triggers this branch every minute
       // TODO: IMPLEMENT
       continue;
     }
@@ -485,6 +450,16 @@ static void otaum_updatetask(void* arg)
       continue;
     }
 
+    // Every `continue` from here on abandons the update; don't leave the step at Updating for the next boot to report.
+    // Only resets Updating, so a step another task moved on (or our own Updated below) is left alone.
+    struct ResetStepOnFailure {
+      bool succeeded = false;
+      ~ResetStepOnFailure()
+      {
+        if (!succeeded) Config::CompareExchangeOtaUpdateStep(OpenShock::OtaUpdateStep::Updating, OpenShock::OtaUpdateStep::None);
+      }
+    } resetStepOnFailure;
+
     if (!Serialization::Gateway::SerializeOtaUpdateStartedMessage(updateId, version, GatewayConnectionManager::SendMessageBIN)) {
       OS_LOGE(TAG, "Failed to serialize OTA update started message");
       continue;
@@ -527,14 +502,6 @@ static void otaum_updatetask(void* arg)
       continue;
     }
 
-    // Increase task watchdog timeout.
-    // Prevents panics on some ESP32s when clearing large partitions.
-    if (otaum_set_wdt_timeout(15) != ESP_OK) {
-      OS_LOGE(TAG, "Failed to increase task watchdog timeout");
-      _sendFailureMessage("Failed to increase task watchdog timeout"sv);
-      continue;
-    }
-
     // Flashing the filesystem force-closes the captive portal; on any failure (`continue`) it must be allowed to
     // open again. On success the portal stays closed until the restart below.
     struct ReopenPortalOnFailure {
@@ -547,11 +514,9 @@ static void otaum_updatetask(void* arg)
 
     // Flash app and filesystem partitions.
     if (!otaum_flash_fs_partition(client, filesystemPartition, release.filesystemBinaryUrl, release.filesystemBinaryHash)) {
-      otaum_restore_wdt_timeout();
       continue;
     }
     if (!otaum_flash_app_partition(client, appPartition, release.appBinaryUrl, release.appBinaryHash)) {
-      otaum_restore_wdt_timeout();
       continue;
     }
 
@@ -559,12 +524,9 @@ static void otaum_updatetask(void* arg)
     if (!Config::SetOtaUpdateStep(OpenShock::OtaUpdateStep::Updated)) {
       OS_LOGE(TAG, "Failed to set OTA update step");
       _sendFailureMessage("Failed to set OTA update step"sv);
-      otaum_restore_wdt_timeout();
       continue;
     }
-
-    // Set task watchdog timeout back to default.
-    otaum_restore_wdt_timeout();
+    resetStepOnFailure.succeeded = true;
 
     // Send reboot message.
     otaum_send_progress_msg(Serialization::Types::OtaUpdateProgressTask::Rebooting, 0.0f);
@@ -668,11 +630,13 @@ bool OtaUpdateManager::Init()
   OS_LOGD(TAG, "Fetching partition state");
 
   // Get OTA state for said partition.
-  err = esp_ota_get_state_partition(partition, &_otaImageState);
+  esp_ota_img_states_t imageState;
+  err = esp_ota_get_state_partition(partition, &imageState);
   if (err != ESP_OK) {
     OS_PANIC(TAG, "Failed to get partition state: %s", esp_err_to_name(err));
     return false;  // Unreachable, here to make tooling happy
   }
+  _otaImageState = imageState;
 
   OS_LOGD(TAG, "Fetching previous update step");
   auto maybeUpdateStep = Config::GetOtaUpdateStep();
