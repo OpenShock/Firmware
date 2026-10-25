@@ -487,60 +487,63 @@ static esp_err_t apiWifiDisconnect(httpd_req_t* req)
 // nothing changed), instead of one handler and one flash write per setting.
 static esp_err_t apiOtaSettings(httpd_req_t* req)
 {
-  auto otaConfig = Config::GetOtaUpdateConfig();
-  if (!otaConfig) {
-    return sendResp(req, S500, HTTP::ContentType::JSON, JSON_ERR_INTERNAL);
-  }
-  Config::OtaUpdateConfig& cfg = *otaConfig;
+  // Parse everything first, then apply it in one atomic update so a concurrent writer (backend, serial) isn't undone
+  std::optional<bool> enabled, allow, require;
+  std::optional<OtaUpdateChannel> channel;
+  std::optional<uint16_t> interval;
 
-  bool present = false;
-  bool changed = false;
-
-  // Applies one optional boolean parameter; returns false (after responding) on an invalid value.
-  auto applyBool = [&](const char* key, bool& field, esp_err_t& response) {
+  // Reads one optional boolean parameter; returns false (after responding) on an invalid value.
+  auto parseBool = [&](const char* key, std::optional<bool>& out, esp_err_t& response) {
     auto value = getBoolQueryParam(req, key);
     if (!value) {
       if (value.error() == ParamError::Missing) return true;
       response = sendParamError(req, value.error());
       return false;
     }
-    present = true;
-    changed |= field != *value;
-    field = *value;
+    out = *value;
     return true;
   };
 
   esp_err_t response = ESP_OK;
-  if (!applyBool("enabled", cfg.isEnabled, response) || !applyBool("allow", cfg.allowBackendManagement, response) || !applyBool("require", cfg.requireManualApproval, response)) {
+  if (!parseBool("enabled", enabled, response) || !parseBool("allow", allow, response) || !parseBool("require", require, response)) {
     return response;
   }
 
   if (auto channelStr = getQueryParam(req, "channel")) {
-    auto channel = TryParseOtaUpdateChannel(*channelStr);
+    channel = TryParseOtaUpdateChannel(*channelStr);
     if (!channel) {
       return sendResp(req, S400, HTTP::ContentType::JSON, JSON_ERR_INVALID_CHANNEL);
     }
-    present = true;
-    changed |= cfg.updateChannel != *channel;
-    cfg.updateChannel = *channel;
   }
 
   if (auto intervalStr = getQueryParam(req, "interval")) {
     // Minutes; 0 would make periodic checks fire on every OTA task wake-up
-    auto interval = Convert::ToUint16(*intervalStr);
+    interval = Convert::ToUint16(*intervalStr);
     if (!interval || *interval == 0) {
       return sendResp(req, S400, HTTP::ContentType::JSON, JSON_ERR_INVALID_PARAM);
     }
-    present = true;
-    changed |= cfg.checkInterval != *interval;
-    cfg.checkInterval = *interval;
   }
 
-  if (!present) {
+  if (!enabled && !allow && !require && !channel && !interval) {
     return sendResp(req, S400, HTTP::ContentType::JSON, JSON_ERR_MISSING_PARAM);
   }
 
-  if (changed && !Config::SetOtaUpdateConfig(cfg)) {
+  bool saved = Config::UpdateOtaUpdateConfig([&](Config::OtaUpdateConfig& cfg) {
+    bool changed = false;
+    auto apply   = [&changed](auto& field, const auto& value) {
+      if (value && field != *value) {
+        field   = *value;
+        changed = true;
+      }
+    };
+    apply(cfg.isEnabled, enabled);
+    apply(cfg.allowBackendManagement, allow);
+    apply(cfg.requireManualApproval, require);
+    apply(cfg.updateChannel, channel);
+    apply(cfg.checkInterval, interval);
+    return changed;
+  });
+  if (!saved) {
     return sendResp(req, S500, HTTP::ContentType::JSON, JSON_ERR_INTERNAL);
   }
   return sendResp(req, S200, nullptr, {});

@@ -405,6 +405,21 @@ bool Config::SetOtaUpdateConfig(const Config::OtaUpdateConfig& config)
   });
 }
 
+bool Config::UpdateOtaUpdateConfig(Util::FunctionRef<bool(Config::OtaUpdateConfig&)> update)
+{
+  CONFIG_LOCK_WRITE(false);
+
+  Config::OtaUpdateConfig config = _configData.otaUpdate;
+  if (!update(config)) {
+    return true;  // Unchanged
+  }
+
+  return mutateAndSave([&](Config::RootConfig& root) {
+    root.otaUpdate = std::move(config);
+    return true;
+  });
+}
+
 bool Config::SetEStopConfig(const Config::EStopConfig& config)
 {
   CONFIG_LOCK_WRITE(false);

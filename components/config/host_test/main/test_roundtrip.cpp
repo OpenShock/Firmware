@@ -317,3 +317,41 @@ TEST_CASE("GetAsJSON without sensitive data omits secrets", "[config][roundtrip]
   TEST_ASSERT_NOT_EQUAL(std::string::npos, redacted.find("\"HomeNet\""));
   TEST_ASSERT_NOT_EQUAL(std::string::npos, redacted.find("\"api.example.org\""));
 }
+
+TEST_CASE("UpdateOtaUpdateConfig edits only what the update touches and saves only on change", "[config][roundtrip]")
+{
+  const Config::RootConfig sample = MakeSampleConfig();
+  TEST_ASSERT_TRUE(InitFrom(Serialize(sample)));
+
+  const std::vector<uint8_t> storedBefore = StoredFile();
+  TEST_ASSERT_TRUE(Config::UpdateOtaUpdateConfig([](Config::OtaUpdateConfig&) { return false; }));
+  TEST_ASSERT_TRUE(storedBefore == StoredFile());
+
+  const uint16_t interval = static_cast<uint16_t>(sample.otaUpdate.checkInterval + 7);
+  TEST_ASSERT_TRUE(Config::UpdateOtaUpdateConfig([&](Config::OtaUpdateConfig& cfg) {
+    cfg.checkInterval = interval;
+    return true;
+  }));
+
+  Config::RootConfig expected      = sample;
+  expected.otaUpdate.checkInterval = interval;
+  AssertConfigEqual(expected, Snapshot());
+
+  TEST_ASSERT_TRUE(InitFrom(StoredFile()));
+  AssertConfigEqual(expected, Snapshot());
+}
+
+TEST_CASE("CompareExchangeOtaUpdateStep only replaces the expected step", "[config][roundtrip]")
+{
+  InitDefault();
+  TEST_ASSERT_TRUE(Config::SetOtaUpdateStep(OtaUpdateStep::Updated));
+
+  TEST_ASSERT_FALSE(Config::CompareExchangeOtaUpdateStep(OtaUpdateStep::Validated, OtaUpdateStep::None));
+  TEST_ASSERT_TRUE(Config::GetOtaUpdateStep() == OtaUpdateStep::Updated);
+
+  TEST_ASSERT_TRUE(Config::CompareExchangeOtaUpdateStep(OtaUpdateStep::Updated, OtaUpdateStep::None));
+  TEST_ASSERT_TRUE(Config::GetOtaUpdateStep() == OtaUpdateStep::None);
+
+  TEST_ASSERT_TRUE(InitFrom(StoredFile()));
+  TEST_ASSERT_TRUE(Config::GetOtaUpdateStep() == OtaUpdateStep::None);
+}
