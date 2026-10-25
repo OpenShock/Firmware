@@ -67,10 +67,12 @@ namespace {
 }  // namespace
 
 namespace HostFake {
-  int64_t Now         = 1'000'000;
-  bool EStopped       = false;
-  int64_t RmtFrameMs  = 10;
-  bool FailRmtChannel = false;
+  int64_t Now          = 1'000'000;
+  bool EStopped        = false;
+  int64_t RmtFrameMs   = 10;
+  bool FailRmtChannel  = false;
+  bool FailRmtTransmit = false;
+  int TaskDelays       = 0;
   std::vector<Transmission> Transmissions;
   std::function<void()> OnIdle;
   std::function<void()> OnTransmit;
@@ -85,10 +87,12 @@ namespace HostFake {
 
   void Reset()
   {
-    EStopped       = false;
-    EStopCfg       = {.enabled = false, .gpioPin = GPIO_NUM_NC};
-    RmtFrameMs     = 10;
-    FailRmtChannel = false;
+    EStopped        = false;
+    EStopCfg        = {.enabled = false, .gpioPin = GPIO_NUM_NC};
+    RmtFrameMs      = 10;
+    FailRmtChannel  = false;
+    FailRmtTransmit = false;
+    TaskDelays      = 0;
     Transmissions.clear();
     OnIdle     = nullptr;
     OnTransmit = nullptr;
@@ -260,6 +264,7 @@ static void fakeQueueDelete(QueueHandle_t handle, int)
 
 static void fakeTaskDelay(const TickType_t ticks, int)
 {
+  ++TaskDelays;
   Now += TicksToMs(ticks);
 }
 
@@ -317,6 +322,10 @@ static esp_err_t fakeRmtDelEncoder(rmt_encoder_handle_t encoder, int)
 
 static esp_err_t fakeRmtTransmit(rmt_channel_handle_t, rmt_encoder_handle_t, const void* payload, size_t payload_bytes, const rmt_transmit_config_t*, int)
 {
+  if (FailRmtTransmit) {
+    return ESP_ERR_INVALID_STATE;
+  }
+
   const auto* symbols = static_cast<const rmt_symbol_word_t*>(payload);
 
   Transmission tx {.at = Now, .symbols = {}};
