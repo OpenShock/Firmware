@@ -26,7 +26,8 @@ namespace OpenShock::TaskUtils {
   ///        touching its handle. Does not return.
   void TaskExiting(TaskExitFlag& exited);
 
-  /// @brief Waits for a task to exit within the given timeout. Force-kills it if it doesn't exit in time.
+  /// @brief Waits for a task to exit. Logs an error every `timeout` it keeps running, and restarts the device if it
+  ///        is still running after a hard limit; it never deletes the task from outside.
   ///        The caller is responsible for signaling the task to stop before calling this.
   ///        `exited` must be the same flag the task passes to TaskExiting(), and must be
   ///        cleared before the task is created.

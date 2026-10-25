@@ -19,7 +19,7 @@ namespace OpenShock {
   /// deletes itself, and the exit is published through TaskUtils::TaskExiting(), so the body never calls
   /// vTaskDelete() and never touches the exit flag. A long-running body polls stopRequested() at its wait points.
   ///
-  /// stop() requests the stop, wakes the task and waits for it to exit (force-killing it after the timeout). The
+  /// stop() requests the stop, wakes the task and waits for it to exit (see TaskUtils::StopTask() for overruns). The
   /// default wake is a task notification, which ends a ulTaskNotifyTake() wait; a task that blocks on something else
   /// (a queue) passes its own wake, e.g. one that posts a sentinel.
   ///
@@ -64,7 +64,8 @@ namespace OpenShock {
     /// @brief Same as start(), on the core that does expensive work (see TaskUtils::TaskCreateExpensive).
     bool startExpensive(const char* name, uint32_t stackSize, UBaseType_t priority, std::move_only_function<void()> body) { return start(name, stackSize, priority, 1, std::move(body)); }
 
-    /// @brief Requests a stop, wakes the task with a task notification and waits for it to exit.
+    /// @brief Requests a stop, wakes the task with a task notification and waits for it to exit. `timeout` is when
+    ///        an overrun starts being logged, not a limit.
     void stop(TickType_t timeout = pdMS_TO_TICKS(1000))
     {
       stop([this] { xTaskNotifyGive(m_handle); }, timeout);
@@ -86,8 +87,8 @@ namespace OpenShock {
         m_stopRequested.store(true, std::memory_order_relaxed);
         wake();
 
-        // From here on nothing touches the handle except a force-kill of a task that never exited, so the task may
-        // now delete itself (see entry()). notify() checks m_stopRequested under the same lock, so it can't either.
+        // From here on nothing touches the handle, so the task may now delete itself (see entry()). notify() checks
+        // m_stopRequested under the same lock, so it can't either.
         m_handleReleased.store(true, std::memory_order_release);
       }
 

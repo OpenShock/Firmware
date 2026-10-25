@@ -221,10 +221,15 @@ static void transmitSymbols(rmt_channel_handle_t channel, rmt_encoder_handle_t e
   }
 }
 
-static void writeSequences(rmt_channel_handle_t channel, rmt_encoder_handle_t encoder, std::vector<Rmt::Sequence>& sequences)
+static void writeSequences(rmt_channel_handle_t channel, rmt_encoder_handle_t encoder, std::vector<Rmt::Sequence>& sequences, const ManagedTask& task)
 {
   // Send queued commands
   for (auto seq = sequences.begin(); seq != sequences.end();) {
+    // A round of many sequences can outlast stop()'s timeout; the shocker stops on its own once frames stop.
+    if (task.stopRequested()) {
+      return;
+    }
+
     int64_t now = OpenShock::millis();
 
     // A round can take several frames; re-check EStop per sequence so no payload goes out after activation.
@@ -310,6 +315,6 @@ void RFTransmitter::TransmitTask()
       }
     }
 
-    writeSequences(m_rmtChannel, m_rmtEncoder, sequences);
+    writeSequences(m_rmtChannel, m_rmtEncoder, sequences, m_task);
   }
 }

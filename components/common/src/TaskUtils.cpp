@@ -36,19 +36,25 @@ void TaskUtils::TaskExiting(TaskExitFlag& exited)
   vTaskDelete(nullptr);
 }
 
-void TaskUtils::StopTask(TaskHandle_t taskHandle, TaskExitFlag& exited, const char* tag, const char* taskName, TickType_t timeout)
+// A task that still hasn't exited after this long is wedged
+static const TickType_t kStopTaskHardLimit = pdMS_TO_TICKS(10'000);
+
+void TaskUtils::StopTask(TaskHandle_t /*taskHandle*/, TaskExitFlag& exited, const char* tag, const char* taskName, TickType_t timeout)
 {
+  // Never vTaskDelete() the task from here: it could be holding a mutex, a heap block or a peripheral, and FreeRTOS
+  // releases none of them. A slow task gets more time; one that never exits is a fault.
   const TickType_t tickInterval = pdMS_TO_TICKS(10);
   TickType_t elapsed            = 0;
-  while (!exited.load(std::memory_order_acquire) && elapsed < timeout) {
+  TickType_t nextWarning        = timeout;
+  while (!exited.load(std::memory_order_acquire)) {
+    if (elapsed >= kStopTaskHardLimit) {
+      OS_PANIC(tag, "%s did not exit within %lu ms", taskName, static_cast<unsigned long>(pdTICKS_TO_MS(elapsed)));
+    }
+    if (elapsed >= nextWarning) {
+      OS_LOGE(tag, "%s has not exited after %lu ms, still waiting", taskName, static_cast<unsigned long>(pdTICKS_TO_MS(elapsed)));
+      nextWarning += timeout;
+    }
     vTaskDelay(tickInterval);
     elapsed += tickInterval;
-  }
-
-  if (!exited.load(std::memory_order_acquire)) {
-    // The task never reached TaskExiting(), so it has not deleted itself and the
-    // handle is still valid to kill.
-    OS_LOGW(tag, "%s did not exit gracefully, killing task", taskName);
-    vTaskDelete(taskHandle);
   }
 }
