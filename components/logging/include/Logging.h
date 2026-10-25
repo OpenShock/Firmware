@@ -16,8 +16,9 @@
 // Named distinctly from the framework's own log_printf to avoid a symbol clash.
 extern "C" int openshock_log_printf(const char* fmt, ...) __attribute__((format(printf, 1, 2)));
 
+// Only ever called with __FILE__; consteval guarantees the directory is stripped at compile time.
 template<std::size_t N>
-constexpr const char* openshockPathToFileName(const char (&path)[N])
+consteval const char* openshockPathToFileName(const char (&path)[N])
 {
   std::size_t pos = 0;
   for (std::size_t i = 0; i < N; i++) {

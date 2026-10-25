@@ -1,8 +1,11 @@
 #pragma once
 
 #include <array>
+#include <cstddef>
 #include <cstdint>
-#include <cstring>
+#include <optional>
+#include <span>
+#include <string_view>
 
 namespace OpenShock::HexUtils {
   /// @brief Converts a single byte to a hex pair, and writes it to the output buffer.
@@ -90,10 +93,11 @@ namespace OpenShock::HexUtils {
   /// @brief Converts a hex pair to a byte.
   /// @param high The high nibble.
   /// @param low The low nibble.
-  /// @param output The output buffer to write to.
-  /// @return Whether the conversion was successful.
-  constexpr bool TryParseHexPair(char high, char low, uint8_t& output) noexcept
+  /// @return The byte, or std::nullopt if either character is not a hex digit.
+  [[nodiscard]] constexpr std::optional<uint8_t> TryParseHexPair(char high, char low) noexcept
   {
+    uint8_t output = 0;
+
     if (high >= '0' && high <= '9') {
       output = (high - '0') << 4;
     } else if (high >= 'A' && high <= 'F') {
@@ -101,7 +105,7 @@ namespace OpenShock::HexUtils {
     } else if (high >= 'a' && high <= 'f') {
       output = (high - 'a' + 10) << 4;
     } else {
-      return false;
+      return std::nullopt;
     }
 
     if (low >= '0' && low <= '9') {
@@ -111,67 +115,62 @@ namespace OpenShock::HexUtils {
     } else if (low >= 'a' && low <= 'f') {
       output |= low - 'a' + 10;
     } else {
-      return false;
+      return std::nullopt;
     }
 
-    return true;
+    return output;
   }
 
-  constexpr std::size_t TryParseHexMac(const char* str, std::size_t strLen, uint8_t* out, std::size_t outLen) noexcept
+  /// @brief Parses a MAC-style hex string (hex pairs separated by colons, e.g. "DE:AD:BE:EF:01:23") into `out`.
+  /// @return The number of bytes parsed, or 0 on failure (bad length, bad digit/separator, or `out` too small).
+  constexpr std::size_t TryParseHexMac(std::string_view str, std::span<uint8_t> out) noexcept
   {
-    std::size_t parsedLength = (strLen + 1) / 3;
+    std::size_t parsedLength = (str.length() + 1) / 3;
 
-    if ((parsedLength * 3) - 1 != strLen) {
+    if ((parsedLength * 3) - 1 != str.length()) {
       return 0;  // Invalid MAC-Style hex string length.
     }
 
-    if (parsedLength > outLen) {
-      return 0;  // Output buffer is too small.
-    }
-
-    for (std::size_t i = 0; i < parsedLength - 1; ++i) {
-      if (!TryParseHexPair(str[i * 3], str[i * 3 + 1], out[i])) {
-        return 0;  // Invalid hex pair.
-      }
-      if (str[i * 3 + 2] != ':') {
-        return 0;  // Invalid separator.
-      }
-    }
-
-    if (!TryParseHexPair(str[(parsedLength - 1) * 3], str[(parsedLength - 1) * 3 + 1], out[parsedLength - 1])) {
-      return 0;  // Invalid hex pair.
-    }
-
-    return parsedLength;
-  }
-
-  inline std::size_t TryParseHexMac(const char* str, uint8_t* out, std::size_t outLen) noexcept
-  {
-    return TryParseHexMac(str, strlen(str), out, outLen);
-  }
-
-  constexpr std::size_t TryParseHex(const char* str, std::size_t strLen, uint8_t* out, std::size_t outLen) noexcept
-  {
-    std::size_t parsedLength = strLen / 2;
-
-    if (parsedLength * 2 != strLen) {
-      return 0;  // Invalid hex string length.
-    }
-
-    if (parsedLength > outLen) {
+    if (parsedLength > out.size()) {
       return 0;  // Output buffer is too small.
     }
 
     for (std::size_t i = 0; i < parsedLength; ++i) {
-      if (!TryParseHexPair(str[i * 2], str[i * 2 + 1], out[i])) {
+      auto byte = TryParseHexPair(str[i * 3], str[i * 3 + 1]);
+      if (!byte) {
         return 0;  // Invalid hex pair.
       }
+      if (i + 1 < parsedLength && str[i * 3 + 2] != ':') {
+        return 0;  // Invalid separator.
+      }
+      out[i] = *byte;
     }
 
     return parsedLength;
   }
-  inline std::size_t TryParseHex(const char* str, uint8_t* out, std::size_t outLen) noexcept
+
+  /// @brief Parses a plain hex string (e.g. "DEADBEEF") into `out`.
+  /// @return The number of bytes parsed, or 0 on failure (odd length, bad digit, or `out` too small).
+  constexpr std::size_t TryParseHex(std::string_view str, std::span<uint8_t> out) noexcept
   {
-    return TryParseHex(str, strlen(str), out, outLen);
+    std::size_t parsedLength = str.length() / 2;
+
+    if (parsedLength * 2 != str.length()) {
+      return 0;  // Invalid hex string length.
+    }
+
+    if (parsedLength > out.size()) {
+      return 0;  // Output buffer is too small.
+    }
+
+    for (std::size_t i = 0; i < parsedLength; ++i) {
+      auto byte = TryParseHexPair(str[i * 2], str[i * 2 + 1]);
+      if (!byte) {
+        return 0;  // Invalid hex pair.
+      }
+      out[i] = *byte;
+    }
+
+    return parsedLength;
   }
 }  // namespace OpenShock::HexUtils

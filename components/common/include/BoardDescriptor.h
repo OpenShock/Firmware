@@ -29,6 +29,7 @@
 #include <bit>
 #include <cstddef>
 #include <cstdint>
+#include <span>
 #include <string_view>
 
 #define OPENSHOCK_BOARD_DESCRIPTOR_MAGIC          0x4442534Fu  // "OSBD" as little-endian bytes
@@ -74,7 +75,7 @@ namespace OpenShock {
     {
       desc.crc32 = 0;
       auto bytes = std::bit_cast<std::array<uint8_t, OPENSHOCK_BOARD_DESCRIPTOR_SIZE>>(desc);
-      desc.crc32 = Checksum::Crc32(bytes.data(), kCrcCoverage);
+      desc.crc32 = Checksum::Crc32(std::span<const uint8_t>(bytes).first(kCrcCoverage));
       return desc;
     }
 
@@ -83,7 +84,7 @@ namespace OpenShock {
     ///
     /// These are the safe defaults: with no pins the hub drives nothing it was never told about, and still boots
     /// into the captive portal.
-    constexpr BoardDescriptor Defaults(const char* name, const char* chip)
+    consteval BoardDescriptor Defaults(const char* name, const char* chip)
     {
       BoardDescriptor desc {};
       desc.magic         = OPENSHOCK_BOARD_DESCRIPTOR_MAGIC;

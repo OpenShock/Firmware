@@ -36,7 +36,10 @@ def find_install() -> dict | None:
     for meta in _candidate_metadata():
         if not meta.is_file():
             continue
-        data = json.loads(meta.read_text(encoding='utf-8'))
+        try:
+            data = json.loads(meta.read_text(encoding='utf-8'))
+        except (OSError, json.JSONDecodeError) as err:
+            raise SystemExit(f'error: cannot read the ESP-IDF install metadata {meta}: {err}') from None
         installs = data.get('idfInstalled') or []
         selected = data.get('idfSelectedId')
         for install in installs:
@@ -54,7 +57,16 @@ def env_dump(activation_script: str) -> str:
         cmd = [shell, '-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', str(script), '-e']
     else:
         cmd = ['sh', str(script), '-e']
-    return subprocess.run(cmd, capture_output=True, text=True, check=True).stdout
+    try:
+        return subprocess.run(cmd, capture_output=True, text=True, check=True).stdout
+    except OSError as err:
+        raise SystemExit(f'error: cannot run {cmd[0]} to activate ESP-IDF with {script}: {err}') from None
+    except subprocess.CalledProcessError as err:
+        detail = (err.stderr or err.stdout or '').strip()
+        raise SystemExit(
+            f'error: activating ESP-IDF with {script} failed (exit {err.returncode})'
+            + (f':\n{detail}' if detail else '')
+        ) from None
 
 
 def apply_env_dump(dump: str, environ: MutableMapping[str, str]) -> None:

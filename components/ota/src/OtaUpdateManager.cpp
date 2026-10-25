@@ -34,10 +34,12 @@ const char* const TAG = "OtaUpdateManager";
 #include <array>
 #include <atomic>
 #include <cstring>
+#include <optional>
 #include <span>
 #include <sstream>
 #include <string>
 #include <string_view>
+#include <utility>
 
 // Firmware version / commit. Regenerated every build, so this file is one of the
 // few that recompile on a new commit.
@@ -105,18 +107,18 @@ static bool otaum_try_queue_update_request(const OpenShock::SemVer& version)
   return true;
 }
 
-static bool _tryGetRequestedVersion(OpenShock::SemVer& version)
+[[nodiscard]] static std::optional<OpenShock::SemVer> _tryGetRequestedVersion()
 {
   if (!_requestedVersionMutex.lock(pdMS_TO_TICKS(1000))) {
     OS_LOGE(TAG, "Failed to take requested version mutex");
-    return false;
+    return std::nullopt;
   }
 
-  version = _requestedVersion;
+  OpenShock::SemVer version = _requestedVersion;
 
   _requestedVersionMutex.unlock();
 
-  return true;
+  return version;
 }
 
 static void otaum_evh_wifidisconnected(void* event_handler_arg, esp_event_base_t event_base, int32_t event_id, void* event_data)
@@ -150,13 +152,13 @@ static void otaum_evh_ipevent(void* event_handler_arg, esp_event_base_t event_ba
 
 static bool otaum_send_progress_msg(Serialization::Types::OtaUpdateProgressTask task, float progress)
 {
-  int32_t updateId;
-  if (!Config::GetOtaUpdateId(updateId)) {
+  auto updateId = Config::GetOtaUpdateId();
+  if (!updateId) {
     OS_LOGE(TAG, "Failed to get OTA update ID");
     return false;
   }
 
-  if (!Serialization::Gateway::SerializeOtaUpdateProgressMessage(updateId, task, progress, GatewayConnectionManager::SendMessageBIN)) {
+  if (!Serialization::Gateway::SerializeOtaUpdateProgressMessage(*updateId, task, progress, GatewayConnectionManager::SendMessageBIN)) {
     OS_LOGE(TAG, "Failed to send OTA install progress message");
     return false;
   }
@@ -165,13 +167,13 @@ static bool otaum_send_progress_msg(Serialization::Types::OtaUpdateProgressTask 
 }
 static bool _sendFailureMessage(std::string_view message, bool fatal = false)
 {
-  int32_t updateId;
-  if (!Config::GetOtaUpdateId(updateId)) {
+  auto updateId = Config::GetOtaUpdateId();
+  if (!updateId) {
     OS_LOGE(TAG, "Failed to get OTA update ID");
     return false;
   }
 
-  if (!Serialization::Gateway::SerializeOtaUpdateFailedMessage(updateId, message, fatal, GatewayConnectionManager::SendMessageBIN)) {
+  if (!Serialization::Gateway::SerializeOtaUpdateFailedMessage(*updateId, message, fatal, GatewayConnectionManager::SendMessageBIN)) {
     OS_LOGE(TAG, "Failed to send OTA install failed message");
     return false;
   }
@@ -398,11 +400,12 @@ static void otaum_updatetask(void* arg)
 
     int64_t now = OpenShock::millis();
 
-    Config::OtaUpdateConfig config;
-    if (!Config::GetOtaUpdateConfig(config)) {
+    auto maybeConfig = Config::GetOtaUpdateConfig();
+    if (!maybeConfig) {
       OS_LOGE(TAG, "Failed to get OTA update config");
       continue;
     }
+    const Config::OtaUpdateConfig& config = *maybeConfig;
 
     if (!config.isEnabled) {
       OS_LOGD(TAG, "OTA updates are disabled, skipping update check");
@@ -445,18 +448,22 @@ static void otaum_updatetask(void* arg)
     if (updateRequested) {
       updateRequested = false;
 
-      if (!_tryGetRequestedVersion(version)) {
+      auto requestedVersion = _tryGetRequestedVersion();
+      if (!requestedVersion) {
         OS_LOGE(TAG, "Failed to get requested version");
         continue;
       }
+      version = std::move(*requestedVersion);
     } else {
       OS_LOGD(TAG, "Checking for updates");
 
       // Fetch current version.
-      if (!OtaUpdateManager::TryGetFirmwareVersion(client, config.updateChannel, version)) {
+      auto latestVersion = OtaUpdateManager::TryGetFirmwareVersion(client, config.updateChannel);
+      if (!latestVersion) {
         OS_LOGE(TAG, "Failed to fetch firmware version");
         continue;
       }
+      version = std::move(*latestVersion);
     }
 
     std::string versionStr = version.toString();  // TODO: This is abusing the SemVer::toString() method causing alot of string copies, fix this
@@ -489,12 +496,13 @@ static void otaum_updatetask(void* arg)
     }
 
     // Fetch current release.
-    OtaUpdateManager::FirmwareRelease release;
-    if (!OtaUpdateManager::TryGetFirmwareRelease(client, version, release)) {
+    auto maybeRelease = OtaUpdateManager::TryGetFirmwareRelease(client, version);
+    if (!maybeRelease) {
       OS_LOGE(TAG, "Failed to fetch firmware release");  // TODO: Send error message to server
       _sendFailureMessage("Failed to fetch firmware release"sv);
       continue;
     }
+    const OtaUpdateManager::FirmwareRelease& release = *maybeRelease;
 
     // Print release.
     OS_LOGD(TAG, "Firmware release:");
@@ -582,9 +590,9 @@ static const char* otaum_channel_name(OpenShock::OtaUpdateChannel channel)
       return "beta";
     case OtaUpdateChannel::Develop:
       return "develop";
-    default:
-      return nullptr;
   }
+
+  return nullptr;  // Channel comes from config and may be out of range
 }
 
 /// @brief Fetches the repository server domain from runtime config.
@@ -592,29 +600,28 @@ static const char* otaum_channel_name(OpenShock::OtaUpdateChannel channel)
 /// Historically named cdnDomain, from when OTA metadata was flat files served straight off the CDN.
 /// It now addresses the repository server's JSON API; artifact URLs come back absolute in the response,
 /// so the CDN host no longer has to be known by the hub.
-static bool otaum_try_get_repo_domain(std::string& domain)
+[[nodiscard]] static std::optional<std::string> otaum_try_get_repo_domain()
 {
-  Config::OtaUpdateConfig config;
-  if (!Config::GetOtaUpdateConfig(config)) {
+  auto config = Config::GetOtaUpdateConfig();
+  if (!config) {
     OS_LOGE(TAG, "Failed to get OTA update config");
-    return false;
+    return std::nullopt;
   }
 
-  if (config.cdnDomain.empty()) {
+  if (config->cdnDomain.empty()) {
     OS_LOGE(TAG, "OTA repository domain is not configured");
-    return false;
+    return std::nullopt;
   }
 
-  domain = std::move(config.cdnDomain);
-
-  return true;
+  return std::move(config->cdnDomain);
 }
 
 /// @brief Issues a GET against the repository API and parses the body as JSON.
 /// @param body Receives the response body. JsonView is zero-copy, so this must outlive `doc`.
 /// @param acceptedCodes Response codes to treat as success. 204 is handled by the caller and must not
 ///                      reach the parser; an empty body is not valid JSON.
-static bool otaum_try_get_json(HTTP::Client& client, std::string_view url, std::span<const uint16_t> acceptedCodes, std::string& body, JSON::JsonDocument& doc, int& code)
+/// @return The response code, or std::nullopt if the request or the JSON parse failed.
+[[nodiscard]] static std::optional<int> otaum_try_get_json(HTTP::Client& client, std::string_view url, std::span<const uint16_t> acceptedCodes, std::string& body, JSON::JsonDocument& doc)
 {
   auto response = client.GetString(
     url,
@@ -625,23 +632,23 @@ static bool otaum_try_get_json(HTTP::Client& client, std::string_view url, std::
   );
   if (response.result != OpenShock::HTTP::RequestResult::Success) {
     OS_LOGE(TAG, "Request failed: %s [%u] %s", response.ResultToString(), response.code, response.data.c_str());
-    return false;
+    return std::nullopt;
   }
 
-  code = response.code;
-  body = std::move(response.data);
+  int code = response.code;
+  body     = std::move(response.data);
 
   // 204 carries no body; the caller decides what that means for the endpoint it called.
   if (code == 204) {
-    return true;
+    return code;
   }
 
   if (!doc.parse(body)) {
     OS_LOGE(TAG, "Failed to parse response JSON");
-    return false;
+    return std::nullopt;
   }
 
-  return true;
+  return code;
 }
 
 bool OtaUpdateManager::Init()
@@ -671,11 +678,12 @@ bool OtaUpdateManager::Init()
   _otaImageState = imageState;
 
   OS_LOGD(TAG, "Fetching previous update step");
-  OtaUpdateStep updateStep;
-  if (!Config::GetOtaUpdateStep(updateStep)) {
+  auto maybeUpdateStep = Config::GetOtaUpdateStep();
+  if (!maybeUpdateStep) {
     OS_LOGE(TAG, "Failed to get OTA update step");
     return false;
   }
+  OtaUpdateStep updateStep = *maybeUpdateStep;
 
   // Infer boot type from update step.
   _bootType = OpenShock::InferFirmwareBootType(updateStep);
@@ -707,55 +715,55 @@ bool OtaUpdateManager::Init()
   return true;
 }
 
-bool OtaUpdateManager::TryGetFirmwareVersion(HTTP::Client& client, OtaUpdateChannel channel, OpenShock::SemVer& version)
+std::optional<OpenShock::SemVer> OtaUpdateManager::TryGetFirmwareVersion(HTTP::Client& client, OtaUpdateChannel channel)
 {
   const char* channelName = otaum_channel_name(channel);
   if (channelName == nullptr) {
-    OS_LOGE(TAG, "Unknown channel: %u", static_cast<unsigned>(channel));
-    return false;
+    OS_LOGE(TAG, "Unknown channel: %u", std::to_underlying(channel));
+    return std::nullopt;
   }
 
-  std::string domain;
-  if (!otaum_try_get_repo_domain(domain)) {
-    return false;
+  auto domain = otaum_try_get_repo_domain();
+  if (!domain) {
+    return std::nullopt;
   }
 
   std::string uri;
   const auto board = Board::Name();
-  if (!FormatToString(uri, OPENSHOCK_FW_REPO_LATEST_URL_FORMAT, domain.c_str(), channelName, static_cast<int>(board.size()), board.data(), OpenShock::Constants::FW_VERSION)) {
+  if (!FormatToString(uri, OPENSHOCK_FW_REPO_LATEST_URL_FORMAT, domain->c_str(), channelName, static_cast<int>(board.size()), board.data(), OpenShock::Constants::FW_VERSION)) {
     OS_LOGE(TAG, "Failed to format URL");
-    return false;
+    return std::nullopt;
   }
 
   OS_LOGD(TAG, "Fetching latest firmware version from %s", uri.c_str());
 
   std::string body;
   JSON::JsonDocument doc;
-  int code = 0;
-  if (!otaum_try_get_json(client, uri, std::array<uint16_t, 2> {200, 204}, body, doc, code)) {
-    return false;
+  auto code = otaum_try_get_json(client, uri, std::array<uint16_t, 2> {200, 204}, body, doc);
+  if (!code) {
+    return std::nullopt;
   }
 
   // 204 means the server compared our version against the channel head and found no work to do.
   // Report the running version back so the caller's "already installed" check short-circuits.
-  if (code == 204) {
+  if (*code == 204) {
     OS_LOGD(TAG, "Already on the latest version for this channel");
-    version = OpenShock::Constants::FirmwareVersion();
-    return true;
+    return OpenShock::Constants::FirmwareVersion();
   }
 
-  std::string versionStr;
-  if (!doc.root()["version"].tryGetStr(versionStr)) {
+  auto versionStr = doc.root()["version"].tryGetStr();
+  if (!versionStr) {
     OS_LOGE(TAG, "Response is missing a 'version' string");
-    return false;
+    return std::nullopt;
   }
 
-  if (!OpenShock::TryParseSemVer(versionStr, version)) {
-    OS_LOGE(TAG, "Failed to parse firmware version: %.*s", static_cast<int>(versionStr.size()), versionStr.data());
-    return false;
+  auto version = OpenShock::TryParseSemVer(*versionStr);
+  if (!version) {
+    OS_LOGE(TAG, "Failed to parse firmware version: %.*s", static_cast<int>(versionStr->size()), versionStr->data());
+    return std::nullopt;
   }
 
-  return true;
+  return version;
 }
 
 static bool _tryParseIntoHash(std::string_view hash, uint8_t (&hashBytes)[32])
@@ -765,7 +773,7 @@ static bool _tryParseIntoHash(std::string_view hash, uint8_t (&hashBytes)[32])
     return false;
   }
 
-  if (HexUtils::TryParseHex(hash.data(), hash.size(), hashBytes, 32) != 32) {
+  if (HexUtils::TryParseHex(hash, std::span<uint8_t>(hashBytes)) != 32) {
     OS_LOGE(TAG, "Failed to parse hash: %.*s", static_cast<int>(hash.size()), hash.data());
     return false;
   }
@@ -779,13 +787,15 @@ static bool _tryParseIntoHash(std::string_view hash, uint8_t (&hashBytes)[32])
 /// ignored: it is a full-flash esptool image (bootloader at 0x1000, partition table at 0x8000, app at
 /// 0x10000, filesystem at its offset) meant for USB flashing a blank device. Writing it into an OTA app
 /// slot would put a bootloader image where the app belongs. See firmware-api-spec.md §9.2.
-static bool otaum_parse_board_artifacts(JSON::JsonView root, OtaUpdateManager::FirmwareRelease& release)
+[[nodiscard]] static std::optional<OtaUpdateManager::FirmwareRelease> otaum_parse_board_artifacts(JSON::JsonView root)
 {
   auto artifacts = root["artifacts"];
   if (!artifacts.isArray()) {
     OS_LOGE(TAG, "Response is missing an 'artifacts' array");
-    return false;
+    return std::nullopt;
   }
+
+  OtaUpdateManager::FirmwareRelease release {};
 
   bool foundApp = false, foundFilesystem = false;
 
@@ -793,73 +803,80 @@ static bool otaum_parse_board_artifacts(JSON::JsonView root, OtaUpdateManager::F
   for (int i = 0; i < count; i++) {
     auto artifact = artifacts.at(i);
 
-    std::string typeStr, urlStr, hashStr;
-    if (!artifact["type"].tryGetStr(typeStr) || !artifact["url"].tryGetStr(urlStr) || !artifact["sha256Hash"].tryGetStr(hashStr)) {
+    auto typeStr = artifact["type"].tryGetStr();
+    if (!typeStr) {
+      continue;
+    }
+    auto urlStr = artifact["url"].tryGetStr();
+    if (!urlStr) {
+      continue;
+    }
+    auto hashStr = artifact["sha256Hash"].tryGetStr();
+    if (!hashStr) {
       continue;
     }
 
-    if (typeStr == "app"sv) {
+    if (*typeStr == "app"sv) {
       if (foundApp) {
         OS_LOGE(TAG, "Duplicate 'app' artifact");
-        return false;
+        return std::nullopt;
       }
-      if (!_tryParseIntoHash(hashStr, release.appBinaryHash)) {
-        return false;
+      if (!_tryParseIntoHash(*hashStr, release.appBinaryHash)) {
+        return std::nullopt;
       }
-      release.appBinaryUrl = std::move(urlStr);
+      release.appBinaryUrl = std::move(*urlStr);
       foundApp             = true;
-    } else if (typeStr == "staticfs"sv) {
+    } else if (*typeStr == "staticfs"sv) {
       if (foundFilesystem) {
         OS_LOGE(TAG, "Duplicate 'staticfs' artifact");
-        return false;
+        return std::nullopt;
       }
-      if (!_tryParseIntoHash(hashStr, release.filesystemBinaryHash)) {
-        return false;
+      if (!_tryParseIntoHash(*hashStr, release.filesystemBinaryHash)) {
+        return std::nullopt;
       }
-      release.filesystemBinaryUrl = std::move(urlStr);
+      release.filesystemBinaryUrl = std::move(*urlStr);
       foundFilesystem             = true;
     }
   }
 
   if (!foundApp) {
     OS_LOGE(TAG, "Release is missing an 'app' artifact");
-    return false;
+    return std::nullopt;
   }
 
   if (!foundFilesystem) {
     OS_LOGE(TAG, "Release is missing a 'staticfs' artifact");
-    return false;
+    return std::nullopt;
   }
 
-  return true;
+  return release;
 }
 
-bool OtaUpdateManager::TryGetFirmwareRelease(HTTP::Client& client, const OpenShock::SemVer& version, FirmwareRelease& release)
+std::optional<OtaUpdateManager::FirmwareRelease> OtaUpdateManager::TryGetFirmwareRelease(HTTP::Client& client, const OpenShock::SemVer& version)
 {
   auto versionStr = version.toString();  // TODO: This is abusing the SemVer::toString() method causing alot of string copies, fix this
 
-  std::string domain;
-  if (!otaum_try_get_repo_domain(domain)) {
-    return false;
+  auto domain = otaum_try_get_repo_domain();
+  if (!domain) {
+    return std::nullopt;
   }
 
   std::string uri;
   const auto board = Board::Name();
-  if (!FormatToString(uri, OPENSHOCK_FW_REPO_VERSION_URL_FORMAT, domain.c_str(), versionStr.c_str(), static_cast<int>(board.size()), board.data())) {
+  if (!FormatToString(uri, OPENSHOCK_FW_REPO_VERSION_URL_FORMAT, domain->c_str(), versionStr.c_str(), static_cast<int>(board.size()), board.data())) {
     OS_LOGE(TAG, "Failed to format URL");
-    return false;
+    return std::nullopt;
   }
 
   OS_LOGD(TAG, "Fetching firmware release from %s", uri.c_str());
 
   std::string body;
   JSON::JsonDocument doc;
-  int code = 0;
-  if (!otaum_try_get_json(client, uri, std::array<uint16_t, 1> {200}, body, doc, code)) {
-    return false;
+  if (!otaum_try_get_json(client, uri, std::array<uint16_t, 1> {200}, body, doc)) {
+    return std::nullopt;
   }
 
-  return otaum_parse_board_artifacts(doc.root(), release);
+  return otaum_parse_board_artifacts(doc.root());
 }
 
 bool OtaUpdateManager::TryStartFirmwareUpdate(const OpenShock::SemVer& version)

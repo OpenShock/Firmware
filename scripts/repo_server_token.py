@@ -5,7 +5,8 @@ import base64
 import json
 
 import requests
-from gha import env, fail, mask, require_env, set_output
+
+from utils.gha import env, fail, mask, require_env, set_output
 
 # Printed so a later rejection can be read against what was sent; the token itself is masked, these claims are not secret.
 ECHOED_CLAIMS = ('aud', 'repository', 'repository_owner', 'ref', 'run_id')
@@ -35,7 +36,7 @@ def main() -> int:
             request_url,
             params={'audience': audience},
             headers={
-                'Authorization': f"bearer {env('ACTIONS_ID_TOKEN_REQUEST_TOKEN')}",
+                'Authorization': f'bearer {env("ACTIONS_ID_TOKEN_REQUEST_TOKEN")}',
                 'Accept': 'application/json',
             },
             timeout=(10, 30),

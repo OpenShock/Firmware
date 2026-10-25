@@ -1,4 +1,4 @@
-# Test and lint dependencies for the CI scripts in this directory and the build scripts, on top of the runtime set.
+# Test and lint dependencies for the scripts in scripts/, on top of requirements.txt.
 #
 # Kept out of requirements.txt so the jobs that hold the repository-server publish
 # credential do not install a test runner they never use. Hashed for the same reason
@@ -6,7 +6,7 @@
 #
 #   python -m venv .venv
 #   .venv/bin/pip install --require-hashes -r requirements.txt   # root build lock; scripts/tests need it
-#   .venv/bin/pip install --require-hashes -r .github/scripts/requirements-dev.txt
+#   .venv/bin/pip install --require-hashes -r requirements-dev.txt
 #   .venv/bin/python -m pytest
 
 -r requirements.txt

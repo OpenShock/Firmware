@@ -36,10 +36,12 @@ def merge_one(board: str, bindir: Path, staticfs: str, output: str) -> None:
     esptool.main(argv)
 
 
-def main(argv=None) -> int:
+def main(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument('--board', required=True, action='append', help='board name(s); repeatable, whitespace-separated')
-    ap.add_argument('--bindir', required=True, help='dir with app.bin, bootloader.bin, partition-table.bin; {board} is expanded')
+    ap.add_argument(
+        '--bindir', required=True, help='dir with app.bin, bootloader.bin, partition-table.bin; {board} is expanded'
+    )
     ap.add_argument('--staticfs', required=True, help='path to the static0 image (staticfs.bin)')
     ap.add_argument('--output', required=True, help='merged output binary; {board} is expanded')
     args = ap.parse_args(argv)
@@ -50,7 +52,9 @@ def main(argv=None) -> int:
         for template in (args.bindir, args.output):
             template.format(board=names[0])
     except (KeyError, IndexError, ValueError) as e:
-        raise SystemExit(f'error: cannot expand --bindir or --output ({type(e).__name__}: {e}); only {{board}} is expanded') from e
+        raise SystemExit(
+            f'error: cannot expand --bindir or --output ({type(e).__name__}: {e}); only {{board}} is expanded'
+        ) from e
     if len(names) > 1 and len({args.output.format(board=b) for b in names}) < len(names):
         raise SystemExit('error: --output expands to the same path for different boards; include {board}')
 
@@ -63,7 +67,10 @@ def main(argv=None) -> int:
         # esptool exits rather than raising, and a zero code is still a success.
         except SystemExit as e:
             if e.code not in (0, None):
-                print(f'{board}: {e.code if isinstance(e.code, str) else f"esptool exited with {e.code}"}', file=sys.stderr)
+                print(
+                    f'{board}: {e.code if isinstance(e.code, str) else f"esptool exited with {e.code}"}',
+                    file=sys.stderr,
+                )
                 failed.append(board)
         except Exception as e:
             print(f'{board}: {type(e).__name__}: {e}', file=sys.stderr)

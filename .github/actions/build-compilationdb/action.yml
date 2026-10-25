@@ -1,7 +1,5 @@
 name: build-compilationdb
-description: >-
-  Emit build/OpenShock-Core-V2/compile_commands.json with native ESP-IDF for the
-  canonical OpenShock-Core-V2 config.
+description: Generate compile_commands.json for the OpenShock-Core-V2
 inputs:
   version:
     required: true
@@ -9,16 +7,17 @@ inputs:
   target:
     required: false
     default: reconfigure
-    description: >-
-      The idf.py target: reconfigure runs CMake only, which writes compile_commands.json;
-      app also compiles, for tools that trace the compiler (CodeQL).
+    description: 'The idf.py target, reconfigure writes compile_commands.json, app also compiles for tools that trace the compiler (CodeQL)'
 
 runs:
   using: composite
   steps:
     - uses: ./.github/actions/setup-esp-idf
 
-    # ccache stays off: it would hide compiler invocations from CodeQL's tracer.
+    # scripts/build.py and the scripts CMake runs need requirements.txt
+    - uses: ./.github/actions/install-python-deps
+
+    # ccache stays off, it would hide compiler invocations from CodeQL's tracer.
     - name: Generate compilation database (OpenShock-Core-V2)
       shell: bash
       run: |

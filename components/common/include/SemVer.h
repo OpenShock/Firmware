@@ -1,6 +1,7 @@
 #pragma once
 
 #include <cstdint>
+#include <optional>
 #include <string>
 #include <string_view>
 
@@ -59,5 +60,5 @@ namespace OpenShock {
     std::string toString() const;
   };
 
-  bool TryParseSemVer(std::string_view str, SemVer& out);
+  [[nodiscard]] std::optional<SemVer> TryParseSemVer(std::string_view str);
 }  // namespace OpenShock

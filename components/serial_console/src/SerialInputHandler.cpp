@@ -647,7 +647,7 @@ static void serialRxTask(void*)
       case SerialReadResult::Data:
         echoHandleSerialInput(buffer, true);
         break;
-      default:
+      case SerialReadResult::NoData:
         echoHandleSerialInput(buffer, false);
         break;
     }
@@ -682,10 +682,12 @@ bool SerialInputHandler::Init()
   SerialInputHandler::PrintVersionInfo();
   OS_SERIAL_PRINTLN();
 
-  if (!Config::GetSerialInputConfigEchoEnabled(s_echoEnabled)) {
+  auto echoEnabled = Config::GetSerialInputConfigEchoEnabled();
+  if (!echoEnabled) {
     OS_LOGE(TAG, "Failed to get serial echo status from config");
     return false;
   }
+  s_echoEnabled = *echoEnabled;
 
   if (TaskUtils::TaskCreateExpensive(serialRxTask, "SerialRX", 10'000, nullptr, 1, nullptr) != pdPASS) {  // TODO: Profile stack size
     OS_LOGE(TAG, "Failed to create serial RX task");

@@ -6,8 +6,12 @@ scripts/stamp_board.py (the CLI, and CMake's POST_BUILD stamp) and scripts/packa
 """
 
 import dataclasses
+import os
 
-from . import boards, espimage
+from . import boards, espimage, targets
+
+# What a message calls the image: its path, or a label such as the board an in-memory image is for.
+ImageName = str | os.PathLike[str]
 
 
 def descriptor_for(spec: boards.BoardSpec) -> espimage.Descriptor:
@@ -24,18 +28,14 @@ def descriptor_for(spec: boards.BoardSpec) -> espimage.Descriptor:
 
 
 def check_chip(image: espimage.Image, spec: boards.BoardSpec) -> None:
-    expected = espimage.CHIP_IDS.get(spec.target)
-    if expected is None:
-        raise SystemExit(
-            f'error: no image chip id known for target {spec.target!r} - add it to scripts/utils/espimage.py'
-        )
+    expected = targets.target(spec.target).image_chip_id
     if image.chip_id != expected:
         raise SystemExit(
             f'error: image was built for chip id 0x{image.chip_id:04X}, but {spec.name} is {spec.target} (0x{expected:04X})'
         )
 
 
-def read_descriptor(image: espimage.Image, path) -> espimage.Descriptor:
+def read_descriptor(image: espimage.Image, path: ImageName) -> espimage.Descriptor:
     try:
         return espimage.unpack_descriptor(image.descriptor_bytes())
     except espimage.DescriptorError as err:
@@ -44,7 +44,7 @@ def read_descriptor(image: espimage.Image, path) -> espimage.Descriptor:
         ) from err
 
 
-def stamp_image(image: espimage.Image, spec: boards.BoardSpec, path) -> espimage.Image:
+def stamp_image(image: espimage.Image, spec: boards.BoardSpec, path: ImageName) -> espimage.Image:
     """A copy of the image stamped as this board, its checksum and SHA-256 recomputed."""
     image.verify()
     check_chip(image, spec)
@@ -52,7 +52,7 @@ def stamp_image(image: espimage.Image, spec: boards.BoardSpec, path) -> espimage
     return image.patch(espimage.DESC_OFFSET, descriptor_for(spec).pack())
 
 
-def verify_image(image: espimage.Image, spec: boards.BoardSpec, path) -> None:
+def verify_image(image: espimage.Image, spec: boards.BoardSpec, path: ImageName) -> None:
     """Fail unless the image is intact, for the board's chip, and carries exactly its descriptor."""
     image.verify()
     check_chip(image, spec)

@@ -64,9 +64,10 @@ user:
 
 ### Python dependencies
 
-The scripts need a few packages beyond what ESP-IDF's venv ships. Install them into a venv of
-your own, not into ESP-IDF's: `requirements.txt` pins a newer `cryptography` than ESP-IDF's
-constraints allow, and installing it there breaks the ESP-IDF activation.
+The project's scripts, both the ones you run and the ones the build runs (`gen_staticfs.py`,
+`stamp_board.py`), need `requirements.txt`. Install it into a venv of your own, not into ESP-IDF's:
+`requirements.txt` pins a newer `cryptography` than ESP-IDF's constraints allow, and installing it
+there breaks the ESP-IDF activation.
 
 ```sh
 python -m venv .venv
@@ -74,9 +75,12 @@ python -m venv .venv
 pip install --require-hashes -r requirements.txt
 ```
 
-The one exception is the `staticfs` build target, which ESP-IDF's own interpreter runs: it needs
-`littlefs-python` in the ESP-IDF venv. Install just that one there, at the version pinned in
-`requirements.in`.
+Run `scripts/build.py` from that venv: it checks that its own interpreter has every pin of
+`requirements.txt` before `idf.py` starts, then hands the interpreter to CMake as `OPENSHOCK_PYTHON`
+for the scripts the build runs. A bare `cmake --preset <board>` (CLion, the command line) uses
+`.venv/` in the repository when it exists, or the interpreter you set `OPENSHOCK_PYTHON` to, and
+runs the same check at configure time. Nothing installs packages for you: a missing pin fails fast
+with the list.
 
 ## Building
 
@@ -265,7 +269,7 @@ The loop CI runs over all of them is in `.github/workflows/host-tests.yml`.
 ### Script tests (Python)
 
 ```sh
-pip install --require-hashes -r requirements.txt -r .github/scripts/requirements-dev.txt
+pip install --require-hashes -r requirements.txt -r requirements-dev.txt
 ruff check .
 mypy
 python -m pytest
@@ -307,8 +311,7 @@ reconfigure prints what it ignored.
 uv pip compile requirements.in --universal --python-version 3.10 --generate-hashes -o requirements.txt
 ```
 
-The CI helper scripts have their own pinned file; the refresh command is in the header of
-`.github/scripts/requirements.txt`.
+`requirements-dev.txt` adds the test and lint tools on top of it; the refresh command is in its header.
 
 ### Frontend
 

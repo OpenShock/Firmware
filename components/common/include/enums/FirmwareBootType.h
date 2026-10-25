@@ -4,6 +4,7 @@
 #include "StringHelpers.h"
 
 #include <cstdint>
+#include <optional>
 #include <string_view>
 
 namespace OpenShock {
@@ -13,24 +14,21 @@ namespace OpenShock {
     Rollback
   };
 
-  inline bool TryParseFirmwareBootType(FirmwareBootType& bootType, std::string_view str)
+  [[nodiscard]] inline std::optional<FirmwareBootType> TryParseFirmwareBootType(std::string_view str)
   {
     if (StringIEquals(str, "normal")) {
-      bootType = FirmwareBootType::Normal;
-      return true;
+      return FirmwareBootType::Normal;
     }
 
     if (StringIEquals(str, "newfirmware") || StringIEquals(str, "new_firmware")) {
-      bootType = FirmwareBootType::NewFirmware;
-      return true;
+      return FirmwareBootType::NewFirmware;
     }
 
     if (StringIEquals(str, "rollback")) {
-      bootType = FirmwareBootType::Rollback;
-      return true;
+      return FirmwareBootType::Rollback;
     }
 
-    return false;
+    return std::nullopt;
   }
 
   // Maps the OTA update step persisted in config (read once at boot) to the boot

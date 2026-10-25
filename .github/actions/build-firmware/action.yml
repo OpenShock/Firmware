@@ -1,7 +1,5 @@
 name: build-firmware
-description: >-
-  Compile one build variant (scripts/utils/boards.py) with native ESP-IDF and upload its
-  unstamped app, bootloader and partition-table images for the package job to stamp.
+description: Compile app, bootloader, and parition-table images without board stamps and upload it to build artifacts.
 inputs:
   variant:
     required: true
@@ -16,25 +14,17 @@ runs:
     - uses: ./.github/actions/setup-esp-idf
       id: idf
 
-    # One store per variant and IDF version. Entries are immutable, so the key ends in the run and
-    # restore-keys picks the newest store; only develop saves, so every other ref restores develop's.
-    - name: Compute ccache key
-      id: ccache-key
-      shell: bash
-      env:
-        IDF_VERSION: ${{ steps.idf.outputs.version }}
-        VARIANT: ${{ inputs.variant }}
-      run: echo "key=ccache-v2-$RUNNER_OS-$IDF_VERSION-$VARIANT-" >> "$GITHUB_OUTPUT"
+    # scripts/build.py and the scripts CMake runs need requirements.txt
+    - uses: ./.github/actions/install-python-deps
 
+    # Entries are immutable, so the key ends in the run and restore-keys picks the newest store
     - name: Restore ccache
       uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9  # v6.1.0
       with:
         path: ~/.cache/ccache
-        key: ${{ steps.ccache-key.outputs.key }}${{ github.run_id }}-${{ github.run_attempt }}
-        restore-keys: |
-          ${{ steps.ccache-key.outputs.key }}
+        key: ccache-v2-${{ runner.os }}-${{ steps.idf.outputs.version }}-${{ inputs.variant }}-${{ github.run_id }}-${{ github.run_attempt }}
+        restore-keys: ccache-v2-${{ runner.os }}-${{ steps.idf.outputs.version }}-${{ inputs.variant }}-
 
-    # Code targets only: the static0 image is the staticfs job's.
     - name: Build firmware
       shell: bash
       run: |
@@ -45,16 +35,14 @@ runs:
       env:
         VARIANT: ${{ inputs.variant }}
         OPENSHOCK_FW_VERSION: ${{ inputs.version }}
-        # Fixed: the build directory is on every compile command line, so it is part of each ccache hash.
         OPENSHOCK_BUILD_DIR: build/firmware
         OPENSHOCK_FW_GIT_COMMIT: ${{ github.sha }}
-        # content, not mtime: the restored toolchain has fresh timestamps every run.
         CCACHE_COMPILERCHECK: content
-        # Generous for one sdkconfig's objects; it only stops a store growing without bound.
-        CCACHE_MAXSIZE: 500M
+        CCACHE_MAXSIZE: 500M # Could be lower maybe
 
-    # A near-zero hit rate on an unchanged tree means something per-commit is being force-included.
+    # Log caching statistics to actions run summary
     - name: ccache statistics
+      id: ccache-stats
       shell: bash
       env:
         VARIANT: ${{ inputs.variant }}
@@ -66,16 +54,17 @@ runs:
           ccache --show-stats || true
           echo '```'
         } >> "$GITHUB_STEP_SUMMARY"
+        misses=$(ccache --print-stats 2>/dev/null | awk -F'\t' '$1 == "cache_miss" { print $2 }')
+        echo "misses=${misses:-unknown}" >> "$GITHUB_OUTPUT"
 
-    # develop only: another ref's entry is restorable by that ref alone and would only spend the 10 GB.
     - name: Save ccache
-      if: ${{ github.ref == 'refs/heads/develop' }}
+      if: ${{ steps.ccache-stats.outputs.misses != '0' && !github.event.pull_request.head.repo.fork }} # Probably dont wanna save cache from external prs
       uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9  # v6.1.0
       with:
         path: ~/.cache/ccache
-        key: ${{ steps.ccache-key.outputs.key }}${{ github.run_id }}-${{ github.run_attempt }}
+        key: ccache-v2-${{ runner.os }}-${{ steps.idf.outputs.version }}-${{ inputs.variant }}-${{ github.run_id }}-${{ github.run_attempt }}
 
-    # dist/<variant>/ so the package job can merge every variant into one tree; app.bin is the OTA name.
+    # Copy built images out for artifact upload
     - name: Stage partition images
       shell: bash
       env:
@@ -88,11 +77,30 @@ runs:
         cp "$BUILD_DIR/bootloader/bootloader.bin"           "$OUT_DIR/bootloader.bin"
         cp "$BUILD_DIR/partition_table/partition-table.bin" "$OUT_DIR/partition-table.bin"
 
-    # variant_*, not firmware_*: repo-server-publish downloads firmware_* and must not get unstamped images.
     - name: Upload partition images
       uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9  # v7.0.2
       with:
         name: variant_${{ inputs.variant }}
         path: dist
         retention-days: 1
+        if-no-files-found: error
+
+    # The symbols for decoding a crash backtrace: stable builds print no assert text (ASSERTIONS_SILENT). Stamping
+    # does not move code, so one ELF covers every board of the variant. ci-build.yml attaches it to the release.
+    - name: Stage ELF
+      shell: bash
+      env:
+        BUILD_DIR: build/firmware
+        OUT: elf/OpenShock_${{ inputs.variant }}_${{ inputs.version }}.elf
+      run: |
+        set -euo pipefail
+        mkdir -p elf
+        cp "$BUILD_DIR/firmware.elf" "$OUT"
+
+    - name: Upload ELF
+      uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9  # v7.0.2
+      with:
+        name: elf_${{ inputs.variant }}
+        path: elf
+        retention-days: 7
         if-no-files-found: error

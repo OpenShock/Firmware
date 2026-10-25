@@ -16,6 +16,7 @@ const char* const TAG = "RFTransmitter";
 
 #include <freertos/queue.h>
 
+#include <utility>
 #include <vector>
 
 const UBaseType_t kQueueSize        = 64;
@@ -114,7 +115,7 @@ bool RFTransmitter::SendCommand(ShockerModelType model, uint16_t shockerId, Shoc
     durationMs        = 300;
     overwriteExisting = true;
   } else {
-    OS_LOGD(TAG, "Command received: %u %u %u %u", static_cast<unsigned>(model), shockerId, static_cast<unsigned>(type), intensity);
+    OS_LOGD(TAG, "Command received: %u %u %u %u", std::to_underlying(model), shockerId, std::to_underlying(type), intensity);
   }
 
   Command cmd = Command {.transmitEnd = OpenShock::millis() + durationMs, .modelType = model, .type = type, .shockerId = shockerId, .intensity = intensity, .flags = overwriteExisting ? kFlagOverwrite : (uint8_t)0};

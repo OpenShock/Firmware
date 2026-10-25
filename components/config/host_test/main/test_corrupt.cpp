@@ -10,6 +10,7 @@
 #include <cstdint>
 #include <cstdio>
 #include <string>
+#include <utility>
 #include <vector>
 
 using namespace OpenShock;
@@ -246,8 +247,8 @@ TEST_CASE("An unknown OTA channel in JSON falls back to the default, not the run
   TEST_ASSERT_TRUE(Config::SaveFromJSON(R"({"otaUpdate":{"updateChannel":"nightly","updateStep":42}})"));
 
   const Config::RootConfig loaded = Snapshot();
-  TEST_ASSERT_EQUAL_UINT8(static_cast<uint8_t>(OtaUpdateChannel::Stable), static_cast<uint8_t>(loaded.otaUpdate.updateChannel));
-  TEST_ASSERT_EQUAL_UINT8(static_cast<uint8_t>(OtaUpdateStep::None), static_cast<uint8_t>(loaded.otaUpdate.updateStep));
+  TEST_ASSERT_EQUAL_UINT8(std::to_underlying(OtaUpdateChannel::Stable), std::to_underlying(loaded.otaUpdate.updateChannel));
+  TEST_ASSERT_EQUAL_UINT8(std::to_underlying(OtaUpdateStep::None), std::to_underlying(loaded.otaUpdate.updateStep));
 }
 
 TEST_CASE("Schema fields the firmware does not model are dropped on save", "[config][corrupt]")
@@ -290,10 +291,10 @@ TEST_CASE("Out-of-range E-Stop GPIO in a stored config falls back to the default
     snprintf(msg, sizeof(msg), "gpio_pin %d", pin);
     TEST_ASSERT_TRUE_MESSAGE(InitFrom(builder.GetBufferPointer(), builder.GetSize()), msg);
 
-    Config::EStopConfig estopConfig;
-    TEST_ASSERT_TRUE(Config::GetEStopConfig(estopConfig));
-    TEST_ASSERT_EQUAL_INT_MESSAGE(Config::EStopConfig().gpioPin, estopConfig.gpioPin, msg);
-    TEST_ASSERT_EQUAL_MESSAGE(Config::EStopConfig().enabled, estopConfig.enabled, msg);
+    auto estopConfig = Config::GetEStopConfig();
+    TEST_ASSERT_TRUE(estopConfig.has_value());
+    TEST_ASSERT_EQUAL_INT_MESSAGE(Config::EStopConfig().gpioPin, estopConfig->gpioPin, msg);
+    TEST_ASSERT_EQUAL_MESSAGE(Config::EStopConfig().enabled, estopConfig->enabled, msg);
   }
 }
 

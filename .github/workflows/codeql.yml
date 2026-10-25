@@ -65,16 +65,12 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
 
-      # The firmware needs only the flatbuffers runtime submodule.
-      - name: Fetch flatbuffers submodule
-        run: git submodule update --init --depth 1 components/flatbuffers/flatbuffers
-
       - name: Initialize CodeQL
         uses: github/codeql-action/init@9b3254085494b55a0f7c4c2b3d2d52cc712ce370  # v4.39.1
         with:
           languages: c-cpp
 
-      # build, not configure: the tracer must see the compiler run. The version is a placeholder.
+      # build, not configure, the tracer must see the compiler run. The version is a placeholder.
       - uses: ./.github/actions/build-compilationdb
         with:
           version: 0.0.0-codeql+build

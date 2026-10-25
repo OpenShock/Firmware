@@ -1,12 +1,18 @@
-"""Shared test helpers: the repository root, synthetic app images and board fragments."""
+"""Shared test helpers: synthetic app images and board fragments, and checks for the scripts' failure exits."""
 
 import hashlib
+import re
 import struct
+from collections.abc import Iterator
+from contextlib import contextmanager
 from pathlib import Path
 
-from utils import espimage
+import pytest
 
-ROOT = Path(__file__).resolve().parents[2]
+from utils import espimage
+from utils.paths import ROOT
+
+__all__ = ['ROOT', 'blank', 'fails_with', 'make_image', 'write_fragment']
 
 
 def blank(chip: str = 'ESP32-S3') -> bytes:
@@ -49,3 +55,13 @@ def write_fragment(tmp_path: Path, name: str, body: str) -> Path:
     fragment = tmp_path / f'{name}.defaults'
     fragment.write_text(body, encoding='utf-8')
     return fragment
+
+
+@contextmanager
+def fails_with(capsys: pytest.CaptureFixture[str], pattern: str) -> Iterator[None]:
+    """Expect a CI script's gha.fail(): exit code 1 after an ::error:: annotation matching pattern."""
+    with pytest.raises(SystemExit) as exc:
+        yield
+    assert exc.value.code == 1
+    errors = [line for line in capsys.readouterr().out.splitlines() if line.startswith('::error::')]
+    assert any(re.search(pattern, line) for line in errors), errors

@@ -12,29 +12,13 @@ The version comes from OPENSHOCK_FW_VERSION (required in CI), else a local ``0.0
 
 import argparse
 import os
-import re
 import subprocess
 from pathlib import Path
 
 from utils import boards, github
 from utils.files import write_if_changed
-
-
-def split_semver(version: str):
-    pattern = (
-        r'^v?(?P<major>\d+)\.(?P<minor>\d+)\.(?P<patch>\d+)'
-        r'(?:-(?P<prerelease>[0-9A-Za-z.-]+))?(?:\+(?P<build>[0-9A-Za-z.-]+))?$'
-    )
-    m = re.match(pattern, version)
-    if not m:
-        raise ValueError(f'Invalid semver version: {version!r}')
-    return (
-        int(m.group('major')),
-        int(m.group('minor')),
-        int(m.group('patch')),
-        m.group('prerelease'),
-        m.group('build'),
-    )
+from utils.paths import ROOT
+from utils.versions import parse_version
 
 
 def c_string(value: str) -> str:
@@ -52,7 +36,10 @@ def git_commit() -> str | None:
     if commit:
         return commit
     try:
-        return subprocess.check_output(['git', 'rev-parse', 'HEAD'], text=True, stderr=subprocess.DEVNULL).strip()
+        # In the repository, not the working directory: CMake runs this from the build directory, which may be outside it.
+        return subprocess.check_output(
+            ['git', 'rev-parse', 'HEAD'], cwd=ROOT, text=True, stderr=subprocess.DEVNULL
+        ).strip()
     except (OSError, subprocess.CalledProcessError):
         return None
 
@@ -79,17 +66,17 @@ def board_defines(chip: str) -> dict[str, int | str]:
 
 def version_defines(commit: str | None) -> dict[str, int | str]:
     version = resolve_version(commit)
-    major, minor, patch, prerelease, build = split_semver(version)
+    parsed = parse_version(version)
     defines: dict[str, int | str] = {
         'OPENSHOCK_FW_VERSION': version,
-        'OPENSHOCK_FW_VERSION_MAJOR': major,
-        'OPENSHOCK_FW_VERSION_MINOR': minor,
-        'OPENSHOCK_FW_VERSION_PATCH': patch,
+        'OPENSHOCK_FW_VERSION_MAJOR': parsed.major,
+        'OPENSHOCK_FW_VERSION_MINOR': parsed.minor,
+        'OPENSHOCK_FW_VERSION_PATCH': parsed.patch,
     }
-    if prerelease is not None:
-        defines['OPENSHOCK_FW_VERSION_PRERELEASE'] = prerelease
-    if build is not None:
-        defines['OPENSHOCK_FW_VERSION_BUILD'] = build
+    if parsed.prerelease is not None:
+        defines['OPENSHOCK_FW_VERSION_PRERELEASE'] = parsed.prerelease
+    if parsed.build is not None:
+        defines['OPENSHOCK_FW_VERSION_BUILD'] = parsed.build
     if commit is not None:
         defines['OPENSHOCK_FW_GIT_COMMIT'] = commit
     return defines
@@ -101,7 +88,7 @@ def render(title: str, defines: dict[str, int | str]) -> str:
     return '\n'.join(lines) + '\n'
 
 
-def main(argv=None) -> int:
+def main(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser(description=__doc__)
     ap.add_argument('--out-dir', required=True, help='directory to write the headers into')
     ap.add_argument('--target', required=True, help='IDF target the build is configured for (IDF_TARGET)')
@@ -116,11 +103,17 @@ def main(argv=None) -> int:
     headers = []
     if not args.version_only:
         headers.append(('openshock_board.h', 'Chip identity, build mode and log level.', board_defines(chip)))
-    headers.append(('openshock_version.h', 'Firmware version and git commit. Changes every commit.', version_defines(git_commit())))
+    headers.append(
+        ('openshock_version.h', 'Firmware version and git commit. Changes every commit.', version_defines(git_commit()))
+    )
 
     out_dir = Path(args.out_dir)
     written = [name for name, title, defines in headers if write_if_changed(out_dir / name, render(title, defines))]
-    print(f'gen_env_header: wrote {", ".join(written)} to {out_dir}' if written else f'gen_env_header: {out_dir} already up to date')
+    print(
+        f'gen_env_header: wrote {", ".join(written)} to {out_dir}'
+        if written
+        else f'gen_env_header: {out_dir} already up to date'
+    )
     return 0
 
 

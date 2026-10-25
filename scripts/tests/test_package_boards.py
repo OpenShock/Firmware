@@ -6,7 +6,7 @@ import package_boards
 import pytest
 from support import blank, make_image
 
-from utils import boards, espimage, stamping
+from utils import boards, espimage, stamping, targets
 
 
 @pytest.fixture
@@ -19,7 +19,7 @@ def write_variant(variants, board):
     vid = boards.variant_id(boards.board_fragment(board))
     src = variants / vid
     src.mkdir(parents=True)
-    (src / 'app.bin').write_bytes(make_image(blank(), chip_id=espimage.CHIP_IDS['esp32s3']))
+    (src / 'app.bin').write_bytes(make_image(blank(), chip_id=targets.TARGETS['esp32s3'].image_chip_id))
     (src / 'bootloader.bin').write_bytes(b'boot')
     (src / 'partition-table.bin').write_bytes(b'table')
     return vid

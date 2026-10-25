@@ -33,11 +33,51 @@ def test_sizes_with_suffixes_and_comments(tmp_path):
     assert table['app0']['size'] == 1024 * 1024
 
 
-def test_entries_without_an_offset_are_refused(tmp_path):
+@pytest.mark.parametrize(
+    'line, error',
+    [
+        ('nvs, data, nvs, , 0x5000', "partition 'nvs' in .* has no explicit offset"),
+        ('nvs, data, nvs, 0x9zz0, 0x5000', "partition 'nvs' in .* has a bad offset '0x9zz0'"),
+        ('nvs, data, nvs, 0x9000, 3G', "partition 'nvs' in .* has an unsupported size '3G'"),
+        ('nvs, data, nvs, 0x9000', 'malformed partition line'),
+    ],
+)
+def test_a_bad_entry_is_refused_naming_the_partition_and_file(tmp_path, line, error):
     csv = tmp_path / 'table.csv'
-    csv.write_text('nvs, data, nvs, , 0x5000\n', encoding='utf-8')
-    with pytest.raises(SystemExit):
+    csv.write_text(line + '\n', encoding='utf-8')
+    with pytest.raises(SystemExit, match=error):
         partitions.read_partitions(csv)
+
+
+def test_a_table_without_an_app_partition_is_refused():
+    table = {'nvs': {'type': 'data', 'subtype': 'nvs', 'offset': 0x9000, 'size': 0x5000}}
+    with pytest.raises(SystemExit, match='no app partition'):
+        partitions.first_app_partition(table)
+
+
+def test_the_static_partition_size_comes_from_the_table(tmp_path):
+    csv = tmp_path / 'table.csv'
+    csv.write_text('static0, data, spiffs, 0x353000, 0x9D000\n', encoding='utf-8')
+    assert gen_staticfs.static_partition_size(csv) == 0x9D000
+    csv.write_text('nvs, data, nvs, 0x9000, 0x5000\n', encoding='utf-8')
+    with pytest.raises(SystemExit, match='has no static0 partition'):
+        gen_staticfs.static_partition_size(csv)
+
+
+def test_a_stale_frontend_without_pnpm_names_the_way_out(tmp_path, monkeypatch):
+    monkeypatch.setattr(gen_staticfs.shutil, 'which', lambda name: None)
+    with pytest.raises(SystemExit, match='pnpm not found.*--skip-frontend-build'):
+        gen_staticfs.build_frontend(tmp_path)
+
+
+def test_a_failing_pnpm_step_is_named(tmp_path, monkeypatch):
+    def fail(cmd, **kwargs):
+        raise gen_staticfs.subprocess.CalledProcessError(3, cmd)
+
+    monkeypatch.setattr(gen_staticfs.shutil, 'which', lambda name: '/bin/pnpm')
+    monkeypatch.setattr(gen_staticfs.subprocess, 'run', fail)
+    with pytest.raises(SystemExit, match=r'`pnpm i` failed in .* \(exit 3\)'):
+        gen_staticfs.build_frontend(tmp_path)
 
 
 def test_staged_assets_are_byte_identical_across_runs(tmp_path):

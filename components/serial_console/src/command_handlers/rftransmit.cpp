@@ -16,15 +16,14 @@ static void handleRFTransmitCommand(std::string_view arg, bool isAutomated)
     return;
   }
 
-  OpenShock::Serialization::JsonSerial::ShockerCommand cmd;
-  bool parsed = OpenShock::Serialization::JsonSerial::ParseShockerCommand(doc.root(), cmd);
+  auto cmd = OpenShock::Serialization::JsonSerial::ParseShockerCommand(doc.root());
 
-  if (!parsed) {
+  if (!cmd) {
     SERPR_ERROR("Failed to parse shocker command");
     return;
   }
 
-  if (!OpenShock::CommandHandler::HandleCommand(cmd.model, cmd.id, cmd.command, cmd.intensity, cmd.durationMs)) {
+  if (!OpenShock::CommandHandler::HandleCommand(cmd->model, cmd->id, cmd->command, cmd->intensity, cmd->durationMs)) {
     SERPR_ERROR("Failed to send command");
     return;
   }

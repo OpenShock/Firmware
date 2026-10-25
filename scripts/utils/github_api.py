@@ -1,4 +1,4 @@
-"""GitHub REST API reads shared by the gate and the publishing policy."""
+"""GitHub REST API reads shared by ci_build_gate.py and repo_server_policy.py."""
 
 from typing import Any
 

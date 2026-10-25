@@ -43,6 +43,8 @@ import sys
 import tempfile
 import urllib.request
 import warnings
+from collections.abc import Callable
+from dataclasses import dataclass
 from pathlib import Path
 
 try:
@@ -79,7 +81,7 @@ MERGED_BANNER = (
     b'##\n'
     b'## Produced by certificates/cert_bundle.py. This is what the firmware packs:\n'
     b'##   the verbatim curl/Mozilla CA extract (see cacert-curl.pem) + certificates/pinned_certs/.\n'
-    b'## Its sha256 intentionally differs from curl\'s published hash. To change it, edit\n'
+    b"## Its sha256 intentionally differs from curl's published hash. To change it, edit\n"
     b'## pinned_certs/ and re-run `cert_bundle.py generate` -- never hand-edit this file.\n'
     b'##\n'
 )
@@ -101,7 +103,7 @@ EXPIRY_WARN_DAYS_DEFAULT = 90
 PEM_BEGIN = b'-----BEGIN CERTIFICATE-----'
 PEM_END = b'-----END CERTIFICATE-----'
 PEM_BLOCK_RE = re.compile(
-    br'-----BEGIN CERTIFICATE-----\s*[\s\S]+?\s*-----END CERTIFICATE-----\s*',
+    rb'-----BEGIN CERTIFICATE-----\s*[\s\S]+?\s*-----END CERTIFICATE-----\s*',
     re.MULTILINE,
 )
 
@@ -229,42 +231,46 @@ def _load_single_pem_cert_block_from_file(path: Path) -> bytes:
     return _load_single_pem_cert_block_from_bytes_strict(data, source=f'cert file: {path}')
 
 
-def load_dir_cert_blocks(dirname: str, glob: str) -> tuple[list[bytes], list[Path]]:
-    """
-    Load one-cert-per-file PEM blocks from a directory.
+@dataclass(frozen=True)
+class LoadedCert:
+    """One certificate as read from a file: its canonical PEM block, the parsed cert, and where it came from."""
 
-    Returns: (blocks, paths)
+    block: bytes
+    cert: x509.Certificate
+    origin: str
+
+    @property
+    def der(self) -> bytes:
+        return self.cert.public_bytes(serialization.Encoding.DER)
+
+
+def load_dir_cert_blocks(dirname: str, glob: str) -> list[tuple[Path, bytes]]:
+    """
+    Load one-cert-per-file PEM blocks from a directory, as (path relative to HERE, block) pairs.
 
     Behavior:
-      - If the directory does not exist -> return ([], [])
+      - If the directory does not exist -> []
       - Only files matching `glob` are considered
-      - If the directory exists but contains no matches -> return ([], [])
+      - If the directory exists but contains no matches -> []
       - Each file must contain exactly one certificate
     """
     d = HERE / dirname
     if not d.exists():
-        return ([], [])
+        return []
 
     if not d.is_dir():
         raise InputError(f'{dirname} exists but is not a directory')
 
     paths = sorted(p.relative_to(HERE) for p in d.glob(glob))
-    if not paths:
-        return ([], [])
-
-    log(f'Loading certificates from: {dirname}/ ({len(paths)} file(s))')
-
-    blocks: list[bytes] = []
-    for p in paths:
-        blocks.append(_load_single_pem_cert_block_from_file(p))
-
-    return (blocks, paths)
+    if paths:
+        log(f'Loading certificates from: {dirname}/ ({len(paths)} file(s))')
+    return [(p, _load_single_pem_cert_block_from_file(p)) for p in paths]
 
 
 def check_certs_expiry(
-    certs: list[x509.Certificate],
-    origins: list[str],
+    certs: list[LoadedCert],
     warn_days: int,
+    now: datetime.datetime | None = None,
 ) -> tuple[list[str], list[str]]:
     """
     Classify certs by expiry against `warn_days`.
@@ -274,15 +280,17 @@ def check_certs_expiry(
       - expiring: notAfter is within `warn_days` from now (but not yet expired)
     Emits a diagnostic line for each problem cert.
     """
-    now = datetime.datetime.now(datetime.timezone.utc)
+    now = now or datetime.datetime.now(datetime.timezone.utc)
     expired: list[str] = []
     expiring: list[str] = []
 
-    for idx, cert in enumerate(certs):
-        origin = origins[idx]
-        not_after = cert.not_valid_after_utc
+    for loaded in certs:
+        not_after = loaded.cert.not_valid_after_utc
         days_left = (not_after - now).days
-        desc = f'{cert.subject.rfc4514_string()} (origin: {origin}; notAfter: {not_after:%Y-%m-%d}; {days_left}d left)'
+        desc = (
+            f'{loaded.cert.subject.rfc4514_string()} '
+            f'(origin: {loaded.origin}; notAfter: {not_after:%Y-%m-%d}; {days_left}d left)'
+        )
 
         if days_left < 0:
             log(f'EXPIRED certificate: {desc}')
@@ -307,15 +315,15 @@ def _expiry_warn_days() -> int:
     return val
 
 
-def _reject_non_ca(certs: list[x509.Certificate], origins: list[str], *, kind: str) -> None:
-    non_ca = [(c, o) for (c, o) in zip(certs, origins, strict=True) if not _is_ca_certificate(c)]
+def _reject_non_ca(certs: list[LoadedCert], *, kind: str) -> None:
+    non_ca = [c for c in certs if not _is_ca_certificate(c.cert)]
     if not non_ca:
         return
     log(f'FATAL: One or more {kind} certificates are not CA certificates (BasicConstraints CA=TRUE missing)')
-    for c, origin in non_ca:
-        log(f'  Origin : {origin}')
-        log(f'  Subject: {c.subject.rfc4514_string()}')
-        log(f'  Issuer : {c.issuer.rfc4514_string()}')
+    for c in non_ca:
+        log(f'  Origin : {c.origin}')
+        log(f'  Subject: {c.cert.subject.rfc4514_string()}')
+        log(f'  Issuer : {c.cert.issuer.rfc4514_string()}')
     raise InputError(f'Refusing to include non-CA {kind} certificates')
 
 
@@ -365,13 +373,85 @@ def required_anchor_subject(domain: str) -> str | None:
     return _openssl_name(chain[-1], 'issuer')
 
 
-def _emit_gh_outputs(*, removable: list[str], alert: bool) -> None:
+def probe_required_anchors(domains: list[str] = MONITORED_DOMAINS) -> tuple[set[str], bool]:
+    """The anchor subjects the live endpoints chain through, and whether every probe succeeded."""
+    required: set[str] = set()
+    probe_ok = True
+    for domain in domains:
+        subj = required_anchor_subject(domain)
+        if subj is None:
+            probe_ok = False
+            log(f'  {domain}: UNREACHABLE (will not retire any pin this run)')
+            continue
+        required.add(subj)
+        log(f'  {domain}: requires anchor -> {subj}')
+    return required, probe_ok
+
+
+@dataclass(frozen=True)
+class AuditResult:
+    removable: list[str]  # pinned cert files no endpoint chains through anymore
+    alert: bool  # a cert that must stay is expired or about to expire
+
+
+def classify_bundle(
+    bundle: list[tuple[str, x509.Certificate]],
+    pinned_by_subject: dict[str, str],
+    required: set[str],
+    *,
+    probe_ok: bool,
+    warn_days: int,
+    now: datetime.datetime,
+) -> AuditResult:
+    """
+    Decide, for every (rfc2253 subject, cert) in the shipped bundle, whether it can be retired or needs rotating.
+
+    - A base root (not pinned) is never retired here, but an expired one alerts; curl's refresh handles the rest.
+    - A pinned root no endpoint requires is removable, but only when every probe succeeded (fail-safe).
+    - A pinned root an endpoint requires alerts when it is expired or within `warn_days` of expiry.
+    """
+    removable: list[str] = []
+    alert = False
+
+    for subject, cert in bundle:
+        days_left = (cert.not_valid_after_utc - now).days
+        pinned_path = pinned_by_subject.get(subject)
+
+        if pinned_path is None:
+            if days_left < 0:
+                log(f'ALERT: shipped root EXPIRED: {subject}')
+                alert = True
+            elif days_left <= warn_days:
+                log(f'note: base root expires in {days_left}d (curl refresh will handle it): {subject}')
+            continue
+
+        if subject not in required:
+            if probe_ok:
+                log(f'REMOVABLE pin (no endpoint chains through it): {pinned_path} [{subject}]')
+                removable.append(pinned_path)
+            else:
+                log(f'unused pin, but a probe failed -> keeping (fail-safe): {pinned_path}')
+            continue
+
+        # Still needed, so expiry is an operational risk.
+        if days_left < 0:
+            log(f'ALERT: pinned root EXPIRED and still required: {pinned_path} [{subject}]')
+            alert = True
+        elif days_left <= warn_days:
+            log(f'ALERT: pinned root expires in {days_left}d and still required: {pinned_path} [{subject}]')
+            alert = True
+
+    return AuditResult(removable, alert)
+
+
+def _emit_gh_outputs(result: AuditResult) -> None:
+    # Standalone on purpose (run as certificates/cert_bundle.py, without scripts/ on the path), so not gha.set_output.
     gh_out = os.environ.get('GITHUB_OUTPUT')
     if not gh_out:
         return
     with open(gh_out, 'a', encoding='utf-8') as f:
-        f.write(f'removable={" ".join(removable)}\n')
-        f.write(f'alert={"true" if alert else "false"}\n')
+        f.write(f'removable={" ".join(result.removable)}\n')
+        f.write(f'alert={"true" if result.alert else "false"}\n')
 
 
 def audit() -> int:
@@ -392,68 +472,34 @@ def audit() -> int:
         bundle_bytes = (HERE / MERGED_PEM_FILE).read_bytes()
     except OSError as e:
         raise InputError(f'Cannot read {MERGED_PEM_FILE}: {e}') from e
-    bundle_blocks = extract_pem_cert_blocks(bundle_bytes, source=MERGED_PEM_FILE)
-    bundle_certs = load_all_certs(bundle_blocks, label='bundle')
+    bundle_certs = load_all_certs(extract_pem_cert_blocks(bundle_bytes, source=MERGED_PEM_FILE), label='bundle')
 
     # Pinned roots, keyed by canonical subject, so we can tell them apart from the curl
     # base within the merged bundle and know which file to retire.
-    pinned_blocks, pinned_paths = load_dir_cert_blocks(PINNED_CERTS_DIR, CERT_GLOB)
-    pinned_by_subject: dict[str, str] = {}
-    for blk, path in zip(pinned_blocks, pinned_paths, strict=True):
-        pinned_by_subject[_openssl_name(blk, 'subject')] = path.as_posix()
+    pinned_by_subject = {
+        _openssl_name(block, 'subject'): path.as_posix()
+        for path, block in load_dir_cert_blocks(PINNED_CERTS_DIR, CERT_GLOB)
+    }
 
-    log(f'Auditing {len(bundle_certs)} certificate(s) in {MERGED_PEM_FILE} '
-             f'({len(pinned_by_subject)} pinned); warn window {warn_days}d')
+    log(
+        f'Auditing {len(bundle_certs)} certificate(s) in {MERGED_PEM_FILE} '
+        f'({len(pinned_by_subject)} pinned); warn window {warn_days}d'
+    )
 
-    # Which anchors do the live endpoints actually require?
-    required: set[str] = set()
-    probe_ok = True
-    for domain in MONITORED_DOMAINS:
-        subj = required_anchor_subject(domain)
-        if subj is None:
-            probe_ok = False
-            log(f'  {domain}: UNREACHABLE (will not retire any pin this run)')
-            continue
-        required.add(subj)
-        log(f'  {domain}: requires anchor -> {subj}')
-
-    now = datetime.datetime.now(datetime.timezone.utc)
-    removable: list[str] = []
-    alert = False
-
-    for cert in bundle_certs:
-        subject = _rfc2253_subject(cert)
-        days_left = (cert.not_valid_after_utc - now).days
-        pinned_path = pinned_by_subject.get(subject)
-
-        if pinned_path is None:
-            # Curl/base (or committed custom) root: not retired individually, but an expired one still fails.
-            if days_left < 0:
-                log(f'ALERT: shipped root EXPIRED: {subject}')
-                alert = True
-            elif days_left <= warn_days:
-                log(f'note: base root expires in {days_left}d (curl refresh will handle it): {subject}')
-            continue
-
-        if subject not in required:
-            if probe_ok:
-                log(f'REMOVABLE pin (no endpoint chains through it): {pinned_path} [{subject}]')
-                removable.append(pinned_path)
-            else:
-                log(f'unused pin, but a probe failed -> keeping (fail-safe): {pinned_path}')
-            continue
-        # Still needed, so expiry is an operational risk.
-        if days_left < 0:
-            log(f'ALERT: pinned root EXPIRED and still required: {pinned_path} [{subject}]')
-            alert = True
-        elif days_left <= warn_days:
-            log(f'ALERT: pinned root expires in {days_left}d and still required: {pinned_path} [{subject}]')
-            alert = True
+    required, probe_ok = probe_required_anchors()
+    result = classify_bundle(
+        [(_rfc2253_subject(cert), cert) for cert in bundle_certs],
+        pinned_by_subject,
+        required,
+        probe_ok=probe_ok,
+        warn_days=warn_days,
+        now=datetime.datetime.now(datetime.timezone.utc),
+    )
 
     log('')
-    log(f'Summary: {len(removable)} removable pin(s), alert={alert}, probe_ok={probe_ok}')
-    _emit_gh_outputs(removable=removable, alert=alert)
-    return 1 if alert else 0
+    log(f'Summary: {len(result.removable)} removable pin(s), alert={result.alert}, probe_ok={probe_ok}')
+    _emit_gh_outputs(result)
+    return 1 if result.alert else 0
 
 
 def _is_ca_certificate(cert: x509.Certificate) -> bool:
@@ -564,32 +610,46 @@ def _append_pem_blocks(base: bytes, blocks: list[bytes]) -> bytes:
     return bytes(out)
 
 
-def load_group(dirname: str, kind: str) -> tuple[list[bytes], list[x509.Certificate], list[str]]:
+def load_group(dirname: str, kind: str) -> list[LoadedCert]:
     """Load and CA-check one directory of certs; empty when the directory holds none."""
-    blocks, paths = load_dir_cert_blocks(dirname, CERT_GLOB)
-    if not blocks:
+    files = load_dir_cert_blocks(dirname, CERT_GLOB)
+    if not files:
         log(f'No {kind} certificates found ({dirname}/{CERT_GLOB})')
-        return [], [], []
-    origins = [p.as_posix() for p in paths]
-    certs = load_all_certs(blocks, label=kind, origins=origins)
-    _reject_non_ca(certs, origins, kind=kind)
-    log(f'Found {len(blocks)} {kind} certificate(s)')
-    return blocks, certs, origins
+        return []
+    origins = [path.as_posix() for path, _ in files]
+    certs = load_all_certs([block for _, block in files], label=kind, origins=origins)
+    loaded = [LoadedCert(block, cert, origin) for (_, block), cert, origin in zip(files, certs, origins, strict=True)]
+    _reject_non_ca(loaded, kind=kind)
+    log(f'Found {len(loaded)} {kind} certificate(s)')
+    return loaded
 
 
-def generate() -> int:
-    warn_days = _expiry_warn_days()
+def dedupe_extra_certs(base: list[x509.Certificate], extras: list[LoadedCert]) -> list[LoadedCert]:
+    """The extras whose DER is not already in the base or an earlier extra, so the bundle never holds a cert twice."""
+    seen = {c.public_bytes(serialization.Encoding.DER) for c in base}
+    kept: list[LoadedCert] = []
+    for extra in extras:
+        if extra.der in seen:
+            log(
+                f'Skipping duplicate certificate (already in bundle): {extra.cert.subject.rfc4514_string()} [{extra.origin}]'
+            )
+            continue
+        seen.add(extra.der)
+        kept.append(extra)
+    return kept
 
+
+def verified_curl_bundle(download: Callable[[str], bytes]) -> bytes:
+    """Download curl's CA extract and refuse it unless it matches the SHA-256 curl publishes beside it."""
     log(f'Downloading CA bundle from: {URL_PEM}')
-    pem = download_bytes(URL_PEM)
+    pem = download(URL_PEM)
 
     got_hash = hashlib.sha256(pem).hexdigest().lower()
     log(f'Downloaded {len(pem)} bytes')
     log(f'SHA-256(curl download) = {got_hash}')
 
     log(f'Downloading published hash from: {URL_SHA256}')
-    sha_file = download_bytes(URL_SHA256)
-    expected_hash = parse_sha256_file(sha_file, expect_filename='cacert.pem')
+    expected_hash = parse_sha256_file(download(URL_SHA256), expect_filename='cacert.pem')
     log(f'Published SHA-256      = {expected_hash}')
 
     log('')
@@ -601,8 +661,13 @@ def generate() -> int:
 
     if got_hash != expected_hash:
         raise InputError('SHA-256 mismatch against cacert.pem.sha256; refusing to proceed')
-
     log('Automatic SHA-256 validation passed')
+    return pem
+
+
+def generate(download: Callable[[str], bytes] = download_bytes) -> int:
+    warn_days = _expiry_warn_days()
+    pem = verified_curl_bundle(download)
 
     # Curl/Mozilla base.
     blocks = extract_pem_cert_blocks(pem, source='downloaded curl CA bundle')
@@ -610,38 +675,21 @@ def generate() -> int:
     log(f'Found {len(blocks)} certificate blocks in curl bundle')
 
     # Pinned roots (tracked, shipped, expiry-monitored), then custom roots (local-only, git-ignored self-hosted PKI).
-    pinned_blocks, pinned_certs, pinned_origins = load_group(PINNED_CERTS_DIR, 'pinned')
+    pinned = load_group(PINNED_CERTS_DIR, 'pinned')
     # Never ship an already-dead anchor.
-    expired, expiring = check_certs_expiry(pinned_certs, pinned_origins, warn_days)
+    expired, expiring = check_certs_expiry(pinned, warn_days)
     if expired:
         raise InputError(f'Refusing to ship {len(expired)} expired pinned certificate(s)')
     if expiring:
         log(f'NOTE: {len(expiring)} pinned cert(s) expire within {warn_days}d; rotate soon')
-    custom_blocks, custom_certs, custom_origins = load_group(CUSTOM_CERTS_DIR, 'custom')
+    custom = load_group(CUSTOM_CERTS_DIR, 'custom')
 
-    # Deduplicate: drop any pinned/custom cert whose DER is already present (in the base
-    # or an earlier pin/custom) so the merged output never contains the same cert twice.
-    seen_der = {c.public_bytes(serialization.Encoding.DER) for c in curl_certs}
-    extra_blocks: list[bytes] = []
-    extra_certs: list[x509.Certificate] = []
-    for blk, cert, origin in zip(
-        pinned_blocks + custom_blocks,
-        pinned_certs + custom_certs,
-        pinned_origins + custom_origins,
-        strict=True,
-    ):
-        der = cert.public_bytes(serialization.Encoding.DER)
-        if der in seen_der:
-            log(f'Skipping duplicate certificate (already in bundle): {cert.subject.rfc4514_string()} [{origin}]')
-            continue
-        seen_der.add(der)
-        extra_blocks.append(blk)
-        extra_certs.append(cert)
+    extras = dedupe_extra_certs(curl_certs, pinned + custom)
 
     # Validate the deduplicated set: unique subject names so esp_crt_bundle's subject-name
     # lookup stays unambiguous (this also catches two *different* certs sharing a subject).
-    certs = curl_certs + extra_certs
-    log(f'Bundle: {len(curl_certs)} base + {len(extra_certs)} pinned/custom = {len(certs)} certs')
+    certs = curl_certs + [e.cert for e in extras]
+    log(f'Bundle: {len(curl_certs)} base + {len(extras)} pinned/custom = {len(certs)} certs')
     validate_unique_subjects(certs)
 
     # Save the verbatim curl base (so `sha256sum {BASE_PEM_FILE}` matches curl's published
@@ -653,7 +701,7 @@ def generate() -> int:
 
     # Merged file gets our own banner in place of curl's leading header, then all certs.
     base_no_header = pem[pem.find(PEM_BEGIN) :]
-    combined = MERGED_BANNER + _append_pem_blocks(base_no_header, extra_blocks)
+    combined = MERGED_BANNER + _append_pem_blocks(base_no_header, [e.block for e in extras])
     log(f'Saving {MERGED_PEM_FILE} ({len(certs)} certs, atomic)')
     atomic_write(HERE / MERGED_PEM_FILE, combined)
 
@@ -661,18 +709,18 @@ def generate() -> int:
     return 0
 
 
-def main() -> int:
+def main(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser(description='OpenShock CA trust store manager.')
     ap.add_argument(
         'command',
         nargs='?',
         choices=['generate', 'audit'],
         default='generate',
-        help='generate (default): download + verify curl\'s bundle, write cacert-curl.pem (base) and '
+        help="generate (default): download + verify curl's bundle, write cacert-curl.pem (base) and "
         'cacert-merged.pem (base+pinned+custom); audit: check expiry of every shipped cert and probe endpoints '
         'for pinned relevance, exit 1 on a still-needed expired/expiring cert',
     )
-    return audit() if ap.parse_args().command == 'audit' else generate()
+    return audit() if ap.parse_args(argv).command == 'audit' else generate()
 
 
 if __name__ == '__main__':

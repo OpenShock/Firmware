@@ -1,7 +1,12 @@
+"""Tests for scripts/get_vars.py: the version, channel and build-variant matrix a CI run derives from its ref."""
+
 import json
 
 import get_vars
 import pytest
+from support import fails_with
+
+from utils import channels
 
 
 @pytest.mark.parametrize(
@@ -29,12 +34,20 @@ def test_parse_version_rejects(tag):
         ('1.5.0-beta.3', 'beta'),
         ('1.5.0-develop.4', 'develop'),
         ('1.5.0-dev.4', 'develop'),
-        ('1.5.0-feature.1', None),
     ],
 )
-def test_channel_of_version(tag, channel):
-    version = get_vars.parse_version(tag)
-    assert get_vars.CHANNEL_BY_PRERELEASE.get(get_vars.prerelease_id(version)) == channel
+def test_a_tag_publishes_to_the_channel_its_prerelease_names(tag, channel):
+    assert get_vars.resolve_channel(True, tag, get_vars.parse_version(tag)) == channel
+
+
+def test_a_tag_with_an_unknown_prerelease_is_refused(capsys):
+    with fails_with(capsys, 'Tag "1.5.0-feature.1" has an unrecognized prerelease channel'):
+        get_vars.resolve_channel(True, '1.5.0-feature.1', get_vars.parse_version('1.5.0-feature.1'))
+
+
+def test_every_prerelease_channel_is_a_server_channel():
+    assert set(channels.PRERELEASE_CHANNEL.values()) <= set(channels.CHANNELS)
+    assert set(channels.BRANCH_CHANNEL.values()) == set(channels.CHANNELS)
 
 
 @pytest.mark.parametrize(
@@ -49,12 +62,15 @@ def test_sanitize(name, expected):
     assert get_vars.sanitize(name) == expected
 
 
+def test_release_versions_skip_tags_that_are_not_versions():
+    versions = get_vars.release_versions(['1.5.0', 'latest', 'v0.8.1', 'nightly-2026'])
+    assert [str(v) for v in versions] == ['1.5.0', '0.8.1']
+
+
 @pytest.fixture
 def run_main(monkeypatch):
     """Runs get-vars main() for a ref and board selection, git's tag list stubbed out; returns its outputs."""
     monkeypatch.setattr(get_vars.subprocess, 'check_output', lambda *a, **kw: '1.4.0\n1.3.0\n')
-    for name in ('GITHUB_HEAD_REF', 'RELEASE_NEXT_VERSION', 'RELEASE_SKIP', 'CHANNEL_INPUT', 'NIGHTLY_INPUT', 'GITHUB_STEP_SUMMARY'):
-        monkeypatch.delenv(name, raising=False)
 
     def run(ref, boards_input=''):
         outputs = {}
@@ -97,13 +113,9 @@ def test_main_on_a_feature_branch_publishes_to_develop(run_main):
     assert outputs['release-channel'] == 'develop'
 
 
-@pytest.mark.parametrize(
-    'channel, nightly, expected',
-    [('beta', 'false', 'beta'), ('derive', 'false', 'develop'), ('', '', 'develop'), ('beta', 'true', 'develop')],
-)
-def test_main_channel_input(run_main, monkeypatch, channel, nightly, expected):
+@pytest.mark.parametrize('channel, expected', [('beta', 'beta'), ('derive', 'develop'), ('', 'develop')])
+def test_main_channel_input(run_main, monkeypatch, channel, expected):
     monkeypatch.setenv('CHANNEL_INPUT', channel)
-    monkeypatch.setenv('NIGHTLY_INPUT', nightly)
     outputs, _ = run_main('refs/heads/develop')
     assert outputs['release-channel'] == expected
 
@@ -115,10 +127,20 @@ def test_main_on_a_pull_request_names_the_version_after_the_head_branch(run_main
     assert outputs['release-channel'] == 'develop'
 
 
-@pytest.mark.parametrize('ref', ['refs/pull/12/head', 'refs/remotes/origin/x', 'develop'])
-def test_main_refuses_a_ref_that_is_not_a_branch_tag_or_merge_ref(run_main, ref):
-    with pytest.raises(SystemExit):
+@pytest.mark.parametrize('ref', ['refs/remotes/origin/x', 'develop'])
+def test_main_refuses_a_ref_that_is_not_a_branch_tag_or_pull_request(run_main, capsys, ref):
+    with fails_with(capsys, 'is not a valid branch, tag or pull request'):
         run_main(ref)
+
+
+def test_main_refuses_a_pull_request_without_its_head_branch(run_main, capsys):
+    with fails_with(capsys, 'Failed to get git head ref name'):
+        run_main('refs/pull/12/merge')
+
+
+def test_main_refuses_a_tag_that_is_not_a_version(run_main, capsys):
+    with fails_with(capsys, 'Git tag "latest" is not a valid semver version'):
+        run_main('refs/tags/latest')
 
 
 @pytest.mark.parametrize(
@@ -136,12 +158,12 @@ def test_main_next_version_applies_to_branch_builds_only(run_main, monkeypatch, 
     assert outputs['version'] == expected
 
 
-def test_main_refuses_a_channel_the_server_does_not_know(run_main, monkeypatch):
+def test_main_refuses_a_channel_the_server_does_not_know(run_main, monkeypatch, capsys):
     monkeypatch.setenv('CHANNEL_INPUT', 'nightly')
-    with pytest.raises(SystemExit):
+    with fails_with(capsys, 'Channel "nightly" is not one of: stable, beta, develop'):
         run_main('refs/heads/develop')
 
 
-def test_main_refuses_an_unknown_board(run_main):
-    with pytest.raises(SystemExit):
+def test_main_refuses_an_unknown_board(run_main, capsys):
+    with fails_with(capsys, r'Unknown board\(s\) requested: No-Such-Board'):
         run_main('refs/heads/develop', 'OpenShock-Core-V2, No-Such-Board')

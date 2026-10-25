@@ -13,6 +13,8 @@
 #include <cstddef>
 #include <cstdint>
 #include <cstring>
+#include <span>
+#include <utility>
 
 using namespace OpenShock;
 
@@ -66,7 +68,7 @@ namespace {
   {
     std::memcpy(dst, src, sizeof(dst));
     mutate(dst);
-    const uint32_t crc = Checksum::Crc32(dst, Board::kCrcCoverage);
+    const uint32_t crc = Checksum::Crc32(std::span<const uint8_t>(dst).first(Board::kCrcCoverage));
     std::memcpy(dst + Board::kCrcCoverage, &crc, sizeof(crc));
   }
 }  // namespace
@@ -81,7 +83,7 @@ TEST_CASE("Seal(Defaults) is byte-identical to the placeholder espimage.py packs
 TEST_CASE("Parse decodes a descriptor stamped by espimage.py", "[board]")
 {
   BoardDescriptor desc;
-  TEST_ASSERT_EQUAL_INT(static_cast<int>(Board::ParseResult::Valid), static_cast<int>(Board::Parse(kStamped, desc)));
+  TEST_ASSERT_EQUAL_INT(std::to_underlying(Board::ParseResult::Valid), std::to_underlying(Board::Parse(kStamped, desc)));
   TEST_ASSERT_EQUAL_STRING("OpenShock-Core-V2", desc.board);
   TEST_ASSERT_EQUAL_STRING("ESP32-S3", desc.chip);
   TEST_ASSERT_EQUAL_INT8(1, desc.rfTxGpio);
@@ -98,27 +100,27 @@ TEST_CASE("Parse tells a placeholder, a non-descriptor and a corrupt descriptor 
 {
   BoardDescriptor desc;
 
-  TEST_ASSERT_EQUAL_INT(static_cast<int>(Board::ParseResult::Unstamped), static_cast<int>(Board::Parse(kPlaceholder, desc)));
+  TEST_ASSERT_EQUAL_INT(std::to_underlying(Board::ParseResult::Unstamped), std::to_underlying(Board::Parse(kPlaceholder, desc)));
   TEST_ASSERT_EQUAL_STRING("", desc.board);
   TEST_ASSERT_EQUAL_STRING("ESP32", desc.chip);
 
   uint8_t bytes[OPENSHOCK_BOARD_DESCRIPTOR_SIZE] = {};
-  TEST_ASSERT_EQUAL_INT(static_cast<int>(Board::ParseResult::Absent), static_cast<int>(Board::Parse(bytes, desc)));
+  TEST_ASSERT_EQUAL_INT(std::to_underlying(Board::ParseResult::Absent), std::to_underlying(Board::Parse(bytes, desc)));
 
   // A flipped byte inside the CRC coverage.
   std::memcpy(bytes, kStamped, sizeof(bytes));
   bytes[offsetof(BoardDescriptor, board)] ^= 0x01;
-  TEST_ASSERT_EQUAL_INT(static_cast<int>(Board::ParseResult::Invalid), static_cast<int>(Board::Parse(bytes, desc)));
+  TEST_ASSERT_EQUAL_INT(std::to_underlying(Board::ParseResult::Invalid), std::to_underlying(Board::Parse(bytes, desc)));
 
   // Wrong length and wrong schema version, each with a matching CRC so that is the only fault.
   reseal(bytes, kStamped, [](uint8_t* b) { b[offsetof(BoardDescriptor, length)] ^= 0x01; });
-  TEST_ASSERT_EQUAL_INT(static_cast<int>(Board::ParseResult::Invalid), static_cast<int>(Board::Parse(bytes, desc)));
+  TEST_ASSERT_EQUAL_INT(std::to_underlying(Board::ParseResult::Invalid), std::to_underlying(Board::Parse(bytes, desc)));
   reseal(bytes, kStamped, [](uint8_t* b) { b[offsetof(BoardDescriptor, schemaVersion)] += 1; });
-  TEST_ASSERT_EQUAL_INT(static_cast<int>(Board::ParseResult::Invalid), static_cast<int>(Board::Parse(bytes, desc)));
+  TEST_ASSERT_EQUAL_INT(std::to_underlying(Board::ParseResult::Invalid), std::to_underlying(Board::Parse(bytes, desc)));
 
   // A stamp with no chip label is not a descriptor the firmware will run on.
   reseal(bytes, kStamped, [](uint8_t* b) { b[offsetof(BoardDescriptor, chip)] = 0; });
-  TEST_ASSERT_EQUAL_INT(static_cast<int>(Board::ParseResult::Invalid), static_cast<int>(Board::Parse(bytes, desc)));
+  TEST_ASSERT_EQUAL_INT(std::to_underlying(Board::ParseResult::Invalid), std::to_underlying(Board::Parse(bytes, desc)));
 
   // Re-sealing without a change must reproduce the Python CRC exactly.
   reseal(bytes, kStamped, [](uint8_t*) { });

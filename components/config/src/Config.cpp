@@ -18,6 +18,7 @@ const char* const TAG = "Config";
 #include <algorithm>
 #include <bitset>
 #include <cstring>
+#include <optional>
 #include <span>
 #include <utility>
 #include <vector>
@@ -278,67 +279,53 @@ void Config::FactoryReset()
   OS_LOGI(TAG, "Factory reset complete");
 }
 
-bool Config::GetRFConfig(Config::RFConfig& out)
+std::optional<Config::RFConfig> Config::GetRFConfig()
 {
-  CONFIG_LOCK_READ(false);
+  CONFIG_LOCK_READ(std::nullopt);
 
-  out = _configData.rf;
-
-  return true;
+  return _configData.rf;
 }
 
-bool Config::GetWiFiConfig(Config::WiFiConfig& out)
+std::optional<Config::WiFiConfig> Config::GetWiFiConfig()
 {
-  CONFIG_LOCK_READ(false);
+  CONFIG_LOCK_READ(std::nullopt);
 
-  out = _configData.wifi;
-
-  return true;
+  return _configData.wifi;
 }
 
-bool Config::GetCaptivePortalConfig(Config::CaptivePortalConfig& out)
+std::optional<Config::CaptivePortalConfig> Config::GetCaptivePortalConfig()
 {
-  CONFIG_LOCK_READ(false);
+  CONFIG_LOCK_READ(std::nullopt);
 
-  out = _configData.captivePortal;
-
-  return true;
+  return _configData.captivePortal;
 }
 
-bool Config::GetBackendConfig(Config::BackendConfig& out)
+std::optional<Config::BackendConfig> Config::GetBackendConfig()
 {
-  CONFIG_LOCK_READ(false);
+  CONFIG_LOCK_READ(std::nullopt);
 
-  out = _configData.backend;
-
-  return true;
+  return _configData.backend;
 }
 
-bool Config::GetSerialInputConfig(Config::SerialInputConfig& out)
+std::optional<Config::SerialInputConfig> Config::GetSerialInputConfig()
 {
-  CONFIG_LOCK_READ(false);
+  CONFIG_LOCK_READ(std::nullopt);
 
-  out = _configData.serialInput;
-
-  return true;
+  return _configData.serialInput;
 }
 
-bool Config::GetOtaUpdateConfig(Config::OtaUpdateConfig& out)
+std::optional<Config::OtaUpdateConfig> Config::GetOtaUpdateConfig()
 {
-  CONFIG_LOCK_READ(false);
+  CONFIG_LOCK_READ(std::nullopt);
 
-  out = _configData.otaUpdate;
-
-  return true;
+  return _configData.otaUpdate;
 }
 
-bool Config::GetEStopConfig(Config::EStopConfig& out)
+std::optional<Config::EStopConfig> Config::GetEStopConfig()
 {
-  CONFIG_LOCK_READ(false);
+  CONFIG_LOCK_READ(std::nullopt);
 
-  out = _configData.estop;
-
-  return true;
+  return _configData.estop;
 }
 
 bool Config::SetRFConfig(const Config::RFConfig& config)
@@ -412,13 +399,11 @@ bool Config::SetEStopConfig(const Config::EStopConfig& config)
   });
 }
 
-bool Config::GetWiFiCredentials(std::vector<Config::WiFiCredentials>& out)
+std::optional<std::vector<Config::WiFiCredentials>> Config::GetWiFiCredentials()
 {
-  CONFIG_LOCK_READ(false);
+  CONFIG_LOCK_READ(std::nullopt);
 
-  out = _configData.wifi.credentialsList;
-
-  return true;
+  return _configData.wifi.credentialsList;
 }
 
 bool Config::GetWiFiCredentials(json_gen_str_t* gen, bool withSensitiveData)
@@ -473,13 +458,11 @@ bool Config::SetWiFiCredentials(const std::vector<Config::WiFiCredentials>& cred
   });
 }
 
-bool Config::GetRFConfigTxPin(gpio_num_t& out)
+std::optional<gpio_num_t> Config::GetRFConfigTxPin()
 {
-  CONFIG_LOCK_READ(false);
+  CONFIG_LOCK_READ(std::nullopt);
 
-  out = _configData.rf.txPin;
-
-  return true;
+  return _configData.rf.txPin;
 }
 
 bool Config::SetRFConfigTxPin(gpio_num_t txPin)
@@ -492,13 +475,11 @@ bool Config::SetRFConfigTxPin(gpio_num_t txPin)
   });
 }
 
-bool Config::GetRFConfigKeepAliveEnabled(bool& out)
+std::optional<bool> Config::GetRFConfigKeepAliveEnabled()
 {
-  CONFIG_LOCK_READ(false);
+  CONFIG_LOCK_READ(std::nullopt);
 
-  out = _configData.rf.keepAliveEnabled;
-
-  return true;
+  return _configData.rf.keepAliveEnabled;
 }
 
 bool Config::SetRFConfigKeepAliveEnabled(bool enabled)
@@ -511,7 +492,7 @@ bool Config::SetRFConfigKeepAliveEnabled(bool enabled)
   });
 }
 
-bool Config::AnyWiFiCredentials(std::function<bool(const Config::WiFiCredentials&)> predicate)
+bool Config::AnyWiFiCredentials(Util::FunctionRef<bool(const Config::WiFiCredentials&)> predicate)
 {
   CONFIG_LOCK_READ(false);
 
@@ -587,32 +568,30 @@ uint8_t Config::AddWiFiCredentials(std::string_view ssid, std::string_view passw
   return id;
 }
 
-bool Config::TryGetWiFiCredentialsByID(uint8_t id, Config::WiFiCredentials& credentials)
+std::optional<Config::WiFiCredentials> Config::TryGetWiFiCredentialsByID(uint8_t id)
 {
-  CONFIG_LOCK_READ(false);
+  CONFIG_LOCK_READ(std::nullopt);
 
   for (const auto& creds : _configData.wifi.credentialsList) {
     if (creds.id == id) {
-      credentials = creds;
-      return true;
+      return creds;
     }
   }
 
-  return false;
+  return std::nullopt;
 }
 
-bool Config::TryGetWiFiCredentialsBySSID(const char* ssid, Config::WiFiCredentials& credentials)
+std::optional<Config::WiFiCredentials> Config::TryGetWiFiCredentialsBySSID(const char* ssid)
 {
-  CONFIG_LOCK_READ(false);
+  CONFIG_LOCK_READ(std::nullopt);
 
   for (const auto& creds : _configData.wifi.credentialsList) {
     if (creds.ssid == ssid) {
-      credentials = creds;
-      return true;
+      return creds;
     }
   }
 
-  return false;
+  return std::nullopt;
 }
 
 uint8_t Config::GetWiFiCredentialsIDbySSID(const char* ssid)
@@ -668,13 +647,11 @@ bool Config::ClearWiFiCredentials()
   });
 }
 
-bool Config::GetWiFiHostname(std::string& out)
+std::optional<std::string> Config::GetWiFiHostname()
 {
-  CONFIG_LOCK_READ(false);
+  CONFIG_LOCK_READ(std::nullopt);
 
-  out = _configData.wifi.hostname;
-
-  return true;
+  return _configData.wifi.hostname;
 }
 
 bool Config::SetWiFiHostname(std::string hostname)
@@ -687,13 +664,11 @@ bool Config::SetWiFiHostname(std::string hostname)
   });
 }
 
-bool Config::GetBackendDomain(std::string& out)
+std::optional<std::string> Config::GetBackendDomain()
 {
-  CONFIG_LOCK_READ(false);
+  CONFIG_LOCK_READ(std::nullopt);
 
-  out = _configData.backend.domain;
-
-  return true;
+  return _configData.backend.domain;
 }
 
 bool Config::SetBackendDomain(std::string domain)
@@ -713,13 +688,11 @@ bool Config::HasBackendAuthToken()
   return !_configData.backend.authToken.empty();
 }
 
-bool Config::GetBackendAuthToken(std::string& out)
+std::optional<std::string> Config::GetBackendAuthToken()
 {
-  CONFIG_LOCK_READ(false);
+  CONFIG_LOCK_READ(std::nullopt);
 
-  out = _configData.backend.authToken;
-
-  return true;
+  return _configData.backend.authToken;
 }
 
 bool Config::SetBackendAuthToken(std::string token)
@@ -742,12 +715,11 @@ bool Config::ClearBackendAuthToken()
   });
 }
 
-bool Config::GetSerialInputConfigEchoEnabled(bool& out)
+std::optional<bool> Config::GetSerialInputConfigEchoEnabled()
 {
-  CONFIG_LOCK_READ(false);
+  CONFIG_LOCK_READ(std::nullopt);
 
-  out = _configData.serialInput.echoEnabled;
-  return true;
+  return _configData.serialInput.echoEnabled;
 }
 
 bool Config::SetSerialInputConfigEchoEnabled(bool enabled)
@@ -760,13 +732,11 @@ bool Config::SetSerialInputConfigEchoEnabled(bool enabled)
   });
 }
 
-bool Config::GetOtaUpdateId(int32_t& out)
+std::optional<int32_t> Config::GetOtaUpdateId()
 {
-  CONFIG_LOCK_READ(false);
+  CONFIG_LOCK_READ(std::nullopt);
 
-  out = _configData.otaUpdate.updateId;
-
-  return true;
+  return _configData.otaUpdate.updateId;
 }
 
 bool Config::SetOtaUpdateId(int32_t updateId)
@@ -783,13 +753,11 @@ bool Config::SetOtaUpdateId(int32_t updateId)
   });
 }
 
-bool Config::GetOtaUpdateStep(OtaUpdateStep& out)
+std::optional<OtaUpdateStep> Config::GetOtaUpdateStep()
 {
-  CONFIG_LOCK_READ(false);
+  CONFIG_LOCK_READ(std::nullopt);
 
-  out = _configData.otaUpdate.updateStep;
-
-  return true;
+  return _configData.otaUpdate.updateStep;
 }
 
 bool Config::SetOtaUpdateStep(OtaUpdateStep updateStep)
@@ -806,13 +774,11 @@ bool Config::SetOtaUpdateStep(OtaUpdateStep updateStep)
   });
 }
 
-bool Config::GetEStopEnabled(bool& out)
+std::optional<bool> Config::GetEStopEnabled()
 {
-  CONFIG_LOCK_READ(false);
+  CONFIG_LOCK_READ(std::nullopt);
 
-  out = _configData.estop.enabled;
-
-  return true;
+  return _configData.estop.enabled;
 }
 
 bool Config::SetEStopEnabled(bool enabled)
@@ -825,13 +791,11 @@ bool Config::SetEStopEnabled(bool enabled)
   });
 }
 
-bool Config::GetEStopGpioPin(gpio_num_t& out)
+std::optional<gpio_num_t> Config::GetEStopGpioPin()
 {
-  CONFIG_LOCK_READ(false);
+  CONFIG_LOCK_READ(std::nullopt);
 
-  out = _configData.estop.gpioPin;
-
-  return true;
+  return _configData.estop.gpioPin;
 }
 
 bool Config::SetEStopGpioPin(gpio_num_t gpioPin)
