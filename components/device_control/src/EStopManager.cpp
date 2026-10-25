@@ -37,6 +37,10 @@ static gpio_num_t s_estopPin = GPIO_NUM_NC;  // Captured by value when the task 
 
 // Wrapped in atomics as they're read (or set via public methods) by Tasks potentially running on other cores.
 static std::atomic<int64_t> s_estopActivatedAt = 0;  // When == 0, EStop not active. When != 0, EStop is active.
+// Mirrors `s_estopActivatedAt != 0` for IsEStopped(), which runs on every command and every RF frame:
+// std::atomic<int64_t> isn't lock-free on these chips (every access takes a global spinlock), a bool is.
+// Set no later than the timestamp and cleared with it, so IsEStopped() never reports clear while it is set.
+static std::atomic<bool> s_estopActive = false;
 // A software trigger not yet taken over by the task. IsEStopped() reports it at once, so the trigger needs no lock
 // and doesn't wait for the next tick.
 static std::atomic<bool> s_externallyTriggered = false;
@@ -101,6 +105,7 @@ static void estopmgr_managerTask(gpio_num_t estopPin)
 
     // This task is the only writer while it runs; mirror before publishing so consumers see the new state.
     s_estopActivatedAt.store(machine.activatedAt());
+    s_estopActive.store(machine.activatedAt() != 0);
 
     // Cleared only once the activation is mirrored, so IsEStopped() never sees neither
     if (triggered) {
@@ -323,7 +328,7 @@ bool EStopManager::SetEStopPin(gpio_num_t pin)
 
 bool EStopManager::IsEStopped()
 {
-  return EStopManager::LastEStopped() != 0 || s_externallyTriggered.load();
+  return s_estopActive.load() || s_externallyTriggered.load();
 }
 
 int64_t EStopManager::LastEStopped()
@@ -338,6 +343,7 @@ static void estopmgr_latchWithoutTask()
 {
   int64_t expected = 0;
   bool latched     = s_estopActivatedAt.compare_exchange_strong(expected, OpenShock::millis());
+  s_estopActive.store(true);           // Active either way: just latched, or already was
   s_externallyTriggered.store(false);  // Taken over by the latch
   if (!latched) {
     return;                            // Already active
