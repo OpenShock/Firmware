@@ -8,8 +8,6 @@ const char* const TAG = "CommandHandler";
 #include "Chipset.h"
 #include "config/Config.h"
 #include "estop/EStopManager.h"
-#include "estop/EStopState.h"
-#include "events/Events.h"
 #include "Logging.h"
 
 #include "OpenShock.h"
@@ -120,6 +118,14 @@ static void commandhandler_keepalivetask()
     // Update the time to now
     int64_t now = OpenShock::millis();
 
+    // The task stays up through an E-Stop (stopping it from the event loop would join a task there) and simply sends
+    // nothing. Shockers seen before the E-Stop are forgotten; only commands accepted after it count again.
+    if (EStopManager::IsEStopped()) {
+      activityMap.clear();
+      timeToKeepAlive = now + KEEP_ALIVE_INTERVAL;
+      continue;
+    }
+
     // Keep track of the minimum activity time, so we know when to wake up
     timeToKeepAlive = now + KEEP_ALIVE_INTERVAL;
 
@@ -150,7 +156,7 @@ static void commandhandler_keepalivetask()
 
 static bool internalSetKeepAliveEnabled(bool enabled)
 {
-  // Called from the event loop (EStop changes) and from serial/portal tasks; the check must be under the lock.
+  // Called from Init and from serial/portal tasks; the check must be under the lock.
   ScopedLock lock__(&s_keepAliveMutex);
 
   bool wasEnabled = s_keepAliveQueue != nullptr && s_keepAliveTask.running();
@@ -200,45 +206,12 @@ static bool internalSetKeepAliveEnabled(bool enabled)
   return true;
 }
 
-static void commandhandler_handleestopstatechange(void* event_handler_arg, esp_event_base_t event_base, int32_t event_id, void* event_data)
-{
-  (void)event_handler_arg;
-  (void)event_base;
-  (void)event_id;
-
-  EStopState state = *static_cast<EStopState*>(event_data);
-
-  if (state != EStopState::Idle) {
-    internalSetKeepAliveEnabled(false);
-    return;
-  }
-
-  // E-Stop cleared: restore the configured keep-alive setting instead of forcing it on.
-  auto keepAliveEnabled = Config::GetRFConfigKeepAliveEnabled();
-  if (!keepAliveEnabled) {
-    OS_LOGE(TAG, "Failed to get keep-alive enabled from config");
-    return;
-  }
-
-  internalSetKeepAliveEnabled(*keepAliveEnabled);
-}
-
 bool CommandHandler::Init()
 {
-  esp_err_t err;
-
   static bool initialized = false;
   if (initialized) {
     OS_LOGW(TAG, "RF Transmitter and EStopManager are already initialized?");
     return true;
-  }
-
-  // Register first so EStop changes gate the keep-alive task even if the transmitter can't be created yet
-  // (it can still be brought up later through SetRfTxPin).
-  err = esp_event_handler_register(OPENSHOCK_EVENTS, OPENSHOCK_EVENT_ESTOP_STATE_CHANGED, commandhandler_handleestopstatechange, nullptr);
-  if (err != ESP_OK) {
-    OS_LOGE(TAG, "Failed to register event handler for OPENSHOCK_EVENTS: %s", esp_err_to_name(err));
-    return false;
   }
   initialized = true;
 
@@ -248,7 +221,8 @@ bool CommandHandler::Init()
     return false;
   }
 
-  if (rfConfig->keepAliveEnabled && !EStopManager::IsEStopped()) {
+  // Runs through E-Stops too; the task itself sends nothing while e-stopped
+  if (rfConfig->keepAliveEnabled) {
     internalSetKeepAliveEnabled(true);
   }
 
@@ -335,8 +309,7 @@ SetGPIOResultCode CommandHandler::SetRfTxPin(gpio_num_t txPin)
 
 bool CommandHandler::SetKeepAliveEnabled(bool enabled)
 {
-  // While e-stopped the task stays off; clearing the e-stop starts it from the saved setting.
-  if (!internalSetKeepAliveEnabled(enabled && !EStopManager::IsEStopped())) {
+  if (!internalSetKeepAliveEnabled(enabled)) {
     return false;
   }
 

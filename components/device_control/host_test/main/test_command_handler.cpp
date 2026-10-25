@@ -4,7 +4,6 @@
 #include "unity.h"
 
 #include "CommandHandler.h"
-#include "estop/EStopState.h"
 #include "frames.h"
 #include "host_fakes.h"
 
@@ -28,7 +27,6 @@ static void resetCommandHandler()
   if (!initialized) {
     HostFake::RfConfig = {.txPin = kTxPin, .keepAliveEnabled = false};
     TEST_ASSERT_TRUE(CommandHandler::Init());
-    TEST_ASSERT_NOT_NULL(HostFake::EStopHandler);
     initialized = true;
   }
 
@@ -44,9 +42,22 @@ static TaskHandle_t transmitTask()
   return task;
 }
 
-static void deliverEStopState(EStopState state)
+// Steps the keep-alive task until the fake clock passes `until`. Returns whether it handed anything to the transmitter.
+static bool runKeepAliveUntil(TaskHandle_t keepAlive, QueueHandle_t rfQueue, int64_t until)
 {
-  HostFake::EStopHandler(nullptr, OPENSHOCK_EVENTS, OPENSHOCK_EVENT_ESTOP_STATE_CHANGED, &state);
+  bool pinged      = false;
+  HostFake::OnIdle = [&] {
+    if (HostFake::QueueLength(rfQueue) > 0) {
+      pinged = true;
+      throw HostFake::TaskBlocked {};
+    }
+    if (HostFake::Now > until) {
+      throw HostFake::TaskBlocked {};
+    }
+  };
+  HostFake::RunTask(keepAlive, kBudget);
+  HostFake::OnIdle = nullptr;
+  return pinged;
 }
 
 TEST_CASE("CommandHandler transmits commands while not e-stopped", "[device_control][command]")
@@ -240,55 +251,40 @@ TEST_CASE("CommandHandler keep-alive pings a shocker after a minute of inactivit
   TEST_ASSERT_TRUE(CommandHandler::SetKeepAliveEnabled(false));
 }
 
-TEST_CASE("CommandHandler e-stop events suspend keep-alive until Idle", "[device_control][command][keepalive][estop]")
+TEST_CASE("CommandHandler keep-alive stays up but sends nothing while e-stopped", "[device_control][command][keepalive][estop]")
 {
   resetCommandHandler();
+  QueueHandle_t rfQueue = HostFake::NewestQueue();
   TEST_ASSERT_TRUE(CommandHandler::SetKeepAliveEnabled(true));
   TaskHandle_t keepAlive = HostFake::FindTask("KeepAliveTask");
   TEST_ASSERT_NOT_NULL(keepAlive);
 
-  deliverEStopState(EStopState::Active);
-  TEST_ASSERT_TRUE(HostFake::TaskStopped(keepAlive));
-  TEST_ASSERT_NULL(HostFake::FindTask("KeepAliveTask"));
+  int64_t commandEnd = HostFake::Now + 500;
+  TEST_ASSERT_TRUE(CommandHandler::HandleCommand(kModel, kShockerId, ShockerCommandType::Vibrate, 10, 500));
+  HostFake::RunTask(transmitTask(), kBudget);
+  TEST_ASSERT_EQUAL(0, HostFake::QueueLength(rfQueue));
 
-  deliverEStopState(EStopState::ActiveClearing);
-  deliverEStopState(EStopState::AwaitingRelease);
-  TEST_ASSERT_NULL(HostFake::FindTask("KeepAliveTask"));
+  // Well past the keep-alive interval, nothing goes out and the task is still there.
+  HostFake::EStopped = true;
+  TEST_ASSERT_FALSE(runKeepAliveUntil(keepAlive, rfQueue, commandEnd + 2 * kKeepAliveMs));
+  TEST_ASSERT_FALSE(HostFake::TaskStopped(keepAlive));
 
-  deliverEStopState(EStopState::Idle);
-  TEST_ASSERT_NOT_NULL(HostFake::FindTask("KeepAliveTask"));
+  // Shockers seen before the e-stop were forgotten, so clearing it doesn't bring their pings back.
+  HostFake::EStopped = false;
+  TEST_ASSERT_FALSE(runKeepAliveUntil(keepAlive, rfQueue, HostFake::Now + 2 * kKeepAliveMs));
 
   TEST_ASSERT_TRUE(CommandHandler::SetKeepAliveEnabled(false));
 }
 
-TEST_CASE("CommandHandler clearing an e-stop leaves keep-alive off when disabled in config", "[device_control][command][keepalive][estop]")
-{
-  resetCommandHandler();
-  TEST_ASSERT_FALSE(HostFake::RfConfig.keepAliveEnabled);
-  TEST_ASSERT_NULL(HostFake::FindTask("KeepAliveTask"));
-
-  deliverEStopState(EStopState::Active);
-  deliverEStopState(EStopState::Idle);
-
-  TEST_ASSERT_NULL(HostFake::FindTask("KeepAliveTask"));
-  TEST_ASSERT_FALSE(HostFake::RfConfig.keepAliveEnabled);
-}
-
-TEST_CASE("CommandHandler keep-alive enabled while e-stopped starts only once the e-stop clears", "[device_control][command][keepalive][estop]")
+TEST_CASE("CommandHandler keep-alive enabled while e-stopped starts its task", "[device_control][command][keepalive][estop]")
 {
   resetCommandHandler();
 
   HostFake::EStopped = true;
-  deliverEStopState(EStopState::Active);
-
-  // The setting is saved, but the task stays off while e-stopped.
   TEST_ASSERT_TRUE(CommandHandler::SetKeepAliveEnabled(true));
   TEST_ASSERT_TRUE(HostFake::RfConfig.keepAliveEnabled);
-  TEST_ASSERT_NULL(HostFake::FindTask("KeepAliveTask"));
-
-  HostFake::EStopped = false;
-  deliverEStopState(EStopState::Idle);
   TEST_ASSERT_NOT_NULL(HostFake::FindTask("KeepAliveTask"));
 
+  HostFake::EStopped = false;
   TEST_ASSERT_TRUE(CommandHandler::SetKeepAliveEnabled(false));
 }
