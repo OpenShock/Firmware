@@ -109,10 +109,11 @@ std::optional<JsonAPI::HubInfoResponse> JsonAPI::ParseHubInfoJsonResponse(int co
     return std::nullopt;
   }
 
-  HubInfoResponse out {};
-
-  out.hubId   = std::move(*hubId);
-  out.hubName = std::move(*hubName);
+  HubInfoResponse out {
+    .hubId    = std::move(*hubId),
+    .hubName  = std::move(*hubName),
+    .shockers = {},
+  };
 
   const int shockerCount = hubShockers.count();
   for (int i = 0; i < shockerCount; ++i) {

@@ -50,7 +50,7 @@ TEST_CASE("TryParseHexPair", "[util][hex]")
   TEST_ASSERT_TRUE(v.has_value());
   TEST_ASSERT_EQUAL_HEX8(0xAB, *v);
   v = HexUtils::TryParseHexPair('0', '0');
-  TEST_ASSERT_TRUE(v.has_value());  // 0x00 is a valid byte, not a failure
+  TEST_ASSERT_TRUE(v.has_value());                                     // 0x00 is a valid byte, not a failure
   TEST_ASSERT_EQUAL_HEX8(0x00, *v);
   TEST_ASSERT_FALSE(HexUtils::TryParseHexPair('G', '0').has_value());  // invalid high nibble
   TEST_ASSERT_FALSE(HexUtils::TryParseHexPair('0', 'Z').has_value());  // invalid low nibble
@@ -75,8 +75,8 @@ TEST_CASE("TryParseHexMac edge cases", "[util][hex]")
 {
   uint8_t out[6] = {0};
 
-  TEST_ASSERT_EQUAL_size_t(0, HexUtils::TryParseHexMac("", out));    // empty
-  TEST_ASSERT_EQUAL_size_t(1, HexUtils::TryParseHexMac("AB", out));  // a single pair
+  TEST_ASSERT_EQUAL_size_t(0, HexUtils::TryParseHexMac("", out));                              // empty
+  TEST_ASSERT_EQUAL_size_t(1, HexUtils::TryParseHexMac("AB", out));                            // a single pair
   TEST_ASSERT_EQUAL_HEX8(0xAB, out[0]);
   TEST_ASSERT_EQUAL_size_t(0, HexUtils::TryParseHexMac("DE:AD:BE", std::span(out).first(2)));  // output too small
   TEST_ASSERT_EQUAL_size_t(0, HexUtils::TryParseHexMac("DE:AD:", out));                        // trailing separator

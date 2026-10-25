@@ -37,6 +37,14 @@ static_assert(sizeof(FunctionRef<int(int)>) == 2 * sizeof(void*));
 static_assert(!std::is_default_constructible_v<FunctionRef<int(int)>>);
 static_assert(!std::is_constructible_v<FunctionRef<int(int)>, int>);
 static_assert(!std::is_constructible_v<FunctionRef<int(int)>, void (*)(std::string)>);
+// A member pointer would be referenced by the address of a temporary, so it is rejected (like std::function_ref).
+static_assert(!std::is_constructible_v<FunctionRef<int(const Adder&, int)>, decltype(&Adder::operator())>);
+static_assert(!std::is_constructible_v<FunctionRef<int(const Adder&)>, decltype(&Adder::base)>);
+// Assigning a callable would leave the FunctionRef referencing a dead temporary; a FunctionRef or function pointer is fine.
+static_assert(!std::is_assignable_v<FunctionRef<int(int)>&, Adder>);
+static_assert(!std::is_assignable_v<FunctionRef<int(int)>&, decltype([](int x) { return x; })>);
+static_assert(std::is_assignable_v<FunctionRef<int(int)>&, FunctionRef<int(int)>>);
+static_assert(std::is_assignable_v<FunctionRef<int(int)>&, int (*)(int)>);
 
 TEST_CASE("FunctionRef calls a capturing lambda", "[util][functionref]")
 {
@@ -83,11 +91,25 @@ TEST_CASE("FunctionRef discards the result for a void signature", "[util][functi
 TEST_CASE("FunctionRef copies refer to the same callable", "[util][functionref]")
 {
   int counter = 0;
-  auto inc    = [&](int x) { return counter += x; };
+  auto inc    = [&](int x) {
+    return counter += x;
+  };
 
   FunctionRef<int(int)> a = inc;
   FunctionRef<int(int)> b = a;  // copy, not a re-wrap
   a(1);
   b(2);
   TEST_ASSERT_EQUAL_INT(3, counter);
+}
+
+TEST_CASE("FunctionRef can be reassigned a function pointer", "[util][functionref]")
+{
+  auto negate = [](int x) {
+    return -x;
+  };
+  FunctionRef<int(int)> ref = negate;
+  TEST_ASSERT_EQUAL_INT(-4, ref(4));
+
+  ref = Twice;
+  TEST_ASSERT_EQUAL_INT(8, ref(4));
 }

@@ -2,6 +2,7 @@
 
 #include "config/ConfigBase.h"
 
+#include "util/FunctionRef.h"
 #include "json/Json.h"
 
 #include <hal/gpio_types.h>
@@ -9,6 +10,7 @@
 #include <optional>
 #include <string>
 #include <string_view>
+#include <type_traits>
 #include <vector>
 
 namespace OpenShock::Config::Internal::Utils {
@@ -36,7 +38,7 @@ namespace OpenShock::Config::Internal::Utils {
     }
   }
   template<typename T>  // T inherits from ConfigBase<T>
-  bool FromJsonStrParsed(T& val, JSON::JsonView json, std::string_view name, std::optional<T> (*StringParser)(std::string_view), T defaultVal)
+  bool FromJsonStrParsed(T& val, JSON::JsonView json, std::string_view name, std::type_identity_t<Util::FunctionRef<std::optional<T>(std::string_view)>> StringParser, T defaultVal)
   {
     JSON::JsonView jsonVal = json[name];
     if (!jsonVal.valid()) {

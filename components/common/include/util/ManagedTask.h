@@ -135,7 +135,7 @@ namespace OpenShock {
     const char* m_tag;
     const char* m_description;
     std::move_only_function<void()> m_body;  // Moved in by start(), never copied
-    mutable SimpleMutex m_handleMutex;  // Guards m_handle against notify()/running() on other tasks during start()/stop()
+    mutable SimpleMutex m_handleMutex;       // Guards m_handle against notify()/running() on other tasks during start()/stop()
     TaskHandle_t m_handle = nullptr;
     TaskUtils::TaskExitFlag m_exited {false};
     std::atomic<bool> m_stopRequested {false};

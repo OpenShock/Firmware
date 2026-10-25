@@ -36,8 +36,10 @@ namespace OpenShock::Util {
     static constexpr bool IsFunction = std::is_function_v<std::remove_pointer_t<std::remove_cvref_t<F>>>;
 
   public:
+    // A member pointer is excluded like in std::function_ref: it is not a function, so it would be referenced by the
+    // address of the caller's temporary.
     template<class F>
-      requires(!std::is_same_v<std::remove_cvref_t<F>, FunctionRef> && std::is_invocable_r_v<R, std::remove_reference_t<F>&, A...>)
+      requires(!std::is_same_v<std::remove_cvref_t<F>, FunctionRef> && !std::is_member_pointer_v<std::remove_cvref_t<F>> && std::is_invocable_r_v<R, std::remove_reference_t<F>&, A...>)
     FunctionRef(F&& f) noexcept  // NOLINT(google-explicit-constructor): implicit like std::function_ref
     {
       if constexpr (IsFunction<F>) {
@@ -45,14 +47,25 @@ namespace OpenShock::Util {
         using Fn     = std::remove_pointer_t<std::remove_cvref_t<F>>*;
         Fn fn        = f;
         m_storage.fn = reinterpret_cast<void (*)()>(fn);
-        m_thunk      = [](Storage s, A... args) -> R { return Invoke(reinterpret_cast<Fn>(s.fn), std::forward<A>(args)...); };
+        m_thunk      = [](Storage s, A... args) -> R {
+          return Invoke(reinterpret_cast<Fn>(s.fn), std::forward<A>(args)...);
+        };
       } else {
         // Callable object: keep its address and cast back with the same constness on invocation.
         using T       = std::remove_reference_t<F>;
         m_storage.obj = const_cast<void*>(static_cast<const volatile void*>(std::addressof(f)));
-        m_thunk       = [](Storage s, A... args) -> R { return Invoke(*static_cast<T*>(s.obj), std::forward<A>(args)...); };
+        m_thunk       = [](Storage s, A... args) -> R {
+          return Invoke(*static_cast<T*>(s.obj), std::forward<A>(args)...);
+        };
       }
     }
+
+    // Assigning a callable would go through a temporary FunctionRef and leave this one referencing a lambda that dies
+    // at the end of the statement, so only another FunctionRef (the implicit copy assignment) or a function pointer may
+    // be assigned, as with std::function_ref.
+    template<class T>
+      requires(!std::is_same_v<std::remove_cvref_t<T>, FunctionRef> && !std::is_pointer_v<T>)
+    FunctionRef& operator=(T) = delete;
 
     R operator()(A... args) const { return m_thunk(m_storage, std::forward<A>(args)...); }
 

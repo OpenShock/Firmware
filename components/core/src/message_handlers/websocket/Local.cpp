@@ -14,7 +14,7 @@ const char* const TAG = "LocalMessageHandlers";
 
 namespace Schemas  = OpenShock::Serialization::Local;
 namespace Handlers = OpenShock::MessageHandlers::Local::_Private;
-using PayloadType = Schemas::LocalToHubMessagePayload;
+using PayloadType  = Schemas::LocalToHubMessagePayload;
 
 using namespace OpenShock;
 

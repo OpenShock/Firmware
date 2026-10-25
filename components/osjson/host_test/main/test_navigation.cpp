@@ -40,7 +40,7 @@ TEST_CASE("operator[]: case-sensitive and prefix-distinct keys", "[osjson][nav]"
   v = root["Name"].tryGetI64();  // different case -> different key
   TEST_ASSERT_TRUE(v.has_value());
   TEST_ASSERT_EQUAL_INT64(2, *v);
-  v = root["n"].tryGetI64();     // must not match "name"/"nam"
+  v = root["n"].tryGetI64();  // must not match "name"/"nam"
   TEST_ASSERT_TRUE(v.has_value());
   TEST_ASSERT_EQUAL_INT64(3, *v);
   v = root["nam"].tryGetI64();

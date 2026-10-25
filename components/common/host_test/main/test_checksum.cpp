@@ -119,7 +119,7 @@ TEST_CASE("ReverseInverseNibble reverses the inverted nibble", "[util][checksum]
 TEST_CASE("Crc32 matches the IEEE check value and zlib", "[util][checksum]")
 {
   // The standard CRC-32 check value: crc32("123456789") == 0xCBF43926 (also what zlib.crc32 gives).
-  const uint8_t check[] = {'1', '2', '3', '4', '5', '6', '7', '8', '9'};
+  const uint8_t check[]                    = {'1', '2', '3', '4', '5', '6', '7', '8', '9'};
   const std::span<const uint8_t> checkSpan = check;
   TEST_ASSERT_EQUAL_HEX32(0xCBF43926, Checksum::Crc32(checkSpan));
   TEST_ASSERT_EQUAL_HEX32(0x00000000, Checksum::Crc32(checkSpan.first(0)));

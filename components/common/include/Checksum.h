@@ -13,8 +13,7 @@ namespace OpenShock::Checksum {
     // A value the object overloads below must NOT take: anything that already is (or converts to) a byte span, e.g.
     // std::span<uint8_t>, std::array<uint8_t, N> or uint8_t[N]. Those go to the span overloads, so a span is
     // checksummed over the bytes it points at, never over its own pointer/size representation.
-    template<typename T>
-    concept ChecksumObject = std::is_trivially_copyable_v<T> && !std::is_pointer_v<T> && !std::is_convertible_v<const T&, std::span<const uint8_t>>;
+    template<typename T> concept ChecksumObject = std::is_trivially_copyable_v<T> && !std::is_pointer_v<T> && !std::is_convertible_v<const T&, std::span<const uint8_t>>;
   }  // namespace Detail
 
   // ------------------------------------------------------------
@@ -40,8 +39,7 @@ namespace OpenShock::Checksum {
     requires Detail::ChecksumObject<T>
   constexpr uint8_t Sum8(const T& value)
   {
-    const auto bytes = std::bit_cast<std::array<uint8_t, sizeof(T)>>(value);
-    return Sum8(std::span<const uint8_t>(bytes));
+    return Sum8(std::bit_cast<std::array<uint8_t, sizeof(T)>>(value));
   }
 
   // ------------------------------------------------------------
@@ -65,8 +63,7 @@ namespace OpenShock::Checksum {
     requires(!std::integral<T> && Detail::ChecksumObject<T>)
   constexpr uint32_t Crc32(const T& data)
   {
-    const auto bytes = std::bit_cast<std::array<uint8_t, sizeof(T)>>(data);
-    return Crc32(std::span<const uint8_t>(bytes));
+    return Crc32(std::bit_cast<std::array<uint8_t, sizeof(T)>>(data));
   }
 
   /// @brief Reverses the bit order of the low nibble of `b` (lookup table packed into a 64-bit constant).

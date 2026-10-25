@@ -6,6 +6,7 @@ const char* const TAG = "HTTPRequestManager";
 
 #include "Logging.h"
 
+#include "Convert.h"
 #include "OpenShock.h"
 #include "RateLimiter.h"
 #include "SimpleMutex.h"
@@ -17,7 +18,6 @@ const char* const TAG = "HTTPRequestManager";
 #include <esp_http_client.h>
 
 #include <algorithm>
-#include <charconv>
 #include <cstdint>
 #include <cstdlib>
 #include <cstring>
@@ -239,29 +239,15 @@ HTTP::Response<std::size_t>
 
   if (responseCode == 429) {  // Too Many Requests
     // https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers/Retry-After
-    // Only a plain run of digits is accepted (from_chars on an unsigned type takes no sign or whitespace);
-    // an overlong number saturates and is capped below.
-    uint32_t retryAfter = 0;
-    if (!m_retryAfter.empty()) {
-      const char* first = m_retryAfter.data();
-      const char* last  = first + m_retryAfter.size();
+    // Only delay-seconds (whole seconds, RFC 9110) is parsed; a missing header, an HTTP-date or anything else
+    // unparseable gets the minimum. At least 2 seconds, so a "0" can't turn into a tight retry loop; at most 10
+    // minutes, so one bad header can't keep us offline for long.
+    static constexpr uint32_t kMinRetryAfterSeconds = 2;
+    static constexpr uint32_t kMaxRetryAfterSeconds = 600;
 
-      auto [ptr, ec] = std::from_chars(first, last, retryAfter);
-      if (ptr != last || ec == std::errc::invalid_argument) {
-        retryAfter = 0;
-      } else if (ec == std::errc::result_out_of_range) {
-        retryAfter = UINT32_MAX;
-      }
-    }
+    uint32_t retryAfter = OpenShock::Convert::ToUint32(m_retryAfter).value_or(kMinRetryAfterSeconds);
 
-    // If header missing/unparseable, default to 15 seconds; cap at an hour (also keeps the ms conversion in range)
-    if (retryAfter == 0) {
-      retryAfter = 15;
-    } else if (retryAfter > 3600) {
-      retryAfter = 3600;
-    }
-
-    rateLimiter->blockFor(static_cast<int64_t>(retryAfter) * 1000);
+    rateLimiter->blockFor(static_cast<int64_t>(std::clamp(retryAfter, kMinRetryAfterSeconds, kMaxRetryAfterSeconds)) * 1000);
 
     return fail(RequestResult::RateLimited, responseCode, 0);  // body not drained
   }

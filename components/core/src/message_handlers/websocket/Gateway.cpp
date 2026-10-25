@@ -15,7 +15,7 @@ const char* const TAG = "ServerMessageHandlers";
 
 namespace Schemas  = OpenShock::Serialization::Gateway;
 namespace Handlers = OpenShock::MessageHandlers::Server::_Private;
-using PayloadType = Schemas::GatewayToHubMessagePayload;
+using PayloadType  = Schemas::GatewayToHubMessagePayload;
 
 using namespace OpenShock;
 

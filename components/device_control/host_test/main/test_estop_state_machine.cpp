@@ -317,7 +317,7 @@ TEST_CASE("EStop is e-stopped in every state except Idle", "[device_control][est
       }
     }
 
-    EStopState state                      = rig.state();
+    EStopState state                    = rig.state();
     sawState[std::to_underlying(state)] = true;
     TEST_ASSERT_EQUAL(state != EStopState::Idle, rig.estopped());
 
