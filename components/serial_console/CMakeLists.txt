@@ -12,6 +12,7 @@ idf_component_register(
   INCLUDE_DIRS  "include"
   PRIV_REQUIRES core serial device_control crypto   # core: wifi/gateway/http/serialization; serial: Serial::Init/Read; device_control: estop/CommandHandler/visual/radio; crypto: Base64
                 common config logging temporal osjson chipset   # used directly; previously only reachable through core's public REQUIRES
+                heap                                            # heap_caps minimums (diag)
 )
 
 target_compile_options(${COMPONENT_LIB} PRIVATE -Wno-error)

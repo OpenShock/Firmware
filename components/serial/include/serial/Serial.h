@@ -39,6 +39,10 @@ namespace OpenShock::Serial {
    */
   int Write(const uint8_t* data, std::size_t len);
 
+  /// @brief How many Write() calls since boot gave up waiting for another writer and dropped their bytes. Only defined
+  ///        with CONFIG_FREERTOS_USE_TRACE_FACILITY (for `diag`).
+  uint32_t DroppedWrites();
+
   /**
    * @brief printf-style Write(). Formats into a stack buffer, and only for long output (e.g. a config dump) into a
    *        heap buffer; if that allocation fails the output is truncated rather than dropped.

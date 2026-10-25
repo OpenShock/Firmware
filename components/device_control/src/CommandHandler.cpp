@@ -7,6 +7,7 @@ const char* const TAG = "CommandHandler";
 #include "BoardDescriptor.h"
 #include "Chipset.h"
 #include "config/Config.h"
+#include "Diagnostics.h"
 #include "estop/EStopManager.h"
 #include "Logging.h"
 
@@ -116,6 +117,7 @@ static void commandhandler_keepalivetask()
       if (activityMap.size() >= KEEP_ALIVE_MAX_SHOCKERS && !activityMap.contains(key)) {
         auto oldest = std::min_element(activityMap.begin(), activityMap.end(), [](const auto& a, const auto& b) { return a.second.lastActivityTimestamp < b.second.lastActivityTimestamp; });
         OS_LOGW(TAG, "Keeping more than %zu shockers alive, dropping shocker %u", KEEP_ALIVE_MAX_SHOCKERS, oldest->second.shockerId);
+        Diagnostics::Increment(Diagnostics::Counter::KeepAliveEvictions);
         activityMap.erase(oldest);
       }
       activityMap[key] = cmd;
@@ -365,6 +367,7 @@ bool CommandHandler::HandleCommand(ShockerModelType model, uint16_t shockerId, S
   if (ok && s_keepAliveQueue != nullptr) {
     KnownShocker cmd {.killTask = false, .model = model, .shockerId = shockerId, .lastActivityTimestamp = OpenShock::millis() + durationMs};
     if (xQueueSend(s_keepAliveQueue, &cmd, pdMS_TO_TICKS(10)) != pdTRUE) {
+      Diagnostics::Increment(Diagnostics::Counter::KeepAliveQueueFull);
       OS_LOGE(TAG, "Failed to send keep-alive command to queue");
     }
   }

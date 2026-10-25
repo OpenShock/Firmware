@@ -3,6 +3,7 @@
 // to their terminator frames the moment the e-stop trips.
 #include "unity.h"
 
+#include "Diagnostics.h"
 #include "frames.h"
 #include "host_fakes.h"
 #include "radio/RFTransmitter.h"
@@ -11,6 +12,7 @@
 #include <vector>
 
 using namespace OpenShock;
+using Diagnostics::Counter;
 
 namespace {
   const gpio_num_t kPin                = static_cast<gpio_num_t>(5);
@@ -237,6 +239,7 @@ TEST_CASE("RFTransmitter Stop overtakes a backlog and drops that shocker's older
   auto other                     = TestFrames::Payload(kModel, kOtherShockerId, ShockerCommandType::Vibrate, 30);
 
   // Queued before the task gets to run, so the Stop lands in front of both.
+  uint32_t superseded = Diagnostics::Get(Counter::RfCommandsSuperseded);
   TEST_ASSERT_TRUE(tx.SendCommand(kModel, kShockerId, ShockerCommandType::Shock, 80, 10'000));
   TEST_ASSERT_TRUE(tx.SendCommand(kModel, kOtherShockerId, ShockerCommandType::Vibrate, 30, 500));
   TEST_ASSERT_TRUE(tx.SendCommand(kModel, kShockerId, ShockerCommandType::Stop, 0, 0));
@@ -246,6 +249,7 @@ TEST_CASE("RFTransmitter Stop overtakes a backlog and drops that shocker's older
   TEST_ASSERT_EQUAL(0, TestFrames::Count(shock));
   TEST_ASSERT_TRUE(TestFrames::Count(stop) > 0);
   TEST_ASSERT_TRUE(TestFrames::Count(other) > 0);  // Other shockers are unaffected
+  TEST_ASSERT_EQUAL(superseded + 1, Diagnostics::Get(Counter::RfCommandsSuperseded));
 
   // Once the backlog is gone, new commands for the stopped shocker are accepted again.
   HostFake::Transmissions.clear();
@@ -265,9 +269,13 @@ TEST_CASE("RFTransmitter backs off on failing transmits and gives up on its sequ
   // Without a back-off the loop would spin on the failing call without ever blocking. With it, the task sleeps after
   // each failure, then drops the sequence and goes back to waiting on its queue (RunTask returns false) well before
   // the command would have ended.
-  int64_t start = HostFake::Now;
+  int64_t start          = HostFake::Now;
+  uint32_t failures      = Diagnostics::Get(Counter::RfTransmitFailures);
+  uint32_t droppedBefore = Diagnostics::Get(Counter::RfSequencesDropped);
   TEST_ASSERT_FALSE(HostFake::RunTask(transmitTask(), kBudget));
   TEST_ASSERT_TRUE(HostFake::TaskDelays >= 20);
+  TEST_ASSERT_TRUE(Diagnostics::Get(Counter::RfTransmitFailures) - failures >= 20);
+  TEST_ASSERT_EQUAL(droppedBefore + 1, Diagnostics::Get(Counter::RfSequencesDropped));
   TEST_ASSERT_TRUE(HostFake::Now - start < 10'000);
   TEST_ASSERT_TRUE(HostFake::Transmissions.empty());
 
@@ -321,4 +329,19 @@ TEST_CASE("RFTransmitter is not ok when the RMT channel cannot be created", "[de
   TEST_ASSERT_FALSE(tx.SendCommand(kModel, kShockerId, ShockerCommandType::Shock, 10, 100));
 
   HostFake::Reset();
+}
+
+TEST_CASE("RFTransmitter counts commands it couldn't queue", "[device_control][rf][diag]")
+{
+  HostFake::Reset();
+  RFTransmitter tx(kPin);
+
+  // The task never runs, so the queue fills up
+  uint32_t before = Diagnostics::Get(Counter::RfQueueFull);
+  int refused     = 0;
+  for (int i = 0; i < 70; i++) {
+    refused += tx.SendCommand(kModel, static_cast<uint16_t>(kShockerId + i), ShockerCommandType::Vibrate, 10, 100) ? 0 : 1;
+  }
+  TEST_ASSERT_TRUE(refused > 0);
+  TEST_ASSERT_EQUAL(before + refused, Diagnostics::Get(Counter::RfQueueFull));
 }

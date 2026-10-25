@@ -2,6 +2,8 @@
 
 #include "serial_console/command_handlers/CommandEntry.h"
 
+#include <sdkconfig.h>
+
 #include <vector>
 
 namespace OpenShock::SerialCmds::CommandHandlers {
@@ -22,6 +24,9 @@ namespace OpenShock::SerialCmds::CommandHandlers {
   OpenShock::SerialCmds::CommandGroup RfTransmitHandler();
   OpenShock::SerialCmds::CommandGroup FactoryResetHandler();
   OpenShock::SerialCmds::CommandGroup LedTestHandler();
+#if CONFIG_FREERTOS_USE_TRACE_FACILITY
+  OpenShock::SerialCmds::CommandGroup DiagHandler();
+#endif
 
   inline std::vector<OpenShock::SerialCmds::CommandGroup> AllCommandHandlers()
   {
@@ -43,6 +48,9 @@ namespace OpenShock::SerialCmds::CommandHandlers {
       RfTransmitHandler(),
       FactoryResetHandler(),
       LedTestHandler(),
+#if CONFIG_FREERTOS_USE_TRACE_FACILITY
+      DiagHandler(),
+#endif
     };
   }
 }  // namespace OpenShock::SerialCmds::CommandHandlers

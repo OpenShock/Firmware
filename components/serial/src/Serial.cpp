@@ -49,6 +49,9 @@ static std::atomic<bool> s_usbHostStalled     = false;
 // Bounds how long a writer queues behind another; the line is dropped instead of stalling the caller (which may be
 // the event loop or the websocket task) without limit.
 static constexpr TickType_t k_writeLockTimeout = pdMS_TO_TICKS(500);
+#if CONFIG_FREERTOS_USE_TRACE_FACILITY
+static std::atomic<uint32_t> s_droppedWrites   = 0;
+#endif
 
 // Published with release ordering after s_writeMutex is created, so a writer on another core that sees it set also
 // sees the mutex.
@@ -218,6 +221,13 @@ int Serial::VWritef(const char* format, va_list args)
   return written;
 }
 
+#if CONFIG_FREERTOS_USE_TRACE_FACILITY
+uint32_t Serial::DroppedWrites()
+{
+  return s_droppedWrites.load(std::memory_order_relaxed);
+}
+#endif
+
 int Serial::Write(const uint8_t* data, std::size_t len)
 {
   if (data == nullptr || len == 0) {
@@ -230,6 +240,9 @@ int Serial::Write(const uint8_t* data, std::size_t len)
   }
 
   if (xSemaphoreTake(s_writeMutex, k_writeLockTimeout) != pdTRUE) {
+#if CONFIG_FREERTOS_USE_TRACE_FACILITY
+    s_droppedWrites.fetch_add(1, std::memory_order_relaxed);
+#endif
     return 0;  // Dropped: another writer is stuck on the console
   }
   int written = driverWrite(data, len);

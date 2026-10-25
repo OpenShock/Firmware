@@ -6,6 +6,7 @@ const char* const TAG = "EStopManager";
 
 #include "Chipset.h"
 #include "config/Config.h"
+#include "Diagnostics.h"
 #include "estop/EStopStateMachine.h"
 #include "events/Events.h"
 #include "Logging.h"
@@ -59,6 +60,7 @@ static void estopmgr_publishState(EStopState state, EStopState& lastState, TickT
   if (err == ESP_OK) {
     lastState = state;
   } else {
+    OpenShock::Diagnostics::Increment(OpenShock::Diagnostics::Counter::EventPostFailures);
     OS_LOGE(TAG, "Failed to publish EStop event: %s", esp_err_to_name(err));
   }
 }

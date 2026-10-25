@@ -7,6 +7,7 @@ const char* const TAG = "GatewayClient";
 
 #include "AppHooks.h"
 #include "config/Config.h"
+#include "Diagnostics.h"
 #include "events/Events.h"
 #include "Logging.h"
 #include "message_handlers/WebSocket.h"
@@ -88,6 +89,7 @@ void GatewayClient::retire()
   if (m_state.exchange(state) != state) {
     esp_err_t err = esp_event_post(OPENSHOCK_EVENTS, OPENSHOCK_EVENT_GATEWAY_CLIENT_STATE_CHANGED, &state, sizeof(state), pdMS_TO_TICKS(100));
     if (err != ESP_OK) {
+      OpenShock::Diagnostics::Increment(OpenShock::Diagnostics::Counter::EventPostFailures);
       OS_LOGE(TAG, "Failed to post gateway client state change: %s", esp_err_to_name(err));
     }
   }
@@ -186,6 +188,7 @@ bool GatewayClient::_send(ws_transport_opcodes_t opcode, const uint8_t* data, st
   const TickType_t started = xTaskGetTickCount();
   ScopedTryLock lock__(&m_handleMutex, GATEWAY_SEND_TIMEOUT);
   if (!lock__.isLocked()) {
+    OpenShock::Diagnostics::Increment(OpenShock::Diagnostics::Counter::GatewaySendTimeouts);
     OS_LOGW(TAG, "Timed out waiting for the websocket handle, dropping message");
     return false;
   }
@@ -248,6 +251,7 @@ void GatewayClient::_setState(GatewayClientState state)
   // Bounded wait: never block the websocket task or the owning task indefinitely on a full event queue.
   esp_err_t err = esp_event_post(OPENSHOCK_EVENTS, OPENSHOCK_EVENT_GATEWAY_CLIENT_STATE_CHANGED, &state, sizeof(state), pdMS_TO_TICKS(100));
   if (err != ESP_OK) {
+    OpenShock::Diagnostics::Increment(OpenShock::Diagnostics::Counter::EventPostFailures);
     OS_LOGE(TAG, "Failed to post gateway client state change: %s", esp_err_to_name(err));
   }
 }

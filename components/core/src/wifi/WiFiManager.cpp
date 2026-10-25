@@ -6,6 +6,7 @@ const char* const TAG = "WiFiManager";
 
 #include "AppHooks.h"
 #include "config/Config.h"
+#include "Diagnostics.h"
 #include "events/Events.h"
 #include "FormatHelpers.h"
 #include "Logging.h"
@@ -121,6 +122,7 @@ static void postWiFiState(OpenShockWiFiState state)
 {
   esp_err_t err = esp_event_post(OPENSHOCK_EVENTS, OPENSHOCK_EVENT_WIFI_STATE_CHANGED, &state, sizeof(state), pdMS_TO_TICKS(100));
   if (err != ESP_OK) {
+    OpenShock::Diagnostics::Increment(OpenShock::Diagnostics::Counter::EventPostFailures);
     OS_LOGE(TAG, "Failed to post WiFi state event: %s", esp_err_to_name(err));
   }
 }

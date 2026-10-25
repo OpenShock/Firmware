@@ -4,6 +4,7 @@
 
 const char* const TAG = "RFTransmitter";
 
+#include "Diagnostics.h"
 #include "estop/EStopManager.h"
 #include "Logging.h"
 
@@ -153,6 +154,7 @@ bool RFTransmitter::SendCommand(ShockerModelType model, uint16_t shockerId, Shoc
   // older commands for that shocker still queued behind it.
   BaseType_t queued = isStop ? xQueueSendToFront(m_queueHandle, &cmd, kStopQueueWait) : xQueueSend(m_queueHandle, &cmd, pdMS_TO_TICKS(10));
   if (queued != pdTRUE) {
+    Diagnostics::Increment(Diagnostics::Counter::RfQueueFull);
     OS_LOGE(TAG, "[pin-%hhi] Failed to send command to queue", m_txPin);
     return false;
   }
@@ -250,6 +252,7 @@ static bool transmitSymbols(rmt_channel_handle_t channel, rmt_encoder_handle_t e
       failures = 0;
       return true;
     }
+    Diagnostics::Increment(Diagnostics::Counter::RfTransmitFailures);
     if (failures++ == 0) {
       OS_LOGE(TAG, "rmt_tx_wait_all_done failed: %s", esp_err_to_name(err));
     }
@@ -260,6 +263,7 @@ static bool transmitSymbols(rmt_channel_handle_t channel, rmt_encoder_handle_t e
     return false;
   }
 
+  Diagnostics::Increment(Diagnostics::Counter::RfTransmitFailures);
   // Log the first failure of a run and then every 10th
   if (failures++ % 10 == 0) {
     OS_LOGE(TAG, "rmt_transmit failed (%lu in a row): %s", static_cast<unsigned long>(failures), esp_err_to_name(err));
@@ -276,6 +280,7 @@ static void writeSequences(rmt_channel_handle_t channel, rmt_encoder_handle_t en
     if (failures >= kMaxConsecutiveFailures) {
       // Nothing is getting out; dropping them beats retrying forever. New commands get a fresh run.
       OS_LOGE(TAG, "RMT keeps failing, dropping %zu pending sequences", sequences.size());
+      Diagnostics::Increment(Diagnostics::Counter::RfSequencesDropped, sequences.size());
       sequences.clear();
       failures = 0;
       return;
@@ -353,6 +358,7 @@ void RFTransmitter::TransmitTask()
           stop->second = cmd.seq;
         }
       } else if (stop != stops.end() && static_cast<int32_t>(cmd.seq - stop->second) < 0) {
+        Diagnostics::Increment(Diagnostics::Counter::RfCommandsSuperseded);
         continue;  // Sent before a Stop that overtook it
       }
 

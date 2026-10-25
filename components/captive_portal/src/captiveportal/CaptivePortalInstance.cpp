@@ -11,6 +11,7 @@ const char* const TAG = "CaptivePortalInstance";
 #include "CommandHandler.h"
 #include "config/Config.h"
 #include "Convert.h"
+#include "Diagnostics.h"
 #include "enums/OtaUpdateChannel.h"
 #include "GatewayConnectionManager.h"
 #include "http/ContentTypes.h"
@@ -936,6 +937,7 @@ bool CaptivePortal::CaptivePortalInstance::queueSend(int fd, bool broadcast, boo
   {
     ScopedLock lock__(&m_sendMutex);
     if (m_sendQueue.size() >= kMaxQueuedSends) {
+      OpenShock::Diagnostics::Increment(OpenShock::Diagnostics::Counter::PortalWsQueueFull);
       OS_LOGW(TAG, "WebSocket send queue full, dropping message");
       return false;
     }
@@ -953,6 +955,7 @@ void CaptivePortal::CaptivePortalInstance::scheduleDrain()
     if (httpd_queue_work(m_server, &CaptivePortalInstance::wsDrainWork, this) != ESP_OK) {
       m_drainQueued.store(false);
       // The messages stay queued: the next send, or retryDrain() on the manager's next tick, tries again
+      OpenShock::Diagnostics::Increment(OpenShock::Diagnostics::Counter::PortalDrainDelayed);
       OS_LOGW(TAG, "httpd work queue full, WebSocket send delayed");
     }
   }

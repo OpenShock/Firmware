@@ -44,3 +44,6 @@ idf_component_register(
 # Same as the firmware component: format-string width warnings (%hhi on gpio_num_t)
 # are not errors.
 target_compile_options(${COMPONENT_LIB} PRIVATE -Wno-error)
+# The drop counters only exist with CONFIG_FREERTOS_USE_TRACE_FACILITY, which ESP-IDF's FreeRTOS mock has no Kconfig
+# entry for, so turn it on by hand for the tests that read them.
+target_compile_definitions(${COMPONENT_LIB} PRIVATE CONFIG_FREERTOS_USE_TRACE_FACILITY=1)

@@ -3,6 +3,9 @@
 CONFIG_FREERTOS_HZ=1000
 # Index 1 is OpenShock's own (TaskUtils::kNotifyIndex), so its wakes and ESP-IDF's index-0 waits can't interfere
 CONFIG_FREERTOS_TASK_NOTIFICATION_ARRAY_ENTRIES=2
+# Set to y to build in the drop counters and the `diag` serial command, which reads every task's stack high-water mark
+# through uxTaskGetSystemState(); that holds the scheduler while it reads, so no task can be deleted under it
+CONFIG_FREERTOS_USE_TRACE_FACILITY=n
 
 # Keep the main task large enough for the init chain.
 CONFIG_ESP_MAIN_TASK_STACK_SIZE=16384
