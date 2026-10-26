@@ -166,3 +166,32 @@ def parse(data: bytes) -> Image:
     if hashlib.sha256(data[HEADER_LEN:end]).digest()[:BODY_HASH_LEN] != body_hash:
         raise WwwImageError('body hash mismatch')
     return Image(tuple(entries), body_hash, end)
+
+
+def main(argv: list[str] | None = None) -> int:
+    """``wwwimage.py <dir> <out.bin> [--gzip]``: pack a directory as-is. Test fixtures only; the build uses gen_staticfs.py."""
+    import argparse
+    from pathlib import Path
+
+    ap = argparse.ArgumentParser(description='Pack a directory into a www image without gzipping (test fixtures)')
+    ap.add_argument('directory', type=Path)
+    ap.add_argument('output', type=Path)
+    ap.add_argument('--gzip', action='store_true', help='mark every entry as gzipped (the bytes are taken as-is)')
+    args = ap.parse_args(argv)
+
+    entries = [
+        Entry(
+            p.relative_to(args.directory).as_posix(),
+            p.read_bytes(),
+            gzip=args.gzip,
+            immutable='/immutable/' in f'/{p.relative_to(args.directory).as_posix()}',
+        )
+        for p in sorted(args.directory.rglob('*'))
+        if p.is_file()
+    ]
+    args.output.write_bytes(pack(entries))
+    return 0
+
+
+if __name__ == '__main__':
+    raise SystemExit(main())
