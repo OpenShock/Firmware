@@ -186,11 +186,12 @@ def main() -> int:
     set_output('publish', str(d.publish).lower())
     set_output('server', d.server)
     set_output('boards', d.boards)
-    decision = (
-        f'build={str(d.build).lower()} publish={str(d.publish).lower()} server={d.server} boards={d.boards or "all"}'
+    boards = d.boards or 'all'
+    print(f'decision: build={str(d.build).lower()} publish={str(d.publish).lower()} server={d.server} boards={boards}')
+    summary(
+        f'### Gate\n\n- Build: `{str(d.build).lower()}`\n- Publish: `{str(d.publish).lower()}`\n'
+        f'- Server: `{d.server}`\n- Boards: `{boards}`'
     )
-    print(f'decision: {decision}')
-    summary(f'### Gate\n\n`{decision}`')
     return 0
 
 
