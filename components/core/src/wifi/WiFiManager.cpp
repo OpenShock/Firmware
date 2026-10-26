@@ -84,9 +84,9 @@ static const char* wifiDisconnectReason(uint8_t reason)
 }
 
 enum class WiFiState : uint8_t {
-  Disconnected = 0,
-  Connecting   = 1 << 0,
-  Connected    = 1 << 1,
+  Disconnected,
+  Connecting,
+  Connected,
 };
 
 static esp_netif_t* s_staNetif = nullptr;
@@ -301,57 +301,53 @@ static void evWiFiConnected(const wifi_event_sta_connected_t& info)
   char ssid[33];
   copyEventSSID(info, ssid);
 
-  ScopedLock lock__(&s_networksMutex);
+  uint8_t credentialsId;
+  std::optional<WiFiNetwork> network;  // The scanned entry for this BSSID, if any
+  {
+    ScopedLock lock__(&s_networksMutex);
 
-  memcpy(s_connectedBSSID, info.bssid, sizeof(s_connectedBSSID));
+    memcpy(s_connectedBSSID, info.bssid, sizeof(s_connectedBSSID));
 
-  // A successful connection clears the retry throttling for every BSSID of this network
-  for (WiFiNetwork& net : s_wifiNetworks) {
-    if (strcmp(net.ssid, ssid) == 0) {
-      net.connectAttempts    = 0;
-      net.lastConnectAttempt = 0;
+    // A successful connection clears the retry throttling for every BSSID of this network
+    for (WiFiNetwork& net : s_wifiNetworks) {
+      if (strcmp(net.ssid, ssid) == 0) {
+        net.connectAttempts    = 0;
+        net.lastConnectAttempt = 0;
+      }
     }
+
+    auto it = findNetworkByBSSID(info.bssid);
+    if (it != s_wifiNetworks.end()) {
+      credentialsId = it->credentialsID;
+      network       = *it;
+    } else {
+      credentialsId = Config::GetWiFiCredentialsIDbySSID(ssid);
+    }
+
+    // Under the lock: Forget() reads it there to decide whether to disconnect
+    s_connectedCredentialsID.store(credentialsId, std::memory_order_relaxed);
   }
 
-  auto it = findNetworkByBSSID(info.bssid);
-  if (it == s_wifiNetworks.end()) {
-    s_connectedCredentialsID.store(0, std::memory_order_relaxed);
-
+  if (!network) {
     OS_LOGW(TAG, "Connected to unscanned network \"%s\", BSSID: " BSSID_FMT, ssid, BSSID_ARG(info.bssid));
-
-    uint8_t credentialsId = 0;
-    if (auto creds = Config::TryGetWiFiCredentialsBySSID(ssid)) {
-      credentialsId = creds->id;
-      s_connectedCredentialsID.store(credentialsId, std::memory_order_relaxed);
-    }
-
-    // Every connect starts from saved credentials, so none means they were forgotten while connecting
-    if (credentialsId == 0) {
-      OS_LOGW(TAG, "Credentials for \"%s\" were removed while connecting, disconnecting", ssid);
-      lock__.unlock();  // Not across a driver call
-      esp_wifi_disconnect();
-      return;
-    }
-
-    if (auto network = getConnectedAPNetwork(credentialsId)) {
-      portalBroadcastNetworkEvent(Serialization::Types::WifiNetworkEventType::Connected, *network);
-    }
-
-    return;
   }
 
-  s_connectedCredentialsID.store(it->credentialsID, std::memory_order_relaxed);
-
-  if (it->credentialsID == 0) {
-    OS_LOGW(TAG, "Credentials for %s were removed while connecting, disconnecting", ssid);
-    lock__.unlock();  // Not across a driver call
+  // Every connect starts from saved credentials, so none means they were forgotten while connecting
+  if (credentialsId == 0) {
+    OS_LOGW(TAG, "Credentials for \"%s\" were removed while connecting, disconnecting", ssid);
     esp_wifi_disconnect();
     return;
   }
 
-  OS_LOGI(TAG, "Connected to network %s (" BSSID_FMT ")", ssid, BSSID_ARG(info.bssid));
+  if (network) {
+    OS_LOGI(TAG, "Connected to network %s (" BSSID_FMT ")", ssid, BSSID_ARG(info.bssid));
+  } else {
+    network = getConnectedAPNetwork(credentialsId);
+  }
 
-  portalBroadcastNetworkEvent(Serialization::Types::WifiNetworkEventType::Connected, *it);
+  if (network) {
+    portalBroadcastNetworkEvent(Serialization::Types::WifiNetworkEventType::Connected, *network);
+  }
 }
 static void evWiFiGotIP(const ip_event_got_ip_t& info)
 {
@@ -797,18 +793,11 @@ bool WiFiManager::Connect(const char* ssid)
     return false;
   }
 
-  if (s_connectedCredentialsID.load(std::memory_order_relaxed) != creds->id) {
-    // Preference first: the update task may reconnect as soon as the DISCONNECTED event lands
-    s_preferredCredentialsID.store(creds->id, std::memory_order_relaxed);
-    Disconnect();
-    return true;
+  // Already connected to this network: nothing to do
+  if (s_connectedCredentialsID.load(std::memory_order_relaxed) != creds->id || s_wifiState.load(std::memory_order_relaxed) == WiFiState::Disconnected) {
+    requestConnect(creds->id);
   }
 
-  if (s_wifiState.load(std::memory_order_relaxed) == WiFiState::Disconnected) {
-    s_preferredCredentialsID.store(creds->id, std::memory_order_relaxed);
-  }
-
-  // Already connected to this network, or reconnecting; either way, success
   return true;
 }
 
