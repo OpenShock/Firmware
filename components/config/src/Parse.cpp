@@ -1,8 +1,7 @@
-#include "config/internal/utils.h"
+#include "config/Parse.h"
 
-const char* const TAG = "Config::Internal::Utils";
+const char* const TAG = "Config::Parse";
 
-#include "Chipset.h"
 #include "Logging.h"
 
 #include <cinttypes>
@@ -10,7 +9,7 @@ const char* const TAG = "Config::Internal::Utils";
 
 using namespace OpenShock;
 
-std::optional<gpio_num_t> Config::Internal::Utils::FromIntGpioNum(int32_t intVal)
+std::optional<gpio_num_t> Config::Parse::GpioNum(int32_t intVal)
 {
   if (intVal == GPIO_NUM_NC) {
     return GPIO_NUM_NC;
@@ -24,21 +23,12 @@ std::optional<gpio_num_t> Config::Internal::Utils::FromIntGpioNum(int32_t intVal
   return static_cast<gpio_num_t>(intVal);
 }
 
-void Config::Internal::Utils::FromFbsStr(std::string& str, const flatbuffers::String* fbsStr, const char* defaultStr)
-{
-  if (fbsStr != nullptr) {
-    str = fbsStr->c_str();
-  } else {
-    str = defaultStr;
-  }
-}
-
-std::optional<gpio_num_t> Config::Internal::Utils::FromJsonGpioNum(JSON::JsonView json, std::string_view name)
+std::optional<gpio_num_t> Config::Parse::JsonGpioNum(JSON::JsonView json, std::string_view name)
 {
   auto intVal = json[name].tryGetI32();
   if (!intVal) {
     return std::nullopt;
   }
 
-  return FromIntGpioNum(*intVal);
+  return GpioNum(*intVal);
 }

@@ -1,20 +1,41 @@
 #pragma once
 
-#include "config/ConfigBase.h"
+// The `serialInput` config section. Owned by serial_console and kept in NVS through the config framework
+// (config/Section.h); namespace "serial", key echo (u8).
+
+#include "config/Section.h"
+#include "serialization/_fbs/HubConfig_generated.h"
+
+#include <optional>
+
+namespace OpenShock::JSON {
+  class JsonView;
+}
 
 namespace OpenShock::Config {
-  struct SerialInputConfig : public ConfigBase<Serialization::Configuration::SerialInputConfig> {
+  struct SerialInputConfig {
     SerialInputConfig();
     SerialInputConfig(bool echoEnabled);
 
     bool echoEnabled;
 
-    void ToDefault() override;
+    void ToDefault();
 
-    bool FromFlatbuffers(const Serialization::Configuration::SerialInputConfig* config) override;
-    [[nodiscard]] flatbuffers::Offset<Serialization::Configuration::SerialInputConfig> ToFlatbuffers(flatbuffers::FlatBufferBuilder& builder, bool withSensitiveData) const override;
+    [[nodiscard]] flatbuffers::Offset<Serialization::Configuration::SerialInputConfig> ToFlatbuffers(flatbuffers::FlatBufferBuilder& builder, bool withSensitiveData) const;
 
-    bool FromJSON(JSON::JsonView json) override;
-    void ToJSON(json_gen_str_t* gen, const char* name, bool withSensitiveData) const override;
+    /// @brief Reads this section from `partition`; a missing key is its default, a read error fails.
+    bool LoadNvs(const char* partition);
+    /// @brief Writes the keys that differ from `previous` (every key when null) to `partition`.
+    bool SaveNvs(const char* partition, const SerialInputConfig* previous) const;
+
+    bool FromJSON(JSON::JsonView json);
+    void ToJSON(json_gen_str_t* gen, const char* name, bool withSensitiveData) const;
   };
+
+  Section<SerialInputConfig>& SerialInputSection();
+
+  [[nodiscard]] std::optional<SerialInputConfig> GetSerialInputConfig();
+  bool SetSerialInputConfig(const SerialInputConfig& config);
+  [[nodiscard]] std::optional<bool> GetSerialInputConfigEchoEnabled();
+  bool SetSerialInputConfigEchoEnabled(bool enabled);
 }  // namespace OpenShock::Config

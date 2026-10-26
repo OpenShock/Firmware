@@ -5,7 +5,6 @@
 const char* const TAG = "WiFiManager";
 
 #include "AppHooks.h"
-#include "config/Config.h"
 #include "events/Events.h"
 #include "FormatHelpers.h"
 #include "Logging.h"
@@ -13,6 +12,7 @@ const char* const TAG = "WiFiManager";
 #include "Temporal.h"
 #include "util/FunctionRef.h"
 #include "util/TaskUtils.h"
+#include "wifi/WiFiConfig.h"
 #include "wifi/WiFiNetwork.h"
 #include "wifi/WiFiScanManager.h"
 

@@ -6,7 +6,7 @@ const char* const TAG = "main";
 #include "captiveportal/Manager.h"
 #include "Chipset.h"
 #include "CommandHandler.h"
-#include "config/Config.h"
+#include "config/Store.h"
 #include "estop/EStopManager.h"
 #include "events/Events.h"
 #include "GatewayConnectionManager.h"

@@ -1,13 +1,40 @@
-#include "config/OtaUpdateConfig.h"
+#include <freertos/FreeRTOS.h>
+
+#include "OtaUpdateConfig.h"
 
 const char* const TAG = "Config::OtaUpdateConfig";
 
-#include "config/internal/utils.h"
+#include "config/Nvs.h"
+#include "config/Parse.h"
 #include "Logging.h"
+
+#include "json/Json.h"
 
 #include <utility>
 
 using namespace OpenShock::Config;
+namespace Fbs = OpenShock::Serialization::Configuration;
+
+static constexpr const char* kNamespace      = "ota";
+static constexpr const char* kKeyEnabled     = "enabled";
+static constexpr const char* kKeyDomain      = "domain";
+static constexpr const char* kKeyChannel     = "channel";
+static constexpr const char* kKeyCheckBoot   = "chk_boot";
+static constexpr const char* kKeyCheckPeriod = "chk_period";
+static constexpr const char* kKeyCheckMin    = "chk_min";
+static constexpr const char* kKeyBackendMgmt = "backend_mgmt";
+static constexpr const char* kKeyManual      = "manual";
+static constexpr const char* kKeyUpdateId    = "update_id";
+static constexpr const char* kKeyStep        = "step";
+
+static constexpr const char* kNamespaces[] = {kNamespace};
+static Section<OtaUpdateConfig> s_section({.name = "otaUpdate", .order = 5, .hubConfigField = Fbs::HubConfig::VT_OTA_UPDATE, .namespaces = kNamespaces});
+
+Section<OtaUpdateConfig>& OpenShock::Config::OtaUpdateSection()
+{
+  return s_section;
+}
+
 using namespace std::string_view_literals;
 
 OtaUpdateConfig::OtaUpdateConfig()
@@ -54,31 +81,6 @@ void OtaUpdateConfig::ToDefault()
   updateStep             = OtaUpdateStep::None;
 }
 
-bool OtaUpdateConfig::FromFlatbuffers(const Serialization::Configuration::OtaUpdateConfig* config)
-{
-  if (config == nullptr) {
-    OS_LOGW(TAG, "Config is null, setting to default");
-    ToDefault();
-    return true;
-  }
-
-  isEnabled = config->is_enabled();
-  Internal::Utils::FromFbsStr(cdnDomain, config->cdn_domain(), CONFIG_OPENSHOCK_FW_CDN_DOMAIN);
-  // Out-of-range enum values (bit flips, configs from newer firmware) fall back to the defaults
-  auto fbsChannel        = std::to_underlying(config->update_channel());
-  updateChannel          = fbsChannel <= std::to_underlying(OtaUpdateChannel::Develop) ? static_cast<OtaUpdateChannel>(fbsChannel) : OtaUpdateChannel::Stable;
-  checkOnStartup         = config->check_on_startup();
-  checkPeriodically      = config->check_periodically();
-  checkInterval          = config->check_interval();
-  allowBackendManagement = config->allow_backend_management();
-  requireManualApproval  = config->require_manual_approval();
-  updateId               = config->update_id();
-  auto fbsStep           = std::to_underlying(config->update_step());
-  updateStep             = fbsStep <= std::to_underlying(OtaUpdateStep::RollingBack) ? static_cast<OtaUpdateStep>(fbsStep) : OtaUpdateStep::None;
-
-  return true;
-}
-
 flatbuffers::Offset<OpenShock::Serialization::Configuration::OtaUpdateConfig> OtaUpdateConfig::ToFlatbuffers(flatbuffers::FlatBufferBuilder& builder, bool withSensitiveData) const
 {
   namespace Fbs = Serialization::Configuration;
@@ -120,7 +122,7 @@ bool OtaUpdateConfig::FromJSON(JSON::JsonView json)
 
   cdnDomain = json["cdnDomain"].tryGetStr().value_or(CONFIG_OPENSHOCK_FW_CDN_DOMAIN);
 
-  Internal::Utils::FromJsonStrParsed(updateChannel, json, "updateChannel"sv, OpenShock::TryParseOtaUpdateChannel, OpenShock::OtaUpdateChannel::Stable);
+  Parse::JsonStrParsed(updateChannel, json, "updateChannel"sv, OpenShock::TryParseOtaUpdateChannel, OpenShock::OtaUpdateChannel::Stable);
 
   checkOnStartup         = json["checkOnStartup"].tryGetBool().value_or(false);
   checkPeriodically      = json["checkPeriodically"].tryGetBool().value_or(false);
@@ -129,7 +131,7 @@ bool OtaUpdateConfig::FromJSON(JSON::JsonView json)
   requireManualApproval  = json["requireManualApproval"].tryGetBool().value_or(false);
   updateId               = json["updateId"].tryGetI32().value_or(0);
 
-  Internal::Utils::FromJsonStrParsed(updateStep, json, "updateStep"sv, OpenShock::TryParseOtaUpdateStep, OpenShock::OtaUpdateStep::None);
+  Parse::JsonStrParsed(updateStep, json, "updateStep"sv, OpenShock::TryParseOtaUpdateStep, OpenShock::OtaUpdateStep::None);
 
   return true;
 }
@@ -148,4 +150,109 @@ void OtaUpdateConfig::ToJSON(json_gen_str_t* gen, const char* name, bool withSen
   json_gen_obj_set_int(gen, "updateId", updateId);
   JSON::objSetString(gen, "updateStep", OpenShock::Serialization::Configuration::EnumNameOtaUpdateStep(static_cast<Serialization::Configuration::OtaUpdateStep>(updateStep)));
   JSON::objEnd(gen, name);
+}
+
+bool OtaUpdateConfig::LoadNvs(const char* partition)
+{
+  auto handle = Nvs::Handle::Open(partition, kNamespace, false);
+  if (!handle) {
+    ToDefault();
+    return true;
+  }
+
+  uint8_t channel = std::to_underlying(OtaUpdateChannel::Stable);
+  uint8_t step    = std::to_underlying(OtaUpdateStep::None);
+  bool ok = Nvs::Load(*handle, kKeyEnabled, isEnabled, true) && Nvs::Load(*handle, kKeyDomain, cdnDomain, CONFIG_OPENSHOCK_FW_CDN_DOMAIN) && Nvs::Load(*handle, kKeyChannel, channel, channel) && Nvs::Load(*handle, kKeyCheckBoot, checkOnStartup, false)
+         && Nvs::Load(*handle, kKeyCheckPeriod, checkPeriodically, false) && Nvs::Load(*handle, kKeyCheckMin, checkInterval, static_cast<uint16_t>(30)) && Nvs::Load(*handle, kKeyBackendMgmt, allowBackendManagement, true)
+         && Nvs::Load(*handle, kKeyManual, requireManualApproval, false) && Nvs::Load(*handle, kKeyUpdateId, updateId, 0) && Nvs::Load(*handle, kKeyStep, step, step);
+  if (!ok) {
+    return false;
+  }
+  // Out-of-range enum values (bit flips, configs from newer firmware) fall back to the defaults
+  updateChannel = channel <= std::to_underlying(OtaUpdateChannel::Develop) ? static_cast<OtaUpdateChannel>(channel) : OtaUpdateChannel::Stable;
+  updateStep    = step <= std::to_underlying(OtaUpdateStep::RollingBack) ? static_cast<OtaUpdateStep>(step) : OtaUpdateStep::None;
+  return true;
+}
+
+bool OtaUpdateConfig::SaveNvs(const char* partition, const OtaUpdateConfig* previous) const
+{
+  auto handle = Nvs::Handle::Open(partition, kNamespace, true);
+  if (!handle) {
+    return false;
+  }
+  const uint8_t channel     = std::to_underlying(updateChannel);
+  const uint8_t step        = std::to_underlying(updateStep);
+  const uint8_t prevChannel = previous != nullptr ? std::to_underlying(previous->updateChannel) : 0;
+  const uint8_t prevStep    = previous != nullptr ? std::to_underlying(previous->updateStep) : 0;
+  const bool p              = previous != nullptr;
+  return handle->SetBool(kKeyEnabled, isEnabled, p ? &previous->isEnabled : nullptr) && handle->SetStr(kKeyDomain, cdnDomain, p ? &previous->cdnDomain : nullptr) && handle->SetU8(kKeyChannel, channel, p ? &prevChannel : nullptr)
+      && handle->SetBool(kKeyCheckBoot, checkOnStartup, p ? &previous->checkOnStartup : nullptr) && handle->SetBool(kKeyCheckPeriod, checkPeriodically, p ? &previous->checkPeriodically : nullptr)
+      && handle->SetU16(kKeyCheckMin, checkInterval, p ? &previous->checkInterval : nullptr) && handle->SetBool(kKeyBackendMgmt, allowBackendManagement, p ? &previous->allowBackendManagement : nullptr)
+      && handle->SetBool(kKeyManual, requireManualApproval, p ? &previous->requireManualApproval : nullptr) && handle->SetI32(kKeyUpdateId, updateId, p ? &previous->updateId : nullptr) && handle->SetU8(kKeyStep, step, p ? &prevStep : nullptr)
+      && handle->Commit();
+}
+
+std::optional<OtaUpdateConfig> OpenShock::Config::GetOtaUpdateConfig()
+{
+  return s_section.Get();
+}
+
+bool OpenShock::Config::SetOtaUpdateConfig(const OtaUpdateConfig& config)
+{
+  return s_section.Set(config);
+}
+
+bool OpenShock::Config::UpdateOtaUpdateConfig(Util::FunctionRef<bool(OtaUpdateConfig&)> update)
+{
+  return s_section.Update(update);
+}
+
+std::optional<int32_t> OpenShock::Config::GetOtaUpdateId()
+{
+  return s_section.Read([](const OtaUpdateConfig& ota) { return ota.updateId; });
+}
+
+bool OpenShock::Config::SetOtaUpdateId(int32_t updateId)
+{
+  return s_section.Update([&](OtaUpdateConfig& ota) {
+    if (ota.updateId == updateId) {
+      return false;
+    }
+    ota.updateId = updateId;
+    return true;
+  });
+}
+
+std::optional<OpenShock::OtaUpdateStep> OpenShock::Config::GetOtaUpdateStep()
+{
+  return s_section.Read([](const OtaUpdateConfig& ota) { return ota.updateStep; });
+}
+
+bool OpenShock::Config::SetOtaUpdateStep(OpenShock::OtaUpdateStep updateStep)
+{
+  return s_section.Update([&](OtaUpdateConfig& ota) {
+    if (ota.updateStep == updateStep) {
+      return false;
+    }
+    ota.updateStep = updateStep;
+    return true;
+  });
+}
+
+bool OpenShock::Config::CompareExchangeOtaUpdateStep(OpenShock::OtaUpdateStep expected, OpenShock::OtaUpdateStep desired)
+{
+  // Writers are serialized by the write lock, so the step can't change between this check and the save
+  bool matched = false;
+  bool saved   = s_section.Update([&](OtaUpdateConfig& ota) {
+    if (ota.updateStep != expected) {
+      return false;
+    }
+    matched = true;
+    if (expected == desired) {
+      return false;
+    }
+    ota.updateStep = desired;
+    return true;
+  });
+  return matched && saved;
 }

@@ -1,23 +1,38 @@
-// Defaults: no stored config, an empty one, or one missing sections/fields must give
-// usable defaults rather than a failed load (which would wipe the whole file).
+// Defaults: no stored config, a store missing namespaces or keys, must give usable defaults rather than a failed
+// load, and a key this firmware does not know must be ignored.
+#include <freertos/FreeRTOS.h>
+
 #include "unity.h"
 
 #include "config_test_helpers.h"
 
 #include "BoardDescriptor.h"
 
+#include <nvs_flash.h>
+
 #include <string>
 #include <utility>
 
 using namespace OpenShock;
 using namespace ConfigTest;
-namespace Fbs = OpenShock::Serialization::Configuration;
+namespace Keys = ConfigTest::Keys;
+namespace Nvs  = OpenShock::Config::Nvs;
 
 namespace {
-  std::vector<uint8_t> Finish(flatbuffers::FlatBufferBuilder& builder, flatbuffers::Offset<Fbs::HubConfig> root)
+  // Writes a few keys straight into the store, as a different firmware version might have, then marks the schema
+  // so Init loads rather than imports.
+  Nvs::Handle Open(const char* ns)
   {
-    Fbs::FinishHubConfigBuffer(builder, root);
-    return std::vector<uint8_t>(builder.GetBufferPointer(), builder.GetBufferPointer() + builder.GetSize());
+    auto handle = Nvs::Handle::Open(Keys::kPartitionCfg, ns, true);
+    TEST_ASSERT_TRUE(handle.has_value());
+    return std::move(*handle);
+  }
+
+  void MarkSchema()
+  {
+    auto root = Open(Keys::Ns::kRoot);
+    TEST_ASSERT_TRUE(root.SetU8(Keys::Root::kSchema, Keys::kSchemaVersion));
+    TEST_ASSERT_TRUE(root.Commit());
   }
 }  // namespace
 
@@ -28,7 +43,7 @@ TEST_CASE("Default values come from Kconfig and the board descriptor", "[config]
   TEST_ASSERT_EQUAL_STRING(OPENSHOCK_FW_BOARD, OpenShock::Board::Get().board);
   TEST_ASSERT_EQUAL_INT(OPENSHOCK_RF_TX_GPIO, OpenShock::Board::Get().rfTxGpio);
 
-  const Config::RootConfig config;
+  const Full config;
 
   TEST_ASSERT_EQUAL_INT(OPENSHOCK_RF_TX_GPIO, config.rf.txPin);
   TEST_ASSERT_TRUE(config.rf.keepAliveEnabled);
@@ -53,72 +68,69 @@ TEST_CASE("Default values come from Kconfig and the board descriptor", "[config]
 
 TEST_CASE("ToDefault resets every section to the constructed defaults", "[config][defaults]")
 {
-  Config::RootConfig config = MakeSampleConfig();
+  Full config = MakeSampleConfig();
   config.ToDefault();
-  AssertConfigEqual(Config::RootConfig(), config);
+  AssertConfigEqual(Full(), config);
 }
 
-TEST_CASE("Missing config file: Init writes a default config that reloads", "[config][defaults]")
+TEST_CASE("An empty store: Init writes a default config that reloads", "[config][defaults]")
 {
-  TEST_ASSERT_FALSE(InitFrom(nullptr, 0));  // falls back to defaults and writes them
-  TEST_ASSERT_EQUAL_INT(1, HostConfigFs::writeCount);
-  AssertConfigEqual(Config::RootConfig(), Snapshot());
+  InitDefault();
+  TEST_ASSERT_EQUAL_STRING("cfg", Config::StorageLabel());
+  AssertConfigEqual(Full(), Snapshot());
 
-  const std::vector<uint8_t> written = StoredFile();
-  TEST_ASSERT_FALSE(written.empty());
-  TEST_ASSERT_TRUE(InitFrom(written));
-  AssertConfigEqual(Config::RootConfig(), Snapshot());
-}
+  // Every section namespace and the schema marker are now on flash
+  for (const char* ns : Keys::Ns::kAll) {
+    TEST_ASSERT_TRUE_MESSAGE(Nvs::NamespaceExists(Keys::kPartitionCfg, ns), ns);
+  }
+  TEST_ASSERT_TRUE(UsedEntries() > 0);
 
-TEST_CASE("HubConfig with no sections loads as defaults", "[config][defaults]")
-{
-  flatbuffers::FlatBufferBuilder builder;
-  const std::vector<uint8_t> bytes = Finish(builder, Fbs::CreateHubConfig(builder));
-
-  TEST_ASSERT_TRUE(InitFrom(bytes));
-  AssertConfigEqual(Config::RootConfig(), Snapshot());
+  Reload();
+  AssertConfigEqual(Full(), Snapshot());
 }
 
 TEST_CASE("Missing sections default while present ones are kept", "[config][defaults]")
 {
-  flatbuffers::FlatBufferBuilder builder;
-  auto backend                     = Fbs::CreateBackendConfigDirect(builder, "api.example.org", "tok");
-  auto estop                       = Fbs::CreateEStopConfig(builder, true, 13);
-  const std::vector<uint8_t> bytes = Finish(builder, Fbs::CreateHubConfig(builder, 0, 0, 0, backend, 0, 0, estop));
+  WipeStore();
+  {
+    auto backend = Open(Keys::Ns::kBackend);
+    TEST_ASSERT_TRUE(backend.SetStr(Keys::Backend::kDomain, "api.example.org"));
+    TEST_ASSERT_TRUE(backend.SetStr(Keys::Backend::kToken, "tok"));
+    TEST_ASSERT_TRUE(backend.Commit());
+    auto estop = Open(Keys::Ns::kEstop);
+    TEST_ASSERT_TRUE(estop.SetBool(Keys::Estop::kEnabled, true));
+    TEST_ASSERT_TRUE(estop.SetI8(Keys::Estop::kGpio, 13));
+    TEST_ASSERT_TRUE(estop.Commit());
+  }
+  MarkSchema();
+  Reload();
 
-  TEST_ASSERT_TRUE(InitFrom(bytes));
-
-  Config::RootConfig expected;
+  Full expected;
   expected.backend = Config::BackendConfig("api.example.org", "tok");
   expected.estop   = Config::EStopConfig(true, GPIO_NUM_13);
   AssertConfigEqual(expected, Snapshot());
 }
 
-TEST_CASE("Missing fields inside a section take their defaults", "[config][defaults]")
+TEST_CASE("Missing keys inside a section take their defaults", "[config][defaults]")
 {
-  flatbuffers::FlatBufferBuilder builder;
-
-  Fbs::RFConfigBuilder rf(builder);
-  rf.add_tx_pin(13);
-  auto rfOffset = rf.Finish();  // keepalive_enabled absent
-
-  auto hostname = builder.CreateString("my-hub");
-  Fbs::WiFiConfigBuilder wifi(builder);
-  wifi.add_hostname(hostname);
-  auto wifiOffset = wifi.Finish();  // no AP SSID, no credentials
-
-  auto domain = builder.CreateString("api.example.org");
-  Fbs::BackendConfigBuilder backend(builder);
-  backend.add_domain(domain);
-  auto backendOffset = backend.Finish();  // no auth token
-
-  Fbs::OtaUpdateConfigBuilder ota(builder);
-  ota.add_update_id(77);
-  auto otaOffset = ota.Finish();  // no CDN domain, rest at schema defaults
-
-  const std::vector<uint8_t> bytes = Finish(builder, Fbs::CreateHubConfig(builder, rfOffset, wifiOffset, 0, backendOffset, 0, otaOffset, 0));
-  TEST_ASSERT_TRUE(InitFrom(bytes));
-  const Config::RootConfig loaded = Snapshot();
+  WipeStore();
+  {
+    auto rf = Open(Keys::Ns::kRf);
+    TEST_ASSERT_TRUE(rf.SetI8(Keys::Rf::kTxPin, 13));  // keepalive absent
+    TEST_ASSERT_TRUE(rf.Commit());
+    auto wifi = Open(Keys::Ns::kWifiCfg);
+    TEST_ASSERT_TRUE(wifi.SetStr(Keys::WifiCfg::kHostname, "my-hub"));  // no AP SSID, no credentials namespace at all
+    TEST_ASSERT_TRUE(wifi.Commit());
+    auto backend = Open(Keys::Ns::kBackend);
+    TEST_ASSERT_TRUE(backend.SetStr(Keys::Backend::kDomain, "api.example.org"));  // no auth token
+    TEST_ASSERT_TRUE(backend.Commit());
+    auto ota = Open(Keys::Ns::kOta);
+    TEST_ASSERT_TRUE(ota.SetI32(Keys::Ota::kUpdateId, 77));  // the rest at their defaults
+    TEST_ASSERT_TRUE(ota.Commit());
+  }
+  MarkSchema();
+  Reload();
+  const Full loaded = Snapshot();
 
   TEST_ASSERT_EQUAL_INT(GPIO_NUM_13, loaded.rf.txPin);
   TEST_ASSERT_TRUE(loaded.rf.keepAliveEnabled);
@@ -133,17 +145,38 @@ TEST_CASE("Missing fields inside a section take their defaults", "[config][defau
   TEST_ASSERT_EQUAL_INT32(77, loaded.otaUpdate.updateId);
 }
 
-TEST_CASE("Credentials without an SSID are dropped, the rest kept", "[config][defaults]")
+TEST_CASE("Keys this firmware does not know are ignored and kept", "[config][defaults]")
 {
-  flatbuffers::FlatBufferBuilder builder;
-  std::vector<flatbuffers::Offset<Fbs::WiFiCredentials>> creds {
-    Fbs::CreateWiFiCredentialsDirect(builder, 1, "HomeNet", "hunter22"),
-    Fbs::CreateWiFiCredentialsDirect(builder, 2, nullptr, "orphan"),
-    Fbs::CreateWiFiCredentialsDirect(builder, 3, "", "empty"),
-    Fbs::CreateWiFiCredentialsDirect(builder, 4, "Office", nullptr),
-  };
-  auto wifi = Fbs::CreateWiFiConfig(builder, 0, 0, builder.CreateVector(creds));
-  TEST_ASSERT_TRUE(InitFrom(Finish(builder, Fbs::CreateHubConfig(builder, 0, wifi))));
+  InitWith(MakeSampleConfig());
+  {
+    auto rf = Open(Keys::Ns::kRf);
+    TEST_ASSERT_TRUE(rf.SetU16("future_fld", 1234));  // from a newer firmware
+    TEST_ASSERT_TRUE(rf.Commit());
+  }
+  Reload();
+  AssertConfigEqual(MakeSampleConfig(), Snapshot());
+  TEST_ASSERT_TRUE(Config::SetRFConfigKeepAliveEnabled(false));  // a save of the section leaves it alone
+
+  auto rf        = Open(Keys::Ns::kRf);
+  uint16_t value = 0;
+  TEST_ASSERT_EQUAL(Nvs::Result::Found, rf.GetU16("future_fld", value));
+  TEST_ASSERT_EQUAL_UINT16(1234, value);
+}
+
+TEST_CASE("Malformed credential blobs are dropped, the rest kept", "[config][defaults]")
+{
+  Full config;
+  config.wifi.credentialsList = {Config::WiFiCredentials(1, "HomeNet", "hunter22"), Config::WiFiCredentials(4, "Office", "")};
+  InitWith(config);
+  {
+    auto wifi            = Open(Keys::Ns::kWifi);
+    const uint8_t junk[] = {0x09, 0x02, 0x00};
+    TEST_ASSERT_TRUE(wifi.SetBlob("2", junk));                        // unknown blob version
+    TEST_ASSERT_TRUE(wifi.SetBlob("3", std::span<const uint8_t>()));  // empty
+    TEST_ASSERT_TRUE(wifi.SetStr("notanid", "x"));                    // not a credential at all
+    TEST_ASSERT_TRUE(wifi.Commit());
+  }
+  Reload();
 
   auto loaded = Config::GetWiFiCredentials();
   TEST_ASSERT_TRUE(loaded.has_value());
@@ -154,10 +187,18 @@ TEST_CASE("Credentials without an SSID are dropped, the rest kept", "[config][de
 
 TEST_CASE("Invalid stored GPIO pins fall back safely", "[config][defaults]")
 {
-  flatbuffers::FlatBufferBuilder builder;
-  auto rf    = Fbs::CreateRFConfig(builder, 24, true);    // GPIO24 does not exist on ESP32
-  auto estop = Fbs::CreateEStopConfig(builder, true, 0);  // strapping pin: not a valid E-Stop input
-  TEST_ASSERT_TRUE(InitFrom(Finish(builder, Fbs::CreateHubConfig(builder, rf, 0, 0, 0, 0, 0, estop))));
+  WipeStore();
+  {
+    auto rf = Open(Keys::Ns::kRf);
+    TEST_ASSERT_TRUE(rf.SetI8(Keys::Rf::kTxPin, 24));  // GPIO24 does not exist on ESP32
+    TEST_ASSERT_TRUE(rf.Commit());
+    auto estop = Open(Keys::Ns::kEstop);
+    TEST_ASSERT_TRUE(estop.SetBool(Keys::Estop::kEnabled, true));
+    TEST_ASSERT_TRUE(estop.SetI8(Keys::Estop::kGpio, 0));  // strapping pin: not a valid E-Stop input
+    TEST_ASSERT_TRUE(estop.Commit());
+  }
+  MarkSchema();
+  Reload();
 
   auto txPin = Config::GetRFConfigTxPin();
   TEST_ASSERT_TRUE(txPin.has_value());
@@ -168,9 +209,14 @@ TEST_CASE("Invalid stored GPIO pins fall back safely", "[config][defaults]")
   TEST_ASSERT_FALSE(*estopEnabled);
 
   // Negative pin (the old "invalid" marker) also falls back.
-  flatbuffers::FlatBufferBuilder builder2;
-  auto rf2 = Fbs::CreateRFConfig(builder2, -1, true);
-  TEST_ASSERT_TRUE(InitFrom(Finish(builder2, Fbs::CreateHubConfig(builder2, rf2))));
+  WipeStore();
+  {
+    auto rf = Open(Keys::Ns::kRf);
+    TEST_ASSERT_TRUE(rf.SetI8(Keys::Rf::kTxPin, -1));
+    TEST_ASSERT_TRUE(rf.Commit());
+  }
+  MarkSchema();
+  Reload();
   txPin = Config::GetRFConfigTxPin();
   TEST_ASSERT_TRUE(txPin.has_value());
   TEST_ASSERT_EQUAL_INT(OPENSHOCK_RF_TX_GPIO, *txPin);
@@ -178,12 +224,12 @@ TEST_CASE("Invalid stored GPIO pins fall back safely", "[config][defaults]")
 
 TEST_CASE("jsonconfig set with an empty object resets to defaults", "[config][defaults][json]")
 {
-  TEST_ASSERT_TRUE(InitFrom(Serialize(MakeSampleConfig())));
+  InitWith(MakeSampleConfig());
   TEST_ASSERT_TRUE(Config::SaveFromJSON("{}"));
-  AssertConfigEqual(Config::RootConfig(), Snapshot());
+  AssertConfigEqual(Full(), Snapshot());
 
-  TEST_ASSERT_TRUE(InitFrom(StoredFile()));
-  AssertConfigEqual(Config::RootConfig(), Snapshot());
+  Reload();
+  AssertConfigEqual(Full(), Snapshot());
 }
 
 TEST_CASE("jsonconfig set with partial sections fills in defaults", "[config][defaults][json]")
@@ -191,7 +237,7 @@ TEST_CASE("jsonconfig set with partial sections fills in defaults", "[config][de
   InitDefault();
   TEST_ASSERT_TRUE(Config::SaveFromJSON(R"({"rf":{"txPin":13},"wifi":{"hostname":"my-hub","credentials":[]},"backend":{"domain":"api.example.org"},"otaUpdate":{"updateChannel":"develop"}})"));
 
-  Config::RootConfig expected;
+  Full expected;
   expected.rf.txPin                = GPIO_NUM_13;
   expected.wifi.hostname           = "my-hub";
   expected.backend.domain          = "api.example.org";
@@ -203,7 +249,8 @@ TEST_CASE("jsonconfig set requires the wifi credentials array when wifi is given
 {
   // Same rule as the develop firmware: a wifi object without "credentials" is rejected.
   InitDefault();
+  const std::size_t before = UsedEntries();
   TEST_ASSERT_FALSE(Config::SaveFromJSON(R"({"wifi":{"hostname":"my-hub"}})"));
   TEST_ASSERT_FALSE(Config::SaveFromJSON(R"({"wifi":{"hostname":"my-hub","credentials":{}}})"));
-  TEST_ASSERT_EQUAL_INT(0, HostConfigFs::writeCount);
+  TEST_ASSERT_EQUAL_size_t(before, UsedEntries());
 }

@@ -1,3 +1,5 @@
+#include <freertos/FreeRTOS.h>
+
 #include "OtaUpdateManager.h"
 
 const char* const TAG = "OtaUpdateManager";
@@ -5,7 +7,6 @@ const char* const TAG = "OtaUpdateManager";
 #include "AppHooks.h"
 #include "BoardDescriptor.h"
 #include "captiveportal/Manager.h"
-#include "config/Config.h"
 #include "fs/FsCheck.h"
 #include "GatewayConnectionManager.h"
 #include "Hashing.h"
@@ -13,6 +14,7 @@ const char* const TAG = "OtaUpdateManager";
 #include "hwutil/PartitionUtils.h"
 #include "Logging.h"
 #include "OpenShock.h"
+#include "OtaUpdateConfig.h"
 #include "SemVer.h"
 #include "serialization/WSGateway.h"
 #include "SimpleMutex.h"

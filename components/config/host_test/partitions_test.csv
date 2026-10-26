@@ -1,0 +1,10 @@
+# The partition table the config host test runs on (ESP-IDF's linux esp_partition emulates the flash in a file).
+# Both a 2.x `cfg` NVS partition and the 1.x littlefs `config` partition, so Config::Init can be tested picking the
+# store (cfg), moving a config out of the shared `nvs`, and importing the 1.x file (through the in-memory
+# LfsPartition stub; the `config` partition only has to exist for the import to be attempted).
+# Name,   Type, SubType,  Offset,   Size,     Flags
+nvs,      data, nvs,      0x009000, 0x005000,
+otadata,  data, ota,      0x00E000, 0x002000,
+app0,     app,  ota_0,    0x010000, 0x100000,
+cfg,      data, nvs,      0x110000, 0x008000,
+config,   data, spiffs,   0x118000, 0x003000,

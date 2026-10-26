@@ -1,6 +1,7 @@
 #pragma once
 
-#include "config/ConfigBase.h"
+// Field parsing helpers shared by every module's config section (its FromJSON): GPIO numbers, enum strings and
+// arrays, each falling back to the default the way the rest of a section does.
 
 #include "util/FunctionRef.h"
 #include "json/Json.h"
@@ -13,32 +14,14 @@
 #include <type_traits>
 #include <vector>
 
-namespace OpenShock::Config::Internal::Utils {
+namespace OpenShock::Config::Parse {
   // Accepts GPIO_NUM_NC (-1, "no pin") or any GPIO number valid on this chip; used for every stored/imported pin.
-  [[nodiscard]] std::optional<gpio_num_t> FromIntGpioNum(int32_t intVal);
+  [[nodiscard]] std::optional<gpio_num_t> GpioNum(int32_t intVal);
 
-  void FromFbsStr(std::string& str, const flatbuffers::String* fbsStr, const char* defaultStr);
+  [[nodiscard]] std::optional<gpio_num_t> JsonGpioNum(JSON::JsonView json, std::string_view name);
 
-  [[nodiscard]] std::optional<gpio_num_t> FromJsonGpioNum(JSON::JsonView json, std::string_view name);
-
-  template<typename T, typename U>  // T inherits from ConfigBase<U>
-  void FromFbsVec(std::vector<T>& vec, const flatbuffers::Vector<flatbuffers::Offset<U>>* fbsVec)
-  {
-    vec.clear();
-
-    if (fbsVec == nullptr) {
-      return;
-    }
-
-    for (auto fbsItem : *fbsVec) {
-      T item;
-      if (item.FromFlatbuffers(fbsItem)) {
-        vec.push_back(std::move(item));
-      }
-    }
-  }
-  template<typename T>  // T inherits from ConfigBase<T>
-  bool FromJsonStrParsed(T& val, JSON::JsonView json, std::string_view name, std::type_identity_t<Util::FunctionRef<std::optional<T>(std::string_view)>> StringParser, T defaultVal)
+  template<typename T>
+  bool JsonStrParsed(T& val, JSON::JsonView json, std::string_view name, std::type_identity_t<Util::FunctionRef<std::optional<T>(std::string_view)>> StringParser, T defaultVal)
   {
     JSON::JsonView jsonVal = json[name];
     if (!jsonVal.valid()) {
@@ -63,8 +46,10 @@ namespace OpenShock::Config::Internal::Utils {
     val = *parsed;
     return true;
   }
-  template<typename T>  // T inherits from ConfigBase<T>
-  bool FromJsonArray(std::vector<T>& vec, JSON::JsonView jsonArray)
+
+  /// @brief Fills `vec` with every element of `jsonArray` whose T::FromJSON accepts it; the others are dropped.
+  template<typename T>
+  bool JsonArray(std::vector<T>& vec, JSON::JsonView jsonArray)
   {
     vec.clear();
     if (!jsonArray.isArray()) {
@@ -81,4 +66,4 @@ namespace OpenShock::Config::Internal::Utils {
 
     return true;
   }
-}  // namespace OpenShock::Config::Internal::Utils
+}  // namespace OpenShock::Config::Parse

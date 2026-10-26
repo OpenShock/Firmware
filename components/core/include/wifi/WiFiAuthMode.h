@@ -5,8 +5,8 @@
 #include <esp_wifi_types.h>
 
 namespace OpenShock::Config {
-  // The one mapping between ESP-IDF's wifi_auth_mode_t and the FlatBuffers WifiAuthMode used by the stored config
-  // and the local (captive portal) protocol. Modes without a FlatBuffers counterpart map to UNKNOWN / WIFI_AUTH_MAX.
+  // The one mapping between ESP-IDF's wifi_auth_mode_t and the FlatBuffers WifiAuthMode used by the stored credential
+  // blobs, the jsonconfig document and the local (captive portal) protocol. Modes without a FlatBuffers counterpart map to UNKNOWN / WIFI_AUTH_MAX.
   constexpr Serialization::Types::WifiAuthMode ToFbsAuthMode(wifi_auth_mode_t mode)
   {
     using FbsAuthMode = Serialization::Types::WifiAuthMode;

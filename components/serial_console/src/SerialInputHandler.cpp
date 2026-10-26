@@ -1,3 +1,5 @@
+#include <freertos/FreeRTOS.h>
+
 #include "serial_console/SerialInputHandler.h"
 
 const char* const TAG = "SerialInputHandler";
@@ -5,8 +7,6 @@ const char* const TAG = "SerialInputHandler";
 #include "Base64.h"
 #include "Chipset.h"
 #include "CommandHandler.h"
-#include "config/Config.h"
-#include "config/SerialInputConfig.h"
 #include "Convert.h"
 #include "estop/EStopManager.h"
 #include "FormatHelpers.h"
@@ -17,6 +17,7 @@ const char* const TAG = "SerialInputHandler";
 #include "serial_console/command_handlers/CommandEntry.h"
 #include "serial_console/command_handlers/common.h"
 #include "serial_console/command_handlers/index.h"
+#include "serial_console/SerialInputConfig.h"
 #include "serialization/JsonAPI.h"
 #include "serialization/JsonSerial.h"
 #include "StringHelpers.h"

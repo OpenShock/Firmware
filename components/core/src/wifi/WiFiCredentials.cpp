@@ -1,13 +1,14 @@
-#include "config/WiFiCredentials.h"
+#include "wifi/WiFiCredentials.h"
 
 const char* const TAG = "Config::WiFiCredentials";
 
-#include "config/internal/utils.h"
-#include "config/WiFiAuthMode.h"
 #include "Logging.h"
+#include "wifi/WiFiAuthMode.h"
 
 #include "util/HexUtils.h"
+#include "json/Json.h"
 
+#include <algorithm>
 #include <cstring>
 #include <utility>
 
@@ -47,34 +48,6 @@ void WiFiCredentials::ToDefault()
   password.clear();
   authMode = WIFI_AUTH_MAX;
   bssid.fill(0);
-}
-
-bool WiFiCredentials::FromFlatbuffers(const Serialization::Configuration::WiFiCredentials* config)
-{
-  if (config == nullptr) {
-    OS_LOGW(TAG, "Config is null, setting to default");
-    ToDefault();
-    return true;
-  }
-
-  id = config->id();
-  Internal::Utils::FromFbsStr(ssid, config->ssid(), "");
-  Internal::Utils::FromFbsStr(password, config->password(), "");
-  authMode = FromFbsAuthMode(config->auth_mode());
-
-  auto fbsBssid = config->bssid();
-  if (fbsBssid != nullptr) {
-    memcpy(bssid.data(), fbsBssid->bytes()->data(), 6);
-  } else {
-    bssid.fill(0);
-  }
-
-  if (ssid.empty()) {
-    OS_LOGE(TAG, "ssid is empty");
-    return false;
-  }
-
-  return true;
 }
 
 flatbuffers::Offset<OpenShock::Serialization::Configuration::WiFiCredentials> WiFiCredentials::ToFlatbuffers(flatbuffers::FlatBufferBuilder& builder, bool withSensitiveData) const
@@ -156,4 +129,61 @@ void WiFiCredentials::ToJSON(json_gen_str_t* gen, const char* name, bool withSen
     JSON::objSetString(gen, "bssid", hex);
   }
   JSON::objEnd(gen, name);
+}
+
+// Blob layout, version 1: version u8, id u8, auth mode u8 (the FlatBuffers WifiAuthMode, which is ours and stable
+// across ESP-IDF versions), bssid u8[6] (all zero: no pin), ssid length u8, ssid, password length u8, password.
+static constexpr uint8_t kBlobVersion = 1;
+
+std::vector<uint8_t> WiFiCredentials::ToBlob() const
+{
+  std::vector<uint8_t> blob;
+  blob.reserve(11 + ssid.size() + password.size());
+  blob.push_back(kBlobVersion);
+  blob.push_back(id);
+  blob.push_back(static_cast<uint8_t>(std::to_underlying(ToFbsAuthMode(authMode))));
+  blob.insert(blob.end(), bssid.begin(), bssid.end());
+  blob.push_back(static_cast<uint8_t>(std::min<std::size_t>(ssid.size(), 255)));
+  blob.insert(blob.end(), ssid.begin(), ssid.begin() + std::min<std::size_t>(ssid.size(), 255));
+  blob.push_back(static_cast<uint8_t>(std::min<std::size_t>(password.size(), 255)));
+  blob.insert(blob.end(), password.begin(), password.begin() + std::min<std::size_t>(password.size(), 255));
+  return blob;
+}
+
+bool WiFiCredentials::FromBlob(std::span<const uint8_t> blob)
+{
+  if (blob.size() < 11 || blob[0] != kBlobVersion) {
+    OS_LOGE(TAG, "Unknown credential blob (%zu bytes, version %u)", blob.size(), blob.empty() ? 0u : blob[0]);
+    return false;
+  }
+  std::size_t pos    = 1;
+  uint8_t storedId   = blob[pos++];
+  uint8_t storedAuth = blob[pos++];
+  std::array<uint8_t, 6> storedBssid;
+  std::copy_n(blob.begin() + pos, 6, storedBssid.begin());
+  pos += 6;
+  const std::size_t ssidLen = blob[pos++];
+  if (blob.size() < pos + ssidLen + 1) {
+    OS_LOGE(TAG, "Credential blob truncated");
+    return false;
+  }
+  std::string storedSsid(reinterpret_cast<const char*>(blob.data() + pos), ssidLen);
+  pos += ssidLen;
+  const std::size_t pwLen = blob[pos++];
+  if (blob.size() < pos + pwLen) {
+    OS_LOGE(TAG, "Credential blob truncated");
+    return false;
+  }
+  std::string storedPassword(reinterpret_cast<const char*>(blob.data() + pos), pwLen);
+  if (storedId == 0 || storedSsid.empty()) {
+    OS_LOGE(TAG, "Credential blob has no id or no ssid");
+    return false;
+  }
+
+  id       = storedId;
+  ssid     = std::move(storedSsid);
+  password = std::move(storedPassword);
+  authMode = FromFbsAuthMode(static_cast<FbsAuthMode>(storedAuth));
+  bssid    = storedBssid;
+  return true;
 }

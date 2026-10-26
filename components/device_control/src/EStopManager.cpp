@@ -5,7 +5,7 @@
 const char* const TAG = "EStopManager";
 
 #include "Chipset.h"
-#include "config/Config.h"
+#include "estop/EStopConfig.h"
 #include "estop/EStopStateMachine.h"
 #include "events/Events.h"
 #include "Logging.h"

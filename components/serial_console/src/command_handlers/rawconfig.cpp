@@ -1,7 +1,7 @@
 #include "serial_console/command_handlers/common.h"
 
 #include "Base64.h"
-#include "config/Config.h"
+#include "config/Wire.h"
 #include "TinyVec.h"
 
 #include <esp_system.h>
