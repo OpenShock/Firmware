@@ -89,6 +89,9 @@ CONFIG_JSMN_STRICT=y
 
 # Keep crash dumps in the (otherwise unused) coredump partition so field crashes can be read back over serial.
 CONFIG_ESP_COREDUMP_ENABLE_TO_FLASH=y
+# Record the crashed app's full ELF SHA-256 (64 hex chars, not the default 9) in the dump summary, so an uploaded or
+# SD-stored dump names the exact build that decodes it.
+CONFIG_APP_RETRIEVE_LEN_ELF_SHA=64
 
 # Captive portal httpd uses max_open_sockets (8) + 3 internal sockets, plus DNS server, HTTP client and gateway
 # websocket sockets; the default of 10 would make httpd_start fail.

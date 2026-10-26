@@ -14,13 +14,12 @@
 #error "OPENSHOCK_LOG_LEVEL is not defined (openshock_board.h)"
 #endif
 
-// openshock_log_printf forwards to vprintf (the IDF console: UART0 + any secondary
-// USB-Serial-JTAG/CDC output). Defined in Logging.cpp so the logging path carries
-// no hardware include of its own. The OS_PANIC* macros below, however, pull in
-// esp_ota_ops / esp_system / freertos, so this header is firmware-only (host tests
-// shadow it with a no-op stub).
-// Named distinctly from the framework's own log_printf to avoid a symbol clash.
-extern "C" int openshock_log_printf(const char* fmt, ...) __attribute__((format(printf, 1, 2)));
+// openshock_log_write formats the message, writes "[uptime][L][file:line] func(): [tag] message" to the serial console
+// and hands level, tag and message to the log tap (LogTap.h). `level` is the severity letter: V, D, I, W, E, N, or C
+// for a panic. Defined in Logging.cpp so the logging path carries no hardware include of its own. The OS_PANIC* macros
+// below, however, pull in esp_ota_ops / esp_system / freertos, so this header is firmware-only (host tests shadow it
+// with a no-op stub).
+extern "C" void openshock_log_write(char level, const char* tag, const char* file, int line, const char* func, const char* fmt, ...) __attribute__((format(printf, 6, 7)));
 
 // Only ever called with __FILE__; consteval guarantees the directory is stripped at compile time.
 template<std::size_t N>
@@ -43,10 +42,10 @@ consteval const char* openshockPathToFileName(const char (&path)[N])
 #define OPENSHOCK_LOG_LEVEL_DEBUG   (4)
 #define OPENSHOCK_LOG_LEVEL_VERBOSE (5)
 
-#define OPENSHOCK_LOG_FORMAT(letter, format) "[%lli][" #letter "][%s:%d] %s(): " format "\r\n", OpenShock::millis(), openshockPathToFileName(__FILE__), __LINE__, __FUNCTION__
+#define OPENSHOCK_LOG_WRITE(letter, TAG, format, ...) openshock_log_write(letter, TAG, openshockPathToFileName(__FILE__), __LINE__, __FUNCTION__, format, ##__VA_ARGS__)
 
 #if OPENSHOCK_LOG_LEVEL >= OPENSHOCK_LOG_LEVEL_VERBOSE
-#define OS_LOGV(TAG, format, ...) openshock_log_printf(OPENSHOCK_LOG_FORMAT(V, "[%s] " format), TAG, ##__VA_ARGS__)
+#define OS_LOGV(TAG, format, ...) OPENSHOCK_LOG_WRITE('V', TAG, format, ##__VA_ARGS__)
 #else
 #define OS_LOGV(TAG, format, ...) \
   do {                            \
@@ -54,7 +53,7 @@ consteval const char* openshockPathToFileName(const char (&path)[N])
 #endif
 
 #if OPENSHOCK_LOG_LEVEL >= OPENSHOCK_LOG_LEVEL_DEBUG
-#define OS_LOGD(TAG, format, ...) openshock_log_printf(OPENSHOCK_LOG_FORMAT(D, "[%s] " format), TAG, ##__VA_ARGS__)
+#define OS_LOGD(TAG, format, ...) OPENSHOCK_LOG_WRITE('D', TAG, format, ##__VA_ARGS__)
 #else
 #define OS_LOGD(TAG, format, ...) \
   do {                            \
@@ -62,7 +61,7 @@ consteval const char* openshockPathToFileName(const char (&path)[N])
 #endif
 
 #if OPENSHOCK_LOG_LEVEL >= OPENSHOCK_LOG_LEVEL_INFO
-#define OS_LOGI(TAG, format, ...) openshock_log_printf(OPENSHOCK_LOG_FORMAT(I, "[%s] " format), TAG, ##__VA_ARGS__)
+#define OS_LOGI(TAG, format, ...) OPENSHOCK_LOG_WRITE('I', TAG, format, ##__VA_ARGS__)
 #else
 #define OS_LOGI(TAG, format, ...) \
   do {                            \
@@ -70,7 +69,7 @@ consteval const char* openshockPathToFileName(const char (&path)[N])
 #endif
 
 #if OPENSHOCK_LOG_LEVEL >= OPENSHOCK_LOG_LEVEL_WARN
-#define OS_LOGW(TAG, format, ...) openshock_log_printf(OPENSHOCK_LOG_FORMAT(W, "[%s] " format), TAG, ##__VA_ARGS__)
+#define OS_LOGW(TAG, format, ...) OPENSHOCK_LOG_WRITE('W', TAG, format, ##__VA_ARGS__)
 #else
 #define OS_LOGW(TAG, format, ...) \
   do {                            \
@@ -78,7 +77,7 @@ consteval const char* openshockPathToFileName(const char (&path)[N])
 #endif
 
 #if OPENSHOCK_LOG_LEVEL >= OPENSHOCK_LOG_LEVEL_ERROR
-#define OS_LOGE(TAG, format, ...) openshock_log_printf(OPENSHOCK_LOG_FORMAT(E, "[%s] " format), TAG, ##__VA_ARGS__)
+#define OS_LOGE(TAG, format, ...) OPENSHOCK_LOG_WRITE('E', TAG, format, ##__VA_ARGS__)
 #else
 #define OS_LOGE(TAG, format, ...) \
   do {                            \
@@ -86,12 +85,19 @@ consteval const char* openshockPathToFileName(const char (&path)[N])
 #endif
 
 // Always compiled in: NONE is the lowest level, so no OPENSHOCK_LOG_LEVEL disables it.
-#define OS_LOGN(TAG, format, ...) openshock_log_printf(OPENSHOCK_LOG_FORMAT(N, "[%s] " format), TAG, ##__VA_ARGS__)
+#define OS_LOGN(TAG, format, ...) OPENSHOCK_LOG_WRITE('N', TAG, format, ##__VA_ARGS__)
 
-// Panic/abort macros. These log at error level, then restart the device; they
+// Panic/abort macros. These log at critical level (C), then restart the device; they
 // pull in esp_ota_ops / esp_system / freertos (included above), so anything that
 // includes Logging.h is firmware-only.
-#define OS_PANIC_PRINT(TAG, format, ...) OS_LOGE(TAG, "PANIC: " format, ##__VA_ARGS__)
+// Printed with the letter C (critical), so diagnostics and anyone reading the console can tell a panic from an error.
+#if OPENSHOCK_LOG_LEVEL >= OPENSHOCK_LOG_LEVEL_ERROR
+#define OS_PANIC_PRINT(TAG, format, ...) OPENSHOCK_LOG_WRITE('C', TAG, "PANIC: " format, ##__VA_ARGS__)
+#else
+#define OS_PANIC_PRINT(TAG, format, ...) \
+  do {                                   \
+  } while (0)
+#endif
 
 #define OS_PANIC(TAG, format, ...)                                             \
   do {                                                                         \

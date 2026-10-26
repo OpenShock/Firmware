@@ -27,6 +27,23 @@ def is_ci() -> bool:
     return os.environ.get('CI') == 'true' and os.environ.get('GITHUB_ACTIONS') == 'true'
 
 
+# The repository whose CI builds are the official firmware.
+OFFICIAL_REPOSITORY = 'OpenShock/Firmware'
+
+# Events whose builds are official: release tags, the nightly develop build, a maintainer's dispatch. Not
+# pull_request: a pull request's code is the contributor's, even when it builds in this repository.
+OFFICIAL_EVENTS = ('push', 'schedule', 'workflow_dispatch')
+
+
+def is_official_build() -> bool:
+    """Whether this is OpenShock's own CI building its own code, as opposed to a local, fork or pull request build."""
+    return (
+        is_ci()
+        and os.environ.get('GITHUB_REPOSITORY', '').lower() == OFFICIAL_REPOSITORY.lower()
+        and os.environ.get('GITHUB_EVENT_NAME') in OFFICIAL_EVENTS
+    )
+
+
 def ref_name() -> str:
     """The branch or tag name the run is for, e.g. `develop` or `1.5.0-rc.1`."""
     return os.environ.get('GITHUB_REF_NAME', '')

@@ -22,6 +22,7 @@ const char* const TAG = "HTTPRequestManager";
 #include <cstdlib>
 #include <cstring>
 #include <memory>
+#include <new>
 #include <string>
 #include <string_view>
 #include <unordered_map>
@@ -146,6 +147,71 @@ void HTTP::Client::drop()
 HTTP::Response<std::size_t>
   HTTP::Client::Download(std::string_view url, const std::map<std::string, std::string>& headers, HTTP::GotContentLengthCallback contentLengthCallback, HTTP::DownloadCallback downloadCallback, std::span<const uint16_t> acceptedCodes, uint32_t timeoutMs)
 {
+  return perform(url, headers, 0, nullptr, contentLengthCallback, downloadCallback, acceptedCodes, timeoutMs);
+}
+
+HTTP::Response<std::size_t> HTTP::Client::Upload(std::string_view url, const std::map<std::string, std::string>& headers, std::size_t contentLength, HTTP::UploadCallback uploadCallback, std::span<const uint16_t> acceptedCodes, uint32_t timeoutMs)
+{
+  auto ignoreLength = [](int) {
+    return true;
+  };
+  auto discard = [](std::size_t, const uint8_t*, std::size_t) {
+    return true;
+  };
+
+  return perform(url, headers, contentLength, &uploadCallback, ignoreLength, discard, acceptedCodes, timeoutMs);
+}
+
+esp_err_t HTTP::Client::writeBody(std::size_t length, HTTP::UploadCallback& upload, int64_t deadline, bool& cancelled)
+{
+  static constexpr std::size_t kChunkSize = 1024;
+
+  std::unique_ptr<uint8_t[]> buffer(new (std::nothrow) uint8_t[kChunkSize]);
+  if (buffer == nullptr) {
+    OS_LOGE(TAG, "Failed to allocate upload buffer");
+    return ESP_ERR_NO_MEM;
+  }
+
+  std::size_t offset = 0;
+  while (offset < length) {
+    int produced = upload(offset, buffer.get(), std::min(kChunkSize, length - offset));
+    if (produced <= 0 || static_cast<std::size_t>(produced) > length - offset) {
+      cancelled = true;
+      return ESP_FAIL;
+    }
+
+    int sent = 0;
+    while (sent < produced) {
+      int64_t remaining = deadline - OpenShock::millis();
+      if (remaining <= 0) {
+        return ESP_ERR_TIMEOUT;
+      }
+      esp_http_client_set_timeout_ms(m_handle, static_cast<int>(remaining));
+
+      int written = esp_http_client_write(m_handle, reinterpret_cast<const char*>(buffer.get()) + sent, produced - sent);
+      if (written <= 0) {
+        return ESP_FAIL;
+      }
+      sent += written;
+    }
+
+    offset += static_cast<std::size_t>(produced);
+  }
+
+  return ESP_OK;
+}
+
+HTTP::Response<std::size_t> HTTP::Client::perform(
+  std::string_view url,
+  const std::map<std::string, std::string>& headers,
+  std::size_t uploadLength,
+  HTTP::UploadCallback* upload,
+  HTTP::GotContentLengthCallback contentLengthCallback,
+  HTTP::DownloadCallback downloadCallback,
+  std::span<const uint16_t> acceptedCodes,
+  uint32_t timeoutMs
+)
+{
   std::shared_ptr<OpenShock::RateLimiter> rateLimiter = createRateLimiterForURL(url);
   if (rateLimiter == nullptr) {
     return {RequestResult::InvalidURL, 0, 0};
@@ -180,7 +246,7 @@ HTTP::Response<std::size_t>
       esp_http_client_config_t config = {};
       config.url                      = urlStr.c_str();
       config.user_agent               = OpenShock::Constants::UserAgent();
-      config.method                   = HTTP_METHOD_GET;
+      config.method                   = upload != nullptr ? HTTP_METHOD_POST : HTTP_METHOD_GET;
       config.timeout_ms               = static_cast<int>(std::max<int64_t>(remainingMs(), 1));
       config.keep_alive_enable        = true;
       config.event_handler            = &Client::eventHandler;
@@ -194,7 +260,7 @@ HTTP::Response<std::size_t>
       }
     } else {
       esp_http_client_set_url(m_handle, urlStr.c_str());
-      esp_http_client_set_method(m_handle, HTTP_METHOD_GET);
+      esp_http_client_set_method(m_handle, upload != nullptr ? HTTP_METHOD_POST : HTTP_METHOD_GET);
       esp_http_client_set_timeout_ms(m_handle, static_cast<int>(std::max<int64_t>(remainingMs(), 1)));
     }
 
@@ -209,7 +275,21 @@ HTTP::Response<std::size_t>
       m_headerKeys.push_back(header.first);
     }
 
-    err = esp_http_client_open(m_handle, 0);
+    err = esp_http_client_open(m_handle, upload != nullptr ? static_cast<int>(uploadLength) : 0);
+    if (err == ESP_OK && upload != nullptr) {
+      bool cancelled = false;
+      err            = writeBody(uploadLength, *upload, begin + timeoutMs, cancelled);
+      if (cancelled) {
+        OS_LOGW(TAG, "Request cancelled by upload callback");
+        drop();
+        return {RequestResult::Cancelled, 0, 0};
+      }
+      if (err == ESP_ERR_TIMEOUT) {
+        OS_LOGW(TAG, "Request timed out");
+        drop();
+        return {RequestResult::TimedOut, 0, 0};
+      }
+    }
     if (err == ESP_OK && remainingMs() <= 0) {
       OS_LOGW(TAG, "Request timed out");
       drop();

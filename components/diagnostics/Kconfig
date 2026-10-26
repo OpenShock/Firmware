@@ -1,0 +1,122 @@
+menu "OpenShock Diagnostics"
+
+    config OPENSHOCK_DIAG_LOG_BUFFER_SIZE
+        int "Retained log size (bytes)"
+        range 1024 16384
+        default 4096
+        help
+            Log lines (errors always, more at a higher log upload level) are kept in a ring of
+            this size in RAM that survives a software reset (panic, watchdog, restart), for
+            upload once the owner enables it.
+
+    config OPENSHOCK_DIAG_SDCARD
+        bool "Store logs and crash dumps on an SD card"
+        default n
+        help
+            Writes every log record and every crash dump to a microSD card in the raw format
+            of docs/SDCARD.md (no filesystem), through ESP-IDF's sdmmc/sdspi drivers. For
+            development and field-debugging builds; release builds leave it off.
+
+            The pins below are Kconfig symbols, unlike the board pins (which come from the
+            board descriptor). They exist only while this option is on, so a normal build's
+            sdkconfig.h - and with it the shared build cache - is unaffected.
+
+    if OPENSHOCK_DIAG_SDCARD
+
+        choice OPENSHOCK_DIAG_SDCARD_BUS
+            prompt "SD card bus"
+            default OPENSHOCK_DIAG_SDCARD_BUS_SDMMC if SOC_SDMMC_USE_GPIO_MATRIX
+            default OPENSHOCK_DIAG_SDCARD_BUS_SPI
+
+            config OPENSHOCK_DIAG_SDCARD_BUS_SDMMC
+                bool "SDMMC host (1- or 4-bit)"
+                depends on SOC_SDMMC_USE_GPIO_MATRIX
+                help
+                    The chip's SD host controller, on any pins. Offered only where the host is
+                    routed through the GPIO matrix (ESP32-S3): on the ESP32 its pins are fixed and
+                    include strapping pins, so the ESP32 uses SPI mode.
+
+            config OPENSHOCK_DIAG_SDCARD_BUS_SPI
+                bool "SPI mode (SPI2)"
+        endchoice
+
+        if OPENSHOCK_DIAG_SDCARD_BUS_SDMMC
+
+            config OPENSHOCK_DIAG_SDCARD_CLK_GPIO
+                int "SD card CLK GPIO"
+                default -1
+
+            config OPENSHOCK_DIAG_SDCARD_CMD_GPIO
+                int "SD card CMD GPIO"
+                default -1
+
+            config OPENSHOCK_DIAG_SDCARD_D0_GPIO
+                int "SD card D0 GPIO"
+                default -1
+
+            config OPENSHOCK_DIAG_SDCARD_D1_GPIO
+                int "SD card D1 GPIO (-1 for a 1-bit bus)"
+                default -1
+
+            config OPENSHOCK_DIAG_SDCARD_D2_GPIO
+                int "SD card D2 GPIO (-1 for a 1-bit bus)"
+                default -1
+
+            config OPENSHOCK_DIAG_SDCARD_D3_GPIO
+                int "SD card D3 GPIO (-1 for a 1-bit bus)"
+                default -1
+                help
+                    With D3 set the bus runs 4-bit, and D1 and D2 must be set too.
+
+        endif
+
+        if OPENSHOCK_DIAG_SDCARD_BUS_SPI
+
+            config OPENSHOCK_DIAG_SDCARD_SCK_GPIO
+                int "SD card SCK GPIO"
+                default -1
+
+            config OPENSHOCK_DIAG_SDCARD_MOSI_GPIO
+                int "SD card MOSI (CMD) GPIO"
+                default -1
+
+            config OPENSHOCK_DIAG_SDCARD_MISO_GPIO
+                int "SD card MISO (DAT0) GPIO"
+                default -1
+
+            config OPENSHOCK_DIAG_SDCARD_CS_GPIO
+                int "SD card CS (DAT3) GPIO"
+                default -1
+
+        endif
+
+        config OPENSHOCK_DIAG_SDCARD_CD_GPIO
+            int "SD card card-detect GPIO"
+            default -1
+            help
+                Required: without card detect, removing the card can't be told apart from
+                a dead card.
+
+        config OPENSHOCK_DIAG_SDCARD_CD_ACTIVE_LOW
+            bool "Card detect reads low when a card is inserted"
+            default y
+
+        config OPENSHOCK_DIAG_SDCARD_FREQ_KHZ
+            int "SD card clock limit (kHz)"
+            range 400 40000
+            default 20000
+            help
+                The most the card is clocked at; the driver also stays within what the card
+                reports. 40000 (high speed) needs a short, clean bus, and SDMMC.
+
+        config OPENSHOCK_DIAG_SDCARD_QUEUE_SIZE
+            int "Log record queue (bytes)"
+            range 4096 65536
+            default 16384
+            help
+                Records wait here for the card writer. When it is full, records are dropped
+                and counted, never waited for.
+
+    endif
+
+endmenu

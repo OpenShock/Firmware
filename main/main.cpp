@@ -7,6 +7,7 @@ const char* const TAG = "main";
 #include "Chipset.h"
 #include "CommandHandler.h"
 #include "config/Config.h"
+#include "diagnostics/Diagnostics.h"
 #include "estop/EStopManager.h"
 #include "events/Events.h"
 #include "GatewayConnectionManager.h"
@@ -136,6 +137,10 @@ extern "C" void app_main()
     }
   }
 
+  // Log capture first, so the rest of the boot is captured; with SD card support this also mounts the card and copies a
+  // pending crash dump to it, which belongs before WiFi starts.
+  OpenShock::Diagnostics::Init();
+
   OpenShock::Config::Init();
 
   if (!OpenShock::Events::Init()) {
@@ -154,6 +159,7 @@ extern "C" void app_main()
 
   while (true) {
     OpenShock::GatewayConnectionManager::Update();
+    OpenShock::Diagnostics::Update([] { return OpenShock::GatewayConnectionManager::IsConnected(); });
 
     vTaskDelay(5);  // 5 ticks update interval
   }
