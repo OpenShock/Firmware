@@ -1,3 +1,4 @@
+# (Named partition_layout: ESP-IDF owns the component name partition_table.)
 # The ESP-IDF partition table as data: parse the binary table, tell which OpenShock layout it is, and check a
 # staged table against the invariants the over-the-air table rewrite relies on (docs/STORAGE.md). Pure C++ over
 # byte spans with its own MD5, so it has no ESP-IDF dependency and the host tests run it against every table in

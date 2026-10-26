@@ -29,14 +29,14 @@ namespace OpenShock::PartitionTable {
   inline constexpr uint16_t kMagic         = 0x50AA;
   inline constexpr uint16_t kMd5Magic      = 0xEBEB;
 
-  inline constexpr uint8_t kTypeApp            = 0x00;
-  inline constexpr uint8_t kTypeData           = 0x01;
-  inline constexpr uint8_t kTypeWww            = 0x40;  // OpenShock's own: the flat asset image
-  inline constexpr uint8_t kSubtypeDataOta     = 0x00;
-  inline constexpr uint8_t kSubtypeDataNvs     = 0x02;
-  inline constexpr uint8_t kSubtypeDataSpiffs  = 0x82;
-  inline constexpr uint32_t kAppAlignment      = 0x10000;  // app partitions start on a 64 KiB boundary
-  inline constexpr uint32_t kSectorSize        = 0x1000;
+  inline constexpr uint8_t kTypeApp           = 0x00;
+  inline constexpr uint8_t kTypeData          = 0x01;
+  inline constexpr uint8_t kTypeWww           = 0x40;  // OpenShock's own: the flat asset image
+  inline constexpr uint8_t kSubtypeDataOta    = 0x00;
+  inline constexpr uint8_t kSubtypeDataNvs    = 0x02;
+  inline constexpr uint8_t kSubtypeDataSpiffs = 0x82;
+  inline constexpr uint32_t kAppAlignment     = 0x10000;  // app partitions start on a 64 KiB boundary
+  inline constexpr uint32_t kSectorSize       = 0x1000;
 
   // What every OpenShock layout keeps in place: the migration invariant.
   inline constexpr uint32_t kNvsOffset     = 0x9000;
@@ -103,21 +103,21 @@ namespace OpenShock::PartitionTable {
   };
 
   enum class Violation : uint8_t {
-    NotV2Layout,                // the staged table is not a 2.x layout at all
-    TooManyEntries,             //
-    SizeUnaligned,              // an entry's size is 0 or not a multiple of 4 KiB
-    AppUnaligned,               // an app entry does not start on a 64 KiB boundary
-    Overlap,                    // two entries overlap
-    PastFlash,                  // an entry ends past the chip
-    NvsMoved,                   // the shared nvs is not at 0x9000 / 0x5000
-    OtadataMoved,               // otadata is not at 0xE000 / 0x2000
-    NoCfg,                      // no data/nvs entry labelled cfg
-    NoWww,                      // no type-0x40 entry labelled www
-    NoRunningSlot,              // no app entry at the running offset large enough, and no app entry clear of the live table
-    BootloaderHeaderUnknown,    // the bootloader's declared flash size could not be read
-    BootloaderHeaderTooSmall,   // the bootloader declares a flash smaller than the table needs: it would reject the table
-    LiveUnreadable,             // the live table could not be parsed
-    LiveNotMigratable,          // the live table is not the layout this firmware migrates from
+    NotV2Layout,               // the staged table is not a 2.x layout at all
+    TooManyEntries,            //
+    SizeUnaligned,             // an entry's size is 0 or not a multiple of 4 KiB
+    AppUnaligned,              // an app entry does not start on a 64 KiB boundary
+    Overlap,                   // two entries overlap
+    PastFlash,                 // an entry ends past the chip
+    NvsMoved,                  // the shared nvs is not at 0x9000 / 0x5000
+    OtadataMoved,              // otadata is not at 0xE000 / 0x2000
+    NoCfg,                     // no data/nvs entry labelled cfg
+    NoWww,                     // no type-0x40 entry labelled www
+    NoRunningSlot,             // no app entry at the running offset large enough, and no app entry clear of the live table
+    BootloaderHeaderUnknown,   // the bootloader's declared flash size could not be read
+    BootloaderHeaderTooSmall,  // the bootloader declares a flash smaller than the table needs: it would reject the table
+    LiveUnreadable,            // the live table could not be parsed
+    LiveNotMigratable,         // the live table is not the layout this firmware migrates from
   };
   [[nodiscard]] const char* ViolationName(Violation violation);
 

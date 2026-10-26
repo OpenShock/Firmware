@@ -1,4 +1,4 @@
-#include "partition_table/PartitionTable.h"
+#include "partition_layout/PartitionTable.h"
 
 #include "Md5.h"
 

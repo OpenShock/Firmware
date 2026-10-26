@@ -3,7 +3,7 @@
 #include "unity.h"
 
 #include "Md5.h"
-#include "partition_table/PartitionTable.h"
+#include "partition_layout/PartitionTable.h"
 
 #include <cstdio>
 #include <cstring>
@@ -191,8 +191,8 @@ TEST_CASE("A table without an MD5 entry, or with a wrong one, is refused", "[par
   bytes[16] ^= 0x01;  // a byte inside the first entry: the MD5 no longer matches
   ExpectParseError(bytes, PT::ParseError::Md5Mismatch);
 
-  bytes               = V2_4MB();
-  std::size_t md5Pos  = 7 * PT::kEntrySize;
+  bytes              = V2_4MB();
+  std::size_t md5Pos = 7 * PT::kEntrySize;
   memset(bytes.data() + md5Pos, 0xFF, PT::kEntrySize);  // the MD5 entry erased
   ExpectParseError(bytes, PT::ParseError::NoMd5);
 
@@ -200,7 +200,7 @@ TEST_CASE("A table without an MD5 entry, or with a wrong one, is refused", "[par
   bytes[md5Pos + 16] ^= 0x01;  // the digest itself
   ExpectParseError(bytes, PT::ParseError::Md5Mismatch);
 
-  bytes = V2_4MB();
+  bytes                              = V2_4MB();
   bytes[md5Pos + PT::kEntrySize + 5] = 0x00;  // garbage after the MD5 entry
   ExpectParseError(bytes, PT::ParseError::Trailing);
 
@@ -252,7 +252,7 @@ TEST_CASE("The live table must be readable and the 1.x layout", "[partition_tabl
   scenario.context.live = nullptr;
   ExpectViolation(V2_4MB(), scenario.context, PT::Violation::LiveUnreadable);
 
-  PT::Table alreadyV2 = ParseOk(V2_4MB());
+  PT::Table alreadyV2   = ParseOk(V2_4MB());
   scenario.context.live = &alreadyV2;
   ExpectViolation(V2_4MB(), scenario.context, PT::Violation::LiveNotMigratable);
 
@@ -277,7 +277,7 @@ TEST_CASE("A moved nvs or otadata is refused", "[partition_table][validate]")
   SetOffset(bytes, "otadata", 0xF000);
   ExpectViolation(bytes, Scenario().context, PT::Violation::Overlap);  // onto app0; geometry is checked first
   SetOffset(bytes, "otadata", 0xE000);
-  SetSize(bytes, "otadata", 0x1000);  // in place, but shrunk
+  SetSize(bytes, "otadata", 0x1000);                                   // in place, but shrunk
   ExpectViolation(bytes, Scenario().context, PT::Violation::OtadataMoved);
 }
 

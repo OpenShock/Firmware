@@ -11,4 +11,4 @@ list(APPEND EXTRA_COMPONENT_DIRS
      "$ENV{IDF_PATH}/tools/mocks/freertos/"
      "${CMAKE_CURRENT_LIST_DIR}/../../../test/host_support")
 
-project(partition_table_host_test)
+project(partition_layout_host_test)

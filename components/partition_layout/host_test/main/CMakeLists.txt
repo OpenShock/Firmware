@@ -7,7 +7,7 @@ idf_component_register(
                "../../src/PartitionTable.cpp"
                "../../src/Md5.cpp"
   INCLUDE_DIRS "."
-               "../../include"             # partition_table/PartitionTable.h
+               "../../include"             # partition_layout/PartitionTable.h
                "../../src"                 # Md5.h (known-answer test)
                "../../../common/include"
   REQUIRES     unity
