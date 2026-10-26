@@ -162,12 +162,11 @@ static bool strongerSignal(const WiFiNetwork& a, const WiFiNetwork& b)
   return a.rssi > b.rssi;
 }
 
-// Event SSIDs are not guaranteed null-terminated; bound by ssid_len.
-template<typename Event>
-static void copyEventSSID(const Event& info, char (&ssid)[33])
+// An event's SSID field is not guaranteed null-terminated, and ssid_len comes from the driver: clamp it to the field
+static void copyEventSSID(const uint8_t (&eventSsid)[32], uint8_t eventSsidLen, char (&ssid)[33])
 {
-  size_t ssidLen = std::min(static_cast<size_t>(info.ssid_len), sizeof(ssid) - 1);
-  memcpy(ssid, info.ssid, ssidLen);
+  size_t ssidLen = std::min(static_cast<size_t>(eventSsidLen), sizeof(eventSsid));
+  memcpy(ssid, eventSsid, ssidLen);
   ssid[ssidLen] = '\0';
 }
 
@@ -302,7 +301,7 @@ static void evWiFiConnected(const wifi_event_sta_connected_t& info)
   postWiFiState(OPENSHOCK_WIFI_STATE_CONNECTED, kPostWaitFromEventLoop);
 
   char ssid[33];
-  copyEventSSID(info, ssid);
+  copyEventSSID(info.ssid, info.ssid_len, ssid);
 
   uint8_t credentialsId;
   std::optional<WiFiNetwork> network;  // The scanned entry for this BSSID, if any
@@ -382,7 +381,7 @@ static void evWiFiDisconnected(const wifi_event_sta_disconnected_t& info)
   postWiFiState(OPENSHOCK_WIFI_STATE_DISCONNECTED, kPostWaitFromEventLoop);
 
   char ssid[33];
-  copyEventSSID(info, ssid);
+  copyEventSSID(info.ssid, info.ssid_len, ssid);
 
   OS_LOGI(TAG, "Disconnected from network %s (" BSSID_FMT ")", ssid, BSSID_ARG(info.bssid));
 
