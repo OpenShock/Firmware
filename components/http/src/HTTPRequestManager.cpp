@@ -143,23 +143,11 @@ void HTTP::Client::drop()
   m_headerKeys.clear();
 }
 
-HTTP::Response<std::size_t>
-  HTTP::Client::Download(std::string_view url, const std::map<std::string, std::string>& headers, HTTP::GotContentLengthCallback contentLengthCallback, HTTP::DownloadCallback downloadCallback, std::span<const uint16_t> acceptedCodes, uint32_t timeoutMs)
+HTTP::RequestResult HTTP::Client::openRequest(int method, std::string_view url, const std::map<std::string, std::string>& headers, int64_t begin, uint32_t timeoutMs, int64_t& contentLength)
 {
-  std::shared_ptr<OpenShock::RateLimiter> rateLimiter = createRateLimiterForURL(url);
-  if (rateLimiter == nullptr) {
-    return {RequestResult::InvalidURL, 0, 0};
-  }
-
-  if (!rateLimiter->tryRequest()) {
-    return {RequestResult::RateLimited, 0, 0};
-  }
-
   std::string urlStr(url);
   m_retryAfter.clear();
   m_connectionClose = false;
-
-  int64_t begin = OpenShock::millis();
 
   // timeoutMs bounds the whole request. The client applies its timeout per socket operation, so each phase gets
   // what is left of the budget rather than a fresh timeoutMs (DNS resolution can't be bounded from here).
@@ -171,8 +159,8 @@ HTTP::Response<std::size_t>
   // reused (kept-alive) socket has been closed by the server, drop it and
   // reconnect fresh once. HTTPS servers are verified against the compiled-in
   // CA bundle via config.crt_bundle_attach below.
-  esp_err_t err         = ESP_FAIL;
-  int64_t contentLength = -1;
+  esp_err_t err = ESP_FAIL;
+  contentLength = -1;
   for (int attempt = 0; attempt < 2; ++attempt) {
     bool reused = m_handle != nullptr;
 
@@ -180,7 +168,7 @@ HTTP::Response<std::size_t>
       esp_http_client_config_t config = {};
       config.url                      = urlStr.c_str();
       config.user_agent               = OpenShock::Constants::UserAgent();
-      config.method                   = HTTP_METHOD_GET;
+      config.method                   = static_cast<esp_http_client_method_t>(method);
       config.timeout_ms               = static_cast<int>(std::max<int64_t>(remainingMs(), 1));
       config.keep_alive_enable        = true;
       config.event_handler            = &Client::eventHandler;
@@ -190,11 +178,11 @@ HTTP::Response<std::size_t>
       m_handle = esp_http_client_init(&config);
       if (m_handle == nullptr) {
         OS_LOGE(TAG, "Failed to initialize HTTP client");
-        return {RequestResult::RequestFailed, 0, 0};
+        return RequestResult::RequestFailed;
       }
     } else {
       esp_http_client_set_url(m_handle, urlStr.c_str());
-      esp_http_client_set_method(m_handle, HTTP_METHOD_GET);
+      esp_http_client_set_method(m_handle, static_cast<esp_http_client_method_t>(method));
       esp_http_client_set_timeout_ms(m_handle, static_cast<int>(std::max<int64_t>(remainingMs(), 1)));
     }
 
@@ -213,7 +201,7 @@ HTTP::Response<std::size_t>
     if (err == ESP_OK && remainingMs() <= 0) {
       OS_LOGW(TAG, "Request timed out");
       drop();
-      return {RequestResult::TimedOut, 0, 0};
+      return RequestResult::TimedOut;
     }
     if (err == ESP_OK) {
       // A server-closed keep-alive socket usually accepts the request write and only fails here.
@@ -228,12 +216,70 @@ HTTP::Response<std::size_t>
     drop();
     if (!reused) {
       OS_LOGE(TAG, "Failed to send HTTP request: %s", esp_err_to_name(err));
-      return {RequestResult::RequestFailed, 0, 0};
+      return RequestResult::RequestFailed;
     }
     OS_LOGD(TAG, "Reused connection failed, reconnecting");
   }
   if (err != ESP_OK) {
-    return {RequestResult::RequestFailed, 0, 0};
+    return RequestResult::RequestFailed;
+  }
+  return RequestResult::Success;
+}
+
+HTTP::Response<int64_t> HTTP::Client::Head(std::string_view url, const std::map<std::string, std::string>& headers, std::span<const uint16_t> acceptedCodes, uint32_t timeoutMs)
+{
+  std::shared_ptr<OpenShock::RateLimiter> rateLimiter = createRateLimiterForURL(url);
+  if (rateLimiter == nullptr) {
+    return {RequestResult::InvalidURL, 0, -1};
+  }
+  if (!rateLimiter->tryRequest()) {
+    return {RequestResult::RateLimited, 0, -1};
+  }
+
+  int64_t contentLength = -1;
+  RequestResult result  = openRequest(HTTP_METHOD_HEAD, url, headers, OpenShock::millis(), timeoutMs, contentLength);
+  if (result != RequestResult::Success) {
+    return {result, 0, -1};
+  }
+
+  int responseCode = esp_http_client_get_status_code(m_handle);
+  // A HEAD response has no body to drain, and esp_http_client would expect one from the Content-Length on the
+  // next request over this handle: drop the connection rather than reuse it.
+  drop();
+
+  if (responseCode == 429) {
+    rateLimiter->blockFor(2000);
+    return {RequestResult::RateLimited, responseCode, -1};
+  }
+  if (std::find(acceptedCodes.begin(), acceptedCodes.end(), responseCode) == acceptedCodes.end()) {
+    OS_LOGD(TAG, "Received unexpected response code %d", responseCode);
+    return {RequestResult::CodeRejected, responseCode, -1};
+  }
+  return {RequestResult::Success, responseCode, contentLength};
+}
+
+HTTP::Response<std::size_t>
+  HTTP::Client::Download(std::string_view url, const std::map<std::string, std::string>& headers, HTTP::GotContentLengthCallback contentLengthCallback, HTTP::DownloadCallback downloadCallback, std::span<const uint16_t> acceptedCodes, uint32_t timeoutMs)
+{
+  std::shared_ptr<OpenShock::RateLimiter> rateLimiter = createRateLimiterForURL(url);
+  if (rateLimiter == nullptr) {
+    return {RequestResult::InvalidURL, 0, 0};
+  }
+
+  if (!rateLimiter->tryRequest()) {
+    return {RequestResult::RateLimited, 0, 0};
+  }
+
+  int64_t begin = OpenShock::millis();
+
+  auto remainingMs = [&]() -> int64_t {
+    return begin + timeoutMs - OpenShock::millis();
+  };
+
+  int64_t contentLength = -1;
+  RequestResult opened  = openRequest(HTTP_METHOD_GET, url, headers, begin, timeoutMs, contentLength);
+  if (opened != RequestResult::Success) {
+    return {opened, 0, 0};
   }
 
   // Tears down the connection when it can't be safely reused.

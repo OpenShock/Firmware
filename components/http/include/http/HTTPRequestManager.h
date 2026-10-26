@@ -99,6 +99,10 @@ namespace OpenShock::HTTP {
       Download(std::string_view url, const std::map<std::string, std::string>& headers, GotContentLengthCallback contentLengthCallback, DownloadCallback downloadCallback, std::span<const uint16_t> acceptedCodes, uint32_t timeoutMs = 10'000);
     Response<std::string> GetString(std::string_view url, const std::map<std::string, std::string>& headers, std::span<const uint16_t> acceptedCodes, uint32_t timeoutMs = 10'000);
 
+    /// @brief A HEAD request: whether `url` answers with one of `acceptedCodes`, and its Content-Length (-1 when not
+    ///        given). The connection is dropped afterwards rather than kept alive.
+    Response<int64_t> Head(std::string_view url, const std::map<std::string, std::string>& headers, std::span<const uint16_t> acceptedCodes, uint32_t timeoutMs = 10'000);
+
     template<typename T>
     Response<T> GetJSON(std::string_view url, const std::map<std::string, std::string>& headers, JsonParser<T> jsonParser, std::span<const uint16_t> acceptedCodes, uint32_t timeoutMs = 10'000)
     {
@@ -125,6 +129,11 @@ namespace OpenShock::HTTP {
   private:
     static esp_err_t eventHandler(esp_http_client_event_t* evt);
     void drop();
+
+    // Sends `method` (an esp_http_client_method_t) for `url` on the kept-alive handle, reconnecting once if the
+    // server closed it, and reads the response headers. On Success the handle holds the response and
+    // `contentLength` its Content-Length. `begin` + `timeoutMs` bound the whole request.
+    RequestResult openRequest(int method, std::string_view url, const std::map<std::string, std::string>& headers, int64_t begin, uint32_t timeoutMs, int64_t& contentLength);
 
     esp_http_client_handle_t m_handle;
     std::vector<std::string> m_headerKeys;  // headers set on the last request, cleared before reuse
