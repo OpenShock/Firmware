@@ -158,9 +158,10 @@ def main() -> int:
     for variant in variants:
         print(f'  {variant.id}  {", ".join(variant.boards)}')
 
+    board_lines = ''.join(f'\n  - `{b}`' for b in boards)
     summary(
-        f'### Plan\n\n- Version: `{version}`\n- Channel: `{channel}`\n- Boards: {", ".join(boards)}\n'
-        f'- Variants: {len(variants)}'
+        f'### Plan\n\n- Version: `{version}`\n- Channel: `{channel}`\n- Variants: `{len(variants)}`\n'
+        f'- Boards: {len(boards)}{board_lines}'
     )
     set_output('version', version)
     set_output('release-channel', channel)

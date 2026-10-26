@@ -339,7 +339,7 @@ def test_main_writes_every_output(tmp_path, monkeypatch):
     monkeypatch.setenv('GITHUB_OUTPUT', str(out))
     monkeypatch.setenv('GITHUB_STEP_SUMMARY', str(tmp_path / 'summary'))
     assert ci_build_gate.main() == 0
-    assert f'boards={CANARY_BOARD}' in (tmp_path / 'summary').read_text(encoding='utf-8')
+    assert f'- Boards: `{CANARY_BOARD}`' in (tmp_path / 'summary').read_text(encoding='utf-8')
     assert out.read_text(encoding='utf-8').splitlines() == [
         'build=true',
         'publish=false',
