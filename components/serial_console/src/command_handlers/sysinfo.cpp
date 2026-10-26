@@ -2,7 +2,9 @@
 
 #include "serial_console/command_handlers/common.h"
 
+#include "config/Store.h"
 #include "FormatHelpers.h"
+#include "migration/LayoutMigration.h"
 #include "Temporal.h"
 #include "wifi/WiFiManager.h"
 #include "wifi/WiFiNetwork.h"
@@ -22,6 +24,12 @@ static void handleDebugInfoCommand(std::string_view arg, bool isAutomated)
   const int64_t hours   = minutes / 60;
   const int64_t days    = hours / 24;
   SERPR_RESPONSE("RTOSInfo|Uptime|%llid %llih %llim %llis", days, hours % 24, minutes % 60, seconds % 60);
+
+  // What the partition layout migration decides on (docs/STORAGE.md)
+  SERPR_RESPONSE("FlashInfo|Partition layout|%s", OpenShock::Migration::LiveLayoutName());
+  SERPR_RESPONSE("FlashInfo|Bootloader header flash size|%u MiB", static_cast<unsigned>(OpenShock::Migration::BootloaderFlashSize() / (1024 * 1024)));
+  const char* store = OpenShock::Config::StorageLabel();
+  SERPR_RESPONSE("FlashInfo|Config store|%s", store != nullptr ? store : "RAM only");
 
   OpenShock::WiFiNetwork network;
   bool connected = OpenShock::WiFiManager::GetConnectedNetwork(network);
