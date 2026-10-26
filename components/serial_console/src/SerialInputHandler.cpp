@@ -345,6 +345,13 @@ public:
       return;
     }
 
+    if (m_size + len > CONFIG_OPENSHOCK_SERIAL_LINE_MAX_SIZE) {
+      OS_LOGE(TAG, "Line exceeds %d bytes, discarding it", CONFIG_OPENSHOCK_SERIAL_LINE_MAX_SIZE);
+      m_size       = 0;
+      m_overflowed = true;
+      return;
+    }
+
     if (m_size + len > m_capacity) {
       reserve(m_size + len);
       if (m_overflowed) {
