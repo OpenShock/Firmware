@@ -1,5 +1,5 @@
 name: package-firmware
-description: Stamp each board from its variant build and merge it with the static0 image
+description: Stamp each board from its variant build, give it its partition table and bootloader flash size, and merge it with the www image
 inputs:
   version:
     required: true
@@ -21,13 +21,14 @@ runs:
         path: variants
         merge-multiple: true
 
-    - name: Download static filesystem image
+    - name: Download asset image
       uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333  # v8.0.2
       with:
         name: firmware_staticfs
         path: staticfs
 
-    - name: Stamp every board
+    # Stamps the app, writes the board's partition table and sets its flash size in the bootloader header
+    - name: Package every board
       shell: bash
       env:
         BOARDS: ${{ inputs.boards }}
@@ -44,7 +45,7 @@ runs:
         python scripts/merge_image.py \
           --board "$BOARDS" \
           --bindir 'boards-out/{board}' \
-          --staticfs staticfs/staticfs.bin \
+          --www staticfs/www.bin \
           --output "merged/OpenShock_{board}_${VERSION}.bin"
 
     # One directory per board, what repo_server_publish.py uploads

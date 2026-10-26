@@ -59,6 +59,12 @@ if(OPENSHOCK_BOARD AND NOT DEFINED SDKCONFIG_DEFAULTS)
       set(IDF_TARGET ${CMAKE_MATCH_1})
     endif()
   endforeach()
+  # The partition table follows from the flash size, as in scripts/build.py: sdkconfig.defaults names the 4 MB
+  # table, a board with 8 MB or more gets partitions/ota_8mb.csv.
+  string(REGEX MATCH "CONFIG_ESPTOOLPY_FLASHSIZE_([0-9]+)MB=y" _os_m "${_os_board_kconfig}")
+  if(_os_m AND CMAKE_MATCH_1 GREATER_EQUAL 8)
+    string(APPEND _os_board_kconfig "CONFIG_PARTITION_TABLE_CUSTOM=y\nCONFIG_PARTITION_TABLE_CUSTOM_FILENAME=\"partitions/ota_8mb.csv\"\n")
+  endif()
   set(_os_board_fragment ${CMAKE_BINARY_DIR}/openshock_board.defaults)
   file(WRITE ${_os_board_fragment} "${_os_board_kconfig}")
   set(SDKCONFIG_DEFAULTS "${CMAKE_CURRENT_LIST_DIR}/sdkconfig.defaults;${_os_board_fragment}")
@@ -185,29 +191,28 @@ if(NOT CMAKE_BINARY_DIR STREQUAL _os_compile_db_dir)
     VERBATIM)
 endif()
 
-# --- Static filesystem image (captive-portal web assets) ---------------------
-# gen_staticfs.py packs the frontend into the `static0` partition image; skipped when the partition table has none.
-partition_table_get_partition_info(_staticfs_offset "--partition-name static0" "offset")
-partition_table_get_partition_info(_staticfs_size   "--partition-name static0" "size")
+# --- Captive-portal asset image (www) ----------------------------------------
+# gen_staticfs.py packs the frontend into the flat `www` image; skipped when the partition table has no such partition.
+partition_table_get_partition_info(_www_offset "--partition-name www" "offset")
+partition_table_get_partition_info(_www_size   "--partition-name www" "size")
 
-if("${_staticfs_offset}" STREQUAL "" OR "${_staticfs_size}" STREQUAL "")
-  message(WARNING "No `static0` partition in the active partition table; "
-                  "skipping static filesystem image generation.")
+if("${_www_offset}" STREQUAL "" OR "${_www_size}" STREQUAL "")
+  message(WARNING "No `www` partition in the active partition table; "
+                  "skipping asset image generation.")
 else()
-  set(_staticfs_image ${CMAKE_BINARY_DIR}/staticfs.bin)
+  set(_www_image ${CMAKE_BINARY_DIR}/www.bin)
 
   # CI never builds this target: its staticfs job runs gen_staticfs.py --skip-frontend-build once for every variant.
-  add_custom_target(staticfs ALL
-    BYPRODUCTS ${_staticfs_image}
+  add_custom_target(www ALL
+    BYPRODUCTS ${_www_image}
     COMMAND ${_os_python} ${CMAKE_CURRENT_LIST_DIR}/scripts/gen_staticfs.py
-            --frontend-dir   ${CMAKE_CURRENT_LIST_DIR}/frontend
-            --staging-dir    ${CMAKE_BINARY_DIR}/staticfs
-            --output         ${_staticfs_image}
-            --partition-size ${_staticfs_size}
-    COMMENT "Building static filesystem image (staticfs.bin) for static0"
+            --frontend-dir ${CMAKE_CURRENT_LIST_DIR}/frontend
+            --output       ${_www_image}
+            --max-size     ${_www_size}
+    COMMENT "Building captive-portal asset image (www.bin) for www"
     VERBATIM USES_TERMINAL)
 
   # Register the image with the flasher so `idf.py flash` writes it to the
-  # static0 offset alongside the app and partition table.
-  esptool_py_flash_target_image(flash "static0" "${_staticfs_offset}" "${_staticfs_image}")
+  # www offset alongside the app and partition table.
+  esptool_py_flash_target_image(flash "www" "${_www_offset}" "${_www_image}")
 endif()

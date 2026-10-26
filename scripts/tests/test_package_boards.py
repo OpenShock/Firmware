@@ -6,7 +6,7 @@ import package_boards
 import pytest
 from support import blank, make_image
 
-from utils import boards, espimage, stamping, targets
+from utils import boards, espimage, partitions, stamping, targets
 
 
 @pytest.fixture
@@ -20,8 +20,8 @@ def write_variant(variants, board):
     src = variants / vid
     src.mkdir(parents=True)
     (src / 'app.bin').write_bytes(make_image(blank(), chip_id=targets.TARGETS['esp32s3'].image_chip_id))
-    (src / 'bootloader.bin').write_bytes(b'boot')
-    (src / 'partition-table.bin').write_bytes(b'table')
+    # A variant's bootloader is built at the variant's 4 MB; packaging restamps it per board
+    (src / 'bootloader.bin').write_bytes(espimage.parse(make_image(None)).with_flash_size('4MB').data)
     return vid
 
 
@@ -31,11 +31,20 @@ def test_packages_every_board_of_a_variant(dirs):
 
     assert package_boards.package(['OpenShock-Core-V2', 'Wemos-Lolin-S3-Mini'], variants, out) == []
 
-    for board in ('OpenShock-Core-V2', 'Wemos-Lolin-S3-Mini'):
+    for board, size, table in (
+        ('OpenShock-Core-V2', '8MB', 'ota_8mb.csv'),
+        ('Wemos-Lolin-S3-Mini', '4MB', 'ota_4mb.csv'),
+    ):
         stamping.verify_image(espimage.load(out / board / 'app.bin'), boards.read_board(board), board)
-        # The bootloader and partition table ship as the variant built them, whatever the board's flash size.
-        assert (out / board / 'bootloader.bin').read_bytes() == b'boot'
-        assert (out / board / 'partition-table.bin').read_bytes() == b'table'
+        # The bootloader declares the board's flash size and the partition table is the one for that size
+        bootloader = espimage.load(out / board / 'bootloader.bin')
+        bootloader.verify()
+        assert bootloader.flash_size == size
+        assert (out / board / 'partition-table.bin').read_bytes() == partitions.build_table(
+            boards.ROOT / 'partitions' / table
+        )
+    # The variant's own images stay as built, so they can serve the next board.
+    assert espimage.load(variants / vid / 'bootloader.bin').flash_size == '4MB'
     # The variant's own image stays unstamped, so it can serve the next board.
     assert stamping.read_descriptor(espimage.load(variants / vid / 'app.bin'), 'app').board == ''
 

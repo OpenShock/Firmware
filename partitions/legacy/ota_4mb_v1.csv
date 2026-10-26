@@ -1,0 +1,14 @@
+# OpenShock 1.x partition table (every board, whatever its flash size). NOT built any more.
+#
+# Kept as the reference for what fielded 1.5.x / 1.6.x hubs carry and as a fixture for the
+# partition-table migration tests (components/partition_table/host_test): the migration
+# recognises this layout and rewrites it into partitions/ota_4mb.csv or ota_8mb.csv.
+# nvs, otadata and the app0 offset are the migration invariant: identical in every layout.
+# Name,   Type, SubType,  Offset,   Size,     Flags
+nvs,      data, nvs,      0x009000, 0x005000,
+otadata,  data, ota,      0x00e000, 0x002000,
+app0,     app,  ota_0,    0x010000, 0x1A0000,
+app1,     app,  ota_1,    0x1B0000, 0x1A0000,
+config,   data, spiffs,   0x350000, 0x003000,
+static0,  data, spiffs,   0x353000, 0x09D000,
+coredump, data, coredump, 0x3F0000, 0x010000,

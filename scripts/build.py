@@ -27,8 +27,8 @@ import sys
 from pathlib import Path
 from typing import NamedTuple
 
-from utils import github, idfenv, pyreqs
-from utils.boards import board_fragment, find_variant, kconfig_lines, read_board_fragment
+from utils import github, idfenv, partitions, pyreqs
+from utils.boards import board_fragment, find_variant, flash_size, kconfig_lines, read_board_fragment
 from utils.files import write_if_changed
 from utils.paths import ROOT
 
@@ -78,6 +78,16 @@ def optimization_kconfig(optimization: str) -> str:
     return f'# Optimization: {optimization}\n' + ''.join(f'{line}\n' for line in OPTIMIZATION_KCONFIG[optimization])
 
 
+def partition_table_kconfig(size: str) -> str:
+    # Relative to the project, which is how ESP-IDF resolves CONFIG_PARTITION_TABLE_CUSTOM_FILENAME
+    csv = partitions.table_csv_for_flash_size(size).relative_to(partitions.ROOT).as_posix()
+    return (
+        f'# Partition table for a {size} flash\n'
+        'CONFIG_PARTITION_TABLE_CUSTOM=y\n'
+        f'CONFIG_PARTITION_TABLE_CUSTOM_FILENAME="{csv}"\n'
+    )
+
+
 def variant_inputs(variant_id: str, optimization: str = 'debug') -> BuildInputs:
     variant = find_variant(variant_id)
     build_dir = resolve_build_dir(variant.id, optimization)
@@ -93,11 +103,13 @@ def board_inputs(board: str, optimization: str = 'debug') -> BuildInputs:
     fragment = board_fragment(board)
     target = read_board_fragment(fragment).target  # parsed whole, so a typo fails now rather than at the stamp
     build_dir = resolve_build_dir(board, optimization)
-    # Only the Kconfig lines: the OPENSHOCK_* pins are stamped, and Kconfig would reject them.
+    # Only the Kconfig lines: the OPENSHOCK_* pins are stamped, and Kconfig would reject them. The partition table
+    # follows from the flash size (sdkconfig.defaults names the 4 MB one; an 8 MB board gets its own here).
     body = (
         f'# Board {board}, without its pins\n'
         + '\n'.join(kconfig_lines(fragment))
         + '\n'
+        + partition_table_kconfig(flash_size(board))
         + optimization_kconfig(optimization)
     )
     return BuildInputs(target, board, build_dir, build_dir / 'board.defaults', body)

@@ -3,17 +3,19 @@
 
     package_boards.py --variants images --board "OpenShock-Core-V2 Seeed-Xiao-ESP32S3" --out boards
 
-reads <variants>/<variant-id>/{app,bootloader,partition-table}.bin, as CI's build jobs upload them, and
-writes <out>/<board>/ with the stamped app beside the variant's bootloader and partition table, which
-every board of a variant shares unchanged. Every board is attempted before the run fails.
+reads <variants>/<variant-id>/{app,bootloader}.bin, as CI's build jobs upload them, and writes <out>/<board>/ with:
+  - app.bin: the variant's app, stamped with the board's descriptor;
+  - bootloader.bin: the variant's bootloader with the board's flash size in its header (the bootloader and the
+    app size the flash from that header, and a 4 MB header would refuse the 8 MB partition table);
+  - partition-table.bin: built from the table for the board's flash size (scripts/utils/partitions.py).
+Every board is attempted before the run fails.
 """
 
 import argparse
-import shutil
 import sys
 from pathlib import Path
 
-from utils import boards, espimage, stamping
+from utils import boards, espimage, partitions, stamping
 from utils.files import atomic_write_bytes
 
 
@@ -28,6 +30,15 @@ def package_board(board: str, variants: Path, out: Path) -> str:
     app_path = src / 'app.bin'
     stamped = stamping.stamp_image(espimage.load(app_path), spec, app_path)
 
+    size = boards.flash_size(board)
+    bootloader_path = src / 'bootloader.bin'
+    bootloader = espimage.load(bootloader_path)
+    bootloader.verify()
+    bootloader = bootloader.with_flash_size(size)
+
+    table_csv = partitions.partition_csv_for(board)
+    table = partitions.build_table(table_csv, boards.flash_size_bytes(size))
+
     dst = out / board
     dst.mkdir(parents=True, exist_ok=True)
     app_out = dst / 'app.bin'
@@ -38,9 +49,16 @@ def package_board(board: str, variants: Path, out: Path) -> str:
     stamping.verify_image(written, spec, app_out)
     if stamping.stamp_image(written, spec, app_out).data != stamped.data:
         raise SystemExit(f'error: stamping {app_out} a second time changed it')
-    for name in ('bootloader.bin', 'partition-table.bin'):
-        shutil.copyfile(src / name, dst / name)
-    return f'{board}: stamped from {vid}'
+
+    bootloader_out = dst / 'bootloader.bin'
+    atomic_write_bytes(bootloader_out, bootloader.data)
+    written_bootloader = espimage.load(bootloader_out)
+    written_bootloader.verify()
+    if written_bootloader.flash_size != size:
+        raise SystemExit(f'error: {bootloader_out} declares {written_bootloader.flash_size}, not {size}')
+
+    atomic_write_bytes(dst / 'partition-table.bin', table)
+    return f'{board}: stamped from {vid}, {size} flash, {table_csv.name}'
 
 
 def package(board_names: list[str], variants: Path, out: Path) -> list[str]:

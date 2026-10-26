@@ -177,7 +177,7 @@ jobs:
           boards: ${{ needs.plan.outputs.board-list }}
           mode: init
 
-  # The frontend packed into the static0 image, once for every board (its checks are frontend-checks.yml's).
+  # The frontend packed into the www asset image, once for every board (its checks are frontend-checks.yml's).
   # The jobs below wait on stage so a prod release is approved before compute is spent: a skipped stage
   # (nothing to publish) lets them run, a failed one stops them.
   staticfs:
@@ -227,7 +227,7 @@ jobs:
           variant: ${{ matrix.variant }}
           version: ${{ needs.plan.outputs.version }}
 
-  # Stamp every board from its variant and merge it with static0. One job: it is seconds of work per board.
+  # Package every board from its variant and merge it with the www image. One job: it is seconds of work per board.
   package:
     runs-on: ubuntu-latest
     needs: [plan, stage, staticfs, build]
