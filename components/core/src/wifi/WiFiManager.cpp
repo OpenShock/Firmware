@@ -128,12 +128,9 @@ static void postWiFiState(OpenShockWiFiState state, TickType_t wait)
   }
 }
 
+// Only compares saved networks: getNextWiFiNetwork skips the rest
 static bool attractivityComparer(const WiFiNetwork& a, const WiFiNetwork& b)
 {
-  // Networks with credentials sort before those without
-  if (a.credentialsID != 0 && b.credentialsID == 0) return true;
-  if (a.credentialsID == 0 && b.credentialsID != 0) return false;
-
   // Fewer connect attempts is more attractive
   if (a.connectAttempts != b.connectAttempts) return a.connectAttempts < b.connectAttempts;
 
@@ -192,6 +189,20 @@ static std::vector<WiFiNetwork>::iterator findNetworkByBSSID(const uint8_t (&bss
 {
   return findNetwork([bssid](const WiFiNetwork& net) noexcept { return memcmp(net.bssid, bssid, sizeof(bssid)) == 0; });
 }
+// Sets the credentials ID of every scanned BSSID of `ssid`. Returns the strongest of them, if any were scanned.
+static std::optional<WiFiNetwork> setCredentialsID(const char* ssid, uint8_t credentialsId)
+{
+  std::optional<WiFiNetwork> strongest;
+  for (auto& net : s_wifiNetworks) {
+    if (strcmp(net.ssid, ssid) == 0) {
+      net.credentialsID = credentialsId;
+      if (!strongest) {
+        strongest = net;
+      }
+    }
+  }
+  return strongest;
+}
 
 // Picks the most attractive saved, non-rate-limited network without reordering the list.
 [[nodiscard]] static std::optional<OpenShock::Config::WiFiCredentials> getNextWiFiNetwork()
@@ -247,7 +258,7 @@ static std::vector<WiFiNetwork>::iterator findNetworkByBSSID(const uint8_t (&bss
 
 // Must be called without s_networksMutex held, after prepareConnectAttempt(). A known `channel` (from a scan) lets
 // esp_wifi probe just that channel instead of sweeping all of them.
-static bool connectWiFi(const std::string& ssid, const std::string& password, const uint8_t* pinnedBssid = nullptr, uint8_t channel = 0)
+static bool connectWiFi(const std::string& ssid, const std::string& password, const uint8_t* pinnedBssid, uint8_t channel)
 {
   if (ssid.empty()) {
     OS_LOGW(TAG, "Cannot connect to network with empty SSID");
@@ -276,17 +287,16 @@ static bool connectWiFi(const std::string& ssid, const std::string& password, co
   s_wifiState.store(WiFiState::Connecting, std::memory_order_relaxed);
   postWiFiState(OPENSHOCK_WIFI_STATE_CONNECTING, kPostWaitFromTask);
 
-  esp_err_t err = esp_wifi_set_config(WIFI_IF_STA, &config);
+  const char* failed = nullptr;
+  esp_err_t err      = esp_wifi_set_config(WIFI_IF_STA, &config);
   if (err != ESP_OK) {
-    OS_LOGE(TAG, "esp_wifi_set_config failed: %s", esp_err_to_name(err));
-    s_wifiState.store(WiFiState::Disconnected, std::memory_order_relaxed);
-    postWiFiState(OPENSHOCK_WIFI_STATE_DISCONNECTED, kPostWaitFromTask);
-    return false;
+    failed = "esp_wifi_set_config";
+  } else if (err = esp_wifi_connect(); err != ESP_OK) {
+    failed = "esp_wifi_connect";
   }
 
-  err = esp_wifi_connect();
-  if (err != ESP_OK) {
-    OS_LOGE(TAG, "esp_wifi_connect failed: %s", esp_err_to_name(err));
+  if (failed != nullptr) {
+    OS_LOGE(TAG, "%s failed: %s", failed, esp_err_to_name(err));
     s_wifiState.store(WiFiState::Disconnected, std::memory_order_relaxed);
     postWiFiState(OPENSHOCK_WIFI_STATE_DISCONNECTED, kPostWaitFromTask);
     return false;
@@ -700,18 +710,11 @@ bool WiFiManager::Save(const char* ssid, std::string_view password, bool connect
     return false;
   }
 
-  // Tag every scanned entry (one per BSSID) and report one of them; the network may have dropped out meanwhile
+  // The network may have dropped out of the scan results meanwhile
   std::optional<WiFiNetwork> saved;
   {
     ScopedLock lock__(&s_networksMutex);
-    for (auto& net : s_wifiNetworks) {
-      if (strcmp(net.ssid, ssid) == 0) {
-        net.credentialsID = id;
-        if (!saved) {
-          saved = net;
-        }
-      }
-    }
+    saved = setCredentialsID(ssid, id);
   }
 
   if (!saved) {
@@ -732,15 +735,15 @@ bool WiFiManager::Forget(const char* ssid)
 {
   OS_LOGV(TAG, "Forgetting network %s", ssid);
 
-  auto creds = Config::TryGetWiFiCredentialsBySSID(ssid);
-  if (!creds) {
+  uint8_t id = Config::GetWiFiCredentialsIDbySSID(ssid);
+  if (id == 0) {
     OS_LOGE(TAG, "Failed to find credentials for network %s", ssid);
     return false;
   }
 
   // Remove first: a connect already under way then finds no credentials when it lands and drops the link itself
   // (see evWiFiConnected), so there is no window to connect to the forgotten network.
-  if (!Config::RemoveWiFiCredentials(creds->id)) {
+  if (!Config::RemoveWiFiCredentials(id)) {
     OS_LOGE(TAG, "Failed to remove credentials for network %s", ssid);
     return false;
   }
@@ -750,15 +753,8 @@ bool WiFiManager::Forget(const char* ssid)
   {
     // evWiFiConnected sets s_connectedCredentialsID under this lock, so this sees either its id or its disconnect
     ScopedLock lock__(&s_networksMutex);
-    for (auto& net : s_wifiNetworks) {
-      if (net.credentialsID == creds->id) {
-        net.credentialsID = 0;
-        if (!removed) {
-          removed = net;
-        }
-      }
-    }
-    connected = s_connectedCredentialsID.load(std::memory_order_relaxed) == creds->id;
+    removed   = setCredentialsID(ssid, 0);
+    connected = s_connectedCredentialsID.load(std::memory_order_relaxed) == id;
   }
 
   if (connected) {
@@ -780,13 +776,7 @@ bool WiFiManager::RefreshNetworkCredentials()
   ScopedLock lock__(&s_networksMutex);
 
   for (auto& net : s_wifiNetworks) {
-    if (auto creds = Config::TryGetWiFiCredentialsBySSID(net.ssid)) {
-      OS_LOGV(TAG, "Found credentials for network %s (" BSSID_FMT ")", net.ssid, BSSID_ARG(net.bssid));
-      net.credentialsID = creds->id;
-    } else {
-      OS_LOGV(TAG, "Failed to find credentials for network %s (" BSSID_FMT ")", net.ssid, BSSID_ARG(net.bssid));
-      net.credentialsID = 0;
-    }
+    net.credentialsID = Config::GetWiFiCredentialsIDbySSID(net.ssid);
   }
 
   return true;
@@ -799,15 +789,15 @@ bool WiFiManager::IsSaved(const char* ssid)
 
 bool WiFiManager::Connect(const char* ssid)
 {
-  auto creds = Config::TryGetWiFiCredentialsBySSID(ssid);
-  if (!creds) {
+  uint8_t id = Config::GetWiFiCredentialsIDbySSID(ssid);
+  if (id == 0) {
     OS_LOGE(TAG, "Failed to find credentials for network %s", ssid);
     return false;
   }
 
   // Already connected to this network: nothing to do
-  if (s_connectedCredentialsID.load(std::memory_order_relaxed) != creds->id || s_wifiState.load(std::memory_order_relaxed) == WiFiState::Disconnected) {
-    requestConnect(creds->id);
+  if (s_connectedCredentialsID.load(std::memory_order_relaxed) != id || s_wifiState.load(std::memory_order_relaxed) == WiFiState::Disconnected) {
+    requestConnect(id);
   }
 
   return true;
