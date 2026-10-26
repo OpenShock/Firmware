@@ -18,8 +18,10 @@ const char* const TAG = "EStopManager";
 #include <freertos/task.h>
 #include <freertos/timers.h>
 
+#include <algorithm>
 #include <atomic>
 #include <cstdint>
+#include <optional>
 
 using namespace OpenShock;
 
@@ -47,6 +49,13 @@ static std::atomic<bool> s_externallyTriggered = false;
 
 static bool s_estopInitialized = false;
 
+// The E-Stop latch as last written to (or read from) the config store; nullopt when that is not known. Owned by Init
+// until the task starts, then by the task: one task runs at a time, and start and stop are serialized by s_estopMutex.
+static std::optional<bool> s_latchStored = std::nullopt;
+
+// How long to wait before writing the latch again after a write failed (a busy store is retried on the next sample).
+const int64_t k_latchRetryInterval = 1000;
+
 static void estopmgr_publishState(EStopState state, EStopState& lastState, TickType_t timeout = pdMS_TO_TICKS(750))
 {
   if (state == lastState) {
@@ -65,13 +74,36 @@ static void estopmgr_publishState(EStopState state, EStopState& lastState, TickT
 
 static void estopmgr_latchWithoutTask();
 
+// Stores the latch when it differs from what is stored. Returns whether it touched flash, which takes the task off its
+// fixed sample rate for the length of the write.
+static bool estopmgr_storeLatch(bool latched, int64_t now, int64_t& nextAttempt)
+{
+  if (s_latchStored == latched || now < nextAttempt) {
+    return false;
+  }
+
+  switch (Config::SaveEStopLatched(latched)) {
+    case Config::LatchSave::Saved:
+      s_latchStored = latched;
+      return true;
+    case Config::LatchSave::Busy:
+      return false;  // Another config writer: try again on the next sample
+    case Config::LatchSave::Failed:
+    default:
+      OS_LOGE(TAG, "Failed to store the E-Stop latch (%s), retrying", latched ? "latched" : "released");
+      nextAttempt = now + k_latchRetryInterval;
+      return true;
+  }
+}
+
 // Samples the estop at a fixed rate and updates internal state + events
 static void estopmgr_managerTask(gpio_num_t estopPin)
 {
   EStopStateMachine machine;
   EStopState lastPublishedState = EStopState::Idle;
 
-  // Carry over an E-Stop latched while no task was running (software trigger); it must be cleared with the button.
+  // Carry over an E-Stop latched while no task was running (software trigger, or the latch stored before a reboot);
+  // it must be cleared with the button.
   int64_t latchedAt = s_estopActivatedAt.load(std::memory_order_relaxed);
   if (latchedAt != 0) {
     machine.Trigger(latchedAt);
@@ -81,6 +113,8 @@ static void estopmgr_managerTask(gpio_num_t estopPin)
   // On the task watchdog for as long as it samples: a wedged sampler means the kill switch silently stops working.
   // Fed every 5 ms sample, so only a real hang (not a slow post or log) can trip it.
   TaskUtils::TaskWatchdog watchdog;
+
+  int64_t nextLatchAttempt = 0;
 
   // Check if killing manager was requested, continue looping otherwise
   TickType_t lastWake = xTaskGetTickCount();
@@ -110,6 +144,14 @@ static void estopmgr_managerTask(gpio_num_t estopPin)
     }
 
     estopmgr_publishState(machine.state(), lastPublishedState);
+
+    // Only once the state is mirrored and published: the E-Stop is in effect before its latch reaches flash, and a
+    // slow write never delays it.
+    if (estopmgr_storeLatch(machine.activatedAt() != 0, now, nextLatchAttempt)) {
+      // Resume the fixed rate from here instead of catching up with back-to-back samples, which would shorten the
+      // debounce window.
+      lastWake = xTaskGetTickCount();
+    }
   }
 
   // An active E-Stop survives the stop: s_estopActivatedAt stays set, and the next task takes it over (or, with no
@@ -228,11 +270,32 @@ bool EStopManager::Init()
     return false;
   }
 
+  // Read before anything can transmit: CommandHandler and the RF transmitter start after this.
+  bool latched  = OpenShock::Config::LoadEStopLatched();
+  s_latchStored = latched;
+
   if (!cfg->enabled) {
+    if (latched) {
+      // Without an input there is no button to clear it, so it would stop the hub for good. Drop it.
+      OS_LOGW(TAG, "E-Stop was latched, but the E-Stop is disabled; releasing the latch");
+      if (OpenShock::Config::SaveEStopLatched(false) == OpenShock::Config::LatchSave::Saved) {
+        s_latchStored = false;
+      }
+    }
     return true;
   }
 
   OpenShock::ScopedLock lock__(&s_estopMutex);
+
+  if (latched) {
+    // Active from here on, through IsEStopped(); the task takes it over and it is cleared with the button. Even if the
+    // input can't be set up below, it stays active until a reboot that can.
+    OS_LOGW(TAG, "E-Stop was latched before the restart, keeping it active until it is cleared with the button");
+    s_estopActivatedAt.store(std::max<int64_t>(OpenShock::millis(), 1));
+    s_estopActive.store(true);
+    EStopState lastState = EStopState::Idle;
+    estopmgr_publishState(EStopState::Active, lastState);
+  }
 
   if (!estopmgr_configurePin(cfg->gpioPin)) {
     return false;

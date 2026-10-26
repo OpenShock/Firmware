@@ -14,6 +14,7 @@ idf_component_register(
                "test_legacy.cpp"      # the 1.x config file (legacy_fixtures.h) imported on first boot
                "test_corrupt.cpp"     # truncated / garbage / tampered input
                "test_storage.cpp"     # store selection, the move from the shared nvs into cfg, the registry
+               "test_estop_latch.cpp" # the E-Stop latch kept beside the estop section
                # The framework
                "${_components}/config/src/Nvs.cpp"
                "${_components}/config/src/Parse.cpp"
