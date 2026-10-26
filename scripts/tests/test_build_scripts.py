@@ -198,3 +198,25 @@ def test_main_takes_the_smallest_of_every_limit(tmp_path, monkeypatch):
 
     with pytest.raises(SystemExit):
         gen_staticfs.main(args)  # no limit at all
+
+
+def test_the_legacy_image_is_littlefs_sized_for_static0(tmp_path):
+    from littlefs import LittleFS
+
+    entries = gen_staticfs.collect_assets(write_build(tmp_path))
+    output = tmp_path / 'staticfs.bin'
+    size = gen_staticfs.legacy_partition_size()
+    assert size == 0x9D000
+
+    gen_staticfs.pack_legacy_image(entries, output, size)
+
+    image = output.read_bytes()
+    assert len(image) == size
+    fs = LittleFS(
+        block_size=gen_staticfs.LFS_BLOCK_SIZE, block_count=size // gen_staticfs.LFS_BLOCK_SIZE, disk_version=0
+    )
+    fs.context.buffer[:] = image
+    fs.mount()
+    assert sorted(fs.listdir('www')) == ['assets', 'index.html.gz']
+    with fs.open('www/index.html.gz', 'rb') as f:
+        assert gzip.decompress(f.read()) == b'<!doctype html><title>x</title>'

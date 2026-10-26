@@ -1,5 +1,8 @@
 cryptography==50.0.2
 esptool==5.6.0
+# scripts/gen_staticfs.py --legacy-output: the littlefs staticfs image a 1.x hub's OTA installs and checks by
+# mounting it, published for 1.x-numbered releases (the 1.9.x pivot) only. Goes away with release/1.9.
+littlefs-python==0.19.0
 # .github/workflows run scripts/ci_build_gate.py, get_vars.py and repo_server_*.py against the GitHub and repository-server APIs
 requests==2.34.2
 semver==3.1.0

@@ -10,6 +10,11 @@ The output is reproducible: gzip headers carry no timestamp and entries are sort
 byte-identical www.bin (and the same hash, so devices don't re-flash it). One image serves every board: it is not
 padded to any partition size, only checked to fit.
 
+With --legacy-output it also packs the same assets as a littlefs image of the 1.x `static0` partition
+(partitions/legacy/ota_4mb_v1.csv, under /www/<path>.gz). That is what a 1.x hub's OTA installs as the `staticfs`
+artifact and verifies by mounting it, so it is published for 1.x-numbered releases (the 1.9.x pivot) only; it goes
+away with release/1.9.
+
 Invoked by CMake (see the root CMakeLists.txt), and by CI with --skip-frontend-build.
 """
 
@@ -18,12 +23,22 @@ import gzip
 import os
 import shutil
 import subprocess
+import sys
 from collections.abc import Iterable
 from pathlib import Path
 
 from utils import partitions, wwwimage
 
 WWW_PARTITION = 'www'
+
+# The littlefs geometry the 1.x firmware (and 1.9.x on the 1.x layout) mounts static0 with (components/fs/src/
+# LfsPartition.cpp). Only the block size is on disk and checked at mount; the rest are runtime buffer sizes.
+LEGACY_PARTITION = 'static0'
+LEGACY_TABLE = 'partitions/legacy/ota_4mb_v1.csv'
+LFS_BLOCK_SIZE = 4096
+LFS_READ_SIZE = LFS_PROG_SIZE = 128
+LFS_CACHE_SIZE = 512
+LFS_LOOKAHEAD_SIZE = 128
 
 # Inputs of the frontend build; a change to any of them makes frontend/build stale.
 FRONTEND_INPUTS = (
@@ -156,6 +171,40 @@ def pack_image(entries: list[wwwimage.Entry], output: Path, max_size: int) -> No
     )
 
 
+def pack_legacy_image(entries: list[wwwimage.Entry], output: Path, partition_size: int) -> None:
+    """The assets as the 1.x littlefs image: /www/<path>.gz, exactly partition_size bytes."""
+    try:
+        from littlefs import LittleFS
+    except ImportError:
+        raise SystemExit(
+            f'error: littlefs-python is not installed for {sys.executable}: the build scripts need an interpreter '
+            'with requirements.txt installed (docs/DEVELOPING.md, Python dependencies)'
+        ) from None
+
+    if partition_size % LFS_BLOCK_SIZE != 0:
+        raise SystemExit(f'error: partition size {partition_size} is not a multiple of block size {LFS_BLOCK_SIZE}')
+    fs = LittleFS(
+        block_size=LFS_BLOCK_SIZE,
+        block_count=partition_size // LFS_BLOCK_SIZE,
+        read_size=LFS_READ_SIZE,
+        prog_size=LFS_PROG_SIZE,
+        cache_size=LFS_CACHE_SIZE,
+        lookahead_size=LFS_LOOKAHEAD_SIZE,
+    )
+    for entry in sorted(entries, key=lambda e: e.path):
+        path = f'www/{entry.path}.gz'
+        fs.makedirs(path.rsplit('/', 1)[0], exist_ok=True)
+        with fs.open(path, 'wb') as f_out:
+            f_out.write(entry.data)
+    output.resolve().parent.mkdir(parents=True, exist_ok=True)
+    output.write_bytes(bytes(fs.context.buffer))
+    log(f'Packed {len(entries)} assets into the 1.x littlefs image {output} ({partition_size} bytes)')
+
+
+def legacy_partition_size() -> int:
+    return partitions.read_partitions(partitions.ROOT / LEGACY_TABLE)[LEGACY_PARTITION]['size']
+
+
 def main(argv: list[str] | None = None) -> int:
     p = argparse.ArgumentParser(description='Build the OpenShock captive-portal asset image (www.bin)')
     p.add_argument('--frontend-dir', type=Path, required=True, help='Path to the frontend/ project')
@@ -173,6 +222,11 @@ def main(argv: list[str] | None = None) -> int:
     )
     p.add_argument(
         '--skip-frontend-build', action='store_true', help='Reuse existing frontend/build without invoking pnpm'
+    )
+    p.add_argument(
+        '--legacy-output',
+        type=Path,
+        help=f'also write the assets as the 1.x littlefs {LEGACY_PARTITION} image here (1.x-numbered releases)',
     )
     args = p.parse_args(argv)
 
@@ -192,6 +246,8 @@ def main(argv: list[str] | None = None) -> int:
     entries = collect_assets(build_dir)
     log(f'Collected {len(entries)} gzipped assets from {build_dir}')
     pack_image(entries, args.output, min(limits))
+    if args.legacy_output is not None:
+        pack_legacy_image(entries, args.legacy_output, legacy_partition_size())
     return 0
 
 
