@@ -12,7 +12,8 @@ namespace OpenShock {
     class Client;
   }
 
-  /// @brief The `static0` partition holding the captive portal's web assets (served by the portal, rewritten by OTA).
+  /// @brief The littlefs `static0` partition that holds the captive portal's assets on the 1.x partition layout, or null
+  ///        on a 2.x layout (which has the flat `www` image instead, www/WwwPartition.h). 1.x compatibility.
   const esp_partition_t* FindStaticPartition();
 
   bool TryGetPartitionHash(const esp_partition_t* partition, char (&hash)[65]);

@@ -23,6 +23,7 @@ const char* const TAG = "OtaUpdateManager";
 #include "util/HexUtils.h"
 #include "util/TaskUtils.h"
 #include "wifi/WiFiManager.h"
+#include "www/WwwPartition.h"
 #include "json/Json.h"
 
 #include <esp_event.h>
@@ -73,6 +74,7 @@ static std::atomic<esp_ota_img_states_t> _otaImageState;
 static OpenShock::FirmwareBootType _bootType;
 static TaskHandle_t _taskHandle = nullptr;
 static OpenShock::SemVer _requestedVersion;
+static bool _requestedByHub                          = false;  // Guarded by _requestedVersionMutex, like _requestedVersion
 static OpenShock::SimpleMutex _requestedVersionMutex = {};
 
 using namespace OpenShock;
@@ -92,7 +94,7 @@ static bool otaum_try_notify_task(uint32_t eventFlag)
   return true;
 }
 
-static bool otaum_try_queue_update_request(const OpenShock::SemVer& version)
+static bool otaum_try_queue_update_request(const OpenShock::SemVer& version, bool byHub)
 {
   if (!_requestedVersionMutex.lock(pdMS_TO_TICKS(1000))) {
     OS_LOGE(TAG, "Failed to take requested version mutex");
@@ -100,12 +102,24 @@ static bool otaum_try_queue_update_request(const OpenShock::SemVer& version)
   }
 
   _requestedVersion = version;
+  _requestedByHub   = byHub;
 
   _requestedVersionMutex.unlock();
 
   otaum_try_notify_task(OTA_TASK_EVENT_UPDATE_REQUESTED);
 
   return true;
+}
+
+// Whether the pending request came from the hub itself (TryStartMigrationUpdate) rather than the backend.
+static bool _isRequestByHub()
+{
+  if (!_requestedVersionMutex.lock(pdMS_TO_TICKS(1000))) {
+    return false;
+  }
+  bool byHub = _requestedByHub;
+  _requestedVersionMutex.unlock();
+  return byHub;
 }
 
 [[nodiscard]] static std::optional<OpenShock::SemVer> _tryGetRequestedVersion()
@@ -310,10 +324,12 @@ static bool otaum_flash_fs_partition(OpenShock::HTTP::Client& client, const esp_
     return false;
   }
 
-  // Verify the freshly flashed image mounts cleanly.
-  if (!OpenShock::TestFilesystem(parition)) {
-    OS_LOGE(TAG, "Failed to mount filesystem");
-    _sendFailureMessage("Failed to mount filesystem"sv);
+  // Verify the freshly flashed image: the www format where the table has a www partition, else (1.x layout) that the
+  // littlefs image mounts.
+  const bool valid = parition->type == Www::kPartitionType ? Www::VerifyPartition(parition) : OpenShock::TestFilesystem(parition);
+  if (!valid) {
+    OS_LOGE(TAG, "The flashed filesystem image is not valid");
+    _sendFailureMessage("The flashed filesystem image is not valid"sv);
     return false;
   }
 
@@ -377,7 +393,9 @@ static void otaum_updatetask(void* arg)
       continue;
     }
 
-    if (updateRequested && !config.allowBackendManagement) {
+    const bool requestedByHub = updateRequested && _isRequestByHub();
+
+    if (updateRequested && !requestedByHub && !config.allowBackendManagement) {
       OS_LOGW(TAG, "Ignoring backend update request, backend management is disabled");
       updateRequested = false;
     }
@@ -399,7 +417,7 @@ static void otaum_updatetask(void* arg)
     lastUpdateCheck = now;
     checkRequested  = false;
 
-    if (config.requireManualApproval) {
+    if (config.requireManualApproval && !requestedByHub) {
       OS_LOGD(TAG, "Manual approval required, skipping update check");
       updateRequested = false;  // Otherwise it re-triggers this branch every minute
       // TODO: IMPLEMENT
@@ -496,8 +514,11 @@ static void otaum_updatetask(void* arg)
       continue;
     }
 
-    // Get filesystem partition.
-    const esp_partition_t* filesystemPartition = FindStaticPartition();
+    // The portal assets go into the www partition; on the 1.x layout, which has none, into littlefs static0.
+    const esp_partition_t* filesystemPartition = Www::FindPartition();
+    if (filesystemPartition == nullptr) {
+      filesystemPartition = FindStaticPartition();
+    }
     if (filesystemPartition == nullptr) {
       OS_LOGE(TAG, "Failed to find filesystem partition");
       _sendFailureMessage("Failed to find filesystem partition"sv);
@@ -514,8 +535,12 @@ static void otaum_updatetask(void* arg)
       }
     } reopenPortalOnFailure;
 
-    // Flash app and filesystem partitions.
-    if (!otaum_flash_fs_partition(client, filesystemPartition, release.filesystemBinaryUrl, release.filesystemBinaryHash)) {
+    // Flash app and filesystem partitions. An unchanged www image (the same hash) is not written again.
+    std::array<uint8_t, 32> currentWwwHash {};
+    const bool wwwCurrent = filesystemPartition->type == Www::kPartitionType && Www::ImageSha256(filesystemPartition, currentWwwHash) && memcmp(currentWwwHash.data(), release.filesystemBinaryHash, 32) == 0;
+    if (wwwCurrent) {
+      OS_LOGI(TAG, "The www image is already current, not flashing it");
+    } else if (!otaum_flash_fs_partition(client, filesystemPartition, release.filesystemBinaryUrl, release.filesystemBinaryHash)) {
       continue;
     }
     if (!otaum_flash_app_partition(client, appPartition, release.appBinaryUrl, release.appBinaryHash)) {
@@ -760,7 +785,7 @@ static bool _tryParseIntoHash(std::string_view hash, uint8_t (&hashBytes)[32])
 
   OtaUpdateManager::FirmwareRelease release {};
 
-  bool foundApp = false, foundFilesystem = false;
+  bool foundApp = false, foundFilesystem = false, foundPartitions = false;
 
   int count = artifacts.count();
   for (int i = 0; i < count; i++) {
@@ -799,6 +824,17 @@ static bool _tryParseIntoHash(std::string_view hash, uint8_t (&hashBytes)[32])
       }
       release.filesystemBinaryUrl = std::move(*urlStr);
       foundFilesystem             = true;
+    } else if (*typeStr == "partitions"sv) {
+      // Optional: only the partition table migration uses it
+      if (foundPartitions) {
+        OS_LOGE(TAG, "Duplicate 'partitions' artifact");
+        return std::nullopt;
+      }
+      if (!_tryParseIntoHash(*hashStr, release.partitionTableHash)) {
+        return std::nullopt;
+      }
+      release.partitionTableUrl = std::move(*urlStr);
+      foundPartitions           = true;
     }
   }
 
@@ -846,7 +882,14 @@ bool OtaUpdateManager::TryStartFirmwareUpdate(const OpenShock::SemVer& version)
 {
   OS_LOGD(TAG, "Requesting firmware version %s", version.toString().c_str());  // TODO: This is abusing the SemVer::toString() method causing alot of string copies, fix this
 
-  return otaum_try_queue_update_request(version);
+  return otaum_try_queue_update_request(version, false);
+}
+
+bool OtaUpdateManager::TryStartMigrationUpdate(const OpenShock::SemVer& version)
+{
+  OS_LOGI(TAG, "Installing firmware version %s to finish the partition layout migration", version.toString().c_str());
+
+  return otaum_try_queue_update_request(version, true);
 }
 
 bool OtaUpdateManager::RequestUpdateCheck()

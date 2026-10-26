@@ -8,6 +8,7 @@
 #include "fs/StaticFs.h"
 #include "OpenShock.h"
 #include "SimpleMutex.h"
+#include "www/WwwPartition.h"
 
 #include <esp_http_server.h>
 
@@ -16,6 +17,7 @@
 #include <deque>
 #include <memory>
 #include <span>
+#include <string>
 #include <string_view>
 #include <vector>
 
@@ -89,8 +91,11 @@ namespace OpenShock::CaptivePortal {
     static void wsSessCtxFree(void* ctx);
 
     httpd_handle_t m_server;
+    // The portal assets: the flat www image (2.x layouts), or on the 1.x layout, which has no www partition, the
+    // littlefs static0 image (1.x compatibility; goes away with release/1.9). At most one is mounted.
+    Www::Partition m_www;
     StaticFs m_staticFs;
-    const char* m_fsHash;
+    std::string m_etag;  // quoted, for ETag / If-None-Match; empty when unknown
     DNSServer m_dnsServer;
 
     WsClient m_clients[MAX_WS_CLIENTS];

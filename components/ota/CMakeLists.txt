@@ -11,6 +11,7 @@ idf_component_register(
   REQUIRES      common                                          # enums/FirmwareBootType.h, enums/OtaUpdateChannel.h, SemVer.h in public header
   PRIV_REQUIRES core captive_portal config                      # gateway/wifi/WSGateway/AppHooks; CaptivePortal::ForceClose; Config::
                 crypto fs http hwutil logging osjson temporal   # Hashing, FsCheck, HTTPRequestManager, PartitionUtils, json
+                www                                             # the www image: where staticfs goes on 2.x layouts
                 app_update esp_event esp_netif esp_wifi         # esp_ota_ops.h, WiFi/IP event handlers
 )
 

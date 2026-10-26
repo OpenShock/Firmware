@@ -81,15 +81,11 @@ static OpenShock::RateLimiter& getAccountLinkRateLimiter()
   return *rl;
 }
 
-static const char* getPartitionHash()
+// The littlefs static0 image's hash, for its ETag (1.x layout only). Hashing the whole partition takes a noticeable
+// time and its content only changes through OTA, which restarts the device, so it is computed once per boot. Only
+// called from the portal manager task.
+static const char* getLegacyPartitionHash(const esp_partition_t* partition)
 {
-  const esp_partition_t* partition = FindStaticPartition();
-  if (partition == nullptr) {
-    return nullptr;
-  }
-
-  // Hashing the whole partition takes a noticeable time and its content only changes through OTA, which restarts the
-  // device, so compute it once per boot. Only called from the portal manager task.
   static char hash[65];
   static bool hashValid = false;
   if (!hashValid) {
@@ -564,26 +560,45 @@ static esp_err_t apiOtaCheck(httpd_req_t* req)
 }
 
 // ---------------------------------------------------------------------------
-// Static file serving (gzipped assets from the raw littlefs static0 partition)
+// Static file serving: the www image (mapped, served by pointer), or littlefs static0 on the 1.x layout
 // ---------------------------------------------------------------------------
+
+static esp_err_t sendNoAssets(httpd_req_t* req)
+{
+  return sendResp(
+    req,
+    S200,
+    HTTP::ContentType::TextPlain,
+    R"(This hub has no captive portal assets.
+They are installed with every firmware update; flashing the merged image for your board over USB also restores them.
+If this happened with a file we provided or you just need help, come to the Discord!
+
+discord.gg/OpenShock
+)"
+  );
+}
+
+// Answers a conditional request whose ETag matches. Returns true when it did.
+static bool sendNotModified(httpd_req_t* req, const std::string& etag, esp_err_t& result)
+{
+  if (etag.empty()) {
+    return false;
+  }
+  char inm[80];
+  if (httpd_req_get_hdr_value_str(req, "If-None-Match", inm, sizeof(inm)) != ESP_OK || etag != inm) {
+    return false;
+  }
+  httpd_resp_set_status(req, S304);
+  result = httpd_resp_send(req, nullptr, 0);
+  return true;
+}
 
 esp_err_t CaptivePortal::CaptivePortalInstance::staticFileHandler(httpd_req_t* req)
 {
   auto* self = static_cast<CaptivePortalInstance*>(req->user_ctx);
 
-  if (!self->m_staticFs.isMounted()) {
-    // Filesystem image was never uploaded; serve the help page for any request.
-    return sendResp(
-      req,
-      S200,
-      HTTP::ContentType::TextPlain,
-      R"(You probably forgot to upload the Filesystem with PlatformIO!
-Go to PlatformIO -> Platform -> Upload Filesystem Image!
-If this happened with a file we provided or you just need help, come to the Discord!
-
-discord.gg/OpenShock
-)"
-    );
+  if (!self->m_www.isMounted() && !self->m_staticFs.isMounted()) {
+    return sendNoAssets(req);
   }
 
   std::string uri(req->uri);
@@ -601,7 +616,32 @@ discord.gg/OpenShock
     uri = "/index.html";
   }
 
-  // All assets are pre-gzipped, stored at /www/<path>.gz on the static0 partition.
+  if (self->m_www.isMounted()) {
+    // Stored without the leading slash
+    auto asset = self->m_www.find(std::string_view(uri).substr(1));
+    if (!asset) {
+      // Unknown path -> captive redirect (the index fallback of a static server).
+      return RFC8908::EmitRedirect(req);
+    }
+
+    esp_err_t result = ESP_OK;
+    if (sendNotModified(req, self->m_etag, result)) {
+      return result;
+    }
+
+    httpd_resp_set_type(req, contentTypeForPath(uri));
+    if (asset->gzip()) {
+      httpd_resp_set_hdr(req, "Content-Encoding", "gzip");
+    }
+    httpd_resp_set_hdr(req, "Cache-Control", asset->immutable() ? "public, max-age=31536000, immutable" : "max-age=3600");
+    if (!self->m_etag.empty()) {
+      httpd_resp_set_hdr(req, "ETag", self->m_etag.c_str());
+    }
+    // Straight from the flash mapping: no copy, no filesystem
+    return httpd_resp_send(req, reinterpret_cast<const char*>(asset->body.data()), static_cast<ssize_t>(asset->body.size()));
+  }
+
+  // 1.x layout: all assets are pre-gzipped, stored at /www/<path>.gz on the littlefs static0 partition.
   std::string path = "/www" + uri + ".gz";
 
   if (!self->m_staticFs.exists(path.c_str())) {
@@ -609,22 +649,16 @@ discord.gg/OpenShock
     return RFC8908::EmitRedirect(req);
   }
 
-  // ETag / conditional request. Keep the quoted hash alive until after send.
-  std::string etag;
-  if (self->m_fsHash != nullptr) {
-    etag = std::string("\"") + self->m_fsHash + "\"";
-    char inm[80];
-    if (httpd_req_get_hdr_value_str(req, "If-None-Match", inm, sizeof(inm)) == ESP_OK && etag == inm) {
-      httpd_resp_set_status(req, S304);
-      return httpd_resp_send(req, nullptr, 0);
-    }
+  esp_err_t result = ESP_OK;
+  if (sendNotModified(req, self->m_etag, result)) {
+    return result;
   }
 
   httpd_resp_set_type(req, contentTypeForPath(uri));
   httpd_resp_set_hdr(req, "Content-Encoding", "gzip");
   httpd_resp_set_hdr(req, "Cache-Control", "max-age=3600");
-  if (!etag.empty()) {
-    httpd_resp_set_hdr(req, "ETag", etag.c_str());
+  if (!self->m_etag.empty()) {
+    httpd_resp_set_hdr(req, "ETag", self->m_etag.c_str());
   }
 
   bool ok = self->m_staticFs.readFile(path.c_str(), [req](std::span<const uint8_t> chunk) { return httpd_resp_send_chunk(req, reinterpret_cast<const char*>(chunk.data()), chunk.size()) == ESP_OK; });
@@ -1156,23 +1190,42 @@ bool CaptivePortal::CaptivePortalInstance::startHttpServer()
 
 CaptivePortal::CaptivePortalInstance::CaptivePortalInstance()
   : m_server(nullptr)
+  , m_www()
   , m_staticFs()
-  , m_fsHash(nullptr)
+  , m_etag()
   , m_dnsServer()
   , m_clients {}
   , m_clientsMutex()
 {
-  // Mount the static filesystem (gzipped portal assets) read-only via raw littlefs.
-  const esp_partition_t* partition = FindStaticPartition();
-  if (partition == nullptr) {
-    OS_LOGE(TAG, "Failed to find static filesystem partition");
+  // The portal assets: the www image where the partition table has one, else (1.x layout) littlefs static0.
+  if (const esp_partition_t* www = Www::FindPartition(); www != nullptr) {
+    if (m_www.mount(www)) {
+      if (!m_www.find("index.html")) {
+        OS_LOGE(TAG, "The www image has no index.html, serving the error page");
+        m_www.unmount();
+      } else {
+        const auto bodyHash = m_www.image().BodyHash();
+        char hex[Www::kBodyHashSize * 2 + 1];
+        for (std::size_t i = 0; i < bodyHash.size(); ++i) {
+          HexUtils::ToHex(bodyHash[i], &hex[i * 2], false);
+        }
+        hex[sizeof(hex) - 1] = '\0';
+        m_etag               = std::string("\"") + hex + "\"";
+        OS_LOGI(TAG, "Serving files from the www image (%s)", m_etag.c_str());
+      }
+    }
+  } else if (const esp_partition_t* partition = FindStaticPartition(); partition == nullptr) {
+    OS_LOGE(TAG, "Failed to find a www or static filesystem partition");
   } else if (!m_staticFs.mount(partition)) {
     OS_LOGE(TAG, "Failed to mount static filesystem");
   } else if (!m_staticFs.exists("/www/index.html.gz")) {
     OS_LOGE(TAG, "/www/index.html.gz not found, serving error page");
+    m_staticFs.unmount();
   } else {
-    m_fsHash = getPartitionHash();
-    OS_LOGI(TAG, "Serving files from littlefs (hash: %s)", m_fsHash != nullptr ? m_fsHash : "?");
+    if (const char* hash = getLegacyPartitionHash(partition)) {
+      m_etag = std::string("\"") + hash + "\"";
+    }
+    OS_LOGI(TAG, "Serving files from littlefs (hash: %s)", m_etag.empty() ? "?" : m_etag.c_str());
   }
 
   // Start the combined HTTP + WebSocket server on port 80.
@@ -1199,5 +1252,6 @@ CaptivePortal::CaptivePortalInstance::~CaptivePortalInstance()
     m_server = nullptr;
   }
 
+  m_www.unmount();
   m_staticFs.unmount();
 }
