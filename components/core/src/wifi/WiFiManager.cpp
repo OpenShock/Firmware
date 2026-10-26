@@ -46,6 +46,9 @@ static const char* wifiDisconnectReason(uint8_t reason)
     // Network not reachable
     case WIFI_REASON_NO_AP_FOUND:
       return "Network not found, is it in range?";
+    case WIFI_REASON_NO_AP_FOUND_W_COMPATIBLE_SECURITY:
+    case WIFI_REASON_NO_AP_FOUND_IN_AUTHMODE_THRESHOLD:  // Weaker than the security it was saved with
+      return "Network security is weaker than expected, not connecting";
     case WIFI_REASON_BEACON_TIMEOUT:
       return "Lost connection to the network, out of range?";
     case WIFI_REASON_CONNECTION_FAIL:
@@ -91,7 +94,6 @@ enum class WiFiState : uint8_t {
 
 static esp_netif_t* s_staNetif = nullptr;
 static std::atomic<WiFiState> s_wifiState {WiFiState::Disconnected};
-static uint8_t s_connectedBSSID[6]                   = {0};  // Guarded by s_networksMutex
 static std::atomic<uint8_t> s_connectedCredentialsID = 0;
 static std::atomic<uint8_t> s_preferredCredentialsID = 0;
 static OpenShock::SimpleMutex s_networksMutex;
@@ -225,19 +227,13 @@ static std::optional<WiFiNetwork> setCredentialsID(const char* ssid, uint8_t cre
   return Config::TryGetWiFiCredentialsByID(best->credentialsID);
 }
 
-// Requires s_networksMutex. Records the attempt and rejects the network if its scanned auth mode is weaker than expected.
-// Returns the scanned channel of the strongest BSSID (0 if not scanned), or nullopt if the network is rejected.
-[[nodiscard]] static std::optional<uint8_t> prepareConnectAttempt(const std::string& ssid, wifi_auth_mode_t expectedAuthMode)
+// Requires s_networksMutex. Records the attempt and returns the scanned channel of the strongest BSSID, or 0 if the
+// network isn't in the scan results (hidden or out of range).
+[[nodiscard]] static uint8_t prepareConnectAttempt(const std::string& ssid)
 {
   auto it = findNetworkBySSID(ssid.c_str());
   if (it == s_wifiNetworks.end()) {
-    return uint8_t {0};  // Not scanned (hidden or out of range); nothing to validate against
-  }
-
-  // Reject if the AP's auth mode is weaker than expected (evil twin protection)
-  if (expectedAuthMode != WIFI_AUTH_MAX && it->authMode < expectedAuthMode) {
-    OS_LOGW(TAG, "Rejecting network %s: auth mode %d is weaker than expected %d", ssid.c_str(), it->authMode, expectedAuthMode);
-    return std::nullopt;
+    return 0;
   }
 
   it->connectAttempts++;
@@ -257,8 +253,9 @@ static std::optional<WiFiNetwork> setCredentialsID(const char* ssid, uint8_t cre
 }
 
 // Must be called without s_networksMutex held, after prepareConnectAttempt(). A known `channel` (from a scan) lets
-// esp_wifi probe just that channel instead of sweeping all of them.
-static bool connectWiFi(const std::string& ssid, const std::string& password, const uint8_t* pinnedBssid, uint8_t channel)
+// esp_wifi probe just that channel instead of sweeping all of them. `authMode` is the security the network was saved
+// with (WIFI_AUTH_MAX if unknown): esp_wifi skips every BSSID weaker than that (evil twin protection).
+static bool connectWiFi(const std::string& ssid, const std::string& password, wifi_auth_mode_t authMode, const uint8_t* pinnedBssid, uint8_t channel)
 {
   if (ssid.empty()) {
     OS_LOGW(TAG, "Cannot connect to network with empty SSID");
@@ -274,11 +271,16 @@ static bool connectWiFi(const std::string& ssid, const std::string& password, co
   wifi_config_t config = {};
   std::strncpy(reinterpret_cast<char*>(config.sta.ssid), ssid.c_str(), sizeof(config.sta.ssid));
   std::strncpy(reinterpret_cast<char*>(config.sta.password), password.c_str(), sizeof(config.sta.password));
-  // Let esp_wifi pick the strongest matching BSSID and retry a few times before giving up.
+  // With a known channel, a fast scan takes the first matching BSSID it finds there. Without one, an all-channel scan
+  // picks the strongest matching BSSID (sort_method defaults to WIFI_CONNECT_AP_BY_SIGNAL) and retries it a few times;
+  // esp_wifi applies failure_retry_cnt to all-channel scans only.
   config.sta.scan_method       = channel != 0 ? WIFI_FAST_SCAN : WIFI_ALL_CHANNEL_SCAN;
   config.sta.channel           = channel;
-  config.sta.sort_method       = WIFI_CONNECT_AP_BY_SIGNAL;
   config.sta.failure_retry_cnt = 3;
+  // Left unset, esp_wifi requires WPA2 for any password of 8+ characters, so WPA/WEP networks would never connect
+  if (authMode != WIFI_AUTH_MAX) {
+    config.sta.threshold.authmode = authMode;
+  }
   if (pinnedBssid != nullptr) {
     config.sta.bssid_set = true;
     std::memcpy(config.sta.bssid, pinnedBssid, sizeof(config.sta.bssid));
@@ -317,8 +319,6 @@ static void evWiFiConnected(const wifi_event_sta_connected_t& info)
   std::optional<WiFiNetwork> network;  // The scanned entry for this BSSID, if any
   {
     ScopedLock lock__(&s_networksMutex);
-
-    memcpy(s_connectedBSSID, info.bssid, sizeof(s_connectedBSSID));
 
     // A successful connection clears the retry throttling for every BSSID of this network
     for (WiFiNetwork& net : s_wifiNetworks) {
@@ -468,11 +468,6 @@ static void evWiFiScanStatusChanged(OpenShock::WiFiScanStatus status)
         }
       }
     }
-
-    // If the scan completed, sort the networks by RSSI
-    if (status == OpenShock::WiFiScanStatus::Completed || status == OpenShock::WiFiScanStatus::Aborted || status == OpenShock::WiFiScanStatus::Error) {
-      std::sort(s_wifiNetworks.begin(), s_wifiNetworks.end(), strongerSignal);
-    }
   }
 
   // One message for all of them rather than one per network
@@ -519,9 +514,11 @@ static void evWiFiNetworksDiscovery(const std::vector<const wifi_ap_record_t*>& 
       discoveredNetworks.push_back(network);
       OS_LOGV(TAG, "Discovered new network %s (" BSSID_FMT ")", network.ssid, BSSID_ARG(network.bssid));
 
-      // Insert the network into the list of networks sorted by RSSI
-      s_wifiNetworks.insert(std::lower_bound(s_wifiNetworks.begin(), s_wifiNetworks.end(), network, strongerSignal), std::move(network));
+      s_wifiNetworks.push_back(std::move(network));
     }
+
+    // Updated RSSIs and appended networks both break the order; restore it once, before anyone else sees the list
+    std::sort(s_wifiNetworks.begin(), s_wifiNetworks.end(), strongerSignal);
   }
 
   if (!updatedNetworks.empty()) {
@@ -537,7 +534,7 @@ static bool tryConnect()
   std::optional<Config::WiFiCredentials> creds;
   uint8_t channel = 0;
 
-  // Select the target network, validate it and mark it as attempted under lock, then release before connecting
+  // Select the target network and mark it as attempted under lock, then release before connecting
   {
     ScopedLock lock__(&s_networksMutex);
 
@@ -555,14 +552,10 @@ static bool tryConnect()
       }
     }
 
-    auto scannedChannel = prepareConnectAttempt(creds->ssid, creds->authMode);
-    if (!scannedChannel) {
-      return false;
-    }
-    channel = *scannedChannel;
+    channel = prepareConnectAttempt(creds->ssid);
   }
 
-  return connectWiFi(creds->ssid, creds->password, creds->HasPinnedBSSID() ? creds->bssid.data() : nullptr, channel);
+  return connectWiFi(creds->ssid, creds->password, creds->authMode, creds->HasPinnedBSSID() ? creds->bssid.data() : nullptr, channel);
 }
 
 // Published once the update task exists; wakes before that are no-ops and its 1 s poll picks the work up
@@ -814,27 +807,12 @@ bool WiFiManager::IsConnected()
 }
 bool WiFiManager::GetConnectedNetwork(OpenShock::WiFiNetwork& network)
 {
-  uint8_t connectedId;
-  {
-    // evWiFiConnected sets the ID and the BSSID together under this lock, so they belong to the same connection
-    ScopedLock lock__(&s_networksMutex);
-    connectedId = s_connectedCredentialsID.load(std::memory_order_relaxed);
-
-    // Match the associated BSSID: several APs (mesh, 2.4/5 GHz) can share one set of credentials
-    if (connectedId != 0) {
-      if (auto it = findNetworkByBSSID(s_connectedBSSID); it != s_wifiNetworks.end()) {
-        network = *it;
-        return true;
-      }
-    }
-  }
-
   if (!IsConnected()) {
     return false;
   }
 
-  // The connected network is not in the scan results (e.g. connected on boot before any scan), so query the AP directly
-  auto apNetwork = getConnectedAPNetwork(connectedId);
+  // The driver knows the associated AP (the actual BSSID, even when several share the credentials) and its live RSSI
+  auto apNetwork = getConnectedAPNetwork(s_connectedCredentialsID.load(std::memory_order_relaxed));
   if (!apNetwork) {
     return false;
   }
