@@ -28,8 +28,8 @@ const char* const TAG = "DiagUpload";
 using namespace OpenShock;
 using namespace OpenShock::Diagnostics;
 
-// Upload endpoints, on the linked backend or the override domain. On the linked backend they take the hub token in the
-// DeviceToken header, like the other /device endpoints; elsewhere they get no token.
+// Upload endpoints, on CONFIG_OPENSHOCK_DIAG_UPLOAD_DOMAIN. When that is the backend the hub is linked to they take the
+// hub token in the DeviceToken header, like the other /device endpoints; elsewhere they get no token.
 static constexpr std::string_view kCoredumpPath = "/1/device/diagnostics/coredump";  // application/octet-stream: the raw ELF coredump
 static constexpr std::string_view kLogsPath     = "/1/device/diagnostics/logs";      // text/plain: log lines, oldest first
 
@@ -49,20 +49,14 @@ struct Target {
 
 // Where an upload goes, with the headers every upload carries: who is sending, and what it runs. The linked backend, or
 // the override domain; the hub token only goes to the linked backend.
+// Where an upload goes, with the headers every upload carries: who is sending, and what it runs. The hub token goes
+// along only when the upload domain is the backend the hub is linked to.
 static std::optional<Target> uploadTarget(std::string_view path, const char* contentType, const char*& result)
 {
-  std::string domain = GetUploadDomain();
-  auto backend       = Config::GetBackendDomain();
-  if (domain.empty()) {
-    if (!backend || backend->empty()) {
-      result = "no backend configured";
-      return std::nullopt;
-    }
-    domain = *backend;
-  }
+  constexpr std::string_view domain = CONFIG_OPENSHOCK_DIAG_UPLOAD_DOMAIN;
 
   Target target;
-  target.uri     = "https://" + domain + std::string(path);
+  target.uri     = "https://" + std::string(domain) + std::string(path);
   target.headers = {
     {            "Content-Type",                                 contentType},
     {    "X-OpenShock-Firmware",                       Constants::FW_VERSION},
@@ -71,13 +65,11 @@ static std::optional<Target> uploadTarget(std::string_view path, const char* con
     {"X-OpenShock-Reset-Reason", Detail::ResetReasonName(esp_reset_reason())},
   };
 
+  auto backend = Config::GetBackendDomain();
   if (backend && sameDomain(domain, *backend)) {
-    auto token = Config::GetBackendAuthToken();
-    if (!token) {
-      result = "not linked to an account";
-      return std::nullopt;
+    if (auto token = Config::GetBackendAuthToken()) {
+      target.headers["DeviceToken"] = std::move(*token);
     }
-    target.headers["DeviceToken"] = std::move(*token);
   }
   return target;
 }
@@ -176,19 +168,13 @@ static bool uploadLogs(const char*& result)
 
 bool Detail::RunUploads(const char*& result)
 {
-  if (!UploadsAllowed()) {
-    result = "not official firmware";
-    return false;
-  }
-
   result  = "ok";
   bool ok = true;
 
-  Status status = GetStatus();
-  if (IsCoredumpUploadEnabled() && status.coredumpStored && !status.coredumpUploaded) {
+  if (CoredumpUploadEnabled() && CoredumpAwaitingBackend()) {
     ok = uploadCoredump(result) && ok;
   }
-  if (GetLogUploadLevel() != LogLevel::None && status.pendingLogBytes > 0) {
+  if (GetStatus().pendingLogBytes > 0) {
     ok = uploadLogs(result) && ok;
   }
 

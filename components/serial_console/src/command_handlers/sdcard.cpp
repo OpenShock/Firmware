@@ -1,3 +1,7 @@
+#include <sdkconfig.h>
+
+#if CONFIG_OPENSHOCK_DIAG_SDCARD
+
 #include "serial_console/command_handlers/common.h"
 
 #include "diagnostics/SdCard.h"
@@ -63,3 +67,5 @@ OpenShock::SerialCmds::CommandGroup OpenShock::SerialCmds::CommandHandlers::SdCa
 
   return group;
 }
+
+#endif

@@ -49,6 +49,9 @@ TEST_CASE("Default values come from Kconfig and the board descriptor", "[config]
   // The host-test board has no E-Stop pin, so E-Stop defaults to off.
   TEST_ASSERT_EQUAL_INT(OPENSHOCK_ESTOP_PIN, config.estop.gpioPin);
   TEST_ASSERT_FALSE(config.estop.enabled);
+  // Both uploads are opt-in.
+  TEST_ASSERT_FALSE(config.diagnostics.coredumpUpload);
+  TEST_ASSERT_EQUAL_UINT8(std::to_underlying(DiagnosticsLogLevel::None), std::to_underlying(config.diagnostics.logUploadLevel));
 }
 
 TEST_CASE("ToDefault resets every section to the constructed defaults", "[config][defaults]")

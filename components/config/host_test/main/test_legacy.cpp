@@ -235,7 +235,12 @@ TEST_CASE("jsonconfig set accepts JSON exported by 1.5.2 firmware", "[config][le
 TEST_CASE("jsonconfig get emits the same document develop did", "[config][legacy][json]")
 {
   TEST_ASSERT_TRUE(InitFrom(Legacy::kDevelopConfig, sizeof(Legacy::kDevelopConfig)));
-  TEST_ASSERT_EQUAL_STRING(kDevelopJson, Config::GetAsJSON(true).c_str());
+
+  // develop's sections unchanged, then the sections added since, at their defaults.
+  std::string expected(kDevelopJson);
+  expected.pop_back();
+  expected += R"(,"diagnostics":{"coredumpUpload":false,"logUploadLevel":"none"}})";
+  TEST_ASSERT_EQUAL_STRING(expected.c_str(), Config::GetAsJSON(true).c_str());
 }
 
 TEST_CASE("Fields from a newer schema are tolerated on load", "[config][legacy]")

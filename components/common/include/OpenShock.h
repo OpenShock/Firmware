@@ -41,7 +41,6 @@ namespace OpenShock::Constants {
   // them on every commit for strings almost none of them use.
   extern const char* const FW_VERSION;     // e.g. "1.5.0-rc.7+abc1234"
   extern const char* const FW_GIT_COMMIT;  // full SHA
-  extern const bool FW_OFFICIAL;           // Built by OpenShock's CI (a release, nightly or dispatch), not locally, by a fork or for a pull request
 
   /// @brief The HTTP user agent: hostname, version, board and chip. Built once on first use, since the board
   /// name comes from the descriptor stamped into the image (BoardDescriptor.h) rather than a compile-time string.

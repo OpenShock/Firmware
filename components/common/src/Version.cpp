@@ -27,11 +27,6 @@
 namespace OpenShock::Constants {
   const char* const FW_VERSION    = OPENSHOCK_FW_VERSION;
   const char* const FW_GIT_COMMIT = OPENSHOCK_FW_GIT_COMMIT;
-#ifdef OPENSHOCK_FW_OFFICIAL
-  const bool FW_OFFICIAL = true;
-#else
-  const bool FW_OFFICIAL = false;
-#endif
 
   const char* UserAgent()
   {

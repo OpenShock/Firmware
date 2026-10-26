@@ -2,6 +2,7 @@
 
 #include "config/BackendConfig.h"
 #include "config/CaptivePortalConfig.h"
+#include "config/DiagnosticsConfig.h"
 #include "config/EStopConfig.h"
 #include "config/OtaUpdateConfig.h"
 #include "config/RFConfig.h"
@@ -53,6 +54,7 @@ namespace OpenShock::Config {
   [[nodiscard]] std::optional<SerialInputConfig> GetSerialInputConfig();
   [[nodiscard]] std::optional<OtaUpdateConfig> GetOtaUpdateConfig();
   [[nodiscard]] std::optional<EStopConfig> GetEStopConfig();
+  [[nodiscard]] std::optional<DiagnosticsConfig> GetDiagnosticsConfig();
 
   bool SetRFConfig(const RFConfig& config);
   bool SetWiFiConfig(const WiFiConfig& config);
@@ -65,6 +67,7 @@ namespace OpenShock::Config {
   ///        it to plain field updates.
   bool UpdateOtaUpdateConfig(Util::FunctionRef<bool(OtaUpdateConfig&)> update);
   bool SetEStopConfig(const EStopConfig& config);
+  bool SetDiagnosticsConfig(const DiagnosticsConfig& config);
 
   [[nodiscard]] std::optional<std::vector<WiFiCredentials>> GetWiFiCredentials();
   // Emits each stored credential as an object into an already-open JSON array
@@ -105,6 +108,11 @@ namespace OpenShock::Config {
   /// @brief Sets the step only if it is still `expected`, so a stale writer can't clobber an update started meanwhile.
   /// @return True if the step was `expected` and is now `desired`
   bool CompareExchangeOtaUpdateStep(OtaUpdateStep expected, OtaUpdateStep desired);
+
+  [[nodiscard]] std::optional<bool> GetDiagnosticsCoredumpUpload();
+  bool SetDiagnosticsCoredumpUpload(bool enabled);
+  [[nodiscard]] std::optional<DiagnosticsLogLevel> GetDiagnosticsLogUploadLevel();
+  bool SetDiagnosticsLogUploadLevel(DiagnosticsLogLevel level);
 
   [[nodiscard]] std::optional<bool> GetEStopEnabled();
   bool SetEStopEnabled(bool enabled);

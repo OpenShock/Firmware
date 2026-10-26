@@ -1,15 +1,23 @@
-# Diagnostics: error-log capture, coredump handling and the opt-in upload of both to the
-# backend, plus SD card storage of logs and coredumps (CONFIG_OPENSHOCK_DIAG_SDCARD, off by
-# default).
+# Diagnostics: crash dumps and logs, uploaded (CONFIG_OPENSHOCK_DIAG_UPLOAD) and/or stored on an SD card
+# (CONFIG_OPENSHOCK_DIAG_SDCARD). With neither, the component is empty and its callers leave it alone
+# (CONFIG_OPENSHOCK_DIAG).
 #
 # Sits above logging (installs its log tap), http and config (uploads). Nothing in core
 # depends on it: app_main calls Init/Update and passes in whether the backend is reachable.
-set(diagnostics_sources
-  "src/Diagnostics.cpp"
-  "src/Uploader.cpp"
-  "src/Coredump.cpp"
-  "src/RetainedRing.cpp"
-  "src/sdcard/SdCardDisabled.cpp")
+set(diagnostics_sources)
+
+if(CONFIG_OPENSHOCK_DIAG)
+  list(APPEND diagnostics_sources
+    "src/Diagnostics.cpp"
+    "src/Coredump.cpp")
+endif()
+
+if(CONFIG_OPENSHOCK_DIAG_UPLOAD)
+  list(APPEND diagnostics_sources
+    "src/Upload.cpp"
+    "src/Uploader.cpp"
+    "src/RetainedRing.cpp")
+endif()
 
 if(CONFIG_OPENSHOCK_DIAG_SDCARD)
   list(APPEND diagnostics_sources
@@ -26,10 +34,10 @@ idf_component_register(
   PRIV_REQUIRES     logging                  # LogTap.h, OS_LOG*
                     temporal                 # OpenShock::millis()
                     http                     # HTTP::Client::Upload
-                    config                   # backend domain and token
+                    config                   # upload opt-ins, backend domain and token
                     espcoredump              # esp_core_dump_*
                     spi_flash                # esp_flash_read (coredump partition)
-                    nvs_flash                # opt-in settings
+                    nvs_flash                # which coredump the backend already has
                     log                      # esp_log_set_vprintf (ESP-IDF's own errors)
                     esp_system
                     app_update               # esp_ota_get_running_partition (BOOT record)

@@ -1,7 +1,23 @@
 menu "OpenShock Diagnostics"
 
+    config OPENSHOCK_DIAG_UPLOAD_DOMAIN
+        string "Diagnostics upload domain"
+        default ""
+        help
+            Domain crash dumps and logs are uploaded to, when the owner opts in. Empty compiles
+            uploading out.
+
+    config OPENSHOCK_DIAG_UPLOAD
+        bool
+        default y if OPENSHOCK_DIAG_UPLOAD_DOMAIN != ""
+
+    config OPENSHOCK_DIAG
+        bool
+        default y if OPENSHOCK_DIAG_UPLOAD || OPENSHOCK_DIAG_SDCARD
+
     config OPENSHOCK_DIAG_LOG_BUFFER_SIZE
         int "Retained log size (bytes)"
+        depends on OPENSHOCK_DIAG_UPLOAD
         range 1024 16384
         default 4096
         help

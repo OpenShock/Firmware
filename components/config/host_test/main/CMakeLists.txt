@@ -16,6 +16,7 @@ idf_component_register(
                "../../src/BackendConfig.cpp"
                "../../src/CaptivePortalConfig.cpp"
                "../../src/Config.cpp"
+               "../../src/DiagnosticsConfig.cpp"
                "../../src/EStopConfig.cpp"
                "../../src/OtaUpdateConfig.cpp"
                "../../src/RFConfig.cpp"

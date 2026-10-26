@@ -4,9 +4,8 @@
 ``openshock_board.h``: chip identity, build mode and log level. The same for every board of a
 build variant; the board itself is stamped into the image after linking (scripts/utils/stamping.py).
 
-``openshock_version.h``: firmware version and git commit, which change every commit, and whether
-this is an official build (OpenShock's CI, utils/github.py:is_official_build). Kept apart so the
-version only rebuilds the few translation units that include it.
+``openshock_version.h``: firmware version and git commit, which change every commit. Kept apart
+so the version only rebuilds the few translation units that include it.
 
 The version comes from OPENSHOCK_FW_VERSION (required in CI), else a local ``0.0.0-local`` fallback.
 """
@@ -80,8 +79,6 @@ def version_defines(commit: str | None) -> dict[str, int | str]:
         defines['OPENSHOCK_FW_VERSION_BUILD'] = parsed.build
     if commit is not None:
         defines['OPENSHOCK_FW_GIT_COMMIT'] = commit
-    if github.is_official_build():
-        defines['OPENSHOCK_FW_OFFICIAL'] = 1
     return defines
 
 

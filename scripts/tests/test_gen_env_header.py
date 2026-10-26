@@ -54,32 +54,6 @@ def test_version_defines_include_only_the_parts_present(monkeypatch):
     )
 
 
-@pytest.mark.parametrize(
-    'repository, event, official',
-    [
-        ('OpenShock/Firmware', 'push', True),
-        ('OpenShock/Firmware', 'schedule', True),
-        ('OpenShock/Firmware', 'workflow_dispatch', True),
-        ('OpenShock/Firmware', 'pull_request', False),
-        ('someone/Firmware', 'push', False),
-        ('', 'push', False),
-    ],
-)
-def test_only_openshock_ci_builds_are_official(monkeypatch, repository, event, official):
-    monkeypatch.setenv('OPENSHOCK_FW_VERSION', '1.5.0')
-    monkeypatch.setenv('CI', 'true')
-    monkeypatch.setenv('GITHUB_ACTIONS', 'true')
-    monkeypatch.setenv('GITHUB_REPOSITORY', repository)
-    monkeypatch.setenv('GITHUB_EVENT_NAME', event)
-    assert ('OPENSHOCK_FW_OFFICIAL' in gen_env_header.version_defines(None)) == official
-
-
-def test_local_builds_are_not_official(monkeypatch):
-    monkeypatch.setenv('GITHUB_REPOSITORY', 'OpenShock/Firmware')
-    monkeypatch.setenv('GITHUB_EVENT_NAME', 'push')
-    assert 'OPENSHOCK_FW_OFFICIAL' not in gen_env_header.version_defines(None)
-
-
 def test_resolve_version_falls_back_locally_but_not_in_ci(monkeypatch):
     monkeypatch.delenv('OPENSHOCK_FW_VERSION', raising=False)
     monkeypatch.setattr(gen_env_header.github, 'is_ci', lambda: False)

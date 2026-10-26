@@ -2,11 +2,11 @@
 
 #include <cstdint>
 
-// Logging to a removable SD card, compiled in only with CONFIG_OPENSHOCK_DIAG_SDCARD. Without it these functions
-// exist but report Disabled and do nothing. The card format is documented in docs/SDCARD.md.
+// Logging to a removable SD card, compiled in only with CONFIG_OPENSHOCK_DIAG_SDCARD (callers check it). The card format
+// is documented in docs/SDCARD.md.
 namespace OpenShock::Diagnostics::SdCard {
   enum class State : uint8_t {
-    Disabled,     // Not compiled in, or not configured
+    Disabled,     // Its pins are not configured
     NoCard,       // Card detect says the slot is empty
     Unusable,     // A card is present but could not be initialised, or is smaller than 1 GiB
     NeedsFormat,  // Blank or foreign: never written until someone asks for a format

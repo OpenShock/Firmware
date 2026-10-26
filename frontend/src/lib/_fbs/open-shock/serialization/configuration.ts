@@ -4,6 +4,8 @@
 
 export { BackendConfig } from './configuration/backend-config';
 export { CaptivePortalConfig } from './configuration/captive-portal-config';
+export { DiagnosticsConfig } from './configuration/diagnostics-config';
+export { DiagnosticsLogLevel } from './configuration/diagnostics-log-level';
 export { EStopConfig } from './configuration/estop-config';
 export { HubConfig } from './configuration/hub-config';
 export { LanConfig } from './configuration/lan-config';
