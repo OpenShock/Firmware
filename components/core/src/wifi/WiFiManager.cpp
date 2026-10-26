@@ -114,12 +114,15 @@ static void portalBroadcastError(std::string_view message)
   Serialization::Local::SerializeErrorMessage(message, AppHooks::CaptivePortalBroadcastMessageBIN);
 }
 
-// Broadcast a coarse connectivity change on the OpenShock event bus. Posted with a
-// short timeout because this runs on the default event loop task (posting to the
-// same loop must never block on a full queue).
-static void postWiFiState(OpenShockWiFiState state)
+// How long postWiFiState may wait for room on the default event loop. The WiFi/IP event handlers run on that loop's
+// own task, which is the only one that drains it, so waiting there can't help: they don't wait.
+const TickType_t kPostWaitFromEventLoop = 0;
+const TickType_t kPostWaitFromTask      = pdMS_TO_TICKS(100);
+
+// Broadcast a coarse connectivity change on the OpenShock event bus
+static void postWiFiState(OpenShockWiFiState state, TickType_t wait)
 {
-  esp_err_t err = esp_event_post(OPENSHOCK_EVENTS, OPENSHOCK_EVENT_WIFI_STATE_CHANGED, &state, sizeof(state), pdMS_TO_TICKS(100));
+  esp_err_t err = esp_event_post(OPENSHOCK_EVENTS, OPENSHOCK_EVENT_WIFI_STATE_CHANGED, &state, sizeof(state), wait);
   if (err != ESP_OK) {
     OS_LOGE(TAG, "Failed to post WiFi state event: %s", esp_err_to_name(err));
   }
@@ -272,13 +275,13 @@ static bool connectWiFi(const std::string& ssid, const std::string& password, co
   }
 
   s_wifiState.store(WiFiState::Connecting, std::memory_order_relaxed);
-  postWiFiState(OPENSHOCK_WIFI_STATE_CONNECTING);
+  postWiFiState(OPENSHOCK_WIFI_STATE_CONNECTING, kPostWaitFromTask);
 
   esp_err_t err = esp_wifi_set_config(WIFI_IF_STA, &config);
   if (err != ESP_OK) {
     OS_LOGE(TAG, "esp_wifi_set_config failed: %s", esp_err_to_name(err));
     s_wifiState.store(WiFiState::Disconnected, std::memory_order_relaxed);
-    postWiFiState(OPENSHOCK_WIFI_STATE_DISCONNECTED);
+    postWiFiState(OPENSHOCK_WIFI_STATE_DISCONNECTED, kPostWaitFromTask);
     return false;
   }
 
@@ -286,7 +289,7 @@ static bool connectWiFi(const std::string& ssid, const std::string& password, co
   if (err != ESP_OK) {
     OS_LOGE(TAG, "esp_wifi_connect failed: %s", esp_err_to_name(err));
     s_wifiState.store(WiFiState::Disconnected, std::memory_order_relaxed);
-    postWiFiState(OPENSHOCK_WIFI_STATE_DISCONNECTED);
+    postWiFiState(OPENSHOCK_WIFI_STATE_DISCONNECTED, kPostWaitFromTask);
     return false;
   }
 
@@ -296,7 +299,7 @@ static bool connectWiFi(const std::string& ssid, const std::string& password, co
 static void evWiFiConnected(const wifi_event_sta_connected_t& info)
 {
   s_wifiState.store(WiFiState::Connected, std::memory_order_relaxed);
-  postWiFiState(OPENSHOCK_WIFI_STATE_CONNECTED);
+  postWiFiState(OPENSHOCK_WIFI_STATE_CONNECTED, kPostWaitFromEventLoop);
 
   char ssid[33];
   copyEventSSID(info, ssid);
@@ -356,7 +359,7 @@ static void evWiFiGotIP(const ip_event_got_ip_t& info)
 
   OS_LOGI(TAG, "Got IP address " IPV4ADDR_FMT, IPV4ADDR_ARG(ip));
 
-  postWiFiState(OPENSHOCK_WIFI_STATE_GOT_IP);
+  postWiFiState(OPENSHOCK_WIFI_STATE_GOT_IP, kPostWaitFromEventLoop);
 
   char ipStr[16];
   snprintf(ipStr, sizeof(ipStr), IPV4ADDR_FMT, IPV4ADDR_ARG(ip));
@@ -370,13 +373,13 @@ static void evWiFiGotIP6(const ip_event_got_ip6_t& info)
 
   OS_LOGI(TAG, "Got IPv6 address " IPV6ADDR_FMT, IPV6ADDR_ARG(ip6));
 
-  postWiFiState(OPENSHOCK_WIFI_STATE_GOT_IP);
+  postWiFiState(OPENSHOCK_WIFI_STATE_GOT_IP, kPostWaitFromEventLoop);
 }
 static void evWiFiDisconnected(const wifi_event_sta_disconnected_t& info)
 {
   s_wifiState.store(WiFiState::Disconnected, std::memory_order_relaxed);
   s_connectedCredentialsID.store(0, std::memory_order_relaxed);
-  postWiFiState(OPENSHOCK_WIFI_STATE_DISCONNECTED);
+  postWiFiState(OPENSHOCK_WIFI_STATE_DISCONNECTED, kPostWaitFromEventLoop);
 
   char ssid[33];
   copyEventSSID(info, ssid);
@@ -384,16 +387,19 @@ static void evWiFiDisconnected(const wifi_event_sta_disconnected_t& info)
   OS_LOGI(TAG, "Disconnected from network %s (" BSSID_FMT ")", ssid, BSSID_ARG(info.bssid));
 
   // Notify the frontend
-  ScopedLock lock__(&s_networksMutex);
-  auto it = findNetworkByBSSID(info.bssid);
-  if (it != s_wifiNetworks.end()) {
-    portalBroadcastNetworkEvent(Serialization::Types::WifiNetworkEventType::Disconnected, *it);
-  } else {
-    // Network not in scan results (forgotten or hidden); send minimal event
-    WiFiNetwork net = placeholderNetwork(ssid);
-    memcpy(net.bssid, info.bssid, sizeof(net.bssid));
-    portalBroadcastNetworkEvent(Serialization::Types::WifiNetworkEventType::Disconnected, net);
+  std::optional<WiFiNetwork> network;
+  {
+    ScopedLock lock__(&s_networksMutex);
+    if (auto it = findNetworkByBSSID(info.bssid); it != s_wifiNetworks.end()) {
+      network = *it;
+    }
   }
+  if (!network) {
+    // Network not in scan results (forgotten or hidden); send minimal event
+    network = placeholderNetwork(ssid);
+    memcpy(network->bssid, info.bssid, sizeof(network->bssid));
+  }
+  portalBroadcastNetworkEvent(Serialization::Types::WifiNetworkEventType::Disconnected, *network);
 
   // Send error message for unexpected disconnects (not user-initiated)
   if (info.reason != WIFI_REASON_ASSOC_LEAVE) {
@@ -437,29 +443,32 @@ static void ipEventHandler(void* /*arg*/, esp_event_base_t /*base*/, int32_t id,
 
 static void evWiFiScanStatusChanged(OpenShock::WiFiScanStatus status)
 {
-  ScopedLock lock__(&s_networksMutex);
+  std::vector<WiFiNetwork> lostNetworks;
+  {
+    ScopedLock lock__(&s_networksMutex);
 
-  // If the scan started, remove any networks that have not been seen in the last 3 scans
-  if (status == OpenShock::WiFiScanStatus::Started) {
-    std::vector<WiFiNetwork> lostNetworks;
-    for (auto it = s_wifiNetworks.begin(); it != s_wifiNetworks.end();) {
-      if (++it->scansMissed > 3) {
-        OS_LOGV(TAG, "Network %s (" BSSID_FMT ") has not been seen in 3 scans, removing from list", it->ssid, BSSID_ARG(it->bssid));
-        lostNetworks.push_back(std::move(*it));
-        it = s_wifiNetworks.erase(it);
-      } else {
-        ++it;
+    // If the scan started, remove any networks that have not been seen in the last 3 scans
+    if (status == OpenShock::WiFiScanStatus::Started) {
+      for (auto it = s_wifiNetworks.begin(); it != s_wifiNetworks.end();) {
+        if (++it->scansMissed > 3) {
+          OS_LOGV(TAG, "Network %s (" BSSID_FMT ") has not been seen in 3 scans, removing from list", it->ssid, BSSID_ARG(it->bssid));
+          lostNetworks.push_back(std::move(*it));
+          it = s_wifiNetworks.erase(it);
+        } else {
+          ++it;
+        }
       }
     }
-    // One message for all of them rather than one per network
-    if (!lostNetworks.empty()) {
-      portalBroadcastNetworksEvent(Serialization::Types::WifiNetworkEventType::Lost, lostNetworks);
+
+    // If the scan completed, sort the networks by RSSI
+    if (status == OpenShock::WiFiScanStatus::Completed || status == OpenShock::WiFiScanStatus::Aborted || status == OpenShock::WiFiScanStatus::Error) {
+      std::sort(s_wifiNetworks.begin(), s_wifiNetworks.end(), strongerSignal);
     }
   }
 
-  // If the scan completed, sort the networks by RSSI
-  if (status == OpenShock::WiFiScanStatus::Completed || status == OpenShock::WiFiScanStatus::Aborted || status == OpenShock::WiFiScanStatus::Error) {
-    std::sort(s_wifiNetworks.begin(), s_wifiNetworks.end(), strongerSignal);
+  // One message for all of them rather than one per network
+  if (!lostNetworks.empty()) {
+    portalBroadcastNetworksEvent(Serialization::Types::WifiNetworkEventType::Lost, lostNetworks);
   }
 
   // Send the scan status changed event
@@ -469,37 +478,41 @@ static void evWiFiScanStatusChanged(OpenShock::WiFiScanStatus status)
 }
 static void evWiFiNetworksDiscovery(const std::vector<const wifi_ap_record_t*>& records)
 {
-  ScopedLock lock__(&s_networksMutex);
-
   std::vector<WiFiNetwork> updatedNetworks;
   std::vector<WiFiNetwork> discoveredNetworks;
 
-  for (const wifi_ap_record_t* record : records) {
-    uint8_t credsId = Config::GetWiFiCredentialsIDbySSID(reinterpret_cast<const char*>(record->ssid));
+  {
+    ScopedLock lock__(&s_networksMutex);
 
-    auto it = findNetworkByBSSID(record->bssid);
-    if (it != s_wifiNetworks.end()) {
-      // Update the network
-      memcpy(it->ssid, record->ssid, sizeof(it->ssid));
-      it->channel       = record->primary;
-      it->rssi          = record->rssi;
-      it->authMode      = record->authmode;
-      it->credentialsID = credsId;  // TODO: I don't understand why I need to set this here, but it seems to fix a bug where the credentials ID is not set correctly
-      it->scansMissed   = 0;
+    for (const wifi_ap_record_t* record : records) {
+      uint8_t credsId = Config::GetWiFiCredentialsIDbySSID(reinterpret_cast<const char*>(record->ssid));
 
-      updatedNetworks.push_back(*it);
-      OS_LOGV(TAG, "Updated network %s (" BSSID_FMT ") with new scan info", it->ssid, BSSID_ARG(it->bssid));
+      auto it = findNetworkByBSSID(record->bssid);
+      if (it != s_wifiNetworks.end()) {
+        // Update the network
+        memcpy(it->ssid, record->ssid, sizeof(it->ssid));
+        it->channel  = record->primary;
+        it->rssi     = record->rssi;
+        it->authMode = record->authmode;
+        // Save, Forget and RefreshNetworkCredentials keep this in sync; re-reading it on every scan also repairs an
+        // entry that missed one of them, so the scan is the point where the list always catches up with the config
+        it->credentialsID = credsId;
+        it->scansMissed   = 0;
 
-      continue;
+        updatedNetworks.push_back(*it);
+        OS_LOGV(TAG, "Updated network %s (" BSSID_FMT ") with new scan info", it->ssid, BSSID_ARG(it->bssid));
+
+        continue;
+      }
+
+      WiFiNetwork network(record->ssid, record->bssid, record->primary, record->rssi, record->authmode, credsId);
+
+      discoveredNetworks.push_back(network);
+      OS_LOGV(TAG, "Discovered new network %s (" BSSID_FMT ")", network.ssid, BSSID_ARG(network.bssid));
+
+      // Insert the network into the list of networks sorted by RSSI
+      s_wifiNetworks.insert(std::lower_bound(s_wifiNetworks.begin(), s_wifiNetworks.end(), network, strongerSignal), std::move(network));
     }
-
-    WiFiNetwork network(record->ssid, record->bssid, record->primary, record->rssi, record->authmode, credsId);
-
-    discoveredNetworks.push_back(network);
-    OS_LOGV(TAG, "Discovered new network %s (" BSSID_FMT ")", network.ssid, BSSID_ARG(network.bssid));
-
-    // Insert the network into the list of networks sorted by RSSI
-    s_wifiNetworks.insert(std::lower_bound(s_wifiNetworks.begin(), s_wifiNetworks.end(), network, strongerSignal), std::move(network));
   }
 
   if (!updatedNetworks.empty()) {
@@ -812,16 +825,18 @@ bool WiFiManager::IsConnected()
 }
 bool WiFiManager::GetConnectedNetwork(OpenShock::WiFiNetwork& network)
 {
-  uint8_t connectedId = s_connectedCredentialsID.load(std::memory_order_relaxed);
-
-  if (connectedId != 0) {
+  uint8_t connectedId;
+  {
+    // evWiFiConnected sets the ID and the BSSID together under this lock, so they belong to the same connection
     ScopedLock lock__(&s_networksMutex);
+    connectedId = s_connectedCredentialsID.load(std::memory_order_relaxed);
 
     // Match the associated BSSID: several APs (mesh, 2.4/5 GHz) can share one set of credentials
-    auto it = findNetworkByBSSID(s_connectedBSSID);
-    if (it != s_wifiNetworks.end()) {
-      network = *it;
-      return true;
+    if (connectedId != 0) {
+      if (auto it = findNetworkByBSSID(s_connectedBSSID); it != s_wifiNetworks.end()) {
+        network = *it;
+        return true;
+      }
     }
   }
 
