@@ -3,8 +3,8 @@
 const char* const TAG = "JsonAPI";
 
 #include "Common.h"
-#include "Logging.h"
 #include "config/Config.h"
+#include "Logging.h"
 #include "util/StringUtils.h"
 
 using namespace OpenShock;
