@@ -145,7 +145,8 @@ static void captiveportal_updateloop(void*)
   }
 
   // User completed setup — close portal once device is fully online
-  if (s_userDone && GatewayConnectionManager::IsConnected()) {
+  // Always-enabled wins: closing here would only drop the clients and reopen the AP next tick
+  if (s_userDone && !s_alwaysEnabled && GatewayConnectionManager::IsConnected()) {
     if (GetInstance() != nullptr) {
       OS_LOGI(TAG, "User completed setup, closing captive portal");
       captiveportal_stop();
@@ -186,6 +187,14 @@ static void captiveportal_updateloop(void*)
 
 bool CaptivePortal::Init()
 {
+  // Restore the persisted always-enabled setting so it survives a reboot
+  Config::CaptivePortalConfig captivePortalConfig;
+  if (Config::GetCaptivePortalConfig(captivePortalConfig)) {
+    s_alwaysEnabled = captivePortalConfig.alwaysEnabled;
+  } else {
+    OS_LOGE(TAG, "Failed to get captive portal config");
+  }
+
   // If device is already fully configured, set a startup grace period before opening portal
   if (isDeviceFullyConfigured()) {
     s_startupGraceExpiry.store(esp_timer_get_time() + STARTUP_GRACE_PERIOD_US, std::memory_order_relaxed);
