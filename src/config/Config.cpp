@@ -139,6 +139,10 @@ static bool trySaveConfig()
 {
   flatbuffers::FlatBufferBuilder builder;
 
+  // Write every field, even ones equal to the schema default. Older firmware may use different defaults
+  // (1.5.x reads a missing is_enabled/keepalive_enabled as false), so an omitted field changes meaning on downgrade.
+  builder.ForceDefaults(true);
+
   auto fbsConfig = _configData.ToFlatbuffers(builder, true);
 
   Serialization::Configuration::FinishHubConfigBuffer(builder, fbsConfig);
