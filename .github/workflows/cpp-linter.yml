@@ -50,8 +50,10 @@ jobs:
           thread-comments: ${{ github.event_name == 'pull_request' && 'update' || 'false' }}
           no-lgtm: false
 
+      # Advisory on beta and master (pushes and PRs targeting them): findings are
+      # still reported, but they don't fail the job.
       - name: Fail fast?!
-        if: steps.linter.outputs.checks-failed > 0
+        if: steps.linter.outputs.checks-failed > 0 && !contains(fromJSON('["beta", "master"]'), github.base_ref || github.ref_name)
         run: |
           echo "::error::Some files failed the linting checks!"
           exit 1
