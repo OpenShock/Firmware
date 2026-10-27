@@ -59,7 +59,7 @@ OpenShock::SerialCmds::CommandGroup OpenShock::SerialCmds::CommandHandlers::Host
   group.addCommand("Get the network hostname."sv, handleHostnameCommand);
 
   auto& setCommand = group.addCommand("Set the network hostname."sv, handleHostnameCommand);
-  setCommand.addArgument("hostname"sv, "letters, digits and hyphens, max 32 characters"sv, "OpenShock"sv);
+  setCommand.addArgument("hostname"sv, "letters, digits and hyphens, max 32 characters"sv, std::string_view(CONFIG_OPENSHOCK_FW_HOSTNAME));
 
   return group;
 }

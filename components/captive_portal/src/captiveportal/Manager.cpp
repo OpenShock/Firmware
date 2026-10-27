@@ -22,6 +22,7 @@ const char* const TAG = "CaptivePortal";
 #include <esp_wifi_default.h>
 
 #include "SimpleMutex.h"
+#include "util/IPv4Utils.h"
 #include "util/RetiredList.h"
 #include "util/TaskUtils.h"
 
@@ -72,9 +73,7 @@ static std::atomic<bool> s_instanceLive = false;
 static RetiredList<CaptivePortalInstance> s_retiredInstances;
 static esp_netif_t* s_apNetif = nullptr;
 
-// The captive portal AP always serves from this fixed address; the DNS server and
-// RFC8908 handler reference it too (see CaptivePortal::ApIPv4String()).
-static const char* const CAPTIVE_PORTAL_AP_IP = "4.3.2.1";
+static_assert(IPv4Utils::IsDottedDecimal(CONFIG_OPENSHOCK_PORTAL_AP_IP), "CONFIG_OPENSHOCK_PORTAL_AP_IP must be a dotted-decimal IPv4 address");
 
 static void sendCommand(uint32_t command)
 {
@@ -161,8 +160,8 @@ static bool captiveportal_start()
     }
 
     esp_netif_ip_info_t ipInfo = {};
-    esp_netif_str_to_ip4(CAPTIVE_PORTAL_AP_IP, &ipInfo.ip);
-    esp_netif_str_to_ip4(CAPTIVE_PORTAL_AP_IP, &ipInfo.gw);
+    esp_netif_str_to_ip4(CONFIG_OPENSHOCK_PORTAL_AP_IP, &ipInfo.ip);
+    esp_netif_str_to_ip4(CONFIG_OPENSHOCK_PORTAL_AP_IP, &ipInfo.gw);
     esp_netif_str_to_ip4("255.255.255.0", &ipInfo.netmask);
 
     esp_netif_dhcps_stop(s_apNetif);
@@ -172,7 +171,7 @@ static bool captiveportal_start()
     // can open the portal without waiting for their connectivity probes to be redirected. esp_netif keeps the
     // pointer, so the string must outlive the netif.
     static char captivePortalUri[64];
-    snprintf(captivePortalUri, sizeof(captivePortalUri), "http://%s/captive-portal/api", CAPTIVE_PORTAL_AP_IP);  // RFC8908Handler's API path
+    snprintf(captivePortalUri, sizeof(captivePortalUri), "http://%s/captive-portal/api", CONFIG_OPENSHOCK_PORTAL_AP_IP);  // RFC8908Handler's API path
     esp_err_t uriErr = esp_netif_dhcps_option(s_apNetif, ESP_NETIF_OP_SET, ESP_NETIF_CAPTIVEPORTAL_URI, captivePortalUri, strlen(captivePortalUri));
     if (uriErr != ESP_OK) {
       OS_LOGW(TAG, "Failed to set DHCP captive portal URI: %s", esp_err_to_name(uriErr));
@@ -457,7 +456,7 @@ bool CaptivePortal::IsRunning()
 
 const char* CaptivePortal::ApIPv4String()
 {
-  return CAPTIVE_PORTAL_AP_IP;
+  return CONFIG_OPENSHOCK_PORTAL_AP_IP;
 }
 
 bool CaptivePortal::SendMessageTXT(uint8_t socketId, std::string_view data)

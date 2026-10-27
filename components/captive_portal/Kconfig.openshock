@@ -2,6 +2,14 @@
 
 menu "Captive portal"
 
+    config OPENSHOCK_PORTAL_AP_IP
+        string "SoftAP IPv4 address"
+        default "4.3.2.1"
+        help
+            The fixed address the portal's SoftAP, DHCP server, DNS responder and captive
+            portal API serve from, on a /24 network. Must be a dotted-decimal IPv4 address
+            (checked at compile time).
+
     config OPENSHOCK_PORTAL_MAX_CLIENTS
         int "Clients (SoftAP stations and websockets)"
         range 1 8
