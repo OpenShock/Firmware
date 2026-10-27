@@ -21,3 +21,17 @@ compile_commands.json
 
 # Claude Code
 .claude/settings.local.json
+
+# ESP-IDF build
+/build/
+/managed_components/
+/components/
+/sdkconfig
+/sdkconfig.old
+
+# Python
+__pycache__/
+*.py[cod]
+
+# IDEs
+.idea/
