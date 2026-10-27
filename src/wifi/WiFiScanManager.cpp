@@ -76,6 +76,8 @@ static void handleScanError(int16_t retval)
 
 static int16_t scanChannel(uint8_t channel)
 {
+  s_currentChannel = channel;
+
   int16_t retval = WiFi.scanNetworks(true, true, false, OPENSHOCK_WIFI_SCAN_MAX_MS_PER_CHANNEL, channel);
   if (!isScanError(retval)) {
     return retval;

@@ -457,7 +457,11 @@ bool WiFiManager::Init()
   if (esp_wifi_get_config(static_cast<wifi_interface_t>(ESP_IF_WIFI_STA), &current_conf) == ESP_OK) {
     if (current_conf.sta.ssid[0] != '\0') {
       if (Config::GetWiFiCredentialsIDbySSID(reinterpret_cast<const char*>(current_conf.sta.ssid)) != 0) {
-        WiFi.begin();
+        // Mark as connecting so the update task doesn't start a scan that collides with this connection attempt
+        s_wifiState.store(WiFiState::Connecting, std::memory_order_relaxed);
+        if (WiFi.begin() == WL_CONNECT_FAILED) {
+          s_wifiState.store(WiFiState::Disconnected, std::memory_order_relaxed);
+        }
       }
     }
   }
