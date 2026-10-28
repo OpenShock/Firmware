@@ -250,7 +250,7 @@ jobs:
     if: ${{ needs.gate.outputs.deploy == 'true' }}
     environment: cdn
     permissions:
-      contents: read
+      contents: write # Draft releases are only visible to tokens with push access
 
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -271,9 +271,12 @@ jobs:
           set -euo pipefail
           # release.yml pushes the tag (which triggers this run) and only then
           # stages the draft, so poll for up to ~60s rather than failing on the
-          # brief window before the draft exists.
+          # brief window before the draft exists. A draft is not reachable by tag
+          # name, so read the release list.
           for attempt in $(seq 1 12); do
-            isDraft=$(gh release view "$TAG" --repo "$REPO" --json isDraft --jq '.isDraft' 2>/dev/null || echo "missing")
+            if ! isDraft=$(gh api "repos/$REPO/releases?per_page=100" --jq 'map(select(.tag_name == env.TAG)) | if length == 0 then "missing" else .[0].draft end' 2>&1); then
+              isDraft="error: $isDraft"
+            fi
             if [ "$isDraft" = "true" ]; then
               echo "Draft release for $TAG is staged."
               exit 0
