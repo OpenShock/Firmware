@@ -2,11 +2,8 @@
 kind: fixed
 pr: 424
 ---
-Various bug fixes and stability improvements
+Fix race conditions between the hub's background tasks
 
 ## Release Note
-Various bug fixes and stability improvements
-
-- Cooperative task shutdown with bounded timeout and force-kill fallback
-- User-friendly WiFi disconnect error messages
-- Remove erroneous "unexpected protocol: https, expected http" warning
+Fix race conditions between the hub's background tasks
+The backend connection, captive portal, E-Stop and command handler now share their state safely between tasks, with added null checks, which prevents rare crashes when several of them run at the same time.
