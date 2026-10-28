@@ -45,7 +45,7 @@ jobs:
 
       - name: Run release tool
         id: meta
-        uses: OpenShock/release-tool@ea651e8c10372a10b6f452dcb34c38e60a72dc1f  # v0.5.1
+        uses: OpenShock/release-tool@51b254567fe00feb205c1c9ef2bdceb287a6c092  # v1.0.0
         with:
           mode: release
           output: release.json
