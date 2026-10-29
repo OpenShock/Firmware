@@ -105,7 +105,7 @@ jobs:
       # The next version from .changes/; status mode works on every branch and creates no tag.
       - name: Compute next version
         id: relmeta
-        uses: OpenShock/release-tool@51b254567fe00feb205c1c9ef2bdceb287a6c092  # v1.0.0
+        uses: OpenShock/release-tool@50f3d4be9462cb69931d134fd4df2a4f5fcd1c5e  # v1.0.1
         with:
           mode: status
 
@@ -129,7 +129,7 @@ jobs:
     # The environment carries OPENSHOCK_REPO_SERVER_URL, and repo-server-prod's reviewer approves here, before the build.
     environment: repo-server-${{ needs.gate.outputs.server }}
     permissions:
-      contents: read
+      contents: write # Draft releases are only visible to tokens with push access, and the policy step requires one
       id-token: write
     outputs:
       release-id: ${{ steps.stage.outputs.release-id }}
