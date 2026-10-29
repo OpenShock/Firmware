@@ -17,6 +17,7 @@ const char* const TAG = "LayoutMigration";
 #include "SemVer.h"
 #include "SimpleMutex.h"
 #include "util/TaskUtils.h"
+#include "visual/VisualStateManager.h"
 #include "wifi/WiFiManager.h"
 #include "www/WwwImage.h"
 #include "www/WwwPartition.h"
@@ -411,8 +412,13 @@ namespace {
       OS_LOGI(TAG, "An update is being installed; migrating later");
       return Step::Retry;
     }
+    VisualStateManager::SetDoNotUnplug(true);
     struct UnlockOnReturn {
-      ~UnlockOnReturn() { OtaUpdateManager::UnlockFlashWrites(); }
+      ~UnlockOnReturn()
+      {
+        VisualStateManager::SetDoNotUnplug(false);
+        OtaUpdateManager::UnlockFlashWrites();
+      }
     } unlockOnReturn;  // Every return from here is a failure; success ends in esp_restart
 
     // From here the portal's 1.x assets are overwritten (www is the 1.x static0): the portal stays closed until the restart

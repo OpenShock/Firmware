@@ -6,6 +6,7 @@ idf_component_register(
   SRCS          "src/LayoutMigration.cpp"
   INCLUDE_DIRS  "include"
   PRIV_REQUIRES ota captive_portal core config partition_layout www   # OtaUpdateManager, ForceClose, WiFiManager + OTA config, write lock, the table checks, www format
+                device_control                                     # VisualStateManager (the do-not-unplug LED)
                 common crypto http logging                         # SemVer/TaskUtils, SHA256, HTTP::Client, OS_LOG*
                 app_update bootloader_support esp_partition spi_flash nvs_flash
 )
