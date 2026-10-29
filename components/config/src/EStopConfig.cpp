@@ -36,12 +36,14 @@ bool EStopConfig::FromFlatbuffers(const Serialization::Configuration::EStopConfi
 
   // gpio_pin is a raw int8 from flash or rawconfig; anything that isn't "no pin" or a real GPIO means a
   // corrupt section, so fall back to the default.
-  if (!Internal::Utils::FromIntGpioNum(gpioPin, config->gpio_pin())) {
+  auto pin = Internal::Utils::FromIntGpioNum(config->gpio_pin());
+  if (!pin) {
     OS_LOGW(TAG, "Invalid E-Stop GPIO pin %d, using default", config->gpio_pin());
     ToDefault();
     return true;
   }
 
+  gpioPin = *pin;
   enabled = config->enabled();
   Normalize();
 
@@ -65,15 +67,15 @@ bool EStopConfig::FromJSON(JSON::JsonView json)
     return false;
   }
 
-  if (!Internal::Utils::FromJsonGpioNum(gpioPin, json, "gpioPin")) {
-    gpioPin = static_cast<gpio_num_t>(Board::Get().estopGpio);
-  }
+  gpioPin = Internal::Utils::FromJsonGpioNum(json, "gpioPin").value_or(static_cast<gpio_num_t>(Board::Get().estopGpio));
 
   if (JSON::JsonView enabledJson = json["enabled"]; enabledJson.valid()) {
-    if (!enabledJson.tryGetBool(enabled)) {
+    auto parsed = enabledJson.tryGetBool();
+    if (!parsed) {
       OS_LOGE(TAG, "Failed to parse enabled");
       return false;
     }
+    enabled = *parsed;
   } else {
     enabled = OpenShock::IsValidInputPin(gpioPin);
   }

@@ -4,7 +4,8 @@ import re
 from pathlib import Path
 from typing import TypedDict
 
-from .boards import ROOT, sdkconfig_value
+from .boards import sdkconfig_value
+from .paths import ROOT
 
 # ESP-IDF's default CONFIG_PARTITION_TABLE_OFFSET.
 DEFAULT_PARTITION_TABLE_OFFSET = 0x8000
@@ -40,16 +41,29 @@ def read_partitions(csv_path: Path) -> dict[str, Partition]:
         if len(fields) < 5:
             raise SystemExit(f'error: malformed partition line in {csv_path}: {raw!r}')
         name, ptype, subtype, offset, size = fields[:5]
+        where = f'partition {name!r} in {csv_path}'
         if not offset:
-            raise SystemExit(f'error: partition {name!r} in {csv_path} has no explicit offset')
-        partitions[name] = {'type': ptype, 'subtype': subtype, 'offset': int(offset, 0), 'size': _parse_size(size)}
+            raise SystemExit(f'error: {where} has no explicit offset')
+        partitions[name] = {
+            'type': ptype,
+            'subtype': subtype,
+            'offset': _parse_offset(offset, where),
+            'size': _parse_size(size, where),
+        }
     return partitions
 
 
-def _parse_size(size: str) -> int:
+def _parse_offset(offset: str, where: str) -> int:
+    try:
+        return int(offset, 0)
+    except ValueError:
+        raise SystemExit(f'error: {where} has a bad offset {offset!r}') from None
+
+
+def _parse_size(size: str, where: str) -> int:
     m = re.fullmatch(r'(0x[0-9a-fA-F]+|\d+)([KM]?)', size)
     if not m:
-        raise SystemExit(f'error: unsupported partition size {size!r}')
+        raise SystemExit(f'error: {where} has an unsupported size {size!r}')
     value = int(m.group(1), 0)
     return value * {'': 1, 'K': 1024, 'M': 1024 * 1024}[m.group(2)]
 

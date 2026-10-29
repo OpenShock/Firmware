@@ -1,0 +1,1 @@
+1.6.0 adds a guided setup wizard to the captive portal, rebuilt on a new frontend, reconnects on its own when its connection to the gateway silently dies, and fixes safety and security issues in the E-Stop and the setup access point.

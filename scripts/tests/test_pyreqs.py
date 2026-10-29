@@ -63,7 +63,7 @@ def test_check_against_the_real_requirements_names_only_absent_pins(tmp_path, mo
     import importlib.metadata as m
 
     real = m.version('pytest')
-    (tmp_path / 'req.txt').write_text(f'pytest=={real}\npytest-nonexistent-plugin==1.0\n')
+    (tmp_path / 'req.txt').write_text(f'pytest=={real}\npytest-nonexistent-plugin==1.0\n', encoding='utf-8')
     missing = pyreqs.check(tmp_path / 'req.txt')
     assert [str(p) for p in missing] == ['pytest-nonexistent-plugin==1.0']
 
@@ -75,13 +75,15 @@ def test_report_names_the_interpreter_the_count_and_the_pins():
 
 
 def test_main_exits_nonzero_with_the_report(tmp_path, capsys):
-    (tmp_path / 'req.txt').write_text('pytest-nonexistent-plugin==1.0\n')
+    (tmp_path / 'req.txt').write_text('pytest-nonexistent-plugin==1.0\n', encoding='utf-8')
     assert pyreqs.main(['--check', str(tmp_path / 'req.txt')]) == 1
     assert 'pytest-nonexistent-plugin==1.0' in capsys.readouterr().err
-    (tmp_path / 'ok.txt').write_text('# nothing pinned\n')
+    (tmp_path / 'ok.txt').write_text('# nothing pinned\n', encoding='utf-8')
     assert pyreqs.main(['--check', str(tmp_path / 'ok.txt')]) == 0
 
 
-def test_main_requires_a_file():
-    with pytest.raises(SystemExit):
+def test_main_requires_a_file(capsys):
+    with pytest.raises(SystemExit) as exc:
         pyreqs.main([])
+    assert exc.value.code == 2  # argparse's usage error
+    assert '--check' in capsys.readouterr().err

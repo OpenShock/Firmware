@@ -1,12 +1,10 @@
 name: build-frontend
-description: >-
-  Build the captive-portal frontend into frontend/build, optionally running its type
-  check and unit tests first.
+description: Build the captive-portal frontend into frontend/build, optionally running its checks first
 inputs:
   checks:
-    description: 'Run svelte-check and the unit tests before building.'
     required: false
     default: 'true'
+    description: 'Run svelte-check and the unit tests before building'
 
 runs:
   using: composite

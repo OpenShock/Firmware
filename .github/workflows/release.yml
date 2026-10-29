@@ -1,9 +1,7 @@
 name: release
 
 on:
-  # Releases are cut manually, never on push. Run this workflow from the beta
-  # branch to cut an rc, or from master for a stable release. A plain push to
-  # beta/master (e.g. merging CI changes) must not create a release.
+  # Releases are cut manually, never on push. Run from beta for an rc, from master for a stable release.
   workflow_dispatch:
 
 concurrency:
@@ -25,11 +23,11 @@ jobs:
     if: github.ref_name == 'beta' || github.ref_name == 'master'
 
     steps:
-      # An App token, not GITHUB_TOKEN, so the tag push below triggers ci-build.
+      # An App token, not GITHUB_TOKEN, so the tag push below triggers ci-build
       - uses: actions/create-github-app-token@64ab729a6294000f5aa4a4bc0b73d1f32bc45510  # v3.3.0
         id: app-token
         with:
-          app-id: ${{ secrets.RELEASE_APP_ID }}
+          client-id: ${{ secrets.RELEASE_APP_ID }}
           private-key: ${{ secrets.RELEASE_APP_KEY }}
 
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
@@ -45,12 +43,9 @@ jobs:
       - name: Rebase on top of latest remote
         run: git pull --rebase --autostash origin "${GITHUB_REF_NAME}"
 
-      - name: Fetch all tags
-        run: git fetch --tags
-
       - name: Run release tool
         id: meta
-        uses: OpenShock/release-tool@ea651e8c10372a10b6f452dcb34c38e60a72dc1f  # v0.5.1
+        uses: OpenShock/release-tool@50f3d4be9462cb69931d134fd4df2a4f5fcd1c5e  # v1.0.1
         with:
           mode: release
           output: release.json
@@ -58,9 +53,7 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ steps.app-token.outputs.token }}
 
-      # Precondition: there must be change files accumulated since the last tag.
-      # release-tool reports this by leaving the tag output empty; make it a loud
-      # failure rather than a silent no-op, since this workflow is run by hand.
+      # release-tool leaves the tag empty when no change files accumulated since the last tag
       - name: Fail if there is nothing to release
         if: steps.meta.outputs.tag == ''
         run: |
@@ -72,9 +65,8 @@ jobs:
         with:
           tag: ${{ steps.meta.outputs.tag }}
 
-      # A draft: the tag push triggers ci-build, whose `release` job attaches the binaries and publishes it.
+      # A draft, the tag push triggers ci-build whose release job attaches the binaries and publishes it
       - name: Stage GitHub Release (draft)
-        if: steps.meta.outputs.tag != ''
         env:
           GH_TOKEN: ${{ steps.app-token.outputs.token }}
           TAG: ${{ steps.meta.outputs.tag }}

@@ -1,6 +1,8 @@
 # Tick rate. Originally raised for Arduino-as-IDF-component; kept because the existing
 # timing code assumes a 1 ms tick.
 CONFIG_FREERTOS_HZ=1000
+# Index 1 is OpenShock's own (TaskUtils::kNotifyIndex), so its wakes and ESP-IDF's index-0 waits can't interfere
+CONFIG_FREERTOS_TASK_NOTIFICATION_ARRAY_ENTRIES=2
 
 # Keep the main task large enough for the init chain.
 CONFIG_ESP_MAIN_TASK_STACK_SIZE=16384
@@ -31,6 +33,14 @@ CONFIG_HTTPD_WS_SUPPORT=y
 # The URI handler is not called for the handshake itself, so greeting a new client (the Ready message with the config
 # and valid GPIO pins) needs the post-handshake callback.
 CONFIG_HTTPD_WS_POST_HANDSHAKE_CB_SUPPORT=y
+# Nothing subscribes to ESP_HTTP_SERVER_EVENT; posting them only adds traffic to the default event loop's queue,
+# which the WiFi, IP and OpenShock events depend on.
+CONFIG_HTTPD_ENABLE_EVENTS=n
+
+# Keep the RMT TX ISR running while the flash cache is off (OTA erase, config writes). Otherwise it is masked for the
+# whole flash operation and a frame longer than the channel's 64-symbol memory block runs dry mid-transmission: a
+# corrupted RF frame or LED colour. Costs some IRAM; frame buffers must be in internal RAM (they are: heap and stack).
+CONFIG_RMT_TX_ISR_CACHE_SAFE=y
 
 # TLS server-cert verification uses the mbedTLS certificate bundle. We compile in
 # our own curated trust store (certificates/cacert-merged.pem) instead of IDF's built-in

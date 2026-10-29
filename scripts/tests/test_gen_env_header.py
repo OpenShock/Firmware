@@ -3,6 +3,8 @@
 import gen_env_header
 import pytest
 
+from utils import versions
+
 
 @pytest.mark.parametrize(
     'version, expected',
@@ -11,16 +13,24 @@ import pytest
         ('v0.8.1', (0, 8, 1, None, None)),
         ('1.5.0-rc.2+abc123', (1, 5, 0, 'rc.2', 'abc123')),
         ('0.0.0-local+1234567', (0, 0, 0, 'local', '1234567')),
+        ('1.2.3-1+abc', (1, 2, 3, '1', 'abc')),
     ],
 )
-def test_split_semver(version, expected):
-    assert gen_env_header.split_semver(version) == expected
+def test_parse_version(version, expected):
+    v = versions.parse_version(version)
+    assert (v.major, v.minor, v.patch, v.prerelease, v.build) == expected
 
 
-@pytest.mark.parametrize('version', ['1.5', '1.5.0-', 'latest', ''])
-def test_split_semver_rejects(version):
-    with pytest.raises(ValueError, match='Invalid semver'):
-        gen_env_header.split_semver(version)
+@pytest.mark.parametrize('version', ['1.5', '1.5.0-', 'latest', '', '01.5.0'])
+def test_parse_version_rejects(version):
+    with pytest.raises(ValueError, match=f'Invalid semver version: {version!r}'):
+        versions.parse_version(version)
+
+
+def test_an_invalid_version_stops_the_header_naming_it(monkeypatch):
+    monkeypatch.setenv('OPENSHOCK_FW_VERSION', 'one.two')
+    with pytest.raises(ValueError, match="'one.two'"):
+        gen_env_header.version_defines(None)
 
 
 def test_serialize_quotes_strings_even_when_numeric():
@@ -39,7 +49,9 @@ def test_version_defines_include_only_the_parts_present(monkeypatch):
 
     monkeypatch.setenv('OPENSHOCK_FW_VERSION', '1.5.0')
     defines = gen_env_header.version_defines(None)
-    assert not {'OPENSHOCK_FW_VERSION_PRERELEASE', 'OPENSHOCK_FW_VERSION_BUILD', 'OPENSHOCK_FW_GIT_COMMIT'} & set(defines)
+    assert not {'OPENSHOCK_FW_VERSION_PRERELEASE', 'OPENSHOCK_FW_VERSION_BUILD', 'OPENSHOCK_FW_GIT_COMMIT'} & set(
+        defines
+    )
 
 
 def test_resolve_version_falls_back_locally_but_not_in_ci(monkeypatch):

@@ -42,7 +42,7 @@ def test_default_preset_is_visible_and_passes_no_board():
 
 def test_check_fails_on_a_stale_file(tmp_path):
     stale = tmp_path / 'CMakePresets.json'
-    stale.write_text('{}')
+    stale.write_text('{}', encoding='utf-8')
     assert gen_cmake_presets.main(['--check', '--output', str(stale)]) == 1
     assert gen_cmake_presets.main(['--output', str(stale)]) == 0
     assert gen_cmake_presets.main(['--check', '--output', str(stale)]) == 0

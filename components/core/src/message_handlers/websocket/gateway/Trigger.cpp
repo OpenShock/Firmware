@@ -8,12 +8,13 @@ const char* const TAG = "ServerMessageHandlers";
 #include "Logging.h"
 
 #include <cstdint>
+#include <utility>
 
 using namespace OpenShock::MessageHandlers::Server;
 
 using TriggerType = OpenShock::Serialization::Gateway::TriggerType;
 
-void _Private::HandleTrigger(const OpenShock::Serialization::Gateway::GatewayToHubMessage* root)
+void _Private::HandleTrigger(OpenShock::GatewayClient&, const OpenShock::Serialization::Gateway::GatewayToHubMessage* root)
 {
   auto msg = root->payload_as_Trigger();
   if (msg == nullptr) {
@@ -28,22 +29,22 @@ void _Private::HandleTrigger(const OpenShock::Serialization::Gateway::GatewayToH
 
   auto triggerType = msg->type();
 
+  // No default: -Wswitch flags new trigger types. The value comes from the network, so fall through to the log below.
   switch (triggerType) {
     case TriggerType::Restart:
       // Handled on the websocket task: the actual restart runs from the main task so the client can close cleanly.
       GatewayConnectionManager::RequestRestart();
-      break;
+      return;
     case TriggerType::EmergencyStop:
       EStopManager::SoftwareTrigger();
-      break;
+      return;
     case TriggerType::CaptivePortalEnable:
       OpenShock::AppHooks::CaptivePortalSetAlwaysEnabled(true);
-      break;
+      return;
     case TriggerType::CaptivePortalDisable:
       OpenShock::AppHooks::CaptivePortalSetAlwaysEnabled(false);
-      break;
-    default:
-      OS_LOGW(TAG, "Got unknown trigger type: %hhu", static_cast<uint8_t>(triggerType));
-      break;
+      return;
   }
+
+  OS_LOGW(TAG, "Got unknown trigger type: %hhu", std::to_underlying(triggerType));
 }

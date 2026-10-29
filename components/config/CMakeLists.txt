@@ -14,7 +14,7 @@ idf_component_register(
   INCLUDE_DIRS  "include"
   REQUIRES      common osjson serialization flatbuffers   # in public headers (enums, json/Json.h, HubConfig fbs, TinyVec, flatbuffers::Offset)
                 esp_wifi esp_hal_gpio                           # WiFiCredentials.h -> esp_wifi_types.h (wifi_auth_mode_t); RFConfig.h -> hal/gpio_types.h (gpio_num_t)
-  PRIV_REQUIRES chipset fs logging                              # .cpp only (GPIO validation, ConfigFs, OS_LOG*/OS_PANIC; ReadWriteMutex via common)
+  PRIV_REQUIRES chipset fs logging                              # .cpp only (GPIO validation, ConfigFs, OS_LOG*/OS_PANIC; SimpleMutex via common)
 )
 
 target_compile_options(${COMPONENT_LIB} PRIVATE -Wno-error)

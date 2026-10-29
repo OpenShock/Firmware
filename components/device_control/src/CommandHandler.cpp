@@ -8,8 +8,6 @@ const char* const TAG = "CommandHandler";
 #include "Chipset.h"
 #include "config/Config.h"
 #include "estop/EStopManager.h"
-#include "estop/EStopState.h"
-#include "events/Events.h"
 #include "Logging.h"
 
 #include "OpenShock.h"
@@ -20,6 +18,7 @@ const char* const TAG = "CommandHandler";
 #include <cstring>
 
 #include <freertos/queue.h>
+#include <freertos/task.h>
 
 #include <algorithm>
 #include <memory>
@@ -27,6 +26,8 @@ const char* const TAG = "CommandHandler";
 
 const int64_t KEEP_ALIVE_INTERVAL  = 60'000;
 const uint16_t KEEP_ALIVE_DURATION = 300;
+// Shocker IDs come from the network, so the set is capped; past it the least recently used shocker is dropped
+const size_t KEEP_ALIVE_MAX_SHOCKERS = 16;
 
 static uint32_t calculateEepyTime(int64_t timeToKeepAlive)
 {
@@ -41,6 +42,10 @@ struct KnownShocker {
   int64_t lastActivityTimestamp;
 };
 
+// Serializes creating and replacing the transmitter (Init, SetRfTxPin from httpd or serial). Never taken by the
+// command path. Lock order: s_rfLifecycleMutex before s_rfTransmitterMutex.
+static OpenShock::SimpleMutex s_rfLifecycleMutex = {};
+// Guards only the pointer; held for a copy or a swap, never across the transmitter's destructor.
 static OpenShock::SimpleMutex s_rfTransmitterMutex               = {};
 static std::shared_ptr<OpenShock::RFTransmitter> s_rfTransmitter = nullptr;
 
@@ -60,10 +65,27 @@ static bool TryCreateTransmitter(gpio_num_t txPin)
   s_rfTransmitter = std::move(transmitter);
   return true;
 }
+// Requires s_rfLifecycleMutex. Unpublishes the transmitter and destroys it on the calling task, so its RMT channel is
+// free before a new one is created and its destructor (a task join and RMT teardown) never runs under
+// s_rfTransmitterMutex or on a command sender that happened to hold the last copy.
 static void DestroyTransmitter()
 {
-  OpenShock::ScopedLock lock__(&s_rfTransmitterMutex);
-  s_rfTransmitter = nullptr;
+  std::shared_ptr<OpenShock::RFTransmitter> old;
+  {
+    OpenShock::ScopedLock lock__(&s_rfTransmitterMutex);
+    old = std::move(s_rfTransmitter);
+  }
+  if (old == nullptr) {
+    return;
+  }
+
+  // Command senders hold a copy only across SendCommand (bounded by its 10 ms queue wait)
+  for (int i = 0; i < 50 && old.use_count() > 1; ++i) {
+    vTaskDelay(pdMS_TO_TICKS(10));
+  }
+  if (old.use_count() > 1) {
+    OS_LOGW(TAG, "RF transmitter still in use, it will be destroyed by its last user");
+  }
 }
 
 static OpenShock::SimpleMutex s_keepAliveMutex = {};
@@ -90,13 +112,27 @@ static void commandhandler_keepalivetask()
         return;
       }
 
-      activityMap[(static_cast<uint32_t>(cmd.model) << 16) | cmd.shockerId] = cmd;
+      uint32_t key = (static_cast<uint32_t>(cmd.model) << 16) | cmd.shockerId;
+      if (activityMap.size() >= KEEP_ALIVE_MAX_SHOCKERS && !activityMap.contains(key)) {
+        auto oldest = std::min_element(activityMap.begin(), activityMap.end(), [](const auto& a, const auto& b) { return a.second.lastActivityTimestamp < b.second.lastActivityTimestamp; });
+        OS_LOGW(TAG, "Keeping more than %zu shockers alive, dropping shocker %u", KEEP_ALIVE_MAX_SHOCKERS, oldest->second.shockerId);
+        activityMap.erase(oldest);
+      }
+      activityMap[key] = cmd;
 
       eepyTime = calculateEepyTime(std::min(timeToKeepAlive, cmd.lastActivityTimestamp + KEEP_ALIVE_INTERVAL));
     }
 
     // Update the time to now
     int64_t now = OpenShock::millis();
+
+    // The task stays up through an E-Stop (stopping it from the event loop would join a task there) and simply sends
+    // nothing. Shockers seen before the E-Stop are forgotten; only commands accepted after it count again.
+    if (EStopManager::IsEStopped()) {
+      activityMap.clear();
+      timeToKeepAlive = now + KEEP_ALIVE_INTERVAL;
+      continue;
+    }
 
     // Keep track of the minimum activity time, so we know when to wake up
     timeToKeepAlive = now + KEEP_ALIVE_INTERVAL;
@@ -128,7 +164,7 @@ static void commandhandler_keepalivetask()
 
 static bool internalSetKeepAliveEnabled(bool enabled)
 {
-  // Called from the event loop (EStop changes) and from serial/portal tasks; the check must be under the lock.
+  // Called from Init and from serial/portal tasks; the check must be under the lock.
   ScopedLock lock__(&s_keepAliveMutex);
 
   bool wasEnabled = s_keepAliveQueue != nullptr && s_keepAliveTask.running();
@@ -178,59 +214,27 @@ static bool internalSetKeepAliveEnabled(bool enabled)
   return true;
 }
 
-static void commandhandler_handleestopstatechange(void* event_handler_arg, esp_event_base_t event_base, int32_t event_id, void* event_data)
-{
-  (void)event_handler_arg;
-  (void)event_base;
-  (void)event_id;
-
-  EStopState state = *static_cast<EStopState*>(event_data);
-
-  if (state != EStopState::Idle) {
-    internalSetKeepAliveEnabled(false);
-    return;
-  }
-
-  // E-Stop cleared: restore the configured keep-alive setting instead of forcing it on.
-  bool keepAliveEnabled;
-  if (!Config::GetRFConfigKeepAliveEnabled(keepAliveEnabled)) {
-    OS_LOGE(TAG, "Failed to get keep-alive enabled from config");
-    return;
-  }
-
-  internalSetKeepAliveEnabled(keepAliveEnabled);
-}
-
 bool CommandHandler::Init()
 {
-  esp_err_t err;
-
   static bool initialized = false;
   if (initialized) {
     OS_LOGW(TAG, "RF Transmitter and EStopManager are already initialized?");
     return true;
   }
-
-  // Register first so EStop changes gate the keep-alive task even if the transmitter can't be created yet
-  // (it can still be brought up later through SetRfTxPin).
-  err = esp_event_handler_register(OPENSHOCK_EVENTS, OPENSHOCK_EVENT_ESTOP_STATE_CHANGED, commandhandler_handleestopstatechange, nullptr);
-  if (err != ESP_OK) {
-    OS_LOGE(TAG, "Failed to register event handler for OPENSHOCK_EVENTS: %s", esp_err_to_name(err));
-    return false;
-  }
   initialized = true;
 
-  Config::RFConfig rfConfig;
-  if (!Config::GetRFConfig(rfConfig)) {
+  auto rfConfig = Config::GetRFConfig();
+  if (!rfConfig) {
     OS_LOGE(TAG, "Failed to get RF config");
     return false;
   }
 
-  if (rfConfig.keepAliveEnabled && !EStopManager::IsEStopped()) {
+  // Runs through E-Stops too; the task itself sends nothing while e-stopped
+  if (rfConfig->keepAliveEnabled) {
     internalSetKeepAliveEnabled(true);
   }
 
-  gpio_num_t txPin = rfConfig.txPin;
+  gpio_num_t txPin = rfConfig->txPin;
   if (!OpenShock::IsValidOutputPin(txPin)) {
     const int8_t boardTxPin = Board::Get().rfTxGpio;
     if (!OpenShock::IsValidOutputPin(boardTxPin)) {
@@ -248,6 +252,7 @@ bool CommandHandler::Init()
     }
   }
 
+  ScopedLock lifecycleLock(&s_rfLifecycleMutex);
   if (!TryCreateTransmitter(txPin)) {
     OS_LOGE(TAG, "Failed to initialize RF Transmitter");
     return false;
@@ -269,13 +274,16 @@ SetGPIOResultCode CommandHandler::SetRfTxPin(gpio_num_t txPin)
 
   // Driving the E-Stop input as the RF output would defeat the kill switch. Checked against the configured pin even
   // while the E-Stop is disabled, so enabling it later can't collide either.
-  gpio_num_t estopPin = GPIO_NUM_NC;
-  if (!Config::GetEStopGpioPin(estopPin)) {
+  auto estopPin = Config::GetEStopGpioPin();
+  if (!estopPin) {
     return SetGPIOResultCode::InternalError;
   }
-  if (estopPin != GPIO_NUM_NC && txPin == estopPin) {
+  if (*estopPin != GPIO_NUM_NC && txPin == *estopPin) {
     return SetGPIOResultCode::PinInUse;
   }
+
+  // Held throughout so concurrent changes can't leave config and the live pin disagreeing
+  ScopedLock lifecycleLock(&s_rfLifecycleMutex);
 
   gpio_num_t oldPin = static_cast<gpio_num_t>(OPENSHOCK_GPIO_INVALID);
   if (auto current = GetTransmitter(); current != nullptr) {
@@ -309,8 +317,7 @@ SetGPIOResultCode CommandHandler::SetRfTxPin(gpio_num_t txPin)
 
 bool CommandHandler::SetKeepAliveEnabled(bool enabled)
 {
-  // While e-stopped the task stays off; clearing the e-stop starts it from the saved setting.
-  if (!internalSetKeepAliveEnabled(enabled && !EStopManager::IsEStopped())) {
+  if (!internalSetKeepAliveEnabled(enabled)) {
     return false;
   }
 
@@ -329,13 +336,13 @@ gpio_num_t CommandHandler::GetRfTxPin()
     return transmitter->GetTxPin();
   }
 
-  gpio_num_t txPin;
-  if (!Config::GetRFConfigTxPin(txPin)) {
+  auto txPin = Config::GetRFConfigTxPin();
+  if (!txPin) {
     OS_LOGE(TAG, "Failed to get RF TX pin from config");
-    txPin = static_cast<gpio_num_t>(OPENSHOCK_GPIO_INVALID);
+    return static_cast<gpio_num_t>(OPENSHOCK_GPIO_INVALID);
   }
 
-  return txPin;
+  return *txPin;
 }
 
 bool CommandHandler::HandleCommand(ShockerModelType model, uint16_t shockerId, ShockerCommandType type, uint8_t intensity, uint16_t durationMs)

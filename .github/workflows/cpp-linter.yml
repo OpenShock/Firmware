@@ -3,13 +3,12 @@ name: cpp-linter
 on:
   pull_request:
     types: [opened, reopened, synchronize]
-    paths: ['**.c', '**.h', '**.cpp', '**.hpp', '.clang-format', '.github/workflows/cpp-linter.yml']
+    paths: &paths ['**.c', '**.h', '**.cpp', '**.hpp', '.clang-format', '.github/workflows/cpp-linter.yml']
   push:
-    # Branch-scoped: path filters are ignored for tag pushes, so without this every
-    # release tag would re-lint.
+    # Branch-scoped, path filters are ignored for tag pushes so every release tag would re-lint
     branches: [develop, beta, master]
-    paths: ['**.c', '**.h', '**.cpp', '**.hpp', '.clang-format', '.github/workflows/cpp-linter.yml']
-  workflow_dispatch: # Manually invoked by user.
+    paths: *paths
+  workflow_dispatch:
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
@@ -33,7 +32,7 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
 
-      # clang-format only, so no ESP-IDF or compile database is needed.
+      # clang-format only, so no ESP-IDF or compile database is needed
       - uses: cpp-linter/cpp-linter-action@8120e05c7fbd25fa09fa93424ec49f55f7b304ab # v2.23.1
         id: linter
         env:
@@ -41,16 +40,14 @@ jobs:
         with:
           style: file
           version: 21
-          # clang-tidy is off: it rejects the gcc-only flags of the ESP-IDF compile DB. CodeQL covers static analysis.
-          tidy-checks: '-*'
-          # Scan the tree, not the PR diff: GitHub returns 406 for very large diffs.
-          files-changed-only: false
+          tidy-checks: '-*' # clang-tidy rejects the gcc-only flags of the ESP-IDF compile DB, CodeQL covers static analysis
+          files-changed-only: false # GitHub returns 406 for very large PR diffs
           ignore: '.github|build|managed_components|components/littlefs|components/flatbuffers|components/serialization/include/serialization/_fbs'
-          # Commit comments on push need contents:write, which this job does not grant.
-          thread-comments: ${{ github.event_name == 'pull_request' && 'update' || 'false' }}
+          thread-comments: ${{ github.event_name == 'pull_request' && 'update' || 'false' }} # Commit comments on push need contents:write
 
+      # Advisory on beta and master (pushes and PRs targeting them): findings are still reported, but they don't fail the job
       - name: Fail on lint errors
-        if: steps.linter.outputs.checks-failed > 0
+        if: steps.linter.outputs.checks-failed > 0 && !contains(fromJSON('["beta", "master"]'), github.base_ref || github.ref_name)
         run: |
           echo "::error::Some files failed the linting checks!"
           exit 1

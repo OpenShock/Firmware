@@ -4,17 +4,13 @@ name: frontend-checks
 on:
   push:
     branches: ['**']
-    paths:
+    paths: &paths
       - 'frontend/**'
       - '.github/actions/build-frontend/**'
       - '.github/workflows/frontend-checks.yml'
-  # A same-repo PR branch is already covered by its push run; pull_request is for forks, whose
-  # pushes do not run here. Fork runs need a maintainer's approval (repository setting).
+  # Same-repo PR branches are covered by their push run, pull_request is for forks (needs maintainer approval)
   pull_request:
-    paths:
-      - 'frontend/**'
-      - '.github/actions/build-frontend/**'
-      - '.github/workflows/frontend-checks.yml'
+    paths: *paths
   workflow_dispatch:
 
 concurrency:

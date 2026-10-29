@@ -5,17 +5,15 @@ One parametrized case per board, so a broken fragment names itself rather than h
 
 import pytest
 
-from utils import boards, espimage, partitions
+from utils import boards, partitions
 
 ALL_BOARDS = boards.all_boards()
 
 
 @pytest.mark.parametrize('board', ALL_BOARDS)
 def test_board_is_complete(board):
-    spec = boards.read_board(board)
-
-    # Stamping needs the image chip id.
-    assert spec.target in espimage.CHIP_IDS
+    # Parsed whole: pins, flags, and a target utils/targets.py knows (so a chip label and an image chip id).
+    boards.read_board(board)
 
     # The variant compiles at VARIANT_FLASH_SIZE, so no board may have less.
     assert boards.flash_size_bytes(boards.flash_size(board)) >= boards.flash_size_bytes(boards.VARIANT_FLASH_SIZE)

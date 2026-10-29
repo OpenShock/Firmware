@@ -1,7 +1,7 @@
 # Compile config's sources directly (not via the config component, whose logging
 # dependency pulls in app_update, which has no linux port). Config.cpp is included,
 # so the tests drive the real Config:: store (Init, SetRaw, GetAsJSON / SaveFromJSON)
-# under the real ReadWriteMutex, and Config::Init finds its partition in the
+# under the real SimpleMutexes, and Config::Init finds its partition in the
 # firmware's real partition table through ESP-IDF's linux esp_partition. Only the
 # filesystem is faked: stubs/fs/ConfigFs.h is an in-memory file store the tests seed
 # and inspect. osjson's Json.cpp and the common sources config needs are compiled in
@@ -26,20 +26,19 @@ idf_component_register(
                "../../src/internal/utils.cpp"
                "../../../osjson/src/Json.cpp"
                "../../../common/src/Convert.cpp"        # Json.cpp strict string->int
-               "../../../common/src/DigitCounter.cpp"
-               "../../../common/src/ReadWriteMutex.cpp" # Config.cpp's store lock
+               "../../../common/src/SimpleMutex.cpp"    # Config.cpp's store locks
                "../../../common/src/StringHelpers.cpp"
   INCLUDE_DIRS "."
                "stubs"                                   # fs/ConfigFs.h (in-memory)
                "../../include"                           # config/*.h
                "../../../chipset/include"                # Chipset.h
-               "../../../common/include"                 # OpenShock.h, ReadWriteMutex.h, TinyVec.h, enums/*, util/HexUtils.h
+               "../../../common/include"                 # OpenShock.h, SimpleMutex.h, TinyVec.h, enums/*, util/HexUtils.h
                "../../../osjson/include"                 # json/Json.h
                "../../../serialization/include"          # serialization/_fbs/HubConfig_generated.h
                "../../../flatbuffers/flatbuffers/include"
   REQUIRES     unity
                host_support                              # Logging.h, openshock_board.h, ESP32 GPIO caps (test/host_support)
-               freertos                                  # ReadWriteMutex (real POSIX port)
+               freertos                                  # SimpleMutex (real POSIX port)
                esp_partition                             # Config::Init's partition lookup (linux flash emulation)
                driver                                    # Chipset.h -> driver/gpio.h (tools/mocks/driver)
                esp_wifi                                  # WiFiCredentials.h -> esp_wifi_types.h (tools/mocks/esp_wifi)

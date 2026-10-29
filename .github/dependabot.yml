@@ -29,18 +29,6 @@ updates:
         patterns:
           - '*'
 
-  # Weekly checks for pip package updates in CI-CD scripts
-  - package-ecosystem: 'pip'
-    directory: '/.github/scripts'
-    schedule:
-      interval: 'weekly'
-      day: monday
-      time: '06:00'
-    groups:
-      ci-cd:
-        patterns:
-          - '*'
-
   # Weekly checks for npm package updates in frontend
   - package-ecosystem: 'npm'
     directory: '/frontend'

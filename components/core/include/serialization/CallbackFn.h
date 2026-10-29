@@ -1,9 +1,11 @@
 #pragma once
 
+#include "util/FunctionRef.h"
+
 #include <cstdint>
-#include <functional>
 #include <span>
 
 namespace OpenShock::Serialization::Common {
-  typedef std::function<bool(std::span<const uint8_t> data)> SerializationCallbackFn;
+  // Invoked synchronously with the finished buffer before the Serialize* call returns; never stored.
+  using SerializationCallbackFn = OpenShock::Util::FunctionRef<bool(std::span<const uint8_t> data)>;
 }

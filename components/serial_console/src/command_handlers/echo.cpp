@@ -14,14 +14,14 @@ static void handleSerialEchoCommand(std::string_view arg, bool isAutomated)
     return;
   }
 
-  bool enabled;
-  if (!OpenShock::Convert::ToBool(OpenShock::StringTrim(arg), enabled)) {
+  auto enabled = OpenShock::Convert::ToBool(OpenShock::StringTrim(arg));
+  if (!enabled) {
     SERPR_ERROR("Invalid argument (not a boolean)");
     return;
   }
 
-  bool result = OpenShock::Config::SetSerialInputConfigEchoEnabled(enabled);
-  OpenShock::SerialInputHandler::SetSerialEchoEnabled(enabled);
+  bool result = OpenShock::Config::SetSerialInputConfigEchoEnabled(*enabled);
+  OpenShock::SerialInputHandler::SetSerialEchoEnabled(*enabled);
 
   if (result) {
     SERPR_SUCCESS("Saved config");

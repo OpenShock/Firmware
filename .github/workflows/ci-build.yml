@@ -1,6 +1,6 @@
 # Compiles once per build variant (scripts/utils/boards.py) and stamps each board from it. Runs on:
 #   - release tags: every board, published to prod;
-#   - nightly (nightly.yml) on develop, beta and master when firmware sources changed; develop's publishes to prod;
+#   - nightly on develop when firmware sources changed, published to prod;
 #   - pull requests: one canary board, or every board with the ci:full-build label;
 #   - dispatch: every board, on demand.
 # Per-commit checks are host-tests.yml, script-tests.yml, frontend-checks.yml and cpp-linter.yml.
@@ -32,11 +32,8 @@ on:
         type: choice
         default: derive
         options: [derive, develop, beta, stable]
-      nightly:
-        description: 'Run as the nightly build of this branch (set by nightly.yml): skip when no firmware sources changed; server and channel are ignored'
-        required: false
-        type: boolean
-        default: false
+  schedule:
+    - cron: '0 3 * * *' # Runs on the default branch, develop
 
 # Per ref. A label other than ci:full-build gets its own group, so its no-op run does not cancel the PR's build.
 concurrency:
@@ -54,7 +51,7 @@ defaults:
     shell: bash
 
 jobs:
-  # Decides build, publish, the server and the boards (.github/scripts/ci_build_gate.py).
+  # Decides build, publish, the server and the boards (scripts/ci_build_gate.py).
   gate:
     runs-on: ubuntu-latest # ships the pinned Python; ubuntu-slim would download it every run
     timeout-minutes: 3
@@ -69,17 +66,19 @@ jobs:
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
         with:
-          sparse-checkout: .github
+          sparse-checkout: |
+            .github
+            scripts
 
-      - uses: ./.github/actions/setup-ci-scripts
+      - uses: ./.github/actions/install-python-deps
 
       - name: Decide build and publish
         id: decide
         env:
           GITHUB_TOKEN: ${{ github.token }}
-        run: python .github/scripts/ci_build_gate.py
+        run: python scripts/ci_build_gate.py
 
-  # Version, channel, boards, and the build variants they need (.github/scripts/get_vars.py).
+  # Version, channel, boards, and the build variants they need (scripts/get_vars.py).
   plan:
     needs: [gate]
     if: ${{ needs.gate.outputs.build == 'true' }}
@@ -99,14 +98,14 @@ jobs:
             .github
             .changes
             boards
-            scripts/utils
+            scripts
 
-      - uses: ./.github/actions/setup-ci-scripts
+      - uses: ./.github/actions/install-python-deps
 
       # The next version from .changes/; status mode works on every branch and creates no tag.
       - name: Compute next version
         id: relmeta
-        uses: OpenShock/release-tool@ea651e8c10372a10b6f452dcb34c38e60a72dc1f  # v0.5.1
+        uses: OpenShock/release-tool@50f3d4be9462cb69931d134fd4df2a4f5fcd1c5e  # v1.0.1
         with:
           mode: status
 
@@ -116,9 +115,8 @@ jobs:
           RELEASE_NEXT_VERSION: ${{ steps.relmeta.outputs.next-version }}
           RELEASE_SKIP: ${{ steps.relmeta.outputs.skip }}
           CHANNEL_INPUT: ${{ inputs.channel }}
-          NIGHTLY_INPUT: ${{ inputs.nightly }}
           BOARDS_INPUT: ${{ needs.gate.outputs.boards }}
-        run: python .github/scripts/get_vars.py
+        run: python scripts/get_vars.py
 
   # Opens and reserves the release before anything is built, so the server's checks fail in a minute, not after the matrix.
   stage:
@@ -131,35 +129,29 @@ jobs:
     # The environment carries OPENSHOCK_REPO_SERVER_URL, and repo-server-prod's reviewer approves here, before the build.
     environment: repo-server-${{ needs.gate.outputs.server }}
     permissions:
-      contents: read
+      contents: write # Draft releases are only visible to tokens with push access, and the policy step requires one
       id-token: write
     outputs:
       release-id: ${{ steps.stage.outputs.release-id }}
-      # For the publish and abort jobs, which run outside the environment. A hostname, not a credential.
-      server-url: ${{ steps.resolve.outputs.server-url }}
+      server-url: ${{ vars.OPENSHOCK_REPO_SERVER_URL }} # For the publish and abort jobs, which run outside the environment
 
     steps:
-      - name: Resolve server configuration
-        id: resolve
-        env:
-          SERVER_URL: ${{ vars.OPENSHOCK_REPO_SERVER_URL }}
-          TARGET: ${{ needs.gate.outputs.server }}
+      - name: Fail when the environment has no server URL
+        if: ${{ vars.OPENSHOCK_REPO_SERVER_URL == '' }}
         run: |
-          set -euo pipefail
-          if [ -z "$SERVER_URL" ]; then
-            echo "::error::OPENSHOCK_REPO_SERVER_URL is unset on environment repo-server-$TARGET, so this build has nowhere to publish to."
-            exit 1
-          fi
-          echo "server-url=$SERVER_URL" >> "$GITHUB_OUTPUT"
-          echo "Publishing to the $TARGET repository server."
+          echo "::error::OPENSHOCK_REPO_SERVER_URL is unset on environment repo-server-$TARGET, so this build has nowhere to publish to."
+          exit 1
+        env:
+          TARGET: ${{ needs.gate.outputs.server }}
 
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
         with:
           sparse-checkout: |
             .github
+            scripts
             CHANGELOG.md
 
-      - uses: ./.github/actions/setup-ci-scripts
+      - uses: ./.github/actions/install-python-deps
 
       # This repository's prod rules, which the server cannot know (stable descends from master, a draft is staged).
       - name: Apply repository publishing policy
@@ -170,7 +162,7 @@ jobs:
           SERVER: ${{ needs.gate.outputs.server }}
           CHANNEL: ${{ needs.plan.outputs.release-channel }}
           VERSION: ${{ needs.plan.outputs.version }}
-        run: python .github/scripts/repo_server_policy.py
+        run: python scripts/repo_server_policy.py
 
       - uses: ./.github/actions/repo-server-token
         id: token
@@ -178,7 +170,7 @@ jobs:
       - uses: ./.github/actions/repo-server-publish
         id: stage
         with:
-          server-url: ${{ steps.resolve.outputs.server-url }}
+          server-url: ${{ vars.OPENSHOCK_REPO_SERVER_URL }}
           token: ${{ steps.token.outputs.token }}
           version: ${{ needs.plan.outputs.version }}
           channel: ${{ needs.plan.outputs.release-channel }}
@@ -229,10 +221,6 @@ jobs:
 
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
-
-      # The firmware needs only the flatbuffers runtime submodule.
-      - name: Fetch flatbuffers submodule
-        run: git submodule update --init --depth 1 components/flatbuffers/flatbuffers
 
       - uses: ./.github/actions/build-firmware
         with:
@@ -293,7 +281,9 @@ jobs:
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
         with:
-          sparse-checkout: .github
+          sparse-checkout: |
+            .github
+            scripts
 
       - uses: ./.github/actions/repo-server-token
         id: token
@@ -321,7 +311,9 @@ jobs:
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
         with:
-          sparse-checkout: .github
+          sparse-checkout: |
+            .github
+            scripts
 
       - uses: ./.github/actions/repo-server-token
         id: token
@@ -356,6 +348,13 @@ jobs:
         with:
           name: firmware_merged
 
+      # One per build variant, for decoding crash backtraces (build-firmware's Stage ELF)
+      - name: Download ELF files
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333  # v8.0.2
+        with:
+          pattern: elf_*
+          merge-multiple: true
+
       - name: Upload binaries to staged release
         run: |
           shopt -s globstar nullglob
@@ -364,7 +363,12 @@ jobs:
             echo "::error::No firmware binaries found to upload"
             exit 1
           fi
-          gh release upload "$TAG" "${files[@]}" --clobber
+          elfs=(**/OpenShock_*.elf)
+          if [ ${#elfs[@]} -eq 0 ]; then
+            echo "::error::No ELF files found to upload"
+            exit 1
+          fi
+          gh release upload "$TAG" "${files[@]}" "${elfs[@]}" --clobber
 
       - name: Publish the release
         run: gh release edit "$TAG" --draft=false
@@ -382,7 +386,9 @@ jobs:
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
         with:
-          sparse-checkout: .github
+          sparse-checkout: |
+            .github
+            scripts
 
       - uses: ./.github/actions/repo-server-token
         id: token

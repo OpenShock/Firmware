@@ -1,28 +1,19 @@
 name: package-firmware
-description: >-
-  Turn the per-variant builds into per-board firmware: scripts/package_boards.py stamps
-  each board, scripts/merge_image.py merges it with static0. Needs esptool, not ESP-IDF.
+description: Stamp each board from its variant build and merge it with the static0 image
 inputs:
   version:
+    required: true
     description: 'Firmware version'
-    required: true
   boards:
-    description: 'Newline-separated board names to package'
     required: true
+    description: 'Newline-separated board names to package'
 
 runs:
   using: composite
   steps:
-    - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97  # v7.0.0
-      with:
-        python-version-file: .python-version
-        cache: 'pip'
+    - uses: ./.github/actions/install-python-deps
 
-    - name: Install Python dependencies
-      shell: bash
-      run: pip install --require-hashes -r requirements.txt
-
-    # Each variant artifact holds one <variant-id>/ directory, so merging them keeps variants apart.
+    # Each variant artifact holds one <variant-id>/ directory, so merging them keeps variants apart
     - name: Download variant builds
       uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333  # v8.0.2
       with:
@@ -42,7 +33,7 @@ runs:
         BOARDS: ${{ inputs.boards }}
       run: python scripts/package_boards.py --variants variants --board "$BOARDS" --out boards-out
 
-    # One invocation for every board; merge_image.py expands {board} in --bindir and --output.
+    # merge_image.py expands {board} in --bindir and --output
     - name: Merge partitions
       shell: bash
       env:
@@ -56,7 +47,7 @@ runs:
           --staticfs staticfs/staticfs.bin \
           --output "merged/OpenShock_{board}_${VERSION}.bin"
 
-    # One artifact holding a directory per board: what repo_server_publish.py uploads for each.
+    # One directory per board, what repo_server_publish.py uploads
     - name: Upload per-board images
       uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9  # v7.0.2
       with:

@@ -269,7 +269,7 @@ The loop CI runs over all of them is in `.github/workflows/host-tests.yml`.
 ### Script tests (Python)
 
 ```sh
-pip install --require-hashes -r requirements.txt -r .github/scripts/requirements-dev.txt
+pip install --require-hashes -r requirements.txt -r requirements-dev.txt
 ruff check .
 mypy
 python -m pytest
@@ -311,8 +311,7 @@ reconfigure prints what it ignored.
 uv pip compile requirements.in --universal --python-version 3.10 --generate-hashes -o requirements.txt
 ```
 
-The CI helper scripts have their own pinned file; the refresh command is in the header of
-`.github/scripts/requirements.txt`.
+`requirements-dev.txt` adds the test and lint tools on top of it; the refresh command is in its header.
 
 ### Frontend
 

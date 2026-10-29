@@ -10,21 +10,18 @@ const char* const TAG = "Config::Internal::Utils";
 
 using namespace OpenShock;
 
-bool Config::Internal::Utils::FromIntGpioNum(gpio_num_t& val, int32_t intVal)
+std::optional<gpio_num_t> Config::Internal::Utils::FromIntGpioNum(int32_t intVal)
 {
   if (intVal == GPIO_NUM_NC) {
-    val = GPIO_NUM_NC;
-    return true;
+    return GPIO_NUM_NC;
   }
 
   if (intVal < 0 || intVal >= GPIO_NUM_MAX || !GPIO_IS_VALID_GPIO(intVal)) {
     OS_LOGE(TAG, "invalid GPIO number %" PRId32, intVal);
-    return false;
+    return std::nullopt;
   }
 
-  val = static_cast<gpio_num_t>(intVal);
-
-  return true;
+  return static_cast<gpio_num_t>(intVal);
 }
 
 void Config::Internal::Utils::FromFbsStr(std::string& str, const flatbuffers::String* fbsStr, const char* defaultStr)
@@ -36,12 +33,12 @@ void Config::Internal::Utils::FromFbsStr(std::string& str, const flatbuffers::St
   }
 }
 
-bool Config::Internal::Utils::FromJsonGpioNum(gpio_num_t& val, JSON::JsonView json, std::string_view name)
+std::optional<gpio_num_t> Config::Internal::Utils::FromJsonGpioNum(JSON::JsonView json, std::string_view name)
 {
-  int32_t intVal;
-  if (!json[name].tryGetI32(intVal)) {
-    return false;
+  auto intVal = json[name].tryGetI32();
+  if (!intVal) {
+    return std::nullopt;
   }
 
-  return FromIntGpioNum(val, intVal);
+  return FromIntGpioNum(*intVal);
 }

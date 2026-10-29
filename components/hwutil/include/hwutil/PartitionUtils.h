@@ -1,9 +1,10 @@
 #pragma once
 
+#include "util/FunctionRef.h"
+
 #include <esp_partition.h>
 
 #include <cstdint>
-#include <functional>
 #include <string_view>
 
 namespace OpenShock {
@@ -15,5 +16,6 @@ namespace OpenShock {
   const esp_partition_t* FindStaticPartition();
 
   bool TryGetPartitionHash(const esp_partition_t* partition, char (&hash)[65]);
-  bool FlashPartitionFromUrl(HTTP::Client& client, const esp_partition_t* partition, std::string_view remoteUrl, const uint8_t (&remoteHash)[32], std::function<bool(std::size_t, std::size_t, float)> progressCallback = nullptr);
+  /// @param progressCallback Invoked with (written, total, fraction) while flashing; only used during this call, never stored.
+  bool FlashPartitionFromUrl(HTTP::Client& client, const esp_partition_t* partition, std::string_view remoteUrl, const uint8_t (&remoteHash)[32], Util::FunctionRef<bool(std::size_t, std::size_t, float)> progressCallback);
 }  // namespace OpenShock

@@ -35,7 +35,9 @@ bool RFConfig::FromFlatbuffers(const Serialization::Configuration::RFConfig* con
   }
 
   // "No pin" (-1) is not a usable TX pin either; both fall back to the board default.
-  if (!Internal::Utils::FromIntGpioNum(txPin, config->tx_pin()) || txPin == GPIO_NUM_NC) {
+  if (auto pin = Internal::Utils::FromIntGpioNum(config->tx_pin()); pin && *pin != GPIO_NUM_NC) {
+    txPin = *pin;
+  } else {
     txPin = static_cast<gpio_num_t>(Board::Get().rfTxGpio);
   }
   keepAliveEnabled = config->keepalive_enabled();
@@ -69,10 +71,12 @@ bool RFConfig::FromJSON(JSON::JsonView json)
     return false;
   }
 
-  if (!Internal::Utils::FromJsonGpioNum(txPin, json, "txPin") || txPin == GPIO_NUM_NC) {
+  if (auto pin = Internal::Utils::FromJsonGpioNum(json, "txPin"); pin && *pin != GPIO_NUM_NC) {
+    txPin = *pin;
+  } else {
     txPin = static_cast<gpio_num_t>(Board::Get().rfTxGpio);
   }
-  if (!json["keepAliveEnabled"].tryGetBool(keepAliveEnabled)) keepAliveEnabled = true;
+  keepAliveEnabled = json["keepAliveEnabled"].tryGetBool().value_or(true);
 
   return true;
 }
