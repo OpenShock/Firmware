@@ -20,13 +20,7 @@ const char* const TAG = "RFTransmitter";
 #include <utility>
 #include <vector>
 
-const UBaseType_t kQueueSize = 64;
-// Above the network tasks (5): it blocks on its queue or on RMT almost all the time, and frames (and the terminators
-// after an E-Stop) shouldn't wait behind TLS work. Below the E-Stop sampler (10). Never spins: see transmitSymbols.
-const BaseType_t kTaskPriority      = 9;
-const uint32_t kTaskStackSize       = 4096;  // PROFILED: 1.4KB stack usage
-const int64_t kTerminatorDurationMs = 300;
-const int32_t kRmtTimeoutMs         = 100;
+const int32_t kRmtTimeoutMs = 100;
 // After this many transmit failures in a row the RMT channel is presumed broken and the pending sequences are dropped
 const uint32_t kMaxConsecutiveFailures = 20;
 const uint32_t kMaxFailureBackoffMs    = 100;
@@ -93,7 +87,7 @@ RFTransmitter::RFTransmitter(gpio_num_t gpioPin)
     return;
   }
 
-  m_queueHandle = xQueueCreate(kQueueSize, sizeof(Command));
+  m_queueHandle = xQueueCreate(CONFIG_OPENSHOCK_RF_QUEUE_SIZE, sizeof(Command));
   if (m_queueHandle == nullptr) {
     OS_LOGE(TAG, "[pin-%hhi] Failed to create queue", m_txPin);
     destroy();
@@ -103,7 +97,7 @@ RFTransmitter::RFTransmitter(gpio_num_t gpioPin)
   char name[32];
   snprintf(name, sizeof(name), "RFTransmitter-%u", m_txPin);
 
-  if (!m_task.startExpensive(name, kTaskStackSize, kTaskPriority, [this] { TransmitTask(); })) {
+  if (!m_task.startExpensive(name, CONFIG_OPENSHOCK_RF_TASK_STACK_SIZE, CONFIG_OPENSHOCK_RF_TASK_PRIORITY, [this] { TransmitTask(); })) {
     OS_LOGE(TAG, "[pin-%hhi] Failed to create task", m_txPin);
     destroy();
     return;
@@ -304,7 +298,7 @@ static void writeSequences(rmt_channel_handle_t channel, rmt_encoder_handle_t en
 
     // Remove command once it has sent out its termination sequence for long enough. A sequence that never got a
     // terminator out (a slow round skipped past the whole window, or a failed fill zeroed its end) sends one first.
-    if (timeToLive <= -kTerminatorDurationMs && seq->terminatorSent()) {
+    if (timeToLive <= -CONFIG_OPENSHOCK_RF_TERMINATOR_DURATION_MS && seq->terminatorSent()) {
       seq = sequences.erase(seq);
       continue;
     }

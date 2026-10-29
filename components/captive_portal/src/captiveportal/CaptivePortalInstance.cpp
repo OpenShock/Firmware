@@ -35,15 +35,9 @@ const char* const TAG = "CaptivePortalInstance";
 #include <string_view>
 
 const uint16_t HTTP_PORT = 80;
-// Browsers open several connections per page load; with only 4 slots the LRU purge evicted the (server-push, therefore
-// "idle" looking) WebSocket. Needs CONFIG_LWIP_MAX_SOCKETS >= this + 3 (+ DNS/HTTP client). Also sizes the broadcast
-// fd list, which must hold every open socket.
-const size_t HTTP_MAX_OPEN_SOCKETS = 8;
-static_assert(CONFIG_LWIP_MAX_SOCKETS >= HTTP_MAX_OPEN_SOCKETS + 3, "httpd needs 3 lwIP sockets besides its client sockets");
-
-// Largest inbound WebSocket message we'll accept (local FlatBuffer commands are tiny).
-// Nothing larger is accepted by the local message handler, so don't buffer more than that.
-static constexpr size_t MAX_WS_MSG = OpenShock::MessageHandlers::WebSocket::MaxLocalMessageSize;
+// httpd needs 3 lwIP sockets besides its client sockets; the DNS server, the gateway connection and an outbound HTTP request need one each
+static_assert(CONFIG_LWIP_MAX_SOCKETS >= CONFIG_OPENSHOCK_PORTAL_HTTPD_MAX_SOCKETS + 3 + 3, "httpd client sockets would leave no lwIP sockets for the DNS server and outbound connections");
+static_assert(CONFIG_OPENSHOCK_PORTAL_HTTPD_MAX_SOCKETS > CONFIG_OPENSHOCK_PORTAL_MAX_CLIENTS, "every websocket client needs a socket, plus one for plain requests");
 
 // HTTP status lines (esp_http_server needs the full "code reason" string, and stores
 // the pointer rather than copying, so these must have static storage duration).
@@ -363,7 +357,7 @@ static esp_err_t apiAccountLink(httpd_req_t* req)
 
   auto* job = new AccountLinkJob {std::move(instance), asyncReq, std::move(*code)};
   // TLS needs a large stack
-  if (TaskUtils::TaskCreateExpensive(accountLinkTask, "AccountLink", 8192, job, 1, nullptr) != pdPASS) {
+  if (TaskUtils::TaskCreateExpensive(accountLinkTask, "AccountLink", CONFIG_OPENSHOCK_PORTAL_ACCOUNT_LINK_TASK_STACK_SIZE, job, 1, nullptr) != pdPASS) {
     OS_LOGE(TAG, "Failed to create account link task");
     delete job;
     esp_err_t err = sendResp(asyncReq, S500, HTTP::ContentType::JSON, JSON_ERR_INTERNAL);
@@ -685,9 +679,6 @@ namespace {
 #error "CONFIG_HTTPD_QUEUE_WORK_BLOCKING must be disabled"
 #endif
 
-  // Bounds the memory a burst of broadcasts can hold while no client drains them
-  constexpr size_t kMaxQueuedSends = 32;
-
   void sendToWsClient(httpd_handle_t hd, int fd, httpd_ws_frame_t& frame)
   {
     if (httpd_ws_send_frame_async(hd, fd, &frame) != ESP_OK) {
@@ -706,7 +697,7 @@ namespace {
 int CaptivePortal::CaptivePortalInstance::idForFd(int fd)
 {
   ScopedLock lock__(&m_clientsMutex);
-  for (uint8_t i = 0; i < MAX_WS_CLIENTS; ++i) {
+  for (uint8_t i = 0; i < CONFIG_OPENSHOCK_PORTAL_MAX_CLIENTS; ++i) {
     if (m_clients[i].used && m_clients[i].fd == fd) {
       return i;
     }
@@ -717,7 +708,7 @@ int CaptivePortal::CaptivePortalInstance::idForFd(int fd)
 int CaptivePortal::CaptivePortalInstance::fdForId(uint8_t socketId)
 {
   ScopedLock lock__(&m_clientsMutex);
-  if (socketId < MAX_WS_CLIENTS && m_clients[socketId].used) {
+  if (socketId < CONFIG_OPENSHOCK_PORTAL_MAX_CLIENTS && m_clients[socketId].used) {
     return m_clients[socketId].fd;
   }
   return -1;
@@ -728,13 +719,13 @@ uint8_t CaptivePortal::CaptivePortalInstance::onWsOpen(int fd)
   ScopedLock lock__(&m_clientsMutex);
 
   // Idempotent: an fd already tracked keeps its id.
-  for (uint8_t i = 0; i < MAX_WS_CLIENTS; ++i) {
+  for (uint8_t i = 0; i < CONFIG_OPENSHOCK_PORTAL_MAX_CLIENTS; ++i) {
     if (m_clients[i].used && m_clients[i].fd == fd) {
       return i;
     }
   }
 
-  for (uint8_t i = 0; i < MAX_WS_CLIENTS; ++i) {
+  for (uint8_t i = 0; i < CONFIG_OPENSHOCK_PORTAL_MAX_CLIENTS; ++i) {
     if (!m_clients[i].used) {
       m_clients[i].used        = true;
       m_clients[i].fd          = fd;
@@ -753,7 +744,7 @@ void CaptivePortal::CaptivePortalInstance::onWsClose(int fd)
   int id = -1;
   {
     ScopedLock lock__(&m_clientsMutex);
-    for (uint8_t i = 0; i < MAX_WS_CLIENTS; ++i) {
+    for (uint8_t i = 0; i < CONFIG_OPENSHOCK_PORTAL_MAX_CLIENTS; ++i) {
       if (m_clients[i].used && m_clients[i].fd == fd) {
         m_clients[i].used        = false;
         m_clients[i].reasmActive = false;
@@ -817,7 +808,7 @@ esp_err_t CaptivePortal::CaptivePortalInstance::wsHandler(httpd_req_t* req)
     return ESP_OK;
   }
 
-  if (frame.len > MAX_WS_MSG) {
+  if (frame.len > CONFIG_OPENSHOCK_LOCAL_MAX_MESSAGE_SIZE) {  // Nothing larger is accepted by the local message handler, so don't buffer it
     OS_LOGE(TAG, "WebSocket frame too large (%u bytes), dropping", static_cast<unsigned>(frame.len));
     return ESP_FAIL;
   }
@@ -879,9 +870,9 @@ void CaptivePortal::CaptivePortalInstance::onWsFrame(int fd, httpd_ws_type_t opc
           OS_LOGW(TAG, "WebSocket client %u sent a continuation frame without a message start, dropping it", socketId);
           break;
         }
-        // MAX_WS_MSG only bounds single frames; also bound the reassembled message
-        if (m_clients[idx].reasm.size() + payload.size() > MAX_WS_MSG) {
-          OS_LOGE(TAG, "WebSocket client %u fragmented message exceeds %u bytes, closing", socketId, static_cast<unsigned>(MAX_WS_MSG));
+        // The frame check only bounds single frames; also bound the reassembled message
+        if (m_clients[idx].reasm.size() + payload.size() > CONFIG_OPENSHOCK_LOCAL_MAX_MESSAGE_SIZE) {
+          OS_LOGE(TAG, "WebSocket client %u fragmented message exceeds %d bytes, closing", socketId, CONFIG_OPENSHOCK_LOCAL_MAX_MESSAGE_SIZE);
           m_clients[idx].reasmActive = false;
           m_clients[idx].reasm.clear();
           m_clients[idx].reasm.shrink_to_fit();
@@ -969,7 +960,7 @@ bool CaptivePortal::CaptivePortalInstance::queueSend(int fd, bool broadcast, boo
 
   {
     ScopedLock lock__(&m_sendMutex);
-    if (m_sendQueue.size() >= kMaxQueuedSends) {
+    if (m_sendQueue.size() >= CONFIG_OPENSHOCK_PORTAL_WS_MAX_QUEUED_SENDS) {
       OS_LOGW(TAG, "WebSocket send queue full, dropping message");
       return false;
     }
@@ -1037,8 +1028,8 @@ void CaptivePortal::CaptivePortalInstance::drainSends()
         continue;
       }
 
-      size_t count = HTTP_MAX_OPEN_SOCKETS;
-      int fds[HTTP_MAX_OPEN_SOCKETS];
+      size_t count = CONFIG_OPENSHOCK_PORTAL_HTTPD_MAX_SOCKETS;
+      int fds[CONFIG_OPENSHOCK_PORTAL_HTTPD_MAX_SOCKETS];
       if (httpd_get_client_list(m_server, &count, fds) == ESP_OK) {
         for (size_t i = 0; i < count; ++i) {
           if (httpd_ws_get_fd_info(m_server, fds[i]) == HTTPD_WS_CLIENT_WEBSOCKET) {
@@ -1093,7 +1084,7 @@ bool CaptivePortal::CaptivePortalInstance::broadcastMessageBIN(std::span<const u
 bool CaptivePortal::CaptivePortalInstance::hasClients()
 {
   ScopedLock lock__(&m_clientsMutex);
-  for (uint8_t i = 0; i < MAX_WS_CLIENTS; ++i) {
+  for (uint8_t i = 0; i < CONFIG_OPENSHOCK_PORTAL_MAX_CLIENTS; ++i) {
     if (m_clients[i].used) {
       return true;
     }
@@ -1163,12 +1154,12 @@ bool CaptivePortal::CaptivePortalInstance::startHttpServer()
   httpd_config_t config   = HTTPD_DEFAULT_CONFIG();
   config.server_port      = HTTP_PORT;
   config.max_uri_handlers = 40;
-  config.max_open_sockets = HTTP_MAX_OPEN_SOCKETS;
+  config.max_open_sockets = CONFIG_OPENSHOCK_PORTAL_HTTPD_MAX_SOCKETS;
   config.lru_purge_enable = true;
-  config.stack_size       = 8192;
+  config.stack_size       = CONFIG_OPENSHOCK_PORTAL_HTTPD_STACK_SIZE;
   // Shorter than the default 10 s: one stalled or sleeping client blocks the single httpd task for this long.
-  config.recv_wait_timeout = 5;
-  config.send_wait_timeout = 5;
+  config.recv_wait_timeout = CONFIG_OPENSHOCK_PORTAL_HTTPD_TIMEOUT_S;
+  config.send_wait_timeout = CONFIG_OPENSHOCK_PORTAL_HTTPD_TIMEOUT_S;
   config.uri_match_fn      = httpd_uri_match_wildcard;
   // Same core as the WiFi/lwIP tasks, away from the E-Stop and RF tasks on core 1
   config.core_id = 0;

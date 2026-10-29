@@ -51,8 +51,6 @@ namespace OpenShock::CaptivePortal {
     inline bool ok() const { return m_server != nullptr && m_dnsStarted; }
 
   private:
-    static constexpr uint8_t MAX_WS_CLIENTS = 4;  // matches AP max_connection
-
     struct WsClient {
       bool used;
       int fd;
@@ -98,7 +96,7 @@ namespace OpenShock::CaptivePortal {
     std::string m_etag;  // quoted, for ETag / If-None-Match; empty when unknown
     DNSServer m_dnsServer;
 
-    WsClient m_clients[MAX_WS_CLIENTS];
+    WsClient m_clients[CONFIG_OPENSHOCK_PORTAL_MAX_CLIENTS];
     SimpleMutex m_clientsMutex;
 
     struct WsSend {

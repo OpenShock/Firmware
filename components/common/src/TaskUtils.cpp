@@ -6,6 +6,14 @@
 
 #include <esp_task_wdt.h>
 
+#include "sdkconfig.h"
+
+// The priority order between OpenShock's tasks (Kconfig "OpenShock tasks"), checked in one place
+static_assert(CONFIG_OPENSHOCK_RF_TASK_PRIORITY < CONFIG_OPENSHOCK_ESTOP_TASK_PRIORITY, "an E-Stop press must preempt a transmission");
+static_assert(CONFIG_OPENSHOCK_DNS_TASK_PRIORITY < CONFIG_OPENSHOCK_ESTOP_TASK_PRIORITY, "a DNS query burst must not delay E-Stop sampling");
+static_assert(CONFIG_OPENSHOCK_RF_TASK_PRIORITY > CONFIG_OPENSHOCK_WIFI_TASK_PRIORITY, "frames and E-Stop terminators must not wait behind the WiFi manager");
+static_assert(CONFIG_OPENSHOCK_RF_TASK_PRIORITY > CONFIG_OPENSHOCK_DNS_TASK_PRIORITY, "frames and E-Stop terminators must not wait behind the DNS server");
+
 using namespace OpenShock;
 
 bool TaskUtils::WatchdogSubscribe()

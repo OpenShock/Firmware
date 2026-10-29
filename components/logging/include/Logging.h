@@ -1,6 +1,7 @@
 #pragma once
 
 #include "openshock_board.h"  // OPENSHOCK_LOG_LEVEL, which the OS_LOG* macros below are gated on
+#include "sdkconfig.h"
 #include "Temporal.h"
 
 #include <esp_ota_ops.h>
@@ -12,6 +13,12 @@
 // Without it every OS_LOG* (and the OS_PANIC message) in the including file would silently compile to nothing.
 #ifndef OPENSHOCK_LOG_LEVEL
 #error "OPENSHOCK_LOG_LEVEL is not defined (openshock_board.h)"
+#endif
+
+// A level picked in menuconfig wins over the build mode's (the OPENSHOCK_LOG_LEVEL_CHOICE Kconfig choice)
+#if defined(CONFIG_OPENSHOCK_LOG_LEVEL_OVERRIDE) && CONFIG_OPENSHOCK_LOG_LEVEL_OVERRIDE >= 0
+#undef OPENSHOCK_LOG_LEVEL
+#define OPENSHOCK_LOG_LEVEL CONFIG_OPENSHOCK_LOG_LEVEL_OVERRIDE
 #endif
 
 // openshock_log_printf forwards to vprintf (the IDF console: UART0 + any secondary

@@ -9,6 +9,7 @@ idf_component_register(
                "test_stringutils.cpp"
                "test_convert.cpp"
                "test_hexutils.cpp"
+               "test_ipv4utils.cpp"
                "test_semver.cpp"
                "test_checksum.cpp"
                "test_boarddescriptor.cpp"

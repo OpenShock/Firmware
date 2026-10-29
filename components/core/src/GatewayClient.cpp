@@ -21,16 +21,8 @@ const char* const TAG = "GatewayClient";
 
 using namespace OpenShock;
 
-const int64_t GATEWAY_PING_TIMEOUT = 90'000;
-
 // Covers both the handle lock wait and the send itself
-const TickType_t GATEWAY_SEND_TIMEOUT = pdMS_TO_TICKS(10'000);
-
-// Message handlers (config reads, flash writes, FlatBuffers verification) run on the websocket task.
-const int GATEWAY_TASK_STACK_SIZE = 6 * 1024;
-
-// Upper bound for a reassembled message: the gateway message handler limit.
-const std::size_t GATEWAY_MAX_MESSAGE_SIZE = OpenShock::MessageHandlers::WebSocket::MaxGatewayMessageSize;
+const TickType_t GATEWAY_SEND_TIMEOUT = pdMS_TO_TICKS(CONFIG_OPENSHOCK_GATEWAY_SEND_TIMEOUT_MS);
 
 // WebSocket opcodes (RFC 6455) as delivered by esp_websocket_client event data.
 static constexpr int WS_OP_TEXT   = 0x01;
@@ -129,9 +121,9 @@ void GatewayClient::connect(const std::string& host, uint16_t port, const std::s
   config.transport                     = WEBSOCKET_TRANSPORT_OVER_SSL;
   config.user_agent                    = OpenShock::Constants::UserAgent();
   config.headers                       = m_headers.c_str();
-  config.disable_auto_reconnect        = true;                   // GatewayConnectionManager owns reconnection
-  config.crt_bundle_attach             = esp_crt_bundle_attach;  // verify server against the compiled-in CA bundle
-  config.task_stack                    = GATEWAY_TASK_STACK_SIZE;
+  config.disable_auto_reconnect        = true;                                      // GatewayConnectionManager owns reconnection
+  config.crt_bundle_attach             = esp_crt_bundle_attach;                     // verify server against the compiled-in CA bundle
+  config.task_stack                    = CONFIG_OPENSHOCK_GATEWAY_TASK_STACK_SIZE;  // Message handlers (config reads, flash writes, FlatBuffers verification) run on it
   // TLS work stays on core 0 with the WiFi/lwIP tasks, away from the E-Stop and RF tasks on core 1
   config.task_core_id_set = true;
   config.task_core_id     = 0;
@@ -228,8 +220,8 @@ bool GatewayClient::loop()
   }
 
   // Timestamp is seeded on connect, so a connection that never sees a ping also times out.
-  if ((OpenShock::millis() - m_lastPingTimestamp.load()) > GATEWAY_PING_TIMEOUT) {
-    OS_LOGW(TAG, "No ping received from gateway for %lld ms, forcing reconnect", GATEWAY_PING_TIMEOUT);
+  if ((OpenShock::millis() - m_lastPingTimestamp.load()) > CONFIG_OPENSHOCK_GATEWAY_PING_TIMEOUT_MS) {
+    OS_LOGW(TAG, "No ping received from gateway for %d ms, forcing reconnect", CONFIG_OPENSHOCK_GATEWAY_PING_TIMEOUT_MS);
     // The link is presumed dead, so skip the close handshake; destroy stops the client task and frees the handle.
     _destroyHandle();
     _setState(GatewayClientState::Disconnected);
@@ -354,8 +346,8 @@ void GatewayClient::_handleData(const esp_websocket_event_data_t* data)
   }
 
   if (!m_binReasmDiscard) {
-    if (m_binReasm.size() + data->data_len > GATEWAY_MAX_MESSAGE_SIZE) {
-      OS_LOGE(TAG, "Fragmented message exceeds %zu bytes, dropping it", GATEWAY_MAX_MESSAGE_SIZE);
+    if (m_binReasm.size() + data->data_len > CONFIG_OPENSHOCK_GATEWAY_MAX_MESSAGE_SIZE) {  // The gateway message handler limit
+      OS_LOGE(TAG, "Fragmented message exceeds %d bytes, dropping it", CONFIG_OPENSHOCK_GATEWAY_MAX_MESSAGE_SIZE);
       m_binReasm.clear();
       m_binReasm.shrink_to_fit();
       m_binReasmDiscard = true;
