@@ -1,11 +1,4 @@
-# Sourced into the OpenShock menu by main/Kconfig.projbuild
-
-menu "Serial console"
-
-    config OPENSHOCK_SERIAL_RX_TASK_STACK_SIZE
-        int "Serial input task stack (bytes)"
-        range 4096 32768
-        default 10000
+menu "OpenShock serial console"
 
     config OPENSHOCK_SERIAL_LINE_MAX_SIZE
         int "Longest input line (bytes)"

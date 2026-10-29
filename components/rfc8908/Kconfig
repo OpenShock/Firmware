@@ -1,6 +1,4 @@
-# Sourced into the OpenShock menu by main/Kconfig.projbuild
-
-menu "Captive portal detection"
+menu "OpenShock captive portal detection"
 
     config OPENSHOCK_PORTAL_VENUE_INFO_URL
         string "Venue info URL"

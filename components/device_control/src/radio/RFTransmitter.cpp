@@ -20,9 +20,6 @@ const char* const TAG = "RFTransmitter";
 #include <utility>
 #include <vector>
 
-static_assert(CONFIG_OPENSHOCK_RF_TASK_PRIORITY < CONFIG_OPENSHOCK_ESTOP_TASK_PRIORITY, "an E-Stop press must preempt a transmission");
-static_assert(CONFIG_OPENSHOCK_RF_TASK_PRIORITY > CONFIG_OPENSHOCK_WIFI_TASK_PRIORITY, "frames and E-Stop terminators must not wait behind the WiFi manager");
-static_assert(CONFIG_OPENSHOCK_RF_TASK_PRIORITY > CONFIG_OPENSHOCK_DNS_TASK_PRIORITY, "frames and E-Stop terminators must not wait behind the DNS server");
 const int32_t kRmtTimeoutMs = 100;
 // After this many transmit failures in a row the RMT channel is presumed broken and the pending sequences are dropped
 const uint32_t kMaxConsecutiveFailures = 20;

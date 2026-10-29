@@ -1,6 +1,4 @@
-# Sourced into the OpenShock menu by main/Kconfig.projbuild
-
-menu "Serial driver"
+menu "OpenShock serial driver"
 
     config OPENSHOCK_SERIAL_RX_BUFFER_SIZE
         int "Console driver receive buffer (bytes)"

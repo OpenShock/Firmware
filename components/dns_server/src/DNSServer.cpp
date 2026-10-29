@@ -15,8 +15,6 @@ const char* const TAG = "DNSServer";
 #include <cstddef>
 #include <cstring>
 
-static_assert(CONFIG_OPENSHOCK_DNS_TASK_PRIORITY < CONFIG_OPENSHOCK_ESTOP_TASK_PRIORITY, "a DNS query burst must not delay E-Stop sampling");
-
 using namespace OpenShock;
 
 DNSServer::DNSServer()

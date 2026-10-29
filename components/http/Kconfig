@@ -1,6 +1,4 @@
-# Sourced into the OpenShock menu by main/Kconfig.projbuild
-
-menu "HTTP client"
+menu "OpenShock HTTP client"
 
     config OPENSHOCK_HTTP_BUFFER_SIZE
         int "Download buffer (bytes)"
@@ -29,7 +27,7 @@ menu "HTTP client"
 
     config OPENSHOCK_HTTP_RETRY_AFTER_MAX_S
         int "Longest Retry-After honoured (s)"
-        range 1 86400
+        range OPENSHOCK_HTTP_RETRY_AFTER_MIN_S 86400
         default 600
         help
             So one bad header can't keep the hub offline for long.

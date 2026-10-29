@@ -1,16 +1,4 @@
-# Sourced into the OpenShock menu by main/Kconfig.projbuild
-
-menu "WiFi"
-
-    config OPENSHOCK_WIFI_TASK_STACK_SIZE
-        int "WiFi manager task stack (bytes)"
-        range 2048 16384
-        default 4096
-
-    config OPENSHOCK_WIFI_TASK_PRIORITY
-        int "WiFi manager task priority"
-        range 1 24
-        default 5
+menu "OpenShock WiFi"
 
     config OPENSHOCK_WIFI_SCAN_MIN_MS_PER_CHANNEL
         int "Scan time per channel, minimum (ms)"
@@ -19,13 +7,13 @@ menu "WiFi"
 
     config OPENSHOCK_WIFI_SCAN_MAX_MS_PER_CHANNEL
         int "Scan time per channel, maximum (ms)"
-        range 10 1500
+        range OPENSHOCK_WIFI_SCAN_MIN_MS_PER_CHANNEL 1500
         default 120
         help
-            Must be at least the minimum. esp_wifi walks every channel itself, so this is
-            the main knob for scan duration. Every scan takes the radio off the captive
-            portal AP's channel for this long per channel, and portal clients lose frames
-            meanwhile: keep it near the ESP-IDF default (120 ms).
+            At least the minimum. esp_wifi walks every channel itself, so this is the main
+            knob for scan duration. Every scan takes the radio off the captive portal AP's
+            channel for this long per channel, and portal clients lose frames meanwhile:
+            keep it near the ESP-IDF default (120 ms).
 
     config OPENSHOCK_WIFI_AUTOSCAN_INTERVAL_MS
         int "Auto-scan interval when nothing to connect to (ms)"
@@ -41,12 +29,7 @@ menu "WiFi"
 
 endmenu
 
-menu "Gateway"
-
-    config OPENSHOCK_GATEWAY_TASK_STACK_SIZE
-        int "Websocket client task stack (bytes)"
-        range 4096 16384
-        default 6144
+menu "OpenShock gateway"
 
     config OPENSHOCK_GATEWAY_MAX_MESSAGE_SIZE
         int "Largest gateway message (bytes)"
@@ -82,9 +65,21 @@ menu "Gateway"
 
     config OPENSHOCK_GATEWAY_HUB_INFO_RETRY_MAX_MS
         int "Hub info fetch retry, cap (ms)"
-        range 1000 3600000
+        range OPENSHOCK_GATEWAY_HUB_INFO_RETRY_MIN_MS 3600000
         default 300000
         help
             The retry after a failed hub info fetch doubles from the first value up to this.
+
+endmenu
+
+menu "OpenShock local messages"
+
+    config OPENSHOCK_LOCAL_MAX_MESSAGE_SIZE
+        int "Largest local message (bytes)"
+        range 1024 32768
+        default 4096
+        help
+            The largest message the local (captive portal websocket) message handler accepts.
+            The portal drops a websocket message past this before buffering it.
 
 endmenu

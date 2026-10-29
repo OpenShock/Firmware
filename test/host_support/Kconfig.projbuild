@@ -1,4 +1,5 @@
-# The CONFIG_OPENSHOCK_* settings the firmware reads through sdkconfig.h. Sourced from
-# the firmware's own menu (which pulls in every component's Kconfig.openshock) rather
-# than copied, so the host tests always build against the same defaults as the firmware.
-rsource "../../main/Kconfig.projbuild"
+# The CONFIG_OPENSHOCK_* settings the firmware reads through sdkconfig.h. A suite compiles
+# component sources straight into its main, so ESP-IDF never sees those components or their
+# Kconfig. Sourced from every component's own Kconfig rather than copied, so the host tests
+# always build against the same defaults as the firmware.
+orsource "../../components/*/Kconfig"

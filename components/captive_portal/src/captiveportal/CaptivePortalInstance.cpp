@@ -774,7 +774,7 @@ esp_err_t CaptivePortal::CaptivePortalInstance::wsHandler(httpd_req_t* req)
     return ESP_OK;
   }
 
-  if (frame.len > CONFIG_OPENSHOCK_PORTAL_MAX_MESSAGE_SIZE) {  // Nothing larger is accepted by the local message handler, so don't buffer it
+  if (frame.len > CONFIG_OPENSHOCK_LOCAL_MAX_MESSAGE_SIZE) {  // Nothing larger is accepted by the local message handler, so don't buffer it
     OS_LOGE(TAG, "WebSocket frame too large (%u bytes), dropping", static_cast<unsigned>(frame.len));
     return ESP_FAIL;
   }
@@ -837,8 +837,8 @@ void CaptivePortal::CaptivePortalInstance::onWsFrame(int fd, httpd_ws_type_t opc
           break;
         }
         // The frame check only bounds single frames; also bound the reassembled message
-        if (m_clients[idx].reasm.size() + payload.size() > CONFIG_OPENSHOCK_PORTAL_MAX_MESSAGE_SIZE) {
-          OS_LOGE(TAG, "WebSocket client %u fragmented message exceeds %d bytes, closing", socketId, CONFIG_OPENSHOCK_PORTAL_MAX_MESSAGE_SIZE);
+        if (m_clients[idx].reasm.size() + payload.size() > CONFIG_OPENSHOCK_LOCAL_MAX_MESSAGE_SIZE) {
+          OS_LOGE(TAG, "WebSocket client %u fragmented message exceeds %d bytes, closing", socketId, CONFIG_OPENSHOCK_LOCAL_MAX_MESSAGE_SIZE);
           m_clients[idx].reasmActive = false;
           m_clients[idx].reasm.clear();
           m_clients[idx].reasm.shrink_to_fit();

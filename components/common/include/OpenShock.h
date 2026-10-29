@@ -10,7 +10,7 @@
 
 // Config comes from two places: Kconfig (CONFIG_OPENSHOCK_*, via sdkconfig.h -
 // domains, hostname, task stacks and priorities, timeouts, queue and buffer sizes;
-// see main/Kconfig.projbuild and components/*/Kconfig.openshock)
+// see components/*/Kconfig, shared ones in components/common/Kconfig)
 // and the generated board header (OPENSHOCK_FW_CHIP, build mode, log level, and the
 // board the build was configured for; see scripts/gen_env_header.py).
 //

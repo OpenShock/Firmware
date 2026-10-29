@@ -252,8 +252,6 @@ HTTP::Response<std::size_t>
     // https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers/Retry-After
     // Only delay-seconds (whole seconds, RFC 9110) is parsed; a missing header, an HTTP-date or anything else
     // unparseable gets the minimum.
-    static_assert(CONFIG_OPENSHOCK_HTTP_RETRY_AFTER_MIN_S <= CONFIG_OPENSHOCK_HTTP_RETRY_AFTER_MAX_S, "Retry-After minimum above its maximum");
-
     uint32_t retryAfter = OpenShock::Convert::ToUint32(m_retryAfter).value_or(CONFIG_OPENSHOCK_HTTP_RETRY_AFTER_MIN_S);
 
     rateLimiter->blockFor(static_cast<int64_t>(std::clamp<uint32_t>(retryAfter, CONFIG_OPENSHOCK_HTTP_RETRY_AFTER_MIN_S, CONFIG_OPENSHOCK_HTTP_RETRY_AFTER_MAX_S)) * 1000);

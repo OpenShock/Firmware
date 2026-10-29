@@ -14,8 +14,6 @@ const char* const TAG = "WiFiScanManager";
 #include <utility>
 #include <vector>
 
-static_assert(CONFIG_OPENSHOCK_WIFI_SCAN_MIN_MS_PER_CHANNEL <= CONFIG_OPENSHOCK_WIFI_SCAN_MAX_MS_PER_CHANNEL, "scan time minimum above its maximum");
-
 // Idle -> Scanning (StartScan) -> Idle (results handled, failure, STA stop).
 // Scanning -> Stopping (AbortScan) -> Idle (the stopped scan's SCAN_DONE, or kStopTimeout without one).
 // Stopping keeps a new scan from starting until the stopped one's SCAN_DONE is out of the way, so that event can't be

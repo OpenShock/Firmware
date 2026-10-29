@@ -43,7 +43,6 @@ static OpenShock::Backoff s_authBackoff(CONFIG_OPENSHOCK_GATEWAY_AUTH_RETRY_MS, 
 static OpenShock::Backoff s_connectBackoff(CONFIG_OPENSHOCK_GATEWAY_CONNECT_RETRY_MS, CONFIG_OPENSHOCK_GATEWAY_CONNECT_RETRY_MS);
 // After a failed hub info fetch: doubling from the first value up to the cap
 static OpenShock::Backoff s_hubInfoBackoff(CONFIG_OPENSHOCK_GATEWAY_HUB_INFO_RETRY_MIN_MS, CONFIG_OPENSHOCK_GATEWAY_HUB_INFO_RETRY_MAX_MS);
-static_assert(CONFIG_OPENSHOCK_GATEWAY_HUB_INFO_RETRY_MIN_MS <= CONFIG_OPENSHOCK_GATEWAY_HUB_INFO_RETRY_MAX_MS, "hub info retry above its cap");
 static std::atomic<bool> s_retryResetRequested = false;
 static OpenShock::SimpleMutex s_clientMutex;
 static std::shared_ptr<OpenShock::GatewayClient> s_wsClient = nullptr;

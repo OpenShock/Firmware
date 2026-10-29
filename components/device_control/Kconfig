@@ -1,23 +1,4 @@
-# Sourced into the OpenShock menu by main/Kconfig.projbuild
-
-menu "Radio"
-
-    config OPENSHOCK_RF_TASK_STACK_SIZE
-        int "RF transmitter task stack (bytes)"
-        range 2048 16384
-        default 4096
-        help
-            Profiled at about 1.4 KB.
-
-    config OPENSHOCK_RF_TASK_PRIORITY
-        int "RF transmitter task priority"
-        range 2 24
-        default 9
-        help
-            Above the network tasks (5): it blocks on its queue or on RMT almost all the time,
-            and frames (and the terminators after an E-Stop) shouldn't wait behind TLS work.
-            Must stay above the WiFi manager and DNS server tasks, and below the E-Stop task's
-            priority so a press preempts a transmission (checked at compile time).
+menu "OpenShock radio"
 
     config OPENSHOCK_RF_QUEUE_SIZE
         int "RF command queue length"
@@ -36,7 +17,7 @@ menu "Radio"
 
 endmenu
 
-menu "Keep-alive"
+menu "OpenShock keep-alive"
 
     config OPENSHOCK_KEEPALIVE_INTERVAL_MS
         int "Keep-alive interval (ms)"
@@ -64,21 +45,9 @@ menu "Keep-alive"
         range 4 128
         default 32
 
-    config OPENSHOCK_KEEPALIVE_TASK_STACK_SIZE
-        int "Keep-alive task stack (bytes)"
-        range 2048 16384
-        default 4096
-        help
-            Profiled at about 1.5 KB.
-
-    config OPENSHOCK_KEEPALIVE_TASK_PRIORITY
-        int "Keep-alive task priority"
-        range 1 24
-        default 1
-
 endmenu
 
-menu "Emergency stop"
+menu "OpenShock emergency stop"
 
     config OPENSHOCK_ESTOP_POLL_INTERVAL_MS
         int "Button poll interval (ms)"
@@ -88,19 +57,5 @@ menu "Emergency stop"
             How often the E-Stop task samples the button. The debounce time is fixed in
             code (65 ms); the number of samples it takes follows from this interval.
             At most 16 samples fit the debounce history, hence the 5 ms floor.
-
-    config OPENSHOCK_ESTOP_TASK_STACK_SIZE
-        int "E-Stop task stack (bytes)"
-        range 2048 16384
-        default 4096
-
-    config OPENSHOCK_ESTOP_TASK_PRIORITY
-        int "E-Stop task priority"
-        range 3 24
-        default 10
-        help
-            Above the network tasks (5) and the RF task: it is blocked almost all the time,
-            and a sample that waits behind TLS work delays the E-Stop by that long. Must stay
-            above the RF transmitter and DNS server tasks' priorities (checked at compile time).
 
 endmenu
