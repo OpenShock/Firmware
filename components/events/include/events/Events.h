@@ -12,6 +12,7 @@ enum {
   OPENSHOCK_EVENT_ESTOP_STATE_CHANGED,           // Event for when the EStop activation state changes
   OPENSHOCK_EVENT_GATEWAY_CLIENT_STATE_CHANGED,  // Event for when the gateway connection state changes
   OPENSHOCK_EVENT_WIFI_STATE_CHANGED,            // Event for when the WiFi station connectivity state changes
+  OPENSHOCK_EVENT_DEVICE_ACTIVITY,               // A shocker command was accepted (no payload)
 };
 
 // Coarse WiFi station connectivity, posted as the OPENSHOCK_EVENT_WIFI_STATE_CHANGED payload.

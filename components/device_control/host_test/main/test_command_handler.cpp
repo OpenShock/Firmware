@@ -72,6 +72,28 @@ TEST_CASE("CommandHandler transmits commands while not e-stopped", "[device_cont
   TEST_ASSERT_TRUE(TestFrames::Count(shock) > 0);
 }
 
+TEST_CASE("CommandHandler reports activity at most once a minute", "[device_control][command]")
+{
+  resetCommandHandler();
+  HostFake::Now += 60'000;  // Clear of whatever an earlier test reported
+
+  // The activity event keeps WiFiManager's radio out of power save; one per command would flood the event loop.
+  for (int i = 0; i < 3; i++) {
+    TEST_ASSERT_TRUE(CommandHandler::HandleCommand(kModel, kShockerId, ShockerCommandType::Vibrate, 10, 300));
+  }
+  TEST_ASSERT_EQUAL(1, HostFake::ActivityPosts);
+
+  HostFake::Now += 59'999;
+  TEST_ASSERT_TRUE(CommandHandler::HandleCommand(kModel, kShockerId, ShockerCommandType::Vibrate, 10, 300));
+  TEST_ASSERT_EQUAL(1, HostFake::ActivityPosts);
+
+  HostFake::Now += 1;
+  TEST_ASSERT_TRUE(CommandHandler::HandleCommand(kModel, kShockerId, ShockerCommandType::Vibrate, 10, 300));
+  TEST_ASSERT_EQUAL(2, HostFake::ActivityPosts);
+
+  HostFake::RunTask(transmitTask(), kBudget);  // Send what was queued so the next test starts with an empty queue
+}
+
 TEST_CASE("CommandHandler refuses commands while e-stopped", "[device_control][command][estop]")
 {
   resetCommandHandler();
@@ -80,6 +102,7 @@ TEST_CASE("CommandHandler refuses commands while e-stopped", "[device_control][c
   TEST_ASSERT_FALSE(CommandHandler::HandleCommand(kModel, kShockerId, ShockerCommandType::Shock, 100, 1000));
   TEST_ASSERT_FALSE(CommandHandler::HandleCommand(kModel, kShockerId, ShockerCommandType::Vibrate, 100, 1000));
   TEST_ASSERT_FALSE(CommandHandler::HandleCommand(kModel, kShockerId, ShockerCommandType::Sound, 0, 1000));
+  TEST_ASSERT_EQUAL(0, HostFake::ActivityPosts);  // Refused commands are not activity
 
   // Nothing even reached the transmitter's queue.
   HostFake::EStopped = false;
