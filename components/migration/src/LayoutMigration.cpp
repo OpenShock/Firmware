@@ -50,6 +50,9 @@ namespace {
   constexpr TickType_t kRetryDelay = pdMS_TO_TICKS(10 * 60'000);   // a network or server problem
   constexpr TickType_t kRefuseWait = pdMS_TO_TICKS(6 * 3600'000);  // the checks refused: only a new release changes that
 
+  constexpr int kTableWriteAttempts          = 3;
+  constexpr TickType_t kTableWriteRetryDelay = pdMS_TO_TICKS(1'000);
+
   enum class Step : uint8_t {
     Done,        // nothing (more) to do here; the task ends
     Retry,       // try again after kRetryDelay
@@ -227,17 +230,11 @@ namespace {
     return true;
   }
 
-  // Requires everything else quiesced. Writes `table` over the live one through the OTA path, which lifts the
-  // dangerous-write protection for that one sector, erases it and verifies the written table; then reads it back.
-  bool writeTable(const std::array<uint8_t, PT::kMaxLen>& table)
+  // Writes `table` over the live one through the OTA path, which lifts the dangerous-write protection for that one
+  // sector, erases it and verifies the written table; then reads it back. False unless `table` is what is on flash.
+  bool writeTable(const esp_partition_t* pt, const std::array<uint8_t, PT::kMaxLen>& table)
   {
-    const esp_partition_t* pt = nullptr;
-    esp_err_t err             = esp_partition_register_external(nullptr, ESP_PRIMARY_PARTITION_TABLE_OFFSET, ESP_PARTITION_TABLE_SIZE, "pt", ESP_PARTITION_TYPE_PARTITION_TABLE, ESP_PARTITION_SUBTYPE_PARTITION_TABLE_PRIMARY, &pt);
-    if (err != ESP_OK) {
-      OS_LOGE(TAG, "Failed to register the partition table region: %s", esp_err_to_name(err));
-      return false;
-    }
-
+    esp_err_t err           = ESP_OK;
     esp_ota_handle_t handle = 0;
     // ---- From the erase in esp_ota_begin until esp_ota_write completes, a power cut leaves no partition table ----
     err = esp_ota_begin(pt, ESP_PARTITION_TABLE_MAX_LEN, &handle);
@@ -260,6 +257,41 @@ namespace {
       return false;
     }
     return true;
+  }
+
+  enum class TableWrite : uint8_t {
+    Staged,    // the new table is on flash
+    Restored,  // the new table would not stick; the old one is back
+    Failed,    // could not even start: the old table was never touched
+  };
+
+  // Requires everything else quiesced. Replaces the live table (`liveBytes`) with `staged`. A write that fails (not a
+  // power cut: an error, a read-back mismatch) is retried, then the old table is written back, and that is retried
+  // for as long as it takes: this never returns while no table that parses is on flash, so a restart is always safe.
+  // Until then the running firmware keeps going on the table it loaded at boot.
+  TableWrite replaceTable(const std::array<uint8_t, PT::kMaxLen>& staged, const std::array<uint8_t, PT::kMaxLen>& liveBytes)
+  {
+    const esp_partition_t* pt = nullptr;
+    esp_err_t err             = esp_partition_register_external(nullptr, ESP_PRIMARY_PARTITION_TABLE_OFFSET, ESP_PARTITION_TABLE_SIZE, "pt", ESP_PARTITION_TYPE_PARTITION_TABLE, ESP_PARTITION_SUBTYPE_PARTITION_TABLE_PRIMARY, &pt);
+    if (err != ESP_OK) {
+      OS_LOGE(TAG, "Failed to register the partition table region: %s", esp_err_to_name(err));
+      return TableWrite::Failed;
+    }
+
+    for (int attempt = 0; attempt < kTableWriteAttempts; ++attempt) {
+      if (writeTable(pt, staged)) {
+        return TableWrite::Staged;
+      }
+    }
+    OS_LOGE(TAG, "The new partition table does not stick; writing the old one back");
+    for (uint32_t attempt = 1;; ++attempt) {
+      if (writeTable(pt, liveBytes)) {
+        return TableWrite::Restored;
+      }
+      // Whatever is on flash now may not parse: restarting would brick the hub. Keep trying.
+      OS_LOGE(TAG, "Failed to write the old partition table back (attempt %u). Do not unplug the hub.", static_cast<unsigned>(attempt));
+      vTaskDelay(kTableWriteRetryDelay);
+    }
   }
 
   // ---------------------------------------------------------------------------------------------------------------
@@ -385,19 +417,34 @@ namespace {
       return Step::Retry;
     }
 
+    // What goes back if the new table will not stick: the live table exactly as it is on flash, and still 1.x
+    std::array<uint8_t, PT::kMaxLen> liveBytes {};
+    const bool liveRead = readLiveTable(liveBytes);
+    const auto liveNow  = PT::Parse(liveBytes);
+    if (!liveRead || !liveNow || PT::Detect(*liveNow) != PT::Layout::V1) {
+      OS_LOGE(TAG, "The live partition table changed under the migration");
+      CaptivePortal::ReleaseForceClose();
+      return Step::RetryLater;
+    }
+
     // Quiesce: no config write can start, NVS is closed, nothing else touches the partition API
     OS_LOGW(TAG, "Rewriting the partition table. Do not unplug the hub.");
     ScopedLock configLock(&Config::Internal::WriteLock());
     nvs_flash_deinit();
     vTaskDelay(pdMS_TO_TICKS(100));
 
-    if (!writeTable(stagedBytes)) {
-      // Still the old table (esp_ota_begin failed before erasing) or a corrupt one; either way restart: the next boot
-      // tells which, and an unbootable hub needs the serial recovery (docs/STORAGE.md).
-      OS_LOGE(TAG, "The partition table write failed; restarting");
-    } else {
-      OS_LOGI(TAG, "Partition table rewritten; restarting into the new layout");
+    switch (replaceTable(stagedBytes, liveBytes)) {
+      case TableWrite::Staged:
+        OS_LOGI(TAG, "Partition table rewritten; restarting into the new layout");
+        break;
+      case TableWrite::Restored:
+        OS_LOGE(TAG, "The partition table is the 1.x one again; restarting on it");
+        break;
+      case TableWrite::Failed:
+        OS_LOGE(TAG, "The partition table was not touched; restarting on it");
+        break;
     }
+    // NVS is closed and the www image is the new layout's: a restart is the one clean way back to a running hub
     esp_partition_unload_all();
     esp_restart();
     return Step::Done;  // Unreachable
