@@ -94,6 +94,15 @@ CONFIG_ESP_COREDUMP_ENABLE_TO_FLASH=y
 # websocket sockets; the default of 10 would make httpd_start fail.
 CONFIG_LWIP_MAX_SOCKETS=16
 
+# The receive window caps a download at one window per round trip, and while an OTA erases a 64 KB flash block the
+# sender stalls once the window is full (the download and the flash writes share one task). The 5760-byte default
+# allows ~190 KB/s at 30 ms RTT; 16 KB lets the network keep going through an erase. A window is a promise, not an
+# allocation: only data actually queued and unread uses heap, but that peak now applies to every TCP socket. The
+# recvmbox holds received pbufs, so it is raised to cover a full window of segments. Measure OTA time and heap on a
+# device (PartitionUtils logs the breakdown) before keeping this.
+CONFIG_LWIP_TCP_WND_DEFAULT=16384
+CONFIG_LWIP_TCP_RECVMBOX_SIZE=16
+
 # The gateway websocket and the kept-alive HTTP client each hold a TLS session. With static
 # buffers every session keeps a 16 KB input + 4 KB output record buffer for its whole life;
 # dynamic buffers allocate them per record and shrink while idle, lowering the heap peak
