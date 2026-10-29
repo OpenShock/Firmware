@@ -1,20 +1,31 @@
 name: build-staticfs
-description: Pack the frontend build into the board-independent www asset image, and the 1.x littlefs staticfs image
+description: Pack the frontend build into the board-independent www asset image (and, for a 1.x release, the littlefs staticfs image)
+
+inputs:
+  version:
+    description: 'Firmware version the images are for; a 1.x version also gets the littlefs staticfs.bin'
+    required: true
 
 runs:
   using: composite
   steps:
     - uses: ./.github/actions/install-python-deps
 
-    # One flat image serves every board; it must fit the www partition of every table it can be flashed into. The
-    # littlefs staticfs.bin is what a 1.x hub's OTA installs, published for 1.x-numbered releases only.
+    # One flat image serves every board. A 1.x hub's OTA only accepts a littlefs image it can mount, so the 1.x
+    # bridge release (the 1.9.x pivot) also ships the assets as littlefs staticfs.bin; no other release does.
     - name: Build asset images
       shell: bash
+      env:
+        VERSION: ${{ inputs.version }}
       run: |
+        legacy=()
+        if [[ "$VERSION" == 1.* ]]; then
+          legacy=(--legacy-output staticfs.bin)
+        fi
         python scripts/gen_staticfs.py \
           --frontend-dir frontend \
           --output www.bin \
-          --legacy-output staticfs.bin \
+          "${legacy[@]}" \
           --partition-csv partitions/ota_4mb.csv \
           --skip-frontend-build
 

@@ -33,7 +33,7 @@ BUILD_ARTIFACTS = {
 STATICFS_FIELD = 'staticfs'
 # What the staticfs field carries: a 1.x-numbered release (the 1.9.x pivot) is installed by 1.x firmware, whose OTA
 # flashes staticfs into its littlefs static0 partition and checks it by mounting it, so it gets the littlefs image;
-# every later release gets the flat www image. The build-staticfs action builds both.
+# every later release gets the flat www image. The build-staticfs action builds the littlefs one for 1.x versions only.
 STATICFS_FILE = 'www.bin'
 STATICFS_FILE_1X = 'staticfs.bin'
 

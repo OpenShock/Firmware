@@ -181,7 +181,7 @@ jobs:
   # The jobs below wait on stage so a prod release is approved before compute is spent: a skipped stage
   # (nothing to publish) lets them run, a failed one stops them.
   staticfs:
-    needs: [gate, stage]
+    needs: [gate, plan, stage]
     if: >-
       ${{ !cancelled()
       && needs.stage.result != 'failure'
@@ -204,6 +204,8 @@ jobs:
           checks: 'false'
 
       - uses: ./.github/actions/build-staticfs
+        with:
+          version: ${{ needs.plan.outputs.version }}
 
   # One unstamped compile per build variant, in parallel with staticfs.
   build:
