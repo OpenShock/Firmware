@@ -117,6 +117,19 @@ TEST_CASE("Credentials are enumerated from their keys, never counted", "[config]
   TEST_ASSERT_EQUAL_STRING("Max", (*creds)[2].ssid.c_str());
 }
 
+TEST_CASE("GetRaw writes fields that equal their schema default", "[config][roundtrip]")
+{
+  // 1.5.x reads a missing is_enabled/keepalive_enabled as false, so omitting them breaks loading the dump there.
+  InitDefault();
+  TEST_ASSERT_TRUE(Config::SetRFConfigKeepAliveEnabled(true));
+
+  TinyVec<uint8_t> raw;
+  TEST_ASSERT_TRUE(Config::GetRaw(raw));
+  const auto* root = Serialization::Configuration::GetHubConfig(raw.data());
+  TEST_ASSERT_TRUE(root->rf()->CheckField(Serialization::Configuration::RFConfig::VT_KEEPALIVE_ENABLED));
+  TEST_ASSERT_TRUE(root->ota_update()->CheckField(Serialization::Configuration::OtaUpdateConfig::VT_IS_ENABLED));
+}
+
 TEST_CASE("A save writes only what changed", "[config][roundtrip]")
 {
   const Full sample = MakeSampleConfig();

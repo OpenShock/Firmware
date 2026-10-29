@@ -76,7 +76,9 @@ namespace ConfigTest {
 
   std::vector<uint8_t> Serialize(const Full& config, bool withSensitiveData)
   {
+    // ForceDefaults like the firmware's own writes, so the bytes match what Config stores and GetRaw returns
     flatbuffers::FlatBufferBuilder builder;
+    builder.ForceDefaults(true);
     auto rf            = config.rf.ToFlatbuffers(builder, withSensitiveData);
     auto wifi          = config.wifi.ToFlatbuffers(builder, withSensitiveData);
     auto captivePortal = config.captivePortal.ToFlatbuffers(builder, withSensitiveData);

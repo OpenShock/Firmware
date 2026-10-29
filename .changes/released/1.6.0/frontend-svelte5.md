@@ -12,4 +12,4 @@ The captive portal frontend has been completely rewritten using Svelte 5 with it
 - Single-file HTML output via vite-plugin-singlefile for LittleFS
 
 ## Notices
-- info: The frontend was fully rewritten, but since it is served directly from the device's filesystem, no user action is required. The update is applied automatically with the firmware flash.
+- note: The frontend was fully rewritten, but since it is served directly from the device's filesystem, no user action is required. The update is applied automatically with the firmware flash.

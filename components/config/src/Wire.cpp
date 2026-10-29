@@ -39,7 +39,10 @@ flatbuffers::Offset<Fbs::HubConfig> Config::GetAsFlatBuffer(flatbuffers::FlatBuf
 
 bool Config::GetRaw(TinyVec<uint8_t>& buffer)
 {
+  // Write every field, even ones equal to the schema default. Older firmware may use different defaults (1.5.x reads a
+  // missing is_enabled/keepalive_enabled as false), so an omitted field changes meaning when the dump is loaded there.
   flatbuffers::FlatBufferBuilder builder;
+  builder.ForceDefaults(true);
   Fbs::FinishHubConfigBuffer(builder, GetAsFlatBuffer(builder, true));
 
   buffer.resize(builder.GetSize());
