@@ -1,4 +1,4 @@
-// IPv4Utils: dotted-decimal validation, used to check CONFIG_OPENSHOCK_PORTAL_AP_IP at compile time.
+// IPv4Utils: dotted-decimal and /24 host validation, used to check CONFIG_OPENSHOCK_PORTAL_AP_IP at compile time.
 #include "unity.h"
 
 #include "util/IPv4Utils.h"
@@ -28,5 +28,16 @@ TEST_CASE("IsDottedDecimal rejects malformed addresses", "[util][ipv4]")
   TEST_ASSERT_FALSE(IPv4Utils::IsDottedDecimal("a.b.c.d"));
 }
 
+TEST_CASE("IsSlash24Host rejects the network and broadcast addresses", "[util][ipv4]")
+{
+  TEST_ASSERT_TRUE(IPv4Utils::IsSlash24Host("4.3.2.1"));
+  TEST_ASSERT_TRUE(IPv4Utils::IsSlash24Host("192.168.10.254"));
+  TEST_ASSERT_FALSE(IPv4Utils::IsSlash24Host("0.0.0.0"));
+  TEST_ASSERT_FALSE(IPv4Utils::IsSlash24Host("192.168.10.0"));
+  TEST_ASSERT_FALSE(IPv4Utils::IsSlash24Host("192.168.10.255"));
+  TEST_ASSERT_FALSE(IPv4Utils::IsSlash24Host("192.168.10.01"));  // malformed
+}
+
 static_assert(IPv4Utils::IsDottedDecimal("4.3.2.1"));
+static_assert(IPv4Utils::IsSlash24Host("4.3.2.1"));
 static_assert(!IPv4Utils::IsDottedDecimal("01.2.3.4"));

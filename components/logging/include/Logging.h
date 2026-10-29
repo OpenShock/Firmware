@@ -15,7 +15,7 @@
 #error "OPENSHOCK_LOG_LEVEL is not defined (openshock_board.h)"
 #endif
 
-// A level picked in menuconfig wins over the build mode's (CONFIG_OPENSHOCK_LOG_LEVEL_CHOICE)
+// A level picked in menuconfig wins over the build mode's (the OPENSHOCK_LOG_LEVEL_CHOICE Kconfig choice)
 #if defined(CONFIG_OPENSHOCK_LOG_LEVEL_OVERRIDE) && CONFIG_OPENSHOCK_LOG_LEVEL_OVERRIDE >= 0
 #undef OPENSHOCK_LOG_LEVEL
 #define OPENSHOCK_LOG_LEVEL CONFIG_OPENSHOCK_LOG_LEVEL_OVERRIDE

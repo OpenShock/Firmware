@@ -22,7 +22,8 @@ from gen_dep_graph import read_components
 
 from utils.paths import ROOT
 
-CONFIG_DEFINITION = re.compile(r'^\s*(?:menuconfig|config|choice)\s+(OPENSHOCK_\w+)', re.MULTILINE)
+# Only config entries become CONFIG_* macros; a choice's own name never does
+CONFIG_DEFINITION = re.compile(r'^\s*(?:menuconfig|config)\s+(OPENSHOCK_\w+)', re.MULTILINE)
 CONFIG_USE = re.compile(r'\bCONFIG_(OPENSHOCK_\w+)')
 SOURCE_SUFFIXES = {'.c', '.cpp', '.h', '.hpp'}
 

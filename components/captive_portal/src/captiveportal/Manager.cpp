@@ -73,7 +73,7 @@ static std::atomic<bool> s_instanceLive = false;
 static RetiredList<CaptivePortalInstance> s_retiredInstances;
 static esp_netif_t* s_apNetif = nullptr;
 
-static_assert(IPv4Utils::IsDottedDecimal(CONFIG_OPENSHOCK_PORTAL_AP_IP), "CONFIG_OPENSHOCK_PORTAL_AP_IP must be a dotted-decimal IPv4 address");
+static_assert(IPv4Utils::IsSlash24Host(CONFIG_OPENSHOCK_PORTAL_AP_IP), "CONFIG_OPENSHOCK_PORTAL_AP_IP must be a dotted-decimal IPv4 address with a host octet of 1-254");
 
 static void sendCommand(uint32_t command)
 {

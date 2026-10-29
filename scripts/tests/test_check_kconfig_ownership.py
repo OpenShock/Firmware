@@ -45,10 +45,20 @@ def test_an_undefined_option_is_a_violation(tmp_path):
     assert violations(tmp_path) == [('top', 'OPENSHOCK_NOWHERE', None)]
 
 
-def test_choices_count_as_definitions_and_host_tests_are_skipped(tmp_path):
-    component(
-        tmp_path, 'log', kconfig='choice OPENSHOCK_LEVEL\n    prompt "x"\nendchoice\n', source='CONFIG_OPENSHOCK_LEVEL'
-    )
-    (tmp_path / 'log' / 'host_test').mkdir()
-    (tmp_path / 'log' / 'host_test' / 't.cpp').write_text('CONFIG_OPENSHOCK_NOWHERE', encoding='utf-8')
+def test_a_choice_name_is_not_a_macro(tmp_path):
+    kconfig = 'choice OPENSHOCK_LEVEL\n    prompt "x"\n    config OPENSHOCK_LEVEL_LOW\n        bool "low"\nendchoice\n'
+    component(tmp_path, 'log', kconfig=kconfig, source='CONFIG_OPENSHOCK_LEVEL_LOW CONFIG_OPENSHOCK_LEVEL')
+    assert violations(tmp_path) == [('log', 'OPENSHOCK_LEVEL', None)]
+
+
+def test_host_tests_are_skipped(tmp_path):
+    component(tmp_path, 'top')
+    (tmp_path / 'top' / 'host_test').mkdir()
+    (tmp_path / 'top' / 'host_test' / 't.cpp').write_text('CONFIG_OPENSHOCK_NOWHERE', encoding='utf-8')
+    assert violations(tmp_path) == []
+
+
+def test_a_quoted_requirement_counts(tmp_path):
+    component(tmp_path, 'base', kconfig='config OPENSHOCK_BASE\n    int "x"\n')
+    component(tmp_path, 'top', priv='"base"', source='CONFIG_OPENSHOCK_BASE')
     assert violations(tmp_path) == []
