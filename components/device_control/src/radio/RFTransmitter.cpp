@@ -33,7 +33,7 @@ const uint32_t kMaxFailureBackoffMs    = 100;
 const uint8_t kFlagOverwrite           = 1 << 0;
 const uint8_t kFlagDeleteTask          = 1 << 1;
 const uint8_t kFlagStop                = 1 << 2;
-// A Stop waits longer for a slot than other commands: the queue only stays full while the task is mid-round
+// A Stop waits longer for a slot than other commands: the queue only stays full while the task is mid-frame
 const TickType_t kStopQueueWait = pdMS_TO_TICKS(100);
 
 using namespace OpenShock;
@@ -268,54 +268,56 @@ static bool transmitSymbols(rmt_channel_handle_t channel, rmt_encoder_handle_t e
   return false;
 }
 
-static void writeSequences(rmt_channel_handle_t channel, rmt_encoder_handle_t encoder, std::vector<Rmt::Sequence>& sequences, const ManagedTask& task, uint32_t& failures, const TaskUtils::TaskWatchdog& watchdog)
+// Sends one frame for the sequence at `cursor` (its payload, or its terminator once it expired) and advances the cursor
+// round-robin. One frame per call lets the task check its queue between frames instead of between whole rounds, so a
+// new command or Stop waits at most one frame rather than a frame per active shocker.
+static void writeNextFrame(rmt_channel_handle_t channel, rmt_encoder_handle_t encoder, std::vector<Rmt::Sequence>& sequences, std::size_t& cursor, uint32_t& failures)
 {
-  // Send queued commands
-  for (auto seq = sequences.begin(); seq != sequences.end();) {
-    watchdog.feed();  // Per frame: a round over many shockers can outlast the watchdog timeout
-    if (failures >= kMaxConsecutiveFailures) {
-      // Nothing is getting out; dropping them beats retrying forever. New commands get a fresh run.
-      OS_LOGE(TAG, "RMT keeps failing, dropping %zu pending sequences", sequences.size());
-      sequences.clear();
-      failures = 0;
-      return;
-    }
-
-    // A round of many sequences can outlast stop()'s timeout; the shocker stops on its own once frames stop.
-    if (task.stopRequested()) {
-      return;
-    }
-
-    int64_t now = OpenShock::millis();
-
-    // A round can take several frames; re-check EStop per sequence so no payload goes out after activation.
-    if (seq->transmitEnd() > now && OpenShock::EStopManager::IsEStopped()) {
-      seq->setTransmitEnd(now);
-    }
-
-    int64_t timeToLive = seq->transmitEnd() - now;
-
-    if (timeToLive > 0) {
-      // Send the command
-      transmitSymbols(channel, encoder, seq->payload(), seq->size(), failures);
-      ++seq;
-      continue;
-    }
-
-    // Remove command once it has sent out its termination sequence for long enough. A sequence that never got a
-    // terminator out (a slow round skipped past the whole window, or a failed fill zeroed its end) sends one first.
-    if (timeToLive <= -kTerminatorDurationMs && seq->terminatorSent()) {
-      seq = sequences.erase(seq);
-      continue;
-    }
-
-    // Send the termination sequence to stop the shocker. Only a terminator that went out counts: after a failure it is
-    // retried next round, and kMaxConsecutiveFailures bounds the retries.
-    if (transmitSymbols(channel, encoder, seq->terminator(), seq->size(), failures)) {
-      seq->markTerminatorSent();
-    }
-    ++seq;
+  if (failures >= kMaxConsecutiveFailures) {
+    // Nothing is getting out; dropping them beats retrying forever. New commands get a fresh run.
+    OS_LOGE(TAG, "RMT keeps failing, dropping %zu pending sequences", sequences.size());
+    sequences.clear();
+    failures = 0;
+    cursor   = 0;
+    return;
   }
+
+  if (cursor >= sequences.size()) {
+    cursor = 0;
+  }
+
+  // Indexed, not an iterator: commands received between frames may push_back and reallocate the vector.
+  Rmt::Sequence& seq = sequences[cursor];
+
+  int64_t now = OpenShock::millis();
+
+  // Re-check EStop per frame so no payload goes out after activation.
+  if (seq.transmitEnd() > now && OpenShock::EStopManager::IsEStopped()) {
+    seq.setTransmitEnd(now);
+  }
+
+  int64_t timeToLive = seq.transmitEnd() - now;
+
+  if (timeToLive > 0) {
+    // Send the command
+    transmitSymbols(channel, encoder, seq.payload(), seq.size(), failures);
+    ++cursor;
+    return;
+  }
+
+  // Remove command once it has sent out its termination sequence for long enough. A sequence that never got a
+  // terminator out (a slow round skipped past the whole window, or a failed fill zeroed its end) sends one first.
+  if (timeToLive <= -kTerminatorDurationMs && seq.terminatorSent()) {
+    sequences.erase(sequences.begin() + static_cast<std::ptrdiff_t>(cursor));  // cursor now points at the next one
+    return;
+  }
+
+  // Send the termination sequence to stop the shocker. Only a terminator that went out counts: after a failure it is
+  // retried on its next turn, and kMaxConsecutiveFailures bounds the retries.
+  if (transmitSymbols(channel, encoder, seq.terminator(), seq.size(), failures)) {
+    seq.markTerminatorSent();
+  }
+  ++cursor;
 }
 
 void RFTransmitter::TransmitTask()
@@ -324,6 +326,7 @@ void RFTransmitter::TransmitTask()
 
   bool wasEstopped     = false;
   uint32_t rmtFailures = 0;  // Transmit failures in a row
+  std::size_t cursor   = 0;  // Next sequence to send a frame for
   std::vector<Rmt::Sequence> sequences;
   // (shocker key, seq) of Stops taken from the front of the queue while older commands may still be behind them.
   // Cleared once the queue drains, so it stays as small as the number of distinct shockers stopped in one backlog.
@@ -404,6 +407,11 @@ void RFTransmitter::TransmitTask()
     if (!sequences.empty()) {
       watchdog.subscribe();
     }
-    writeSequences(m_rmtChannel, m_rmtEncoder, sequences, m_task, rmtFailures, watchdog);
+    // Once stop() is requested no further frames go out (the shocker stops on its own); the task exits on the kill
+    // command stop() queues.
+    if (!sequences.empty() && !m_task.stopRequested()) {
+      watchdog.feed();
+      writeNextFrame(m_rmtChannel, m_rmtEncoder, sequences, cursor, rmtFailures);
+    }
   }
 }

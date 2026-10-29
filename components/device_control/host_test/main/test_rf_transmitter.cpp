@@ -226,6 +226,40 @@ TEST_CASE("RFTransmitter Stop replaces a live command with a short zero-intensit
   TEST_ASSERT_TRUE(HostFake::Transmissions.back().at < start + 1000);
 }
 
+TEST_CASE("RFTransmitter picks up a Stop on the next frame, not after the round", "[device_control][rf]")
+{
+  HostFake::Reset();
+  RFTransmitter tx(kPin);
+
+  // Three live shockers, so a round is three frames. The Stop for the last one arrives right after the first frame of
+  // a round; it must win before that shocker's next frame instead of waiting for the round to finish.
+  const uint16_t kLastShockerId = kShockerId + 2;
+  auto lastShock                = TestFrames::Payload(kModel, kLastShockerId, ShockerCommandType::Shock, 80);
+  auto lastStop                 = TestFrames::Payload(kModel, kLastShockerId, ShockerCommandType::Vibrate, 0);
+
+  for (uint16_t id = kShockerId; id <= kLastShockerId; id++) {
+    TEST_ASSERT_TRUE(tx.SendCommand(kModel, id, ShockerCommandType::Shock, 80, 1000));
+  }
+
+  size_t stoppedAfter  = 0;
+  HostFake::OnTransmit = [&] {
+    if (stoppedAfter == 0 && HostFake::Transmissions.size() == 4) {  // First frame of the second round
+      stoppedAfter = HostFake::Transmissions.size();
+      tx.SendCommand(kModel, kLastShockerId, ShockerCommandType::Stop, 0, 0);
+    }
+  };
+
+  TEST_ASSERT_FALSE(HostFake::RunTask(transmitTask(), kBudget));
+
+  TEST_ASSERT_EQUAL(1, TestFrames::Count(lastShock));  // Only its frame from the first round
+  bool sawStop = false;
+  for (size_t i = stoppedAfter; i < HostFake::Transmissions.size(); i++) {
+    TEST_ASSERT_TRUE(HostFake::Transmissions[i].symbols != lastShock);
+    sawStop = sawStop || HostFake::Transmissions[i].symbols == lastStop;
+  }
+  TEST_ASSERT_TRUE(sawStop);
+}
+
 TEST_CASE("RFTransmitter Stop overtakes a backlog and drops that shocker's older commands", "[device_control][rf]")
 {
   HostFake::Reset();
