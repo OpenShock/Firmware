@@ -11,8 +11,8 @@ idf_component_register(
   SRCS          "src/WwwImage.cpp"
                 "src/WwwPartition.cpp"
   INCLUDE_DIRS  "include"
-  REQUIRES      common                     # util/FunctionRef.h in WwwImage.h; OpenShock.h
+  REQUIRES      common                     # OpenShock.h
                 esp_partition              # esp_partition_t in WwwPartition.h
-  PRIV_REQUIRES crypto logging             # SHA256 for the body hash; OS_LOG*
+  PRIV_REQUIRES crypto logging             # SHA256 for the image hash; OS_LOG*
                 spi_flash                  # esp_partition_mmap
 )

@@ -21,9 +21,6 @@ namespace OpenShock::Www {
   /// @brief The `www` partition of the running partition table, or null on a table without one (the 1.x layout).
   [[nodiscard]] const esp_partition_t* FindPartition();
 
-  /// @brief SHA-256 over `parts`, concatenated: the hasher WwwImage expects (the crypto component's SHA256).
-  bool Sha256(std::span<const std::span<const uint8_t>> parts, std::span<uint8_t, 32> digest);
-
   /// @brief Whether `partition` holds a valid image; what the OTA path runs on a freshly flashed partition.
   [[nodiscard]] bool VerifyPartition(const esp_partition_t* partition);
 

@@ -15,10 +15,8 @@
 // is used: a failure means "no portal assets", never a partially trusted image. The image is smaller
 // than the partition it sits in; the bytes after it are ignored.
 //
-// Pure C++ over a byte span, so the host tests cover it; the device side (WwwPartition.h) maps the
-// partition and hands the span in.
-
-#include "util/FunctionRef.h"
+// C++ over a byte span plus OpenShock::SHA256 (Hashing.h; the host tests stub it), so the host tests cover it; the
+// device side (WwwPartition.h) maps the partition and hands the span in.
 
 #include <cstddef>
 #include <cstdint>
@@ -63,14 +61,10 @@ namespace OpenShock::Www {
   };
   [[nodiscard]] const char* ParseErrorName(ParseError error);
 
-  /// @brief SHA-256 of `parts`, concatenated, into `digest`; false when hashing is unavailable. Injected so the
-  ///        parser stays pure.
-  using Sha256Fn = Util::FunctionRef<bool(std::span<const std::span<const uint8_t>> parts, std::span<uint8_t, 32> digest)>;
-
   class Image {
   public:
-    /// @brief Validates the image at the start of `bytes` (the whole mapped partition is fine) and verifies the body hash.
-    [[nodiscard]] static std::expected<Image, ParseError> Parse(std::span<const uint8_t> bytes, Sha256Fn sha256);
+    /// @brief Validates the image at the start of `bytes` (the whole mapped partition is fine) and verifies its hash.
+    [[nodiscard]] static std::expected<Image, ParseError> Parse(std::span<const uint8_t> bytes);
 
     /// @brief The asset stored under `path` (no leading slash). Binary search over the sorted directory.
     [[nodiscard]] std::optional<Asset> Find(std::string_view path) const;

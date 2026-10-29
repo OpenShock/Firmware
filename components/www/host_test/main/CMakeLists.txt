@@ -6,8 +6,9 @@ idf_component_register(
                "sha256.cpp"
                "../../src/WwwImage.cpp"
   INCLUDE_DIRS "."
+               "stubs"                     # Hashing.h: OpenShock::SHA256 over the host SHA-256
                "../../include"             # www/WwwImage.h
-               "../../../common/include"   # util/FunctionRef.h
+               "../../../common/include"   # OpenShock.h
   REQUIRES     unity
                host_support                # Logging.h, openshock_board.h (test/host_support)
   WHOLE_ARCHIVE  # keep the auto-registered TEST_CASEs from being stripped

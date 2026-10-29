@@ -1,5 +1,7 @@
 #include "www/WwwImage.h"
 
+#include "Hashing.h"
+
 #include <algorithm>
 #include <array>
 #include <cstring>
@@ -86,7 +88,7 @@ Www::Image::Image(std::span<const uint8_t> bytes, uint16_t count, uint32_t dirLe
 {
 }
 
-std::expected<Www::Image, Www::ParseError> Www::Image::Parse(std::span<const uint8_t> bytes, Sha256Fn sha256)
+std::expected<Www::Image, Www::ParseError> Www::Image::Parse(std::span<const uint8_t> bytes)
 {
   if (bytes.size() < kHeaderSize) {
     return std::unexpected(ParseError::TooShort);
@@ -143,13 +145,13 @@ std::expected<Www::Image, Www::ParseError> Www::Image::Parse(std::span<const uin
     return std::unexpected(ParseError::BadBody);  // a body's padding runs past the end
   }
 
-  // The header as it was hashed: body_hash zeroed
-  std::array<uint8_t, kHeaderSize> header;
-  memcpy(header.data(), bytes.data(), kHeaderSize);
-  memset(header.data() + kHashOffset, 0, kBodyHashSize);
-  const std::array<std::span<const uint8_t>, 2> parts {std::span<const uint8_t>(header), bytes.subspan(kHeaderSize, end - kHeaderSize)};
-  std::array<uint8_t, 32> digest {};
-  if (!sha256(parts, digest)) {
+  // The image as it was hashed: body_hash zeroed
+  static constexpr uint8_t kZeroHash[kBodyHashSize] = {};
+  SHA256 sha;
+  SHA256::Digest digest {};
+  const bool hashed = sha.begin() && sha.update(bytes.data(), kHashOffset) && sha.update(kZeroHash, kBodyHashSize)
+                   && sha.update(bytes.data() + kHashOffset + kBodyHashSize, end - kHashOffset - kBodyHashSize) && sha.finish(digest);
+  if (!hashed) {
     return std::unexpected(ParseError::HashFailed);
   }
   if (memcmp(digest.data(), bytes.data() + kHashOffset, kBodyHashSize) != 0) {

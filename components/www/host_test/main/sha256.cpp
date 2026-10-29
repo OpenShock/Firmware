@@ -1,7 +1,6 @@
 #include "sha256.h"
 
 #include <cstring>
-#include <vector>
 
 namespace {
   constexpr uint32_t K[64] = {
@@ -84,16 +83,4 @@ void HostTest::Sha256(const uint8_t* data, std::size_t length, uint8_t (&digest)
     digest[i * 4 + 2] = static_cast<uint8_t>(state[i] >> 8);
     digest[i * 4 + 3] = static_cast<uint8_t>(state[i]);
   }
-}
-
-bool HostTest::Sha256Fn(std::span<const std::span<const uint8_t>> parts, std::span<uint8_t, 32> digest)
-{
-  std::vector<uint8_t> data;
-  for (std::span<const uint8_t> part : parts) {
-    data.insert(data.end(), part.begin(), part.end());
-  }
-  uint8_t out[32];
-  Sha256(data.data(), data.size(), out);
-  memcpy(digest.data(), out, 32);
-  return true;
 }

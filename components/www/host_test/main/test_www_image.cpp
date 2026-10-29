@@ -2,6 +2,7 @@
 // every way a field of one can be wrong.
 #include "unity.h"
 
+#include "Hashing.h"
 #include "sha256.h"
 #include "www/WwwImage.h"
 
@@ -35,14 +36,14 @@ namespace {
 
   Www::Image ParseOk(const std::vector<uint8_t>& bytes)
   {
-    auto image = Www::Image::Parse(bytes, HostTest::Sha256Fn);
+    auto image = Www::Image::Parse(bytes);
     TEST_ASSERT_TRUE_MESSAGE(image.has_value(), image ? "" : Www::ParseErrorName(image.error()));
     return *image;
   }
 
   void ExpectError(const std::vector<uint8_t>& bytes, Www::ParseError expected)
   {
-    auto image = Www::Image::Parse(bytes, HostTest::Sha256Fn);
+    auto image = Www::Image::Parse(bytes);
     TEST_ASSERT_FALSE_MESSAGE(image.has_value(), "parsed a corrupt image");
     TEST_ASSERT_EQUAL_STRING(Www::ParseErrorName(expected), Www::ParseErrorName(image.error()));
   }
@@ -153,7 +154,7 @@ TEST_CASE("Every truncation is rejected", "[www]")
   const auto bytes = Fixture();
   for (std::size_t len : {std::size_t(0), std::size_t(4), Www::kHeaderSize - 1, Www::kHeaderSize, Www::kHeaderSize + 40, bytes.size() - 1}) {
     std::vector<uint8_t> cut(bytes.begin(), bytes.begin() + len);
-    auto image = Www::Image::Parse(cut, HostTest::Sha256Fn);
+    auto image = Www::Image::Parse(cut);
     TEST_ASSERT_FALSE_MESSAGE(image.has_value(), "a truncated image parsed");
   }
 }
@@ -252,7 +253,8 @@ TEST_CASE("Each corrupted entry field is rejected", "[www]")
 
 TEST_CASE("A failing hasher is reported, not treated as a match", "[www]")
 {
-  auto image = Www::Image::Parse(Fixture(), [](std::span<const std::span<const uint8_t>>, std::span<uint8_t, 32>) { return false; });
+  HostTest::FailNextHash = true;
+  auto image             = Www::Image::Parse(Fixture());
   TEST_ASSERT_FALSE(image.has_value());
   TEST_ASSERT_EQUAL_STRING(Www::ParseErrorName(Www::ParseError::HashFailed), Www::ParseErrorName(image.error()));
 }
