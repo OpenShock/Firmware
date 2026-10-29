@@ -1,5 +1,6 @@
 ---
 kind: chore
+pr: 531
 ---
 Compile once per build variant in CI and stamp each board from it
 
@@ -14,4 +15,4 @@ CI now compiles the firmware once per build variant instead of once per board, a
 - Consolidate the build and CI script helpers and their tests, and drop helpers nothing calls
 
 ## Notices
-- info: Boards with more than 4 MB of flash now ship with a bootloader whose header says 4 MB, the size the shared partition table is laid out for. They log that the chip is larger than the image header says at boot and behave as before; no board's partition table uses flash past 4 MB.
+- note: Boards with more than 4 MB of flash now ship with a bootloader whose header says 4 MB, the size the shared partition table is laid out for. They log that the chip is larger than the image header says at boot and behave as before; no board's partition table uses flash past 4 MB.

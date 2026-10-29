@@ -33,7 +33,9 @@ namespace ConfigTest {
 
   std::vector<uint8_t> Serialize(const Config::RootConfig& config, bool withSensitiveData)
   {
+    // ForceDefaults like the firmware's own writes, so the bytes match what Config stores and GetRaw returns
     flatbuffers::FlatBufferBuilder builder;
+    builder.ForceDefaults(true);
     auto root = config.ToFlatbuffers(builder, withSensitiveData);
     Serialization::Configuration::FinishHubConfigBuffer(builder, root);
     return std::vector<uint8_t>(builder.GetBufferPointer(), builder.GetBufferPointer() + builder.GetSize());

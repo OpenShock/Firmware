@@ -114,6 +114,10 @@ static bool trySaveConfig(const OpenShock::Config::RootConfig& config)
 {
   flatbuffers::FlatBufferBuilder builder;
 
+  // Write every field, even ones equal to the schema default. Older firmware may use different defaults
+  // (1.5.x reads a missing is_enabled/keepalive_enabled as false), so an omitted field changes meaning on downgrade.
+  builder.ForceDefaults(true);
+
   auto fbsConfig = config.ToFlatbuffers(builder, true);
 
   Serialization::Configuration::FinishHubConfigBuffer(builder, fbsConfig);
@@ -238,7 +242,9 @@ bool Config::GetRaw(TinyVec<uint8_t>& buffer)
 
   // Serialize the live config rather than reading flash: no filesystem access under the read lock, and it is
   // what the device is actually running with.
+  // ForceDefaults like trySaveConfig, so a raw dump stays valid when loaded into older firmware.
   flatbuffers::FlatBufferBuilder builder;
+  builder.ForceDefaults(true);
   auto fbsConfig = _configData.ToFlatbuffers(builder, true);
   Serialization::Configuration::FinishHubConfigBuffer(builder, fbsConfig);
 

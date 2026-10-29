@@ -1,3 +1,39 @@
+## [1.6.0] - 2026-10-29
+
+### Notices
+
+- **NOTE**: The frontend was fully rewritten, but since it is served directly from the device's filesystem, no user action is required. The update is applied automatically with the firmware flash.
+
+### Safety
+- Refuse disabling or re-pinning the E-Stop while it is active
+
+### Security
+- Reject oversize WebSocket messages and config files before verifying them
+- Remove the captive portal endpoint for changing the OTA domain
+
+### Added
+- Full setup wizard, REST API migration, and WiFi CRUD overhaul ([#426](https://github.com/OpenShock/Firmware/pull/426))
+- Reconnect when the gateway stops sending keepalive pings ([#469](https://github.com/OpenShock/Firmware/pull/469))
+
+### Changed
+- Rewrite frontend to Svelte 5 + Vite ([#427](https://github.com/OpenShock/Firmware/pull/427))
+- Replace LED managers with LEDC-driven drivers ([#435](https://github.com/OpenShock/Firmware/pull/435))
+- Report specific account linking failure reasons instead of a generic internal error ([#484](https://github.com/OpenShock/Firmware/pull/484))
+
+### Fixed
+- Fix race conditions between the hub's background tasks ([#424](https://github.com/OpenShock/Firmware/pull/424))
+- Report the connected WiFi network when it isn't in the scan results ([#515](https://github.com/OpenShock/Firmware/pull/515))
+- Stop the boot WiFi scan colliding with the cached network reconnect
+- Write default-valued config fields so downgrades keep OTA updates enabled
+- Keep the always-enabled captive portal setting across reboots and setup completion
+
+### Internal
+- Rename all _ prefixed static functions to camelCase and add missing static keywords ([#437](https://github.com/OpenShock/Firmware/pull/437))
+- Replace hand-rolled release.py with release-tool action ([#477](https://github.com/OpenShock/Firmware/pull/477))
+- Consume the shared @openshock/svelte-core library in the captive portal ([#483](https://github.com/OpenShock/Firmware/pull/483))
+
+**Full Changelog: [1.5.2 -> 1.6.0](https://github.com/OpenShock/Firmware/compare/1.5.2...1.6.0)**
+
 # Version 1.5.2 Release Notes
 
 Feature release restoring missing WellturnT330 support that was intended for 1.5.0.
