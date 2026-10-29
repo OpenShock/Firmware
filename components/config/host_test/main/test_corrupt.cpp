@@ -174,6 +174,35 @@ TEST_CASE("Every truncation and corruption of a credential blob is rejected with
   }
 }
 
+TEST_CASE("The credential blob's auth mode codes never change", "[config][corrupt]")
+{
+  // What hubs hold on flash: owned by the blob format, not by ESP-IDF or the FlatBuffers schema
+  const std::pair<wifi_auth_mode_t, uint8_t> codes[] = {
+    {WIFI_AUTH_OPEN, 0}, {WIFI_AUTH_WEP, 1}, {WIFI_AUTH_WPA_PSK, 2}, {WIFI_AUTH_WPA2_PSK, 3}, {WIFI_AUTH_WPA_WPA2_PSK, 4},
+    {WIFI_AUTH_WPA2_ENTERPRISE, 5}, {WIFI_AUTH_WPA3_PSK, 6}, {WIFI_AUTH_WPA2_WPA3_PSK, 7}, {WIFI_AUTH_WAPI_PSK, 8}, {WIFI_AUTH_MAX, 9},
+  };
+  for (const auto& [mode, code] : codes) {
+    const auto blob = Config::WiFiCredentials(1, "Net", "pw", mode).ToBlob();
+    TEST_ASSERT_EQUAL_UINT8(code, blob[2]);
+    Config::WiFiCredentials decoded;
+    TEST_ASSERT_TRUE(decoded.FromBlob(blob));
+    TEST_ASSERT_EQUAL(mode, decoded.authMode);
+  }
+  // An auth mode the format has no code for is stored as unknown
+  TEST_ASSERT_EQUAL_UINT8(9, Config::WiFiCredentials(1, "Net", "pw", WIFI_AUTH_OWE).ToBlob()[2]);
+}
+
+TEST_CASE("A version 1 blob with fields appended after the known ones still reads", "[config][corrupt]")
+{
+  // How the format grows: what a later firmware appends, an older one (after a rollback) skips
+  Config::WiFiCredentials sample(7, "Office", "s3cret!", WIFI_AUTH_WPA2_PSK);
+  std::vector<uint8_t> blob = sample.ToBlob();
+  blob.insert(blob.end(), {0x01, 0x02, 0x03});
+  Config::WiFiCredentials decoded;
+  TEST_ASSERT_TRUE(decoded.FromBlob(blob));
+  AssertCredentialsEqual(sample, decoded);
+}
+
 TEST_CASE("jsonconfig set rejects malformed JSON without touching the store", "[config][corrupt][json]")
 {
   const char* inputs[] = {

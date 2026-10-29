@@ -131,9 +131,48 @@ void WiFiCredentials::ToJSON(json_gen_str_t* gen, const char* name, bool withSen
   JSON::objEnd(gen, name);
 }
 
-// Blob layout, version 1: version u8, id u8, auth mode u8 (the FlatBuffers WifiAuthMode, which is ours and stable
-// across ESP-IDF versions), bssid u8[6] (all zero: no pin), ssid length u8, ssid, password length u8, password.
+// Blob layout, version 1: version u8, id u8, auth mode u8 (kBlobAuthModes), bssid u8[6] (all zero: no pin), ssid
+// length u8, ssid, password length u8, password.
+//
+// Versioning: a new field is appended and the version stays 1, since a reader ignores whatever follows the fields it
+// knows; firmware rolled back to an older build then still reads every credential. The version changes only for a
+// change an older reader must not misread, and that costs a rolled-back hub its saved networks.
 static constexpr uint8_t kBlobVersion = 1;
+
+// The auth mode codes the blob stores. Owned by this format alone: neither ESP-IDF's wifi_auth_mode_t nor the
+// FlatBuffers schema may renumber what is on flash. Never reuse or renumber a code; append new ones.
+static constexpr std::pair<uint8_t, wifi_auth_mode_t> kBlobAuthModes[] = {
+  {0,            WIFI_AUTH_OPEN},
+  {1,             WIFI_AUTH_WEP},
+  {2,         WIFI_AUTH_WPA_PSK},
+  {3,        WIFI_AUTH_WPA2_PSK},
+  {4,    WIFI_AUTH_WPA_WPA2_PSK},
+  {5, WIFI_AUTH_WPA2_ENTERPRISE},
+  {6,        WIFI_AUTH_WPA3_PSK},
+  {7,   WIFI_AUTH_WPA2_WPA3_PSK},
+  {8,        WIFI_AUTH_WAPI_PSK},
+};
+static constexpr uint8_t kBlobAuthUnknown = 9;
+
+static uint8_t toBlobAuthMode(wifi_auth_mode_t mode)
+{
+  for (const auto& [code, known] : kBlobAuthModes) {
+    if (known == mode) {
+      return code;
+    }
+  }
+  return kBlobAuthUnknown;
+}
+
+static wifi_auth_mode_t fromBlobAuthMode(uint8_t code)
+{
+  for (const auto& [known, mode] : kBlobAuthModes) {
+    if (known == code) {
+      return mode;
+    }
+  }
+  return WIFI_AUTH_MAX;
+}
 
 std::vector<uint8_t> WiFiCredentials::ToBlob() const
 {
@@ -141,7 +180,7 @@ std::vector<uint8_t> WiFiCredentials::ToBlob() const
   blob.reserve(11 + ssid.size() + password.size());
   blob.push_back(kBlobVersion);
   blob.push_back(id);
-  blob.push_back(static_cast<uint8_t>(std::to_underlying(ToFbsAuthMode(authMode))));
+  blob.push_back(toBlobAuthMode(authMode));
   blob.insert(blob.end(), bssid.begin(), bssid.end());
   blob.push_back(static_cast<uint8_t>(std::min<std::size_t>(ssid.size(), 255)));
   blob.insert(blob.end(), ssid.begin(), ssid.begin() + std::min<std::size_t>(ssid.size(), 255));
@@ -183,7 +222,7 @@ bool WiFiCredentials::FromBlob(std::span<const uint8_t> blob)
   id       = storedId;
   ssid     = std::move(storedSsid);
   password = std::move(storedPassword);
-  authMode = FromFbsAuthMode(static_cast<FbsAuthMode>(storedAuth));
+  authMode = fromBlobAuthMode(storedAuth);
   bssid    = storedBssid;
   return true;
 }
