@@ -5,7 +5,8 @@
 const char* const TAG = "SimpleMutex";
 
 OpenShock::SimpleMutex::SimpleMutex()
-  : m_mutex(xSemaphoreCreateMutex())
+  : m_storage()
+  , m_mutex(xSemaphoreCreateMutexStatic(&m_storage))
 {
 }
 

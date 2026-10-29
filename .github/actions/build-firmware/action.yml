@@ -1,117 +1,106 @@
 name: build-firmware
-description: >-
-  Compile one board's C++ firmware with native ESP-IDF and upload its discrete
-  partition images (app, bootloader, partition-table). Builds only the code
-  targets - not the static0 web-assets image - so it runs in parallel with
-  build-staticfs; the merge-partitions job links them together.
+description: Compile app, bootloader, and parition-table images without board stamps and upload it to build artifacts.
 inputs:
-  board:
+  variant:
     required: true
-    description: 'Board name to build (matches boards/<board>.defaults)'
+    description: 'Build variant id, as get_vars.py emits it (e.g. esp32s3-6832dbd5)'
   version:
     required: true
     description: 'Current firmware version'
-  cache-group:
-    required: true
-    description: >-
-      Identifier of the ccache store this board shares, computed by get-vars.py as the
-      chip plus a digest of the resolved sdkconfig. Boards with identical sdkconfig
-      compile identical ESP-IDF objects, so they share one store.
-  idf-cache-writer:
-    required: false
-    default: 'false'
-    description: >-
-      Whether this job writes the shared ESP-IDF cache. get-vars nominates one board;
-      every other job restores it read-only.
 
 runs:
   using: composite
   steps:
     - uses: ./.github/actions/setup-esp-idf
-      with:
-        save-cache: ${{ inputs.idf-cache-writer }}
+      id: idf
 
-    # ccache is keyed on the sdkconfig identity, not the board: 13 boards resolve to 6
-    # stores, so same-chip/same-flash boards reuse each other's ESP-IDF objects.
-    #
-    # The key deliberately does NOT contain the commit SHA. Cache entries are immutable,
-    # so a key that always misses always writes a full new copy - 13 fresh entries per
-    # push was what pushed this repository over the 10 GB cap. The SHA is only a save
-    # discriminator here; restore-keys does the real work by taking the newest store for
-    # the group.
+    # scripts/build.py and the scripts CMake runs need requirements.txt
+    - uses: ./.github/actions/install-python-deps
+
+    # Entries are immutable, so the key ends in the run and restore-keys picks the newest store
     - name: Restore ccache
       uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9  # v6.1.0
       with:
         path: ~/.cache/ccache
-        key: ccache-${{ runner.os }}-${{ inputs.cache-group }}-${{ github.sha }}
-        restore-keys: |
-          ccache-${{ runner.os }}-${{ inputs.cache-group }}-
+        key: ccache-v2-${{ runner.os }}-${{ steps.idf.outputs.version }}-${{ inputs.variant }}-${{ github.run_id }}-${{ github.run_attempt }}
+        restore-keys: ccache-v2-${{ runner.os }}-${{ steps.idf.outputs.version }}-${{ inputs.variant }}-
 
-    # Build only the code targets (app + bootloader + partition-table). This
-    # skips the static0 image (built separately by build-staticfs), so no
-    # frontend is needed here. scripts/build.py resolves the target from
-    # boards/<board>.defaults, sets OPENSHOCK_BOARD, and layers the sdkconfig.
     - name: Build firmware
       shell: bash
       run: |
         set -euo pipefail
         export IDF_CCACHE_ENABLE=1
         ccache --zero-stats >/dev/null 2>&1 || true
-        python3 scripts/build.py "${{ inputs.board }}" app bootloader partition-table
+        python scripts/build.py --variant "$VARIANT" app bootloader partition-table
       env:
+        VARIANT: ${{ inputs.variant }}
         OPENSHOCK_FW_VERSION: ${{ inputs.version }}
-        # One board per job, so a fixed build directory is safe here - and necessary.
-        # The directory path appears on every compile command line, so building each
-        # board under build/<board> gave every board a different command line and no two
-        # boards in a cache group could share an object.
         OPENSHOCK_BUILD_DIR: build/firmware
-        OPENSHOCK_FW_GIT_REF: ${{ github.ref }}
         OPENSHOCK_FW_GIT_COMMIT: ${{ github.sha }}
-        # content, not the default mtime: the toolchain is restored from a cache with
-        # fresh timestamps every run, which would otherwise invalidate the whole store.
         CCACHE_COMPILERCHECK: content
-        # ccache defaults to 5 GB. One store holds a single sdkconfig's objects, so this
-        # is generous - it exists to stop a store growing without bound between evictions.
-        CCACHE_MAXSIZE: 500M
+        CCACHE_MAXSIZE: 500M # Could be lower maybe
 
-    # The hit rate is the thing to watch after a change to the generated headers: a
-    # near-zero rate on an unchanged tree means something is being force-included that
-    # varies per commit again.
+    # Log caching statistics to actions run summary
     - name: ccache statistics
+      id: ccache-stats
       shell: bash
-      run: ccache --show-stats --verbose || ccache -s
+      env:
+        VARIANT: ${{ inputs.variant }}
+      run: |
+        ccache --show-stats --verbose || ccache -s
+        {
+          echo "### ccache ($VARIANT)"
+          echo '```'
+          ccache --show-stats || true
+          echo '```'
+        } >> "$GITHUB_STEP_SUMMARY"
+        misses=$(ccache --print-stats 2>/dev/null | awk -F'\t' '$1 == "cache_miss" { print $2 }')
+        echo "misses=${misses:-unknown}" >> "$GITHUB_OUTPUT"
 
-    # Saved on pull requests too, deliberately. ci-build only runs `push` for develop,
-    # beta and master, so a feature branch only ever builds as a PR - skipping the save
-    # there meant the store was never written and every PR push started from nothing.
-    #
-    # The entry count this costs is bounded now in a way it was not before: 6 stores per
-    # push rather than 13, each measured at roughly 30 MB for one board and capped by
-    # CCACHE_MAXSIZE, and PR-scoped entries age out with the branch.
     - name: Save ccache
+      if: ${{ steps.ccache-stats.outputs.misses != '0' && !github.event.pull_request.head.repo.fork }} # Probably dont wanna save cache from external prs
       uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9  # v6.1.0
       with:
         path: ~/.cache/ccache
-        key: ccache-${{ runner.os }}-${{ inputs.cache-group }}-${{ github.sha }}
+        key: ccache-v2-${{ runner.os }}-${{ steps.idf.outputs.version }}-${{ inputs.variant }}-${{ github.run_id }}-${{ github.run_attempt }}
 
-    # Flat, canonically-named images. app.bin/staticfs.bin are the names the
-    # device OTA pulls (OtaUpdateManager.cpp); merge_image.py and the CDN upload
-    # consume these too. `project(firmware)` names the app image firmware.bin.
+    # Copy built images out for artifact upload
     - name: Stage partition images
       shell: bash
       env:
-        B: build/firmware
+        BUILD_DIR: build/firmware
+        OUT_DIR: dist/${{ inputs.variant }}
       run: |
         set -euo pipefail
-        mkdir -p dist
-        cp "$B/firmware.bin"                        dist/app.bin
-        cp "$B/bootloader/bootloader.bin"           dist/bootloader.bin
-        cp "$B/partition_table/partition-table.bin" dist/partition-table.bin
+        mkdir -p "$OUT_DIR"
+        cp "$BUILD_DIR/firmware.bin"                        "$OUT_DIR/app.bin"
+        cp "$BUILD_DIR/bootloader/bootloader.bin"           "$OUT_DIR/bootloader.bin"
+        cp "$BUILD_DIR/partition_table/partition-table.bin" "$OUT_DIR/partition-table.bin"
 
     - name: Upload partition images
-      uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a  # v7.0.1
+      uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9  # v7.0.2
       with:
-        name: firmware_build_${{ inputs.board }}
-        path: dist/*.bin
+        name: variant_${{ inputs.variant }}
+        path: dist
+        retention-days: 1
+        if-no-files-found: error
+
+    # The symbols for decoding a crash backtrace: stable builds print no assert text (ASSERTIONS_SILENT). Stamping
+    # does not move code, so one ELF covers every board of the variant. ci-build.yml attaches it to the release.
+    - name: Stage ELF
+      shell: bash
+      env:
+        BUILD_DIR: build/firmware
+        OUT: elf/OpenShock_${{ inputs.variant }}_${{ inputs.version }}.elf
+      run: |
+        set -euo pipefail
+        mkdir -p elf
+        cp "$BUILD_DIR/firmware.elf" "$OUT"
+
+    - name: Upload ELF
+      uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9  # v7.0.2
+      with:
+        name: elf_${{ inputs.variant }}
+        path: elf
         retention-days: 7
         if-no-files-found: error

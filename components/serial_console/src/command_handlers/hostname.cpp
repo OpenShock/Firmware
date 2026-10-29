@@ -28,13 +28,13 @@ static bool isValidHostname(std::string_view hostname)
 static void handleHostnameCommand(std::string_view arg, bool isAutomated)
 {
   if (arg.empty()) {
-    std::string hostname;
-    if (!OpenShock::Config::GetWiFiHostname(hostname)) {
+    auto hostname = OpenShock::Config::GetWiFiHostname();
+    if (!hostname) {
       SERPR_ERROR("Failed to get hostname from config");
       return;
     }
     // Get hostname
-    SERPR_RESPONSE("Hostname|%s", hostname.c_str());
+    SERPR_RESPONSE("Hostname|%s", hostname->c_str());
     return;
   }
 

@@ -7,25 +7,25 @@
 
 static void handleKeepAliveCommand(std::string_view arg, bool isAutomated)
 {
-  bool keepAliveEnabled;
-
   if (arg.empty()) {
     // Get keep alive status
-    if (!OpenShock::Config::GetRFConfigKeepAliveEnabled(keepAliveEnabled)) {
+    auto configEnabled = OpenShock::Config::GetRFConfigKeepAliveEnabled();
+    if (!configEnabled) {
       SERPR_ERROR("Failed to get keep-alive status from config");
       return;
     }
 
-    SERPR_RESPONSE("KeepAlive|%s", keepAliveEnabled ? "true" : "false");
+    SERPR_RESPONSE("KeepAlive|%s", *configEnabled ? "true" : "false");
     return;
   }
 
-  if (!OpenShock::Convert::ToBool(OpenShock::StringTrim(arg), keepAliveEnabled)) {
+  auto keepAliveEnabled = OpenShock::Convert::ToBool(OpenShock::StringTrim(arg));
+  if (!keepAliveEnabled) {
     SERPR_ERROR("Invalid argument (not a boolean)");
     return;
   }
 
-  bool result = OpenShock::CommandHandler::SetKeepAliveEnabled(keepAliveEnabled);
+  bool result = OpenShock::CommandHandler::SetKeepAliveEnabled(*keepAliveEnabled);
 
   if (result) {
     SERPR_SUCCESS("Saved config");

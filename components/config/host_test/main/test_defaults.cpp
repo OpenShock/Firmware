@@ -4,7 +4,10 @@
 
 #include "config_test_helpers.h"
 
+#include "BoardDescriptor.h"
+
 #include <string>
+#include <utility>
 
 using namespace OpenShock;
 using namespace ConfigTest;
@@ -18,8 +21,13 @@ namespace {
   }
 }  // namespace
 
-TEST_CASE("Default values come from Kconfig and the board header", "[config][defaults]")
+TEST_CASE("Default values come from Kconfig and the board descriptor", "[config][defaults]")
 {
+  // The host-test descriptor is compiled from openshock_board.h, so the macros are what Board::Get() serves.
+  TEST_ASSERT_TRUE(OpenShock::Board::IsStamped());
+  TEST_ASSERT_EQUAL_STRING(OPENSHOCK_FW_BOARD, OpenShock::Board::Get().board);
+  TEST_ASSERT_EQUAL_INT(OPENSHOCK_RF_TX_GPIO, OpenShock::Board::Get().rfTxGpio);
+
   const Config::RootConfig config;
 
   TEST_ASSERT_EQUAL_INT(OPENSHOCK_RF_TX_GPIO, config.rf.txPin);
@@ -33,11 +41,11 @@ TEST_CASE("Default values come from Kconfig and the board header", "[config][def
   TEST_ASSERT_TRUE(config.serialInput.echoEnabled);
   TEST_ASSERT_TRUE(config.otaUpdate.isEnabled);
   TEST_ASSERT_EQUAL_STRING(CONFIG_OPENSHOCK_FW_CDN_DOMAIN, config.otaUpdate.cdnDomain.c_str());
-  TEST_ASSERT_EQUAL_UINT8(static_cast<uint8_t>(OtaUpdateChannel::Stable), static_cast<uint8_t>(config.otaUpdate.updateChannel));
+  TEST_ASSERT_EQUAL_UINT8(std::to_underlying(OtaUpdateChannel::Stable), std::to_underlying(config.otaUpdate.updateChannel));
   TEST_ASSERT_EQUAL_UINT16(30, config.otaUpdate.checkInterval);
   TEST_ASSERT_TRUE(config.otaUpdate.allowBackendManagement);
   TEST_ASSERT_EQUAL_INT32(0, config.otaUpdate.updateId);
-  TEST_ASSERT_EQUAL_UINT8(static_cast<uint8_t>(OtaUpdateStep::None), static_cast<uint8_t>(config.otaUpdate.updateStep));
+  TEST_ASSERT_EQUAL_UINT8(std::to_underlying(OtaUpdateStep::None), std::to_underlying(config.otaUpdate.updateStep));
   // The host-test board has no E-Stop pin, so E-Stop defaults to off.
   TEST_ASSERT_EQUAL_INT(OPENSHOCK_ESTOP_PIN, config.estop.gpioPin);
   TEST_ASSERT_FALSE(config.estop.enabled);
@@ -137,11 +145,11 @@ TEST_CASE("Credentials without an SSID are dropped, the rest kept", "[config][de
   auto wifi = Fbs::CreateWiFiConfig(builder, 0, 0, builder.CreateVector(creds));
   TEST_ASSERT_TRUE(InitFrom(Finish(builder, Fbs::CreateHubConfig(builder, 0, wifi))));
 
-  std::vector<Config::WiFiCredentials> loaded;
-  TEST_ASSERT_TRUE(Config::GetWiFiCredentials(loaded));
-  TEST_ASSERT_EQUAL_size_t(2, loaded.size());
-  AssertCredentialsEqual(Config::WiFiCredentials(1, "HomeNet", "hunter22"), loaded[0]);
-  AssertCredentialsEqual(Config::WiFiCredentials(4, "Office", ""), loaded[1]);
+  auto loaded = Config::GetWiFiCredentials();
+  TEST_ASSERT_TRUE(loaded.has_value());
+  TEST_ASSERT_EQUAL_size_t(2, loaded->size());
+  AssertCredentialsEqual(Config::WiFiCredentials(1, "HomeNet", "hunter22"), (*loaded)[0]);
+  AssertCredentialsEqual(Config::WiFiCredentials(4, "Office", ""), (*loaded)[1]);
 }
 
 TEST_CASE("Invalid stored GPIO pins fall back safely", "[config][defaults]")
@@ -151,20 +159,21 @@ TEST_CASE("Invalid stored GPIO pins fall back safely", "[config][defaults]")
   auto estop = Fbs::CreateEStopConfig(builder, true, 0);  // strapping pin: not a valid E-Stop input
   TEST_ASSERT_TRUE(InitFrom(Finish(builder, Fbs::CreateHubConfig(builder, rf, 0, 0, 0, 0, 0, estop))));
 
-  gpio_num_t txPin;
-  TEST_ASSERT_TRUE(Config::GetRFConfigTxPin(txPin));
-  TEST_ASSERT_EQUAL_INT(OPENSHOCK_RF_TX_GPIO, txPin);
+  auto txPin = Config::GetRFConfigTxPin();
+  TEST_ASSERT_TRUE(txPin.has_value());
+  TEST_ASSERT_EQUAL_INT(OPENSHOCK_RF_TX_GPIO, *txPin);
 
-  bool estopEnabled = true;
-  TEST_ASSERT_TRUE(Config::GetEStopEnabled(estopEnabled));
-  TEST_ASSERT_FALSE(estopEnabled);
+  auto estopEnabled = Config::GetEStopEnabled();
+  TEST_ASSERT_TRUE(estopEnabled.has_value());
+  TEST_ASSERT_FALSE(*estopEnabled);
 
   // Negative pin (the old "invalid" marker) also falls back.
   flatbuffers::FlatBufferBuilder builder2;
   auto rf2 = Fbs::CreateRFConfig(builder2, -1, true);
   TEST_ASSERT_TRUE(InitFrom(Finish(builder2, Fbs::CreateHubConfig(builder2, rf2))));
-  TEST_ASSERT_TRUE(Config::GetRFConfigTxPin(txPin));
-  TEST_ASSERT_EQUAL_INT(OPENSHOCK_RF_TX_GPIO, txPin);
+  txPin = Config::GetRFConfigTxPin();
+  TEST_ASSERT_TRUE(txPin.has_value());
+  TEST_ASSERT_EQUAL_INT(OPENSHOCK_RF_TX_GPIO, *txPin);
 }
 
 TEST_CASE("jsonconfig set with an empty object resets to defaults", "[config][defaults][json]")

@@ -4,6 +4,7 @@
 #include "json/Json.h"
 
 #include <cstdint>
+#include <optional>
 #include <string>
 #include <vector>
 
@@ -33,8 +34,8 @@ namespace OpenShock::Serialization::JsonAPI {
     std::string country;
   };
 
-  bool ParseBackendVersionJsonResponse(int code, JSON::JsonView root, BackendVersionResponse& out);
-  bool ParseAccountLinkJsonResponse(int code, JSON::JsonView root, AccountLinkResponse& out);
-  bool ParseHubInfoJsonResponse(int code, JSON::JsonView root, HubInfoResponse& out);
-  bool ParseAssignLcgJsonResponse(int code, JSON::JsonView root, AssignLcgResponse& out);
+  [[nodiscard]] std::optional<BackendVersionResponse> ParseBackendVersionJsonResponse(int code, JSON::JsonView root);
+  [[nodiscard]] std::optional<AccountLinkResponse> ParseAccountLinkJsonResponse(int code, JSON::JsonView root);
+  [[nodiscard]] std::optional<HubInfoResponse> ParseHubInfoJsonResponse(int code, JSON::JsonView root);
+  [[nodiscard]] std::optional<AssignLcgResponse> ParseAssignLcgJsonResponse(int code, JSON::JsonView root);
 }  // namespace OpenShock::Serialization::JsonAPI

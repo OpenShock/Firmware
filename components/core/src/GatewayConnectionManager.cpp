@@ -16,11 +16,14 @@ const char* const TAG = "GatewayConnectionManager";
 #include "SimpleMutex.h"
 #include "util/Backoff.h"
 #include "util/RetiredList.h"
+#include "wifi/WiFiManager.h"
 
 #include <algorithm>
 #include <atomic>
+#include <cstring>
 #include <memory>
 #include <unordered_map>
+#include <utility>
 #include <vector>
 
 const char* const AUTH_TOKEN_FILE = "/authToken";
@@ -45,22 +48,31 @@ static std::shared_ptr<OpenShock::GatewayClient> s_wsClient = nullptr;
 // task (where stopping the client from inside its own task is not allowed).
 static OpenShock::RetiredList<OpenShock::GatewayClient> s_retiredClients;
 
+// Bumped under s_clientMutex whenever the client is torn down (token change, unlink, WiFi loss). A token verification
+// that started under an older generation is stale and must not create a client or mark the hub linked.
+static uint32_t s_clientGeneration = 0;
+
 static std::shared_ptr<OpenShock::GatewayClient> GetClient()
 {
   OpenShock::ScopedLock lock__(&s_clientMutex);
   return s_wsClient;
 }
-static void CreateClient(const std::string& authToken)
+static uint32_t GetClientGeneration()
 {
   OpenShock::ScopedLock lock__(&s_clientMutex);
-  s_wsClient = std::make_shared<OpenShock::GatewayClient>(authToken);
+  return s_clientGeneration;
 }
 static void DestroyClient()
 {
-  OpenShock::ScopedLock lock__(&s_clientMutex);
-  if (s_wsClient != nullptr) {
-    s_wsClient->retire();
-    s_retiredClients.retire(std::move(s_wsClient));  // Leaves s_wsClient null
+  std::shared_ptr<OpenShock::GatewayClient> client;
+  {
+    OpenShock::ScopedLock lock__(&s_clientMutex);
+    ++s_clientGeneration;
+    client = std::move(s_wsClient);  // Leaves s_wsClient null
+  }
+  if (client != nullptr) {
+    client->retire();  // Outside s_clientMutex: it posts an event
+    s_retiredClients.retire(std::move(client));
   }
 }
 
@@ -76,7 +88,8 @@ static void handleWiFiStateChanged(void* arg, esp_event_base_t base, int32_t id,
       OS_LOGD(TAG, "Got IP address");
       break;
     case OPENSHOCK_WIFI_STATE_DISCONNECTED:
-      s_flags.store(FLAG_NONE, std::memory_order_relaxed);
+      // Linked is about the token, not the connection; keep it so the UI doesn't show the hub unlinked on WiFi loss
+      s_flags.fetch_and(static_cast<uint8_t>(~FLAG_HAS_IP), std::memory_order_relaxed);
       DestroyClient();
       OS_LOGD(TAG, "Lost IP address");
       break;
@@ -135,7 +148,7 @@ AccountLinkResultCode GatewayConnectionManager::Link(std::string_view linkCode)
   }
 
   if (response.result != HTTP::RequestResult::Success) {
-    OS_LOGE(TAG, "Account link request failed: %s (result=%hhu, http=%d)", response.ResultToString(), static_cast<uint8_t>(response.result), response.code);
+    OS_LOGE(TAG, "Account link request failed: %s (result=%hhu, http=%d)", response.ResultToString(), std::to_underlying(response.result), response.code);
 
     switch (response.result) {
       case HTTP::RequestResult::RateLimited:
@@ -180,9 +193,11 @@ AccountLinkResultCode GatewayConnectionManager::Link(std::string_view linkCode)
 }
 void GatewayConnectionManager::UnLink()
 {
-  s_flags.fetch_and(static_cast<uint8_t>(~FLAG_LINKED), std::memory_order_relaxed);
-  DestroyClient();
+  // Token first: a verification still in flight then either sees it gone or is invalidated by DestroyClient. The flag
+  // last: a verification that passed its generation check before DestroyClient may already have set it.
   Config::ClearBackendAuthToken();
+  DestroyClient();
+  s_flags.fetch_and(static_cast<uint8_t>(~FLAG_LINKED), std::memory_order_relaxed);
 }
 bool GatewayConnectionManager::SetAuthToken(std::string authToken)
 {
@@ -216,16 +231,6 @@ bool GatewayConnectionManager::SendMessageBIN(std::span<const uint8_t> data)
   }
 
   return client->sendMessageBIN(data);
-}
-
-void GatewayConnectionManager::MarkPingReceived()
-{
-  auto client = GetClient();
-  if (client == nullptr) {
-    return;
-  }
-
-  client->markPingReceived();
 }
 
 static bool FetchHubInfo(std::string authToken)
@@ -264,7 +269,7 @@ static bool FetchHubInfo(std::string authToken)
   OS_LOGI(TAG, "Hub Name: %s", response.data.hubName.c_str());
   OS_LOGI(TAG, "Shockers:");
   for (auto& shocker : response.data.shockers) {
-    OS_LOGI(TAG, "  [%s] rf=%u model=%u", shocker.id.c_str(), shocker.rfId, static_cast<unsigned>(shocker.model));
+    OS_LOGI(TAG, "  [%s] rf=%u model=%u", shocker.id.c_str(), shocker.rfId, std::to_underlying(shocker.model));
   }
 
   return true;
@@ -293,13 +298,13 @@ static bool StartConnectingToLCG()
     return false;
   }
 
-  std::string authToken;
-  if (!Config::GetBackendAuthToken(authToken)) {
+  auto authToken = Config::GetBackendAuthToken();
+  if (!authToken) {
     OS_LOGE(TAG, "Failed to get auth token");
     return false;
   }
 
-  auto response = HTTP::JsonAPI::AssignLcg(std::move(authToken));
+  auto response = HTTP::JsonAPI::AssignLcg(*authToken);
 
   if (response.code == 401) {
     OS_LOGD(TAG, "Auth token is invalid, waiting 5 minutes before retrying");
@@ -329,6 +334,7 @@ static bool StartConnectingToLCG()
 static void InitializeClient()
 {
   DestroyClient();
+  uint32_t generation = GetClientGeneration();
 
   // No client; check prerequisites
   if ((s_flags.load(std::memory_order_relaxed) & FLAG_HAS_IP) == 0 || !Config::HasBackendAuthToken()) {
@@ -340,37 +346,59 @@ static void InitializeClient()
     return;  // Checked here so an auth hold-off doesn't also count as a hub info failure and stack the two backoffs
   }
 
-  std::string authToken;
-  if (!Config::GetBackendAuthToken(authToken)) {
+  auto authToken = Config::GetBackendAuthToken();
+  if (!authToken) {
     OS_LOGE(TAG, "Failed to get auth token");
     return;
   }
 
-  if (!FetchHubInfo(authToken)) {
+  if (!FetchHubInfo(*authToken)) {
     // Back off on failure so an unreachable backend isn't polled on every update tick.
     s_hubInfoBackoff.backOff(OpenShock::millis());
     return;
   }
   s_hubInfoBackoff.reset();
 
-  // The token may have been cleared or replaced (UnLink / Link) while the request was in flight.
-  std::string currentToken;
-  if (!Config::GetBackendAuthToken(currentToken) || currentToken != authToken) {
-    OS_LOGD(TAG, "Auth token changed while verifying it, discarding result");
-    return;
-  }
+  {
+    // The token may have been cleared or replaced (UnLink / Link / SetAuthToken) while the request was in flight.
+    // Those tear the client down, bumping the generation, so checking it under the same lock as creating the client
+    // leaves no window for them.
+    ScopedLock lock__(&s_clientMutex);
+    if (s_clientGeneration != generation) {
+      OS_LOGD(TAG, "Auth token changed while verifying it, discarding result");
+      return;
+    }
 
-  s_flags.fetch_or(FLAG_LINKED, std::memory_order_relaxed);
+    s_flags.fetch_or(FLAG_LINKED, std::memory_order_relaxed);
+    s_wsClient = std::make_shared<OpenShock::GatewayClient>(*authToken);
+  }
   OS_LOGD(TAG, "Successfully verified auth token");
 
   Serialization::Local::SerializeAccountLinkStatusEvent(true, AppHooks::CaptivePortalBroadcastMessageBIN);
+}
 
-  CreateClient(authToken);
+// The WiFi state events are edges posted to the default loop with a short timeout, so one can be dropped when its
+// queue is full. Reconcile with the actual WiFi state every tick so a lost edge can't strand the connection.
+static void reconcileConnectivity()
+{
+  bool hasIp = (s_flags.load(std::memory_order_relaxed) & FLAG_HAS_IP) != 0;
+  if (hasIp && !WiFiManager::IsConnected()) {
+    OS_LOGW(TAG, "Missed a WiFi disconnect, dropping the gateway connection");
+    s_flags.fetch_and(static_cast<uint8_t>(~FLAG_HAS_IP), std::memory_order_relaxed);
+    DestroyClient();
+  } else if (!hasIp) {
+    char ip[16];
+    if (WiFiManager::GetIPAddress(ip) && strcmp(ip, "0.0.0.0") != 0) {
+      OS_LOGW(TAG, "Missed a got-IP event, recovering");
+      s_flags.fetch_or(FLAG_HAS_IP, std::memory_order_relaxed);
+    }
+  }
 }
 
 void GatewayConnectionManager::Update()
 {
   s_retiredClients.reap();
+  reconcileConnectivity();
 
   if (s_retryResetRequested.exchange(false)) {
     s_authBackoff.reset();

@@ -19,20 +19,30 @@ Paste the output into any Mermaid renderer (GitHub, mermaid.live, VS Code).
 """
 
 import argparse
+import heapq
 import re
 import sys
 from pathlib import Path
 
-ROOT = Path(__file__).resolve().parent.parent
+from utils.paths import ROOT
 
 # idf_component_register() argument keywords. A token equal to one of these ends
 # the current value list and (for REQUIRES/PRIV_REQUIRES) starts a new one.
 CMAKE_KEYWORDS = {
-    'SRCS', 'SRC_DIRS', 'EXCLUDE_SRCS',
-    'INCLUDE_DIRS', 'PRIV_INCLUDE_DIRS',
-    'REQUIRES', 'PRIV_REQUIRES', 'REQUIRED_IDF_TARGETS',
-    'EMBED_FILES', 'EMBED_TXTFILES', 'LDFRAGMENTS',
-    'KCONFIG', 'KCONFIG_PROJBUILD', 'WHOLE_ARCHIVE',
+    'SRCS',
+    'SRC_DIRS',
+    'EXCLUDE_SRCS',
+    'INCLUDE_DIRS',
+    'PRIV_INCLUDE_DIRS',
+    'REQUIRES',
+    'PRIV_REQUIRES',
+    'REQUIRED_IDF_TARGETS',
+    'EMBED_FILES',
+    'EMBED_TXTFILES',
+    'LDFRAGMENTS',
+    'KCONFIG',
+    'KCONFIG_PROJBUILD',
+    'WHOLE_ARCHIVE',
 }
 
 # Component name -> display label. Anything not listed falls back to PascalCase
@@ -81,8 +91,8 @@ def extract_register_block(text: str) -> str:
         elif c == ')':
             depth -= 1
             if depth == 0:
-                return text[start + 1:i]
-    return text[start + 1:]  # unbalanced; take the rest
+                return text[start + 1 : i]
+    return text[start + 1 :]  # unbalanced; take the rest
 
 
 def parse_requires(cmake_text: str, include_priv: bool) -> list[str]:
@@ -91,102 +101,109 @@ def parse_requires(cmake_text: str, include_priv: bool) -> list[str]:
     tokens = block.split()
 
     deps: list[str] = []
-    active = None  # None | 'collect'
+    active = False
     for tok in tokens:
         if tok in CMAKE_KEYWORDS:
-            if tok == 'REQUIRES' or (tok == 'PRIV_REQUIRES' and include_priv):
-                active = 'collect'
-            else:
-                active = None
+            active = tok == 'REQUIRES' or (tok == 'PRIV_REQUIRES' and include_priv)
             continue
-        if active == 'collect':
+        if active:
             deps.append(tok)
 
-    # de-dupe while preserving order
-    seen = set()
-    ordered = []
-    for d in deps:
-        if d not in seen:
-            seen.add(d)
-            ordered.append(d)
-    return ordered
+    return list(dict.fromkeys(deps))
 
 
 def topo_order(nodes: set[str], edges: set[tuple[str, str]]) -> list[str]:
     """Dependencies first. Edge (dep, dependent). Alphabetical tie-break; any
     nodes left in a cycle are appended in sorted order so output stays total."""
     indeg = {n: 0 for n in nodes}
-    adj = {n: [] for n in nodes}
+    adj: dict[str, list[str]] = {n: [] for n in nodes}
     for dep, dependent in edges:
         adj[dep].append(dependent)
         indeg[dependent] += 1
 
-    ready = sorted(n for n in nodes if indeg[n] == 0)
+    ready = [n for n in nodes if indeg[n] == 0]
+    heapq.heapify(ready)
     order = []
     while ready:
-        n = ready.pop(0)
+        n = heapq.heappop(ready)
         order.append(n)
         for m in sorted(adj[n]):
             indeg[m] -= 1
             if indeg[m] == 0:
-                ready.append(m)
-        ready.sort()
+                heapq.heappush(ready, m)
 
     if len(order) < len(nodes):
         order.extend(sorted(nodes - set(order)))
     return order
 
 
-def main(argv: list[str]) -> int:
-    parser = argparse.ArgumentParser(description=__doc__,
-                                     formatter_class=argparse.RawDescriptionHelpFormatter)
-    parser.add_argument('--components-dir', default=str(ROOT / 'components'),
-                        help='directory holding the component subdirs (default: ./components)')
-    parser.add_argument('-e', '--external', action='store_true',
-                        help='also include external components (IDF/managed) as nodes')
-    parser.add_argument('--no-priv', action='store_true',
-                        help='ignore PRIV_REQUIRES, use only public REQUIRES')
-    parser.add_argument('--direction', default='TD', choices=['TD', 'TB', 'LR', 'RL', 'BT'],
-                        help='Mermaid flowchart direction (default: TD)')
-    parser.add_argument('-o', '--output', help='write to this file instead of stdout')
-    args = parser.parse_args(argv)
+Edge = tuple[str, str]  # (dependency, dependent)
 
-    comp_dir = Path(args.components_dir)
-    if not comp_dir.is_dir():
-        raise SystemExit(f'error: {comp_dir} is not a directory')
 
-    # Local components: direct children of components/ with a CMakeLists.txt.
-    local = {}
-    for cml in sorted(comp_dir.glob('*/CMakeLists.txt')):
-        name = cml.parent.name
-        local[name] = parse_requires(cml.read_text(encoding='utf-8'),
-                                     include_priv=not args.no_priv)
+def build_graph(components: dict[str, list[str]], *, external: bool) -> tuple[set[str], set[Edge]]:
+    """Nodes and (dependency, dependent) edges for components given as name -> required components.
 
-    edges: set[tuple[str, str]] = set()
-    nodes: set[str] = set(local)
-    for name, deps in local.items():
+    A dependency that is not itself a component is dropped unless `external` is set.
+    """
+    nodes: set[str] = set(components)
+    edges: set[Edge] = set()
+    for name, deps in components.items():
         for dep in deps:
-            is_local = dep in local
-            if not is_local and not args.external:
+            if dep not in components and not external:
                 continue
-            edges.add((dep, name))  # dependency -> dependent
+            edges.add((dep, name))
             nodes.add(dep)
+    return nodes, edges
 
+
+def render_mermaid(nodes: set[str], edges: set[Edge], direction: str) -> str:
+    """A Mermaid flowchart: dependencies first, edges grouped by source in node order for stable output."""
     order = topo_order(nodes, edges)
     ids = {name: col_id(i) for i, name in enumerate(order)}
+    lines = [f'flowchart {direction}']
+    lines += [f'    {ids[name]}({label_for(name)})' for name in order]
+    lines += [f'    {ids[src]} --> {ids[dst]}' for src in order for dst in order if (src, dst) in edges]
+    return '\n'.join(lines) + '\n'
 
-    lines = [f'flowchart {args.direction}']
-    for name in order:
-        lines.append(f'    {ids[name]}({label_for(name)})')
-    # Edges grouped by source in node order for stable, readable output.
-    for src in order:
-        for dst in order:
-            if (src, dst) in edges:
-                lines.append(f'    {ids[src]} --> {ids[dst]}')
 
-    text = '\n'.join(lines) + '\n'
+def read_components(comp_dir: Path, *, include_priv: bool) -> dict[str, list[str]]:
+    """Every direct child of comp_dir with a CMakeLists.txt, mapped to the components it requires."""
+    return {
+        cml.parent.name: parse_requires(cml.read_text(encoding='utf-8'), include_priv=include_priv)
+        for cml in sorted(comp_dir.glob('*/CMakeLists.txt'))
+    }
+
+
+def main(argv: list[str] | None = None) -> int:
+    parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
+    parser.add_argument(
+        '--components-dir',
+        type=Path,
+        default=ROOT / 'components',
+        help='directory holding the component subdirs (default: ./components)',
+    )
+    parser.add_argument(
+        '-e', '--external', action='store_true', help='also include external components (IDF/managed) as nodes'
+    )
+    parser.add_argument('--no-priv', action='store_true', help='ignore PRIV_REQUIRES, use only public REQUIRES')
+    parser.add_argument(
+        '--direction',
+        default='TD',
+        choices=['TD', 'TB', 'LR', 'RL', 'BT'],
+        help='Mermaid flowchart direction (default: TD)',
+    )
+    parser.add_argument('-o', '--output', type=Path, help='write to this file instead of stdout')
+    args = parser.parse_args(argv)
+
+    if not args.components_dir.is_dir():
+        raise SystemExit(f'error: {args.components_dir} is not a directory')
+
+    components = read_components(args.components_dir, include_priv=not args.no_priv)
+    nodes, edges = build_graph(components, external=args.external)
+    text = render_mermaid(nodes, edges, args.direction)
+
     if args.output:
-        Path(args.output).write_text(text, encoding='utf-8')
+        args.output.write_text(text, encoding='utf-8')
         print(f'wrote {args.output} ({len(nodes)} nodes, {len(edges)} edges)', file=sys.stderr)
     else:
         sys.stdout.write(text)
@@ -194,4 +211,4 @@ def main(argv: list[str]) -> int:
 
 
 if __name__ == '__main__':
-    raise SystemExit(main(sys.argv[1:]))
+    raise SystemExit(main())

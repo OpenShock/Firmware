@@ -1,6 +1,6 @@
 {
 	"name": "frontend",
-	"version": "1.5.2",
+	"version": "1.6.0",
 	"private": true,
 	"type": "module",
 	"scripts": {
@@ -21,10 +21,10 @@
 		"@internationalized/date": "^3.12.4",
 		"@lucide/svelte": "^1.52.0",
 		"@openshock/svelte-core": "workspace:*",
-		"@playwright/test": "^1.63.0",
+		"@playwright/test": "^1.64.1",
 		"@sveltejs/vite-plugin-svelte": "^7.3.1",
 		"@tailwindcss/vite": "^4.3.3",
-		"@types/node": "^26.6.4",
+		"@types/node": "^26.6.5",
 		"bits-ui": "2.19.5",
 		"clsx": "^2.1.1",
 		"eslint": "^10.12.0",
@@ -49,7 +49,7 @@
 		"typescript": "~6.0.3",
 		"typescript-eslint": "^8.71.1",
 		"vite": "^8.3.2",
-		"vite-plugin-singlefile": "^2.3.3",
+		"vite-plugin-singlefile": "^2.3.4",
 		"vitest": "^5.0.3"
 	},
 	"engines": {

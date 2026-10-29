@@ -7,6 +7,7 @@
 #include "radio/rmt/Sequence.h"
 
 #include <cstdint>
+#include <utility>
 
 using namespace OpenShock;
 
@@ -16,7 +17,7 @@ TEST_CASE("Sequence builds and fills a CaiXianlin buffer", "[protocols][sequence
 
   TEST_ASSERT_TRUE(seq.is_valid());
   TEST_ASSERT_EQUAL(44, seq.size());
-  TEST_ASSERT_EQUAL_INT(static_cast<int>(ShockerModelType::CaiXianlin), static_cast<int>(seq.shockerModel()));
+  TEST_ASSERT_EQUAL_INT(std::to_underlying(ShockerModelType::CaiXianlin), std::to_underlying(seq.shockerModel()));
   TEST_ASSERT_EQUAL_UINT16(0x4321, seq.shockerId());
   TEST_ASSERT_TRUE(seq.fill(ShockerCommandType::Vibrate, 30));
 }

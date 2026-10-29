@@ -64,9 +64,9 @@ bool LanConfig::FromJSON(JSON::JsonView json)
     return false;
   }
 
-  if (!json["apiKeyEnabled"].tryGetBool(apiKeyEnabled)) apiKeyEnabled = false;
+  apiKeyEnabled = json["apiKeyEnabled"].tryGetBool().value_or(false);
 
-  if (!json["apiKey"].tryGetStr(apiKey)) apiKey.clear();
+  apiKey = json["apiKey"].tryGetStr().value_or(std::string());
 
   return true;
 }

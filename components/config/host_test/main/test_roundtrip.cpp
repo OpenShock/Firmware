@@ -64,14 +64,14 @@ TEST_CASE("Values set through the Config API survive a reload", "[config][roundt
   TEST_ASSERT_TRUE(InitFrom(StoredFile()));
   AssertConfigEqual(before, Snapshot());
 
-  std::string token;
   TEST_ASSERT_TRUE(Config::HasBackendAuthToken());
-  TEST_ASSERT_TRUE(Config::GetBackendAuthToken(token));
-  TEST_ASSERT_EQUAL_STRING("tok_0123456789abcdef", token.c_str());
+  auto token = Config::GetBackendAuthToken();
+  TEST_ASSERT_TRUE(token.has_value());
+  TEST_ASSERT_EQUAL_STRING("tok_0123456789abcdef", token->c_str());
 
-  Config::WiFiCredentials creds;
-  TEST_ASSERT_TRUE(Config::TryGetWiFiCredentialsBySSID("Guest", creds));
-  TEST_ASSERT_EQUAL_UINT8(2, creds.id);
+  auto creds = Config::TryGetWiFiCredentialsBySSID("Guest");
+  TEST_ASSERT_TRUE(creds.has_value());
+  TEST_ASSERT_EQUAL_UINT8(2, creds->id);
   TEST_ASSERT_EQUAL_UINT8(2, Config::GetWiFiCredentialsIDbySSID("Guest"));
 }
 
@@ -128,6 +128,23 @@ TEST_CASE("SetRaw stores a valid buffer verbatim and GetRaw returns it", "[confi
   AssertConfigEqual(MakeSampleConfig(), Snapshot());
   TEST_ASSERT_TRUE(InitFrom(StoredFile()));
   AssertConfigEqual(MakeSampleConfig(), Snapshot());
+}
+
+TEST_CASE("Saved configs write fields that equal their schema default", "[config][roundtrip]")
+{
+  // 1.5.x reads a missing is_enabled/keepalive_enabled as false, so omitting them breaks downgrades.
+  InitDefault();
+  TEST_ASSERT_TRUE(Config::SetRFConfigKeepAliveEnabled(true));
+
+  const std::vector<uint8_t> stored = StoredFile();
+  const auto* root                  = Serialization::Configuration::GetHubConfig(stored.data());
+  TEST_ASSERT_TRUE(root->rf()->CheckField(Serialization::Configuration::RFConfig::VT_KEEPALIVE_ENABLED));
+  TEST_ASSERT_TRUE(root->ota_update()->CheckField(Serialization::Configuration::OtaUpdateConfig::VT_IS_ENABLED));
+
+  TinyVec<uint8_t> raw;
+  TEST_ASSERT_TRUE(Config::GetRaw(raw));
+  const auto* rawRoot = Serialization::Configuration::GetHubConfig(raw.data());
+  TEST_ASSERT_TRUE(rawRoot->ota_update()->CheckField(Serialization::Configuration::OtaUpdateConfig::VT_IS_ENABLED));
 }
 
 TEST_CASE("A setter after SetRaw keeps the imported config", "[config][roundtrip]")
@@ -279,10 +296,10 @@ TEST_CASE("jsonconfig round trip keeps strings that need escaping", "[config][ro
   TEST_ASSERT_NOT_EQUAL(std::string::npos, json.find(R"("Office \"5G\"")"));
   TEST_ASSERT_NOT_EQUAL(std::string::npos, json.find(R"("p@ss w0rd/\\")"));
 
-  Config::WiFiCredentials office;
-  TEST_ASSERT_TRUE(Config::TryGetWiFiCredentialsByID(7, office));
-  TEST_ASSERT_EQUAL_STRING("Office \"5G\"", office.ssid.c_str());
-  TEST_ASSERT_EQUAL_STRING("p@ss w0rd/\\", office.password.c_str());
+  auto office = Config::TryGetWiFiCredentialsByID(7);
+  TEST_ASSERT_TRUE(office.has_value());
+  TEST_ASSERT_EQUAL_STRING("Office \"5G\"", office->ssid.c_str());
+  TEST_ASSERT_EQUAL_STRING("p@ss w0rd/\\", office->password.c_str());
 
   // Repeated get/set cycles are stable.
   TEST_ASSERT_TRUE(Config::SaveFromJSON(Config::GetAsJSON(true)));
@@ -294,12 +311,12 @@ TEST_CASE("jsonconfig set decodes \\u escapes", "[config][roundtrip][json]")
   InitDefault();
   TEST_ASSERT_TRUE(Config::SaveFromJSON(R"({"wifi":{"hostname":"hub\u002d1","credentials":[{"id":1,"ssid":"Caf\u00e9 \ud83d\ude00","password":"a\tb"}]}})"));
 
-  Config::WiFiConfig wifi;
-  TEST_ASSERT_TRUE(Config::GetWiFiConfig(wifi));
-  TEST_ASSERT_EQUAL_STRING("hub-1", wifi.hostname.c_str());
-  TEST_ASSERT_EQUAL_size_t(1, wifi.credentialsList.size());
-  TEST_ASSERT_EQUAL_STRING("Caf\xc3\xa9 \xf0\x9f\x98\x80", wifi.credentialsList[0].ssid.c_str());
-  TEST_ASSERT_EQUAL_STRING("a\tb", wifi.credentialsList[0].password.c_str());
+  auto wifi = Config::GetWiFiConfig();
+  TEST_ASSERT_TRUE(wifi.has_value());
+  TEST_ASSERT_EQUAL_STRING("hub-1", wifi->hostname.c_str());
+  TEST_ASSERT_EQUAL_size_t(1, wifi->credentialsList.size());
+  TEST_ASSERT_EQUAL_STRING("Caf\xc3\xa9 \xf0\x9f\x98\x80", wifi->credentialsList[0].ssid.c_str());
+  TEST_ASSERT_EQUAL_STRING("a\tb", wifi->credentialsList[0].password.c_str());
 }
 
 TEST_CASE("GetAsJSON without sensitive data omits secrets", "[config][roundtrip][json]")
@@ -316,4 +333,42 @@ TEST_CASE("GetAsJSON without sensitive data omits secrets", "[config][roundtrip]
   TEST_ASSERT_EQUAL(std::string::npos, redacted.find("authToken"));
   TEST_ASSERT_NOT_EQUAL(std::string::npos, redacted.find("\"HomeNet\""));
   TEST_ASSERT_NOT_EQUAL(std::string::npos, redacted.find("\"api.example.org\""));
+}
+
+TEST_CASE("UpdateOtaUpdateConfig edits only what the update touches and saves only on change", "[config][roundtrip]")
+{
+  const Config::RootConfig sample = MakeSampleConfig();
+  TEST_ASSERT_TRUE(InitFrom(Serialize(sample)));
+
+  const std::vector<uint8_t> storedBefore = StoredFile();
+  TEST_ASSERT_TRUE(Config::UpdateOtaUpdateConfig([](Config::OtaUpdateConfig&) { return false; }));
+  TEST_ASSERT_TRUE(storedBefore == StoredFile());
+
+  const uint16_t interval = static_cast<uint16_t>(sample.otaUpdate.checkInterval + 7);
+  TEST_ASSERT_TRUE(Config::UpdateOtaUpdateConfig([&](Config::OtaUpdateConfig& cfg) {
+    cfg.checkInterval = interval;
+    return true;
+  }));
+
+  Config::RootConfig expected      = sample;
+  expected.otaUpdate.checkInterval = interval;
+  AssertConfigEqual(expected, Snapshot());
+
+  TEST_ASSERT_TRUE(InitFrom(StoredFile()));
+  AssertConfigEqual(expected, Snapshot());
+}
+
+TEST_CASE("CompareExchangeOtaUpdateStep only replaces the expected step", "[config][roundtrip]")
+{
+  InitDefault();
+  TEST_ASSERT_TRUE(Config::SetOtaUpdateStep(OtaUpdateStep::Updated));
+
+  TEST_ASSERT_FALSE(Config::CompareExchangeOtaUpdateStep(OtaUpdateStep::Validated, OtaUpdateStep::None));
+  TEST_ASSERT_TRUE(Config::GetOtaUpdateStep() == OtaUpdateStep::Updated);
+
+  TEST_ASSERT_TRUE(Config::CompareExchangeOtaUpdateStep(OtaUpdateStep::Updated, OtaUpdateStep::None));
+  TEST_ASSERT_TRUE(Config::GetOtaUpdateStep() == OtaUpdateStep::None);
+
+  TEST_ASSERT_TRUE(InitFrom(StoredFile()));
+  TEST_ASSERT_TRUE(Config::GetOtaUpdateStep() == OtaUpdateStep::None);
 }

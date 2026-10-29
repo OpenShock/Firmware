@@ -1,5 +1,6 @@
 #pragma once
 
+#include "openshock_board.h"  // OPENSHOCK_LOG_LEVEL, which the OS_LOG* macros below are gated on
 #include "Temporal.h"
 
 #include <esp_ota_ops.h>
@@ -7,6 +8,11 @@
 
 #include <freertos/FreeRTOS.h>
 #include <freertos/task.h>
+
+// Without it every OS_LOG* (and the OS_PANIC message) in the including file would silently compile to nothing.
+#ifndef OPENSHOCK_LOG_LEVEL
+#error "OPENSHOCK_LOG_LEVEL is not defined (openshock_board.h)"
+#endif
 
 // openshock_log_printf forwards to vprintf (the IDF console: UART0 + any secondary
 // USB-Serial-JTAG/CDC output). Defined in Logging.cpp so the logging path carries
@@ -16,8 +22,9 @@
 // Named distinctly from the framework's own log_printf to avoid a symbol clash.
 extern "C" int openshock_log_printf(const char* fmt, ...) __attribute__((format(printf, 1, 2)));
 
+// Only ever called with __FILE__; consteval guarantees the directory is stripped at compile time.
 template<std::size_t N>
-constexpr const char* openshockPathToFileName(const char (&path)[N])
+consteval const char* openshockPathToFileName(const char (&path)[N])
 {
   std::size_t pos = 0;
   for (std::size_t i = 0; i < N; i++) {

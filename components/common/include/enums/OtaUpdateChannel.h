@@ -3,6 +3,7 @@
 #include "StringHelpers.h"
 
 #include <cstdint>
+#include <optional>
 #include <string_view>
 
 namespace OpenShock {
@@ -12,23 +13,20 @@ namespace OpenShock {
     Develop
   };
 
-  inline bool TryParseOtaUpdateChannel(OtaUpdateChannel& channel, std::string_view str)
+  [[nodiscard]] inline std::optional<OtaUpdateChannel> TryParseOtaUpdateChannel(std::string_view str)
   {
     if (StringIEquals(str, "stable")) {
-      channel = OtaUpdateChannel::Stable;
-      return true;
+      return OtaUpdateChannel::Stable;
     }
 
     if (StringIEquals(str, "beta")) {
-      channel = OtaUpdateChannel::Beta;
-      return true;
+      return OtaUpdateChannel::Beta;
     }
 
     if (StringIEquals(str, "develop") || StringIEquals(str, "dev")) {
-      channel = OtaUpdateChannel::Develop;
-      return true;
+      return OtaUpdateChannel::Develop;
     }
 
-    return false;
+    return std::nullopt;
   }
 }  // namespace OpenShock
