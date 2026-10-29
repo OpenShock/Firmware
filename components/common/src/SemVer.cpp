@@ -5,7 +5,8 @@ const char* const TAG = "SemVer";
 #include "Convert.h"
 #include "Logging.h"
 #include "StringHelpers.h"
-#include "util/DigitCounter.h"
+
+#include <charconv>
 
 using namespace OpenShock;
 
@@ -177,7 +178,8 @@ bool SemVer::isValid() const
 
 std::string SemVer::toString() const
 {
-  std::size_t length = 2 + Util::Digits10Count(major) + Util::Digits10Count(minor) + Util::Digits10Count(patch);
+  // "65535.65535.65535" is the longest version core
+  std::size_t length = 17;
   if (!prerelease.empty()) {
     length += 1 + prerelease.length();
   }
@@ -188,11 +190,20 @@ std::string SemVer::toString() const
   std::string str;
   str.reserve(length);
 
-  Convert::FromUint16(major, str);
+  // Each part through its own buffer, appending only what to_chars wrote: never a write past what it returned.
+  auto appendNumber = [&str](uint16_t value) {
+    char digits[5];  // "65535"
+    auto [end, ec] = std::to_chars(digits, digits + sizeof(digits), value);
+    if (ec == std::errc {}) {
+      str.append(digits, end);
+    }
+  };
+
+  appendNumber(major);
   str.push_back('.');
-  Convert::FromUint16(minor, str);
+  appendNumber(minor);
   str.push_back('.');
-  Convert::FromUint16(patch, str);
+  appendNumber(patch);
 
   if (!prerelease.empty()) {
     str.push_back('-');
@@ -281,41 +292,40 @@ bool SemVer::operator<(const SemVer& other) const
 
 bool SemVer::operator==(std::string_view other) const
 {
-  SemVer otherSemVer;
-  if (!OpenShock::TryParseSemVer(other, otherSemVer)) {
+  auto otherSemVer = OpenShock::TryParseSemVer(other);
+  if (!otherSemVer) {
     return false;
   }
 
-  return *this == otherSemVer;
+  return *this == *otherSemVer;
 }
 
 bool SemVer::operator<(std::string_view other) const
 {
-  SemVer otherSemVer;
-  return OpenShock::TryParseSemVer(other, otherSemVer) && *this < otherSemVer;
+  auto otherSemVer = OpenShock::TryParseSemVer(other);
+  return otherSemVer && *this < *otherSemVer;
 }
 
 bool SemVer::operator<=(std::string_view other) const
 {
-  SemVer otherSemVer;
-  return OpenShock::TryParseSemVer(other, otherSemVer) && *this <= otherSemVer;
+  auto otherSemVer = OpenShock::TryParseSemVer(other);
+  return otherSemVer && *this <= *otherSemVer;
 }
 
 bool SemVer::operator>(std::string_view other) const
 {
-  SemVer otherSemVer;
-  return OpenShock::TryParseSemVer(other, otherSemVer) && *this > otherSemVer;
+  auto otherSemVer = OpenShock::TryParseSemVer(other);
+  return otherSemVer && *this > *otherSemVer;
 }
 
 bool SemVer::operator>=(std::string_view other) const
 {
-  SemVer otherSemVer;
-  return OpenShock::TryParseSemVer(other, otherSemVer) && *this >= otherSemVer;
+  auto otherSemVer = OpenShock::TryParseSemVer(other);
+  return otherSemVer && *this >= *otherSemVer;
 }
 
-bool OpenShock::TryParseSemVer(std::string_view semverStr, SemVer& out)
+std::optional<SemVer> OpenShock::TryParseSemVer(std::string_view semverStr)
 {
-  // Parse into a local and assign on success only, so a failed parse leaves `out` untouched.
   SemVer semver;
 
   // Peel off build (after the first '+') then prerelease (after the first '-'),
@@ -331,7 +341,7 @@ bool OpenShock::TryParseSemVer(std::string_view semverStr, SemVer& out)
     rest  = rest.substr(0, plusIdx);
     if (build.empty()) {
       OS_LOGE(TAG, "Empty build metadata");
-      return false;
+      return std::nullopt;
     }
   }
 
@@ -342,33 +352,39 @@ bool OpenShock::TryParseSemVer(std::string_view semverStr, SemVer& out)
     rest       = rest.substr(0, dashIdx);
     if (prerelease.empty()) {
       OS_LOGE(TAG, "Empty prerelease");
-      return false;
+      return std::nullopt;
     }
   }
 
-  std::string_view parts[3];
-  if (!OpenShock::TryStringSplit(rest, '.', parts)) {
+  auto parts = OpenShock::TryStringSplit<3>(rest, '.');
+  if (!parts) {
     OS_LOGE(TAG, "Failed to split version core: %.*s", static_cast<int>(rest.length()), rest.data());
-    return false;
+    return std::nullopt;
   }
 
-  if (!Convert::ToUint16(parts[0], semver.major) || !Convert::ToUint16(parts[1], semver.minor) || !Convert::ToUint16(parts[2], semver.patch)) {
+  auto parsedMajor = Convert::ToUint16((*parts)[0]);
+  auto parsedMinor = Convert::ToUint16((*parts)[1]);
+  auto parsedPatch = Convert::ToUint16((*parts)[2]);
+  if (!parsedMajor || !parsedMinor || !parsedPatch) {
     OS_LOGE(TAG, "Invalid version core: %.*s", static_cast<int>(rest.length()), rest.data());
-    return false;
+    return std::nullopt;
   }
+
+  semver.major = *parsedMajor;
+  semver.minor = *parsedMinor;
+  semver.patch = *parsedPatch;
 
   if (!prerelease.empty() && !semverIsPrerelease(prerelease)) {
     OS_LOGE(TAG, "Invalid prerelease: %.*s", static_cast<int>(prerelease.length()), prerelease.data());
-    return false;
+    return std::nullopt;
   }
   if (!build.empty() && !semverIsBuild(build)) {
     OS_LOGE(TAG, "Invalid build: %.*s", static_cast<int>(build.length()), build.data());
-    return false;
+    return std::nullopt;
   }
 
   semver.prerelease.assign(prerelease);
   semver.build.assign(build);
 
-  out = std::move(semver);
-  return true;
+  return semver;
 }

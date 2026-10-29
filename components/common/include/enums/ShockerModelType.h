@@ -3,6 +3,7 @@
 #include "StringHelpers.h"
 
 #include <cstdint>
+#include <optional>
 #include <string_view>
 
 namespace OpenShock {
@@ -15,48 +16,40 @@ namespace OpenShock {
     WellturnT330Alt1
   };
 
-  inline bool TryParseShockerModelType(ShockerModelType& out, std::string_view str, bool allowTypo = false)
+  [[nodiscard]] inline std::optional<ShockerModelType> TryParseShockerModelType(std::string_view str, bool allowTypo = false)
   {
     if (StringIEquals(str, "caixianlin") || StringIEquals(str, "cai-xianlin")) {
-      out = ShockerModelType::CaiXianlin;
-      return true;
+      return ShockerModelType::CaiXianlin;
     }
 
     if (StringIEquals(str, "petrainer")) {
-      out = ShockerModelType::Petrainer;
-      return true;
+      return ShockerModelType::Petrainer;
     }
 
     if (allowTypo && StringIEquals(str, "pettrainer")) {
-      out = ShockerModelType::Petrainer;
-      return true;
+      return ShockerModelType::Petrainer;
     }
 
     if (StringIEquals(str, "petrainer998dr")) {
-      out = ShockerModelType::Petrainer998DR;
-      return true;
+      return ShockerModelType::Petrainer998DR;
     }
 
     if (allowTypo && StringIEquals(str, "pettrainer998dr")) {
-      out = ShockerModelType::Petrainer998DR;
-      return true;
+      return ShockerModelType::Petrainer998DR;
     }
 
     if (StringIEquals(str, "wellturnt330") || StringIEquals(str, "t330")) {
-      out = ShockerModelType::WellturnT330;
-      return true;
+      return ShockerModelType::WellturnT330;
     }
 
     if (StringIEquals(str, "d80")) {
-      out = ShockerModelType::D80;
-      return true;
+      return ShockerModelType::D80;
     }
 
     if (StringIEquals(str, "wellturnt330alt1") || StringIEquals(str, "t330alt1")) {
-      out = ShockerModelType::WellturnT330Alt1;
-      return true;
+      return ShockerModelType::WellturnT330Alt1;
     }
 
-    return false;
+    return std::nullopt;
   }
 }  // namespace OpenShock

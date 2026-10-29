@@ -4,104 +4,103 @@ const char* const TAG = "JsonSerial";
 
 #include "Logging.h"
 
+#include <optional>
 #include <string>
 
 using namespace OpenShock::Serialization;
 
-bool JsonSerial::ParseShockerCommand(JSON::JsonView root, JsonSerial::ShockerCommand& out)
+std::optional<JsonSerial::ShockerCommand> JsonSerial::ParseShockerCommand(JSON::JsonView root)
 {
   if (!root.isObject()) {
     OS_LOGE(TAG, "not an object");
-    return false;
+    return std::nullopt;
   }
 
   JSON::JsonView model = root["model"];
   if (!model.valid()) {
     OS_LOGE(TAG, "missing 'model' field");
-    return false;
+    return std::nullopt;
   }
-  std::string modelStr;
-  if (!model.tryGetStr(modelStr)) {
+  auto modelStr = model.tryGetStr();
+  if (!modelStr) {
     OS_LOGE(TAG, "value at 'model' is not a string");
-    return false;
+    return std::nullopt;
   }
-  ShockerModelType modelType = ShockerModelType::CaiXianlin;
-  if (!TryParseShockerModelType(modelType, modelStr)) {
+  auto modelType = TryParseShockerModelType(*modelStr);
+  if (!modelType) {
     OS_LOGE(TAG, "value at 'model' is not a valid shocker model (caixianlin, petrainer, petrainer998dr, wellturnt330, d80, wellturnt330alt1)");
-    return false;
+    return std::nullopt;
   }
 
   JSON::JsonView id = root["id"];
   if (!id.valid()) {
     OS_LOGE(TAG, "missing 'id' field");
-    return false;
+    return std::nullopt;
   }
-  int64_t idInt;
-  if (!id.tryGetI64(idInt)) {
+  auto idInt = id.tryGetI64();
+  if (!idInt) {
     OS_LOGE(TAG, "value at 'id' is not a number");
-    return false;
+    return std::nullopt;
   }
-  if (idInt < 0 || idInt > UINT16_MAX) {
+  if (*idInt < 0 || *idInt > UINT16_MAX) {
     OS_LOGE(TAG, "value at 'id' is out of range (0-65535)");
-    return false;
+    return std::nullopt;
   }
-  uint16_t idU16 = static_cast<uint16_t>(idInt);
+  uint16_t idU16 = static_cast<uint16_t>(*idInt);
 
   JSON::JsonView command = root["type"];
   if (!command.valid()) {
     OS_LOGE(TAG, "missing 'type' field");
-    return false;
+    return std::nullopt;
   }
-  std::string commandStr;
-  if (!command.tryGetStr(commandStr)) {
+  auto commandStr = command.tryGetStr();
+  if (!commandStr) {
     OS_LOGE(TAG, "value at 'type' is not a string");
-    return false;
+    return std::nullopt;
   }
-  ShockerCommandType commandType = ShockerCommandType::Stop;
-  if (!TryParseShockerCommandType(commandType, commandStr)) {
+  auto commandType = TryParseShockerCommandType(*commandStr);
+  if (!commandType) {
     OS_LOGE(TAG, "value at 'type' is not a valid shocker command (shock, vibrate, sound, light, stop)");
-    return false;
+    return std::nullopt;
   }
 
   JSON::JsonView intensity = root["intensity"];
   if (!intensity.valid()) {
     OS_LOGE(TAG, "missing 'intensity' field");
-    return false;
+    return std::nullopt;
   }
-  int64_t intensityInt;
-  if (!intensity.tryGetI64(intensityInt)) {
+  auto intensityInt = intensity.tryGetI64();
+  if (!intensityInt) {
     OS_LOGE(TAG, "value at 'intensity' is not a number");
-    return false;
+    return std::nullopt;
   }
-  if (intensityInt < 0 || intensityInt > UINT8_MAX) {
+  if (*intensityInt < 0 || *intensityInt > UINT8_MAX) {
     OS_LOGE(TAG, "value at 'intensity' is out of range (0-255)");
-    return false;
+    return std::nullopt;
   }
-  uint8_t intensityU8 = static_cast<uint8_t>(intensityInt);
+  uint8_t intensityU8 = static_cast<uint8_t>(*intensityInt);
 
   JSON::JsonView durationMs = root["durationMs"];
   if (!durationMs.valid()) {
     OS_LOGE(TAG, "missing 'durationMs' field");
-    return false;
+    return std::nullopt;
   }
-  int64_t durationMsInt;
-  if (!durationMs.tryGetI64(durationMsInt)) {
+  auto durationMsInt = durationMs.tryGetI64();
+  if (!durationMsInt) {
     OS_LOGE(TAG, "value at 'durationMs' is not a number");
-    return false;
+    return std::nullopt;
   }
-  if (durationMsInt < 0 || durationMsInt > UINT16_MAX) {
+  if (*durationMsInt < 0 || *durationMsInt > UINT16_MAX) {
     OS_LOGE(TAG, "value at 'durationMs' is out of range (0-65535)");
-    return false;
+    return std::nullopt;
   }
-  uint16_t durationMsU16 = static_cast<uint16_t>(durationMsInt);
+  uint16_t durationMsU16 = static_cast<uint16_t>(*durationMsInt);
 
-  out = {
-    .model      = modelType,
+  return ShockerCommand {
+    .model      = *modelType,
     .id         = idU16,
-    .command    = commandType,
+    .command    = *commandType,
     .intensity  = intensityU8,
     .durationMs = durationMsU16,
   };
-
-  return true;
 }

@@ -1,11 +1,11 @@
 #pragma once
 
 #include "OpenShock.h"
+#include "util/FunctionRef.h"
 
 #include <esp_partition.h>
 
 #include <cstdint>
-#include <functional>
 #include <span>
 #include <vector>
 
@@ -40,7 +40,7 @@ namespace OpenShock {
 
     // Stream a file to `sink` in chunks. Returns false if the file is missing/unreadable
     // or if `sink` returns false (which aborts the stream).
-    bool readStream(const char* path, const std::function<bool(std::span<const uint8_t>)>& sink);
+    bool readStream(const char* path, Util::FunctionRef<bool(std::span<const uint8_t>)> sink);
 
     // Read a whole file into `out`. Returns false (and clears `out`) on any error.
     bool readAll(const char* path, std::vector<uint8_t>& out);

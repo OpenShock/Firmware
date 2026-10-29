@@ -3,6 +3,7 @@
 
 #include "json/Json.h"
 
+#include <optional>
 #include <string>
 #include <string_view>
 
@@ -112,9 +113,10 @@ TEST_CASE("escape: objSetString escapes quotes and backslashes", "[osjson][gen][
   JSON::JsonDocument doc;
   TEST_ASSERT_TRUE(doc.parse(out));
   TEST_ASSERT_TRUE(doc.root().isObject());
-  std::string back;
-  TEST_ASSERT_TRUE(doc.root()["k"].tryGetStr(back));
-  TEST_ASSERT_TRUE(back == R"(a"b\c)");
+  std::optional<std::string> back;
+  back = doc.root()["k"].tryGetStr();
+  TEST_ASSERT_TRUE(back.has_value());
+  TEST_ASSERT_TRUE(*back == R"(a"b\c)");
 }
 
 TEST_CASE("escape: objSetString escapes the short-form control chars", "[osjson][gen][escape]")
@@ -234,13 +236,15 @@ TEST_CASE("escape: a WiFi password with a quote serializes to valid JSON", "[osj
   TEST_ASSERT_TRUE(doc.parse(out));  // would be malformed via the raw call
   JSON::JsonView root = doc.root();
 
-  std::string ssid;
-  TEST_ASSERT_TRUE(root["ssid"].tryGetStr(ssid));
-  TEST_ASSERT_TRUE(ssid == "Home");
+  std::optional<std::string> ssid;
+  ssid = root["ssid"].tryGetStr();
+  TEST_ASSERT_TRUE(ssid.has_value());
+  TEST_ASSERT_TRUE(*ssid == "Home");
   // the password decodes back to exactly what was written
-  std::string pw;
-  TEST_ASSERT_TRUE(root["password"].tryGetStr(pw));
-  TEST_ASSERT_TRUE(pw == R"(p@ss"word\)");
+  std::optional<std::string> pw;
+  pw = root["password"].tryGetStr();
+  TEST_ASSERT_TRUE(pw.has_value());
+  TEST_ASSERT_TRUE(*pw == R"(p@ss"word\)");
 }
 
 TEST_CASE("generate: value larger than the 256-byte flush buffer", "[osjson][gen]")
@@ -283,23 +287,28 @@ TEST_CASE("generate -> parse round-trip preserves scalar values", "[osjson][gen]
   TEST_ASSERT_TRUE(doc.parse(out));
   JSON::JsonView root = doc.root();
 
-  std::string ssid;
-  TEST_ASSERT_TRUE(root["ssid"].tryGetStr(ssid));
-  TEST_ASSERT_TRUE(ssid == "net");
+  std::optional<std::string> ssid;
+  ssid = root["ssid"].tryGetStr();
+  TEST_ASSERT_TRUE(ssid.has_value());
+  TEST_ASSERT_TRUE(*ssid == "net");
 
-  int64_t id = 0;
-  TEST_ASSERT_TRUE(root["id"].tryGetI64(id));
-  TEST_ASSERT_EQUAL_INT64(7, id);
+  std::optional<int64_t> id;
+  id = root["id"].tryGetI64();
+  TEST_ASSERT_TRUE(id.has_value());
+  TEST_ASSERT_EQUAL_INT64(7, *id);
 
-  bool on = false;
-  TEST_ASSERT_TRUE(root["on"].tryGetBool(on));
-  TEST_ASSERT_TRUE(on);
+  std::optional<bool> on;
+  on = root["on"].tryGetBool();
+  TEST_ASSERT_TRUE(on.has_value());
+  TEST_ASSERT_TRUE(*on);
 
   TEST_ASSERT_EQUAL_INT(3, root["nums"].count());
-  int64_t sum = 0, v = 0;
+  int64_t sum = 0;
+  std::optional<int64_t> v;
   for (int i = 0; i < root["nums"].count(); ++i) {
-    TEST_ASSERT_TRUE(root["nums"].at(i).tryGetI64(v));
-    sum += v;
+    v = root["nums"].at(i).tryGetI64();
+    TEST_ASSERT_TRUE(v.has_value());
+    sum += *v;
   }
   TEST_ASSERT_EQUAL_INT64(6, sum);
 }

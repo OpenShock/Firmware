@@ -5,6 +5,7 @@
 #include "json/Json.h"
 
 #include <cstdint>
+#include <optional>
 #include <string>
 #include <string_view>
 
@@ -28,13 +29,16 @@ TEST_CASE("stress: large flat array forces the token buffer to grow", "[osjson][
   TEST_ASSERT_TRUE(root.isArray());
   TEST_ASSERT_EQUAL_INT(N, root.count());
 
-  int64_t v = 0;
-  TEST_ASSERT_TRUE(root.at(0).tryGetI64(v));
-  TEST_ASSERT_EQUAL_INT64(0, v);
-  TEST_ASSERT_TRUE(root.at(500).tryGetI64(v));
-  TEST_ASSERT_EQUAL_INT64(500, v);
-  TEST_ASSERT_TRUE(root.at(N - 1).tryGetI64(v));
-  TEST_ASSERT_EQUAL_INT64(N - 1, v);
+  std::optional<int64_t> v;
+  v = root.at(0).tryGetI64();
+  TEST_ASSERT_TRUE(v.has_value());
+  TEST_ASSERT_EQUAL_INT64(0, *v);
+  v = root.at(500).tryGetI64();
+  TEST_ASSERT_TRUE(v.has_value());
+  TEST_ASSERT_EQUAL_INT64(500, *v);
+  v = root.at(N - 1).tryGetI64();
+  TEST_ASSERT_TRUE(v.has_value());
+  TEST_ASSERT_EQUAL_INT64(N - 1, *v);
   TEST_ASSERT_FALSE(root.at(N).valid());
 }
 
@@ -54,13 +58,16 @@ TEST_CASE("stress: object with many members, every key resolvable", "[osjson][st
   TEST_ASSERT_EQUAL_INT(N, root.count());
 
   // spot-check first, middle, last, and a miss
-  int64_t v = 0;
-  TEST_ASSERT_TRUE(root["k0"].tryGetI64(v));
-  TEST_ASSERT_EQUAL_INT64(0, v);
-  TEST_ASSERT_TRUE(root["k150"].tryGetI64(v));
-  TEST_ASSERT_EQUAL_INT64(300, v);
-  TEST_ASSERT_TRUE(root["k299"].tryGetI64(v));
-  TEST_ASSERT_EQUAL_INT64(598, v);
+  std::optional<int64_t> v;
+  v = root["k0"].tryGetI64();
+  TEST_ASSERT_TRUE(v.has_value());
+  TEST_ASSERT_EQUAL_INT64(0, *v);
+  v = root["k150"].tryGetI64();
+  TEST_ASSERT_TRUE(v.has_value());
+  TEST_ASSERT_EQUAL_INT64(300, *v);
+  v = root["k299"].tryGetI64();
+  TEST_ASSERT_TRUE(v.has_value());
+  TEST_ASSERT_EQUAL_INT64(598, *v);
   TEST_ASSERT_FALSE(root["k300"].valid());
 }
 
@@ -96,9 +103,10 @@ TEST_CASE("stress: just under the cap still parses", "[osjson][stress]")
   JSON::JsonDocument doc;
   TEST_ASSERT_TRUE(doc.parse(json));
   TEST_ASSERT_EQUAL_INT(N, doc.root().count());
-  int64_t v = 0;
-  TEST_ASSERT_TRUE(doc.root().at(N - 1).tryGetI64(v));
-  TEST_ASSERT_EQUAL_INT64(7, v);
+  std::optional<int64_t> v;
+  v = doc.root().at(N - 1).tryGetI64();
+  TEST_ASSERT_TRUE(v.has_value());
+  TEST_ASSERT_EQUAL_INT64(7, *v);
 }
 
 TEST_CASE("stress: moderately deep nesting navigates correctly", "[osjson][stress]")
@@ -118,9 +126,10 @@ TEST_CASE("stress: moderately deep nesting navigates correctly", "[osjson][stres
     TEST_ASSERT_TRUE(v.isObject());
     v = v["a"];
   }
-  int64_t leaf = 0;
-  TEST_ASSERT_TRUE(v.tryGetI64(leaf));
-  TEST_ASSERT_EQUAL_INT64(depth, leaf);
+  std::optional<int64_t> leaf;
+  leaf = v.tryGetI64();
+  TEST_ASSERT_TRUE(leaf.has_value());
+  TEST_ASSERT_EQUAL_INT64(depth, *leaf);
 }
 
 TEST_CASE("stress: skipping a very deep subtree does not recurse", "[osjson][stress]")
@@ -137,9 +146,10 @@ TEST_CASE("stress: skipping a very deep subtree does not recurse", "[osjson][str
   JSON::JsonDocument doc;
   TEST_ASSERT_TRUE(doc.parse(json));
 
-  int64_t v = 0;
-  TEST_ASSERT_TRUE(doc.root()["after"].tryGetI64(v));
-  TEST_ASSERT_EQUAL_INT64(7, v);
+  std::optional<int64_t> v;
+  v = doc.root()["after"].tryGetI64();
+  TEST_ASSERT_TRUE(v.has_value());
+  TEST_ASSERT_EQUAL_INT64(7, *v);
 }
 
 TEST_CASE("stress: large generate -> parse round-trip", "[osjson][stress]")
@@ -165,9 +175,11 @@ TEST_CASE("stress: large generate -> parse round-trip", "[osjson][stress]")
   JSON::JsonView root = doc.root();
   TEST_ASSERT_EQUAL_INT(N, root.count());
 
-  int64_t v = 0;
-  TEST_ASSERT_TRUE(root.at(0)["i"].tryGetI64(v));
-  TEST_ASSERT_EQUAL_INT64(0, v);
-  TEST_ASSERT_TRUE(root.at(N - 1)["i"].tryGetI64(v));
-  TEST_ASSERT_EQUAL_INT64(N - 1, v);
+  std::optional<int64_t> v;
+  v = root.at(0)["i"].tryGetI64();
+  TEST_ASSERT_TRUE(v.has_value());
+  TEST_ASSERT_EQUAL_INT64(0, *v);
+  v = root.at(N - 1)["i"].tryGetI64();
+  TEST_ASSERT_TRUE(v.has_value());
+  TEST_ASSERT_EQUAL_INT64(N - 1, *v);
 }

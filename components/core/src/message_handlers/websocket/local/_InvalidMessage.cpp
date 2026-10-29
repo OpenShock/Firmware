@@ -4,6 +4,8 @@ const char* const TAG = "LocalMessageHandlers";
 
 #include "Logging.h"
 
+#include <utility>
+
 using namespace OpenShock::MessageHandlers::Local;
 
 void _Private::HandleInvalidMessage(uint8_t socketId, const OpenShock::Serialization::Local::LocalToHubMessage* root)
@@ -15,5 +17,5 @@ void _Private::HandleInvalidMessage(uint8_t socketId, const OpenShock::Serializa
     return;
   }
 
-  OS_LOGE(TAG, "Invalid message type: %u", static_cast<unsigned>(root->payload_type()));
+  OS_LOGE(TAG, "Invalid message type: %u", std::to_underlying(root->payload_type()));
 }

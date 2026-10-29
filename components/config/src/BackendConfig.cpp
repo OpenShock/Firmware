@@ -66,9 +66,9 @@ bool BackendConfig::FromJSON(JSON::JsonView json)
     return false;
   }
 
-  if (!json["domain"].tryGetStr(domain)) domain = CONFIG_OPENSHOCK_API_DOMAIN;
+  domain = json["domain"].tryGetStr().value_or(CONFIG_OPENSHOCK_API_DOMAIN);
 
-  if (!json["authToken"].tryGetStr(authToken)) authToken.clear();
+  authToken = json["authToken"].tryGetStr().value_or(std::string());
 
   return true;
 }

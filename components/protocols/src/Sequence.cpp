@@ -10,6 +10,8 @@ const char* const TAG = "Sequence";
 #include "radio/rmt/T330Alt1Encoder.h"
 #include "radio/rmt/T330Encoder.h"
 
+#include <utility>
+
 using namespace OpenShock;
 
 namespace {
@@ -26,11 +28,12 @@ namespace {
     static constexpr EncoderInfo kCaiXianlin {
       Rmt::CaiXianlinEncoder::GetBufferSize,
       [](rmt_symbol_word_t* data, uint16_t shockerId, ShockerCommandType commandType, uint8_t intensity) { return Rmt::CaiXianlinEncoder::FillBuffer(data, shockerId, 0, commandType, intensity); },
+      nullptr,
     };
-    static constexpr EncoderInfo kPetrainer {Rmt::PetrainerEncoder::GetBufferSize, Rmt::PetrainerEncoder::FillBuffer};
-    static constexpr EncoderInfo kPetrainer998DR {Rmt::Petrainer998DREncoder::GetBufferSize, Rmt::Petrainer998DREncoder::FillBuffer};
-    static constexpr EncoderInfo kWellturnT330 {Rmt::WellturnT330Encoder::GetBufferSize, Rmt::WellturnT330Encoder::FillBuffer};
-    static constexpr EncoderInfo kD80 {Rmt::D80Encoder::GetBufferSize, Rmt::D80Encoder::FillBuffer};
+    static constexpr EncoderInfo kPetrainer {Rmt::PetrainerEncoder::GetBufferSize, Rmt::PetrainerEncoder::FillBuffer, nullptr};
+    static constexpr EncoderInfo kPetrainer998DR {Rmt::Petrainer998DREncoder::GetBufferSize, Rmt::Petrainer998DREncoder::FillBuffer, nullptr};
+    static constexpr EncoderInfo kWellturnT330 {Rmt::WellturnT330Encoder::GetBufferSize, Rmt::WellturnT330Encoder::FillBuffer, nullptr};
+    static constexpr EncoderInfo kD80 {Rmt::D80Encoder::GetBufferSize, Rmt::D80Encoder::FillBuffer, nullptr};
     static constexpr EncoderInfo kWellturnT330Alt1 {Rmt::WellturnT330Alt1Encoder::GetBufferSize, Rmt::WellturnT330Alt1Encoder::FillBuffer, Rmt::WellturnT330Alt1Encoder::RefillBuffer};
 
     switch (modelType) {
@@ -46,10 +49,11 @@ namespace {
         return &kD80;
       case ShockerModelType::WellturnT330Alt1:
         return &kWellturnT330Alt1;
-      default:
-        OS_LOGE(TAG, "Unknown shocker model: %u", static_cast<unsigned>(modelType));
-        return nullptr;
     }
+
+    // The model arrives from the network/config and may hold any value; never assume it is in range.
+    OS_LOGE(TAG, "Unknown shocker model: %u", std::to_underlying(modelType));
+    return nullptr;
   }
 }  // namespace
 

@@ -9,14 +9,14 @@
 static void handleAuthtokenCommand(std::string_view arg, bool isAutomated)
 {
   if (arg.empty()) {
-    std::string authToken;
-    if (!OpenShock::Config::GetBackendAuthToken(authToken)) {
+    auto authToken = OpenShock::Config::GetBackendAuthToken();
+    if (!authToken) {
       SERPR_ERROR("Failed to get auth token from config");
       return;
     }
 
     // Get auth token
-    SERPR_RESPONSE("AuthToken|%s", authToken.c_str());
+    SERPR_RESPONSE("AuthToken|%s", authToken->c_str());
     return;
   }
 

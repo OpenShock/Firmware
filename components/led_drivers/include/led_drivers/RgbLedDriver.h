@@ -8,6 +8,7 @@
 #include <driver/rmt_encoder.h>
 #include <driver/rmt_tx.h>
 
+#include <array>
 #include <atomic>
 #include <cstdint>
 
@@ -40,8 +41,11 @@ namespace OpenShock {
 
   private:
     gpio_num_t m_gpioPin;
+    bool m_swapRg;  // Board wants RGB rather than GRB wire order; decided once, apply() runs on the pattern task
     std::atomic<uint8_t> m_brightness;
     rmt_channel_handle_t m_rmtChannel;
     rmt_encoder_handle_t m_rmtEncoder;
+    // The frame RMT reads from. A member, not a local: after a timed-out wait the transmission may still be reading it.
+    std::array<rmt_symbol_word_t, 24> m_frame;  // 24 bits per LED (8 bits per color * 3 colors)
   };
 }  // namespace OpenShock

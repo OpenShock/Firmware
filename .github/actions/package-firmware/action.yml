@@ -1,0 +1,65 @@
+name: package-firmware
+description: Stamp each board from its variant build and merge it with the static0 image
+inputs:
+  version:
+    required: true
+    description: 'Firmware version'
+  boards:
+    required: true
+    description: 'Newline-separated board names to package'
+
+runs:
+  using: composite
+  steps:
+    - uses: ./.github/actions/install-python-deps
+
+    # Each variant artifact holds one <variant-id>/ directory, so merging them keeps variants apart
+    - name: Download variant builds
+      uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333  # v8.0.2
+      with:
+        pattern: variant_*
+        path: variants
+        merge-multiple: true
+
+    - name: Download static filesystem image
+      uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333  # v8.0.2
+      with:
+        name: firmware_staticfs
+        path: staticfs
+
+    - name: Stamp every board
+      shell: bash
+      env:
+        BOARDS: ${{ inputs.boards }}
+      run: python scripts/package_boards.py --variants variants --board "$BOARDS" --out boards-out
+
+    # merge_image.py expands {board} in --bindir and --output
+    - name: Merge partitions
+      shell: bash
+      env:
+        BOARDS: ${{ inputs.boards }}
+        VERSION: ${{ inputs.version }}
+      run: |
+        set -euo pipefail
+        python scripts/merge_image.py \
+          --board "$BOARDS" \
+          --bindir 'boards-out/{board}' \
+          --staticfs staticfs/staticfs.bin \
+          --output "merged/OpenShock_{board}_${VERSION}.bin"
+
+    # One directory per board, what repo_server_publish.py uploads
+    - name: Upload per-board images
+      uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9  # v7.0.2
+      with:
+        name: firmware_boards
+        path: boards-out
+        retention-days: 7
+        if-no-files-found: error
+
+    - name: Upload merged firmware binaries
+      uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9  # v7.0.2
+      with:
+        name: firmware_merged
+        path: merged/OpenShock_*.bin
+        retention-days: 7
+        if-no-files-found: error

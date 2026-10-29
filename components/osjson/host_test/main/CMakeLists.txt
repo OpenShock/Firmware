@@ -11,11 +11,10 @@ idf_component_register(
                "test_stress.cpp"     # scale, token-cap, deep nesting
                "../../src/Json.cpp"
                "../../../common/src/Convert.cpp"
-               "../../../common/src/DigitCounter.cpp"
                "../../../common/src/StringHelpers.cpp"
   INCLUDE_DIRS "."
                "../../include"            # json/Json.h
-               "../../../common/include"  # Convert.h, StringHelpers.h, util/DigitCounter.h
+               "../../../common/include"  # Convert.h, StringHelpers.h
   REQUIRES     unity
                host_support               # Logging.h, openshock_board.h (test/host_support)
                esp_hal_gpio               # Convert.h -> hal/gpio_types.h

@@ -3,6 +3,7 @@
 
 #include "json/Json.h"
 
+#include <optional>
 #include <string>
 #include <string_view>
 
@@ -82,22 +83,25 @@ TEST_CASE("parse: scalar document at the root", "[osjson][parse]")
   JSON::JsonDocument num;
   TEST_ASSERT_TRUE(num.parse("42"));
   TEST_ASSERT_TRUE(num.root().isNumber());
-  int64_t n = 0;
-  TEST_ASSERT_TRUE(num.root().tryGetI64(n));
-  TEST_ASSERT_EQUAL_INT64(42, n);
+  std::optional<int64_t> n;
+  n = num.root().tryGetI64();
+  TEST_ASSERT_TRUE(n.has_value());
+  TEST_ASSERT_EQUAL_INT64(42, *n);
 
   JSON::JsonDocument str;
   TEST_ASSERT_TRUE(str.parse("\"hello\""));
   TEST_ASSERT_TRUE(str.root().isString());
-  std::string sv;
-  TEST_ASSERT_TRUE(str.root().tryGetStr(sv));
-  TEST_ASSERT_TRUE(sv == "hello");
+  std::optional<std::string> sv;
+  sv = str.root().tryGetStr();
+  TEST_ASSERT_TRUE(sv.has_value());
+  TEST_ASSERT_TRUE(*sv == "hello");
 
   JSON::JsonDocument boolean;
   TEST_ASSERT_TRUE(boolean.parse("true"));
-  bool b = false;
-  TEST_ASSERT_TRUE(boolean.root().tryGetBool(b));
-  TEST_ASSERT_TRUE(b);
+  std::optional<bool> b;
+  b = boolean.root().tryGetBool();
+  TEST_ASSERT_TRUE(b.has_value());
+  TEST_ASSERT_TRUE(*b);
 
   JSON::JsonDocument null;
   TEST_ASSERT_TRUE(null.parse("null"));
@@ -113,9 +117,10 @@ TEST_CASE("parse: re-parsing the same document reuses state cleanly", "[osjson][
 
   TEST_ASSERT_TRUE(doc.parse(R"({"x":9})"));
   TEST_ASSERT_EQUAL_INT(1, doc.root().count());
-  int64_t x = 0;
-  TEST_ASSERT_TRUE(doc.root()["x"].tryGetI64(x));
-  TEST_ASSERT_EQUAL_INT64(9, x);
+  std::optional<int64_t> x;
+  x = doc.root()["x"].tryGetI64();
+  TEST_ASSERT_TRUE(x.has_value());
+  TEST_ASSERT_EQUAL_INT64(9, *x);
   TEST_ASSERT_FALSE(doc.root()["a"].valid());  // key from the previous parse is gone
 }
 
