@@ -31,6 +31,9 @@ struct OpenShock::detail::LfsState {
   struct lfs_config cfg;
   const esp_partition_t* partition;
   bool writable;
+  // Read-only mounts map the whole partition and read through the flash cache (nullptr when not mapped)
+  const uint8_t* map;
+  esp_partition_mmap_handle_t mapHandle;
 };
 
 using OpenShock::detail::LfsState;
@@ -40,6 +43,24 @@ static int bdRead(const struct lfs_config* c, lfs_block_t block, lfs_off_t off, 
   auto* st    = static_cast<LfsState*>(c->context);
   size_t addr = static_cast<size_t>(block) * c->block_size + off;
   return esp_partition_read(st->partition, addr, buffer, size) == ESP_OK ? 0 : LFS_ERR_IO;
+}
+
+// esp_partition_read is a SPI1 transaction: it disables the flash cache and, on dual-core chips, stalls the other core
+// (where WiFi and lwIP run) for every call, moving 64 bytes per transaction. A static asset costs hundreds of those;
+// reading the mapped partition is a plain memcpy through the cache instead.
+static int bdReadMapped(const struct lfs_config* c, lfs_block_t block, lfs_off_t off, void* buffer, lfs_size_t size)
+{
+  auto* st = static_cast<LfsState*>(c->context);
+  std::memcpy(buffer, st->map + static_cast<size_t>(block) * c->block_size + off, size);
+  return 0;
+}
+
+static void unmapPartition(LfsState* st)
+{
+  if (st->map != nullptr) {
+    esp_partition_munmap(st->mapHandle);
+    st->map = nullptr;
+  }
 }
 
 static int bdProg(const struct lfs_config* c, lfs_block_t block, lfs_off_t off, const void* buffer, lfs_size_t size)
@@ -106,17 +127,31 @@ bool LfsPartition::mount(const esp_partition_t* partition, bool writable, bool f
   cfg.cache_size     = LFS_CACHE_SIZE;
   cfg.lookahead_size = LFS_LOOKAHEAD_SIZE;
 
+  // Only read-only mounts: a writable one would read stale data through the cache after its own writes. Writers to a
+  // read-only partition (OTA) unmount it first. A failed map just keeps the esp_partition_read path.
+  if (!writable) {
+    const void* map = nullptr;
+    if (esp_partition_mmap(partition, 0, partition->size, ESP_PARTITION_MMAP_DATA, &map, &m_state->mapHandle) == ESP_OK) {
+      m_state->map = static_cast<const uint8_t*>(map);
+      cfg.read     = &bdReadMapped;
+    } else {
+      OS_LOGW(TAG, "Failed to map partition, reading it through esp_partition_read");
+    }
+  }
+
   int err = lfs_mount(&m_state->lfs, &cfg);
   if (err < 0) {
     if (writable && formatOnFail) {
       OS_LOGW(TAG, "Mount failed (lfs error %d), formatting partition", err);
       if (lfs_format(&m_state->lfs, &cfg) < 0 || lfs_mount(&m_state->lfs, &cfg) < 0) {
         OS_LOGE(TAG, "Failed to format and mount partition");
+        unmapPartition(m_state);
         m_state->partition = nullptr;
         return false;
       }
     } else {
       OS_LOGE(TAG, "Failed to mount partition (lfs error %d)", err);
+      unmapPartition(m_state);
       m_state->partition = nullptr;
       return false;
     }
@@ -132,6 +167,7 @@ void LfsPartition::unmount()
     lfs_unmount(&m_state->lfs);
     m_mounted = false;
   }
+  unmapPartition(m_state);
   m_state->partition = nullptr;
 }
 
