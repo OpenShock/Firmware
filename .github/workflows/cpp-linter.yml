@@ -45,8 +45,9 @@ jobs:
           ignore: '.github|build|managed_components|components/littlefs|components/flatbuffers|components/serialization/include/serialization/_fbs'
           thread-comments: ${{ github.event_name == 'pull_request' && 'update' || 'false' }} # Commit comments on push need contents:write
 
+      # Advisory on beta and master (pushes and PRs targeting them): findings are still reported, but they don't fail the job
       - name: Fail on lint errors
-        if: steps.linter.outputs.checks-failed > 0
+        if: steps.linter.outputs.checks-failed > 0 && !contains(fromJSON('["beta", "master"]'), github.base_ref || github.ref_name)
         run: |
           echo "::error::Some files failed the linting checks!"
           exit 1

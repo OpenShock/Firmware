@@ -303,7 +303,8 @@ static void captiveportal_tick(ManagerState& state)
     instance->retryDrain();
   }
 
-  if (state.closeWhenOnline && connected) {
+  // Always-enabled wins over setup completion: closing here would only drop the clients and reopen the AP next tick
+  if (state.closeWhenOnline && connected && !state.alwaysEnabled) {
     if (running) {
       OS_LOGI(TAG, "Setup completed or portal disabled, closing captive portal");
     }
