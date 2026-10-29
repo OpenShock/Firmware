@@ -5,6 +5,7 @@
     "beta":    { "release": "prerelease", "label": "rc" },
     "master":  { "release": "stable" }
   },
+  "version_files": [{ "path": "frontend/package.json", "json_key": "version" }],
   "maintainers": ["hhvrc", "LucHeart", "nullstalgia"],
   "prerelease_notice": "This is a release candidate for testing and may contain bugs. Back up your configuration before installing it, and be ready to reflash the hub over USB if something goes wrong. The latest stable release is {stable}."
 }
