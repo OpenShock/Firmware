@@ -85,7 +85,7 @@ def write_board_artifacts(artifacts, board, version='1.5.0'):
     for filename in repo_server_publish.BUILD_ARTIFACTS.values():
         (build / filename).write_bytes(filename.encode())
     (artifacts / 'firmware_staticfs').mkdir(exist_ok=True)
-    (artifacts / 'firmware_staticfs' / 'staticfs.bin').write_bytes(b'fs')
+    (artifacts / 'firmware_staticfs' / 'www.bin').write_bytes(b'fs')
     (artifacts / 'firmware_merged').mkdir(exist_ok=True)
     (artifacts / 'firmware_merged' / f'OpenShock_{board}_{version}.bin').write_bytes(b'merged')
 
@@ -98,7 +98,7 @@ def test_resolve_artifacts_reads_the_package_layout(tmp_path):
 
     for field, filename in repo_server_publish.BUILD_ARTIFACTS.items():
         assert found[field] == tmp_path / 'firmware_boards' / 'BoardA' / filename
-    assert found[repo_server_publish.STATICFS_FIELD] == tmp_path / 'firmware_staticfs' / 'staticfs.bin'
+    assert found[repo_server_publish.STATICFS_FIELD] == tmp_path / 'firmware_staticfs' / 'www.bin'
     # A board whose name extends another's does not pick up the other's merged image.
     assert found[repo_server_publish.MERGED_FIELD] == tmp_path / 'firmware_merged' / 'OpenShock_BoardA_1.5.0.bin'
 

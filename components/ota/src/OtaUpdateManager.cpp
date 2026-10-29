@@ -6,7 +6,6 @@ const char* const TAG = "OtaUpdateManager";
 #include "BoardDescriptor.h"
 #include "captiveportal/Manager.h"
 #include "config/Config.h"
-#include "fs/FsCheck.h"
 #include "GatewayConnectionManager.h"
 #include "Hashing.h"
 #include "http/HTTPRequestManager.h"
@@ -21,6 +20,7 @@ const char* const TAG = "OtaUpdateManager";
 #include "util/HexUtils.h"
 #include "util/TaskUtils.h"
 #include "wifi/WiFiManager.h"
+#include "www/WwwPartition.h"
 #include "json/Json.h"
 
 #include <esp_event.h>
@@ -308,10 +308,10 @@ static bool otaum_flash_fs_partition(OpenShock::HTTP::Client& client, const esp_
     return false;
   }
 
-  // Verify the freshly flashed image mounts cleanly.
-  if (!OpenShock::TestFilesystem(parition)) {
-    OS_LOGE(TAG, "Failed to mount filesystem");
-    _sendFailureMessage("Failed to mount filesystem"sv);
+  // Verify the freshly flashed image parses.
+  if (!Www::VerifyPartition(parition)) {
+    OS_LOGE(TAG, "The flashed www image is not valid");
+    _sendFailureMessage("The flashed www image is not valid"sv);
     return false;
   }
 
@@ -494,11 +494,12 @@ static void otaum_updatetask(void* arg)
       continue;
     }
 
-    // Get filesystem partition.
-    const esp_partition_t* filesystemPartition = FindStaticPartition();
+    // Releases ship the portal assets as a www image. On the 1.x layout, which has no www partition, it would only
+    // overwrite the littlefs static0 and fail its check: refuse before touching anything (the www migration comes first).
+    const esp_partition_t* filesystemPartition = Www::FindPartition();
     if (filesystemPartition == nullptr) {
-      OS_LOGE(TAG, "Failed to find filesystem partition");
-      _sendFailureMessage("Failed to find filesystem partition"sv);
+      OS_LOGE(TAG, "No www partition (1.x partition layout); the www migration has to run before an update");
+      _sendFailureMessage("No www partition; the partition layout has to be migrated first"sv);
       continue;
     }
 
@@ -512,8 +513,12 @@ static void otaum_updatetask(void* arg)
       }
     } reopenPortalOnFailure;
 
-    // Flash app and filesystem partitions.
-    if (!otaum_flash_fs_partition(client, filesystemPartition, release.filesystemBinaryUrl, release.filesystemBinaryHash)) {
+    // Flash app and filesystem partitions. An unchanged www image (the same hash) is not written again.
+    std::array<uint8_t, 32> currentWwwHash {};
+    const bool wwwCurrent = Www::ImageSha256(filesystemPartition, currentWwwHash) && memcmp(currentWwwHash.data(), release.filesystemBinaryHash, 32) == 0;
+    if (wwwCurrent) {
+      OS_LOGI(TAG, "The www image is already current, not flashing it");
+    } else if (!otaum_flash_fs_partition(client, filesystemPartition, release.filesystemBinaryUrl, release.filesystemBinaryHash)) {
       continue;
     }
     if (!otaum_flash_app_partition(client, appPartition, release.appBinaryUrl, release.appBinaryHash)) {

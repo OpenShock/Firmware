@@ -22,6 +22,7 @@ VALID_MODES = ('init', 'publish', 'abort')
 
 # Server field name -> the artifact it carries.
 # app and staticfs are what an OTA update needs; the rest are for the flashtool, which writes a whole chip rather than updating one.
+# The `staticfs` field keeps its name on the server API although it now carries the flat `www` image (www.bin).
 # The manifest keys and the file field names come from this one table, so they cannot drift apart.
 BUILD_ARTIFACTS = {
     'app': 'app.bin',
@@ -29,6 +30,7 @@ BUILD_ARTIFACTS = {
     'partitions': 'partition-table.bin',
 }
 STATICFS_FIELD = 'staticfs'
+STATICFS_FILE = 'www.bin'
 MERGED_FIELD = 'merged'
 
 UPLOAD_RETRIES = 3
@@ -94,7 +96,7 @@ def resolve_artifacts(artifacts: Path, board: str) -> dict[str, Path]:
         fail(f'{board} is missing its {MERGED_FIELD} artifact (expected {artifacts}/firmware_merged/{merged_glob})')
 
     found = {field: build / filename for field, filename in BUILD_ARTIFACTS.items()}
-    found[STATICFS_FIELD] = artifacts / 'firmware_staticfs' / 'staticfs.bin'
+    found[STATICFS_FIELD] = artifacts / 'firmware_staticfs' / STATICFS_FILE
     found[MERGED_FIELD] = merged[0]
     for field, path in found.items():
         if not path.is_file():

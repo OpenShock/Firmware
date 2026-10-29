@@ -1,21 +1,19 @@
-"""Tests for the build helpers in scripts/ (partition table reading, reproducible staticfs staging)."""
+"""Tests for the build helpers in scripts/ (partition table reading, reproducible www asset packing)."""
 
 import gzip
 import os
-from pathlib import Path
 
 import gen_staticfs
 import pytest
 from support import ROOT
 
-from utils import partitions
+from utils import partitions, wwwimage
 
 
-def test_reads_the_repository_partition_table():
+def test_reads_the_repository_partition_tables():
     table = partitions.read_partitions(ROOT / 'partitions' / 'ota_4mb.csv')
-
-    assert table['static0']['offset'] == 0x353000
-    assert table['static0']['size'] == 0x9D000
+    assert table['www']['offset'] == 0x353000
+    assert table['www']['size'] == 0x9D000
     assert table['config']['size'] == 0x3000
     assert partitions.first_app_partition(table)['offset'] == 0x10000
 
@@ -55,13 +53,13 @@ def test_a_table_without_an_app_partition_is_refused():
         partitions.first_app_partition(table)
 
 
-def test_the_static_partition_size_comes_from_the_table(tmp_path):
+def test_the_www_partition_size_comes_from_the_table(tmp_path):
     csv = tmp_path / 'table.csv'
-    csv.write_text('static0, data, spiffs, 0x353000, 0x9D000\n', encoding='utf-8')
-    assert gen_staticfs.static_partition_size(csv) == 0x9D000
+    csv.write_text('www, 0x40, 0x00, 0x3A8000, 0x48000\n', encoding='utf-8')
+    assert gen_staticfs.www_partition_size(csv) == 0x48000
     csv.write_text('nvs, data, nvs, 0x9000, 0x5000\n', encoding='utf-8')
-    with pytest.raises(SystemExit, match='has no static0 partition'):
-        gen_staticfs.static_partition_size(csv)
+    with pytest.raises(SystemExit, match='has no www partition'):
+        gen_staticfs.www_partition_size(csv)
 
 
 def test_a_stale_frontend_without_pnpm_names_the_way_out(tmp_path, monkeypatch):
@@ -80,26 +78,28 @@ def test_a_failing_pnpm_step_is_named(tmp_path, monkeypatch):
         gen_staticfs.build_frontend(tmp_path)
 
 
-def test_staged_assets_are_byte_identical_across_runs(tmp_path):
+def write_build(tmp_path):
     build = tmp_path / 'build'
     (build / 'assets').mkdir(parents=True)
     (build / 'index.html').write_text('<!doctype html><title>x</title>', encoding='utf-8')
     (build / 'assets' / 'app.js').write_text('console.log(1)', encoding='utf-8')
+    return build
 
-    def stage(name):
-        staging = tmp_path / name
-        gen_staticfs.stage_assets(build, staging)
-        return {p.relative_to(staging): p.read_bytes() for p in staging.rglob('*') if p.is_file()}
 
-    first = stage('a')
+def test_collected_assets_are_byte_identical_across_runs(tmp_path):
+    build = write_build(tmp_path)
+
+    first = gen_staticfs.collect_assets(build)
     # Touch the sources: gzip used to embed the mtime, so the output changed on every build.
     for p in build.rglob('*'):
         if p.is_file():
             p.touch()
-    second = stage('b')
+    second = gen_staticfs.collect_assets(build)
 
     assert first == second
-    assert Path('www') / 'index.html.gz' in first
+    assert sorted(e.path for e in first) == ['assets/app.js', 'index.html']
+    assert all(e.gzip for e in first)
+    assert wwwimage.pack(first) == wwwimage.pack(second)
 
 
 def test_frontend_build_is_current_tracks_source_changes(tmp_path):
@@ -120,48 +120,77 @@ def test_frontend_build_is_current_tracks_source_changes(tmp_path):
     assert not gen_staticfs.frontend_build_is_current(frontend, frontend / 'build')
 
 
-def test_staged_assets_gzip_everything_but_prebuilt_gz(tmp_path):
+def test_collected_assets_gzip_everything_but_prebuilt_gz(tmp_path):
     build = tmp_path / 'build'
     build.mkdir()
     (build / 'index.html').write_text('<title>x</title>', encoding='utf-8')
     (build / 'font.woff2.gz').write_bytes(b'already')
+    (build / 'app.js').write_text('1', encoding='utf-8')
+    (build / 'app.js.gz').write_bytes(b'prebuilt')
 
-    www = gen_staticfs.stage_assets(build, tmp_path / 'staging')
+    entries = {e.path: e for e in gen_staticfs.collect_assets(build)}
 
-    assert sorted(p.name for p in www.iterdir()) == ['font.woff2.gz', 'index.html.gz']
-    assert (www / 'font.woff2.gz').read_bytes() == b'already'
-    assert gzip.decompress((www / 'index.html.gz').read_bytes()) == b'<title>x</title>'
+    assert sorted(entries) == ['app.js', 'font.woff2', 'index.html']
+    assert entries['font.woff2'].data == b'already'
+    assert entries['app.js'].data == b'prebuilt'
+    assert gzip.decompress(entries['index.html'].data) == b'<title>x</title>'
 
 
-def test_staging_a_build_without_index_html_fails(tmp_path):
+def test_immutable_assets_are_flagged(tmp_path):
+    build = tmp_path / 'build'
+    (build / '_app' / 'immutable').mkdir(parents=True)
+    (build / 'index.html').write_text('x', encoding='utf-8')
+    (build / '_app' / 'immutable' / 'chunk.abc123.js').write_text('1', encoding='utf-8')
+    entries = {e.path: e for e in gen_staticfs.collect_assets(build)}
+    assert entries['_app/immutable/chunk.abc123.js'].immutable
+    assert not entries['index.html'].immutable
+
+
+def test_collecting_a_build_without_index_html_fails(tmp_path):
     build = tmp_path / 'build'
     build.mkdir()
     (build / 'app.js').write_text('1', encoding='utf-8')
-    with pytest.raises(SystemExit, match='index.html.gz missing'):
-        gen_staticfs.stage_assets(build, tmp_path / 'staging')
+    with pytest.raises(SystemExit, match='index.html missing'):
+        gen_staticfs.collect_assets(build)
 
 
-def test_packed_image_is_partition_sized_and_holds_only_www(tmp_path):
-    from littlefs import LittleFS
+def test_packed_image_is_the_bare_image_and_must_fit(tmp_path):
+    entries = gen_staticfs.collect_assets(write_build(tmp_path))
+    output = tmp_path / 'out' / 'www.bin'
 
-    staging = tmp_path / 'staging'
-    (staging / 'www').mkdir(parents=True)
-    (staging / 'www' / 'index.html.gz').write_bytes(b'page')
-    (staging / 'stray.txt').write_text('x', encoding='utf-8')
-    output = tmp_path / 'out' / 'staticfs.bin'
-
-    gen_staticfs.pack_image(staging, output, 64 * 1024)
+    gen_staticfs.pack_image(entries, output, 64 * 1024)
 
     image = output.read_bytes()
-    assert len(image) == 64 * 1024
-    fs = LittleFS(block_size=gen_staticfs.BLOCK_SIZE, block_count=16, disk_version=0)
-    fs.context.buffer[:] = image
-    fs.mount()
-    assert fs.listdir('/') == ['www']
-    with fs.open('www/index.html.gz', 'rb') as f:
-        assert f.read() == b'page'
+    assert image == wwwimage.pack(entries)  # no padding to the partition size
+    parsed = wwwimage.parse(image)
+    assert gzip.decompress(parsed.find('index.html').data) == b'<!doctype html><title>x</title>'
+
+    with pytest.raises(SystemExit, match='more than the 100-byte www partition'):
+        gen_staticfs.pack_image(entries, output, 100)
 
 
-def test_packing_refuses_a_size_that_is_not_a_block_multiple(tmp_path):
-    with pytest.raises(SystemExit, match='not a multiple of block size'):
-        gen_staticfs.pack_image(tmp_path, tmp_path / 'out.bin', 5000)
+def test_main_takes_the_smallest_of_every_limit(tmp_path, monkeypatch):
+    build = write_build(tmp_path)
+    csv = tmp_path / 'small.csv'
+    csv.write_text('www, 0x40, 0x00, 0x3A8000, 0x1000\n', encoding='utf-8')
+    limits = []
+    monkeypatch.setattr(gen_staticfs, 'pack_image', lambda entries, output, max_size: limits.append(max_size))
+
+    args = ['--frontend-dir', str(tmp_path), '--output', str(tmp_path / 'www.bin'), '--skip-frontend-build']
+    gen_staticfs.main(
+        [
+            *args,
+            '--max-size',
+            '0x2000',
+            '--partition-csv',
+            str(csv),
+            '--partition-csv',
+            str(ROOT / 'partitions' / 'ota_4mb.csv'),
+        ]
+    )
+    assert limits == [0x1000]
+    assert build.is_dir()
+
+    with pytest.raises(SystemExit):
+        gen_staticfs.main(args)  # no limit at all
+

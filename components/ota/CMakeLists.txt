@@ -1,6 +1,6 @@
 # OpenShock OTA update manager: boot-type tracking and app validation/rollback, plus
 # the update task that fetches release metadata from the firmware repository and
-# flashes the app and static filesystem partitions.
+# flashes the app and the www asset image.
 #
 # Extracted out of `core` and layered above it (and above captive_portal, which it
 # closes before flashing). core reaches back only through the AppHooks callbacks
@@ -10,7 +10,8 @@ idf_component_register(
   INCLUDE_DIRS  "include"
   REQUIRES      common                                          # enums/FirmwareBootType.h, enums/OtaUpdateChannel.h, SemVer.h in public header
   PRIV_REQUIRES core captive_portal config                      # gateway/wifi/WSGateway/AppHooks; CaptivePortal::ForceClose; Config::
-                crypto fs http hwutil logging osjson temporal   # Hashing, FsCheck, HTTPRequestManager, PartitionUtils, json
+                crypto http hwutil logging osjson temporal      # Hashing, HTTPRequestManager, PartitionUtils, json
+                www                                             # the www partition the staticfs artifact goes into
                 app_update esp_event esp_netif esp_wifi         # esp_ota_ops.h, WiFi/IP event handlers
 )
 

@@ -91,7 +91,7 @@ with the list.
 image after linking. Anything after the board name is passed to `idf.py`.
 
 ```sh
-python scripts/build.py OpenShock-Core-V2                    # full build, incl. staticfs
+python scripts/build.py OpenShock-Core-V2                    # full build, incl. the www image
 python scripts/build.py OpenShock-Core-V2 app                # app only
 python scripts/build.py OpenShock-Core-V2 flash -p COM4      # build and flash
 python scripts/build.py OpenShock-Core-V2 monitor -p COM4    # serial monitor
@@ -155,7 +155,7 @@ file and activates an installer-registered ESP-IDF itself, so no exported shell 
 
 ```sh
 cmake --preset OpenShock-Core-V2
-cmake --build --preset OpenShock-Core-V2                      # everything, incl. staticfs
+cmake --build --preset OpenShock-Core-V2                      # everything, incl. the www image
 cmake --build --preset OpenShock-Core-V2 --target app
 ESPPORT=COM4 cmake --build --preset OpenShock-Core-V2 --target flash
 ESPPORT=COM4 cmake --build --preset OpenShock-Core-V2 --target monitor
@@ -206,10 +206,10 @@ settings stay local. The presets file is generated from `boards/`; after adding 
 python scripts/gen_cmake_presets.py
 ```
 
-### Captive-portal frontend and staticfs
+### Captive-portal frontend and the www image
 
-The web UI in `frontend/` is built with Vite, gzipped, and packed into a littlefs image for the
-`static0` partition. The CMake `staticfs` target does this automatically during a full build and
+The web UI in `frontend/` is built with Vite, gzipped, and packed into the flat `www` image
+([STORAGE.md](STORAGE.md)). The CMake `www` target does this automatically during a full build and
 only rebuilds the frontend when its sources changed. To work on the frontend itself:
 
 ```sh
@@ -224,8 +224,8 @@ pnpm test:unit
 To build only the image, as CI does:
 
 ```sh
-python scripts/gen_staticfs.py --frontend-dir frontend --staging-dir build/staticfs \
-    --output build/staticfs.bin --partition-csv partitions/ota_4mb.csv
+python scripts/gen_staticfs.py --frontend-dir frontend --output build/www.bin \
+    --partition-csv partitions/ota_4mb.csv
 ```
 
 ### Packaged and merged images
@@ -245,7 +245,7 @@ cp build/esp32s3-6832dbd5/partition_table/partition-table.bin out/variants/esp32
 
 python scripts/package_boards.py --variants out/variants --board "OpenShock-Core-V2" --out out/boards
 python scripts/merge_image.py --board OpenShock-Core-V2 --bindir 'out/boards/{board}' \
-    --staticfs build/staticfs.bin --output 'out/merged/{board}.bin'
+    --www build/www.bin --output 'out/merged/{board}.bin'
 esptool write_flash 0x0 out/merged/OpenShock-Core-V2.bin
 ```
 

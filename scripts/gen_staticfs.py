@@ -1,13 +1,14 @@
 #!/usr/bin/env python3
-"""Build the captive-portal static filesystem image (native ESP-IDF).
+"""Build the captive-portal asset image (www.bin) for the `www` partition.
 
 Pipeline:
   1. Build the SvelteKit frontend (pnpm) when its sources are newer than the last build (unless --skip-frontend-build, which CI passes).
-  2. Gzip every built asset into <staging>/www/<path>.gz.
-  3. Pack <staging>/www into a littlefs image sized for the `static0` partition.
+  2. Gzip every built asset (a prebuilt <name>.gz is taken as-is).
+  3. Pack them into one flat read-only image (scripts/utils/wwwimage.py), checked to fit the smallest `www` partition.
 
-The output is reproducible: gzip headers carry no timestamp and files are packed in sorted order, so an unchanged
-frontend gives a byte-identical staticfs.bin (and the same hash, so devices don't re-flash it).
+The output is reproducible: gzip headers carry no timestamp and entries are sorted, so an unchanged frontend gives a
+byte-identical www.bin (and the same hash, so devices don't re-flash it). One image serves every board: it is not
+padded to any partition size, only checked to fit.
 
 Invoked by CMake (see the root CMakeLists.txt), and by CI with --skip-frontend-build.
 """
@@ -17,20 +18,12 @@ import gzip
 import os
 import shutil
 import subprocess
-import sys
 from collections.abc import Iterable
 from pathlib import Path
 
-from utils import partitions
+from utils import partitions, wwwimage
 
-# The littlefs geometry the firmware mounts static0 with (components/fs/src/LfsPartition.cpp). Only the
-# block size is on disk and checked at mount; read/prog/cache are runtime buffer sizes that must agree.
-BLOCK_SIZE = 4096
-READ_SIZE = PROG_SIZE = 128
-CACHE_SIZE = 512
-LOOKAHEAD_SIZE = 128
-
-STATIC_PARTITION = 'static0'
+WWW_PARTITION = 'www'
 
 # Inputs of the frontend build; a change to any of them makes frontend/build stale.
 FRONTEND_INPUTS = (
@@ -44,6 +37,9 @@ FRONTEND_INPUTS = (
     'tsconfig.json',
 )
 FRONTEND_IGNORED_DIRS = {'node_modules', 'build', 'dist', '.svelte-kit'}
+
+# Assets with a content hash in their name never change under the same path, so browsers may cache them for long.
+IMMUTABLE_PREFIXES = ('_app/immutable/',)
 
 
 def log(msg: str) -> None:
@@ -97,97 +93,94 @@ def build_frontend(frontend_dir: Path) -> Path:
     return build_dir
 
 
-def stage_assets(build_dir: Path, staging_dir: Path) -> Path:
-    """Mirror build_dir into <staging>/www, gzipping everything that isn't already .gz."""
-    www_dir = staging_dir / 'www'
-    if www_dir.exists():
-        shutil.rmtree(www_dir)
+def gzip_bytes(raw: bytes) -> bytes:
+    # mtime=0 and no filename: the gzip bytes depend only on the content
+    import io
 
-    count = 0
-    for root, dirs, files in os.walk(build_dir):
+    out = io.BytesIO()
+    with gzip.GzipFile(filename='', mode='wb', fileobj=out, mtime=0) as gz:
+        gz.write(raw)
+    return out.getvalue()
+
+
+def collect_assets(build_dir: Path) -> list[wwwimage.Entry]:
+    """Every file under build_dir as a gzipped entry at its relative path (a prebuilt <name>.gz wins over <name>)."""
+    files: dict[str, Path] = {}
+    for root, dirs, names in os.walk(build_dir):
         dirs.sort()
-        dst_root = www_dir / Path(root).relative_to(build_dir)
-        dst_root.mkdir(parents=True, exist_ok=True)
-
-        for name in sorted(files):
+        for name in sorted(names):
             src = Path(root) / name
-            if name.endswith('.gz'):
-                shutil.copyfile(src, dst_root / name)
-            else:
-                # mtime=0: the gzip bytes depend only on the content
-                with (
-                    (dst_root / f'{name}.gz').open('wb') as raw,
-                    gzip.GzipFile(filename='', mode='wb', fileobj=raw, mtime=0) as gz,
-                ):
-                    gz.write(src.read_bytes())
-            count += 1
+            files[src.relative_to(build_dir).as_posix()] = src
 
-    log(f'Staged {count} gzipped assets into {www_dir}')
-    if not (www_dir / 'index.html.gz').exists():
-        raise SystemExit(f'error: {www_dir}/index.html.gz missing: the frontend build produced no index.html')
-    return www_dir
+    entries = []
+    for rel, src in files.items():
+        if rel.endswith('.gz'):
+            continue
+        prebuilt = files.get(rel + '.gz')
+        data = prebuilt.read_bytes() if prebuilt is not None else gzip_bytes(src.read_bytes())
+        entries.append(wwwimage.Entry(rel, data, gzip=True, immutable=rel.startswith(IMMUTABLE_PREFIXES)))
+    # A .gz with no raw sibling is an asset of its own, served under the name without .gz
+    for rel, src in files.items():
+        if rel.endswith('.gz') and rel[: -len('.gz')] not in files:
+            entries.append(
+                wwwimage.Entry(
+                    rel[: -len('.gz')], src.read_bytes(), gzip=True, immutable=rel.startswith(IMMUTABLE_PREFIXES)
+                )
+            )
 
-
-def pack_image(staging_dir: Path, output: Path, partition_size: int) -> None:
-    """Pack <staging_dir>/www into a littlefs image of exactly partition_size bytes (as /www/...)."""
-    try:
-        from littlefs import LittleFS
-    except ImportError:
-        raise SystemExit(
-            f'error: littlefs-python is not installed for {sys.executable}: the build scripts need an interpreter '
-            'with requirements.txt installed (docs/DEVELOPING.md, Python dependencies)'
-        ) from None
-
-    if partition_size % BLOCK_SIZE != 0:
-        raise SystemExit(f'error: partition size {partition_size} is not a multiple of block size {BLOCK_SIZE}')
-    block_count = partition_size // BLOCK_SIZE
-    fs = LittleFS(
-        block_size=BLOCK_SIZE,
-        block_count=block_count,
-        read_size=READ_SIZE,
-        prog_size=PROG_SIZE,
-        cache_size=CACHE_SIZE,
-        lookahead_size=LOOKAHEAD_SIZE,
-    )
-
-    # Only www/ is packed, so stray files in the staging directory never end up in the image.
-    file_count = 0
-    for root, dirs, files in os.walk(staging_dir / 'www'):
-        dirs.sort()
-        rel_root = Path(root).relative_to(staging_dir).as_posix()
-        fs.makedirs(rel_root, exist_ok=True)
-        for name in sorted(files):
-            with fs.open(f'{rel_root}/{name}', 'wb') as f_out:
-                f_out.write((Path(root) / name).read_bytes())
-            file_count += 1
-
-    output.resolve().parent.mkdir(parents=True, exist_ok=True)
-    output.write_bytes(bytes(fs.context.buffer))
-
-    log(f'Packed {file_count} files into {output} ({partition_size} bytes, {block_count} x {BLOCK_SIZE}-byte blocks)')
+    if not any(e.path == 'index.html' for e in entries):
+        raise SystemExit(f'error: {build_dir}/index.html missing: the frontend build produced no index.html')
+    return entries
 
 
-def static_partition_size(csv_path: Path) -> int:
+def www_partition_size(csv_path: Path) -> int:
     table = partitions.read_partitions(csv_path)
-    if STATIC_PARTITION not in table:
-        raise SystemExit(f'error: {csv_path} has no {STATIC_PARTITION} partition')
-    return table[STATIC_PARTITION]['size']
+    if WWW_PARTITION not in table:
+        raise SystemExit(f'error: {csv_path} has no {WWW_PARTITION} partition')
+    return table[WWW_PARTITION]['size']
+
+
+def pack_image(entries: list[wwwimage.Entry], output: Path, max_size: int) -> None:
+    try:
+        image = wwwimage.pack(entries)
+    except wwwimage.WwwImageError as err:
+        raise SystemExit(f'error: cannot pack the assets: {err}') from None
+    if len(image) > max_size:
+        raise SystemExit(
+            f'error: the asset image is {len(image)} bytes, more than the {max_size}-byte {WWW_PARTITION} partition'
+        )
+    output.resolve().parent.mkdir(parents=True, exist_ok=True)
+    output.write_bytes(image)
+    log(
+        f'Packed {len(entries)} assets into {output} ({len(image)} of {max_size} bytes, {100 * len(image) // max_size}% of the partition)'
+    )
 
 
 def main(argv: list[str] | None = None) -> int:
-    p = argparse.ArgumentParser(description='Build the OpenShock static filesystem image')
+    p = argparse.ArgumentParser(description='Build the OpenShock captive-portal asset image (www.bin)')
     p.add_argument('--frontend-dir', type=Path, required=True, help='Path to the frontend/ project')
-    p.add_argument('--staging-dir', type=Path, required=True, help='Where to stage gzipped assets (contains www/)')
-    p.add_argument('--output', type=Path, required=True, help='Output littlefs image path')
-    size = p.add_mutually_exclusive_group(required=True)
-    size.add_argument('--partition-size', type=lambda v: int(v, 0), help=f'{STATIC_PARTITION} partition size')
+    p.add_argument('--output', type=Path, required=True, help='Output image path (www.bin)')
+    size = p.add_argument_group('size limit (at least one)')
     size.add_argument(
-        '--partition-csv', type=Path, help=f'partition table CSV to read the {STATIC_PARTITION} size from'
+        '--max-size', type=lambda v: int(v, 0), help=f'largest image allowed ({WWW_PARTITION} partition size)'
+    )
+    size.add_argument(
+        '--partition-csv',
+        type=Path,
+        action='append',
+        default=[],
+        help=f'partition table CSV to read the {WWW_PARTITION} size from; repeatable, the smallest wins',
     )
     p.add_argument(
         '--skip-frontend-build', action='store_true', help='Reuse existing frontend/build without invoking pnpm'
     )
     args = p.parse_args(argv)
+
+    limits = [www_partition_size(csv) for csv in args.partition_csv]
+    if args.max_size is not None:
+        limits.append(args.max_size)
+    if not limits:
+        p.error('one of --max-size or --partition-csv is required')
 
     if args.skip_frontend_build:
         build_dir = args.frontend_dir / 'build'
@@ -196,12 +189,9 @@ def main(argv: list[str] | None = None) -> int:
     else:
         build_dir = build_frontend(args.frontend_dir)
 
-    partition_size = args.partition_size
-    if partition_size is None:
-        partition_size = static_partition_size(args.partition_csv)
-
-    stage_assets(build_dir, args.staging_dir)
-    pack_image(args.staging_dir, args.output, partition_size)
+    entries = collect_assets(build_dir)
+    log(f'Collected {len(entries)} gzipped assets from {build_dir}')
+    pack_image(entries, args.output, min(limits))
     return 0
 
 
