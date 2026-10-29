@@ -27,12 +27,10 @@ menu "OpenShock captive portal"
             gateway connection and an outbound HTTP request need one each (checked against
             LWIP_MAX_SOCKETS).
 
-    config OPENSHOCK_PORTAL_HTTPD_TIMEOUT_MS
-        int "HTTP socket send/receive timeout (ms)"
-        range 1000 60000
-        default 5000
-        help
-            Rounded up to whole seconds, the unit esp_http_server takes.
+    config OPENSHOCK_PORTAL_HTTPD_TIMEOUT_S
+        int "HTTP socket send/receive timeout (s)"
+        range 1 60
+        default 5
 
     config OPENSHOCK_PORTAL_WS_MAX_QUEUED_SENDS
         int "Queued websocket sends"
