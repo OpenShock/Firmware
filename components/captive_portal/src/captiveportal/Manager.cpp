@@ -54,8 +54,8 @@ struct ManagerState {
   int64_t autoCloseAt     = 0;      // esp_timer time at which an idle portal closes; 0 = not armed
 };
 
-static constexpr int64_t STARTUP_GRACE_PERIOD_US = CONFIG_OPENSHOCK_PORTAL_STARTUP_GRACE_S * 1'000'000LL;
-static constexpr int64_t AUTO_CLOSE_DELAY_US     = CONFIG_OPENSHOCK_PORTAL_AUTO_CLOSE_S * 1'000'000LL;
+static constexpr int64_t kStartupGracePeriodUs = CONFIG_OPENSHOCK_PORTAL_STARTUP_GRACE_MS * 1000LL;
+static constexpr int64_t kAutoCloseDelayUs     = CONFIG_OPENSHOCK_PORTAL_AUTO_CLOSE_MS * 1000LL;
 
 // The requested always-enabled setting, and what IsAlwaysEnabled() reports. Written by SetAlwaysEnabled().
 static std::atomic<bool> s_alwaysEnabled = false;
@@ -312,12 +312,12 @@ static void captiveportal_tick(ManagerState& state)
     return;
   }
 
-  // Auto-close: no clients connected, WiFi + gateway are up, AUTO_CLOSE_DELAY_US elapsed
+  // Auto-close: no clients connected, WiFi + gateway are up, kAutoCloseDelayUs elapsed
   if (running && !state.alwaysEnabled && connected && !hasClients) {
     if (state.autoCloseAt == 0) {
-      state.autoCloseAt = now + AUTO_CLOSE_DELAY_US;
+      state.autoCloseAt = now + kAutoCloseDelayUs;
     } else if (now >= state.autoCloseAt) {
-      OS_LOGI(TAG, "Auto-closing captive portal AP (no clients for %d s)", CONFIG_OPENSHOCK_PORTAL_AUTO_CLOSE_S);
+      OS_LOGI(TAG, "Auto-closing captive portal AP (no clients for %d ms)", CONFIG_OPENSHOCK_PORTAL_AUTO_CLOSE_MS);
       captiveportal_stop(state);
       return;
     }
@@ -367,8 +367,8 @@ bool CaptivePortal::Init()
 
   // If device is already fully configured, set a startup grace period before opening portal
   if (isDeviceFullyConfigured()) {
-    initialState->startupGraceEnd = esp_timer_get_time() + STARTUP_GRACE_PERIOD_US;
-    OS_LOGI(TAG, "Device fully configured, startup grace period of %ds before opening portal", CONFIG_OPENSHOCK_PORTAL_STARTUP_GRACE_S);
+    initialState->startupGraceEnd = esp_timer_get_time() + kStartupGracePeriodUs;
+    OS_LOGI(TAG, "Device fully configured, startup grace period of %d ms before opening portal", CONFIG_OPENSHOCK_PORTAL_STARTUP_GRACE_MS);
   }
 
   s_forceCloseDone = xSemaphoreCreateBinary();

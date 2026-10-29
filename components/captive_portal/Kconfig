@@ -40,18 +40,18 @@ menu "OpenShock captive portal"
             Outgoing websocket messages waiting for httpd. Bounds the memory a burst of
             broadcasts can hold while no client drains them; past it, new ones are dropped.
 
-    config OPENSHOCK_PORTAL_STARTUP_GRACE_S
-        int "Startup grace period (s)"
-        range 0 600
-        default 30
+    config OPENSHOCK_PORTAL_STARTUP_GRACE_MS
+        int "Startup grace period (ms)"
+        range 0 600000
+        default 30000
         help
             On a fully configured hub, how long after boot the portal waits for the gateway
             connection before it opens. It stays closed if the hub connects in time.
 
-    config OPENSHOCK_PORTAL_AUTO_CLOSE_S
-        int "Auto-close delay (s)"
-        range 10 3600
-        default 300
+    config OPENSHOCK_PORTAL_AUTO_CLOSE_MS
+        int "Auto-close delay (ms)"
+        range 10000 3600000
+        default 300000
         help
             Once the hub is online and no client is connected, the portal closes after this long.
 
