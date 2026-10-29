@@ -8,5 +8,5 @@
 
 namespace HostTest {
   void Sha256(const uint8_t* data, std::size_t length, uint8_t (&digest)[32]);
-  bool Sha256Fn(std::span<const uint8_t> data, std::span<uint8_t, 32> digest);
+  bool Sha256Fn(std::span<const std::span<const uint8_t>> parts, std::span<uint8_t, 32> digest);
 }  // namespace HostTest

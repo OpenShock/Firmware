@@ -32,7 +32,8 @@ def test_layout_is_what_the_firmware_header_describes():
     assert (magic, version, count, reserved) == (wwwimage.MAGIC, 1, 4, b'\0' * 4)
     assert image[:4] == b'OSWW'
     assert dir_len % 4 == 0
-    assert body_hash == hashlib.sha256(image[wwwimage.HEADER_LEN :]).digest()[:16]
+    # The hash covers the whole image, its own field zeroed
+    assert body_hash == hashlib.sha256(image[:12] + b'\0' * 16 + image[28:]).digest()[:16]
     assert len(image) % 4 == 0
 
     body_start = wwwimage.HEADER_LEN + dir_len
@@ -87,7 +88,9 @@ def corrupt(image: bytes, offset: int, value: bytes) -> bytes:
         (6, struct.pack('<H', 200), 'directory length out of range'),
         (8, struct.pack('<I', 2), 'directory length out of range'),
         (8, struct.pack('<I', 0x100000), 'directory length out of range'),
-        (12, b'\0' * 16, 'body hash mismatch'),
+        (12, b'\0' * 16, 'image hash mismatch'),
+        (28, b'\1\0\0\0', 'reserved header field not zero'),
+        (wwwimage.HEADER_LEN + 12, struct.pack('<I', 1), 'reserved field not zero'),
         (wwwimage.HEADER_LEN + 0, struct.pack('<H', 0xFFFF), 'path offset out of range'),
         (wwwimage.HEADER_LEN + 2, struct.pack('<H', 0x8000), 'unknown flags'),
         (wwwimage.HEADER_LEN + 4, struct.pack('<I', 0x10), 'body out of range'),
@@ -106,8 +109,16 @@ def test_entries_out_of_order_are_rejected():
     second = image[wwwimage.HEADER_LEN + 16 : wwwimage.HEADER_LEN + 18]
     image[wwwimage.HEADER_LEN : wwwimage.HEADER_LEN + 2] = second
     image[wwwimage.HEADER_LEN + 16 : wwwimage.HEADER_LEN + 18] = first
-    with pytest.raises(wwwimage.WwwImageError, match='not strictly increasing|body hash'):
+    with pytest.raises(wwwimage.WwwImageError, match='not strictly increasing|image hash'):
         wwwimage.parse(bytes(image))
+
+
+def test_a_hash_over_the_bodies_alone_is_refused():
+    # What the first draft of the format hashed: everything after the header
+    image = wwwimage.pack(ASSETS)
+    image = corrupt(image, 12, hashlib.sha256(image[wwwimage.HEADER_LEN :]).digest()[:16])
+    with pytest.raises(wwwimage.WwwImageError, match='image hash mismatch'):
+        wwwimage.parse(image)
 
 
 def test_a_truncated_image_is_rejected():

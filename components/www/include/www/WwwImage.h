@@ -10,8 +10,9 @@
 //   string table: NUL-terminated paths, no leading slash
 //   bodies: in entry order, each padded to 4 bytes
 //
-// body_hash is the truncated SHA-256 of everything after the header. Parse() checks every field before the
-// image is used: a failure means "no portal assets", never a partially trusted image. The image is smaller
+// body_hash is the truncated SHA-256 of the whole image (header included, with body_hash itself zeroed), so no
+// byte the parser reads goes unchecked; reserved fields must be zero. Parse() checks every field before the image
+// is used: a failure means "no portal assets", never a partially trusted image. The image is smaller
 // than the partition it sits in; the bytes after it are ignored.
 //
 // Pure C++ over a byte span, so the host tests cover it; the device side (WwwPartition.h) maps the
@@ -56,13 +57,15 @@ namespace OpenShock::Www {
     NotSorted,     // paths not strictly increasing
     BadFlags,
     BadBody,       // body before the directory, unaligned, or past the end
+    BadReserved,   // a reserved field of the header or an entry is not zero
     HashMismatch,
     HashFailed,  // the hasher itself failed
   };
   [[nodiscard]] const char* ParseErrorName(ParseError error);
 
-  /// @brief SHA-256 of `data` into `digest`; false when hashing is unavailable. Injected so the parser stays pure.
-  using Sha256Fn = Util::FunctionRef<bool(std::span<const uint8_t> data, std::span<uint8_t, 32> digest)>;
+  /// @brief SHA-256 of `parts`, concatenated, into `digest`; false when hashing is unavailable. Injected so the
+  ///        parser stays pure.
+  using Sha256Fn = Util::FunctionRef<bool(std::span<const std::span<const uint8_t>> parts, std::span<uint8_t, 32> digest)>;
 
   class Image {
   public:
@@ -77,6 +80,7 @@ namespace OpenShock::Www {
 
     /// @brief Bytes from the header to the end of the last body's padding: what an OTA hash of the image covers.
     [[nodiscard]] std::size_t ImageSize() const { return m_size; }
+    /// @brief The image's own (truncated) hash; it changes whenever any byte of the image does.
     [[nodiscard]] std::span<const uint8_t, kBodyHashSize> BodyHash() const { return m_bytes.subspan<12, kBodyHashSize>(); }
     [[nodiscard]] std::span<const uint8_t> Bytes() const { return m_bytes.first(m_size); }
 

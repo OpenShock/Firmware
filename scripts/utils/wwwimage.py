@@ -7,7 +7,7 @@ Mirrors components/www/include/www/WwwImage.h; change both together and bump VER
       version    u16   1
       count      u16   number of entries
       dir_len    u32   bytes of entries + string table (+ padding to 4)
-      body_hash  u8[16]  sha256 of everything after the header, truncated
+      body_hash  u8[16]  sha256 of the whole image with this field zeroed, truncated
       reserved   u8[4]  zero
     entry (16 B) x count, sorted by path (byte order)
       path_off   u16   offset into the string table
@@ -103,7 +103,8 @@ def pack(entries: list[Entry]) -> bytes:
     directory = bytes(table) + bytes(strings)
     directory += b'\0' * (dir_len - len(directory))
     after_header = directory + bytes(bodies)
-    body_hash = hashlib.sha256(after_header).digest()[:BODY_HASH_LEN]
+    header = struct.pack(HEADER_FORMAT, MAGIC, VERSION, len(ordered), dir_len, b'\0' * BODY_HASH_LEN, b'\0' * 4)
+    body_hash = hashlib.sha256(header + after_header).digest()[:BODY_HASH_LEN]
     header = struct.pack(HEADER_FORMAT, MAGIC, VERSION, len(ordered), dir_len, body_hash, b'\0' * 4)
     return header + after_header
 
@@ -122,13 +123,15 @@ def parse(data: bytes) -> Image:
     """Decode and fully validate an image (what the firmware checks at mount). Raises WwwImageError."""
     if len(data) < HEADER_LEN:
         raise WwwImageError('too short for a header')
-    magic, version, count, dir_len, body_hash, _reserved = struct.unpack_from(HEADER_FORMAT, data, 0)
+    magic, version, count, dir_len, body_hash, reserved = struct.unpack_from(HEADER_FORMAT, data, 0)
     if magic != MAGIC:
         raise WwwImageError(f'bad magic 0x{magic:08X}')
     if version != VERSION:
         raise WwwImageError(f'unsupported version {version}')
     if dir_len % ALIGN or dir_len < ENTRY_LEN * count or HEADER_LEN + dir_len > len(data):
         raise WwwImageError('directory length out of range')
+    if reserved != b'\0' * 4:
+        raise WwwImageError('reserved header field not zero')
     strings_start = HEADER_LEN + ENTRY_LEN * count
     strings = data[strings_start : HEADER_LEN + dir_len]
     body_start = HEADER_LEN + dir_len
@@ -137,7 +140,7 @@ def parse(data: bytes) -> Image:
     end = body_start
     previous = None
     for index in range(count):
-        path_off, flags, offset, size, _reserved = struct.unpack_from(
+        path_off, flags, offset, size, entry_reserved = struct.unpack_from(
             ENTRY_FORMAT, data, HEADER_LEN + ENTRY_LEN * index
         )
         if path_off >= len(strings):
@@ -153,6 +156,8 @@ def parse(data: bytes) -> Image:
             raise WwwImageError(f'entry {index}: body out of range')
         if flags & ~(FLAG_GZIP | FLAG_IMMUTABLE):
             raise WwwImageError(f'entry {index}: unknown flags 0x{flags:04X}')
+        if entry_reserved:
+            raise WwwImageError(f'entry {index}: reserved field not zero')
         entries.append(
             Entry(
                 path.decode('utf-8'),
@@ -163,8 +168,9 @@ def parse(data: bytes) -> Image:
         )
         end = max(end, offset + size + _pad(size))
 
-    if hashlib.sha256(data[HEADER_LEN:end]).digest()[:BODY_HASH_LEN] != body_hash:
-        raise WwwImageError('body hash mismatch')
+    hashed = data[:12] + b'\0' * BODY_HASH_LEN + data[12 + BODY_HASH_LEN : end]
+    if hashlib.sha256(hashed).digest()[:BODY_HASH_LEN] != body_hash:
+        raise WwwImageError('image hash mismatch')
     return Image(tuple(entries), body_hash, end)
 
 

@@ -15,6 +15,8 @@ namespace {
   {
     return static_cast<uint32_t>(p[0]) | (static_cast<uint32_t>(p[1]) << 8) | (static_cast<uint32_t>(p[2]) << 16) | (static_cast<uint32_t>(p[3]) << 24);
   }
+  constexpr std::size_t kHashOffset = 12;  // body_hash in the header
+
   std::size_t padded(std::size_t size)
   {
     return size + ((Www::kAlign - (size % Www::kAlign)) % Www::kAlign);
@@ -25,12 +27,13 @@ namespace {
     uint16_t flags;
     uint32_t offset;
     uint32_t size;
+    uint32_t reserved;
   };
 
   RawEntry rawEntry(std::span<const uint8_t> bytes, std::size_t index)
   {
     const uint8_t* p = bytes.data() + Www::kHeaderSize + Www::kEntrySize * index;
-    return {readU16(p), readU16(p + 2), readU32(p + 4), readU32(p + 8)};
+    return {readU16(p), readU16(p + 2), readU32(p + 4), readU32(p + 8), readU32(p + 12)};
   }
 
   // The path of entry `index`; the directory was validated by Parse, so this cannot run off the table.
@@ -65,8 +68,10 @@ const char* Www::ParseErrorName(ParseError error)
       return "unknown flags";
     case ParseError::BadBody:
       return "body out of range";
+    case ParseError::BadReserved:
+      return "reserved field not zero";
     case ParseError::HashMismatch:
-      return "body hash mismatch";
+      return "image hash mismatch";
     case ParseError::HashFailed:
       return "hashing failed";
   }
@@ -97,6 +102,9 @@ std::expected<Www::Image, Www::ParseError> Www::Image::Parse(std::span<const uin
   if (dirLen % kAlign != 0 || dirLen < kEntrySize * count || dirLen > bytes.size() - kHeaderSize) {
     return std::unexpected(ParseError::BadDirectory);
   }
+  if (readU32(bytes.data() + kHashOffset + kBodyHashSize) != 0) {
+    return std::unexpected(ParseError::BadReserved);
+  }
 
   const std::size_t stringsStart = kHeaderSize + kEntrySize * count;
   const std::size_t stringsLen   = kHeaderSize + dirLen - stringsStart;
@@ -122,6 +130,9 @@ std::expected<Www::Image, Www::ParseError> Www::Image::Parse(std::span<const uin
     if ((entry.flags & ~kKnownFlags) != 0) {
       return std::unexpected(ParseError::BadFlags);
     }
+    if (entry.reserved != 0) {
+      return std::unexpected(ParseError::BadReserved);
+    }
     // Checked against the span (not the image size we have not finished computing) with overflow-safe arithmetic.
     if (entry.offset < bodyStart || entry.offset % kAlign != 0 || entry.size > bytes.size() || entry.offset > bytes.size() - entry.size) {
       return std::unexpected(ParseError::BadBody);
@@ -132,11 +143,16 @@ std::expected<Www::Image, Www::ParseError> Www::Image::Parse(std::span<const uin
     return std::unexpected(ParseError::BadBody);  // a body's padding runs past the end
   }
 
+  // The header as it was hashed: body_hash zeroed
+  std::array<uint8_t, kHeaderSize> header;
+  memcpy(header.data(), bytes.data(), kHeaderSize);
+  memset(header.data() + kHashOffset, 0, kBodyHashSize);
+  const std::array<std::span<const uint8_t>, 2> parts {std::span<const uint8_t>(header), bytes.subspan(kHeaderSize, end - kHeaderSize)};
   std::array<uint8_t, 32> digest {};
-  if (!sha256(bytes.subspan(kHeaderSize, end - kHeaderSize), digest)) {
+  if (!sha256(parts, digest)) {
     return std::unexpected(ParseError::HashFailed);
   }
-  if (memcmp(digest.data(), bytes.data() + 12, kBodyHashSize) != 0) {
+  if (memcmp(digest.data(), bytes.data() + kHashOffset, kBodyHashSize) != 0) {
     return std::unexpected(ParseError::HashMismatch);
   }
 

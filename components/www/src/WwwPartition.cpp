@@ -12,11 +12,19 @@ const esp_partition_t* Www::FindPartition()
   return esp_partition_find_first(kPartitionType, ESP_PARTITION_SUBTYPE_ANY, kPartitionLabel);
 }
 
-bool Www::Sha256(std::span<const uint8_t> data, std::span<uint8_t, 32> digest)
+bool Www::Sha256(std::span<const std::span<const uint8_t>> parts, std::span<uint8_t, 32> digest)
 {
   OpenShock::SHA256 sha;
   std::array<uint8_t, 32> out;
-  if (!sha.begin() || !sha.update(data.data(), data.size()) || !sha.finish(out)) {
+  if (!sha.begin()) {
+    return false;
+  }
+  for (std::span<const uint8_t> part : parts) {
+    if (!sha.update(part.data(), part.size())) {
+      return false;
+    }
+  }
+  if (!sha.finish(out)) {
     return false;
   }
   std::copy(out.begin(), out.end(), digest.begin());
@@ -63,7 +71,8 @@ bool Www::ImageSha256(const esp_partition_t* partition, std::array<uint8_t, 32>&
     if (!image) {
       return false;
     }
-    return Sha256(image->Bytes(), digest);
+    const std::span<const uint8_t> whole = image->Bytes();
+    return Sha256(std::span(&whole, 1), digest);
   });
 }
 

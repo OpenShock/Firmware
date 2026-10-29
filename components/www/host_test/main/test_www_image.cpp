@@ -185,8 +185,12 @@ TEST_CASE("Each corrupted header field is rejected with its own reason", "[www]"
   ExpectError(bytes, Www::ParseError::BadDirectory);
 
   bytes = Fixture();
-  bytes[12] ^= 0x01;  // body hash
+  bytes[12] ^= 0x01;  // the hash itself
   ExpectError(bytes, Www::ParseError::HashMismatch);
+
+  bytes = Fixture();
+  bytes[28] = 0x01;  // reserved
+  ExpectError(bytes, Www::ParseError::BadReserved);
 
   bytes = Fixture();
   bytes[bytes.size() - 1] ^= 0x01;  // a body byte: the hash no longer matches
@@ -204,6 +208,10 @@ TEST_CASE("Each corrupted entry field is rejected", "[www]")
   bytes = Fixture();
   Put16(bytes, entry0 + 2, 0x8000);  // unknown flag
   ExpectError(bytes, Www::ParseError::BadFlags);
+
+  bytes = Fixture();
+  Put32(bytes, entry0 + 12, 1);  // reserved
+  ExpectError(bytes, Www::ParseError::BadReserved);
 
   bytes = Fixture();
   Put32(bytes, entry0 + 4, 0x10);  // body inside the header
@@ -244,7 +252,7 @@ TEST_CASE("Each corrupted entry field is rejected", "[www]")
 
 TEST_CASE("A failing hasher is reported, not treated as a match", "[www]")
 {
-  auto image = Www::Image::Parse(Fixture(), [](std::span<const uint8_t>, std::span<uint8_t, 32>) { return false; });
+  auto image = Www::Image::Parse(Fixture(), [](std::span<const std::span<const uint8_t>>, std::span<uint8_t, 32>) { return false; });
   TEST_ASSERT_FALSE(image.has_value());
   TEST_ASSERT_EQUAL_STRING(Www::ParseErrorName(Www::ParseError::HashFailed), Www::ParseErrorName(image.error()));
 }
