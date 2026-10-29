@@ -76,6 +76,9 @@ static TaskHandle_t _taskHandle = nullptr;
 static OpenShock::SemVer _requestedVersion;
 static bool _requestedByHub                          = false;  // Guarded by _requestedVersionMutex, like _requestedVersion
 static OpenShock::SimpleMutex _requestedVersionMutex = {};
+// Held by whoever writes the flash an install writes: the update task for the whole install (until the restart on
+// success), the layout migration from its www write to its restart (TryLockFlashWrites).
+static OpenShock::SimpleMutex _flashWriteMutex = {};
 
 using namespace OpenShock;
 
@@ -454,6 +457,13 @@ static void otaum_updatetask(void* arg)
 
     if (versionStr == OpenShock::Constants::FW_VERSION) {
       OS_LOGI(TAG, "Requested version is already installed");
+      continue;
+    }
+
+    // Never alongside the layout migration's www and partition table writes; it restarts the hub when it is done
+    ScopedTryLock flashWrites(&_flashWriteMutex, 0);
+    if (!flashWrites.isLocked()) {
+      OS_LOGW(TAG, "The partition layout migration is writing flash; not updating now");
       continue;
     }
 
@@ -890,6 +900,16 @@ bool OtaUpdateManager::TryStartMigrationUpdate(const OpenShock::SemVer& version)
   OS_LOGI(TAG, "Installing firmware version %s to finish the partition layout migration", version.toString().c_str());
 
   return otaum_try_queue_update_request(version, true);
+}
+
+bool OtaUpdateManager::TryLockFlashWrites()
+{
+  return _flashWriteMutex.lock(0);
+}
+
+void OtaUpdateManager::UnlockFlashWrites()
+{
+  _flashWriteMutex.unlock();
 }
 
 bool OtaUpdateManager::RequestUpdateCheck()

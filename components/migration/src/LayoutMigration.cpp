@@ -405,6 +405,16 @@ namespace {
       return Step::RetryLater;
     }
 
+    // From here on no OTA install may run: it writes static0 too, and the table must not change under it. Held until
+    // the restart, or released on the way out of a failed step.
+    if (!OtaUpdateManager::TryLockFlashWrites()) {
+      OS_LOGI(TAG, "An update is being installed; migrating later");
+      return Step::Retry;
+    }
+    struct UnlockOnReturn {
+      ~UnlockOnReturn() { OtaUpdateManager::UnlockFlashWrites(); }
+    } unlockOnReturn;  // Every return from here is a failure; success ends in esp_restart
+
     // From here the portal's 1.x assets are overwritten (www is the 1.x static0): the portal stays closed until the restart
     if (!CaptivePortal::ForceClose(5000)) {
       OS_LOGE(TAG, "Failed to close the captive portal");
