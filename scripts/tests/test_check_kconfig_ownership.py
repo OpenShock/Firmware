@@ -62,3 +62,7 @@ def test_a_quoted_requirement_counts(tmp_path):
     component(tmp_path, 'base', kconfig='config OPENSHOCK_BASE\n    int "x"\n')
     component(tmp_path, 'top', priv='"base"', source='CONFIG_OPENSHOCK_BASE')
     assert violations(tmp_path) == []
+
+
+def test_the_repository_has_no_violations():
+    assert check_kconfig_ownership.find_violations(check_kconfig_ownership.ROOT / 'components') == []
