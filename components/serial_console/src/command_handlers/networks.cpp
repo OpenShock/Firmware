@@ -1,6 +1,8 @@
+#include <freertos/FreeRTOS.h>
+
 #include "serial_console/command_handlers/common.h"
 
-#include "config/Config.h"
+#include "wifi/WiFiConfig.h"
 #include "wifi/WiFiManager.h"
 #include "json/Json.h"
 

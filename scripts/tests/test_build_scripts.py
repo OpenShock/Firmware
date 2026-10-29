@@ -16,7 +16,7 @@ def test_reads_the_repository_partition_table():
 
     assert table['static0']['offset'] == 0x353000
     assert table['static0']['size'] == 0x9D000
-    assert table['config']['size'] == 0x3000
+    assert table['cfg']['size'] == 0x3000
     assert partitions.first_app_partition(table)['offset'] == 0x10000
 
 

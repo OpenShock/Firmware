@@ -8,11 +8,13 @@
 # captiveportal/Manager.h (std types only); CaptivePortalInstance.h stays in src/ so
 # esp_http_server and friends do not leak into consumers.
 idf_component_register(
-  SRCS              "src/captiveportal/CaptivePortalInstance.cpp"
+  SRCS              "src/captiveportal/CaptivePortalConfig.cpp"
+                    "src/captiveportal/CaptivePortalInstance.cpp"
                     "src/captiveportal/Manager.cpp"
   INCLUDE_DIRS      "include"
   PRIV_INCLUDE_DIRS "src"
-  PRIV_REQUIRES     core config device_control                        # wifi/gateway/message handlers/AppHooks; Config::; CommandHandler/EStopManager
+  REQUIRES          config serialization                              # its config section (captiveportal/CaptivePortalConfig.h)
+  PRIV_REQUIRES     core device_control                        # wifi/gateway/message handlers/AppHooks; Config::; CommandHandler/EStopManager
                     common chipset logging temporal osjson serialization   # foundation utilities, json, HubToLocalMessage fbs
                     dns_server fs http hwutil rfc8908                    # DNSServer, StaticFs, ContentTypes, PartitionUtils, RFC8908Handler
                     esp_http_server esp_netif esp_timer esp_wifi

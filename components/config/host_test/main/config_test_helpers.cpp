@@ -1,6 +1,12 @@
+#include <freertos/FreeRTOS.h>
+
 #include "config_test_helpers.h"
 
 #include "unity.h"
+
+#include "json/Json.h"
+
+#include <nvs_flash.h>
 
 #include <cstring>
 #include <string>
@@ -9,9 +15,47 @@
 using namespace OpenShock;
 
 namespace ConfigTest {
-  Config::RootConfig MakeSampleConfig()
+  void Full::ToDefault()
   {
-    Config::RootConfig config;
+    rf.ToDefault();
+    wifi.ToDefault();
+    captivePortal.ToDefault();
+    backend.ToDefault();
+    serialInput.ToDefault();
+    otaUpdate.ToDefault();
+    estop.ToDefault();
+  }
+
+  bool Full::SaveNvs(const char* partition) const
+  {
+    if (!rf.SaveNvs(partition, nullptr) || !wifi.SaveNvs(partition, nullptr) || !captivePortal.SaveNvs(partition, nullptr) || !backend.SaveNvs(partition, nullptr) || !serialInput.SaveNvs(partition, nullptr) || !otaUpdate.SaveNvs(partition, nullptr)
+        || !estop.SaveNvs(partition, nullptr))
+    {
+      return false;
+    }
+    auto root = Config::Nvs::Handle::Open(partition, Keys::Ns::kRoot, true);
+    return root && root->SetU8(Keys::Root::kSchema, Keys::kSchemaVersion) && root->Commit();
+  }
+
+  std::string Full::ToJSON(bool withSensitiveData) const
+  {
+    JSON::StringWriter writer;
+    json_gen_str_t* gen = writer.gen();
+    json_gen_start_object(gen);
+    rf.ToJSON(gen, "rf", withSensitiveData);
+    wifi.ToJSON(gen, "wifi", withSensitiveData);
+    captivePortal.ToJSON(gen, "captivePortal", withSensitiveData);
+    backend.ToJSON(gen, "backend", withSensitiveData);
+    serialInput.ToJSON(gen, "serialInput", withSensitiveData);
+    otaUpdate.ToJSON(gen, "otaUpdate", withSensitiveData);
+    estop.ToJSON(gen, "estop", withSensitiveData);
+    json_gen_end_object(gen);
+    return writer.finish();
+  }
+
+  Full MakeSampleConfig()
+  {
+    Full config;
 
     config.rf = Config::RFConfig(GPIO_NUM_25, false);
 
@@ -30,54 +74,97 @@ namespace ConfigTest {
     return config;
   }
 
-  std::vector<uint8_t> Serialize(const Config::RootConfig& config, bool withSensitiveData)
+  std::vector<uint8_t> Serialize(const Full& config, bool withSensitiveData)
   {
     // ForceDefaults like the firmware's own writes, so the bytes match what Config stores and GetRaw returns
     flatbuffers::FlatBufferBuilder builder;
     builder.ForceDefaults(true);
-    auto root = config.ToFlatbuffers(builder, withSensitiveData);
+    auto rf            = config.rf.ToFlatbuffers(builder, withSensitiveData);
+    auto wifi          = config.wifi.ToFlatbuffers(builder, withSensitiveData);
+    auto captivePortal = config.captivePortal.ToFlatbuffers(builder, withSensitiveData);
+    auto backend       = config.backend.ToFlatbuffers(builder, withSensitiveData);
+    auto serialInput   = config.serialInput.ToFlatbuffers(builder, withSensitiveData);
+    auto otaUpdate     = config.otaUpdate.ToFlatbuffers(builder, withSensitiveData);
+    auto estop         = config.estop.ToFlatbuffers(builder, withSensitiveData);
+    auto root          = Serialization::Configuration::CreateHubConfig(builder, rf, wifi, captivePortal, backend, serialInput, otaUpdate, estop);
     Serialization::Configuration::FinishHubConfigBuffer(builder, root);
     return std::vector<uint8_t>(builder.GetBufferPointer(), builder.GetBufferPointer() + builder.GetSize());
   }
 
-  bool Deserialize(const uint8_t* data, std::size_t size, Config::RootConfig& out)
+  bool Deserialize(const uint8_t* data, std::size_t size, Full& out)
   {
-    if (size > Config::MaxConfigSize) {
-      return false;  // the Verifier constructor would assert
-    }
-    flatbuffers::Verifier::Options options {
-      .max_size = Config::MaxConfigSize + 1,
-    };
-    flatbuffers::Verifier verifier(data, size, options);
-    if (!verifier.VerifyBuffer<Serialization::Configuration::HubConfig>()) {
+    auto json = Config::HubConfigToJSON(std::span<const uint8_t>(data, size));
+    if (!json) {
       return false;
     }
-    return out.FromFlatbuffers(flatbuffers::GetRoot<Serialization::Configuration::HubConfig>(data));
+    JSON::JsonDocument doc;
+    if (!doc.parse(*json)) {
+      return false;
+    }
+    JSON::JsonView root = doc.root();
+    return out.rf.FromJSON(root["rf"]) && out.wifi.FromJSON(root["wifi"]) && out.captivePortal.FromJSON(root["captivePortal"]) && out.backend.FromJSON(root["backend"]) && out.serialInput.FromJSON(root["serialInput"])
+        && out.otaUpdate.FromJSON(root["otaUpdate"]) && out.estop.FromJSON(root["estop"]);
   }
 
-  bool InitFrom(const uint8_t* data, std::size_t size)
+  static void wipePartition(const char* label)
   {
-    HostConfigFs::reset();
-    if (data != nullptr) {
-      HostConfigFs::files()[kConfigPath].assign(data, data + size);
-    }
-    Config::Init();
-    return HostConfigFs::writeCount == 0;
+    nvs_flash_deinit_partition(label);  // ESP_ERR_NVS_NOT_INITIALIZED when it is not up, which is fine
+    TEST_ASSERT_EQUAL(ESP_OK, nvs_flash_erase_partition(label));
+  }
+
+  void WipeStore()
+  {
+    wipePartition(Keys::kPartitionCfg);
+    wipePartition(Keys::kPartitionShared);
+    // Back up right away, so a test can write straight into either store; Config::Init's own init is then a no-op
+    TEST_ASSERT_EQUAL(ESP_OK, nvs_flash_init_partition(Keys::kPartitionCfg));
+    TEST_ASSERT_EQUAL(ESP_OK, nvs_flash_init_partition(Keys::kPartitionShared));
+    HostLfs::reset();
   }
 
   void InitDefault()
   {
-    InitFrom(nullptr, 0);
-    HostConfigFs::writeCount = 0;
+    WipeStore();
+    Config::Init();
   }
 
-  std::vector<uint8_t> StoredFile()
+  bool InitFromLegacy(const uint8_t* data, std::size_t size)
   {
-    auto it = HostConfigFs::files().find(kConfigPath);
-    return it == HostConfigFs::files().end() ? std::vector<uint8_t>() : it->second;
+    WipeStore();
+    Full expected;
+    const bool parses = data != nullptr && Deserialize(data, size, expected);
+    if (data != nullptr) {
+      HostLfs::files()[kLegacyPath].assign(data, data + size);
+    }
+    Config::Init();
+    TEST_ASSERT_EQUAL_INT_MESSAGE(0, HostLfs::writeCount, "the 1.x file must be left untouched");
+    if (!parses) {
+      return false;
+    }
+    // Imported when what the hub runs with is what the file held (as this firmware decodes it)
+    return expected.ToJSON() == Snapshot().ToJSON();
   }
 
-  Config::RootConfig Snapshot()
+  void Reload()
+  {
+    Config::Init();
+  }
+
+  void InitWith(const Full& config)
+  {
+    WipeStore();
+    TEST_ASSERT_TRUE(config.SaveNvs(Keys::kPartitionCfg));
+    Reload();
+  }
+
+  std::size_t UsedEntries()
+  {
+    nvs_stats_t stats {};
+    TEST_ASSERT_EQUAL(ESP_OK, nvs_get_stats(Keys::kPartitionCfg, &stats));
+    return stats.used_entries;
+  }
+
+  Full Snapshot()
   {
     // Every getter must succeed; unwraps the returned optional.
     auto get = [](auto section) {
@@ -85,7 +172,7 @@ namespace ConfigTest {
       return *std::move(section);
     };
 
-    Config::RootConfig config;
+    Full config;
     config.rf            = get(Config::GetRFConfig());
     config.wifi          = get(Config::GetWiFiConfig());
     config.captivePortal = get(Config::GetCaptivePortalConfig());
@@ -105,7 +192,7 @@ namespace ConfigTest {
     TEST_ASSERT_EQUAL_UINT8_ARRAY_MESSAGE(expected.bssid.data(), actual.bssid.data(), 6, "wifi credentials bssid");
   }
 
-  void AssertConfigEqual(const Config::RootConfig& expected, const Config::RootConfig& actual, bool withSensitiveData)
+  void AssertConfigEqual(const Full& expected, const Full& actual, bool withSensitiveData)
   {
     TEST_ASSERT_EQUAL_INT_MESSAGE(expected.rf.txPin, actual.rf.txPin, "rf.txPin");
     TEST_ASSERT_EQUAL_MESSAGE(expected.rf.keepAliveEnabled, actual.rf.keepAliveEnabled, "rf.keepAliveEnabled");

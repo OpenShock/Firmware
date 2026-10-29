@@ -7,13 +7,12 @@ include($ENV{IDF_PATH}/tools/cmake/project.cmake)
 set(COMPONENTS main)
 
 # No freertos mock: this suite runs on ESP-IDF's real FreeRTOS POSIX port, so the real
-# SimpleMutexes guard the Config:: store exactly as on the device. The driver mock
-# provides <driver/gpio.h> for the real Chipset.h, the esp_wifi mock the real
-# <esp_wifi_types.h> (wifi_auth_mode_t) - neither has a linux implementation; the
-# esp_wifi mock in turn needs the esp_netif and lwip mocks. Plus the shared host-test
-# stand-ins (Logging.h, openshock_board.h, CONFIG_OPENSHOCK_*).
+# SimpleMutexes guard the Config:: store exactly as on the device, and the real nvs_flash
+# and esp_partition (linux flash emulation) hold it. The esp_wifi mock provides the real
+# <esp_wifi_types.h> (wifi_auth_mode_t), which has no linux implementation; it in turn
+# needs the esp_netif and lwip mocks. Plus the shared host-test stand-ins (Logging.h,
+# openshock_board.h, CONFIG_OPENSHOCK_*).
 list(APPEND EXTRA_COMPONENT_DIRS
-     "$ENV{IDF_PATH}/tools/mocks/driver/"
      "$ENV{IDF_PATH}/tools/mocks/esp_wifi/"
      "$ENV{IDF_PATH}/tools/mocks/esp_netif/"
      "$ENV{IDF_PATH}/tools/mocks/lwip/"

@@ -1,8 +1,10 @@
+#include <freertos/FreeRTOS.h>
+
 #include "serial_console/command_handlers/common.h"
 
 #include "CommandHandler.h"
-#include "config/Config.h"
 #include "Convert.h"
+#include "radio/RFConfig.h"
 #include "StringHelpers.h"
 
 static void handleKeepAliveCommand(std::string_view arg, bool isAutomated)

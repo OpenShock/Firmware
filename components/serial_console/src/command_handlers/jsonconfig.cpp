@@ -1,6 +1,6 @@
 #include "serial_console/command_handlers/common.h"
 
-#include "config/Config.h"
+#include "config/Store.h"
 
 #include <esp_system.h>
 

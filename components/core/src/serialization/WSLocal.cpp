@@ -3,10 +3,10 @@
 const char* const TAG = "WSLocal";
 
 #include "Chipset.h"
-#include "config/Config.h"
-#include "config/WiFiAuthMode.h"
+#include "config/Wire.h"
 #include "Logging.h"
 #include "util/HexUtils.h"
+#include "wifi/WiFiAuthMode.h"
 #include "wifi/WiFiNetwork.h"
 
 #include "serialization/_fbs/HubToLocalMessage_generated.h"

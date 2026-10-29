@@ -6,11 +6,11 @@
 const char* const TAG = "GatewayClient";
 
 #include "AppHooks.h"
-#include "config/Config.h"
 #include "events/Events.h"
 #include "Logging.h"
 #include "message_handlers/WebSocket.h"
 #include "OpenShock.h"
+#include "OtaUpdateConfig.h"
 #include "serialization/WSGateway.h"
 #include "Temporal.h"
 #include "visual/VisualStateManager.h"

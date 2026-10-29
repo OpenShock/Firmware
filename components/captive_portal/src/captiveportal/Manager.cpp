@@ -7,13 +7,15 @@
 const char* const TAG = "CaptivePortal";
 
 #include "AppHooks.h"
+#include "BackendConfig.h"
+#include "captiveportal/CaptivePortalConfig.h"
 #include "captiveportal/CaptivePortalInstance.h"
 #include "CommandHandler.h"
-#include "config/Config.h"
 #include "FormatHelpers.h"
 #include "GatewayConnectionManager.h"
 #include "Logging.h"
 #include "Temporal.h"
+#include "wifi/WiFiConfig.h"
 
 #include <esp_mac.h>
 #include <esp_netif.h>

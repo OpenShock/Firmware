@@ -1,3 +1,5 @@
+#include <freertos/FreeRTOS.h>
+
 #include "GatewayConnectionManager.h"
 
 const char* const TAG = "GatewayConnectionManager";
@@ -5,7 +7,7 @@ const char* const TAG = "GatewayConnectionManager";
 #include "visual/VisualStateManager.h"
 
 #include "AppHooks.h"
-#include "config/Config.h"
+#include "BackendConfig.h"
 #include "events/Events.h"
 #include "GatewayClient.h"
 #include "http/JsonAPI.h"

@@ -1,9 +1,11 @@
+#include <freertos/FreeRTOS.h>
+
 #include "serial_console/command_handlers/common.h"
 
 #include "CommandHandler.h"
-#include "config/Config.h"
 #include "Convert.h"
 #include "enums/SetGPIOResultCode.h"
+#include "radio/RFConfig.h"
 
 static void handleRfTxPinCommand(std::string_view arg, bool isAutomated)
 {

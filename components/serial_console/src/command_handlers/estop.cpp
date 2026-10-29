@@ -1,7 +1,9 @@
+#include <freertos/FreeRTOS.h>
+
 #include "serial_console/command_handlers/common.h"
 
-#include "config/Config.h"
 #include "Convert.h"
+#include "estop/EStopConfig.h"
 #include "estop/EStopManager.h"
 
 static void handleEStopEnabledCommand(std::string_view arg, bool isAutomated)

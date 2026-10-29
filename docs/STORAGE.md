@@ -1,0 +1,94 @@
+# Storage and partition layouts
+
+How the firmware lays out flash, where it keeps its config, and how a 1.x hub's littlefs config partition becomes the
+NVS config store in place. The reasoning behind each choice is in the design document (OpenShock Firmware 2.0:
+Storage and Partition Migration Design); this page describes what the code does.
+
+## Partition tables
+
+One table, `partitions/ota_4mb.csv`, for every board whatever its flash size. Board files never name it.
+
+| Partition | Offset | Size | 1.x (`partitions/legacy/ota_4mb_v1.csv`) |
+| --- | --- | --- | --- |
+| `nvs` | 0x9000 | 20 KiB | the same |
+| `otadata` | 0xE000 | 8 KiB | the same |
+| `app0`, `app1` | 0x10000, 0x1B0000 | 1,664 KiB each | the same |
+| `cfg` (data/nvs) | 0x350000 | 12 KiB | littlefs `config` (data/spiffs) |
+| `static0` (data/spiffs) | 0x353000 | 628 KiB | the same |
+| `coredump` | 0x3F0000 | 64 KiB | the same |
+
+It is the 1.x geometry entry for entry: a fielded hub rewrites its table in place and nothing moves. Only `config`
+changes, in type and label. The flash past 4 MB on bigger boards stays unused.
+
+## Config
+
+The config lives in the `cfg` NVS partition as typed keys, one namespace per section. At 12 KiB (three NVS pages, one
+always kept free for compaction) it holds the whole config with some 32 long WiFi credentials, more than the 4 KiB
+1.x config file did; it fills up at about 36. The config component
+(`components/config`) is only the framework; each module owns its section, its keys and its accessors:
+
+| Section | Owner | NVS namespaces |
+| --- | --- | --- |
+| `rf` | device_control (`radio/RFConfig.h`) | `rf` |
+| `wifi` | core (`wifi/WiFiConfig.h`) | `wifi.cfg`, `wifi` (one blob per credential, key = its id) |
+| `captivePortal` | captive_portal (`captiveportal/CaptivePortalConfig.h`) | `portal` |
+| `backend` | core (`BackendConfig.h`) | `backend` |
+| `serialInput` | serial_console (`serial_console/SerialInputConfig.h`) | `serial` |
+| `otaUpdate` | core (`OtaUpdateConfig.h`) | `ota` |
+| `estop` | device_control (`estop/EStopConfig.h`) | `estop` |
+
+The `estop` namespace also holds the E-Stop latch, `latched` (u8), which is state rather than config: it is not in
+`jsonconfig` or the wire form. The E-Stop task writes it when the E-Stop activates and when it is cleared with the
+button, after the change is already in effect. At boot it is read before anything can transmit, and a set latch keeps the
+E-Stop active until it is cleared with the button. A missing key reads as not latched, so a fresh hub starts usable, and
+a read error reads as latched. A latch on a hub whose E-Stop is disabled is dropped, since no button could clear it.
+A factory reset clears it. A latch set while another config write holds the store (the migration's table write, for
+one) reaches flash only once that write is done.
+
+The store's own namespace is `root`, with `schema` (u8, 1) marking a filled store. Namespace and key names are at
+most 15 characters and are permanent once hubs hold them: renaming one is a migration, not an edit. A missing key
+reads as its default and an unknown key is ignored, so adding or removing a field never changes the schema.
+
+To add a section, define a value type with `ToDefault`, `LoadNvs`, `SaveNvs`, `FromJSON`, `ToJSON` and
+`ToFlatbuffers`, and one `Config::Section<T>` for it in the module (`config/Section.h` has the contract). It joins
+`jsonconfig`, `rawconfig`, the local protocol's Ready message and factory reset through the section registry.
+
+Where the store is:
+
+- `cfg` once the table has it. On the first boot after the table rewrite `cfg` still holds the 1.x littlefs; it is
+  erased before NVS opens it.
+- On the 1.x table, which has no `cfg`, the same namespaces in the shared `nvs` partition. The first boot that finds
+  `cfg` copies them over key by key, compares the copy, and deletes the shared one.
+- An empty store is filled once: from the 1.x littlefs config file (`/config` on the 1.x `config` partition, read
+  only, so a rollback to 1.x still finds it) when there is one, else from every section's defaults.
+- Without any usable NVS, the hub runs on defaults in RAM and logs it.
+
+The shared `nvs` belongs to ESP-IDF (PHY calibration cache) and may be erased at any time; nothing of OpenShock's is
+kept there once `cfg` exists. The WiFi driver's own NVS store is compiled out (`CONFIG_ESP_WIFI_NVS_ENABLED=n`).
+`sysinfo` on the serial console prints where the config is.
+
+## The config partition migration
+
+`Config::MigrateToCfgPartition()` (`config/Migration.h`) moves a 1.x hub onto `cfg`. Nothing calls it yet: the release
+that pipelines the storage migrations decides when it runs.
+
+1. It refuses unless the live table has the 1.x littlefs `config` partition and no `cfg`, and the config is in the
+   shared `nvs` (where a 1.x hub keeps it after its first boot on this firmware, imported from the 1.x file).
+2. It retypes `config` as `cfg` (data/nvs) in a copy of the live table and re-seals the MD5
+   (`components/partition_layout`). Every offset and size stays, so the bootloader that boots the 1.x table boots it.
+3. Config writes are held, the WiFi driver's stale `nvs.net80211` store is dropped, NVS is closed, and the table sector
+   is erased and written through the OTA path and read back. A write that will not stick puts the old table back; the
+   hub never restarts without a table that parses.
+4. The hub restarts; `Store` erases the littlefs left in `cfg` and moves the config in.
+
+### Recovery
+
+The table sector's erase-to-write window (one sector, well under a second, once per hub) is the one step a power cut
+cannot recover from: the bootloader then finds no partition table. The app and config are still on flash, so writing
+the board's table restores the hub with its config:
+
+```sh
+esptool write_flash 0x8000 partition-table.bin    # this board's, from its release
+```
+
+Flashing the merged image for the board at 0x0 also works but erases the config.

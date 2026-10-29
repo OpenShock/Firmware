@@ -1,6 +1,8 @@
-// Upgrade safety: hubs flashed from the Arduino firmware (1.5.x releases and the
-// develop branch) must keep their config. The fixtures are the exact bytes those
-// firmwares stored in the "config" partition (see legacy_fixtures.h).
+// Upgrade safety: hubs flashed from the Arduino firmware (1.5.x releases and the develop branch) must keep their
+// config. The fixtures are the exact bytes those firmwares stored in the "config" partition (see
+// legacy_fixtures.h); the 1.9.9 pivot imports that file into NVS on the first boot that finds no NVS config.
+#include <freertos/FreeRTOS.h>
+
 #include "unity.h"
 
 #include "config_test_helpers.h"
@@ -15,9 +17,9 @@ using namespace ConfigTest;
 
 namespace {
   // The settings every legacy fixture holds (see legacy_fixtures.h).
-  Config::RootConfig ExpectedLegacyConfig(bool hasAuthModeAndBssid, bool keepAlive)
+  Full ExpectedLegacyConfig(bool hasAuthModeAndBssid, bool keepAlive)
   {
-    Config::RootConfig config;
+    Full config;
     config.rf = Config::RFConfig(GPIO_NUM_15, keepAlive);
 
     Config::WiFiCredentials home(1, "HomeNet", "hunter22");
@@ -66,19 +68,22 @@ namespace {
                                     R"("estop":{"enabled":true,"gpioPin":13}})";
 }  // namespace
 
-TEST_CASE("Config stored by develop (Arduino) firmware loads unchanged", "[config][legacy]")
+TEST_CASE("Config stored by develop (Arduino) firmware is imported unchanged", "[config][legacy]")
 {
-  TEST_ASSERT_TRUE_MESSAGE(InitFrom(Legacy::kDevelopConfig, sizeof(Legacy::kDevelopConfig)), "Init fell back to defaults");
+  TEST_ASSERT_TRUE_MESSAGE(InitFromLegacy(Legacy::kDevelopConfig, sizeof(Legacy::kDevelopConfig)), "Init fell back to defaults");
   AssertConfigEqual(ExpectedLegacyConfig(true, false), Snapshot());
 
-  // Loading alone must not rewrite the file.
-  TEST_ASSERT_EQUAL_size_t(sizeof(Legacy::kDevelopConfig), StoredFile().size());
-  TEST_ASSERT_EQUAL_UINT8_ARRAY(Legacy::kDevelopConfig, StoredFile().data(), sizeof(Legacy::kDevelopConfig));
+  // Imported into NVS: a reboot loads it from there, with or without the file.
+  Reload();
+  AssertConfigEqual(ExpectedLegacyConfig(true, false), Snapshot());
+  HostLfs::files().clear();
+  Reload();
+  AssertConfigEqual(ExpectedLegacyConfig(true, false), Snapshot());
 }
 
-TEST_CASE("Config stored by 1.5.2 release firmware loads unchanged", "[config][legacy]")
+TEST_CASE("Config stored by 1.5.2 release firmware is imported unchanged", "[config][legacy]")
 {
-  TEST_ASSERT_TRUE_MESSAGE(InitFrom(Legacy::kV152Config, sizeof(Legacy::kV152Config)), "Init fell back to defaults");
+  TEST_ASSERT_TRUE_MESSAGE(InitFromLegacy(Legacy::kV152Config, sizeof(Legacy::kV152Config)), "Init fell back to defaults");
 
   // 1.5.2 stored no auth mode / BSSID: they read back as unknown / not pinned.
   // OTA updates and backend management are off in this file, which 1.5.2 encoded
@@ -87,17 +92,39 @@ TEST_CASE("Config stored by 1.5.2 release firmware loads unchanged", "[config][l
   AssertConfigEqual(ExpectedLegacyConfig(false, true), Snapshot());
 }
 
+TEST_CASE("The 1.x file is read once: a store that has a config ignores it", "[config][legacy]")
+{
+  InitWith(MakeSampleConfig());
+  HostLfs::files()[kLegacyPath].assign(Legacy::kDevelopConfig, Legacy::kDevelopConfig + sizeof(Legacy::kDevelopConfig));
+  Reload();
+  AssertConfigEqual(MakeSampleConfig(), Snapshot());
+  TEST_ASSERT_EQUAL_INT(0, HostLfs::writeCount);
+}
+
+TEST_CASE("A 1.x partition that does not mount, or has no file, gives the defaults", "[config][legacy]")
+{
+  TEST_ASSERT_FALSE(InitFromLegacy(nullptr, 0));
+  AssertConfigEqual(Full(), Snapshot());
+
+  WipeStore();
+  HostLfs::mountable = false;
+  HostLfs::files()[kLegacyPath].assign(Legacy::kDevelopConfig, Legacy::kDevelopConfig + sizeof(Legacy::kDevelopConfig));
+  Config::Init();
+  AssertConfigEqual(Full(), Snapshot());
+  HostLfs::mountable = true;
+}
+
 TEST_CASE("1.5.2 booleans stored as false keep their value", "[config][legacy]")
 {
   // kV152ConfigKeepAliveOff has rf.keepalive_enabled, ota.is_enabled and
   // ota.allow_backend_management all false.
-  TEST_ASSERT_TRUE(InitFrom(Legacy::kV152ConfigKeepAliveOff, sizeof(Legacy::kV152ConfigKeepAliveOff)));
+  TEST_ASSERT_TRUE(InitFromLegacy(Legacy::kV152ConfigKeepAliveOff, sizeof(Legacy::kV152ConfigKeepAliveOff)));
 
   bool allOn;
   {
     // Scoped: TEST_IGNORE longjmps out, skipping destructors.
-    const Config::RootConfig loaded = Snapshot();
-    allOn                           = loaded.rf.keepAliveEnabled && loaded.otaUpdate.isEnabled && loaded.otaUpdate.allowBackendManagement;
+    const Full loaded = Snapshot();
+    allOn             = loaded.rf.keepAliveEnabled && loaded.otaUpdate.isEnabled && loaded.otaUpdate.allowBackendManagement;
   }
   if (allOn) {
     // 1.5.2's schema gave these three fields default false, so flatbuffers never
@@ -140,8 +167,8 @@ namespace {
 
   void AssertFlippedDefaults(const std::vector<uint8_t>& file, bool keepAlive, bool otaEnabled, bool backendManagement)
   {
-    TEST_ASSERT_TRUE(InitFrom(file));
-    const Config::RootConfig loaded = Snapshot();
+    TEST_ASSERT_TRUE(InitFromLegacy(file));
+    const Full loaded = Snapshot();
     TEST_ASSERT_EQUAL_MESSAGE(keepAlive, loaded.rf.keepAliveEnabled, "rf.keepAliveEnabled");
     TEST_ASSERT_EQUAL_MESSAGE(otaEnabled, loaded.otaUpdate.isEnabled, "otaUpdate.isEnabled");
     TEST_ASSERT_EQUAL_MESSAGE(backendManagement, loaded.otaUpdate.allowBackendManagement, "otaUpdate.allowBackendManagement");
@@ -168,51 +195,17 @@ TEST_CASE("Omitted flipped-default booleans follow the convention the file shows
   AssertFlippedDefaults(FlippedDefaultsConfig(std::nullopt, std::nullopt, std::nullopt), true, true, true);
 }
 
-TEST_CASE("This firmware stores the flipped-default booleans explicitly", "[config][legacy]")
+TEST_CASE("The imported config survives the first save by the new firmware", "[config][legacy]")
 {
-  // So its files read back the same under any schema (a downgrade to 1.5.x reads
-  // an omitted field as false) and are never ambiguous.
-  for (bool value : {true, false}) {
-    Config::RootConfig config;
-    config.rf.keepAliveEnabled              = value;
-    config.otaUpdate.isEnabled              = value;
-    config.otaUpdate.allowBackendManagement = value;
-    const std::vector<uint8_t> bytes        = Serialize(config);
-    const Fbs::HubConfig* fbs               = Fbs::GetHubConfig(bytes.data());
-    // Generated tables derive privately from flatbuffers::Table (a view of the same bytes).
-    const auto* rf  = static_cast<const flatbuffers::Table*>(static_cast<const void*>(fbs->rf()));
-    const auto* ota = static_cast<const flatbuffers::Table*>(static_cast<const void*>(fbs->ota_update()));
-    TEST_ASSERT_TRUE(rf->CheckField(Fbs::RFConfig::VT_KEEPALIVE_ENABLED));
-    TEST_ASSERT_TRUE(ota->CheckField(Fbs::OtaUpdateConfig::VT_IS_ENABLED));
-    TEST_ASSERT_TRUE(ota->CheckField(Fbs::OtaUpdateConfig::VT_ALLOW_BACKEND_MANAGEMENT));
+  TEST_ASSERT_TRUE(InitFromLegacy(Legacy::kDevelopConfig, sizeof(Legacy::kDevelopConfig)));
 
-    Config::RootConfig loaded;
-    TEST_ASSERT_TRUE(Deserialize(bytes.data(), bytes.size(), loaded));
-    AssertConfigEqual(config, loaded);
-  }
-}
-
-TEST_CASE("Legacy config survives the first save by the new firmware", "[config][legacy]")
-{
-  TEST_ASSERT_TRUE(InitFrom(Legacy::kDevelopConfig, sizeof(Legacy::kDevelopConfig)));
-
-  // Any setter rewrites the whole file in the new firmware's encoding.
   TEST_ASSERT_TRUE(Config::SetOtaUpdateStep(OtaUpdateStep::Validated));
-  Config::RootConfig expected   = ExpectedLegacyConfig(true, false);
+  Full expected                 = ExpectedLegacyConfig(true, false);
   expected.otaUpdate.updateStep = OtaUpdateStep::Validated;
 
-  TEST_ASSERT_TRUE(InitFrom(StoredFile()));
+  Reload();
   AssertConfigEqual(expected, Snapshot());
-}
-
-TEST_CASE("rawconfig set accepts a config backed up from legacy firmware", "[config][legacy]")
-{
-  InitDefault();
-  TEST_ASSERT_TRUE(Config::SetRaw(Legacy::kV152Config, sizeof(Legacy::kV152Config)));
-  TEST_ASSERT_TRUE(Config::SetRaw(Legacy::kDevelopConfig, sizeof(Legacy::kDevelopConfig)));
-
-  TEST_ASSERT_TRUE(InitFrom(StoredFile()));
-  AssertConfigEqual(ExpectedLegacyConfig(true, false), Snapshot());
+  TEST_ASSERT_EQUAL_INT(0, HostLfs::writeCount);  // the 1.x file is never written to, so a rollback still finds it
 }
 
 TEST_CASE("jsonconfig set accepts JSON exported by develop firmware", "[config][legacy][json]")
@@ -221,7 +214,7 @@ TEST_CASE("jsonconfig set accepts JSON exported by develop firmware", "[config][
   TEST_ASSERT_TRUE(Config::SaveFromJSON(kDevelopJson));
   AssertConfigEqual(ExpectedLegacyConfig(true, false), Snapshot());
 
-  TEST_ASSERT_TRUE(InitFrom(StoredFile()));
+  Reload();
   AssertConfigEqual(ExpectedLegacyConfig(true, false), Snapshot());
 }
 
@@ -234,14 +227,14 @@ TEST_CASE("jsonconfig set accepts JSON exported by 1.5.2 firmware", "[config][le
 
 TEST_CASE("jsonconfig get emits the same document develop did", "[config][legacy][json]")
 {
-  TEST_ASSERT_TRUE(InitFrom(Legacy::kDevelopConfig, sizeof(Legacy::kDevelopConfig)));
+  TEST_ASSERT_TRUE(InitFromLegacy(Legacy::kDevelopConfig, sizeof(Legacy::kDevelopConfig)));
   TEST_ASSERT_EQUAL_STRING(kDevelopJson, Config::GetAsJSON(true).c_str());
 }
 
-TEST_CASE("Fields from a newer schema are tolerated on load", "[config][legacy]")
+TEST_CASE("Fields from a newer 1.x schema are tolerated on import", "[config][legacy]")
 {
-  // The schema has grown fields this firmware does not read yet (wifi AP password /
-  // disable flags, LAN config). A file carrying them must still load.
+  // The schema has grown fields this firmware does not read (wifi AP password / disable flags, LAN config). A
+  // file carrying them must still import.
   namespace Fbs = Serialization::Configuration;
   flatbuffers::FlatBufferBuilder builder;
   auto creds   = builder.CreateVector(std::vector<flatbuffers::Offset<Fbs::WiFiCredentials>> {Fbs::CreateWiFiCredentialsDirect(builder, 1, "HomeNet", "hunter22")});
@@ -251,7 +244,7 @@ TEST_CASE("Fields from a newer schema are tolerated on load", "[config][legacy]"
   auto root    = Fbs::CreateHubConfig(builder, 0, wifi, 0, backend, 0, 0, 0, lan);
   Fbs::FinishHubConfigBuffer(builder, root);
 
-  TEST_ASSERT_TRUE(InitFrom(builder.GetBufferPointer(), builder.GetSize()));
+  TEST_ASSERT_TRUE(InitFromLegacy(builder.GetBufferPointer(), builder.GetSize()));
 
   auto wifiConfig = Config::GetWiFiConfig();
   TEST_ASSERT_TRUE(wifiConfig.has_value());
