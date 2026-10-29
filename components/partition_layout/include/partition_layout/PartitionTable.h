@@ -6,8 +6,9 @@
 // 0xFF up to 0xC00. scripts/utils/partitions.py writes it; this reads it.
 //
 // Layouts (docs/STORAGE.md):
-//   V1  the 1.x table: littlefs `config` and `static0` data/spiffs partitions, 1,664 KiB app slots.
-//   V2  the 2.x tables: a `cfg` data/nvs partition and a `www` partition of type 0x40.
+//   V1  the 1.x table: littlefs `config` and `static0` data/spiffs partitions.
+//   V2  the 2.x table: the same geometry, with `config` retyped as the `cfg` data/nvs partition and `static0` as
+//       the `www` partition of type 0x40.
 //
 // Validate() is the gate in front of the one dangerous write the firmware ever makes: it refuses anything
 // that the bootloader would refuse, anything that would move what the running image depends on, and anything
@@ -113,6 +114,8 @@ namespace OpenShock::PartitionTable {
     OtadataMoved,              // otadata is not at 0xE000 / 0x2000
     NoCfg,                     // no data/nvs entry labelled cfg
     NoWww,                     // no type-0x40 entry labelled www
+    GeometryChanged,           // an entry was added, removed, moved or resized: the rewrite only retypes config and static0
+    EntryRetyped,              // an entry other than config and static0 changed type, subtype or label
     NoRunningSlot,             // no app entry at the running offset large enough, and no app entry clear of the live table
     BootloaderHeaderUnknown,   // the bootloader's declared flash size could not be read
     BootloaderHeaderTooSmall,  // the bootloader declares a flash smaller than the table needs: it would reject the table

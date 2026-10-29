@@ -59,12 +59,7 @@ if(OPENSHOCK_BOARD AND NOT DEFINED SDKCONFIG_DEFAULTS)
       set(IDF_TARGET ${CMAKE_MATCH_1})
     endif()
   endforeach()
-  # The partition table follows from the flash size, as in scripts/build.py: sdkconfig.defaults names the 4 MB
-  # table, a board with 8 MB or more gets partitions/ota_8mb.csv.
-  string(REGEX MATCH "CONFIG_ESPTOOLPY_FLASHSIZE_([0-9]+)MB=y" _os_m "${_os_board_kconfig}")
-  if(_os_m AND CMAKE_MATCH_1 GREATER_EQUAL 8)
-    string(APPEND _os_board_kconfig "CONFIG_PARTITION_TABLE_CUSTOM=y\nCONFIG_PARTITION_TABLE_CUSTOM_FILENAME=\"partitions/ota_8mb.csv\"\n")
-  endif()
+  # Every board uses the one partition table sdkconfig.defaults names (partitions/ota_4mb.csv).
   set(_os_board_fragment ${CMAKE_BINARY_DIR}/openshock_board.defaults)
   file(WRITE ${_os_board_fragment} "${_os_board_kconfig}")
   set(SDKCONFIG_DEFAULTS "${CMAKE_CURRENT_LIST_DIR}/sdkconfig.defaults;${_os_board_fragment}")

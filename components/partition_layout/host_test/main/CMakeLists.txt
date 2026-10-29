@@ -23,7 +23,7 @@ else()
   find_program(_python NAMES python3 python REQUIRED)
 endif()
 set(_repo ${CMAKE_CURRENT_LIST_DIR}/../../../..)
-foreach(_csv ota_4mb ota_8mb legacy/ota_4mb_v1)
+foreach(_csv ota_4mb legacy/ota_4mb_v1)
   get_filename_component(_name ${_csv} NAME)
   execute_process(
     COMMAND ${_python} -m utils.partitions ${_repo}/partitions/${_csv}.csv ${_fixture_dir}/${_name}.bin

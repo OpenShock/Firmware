@@ -6,7 +6,7 @@
 reads <variants>/<variant-id>/{app,bootloader}.bin, as CI's build jobs upload them, and writes <out>/<board>/ with:
   - app.bin: the variant's app, stamped with the board's descriptor;
   - bootloader.bin: the variant's bootloader with the board's flash size in its header (the bootloader and the
-    app size the flash from that header, and a 4 MB header would refuse the 8 MB partition table);
+    app size the flash from that header);
   - partition-table.bin: built from the table for the board's flash size (scripts/utils/partitions.py).
 Every board is attempted before the run fails.
 """

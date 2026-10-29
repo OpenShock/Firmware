@@ -36,10 +36,6 @@ namespace {
   {
     return ReadFixture("ota_4mb.bin");
   }
-  std::vector<uint8_t> V2_8MB()
-  {
-    return ReadFixture("ota_8mb.bin");
-  }
 
   PT::Table ParseOk(const std::vector<uint8_t>& bytes)
   {
@@ -94,6 +90,11 @@ namespace {
   void SetSize(std::vector<uint8_t>& bytes, const char* label, uint32_t size)
   {
     Put32(bytes, EntryPos(bytes, label) + 8, size);
+    Reseal(bytes);
+  }
+  void SetSubtype(std::vector<uint8_t>& bytes, const char* label, uint8_t subtype)
+  {
+    bytes[EntryPos(bytes, label) + 3] = subtype;
     Reseal(bytes);
   }
   void SetLabel(std::vector<uint8_t>& bytes, const char* label, const char* replacement)
@@ -162,23 +163,20 @@ TEST_CASE("Every table the repository ships parses with its MD5", "[partition_ta
 
   PT::Table v2 = ParseOk(V2_4MB());
   TEST_ASSERT_EQUAL_size_t(7, v2.count);
-  TEST_ASSERT_EQUAL_HEX32(0x1C8000, v2.FindAppAt(0x10000)->size);
-  TEST_ASSERT_EQUAL_HEX32(0x1D8000, v2.Find("cfg")->offset);
+  TEST_ASSERT_EQUAL_HEX32(0x1A0000, v2.FindAppAt(0x10000)->size);
+  TEST_ASSERT_EQUAL_HEX32(0x350000, v2.Find("cfg")->offset);
+  TEST_ASSERT_EQUAL_UINT8(PT::kSubtypeDataNvs, v2.Find("cfg")->subtype);
   TEST_ASSERT_EQUAL_UINT8(PT::kTypeWww, v2.Find("www")->type);
-  TEST_ASSERT_EQUAL_HEX32(0x3A8000, v2.Find("www")->offset);
+  TEST_ASSERT_EQUAL_HEX32(0x353000, v2.Find("www")->offset);
+  TEST_ASSERT_EQUAL_HEX32(0x400000, v2.End());
   TEST_ASSERT_NULL(v2.Find("static0"));
-
-  PT::Table v2big = ParseOk(V2_8MB());
-  TEST_ASSERT_EQUAL_HEX32(0x400000, v2big.FindAppAt(0x400000)->offset);
-  TEST_ASSERT_EQUAL_HEX32(0x798000, v2big.End());
-  TEST_ASSERT_NULL(v2big.Find(PT::kTypeData, PT::kSubtypeDataNvs, "www"));  // the subtype is checked too
+  TEST_ASSERT_NULL(v2.Find(PT::kTypeData, PT::kSubtypeDataNvs, "www"));  // the subtype is checked too
 }
 
 TEST_CASE("Layouts are told apart", "[partition_table]")
 {
   TEST_ASSERT_EQUAL(PT::Layout::V1, PT::Detect(ParseOk(V1())));
   TEST_ASSERT_EQUAL(PT::Layout::V2, PT::Detect(ParseOk(V2_4MB())));
-  TEST_ASSERT_EQUAL(PT::Layout::V2, PT::Detect(ParseOk(V2_8MB())));
 
   auto bytes = V2_4MB();
   SetLabel(bytes, "www", "static0");  // neither layout
@@ -215,35 +213,61 @@ TEST_CASE("A table without an MD5 entry, or with a wrong one, is refused", "[par
   ExpectParseError(std::vector<uint8_t>(whole.begin(), whole.begin() + 3 * PT::kEntrySize), PT::ParseError::NoMd5);
 }
 
-TEST_CASE("The shipped 2.x tables pass every invariant from a 1.x hub", "[partition_table][validate]")
+TEST_CASE("The shipped 2.x table passes every invariant from a 1.x hub", "[partition_table][validate]")
 {
   ExpectValid(V2_4MB(), Scenario(4, 4).context);
-  ExpectValid(V2_4MB(), Scenario(8, 8).context);  // the 4 MB table also fits a bigger chip
-  ExpectValid(V2_8MB(), Scenario(8, 8).context);
-  ExpectValid(V2_8MB(), Scenario(16, 16).context);
-  ExpectValid(V2_8MB(), Scenario(8, 16).context);  // a bootloader that declares more than the table needs is fine
+  ExpectValid(V2_4MB(), Scenario(8, 8).context);  // one table for every flash size
+  ExpectValid(V2_4MB(), Scenario(16, 16).context);
+  ExpectValid(V2_4MB(), Scenario(16, 4).context);  // a bootloader stamped smaller than the chip still covers it
+  // Nothing moves, so running from app1 is as good as running from app0
+  ExpectValid(V2_4MB(), Scenario(4, 4, 0x1B0000).context);
 }
 
-TEST_CASE("An 8 MB table is refused on a 4 MB chip or behind a 4 MB bootloader header", "[partition_table][validate]")
+TEST_CASE("The table is refused on a smaller chip or behind a smaller bootloader header", "[partition_table][validate]")
 {
-  ExpectViolation(V2_8MB(), Scenario(4, 4).context, PT::Violation::PastFlash);
-  // The chip is 8 MB but the bootloader was stamped 4 MB: it would reject every entry past 4 MB, a brick
-  ExpectViolation(V2_8MB(), Scenario(8, 4).context, PT::Violation::BootloaderHeaderTooSmall);
-  ExpectViolation(V2_8MB(), Scenario(8, 0).context, PT::Violation::BootloaderHeaderUnknown);
+  ExpectViolation(V2_4MB(), Scenario(2, 2).context, PT::Violation::PastFlash);
+  // The bootloader rejects every entry past the size its header declares: a brick
+  ExpectViolation(V2_4MB(), Scenario(4, 2).context, PT::Violation::BootloaderHeaderTooSmall);
+  ExpectViolation(V2_4MB(), Scenario(4, 0).context, PT::Violation::BootloaderHeaderUnknown);
 }
 
-TEST_CASE("Running from app1 only passes when the new table has a slot clear of the old one", "[partition_table][validate]")
+TEST_CASE("The running image must fit its slot", "[partition_table][validate]")
 {
-  // The 4 MB table moves app1 (0x1B0000 -> 0x1E0000) and grows app0 over it: nothing holds a 1.2 MB image at
-  // 0x1B0000 without overlapping the old table, so the hub must hop to app0 first.
-  ExpectViolation(V2_4MB(), Scenario(4, 4, 0x1B0000).context, PT::Violation::NoRunningSlot);
-  // The 8 MB table's app1 at 0x400000 overlaps nothing in the old table: a copy there is safe.
-  ExpectValid(V2_8MB(), Scenario(8, 8, 0x1B0000).context);
-
-  // The running image must fit its grown slot.
   Scenario huge(4, 4);
-  huge.context.runningImageSize = 0x1C8000 + 1;
+  huge.context.runningImageSize = 0x1A0000 + 1;
   ExpectViolation(V2_4MB(), huge.context, PT::Violation::NoRunningSlot);
+}
+
+TEST_CASE("A table that moves, adds, removes or retypes anything else is refused", "[partition_table][validate]")
+{
+  auto bytes = V2_4MB();
+  SetSize(bytes, "cfg", 0x2000);  // a gap, no overlap: still a valid table, but cfg shrank
+  ExpectViolation(bytes, Scenario().context, PT::Violation::GeometryChanged);
+
+  bytes = V2_4MB();
+  SetOffset(bytes, "www", 0x354000);
+  SetSize(bytes, "www", 0x9C000);
+  ExpectViolation(bytes, Scenario().context, PT::Violation::GeometryChanged);
+
+  bytes = V2_4MB();
+  SetSize(bytes, "coredump", 0x8000);  // shrunk
+  ExpectViolation(bytes, Scenario().context, PT::Violation::GeometryChanged);
+
+  bytes = V2_4MB();
+  SetLabel(bytes, "coredump", "crash");
+  ExpectViolation(bytes, Scenario().context, PT::Violation::EntryRetyped);
+
+  bytes = V2_4MB();
+  SetSubtype(bytes, "coredump", PT::kSubtypeDataNvs);
+  ExpectViolation(bytes, Scenario().context, PT::Violation::EntryRetyped);
+
+  // cfg and www swapped: each exists with its type, every place is the old one, but cfg would take over static0
+  bytes = V2_4MB();
+  SetOffset(bytes, "cfg", 0x353000);
+  SetSize(bytes, "cfg", 0x9D000);
+  SetOffset(bytes, "www", 0x350000);
+  SetSize(bytes, "www", 0x3000);
+  ExpectViolation(bytes, Scenario().context, PT::Violation::EntryRetyped);
 }
 
 TEST_CASE("The live table must be readable and the 1.x layout", "[partition_table][validate]")
@@ -298,15 +322,15 @@ TEST_CASE("A table missing cfg or www, or not a 2.x layout, is refused", "[parti
 TEST_CASE("Geometry the bootloader would refuse is refused first", "[partition_table][validate]")
 {
   auto bytes = V2_4MB();
-  SetOffset(bytes, "app1", 0x1E0800);
+  SetOffset(bytes, "app1", 0x1B0800);
   ExpectViolation(bytes, Scenario().context, PT::Violation::SizeUnaligned);  // not even sector aligned
 
   bytes = V2_4MB();
-  SetOffset(bytes, "app1", 0x1E1000);
+  SetOffset(bytes, "app1", 0x1B1000);
   ExpectViolation(bytes, Scenario().context, PT::Violation::AppUnaligned);
 
   bytes = V2_4MB();
-  SetSize(bytes, "cfg", 0x8800);
+  SetSize(bytes, "cfg", 0x3800);
   ExpectViolation(bytes, Scenario().context, PT::Violation::SizeUnaligned);
 
   bytes = V2_4MB();
@@ -314,7 +338,7 @@ TEST_CASE("Geometry the bootloader would refuse is refused first", "[partition_t
   ExpectViolation(bytes, Scenario().context, PT::Violation::SizeUnaligned);
 
   bytes = V2_4MB();
-  SetSize(bytes, "cfg", 0x10000);  // into app1
+  SetSize(bytes, "cfg", 0x4000);  // into www
   ExpectViolation(bytes, Scenario().context, PT::Violation::Overlap);
 
   bytes = V2_4MB();

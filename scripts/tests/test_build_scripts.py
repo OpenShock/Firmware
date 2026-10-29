@@ -12,14 +12,9 @@ from utils import partitions, wwwimage
 
 def test_reads_the_repository_partition_tables():
     table = partitions.read_partitions(ROOT / 'partitions' / 'ota_4mb.csv')
-    assert table['www']['offset'] == 0x3A8000
-    assert table['www']['size'] == 0x48000
-    assert table['cfg']['size'] == 0x8000
-    assert partitions.first_app_partition(table)['offset'] == 0x10000
-
-    table = partitions.read_partitions(ROOT / 'partitions' / 'ota_8mb.csv')
-    assert table['app1']['offset'] == 0x400000
-    assert table['www']['size'] == 0x40000
+    assert table['www']['offset'] == 0x353000
+    assert table['www']['size'] == 0x9D000
+    assert table['cfg']['size'] == 0x3000
     assert partitions.first_app_partition(table)['offset'] == 0x10000
 
 
@@ -190,7 +185,7 @@ def test_main_takes_the_smallest_of_every_limit(tmp_path, monkeypatch):
             '--partition-csv',
             str(csv),
             '--partition-csv',
-            str(ROOT / 'partitions' / 'ota_8mb.csv'),
+            str(ROOT / 'partitions' / 'ota_4mb.csv'),
         ]
     )
     assert limits == [0x1000]

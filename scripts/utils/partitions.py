@@ -1,6 +1,7 @@
 """The ESP-IDF partition tables the firmware ships, as CSV and as the binary the bootloader reads.
 
-There is one table per flash size (``partitions/ota_<size>.csv``); a board gets the one for its flash.
+There is one table, ``partitions/ota_4mb.csv``, for every board whatever its flash size (the 1.x geometry, so a
+fielded hub can rewrite its table in place without moving anything).
 ``build_table`` turns a CSV into the exact bytes ``gen_esp32part.py`` would produce (verified against
 ESP-IDF 6.0's output for every table in ``partitions/``), so the packaging scripts need no ESP-IDF to
 write a board's ``partition-table.bin``, and the host tests of the firmware's own table parser get
@@ -56,11 +57,11 @@ class Partition(TypedDict):
 
 
 def table_csv_for_flash_size(size: str) -> Path:
-    """The table a flash size builds with: ``partitions/ota_4mb.csv`` up to 4 MB, ``ota_8mb.csv`` from 8 MB."""
+    """The table a flash size builds with: ``partitions/ota_4mb.csv``, for every flash of 4 MB or more."""
     megabytes = int(size.removesuffix('MB'))
     if megabytes < 4:
         raise SystemExit(f'error: no partition table fits a {size} flash; the firmware needs at least 4 MB')
-    return ROOT / 'partitions' / ('ota_8mb.csv' if megabytes >= 8 else 'ota_4mb.csv')
+    return ROOT / 'partitions' / 'ota_4mb.csv'
 
 
 def partition_csv_for(board: str) -> Path:

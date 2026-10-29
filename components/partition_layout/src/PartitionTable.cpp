@@ -187,6 +187,10 @@ const char* PartitionTable::ViolationName(Violation violation)
       return "no cfg partition";
     case Violation::NoWww:
       return "no www partition";
+    case Violation::GeometryChanged:
+      return "an entry was added, removed, moved or resized";
+    case Violation::EntryRetyped:
+      return "an entry other than config and static0 changed type, subtype or label";
     case Violation::NoRunningSlot:
       return "no slot for the running image";
     case Violation::BootloaderHeaderUnknown:
@@ -254,6 +258,26 @@ std::expected<void, PartitionTable::Violation> PartitionTable::Validate(const Ta
   }
   if (Detect(*context.live) != Layout::V1) {
     return std::unexpected(Violation::LiveNotMigratable);
+  }
+
+  // 9. Nothing moves: every staged entry sits exactly where a live one does (no overlap and the same count make that
+  //    one to one), and only config and static0 become something else. No data of the old layout ends up inside a
+  //    partition of another kind except the two the migration fills itself.
+  const auto liveEntries = context.live->Entries();
+  if (entries.size() != liveEntries.size()) {
+    return std::unexpected(Violation::GeometryChanged);
+  }
+  for (const Entry& entry : entries) {
+    const auto old = std::find_if(liveEntries.begin(), liveEntries.end(), [&](const Entry& e) { return entry.SamePlace(e); });
+    if (old == liveEntries.end()) {
+      return std::unexpected(Violation::GeometryChanged);
+    }
+    // cfg and www themselves (type and subtype) were checked above
+    const std::string_view expected = old->Label() == "config" ? "cfg" : old->Label() == "static0" ? "www" : old->Label();
+    const bool retyped              = expected != old->Label() ? entry.Label() != expected : (entry.type != old->type || entry.subtype != old->subtype || entry.Label() != expected);
+    if (retyped) {
+      return std::unexpected(Violation::EntryRetyped);
+    }
   }
 
   // 4. Where the running image lives after the rewrite: its slot, grown in place, or an app slot the old table

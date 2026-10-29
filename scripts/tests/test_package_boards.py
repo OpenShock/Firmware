@@ -32,11 +32,11 @@ def test_packages_every_board_of_a_variant(dirs):
     assert package_boards.package(['OpenShock-Core-V2', 'Wemos-Lolin-S3-Mini'], variants, out) == []
 
     for board, size, table in (
-        ('OpenShock-Core-V2', '8MB', 'ota_8mb.csv'),
+        ('OpenShock-Core-V2', '8MB', 'ota_4mb.csv'),
         ('Wemos-Lolin-S3-Mini', '4MB', 'ota_4mb.csv'),
     ):
         stamping.verify_image(espimage.load(out / board / 'app.bin'), boards.read_board(board), board)
-        # The bootloader declares the board's flash size and the partition table is the one for that size
+        # The bootloader declares the board's flash size; every board gets the one partition table
         bootloader = espimage.load(out / board / 'bootloader.bin')
         bootloader.verify()
         assert bootloader.flash_size == size

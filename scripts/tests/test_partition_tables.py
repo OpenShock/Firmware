@@ -1,4 +1,4 @@
-"""Tests for the binary partition-table builder in scripts/utils/partitions.py and the per-flash-size table choice."""
+"""Tests for the binary partition-table builder in scripts/utils/partitions.py and the table choice."""
 
 import hashlib
 import struct
@@ -62,19 +62,26 @@ def test_the_migration_invariant_holds_across_every_table():
         assert table['app0']['offset'] == 0x10000, csv
 
 
-def test_the_2x_tables_have_what_the_firmware_hardcodes():
-    for name, size in (('ota_4mb.csv', 4), ('ota_8mb.csv', 8)):
-        table = partitions.read_partitions(ROOT / 'partitions' / name)
-        assert table['cfg']['type'] == 'data' and table['cfg']['subtype'] == 'nvs'
-        assert table['www']['type'] == '0x40'
-        assert max(p['offset'] + p['size'] for p in table.values()) <= size * 1024 * 1024
-        partitions.build_table(ROOT / 'partitions' / name, size * 1024 * 1024)  # fits
-    # The 2.x app slots are no smaller than the 1.x ones, so a 1.x image always fits its grown slot
+def test_the_2x_table_has_what_the_firmware_hardcodes():
+    table = partitions.read_partitions(ROOT / 'partitions' / 'ota_4mb.csv')
+    assert table['cfg']['type'] == 'data' and table['cfg']['subtype'] == 'nvs'
+    assert table['cfg']['size'] >= 0x3000  # gen_esp32part.py's NVS minimum: three pages
+    assert table['www']['type'] == '0x40'
+    partitions.build_table(ROOT / 'partitions' / 'ota_4mb.csv', 4 * 1024 * 1024)  # fits
+
+
+def test_the_2x_table_keeps_the_1x_geometry():
+    # The migration rewrites the table in place and moves nothing: every 1.x entry keeps its offset and size, and
+    # only config (-> cfg) and static0 (-> www) change type and label.
     legacy = partitions.read_partitions(ROOT / 'partitions' / 'legacy' / 'ota_4mb_v1.csv')
-    for name in ('ota_4mb.csv', 'ota_8mb.csv'):
-        table = partitions.read_partitions(ROOT / 'partitions' / name)
-        assert table['app0']['size'] >= legacy['app0']['size']
-        assert table['app1']['size'] >= legacy['app1']['size']
+    table = partitions.read_partitions(ROOT / 'partitions' / 'ota_4mb.csv')
+    renamed = {'config': 'cfg', 'static0': 'www'}
+    assert sorted(renamed.get(name, name) for name in legacy) == sorted(table)
+    for name, old in legacy.items():
+        new = table[renamed.get(name, name)]
+        assert (new['offset'], new['size']) == (old['offset'], old['size']), name
+        if name not in renamed:
+            assert (new['type'], new['subtype']) == (old['type'], old['subtype']), name
 
 
 @pytest.mark.parametrize(
@@ -104,21 +111,20 @@ def test_an_entry_past_the_flash_is_refused(tmp_path):
     partitions.build_table(path, 8 * 1024 * 1024)
 
 
-def test_the_table_follows_the_flash_size():
+def test_every_flash_size_gets_the_one_table():
     assert partitions.table_csv_for_flash_size('4MB').name == 'ota_4mb.csv'
-    assert partitions.table_csv_for_flash_size('8MB').name == 'ota_8mb.csv'
-    assert partitions.table_csv_for_flash_size('16MB').name == 'ota_8mb.csv'
+    assert partitions.table_csv_for_flash_size('8MB').name == 'ota_4mb.csv'
+    assert partitions.table_csv_for_flash_size('16MB').name == 'ota_4mb.csv'
     with pytest.raises(SystemExit, match='at least 4 MB'):
         partitions.table_csv_for_flash_size('2MB')
 
 
-def test_every_repository_board_gets_the_table_for_its_flash():
+def test_every_repository_board_gets_the_table():
     for board in boards.all_boards():
-        size = int(boards.flash_size(board).removesuffix('MB'))
-        assert partitions.partition_csv_for(board).name == ('ota_8mb.csv' if size >= 8 else 'ota_4mb.csv'), board
+        assert partitions.partition_csv_for(board).name == 'ota_4mb.csv', board
 
 
 def test_cli_writes_the_table(tmp_path):
     out = tmp_path / 'table.bin'
-    assert partitions.main([str(ROOT / 'partitions' / 'ota_8mb.csv'), str(out), '--flash-size', '8MB']) == 0
-    assert out.read_bytes() == partitions.build_table(ROOT / 'partitions' / 'ota_8mb.csv')
+    assert partitions.main([str(ROOT / 'partitions' / 'ota_4mb.csv'), str(out), '--flash-size', '8MB']) == 0
+    assert out.read_bytes() == partitions.build_table(ROOT / 'partitions' / 'ota_4mb.csv')

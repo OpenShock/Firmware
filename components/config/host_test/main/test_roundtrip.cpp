@@ -166,17 +166,18 @@ TEST_CASE("Many max-length WiFi credentials survive a reload", "[config][roundtr
   AssertConfigEqual(before, Snapshot());
 }
 
-TEST_CASE("The store holds far more than the 1.x partition could", "[config][roundtrip]")
+TEST_CASE("The store holds more than the 1.x config file could", "[config][roundtrip]")
 {
-  // The 1.x littlefs partition could hold one 4 KiB file; AddWiFiCredentials capped the list there. NVS has
-  // 32 KiB: 40 credentials with long names and passphrases, some 4.5 KiB of config, are nowhere near its limit.
+  // The 1.x firmware capped its config file at 4 KiB, some 30 credentials like these. cfg is that file's 12 KiB
+  // partition retyped as NVS (three pages, one of them always kept free for compaction): 32 credentials with long
+  // names and passphrases fit with room for the rest of the config. The store fills up at about 36.
   InitDefault();
-  for (int i = 0; i < 40; ++i) {
+  for (int i = 0; i < 32; ++i) {
     std::string ssid = "Network-" + std::to_string(i) + std::string(20, 'x');
     TEST_ASSERT_NOT_EQUAL_MESSAGE(0, Config::AddWiFiCredentials(ssid, std::string(63, 'p'), WIFI_AUTH_WPA2_PSK), ssid.c_str());
   }
   const Full before = Snapshot();
-  TEST_ASSERT_EQUAL_size_t(40, before.wifi.credentialsList.size());
+  TEST_ASSERT_EQUAL_size_t(32, before.wifi.credentialsList.size());
   Reload();
   AssertConfigEqual(before, Snapshot());
 }

@@ -102,8 +102,36 @@ static bool nvsPartitionExists(const char* label)
   return esp_partition_find_first(ESP_PARTITION_TYPE_DATA, ESP_PARTITION_SUBTYPE_DATA_NVS, label) != nullptr;
 }
 
+// The 2.x cfg is the 1.x littlefs `config` partition retyped in place, so on the first boot after the table rewrite it
+// still holds that littlefs. NVS must never try to make sense of it: it is erased. littlefs names itself in the
+// superblock entry at the start of either of its first two blocks (revision count, tag, then "littlefs").
+static void clearLegacyLittlefs(const char* label)
+{
+  const esp_partition_t* partition = esp_partition_find_first(ESP_PARTITION_TYPE_DATA, ESP_PARTITION_SUBTYPE_DATA_NVS, label);
+  if (partition == nullptr) {
+    return;
+  }
+  static constexpr uint32_t kBlockSize   = 0x1000;
+  static constexpr uint32_t kMagicOffset = 8;
+  static constexpr char kMagic[]         = {'l', 'i', 't', 't', 'l', 'e', 'f', 's'};
+  for (uint32_t block = 0; block < 2 && (block + 1) * kBlockSize <= partition->size; ++block) {
+    char magic[sizeof(kMagic)];
+    if (esp_partition_read(partition, block * kBlockSize + kMagicOffset, magic, sizeof(magic)) != ESP_OK || memcmp(magic, kMagic, sizeof(kMagic)) != 0) {
+      continue;
+    }
+    OS_LOGI(TAG, "Partition %s still holds the 1.x littlefs; erasing it", label);
+    if (esp_partition_erase_range(partition, 0, partition->size) != ESP_OK) {
+      OS_LOGE(TAG, "Failed to erase partition %s", label);
+    }
+    return;
+  }
+}
+
 static const char* openStorage()
 {
+  if (nvsPartitionExists(kPartitionCfg)) {
+    clearLegacyLittlefs(kPartitionCfg);
+  }
   if (nvsPartitionExists(kPartitionCfg) && initNvsPartition(kPartitionCfg)) {
     return kPartitionCfg;
   }

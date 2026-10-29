@@ -104,7 +104,7 @@ def board_inputs(board: str, optimization: str = 'debug') -> BuildInputs:
     target = read_board_fragment(fragment).target  # parsed whole, so a typo fails now rather than at the stamp
     build_dir = resolve_build_dir(board, optimization)
     # Only the Kconfig lines: the OPENSHOCK_* pins are stamped, and Kconfig would reject them. The partition table
-    # follows from the flash size (sdkconfig.defaults names the 4 MB one; an 8 MB board gets its own here).
+    # follows from the flash size (partitions.table_csv_for_flash_size; today one table for every size).
     body = (
         f'# Board {board}, without its pins\n'
         + '\n'.join(kconfig_lines(fragment))

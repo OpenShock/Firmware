@@ -16,7 +16,6 @@ runs:
           --output www.bin \
           --legacy-output staticfs.bin \
           --partition-csv partitions/ota_4mb.csv \
-          --partition-csv partitions/ota_8mb.csv \
           --skip-frontend-build
 
     - name: Upload asset image artifact

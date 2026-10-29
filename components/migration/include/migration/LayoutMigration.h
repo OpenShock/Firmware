@@ -1,9 +1,11 @@
 #pragma once
 
 // The one-time partition layout migration of the 1.9.x pivot release (docs/STORAGE.md): from the 1.x table every
-// fielded hub carries to the 2.x table for its flash size, then on to the 2.x firmware.
+// fielded hub carries to the 2.x table, then on to the 2.x firmware. The 2.x table keeps the 1.x geometry: the
+// littlefs `config` becomes the `cfg` NVS store and the littlefs `static0` becomes the flat `www` image, and nothing
+// moves, so no firmware image is ever copied.
 //
-// It only runs in a 1.x-numbered build (the pivot); a 2.x build boots on the 2.x layouts only and this does nothing
+// It only runs in a 1.x-numbered build (the pivot); a 2.x build boots on the 2.x layout only and this does nothing
 // but report. Every step starts by finding out where it is (which layout, which slot, what is installed), so a
 // reboot at any point resumes at the first unfinished step:
 //
@@ -13,16 +15,14 @@
 //        image must answer;
 //     3. download the table into RAM, check its SHA-256, and check it against every invariant
 //        (partition_layout/PartitionTable.h); any failure leaves the hub on the 1.x layout and retries later;
-//     4. running from the 1.x app1 on 4 MB: copy the image into app0, boot it, start over;
-//        running from the 1.x app1 on 8 MB: copy the image into the new app1 (0x400000, flash no 1.x partition uses);
-//     5. close the portal and write the target's www image where the new table puts the www partition, so the portal
-//        has assets on the first boot of the new layout even without a network;
-//     6. quiesce (config writes held, NVS deinitialized), erase and write the table sector, read it back, restart.
+//     4. close the portal and write the target's www image over the 1.x static0, which the new table makes www, so
+//        the portal has assets on the first boot of the new layout even without a network;
+//     5. quiesce (config writes held, NVS deinitialized), erase and write the table sector, read it back, restart.
 //        The erase-to-write window of that one sector is the only step a power cut cannot recover from.
 //   on the 2.x table, still running the pivot:
-//     7. config/Store.h has moved the config from the shared nvs into cfg; drop the WiFi driver's stale nvs.net80211,
-//        erase a stale fragment in the slot the table moved;
-//     8. install the target version (OtaUpdateManager::TryStartMigrationUpdate), which boots into it. If it rolls
+//     6. config/Store.h has cleared the old littlefs out of cfg and moved the config from the shared nvs into it;
+//        drop the WiFi driver's stale nvs.net80211;
+//     7. install the target version (OtaUpdateManager::TryStartMigrationUpdate), which boots into it. If it rolls
 //        back to the pivot, the chain stops there instead of retrying.
 
 #include <cstdint>
@@ -32,7 +32,7 @@ namespace OpenShock::Migration {
   bool Start();
 
   /// @brief The flash size the bootloader's image header declares, in bytes; 0 when it cannot be read. The 1.x
-  ///        bootloader refuses every partition past it, so it decides whether the 8 MB table can be used.
+  ///        bootloader refuses every partition past it, so a header smaller than the table refuses the migration.
   [[nodiscard]] uint32_t BootloaderFlashSize();
 
   /// @brief The layout of the partition table this hub booted with: "v1 (...)", "v2 (...)" or "unknown".

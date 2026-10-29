@@ -64,7 +64,7 @@ def test_merge_one_places_each_image_at_its_partition_offset(monkeypatch, tmp_pa
 
     calls = []
     monkeypatch.setattr(esptool, 'main', calls.append)
-    # Core V2 has 8 MB of flash, so its table is ota_8mb.csv and www sits at 0x3C0000
+    # Every board has the one table, whatever its flash: www sits at 0x353000
     merge_image.merge_one('OpenShock-Core-V2', tmp_path / 'bin', 'www.bin', 'out.bin')
 
     argv = calls[0]
@@ -76,13 +76,13 @@ def test_merge_one_places_each_image_at_its_partition_offset(monkeypatch, tmp_pa
         '0x0': str(tmp_path / 'bin' / 'bootloader.bin'),
         '0x8000': str(tmp_path / 'bin' / 'partition-table.bin'),
         '0x10000': str(tmp_path / 'bin' / 'app.bin'),
-        '0x3c0000': 'www.bin',
+        '0x353000': 'www.bin',
     }
 
     calls.clear()
     merge_image.merge_one('Wemos-Lolin-S3-Mini', tmp_path / 'bin', 'www.bin', 'out.bin')
     pairs = dict(zip(calls[0][7::2], calls[0][8::2], strict=True))
-    assert pairs['0x3a8000'] == 'www.bin'
+    assert pairs['0x353000'] == 'www.bin'
 
 
 def test_merge_one_refuses_a_table_without_www(monkeypatch, tmp_path):

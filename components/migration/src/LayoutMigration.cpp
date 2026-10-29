@@ -21,7 +21,6 @@ const char* const TAG = "LayoutMigration";
 #include "www/WwwImage.h"
 #include "www/WwwPartition.h"
 
-#include <esp_app_desc.h>
 #include <esp_flash.h>
 #include <esp_flash_partitions.h>
 #include <esp_image_format.h>
@@ -44,7 +43,6 @@ using namespace OpenShock;
 namespace PT = OpenShock::PartitionTable;
 
 namespace {
-  constexpr uint32_t kSectorSize   = 0x1000;
   constexpr uint32_t kCopyChunk    = 0x1000;
   constexpr uint32_t kEraseStep    = 0x10000;  // erase ahead of the data in steps this size, as PartitionUtils does
   constexpr uint32_t kMiB          = 1024 * 1024;
@@ -105,31 +103,6 @@ namespace {
       return 0;
     }
     return metadata.image_len;
-  }
-
-  // Copies `length` bytes of `src` into raw flash at `dstAddress`, erasing first, and compares the copy.
-  bool copyImage(const esp_partition_t* src, uint32_t length, uint32_t dstAddress)
-  {
-    const uint32_t eraseLength = (length + kSectorSize - 1) & ~(kSectorSize - 1);
-    for (uint32_t done = 0; done < eraseLength; done += kEraseStep) {
-      const uint32_t step = std::min(kEraseStep, eraseLength - done);
-      if (esp_flash_erase_region(nullptr, dstAddress + done, step) != ESP_OK) {
-        OS_LOGE(TAG, "Failed to erase 0x%08x", static_cast<unsigned>(dstAddress + done));
-        return false;
-      }
-    }
-    auto chunk = std::make_unique<uint8_t[]>(kCopyChunk);
-    auto check = std::make_unique<uint8_t[]>(kCopyChunk);
-    for (uint32_t offset = 0; offset < length; offset += kCopyChunk) {
-      const uint32_t n = std::min(kCopyChunk, length - offset);
-      if (esp_partition_read(src, offset, chunk.get(), n) != ESP_OK || esp_flash_write(nullptr, chunk.get(), dstAddress + offset, n) != ESP_OK || esp_flash_read(nullptr, check.get(), dstAddress + offset, n) != ESP_OK
-          || memcmp(chunk.get(), check.get(), n) != 0)
-      {
-        OS_LOGE(TAG, "Failed to copy the image at offset 0x%08x", static_cast<unsigned>(offset));
-        return false;
-      }
-    }
-    return true;
   }
 
   // Downloads `url` into raw flash at [address, address + size), checking its SHA-256 against `hash` and that it is a
@@ -305,27 +278,6 @@ namespace {
     nvs_close(handle);
   }
 
-  // The slot the table moved may begin with a fragment of a 1.x image. The bootloader would reject it, but it is
-  // erased so nothing ever tries.
-  void eraseStaleSlot()
-  {
-    const esp_partition_t* other = esp_ota_get_next_update_partition(nullptr);
-    if (other == nullptr) {
-      return;
-    }
-    esp_app_desc_t desc;
-    if (esp_ota_get_partition_description(other, &desc) == ESP_OK) {
-      return;  // A whole image (the previous firmware, or one being installed)
-    }
-    uint8_t first = 0;
-    if (esp_partition_read(other, 0, &first, 1) == ESP_OK && first == 0xFF) {
-      return;  // Already erased
-    }
-    if (esp_partition_erase_range(other, 0, kSectorSize) == ESP_OK) {
-      OS_LOGI(TAG, "Erased the stale start of %s", other->label);
-    }
-  }
-
   Step finishOnNewLayout(const SemVer& target)
   {
     if (OtaUpdateManager::GetFirmwareBootType() == FirmwareBootType::Rollback) {
@@ -334,7 +286,6 @@ namespace {
     }
 
     dropWifiDriverStore();
-    eraseStaleSlot();
 
     auto ota = Config::GetOtaUpdateConfig();
     if (!ota->isEnabled) {
@@ -415,54 +366,20 @@ namespace {
       return Step::RetryLater;
     }
 
+    // Nothing moves (the checks hold the new table to the old geometry), so the running image stays where it is
     auto verdict = PT::Validate(*staged, context);
     if (!verdict) {
-      if (verdict.error() == PT::Violation::NoRunningSlot && running->address != PT::kApp0Offset) {
-        // Running from the 1.x app1, which the new table moves, and no app slot of the new table is clear of the old
-        // one: hop to app0 first. An ordinary, interruptible flash write.
-        const esp_partition_t* app0 = esp_partition_find_first(ESP_PARTITION_TYPE_APP, ESP_PARTITION_SUBTYPE_APP_OTA_0, nullptr);
-        if (app0 == nullptr || app0->size < context.runningImageSize) {
-          OS_LOGE(TAG, "Cannot hop to app0");
-          return Step::RetryLater;
-        }
-        OS_LOGI(TAG, "Copying this firmware into %s before the partition table can change", app0->label);
-        if (!copyImage(running, context.runningImageSize, app0->address) || esp_ota_set_boot_partition(app0) != ESP_OK) {
-          return Step::Retry;
-        }
-        OS_LOGI(TAG, "Restarting into %s", app0->label);
-        vTaskDelay(pdMS_TO_TICKS(500));
-        esp_restart();
-      }
       OS_LOGE(TAG, "The target partition table fails a check: %s; staying on the 1.x layout", PT::ViolationName(verdict.error()));
       return Step::RetryLater;
     }
 
-    // Where the running image will be after the rewrite: its slot grown in place, or (running from the 1.x app1 on
-    // 8 MB) the new slot of the same OTA index, which overlaps nothing in the old table and so is plain free flash.
-    const PT::Entry* slot = staged->FindAppAt(running->address);
-    if (slot == nullptr) {
-      for (const PT::Entry& entry : staged->Entries()) {
-        if (entry.IsApp() && entry.subtype == running->subtype) {
-          slot = &entry;
-        }
-      }
-      if (slot == nullptr || slot->size < context.runningImageSize) {
-        OS_LOGE(TAG, "The target table has no slot of this image's OTA index to move it into");
-        return Step::RetryLater;
-      }
-      OS_LOGI(TAG, "Copying this firmware to 0x%06x, where the new table puts %s", static_cast<unsigned>(slot->offset), slot->label);
-      if (!copyImage(running, context.runningImageSize, slot->offset)) {
-        return Step::Retry;
-      }
-    }
-
-    // From here the portal's 1.x assets may be overwritten: the portal stays closed until the restart
+    // From here the portal's 1.x assets are overwritten (www is the 1.x static0): the portal stays closed until the restart
     if (!CaptivePortal::ForceClose(5000)) {
       OS_LOGE(TAG, "Failed to close the captive portal");
       return Step::Retry;
     }
     const PT::Entry* www = staged->Find(PT::kTypeWww, 0xFF, "www");
-    OS_LOGI(TAG, "Writing the portal assets where the new table puts www (0x%06x)", static_cast<unsigned>(www->offset));
+    OS_LOGI(TAG, "Writing the portal assets over the 1.x static0, where the new table puts www (0x%06x)", static_cast<unsigned>(www->offset));
     if (!downloadWwwToFlash(client, release->filesystemBinaryUrl, release->filesystemBinaryHash, www->offset, www->size)) {
       CaptivePortal::ReleaseForceClose();
       return Step::Retry;

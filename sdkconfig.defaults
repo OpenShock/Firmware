@@ -58,12 +58,10 @@ CONFIG_MBEDTLS_CERTIFICATE_BUNDLE_DEFAULT_NONE=y
 CONFIG_MBEDTLS_CUSTOM_CERTIFICATE_BUNDLE=y
 CONFIG_MBEDTLS_CUSTOM_CERTIFICATE_BUNDLE_PATH="certificates/cacert-merged.pem"
 
-# Partition table: one layout per flash size (partitions/ota_4mb.csv, ota_8mb.csv; docs/STORAGE.md).
-# The 4 MB one is the default so a build without a board fragment (e.g. the VS Code ESP-IDF
+# Partition table: one layout for every board, whatever its flash size (partitions/ota_4mb.csv;
+# docs/STORAGE.md). Named here so a build without a board fragment (e.g. the VS Code ESP-IDF
 # extension) does not fall back to IDF's 1 MB single-app table, which the app overflows and which
-# has no cfg/www partitions. scripts/build.py and the root CMakeLists.txt switch a board with 8 MB
-# or more to ota_8mb.csv; a variant build (CI) always compiles against the 4 MB table, whose app
-# slot is the smaller of the two, and scripts/package_boards.py writes each board's own table.
+# has no cfg/www partitions. scripts/package_boards.py writes each board's partition-table.bin.
 CONFIG_ESPTOOLPY_FLASHSIZE_4MB=y
 CONFIG_PARTITION_TABLE_CUSTOM=y
 CONFIG_PARTITION_TABLE_CUSTOM_FILENAME="partitions/ota_4mb.csv"

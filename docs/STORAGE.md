@@ -6,25 +6,30 @@ Partition Migration Design); this page describes what the code does.
 
 ## Partition tables
 
-One table per flash size, picked from the board's `CONFIG_ESPTOOLPY_FLASHSIZE_*` by `scripts/utils/partitions.py`
-(and by the root `CMakeLists.txt` for preset builds). Board files never name a table.
+One table, `partitions/ota_4mb.csv`, for every board whatever its flash size. Board files never name it.
 
-| Table | Boards | app0 / app1 | cfg | www |
-| --- | --- | --- | --- | --- |
-| `partitions/ota_4mb.csv` | every 4 MB board | 1,824 KiB each | 32 KiB at 0x1D8000 | 288 KiB at 0x3A8000 |
-| `partitions/ota_8mb.csv` | 8 MB and 16 MB boards | 3,680 KiB each | 32 KiB at 0x3A8000 | 256 KiB at 0x3C0000 |
+| Partition | Offset | Size | 1.x (`partitions/legacy/ota_4mb_v1.csv`) |
+| --- | --- | --- | --- |
+| `nvs` | 0x9000 | 20 KiB | the same |
+| `otadata` | 0xE000 | 8 KiB | the same |
+| `app0`, `app1` | 0x10000, 0x1B0000 | 1,664 KiB each | the same |
+| `cfg` (data/nvs) | 0x350000 | 12 KiB | littlefs `config` (data/spiffs) |
+| `www` (type 0x40) | 0x353000 | 628 KiB | littlefs `static0` (data/spiffs) |
+| `coredump` | 0x3F0000 | 64 KiB | the same |
 
-`nvs` (0x9000), `otadata` (0xE000) and the start of `app0` (0x10000) are the same in every table, the 1.x one
-(`partitions/legacy/ota_4mb_v1.csv`) included: that is what lets a running hub rewrite its table in place. On 8 MB,
-`app1` starts at 0x400000, above everything the 1.x table used.
+It is the 1.x geometry entry for entry: a fielded hub rewrites its table in place and nothing moves, so the migration
+never copies a firmware image and never needs more flash than the 1.x table already declared. Only `config` and
+`static0` change, in type and label. The flash past 4 MB on bigger boards stays unused.
 
-A build variant compiles against the 4 MB table (the smaller app slot). `scripts/package_boards.py` then gives each
-board its own `partition-table.bin` (written by `partitions.py`, byte-identical to `gen_esp32part.py`) and stamps the
-board's flash size into the bootloader header, which the bootloader sizes the flash from.
+`scripts/package_boards.py` gives each board its `partition-table.bin` (written by `scripts/utils/partitions.py`,
+byte-identical to `gen_esp32part.py`) and stamps the board's flash size into the bootloader header, which the
+bootloader sizes the flash from.
 
 ## Config
 
-The config lives in the `cfg` NVS partition as typed keys, one namespace per section. The config component
+The config lives in the `cfg` NVS partition as typed keys, one namespace per section. At 12 KiB (three NVS pages, one
+always kept free for compaction) it holds the whole config with some 32 long WiFi credentials, more than the 4 KiB
+1.x config file did; it fills up at about 36. The config component
 (`components/config`) is only the framework; each module owns its section, its keys and its accessors:
 
 | Section | Owner | NVS namespaces |
@@ -55,7 +60,8 @@ To add a section, define a value type with `ToDefault`, `LoadNvs`, `SaveNvs`, `F
 
 Where the store is:
 
-- `cfg` on a 2.x layout.
+- `cfg` on the 2.x layout. On the first boot after the table rewrite `cfg` still holds the 1.x littlefs; it is erased
+  before NVS opens it.
 - On the 1.x layout, which has no `cfg`, the same namespaces in the shared `nvs` partition. The first boot that finds
   `cfg` copies them over key by key, compares the copy, and deletes the shared one.
 - An empty store is filled once: from the 1.x littlefs config file (`/config` on the 1.x `config` partition, read
@@ -73,8 +79,9 @@ tries to mount it), mapped once and served by pointer. `scripts/utils/wwwimage.p
 truncated SHA-256 over everything after the header, checked before anything is served. The same image serves every
 board. The OTA update skips flashing it when the hash on flash already matches the release's.
 
-1.x-numbered releases also publish the assets as a littlefs image of the 1.x `static0` partition: that is what a 1.x
-hub's OTA installs as `staticfs` and checks by mounting it. On the 1.x layout the portal serves from that image.
+A 1.x hub's OTA only accepts a `staticfs` it can mount as littlefs, so the 1.x bridge release (the 1.9.x pivot) also
+publishes the assets as a littlefs image of `static0`, and on the 1.x layout its portal serves from that. CI builds the
+littlefs image for 1.x-numbered versions only; every other release ships the www image alone.
 
 ## The 1.x to 2.x migration
 
@@ -86,15 +93,14 @@ A 1.x hub reaches the 2.x layout through the 1.9.x pivot release, which runs on 
    `components/partition_layout`: nvs and otadata unmoved, `cfg` and `www` present, geometry the bootloader accepts,
    a slot for the running image, a 1.x live table, and a bootloader header that declares enough flash. Any failure
    leaves the hub on the 1.x layout and retries later.
-3. Running from the 1.x `app1` on 4 MB, the image is first copied into `app0` and booted. On 8 MB it is copied to
-   0x400000, where the new table puts `app1`.
-4. The portal closes and the target's www image is written where the new table puts `www`, so the first boot of the
-   new layout has a portal even without a network.
-5. Config writes are held, NVS is closed, and the table sector is erased and written through the OTA path, read back,
+   The new table must also keep every entry where it is and retype nothing but `config` and `static0`.
+3. The portal closes and the target's www image is written over `static0`, which the new table makes `www`, so the
+   first boot of the new layout has a portal even without a network.
+4. Config writes are held, NVS is closed, and the table sector is erased and written through the OTA path, read back,
    and the hub restarts.
-6. On the 2.x table, still running the pivot: the config moves from `nvs` into `cfg`, the WiFi driver's stale store
-   and any fragment of a 1.x image in the moved slot are erased, and the target version is installed. If it rolls back
-   to the pivot, the chain stops.
+5. On the 2.x table, still running the pivot: the 1.x littlefs in `cfg` is erased, the config moves from `nvs` into
+   `cfg`, the WiFi driver's stale store is erased, and the target version is installed. If it rolls back to the
+   pivot, the chain stops.
 
 `sysinfo` on the serial console prints the partition layout, the bootloader header's flash size and the config store.
 

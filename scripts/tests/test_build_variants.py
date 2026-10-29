@@ -33,7 +33,7 @@ def test_variant_ignores_pins_flash_size_and_order(tmp_path):
     assert vid(tmp_path, BASE + '# CONFIG_ESPTOOLPY_FLASHSIZE_4MB is not set\n') == base
     assert vid(tmp_path, 'CONFIG_PARTITION_TABLE_CUSTOM=y\nCONFIG_IDF_TARGET="esp32s3"\n') == base
     # The table follows from the flash size, so naming one does not split a variant either
-    assert vid(tmp_path, BASE + 'CONFIG_PARTITION_TABLE_CUSTOM_FILENAME="partitions/ota_8mb.csv"\n') == base
+    assert vid(tmp_path, BASE + 'CONFIG_PARTITION_TABLE_CUSTOM_FILENAME="partitions/legacy/ota_4mb_v1.csv"\n') == base
     assert vid(tmp_path, 'CONFIG_IDF_TARGET="esp32s3"\n') == base
 
 

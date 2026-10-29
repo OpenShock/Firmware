@@ -6,5 +6,5 @@
 nvs,      data, nvs,      0x009000, 0x005000,
 otadata,  data, ota,      0x00E000, 0x002000,
 app0,     app,  ota_0,    0x010000, 0x100000,
-cfg,      data, nvs,      0x110000, 0x008000,
-config,   data, spiffs,   0x118000, 0x003000,
+cfg,      data, nvs,      0x110000, 0x003000,
+config,   data, spiffs,   0x113000, 0x003000,

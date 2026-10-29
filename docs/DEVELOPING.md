@@ -122,8 +122,8 @@ python scripts/build.py --variant ?                  # any unknown id lists the 
 - `OPENSHOCK_*` pin lines: not Kconfig. Stripped from the fragment and stamped into the image by
   `scripts/stamp_board.py`, so the same compiled objects serve every board of a chip.
 
-Shared config lives in `sdkconfig.defaults`. The partition table follows from the board's flash size
-(`partitions/ota_4mb.csv` or `ota_8mb.csv`, see [STORAGE.md](STORAGE.md)); board files do not name one. `sdkconfig` and `build/` are generated and
+Shared config lives in `sdkconfig.defaults`. Every board uses the one partition table
+(`partitions/ota_4mb.csv`, see [STORAGE.md](STORAGE.md)); board files do not name one. `sdkconfig` and `build/` are generated and
 gitignored. If a `sdkconfig` is stale after a defaults change, delete it or run `fullclean`.
 
 ```sh
@@ -225,8 +225,8 @@ To build only the image, as CI does:
 
 ```sh
 python scripts/gen_staticfs.py --frontend-dir frontend --output build/www.bin \
-    --partition-csv partitions/ota_4mb.csv --partition-csv partitions/ota_8mb.csv \
-    --legacy-output build/staticfs.bin    # the 1.x littlefs image, only for 1.x-numbered releases
+    --partition-csv partitions/ota_4mb.csv \
+    --legacy-output build/staticfs.bin    # the 1.x littlefs image, only for the 1.x bridge release
 ```
 
 ### Packaged and merged images
