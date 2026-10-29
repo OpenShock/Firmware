@@ -2,10 +2,12 @@
 
 const char* const TAG = "WSGateway";
 
+#include <esp_flash.h>
 #include <esp_wifi.h>
 
 #include "Logging.h"
 #include "OpenShock.h"
+#include "partition_layout/LiveTable.h"
 #include "SemVer.h"
 #include "Temporal.h"
 
@@ -50,7 +52,31 @@ bool Gateway::SerializeBootStatusMessage(int32_t updateId, OpenShock::FirmwareBo
   const OpenShock::SemVer& version = OpenShock::Constants::FirmwareVersion();
   auto fbsVersion                  = Types::CreateSemVerDirect(builder, version.major, version.minor, version.patch, version.prerelease.empty() ? nullptr : version.prerelease.c_str(), version.build.empty() ? nullptr : version.build.c_str());
 
-  auto fbsBootStatus = Gateway::CreateBootStatus(builder, static_cast<Types::FirmwareBootType>(bootType), fbsVersion, updateId);
+  // Which partition table the hub runs on, and whether its bootloader lets it move to the 2.x one
+  Gateway::PartitionLayout layout = Gateway::PartitionLayout::Unknown;
+  switch (PartitionTable::LiveLayout()) {
+    case PartitionTable::Layout::V1:
+      layout = Gateway::PartitionLayout::V1;
+      break;
+    case PartitionTable::Layout::V2:
+      layout = Gateway::PartitionLayout::V2;
+      break;
+    case PartitionTable::Layout::Unknown:
+      break;
+  }
+  uint32_t flashSize = 0;
+  esp_flash_get_size(nullptr, &flashSize);
+  constexpr uint32_t kMiB = 1024 * 1024;
+
+  auto fbsBootStatus = Gateway::CreateBootStatus(
+    builder,
+    static_cast<Types::FirmwareBootType>(bootType),
+    fbsVersion,
+    updateId,
+    layout,
+    static_cast<uint16_t>(PartitionTable::BootloaderFlashSize() / kMiB),
+    static_cast<uint16_t>(flashSize / kMiB)
+  );
 
   return finishMessage(builder, Gateway::HubToGatewayMessagePayload::BootStatus, fbsBootStatus, callback);
 }

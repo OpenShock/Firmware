@@ -13,6 +13,7 @@ const char* const TAG = "LayoutMigration";
 #include "OpenShock.h"
 #include "OtaUpdateConfig.h"
 #include "OtaUpdateManager.h"
+#include "partition_layout/LiveTable.h"
 #include "partition_layout/PartitionTable.h"
 #include "SemVer.h"
 #include "SimpleMutex.h"
@@ -72,30 +73,6 @@ namespace {
   bool isPivotBuild()
   {
     return Constants::FirmwareVersion().major < 2;
-  }
-
-  bool readLiveTable(std::array<uint8_t, PT::kMaxLen>& out)
-  {
-    esp_err_t err = esp_flash_read(nullptr, out.data(), ESP_PRIMARY_PARTITION_TABLE_OFFSET, out.size());
-    if (err != ESP_OK) {
-      OS_LOGE(TAG, "Failed to read the partition table: %s", esp_err_to_name(err));
-      return false;
-    }
-    return true;
-  }
-
-  std::optional<PT::Table> liveTable()
-  {
-    std::array<uint8_t, PT::kMaxLen> bytes;
-    if (!readLiveTable(bytes)) {
-      return std::nullopt;
-    }
-    auto table = PT::Parse(bytes);
-    if (!table) {
-      OS_LOGE(TAG, "The live partition table does not parse: %s", PT::ParseErrorName(table.error()));
-      return std::nullopt;
-    }
-    return *table;
   }
 
   // Length of the image in the running slot, from its own header (what has to fit wherever it goes).
@@ -253,7 +230,7 @@ namespace {
     }
 
     std::array<uint8_t, PT::kMaxLen> readBack;
-    if (!readLiveTable(readBack) || readBack != table) {
+    if (!PT::ReadLiveBytes(readBack) || readBack != table) {
       OS_LOGE(TAG, "The partition table does not read back as written");
       return false;
     }
@@ -435,7 +412,7 @@ namespace {
 
     // What goes back if the new table will not stick: the live table exactly as it is on flash, and still 1.x
     std::array<uint8_t, PT::kMaxLen> liveBytes {};
-    const bool liveRead = readLiveTable(liveBytes);
+    const bool liveRead = PT::ReadLiveBytes(liveBytes);
     const auto liveNow  = PT::Parse(liveBytes);
     if (!liveRead || !liveNow || PT::Detect(*liveNow) != PT::Layout::V1) {
       OS_LOGE(TAG, "The live partition table changed under the migration");
@@ -478,7 +455,7 @@ namespace {
     const auto target = targetVersion();
     while (target) {
       waitForWifi();
-      auto live = liveTable();
+      auto live = PT::ReadLive();
       Step step = Step::Done;
       if (!live) {
         step = Step::RetryLater;
@@ -507,23 +484,18 @@ namespace {
 
 uint32_t Migration::BootloaderFlashSize()
 {
-  uint8_t header[4] = {};
-  if (esp_flash_read(nullptr, header, CONFIG_BOOTLOADER_OFFSET_IN_FLASH, sizeof(header)) != ESP_OK || header[0] != ESP_IMAGE_HEADER_MAGIC) {
-    return 0;
-  }
-  const uint8_t code = header[3] >> 4;  // esp_image_flash_size_t: 0 = 1 MB, 1 = 2 MB, 2 = 4 MB, ...
-  return code <= 7 ? (kMiB << code) : 0;
+  return PT::BootloaderFlashSize();
 }
 
 const char* Migration::LiveLayoutName()
 {
-  auto live = liveTable();
+  auto live = PT::ReadLive();
   return live ? PT::LayoutName(PT::Detect(*live)) : "unreadable";
 }
 
 bool Migration::Start()
 {
-  auto live               = liveTable();
+  auto live               = PT::ReadLive();
   const PT::Layout layout = live ? PT::Detect(*live) : PT::Layout::Unknown;
   OS_LOGI(TAG, "Partition layout: %s; bootloader header declares %u MiB", PT::LayoutName(layout), static_cast<unsigned>(BootloaderFlashSize() / kMiB));
 

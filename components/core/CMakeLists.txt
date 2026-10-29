@@ -20,6 +20,7 @@ idf_component_register(
   # Internal-only now that GatewayClient.h is private:
   PRIV_REQUIRES espressif__esp_websocket_client
                 device_control   # estop/CommandHandler/visual used only in core .cpp
+                partition_layout spi_flash   # the boot status's partition layout and flash sizes
 )
 
 # IDF compiles application components with -Werror. The legacy PlatformIO build
