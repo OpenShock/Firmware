@@ -11,21 +11,22 @@ const char* const TAG = "ServerMessageHandlers";
 
 #include <array>
 #include <cstdint>
+#include <utility>
 
 namespace Schemas  = OpenShock::Serialization::Gateway;
 namespace Handlers = OpenShock::MessageHandlers::Server::_Private;
-typedef Schemas::GatewayToHubMessagePayload PayloadType;
+using PayloadType  = Schemas::GatewayToHubMessagePayload;
 
 using namespace OpenShock;
 
-const std::size_t HANDLER_COUNT = static_cast<std::size_t>(PayloadType::MAX) + 1;
+const std::size_t HANDLER_COUNT = std::to_underlying(PayloadType::MAX) + 1;
 
 static std::array<Handlers::HandlerType, HANDLER_COUNT> s_serverHandlers = []() {
   std::array<Handlers::HandlerType, HANDLER_COUNT> handlers {};
   handlers.fill(Handlers::HandleInvalidMessage);
 
   auto set = [&](PayloadType p, Handlers::HandlerType h) {
-    handlers[static_cast<std::size_t>(p)] = h;
+    handlers[std::to_underlying(p)] = h;
   };
 
   set(PayloadType::Ping, Handlers::HandlePing);
@@ -36,7 +37,7 @@ static std::array<Handlers::HandlerType, HANDLER_COUNT> s_serverHandlers = []() 
   return handlers;
 }();
 
-void MessageHandlers::WebSocket::HandleGatewayBinary(std::span<const uint8_t> data)
+void MessageHandlers::WebSocket::HandleGatewayBinary(GatewayClient& client, std::span<const uint8_t> data)
 {
   auto msg = Serialization::GetVerifiedRoot<Schemas::GatewayToHubMessage>(data, MaxGatewayMessageSize);
   if (msg == nullptr) {
@@ -45,9 +46,9 @@ void MessageHandlers::WebSocket::HandleGatewayBinary(std::span<const uint8_t> da
   }
 
   if (msg->payload_type() < PayloadType::MIN || msg->payload_type() > PayloadType::MAX) {
-    Handlers::HandleInvalidMessage(msg);
+    Handlers::HandleInvalidMessage(client, msg);
     return;
   }
 
-  s_serverHandlers[static_cast<std::size_t>(msg->payload_type())](msg);
+  s_serverHandlers[std::to_underlying(msg->payload_type())](client, msg);
 }

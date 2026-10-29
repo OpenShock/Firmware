@@ -9,14 +9,14 @@ idf_component_register(
                "test_stringutils.cpp"
                "test_convert.cpp"
                "test_hexutils.cpp"
-               "test_digitcounter.cpp"
                "test_semver.cpp"
                "test_checksum.cpp"
+               "test_boarddescriptor.cpp"
                "test_tinyvec.cpp"
                "test_fnproxy.cpp"
+               "test_functionref.cpp"
                "../../src/StringHelpers.cpp"  # StringSplit/StringIContains/FormatToString (out-of-line)
                "../../src/Convert.cpp"
-               "../../src/DigitCounter.cpp"
                "../../src/SemVer.cpp"
   INCLUDE_DIRS "."
                "../../include"  # common's headers (enums/*, Convert.h, SemVer.h, util/*.h)

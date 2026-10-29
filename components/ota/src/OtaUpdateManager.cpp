@@ -3,6 +3,7 @@
 const char* const TAG = "OtaUpdateManager";
 
 #include "AppHooks.h"
+#include "BoardDescriptor.h"
 #include "captiveportal/Manager.h"
 #include "config/Config.h"
 #include "fs/FsCheck.h"
@@ -26,15 +27,19 @@ const char* const TAG = "OtaUpdateManager";
 #include <esp_event.h>
 #include <esp_netif.h>
 #include <esp_ota_ops.h>
+#include <esp_partition.h>
 #include <esp_random.h>
-#include <esp_task_wdt.h>
 #include <esp_wifi.h>
 
 #include <array>
+#include <atomic>
+#include <cstring>
+#include <optional>
 #include <span>
 #include <sstream>
 #include <string>
 #include <string_view>
+#include <utility>
 
 // Firmware version / commit. Regenerated every build, so this file is one of the
 // few that recompile on a new commit.
@@ -44,12 +49,17 @@ using namespace std::string_view_literals;
 /// Repository server firmware API root. Paths per firmware-api-spec.md §4.
 #define OPENSHOCK_FW_REPO_API_PREFIX "/2/firmware"
 
+// The board in these URLs is the name from the descriptor stamped into the image (Board::Get().board), so the
+// repository server's per-board releases keep working unchanged now that the firmware is compiled per chip.
+
 /// @brief Latest release for this board on a channel, with the hub's current version attached so the
 /// server can answer 204 when there is nothing to do. See spec §4.2.
-#define OPENSHOCK_FW_REPO_LATEST_URL_FORMAT "https://%s" OPENSHOCK_FW_REPO_API_PREFIX "/latest/%s/" OPENSHOCK_FW_BOARD "?version=%s"
+/// Arguments: domain, channel, board (as %.*s: length, data), version.
+#define OPENSHOCK_FW_REPO_LATEST_URL_FORMAT "https://%s" OPENSHOCK_FW_REPO_API_PREFIX "/latest/%s/%.*s?version=%s"
 
 /// @brief Artifacts for one specific version of this board: the directed-update path. See spec §4.4.
-#define OPENSHOCK_FW_REPO_VERSION_URL_FORMAT "https://%s" OPENSHOCK_FW_REPO_API_PREFIX "/versions/%s/" OPENSHOCK_FW_BOARD
+/// Arguments: domain, version, board (as %.*s: length, data).
+#define OPENSHOCK_FW_REPO_VERSION_URL_FORMAT "https://%s" OPENSHOCK_FW_REPO_API_PREFIX "/versions/%s/%.*s"
 
 enum OtaTaskEventFlag : uint32_t {
   OTA_TASK_EVENT_UPDATE_REQUESTED     = 1 << 0,
@@ -58,7 +68,7 @@ enum OtaTaskEventFlag : uint32_t {
   OTA_TASK_EVENT_CHECK_REQUESTED      = 1 << 3,
 };
 
-static esp_ota_img_states_t _otaImageState;
+static std::atomic<esp_ota_img_states_t> _otaImageState;
 static OpenShock::FirmwareBootType _bootType;
 static TaskHandle_t _taskHandle = nullptr;
 static OpenShock::SemVer _requestedVersion;
@@ -73,7 +83,7 @@ static bool otaum_try_notify_task(uint32_t eventFlag)
     return false;
   }
 
-  if (xTaskNotify(_taskHandle, eventFlag, eSetBits) != pdPASS) {
+  if (xTaskNotifyIndexed(_taskHandle, TaskUtils::kNotifyIndex, eventFlag, eSetBits) != pdPASS) {
     OS_LOGE(TAG, "Failed to notify OTA task (event: 0x%08x)", static_cast<unsigned>(eventFlag));
     return false;
   }
@@ -97,18 +107,18 @@ static bool otaum_try_queue_update_request(const OpenShock::SemVer& version)
   return true;
 }
 
-static bool _tryGetRequestedVersion(OpenShock::SemVer& version)
+[[nodiscard]] static std::optional<OpenShock::SemVer> _tryGetRequestedVersion()
 {
   if (!_requestedVersionMutex.lock(pdMS_TO_TICKS(1000))) {
     OS_LOGE(TAG, "Failed to take requested version mutex");
-    return false;
+    return std::nullopt;
   }
 
-  version = _requestedVersion;
+  OpenShock::SemVer version = _requestedVersion;
 
   _requestedVersionMutex.unlock();
 
-  return true;
+  return version;
 }
 
 // Network events cover WiFi and Ethernet: DOWN only fires once no interface has an IP left.
@@ -133,13 +143,13 @@ static void otaum_evh_network(void* event_handler_arg, esp_event_base_t event_ba
 
 static bool otaum_send_progress_msg(Serialization::Types::OtaUpdateProgressTask task, float progress)
 {
-  int32_t updateId;
-  if (!Config::GetOtaUpdateId(updateId)) {
+  auto updateId = Config::GetOtaUpdateId();
+  if (!updateId) {
     OS_LOGE(TAG, "Failed to get OTA update ID");
     return false;
   }
 
-  if (!Serialization::Gateway::SerializeOtaUpdateProgressMessage(updateId, task, progress, GatewayConnectionManager::SendMessageBIN)) {
+  if (!Serialization::Gateway::SerializeOtaUpdateProgressMessage(*updateId, task, progress, GatewayConnectionManager::SendMessageBIN)) {
     OS_LOGE(TAG, "Failed to send OTA install progress message");
     return false;
   }
@@ -148,17 +158,65 @@ static bool otaum_send_progress_msg(Serialization::Types::OtaUpdateProgressTask 
 }
 static bool _sendFailureMessage(std::string_view message, bool fatal = false)
 {
-  int32_t updateId;
-  if (!Config::GetOtaUpdateId(updateId)) {
+  auto updateId = Config::GetOtaUpdateId();
+  if (!updateId) {
     OS_LOGE(TAG, "Failed to get OTA update ID");
     return false;
   }
 
-  if (!Serialization::Gateway::SerializeOtaUpdateFailedMessage(updateId, message, fatal, GatewayConnectionManager::SendMessageBIN)) {
+  if (!Serialization::Gateway::SerializeOtaUpdateFailedMessage(*updateId, message, fatal, GatewayConnectionManager::SendMessageBIN)) {
     OS_LOGE(TAG, "Failed to send OTA install failed message");
     return false;
   }
 
+  return true;
+}
+
+/// @brief Whether the descriptor in `slot` names the board this hub is, logging the verdict.
+///
+/// A slot with no descriptor at all passes: the repository server keyed pre-descriptor builds by board, and
+/// refusing them would block every downgrade to one. A descriptor that is present but corrupt, or a placeholder
+/// from an image nobody stamped, is not that case: such an image would run with no pins, so it is refused when
+/// strict. Running unstamped ourselves passes, since there is nothing to compare to.
+/// @param strict True for an image about to be made bootable: an unreadable, corrupt or unstamped descriptor is a
+///               refusal. False for the first-boot check against the slot we came from, where a problem reading
+///               the old slot must not roll back a good image.
+static bool otaum_slot_matches_this_board(const esp_partition_t* slot, const char* what, bool strict)
+{
+  uint8_t bytes[OPENSHOCK_BOARD_DESCRIPTOR_SIZE];
+  esp_err_t err = esp_partition_read(slot, OPENSHOCK_BOARD_DESCRIPTOR_IMAGE_OFFSET, bytes, sizeof(bytes));
+  if (err != ESP_OK) {
+    OS_LOGE(TAG, "Failed to read the board descriptor of %s from %s: %s", what, slot->label, esp_err_to_name(err));
+    return !strict;
+  }
+
+  BoardDescriptor other;
+  switch (Board::Parse(bytes, other)) {
+    case Board::ParseResult::Absent:
+      OS_LOGW(TAG, "%s carries no board descriptor (built before descriptors existed), cannot check it against this board", what);
+      return true;
+    case Board::ParseResult::Invalid:
+      OS_LOGE(TAG, "%s carries a corrupt board descriptor", what);
+      return !strict;
+    case Board::ParseResult::Unstamped:
+      OS_LOGE(TAG, "%s was never stamped with a board and would run with no pins", what);
+      return !strict;
+    case Board::ParseResult::Valid:
+      break;
+  }
+
+  if (!Board::IsStamped()) {
+    OS_LOGW(TAG, "This image carries no valid board descriptor; accepting %s for %s unchecked", what, other.board);
+    return true;
+  }
+
+  const BoardDescriptor& self = Board::Get();
+  if (std::strcmp(other.board, self.board) != 0 || std::strcmp(other.chip, self.chip) != 0) {
+    OS_LOGE(TAG, "%s is for %s (%s), but this hub is %s (%s)", what, other.board, other.chip, self.board, self.chip);
+    return false;
+  }
+
+  OS_LOGD(TAG, "%s is for %s, matching this hub", what, other.board);
   return true;
 }
 
@@ -181,6 +239,13 @@ static bool otaum_flash_app_partition(OpenShock::HTTP::Client& client, const esp
   if (!OpenShock::FlashPartitionFromUrl(client, partition, remoteUrl, remoteHash, onProgress)) {
     OS_LOGE(TAG, "Failed to flash app partition");
     _sendFailureMessage("Failed to flash app partition"sv);
+    return false;
+  }
+
+  // The hash proved the download is what the server published; this proves the server published it for this
+  // board. Checked before the slot is made bootable, so a mislabelled release never gets a chance to boot.
+  if (!otaum_slot_matches_this_board(partition, "Downloaded firmware", true)) {
+    _sendFailureMessage("Downloaded firmware is for a different board"sv);
     return false;
   }
 
@@ -245,45 +310,6 @@ static bool otaum_flash_fs_partition(OpenShock::HTTP::Client& client, const esp_
   return true;
 }
 
-// Only the timeout is changed; idle-core mask and panic behaviour stay as configured in sdkconfig.
-static esp_err_t otaum_set_wdt_timeout(uint32_t timeoutSeconds)
-{
-  uint32_t idleCoreMask = 0;
-#if CONFIG_ESP_TASK_WDT_CHECK_IDLE_TASK_CPU0
-  idleCoreMask |= 1U << 0;
-#endif
-#if CONFIG_ESP_TASK_WDT_CHECK_IDLE_TASK_CPU1
-  idleCoreMask |= 1U << 1;
-#endif
-
-  esp_task_wdt_config_t twdt_config = {
-    .timeout_ms     = timeoutSeconds * 1000U,
-    .idle_core_mask = idleCoreMask,
-#if CONFIG_ESP_TASK_WDT_PANIC
-    .trigger_panic = true,
-#else
-    .trigger_panic = false,
-#endif
-  };
-  // ESP-IDF initializes the TWDT at startup (CONFIG_ESP_TASK_WDT_INIT, default y), so
-  // reconfigure it instead of re-initializing. esp_task_wdt_reconfigure() returns
-  // ESP_ERR_INVALID_STATE if the TWDT isn't initialized yet, in which case we fall back to init.
-  esp_err_t err = esp_task_wdt_reconfigure(&twdt_config);
-  if (err == ESP_ERR_INVALID_STATE) {
-    // Not yet initialized, fall back to init
-    return esp_task_wdt_init(&twdt_config);
-  }
-
-  return err;
-}
-
-static void otaum_restore_wdt_timeout()
-{
-  if (otaum_set_wdt_timeout(CONFIG_ESP_TASK_WDT_TIMEOUT_S) != ESP_OK) {
-    OS_LOGE(TAG, "Failed to restore task watchdog timeout");
-  }
-};
-
 static void otaum_updatetask(void* arg)
 {
   (void)arg;
@@ -299,7 +325,7 @@ static void otaum_updatetask(void* arg)
   while (true) {
     // Wait for event.
     uint32_t eventBits = 0;
-    xTaskNotifyWait(0, UINT32_MAX, &eventBits, pdMS_TO_TICKS(5000));  // TODO: wait for rest time
+    xTaskNotifyWaitIndexed(TaskUtils::kNotifyIndex, 0, UINT32_MAX, &eventBits, pdMS_TO_TICKS(5000));  // TODO: wait for rest time
 
     updateRequested |= (eventBits & OTA_TASK_EVENT_UPDATE_REQUESTED) != 0;
     checkRequested |= (eventBits & OTA_TASK_EVENT_CHECK_REQUESTED) != 0;
@@ -326,14 +352,18 @@ static void otaum_updatetask(void* arg)
 
     int64_t now = OpenShock::millis();
 
-    Config::OtaUpdateConfig config;
-    if (!Config::GetOtaUpdateConfig(config)) {
+    auto maybeConfig = Config::GetOtaUpdateConfig();
+    if (!maybeConfig) {
       OS_LOGE(TAG, "Failed to get OTA update config");
       continue;
     }
+    const Config::OtaUpdateConfig& config = *maybeConfig;
 
     if (!config.isEnabled) {
       OS_LOGD(TAG, "OTA updates are disabled, skipping update check");
+      // Dropped rather than kept for later: re-enabling updates shouldn't act on a request made while disabled
+      updateRequested = false;
+      checkRequested  = false;
       continue;
     }
 
@@ -361,6 +391,7 @@ static void otaum_updatetask(void* arg)
 
     if (config.requireManualApproval) {
       OS_LOGD(TAG, "Manual approval required, skipping update check");
+      updateRequested = false;  // Otherwise it re-triggers this branch every minute
       // TODO: IMPLEMENT
       continue;
     }
@@ -373,18 +404,22 @@ static void otaum_updatetask(void* arg)
     if (updateRequested) {
       updateRequested = false;
 
-      if (!_tryGetRequestedVersion(version)) {
+      auto requestedVersion = _tryGetRequestedVersion();
+      if (!requestedVersion) {
         OS_LOGE(TAG, "Failed to get requested version");
         continue;
       }
+      version = std::move(*requestedVersion);
     } else {
       OS_LOGD(TAG, "Checking for updates");
 
       // Fetch current version.
-      if (!OtaUpdateManager::TryGetFirmwareVersion(client, config.updateChannel, version)) {
+      auto latestVersion = OtaUpdateManager::TryGetFirmwareVersion(client, config.updateChannel);
+      if (!latestVersion) {
         OS_LOGE(TAG, "Failed to fetch firmware version");
         continue;
       }
+      version = std::move(*latestVersion);
     }
 
     std::string versionStr = version.toString();  // TODO: This is abusing the SemVer::toString() method causing alot of string copies, fix this
@@ -407,6 +442,16 @@ static void otaum_updatetask(void* arg)
       continue;
     }
 
+    // Every `continue` from here on abandons the update; don't leave the step at Updating for the next boot to report.
+    // Only resets Updating, so a step another task moved on (or our own Updated below) is left alone.
+    struct ResetStepOnFailure {
+      bool succeeded = false;
+      ~ResetStepOnFailure()
+      {
+        if (!succeeded) Config::CompareExchangeOtaUpdateStep(OpenShock::OtaUpdateStep::Updating, OpenShock::OtaUpdateStep::None);
+      }
+    } resetStepOnFailure;
+
     if (!Serialization::Gateway::SerializeOtaUpdateStartedMessage(updateId, version, GatewayConnectionManager::SendMessageBIN)) {
       OS_LOGE(TAG, "Failed to serialize OTA update started message");
       continue;
@@ -417,12 +462,13 @@ static void otaum_updatetask(void* arg)
     }
 
     // Fetch current release.
-    OtaUpdateManager::FirmwareRelease release;
-    if (!OtaUpdateManager::TryGetFirmwareRelease(client, version, release)) {
+    auto maybeRelease = OtaUpdateManager::TryGetFirmwareRelease(client, version);
+    if (!maybeRelease) {
       OS_LOGE(TAG, "Failed to fetch firmware release");  // TODO: Send error message to server
       _sendFailureMessage("Failed to fetch firmware release"sv);
       continue;
     }
+    const OtaUpdateManager::FirmwareRelease& release = *maybeRelease;
 
     // Print release.
     OS_LOGD(TAG, "Firmware release:");
@@ -448,14 +494,6 @@ static void otaum_updatetask(void* arg)
       continue;
     }
 
-    // Increase task watchdog timeout.
-    // Prevents panics on some ESP32s when clearing large partitions.
-    if (otaum_set_wdt_timeout(15) != ESP_OK) {
-      OS_LOGE(TAG, "Failed to increase task watchdog timeout");
-      _sendFailureMessage("Failed to increase task watchdog timeout"sv);
-      continue;
-    }
-
     // Flashing the filesystem force-closes the captive portal; on any failure (`continue`) it must be allowed to
     // open again. On success the portal stays closed until the restart below.
     struct ReopenPortalOnFailure {
@@ -468,11 +506,9 @@ static void otaum_updatetask(void* arg)
 
     // Flash app and filesystem partitions.
     if (!otaum_flash_fs_partition(client, filesystemPartition, release.filesystemBinaryUrl, release.filesystemBinaryHash)) {
-      otaum_restore_wdt_timeout();
       continue;
     }
     if (!otaum_flash_app_partition(client, appPartition, release.appBinaryUrl, release.appBinaryHash)) {
-      otaum_restore_wdt_timeout();
       continue;
     }
 
@@ -480,12 +516,9 @@ static void otaum_updatetask(void* arg)
     if (!Config::SetOtaUpdateStep(OpenShock::OtaUpdateStep::Updated)) {
       OS_LOGE(TAG, "Failed to set OTA update step");
       _sendFailureMessage("Failed to set OTA update step"sv);
-      otaum_restore_wdt_timeout();
       continue;
     }
-
-    // Set task watchdog timeout back to default.
-    otaum_restore_wdt_timeout();
+    resetStepOnFailure.succeeded = true;
 
     // Send reboot message.
     otaum_send_progress_msg(Serialization::Types::OtaUpdateProgressTask::Rebooting, 0.0f);
@@ -510,9 +543,9 @@ static const char* otaum_channel_name(OpenShock::OtaUpdateChannel channel)
       return "beta";
     case OtaUpdateChannel::Develop:
       return "develop";
-    default:
-      return nullptr;
   }
+
+  return nullptr;  // Channel comes from config and may be out of range
 }
 
 /// @brief Fetches the repository server domain from runtime config.
@@ -520,29 +553,28 @@ static const char* otaum_channel_name(OpenShock::OtaUpdateChannel channel)
 /// Historically named cdnDomain, from when OTA metadata was flat files served straight off the CDN.
 /// It now addresses the repository server's JSON API; artifact URLs come back absolute in the response,
 /// so the CDN host no longer has to be known by the hub.
-static bool otaum_try_get_repo_domain(std::string& domain)
+[[nodiscard]] static std::optional<std::string> otaum_try_get_repo_domain()
 {
-  Config::OtaUpdateConfig config;
-  if (!Config::GetOtaUpdateConfig(config)) {
+  auto config = Config::GetOtaUpdateConfig();
+  if (!config) {
     OS_LOGE(TAG, "Failed to get OTA update config");
-    return false;
+    return std::nullopt;
   }
 
-  if (config.cdnDomain.empty()) {
+  if (config->cdnDomain.empty()) {
     OS_LOGE(TAG, "OTA repository domain is not configured");
-    return false;
+    return std::nullopt;
   }
 
-  domain = std::move(config.cdnDomain);
-
-  return true;
+  return std::move(config->cdnDomain);
 }
 
 /// @brief Issues a GET against the repository API and parses the body as JSON.
 /// @param body Receives the response body. JsonView is zero-copy, so this must outlive `doc`.
 /// @param acceptedCodes Response codes to treat as success. 204 is handled by the caller and must not
 ///                      reach the parser; an empty body is not valid JSON.
-static bool otaum_try_get_json(HTTP::Client& client, std::string_view url, std::span<const uint16_t> acceptedCodes, std::string& body, JSON::JsonDocument& doc, int& code)
+/// @return The response code, or std::nullopt if the request or the JSON parse failed.
+[[nodiscard]] static std::optional<int> otaum_try_get_json(HTTP::Client& client, std::string_view url, std::span<const uint16_t> acceptedCodes, std::string& body, JSON::JsonDocument& doc)
 {
   auto response = client.GetString(
     url,
@@ -553,23 +585,23 @@ static bool otaum_try_get_json(HTTP::Client& client, std::string_view url, std::
   );
   if (response.result != OpenShock::HTTP::RequestResult::Success) {
     OS_LOGE(TAG, "Request failed: %s [%u] %s", response.ResultToString(), response.code, response.data.c_str());
-    return false;
+    return std::nullopt;
   }
 
-  code = response.code;
-  body = std::move(response.data);
+  int code = response.code;
+  body     = std::move(response.data);
 
   // 204 carries no body; the caller decides what that means for the endpoint it called.
   if (code == 204) {
-    return true;
+    return code;
   }
 
   if (!doc.parse(body)) {
     OS_LOGE(TAG, "Failed to parse response JSON");
-    return false;
+    return std::nullopt;
   }
 
-  return true;
+  return code;
 }
 
 bool OtaUpdateManager::Init()
@@ -590,18 +622,21 @@ bool OtaUpdateManager::Init()
   OS_LOGD(TAG, "Fetching partition state");
 
   // Get OTA state for said partition.
-  err = esp_ota_get_state_partition(partition, &_otaImageState);
+  esp_ota_img_states_t imageState;
+  err = esp_ota_get_state_partition(partition, &imageState);
   if (err != ESP_OK) {
     OS_PANIC(TAG, "Failed to get partition state: %s", esp_err_to_name(err));
     return false;  // Unreachable, here to make tooling happy
   }
+  _otaImageState = imageState;
 
   OS_LOGD(TAG, "Fetching previous update step");
-  OtaUpdateStep updateStep;
-  if (!Config::GetOtaUpdateStep(updateStep)) {
+  auto maybeUpdateStep = Config::GetOtaUpdateStep();
+  if (!maybeUpdateStep) {
     OS_LOGE(TAG, "Failed to get OTA update step");
     return false;
   }
+  OtaUpdateStep updateStep = *maybeUpdateStep;
 
   // Infer boot type from update step.
   _bootType = OpenShock::InferFirmwareBootType(updateStep);
@@ -629,54 +664,55 @@ bool OtaUpdateManager::Init()
   return true;
 }
 
-bool OtaUpdateManager::TryGetFirmwareVersion(HTTP::Client& client, OtaUpdateChannel channel, OpenShock::SemVer& version)
+std::optional<OpenShock::SemVer> OtaUpdateManager::TryGetFirmwareVersion(HTTP::Client& client, OtaUpdateChannel channel)
 {
   const char* channelName = otaum_channel_name(channel);
   if (channelName == nullptr) {
-    OS_LOGE(TAG, "Unknown channel: %u", static_cast<unsigned>(channel));
-    return false;
+    OS_LOGE(TAG, "Unknown channel: %u", std::to_underlying(channel));
+    return std::nullopt;
   }
 
-  std::string domain;
-  if (!otaum_try_get_repo_domain(domain)) {
-    return false;
+  auto domain = otaum_try_get_repo_domain();
+  if (!domain) {
+    return std::nullopt;
   }
 
   std::string uri;
-  if (!FormatToString(uri, OPENSHOCK_FW_REPO_LATEST_URL_FORMAT, domain.c_str(), channelName, OpenShock::Constants::FW_VERSION)) {
+  const auto board = Board::Name();
+  if (!FormatToString(uri, OPENSHOCK_FW_REPO_LATEST_URL_FORMAT, domain->c_str(), channelName, static_cast<int>(board.size()), board.data(), OpenShock::Constants::FW_VERSION)) {
     OS_LOGE(TAG, "Failed to format URL");
-    return false;
+    return std::nullopt;
   }
 
   OS_LOGD(TAG, "Fetching latest firmware version from %s", uri.c_str());
 
   std::string body;
   JSON::JsonDocument doc;
-  int code = 0;
-  if (!otaum_try_get_json(client, uri, std::array<uint16_t, 2> {200, 204}, body, doc, code)) {
-    return false;
+  auto code = otaum_try_get_json(client, uri, std::array<uint16_t, 2> {200, 204}, body, doc);
+  if (!code) {
+    return std::nullopt;
   }
 
   // 204 means the server compared our version against the channel head and found no work to do.
   // Report the running version back so the caller's "already installed" check short-circuits.
-  if (code == 204) {
+  if (*code == 204) {
     OS_LOGD(TAG, "Already on the latest version for this channel");
-    version = OpenShock::Constants::FirmwareVersion();
-    return true;
+    return OpenShock::Constants::FirmwareVersion();
   }
 
-  std::string versionStr;
-  if (!doc.root()["version"].tryGetStr(versionStr)) {
+  auto versionStr = doc.root()["version"].tryGetStr();
+  if (!versionStr) {
     OS_LOGE(TAG, "Response is missing a 'version' string");
-    return false;
+    return std::nullopt;
   }
 
-  if (!OpenShock::TryParseSemVer(versionStr, version)) {
-    OS_LOGE(TAG, "Failed to parse firmware version: %.*s", static_cast<int>(versionStr.size()), versionStr.data());
-    return false;
+  auto version = OpenShock::TryParseSemVer(*versionStr);
+  if (!version) {
+    OS_LOGE(TAG, "Failed to parse firmware version: %.*s", static_cast<int>(versionStr->size()), versionStr->data());
+    return std::nullopt;
   }
 
-  return true;
+  return version;
 }
 
 static bool _tryParseIntoHash(std::string_view hash, uint8_t (&hashBytes)[32])
@@ -686,7 +722,7 @@ static bool _tryParseIntoHash(std::string_view hash, uint8_t (&hashBytes)[32])
     return false;
   }
 
-  if (HexUtils::TryParseHex(hash.data(), hash.size(), hashBytes, 32) != 32) {
+  if (HexUtils::TryParseHex(hash, std::span<uint8_t>(hashBytes)) != 32) {
     OS_LOGE(TAG, "Failed to parse hash: %.*s", static_cast<int>(hash.size()), hash.data());
     return false;
   }
@@ -700,13 +736,15 @@ static bool _tryParseIntoHash(std::string_view hash, uint8_t (&hashBytes)[32])
 /// ignored: it is a full-flash esptool image (bootloader at 0x1000, partition table at 0x8000, app at
 /// 0x10000, filesystem at its offset) meant for USB flashing a blank device. Writing it into an OTA app
 /// slot would put a bootloader image where the app belongs. See firmware-api-spec.md §9.2.
-static bool otaum_parse_board_artifacts(JSON::JsonView root, OtaUpdateManager::FirmwareRelease& release)
+[[nodiscard]] static std::optional<OtaUpdateManager::FirmwareRelease> otaum_parse_board_artifacts(JSON::JsonView root)
 {
   auto artifacts = root["artifacts"];
   if (!artifacts.isArray()) {
     OS_LOGE(TAG, "Response is missing an 'artifacts' array");
-    return false;
+    return std::nullopt;
   }
+
+  OtaUpdateManager::FirmwareRelease release {};
 
   bool foundApp = false, foundFilesystem = false;
 
@@ -714,72 +752,80 @@ static bool otaum_parse_board_artifacts(JSON::JsonView root, OtaUpdateManager::F
   for (int i = 0; i < count; i++) {
     auto artifact = artifacts.at(i);
 
-    std::string typeStr, urlStr, hashStr;
-    if (!artifact["type"].tryGetStr(typeStr) || !artifact["url"].tryGetStr(urlStr) || !artifact["sha256Hash"].tryGetStr(hashStr)) {
+    auto typeStr = artifact["type"].tryGetStr();
+    if (!typeStr) {
+      continue;
+    }
+    auto urlStr = artifact["url"].tryGetStr();
+    if (!urlStr) {
+      continue;
+    }
+    auto hashStr = artifact["sha256Hash"].tryGetStr();
+    if (!hashStr) {
       continue;
     }
 
-    if (typeStr == "app"sv) {
+    if (*typeStr == "app"sv) {
       if (foundApp) {
         OS_LOGE(TAG, "Duplicate 'app' artifact");
-        return false;
+        return std::nullopt;
       }
-      if (!_tryParseIntoHash(hashStr, release.appBinaryHash)) {
-        return false;
+      if (!_tryParseIntoHash(*hashStr, release.appBinaryHash)) {
+        return std::nullopt;
       }
-      release.appBinaryUrl = std::move(urlStr);
+      release.appBinaryUrl = std::move(*urlStr);
       foundApp             = true;
-    } else if (typeStr == "staticfs"sv) {
+    } else if (*typeStr == "staticfs"sv) {
       if (foundFilesystem) {
         OS_LOGE(TAG, "Duplicate 'staticfs' artifact");
-        return false;
+        return std::nullopt;
       }
-      if (!_tryParseIntoHash(hashStr, release.filesystemBinaryHash)) {
-        return false;
+      if (!_tryParseIntoHash(*hashStr, release.filesystemBinaryHash)) {
+        return std::nullopt;
       }
-      release.filesystemBinaryUrl = std::move(urlStr);
+      release.filesystemBinaryUrl = std::move(*urlStr);
       foundFilesystem             = true;
     }
   }
 
   if (!foundApp) {
     OS_LOGE(TAG, "Release is missing an 'app' artifact");
-    return false;
+    return std::nullopt;
   }
 
   if (!foundFilesystem) {
     OS_LOGE(TAG, "Release is missing a 'staticfs' artifact");
-    return false;
+    return std::nullopt;
   }
 
-  return true;
+  return release;
 }
 
-bool OtaUpdateManager::TryGetFirmwareRelease(HTTP::Client& client, const OpenShock::SemVer& version, FirmwareRelease& release)
+std::optional<OtaUpdateManager::FirmwareRelease> OtaUpdateManager::TryGetFirmwareRelease(HTTP::Client& client, const OpenShock::SemVer& version)
 {
   auto versionStr = version.toString();  // TODO: This is abusing the SemVer::toString() method causing alot of string copies, fix this
 
-  std::string domain;
-  if (!otaum_try_get_repo_domain(domain)) {
-    return false;
+  auto domain = otaum_try_get_repo_domain();
+  if (!domain) {
+    return std::nullopt;
   }
 
   std::string uri;
-  if (!FormatToString(uri, OPENSHOCK_FW_REPO_VERSION_URL_FORMAT, domain.c_str(), versionStr.c_str())) {
+  const auto board = Board::Name();
+  if (!FormatToString(uri, OPENSHOCK_FW_REPO_VERSION_URL_FORMAT, domain->c_str(), versionStr.c_str(), static_cast<int>(board.size()), board.data())) {
     OS_LOGE(TAG, "Failed to format URL");
-    return false;
+    return std::nullopt;
   }
 
   OS_LOGD(TAG, "Fetching firmware release from %s", uri.c_str());
 
   std::string body;
   JSON::JsonDocument doc;
-  int code = 0;
-  if (!otaum_try_get_json(client, uri, std::array<uint16_t, 1> {200}, body, doc, code)) {
-    return false;
+  if (!otaum_try_get_json(client, uri, std::array<uint16_t, 1> {200}, body, doc)) {
+    return std::nullopt;
   }
 
-  return otaum_parse_board_artifacts(doc.root(), release);
+  return otaum_parse_board_artifacts(doc.root());
 }
 
 bool OtaUpdateManager::TryStartFirmwareUpdate(const OpenShock::SemVer& version)
@@ -802,6 +848,18 @@ FirmwareBootType OtaUpdateManager::GetFirmwareBootType()
 bool OtaUpdateManager::IsValidatingApp()
 {
   return _otaImageState == ESP_OTA_IMG_PENDING_VERIFY;
+}
+
+bool OtaUpdateManager::IsPendingImageForThisBoard()
+{
+  // The slot we were installed from is the other OTA slot, which is also the next update target.
+  const esp_partition_t* previous = esp_ota_get_next_update_partition(nullptr);
+  if (previous == nullptr) {
+    OS_LOGW(TAG, "No previous app slot to check the board against");
+    return true;
+  }
+
+  return otaum_slot_matches_this_board(previous, "The previous firmware", false);
 }
 
 void OtaUpdateManager::InvalidateAndRollback()

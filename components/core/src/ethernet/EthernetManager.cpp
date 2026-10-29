@@ -1,15 +1,16 @@
 #include "ethernet/EthernetManager.h"
 
-#include "OpenShock.h"
+#include <sdkconfig.h>
 
-#if OPENSHOCK_ETHERNET_LAN8720
+// Compiled in where the build enables the internal EMAC (boards whose fragment sets CONFIG_ETH_USE_ESP32_EMAC); which
+// PHY is wired up, and on which pins, comes from the board descriptor at runtime.
+#if CONFIG_ETH_USE_ESP32_EMAC
 
 const char* const TAG = "EthernetManager";
 
+#include "BoardDescriptor.h"
 #include "config/Config.h"
 #include "Logging.h"
-
-#include <sdkconfig.h>
 
 #include <driver/gpio.h>
 #include <esp_eth.h>
@@ -22,12 +23,6 @@ const char* const TAG = "EthernetManager";
 #include <atomic>
 #include <cstdio>
 #include <string>
-
-#ifndef CONFIG_ETH_USE_ESP32_EMAC
-#error "OPENSHOCK_ETHERNET_LAN8720 needs CONFIG_ETH_USE_ESP32_EMAC (classic ESP32 internal EMAC)"
-#endif
-
-static_assert(OPENSHOCK_ETH_MDC_GPIO >= 0 && OPENSHOCK_ETH_MDIO_GPIO >= 0, "OPENSHOCK_ETH_MDC_GPIO / OPENSHOCK_ETH_MDIO_GPIO must be set for Ethernet builds");
 
 using namespace OpenShock;
 
@@ -95,19 +90,19 @@ static void handleIpEvent(void* arg, esp_event_base_t base, int32_t id, void* da
   }
 }
 
-static bool powerOnPhy()
+static bool powerOnPhy(int8_t powerGpio)
 {
-  if (OPENSHOCK_ETH_PHY_POWER_GPIO < 0) {
+  if (powerGpio < 0) {
     return true;
   }
 
-  gpio_num_t pin = static_cast<gpio_num_t>(OPENSHOCK_ETH_PHY_POWER_GPIO);
+  gpio_num_t pin = static_cast<gpio_num_t>(powerGpio);
 
   esp_err_t err = gpio_reset_pin(pin);
   if (err == ESP_OK) err = gpio_set_direction(pin, GPIO_MODE_OUTPUT);
   if (err == ESP_OK) err = gpio_set_level(pin, 1);
   if (err != ESP_OK) {
-    OS_LOGE(TAG, "Failed to power on PHY (GPIO %d): %s", OPENSHOCK_ETH_PHY_POWER_GPIO, esp_err_to_name(err));
+    OS_LOGE(TAG, "Failed to power on PHY (GPIO %d): %s", powerGpio, esp_err_to_name(err));
     return false;
   }
 
@@ -121,7 +116,20 @@ bool EthernetManager::Init()
     return true;
   }
 
-  OS_LOGI(TAG, "Initializing Ethernet: addr=%d mdc=%d mdio=%d power=%d clk_out=%d", OPENSHOCK_ETH_PHY_ADDR, OPENSHOCK_ETH_MDC_GPIO, OPENSHOCK_ETH_MDIO_GPIO, OPENSHOCK_ETH_PHY_POWER_GPIO, kRmiiClockOutGpio);
+  const BoardDescriptor& board = Board::Get();
+  if (board.ethPhy == OPENSHOCK_BOARD_ETH_PHY_NONE) {
+    return true;  // No Ethernet on this board
+  }
+  if (board.ethPhy != OPENSHOCK_BOARD_ETH_PHY_LAN8720) {
+    OS_LOGE(TAG, "Unsupported Ethernet PHY type %u in the board descriptor", board.ethPhy);
+    return false;
+  }
+  if (board.ethMdcGpio < 0 || board.ethMdioGpio < 0) {
+    OS_LOGE(TAG, "The board descriptor has no MDC/MDIO pins for its Ethernet PHY");
+    return false;
+  }
+
+  OS_LOGI(TAG, "Initializing Ethernet: addr=%d mdc=%d mdio=%d power=%d clk_out=%d", board.ethPhyAddr, board.ethMdcGpio, board.ethMdioGpio, board.ethPowerGpio, kRmiiClockOutGpio);
 
   esp_err_t err = esp_event_handler_register(ETH_EVENT, ESP_EVENT_ANY_ID, handleEthEvent, nullptr);
   if (err == ESP_OK) err = esp_event_handler_register(IP_EVENT, ESP_EVENT_ANY_ID, handleIpEvent, nullptr);
@@ -130,20 +138,20 @@ bool EthernetManager::Init()
     return false;
   }
 
-  if (!powerOnPhy()) {
+  if (!powerOnPhy(board.ethPowerGpio)) {
     return false;
   }
 
   eth_mac_config_t macConfig              = ETH_MAC_DEFAULT_CONFIG();
   eth_esp32_emac_config_t emacConfig      = ETH_ESP32_EMAC_DEFAULT_CONFIG();
-  emacConfig.smi_gpio.mdc_num             = OPENSHOCK_ETH_MDC_GPIO;
-  emacConfig.smi_gpio.mdio_num            = OPENSHOCK_ETH_MDIO_GPIO;
+  emacConfig.smi_gpio.mdc_num             = board.ethMdcGpio;
+  emacConfig.smi_gpio.mdio_num            = board.ethMdioGpio;
   emacConfig.clock_config.rmii.clock_mode = EMAC_CLK_OUT;
   emacConfig.clock_config.rmii.clock_gpio = kRmiiClockOutGpio;
 
   // IDF no longer ships a LAN87xx-specific driver; the LAN8720 is IEEE 802.3 compliant, so the generic PHY drives it.
   eth_phy_config_t phyConfig = ETH_PHY_DEFAULT_CONFIG();
-  phyConfig.phy_addr         = OPENSHOCK_ETH_PHY_ADDR;
+  phyConfig.phy_addr         = board.ethPhyAddr;
   phyConfig.reset_gpio_num   = -1;  // No dedicated reset line; the PHY is reset by its power-enable pin
 
   esp_eth_mac_t* mac = esp_eth_mac_new_esp32(&emacConfig, &macConfig);
@@ -173,10 +181,7 @@ bool EthernetManager::Init()
   }
 
   // Same hostname as the WiFi station, so the hub answers to one name on either interface.
-  std::string hostname;
-  if (!Config::GetWiFiHostname(hostname)) {
-    hostname = CONFIG_OPENSHOCK_FW_HOSTNAME;
-  }
+  std::string hostname = Config::GetWiFiHostname().value_or(CONFIG_OPENSHOCK_FW_HOSTNAME);
   esp_netif_set_hostname(s_netif, hostname.c_str());
 
   err = esp_netif_attach(s_netif, esp_eth_new_netif_glue(s_eth));
@@ -220,10 +225,20 @@ bool EthernetManager::GetIPv4(char* out, std::size_t len)
   return n > 0 && static_cast<std::size_t>(n) < len;
 }
 
-#else  // !OPENSHOCK_ETHERNET_LAN8720
+#else  // !CONFIG_ETH_USE_ESP32_EMAC
+
+#include "BoardDescriptor.h"
+
+const char* const TAG = "EthernetManager";
+
+#include "Logging.h"
 
 bool OpenShock::EthernetManager::Init()
 {
+  if (OpenShock::Board::Get().ethPhy != OPENSHOCK_BOARD_ETH_PHY_NONE) {
+    OS_LOGE(TAG, "The board has an Ethernet PHY, but this build has no EMAC driver (CONFIG_ETH_USE_ESP32_EMAC)");
+    return false;
+  }
   return true;  // No Ethernet on this board
 }
 
@@ -244,4 +259,4 @@ bool OpenShock::EthernetManager::GetIPv4(char* out, std::size_t len)
   return false;
 }
 
-#endif  // OPENSHOCK_ETHERNET_LAN8720
+#endif  // CONFIG_ETH_USE_ESP32_EMAC

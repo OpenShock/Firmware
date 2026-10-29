@@ -1,5 +1,6 @@
 #pragma once
 
+#include "BoardDescriptor.h"
 #include "OpenShock.h"
 
 #include <driver/gpio.h>
@@ -187,57 +188,46 @@
 
 #pragma endregion
 
-/// Board specific bad-pin bypasses for compatibility reasons.
-/// To be clear, these pins are still unsafe, but we need to use them for compatibility reasons.
-#pragma region Board Specific Bypasses
+// Board-specific bypasses of the chip-unsafe pins above are no longer compiled in per
+// board: they come from the board descriptor (BoardDescriptor::gpioBypassMask, the
+// OPENSHOCK_GPIO_BYPASS line of boards/<board>.defaults), so one build serves every
+// board on the chip. The pins are still unsafe; the board just wires them up anyway.
 
-#ifdef OPENSHOCK_FW_BOARD_WEMOSD1MINIESP32
-#define OPENSHOCK_BYPASSED_GPIO(pin) ((pin) == 15 || (pin) == 2)
-#endif
-#ifdef OPENSHOCK_FW_BOARD_WEMOSLOLINS2MINI
-#define OPENSHOCK_BYPASSED_GPIO(pin) ((pin) == 15)
-#endif
-#ifdef OPENSHOCK_FW_BOARD_PISHOCK2023
-#define OPENSHOCK_BYPASSED_GPIO(pin) ((pin) == 12 || (pin) == 2)
-#endif
-#ifdef OPENSHOCK_FW_BOARD_PISHOCKLITE2021
-#define OPENSHOCK_BYPASSED_GPIO(pin) ((pin) == 15 || (pin) == 2)
-#endif
-#ifdef OPENSHOCK_FW_BOARD_OPENSHOCKCOREV1
-#define OPENSHOCK_BYPASSED_GPIO(pin) ((pin) == 15 || (pin) == 35)
-#endif
-#ifdef OPENSHOCK_FW_BOARD_DFROBOTFIREBEETLE2ESP32E
-#define OPENSHOCK_BYPASSED_GPIO(pin) ((pin) == 2 || (pin) == 5)
-#endif
-#ifdef OPENSHOCK_FW_BOARD_NODEMCU32S
-#define OPENSHOCK_BYPASSED_GPIO(pin) ((pin) == 2)
-#endif
-#ifdef OPENSHOCK_FW_BOARD_ESTPOE32
-#define OPENSHOCK_BYPASSED_GPIO(pin) ((pin) == 2)
-#endif
-#ifndef OPENSHOCK_BYPASSED_GPIO
-#define OPENSHOCK_BYPASSED_GPIO(pin) (false)
-#endif
-
-#pragma endregion
-
-/// Ethernet-peripheral reserved pins. Cannot be bypassed: if physically wired to a PHY, nothing else may use them.
+/// Pins the internal EMAC's RMII interface is fixed to in silicon. Only taken on boards with an Ethernet PHY
+/// (BoardDescriptor::ethPhy); see IsEthernetGPIO.
 #pragma region Ethernet Reserved Pins
 
-#if OPENSHOCK_ETHERNET_LAN8720
-// LAN8720 / internal EMAC RMII (ESP32 classic):
-//   GPIO12 PHY_POWER, GPIO18 MDIO, GPIO19 TXD0, GPIO21 TX_EN, GPIO22 TXD1,
-//   GPIO23 MDC, GPIO25 RXD0, GPIO26 RXD1, GPIO27 CRS_DV.
-// GPIO0 / GPIO17 are already covered by the ESP32 CHIP_UNSAFE_GPIO set (strapping / flash).
-#define OPENSHOCK_ETHERNET_UNSAFE_GPIO(pin)   ((pin) == GPIO_NUM_12 || (pin) == GPIO_NUM_18 || (pin) == GPIO_NUM_19 || (pin) == GPIO_NUM_21 || (pin) == GPIO_NUM_22 || (pin) == GPIO_NUM_23 || (pin) == GPIO_NUM_25 || (pin) == GPIO_NUM_26 || (pin) == GPIO_NUM_27)
+#ifdef OPENSHOCK_FW_CHIP_ESP32
+// GPIO19 TXD0, GPIO21 TX_EN, GPIO22 TXD1, GPIO25 RXD0, GPIO26 RXD1, GPIO27 CRS_DV.
+// The RMII clock (GPIO0 in, or GPIO16/GPIO17 out) is already in CHIP_UNSAFE_GPIO.
+#define CHIP_EMAC_RMII_GPIO(pin) ((pin) == GPIO_NUM_19 || (pin) == GPIO_NUM_21 || (pin) == GPIO_NUM_22 || (pin) == GPIO_NUM_25 || (pin) == GPIO_NUM_26 || (pin) == GPIO_NUM_27)
 #else
-#define OPENSHOCK_ETHERNET_UNSAFE_GPIO(pin) (false)
+#define CHIP_EMAC_RMII_GPIO(pin) (false)
 #endif
 
 #pragma endregion
 
 namespace OpenShock {
-  constexpr bool IsValidGPIOPin(int8_t pin)
+  /// @brief Whether the chip itself reserves this pin (strapping, flash, UART0, USB); see the table above.
+  constexpr bool IsChipUnsafeGPIO(int8_t pin)
+  {
+    return CHIP_UNSAFE_GPIO(pin);
+  }
+
+  /// @brief Whether the board's Ethernet PHY uses this pin: the EMAC's RMII pins plus the board's MDC, MDIO and PHY
+  ///        power pins. Not bypassable: when wired to a PHY, nothing else may use them.
+  inline bool IsEthernetGPIO(int8_t pin)
+  {
+    const BoardDescriptor& board = Board::Get();
+    if (pin < 0 || board.ethPhy == OPENSHOCK_BOARD_ETH_PHY_NONE) {
+      return false;
+    }
+
+    return CHIP_EMAC_RMII_GPIO(pin) || pin == board.ethMdcGpio || pin == board.ethMdioGpio || pin == board.ethPowerGpio;
+  }
+
+  // Not constexpr: the board's bypass list comes from the descriptor stamped into the image.
+  inline bool IsValidGPIOPin(int8_t pin)
   {
     if (pin == OPENSHOCK_GPIO_INVALID) {
       return false;
@@ -251,25 +241,25 @@ namespace OpenShock {
       return false;
     }
 
-    if (OPENSHOCK_ETHERNET_UNSAFE_GPIO(pin)) {
+    if (IsEthernetGPIO(pin)) {
       return false;
     }
 
-    if (OPENSHOCK_BYPASSED_GPIO(pin)) {
+    if (Board::IsBypassedGPIO(pin)) {
       return true;
     }
 
-    if (CHIP_UNSAFE_GPIO(pin)) {
+    if (IsChipUnsafeGPIO(pin)) {
       return false;
     }
 
     return true;
   }
-  constexpr bool IsValidInputPin(int8_t pin)
+  inline bool IsValidInputPin(int8_t pin)
   {
     return IsValidGPIOPin(pin);
   }
-  constexpr bool IsValidOutputPin(int8_t pin)
+  inline bool IsValidOutputPin(int8_t pin)
   {
     if (!IsValidGPIOPin(pin)) {
       return false;
@@ -283,33 +273,11 @@ namespace OpenShock {
   }
 
   static_assert(GPIO_NUM_MAX < std::numeric_limits<int8_t>::max(), "GPIO_NUM_MAX is too large for int8_t.");
+  static_assert(GPIO_NUM_MAX <= 64, "BoardDescriptor::gpioBypassMask holds 64 pins.");
 
-  constexpr uint8_t GetValidInputPinsCount()
-  {
-    uint8_t count = 0;
-    for (int8_t i = GPIO_NUM_NC; i < GPIO_NUM_MAX; i++) {
-      if (IsValidInputPin(i)) {
-        count++;
-      }
-    }
-    return count;
-  }
-  constexpr uint8_t GetValidOutputPinsCount()
-  {
-    uint8_t count = 0;
-    for (int8_t i = GPIO_NUM_NC; i < GPIO_NUM_MAX; i++) {
-      if (IsValidOutputPin(i)) {
-        count++;
-      }
-    }
-    return count;
-  }
+  using GPIOPinSet = std::bitset<GPIO_NUM_MAX>;
 
-  constexpr uint8_t ValidInputPinsCount  = GetValidInputPinsCount();
-  constexpr uint8_t ValidOutputPinsCount = GetValidOutputPinsCount();
-  typedef std::bitset<GPIO_NUM_MAX> GPIOPinSet;
-
-  constexpr GPIOPinSet GetValidGPIOPins()
+  inline GPIOPinSet GetValidGPIOPins()
   {
     GPIOPinSet pins;
     for (uint8_t i = 0; i < GPIO_NUM_MAX; i++) {
@@ -322,7 +290,7 @@ namespace OpenShock {
   inline std::vector<int8_t> GetValidInputPinsVector()
   {
     std::vector<int8_t> pins;
-    pins.reserve(ValidInputPinsCount);
+    pins.reserve(GPIO_NUM_MAX);
     for (int8_t i = GPIO_NUM_NC; i < GPIO_NUM_MAX; i++) {
       if (IsValidInputPin(i)) {
         pins.push_back(i);
@@ -333,7 +301,7 @@ namespace OpenShock {
   inline std::vector<int8_t> GetValidOutputPinsVector()
   {
     std::vector<int8_t> pins;
-    pins.reserve(ValidOutputPinsCount);
+    pins.reserve(GPIO_NUM_MAX);
     for (int8_t i = GPIO_NUM_NC; i < GPIO_NUM_MAX; i++) {
       if (IsValidOutputPin(i)) {
         pins.push_back(i);
@@ -341,4 +309,12 @@ namespace OpenShock {
     }
     return pins;
   }
+
+  /// @brief Checks the running board descriptor against this chip: the chip label matches the build, and every pin
+  /// the board declares is either -1 or usable on this chip (given the board's bypasses). Logs each problem.
+  ///
+  /// Replaces the compile-time static_asserts of the per-board builds. A bad pin is not fatal: every consumer
+  /// validates its pin again and falls back to "no pin", so the hub still boots into the captive portal.
+  /// @return true when the descriptor is stamped and clean.
+  bool ValidateBoardDescriptor();
 }  // namespace OpenShock

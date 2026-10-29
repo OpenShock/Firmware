@@ -9,7 +9,7 @@
 #define HANDLER_FN(NAME)  HANDLER_SIG(Handle##NAME)
 
 namespace OpenShock::MessageHandlers::Local::_Private {
-  typedef HANDLER_SIG((*HandlerType));
+  using HandlerType = HANDLER_SIG((*));
   HANDLER_FN(Common_ShockerCommandList);
   HANDLER_FN(InvalidMessage);
 }  // namespace OpenShock::MessageHandlers::Local::_Private

@@ -3,6 +3,7 @@
 #include "StringHelpers.h"
 
 #include <cstdint>
+#include <optional>
 #include <string_view>
 
 namespace OpenShock {
@@ -15,38 +16,32 @@ namespace OpenShock {
     RollingBack
   };
 
-  inline bool TryParseOtaUpdateStep(OtaUpdateStep& channel, std::string_view str)
+  [[nodiscard]] inline std::optional<OtaUpdateStep> TryParseOtaUpdateStep(std::string_view str)
   {
     if (StringIEquals(str, "none")) {
-      channel = OtaUpdateStep::None;
-      return true;
+      return OtaUpdateStep::None;
     }
 
     if (StringIEquals(str, "updating")) {
-      channel = OtaUpdateStep::Updating;
-      return true;
+      return OtaUpdateStep::Updating;
     }
 
     if (StringIEquals(str, "updated")) {
-      channel = OtaUpdateStep::Updated;
-      return true;
+      return OtaUpdateStep::Updated;
     }
 
     if (StringIEquals(str, "validating")) {
-      channel = OtaUpdateStep::Validating;
-      return true;
+      return OtaUpdateStep::Validating;
     }
 
     if (StringIEquals(str, "validated")) {
-      channel = OtaUpdateStep::Validated;
-      return true;
+      return OtaUpdateStep::Validated;
     }
 
     if (StringIEquals(str, "rollingback")) {
-      channel = OtaUpdateStep::RollingBack;
-      return true;
+      return OtaUpdateStep::RollingBack;
     }
 
-    return false;
+    return std::nullopt;
   }
 }  // namespace OpenShock

@@ -5,6 +5,7 @@
 #include "json/Json.h"
 
 #include <cstdint>
+#include <optional>
 
 namespace OpenShock::Serialization::JsonSerial {
   struct ShockerCommand {
@@ -15,5 +16,5 @@ namespace OpenShock::Serialization::JsonSerial {
     uint16_t durationMs;
   };
 
-  bool ParseShockerCommand(JSON::JsonView root, ShockerCommand& out);
+  [[nodiscard]] std::optional<ShockerCommand> ParseShockerCommand(JSON::JsonView root);
 }  // namespace OpenShock::Serialization::JsonSerial

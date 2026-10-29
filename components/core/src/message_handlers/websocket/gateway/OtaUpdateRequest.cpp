@@ -9,7 +9,7 @@ const char* const TAG = "ServerMessageHandlers";
 
 using namespace OpenShock::MessageHandlers::Server;
 
-void _Private::HandleOtaUpdateRequest(const OpenShock::Serialization::Gateway::GatewayToHubMessage* root)
+void _Private::HandleOtaUpdateRequest(OpenShock::GatewayClient&, const OpenShock::Serialization::Gateway::GatewayToHubMessage* root)
 {
   auto msg = root->payload_as_OtaUpdateRequest();
   if (msg == nullptr) {

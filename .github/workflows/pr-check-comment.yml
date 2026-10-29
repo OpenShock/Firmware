@@ -1,9 +1,9 @@
+name: pr-check-comment
+
 on:
   workflow_run:
     workflows: [check-changes]
     types: [completed]
-
-name: pr-check-comment
 
 permissions:
   pull-requests: write
@@ -12,6 +12,7 @@ jobs:
   comment:
     runs-on: ubuntu-slim # lightweight: jq + gh api sticky comment
     if: github.event.workflow_run.event == 'pull_request'
+    timeout-minutes: 5
     steps:
       - name: Check PR comment
         uses: OpenShock/actions/pr-check-comment@21ca2d511bca92cf24fb502fa302f82700822584  # v1.1.1

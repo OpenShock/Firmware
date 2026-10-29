@@ -9,6 +9,8 @@ const char* const TAG = "Sequence";
 #include "radio/rmt/PetrainerEncoder.h"
 #include "radio/rmt/T330Encoder.h"
 
+#include <utility>
+
 using namespace OpenShock;
 
 namespace {
@@ -40,10 +42,11 @@ namespace {
         return &kWellturnT330;
       case ShockerModelType::D80:
         return &kD80;
-      default:
-        OS_LOGE(TAG, "Unknown shocker model: %u", static_cast<unsigned>(modelType));
-        return nullptr;
     }
+
+    // The model arrives from the network/config and may hold any value; never assume it is in range.
+    OS_LOGE(TAG, "Unknown shocker model: %u", std::to_underlying(modelType));
+    return nullptr;
   }
 }  // namespace
 

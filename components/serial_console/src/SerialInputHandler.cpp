@@ -647,7 +647,7 @@ static void serialRxTask(void*)
       case SerialReadResult::Data:
         echoHandleSerialInput(buffer, true);
         break;
-      default:
+      case SerialReadResult::NoData:
         echoHandleSerialInput(buffer, false);
         break;
     }
@@ -682,10 +682,12 @@ bool SerialInputHandler::Init()
   SerialInputHandler::PrintVersionInfo();
   OS_SERIAL_PRINTLN();
 
-  if (!Config::GetSerialInputConfigEchoEnabled(s_echoEnabled)) {
+  auto echoEnabled = Config::GetSerialInputConfigEchoEnabled();
+  if (!echoEnabled) {
     OS_LOGE(TAG, "Failed to get serial echo status from config");
     return false;
   }
+  s_echoEnabled = *echoEnabled;
 
   if (TaskUtils::TaskCreateExpensive(serialRxTask, "SerialRX", 10'000, nullptr, 1, nullptr) != pdPASS) {  // TODO: Profile stack size
     OS_LOGE(TAG, "Failed to create serial RX task");
@@ -736,9 +738,14 @@ void SerialInputHandler::PrintVersionInfo()
     "  Version:  %s\r\n"
     "    Build:  " OPENSHOCK_FW_MODE "\r\n"
     "   Commit:  %s\r\n"
-    "    Board:  " OPENSHOCK_FW_BOARD "\r\n"
-    "     Chip:  " OPENSHOCK_FW_CHIP "\r\n",
+    "    Board:  %.*s%s\r\n"
+    "     Chip:  %.*s\r\n",
     OpenShock::Constants::FW_VERSION,
-    OpenShock::Constants::FW_GIT_COMMIT
+    OpenShock::Constants::FW_GIT_COMMIT,
+    static_cast<int>(OpenShock::Board::Name().size()),
+    OpenShock::Board::Name().data(),
+    OpenShock::Board::IsStamped() ? "" : " (no valid board descriptor in image)",
+    static_cast<int>(OpenShock::Board::Chip().size()),
+    OpenShock::Board::Chip().data()
   );
 }

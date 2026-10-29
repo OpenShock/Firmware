@@ -1,37 +1,12 @@
 name: build-staticfs
-description: >-
-  Pack the captive-portal web assets into the static0 littlefs image once
-  (board-independent) via scripts/gen_staticfs.py. Runs in parallel with the
-  per-board C++ build; the merge job combines the two.
-inputs:
-  version:
-    description: 'Current firmware version (unused in the image, kept for parity)'
-    required: false
-    default: ''
+description: Pack the frontend build into the board-independent static0 littlefs image
 
 runs:
   using: composite
   steps:
-    - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97  # v7.0.0
-      with:
-        cache: 'pip'
+    - uses: ./.github/actions/install-python-deps
 
-    - name: Install Python dependencies
-      shell: bash
-      run: pip install -r requirements.txt
-
-    # The frontend is built once in build-frontend and downloaded here so
-    # gen_staticfs.py packs the prebuilt assets rather than rebuilding them.
-    - name: Download frontend
-      uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c  # v8.0.1
-      with:
-        name: frontend
-        path: frontend/build
-
-    # The static0 size comes from partitions/ota_4mb.csv (the table every board uses);
-    # the image is board-independent, so one build serves every board. Geometry
-    # (4 KiB blocks, 128-byte read/prog) matches the runtime mount in
-    # components/fs/src/LfsPartition.cpp and the CMake build.
+    # Sized from partitions/ota_4mb.csv, the table every board uses
     - name: Build static filesystem image
       shell: bash
       run: |
@@ -40,11 +15,10 @@ runs:
           --staging-dir staticfs \
           --output staticfs.bin \
           --partition-csv partitions/ota_4mb.csv \
-          --block-size 4096 --read-size 128 --prog-size 128 \
           --skip-frontend-build
 
     - name: Upload static filesystem artifact
-      uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a  # v7.0.1
+      uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9  # v7.0.2
       with:
         name: firmware_staticfs
         path: staticfs.bin

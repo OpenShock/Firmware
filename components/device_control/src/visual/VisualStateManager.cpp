@@ -4,12 +4,15 @@
 
 const char* const TAG = "VisualStateManager";
 
+#include "BoardDescriptor.h"
+#include "Chipset.h"
 #include "enums/GatewayClientState.h"
 #include "estop/EStopState.h"
 #include "events/Events.h"
 #include "led_drivers/MonoLedDriver.h"
 #include "led_drivers/RgbLedDriver.h"
 #include "Logging.h"
+#include "SimpleMutex.h"
 
 #include <esp_eth.h>
 #include <esp_netif.h>
@@ -18,44 +21,42 @@ const char* const TAG = "VisualStateManager";
 #include <atomic>
 #include <memory>
 
-// Status LED pins are Kconfig options (CONFIG_OPENSHOCK_*, see
-// openshock_board.h); -1 (== GPIO_NUM_NC) means the board has no such LED.
-#include "sdkconfig.h"
+// Status LED pins come from the board descriptor stamped into the image (BoardDescriptor.h);
+// -1 (== GPIO_NUM_NC) means the board has no such LED.
 
-// Board GPIO assignments (no longer Kconfig; see scripts/gen_env_header.py).
-#include "openshock_board.h"
-
-const uint64_t kCriticalErrorFlag                = 1 << 0;
-const uint64_t kEmergencyStoppedFlag             = 1 << 1;
-const uint64_t kEmergencyStopActiveClearingFlag  = 1 << 2;
-const uint64_t kEmergencyStopAwaitingReleaseFlag = 1 << 3;
-const uint64_t kWebSocketConnectedFlag           = 1 << 4;
-const uint64_t kHasIpAddressFlag                 = 1 << 5;
-const uint64_t kWiFiConnectedFlag                = 1 << 6;
-const uint64_t kWiFiScanningFlag                 = 1 << 7;
-const uint64_t kEthernetConnectedFlag            = 1 << 8;
+const uint32_t kCriticalErrorFlag                = 1 << 0;
+const uint32_t kEmergencyStoppedFlag             = 1 << 1;
+const uint32_t kEmergencyStopActiveClearingFlag  = 1 << 2;
+const uint32_t kEmergencyStopAwaitingReleaseFlag = 1 << 3;
+const uint32_t kWebSocketConnectedFlag           = 1 << 4;
+const uint32_t kHasIpAddressFlag                 = 1 << 5;
+const uint32_t kWiFiConnectedFlag                = 1 << 6;
+const uint32_t kWiFiScanningFlag                 = 1 << 7;
+const uint32_t kEthernetConnectedFlag            = 1 << 8;
 
 // Bitmask of when the system is running normally
-const uint64_t kStatusOKMask = kWebSocketConnectedFlag | kHasIpAddressFlag | kWiFiConnectedFlag;
+const uint32_t kStatusOKMask = kWebSocketConnectedFlag | kHasIpAddressFlag | kWiFiConnectedFlag;
 // The same over Ethernet, with or without WiFi also connected.
-const uint64_t kStatusOKMaskEthernet  = kWebSocketConnectedFlag | kHasIpAddressFlag | kEthernetConnectedFlag;
-const uint64_t kStatusOKMaskDualHomed = kStatusOKMask | kEthernetConnectedFlag;
+const uint32_t kStatusOKMaskEthernet  = kWebSocketConnectedFlag | kHasIpAddressFlag | kEthernetConnectedFlag;
+const uint32_t kStatusOKMaskDualHomed = kStatusOKMask | kEthernetConnectedFlag;
 
-static inline bool isStatusOk(uint64_t flags)
+static inline bool isStatusOk(uint32_t flags)
 {
   return flags == kStatusOKMask || flags == kStatusOKMaskEthernet || flags == kStatusOKMaskDualHomed;
 }
 
-static std::atomic<uint64_t> s_stateFlags = 0;
+// 32-bit so the atomic is lock-free. Both need seq_cst so a state change during the LED test isn't lost.
+static std::atomic<uint32_t> s_stateFlags = 0;
 static std::atomic<bool> s_ledTestActive  = false;  // While set, the LED test owns the LEDs; flags keep tracking live state
+static OpenShock::SimpleMutex s_applyMutex;         // Serializes reading the flags with applying them, so an older snapshot can't land last
 static std::unique_ptr<OpenShock::MonoLedDriver> s_monoLedDriver;
 static std::unique_ptr<OpenShock::RgbLedDriver> s_rgbLedDriver;
 
 // Sets or clears `flag` and returns whether that changed it. Atomic per flag, so concurrent setters (the event loop,
 // SetCriticalError, SetScanningStarted) each see their own change and none is missed.
-static inline bool setStateFlag(uint64_t flag, bool state)
+static inline bool setStateFlag(uint32_t flag, bool state)
 {
-  uint64_t previous = state ? s_stateFlags.fetch_or(flag, std::memory_order_relaxed) : s_stateFlags.fetch_and(~flag, std::memory_order_relaxed);
+  uint32_t previous = state ? s_stateFlags.fetch_or(flag) : s_stateFlags.fetch_and(~flag);
   return ((previous & flag) != 0) != state;
 }
 
@@ -211,7 +212,7 @@ static inline void updateVisualStateGPIO(const MonoLedDriver::State (&override)[
     return;                                 \
   }
 
-static void updateVisualStateGPIO(uint64_t flags)
+static void updateVisualStateGPIO(uint32_t flags)
 {
   CSR_PATTERN(s_monoLedDriver, kCriticalErrorFlag, kCriticalErrorPattern);
   CSR_PATTERN(s_monoLedDriver, kEmergencyStopAwaitingReleaseFlag, kEmergencyStopAwaitingReleasePattern);
@@ -224,7 +225,7 @@ static void updateVisualStateGPIO(uint64_t flags)
   s_monoLedDriver->SetPattern(kWiFiDisconnectedPattern);
 }
 
-static void updateVisualStateRGB(uint64_t flags)
+static void updateVisualStateRGB(uint32_t flags)
 {
   CSR_PATTERN(s_rgbLedDriver, kCriticalErrorFlag, kCriticalErrorRGBPattern);
   CSR_PATTERN(s_rgbLedDriver, kEmergencyStopAwaitingReleaseFlag, kEmergencyStopAwaitingReleaseRGBPattern);
@@ -237,7 +238,7 @@ static void updateVisualStateRGB(uint64_t flags)
   s_rgbLedDriver->SetPattern(kWiFiDisconnectedRGBPattern);
 }
 
-static void applyVisualState(uint64_t flags)
+static void applyVisualState(uint32_t flags)
 {
   bool gpioActive = s_monoLedDriver != nullptr;
   bool rgbActive  = s_rgbLedDriver != nullptr;
@@ -267,11 +268,13 @@ static void applyVisualState(uint64_t flags)
 
 static void updateVisualState()
 {
-  if (s_ledTestActive.load(std::memory_order_relaxed)) {
+  OpenShock::ScopedLock lock__(&s_applyMutex);
+
+  if (s_ledTestActive.load()) {
     return;  // Re-applied from the live flags when the test finishes
   }
 
-  applyVisualState(s_stateFlags.load(std::memory_order_relaxed));
+  applyVisualState(s_stateFlags.load());
 }
 
 static void handleEspWiFiEvent(void* event_handler_arg, esp_event_base_t event_base, int32_t event_id, void* event_data)
@@ -382,23 +385,36 @@ bool VisualStateManager::Init()
 {
   bool ledActive = false;
 
-  if (OPENSHOCK_LED_GPIO != GPIO_NUM_NC) {
-    s_monoLedDriver = std::make_unique<MonoLedDriver>(static_cast<gpio_num_t>(OPENSHOCK_LED_GPIO));
-    if (!s_monoLedDriver->IsValid()) {
-      OS_LOGE(TAG, "Failed to initialize built-in LED manager");
-      return false;
+  const BoardDescriptor& board = Board::Get();
+
+  // The pins come from the stamped descriptor, so they are data, not something the build checked. A pin this
+  // chip cannot drive leaves that LED off rather than failing Init: that would restart-loop a normal boot and
+  // roll back an OTA boot over an indicator. ValidateBoardDescriptor() has already logged the specifics.
+  if (board.ledGpio != GPIO_NUM_NC) {
+    if (!OpenShock::IsValidOutputPin(board.ledGpio)) {
+      OS_LOGW(TAG, "Built-in LED pin %hhi is not usable on this board, leaving the LED disabled", board.ledGpio);
+    } else {
+      s_monoLedDriver = std::make_unique<MonoLedDriver>(static_cast<gpio_num_t>(board.ledGpio));
+      if (!s_monoLedDriver->IsValid()) {
+        OS_LOGE(TAG, "Failed to initialize built-in LED manager");
+        return false;
+      }
+      ledActive = true;
     }
-    ledActive = true;
   }
 
-  if (OPENSHOCK_LED_WS2812B != GPIO_NUM_NC) {
-    s_rgbLedDriver = std::make_unique<RgbLedDriver>(static_cast<gpio_num_t>(OPENSHOCK_LED_WS2812B));
-    if (!s_rgbLedDriver->IsValid()) {
-      OS_LOGE(TAG, "Failed to initialize RGB LED manager");
-      return false;
+  if (board.ws2812bGpio != GPIO_NUM_NC) {
+    if (!OpenShock::IsValidOutputPin(board.ws2812bGpio)) {
+      OS_LOGW(TAG, "RGB LED pin %hhi is not usable on this board, leaving the LED disabled", board.ws2812bGpio);
+    } else {
+      s_rgbLedDriver = std::make_unique<RgbLedDriver>(static_cast<gpio_num_t>(board.ws2812bGpio));
+      if (!s_rgbLedDriver->IsValid()) {
+        OS_LOGE(TAG, "Failed to initialize RGB LED manager");
+        return false;
+      }
+      s_rgbLedDriver->SetBrightness(20);
+      ledActive = true;
     }
-    s_rgbLedDriver->SetBrightness(20);
-    ledActive = true;
   }
 
   if (!ledActive) {
@@ -448,10 +464,14 @@ void VisualStateManager::SetScanningStarted()
 
 void VisualStateManager::RunLedTest()
 {
-  // Take over the LEDs; state events keep updating s_stateFlags but don't touch the LEDs until the test ends
-  if (s_ledTestActive.exchange(true, std::memory_order_relaxed)) {
-    OS_LOGW(TAG, "LED test already running");
-    return;
+  // Take over the LEDs; state events keep updating s_stateFlags but don't touch the LEDs until the test ends.
+  // Under s_applyMutex so an update already in flight finishes before the test starts.
+  {
+    ScopedLock lock__(&s_applyMutex);
+    if (s_ledTestActive.exchange(true)) {
+      OS_LOGW(TAG, "LED test already running");
+      return;
+    }
   }
 
   OS_LOGI(TAG, "=== LED Test Started ===");
@@ -554,7 +574,7 @@ void VisualStateManager::RunLedTest()
   // --- Phase 3: State pattern test (both LEDs together) ---
   struct TestStep {
     const char* name;
-    uint64_t flags;
+    uint32_t flags;
     uint32_t durationMs;
   };
 
@@ -577,6 +597,6 @@ void VisualStateManager::RunLedTest()
 
   // Show the live state again (including anything that changed during the test, e.g. an E-Stop)
   OS_LOGI(TAG, "=== LED Test Complete, restoring state ===");
-  s_ledTestActive.store(false, std::memory_order_relaxed);
+  s_ledTestActive.store(false);
   updateVisualState();
 }

@@ -1,10 +1,8 @@
-on:
-  # Releases are cut manually, never on push. Run this workflow from the beta
-  # branch to cut an rc, or from master for a stable release. A plain push to
-  # beta/master (e.g. merging CI changes) must not create a release.
-  workflow_dispatch:
-
 name: release
+
+on:
+  # Releases are cut manually, never on push. Run from beta for an rc, from master for a stable release.
+  workflow_dispatch:
 
 concurrency:
   group: release-${{ github.ref }}
@@ -13,24 +11,23 @@ concurrency:
 permissions:
   contents: write
 
+defaults:
+  run:
+    shell: bash
+
 jobs:
   auto-release:
     runs-on: ubuntu-slim # lightweight: release-tool + git/gh, no build
     timeout-minutes: 10
-    # Only beta (rc) and master (stable) produce releases; refuse a dispatch
-    # from any other branch.
+    # Only beta (rc) and master (stable) produce releases.
     if: github.ref_name == 'beta' || github.ref_name == 'master'
 
     steps:
-      # Mint a short-lived, repo-scoped installation token from the release
-      # GitHub App. A non-GITHUB_TOKEN actor is required so the tag push below
-      # triggers ci-build; the default GITHUB_TOKEN does not trigger downstream
-      # workflows. Using an App (instead of a personal PAT) keeps the token
-      # short-lived, least-privilege, and owned by the org rather than a person.
-      - uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1  # v3.2.0
+      # An App token, not GITHUB_TOKEN, so the tag push below triggers ci-build
+      - uses: actions/create-github-app-token@64ab729a6294000f5aa4a4bc0b73d1f32bc45510  # v3.3.0
         id: app-token
         with:
-          app-id: ${{ secrets.RELEASE_APP_ID }}
+          client-id: ${{ secrets.RELEASE_APP_ID }}
           private-key: ${{ secrets.RELEASE_APP_KEY }}
 
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
@@ -41,17 +38,14 @@ jobs:
       - name: Configure git
         run: |
           git config user.name "github-actions[bot]"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
 
       - name: Rebase on top of latest remote
         run: git pull --rebase --autostash origin "${GITHUB_REF_NAME}"
 
-      - name: Fetch all tags
-        run: git fetch --tags
-
       - name: Run release tool
         id: meta
-        uses: OpenShock/release-tool@ea651e8c10372a10b6f452dcb34c38e60a72dc1f  # v0.5.1
+        uses: OpenShock/release-tool@50f3d4be9462cb69931d134fd4df2a4f5fcd1c5e  # v1.0.1
         with:
           mode: release
           output: release.json
@@ -59,9 +53,7 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ steps.app-token.outputs.token }}
 
-      # Precondition: there must be change files accumulated since the last tag.
-      # release-tool reports this by leaving the tag output empty; make it a loud
-      # failure rather than a silent no-op, since this workflow is run by hand.
+      # release-tool leaves the tag empty when no change files accumulated since the last tag
       - name: Fail if there is nothing to release
         if: steps.meta.outputs.tag == ''
         run: |
@@ -73,17 +65,8 @@ jobs:
         with:
           tag: ${{ steps.meta.outputs.tag }}
 
-      # The OpenShock API is announced from ci-build's release job, only after
-      # the firmware is actually built and uploaded - not here, before it exists.
-      # release.json is attached to the draft below so ci-build can read it.
-
-      # Stage the release as a draft. The tag push above triggers ci-build,
-      # which builds the firmware and then attaches the binaries to this draft
-      # and publishes it (see the `release` job in ci-build.yml). Staging as a
-      # draft keeps the release hidden until its artifacts are in place, and
-      # avoids ci-build failing on an "already exists" conflict.
+      # A draft, the tag push triggers ci-build whose release job attaches the binaries and publishes it
       - name: Stage GitHub Release (draft)
-        if: steps.meta.outputs.tag != ''
         env:
           GH_TOKEN: ${{ steps.app-token.outputs.token }}
           TAG: ${{ steps.meta.outputs.tag }}

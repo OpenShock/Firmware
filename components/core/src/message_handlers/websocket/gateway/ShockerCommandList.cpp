@@ -5,7 +5,7 @@ const char* const TAG = "ServerMessageHandlers";
 #include "Logging.h"
 #include "message_handlers/ShockerCommandList.h"
 
-void OpenShock::MessageHandlers::Server::_Private::HandleShockerCommandList(const OpenShock::Serialization::Gateway::GatewayToHubMessage* root)
+void OpenShock::MessageHandlers::Server::_Private::HandleShockerCommandList(OpenShock::GatewayClient&, const OpenShock::Serialization::Gateway::GatewayToHubMessage* root)
 {
   auto cmdList = root->payload_as_Common_ShockerCommandList();
   if (cmdList == nullptr) {

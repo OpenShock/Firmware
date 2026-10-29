@@ -4,6 +4,7 @@
 
 const char* const TAG = "RGBLedDriver";
 
+#include "BoardDescriptor.h"
 #include "Chipset.h"
 #include "Logging.h"
 
@@ -11,13 +12,6 @@ const char* const TAG = "RGBLedDriver";
 #include <soc/soc_caps.h>
 
 #include <array>
-
-// R/G channel swap is a board setting, generated into openshock_board.h by
-// scripts/gen_env_header.py rather than coming from Kconfig - keeping it out of
-// sdkconfig.h is what lets boards sharing a chip reuse ESP-IDF objects. It is always
-// defined, as 0 or 1, so the #if below reads it directly.
-#include "openshock_board.h"
-#include "sdkconfig.h"
 
 using namespace OpenShock;
 
@@ -27,9 +21,11 @@ using namespace OpenShock;
 
 RgbLedDriver::RgbLedDriver(gpio_num_t gpioPin)
   : m_gpioPin(GPIO_NUM_NC)
+  , m_swapRg((Board::Get().flags & OPENSHOCK_BOARD_FLAG_LED_SWAP_RG) != 0)
   , m_brightness(255)
   , m_rmtChannel(nullptr)
   , m_rmtEncoder(nullptr)
+  , m_frame()
 {
   if (gpioPin == GPIO_NUM_NC) {
     OS_LOGE(TAG, "Pin is not set");
@@ -108,7 +104,7 @@ RgbLedDriver::~RgbLedDriver()
 
 void RgbLedDriver::apply(const RGBState& state)
 {
-  std::array<rmt_symbol_word_t, 24> led_data;  // 24 bits per LED (8 bits per color * 3 colors)
+  auto& led_data = m_frame;
 
   // WS2812B usually takes commands in GRB order
   // https://cdn-shop.adafruit.com/datasheets/WS2812B.pdf - Page 5
@@ -118,9 +114,10 @@ void RgbLedDriver::apply(const RGBState& state)
   uint8_t r = static_cast<uint8_t>(static_cast<uint16_t>(state.red) * brightness / 255);
   uint8_t g = static_cast<uint8_t>(static_cast<uint16_t>(state.green) * brightness / 255);
   uint8_t b = static_cast<uint8_t>(static_cast<uint16_t>(state.blue) * brightness / 255);
-#if OPENSHOCK_LED_SWAP_RG_CHANNELS
-  std::swap(r, g);
-#endif
+  // Board setting (descriptor flag), decided once in the constructor so this path stays a single branch.
+  if (m_swapRg) {
+    std::swap(r, g);
+  }
 
   const uint32_t colors = (static_cast<uint32_t>(g) << 16) | (static_cast<uint32_t>(r) << 8) | static_cast<uint32_t>(b);
 
@@ -142,6 +139,14 @@ void RgbLedDriver::apply(const RGBState& state)
   // Send the data (blocking, wait up to 10ms per frame)
   rmt_transmit_config_t txConfig = {};
   txConfig.flags.eot_level       = 0;
-  rmt_transmit(m_rmtChannel, m_rmtEncoder, led_data.data(), led_data.size() * sizeof(rmt_symbol_word_t), &txConfig);
-  rmt_tx_wait_all_done(m_rmtChannel, 10);
+  esp_err_t err                  = rmt_transmit(m_rmtChannel, m_rmtEncoder, led_data.data(), led_data.size() * sizeof(rmt_symbol_word_t), &txConfig);
+  if (err != ESP_OK) {
+    OS_LOGW(TAG, "rmt_transmit failed: %s", esp_err_to_name(err));
+    return;
+  }
+  if (rmt_tx_wait_all_done(m_rmtChannel, 10) != ESP_OK) {
+    // Abort the frame still in flight before the buffer is rewritten for the next one
+    rmt_disable(m_rmtChannel);
+    rmt_enable(m_rmtChannel);
+  }
 }

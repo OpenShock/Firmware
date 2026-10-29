@@ -37,6 +37,8 @@ namespace HostFake {
   extern bool EStopped;                     // EStopManager::IsEStopped()
   extern int64_t RmtFrameMs;                // Fake clock advance per transmitted frame
   extern bool FailRmtChannel;               // Make rmt_new_tx_channel fail (RFTransmitter::ok() == false)
+  extern bool FailRmtTransmit;              // Make rmt_transmit fail immediately (nothing is recorded)
+  extern int TaskDelays;                    // vTaskDelay calls since Reset()
   extern std::vector<Transmission> Transmissions;
   extern std::function<void()> OnIdle;      // Called on every empty queue receive inside RunTask()
   extern std::function<void()> OnTransmit;  // Called after every recorded RMT frame

@@ -3,6 +3,7 @@
 #include "StringHelpers.h"
 
 #include <cstdint>
+#include <optional>
 #include <string_view>
 
 namespace OpenShock {
@@ -14,25 +15,20 @@ namespace OpenShock {
     Light
   };
 
-  inline bool TryParseShockerCommandType(ShockerCommandType& out, std::string_view str)
+  [[nodiscard]] inline std::optional<ShockerCommandType> TryParseShockerCommandType(std::string_view str)
   {
     if (StringIEquals(str, "stop")) {
-      out = ShockerCommandType::Stop;
-      return true;
+      return ShockerCommandType::Stop;
     } else if (StringIEquals(str, "shock")) {
-      out = ShockerCommandType::Shock;
-      return true;
+      return ShockerCommandType::Shock;
     } else if (StringIEquals(str, "vibrate")) {
-      out = ShockerCommandType::Vibrate;
-      return true;
+      return ShockerCommandType::Vibrate;
     } else if (StringIEquals(str, "sound")) {
-      out = ShockerCommandType::Sound;
-      return true;
+      return ShockerCommandType::Sound;
     } else if (StringIEquals(str, "light")) {
-      out = ShockerCommandType::Light;
-      return true;
+      return ShockerCommandType::Light;
     } else {
-      return false;
+      return std::nullopt;
     }
   }
 }  // namespace OpenShock

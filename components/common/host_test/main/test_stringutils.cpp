@@ -45,21 +45,32 @@ TEST_CASE("StringSplitByFirst / ByLast", "[common][strhelpers]")
 
 TEST_CASE("TryStringSplit into a fixed array", "[common][strhelpers]")
 {
-  std::string_view parts[4];
-  TEST_ASSERT_TRUE(TryStringSplit("192.168.0.1", '.', parts));
-  TEST_ASSERT_TRUE(parts[0] == "192");
-  TEST_ASSERT_TRUE(parts[1] == "168");
-  TEST_ASSERT_TRUE(parts[2] == "0");
-  TEST_ASSERT_TRUE(parts[3] == "1");
+  auto parts = TryStringSplit<4>("192.168.0.1", '.');
+  TEST_ASSERT_TRUE(parts.has_value());
+  TEST_ASSERT_TRUE((*parts)[0] == "192");
+  TEST_ASSERT_TRUE((*parts)[1] == "168");
+  TEST_ASSERT_TRUE((*parts)[2] == "0");
+  TEST_ASSERT_TRUE((*parts)[3] == "1");
 
-  std::string_view three[4];
-  TEST_ASSERT_FALSE(TryStringSplit("1.2.3", '.', three));  // too few -> false
+  TEST_ASSERT_FALSE(TryStringSplit<4>("1.2.3", '.').has_value());  // too few -> nullopt
 
   // "too many": the last slot keeps the whole remainder (nothing dropped), so a
-  // caller like IPAddressUtils then rejects it via Convert::ToUint8("4.5").
-  std::string_view five[4];
-  TEST_ASSERT_TRUE(TryStringSplit("1.2.3.4.5", '.', five));
-  TEST_ASSERT_TRUE(five[3] == "4.5");
+  // caller parsing each part as a number then rejects it, e.g. Convert::ToUint8("4.5").
+  auto five = TryStringSplit<4>("1.2.3.4.5", '.');
+  TEST_ASSERT_TRUE(five.has_value());
+  TEST_ASSERT_TRUE((*five)[3] == "4.5");
+
+  // Empty fields are kept, and N == 1 is the whole input
+  auto empties = TryStringSplit<3>("..", '.');
+  TEST_ASSERT_TRUE(empties.has_value());
+  TEST_ASSERT_TRUE((*empties)[0].empty() && (*empties)[1].empty() && (*empties)[2].empty());
+  auto whole = TryStringSplit<1>("a.b", '.');
+  TEST_ASSERT_TRUE(whole.has_value());
+  TEST_ASSERT_TRUE((*whole)[0] == "a.b");
+
+  // Usable in constant expressions
+  static_assert((*TryStringSplit<2>("k=v", '='))[1] == "v");
+  static_assert(!TryStringSplit<2>("kv", '=').has_value());
 }
 
 TEST_CASE("StringSplit into a vector", "[common][strhelpers]")

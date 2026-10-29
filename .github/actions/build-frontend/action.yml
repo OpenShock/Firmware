@@ -1,5 +1,10 @@
 name: build-frontend
-description: Builds the frontend and uploads it as an artifact
+description: Build the captive-portal frontend into frontend/build, optionally running its checks first
+inputs:
+  checks:
+    required: false
+    default: 'true'
+    description: 'Run svelte-check and the unit tests before building'
 
 runs:
   using: composite
@@ -8,42 +13,31 @@ runs:
       with:
         node-version-file: ./frontend/package.json
 
-    - uses: pnpm/action-setup@ea17c68df8912ef543352723c149a84f56e3d413  # v6.1.0
-      name: Install pnpm
+    - name: Install pnpm
+      uses: pnpm/action-setup@ea17c68df8912ef543352723c149a84f56e3d413  # v6.1.0
       with:
-          cache: true
-          cache_dependency_path: ./frontend/pnpm-lock.yaml
-          package_json_file: ./frontend/package.json
-          run_install: |
-            - recursive: true
-              cwd: ./frontend
-              args: [--frozen-lockfile, --strict-peer-dependencies]
+        cache: true
+        cache_dependency_path: ./frontend/pnpm-lock.yaml
+        package_json_file: ./frontend/package.json
+        run_install: |
+          - recursive: true
+            cwd: ./frontend
+            args: [--frozen-lockfile, --strict-peer-dependencies]
 
     - name: Check
+      if: ${{ inputs.checks == 'true' }}
       working-directory: ./frontend
       shell: bash
       run: pnpm run check
 
-    # FIXME: Playwirght is not working: Error: browserType.launch: Executable doesn't exist at /home/runner/.cache/ms-playwright/chromium_headless_shell-1161/chrome-linux/headless_shell
-    #    - name: Install playwright
-    #      working-directory: ./frontend
-    #      shell: bash
-    #      run: pnpx playwright install --with-deps
-
+    # TODO: run e2e tests once playwright installs on the runner
     - name: Test
+      if: ${{ inputs.checks == 'true' }}
       working-directory: ./frontend
       shell: bash
-      run: pnpm test:unit # TODO: Change back to pnpm test when playwright is working
+      run: pnpm test:unit
 
     - name: Build
       working-directory: ./frontend
       shell: bash
       run: pnpm run build
-
-    - name: Upload artifacts
-      uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a  # v7.0.1
-      with:
-        name: frontend
-        path: frontend/build/*
-        retention-days: 1
-        if-no-files-found: error

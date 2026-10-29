@@ -5,6 +5,7 @@
 #include "SemVer.h"
 
 #include <array>
+#include <optional>
 #include <string>
 #include <unordered_map>
 #include <vector>
@@ -24,12 +25,12 @@ namespace OpenShock::OtaUpdateManager {
   };
 
   /// @brief Asks the repository server for the head of a channel for this board.
-  /// @param version Receives the version to install. When the hub is already current the server answers
-  ///                204 and this is set to the running version, so an equality check skips the update.
-  bool TryGetFirmwareVersion(HTTP::Client& client, OtaUpdateChannel channel, OpenShock::SemVer& version);
+  /// @return The version to install, or std::nullopt on failure. When the hub is already current the server
+  ///         answers 204 and this is the running version, so an equality check skips the update.
+  [[nodiscard]] std::optional<OpenShock::SemVer> TryGetFirmwareVersion(HTTP::Client& client, OtaUpdateChannel channel);
 
   /// @brief Fetches the app and staticfs artifacts for a specific version of this board.
-  bool TryGetFirmwareRelease(HTTP::Client& client, const OpenShock::SemVer& version, FirmwareRelease& release);
+  [[nodiscard]] std::optional<FirmwareRelease> TryGetFirmwareRelease(HTTP::Client& client, const OpenShock::SemVer& version);
 
   bool TryStartFirmwareUpdate(const OpenShock::SemVer& version);
 
@@ -38,6 +39,15 @@ namespace OpenShock::OtaUpdateManager {
 
   FirmwareBootType GetFirmwareBootType();
   bool IsValidatingApp();
+
+  /// @brief On the first boot of a freshly installed image, whether it was meant for this board.
+  ///
+  /// Compares the running image's board descriptor with the one in the slot it was installed from. The update
+  /// path already refuses a foreign image before it is made bootable; this is the second line, for an image that
+  /// got into the slot some other way. A slot without a descriptor (a pre-descriptor build, or empty) cannot be
+  /// compared and passes.
+  /// @return false when the previous slot names a different board, in which case the caller should roll back.
+  bool IsPendingImageForThisBoard();
 
   void InvalidateAndRollback();
   void ValidateApp();

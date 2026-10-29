@@ -11,12 +11,18 @@
 
 #include <esp_http_server.h>
 
+#include <atomic>
 #include <cstdint>
+#include <deque>
+#include <memory>
 #include <span>
 #include <string_view>
 #include <vector>
 
 namespace OpenShock::CaptivePortal {
+  // Shared so a detached job (account link) can keep the instance, and with it the server, alive until it answers.
+  // New references only come from the manager (GetLiveInstance), never from the instance itself: a retired instance
+  // is destroyed once the manager's RetiredList holds the only one, which a weak_ptr could otherwise undo.
   class CaptivePortalInstance {
     DISABLE_COPY(CaptivePortalInstance);
     DISABLE_MOVE(CaptivePortalInstance);
@@ -25,9 +31,14 @@ namespace OpenShock::CaptivePortal {
     CaptivePortalInstance();
     ~CaptivePortalInstance();
 
+    /// @brief Schedules a drain if sends are waiting and none is pending: retries a doorbell httpd's work mailbox
+    ///        refused. Called from the manager's tick.
+    void retryDrain();
+
     // WS sends invoked from arbitrary tasks (WiFiManager, GatewayConnectionManager,
     // the captive-portal manager task). httpd frames may only be written from the
-    // httpd task, so these copy the payload and marshal it via httpd_queue_work.
+    // httpd task, so these copy the payload into a bounded queue that the httpd task
+    // drains. Return false when the message was dropped.
     bool sendMessageTXT(uint8_t socketId, std::string_view data);
     bool sendMessageBIN(uint8_t socketId, std::span<const uint8_t> data);
     bool broadcastMessageTXT(std::string_view data);
@@ -70,6 +81,9 @@ namespace OpenShock::CaptivePortal {
     int idForFd(int fd);  // -1 if not found
 
     bool queueSend(int fd, bool broadcast, bool binary, std::span<const uint8_t> data);
+    static void wsDrainWork(void* arg);
+    void scheduleDrain();
+    void drainSends();
 
     // Per-session free callback fired by httpd on socket close/LRU/timeout.
     static void wsSessCtxFree(void* ctx);
@@ -81,5 +95,21 @@ namespace OpenShock::CaptivePortal {
 
     WsClient m_clients[MAX_WS_CLIENTS];
     SimpleMutex m_clientsMutex;
+
+    struct WsSend {
+      int fd;  // -1 to broadcast
+      bool binary;
+      std::vector<uint8_t> data;
+    };
+
+    // Sends waiting for the httpd task. httpd's own work mailbox is only a few slots deep (and shared with its
+    // control messages), so it carries at most one pending drain request ("doorbell") instead of one per message.
+    SimpleMutex m_sendMutex;
+    std::deque<WsSend> m_sendQueue;
+    std::atomic<bool> m_drainQueued = false;
   };
+
+  /// @brief A reference to `instance` if it is the one the manager has published, or null (being constructed, or
+  ///        retired). Defined in Manager.cpp.
+  std::shared_ptr<CaptivePortalInstance> GetLiveInstance(const CaptivePortalInstance* instance);
 }  // namespace OpenShock::CaptivePortal

@@ -1,8 +1,10 @@
 #pragma once
 
+#include <array>
 #include <cstddef>
 #include <cstdint>
 #include <limits>
+#include <optional>
 #include <string>
 #include <string_view>
 #include <utility>
@@ -133,26 +135,28 @@ namespace OpenShock {
 
   // Splits `view` into N parts on `delimiter`. The first N-1 parts are the
   // delimited fields; the last part is the entire remainder (delimiters and
-  // all), so nothing is silently dropped. Returns false only if there are too
-  // few parts (fewer than N-1 delimiters). Callers that need each part to be a
-  // single field validate the remainder themselves (e.g. Convert::ToUint8).
+  // all), so nothing is silently dropped. Returns std::nullopt only if there are
+  // too few parts (fewer than N-1 delimiters). Callers that need each part to be
+  // a single field validate the remainder themselves (e.g. Convert::ToUint8).
   template<std::size_t N>
-  constexpr bool TryStringSplit(std::string_view view, char delimiter, std::string_view (&out)[N])
+  [[nodiscard]] constexpr std::optional<std::array<std::string_view, N>> TryStringSplit(std::string_view view, char delimiter)
   {
     static_assert(N > 0, "TryStringSplit needs at least one output slot");
+
+    std::array<std::string_view, N> parts {};
 
     std::size_t pos = 0;
     for (std::size_t idx = 0; idx < N - 1; ++idx) {
       std::size_t nextPos = view.find(delimiter, pos);
       if (nextPos == std::string_view::npos) {
-        return false;  // too few parts
+        return std::nullopt;  // too few parts
       }
-      out[idx] = view.substr(pos, nextPos - pos);
-      pos      = nextPos + 1;
+      parts[idx] = view.substr(pos, nextPos - pos);
+      pos        = nextPos + 1;
     }
 
-    out[N - 1] = view.substr(pos);  // remainder (may still contain delimiters)
-    return true;
+    parts[N - 1] = view.substr(pos);  // remainder (may still contain delimiters)
+    return parts;
   }
   // Splits on every `delimiter`, keeping empty fields between delimiters ("a,,b" -> a, "", b). After `maxSplits`
   // splits the rest is returned as one final part. An empty input, or a trailing delimiter, adds no empty field.
