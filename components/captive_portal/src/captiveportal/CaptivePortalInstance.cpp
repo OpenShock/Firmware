@@ -35,6 +35,8 @@ const char* const TAG = "CaptivePortalInstance";
 #include <string_view>
 
 const uint16_t HTTP_PORT = 80;
+// esp_http_server takes its socket timeouts in whole seconds
+static constexpr uint16_t kHttpdTimeoutS = (CONFIG_OPENSHOCK_PORTAL_HTTPD_TIMEOUT_MS + 999) / 1000;
 // httpd needs 3 lwIP sockets besides its client sockets; the DNS server, the gateway connection and an outbound HTTP request need one each
 static_assert(CONFIG_LWIP_MAX_SOCKETS >= CONFIG_OPENSHOCK_PORTAL_HTTPD_MAX_SOCKETS + 3 + 3, "httpd client sockets would leave no lwIP sockets for the DNS server and outbound connections");
 static_assert(CONFIG_OPENSHOCK_PORTAL_HTTPD_MAX_SOCKETS > CONFIG_OPENSHOCK_PORTAL_MAX_CLIENTS, "every websocket client needs a socket, plus one for plain requests");
@@ -1124,8 +1126,8 @@ bool CaptivePortal::CaptivePortalInstance::startHttpServer()
   config.lru_purge_enable = true;
   config.stack_size       = CONFIG_OPENSHOCK_PORTAL_HTTPD_STACK_SIZE;
   // Shorter than the default 10 s: one stalled or sleeping client blocks the single httpd task for this long.
-  config.recv_wait_timeout = CONFIG_OPENSHOCK_PORTAL_HTTPD_TIMEOUT_S;
-  config.send_wait_timeout = CONFIG_OPENSHOCK_PORTAL_HTTPD_TIMEOUT_S;
+  config.recv_wait_timeout = kHttpdTimeoutS;
+  config.send_wait_timeout = kHttpdTimeoutS;
   config.uri_match_fn      = httpd_uri_match_wildcard;
   // Same core as the WiFi/lwIP tasks, away from the E-Stop and RF tasks on core 1
   config.core_id = 0;
