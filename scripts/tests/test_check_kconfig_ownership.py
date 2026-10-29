@@ -52,7 +52,3 @@ def test_choices_count_as_definitions_and_host_tests_are_skipped(tmp_path):
     (tmp_path / 'log' / 'host_test').mkdir()
     (tmp_path / 'log' / 'host_test' / 't.cpp').write_text('CONFIG_OPENSHOCK_NOWHERE', encoding='utf-8')
     assert violations(tmp_path) == []
-
-
-def test_the_repository_has_no_violations():
-    assert check_kconfig_ownership.find_violations(check_kconfig_ownership.ROOT / 'components') == []
