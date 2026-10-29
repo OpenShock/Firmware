@@ -4,6 +4,8 @@
 // calls, backed by plain values in host_fakes.cpp (HostFake::RfConfig/EStopCfg).
 #include <hal/gpio_types.h>
 
+#include <optional>
+
 namespace OpenShock::Config {
   struct RFConfig {
     gpio_num_t txPin;
@@ -15,12 +17,12 @@ namespace OpenShock::Config {
     gpio_num_t gpioPin;
   };
 
-  bool GetRFConfig(RFConfig& out);
-  bool GetRFConfigTxPin(gpio_num_t& out);
+  [[nodiscard]] std::optional<RFConfig> GetRFConfig();
+  [[nodiscard]] std::optional<gpio_num_t> GetRFConfigTxPin();
   bool SetRFConfigTxPin(gpio_num_t txPin);
-  bool GetRFConfigKeepAliveEnabled(bool& out);
+  [[nodiscard]] std::optional<bool> GetRFConfigKeepAliveEnabled();
   bool SetRFConfigKeepAliveEnabled(bool enabled);
 
-  bool GetEStopConfig(EStopConfig& out);
-  bool GetEStopGpioPin(gpio_num_t& out);
+  [[nodiscard]] std::optional<EStopConfig> GetEStopConfig();
+  [[nodiscard]] std::optional<gpio_num_t> GetEStopGpioPin();
 }  // namespace OpenShock::Config

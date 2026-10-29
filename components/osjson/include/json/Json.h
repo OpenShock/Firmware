@@ -11,6 +11,7 @@
 #include <json_generator.h>
 
 #include <cstdint>
+#include <optional>
 #include <string>
 #include <string_view>
 #include <vector>
@@ -45,16 +46,17 @@ namespace OpenShock::JSON {
     // body between the quotes with its escapes still in place.
     [[nodiscard]] std::string_view raw() const noexcept;
 
-    // Typed getters. Return false if this node is not of the requested kind.
+    // Typed getters. Return std::nullopt if this node is not of the requested kind
+    // (or the number does not fit the requested type).
     // tryGetStr decodes the string's escapes (\uXXXX and surrogate pairs to UTF-8)
-    // and returns false for a malformed escape; `out` is left unchanged on failure.
-    [[nodiscard]] bool tryGetStr(std::string& out) const;
-    [[nodiscard]] bool tryGetBool(bool& out) const noexcept;
-    [[nodiscard]] bool tryGetU8(uint8_t& out) const noexcept;
-    [[nodiscard]] bool tryGetU16(uint16_t& out) const noexcept;
-    [[nodiscard]] bool tryGetI32(int32_t& out) const noexcept;
-    [[nodiscard]] bool tryGetI64(int64_t& out) const noexcept;
-    [[nodiscard]] bool tryGetDouble(double& out) const noexcept;
+    // and returns std::nullopt for a malformed escape.
+    [[nodiscard]] std::optional<std::string> tryGetStr() const;
+    [[nodiscard]] std::optional<bool> tryGetBool() const noexcept;
+    [[nodiscard]] std::optional<uint8_t> tryGetU8() const noexcept;
+    [[nodiscard]] std::optional<uint16_t> tryGetU16() const noexcept;
+    [[nodiscard]] std::optional<int32_t> tryGetI32() const noexcept;
+    [[nodiscard]] std::optional<int64_t> tryGetI64() const noexcept;
+    [[nodiscard]] std::optional<double> tryGetDouble() const noexcept;
 
     // Object member lookup (keys compare after decoding escapes). Returns an
     // invalid view if not found or not an object.

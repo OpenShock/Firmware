@@ -2,20 +2,24 @@
 
 #include "config/ConfigBase.h"
 
+#include "util/FunctionRef.h"
 #include "json/Json.h"
 
 #include <hal/gpio_types.h>
 
+#include <optional>
 #include <string>
+#include <string_view>
+#include <type_traits>
 #include <vector>
 
 namespace OpenShock::Config::Internal::Utils {
   // Accepts GPIO_NUM_NC (-1, "no pin") or any GPIO number valid on this chip; used for every stored/imported pin.
-  bool FromIntGpioNum(gpio_num_t& val, int32_t intVal);
+  [[nodiscard]] std::optional<gpio_num_t> FromIntGpioNum(int32_t intVal);
 
   void FromFbsStr(std::string& str, const flatbuffers::String* fbsStr, const char* defaultStr);
 
-  bool FromJsonGpioNum(gpio_num_t& val, JSON::JsonView json, std::string_view name);
+  [[nodiscard]] std::optional<gpio_num_t> FromJsonGpioNum(JSON::JsonView json, std::string_view name);
 
   template<typename T, typename U>  // T inherits from ConfigBase<U>
   void FromFbsVec(std::vector<T>& vec, const flatbuffers::Vector<flatbuffers::Offset<U>>* fbsVec)
@@ -34,7 +38,7 @@ namespace OpenShock::Config::Internal::Utils {
     }
   }
   template<typename T>  // T inherits from ConfigBase<T>
-  bool FromJsonStrParsed(T& val, JSON::JsonView json, std::string_view name, bool (*StringParser)(T&, std::string_view), T defaultVal)
+  bool FromJsonStrParsed(T& val, JSON::JsonView json, std::string_view name, std::type_identity_t<Util::FunctionRef<std::optional<T>(std::string_view)>> StringParser, T defaultVal)
   {
     JSON::JsonView jsonVal = json[name];
     if (!jsonVal.valid()) {
@@ -44,12 +48,19 @@ namespace OpenShock::Config::Internal::Utils {
 
     // Wrong type or unknown value: fall back to the default like every other field, rather than keeping
     // whatever value `val` held before (the current running config when importing JSON).
-    std::string str;
-    if (!jsonVal.tryGetStr(str) || !StringParser(val, str)) {
+    auto str = jsonVal.tryGetStr();
+    if (!str) {
       val = defaultVal;
       return false;
     }
 
+    auto parsed = StringParser(*str);
+    if (!parsed) {
+      val = defaultVal;
+      return false;
+    }
+
+    val = *parsed;
     return true;
   }
   template<typename T>  // T inherits from ConfigBase<T>

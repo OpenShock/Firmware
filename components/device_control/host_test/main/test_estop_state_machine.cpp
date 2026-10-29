@@ -6,6 +6,7 @@
 #include "estop/EStopStateMachine.h"
 
 #include <cstdint>
+#include <utility>
 
 using namespace OpenShock;
 
@@ -63,7 +64,7 @@ namespace {
 
 static void assertState(EStopState expected, const Rig& rig)
 {
-  TEST_ASSERT_EQUAL_UINT8(static_cast<uint8_t>(expected), static_cast<uint8_t>(rig.state()));
+  TEST_ASSERT_EQUAL_UINT8(std::to_underlying(expected), std::to_underlying(rig.state()));
   TEST_ASSERT_EQUAL(expected != EStopState::Idle, rig.estopped());
 }
 
@@ -321,8 +322,8 @@ TEST_CASE("EStop is e-stopped in every state except Idle", "[device_control][est
       }
     }
 
-    EStopState state                      = rig.state();
-    sawState[static_cast<uint8_t>(state)] = true;
+    EStopState state                    = rig.state();
+    sawState[std::to_underlying(state)] = true;
     TEST_ASSERT_EQUAL(state != EStopState::Idle, rig.estopped());
 
     if (state != EStopState::Idle) {
@@ -336,9 +337,9 @@ TEST_CASE("EStop is e-stopped in every state except Idle", "[device_control][est
     }
   }
 
-  TEST_ASSERT_TRUE(sawState[static_cast<uint8_t>(EStopState::Idle)]);
-  TEST_ASSERT_TRUE(sawState[static_cast<uint8_t>(EStopState::Active)]);
-  TEST_ASSERT_TRUE(sawState[static_cast<uint8_t>(EStopState::ActiveClearing)]);
+  TEST_ASSERT_TRUE(sawState[std::to_underlying(EStopState::Idle)]);
+  TEST_ASSERT_TRUE(sawState[std::to_underlying(EStopState::Active)]);
+  TEST_ASSERT_TRUE(sawState[std::to_underlying(EStopState::ActiveClearing)]);
 }
 
 // ---------------------------------------------------------------------------

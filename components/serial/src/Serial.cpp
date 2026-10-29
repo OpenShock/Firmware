@@ -34,6 +34,22 @@ using namespace OpenShock;
 
 static constexpr int k_consoleBufferSize = 256;
 
+#if defined(OS_CONSOLE_USJ)
+static constexpr int k_usjTxBufferSize = 1024;
+#endif
+
+#if defined(OS_CONSOLE_USJ) || defined(OS_CONSOLE_CDC)
+// How long a USB console write may wait for the host to drain it. Once one wait runs out the host is presumed absent
+// (a headless hub on USB power) and later writes don't wait at all until one goes through again, so a log line costs
+// nothing instead of 50 ms held under s_writeMutex. Same idea as ESP-IDF's USJ VFS (tx_tried_blocking).
+static constexpr TickType_t k_usbWriteTimeout = pdMS_TO_TICKS(50);
+static std::atomic<bool> s_usbHostStalled     = false;
+#endif
+
+// Bounds how long a writer queues behind another; the line is dropped instead of stalling the caller (which may be
+// the event loop or the websocket task) without limit.
+static constexpr TickType_t k_writeLockTimeout = pdMS_TO_TICKS(500);
+
 // Published with release ordering after s_writeMutex is created, so a writer on another core that sees it set also
 // sees the mutex.
 static std::atomic<bool> s_initialized = false;
@@ -60,7 +76,8 @@ bool Serial::Init()
   }
 
 #if defined(OS_CONSOLE_USJ)
-  usb_serial_jtag_driver_config_t cfg = {.tx_buffer_size = k_consoleBufferSize, .rx_buffer_size = k_consoleBufferSize};
+  // A larger TX ring absorbs bursts while the host reads; RX stays small (console commands)
+  usb_serial_jtag_driver_config_t cfg = {.tx_buffer_size = k_usjTxBufferSize, .rx_buffer_size = k_consoleBufferSize};
 
   esp_err_t err = usb_serial_jtag_driver_install(&cfg);
   if (err != ESP_OK && err != ESP_ERR_INVALID_STATE) {
@@ -113,25 +130,38 @@ int Serial::Read(uint8_t* buffer, std::size_t len)
 static int driverWrite(const uint8_t* data, std::size_t len)
 {
 #if defined(OS_CONSOLE_USJ)
+  if (!usb_serial_jtag_is_connected()) {
+    return 0;  // Nobody is listening; don't fill the ring and then wait on it
+  }
+
   // The driver queues each call into its TX ring buffer as a single item and rejects
-  // anything larger than the buffer outright, so feed it buffer-sized chunks.
-  std::size_t sent = 0;
+  // anything larger than the buffer outright, so feed it buffer-sized chunks. The timeout covers the whole write, not
+  // each chunk, so a slowly drained long message can't hold s_writeMutex for longer than that.
+  TickType_t timeout = s_usbHostStalled.load(std::memory_order_relaxed) ? 0 : k_usbWriteTimeout;
+  TickType_t started = xTaskGetTickCount();
+  std::size_t sent   = 0;
   while (sent < len) {
-    std::size_t chunk = std::min(len - sent, static_cast<std::size_t>(k_consoleBufferSize));
-    int n             = usb_serial_jtag_write_bytes(data + sent, chunk, pdMS_TO_TICKS(50));
+    TickType_t elapsed = xTaskGetTickCount() - started;  // Unsigned: wrap-safe
+    std::size_t chunk  = std::min(len - sent, static_cast<std::size_t>(k_usjTxBufferSize));
+    int n              = usb_serial_jtag_write_bytes(data + sent, chunk, elapsed < timeout ? timeout - elapsed : 0);
     if (n <= 0) {
+      s_usbHostStalled.store(true, std::memory_order_relaxed);
       break;
     }
     sent += static_cast<std::size_t>(n);
+  }
+  if (sent == len) {
+    s_usbHostStalled.store(false, std::memory_order_relaxed);
   }
   return static_cast<int>(sent);
 #elif defined(OS_CONSOLE_UART)
   return uart_write_bytes(static_cast<uart_port_t>(CONFIG_ESP_CONSOLE_UART_NUM), data, len);
 #elif defined(OS_CONSOLE_CDC)
   // write_buf never blocks: it takes what fits in its TX buffer and returns 0 while the
-  // host isn't draining it. Retry for up to 50 ms (as the USJ path waits), then flush so
+  // host isn't draining it. Retry for up to k_usbWriteTimeout (as the USJ path waits), then flush so
   // prompts without a trailing newline go out too.
   // Elapsed-time check: comparing against an absolute deadline breaks when the tick counter wraps.
+  TickType_t timeout = s_usbHostStalled.load(std::memory_order_relaxed) ? 0 : k_usbWriteTimeout;
   std::size_t sent   = 0;
   TickType_t started = xTaskGetTickCount();
   while (sent < len) {
@@ -140,13 +170,17 @@ static int driverWrite(const uint8_t* data, std::size_t len)
       break;
     }
     if (n == 0) {
-      if (xTaskGetTickCount() - started >= pdMS_TO_TICKS(50)) {
+      if (xTaskGetTickCount() - started >= timeout) {
+        s_usbHostStalled.store(true, std::memory_order_relaxed);
         break;
       }
       vTaskDelay(1);
       continue;
     }
     sent += static_cast<std::size_t>(n);
+  }
+  if (sent == len) {
+    s_usbHostStalled.store(false, std::memory_order_relaxed);
   }
   esp_usb_console_flush();
   return static_cast<int>(sent);
@@ -195,7 +229,9 @@ int Serial::Write(const uint8_t* data, std::size_t len)
     return static_cast<int>(len);
   }
 
-  xSemaphoreTake(s_writeMutex, portMAX_DELAY);
+  if (xSemaphoreTake(s_writeMutex, k_writeLockTimeout) != pdTRUE) {
+    return 0;  // Dropped: another writer is stuck on the console
+  }
   int written = driverWrite(data, len);
   xSemaphoreGive(s_writeMutex);
 

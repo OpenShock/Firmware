@@ -1,24 +1,30 @@
 #include "config/EStopConfig.h"
 
+#include "BoardDescriptor.h"
 #include "Chipset.h"
 #include "config/internal/utils.h"
 #include "Logging.h"
-#include "OpenShock.h"
 
 const char* const TAG = "Config::EStopConfig";
 
 using namespace OpenShock::Config;
 
+// The board's default switch type (OPENSHOCK_ESTOP_LATCHING in boards/<board>.defaults, stamped into the descriptor).
+static bool defaultLatching()
+{
+  return (OpenShock::Board::Get().flags & OPENSHOCK_BOARD_FLAG_ESTOP_LATCHING) != 0;
+}
+
 EStopConfig::EStopConfig()
-  : enabled(OpenShock::IsValidInputPin(OPENSHOCK_ESTOP_PIN))
-  , gpioPin(static_cast<gpio_num_t>(OPENSHOCK_ESTOP_PIN))
-  , latching(OPENSHOCK_ESTOP_LATCHING)
+  : enabled(OpenShock::IsValidInputPin(Board::Get().estopGpio))
+  , gpioPin(static_cast<gpio_num_t>(Board::Get().estopGpio))
+  , latching(defaultLatching())
   , active(false)
 {
 }
 
 EStopConfig::EStopConfig(bool enabled, gpio_num_t gpioPin)
-  : EStopConfig(enabled, gpioPin, OPENSHOCK_ESTOP_LATCHING, false)
+  : EStopConfig(enabled, gpioPin, defaultLatching(), false)
 {
 }
 
@@ -32,9 +38,9 @@ EStopConfig::EStopConfig(bool enabled, gpio_num_t gpioPin, bool latching, bool a
 
 void EStopConfig::ToDefault()
 {
-  enabled  = OpenShock::IsValidInputPin(OPENSHOCK_ESTOP_PIN);
-  gpioPin  = static_cast<gpio_num_t>(OPENSHOCK_ESTOP_PIN);
-  latching = OPENSHOCK_ESTOP_LATCHING;
+  enabled  = OpenShock::IsValidInputPin(Board::Get().estopGpio);
+  gpioPin  = static_cast<gpio_num_t>(Board::Get().estopGpio);
+  latching = defaultLatching();
   active   = false;
 }
 
@@ -47,7 +53,8 @@ bool EStopConfig::FromFlatbuffers(const Serialization::Configuration::EStopConfi
 
   // gpio_pin is a raw int8 from flash or rawconfig; anything that isn't "no pin" or a real GPIO means a
   // corrupt section, so fall back to the default.
-  if (!Internal::Utils::FromIntGpioNum(gpioPin, config->gpio_pin())) {
+  auto pin = Internal::Utils::FromIntGpioNum(config->gpio_pin());
+  if (!pin) {
     OS_LOGW(TAG, "Invalid E-Stop GPIO pin %d, using default", config->gpio_pin());
     ToDefault();
     latching = config->latching();
@@ -55,6 +62,7 @@ bool EStopConfig::FromFlatbuffers(const Serialization::Configuration::EStopConfi
     return true;
   }
 
+  gpioPin  = *pin;
   enabled  = config->enabled();
   latching = config->latching();
   active   = config->active();
@@ -84,26 +92,28 @@ bool EStopConfig::FromJSON(JSON::JsonView json)
     return false;
   }
 
-  if (!Internal::Utils::FromJsonGpioNum(gpioPin, json, "gpioPin")) {
-    gpioPin = static_cast<gpio_num_t>(OPENSHOCK_ESTOP_PIN);
-  }
+  gpioPin = Internal::Utils::FromJsonGpioNum(json, "gpioPin").value_or(static_cast<gpio_num_t>(Board::Get().estopGpio));
 
   if (JSON::JsonView enabledJson = json["enabled"]; enabledJson.valid()) {
-    if (!enabledJson.tryGetBool(enabled)) {
+    auto parsed = enabledJson.tryGetBool();
+    if (!parsed) {
       OS_LOGE(TAG, "Failed to parse enabled");
       return false;
     }
+    enabled = *parsed;
   } else {
     enabled = OpenShock::IsValidInputPin(gpioPin);
   }
 
   if (JSON::JsonView latchingJson = json["latching"]; latchingJson.valid()) {
-    if (!latchingJson.tryGetBool(latching)) {
+    auto parsed = latchingJson.tryGetBool();
+    if (!parsed) {
       OS_LOGE(TAG, "Failed to parse latching");
       return false;
     }
+    latching = *parsed;
   } else {
-    latching = OPENSHOCK_ESTOP_LATCHING;
+    latching = defaultLatching();
   }
   Normalize();
 

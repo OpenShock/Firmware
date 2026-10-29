@@ -9,7 +9,12 @@ const char* const TAG = "PartitionUtils";
 #include "Temporal.h"
 #include "util/HexUtils.h"
 
+#include <algorithm>
 #include <cstring>
+
+// Erased ahead of the data in steps of this much. Erasing the whole partition up front kept the flash cache off for
+// seconds, starving the idle tasks into the task watchdog; one step of this size takes well under a second.
+static constexpr std::size_t kEraseStep = 64 * 1024;
 
 const esp_partition_t* OpenShock::FindStaticPartition()
 {
@@ -31,7 +36,7 @@ bool OpenShock::TryGetPartitionHash(const esp_partition_t* partition, char (&has
   return true;
 }
 
-bool OpenShock::FlashPartitionFromUrl(HTTP::Client& client, const esp_partition_t* partition, std::string_view remoteUrl, const uint8_t (&remoteHash)[32], std::function<bool(std::size_t, std::size_t, float)> progressCallback)
+bool OpenShock::FlashPartitionFromUrl(HTTP::Client& client, const esp_partition_t* partition, std::string_view remoteUrl, const uint8_t (&remoteHash)[32], Util::FunctionRef<bool(std::size_t, std::size_t, float)> progressCallback)
 {
   OpenShock::SHA256 sha256;
   if (!sha256.begin()) {
@@ -41,6 +46,7 @@ bool OpenShock::FlashPartitionFromUrl(HTTP::Client& client, const esp_partition_
 
   std::size_t contentLength  = 0;
   std::size_t contentWritten = 0;
+  std::size_t erasedTo       = 0;
   int64_t lastProgress       = 0;
 
   auto sizeValidator = [partition, &contentLength, progressCallback, &lastProgress](std::size_t size) -> bool {
@@ -49,20 +55,25 @@ bool OpenShock::FlashPartitionFromUrl(HTTP::Client& client, const esp_partition_
       return false;
     }
 
-    // Erase app partition.
-    if (esp_partition_erase_range(partition, 0, partition->size) != ESP_OK) {
-      OS_LOGE(TAG, "Failed to erase partition in preparation for update");
-      return false;
-    }
-
+    // Erased incrementally by dataWriter, just ahead of the data
     contentLength = size;
 
     lastProgress = OpenShock::millis();
-    if (progressCallback) progressCallback(0, contentLength, 0.0f);
+    progressCallback(0, contentLength, 0.0f);
 
     return true;
   };
-  auto dataWriter = [partition, &sha256, &contentLength, &contentWritten, progressCallback, &lastProgress](std::size_t offset, const uint8_t* data, std::size_t length) -> bool {
+  auto dataWriter = [partition, &sha256, &contentLength, &contentWritten, &erasedTo, progressCallback, &lastProgress](std::size_t offset, const uint8_t* data, std::size_t length) -> bool {
+    while (erasedTo < offset + length) {
+      // The step is a multiple of the erase size, and partitions end on an erase-size boundary
+      std::size_t eraseLength = std::min<std::size_t>(kEraseStep, partition->size - erasedTo);
+      if (eraseLength == 0 || esp_partition_erase_range(partition, erasedTo, eraseLength) != ESP_OK) {
+        OS_LOGE(TAG, "Failed to erase partition at offset %zu", erasedTo);
+        return false;
+      }
+      erasedTo += eraseLength;
+    }
+
     if (esp_partition_write(partition, offset, data, length) != ESP_OK) {
       OS_LOGE(TAG, "Failed to write to partition");
       return false;
@@ -78,7 +89,7 @@ bool OpenShock::FlashPartitionFromUrl(HTTP::Client& client, const esp_partition_
     int64_t now = OpenShock::millis();
     if (now - lastProgress >= 500) {  // Send progress every 500ms
       lastProgress = now;
-      if (progressCallback) progressCallback(contentWritten, contentLength, static_cast<float>(contentWritten) / static_cast<float>(contentLength));
+      progressCallback(contentWritten, contentLength, static_cast<float>(contentWritten) / static_cast<float>(contentLength));
     }
 
     return true;
@@ -100,7 +111,7 @@ bool OpenShock::FlashPartitionFromUrl(HTTP::Client& client, const esp_partition_
     return false;
   }
 
-  if (progressCallback) progressCallback(contentLength, contentLength, 1.0f);
+  progressCallback(contentLength, contentLength, 1.0f);
   OS_LOGD(TAG, "Wrote %zu bytes to partition", appBinaryResponse.data);
 
   std::array<uint8_t, 32> localHash;

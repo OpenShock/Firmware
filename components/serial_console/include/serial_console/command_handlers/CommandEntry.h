@@ -4,7 +4,7 @@
 #include <vector>
 
 namespace OpenShock::SerialCmds {
-  typedef void (*CommandHandler)(std::string_view arg, bool isAutomated);
+  using CommandHandler = void (*)(std::string_view arg, bool isAutomated);
 
   class CommandArgument {
   public:

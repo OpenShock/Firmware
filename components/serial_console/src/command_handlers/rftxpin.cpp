@@ -7,47 +7,45 @@
 
 static void handleRfTxPinCommand(std::string_view arg, bool isAutomated)
 {
-  gpio_num_t txPin;
-
   if (arg.empty()) {
-    if (!OpenShock::Config::GetRFConfigTxPin(txPin)) {
+    auto configPin = OpenShock::Config::GetRFConfigTxPin();
+    if (!configPin) {
       SERPR_ERROR("Failed to get RF TX pin from config");
       return;
     }
 
     // Get rmt pin
-    SERPR_RESPONSE("RmtPin|%hhi", static_cast<int8_t>(txPin));
+    SERPR_RESPONSE("RmtPin|%hhi", static_cast<int8_t>(*configPin));
     return;
   }
 
-  if (!OpenShock::Convert::ToGpioNum(arg, txPin)) {
+  auto txPin = OpenShock::Convert::ToGpioNum(arg);
+  if (!txPin) {
     SERPR_ERROR("Invalid argument (number invalid or out of range)");
     return;
   }
 
-  OpenShock::SetGPIOResultCode result = OpenShock::CommandHandler::SetRfTxPin(txPin);
+  OpenShock::SetGPIOResultCode result = OpenShock::CommandHandler::SetRfTxPin(*txPin);
 
   switch (result) {
     case OpenShock::SetGPIOResultCode::InvalidPin:
       SERPR_ERROR("Invalid argument (invalid pin)");
-      break;
+      return;
 
     case OpenShock::SetGPIOResultCode::InternalError:
       SERPR_ERROR("Internal error while setting RF TX pin");
-      break;
+      return;
 
     case OpenShock::SetGPIOResultCode::PinInUse:
       SERPR_ERROR("Pin is in use by the E-Stop");
-      break;
+      return;
 
     case OpenShock::SetGPIOResultCode::Success:
       SERPR_SUCCESS("Saved config");
-      break;
-
-    default:
-      SERPR_ERROR("Unknown error while setting RF TX pin");
-      break;
+      return;
   }
+
+  SERPR_ERROR("Unknown error while setting RF TX pin");
 }
 
 OpenShock::SerialCmds::CommandGroup OpenShock::SerialCmds::CommandHandlers::RfTxPinHandler()

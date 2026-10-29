@@ -21,11 +21,17 @@
 __pycache__/
 *.py[cod]
 
-# Editors & IDEs
-.vscode/
+# Editors & IDEs. .vscode/ is tracked (clangd, tasks, recommendations); machine-specific
+# files such as launch.json or c_cpp_properties.json stay local.
+.vscode/*
+!.vscode/settings.json
+!.vscode/tasks.json
+!.vscode/extensions.json
 .vs/
 *.sln
 /packages/
+.idea/
+CMakeUserPresets.json
 compile_commands.json
 .claude/settings.local.json
 

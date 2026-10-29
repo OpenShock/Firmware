@@ -19,8 +19,8 @@ namespace OpenShock {
   /// deletes itself, and the exit is published through TaskUtils::TaskExiting(), so the body never calls
   /// vTaskDelete() and never touches the exit flag. A long-running body polls stopRequested() at its wait points.
   ///
-  /// stop() requests the stop, wakes the task and waits for it to exit (force-killing it after the timeout). The
-  /// default wake is a task notification, which ends a ulTaskNotifyTake() wait; a task that blocks on something else
+  /// stop() requests the stop, wakes the task and waits for it to exit (see TaskUtils::StopTask() for overruns). The
+  /// default wake is a task notification, which ends a TaskUtils::WaitForNotify() wait; a task that blocks on something else
   /// (a queue) passes its own wake, e.g. one that posts a sentinel.
   ///
   /// start() and stop() must be serialized by the owner; notify(), running() and stopRequested() may be called from
@@ -39,7 +39,7 @@ namespace OpenShock {
     ~ManagedTask() { stop(); }
 
     /// @brief Creates the task on `core` (-1 for any core). Returns true if it is already running.
-    bool start(const char* name, uint32_t stackSize, UBaseType_t priority, BaseType_t core, std::function<void()> body)
+    bool start(const char* name, uint32_t stackSize, UBaseType_t priority, BaseType_t core, std::move_only_function<void()> body)
     {
       ScopedLock lock__(&m_handleMutex);
 
@@ -62,15 +62,18 @@ namespace OpenShock {
     }
 
     /// @brief Same as start(), on the core that does expensive work (see TaskUtils::TaskCreateExpensive).
-    bool startExpensive(const char* name, uint32_t stackSize, UBaseType_t priority, std::function<void()> body) { return start(name, stackSize, priority, 1, std::move(body)); }
+    bool startExpensive(const char* name, uint32_t stackSize, UBaseType_t priority, std::move_only_function<void()> body) { return start(name, stackSize, priority, 1, std::move(body)); }
 
-    /// @brief Requests a stop, wakes the task with a task notification and waits for it to exit.
+    /// @brief Requests a stop, wakes the task with a task notification and waits for it to exit. `timeout` is when
+    ///        an overrun starts being logged, not a limit.
     void stop(TickType_t timeout = pdMS_TO_TICKS(1000))
     {
-      stop([this] { xTaskNotifyGive(m_handle); }, timeout);
+      stop([this] { TaskUtils::Notify(m_handle); }, timeout);
     }
 
-    /// @brief Requests a stop, wakes the task with `wake` and waits for it to exit.
+    /// @brief Requests a stop, wakes the task with `wake` and waits for it to exit. `wake` runs under the handle lock,
+    ///        which keeps the task from deleting itself under it, so it must not block for long (bound any queue send)
+    ///        and must not call back into this ManagedTask.
     template<typename Wake>
     void stop(Wake&& wake, TickType_t timeout = pdMS_TO_TICKS(1000))
     {
@@ -86,8 +89,8 @@ namespace OpenShock {
         m_stopRequested.store(true, std::memory_order_relaxed);
         wake();
 
-        // From here on nothing touches the handle except a force-kill of a task that never exited, so the task may
-        // now delete itself (see entry()). notify() checks m_stopRequested under the same lock, so it can't either.
+        // From here on nothing touches the handle, so the task may now delete itself (see entry()). notify() checks
+        // m_stopRequested under the same lock, so it can't either.
         m_handleReleased.store(true, std::memory_order_release);
       }
 
@@ -98,12 +101,12 @@ namespace OpenShock {
       m_body   = nullptr;
     }
 
-    /// @brief Wakes a task blocked in ulTaskNotifyTake() without stopping it. Safe from any task.
+    /// @brief Wakes a task blocked in TaskUtils::WaitForNotify() without stopping it. Safe from any task.
     void notify()
     {
       ScopedLock lock__(&m_handleMutex);
       if (m_handle != nullptr && !m_stopRequested.load(std::memory_order_relaxed)) {
-        xTaskNotifyGive(m_handle);
+        TaskUtils::Notify(m_handle);
       }
     }
 
@@ -134,8 +137,8 @@ namespace OpenShock {
 
     const char* m_tag;
     const char* m_description;
-    std::function<void()> m_body;
-    mutable SimpleMutex m_handleMutex;  // Guards m_handle against notify()/running() on other tasks during start()/stop()
+    std::move_only_function<void()> m_body;  // Moved in by start(), never copied
+    mutable SimpleMutex m_handleMutex;       // Guards m_handle against notify()/running() on other tasks during start()/stop()
     TaskHandle_t m_handle = nullptr;
     TaskUtils::TaskExitFlag m_exited {false};
     std::atomic<bool> m_stopRequested {false};

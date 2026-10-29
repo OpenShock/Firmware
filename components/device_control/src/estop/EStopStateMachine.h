@@ -112,10 +112,6 @@ namespace OpenShock {
             clear(now);
           }
           break;
-
-        default:
-          // Should never happen
-          break;
       }
     }
 

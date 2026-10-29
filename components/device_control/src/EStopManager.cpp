@@ -24,10 +24,12 @@ const char* const TAG = "EStopManager";
 
 using namespace OpenShock;
 
-const uint32_t k_estopUpdateRate = 5;          // 200 Hz (debounce/hold timings live in EStopStateMachine)
+const uint32_t k_estopUpdateRate = 5;        // 200 Hz (debounce/hold timings live in EStopStateMachine)
 
-const uint32_t k_estopTaskStackSize   = 4096;  // TODO: profile and tune
-const UBaseType_t k_estopTaskPriority = 5;
+const uint32_t k_estopTaskStackSize = 4096;  // TODO: profile and tune
+// Above the network tasks (5) and the RF task: it is blocked almost all the time, and a sample that waits behind TLS
+// work delays the E-Stop by that long.
+const UBaseType_t k_estopTaskPriority = 10;
 
 static OpenShock::SimpleMutex s_estopMutex = {};
 // Guarded via Mutex
@@ -37,6 +39,12 @@ static bool s_estopLatching  = false;        // Captured by value when the task 
 
 // Wrapped in atomics as they're read (or set via public methods) by Tasks potentially running on other cores.
 static std::atomic<int64_t> s_estopActivatedAt = 0;  // When == 0, EStop not active. When != 0, EStop is active.
+// Mirrors `s_estopActivatedAt != 0` for IsEStopped(), which runs on every command and every RF frame:
+// std::atomic<int64_t> isn't lock-free on these chips (every access takes a global spinlock), a bool is.
+// Set no later than the timestamp and cleared with it, so IsEStopped() never reports clear while it is set.
+static std::atomic<bool> s_estopActive = false;
+// A software trigger not yet taken over by the task. IsEStopped() reports it at once, so the trigger needs no lock
+// and doesn't wait for the next tick.
 static std::atomic<bool> s_externallyTriggered = false;
 
 static bool s_estopInitialized = false;
@@ -72,32 +80,47 @@ static void estopmgr_managerTask(gpio_num_t estopPin, bool latching)
     lastPublishedState = EStopState::Active;  // Already published when it was latched
   }
 
+  // On the task watchdog for as long as it samples: a wedged sampler means the kill switch silently stops working.
+  // Fed every 5 ms sample, so only a real hang (not a slow post or log) can trip it.
+  TaskUtils::TaskWatchdog watchdog;
+
   // Check if killing manager was requested, continue looping otherwise
+  TickType_t lastWake = xTaskGetTickCount();
   while (!s_estopTask.stopRequested()) {
-    // Sleep for the update rate
-    vTaskDelay(pdMS_TO_TICKS(k_estopUpdateRate));
+    watchdog.feed();
+    // Fixed rate: the debounce and hold timings assume samples k_estopUpdateRate apart, whatever the loop body costs
+    xTaskDelayUntil(&lastWake, pdMS_TO_TICKS(k_estopUpdateRate));
 
     // Get current time
     int64_t now = OpenShock::millis();
 
     // Handle external trigger: forcibly set the E-Stop active, otherwise sample the EStop input.
-    if (s_externallyTriggered.exchange(false, std::memory_order_relaxed)) {
+    bool triggered = s_externallyTriggered.load();
+    if (triggered) {
       machine.Trigger(now);
     } else {
       machine.Sample(gpio_get_level(estopPin), now);
     }
 
     // This task is the only writer while it runs; mirror before publishing so consumers see the new state.
-    s_estopActivatedAt.store(machine.activatedAt(), std::memory_order_relaxed);
+    s_estopActivatedAt.store(machine.activatedAt());
+    s_estopActive.store(machine.activatedAt() != 0);
+
+    // Cleared only once the activation is mirrored, so IsEStopped() never sees neither
+    if (triggered) {
+      s_externallyTriggered.store(false);
+    }
 
     estopmgr_publishState(machine.state(), lastPublishedState);
   }
 
-  // Broke out of main loop, set global variables to Idle state.
-  // Use a blocking publish so downstream consumers (keep-alive gating, visuals)
-  // are guaranteed to observe the Idle transition even under event-loop pressure.
-  estopmgr_publishState(EStopState::Idle, lastPublishedState, portMAX_DELAY);
-  s_estopActivatedAt.store(0, std::memory_order_relaxed);
+  // An active E-Stop survives the stop: s_estopActivatedAt stays set, and the next task takes it over (or, with no
+  // task, it stays latched until reboot). Clearing it here would release it without the hold-to-clear.
+  if (machine.activatedAt() != 0) {
+    return;
+  }
+
+  estopmgr_publishState(EStopState::Idle, lastPublishedState);
 }
 
 // Validates and configures `pin` as an EStop input. Does not touch s_estopPin
@@ -147,12 +170,13 @@ static bool estopmgr_taskStart()
   }
 
   if (s_estopPin == GPIO_NUM_NC) {
-    gpio_num_t pin = GPIO_NUM_NC;
-    if (!OpenShock::Config::GetEStopGpioPin(pin)) {
+    auto configPin = OpenShock::Config::GetEStopGpioPin();
+    if (!configPin) {
       OS_LOGE(TAG, "Failed to get EStop pin from config");
       return false;
     }
 
+    gpio_num_t pin = *configPin;
     if (pin == GPIO_NUM_NC) {
       OS_LOGW(TAG, "No valid pin is defined, refusing to start task");
       return false;
@@ -185,11 +209,9 @@ static bool estopmgr_taskStop()
 
   s_estopTask.stop();
 
-  // Disable E-Stop after task has stopped to ensure that the task didn't get it stuck in enabled state
-  s_estopActivatedAt.store(0, std::memory_order_relaxed);
-
-  // A software trigger that arrived while the task was shutting down was never consumed; don't lose it.
-  if (s_externallyTriggered.exchange(false, std::memory_order_relaxed)) {
+  // The task left s_estopActivatedAt set if it was active (see estopmgr_managerTask). A software trigger that arrived
+  // while it was shutting down was never consumed; don't lose it.
+  if (s_externallyTriggered.load()) {
     estopmgr_latchWithoutTask();
   }
 
@@ -218,8 +240,8 @@ bool EStopManager::Init()
   }
   s_estopInitialized = true;
 
-  Config::EStopConfig cfg;
-  if (!OpenShock::Config::GetEStopConfig(cfg)) {
+  auto cfg = OpenShock::Config::GetEStopConfig();
+  if (!cfg) {
     OS_LOGE(TAG, "Failed to get EStop pin from config");
     return false;
   }
@@ -227,7 +249,7 @@ bool EStopManager::Init()
   OpenShock::ScopedLock lock__(&s_estopMutex);
 
   // Set regardless of enabled so a later SetEStopEnabled(true) uses the right mode.
-  s_estopLatching = cfg.latching;
+  s_estopLatching = cfg->latching;
 
   esp_err_t err = esp_event_handler_register(OPENSHOCK_EVENTS, OPENSHOCK_EVENT_ESTOP_STATE_CHANGED, estopmgr_handleStateChange, nullptr);
   if (err != ESP_OK) {
@@ -235,9 +257,9 @@ bool EStopManager::Init()
     return false;
   }
 
-  if (!cfg.enabled) {
+  if (!cfg->enabled) {
     // A disabled E-Stop can't be active, drop any stale persisted state
-    if (cfg.active && !OpenShock::Config::SetEStopActive(false)) {
+    if (cfg->active && !OpenShock::Config::SetEStopActive(false)) {
       OS_LOGE(TAG, "Failed to clear persisted EStop active state");
     }
     return true;
@@ -245,16 +267,16 @@ bool EStopManager::Init()
 
   // Restore a persisted E-Stop first, so it stays latched even if the input can't be brought up below.
   // The manager task carries it over and it must be cleared with the button.
-  if (cfg.active) {
+  if (cfg->active) {
     OS_LOGW(TAG, "EStop was active before reboot, restoring active state");
     estopmgr_latchWithoutTask();
   }
 
-  if (!estopmgr_configurePin(cfg.gpioPin)) {
+  if (!estopmgr_configurePin(cfg->gpioPin)) {
     return false;
   }
 
-  s_estopPin = cfg.gpioPin;
+  s_estopPin = cfg->gpioPin;
 
   return estopmgr_taskStart();
 }
@@ -321,8 +343,10 @@ bool EStopManager::SetEStopPin(gpio_num_t pin)
   s_estopPin = pin;
 
   if (wasRunning && !estopmgr_taskStart()) {
-    // Task is gone and we can't bring it back. The old pin is no longer being
-    // sampled so we release it, but the manager is left inactive.
+    // Task is gone and we can't bring it back, so no pin is sampled. Fail safe: latch until reboot, which restarts
+    // the task on the pin still in config.
+    OS_LOGE(TAG, "Failed to restart EStop task, latching EStop until reboot");
+    estopmgr_latchWithoutTask();
     estopmgr_releasePin(oldPin);
     return false;
   }
@@ -370,7 +394,7 @@ bool EStopManager::SetEStopLatching(bool latching)
 
 bool EStopManager::IsEStopped()
 {
-  return EStopManager::LastEStopped() != 0;
+  return s_estopActive.load() || s_externallyTriggered.load();
 }
 
 int64_t EStopManager::LastEStopped()
@@ -384,22 +408,28 @@ int64_t EStopManager::LastEStopped()
 static void estopmgr_latchWithoutTask()
 {
   int64_t expected = 0;
-  if (!s_estopActivatedAt.compare_exchange_strong(expected, std::max<int64_t>(OpenShock::millis(), 1), std::memory_order_relaxed)) {  // 0 means inactive
-    return;  // Already active
+  bool latched     = s_estopActivatedAt.compare_exchange_strong(expected, std::max<int64_t>(OpenShock::millis(), 1));  // 0 means inactive
+  s_estopActive.store(true);           // Active either way: just latched, or already was
+  s_externallyTriggered.store(false);  // Taken over by the latch
+  if (!latched) {
+    return;                            // Already active
   }
 
+  // Bounded: the latch itself is already in effect, the event only informs listeners
   EStopState lastState = EStopState::Idle;
-  estopmgr_publishState(EStopState::Active, lastState, portMAX_DELAY);
+  estopmgr_publishState(EStopState::Active, lastState);
 }
 
 void EStopManager::SoftwareTrigger()
 {
+  // In effect immediately through IsEStopped(), without waiting on s_estopMutex (held across task restarts and
+  // config writes) or on the task's next tick.
+  s_externallyTriggered.store(true);
+
   OpenShock::ScopedLock lock__(&s_estopMutex);
 
   if (s_estopTask.running()) {
-    // Picked up by the manager task on its next tick
-    s_externallyTriggered.store(true, std::memory_order_relaxed);
-    return;
+    return;  // Picked up by the manager task on its next tick
   }
 
   OS_LOGW(TAG, "Software EStop triggered without an EStop input configured, latching until reboot");

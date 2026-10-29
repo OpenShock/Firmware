@@ -31,7 +31,7 @@ bool Base64::Encode(std::span<const uint8_t> data, std::string& output)
 
   if (retval != 0) {
     if (retval == MBEDTLS_ERR_BASE64_BUFFER_TOO_SMALL)
-      OS_LOGW(TAG, "Output buffer too small (expected %zu, got %zu)", written, buffer.size());
+      OS_LOGW(TAG, "Output buffer too small (expected %zu, got %zu)", written, static_cast<std::size_t>(buffer.size()));
     else
       OS_LOGW(TAG, "Failed to encode data, error: %d", retval);
     output.clear();
@@ -55,7 +55,7 @@ bool Base64::Decode(std::string_view data, TinyVec<uint8_t>& output) noexcept
 
   if (retval != 0) {
     if (retval == MBEDTLS_ERR_BASE64_BUFFER_TOO_SMALL)
-      OS_LOGW(TAG, "Output buffer too small (expected %zu, got %zu)", written, output.size());
+      OS_LOGW(TAG, "Output buffer too small (expected %zu, got %zu)", written, static_cast<std::size_t>(output.size()));
     else if (retval == MBEDTLS_ERR_BASE64_INVALID_CHARACTER)
       OS_LOGW(TAG, "Invalid character in input data");
     else

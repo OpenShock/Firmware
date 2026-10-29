@@ -68,9 +68,9 @@ bool WiFiConfig::FromJSON(JSON::JsonView json)
     return false;
   }
 
-  if (!json["accessPointSSID"].tryGetStr(accessPointSSID)) accessPointSSID = CONFIG_OPENSHOCK_FW_AP_PREFIX;
+  accessPointSSID = json["accessPointSSID"].tryGetStr().value_or(CONFIG_OPENSHOCK_FW_AP_PREFIX);
 
-  if (!json["hostname"].tryGetStr(hostname)) hostname = CONFIG_OPENSHOCK_FW_HOSTNAME;
+  hostname = json["hostname"].tryGetStr().value_or(CONFIG_OPENSHOCK_FW_HOSTNAME);
 
   JSON::JsonView credentialsListJson = json["credentials"];
   if (!credentialsListJson.valid()) {

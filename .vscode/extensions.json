@@ -1,0 +1,17 @@
+{
+  "recommendations": [
+    "llvm-vs-code-extensions.vscode-clangd",
+    "ms-python.python",
+    "charliermarsh.ruff",
+    "svelte.svelte-vscode",
+    "esbenp.prettier-vscode",
+    "dbaeumer.vscode-eslint",
+    "Jason2866.esp-decoder"
+  ],
+  "unwantedRecommendations": [
+    "ms-vscode.cpptools",
+    "ms-vscode.cpptools-extension-pack",
+    "espressif.esp-idf-extension",
+    "platformio.platformio-ide"
+  ]
+}
