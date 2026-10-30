@@ -26,6 +26,7 @@ namespace ConfigTest {
     config.serialInput   = Config::SerialInputConfig(false);
     config.otaUpdate     = Config::OtaUpdateConfig(false, "fw.example.org", OtaUpdateChannel::Develop, true, true, 120, false, true, 4242, OtaUpdateStep::Validating);
     config.estop         = Config::EStopConfig(true, GPIO_NUM_13);
+    config.lan           = Config::LanConfig(true, "lan_key_0123456789");
 
     return config;
   }
@@ -93,6 +94,7 @@ namespace ConfigTest {
     config.serialInput   = get(Config::GetSerialInputConfig());
     config.otaUpdate     = get(Config::GetOtaUpdateConfig());
     config.estop         = get(Config::GetEStopConfig());
+    config.lan           = get(Config::GetLanConfig());
     return config;
   }
 
@@ -139,5 +141,8 @@ namespace ConfigTest {
 
     TEST_ASSERT_EQUAL_MESSAGE(expected.estop.enabled, actual.estop.enabled, "estop.enabled");
     TEST_ASSERT_EQUAL_INT_MESSAGE(expected.estop.gpioPin, actual.estop.gpioPin, "estop.gpioPin");
+
+    TEST_ASSERT_EQUAL_MESSAGE(expected.lan.apiKeyEnabled, actual.lan.apiKeyEnabled, "lan.apiKeyEnabled");
+    TEST_ASSERT_EQUAL_STRING_MESSAGE(withSensitiveData ? expected.lan.apiKey.c_str() : "", actual.lan.apiKey.c_str(), "lan.apiKey");
   }
 }  // namespace ConfigTest

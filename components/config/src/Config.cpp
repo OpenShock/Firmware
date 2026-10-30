@@ -343,6 +343,13 @@ std::optional<Config::EStopConfig> Config::GetEStopConfig()
   return _configData.estop;
 }
 
+std::optional<Config::LanConfig> Config::GetLanConfig()
+{
+  CONFIG_LOCK_READ(std::nullopt);
+
+  return _configData.lan;
+}
+
 bool Config::SetRFConfig(const Config::RFConfig& config)
 {
   CONFIG_LOCK_WRITE(false);
@@ -425,6 +432,16 @@ bool Config::SetEStopConfig(const Config::EStopConfig& config)
   return mutateAndSave([&](Config::RootConfig& root) {
     root.estop = config;
     root.estop.Normalize();
+    return true;
+  });
+}
+
+bool Config::SetLanConfig(const Config::LanConfig& config)
+{
+  CONFIG_LOCK_WRITE(false);
+
+  return mutateAndSave([&](Config::RootConfig& root) {
+    root.lan = config;
     return true;
   });
 }
