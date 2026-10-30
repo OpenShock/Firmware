@@ -164,6 +164,22 @@ namespace ConfigTest {
     return stats.used_entries;
   }
 
+  bool NamespaceExists(const char* partition, const char* ns)
+  {
+    return OpenShock::Config::Nvs::Handle::Open(partition, ns, false).has_value();
+  }
+
+  std::size_t KeyCount(const char* partition, const char* ns)
+  {
+    auto handle = OpenShock::Config::Nvs::Handle::Open(partition, ns, false);
+    if (!handle) {
+      return 0;
+    }
+    std::size_t count = 0;
+    TEST_ASSERT_TRUE(handle->ForEachKey(NVS_TYPE_ANY, [&](const char*) { ++count; }));
+    return count;
+  }
+
   Full Snapshot()
   {
     // Every getter must succeed; unwraps the returned optional.

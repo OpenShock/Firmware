@@ -81,7 +81,7 @@ TEST_CASE("An empty store: Init writes a default config that reloads", "[config]
 
   // Every section namespace and the schema marker are now on flash
   for (const char* ns : Keys::Ns::kAll) {
-    TEST_ASSERT_TRUE_MESSAGE(Nvs::NamespaceExists(Keys::kPartitionCfg, ns), ns);
+    TEST_ASSERT_TRUE_MESSAGE(NamespaceExists(Keys::kPartitionCfg, ns), ns);
   }
   TEST_ASSERT_TRUE(UsedEntries() > 0);
 

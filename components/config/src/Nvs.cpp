@@ -247,28 +247,6 @@ bool Nvs::Load(const Handle& handle, const char* key, std::string& out, std::str
   return false;
 }
 
-bool Nvs::NamespaceExists(const char* partition, const char* ns)
-{
-  nvs_handle_t handle = 0;
-  esp_err_t err       = nvs_open_from_partition(partition, ns, NVS_READONLY, &handle);
-  if (err == ESP_OK) {
-    nvs_close(handle);
-    return true;
-  }
-  return false;
-}
-
-std::size_t Nvs::KeyCount(const char* partition, const char* ns)
-{
-  auto handle = Handle::Open(partition, ns, false);
-  if (!handle) {
-    return 0;
-  }
-  std::size_t count = 0;
-  handle->ForEachKey(NVS_TYPE_ANY, [&](const char*) { ++count; });
-  return count;
-}
-
 bool Nvs::EraseNamespace(const char* partition, const char* ns)
 {
   nvs_handle_t handle = 0;

@@ -57,7 +57,7 @@ TEST_CASE("A config kept in the shared nvs moves into cfg on the first boot that
   // The shared copy is gone: every key of every namespace of ours (NVS keeps an emptied namespace's name)
   TEST_ASSERT_FALSE(HasSchema(Keys::kPartitionShared));
   for (const char* ns : Keys::Ns::kAll) {
-    TEST_ASSERT_EQUAL_size_t_MESSAGE(0, Nvs::KeyCount(Keys::kPartitionShared, ns), ns);
+    TEST_ASSERT_EQUAL_size_t_MESSAGE(0, KeyCount(Keys::kPartitionShared, ns), ns);
   }
 
   // And a later boot is a plain load from cfg

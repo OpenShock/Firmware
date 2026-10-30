@@ -96,13 +96,6 @@ namespace OpenShock::Config::Nvs {
   bool Load(const Handle& handle, const char* key, int32_t& out, int32_t defaultValue);
   bool Load(const Handle& handle, const char* key, std::string& out, std::string_view defaultValue);
 
-  /// @brief Whether `ns` exists in `partition`: it was created by a write once, and stays even when every key of it
-  ///        has since been erased.
-  [[nodiscard]] bool NamespaceExists(const char* partition, const char* ns);
-
-  /// @brief The number of keys in `ns` of `partition`; 0 for a namespace that does not exist.
-  [[nodiscard]] std::size_t KeyCount(const char* partition, const char* ns);
-
   /// @brief Erases every key of `ns` in `partition`; a namespace that does not exist counts as erased.
   [[nodiscard]] bool EraseNamespace(const char* partition, const char* ns);
 
