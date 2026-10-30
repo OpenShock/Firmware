@@ -78,7 +78,6 @@ def test_merge_one_places_each_image_at_its_partition_offset(monkeypatch, tmp_pa
     }
 
 
-
 def test_merge_one_refuses_a_table_without_www(monkeypatch, tmp_path):
     monkeypatch.setattr(merge_image.partitions, 'read_partitions', lambda path: {'app0': {}})
     with pytest.raises(SystemExit, match='no www partition'):

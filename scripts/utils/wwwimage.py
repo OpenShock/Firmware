@@ -156,9 +156,9 @@ def pack(entries: list[Entry]) -> bytes:
             bodies += b'\0' * _pad(len(data))
         table += struct.pack(NODE_FORMAT, name_offsets[name], flags, offset, size, 0)
 
-    directory = bytes(table) + bytes(strings)
-    directory += b'\0' * (dir_len - len(directory))
-    after_header = directory + bytes(bodies)
+    dir_bytes = bytes(table) + bytes(strings)
+    dir_bytes += b'\0' * (dir_len - len(dir_bytes))
+    after_header = dir_bytes + bytes(bodies)
     reserved = b'\0' * HEADER_RESERVED_LEN
     header = struct.pack(HEADER_FORMAT, MAGIC, VERSION, len(nodes), dir_len, b'\0' * BODY_HASH_LEN, reserved)
     body_hash = hashlib.sha256(header + after_header).digest()
