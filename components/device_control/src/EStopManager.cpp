@@ -319,8 +319,7 @@ bool EStopManager::SetEStopPin(gpio_num_t pin)
 
 bool EStopManager::IsEStopped()
 {
-  // The trigger first: the task sets s_estopActive before clearing it, so a cleared trigger means the flag is set
-  return s_externallyTriggered.load() || s_estopActive.load();
+  return s_estopActive.load() || s_externallyTriggered.load();
 }
 
 int64_t EStopManager::LastEStopped()
