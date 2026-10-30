@@ -288,9 +288,23 @@ static bool otaum_flash_fs_partition(OpenShock::HTTP::Client& client, const esp_
     return true;
   };
 
-  if (!OpenShock::FlashPartitionFromUrl(client, parition, remoteUrl, remoteHash, onProgress)) {
+  // Refuse an image in the other format before the first erase: a www image written over littlefs static0 (a 2.x
+  // release on the 1.x table, before the www migration has run) or a littlefs image over www would fail the check
+  // below only after the portal assets are gone.
+  const bool isWwwPartition = parition->type == Www::kPartitionType;
+  bool formatMismatch       = false;
+  auto matchesPartition     = [isWwwPartition, &formatMismatch](std::span<const uint8_t> chunk) -> bool {
+    if (Www::StartsLikeImage(chunk) != isWwwPartition) {
+      OS_LOGE(TAG, isWwwPartition ? "The filesystem image is not a www image" : "The filesystem image is a www image, but this partition table has no www partition");
+      formatMismatch = true;
+      return false;
+    }
+    return true;
+  };
+
+  if (!OpenShock::FlashPartitionFromUrl(client, parition, remoteUrl, remoteHash, onProgress, matchesPartition)) {
     OS_LOGE(TAG, "Failed to flash filesystem partition");
-    _sendFailureMessage("Failed to flash filesystem partition"sv);
+    _sendFailureMessage(formatMismatch ? "The filesystem image does not match this hub's partition table"sv : "Failed to flash filesystem partition"sv);
     return false;
   }
 
@@ -300,7 +314,7 @@ static bool otaum_flash_fs_partition(OpenShock::HTTP::Client& client, const esp_
 
   // Verify the freshly flashed image: the www format where the table has a www partition, else (1.x layout) that the
   // littlefs image mounts.
-  const bool valid = parition->type == Www::kPartitionType ? Www::VerifyPartition(parition) : OpenShock::TestFilesystem(parition);
+  const bool valid = isWwwPartition ? Www::VerifyPartition(parition) : OpenShock::TestFilesystem(parition);
   if (!valid) {
     OS_LOGE(TAG, "The flashed filesystem image is not valid");
     _sendFailureMessage("The flashed filesystem image is not valid"sv);

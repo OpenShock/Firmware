@@ -8,6 +8,7 @@
 #include <algorithm>
 #include <cstdio>
 #include <cstring>
+#include <span>
 #include <string>
 #include <vector>
 
@@ -180,6 +181,19 @@ TEST_CASE("An empty image is valid and finds nothing", "[www]")
   TEST_ASSERT_EQUAL_size_t(1, image.Count());  // just the root
   TEST_ASSERT_EQUAL_size_t(bytes.size(), image.ImageSize());
   TEST_ASSERT_FALSE(image.Find("index.html").has_value());
+}
+
+TEST_CASE("Only bytes that begin with the magic start like an image", "[www]")
+{
+  const auto bytes = Fixture();
+  TEST_ASSERT_TRUE(Www::StartsLikeImage(bytes));
+  TEST_ASSERT_TRUE(Www::StartsLikeImage(std::span<const uint8_t>(bytes).first(4)));
+  TEST_ASSERT_FALSE(Www::StartsLikeImage(std::span<const uint8_t>(bytes).first(3)));
+  TEST_ASSERT_FALSE(Www::StartsLikeImage({}));
+
+  // Shaped like the start of a littlefs image: a revision count, a metadata tag, then the "littlefs" name
+  const uint8_t littlefs[] = {0x01, 0x00, 0x00, 0x00, 0xF0, 0x0F, 0xFF, 0xF7, 'l', 'i', 't', 't', 'l', 'e', 'f', 's'};
+  TEST_ASSERT_FALSE(Www::StartsLikeImage(littlefs));
 }
 
 TEST_CASE("Every truncation is rejected", "[www]")

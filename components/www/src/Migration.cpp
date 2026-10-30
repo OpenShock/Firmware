@@ -33,11 +33,7 @@ namespace {
     };
     // A littlefs image (a 1.x release's staticfs) must not end up in what becomes www
     auto startsLikeWwwImage = [](std::span<const uint8_t> chunk) -> bool {
-      uint32_t magic = 0;
-      if (chunk.size() >= sizeof(magic)) {
-        memcpy(&magic, chunk.data(), sizeof(magic));
-      }
-      if (magic != Www::kMagic) {
+      if (!Www::StartsLikeImage(chunk)) {
         OS_LOGE(TAG, "The download is not a www image");
         return false;
       }

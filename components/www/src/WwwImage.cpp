@@ -117,6 +117,11 @@ Www::Image::Image(std::span<const uint8_t> bytes, uint16_t count, uint32_t dirLe
 {
 }
 
+bool Www::StartsLikeImage(std::span<const uint8_t> bytes)
+{
+  return bytes.size() >= sizeof(kMagic) && readU32(bytes.data()) == kMagic;
+}
+
 std::expected<Www::Image, Www::ParseError> Www::Image::Parse(std::span<const uint8_t> bytes)
 {
   if (bytes.size() < kHeaderSize) {
