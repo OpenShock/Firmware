@@ -18,6 +18,7 @@ namespace Fbs = OpenShock::Serialization::Configuration;
 static constexpr const char* kNamespace  = "estop";
 static constexpr const char* kKeyEnabled = "enabled";
 static constexpr const char* kKeyGpio    = "gpio";
+static constexpr const char* kKeyLatched = "latched";
 
 static constexpr const char* kNamespaces[] = {kNamespace};
 static Section<EStopConfig> s_section({.name = "estop", .order = 6, .hubConfigField = Fbs::HubConfig::VT_ESTOP, .namespaces = kNamespaces});
@@ -168,4 +169,51 @@ bool OpenShock::Config::SetEStopGpioPin(gpio_num_t gpioPin)
     estop.gpioPin = gpioPin;
     return true;
   });
+}
+
+bool OpenShock::Config::LoadEStopLatched()
+{
+  ScopedLock lock__(&Internal::WriteLock());  // The partition can't change or close under the read
+
+  const char* partition = Internal::Partition();
+  if (partition == nullptr) {
+    return false;
+  }
+
+  auto handle = Nvs::Handle::Open(partition, kNamespace, false);
+  if (!handle) {
+    return false;  // No estop namespace yet: never latched
+  }
+
+  uint8_t latched = 0;
+  switch (handle->GetU8(kKeyLatched, latched)) {
+    case Nvs::Result::Found:
+      return latched != 0;
+    case Nvs::Result::Missing:
+      return false;
+    case Nvs::Result::Error:
+    default:
+      OS_LOGE(TAG, "Failed to read the E-Stop latch, treating it as latched");
+      return true;
+  }
+}
+
+LatchSave OpenShock::Config::SaveEStopLatched(bool latched)
+{
+  ScopedTryLock lock__(&Internal::WriteLock(), 0);
+  if (!lock__.isLocked()) {
+    return LatchSave::Busy;
+  }
+
+  const char* partition = Internal::Partition();
+  if (partition == nullptr) {
+    return LatchSave::Saved;
+  }
+
+  auto handle = Nvs::Handle::Open(partition, kNamespace, true);
+  if (!handle || !handle->SetU8(kKeyLatched, latched ? 1 : 0) || !handle->Commit()) {
+    return LatchSave::Failed;
+  }
+
+  return LatchSave::Saved;
 }
