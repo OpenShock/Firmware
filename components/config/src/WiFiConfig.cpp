@@ -4,8 +4,11 @@ const char* const TAG = "Config::WiFiConfig";
 
 #include "config/internal/utils.h"
 #include "Logging.h"
+#include "util/HostnameUtils.h"
 
 using namespace OpenShock::Config;
+
+static_assert(OpenShock::HostnameUtils::IsValid(CONFIG_OPENSHOCK_FW_HOSTNAME), "CONFIG_OPENSHOCK_FW_HOSTNAME must be 1-32 letters, digits or hyphens, not starting or ending with a hyphen");
 
 WiFiConfig::WiFiConfig()
   : accessPointSSID(CONFIG_OPENSHOCK_FW_AP_PREFIX)

@@ -23,6 +23,11 @@ def test_parse_requires_reads_public_and_private_lists():
     assert gen_dep_graph.parse_requires(CMAKE, include_priv=False) == ['fs', '$<IF:$<BOOL:x>,y,z>', 'util']
 
 
+def test_parse_requires_unquotes_arguments():
+    text = 'idf_component_register(SRCS "a.cpp" REQUIRES "common" PRIV_REQUIRES "fs" util)'
+    assert gen_dep_graph.parse_requires(text, include_priv=True) == ['common', 'fs', 'util']
+
+
 def test_parse_requires_without_a_register_call_is_empty():
     assert gen_dep_graph.parse_requires('project(x)\n', include_priv=True) == []
 

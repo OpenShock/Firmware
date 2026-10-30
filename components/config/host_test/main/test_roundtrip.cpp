@@ -9,6 +9,13 @@
 using namespace OpenShock;
 using namespace ConfigTest;
 
+// Whether `field` is physically present in `table`. Generated tables derive privately from
+// flatbuffers::Table (a view of the same bytes), so CheckField is reached through it.
+static bool IsStored(const void* table, flatbuffers::voffset_t field)
+{
+  return static_cast<const flatbuffers::Table*>(table)->CheckField(field);
+}
+
 TEST_CASE("RootConfig flatbuffer round trip keeps every section", "[config][roundtrip]")
 {
   const Config::RootConfig sample  = MakeSampleConfig();
@@ -138,13 +145,13 @@ TEST_CASE("Saved configs write fields that equal their schema default", "[config
 
   const std::vector<uint8_t> stored = StoredFile();
   const auto* root                  = Serialization::Configuration::GetHubConfig(stored.data());
-  TEST_ASSERT_TRUE(root->rf()->CheckField(Serialization::Configuration::RFConfig::VT_KEEPALIVE_ENABLED));
-  TEST_ASSERT_TRUE(root->ota_update()->CheckField(Serialization::Configuration::OtaUpdateConfig::VT_IS_ENABLED));
+  TEST_ASSERT_TRUE(IsStored(root->rf(), Serialization::Configuration::RFConfig::VT_KEEPALIVE_ENABLED));
+  TEST_ASSERT_TRUE(IsStored(root->ota_update(), Serialization::Configuration::OtaUpdateConfig::VT_IS_ENABLED));
 
   TinyVec<uint8_t> raw;
   TEST_ASSERT_TRUE(Config::GetRaw(raw));
   const auto* rawRoot = Serialization::Configuration::GetHubConfig(raw.data());
-  TEST_ASSERT_TRUE(rawRoot->ota_update()->CheckField(Serialization::Configuration::OtaUpdateConfig::VT_IS_ENABLED));
+  TEST_ASSERT_TRUE(IsStored(rawRoot->ota_update(), Serialization::Configuration::OtaUpdateConfig::VT_IS_ENABLED));
 }
 
 TEST_CASE("A setter after SetRaw keeps the imported config", "[config][roundtrip]")

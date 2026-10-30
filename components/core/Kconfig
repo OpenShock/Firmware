@@ -1,0 +1,85 @@
+menu "OpenShock WiFi"
+
+    config OPENSHOCK_WIFI_SCAN_MIN_MS_PER_CHANNEL
+        int "Scan time per channel, minimum (ms)"
+        range 10 1000
+        default 60
+
+    config OPENSHOCK_WIFI_SCAN_MAX_MS_PER_CHANNEL
+        int "Scan time per channel, maximum (ms)"
+        range OPENSHOCK_WIFI_SCAN_MIN_MS_PER_CHANNEL 1500
+        default 120
+        help
+            At least the minimum. esp_wifi walks every channel itself, so this is the main
+            knob for scan duration. Every scan takes the radio off the captive portal AP's
+            channel for this long per channel, and portal clients lose frames meanwhile:
+            keep it near the ESP-IDF default (120 ms).
+
+    config OPENSHOCK_WIFI_AUTOSCAN_INTERVAL_MS
+        int "Auto-scan interval when nothing to connect to (ms)"
+        range 10000 3600000
+        default 120000
+
+    config OPENSHOCK_WIFI_CONNECT_BACKOFF_MAX_MS
+        int "Connect retry backoff cap (ms)"
+        range 2000 600000
+        default 60000
+        help
+            A network that failed to connect is retried after 2 s, 4 s, 8 s, ... up to this.
+
+endmenu
+
+menu "OpenShock gateway"
+
+    config OPENSHOCK_GATEWAY_MAX_MESSAGE_SIZE
+        int "Largest gateway message (bytes)"
+        range 1024 32768
+        default 4096
+
+    config OPENSHOCK_GATEWAY_PING_TIMEOUT_MS
+        int "Ping timeout (ms)"
+        range 10000 600000
+        default 90000
+        help
+            Reconnect when the gateway sent no ping for this long.
+
+    config OPENSHOCK_GATEWAY_SEND_TIMEOUT_MS
+        int "Send timeout (ms)"
+        range 1000 60000
+        default 10000
+
+    config OPENSHOCK_GATEWAY_AUTH_RETRY_MS
+        int "Retry after the backend rejected the token (ms)"
+        range 10000 3600000
+        default 300000
+
+    config OPENSHOCK_GATEWAY_CONNECT_RETRY_MS
+        int "Retry between gateway connection attempts (ms)"
+        range 1000 600000
+        default 20000
+
+    config OPENSHOCK_GATEWAY_HUB_INFO_RETRY_MIN_MS
+        int "Hub info fetch retry, first (ms)"
+        range 1000 600000
+        default 5000
+
+    config OPENSHOCK_GATEWAY_HUB_INFO_RETRY_MAX_MS
+        int "Hub info fetch retry, cap (ms)"
+        range OPENSHOCK_GATEWAY_HUB_INFO_RETRY_MIN_MS 3600000
+        default 300000
+        help
+            The retry after a failed hub info fetch doubles from the first value up to this.
+
+endmenu
+
+menu "OpenShock local messages"
+
+    config OPENSHOCK_LOCAL_MAX_MESSAGE_SIZE
+        int "Largest local message (bytes)"
+        range 1024 32768
+        default 4096
+        help
+            The largest message the local (captive portal websocket) message handler accepts.
+            The portal drops a websocket message past this before buffering it.
+
+endmenu
