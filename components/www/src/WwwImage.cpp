@@ -149,8 +149,7 @@ std::expected<Www::Image, Www::ParseError> Www::Image::Parse(std::span<const uin
   static constexpr uint8_t kZeroHash[kBodyHashSize] = {};
   SHA256 sha;
   SHA256::Digest digest {};
-  const bool hashed = sha.begin() && sha.update(bytes.data(), kHashOffset) && sha.update(kZeroHash, kBodyHashSize)
-                   && sha.update(bytes.data() + kHashOffset + kBodyHashSize, end - kHashOffset - kBodyHashSize) && sha.finish(digest);
+  const bool hashed = sha.begin() && sha.update(bytes.data(), kHashOffset) && sha.update(kZeroHash, kBodyHashSize) && sha.update(bytes.data() + kHashOffset + kBodyHashSize, end - kHashOffset - kBodyHashSize) && sha.finish(digest);
   if (!hashed) {
     return std::unexpected(ParseError::HashFailed);
   }

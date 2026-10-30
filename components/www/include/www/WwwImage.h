@@ -26,8 +26,8 @@
 #include <string_view>
 
 namespace OpenShock::Www {
-  inline constexpr uint32_t kMagic        = 0x5757534Fu;  // 'OSWW' as little-endian bytes
-  inline constexpr uint16_t kVersion      = 1;
+  inline constexpr uint32_t kMagic           = 0x5757534Fu;  // 'OSWW' as little-endian bytes
+  inline constexpr uint16_t kVersion         = 1;
   inline constexpr std::size_t kHeaderSize   = 32;
   inline constexpr std::size_t kEntrySize    = 16;
   inline constexpr std::size_t kBodyHashSize = 16;
@@ -38,7 +38,7 @@ namespace OpenShock::Www {
   inline constexpr uint16_t kKnownFlags    = kFlagGzip | kFlagImmutable;
 
   struct Asset {
-    std::string_view path;         // as stored: no leading slash
+    std::string_view path;          // as stored: no leading slash
     std::span<const uint8_t> body;  // points into the image
     uint16_t flags;
 
@@ -57,7 +57,7 @@ namespace OpenShock::Www {
     BadBody,       // body before the directory, unaligned, or past the end
     BadReserved,   // a reserved field of the header or an entry is not zero
     HashMismatch,
-    HashFailed,  // the hasher itself failed
+    HashFailed,    // the hasher itself failed
   };
   [[nodiscard]] const char* ParseErrorName(ParseError error);
 

@@ -118,7 +118,7 @@ TEST_CASE("Entries are sorted and every body is 4-byte aligned", "[www]")
 
 TEST_CASE("The bytes after the image are ignored, as on a partition larger than it", "[www]")
 {
-  auto bytes = Fixture();
+  auto bytes             = Fixture();
   const std::size_t size = bytes.size();
   bytes.insert(bytes.end(), 4096, 0xFF);
   Www::Image image = ParseOk(bytes);
@@ -174,7 +174,7 @@ TEST_CASE("Each corrupted header field is rejected with its own reason", "[www]"
   bytes[12] ^= 0x01;  // the hash itself
   ExpectError(bytes, Www::ParseError::HashMismatch);
 
-  bytes = Fixture();
+  bytes     = Fixture();
   bytes[28] = 0x01;  // reserved
   ExpectError(bytes, Www::ParseError::BadReserved);
 
@@ -226,9 +226,9 @@ TEST_CASE("Each corrupted entry field is rejected", "[www]")
   // The last path loses its terminator (it is the last byte of the string table, before the padding)
   bytes = Fixture();
   {
-    const uint16_t count       = Get16(bytes, 6);
-    const std::size_t strings  = Www::kHeaderSize + count * Www::kEntrySize;
-    const std::size_t dirEnd   = Www::kHeaderSize + (bytes[8] | (bytes[9] << 8) | (bytes[10] << 16) | (static_cast<uint32_t>(bytes[11]) << 24));
+    const uint16_t count      = Get16(bytes, 6);
+    const std::size_t strings = Www::kHeaderSize + count * Www::kEntrySize;
+    const std::size_t dirEnd  = Www::kHeaderSize + (bytes[8] | (bytes[9] << 8) | (bytes[10] << 16) | (static_cast<uint32_t>(bytes[11]) << 24));
     for (std::size_t i = strings; i < dirEnd; ++i) {
       bytes[i] = 'x';  // every NUL gone
     }

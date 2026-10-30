@@ -16,7 +16,7 @@
 namespace OpenShock::Www {
   inline constexpr esp_partition_type_t kPartitionType       = static_cast<esp_partition_type_t>(0x40);
   inline constexpr esp_partition_subtype_t kPartitionSubtype = static_cast<esp_partition_subtype_t>(0x00);
-  inline constexpr const char* kPartitionLabel                = "www";
+  inline constexpr const char* kPartitionLabel               = "www";
 
   /// @brief The `www` partition of the running partition table, or null on a table without one (the 1.x layout).
   [[nodiscard]] const esp_partition_t* FindPartition();
