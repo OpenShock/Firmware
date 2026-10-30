@@ -23,21 +23,28 @@ def test_every_board_has_a_configure_and_a_build_preset():
     assert set(configure) == set(all_boards()) == build
     for name, preset in configure.items():
         assert preset['cacheVariables'] == {'OPENSHOCK_BOARD': name}
-        assert preset['inherits'] == gen_cmake_presets.DEFAULT_PRESET
 
 
-def test_default_preset_is_visible_and_passes_no_board():
+def test_every_preset_is_readable_by_idf_py():
+    # idf.py reads binaryDir and generator straight from the preset: no inheritance, no macro expansion. The build
+    # directory is the one scripts/build.py uses for the board, so the two share a configured tree.
+    for preset in load_presets()['configurePresets']:
+        board = preset['cacheVariables']['OPENSHOCK_BOARD']
+        assert 'inherits' not in preset
+        assert preset['generator'] == 'Ninja'
+        assert preset['binaryDir'] == f'build/{board}'
+        assert '$' not in preset['binaryDir']
+
+
+def test_default_preset_is_visible_and_configures_the_default_board():
     # idf.py 6.1 configures with the preset named 'default' when given none, else the first in the file,
-    # and CMake rejects a hidden one. scripts/build.py would stop working if this preset went hidden,
-    # was renamed, or set a board under the -D arguments the script passes.
+    # and CMake rejects a hidden one. scripts/build.py runs under it as well; its -D arguments override the board.
     data = load_presets()
     assert gen_cmake_presets.DEFAULT_PRESET == 'default'
     first = data['configurePresets'][0]
     assert first['name'] == 'default'
     assert not first.get('hidden')
-    assert 'cacheVariables' not in first
-    assert 'inherits' not in first
-    assert first['generator'] == 'Ninja'
+    assert first['cacheVariables'] == {'OPENSHOCK_BOARD': gen_cmake_presets.DEFAULT_BOARD}
 
 
 def test_check_fails_on_a_stale_file(tmp_path):

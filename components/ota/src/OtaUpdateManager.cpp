@@ -23,6 +23,7 @@ const char* const TAG = "OtaUpdateManager";
 #include "util/HexUtils.h"
 #include "util/TaskUtils.h"
 #include "wifi/WiFiManager.h"
+#include "www/WwwPartition.h"
 #include "json/Json.h"
 
 #include <esp_event.h>
@@ -275,17 +276,6 @@ static bool otaum_flash_app_partition(OpenShock::HTTP::Client& client, const esp
 
 static bool otaum_flash_fs_partition(OpenShock::HTTP::Client& client, const esp_partition_t* parition, std::string_view remoteUrl, const uint8_t (&remoteHash)[32])
 {
-  if (!otaum_send_progress_msg(Serialization::Types::OtaUpdateProgressTask::PreparingForUpdate, 0.0f)) {
-    return false;
-  }
-
-  // Make sure captive portal is stopped, timeout after 5 seconds.
-  if (!CaptivePortal::ForceClose(5000U)) {
-    OS_LOGE(TAG, "Failed to force close captive portal (timed out)");
-    _sendFailureMessage("Failed to force close captive portal (timed out)"sv);
-    return false;
-  }
-
   OS_LOGD(TAG, "Flashing filesystem partition");
 
   if (!otaum_send_progress_msg(Serialization::Types::OtaUpdateProgressTask::FlashingFilesystem, 0.0f)) {
@@ -300,9 +290,27 @@ static bool otaum_flash_fs_partition(OpenShock::HTTP::Client& client, const esp_
     return true;
   };
 
-  if (!OpenShock::FlashPartitionFromUrl(client, parition, remoteUrl, remoteHash, onProgress)) {
+  // Refuse an image in the other format before the first erase: a www image written over littlefs static0 (a 2.x
+  // release on the 1.x table, before the www migration has run) or a littlefs image over www would fail the check
+  // below only after the portal assets are gone.
+  const bool isWwwPartition = parition->type == Www::kPartitionType;
+  bool formatMismatch       = false;
+  auto matchesPartition     = [isWwwPartition, &formatMismatch](std::span<const uint8_t> chunk) -> bool {
+    if (Www::StartsLikeImage(chunk) != isWwwPartition) {
+      if (isWwwPartition) {
+        OS_LOGE(TAG, "The filesystem image is not a www image");
+      } else {
+        OS_LOGE(TAG, "The filesystem image is a www image, but this partition table has no www partition");
+      }
+      formatMismatch = true;
+      return false;
+    }
+    return true;
+  };
+
+  if (!OpenShock::FlashPartitionFromUrl(client, parition, remoteUrl, remoteHash, onProgress, matchesPartition)) {
     OS_LOGE(TAG, "Failed to flash filesystem partition");
-    _sendFailureMessage("Failed to flash filesystem partition"sv);
+    _sendFailureMessage(formatMismatch ? "The filesystem image does not match this hub's partition table"sv : "Failed to flash filesystem partition"sv);
     return false;
   }
 
@@ -310,10 +318,12 @@ static bool otaum_flash_fs_partition(OpenShock::HTTP::Client& client, const esp_
     return false;
   }
 
-  // Verify the freshly flashed image mounts cleanly.
-  if (!OpenShock::TestFilesystem(parition)) {
-    OS_LOGE(TAG, "Failed to mount filesystem");
-    _sendFailureMessage("Failed to mount filesystem"sv);
+  // Verify the freshly flashed image: the www format where the table has a www partition, else (1.x layout) that the
+  // littlefs image mounts.
+  const bool valid = isWwwPartition ? Www::VerifyPartition(parition) : OpenShock::TestFilesystem(parition);
+  if (!valid) {
+    OS_LOGE(TAG, "The flashed filesystem image is not valid");
+    _sendFailureMessage("The flashed filesystem image is not valid"sv);
     return false;
   }
 
@@ -496,16 +506,22 @@ static void otaum_updatetask(void* arg)
       continue;
     }
 
-    // Get filesystem partition.
-    const esp_partition_t* filesystemPartition = FindStaticPartition();
+    // The portal assets go into the www partition; on the 1.x layout, which has none, into littlefs static0. The
+    // staticfs artifact of a 1.x-numbered release is the littlefs image (scripts/repo_server_publish.py), which is
+    // what every hub still on the 1.x layout installs, by this code or by the 1.x firmware's own.
+    const esp_partition_t* filesystemPartition = Www::FindPartition();
     if (filesystemPartition == nullptr) {
-      OS_LOGE(TAG, "Failed to find filesystem partition");
+      filesystemPartition = FindStaticPartition();
+    }
+    if (filesystemPartition == nullptr) {
+      OS_LOGE(TAG, "Failed to find a www or static filesystem partition");
       _sendFailureMessage("Failed to find filesystem partition"sv);
       continue;
     }
 
-    // Flashing the filesystem force-closes the captive portal; on any failure (`continue`) it must be allowed to
-    // open again. On success the portal stays closed until the restart below.
+    // The captive portal is force-closed for the whole install (it serves from the www partition, and the app slot
+    // is swapped under it); on any failure (`continue`) it must be allowed to open again. On success the portal
+    // stays closed until the restart below.
     struct ReopenPortalOnFailure {
       bool succeeded = false;
       ~ReopenPortalOnFailure()
@@ -514,8 +530,24 @@ static void otaum_updatetask(void* arg)
       }
     } reopenPortalOnFailure;
 
-    // Flash app and filesystem partitions.
-    if (!otaum_flash_fs_partition(client, filesystemPartition, release.filesystemBinaryUrl, release.filesystemBinaryHash)) {
+    if (!otaum_send_progress_msg(Serialization::Types::OtaUpdateProgressTask::PreparingForUpdate, 0.0f)) {
+      continue;
+    }
+
+    // Make sure captive portal is stopped, timeout after 5 seconds.
+    if (!CaptivePortal::ForceClose(5000U)) {
+      OS_LOGE(TAG, "Failed to force close captive portal (timed out)");
+      _sendFailureMessage("Failed to force close captive portal (timed out)"sv);
+      continue;
+    }
+
+    // Flash app and filesystem partitions. An unchanged www image (the same hash) is not written again; a littlefs
+    // static0 always is, as the 1.x firmware does.
+    std::array<uint8_t, 32> currentWwwHash {};
+    const bool wwwCurrent = filesystemPartition->type == Www::kPartitionType && Www::ImageSha256(filesystemPartition, currentWwwHash) && memcmp(currentWwwHash.data(), release.filesystemBinaryHash, 32) == 0;
+    if (wwwCurrent) {
+      OS_LOGI(TAG, "The www image is already current, not flashing it");
+    } else if (!otaum_flash_fs_partition(client, filesystemPartition, release.filesystemBinaryUrl, release.filesystemBinaryHash)) {
       continue;
     }
     if (!otaum_flash_app_partition(client, appPartition, release.appBinaryUrl, release.appBinaryHash)) {

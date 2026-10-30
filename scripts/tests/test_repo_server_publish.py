@@ -41,6 +41,7 @@ class FakeSession:
 @pytest.fixture(autouse=True)
 def upload_env(monkeypatch):
     monkeypatch.setenv('RELEASE_ID', 'rel-1')
+    monkeypatch.setenv('VERSION', '1.5.0')
     monkeypatch.setenv('BOARDS', 'BoardA\nBoardB')
     monkeypatch.setattr(repo_server_publish, 'upload_board', lambda *args, **kwargs: None)
     monkeypatch.setattr(repo_server_publish, 'show_response', lambda resp: None)
@@ -85,7 +86,8 @@ def write_board_artifacts(artifacts, board, version='1.5.0'):
     for filename in repo_server_publish.BUILD_ARTIFACTS.values():
         (build / filename).write_bytes(filename.encode())
     (artifacts / 'firmware_staticfs').mkdir(exist_ok=True)
-    (artifacts / 'firmware_staticfs' / 'staticfs.bin').write_bytes(b'fs')
+    (artifacts / 'firmware_staticfs' / 'www.bin').write_bytes(b'www')
+    (artifacts / 'firmware_staticfs' / 'staticfs.bin').write_bytes(b'littlefs')
     (artifacts / 'firmware_merged').mkdir(exist_ok=True)
     (artifacts / 'firmware_merged' / f'OpenShock_{board}_{version}.bin').write_bytes(b'merged')
 
@@ -94,20 +96,29 @@ def test_resolve_artifacts_reads_the_package_layout(tmp_path):
     write_board_artifacts(tmp_path, 'BoardA')
     write_board_artifacts(tmp_path, 'BoardA_Mini')
 
-    found = repo_server_publish.resolve_artifacts(tmp_path, 'BoardA')
+    found = repo_server_publish.resolve_artifacts(tmp_path, 'BoardA', '1.5.0')
 
     for field, filename in repo_server_publish.BUILD_ARTIFACTS.items():
         assert found[field] == tmp_path / 'firmware_boards' / 'BoardA' / filename
+    # A 1.x-numbered release is installed by 1.x firmware, which only takes the littlefs image
     assert found[repo_server_publish.STATICFS_FIELD] == tmp_path / 'firmware_staticfs' / 'staticfs.bin'
     # A board whose name extends another's does not pick up the other's merged image.
     assert found[repo_server_publish.MERGED_FIELD] == tmp_path / 'firmware_merged' / 'OpenShock_BoardA_1.5.0.bin'
+
+
+def test_a_2x_release_publishes_the_www_image(tmp_path):
+    write_board_artifacts(tmp_path, 'BoardA', version='2.0.0')
+    found = repo_server_publish.resolve_artifacts(tmp_path, 'BoardA', '2.0.0')
+    assert found[repo_server_publish.STATICFS_FIELD] == tmp_path / 'firmware_staticfs' / 'www.bin'
+    assert repo_server_publish.staticfs_file_for('1.9.3') == 'staticfs.bin'
+    assert repo_server_publish.staticfs_file_for('10.0.0') == 'www.bin'
 
 
 def test_resolve_artifacts_fails_on_a_missing_image(tmp_path, capsys):
     write_board_artifacts(tmp_path, 'BoardA')
     (tmp_path / 'firmware_boards' / 'BoardA' / 'bootloader.bin').unlink()
     with fails_with(capsys, 'BoardA is missing its bootloader artifact'):
-        repo_server_publish.resolve_artifacts(tmp_path, 'BoardA')
+        repo_server_publish.resolve_artifacts(tmp_path, 'BoardA', '1.5.0')
 
 
 def test_resolve_artifacts_fails_without_a_merged_image(tmp_path, capsys):
@@ -115,7 +126,7 @@ def test_resolve_artifacts_fails_without_a_merged_image(tmp_path, capsys):
     for merged in (tmp_path / 'firmware_merged').iterdir():
         merged.unlink()
     with fails_with(capsys, 'BoardA is missing its merged artifact'):
-        repo_server_publish.resolve_artifacts(tmp_path, 'BoardA')
+        repo_server_publish.resolve_artifacts(tmp_path, 'BoardA', '1.5.0')
 
 
 @pytest.mark.parametrize(
@@ -166,34 +177,34 @@ def real_upload(monkeypatch, tmp_path):
 
 def test_upload_retries_a_5xx_then_succeeds(real_upload):
     session = ScriptedSession(503, requests.ConnectionError('reset'), 200)
-    repo_server_publish.upload_board(session, 'https://repo', 'rel-1', 'BoardA', real_upload)
+    repo_server_publish.upload_board(session, 'https://repo', 'rel-1', 'BoardA', real_upload, '1.5.0')
     assert [url for url, _ in session.calls] == ['https://repo/2/firmware/releases/rel-1/boards/BoardA'] * 3
 
 
 def test_upload_gives_up_after_the_last_5xx(real_upload, capsys):
     session = ScriptedSession(500, 500, 500)
     with fails_with(capsys, r'Upload failed for BoardA \(HTTP 500\)'):
-        repo_server_publish.upload_board(session, 'https://repo', 'rel-1', 'BoardA', real_upload)
+        repo_server_publish.upload_board(session, 'https://repo', 'rel-1', 'BoardA', real_upload, '1.5.0')
     assert len(session.calls) == repo_server_publish.UPLOAD_RETRIES
 
 
 def test_upload_does_not_retry_a_4xx(real_upload, capsys):
     session = ScriptedSession(422)
     with fails_with(capsys, r'Upload failed for BoardA \(HTTP 422\)'):
-        repo_server_publish.upload_board(session, 'https://repo', 'rel-1', 'BoardA', real_upload)
+        repo_server_publish.upload_board(session, 'https://repo', 'rel-1', 'BoardA', real_upload, '1.5.0')
     assert len(session.calls) == 1
 
 
 def test_upload_gives_up_after_repeated_transport_errors(real_upload, capsys):
     session = ScriptedSession(*[requests.ConnectionError('down')] * repo_server_publish.UPLOAD_RETRIES)
     with fails_with(capsys, 'Upload failed for BoardA after 3 attempts: down'):
-        repo_server_publish.upload_board(session, 'https://repo', 'rel-1', 'BoardA', real_upload)
+        repo_server_publish.upload_board(session, 'https://repo', 'rel-1', 'BoardA', real_upload, '1.5.0')
     assert not session.outcomes
 
 
 def test_upload_sends_a_sha256_manifest_of_every_artifact(real_upload):
     session = ScriptedSession(200)
-    repo_server_publish.upload_board(session, 'https://repo', 'rel-1', 'BoardA', real_upload)
+    repo_server_publish.upload_board(session, 'https://repo', 'rel-1', 'BoardA', real_upload, '1.5.0')
     kwargs = session.calls[0][1]
     manifest = json.loads(kwargs['data']['sha256'])
     assert set(manifest) == set(kwargs['files']) == {*repo_server_publish.BUILD_ARTIFACTS, 'staticfs', 'merged'}
@@ -302,6 +313,7 @@ def test_init_stages_the_release_and_outputs_its_id(in_checkout, monkeypatch):
     ],
 )
 def test_init_refuses_what_the_server_would(in_checkout, monkeypatch, capsys, env, error):
+    monkeypatch.delenv('VERSION', raising=False)  # upload_env sets it for the publish mode
     for name, value in env.items():
         monkeypatch.setenv(name, value)
     with fails_with(capsys, error):

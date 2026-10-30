@@ -1,6 +1,6 @@
 #include "partition_layout/PartitionTable.h"
 
-#include "Md5.h"
+#include "Hashing.h"
 
 #include <algorithm>
 #include <cstring>
@@ -54,9 +54,11 @@ namespace {
         if (md5Seen) {
           return std::unexpected(ParseError::Trailing);
         }
-        uint8_t digest[16];
-        Internal::Md5(bytes.data(), pos, digest);
-        if (memcmp(digest, p + 16, 16) != 0) {
+        MD5::Digest digest {};
+        if (!MD5::compute(bytes.data(), pos, digest)) {
+          return std::unexpected(ParseError::HashFailed);
+        }
+        if (memcmp(digest.data(), p + 16, digest.size()) != 0) {
           return std::unexpected(ParseError::Md5Mismatch);
         }
         md5Seen = true;
@@ -106,6 +108,8 @@ const char* PartitionTable::ParseErrorName(ParseError error)
       return "MD5 mismatch";
     case ParseError::Trailing:
       return "data after the MD5 entry";
+    case ParseError::HashFailed:
+      return "computing the MD5 failed";
   }
   return "unknown";
 }
@@ -143,6 +147,8 @@ const char* PartitionTable::RetypeErrorName(RetypeError error)
       return "the new label is too long";
     case RetypeError::LabelTaken:
       return "another entry has the new label";
+    case RetypeError::HashFailed:
+      return "computing the MD5 failed";
   }
   return "unknown";
 }
@@ -154,7 +160,7 @@ std::expected<void, PartitionTable::RetypeError> PartitionTable::Retype(Bytes& b
   }
   auto count = scan(bytes);
   if (!count) {
-    return std::unexpected(RetypeError::Unparsable);
+    return std::unexpected(count.error() == ParseError::HashFailed ? RetypeError::HashFailed : RetypeError::Unparsable);
   }
 
   uint8_t* target = nullptr;
@@ -171,6 +177,9 @@ std::expected<void, PartitionTable::RetypeError> PartitionTable::Retype(Bytes& b
     return std::unexpected(RetypeError::NoSuchEntry);
   }
 
+  uint8_t original[kEntrySize];
+  memcpy(original, target, kEntrySize);
+
   target[2] = type;
   target[3] = subtype;
   memset(target + 12, 0, kLabelSize);
@@ -178,8 +187,11 @@ std::expected<void, PartitionTable::RetypeError> PartitionTable::Retype(Bytes& b
 
   // The MD5 entry follows the last entry; its digest covers every entry before it
   const std::size_t md5Pos = *count * kEntrySize;
-  uint8_t digest[16];
-  Internal::Md5(bytes.data(), md5Pos, digest);
-  memcpy(bytes.data() + md5Pos + 16, digest, 16);
+  MD5::Digest digest {};
+  if (!MD5::compute(bytes.data(), md5Pos, digest)) {
+    memcpy(target, original, kEntrySize);
+    return std::unexpected(RetypeError::HashFailed);
+  }
+  memcpy(bytes.data() + md5Pos + 16, digest.data(), digest.size());
   return {};
 }

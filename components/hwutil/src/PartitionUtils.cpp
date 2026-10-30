@@ -36,7 +36,14 @@ bool OpenShock::TryGetPartitionHash(const esp_partition_t* partition, char (&has
   return true;
 }
 
-bool OpenShock::FlashPartitionFromUrl(HTTP::Client& client, const esp_partition_t* partition, std::string_view remoteUrl, const uint8_t (&remoteHash)[32], Util::FunctionRef<bool(std::size_t, std::size_t, float)> progressCallback)
+bool OpenShock::FlashPartitionFromUrl(
+  HTTP::Client& client,
+  const esp_partition_t* partition,
+  std::string_view remoteUrl,
+  const uint8_t (&remoteHash)[32],
+  Util::FunctionRef<bool(std::size_t, std::size_t, float)> progressCallback,
+  std::optional<Util::FunctionRef<bool(std::span<const uint8_t>)>> firstChunkCheck
+)
 {
   OpenShock::SHA256 sha256;
   if (!sha256.begin()) {
@@ -63,7 +70,13 @@ bool OpenShock::FlashPartitionFromUrl(HTTP::Client& client, const esp_partition_
 
     return true;
   };
-  auto dataWriter = [partition, &sha256, &contentLength, &contentWritten, &erasedTo, progressCallback, &lastProgress](std::size_t offset, const uint8_t* data, std::size_t length) -> bool {
+  auto dataWriter = [partition, &sha256, &contentLength, &contentWritten, &erasedTo, progressCallback, &lastProgress, &firstChunkCheck](std::size_t offset, const uint8_t* data, std::size_t length) -> bool {
+    // Before the first erase: a refused first chunk leaves the partition as it was
+    if (offset == 0 && firstChunkCheck && !(*firstChunkCheck)(std::span<const uint8_t>(data, length))) {
+      OS_LOGE(TAG, "The download is not what the partition takes; nothing was erased");
+      return false;
+    }
+
     while (erasedTo < offset + length) {
       // The step is a multiple of the erase size, and partitions end on an erase-size boundary
       std::size_t eraseLength = std::min<std::size_t>(kEraseStep, partition->size - erasedTo);

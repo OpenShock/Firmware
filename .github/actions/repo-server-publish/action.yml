@@ -12,7 +12,7 @@ inputs:
     description: 'init opens the release, publish uploads and promotes it, abort closes one the build never reached'
   version:
     required: false
-    description: 'Firmware version, strict semver (init)'
+    description: 'Firmware version, strict semver (init; publish, where it picks the staticfs image)'
   channel:
     required: false
     description: 'Release channel: stable, beta or develop (init)'

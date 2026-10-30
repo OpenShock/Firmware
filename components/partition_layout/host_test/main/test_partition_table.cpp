@@ -1,11 +1,10 @@
 // The parser and the in-place retype against the 1.x table every fielded hub carries and a corpus of broken copies.
 #include "unity.h"
 
-#include "Md5.h"
+#include "Hashing.h"
 #include "partition_layout/PartitionTable.h"
 
 #include <cstring>
-#include <string>
 #include <vector>
 
 using namespace OpenShock;
@@ -57,9 +56,9 @@ namespace {
     }
     bytes[pos]     = PT::kMd5Magic & 0xFF;
     bytes[pos + 1] = PT::kMd5Magic >> 8;
-    uint8_t digest[16];
-    PT::Internal::Md5(bytes.data(), pos, digest);
-    memcpy(bytes.data() + pos + 16, digest, 16);
+    MD5::Digest digest {};
+    TEST_ASSERT_TRUE(MD5::compute(bytes.data(), pos, digest));
+    memcpy(bytes.data() + pos + 16, digest.data(), digest.size());
     return bytes;
   }
 
@@ -88,24 +87,6 @@ namespace {
     TEST_ASSERT_TRUE_MESSAGE(bytes == before, "a refused retype changed the table");
   }
 }  // namespace
-
-TEST_CASE("MD5 matches the RFC 1321 test suite", "[partition_table][md5]")
-{
-  uint8_t digest[16];
-  PT::Internal::Md5(reinterpret_cast<const uint8_t*>(""), 0, digest);
-  const uint8_t empty[16] = {0xd4, 0x1d, 0x8c, 0xd9, 0x8f, 0x00, 0xb2, 0x04, 0xe9, 0x80, 0x09, 0x98, 0xec, 0xf8, 0x42, 0x7e};
-  TEST_ASSERT_EQUAL_UINT8_ARRAY(empty, digest, 16);
-
-  const char* msg = "The quick brown fox jumps over the lazy dog";
-  PT::Internal::Md5(reinterpret_cast<const uint8_t*>(msg), strlen(msg), digest);
-  const uint8_t fox[16] = {0x9e, 0x10, 0x7d, 0x9d, 0x37, 0x2b, 0xb6, 0x82, 0x6b, 0xd8, 0x1d, 0x35, 0x42, 0xa4, 0x19, 0xd6};
-  TEST_ASSERT_EQUAL_UINT8_ARRAY(fox, digest, 16);
-
-  std::string eighty(80, 'a');  // crosses a block, length lands in the next padding block
-  PT::Internal::Md5(reinterpret_cast<const uint8_t*>(eighty.data()), eighty.size(), digest);
-  const uint8_t a80[16] = {0xb1, 0x5a, 0xf9, 0xcd, 0xab, 0xba, 0xea, 0x05, 0x16, 0x86, 0x6a, 0x33, 0xd8, 0xfd, 0x0f, 0x98};
-  TEST_ASSERT_EQUAL_UINT8_ARRAY(a80, digest, 16);
-}
 
 TEST_CASE("The 1.x table parses with its MD5", "[partition_table]")
 {
@@ -153,6 +134,69 @@ TEST_CASE("A table without an MD5 entry, or with a wrong one, is refused", "[par
   ExpectParseError(erased, PT::ParseError::NoEntries);
   ExpectParseError(std::vector<uint8_t>(10, 0xFF), PT::ParseError::TooShort);
   ExpectParseError(std::span<const uint8_t>(good).first(3 * PT::kEntrySize), PT::ParseError::NoMd5);
+}
+
+TEST_CASE("Only the first 0xC00 bytes are the table; whatever follows is ignored", "[partition_table]")
+{
+  // A read that takes more than the table (the next sector, say): the bytes past kMaxLen are not even looked at,
+  // so they need not be erased
+  const PT::Bytes good = Build(kV1);
+  std::vector<uint8_t> longer(PT::kMaxLen + 0x400, 0x5A);
+  memcpy(longer.data(), good.data(), good.size());
+  PT::Table table = ParseOk(longer);
+  TEST_ASSERT_EQUAL_size_t(kV1.size(), table.count);
+  TEST_ASSERT_NOT_NULL(table.Find("static0"));
+}
+
+TEST_CASE("A table with no room left for the MD5 entry is refused", "[partition_table][corrupt]")
+{
+  // kMaxEntries entries fill every slot but the last; one more leaves the MD5 entry nowhere to go
+  PT::Bytes bytes;
+  bytes.fill(0xFF);
+  for (std::size_t i = 0; i <= PT::kMaxEntries; ++i) {
+    uint8_t* p = bytes.data() + i * PT::kEntrySize;
+    memset(p, 0, PT::kEntrySize);
+    p[0] = PT::kMagic & 0xFF;
+    p[1] = PT::kMagic >> 8;
+    p[2] = PT::kTypeData;
+    p[3] = PT::kSubtypeDataNvs;
+    Put32(p + 4, 0x9000 + static_cast<uint32_t>(i) * 0x1000);
+    Put32(p + 8, 0x1000);
+    p[12] = 'p';
+  }
+  ExpectParseError(bytes, PT::ParseError::TooManyEntries);
+}
+
+TEST_CASE("Retyping static0 as www is byte for byte what the packer would write", "[partition_table][retype]")
+{
+  // The one retype the www migration does: static0 (data/spiffs) becomes www (type 0x40, subtype 0x00), in place
+  PT::Bytes bytes = Build(kV1);
+  TEST_ASSERT_TRUE(PT::Retype(bytes, "static0", 0x40, 0x00, "www").has_value());
+
+  std::vector<Row> expected = kV1;
+  expected[5]               = {"www", 0x40, 0x00, 0x353000, 0x09D000};
+  TEST_ASSERT_EQUAL_UINT8_ARRAY(Build(expected).data(), bytes.data(), PT::kMaxLen);
+
+  PT::Table table = ParseOk(bytes);
+  TEST_ASSERT_NULL(table.Find("static0"));
+  const PT::Entry* www = table.Find("www");
+  TEST_ASSERT_NOT_NULL(www);
+  TEST_ASSERT_EQUAL_UINT8(0x40, www->type);
+  TEST_ASSERT_EQUAL_UINT8(0x00, www->subtype);
+  TEST_ASSERT_EQUAL_HEX32(0x353000, www->offset);
+  TEST_ASSERT_EQUAL_HEX32(0x09D000, www->size);
+}
+
+TEST_CASE("Retype keeps the label when the new one is the same", "[partition_table][retype]")
+{
+  // The entry's own label is not "taken": only the type and subtype change
+  PT::Bytes bytes = Build(kV1);
+  TEST_ASSERT_TRUE(PT::Retype(bytes, "config", PT::kTypeData, PT::kSubtypeDataNvs, "config").has_value());
+
+  std::vector<Row> expected = kV1;
+  expected[4]               = {"config", PT::kTypeData, PT::kSubtypeDataNvs, 0x350000, 0x003000};
+  TEST_ASSERT_EQUAL_UINT8_ARRAY(Build(expected).data(), bytes.data(), PT::kMaxLen);
+  TEST_ASSERT_EQUAL_UINT8(PT::kSubtypeDataNvs, ParseOk(bytes).Find("config")->subtype);
 }
 
 TEST_CASE("Retype changes one entry's type, subtype and label and re-seals the MD5", "[partition_table][retype]")

@@ -1,4 +1,5 @@
 #include <freertos/FreeRTOS.h>
+#include <freertos/task.h>
 
 #include "partition_layout/LiveTable.h"
 
@@ -10,6 +11,8 @@ const char* const TAG = "PartitionTable";
 #include <esp_flash_partitions.h>
 #include <esp_ota_ops.h>
 #include <esp_partition.h>
+
+#include <memory>
 
 using namespace OpenShock;
 
@@ -55,21 +58,6 @@ bool PartitionTable::ReadLiveBytes(Bytes& out)
     return false;
   }
   return true;
-}
-
-std::unique_ptr<PartitionTable::Table> PartitionTable::ReadLive()
-{
-  auto bytes = std::make_unique<Bytes>();
-  if (!ReadLiveBytes(*bytes)) {
-    return nullptr;
-  }
-  auto table  = std::make_unique<Table>();
-  auto parsed = Parse(*bytes, *table);
-  if (!parsed) {
-    OS_LOGE(TAG, "The live partition table does not parse: %s", ParseErrorName(parsed.error()));
-    return nullptr;
-  }
-  return table;
 }
 
 PartitionTable::ReplaceResult PartitionTable::Replace(const Bytes& next, const Bytes& live)
