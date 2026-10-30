@@ -126,6 +126,16 @@ Shared config lives in `sdkconfig.defaults`, including the 4 MB OTA partition ta
 (`partitions/ota_4mb.csv`) every board uses. `sdkconfig` and `build/` are generated and
 gitignored. If a `sdkconfig` is stale after a defaults change, delete it or run `fullclean`.
 
+### OpenShock Kconfig options
+
+Each component defines its own `CONFIG_OPENSHOCK_*` options in `components/<name>/Kconfig`; they
+show up in `menuconfig` under Component config, in the "OpenShock ..." menus. A component may
+read only its own options and those of the components it requires, which
+`scripts/check_kconfig_ownership.py` checks in CI. An option more than one component reads goes
+in the lowest component they all depend on: the default domains and hostname, and every task's
+stack and priority, live in `components/common/Kconfig`, where `src/TaskUtils.cpp` checks the
+priority order between the tasks.
+
 ```sh
 python scripts/stamp_board.py read --image build/OpenShock-Core-V2/firmware.bin
 ```

@@ -37,9 +37,12 @@ const uint8_t LINK_CODE_LENGTH = 6;
 static std::atomic<uint8_t> s_flags = 0;
 
 // Retry timing, owned by the main task (Update()). Other tasks ask for a reset through s_retryResetRequested.
-static OpenShock::Backoff s_authBackoff(300'000, 300'000);   // After the backend rejects the token: 5 minutes
-static OpenShock::Backoff s_connectBackoff(20'000, 20'000);  // Between LCG connection attempts: 20 seconds
-static OpenShock::Backoff s_hubInfoBackoff(5'000, 300'000);  // After a failed hub info fetch: 5 s doubling up to 5 min
+// After the backend rejects the token
+static OpenShock::Backoff s_authBackoff(CONFIG_OPENSHOCK_GATEWAY_AUTH_RETRY_MS, CONFIG_OPENSHOCK_GATEWAY_AUTH_RETRY_MS);
+// Between LCG connection attempts
+static OpenShock::Backoff s_connectBackoff(CONFIG_OPENSHOCK_GATEWAY_CONNECT_RETRY_MS, CONFIG_OPENSHOCK_GATEWAY_CONNECT_RETRY_MS);
+// After a failed hub info fetch: doubling from the first value up to the cap
+static OpenShock::Backoff s_hubInfoBackoff(CONFIG_OPENSHOCK_GATEWAY_HUB_INFO_RETRY_MIN_MS, CONFIG_OPENSHOCK_GATEWAY_HUB_INFO_RETRY_MAX_MS);
 static std::atomic<bool> s_retryResetRequested = false;
 static OpenShock::SimpleMutex s_clientMutex;
 static std::shared_ptr<OpenShock::GatewayClient> s_wsClient = nullptr;
