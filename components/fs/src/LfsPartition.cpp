@@ -149,6 +149,18 @@ bool LfsPartition::exists(const char* path)
   return lfs_stat(&m_state->lfs, path, &info) >= 0;
 }
 
+std::optional<std::size_t> LfsPartition::fileSize(const char* path)
+{
+  if (!m_mounted) {
+    return std::nullopt;
+  }
+  struct lfs_info info;
+  if (lfs_stat(&m_state->lfs, path, &info) < 0 || info.type != LFS_TYPE_REG) {
+    return std::nullopt;
+  }
+  return info.size;
+}
+
 bool LfsPartition::readStream(const char* path, Util::FunctionRef<bool(std::span<const uint8_t>)> sink)
 {
   if (!m_mounted) {

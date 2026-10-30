@@ -14,6 +14,7 @@ const char* const TAG = "CaptivePortalStatic";
 
 #include <cstddef>
 #include <cstring>
+#include <optional>
 #include <span>
 #include <string>
 #include <string_view>
@@ -153,7 +154,7 @@ static bool acceptsGzip(std::string_view acceptEncoding)
     std::string_view coding = StringTrim(item.substr(0, semicolon));
     std::string_view params = semicolon == std::string_view::npos ? std::string_view() : item.substr(semicolon + 1);
 
-    if (StringIEquals(coding, "gzip")) {
+    if (StringIEquals(coding, "gzip") || StringIEquals(coding, "x-gzip")) {  // x-gzip is an alias (RFC 9110 §8.4.1.3)
       return !weightIsZero(params);
     }
     if (coding == "*") {
@@ -163,20 +164,57 @@ static bool acceptsGzip(std::string_view acceptEncoding)
   return wildcard;
 }
 
-// Without an Accept-Encoding header any coding may be sent. httpd reports an absent and an empty header the same
-// way; the (rare) empty one is treated as absent.
+// Without an Accept-Encoding header any coding may be sent; an empty one means identity only (RFC 9110 §12.5.3).
+// The length lookup can't tell the two apart, but the value lookup can.
 static bool clientAcceptsGzip(httpd_req_t* req)
 {
   std::size_t len = httpd_req_get_hdr_value_len(req, "Accept-Encoding");
-  if (len == 0) {
-    return true;
-  }
   std::string value;
   value.resize(len + 1);
-  if (httpd_req_get_hdr_value_str(req, "Accept-Encoding", value.data(), value.size()) != ESP_OK) {
+  esp_err_t err = httpd_req_get_hdr_value_str(req, "Accept-Encoding", value.data(), value.size());
+  if (err == ESP_ERR_NOT_FOUND) {
+    return true;
+  }
+  if (err != ESP_OK) {
     return false;
   }
   return acceptsGzip(std::string_view(value.data(), len));
+}
+
+static constexpr const char* kCacheControl = "max-age=3600";
+
+// httpd derives Content-Length from the buffer it is handed and has no bodiless send, so the HEAD response (the GET's
+// headers with the file's size, RFC 9110 §9.3.2) is written out directly.
+static esp_err_t sendHeadResponse(httpd_req_t* req, const char* contentType, bool gzip, const char* etag, std::size_t size)
+{
+  std::string head;
+  head.reserve(256);
+  head += "HTTP/1.1 ";
+  head += CaptivePortal::S200;
+  head += "\r\nContent-Type: ";
+  head += contentType;
+  head += "\r\nContent-Length: ";
+  head += std::to_string(size);
+  if (gzip) {
+    head += "\r\nContent-Encoding: gzip";
+  }
+  head += "\r\nVary: Accept-Encoding\r\nCache-Control: ";
+  head += kCacheControl;
+  if (etag != nullptr) {
+    head += "\r\nETag: ";
+    head += etag;
+  }
+  head += "\r\n\r\n";
+
+  std::size_t sent = 0;
+  while (sent < head.size()) {
+    int n = httpd_send(req, head.data() + sent, head.size() - sent);
+    if (n <= 0) {
+      return ESP_FAIL;
+    }
+    sent += static_cast<std::size_t>(n);
+  }
+  return ESP_OK;
 }
 
 CaptivePortal::StaticFileServer::StaticFileServer()
@@ -187,7 +225,7 @@ CaptivePortal::StaticFileServer::StaticFileServer()
     OS_LOGE(TAG, "Failed to find static filesystem partition");
   } else if (!m_partition.mount(partition, false)) {
     OS_LOGE(TAG, "Failed to mount static filesystem");
-  } else if (!m_partition.exists("/www/index.html.gz") && !m_partition.exists("/www/index.html")) {
+  } else if (!m_partition.fileSize("/www/index.html.gz") && !m_partition.fileSize("/www/index.html")) {
     OS_LOGE(TAG, "/www/index.html(.gz) not found, serving error page");
     m_partition.unmount();
   } else {
@@ -202,6 +240,7 @@ void CaptivePortal::StaticFileServer::registerHandler(httpd_handle_t server)
   // Decided once: the image is mounted in the constructor and stays that way until destruction
   if (m_partition.isMounted()) {
     CaptivePortal::registerHandler(server, "/*", HTTP_GET, &StaticFileServer::staticFileHandler, &m_partition);
+    CaptivePortal::registerHandler(server, "/*", HTTP_HEAD, &StaticFileServer::staticFileHandler, &m_partition);
   } else {
     CaptivePortal::registerHandler(server, "/*", HTTP_GET, &StaticFileServer::missingFsHandler, nullptr);
   }
@@ -250,45 +289,81 @@ esp_err_t CaptivePortal::StaticFileServer::staticFileHandler(httpd_req_t* req)
   path += "/www";
   path += uri;
 
+  // fileSize only answers for regular files: littlefs collapses "//" and "." segments, so a path can land on a
+  // directory, which must not be opened as a file.
+  std::optional<std::size_t> size;
   bool gzip = false;
   if (wantsGzip) {
     path += ".gz";
-    gzip = partition->exists(path.c_str());
+    size = partition->fileSize(path.c_str());
+    gzip = size.has_value();
     if (!gzip) {
       path.resize(path.size() - 3);
     }
   }
-  if (!gzip && !partition->exists(path.c_str())) {
-    // Unknown path -> captive redirect (matches serveStatic default-file fallthrough).
-    return RFC8908::EmitRedirect(req);
+  if (!gzip) {
+    size = partition->fileSize(path.c_str());
+    if (!size) {
+      // Unknown path -> captive redirect (matches serveStatic default-file fallthrough).
+      return RFC8908::EmitRedirect(req);
+    }
   }
 
   // ETag / conditional request. The two encodings are different representations, so they get different tags. Keep
   // the quoted tag alive until after send.
   std::string etag;
+  bool notModified = false;
   if (const char* fsHash = getPartitionHash(partition->partition())) {
     etag = std::string("\"") + fsHash + (gzip ? "-gz\"" : "\"");
     char inm[80];
-    if (httpd_req_get_hdr_value_str(req, "If-None-Match", inm, sizeof(inm)) == ESP_OK && etag == inm) {
-      httpd_resp_set_status(req, S304);
-      return httpd_resp_send(req, nullptr, 0);
+    notModified = httpd_req_get_hdr_value_str(req, "If-None-Match", inm, sizeof(inm)) == ESP_OK && etag == inm;
+  }
+  const char* contentType = contentTypeForPath(path);
+
+  // Validator and cache headers go on the 304 too, so a cache can refresh its stored response (RFC 9110 §15.4.5)
+  auto setHeaders = [&]() {
+    httpd_resp_set_type(req, contentType);
+    httpd_resp_set_hdr(req, "Vary", "Accept-Encoding");
+    httpd_resp_set_hdr(req, "Cache-Control", kCacheControl);
+    if (!etag.empty()) {
+      httpd_resp_set_hdr(req, "ETag", etag.c_str());
     }
+  };
+
+  if (notModified) {
+    setHeaders();
+    httpd_resp_set_status(req, S304);
+    return httpd_resp_send(req, nullptr, 0);
   }
 
-  httpd_resp_set_type(req, contentTypeForPath(path));
-  if (gzip) {
-    httpd_resp_set_hdr(req, "Content-Encoding", "gzip");
-  }
-  httpd_resp_set_hdr(req, "Vary", "Accept-Encoding");
-  httpd_resp_set_hdr(req, "Cache-Control", "max-age=3600");
-  if (!etag.empty()) {
-    httpd_resp_set_hdr(req, "ETag", etag.c_str());
+  if (req->method == HTTP_HEAD) {
+    return sendHeadResponse(req, contentType, gzip, etag.empty() ? nullptr : etag.c_str(), *size);
   }
 
-  bool ok = partition->readStream(path.c_str(), [req](std::span<const uint8_t> chunk) { return httpd_resp_send_chunk(req, reinterpret_cast<const char*>(chunk.data()), chunk.size()) == ESP_OK; });
+  // Headers are only committed with the first chunk, so a failure before anything is on the wire (open or buffer
+  // allocation) can still be answered with a clean 500 instead of a dropped connection.
+  bool started = false;
+  auto begin   = [&]() {
+    setHeaders();
+    if (gzip) {
+      httpd_resp_set_hdr(req, "Content-Encoding", "gzip");
+    }
+    started = true;
+  };
+  bool ok = partition->readStream(path.c_str(), [&](std::span<const uint8_t> chunk) {
+    if (!started) {
+      begin();
+    }
+    return httpd_resp_send_chunk(req, reinterpret_cast<const char*>(chunk.data()), chunk.size()) == ESP_OK;
+  });
   if (!ok) {
-    // Headers/chunks may already be on the wire; can't cleanly redirect now.
-    return ESP_FAIL;
+    if (started) {
+      return ESP_FAIL;  // Mid-stream: the client sees a truncated chunked body
+    }
+    return sendResp(req, S500, HTTP::ContentType::TextPlain, "Internal Server Error\n");
+  }
+  if (!started) {
+    begin();  // Empty file
   }
   return httpd_resp_send_chunk(req, nullptr, 0);
 }

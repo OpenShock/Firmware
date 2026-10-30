@@ -5,7 +5,9 @@
 
 #include <esp_partition.h>
 
+#include <cstddef>
 #include <cstdint>
+#include <optional>
 #include <span>
 #include <vector>
 
@@ -37,7 +39,11 @@ namespace OpenShock {
     // The partition this is mounted on, or null when not mounted.
     const esp_partition_t* partition() const;
 
+    // True if `path` names anything, file or directory.
     bool exists(const char* path);
+
+    // The size of the regular file at `path`; empty if there is none (a directory does not count).
+    std::optional<std::size_t> fileSize(const char* path);
 
     // Stream a file to `sink` in chunks. Returns false if the file is missing/unreadable
     // or if `sink` returns false (which aborts the stream).
