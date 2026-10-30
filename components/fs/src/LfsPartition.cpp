@@ -135,6 +135,11 @@ void LfsPartition::unmount()
   m_state->partition = nullptr;
 }
 
+const esp_partition_t* LfsPartition::partition() const
+{
+  return m_mounted ? m_state->partition : nullptr;
+}
+
 bool LfsPartition::exists(const char* path)
 {
   if (!m_mounted) {

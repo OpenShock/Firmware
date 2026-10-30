@@ -1,6 +1,6 @@
 #pragma once
 
-#include "fs/StaticFs.h"
+#include "fs/LfsPartition.h"
 #include "OpenShock.h"
 
 #include <esp_http_server.h>
@@ -18,9 +18,9 @@ namespace OpenShock::CaptivePortal {
     void registerHandler(httpd_handle_t server);
 
   private:
+    static esp_err_t missingFsHandler(httpd_req_t* req);
     static esp_err_t staticFileHandler(httpd_req_t* req);
 
-    StaticFs m_staticFs;
-    const char* m_fsHash = nullptr;
+    LfsPartition m_partition;
   };
 }  // namespace OpenShock::CaptivePortal

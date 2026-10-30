@@ -18,7 +18,7 @@ idf_component_register(
   PRIV_INCLUDE_DIRS "src"
   PRIV_REQUIRES     core config device_control                        # wifi/gateway/message handlers/AppHooks; Config::; CommandHandler/EStopManager
                     common chipset logging temporal osjson serialization   # foundation utilities, json, HubToLocalMessage fbs
-                    dns_server fs http hwutil rfc8908                    # DNSServer, StaticFs, ContentTypes, PartitionUtils, RFC8908Handler
+                    dns_server fs http hwutil rfc8908                    # DNSServer, LfsPartition, ContentTypes, PartitionUtils, RFC8908Handler
                     esp_http_server esp_netif esp_timer esp_wifi
 )
 
