@@ -30,9 +30,15 @@ served.
 The same image serves every board. The OTA update skips flashing it when the hash on flash already matches the
 release's.
 
-Releases publish the image as `www.bin` under the repository server's `staticfs` artifact. On the 1.x table, which has
-no `www`, the portal still serves the littlefs `static0`, and the OTA update refuses before writing anything: such a
-hub needs the migration below before it can take an update.
+Releases from 2.0.0 publish the image as `www.bin` under the repository server's `staticfs` artifact. A 1.x-numbered
+release (the 1.9.x pivot that every fielded hub installs first) publishes the littlefs `staticfs.bin` there instead,
+packed from the same assets by `gen_staticfs.py --legacy-output`: a 1.x hub installs an update with its own OTA code,
+which writes `staticfs` over its littlefs `static0` and aborts unless that then mounts. `scripts/repo_server_publish.py`
+picks the file by the release's major version.
+
+On the 1.x table, which has no `www`, this firmware serves the portal from the littlefs `static0` and its OTA update
+flashes `static0` and verifies it by mounting, as the 1.x firmware does. Nothing on a 1.x hub touches the partition
+table until the migration below runs.
 
 ## The www partition migration
 

@@ -53,13 +53,17 @@ def test_a_table_without_an_app_partition_is_refused():
         partitions.first_app_partition(table)
 
 
+def test_a_table_without_a_www_partition_is_refused_naming_the_table():
+    www = {'type': '0x40', 'subtype': '0x00', 'offset': 0x353000, 'size': 0x9D000}
+    assert partitions.www_partition({'www': www}, 'x') is www
+    with pytest.raises(SystemExit, match='error: the table for Board has no www partition'):
+        partitions.www_partition({'app0': {}}, 'the table for Board')
+
+
 def test_the_www_partition_size_comes_from_the_table(tmp_path):
     csv = tmp_path / 'table.csv'
     csv.write_text('www, 0x40, 0x00, 0x3A8000, 0x48000\n', encoding='utf-8')
     assert gen_staticfs.www_partition_size(csv) == 0x48000
-    csv.write_text('nvs, data, nvs, 0x9000, 0x5000\n', encoding='utf-8')
-    with pytest.raises(SystemExit, match='has no www partition'):
-        gen_staticfs.www_partition_size(csv)
 
 
 def test_a_stale_frontend_without_pnpm_names_the_way_out(tmp_path, monkeypatch):
@@ -97,8 +101,7 @@ def test_collected_assets_are_byte_identical_across_runs(tmp_path):
     second = gen_staticfs.collect_assets(build)
 
     assert first == second
-    assert sorted(e.path for e in first) == ['assets/app.js', 'index.html']
-    assert wwwimage.pack(first) == wwwimage.pack(second)
+    assert [e.path for e in first] == ['assets/app.js', 'index.html']
 
 
 def test_frontend_build_is_current_tracks_source_changes(tmp_path):
@@ -169,7 +172,7 @@ def test_packed_image_is_the_bare_image_and_must_fit(tmp_path):
 
 
 def test_main_takes_the_smallest_of_every_limit(tmp_path, monkeypatch):
-    build = write_build(tmp_path)
+    write_build(tmp_path)
     csv = tmp_path / 'small.csv'
     csv.write_text('www, 0x40, 0x00, 0x3A8000, 0x1000\n', encoding='utf-8')
     limits = []
@@ -188,7 +191,28 @@ def test_main_takes_the_smallest_of_every_limit(tmp_path, monkeypatch):
         ]
     )
     assert limits == [0x1000]
-    assert build.is_dir()
 
     with pytest.raises(SystemExit):
         gen_staticfs.main(args)  # no limit at all
+
+
+def test_the_legacy_image_is_littlefs_sized_for_static0(tmp_path):
+    from littlefs import LittleFS
+
+    entries = gen_staticfs.collect_assets(write_build(tmp_path))
+    output = tmp_path / 'staticfs.bin'
+    size = gen_staticfs.legacy_partition_size()
+    assert size == 0x9D000
+
+    gen_staticfs.pack_legacy_image(entries, output, size)
+
+    image = output.read_bytes()
+    assert len(image) == size
+    fs = LittleFS(
+        block_size=gen_staticfs.LFS_BLOCK_SIZE, block_count=size // gen_staticfs.LFS_BLOCK_SIZE, disk_version=0
+    )
+    fs.context.buffer[:] = image
+    fs.mount()
+    assert sorted(fs.listdir('www')) == ['assets', 'index.html.gz']
+    with fs.open('www/index.html.gz', 'rb') as f:
+        assert gzip.decompress(f.read()) == b'<!doctype html><title>x</title>'

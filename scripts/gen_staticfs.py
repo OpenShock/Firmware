@@ -10,20 +10,36 @@ The output is reproducible: gzip headers carry no timestamp and entries are sort
 byte-identical www.bin (and the same hash, so devices don't re-flash it). One image serves every board: it is not
 padded to any partition size, only checked to fit.
 
+With --legacy-output it also packs the same assets as a littlefs image of the 1.x `static0` partition
+(partitions/legacy/ota_4mb_v1.csv, under /www/<path>.gz). That is what a 1.x hub's OTA installs as the `staticfs`
+artifact and verifies by mounting it, so it is published for 1.x-numbered releases (the 1.9.x pivot) only; it goes
+away with release/1.9.
+
 Invoked by CMake (see the root CMakeLists.txt), and by CI with --skip-frontend-build.
 """
 
 import argparse
 import gzip
+import io
 import os
 import shutil
 import subprocess
+import sys
 from collections.abc import Iterable
 from pathlib import Path
 
 from utils import partitions, wwwimage
+from utils.partitions import WWW_PARTITION
+from utils.paths import ROOT
 
-WWW_PARTITION = 'www'
+# The littlefs geometry the 1.x firmware (and this firmware on the 1.x layout) mounts static0 with (components/fs/src/
+# LfsPartition.cpp). Only the block size is on disk and checked at mount; the rest are runtime buffer sizes.
+LEGACY_PARTITION = 'static0'
+LEGACY_TABLE = ROOT / 'partitions' / 'legacy' / 'ota_4mb_v1.csv'
+LFS_BLOCK_SIZE = 4096
+LFS_READ_SIZE = LFS_PROG_SIZE = 128
+LFS_CACHE_SIZE = 512
+LFS_LOOKAHEAD_SIZE = 128
 
 # Inputs of the frontend build; a change to any of them makes frontend/build stale.
 FRONTEND_INPUTS = (
@@ -37,9 +53,6 @@ FRONTEND_INPUTS = (
     'tsconfig.json',
 )
 FRONTEND_IGNORED_DIRS = {'node_modules', 'build', 'dist', '.svelte-kit'}
-
-# Assets with a content hash in their name never change under the same path, so browsers may cache them for long.
-IMMUTABLE_PREFIXES = ('_app/immutable/',)
 
 
 def log(msg: str) -> None:
@@ -94,9 +107,8 @@ def build_frontend(frontend_dir: Path) -> Path:
 
 
 def gzip_bytes(raw: bytes) -> bytes:
-    # mtime=0 and no filename: the gzip bytes depend only on the content
-    import io
-
+    # mtime=0 and no filename: the gzip bytes depend only on the content. GzipFile, not gzip.compress: since 3.11 the
+    # latter goes through zlib and its OS header byte is platform-dependent, which would break byte-identical images.
     out = io.BytesIO()
     with gzip.GzipFile(filename='', mode='wb', fileobj=out, mtime=0) as gz:
         gz.write(raw)
@@ -105,26 +117,14 @@ def gzip_bytes(raw: bytes) -> bytes:
 
 def collect_assets(build_dir: Path) -> list[wwwimage.Entry]:
     """Every file under build_dir, gzipped, as an entry at its relative path."""
-    entries = []
-    for root, dirs, names in os.walk(build_dir):
-        dirs.sort()
-        for name in sorted(names):
-            src = Path(root) / name
-            rel = src.relative_to(build_dir).as_posix()
-            entries.append(
-                wwwimage.Entry(rel, gzip_bytes(src.read_bytes()), immutable=rel.startswith(IMMUTABLE_PREFIXES))
-            )
-
+    entries = wwwimage.read_tree(build_dir, gzip_bytes)
     if not any(e.path == 'index.html' for e in entries):
         raise SystemExit(f'error: {build_dir}/index.html missing: the frontend build produced no index.html')
     return entries
 
 
 def www_partition_size(csv_path: Path) -> int:
-    table = partitions.read_partitions(csv_path)
-    if WWW_PARTITION not in table:
-        raise SystemExit(f'error: {csv_path} has no {WWW_PARTITION} partition')
-    return table[WWW_PARTITION]['size']
+    return partitions.www_partition(partitions.read_partitions(csv_path), str(csv_path))['size']
 
 
 def pack_image(entries: list[wwwimage.Entry], output: Path, max_size: int) -> None:
@@ -141,6 +141,40 @@ def pack_image(entries: list[wwwimage.Entry], output: Path, max_size: int) -> No
     log(
         f'Packed {len(entries)} assets into {output} ({len(image)} of {max_size} bytes, {100 * len(image) // max_size}% of the partition)'
     )
+
+
+def pack_legacy_image(entries: list[wwwimage.Entry], output: Path, partition_size: int) -> None:
+    """The assets as the 1.x littlefs image: /www/<path>.gz, exactly partition_size bytes."""
+    try:
+        from littlefs import LittleFS
+    except ImportError:
+        raise SystemExit(
+            f'error: littlefs-python is not installed for {sys.executable}: the build scripts need an interpreter '
+            'with requirements.txt installed (docs/DEVELOPING.md, Python dependencies)'
+        ) from None
+
+    if partition_size % LFS_BLOCK_SIZE != 0:
+        raise SystemExit(f'error: partition size {partition_size} is not a multiple of block size {LFS_BLOCK_SIZE}')
+    fs = LittleFS(
+        block_size=LFS_BLOCK_SIZE,
+        block_count=partition_size // LFS_BLOCK_SIZE,
+        read_size=LFS_READ_SIZE,
+        prog_size=LFS_PROG_SIZE,
+        cache_size=LFS_CACHE_SIZE,
+        lookahead_size=LFS_LOOKAHEAD_SIZE,
+    )
+    for entry in entries:
+        path = f'www/{entry.path}.gz'
+        fs.makedirs(path.rsplit('/', 1)[0], exist_ok=True)
+        with fs.open(path, 'wb') as f_out:
+            f_out.write(entry.data)
+    output.resolve().parent.mkdir(parents=True, exist_ok=True)
+    output.write_bytes(bytes(fs.context.buffer))
+    log(f'Packed {len(entries)} assets into the 1.x littlefs image {output} ({partition_size} bytes)')
+
+
+def legacy_partition_size() -> int:
+    return partitions.read_partitions(LEGACY_TABLE)[LEGACY_PARTITION]['size']
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -161,6 +195,11 @@ def main(argv: list[str] | None = None) -> int:
     p.add_argument(
         '--skip-frontend-build', action='store_true', help='Reuse existing frontend/build without invoking pnpm'
     )
+    p.add_argument(
+        '--legacy-output',
+        type=Path,
+        help=f'also write the assets as the 1.x littlefs {LEGACY_PARTITION} image here (1.x-numbered releases)',
+    )
     args = p.parse_args(argv)
 
     limits = [www_partition_size(csv) for csv in args.partition_csv]
@@ -179,6 +218,8 @@ def main(argv: list[str] | None = None) -> int:
     entries = collect_assets(build_dir)
     log(f'Collected {len(entries)} gzipped assets from {build_dir}')
     pack_image(entries, args.output, min(limits))
+    if args.legacy_output is not None:
+        pack_legacy_image(entries, args.legacy_output, legacy_partition_size())
     return 0
 
 

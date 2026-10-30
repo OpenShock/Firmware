@@ -295,6 +295,7 @@ jobs:
           token: ${{ steps.token.outputs.token }}
           release-id: ${{ needs.stage.outputs.release-id }}
           boards: ${{ needs.plan.outputs.board-list }}
+          version: ${{ needs.plan.outputs.version }}
           mode: publish
 
   # Hands the staged version back when the run fails, is cancelled or never publishes; the server's TTL is only a backstop.

@@ -6,6 +6,7 @@ const char* const TAG = "OtaUpdateManager";
 #include "BoardDescriptor.h"
 #include "captiveportal/Manager.h"
 #include "config/Config.h"
+#include "fs/FsCheck.h"
 #include "GatewayConnectionManager.h"
 #include "Hashing.h"
 #include "http/HTTPRequestManager.h"
@@ -273,17 +274,6 @@ static bool otaum_flash_app_partition(OpenShock::HTTP::Client& client, const esp
 
 static bool otaum_flash_fs_partition(OpenShock::HTTP::Client& client, const esp_partition_t* parition, std::string_view remoteUrl, const uint8_t (&remoteHash)[32])
 {
-  if (!otaum_send_progress_msg(Serialization::Types::OtaUpdateProgressTask::PreparingForUpdate, 0.0f)) {
-    return false;
-  }
-
-  // Make sure captive portal is stopped, timeout after 5 seconds.
-  if (!CaptivePortal::ForceClose(5000U)) {
-    OS_LOGE(TAG, "Failed to force close captive portal (timed out)");
-    _sendFailureMessage("Failed to force close captive portal (timed out)"sv);
-    return false;
-  }
-
   OS_LOGD(TAG, "Flashing filesystem partition");
 
   if (!otaum_send_progress_msg(Serialization::Types::OtaUpdateProgressTask::FlashingFilesystem, 0.0f)) {
@@ -308,10 +298,12 @@ static bool otaum_flash_fs_partition(OpenShock::HTTP::Client& client, const esp_
     return false;
   }
 
-  // Verify the freshly flashed image parses.
-  if (!Www::VerifyPartition(parition)) {
-    OS_LOGE(TAG, "The flashed www image is not valid");
-    _sendFailureMessage("The flashed www image is not valid"sv);
+  // Verify the freshly flashed image: the www format where the table has a www partition, else (1.x layout) that the
+  // littlefs image mounts.
+  const bool valid = parition->type == Www::kPartitionType ? Www::VerifyPartition(parition) : OpenShock::TestFilesystem(parition);
+  if (!valid) {
+    OS_LOGE(TAG, "The flashed filesystem image is not valid");
+    _sendFailureMessage("The flashed filesystem image is not valid"sv);
     return false;
   }
 
@@ -494,17 +486,22 @@ static void otaum_updatetask(void* arg)
       continue;
     }
 
-    // Releases ship the portal assets as a www image. On the 1.x layout, which has no www partition, it would only
-    // overwrite the littlefs static0 and fail its check: refuse before touching anything (the www migration comes first).
+    // The portal assets go into the www partition; on the 1.x layout, which has none, into littlefs static0. The
+    // staticfs artifact of a 1.x-numbered release is the littlefs image (scripts/repo_server_publish.py), which is
+    // what every hub still on the 1.x layout installs, by this code or by the 1.x firmware's own.
     const esp_partition_t* filesystemPartition = Www::FindPartition();
     if (filesystemPartition == nullptr) {
-      OS_LOGE(TAG, "No www partition (1.x partition layout); the www migration has to run before an update");
-      _sendFailureMessage("No www partition; the partition layout has to be migrated first"sv);
+      filesystemPartition = FindStaticPartition();
+    }
+    if (filesystemPartition == nullptr) {
+      OS_LOGE(TAG, "Failed to find a www or static filesystem partition");
+      _sendFailureMessage("Failed to find filesystem partition"sv);
       continue;
     }
 
-    // Flashing the filesystem force-closes the captive portal; on any failure (`continue`) it must be allowed to
-    // open again. On success the portal stays closed until the restart below.
+    // The captive portal is force-closed for the whole install (it serves from the www partition, and the app slot
+    // is swapped under it); on any failure (`continue`) it must be allowed to open again. On success the portal
+    // stays closed until the restart below.
     struct ReopenPortalOnFailure {
       bool succeeded = false;
       ~ReopenPortalOnFailure()
@@ -513,9 +510,21 @@ static void otaum_updatetask(void* arg)
       }
     } reopenPortalOnFailure;
 
-    // Flash app and filesystem partitions. An unchanged www image (the same hash) is not written again.
+    if (!otaum_send_progress_msg(Serialization::Types::OtaUpdateProgressTask::PreparingForUpdate, 0.0f)) {
+      continue;
+    }
+
+    // Make sure captive portal is stopped, timeout after 5 seconds.
+    if (!CaptivePortal::ForceClose(5000U)) {
+      OS_LOGE(TAG, "Failed to force close captive portal (timed out)");
+      _sendFailureMessage("Failed to force close captive portal (timed out)"sv);
+      continue;
+    }
+
+    // Flash app and filesystem partitions. An unchanged www image (the same hash) is not written again; a littlefs
+    // static0 always is, as the 1.x firmware does.
     std::array<uint8_t, 32> currentWwwHash {};
-    const bool wwwCurrent = Www::ImageSha256(filesystemPartition, currentWwwHash) && memcmp(currentWwwHash.data(), release.filesystemBinaryHash, 32) == 0;
+    const bool wwwCurrent = filesystemPartition->type == Www::kPartitionType && Www::ImageSha256(filesystemPartition, currentWwwHash) && memcmp(currentWwwHash.data(), release.filesystemBinaryHash, 32) == 0;
     if (wwwCurrent) {
       OS_LOGI(TAG, "The www image is already current, not flashing it");
     } else if (!otaum_flash_fs_partition(client, filesystemPartition, release.filesystemBinaryUrl, release.filesystemBinaryHash)) {

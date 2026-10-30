@@ -1,18 +1,20 @@
 name: build-staticfs
-description: Pack the frontend build into the board-independent www asset image
+description: Pack the frontend build into the board-independent www asset image, and the 1.x littlefs staticfs image
 
 runs:
   using: composite
   steps:
     - uses: ./.github/actions/install-python-deps
 
-    # One flat image serves every board; checked to fit the www partition of partitions/ota_4mb.csv
-    - name: Build asset image
+    # One flat image serves every board; checked to fit the www partition of partitions/ota_4mb.csv. The littlefs
+    # staticfs.bin is what a 1.x hub's OTA installs, published for 1.x-numbered releases only.
+    - name: Build asset images
       shell: bash
       run: |
         python scripts/gen_staticfs.py \
           --frontend-dir frontend \
           --output www.bin \
+          --legacy-output staticfs.bin \
           --partition-csv partitions/ota_4mb.csv \
           --skip-frontend-build
 
@@ -20,6 +22,8 @@ runs:
       uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9  # v7.0.2
       with:
         name: firmware_staticfs
-        path: www.bin
+        path: |
+          www.bin
+          staticfs.bin
         retention-days: 7
         if-no-files-found: error

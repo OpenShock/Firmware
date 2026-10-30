@@ -22,7 +22,6 @@ VALID_MODES = ('init', 'publish', 'abort')
 
 # Server field name -> the artifact it carries.
 # app and staticfs are what an OTA update needs; the rest are for the flashtool, which writes a whole chip rather than updating one.
-# The `staticfs` field keeps its name on the server API although it now carries the flat `www` image (www.bin).
 # The manifest keys and the file field names come from this one table, so they cannot drift apart.
 BUILD_ARTIFACTS = {
     'app': 'app.bin',
@@ -30,8 +29,17 @@ BUILD_ARTIFACTS = {
     'partitions': 'partition-table.bin',
 }
 STATICFS_FIELD = 'staticfs'
+# What the staticfs field carries: a 1.x-numbered release (the 1.9.x pivot) is installed by 1.x firmware, whose OTA
+# flashes staticfs into its littlefs static0 partition and checks it by mounting it, so it gets the littlefs image;
+# every later release gets the flat www image. The build-staticfs action builds both.
 STATICFS_FILE = 'www.bin'
+STATICFS_FILE_1X = 'staticfs.bin'
 MERGED_FIELD = 'merged'
+
+
+def staticfs_file_for(version: str) -> str:
+    return STATICFS_FILE_1X if version.split('.', 1)[0] == '1' else STATICFS_FILE
+
 
 UPLOAD_RETRIES = 3
 UPLOAD_BACKOFF_SECONDS = 5
@@ -86,7 +94,7 @@ def sha256_of(path: Path) -> str:
     return digest.hexdigest()
 
 
-def resolve_artifacts(artifacts: Path, board: str) -> dict[str, Path]:
+def resolve_artifacts(artifacts: Path, board: str, version: str) -> dict[str, Path]:
     """Every artifact the server wants for one board, or a failure naming the first one missing."""
     build = artifacts / 'firmware_boards' / board
     # The package job merges every board at once, so the merged binaries share a directory and are told apart by the board in their filename.
@@ -96,7 +104,7 @@ def resolve_artifacts(artifacts: Path, board: str) -> dict[str, Path]:
         fail(f'{board} is missing its {MERGED_FIELD} artifact (expected {artifacts}/firmware_merged/{merged_glob})')
 
     found = {field: build / filename for field, filename in BUILD_ARTIFACTS.items()}
-    found[STATICFS_FIELD] = artifacts / 'firmware_staticfs' / STATICFS_FILE
+    found[STATICFS_FIELD] = artifacts / 'firmware_staticfs' / staticfs_file_for(version)
     found[MERGED_FIELD] = merged[0]
     for field, path in found.items():
         if not path.is_file():
@@ -104,12 +112,14 @@ def resolve_artifacts(artifacts: Path, board: str) -> dict[str, Path]:
     return found
 
 
-def upload_board(session: requests.Session, server: str, release_id: str, board: str, artifacts: Path) -> None:
+def upload_board(
+    session: requests.Session, server: str, release_id: str, board: str, artifacts: Path, version: str
+) -> None:
     """PUT one board's artifacts with a sha256 manifest.
 
     Retried on transport errors and 5xx, since a repeated PUT replaces rather than appends; init and publish are POSTs and are not retried.
     """
-    paths = resolve_artifacts(artifacts, board)
+    paths = resolve_artifacts(artifacts, board, version)
     manifest = {field: sha256_of(path) for field, path in paths.items()}
 
     url = f'{server}/2/firmware/releases/{release_id}/boards/{board}'
@@ -249,8 +259,9 @@ def do_init(session: requests.Session, server: str) -> int:
 
 def do_publish(session: requests.Session, server: str) -> int:
     """Upload every board into the release init opened, then promote it; discard it on any failure."""
-    require_env('RELEASE_ID')
+    require_env('RELEASE_ID', 'VERSION')
     release_id = env('RELEASE_ID')
+    version = env('VERSION')
     boards = read_boards()
     artifacts = Path('artifacts')
 
@@ -259,7 +270,7 @@ def do_publish(session: requests.Session, server: str) -> int:
 
     try:
         for board in boards:
-            upload_board(session, server, release_id, board, artifacts)
+            upload_board(session, server, release_id, board, artifacts, version)
         promote(session, server, release_id)
     except PublishOutcomeUnknown:
         # Discarding now could delete a release that did go live; leave it for a human to check.
