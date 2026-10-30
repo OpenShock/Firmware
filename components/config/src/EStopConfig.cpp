@@ -9,22 +9,39 @@ const char* const TAG = "Config::EStopConfig";
 
 using namespace OpenShock::Config;
 
+// The board's default switch type (OPENSHOCK_ESTOP_LATCHING in boards/<board>.defaults, stamped into the descriptor).
+static bool defaultLatching()
+{
+  return (OpenShock::Board::Get().flags & OPENSHOCK_BOARD_FLAG_ESTOP_LATCHING) != 0;
+}
+
 EStopConfig::EStopConfig()
   : enabled(OpenShock::IsValidInputPin(Board::Get().estopGpio))
   , gpioPin(static_cast<gpio_num_t>(Board::Get().estopGpio))
+  , latching(defaultLatching())
+  , active(false)
 {
 }
 
 EStopConfig::EStopConfig(bool enabled, gpio_num_t gpioPin)
+  : EStopConfig(enabled, gpioPin, defaultLatching(), false)
+{
+}
+
+EStopConfig::EStopConfig(bool enabled, gpio_num_t gpioPin, bool latching, bool active)
   : enabled(enabled)
   , gpioPin(gpioPin)
+  , latching(latching)
+  , active(active)
 {
 }
 
 void EStopConfig::ToDefault()
 {
-  enabled = OpenShock::IsValidInputPin(Board::Get().estopGpio);
-  gpioPin = static_cast<gpio_num_t>(Board::Get().estopGpio);
+  enabled  = OpenShock::IsValidInputPin(Board::Get().estopGpio);
+  gpioPin  = static_cast<gpio_num_t>(Board::Get().estopGpio);
+  latching = defaultLatching();
+  active   = false;
 }
 
 bool EStopConfig::FromFlatbuffers(const Serialization::Configuration::EStopConfig* config)
@@ -40,11 +57,15 @@ bool EStopConfig::FromFlatbuffers(const Serialization::Configuration::EStopConfi
   if (!pin) {
     OS_LOGW(TAG, "Invalid E-Stop GPIO pin %d, using default", config->gpio_pin());
     ToDefault();
+    latching = config->latching();
+    active   = config->active();  // Never drop an active E-Stop, even when the rest of the section is unusable
     return true;
   }
 
-  gpioPin = *pin;
-  enabled = config->enabled();
+  gpioPin  = *pin;
+  enabled  = config->enabled();
+  latching = config->latching();
+  active   = config->active();
   Normalize();
 
   return true;
@@ -52,13 +73,17 @@ bool EStopConfig::FromFlatbuffers(const Serialization::Configuration::EStopConfi
 
 flatbuffers::Offset<OpenShock::Serialization::Configuration::EStopConfig> EStopConfig::ToFlatbuffers(flatbuffers::FlatBufferBuilder& builder, bool withSensitiveData) const
 {
-  return Serialization::Configuration::CreateEStopConfig(builder, enabled, gpioPin);
+  return Serialization::Configuration::CreateEStopConfig(builder, enabled, gpioPin, active, latching);
 }
 
+// `active` is owned by EStopManager (persisted on every state change, restored on boot). JSON import never touches it,
+// so a jsonconfig can't release an active E-Stop across a reboot.
 bool EStopConfig::FromJSON(JSON::JsonView json)
 {
   if (!json.valid()) {
+    bool wasActive = active;
     ToDefault();  // Set to default if config is null
+    active = wasActive;
     return true;
   }
 
@@ -79,6 +104,17 @@ bool EStopConfig::FromJSON(JSON::JsonView json)
   } else {
     enabled = OpenShock::IsValidInputPin(gpioPin);
   }
+
+  if (JSON::JsonView latchingJson = json["latching"]; latchingJson.valid()) {
+    auto parsed = latchingJson.tryGetBool();
+    if (!parsed) {
+      OS_LOGE(TAG, "Failed to parse latching");
+      return false;
+    }
+    latching = *parsed;
+  } else {
+    latching = defaultLatching();
+  }
   Normalize();
 
   return true;
@@ -98,5 +134,7 @@ void EStopConfig::ToJSON(json_gen_str_t* gen, const char* name, bool withSensiti
   JSON::objBegin(gen, name);
   json_gen_obj_set_bool(gen, "enabled", enabled);
   json_gen_obj_set_int(gen, "gpioPin", gpioPin);
+  json_gen_obj_set_bool(gen, "latching", latching);
+  json_gen_obj_set_bool(gen, "active", active);
   JSON::objEnd(gen, name);
 }

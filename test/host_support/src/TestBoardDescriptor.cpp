@@ -15,7 +15,7 @@ namespace {
     desc.estopGpio                  = OPENSHOCK_ESTOP_PIN;
     desc.ledGpio                    = OPENSHOCK_LED_GPIO;
     desc.ws2812bGpio                = OPENSHOCK_LED_WS2812B;
-    desc.flags                      = OPENSHOCK_LED_SWAP_RG_CHANNELS ? OPENSHOCK_BOARD_FLAG_LED_SWAP_RG : 0u;
+    desc.flags                      = (OPENSHOCK_LED_SWAP_RG_CHANNELS ? OPENSHOCK_BOARD_FLAG_LED_SWAP_RG : 0u) | (OPENSHOCK_ESTOP_LATCHING ? OPENSHOCK_BOARD_FLAG_ESTOP_LATCHING : 0u);
     desc.gpioBypassMask             = OPENSHOCK_GPIO_BYPASS_MASK;
     return OpenShock::Board::Seal(desc);
   }

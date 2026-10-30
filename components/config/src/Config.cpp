@@ -866,3 +866,41 @@ bool Config::SetEStopGpioPin(gpio_num_t gpioPin)
     return true;
   });
 }
+
+std::optional<bool> Config::GetEStopLatching()
+{
+  CONFIG_LOCK_READ(std::nullopt);
+
+  return _configData.estop.latching;
+}
+
+bool Config::SetEStopLatching(bool latching)
+{
+  CONFIG_LOCK_WRITE(false);
+
+  return mutateAndSave([&](Config::RootConfig& root) {
+    root.estop.latching = latching;
+    return true;
+  });
+}
+
+std::optional<bool> Config::GetEStopActive()
+{
+  CONFIG_LOCK_READ(std::nullopt);
+
+  return _configData.estop.active;
+}
+
+bool Config::SetEStopActive(bool active)
+{
+  CONFIG_LOCK_WRITE(false);
+
+  if (_configData.estop.active == active) {
+    return true;
+  }
+
+  return mutateAndSave([&](Config::RootConfig& root) {
+    root.estop.active = active;
+    return true;
+  });
+}

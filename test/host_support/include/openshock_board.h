@@ -7,6 +7,7 @@
 // component's CMakeLists.txt.
 #pragma once
 
+#define OPENSHOCK_ESTOP_LATCHING       0
 #define OPENSHOCK_ESTOP_PIN            -1
 #define OPENSHOCK_FW_BOARD             "HostTest"
 #define OPENSHOCK_FW_BOARD_HOSTTEST    1

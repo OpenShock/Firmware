@@ -110,4 +110,8 @@ namespace OpenShock::Config {
   bool SetEStopEnabled(bool enabled);
   [[nodiscard]] std::optional<gpio_num_t> GetEStopGpioPin();
   bool SetEStopGpioPin(gpio_num_t gpioPin);
+  [[nodiscard]] std::optional<bool> GetEStopLatching();
+  bool SetEStopLatching(bool latching);
+  [[nodiscard]] std::optional<bool> GetEStopActive();
+  bool SetEStopActive(bool active);
 }  // namespace OpenShock::Config

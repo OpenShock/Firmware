@@ -38,7 +38,8 @@
 #define OPENSHOCK_BOARD_DESCRIPTOR_IMAGE_OFFSET   0x120u  // sizeof(esp_image_header_t) + sizeof(esp_image_segment_header_t) + sizeof(esp_app_desc_t)
 
 // BoardDescriptor::flags bits.
-#define OPENSHOCK_BOARD_FLAG_LED_SWAP_RG (1u << 0)  // The WS2812B expects RGB rather than GRB order
+#define OPENSHOCK_BOARD_FLAG_LED_SWAP_RG    (1u << 0)  // The WS2812B expects RGB rather than GRB order
+#define OPENSHOCK_BOARD_FLAG_ESTOP_LATCHING (1u << 1)  // The E-Stop is a latching switch by default rather than a momentary button
 
 namespace OpenShock {
   struct alignas(8) BoardDescriptor {

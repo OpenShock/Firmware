@@ -235,7 +235,14 @@ TEST_CASE("jsonconfig set accepts JSON exported by 1.5.2 firmware", "[config][le
 TEST_CASE("jsonconfig get emits the same document develop did", "[config][legacy][json]")
 {
   TEST_ASSERT_TRUE(InitFrom(Legacy::kDevelopConfig, sizeof(Legacy::kDevelopConfig)));
-  TEST_ASSERT_EQUAL_STRING(kDevelopJson, Config::GetAsJSON(true).c_str());
+
+  // Same document plus the E-Stop's latching/active keys, which develop did not emit yet.
+  std::string expected       = kDevelopJson;
+  const std::string oldEStop = R"("estop":{"enabled":true,"gpioPin":13})";
+  const size_t pos           = expected.find(oldEStop);
+  TEST_ASSERT_NOT_EQUAL(std::string::npos, pos);
+  expected.replace(pos, oldEStop.size(), R"("estop":{"enabled":true,"gpioPin":13,"latching":false,"active":false})");
+  TEST_ASSERT_EQUAL_STRING(expected.c_str(), Config::GetAsJSON(true).c_str());
 }
 
 TEST_CASE("Fields from a newer schema are tolerated on load", "[config][legacy]")

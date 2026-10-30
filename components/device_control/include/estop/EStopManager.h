@@ -8,10 +8,11 @@
 
 namespace OpenShock::EStopManager {
   [[nodiscard]] bool Init();
-  // Both apply the change to the running E-Stop and then persist it to the config (like CommandHandler::SetRfTxPin),
+  // These apply the change to the running E-Stop and then persist it to the config (like CommandHandler::SetRfTxPin),
   // so callers don't have to keep the two in sync. They refuse while the E-Stop is active.
   bool SetEStopEnabled(bool enabled);
   bool SetEStopPin(gpio_num_t pin);
+  bool SetEStopLatching(bool latching);
   bool IsEStopped();
   int64_t LastEStopped();
 
