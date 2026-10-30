@@ -3,8 +3,8 @@
 
 Pipeline:
   1. Build the SvelteKit frontend (pnpm) when its sources are newer than the last build (unless --skip-frontend-build, which CI passes).
-  2. Gzip every built asset (a prebuilt <name>.gz is taken as-is).
-  3. Pack them into one flat read-only image (scripts/utils/wwwimage.py), checked to fit the smallest `www` partition.
+  2. Gzip every built asset (the frontend build emits plain files; compression happens here).
+  3. Pack them into one read-only image (scripts/utils/wwwimage.py), checked to fit the smallest `www` partition.
 
 The output is reproducible: gzip headers carry no timestamp and entries are sorted, so an unchanged frontend gives a
 byte-identical www.bin (and the same hash, so devices don't re-flash it). One image serves every board: it is not
@@ -104,28 +104,15 @@ def gzip_bytes(raw: bytes) -> bytes:
 
 
 def collect_assets(build_dir: Path) -> list[wwwimage.Entry]:
-    """Every file under build_dir as a gzipped entry at its relative path (a prebuilt <name>.gz wins over <name>)."""
-    files: dict[str, Path] = {}
+    """Every file under build_dir, gzipped, as an entry at its relative path."""
+    entries = []
     for root, dirs, names in os.walk(build_dir):
         dirs.sort()
         for name in sorted(names):
             src = Path(root) / name
-            files[src.relative_to(build_dir).as_posix()] = src
-
-    entries = []
-    for rel, src in files.items():
-        if rel.endswith('.gz'):
-            continue
-        prebuilt = files.get(rel + '.gz')
-        data = prebuilt.read_bytes() if prebuilt is not None else gzip_bytes(src.read_bytes())
-        entries.append(wwwimage.Entry(rel, data, gzip=True, immutable=rel.startswith(IMMUTABLE_PREFIXES)))
-    # A .gz with no raw sibling is an asset of its own, served under the name without .gz
-    for rel, src in files.items():
-        if rel.endswith('.gz') and rel[: -len('.gz')] not in files:
+            rel = src.relative_to(build_dir).as_posix()
             entries.append(
-                wwwimage.Entry(
-                    rel[: -len('.gz')], src.read_bytes(), gzip=True, immutable=rel.startswith(IMMUTABLE_PREFIXES)
-                )
+                wwwimage.Entry(rel, gzip_bytes(src.read_bytes()), immutable=rel.startswith(IMMUTABLE_PREFIXES))
             )
 
     if not any(e.path == 'index.html' for e in entries):

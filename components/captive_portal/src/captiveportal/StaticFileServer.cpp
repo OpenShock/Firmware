@@ -354,19 +354,19 @@ esp_err_t CaptivePortal::StaticFileServer::staticFileHandler(httpd_req_t* req)
 
 esp_err_t CaptivePortal::StaticFileServer::serveFromImage(httpd_req_t* req, std::string_view uri, bool wantsGzip)
 {
-  // Stored without the leading slash. Each asset exists in one encoding only.
+  // Stored without the leading slash. Every body in the image is gzipped.
   auto asset = m_www.find(uri.substr(1));
   if (!asset) {
     // Unknown path -> captive redirect (the index fallback of a static server).
     return RFC8908::EmitRedirect(req);
   }
-  if (asset->gzip() && !wantsGzip) {
+  if (!wantsGzip) {
     return sendNotAcceptable(req);
   }
 
   Representation rep {
     .contentType  = contentTypeForPath(uri),
-    .gzip         = asset->gzip(),
+    .gzip         = true,
     .cacheControl = asset->immutable() ? kCacheControlImmutable : kCacheControl,
     .etag         = m_etag.empty() ? nullptr : m_etag.c_str(),
     .size         = asset->body.size(),

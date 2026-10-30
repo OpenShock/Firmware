@@ -1,22 +1,27 @@
-"""The `www` image: the captive-portal assets as one flat, read-only directory the firmware maps and serves.
+"""The `www` image: the captive-portal assets as one read-only directory tree the firmware maps and serves.
 
 Mirrors components/www/include/www/WwwImage.h; change both together and bump VERSION.
 
     header (64 B)
       magic      u32   'OSWW' as little-endian bytes
       version    u16   1
-      count      u16   number of entries
-      dir_len    u32   bytes of entries + string table (+ padding to 4)
+      node_count u16   number of nodes, the root and directories included
+      dir_len    u32   bytes of nodes + string table (+ padding to 4)
       body_hash  u8[32]  sha256 of the whole image with this field zeroed
       reserved   u8[20]  zero
-    entry (16 B) x count, sorted by path (byte order)
-      path_off   u16   offset into the string table
-      flags      u16   bit0 gzip, bit1 immutable (long cache)
-      offset     u32   body offset from the start of the image
-      size       u32   bytes
+    node (16 B) x node_count
+      name_off   u16   offset into the string table
+      flags      u16   bit0 directory, bit1 immutable (files only; long cache)
+      offset     u32   directory: index of its first child; file: body offset from the start of the image
+      size       u32   directory: number of children; file: body bytes
       reserved   u32   zero
-    string table: NUL-terminated paths, no leading slash, forward slashes
-    bodies: in entry order, each padded to 4 bytes
+    string table: NUL-terminated names, one path component each (no '/')
+    bodies: in node order, each padded to 4 bytes
+
+Node 0 is the root directory (empty name). A directory's children are one contiguous run of nodes, strictly
+sorted by name (byte order), and the runs are laid out breadth-first: walking the nodes in order, each directory's
+run starts where the previous one ended, the first right after the root. Every body is gzipped; there is no flag
+for it.
 
 Everything is 4-byte aligned. The output is a pure function of the entries: no timestamps, sorted order, so an
 unchanged frontend gives a byte-identical image and the device can skip re-flashing it.
@@ -24,22 +29,23 @@ unchanged frontend gives a byte-identical image and the device can skip re-flash
 
 import hashlib
 import struct
+from collections import deque
 from dataclasses import dataclass
 
 MAGIC = 0x5757534F  # 'OSWW'
 VERSION = 1
 HEADER_LEN = 64
-ENTRY_LEN = 16
+NODE_LEN = 16
 HEADER_FORMAT = '<IHHI32s20s'
-ENTRY_FORMAT = '<HHIII'
+NODE_FORMAT = '<HHIII'
 BODY_HASH_LEN = 32
 HEADER_RESERVED_LEN = 20
 ALIGN = 4
 
-FLAG_GZIP = 1 << 0
+FLAG_DIRECTORY = 1 << 0
 FLAG_IMMUTABLE = 1 << 1
 
-MAX_PATH_LEN = 255  # the string table is addressed by u16; this keeps a path comfortably below it
+MAX_NAME_LEN = 255  # the string table is addressed by u16; this keeps a name comfortably below it
 
 
 class WwwImageError(ValueError):
@@ -49,72 +55,120 @@ class WwwImageError(ValueError):
 @dataclass(frozen=True)
 class Entry:
     path: str
-    data: bytes
-    gzip: bool = False
+    data: bytes  # gzipped
     immutable: bool = False
 
     @property
     def flags(self) -> int:
-        return (FLAG_GZIP if self.gzip else 0) | (FLAG_IMMUTABLE if self.immutable else 0)
+        return FLAG_IMMUTABLE if self.immutable else 0
 
 
 def _pad(length: int) -> int:
     return (-length) % ALIGN
 
 
-def _check_path(path: str) -> bytes:
+def _check_path(path: str) -> list[bytes]:
+    """The path's components, encoded. Raises WwwImageError for anything the firmware would not look up."""
     if not path or path.startswith('/') or '\\' in path or '//' in path or path.endswith('/'):
         raise WwwImageError(f'bad asset path {path!r}: no leading or trailing slash, forward slashes only')
-    if any(part in ('.', '..') for part in path.split('/')):
+    parts = path.split('/')
+    if any(part in ('.', '..') for part in parts):
         raise WwwImageError(f'bad asset path {path!r}: no . or .. components')
-    encoded = path.encode('utf-8')
-    if len(encoded) > MAX_PATH_LEN or b'\0' in encoded:
-        raise WwwImageError(f'bad asset path {path!r}: at most {MAX_PATH_LEN} bytes, no NUL')
+    encoded = [part.encode('utf-8') for part in parts]
+    if any(len(part) > MAX_NAME_LEN or b'\0' in part for part in encoded):
+        raise WwwImageError(f'bad asset path {path!r}: at most {MAX_NAME_LEN} bytes per name, no NUL')
     return encoded
 
 
+class _Dir:
+    __slots__ = ('children',)
+
+    def __init__(self) -> None:
+        self.children: dict[bytes, _Dir | Entry] = {}
+
+
+def _build_tree(entries: list[Entry]) -> _Dir:
+    root = _Dir()
+    for entry in entries:
+        *dirs, leaf = _check_path(entry.path)
+        node = root
+        for name in dirs:
+            child = node.children.get(name)
+            if child is None:
+                child = _Dir()
+                node.children[name] = child
+            elif not isinstance(child, _Dir):
+                raise WwwImageError(f'{entry.path!r}: {name.decode()!r} is both a file and a directory')
+            node = child
+        existing = node.children.get(leaf)
+        if isinstance(existing, _Dir):
+            raise WwwImageError(f'{entry.path!r}: {leaf.decode()!r} is both a file and a directory')
+        if existing is not None:
+            raise WwwImageError(f'duplicate asset path {entry.path!r}')
+        node.children[leaf] = entry
+    return root
+
+
 def pack(entries: list[Entry]) -> bytes:
-    """The image bytes for these entries, sorted by path. Raises WwwImageError on a bad or duplicate path."""
-    ordered = sorted(entries, key=lambda e: e.path.encode('utf-8'))
-    paths = [_check_path(e.path) for e in ordered]
-    if len(set(paths)) != len(paths):
-        raise WwwImageError('duplicate asset path')
-    if len(ordered) > 0xFFFF:
-        raise WwwImageError('too many assets')
+    """The image bytes for these entries. Raises WwwImageError on a bad, duplicate or conflicting path."""
+    root = _build_tree(entries)
+
+    # Breadth-first layout: node 0 is the root; each directory's children are one sorted run, allocated in node order.
+    # A node is [name, flags, offset, size, data]; data is None for a directory.
+    nodes: list[list] = [[b'', FLAG_DIRECTORY, 0, 0, None]]
+    queue: deque[tuple[_Dir, int]] = deque([(root, 0)])
+    while queue:
+        directory, index = queue.popleft()
+        names = sorted(directory.children)
+        nodes[index][2] = len(nodes)
+        nodes[index][3] = len(names)
+        for name in names:
+            child = directory.children[name]
+            if isinstance(child, _Dir):
+                nodes.append([name, FLAG_DIRECTORY, 0, 0, None])
+                queue.append((child, len(nodes) - 1))
+            else:
+                nodes.append([name, child.flags, 0, len(child.data), child.data])
+    if len(nodes) > 0xFFFF:
+        raise WwwImageError('too many nodes')
 
     strings = bytearray()
-    path_offsets = []
-    for path in paths:
-        path_offsets.append(len(strings))
-        strings += path + b'\0'
+    name_offsets: dict[bytes, int] = {}
+    for name, *_ in nodes:
+        if name not in name_offsets:
+            name_offsets[name] = len(strings)
+            strings += name + b'\0'
     if len(strings) > 0xFFFF:
         raise WwwImageError('string table too large')
 
-    dir_len = ENTRY_LEN * len(ordered) + len(strings)
+    dir_len = NODE_LEN * len(nodes) + len(strings)
     dir_len += _pad(dir_len)
 
     body_offset = HEADER_LEN + dir_len
     table = bytearray()
     bodies = bytearray()
-    for entry, path_off in zip(ordered, path_offsets, strict=True):
-        table += struct.pack(ENTRY_FORMAT, path_off, entry.flags, body_offset + len(bodies), len(entry.data), 0)
-        bodies += entry.data
-        bodies += b'\0' * _pad(len(entry.data))
+    for name, flags, offset, size, data in nodes:
+        if data is not None:
+            offset = body_offset + len(bodies)
+            bodies += data
+            bodies += b'\0' * _pad(len(data))
+        table += struct.pack(NODE_FORMAT, name_offsets[name], flags, offset, size, 0)
 
     directory = bytes(table) + bytes(strings)
     directory += b'\0' * (dir_len - len(directory))
     after_header = directory + bytes(bodies)
     reserved = b'\0' * HEADER_RESERVED_LEN
-    header = struct.pack(HEADER_FORMAT, MAGIC, VERSION, len(ordered), dir_len, b'\0' * BODY_HASH_LEN, reserved)
+    header = struct.pack(HEADER_FORMAT, MAGIC, VERSION, len(nodes), dir_len, b'\0' * BODY_HASH_LEN, reserved)
     body_hash = hashlib.sha256(header + after_header).digest()
-    header = struct.pack(HEADER_FORMAT, MAGIC, VERSION, len(ordered), dir_len, body_hash, reserved)
+    header = struct.pack(HEADER_FORMAT, MAGIC, VERSION, len(nodes), dir_len, body_hash, reserved)
     return header + after_header
 
 
 @dataclass(frozen=True)
 class Image:
-    entries: tuple[Entry, ...]
+    entries: tuple[Entry, ...]  # every file, with its full path, depth-first
     body_hash: bytes
+    node_count: int
     size: int  # bytes of the image, header to the end of the last body's padding
 
     def find(self, path: str) -> Entry | None:
@@ -130,68 +184,89 @@ def parse(data: bytes) -> Image:
         raise WwwImageError(f'bad magic 0x{magic:08X}')
     if version != VERSION:
         raise WwwImageError(f'unsupported version {version}')
-    if dir_len % ALIGN or dir_len < ENTRY_LEN * count or HEADER_LEN + dir_len > len(data):
+    if dir_len % ALIGN or dir_len < NODE_LEN * count or HEADER_LEN + dir_len > len(data):
         raise WwwImageError('directory length out of range')
     if reserved != b'\0' * HEADER_RESERVED_LEN:
         raise WwwImageError('reserved header field not zero')
-    strings_start = HEADER_LEN + ENTRY_LEN * count
+    if count == 0:
+        raise WwwImageError('no root node')
+    strings_start = HEADER_LEN + NODE_LEN * count
     strings = data[strings_start : HEADER_LEN + dir_len]
     body_start = HEADER_LEN + dir_len
 
-    entries = []
+    nodes = [struct.unpack_from(NODE_FORMAT, data, HEADER_LEN + NODE_LEN * index) for index in range(count)]
+    names: list[bytes] = []
+    next_run = 1
     end = body_start
-    previous = None
-    for index in range(count):
-        path_off, flags, offset, size, entry_reserved = struct.unpack_from(
-            ENTRY_FORMAT, data, HEADER_LEN + ENTRY_LEN * index
-        )
-        if path_off >= len(strings):
-            raise WwwImageError(f'entry {index}: path offset out of range')
-        nul = strings.find(b'\0', path_off)
+    for index, (name_off, flags, offset, size, node_reserved) in enumerate(nodes):
+        if name_off >= len(strings):
+            raise WwwImageError(f'node {index}: name offset out of range')
+        nul = strings.find(b'\0', name_off)
         if nul < 0:
-            raise WwwImageError(f'entry {index}: unterminated path')
-        path = strings[path_off:nul]
-        if previous is not None and path <= previous:
-            raise WwwImageError(f'entry {index}: paths not strictly increasing')
-        previous = path
-        if offset < body_start or offset % ALIGN or offset + size > len(data) or offset + size < offset:
-            raise WwwImageError(f'entry {index}: body out of range')
-        if flags & ~(FLAG_GZIP | FLAG_IMMUTABLE):
-            raise WwwImageError(f'entry {index}: unknown flags 0x{flags:04X}')
-        if entry_reserved:
-            raise WwwImageError(f'entry {index}: reserved field not zero')
-        entries.append(
-            Entry(
-                path.decode('utf-8'),
-                data[offset : offset + size],
-                bool(flags & FLAG_GZIP),
-                bool(flags & FLAG_IMMUTABLE),
-            )
-        )
-        end = max(end, offset + size + _pad(size))
+            raise WwwImageError(f'node {index}: unterminated name')
+        name = strings[name_off:nul]
+        if index == 0:
+            if name or not flags & FLAG_DIRECTORY:
+                raise WwwImageError('node 0 is not the root directory')
+        elif not name or b'/' in name or name in (b'.', b'..'):
+            raise WwwImageError(f'node {index}: bad name {name!r}')
+        if flags & ~(FLAG_DIRECTORY | FLAG_IMMUTABLE):
+            raise WwwImageError(f'node {index}: unknown flags 0x{flags:04X}')
+        if node_reserved:
+            raise WwwImageError(f'node {index}: reserved field not zero')
+        if flags & FLAG_DIRECTORY:
+            if flags & FLAG_IMMUTABLE:
+                raise WwwImageError(f'node {index}: immutable directory')
+            if offset != next_run or size > count - next_run:
+                raise WwwImageError(f'node {index}: bad child run')
+            next_run += size
+        else:
+            if offset < body_start or offset % ALIGN or offset + size > len(data) or offset + size < offset:
+                raise WwwImageError(f'node {index}: body out of range')
+            end = max(end, offset + size + _pad(size))
+        names.append(name)
+    if next_run != count:
+        raise WwwImageError('unreachable nodes')
+    for index, (_, flags, offset, size, _) in enumerate(nodes):
+        if flags & FLAG_DIRECTORY:
+            run = names[offset : offset + size]
+            if any(a >= b for a, b in zip(run, run[1:], strict=False)):
+                raise WwwImageError(f'node {index}: children not strictly increasing')
 
     hashed = data[:12] + b'\0' * BODY_HASH_LEN + data[12 + BODY_HASH_LEN : end]
     if hashlib.sha256(hashed).digest() != body_hash:
         raise WwwImageError('image hash mismatch')
-    return Image(tuple(entries), body_hash, end)
+
+    entries: list[Entry] = []
+
+    def walk(index: int, prefix: bytes) -> None:
+        _, _, first, child_count, _ = nodes[index]
+        for child in range(first, first + child_count):
+            _, flags, offset, size, _ = nodes[child]
+            path = prefix + names[child]
+            if flags & FLAG_DIRECTORY:
+                walk(child, path + b'/')
+            else:
+                entries.append(Entry(path.decode('utf-8'), data[offset : offset + size], bool(flags & FLAG_IMMUTABLE)))
+
+    walk(0, b'')
+    return Image(tuple(entries), body_hash, count, end)
 
 
 def main(argv: list[str] | None = None) -> int:
-    """``wwwimage.py <dir> <out.bin> [--gzip]``: pack a directory as-is. Test fixtures only; the build uses gen_staticfs.py."""
+    """``wwwimage.py <dir> <out.bin>``: pack a directory as-is. Test fixtures only; the build uses gen_staticfs.py."""
     import argparse
     from pathlib import Path
 
     ap = argparse.ArgumentParser(description='Pack a directory into a www image without gzipping (test fixtures)')
     ap.add_argument('directory', type=Path)
     ap.add_argument('output', type=Path)
-    ap.add_argument('--gzip', action='store_true', help='mark every entry as gzipped (the bytes are taken as-is)')
     args = ap.parse_args(argv)
 
     entries = [
         Entry(
             p.relative_to(args.directory).as_posix(),
             p.read_bytes(),
-            gzip=args.gzip,
             immutable='/immutable/' in f'/{p.relative_to(args.directory).as_posix()}',
         )
         for p in sorted(args.directory.rglob('*'))

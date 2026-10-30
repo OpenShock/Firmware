@@ -83,7 +83,7 @@ bool Www::Partition::mount(const esp_partition_t* partition)
   }
 
   m_image.emplace(*image);
-  OS_LOGI(TAG, "Mapped %u assets (%u bytes) from %s", static_cast<unsigned>(m_image->Count()), static_cast<unsigned>(m_image->ImageSize()), partition->label);
+  OS_LOGI(TAG, "Mapped www image from %s: %u nodes, %u bytes", partition->label, static_cast<unsigned>(m_image->Count()), static_cast<unsigned>(m_image->ImageSize()));
   return true;
 }
 

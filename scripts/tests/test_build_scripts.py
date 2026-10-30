@@ -98,7 +98,6 @@ def test_collected_assets_are_byte_identical_across_runs(tmp_path):
 
     assert first == second
     assert sorted(e.path for e in first) == ['assets/app.js', 'index.html']
-    assert all(e.gzip for e in first)
     assert wwwimage.pack(first) == wwwimage.pack(second)
 
 
@@ -120,19 +119,19 @@ def test_frontend_build_is_current_tracks_source_changes(tmp_path):
     assert not gen_staticfs.frontend_build_is_current(frontend, frontend / 'build')
 
 
-def test_collected_assets_gzip_everything_but_prebuilt_gz(tmp_path):
+def test_collected_assets_are_all_gzipped_by_the_generator(tmp_path):
+    # The frontend build emits plain files; a name ending in .gz is just another asset, compressed like the rest
     build = tmp_path / 'build'
     build.mkdir()
     (build / 'index.html').write_text('<title>x</title>', encoding='utf-8')
     (build / 'font.woff2.gz').write_bytes(b'already')
     (build / 'app.js').write_text('1', encoding='utf-8')
-    (build / 'app.js.gz').write_bytes(b'prebuilt')
 
     entries = {e.path: e for e in gen_staticfs.collect_assets(build)}
 
-    assert sorted(entries) == ['app.js', 'font.woff2', 'index.html']
-    assert entries['font.woff2'].data == b'already'
-    assert entries['app.js'].data == b'prebuilt'
+    assert sorted(entries) == ['app.js', 'font.woff2.gz', 'index.html']
+    assert gzip.decompress(entries['font.woff2.gz'].data) == b'already'
+    assert gzip.decompress(entries['app.js'].data) == b'1'
     assert gzip.decompress(entries['index.html'].data) == b'<title>x</title>'
 
 
@@ -193,4 +192,3 @@ def test_main_takes_the_smallest_of_every_limit(tmp_path, monkeypatch):
 
     with pytest.raises(SystemExit):
         gen_staticfs.main(args)  # no limit at all
-

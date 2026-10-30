@@ -37,7 +37,7 @@ else()
 endif()
 set(_scripts_dir ${CMAKE_CURRENT_LIST_DIR}/../../../../scripts)
 execute_process(
-  COMMAND ${_python} -m utils.wwwimage ${_fixture_dir}/assets ${_fixture_dir}/assets.bin --gzip
+  COMMAND ${_python} -m utils.wwwimage ${_fixture_dir}/assets ${_fixture_dir}/assets.bin
   WORKING_DIRECTORY ${_scripts_dir}
   RESULT_VARIABLE _rc)
 if(NOT _rc EQUAL 0)
