@@ -26,6 +26,7 @@ namespace ConfigTest {
     config.serialInput   = Config::SerialInputConfig(false);
     config.otaUpdate     = Config::OtaUpdateConfig(false, "fw.example.org", OtaUpdateChannel::Develop, true, true, 120, false, true, 4242, OtaUpdateStep::Validating);
     config.estop         = Config::EStopConfig(true, GPIO_NUM_13);
+    config.diagnostics   = Config::DiagnosticsConfig(true, DiagnosticsLogLevel::Warn);
 
     return config;
   }
@@ -93,6 +94,7 @@ namespace ConfigTest {
     config.serialInput   = get(Config::GetSerialInputConfig());
     config.otaUpdate     = get(Config::GetOtaUpdateConfig());
     config.estop         = get(Config::GetEStopConfig());
+    config.diagnostics   = get(Config::GetDiagnosticsConfig());
     return config;
   }
 
@@ -139,5 +141,8 @@ namespace ConfigTest {
 
     TEST_ASSERT_EQUAL_MESSAGE(expected.estop.enabled, actual.estop.enabled, "estop.enabled");
     TEST_ASSERT_EQUAL_INT_MESSAGE(expected.estop.gpioPin, actual.estop.gpioPin, "estop.gpioPin");
+
+    TEST_ASSERT_EQUAL_MESSAGE(expected.diagnostics.coredumpUpload, actual.diagnostics.coredumpUpload, "diagnostics.coredumpUpload");
+    TEST_ASSERT_EQUAL_UINT8_MESSAGE(std::to_underlying(expected.diagnostics.logUploadLevel), std::to_underlying(actual.diagnostics.logUploadLevel), "diagnostics.logUploadLevel");
   }
 }  // namespace ConfigTest

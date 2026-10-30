@@ -2,6 +2,8 @@
 
 #include "serial_console/command_handlers/CommandEntry.h"
 
+#include <sdkconfig.h>
+
 #include <vector>
 
 namespace OpenShock::SerialCmds::CommandHandlers {
@@ -22,27 +24,24 @@ namespace OpenShock::SerialCmds::CommandHandlers {
   OpenShock::SerialCmds::CommandGroup RfTransmitHandler();
   OpenShock::SerialCmds::CommandGroup FactoryResetHandler();
   OpenShock::SerialCmds::CommandGroup LedTestHandler();
+#if CONFIG_OPENSHOCK_DIAG
+  OpenShock::SerialCmds::CommandGroup DiagHandler();
+#endif
+#if CONFIG_OPENSHOCK_DIAG_SDCARD
+  OpenShock::SerialCmds::CommandGroup SdCardHandler();
+#endif
 
   inline std::vector<OpenShock::SerialCmds::CommandGroup> AllCommandHandlers()
   {
     return {
-      VersionHandler(),
-      RestartHandler(),
-      SysInfoHandler(),
-      EchoHandler(),
-      ValidGpiosHandler(),
-      RfTxPinHandler(),
-      EStopHandler(),
-      DomainHandler(),
-      AuthTokenHandler(),
-      HostnameHandler(),
-      NetworksHandler(),
-      KeepAliveHandler(),
-      JsonConfigHandler(),
-      RawConfigHandler(),
-      RfTransmitHandler(),
-      FactoryResetHandler(),
-      LedTestHandler(),
+      VersionHandler(),  RestartHandler(),  SysInfoHandler(),   EchoHandler(),       ValidGpiosHandler(), RfTxPinHandler(),    EStopHandler(),        DomainHandler(),  AuthTokenHandler(),
+      HostnameHandler(), NetworksHandler(), KeepAliveHandler(), JsonConfigHandler(), RawConfigHandler(),  RfTransmitHandler(), FactoryResetHandler(), LedTestHandler(),
+#if CONFIG_OPENSHOCK_DIAG
+      DiagHandler(),
+#endif
+#if CONFIG_OPENSHOCK_DIAG_SDCARD
+      SdCardHandler(),
+#endif
     };
   }
 }  // namespace OpenShock::SerialCmds::CommandHandlers

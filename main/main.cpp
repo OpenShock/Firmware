@@ -7,6 +7,7 @@ const char* const TAG = "main";
 #include "Chipset.h"
 #include "CommandHandler.h"
 #include "config/Config.h"
+#include "diagnostics/Diagnostics.h"
 #include "estop/EStopManager.h"
 #include "events/Events.h"
 #include "GatewayConnectionManager.h"
@@ -138,6 +139,12 @@ extern "C" void app_main()
 
   OpenShock::Config::Init();
 
+#if CONFIG_OPENSHOCK_DIAG
+  // After the config, which holds the upload opt-ins, and before WiFi: with the SD card this mounts the card and copies a
+  // pending crash dump to it.
+  OpenShock::Diagnostics::Init();
+#endif
+
   if (!OpenShock::Events::Init()) {
     OS_PANIC(TAG, "Unable to initialize Events");
   }
@@ -154,6 +161,9 @@ extern "C" void app_main()
 
   while (true) {
     OpenShock::GatewayConnectionManager::Update();
+#if CONFIG_OPENSHOCK_DIAG
+    OpenShock::Diagnostics::Update([] { return OpenShock::GatewayConnectionManager::IsConnected(); });
+#endif
 
     vTaskDelay(5);  // 5 ticks update interval
   }

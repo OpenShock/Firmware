@@ -226,6 +226,8 @@ jobs:
         with:
           variant: ${{ matrix.variant }}
           version: ${{ needs.plan.outputs.version }}
+          # Never for a pull request: its code is the contributor's, so its builds upload nothing.
+          diag-upload-domain: ${{ github.event_name != 'pull_request' && vars.DIAG_UPLOAD_DOMAIN || '' }}
 
   # Stamp every board from its variant and merge it with static0. One job: it is seconds of work per board.
   package:

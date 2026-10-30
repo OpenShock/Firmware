@@ -13,6 +13,12 @@ An unknown variant id lists the variants and their boards.
 CI builds of the stable channel compile with -Os, everything else with -Og (utils/github.py:build_optimization).
 OPENSHOCK_FW_OPTIMIZATION=size|debug overrides it; a local size build goes to build/<board>-size/.
 
+OPENSHOCK_EXTRA_DEFAULTS layers more sdkconfig fragments (';'-separated, relative to the repository) after the board's,
+such as the SD card options of .github/diagnostics-compile.defaults.
+
+OPENSHOCK_DIAG_UPLOAD_DOMAIN sets CONFIG_OPENSHOCK_DIAG_UPLOAD_DOMAIN, the domain crash dumps and logs are uploaded to;
+without it uploading is compiled out. An existing sdkconfig keeps its value: reconfigure after changing it.
+
 Examples:
     python scripts/build.py OpenShock-Core-V2                 # full build
     python scripts/build.py OpenShock-Core-V2 app bootloader partition-table
@@ -78,6 +84,25 @@ def optimization_kconfig(optimization: str) -> str:
     return f'# Optimization: {optimization}\n' + ''.join(f'{line}\n' for line in OPTIMIZATION_KCONFIG[optimization])
 
 
+def extra_defaults() -> str:
+    """OPENSHOCK_EXTRA_DEFAULTS as a ';'-prefixed tail for SDKCONFIG_DEFAULTS; every file must exist."""
+    extra = [entry.strip() for entry in os.environ.get('OPENSHOCK_EXTRA_DEFAULTS', '').split(';') if entry.strip()]
+    for entry in extra:
+        if not (ROOT / entry).is_file():
+            raise SystemExit(f'error: OPENSHOCK_EXTRA_DEFAULTS names {entry!r}, which does not exist')
+    return ''.join(f';{entry}' for entry in extra)
+
+
+def diag_kconfig() -> str:
+    """The diagnostics upload domain from OPENSHOCK_DIAG_UPLOAD_DOMAIN; nothing (uploading compiled out) without it."""
+    domain = os.environ.get('OPENSHOCK_DIAG_UPLOAD_DOMAIN', '').strip()
+    if not domain:
+        return ''
+    if any(c in domain for c in '"\\/ ') or '://' in domain:
+        raise SystemExit(f'error: OPENSHOCK_DIAG_UPLOAD_DOMAIN must be a bare host name, not {domain!r}')
+    return f'# Diagnostics upload\nCONFIG_OPENSHOCK_DIAG_UPLOAD_DOMAIN="{domain}"\n'
+
+
 def variant_inputs(variant_id: str, optimization: str = 'debug') -> BuildInputs:
     variant = find_variant(variant_id)
     build_dir = resolve_build_dir(variant.id, optimization)
@@ -85,6 +110,7 @@ def variant_inputs(variant_id: str, optimization: str = 'debug') -> BuildInputs:
         f'# Build variant {variant.id} ({", ".join(variant.boards)})\n'
         + variant.sdkconfig_fragment()
         + optimization_kconfig(optimization)
+        + diag_kconfig()
     )
     return BuildInputs(variant.target, None, build_dir, build_dir / 'variant.defaults', body)
 
@@ -99,6 +125,7 @@ def board_inputs(board: str, optimization: str = 'debug') -> BuildInputs:
         + '\n'.join(kconfig_lines(fragment))
         + '\n'
         + optimization_kconfig(optimization)
+        + diag_kconfig()
     )
     return BuildInputs(target, board, build_dir, build_dir / 'board.defaults', body)
 
@@ -184,7 +211,7 @@ def main(argv: list[str] | None = None) -> int:
             str(build_dir),
             f'-DOPENSHOCK_PYTHON={sys.executable}',
             f'-DIDF_TARGET={inputs.target}',
-            f'-DSDKCONFIG_DEFAULTS=sdkconfig.defaults;{frag_rel}',
+            f'-DSDKCONFIG_DEFAULTS=sdkconfig.defaults;{frag_rel}{extra_defaults()}',
             f'-DSDKCONFIG={build_dir / "sdkconfig"}',
             # Empty for a variant, which also clears a board an earlier configure cached.
             f'-DOPENSHOCK_BOARD={inputs.board or ""}',

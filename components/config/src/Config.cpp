@@ -329,6 +329,13 @@ std::optional<Config::SerialInputConfig> Config::GetSerialInputConfig()
   return _configData.serialInput;
 }
 
+std::optional<Config::DiagnosticsConfig> Config::GetDiagnosticsConfig()
+{
+  CONFIG_LOCK_READ(std::nullopt);
+
+  return _configData.diagnostics;
+}
+
 std::optional<Config::OtaUpdateConfig> Config::GetOtaUpdateConfig()
 {
   CONFIG_LOCK_READ(std::nullopt);
@@ -389,6 +396,16 @@ bool Config::SetSerialInputConfig(const Config::SerialInputConfig& config)
 
   return mutateAndSave([&](Config::RootConfig& root) {
     root.serialInput = config;
+    return true;
+  });
+}
+
+bool Config::SetDiagnosticsConfig(const Config::DiagnosticsConfig& config)
+{
+  CONFIG_LOCK_WRITE(false);
+
+  return mutateAndSave([&](Config::RootConfig& root) {
+    root.diagnostics = config;
     return true;
   });
 }
@@ -764,6 +781,40 @@ bool Config::SetSerialInputConfigEchoEnabled(bool enabled)
 
   return mutateAndSave([&](Config::RootConfig& root) {
     root.serialInput.echoEnabled = enabled;
+    return true;
+  });
+}
+
+std::optional<bool> Config::GetDiagnosticsCoredumpUpload()
+{
+  CONFIG_LOCK_READ(std::nullopt);
+
+  return _configData.diagnostics.coredumpUpload;
+}
+
+bool Config::SetDiagnosticsCoredumpUpload(bool enabled)
+{
+  CONFIG_LOCK_WRITE(false);
+
+  return mutateAndSave([&](Config::RootConfig& root) {
+    root.diagnostics.coredumpUpload = enabled;
+    return true;
+  });
+}
+
+std::optional<OpenShock::DiagnosticsLogLevel> Config::GetDiagnosticsLogUploadLevel()
+{
+  CONFIG_LOCK_READ(std::nullopt);
+
+  return _configData.diagnostics.logUploadLevel;
+}
+
+bool Config::SetDiagnosticsLogUploadLevel(OpenShock::DiagnosticsLogLevel level)
+{
+  CONFIG_LOCK_WRITE(false);
+
+  return mutateAndSave([&](Config::RootConfig& root) {
+    root.diagnostics.logUploadLevel = level;
     return true;
   });
 }

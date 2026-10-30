@@ -6,6 +6,7 @@ import * as flatbuffers from 'flatbuffers';
 
 import { BackendConfig } from '../../../open-shock/serialization/configuration/backend-config';
 import { CaptivePortalConfig } from '../../../open-shock/serialization/configuration/captive-portal-config';
+import { DiagnosticsConfig } from '../../../open-shock/serialization/configuration/diagnostics-config';
 import { EStopConfig } from '../../../open-shock/serialization/configuration/estop-config';
 import { LanConfig } from '../../../open-shock/serialization/configuration/lan-config';
 import { OtaUpdateConfig } from '../../../open-shock/serialization/configuration/ota-update-config';
@@ -96,8 +97,16 @@ lan(obj?:LanConfig):LanConfig|null {
   return offset ? (obj || new LanConfig()).__init(this.bb!.__indirect(this.bb_pos + offset), this.bb!) : null;
 }
 
+/**
+ * Crash dump and log upload configuration
+ */
+diagnostics(obj?:DiagnosticsConfig):DiagnosticsConfig|null {
+  const offset = this.bb!.__offset(this.bb_pos, 20);
+  return offset ? (obj || new DiagnosticsConfig()).__init(this.bb!.__indirect(this.bb_pos + offset), this.bb!) : null;
+}
+
 static startHubConfig(builder:flatbuffers.Builder) {
-  builder.startObject(8);
+  builder.startObject(9);
 }
 
 static addRf(builder:flatbuffers.Builder, rfOffset:flatbuffers.Offset) {
@@ -130,6 +139,10 @@ static addEstop(builder:flatbuffers.Builder, estopOffset:flatbuffers.Offset) {
 
 static addLan(builder:flatbuffers.Builder, lanOffset:flatbuffers.Offset) {
   builder.addFieldOffset(7, lanOffset, 0);
+}
+
+static addDiagnostics(builder:flatbuffers.Builder, diagnosticsOffset:flatbuffers.Offset) {
+  builder.addFieldOffset(8, diagnosticsOffset, 0);
 }
 
 static endHubConfig(builder:flatbuffers.Builder):flatbuffers.Offset {

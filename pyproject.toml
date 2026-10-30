@@ -4,7 +4,7 @@ version = '0.0.0'
 requires-python = '>=3.10'
 
 [tool.pytest.ini_options]
-pythonpath = ['scripts', 'scripts/tests', 'certificates']
+pythonpath = ['scripts', 'scripts/tests', 'certificates', 'tools/sdlog']
 testpaths = ['scripts/tests']
 
 [tool.ruff]

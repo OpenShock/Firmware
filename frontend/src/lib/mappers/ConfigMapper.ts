@@ -1,4 +1,7 @@
-import type { OtaUpdateChannel } from '#lib/_fbs/open-shock/serialization/configuration.js';
+import {
+  DiagnosticsLogLevel,
+  type OtaUpdateChannel,
+} from '#lib/_fbs/open-shock/serialization/configuration.js';
 import { HubConfig } from '#lib/_fbs/open-shock/serialization/configuration/hub-config.js';
 
 // TODO: Update these configs and ensure that typescript enforces them to be up to date
@@ -48,6 +51,11 @@ export interface EStopConfig {
   gpioPin: number;
 }
 
+export interface DiagnosticsConfig {
+  coredumpUpload: boolean;
+  logUploadLevel: DiagnosticsLogLevel;
+}
+
 export interface Config {
   rf: RFConfig;
   wifi: WifiConfig;
@@ -56,6 +64,7 @@ export interface Config {
   serialInput: SerialInputConfig;
   otaUpdate: OtaUpdateConfig;
   estop: EStopConfig;
+  diagnostics: DiagnosticsConfig;
 }
 
 function mapRfConfig(hubConfig: HubConfig): RFConfig {
@@ -183,6 +192,17 @@ function mapEstopConfig(hubConfig: HubConfig): EStopConfig {
   };
 }
 
+// Hubs from before the diagnostics section have none: both uploads off, as on the hub.
+function mapDiagnosticsConfig(hubConfig: HubConfig): DiagnosticsConfig {
+  const diagnostics = hubConfig.diagnostics();
+  if (!diagnostics) return { coredumpUpload: false, logUploadLevel: DiagnosticsLogLevel.None };
+
+  return {
+    coredumpUpload: diagnostics.coredumpUpload(),
+    logUploadLevel: diagnostics.logUploadLevel(),
+  };
+}
+
 export function mapConfig(hubConfig: HubConfig | null): Config | null {
   if (!hubConfig) return null;
 
@@ -194,5 +214,6 @@ export function mapConfig(hubConfig: HubConfig | null): Config | null {
     serialInput: mapSerialInputConfig(hubConfig),
     otaUpdate: mapOtaUpdateConfig(hubConfig),
     estop: mapEstopConfig(hubConfig),
+    diagnostics: mapDiagnosticsConfig(hubConfig),
   };
 }

@@ -7,6 +7,10 @@ inputs:
   version:
     required: true
     description: 'Current firmware version'
+  diag-upload-domain:
+    required: false
+    default: ''
+    description: 'Domain crash dumps and logs are uploaded to; empty compiles uploading out'
 
 runs:
   using: composite
@@ -17,13 +21,14 @@ runs:
     # scripts/build.py and the scripts CMake runs need requirements.txt
     - uses: ./.github/actions/install-python-deps
 
-    # Entries are immutable, so the key ends in the run and restore-keys picks the newest store
+    # Entries are immutable, so the key ends in the run and restore-keys picks the newest store. Builds with and
+    # without diagnostics upload differ in sdkconfig.h, which every object includes, so they keep separate caches.
     - name: Restore ccache
       uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9  # v6.1.0
       with:
         path: ~/.cache/ccache
-        key: ccache-v2-${{ runner.os }}-${{ steps.idf.outputs.version }}-${{ inputs.variant }}-${{ github.run_id }}-${{ github.run_attempt }}
-        restore-keys: ccache-v2-${{ runner.os }}-${{ steps.idf.outputs.version }}-${{ inputs.variant }}-
+        key: ccache-v2-${{ runner.os }}-${{ steps.idf.outputs.version }}-${{ inputs.variant }}-${{ inputs.diag-upload-domain != '' && 'diag' || 'nodiag' }}-${{ github.run_id }}-${{ github.run_attempt }}
+        restore-keys: ccache-v2-${{ runner.os }}-${{ steps.idf.outputs.version }}-${{ inputs.variant }}-${{ inputs.diag-upload-domain != '' && 'diag' || 'nodiag' }}-
 
     - name: Build firmware
       shell: bash
@@ -37,6 +42,7 @@ runs:
         OPENSHOCK_FW_VERSION: ${{ inputs.version }}
         OPENSHOCK_BUILD_DIR: build/firmware
         OPENSHOCK_FW_GIT_COMMIT: ${{ github.sha }}
+        OPENSHOCK_DIAG_UPLOAD_DOMAIN: ${{ inputs.diag-upload-domain }}
         CCACHE_COMPILERCHECK: content
         CCACHE_MAXSIZE: 500M # Could be lower maybe
 
@@ -62,7 +68,7 @@ runs:
       uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9  # v6.1.0
       with:
         path: ~/.cache/ccache
-        key: ccache-v2-${{ runner.os }}-${{ steps.idf.outputs.version }}-${{ inputs.variant }}-${{ github.run_id }}-${{ github.run_attempt }}
+        key: ccache-v2-${{ runner.os }}-${{ steps.idf.outputs.version }}-${{ inputs.variant }}-${{ inputs.diag-upload-domain != '' && 'diag' || 'nodiag' }}-${{ github.run_id }}-${{ github.run_attempt }}
 
     # Copy built images out for artifact upload
     - name: Stage partition images

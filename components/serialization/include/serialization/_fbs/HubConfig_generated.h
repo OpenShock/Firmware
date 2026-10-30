@@ -48,6 +48,9 @@ struct OtaUpdateConfigBuilder;
 struct LanConfig;
 struct LanConfigBuilder;
 
+struct DiagnosticsConfig;
+struct DiagnosticsConfigBuilder;
+
 struct HubConfig;
 struct HubConfigBuilder;
 
@@ -124,6 +127,48 @@ inline const char *EnumNameOtaUpdateStep(OtaUpdateStep e) {
   if (::flatbuffers::IsOutRange(e, OtaUpdateStep::None, OtaUpdateStep::RollingBack)) return "";
   const size_t index = static_cast<size_t>(e);
   return EnumNamesOtaUpdateStep()[index];
+}
+
+enum class DiagnosticsLogLevel : uint8_t {
+  None = 0,
+  Error = 1,
+  Warn = 2,
+  Info = 3,
+  Debug = 4,
+  Verbose = 5,
+  MIN = None,
+  MAX = Verbose
+};
+
+inline const DiagnosticsLogLevel (&EnumValuesDiagnosticsLogLevel())[6] {
+  static const DiagnosticsLogLevel values[] = {
+    DiagnosticsLogLevel::None,
+    DiagnosticsLogLevel::Error,
+    DiagnosticsLogLevel::Warn,
+    DiagnosticsLogLevel::Info,
+    DiagnosticsLogLevel::Debug,
+    DiagnosticsLogLevel::Verbose
+  };
+  return values;
+}
+
+inline const char * const *EnumNamesDiagnosticsLogLevel() {
+  static const char * const names[7] = {
+    "None",
+    "Error",
+    "Warn",
+    "Info",
+    "Debug",
+    "Verbose",
+    nullptr
+  };
+  return names;
+}
+
+inline const char *EnumNameDiagnosticsLogLevel(DiagnosticsLogLevel e) {
+  if (::flatbuffers::IsOutRange(e, DiagnosticsLogLevel::None, DiagnosticsLogLevel::Verbose)) return "";
+  const size_t index = static_cast<size_t>(e);
+  return EnumNamesDiagnosticsLogLevel()[index];
 }
 
 /// 6-byte MAC address (BSSID)
@@ -998,6 +1043,69 @@ inline ::flatbuffers::Offset<LanConfig> CreateLanConfigDirect(
       api_key__);
 }
 
+struct DiagnosticsConfig FLATBUFFERS_FINAL_CLASS : private ::flatbuffers::Table {
+  typedef DiagnosticsConfigBuilder Builder;
+  struct Traits;
+  static FLATBUFFERS_CONSTEXPR_CPP11 const char *GetFullyQualifiedName() {
+    return "OpenShock.Serialization.Configuration.DiagnosticsConfig";
+  }
+  enum FlatBuffersVTableOffset FLATBUFFERS_VTABLE_UNDERLYING_TYPE {
+    VT_COREDUMP_UPLOAD = 4,
+    VT_LOG_UPLOAD_LEVEL = 6
+  };
+  /// Whether crash dumps are uploaded
+  bool coredump_upload() const {
+    return GetField<uint8_t>(VT_COREDUMP_UPLOAD, 0) != 0;
+  }
+  /// The least severe log level that is uploaded; None uploads no logs
+  OpenShock::Serialization::Configuration::DiagnosticsLogLevel log_upload_level() const {
+    return static_cast<OpenShock::Serialization::Configuration::DiagnosticsLogLevel>(GetField<uint8_t>(VT_LOG_UPLOAD_LEVEL, 0));
+  }
+  template <bool B = false>
+  bool Verify(::flatbuffers::VerifierTemplate<B> &verifier) const {
+    return VerifyTableStart(verifier) &&
+           VerifyField<uint8_t>(verifier, VT_COREDUMP_UPLOAD, 1) &&
+           VerifyField<uint8_t>(verifier, VT_LOG_UPLOAD_LEVEL, 1) &&
+           verifier.EndTable();
+  }
+};
+
+struct DiagnosticsConfigBuilder {
+  typedef DiagnosticsConfig Table;
+  ::flatbuffers::FlatBufferBuilder &fbb_;
+  ::flatbuffers::uoffset_t start_;
+  void add_coredump_upload(bool coredump_upload) {
+    fbb_.AddElement<uint8_t>(DiagnosticsConfig::VT_COREDUMP_UPLOAD, static_cast<uint8_t>(coredump_upload), 0);
+  }
+  void add_log_upload_level(OpenShock::Serialization::Configuration::DiagnosticsLogLevel log_upload_level) {
+    fbb_.AddElement<uint8_t>(DiagnosticsConfig::VT_LOG_UPLOAD_LEVEL, static_cast<uint8_t>(log_upload_level), 0);
+  }
+  explicit DiagnosticsConfigBuilder(::flatbuffers::FlatBufferBuilder &_fbb)
+        : fbb_(_fbb) {
+    start_ = fbb_.StartTable();
+  }
+  ::flatbuffers::Offset<DiagnosticsConfig> Finish() {
+    const auto end = fbb_.EndTable(start_);
+    auto o = ::flatbuffers::Offset<DiagnosticsConfig>(end);
+    return o;
+  }
+};
+
+inline ::flatbuffers::Offset<DiagnosticsConfig> CreateDiagnosticsConfig(
+    ::flatbuffers::FlatBufferBuilder &_fbb,
+    bool coredump_upload = false,
+    OpenShock::Serialization::Configuration::DiagnosticsLogLevel log_upload_level = OpenShock::Serialization::Configuration::DiagnosticsLogLevel::None) {
+  DiagnosticsConfigBuilder builder_(_fbb);
+  builder_.add_log_upload_level(log_upload_level);
+  builder_.add_coredump_upload(coredump_upload);
+  return builder_.Finish();
+}
+
+struct DiagnosticsConfig::Traits {
+  using type = DiagnosticsConfig;
+  static auto constexpr Create = CreateDiagnosticsConfig;
+};
+
 struct HubConfig FLATBUFFERS_FINAL_CLASS : private ::flatbuffers::Table {
   typedef HubConfigBuilder Builder;
   struct Traits;
@@ -1012,7 +1120,8 @@ struct HubConfig FLATBUFFERS_FINAL_CLASS : private ::flatbuffers::Table {
     VT_SERIAL_INPUT = 12,
     VT_OTA_UPDATE = 14,
     VT_ESTOP = 16,
-    VT_LAN = 18
+    VT_LAN = 18,
+    VT_DIAGNOSTICS = 20
   };
   /// RF Transmitter configuration
   const OpenShock::Serialization::Configuration::RFConfig *rf() const {
@@ -1046,6 +1155,10 @@ struct HubConfig FLATBUFFERS_FINAL_CLASS : private ::flatbuffers::Table {
   const OpenShock::Serialization::Configuration::LanConfig *lan() const {
     return GetPointer<const OpenShock::Serialization::Configuration::LanConfig *>(VT_LAN);
   }
+  /// Crash dump and log upload configuration
+  const OpenShock::Serialization::Configuration::DiagnosticsConfig *diagnostics() const {
+    return GetPointer<const OpenShock::Serialization::Configuration::DiagnosticsConfig *>(VT_DIAGNOSTICS);
+  }
   template <bool B = false>
   bool Verify(::flatbuffers::VerifierTemplate<B> &verifier) const {
     return VerifyTableStart(verifier) &&
@@ -1065,6 +1178,8 @@ struct HubConfig FLATBUFFERS_FINAL_CLASS : private ::flatbuffers::Table {
            verifier.VerifyTable(estop()) &&
            VerifyOffset(verifier, VT_LAN) &&
            verifier.VerifyTable(lan()) &&
+           VerifyOffset(verifier, VT_DIAGNOSTICS) &&
+           verifier.VerifyTable(diagnostics()) &&
            verifier.EndTable();
   }
 };
@@ -1097,6 +1212,9 @@ struct HubConfigBuilder {
   void add_lan(::flatbuffers::Offset<OpenShock::Serialization::Configuration::LanConfig> lan) {
     fbb_.AddOffset(HubConfig::VT_LAN, lan);
   }
+  void add_diagnostics(::flatbuffers::Offset<OpenShock::Serialization::Configuration::DiagnosticsConfig> diagnostics) {
+    fbb_.AddOffset(HubConfig::VT_DIAGNOSTICS, diagnostics);
+  }
   explicit HubConfigBuilder(::flatbuffers::FlatBufferBuilder &_fbb)
         : fbb_(_fbb) {
     start_ = fbb_.StartTable();
@@ -1117,8 +1235,10 @@ inline ::flatbuffers::Offset<HubConfig> CreateHubConfig(
     ::flatbuffers::Offset<OpenShock::Serialization::Configuration::SerialInputConfig> serial_input = 0,
     ::flatbuffers::Offset<OpenShock::Serialization::Configuration::OtaUpdateConfig> ota_update = 0,
     ::flatbuffers::Offset<OpenShock::Serialization::Configuration::EStopConfig> estop = 0,
-    ::flatbuffers::Offset<OpenShock::Serialization::Configuration::LanConfig> lan = 0) {
+    ::flatbuffers::Offset<OpenShock::Serialization::Configuration::LanConfig> lan = 0,
+    ::flatbuffers::Offset<OpenShock::Serialization::Configuration::DiagnosticsConfig> diagnostics = 0) {
   HubConfigBuilder builder_(_fbb);
+  builder_.add_diagnostics(diagnostics);
   builder_.add_lan(lan);
   builder_.add_estop(estop);
   builder_.add_ota_update(ota_update);

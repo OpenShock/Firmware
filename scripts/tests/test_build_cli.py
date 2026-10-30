@@ -130,6 +130,35 @@ def test_board_mode_strips_the_pins(idf, tmp_path):
     assert not any(line.startswith('OPENSHOCK_') for line in text.splitlines())
 
 
+def test_the_diagnostics_upload_domain_is_injected_only_when_set(idf, monkeypatch, tmp_path):
+    variant = boards.group_variants(['OpenShock-Core-V2'])[0]
+    fragment = tmp_path / 'build' / 'variant.defaults'
+
+    assert build.main(['--variant', variant.id]) == 0
+    assert 'OPENSHOCK_DIAG_UPLOAD_DOMAIN' not in fragment.read_text(encoding='utf-8')
+
+    monkeypatch.setenv('OPENSHOCK_DIAG_UPLOAD_DOMAIN', 'diag.example.org')
+    assert build.main(['--variant', variant.id]) == 0
+    assert 'CONFIG_OPENSHOCK_DIAG_UPLOAD_DOMAIN="diag.example.org"' in fragment.read_text(encoding='utf-8')
+
+
+def test_extra_defaults_are_layered_after_the_board(idf, monkeypatch):
+    monkeypatch.setenv('OPENSHOCK_EXTRA_DEFAULTS', '.github/diagnostics-compile.defaults')
+    assert build.main(['OpenShock-Core-V2']) == 0
+    assert defaults_arg(idf[0]).endswith(';.github/diagnostics-compile.defaults')
+
+    monkeypatch.setenv('OPENSHOCK_EXTRA_DEFAULTS', 'no/such.defaults')
+    with pytest.raises(SystemExit, match='does not exist'):
+        build.main(['OpenShock-Core-V2'])
+
+
+@pytest.mark.parametrize('domain', ['https://diag.example.org', 'diag.example.org/x', 'a"b', 'a b'])
+def test_a_malformed_diagnostics_upload_domain_is_refused(idf, monkeypatch, domain):
+    monkeypatch.setenv('OPENSHOCK_DIAG_UPLOAD_DOMAIN', domain)
+    with pytest.raises(SystemExit, match='bare host name'):
+        build.main(['OpenShock-Core-V2'])
+
+
 def test_a_build_dir_in_the_repository_is_passed_relative(idf, monkeypatch, tmp_path):
     # A relative build dir resolves against the repository root, so stand one in: pytest must not write into the checkout.
     monkeypatch.setattr(build, 'ROOT', tmp_path)

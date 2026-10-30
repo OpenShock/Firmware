@@ -1,0 +1,60 @@
+# Compiles the diagnostics code release and pull request builds leave out: uploading (no upload domain outside
+# release builds) and SD card storage (off by default). One board per SD bus: the S3 on the SDMMC host, the C3 in SPI
+# mode. The images are thrown away; the upload domain is reserved (.invalid), so nothing could reach it anyway.
+name: diagnostics-compile
+
+on:
+  push:
+    branches: ['**']
+    paths: &paths
+      - 'components/diagnostics/**'
+      - 'components/logging/**'
+      - 'components/http/**'
+      - 'components/config/**'
+      - 'components/serial_console/**'
+      - 'main/**'
+      - 'sdkconfig.defaults'
+      - 'scripts/build.py'
+      - '.github/diagnostics-compile.defaults'
+      - '.github/actions/setup-esp-idf/**'
+      - '.github/workflows/diagnostics-compile.yml'
+  # Same-repo PR branches are covered by their push run, pull_request is for forks
+  pull_request:
+    paths: *paths
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  compile:
+    if: ${{ github.event_name != 'pull_request' || github.event.pull_request.head.repo.fork }}
+    name: 'compile (${{ matrix.board }})'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        board: [OpenShock-Core-V2, Seeed-Xiao-ESP32C3]
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+
+      - uses: ./.github/actions/setup-esp-idf
+
+      - uses: ./.github/actions/install-python-deps
+
+      - name: Build
+        run: python scripts/build.py "$BOARD" app
+        env:
+          BOARD: ${{ matrix.board }}
+          OPENSHOCK_DIAG_UPLOAD_DOMAIN: upload.invalid
+          OPENSHOCK_EXTRA_DEFAULTS: .github/diagnostics-compile.defaults
+          OPENSHOCK_BUILD_DIR: build/diagnostics

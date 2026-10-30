@@ -1,5 +1,7 @@
 import { BackendConfig } from '#lib/_fbs/open-shock/serialization/configuration/backend-config.js';
 import { CaptivePortalConfig } from '#lib/_fbs/open-shock/serialization/configuration/captive-portal-config.js';
+import { DiagnosticsConfig } from '#lib/_fbs/open-shock/serialization/configuration/diagnostics-config.js';
+import { DiagnosticsLogLevel } from '#lib/_fbs/open-shock/serialization/configuration/diagnostics-log-level.js';
 import { EStopConfig } from '#lib/_fbs/open-shock/serialization/configuration/estop-config.js';
 import { HubConfig } from '#lib/_fbs/open-shock/serialization/configuration/hub-config.js';
 import { OtaUpdateChannel } from '#lib/_fbs/open-shock/serialization/configuration/ota-update-channel.js';
@@ -20,8 +22,14 @@ interface Strings {
   cdnDomain: string;
 }
 
-// Builds a HubConfig the way the hub serializes it (every section present).
-function buildHubConfig(strings: Strings): HubConfig {
+interface Diagnostics {
+  coredumpUpload: boolean;
+  logUploadLevel: DiagnosticsLogLevel;
+}
+
+// Builds a HubConfig the way the hub serializes it (every section present; diagnostics only when given, as from a hub
+// that predates it otherwise).
+function buildHubConfig(strings: Strings, diagnostics?: Diagnostics): HubConfig {
   const b = new Builder(512);
 
   const ssid = b.createString('HomeNet');
@@ -58,6 +66,13 @@ function buildHubConfig(strings: Strings): HubConfig {
     OtaUpdateStep.None
   );
   const estop = EStopConfig.createEStopConfig(b, true, 13, false, false);
+  const diag = diagnostics
+    ? DiagnosticsConfig.createDiagnosticsConfig(
+        b,
+        diagnostics.coredumpUpload,
+        diagnostics.logUploadLevel
+      )
+    : null;
 
   HubConfig.startHubConfig(b);
   HubConfig.addRf(b, rf);
@@ -67,6 +82,7 @@ function buildHubConfig(strings: Strings): HubConfig {
   HubConfig.addSerialInput(b, serial);
   HubConfig.addOtaUpdate(b, ota);
   HubConfig.addEstop(b, estop);
+  if (diag !== null) HubConfig.addDiagnostics(b, diag);
   HubConfig.finishHubConfigBuffer(b, HubConfig.endHubConfig(b));
 
   return HubConfig.getRootAsHubConfig(new ByteBuffer(b.asUint8Array()));
@@ -94,6 +110,25 @@ describe('mapConfig', () => {
     expect(config?.otaUpdate.cdnDomain).toBe('fw.example.org');
     expect(config?.otaUpdate.updateChannel).toBe(OtaUpdateChannel.Beta);
     expect(config?.estop).toEqual({ enabled: true, gpioPin: 13 });
+  });
+
+  it('maps the diagnostics opt-ins, and defaults them off for a hub that has none', () => {
+    const strings = {
+      apSsid: 'OpenShock-',
+      hostname: 'hub',
+      domain: 'api.example.org',
+      cdnDomain: 'fw.example.org',
+    };
+
+    expect(
+      mapConfig(
+        buildHubConfig(strings, { coredumpUpload: true, logUploadLevel: DiagnosticsLogLevel.Warn })
+      )?.diagnostics
+    ).toEqual({ coredumpUpload: true, logUploadLevel: DiagnosticsLogLevel.Warn });
+    expect(mapConfig(buildHubConfig(strings))?.diagnostics).toEqual({
+      coredumpUpload: false,
+      logUploadLevel: DiagnosticsLogLevel.None,
+    });
   });
 
   it('accepts empty strings the hub can legitimately store', () => {

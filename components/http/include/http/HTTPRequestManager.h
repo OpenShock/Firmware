@@ -77,6 +77,9 @@ namespace OpenShock::HTTP {
   using JsonParser               = Util::FunctionRef<std::optional<T>(int code, JSON::JsonView json)>;
   using GotContentLengthCallback = Util::FunctionRef<bool(int contentLength)>;
   using DownloadCallback         = Util::FunctionRef<bool(std::size_t offset, const uint8_t* data, std::size_t len)>;
+  // Fills `buffer` with up to `capacity` request-body bytes starting at `offset`; returns how many it wrote (more than 0),
+  // or 0 or less to cancel. Called again from offset 0 if a reused connection has to be re-established.
+  using UploadCallback = Util::FunctionRef<int(std::size_t offset, uint8_t* buffer, std::size_t capacity)>;
 
   // A reusable HTTP client. Sequential requests on the same instance reuse the
   // underlying TCP/TLS connection (HTTP keep-alive) when they target the same
@@ -98,6 +101,10 @@ namespace OpenShock::HTTP {
     Response<std::size_t>
       Download(std::string_view url, const std::map<std::string, std::string>& headers, GotContentLengthCallback contentLengthCallback, DownloadCallback downloadCallback, std::span<const uint16_t> acceptedCodes, uint32_t timeoutMs = 10'000);
     Response<std::string> GetString(std::string_view url, const std::map<std::string, std::string>& headers, std::span<const uint16_t> acceptedCodes, uint32_t timeoutMs = 10'000);
+
+    /// @brief POSTs a `contentLength`-byte body produced by `uploadCallback`. The response body is read and discarded;
+    ///        the returned size is its length.
+    Response<std::size_t> Upload(std::string_view url, const std::map<std::string, std::string>& headers, std::size_t contentLength, UploadCallback uploadCallback, std::span<const uint16_t> acceptedCodes, uint32_t timeoutMs = 30'000);
 
     template<typename T>
     Response<T> GetJSON(std::string_view url, const std::map<std::string, std::string>& headers, JsonParser<T> jsonParser, std::span<const uint16_t> acceptedCodes, uint32_t timeoutMs = 10'000)
@@ -123,6 +130,18 @@ namespace OpenShock::HTTP {
     }
 
   private:
+    // GET when `upload` is null, otherwise POST with its `uploadLength`-byte body.
+    Response<std::size_t> perform(
+      std::string_view url,
+      const std::map<std::string, std::string>& headers,
+      std::size_t uploadLength,
+      UploadCallback* upload,
+      GotContentLengthCallback contentLengthCallback,
+      DownloadCallback downloadCallback,
+      std::span<const uint16_t> acceptedCodes,
+      uint32_t timeoutMs
+    );
+    esp_err_t writeBody(std::size_t length, UploadCallback& upload, int64_t deadline, bool& cancelled);
     static esp_err_t eventHandler(esp_http_client_event_t* evt);
     void drop();
 
