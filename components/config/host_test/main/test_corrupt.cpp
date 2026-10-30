@@ -178,8 +178,16 @@ TEST_CASE("The credential blob's auth mode codes never change", "[config][corrup
 {
   // What hubs hold on flash: owned by the blob format, not by ESP-IDF or the FlatBuffers schema
   const std::pair<wifi_auth_mode_t, uint8_t> codes[] = {
-    {WIFI_AUTH_OPEN, 0}, {WIFI_AUTH_WEP, 1}, {WIFI_AUTH_WPA_PSK, 2}, {WIFI_AUTH_WPA2_PSK, 3}, {WIFI_AUTH_WPA_WPA2_PSK, 4},
-    {WIFI_AUTH_WPA2_ENTERPRISE, 5}, {WIFI_AUTH_WPA3_PSK, 6}, {WIFI_AUTH_WPA2_WPA3_PSK, 7}, {WIFI_AUTH_WAPI_PSK, 8}, {WIFI_AUTH_MAX, 9},
+    {           WIFI_AUTH_OPEN, 0},
+    {            WIFI_AUTH_WEP, 1},
+    {        WIFI_AUTH_WPA_PSK, 2},
+    {       WIFI_AUTH_WPA2_PSK, 3},
+    {   WIFI_AUTH_WPA_WPA2_PSK, 4},
+    {WIFI_AUTH_WPA2_ENTERPRISE, 5},
+    {       WIFI_AUTH_WPA3_PSK, 6},
+    {  WIFI_AUTH_WPA2_WPA3_PSK, 7},
+    {       WIFI_AUTH_WAPI_PSK, 8},
+    {            WIFI_AUTH_MAX, 9},
   };
   for (const auto& [mode, code] : codes) {
     const auto blob = Config::WiFiCredentials(1, "Net", "pw", mode).ToBlob();

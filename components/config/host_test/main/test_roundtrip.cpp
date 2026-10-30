@@ -127,7 +127,9 @@ TEST_CASE("GetRaw writes fields that equal their schema default", "[config][roun
   TEST_ASSERT_TRUE(Config::GetRaw(raw));
   const auto* root = Serialization::Configuration::GetHubConfig(raw.data());
   // The generated tables derive from flatbuffers::Table privately; every table is one at the same address
-  auto hasField = [](const void* table, flatbuffers::voffset_t field) { return static_cast<const flatbuffers::Table*>(table)->CheckField(field); };
+  auto hasField = [](const void* table, flatbuffers::voffset_t field) {
+    return static_cast<const flatbuffers::Table*>(table)->CheckField(field);
+  };
   TEST_ASSERT_TRUE(hasField(root->rf(), Serialization::Configuration::RFConfig::VT_KEEPALIVE_ENABLED));
   TEST_ASSERT_TRUE(hasField(root->ota_update(), Serialization::Configuration::OtaUpdateConfig::VT_IS_ENABLED));
 }
