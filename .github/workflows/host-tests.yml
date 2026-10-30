@@ -39,6 +39,10 @@ jobs:
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
 
+      # Standard library only, so it runs before (and fails faster than) the ESP-IDF setup
+      - name: Check Kconfig ownership
+        run: python3 scripts/check_kconfig_ownership.py
+
       # The linux target links libbsd, ESP-IDF generates the CMock mocks with Ruby
       - name: Install host build dependencies
         run: sudo apt-get update && sudo apt-get install -y --no-install-recommends libbsd-dev ruby

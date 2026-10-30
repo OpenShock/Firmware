@@ -1,0 +1,41 @@
+menu "OpenShock logging"
+
+    choice OPENSHOCK_LOG_LEVEL_CHOICE
+        prompt "Log level"
+        default OPENSHOCK_LOG_LEVEL_FROM_BUILD_MODE
+        help
+            Compile-time level of the OS_LOG* macros; anything below it is compiled out.
+
+            By default it follows the build mode (scripts/gen_env_header.py: verbose for
+            local and develop builds, debug for beta, info for stable). That value lives
+            in openshock_board.h, not sdkconfig.h, so CI builds of every channel keep one
+            sdkconfig.h and share their compiled ESP-IDF objects. Pick a level here to
+            override it for a local build.
+
+        config OPENSHOCK_LOG_LEVEL_FROM_BUILD_MODE
+            bool "From the build mode"
+        config OPENSHOCK_LOG_LEVEL_SET_NONE
+            bool "None"
+        config OPENSHOCK_LOG_LEVEL_SET_ERROR
+            bool "Error"
+        config OPENSHOCK_LOG_LEVEL_SET_WARN
+            bool "Warning"
+        config OPENSHOCK_LOG_LEVEL_SET_INFO
+            bool "Info"
+        config OPENSHOCK_LOG_LEVEL_SET_DEBUG
+            bool "Debug"
+        config OPENSHOCK_LOG_LEVEL_SET_VERBOSE
+            bool "Verbose"
+    endchoice
+
+    config OPENSHOCK_LOG_LEVEL_OVERRIDE
+        int
+        default -1 if OPENSHOCK_LOG_LEVEL_FROM_BUILD_MODE
+        default 0 if OPENSHOCK_LOG_LEVEL_SET_NONE
+        default 1 if OPENSHOCK_LOG_LEVEL_SET_ERROR
+        default 2 if OPENSHOCK_LOG_LEVEL_SET_WARN
+        default 3 if OPENSHOCK_LOG_LEVEL_SET_INFO
+        default 4 if OPENSHOCK_LOG_LEVEL_SET_DEBUG
+        default 5 if OPENSHOCK_LOG_LEVEL_SET_VERBOSE
+
+endmenu

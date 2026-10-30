@@ -2,6 +2,8 @@
 
 #include "estop/EStopState.h"
 
+#include <sdkconfig.h>
+
 #include <cstdint>
 
 namespace OpenShock {
@@ -18,8 +20,11 @@ namespace OpenShock {
   class EStopStateMachine {
   public:
     static constexpr int64_t kHoldToClearTime = 5000;
-    static constexpr uint32_t kCheckCount     = 13;                                                // 65 ms at 200 Hz
-    static constexpr uint16_t kCheckMask      = 0xFFFF >> ((sizeof(uint16_t) * 8) - kCheckCount);  // Mask to check only last kCheckCount bits within history
+    // The poll interval is a build setting; the debounce time is not, so the sample count follows from it
+    static constexpr uint32_t kDebounceTimeMs = 65;
+    static constexpr uint32_t kCheckCount     = (kDebounceTimeMs + CONFIG_OPENSHOCK_ESTOP_POLL_INTERVAL_MS - 1) / CONFIG_OPENSHOCK_ESTOP_POLL_INTERVAL_MS;  // 13 at 5 ms
+    static_assert(kCheckCount >= 1 && kCheckCount <= 16, "the debounce history holds 16 samples");
+    static constexpr uint16_t kCheckMask = 0xFFFF >> ((sizeof(uint16_t) * 8) - kCheckCount);                                                                // Mask to check only last kCheckCount bits within history
 
     // Grace period after deactivation (prevents immediate re-trigger on release bounce/EMI)
     static constexpr int64_t kRearmGraceTime = 250;  // tune as needed

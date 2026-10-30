@@ -14,7 +14,7 @@ namespace {
   const int kPressed  = 0;  // Input is pulled up; the button pulls it low
   const int kReleased = 1;
 
-  const int64_t kSampleMs = 5;  // EStopManager samples at 200 Hz
+  const int64_t kSampleMs = CONFIG_OPENSHOCK_ESTOP_POLL_INTERVAL_MS;  // EStopManager's poll interval
 
   struct Rig {
     explicit Rig(bool latching = false)
