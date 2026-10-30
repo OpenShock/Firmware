@@ -307,7 +307,7 @@ void Config::Init()
   for (auto* section = SectionBase::First(); section != nullptr; section = section->Next()) {
     if (!section->Load(s_partition)) {
       // The section runs on its defaults, but flash is left alone: erasing it would take every key with it (all WiFi
-      // networks, the E-Stop latch). Its next save rewrites every key.
+      // networks). Its next save rewrites every key.
       OS_LOGE(TAG, "Failed to load the %s config from %s, running it on the defaults", section->Info().name, s_partition);
     }
   }

@@ -39,14 +39,6 @@ always kept free for compaction) it holds the whole config with some 32 long WiF
 | `otaUpdate` | core (`OtaUpdateConfig.h`) | `ota` |
 | `estop` | device_control (`estop/EStopConfig.h`) | `estop` |
 
-The `estop` namespace also holds the E-Stop latch, `latched` (u8), which is state rather than config: it is not in
-`jsonconfig` or the wire form. The E-Stop task writes it when the E-Stop activates and when it is cleared with the
-button, after the change is already in effect. At boot it is read before anything can transmit, and a set latch keeps the
-E-Stop active until it is cleared with the button. A missing key reads as not latched, so a fresh hub starts usable, and
-a read error reads as latched. A latch on a hub whose E-Stop is disabled is dropped, since no button could clear it.
-A factory reset clears it. A latch set while another config write holds the store (the migration's table write, for
-one) reaches flash only once that write is done.
-
 The store's own namespace is `root`, with `schema` (u8, 1) marking a filled store. Namespace and key names are at
 most 15 characters and are permanent once hubs hold them: renaming one is a migration, not an edit. A missing key
 reads as its default and an unknown key is ignored, so adding or removing a field never changes the schema.

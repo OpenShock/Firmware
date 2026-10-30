@@ -63,7 +63,6 @@ namespace ConfigTest {
     namespace Estop {
       inline constexpr const char* kEnabled = "enabled";
       inline constexpr const char* kGpio    = "gpio";
-      inline constexpr const char* kLatched = "latched";
     }  // namespace Estop
     namespace Ota {
       inline constexpr const char* kUpdateId = "update_id";
