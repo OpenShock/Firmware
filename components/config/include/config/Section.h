@@ -19,8 +19,9 @@
 // needs to know T's fields or keys; this framework only sees the section through SectionBase.
 //
 // The section caches its value in RAM: readers copy it out under a short lock and never wait on flash. Writers are
-// serialized across every section (one write lock), save what changed, and only then publish the new value, so a
-// failed write leaves the running value identical to what is on flash.
+// serialized across every section (one write lock), save what changed, and only then publish the new value. NVS writes
+// land key by key, so a failed save can leave some of them on flash; the section then no longer trusts its cache as a
+// picture of flash, and its next save rewrites every key. A section that failed to load is treated the same way.
 //
 // Every section links itself into one registry when it is constructed (static initialization), which is how the
 // framework loads all of them at boot, renders the whole config as JSON (jsonconfig), imports one, and resets them
@@ -129,7 +130,7 @@ namespace OpenShock::Config {
     /// @brief Read-modify-write that no other writer can interleave with. `mutate` edits a copy of the current value
     ///        and returns whether it changed anything; a changed copy is saved (the keys that differ) and only then
     ///        published. It runs under the write lock: keep it to plain field updates.
-    /// @return False only when saving failed, in which case the value is unchanged.
+    /// @return False only when saving failed, in which case the running value is unchanged.
     bool Update(Util::FunctionRef<bool(T&)> mutate)
     {
       ScopedLock lock__(&Internal::WriteLock());
@@ -137,7 +138,7 @@ namespace OpenShock::Config {
       if (!mutate(updated)) {
         return true;
       }
-      if (!save(updated, &m_value)) {
+      if (!save(updated)) {
         return false;
       }
       publish(std::move(updated));
@@ -151,6 +152,7 @@ namespace OpenShock::Config {
       if (!ok) {
         loaded.ToDefault();
       }
+      m_unsynced = !ok;
       publish(std::move(loaded));
       return ok;
     }
@@ -163,6 +165,7 @@ namespace OpenShock::Config {
       if (partition != nullptr) {
         ok = eraseNamespaces(partition) && defaults.SaveNvs(partition, nullptr);
       }
+      m_unsynced = !ok;
       publish(std::move(defaults));  // What the hub runs with either way; a failed save only means it isn't kept
       return ok;
     }
@@ -194,7 +197,8 @@ namespace OpenShock::Config {
       if (!m_staged) {
         return true;
       }
-      bool ok = partition == nullptr || m_staged->SaveNvs(partition, full ? nullptr : &m_value);
+      bool ok    = partition == nullptr || m_staged->SaveNvs(partition, full || m_unsynced ? nullptr : &m_value);
+      m_unsynced = !ok;
       if (ok) {
         publish(std::move(*m_staged));
       }
@@ -211,10 +215,15 @@ namespace OpenShock::Config {
     }
 
   private:
-    bool save(const T& value, const T* previous) const
+    // Only the keys that differ from the cache, or every key when flash may not match it
+    bool save(const T& value)
     {
       const char* partition = Internal::Partition();
-      return partition == nullptr || value.SaveNvs(partition, previous);
+      if (partition == nullptr) {
+        return true;
+      }
+      m_unsynced = !value.SaveNvs(partition, m_unsynced ? nullptr : &m_value);
+      return !m_unsynced;
     }
 
     void publish(T&& value)
@@ -229,6 +238,7 @@ namespace OpenShock::Config {
     mutable SimpleMutex m_dataMutex;
     T m_value;
     std::optional<T> m_staged;  // Only touched under the write lock
+    bool m_unsynced = false;    // Flash may differ from m_value, so the next save writes every key. Write lock only.
   };
 
   namespace Internal {

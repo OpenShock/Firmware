@@ -48,6 +48,7 @@ const char* Config::StorageLabel()
 
 #define CONFIG_LOCK_WRITE() ScopedLock lock__(&Config::Internal::WriteLock())
 
+// A store marked by a newer firmware (a rollback) counts as filled: it is loaded best-effort, never refilled.
 static bool hasSchema(const char* partition)
 {
   auto handle = Config::Nvs::Handle::Open(partition, kRootNamespace, false);
@@ -55,7 +56,13 @@ static bool hasSchema(const char* partition)
     return false;
   }
   uint8_t schema = 0;
-  return handle->GetU8(kSchemaKey, schema) == Config::Nvs::Result::Found && schema == kSchemaVersion;
+  if (handle->GetU8(kSchemaKey, schema) != Config::Nvs::Result::Found || schema < kSchemaVersion) {
+    return false;
+  }
+  if (schema > kSchemaVersion) {
+    OS_LOGW(TAG, "The config in %s has schema %u, newer than this firmware's %u; loading what this firmware knows", partition, schema, kSchemaVersion);
+  }
+  return true;
 }
 
 static bool writeSchema(const char* partition)
@@ -144,26 +151,28 @@ static const char* openStorage()
 }
 
 // First boot on a 2.x layout after the table rewrite: what the 1.9.9 pivot kept in the shared `nvs` is copied into
-// `cfg` key by key, compared, and only then deleted from the shared partition. Idempotent: once `cfg` has a schema
-// the shared copy is only ever cleaned up.
-static void moveSharedIntoCfg()
+// `cfg` key by key, compared, and only then deleted from the shared partition. The schema marker (`root`) is copied
+// last, so a power cut mid-copy leaves `cfg` unmarked and the copy is redone. Idempotent: once `cfg` has a schema the
+// shared copy is only ever cleaned up. Returns the partition the config now lives in: `cfg`, or the shared `nvs` when
+// the copy failed.
+static const char* moveSharedIntoCfg()
 {
   if (!nvsPartitionExists(kPartitionShared) || !initNvsPartition(kPartitionShared) || !hasSchema(kPartitionShared)) {
-    return;
+    return kPartitionCfg;
   }
-  const auto namespaces = allNamespaces();
+  const auto namespaces = allNamespaces();  // kRootNamespace first, so walked backwards
 
   if (!hasSchema(kPartitionCfg)) {
     bool ok = true;
-    for (const char* ns : namespaces) {
-      ok = ok && Config::Nvs::CopyNamespace(kPartitionShared, kPartitionCfg, ns) && Config::Nvs::NamespacesEqual(kPartitionShared, kPartitionCfg, ns);
+    for (std::size_t i = namespaces.size(); ok && i-- > 0;) {
+      ok = Config::Nvs::CopyNamespace(kPartitionShared, kPartitionCfg, namespaces[i]) && Config::Nvs::NamespacesEqual(kPartitionShared, kPartitionCfg, namespaces[i]);
     }
     if (!ok) {
       OS_LOGE(TAG, "Failed to copy the config into cfg; it stays in the shared nvs partition");
       for (const char* ns : namespaces) {
         (void)Config::Nvs::EraseNamespace(kPartitionCfg, ns);
       }
-      return;
+      return kPartitionShared;
     }
     OS_LOGI(TAG, "Moved the config from the shared nvs partition into cfg");
   }
@@ -175,6 +184,7 @@ static void moveSharedIntoCfg()
   if (erased) {
     OS_LOGI(TAG, "Removed the config copy from the shared nvs partition");
   }
+  return kPartitionCfg;
 }
 
 // The config file a 1.x hub left behind, as a jsonconfig document. Nullopt when the hub has none.
@@ -279,7 +289,7 @@ void Config::Init()
 
   s_partition = openStorage();
   if (s_partition != nullptr && std::strcmp(s_partition, kPartitionCfg) == 0) {
-    moveSharedIntoCfg();
+    s_partition = moveSharedIntoCfg();
   }
 
   if (s_partition == nullptr || !hasSchema(s_partition)) {
@@ -289,9 +299,9 @@ void Config::Init()
 
   for (auto* section = SectionBase::First(); section != nullptr; section = section->Next()) {
     if (!section->Load(s_partition)) {
-      // One unreadable section costs that section only
-      OS_LOGE(TAG, "Failed to load the %s config from %s, rewriting it with the defaults", section->Info().name, s_partition);
-      section->Reset(s_partition);
+      // The section runs on its defaults, but flash is left alone: erasing it would take every key with it (all WiFi
+      // networks, the E-Stop latch). Its next save rewrites every key.
+      OS_LOGE(TAG, "Failed to load the %s config from %s, running it on the defaults", section->Info().name, s_partition);
     }
   }
   OS_LOGI(TAG, "Loaded config from %s", s_partition);

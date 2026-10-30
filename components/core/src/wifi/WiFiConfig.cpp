@@ -98,6 +98,36 @@ bool WiFiConfig::FromJSON(JSON::JsonView json)
 
   Parse::JsonArray(credentialsList, credentialsListJson);
 
+  // Each credential is stored under its id, so 0 (what a missing id parses to) and a repeated id would be lost on
+  // flash. Those get the lowest free id instead; one that finds none is dropped.
+  std::bitset<256> usedIds;
+  usedIds[0] = true;
+  for (const auto& creds : credentialsList) {
+    usedIds[creds.id] = true;
+  }
+  std::bitset<256> seenIds;
+  for (auto it = credentialsList.begin(); it != credentialsList.end();) {
+    if (it->id != 0 && !seenIds[it->id]) {
+      seenIds[it->id] = true;
+      ++it;
+      continue;
+    }
+    std::size_t freeId = 1;
+    while (freeId < usedIds.size() && usedIds[freeId]) {
+      ++freeId;
+    }
+    if (freeId == usedIds.size()) {
+      OS_LOGW(TAG, "Dropping credential %u: no free id left", it->id);
+      it = credentialsList.erase(it);
+      continue;
+    }
+    OS_LOGW(TAG, "Credential %u renumbered to %zu", it->id, freeId);
+    it->id          = static_cast<uint8_t>(freeId);
+    usedIds[freeId] = true;
+    seenIds[freeId] = true;
+    ++it;
+  }
+
   return true;
 }
 

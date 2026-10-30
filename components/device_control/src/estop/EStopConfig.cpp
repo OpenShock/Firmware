@@ -161,6 +161,7 @@ bool OpenShock::Config::SetEStopEnabled(bool enabled)
 {
   return s_section.Update([&](EStopConfig& estop) {
     estop.enabled = enabled;
+    estop.Normalize();
     return true;
   });
 }
