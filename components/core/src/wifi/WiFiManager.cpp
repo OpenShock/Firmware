@@ -143,12 +143,12 @@ static bool isConnectRateLimited(const WiFiNetwork& net)
     return false;
   }
 
-  // Back off from the first failure: 2 s, 4 s, 8 s, ... capped at 60 s. Every attempt is an all-channel scan that
+  // Back off from the first failure: 2 s, 4 s, 8 s, ... capped at CONFIG_OPENSHOCK_WIFI_CONNECT_BACKOFF_MAX_MS. Every attempt is an all-channel scan that
   // takes the radio off the captive portal AP's channel, so retrying every second starves portal clients.
   int64_t now     = OpenShock::millis();
   int64_t diff    = now - net.lastConnectAttempt;
-  uint16_t shift  = std::min<uint16_t>(net.connectAttempts, 5);
-  int64_t backoff = std::min<int64_t>(1000LL << shift, 60'000);
+  uint16_t shift  = std::min<uint16_t>(net.connectAttempts, 20);  // 1000 << 20 is past the largest cap
+  int64_t backoff = std::min<int64_t>(1000LL << shift, CONFIG_OPENSHOCK_WIFI_CONNECT_BACKOFF_MAX_MS);
 
   return diff < backoff;
 }
@@ -560,7 +560,7 @@ static void wifimanagerUpdateTask(void*)
     if (s_wifiState.load(std::memory_order_relaxed) == WiFiState::Disconnected && !WiFiScanManager::IsScanning()) {
       if (!tryConnect()) {
         int64_t now = OpenShock::millis();
-        if (lastScanRequest == 0 || now - lastScanRequest > 120'000) {  // Auto-scan at boot and then every 2 mins
+        if (lastScanRequest == 0 || now - lastScanRequest > CONFIG_OPENSHOCK_WIFI_AUTOSCAN_INTERVAL_MS) {  // Auto-scan at boot and then periodically
           lastScanRequest = now;
 
           OS_LOGV(TAG, "No networks to connect to, starting scan...");
@@ -640,7 +640,7 @@ bool WiFiManager::Init()
   esp_netif_set_hostname(s_staNetif, hostname->c_str());
 
   TaskHandle_t updateTask = nullptr;
-  if (TaskUtils::TaskCreateUniversal(wifimanagerUpdateTask, TAG, 4096, nullptr, 5, &updateTask, 1) != pdPASS) {  // TODO: Re-profile stack usage
+  if (TaskUtils::TaskCreateUniversal(wifimanagerUpdateTask, TAG, CONFIG_OPENSHOCK_WIFI_TASK_STACK_SIZE, nullptr, CONFIG_OPENSHOCK_WIFI_TASK_PRIORITY, &updateTask, 1) != pdPASS) {  // TODO: Re-profile stack usage
     OS_LOGE(TAG, "Failed to create WiFiManager update task");
     return false;
   }

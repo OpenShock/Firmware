@@ -69,7 +69,7 @@ OpenShock::SerialCmds::CommandGroup OpenShock::SerialCmds::CommandHandlers::Doma
   group.addCommand("Get the backend domain."sv, handleDomainCommand);
 
   auto& setCommand = group.addCommand("Set the backend domain."sv, handleDomainCommand);
-  setCommand.addArgument("domain"sv, "must be a string"sv, "api.shocklink.net"sv);
+  setCommand.addArgument("domain"sv, "must be a string"sv, std::string_view(CONFIG_OPENSHOCK_API_DOMAIN));
 
   return group;
 }
