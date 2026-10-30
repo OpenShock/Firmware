@@ -55,8 +55,7 @@ using namespace std::string_view_literals;
 
 using namespace OpenShock;
 
-const int64_t PASTE_INTERVAL_THRESHOLD_MS    = 20;
-const std::size_t SERIAL_BUFFER_MAX_CAPACITY = 4096;
+const int64_t PASTE_INTERVAL_THRESHOLD_MS = 20;
 
 static bool s_echoEnabled = true;
 static std::vector<OpenShock::SerialCmds::CommandGroup> s_commandGroups;
@@ -305,7 +304,7 @@ public:
   constexpr std::size_t capacity() const noexcept { return m_capacity; }
   constexpr bool empty() const noexcept { return m_size == 0; }
 
-  // Set when a line outgrew SERIAL_BUFFER_MAX_CAPACITY; the rest of that line is discarded and it is never executed.
+  // Set when a line outgrew CONFIG_OPENSHOCK_SERIAL_LINE_MAX_SIZE; the rest of that line is discarded and it is never executed.
   constexpr bool overflowed() const noexcept { return m_overflowed; }
 
   constexpr void clear() noexcept
@@ -316,14 +315,15 @@ public:
 
   inline void reserve(std::size_t size)
   {
-    size = (size + 31) & ~31;  // Align to 32 bytes
-
-    if (size > SERIAL_BUFFER_MAX_CAPACITY) {
-      OS_LOGE(TAG, "Line exceeds %zu bytes, discarding it", SERIAL_BUFFER_MAX_CAPACITY);
+    if (size > CONFIG_OPENSHOCK_SERIAL_LINE_MAX_SIZE) {
+      OS_LOGE(TAG, "Line exceeds %d bytes, discarding it", CONFIG_OPENSHOCK_SERIAL_LINE_MAX_SIZE);
       m_size       = 0;
       m_overflowed = true;
       return;
     }
+
+    size = (size + 31) & ~31;  // Align to 32 bytes
+
     if (size <= m_capacity) {
       return;
     }
@@ -342,6 +342,13 @@ public:
   inline void append(const char* data, std::size_t len)
   {
     if (len == 0 || m_overflowed) {
+      return;
+    }
+
+    if (m_size + len > CONFIG_OPENSHOCK_SERIAL_LINE_MAX_SIZE) {
+      OS_LOGE(TAG, "Line exceeds %d bytes, discarding it", CONFIG_OPENSHOCK_SERIAL_LINE_MAX_SIZE);
+      m_size       = 0;
+      m_overflowed = true;
       return;
     }
 
@@ -631,7 +638,7 @@ static void serialRxTask(void*)
     switch (tryReadSerialLine(buffer)) {
       case SerialReadResult::LineEnd:
         if (buffer.overflowed()) {
-          SERPR_ERROR("Line too long (max %zu bytes), ignored", SERIAL_BUFFER_MAX_CAPACITY);
+          SERPR_ERROR("Line too long (max %d bytes), ignored", CONFIG_OPENSHOCK_SERIAL_LINE_MAX_SIZE);
         } else {
           processSerialLine(buffer);
         }
@@ -689,7 +696,7 @@ bool SerialInputHandler::Init()
   }
   s_echoEnabled = *echoEnabled;
 
-  if (TaskUtils::TaskCreateExpensive(serialRxTask, "SerialRX", 10'000, nullptr, 1, nullptr) != pdPASS) {  // TODO: Profile stack size
+  if (TaskUtils::TaskCreateExpensive(serialRxTask, "SerialRX", CONFIG_OPENSHOCK_SERIAL_RX_TASK_STACK_SIZE, nullptr, 1, nullptr) != pdPASS) {  // TODO: Profile stack size
     OS_LOGE(TAG, "Failed to create serial RX task");
     return false;
   }

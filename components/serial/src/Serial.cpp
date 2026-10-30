@@ -32,12 +32,6 @@
 
 using namespace OpenShock;
 
-static constexpr int k_consoleBufferSize = 256;
-
-#if defined(OS_CONSOLE_USJ)
-static constexpr int k_usjTxBufferSize = 1024;
-#endif
-
 #if defined(OS_CONSOLE_USJ) || defined(OS_CONSOLE_CDC)
 // How long a USB console write may wait for the host to drain it. Once one wait runs out the host is presumed absent
 // (a headless hub on USB power) and later writes don't wait at all until one goes through again, so a log line costs
@@ -77,7 +71,7 @@ bool Serial::Init()
 
 #if defined(OS_CONSOLE_USJ)
   // A larger TX ring absorbs bursts while the host reads; RX stays small (console commands)
-  usb_serial_jtag_driver_config_t cfg = {.tx_buffer_size = k_usjTxBufferSize, .rx_buffer_size = k_consoleBufferSize};
+  usb_serial_jtag_driver_config_t cfg = {.tx_buffer_size = CONFIG_OPENSHOCK_SERIAL_USJ_TX_BUFFER_SIZE, .rx_buffer_size = CONFIG_OPENSHOCK_SERIAL_RX_BUFFER_SIZE};
 
   esp_err_t err = usb_serial_jtag_driver_install(&cfg);
   if (err != ESP_OK && err != ESP_ERR_INVALID_STATE) {
@@ -88,8 +82,7 @@ bool Serial::Init()
   // With a TX ring buffer, uart_write_bytes returns once the bytes are queued instead of waiting ~9 ms per 100-byte
   // line at 115200 baud, so logging no longer stalls the caller (event loop, httpd, ...). OS_PANIC waits 5 s before
   // restarting, which lets the buffer drain; only OS_PANIC_INSTANT can lose its last line.
-  static constexpr int k_uartTxBufferSize = 2048;
-  esp_err_t err                           = uart_driver_install(static_cast<uart_port_t>(CONFIG_ESP_CONSOLE_UART_NUM), k_consoleBufferSize, k_uartTxBufferSize, 0, nullptr, 0);
+  esp_err_t err = uart_driver_install(static_cast<uart_port_t>(CONFIG_ESP_CONSOLE_UART_NUM), CONFIG_OPENSHOCK_SERIAL_RX_BUFFER_SIZE, CONFIG_OPENSHOCK_SERIAL_UART_TX_BUFFER_SIZE, 0, nullptr, 0);
   if (err != ESP_OK && err != ESP_ERR_INVALID_STATE) {
     return false;
   }
@@ -142,7 +135,7 @@ static int driverWrite(const uint8_t* data, std::size_t len)
   std::size_t sent   = 0;
   while (sent < len) {
     TickType_t elapsed = xTaskGetTickCount() - started;  // Unsigned: wrap-safe
-    std::size_t chunk  = std::min(len - sent, static_cast<std::size_t>(k_usjTxBufferSize));
+    std::size_t chunk  = std::min(len - sent, static_cast<std::size_t>(CONFIG_OPENSHOCK_SERIAL_USJ_TX_BUFFER_SIZE));
     int n              = usb_serial_jtag_write_bytes(data + sent, chunk, elapsed < timeout ? timeout - elapsed : 0);
     if (n <= 0) {
       s_usbHostStalled.store(true, std::memory_order_relaxed);
