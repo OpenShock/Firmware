@@ -15,13 +15,14 @@ Mirrors components/www/include/www/WwwImage.h; change both together and bump VER
       offset     u32   directory: index of its first child; file: body offset from the start of the image
       size       u32   directory: number of children; file: body bytes
       reserved   u32   zero
-    string table: NUL-terminated names, one path component each (no '/')
+    string table: NUL-terminated names, one path component each (no '/'), no ASCII uppercase
     bodies: in node order, each padded to 4 bytes
 
 Node 0 is the root directory (empty name). A directory's children are one contiguous run of nodes, strictly
 sorted by name (byte order), and the runs are laid out breadth-first: walking the nodes in order, each directory's
 run starts where the previous one ended, the first right after the root. Every body is gzipped; there is no flag
-for it.
+for it. Names are lowercase: the packer folds ASCII letters, and the firmware folds the request path the same way,
+so URL case never matters.
 
 Everything is 4-byte aligned. The output is a pure function of the entries: no timestamps, sorted order, so an
 unchanged frontend gives a byte-identical image and the device can skip re-flashing it.
@@ -74,7 +75,8 @@ def _check_path(path: str) -> list[bytes]:
     parts = path.split('/')
     if any(part in ('.', '..') for part in parts):
         raise WwwImageError(f'bad asset path {path!r}: no . or .. components')
-    encoded = [part.encode('utf-8') for part in parts]
+    # bytes.lower() folds ASCII only, which is exactly what the firmware does to the request path
+    encoded = [part.encode('utf-8').lower() for part in parts]
     if any(len(part) > MAX_NAME_LEN or b'\0' in part for part in encoded):
         raise WwwImageError(f'bad asset path {path!r}: at most {MAX_NAME_LEN} bytes per name, no NUL')
     return encoded
@@ -172,7 +174,9 @@ class Image:
     size: int  # bytes of the image, header to the end of the last body's padding
 
     def find(self, path: str) -> Entry | None:
-        return next((e for e in self.entries if e.path == path), None)
+        """Case-insensitive for ASCII, as on the device."""
+        folded = path.encode('utf-8').lower()
+        return next((e for e in self.entries if e.path.encode('utf-8') == folded), None)
 
 
 def parse(data: bytes) -> Image:
@@ -208,7 +212,7 @@ def parse(data: bytes) -> Image:
         if index == 0:
             if name or not flags & FLAG_DIRECTORY:
                 raise WwwImageError('node 0 is not the root directory')
-        elif not name or b'/' in name or name in (b'.', b'..'):
+        elif not name or b'/' in name or name in (b'.', b'..') or name != name.lower():
             raise WwwImageError(f'node {index}: bad name {name!r}')
         if flags & ~(FLAG_DIRECTORY | FLAG_IMMUTABLE):
             raise WwwImageError(f'node {index}: unknown flags 0x{flags:04X}')

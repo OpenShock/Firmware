@@ -10,12 +10,14 @@
 //     flags: bit0 directory, bit1 immutable (files only)
 //     directory: offset = index of its first child, size = number of children
 //     file: offset = body offset from the start of the image, size = body bytes
-//   string table: NUL-terminated names, one path component each (no '/')
+//   string table: NUL-terminated names, one path component each (no '/'), no ASCII uppercase
 //   bodies: in node order, each padded to 4 bytes
 //
 // Node 0 is the root directory (empty name). A directory's children are one contiguous run of nodes, strictly
 // sorted by name, and the runs are laid out breadth-first: walking the nodes in order, each directory's run starts
 // where the previous one ended, the first right after the root. Every body is gzipped; there is no flag for it.
+// Names are lowercase: the packer folds ASCII letters and Find() folds the request path the same way, so URL case
+// never matters.
 //
 // body_hash is the SHA-256 of the whole image (header included, with body_hash itself zeroed), so no byte the
 // parser reads goes unchecked; reserved fields must be zero. Parse() checks every field before the image

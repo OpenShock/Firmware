@@ -24,6 +24,31 @@ namespace {
     return size + ((Www::kAlign - (size % Www::kAlign)) % Www::kAlign);
   }
 
+  // Names are stored lowercase (ASCII); a request path is folded the same way while comparing, never copied.
+  char foldAscii(char c)
+  {
+    return (c >= 'A' && c <= 'Z') ? static_cast<char>(c + ('a' - 'A')) : c;
+  }
+  bool isLowercase(std::string_view name)
+  {
+    for (char c : name) {
+      if (c >= 'A' && c <= 'Z') return false;
+    }
+    return true;
+  }
+  // <0, 0, >0 as `name` compares to the folded `request`, bytewise
+  int compareFolded(std::string_view name, std::string_view request)
+  {
+    const std::size_t n = std::min(name.size(), request.size());
+    for (std::size_t i = 0; i < n; ++i) {
+      const auto a = static_cast<unsigned char>(name[i]);
+      const auto b = static_cast<unsigned char>(foldAscii(request[i]));
+      if (a != b) return a < b ? -1 : 1;
+    }
+    if (name.size() == request.size()) return 0;
+    return name.size() < request.size() ? -1 : 1;
+  }
+
   struct RawNode {
     uint16_t nameOff;
     uint16_t flags;
@@ -139,7 +164,7 @@ std::expected<Www::Image, Www::ParseError> Www::Image::Parse(std::span<const uin
       if (!name.empty() || !node.isDirectory()) {
         return std::unexpected(ParseError::BadTree);
       }
-    } else if (name.empty() || name.find('/') != std::string_view::npos || name == "." || name == "..") {
+    } else if (name.empty() || name.find('/') != std::string_view::npos || name == "." || name == ".." || !isLowercase(name)) {
       return std::unexpected(ParseError::BadName);
     }
     if ((node.flags & ~kKnownFlags) != 0) {
@@ -223,13 +248,13 @@ std::optional<Www::Asset> Www::Image::Find(std::string_view path) const
     std::size_t lo = dir.offset, hi = dir.offset + dir.size;
     std::size_t found = std::string_view::npos;
     while (lo < hi) {
-      const std::size_t mid     = lo + (hi - lo) / 2;
-      const std::string_view at = nodeName(m_bytes, m_count, m_dirLen, mid);
-      if (at == component) {
+      const std::size_t mid = lo + (hi - lo) / 2;
+      const int cmp         = compareFolded(nodeName(m_bytes, m_count, m_dirLen, mid), component);
+      if (cmp == 0) {
         found = mid;
         break;
       }
-      if (at < component) {
+      if (cmp < 0) {
         lo = mid + 1;
       } else {
         hi = mid;

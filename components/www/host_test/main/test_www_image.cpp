@@ -5,6 +5,7 @@
 #include "Hashing.h"
 #include "www/WwwImage.h"
 
+#include <algorithm>
 #include <cstdio>
 #include <cstring>
 #include <string>
@@ -12,11 +13,11 @@
 
 using namespace OpenShock;
 
-// The fixture's node table, breadth-first ('L' sorts before '_' sorts before lowercase):
+// The fixture's node table, breadth-first, names folded to lowercase ('_' sorts before letters):
 //   0 root (dir)              children [1, 6)
-//   1 LICENSES.txt
-//   2 _app (dir)              children [6, 7)
-//   3 index.html
+//   1 _app (dir)              children [6, 7)
+//   2 index.html
+//   3 licenses.txt            (LICENSES.txt on disk)
 //   4 logo.svg
 //   5 many (dir)              children [7, 47)
 //   6 immutable (dir)         children [47, 48)
@@ -104,7 +105,14 @@ TEST_CASE("An image packed by the Python packer parses and serves every asset", 
   TEST_ASSERT_EQUAL_STRING("chunk.abc123.js", std::string(chunk->name).c_str());
   TEST_ASSERT_EQUAL_STRING("export default 1;", Body(*chunk).c_str());
 
-  TEST_ASSERT_EQUAL_STRING("MIT", Body(*image.Find("LICENSES.txt")).c_str());
+  // Names are stored lowercase and looked up case-insensitively
+  auto licenses = image.Find("LICENSES.txt");
+  TEST_ASSERT_TRUE(licenses.has_value());
+  TEST_ASSERT_EQUAL_STRING("MIT", Body(*licenses).c_str());
+  TEST_ASSERT_EQUAL_STRING("licenses.txt", std::string(licenses->name).c_str());
+  TEST_ASSERT_TRUE(image.Find("licenses.txt").has_value());
+  TEST_ASSERT_TRUE(image.Find("INDEX.HTML").has_value());
+  TEST_ASSERT_TRUE(image.Find("_App/Immutable/Chunk.ABC123.js").has_value());
   TEST_ASSERT_TRUE(image.Find("logo.svg").has_value());
   for (int i = 0; i < 40; ++i) {
     std::string path = "many/f" + std::to_string(i) + ".txt";
@@ -233,36 +241,46 @@ TEST_CASE("Each corrupted header field is rejected with its own reason", "[www]"
 
 TEST_CASE("Each corrupted node field is rejected", "[www]")
 {
-  const std::size_t root  = NodeAt(0);
-  const std::size_t file1 = NodeAt(1);  // LICENSES.txt
+  const std::size_t root = NodeAt(0);
+  const std::size_t file = NodeAt(2);  // index.html
 
   auto bytes = Fixture();
-  Put16(bytes, file1, 0xFFFF);  // name offset past the string table
+  Put16(bytes, file, 0xFFFF);  // name offset past the string table
   ExpectError(bytes, Www::ParseError::BadName);
 
   bytes = Fixture();
-  Put16(bytes, file1 + 2, 0x8000);  // unknown flag
+  Put16(bytes, file + 2, 0x8000);  // unknown flag
   ExpectError(bytes, Www::ParseError::BadFlags);
 
   bytes = Fixture();
-  Put32(bytes, file1 + 12, 1);  // reserved
+  Put32(bytes, file + 12, 1);  // reserved
   ExpectError(bytes, Www::ParseError::BadReserved);
 
   bytes = Fixture();
-  Put32(bytes, file1 + 4, 0x10);  // body inside the header
+  Put32(bytes, file + 4, 0x10);  // body inside the header
   ExpectError(bytes, Www::ParseError::BadBody);
 
   bytes = Fixture();
-  Put32(bytes, file1 + 4, Www::kHeaderSize + 2);  // unaligned
+  Put32(bytes, file + 4, Www::kHeaderSize + 2);  // unaligned
   ExpectError(bytes, Www::ParseError::BadBody);
 
   bytes = Fixture();
-  Put32(bytes, file1 + 8, 0x7FFFFFFF);  // size past the end
+  Put32(bytes, file + 8, 0x7FFFFFFF);  // size past the end
   ExpectError(bytes, Www::ParseError::BadBody);
 
   bytes = Fixture();
-  Put32(bytes, file1 + 8, 0xFFFFFFF0);  // offset + size overflows
+  Put32(bytes, file + 8, 0xFFFFFFF0);  // offset + size overflows
   ExpectError(bytes, Www::ParseError::BadBody);
+
+  // An uppercase letter in a stored name
+  bytes = Fixture();
+  {
+    static constexpr char kName[] = "index.html";
+    auto it                       = std::search(bytes.begin(), bytes.end(), kName, kName + sizeof(kName));  // includes the NUL
+    TEST_ASSERT_TRUE(it != bytes.end());
+    *it = 'I';
+    ExpectError(bytes, Www::ParseError::BadName);
+  }
 
   // The last path loses its terminator (it is the last byte of the string table, before the padding)
   bytes = Fixture();
@@ -276,19 +294,19 @@ TEST_CASE("Each corrupted node field is rejected", "[www]")
     ExpectError(bytes, Www::ParseError::BadName);
   }
 
-  // A file where a directory name should be: node 1's name offset on the root
+  // The root gets a non-empty name (index.html's)
   bytes = Fixture();
-  Put16(bytes, root, Get16(bytes, file1));  // the root gets a non-empty name
+  Put16(bytes, root, Get16(bytes, file));
   ExpectError(bytes, Www::ParseError::BadTree);
 }
 
 TEST_CASE("Each corrupted directory is rejected", "[www]")
 {
-  const std::size_t root  = NodeAt(0);
-  const std::size_t file1 = NodeAt(1);  // LICENSES.txt
-  const std::size_t app   = NodeAt(2);  // _app (dir), children [6, 7)
-  const std::size_t index = NodeAt(3);  // index.html
-  const std::size_t imm   = NodeAt(6);  // _app/immutable (dir), children [47, 48)
+  const std::size_t root     = NodeAt(0);
+  const std::size_t app      = NodeAt(1);  // _app (dir), children [6, 7)
+  const std::size_t index    = NodeAt(2);  // index.html
+  const std::size_t licenses = NodeAt(3);  // licenses.txt
+  const std::size_t imm      = NodeAt(6);  // _app/immutable (dir), children [47, 48)
 
   auto bytes = Fixture();
   Put16(bytes, root + 2, 0);  // the root is not a directory
@@ -314,12 +332,12 @@ TEST_CASE("Each corrupted directory is rejected", "[www]")
   Put32(bytes, imm + 8, 0);  // chunk.abc123.js then belongs to no directory
   ExpectError(bytes, Www::ParseError::BadTree);
 
-  // Swap the names of LICENSES.txt and index.html: the root's children are no longer increasing
+  // Swap the names of index.html and licenses.txt: the root's children are no longer increasing
   bytes         = Fixture();
-  uint16_t off1 = Get16(bytes, file1);
-  uint16_t off3 = Get16(bytes, index);
-  Put16(bytes, file1, off3);
-  Put16(bytes, index, off1);
+  uint16_t off2 = Get16(bytes, index);
+  uint16_t off3 = Get16(bytes, licenses);
+  Put16(bytes, index, off3);
+  Put16(bytes, licenses, off2);
   ExpectError(bytes, Www::ParseError::NotSorted);
 }
 

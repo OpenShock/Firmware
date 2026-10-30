@@ -10,15 +10,15 @@ from utils import wwwimage
 ASSETS = [
     wwwimage.Entry('index.html', b'<html>' * 7),
     wwwimage.Entry('logo.svg', b'<svg/>'),
-    wwwimage.Entry('LICENSES.txt', b'MIT'),
+    wwwimage.Entry('LICENSES.txt', b'MIT'),  # stored as licenses.txt
     wwwimage.Entry('_app/immutable/chunk.js', b'js' * 3, immutable=True),
 ]
 
-# The node table for ASSETS, breadth-first ('L' sorts before '_' sorts before lowercase):
+# The node table for ASSETS, breadth-first, names folded to lowercase ('_' sorts before letters):
 #   0 root (dir)          children [1, 5)
-#   1 LICENSES.txt
-#   2 _app (dir)          children [5, 6)
-#   3 index.html
+#   1 _app (dir)          children [5, 6)
+#   2 index.html
+#   3 licenses.txt
 #   4 logo.svg
 #   5 immutable (dir)     children [6, 7)
 #   6 chunk.js
@@ -32,9 +32,11 @@ def node(index: int) -> int:
 def test_round_trip_keeps_every_entry():
     image = wwwimage.pack(ASSETS)
     parsed = wwwimage.parse(image)
-    assert [e.path for e in parsed.entries] == ['LICENSES.txt', '_app/immutable/chunk.js', 'index.html', 'logo.svg']
+    assert [e.path for e in parsed.entries] == ['_app/immutable/chunk.js', 'index.html', 'licenses.txt', 'logo.svg']
     for asset in ASSETS:
-        assert parsed.find(asset.path) == asset
+        found = parsed.find(asset.path)
+        assert found is not None
+        assert (found.path, found.data, found.immutable) == (asset.path.lower(), asset.data, asset.immutable)
     assert parsed.node_count == NODE_COUNT
     assert parsed.size == len(image)
     assert parsed.find('missing') is None
@@ -61,18 +63,18 @@ def test_layout_is_what_the_firmware_header_describes():
 
     assert [name(n[0]) for n in nodes] == [
         b'',
-        b'LICENSES.txt',
         b'_app',
         b'index.html',
+        b'licenses.txt',
         b'logo.svg',
         b'immutable',
         b'chunk.js',
     ]
     # Directories: flags, first child, child count
     assert nodes[0][1:4] == (wwwimage.FLAG_DIRECTORY, 1, 4)
-    assert nodes[2][1:4] == (wwwimage.FLAG_DIRECTORY, 5, 1)
+    assert nodes[1][1:4] == (wwwimage.FLAG_DIRECTORY, 5, 1)
     assert nodes[5][1:4] == (wwwimage.FLAG_DIRECTORY, 6, 1)
-    assert nodes[1][1] == 0
+    assert nodes[2][1] == 0
     assert nodes[6][1] == wwwimage.FLAG_IMMUTABLE
 
     # Bodies: in node order, right after the directory, each 4-byte aligned
@@ -106,6 +108,27 @@ def test_names_are_shared_between_nodes():
     parsed = wwwimage.parse(image)
     assert parsed.find('a/x.txt').data == b'1'
     assert parsed.find('b/x.txt').data == b'2'
+
+
+def test_names_are_folded_to_lowercase_and_looked_up_case_insensitively():
+    image = wwwimage.pack([wwwimage.Entry('LICENSES.txt', b'MIT'), wwwimage.Entry('Dir/File.JS', b'1')])
+    assert b'LICENSES' not in image and b'licenses.txt\0' in image
+    parsed = wwwimage.parse(image)
+    assert [e.path for e in parsed.entries] == ['dir/file.js', 'licenses.txt']
+    assert parsed.find('LICENSES.TXT').data == b'MIT'
+    assert parsed.find('dir/FILE.js').data == b'1'
+
+
+@pytest.mark.parametrize(
+    'entries, error',
+    [
+        ([wwwimage.Entry('a.txt', b'1'), wwwimage.Entry('A.TXT', b'2')], 'duplicate'),
+        ([wwwimage.Entry('A', b'1'), wwwimage.Entry('a/b', b'2')], 'both a file and a directory'),
+    ],
+)
+def test_paths_differing_only_by_case_collide(entries, error):
+    with pytest.raises(wwwimage.WwwImageError, match=error):
+        wwwimage.pack(entries)
 
 
 @pytest.mark.parametrize(
@@ -150,13 +173,13 @@ def corrupt(image: bytes, offset: int, value: bytes) -> bytes:
         (node(0) + 2, struct.pack('<H', 0), 'not the root directory'),
         (node(0) + 4, struct.pack('<I', 2), 'bad child run'),  # the root's children start at 1
         (node(0) + 8, struct.pack('<I', 100), 'bad child run'),
-        (node(1) + 0, struct.pack('<H', 0xFFFF), 'name offset out of range'),
-        (node(1) + 2, struct.pack('<H', 0x8000), 'unknown flags'),
-        (node(1) + 4, struct.pack('<I', 0x10), 'body out of range'),
-        (node(1) + 8, struct.pack('<I', 0x7FFFFFFF), 'body out of range'),
-        (node(1) + 12, struct.pack('<I', 1), 'reserved field not zero'),
-        (node(2) + 2, struct.pack('<H', wwwimage.FLAG_DIRECTORY | wwwimage.FLAG_IMMUTABLE), 'immutable directory'),
-        (node(2) + 4, struct.pack('<I', 6), 'bad child run'),  # _app's run must follow the root's
+        (node(1) + 2, struct.pack('<H', wwwimage.FLAG_DIRECTORY | wwwimage.FLAG_IMMUTABLE), 'immutable directory'),
+        (node(1) + 4, struct.pack('<I', 6), 'bad child run'),  # _app's run must follow the root's
+        (node(2) + 0, struct.pack('<H', 0xFFFF), 'name offset out of range'),
+        (node(2) + 2, struct.pack('<H', 0x8000), 'unknown flags'),
+        (node(2) + 4, struct.pack('<I', 0x10), 'body out of range'),
+        (node(2) + 8, struct.pack('<I', 0x7FFFFFFF), 'body out of range'),
+        (node(2) + 12, struct.pack('<I', 1), 'reserved field not zero'),
         (node(5) + 8, struct.pack('<I', 0), 'unreachable nodes'),  # chunk.js then belongs to no directory
     ],
 )
@@ -165,13 +188,20 @@ def test_every_corrupted_field_is_rejected(offset, value, error):
         wwwimage.parse(corrupt(wwwimage.pack(ASSETS), offset, value))
 
 
+def test_an_uppercase_name_in_the_image_is_rejected():
+    image = wwwimage.pack(ASSETS)
+    image = corrupt(image, image.index(b'index.html\0'), b'I')
+    with pytest.raises(wwwimage.WwwImageError, match='bad name'):
+        wwwimage.parse(image)
+
+
 def test_children_out_of_order_are_rejected():
     image = bytearray(wwwimage.pack(ASSETS))
-    # Swap the names of LICENSES.txt and index.html: the root's children are then no longer increasing
-    first = image[node(1) : node(1) + 2]
+    # Swap the names of index.html and licenses.txt: the root's children are then no longer increasing
+    second = image[node(2) : node(2) + 2]
     third = image[node(3) : node(3) + 2]
-    image[node(1) : node(1) + 2] = third
-    image[node(3) : node(3) + 2] = first
+    image[node(2) : node(2) + 2] = third
+    image[node(3) : node(3) + 2] = second
     with pytest.raises(wwwimage.WwwImageError, match='not strictly increasing'):
         wwwimage.parse(bytes(image))
 
