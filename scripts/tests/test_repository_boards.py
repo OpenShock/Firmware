@@ -20,5 +20,5 @@ def test_board_is_complete(board):
 
     csv = partitions.partition_csv_for(board)
     assert csv.is_file()
-    assert 'static0' in partitions.read_partitions(csv)
+    assert 'www' in partitions.read_partitions(csv)
     assert partitions.partition_table_offset(board) == 0x8000

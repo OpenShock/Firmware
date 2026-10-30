@@ -21,6 +21,9 @@ namespace OpenShock {
   public:
     using Digest = std::array<uint8_t, DigestSize>;
 
+    /// @brief Hashes one contiguous buffer in a single call.
+    [[nodiscard]] static inline bool compute(const uint8_t* data, std::size_t dataLen, Digest& hash) { return mbedtls_md(mbedtls_md_info_from_type(Type), data, dataLen, hash.data()) == 0; }
+
     // A setup failure (algorithm not compiled in, out of memory) surfaces as begin() returning false.
     Hasher()
     {
