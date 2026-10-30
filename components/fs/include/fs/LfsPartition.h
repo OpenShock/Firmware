@@ -5,7 +5,9 @@
 
 #include <esp_partition.h>
 
+#include <cstddef>
 #include <cstdint>
+#include <optional>
 #include <span>
 #include <vector>
 
@@ -15,9 +17,8 @@ namespace OpenShock {
   }
 
   // Mounts a littlefs filesystem directly over a raw esp_partition using the vendored
-  // littlefs core, no VFS registration. This is the shared kernel behind StaticFs
-  // (read-only) and ConfigFs (read/write); most callers should use one of those
-  // facades rather than this class directly.
+  // littlefs core, no VFS registration. This is the shared kernel behind ConfigFs
+  // (read/write) and the captive portal's StaticFileServer (read-only).
   //
   // Not thread-safe: callers that share a partition across tasks must serialize access
   // themselves.
@@ -35,8 +36,14 @@ namespace OpenShock {
     bool mount(const esp_partition_t* partition, bool writable, bool formatOnFail = false);
     void unmount();
     bool isMounted() const { return m_mounted; }
+    // The partition this is mounted on, or null when not mounted.
+    const esp_partition_t* partition() const;
 
+    // True if `path` names anything, file or directory.
     bool exists(const char* path);
+
+    // The size of the regular file at `path`; empty if there is none (a directory does not count).
+    std::optional<std::size_t> fileSize(const char* path);
 
     // Stream a file to `sink` in chunks. Returns false if the file is missing/unreadable
     // or if `sink` returns false (which aborts the stream).
