@@ -49,7 +49,9 @@ static esp_err_t captiveApiHandler(httpd_req_t* req)
   json_gen_start_object(gen);
   json_gen_obj_set_bool(gen, "captive", true);
   JSON::objSetString(gen, "user-portal-url", portalUrl.c_str());
-  JSON::objSetString(gen, "venue-info-url", "https://openshock.org");
+  if constexpr (sizeof(CONFIG_OPENSHOCK_PORTAL_VENUE_INFO_URL) > 1) {  // empty: leave it out
+    JSON::objSetString(gen, "venue-info-url", CONFIG_OPENSHOCK_PORTAL_VENUE_INFO_URL);
+  }
   json_gen_end_object(gen);
   std::string jsonStr = writer.finish();
 

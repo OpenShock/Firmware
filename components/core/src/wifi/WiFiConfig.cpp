@@ -8,6 +8,7 @@ const char* const TAG = "Config::WiFiConfig";
 #include "config/Parse.h"
 #include "Convert.h"
 #include "Logging.h"
+#include "util/HostnameUtils.h"
 
 #include "json/Json.h"
 
@@ -18,6 +19,8 @@ const char* const TAG = "Config::WiFiConfig";
 
 using namespace OpenShock::Config;
 namespace Fbs = OpenShock::Serialization::Configuration;
+
+static_assert(OpenShock::HostnameUtils::IsValid(CONFIG_OPENSHOCK_FW_HOSTNAME), "CONFIG_OPENSHOCK_FW_HOSTNAME must be 1-32 letters, digits or hyphens, not starting or ending with a hyphen");
 
 static constexpr const char* kNamespaceCfg   = "wifi.cfg";
 static constexpr const char* kNamespaceCreds = "wifi";
