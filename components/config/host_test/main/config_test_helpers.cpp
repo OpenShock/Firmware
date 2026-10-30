@@ -15,17 +15,6 @@
 using namespace OpenShock;
 
 namespace ConfigTest {
-  void Full::ToDefault()
-  {
-    rf.ToDefault();
-    wifi.ToDefault();
-    captivePortal.ToDefault();
-    backend.ToDefault();
-    serialInput.ToDefault();
-    otaUpdate.ToDefault();
-    estop.ToDefault();
-  }
-
   bool Full::SaveNvs(const char* partition) const
   {
     if (!rf.SaveNvs(partition, nullptr) || !wifi.SaveNvs(partition, nullptr) || !captivePortal.SaveNvs(partition, nullptr) || !backend.SaveNvs(partition, nullptr) || !serialInput.SaveNvs(partition, nullptr) || !otaUpdate.SaveNvs(partition, nullptr)

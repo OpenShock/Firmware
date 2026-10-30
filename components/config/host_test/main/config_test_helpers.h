@@ -81,7 +81,6 @@ namespace ConfigTest {
     OpenShock::Config::OtaUpdateConfig otaUpdate;
     OpenShock::Config::EStopConfig estop;
 
-    void ToDefault();
     // Every section's keys, plus the store's schema marker, so the store loads rather than fills it
     bool SaveNvs(const char* partition) const;
     // As the jsonconfig document renders it

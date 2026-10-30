@@ -18,14 +18,15 @@
 
 namespace OpenShock::Config {
   struct WiFiConfig {
-    WiFiConfig();
+    WiFiConfig();  // The defaults: the one place they are defined
     WiFiConfig(std::string_view accessPointSSID, std::string_view hostname, const std::vector<WiFiCredentials>& credentialsList);
 
     std::string accessPointSSID;
     std::string hostname;
     std::vector<OpenShock::Config::WiFiCredentials> credentialsList;  // in id order once loaded from NVS
 
-    void ToDefault();
+    /// @brief No rules to apply yet. The section runs it on every value it takes in.
+    void Normalize() { }
 
     bool LoadNvs(const char* partition);
     bool SaveNvs(const char* partition, const WiFiConfig* previous) const;

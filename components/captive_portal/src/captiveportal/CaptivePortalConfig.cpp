@@ -34,11 +34,6 @@ CaptivePortalConfig::CaptivePortalConfig(bool alwaysEnabled)
 {
 }
 
-void CaptivePortalConfig::ToDefault()
-{
-  alwaysEnabled = false;
-}
-
 flatbuffers::Offset<OpenShock::Serialization::Configuration::CaptivePortalConfig> CaptivePortalConfig::ToFlatbuffers(flatbuffers::FlatBufferBuilder& builder, bool withSensitiveData) const
 {
   return Serialization::Configuration::CreateCaptivePortalConfig(builder, alwaysEnabled);
@@ -48,7 +43,7 @@ bool CaptivePortalConfig::FromJSON(JSON::JsonView json)
 {
   if (!json.valid()) {
     OS_LOGW(TAG, "Config is null, setting to default");
-    ToDefault();
+    *this = CaptivePortalConfig();
     return true;
   }
 
@@ -73,7 +68,7 @@ bool CaptivePortalConfig::LoadNvs(const char* partition)
 {
   auto handle = Nvs::Handle::Open(partition, kNamespace, false);
   if (!handle) {
-    ToDefault();
+    *this = CaptivePortalConfig();
     return true;
   }
   return Nvs::Load(*handle, kKeyAlways, alwaysEnabled, false);

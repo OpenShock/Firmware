@@ -49,13 +49,6 @@ WiFiConfig::WiFiConfig(std::string_view accessPointSSID, std::string_view hostna
 {
 }
 
-void WiFiConfig::ToDefault()
-{
-  accessPointSSID = CONFIG_OPENSHOCK_FW_AP_PREFIX;
-  hostname        = CONFIG_OPENSHOCK_FW_HOSTNAME;
-  credentialsList.clear();
-}
-
 flatbuffers::Offset<OpenShock::Serialization::Configuration::WiFiConfig> WiFiConfig::ToFlatbuffers(flatbuffers::FlatBufferBuilder& builder, bool withSensitiveData) const
 {
   std::vector<flatbuffers::Offset<OpenShock::Serialization::Configuration::WiFiCredentials>> fbsCredentialsList;
@@ -72,7 +65,7 @@ bool WiFiConfig::FromJSON(JSON::JsonView json)
 {
   if (!json.valid()) {
     OS_LOGW(TAG, "Config is null, setting to default");
-    ToDefault();
+    *this = WiFiConfig();
     return true;
   }
 

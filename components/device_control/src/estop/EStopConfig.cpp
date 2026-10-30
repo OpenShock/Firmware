@@ -40,12 +40,6 @@ EStopConfig::EStopConfig(bool enabled, gpio_num_t gpioPin)
 {
 }
 
-void EStopConfig::ToDefault()
-{
-  enabled = OpenShock::IsValidInputPin(Board::Get().estopGpio);
-  gpioPin = static_cast<gpio_num_t>(Board::Get().estopGpio);
-}
-
 void EStopConfig::Normalize()
 {
   // An E-Stop on a pin that can't be read as an input would never trigger; store it as disabled on every path.
@@ -59,7 +53,7 @@ bool EStopConfig::LoadNvs(const char* partition)
 {
   auto handle = Nvs::Handle::Open(partition, kNamespace, false);
   if (!handle) {
-    ToDefault();
+    *this = EStopConfig();
     return true;
   }
 
@@ -72,15 +66,11 @@ bool EStopConfig::LoadNvs(const char* partition)
   auto pin = Parse::GpioNum(storedPin);
   if (!pin) {
     OS_LOGW(TAG, "Invalid E-Stop GPIO pin %d, using default", storedPin);
-    ToDefault();
+    *this = EStopConfig();
     return true;
   }
   gpioPin = *pin;
-  if (!Nvs::Load(*handle, kKeyEnabled, enabled, OpenShock::IsValidInputPin(gpioPin))) {
-    return false;
-  }
-  Normalize();
-  return true;
+  return Nvs::Load(*handle, kKeyEnabled, enabled, OpenShock::IsValidInputPin(gpioPin));
 }
 
 bool EStopConfig::SaveNvs(const char* partition, const EStopConfig* previous) const
@@ -97,7 +87,7 @@ bool EStopConfig::SaveNvs(const char* partition, const EStopConfig* previous) co
 bool EStopConfig::FromJSON(JSON::JsonView json)
 {
   if (!json.valid()) {
-    ToDefault();
+    *this = EStopConfig();
     return true;
   }
 
@@ -118,7 +108,6 @@ bool EStopConfig::FromJSON(JSON::JsonView json)
   } else {
     enabled = OpenShock::IsValidInputPin(gpioPin);
   }
-  Normalize();
 
   return true;
 }
@@ -147,7 +136,6 @@ bool OpenShock::Config::SetEStopConfig(const EStopConfig& config)
 {
   return s_section.Update([&](EStopConfig& estop) {
     estop = config;
-    estop.Normalize();
     return true;
   });
 }
@@ -161,7 +149,6 @@ bool OpenShock::Config::SetEStopEnabled(bool enabled)
 {
   return s_section.Update([&](EStopConfig& estop) {
     estop.enabled = enabled;
-    estop.Normalize();
     return true;
   });
 }

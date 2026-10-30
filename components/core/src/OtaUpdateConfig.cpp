@@ -67,20 +67,6 @@ OtaUpdateConfig::OtaUpdateConfig(
 {
 }
 
-void OtaUpdateConfig::ToDefault()
-{
-  isEnabled              = true;
-  cdnDomain              = CONFIG_OPENSHOCK_FW_CDN_DOMAIN;
-  updateChannel          = OtaUpdateChannel::Stable;
-  checkOnStartup         = false;
-  checkPeriodically      = false;
-  checkInterval          = 30;  // 30 minutes
-  allowBackendManagement = true;
-  requireManualApproval  = false;
-  updateId               = 0;
-  updateStep             = OtaUpdateStep::None;
-}
-
 flatbuffers::Offset<OpenShock::Serialization::Configuration::OtaUpdateConfig> OtaUpdateConfig::ToFlatbuffers(flatbuffers::FlatBufferBuilder& builder, bool withSensitiveData) const
 {
   namespace Fbs = Serialization::Configuration;
@@ -109,7 +95,7 @@ bool OtaUpdateConfig::FromJSON(JSON::JsonView json)
 {
   if (!json.valid()) {
     OS_LOGW(TAG, "Config is null, setting to default");
-    ToDefault();
+    *this = OtaUpdateConfig();
     return true;
   }
 
@@ -156,7 +142,7 @@ bool OtaUpdateConfig::LoadNvs(const char* partition)
 {
   auto handle = Nvs::Handle::Open(partition, kNamespace, false);
   if (!handle) {
-    ToDefault();
+    *this = OtaUpdateConfig();
     return true;
   }
 

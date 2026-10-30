@@ -34,11 +34,6 @@ SerialInputConfig::SerialInputConfig(bool echoEnabled)
 {
 }
 
-void SerialInputConfig::ToDefault()
-{
-  echoEnabled = true;
-}
-
 flatbuffers::Offset<OpenShock::Serialization::Configuration::SerialInputConfig> SerialInputConfig::ToFlatbuffers(flatbuffers::FlatBufferBuilder& builder, bool withSensitiveData) const
 {
   return Serialization::Configuration::CreateSerialInputConfig(builder, echoEnabled);
@@ -48,7 +43,7 @@ bool SerialInputConfig::FromJSON(JSON::JsonView json)
 {
   if (!json.valid()) {
     OS_LOGW(TAG, "Config is null, setting to default");
-    ToDefault();
+    *this = SerialInputConfig();
     return true;
   }
 
@@ -73,7 +68,7 @@ bool SerialInputConfig::LoadNvs(const char* partition)
 {
   auto handle = Nvs::Handle::Open(partition, kNamespace, false);
   if (!handle) {
-    ToDefault();
+    *this = SerialInputConfig();
     return true;
   }
   return Nvs::Load(*handle, kKeyEcho, echoEnabled, true);

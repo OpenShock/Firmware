@@ -2,10 +2,12 @@
 
 // A config section: one module's settings, owned and defined by that module, kept in NVS through this framework.
 //
-// The module defines a value type T and one Section<T> object for it (a namespace-scope static in its own .cpp):
+// The module defines a value type T meeting SectionValue (below) and one Section<T> object for it (a namespace-scope
+// static in its own .cpp):
 //
 //   struct RFConfig {
-//     void ToDefault();
+//     RFConfig();                                                       // the defaults, defined nowhere else
+//     void Normalize();                                                 // validation, run on every value taken in
 //     bool LoadNvs(const char* partition);                              // missing keys are defaults
 //     bool SaveNvs(const char* partition, const RFConfig* previous) const;  // writes only what differs
 //     bool FromJSON(JSON::JsonView json);                               // invalid view: defaults
@@ -33,6 +35,7 @@
 
 #include <json_generator.h>
 
+#include <concepts>
 #include <cstdint>
 #include <optional>
 #include <span>
@@ -85,6 +88,19 @@ namespace OpenShock::Config {
     SectionBase* m_next;
   };
 
+  /// @brief What a section's value type provides; no base class, checked where its Section is defined. A default
+  ///        constructed value is the defaults. Normalize() is the type's validation: the section runs it on every value
+  ///        it takes in (load, update, import, reset), so no setter can skip it.
+  template<typename T>
+  concept SectionValue = std::default_initializable<T> && std::copyable<T> && requires(T& value, const T& constValue, const char* partition, json_gen_str_t* gen, flatbuffers::FlatBufferBuilder& builder, bool withSensitiveData) {
+    { value.Normalize() } -> std::same_as<void>;
+    { value.LoadNvs(partition) } -> std::same_as<bool>;
+    { constValue.SaveNvs(partition, &constValue) } -> std::same_as<bool>;
+    { &T::FromJSON } -> std::same_as<bool (T::*)(JSON::JsonView)>;  // JsonView may be incomplete here
+    { constValue.ToJSON(gen, "name", withSensitiveData) } -> std::same_as<void>;
+    { constValue.ToFlatbuffers(builder, withSensitiveData).o } -> std::convertible_to<uint32_t>;
+  };
+
   namespace Internal {
     /// @brief Serializes every writer of every section, the store's own operations included.
     SimpleMutex& WriteLock();
@@ -92,7 +108,7 @@ namespace OpenShock::Config {
     const char* Partition();
   }  // namespace Internal
 
-  template<typename T>
+  template<SectionValue T>
   class Section final : public SectionBase {
   public:
     explicit Section(const SectionInfo& info)
@@ -138,6 +154,7 @@ namespace OpenShock::Config {
       if (!mutate(updated)) {
         return true;
       }
+      updated.Normalize();
       if (!save(updated)) {
         return false;
       }
@@ -148,9 +165,10 @@ namespace OpenShock::Config {
     bool Load(const char* partition) override
     {
       T loaded;
-      bool ok = loaded.LoadNvs(partition);
+      bool ok = loadNvs(loaded, partition);
       if (!ok) {
-        loaded.ToDefault();
+        loaded = T();
+        loaded.Normalize();
       }
       m_unsynced = !ok;
       publish(std::move(loaded));
@@ -160,7 +178,7 @@ namespace OpenShock::Config {
     bool Reset(const char* partition) override
     {
       T defaults;
-      defaults.ToDefault();
+      defaults.Normalize();
       bool ok = true;
       if (partition != nullptr) {
         ok = eraseNamespaces(partition) && defaults.SaveNvs(partition, nullptr);
@@ -173,7 +191,7 @@ namespace OpenShock::Config {
     bool VerifyStored(const char* partition) const override
     {
       T stored;
-      return stored.LoadNvs(partition) && sameValue(stored, Get());
+      return loadNvs(stored, partition) && sameValue(stored, Get());
     }
 
     void ToJSON(json_gen_str_t* gen, bool withSensitiveData) const override
@@ -188,6 +206,7 @@ namespace OpenShock::Config {
       if (!staged.FromJSON(json)) {
         return false;
       }
+      staged.Normalize();
       m_staged.emplace(std::move(staged));
       return true;
     }
@@ -215,6 +234,15 @@ namespace OpenShock::Config {
     }
 
   private:
+    static bool loadNvs(T& value, const char* partition)
+    {
+      if (!value.LoadNvs(partition)) {
+        return false;
+      }
+      value.Normalize();
+      return true;
+    }
+
     // Only the keys that differ from the cache, or every key when flash may not match it
     bool save(const T& value)
     {
@@ -247,13 +275,13 @@ namespace OpenShock::Config {
     bool SameJson(Util::FunctionRef<void(json_gen_str_t*)> renderA, Util::FunctionRef<void(json_gen_str_t*)> renderB);
   }  // namespace Internal
 
-  template<typename T>
+  template<SectionValue T>
   bool Section<T>::eraseNamespaces(const char* partition) const
   {
     return Internal::EraseNamespaces(partition, Info().namespaces);
   }
 
-  template<typename T>
+  template<SectionValue T>
   bool Section<T>::sameValue(const T& a, const T& b)
   {
     return Internal::SameJson([&](json_gen_str_t* gen) { a.ToJSON(gen, nullptr, true); }, [&](json_gen_str_t* gen) { b.ToJSON(gen, nullptr, true); });

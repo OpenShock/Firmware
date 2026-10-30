@@ -16,13 +16,14 @@ namespace OpenShock::JSON {
 
 namespace OpenShock::Config {
   struct BackendConfig {
-    BackendConfig();
+    BackendConfig();  // The defaults: the one place they are defined
     BackendConfig(std::string_view domain, std::string_view authToken);
 
     std::string domain;
     std::string authToken;
 
-    void ToDefault();
+    /// @brief No rules to apply yet. The section runs it on every value it takes in.
+    void Normalize() { }
 
     [[nodiscard]] flatbuffers::Offset<Serialization::Configuration::BackendConfig> ToFlatbuffers(flatbuffers::FlatBufferBuilder& builder, bool withSensitiveData) const;
 

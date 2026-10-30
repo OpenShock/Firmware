@@ -23,15 +23,13 @@ namespace OpenShock::JSON {
 namespace OpenShock::Config {
   // The schema's `active` and `latching` fields are not modelled: nothing reads them.
   struct EStopConfig {
-    EStopConfig();
+    EStopConfig();  // The defaults: the one place they are defined
     EStopConfig(bool enabled, gpio_num_t gpioPin);
 
     bool enabled;
     gpio_num_t gpioPin;
 
-    void ToDefault();
-
-    /// @brief Disables the E-Stop when its pin can't be used as an input, so every input path stores the same thing.
+    /// @brief Disables the E-Stop when its pin can't be used as an input. The section runs it on every value it takes in.
     void Normalize();
 
     bool LoadNvs(const char* partition);

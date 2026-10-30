@@ -37,12 +37,6 @@ BackendConfig::BackendConfig(std::string_view domain, std::string_view authToken
 {
 }
 
-void BackendConfig::ToDefault()
-{
-  domain = CONFIG_OPENSHOCK_API_DOMAIN;
-  authToken.clear();
-}
-
 flatbuffers::Offset<OpenShock::Serialization::Configuration::BackendConfig> BackendConfig::ToFlatbuffers(flatbuffers::FlatBufferBuilder& builder, bool withSensitiveData) const
 {
   auto domainOffset = builder.CreateString(domain);
@@ -61,7 +55,7 @@ bool BackendConfig::FromJSON(JSON::JsonView json)
 {
   if (!json.valid()) {
     OS_LOGW(TAG, "Config is null, setting to default");
-    ToDefault();
+    *this = BackendConfig();
     return true;
   }
 
@@ -92,7 +86,7 @@ bool BackendConfig::LoadNvs(const char* partition)
 {
   auto handle = Nvs::Handle::Open(partition, kNamespace, false);
   if (!handle) {
-    ToDefault();
+    *this = BackendConfig();
     return true;
   }
   return Nvs::Load(*handle, kKeyDomain, domain, CONFIG_OPENSHOCK_API_DOMAIN) && Nvs::Load(*handle, kKeyToken, authToken, "");

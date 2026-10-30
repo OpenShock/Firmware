@@ -66,13 +66,6 @@ TEST_CASE("Default values come from Kconfig and the board descriptor", "[config]
   TEST_ASSERT_FALSE(config.estop.enabled);
 }
 
-TEST_CASE("ToDefault resets every section to the constructed defaults", "[config][defaults]")
-{
-  Full config = MakeSampleConfig();
-  config.ToDefault();
-  AssertConfigEqual(Full(), config);
-}
-
 TEST_CASE("An empty store: Init writes a default config that reloads", "[config][defaults]")
 {
   InitDefault();

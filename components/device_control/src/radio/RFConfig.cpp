@@ -38,17 +38,11 @@ RFConfig::RFConfig(gpio_num_t txPin, bool keepAliveEnabled)
 {
 }
 
-void RFConfig::ToDefault()
-{
-  txPin            = static_cast<gpio_num_t>(Board::Get().rfTxGpio);
-  keepAliveEnabled = true;
-}
-
 bool RFConfig::LoadNvs(const char* partition)
 {
   auto handle = Nvs::Handle::Open(partition, kNamespace, false);
   if (!handle) {
-    ToDefault();
+    *this = RFConfig();
     return true;
   }
 
@@ -80,7 +74,7 @@ bool RFConfig::SaveNvs(const char* partition, const RFConfig* previous) const
 bool RFConfig::FromJSON(JSON::JsonView json)
 {
   if (!json.valid()) {
-    ToDefault();
+    *this = RFConfig();
     return true;
   }
 

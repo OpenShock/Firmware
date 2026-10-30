@@ -24,7 +24,7 @@ namespace OpenShock::JSON {
 
 namespace OpenShock::Config {
   struct OtaUpdateConfig {
-    OtaUpdateConfig();
+    OtaUpdateConfig();  // The defaults: the one place they are defined
     OtaUpdateConfig(
       bool isEnabled, std::string cdnDomain, OtaUpdateChannel updateChannel, bool checkOnStartup, bool checkPeriodically, uint16_t checkInterval, bool allowBackendManagement, bool requireManualApproval, int32_t updateId, OtaUpdateStep updateStep
     );
@@ -40,7 +40,8 @@ namespace OpenShock::Config {
     int32_t updateId;
     OtaUpdateStep updateStep;
 
-    void ToDefault();
+    /// @brief No rules to apply yet. The section runs it on every value it takes in.
+    void Normalize() { }
 
     [[nodiscard]] flatbuffers::Offset<Serialization::Configuration::OtaUpdateConfig> ToFlatbuffers(flatbuffers::FlatBufferBuilder& builder, bool withSensitiveData) const;
 

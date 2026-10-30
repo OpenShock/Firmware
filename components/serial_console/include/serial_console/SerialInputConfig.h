@@ -14,12 +14,13 @@ namespace OpenShock::JSON {
 
 namespace OpenShock::Config {
   struct SerialInputConfig {
-    SerialInputConfig();
+    SerialInputConfig();  // The defaults: the one place they are defined
     SerialInputConfig(bool echoEnabled);
 
     bool echoEnabled;
 
-    void ToDefault();
+    /// @brief No rules to apply yet. The section runs it on every value it takes in.
+    void Normalize() { }
 
     [[nodiscard]] flatbuffers::Offset<Serialization::Configuration::SerialInputConfig> ToFlatbuffers(flatbuffers::FlatBufferBuilder& builder, bool withSensitiveData) const;
 

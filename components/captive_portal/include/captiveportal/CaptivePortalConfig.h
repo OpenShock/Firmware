@@ -14,12 +14,13 @@ namespace OpenShock::JSON {
 
 namespace OpenShock::Config {
   struct CaptivePortalConfig {
-    CaptivePortalConfig();
+    CaptivePortalConfig();  // The defaults: the one place they are defined
     CaptivePortalConfig(bool alwaysEnabled);
 
     bool alwaysEnabled;
 
-    void ToDefault();
+    /// @brief No rules to apply yet. The section runs it on every value it takes in.
+    void Normalize() { }
 
     [[nodiscard]] flatbuffers::Offset<Serialization::Configuration::CaptivePortalConfig> ToFlatbuffers(flatbuffers::FlatBufferBuilder& builder, bool withSensitiveData) const;
 
