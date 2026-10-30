@@ -30,7 +30,7 @@ namespace OpenShock::CaptivePortal {
     esp_err_t serveFromLittlefs(httpd_req_t* req, std::string_view uri, bool wantsGzip);
 
     Www::Partition m_www;
-    LfsPartition m_partition;  // 1.x layout only
+    LfsPartition m_partition;  // TODO(remove with 1.x): the littlefs path is transitional, for hubs the www migration has not reached yet
     std::string m_etag;        // the www image's hash, quoted; empty on the 1.x layout, which tags by partition hash
   };
 }  // namespace OpenShock::CaptivePortal

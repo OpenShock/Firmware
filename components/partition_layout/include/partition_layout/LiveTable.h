@@ -6,14 +6,10 @@
 #include "partition_layout/PartitionTable.h"
 
 #include <cstdint>
-#include <memory>
 
 namespace OpenShock::PartitionTable {
   /// @brief The raw table at 0x8000; false when the flash read fails.
   bool ReadLiveBytes(Bytes& out);
-
-  /// @brief The table at 0x8000, parsed, on the heap; null (logged) when it cannot be read or does not parse.
-  [[nodiscard]] std::unique_ptr<Table> ReadLive();
 
   enum class ReplaceResult : uint8_t {
     Written,    // `next` is on flash

@@ -136,6 +136,69 @@ TEST_CASE("A table without an MD5 entry, or with a wrong one, is refused", "[par
   ExpectParseError(std::span<const uint8_t>(good).first(3 * PT::kEntrySize), PT::ParseError::NoMd5);
 }
 
+TEST_CASE("Only the first 0xC00 bytes are the table; whatever follows is ignored", "[partition_table]")
+{
+  // A read that takes more than the table (the next sector, say): the bytes past kMaxLen are not even looked at,
+  // so they need not be erased
+  const PT::Bytes good = Build(kV1);
+  std::vector<uint8_t> longer(PT::kMaxLen + 0x400, 0x5A);
+  memcpy(longer.data(), good.data(), good.size());
+  PT::Table table = ParseOk(longer);
+  TEST_ASSERT_EQUAL_size_t(kV1.size(), table.count);
+  TEST_ASSERT_NOT_NULL(table.Find("static0"));
+}
+
+TEST_CASE("A table with no room left for the MD5 entry is refused", "[partition_table][corrupt]")
+{
+  // kMaxEntries entries fill every slot but the last; one more leaves the MD5 entry nowhere to go
+  PT::Bytes bytes;
+  bytes.fill(0xFF);
+  for (std::size_t i = 0; i <= PT::kMaxEntries; ++i) {
+    uint8_t* p = bytes.data() + i * PT::kEntrySize;
+    memset(p, 0, PT::kEntrySize);
+    p[0] = PT::kMagic & 0xFF;
+    p[1] = PT::kMagic >> 8;
+    p[2] = PT::kTypeData;
+    p[3] = PT::kSubtypeDataNvs;
+    Put32(p + 4, 0x9000 + static_cast<uint32_t>(i) * 0x1000);
+    Put32(p + 8, 0x1000);
+    p[12] = 'p';
+  }
+  ExpectParseError(bytes, PT::ParseError::TooManyEntries);
+}
+
+TEST_CASE("Retyping static0 as www is byte for byte what the packer would write", "[partition_table][retype]")
+{
+  // The one retype the www migration does: static0 (data/spiffs) becomes www (type 0x40, subtype 0x00), in place
+  PT::Bytes bytes = Build(kV1);
+  TEST_ASSERT_TRUE(PT::Retype(bytes, "static0", 0x40, 0x00, "www").has_value());
+
+  std::vector<Row> expected = kV1;
+  expected[5]               = {"www", 0x40, 0x00, 0x353000, 0x09D000};
+  TEST_ASSERT_EQUAL_UINT8_ARRAY(Build(expected).data(), bytes.data(), PT::kMaxLen);
+
+  PT::Table table = ParseOk(bytes);
+  TEST_ASSERT_NULL(table.Find("static0"));
+  const PT::Entry* www = table.Find("www");
+  TEST_ASSERT_NOT_NULL(www);
+  TEST_ASSERT_EQUAL_UINT8(0x40, www->type);
+  TEST_ASSERT_EQUAL_UINT8(0x00, www->subtype);
+  TEST_ASSERT_EQUAL_HEX32(0x353000, www->offset);
+  TEST_ASSERT_EQUAL_HEX32(0x09D000, www->size);
+}
+
+TEST_CASE("Retype keeps the label when the new one is the same", "[partition_table][retype]")
+{
+  // The entry's own label is not "taken": only the type and subtype change
+  PT::Bytes bytes = Build(kV1);
+  TEST_ASSERT_TRUE(PT::Retype(bytes, "config", PT::kTypeData, PT::kSubtypeDataNvs, "config").has_value());
+
+  std::vector<Row> expected = kV1;
+  expected[4]               = {"config", PT::kTypeData, PT::kSubtypeDataNvs, 0x350000, 0x003000};
+  TEST_ASSERT_EQUAL_UINT8_ARRAY(Build(expected).data(), bytes.data(), PT::kMaxLen);
+  TEST_ASSERT_EQUAL_UINT8(PT::kSubtypeDataNvs, ParseOk(bytes).Find("config")->subtype);
+}
+
 TEST_CASE("Retype changes one entry's type, subtype and label and re-seals the MD5", "[partition_table][retype]")
 {
   PT::Bytes bytes = Build(kV1);

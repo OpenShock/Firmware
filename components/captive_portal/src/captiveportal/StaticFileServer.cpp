@@ -268,20 +268,17 @@ CaptivePortal::StaticFileServer::StaticFileServer()
   // The portal assets: the www image where the partition table has one, else (1.x layout) littlefs static0.
   if (const esp_partition_t* www = Www::FindPartition(); www != nullptr) {
     if (!m_www.mount(www)) {
-      return;  // mount() logged why; the no-assets page is served
+      OS_LOGE(TAG, "The portal has no assets until a www image is flashed, serving the error page");  // mount() logged why
+      return;
     }
     if (!m_www.find("index.html")) {
       OS_LOGE(TAG, "The www image has no index.html, serving the error page");
       m_www.unmount();
       return;
     }
-    const auto bodyHash = m_www.image().BodyHash();
     char hex[Www::kBodyHashSize * 2 + 1];
-    for (std::size_t i = 0; i < bodyHash.size(); ++i) {
-      HexUtils::ToHex(bodyHash[i], &hex[i * 2], false);
-    }
-    hex[sizeof(hex) - 1] = '\0';
-    m_etag               = std::string("\"") + hex + "\"";
+    HexUtils::ToHex(m_www.image().BodyHash(), hex, false);
+    m_etag = std::string("\"") + hex + "\"";
     OS_LOGI(TAG, "Serving files from the www image (%s)", m_etag.c_str());
     return;
   }
@@ -380,9 +377,7 @@ esp_err_t CaptivePortal::StaticFileServer::serveFromImage(httpd_req_t* req, std:
   }
 
   setHeaders(req, rep);
-  if (rep.gzip) {
-    httpd_resp_set_hdr(req, "Content-Encoding", "gzip");
-  }
+  httpd_resp_set_hdr(req, "Content-Encoding", "gzip");  // every body in the image is gzipped
   // Straight from the flash mapping: no copy, no filesystem
   return httpd_resp_send(req, reinterpret_cast<const char*>(asset->body.data()), static_cast<ssize_t>(asset->body.size()));
 }

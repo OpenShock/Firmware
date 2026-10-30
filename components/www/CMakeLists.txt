@@ -17,6 +17,6 @@ idf_component_register(
                 esp_partition              # esp_partition_t in WwwPartition.h
   PRIV_REQUIRES crypto logging             # SHA256 for the image hash; OS_LOG*
                 spi_flash                  # esp_partition_mmap
-                http partition_layout      # the migration: downloading the image, retyping static0
-                esp_system freertos        # esp_restart; FreeRTOS.h
+                hwutil partition_layout    # the migration: FindStaticPartition/FlashPartitionFromUrl, retyping static0
+                esp_system                 # esp_restart
 )

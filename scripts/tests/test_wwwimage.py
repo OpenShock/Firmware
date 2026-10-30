@@ -219,3 +219,42 @@ def test_a_truncated_image_is_rejected():
     for length in (0, 10, wwwimage.HEADER_LEN, len(image) - 1):
         with pytest.raises(wwwimage.WwwImageError):
             wwwimage.parse(image[:length])
+
+
+def test_a_body_whose_padding_runs_past_the_image_is_rejected_explicitly():
+    # chunk.js is the last body (6 bytes, padded to 8): cutting its padding keeps offset + size within the image,
+    # but the padded end is not, which the firmware reports as a bad body rather than a hash mismatch.
+    image = wwwimage.pack(ASSETS)
+    with pytest.raises(wwwimage.WwwImageError, match='body padding out of range'):
+        wwwimage.parse(image[:-1])
+
+
+@pytest.mark.parametrize(
+    'path, immutable',
+    [
+        ('_app/immutable/chunk.abc123.js', True),
+        ('_app/immutable/assets/app.css', True),
+        ('_app/version.json', False),
+        ('index.html', False),
+        ('immutable/x.js', False),  # only SvelteKit's _app/immutable/ carries content hashes
+        ('static/_app/immutable/x.js', False),
+    ],
+)
+def test_only_svelte_kit_hashed_assets_are_immutable(path, immutable):
+    assert wwwimage.is_immutable(path) is immutable
+
+
+def test_main_packs_a_directory_as_is(tmp_path):
+    source = tmp_path / 'assets'
+    (source / '_app' / 'immutable').mkdir(parents=True)
+    (source / 'index.html').write_bytes(b'<title>x</title>')
+    (source / '_app' / 'immutable' / 'chunk.js').write_bytes(b'1')
+    output = tmp_path / 'out.bin'
+
+    assert wwwimage.main([str(source), str(output)]) == 0
+
+    parsed = wwwimage.parse(output.read_bytes())
+    assert [(e.path, e.data, e.immutable) for e in parsed.entries] == [
+        ('_app/immutable/chunk.js', b'1', True),
+        ('index.html', b'<title>x</title>', False),
+    ]

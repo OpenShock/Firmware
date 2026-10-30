@@ -1,11 +1,13 @@
 #pragma once
 
-// Host-test stub for the crypto component's Hashing.h: the same incremental begin/update/finish API over mbedTLS, so
-// HostTest::FailNextHash can make the next begin() fail, as a real setup failure would.
+// Host-test stub for the crypto component's Hashing.h, shadowing it on the include path. It exists only so that
+// HostTest::FailNextHash can make the next begin() fail, as a real setup failure would, which makes
+// Www::ParseError::HashFailed testable; it otherwise mirrors the real OpenShock::SHA256 API (compute/begin/update/finish).
 #include <mbedtls/md.h>
 
 #include <array>
 #include <cstdint>
+#include <string_view>
 #include <vector>
 
 namespace HostTest {
@@ -16,6 +18,9 @@ namespace OpenShock {
   class SHA256 {
   public:
     using Digest = std::array<uint8_t, 32>;
+
+    /// @brief Hashes one contiguous buffer in a single call.
+    [[nodiscard]] static inline bool compute(const uint8_t* data, std::size_t dataLen, Digest& hash) { return mbedtls_md(mbedtls_md_info_from_type(MBEDTLS_MD_SHA256), data, dataLen, hash.data()) == 0; }
 
     bool begin()
     {
@@ -31,7 +36,8 @@ namespace OpenShock {
       m_data.insert(m_data.end(), data, data + dataLen);
       return true;
     }
-    bool finish(Digest& hash) { return mbedtls_md(mbedtls_md_info_from_type(MBEDTLS_MD_SHA256), m_data.data(), m_data.size(), hash.data()) == 0; }
+    bool update(std::string_view data) { return update(reinterpret_cast<const uint8_t*>(data.data()), data.length()); }
+    bool finish(Digest& hash) { return compute(m_data.data(), m_data.size(), hash); }
 
   private:
     std::vector<uint8_t> m_data;

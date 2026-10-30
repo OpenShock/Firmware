@@ -10,6 +10,9 @@ from .paths import ROOT
 # ESP-IDF's default CONFIG_PARTITION_TABLE_OFFSET.
 DEFAULT_PARTITION_TABLE_OFFSET = 0x8000
 
+# The captive-portal asset image partition (partitions/ota_4mb.csv), written by gen_staticfs.py and merged by merge_image.py.
+WWW_PARTITION = 'www'
+
 
 class Partition(TypedDict):
     type: str
@@ -73,3 +76,11 @@ def first_app_partition(partitions: dict[str, Partition]) -> Partition:
     if not apps:
         raise SystemExit('error: partition table has no app partition')
     return min(apps, key=lambda p: p['offset'])
+
+
+def www_partition(partitions: dict[str, Partition], where: str) -> Partition:
+    """The `www` partition; `where` names the table in the error (a path, or 'the partition table for <board>')."""
+    try:
+        return partitions[WWW_PARTITION]
+    except KeyError:
+        raise SystemExit(f'error: {where} has no {WWW_PARTITION} partition') from None

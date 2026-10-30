@@ -15,8 +15,6 @@ from pathlib import Path
 from utils import partitions
 from utils.boards import board_fragment, board_names, read_target
 
-WWW_PARTITION = 'www'
-
 
 def merge_one(board: str, bindir: Path, www: str, output: str) -> None:
     # Imported here so the argument checks (and their tests) need no esptool.
@@ -25,14 +23,13 @@ def merge_one(board: str, bindir: Path, www: str, output: str) -> None:
 
     chip = read_target(board_fragment(board))
     table = partitions.read_partitions(partitions.partition_csv_for(board))
-    if WWW_PARTITION not in table:
-        raise SystemExit(f'error: the partition table for {board} has no {WWW_PARTITION} partition')
+    www_partition = partitions.www_partition(table, f'the partition table for {board}')
     argv = [
         '--chip', chip, 'merge-bin', '--output', output, '--flash-size', 'keep',
         hex(CHIP_DEFS[chip].BOOTLOADER_FLASH_OFFSET), str(bindir / 'bootloader.bin'),
         hex(partitions.partition_table_offset(board)), str(bindir / 'partition-table.bin'),
         hex(partitions.first_app_partition(table)['offset']), str(bindir / 'app.bin'),
-        hex(table[WWW_PARTITION]['offset']), www,
+        hex(www_partition['offset']), www,
     ]  # fmt: skip
     print(f'+ esptool {" ".join(argv)}', flush=True)
     esptool.main(argv)

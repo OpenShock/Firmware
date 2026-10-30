@@ -28,10 +28,13 @@ Everything is 4-byte aligned. The output is a pure function of the entries: no t
 unchanged frontend gives a byte-identical image and the device can skip re-flashing it.
 """
 
+import argparse
 import hashlib
 import struct
 from collections import deque
+from collections.abc import Callable
 from dataclasses import dataclass
+from pathlib import Path
 
 MAGIC = 0x5757534F  # 'OSWW'
 VERSION = 1
@@ -48,9 +51,18 @@ FLAG_IMMUTABLE = 1 << 1
 
 MAX_NAME_LEN = 255  # the string table is addressed by u16; this keeps a name comfortably below it
 
+# SvelteKit puts every asset with a content hash in its name under _app/immutable/: such a file never changes under
+# the same path, so browsers may cache it for long.
+IMMUTABLE_PREFIXES = ('_app/immutable/',)
+
 
 class WwwImageError(ValueError):
     pass
+
+
+def is_immutable(path: str) -> bool:
+    """Whether an asset at this (relative, forward-slash) path gets the immutable flag (long browser cache)."""
+    return path.startswith(IMMUTABLE_PREFIXES)
 
 
 @dataclass(frozen=True)
@@ -62,6 +74,16 @@ class Entry:
     @property
     def flags(self) -> int:
         return FLAG_IMMUTABLE if self.immutable else 0
+
+
+def read_tree(directory: Path, encode: Callable[[bytes], bytes] | None = None) -> list[Entry]:
+    """Every file under `directory` as an entry at its relative path, in sorted order, `encode` applied to each body."""
+    entries = []
+    for file in sorted(p for p in directory.rglob('*') if p.is_file()):
+        rel = file.relative_to(directory).as_posix()
+        data = file.read_bytes()
+        entries.append(Entry(rel, encode(data) if encode else data, immutable=is_immutable(rel)))
+    return entries
 
 
 def _pad(length: int) -> int:
@@ -225,10 +247,12 @@ def parse(data: bytes) -> Image:
                 raise WwwImageError(f'node {index}: bad child run')
             next_run += size
         else:
-            if offset < body_start or offset % ALIGN or offset + size > len(data) or offset + size < offset:
+            if offset < body_start or offset % ALIGN or offset + size > len(data):
                 raise WwwImageError(f'node {index}: body out of range')
             end = max(end, offset + size + _pad(size))
         names.append(name)
+    if end > len(data):
+        raise WwwImageError('body padding out of range')
     if next_run != count:
         raise WwwImageError('unreachable nodes')
     for index, (_, flags, offset, size, _) in enumerate(nodes):
@@ -259,24 +283,12 @@ def parse(data: bytes) -> Image:
 
 def main(argv: list[str] | None = None) -> int:
     """``wwwimage.py <dir> <out.bin>``: pack a directory as-is. Test fixtures only; the build uses gen_staticfs.py."""
-    import argparse
-    from pathlib import Path
-
     ap = argparse.ArgumentParser(description='Pack a directory into a www image without gzipping (test fixtures)')
     ap.add_argument('directory', type=Path)
     ap.add_argument('output', type=Path)
     args = ap.parse_args(argv)
 
-    entries = [
-        Entry(
-            p.relative_to(args.directory).as_posix(),
-            p.read_bytes(),
-            immutable='/immutable/' in f'/{p.relative_to(args.directory).as_posix()}',
-        )
-        for p in sorted(args.directory.rglob('*'))
-        if p.is_file()
-    ]
-    args.output.write_bytes(pack(entries))
+    args.output.write_bytes(pack(read_tree(args.directory)))
     return 0
 
 

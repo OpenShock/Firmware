@@ -1,11 +1,8 @@
-#include <freertos/FreeRTOS.h>
-
 #include "www/Migration.h"
 
 const char* const TAG = "WwwMigration";
 
-#include "Hashing.h"
-#include "http/HTTPRequestManager.h"
+#include "hwutil/PartitionUtils.h"
 #include "Logging.h"
 #include "partition_layout/LiveTable.h"
 #include "partition_layout/PartitionTable.h"
@@ -15,77 +12,44 @@ const char* const TAG = "WwwMigration";
 #include <esp_partition.h>
 #include <esp_system.h>
 
-#include <algorithm>
 #include <array>
 #include <cstring>
 #include <memory>
+#include <span>
 
 using namespace OpenShock;
 namespace PT = OpenShock::PartitionTable;
 
 namespace {
-  constexpr uint32_t kEraseStep      = 0x10000;  // erase ahead of the data in steps this size, as PartitionUtils does
-  constexpr const char* kStaticLabel = "static0";
+  constexpr const char* kStaticLabel = "static0";  // the 1.x entry the www partition takes over
 
-  // Downloads `url` into `partition`, checking that it is a www image and that its SHA-256 matches `hash`; then checks
-  // what is on flash, so a write that did not stick fails too.
+  // Downloads `url` into `partition` (FlashPartitionFromUrl: streamed, hashed, erased just ahead of the data), refusing
+  // anything that does not start like a www image before the first erase; then checks what is on flash, so a write that
+  // did not stick fails too.
   bool downloadInto(HTTP::Client& client, const esp_partition_t* partition, std::string_view url, const uint8_t (&hash)[32])
   {
-    SHA256 sha;
-    if (!sha.begin()) {
-      return false;
-    }
-    std::size_t erasedTo = 0;
-    bool magicOk         = false;
-
-    auto onLength = [&](int length) -> bool {
-      if (length <= 0 || static_cast<uint32_t>(length) > partition->size) {
-        OS_LOGE(TAG, "The www image (%d bytes) does not fit %s (%u bytes)", length, partition->label, static_cast<unsigned>(partition->size));
+    auto noProgress = [](std::size_t, std::size_t, float) -> bool {
+      return true;
+    };
+    // A littlefs image (a 1.x release's staticfs) must not end up in what becomes www
+    auto startsLikeWwwImage = [](std::span<const uint8_t> chunk) -> bool {
+      uint32_t magic = 0;
+      if (chunk.size() >= sizeof(magic)) {
+        memcpy(&magic, chunk.data(), sizeof(magic));
+      }
+      if (magic != Www::kMagic) {
+        OS_LOGE(TAG, "The download is not a www image");
         return false;
       }
       return true;
     };
-    auto onData = [&](std::size_t offset, const uint8_t* data, std::size_t length) -> bool {
-      if (offset == 0) {
-        // A littlefs image (a 1.x release's staticfs) must not end up in what becomes www
-        uint32_t magic = 0;
-        magicOk        = length >= sizeof(magic) && (memcpy(&magic, data, sizeof(magic)), magic == Www::kMagic);
-        if (!magicOk) {
-          OS_LOGE(TAG, "The download is not a www image");
-          return false;
-        }
-      }
-      while (erasedTo < offset + length) {
-        const std::size_t step = std::min<std::size_t>(kEraseStep, partition->size - erasedTo);
-        if (step == 0 || esp_partition_erase_range(partition, erasedTo, step) != ESP_OK) {
-          return false;
-        }
-        erasedTo += step;
-      }
-      return esp_partition_write(partition, offset, data, length) == ESP_OK && sha.update(data, length);
-    };
-
-    auto response = client.Download(
-      url,
-      {
-        {"Accept", "application/octet-stream"}
-    },
-      onLength,
-      onData,
-      std::array<uint16_t, 1> {200},
-      120'000
-    );
-    if (response.result != HTTP::RequestResult::Success || !magicOk) {
-      OS_LOGE(TAG, "Failed to download the www image: %s [%d]", response.ResultToString(), response.code);
-      return false;
-    }
-    std::array<uint8_t, 32> digest;
-    if (!sha.finish(digest) || memcmp(digest.data(), hash, 32) != 0) {
-      OS_LOGE(TAG, "The www image does not match its published hash");
+    if (!FlashPartitionFromUrl(client, partition, url, hash, noProgress, startsLikeWwwImage)) {
+      OS_LOGE(TAG, "Failed to download the www image");
       return false;
     }
 
     // What is on flash now: an image that parses, with the published hash
+    std::array<uint8_t, 32> digest;
     if (!Www::ImageSha256(partition, digest) || memcmp(digest.data(), hash, 32) != 0) {
       OS_LOGE(TAG, "The www image does not read back as written");
       return false;
@@ -96,7 +60,8 @@ namespace {
 
 Www::MigrationResult Www::MigrateToWwwPartition(HTTP::Client& client, std::string_view url, const uint8_t (&sha256)[32])
 {
-  // A raw table and a parsed one come to some 6.5 KiB: on the heap, not the caller's stack
+  // Two raw tables (3 KiB each) and a parsed one (some 3.4 KiB) come to close to 9.5 KiB: on the heap, not the
+  // caller's stack
   struct Tables {
     PT::Bytes live;
     PT::Bytes next;
@@ -116,7 +81,7 @@ Www::MigrationResult Www::MigrateToWwwPartition(HTTP::Client& client, std::strin
     OS_LOGE(TAG, "No 1.x littlefs static0 partition; not migrating");
     return MigrationResult::Refused;
   }
-  const esp_partition_t* staticPartition = esp_partition_find_first(ESP_PARTITION_TYPE_DATA, ESP_PARTITION_SUBTYPE_DATA_SPIFFS, kStaticLabel);
+  const esp_partition_t* staticPartition = FindStaticPartition();
   if (staticPartition == nullptr || staticPartition->address != entry->offset || staticPartition->size != entry->size) {
     OS_LOGE(TAG, "The running partition table does not match the one on flash; not migrating");
     return MigrationResult::Refused;
