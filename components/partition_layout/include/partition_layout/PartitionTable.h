@@ -6,7 +6,8 @@
 // 0xFF up to 0xC00.
 //
 // What the in-place table migrations need (docs/STORAGE.md): read the table, and retype one entry - its type,
-// subtype and label - without moving anything, re-sealing the MD5. Pure C++ over bytes, so the host tests run it.
+// subtype and label - without moving anything, re-sealing the MD5. Pure C++ over bytes plus OpenShock::MD5, so the
+// host tests run it.
 
 #include <array>
 #include <cstddef>
@@ -57,6 +58,7 @@ namespace OpenShock::PartitionTable {
     NoMd5,        // the table ended without an MD5 entry: the bootloader refuses it
     Md5Mismatch,  // the MD5 entry does not match the entries
     Trailing,     // something other than 0xFF after the MD5 entry
+    HashFailed,   // computing the MD5 failed: nothing is known about the table
   };
   [[nodiscard]] const char* ParseErrorName(ParseError error);
 
@@ -69,6 +71,7 @@ namespace OpenShock::PartitionTable {
     NoSuchEntry,   // no entry is labelled `label`
     LabelTooLong,  // the new label does not fit the 16-byte field
     LabelTaken,    // another entry already has the new label
+    HashFailed,    // computing the MD5 failed
   };
   [[nodiscard]] const char* RetypeErrorName(RetypeError error);
 

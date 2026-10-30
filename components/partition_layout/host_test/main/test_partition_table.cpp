@@ -1,11 +1,10 @@
 // The parser and the in-place retype against the 1.x table every fielded hub carries and a corpus of broken copies.
 #include "unity.h"
 
-#include "Md5.h"
+#include "Hashing.h"
 #include "partition_layout/PartitionTable.h"
 
 #include <cstring>
-#include <string>
 #include <vector>
 
 using namespace OpenShock;
@@ -57,9 +56,9 @@ namespace {
     }
     bytes[pos]     = PT::kMd5Magic & 0xFF;
     bytes[pos + 1] = PT::kMd5Magic >> 8;
-    uint8_t digest[16];
-    PT::Internal::Md5(bytes.data(), pos, digest);
-    memcpy(bytes.data() + pos + 16, digest, 16);
+    MD5::Digest digest {};
+    TEST_ASSERT_TRUE(MD5::compute(bytes.data(), pos, digest));
+    memcpy(bytes.data() + pos + 16, digest.data(), digest.size());
     return bytes;
   }
 
@@ -88,24 +87,6 @@ namespace {
     TEST_ASSERT_TRUE_MESSAGE(bytes == before, "a refused retype changed the table");
   }
 }  // namespace
-
-TEST_CASE("MD5 matches the RFC 1321 test suite", "[partition_table][md5]")
-{
-  uint8_t digest[16];
-  PT::Internal::Md5(reinterpret_cast<const uint8_t*>(""), 0, digest);
-  const uint8_t empty[16] = {0xd4, 0x1d, 0x8c, 0xd9, 0x8f, 0x00, 0xb2, 0x04, 0xe9, 0x80, 0x09, 0x98, 0xec, 0xf8, 0x42, 0x7e};
-  TEST_ASSERT_EQUAL_UINT8_ARRAY(empty, digest, 16);
-
-  const char* msg = "The quick brown fox jumps over the lazy dog";
-  PT::Internal::Md5(reinterpret_cast<const uint8_t*>(msg), strlen(msg), digest);
-  const uint8_t fox[16] = {0x9e, 0x10, 0x7d, 0x9d, 0x37, 0x2b, 0xb6, 0x82, 0x6b, 0xd8, 0x1d, 0x35, 0x42, 0xa4, 0x19, 0xd6};
-  TEST_ASSERT_EQUAL_UINT8_ARRAY(fox, digest, 16);
-
-  std::string eighty(80, 'a');  // crosses a block, length lands in the next padding block
-  PT::Internal::Md5(reinterpret_cast<const uint8_t*>(eighty.data()), eighty.size(), digest);
-  const uint8_t a80[16] = {0xb1, 0x5a, 0xf9, 0xcd, 0xab, 0xba, 0xea, 0x05, 0x16, 0x86, 0x6a, 0x33, 0xd8, 0xfd, 0x0f, 0x98};
-  TEST_ASSERT_EQUAL_UINT8_ARRAY(a80, digest, 16);
-}
 
 TEST_CASE("The 1.x table parses with its MD5", "[partition_table]")
 {
