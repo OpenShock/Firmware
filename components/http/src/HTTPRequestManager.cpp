@@ -28,13 +28,12 @@ const char* const TAG = "HTTPRequestManager";
 
 using namespace std::string_view_literals;
 
-const std::size_t HTTP_BUFFER_SIZE = 4096LLU;
-const int HTTP_DOWNLOAD_SIZE_LIMIT = 200 * 1024 * 1024;  // 200 MB
-
 static OpenShock::SimpleMutex s_rateLimitsMutex                                              = {};
 static std::unordered_map<std::string, std::shared_ptr<OpenShock::RateLimiter>> s_rateLimits = {};
 
 using namespace OpenShock;
+
+const int64_t HTTP_DOWNLOAD_SIZE_LIMIT = CONFIG_OPENSHOCK_HTTP_DOWNLOAD_SIZE_LIMIT_MB * 1024LL * 1024LL;
 
 // Rate limits are kept per host, so the API host gets its own limits independent of CDN/firmware hosts.
 static std::string_view getHostFromURL(std::string_view url)
@@ -298,14 +297,10 @@ HTTP::Response<std::size_t>
   if (responseCode == 429) {  // Too Many Requests
     // https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers/Retry-After
     // Only delay-seconds (whole seconds, RFC 9110) is parsed; a missing header, an HTTP-date or anything else
-    // unparseable gets the minimum. At least 2 seconds, so a "0" can't turn into a tight retry loop; at most 10
-    // minutes, so one bad header can't keep us offline for long.
-    static constexpr uint32_t kMinRetryAfterSeconds = 2;
-    static constexpr uint32_t kMaxRetryAfterSeconds = 600;
+    // unparseable gets the minimum.
+    uint32_t retryAfter = OpenShock::Convert::ToUint32(m_retryAfter).value_or(CONFIG_OPENSHOCK_HTTP_RETRY_AFTER_MIN_S);
 
-    uint32_t retryAfter = OpenShock::Convert::ToUint32(m_retryAfter).value_or(kMinRetryAfterSeconds);
-
-    rateLimiter->blockFor(static_cast<int64_t>(std::clamp(retryAfter, kMinRetryAfterSeconds, kMaxRetryAfterSeconds)) * 1000);
+    rateLimiter->blockFor(static_cast<int64_t>(std::clamp<uint32_t>(retryAfter, CONFIG_OPENSHOCK_HTTP_RETRY_AFTER_MIN_S, CONFIG_OPENSHOCK_HTTP_RETRY_AFTER_MAX_S)) * 1000);
 
     return fail(RequestResult::RateLimited, responseCode, 0);  // body not drained
   }
@@ -339,7 +334,7 @@ HTTP::Response<std::size_t>
     return {RequestResult::Success, responseCode, 0};
   }
 
-  uint8_t* buffer = static_cast<uint8_t*>(malloc(HTTP_BUFFER_SIZE));
+  uint8_t* buffer = static_cast<uint8_t*>(malloc(CONFIG_OPENSHOCK_HTTP_BUFFER_SIZE));
   if (buffer == nullptr) {
     OS_LOGE(TAG, "Failed to allocate HTTP buffer");
     return fail(RequestResult::InternalError, responseCode, 0);
@@ -359,13 +354,20 @@ HTTP::Response<std::size_t>
     }
     esp_http_client_set_timeout_ms(m_handle, static_cast<int>(remaining));
 
-    read = esp_http_client_read(m_handle, reinterpret_cast<char*>(buffer), static_cast<int>(HTTP_BUFFER_SIZE));
+    read = esp_http_client_read(m_handle, reinterpret_cast<char*>(buffer), static_cast<int>(CONFIG_OPENSHOCK_HTTP_BUFFER_SIZE));
     if (read == -ESP_ERR_HTTP_EAGAIN) {
       OS_LOGW(TAG, "Request timed out");  // The remaining budget ran out inside the read
       result = HTTP::RequestResult::TimedOut;
       break;
     }
     if (read <= 0) {
+      break;
+    }
+
+    // Content-Length was checked against the limit up front, a chunked body is only bounded here
+    if (static_cast<int64_t>(totalWritten) + read > HTTP_DOWNLOAD_SIZE_LIMIT) {
+      OS_LOGE(TAG, "Response body exceeds %d MB", CONFIG_OPENSHOCK_HTTP_DOWNLOAD_SIZE_LIMIT_MB);
+      result = HTTP::RequestResult::RequestFailed;
       break;
     }
 
@@ -399,13 +401,10 @@ HTTP::Response<std::size_t>
 
 HTTP::Response<std::string> HTTP::Client::GetString(std::string_view url, const std::map<std::string, std::string>& headers, std::span<const uint16_t> acceptedCodes, uint32_t timeoutMs)
 {
-  // String responses are small JSON documents; refuse anything that would only exhaust the heap.
-  static constexpr std::size_t kMaxStringResponseSize = 64 * 1024;
-
   std::string result;
 
   auto allocator = [&result](std::size_t contentLength) {
-    if (contentLength > kMaxStringResponseSize) {
+    if (contentLength > CONFIG_OPENSHOCK_HTTP_MAX_STRING_RESPONSE_SIZE) {
       OS_LOGE(TAG, "Response too large (%zu bytes)", contentLength);
       return false;
     }
@@ -413,8 +412,8 @@ HTTP::Response<std::string> HTTP::Client::GetString(std::string_view url, const 
     return true;
   };
   auto writer = [&result](std::size_t offset, const uint8_t* data, std::size_t len) {
-    if (result.size() + len > kMaxStringResponseSize) {
-      OS_LOGE(TAG, "Response exceeds %zu bytes", kMaxStringResponseSize);
+    if (result.size() + len > CONFIG_OPENSHOCK_HTTP_MAX_STRING_RESPONSE_SIZE) {
+      OS_LOGE(TAG, "Response exceeds %d bytes", CONFIG_OPENSHOCK_HTTP_MAX_STRING_RESPONSE_SIZE);
       return false;
     }
     result.append(reinterpret_cast<const char*>(data), len);

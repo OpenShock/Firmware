@@ -693,7 +693,7 @@ bool OtaUpdateManager::Init()
   }
 
   // Start OTA update task.
-  if (TaskUtils::TaskCreateExpensive(otaum_updatetask, "OTA Update", 16'384, nullptr, 1, &_taskHandle) != pdPASS) {  // PROFILED: 6.2KB stack usage
+  if (TaskUtils::TaskCreateExpensive(otaum_updatetask, "OTA Update", CONFIG_OPENSHOCK_OTA_TASK_STACK_SIZE, nullptr, 1, &_taskHandle) != pdPASS) {
     OS_LOGE(TAG, "Failed to create OTA update task");
     return false;
   }

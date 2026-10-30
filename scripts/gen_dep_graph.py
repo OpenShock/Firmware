@@ -98,7 +98,7 @@ def extract_register_block(text: str) -> str:
 def parse_requires(cmake_text: str, include_priv: bool) -> list[str]:
     """Pull the REQUIRES (+ optionally PRIV_REQUIRES) token lists."""
     block = extract_register_block(strip_comments(cmake_text))
-    tokens = block.split()
+    tokens = [tok.strip('"') for tok in block.split()]  # CMake reads "common" and common alike
 
     deps: list[str] = []
     active = False
