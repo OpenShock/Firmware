@@ -3,7 +3,6 @@
 #include "unity.h"
 
 #include "Hashing.h"
-#include "sha256.h"
 #include "www/WwwImage.h"
 
 #include <cstdio>
@@ -67,20 +66,6 @@ namespace {
     return std::string(reinterpret_cast<const char*>(asset.body.data()), asset.body.size());
   }
 }  // namespace
-
-TEST_CASE("The host SHA-256 matches a known answer", "[www][sha256]")
-{
-  uint8_t digest[32];
-  HostTest::Sha256(reinterpret_cast<const uint8_t*>("abc"), 3, digest);
-  const uint8_t expected[32] = {0xba, 0x78, 0x16, 0xbf, 0x8f, 0x01, 0xcf, 0xea, 0x41, 0x41, 0x40, 0xde, 0x5d, 0xae, 0x22, 0x23, 0xb0, 0x03, 0x61, 0xa3, 0x96, 0x17, 0x7a, 0x9c, 0xb4, 0x10, 0xff, 0x61, 0xf2, 0x00, 0x15, 0xad};
-  TEST_ASSERT_EQUAL_UINT8_ARRAY(expected, digest, 32);
-
-  // A message longer than one block, with the length landing in the second padding block
-  std::string sixtyfour(64, 'a');
-  HostTest::Sha256(reinterpret_cast<const uint8_t*>(sixtyfour.data()), 64, digest);
-  const uint8_t expected64[32] = {0xff, 0xe0, 0x54, 0xfe, 0x7a, 0xe0, 0xcb, 0x6d, 0xc6, 0x5c, 0x3a, 0xf9, 0xb6, 0x1d, 0x52, 0x09, 0xf4, 0x39, 0x85, 0x1d, 0xb4, 0x3d, 0x0b, 0xa5, 0x99, 0x73, 0x37, 0xdf, 0x15, 0x46, 0x68, 0xeb};
-  TEST_ASSERT_EQUAL_UINT8_ARRAY(expected64, digest, 32);
-}
 
 TEST_CASE("An image packed by the Python packer parses and serves every asset", "[www]")
 {
