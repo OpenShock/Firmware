@@ -21,5 +21,9 @@ namespace OpenShock::GatewayConnectionManager {
   bool SendMessageTXT(std::string_view data);
   bool SendMessageBIN(std::span<const uint8_t> data);
 
+  /// @brief Restarts the hub from the main task. Gateway messages arrive on the websocket task, which cannot close its
+  /// own client, so a restart requested there is deferred to Update().
+  void RequestRestart();
+
   void Update();
 }  // namespace OpenShock::GatewayConnectionManager

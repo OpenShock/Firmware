@@ -4,12 +4,11 @@ const char* const TAG = "ServerMessageHandlers";
 
 #include "AppHooks.h"
 #include "estop/EStopManager.h"
+#include "GatewayConnectionManager.h"
 #include "Logging.h"
 
 #include <cstdint>
 #include <utility>
-
-#include <esp_system.h>
 
 using namespace OpenShock::MessageHandlers::Server;
 
@@ -33,7 +32,8 @@ void _Private::HandleTrigger(OpenShock::GatewayClient&, const OpenShock::Seriali
   // No default: -Wswitch flags new trigger types. The value comes from the network, so fall through to the log below.
   switch (triggerType) {
     case TriggerType::Restart:
-      esp_restart();
+      // Handled on the websocket task: the actual restart runs from the main task so the client can close cleanly.
+      GatewayConnectionManager::RequestRestart();
       return;
     case TriggerType::EmergencyStop:
       EStopManager::SoftwareTrigger();

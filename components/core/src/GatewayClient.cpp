@@ -91,6 +91,17 @@ esp_websocket_client_handle_t GatewayClient::_takeHandle()
   return m_client.exchange(nullptr);
 }
 
+void GatewayClient::close()
+{
+  // The same bounded close frame as the destructor, without destroying the handle: the shutdown handler runs on
+  // whichever task called esp_restart(), and the restart follows right after, so nothing needs to be torn down.
+  ScopedLock lock__(&m_handleMutex);
+  esp_websocket_client_handle_t handle = m_client.load();
+  if (handle != nullptr && esp_websocket_client_is_connected(handle)) {
+    esp_websocket_client_send_with_opcode(handle, WS_TRANSPORT_OPCODES_CLOSE, nullptr, 0, pdMS_TO_TICKS(1000));
+  }
+}
+
 void GatewayClient::_destroyHandle()
 {
   esp_websocket_client_handle_t handle = _takeHandle();
