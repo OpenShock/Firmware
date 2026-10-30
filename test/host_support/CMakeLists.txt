@@ -14,7 +14,7 @@
 #                               not, so this component compiles it, together with
 #                               common/src/BoardDescriptor.cpp, and every suite has
 #                               Board::Get() (after calling Board::Init() in its main).
-#   Kconfig.projbuild         - sources core's Kconfig.projbuild, so the suites see the
+#   Kconfig.projbuild         - sources every components/*/Kconfig, so the suites see the
 #                               real CONFIG_OPENSHOCK_* defaults through sdkconfig.h.
 #
 # Everything else a suite needs comes from the real OpenShock headers, ESP-IDF's
