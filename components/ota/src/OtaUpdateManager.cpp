@@ -295,7 +295,11 @@ static bool otaum_flash_fs_partition(OpenShock::HTTP::Client& client, const esp_
   bool formatMismatch       = false;
   auto matchesPartition     = [isWwwPartition, &formatMismatch](std::span<const uint8_t> chunk) -> bool {
     if (Www::StartsLikeImage(chunk) != isWwwPartition) {
-      OS_LOGE(TAG, isWwwPartition ? "The filesystem image is not a www image" : "The filesystem image is a www image, but this partition table has no www partition");
+      if (isWwwPartition) {
+        OS_LOGE(TAG, "The filesystem image is not a www image");
+      } else {
+        OS_LOGE(TAG, "The filesystem image is a www image, but this partition table has no www partition");
+      }
       formatMismatch = true;
       return false;
     }
