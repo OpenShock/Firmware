@@ -177,9 +177,11 @@ The inline `ESPPORT=COM4` form is POSIX shell syntax. In PowerShell set it first
 The presets build into `build/<board>/`, the same directories `scripts/build.py` uses, so the
 two can be mixed. Flash and monitor read the port from `ESPPORT`; `menuconfig` is a target too.
 A preset build stamps the board like the script does, since the stamp is a CMake post-build step.
-The file also has a `default` preset with no board. It exists for `idf.py`, which configures with
-the preset of that name once a `CMakePresets.json` is present, and it is what `scripts/build.py`
-runs under; the script's own `-B` and `-D` arguments take precedence, so it changes nothing.
+The file also has a `default` preset, which configures `OpenShock-Core-V2` (`DEFAULT_BOARD` in
+`scripts/gen_cmake_presets.py`). `idf.py` configures with the preset of that name once a
+`CMakePresets.json` is present, so a bare `idf.py menuconfig` or `idf.py build` works on that board;
+`idf.py --preset <board> menuconfig` picks another. `scripts/build.py` runs under it too, and the
+script's own `-B` and `-D` arguments take precedence, so it changes nothing there.
 Differences from the script: a tree configured by a preset has ccache off (idf.py turns it on),
 and the bootloader's nested configure prints a warning about `ESP_ROM_ELF_DIR` when the shell is
 not exported; it is harmless. A tree the script configured keeps ccache when CLion or a bare
