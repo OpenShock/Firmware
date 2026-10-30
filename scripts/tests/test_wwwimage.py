@@ -29,11 +29,12 @@ def test_round_trip_keeps_every_entry_sorted_by_path():
 def test_layout_is_what_the_firmware_header_describes():
     image = wwwimage.pack(ASSETS)
     magic, version, count, dir_len, body_hash, reserved = struct.unpack_from(wwwimage.HEADER_FORMAT, image, 0)
-    assert (magic, version, count, reserved) == (wwwimage.MAGIC, 1, 4, b'\0' * 4)
+    assert (magic, version, count, reserved) == (wwwimage.MAGIC, 1, 4, b'\0' * 20)
     assert image[:4] == b'OSWW'
     assert dir_len % 4 == 0
-    # The hash covers the whole image, its own field zeroed
-    assert body_hash == hashlib.sha256(image[:12] + b'\0' * 16 + image[28:]).digest()[:16]
+    # The hash is a full SHA-256 over the whole image, its own field zeroed
+    assert len(body_hash) == 32
+    assert body_hash == hashlib.sha256(image[:12] + b'\0' * 32 + image[44:]).digest()
     assert len(image) % 4 == 0
 
     body_start = wwwimage.HEADER_LEN + dir_len
@@ -88,8 +89,9 @@ def corrupt(image: bytes, offset: int, value: bytes) -> bytes:
         (6, struct.pack('<H', 200), 'directory length out of range'),
         (8, struct.pack('<I', 2), 'directory length out of range'),
         (8, struct.pack('<I', 0x100000), 'directory length out of range'),
-        (12, b'\0' * 16, 'image hash mismatch'),
-        (28, b'\1\0\0\0', 'reserved header field not zero'),
+        (12, b'\0' * 32, 'image hash mismatch'),
+        (44, b'\1\0\0\0', 'reserved header field not zero'),
+        (63, b'\1', 'reserved header field not zero'),
         (wwwimage.HEADER_LEN + 12, struct.pack('<I', 1), 'reserved field not zero'),
         (wwwimage.HEADER_LEN + 0, struct.pack('<H', 0xFFFF), 'path offset out of range'),
         (wwwimage.HEADER_LEN + 2, struct.pack('<H', 0x8000), 'unknown flags'),
@@ -116,7 +118,7 @@ def test_entries_out_of_order_are_rejected():
 def test_a_hash_over_the_bodies_alone_is_refused():
     # What the first draft of the format hashed: everything after the header
     image = wwwimage.pack(ASSETS)
-    image = corrupt(image, 12, hashlib.sha256(image[wwwimage.HEADER_LEN :]).digest()[:16])
+    image = corrupt(image, 12, hashlib.sha256(image[wwwimage.HEADER_LEN :]).digest())
     with pytest.raises(wwwimage.WwwImageError, match='image hash mismatch'):
         wwwimage.parse(image)
 

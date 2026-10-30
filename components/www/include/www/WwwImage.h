@@ -5,13 +5,13 @@
 // Written by scripts/utils/wwwimage.py (the one place the format is documented in full; keep both in
 // step and bump kVersion together). Little-endian, everything 4-byte aligned:
 //
-//   header (32 B): magic u32 'OSWW', version u16, count u16, dir_len u32, body_hash u8[16], reserved u8[4]
+//   header (64 B): magic u32 'OSWW', version u16, count u16, dir_len u32, body_hash u8[32], reserved u8[20]
 //   entry (16 B) x count, sorted by path: path_off u16, flags u16, offset u32, size u32, reserved u32
 //   string table: NUL-terminated paths, no leading slash
 //   bodies: in entry order, each padded to 4 bytes
 //
-// body_hash is the truncated SHA-256 of the whole image (header included, with body_hash itself zeroed), so no
-// byte the parser reads goes unchecked; reserved fields must be zero. Parse() checks every field before the image
+// body_hash is the SHA-256 of the whole image (header included, with body_hash itself zeroed), so no byte the
+// parser reads goes unchecked; reserved fields must be zero. Parse() checks every field before the image
 // is used: a failure means "no portal assets", never a partially trusted image. The image is smaller
 // than the partition it sits in; the bytes after it are ignored.
 //
@@ -28,9 +28,9 @@
 namespace OpenShock::Www {
   inline constexpr uint32_t kMagic           = 0x5757534Fu;  // 'OSWW' as little-endian bytes
   inline constexpr uint16_t kVersion         = 1;
-  inline constexpr std::size_t kHeaderSize   = 32;
+  inline constexpr std::size_t kHeaderSize   = 64;
   inline constexpr std::size_t kEntrySize    = 16;
-  inline constexpr std::size_t kBodyHashSize = 16;
+  inline constexpr std::size_t kBodyHashSize = 32;
   inline constexpr std::size_t kAlign        = 4;
 
   inline constexpr uint16_t kFlagGzip      = 1u << 0;
@@ -74,7 +74,7 @@ namespace OpenShock::Www {
 
     /// @brief Bytes from the header to the end of the last body's padding: what an OTA hash of the image covers.
     [[nodiscard]] std::size_t ImageSize() const { return m_size; }
-    /// @brief The image's own (truncated) hash; it changes whenever any byte of the image does.
+    /// @brief The image's own hash; it changes whenever any byte of the image does.
     [[nodiscard]] std::span<const uint8_t, kBodyHashSize> BodyHash() const { return m_bytes.subspan<12, kBodyHashSize>(); }
     [[nodiscard]] std::span<const uint8_t> Bytes() const { return m_bytes.first(m_size); }
 

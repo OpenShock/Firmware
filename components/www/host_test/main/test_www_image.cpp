@@ -175,7 +175,11 @@ TEST_CASE("Each corrupted header field is rejected with its own reason", "[www]"
   ExpectError(bytes, Www::ParseError::HashMismatch);
 
   bytes     = Fixture();
-  bytes[28] = 0x01;  // reserved
+  bytes[44] = 0x01;  // first reserved byte, right after the hash
+  ExpectError(bytes, Www::ParseError::BadReserved);
+
+  bytes     = Fixture();
+  bytes[63] = 0x01;  // last reserved byte
   ExpectError(bytes, Www::ParseError::BadReserved);
 
   bytes = Fixture();

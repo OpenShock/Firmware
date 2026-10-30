@@ -25,7 +25,7 @@ changes, in type and label. The flash past 4 MB on bigger boards stays unused.
 The captive portal's assets are one flat read-only image in the `www` partition (type 0x40, so no ESP-IDF component
 tries to mount it), mapped once and served by pointer. `scripts/utils/wwwimage.py` writes it and
 `components/www/include/www/WwwImage.h` documents the format: a sorted directory, 4-byte aligned bodies and a
-truncated SHA-256 over the whole image (header included, its own field zeroed), checked before anything is served.
+SHA-256 over the whole image (header included, its own field zeroed), checked before anything is served.
 The same image serves every board. The OTA update skips flashing it when the hash on flash already matches the
 release's.
 

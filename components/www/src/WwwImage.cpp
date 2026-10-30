@@ -104,8 +104,10 @@ std::expected<Www::Image, Www::ParseError> Www::Image::Parse(std::span<const uin
   if (dirLen % kAlign != 0 || dirLen < kEntrySize * count || dirLen > bytes.size() - kHeaderSize) {
     return std::unexpected(ParseError::BadDirectory);
   }
-  if (readU32(bytes.data() + kHashOffset + kBodyHashSize) != 0) {
-    return std::unexpected(ParseError::BadReserved);
+  for (std::size_t i = kHashOffset + kBodyHashSize; i < kHeaderSize; ++i) {
+    if (bytes[i] != 0) {
+      return std::unexpected(ParseError::BadReserved);
+    }
   }
 
   const std::size_t stringsStart = kHeaderSize + kEntrySize * count;

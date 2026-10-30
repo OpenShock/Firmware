@@ -2,13 +2,13 @@
 
 Mirrors components/www/include/www/WwwImage.h; change both together and bump VERSION.
 
-    header (32 B)
+    header (64 B)
       magic      u32   'OSWW' as little-endian bytes
       version    u16   1
       count      u16   number of entries
       dir_len    u32   bytes of entries + string table (+ padding to 4)
-      body_hash  u8[16]  sha256 of the whole image with this field zeroed, truncated
-      reserved   u8[4]  zero
+      body_hash  u8[32]  sha256 of the whole image with this field zeroed
+      reserved   u8[20]  zero
     entry (16 B) x count, sorted by path (byte order)
       path_off   u16   offset into the string table
       flags      u16   bit0 gzip, bit1 immutable (long cache)
@@ -28,11 +28,12 @@ from dataclasses import dataclass
 
 MAGIC = 0x5757534F  # 'OSWW'
 VERSION = 1
-HEADER_LEN = 32
+HEADER_LEN = 64
 ENTRY_LEN = 16
-HEADER_FORMAT = '<IHHI16s4s'
+HEADER_FORMAT = '<IHHI32s20s'
 ENTRY_FORMAT = '<HHIII'
-BODY_HASH_LEN = 16
+BODY_HASH_LEN = 32
+HEADER_RESERVED_LEN = 20
 ALIGN = 4
 
 FLAG_GZIP = 1 << 0
@@ -103,9 +104,10 @@ def pack(entries: list[Entry]) -> bytes:
     directory = bytes(table) + bytes(strings)
     directory += b'\0' * (dir_len - len(directory))
     after_header = directory + bytes(bodies)
-    header = struct.pack(HEADER_FORMAT, MAGIC, VERSION, len(ordered), dir_len, b'\0' * BODY_HASH_LEN, b'\0' * 4)
-    body_hash = hashlib.sha256(header + after_header).digest()[:BODY_HASH_LEN]
-    header = struct.pack(HEADER_FORMAT, MAGIC, VERSION, len(ordered), dir_len, body_hash, b'\0' * 4)
+    reserved = b'\0' * HEADER_RESERVED_LEN
+    header = struct.pack(HEADER_FORMAT, MAGIC, VERSION, len(ordered), dir_len, b'\0' * BODY_HASH_LEN, reserved)
+    body_hash = hashlib.sha256(header + after_header).digest()
+    header = struct.pack(HEADER_FORMAT, MAGIC, VERSION, len(ordered), dir_len, body_hash, reserved)
     return header + after_header
 
 
@@ -130,7 +132,7 @@ def parse(data: bytes) -> Image:
         raise WwwImageError(f'unsupported version {version}')
     if dir_len % ALIGN or dir_len < ENTRY_LEN * count or HEADER_LEN + dir_len > len(data):
         raise WwwImageError('directory length out of range')
-    if reserved != b'\0' * 4:
+    if reserved != b'\0' * HEADER_RESERVED_LEN:
         raise WwwImageError('reserved header field not zero')
     strings_start = HEADER_LEN + ENTRY_LEN * count
     strings = data[strings_start : HEADER_LEN + dir_len]
@@ -169,7 +171,7 @@ def parse(data: bytes) -> Image:
         end = max(end, offset + size + _pad(size))
 
     hashed = data[:12] + b'\0' * BODY_HASH_LEN + data[12 + BODY_HASH_LEN : end]
-    if hashlib.sha256(hashed).digest()[:BODY_HASH_LEN] != body_hash:
+    if hashlib.sha256(hashed).digest() != body_hash:
         raise WwwImageError('image hash mismatch')
     return Image(tuple(entries), body_hash, end)
 
