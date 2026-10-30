@@ -304,6 +304,15 @@ esp_err_t CaptivePortal::StaticFileServer::staticFileHandler(httpd_req_t* req)
   if (!gzip) {
     size = partition->fileSize(path.c_str());
     if (!size) {
+      // A gzip-only asset for a client that excluded gzip: there is no inflater on the device, so no acceptable
+      // representation exists (RFC 9110 §12.5.3). A redirect here would send the client back to the same URL.
+      if (!wantsGzip) {
+        path += ".gz";
+        if (partition->fileSize(path.c_str())) {
+          httpd_resp_set_hdr(req, "Vary", "Accept-Encoding");
+          return sendResp(req, S406, HTTP::ContentType::TextPlain, "Only available with Content-Encoding: gzip\n");
+        }
+      }
       // Unknown path -> captive redirect (matches serveStatic default-file fallthrough).
       return RFC8908::EmitRedirect(req);
     }

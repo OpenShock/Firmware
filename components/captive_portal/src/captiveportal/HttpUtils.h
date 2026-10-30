@@ -14,6 +14,7 @@ namespace OpenShock::CaptivePortal {
   inline constexpr const char* S200 = "200 OK";
   inline constexpr const char* S304 = "304 Not Modified";
   inline constexpr const char* S400 = "400 Bad Request";
+  inline constexpr const char* S406 = "406 Not Acceptable";
   inline constexpr const char* S429 = "429 Too Many Requests";
   inline constexpr const char* S500 = "500 Internal Server Error";
   inline constexpr const char* S503 = "503 Service Unavailable";
