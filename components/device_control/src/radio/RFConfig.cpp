@@ -70,14 +70,8 @@ bool RFConfig::SaveNvs(const char* partition, const RFConfig* previous) const
 
 bool RFConfig::FromJSON(JSON::JsonView json)
 {
-  if (!json.valid()) {
-    *this = RFConfig();
-    return true;
-  }
-
-  if (!json.isObject()) {
-    OS_LOGE(TAG, "json is not an object");
-    return false;
+  if (auto done = Parse::ObjectOrDefault(*this, json, TAG)) {
+    return *done;
   }
 
   if (auto pin = Parse::JsonGpioNum(json, "txPin"); pin && *pin != GPIO_NUM_NC) {
@@ -85,7 +79,9 @@ bool RFConfig::FromJSON(JSON::JsonView json)
   } else {
     txPin = static_cast<gpio_num_t>(Board::Get().rfTxGpio);
   }
-  keepAliveEnabled = json["keepAliveEnabled"].tryGetBool().value_or(true);
+  if (!Parse::JsonBool(keepAliveEnabled, json, "keepAliveEnabled", true, TAG)) {
+    return false;
+  }
 
   return true;
 }

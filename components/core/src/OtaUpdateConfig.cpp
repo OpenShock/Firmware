@@ -95,30 +95,23 @@ flatbuffers::Offset<OpenShock::Serialization::Configuration::OtaUpdateConfig> Ot
 
 bool OtaUpdateConfig::FromJSON(JSON::JsonView json)
 {
-  if (!json.valid()) {
-    OS_LOGW(TAG, "Config is null, setting to default");
-    *this = OtaUpdateConfig();
-    return true;
+  if (auto done = Parse::ObjectOrDefault(*this, json, TAG)) {
+    return *done;
   }
 
-  if (!json.isObject()) {
-    OS_LOGE(TAG, "json is not an object");
+  // Every boolean is strict (Parse::JsonBool); the numbers and strings take their default for a value of the wrong type
+  if (
+    !Parse::JsonBool(isEnabled, json, "isEnabled", true, TAG) || !Parse::JsonBool(checkOnStartup, json, "checkOnStartup", false, TAG) || !Parse::JsonBool(checkPeriodically, json, "checkPeriodically", false, TAG)
+    || !Parse::JsonBool(allowBackendManagement, json, "allowBackendManagement", true, TAG) || !Parse::JsonBool(requireManualApproval, json, "requireManualApproval", false, TAG)
+  )
+  {
     return false;
   }
 
-  isEnabled = json["isEnabled"].tryGetBool().value_or(true);
-
   cdnDomain = json["cdnDomain"].tryGetStr().value_or(CONFIG_OPENSHOCK_FW_CDN_DOMAIN);
-
   Parse::JsonStrParsed(updateChannel, json, "updateChannel"sv, OpenShock::TryParseOtaUpdateChannel, OpenShock::OtaUpdateChannel::Stable);
-
-  checkOnStartup         = json["checkOnStartup"].tryGetBool().value_or(false);
-  checkPeriodically      = json["checkPeriodically"].tryGetBool().value_or(false);
-  checkInterval          = json["checkInterval"].tryGetU16().value_or(kDefaultCheckInterval);
-  allowBackendManagement = json["allowBackendManagement"].tryGetBool().value_or(true);
-  requireManualApproval  = json["requireManualApproval"].tryGetBool().value_or(false);
-  updateId               = json["updateId"].tryGetI32().value_or(0);
-
+  checkInterval = json["checkInterval"].tryGetU16().value_or(kDefaultCheckInterval);
+  updateId      = json["updateId"].tryGetI32().value_or(0);
   Parse::JsonStrParsed(updateStep, json, "updateStep"sv, OpenShock::TryParseOtaUpdateStep, OpenShock::OtaUpdateStep::None);
 
   return true;

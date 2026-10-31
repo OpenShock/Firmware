@@ -53,15 +53,8 @@ flatbuffers::Offset<OpenShock::Serialization::Configuration::BackendConfig> Back
 
 bool BackendConfig::FromJSON(JSON::JsonView json)
 {
-  if (!json.valid()) {
-    OS_LOGW(TAG, "Config is null, setting to default");
-    *this = BackendConfig();
-    return true;
-  }
-
-  if (!json.isObject()) {
-    OS_LOGE(TAG, "json is not an object");
-    return false;
+  if (auto done = Parse::ObjectOrDefault(*this, json, TAG)) {
+    return *done;
   }
 
   domain = json["domain"].tryGetStr().value_or(CONFIG_OPENSHOCK_API_DOMAIN);

@@ -41,28 +41,12 @@ flatbuffers::Offset<OpenShock::Serialization::Configuration::CaptivePortalConfig
 
 bool CaptivePortalConfig::FromJSON(JSON::JsonView json)
 {
-  if (!json.valid()) {
-    OS_LOGW(TAG, "Config is null, setting to default");
-    *this = CaptivePortalConfig();
-    return true;
+  if (auto done = Parse::ObjectOrDefault(*this, json, TAG)) {
+    return *done;
   }
 
-  if (!json.isObject()) {
-    OS_LOGE(TAG, "json is not an object");
+  if (!Parse::JsonBool(alwaysEnabled, json, "alwaysEnabled", false, TAG)) {
     return false;
-  }
-
-  // A field that is there but is not a bool is a bad document, not a default: accepting it would store `false` over
-  // whatever the hub has.
-  if (JSON::JsonView field = json["alwaysEnabled"]; field.valid()) {
-    auto parsed = field.tryGetBool();
-    if (!parsed) {
-      OS_LOGE(TAG, "alwaysEnabled is not a boolean");
-      return false;
-    }
-    alwaysEnabled = *parsed;
-  } else {
-    alwaysEnabled = false;
   }
 
   return true;

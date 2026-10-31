@@ -82,27 +82,14 @@ bool EStopConfig::SaveNvs(const char* partition, const EStopConfig* previous) co
 
 bool EStopConfig::FromJSON(JSON::JsonView json)
 {
-  if (!json.valid()) {
-    *this = EStopConfig();
-    return true;
-  }
-
-  if (!json.isObject()) {
-    OS_LOGE(TAG, "json is not an object");
-    return false;
+  if (auto done = Parse::ObjectOrDefault(*this, json, TAG)) {
+    return *done;
   }
 
   gpioPin = Parse::JsonGpioNum(json, "gpioPin").value_or(static_cast<gpio_num_t>(Board::Get().estopGpio));
 
-  if (JSON::JsonView enabledJson = json["enabled"]; enabledJson.valid()) {
-    auto parsed = enabledJson.tryGetBool();
-    if (!parsed) {
-      OS_LOGE(TAG, "Failed to parse enabled");
-      return false;
-    }
-    enabled = *parsed;
-  } else {
-    enabled = OpenShock::IsValidInputPin(gpioPin);
+  if (!Parse::JsonBool(enabled, json, "enabled", OpenShock::IsValidInputPin(gpioPin), TAG)) {
+    return false;
   }
 
   return true;

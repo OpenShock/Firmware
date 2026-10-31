@@ -63,15 +63,8 @@ flatbuffers::Offset<OpenShock::Serialization::Configuration::WiFiConfig> WiFiCon
 
 bool WiFiConfig::FromJSON(JSON::JsonView json)
 {
-  if (!json.valid()) {
-    OS_LOGW(TAG, "Config is null, setting to default");
-    *this = WiFiConfig();
-    return true;
-  }
-
-  if (!json.isObject()) {
-    OS_LOGE(TAG, "json is not an object");
-    return false;
+  if (auto done = Parse::ObjectOrDefault(*this, json, TAG)) {
+    return *done;
   }
 
   accessPointSSID = json["accessPointSSID"].tryGetStr().value_or(CONFIG_OPENSHOCK_FW_AP_PREFIX);
@@ -151,11 +144,6 @@ namespace {
       if (creds.id == id) return &creds;
     }
     return nullptr;
-  }
-
-  bool sameCredentials(const WiFiCredentials& a, const WiFiCredentials& b)
-  {
-    return a.id == b.id && a.ssid == b.ssid && a.password == b.password && a.authMode == b.authMode && a.bssid == b.bssid;
   }
 }  // namespace
 
@@ -251,7 +239,7 @@ bool WiFiConfig::SaveNvs(const char* partition, const WiFiConfig* previous) cons
 
   for (const auto& creds : credentialsList) {
     const WiFiCredentials* old = previous != nullptr ? findById(previous->credentialsList, creds.id) : nullptr;
-    if (old != nullptr && sameCredentials(*old, creds)) {
+    if (old != nullptr && *old == creds) {
       continue;
     }
     credentialKey(creds.id, key);

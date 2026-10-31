@@ -41,28 +41,12 @@ flatbuffers::Offset<OpenShock::Serialization::Configuration::SerialInputConfig> 
 
 bool SerialInputConfig::FromJSON(JSON::JsonView json)
 {
-  if (!json.valid()) {
-    OS_LOGW(TAG, "Config is null, setting to default");
-    *this = SerialInputConfig();
-    return true;
+  if (auto done = Parse::ObjectOrDefault(*this, json, TAG)) {
+    return *done;
   }
 
-  if (!json.isObject()) {
-    OS_LOGE(TAG, "json is not an object");
+  if (!Parse::JsonBool(echoEnabled, json, "echoEnabled", true, TAG)) {
     return false;
-  }
-
-  // A field that is there but is not a bool is a bad document, not a default: accepting it would store the default
-  // over whatever the hub has.
-  if (JSON::JsonView field = json["echoEnabled"]; field.valid()) {
-    auto parsed = field.tryGetBool();
-    if (!parsed) {
-      OS_LOGE(TAG, "echoEnabled is not a boolean");
-      return false;
-    }
-    echoEnabled = *parsed;
-  } else {
-    echoEnabled = true;
   }
 
   return true;
