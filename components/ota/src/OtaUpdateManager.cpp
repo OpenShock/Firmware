@@ -154,13 +154,7 @@ static void otaum_evh_ipevent(void* event_handler_arg, esp_event_base_t event_ba
 
 static bool otaum_send_progress_msg(Serialization::Types::OtaUpdateProgressTask task, float progress)
 {
-  auto updateId = Config::GetOtaUpdateId();
-  if (!updateId) {
-    OS_LOGE(TAG, "Failed to get OTA update ID");
-    return false;
-  }
-
-  if (!Serialization::Gateway::SerializeOtaUpdateProgressMessage(*updateId, task, progress, GatewayConnectionManager::SendMessageBIN)) {
+  if (!Serialization::Gateway::SerializeOtaUpdateProgressMessage(Config::GetOtaUpdateId(), task, progress, GatewayConnectionManager::SendMessageBIN)) {
     OS_LOGE(TAG, "Failed to send OTA install progress message");
     return false;
   }
@@ -169,13 +163,7 @@ static bool otaum_send_progress_msg(Serialization::Types::OtaUpdateProgressTask 
 }
 static bool _sendFailureMessage(std::string_view message, bool fatal = false)
 {
-  auto updateId = Config::GetOtaUpdateId();
-  if (!updateId) {
-    OS_LOGE(TAG, "Failed to get OTA update ID");
-    return false;
-  }
-
-  if (!Serialization::Gateway::SerializeOtaUpdateFailedMessage(*updateId, message, fatal, GatewayConnectionManager::SendMessageBIN)) {
+  if (!Serialization::Gateway::SerializeOtaUpdateFailedMessage(Config::GetOtaUpdateId(), message, fatal, GatewayConnectionManager::SendMessageBIN)) {
     OS_LOGE(TAG, "Failed to send OTA install failed message");
     return false;
   }
@@ -372,12 +360,7 @@ static void otaum_updatetask(void* arg)
 
     int64_t now = OpenShock::millis();
 
-    auto maybeConfig = Config::GetOtaUpdateConfig();
-    if (!maybeConfig) {
-      OS_LOGE(TAG, "Failed to get OTA update config");
-      continue;
-    }
-    const Config::OtaUpdateConfig& config = *maybeConfig;
+    const Config::OtaUpdateConfig config = Config::GetOtaUpdateConfig();
 
     if (!config.isEnabled) {
       OS_LOGD(TAG, "OTA updates are disabled, skipping update check");
@@ -597,18 +580,12 @@ static const char* otaum_channel_name(OpenShock::OtaUpdateChannel channel)
 /// so the CDN host no longer has to be known by the hub.
 [[nodiscard]] static std::optional<std::string> otaum_try_get_repo_domain()
 {
-  auto config = Config::GetOtaUpdateConfig();
-  if (!config) {
-    OS_LOGE(TAG, "Failed to get OTA update config");
-    return std::nullopt;
-  }
-
-  if (config->cdnDomain.empty()) {
+  std::string domain = Config::GetOtaUpdateConfig().cdnDomain;
+  if (domain.empty()) {
     OS_LOGE(TAG, "OTA repository domain is not configured");
     return std::nullopt;
   }
-
-  return std::move(config->cdnDomain);
+  return domain;
 }
 
 /// @brief Issues a GET against the repository API and parses the body as JSON.
@@ -673,12 +650,7 @@ bool OtaUpdateManager::Init()
   _otaImageState = imageState;
 
   OS_LOGD(TAG, "Fetching previous update step");
-  auto maybeUpdateStep = Config::GetOtaUpdateStep();
-  if (!maybeUpdateStep) {
-    OS_LOGE(TAG, "Failed to get OTA update step");
-    return false;
-  }
-  OtaUpdateStep updateStep = *maybeUpdateStep;
+  const OtaUpdateStep updateStep = Config::GetOtaUpdateStep();
 
   // Infer boot type from update step.
   _bootType = OpenShock::InferFirmwareBootType(updateStep);

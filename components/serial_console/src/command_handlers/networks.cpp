@@ -6,7 +6,6 @@
 #include "wifi/WiFiManager.h"
 #include "json/Json.h"
 
-#include <bitset>
 #include <vector>
 
 const char* const TAG = "SerialCmds::CommandHandlers::Networks";
@@ -18,10 +17,7 @@ static void handleNetworksCommand(std::string_view arg, bool isAutomated)
     json_gen_str_t* gen = writer.gen();
 
     json_gen_start_array(gen);
-    if (!OpenShock::Config::GetWiFiCredentials(gen, true)) {
-      SERPR_ERROR("Failed to get WiFi credentials from config");
-      return;
-    }
+    OpenShock::Config::GetWiFiCredentials(gen, true);
     json_gen_end_array(gen);
 
     std::string out = writer.finish();
@@ -42,46 +38,24 @@ static void handleNetworksCommand(std::string_view arg, bool isAutomated)
     return;
   }
 
+  // A network without an id (0) gets the lowest free one from the config section itself
   std::vector<OpenShock::Config::WiFiCredentials> creds;
-
   const int count = root.count();
-  std::bitset<256> usedIds;
   for (int i = 0; i < count; ++i) {
     OpenShock::Config::WiFiCredentials cred;
-
     if (!cred.FromJSON(root.at(i))) {
       SERPR_ERROR("Failed to parse network");
       return;
     }
-
-    usedIds[cred.id] = true;
+    OS_LOGI(TAG, "Adding network \"%s\" to config", cred.ssid.c_str());
     creds.push_back(std::move(cred));
   }
 
-  // Give networks without an ID the lowest IDs not already taken by the ones that have one
-  uint16_t nextId = 1;
-  for (auto& cred : creds) {
-    if (cred.id == 0) {
-      while (nextId < 256 && usedIds[nextId]) ++nextId;
-      if (nextId >= 256) {
-        SERPR_ERROR("Too many networks");
-        return;
-      }
-      cred.id         = static_cast<uint8_t>(nextId);
-      usedIds[nextId] = true;
-    }
-
-    OS_LOGI(TAG, "Adding network \"%s\" to config, id=%u", cred.ssid.c_str(), cred.id);
+  const bool saved = OpenShock::Config::SetWiFiCredentials(creds);
+  OpenShock::SerialCmds::ReportSaved(saved);
+  if (saved) {
+    OpenShock::WiFiManager::RefreshNetworkCredentials();
   }
-
-  if (!OpenShock::Config::SetWiFiCredentials(creds)) {
-    SERPR_ERROR("Failed to save config");
-    return;
-  }
-
-  SERPR_SUCCESS("Saved config");
-
-  OpenShock::WiFiManager::RefreshNetworkCredentials();
 }
 
 OpenShock::SerialCmds::CommandGroup OpenShock::SerialCmds::CommandHandlers::NetworksHandler()

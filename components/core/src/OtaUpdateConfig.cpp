@@ -32,11 +32,6 @@ static constexpr uint16_t kDefaultCheckInterval = 30;  // minutes
 static constexpr const char* kNamespaces[] = {kNamespace};
 static Section<OtaUpdateConfig> s_section({.name = "otaUpdate", .order = 5, .hubConfigField = Fbs::HubConfig::VT_OTA_UPDATE, .namespaces = kNamespaces});
 
-Section<OtaUpdateConfig>& OpenShock::Config::OtaUpdateSection()
-{
-  return s_section;
-}
-
 using namespace std::string_view_literals;
 
 OtaUpdateConfig::OtaUpdateConfig()
@@ -182,7 +177,7 @@ bool OtaUpdateConfig::SaveNvs(const char* partition, const OtaUpdateConfig* prev
     .Commit();
 }
 
-std::optional<OtaUpdateConfig> OpenShock::Config::GetOtaUpdateConfig()
+OtaUpdateConfig OpenShock::Config::GetOtaUpdateConfig()
 {
   return s_section.Get();
 }
@@ -197,7 +192,7 @@ bool OpenShock::Config::UpdateOtaUpdateConfig(Util::FunctionRef<bool(OtaUpdateCo
   return s_section.Update(update);
 }
 
-std::optional<int32_t> OpenShock::Config::GetOtaUpdateId()
+int32_t OpenShock::Config::GetOtaUpdateId()
 {
   return s_section.Read([](const OtaUpdateConfig& ota) { return ota.updateId; });
 }
@@ -213,7 +208,7 @@ bool OpenShock::Config::SetOtaUpdateId(int32_t updateId)
   });
 }
 
-std::optional<OpenShock::OtaUpdateStep> OpenShock::Config::GetOtaUpdateStep()
+OpenShock::OtaUpdateStep OpenShock::Config::GetOtaUpdateStep()
 {
   return s_section.Read([](const OtaUpdateConfig& ota) { return ota.updateStep; });
 }

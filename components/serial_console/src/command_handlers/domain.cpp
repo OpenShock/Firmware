@@ -6,8 +6,6 @@
 #include "http/HTTPRequestManager.h"
 #include "serialization/JsonAPI.h"
 
-#include <esp_system.h>
-
 #include <cstdio>
 #include <string>
 
@@ -16,14 +14,7 @@ const char* const TAG = "SerialCmds::CommandHandlers::Domain";
 static void handleDomainCommand(std::string_view arg, bool isAutomated)
 {
   if (arg.empty()) {
-    auto domain = OpenShock::Config::GetBackendDomain();
-    if (!domain) {
-      SERPR_ERROR("Failed to get domain from config");
-      return;
-    }
-
-    // Get domain
-    SERPR_RESPONSE("Domain|%s", domain->c_str());
+    SERPR_RESPONSE("Domain|%s", OpenShock::Config::GetBackendDomain().c_str());
     return;
   }
 
@@ -51,17 +42,8 @@ static void handleDomainCommand(std::string_view arg, bool isAutomated)
 
   OS_LOGI(TAG, "Successfully connected to \"%.*s\", version: %s, commit: %s, current time: %s", static_cast<int>(arg.length()), arg.data(), resp.data.version.c_str(), resp.data.commit.c_str(), resp.data.currentTime.c_str());
 
-  bool result = OpenShock::Config::SetBackendDomain(std::string(arg));
-
-  if (!result) {
-    SERPR_ERROR("Failed to save config");
-    return;
-  }
-
-  SERPR_SUCCESS("Saved config, restarting...");
-
   // Restart to use the new domain
-  esp_restart();
+  OpenShock::SerialCmds::ReportSavedAndRestart(OpenShock::Config::SetBackendDomain(std::string(arg)));
 }
 
 OpenShock::SerialCmds::CommandGroup OpenShock::SerialCmds::CommandHandlers::DomainHandler()

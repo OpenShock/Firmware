@@ -26,7 +26,8 @@ namespace OpenShock::Config {
     std::vector<OpenShock::Config::WiFiCredentials> credentialsList;  // in id order once loaded from NVS
 
     /// @brief The section runs it on every value it takes in: a hostname esp_netif would refuse (empty, over 32
-    ///        characters, or not letters, digits and hyphens) becomes the default, whichever way it came in.
+    ///        characters, or not letters, digits and hyphens) becomes the default, and a credential with no id (0) or
+    ///        a repeated one gets the lowest free id (or is dropped when none is left), whichever way it came in.
     void Normalize();
 
     bool LoadNvs(const char* partition);
@@ -38,15 +39,16 @@ namespace OpenShock::Config {
     [[nodiscard]] flatbuffers::Offset<Serialization::Configuration::WiFiConfig> ToFlatbuffers(flatbuffers::FlatBufferBuilder& builder, bool withSensitiveData) const;
   };
 
-  Section<WiFiConfig>& WiFiSection();
-
-  [[nodiscard]] std::optional<WiFiConfig> GetWiFiConfig();
+  [[nodiscard]] WiFiConfig GetWiFiConfig();
   bool SetWiFiConfig(const WiFiConfig& config);
 
-  [[nodiscard]] std::optional<std::vector<WiFiCredentials>> GetWiFiCredentials();
+  [[nodiscard]] std::vector<WiFiCredentials> GetWiFiCredentials();
   // Emits each stored credential as an object into an already-open JSON array
   // (the caller opens/closes it with json_gen_{start,end}_array).
-  bool GetWiFiCredentials(json_gen_str_t* gen, bool withSensitiveData);
+  void GetWiFiCredentials(json_gen_str_t* gen, bool withSensitiveData);
+  [[nodiscard]] bool HasWiFiCredentials();
+  /// @brief Replaces every saved network. An id of 0 gets the lowest free id; a repeated id or a bad SSID/password
+  ///        length is refused.
   bool SetWiFiCredentials(const std::vector<WiFiCredentials>& credentials);
 
   bool AnyWiFiCredentials(Util::FunctionRef<bool(const Config::WiFiCredentials&)> predicate);
@@ -58,6 +60,6 @@ namespace OpenShock::Config {
   bool PinWiFiCredentialsBSSID(uint8_t id, const uint8_t (&bssid)[6]);
   bool RemoveWiFiCredentials(uint8_t id);
   bool ClearWiFiCredentials();
-  [[nodiscard]] std::optional<std::string> GetWiFiHostname();
+  [[nodiscard]] std::string GetWiFiHostname();
   bool SetWiFiHostname(std::string hostname);
 }  // namespace OpenShock::Config

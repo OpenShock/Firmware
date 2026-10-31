@@ -19,11 +19,6 @@ static constexpr const char* kKeyAlways = "always";
 static constexpr const char* kNamespaces[] = {kNamespace};
 static Section<CaptivePortalConfig> s_section({.name = "captivePortal", .order = 2, .hubConfigField = Fbs::HubConfig::VT_CAPTIVE_PORTAL, .namespaces = kNamespaces});
 
-Section<CaptivePortalConfig>& OpenShock::Config::CaptivePortalSection()
-{
-  return s_section;
-}
-
 CaptivePortalConfig::CaptivePortalConfig()
   : alwaysEnabled(false)
 {
@@ -77,7 +72,7 @@ bool CaptivePortalConfig::SaveNvs(const char* partition, const CaptivePortalConf
   return Nvs::Saver(*handle, *this, previous).Set(kKeyAlways, &CaptivePortalConfig::alwaysEnabled).Commit();
 }
 
-std::optional<CaptivePortalConfig> OpenShock::Config::GetCaptivePortalConfig()
+CaptivePortalConfig OpenShock::Config::GetCaptivePortalConfig()
 {
   return s_section.Get();
 }

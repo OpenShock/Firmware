@@ -303,13 +303,7 @@ static bool StartConnectingToLCG()
     return false;
   }
 
-  auto authToken = Config::GetBackendAuthToken();
-  if (!authToken) {
-    OS_LOGE(TAG, "Failed to get auth token");
-    return false;
-  }
-
-  auto response = HTTP::JsonAPI::AssignLcg(*authToken);
+  auto response = HTTP::JsonAPI::AssignLcg(Config::GetBackendAuthToken());
 
   if (response.code == 401) {
     OS_LOGD(TAG, "Auth token is invalid, waiting 5 minutes before retrying");
@@ -351,13 +345,7 @@ static void InitializeClient()
     return;  // Checked here so an auth hold-off doesn't also count as a hub info failure and stack the two backoffs
   }
 
-  auto authToken = Config::GetBackendAuthToken();
-  if (!authToken) {
-    OS_LOGE(TAG, "Failed to get auth token");
-    return;
-  }
-
-  if (!FetchHubInfo(*authToken)) {
+  if (!FetchHubInfo(Config::GetBackendAuthToken())) {
     // Back off on failure so an unreachable backend isn't polled on every update tick.
     s_hubInfoBackoff.backOff(OpenShock::millis());
     return;

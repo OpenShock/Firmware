@@ -19,11 +19,6 @@ static constexpr const char* kKeyEcho   = "echo";
 static constexpr const char* kNamespaces[] = {kNamespace};
 static Section<SerialInputConfig> s_section({.name = "serialInput", .order = 4, .hubConfigField = Fbs::HubConfig::VT_SERIAL_INPUT, .namespaces = kNamespaces});
 
-Section<SerialInputConfig>& OpenShock::Config::SerialInputSection()
-{
-  return s_section;
-}
-
 SerialInputConfig::SerialInputConfig()
   : echoEnabled(true)
 {
@@ -77,7 +72,7 @@ bool SerialInputConfig::SaveNvs(const char* partition, const SerialInputConfig* 
   return Nvs::Saver(*handle, *this, previous).Set(kKeyEcho, &SerialInputConfig::echoEnabled).Commit();
 }
 
-std::optional<SerialInputConfig> OpenShock::Config::GetSerialInputConfig()
+SerialInputConfig OpenShock::Config::GetSerialInputConfig()
 {
   return s_section.Get();
 }
@@ -87,7 +82,7 @@ bool OpenShock::Config::SetSerialInputConfig(const SerialInputConfig& config)
   return s_section.Set(config);
 }
 
-std::optional<bool> OpenShock::Config::GetSerialInputConfigEchoEnabled()
+bool OpenShock::Config::GetSerialInputConfigEchoEnabled()
 {
   return s_section.Read([](const SerialInputConfig& serial) { return serial.echoEnabled; });
 }

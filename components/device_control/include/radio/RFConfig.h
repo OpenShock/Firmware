@@ -35,12 +35,10 @@ namespace OpenShock::Config {
   };
 
   /// @brief The section itself, for whole-value reads and read-modify-writes.
-  Section<RFConfig>& RFSection();
-
-  [[nodiscard]] std::optional<RFConfig> GetRFConfig();
+  [[nodiscard]] RFConfig GetRFConfig();
   bool SetRFConfig(const RFConfig& config);
-  [[nodiscard]] std::optional<gpio_num_t> GetRFConfigTxPin();
+  [[nodiscard]] gpio_num_t GetRFConfigTxPin();
   bool SetRFConfigTxPin(gpio_num_t txPin);
-  [[nodiscard]] std::optional<bool> GetRFConfigKeepAliveEnabled();
+  [[nodiscard]] bool GetRFConfigKeepAliveEnabled();
   bool SetRFConfigKeepAliveEnabled(bool enabled);
 }  // namespace OpenShock::Config

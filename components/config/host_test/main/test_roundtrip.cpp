@@ -45,9 +45,7 @@ TEST_CASE("Values set through the Config API survive a reload", "[config][roundt
   AssertConfigEqual(before, Snapshot());
 
   TEST_ASSERT_TRUE(Config::HasBackendAuthToken());
-  auto token = Config::GetBackendAuthToken();
-  TEST_ASSERT_TRUE(token.has_value());
-  TEST_ASSERT_EQUAL_STRING("tok_0123456789abcdef", token->c_str());
+  TEST_ASSERT_EQUAL_STRING("tok_0123456789abcdef", Config::GetBackendAuthToken().c_str());
 
   auto creds = Config::TryGetWiFiCredentialsBySSID("Guest");
   TEST_ASSERT_TRUE(creds.has_value());
@@ -83,22 +81,22 @@ TEST_CASE("Removed credentials are gone after a reload and their ids can be reus
 
   Reload();
   auto creds = Config::GetWiFiCredentials();
-  TEST_ASSERT_TRUE(creds.has_value());
-  TEST_ASSERT_EQUAL_size_t(2, creds->size());
-  TEST_ASSERT_EQUAL_UINT8(1, (*creds)[0].id);
-  TEST_ASSERT_EQUAL_UINT8(3, (*creds)[1].id);
+  TEST_ASSERT_EQUAL_size_t(2, creds.size());
+  TEST_ASSERT_EQUAL_UINT8(1, creds[0].id);
+  TEST_ASSERT_EQUAL_UINT8(3, creds[1].id);
   TEST_ASSERT_FALSE(Config::TryGetWiFiCredentialsByID(2).has_value());
 
   // The freed id is handed out again, and the list order is by id, not by insertion
   TEST_ASSERT_EQUAL_UINT8(2, Config::AddWiFiCredentials("D", "pd", WIFI_AUTH_WPA2_PSK));
   Reload();
   creds = Config::GetWiFiCredentials();
-  TEST_ASSERT_EQUAL_size_t(3, creds->size());
-  TEST_ASSERT_EQUAL_STRING("D", (*creds)[1].ssid.c_str());
+  TEST_ASSERT_EQUAL_size_t(3, creds.size());
+  TEST_ASSERT_EQUAL_STRING("D", creds[1].ssid.c_str());
 
   TEST_ASSERT_TRUE(Config::ClearWiFiCredentials());
   Reload();
-  TEST_ASSERT_TRUE(Config::GetWiFiCredentials()->empty());
+  TEST_ASSERT_TRUE(Config::GetWiFiCredentials().empty());
+  TEST_ASSERT_FALSE(Config::HasWiFiCredentials());
 }
 
 TEST_CASE("Credentials are enumerated from their keys, never counted", "[config][roundtrip]")
@@ -109,10 +107,9 @@ TEST_CASE("Credentials are enumerated from their keys, never counted", "[config]
   InitWith(config);
 
   auto creds = Config::GetWiFiCredentials();
-  TEST_ASSERT_TRUE(creds.has_value());
-  TEST_ASSERT_EQUAL_size_t(3, creds->size());
-  TEST_ASSERT_EQUAL_UINT8(3, (*creds)[0].id);
-  TEST_ASSERT_EQUAL_UINT8(200, (*creds)[1].id);
+  TEST_ASSERT_EQUAL_size_t(3, creds.size());
+  TEST_ASSERT_EQUAL_UINT8(3, creds[0].id);
+  TEST_ASSERT_EQUAL_UINT8(200, creds[1].id);
   TEST_ASSERT_EQUAL_UINT8(255, (*creds)[2].id);
   TEST_ASSERT_EQUAL_STRING("Max", (*creds)[2].ssid.c_str());
 }
@@ -140,10 +137,9 @@ TEST_CASE("One credential that does not read is dropped; the others load and sur
   TEST_ASSERT_EQUAL_UINT8(2, Config::AddWiFiCredentials("Cafe", "latte123", WIFI_AUTH_WPA2_PSK));
   Reload();
   auto creds = Config::GetWiFiCredentials();
-  TEST_ASSERT_TRUE(creds.has_value());
-  TEST_ASSERT_EQUAL_size_t(3, creds->size());
-  TEST_ASSERT_EQUAL_UINT8(1, (*creds)[0].id);
-  TEST_ASSERT_EQUAL_STRING("Cafe", (*creds)[1].ssid.c_str());
+  TEST_ASSERT_EQUAL_size_t(3, creds.size());
+  TEST_ASSERT_EQUAL_UINT8(1, creds[0].id);
+  TEST_ASSERT_EQUAL_STRING("Cafe", creds[1].ssid.c_str());
   TEST_ASSERT_EQUAL_UINT8(7, (*creds)[2].id);
 }
 
@@ -181,7 +177,7 @@ TEST_CASE("A save writes only what changed", "[config][roundtrip]")
   TEST_ASSERT_TRUE(Config::SetSerialInputConfigEchoEnabled(true));
   TEST_ASSERT_EQUAL_size_t(before, UsedEntries());
   Reload();
-  TEST_ASSERT_TRUE(*Config::GetSerialInputConfigEchoEnabled());
+  TEST_ASSERT_TRUE(Config::GetSerialInputConfigEchoEnabled());
 }
 
 TEST_CASE("Many max-length WiFi credentials survive a reload", "[config][roundtrip]")
@@ -265,9 +261,8 @@ TEST_CASE("jsonconfig set decodes \\u escapes", "[config][roundtrip][json]")
 
   Reload();  // UTF-8 and control characters survive the store too
   auto wifi = Config::GetWiFiConfig();
-  TEST_ASSERT_TRUE(wifi.has_value());
-  TEST_ASSERT_EQUAL_STRING("hub-1", wifi->hostname.c_str());
-  TEST_ASSERT_EQUAL_size_t(1, wifi->credentialsList.size());
+  TEST_ASSERT_EQUAL_STRING("hub-1", wifi.hostname.c_str());
+  TEST_ASSERT_EQUAL_size_t(1, wifi.credentialsList.size());
   TEST_ASSERT_EQUAL_STRING("Caf\xc3\xa9 \xf0\x9f\x98\x80", wifi->credentialsList[0].ssid.c_str());
   TEST_ASSERT_EQUAL_STRING("a\tb", wifi->credentialsList[0].password.c_str());
 }

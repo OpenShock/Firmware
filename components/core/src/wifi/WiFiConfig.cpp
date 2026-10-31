@@ -30,11 +30,6 @@ static constexpr const char* kKeyHostname    = "hostname";
 static constexpr const char* kNamespaces[] = {kNamespaceCfg, kNamespaceCreds};
 static Section<WiFiConfig> s_section({.name = "wifi", .order = 1, .hubConfigField = Fbs::HubConfig::VT_WIFI, .namespaces = kNamespaces});
 
-Section<WiFiConfig>& OpenShock::Config::WiFiSection()
-{
-  return s_section;
-}
-
 WiFiConfig::WiFiConfig()
   : accessPointSSID(CONFIG_OPENSHOCK_FW_AP_PREFIX)
   , hostname(CONFIG_OPENSHOCK_FW_HOSTNAME)
@@ -84,36 +79,6 @@ bool WiFiConfig::FromJSON(JSON::JsonView json)
 
   Parse::JsonArray(credentialsList, credentialsListJson);
 
-  // Each credential is stored under its id, so 0 (what a missing id parses to) and a repeated id would be lost on
-  // flash. Those get the lowest free id instead; one that finds none is dropped.
-  std::bitset<256> usedIds;
-  usedIds[0] = true;
-  for (const auto& creds : credentialsList) {
-    usedIds[creds.id] = true;
-  }
-  std::bitset<256> seenIds;
-  for (auto it = credentialsList.begin(); it != credentialsList.end();) {
-    if (it->id != 0 && !seenIds[it->id]) {
-      seenIds[it->id] = true;
-      ++it;
-      continue;
-    }
-    std::size_t freeId = 1;
-    while (freeId < usedIds.size() && usedIds[freeId]) {
-      ++freeId;
-    }
-    if (freeId == usedIds.size()) {
-      OS_LOGW(TAG, "Dropping credential %u: no free id left", it->id);
-      it = credentialsList.erase(it);
-      continue;
-    }
-    OS_LOGW(TAG, "Credential %u renumbered to %zu", it->id, freeId);
-    it->id          = static_cast<uint8_t>(freeId);
-    usedIds[freeId] = true;
-    seenIds[freeId] = true;
-    ++it;
-  }
-
   return true;
 }
 
@@ -138,12 +103,36 @@ namespace {
     snprintf(key, sizeof(key), "%u", id);
   }
 
-  const WiFiCredentials* findById(const std::vector<WiFiCredentials>& list, uint8_t id)
+  // The one credential with `id` / `ssid`, const or mutable with the list; null when there is none
+  template<typename List>
+  auto findById(List& list, uint8_t id) -> decltype(list.data())
   {
-    for (const auto& creds : list) {
+    for (auto& creds : list) {
       if (creds.id == id) return &creds;
     }
     return nullptr;
+  }
+
+  template<typename List>
+  auto findBySsid(List& list, std::string_view ssid) -> decltype(list.data())
+  {
+    for (auto& creds : list) {
+      if (creds.ssid == ssid) return &creds;
+    }
+    return nullptr;
+  }
+
+  // The lowest id in 1..255 no credential in `list` holds; 0 when every id is taken
+  uint8_t lowestFreeId(const std::vector<WiFiCredentials>& list)
+  {
+    std::bitset<256> used;
+    for (const auto& creds : list) {
+      used[creds.id] = true;
+    }
+    for (std::size_t id = 1; id < used.size(); ++id) {
+      if (!used[id]) return static_cast<uint8_t>(id);
+    }
+    return 0;
   }
 }  // namespace
 
@@ -152,6 +141,27 @@ void WiFiConfig::Normalize()
   if (!HostnameUtils::IsValid(hostname)) {
     OS_LOGW(TAG, "Hostname \"%s\" is not valid, using the default", hostname.c_str());
     hostname = CONFIG_OPENSHOCK_FW_HOSTNAME;
+  }
+
+  // Each credential is stored under its id, so 0 (what a missing id parses to, and what a new network comes in with)
+  // and a repeated id would be lost on flash. Those get the lowest free id instead; one that finds none is dropped.
+  std::bitset<256> seenIds;
+  for (auto it = credentialsList.begin(); it != credentialsList.end();) {
+    if (it->id != 0 && !seenIds[it->id]) {
+      seenIds[it->id] = true;
+      ++it;
+      continue;
+    }
+    const uint8_t freeId = lowestFreeId(credentialsList);
+    if (freeId == 0) {
+      OS_LOGW(TAG, "Dropping credential %u: no free id left", it->id);
+      it = credentialsList.erase(it);
+      continue;
+    }
+    OS_LOGW(TAG, "Credential %u renumbered to %u", it->id, freeId);
+    it->id          = freeId;
+    seenIds[freeId] = true;
+    ++it;
   }
 }
 
@@ -264,7 +274,7 @@ static bool isValidWiFiCredentials(std::string_view ssid, std::string_view passw
   return true;
 }
 
-std::optional<WiFiConfig> OpenShock::Config::GetWiFiConfig()
+WiFiConfig OpenShock::Config::GetWiFiConfig()
 {
   return s_section.Get();
 }
@@ -274,30 +284,31 @@ bool OpenShock::Config::SetWiFiConfig(const WiFiConfig& config)
   return s_section.Set(config);
 }
 
-std::optional<std::vector<WiFiCredentials>> OpenShock::Config::GetWiFiCredentials()
+std::vector<WiFiCredentials> OpenShock::Config::GetWiFiCredentials()
 {
   return s_section.Read([](const WiFiConfig& wifi) { return wifi.credentialsList; });
 }
 
-bool OpenShock::Config::GetWiFiCredentials(json_gen_str_t* gen, bool withSensitiveData)
+void OpenShock::Config::GetWiFiCredentials(json_gen_str_t* gen, bool withSensitiveData)
 {
   s_section.Read([&](const WiFiConfig& wifi) {
     for (const auto& creds : wifi.credentialsList) {
       creds.ToJSON(gen, nullptr, withSensitiveData);
     }
   });
-  return true;
+}
+
+bool OpenShock::Config::HasWiFiCredentials()
+{
+  return s_section.Read([](const WiFiConfig& wifi) { return !wifi.credentialsList.empty(); });
 }
 
 bool OpenShock::Config::SetWiFiCredentials(const std::vector<WiFiCredentials>& credentials)
 {
+  // An id of 0 means "pick one" and Normalize hands it the lowest free id; a repeated id is two networks under one key
   std::bitset<256> seenIds;
   for (const auto& creds : credentials) {
-    if (creds.id == 0) {
-      OS_LOGE(TAG, "Cannot set WiFi credentials: credential ID cannot be 0");
-      return false;
-    }
-    if (seenIds[creds.id]) {
+    if (creds.id != 0 && seenIds[creds.id]) {
       OS_LOGE(TAG, "Cannot set WiFi credentials: duplicate credential ID %u", creds.id);
       return false;
     }
@@ -318,7 +329,7 @@ bool OpenShock::Config::AnyWiFiCredentials(Util::FunctionRef<bool(const Config::
 {
   // The predicate is caller code, so run it on a copy outside the lock
   auto creds = GetWiFiCredentials();
-  return std::any_of(creds->begin(), creds->end(), predicate);
+  return std::any_of(creds.begin(), creds.end(), predicate);
 }
 
 uint8_t OpenShock::Config::AddWiFiCredentials(std::string_view ssid, std::string_view password, wifi_auth_mode_t authMode)
@@ -331,37 +342,16 @@ uint8_t OpenShock::Config::AddWiFiCredentials(std::string_view ssid, std::string
   bool stored = s_section.Update([&](WiFiConfig& wifi) {
     auto& list = wifi.credentialsList;
 
-    std::bitset<255> bits;
-    for (auto it = list.begin(); it != list.end();) {
-      auto& creds = *it;
-
-      if (std::string_view(creds.ssid) == ssid) {
-        creds.password = password;
-        if (authMode != WIFI_AUTH_MAX) {
-          creds.authMode = authMode;
-        }
-        id = creds.id;
-        return true;
+    if (WiFiCredentials* existing = findBySsid(list, ssid)) {
+      existing->password = password;
+      if (authMode != WIFI_AUTH_MAX) {
+        existing->authMode = authMode;
       }
-
-      if (creds.id == 0) {
-        OS_LOGW(TAG, "Found WiFi credentials with ID 0, removing");
-        it = list.erase(it);
-        continue;
-      }
-
-      // Mark ID as used
-      bits[creds.id - 1] = true;
-      ++it;
+      id = existing->id;
+      return true;
     }
 
-    // First available ID
-    for (std::size_t i = 0; i < bits.size(); ++i) {
-      if (!bits[i]) {
-        id = static_cast<uint8_t>(i + 1);
-        break;
-      }
-    }
+    id = lowestFreeId(list);
     if (id == 0) {
       OS_LOGE(TAG, "Failed to add WiFi credentials: no available IDs");
       return false;
@@ -383,36 +373,24 @@ uint8_t OpenShock::Config::AddWiFiCredentials(std::string_view ssid, std::string
 std::optional<WiFiCredentials> OpenShock::Config::TryGetWiFiCredentialsByID(uint8_t id)
 {
   return s_section.Read([&](const WiFiConfig& wifi) -> std::optional<WiFiCredentials> {
-    for (const auto& creds : wifi.credentialsList) {
-      if (creds.id == id) {
-        return creds;
-      }
-    }
-    return std::nullopt;
+    const WiFiCredentials* creds = findById(wifi.credentialsList, id);
+    return creds != nullptr ? std::optional(*creds) : std::nullopt;
   });
 }
 
 std::optional<WiFiCredentials> OpenShock::Config::TryGetWiFiCredentialsBySSID(const char* ssid)
 {
   return s_section.Read([&](const WiFiConfig& wifi) -> std::optional<WiFiCredentials> {
-    for (const auto& creds : wifi.credentialsList) {
-      if (creds.ssid == ssid) {
-        return creds;
-      }
-    }
-    return std::nullopt;
+    const WiFiCredentials* creds = findBySsid(wifi.credentialsList, ssid);
+    return creds != nullptr ? std::optional(*creds) : std::nullopt;
   });
 }
 
 uint8_t OpenShock::Config::GetWiFiCredentialsIDbySSID(const char* ssid)
 {
   return s_section.Read([&](const WiFiConfig& wifi) -> uint8_t {
-    for (const auto& creds : wifi.credentialsList) {
-      if (creds.ssid == ssid) {
-        return creds.id;
-      }
-    }
-    return 0;
+    const WiFiCredentials* creds = findBySsid(wifi.credentialsList, ssid);
+    return creds != nullptr ? creds->id : 0;
   });
 }
 
@@ -420,14 +398,13 @@ bool OpenShock::Config::PinWiFiCredentialsBSSID(uint8_t id, const uint8_t (&bssi
 {
   bool found = false;
   bool saved = s_section.Update([&](WiFiConfig& wifi) {
-    for (auto& creds : wifi.credentialsList) {
-      if (creds.id == id) {
-        memcpy(creds.bssid.data(), bssid, 6);
-        found = true;
-        return true;
-      }
+    WiFiCredentials* creds = findById(wifi.credentialsList, id);
+    if (creds == nullptr) {
+      return false;
     }
-    return false;
+    memcpy(creds->bssid.data(), bssid, 6);
+    found = true;
+    return true;
   });
   return found && saved;
 }
@@ -436,12 +413,12 @@ bool OpenShock::Config::RemoveWiFiCredentials(uint8_t id)
 {
   bool found = false;
   bool saved = s_section.Update([&](WiFiConfig& wifi) {
-    auto& list = wifi.credentialsList;
-    auto it    = std::find_if(list.begin(), list.end(), [id](const WiFiCredentials& creds) { return creds.id == id; });
-    if (it == list.end()) {
+    auto& list                   = wifi.credentialsList;
+    const WiFiCredentials* creds = findById(list, id);
+    if (creds == nullptr) {
       return false;
     }
-    list.erase(it);
+    list.erase(list.begin() + (creds - list.data()));
     found = true;
     return true;
   });
@@ -456,7 +433,7 @@ bool OpenShock::Config::ClearWiFiCredentials()
   });
 }
 
-std::optional<std::string> OpenShock::Config::GetWiFiHostname()
+std::string OpenShock::Config::GetWiFiHostname()
 {
   return s_section.Read([](const WiFiConfig& wifi) { return wifi.hostname; });
 }

@@ -172,10 +172,9 @@ TEST_CASE("Malformed credential blobs are dropped, the rest kept", "[config][def
   Reload();
 
   auto loaded = Config::GetWiFiCredentials();
-  TEST_ASSERT_TRUE(loaded.has_value());
-  TEST_ASSERT_EQUAL_size_t(2, loaded->size());
-  AssertCredentialsEqual(Config::WiFiCredentials(1, "HomeNet", "hunter22"), (*loaded)[0]);
-  AssertCredentialsEqual(Config::WiFiCredentials(4, "Office", ""), (*loaded)[1]);
+  TEST_ASSERT_EQUAL_size_t(2, loaded.size());
+  AssertCredentialsEqual(Config::WiFiCredentials(1, "HomeNet", "hunter22"), loaded[0]);
+  AssertCredentialsEqual(Config::WiFiCredentials(4, "Office", ""), loaded[1]);
 }
 
 TEST_CASE("Invalid stored GPIO pins fall back safely", "[config][defaults]")
@@ -193,13 +192,8 @@ TEST_CASE("Invalid stored GPIO pins fall back safely", "[config][defaults]")
   MarkSchema();
   Reload();
 
-  auto txPin = Config::GetRFConfigTxPin();
-  TEST_ASSERT_TRUE(txPin.has_value());
-  TEST_ASSERT_EQUAL_INT(OPENSHOCK_RF_TX_GPIO, *txPin);
-
-  auto estopEnabled = Config::GetEStopEnabled();
-  TEST_ASSERT_TRUE(estopEnabled.has_value());
-  TEST_ASSERT_FALSE(*estopEnabled);
+  TEST_ASSERT_EQUAL_INT(OPENSHOCK_RF_TX_GPIO, Config::GetRFConfigTxPin());
+  TEST_ASSERT_FALSE(Config::GetEStopEnabled());
 
   // Negative pin (the old "invalid" marker) also falls back.
   WipeStore();
@@ -210,9 +204,7 @@ TEST_CASE("Invalid stored GPIO pins fall back safely", "[config][defaults]")
   }
   MarkSchema();
   Reload();
-  txPin = Config::GetRFConfigTxPin();
-  TEST_ASSERT_TRUE(txPin.has_value());
-  TEST_ASSERT_EQUAL_INT(OPENSHOCK_RF_TX_GPIO, *txPin);
+  TEST_ASSERT_EQUAL_INT(OPENSHOCK_RF_TX_GPIO, Config::GetRFConfigTxPin());
 }
 
 TEST_CASE("jsonconfig set with an empty object resets to defaults", "[config][defaults][json]")

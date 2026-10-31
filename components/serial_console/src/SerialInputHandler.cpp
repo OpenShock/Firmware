@@ -58,7 +58,6 @@ using namespace OpenShock;
 
 const int64_t PASTE_INTERVAL_THRESHOLD_MS = 20;
 
-static bool s_echoEnabled = true;
 static std::vector<OpenShock::SerialCmds::CommandGroup> s_commandGroups;
 static std::unordered_map<std::string_view, OpenShock::SerialCmds::CommandGroup, hash_ci, equals_ci> s_commandHandlers;
 
@@ -513,7 +512,7 @@ static void echoHandleSerialInput(std::string_view buffer, bool hasData)
   static bool hasChanges      = false;
 
   // If serial echo is disabled, don't do anything past this point
-  if (!s_echoEnabled) {
+  if (!Config::GetSerialInputConfigEchoEnabled()) {
     return;
   }
 
@@ -549,7 +548,7 @@ static void processSerialLine(std::string_view line)
   // If it's not automated, we can echo the command if echo is enabled
   if (isAutomated) {
     line = line.substr(1);
-  } else if (s_echoEnabled) {
+  } else if (Config::GetSerialInputConfigEchoEnabled()) {
     echoBuffer(line);
     OS_SERIAL_PRINTLN();
   }
@@ -690,28 +689,12 @@ bool SerialInputHandler::Init()
   SerialInputHandler::PrintVersionInfo();
   OS_SERIAL_PRINTLN();
 
-  auto echoEnabled = Config::GetSerialInputConfigEchoEnabled();
-  if (!echoEnabled) {
-    OS_LOGE(TAG, "Failed to get serial echo status from config");
-    return false;
-  }
-  s_echoEnabled = *echoEnabled;
-
   if (TaskUtils::TaskCreateExpensive(serialRxTask, "SerialRX", CONFIG_OPENSHOCK_SERIAL_RX_TASK_STACK_SIZE, nullptr, 1, nullptr) != pdPASS) {  // TODO: Profile stack size
     OS_LOGE(TAG, "Failed to create serial RX task");
     return false;
   }
 
   return true;
-}
-bool SerialInputHandler::SerialEchoEnabled()
-{
-  return s_echoEnabled;
-}
-
-void SerialInputHandler::SetSerialEchoEnabled(bool enabled)
-{
-  s_echoEnabled = enabled;
 }
 
 void SerialInputHandler::Print(std::string_view str)

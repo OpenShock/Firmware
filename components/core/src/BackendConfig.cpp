@@ -20,11 +20,6 @@ static constexpr const char* kKeyToken  = "token";
 static constexpr const char* kNamespaces[] = {kNamespace};
 static Section<BackendConfig> s_section({.name = "backend", .order = 3, .hubConfigField = Fbs::HubConfig::VT_BACKEND, .namespaces = kNamespaces});
 
-Section<BackendConfig>& OpenShock::Config::BackendSection()
-{
-  return s_section;
-}
-
 BackendConfig::BackendConfig()
   : domain(CONFIG_OPENSHOCK_API_DOMAIN)
   , authToken()
@@ -93,7 +88,7 @@ bool BackendConfig::SaveNvs(const char* partition, const BackendConfig* previous
   return Nvs::Saver(*handle, *this, previous).Set(kKeyDomain, &BackendConfig::domain).Set(kKeyToken, &BackendConfig::authToken).Commit();
 }
 
-std::optional<BackendConfig> OpenShock::Config::GetBackendConfig()
+BackendConfig OpenShock::Config::GetBackendConfig()
 {
   return s_section.Get();
 }
@@ -103,7 +98,7 @@ bool OpenShock::Config::SetBackendConfig(const BackendConfig& config)
   return s_section.Set(config);
 }
 
-std::optional<std::string> OpenShock::Config::GetBackendDomain()
+std::string OpenShock::Config::GetBackendDomain()
 {
   return s_section.Read([](const BackendConfig& backend) { return backend.domain; });
 }
@@ -121,7 +116,7 @@ bool OpenShock::Config::HasBackendAuthToken()
   return s_section.Read([](const BackendConfig& backend) { return !backend.authToken.empty(); });
 }
 
-std::optional<std::string> OpenShock::Config::GetBackendAuthToken()
+std::string OpenShock::Config::GetBackendAuthToken()
 {
   return s_section.Read([](const BackendConfig& backend) { return backend.authToken; });
 }

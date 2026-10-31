@@ -21,11 +21,6 @@ static constexpr const char* kKeyKeepAlive = "keepalive";
 static constexpr const char* kNamespaces[] = {kNamespace};
 static Section<RFConfig> s_section({.name = "rf", .order = 0, .hubConfigField = Fbs::HubConfig::VT_RF, .namespaces = kNamespaces});
 
-Section<RFConfig>& OpenShock::Config::RFSection()
-{
-  return s_section;
-}
-
 RFConfig::RFConfig()
   : txPin(static_cast<gpio_num_t>(Board::Get().rfTxGpio))
   , keepAliveEnabled(true)
@@ -106,7 +101,7 @@ flatbuffers::Offset<Fbs::RFConfig> RFConfig::ToFlatbuffers(flatbuffers::FlatBuff
   return rfBuilder.Finish();
 }
 
-std::optional<RFConfig> OpenShock::Config::GetRFConfig()
+RFConfig OpenShock::Config::GetRFConfig()
 {
   return s_section.Get();
 }
@@ -116,7 +111,7 @@ bool OpenShock::Config::SetRFConfig(const RFConfig& config)
   return s_section.Set(config);
 }
 
-std::optional<gpio_num_t> OpenShock::Config::GetRFConfigTxPin()
+gpio_num_t OpenShock::Config::GetRFConfigTxPin()
 {
   return s_section.Read([](const RFConfig& rf) { return rf.txPin; });
 }
@@ -129,7 +124,7 @@ bool OpenShock::Config::SetRFConfigTxPin(gpio_num_t txPin)
   });
 }
 
-std::optional<bool> OpenShock::Config::GetRFConfigKeepAliveEnabled()
+bool OpenShock::Config::GetRFConfigKeepAliveEnabled()
 {
   return s_section.Read([](const RFConfig& rf) { return rf.keepAliveEnabled; });
 }

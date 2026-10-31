@@ -36,14 +36,12 @@ namespace OpenShock::Config {
     void ToJSON(json_gen_str_t* gen, const char* name, bool withSensitiveData) const;
   };
 
-  Section<BackendConfig>& BackendSection();
-
-  [[nodiscard]] std::optional<BackendConfig> GetBackendConfig();
+  [[nodiscard]] BackendConfig GetBackendConfig();
   bool SetBackendConfig(const BackendConfig& config);
-  [[nodiscard]] std::optional<std::string> GetBackendDomain();
+  [[nodiscard]] std::string GetBackendDomain();
   bool SetBackendDomain(std::string domain);
   bool HasBackendAuthToken();
-  [[nodiscard]] std::optional<std::string> GetBackendAuthToken();
+  [[nodiscard]] std::string GetBackendAuthToken();
   bool SetBackendAuthToken(std::string token);
   bool ClearBackendAuthToken();
 }  // namespace OpenShock::Config

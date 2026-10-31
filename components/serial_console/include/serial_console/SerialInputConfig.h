@@ -33,10 +33,8 @@ namespace OpenShock::Config {
     void ToJSON(json_gen_str_t* gen, const char* name, bool withSensitiveData) const;
   };
 
-  Section<SerialInputConfig>& SerialInputSection();
-
-  [[nodiscard]] std::optional<SerialInputConfig> GetSerialInputConfig();
+  [[nodiscard]] SerialInputConfig GetSerialInputConfig();
   bool SetSerialInputConfig(const SerialInputConfig& config);
-  [[nodiscard]] std::optional<bool> GetSerialInputConfigEchoEnabled();
+  [[nodiscard]] bool GetSerialInputConfigEchoEnabled();
   bool SetSerialInputConfigEchoEnabled(bool enabled);
 }  // namespace OpenShock::Config

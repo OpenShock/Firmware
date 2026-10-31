@@ -86,11 +86,7 @@ static void sendCommand(uint32_t command)
 
 static bool isDeviceFullyConfigured()
 {
-  auto credentialsList = Config::GetWiFiCredentials();
-  if (!credentialsList || credentialsList->empty()) {
-    return false;
-  }
-  return Config::HasBackendAuthToken();
+  return Config::HasWiFiCredentials() && Config::HasBackendAuthToken();
 }
 
 static std::shared_ptr<CaptivePortalInstance> GetInstance()
@@ -360,12 +356,9 @@ bool CaptivePortal::Init()
   auto* initialState = new ManagerState();
 
   // Restore the persisted always-enabled setting before the hook can change it, so it survives a reboot.
-  if (auto config = Config::GetCaptivePortalConfig()) {
-    initialState->alwaysEnabled = config->alwaysEnabled;
-    s_alwaysEnabled             = config->alwaysEnabled;
-  } else {
-    OS_LOGE(TAG, "Failed to get captive portal config");
-  }
+  const bool alwaysEnabled    = Config::GetCaptivePortalConfig().alwaysEnabled;
+  initialState->alwaysEnabled = alwaysEnabled;
+  s_alwaysEnabled             = alwaysEnabled;
 
   // If device is already fully configured, set a startup grace period before opening portal
   if (isDeviceFullyConfigured()) {

@@ -36,12 +36,10 @@ namespace OpenShock::Config {
     [[nodiscard]] flatbuffers::Offset<Serialization::Configuration::EStopConfig> ToFlatbuffers(flatbuffers::FlatBufferBuilder& builder, bool withSensitiveData) const;
   };
 
-  Section<EStopConfig>& EStopSection();
-
-  [[nodiscard]] std::optional<EStopConfig> GetEStopConfig();
+  [[nodiscard]] EStopConfig GetEStopConfig();
   bool SetEStopConfig(const EStopConfig& config);
-  [[nodiscard]] std::optional<bool> GetEStopEnabled();
+  [[nodiscard]] bool GetEStopEnabled();
   bool SetEStopEnabled(bool enabled);
-  [[nodiscard]] std::optional<gpio_num_t> GetEStopGpioPin();
+  [[nodiscard]] gpio_num_t GetEStopGpioPin();
   bool SetEStopGpioPin(gpio_num_t gpioPin);
 }  // namespace OpenShock::Config

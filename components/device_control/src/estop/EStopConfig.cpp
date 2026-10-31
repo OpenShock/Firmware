@@ -22,11 +22,6 @@ static constexpr const char* kKeyGpio    = "gpio";
 static constexpr const char* kNamespaces[] = {kNamespace};
 static Section<EStopConfig> s_section({.name = "estop", .order = 6, .hubConfigField = Fbs::HubConfig::VT_ESTOP, .namespaces = kNamespaces});
 
-Section<EStopConfig>& OpenShock::Config::EStopSection()
-{
-  return s_section;
-}
-
 EStopConfig::EStopConfig()
   : enabled(OpenShock::IsValidInputPin(Board::Get().estopGpio))
   , gpioPin(static_cast<gpio_num_t>(Board::Get().estopGpio))
@@ -110,7 +105,7 @@ flatbuffers::Offset<Fbs::EStopConfig> EStopConfig::ToFlatbuffers(flatbuffers::Fl
   return Fbs::CreateEStopConfig(builder, enabled, gpioPin);
 }
 
-std::optional<EStopConfig> OpenShock::Config::GetEStopConfig()
+EStopConfig OpenShock::Config::GetEStopConfig()
 {
   return s_section.Get();
 }
@@ -120,7 +115,7 @@ bool OpenShock::Config::SetEStopConfig(const EStopConfig& config)
   return s_section.Set(config);
 }
 
-std::optional<bool> OpenShock::Config::GetEStopEnabled()
+bool OpenShock::Config::GetEStopEnabled()
 {
   return s_section.Read([](const EStopConfig& estop) { return estop.enabled; });
 }
@@ -133,7 +128,7 @@ bool OpenShock::Config::SetEStopEnabled(bool enabled)
   });
 }
 
-std::optional<gpio_num_t> OpenShock::Config::GetEStopGpioPin()
+gpio_num_t OpenShock::Config::GetEStopGpioPin()
 {
   return s_section.Read([](const EStopConfig& estop) { return estop.gpioPin; });
 }
