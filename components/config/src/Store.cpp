@@ -184,9 +184,11 @@ static const char* moveSharedIntoCfg()
     OS_LOGI(TAG, "Moved the config from the shared nvs partition into cfg");
   }
 
+  // Walked backwards like the copy, so `root` goes last: a power cut mid-erase leaves the schema marker, and the
+  // cleanup is redone on the next boot instead of stranding the rest (WiFi passwords included) in the shared nvs
   bool erased = true;
-  for (const char* ns : namespaces) {
-    erased &= Config::Nvs::EraseNamespace(kPartitionShared, ns);
+  for (std::size_t i = namespaces.size(); i-- > 0;) {
+    erased &= Config::Nvs::EraseNamespace(kPartitionShared, namespaces[i]);
   }
   if (erased) {
     OS_LOGI(TAG, "Removed the config copy from the shared nvs partition");
@@ -257,10 +259,13 @@ static bool applyDocument(JSON::JsonView root, bool full)
   return ok;
 }
 
-// Requires the write lock. Fills an unmarked store: the 1.x file if there is one, else the defaults.
+// Requires the write lock. Fills an unmarked store: the 1.x file if there is one, else the defaults. The store is
+// only marked once every section is on flash as the hub runs it; a write that failed leaves it unmarked, so the fill
+// (the 1.x import included) is redone on the next boot.
 static void fillStore()
 {
-  bool filled = false;
+  bool filled  = false;
+  bool written = true;
   if (auto legacy = readLegacyConfig()) {
     JSON::JsonDocument doc;
     if (doc.parse(*legacy) && applyDocument(doc.root(), true)) {
@@ -272,7 +277,7 @@ static void fillStore()
   if (!filled) {
     OS_LOGW(TAG, "No stored config, writing the defaults");
     for (auto* section = Config::SectionBase::First(); section != nullptr; section = section->Next()) {
-      section->Reset(s_partition);
+      written &= section->Reset(s_partition);
     }
   }
 
@@ -283,7 +288,12 @@ static void fillStore()
   for (auto* section = Config::SectionBase::First(); section != nullptr; section = section->Next()) {
     if (!section->VerifyStored(s_partition)) {
       OS_LOGE(TAG, "The %s config does not read back as written to %s", section->Info().name, s_partition);
+      written = false;
     }
+  }
+  if (!written) {
+    OS_LOGE(TAG, "The config store is incomplete; it will be filled again on the next boot");
+    return;
   }
   if (!writeSchema(s_partition)) {
     OS_LOGE(TAG, "Failed to mark the config store; it will be filled again on the next boot");

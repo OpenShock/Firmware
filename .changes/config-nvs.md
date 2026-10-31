@@ -12,9 +12,11 @@ The hub keeps its settings in the chip's NVS key-value store instead of a single
 - On the 2.x partition table the store is the `cfg` partition (the 1.x littlefs `config` partition retyped in place); on the 1.x table it lives in the shared `nvs` partition until the layout is migrated, and then moves into `cfg`
 - An empty store is filled once from the 1.x config file, which is never modified, otherwise from the defaults
 - WiFi credentials are stored one per key; the WiFi driver's own NVS store is compiled out
-- A section that can't be read runs on its defaults without erasing what is stored, and the save after a failed one rewrites every key
+- A section that can't be read runs on its defaults without erasing what is stored, and the save after a failed one rewrites every key; a single WiFi credential that doesn't read is dropped on its own, so the rest still load
+- The store is marked filled only once every section reads back from flash as written; a first fill cut short is redone on the next boot
 - A store written by newer firmware is loaded instead of reset, and a `cfg` partition in a newer NVS format is never erased
 - `Config::MigrateToCfgPartition` retypes the `config` partition as `cfg`; nothing calls it yet
 
 ## Notices
-- warning: **1.x firmware does not see settings changed after this update.** Downgrading to 1.x brings back the settings the hub had before updating. Re-enter any WiFi networks or pairing you changed since.
+- warning: **1.x firmware does not see settings changed after this update.** Downgrading to 1.x brings back the settings the hub had before updating, as long as the partition layout has not been migrated yet. Re-enter any WiFi networks or pairing you changed since.
+- warning: Until the partition layout is migrated the settings live in the chip's shared NVS partition. If that partition has to be erased (it fills up, or a newer firmware wrote it in a format this one cannot read), the hub imports the 1.x settings again and anything changed since the update is lost.

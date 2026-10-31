@@ -119,6 +119,24 @@ TEST_CASE("A config in cfg wins over a stale copy in the shared nvs, which is cl
   TEST_ASSERT_FALSE(HasSchema(Keys::kPartitionShared));
 }
 
+TEST_CASE("A cleanup of the shared copy cut short is finished on the next boot", "[config][storage]")
+{
+  // The shared copy is erased section by section with `root` last: a power cut mid-way leaves the schema marker,
+  // which is what makes the next boot look at the shared partition again. Here the cut came after two sections.
+  InitWith(MakeSampleConfig());
+  StoreInShared(MakeSampleConfig());
+  TEST_ASSERT_TRUE(Nvs::EraseNamespace(Keys::kPartitionShared, Keys::Ns::kOta));
+  TEST_ASSERT_TRUE(Nvs::EraseNamespace(Keys::kPartitionShared, Keys::Ns::kSerial));
+  TEST_ASSERT_TRUE(HasSchema(Keys::kPartitionShared));
+
+  Reload();
+  AssertConfigEqual(MakeSampleConfig(), Snapshot());
+  TEST_ASSERT_FALSE(HasSchema(Keys::kPartitionShared));
+  for (const char* ns : Keys::Ns::kAll) {
+    TEST_ASSERT_EQUAL_size_t_MESSAGE(0, KeyCount(Keys::kPartitionShared, ns), ns);
+  }
+}
+
 TEST_CASE("The move is idempotent and verified", "[config][storage]")
 {
   WipeStore();

@@ -117,6 +117,36 @@ TEST_CASE("Credentials are enumerated from their keys, never counted", "[config]
   TEST_ASSERT_EQUAL_STRING("Max", (*creds)[2].ssid.c_str());
 }
 
+TEST_CASE("One credential that does not read is dropped; the others load and survive the next save", "[config][roundtrip]")
+{
+  // A credential blob NVS hands back unreadable must not fail the wifi load: a failed load runs the section on an
+  // empty list, and the next save sweeps every stored credential that is not in it, so every network would be lost.
+  const Full sample = MakeSampleConfig();
+  InitWith(sample);
+  {
+    auto wifi = Config::Nvs::Handle::Open(Keys::kPartitionCfg, Keys::Ns::kWifi, true);
+    TEST_ASSERT_TRUE(wifi.has_value());
+    const uint8_t garbage[] = {0xFF, 0x02, 0x00};  // unknown blob version, id 2
+    TEST_ASSERT_TRUE(wifi->SetBlob("2", garbage));
+    TEST_ASSERT_TRUE(wifi->Commit());
+  }
+  Reload();
+
+  Full expected = sample;
+  expected.wifi.credentialsList.erase(expected.wifi.credentialsList.begin() + 1);  // Guest, id 2
+  AssertConfigEqual(expected, Snapshot());
+
+  // The section is in sync with flash: a changed-only save adds one key and leaves the readable credentials alone
+  TEST_ASSERT_EQUAL_UINT8(2, Config::AddWiFiCredentials("Cafe", "latte123", WIFI_AUTH_WPA2_PSK));
+  Reload();
+  auto creds = Config::GetWiFiCredentials();
+  TEST_ASSERT_TRUE(creds.has_value());
+  TEST_ASSERT_EQUAL_size_t(3, creds->size());
+  TEST_ASSERT_EQUAL_UINT8(1, (*creds)[0].id);
+  TEST_ASSERT_EQUAL_STRING("Cafe", (*creds)[1].ssid.c_str());
+  TEST_ASSERT_EQUAL_UINT8(7, (*creds)[2].id);
+}
+
 TEST_CASE("GetRaw writes fields that equal their schema default", "[config][roundtrip]")
 {
   // 1.5.x reads a missing is_enabled/keepalive_enabled as false, so omitting them breaks loading the dump there.

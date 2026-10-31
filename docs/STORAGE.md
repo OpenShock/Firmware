@@ -54,11 +54,14 @@ Where the store is:
 - On the 1.x table, which has no `cfg`, the same namespaces in the shared `nvs` partition. The first boot that finds
   `cfg` copies them over key by key, compares the copy, and deletes the shared one.
 - An empty store is filled once: from the 1.x littlefs config file (`/config` on the 1.x `config` partition, read
-  only, so a rollback to 1.x still finds it) when there is one, else from every section's defaults.
+  only, so a rollback to 1.x still finds it until the config partition migration below has run) when there is one,
+  else from every section's defaults. The store is marked filled only once every section reads back from flash as
+  written; a fill that failed part-way is redone on the next boot.
 - Without any usable NVS, the hub runs on defaults in RAM and logs it.
 
 The shared `nvs` belongs to ESP-IDF (PHY calibration cache) and may be erased at any time; nothing of OpenShock's is
-kept there once `cfg` exists. The WiFi driver's own NVS store is compiled out (`CONFIG_ESP_WIFI_NVS_ENABLED=n`).
+kept there once `cfg` exists. Until then an erased shared `nvs` is an empty store: the hub imports the 1.x file again
+and loses what changed since the update. The WiFi driver's own NVS store is compiled out (`CONFIG_ESP_WIFI_NVS_ENABLED=n`).
 `sysinfo` on the serial console prints where the config is.
 
 ## The config partition migration
@@ -73,7 +76,8 @@ that pipelines the storage migrations decides when it runs.
 3. Config writes are held, the WiFi driver's stale `nvs.net80211` store is dropped, NVS is closed, and the table sector
    is erased and written through the OTA path and read back. A write that will not stick puts the old table back; the
    hub never restarts without a table that parses.
-4. The hub restarts; `Store` erases the littlefs left in `cfg` and moves the config in.
+4. The hub restarts; `Store` erases the littlefs left in `cfg` (the 1.x config file with it: from here a downgrade to
+   1.x starts from defaults) and moves the config in.
 
 ## Portal assets
 

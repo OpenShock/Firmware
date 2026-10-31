@@ -188,13 +188,12 @@ bool WiFiConfig::LoadNvs(const char* partition)
       OS_LOGW(TAG, "Ignoring credential under key %s", key.c_str());
       continue;
     }
+    // One credential that does not read is dropped, not the section: a failed load runs the section on an empty list,
+    // and its next save then sweeps every stored credential that is not in that list
     std::vector<uint8_t> blob;
-    if (handle->GetBlob(key.c_str(), blob) != Nvs::Result::Found) {
-      return false;
-    }
     WiFiCredentials creds;
-    if (!creds.FromBlob(blob) || creds.id != *id) {
-      OS_LOGW(TAG, "Dropping malformed credential %s", key.c_str());
+    if (handle->GetBlob(key.c_str(), blob) != Nvs::Result::Found || !creds.FromBlob(blob) || creds.id != *id) {
+      OS_LOGW(TAG, "Dropping unreadable credential %s", key.c_str());
       continue;
     }
     credentialsList.push_back(std::move(creds));
