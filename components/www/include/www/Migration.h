@@ -1,8 +1,8 @@
 #pragma once
 
 // The www half of the 1.x -> 2.x storage migration (docs/STORAGE.md): write the www image over the 1.x littlefs
-// `static0` partition and retype it as the `www` partition, in place. Not called by anything yet; the release that
-// pipelines the storage migrations decides when it runs.
+// `static0` partition and retype it as the `www` partition, in place. Run by the storage migration task
+// (migration/StorageMigration.h).
 
 #include <cstdint>
 #include <string_view>

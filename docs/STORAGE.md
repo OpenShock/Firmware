@@ -73,8 +73,8 @@ empty store: the hub imports the 1.x file again and loses what changed since the
 
 ## The config partition migration
 
-`Config::MigrateToCfgPartition()` (`config/Migration.h`) moves a 1.x hub onto `cfg`. Nothing calls it yet: the release
-that pipelines the storage migrations decides when it runs.
+`Config::MigrateToCfgPartition()` (`config/Migration.h`) moves a 1.x hub onto `cfg`. The storage migration task (below)
+runs it first, right after setup.
 
 1. It refuses unless the live table has the 1.x littlefs `config` partition and no `cfg`, and the config is in the
    shared `nvs` (where a 1.x hub keeps it after its first boot on this firmware, imported from the 1.x file).
@@ -109,8 +109,8 @@ leaves `static0` as it is.
 
 ## The www partition migration
 
-`Www::MigrateToWwwPartition()` (`www/Migration.h`) moves a 1.x hub onto `www`. Nothing calls it yet: the release that
-pipelines the storage migrations decides when it runs, with the portal closed and no OTA install running.
+`Www::MigrateToWwwPartition()` (`www/Migration.h`) moves a 1.x hub onto `www`. The storage migration task (below)
+runs it once `cfg` exists and the hub is online, with the portal closed and no OTA install running.
 
 1. It refuses unless the live table has the 1.x littlefs `static0` partition and no `www`.
 2. It retypes `static0` as `www` (type 0x40) in a copy of the live table and re-seals the MD5
@@ -121,6 +121,20 @@ pipelines the storage migrations decides when it runs, with the portal closed an
 4. The table sector is erased and written through the OTA path and read back. A write that will not stick puts the
    old table back; the hub never restarts without a table that parses.
 5. The hub restarts and the portal serves from `www`.
+
+## The storage migration task
+
+`Migration::Start()` (`migration/StorageMigration.h`, called from `app_main` after setup) reads the live table and,
+on a hub that still has a 1.x `config` or `static0`, starts one task that runs the two migrations above in order:
+the config partition first (no network needed), then, on the next boot and once WiFi is connected, the www
+partition. Each step takes the OTA manager's flash-write lock for its whole run, so an install never writes `static0`
+or runs while the table changes, and backs off while an install is running. A step that returns without restarting
+is retried after ten minutes; `migrate now` over serial retries at once.
+
+The www image is the running release's `staticfs` artifact, which from 2.0.0 is `www.bin`. A build with no such
+release (a dev build, a 1.x-numbered one) logs that and waits for `migrate www <url> <sha256>` over the serial
+console, which downloads that image instead (plain `http://` works, for a server on the LAN). `migrate` alone says
+whether anything is still pending. On the 2.x table nothing starts.
 
 ## Recovery
 
