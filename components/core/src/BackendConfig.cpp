@@ -84,15 +84,9 @@ void BackendConfig::ToJSON(json_gen_str_t* gen, const char* name, bool withSensi
 
 bool BackendConfig::LoadNvs(const char* partition)
 {
-  std::optional<Nvs::Handle> handle;
-  switch (Nvs::Handle::OpenRead(partition, kNamespace, handle)) {
-    case Nvs::Result::Error:
-      return false;
-    case Nvs::Result::Missing:
-      *this = BackendConfig();
-      return true;
-    case Nvs::Result::Found:
-      break;
+  auto handle = Nvs::Handle::OpenForLoad(partition, kNamespace);
+  if (!handle) {
+    return false;
   }
   return Nvs::Load(*handle, kKeyDomain, domain, CONFIG_OPENSHOCK_API_DOMAIN) && Nvs::Load(*handle, kKeyToken, authToken, "");
 }
@@ -103,7 +97,7 @@ bool BackendConfig::SaveNvs(const char* partition, const BackendConfig* previous
   if (!handle) {
     return false;
   }
-  return handle->SetStr(kKeyDomain, domain, previous != nullptr ? &previous->domain : nullptr) && handle->SetStr(kKeyToken, authToken, previous != nullptr ? &previous->authToken : nullptr) && handle->Commit();
+  return Nvs::Saver(*handle, *this, previous).Set(kKeyDomain, &BackendConfig::domain).Set(kKeyToken, &BackendConfig::authToken).Commit();
 }
 
 std::optional<BackendConfig> OpenShock::Config::GetBackendConfig()

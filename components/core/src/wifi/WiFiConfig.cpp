@@ -169,29 +169,15 @@ void WiFiConfig::Normalize()
 
 bool WiFiConfig::LoadNvs(const char* partition)
 {
-  std::optional<Nvs::Handle> handle;
-  switch (Nvs::Handle::OpenRead(partition, kNamespaceCfg, handle)) {
-    case Nvs::Result::Error:
-      return false;
-    case Nvs::Result::Missing:
-      accessPointSSID = CONFIG_OPENSHOCK_FW_AP_PREFIX;
-      hostname        = CONFIG_OPENSHOCK_FW_HOSTNAME;
-      break;
-    case Nvs::Result::Found:
-      if (!Nvs::Load(*handle, kKeyApSsid, accessPointSSID, CONFIG_OPENSHOCK_FW_AP_PREFIX) || !Nvs::Load(*handle, kKeyHostname, hostname, CONFIG_OPENSHOCK_FW_HOSTNAME)) {
-        return false;
-      }
-      break;
+  auto handle = Nvs::Handle::OpenForLoad(partition, kNamespaceCfg);
+  if (!handle || !Nvs::Load(*handle, kKeyApSsid, accessPointSSID, CONFIG_OPENSHOCK_FW_AP_PREFIX) || !Nvs::Load(*handle, kKeyHostname, hostname, CONFIG_OPENSHOCK_FW_HOSTNAME)) {
+    return false;
   }
 
   credentialsList.clear();
-  switch (Nvs::Handle::OpenRead(partition, kNamespaceCreds, handle)) {
-    case Nvs::Result::Error:
-      return false;
-    case Nvs::Result::Missing:
-      return true;  // No credential was ever stored
-    case Nvs::Result::Found:
-      break;
+  handle = Nvs::Handle::OpenForLoad(partition, kNamespaceCreds);
+  if (!handle) {
+    return false;
   }
 
   // Enumerated, never counted: the keys are the ids. Collected first, since reading while iterating is not allowed.
@@ -227,7 +213,7 @@ bool WiFiConfig::SaveNvs(const char* partition, const WiFiConfig* previous) cons
     if (!handle) {
       return false;
     }
-    if (!handle->SetStr(kKeyApSsid, accessPointSSID, previous != nullptr ? &previous->accessPointSSID : nullptr) || !handle->SetStr(kKeyHostname, hostname, previous != nullptr ? &previous->hostname : nullptr) || !handle->Commit()) {
+    if (!Nvs::Saver(*handle, *this, previous).Set(kKeyApSsid, &WiFiConfig::accessPointSSID).Set(kKeyHostname, &WiFiConfig::hostname).Commit()) {
       return false;
     }
   }

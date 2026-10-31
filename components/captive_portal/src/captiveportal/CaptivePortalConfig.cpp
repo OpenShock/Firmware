@@ -77,15 +77,9 @@ void CaptivePortalConfig::ToJSON(json_gen_str_t* gen, const char* name, bool wit
 
 bool CaptivePortalConfig::LoadNvs(const char* partition)
 {
-  std::optional<Nvs::Handle> handle;
-  switch (Nvs::Handle::OpenRead(partition, kNamespace, handle)) {
-    case Nvs::Result::Error:
-      return false;
-    case Nvs::Result::Missing:
-      *this = CaptivePortalConfig();
-      return true;
-    case Nvs::Result::Found:
-      break;
+  auto handle = Nvs::Handle::OpenForLoad(partition, kNamespace);
+  if (!handle) {
+    return false;
   }
   return Nvs::Load(*handle, kKeyAlways, alwaysEnabled, false);
 }
@@ -96,7 +90,7 @@ bool CaptivePortalConfig::SaveNvs(const char* partition, const CaptivePortalConf
   if (!handle) {
     return false;
   }
-  return handle->SetBool(kKeyAlways, alwaysEnabled, previous != nullptr ? &previous->alwaysEnabled : nullptr) && handle->Commit();
+  return Nvs::Saver(*handle, *this, previous).Set(kKeyAlways, &CaptivePortalConfig::alwaysEnabled).Commit();
 }
 
 std::optional<CaptivePortalConfig> OpenShock::Config::GetCaptivePortalConfig()

@@ -77,15 +77,9 @@ void SerialInputConfig::ToJSON(json_gen_str_t* gen, const char* name, bool withS
 
 bool SerialInputConfig::LoadNvs(const char* partition)
 {
-  std::optional<Nvs::Handle> handle;
-  switch (Nvs::Handle::OpenRead(partition, kNamespace, handle)) {
-    case Nvs::Result::Error:
-      return false;
-    case Nvs::Result::Missing:
-      *this = SerialInputConfig();
-      return true;
-    case Nvs::Result::Found:
-      break;
+  auto handle = Nvs::Handle::OpenForLoad(partition, kNamespace);
+  if (!handle) {
+    return false;
   }
   return Nvs::Load(*handle, kKeyEcho, echoEnabled, true);
 }
@@ -96,7 +90,7 @@ bool SerialInputConfig::SaveNvs(const char* partition, const SerialInputConfig* 
   if (!handle) {
     return false;
   }
-  return handle->SetBool(kKeyEcho, echoEnabled, previous != nullptr ? &previous->echoEnabled : nullptr) && handle->Commit();
+  return Nvs::Saver(*handle, *this, previous).Set(kKeyEcho, &SerialInputConfig::echoEnabled).Commit();
 }
 
 std::optional<SerialInputConfig> OpenShock::Config::GetSerialInputConfig()

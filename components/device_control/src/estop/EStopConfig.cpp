@@ -50,15 +50,9 @@ void EStopConfig::Normalize()
 
 bool EStopConfig::LoadNvs(const char* partition)
 {
-  std::optional<Nvs::Handle> handle;
-  switch (Nvs::Handle::OpenRead(partition, kNamespace, handle)) {
-    case Nvs::Result::Error:
-      return false;
-    case Nvs::Result::Missing:
-      *this = EStopConfig();
-      return true;
-    case Nvs::Result::Found:
-      break;
+  auto handle = Nvs::Handle::OpenForLoad(partition, kNamespace);
+  if (!handle) {
+    return false;
   }
 
   const int8_t boardPin = static_cast<int8_t>(Board::Get().estopGpio);
@@ -83,9 +77,7 @@ bool EStopConfig::SaveNvs(const char* partition, const EStopConfig* previous) co
   if (!handle) {
     return false;
   }
-  const int8_t pin     = static_cast<int8_t>(gpioPin);
-  const int8_t prevPin = previous != nullptr ? static_cast<int8_t>(previous->gpioPin) : 0;
-  return handle->SetBool(kKeyEnabled, enabled, previous != nullptr ? &previous->enabled : nullptr) && handle->SetI8(kKeyGpio, pin, previous != nullptr ? &prevPin : nullptr) && handle->Commit();
+  return Nvs::Saver(*handle, *this, previous).Set(kKeyEnabled, &EStopConfig::enabled).Set<int8_t>(kKeyGpio, &EStopConfig::gpioPin).Commit();
 }
 
 bool EStopConfig::FromJSON(JSON::JsonView json)
@@ -138,10 +130,7 @@ std::optional<EStopConfig> OpenShock::Config::GetEStopConfig()
 
 bool OpenShock::Config::SetEStopConfig(const EStopConfig& config)
 {
-  return s_section.Update([&](EStopConfig& estop) {
-    estop = config;
-    return true;
-  });
+  return s_section.Set(config);
 }
 
 std::optional<bool> OpenShock::Config::GetEStopEnabled()

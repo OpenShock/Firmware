@@ -29,6 +29,7 @@
 // framework loads all of them at boot, renders the whole config as JSON (jsonconfig), imports one, and resets them
 // (factory reset). Sections never die; the registry is a constant-initialized intrusive list.
 
+#include "config/Store.h"
 #include "OpenShock.h"
 #include "SimpleMutex.h"
 #include "util/FunctionRef.h"
@@ -104,8 +105,9 @@ namespace OpenShock::Config {
   namespace Internal {
     /// @brief Serializes every writer of every section, the store's own operations included.
     SimpleMutex& WriteLock();
-    /// @brief The partition the store uses ("cfg"; "nvs" on the 1.x layout), or null when the config only lives in RAM.
-    const char* Partition();
+    bool EraseNamespaces(const char* partition, std::span<const char* const> namespaces);
+    /// @brief Whether two values render the same JSON, secrets included: the complete, canonical comparison.
+    bool SameJson(Util::FunctionRef<void(json_gen_str_t*)> renderA, Util::FunctionRef<void(json_gen_str_t*)> renderB);
   }  // namespace Internal
 
   template<SectionValue T>
@@ -167,8 +169,7 @@ namespace OpenShock::Config {
       T loaded;
       bool ok = loadNvs(loaded, partition);
       if (!ok) {
-        loaded = T();
-        loaded.Normalize();
+        loaded = defaults();
       }
       m_unsynced = !ok;
       publish(std::move(loaded));
@@ -177,14 +178,13 @@ namespace OpenShock::Config {
 
     bool Reset(const char* partition) override
     {
-      T defaults;
-      defaults.Normalize();
+      T value = defaults();
       bool ok = true;
       if (partition != nullptr) {
-        ok = eraseNamespaces(partition) && defaults.SaveNvs(partition, nullptr);
+        ok = Internal::EraseNamespaces(partition, Info().namespaces) && value.SaveNvs(partition, nullptr);
       }
       m_unsynced = !ok;
-      publish(std::move(defaults));  // What the hub runs with either way; a failed save only means it isn't kept
+      publish(std::move(value));  // What the hub runs with either way; a failed save only means it isn't kept
       return ok;
     }
 
@@ -234,6 +234,14 @@ namespace OpenShock::Config {
     }
 
   private:
+    /// @brief The defaults as the section runs them: default constructed, then normalized like every other value.
+    static T defaults()
+    {
+      T value;
+      value.Normalize();
+      return value;
+    }
+
     static bool loadNvs(T& value, const char* partition)
     {
       if (!value.LoadNvs(partition)) {
@@ -246,7 +254,7 @@ namespace OpenShock::Config {
     // Only the keys that differ from the cache, or every key when flash may not match it
     bool save(const T& value)
     {
-      const char* partition = Internal::Partition();
+      const char* partition = StorageLabel();
       if (partition == nullptr) {
         return true;
       }
@@ -260,8 +268,10 @@ namespace OpenShock::Config {
       m_value = std::move(value);
     }
 
-    bool eraseNamespaces(const char* partition) const;
-    static bool sameValue(const T& a, const T& b);
+    static bool sameValue(const T& a, const T& b)
+    {
+      return Internal::SameJson([&](json_gen_str_t* gen) { a.ToJSON(gen, nullptr, true); }, [&](json_gen_str_t* gen) { b.ToJSON(gen, nullptr, true); });
+    }
 
     mutable SimpleMutex m_dataMutex;
     T m_value;
@@ -269,21 +279,4 @@ namespace OpenShock::Config {
     bool m_unsynced = false;    // Flash may differ from m_value, so the next save writes every key. Write lock only.
   };
 
-  namespace Internal {
-    bool EraseNamespaces(const char* partition, std::span<const char* const> namespaces);
-    /// @brief Whether two values render the same JSON, secrets included: the complete, canonical comparison.
-    bool SameJson(Util::FunctionRef<void(json_gen_str_t*)> renderA, Util::FunctionRef<void(json_gen_str_t*)> renderB);
-  }  // namespace Internal
-
-  template<SectionValue T>
-  bool Section<T>::eraseNamespaces(const char* partition) const
-  {
-    return Internal::EraseNamespaces(partition, Info().namespaces);
-  }
-
-  template<SectionValue T>
-  bool Section<T>::sameValue(const T& a, const T& b)
-  {
-    return Internal::SameJson([&](json_gen_str_t* gen) { a.ToJSON(gen, nullptr, true); }, [&](json_gen_str_t* gen) { b.ToJSON(gen, nullptr, true); });
-  }
 }  // namespace OpenShock::Config

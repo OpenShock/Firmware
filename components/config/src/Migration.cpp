@@ -4,6 +4,7 @@
 
 const char* const TAG = "ConfigMigration";
 
+#include "config/Nvs.h"
 #include "config/Section.h"
 #include "config/Store.h"
 #include "Logging.h"
@@ -13,7 +14,6 @@ const char* const TAG = "ConfigMigration";
 
 #include <esp_partition.h>
 #include <esp_system.h>
-#include <nvs.h>
 #include <nvs_flash.h>
 
 #include <cstring>
@@ -29,14 +29,9 @@ namespace {
 
   void dropWifiDriverStore()
   {
-    nvs_handle_t handle = 0;
-    if (nvs_open_from_partition("nvs", kWifiDriverNamespace, NVS_READWRITE, &handle) != ESP_OK) {
-      return;  // Not there: never written, or already dropped
+    if (Config::Nvs::EraseNamespace("nvs", kWifiDriverNamespace)) {
+      OS_LOGI(TAG, "Dropped the WiFi driver's stale NVS store (%s), if it had one", kWifiDriverNamespace);
     }
-    if (nvs_erase_all(handle) == ESP_OK && nvs_commit(handle) == ESP_OK) {
-      OS_LOGI(TAG, "Dropped the WiFi driver's stale NVS store (%s)", kWifiDriverNamespace);
-    }
-    nvs_close(handle);
   }
 }  // namespace
 

@@ -14,7 +14,6 @@ const char* const TAG = "Config";
 #include "json/Json.h"
 
 #include <esp_partition.h>
-#include <nvs_flash.h>
 
 #include <cstring>
 #include <optional>
@@ -37,11 +36,6 @@ static constexpr const char* kLegacyFilePath       = "/config";
 // Written by Init() alone, under the write lock, before anything else reads a section.
 static const char* s_partition = nullptr;
 
-const char* Config::Internal::Partition()
-{
-  return s_partition;
-}
-
 const char* Config::StorageLabel()
 {
   return s_partition;
@@ -53,23 +47,10 @@ const char* Config::StorageLabel()
 // A store marked by a newer firmware (a rollback) counts as filled: it is loaded best-effort, never refilled.
 static std::optional<bool> hasSchema(const char* partition)
 {
-  std::optional<Config::Nvs::Handle> handle;
-  switch (Config::Nvs::Handle::OpenRead(partition, kRootNamespace, handle)) {
-    case Config::Nvs::Result::Error:
-      return std::nullopt;
-    case Config::Nvs::Result::Missing:
-      return false;
-    case Config::Nvs::Result::Found:
-      break;
-  }
+  auto handle    = Config::Nvs::Handle::OpenForLoad(partition, kRootNamespace);
   uint8_t schema = 0;
-  switch (handle->GetU8(kSchemaKey, schema)) {
-    case Config::Nvs::Result::Error:
-      return std::nullopt;
-    case Config::Nvs::Result::Missing:
-      return false;
-    case Config::Nvs::Result::Found:
-      break;
+  if (!handle || !Config::Nvs::Load(*handle, kSchemaKey, schema, 0)) {
+    return std::nullopt;
   }
   if (schema < kSchemaVersion) {
     return false;
@@ -96,31 +77,6 @@ static std::vector<const char*> allNamespaces()
     }
   }
   return namespaces;
-}
-
-// Brings up `label` as an NVS partition. A partition with no free page is damaged or resized and is erased and
-// reformatted. One written in a newer NVS format is only erased when `eraseNewer`: the shared `nvs` regenerates
-// everything in it, but `cfg` in a newer format is a rollback, and the firmware rolled forward to must still find it.
-static bool initNvsPartition(const char* label, bool eraseNewer)
-{
-  esp_err_t err = nvs_flash_init_partition(label);
-  if (err == ESP_ERR_NVS_NEW_VERSION_FOUND && !eraseNewer) {
-    OS_LOGE(TAG, "NVS partition %s was written by a newer firmware; leaving it untouched", label);
-    return false;
-  }
-  if (err == ESP_ERR_NVS_NO_FREE_PAGES || err == ESP_ERR_NVS_NEW_VERSION_FOUND) {
-    OS_LOGW(TAG, "NVS partition %s unusable (%s), erasing and reformatting", label, esp_err_to_name(err));
-    if (nvs_flash_erase_partition(label) != ESP_OK) {
-      OS_LOGE(TAG, "Failed to erase NVS partition %s", label);
-      return false;
-    }
-    err = nvs_flash_init_partition(label);
-  }
-  if (err != ESP_OK) {
-    OS_LOGE(TAG, "Failed to initialize NVS partition %s: %s", label, esp_err_to_name(err));
-    return false;
-  }
-  return true;
 }
 
 static bool nvsPartitionExists(const char* label)
@@ -157,14 +113,14 @@ static const char* openStorage()
 {
   if (nvsPartitionExists(kPartitionCfg)) {
     clearLegacyLittlefs(kPartitionCfg);
-    if (initNvsPartition(kPartitionCfg, false)) {
+    if (Config::Nvs::InitPartition(kPartitionCfg, false)) {
       return kPartitionCfg;
     }
     // Never the shared nvs instead: what is saved there is discarded once cfg opens again
     OS_LOGE(TAG, "The cfg partition is unusable; running on defaults in RAM, nothing will be saved");
     return nullptr;
   }
-  if (nvsPartitionExists(kPartitionShared) && initNvsPartition(kPartitionShared, true)) {
+  if (nvsPartitionExists(kPartitionShared) && Config::Nvs::InitPartition(kPartitionShared, true)) {
     OS_LOGW(TAG, "No cfg partition (1.x partition layout): the config is kept in the shared nvs partition until the layout is migrated");
     return kPartitionShared;
   }
@@ -179,7 +135,7 @@ static const char* openStorage()
 // the copy failed.
 static const char* moveSharedIntoCfg()
 {
-  if (!nvsPartitionExists(kPartitionShared) || !initNvsPartition(kPartitionShared, true)) {
+  if (!nvsPartitionExists(kPartitionShared) || !Config::Nvs::InitPartition(kPartitionShared, true)) {
     return kPartitionCfg;
   }
   // Nothing is moved or erased on a read that failed: a shared copy that cannot be read is left for the next boot, and

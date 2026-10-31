@@ -40,15 +40,9 @@ RFConfig::RFConfig(gpio_num_t txPin, bool keepAliveEnabled)
 
 bool RFConfig::LoadNvs(const char* partition)
 {
-  std::optional<Nvs::Handle> handle;
-  switch (Nvs::Handle::OpenRead(partition, kNamespace, handle)) {
-    case Nvs::Result::Error:
-      return false;
-    case Nvs::Result::Missing:
-      *this = RFConfig();
-      return true;
-    case Nvs::Result::Found:
-      break;
+  auto handle = Nvs::Handle::OpenForLoad(partition, kNamespace);
+  if (!handle) {
+    return false;
   }
 
   const int8_t boardPin = static_cast<int8_t>(Board::Get().rfTxGpio);
@@ -71,9 +65,7 @@ bool RFConfig::SaveNvs(const char* partition, const RFConfig* previous) const
   if (!handle) {
     return false;
   }
-  const int8_t pin     = static_cast<int8_t>(txPin);
-  const int8_t prevPin = previous != nullptr ? static_cast<int8_t>(previous->txPin) : 0;
-  return handle->SetI8(kKeyTxPin, pin, previous != nullptr ? &prevPin : nullptr) && handle->SetBool(kKeyKeepAlive, keepAliveEnabled, previous != nullptr ? &previous->keepAliveEnabled : nullptr) && handle->Commit();
+  return Nvs::Saver(*handle, *this, previous).Set<int8_t>(kKeyTxPin, &RFConfig::txPin).Set(kKeyKeepAlive, &RFConfig::keepAliveEnabled).Commit();
 }
 
 bool RFConfig::FromJSON(JSON::JsonView json)

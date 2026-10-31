@@ -150,15 +150,9 @@ void OtaUpdateConfig::Normalize()
 
 bool OtaUpdateConfig::LoadNvs(const char* partition)
 {
-  std::optional<Nvs::Handle> handle;
-  switch (Nvs::Handle::OpenRead(partition, kNamespace, handle)) {
-    case Nvs::Result::Error:
-      return false;
-    case Nvs::Result::Missing:
-      *this = OtaUpdateConfig();
-      return true;
-    case Nvs::Result::Found:
-      break;
+  auto handle = Nvs::Handle::OpenForLoad(partition, kNamespace);
+  if (!handle) {
+    return false;
   }
 
   uint8_t channel = std::to_underlying(OtaUpdateChannel::Stable);
@@ -181,16 +175,18 @@ bool OtaUpdateConfig::SaveNvs(const char* partition, const OtaUpdateConfig* prev
   if (!handle) {
     return false;
   }
-  const uint8_t channel     = std::to_underlying(updateChannel);
-  const uint8_t step        = std::to_underlying(updateStep);
-  const uint8_t prevChannel = previous != nullptr ? std::to_underlying(previous->updateChannel) : 0;
-  const uint8_t prevStep    = previous != nullptr ? std::to_underlying(previous->updateStep) : 0;
-  const bool p              = previous != nullptr;
-  return handle->SetBool(kKeyEnabled, isEnabled, p ? &previous->isEnabled : nullptr) && handle->SetStr(kKeyDomain, cdnDomain, p ? &previous->cdnDomain : nullptr) && handle->SetU8(kKeyChannel, channel, p ? &prevChannel : nullptr)
-      && handle->SetBool(kKeyCheckBoot, checkOnStartup, p ? &previous->checkOnStartup : nullptr) && handle->SetBool(kKeyCheckPeriod, checkPeriodically, p ? &previous->checkPeriodically : nullptr)
-      && handle->SetU16(kKeyCheckMin, checkInterval, p ? &previous->checkInterval : nullptr) && handle->SetBool(kKeyBackendMgmt, allowBackendManagement, p ? &previous->allowBackendManagement : nullptr)
-      && handle->SetBool(kKeyManual, requireManualApproval, p ? &previous->requireManualApproval : nullptr) && handle->SetI32(kKeyUpdateId, updateId, p ? &previous->updateId : nullptr) && handle->SetU8(kKeyStep, step, p ? &prevStep : nullptr)
-      && handle->Commit();
+  return Nvs::Saver(*handle, *this, previous)
+    .Set(kKeyEnabled, &OtaUpdateConfig::isEnabled)
+    .Set(kKeyDomain, &OtaUpdateConfig::cdnDomain)
+    .Set<uint8_t>(kKeyChannel, &OtaUpdateConfig::updateChannel)
+    .Set(kKeyCheckBoot, &OtaUpdateConfig::checkOnStartup)
+    .Set(kKeyCheckPeriod, &OtaUpdateConfig::checkPeriodically)
+    .Set(kKeyCheckMin, &OtaUpdateConfig::checkInterval)
+    .Set(kKeyBackendMgmt, &OtaUpdateConfig::allowBackendManagement)
+    .Set(kKeyManual, &OtaUpdateConfig::requireManualApproval)
+    .Set(kKeyUpdateId, &OtaUpdateConfig::updateId)
+    .Set<uint8_t>(kKeyStep, &OtaUpdateConfig::updateStep)
+    .Commit();
 }
 
 std::optional<OtaUpdateConfig> OpenShock::Config::GetOtaUpdateConfig()

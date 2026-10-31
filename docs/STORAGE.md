@@ -47,9 +47,9 @@ To add a section, define a value type whose default constructor is the defaults,
 run on every value the section takes in), `LoadNvs`, `SaveNvs`, `FromJSON`, `ToJSON` and `ToFlatbuffers`, and one
 `Config::Section<T>` for it in the module (the `SectionValue` concept in `config/Section.h` is the contract). It
 joins `jsonconfig`, `rawconfig`, the local protocol's Ready message and factory reset through the section registry.
-A load must tell a namespace that was never written (defaults) from one that failed to open (a failed load) with
-`Nvs::Handle::OpenRead`; a failed load runs the section on its defaults without trusting flash, a defaults load is
-taken as what flash holds.
+A load opens its namespace with `Nvs::Handle::OpenForLoad`: a namespace never written reads every key as its
+default, an open that failed fails the load, and a failed load runs the section on its defaults without trusting
+flash. A save goes through `Nvs::Saver`, which writes only the members that differ from the previous value.
 
 Where the store is:
 
