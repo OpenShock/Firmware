@@ -345,7 +345,8 @@ static void InitializeClient()
     return;  // Checked here so an auth hold-off doesn't also count as a hub info failure and stack the two backoffs
   }
 
-  if (!FetchHubInfo(Config::GetBackendAuthToken())) {
+  const std::string authToken = Config::GetBackendAuthToken();
+  if (!FetchHubInfo(authToken)) {
     // Back off on failure so an unreachable backend isn't polled on every update tick.
     s_hubInfoBackoff.backOff(OpenShock::millis());
     return;
@@ -363,7 +364,7 @@ static void InitializeClient()
     }
 
     s_flags.fetch_or(FLAG_LINKED, std::memory_order_relaxed);
-    s_wsClient = std::make_shared<OpenShock::GatewayClient>(*authToken);
+    s_wsClient = std::make_shared<OpenShock::GatewayClient>(authToken);
   }
   OS_LOGD(TAG, "Successfully verified auth token");
 

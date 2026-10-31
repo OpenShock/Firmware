@@ -221,7 +221,7 @@ bool EStopManager::Init()
     return false;
   }
 
-  s_estopPin = cfg->gpioPin;
+  s_estopPin = cfg.gpioPin;
 
   return estopmgr_taskStart();
 }
