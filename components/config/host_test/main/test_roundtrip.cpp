@@ -258,7 +258,7 @@ TEST_CASE("jsonconfig set decodes \\u escapes", "[config][roundtrip][json]")
 {
   InitDefault();
   // Escaped on purpose (a BMP code point, a surrogate pair, an escaped ASCII hyphen): the decoder is what is under test
-  TEST_ASSERT_TRUE(Config::SaveFromJSON(R"({"wifi":{"hostname":"hub-1","credentials":[{"id":1,"ssid":"Café 😀","password":"a\tb"}]}})"));
+  TEST_ASSERT_TRUE(Config::SaveFromJSON(R"({"wifi":{"hostname":"hub\u002d1","credentials":[{"id":1,"ssid":"Caf\u00e9 \ud83d\ude00","password":"a\tb"}]}})"));
 
   Reload();  // UTF-8 and control characters survive the store too
   auto wifi = Config::GetWiFiConfig();
