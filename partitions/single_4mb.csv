@@ -1,0 +1,9 @@
+# CURRENTLY NOT USED - KEPT FOR REFERENCE
+# OpenShock 4MB Partition Table - without OTA
+# Name,   Type, SubType,  Offset,   Size,     Flags
+# nvs,      data, nvs,      0x009000, 0x005000,
+# otadata,  data, ota,      0x00e000, 0x002000,
+# app0,     app,  ota_0,    0x010000, 0x340000,
+# config,   data, spiffs,   0x350000, 0x003000,
+# static0,  data, spiffs,   0x353000, 0x09D000,
+# coredump, data, coredump, 0x3F0000, 0x010000,

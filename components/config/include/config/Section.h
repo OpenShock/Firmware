@@ -2,10 +2,12 @@
 
 // A config section: one module's settings, owned and defined by that module, kept in NVS through this framework.
 //
-// The module defines a value type T and one Section<T> object for it (a namespace-scope static in its own .cpp):
+// The module defines a value type T meeting SectionValue (below) and one Section<T> object for it (a namespace-scope
+// static in its own .cpp):
 //
 //   struct RFConfig {
-//     void ToDefault();
+//     RFConfig();                                                       // the defaults, defined nowhere else
+//     void Normalize();                                                 // validation, run on every value taken in
 //     bool LoadNvs(const char* partition);                              // missing keys are defaults
 //     bool SaveNvs(const char* partition, const RFConfig* previous) const;  // writes only what differs
 //     bool FromJSON(JSON::JsonView json);                               // invalid view: defaults
@@ -19,19 +21,22 @@
 // needs to know T's fields or keys; this framework only sees the section through SectionBase.
 //
 // The section caches its value in RAM: readers copy it out under a short lock and never wait on flash. Writers are
-// serialized across every section (one write lock), save what changed, and only then publish the new value, so a
-// failed write leaves the running value identical to what is on flash.
+// serialized across every section (one write lock), save what changed, and only then publish the new value. NVS writes
+// land key by key, so a failed save can leave some of them on flash; the section then no longer trusts its cache as a
+// picture of flash, and its next save rewrites every key. A section that failed to load is treated the same way.
 //
 // Every section links itself into one registry when it is constructed (static initialization), which is how the
 // framework loads all of them at boot, renders the whole config as JSON (jsonconfig), imports one, and resets them
 // (factory reset). Sections never die; the registry is a constant-initialized intrusive list.
 
+#include "config/Store.h"
 #include "OpenShock.h"
 #include "SimpleMutex.h"
 #include "util/FunctionRef.h"
 
 #include <json_generator.h>
 
+#include <concepts>
 #include <cstdint>
 #include <optional>
 #include <span>
@@ -84,14 +89,28 @@ namespace OpenShock::Config {
     SectionBase* m_next;
   };
 
+  /// @brief What a section's value type provides; no base class, checked where its Section is defined. A default
+  ///        constructed value is the defaults. Normalize() is the type's validation: the section runs it on every value
+  ///        it takes in (load, update, import, reset), so no setter can skip it.
+  template<typename T>
+  concept SectionValue = std::default_initializable<T> && std::copyable<T> && requires(T& value, const T& constValue, const char* partition, json_gen_str_t* gen, flatbuffers::FlatBufferBuilder& builder, bool withSensitiveData) {
+    { value.Normalize() } -> std::same_as<void>;
+    { value.LoadNvs(partition) } -> std::same_as<bool>;
+    { constValue.SaveNvs(partition, &constValue) } -> std::same_as<bool>;
+    { &T::FromJSON } -> std::same_as<bool (T::*)(JSON::JsonView)>;  // JsonView may be incomplete here
+    { constValue.ToJSON(gen, "name", withSensitiveData) } -> std::same_as<void>;
+    { constValue.ToFlatbuffers(builder, withSensitiveData).o } -> std::convertible_to<uint32_t>;
+  };
+
   namespace Internal {
     /// @brief Serializes every writer of every section, the store's own operations included.
     SimpleMutex& WriteLock();
-    /// @brief The partition the store uses ("cfg"; "nvs" on the 1.x layout), or null when the config only lives in RAM.
-    const char* Partition();
+    bool EraseNamespaces(const char* partition, std::span<const char* const> namespaces);
+    /// @brief Whether two values render the same JSON, secrets included: the complete, canonical comparison.
+    bool SameJson(Util::FunctionRef<void(json_gen_str_t*)> renderA, Util::FunctionRef<void(json_gen_str_t*)> renderB);
   }  // namespace Internal
 
-  template<typename T>
+  template<SectionValue T>
   class Section final : public SectionBase {
   public:
     explicit Section(const SectionInfo& info)
@@ -129,7 +148,7 @@ namespace OpenShock::Config {
     /// @brief Read-modify-write that no other writer can interleave with. `mutate` edits a copy of the current value
     ///        and returns whether it changed anything; a changed copy is saved (the keys that differ) and only then
     ///        published. It runs under the write lock: keep it to plain field updates.
-    /// @return False only when saving failed, in which case the value is unchanged.
+    /// @return False only when saving failed, in which case the running value is unchanged.
     bool Update(Util::FunctionRef<bool(T&)> mutate)
     {
       ScopedLock lock__(&Internal::WriteLock());
@@ -137,7 +156,8 @@ namespace OpenShock::Config {
       if (!mutate(updated)) {
         return true;
       }
-      if (!save(updated, &m_value)) {
+      updated.Normalize();
+      if (!save(updated)) {
         return false;
       }
       publish(std::move(updated));
@@ -147,30 +167,31 @@ namespace OpenShock::Config {
     bool Load(const char* partition) override
     {
       T loaded;
-      bool ok = loaded.LoadNvs(partition);
+      bool ok = loadNvs(loaded, partition);
       if (!ok) {
-        loaded.ToDefault();
+        loaded = defaults();
       }
+      m_unsynced = !ok;
       publish(std::move(loaded));
       return ok;
     }
 
     bool Reset(const char* partition) override
     {
-      T defaults;
-      defaults.ToDefault();
+      T value = defaults();
       bool ok = true;
       if (partition != nullptr) {
-        ok = eraseNamespaces(partition) && defaults.SaveNvs(partition, nullptr);
+        ok = Internal::EraseNamespaces(partition, Info().namespaces) && value.SaveNvs(partition, nullptr);
       }
-      publish(std::move(defaults));  // What the hub runs with either way; a failed save only means it isn't kept
+      m_unsynced = !ok;
+      publish(std::move(value));  // What the hub runs with either way; a failed save only means it isn't kept
       return ok;
     }
 
     bool VerifyStored(const char* partition) const override
     {
       T stored;
-      return stored.LoadNvs(partition) && sameValue(stored, Get());
+      return loadNvs(stored, partition) && sameValue(stored, Get());
     }
 
     void ToJSON(json_gen_str_t* gen, bool withSensitiveData) const override
@@ -185,6 +206,7 @@ namespace OpenShock::Config {
       if (!staged.FromJSON(json)) {
         return false;
       }
+      staged.Normalize();
       m_staged.emplace(std::move(staged));
       return true;
     }
@@ -194,7 +216,8 @@ namespace OpenShock::Config {
       if (!m_staged) {
         return true;
       }
-      bool ok = partition == nullptr || m_staged->SaveNvs(partition, full ? nullptr : &m_value);
+      bool ok    = partition == nullptr || m_staged->SaveNvs(partition, full || m_unsynced ? nullptr : &m_value);
+      m_unsynced = !ok;
       if (ok) {
         publish(std::move(*m_staged));
       }
@@ -211,10 +234,32 @@ namespace OpenShock::Config {
     }
 
   private:
-    bool save(const T& value, const T* previous) const
+    /// @brief The defaults as the section runs them: default constructed, then normalized like every other value.
+    static T defaults()
     {
-      const char* partition = Internal::Partition();
-      return partition == nullptr || value.SaveNvs(partition, previous);
+      T value;
+      value.Normalize();
+      return value;
+    }
+
+    static bool loadNvs(T& value, const char* partition)
+    {
+      if (!value.LoadNvs(partition)) {
+        return false;
+      }
+      value.Normalize();
+      return true;
+    }
+
+    // Only the keys that differ from the cache, or every key when flash may not match it
+    bool save(const T& value)
+    {
+      const char* partition = StorageLabel();
+      if (partition == nullptr) {
+        return true;
+      }
+      m_unsynced = !value.SaveNvs(partition, m_unsynced ? nullptr : &m_value);
+      return !m_unsynced;
     }
 
     void publish(T&& value)
@@ -223,29 +268,15 @@ namespace OpenShock::Config {
       m_value = std::move(value);
     }
 
-    bool eraseNamespaces(const char* partition) const;
-    static bool sameValue(const T& a, const T& b);
+    static bool sameValue(const T& a, const T& b)
+    {
+      return Internal::SameJson([&](json_gen_str_t* gen) { a.ToJSON(gen, nullptr, true); }, [&](json_gen_str_t* gen) { b.ToJSON(gen, nullptr, true); });
+    }
 
     mutable SimpleMutex m_dataMutex;
     T m_value;
     std::optional<T> m_staged;  // Only touched under the write lock
+    bool m_unsynced = false;    // Flash may differ from m_value, so the next save writes every key. Write lock only.
   };
 
-  namespace Internal {
-    bool EraseNamespaces(const char* partition, std::span<const char* const> namespaces);
-    /// @brief Whether two values render the same JSON, secrets included: the complete, canonical comparison.
-    bool SameJson(Util::FunctionRef<void(json_gen_str_t*)> renderA, Util::FunctionRef<void(json_gen_str_t*)> renderB);
-  }  // namespace Internal
-
-  template<typename T>
-  bool Section<T>::eraseNamespaces(const char* partition) const
-  {
-    return Internal::EraseNamespaces(partition, Info().namespaces);
-  }
-
-  template<typename T>
-  bool Section<T>::sameValue(const T& a, const T& b)
-  {
-    return Internal::SameJson([&](json_gen_str_t* gen) { a.ToJSON(gen, nullptr, true); }, [&](json_gen_str_t* gen) { b.ToJSON(gen, nullptr, true); });
-  }
 }  // namespace OpenShock::Config

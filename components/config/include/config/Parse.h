@@ -15,6 +15,27 @@
 #include <vector>
 
 namespace OpenShock::Config::Parse {
+  namespace Internal {
+    std::optional<bool> CheckObject(JSON::JsonView json, const char* tag);
+  }
+
+  /// @brief The start of every section's FromJSON. A null view means the section was given no value: `self` becomes
+  ///        the defaults and the result is true. Anything but an object is refused: false. An object is nullopt, and
+  ///        the fields are parsed. `if (auto done = Parse::ObjectOrDefault(*this, json, TAG)) return *done;`
+  template<typename T>
+  [[nodiscard]] std::optional<bool> ObjectOrDefault(T& self, JSON::JsonView json, const char* tag)
+  {
+    std::optional<bool> done = Internal::CheckObject(json, tag);
+    if (done == true) {
+      self = T();
+    }
+    return done;
+  }
+
+  /// @brief A boolean field. Absent: `out` is `defaultVal` and the result is true. Present but not a boolean: false,
+  ///        the document is refused, since taking the default for it would store that over what the hub has.
+  bool JsonBool(bool& out, JSON::JsonView json, std::string_view name, bool defaultVal, const char* tag);
+
   // Accepts GPIO_NUM_NC (-1, "no pin") or any GPIO number valid on this chip; used for every stored/imported pin.
   [[nodiscard]] std::optional<gpio_num_t> GpioNum(int32_t intVal);
 

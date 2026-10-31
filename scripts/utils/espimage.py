@@ -37,9 +37,6 @@ SEGMENT_HEADER_LEN = 8
 CHECKSUM_INIT = 0xEF
 DIGEST_LEN = 32
 
-FLASH_SIZE_OFFSET = 0x03  # high nibble: esp_image_flash_size_t (low nibble: SPI speed)
-FLASH_SIZE_CODES = {'1MB': 0, '2MB': 1, '4MB': 2, '8MB': 3, '16MB': 4, '32MB': 5, '64MB': 6, '128MB': 7}
-
 APP_DESC_OFFSET = 0x20
 APP_DESC_MAGIC = 0xABCD5432
 APP_DESC_LEN = 256
@@ -174,30 +171,6 @@ class Image:
 
     def descriptor_bytes(self) -> bytes:
         return self.data[DESC_OFFSET : DESC_OFFSET + DESC_LEN]
-
-    @property
-    def flash_size(self) -> str | None:
-        """The flash size the header declares, e.g. '8MB', or None for a code esptool has no name for."""
-        code = self.data[FLASH_SIZE_OFFSET] >> 4
-        return next((name for name, c in FLASH_SIZE_CODES.items() if c == code), None)
-
-    def with_flash_size(self, size: str) -> 'Image':
-        """A copy whose header declares `size` ('4MB', '8MB', ...), the digest recomputed.
-
-        The ROM and the second-stage bootloader size the flash from the bootloader image's header, not from the
-        chip, and refuse any partition past it; the app then clamps itself to the same size. A variant compiles
-        at one size, so each board's bootloader gets its own size stamped here. The header is not covered by the
-        segment checksum, so only the appended digest changes.
-        """
-        if size not in FLASH_SIZE_CODES:
-            raise ValueError(f'unknown flash size {size!r}; one of {", ".join(FLASH_SIZE_CODES)}')
-        data = bytearray(self.data)
-        data[FLASH_SIZE_OFFSET] = (data[FLASH_SIZE_OFFSET] & 0x0F) | (FLASH_SIZE_CODES[size] << 4)
-        if self.hash_appended:
-            data[self.digest_offset :] = replace(self, data=bytes(data)).digest()
-        patched = parse(bytes(data))
-        patched.verify()
-        return patched
 
     def patch(self, offset: int, replacement: bytes) -> 'Image':
         """A copy with `replacement` written at `offset` and the checksum and digest recomputed.

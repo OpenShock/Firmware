@@ -219,18 +219,14 @@ bool CommandHandler::Init()
   }
   initialized = true;
 
-  auto rfConfig = Config::GetRFConfig();
-  if (!rfConfig) {
-    OS_LOGE(TAG, "Failed to get RF config");
-    return false;
-  }
+  const Config::RFConfig rfConfig = Config::GetRFConfig();
 
   // Runs through E-Stops too; the task itself sends nothing while e-stopped
-  if (rfConfig->keepAliveEnabled) {
+  if (rfConfig.keepAliveEnabled) {
     internalSetKeepAliveEnabled(true);
   }
 
-  gpio_num_t txPin = rfConfig->txPin;
+  gpio_num_t txPin = rfConfig.txPin;
   if (!OpenShock::IsValidOutputPin(txPin)) {
     const int8_t boardTxPin = Board::Get().rfTxGpio;
     if (!OpenShock::IsValidOutputPin(boardTxPin)) {
@@ -270,11 +266,8 @@ SetGPIOResultCode CommandHandler::SetRfTxPin(gpio_num_t txPin)
 
   // Driving the E-Stop input as the RF output would defeat the kill switch. Checked against the configured pin even
   // while the E-Stop is disabled, so enabling it later can't collide either.
-  auto estopPin = Config::GetEStopGpioPin();
-  if (!estopPin) {
-    return SetGPIOResultCode::InternalError;
-  }
-  if (*estopPin != GPIO_NUM_NC && txPin == *estopPin) {
+  const gpio_num_t estopPin = Config::GetEStopGpioPin();
+  if (estopPin != GPIO_NUM_NC && txPin == estopPin) {
     return SetGPIOResultCode::PinInUse;
   }
 
@@ -332,13 +325,7 @@ gpio_num_t CommandHandler::GetRfTxPin()
     return transmitter->GetTxPin();
   }
 
-  auto txPin = Config::GetRFConfigTxPin();
-  if (!txPin) {
-    OS_LOGE(TAG, "Failed to get RF TX pin from config");
-    return static_cast<gpio_num_t>(OPENSHOCK_GPIO_INVALID);
-  }
-
-  return *txPin;
+  return Config::GetRFConfigTxPin();
 }
 
 bool CommandHandler::HandleCommand(ShockerModelType model, uint16_t shockerId, ShockerCommandType type, uint8_t intensity, uint16_t durationMs)

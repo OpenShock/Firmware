@@ -21,9 +21,7 @@ from utils.gha import env, error, fail, require_env, set_output, warn
 VALID_MODES = ('init', 'publish', 'abort')
 
 # Server field name -> the artifact it carries.
-# app and staticfs are what an OTA update needs (partitions too, once, for the 1.x -> 2.x layout migration); the rest
-# are for the flashtool, which writes a whole chip rather than updating one. The `staticfs` field keeps its name on the
-# server API although it now carries the flat `www` image (www.bin) rather than a littlefs image.
+# app and staticfs are what an OTA update needs; the rest are for the flashtool, which writes a whole chip rather than updating one.
 # The manifest keys and the file field names come from this one table, so they cannot drift apart.
 BUILD_ARTIFACTS = {
     'app': 'app.bin',
@@ -33,16 +31,15 @@ BUILD_ARTIFACTS = {
 STATICFS_FIELD = 'staticfs'
 # What the staticfs field carries: a 1.x-numbered release (the 1.9.x pivot) is installed by 1.x firmware, whose OTA
 # flashes staticfs into its littlefs static0 partition and checks it by mounting it, so it gets the littlefs image;
-# every later release gets the flat www image. The build-staticfs action builds the littlefs one for 1.x versions only.
+# every later release gets the flat www image. The build-staticfs action builds both.
 STATICFS_FILE = 'www.bin'
 STATICFS_FILE_1X = 'staticfs.bin'
+MERGED_FIELD = 'merged'
 
 
 def staticfs_file_for(version: str) -> str:
     return STATICFS_FILE_1X if version.split('.', 1)[0] == '1' else STATICFS_FILE
 
-
-MERGED_FIELD = 'merged'
 
 UPLOAD_RETRIES = 3
 UPLOAD_BACKOFF_SECONDS = 5

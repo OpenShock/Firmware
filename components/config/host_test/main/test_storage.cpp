@@ -57,7 +57,7 @@ TEST_CASE("A config kept in the shared nvs moves into cfg on the first boot that
   // The shared copy is gone: every key of every namespace of ours (NVS keeps an emptied namespace's name)
   TEST_ASSERT_FALSE(HasSchema(Keys::kPartitionShared));
   for (const char* ns : Keys::Ns::kAll) {
-    TEST_ASSERT_EQUAL_size_t_MESSAGE(0, Nvs::KeyCount(Keys::kPartitionShared, ns), ns);
+    TEST_ASSERT_EQUAL_size_t_MESSAGE(0, KeyCount(Keys::kPartitionShared, ns), ns);
   }
 
   // And a later boot is a plain load from cfg
@@ -117,6 +117,24 @@ TEST_CASE("A config in cfg wins over a stale copy in the shared nvs, which is cl
   Reload();
   AssertConfigEqual(MakeSampleConfig(), Snapshot());
   TEST_ASSERT_FALSE(HasSchema(Keys::kPartitionShared));
+}
+
+TEST_CASE("A cleanup of the shared copy cut short is finished on the next boot", "[config][storage]")
+{
+  // The shared copy is erased section by section with `root` last: a power cut mid-way leaves the schema marker,
+  // which is what makes the next boot look at the shared partition again. Here the cut came after two sections.
+  InitWith(MakeSampleConfig());
+  StoreInShared(MakeSampleConfig());
+  TEST_ASSERT_TRUE(Nvs::EraseNamespace(Keys::kPartitionShared, Keys::Ns::kOta));
+  TEST_ASSERT_TRUE(Nvs::EraseNamespace(Keys::kPartitionShared, Keys::Ns::kSerial));
+  TEST_ASSERT_TRUE(HasSchema(Keys::kPartitionShared));
+
+  Reload();
+  AssertConfigEqual(MakeSampleConfig(), Snapshot());
+  TEST_ASSERT_FALSE(HasSchema(Keys::kPartitionShared));
+  for (const char* ns : Keys::Ns::kAll) {
+    TEST_ASSERT_EQUAL_size_t_MESSAGE(0, KeyCount(Keys::kPartitionShared, ns), ns);
+  }
 }
 
 TEST_CASE("The move is idempotent and verified", "[config][storage]")

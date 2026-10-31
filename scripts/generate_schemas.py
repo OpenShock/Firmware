@@ -18,10 +18,6 @@ SCHEMAS_DIR = ROOT / 'schemas'
 TS_OUTPUT = ROOT / 'frontend' / 'src' / 'lib' / '_fbs'
 CPP_OUTPUT = ROOT / 'components' / 'serialization' / 'include' / 'serialization' / '_fbs'
 
-# The frontend only speaks the local (captive portal) protocol and reads the config; the gateway messages are the
-# backend's, so no TypeScript is generated for them.
-TS_EXCLUDED = ('GatewayToHubMessage.fbs', 'HubToGatewayMessage.fbs')
-
 TS_ARGS = [
     # Compile for TypeScript.
     '--ts',
@@ -113,8 +109,7 @@ def main() -> int:
     if not schema_files:
         raise SystemExit(f'error: no .fbs schemas found in {SCHEMAS_DIR}')
 
-    ts_schema_files = [f for f in schema_files if Path(f).name not in TS_EXCLUDED]
-    generate(flatc, TS_ARGS, ts_schema_files, TS_OUTPUT, 'TypeScript')
+    generate(flatc, TS_ARGS, schema_files, TS_OUTPUT, 'TypeScript')
     generate(flatc, CPP_ARGS, schema_files, CPP_OUTPUT, 'C++')
     return 0
 

@@ -1,351 +1,239 @@
-// The parser and the invariant checker against every table in partitions/ and a corpus of broken ones: the
-// design's "a test feeds the checker every table ever shipped plus deliberately broken ones".
+// The parser and the in-place retype against the 1.x table every fielded hub carries and a corpus of broken copies.
 #include "unity.h"
 
-#include "Md5.h"
+#include "Hashing.h"
 #include "partition_layout/PartitionTable.h"
 
-#include <cstdio>
 #include <cstring>
-#include <string>
 #include <vector>
 
 using namespace OpenShock;
 namespace PT = OpenShock::PartitionTable;
 
 namespace {
-  constexpr uint32_t kMiB = 1024 * 1024;
-
-  std::vector<uint8_t> ReadFixture(const char* name)
-  {
-    std::string path = std::string(PT_FIXTURE_DIR) + "/" + name;
-    FILE* f          = fopen(path.c_str(), "rb");
-    TEST_ASSERT_NOT_NULL_MESSAGE(f, path.c_str());
-    std::vector<uint8_t> data(PT::kMaxLen);
-    std::size_t n = fread(data.data(), 1, data.size(), f);
-    fclose(f);
-    TEST_ASSERT_EQUAL_size_t(PT::kMaxLen, n);
-    return data;
-  }
-
-  std::vector<uint8_t> V1()
-  {
-    return ReadFixture("ota_4mb_v1.bin");
-  }
-  std::vector<uint8_t> V2_4MB()
-  {
-    return ReadFixture("ota_4mb.bin");
-  }
-
-  PT::Table ParseOk(const std::vector<uint8_t>& bytes)
-  {
-    auto table = PT::Parse(bytes);
-    TEST_ASSERT_TRUE_MESSAGE(table.has_value(), table ? "" : PT::ParseErrorName(table.error()));
-    return *table;
-  }
-
-  void ExpectParseError(const std::vector<uint8_t>& bytes, PT::ParseError expected)
-  {
-    auto table = PT::Parse(bytes);
-    TEST_ASSERT_FALSE_MESSAGE(table.has_value(), "parsed a broken table");
-    TEST_ASSERT_EQUAL_STRING(PT::ParseErrorName(expected), PT::ParseErrorName(table.error()));
-  }
-
-  // Re-seals a table after an entry was edited, so the test exercises the invariant and not the MD5.
-  void Reseal(std::vector<uint8_t>& bytes)
-  {
-    std::size_t pos = 0;
-    while (pos + PT::kEntrySize <= bytes.size() && (bytes[pos] | (bytes[pos + 1] << 8)) == PT::kMagic) {
-      pos += PT::kEntrySize;
-    }
-    TEST_ASSERT_EQUAL_UINT16(PT::kMd5Magic, bytes[pos] | (bytes[pos + 1] << 8));
-    uint8_t digest[16];
-    PT::Internal::Md5(bytes.data(), pos, digest);
-    memcpy(bytes.data() + pos + 16, digest, 16);
-  }
-
-  std::size_t EntryPos(const std::vector<uint8_t>& bytes, const char* label)
-  {
-    for (std::size_t pos = 0; pos + PT::kEntrySize <= bytes.size(); pos += PT::kEntrySize) {
-      if ((bytes[pos] | (bytes[pos + 1] << 8)) != PT::kMagic) {
-        break;
-      }
-      if (strncmp(reinterpret_cast<const char*>(bytes.data() + pos + 12), label, PT::kLabelSize) == 0) {
-        return pos;
-      }
-    }
-    TEST_FAIL_MESSAGE(label);
-    return 0;
-  }
-
-  void Put32(std::vector<uint8_t>& bytes, std::size_t at, uint32_t value)
-  {
-    for (int i = 0; i < 4; ++i) bytes[at + i] = static_cast<uint8_t>(value >> (8 * i));
-  }
-  void SetOffset(std::vector<uint8_t>& bytes, const char* label, uint32_t offset)
-  {
-    Put32(bytes, EntryPos(bytes, label) + 4, offset);
-    Reseal(bytes);
-  }
-  void SetSize(std::vector<uint8_t>& bytes, const char* label, uint32_t size)
-  {
-    Put32(bytes, EntryPos(bytes, label) + 8, size);
-    Reseal(bytes);
-  }
-  void SetSubtype(std::vector<uint8_t>& bytes, const char* label, uint8_t subtype)
-  {
-    bytes[EntryPos(bytes, label) + 3] = subtype;
-    Reseal(bytes);
-  }
-  void SetLabel(std::vector<uint8_t>& bytes, const char* label, const char* replacement)
-  {
-    std::size_t pos = EntryPos(bytes, label);
-    memset(bytes.data() + pos + 12, 0, PT::kLabelSize);
-    memcpy(bytes.data() + pos + 12, replacement, strlen(replacement));
-    Reseal(bytes);
-  }
-
-  // A 1.9.9 image of 1.2 MB running from app0 on a 4 MB chip whose bootloader says 4 MB, with the v1 table live.
-  struct Scenario {
-    PT::Table live;
-    PT::Context context;
-    explicit Scenario(uint32_t flashMiB = 4, uint32_t bootloaderMiB = 4, uint32_t runningOffset = PT::kApp0Offset)
-      : live(ParseOk(V1()))
-      , context {flashMiB * kMiB, bootloaderMiB * kMiB, runningOffset, 1200 * 1024, &live}
-    {
-    }
+  struct Row {
+    const char* label;
+    uint8_t type;
+    uint8_t subtype;
+    uint32_t offset;
+    uint32_t size;
   };
 
-  void ExpectViolation(const std::vector<uint8_t>& staged, const PT::Context& context, PT::Violation expected)
+  // partitions/legacy/ota_4mb_v1.csv
+  const std::vector<Row> kV1 = {
+    {     "nvs", PT::kTypeData,    PT::kSubtypeDataNvs, 0x009000, 0x005000},
+    { "otadata", PT::kTypeData,                   0x00, 0x00E000, 0x002000},
+    {    "app0",  PT::kTypeApp,                   0x10, 0x010000, 0x1A0000},
+    {    "app1",  PT::kTypeApp,                   0x11, 0x1B0000, 0x1A0000},
+    {  "config", PT::kTypeData, PT::kSubtypeDataSpiffs, 0x350000, 0x003000},
+    { "static0", PT::kTypeData, PT::kSubtypeDataSpiffs, 0x353000, 0x09D000},
+    {"coredump", PT::kTypeData,                   0x03, 0x3F0000, 0x010000},
+  };
+
+  void Put32(uint8_t* p, uint32_t value)
   {
-    auto result = PT::Validate(ParseOk(staged), context);
-    TEST_ASSERT_FALSE_MESSAGE(result.has_value(), "a bad table validated");
-    TEST_ASSERT_EQUAL_STRING(PT::ViolationName(expected), PT::ViolationName(result.error()));
+    for (int i = 0; i < 4; ++i) p[i] = static_cast<uint8_t>(value >> (8 * i));
   }
 
-  void ExpectValid(const std::vector<uint8_t>& staged, const PT::Context& context)
+  // The bytes gen_esp32part.py writes for `rows`: the entries, the MD5 entry, 0xFF to the end.
+  PT::Bytes Build(const std::vector<Row>& rows)
   {
-    auto result = PT::Validate(ParseOk(staged), context);
-    TEST_ASSERT_TRUE_MESSAGE(result.has_value(), result ? "" : PT::ViolationName(result.error()));
+    PT::Bytes bytes;
+    bytes.fill(0xFF);
+    std::size_t pos = 0;
+    for (const Row& row : rows) {
+      uint8_t* p = bytes.data() + pos;
+      p[0]       = PT::kMagic & 0xFF;
+      p[1]       = PT::kMagic >> 8;
+      p[2]       = row.type;
+      p[3]       = row.subtype;
+      Put32(p + 4, row.offset);
+      Put32(p + 8, row.size);
+      memset(p + 12, 0, PT::kLabelSize);
+      memcpy(p + 12, row.label, strlen(row.label));
+      Put32(p + 28, 0);
+      pos += PT::kEntrySize;
+    }
+    bytes[pos]     = PT::kMd5Magic & 0xFF;
+    bytes[pos + 1] = PT::kMd5Magic >> 8;
+    MD5::Digest digest {};
+    TEST_ASSERT_TRUE(MD5::compute(bytes.data(), pos, digest));
+    memcpy(bytes.data() + pos + 16, digest.data(), digest.size());
+    return bytes;
+  }
+
+  PT::Table ParseOk(std::span<const uint8_t> bytes)
+  {
+    PT::Table table {};
+    auto result = PT::Parse(bytes, table);
+    TEST_ASSERT_TRUE_MESSAGE(result.has_value(), result ? "" : PT::ParseErrorName(result.error()));
+    return table;
+  }
+
+  void ExpectParseError(std::span<const uint8_t> bytes, PT::ParseError expected)
+  {
+    PT::Table table {};
+    auto result = PT::Parse(bytes, table);
+    TEST_ASSERT_FALSE_MESSAGE(result.has_value(), "parsed a broken table");
+    TEST_ASSERT_EQUAL_STRING(PT::ParseErrorName(expected), PT::ParseErrorName(result.error()));
+  }
+
+  void ExpectRetypeError(PT::Bytes bytes, std::string_view label, std::string_view newLabel, PT::RetypeError expected)
+  {
+    const PT::Bytes before = bytes;
+    auto result            = PT::Retype(bytes, label, PT::kTypeData, PT::kSubtypeDataNvs, newLabel);
+    TEST_ASSERT_FALSE_MESSAGE(result.has_value(), "retyped what it should not have");
+    TEST_ASSERT_EQUAL_STRING(PT::RetypeErrorName(expected), PT::RetypeErrorName(result.error()));
+    TEST_ASSERT_TRUE_MESSAGE(bytes == before, "a refused retype changed the table");
   }
 }  // namespace
 
-TEST_CASE("MD5 matches the RFC 1321 test suite", "[partition_table][md5]")
+TEST_CASE("The 1.x table parses with its MD5", "[partition_table]")
 {
-  uint8_t digest[16];
-  PT::Internal::Md5(reinterpret_cast<const uint8_t*>(""), 0, digest);
-  const uint8_t empty[16] = {0xd4, 0x1d, 0x8c, 0xd9, 0x8f, 0x00, 0xb2, 0x04, 0xe9, 0x80, 0x09, 0x98, 0xec, 0xf8, 0x42, 0x7e};
-  TEST_ASSERT_EQUAL_UINT8_ARRAY(empty, digest, 16);
-
-  const char* msg = "The quick brown fox jumps over the lazy dog";
-  PT::Internal::Md5(reinterpret_cast<const uint8_t*>(msg), strlen(msg), digest);
-  const uint8_t fox[16] = {0x9e, 0x10, 0x7d, 0x9d, 0x37, 0x2b, 0xb6, 0x82, 0x6b, 0xd8, 0x1d, 0x35, 0x42, 0xa4, 0x19, 0xd6};
-  TEST_ASSERT_EQUAL_UINT8_ARRAY(fox, digest, 16);
-
-  std::string eighty(80, 'a');  // crosses a block, length lands in the next padding block
-  PT::Internal::Md5(reinterpret_cast<const uint8_t*>(eighty.data()), eighty.size(), digest);
-  const uint8_t a80[16] = {0xb1, 0x5a, 0xf9, 0xcd, 0xab, 0xba, 0xea, 0x05, 0x16, 0x86, 0x6a, 0x33, 0xd8, 0xfd, 0x0f, 0x98};
-  TEST_ASSERT_EQUAL_UINT8_ARRAY(a80, digest, 16);
-}
-
-TEST_CASE("Every table the repository ships parses with its MD5", "[partition_table]")
-{
-  PT::Table v1 = ParseOk(V1());
+  PT::Table v1 = ParseOk(Build(kV1));
   TEST_ASSERT_EQUAL_size_t(7, v1.count);
   TEST_ASSERT_EQUAL_STRING("nvs", v1.entries[0].label);
   TEST_ASSERT_EQUAL_HEX32(0x9000, v1.entries[0].offset);
   TEST_ASSERT_EQUAL_HEX32(0x5000, v1.entries[0].size);
   TEST_ASSERT_EQUAL_UINT8(PT::kTypeData, v1.entries[0].type);
   TEST_ASSERT_EQUAL_UINT8(PT::kSubtypeDataNvs, v1.entries[0].subtype);
-  TEST_ASSERT_NOT_NULL(v1.Find(PT::kTypeData, PT::kSubtypeDataSpiffs, "config"));
-  TEST_ASSERT_EQUAL_HEX32(0x1A0000, v1.FindAppAt(0x10000)->size);
-  TEST_ASSERT_EQUAL_HEX32(0x400000, v1.End());
-
-  PT::Table v2 = ParseOk(V2_4MB());
-  TEST_ASSERT_EQUAL_size_t(7, v2.count);
-  TEST_ASSERT_EQUAL_HEX32(0x1A0000, v2.FindAppAt(0x10000)->size);
-  TEST_ASSERT_EQUAL_HEX32(0x350000, v2.Find("cfg")->offset);
-  TEST_ASSERT_EQUAL_UINT8(PT::kSubtypeDataNvs, v2.Find("cfg")->subtype);
-  TEST_ASSERT_EQUAL_UINT8(PT::kTypeWww, v2.Find("www")->type);
-  TEST_ASSERT_EQUAL_HEX32(0x353000, v2.Find("www")->offset);
-  TEST_ASSERT_EQUAL_HEX32(0x400000, v2.End());
-  TEST_ASSERT_NULL(v2.Find("static0"));
-  TEST_ASSERT_NULL(v2.Find(PT::kTypeData, PT::kSubtypeDataNvs, "www"));  // the subtype is checked too
-}
-
-TEST_CASE("Layouts are told apart", "[partition_table]")
-{
-  TEST_ASSERT_EQUAL(PT::Layout::V1, PT::Detect(ParseOk(V1())));
-  TEST_ASSERT_EQUAL(PT::Layout::V2, PT::Detect(ParseOk(V2_4MB())));
-
-  auto bytes = V2_4MB();
-  SetLabel(bytes, "www", "static0");  // neither layout
-  TEST_ASSERT_EQUAL(PT::Layout::Unknown, PT::Detect(ParseOk(bytes)));
+  const PT::Entry* config = v1.Find("config");
+  TEST_ASSERT_NOT_NULL(config);
+  TEST_ASSERT_EQUAL_UINT8(PT::kSubtypeDataSpiffs, config->subtype);
+  TEST_ASSERT_EQUAL_HEX32(0x350000, config->offset);
+  TEST_ASSERT_NULL(v1.Find("cfg"));
 }
 
 TEST_CASE("A table without an MD5 entry, or with a wrong one, is refused", "[partition_table][corrupt]")
 {
-  auto bytes = V2_4MB();
+  const PT::Bytes good     = Build(kV1);
+  const std::size_t md5Pos = kV1.size() * PT::kEntrySize;
+
+  PT::Bytes bytes = good;
   bytes[16] ^= 0x01;  // a byte inside the first entry: the MD5 no longer matches
   ExpectParseError(bytes, PT::ParseError::Md5Mismatch);
 
-  bytes              = V2_4MB();
-  std::size_t md5Pos = 7 * PT::kEntrySize;
+  bytes = good;
   memset(bytes.data() + md5Pos, 0xFF, PT::kEntrySize);  // the MD5 entry erased
   ExpectParseError(bytes, PT::ParseError::NoMd5);
 
-  bytes = V2_4MB();
+  bytes = good;
   bytes[md5Pos + 16] ^= 0x01;  // the digest itself
   ExpectParseError(bytes, PT::ParseError::Md5Mismatch);
 
-  bytes                              = V2_4MB();
+  bytes                              = good;
   bytes[md5Pos + PT::kEntrySize + 5] = 0x00;  // garbage after the MD5 entry
   ExpectParseError(bytes, PT::ParseError::Trailing);
 
-  bytes = V2_4MB();
+  bytes = good;
   memcpy(bytes.data() + md5Pos + PT::kEntrySize, bytes.data(), PT::kEntrySize);  // an entry after the MD5 entry
   ExpectParseError(bytes, PT::ParseError::Trailing);
 
-  std::vector<uint8_t> erased(PT::kMaxLen, 0xFF);
+  PT::Bytes erased;
+  erased.fill(0xFF);
   ExpectParseError(erased, PT::ParseError::NoEntries);
   ExpectParseError(std::vector<uint8_t>(10, 0xFF), PT::ParseError::TooShort);
-  const auto whole = V2_4MB();
-  ExpectParseError(std::vector<uint8_t>(whole.begin(), whole.begin() + 3 * PT::kEntrySize), PT::ParseError::NoMd5);
+  ExpectParseError(std::span<const uint8_t>(good).first(3 * PT::kEntrySize), PT::ParseError::NoMd5);
 }
 
-TEST_CASE("The shipped 2.x table passes every invariant from a 1.x hub", "[partition_table][validate]")
+TEST_CASE("Only the first 0xC00 bytes are the table; whatever follows is ignored", "[partition_table]")
 {
-  ExpectValid(V2_4MB(), Scenario(4, 4).context);
-  ExpectValid(V2_4MB(), Scenario(8, 8).context);  // one table for every flash size
-  ExpectValid(V2_4MB(), Scenario(16, 16).context);
-  ExpectValid(V2_4MB(), Scenario(16, 4).context);  // a bootloader stamped smaller than the chip still covers it
-  // Nothing moves, so running from app1 is as good as running from app0
-  ExpectValid(V2_4MB(), Scenario(4, 4, 0x1B0000).context);
+  // A read that takes more than the table (the next sector, say): the bytes past kMaxLen are not even looked at,
+  // so they need not be erased
+  const PT::Bytes good = Build(kV1);
+  std::vector<uint8_t> longer(PT::kMaxLen + 0x400, 0x5A);
+  memcpy(longer.data(), good.data(), good.size());
+  PT::Table table = ParseOk(longer);
+  TEST_ASSERT_EQUAL_size_t(kV1.size(), table.count);
+  TEST_ASSERT_NOT_NULL(table.Find("static0"));
 }
 
-TEST_CASE("The table is refused on a smaller chip or behind a smaller bootloader header", "[partition_table][validate]")
+TEST_CASE("A table with no room left for the MD5 entry is refused", "[partition_table][corrupt]")
 {
-  ExpectViolation(V2_4MB(), Scenario(2, 2).context, PT::Violation::PastFlash);
-  // The bootloader rejects every entry past the size its header declares: a brick
-  ExpectViolation(V2_4MB(), Scenario(4, 2).context, PT::Violation::BootloaderHeaderTooSmall);
-  ExpectViolation(V2_4MB(), Scenario(4, 0).context, PT::Violation::BootloaderHeaderUnknown);
+  // kMaxEntries entries fill every slot but the last; one more leaves the MD5 entry nowhere to go
+  PT::Bytes bytes;
+  bytes.fill(0xFF);
+  for (std::size_t i = 0; i <= PT::kMaxEntries; ++i) {
+    uint8_t* p = bytes.data() + i * PT::kEntrySize;
+    memset(p, 0, PT::kEntrySize);
+    p[0] = PT::kMagic & 0xFF;
+    p[1] = PT::kMagic >> 8;
+    p[2] = PT::kTypeData;
+    p[3] = PT::kSubtypeDataNvs;
+    Put32(p + 4, 0x9000 + static_cast<uint32_t>(i) * 0x1000);
+    Put32(p + 8, 0x1000);
+    p[12] = 'p';
+  }
+  ExpectParseError(bytes, PT::ParseError::TooManyEntries);
 }
 
-TEST_CASE("The running image must fit its slot", "[partition_table][validate]")
+TEST_CASE("Retyping static0 as www is byte for byte what the packer would write", "[partition_table][retype]")
 {
-  Scenario huge(4, 4);
-  huge.context.runningImageSize = 0x1A0000 + 1;
-  ExpectViolation(V2_4MB(), huge.context, PT::Violation::NoRunningSlot);
+  // The one retype the www migration does: static0 (data/spiffs) becomes www (type 0x40, subtype 0x00), in place
+  PT::Bytes bytes = Build(kV1);
+  TEST_ASSERT_TRUE(PT::Retype(bytes, "static0", 0x40, 0x00, "www").has_value());
+
+  std::vector<Row> expected = kV1;
+  expected[5]               = {"www", 0x40, 0x00, 0x353000, 0x09D000};
+  TEST_ASSERT_EQUAL_UINT8_ARRAY(Build(expected).data(), bytes.data(), PT::kMaxLen);
+
+  PT::Table table = ParseOk(bytes);
+  TEST_ASSERT_NULL(table.Find("static0"));
+  const PT::Entry* www = table.Find("www");
+  TEST_ASSERT_NOT_NULL(www);
+  TEST_ASSERT_EQUAL_UINT8(0x40, www->type);
+  TEST_ASSERT_EQUAL_UINT8(0x00, www->subtype);
+  TEST_ASSERT_EQUAL_HEX32(0x353000, www->offset);
+  TEST_ASSERT_EQUAL_HEX32(0x09D000, www->size);
 }
 
-TEST_CASE("A table that moves, adds, removes or retypes anything else is refused", "[partition_table][validate]")
+TEST_CASE("Retype keeps the label when the new one is the same", "[partition_table][retype]")
 {
-  auto bytes = V2_4MB();
-  SetSize(bytes, "cfg", 0x2000);  // a gap, no overlap: still a valid table, but cfg shrank
-  ExpectViolation(bytes, Scenario().context, PT::Violation::GeometryChanged);
+  // The entry's own label is not "taken": only the type and subtype change
+  PT::Bytes bytes = Build(kV1);
+  TEST_ASSERT_TRUE(PT::Retype(bytes, "config", PT::kTypeData, PT::kSubtypeDataNvs, "config").has_value());
 
-  bytes = V2_4MB();
-  SetOffset(bytes, "www", 0x354000);
-  SetSize(bytes, "www", 0x9C000);
-  ExpectViolation(bytes, Scenario().context, PT::Violation::GeometryChanged);
-
-  bytes = V2_4MB();
-  SetSize(bytes, "coredump", 0x8000);  // shrunk
-  ExpectViolation(bytes, Scenario().context, PT::Violation::GeometryChanged);
-
-  bytes = V2_4MB();
-  SetLabel(bytes, "coredump", "crash");
-  ExpectViolation(bytes, Scenario().context, PT::Violation::EntryRetyped);
-
-  bytes = V2_4MB();
-  SetSubtype(bytes, "coredump", PT::kSubtypeDataNvs);
-  ExpectViolation(bytes, Scenario().context, PT::Violation::EntryRetyped);
-
-  // cfg and www swapped: each exists with its type, every place is the old one, but cfg would take over static0
-  bytes = V2_4MB();
-  SetOffset(bytes, "cfg", 0x353000);
-  SetSize(bytes, "cfg", 0x9D000);
-  SetOffset(bytes, "www", 0x350000);
-  SetSize(bytes, "www", 0x3000);
-  ExpectViolation(bytes, Scenario().context, PT::Violation::EntryRetyped);
+  std::vector<Row> expected = kV1;
+  expected[4]               = {"config", PT::kTypeData, PT::kSubtypeDataNvs, 0x350000, 0x003000};
+  TEST_ASSERT_EQUAL_UINT8_ARRAY(Build(expected).data(), bytes.data(), PT::kMaxLen);
+  TEST_ASSERT_EQUAL_UINT8(PT::kSubtypeDataNvs, ParseOk(bytes).Find("config")->subtype);
 }
 
-TEST_CASE("The live table must be readable and the 1.x layout", "[partition_table][validate]")
+TEST_CASE("Retype changes one entry's type, subtype and label and re-seals the MD5", "[partition_table][retype]")
 {
-  Scenario scenario;
-  scenario.context.live = nullptr;
-  ExpectViolation(V2_4MB(), scenario.context, PT::Violation::LiveUnreadable);
+  PT::Bytes bytes = Build(kV1);
+  TEST_ASSERT_TRUE(PT::Retype(bytes, "config", PT::kTypeData, PT::kSubtypeDataNvs, "cfg").has_value());
 
-  PT::Table alreadyV2   = ParseOk(V2_4MB());
-  scenario.context.live = &alreadyV2;
-  ExpectViolation(V2_4MB(), scenario.context, PT::Violation::LiveNotMigratable);
+  // What gen_esp32part.py would write for the retyped table, byte for byte
+  std::vector<Row> expected = kV1;
+  expected[4]               = {"cfg", PT::kTypeData, PT::kSubtypeDataNvs, 0x350000, 0x003000};
+  TEST_ASSERT_EQUAL_UINT8_ARRAY(Build(expected).data(), bytes.data(), PT::kMaxLen);
 
-  auto odd = V1();
-  SetLabel(odd, "static0", "assets");
-  PT::Table unknown     = ParseOk(odd);
-  scenario.context.live = &unknown;
-  ExpectViolation(V2_4MB(), scenario.context, PT::Violation::LiveNotMigratable);
+  PT::Table table = ParseOk(bytes);
+  TEST_ASSERT_NULL(table.Find("config"));
+  const PT::Entry* cfg = table.Find("cfg");
+  TEST_ASSERT_NOT_NULL(cfg);
+  TEST_ASSERT_EQUAL_UINT8(PT::kSubtypeDataNvs, cfg->subtype);
+  TEST_ASSERT_EQUAL_HEX32(0x350000, cfg->offset);
+  TEST_ASSERT_EQUAL_HEX32(0x3000, cfg->size);
 }
 
-TEST_CASE("A moved nvs or otadata is refused", "[partition_table][validate]")
+TEST_CASE("Retype refuses what it cannot do and leaves the table alone", "[partition_table][retype]")
 {
-  auto bytes = V2_4MB();
-  SetOffset(bytes, "nvs", 0x8000);  // onto the table itself: nothing in the table overlaps, but it moved
-  ExpectViolation(bytes, Scenario().context, PT::Violation::NvsMoved);
+  const PT::Bytes good = Build(kV1);
+  ExpectRetypeError(good, "nope", "cfg", PT::RetypeError::NoSuchEntry);
+  ExpectRetypeError(good, "config", "static0", PT::RetypeError::LabelTaken);
 
-  bytes = V2_4MB();
-  SetSize(bytes, "nvs", 0x4000);
-  ExpectViolation(bytes, Scenario().context, PT::Violation::NvsMoved);
-
-  bytes = V2_4MB();
-  SetOffset(bytes, "otadata", 0xF000);
-  ExpectViolation(bytes, Scenario().context, PT::Violation::Overlap);  // onto app0; geometry is checked first
-  SetOffset(bytes, "otadata", 0xE000);
-  SetSize(bytes, "otadata", 0x1000);                                   // in place, but shrunk
-  ExpectViolation(bytes, Scenario().context, PT::Violation::OtadataMoved);
+  PT::Bytes broken = good;
+  broken[16] ^= 0x01;
+  ExpectRetypeError(broken, "config", "cfg", PT::RetypeError::Unparsable);
 }
 
-TEST_CASE("A table missing cfg or www, or not a 2.x layout, is refused", "[partition_table][validate]")
+TEST_CASE("Retype takes a label of the full 16 bytes and refuses a longer one", "[partition_table][retype]")
 {
-  auto bytes = V2_4MB();
-  SetLabel(bytes, "cfg", "nvs2");
-  ExpectViolation(bytes, Scenario().context, PT::Violation::NoCfg);
+  PT::Bytes bytes = Build(kV1);
+  TEST_ASSERT_TRUE(PT::Retype(bytes, "config", PT::kTypeData, PT::kSubtypeDataNvs, "sixteen-chars-xx").has_value());
+  TEST_ASSERT_NOT_NULL(ParseOk(bytes).Find("sixteen-chars-xx"));
 
-  bytes = V2_4MB();
-  SetLabel(bytes, "www", "static0");
-  ExpectViolation(bytes, Scenario().context, PT::Violation::NoWww);
-
-  // Not 2.x: a 1.x table staged over a 1.x table
-  ExpectViolation(V1(), Scenario().context, PT::Violation::NoCfg);
-}
-
-TEST_CASE("Geometry the bootloader would refuse is refused first", "[partition_table][validate]")
-{
-  auto bytes = V2_4MB();
-  SetOffset(bytes, "app1", 0x1B0800);
-  ExpectViolation(bytes, Scenario().context, PT::Violation::SizeUnaligned);  // not even sector aligned
-
-  bytes = V2_4MB();
-  SetOffset(bytes, "app1", 0x1B1000);
-  ExpectViolation(bytes, Scenario().context, PT::Violation::AppUnaligned);
-
-  bytes = V2_4MB();
-  SetSize(bytes, "cfg", 0x3800);
-  ExpectViolation(bytes, Scenario().context, PT::Violation::SizeUnaligned);
-
-  bytes = V2_4MB();
-  SetSize(bytes, "cfg", 0);
-  ExpectViolation(bytes, Scenario().context, PT::Violation::SizeUnaligned);
-
-  bytes = V2_4MB();
-  SetSize(bytes, "cfg", 0x4000);  // into www
-  ExpectViolation(bytes, Scenario().context, PT::Violation::Overlap);
-
-  bytes = V2_4MB();
-  SetSize(bytes, "coredump", 0x20000);  // past 4 MB
-  ExpectViolation(bytes, Scenario().context, PT::Violation::PastFlash);
-
-  bytes = V2_4MB();
-  SetSize(bytes, "coredump", 0xFFFFF000);  // offset + size wraps
-  ExpectViolation(bytes, Scenario().context, PT::Violation::PastFlash);
+  ExpectRetypeError(Build(kV1), "config", "seventeen-chars-x", PT::RetypeError::LabelTooLong);
 }

@@ -4,17 +4,15 @@
 // RFTransmitter call, backed by a plain value in host_fakes.cpp (HostFake::RfConfig) instead of the config framework.
 #include <hal/gpio_types.h>
 
-#include <optional>
-
 namespace OpenShock::Config {
   struct RFConfig {
     gpio_num_t txPin;
     bool keepAliveEnabled;
   };
 
-  [[nodiscard]] std::optional<RFConfig> GetRFConfig();
-  [[nodiscard]] std::optional<gpio_num_t> GetRFConfigTxPin();
+  [[nodiscard]] RFConfig GetRFConfig();
+  [[nodiscard]] gpio_num_t GetRFConfigTxPin();
   bool SetRFConfigTxPin(gpio_num_t txPin);
-  [[nodiscard]] std::optional<bool> GetRFConfigKeepAliveEnabled();
+  [[nodiscard]] bool GetRFConfigKeepAliveEnabled();
   bool SetRFConfigKeepAliveEnabled(bool enabled);
 }  // namespace OpenShock::Config

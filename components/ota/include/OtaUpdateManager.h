@@ -20,10 +20,8 @@ namespace OpenShock::OtaUpdateManager {
   struct FirmwareRelease {
     std::string appBinaryUrl;
     uint8_t appBinaryHash[32];
-    std::string filesystemBinaryUrl;  // the `staticfs` artifact: the www image (littlefs for 1.x-numbered releases)
+    std::string filesystemBinaryUrl;  // the `staticfs` artifact: the www image (www.bin)
     uint8_t filesystemBinaryHash[32];
-    std::string partitionTableUrl;    // the `partitions` artifact (this board's partition-table.bin); empty if none
-    uint8_t partitionTableHash[32];
   };
 
   /// @brief Asks the repository server for the head of a channel for this board.
@@ -35,17 +33,6 @@ namespace OpenShock::OtaUpdateManager {
   [[nodiscard]] std::optional<FirmwareRelease> TryGetFirmwareRelease(HTTP::Client& client, const OpenShock::SemVer& version);
 
   bool TryStartFirmwareUpdate(const OpenShock::SemVer& version);
-
-  /// @brief Installs `version` on the hub's own initiative: the last step of the partition layout migration
-  ///        (components/migration). Unlike TryStartFirmwareUpdate it is not a backend request, so neither the
-  ///        backend-management nor the manual-approval setting holds it back; disabling OTA updates still does.
-  bool TryStartMigrationUpdate(const OpenShock::SemVer& version);
-
-  /// @brief Keeps installs out while the caller writes flash an install also writes (the layout migration's www image
-  ///        and partition table). False while an install is running. Held by the calling task until
-  ///        UnlockFlashWrites() or a restart; an install that comes up meanwhile is refused, not queued.
-  [[nodiscard]] bool TryLockFlashWrites();
-  void UnlockFlashWrites();
 
   /// @brief Asks the update task to check the configured channel for a new version as soon as it can.
   bool RequestUpdateCheck();

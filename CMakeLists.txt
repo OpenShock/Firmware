@@ -59,7 +59,6 @@ if(OPENSHOCK_BOARD AND NOT DEFINED SDKCONFIG_DEFAULTS)
       set(IDF_TARGET ${CMAKE_MATCH_1})
     endif()
   endforeach()
-  # Every board uses the one partition table sdkconfig.defaults names (partitions/ota_4mb.csv).
   set(_os_board_fragment ${CMAKE_BINARY_DIR}/openshock_board.defaults)
   file(WRITE ${_os_board_fragment} "${_os_board_kconfig}")
   set(SDKCONFIG_DEFAULTS "${CMAKE_CURRENT_LIST_DIR}/sdkconfig.defaults;${_os_board_fragment}")
@@ -141,6 +140,7 @@ if(_os_idf_activated)
 endif()
 
 project(firmware)
+include(${CMAKE_CURRENT_LIST_DIR}/cmake/cxx_standard.cmake)
 
 # --- ccache by absolute path ---------------------------------------------------
 # idf.py configures with CCACHE_ENABLE, and ESP-IDF then launches compiles through a bare `ccache`,

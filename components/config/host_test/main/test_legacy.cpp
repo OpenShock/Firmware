@@ -247,12 +247,9 @@ TEST_CASE("Fields from a newer 1.x schema are tolerated on import", "[config][le
   TEST_ASSERT_TRUE(InitFromLegacy(builder.GetBufferPointer(), builder.GetSize()));
 
   auto wifiConfig = Config::GetWiFiConfig();
-  TEST_ASSERT_TRUE(wifiConfig.has_value());
-  TEST_ASSERT_EQUAL_STRING("my-hub", wifiConfig->hostname.c_str());
-  TEST_ASSERT_EQUAL_size_t(1, wifiConfig->credentialsList.size());
-  TEST_ASSERT_EQUAL_STRING("hunter22", wifiConfig->credentialsList[0].password.c_str());
+  TEST_ASSERT_EQUAL_STRING("my-hub", wifiConfig.hostname.c_str());
+  TEST_ASSERT_EQUAL_size_t(1, wifiConfig.credentialsList.size());
+  TEST_ASSERT_EQUAL_STRING("hunter22", wifiConfig.credentialsList[0].password.c_str());
 
-  auto domain = Config::GetBackendDomain();
-  TEST_ASSERT_TRUE(domain.has_value());
-  TEST_ASSERT_EQUAL_STRING("api.example.org", domain->c_str());
+  TEST_ASSERT_EQUAL_STRING("api.example.org", Config::GetBackendDomain().c_str());
 }

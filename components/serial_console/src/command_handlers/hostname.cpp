@@ -5,8 +5,6 @@
 #include "util/HostnameUtils.h"
 #include "wifi/WiFiConfig.h"
 
-#include <esp_system.h>
-
 #include <string>
 
 const char* const TAG = "SerialCmds::CommandHandlers::Hostname";
@@ -14,13 +12,7 @@ const char* const TAG = "SerialCmds::CommandHandlers::Hostname";
 static void handleHostnameCommand(std::string_view arg, bool isAutomated)
 {
   if (arg.empty()) {
-    auto hostname = OpenShock::Config::GetWiFiHostname();
-    if (!hostname) {
-      SERPR_ERROR("Failed to get hostname from config");
-      return;
-    }
-    // Get hostname
-    SERPR_RESPONSE("Hostname|%s", hostname->c_str());
+    SERPR_RESPONSE("Hostname|%s", OpenShock::Config::GetWiFiHostname().c_str());
     return;
   }
 
@@ -29,13 +21,7 @@ static void handleHostnameCommand(std::string_view arg, bool isAutomated)
     return;
   }
 
-  bool result = OpenShock::Config::SetWiFiHostname(std::string(arg));
-  if (result) {
-    SERPR_SUCCESS("Saved config, restarting...");
-    esp_restart();
-  } else {
-    SERPR_ERROR("Failed to save config");
-  }
+  OpenShock::SerialCmds::ReportSavedAndRestart(OpenShock::Config::SetWiFiHostname(std::string(arg)));
 }
 
 OpenShock::SerialCmds::CommandGroup OpenShock::SerialCmds::CommandHandlers::HostnameHandler()

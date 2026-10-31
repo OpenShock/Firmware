@@ -39,40 +39,6 @@ struct OtaUpdateFailedBuilder;
 struct HubToGatewayMessage;
 struct HubToGatewayMessageBuilder;
 
-/// The partition table a hub booted with: the 1.x one, or the 2.x one the 1.9.x pivot release rewrites it into.
-enum class PartitionLayout : uint8_t {
-  Unknown = 0,
-  V1 = 1,
-  V2 = 2,
-  MIN = Unknown,
-  MAX = V2
-};
-
-inline const PartitionLayout (&EnumValuesPartitionLayout())[3] {
-  static const PartitionLayout values[] = {
-    PartitionLayout::Unknown,
-    PartitionLayout::V1,
-    PartitionLayout::V2
-  };
-  return values;
-}
-
-inline const char * const *EnumNamesPartitionLayout() {
-  static const char * const names[4] = {
-    "Unknown",
-    "V1",
-    "V2",
-    nullptr
-  };
-  return names;
-}
-
-inline const char *EnumNamePartitionLayout(PartitionLayout e) {
-  if (::flatbuffers::IsOutRange(e, PartitionLayout::Unknown, PartitionLayout::V2)) return "";
-  const size_t index = static_cast<size_t>(e);
-  return EnumNamesPartitionLayout()[index];
-}
-
 enum class HubToGatewayMessagePayload : uint8_t {
   NONE = 0,
   /// Respond to a ping message
@@ -219,10 +185,7 @@ struct BootStatus FLATBUFFERS_FINAL_CLASS : private ::flatbuffers::Table {
   enum FlatBuffersVTableOffset FLATBUFFERS_VTABLE_UNDERLYING_TYPE {
     VT_BOOT_TYPE = 4,
     VT_FIRMWARE_VERSION = 6,
-    VT_OTA_UPDATE_ID = 8,
-    VT_PARTITION_LAYOUT = 10,
-    VT_BOOTLOADER_FLASH_SIZE_MIB = 12,
-    VT_FLASH_SIZE_MIB = 14
+    VT_OTA_UPDATE_ID = 8
   };
   OpenShock::Serialization::Types::FirmwareBootType boot_type() const {
     return static_cast<OpenShock::Serialization::Types::FirmwareBootType>(GetField<uint8_t>(VT_BOOT_TYPE, 0));
@@ -233,19 +196,6 @@ struct BootStatus FLATBUFFERS_FINAL_CLASS : private ::flatbuffers::Table {
   int32_t ota_update_id() const {
     return GetField<int32_t>(VT_OTA_UPDATE_ID, 0);
   }
-  /// Which partition table the hub runs on, so the backend can tell which hubs have not moved to the 2.x one.
-  OpenShock::Serialization::Gateway::PartitionLayout partition_layout() const {
-    return static_cast<OpenShock::Serialization::Gateway::PartitionLayout>(GetField<uint8_t>(VT_PARTITION_LAYOUT, 0));
-  }
-  /// The flash size the bootloader's image header declares, in MiB (0: unreadable). The bootloader refuses any
-  /// partition past it, so a header smaller than the 2.x table keeps the hub from migrating.
-  uint16_t bootloader_flash_size_mib() const {
-    return GetField<uint16_t>(VT_BOOTLOADER_FLASH_SIZE_MIB, 0);
-  }
-  /// The chip's real flash size, in MiB.
-  uint16_t flash_size_mib() const {
-    return GetField<uint16_t>(VT_FLASH_SIZE_MIB, 0);
-  }
   template <bool B = false>
   bool Verify(::flatbuffers::VerifierTemplate<B> &verifier) const {
     return VerifyTableStart(verifier) &&
@@ -253,9 +203,6 @@ struct BootStatus FLATBUFFERS_FINAL_CLASS : private ::flatbuffers::Table {
            VerifyOffsetRequired(verifier, VT_FIRMWARE_VERSION) &&
            verifier.VerifyTable(firmware_version()) &&
            VerifyField<int32_t>(verifier, VT_OTA_UPDATE_ID, 4) &&
-           VerifyField<uint8_t>(verifier, VT_PARTITION_LAYOUT, 1) &&
-           VerifyField<uint16_t>(verifier, VT_BOOTLOADER_FLASH_SIZE_MIB, 2) &&
-           VerifyField<uint16_t>(verifier, VT_FLASH_SIZE_MIB, 2) &&
            verifier.EndTable();
   }
 };
@@ -273,15 +220,6 @@ struct BootStatusBuilder {
   void add_ota_update_id(int32_t ota_update_id) {
     fbb_.AddElement<int32_t>(BootStatus::VT_OTA_UPDATE_ID, ota_update_id, 0);
   }
-  void add_partition_layout(OpenShock::Serialization::Gateway::PartitionLayout partition_layout) {
-    fbb_.AddElement<uint8_t>(BootStatus::VT_PARTITION_LAYOUT, static_cast<uint8_t>(partition_layout), 0);
-  }
-  void add_bootloader_flash_size_mib(uint16_t bootloader_flash_size_mib) {
-    fbb_.AddElement<uint16_t>(BootStatus::VT_BOOTLOADER_FLASH_SIZE_MIB, bootloader_flash_size_mib, 0);
-  }
-  void add_flash_size_mib(uint16_t flash_size_mib) {
-    fbb_.AddElement<uint16_t>(BootStatus::VT_FLASH_SIZE_MIB, flash_size_mib, 0);
-  }
   explicit BootStatusBuilder(::flatbuffers::FlatBufferBuilder &_fbb)
         : fbb_(_fbb) {
     start_ = fbb_.StartTable();
@@ -298,16 +236,10 @@ inline ::flatbuffers::Offset<BootStatus> CreateBootStatus(
     ::flatbuffers::FlatBufferBuilder &_fbb,
     OpenShock::Serialization::Types::FirmwareBootType boot_type = OpenShock::Serialization::Types::FirmwareBootType::Normal,
     ::flatbuffers::Offset<OpenShock::Serialization::Types::SemVer> firmware_version = 0,
-    int32_t ota_update_id = 0,
-    OpenShock::Serialization::Gateway::PartitionLayout partition_layout = OpenShock::Serialization::Gateway::PartitionLayout::Unknown,
-    uint16_t bootloader_flash_size_mib = 0,
-    uint16_t flash_size_mib = 0) {
+    int32_t ota_update_id = 0) {
   BootStatusBuilder builder_(_fbb);
   builder_.add_ota_update_id(ota_update_id);
   builder_.add_firmware_version(firmware_version);
-  builder_.add_flash_size_mib(flash_size_mib);
-  builder_.add_bootloader_flash_size_mib(bootloader_flash_size_mib);
-  builder_.add_partition_layout(partition_layout);
   builder_.add_boot_type(boot_type);
   return builder_.Finish();
 }

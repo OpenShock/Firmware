@@ -1,12 +1,13 @@
 # OpenShock 1.x partition table (every board, whatever its flash size). NOT built any more.
 #
 # Kept as the reference for what fielded 1.5.x / 1.6.x hubs carry and as a fixture for the
-# partition-table migration tests (components/partition_layout/host_test): the migration
-# recognises this layout and rewrites it into partitions/ota_4mb.csv, which keeps every offset
-# and size and only retypes config (-> cfg, data/nvs) and static0 (-> www, type 0x40).
+# partition-table tests (components/partition_layout/host_test): the storage migrations recognise
+# this layout and retype it into partitions/ota_4mb.csv, keeping every offset and size. The config
+# migration retypes its littlefs `config` into the `cfg` NVS partition; the www migration writes the
+# www image over its littlefs `static0` and retypes it into the `www` partition.
 # Name,   Type, SubType,  Offset,   Size,     Flags
 nvs,      data, nvs,      0x009000, 0x005000,
-otadata,  data, ota,      0x00e000, 0x002000,
+otadata,  data, ota,      0x00E000, 0x002000,
 app0,     app,  ota_0,    0x010000, 0x1A0000,
 app1,     app,  ota_1,    0x1B0000, 0x1A0000,
 config,   data, spiffs,   0x350000, 0x003000,

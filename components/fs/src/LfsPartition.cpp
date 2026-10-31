@@ -135,6 +135,11 @@ void LfsPartition::unmount()
   m_state->partition = nullptr;
 }
 
+const esp_partition_t* LfsPartition::partition() const
+{
+  return m_mounted ? m_state->partition : nullptr;
+}
+
 bool LfsPartition::exists(const char* path)
 {
   if (!m_mounted) {
@@ -142,6 +147,18 @@ bool LfsPartition::exists(const char* path)
   }
   struct lfs_info info;
   return lfs_stat(&m_state->lfs, path, &info) >= 0;
+}
+
+std::optional<std::size_t> LfsPartition::fileSize(const char* path)
+{
+  if (!m_mounted) {
+    return std::nullopt;
+  }
+  struct lfs_info info;
+  if (lfs_stat(&m_state->lfs, path, &info) < 0 || info.type != LFS_TYPE_REG) {
+    return std::nullopt;
+  }
+  return info.size;
 }
 
 bool LfsPartition::readStream(const char* path, Util::FunctionRef<bool(std::span<const uint8_t>)> sink)

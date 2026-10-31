@@ -15,17 +15,6 @@
 using namespace OpenShock;
 
 namespace ConfigTest {
-  void Full::ToDefault()
-  {
-    rf.ToDefault();
-    wifi.ToDefault();
-    captivePortal.ToDefault();
-    backend.ToDefault();
-    serialInput.ToDefault();
-    otaUpdate.ToDefault();
-    estop.ToDefault();
-  }
-
   bool Full::SaveNvs(const char* partition) const
   {
     if (!rf.SaveNvs(partition, nullptr) || !wifi.SaveNvs(partition, nullptr) || !captivePortal.SaveNvs(partition, nullptr) || !backend.SaveNvs(partition, nullptr) || !serialInput.SaveNvs(partition, nullptr) || !otaUpdate.SaveNvs(partition, nullptr)
@@ -164,22 +153,32 @@ namespace ConfigTest {
     return stats.used_entries;
   }
 
+  bool NamespaceExists(const char* partition, const char* ns)
+  {
+    return OpenShock::Config::Nvs::Handle::Open(partition, ns, false).has_value();
+  }
+
+  std::size_t KeyCount(const char* partition, const char* ns)
+  {
+    auto handle = OpenShock::Config::Nvs::Handle::Open(partition, ns, false);
+    if (!handle) {
+      return 0;
+    }
+    std::size_t count = 0;
+    TEST_ASSERT_TRUE(handle->ForEachKey(NVS_TYPE_ANY, [&](const char*) { ++count; }));
+    return count;
+  }
+
   Full Snapshot()
   {
-    // Every getter must succeed; unwraps the returned optional.
-    auto get = [](auto section) {
-      TEST_ASSERT_TRUE(section.has_value());
-      return *std::move(section);
-    };
-
     Full config;
-    config.rf            = get(Config::GetRFConfig());
-    config.wifi          = get(Config::GetWiFiConfig());
-    config.captivePortal = get(Config::GetCaptivePortalConfig());
-    config.backend       = get(Config::GetBackendConfig());
-    config.serialInput   = get(Config::GetSerialInputConfig());
-    config.otaUpdate     = get(Config::GetOtaUpdateConfig());
-    config.estop         = get(Config::GetEStopConfig());
+    config.rf            = Config::GetRFConfig();
+    config.wifi          = Config::GetWiFiConfig();
+    config.captivePortal = Config::GetCaptivePortalConfig();
+    config.backend       = Config::GetBackendConfig();
+    config.serialInput   = Config::GetSerialInputConfig();
+    config.otaUpdate     = Config::GetOtaUpdateConfig();
+    config.estop         = Config::GetEStopConfig();
     return config;
   }
 

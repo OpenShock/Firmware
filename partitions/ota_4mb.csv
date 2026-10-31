@@ -1,10 +1,10 @@
-# OpenShock 2.x partition table, for every board whatever its flash size.
+# OpenShock partition table, for every board whatever its flash size.
 #
-# The geometry of the 1.x table (partitions/legacy/ota_4mb_v1.csv), entry for entry: the migration
-# rewrites the table in place and moves nothing. Only two entries change, and only their type and label:
-# the 1.x littlefs `config` becomes `cfg`, the NVS config store, and the 1.x littlefs `static0` becomes
-# `www`, the flat read-only image of the captive-portal assets (type 0x40 so no ESP-IDF component ever
-# tries to mount it; the firmware looks it up by type). See docs/STORAGE.md.
+# The geometry of the 1.x table (partitions/legacy/ota_4mb_v1.csv), entry for entry: the storage
+# migrations rewrite the table in place and move nothing. Two 1.x littlefs partitions change, in type
+# and label only: `config` becomes `cfg`, the NVS config store, and `static0` becomes `www`, the flat
+# read-only image of the captive-portal assets (type 0x40 so no ESP-IDF component ever tries to mount
+# it; the firmware looks it up by type). See docs/STORAGE.md.
 # Name,   Type, SubType,  Offset,   Size,     Flags
 nvs,      data, nvs,      0x009000, 0x005000,
 otadata,  data, ota,      0x00E000, 0x002000,

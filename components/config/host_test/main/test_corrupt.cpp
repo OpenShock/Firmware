@@ -178,8 +178,16 @@ TEST_CASE("The credential blob's auth mode codes never change", "[config][corrup
 {
   // What hubs hold on flash: owned by the blob format, not by ESP-IDF or the FlatBuffers schema
   const std::pair<wifi_auth_mode_t, uint8_t> codes[] = {
-    {WIFI_AUTH_OPEN, 0}, {WIFI_AUTH_WEP, 1}, {WIFI_AUTH_WPA_PSK, 2}, {WIFI_AUTH_WPA2_PSK, 3}, {WIFI_AUTH_WPA_WPA2_PSK, 4},
-    {WIFI_AUTH_WPA2_ENTERPRISE, 5}, {WIFI_AUTH_WPA3_PSK, 6}, {WIFI_AUTH_WPA2_WPA3_PSK, 7}, {WIFI_AUTH_WAPI_PSK, 8}, {WIFI_AUTH_MAX, 9},
+    {           WIFI_AUTH_OPEN, 0},
+    {            WIFI_AUTH_WEP, 1},
+    {        WIFI_AUTH_WPA_PSK, 2},
+    {       WIFI_AUTH_WPA2_PSK, 3},
+    {   WIFI_AUTH_WPA_WPA2_PSK, 4},
+    {WIFI_AUTH_WPA2_ENTERPRISE, 5},
+    {       WIFI_AUTH_WPA3_PSK, 6},
+    {  WIFI_AUTH_WPA2_WPA3_PSK, 7},
+    {       WIFI_AUTH_WAPI_PSK, 8},
+    {            WIFI_AUTH_MAX, 9},
   };
   for (const auto& [mode, code] : codes) {
     const auto blob = Config::WiFiCredentials(1, "Net", "pw", mode).ToBlob();
@@ -270,6 +278,63 @@ TEST_CASE("An unknown OTA channel in JSON falls back to the default, not the run
   TEST_ASSERT_EQUAL_UINT8(std::to_underlying(OtaUpdateStep::None), std::to_underlying(loaded.otaUpdate.updateStep));
 }
 
+TEST_CASE("A boolean field of the wrong type rejects the document instead of storing the default", "[config][corrupt][json]")
+{
+  Full sample                        = MakeSampleConfig();
+  sample.captivePortal.alwaysEnabled = true;
+  sample.serialInput.echoEnabled     = false;
+  InitWith(sample);
+  const std::size_t before = UsedEntries();
+
+  TEST_ASSERT_FALSE(Config::SaveFromJSON(R"({"captivePortal":{"alwaysEnabled":"false"}})"));
+  TEST_ASSERT_FALSE(Config::SaveFromJSON(R"({"serialInput":{"echoEnabled":1}})"));
+  TEST_ASSERT_EQUAL_size_t(before, UsedEntries());
+  AssertConfigEqual(sample, Snapshot());
+
+  // A missing field is still its default
+  TEST_ASSERT_TRUE(Config::SaveFromJSON(R"({"captivePortal":{},"serialInput":{}})"));
+  TEST_ASSERT_FALSE(Snapshot().captivePortal.alwaysEnabled);
+  TEST_ASSERT_TRUE(Snapshot().serialInput.echoEnabled);
+}
+
+TEST_CASE("A zero OTA check interval is normalized to the default on every path", "[config][corrupt][json]")
+{
+  InitDefault();
+  TEST_ASSERT_TRUE(Config::SaveFromJSON(R"({"otaUpdate":{"checkPeriodically":true,"checkInterval":0}})"));
+  TEST_ASSERT_EQUAL_UINT16(30, Snapshot().otaUpdate.checkInterval);
+
+  TEST_ASSERT_TRUE(Config::UpdateOtaUpdateConfig([](Config::OtaUpdateConfig& cfg) {
+    cfg.checkInterval = 0;
+    return true;
+  }));
+  TEST_ASSERT_EQUAL_UINT16(30, Snapshot().otaUpdate.checkInterval);
+  Reload();
+  TEST_ASSERT_EQUAL_UINT16(30, Snapshot().otaUpdate.checkInterval);
+}
+
+TEST_CASE("An invalid hostname is normalized to the default on every path", "[config][corrupt][json]")
+{
+  InitDefault();
+  for (const char* doc :
+       {
+         R"({"wifi":{"hostname":"","credentials":[]}})",
+         R"({"wifi":{"hostname":"-hub","credentials":[]}})",
+         R"({"wifi":{"hostname":"my hub","credentials":[]}})",
+         R"({"wifi":{"hostname":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","credentials":[]}})",
+       })
+  {
+    TEST_ASSERT_TRUE_MESSAGE(Config::SaveFromJSON(doc), doc);
+    TEST_ASSERT_EQUAL_STRING_MESSAGE(CONFIG_OPENSHOCK_FW_HOSTNAME, Snapshot().wifi.hostname.c_str(), doc);
+  }
+
+  TEST_ASSERT_TRUE(Config::SetWiFiHostname("hub_1"));
+  TEST_ASSERT_EQUAL_STRING(CONFIG_OPENSHOCK_FW_HOSTNAME, Snapshot().wifi.hostname.c_str());
+  TEST_ASSERT_TRUE(Config::SetWiFiHostname("hub-1"));
+  TEST_ASSERT_EQUAL_STRING("hub-1", Snapshot().wifi.hostname.c_str());
+  Reload();
+  TEST_ASSERT_EQUAL_STRING("hub-1", Snapshot().wifi.hostname.c_str());
+}
+
 TEST_CASE("Schema fields the firmware does not model are dropped on import", "[config][corrupt]")
 {
   // estop.active / estop.latching (and wifi AP/LAN fields) exist in the 1.x schema but nothing in the firmware
@@ -310,9 +375,8 @@ TEST_CASE("Out-of-range E-Stop GPIO in a 1.x config falls back to the default", 
     TEST_ASSERT_TRUE_MESSAGE(InitFromLegacy(builder.GetBufferPointer(), builder.GetSize()), msg);
 
     auto estopConfig = Config::GetEStopConfig();
-    TEST_ASSERT_TRUE(estopConfig.has_value());
-    TEST_ASSERT_EQUAL_INT_MESSAGE(Config::EStopConfig().gpioPin, estopConfig->gpioPin, msg);
-    TEST_ASSERT_EQUAL_MESSAGE(Config::EStopConfig().enabled, estopConfig->enabled, msg);
+    TEST_ASSERT_EQUAL_INT_MESSAGE(Config::EStopConfig().gpioPin, estopConfig.gpioPin, msg);
+    TEST_ASSERT_EQUAL_MESSAGE(Config::EStopConfig().enabled, estopConfig.enabled, msg);
   }
 }
 

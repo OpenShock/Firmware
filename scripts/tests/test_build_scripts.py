@@ -53,13 +53,17 @@ def test_a_table_without_an_app_partition_is_refused():
         partitions.first_app_partition(table)
 
 
+def test_a_table_without_a_www_partition_is_refused_naming_the_table():
+    www = {'type': '0x40', 'subtype': '0x00', 'offset': 0x353000, 'size': 0x9D000}
+    assert partitions.www_partition({'www': www}, 'x') is www
+    with pytest.raises(SystemExit, match='error: the table for Board has no www partition'):
+        partitions.www_partition({'app0': {}}, 'the table for Board')
+
+
 def test_the_www_partition_size_comes_from_the_table(tmp_path):
     csv = tmp_path / 'table.csv'
     csv.write_text('www, 0x40, 0x00, 0x3A8000, 0x48000\n', encoding='utf-8')
     assert gen_staticfs.www_partition_size(csv) == 0x48000
-    csv.write_text('nvs, data, nvs, 0x9000, 0x5000\n', encoding='utf-8')
-    with pytest.raises(SystemExit, match='has no www partition'):
-        gen_staticfs.www_partition_size(csv)
 
 
 def test_a_stale_frontend_without_pnpm_names_the_way_out(tmp_path, monkeypatch):
@@ -97,9 +101,7 @@ def test_collected_assets_are_byte_identical_across_runs(tmp_path):
     second = gen_staticfs.collect_assets(build)
 
     assert first == second
-    assert sorted(e.path for e in first) == ['assets/app.js', 'index.html']
-    assert all(e.gzip for e in first)
-    assert wwwimage.pack(first) == wwwimage.pack(second)
+    assert [e.path for e in first] == ['assets/app.js', 'index.html']
 
 
 def test_frontend_build_is_current_tracks_source_changes(tmp_path):
@@ -120,19 +122,19 @@ def test_frontend_build_is_current_tracks_source_changes(tmp_path):
     assert not gen_staticfs.frontend_build_is_current(frontend, frontend / 'build')
 
 
-def test_collected_assets_gzip_everything_but_prebuilt_gz(tmp_path):
+def test_collected_assets_are_all_gzipped_by_the_generator(tmp_path):
+    # The frontend build emits plain files; a name ending in .gz is just another asset, compressed like the rest
     build = tmp_path / 'build'
     build.mkdir()
     (build / 'index.html').write_text('<title>x</title>', encoding='utf-8')
     (build / 'font.woff2.gz').write_bytes(b'already')
     (build / 'app.js').write_text('1', encoding='utf-8')
-    (build / 'app.js.gz').write_bytes(b'prebuilt')
 
     entries = {e.path: e for e in gen_staticfs.collect_assets(build)}
 
-    assert sorted(entries) == ['app.js', 'font.woff2', 'index.html']
-    assert entries['font.woff2'].data == b'already'
-    assert entries['app.js'].data == b'prebuilt'
+    assert sorted(entries) == ['app.js', 'font.woff2.gz', 'index.html']
+    assert gzip.decompress(entries['font.woff2.gz'].data) == b'already'
+    assert gzip.decompress(entries['app.js'].data) == b'1'
     assert gzip.decompress(entries['index.html'].data) == b'<title>x</title>'
 
 
@@ -170,7 +172,7 @@ def test_packed_image_is_the_bare_image_and_must_fit(tmp_path):
 
 
 def test_main_takes_the_smallest_of_every_limit(tmp_path, monkeypatch):
-    build = write_build(tmp_path)
+    write_build(tmp_path)
     csv = tmp_path / 'small.csv'
     csv.write_text('www, 0x40, 0x00, 0x3A8000, 0x1000\n', encoding='utf-8')
     limits = []
@@ -189,7 +191,6 @@ def test_main_takes_the_smallest_of_every_limit(tmp_path, monkeypatch):
         ]
     )
     assert limits == [0x1000]
-    assert build.is_dir()
 
     with pytest.raises(SystemExit):
         gen_staticfs.main(args)  # no limit at all

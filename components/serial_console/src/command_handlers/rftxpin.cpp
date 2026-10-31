@@ -10,14 +10,7 @@
 static void handleRfTxPinCommand(std::string_view arg, bool isAutomated)
 {
   if (arg.empty()) {
-    auto configPin = OpenShock::Config::GetRFConfigTxPin();
-    if (!configPin) {
-      SERPR_ERROR("Failed to get RF TX pin from config");
-      return;
-    }
-
-    // Get rmt pin
-    SERPR_RESPONSE("RmtPin|%hhi", static_cast<int8_t>(*configPin));
+    SERPR_RESPONSE("RmtPin|%hhi", static_cast<int8_t>(OpenShock::Config::GetRFConfigTxPin()));
     return;
   }
 

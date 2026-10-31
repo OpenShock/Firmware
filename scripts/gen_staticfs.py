@@ -3,8 +3,8 @@
 
 Pipeline:
   1. Build the SvelteKit frontend (pnpm) when its sources are newer than the last build (unless --skip-frontend-build, which CI passes).
-  2. Gzip every built asset (a prebuilt <name>.gz is taken as-is).
-  3. Pack them into one flat read-only image (scripts/utils/wwwimage.py), checked to fit the smallest `www` partition.
+  2. Gzip every built asset (the frontend build emits plain files; compression happens here).
+  3. Pack them into one read-only image (scripts/utils/wwwimage.py), checked to fit the smallest `www` partition.
 
 The output is reproducible: gzip headers carry no timestamp and entries are sorted, so an unchanged frontend gives a
 byte-identical www.bin (and the same hash, so devices don't re-flash it). One image serves every board: it is not
@@ -20,6 +20,7 @@ Invoked by CMake (see the root CMakeLists.txt), and by CI with --skip-frontend-b
 
 import argparse
 import gzip
+import io
 import os
 import shutil
 import subprocess
@@ -28,13 +29,13 @@ from collections.abc import Iterable
 from pathlib import Path
 
 from utils import partitions, wwwimage
+from utils.partitions import WWW_PARTITION
+from utils.paths import ROOT
 
-WWW_PARTITION = 'www'
-
-# The littlefs geometry the 1.x firmware (and 1.9.x on the 1.x layout) mounts static0 with (components/fs/src/
+# The littlefs geometry the 1.x firmware (and this firmware on the 1.x layout) mounts static0 with (components/fs/src/
 # LfsPartition.cpp). Only the block size is on disk and checked at mount; the rest are runtime buffer sizes.
 LEGACY_PARTITION = 'static0'
-LEGACY_TABLE = 'partitions/legacy/ota_4mb_v1.csv'
+LEGACY_TABLE = ROOT / 'partitions' / 'legacy' / 'ota_4mb_v1.csv'
 LFS_BLOCK_SIZE = 4096
 LFS_READ_SIZE = LFS_PROG_SIZE = 128
 LFS_CACHE_SIZE = 512
@@ -52,9 +53,6 @@ FRONTEND_INPUTS = (
     'tsconfig.json',
 )
 FRONTEND_IGNORED_DIRS = {'node_modules', 'build', 'dist', '.svelte-kit'}
-
-# Assets with a content hash in their name never change under the same path, so browsers may cache them for long.
-IMMUTABLE_PREFIXES = ('_app/immutable/',)
 
 
 def log(msg: str) -> None:
@@ -109,9 +107,8 @@ def build_frontend(frontend_dir: Path) -> Path:
 
 
 def gzip_bytes(raw: bytes) -> bytes:
-    # mtime=0 and no filename: the gzip bytes depend only on the content
-    import io
-
+    # mtime=0 and no filename: the gzip bytes depend only on the content. GzipFile, not gzip.compress: since 3.11 the
+    # latter goes through zlib and its OS header byte is platform-dependent, which would break byte-identical images.
     out = io.BytesIO()
     with gzip.GzipFile(filename='', mode='wb', fileobj=out, mtime=0) as gz:
         gz.write(raw)
@@ -119,40 +116,15 @@ def gzip_bytes(raw: bytes) -> bytes:
 
 
 def collect_assets(build_dir: Path) -> list[wwwimage.Entry]:
-    """Every file under build_dir as a gzipped entry at its relative path (a prebuilt <name>.gz wins over <name>)."""
-    files: dict[str, Path] = {}
-    for root, dirs, names in os.walk(build_dir):
-        dirs.sort()
-        for name in sorted(names):
-            src = Path(root) / name
-            files[src.relative_to(build_dir).as_posix()] = src
-
-    entries = []
-    for rel, src in files.items():
-        if rel.endswith('.gz'):
-            continue
-        prebuilt = files.get(rel + '.gz')
-        data = prebuilt.read_bytes() if prebuilt is not None else gzip_bytes(src.read_bytes())
-        entries.append(wwwimage.Entry(rel, data, gzip=True, immutable=rel.startswith(IMMUTABLE_PREFIXES)))
-    # A .gz with no raw sibling is an asset of its own, served under the name without .gz
-    for rel, src in files.items():
-        if rel.endswith('.gz') and rel[: -len('.gz')] not in files:
-            entries.append(
-                wwwimage.Entry(
-                    rel[: -len('.gz')], src.read_bytes(), gzip=True, immutable=rel.startswith(IMMUTABLE_PREFIXES)
-                )
-            )
-
+    """Every file under build_dir, gzipped, as an entry at its relative path."""
+    entries = wwwimage.read_tree(build_dir, gzip_bytes)
     if not any(e.path == 'index.html' for e in entries):
         raise SystemExit(f'error: {build_dir}/index.html missing: the frontend build produced no index.html')
     return entries
 
 
 def www_partition_size(csv_path: Path) -> int:
-    table = partitions.read_partitions(csv_path)
-    if WWW_PARTITION not in table:
-        raise SystemExit(f'error: {csv_path} has no {WWW_PARTITION} partition')
-    return table[WWW_PARTITION]['size']
+    return partitions.www_partition(partitions.read_partitions(csv_path), str(csv_path))['size']
 
 
 def pack_image(entries: list[wwwimage.Entry], output: Path, max_size: int) -> None:
@@ -191,7 +163,7 @@ def pack_legacy_image(entries: list[wwwimage.Entry], output: Path, partition_siz
         cache_size=LFS_CACHE_SIZE,
         lookahead_size=LFS_LOOKAHEAD_SIZE,
     )
-    for entry in sorted(entries, key=lambda e: e.path):
+    for entry in entries:
         path = f'www/{entry.path}.gz'
         fs.makedirs(path.rsplit('/', 1)[0], exist_ok=True)
         with fs.open(path, 'wb') as f_out:
@@ -202,7 +174,7 @@ def pack_legacy_image(entries: list[wwwimage.Entry], output: Path, partition_siz
 
 
 def legacy_partition_size() -> int:
-    return partitions.read_partitions(partitions.ROOT / LEGACY_TABLE)[LEGACY_PARTITION]['size']
+    return partitions.read_partitions(LEGACY_TABLE)[LEGACY_PARTITION]['size']
 
 
 def main(argv: list[str] | None = None) -> int:

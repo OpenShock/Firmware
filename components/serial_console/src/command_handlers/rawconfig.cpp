@@ -4,8 +4,6 @@
 #include "config/Wire.h"
 #include "TinyVec.h"
 
-#include <esp_system.h>
-
 #include <vector>
 
 static void handleRawConfigCommand(std::string_view arg, bool isAutomated)
@@ -35,14 +33,7 @@ static void handleRawConfigCommand(std::string_view arg, bool isAutomated)
     return;
   }
 
-  if (!OpenShock::Config::SetRaw(buffer.data(), buffer.size())) {
-    SERPR_ERROR("Failed to save config");
-    return;
-  }
-
-  SERPR_SUCCESS("Saved config, restarting...");
-
-  esp_restart();
+  OpenShock::SerialCmds::ReportSavedAndRestart(OpenShock::Config::SetRaw(buffer.data(), buffer.size()));
 }
 
 OpenShock::SerialCmds::CommandGroup OpenShock::SerialCmds::CommandHandlers::RawConfigHandler()

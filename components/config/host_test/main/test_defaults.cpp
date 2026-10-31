@@ -66,13 +66,6 @@ TEST_CASE("Default values come from Kconfig and the board descriptor", "[config]
   TEST_ASSERT_FALSE(config.estop.enabled);
 }
 
-TEST_CASE("ToDefault resets every section to the constructed defaults", "[config][defaults]")
-{
-  Full config = MakeSampleConfig();
-  config.ToDefault();
-  AssertConfigEqual(Full(), config);
-}
-
 TEST_CASE("An empty store: Init writes a default config that reloads", "[config][defaults]")
 {
   InitDefault();
@@ -81,7 +74,7 @@ TEST_CASE("An empty store: Init writes a default config that reloads", "[config]
 
   // Every section namespace and the schema marker are now on flash
   for (const char* ns : Keys::Ns::kAll) {
-    TEST_ASSERT_TRUE_MESSAGE(Nvs::NamespaceExists(Keys::kPartitionCfg, ns), ns);
+    TEST_ASSERT_TRUE_MESSAGE(NamespaceExists(Keys::kPartitionCfg, ns), ns);
   }
   TEST_ASSERT_TRUE(UsedEntries() > 0);
 
@@ -179,10 +172,9 @@ TEST_CASE("Malformed credential blobs are dropped, the rest kept", "[config][def
   Reload();
 
   auto loaded = Config::GetWiFiCredentials();
-  TEST_ASSERT_TRUE(loaded.has_value());
-  TEST_ASSERT_EQUAL_size_t(2, loaded->size());
-  AssertCredentialsEqual(Config::WiFiCredentials(1, "HomeNet", "hunter22"), (*loaded)[0]);
-  AssertCredentialsEqual(Config::WiFiCredentials(4, "Office", ""), (*loaded)[1]);
+  TEST_ASSERT_EQUAL_size_t(2, loaded.size());
+  AssertCredentialsEqual(Config::WiFiCredentials(1, "HomeNet", "hunter22"), loaded[0]);
+  AssertCredentialsEqual(Config::WiFiCredentials(4, "Office", ""), loaded[1]);
 }
 
 TEST_CASE("Invalid stored GPIO pins fall back safely", "[config][defaults]")
@@ -200,13 +192,8 @@ TEST_CASE("Invalid stored GPIO pins fall back safely", "[config][defaults]")
   MarkSchema();
   Reload();
 
-  auto txPin = Config::GetRFConfigTxPin();
-  TEST_ASSERT_TRUE(txPin.has_value());
-  TEST_ASSERT_EQUAL_INT(OPENSHOCK_RF_TX_GPIO, *txPin);
-
-  auto estopEnabled = Config::GetEStopEnabled();
-  TEST_ASSERT_TRUE(estopEnabled.has_value());
-  TEST_ASSERT_FALSE(*estopEnabled);
+  TEST_ASSERT_EQUAL_INT(OPENSHOCK_RF_TX_GPIO, Config::GetRFConfigTxPin());
+  TEST_ASSERT_FALSE(Config::GetEStopEnabled());
 
   // Negative pin (the old "invalid" marker) also falls back.
   WipeStore();
@@ -217,9 +204,7 @@ TEST_CASE("Invalid stored GPIO pins fall back safely", "[config][defaults]")
   }
   MarkSchema();
   Reload();
-  txPin = Config::GetRFConfigTxPin();
-  TEST_ASSERT_TRUE(txPin.has_value());
-  TEST_ASSERT_EQUAL_INT(OPENSHOCK_RF_TX_GPIO, *txPin);
+  TEST_ASSERT_EQUAL_INT(OPENSHOCK_RF_TX_GPIO, Config::GetRFConfigTxPin());
 }
 
 TEST_CASE("jsonconfig set with an empty object resets to defaults", "[config][defaults][json]")

@@ -4,6 +4,10 @@
 CONFIG_IDF_TARGET="esp32s3"
 CONFIG_ESPTOOLPY_FLASHSIZE_16MB=y
 
+# OpenShock uses a single 4 MB OTA partition layout (fits every board's flash).
+CONFIG_PARTITION_TABLE_CUSTOM=y
+CONFIG_PARTITION_TABLE_CUSTOM_FILENAME="partitions/ota_4mb.csv"
+
 # Hardware pins. Not Kconfig: bare OPENSHOCK_* lines, stripped from the sdkconfig fragment by
 # scripts/build.py and stamped into the app image after linking by scripts/stamp_board.py,
 # so every board on a chip compiles identical objects and one image can serve them all.

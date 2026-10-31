@@ -74,11 +74,7 @@ static std::atomic<esp_ota_img_states_t> _otaImageState;
 static OpenShock::FirmwareBootType _bootType;
 static TaskHandle_t _taskHandle = nullptr;
 static OpenShock::SemVer _requestedVersion;
-static bool _requestedByHub                          = false;  // Guarded by _requestedVersionMutex, like _requestedVersion
 static OpenShock::SimpleMutex _requestedVersionMutex = {};
-// Held by whoever writes the flash an install writes: the update task for the whole install (until the restart on
-// success), the layout migration from its www write to its restart (TryLockFlashWrites).
-static OpenShock::SimpleMutex _flashWriteMutex = {};
 
 using namespace OpenShock;
 
@@ -97,7 +93,7 @@ static bool otaum_try_notify_task(uint32_t eventFlag)
   return true;
 }
 
-static bool otaum_try_queue_update_request(const OpenShock::SemVer& version, bool byHub)
+static bool otaum_try_queue_update_request(const OpenShock::SemVer& version)
 {
   if (!_requestedVersionMutex.lock(pdMS_TO_TICKS(1000))) {
     OS_LOGE(TAG, "Failed to take requested version mutex");
@@ -105,24 +101,12 @@ static bool otaum_try_queue_update_request(const OpenShock::SemVer& version, boo
   }
 
   _requestedVersion = version;
-  _requestedByHub   = byHub;
 
   _requestedVersionMutex.unlock();
 
   otaum_try_notify_task(OTA_TASK_EVENT_UPDATE_REQUESTED);
 
   return true;
-}
-
-// Whether the pending request came from the hub itself (TryStartMigrationUpdate) rather than the backend.
-static bool _isRequestByHub()
-{
-  if (!_requestedVersionMutex.lock(pdMS_TO_TICKS(1000))) {
-    return false;
-  }
-  bool byHub = _requestedByHub;
-  _requestedVersionMutex.unlock();
-  return byHub;
 }
 
 [[nodiscard]] static std::optional<OpenShock::SemVer> _tryGetRequestedVersion()
@@ -170,13 +154,7 @@ static void otaum_evh_ipevent(void* event_handler_arg, esp_event_base_t event_ba
 
 static bool otaum_send_progress_msg(Serialization::Types::OtaUpdateProgressTask task, float progress)
 {
-  auto updateId = Config::GetOtaUpdateId();
-  if (!updateId) {
-    OS_LOGE(TAG, "Failed to get OTA update ID");
-    return false;
-  }
-
-  if (!Serialization::Gateway::SerializeOtaUpdateProgressMessage(*updateId, task, progress, GatewayConnectionManager::SendMessageBIN)) {
+  if (!Serialization::Gateway::SerializeOtaUpdateProgressMessage(Config::GetOtaUpdateId(), task, progress, GatewayConnectionManager::SendMessageBIN)) {
     OS_LOGE(TAG, "Failed to send OTA install progress message");
     return false;
   }
@@ -185,13 +163,7 @@ static bool otaum_send_progress_msg(Serialization::Types::OtaUpdateProgressTask 
 }
 static bool _sendFailureMessage(std::string_view message, bool fatal = false)
 {
-  auto updateId = Config::GetOtaUpdateId();
-  if (!updateId) {
-    OS_LOGE(TAG, "Failed to get OTA update ID");
-    return false;
-  }
-
-  if (!Serialization::Gateway::SerializeOtaUpdateFailedMessage(*updateId, message, fatal, GatewayConnectionManager::SendMessageBIN)) {
+  if (!Serialization::Gateway::SerializeOtaUpdateFailedMessage(Config::GetOtaUpdateId(), message, fatal, GatewayConnectionManager::SendMessageBIN)) {
     OS_LOGE(TAG, "Failed to send OTA install failed message");
     return false;
   }
@@ -292,17 +264,6 @@ static bool otaum_flash_app_partition(OpenShock::HTTP::Client& client, const esp
 
 static bool otaum_flash_fs_partition(OpenShock::HTTP::Client& client, const esp_partition_t* parition, std::string_view remoteUrl, const uint8_t (&remoteHash)[32])
 {
-  if (!otaum_send_progress_msg(Serialization::Types::OtaUpdateProgressTask::PreparingForUpdate, 0.0f)) {
-    return false;
-  }
-
-  // Make sure captive portal is stopped, timeout after 5 seconds.
-  if (!CaptivePortal::ForceClose(5000U)) {
-    OS_LOGE(TAG, "Failed to force close captive portal (timed out)");
-    _sendFailureMessage("Failed to force close captive portal (timed out)"sv);
-    return false;
-  }
-
   OS_LOGD(TAG, "Flashing filesystem partition");
 
   if (!otaum_send_progress_msg(Serialization::Types::OtaUpdateProgressTask::FlashingFilesystem, 0.0f)) {
@@ -317,9 +278,27 @@ static bool otaum_flash_fs_partition(OpenShock::HTTP::Client& client, const esp_
     return true;
   };
 
-  if (!OpenShock::FlashPartitionFromUrl(client, parition, remoteUrl, remoteHash, onProgress)) {
+  // Refuse an image in the other format before the first erase: a www image written over littlefs static0 (a 2.x
+  // release on the 1.x table, before the www migration has run) or a littlefs image over www would fail the check
+  // below only after the portal assets are gone.
+  const bool isWwwPartition = parition->type == Www::kPartitionType;
+  bool formatMismatch       = false;
+  auto matchesPartition     = [isWwwPartition, &formatMismatch](std::span<const uint8_t> chunk) -> bool {
+    if (Www::StartsLikeImage(chunk) != isWwwPartition) {
+      if (isWwwPartition) {
+        OS_LOGE(TAG, "The filesystem image is not a www image");
+      } else {
+        OS_LOGE(TAG, "The filesystem image is a www image, but this partition table has no www partition");
+      }
+      formatMismatch = true;
+      return false;
+    }
+    return true;
+  };
+
+  if (!OpenShock::FlashPartitionFromUrl(client, parition, remoteUrl, remoteHash, onProgress, matchesPartition)) {
     OS_LOGE(TAG, "Failed to flash filesystem partition");
-    _sendFailureMessage("Failed to flash filesystem partition"sv);
+    _sendFailureMessage(formatMismatch ? "The filesystem image does not match this hub's partition table"sv : "Failed to flash filesystem partition"sv);
     return false;
   }
 
@@ -329,7 +308,7 @@ static bool otaum_flash_fs_partition(OpenShock::HTTP::Client& client, const esp_
 
   // Verify the freshly flashed image: the www format where the table has a www partition, else (1.x layout) that the
   // littlefs image mounts.
-  const bool valid = parition->type == Www::kPartitionType ? Www::VerifyPartition(parition) : OpenShock::TestFilesystem(parition);
+  const bool valid = isWwwPartition ? Www::VerifyPartition(parition) : OpenShock::TestFilesystem(parition);
   if (!valid) {
     OS_LOGE(TAG, "The flashed filesystem image is not valid");
     _sendFailureMessage("The flashed filesystem image is not valid"sv);
@@ -381,12 +360,7 @@ static void otaum_updatetask(void* arg)
 
     int64_t now = OpenShock::millis();
 
-    auto maybeConfig = Config::GetOtaUpdateConfig();
-    if (!maybeConfig) {
-      OS_LOGE(TAG, "Failed to get OTA update config");
-      continue;
-    }
-    const Config::OtaUpdateConfig& config = *maybeConfig;
+    const Config::OtaUpdateConfig config = Config::GetOtaUpdateConfig();
 
     if (!config.isEnabled) {
       OS_LOGD(TAG, "OTA updates are disabled, skipping update check");
@@ -396,9 +370,7 @@ static void otaum_updatetask(void* arg)
       continue;
     }
 
-    const bool requestedByHub = updateRequested && _isRequestByHub();
-
-    if (updateRequested && !requestedByHub && !config.allowBackendManagement) {
+    if (updateRequested && !config.allowBackendManagement) {
       OS_LOGW(TAG, "Ignoring backend update request, backend management is disabled");
       updateRequested = false;
     }
@@ -420,7 +392,7 @@ static void otaum_updatetask(void* arg)
     lastUpdateCheck = now;
     checkRequested  = false;
 
-    if (config.requireManualApproval && !requestedByHub) {
+    if (config.requireManualApproval) {
       OS_LOGD(TAG, "Manual approval required, skipping update check");
       updateRequested = false;  // Otherwise it re-triggers this branch every minute
       // TODO: IMPLEMENT
@@ -457,13 +429,6 @@ static void otaum_updatetask(void* arg)
 
     if (versionStr == OpenShock::Constants::FW_VERSION) {
       OS_LOGI(TAG, "Requested version is already installed");
-      continue;
-    }
-
-    // Never alongside the layout migration's www and partition table writes; it restarts the hub when it is done
-    ScopedTryLock flashWrites(&_flashWriteMutex, 0);
-    if (!flashWrites.isLocked()) {
-      OS_LOGW(TAG, "The partition layout migration is writing flash; not updating now");
       continue;
     }
 
@@ -524,19 +489,22 @@ static void otaum_updatetask(void* arg)
       continue;
     }
 
-    // The portal assets go into the www partition; on the 1.x layout, which has none, into littlefs static0.
+    // The portal assets go into the www partition; on the 1.x layout, which has none, into littlefs static0. The
+    // staticfs artifact of a 1.x-numbered release is the littlefs image (scripts/repo_server_publish.py), which is
+    // what every hub still on the 1.x layout installs, by this code or by the 1.x firmware's own.
     const esp_partition_t* filesystemPartition = Www::FindPartition();
     if (filesystemPartition == nullptr) {
       filesystemPartition = FindStaticPartition();
     }
     if (filesystemPartition == nullptr) {
-      OS_LOGE(TAG, "Failed to find filesystem partition");
+      OS_LOGE(TAG, "Failed to find a www or static filesystem partition");
       _sendFailureMessage("Failed to find filesystem partition"sv);
       continue;
     }
 
-    // Flashing the filesystem force-closes the captive portal; on any failure (`continue`) it must be allowed to
-    // open again. On success the portal stays closed until the restart below.
+    // The captive portal is force-closed for the whole install (it serves from the www partition, and the app slot
+    // is swapped under it); on any failure (`continue`) it must be allowed to open again. On success the portal
+    // stays closed until the restart below.
     struct ReopenPortalOnFailure {
       bool succeeded = false;
       ~ReopenPortalOnFailure()
@@ -545,7 +513,19 @@ static void otaum_updatetask(void* arg)
       }
     } reopenPortalOnFailure;
 
-    // Flash app and filesystem partitions. An unchanged www image (the same hash) is not written again.
+    if (!otaum_send_progress_msg(Serialization::Types::OtaUpdateProgressTask::PreparingForUpdate, 0.0f)) {
+      continue;
+    }
+
+    // Make sure captive portal is stopped, timeout after 5 seconds.
+    if (!CaptivePortal::ForceClose(5000U)) {
+      OS_LOGE(TAG, "Failed to force close captive portal (timed out)");
+      _sendFailureMessage("Failed to force close captive portal (timed out)"sv);
+      continue;
+    }
+
+    // Flash app and filesystem partitions. An unchanged www image (the same hash) is not written again; a littlefs
+    // static0 always is, as the 1.x firmware does.
     std::array<uint8_t, 32> currentWwwHash {};
     const bool wwwCurrent = filesystemPartition->type == Www::kPartitionType && Www::ImageSha256(filesystemPartition, currentWwwHash) && memcmp(currentWwwHash.data(), release.filesystemBinaryHash, 32) == 0;
     if (wwwCurrent) {
@@ -600,18 +580,12 @@ static const char* otaum_channel_name(OpenShock::OtaUpdateChannel channel)
 /// so the CDN host no longer has to be known by the hub.
 [[nodiscard]] static std::optional<std::string> otaum_try_get_repo_domain()
 {
-  auto config = Config::GetOtaUpdateConfig();
-  if (!config) {
-    OS_LOGE(TAG, "Failed to get OTA update config");
-    return std::nullopt;
-  }
-
-  if (config->cdnDomain.empty()) {
+  std::string domain = Config::GetOtaUpdateConfig().cdnDomain;
+  if (domain.empty()) {
     OS_LOGE(TAG, "OTA repository domain is not configured");
     return std::nullopt;
   }
-
-  return std::move(config->cdnDomain);
+  return domain;
 }
 
 /// @brief Issues a GET against the repository API and parses the body as JSON.
@@ -676,12 +650,7 @@ bool OtaUpdateManager::Init()
   _otaImageState = imageState;
 
   OS_LOGD(TAG, "Fetching previous update step");
-  auto maybeUpdateStep = Config::GetOtaUpdateStep();
-  if (!maybeUpdateStep) {
-    OS_LOGE(TAG, "Failed to get OTA update step");
-    return false;
-  }
-  OtaUpdateStep updateStep = *maybeUpdateStep;
+  const OtaUpdateStep updateStep = Config::GetOtaUpdateStep();
 
   // Infer boot type from update step.
   _bootType = OpenShock::InferFirmwareBootType(updateStep);
@@ -795,7 +764,7 @@ static bool _tryParseIntoHash(std::string_view hash, uint8_t (&hashBytes)[32])
 
   OtaUpdateManager::FirmwareRelease release {};
 
-  bool foundApp = false, foundFilesystem = false, foundPartitions = false;
+  bool foundApp = false, foundFilesystem = false;
 
   int count = artifacts.count();
   for (int i = 0; i < count; i++) {
@@ -834,17 +803,6 @@ static bool _tryParseIntoHash(std::string_view hash, uint8_t (&hashBytes)[32])
       }
       release.filesystemBinaryUrl = std::move(*urlStr);
       foundFilesystem             = true;
-    } else if (*typeStr == "partitions"sv) {
-      // Optional: only the partition table migration uses it
-      if (foundPartitions) {
-        OS_LOGE(TAG, "Duplicate 'partitions' artifact");
-        return std::nullopt;
-      }
-      if (!_tryParseIntoHash(*hashStr, release.partitionTableHash)) {
-        return std::nullopt;
-      }
-      release.partitionTableUrl = std::move(*urlStr);
-      foundPartitions           = true;
     }
   }
 
@@ -892,24 +850,7 @@ bool OtaUpdateManager::TryStartFirmwareUpdate(const OpenShock::SemVer& version)
 {
   OS_LOGD(TAG, "Requesting firmware version %s", version.toString().c_str());  // TODO: This is abusing the SemVer::toString() method causing alot of string copies, fix this
 
-  return otaum_try_queue_update_request(version, false);
-}
-
-bool OtaUpdateManager::TryStartMigrationUpdate(const OpenShock::SemVer& version)
-{
-  OS_LOGI(TAG, "Installing firmware version %s to finish the partition layout migration", version.toString().c_str());
-
-  return otaum_try_queue_update_request(version, true);
-}
-
-bool OtaUpdateManager::TryLockFlashWrites()
-{
-  return _flashWriteMutex.lock(0);
-}
-
-void OtaUpdateManager::UnlockFlashWrites()
-{
-  _flashWriteMutex.unlock();
+  return otaum_try_queue_update_request(version);
 }
 
 bool OtaUpdateManager::RequestUpdateCheck()

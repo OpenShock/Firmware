@@ -19,11 +19,6 @@ static constexpr const char* kKeyEcho   = "echo";
 static constexpr const char* kNamespaces[] = {kNamespace};
 static Section<SerialInputConfig> s_section({.name = "serialInput", .order = 4, .hubConfigField = Fbs::HubConfig::VT_SERIAL_INPUT, .namespaces = kNamespaces});
 
-Section<SerialInputConfig>& OpenShock::Config::SerialInputSection()
-{
-  return s_section;
-}
-
 SerialInputConfig::SerialInputConfig()
   : echoEnabled(true)
 {
@@ -34,11 +29,6 @@ SerialInputConfig::SerialInputConfig(bool echoEnabled)
 {
 }
 
-void SerialInputConfig::ToDefault()
-{
-  echoEnabled = true;
-}
-
 flatbuffers::Offset<OpenShock::Serialization::Configuration::SerialInputConfig> SerialInputConfig::ToFlatbuffers(flatbuffers::FlatBufferBuilder& builder, bool withSensitiveData) const
 {
   return Serialization::Configuration::CreateSerialInputConfig(builder, echoEnabled);
@@ -46,18 +36,13 @@ flatbuffers::Offset<OpenShock::Serialization::Configuration::SerialInputConfig> 
 
 bool SerialInputConfig::FromJSON(JSON::JsonView json)
 {
-  if (!json.valid()) {
-    OS_LOGW(TAG, "Config is null, setting to default");
-    ToDefault();
-    return true;
+  if (auto done = Parse::ObjectOrDefault(*this, json, TAG)) {
+    return *done;
   }
 
-  if (!json.isObject()) {
-    OS_LOGE(TAG, "json is not an object");
+  if (!Parse::JsonBool(echoEnabled, json, "echoEnabled", true, TAG)) {
     return false;
   }
-
-  echoEnabled = json["echoEnabled"].tryGetBool().value_or(true);
 
   return true;
 }
@@ -71,10 +56,9 @@ void SerialInputConfig::ToJSON(json_gen_str_t* gen, const char* name, bool withS
 
 bool SerialInputConfig::LoadNvs(const char* partition)
 {
-  auto handle = Nvs::Handle::Open(partition, kNamespace, false);
+  auto handle = Nvs::Handle::OpenForLoad(partition, kNamespace);
   if (!handle) {
-    ToDefault();
-    return true;
+    return false;
   }
   return Nvs::Load(*handle, kKeyEcho, echoEnabled, true);
 }
@@ -85,10 +69,10 @@ bool SerialInputConfig::SaveNvs(const char* partition, const SerialInputConfig* 
   if (!handle) {
     return false;
   }
-  return handle->SetBool(kKeyEcho, echoEnabled, previous != nullptr ? &previous->echoEnabled : nullptr) && handle->Commit();
+  return Nvs::Saver(*handle, *this, previous).Set(kKeyEcho, &SerialInputConfig::echoEnabled).Commit();
 }
 
-std::optional<SerialInputConfig> OpenShock::Config::GetSerialInputConfig()
+SerialInputConfig OpenShock::Config::GetSerialInputConfig()
 {
   return s_section.Get();
 }
@@ -98,7 +82,7 @@ bool OpenShock::Config::SetSerialInputConfig(const SerialInputConfig& config)
   return s_section.Set(config);
 }
 
-std::optional<bool> OpenShock::Config::GetSerialInputConfigEchoEnabled()
+bool OpenShock::Config::GetSerialInputConfigEchoEnabled()
 {
   return s_section.Read([](const SerialInputConfig& serial) { return serial.echoEnabled; });
 }

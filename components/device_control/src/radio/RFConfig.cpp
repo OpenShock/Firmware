@@ -21,11 +21,6 @@ static constexpr const char* kKeyKeepAlive = "keepalive";
 static constexpr const char* kNamespaces[] = {kNamespace};
 static Section<RFConfig> s_section({.name = "rf", .order = 0, .hubConfigField = Fbs::HubConfig::VT_RF, .namespaces = kNamespaces});
 
-Section<RFConfig>& OpenShock::Config::RFSection()
-{
-  return s_section;
-}
-
 RFConfig::RFConfig()
   : txPin(static_cast<gpio_num_t>(Board::Get().rfTxGpio))
   , keepAliveEnabled(true)
@@ -38,18 +33,11 @@ RFConfig::RFConfig(gpio_num_t txPin, bool keepAliveEnabled)
 {
 }
 
-void RFConfig::ToDefault()
-{
-  txPin            = static_cast<gpio_num_t>(Board::Get().rfTxGpio);
-  keepAliveEnabled = true;
-}
-
 bool RFConfig::LoadNvs(const char* partition)
 {
-  auto handle = Nvs::Handle::Open(partition, kNamespace, false);
+  auto handle = Nvs::Handle::OpenForLoad(partition, kNamespace);
   if (!handle) {
-    ToDefault();
-    return true;
+    return false;
   }
 
   const int8_t boardPin = static_cast<int8_t>(Board::Get().rfTxGpio);
@@ -72,21 +60,13 @@ bool RFConfig::SaveNvs(const char* partition, const RFConfig* previous) const
   if (!handle) {
     return false;
   }
-  const int8_t pin     = static_cast<int8_t>(txPin);
-  const int8_t prevPin = previous != nullptr ? static_cast<int8_t>(previous->txPin) : 0;
-  return handle->SetI8(kKeyTxPin, pin, previous != nullptr ? &prevPin : nullptr) && handle->SetBool(kKeyKeepAlive, keepAliveEnabled, previous != nullptr ? &previous->keepAliveEnabled : nullptr) && handle->Commit();
+  return Nvs::Saver(*handle, *this, previous).Set<int8_t>(kKeyTxPin, &RFConfig::txPin).Set(kKeyKeepAlive, &RFConfig::keepAliveEnabled).Commit();
 }
 
 bool RFConfig::FromJSON(JSON::JsonView json)
 {
-  if (!json.valid()) {
-    ToDefault();
-    return true;
-  }
-
-  if (!json.isObject()) {
-    OS_LOGE(TAG, "json is not an object");
-    return false;
+  if (auto done = Parse::ObjectOrDefault(*this, json, TAG)) {
+    return *done;
   }
 
   if (auto pin = Parse::JsonGpioNum(json, "txPin"); pin && *pin != GPIO_NUM_NC) {
@@ -94,7 +74,9 @@ bool RFConfig::FromJSON(JSON::JsonView json)
   } else {
     txPin = static_cast<gpio_num_t>(Board::Get().rfTxGpio);
   }
-  keepAliveEnabled = json["keepAliveEnabled"].tryGetBool().value_or(true);
+  if (!Parse::JsonBool(keepAliveEnabled, json, "keepAliveEnabled", true, TAG)) {
+    return false;
+  }
 
   return true;
 }
@@ -119,7 +101,7 @@ flatbuffers::Offset<Fbs::RFConfig> RFConfig::ToFlatbuffers(flatbuffers::FlatBuff
   return rfBuilder.Finish();
 }
 
-std::optional<RFConfig> OpenShock::Config::GetRFConfig()
+RFConfig OpenShock::Config::GetRFConfig()
 {
   return s_section.Get();
 }
@@ -129,7 +111,7 @@ bool OpenShock::Config::SetRFConfig(const RFConfig& config)
   return s_section.Set(config);
 }
 
-std::optional<gpio_num_t> OpenShock::Config::GetRFConfigTxPin()
+gpio_num_t OpenShock::Config::GetRFConfigTxPin()
 {
   return s_section.Read([](const RFConfig& rf) { return rf.txPin; });
 }
@@ -142,7 +124,7 @@ bool OpenShock::Config::SetRFConfigTxPin(gpio_num_t txPin)
   });
 }
 
-std::optional<bool> OpenShock::Config::GetRFConfigKeepAliveEnabled()
+bool OpenShock::Config::GetRFConfigKeepAliveEnabled()
 {
   return s_section.Read([](const RFConfig& rf) { return rf.keepAliveEnabled; });
 }

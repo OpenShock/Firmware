@@ -2,6 +2,7 @@
 
 const char* const TAG = "Config::WiFiCredentials";
 
+#include "config/Parse.h"
 #include "Logging.h"
 #include "wifi/WiFiAuthMode.h"
 
@@ -41,15 +42,6 @@ bool WiFiCredentials::HasPinnedBSSID() const
   return false;
 }
 
-void WiFiCredentials::ToDefault()
-{
-  id = 0;
-  ssid.clear();
-  password.clear();
-  authMode = WIFI_AUTH_MAX;
-  bssid.fill(0);
-}
-
 flatbuffers::Offset<OpenShock::Serialization::Configuration::WiFiCredentials> WiFiCredentials::ToFlatbuffers(flatbuffers::FlatBufferBuilder& builder, bool withSensitiveData) const
 {
   auto ssidOffset = builder.CreateString(ssid);
@@ -73,15 +65,8 @@ flatbuffers::Offset<OpenShock::Serialization::Configuration::WiFiCredentials> Wi
 
 bool WiFiCredentials::FromJSON(JSON::JsonView json)
 {
-  if (!json.valid()) {
-    OS_LOGW(TAG, "Config is null, setting to default");
-    ToDefault();
-    return true;
-  }
-
-  if (!json.isObject()) {
-    OS_LOGE(TAG, "json is not an object");
-    return false;
+  if (auto done = Parse::ObjectOrDefault(*this, json, TAG)) {
+    return *done;
   }
 
   id = json["id"].tryGetU8().value_or(0);
@@ -121,12 +106,7 @@ void WiFiCredentials::ToJSON(json_gen_str_t* gen, const char* name, bool withSen
   }
   json_gen_obj_set_int(gen, "authMode", std::to_underlying(ToFbsAuthMode(authMode)));
   if (HasPinnedBSSID()) {
-    char hex[13];
-    for (std::size_t i = 0; i < bssid.size(); ++i) {
-      HexUtils::ToHex(bssid[i], &hex[i * 2]);
-    }
-    hex[12] = '\0';
-    JSON::objSetString(gen, "bssid", hex);
+    JSON::objSetString(gen, "bssid", HexUtils::ToHex(std::span<const uint8_t, 6>(bssid)).data());
   }
   JSON::objEnd(gen, name);
 }

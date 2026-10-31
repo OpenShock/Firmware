@@ -4,6 +4,7 @@
 idf_component_register(
   SRCS         "test_main.cpp"
                "test_base64.cpp"
+               "test_hashing.cpp"
                "../../src/Base64.cpp"
   INCLUDE_DIRS "."
                "../../include"             # crypto headers (Hashing.h, Base64.h)

@@ -64,12 +64,10 @@ def test_merge_one_places_each_image_at_its_partition_offset(monkeypatch, tmp_pa
 
     calls = []
     monkeypatch.setattr(esptool, 'main', calls.append)
-    # Every board has the one table, whatever its flash: www sits at 0x353000
     merge_image.merge_one('OpenShock-Core-V2', tmp_path / 'bin', 'www.bin', 'out.bin')
 
     argv = calls[0]
     assert argv[:2] == ['--chip', 'esp32s3']
-    # The bootloader already carries the board's flash size (package_boards.py); esptool must not touch it
     assert argv[argv.index('--flash-size') + 1] == 'keep'
     pairs = dict(zip(argv[7::2], argv[8::2], strict=True))
     assert pairs == {
@@ -78,14 +76,3 @@ def test_merge_one_places_each_image_at_its_partition_offset(monkeypatch, tmp_pa
         '0x10000': str(tmp_path / 'bin' / 'app.bin'),
         '0x353000': 'www.bin',
     }
-
-    calls.clear()
-    merge_image.merge_one('Wemos-Lolin-S3-Mini', tmp_path / 'bin', 'www.bin', 'out.bin')
-    pairs = dict(zip(calls[0][7::2], calls[0][8::2], strict=True))
-    assert pairs['0x353000'] == 'www.bin'
-
-
-def test_merge_one_refuses_a_table_without_www(monkeypatch, tmp_path):
-    monkeypatch.setattr(merge_image.partitions, 'read_partitions', lambda path: {'app0': {}})
-    with pytest.raises(SystemExit, match='no www partition'):
-        merge_image.merge_one('OpenShock-Core-V2', tmp_path, 'www.bin', 'out.bin')

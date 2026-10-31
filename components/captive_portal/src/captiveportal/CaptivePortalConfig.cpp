@@ -19,11 +19,6 @@ static constexpr const char* kKeyAlways = "always";
 static constexpr const char* kNamespaces[] = {kNamespace};
 static Section<CaptivePortalConfig> s_section({.name = "captivePortal", .order = 2, .hubConfigField = Fbs::HubConfig::VT_CAPTIVE_PORTAL, .namespaces = kNamespaces});
 
-Section<CaptivePortalConfig>& OpenShock::Config::CaptivePortalSection()
-{
-  return s_section;
-}
-
 CaptivePortalConfig::CaptivePortalConfig()
   : alwaysEnabled(false)
 {
@@ -34,11 +29,6 @@ CaptivePortalConfig::CaptivePortalConfig(bool alwaysEnabled)
 {
 }
 
-void CaptivePortalConfig::ToDefault()
-{
-  alwaysEnabled = false;
-}
-
 flatbuffers::Offset<OpenShock::Serialization::Configuration::CaptivePortalConfig> CaptivePortalConfig::ToFlatbuffers(flatbuffers::FlatBufferBuilder& builder, bool withSensitiveData) const
 {
   return Serialization::Configuration::CreateCaptivePortalConfig(builder, alwaysEnabled);
@@ -46,18 +36,13 @@ flatbuffers::Offset<OpenShock::Serialization::Configuration::CaptivePortalConfig
 
 bool CaptivePortalConfig::FromJSON(JSON::JsonView json)
 {
-  if (!json.valid()) {
-    OS_LOGW(TAG, "Config is null, setting to default");
-    ToDefault();
-    return true;
+  if (auto done = Parse::ObjectOrDefault(*this, json, TAG)) {
+    return *done;
   }
 
-  if (!json.isObject()) {
-    OS_LOGE(TAG, "json is not an object");
+  if (!Parse::JsonBool(alwaysEnabled, json, "alwaysEnabled", false, TAG)) {
     return false;
   }
-
-  alwaysEnabled = json["alwaysEnabled"].tryGetBool().value_or(false);
 
   return true;
 }
@@ -71,10 +56,9 @@ void CaptivePortalConfig::ToJSON(json_gen_str_t* gen, const char* name, bool wit
 
 bool CaptivePortalConfig::LoadNvs(const char* partition)
 {
-  auto handle = Nvs::Handle::Open(partition, kNamespace, false);
+  auto handle = Nvs::Handle::OpenForLoad(partition, kNamespace);
   if (!handle) {
-    ToDefault();
-    return true;
+    return false;
   }
   return Nvs::Load(*handle, kKeyAlways, alwaysEnabled, false);
 }
@@ -85,10 +69,10 @@ bool CaptivePortalConfig::SaveNvs(const char* partition, const CaptivePortalConf
   if (!handle) {
     return false;
   }
-  return handle->SetBool(kKeyAlways, alwaysEnabled, previous != nullptr ? &previous->alwaysEnabled : nullptr) && handle->Commit();
+  return Nvs::Saver(*handle, *this, previous).Set(kKeyAlways, &CaptivePortalConfig::alwaysEnabled).Commit();
 }
 
-std::optional<CaptivePortalConfig> OpenShock::Config::GetCaptivePortalConfig()
+CaptivePortalConfig OpenShock::Config::GetCaptivePortalConfig()
 {
   return s_section.Get();
 }

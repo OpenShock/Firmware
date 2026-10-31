@@ -63,7 +63,6 @@ namespace ConfigTest {
     namespace Estop {
       inline constexpr const char* kEnabled = "enabled";
       inline constexpr const char* kGpio    = "gpio";
-      inline constexpr const char* kLatched = "latched";
     }  // namespace Estop
     namespace Ota {
       inline constexpr const char* kUpdateId = "update_id";
@@ -81,7 +80,6 @@ namespace ConfigTest {
     OpenShock::Config::OtaUpdateConfig otaUpdate;
     OpenShock::Config::EStopConfig estop;
 
-    void ToDefault();
     // Every section's keys, plus the store's schema marker, so the store loads rather than fills it
     bool SaveNvs(const char* partition) const;
     // As the jsonconfig document renders it
@@ -119,6 +117,13 @@ namespace ConfigTest {
 
   // The number of entries the `cfg` partition has in use: unchanged across a save that changes nothing.
   std::size_t UsedEntries();
+
+  // Whether `ns` exists in `partition`: it was created by a write once, and stays even when every key of it has since
+  // been erased.
+  bool NamespaceExists(const char* partition, const char* ns);
+
+  // The number of keys in `ns` of `partition`; 0 for a namespace that does not exist.
+  std::size_t KeyCount(const char* partition, const char* ns);
 
   // Reads back every section through the modules' public accessors.
   Full Snapshot();

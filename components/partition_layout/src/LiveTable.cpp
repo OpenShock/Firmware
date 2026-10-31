@@ -1,3 +1,6 @@
+#include <freertos/FreeRTOS.h>
+#include <freertos/task.h>
+
 #include "partition_layout/LiveTable.h"
 
 const char* const TAG = "PartitionTable";
@@ -6,12 +9,48 @@ const char* const TAG = "PartitionTable";
 
 #include <esp_flash.h>
 #include <esp_flash_partitions.h>
-#include <esp_image_format.h>
-#include <sdkconfig.h>
+#include <esp_ota_ops.h>
+#include <esp_partition.h>
+
+#include <memory>
 
 using namespace OpenShock;
 
-bool PartitionTable::ReadLiveBytes(std::array<uint8_t, kMaxLen>& out)
+namespace {
+  constexpr int kWriteAttempts          = 3;
+  constexpr TickType_t kWriteRetryDelay = pdMS_TO_TICKS(1'000);
+
+  // Writes `table` through the OTA path, which lifts the dangerous-write protection for that one sector, erases it
+  // and verifies the written table; then reads it back. False unless `table` is what is on flash.
+  bool write(const esp_partition_t* pt, const PartitionTable::Bytes& table)
+  {
+    esp_err_t err           = ESP_OK;
+    esp_ota_handle_t handle = 0;
+    // ---- From the erase in esp_ota_begin until esp_ota_write completes, a power cut leaves no partition table ----
+    err = esp_ota_begin(pt, ESP_PARTITION_TABLE_MAX_LEN, &handle);
+    if (err == ESP_OK) {
+      err = esp_ota_write(handle, table.data(), ESP_PARTITION_TABLE_MAX_LEN);
+      // ---- The table is whole again from here ----
+      esp_err_t endErr = esp_ota_end(handle);
+      if (err == ESP_OK) {
+        err = endErr;
+      }
+    }
+    if (err != ESP_OK) {
+      OS_LOGE(TAG, "Failed to write the partition table: %s", esp_err_to_name(err));
+      return false;
+    }
+
+    auto readBack = std::make_unique<PartitionTable::Bytes>();
+    if (!PartitionTable::ReadLiveBytes(*readBack) || *readBack != table) {
+      OS_LOGE(TAG, "The partition table does not read back as written");
+      return false;
+    }
+    return true;
+  }
+}  // namespace
+
+bool PartitionTable::ReadLiveBytes(Bytes& out)
 {
   esp_err_t err = esp_flash_read(nullptr, out.data(), ESP_PRIMARY_PARTITION_TABLE_OFFSET, out.size());
   if (err != ESP_OK) {
@@ -21,32 +60,27 @@ bool PartitionTable::ReadLiveBytes(std::array<uint8_t, kMaxLen>& out)
   return true;
 }
 
-std::optional<PartitionTable::Table> PartitionTable::ReadLive()
+PartitionTable::ReplaceResult PartitionTable::Replace(const Bytes& next, const Bytes& live)
 {
-  std::array<uint8_t, kMaxLen> bytes;
-  if (!ReadLiveBytes(bytes)) {
-    return std::nullopt;
+  const esp_partition_t* pt = nullptr;
+  esp_err_t err             = esp_partition_register_external(nullptr, ESP_PRIMARY_PARTITION_TABLE_OFFSET, ESP_PARTITION_TABLE_SIZE, "pt", ESP_PARTITION_TYPE_PARTITION_TABLE, ESP_PARTITION_SUBTYPE_PARTITION_TABLE_PRIMARY, &pt);
+  if (err != ESP_OK) {
+    OS_LOGE(TAG, "Failed to register the partition table region: %s", esp_err_to_name(err));
+    return ReplaceResult::Untouched;
   }
-  auto table = Parse(bytes);
-  if (!table) {
-    OS_LOGE(TAG, "The live partition table does not parse: %s", ParseErrorName(table.error()));
-    return std::nullopt;
-  }
-  return *table;
-}
 
-PartitionTable::Layout PartitionTable::LiveLayout()
-{
-  auto live = ReadLive();
-  return live ? Detect(*live) : Layout::Unknown;
-}
-
-uint32_t PartitionTable::BootloaderFlashSize()
-{
-  uint8_t header[4] = {};
-  if (esp_flash_read(nullptr, header, CONFIG_BOOTLOADER_OFFSET_IN_FLASH, sizeof(header)) != ESP_OK || header[0] != ESP_IMAGE_HEADER_MAGIC) {
-    return 0;
+  for (int attempt = 0; attempt < kWriteAttempts; ++attempt) {
+    if (write(pt, next)) {
+      return ReplaceResult::Written;
+    }
   }
-  const uint8_t code = header[3] >> 4;  // esp_image_flash_size_t: 0 = 1 MB, 1 = 2 MB, 2 = 4 MB, ...
-  return code <= 7 ? ((1024u * 1024u) << code) : 0;
+  OS_LOGE(TAG, "The new partition table does not stick; writing the old one back");
+  for (uint32_t attempt = 1;; ++attempt) {
+    if (write(pt, live)) {
+      return ReplaceResult::Restored;
+    }
+    // Whatever is on flash now may not parse: restarting would brick the hub. Keep trying.
+    OS_LOGE(TAG, "Failed to write the old partition table back (attempt %u). Do not unplug the hub.", static_cast<unsigned>(attempt));
+    vTaskDelay(kWriteRetryDelay);
+  }
 }

@@ -2,8 +2,6 @@
 
 #include "serial_console/command_handlers/common.h"
 
-#include "serial_console/SerialInputHandler.h"
-
 #include "Convert.h"
 #include "serial_console/SerialInputConfig.h"
 #include "StringHelpers.h"
@@ -11,8 +9,7 @@
 static void handleSerialEchoCommand(std::string_view arg, bool isAutomated)
 {
   if (arg.empty()) {
-    // Get current serial echo status
-    SERPR_RESPONSE("SerialEcho|%s", OpenShock::SerialInputHandler::SerialEchoEnabled() ? "true" : "false");
+    SERPR_RESPONSE("SerialEcho|%s", OpenShock::Config::GetSerialInputConfigEchoEnabled() ? "true" : "false");
     return;
   }
 
@@ -22,14 +19,7 @@ static void handleSerialEchoCommand(std::string_view arg, bool isAutomated)
     return;
   }
 
-  bool result = OpenShock::Config::SetSerialInputConfigEchoEnabled(*enabled);
-  OpenShock::SerialInputHandler::SetSerialEchoEnabled(*enabled);
-
-  if (result) {
-    SERPR_SUCCESS("Saved config");
-  } else {
-    SERPR_ERROR("Failed to save config");
-  }
+  OpenShock::SerialCmds::ReportSaved(OpenShock::Config::SetSerialInputConfigEchoEnabled(*enabled));
 }
 
 OpenShock::SerialCmds::CommandGroup OpenShock::SerialCmds::CommandHandlers::EchoHandler()

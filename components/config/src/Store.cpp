@@ -14,9 +14,9 @@ const char* const TAG = "Config";
 #include "json/Json.h"
 
 #include <esp_partition.h>
-#include <nvs_flash.h>
 
 #include <cstring>
+#include <optional>
 #include <string>
 #include <vector>
 
@@ -36,11 +36,6 @@ static constexpr const char* kLegacyFilePath       = "/config";
 // Written by Init() alone, under the write lock, before anything else reads a section.
 static const char* s_partition = nullptr;
 
-const char* Config::Internal::Partition()
-{
-  return s_partition;
-}
-
 const char* Config::StorageLabel()
 {
   return s_partition;
@@ -48,14 +43,22 @@ const char* Config::StorageLabel()
 
 #define CONFIG_LOCK_WRITE() ScopedLock lock__(&Config::Internal::WriteLock())
 
-static bool hasSchema(const char* partition)
+// Whether `partition` holds a filled store: true, false, or nullopt when NVS would not say (a failed open or read).
+// A store marked by a newer firmware (a rollback) counts as filled: it is loaded best-effort, never refilled.
+static std::optional<bool> hasSchema(const char* partition)
 {
-  auto handle = Config::Nvs::Handle::Open(partition, kRootNamespace, false);
-  if (!handle) {
+  auto handle    = Config::Nvs::Handle::OpenForLoad(partition, kRootNamespace);
+  uint8_t schema = 0;
+  if (!handle || !Config::Nvs::Load(*handle, kSchemaKey, schema, 0)) {
+    return std::nullopt;
+  }
+  if (schema < kSchemaVersion) {
     return false;
   }
-  uint8_t schema = 0;
-  return handle->GetU8(kSchemaKey, schema) == Config::Nvs::Result::Found && schema == kSchemaVersion;
+  if (schema > kSchemaVersion) {
+    OS_LOGW(TAG, "The config in %s has schema %u, newer than this firmware's %u; loading what this firmware knows", partition, schema, kSchemaVersion);
+  }
+  return true;
 }
 
 static bool writeSchema(const char* partition)
@@ -74,27 +77,6 @@ static std::vector<const char*> allNamespaces()
     }
   }
   return namespaces;
-}
-
-// Brings up `label` as an NVS partition. A partition whose pages are from another NVS version or are all full is
-// erased and reformatted: that is the contract of the shared `nvs` (everything in it regenerates), and `cfg` only
-// ever holds what this firmware wrote.
-static bool initNvsPartition(const char* label)
-{
-  esp_err_t err = nvs_flash_init_partition(label);
-  if (err == ESP_ERR_NVS_NO_FREE_PAGES || err == ESP_ERR_NVS_NEW_VERSION_FOUND) {
-    OS_LOGW(TAG, "NVS partition %s unusable (%s), erasing and reformatting", label, esp_err_to_name(err));
-    if (nvs_flash_erase_partition(label) != ESP_OK) {
-      OS_LOGE(TAG, "Failed to erase NVS partition %s", label);
-      return false;
-    }
-    err = nvs_flash_init_partition(label);
-  }
-  if (err != ESP_OK) {
-    OS_LOGE(TAG, "Failed to initialize NVS partition %s: %s", label, esp_err_to_name(err));
-    return false;
-  }
-  return true;
 }
 
 static bool nvsPartitionExists(const char* label)
@@ -131,11 +113,14 @@ static const char* openStorage()
 {
   if (nvsPartitionExists(kPartitionCfg)) {
     clearLegacyLittlefs(kPartitionCfg);
+    if (Config::Nvs::InitPartition(kPartitionCfg, false)) {
+      return kPartitionCfg;
+    }
+    // Never the shared nvs instead: what is saved there is discarded once cfg opens again
+    OS_LOGE(TAG, "The cfg partition is unusable; running on defaults in RAM, nothing will be saved");
+    return nullptr;
   }
-  if (nvsPartitionExists(kPartitionCfg) && initNvsPartition(kPartitionCfg)) {
-    return kPartitionCfg;
-  }
-  if (nvsPartitionExists(kPartitionShared) && initNvsPartition(kPartitionShared)) {
+  if (nvsPartitionExists(kPartitionShared) && Config::Nvs::InitPartition(kPartitionShared, true)) {
     OS_LOGW(TAG, "No cfg partition (1.x partition layout): the config is kept in the shared nvs partition until the layout is migrated");
     return kPartitionShared;
   }
@@ -144,37 +129,53 @@ static const char* openStorage()
 }
 
 // First boot on a 2.x layout after the table rewrite: what the 1.9.9 pivot kept in the shared `nvs` is copied into
-// `cfg` key by key, compared, and only then deleted from the shared partition. Idempotent: once `cfg` has a schema
-// the shared copy is only ever cleaned up.
-static void moveSharedIntoCfg()
+// `cfg` key by key, compared, and only then deleted from the shared partition. The schema marker (`root`) is copied
+// last, so a power cut mid-copy leaves `cfg` unmarked and the copy is redone. Idempotent: once `cfg` has a schema the
+// shared copy is only ever cleaned up. Returns the partition the config now lives in: `cfg`, or the shared `nvs` when
+// the copy failed.
+static const char* moveSharedIntoCfg()
 {
-  if (!nvsPartitionExists(kPartitionShared) || !initNvsPartition(kPartitionShared) || !hasSchema(kPartitionShared)) {
-    return;
+  if (!nvsPartitionExists(kPartitionShared) || !Config::Nvs::InitPartition(kPartitionShared, true)) {
+    return kPartitionCfg;
   }
-  const auto namespaces = allNamespaces();
+  // Nothing is moved or erased on a read that failed: a shared copy that cannot be read is left for the next boot, and
+  // so is one whose cfg cannot be checked, since erasing it then could erase the only copy
+  const std::optional<bool> sharedFilled = hasSchema(kPartitionShared);
+  const std::optional<bool> cfgFilled    = hasSchema(kPartitionCfg);
+  if (!sharedFilled.has_value() || !cfgFilled.has_value()) {
+    OS_LOGE(TAG, "Could not tell whether the config lives in the shared nvs partition; leaving both partitions as they are");
+    return kPartitionCfg;
+  }
+  if (!*sharedFilled) {
+    return kPartitionCfg;
+  }
+  const auto namespaces = allNamespaces();  // kRootNamespace first, so walked backwards
 
-  if (!hasSchema(kPartitionCfg)) {
+  if (!*cfgFilled) {
     bool ok = true;
-    for (const char* ns : namespaces) {
-      ok = ok && Config::Nvs::CopyNamespace(kPartitionShared, kPartitionCfg, ns) && Config::Nvs::NamespacesEqual(kPartitionShared, kPartitionCfg, ns);
+    for (std::size_t i = namespaces.size(); ok && i-- > 0;) {
+      ok = Config::Nvs::CopyNamespace(kPartitionShared, kPartitionCfg, namespaces[i]) && Config::Nvs::NamespacesEqual(kPartitionShared, kPartitionCfg, namespaces[i]);
     }
     if (!ok) {
       OS_LOGE(TAG, "Failed to copy the config into cfg; it stays in the shared nvs partition");
       for (const char* ns : namespaces) {
         (void)Config::Nvs::EraseNamespace(kPartitionCfg, ns);
       }
-      return;
+      return kPartitionShared;
     }
     OS_LOGI(TAG, "Moved the config from the shared nvs partition into cfg");
   }
 
+  // Walked backwards like the copy, so `root` goes last: a power cut mid-erase leaves the schema marker, and the
+  // cleanup is redone on the next boot instead of stranding the rest (WiFi passwords included) in the shared nvs
   bool erased = true;
-  for (const char* ns : namespaces) {
-    erased &= Config::Nvs::EraseNamespace(kPartitionShared, ns);
+  for (std::size_t i = namespaces.size(); i-- > 0;) {
+    erased &= Config::Nvs::EraseNamespace(kPartitionShared, namespaces[i]);
   }
   if (erased) {
     OS_LOGI(TAG, "Removed the config copy from the shared nvs partition");
   }
+  return kPartitionCfg;
 }
 
 // The config file a 1.x hub left behind, as a jsonconfig document. Nullopt when the hub has none.
@@ -240,10 +241,13 @@ static bool applyDocument(JSON::JsonView root, bool full)
   return ok;
 }
 
-// Requires the write lock. Fills an unmarked store: the 1.x file if there is one, else the defaults.
+// Requires the write lock. Fills an unmarked store: the 1.x file if there is one, else the defaults. The store is
+// only marked once every section is on flash as the hub runs it; a write that failed leaves it unmarked, so the fill
+// (the 1.x import included) is redone on the next boot.
 static void fillStore()
 {
-  bool filled = false;
+  bool filled  = false;
+  bool written = true;
   if (auto legacy = readLegacyConfig()) {
     JSON::JsonDocument doc;
     if (doc.parse(*legacy) && applyDocument(doc.root(), true)) {
@@ -255,7 +259,7 @@ static void fillStore()
   if (!filled) {
     OS_LOGW(TAG, "No stored config, writing the defaults");
     for (auto* section = Config::SectionBase::First(); section != nullptr; section = section->Next()) {
-      section->Reset(s_partition);
+      written &= section->Reset(s_partition);
     }
   }
 
@@ -266,7 +270,12 @@ static void fillStore()
   for (auto* section = Config::SectionBase::First(); section != nullptr; section = section->Next()) {
     if (!section->VerifyStored(s_partition)) {
       OS_LOGE(TAG, "The %s config does not read back as written to %s", section->Info().name, s_partition);
+      written = false;
     }
+  }
+  if (!written) {
+    OS_LOGE(TAG, "The config store is incomplete; it will be filled again on the next boot");
+    return;
   }
   if (!writeSchema(s_partition)) {
     OS_LOGE(TAG, "Failed to mark the config store; it will be filled again on the next boot");
@@ -279,19 +288,21 @@ void Config::Init()
 
   s_partition = openStorage();
   if (s_partition != nullptr && std::strcmp(s_partition, kPartitionCfg) == 0) {
-    moveSharedIntoCfg();
+    s_partition = moveSharedIntoCfg();
   }
 
-  if (s_partition == nullptr || !hasSchema(s_partition)) {
+  // A store whose marker cannot be read is loaded as if marked: filling it would write the defaults over whatever is
+  // there, while a failed load leaves flash alone and runs the section on its defaults
+  if (s_partition == nullptr || hasSchema(s_partition) == false) {
     fillStore();
     return;
   }
 
   for (auto* section = SectionBase::First(); section != nullptr; section = section->Next()) {
     if (!section->Load(s_partition)) {
-      // One unreadable section costs that section only
-      OS_LOGE(TAG, "Failed to load the %s config from %s, rewriting it with the defaults", section->Info().name, s_partition);
-      section->Reset(s_partition);
+      // The section runs on its defaults, but flash is left alone: erasing it would take every key with it (all WiFi
+      // networks). Its next save rewrites every key.
+      OS_LOGE(TAG, "Failed to load the %s config from %s, running it on the defaults", section->Info().name, s_partition);
     }
   }
   OS_LOGI(TAG, "Loaded config from %s", s_partition);

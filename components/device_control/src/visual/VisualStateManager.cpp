@@ -31,7 +31,6 @@ const uint32_t kWebSocketConnectedFlag           = 1 << 4;
 const uint32_t kHasIpAddressFlag                 = 1 << 5;
 const uint32_t kWiFiConnectedFlag                = 1 << 6;
 const uint32_t kWiFiScanningFlag                 = 1 << 7;
-const uint32_t kDoNotUnplugFlag                  = 1 << 8;
 
 // Bitmask of when the system is running normally
 const uint32_t kStatusOKMask = kWebSocketConnectedFlag | kHasIpAddressFlag | kWiFiConnectedFlag;
@@ -95,16 +94,6 @@ const MonoLedDriver::State kEmergencyStopAwaitingReleasePattern[] = {
 const RgbLedDriver::RGBState kEmergencyStopAwaitingReleaseRGBPattern[] = {
   {0, 255, 0, 150},
   {0,   0, 0, 150}
-};
-
-// Mostly on, a short gap: nothing else looks like it, and it never reads as "off" to someone about to pull the plug
-const MonoLedDriver::State kDoNotUnplugPattern[] = {
-  { true, 900},
-  {false, 100}
-};
-const RgbLedDriver::RGBState kDoNotUnplugRGBPattern[] = {
-  {255, 0, 255, 900},
-  {  0, 0,   0, 100}
 };
 
 const MonoLedDriver::State kWiFiDisconnectedPattern[] = {
@@ -219,7 +208,6 @@ static void updateVisualStateGPIO(uint32_t flags)
   CSR_PATTERN(s_monoLedDriver, kEmergencyStopAwaitingReleaseFlag, kEmergencyStopAwaitingReleasePattern);
   CSR_PATTERN(s_monoLedDriver, kEmergencyStopActiveClearingFlag, kEmergencyStopActiveClearingPattern);
   CSR_PATTERN(s_monoLedDriver, kEmergencyStoppedFlag, kEmergencyStoppedPattern);
-  CSR_PATTERN(s_monoLedDriver, kDoNotUnplugFlag, kDoNotUnplugPattern);
   CSR_PATTERN(s_monoLedDriver, kWebSocketConnectedFlag, kWebSocketConnectedPattern);
   CSR_PATTERN(s_monoLedDriver, kHasIpAddressFlag, kWiFiConnectedWithoutWSPattern);
   CSR_PATTERN(s_monoLedDriver, kWiFiScanningFlag, kWiFiScanningPattern);
@@ -233,7 +221,6 @@ static void updateVisualStateRGB(uint32_t flags)
   CSR_PATTERN(s_rgbLedDriver, kEmergencyStopAwaitingReleaseFlag, kEmergencyStopAwaitingReleaseRGBPattern);
   CSR_PATTERN(s_rgbLedDriver, kEmergencyStopActiveClearingFlag, kEmergencyStopActiveClearingRGBPattern);
   CSR_PATTERN(s_rgbLedDriver, kEmergencyStoppedFlag, kEmergencyStoppedRGBPattern);
-  CSR_PATTERN(s_rgbLedDriver, kDoNotUnplugFlag, kDoNotUnplugRGBPattern);
   CSR_PATTERN(s_rgbLedDriver, kWebSocketConnectedFlag, kWebSocketConnectedRGBPattern);
   CSR_PATTERN(s_rgbLedDriver, kHasIpAddressFlag, kWiFiConnectedWithoutWSRGBPattern);
   CSR_PATTERN(s_rgbLedDriver, kWiFiScanningFlag, kWiFiScanningRGBPattern);
@@ -451,13 +438,6 @@ bool VisualStateManager::Init()
 void VisualStateManager::SetCriticalError()
 {
   if (setStateFlag(kCriticalErrorFlag, true)) {
-    updateVisualState();
-  }
-}
-
-void VisualStateManager::SetDoNotUnplug(bool active)
-{
-  if (setStateFlag(kDoNotUnplugFlag, active)) {
     updateVisualState();
   }
 }

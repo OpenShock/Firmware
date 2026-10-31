@@ -234,9 +234,7 @@ def flash_size_bytes(size: str) -> int:
 
 
 # A variant is one compile shared by boards that differ only in the OPENSHOCK_* lines and flash size.
-# It compiles at 4 MB, with partitions/ota_4mb.csv (the table sdkconfig.defaults names): the smallest app slot
-# any board has, so an app that fits the variant fits every board. The partition table and the bootloader's
-# flash-size header are per board, not per variant; scripts/package_boards.py writes both for each board.
+# It compiles at the flash size partitions/ota_4mb.csv is laid out for; a board needing more fails the fit check.
 VARIANT_FLASH_SIZE = '4MB'
 
 
@@ -262,16 +260,9 @@ def kconfig_lines(fragment: Path) -> list[str]:
     return lines
 
 
-def _is_partition_table_line(line: str) -> bool:
-    # The table follows from the flash size (scripts/utils/partitions.py), so it never splits a variant either.
-    return re.match(r'(#\s*)?CONFIG_PARTITION_TABLE_', line) is not None
-
-
 def variant_kconfig(fragment: Path) -> list[str]:
-    """The Kconfig lines that decide what a board compiles to: all of them but the flash size and partition table."""
-    return [
-        line for line in kconfig_lines(fragment) if not _is_flash_size_line(line) and not _is_partition_table_line(line)
-    ]
+    """The Kconfig lines that decide what a board compiles to: all of them but the flash size."""
+    return [line for line in kconfig_lines(fragment) if not _is_flash_size_line(line)]
 
 
 def variant_id(fragment: Path) -> str:

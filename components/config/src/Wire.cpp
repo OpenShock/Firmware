@@ -9,11 +9,13 @@ const char* const TAG = "Config::Wire";
 #include "config/Store.h"
 #include "Logging.h"
 #include "serialization/VerifiedRoot.h"
+#include "util/HexUtils.h"
 
 #include "json/Json.h"
 
 #include <array>
 #include <cstring>
+#include <span>
 #include <utility>
 #include <vector>
 
@@ -154,15 +156,7 @@ namespace {
         setString(gen, "password", creds->password());
         json_gen_obj_set_int(gen, "authMode", std::to_underlying(creds->auth_mode()));
         if (const auto* bssid = creds->bssid()) {
-          static constexpr char kHex[] = "0123456789ABCDEF";
-          char hex[13];
-          for (int i = 0; i < 6; ++i) {
-            const uint8_t b = bssid->bytes()->Get(i);
-            hex[i * 2]      = kHex[b >> 4];
-            hex[i * 2 + 1]  = kHex[b & 0x0F];
-          }
-          hex[12] = '\0';
-          JSON::objSetString(gen, "bssid", hex);
+          JSON::objSetString(gen, "bssid", HexUtils::ToHex(std::span<const uint8_t, 6>(bssid->bytes()->data(), 6)).data());
         }
         json_gen_end_object(gen);
       }

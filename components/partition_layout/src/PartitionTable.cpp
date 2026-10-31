@@ -1,6 +1,6 @@
 #include "partition_layout/PartitionTable.h"
 
-#include "Md5.h"
+#include "Hashing.h"
 
 #include <algorithm>
 #include <cstring>
@@ -16,6 +16,71 @@ namespace {
   {
     return static_cast<uint32_t>(p[0]) | (static_cast<uint32_t>(p[1]) << 8) | (static_cast<uint32_t>(p[2]) << 16) | (static_cast<uint32_t>(p[3]) << 24);
   }
+
+  std::string_view rawLabel(const uint8_t* entry)
+  {
+    const char* label = reinterpret_cast<const char*>(entry + 12);
+    return std::string_view(label, strnlen(label, PartitionTable::kLabelSize));
+  }
+
+  // Checks the structure and the MD5 without decoding anything: the number of entries, or why the bootloader would
+  // refuse the table.
+  std::expected<std::size_t, PartitionTable::ParseError> scan(std::span<const uint8_t> bytes)
+  {
+    using namespace PartitionTable;
+
+    if (bytes.size() < kEntrySize) {
+      return std::unexpected(ParseError::TooShort);
+    }
+    const std::size_t limit = std::min(bytes.size(), kMaxLen);
+
+    std::size_t count = 0;
+    std::size_t pos   = 0;
+    bool md5Seen      = false;
+    for (; pos + kEntrySize <= limit; pos += kEntrySize) {
+      const uint8_t* p     = bytes.data() + pos;
+      const uint16_t magic = readU16(p);
+      if (magic == kMagic) {
+        if (md5Seen) {
+          return std::unexpected(ParseError::Trailing);
+        }
+        if (count >= kMaxEntries) {
+          return std::unexpected(ParseError::TooManyEntries);
+        }
+        ++count;
+        continue;
+      }
+      if (magic == kMd5Magic) {
+        if (md5Seen) {
+          return std::unexpected(ParseError::Trailing);
+        }
+        MD5::Digest digest {};
+        if (!MD5::compute(bytes.data(), pos, digest)) {
+          return std::unexpected(ParseError::HashFailed);
+        }
+        if (memcmp(digest.data(), p + 16, digest.size()) != 0) {
+          return std::unexpected(ParseError::Md5Mismatch);
+        }
+        md5Seen = true;
+        continue;
+      }
+      // 0xFFFF (erased flash) or anything else: the end of the table. What follows must be erased.
+      for (std::size_t i = pos; i < limit; ++i) {
+        if (bytes[i] != 0xFF) {
+          return std::unexpected(md5Seen ? ParseError::Trailing : ParseError::NoMd5);
+        }
+      }
+      break;
+    }
+
+    if (count == 0) {
+      return std::unexpected(ParseError::NoEntries);
+    }
+    if (!md5Seen) {
+      return std::unexpected(ParseError::NoMd5);
+    }
+    return count;
+  }
 }  // namespace
 
 const PartitionTable::Entry* PartitionTable::Table::Find(std::string_view label) const
@@ -26,35 +91,6 @@ const PartitionTable::Entry* PartitionTable::Table::Find(std::string_view label)
     }
   }
   return nullptr;
-}
-
-const PartitionTable::Entry* PartitionTable::Table::Find(uint8_t type, uint8_t subtype, std::string_view label) const
-{
-  for (const Entry& entry : Entries()) {
-    if (entry.type == type && (subtype == 0xFF || entry.subtype == subtype) && entry.Label() == label) {
-      return &entry;
-    }
-  }
-  return nullptr;
-}
-
-const PartitionTable::Entry* PartitionTable::Table::FindAppAt(uint32_t offset) const
-{
-  for (const Entry& entry : Entries()) {
-    if (entry.IsApp() && entry.offset == offset) {
-      return &entry;
-    }
-  }
-  return nullptr;
-}
-
-uint32_t PartitionTable::Table::End() const
-{
-  uint32_t end = 0;
-  for (const Entry& entry : Entries()) {
-    end = std::max(end, entry.End());
-  }
-  return end;
 }
 
 const char* PartitionTable::ParseErrorName(ParseError error)
@@ -72,248 +108,90 @@ const char* PartitionTable::ParseErrorName(ParseError error)
       return "MD5 mismatch";
     case ParseError::Trailing:
       return "data after the MD5 entry";
+    case ParseError::HashFailed:
+      return "computing the MD5 failed";
   }
   return "unknown";
 }
 
-std::expected<PartitionTable::Table, PartitionTable::ParseError> PartitionTable::Parse(std::span<const uint8_t> bytes)
+std::expected<void, PartitionTable::ParseError> PartitionTable::Parse(std::span<const uint8_t> bytes, Table& out)
 {
-  if (bytes.size() < kEntrySize) {
-    return std::unexpected(ParseError::TooShort);
-  }
-  const std::size_t limit = std::min(bytes.size(), kMaxLen);
-
-  Table table {};
-  std::size_t pos = 0;
-  bool md5Seen    = false;
-  for (; pos + kEntrySize <= limit; pos += kEntrySize) {
-    const uint8_t* p     = bytes.data() + pos;
-    const uint16_t magic = readU16(p);
-    if (magic == kMagic) {
-      if (md5Seen) {
-        return std::unexpected(ParseError::Trailing);
-      }
-      if (table.count >= kMaxEntries) {
-        return std::unexpected(ParseError::TooManyEntries);
-      }
-      Entry& entry  = table.entries[table.count++];
-      entry.type    = p[2];
-      entry.subtype = p[3];
-      entry.offset  = readU32(p + 4);
-      entry.size    = readU32(p + 8);
-      memcpy(entry.label, p + 12, kLabelSize);
-      entry.label[kLabelSize] = '\0';
-      entry.flags             = readU32(p + 28);
-      continue;
-    }
-    if (magic == kMd5Magic) {
-      if (md5Seen) {
-        return std::unexpected(ParseError::Trailing);
-      }
-      uint8_t digest[16];
-      Internal::Md5(bytes.data(), pos, digest);
-      if (memcmp(digest, p + 16, 16) != 0) {
-        return std::unexpected(ParseError::Md5Mismatch);
-      }
-      md5Seen = true;
-      continue;
-    }
-    // 0xFFFF (erased flash) or anything else: the end of the table. What follows must be erased.
-    for (std::size_t i = pos; i < limit; ++i) {
-      if (bytes[i] != 0xFF) {
-        return std::unexpected(md5Seen ? ParseError::Trailing : ParseError::NoMd5);
-      }
-    }
-    break;
+  auto count = scan(bytes);
+  if (!count) {
+    return std::unexpected(count.error());
   }
 
-  if (table.count == 0) {
-    return std::unexpected(ParseError::NoEntries);
+  out.count = *count;
+  for (std::size_t i = 0; i < out.count; ++i) {
+    const uint8_t* p = bytes.data() + i * kEntrySize;
+    Entry& entry     = out.entries[i];
+    entry.type       = p[2];
+    entry.subtype    = p[3];
+    entry.offset     = readU32(p + 4);
+    entry.size       = readU32(p + 8);
+    memcpy(entry.label, p + 12, kLabelSize);
+    entry.label[kLabelSize] = '\0';
+    entry.flags             = readU32(p + 28);
   }
-  if (!md5Seen) {
-    return std::unexpected(ParseError::NoMd5);
-  }
-  return table;
+  return {};
 }
 
-const char* PartitionTable::LayoutName(Layout layout)
+const char* PartitionTable::RetypeErrorName(RetypeError error)
 {
-  switch (layout) {
-    case Layout::Unknown:
-      return "unknown";
-    case Layout::V1:
-      return "v1 (1.x: littlefs config/static0)";
-    case Layout::V2:
-      return "v2 (2.x: cfg/www)";
+  switch (error) {
+    case RetypeError::Unparsable:
+      return "the table does not parse";
+    case RetypeError::NoSuchEntry:
+      return "no entry has that label";
+    case RetypeError::LabelTooLong:
+      return "the new label is too long";
+    case RetypeError::LabelTaken:
+      return "another entry has the new label";
+    case RetypeError::HashFailed:
+      return "computing the MD5 failed";
   }
   return "unknown";
 }
 
-PartitionTable::Layout PartitionTable::Detect(const Table& table)
+std::expected<void, PartitionTable::RetypeError> PartitionTable::Retype(Bytes& bytes, std::string_view label, uint8_t type, uint8_t subtype, std::string_view newLabel)
 {
-  const bool cfg     = table.Find(kTypeData, kSubtypeDataNvs, "cfg") != nullptr;
-  const bool www     = table.Find(kTypeWww, 0xFF, "www") != nullptr;
-  const bool config  = table.Find(kTypeData, kSubtypeDataSpiffs, "config") != nullptr;
-  const bool static0 = table.Find(kTypeData, kSubtypeDataSpiffs, "static0") != nullptr;
-  if (cfg && www && !config && !static0) {
-    return Layout::V2;
+  if (newLabel.size() > kLabelSize) {
+    return std::unexpected(RetypeError::LabelTooLong);
   }
-  if (config && static0 && !cfg && !www) {
-    return Layout::V1;
-  }
-  return Layout::Unknown;
-}
-
-const char* PartitionTable::ViolationName(Violation violation)
-{
-  switch (violation) {
-    case Violation::NotV2Layout:
-      return "staged table is not a 2.x layout";
-    case Violation::TooManyEntries:
-      return "too many entries";
-    case Violation::SizeUnaligned:
-      return "an entry's size is not a positive multiple of 4 KiB";
-    case Violation::AppUnaligned:
-      return "an app entry is not 64 KiB aligned";
-    case Violation::Overlap:
-      return "entries overlap";
-    case Violation::PastFlash:
-      return "an entry ends past the flash";
-    case Violation::NvsMoved:
-      return "nvs moved";
-    case Violation::OtadataMoved:
-      return "otadata moved";
-    case Violation::NoCfg:
-      return "no cfg partition";
-    case Violation::NoWww:
-      return "no www partition";
-    case Violation::GeometryChanged:
-      return "an entry was added, removed, moved or resized";
-    case Violation::EntryRetyped:
-      return "an entry other than config and static0 changed type, subtype or label";
-    case Violation::NoRunningSlot:
-      return "no slot for the running image";
-    case Violation::BootloaderHeaderUnknown:
-      return "bootloader header flash size unknown";
-    case Violation::BootloaderHeaderTooSmall:
-      return "bootloader header declares a smaller flash than the table needs";
-    case Violation::LiveUnreadable:
-      return "live table unreadable";
-    case Violation::LiveNotMigratable:
-      return "live table is not a layout this firmware migrates from";
-  }
-  return "unknown";
-}
-
-std::expected<void, PartitionTable::Violation> PartitionTable::Validate(const Table& staged, const Context& context)
-{
-  const auto entries = staged.Entries();
-  if (entries.size() > kMaxEntries) {
-    return std::unexpected(Violation::TooManyEntries);
+  auto count = scan(bytes);
+  if (!count) {
+    return std::unexpected(count.error() == ParseError::HashFailed ? RetypeError::HashFailed : RetypeError::Unparsable);
   }
 
-  // 6. Geometry: what the bootloader checks, plus overlap.
-  for (std::size_t i = 0; i < entries.size(); ++i) {
-    const Entry& entry = entries[i];
-    if (entry.size == 0 || entry.size % kSectorSize != 0 || entry.offset % kSectorSize != 0) {
-      return std::unexpected(Violation::SizeUnaligned);
-    }
-    if (entry.IsApp() && entry.offset % kAppAlignment != 0) {
-      return std::unexpected(Violation::AppUnaligned);
-    }
-    if (entry.End() < entry.offset || entry.End() > context.flashSize) {
-      return std::unexpected(Violation::PastFlash);
-    }
-    for (std::size_t j = i + 1; j < entries.size(); ++j) {
-      if (entry.Overlaps(entries[j])) {
-        return std::unexpected(Violation::Overlap);
-      }
+  uint8_t* target = nullptr;
+  for (std::size_t i = 0; i < *count; ++i) {
+    uint8_t* p                 = bytes.data() + i * kEntrySize;
+    const std::string_view own = rawLabel(p);
+    if (own == label) {
+      target = p;
+    } else if (own == newLabel) {
+      return std::unexpected(RetypeError::LabelTaken);
     }
   }
-
-  // 3. The shared nvs and otadata never move: the bootloader's OTA state and the PHY cache stay where they are.
-  const Entry* nvs = staged.Find(kTypeData, kSubtypeDataNvs, "nvs");
-  if (nvs == nullptr || nvs->offset != kNvsOffset || nvs->size != kNvsSize) {
-    return std::unexpected(Violation::NvsMoved);
-  }
-  const Entry* otadata = staged.Find(kTypeData, kSubtypeDataOta, "otadata");
-  if (otadata == nullptr || otadata->offset != kOtadataOffset || otadata->size != kOtadataSize) {
-    return std::unexpected(Violation::OtadataMoved);
+  if (target == nullptr) {
+    return std::unexpected(RetypeError::NoSuchEntry);
   }
 
-  // 5. The 2.x partitions the firmware hardcodes.
-  if (staged.Find(kTypeData, kSubtypeDataNvs, "cfg") == nullptr) {
-    return std::unexpected(Violation::NoCfg);
-  }
-  if (staged.Find(kTypeWww, 0xFF, "www") == nullptr) {
-    return std::unexpected(Violation::NoWww);
-  }
-  if (Detect(staged) != Layout::V2) {
-    return std::unexpected(Violation::NotV2Layout);
-  }
+  uint8_t original[kEntrySize];
+  memcpy(original, target, kEntrySize);
 
-  // 8. The live table: readable, and the layout this firmware knows how to leave.
-  if (context.live == nullptr) {
-    return std::unexpected(Violation::LiveUnreadable);
-  }
-  if (Detect(*context.live) != Layout::V1) {
-    return std::unexpected(Violation::LiveNotMigratable);
-  }
+  target[2] = type;
+  target[3] = subtype;
+  memset(target + 12, 0, kLabelSize);
+  memcpy(target + 12, newLabel.data(), newLabel.size());
 
-  // 9. Nothing moves: every staged entry sits exactly where a live one does (no overlap and the same count make that
-  //    one to one), and only config and static0 become something else. No data of the old layout ends up inside a
-  //    partition of another kind except the two the migration fills itself.
-  const auto liveEntries = context.live->Entries();
-  if (entries.size() != liveEntries.size()) {
-    return std::unexpected(Violation::GeometryChanged);
+  // The MD5 entry follows the last entry; its digest covers every entry before it
+  const std::size_t md5Pos = *count * kEntrySize;
+  MD5::Digest digest {};
+  if (!MD5::compute(bytes.data(), md5Pos, digest)) {
+    memcpy(target, original, kEntrySize);
+    return std::unexpected(RetypeError::HashFailed);
   }
-  for (const Entry& entry : entries) {
-    const auto old = std::find_if(liveEntries.begin(), liveEntries.end(), [&](const Entry& e) { return entry.SamePlace(e); });
-    if (old == liveEntries.end()) {
-      return std::unexpected(Violation::GeometryChanged);
-    }
-    // cfg and www themselves (type and subtype) were checked above
-    const std::string_view expected = old->Label() == "config" ? "cfg" : old->Label() == "static0" ? "www" : old->Label();
-    const bool retyped              = expected != old->Label() ? entry.Label() != expected : (entry.type != old->type || entry.subtype != old->subtype || entry.Label() != expected);
-    if (retyped) {
-      return std::unexpected(Violation::EntryRetyped);
-    }
-  }
-
-  // 4. Where the running image lives after the rewrite: its slot, grown in place, or an app slot the old table
-  //    never used (so a copy of the image into it touches nothing the old layout cares about).
-  bool runningSlotOk = false;
-  if (const Entry* slot = staged.FindAppAt(context.runningOffset); slot != nullptr && slot->size >= context.runningImageSize) {
-    runningSlotOk = true;
-  } else {
-    for (const Entry& entry : entries) {
-      if (!entry.IsApp() || entry.size < context.runningImageSize) {
-        continue;
-      }
-      bool clear = true;
-      for (const Entry& old : context.live->Entries()) {
-        if (entry.Overlaps(old)) {
-          clear = false;
-          break;
-        }
-      }
-      if (clear) {
-        runningSlotOk = true;
-        break;
-      }
-    }
-  }
-  if (!runningSlotOk) {
-    return std::unexpected(Violation::NoRunningSlot);
-  }
-
-  // 7. The bootloader sizes the flash from its own image header and rejects any entry past that size.
-  if (context.bootloaderFlashSize == 0) {
-    return std::unexpected(Violation::BootloaderHeaderUnknown);
-  }
-  if (staged.End() > context.bootloaderFlashSize) {
-    return std::unexpected(Violation::BootloaderHeaderTooSmall);
-  }
-
+  memcpy(bytes.data() + md5Pos + 16, digest.data(), digest.size());
   return {};
 }

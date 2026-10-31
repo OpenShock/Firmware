@@ -1,5 +1,5 @@
 name: package-firmware
-description: Stamp each board from its variant build, give it its partition table and bootloader flash size, and merge it with the www image
+description: Stamp each board from its variant build and merge it with the www image
 inputs:
   version:
     required: true
@@ -27,8 +27,7 @@ runs:
         name: firmware_staticfs
         path: staticfs
 
-    # Stamps the app, writes the board's partition table and sets its flash size in the bootloader header
-    - name: Package every board
+    - name: Stamp every board
       shell: bash
       env:
         BOARDS: ${{ inputs.boards }}

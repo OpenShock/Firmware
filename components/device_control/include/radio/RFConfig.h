@@ -16,13 +16,14 @@ namespace OpenShock::JSON {
 
 namespace OpenShock::Config {
   struct RFConfig {
-    RFConfig();
+    RFConfig();  // The defaults: the one place they are defined
     RFConfig(gpio_num_t txPin, bool keepAliveEnabled);
 
     gpio_num_t txPin;
     bool keepAliveEnabled;
 
-    void ToDefault();
+    /// @brief No rules to apply yet. The section runs it on every value it takes in.
+    void Normalize() { }
 
     bool LoadNvs(const char* partition);
     bool SaveNvs(const char* partition, const RFConfig* previous) const;
@@ -34,12 +35,10 @@ namespace OpenShock::Config {
   };
 
   /// @brief The section itself, for whole-value reads and read-modify-writes.
-  Section<RFConfig>& RFSection();
-
-  [[nodiscard]] std::optional<RFConfig> GetRFConfig();
+  [[nodiscard]] RFConfig GetRFConfig();
   bool SetRFConfig(const RFConfig& config);
-  [[nodiscard]] std::optional<gpio_num_t> GetRFConfigTxPin();
+  [[nodiscard]] gpio_num_t GetRFConfigTxPin();
   bool SetRFConfigTxPin(gpio_num_t txPin);
-  [[nodiscard]] std::optional<bool> GetRFConfigKeepAliveEnabled();
+  [[nodiscard]] bool GetRFConfigKeepAliveEnabled();
   bool SetRFConfigKeepAliveEnabled(bool enabled);
 }  // namespace OpenShock::Config

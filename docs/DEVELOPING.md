@@ -122,8 +122,8 @@ python scripts/build.py --variant ?                  # any unknown id lists the 
 - `OPENSHOCK_*` pin lines: not Kconfig. Stripped from the fragment and stamped into the image by
   `scripts/stamp_board.py`, so the same compiled objects serve every board of a chip.
 
-Shared config lives in `sdkconfig.defaults`. Every board uses the one partition table
-(`partitions/ota_4mb.csv`, see [STORAGE.md](STORAGE.md)); board files do not name one. `sdkconfig` and `build/` are generated and
+Shared config lives in `sdkconfig.defaults`, including the 4 MB OTA partition table
+(`partitions/ota_4mb.csv`) every board uses. `sdkconfig` and `build/` are generated and
 gitignored. If a `sdkconfig` is stale after a defaults change, delete it or run `fullclean`.
 
 ### OpenShock Kconfig options
@@ -177,9 +177,11 @@ The inline `ESPPORT=COM4` form is POSIX shell syntax. In PowerShell set it first
 The presets build into `build/<board>/`, the same directories `scripts/build.py` uses, so the
 two can be mixed. Flash and monitor read the port from `ESPPORT`; `menuconfig` is a target too.
 A preset build stamps the board like the script does, since the stamp is a CMake post-build step.
-The file also has a `default` preset with no board. It exists for `idf.py`, which configures with
-the preset of that name once a `CMakePresets.json` is present, and it is what `scripts/build.py`
-runs under; the script's own `-B` and `-D` arguments take precedence, so it changes nothing.
+The file also has a `default` preset, which configures `OpenShock-Core-V2` (`DEFAULT_BOARD` in
+`scripts/gen_cmake_presets.py`). `idf.py` configures with the preset of that name once a
+`CMakePresets.json` is present, so a bare `idf.py menuconfig` or `idf.py build` works on that board;
+`idf.py --preset <board> menuconfig` picks another. `scripts/build.py` runs under it too, and the
+script's own `-B` and `-D` arguments take precedence, so it changes nothing there.
 Differences from the script: a tree configured by a preset has ccache off (idf.py turns it on),
 and the bootloader's nested configure prints a warning about `ESP_ROM_ELF_DIR` when the shell is
 not exported; it is harmless. A tree the script configured keeps ccache when CLion or a bare
@@ -235,16 +237,14 @@ To build only the image, as CI does:
 
 ```sh
 python scripts/gen_staticfs.py --frontend-dir frontend --output build/www.bin \
-    --partition-csv partitions/ota_4mb.csv \
-    --legacy-output build/staticfs.bin    # the 1.x littlefs image, only for the 1.x bridge release
+    --partition-csv partitions/ota_4mb.csv
 ```
 
 ### Packaged and merged images
 
 Releases ship one binary per board, flashable at offset 0. CI gets there in three steps, which
-run locally too. `package_boards.py` stamps the app, writes the board's partition table and sets its
-flash size in the bootloader header. It expects each variant directory to hold `app.bin` and
-`bootloader.bin` (a `partition-table.bin` there is not used), the names CI uploads; a local variant build writes
+run locally too. `package_boards.py` expects each variant directory to hold `app.bin`,
+`bootloader.bin` and `partition-table.bin`, the names CI uploads; a local variant build writes
 `firmware.bin`, `bootloader/bootloader.bin` and `partition_table/partition-table.bin`, so copy
 them first.
 

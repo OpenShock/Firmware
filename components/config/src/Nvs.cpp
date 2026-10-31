@@ -4,12 +4,36 @@ const char* const TAG = "Config::Nvs";
 
 #include "Logging.h"
 
+#include <nvs_flash.h>
+
 #include <algorithm>
 #include <string>
 #include <utility>
 #include <vector>
 
 using namespace OpenShock::Config;
+
+bool Nvs::InitPartition(const char* label, bool eraseNewer)
+{
+  esp_err_t err = nvs_flash_init_partition(label);
+  if (err == ESP_ERR_NVS_NEW_VERSION_FOUND && !eraseNewer) {
+    OS_LOGE(TAG, "NVS partition %s was written by a newer firmware; leaving it untouched", label);
+    return false;
+  }
+  if (err == ESP_ERR_NVS_NO_FREE_PAGES || err == ESP_ERR_NVS_NEW_VERSION_FOUND) {
+    OS_LOGW(TAG, "NVS partition %s unusable (%s), erasing and reformatting", label, esp_err_to_name(err));
+    if (nvs_flash_erase_partition(label) != ESP_OK) {
+      OS_LOGE(TAG, "Failed to erase NVS partition %s", label);
+      return false;
+    }
+    err = nvs_flash_init_partition(label);
+  }
+  if (err != ESP_OK) {
+    OS_LOGE(TAG, "Failed to initialize NVS partition %s: %s", label, esp_err_to_name(err));
+    return false;
+  }
+  return true;
+}
 
 std::optional<Nvs::Handle> Nvs::Handle::Open(const char* partition, const char* ns, bool write)
 {
@@ -20,6 +44,20 @@ std::optional<Nvs::Handle> Nvs::Handle::Open(const char* partition, const char* 
   }
   if (err == ESP_ERR_NVS_NOT_FOUND && !write) {
     return std::nullopt;  // The namespace was never written: every key is a default
+  }
+  OS_LOGE(TAG, "Failed to open %s/%s: %s", partition, ns, esp_err_to_name(err));
+  return std::nullopt;
+}
+
+std::optional<Nvs::Handle> Nvs::Handle::OpenForLoad(const char* partition, const char* ns)
+{
+  nvs_handle_t handle = 0;
+  esp_err_t err       = nvs_open_from_partition(partition, ns, NVS_READONLY, &handle);
+  if (err == ESP_OK) {
+    return Handle(handle);
+  }
+  if (err == ESP_ERR_NVS_NOT_FOUND) {
+    return Handle(0);  // The namespace was never written: every key is a default
   }
   OS_LOGE(TAG, "Failed to open %s/%s: %s", partition, ns, esp_err_to_name(err));
   return std::nullopt;
@@ -73,23 +111,28 @@ namespace {
 
 Nvs::Result Nvs::Handle::GetU8(const char* key, uint8_t& out) const
 {
+  if (!Exists()) return Result::Missing;
   return toResult(nvs_get_u8(m_handle, key, &out), key);
 }
 Nvs::Result Nvs::Handle::GetI8(const char* key, int8_t& out) const
 {
+  if (!Exists()) return Result::Missing;
   return toResult(nvs_get_i8(m_handle, key, &out), key);
 }
 Nvs::Result Nvs::Handle::GetU16(const char* key, uint16_t& out) const
 {
+  if (!Exists()) return Result::Missing;
   return toResult(nvs_get_u16(m_handle, key, &out), key);
 }
 Nvs::Result Nvs::Handle::GetI32(const char* key, int32_t& out) const
 {
+  if (!Exists()) return Result::Missing;
   return toResult(nvs_get_i32(m_handle, key, &out), key);
 }
 
 Nvs::Result Nvs::Handle::GetStr(const char* key, std::string& out) const
 {
+  if (!Exists()) return Result::Missing;
   size_t length = 0;
   Result result = toResult(nvs_get_str(m_handle, key, nullptr, &length), key);
   if (result != Result::Found) {
@@ -107,6 +150,7 @@ Nvs::Result Nvs::Handle::GetStr(const char* key, std::string& out) const
 
 Nvs::Result Nvs::Handle::GetBlob(const char* key, std::vector<uint8_t>& out) const
 {
+  if (!Exists()) return Result::Missing;
   size_t length = 0;
   Result result = toResult(nvs_get_blob(m_handle, key, nullptr, &length), key);
   if (result != Result::Found) {
@@ -123,34 +167,28 @@ Nvs::Result Nvs::Handle::GetBlob(const char* key, std::vector<uint8_t>& out) con
   return Result::Found;
 }
 
-bool Nvs::Handle::SetU8(const char* key, uint8_t value, const uint8_t* previous)
+bool Nvs::Handle::SetU8(const char* key, uint8_t value)
 {
-  if (previous != nullptr && *previous == value) return true;
   return checkWrite(nvs_set_u8(m_handle, key, value), key);
 }
-bool Nvs::Handle::SetBool(const char* key, bool value, const bool* previous)
+bool Nvs::Handle::SetBool(const char* key, bool value)
 {
-  if (previous != nullptr && *previous == value) return true;
   return checkWrite(nvs_set_u8(m_handle, key, value ? 1 : 0), key);
 }
-bool Nvs::Handle::SetI8(const char* key, int8_t value, const int8_t* previous)
+bool Nvs::Handle::SetI8(const char* key, int8_t value)
 {
-  if (previous != nullptr && *previous == value) return true;
   return checkWrite(nvs_set_i8(m_handle, key, value), key);
 }
-bool Nvs::Handle::SetU16(const char* key, uint16_t value, const uint16_t* previous)
+bool Nvs::Handle::SetU16(const char* key, uint16_t value)
 {
-  if (previous != nullptr && *previous == value) return true;
   return checkWrite(nvs_set_u16(m_handle, key, value), key);
 }
-bool Nvs::Handle::SetI32(const char* key, int32_t value, const int32_t* previous)
+bool Nvs::Handle::SetI32(const char* key, int32_t value)
 {
-  if (previous != nullptr && *previous == value) return true;
   return checkWrite(nvs_set_i32(m_handle, key, value), key);
 }
-bool Nvs::Handle::SetStr(const char* key, std::string_view value, const std::string* previous)
+bool Nvs::Handle::SetStr(const char* key, std::string_view value)
 {
-  if (previous != nullptr && *previous == value) return true;
   // nvs_set_str wants a C string: a value with an embedded NUL would be silently cut, so refuse it
   if (value.find('\0') != std::string_view::npos) {
     OS_LOGE(TAG, "Refusing to store %s: embedded NUL", key);
@@ -247,49 +285,19 @@ bool Nvs::Load(const Handle& handle, const char* key, std::string& out, std::str
   return false;
 }
 
-bool Nvs::NamespaceExists(const char* partition, const char* ns)
-{
-  nvs_handle_t handle = 0;
-  esp_err_t err       = nvs_open_from_partition(partition, ns, NVS_READONLY, &handle);
-  if (err == ESP_OK) {
-    nvs_close(handle);
-    return true;
-  }
-  return false;
-}
-
-std::size_t Nvs::KeyCount(const char* partition, const char* ns)
-{
-  auto handle = Handle::Open(partition, ns, false);
-  if (!handle) {
-    return 0;
-  }
-  std::size_t count = 0;
-  handle->ForEachKey(NVS_TYPE_ANY, [&](const char*) { ++count; });
-  return count;
-}
-
 bool Nvs::EraseNamespace(const char* partition, const char* ns)
 {
-  nvs_handle_t handle = 0;
-  esp_err_t err       = nvs_open_from_partition(partition, ns, NVS_READWRITE, &handle);
-  if (err == ESP_ERR_NVS_NOT_FOUND) {
+  // Looked up read-only first: a read-write open creates the namespace, which one that is not there must not do
+  auto existing = Handle::OpenForLoad(partition, ns);
+  if (!existing) {
+    return false;
+  }
+  if (!existing->Exists()) {
     return true;
   }
-  if (err != ESP_OK) {
-    OS_LOGE(TAG, "Failed to open %s/%s for erase: %s", partition, ns, esp_err_to_name(err));
-    return false;
-  }
-  err = nvs_erase_all(handle);
-  if (err == ESP_OK) {
-    err = nvs_commit(handle);
-  }
-  nvs_close(handle);
-  if (err != ESP_OK) {
-    OS_LOGE(TAG, "Failed to erase %s/%s: %s", partition, ns, esp_err_to_name(err));
-    return false;
-  }
-  return true;
+  existing.reset();
+  auto handle = Handle::Open(partition, ns, true);
+  return handle && handle->EraseAll() && handle->Commit();
 }
 
 namespace {
@@ -424,26 +432,18 @@ bool Nvs::CopyNamespace(const char* from, const char* to, const char* ns)
     return true;
   }
 
-  nvs_handle_t src = 0, dst = 0;
-  if (nvs_open_from_partition(from, ns, NVS_READONLY, &src) != ESP_OK) {
+  auto src = Handle::Open(from, ns, false);
+  auto dst = Handle::Open(to, ns, true);
+  if (!src || !dst) {
     return false;
   }
-  if (nvs_open_from_partition(to, ns, NVS_READWRITE, &dst) != ESP_OK) {
-    nvs_close(src);
-    return false;
-  }
-  bool ok = true;
   for (const auto& [key, type] : keys) {
     RawEntry entry;
-    if (!readRaw(src, key.c_str(), type, entry) || !writeRaw(dst, key.c_str(), entry)) {
-      ok = false;
-      break;
+    if (!readRaw(src->get(), key.c_str(), type, entry) || !writeRaw(dst->get(), key.c_str(), entry)) {
+      return false;
     }
   }
-  ok = ok && checkWrite(nvs_commit(dst), "commit");
-  nvs_close(dst);
-  nvs_close(src);
-  return ok;
+  return dst->Commit();
 }
 
 bool Nvs::NamespacesEqual(const char* a, const char* b, const char* ns)
@@ -461,23 +461,16 @@ bool Nvs::NamespacesEqual(const char* a, const char* b, const char* ns)
     return true;
   }
 
-  nvs_handle_t ha = 0, hb = 0;
-  if (nvs_open_from_partition(a, ns, NVS_READONLY, &ha) != ESP_OK) {
+  auto ha = Handle::Open(a, ns, false);
+  auto hb = Handle::Open(b, ns, false);
+  if (!ha || !hb) {
     return false;
   }
-  if (nvs_open_from_partition(b, ns, NVS_READONLY, &hb) != ESP_OK) {
-    nvs_close(ha);
-    return false;
-  }
-  bool equal = true;
   for (const auto& [key, type] : keysA) {
     RawEntry ea, eb;
-    if (!readRaw(ha, key.c_str(), type, ea) || !readRaw(hb, key.c_str(), type, eb) || ea.data != eb.data) {
-      equal = false;
-      break;
+    if (!readRaw(ha->get(), key.c_str(), type, ea) || !readRaw(hb->get(), key.c_str(), type, eb) || ea.data != eb.data) {
+      return false;
     }
   }
-  nvs_close(hb);
-  nvs_close(ha);
-  return equal;
+  return true;
 }

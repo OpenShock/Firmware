@@ -3,16 +3,19 @@
 idf_component_register(
   SRCS         "test_main.cpp"
                "test_www_image.cpp"
-               "sha256.cpp"
                "../../src/WwwImage.cpp"
   INCLUDE_DIRS "."
-               "stubs"                     # Hashing.h: OpenShock::SHA256 over the host SHA-256
+               "stubs"                     # Hashing.h: OpenShock::SHA256 with failure injection
                "../../include"             # www/WwwImage.h
                "../../../common/include"   # OpenShock.h
   REQUIRES     unity
                host_support                # Logging.h, openshock_board.h (test/host_support)
+               mbedtls                     # stubs/Hashing.h -> mbedtls/md.h
   WHOLE_ARCHIVE  # keep the auto-registered TEST_CASEs from being stripped
 )
+
+# See components/crypto/host_test/main/CMakeLists.txt: esp_mem.o is otherwise not pulled in by the link order.
+target_link_libraries(${COMPONENT_LIB} INTERFACE "-u esp_mbedtls_mem_calloc" "-u esp_mbedtls_mem_free")
 
 # The fixtures: a few assets packed by the Python packer at configure time, read by the tests at run time.
 set(_fixture_dir ${CMAKE_BINARY_DIR}/fixtures)
@@ -34,7 +37,7 @@ else()
 endif()
 set(_scripts_dir ${CMAKE_CURRENT_LIST_DIR}/../../../../scripts)
 execute_process(
-  COMMAND ${_python} -m utils.wwwimage ${_fixture_dir}/assets ${_fixture_dir}/assets.bin --gzip
+  COMMAND ${_python} -m utils.wwwimage ${_fixture_dir}/assets ${_fixture_dir}/assets.bin
   WORKING_DIRECTORY ${_scripts_dir}
   RESULT_VARIABLE _rc)
 if(NOT _rc EQUAL 0)

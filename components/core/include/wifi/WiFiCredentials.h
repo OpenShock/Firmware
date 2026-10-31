@@ -5,7 +5,6 @@
 #include <json_generator.h>
 
 #include <esp_wifi_types.h>
-#include <hal/gpio_types.h>
 
 #include <array>
 #include <cstdint>
@@ -31,13 +30,12 @@ namespace OpenShock::Config {
     std::array<uint8_t, 6> bssid;  // Pinned BSSID, all zeros = no pin
 
     bool HasPinnedBSSID() const;
+    bool operator==(const WiFiCredentials&) const = default;
 
     /// @brief The credential as the blob stored under its id in the `wifi` NVS namespace (wifi/WiFiConfig.h).
     [[nodiscard]] std::vector<uint8_t> ToBlob() const;
     /// @brief Decodes a blob written by ToBlob (any version it ever wrote). False on a malformed blob.
     bool FromBlob(std::span<const uint8_t> blob);
-
-    void ToDefault();
 
     [[nodiscard]] flatbuffers::Offset<Serialization::Configuration::WiFiCredentials> ToFlatbuffers(flatbuffers::FlatBufferBuilder& builder, bool withSensitiveData) const;
 

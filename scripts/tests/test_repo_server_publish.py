@@ -106,6 +106,14 @@ def test_resolve_artifacts_reads_the_package_layout(tmp_path):
     assert found[repo_server_publish.MERGED_FIELD] == tmp_path / 'firmware_merged' / 'OpenShock_BoardA_1.5.0.bin'
 
 
+def test_a_2x_release_publishes_the_www_image(tmp_path):
+    write_board_artifacts(tmp_path, 'BoardA', version='2.0.0')
+    found = repo_server_publish.resolve_artifacts(tmp_path, 'BoardA', '2.0.0')
+    assert found[repo_server_publish.STATICFS_FIELD] == tmp_path / 'firmware_staticfs' / 'www.bin'
+    assert repo_server_publish.staticfs_file_for('1.9.3') == 'staticfs.bin'
+    assert repo_server_publish.staticfs_file_for('10.0.0') == 'www.bin'
+
+
 def test_resolve_artifacts_fails_on_a_missing_image(tmp_path, capsys):
     write_board_artifacts(tmp_path, 'BoardA')
     (tmp_path / 'firmware_boards' / 'BoardA' / 'bootloader.bin').unlink()
@@ -340,13 +348,3 @@ def test_main_refuses_an_unknown_mode(monkeypatch, capsys):
     monkeypatch.setenv('MODE', 'upload')
     with fails_with(capsys, "MODE must be one of init/publish/abort, got 'upload'"):
         repo_server_publish.main()
-
-
-@pytest.mark.parametrize(
-    'version, expected',
-    [('1.5.0', 'staticfs.bin'), ('1.9.9', 'staticfs.bin'), ('2.0.0', 'www.bin'), ('10.1.0-rc.1', 'www.bin')],
-)
-def test_staticfs_follows_the_release_major(tmp_path, version, expected):
-    write_board_artifacts(tmp_path, 'BoardA', version)
-    found = repo_server_publish.resolve_artifacts(tmp_path, 'BoardA', version)
-    assert found[repo_server_publish.STATICFS_FIELD] == tmp_path / 'firmware_staticfs' / expected
