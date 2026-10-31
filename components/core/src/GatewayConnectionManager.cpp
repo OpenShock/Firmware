@@ -1,3 +1,5 @@
+#include <freertos/FreeRTOS.h>
+
 #include "GatewayConnectionManager.h"
 
 const char* const TAG = "GatewayConnectionManager";
@@ -5,7 +7,7 @@ const char* const TAG = "GatewayConnectionManager";
 #include "visual/VisualStateManager.h"
 
 #include "AppHooks.h"
-#include "config/Config.h"
+#include "BackendConfig.h"
 #include "events/Events.h"
 #include "GatewayClient.h"
 #include "http/JsonAPI.h"
@@ -301,13 +303,7 @@ static bool StartConnectingToLCG()
     return false;
   }
 
-  auto authToken = Config::GetBackendAuthToken();
-  if (!authToken) {
-    OS_LOGE(TAG, "Failed to get auth token");
-    return false;
-  }
-
-  auto response = HTTP::JsonAPI::AssignLcg(*authToken);
+  auto response = HTTP::JsonAPI::AssignLcg(Config::GetBackendAuthToken());
 
   if (response.code == 401) {
     OS_LOGD(TAG, "Auth token is invalid, waiting 5 minutes before retrying");
@@ -349,13 +345,8 @@ static void InitializeClient()
     return;  // Checked here so an auth hold-off doesn't also count as a hub info failure and stack the two backoffs
   }
 
-  auto authToken = Config::GetBackendAuthToken();
-  if (!authToken) {
-    OS_LOGE(TAG, "Failed to get auth token");
-    return;
-  }
-
-  if (!FetchHubInfo(*authToken)) {
+  const std::string authToken = Config::GetBackendAuthToken();
+  if (!FetchHubInfo(authToken)) {
     // Back off on failure so an unreachable backend isn't polled on every update tick.
     s_hubInfoBackoff.backOff(OpenShock::millis());
     return;
@@ -373,7 +364,7 @@ static void InitializeClient()
     }
 
     s_flags.fetch_or(FLAG_LINKED, std::memory_order_relaxed);
-    s_wsClient = std::make_shared<OpenShock::GatewayClient>(*authToken);
+    s_wsClient = std::make_shared<OpenShock::GatewayClient>(authToken);
   }
   OS_LOGD(TAG, "Successfully verified auth token");
 

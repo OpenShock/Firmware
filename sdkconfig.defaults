@@ -13,18 +13,8 @@ CONFIG_ESP_MAIN_TASK_STACK_SIZE=16384
 # headroom here (default is 2304).
 CONFIG_ESP_SYSTEM_EVENT_TASK_STACK_SIZE=4096
 
-# Arduino expects these selected via ENABLE_ARDUINO_DEPENDS, but be explicit
-CONFIG_LWIP_SO_RCVBUF=y
-
 # Let application use exceptions-free C++ (matches build_flags -fno-exceptions)
 CONFIG_COMPILER_CXX_EXCEPTIONS=n
-
-# Arduino NetworkClientSecure (pulled in transitively by WebSockets/WiFiClientSecure)
-# refuses to compile its ssl_client.cpp body unless at least one PSK exchange is
-# enabled, otherwise all ssl_* symbols become unresolved at link time. We don't
-# actually use PSK, but we need MBEDTLS_KEY_EXCHANGE_SOME_PSK_ENABLED to be defined.
-CONFIG_MBEDTLS_PSK_MODES=y
-CONFIG_MBEDTLS_KEY_EXCHANGE_PSK=y
 
 # Captive portal serves HTTP + WebSocket from a single esp_http_server. WebSocket
 # support is compiled out of esp_http_server by default; enable it or the httpd_ws_*
@@ -59,23 +49,24 @@ CONFIG_MBEDTLS_CUSTOM_CERTIFICATE_BUNDLE=y
 CONFIG_MBEDTLS_CUSTOM_CERTIFICATE_BUNDLE_PATH="certificates/cacert-merged.pem"
 
 # Partition table: every board uses the same 4 MB OTA layout (app0/app1 1.6 MB each plus
-# config/static0/coredump). Set it here so a build without a board fragment (e.g. the
+# cfg/www/coredump). Set it here so a build without a board fragment (e.g. the
 # VS Code ESP-IDF extension) does not fall back to IDF's 1 MB single-app table, which
-# the app overflows and which has no static0 partition for the captive-portal assets.
+# the app overflows and which has no www partition for the captive-portal assets.
 CONFIG_ESPTOOLPY_FLASHSIZE_4MB=y
 CONFIG_PARTITION_TABLE_CUSTOM=y
 CONFIG_PARTITION_TABLE_CUSTOM_FILENAME="partitions/ota_4mb.csv"
+
+# The config lives in the dedicated `cfg` NVS partition (components/config); the shared `nvs` at 0x9000 is
+# ESP-IDF's own (PHY calibration cache) and may be erased at any time. The WiFi driver's NVS store
+# (nvs.net80211: one STA profile, one AP profile) cannot express the credential list the config keeps,
+# and WiFiManager already runs the driver with WIFI_STORAGE_RAM; compiling the store out drops the
+# module from the image and an NVS read at startup.
+CONFIG_ESP_WIFI_NVS_ENABLED=n
 
 # The CONFIG_ARDUINO_SELECTIVE_* block that used to live here is gone. Arduino is no
 # longer a component of this project - it is in neither dependencies.lock nor any
 # idf_component.yml - so kconfgen reported every one of those symbols as unknown and
 # discarded it. They were fourteen lines that did nothing.
-#
-# Still to review as part of finishing the de-Arduino migration: CONFIG_MBEDTLS_PSK_MODES
-# and CONFIG_MBEDTLS_KEY_EXCHANGE_PSK above were only needed to make Arduino's
-# NetworkClientSecure link, and CONFIG_LWIP_SO_RCVBUF was an Arduino dependency. All
-# three are real settings that still take effect, so they are left alone here rather
-# than changed as a side effect of a build-caching pass.
 
 # Boot a freshly flashed OTA image as PENDING_VERIFY so otaSetup() validates it and a
 # broken image rolls back to the previous slot instead of boot-looping. Needs the

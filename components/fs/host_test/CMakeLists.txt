@@ -11,3 +11,4 @@ list(APPEND EXTRA_COMPONENT_DIRS
      "$ENV{IDF_PATH}/tools/mocks/freertos/")
 
 project(fs_host_test)
+include(${CMAKE_CURRENT_LIST_DIR}/../../../cmake/cxx_standard.cmake)

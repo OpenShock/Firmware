@@ -1,4 +1,4 @@
-// The config partition is 3 x 4 KiB (partitions/ota_4mb.csv). littlefs keeps its root metadata pair in two of those
+// The 1.x config partition is 3 x 4 KiB (partitions/legacy/ota_4mb_v1.csv). littlefs keeps its root metadata pair in two of those
 // blocks, and ConfigFs::writeAll writes "<path>.tmp" and renames it over the old file. A file too large to be
 // inlined in the metadata needs its own data block while the old copy still occupies the only free one, so the
 // review suspected that larger configs can't be rewritten at all (REVIEW_ACTIONS.md, X01).

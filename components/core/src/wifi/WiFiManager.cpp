@@ -5,7 +5,6 @@
 const char* const TAG = "WiFiManager";
 
 #include "AppHooks.h"
-#include "config/Config.h"
 #include "events/Events.h"
 #include "FormatHelpers.h"
 #include "Logging.h"
@@ -13,6 +12,7 @@ const char* const TAG = "WiFiManager";
 #include "Temporal.h"
 #include "util/FunctionRef.h"
 #include "util/TaskUtils.h"
+#include "wifi/WiFiConfig.h"
 #include "wifi/WiFiNetwork.h"
 #include "wifi/WiFiScanManager.h"
 
@@ -303,9 +303,8 @@ static void evWiFiConnected(const wifi_event_sta_connected_t& info)
 
     OS_LOGW(TAG, "Connected to unscanned network \"%s\", BSSID: " BSSID_FMT, ssid, BSSID_ARG(info.bssid));
 
-    uint8_t credentialsId = 0;
-    if (auto creds = Config::TryGetWiFiCredentialsBySSID(ssid)) {
-      credentialsId = creds->id;
+    const uint8_t credentialsId = Config::GetWiFiCredentialsIDbySSID(ssid);
+    if (credentialsId != 0) {
       s_connectedCredentialsID.store(credentialsId, std::memory_order_relaxed);
     }
 
@@ -619,11 +618,7 @@ bool WiFiManager::Init()
     return false;
   }
 
-  auto hostname = Config::GetWiFiHostname();
-  if (!hostname) {
-    OS_LOGE(TAG, "Failed to get WiFi hostname, reverting to default");
-    hostname = CONFIG_OPENSHOCK_FW_HOSTNAME;
-  }
+  const std::string hostname = Config::GetWiFiHostname();  // Normalize keeps it valid
 
   err = esp_wifi_set_mode(WIFI_MODE_STA);
   if (err != ESP_OK) {
@@ -637,7 +632,7 @@ bool WiFiManager::Init()
     return false;
   }
 
-  esp_netif_set_hostname(s_staNetif, hostname->c_str());
+  esp_netif_set_hostname(s_staNetif, hostname.c_str());
 
   TaskHandle_t updateTask = nullptr;
   if (TaskUtils::TaskCreateUniversal(wifimanagerUpdateTask, TAG, CONFIG_OPENSHOCK_WIFI_TASK_STACK_SIZE, nullptr, CONFIG_OPENSHOCK_WIFI_TASK_PRIORITY, &updateTask, 1) != pdPASS) {  // TODO: Re-profile stack usage
@@ -770,12 +765,11 @@ bool WiFiManager::RefreshNetworkCredentials()
   ScopedLock lock__(&s_networksMutex);
 
   for (auto& net : s_wifiNetworks) {
-    if (auto creds = Config::TryGetWiFiCredentialsBySSID(net.ssid)) {
+    net.credentialsID = Config::GetWiFiCredentialsIDbySSID(net.ssid);
+    if (net.credentialsID != 0) {
       OS_LOGV(TAG, "Found credentials for network %s (" BSSID_FMT ")", net.ssid, BSSID_ARG(net.bssid));
-      net.credentialsID = creds->id;
     } else {
       OS_LOGV(TAG, "Failed to find credentials for network %s (" BSSID_FMT ")", net.ssid, BSSID_ARG(net.bssid));
-      net.credentialsID = 0;
     }
   }
 
