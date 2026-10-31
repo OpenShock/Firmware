@@ -37,7 +37,7 @@ namespace {
 
   TaskHandle_t s_task = nullptr;
   SimpleMutex s_requestMutex {};
-  std::optional<WwwSource> s_requestedWww;  // Guarded by s_requestMutex
+  std::optional<WwwSource> s_requestedWww;  // Guarded by s_requestMutex; kept until a migration succeeds or a new request replaces it
   bool s_saidNoRelease = false;
 
   struct Pending {
@@ -66,12 +66,12 @@ namespace {
     };
   }
 
-  std::optional<WwwSource> takeRequestedWww()
+  // A copy of the serial-supplied source, so a failed attempt (a busy hub, a download that did not go through)
+  // retries from it instead of falling back to the release lookup
+  std::optional<WwwSource> requestedWww()
   {
     ScopedLock lock(&s_requestMutex);
-    auto taken = std::move(s_requestedWww);
-    s_requestedWww.reset();
-    return taken;
+    return s_requestedWww;
   }
 
   // The running release's www image, for a build that has one published.
@@ -126,7 +126,7 @@ namespace {
   void migrateWww()
   {
     HTTP::Client client;
-    auto source = takeRequestedWww();
+    auto source = requestedWww();
     if (!source) {
       source = releaseWww(client);
     }
@@ -139,7 +139,11 @@ namespace {
       OS_LOGI(TAG, "An update is being installed; migrating the www partition later");
       return;
     }
-    // From here the 1.x assets in static0 are overwritten: the portal stays closed until the restart
+    // From here the 1.x assets in static0 are overwritten: the portal stays closed until the restart. A close that
+    // timed out still leaves the portal force-closed, so every return from here releases it.
+    struct ReleasePortalOnReturn {
+      ~ReleasePortalOnReturn() { CaptivePortal::ReleaseForceClose(); }
+    } releasePortal;
     if (!CaptivePortal::ForceClose(5000)) {
       OS_LOGE(TAG, "Failed to close the captive portal; migrating the www partition later");
       return;
@@ -155,7 +159,6 @@ namespace {
         OS_LOGE(TAG, "The www image did not download or verify; static0 holds no portal assets until a retry succeeds");
         break;
     }
-    CaptivePortal::ReleaseForceClose();
   }
 
   void migrationTask(void*)
