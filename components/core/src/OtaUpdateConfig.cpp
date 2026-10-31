@@ -95,10 +95,8 @@ bool OtaUpdateConfig::FromJSON(JSON::JsonView json)
   }
 
   // Every boolean is strict (Parse::JsonBool); the numbers and strings take their default for a value of the wrong type
-  if (
-    !Parse::JsonBool(isEnabled, json, "isEnabled", true, TAG) || !Parse::JsonBool(checkOnStartup, json, "checkOnStartup", false, TAG) || !Parse::JsonBool(checkPeriodically, json, "checkPeriodically", false, TAG)
-    || !Parse::JsonBool(allowBackendManagement, json, "allowBackendManagement", true, TAG) || !Parse::JsonBool(requireManualApproval, json, "requireManualApproval", false, TAG)
-  )
+  if (!Parse::JsonBool(isEnabled, json, "isEnabled", true, TAG) || !Parse::JsonBool(checkOnStartup, json, "checkOnStartup", false, TAG) || !Parse::JsonBool(checkPeriodically, json, "checkPeriodically", false, TAG)
+      || !Parse::JsonBool(allowBackendManagement, json, "allowBackendManagement", true, TAG) || !Parse::JsonBool(requireManualApproval, json, "requireManualApproval", false, TAG))
   {
     return false;
   }

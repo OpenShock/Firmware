@@ -129,7 +129,7 @@ namespace OpenShock::Config::Nvs {
     }
 
     template<typename S = void, typename M>
-    Saver& Set(const char* key, M T::*member)
+    Saver& Set(const char* key, M T::* member)
     {
       if (!m_ok) {
         return *this;

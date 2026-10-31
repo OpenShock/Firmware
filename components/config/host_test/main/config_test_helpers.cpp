@@ -17,10 +17,8 @@ using namespace OpenShock;
 namespace ConfigTest {
   bool Full::SaveNvs(const char* partition) const
   {
-    if (
-      !rf.SaveNvs(partition, nullptr) || !wifi.SaveNvs(partition, nullptr) || !captivePortal.SaveNvs(partition, nullptr) || !backend.SaveNvs(partition, nullptr) || !serialInput.SaveNvs(partition, nullptr) || !otaUpdate.SaveNvs(partition, nullptr)
-      || !estop.SaveNvs(partition, nullptr)
-    )
+    if (!rf.SaveNvs(partition, nullptr) || !wifi.SaveNvs(partition, nullptr) || !captivePortal.SaveNvs(partition, nullptr) || !backend.SaveNvs(partition, nullptr) || !serialInput.SaveNvs(partition, nullptr) || !otaUpdate.SaveNvs(partition, nullptr)
+        || !estop.SaveNvs(partition, nullptr))
     {
       return false;
     }
