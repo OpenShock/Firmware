@@ -72,7 +72,9 @@ bool EStopConfig::SaveNvs(const char* partition, const EStopConfig* previous) co
   if (!handle) {
     return false;
   }
-  return Nvs::Saver(*handle, *this, previous).Set(kKeyEnabled, &EStopConfig::enabled).Set<int8_t>(kKeyGpio, &EStopConfig::gpioPin).Commit();
+  // The pin first: NVS commits key by key, so a power cut between the two leaves the old enable state on the new pin
+  // (disabled stays disabled; enabled moves to the pin that was asked for), never the E-Stop enabled on the old pin
+  return Nvs::Saver(*handle, *this, previous).Set<int8_t>(kKeyGpio, &EStopConfig::gpioPin).Set(kKeyEnabled, &EStopConfig::enabled).Commit();
 }
 
 bool EStopConfig::FromJSON(JSON::JsonView json)

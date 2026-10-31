@@ -59,14 +59,16 @@ Where the store is:
 - On the 1.x table, which has no `cfg`, the same namespaces in the shared `nvs` partition. The first boot that finds
   `cfg` copies them over key by key, compares the copy, and deletes the shared one.
 - An empty store is filled once: from the 1.x littlefs config file (`/config` on the 1.x `config` partition, read
-  only, so a rollback to 1.x still finds it until the config partition migration below has run) when there is one,
-  else from every section's defaults. The store is marked filled only once every section reads back from flash as
-  written; a fill that failed part-way is redone on the next boot.
+  only, so a rollback to 1.x still finds it until the config partition migration below has run) when the partition
+  mounts and the file reads as a valid config, else from every section's defaults (a 1.x file that is missing,
+  unreadable or invalid is logged and the defaults are written). The store is marked filled only once every section
+  reads back from flash as written; a fill that failed part-way is redone on the next boot.
 - Without any usable NVS, the hub runs on defaults in RAM and logs it.
 
 The shared `nvs` belongs to ESP-IDF (PHY calibration cache) and may be erased at any time; nothing of OpenShock's is
-kept there once `cfg` exists. Until then an erased shared `nvs` is an empty store: the hub imports the 1.x file again
-and loses what changed since the update. The WiFi driver's own NVS store is compiled out (`CONFIG_ESP_WIFI_NVS_ENABLED=n`).
+kept there once the copy into `cfg` has been made and verified. A copy that fails to write or to read back is undone
+and the config stays in the shared `nvs`, to be copied again on the next boot. Until then an erased shared `nvs` is an
+empty store: the hub imports the 1.x file again and loses what changed since the update. The WiFi driver's own NVS store is compiled out (`CONFIG_ESP_WIFI_NVS_ENABLED=n`).
 `sysinfo` on the serial console prints where the config is.
 
 ## The config partition migration
@@ -101,8 +103,9 @@ which writes `staticfs` over its littlefs `static0` and aborts unless that then 
 picks the file by the release's major version.
 
 On the 1.x table, which has no `www`, this firmware serves the portal from the littlefs `static0` and its OTA update
-flashes `static0` and verifies it by mounting, as the 1.x firmware does. Nothing on a 1.x hub touches the partition
-table until the www migration below runs.
+flashes `static0` and verifies it by mounting, as the 1.x firmware does. That holds until the www migration below
+runs, whichever of the two migrations goes first: the config migration above only retypes `config` as `cfg` and
+leaves `static0` as it is.
 
 ## The www partition migration
 

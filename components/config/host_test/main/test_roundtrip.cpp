@@ -110,8 +110,8 @@ TEST_CASE("Credentials are enumerated from their keys, never counted", "[config]
   TEST_ASSERT_EQUAL_size_t(3, creds.size());
   TEST_ASSERT_EQUAL_UINT8(3, creds[0].id);
   TEST_ASSERT_EQUAL_UINT8(200, creds[1].id);
-  TEST_ASSERT_EQUAL_UINT8(255, (*creds)[2].id);
-  TEST_ASSERT_EQUAL_STRING("Max", (*creds)[2].ssid.c_str());
+  TEST_ASSERT_EQUAL_UINT8(255, creds[2].id);
+  TEST_ASSERT_EQUAL_STRING("Max", creds[2].ssid.c_str());
 }
 
 TEST_CASE("One credential that does not read is dropped; the others load and survive the next save", "[config][roundtrip]")
@@ -140,7 +140,7 @@ TEST_CASE("One credential that does not read is dropped; the others load and sur
   TEST_ASSERT_EQUAL_size_t(3, creds.size());
   TEST_ASSERT_EQUAL_UINT8(1, creds[0].id);
   TEST_ASSERT_EQUAL_STRING("Cafe", creds[1].ssid.c_str());
-  TEST_ASSERT_EQUAL_UINT8(7, (*creds)[2].id);
+  TEST_ASSERT_EQUAL_UINT8(7, creds[2].id);
 }
 
 TEST_CASE("GetRaw writes fields that equal their schema default", "[config][roundtrip]")
@@ -263,8 +263,8 @@ TEST_CASE("jsonconfig set decodes \\u escapes", "[config][roundtrip][json]")
   auto wifi = Config::GetWiFiConfig();
   TEST_ASSERT_EQUAL_STRING("hub-1", wifi.hostname.c_str());
   TEST_ASSERT_EQUAL_size_t(1, wifi.credentialsList.size());
-  TEST_ASSERT_EQUAL_STRING("Caf\xc3\xa9 \xf0\x9f\x98\x80", wifi->credentialsList[0].ssid.c_str());
-  TEST_ASSERT_EQUAL_STRING("a\tb", wifi->credentialsList[0].password.c_str());
+  TEST_ASSERT_EQUAL_STRING("Caf\xc3\xa9 \xf0\x9f\x98\x80", wifi.credentialsList[0].ssid.c_str());
+  TEST_ASSERT_EQUAL_STRING("a\tb", wifi.credentialsList[0].password.c_str());
 }
 
 TEST_CASE("GetAsJSON without sensitive data omits secrets", "[config][roundtrip][json]")
