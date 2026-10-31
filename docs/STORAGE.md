@@ -43,9 +43,13 @@ The store's own namespace is `root`, with `schema` (u8, 1) marking a filled stor
 most 15 characters and are permanent once hubs hold them: renaming one is a migration, not an edit. A missing key
 reads as its default and an unknown key is ignored, so adding or removing a field never changes the schema.
 
-To add a section, define a value type with `ToDefault`, `LoadNvs`, `SaveNvs`, `FromJSON`, `ToJSON` and
-`ToFlatbuffers`, and one `Config::Section<T>` for it in the module (`config/Section.h` has the contract). It joins
-`jsonconfig`, `rawconfig`, the local protocol's Ready message and factory reset through the section registry.
+To add a section, define a value type whose default constructor is the defaults, with `Normalize` (its validation,
+run on every value the section takes in), `LoadNvs`, `SaveNvs`, `FromJSON`, `ToJSON` and `ToFlatbuffers`, and one
+`Config::Section<T>` for it in the module (the `SectionValue` concept in `config/Section.h` is the contract). It
+joins `jsonconfig`, `rawconfig`, the local protocol's Ready message and factory reset through the section registry.
+A load must tell a namespace that was never written (defaults) from one that failed to open (a failed load) with
+`Nvs::Handle::OpenRead`; a failed load runs the section on its defaults without trusting flash, a defaults load is
+taken as what flash holds.
 
 Where the store is:
 

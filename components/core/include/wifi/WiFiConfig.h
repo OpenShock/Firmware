@@ -25,8 +25,9 @@ namespace OpenShock::Config {
     std::string hostname;
     std::vector<OpenShock::Config::WiFiCredentials> credentialsList;  // in id order once loaded from NVS
 
-    /// @brief No rules to apply yet. The section runs it on every value it takes in.
-    void Normalize() { }
+    /// @brief The section runs it on every value it takes in: a hostname esp_netif would refuse (empty, over 32
+    ///        characters, or not letters, digits and hyphens) becomes the default, whichever way it came in.
+    void Normalize();
 
     bool LoadNvs(const char* partition);
     bool SaveNvs(const char* partition, const WiFiConfig* previous) const;

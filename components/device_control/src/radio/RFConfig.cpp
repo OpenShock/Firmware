@@ -40,10 +40,15 @@ RFConfig::RFConfig(gpio_num_t txPin, bool keepAliveEnabled)
 
 bool RFConfig::LoadNvs(const char* partition)
 {
-  auto handle = Nvs::Handle::Open(partition, kNamespace, false);
-  if (!handle) {
-    *this = RFConfig();
-    return true;
+  std::optional<Nvs::Handle> handle;
+  switch (Nvs::Handle::OpenRead(partition, kNamespace, handle)) {
+    case Nvs::Result::Error:
+      return false;
+    case Nvs::Result::Missing:
+      *this = RFConfig();
+      return true;
+    case Nvs::Result::Found:
+      break;
   }
 
   const int8_t boardPin = static_cast<int8_t>(Board::Get().rfTxGpio);

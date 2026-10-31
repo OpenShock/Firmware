@@ -25,6 +25,22 @@ std::optional<Nvs::Handle> Nvs::Handle::Open(const char* partition, const char* 
   return std::nullopt;
 }
 
+Nvs::Result Nvs::Handle::OpenRead(const char* partition, const char* ns, std::optional<Handle>& out)
+{
+  out.reset();
+  nvs_handle_t handle = 0;
+  esp_err_t err       = nvs_open_from_partition(partition, ns, NVS_READONLY, &handle);
+  if (err == ESP_OK) {
+    out = Handle(handle);
+    return Result::Found;
+  }
+  if (err == ESP_ERR_NVS_NOT_FOUND) {
+    return Result::Missing;
+  }
+  OS_LOGE(TAG, "Failed to open %s/%s: %s", partition, ns, esp_err_to_name(err));
+  return Result::Error;
+}
+
 Nvs::Handle::Handle(Handle&& other) noexcept
   : m_handle(std::exchange(other.m_handle, 0))
 {

@@ -52,7 +52,18 @@ bool CaptivePortalConfig::FromJSON(JSON::JsonView json)
     return false;
   }
 
-  alwaysEnabled = json["alwaysEnabled"].tryGetBool().value_or(false);
+  // A field that is there but is not a bool is a bad document, not a default: accepting it would store `false` over
+  // whatever the hub has.
+  if (JSON::JsonView field = json["alwaysEnabled"]; field.valid()) {
+    auto parsed = field.tryGetBool();
+    if (!parsed) {
+      OS_LOGE(TAG, "alwaysEnabled is not a boolean");
+      return false;
+    }
+    alwaysEnabled = *parsed;
+  } else {
+    alwaysEnabled = false;
+  }
 
   return true;
 }
@@ -66,10 +77,15 @@ void CaptivePortalConfig::ToJSON(json_gen_str_t* gen, const char* name, bool wit
 
 bool CaptivePortalConfig::LoadNvs(const char* partition)
 {
-  auto handle = Nvs::Handle::Open(partition, kNamespace, false);
-  if (!handle) {
-    *this = CaptivePortalConfig();
-    return true;
+  std::optional<Nvs::Handle> handle;
+  switch (Nvs::Handle::OpenRead(partition, kNamespace, handle)) {
+    case Nvs::Result::Error:
+      return false;
+    case Nvs::Result::Missing:
+      *this = CaptivePortalConfig();
+      return true;
+    case Nvs::Result::Found:
+      break;
   }
   return Nvs::Load(*handle, kKeyAlways, alwaysEnabled, false);
 }

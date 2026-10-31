@@ -31,7 +31,13 @@ namespace OpenShock::Config::Nvs {
   public:
     /// @brief Opens `ns` in `partition`. Read-only opens of a namespace that does not exist yet fail with nullopt
     ///        and no error logged: that is what a fresh store looks like, and every read then yields Missing.
+    ///        A load must not use this: it cannot tell that case from a failed open (use OpenRead).
     [[nodiscard]] static std::optional<Handle> Open(const char* partition, const char* ns, bool write);
+
+    /// @brief Opens `ns` in `partition` read-only for a load. Found: `out` holds the handle. Missing: the namespace
+    ///        was never written, `out` is empty and every key is its default. Error: the open failed and the load
+    ///        must fail with it, since defaults would be taken for what is on flash.
+    [[nodiscard]] static Result OpenRead(const char* partition, const char* ns, std::optional<Handle>& out);
 
     Handle(Handle&& other) noexcept;
     Handle& operator=(Handle&& other) noexcept;

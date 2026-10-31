@@ -52,7 +52,18 @@ bool SerialInputConfig::FromJSON(JSON::JsonView json)
     return false;
   }
 
-  echoEnabled = json["echoEnabled"].tryGetBool().value_or(true);
+  // A field that is there but is not a bool is a bad document, not a default: accepting it would store the default
+  // over whatever the hub has.
+  if (JSON::JsonView field = json["echoEnabled"]; field.valid()) {
+    auto parsed = field.tryGetBool();
+    if (!parsed) {
+      OS_LOGE(TAG, "echoEnabled is not a boolean");
+      return false;
+    }
+    echoEnabled = *parsed;
+  } else {
+    echoEnabled = true;
+  }
 
   return true;
 }
@@ -66,10 +77,15 @@ void SerialInputConfig::ToJSON(json_gen_str_t* gen, const char* name, bool withS
 
 bool SerialInputConfig::LoadNvs(const char* partition)
 {
-  auto handle = Nvs::Handle::Open(partition, kNamespace, false);
-  if (!handle) {
-    *this = SerialInputConfig();
-    return true;
+  std::optional<Nvs::Handle> handle;
+  switch (Nvs::Handle::OpenRead(partition, kNamespace, handle)) {
+    case Nvs::Result::Error:
+      return false;
+    case Nvs::Result::Missing:
+      *this = SerialInputConfig();
+      return true;
+    case Nvs::Result::Found:
+      break;
   }
   return Nvs::Load(*handle, kKeyEcho, echoEnabled, true);
 }

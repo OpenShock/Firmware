@@ -84,10 +84,15 @@ void BackendConfig::ToJSON(json_gen_str_t* gen, const char* name, bool withSensi
 
 bool BackendConfig::LoadNvs(const char* partition)
 {
-  auto handle = Nvs::Handle::Open(partition, kNamespace, false);
-  if (!handle) {
-    *this = BackendConfig();
-    return true;
+  std::optional<Nvs::Handle> handle;
+  switch (Nvs::Handle::OpenRead(partition, kNamespace, handle)) {
+    case Nvs::Result::Error:
+      return false;
+    case Nvs::Result::Missing:
+      *this = BackendConfig();
+      return true;
+    case Nvs::Result::Found:
+      break;
   }
   return Nvs::Load(*handle, kKeyDomain, domain, CONFIG_OPENSHOCK_API_DOMAIN) && Nvs::Load(*handle, kKeyToken, authToken, "");
 }

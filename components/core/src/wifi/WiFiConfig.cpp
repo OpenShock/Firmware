@@ -159,21 +159,39 @@ namespace {
   }
 }  // namespace
 
+void WiFiConfig::Normalize()
+{
+  if (!HostnameUtils::IsValid(hostname)) {
+    OS_LOGW(TAG, "Hostname \"%s\" is not valid, using the default", hostname.c_str());
+    hostname = CONFIG_OPENSHOCK_FW_HOSTNAME;
+  }
+}
+
 bool WiFiConfig::LoadNvs(const char* partition)
 {
-  if (auto handle = Nvs::Handle::Open(partition, kNamespaceCfg, false)) {
-    if (!Nvs::Load(*handle, kKeyApSsid, accessPointSSID, CONFIG_OPENSHOCK_FW_AP_PREFIX) || !Nvs::Load(*handle, kKeyHostname, hostname, CONFIG_OPENSHOCK_FW_HOSTNAME)) {
+  std::optional<Nvs::Handle> handle;
+  switch (Nvs::Handle::OpenRead(partition, kNamespaceCfg, handle)) {
+    case Nvs::Result::Error:
       return false;
-    }
-  } else {
-    accessPointSSID = CONFIG_OPENSHOCK_FW_AP_PREFIX;
-    hostname        = CONFIG_OPENSHOCK_FW_HOSTNAME;
+    case Nvs::Result::Missing:
+      accessPointSSID = CONFIG_OPENSHOCK_FW_AP_PREFIX;
+      hostname        = CONFIG_OPENSHOCK_FW_HOSTNAME;
+      break;
+    case Nvs::Result::Found:
+      if (!Nvs::Load(*handle, kKeyApSsid, accessPointSSID, CONFIG_OPENSHOCK_FW_AP_PREFIX) || !Nvs::Load(*handle, kKeyHostname, hostname, CONFIG_OPENSHOCK_FW_HOSTNAME)) {
+        return false;
+      }
+      break;
   }
 
   credentialsList.clear();
-  auto handle = Nvs::Handle::Open(partition, kNamespaceCreds, false);
-  if (!handle) {
-    return true;  // No credential was ever stored
+  switch (Nvs::Handle::OpenRead(partition, kNamespaceCreds, handle)) {
+    case Nvs::Result::Error:
+      return false;
+    case Nvs::Result::Missing:
+      return true;  // No credential was ever stored
+    case Nvs::Result::Found:
+      break;
   }
 
   // Enumerated, never counted: the keys are the ids. Collected first, since reading while iterating is not allowed.

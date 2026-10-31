@@ -17,6 +17,7 @@ const char* const TAG = "Config";
 #include <nvs_flash.h>
 
 #include <cstring>
+#include <optional>
 #include <string>
 #include <vector>
 
@@ -48,15 +49,29 @@ const char* Config::StorageLabel()
 
 #define CONFIG_LOCK_WRITE() ScopedLock lock__(&Config::Internal::WriteLock())
 
+// Whether `partition` holds a filled store: true, false, or nullopt when NVS would not say (a failed open or read).
 // A store marked by a newer firmware (a rollback) counts as filled: it is loaded best-effort, never refilled.
-static bool hasSchema(const char* partition)
+static std::optional<bool> hasSchema(const char* partition)
 {
-  auto handle = Config::Nvs::Handle::Open(partition, kRootNamespace, false);
-  if (!handle) {
-    return false;
+  std::optional<Config::Nvs::Handle> handle;
+  switch (Config::Nvs::Handle::OpenRead(partition, kRootNamespace, handle)) {
+    case Config::Nvs::Result::Error:
+      return std::nullopt;
+    case Config::Nvs::Result::Missing:
+      return false;
+    case Config::Nvs::Result::Found:
+      break;
   }
   uint8_t schema = 0;
-  if (handle->GetU8(kSchemaKey, schema) != Config::Nvs::Result::Found || schema < kSchemaVersion) {
+  switch (handle->GetU8(kSchemaKey, schema)) {
+    case Config::Nvs::Result::Error:
+      return std::nullopt;
+    case Config::Nvs::Result::Missing:
+      return false;
+    case Config::Nvs::Result::Found:
+      break;
+  }
+  if (schema < kSchemaVersion) {
     return false;
   }
   if (schema > kSchemaVersion) {
@@ -164,12 +179,23 @@ static const char* openStorage()
 // the copy failed.
 static const char* moveSharedIntoCfg()
 {
-  if (!nvsPartitionExists(kPartitionShared) || !initNvsPartition(kPartitionShared, true) || !hasSchema(kPartitionShared)) {
+  if (!nvsPartitionExists(kPartitionShared) || !initNvsPartition(kPartitionShared, true)) {
+    return kPartitionCfg;
+  }
+  // Nothing is moved or erased on a read that failed: a shared copy that cannot be read is left for the next boot, and
+  // so is one whose cfg cannot be checked, since erasing it then could erase the only copy
+  const std::optional<bool> sharedFilled = hasSchema(kPartitionShared);
+  const std::optional<bool> cfgFilled    = hasSchema(kPartitionCfg);
+  if (!sharedFilled.has_value() || !cfgFilled.has_value()) {
+    OS_LOGE(TAG, "Could not tell whether the config lives in the shared nvs partition; leaving both partitions as they are");
+    return kPartitionCfg;
+  }
+  if (!*sharedFilled) {
     return kPartitionCfg;
   }
   const auto namespaces = allNamespaces();  // kRootNamespace first, so walked backwards
 
-  if (!hasSchema(kPartitionCfg)) {
+  if (!*cfgFilled) {
     bool ok = true;
     for (std::size_t i = namespaces.size(); ok && i-- > 0;) {
       ok = Config::Nvs::CopyNamespace(kPartitionShared, kPartitionCfg, namespaces[i]) && Config::Nvs::NamespacesEqual(kPartitionShared, kPartitionCfg, namespaces[i]);
@@ -309,7 +335,9 @@ void Config::Init()
     s_partition = moveSharedIntoCfg();
   }
 
-  if (s_partition == nullptr || !hasSchema(s_partition)) {
+  // A store whose marker cannot be read is loaded as if marked: filling it would write the defaults over whatever is
+  // there, while a failed load leaves flash alone and runs the section on its defaults
+  if (s_partition == nullptr || hasSchema(s_partition) == false) {
     fillStore();
     return;
   }

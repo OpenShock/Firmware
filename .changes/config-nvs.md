@@ -15,6 +15,9 @@ The hub keeps its settings in the chip's NVS key-value store instead of a single
 - A section that can't be read runs on its defaults without erasing what is stored, and the save after a failed one rewrites every key; a single WiFi credential that doesn't read is dropped on its own, so the rest still load
 - The store is marked filled only once every section reads back from flash as written; a first fill cut short is redone on the next boot
 - A store written by newer firmware is loaded instead of reset, and a `cfg` partition in a newer NVS format is never erased
+- A section whose NVS namespace fails to open is a failed load, not a load of the defaults: the defaults are only taken when the namespace was never written. The store likewise never fills or cleans up when its own marker cannot be read
+- A boolean field of the wrong type in a `jsonconfig set` document rejects the document instead of storing the default
+- An OTA check interval of zero and a hostname esp_netif would refuse become their defaults on every path (NVS, JSON and the setters), not only through the captive portal
 - `Config::MigrateToCfgPartition` retypes the `config` partition as `cfg`; nothing calls it yet
 
 ## Notices

@@ -50,10 +50,15 @@ void EStopConfig::Normalize()
 
 bool EStopConfig::LoadNvs(const char* partition)
 {
-  auto handle = Nvs::Handle::Open(partition, kNamespace, false);
-  if (!handle) {
-    *this = EStopConfig();
-    return true;
+  std::optional<Nvs::Handle> handle;
+  switch (Nvs::Handle::OpenRead(partition, kNamespace, handle)) {
+    case Nvs::Result::Error:
+      return false;
+    case Nvs::Result::Missing:
+      *this = EStopConfig();
+      return true;
+    case Nvs::Result::Found:
+      break;
   }
 
   const int8_t boardPin = static_cast<int8_t>(Board::Get().estopGpio);

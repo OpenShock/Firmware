@@ -40,8 +40,9 @@ namespace OpenShock::Config {
     int32_t updateId;
     OtaUpdateStep updateStep;
 
-    /// @brief No rules to apply yet. The section runs it on every value it takes in.
-    void Normalize() { }
+    /// @brief The section runs it on every value it takes in: a zero check interval would check on every wake-up
+    ///        of the update task, so it becomes the default (the captive portal refuses it, JSON and NVS do not).
+    void Normalize();
 
     [[nodiscard]] flatbuffers::Offset<Serialization::Configuration::OtaUpdateConfig> ToFlatbuffers(flatbuffers::FlatBufferBuilder& builder, bool withSensitiveData) const;
 

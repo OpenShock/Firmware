@@ -27,6 +27,8 @@ static constexpr const char* kKeyManual      = "manual";
 static constexpr const char* kKeyUpdateId    = "update_id";
 static constexpr const char* kKeyStep        = "step";
 
+static constexpr uint16_t kDefaultCheckInterval = 30;  // minutes
+
 static constexpr const char* kNamespaces[] = {kNamespace};
 static Section<OtaUpdateConfig> s_section({.name = "otaUpdate", .order = 5, .hubConfigField = Fbs::HubConfig::VT_OTA_UPDATE, .namespaces = kNamespaces});
 
@@ -43,7 +45,7 @@ OtaUpdateConfig::OtaUpdateConfig()
   , updateChannel(OtaUpdateChannel::Stable)
   , checkOnStartup(false)
   , checkPeriodically(false)
-  , checkInterval(30)
+  , checkInterval(kDefaultCheckInterval)
   , allowBackendManagement(true)
   , requireManualApproval(false)
   , updateId(0)
@@ -112,7 +114,7 @@ bool OtaUpdateConfig::FromJSON(JSON::JsonView json)
 
   checkOnStartup         = json["checkOnStartup"].tryGetBool().value_or(false);
   checkPeriodically      = json["checkPeriodically"].tryGetBool().value_or(false);
-  checkInterval          = json["checkInterval"].tryGetU16().value_or(30);
+  checkInterval          = json["checkInterval"].tryGetU16().value_or(kDefaultCheckInterval);
   allowBackendManagement = json["allowBackendManagement"].tryGetBool().value_or(true);
   requireManualApproval  = json["requireManualApproval"].tryGetBool().value_or(false);
   updateId               = json["updateId"].tryGetI32().value_or(0);
@@ -138,18 +140,31 @@ void OtaUpdateConfig::ToJSON(json_gen_str_t* gen, const char* name, bool withSen
   JSON::objEnd(gen, name);
 }
 
+void OtaUpdateConfig::Normalize()
+{
+  if (checkInterval == 0) {
+    OS_LOGW(TAG, "A zero update check interval is not allowed, using the default");
+    checkInterval = kDefaultCheckInterval;
+  }
+}
+
 bool OtaUpdateConfig::LoadNvs(const char* partition)
 {
-  auto handle = Nvs::Handle::Open(partition, kNamespace, false);
-  if (!handle) {
-    *this = OtaUpdateConfig();
-    return true;
+  std::optional<Nvs::Handle> handle;
+  switch (Nvs::Handle::OpenRead(partition, kNamespace, handle)) {
+    case Nvs::Result::Error:
+      return false;
+    case Nvs::Result::Missing:
+      *this = OtaUpdateConfig();
+      return true;
+    case Nvs::Result::Found:
+      break;
   }
 
   uint8_t channel = std::to_underlying(OtaUpdateChannel::Stable);
   uint8_t step    = std::to_underlying(OtaUpdateStep::None);
   bool ok = Nvs::Load(*handle, kKeyEnabled, isEnabled, true) && Nvs::Load(*handle, kKeyDomain, cdnDomain, CONFIG_OPENSHOCK_FW_CDN_DOMAIN) && Nvs::Load(*handle, kKeyChannel, channel, channel) && Nvs::Load(*handle, kKeyCheckBoot, checkOnStartup, false)
-         && Nvs::Load(*handle, kKeyCheckPeriod, checkPeriodically, false) && Nvs::Load(*handle, kKeyCheckMin, checkInterval, static_cast<uint16_t>(30)) && Nvs::Load(*handle, kKeyBackendMgmt, allowBackendManagement, true)
+         && Nvs::Load(*handle, kKeyCheckPeriod, checkPeriodically, false) && Nvs::Load(*handle, kKeyCheckMin, checkInterval, kDefaultCheckInterval) && Nvs::Load(*handle, kKeyBackendMgmt, allowBackendManagement, true)
          && Nvs::Load(*handle, kKeyManual, requireManualApproval, false) && Nvs::Load(*handle, kKeyUpdateId, updateId, 0) && Nvs::Load(*handle, kKeyStep, step, step);
   if (!ok) {
     return false;
