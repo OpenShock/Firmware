@@ -5,7 +5,7 @@
 #
 #   include/www/WwwImage.h      the format: a parser/validator over a byte span, pure C++ (host-tested)
 #   include/www/WwwPartition.h  the device side: find the partition, map it, verify, serve
-#   include/www/Migration.h     writing the image over the 1.x static0 and retyping it as www (not wired up yet)
+#   include/www/Migration.h     writing the image over the 1.x static0 and retyping it as www (run by components/migration)
 #
 # scripts/utils/wwwimage.py writes the format; change both together.
 idf_component_register(
