@@ -1,4 +1,4 @@
-// Frame layout tests for the Petrainer, Petrainer 998DR, Wellturn T330 and D80 encoders. Each test decodes the
+// Frame layout tests for the Petrainer, Petrainer 998DR, Wellturn T330 (+Alt1) and D80 encoders. Each test decodes the
 // emitted RMT symbols back into bits and checks every field of the documented payload layout, so a refactor of the
 // encoders (or of EncodeBits) can't silently change what goes on air.
 #include "unity.h"
@@ -7,6 +7,7 @@
 #include "radio/rmt/D80Encoder.h"
 #include "radio/rmt/Petrainer998DREncoder.h"
 #include "radio/rmt/PetrainerEncoder.h"
+#include "radio/rmt/T330Alt1Encoder.h"
 #include "radio/rmt/T330Encoder.h"
 
 #include <cstdint>
@@ -168,6 +169,83 @@ TEST_CASE("Wellturn T330 shock/sound codes, clamping and unsupported types", "[p
   TEST_ASSERT_EQUAL_UINT8(0, (data >> 8) & 0xFF);    // sound always sends 0
 
   TEST_ASSERT_FALSE(Rmt::WellturnT330Encoder::FillBuffer(seq, 1, ShockerCommandType::Light, 10));
+}
+
+// ---------------------------------------------------------------------------
+// Wellturn T330 Alt1: same frame as the T330, but shock carries [toggle:1][counter:3][level:4] in the intensity byte
+// ---------------------------------------------------------------------------
+static uint8_t t330Alt1IntensityByte(const rmt_symbol_word_t* seq)
+{
+  return ((decode(seq + 1, 41, t330One) >> 1) >> 8) & 0xFF;
+}
+
+TEST_CASE("Wellturn T330 Alt1 frame layout matches T330 for vibrate and sound", "[protocols][t330alt1]")
+{
+  TEST_ASSERT_EQUAL(43, Rmt::WellturnT330Alt1Encoder::GetBufferSize());
+
+  rmt_symbol_word_t alt1[43];
+  rmt_symbol_word_t t330[43];
+  const ShockerCommandType types[] = {ShockerCommandType::Vibrate, ShockerCommandType::Sound};
+  for (ShockerCommandType type : types) {
+    TEST_ASSERT_TRUE(Rmt::WellturnT330Alt1Encoder::FillBuffer(alt1, 0x0F0F, type, 77));
+    TEST_ASSERT_TRUE(Rmt::WellturnT330Encoder::FillBuffer(t330, 0x0F0F, type, 77));
+    TEST_ASSERT_EQUAL_MEMORY(t330, alt1, sizeof(t330));
+  }
+
+  TEST_ASSERT_FALSE(Rmt::WellturnT330Alt1Encoder::FillBuffer(alt1, 1, ShockerCommandType::Light, 10));
+}
+
+TEST_CASE("Wellturn T330 Alt1 shock maps 0-100 to a 0-15 level, non-zero never rounds to 0", "[protocols][t330alt1]")
+{
+  rmt_symbol_word_t seq[43];
+  const struct {
+    uint8_t in;
+    uint8_t level;
+  } cases[] = {
+    {  0,  0},
+    {  1,  1},
+    {  6,  1},
+    { 14,  2},
+    { 50,  7},
+    {100, 15},
+    {150, 15}, // clamped
+  };
+  for (const auto& c : cases) {
+    TEST_ASSERT_TRUE(Rmt::WellturnT330Alt1Encoder::FillBuffer(seq, 1, ShockerCommandType::Shock, c.in));
+    TEST_ASSERT_EQUAL_UINT8(c.level, t330Alt1IntensityByte(seq));  // no rolling bits without a refill
+  }
+}
+
+TEST_CASE("Wellturn T330 Alt1 shock rolling toggle and counter", "[protocols][t330alt1]")
+{
+  rmt_symbol_word_t seq[43];
+  const uint16_t id = 0xA1A1;  // rolling state is kept per shocker id across calls
+
+  auto at = [&](int64_t nowMs) {
+    TEST_ASSERT_TRUE(Rmt::WellturnT330Alt1Encoder::RefillBuffer(seq, id, ShockerCommandType::Shock, 100, nowMs));
+    return t330Alt1IntensityByte(seq);
+  };
+
+  // Refill every 50ms like the transmit loop does, up to and including `toMs`.
+  int64_t now = 1000;
+  auto runTo  = [&](int64_t toMs) {
+    uint8_t last = at(now);
+    while (now < toMs) last = at(now += 50);
+    return last;
+  };
+
+  // One continuous transmission: toggle flips every second, counter steps every two.
+  TEST_ASSERT_EQUAL_HEX8(0x0F, runTo(1950));
+  TEST_ASSERT_EQUAL_HEX8(0x8F, runTo(2000));
+  TEST_ASSERT_EQUAL_HEX8(0x1F, runTo(3000));
+  TEST_ASSERT_EQUAL_HEX8(0x9F, runTo(4000));
+
+  // A gap of more than 200ms starts a new transmission with the base counter advanced by one.
+  TEST_ASSERT_EQUAL_HEX8(0x1F, at(4500));
+
+  // Vibrate never carries rolling bits.
+  TEST_ASSERT_TRUE(Rmt::WellturnT330Alt1Encoder::RefillBuffer(seq, id, ShockerCommandType::Vibrate, 77, 4550));
+  TEST_ASSERT_EQUAL_UINT8(77, t330Alt1IntensityByte(seq));
 }
 
 // ---------------------------------------------------------------------------

@@ -28,7 +28,7 @@ std::optional<JsonSerial::ShockerCommand> JsonSerial::ParseShockerCommand(JSON::
   }
   auto modelType = TryParseShockerModelType(*modelStr);
   if (!modelType) {
-    OS_LOGE(TAG, "value at 'model' is not a valid shocker model (caixianlin, petrainer, petrainer998dr, wellturnt330, d80)");
+    OS_LOGE(TAG, "value at 'model' is not a valid shocker model (caixianlin, petrainer, petrainer998dr, wellturnt330, d80, wellturnt330alt1)");
     return std::nullopt;
   }
 

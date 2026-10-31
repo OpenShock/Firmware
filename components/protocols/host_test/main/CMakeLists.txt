@@ -12,6 +12,7 @@ idf_component_register(
                "../../src/D80Encoder.cpp"
                "../../src/Petrainer998DREncoder.cpp"
                "../../src/PetrainerEncoder.cpp"
+               "../../src/T330Alt1Encoder.cpp"
                "../../src/T330Encoder.cpp"
                "../../src/Sequence.cpp"
   INCLUDE_DIRS "."

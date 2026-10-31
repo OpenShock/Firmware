@@ -20,6 +20,8 @@ namespace OpenShock::Rmt {
       , m_shockerId(0)
       , m_shockerModel()
       , m_terminatorSent(false)
+      , m_commandType()
+      , m_intensity(0)
     {
     }
     Sequence(ShockerModelType shockerModel, uint16_t shockerId, int64_t transmitEnd);
@@ -30,6 +32,8 @@ namespace OpenShock::Rmt {
       , m_shockerId(other.m_shockerId)
       , m_shockerModel(other.m_shockerModel)
       , m_terminatorSent(other.m_terminatorSent)
+      , m_commandType(other.m_commandType)
+      , m_intensity(other.m_intensity)
     {
       other.reset();
     }
@@ -54,6 +58,8 @@ namespace OpenShock::Rmt {
     inline size_t size() const noexcept { return m_size; }
 
     bool fill(ShockerCommandType commandType, uint8_t intensity);
+    // Re-encodes the payload for models whose frames change over time (rolling state); no-op for the rest.
+    bool refill(int64_t nowMs);
 
     Sequence& operator=(Sequence&& other)
     {
@@ -67,6 +73,8 @@ namespace OpenShock::Rmt {
       m_shockerId      = other.m_shockerId;
       m_shockerModel   = other.m_shockerModel;
       m_terminatorSent = other.m_terminatorSent;
+      m_commandType    = other.m_commandType;
+      m_intensity      = other.m_intensity;
 
       other.reset();
 
@@ -82,6 +90,8 @@ namespace OpenShock::Rmt {
       m_shockerId      = 0;
       m_shockerModel   = static_cast<ShockerModelType>(0);
       m_terminatorSent = false;
+      m_commandType    = static_cast<ShockerCommandType>(0);
+      m_intensity      = 0;
     }
 
     rmt_symbol_word_t* m_data;
@@ -90,5 +100,7 @@ namespace OpenShock::Rmt {
     uint16_t m_shockerId;
     ShockerModelType m_shockerModel;
     bool m_terminatorSent;
+    ShockerCommandType m_commandType;
+    uint8_t m_intensity;
   };
 }  // namespace OpenShock::Rmt

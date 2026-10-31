@@ -30,6 +30,7 @@ TEST_CASE("Sequence dispatches every supported model", "[protocols][sequence]")
     ShockerModelType::Petrainer998DR,
     ShockerModelType::WellturnT330,
     ShockerModelType::D80,
+    ShockerModelType::WellturnT330Alt1,
   };
 
   for (ShockerModelType model : models) {
