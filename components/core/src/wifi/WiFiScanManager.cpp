@@ -1,5 +1,4 @@
 #include <freertos/FreeRTOS.h>
-#include <freertos/task.h>
 
 #include "wifi/WiFiScanManager.h"
 
@@ -15,19 +14,17 @@ const char* const TAG = "WiFiScanManager";
 #include <vector>
 
 // Idle -> Scanning (StartScan) -> Idle (results handled, failure, STA stop).
-// Scanning -> Stopping (AbortScan) -> Idle (the stopped scan's SCAN_DONE, or kStopTimeout without one).
-// Stopping keeps a new scan from starting until the stopped one's SCAN_DONE is out of the way, so that event can't be
-// taken for the new scan's results. esp_wifi doesn't document whether esp_wifi_scan_stop posts one, hence the timeout.
+// Scanning -> Stopping (AbortScan) -> Idle (the stopped scan's SCAN_DONE, or STA stop).
+// esp_wifi_scan_stop posts a SCAN_DONE (see the WiFi driver guide). Stopping keeps a new scan from starting until that
+// event is out of the way, so it can't be taken for the new scan's results.
 enum class ScanState : uint8_t {
   Idle,
   Scanning,
   Stopping,
 };
-static constexpr TickType_t kStopTimeout = pdMS_TO_TICKS(2000);
 
-static bool s_initialized                   = false;
-static std::atomic<ScanState> s_state       = ScanState::Idle;
-static std::atomic<TickType_t> s_stoppingAt = 0;
+static bool s_initialized             = false;
+static std::atomic<ScanState> s_state = ScanState::Idle;
 // Set on the event loop, consumed by ProcessEvents() on the worker task
 static std::atomic<bool> s_scanDonePending           = false;
 static std::atomic<bool> s_scanAbortedPending        = false;
@@ -50,11 +47,6 @@ static void notifyNetworksDiscoveredHandlers(const std::vector<const wifi_ap_rec
   for (auto& handler : s_networksDiscoveredHandlers) {
     handler(records);
   }
-}
-
-static bool stopTimedOut()
-{
-  return xTaskGetTickCount() - s_stoppingAt.load() >= kStopTimeout;
 }
 
 // Ends the scan this task was handling. False if AbortScan got there first, which has already reported it.
@@ -184,8 +176,7 @@ bool WiFiScanManager::Init(WakeWorker wakeWorker)
 
 bool WiFiScanManager::IsScanning()
 {
-  ScanState state = s_state.load();
-  return state == ScanState::Scanning || (state == ScanState::Stopping && !stopTimedOut());
+  return s_state.load() != ScanState::Idle;
 }
 
 bool WiFiScanManager::StartScan()
@@ -193,10 +184,8 @@ bool WiFiScanManager::StartScan()
   // Claim the scan slot; bail if one is already running or still stopping.
   ScanState expected = ScanState::Idle;
   if (!s_state.compare_exchange_strong(expected, ScanState::Scanning)) {
-    if (expected != ScanState::Stopping || !stopTimedOut() || !s_state.compare_exchange_strong(expected, ScanState::Scanning)) {
-      OS_LOGW(TAG, "Cannot start scan: a scan is already running");
-      return false;
-    }
+    OS_LOGW(TAG, "Cannot start scan: a scan is already running");
+    return false;
   }
 
   notifyStatusChangedHandlers(WiFiScanStatus::Started);
@@ -224,7 +213,6 @@ bool WiFiScanManager::StartScan()
 
 bool WiFiScanManager::AbortScan()
 {
-  s_stoppingAt.store(xTaskGetTickCount());  // Before the state, so whoever sees Stopping sees its start time
   ScanState expected = ScanState::Scanning;
   if (!s_state.compare_exchange_strong(expected, ScanState::Stopping)) {
     OS_LOGW(TAG, "Cannot abort scan: no scan is in progress");
@@ -233,7 +221,12 @@ bool WiFiScanManager::AbortScan()
 
   esp_err_t err = esp_wifi_scan_stop();
   if (err != ESP_OK) {
+    // Not stopped, so no SCAN_DONE of its own: let the scan run to completion. If it finished meanwhile, its SCAN_DONE
+    // already moved the state on.
     OS_LOGE(TAG, "esp_wifi_scan_stop failed: %s", esp_err_to_name(err));
+    expected = ScanState::Stopping;
+    s_state.compare_exchange_strong(expected, ScanState::Scanning);
+    return false;
   }
 
   notifyStatusChangedHandlers(WiFiScanStatus::Aborted);
