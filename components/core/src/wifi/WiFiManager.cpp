@@ -5,7 +5,6 @@
 const char* const TAG = "WiFiManager";
 
 #include "AppHooks.h"
-#include "config/Config.h"
 #include "events/Events.h"
 #include "FormatHelpers.h"
 #include "Logging.h"
@@ -13,6 +12,7 @@ const char* const TAG = "WiFiManager";
 #include "Temporal.h"
 #include "util/FunctionRef.h"
 #include "util/TaskUtils.h"
+#include "wifi/WiFiConfig.h"
 #include "wifi/WiFiNetwork.h"
 #include "wifi/WiFiScanManager.h"
 
@@ -636,11 +636,7 @@ bool WiFiManager::Init()
     return false;
   }
 
-  auto hostname = Config::GetWiFiHostname();
-  if (!hostname) {
-    OS_LOGE(TAG, "Failed to get WiFi hostname, reverting to default");
-    hostname = CONFIG_OPENSHOCK_FW_HOSTNAME;
-  }
+  const std::string hostname = Config::GetWiFiHostname();  // Normalize keeps it valid
 
   err = esp_wifi_set_mode(WIFI_MODE_STA);
   if (err != ESP_OK) {
@@ -654,7 +650,7 @@ bool WiFiManager::Init()
     return false;
   }
 
-  esp_netif_set_hostname(s_staNetif, hostname->c_str());
+  esp_netif_set_hostname(s_staNetif, hostname.c_str());
 
   TaskHandle_t updateTask = nullptr;
   if (TaskUtils::TaskCreateUniversal(wifimanagerUpdateTask, TAG, CONFIG_OPENSHOCK_WIFI_TASK_STACK_SIZE, nullptr, CONFIG_OPENSHOCK_WIFI_TASK_PRIORITY, &updateTask, 1) != pdPASS) {  // TODO: Re-profile stack usage

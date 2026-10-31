@@ -12,7 +12,8 @@ idf_component_register(
   SRCS          ${device_control_sources}
   INCLUDE_DIRS  "include"
   REQUIRES      common esp_hal_gpio esp_driver_rmt freertos   # public headers (enums, gpio_types, rmt_tx/encoder, TaskHandle/QueueHandle)
-  PRIV_REQUIRES config chipset events led_drivers logging temporal protocols   # concurrency/util folded into common (public REQUIRE)
+                config serialization                        # its config sections (radio/RFConfig.h, estop/EStopConfig.h): config/Section.h, HubConfig wire types
+  PRIV_REQUIRES chipset events led_drivers logging temporal protocols   # concurrency/util folded into common (public REQUIRE)
                 esp_driver_gpio esp_wifi esp_event esp_netif soc
 )
 

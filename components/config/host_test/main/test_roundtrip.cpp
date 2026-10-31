@@ -1,5 +1,7 @@
-// Round trips: a config written by this firmware must read back unchanged, both as
-// the stored flatbuffer and through the jsonconfig (GetAsJSON / SaveFromJSON) path.
+// Round trips: a config written by this firmware must read back unchanged after a reboot, through the NVS store
+// and through the jsonconfig (GetAsJSON / SaveFromJSON) path.
+#include <freertos/FreeRTOS.h>
+
 #include "unity.h"
 
 #include "config_test_helpers.h"
@@ -9,39 +11,11 @@
 using namespace OpenShock;
 using namespace ConfigTest;
 
-// Whether `field` is physically present in `table`. Generated tables derive privately from
-// flatbuffers::Table (a view of the same bytes), so CheckField is reached through it.
-static bool IsStored(const void* table, flatbuffers::voffset_t field)
+TEST_CASE("A stored config is loaded unchanged by Config::Init", "[config][roundtrip]")
 {
-  return static_cast<const flatbuffers::Table*>(table)->CheckField(field);
-}
-
-TEST_CASE("RootConfig flatbuffer round trip keeps every section", "[config][roundtrip]")
-{
-  const Config::RootConfig sample  = MakeSampleConfig();
-  const std::vector<uint8_t> bytes = Serialize(sample);
-
-  Config::RootConfig loaded;
-  TEST_ASSERT_TRUE(Deserialize(bytes.data(), bytes.size(), loaded));
-  AssertConfigEqual(sample, loaded);
-}
-
-TEST_CASE("Stored config is loaded unchanged by Config::Init", "[config][roundtrip]")
-{
-  const Config::RootConfig sample = MakeSampleConfig();
-
-  TEST_ASSERT_TRUE(InitFrom(Serialize(sample)));
+  const Full sample = MakeSampleConfig();
+  InitWith(sample);
   AssertConfigEqual(sample, Snapshot());
-}
-
-TEST_CASE("Serializing without sensitive data drops only the secrets", "[config][roundtrip]")
-{
-  const Config::RootConfig sample  = MakeSampleConfig();
-  const std::vector<uint8_t> bytes = Serialize(sample, false);
-
-  Config::RootConfig loaded;
-  TEST_ASSERT_TRUE(Deserialize(bytes.data(), bytes.size(), loaded));
-  AssertConfigEqual(sample, loaded, false);
 }
 
 TEST_CASE("Values set through the Config API survive a reload", "[config][roundtrip]")
@@ -64,17 +38,14 @@ TEST_CASE("Values set through the Config API survive a reload", "[config][roundt
   TEST_ASSERT_TRUE(Config::SetEStopGpioPin(GPIO_NUM_13));
   TEST_ASSERT_TRUE(Config::SetEStopEnabled(true));
 
-  const Config::RootConfig before = Snapshot();
+  const Full before = Snapshot();
   TEST_ASSERT_EQUAL_UINT8_ARRAY(bssid, before.wifi.credentialsList[0].bssid.data(), 6);
 
-  // Reboot: load the file the setters wrote.
-  TEST_ASSERT_TRUE(InitFrom(StoredFile()));
+  Reload();
   AssertConfigEqual(before, Snapshot());
 
   TEST_ASSERT_TRUE(Config::HasBackendAuthToken());
-  auto token = Config::GetBackendAuthToken();
-  TEST_ASSERT_TRUE(token.has_value());
-  TEST_ASSERT_EQUAL_STRING("tok_0123456789abcdef", token->c_str());
+  TEST_ASSERT_EQUAL_STRING("tok_0123456789abcdef", Config::GetBackendAuthToken().c_str());
 
   auto creds = Config::TryGetWiFiCredentialsBySSID("Guest");
   TEST_ASSERT_TRUE(creds.has_value());
@@ -84,7 +55,7 @@ TEST_CASE("Values set through the Config API survive a reload", "[config][roundt
 
 TEST_CASE("Whole-section setters round trip through the store", "[config][roundtrip]")
 {
-  const Config::RootConfig sample = MakeSampleConfig();
+  const Full sample = MakeSampleConfig();
   InitDefault();
 
   TEST_ASSERT_TRUE(Config::SetRFConfig(sample.rf));
@@ -96,76 +67,117 @@ TEST_CASE("Whole-section setters round trip through the store", "[config][roundt
   TEST_ASSERT_TRUE(Config::SetEStopConfig(sample.estop));
   AssertConfigEqual(sample, Snapshot());
 
-  TEST_ASSERT_TRUE(InitFrom(StoredFile()));
+  Reload();
   AssertConfigEqual(sample, Snapshot());
 }
 
-TEST_CASE("GetAsFlatBuffer and SaveFromFlatBuffer round trip", "[config][roundtrip]")
+TEST_CASE("Removed credentials are gone after a reload and their ids can be reused", "[config][roundtrip]")
 {
-  const Config::RootConfig sample = MakeSampleConfig();
-  TEST_ASSERT_TRUE(InitFrom(Serialize(sample)));
-
-  flatbuffers::FlatBufferBuilder builder;
-  Serialization::Configuration::FinishHubConfigBuffer(builder, Config::GetAsFlatBuffer(builder, true));
-  std::vector<uint8_t> exported(builder.GetBufferPointer(), builder.GetBufferPointer() + builder.GetSize());
-
   InitDefault();
-  TEST_ASSERT_TRUE(Config::SaveFromFlatBuffer(Serialization::Configuration::GetHubConfig(exported.data())));
-  AssertConfigEqual(sample, Snapshot());
+  TEST_ASSERT_EQUAL_UINT8(1, Config::AddWiFiCredentials("A", "pa", WIFI_AUTH_WPA2_PSK));
+  TEST_ASSERT_EQUAL_UINT8(2, Config::AddWiFiCredentials("B", "pb", WIFI_AUTH_WPA2_PSK));
+  TEST_ASSERT_EQUAL_UINT8(3, Config::AddWiFiCredentials("C", "pc", WIFI_AUTH_WPA2_PSK));
+  TEST_ASSERT_TRUE(Config::RemoveWiFiCredentials(2));
 
-  TEST_ASSERT_TRUE(InitFrom(StoredFile()));
-  AssertConfigEqual(sample, Snapshot());
+  Reload();
+  auto creds = Config::GetWiFiCredentials();
+  TEST_ASSERT_EQUAL_size_t(2, creds.size());
+  TEST_ASSERT_EQUAL_UINT8(1, creds[0].id);
+  TEST_ASSERT_EQUAL_UINT8(3, creds[1].id);
+  TEST_ASSERT_FALSE(Config::TryGetWiFiCredentialsByID(2).has_value());
+
+  // The freed id is handed out again, and the list order is by id, not by insertion
+  TEST_ASSERT_EQUAL_UINT8(2, Config::AddWiFiCredentials("D", "pd", WIFI_AUTH_WPA2_PSK));
+  Reload();
+  creds = Config::GetWiFiCredentials();
+  TEST_ASSERT_EQUAL_size_t(3, creds.size());
+  TEST_ASSERT_EQUAL_STRING("D", creds[1].ssid.c_str());
+
+  TEST_ASSERT_TRUE(Config::ClearWiFiCredentials());
+  Reload();
+  TEST_ASSERT_TRUE(Config::GetWiFiCredentials().empty());
+  TEST_ASSERT_FALSE(Config::HasWiFiCredentials());
 }
 
-TEST_CASE("SetRaw stores a valid buffer verbatim and GetRaw returns it", "[config][roundtrip]")
+TEST_CASE("Credentials are enumerated from their keys, never counted", "[config][roundtrip]")
 {
-  const std::vector<uint8_t> bytes = Serialize(MakeSampleConfig());
-  InitDefault();
+  // Ids with gaps and out of order, as a list that has been edited over time looks: everything comes back.
+  Full config;
+  config.wifi.credentialsList = {Config::WiFiCredentials(200, "High", "p1"), Config::WiFiCredentials(3, "Low", "p2"), Config::WiFiCredentials(255, "Max", "p3")};
+  InitWith(config);
 
-  TEST_ASSERT_TRUE(Config::SetRaw(bytes.data(), bytes.size()));
-  TEST_ASSERT_EQUAL_size_t(bytes.size(), StoredFile().size());
-  TEST_ASSERT_EQUAL_UINT8_ARRAY(bytes.data(), StoredFile().data(), bytes.size());
-
-  TinyVec<uint8_t> raw;
-  TEST_ASSERT_TRUE(Config::GetRaw(raw));
-  TEST_ASSERT_EQUAL_size_t(bytes.size(), raw.size());
-  TEST_ASSERT_EQUAL_UINT8_ARRAY(bytes.data(), raw.data(), bytes.size());
-
-  // SetRaw takes effect immediately and survives a restart.
-  AssertConfigEqual(MakeSampleConfig(), Snapshot());
-  TEST_ASSERT_TRUE(InitFrom(StoredFile()));
-  AssertConfigEqual(MakeSampleConfig(), Snapshot());
+  auto creds = Config::GetWiFiCredentials();
+  TEST_ASSERT_EQUAL_size_t(3, creds.size());
+  TEST_ASSERT_EQUAL_UINT8(3, creds[0].id);
+  TEST_ASSERT_EQUAL_UINT8(200, creds[1].id);
+  TEST_ASSERT_EQUAL_UINT8(255, creds[2].id);
+  TEST_ASSERT_EQUAL_STRING("Max", creds[2].ssid.c_str());
 }
 
-TEST_CASE("Saved configs write fields that equal their schema default", "[config][roundtrip]")
+TEST_CASE("One credential that does not read is dropped; the others load and survive the next save", "[config][roundtrip]")
 {
-  // 1.5.x reads a missing is_enabled/keepalive_enabled as false, so omitting them breaks downgrades.
+  // A credential blob NVS hands back unreadable must not fail the wifi load: a failed load runs the section on an
+  // empty list, and the next save sweeps every stored credential that is not in it, so every network would be lost.
+  const Full sample = MakeSampleConfig();
+  InitWith(sample);
+  {
+    auto wifi = Config::Nvs::Handle::Open(Keys::kPartitionCfg, Keys::Ns::kWifi, true);
+    TEST_ASSERT_TRUE(wifi.has_value());
+    const uint8_t garbage[] = {0xFF, 0x02, 0x00};  // unknown blob version, id 2
+    TEST_ASSERT_TRUE(wifi->SetBlob("2", garbage));
+    TEST_ASSERT_TRUE(wifi->Commit());
+  }
+  Reload();
+
+  Full expected = sample;
+  expected.wifi.credentialsList.erase(expected.wifi.credentialsList.begin() + 1);  // Guest, id 2
+  AssertConfigEqual(expected, Snapshot());
+
+  // The section is in sync with flash: a changed-only save adds one key and leaves the readable credentials alone
+  TEST_ASSERT_EQUAL_UINT8(2, Config::AddWiFiCredentials("Cafe", "latte123", WIFI_AUTH_WPA2_PSK));
+  Reload();
+  auto creds = Config::GetWiFiCredentials();
+  TEST_ASSERT_EQUAL_size_t(3, creds.size());
+  TEST_ASSERT_EQUAL_UINT8(1, creds[0].id);
+  TEST_ASSERT_EQUAL_STRING("Cafe", creds[1].ssid.c_str());
+  TEST_ASSERT_EQUAL_UINT8(7, creds[2].id);
+}
+
+TEST_CASE("GetRaw writes fields that equal their schema default", "[config][roundtrip]")
+{
+  // 1.5.x reads a missing is_enabled/keepalive_enabled as false, so omitting them breaks loading the dump there.
   InitDefault();
   TEST_ASSERT_TRUE(Config::SetRFConfigKeepAliveEnabled(true));
 
-  const std::vector<uint8_t> stored = StoredFile();
-  const auto* root                  = Serialization::Configuration::GetHubConfig(stored.data());
-  TEST_ASSERT_TRUE(IsStored(root->rf(), Serialization::Configuration::RFConfig::VT_KEEPALIVE_ENABLED));
-  TEST_ASSERT_TRUE(IsStored(root->ota_update(), Serialization::Configuration::OtaUpdateConfig::VT_IS_ENABLED));
-
   TinyVec<uint8_t> raw;
   TEST_ASSERT_TRUE(Config::GetRaw(raw));
-  const auto* rawRoot = Serialization::Configuration::GetHubConfig(raw.data());
-  TEST_ASSERT_TRUE(IsStored(rawRoot->ota_update(), Serialization::Configuration::OtaUpdateConfig::VT_IS_ENABLED));
+  const auto* root = Serialization::Configuration::GetHubConfig(raw.data());
+  // The generated tables derive from flatbuffers::Table privately; every table is one at the same address
+  auto hasField = [](const void* table, flatbuffers::voffset_t field) {
+    return static_cast<const flatbuffers::Table*>(table)->CheckField(field);
+  };
+  TEST_ASSERT_TRUE(hasField(root->rf(), Serialization::Configuration::RFConfig::VT_KEEPALIVE_ENABLED));
+  TEST_ASSERT_TRUE(hasField(root->ota_update(), Serialization::Configuration::OtaUpdateConfig::VT_IS_ENABLED));
 }
 
-TEST_CASE("A setter after SetRaw keeps the imported config", "[config][roundtrip]")
+TEST_CASE("A save writes only what changed", "[config][roundtrip]")
 {
-  const std::vector<uint8_t> bytes = Serialize(MakeSampleConfig());
-  InitDefault();
+  const Full sample = MakeSampleConfig();
+  InitWith(sample);
+  const std::size_t before = UsedEntries();
 
-  TEST_ASSERT_TRUE(Config::SetRaw(bytes.data(), bytes.size()));
-  TEST_ASSERT_TRUE(Config::SetSerialInputConfigEchoEnabled(!MakeSampleConfig().serialInput.echoEnabled));
+  // Setting what is already set changes nothing on flash
+  TEST_ASSERT_TRUE(Config::SetWiFiConfig(sample.wifi));
+  TEST_ASSERT_TRUE(Config::SetBackendConfig(sample.backend));
+  TEST_ASSERT_TRUE(Config::SetOtaUpdateConfig(sample.otaUpdate));
+  TEST_ASSERT_TRUE(Config::SetWiFiCredentials(sample.wifi.credentialsList));
+  TEST_ASSERT_EQUAL_size_t(before, UsedEntries());
 
-  Config::RootConfig expected      = MakeSampleConfig();
-  expected.serialInput.echoEnabled = !expected.serialInput.echoEnabled;
-  TEST_ASSERT_TRUE(InitFrom(StoredFile()));
-  AssertConfigEqual(expected, Snapshot());
+  // One scalar: one entry replaced (NVS writes the new one, then frees the old: the count does not grow)
+  TEST_ASSERT_TRUE(Config::SetSerialInputConfigEchoEnabled(true));
+  TEST_ASSERT_EQUAL_size_t(before, UsedEntries());
+  Reload();
+  TEST_ASSERT_TRUE(Config::GetSerialInputConfigEchoEnabled());
 }
 
 TEST_CASE("Many max-length WiFi credentials survive a reload", "[config][roundtrip]")
@@ -176,105 +188,34 @@ TEST_CASE("Many max-length WiFi credentials survive a reload", "[config][roundtr
     std::string password(63, static_cast<char>('a' + i));  // WPA2 passphrase maximum
     TEST_ASSERT_EQUAL_UINT8(i + 1, Config::AddWiFiCredentials(ssid, password, WIFI_AUTH_WPA2_PSK));
   }
-  const Config::RootConfig before = Snapshot();
+  const Full before = Snapshot();
 
-  TEST_ASSERT_TRUE_MESSAGE(InitFrom(StoredFile()), "Init fell back to defaults");
+  Reload();
   AssertConfigEqual(before, Snapshot());
 }
 
-TEST_CASE("A stored config is never too large to load again", "[config][roundtrip]")
+TEST_CASE("The store holds more than the 1.x config file could", "[config][roundtrip]")
 {
-  // AddWiFiCredentials hands out up to 255 IDs, but the config partition holds at
-  // most Config::MaxConfigSize bytes: once another network would not fit, adding
-  // is refused instead of storing a file that cannot be loaded again.
+  // The 1.x firmware capped its config file at 4 KiB, some 30 credentials like these. cfg is that file's 12 KiB
+  // partition retyped as NVS (three pages, one of them always kept free for compaction): 32 credentials with long
+  // names and passphrases fit with room for the rest of the config. The store fills up at about 36.
   InitDefault();
-  int added = 0;
-  for (int i = 0; i < 40; ++i) {
-    std::string ssid                      = "Network-" + std::to_string(i) + std::string(20, 'x');
-    const Config::RootConfig beforeAdd    = Snapshot();
-    const std::vector<uint8_t> fileBefore = StoredFile();
-    const int writesBefore                = HostConfigFs::writeCount;
-
-    if (Config::AddWiFiCredentials(ssid, std::string(63, 'p'), WIFI_AUTH_WPA2_PSK) == 0) {
-      // Refused: nothing changed, in memory or on flash.
-      AssertConfigEqual(beforeAdd, Snapshot());
-      TEST_ASSERT_EQUAL_INT(writesBefore, HostConfigFs::writeCount);
-      TEST_ASSERT_TRUE(fileBefore == StoredFile());
-      break;
-    }
-    ++added;
+  for (int i = 0; i < 32; ++i) {
+    std::string ssid = "Network-" + std::to_string(i) + std::string(20, 'x');
+    TEST_ASSERT_NOT_EQUAL_MESSAGE(0, Config::AddWiFiCredentials(ssid, std::string(63, 'p'), WIFI_AUTH_WPA2_PSK), ssid.c_str());
   }
-  TEST_ASSERT_TRUE_MESSAGE(added >= 16, "far fewer credentials fit than expected");
-  TEST_ASSERT_TRUE_MESSAGE(added < 40, "40 such credentials cannot fit in MaxConfigSize");
-  TEST_ASSERT_LESS_OR_EQUAL_size_t(Config::MaxConfigSize, StoredFile().size());
-
-  const Config::RootConfig before = Snapshot();
-  TEST_ASSERT_EQUAL_size_t(added, before.wifi.credentialsList.size());
-  TEST_ASSERT_TRUE_MESSAGE(InitFrom(StoredFile()), "Init fell back to defaults");
+  const Full before = Snapshot();
+  TEST_ASSERT_EQUAL_size_t(32, before.wifi.credentialsList.size());
+  Reload();
   AssertConfigEqual(before, Snapshot());
-}
-
-namespace {
-  // A valid config whose serialized form is exactly `size` bytes (padded through the hostname).
-  std::vector<uint8_t> SerializedOfSize(std::size_t size, Config::RootConfig& config)
-  {
-    config = MakeSampleConfig();
-    for (std::size_t len = 0; len < size; ++len) {
-      config.wifi.hostname.assign(len, 'h');
-      std::vector<uint8_t> bytes = Serialize(config);
-      if (bytes.size() == size) {
-        return bytes;
-      }
-    }
-    TEST_FAIL_MESSAGE("no hostname length gives that size");
-    return {};
-  }
-}  // namespace
-
-TEST_CASE("A config of exactly MaxConfigSize bytes loads", "[config][roundtrip]")
-{
-  Config::RootConfig sample;
-  const std::vector<uint8_t> bytes = SerializedOfSize(Config::MaxConfigSize, sample);
-
-  TEST_ASSERT_TRUE_MESSAGE(InitFrom(bytes), "Init fell back to defaults");
-  AssertConfigEqual(sample, Snapshot());
-
-  InitDefault();
-  TEST_ASSERT_TRUE(Config::SetRaw(bytes.data(), bytes.size()));
-  TEST_ASSERT_TRUE(InitFrom(StoredFile()));
-  AssertConfigEqual(sample, Snapshot());
-}
-
-TEST_CASE("A config larger than MaxConfigSize is rejected, not aborted on", "[config][roundtrip]")
-{
-  // A well-formed flatbuffer, just too large: before the fix the Verifier
-  // constructor asserted (size < max_size) and aborted the hub on every boot.
-  Config::RootConfig sample;
-  const std::vector<uint8_t> bytes = SerializedOfSize(Config::MaxConfigSize + 4, sample);
-
-  InitDefault();
-  TEST_ASSERT_FALSE(Config::SetRaw(bytes.data(), bytes.size()));
-  TEST_ASSERT_EQUAL_INT(0, HostConfigFs::writeCount);
-
-  TEST_ASSERT_FALSE(InitFrom(bytes));  // fell back to defaults and rewrote the file
-  AssertConfigEqual(Config::RootConfig(), Snapshot());
-  TEST_ASSERT_TRUE(InitFrom(StoredFile()));
-
-  // Setters cannot store an oversized config either, and keep the old file.
-  InitDefault();
-  const std::vector<uint8_t> before = StoredFile();
-  Config::WiFiConfig wifi           = sample.wifi;
-  wifi.hostname.append(Config::MaxConfigSize, 'h');
-  TEST_ASSERT_FALSE(Config::SetWiFiConfig(wifi));
-  TEST_ASSERT_TRUE(before == StoredFile());
 }
 
 TEST_CASE("jsonconfig get/set round trip keeps every section", "[config][roundtrip][json]")
 {
-  Config::RootConfig sample = MakeSampleConfig();
+  Full sample = MakeSampleConfig();
   // Strings that need JSON escaping are covered separately below.
   sample.wifi.credentialsList[2] = Config::WiFiCredentials(7, "Office", "s3cret!", WIFI_AUTH_WPA3_PSK);
-  TEST_ASSERT_TRUE(InitFrom(Serialize(sample)));
+  InitWith(sample);
   const std::string json = Config::GetAsJSON(true);
   TEST_ASSERT_FALSE(json.empty());
 
@@ -282,8 +223,8 @@ TEST_CASE("jsonconfig get/set round trip keeps every section", "[config][roundtr
   TEST_ASSERT_TRUE(Config::SaveFromJSON(json));
   AssertConfigEqual(sample, Snapshot());
 
-  // SaveFromJSON persists: the stored file reloads to the same config.
-  TEST_ASSERT_TRUE(InitFrom(StoredFile()));
+  // SaveFromJSON persists: the store reloads to the same config.
+  Reload();
   AssertConfigEqual(sample, Snapshot());
 
   // And exporting again yields identical JSON.
@@ -292,8 +233,8 @@ TEST_CASE("jsonconfig get/set round trip keeps every section", "[config][roundtr
 
 TEST_CASE("jsonconfig round trip keeps strings that need escaping", "[config][roundtrip][json]")
 {
-  Config::RootConfig sample = MakeSampleConfig();
-  TEST_ASSERT_TRUE(InitFrom(Serialize(sample)));
+  Full sample = MakeSampleConfig();
+  InitWith(sample);
   const std::string json = Config::GetAsJSON(true);
 
   InitDefault();
@@ -316,19 +257,20 @@ TEST_CASE("jsonconfig round trip keeps strings that need escaping", "[config][ro
 TEST_CASE("jsonconfig set decodes \\u escapes", "[config][roundtrip][json]")
 {
   InitDefault();
+  // Escaped on purpose (a BMP code point, a surrogate pair, an escaped ASCII hyphen): the decoder is what is under test
   TEST_ASSERT_TRUE(Config::SaveFromJSON(R"({"wifi":{"hostname":"hub\u002d1","credentials":[{"id":1,"ssid":"Caf\u00e9 \ud83d\ude00","password":"a\tb"}]}})"));
 
+  Reload();  // UTF-8 and control characters survive the store too
   auto wifi = Config::GetWiFiConfig();
-  TEST_ASSERT_TRUE(wifi.has_value());
-  TEST_ASSERT_EQUAL_STRING("hub-1", wifi->hostname.c_str());
-  TEST_ASSERT_EQUAL_size_t(1, wifi->credentialsList.size());
-  TEST_ASSERT_EQUAL_STRING("Caf\xc3\xa9 \xf0\x9f\x98\x80", wifi->credentialsList[0].ssid.c_str());
-  TEST_ASSERT_EQUAL_STRING("a\tb", wifi->credentialsList[0].password.c_str());
+  TEST_ASSERT_EQUAL_STRING("hub-1", wifi.hostname.c_str());
+  TEST_ASSERT_EQUAL_size_t(1, wifi.credentialsList.size());
+  TEST_ASSERT_EQUAL_STRING("Caf\xc3\xa9 \xf0\x9f\x98\x80", wifi.credentialsList[0].ssid.c_str());
+  TEST_ASSERT_EQUAL_STRING("a\tb", wifi.credentialsList[0].password.c_str());
 }
 
 TEST_CASE("GetAsJSON without sensitive data omits secrets", "[config][roundtrip][json]")
 {
-  TEST_ASSERT_TRUE(InitFrom(Serialize(MakeSampleConfig())));
+  InitWith(MakeSampleConfig());
 
   const std::string full     = Config::GetAsJSON(true);
   const std::string redacted = Config::GetAsJSON(false);
@@ -342,14 +284,28 @@ TEST_CASE("GetAsJSON without sensitive data omits secrets", "[config][roundtrip]
   TEST_ASSERT_NOT_EQUAL(std::string::npos, redacted.find("\"api.example.org\""));
 }
 
+TEST_CASE("The wire form for the portal omits secrets and carries every section", "[config][roundtrip]")
+{
+  const Full sample = MakeSampleConfig();
+  InitWith(sample);
+
+  flatbuffers::FlatBufferBuilder builder;
+  Serialization::Configuration::FinishHubConfigBuffer(builder, Config::GetAsFlatBuffer(builder, false));
+  std::vector<uint8_t> exported(builder.GetBufferPointer(), builder.GetBufferPointer() + builder.GetSize());
+
+  Full decoded;
+  TEST_ASSERT_TRUE(Deserialize(exported.data(), exported.size(), decoded));
+  AssertConfigEqual(sample, decoded, false);
+}
+
 TEST_CASE("UpdateOtaUpdateConfig edits only what the update touches and saves only on change", "[config][roundtrip]")
 {
-  const Config::RootConfig sample = MakeSampleConfig();
-  TEST_ASSERT_TRUE(InitFrom(Serialize(sample)));
+  const Full sample = MakeSampleConfig();
+  InitWith(sample);
 
-  const std::vector<uint8_t> storedBefore = StoredFile();
+  const std::size_t before = UsedEntries();
   TEST_ASSERT_TRUE(Config::UpdateOtaUpdateConfig([](Config::OtaUpdateConfig&) { return false; }));
-  TEST_ASSERT_TRUE(storedBefore == StoredFile());
+  TEST_ASSERT_EQUAL_size_t(before, UsedEntries());
 
   const uint16_t interval = static_cast<uint16_t>(sample.otaUpdate.checkInterval + 7);
   TEST_ASSERT_TRUE(Config::UpdateOtaUpdateConfig([&](Config::OtaUpdateConfig& cfg) {
@@ -357,11 +313,11 @@ TEST_CASE("UpdateOtaUpdateConfig edits only what the update touches and saves on
     return true;
   }));
 
-  Config::RootConfig expected      = sample;
+  Full expected                    = sample;
   expected.otaUpdate.checkInterval = interval;
   AssertConfigEqual(expected, Snapshot());
 
-  TEST_ASSERT_TRUE(InitFrom(StoredFile()));
+  Reload();
   AssertConfigEqual(expected, Snapshot());
 }
 
@@ -376,6 +332,36 @@ TEST_CASE("CompareExchangeOtaUpdateStep only replaces the expected step", "[conf
   TEST_ASSERT_TRUE(Config::CompareExchangeOtaUpdateStep(OtaUpdateStep::Updated, OtaUpdateStep::None));
   TEST_ASSERT_TRUE(Config::GetOtaUpdateStep() == OtaUpdateStep::None);
 
-  TEST_ASSERT_TRUE(InitFrom(StoredFile()));
+  Reload();
   TEST_ASSERT_TRUE(Config::GetOtaUpdateStep() == OtaUpdateStep::None);
+}
+
+TEST_CASE("Factory reset wipes every setting and survives a reload", "[config][roundtrip]")
+{
+  InitWith(MakeSampleConfig());
+  Config::FactoryReset();
+  AssertConfigEqual(Full(), Snapshot());
+  Reload();
+  AssertConfigEqual(Full(), Snapshot());
+}
+
+TEST_CASE("rawconfig get and set round trip the whole config", "[config][roundtrip]")
+{
+  InitWith(MakeSampleConfig());
+  TinyVec<uint8_t> raw;
+  TEST_ASSERT_TRUE(Config::GetRaw(raw));
+  const std::vector<uint8_t> exported(raw.data(), raw.data() + raw.size());
+
+  InitDefault();
+  TEST_ASSERT_TRUE(Config::SetRaw(exported.data(), exported.size()));
+  AssertConfigEqual(MakeSampleConfig(), Snapshot());
+  Reload();
+  AssertConfigEqual(MakeSampleConfig(), Snapshot());
+
+  // A buffer that does not verify changes nothing
+  const std::size_t before = UsedEntries();
+  TEST_ASSERT_FALSE(Config::SetRaw(exported.data(), exported.size() / 2));
+  TEST_ASSERT_FALSE(Config::SetRaw(nullptr, 0));
+  TEST_ASSERT_EQUAL_size_t(before, UsedEntries());
+  AssertConfigEqual(MakeSampleConfig(), Snapshot());
 }

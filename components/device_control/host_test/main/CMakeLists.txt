@@ -1,7 +1,8 @@
 # Compile device_control's CommandHandler + RFTransmitter (and what they use from
 # protocols, common and events) directly, against the real OpenShock and ESP-IDF
 # headers. The IDF APIs are CMock mocks whose callbacks (host_fakes.cpp) step a fake
-# clock; config (stubs/config/Config.h), TaskUtils and EStopManager are faked in
+# clock; the rf and estop config sections (stubs/radio/RFConfig.h, stubs/estop/EStopConfig.h),
+# TaskUtils and EStopManager are faked in
 # host_fakes.cpp too, so a test can run the transmit/keep-alive task loops
 # deterministically. EStopManager's debounce/hold-to-clear logic is tested through
 # the pure EStopStateMachine.h.
@@ -22,7 +23,7 @@ idf_component_register(
                "../../../protocols/src/PetrainerEncoder.cpp"
                "../../../protocols/src/T330Encoder.cpp"
   INCLUDE_DIRS "."
-               "stubs"                      # config/Config.h (fake RF/E-Stop settings)
+               "stubs"                      # radio/RFConfig.h, estop/EStopConfig.h (fake settings; shadow the real ones)
                "../../src"                  # estop/EStopStateMachine.h
                "../../include"              # CommandHandler.h, estop/*, radio/RFTransmitter.h
                "../../../chipset/include"   # Chipset.h

@@ -10,6 +10,7 @@ on:
       - 'test/**'
       - 'partitions/**'
       - 'CMakeLists.txt'
+      - 'cmake/**'
       - 'sdkconfig.defaults'
       - 'dependencies.lock'
       - '.gitmodules'

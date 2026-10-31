@@ -18,6 +18,13 @@ runs:
       shell: bash
       run: git submodule update --init --depth 1 components/flatbuffers/flatbuffers
 
+    # The install's Python venv is built on the runner image's Python, so an install from one image does not run on
+    # another (ubuntu-latest moving to a new release broke every job with "No module named 'rich_click'")
+    - name: Name the runner image
+      id: image
+      shell: bash
+      run: echo "name=${ImageOS:-unknown}" >> "$GITHUB_OUTPUT"
+
     # No restore-keys, a partial match would layer the installer over a stale tree. Bump the trailing number to invalidate.
     - name: Restore ESP-IDF install
       id: idf-cache
@@ -27,7 +34,7 @@ runs:
           /tmp/esp
           /opt/esp
           ~/.espressif
-        key: esp-idf-${{ runner.os }}-${{ inputs.idf-version }}-6
+        key: esp-idf-${{ runner.os }}-${{ steps.image.outputs.name }}-${{ inputs.idf-version }}-6
 
     - uses: espressif/install-esp-idf-action@8fc05d1470d5591417e7a3707a1f2bec178db4ae  # v1
       if: ${{ steps.idf-cache.outputs.cache-hit != 'true' }}
@@ -91,7 +98,7 @@ runs:
           /tmp/esp
           /opt/esp
           ~/.espressif
-        key: esp-idf-${{ runner.os }}-${{ inputs.idf-version }}-6
+        key: esp-idf-${{ runner.os }}-${{ steps.image.outputs.name }}-${{ inputs.idf-version }}-6
 
     - name: Put ccache on PATH
       shell: bash

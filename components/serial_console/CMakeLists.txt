@@ -10,8 +10,9 @@ FILE(GLOB_RECURSE console_sources
 idf_component_register(
   SRCS          ${console_sources}
   INCLUDE_DIRS  "include"
+  REQUIRES      config serialization          # its config section (serial_console/SerialInputConfig.h)
   PRIV_REQUIRES core serial device_control crypto   # core: wifi/gateway/http/serialization; serial: Serial::Init/Read; device_control: estop/CommandHandler/visual/radio; crypto: Base64
-                common config logging temporal osjson chipset   # used directly; previously only reachable through core's public REQUIRES
+                common logging temporal osjson chipset   # used directly; previously only reachable through core's public REQUIRES
 )
 
 target_compile_options(${COMPONENT_LIB} PRIVATE -Wno-error)
