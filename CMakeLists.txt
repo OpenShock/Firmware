@@ -140,6 +140,7 @@ if(_os_idf_activated)
 endif()
 
 project(firmware)
+include(${CMAKE_CURRENT_LIST_DIR}/cmake/cxx_standard.cmake)
 
 # --- ccache by absolute path ---------------------------------------------------
 # idf.py configures with CCACHE_ENABLE, and ESP-IDF then launches compiles through a bare `ccache`,

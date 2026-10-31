@@ -12,3 +12,10 @@
 #define SERPR_ERROR(format, ...)    SERPR_SYS("Error|" format, ##__VA_ARGS__)
 
 using namespace std::string_view_literals;
+
+namespace OpenShock::SerialCmds {
+  /// @brief The tail of every handler that saved a setting: Success or Error for the save's result.
+  void ReportSaved(bool saved);
+  /// @brief ReportSaved for a setting the hub has to restart to apply: a successful save restarts the hub.
+  void ReportSavedAndRestart(bool saved);
+}  // namespace OpenShock::SerialCmds

@@ -9,6 +9,7 @@
 # esp_http_server and friends do not leak into consumers.
 idf_component_register(
   SRCS              "src/captiveportal/ApiHandlers.cpp"
+                    "src/captiveportal/CaptivePortalConfig.cpp"
                     "src/captiveportal/CaptivePortalInstance.cpp"
                     "src/captiveportal/HttpUtils.cpp"
                     "src/captiveportal/Manager.cpp"
@@ -16,7 +17,8 @@ idf_component_register(
                     "src/captiveportal/WebSocketEndpoint.cpp"
   INCLUDE_DIRS      "include"
   PRIV_INCLUDE_DIRS "src"
-  PRIV_REQUIRES     core config device_control                        # wifi/gateway/message handlers/AppHooks; Config::; CommandHandler/EStopManager
+  REQUIRES          config serialization                              # its config section (captiveportal/CaptivePortalConfig.h)
+  PRIV_REQUIRES     core device_control                        # wifi/gateway/message handlers/AppHooks; Config::; CommandHandler/EStopManager
                     common chipset logging temporal osjson serialization   # foundation utilities, json, HubToLocalMessage fbs
                     dns_server fs http hwutil rfc8908 www                # DNSServer, LfsPartition (1.x layout), ContentTypes, PartitionUtils, RFC8908Handler, the www image
                     esp_http_server esp_netif esp_timer esp_wifi
