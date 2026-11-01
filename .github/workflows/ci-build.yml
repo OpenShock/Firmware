@@ -312,7 +312,7 @@ jobs:
     needs: [gate, plan, repo-server]
     timeout-minutes: 20
     if: ${{ inputs.legacy-cdn && needs.gate.outputs.publish == 'true' }}
-    environment: cdn # Carries the Bunny credentials; its branch policy admits develop and feature/ci-*
+    environment: cdn # Carries the Bunny credentials; its branch policy has to admit the dispatched ref
     permissions:
       contents: read
     # The group master and beta's cdn-bump holds: a tag cut from them still cascades into version-develop.txt.
