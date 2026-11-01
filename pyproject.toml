@@ -30,5 +30,5 @@ check_untyped_defs = true
 exclude = ['/tests/']
 
 [[tool.mypy.overrides]]
-module = ['esptool', 'esptool.*', 'littlefs', 'requests']
+module = ['esptool', 'esptool.*', 'requests']
 ignore_missing_imports = true

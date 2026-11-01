@@ -17,7 +17,6 @@ namespace {
   {
     return static_cast<uint32_t>(p[0]) | (static_cast<uint32_t>(p[1]) << 8) | (static_cast<uint32_t>(p[2]) << 16) | (static_cast<uint32_t>(p[3]) << 24);
   }
-  constexpr std::size_t kHashOffset = 12;  // body_hash in the header
 
   std::size_t padded(std::size_t size)
   {

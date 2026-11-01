@@ -10,7 +10,6 @@
 #include "enums/FirmwareBootType.h"
 #include "enums/OtaUpdateChannel.h"
 #include "enums/OtaUpdateStep.h"
-#include "serialization/_fbs/HubConfig_generated.h"
 
 #include "util/FunctionRef.h"
 
@@ -41,10 +40,9 @@ namespace OpenShock::Config {
     OtaUpdateStep updateStep;
 
     /// @brief The section runs it on every value it takes in: a zero check interval would check on every wake-up
-    ///        of the update task, so it becomes the default (the captive portal refuses it, JSON and NVS do not).
+    ///        of the update task, so it becomes the default (the captive portal refuses it, JSON and NVS do not). The
+    ///        1.x CDN domains, which serve no repository API, become the default too.
     void Normalize();
-
-    [[nodiscard]] flatbuffers::Offset<Serialization::Configuration::OtaUpdateConfig> ToFlatbuffers(flatbuffers::FlatBufferBuilder& builder, bool withSensitiveData) const;
 
     /// @brief Reads this section from `partition`; a missing key is its default, a read error fails.
     bool LoadNvs(const char* partition);

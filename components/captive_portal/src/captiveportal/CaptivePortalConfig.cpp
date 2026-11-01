@@ -11,13 +11,12 @@ const char* const TAG = "Config::CaptivePortalConfig";
 #include "json/Json.h"
 
 using namespace OpenShock::Config;
-namespace Fbs = OpenShock::Serialization::Configuration;
 
 static constexpr const char* kNamespace = "portal";
 static constexpr const char* kKeyAlways = "always";
 
 static constexpr const char* kNamespaces[] = {kNamespace};
-static Section<CaptivePortalConfig> s_section({.name = "captivePortal", .order = 2, .hubConfigField = Fbs::HubConfig::VT_CAPTIVE_PORTAL, .namespaces = kNamespaces});
+static Section<CaptivePortalConfig> s_section({.name = "captivePortal", .order = 2, .namespaces = kNamespaces});
 
 CaptivePortalConfig::CaptivePortalConfig()
   : alwaysEnabled(false)
@@ -27,11 +26,6 @@ CaptivePortalConfig::CaptivePortalConfig()
 CaptivePortalConfig::CaptivePortalConfig(bool alwaysEnabled)
   : alwaysEnabled(alwaysEnabled)
 {
-}
-
-flatbuffers::Offset<OpenShock::Serialization::Configuration::CaptivePortalConfig> CaptivePortalConfig::ToFlatbuffers(flatbuffers::FlatBufferBuilder& builder, bool withSensitiveData) const
-{
-  return Serialization::Configuration::CreateCaptivePortalConfig(builder, alwaysEnabled);
 }
 
 bool CaptivePortalConfig::FromJSON(JSON::JsonView json)
@@ -65,7 +59,7 @@ bool CaptivePortalConfig::LoadNvs(const char* partition)
 
 bool CaptivePortalConfig::SaveNvs(const char* partition, const CaptivePortalConfig* previous) const
 {
-  auto handle = Nvs::Handle::Open(partition, kNamespace, true);
+  auto handle = Nvs::Handle::OpenForWrite(partition, kNamespace);
   if (!handle) {
     return false;
   }

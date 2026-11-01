@@ -121,7 +121,7 @@ TEST_CASE("One credential that does not read is dropped; the others load and sur
   const Full sample = MakeSampleConfig();
   InitWith(sample);
   {
-    auto wifi = Config::Nvs::Handle::Open(Keys::kPartitionCfg, Keys::Ns::kWifi, true);
+    auto wifi = Config::Nvs::Handle::OpenForWrite(Keys::kPartitionCfg, Keys::Ns::kWifi);
     TEST_ASSERT_TRUE(wifi.has_value());
     const uint8_t garbage[] = {0xFF, 0x02, 0x00};  // unknown blob version, id 2
     TEST_ASSERT_TRUE(wifi->SetBlob("2", garbage));
@@ -141,23 +141,6 @@ TEST_CASE("One credential that does not read is dropped; the others load and sur
   TEST_ASSERT_EQUAL_UINT8(1, creds[0].id);
   TEST_ASSERT_EQUAL_STRING("Cafe", creds[1].ssid.c_str());
   TEST_ASSERT_EQUAL_UINT8(7, creds[2].id);
-}
-
-TEST_CASE("GetRaw writes fields that equal their schema default", "[config][roundtrip]")
-{
-  // 1.5.x reads a missing is_enabled/keepalive_enabled as false, so omitting them breaks loading the dump there.
-  InitDefault();
-  TEST_ASSERT_TRUE(Config::SetRFConfigKeepAliveEnabled(true));
-
-  TinyVec<uint8_t> raw;
-  TEST_ASSERT_TRUE(Config::GetRaw(raw));
-  const auto* root = Serialization::Configuration::GetHubConfig(raw.data());
-  // The generated tables derive from flatbuffers::Table privately; every table is one at the same address
-  auto hasField = [](const void* table, flatbuffers::voffset_t field) {
-    return static_cast<const flatbuffers::Table*>(table)->CheckField(field);
-  };
-  TEST_ASSERT_TRUE(hasField(root->rf(), Serialization::Configuration::RFConfig::VT_KEEPALIVE_ENABLED));
-  TEST_ASSERT_TRUE(hasField(root->ota_update(), Serialization::Configuration::OtaUpdateConfig::VT_IS_ENABLED));
 }
 
 TEST_CASE("A save writes only what changed", "[config][roundtrip]")
@@ -194,11 +177,10 @@ TEST_CASE("Many max-length WiFi credentials survive a reload", "[config][roundtr
   AssertConfigEqual(before, Snapshot());
 }
 
-TEST_CASE("The store holds more than the 1.x config file could", "[config][roundtrip]")
+TEST_CASE("The store holds 32 long WiFi credentials", "[config][roundtrip]")
 {
-  // The 1.x firmware capped its config file at 4 KiB, some 30 credentials like these. cfg is that file's 12 KiB
-  // partition retyped as NVS (three pages, one of them always kept free for compaction): 32 credentials with long
-  // names and passphrases fit with room for the rest of the config. The store fills up at about 36.
+  // cfg is 12 KiB of NVS (three pages, one of them always kept free for compaction): 32 credentials with long names and
+  // passphrases fit with room for the rest of the config. The store fills up at about 36.
   InitDefault();
   for (int i = 0; i < 32; ++i) {
     std::string ssid = "Network-" + std::to_string(i) + std::string(20, 'x');
@@ -240,7 +222,7 @@ TEST_CASE("jsonconfig round trip keeps strings that need escaping", "[config][ro
   InitDefault();
   TEST_ASSERT_TRUE(Config::SaveFromJSON(json));
 
-  // Escaped exactly once on the way out (as the cJSON firmware did), decoded on the way in.
+  // Escaped exactly once on the way out (not double-escaped), decoded on the way in.
   TEST_ASSERT_NOT_EQUAL(std::string::npos, json.find(R"("Office \"5G\"")"));
   TEST_ASSERT_NOT_EQUAL(std::string::npos, json.find(R"("p@ss w0rd/\\")"));
 
@@ -282,20 +264,6 @@ TEST_CASE("GetAsJSON without sensitive data omits secrets", "[config][roundtrip]
   TEST_ASSERT_EQUAL(std::string::npos, redacted.find("authToken"));
   TEST_ASSERT_NOT_EQUAL(std::string::npos, redacted.find("\"HomeNet\""));
   TEST_ASSERT_NOT_EQUAL(std::string::npos, redacted.find("\"api.example.org\""));
-}
-
-TEST_CASE("The wire form for the portal omits secrets and carries every section", "[config][roundtrip]")
-{
-  const Full sample = MakeSampleConfig();
-  InitWith(sample);
-
-  flatbuffers::FlatBufferBuilder builder;
-  Serialization::Configuration::FinishHubConfigBuffer(builder, Config::GetAsFlatBuffer(builder, false));
-  std::vector<uint8_t> exported(builder.GetBufferPointer(), builder.GetBufferPointer() + builder.GetSize());
-
-  Full decoded;
-  TEST_ASSERT_TRUE(Deserialize(exported.data(), exported.size(), decoded));
-  AssertConfigEqual(sample, decoded, false);
 }
 
 TEST_CASE("UpdateOtaUpdateConfig edits only what the update touches and saves only on change", "[config][roundtrip]")
@@ -343,25 +311,4 @@ TEST_CASE("Factory reset wipes every setting and survives a reload", "[config][r
   AssertConfigEqual(Full(), Snapshot());
   Reload();
   AssertConfigEqual(Full(), Snapshot());
-}
-
-TEST_CASE("rawconfig get and set round trip the whole config", "[config][roundtrip]")
-{
-  InitWith(MakeSampleConfig());
-  TinyVec<uint8_t> raw;
-  TEST_ASSERT_TRUE(Config::GetRaw(raw));
-  const std::vector<uint8_t> exported(raw.data(), raw.data() + raw.size());
-
-  InitDefault();
-  TEST_ASSERT_TRUE(Config::SetRaw(exported.data(), exported.size()));
-  AssertConfigEqual(MakeSampleConfig(), Snapshot());
-  Reload();
-  AssertConfigEqual(MakeSampleConfig(), Snapshot());
-
-  // A buffer that does not verify changes nothing
-  const std::size_t before = UsedEntries();
-  TEST_ASSERT_FALSE(Config::SetRaw(exported.data(), exported.size() / 2));
-  TEST_ASSERT_FALSE(Config::SetRaw(nullptr, 0));
-  TEST_ASSERT_EQUAL_size_t(before, UsedEntries());
-  AssertConfigEqual(MakeSampleConfig(), Snapshot());
 }

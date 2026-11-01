@@ -191,9 +191,8 @@ TEST_CASE("Only bytes that begin with the magic start like an image", "[www]")
   TEST_ASSERT_FALSE(Www::StartsLikeImage(std::span<const uint8_t>(bytes).first(3)));
   TEST_ASSERT_FALSE(Www::StartsLikeImage({}));
 
-  // Shaped like the start of a littlefs image: a revision count, a metadata tag, then the "littlefs" name
-  const uint8_t littlefs[] = {0x01, 0x00, 0x00, 0x00, 0xF0, 0x0F, 0xFF, 0xF7, 'l', 'i', 't', 't', 'l', 'e', 'f', 's'};
-  TEST_ASSERT_FALSE(Www::StartsLikeImage(littlefs));
+  const uint8_t other[] = {0x01, 0x00, 0x00, 0x00, 0xF0, 0x0F, 0xFF, 0xF7};
+  TEST_ASSERT_FALSE(Www::StartsLikeImage(other));
 }
 
 TEST_CASE("Every truncation is rejected", "[www]")

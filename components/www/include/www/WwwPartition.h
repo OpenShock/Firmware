@@ -14,11 +14,7 @@
 #include <optional>
 
 namespace OpenShock::Www {
-  inline constexpr esp_partition_type_t kPartitionType       = static_cast<esp_partition_type_t>(0x40);
-  inline constexpr esp_partition_subtype_t kPartitionSubtype = static_cast<esp_partition_subtype_t>(0x00);
-  inline constexpr const char* kPartitionLabel               = "www";
-
-  /// @brief The `www` partition of the running partition table, or null on a table without one (the 1.x layout).
+  /// @brief The `www` partition of the running partition table, or null on a table without one.
   [[nodiscard]] const esp_partition_t* FindPartition();
 
   /// @brief Whether `partition` holds a valid image; what the OTA path runs on a freshly flashed partition.

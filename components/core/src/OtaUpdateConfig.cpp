@@ -10,10 +10,12 @@ const char* const TAG = "Config::OtaUpdateConfig";
 
 #include "json/Json.h"
 
+#include <algorithm>
+#include <iterator>
+#include <string_view>
 #include <utility>
 
 using namespace OpenShock::Config;
-namespace Fbs = OpenShock::Serialization::Configuration;
 
 static constexpr const char* kNamespace      = "ota";
 static constexpr const char* kKeyEnabled     = "enabled";
@@ -29,8 +31,11 @@ static constexpr const char* kKeyStep        = "step";
 
 static constexpr uint16_t kDefaultCheckInterval = 30;  // minutes
 
+// The domains of the 1.x firmware CDN: they serve flat files for 1.x hubs, not the repository API this firmware asks for.
+static constexpr std::string_view kLegacyCdnDomains[] = {"firmware.openshock.org", "fw.openshock.org"};
+
 static constexpr const char* kNamespaces[] = {kNamespace};
-static Section<OtaUpdateConfig> s_section({.name = "otaUpdate", .order = 5, .hubConfigField = Fbs::HubConfig::VT_OTA_UPDATE, .namespaces = kNamespaces});
+static Section<OtaUpdateConfig> s_section({.name = "otaUpdate", .order = 5, .namespaces = kNamespaces});
 
 using namespace std::string_view_literals;
 
@@ -64,30 +69,6 @@ OtaUpdateConfig::OtaUpdateConfig(
 {
 }
 
-flatbuffers::Offset<OpenShock::Serialization::Configuration::OtaUpdateConfig> OtaUpdateConfig::ToFlatbuffers(flatbuffers::FlatBufferBuilder& builder, bool withSensitiveData) const
-{
-  namespace Fbs = Serialization::Configuration;
-
-  auto cdnDomainOffset = builder.CreateString(cdnDomain);
-
-  // Same field order as CreateOtaUpdateConfig, except that is_enabled and
-  // allow_backend_management are stored even when they equal the schema default, so
-  // they read back the same under every schema version (up to 1.5.x both defaulted
-  // to false) and RootConfig::FromFlatbuffers never has to infer them.
-  Fbs::OtaUpdateConfigBuilder otaBuilder(builder);
-  otaBuilder.add_update_id(updateId);
-  otaBuilder.add_cdn_domain(cdnDomainOffset);
-  otaBuilder.add_check_interval(checkInterval);
-  otaBuilder.add_update_step(static_cast<Fbs::OtaUpdateStep>(updateStep));
-  otaBuilder.add_require_manual_approval(requireManualApproval);
-  builder.AddElement<uint8_t>(Fbs::OtaUpdateConfig::VT_ALLOW_BACKEND_MANAGEMENT, static_cast<uint8_t>(allowBackendManagement));
-  otaBuilder.add_check_periodically(checkPeriodically);
-  otaBuilder.add_check_on_startup(checkOnStartup);
-  otaBuilder.add_update_channel(static_cast<Fbs::OtaUpdateChannel>(updateChannel));
-  builder.AddElement<uint8_t>(Fbs::OtaUpdateConfig::VT_IS_ENABLED, static_cast<uint8_t>(isEnabled));
-  return otaBuilder.Finish();
-}
-
 bool OtaUpdateConfig::FromJSON(JSON::JsonView json)
 {
   if (auto done = Parse::ObjectOrDefault(*this, json, TAG)) {
@@ -115,14 +96,14 @@ void OtaUpdateConfig::ToJSON(json_gen_str_t* gen, const char* name, bool withSen
   JSON::objBegin(gen, name);
   json_gen_obj_set_bool(gen, "isEnabled", isEnabled);
   JSON::objSetString(gen, "cdnDomain", cdnDomain);
-  JSON::objSetString(gen, "updateChannel", OpenShock::Serialization::Configuration::EnumNameOtaUpdateChannel(static_cast<Serialization::Configuration::OtaUpdateChannel>(updateChannel)));
+  JSON::objSetString(gen, "updateChannel", OpenShock::OtaUpdateChannelName(updateChannel));
   json_gen_obj_set_bool(gen, "checkOnStartup", checkOnStartup);
   json_gen_obj_set_bool(gen, "checkPeriodically", checkPeriodically);
   json_gen_obj_set_int(gen, "checkInterval", checkInterval);
   json_gen_obj_set_bool(gen, "allowBackendManagement", allowBackendManagement);
   json_gen_obj_set_bool(gen, "requireManualApproval", requireManualApproval);
   json_gen_obj_set_int(gen, "updateId", updateId);
-  JSON::objSetString(gen, "updateStep", OpenShock::Serialization::Configuration::EnumNameOtaUpdateStep(static_cast<Serialization::Configuration::OtaUpdateStep>(updateStep)));
+  JSON::objSetString(gen, "updateStep", OpenShock::OtaUpdateStepName(updateStep));
   JSON::objEnd(gen, name);
 }
 
@@ -131,6 +112,12 @@ void OtaUpdateConfig::Normalize()
   if (checkInterval == 0) {
     OS_LOGW(TAG, "A zero update check interval is not allowed, using the default");
     checkInterval = kDefaultCheckInterval;
+  }
+  // Rewritten on every load rather than once: it needs no migration state, and a hub that restores an old config still
+  // lands here. Remove it once no hub or config backup can hold the 1.x domain.
+  if (std::ranges::find(kLegacyCdnDomains, cdnDomain) != std::end(kLegacyCdnDomains)) {
+    OS_LOGI(TAG, "Moving OTA updates from the 1.x CDN to %s", CONFIG_OPENSHOCK_FW_CDN_DOMAIN);
+    cdnDomain = CONFIG_OPENSHOCK_FW_CDN_DOMAIN;
   }
 }
 
@@ -157,7 +144,7 @@ bool OtaUpdateConfig::LoadNvs(const char* partition)
 
 bool OtaUpdateConfig::SaveNvs(const char* partition, const OtaUpdateConfig* previous) const
 {
-  auto handle = Nvs::Handle::Open(partition, kNamespace, true);
+  auto handle = Nvs::Handle::OpenForWrite(partition, kNamespace);
   if (!handle) {
     return false;
   }

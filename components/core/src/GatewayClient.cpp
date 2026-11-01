@@ -13,7 +13,6 @@ const char* const TAG = "GatewayClient";
 #include "OtaUpdateConfig.h"
 #include "serialization/WSGateway.h"
 #include "Temporal.h"
-#include "visual/VisualStateManager.h"
 
 #include <esp_crt_bundle.h>
 

@@ -68,14 +68,11 @@ function handleSavedEvent(fbsNetwork: FbsWifiNetwork) {
   // Credentials are per SSID, so every scanned BSSID of it is now saved
   hubState.markWifiNetworksSaved(ssid);
 
-  // Update config credentials so savedOnlySSIDs stays in sync
-  if (hubState.config && !hubState.config.wifi.credentials.some((c) => c.ssid === ssid)) {
+  // Keep the saved SSIDs in sync for savedOnlySSIDs
+  if (hubState.config && !hubState.config.savedSSIDs.includes(ssid)) {
     hubState.config = {
       ...hubState.config,
-      wifi: {
-        ...hubState.config.wifi,
-        credentials: [...hubState.config.wifi.credentials, { id: 0, ssid, password: null }],
-      },
+      savedSSIDs: [...hubState.config.savedSSIDs, ssid],
     };
   }
 
@@ -91,14 +88,11 @@ function handleRemovedEvent(fbsNetwork: FbsWifiNetwork) {
   // Credentials are per SSID, and the event may carry a zeroed BSSID if the network wasn't scanned
   hubState.markWifiNetworksUnsaved(ssid);
 
-  // Update config credentials so savedOnlySSIDs stays in sync
+  // Keep the saved SSIDs in sync for savedOnlySSIDs
   if (hubState.config) {
     hubState.config = {
       ...hubState.config,
-      wifi: {
-        ...hubState.config.wifi,
-        credentials: hubState.config.wifi.credentials.filter((c) => c.ssid !== ssid),
-      },
+      savedSSIDs: hubState.config.savedSSIDs.filter((saved) => saved !== ssid),
     };
   }
 

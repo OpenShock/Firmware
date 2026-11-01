@@ -4,7 +4,6 @@
 
 const char* const TAG = "SerialInputHandler";
 
-#include "Base64.h"
 #include "Chipset.h"
 #include "CommandHandler.h"
 #include "Convert.h"
@@ -25,6 +24,7 @@ const char* const TAG = "SerialInputHandler";
 #include "util/TaskUtils.h"
 #include "wifi/WiFiManager.h"
 
+#include <algorithm>
 #include <cstdarg>
 #include <cstdio>
 #include <cstdlib>

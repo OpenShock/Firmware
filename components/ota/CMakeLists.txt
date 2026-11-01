@@ -7,13 +7,14 @@
 # registered in OtaUpdateManager::Init().
 idf_component_register(
   SRCS          "src/OtaUpdateManager.cpp"
+                "src/PartitionUtils.cpp"
   INCLUDE_DIRS  "include"
   REQUIRES      common                                          # enums/FirmwareBootType.h, enums/OtaUpdateChannel.h, SemVer.h in public header
   PRIV_REQUIRES core captive_portal config                      # gateway/wifi/WSGateway/AppHooks; CaptivePortal::ForceClose; Config::
-                fs                                             # TestFilesystem: a littlefs static0 on the 1.x layout
-                crypto http hwutil logging osjson temporal      # Hashing, HTTPRequestManager, PartitionUtils, json
-                www                                             # the www partition the staticfs artifact goes into (2.x layout)
+                crypto http logging osjson temporal             # Hashing, HTTPRequestManager, json
+                www                                             # the www partition the staticfs artifact goes into
                 app_update esp_event esp_netif esp_wifi         # esp_ota_ops.h, WiFi/IP event handlers
+                esp_partition                                   # flashing partitions from a URL
 )
 
 # Match core: IDF compiles application components with -Werror, the legacy build did not.

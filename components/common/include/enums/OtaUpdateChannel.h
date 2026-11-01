@@ -13,6 +13,20 @@ namespace OpenShock {
     Develop
   };
 
+  // The name jsonconfig renders; TryParseOtaUpdateChannel reads it back.
+  [[nodiscard]] constexpr const char* OtaUpdateChannelName(OtaUpdateChannel channel)
+  {
+    switch (channel) {
+      case OtaUpdateChannel::Stable:
+        return "stable";
+      case OtaUpdateChannel::Beta:
+        return "beta";
+      case OtaUpdateChannel::Develop:
+        return "develop";
+    }
+    return "";
+  }
+
   [[nodiscard]] inline std::optional<OtaUpdateChannel> TryParseOtaUpdateChannel(std::string_view str)
   {
     if (StringIEquals(str, "stable")) {

@@ -4,7 +4,6 @@ const char* const TAG = "Config::WiFiCredentials";
 
 #include "config/Parse.h"
 #include "Logging.h"
-#include "wifi/WiFiAuthMode.h"
 
 #include "util/HexUtils.h"
 #include "json/Json.h"
@@ -14,113 +13,9 @@ const char* const TAG = "Config::WiFiCredentials";
 #include <utility>
 
 using namespace OpenShock::Config;
-using FbsAuthMode = OpenShock::Serialization::Types::WifiAuthMode;
 
-WiFiCredentials::WiFiCredentials()
-  : id(0)
-  , ssid()
-  , password()
-  , authMode(WIFI_AUTH_MAX)
-  , bssid({0})
-{
-}
-
-WiFiCredentials::WiFiCredentials(uint8_t id, std::string_view ssid, std::string_view password, wifi_auth_mode_t authMode)
-  : id(id)
-  , ssid(ssid)
-  , password(password)
-  , authMode(authMode)
-  , bssid({0})
-{
-}
-
-bool WiFiCredentials::HasPinnedBSSID() const
-{
-  for (auto b : bssid) {
-    if (b != 0) return true;
-  }
-  return false;
-}
-
-flatbuffers::Offset<OpenShock::Serialization::Configuration::WiFiCredentials> WiFiCredentials::ToFlatbuffers(flatbuffers::FlatBufferBuilder& builder, bool withSensitiveData) const
-{
-  auto ssidOffset = builder.CreateString(ssid);
-
-  flatbuffers::Offset<flatbuffers::String> passwordOffset;
-  if (withSensitiveData) {
-    passwordOffset = builder.CreateString(password);
-  } else {
-    passwordOffset = 0;
-  }
-
-  const Serialization::Configuration::MacAddress* bssidPtr = nullptr;
-  Serialization::Configuration::MacAddress bssidStruct;
-  if (HasPinnedBSSID()) {
-    bssidStruct = Serialization::Configuration::MacAddress(flatbuffers::span<const uint8_t, 6>(bssid.data(), 6));
-    bssidPtr    = &bssidStruct;
-  }
-
-  return Serialization::Configuration::CreateWiFiCredentials(builder, id, ssidOffset, passwordOffset, ToFbsAuthMode(authMode), bssidPtr);
-}
-
-bool WiFiCredentials::FromJSON(JSON::JsonView json)
-{
-  if (auto done = Parse::ObjectOrDefault(*this, json, TAG)) {
-    return *done;
-  }
-
-  id = json["id"].tryGetU8().value_or(0);
-
-  ssid = json["ssid"].tryGetStr().value_or(std::string());
-
-  password = json["password"].tryGetStr().value_or(std::string());
-
-  uint8_t authModeVal = json["authMode"].tryGetU8().value_or(std::to_underlying(FbsAuthMode::UNKNOWN));
-  authMode            = FromFbsAuthMode(static_cast<FbsAuthMode>(authModeVal));
-
-  bssid.fill(0);
-  if (auto bssidStr = json["bssid"].tryGetStr(); bssidStr && bssidStr->size() == 12) {
-    // Parse into a temporary: TryParseHex writes byte by byte and stops at the first bad pair, and a partial
-    // BSSID would pin the network to an AP that doesn't exist.
-    std::array<uint8_t, 6> parsed {};
-    if (HexUtils::TryParseHex(*bssidStr, parsed) == parsed.size()) {
-      bssid = parsed;
-    }
-  }
-
-  if (ssid.empty()) {
-    OS_LOGE(TAG, "ssid is empty");
-    return false;
-  }
-
-  return true;
-}
-
-void WiFiCredentials::ToJSON(json_gen_str_t* gen, const char* name, bool withSensitiveData) const
-{
-  JSON::objBegin(gen, name);
-  json_gen_obj_set_int(gen, "id", id);
-  JSON::objSetString(gen, "ssid", ssid);
-  if (withSensitiveData) {
-    JSON::objSetString(gen, "password", password);
-  }
-  json_gen_obj_set_int(gen, "authMode", std::to_underlying(ToFbsAuthMode(authMode)));
-  if (HasPinnedBSSID()) {
-    JSON::objSetString(gen, "bssid", HexUtils::ToHex(std::span<const uint8_t, 6>(bssid)).data());
-  }
-  JSON::objEnd(gen, name);
-}
-
-// Blob layout, version 1: version u8, id u8, auth mode u8 (kBlobAuthModes), bssid u8[6] (all zero: no pin), ssid
-// length u8, ssid, password length u8, password.
-//
-// Versioning: a new field is appended and the version stays 1, since a reader ignores whatever follows the fields it
-// knows; firmware rolled back to an older build then still reads every credential. The version changes only for a
-// change an older reader must not misread, and that costs a rolled-back hub its saved networks.
-static constexpr uint8_t kBlobVersion = 1;
-
-// The auth mode codes the blob stores. Owned by this format alone: neither ESP-IDF's wifi_auth_mode_t nor the
-// FlatBuffers schema may renumber what is on flash. Never reuse or renumber a code; append new ones.
+// The auth mode codes the blob and the jsonconfig document store. Owned by this file alone: neither ESP-IDF's
+// wifi_auth_mode_t nor the FlatBuffers schema may renumber what is on flash. Never reuse or renumber a code; append new ones.
 static constexpr std::pair<uint8_t, wifi_auth_mode_t> kBlobAuthModes[] = {
   {0,            WIFI_AUTH_OPEN},
   {1,             WIFI_AUTH_WEP},
@@ -153,6 +48,87 @@ static wifi_auth_mode_t fromBlobAuthMode(uint8_t code)
   }
   return WIFI_AUTH_MAX;
 }
+
+WiFiCredentials::WiFiCredentials()
+  : id(0)
+  , ssid()
+  , password()
+  , authMode(WIFI_AUTH_MAX)
+  , bssid({0})
+{
+}
+
+WiFiCredentials::WiFiCredentials(uint8_t id, std::string_view ssid, std::string_view password, wifi_auth_mode_t authMode)
+  : id(id)
+  , ssid(ssid)
+  , password(password)
+  , authMode(authMode)
+  , bssid({0})
+{
+}
+
+bool WiFiCredentials::HasPinnedBSSID() const
+{
+  for (auto b : bssid) {
+    if (b != 0) return true;
+  }
+  return false;
+}
+
+bool WiFiCredentials::FromJSON(JSON::JsonView json)
+{
+  if (auto done = Parse::ObjectOrDefault(*this, json, TAG)) {
+    return *done;
+  }
+
+  id = json["id"].tryGetU8().value_or(0);
+
+  ssid = json["ssid"].tryGetStr().value_or(std::string());
+
+  password = json["password"].tryGetStr().value_or(std::string());
+
+  authMode = fromBlobAuthMode(json["authMode"].tryGetU8().value_or(kBlobAuthUnknown));
+
+  bssid.fill(0);
+  if (auto bssidStr = json["bssid"].tryGetStr(); bssidStr && bssidStr->size() == 12) {
+    // Parse into a temporary: TryParseHex writes byte by byte and stops at the first bad pair, and a partial
+    // BSSID would pin the network to an AP that doesn't exist.
+    std::array<uint8_t, 6> parsed {};
+    if (HexUtils::TryParseHex(*bssidStr, parsed) == parsed.size()) {
+      bssid = parsed;
+    }
+  }
+
+  if (ssid.empty()) {
+    OS_LOGE(TAG, "ssid is empty");
+    return false;
+  }
+
+  return true;
+}
+
+void WiFiCredentials::ToJSON(json_gen_str_t* gen, const char* name, bool withSensitiveData) const
+{
+  JSON::objBegin(gen, name);
+  json_gen_obj_set_int(gen, "id", id);
+  JSON::objSetString(gen, "ssid", ssid);
+  if (withSensitiveData) {
+    JSON::objSetString(gen, "password", password);
+  }
+  json_gen_obj_set_int(gen, "authMode", toBlobAuthMode(authMode));
+  if (HasPinnedBSSID()) {
+    JSON::objSetString(gen, "bssid", HexUtils::ToHex(std::span<const uint8_t, 6>(bssid)).data());
+  }
+  JSON::objEnd(gen, name);
+}
+
+// Blob layout, version 1: version u8, id u8, auth mode u8 (kBlobAuthModes), bssid u8[6] (all zero: no pin), ssid
+// length u8, ssid, password length u8, password.
+//
+// Versioning: a new field is appended and the version stays 1, since a reader ignores whatever follows the fields it
+// knows; firmware rolled back to an older build then still reads every credential. The version changes only for a
+// change an older reader must not misread, and that costs a rolled-back hub its saved networks.
+static constexpr uint8_t kBlobVersion = 1;
 
 std::vector<uint8_t> WiFiCredentials::ToBlob() const
 {

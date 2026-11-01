@@ -13,14 +13,13 @@ const char* const TAG = "Config::EStopConfig";
 #include "json/Json.h"
 
 using namespace OpenShock::Config;
-namespace Fbs = OpenShock::Serialization::Configuration;
 
 static constexpr const char* kNamespace  = "estop";
 static constexpr const char* kKeyEnabled = "enabled";
 static constexpr const char* kKeyGpio    = "gpio";
 
 static constexpr const char* kNamespaces[] = {kNamespace};
-static Section<EStopConfig> s_section({.name = "estop", .order = 6, .hubConfigField = Fbs::HubConfig::VT_ESTOP, .namespaces = kNamespaces});
+static Section<EStopConfig> s_section({.name = "estop", .order = 6, .namespaces = kNamespaces});
 
 EStopConfig::EStopConfig()
   : enabled(OpenShock::IsValidInputPin(Board::Get().estopGpio))
@@ -68,7 +67,7 @@ bool EStopConfig::LoadNvs(const char* partition)
 
 bool EStopConfig::SaveNvs(const char* partition, const EStopConfig* previous) const
 {
-  auto handle = Nvs::Handle::Open(partition, kNamespace, true);
+  auto handle = Nvs::Handle::OpenForWrite(partition, kNamespace);
   if (!handle) {
     return false;
   }
@@ -99,12 +98,6 @@ void EStopConfig::ToJSON(json_gen_str_t* gen, const char* name, bool withSensiti
   json_gen_obj_set_bool(gen, "enabled", enabled);
   json_gen_obj_set_int(gen, "gpioPin", gpioPin);
   JSON::objEnd(gen, name);
-}
-
-flatbuffers::Offset<Fbs::EStopConfig> EStopConfig::ToFlatbuffers(flatbuffers::FlatBufferBuilder& builder, bool withSensitiveData) const
-{
-  (void)withSensitiveData;
-  return Fbs::CreateEStopConfig(builder, enabled, gpioPin);
 }
 
 EStopConfig OpenShock::Config::GetEStopConfig()

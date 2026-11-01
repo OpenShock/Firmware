@@ -20,8 +20,8 @@ namespace OpenShock::OtaUpdateManager {
   struct FirmwareRelease {
     std::string appBinaryUrl;
     uint8_t appBinaryHash[32];
-    std::string filesystemBinaryUrl;  // the `staticfs` artifact: the www image (www.bin)
-    uint8_t filesystemBinaryHash[32];
+    std::string wwwBinaryUrl;  // the `staticfs` artifact: the www image (www.bin)
+    uint8_t wwwBinaryHash[32];
   };
 
   /// @brief Asks the repository server for the head of a channel for this board.
@@ -33,12 +33,6 @@ namespace OpenShock::OtaUpdateManager {
   [[nodiscard]] std::optional<FirmwareRelease> TryGetFirmwareRelease(HTTP::Client& client, const OpenShock::SemVer& version);
 
   bool TryStartFirmwareUpdate(const OpenShock::SemVer& version);
-
-  /// @brief Keeps installs out while the caller writes flash an install also writes (the storage migration's www image
-  ///        and partition table). False while an install is running. Held by the calling task until
-  ///        UnlockFlashWrites() or a restart; an install that comes up meanwhile is dropped, not queued.
-  [[nodiscard]] bool TryLockFlashWrites();
-  void UnlockFlashWrites();
 
   /// @brief Asks the update task to check the configured channel for a new version as soon as it can.
   bool RequestUpdateCheck();

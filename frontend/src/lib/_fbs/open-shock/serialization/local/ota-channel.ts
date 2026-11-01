@@ -2,7 +2,7 @@
 
 /* eslint-disable @typescript-eslint/no-unused-vars, @typescript-eslint/no-explicit-any, @typescript-eslint/no-non-null-assertion */
 
-export enum OtaUpdateChannel {
+export enum OtaChannel {
   Stable = 0,
   Beta = 1,
   Develop = 2

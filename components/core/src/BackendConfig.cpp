@@ -11,14 +11,13 @@ const char* const TAG = "Config::BackendConfig";
 #include "json/Json.h"
 
 using namespace OpenShock::Config;
-namespace Fbs = OpenShock::Serialization::Configuration;
 
 static constexpr const char* kNamespace = "backend";
 static constexpr const char* kKeyDomain = "domain";
 static constexpr const char* kKeyToken  = "token";
 
 static constexpr const char* kNamespaces[] = {kNamespace};
-static Section<BackendConfig> s_section({.name = "backend", .order = 3, .hubConfigField = Fbs::HubConfig::VT_BACKEND, .namespaces = kNamespaces});
+static Section<BackendConfig> s_section({.name = "backend", .order = 3, .namespaces = kNamespaces});
 
 BackendConfig::BackendConfig()
   : domain(CONFIG_OPENSHOCK_API_DOMAIN)
@@ -30,20 +29,6 @@ BackendConfig::BackendConfig(std::string_view domain, std::string_view authToken
   : domain(domain)
   , authToken(authToken)
 {
-}
-
-flatbuffers::Offset<OpenShock::Serialization::Configuration::BackendConfig> BackendConfig::ToFlatbuffers(flatbuffers::FlatBufferBuilder& builder, bool withSensitiveData) const
-{
-  auto domainOffset = builder.CreateString(domain);
-
-  flatbuffers::Offset<flatbuffers::String> authTokenOffset;
-  if (withSensitiveData) {
-    authTokenOffset = builder.CreateString(authToken);
-  } else {
-    authTokenOffset = 0;
-  }
-
-  return Serialization::Configuration::CreateBackendConfig(builder, domainOffset, authTokenOffset);
 }
 
 bool BackendConfig::FromJSON(JSON::JsonView json)
@@ -81,7 +66,7 @@ bool BackendConfig::LoadNvs(const char* partition)
 
 bool BackendConfig::SaveNvs(const char* partition, const BackendConfig* previous) const
 {
-  auto handle = Nvs::Handle::Open(partition, kNamespace, true);
+  auto handle = Nvs::Handle::OpenForWrite(partition, kNamespace);
   if (!handle) {
     return false;
   }

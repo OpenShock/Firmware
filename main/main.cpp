@@ -12,7 +12,6 @@ const char* const TAG = "main";
 #include "events/Events.h"
 #include "GatewayConnectionManager.h"
 #include "Logging.h"
-#include "migration/StorageMigration.h"
 #include "OtaUpdateManager.h"
 #include "serial/Serial.h"
 #include "serial_console/SerialInputHandler.h"
@@ -144,11 +143,6 @@ extern "C" void app_main()
     otaSetup();
   } else {
     appSetup();
-  }
-
-  // After setup, so a migration only ever starts from a firmware that came up (and, after an OTA, validated itself)
-  if (!OpenShock::Migration::Start()) {
-    OS_LOGE(TAG, "Unable to start the storage migration");
   }
 
   while (true) {

@@ -2,7 +2,7 @@
   import SectionHeader from '#lib/components/SectionHeader.svelte';
   import SettingSwitch from '#lib/components/SettingSwitch.svelte';
   import { hubState } from '#lib/stores/index.js';
-  import { OtaUpdateChannel } from '#lib/_fbs/open-shock/serialization/configuration/ota-update-channel.js';
+  import { OtaChannel } from '#lib/_fbs/open-shock/serialization/local/ota-channel.js';
   import {
     setOtaEnabled,
     setOtaChannel,
@@ -16,9 +16,9 @@
   import { Label } from '@openshock/svelte-core/components/ui/label';
 
   const channels = [
-    { value: OtaUpdateChannel.Stable, label: 'Stable' },
-    { value: OtaUpdateChannel.Beta, label: 'Beta' },
-    { value: OtaUpdateChannel.Develop, label: 'Develop' },
+    { value: OtaChannel.Stable, label: 'Stable' },
+    { value: OtaChannel.Beta, label: 'Beta' },
+    { value: OtaChannel.Develop, label: 'Develop' },
   ];
 
   let otaConfig = $derived(hubState.config?.otaUpdate);
@@ -50,7 +50,7 @@
     saving = false;
   }
 
-  async function setChannel(channel: OtaUpdateChannel) {
+  async function setChannel(channel: OtaChannel) {
     if (saving || channel === otaConfig?.updateChannel) return;
     saving = true;
     await setOtaChannel(channel);
@@ -60,7 +60,7 @@
   async function checkForUpdates() {
     if (saving) return;
     saving = true;
-    await checkOtaUpdates(otaConfig?.updateChannel ?? OtaUpdateChannel.Stable);
+    await checkOtaUpdates(otaConfig?.updateChannel ?? OtaChannel.Stable);
     saving = false;
   }
 </script>
