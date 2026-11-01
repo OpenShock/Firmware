@@ -223,6 +223,26 @@ TEST_CASE("jsonconfig set with partial sections fills in defaults", "[config][de
   AssertConfigEqual(expected, Snapshot());
 }
 
+TEST_CASE("The 1.x CDN domain already in NVS moves to the repository server; a custom one stays", "[config][defaults]")
+{
+  InitWith(MakeSampleConfig());
+  {
+    auto ota = Open(Keys::Ns::kOta);
+    TEST_ASSERT_TRUE(ota.SetStr("domain", "firmware.openshock.org"));
+    TEST_ASSERT_TRUE(ota.Commit());
+  }
+  Reload();
+  TEST_ASSERT_EQUAL_STRING(CONFIG_OPENSHOCK_FW_CDN_DOMAIN, Snapshot().otaUpdate.cdnDomain.c_str());
+
+  {
+    auto ota = Open(Keys::Ns::kOta);
+    TEST_ASSERT_TRUE(ota.SetStr("domain", "fw.example.org"));
+    TEST_ASSERT_TRUE(ota.Commit());
+  }
+  Reload();
+  TEST_ASSERT_EQUAL_STRING("fw.example.org", Snapshot().otaUpdate.cdnDomain.c_str());
+}
+
 TEST_CASE("jsonconfig set requires the wifi credentials array when wifi is given", "[config][defaults][json]")
 {
   // A wifi object without "credentials" is rejected.
