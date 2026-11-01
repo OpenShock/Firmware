@@ -13,7 +13,6 @@ idf_component_register(
                "test_semver.cpp"
                "test_checksum.cpp"
                "test_boarddescriptor.cpp"
-               "test_tinyvec.cpp"
                "test_fnproxy.cpp"
                "test_functionref.cpp"
                "../../src/StringHelpers.cpp"  # StringSplit/StringIContains/FormatToString (out-of-line)

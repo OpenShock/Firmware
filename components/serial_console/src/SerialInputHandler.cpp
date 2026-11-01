@@ -4,7 +4,6 @@
 
 const char* const TAG = "SerialInputHandler";
 
-#include "Base64.h"
 #include "Chipset.h"
 #include "CommandHandler.h"
 #include "Convert.h"

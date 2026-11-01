@@ -12,7 +12,7 @@ idf_component_register(
                 "src/Section.cpp"
                 "src/Store.cpp"
   INCLUDE_DIRS  "include"
-  REQUIRES      common osjson                      # OpenShock.h, SimpleMutex.h, TinyVec.h, util/FunctionRef.h; json/Json.h and json_generator.h
+  REQUIRES      common osjson                      # OpenShock.h, SimpleMutex.h, util/FunctionRef.h; json/Json.h and json_generator.h
                 nvs_flash                          # nvs.h in Nvs.h
                 esp_hal_gpio                       # hal/gpio_types.h in Parse.h
   PRIV_REQUIRES logging                            # OS_LOG*/OS_PANIC

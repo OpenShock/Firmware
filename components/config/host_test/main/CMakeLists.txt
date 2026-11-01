@@ -38,7 +38,7 @@ idf_component_register(
                "${_components}/captive_portal/include"         # captiveportal/CaptivePortalConfig.h
                "${_components}/serial_console/include"         # serial_console/SerialInputConfig.h
                "${_components}/chipset/include"                # Chipset.h
-               "${_components}/common/include"                 # OpenShock.h, SimpleMutex.h, TinyVec.h, enums/*, util/HexUtils.h
+               "${_components}/common/include"                 # OpenShock.h, SimpleMutex.h, enums/*, util/HexUtils.h
                "${_components}/osjson/include"                 # json/Json.h
                "${_components}/serialization/include"          # serialization/_fbs/WifiAuthMode_generated.h
                "${_components}/flatbuffers/flatbuffers/include"
