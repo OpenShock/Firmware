@@ -1,3 +1,5 @@
+#include <freertos/FreeRTOS.h>
+
 #include "serialization/WSLocal.h"
 
 #include "Chipset.h"
