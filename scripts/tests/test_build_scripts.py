@@ -169,28 +169,3 @@ def test_packed_image_is_the_bare_image_and_must_fit(tmp_path):
 
     with pytest.raises(SystemExit, match='more than the 100-byte www partition'):
         gen_staticfs.pack_image(entries, output, 100)
-
-
-def test_main_takes_the_smallest_of_every_limit(tmp_path, monkeypatch):
-    write_build(tmp_path)
-    csv = tmp_path / 'small.csv'
-    csv.write_text('www, 0x40, 0x00, 0x3A8000, 0x1000\n', encoding='utf-8')
-    limits = []
-    monkeypatch.setattr(gen_staticfs, 'pack_image', lambda entries, output, max_size: limits.append(max_size))
-
-    args = ['--frontend-dir', str(tmp_path), '--output', str(tmp_path / 'www.bin'), '--skip-frontend-build']
-    gen_staticfs.main(
-        [
-            *args,
-            '--max-size',
-            '0x2000',
-            '--partition-csv',
-            str(csv),
-            '--partition-csv',
-            str(ROOT / 'partitions' / 'ota_4mb.csv'),
-        ]
-    )
-    assert limits == [0x1000]
-
-    with pytest.raises(SystemExit):
-        gen_staticfs.main(args)  # no limit at all

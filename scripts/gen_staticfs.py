@@ -4,7 +4,7 @@
 Pipeline:
   1. Build the SvelteKit frontend (pnpm) when its sources are newer than the last build (unless --skip-frontend-build, which CI passes).
   2. Gzip every built asset (the frontend build emits plain files; compression happens here).
-  3. Pack them into one read-only image (scripts/utils/wwwimage.py), checked to fit the smallest `www` partition.
+  3. Pack them into one read-only image (scripts/utils/wwwimage.py), checked to fit the `www` partition.
 
 The output is reproducible: gzip headers carry no timestamp and entries are sorted, so an unchanged frontend gives a
 byte-identical www.bin (and the same hash, so devices don't re-flash it). One image serves every board: it is not
@@ -131,27 +131,15 @@ def main(argv: list[str] | None = None) -> int:
     p = argparse.ArgumentParser(description='Build the OpenShock captive-portal asset image (www.bin)')
     p.add_argument('--frontend-dir', type=Path, required=True, help='Path to the frontend/ project')
     p.add_argument('--output', type=Path, required=True, help='Output image path (www.bin)')
-    size = p.add_argument_group('size limit (at least one)')
-    size.add_argument(
-        '--max-size', type=lambda v: int(v, 0), help=f'largest image allowed ({WWW_PARTITION} partition size)'
-    )
-    size.add_argument(
-        '--partition-csv',
-        type=Path,
-        action='append',
-        default=[],
-        help=f'partition table CSV to read the {WWW_PARTITION} size from; repeatable, the smallest wins',
+    p.add_argument(
+        '--partition-csv', type=Path, required=True, help=f'partition table CSV to read the {WWW_PARTITION} size from'
     )
     p.add_argument(
         '--skip-frontend-build', action='store_true', help='Reuse existing frontend/build without invoking pnpm'
     )
     args = p.parse_args(argv)
 
-    limits = [www_partition_size(csv) for csv in args.partition_csv]
-    if args.max_size is not None:
-        limits.append(args.max_size)
-    if not limits:
-        p.error('one of --max-size or --partition-csv is required')
+    max_size = www_partition_size(args.partition_csv)
 
     if args.skip_frontend_build:
         build_dir = args.frontend_dir / 'build'
@@ -162,7 +150,7 @@ def main(argv: list[str] | None = None) -> int:
 
     entries = collect_assets(build_dir)
     log(f'Collected {len(entries)} gzipped assets from {build_dir}')
-    pack_image(entries, args.output, min(limits))
+    pack_image(entries, args.output, max_size)
     return 0
 
 
