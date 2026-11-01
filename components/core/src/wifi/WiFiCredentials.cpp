@@ -4,7 +4,6 @@ const char* const TAG = "Config::WiFiCredentials";
 
 #include "config/Parse.h"
 #include "Logging.h"
-#include "wifi/WiFiAuthMode.h"
 
 #include "util/HexUtils.h"
 #include "json/Json.h"
@@ -14,7 +13,41 @@ const char* const TAG = "Config::WiFiCredentials";
 #include <utility>
 
 using namespace OpenShock::Config;
-using FbsAuthMode = OpenShock::Serialization::Types::WifiAuthMode;
+
+// The auth mode codes the blob and the jsonconfig document store. Owned by this file alone: neither ESP-IDF's
+// wifi_auth_mode_t nor the FlatBuffers schema may renumber what is on flash. Never reuse or renumber a code; append new ones.
+static constexpr std::pair<uint8_t, wifi_auth_mode_t> kBlobAuthModes[] = {
+  {0,            WIFI_AUTH_OPEN},
+  {1,             WIFI_AUTH_WEP},
+  {2,         WIFI_AUTH_WPA_PSK},
+  {3,        WIFI_AUTH_WPA2_PSK},
+  {4,    WIFI_AUTH_WPA_WPA2_PSK},
+  {5, WIFI_AUTH_WPA2_ENTERPRISE},
+  {6,        WIFI_AUTH_WPA3_PSK},
+  {7,   WIFI_AUTH_WPA2_WPA3_PSK},
+  {8,        WIFI_AUTH_WAPI_PSK},
+};
+static constexpr uint8_t kBlobAuthUnknown = 9;
+
+static uint8_t toBlobAuthMode(wifi_auth_mode_t mode)
+{
+  for (const auto& [code, known] : kBlobAuthModes) {
+    if (known == mode) {
+      return code;
+    }
+  }
+  return kBlobAuthUnknown;
+}
+
+static wifi_auth_mode_t fromBlobAuthMode(uint8_t code)
+{
+  for (const auto& [known, mode] : kBlobAuthModes) {
+    if (known == code) {
+      return mode;
+    }
+  }
+  return WIFI_AUTH_MAX;
+}
 
 WiFiCredentials::WiFiCredentials()
   : id(0)
@@ -54,8 +87,7 @@ bool WiFiCredentials::FromJSON(JSON::JsonView json)
 
   password = json["password"].tryGetStr().value_or(std::string());
 
-  uint8_t authModeVal = json["authMode"].tryGetU8().value_or(std::to_underlying(FbsAuthMode::UNKNOWN));
-  authMode            = FromFbsAuthMode(static_cast<FbsAuthMode>(authModeVal));
+  authMode = fromBlobAuthMode(json["authMode"].tryGetU8().value_or(kBlobAuthUnknown));
 
   bssid.fill(0);
   if (auto bssidStr = json["bssid"].tryGetStr(); bssidStr && bssidStr->size() == 12) {
@@ -83,7 +115,7 @@ void WiFiCredentials::ToJSON(json_gen_str_t* gen, const char* name, bool withSen
   if (withSensitiveData) {
     JSON::objSetString(gen, "password", password);
   }
-  json_gen_obj_set_int(gen, "authMode", std::to_underlying(ToFbsAuthMode(authMode)));
+  json_gen_obj_set_int(gen, "authMode", toBlobAuthMode(authMode));
   if (HasPinnedBSSID()) {
     JSON::objSetString(gen, "bssid", HexUtils::ToHex(std::span<const uint8_t, 6>(bssid)).data());
   }
@@ -97,41 +129,6 @@ void WiFiCredentials::ToJSON(json_gen_str_t* gen, const char* name, bool withSen
 // knows; firmware rolled back to an older build then still reads every credential. The version changes only for a
 // change an older reader must not misread, and that costs a rolled-back hub its saved networks.
 static constexpr uint8_t kBlobVersion = 1;
-
-// The auth mode codes the blob stores. Owned by this format alone: neither ESP-IDF's wifi_auth_mode_t nor the
-// FlatBuffers schema may renumber what is on flash. Never reuse or renumber a code; append new ones.
-static constexpr std::pair<uint8_t, wifi_auth_mode_t> kBlobAuthModes[] = {
-  {0,            WIFI_AUTH_OPEN},
-  {1,             WIFI_AUTH_WEP},
-  {2,         WIFI_AUTH_WPA_PSK},
-  {3,        WIFI_AUTH_WPA2_PSK},
-  {4,    WIFI_AUTH_WPA_WPA2_PSK},
-  {5, WIFI_AUTH_WPA2_ENTERPRISE},
-  {6,        WIFI_AUTH_WPA3_PSK},
-  {7,   WIFI_AUTH_WPA2_WPA3_PSK},
-  {8,        WIFI_AUTH_WAPI_PSK},
-};
-static constexpr uint8_t kBlobAuthUnknown = 9;
-
-static uint8_t toBlobAuthMode(wifi_auth_mode_t mode)
-{
-  for (const auto& [code, known] : kBlobAuthModes) {
-    if (known == mode) {
-      return code;
-    }
-  }
-  return kBlobAuthUnknown;
-}
-
-static wifi_auth_mode_t fromBlobAuthMode(uint8_t code)
-{
-  for (const auto& [known, mode] : kBlobAuthModes) {
-    if (known == code) {
-      return mode;
-    }
-  }
-  return WIFI_AUTH_MAX;
-}
 
 std::vector<uint8_t> WiFiCredentials::ToBlob() const
 {

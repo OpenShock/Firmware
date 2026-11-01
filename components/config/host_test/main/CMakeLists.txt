@@ -40,8 +40,6 @@ idf_component_register(
                "${_components}/chipset/include"                # Chipset.h
                "${_components}/common/include"                 # OpenShock.h, SimpleMutex.h, enums/*, util/HexUtils.h
                "${_components}/osjson/include"                 # json/Json.h
-               "${_components}/serialization/include"          # serialization/_fbs/WifiAuthMode_generated.h
-               "${_components}/flatbuffers/flatbuffers/include"
   REQUIRES     unity
                host_support                              # Logging.h, openshock_board.h, ESP32 GPIO caps (test/host_support)
                freertos                                  # SimpleMutex (real POSIX port)
