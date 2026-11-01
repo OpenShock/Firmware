@@ -1,5 +1,6 @@
 ---
 kind: changed
+pr: 552
 ---
 Move hubs from the 1.x firmware CDN domains to the repository server for OTA updates
 

@@ -1,5 +1,6 @@
 ---
 kind: removed
+pr: 552
 ---
 Remove the FlatBuffers form of the config and the rawconfig serial command
 

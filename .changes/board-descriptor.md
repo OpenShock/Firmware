@@ -1,5 +1,6 @@
 ---
 kind: changed
+pr: 530
 ---
 Stamp a board descriptor into the firmware image instead of compiling each board in
 

@@ -1,5 +1,6 @@
 ---
 kind: fixed
+pr: 536
 ---
 Build without a board fragment with the 4 MB OTA partition table
 

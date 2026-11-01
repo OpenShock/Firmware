@@ -1,5 +1,6 @@
 ---
 kind: changed
+pr: 548
 ---
 Keep the configuration in NVS instead of a littlefs file
 

@@ -1,5 +1,6 @@
 ---
 kind: changed
+pr: 549
 ---
 Serve the setup portal from a flat www image
 
