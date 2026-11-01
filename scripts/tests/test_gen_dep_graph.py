@@ -66,7 +66,10 @@ def test_render_mermaid_labels_and_orders_nodes():
 
 
 def test_main_writes_the_graph_of_a_components_dir(tmp_path, capsys):
-    for name, body in {'http': 'idf_component_register(SRCS "x")', 'rf': 'idf_component_register(REQUIRES http)'}.items():
+    for name, body in {
+        'http': 'idf_component_register(SRCS "x")',
+        'rf': 'idf_component_register(REQUIRES http)',
+    }.items():
         (tmp_path / name).mkdir()
         (tmp_path / name / 'CMakeLists.txt').write_text(body, encoding='utf-8')
     out = tmp_path / 'graph.mmd'
