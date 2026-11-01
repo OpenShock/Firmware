@@ -54,8 +54,6 @@ namespace OpenShock::Config::Nvs {
 
     /// @brief False for the empty handle OpenForLoad gives a namespace that was never written.
     [[nodiscard]] bool Exists() const { return m_handle != 0; }
-    /// @brief The raw handle, for the untyped key copy in Nvs.cpp; sections never need it.
-    [[nodiscard]] nvs_handle_t get() const { return m_handle; }
 
     [[nodiscard]] Result GetU8(const char* key, uint8_t& out) const;
     [[nodiscard]] Result GetI8(const char* key, int8_t& out) const;
@@ -175,10 +173,4 @@ namespace OpenShock::Config::Nvs {
 
   /// @brief Erases every key of `ns` in `partition`; a namespace that does not exist counts as erased.
   [[nodiscard]] bool EraseNamespace(const char* partition, const char* ns);
-
-  /// @brief Copies every key of `ns` from partition `from` into partition `to`, whatever its type, and commits.
-  [[nodiscard]] bool CopyNamespace(const char* from, const char* to, const char* ns);
-
-  /// @brief Whether `ns` holds the same keys with the same types and values in both partitions.
-  [[nodiscard]] bool NamespacesEqual(const char* a, const char* b, const char* ns);
 }  // namespace OpenShock::Config::Nvs

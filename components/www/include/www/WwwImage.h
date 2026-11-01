@@ -82,7 +82,7 @@ namespace OpenShock::Www {
   };
   [[nodiscard]] const char* ParseErrorName(ParseError error);
 
-  /// @brief Whether `bytes` begins with the image magic: enough to tell a www image from a littlefs one in the first
+  /// @brief Whether `bytes` begins with the image magic: enough to tell a www image from anything else in the first
   ///        chunk of a download, before anything is erased. Not a validation; Parse() is.
   [[nodiscard]] bool StartsLikeImage(std::span<const uint8_t> bytes);
 

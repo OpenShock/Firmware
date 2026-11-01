@@ -93,11 +93,9 @@ void RFConfig::ToJSON(json_gen_str_t* gen, const char* name, bool withSensitiveD
 flatbuffers::Offset<Fbs::RFConfig> RFConfig::ToFlatbuffers(flatbuffers::FlatBufferBuilder& builder, bool withSensitiveData) const
 {
   (void)withSensitiveData;
-  // keepalive_enabled is stored even when it equals the schema default, so the value reads back the same under every
-  // schema version (up to 1.5.x it defaulted to false): Config::HubConfigToJSON never has to infer it.
   Fbs::RFConfigBuilder rfBuilder(builder);
   rfBuilder.add_tx_pin(txPin);
-  builder.AddElement<uint8_t>(Fbs::RFConfig::VT_KEEPALIVE_ENABLED, static_cast<uint8_t>(keepAliveEnabled));
+  rfBuilder.add_keepalive_enabled(keepAliveEnabled);
   return rfBuilder.Finish();
 }
 

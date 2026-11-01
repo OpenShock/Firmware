@@ -7,7 +7,6 @@ const char* const TAG = "OtaUpdateManager";
 #include "AppHooks.h"
 #include "BoardDescriptor.h"
 #include "captiveportal/Manager.h"
-#include "fs/FsCheck.h"
 #include "GatewayConnectionManager.h"
 #include "Hashing.h"
 #include "http/HTTPRequestManager.h"
@@ -75,9 +74,6 @@ static OpenShock::FirmwareBootType _bootType;
 static TaskHandle_t _taskHandle = nullptr;
 static OpenShock::SemVer _requestedVersion;
 static OpenShock::SimpleMutex _requestedVersionMutex = {};
-// Held by whoever writes the flash an install writes: the update task for the whole install (until the restart on
-// success), the storage migration from before its first flash write to its restart (TryLockFlashWrites).
-static OpenShock::SimpleMutex _flashWriteMutex = {};
 
 using namespace OpenShock;
 
@@ -281,18 +277,12 @@ static bool otaum_flash_fs_partition(OpenShock::HTTP::Client& client, const esp_
     return true;
   };
 
-  // Refuse an image in the other format before the first erase: a www image written over littlefs static0 (a 2.x
-  // release on the 1.x table, before the www migration has run) or a littlefs image over www would fail the check
-  // below only after the portal assets are gone.
-  const bool isWwwPartition = parition->type == Www::kPartitionType;
-  bool formatMismatch       = false;
-  auto matchesPartition     = [isWwwPartition, &formatMismatch](std::span<const uint8_t> chunk) -> bool {
-    if (Www::StartsLikeImage(chunk) != isWwwPartition) {
-      if (isWwwPartition) {
-        OS_LOGE(TAG, "The filesystem image is not a www image");
-      } else {
-        OS_LOGE(TAG, "The filesystem image is a www image, but this partition table has no www partition");
-      }
+  // Refuse anything that is not a www image before the first erase: it would fail the check below only after the
+  // portal assets are gone.
+  bool formatMismatch   = false;
+  auto matchesPartition = [&formatMismatch](std::span<const uint8_t> chunk) -> bool {
+    if (!Www::StartsLikeImage(chunk)) {
+      OS_LOGE(TAG, "The filesystem image is not a www image");
       formatMismatch = true;
       return false;
     }
@@ -301,7 +291,7 @@ static bool otaum_flash_fs_partition(OpenShock::HTTP::Client& client, const esp_
 
   if (!OpenShock::FlashPartitionFromUrl(client, parition, remoteUrl, remoteHash, onProgress, matchesPartition)) {
     OS_LOGE(TAG, "Failed to flash filesystem partition");
-    _sendFailureMessage(formatMismatch ? "The filesystem image does not match this hub's partition table"sv : "Failed to flash filesystem partition"sv);
+    _sendFailureMessage(formatMismatch ? "The filesystem image is not a www image"sv : "Failed to flash filesystem partition"sv);
     return false;
   }
 
@@ -309,10 +299,8 @@ static bool otaum_flash_fs_partition(OpenShock::HTTP::Client& client, const esp_
     return false;
   }
 
-  // Verify the freshly flashed image: the www format where the table has a www partition, else (1.x layout) that the
-  // littlefs image mounts.
-  const bool valid = isWwwPartition ? Www::VerifyPartition(parition) : OpenShock::TestFilesystem(parition);
-  if (!valid) {
+  // Verify the freshly flashed image
+  if (!Www::VerifyPartition(parition)) {
     OS_LOGE(TAG, "The flashed filesystem image is not valid");
     _sendFailureMessage("The flashed filesystem image is not valid"sv);
     return false;
@@ -435,13 +423,6 @@ static void otaum_updatetask(void* arg)
       continue;
     }
 
-    // Never alongside the storage migration's www and partition table writes; it restarts the hub when it is done
-    ScopedTryLock flashWrites(&_flashWriteMutex, 0);
-    if (!flashWrites.isLocked()) {
-      OS_LOGW(TAG, "The storage migration is writing flash; not updating now");
-      continue;
-    }
-
     OS_LOGD(TAG, "Updating to version: %.*s", static_cast<int>(versionStr.length()), versionStr.data());
 
     // Generate random int32_t for this update.
@@ -499,15 +480,10 @@ static void otaum_updatetask(void* arg)
       continue;
     }
 
-    // The portal assets go into the www partition; on the 1.x layout, which has none, into littlefs static0. The
-    // staticfs artifact of a 1.x-numbered release is the littlefs image (scripts/repo_server_publish.py), which is
-    // what every hub still on the 1.x layout installs, by this code or by the 1.x firmware's own.
+    // The portal assets go into the www partition
     const esp_partition_t* filesystemPartition = Www::FindPartition();
     if (filesystemPartition == nullptr) {
-      filesystemPartition = FindStaticPartition();
-    }
-    if (filesystemPartition == nullptr) {
-      OS_LOGE(TAG, "Failed to find a www or static filesystem partition");
+      OS_LOGE(TAG, "Failed to find the www partition");
       _sendFailureMessage("Failed to find filesystem partition"sv);
       continue;
     }
@@ -534,10 +510,9 @@ static void otaum_updatetask(void* arg)
       continue;
     }
 
-    // Flash app and filesystem partitions. An unchanged www image (the same hash) is not written again; a littlefs
-    // static0 always is, as the 1.x firmware does.
+    // Flash app and filesystem partitions. An unchanged www image (the same hash) is not written again.
     std::array<uint8_t, 32> currentWwwHash {};
-    const bool wwwCurrent = filesystemPartition->type == Www::kPartitionType && Www::ImageSha256(filesystemPartition, currentWwwHash) && memcmp(currentWwwHash.data(), release.filesystemBinaryHash, 32) == 0;
+    const bool wwwCurrent = Www::ImageSha256(filesystemPartition, currentWwwHash) && memcmp(currentWwwHash.data(), release.filesystemBinaryHash, 32) == 0;
     if (wwwCurrent) {
       OS_LOGI(TAG, "The www image is already current, not flashing it");
     } else if (!otaum_flash_fs_partition(client, filesystemPartition, release.filesystemBinaryUrl, release.filesystemBinaryHash)) {
@@ -861,16 +836,6 @@ bool OtaUpdateManager::TryStartFirmwareUpdate(const OpenShock::SemVer& version)
   OS_LOGD(TAG, "Requesting firmware version %s", version.toString().c_str());  // TODO: This is abusing the SemVer::toString() method causing alot of string copies, fix this
 
   return otaum_try_queue_update_request(version);
-}
-
-bool OtaUpdateManager::TryLockFlashWrites()
-{
-  return _flashWriteMutex.lock(0);
-}
-
-void OtaUpdateManager::UnlockFlashWrites()
-{
-  _flashWriteMutex.unlock();
 }
 
 bool OtaUpdateManager::RequestUpdateCheck()

@@ -41,10 +41,7 @@ flatbuffers::Offset<Fbs::HubConfig> Config::GetAsFlatBuffer(flatbuffers::FlatBuf
 
 bool Config::GetRaw(TinyVec<uint8_t>& buffer)
 {
-  // Write every field, even ones equal to the schema default. Older firmware may use different defaults (1.5.x reads a
-  // missing is_enabled/keepalive_enabled as false), so an omitted field changes meaning when the dump is loaded there.
   flatbuffers::FlatBufferBuilder builder;
-  builder.ForceDefaults(true);
   Fbs::FinishHubConfigBuffer(builder, GetAsFlatBuffer(builder, true));
 
   buffer.resize(builder.GetSize());
@@ -71,19 +68,6 @@ bool Config::SetRaw(const uint8_t* buffer, std::size_t size)
 // ---------------------------------------------------------------------------
 
 namespace {
-  // Whether `field` is physically present in `table` (flatbuffers omits a scalar equal to its schema default). The
-  // generated tables derive privately from flatbuffers::Table, which is only a view of the same bytes.
-  bool isStored(const void* table, flatbuffers::voffset_t field)
-  {
-    return table != nullptr && static_cast<const flatbuffers::Table*>(table)->CheckField(field);
-  }
-
-  // Whether `field` is present in `table` with a non-zero value, ignoring the schema default.
-  bool storedTrue(const void* table, flatbuffers::voffset_t field)
-  {
-    return isStored(table, field) && static_cast<const flatbuffers::Table*>(table)->GetField<uint8_t>(field, 0) != 0;
-  }
-
   void setString(json_gen_str_t* gen, const char* name, const flatbuffers::String* value)
   {
     if (value != nullptr) {
@@ -91,48 +75,14 @@ namespace {
     }
   }
 
-  struct LegacyBools {
-    bool keepAliveEnabled;
-    bool otaEnabled;
-    bool allowBackendManagement;
-  };
-
-  // Up to 1.5.x the schema declared rf.keepalive_enabled, ota_update.is_enabled and ota_update.allow_backend_management
-  // with default false; since 1.6 they default to true. Flatbuffers omits a field equal to its default, so a field
-  // omitted by a 1.5.x hub (false) reads back as true under the current schema.
-  //
-  // Which convention wrote a buffer shows only when at least one of the three is stored: a stored true can only come
-  // from the old schema (1.6+ omits true, and the 2.x wire form stores all three, so it omits none). When that is the
-  // case, the omitted ones meant false. A buffer that omits all three is ambiguous (1.5.x with all three off, or 1.6+
-  // with all three on) and keeps the current schema's default (true).
-  LegacyBools resolveFlippedDefaults(const Fbs::HubConfig* config)
-  {
-    const Fbs::RFConfig* rf         = config->rf();
-    const Fbs::OtaUpdateConfig* ota = config->ota_update();
-
-    LegacyBools out {
-      .keepAliveEnabled       = rf != nullptr ? rf->keepalive_enabled() : true,
-      .otaEnabled             = ota != nullptr ? ota->is_enabled() : true,
-      .allowBackendManagement = ota != nullptr ? ota->allow_backend_management() : true,
-    };
-
-    const bool legacyWriter = storedTrue(rf, Fbs::RFConfig::VT_KEEPALIVE_ENABLED) || storedTrue(ota, Fbs::OtaUpdateConfig::VT_IS_ENABLED) || storedTrue(ota, Fbs::OtaUpdateConfig::VT_ALLOW_BACKEND_MANAGEMENT);
-    if (legacyWriter) {
-      if (rf != nullptr && !isStored(rf, Fbs::RFConfig::VT_KEEPALIVE_ENABLED)) out.keepAliveEnabled = false;
-      if (ota != nullptr && !isStored(ota, Fbs::OtaUpdateConfig::VT_IS_ENABLED)) out.otaEnabled = false;
-      if (ota != nullptr && !isStored(ota, Fbs::OtaUpdateConfig::VT_ALLOW_BACKEND_MANAGEMENT)) out.allowBackendManagement = false;
-    }
-    return out;
-  }
-
-  void writeRf(json_gen_str_t* gen, const Fbs::RFConfig* rf, const LegacyBools& bools)
+  void writeRf(json_gen_str_t* gen, const Fbs::RFConfig* rf)
   {
     if (rf == nullptr) {
       return;
     }
     json_gen_push_object(gen, "rf");
     json_gen_obj_set_int(gen, "txPin", rf->tx_pin());  // RFConfig::FromJSON maps "no pin" and invalid pins to the board's
-    json_gen_obj_set_bool(gen, "keepAliveEnabled", bools.keepAliveEnabled);
+    json_gen_obj_set_bool(gen, "keepAliveEnabled", rf->keepalive_enabled());
     json_gen_pop_object(gen);
   }
 
@@ -196,13 +146,13 @@ namespace {
     json_gen_pop_object(gen);
   }
 
-  void writeOtaUpdate(json_gen_str_t* gen, const Fbs::OtaUpdateConfig* ota, const LegacyBools& bools)
+  void writeOtaUpdate(json_gen_str_t* gen, const Fbs::OtaUpdateConfig* ota)
   {
     if (ota == nullptr) {
       return;
     }
     json_gen_push_object(gen, "otaUpdate");
-    json_gen_obj_set_bool(gen, "isEnabled", bools.otaEnabled);
+    json_gen_obj_set_bool(gen, "isEnabled", ota->is_enabled());
     setString(gen, "cdnDomain", ota->cdn_domain());
     // Out-of-range values (bit flips, configs from newer firmware) have no name and are left out: the default
     if (const char* channel = Fbs::EnumNameOtaUpdateChannel(ota->update_channel()); channel != nullptr && channel[0] != '\0') {
@@ -211,7 +161,7 @@ namespace {
     json_gen_obj_set_bool(gen, "checkOnStartup", ota->check_on_startup());
     json_gen_obj_set_bool(gen, "checkPeriodically", ota->check_periodically());
     json_gen_obj_set_int(gen, "checkInterval", ota->check_interval());
-    json_gen_obj_set_bool(gen, "allowBackendManagement", bools.allowBackendManagement);
+    json_gen_obj_set_bool(gen, "allowBackendManagement", ota->allow_backend_management());
     json_gen_obj_set_bool(gen, "requireManualApproval", ota->require_manual_approval());
     json_gen_obj_set_int(gen, "updateId", ota->update_id());
     if (const char* step = Fbs::EnumNameOtaUpdateStep(ota->update_step()); step != nullptr && step[0] != '\0') {
@@ -249,17 +199,15 @@ std::optional<std::string> Config::HubConfigToJSON(std::span<const uint8_t> buff
     return std::nullopt;
   }
 
-  const LegacyBools bools = resolveFlippedDefaults(config);
-
   JSON::StringWriter writer;
   json_gen_str_t* gen = writer.gen();
   json_gen_start_object(gen);
-  writeRf(gen, config->rf(), bools);
+  writeRf(gen, config->rf());
   writeWifi(gen, config->wifi());
   writeCaptivePortal(gen, config->captive_portal());
   writeBackend(gen, config->backend());
   writeSerialInput(gen, config->serial_input());
-  writeOtaUpdate(gen, config->ota_update(), bools);
+  writeOtaUpdate(gen, config->ota_update());
   writeEStop(gen, config->estop());
   json_gen_end_object(gen);
 

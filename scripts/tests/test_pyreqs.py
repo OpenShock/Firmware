@@ -12,7 +12,7 @@ cffi==2.1.1 ; platform_python_implementation != 'PyPy' \\
     # via cryptography
 colorama==0.4.6 ; sys_platform == 'win32' \\
     --hash=sha256:cccc
-littlefs-python==0.19.0 \\
+esptool==0.19.0 \\
     --hash=sha256:dddd
 pycparser==3.11 ; python_full_version < '3.11' and implementation_name != 'PyPy' \\
     --hash=sha256:eeee
@@ -27,7 +27,7 @@ def test_parse_pins_reads_name_version_and_marker_and_skips_hash_lines():
     assert [str(p) for p in pins] == [
         'cffi==2.1.1',
         'colorama==0.4.6',
-        'littlefs-python==0.19.0',
+        'esptool==0.19.0',
         'pycparser==3.11',
         'pycparser==3.12',
         'pyserial==3.5',
@@ -38,7 +38,7 @@ def test_parse_pins_reads_name_version_and_marker_and_skips_hash_lines():
 
 
 def test_missing_pins_honours_markers_and_versions(monkeypatch):
-    installed = {'cffi': '2.1.1', 'littlefs-python': '0.18.0', 'pycparser': '3.12', 'pyserial': '3.5'}
+    installed = {'cffi': '2.1.1', 'esptool': '0.18.0', 'pycparser': '3.12', 'pyserial': '3.5'}
     monkeypatch.setattr(pyreqs, 'installed_version', installed.get)
     # Pretend: CPython 3.12 on Linux, so colorama and pycparser 3.11 do not apply.
     holds = {
@@ -50,7 +50,7 @@ def test_missing_pins_honours_markers_and_versions(monkeypatch):
     monkeypatch.setattr(pyreqs, 'marker_holds', holds.__getitem__)
 
     missing = pyreqs.missing_pins(pyreqs.parse_pins(PINNED))
-    assert [str(p) for p in missing] == ['littlefs-python==0.19.0']
+    assert [str(p) for p in missing] == ['esptool==0.19.0']
 
 
 def test_marker_evaluation_uses_the_real_environment():

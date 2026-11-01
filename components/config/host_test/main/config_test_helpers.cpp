@@ -65,9 +65,7 @@ namespace ConfigTest {
 
   std::vector<uint8_t> Serialize(const Full& config, bool withSensitiveData)
   {
-    // ForceDefaults like the firmware's own writes, so the bytes match what Config stores and GetRaw returns
     flatbuffers::FlatBufferBuilder builder;
-    builder.ForceDefaults(true);
     auto rf            = config.rf.ToFlatbuffers(builder, withSensitiveData);
     auto wifi          = config.wifi.ToFlatbuffers(builder, withSensitiveData);
     auto captivePortal = config.captivePortal.ToFlatbuffers(builder, withSensitiveData);
@@ -108,30 +106,12 @@ namespace ConfigTest {
     // Back up right away, so a test can write straight into either store; Config::Init's own init is then a no-op
     TEST_ASSERT_EQUAL(ESP_OK, nvs_flash_init_partition(Keys::kPartitionCfg));
     TEST_ASSERT_EQUAL(ESP_OK, nvs_flash_init_partition(Keys::kPartitionShared));
-    HostLfs::reset();
   }
 
   void InitDefault()
   {
     WipeStore();
     Config::Init();
-  }
-
-  bool InitFromLegacy(const uint8_t* data, std::size_t size)
-  {
-    WipeStore();
-    Full expected;
-    const bool parses = data != nullptr && Deserialize(data, size, expected);
-    if (data != nullptr) {
-      HostLfs::files()[kLegacyPath].assign(data, data + size);
-    }
-    Config::Init();
-    TEST_ASSERT_EQUAL_INT_MESSAGE(0, HostLfs::writeCount, "the 1.x file must be left untouched");
-    if (!parses) {
-      return false;
-    }
-    // Imported when what the hub runs with is what the file held (as this firmware decodes it)
-    return expected.ToJSON() == Snapshot().ToJSON();
   }
 
   void Reload()

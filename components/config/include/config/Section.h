@@ -76,7 +76,7 @@ namespace OpenShock::Config {
     virtual bool VerifyStored(const char* partition) const                                                = 0;  // whether NVS reads back as the cache
     virtual void ToJSON(json_gen_str_t* gen, bool withSensitiveData) const                                = 0;  // as the member `name`
     virtual bool Stage(const JSON::JsonView& json)                                                        = 0;  // parse into a staging copy
-    virtual bool CommitStaged(const char* partition, bool full)                                           = 0;  // save it (every key when full) and publish
+    virtual bool CommitStaged(const char* partition)                                                      = 0;  // save it and publish
     virtual void DiscardStaged()                                                                          = 0;
     virtual uint32_t ToFlatbuffers(flatbuffers::FlatBufferBuilder& builder, bool withSensitiveData) const = 0;  // the sub-table offset
 
@@ -211,12 +211,12 @@ namespace OpenShock::Config {
       return true;
     }
 
-    bool CommitStaged(const char* partition, bool full) override
+    bool CommitStaged(const char* partition) override
     {
       if (!m_staged) {
         return true;
       }
-      bool ok    = partition == nullptr || m_staged->SaveNvs(partition, full || m_unsynced ? nullptr : &m_value);
+      bool ok    = partition == nullptr || m_staged->SaveNvs(partition, m_unsynced ? nullptr : &m_value);
       m_unsynced = !ok;
       if (ok) {
         publish(std::move(*m_staged));

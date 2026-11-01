@@ -257,7 +257,7 @@ static void applyCommands(ManagerState& state, uint32_t commands)
 }
 
 // Runs the captive-portal state machine once. This does heavy work (starting the portal constructs
-// CaptivePortalInstance, which mounts LittleFS and spins up the HTTP/WS/DNS servers), so it runs on the dedicated
+// CaptivePortalInstance, which maps the www image and spins up the HTTP/WS/DNS servers), so it runs on the dedicated
 // manager task, never on the esp_timer task, whose 3.5KB stack would overflow.
 static void captiveportal_tick(ManagerState& state)
 {

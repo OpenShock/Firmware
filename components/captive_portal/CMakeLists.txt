@@ -20,7 +20,7 @@ idf_component_register(
   REQUIRES          config serialization                              # its config section (captiveportal/CaptivePortalConfig.h)
   PRIV_REQUIRES     core device_control                        # wifi/gateway/message handlers/AppHooks; Config::; CommandHandler/EStopManager
                     common chipset logging temporal osjson serialization   # foundation utilities, json, HubToLocalMessage fbs
-                    dns_server fs http hwutil rfc8908 www                # DNSServer, LfsPartition (1.x layout), ContentTypes, PartitionUtils, RFC8908Handler, the www image
+                    dns_server http rfc8908 www                # DNSServer, ContentTypes, RFC8908Handler, the www image
                     esp_http_server esp_netif esp_timer esp_wifi
 )
 

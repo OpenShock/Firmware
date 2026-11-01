@@ -21,7 +21,7 @@ menu "OpenShock defaults"
 
     config OPENSHOCK_FW_CDN_DOMAIN
         string "Firmware CDN domain"
-        default "firmware.openshock.org"
+        default "repo.openshock.dev"
         help
             Default CDN domain used for OTA firmware/version lookups. Overridable at runtime.
 

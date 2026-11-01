@@ -3,7 +3,7 @@
 // Shared helpers for the config host tests. The suite runs the config framework (components/config) together with
 // every module's section (device_control's rf and estop, core's wifi, backend and otaUpdate, captive_portal's
 // captivePortal, serial_console's serialInput), so it checks the store as the firmware assembles it: over ESP-IDF's
-// real NVS on the linux flash emulation, with the 1.x littlefs file faked by stubs/fs/LfsPartition.h.
+// real NVS on the linux flash emulation.
 #include "config/Nvs.h"
 #include "config/Store.h"
 #include "config/Wire.h"
@@ -16,17 +16,12 @@
 #include "serial_console/SerialInputConfig.h"
 #include "wifi/WiFiConfig.h"
 
-#include "fs/LfsPartition.h"
-
 #include <cstddef>
 #include <cstdint>
 #include <string>
 #include <vector>
 
 namespace ConfigTest {
-  // Path the store's 1.x import reads inside the 1.x config partition (the Arduino firmware's "/config").
-  constexpr const char* kLegacyPath = "/config";
-
   // The storage format the tests check against: the store's own names and each module's. Written out here on purpose,
   // so a renamed key or namespace (which would orphan what devices hold) fails a test.
   namespace Keys {
@@ -89,25 +84,17 @@ namespace ConfigTest {
   // Every field differs from the defaults.
   Full MakeSampleConfig();
 
-  // Serializes as the 1.x firmware stored it (each section's FlatBuffers form in a HubConfig): a 1.x config file.
+  // Each section's FlatBuffers form in a HubConfig: what rawconfig carries.
   std::vector<uint8_t> Serialize(const Full& config, bool withSensitiveData = true);
 
-  // Decodes a HubConfig the way the store imports one (HubConfig -> jsonconfig document -> each section's FromJSON).
+  // Decodes a HubConfig the way rawconfig set does (HubConfig -> jsonconfig document -> each section's FromJSON).
   bool Deserialize(const uint8_t* data, std::size_t size, Full& out);
 
-  // Erases the `cfg` and shared `nvs` partitions and the fake 1.x file: a hub with nothing stored.
+  // Erases the `cfg` and shared `nvs` partitions: a hub with nothing stored.
   void WipeStore();
 
   // WipeStore + Config::Init: a hub booting on the defaults, which Init writes to the store.
   void InitDefault();
-
-  // Boots as a 1.x hub would after installing this firmware: nothing in NVS, `data` as its config file
-  // (nullptr = no file). Returns whether Init imported the file (as opposed to falling back to defaults).
-  bool InitFromLegacy(const uint8_t* data, std::size_t size);
-  inline bool InitFromLegacy(const std::vector<uint8_t>& data)
-  {
-    return InitFromLegacy(data.data(), data.size());
-  }
 
   // A reboot: Config::Init again on whatever the store holds.
   void Reload();

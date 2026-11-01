@@ -24,11 +24,10 @@ namespace OpenShock::Config {
   ///        verify or a section refuses its part.
   bool SetRaw(const uint8_t* buffer, std::size_t size);
 
-  /// @brief The jsonconfig document a HubConfig buffer stands for: what SetRaw applies and how the 1.x config file
-  ///        (the same HubConfig, written by the Arduino firmware) is imported. Nullopt when the buffer does not verify.
+  /// @brief The jsonconfig document a HubConfig buffer stands for: what SetRaw applies. Nullopt when the buffer does
+  ///        not verify.
   [[nodiscard]] std::optional<std::string> HubConfigToJSON(std::span<const uint8_t> buffer);
 
-  /// @brief The largest HubConfig accepted: what the 1.x config partition could hold, which is also far more than
-  ///        any real config renders to.
+  /// @brief The largest HubConfig accepted, far more than any real config renders to.
   inline constexpr std::size_t kMaxHubConfigSize = 4096;
 }  // namespace OpenShock::Config

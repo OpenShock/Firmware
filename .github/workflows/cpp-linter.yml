@@ -42,7 +42,7 @@ jobs:
           version: 21
           tidy-checks: '-*' # clang-tidy rejects the gcc-only flags of the ESP-IDF compile DB, CodeQL covers static analysis
           files-changed-only: false # GitHub returns 406 for very large PR diffs
-          ignore: '.github|build|managed_components|components/littlefs|components/flatbuffers|components/serialization/include/serialization/_fbs'
+          ignore: '.github|build|managed_components|components/flatbuffers|components/serialization/include/serialization/_fbs'
           thread-comments: ${{ github.event_name == 'pull_request' && 'update' || 'false' }} # Commit comments on push need contents:write
 
       # Advisory on beta and master (pushes and PRs targeting them): findings are still reported, but they don't fail the job

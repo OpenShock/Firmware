@@ -7,7 +7,6 @@ const char* const TAG = "PartitionUtils";
 #include "Logging.h"
 
 #include "Temporal.h"
-#include "util/HexUtils.h"
 
 #include <algorithm>
 #include <cstring>
@@ -15,26 +14,6 @@ const char* const TAG = "PartitionUtils";
 // Erased ahead of the data in steps of this much. Erasing the whole partition up front kept the flash cache off for
 // seconds, starving the idle tasks into the task watchdog; one step of this size takes well under a second.
 static constexpr std::size_t kEraseStep = 64 * 1024;
-
-const esp_partition_t* OpenShock::FindStaticPartition()
-{
-  return esp_partition_find_first(ESP_PARTITION_TYPE_DATA, ESP_PARTITION_SUBTYPE_DATA_SPIFFS, "static0");
-}
-
-bool OpenShock::TryGetPartitionHash(const esp_partition_t* partition, char (&hash)[65])
-{
-  uint8_t buffer[32];
-  esp_err_t err = esp_partition_get_sha256(partition, buffer);
-  if (err != ESP_OK) {
-    OS_LOGE(TAG, "Failed to get partition hash: %s", esp_err_to_name(err));
-    return false;
-  }
-
-  // Copy the hash to the output buffer
-  HexUtils::ToHex<32>(buffer, hash, false);
-
-  return true;
-}
 
 bool OpenShock::FlashPartitionFromUrl(
   HTTP::Client& client,
