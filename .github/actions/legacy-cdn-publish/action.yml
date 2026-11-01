@@ -1,0 +1,117 @@
+# TEMPORARY: fielded 1.x hubs only update through the flat files on this CDN, so the firmware that migrates them has to
+# be published here too. Delete this action and ci-build's legacy-cdn job once the fleet is on the repository server.
+name: legacy-cdn-publish
+description: Upload a develop build to the 1.x firmware CDN and advance its develop channel pointer
+inputs:
+  hostname:
+    required: true
+    description: 'Bunny SFTP hostname'
+  username:
+    required: true
+    description: 'Bunny SFTP username'
+  password:
+    required: true
+    description: 'Bunny SFTP password; must not contain a comma (lftp -u splits on it)'
+  api-key:
+    required: true
+    description: 'Bunny API key, for the cache purge'
+  cdn-url:
+    required: true
+    description: 'Bunny pull zone base URL, no trailing slash'
+  version:
+    required: true
+    description: 'Firmware version'
+  boards:
+    required: true
+    description: 'Newline-separated boards to publish'
+
+runs:
+  using: composite
+  steps:
+    - name: Download firmware artifacts
+      uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333  # v8.0.2
+      with:
+        path: artifacts
+        pattern: firmware_*
+
+    # The layout 1.x OtaUpdateManager reads: /<version>/boards.txt and /<version>/<board>/{app,staticfs}.bin plus
+    # hashes.sha256.txt. Always the littlefs staticfs.bin whatever the version: the installing OTA code is 1.x, which
+    # flashes it over static0 and aborts unless it mounts.
+    - name: Assemble upload tree
+      shell: bash
+      env:
+        BOARDS: ${{ inputs.boards }}
+        VERSION: ${{ inputs.version }}
+      run: |
+        set -euo pipefail
+        while IFS= read -r board; do
+          [ -z "$board" ] && continue
+          build="artifacts/firmware_boards/$board"
+          dest="upload/$board"
+          mkdir -p "$dest"
+          cp "$build/app.bin" "$build/bootloader.bin" "$dest/"
+          cp "$build/partition-table.bin" "$dest/partitions.bin"
+          cp artifacts/firmware_staticfs/staticfs.bin "$dest/"
+          cp "artifacts/firmware_merged/OpenShock_${board}_${VERSION}.bin" "$dest/firmware.bin"
+          (
+            cd "$dest"
+            md5sum ./*.bin > hashes.md5.txt
+            sha256sum ./*.bin > hashes.sha256.txt
+          )
+        done <<< "$BOARDS"
+        printf '%s\n' "$BOARDS" > upload/boards.txt
+
+    - name: Install lftp
+      shell: bash
+      run: |
+        sudo apt-get update -qq
+        sudo apt-get install -y -qq lftp
+
+    - name: Upload and advance the develop pointer
+      id: upload
+      shell: bash
+      env:
+        SFTP_HOST: ${{ inputs.hostname }}
+        SFTP_USER: ${{ inputs.username }}
+        SFTP_PASS: ${{ inputs.password }}
+        VERSION: ${{ inputs.version }}
+      run: |
+        set -euo pipefail
+        sftp_run() {
+          lftp -u "$SFTP_USER,$SFTP_PASS" "sftp://$SFTP_HOST" \
+            -e "set sftp:auto-confirm yes; set cmd:fail-exit yes; $1; bye"
+        }
+
+        # Mirroring `.` from inside the tree, since `mirror -R upload <target>` would nest it under <target>/upload/
+        sftp_run "lcd upload; mirror -R --verbose --parallel=$(nproc) . /$VERSION/"
+
+        # The pointer is what starts the rollout, so a re-run of an older build must not move it backwards.
+        current=""
+        if sftp_run "get /version-develop.txt -o current.txt" >/dev/null 2>&1; then
+          current="$(tr -d ' \t\r\n' < current.txt)"
+        fi
+        case "$current" in
+          *-develop+*)
+            if git merge-base --is-ancestor "$GITHUB_SHA" "${current##*+}" 2>/dev/null; then
+              echo "version-develop.txt: keeping $current, which already contains this commit"
+              exit 0
+            fi
+            ;;
+        esac
+
+        printf '%s\n' "$VERSION" > version-develop.txt
+        sftp_run "put version-develop.txt -o /version-develop.txt"
+        echo "version-develop.txt: set to $VERSION (was ${current:-<none>})"
+        echo "advanced=true" >> "$GITHUB_OUTPUT"
+
+    - name: Purge the pointer from the CDN cache
+      if: ${{ steps.upload.outputs.advanced == 'true' }}
+      shell: bash
+      env:
+        BUNNY_API_KEY: ${{ inputs.api-key }}
+        BUNNY_CDN_URL: ${{ inputs.cdn-url }}
+      run: |
+        curl -fsSL --retry 3 --retry-delay 5 -X POST \
+          "https://api.bunny.net/purge?url=$BUNNY_CDN_URL/version-develop.txt&async=false" \
+          -H "Content-Type: application/json" \
+          -H "AccessKey: $BUNNY_API_KEY"

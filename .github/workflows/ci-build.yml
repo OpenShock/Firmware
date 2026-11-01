@@ -1,6 +1,6 @@
 # Compiles once per build variant (scripts/utils/boards.py) and stamps each board from it. Runs on:
 #   - release tags: every board, published to prod;
-#   - nightly on develop when firmware sources changed, published to prod;
+#   - nightly on develop when firmware sources changed, published to prod and (temporarily) the 1.x CDN;
 #   - pull requests: one canary board, or every board with the ci:full-build label;
 #   - dispatch: every board, on demand.
 # Per-commit checks are host-tests.yml, script-tests.yml, frontend-checks.yml and cpp-linter.yml.
@@ -298,6 +298,40 @@ jobs:
           version: ${{ needs.plan.outputs.version }}
           mode: publish
 
+  # TEMPORARY: 1.x hubs only update from the old CDN, so the nightly carries the migration firmware there as well.
+  # After repo-server: once a 2.x-numbered build is installed, its www migration fetches the image from that release.
+  # Nightly only: this starts a rollout to fielded hubs, which a manual dispatch on develop should not do by default.
+  legacy-cdn:
+    name: Legacy 1.x CDN (develop channel)
+    runs-on: ubuntu-latest
+    needs: [gate, plan, repo-server]
+    timeout-minutes: 20
+    if: ${{ github.event_name == 'schedule' && needs.gate.outputs.publish == 'true' }}
+    environment: cdn # Carries the Bunny credentials; its branch policy admits develop
+    permissions:
+      contents: read
+    # The group master and beta's cdn-bump holds: a tag cut from them still cascades into version-develop.txt.
+    concurrency:
+      group: cdn-version-bump
+      cancel-in-progress: false
+
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+        with:
+          fetch-depth: 0 # The pointer guard compares this commit with the one the channel is on
+          sparse-checkout: |
+            .github
+
+      - uses: ./.github/actions/legacy-cdn-publish
+        with:
+          hostname: ${{ vars.BUNNY_STOR_HOSTNAME }}
+          username: ${{ secrets.BUNNY_STOR_USERNAME }}
+          password: ${{ secrets.BUNNY_STOR_PASSWORD }}
+          api-key: ${{ secrets.BUNNY_APIKEY }}
+          cdn-url: ${{ vars.BUNNY_CDN_URL }}
+          version: ${{ needs.plan.outputs.version }}
+          boards: ${{ needs.plan.outputs.board-list }}
+
   # Hands the staged version back when the run fails, is cancelled or never publishes; the server's TTL is only a backstop.
   abort:
     name: Abort staged release
@@ -416,7 +450,7 @@ jobs:
   # because a skipped required check would count as passing.
   checkpoint-build:
     runs-on: ubuntu-slim
-    needs: [gate, plan, stage, staticfs, build, package, repo-server, release, announce]
+    needs: [gate, plan, stage, staticfs, build, package, repo-server, legacy-cdn, release, announce]
     if: ${{ always() }}
     timeout-minutes: 1
     steps:
